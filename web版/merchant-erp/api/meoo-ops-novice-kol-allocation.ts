@@ -70,6 +70,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       targetHeadcount?: number
       feeType?: 'tier' | 'fixed'
       platform?: string
+      industry?: string
     }
     try {
       body = JSON.parse(rawBody(req) || '{}') as typeof body
@@ -116,6 +117,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       targetHeadcount,
       feeType,
       platform,
+      industry: String(body.industry ?? '').trim(),
     })
 
     const { pricingContext, ...publicAllocation } = allocation

@@ -1,0 +1,210 @@
+<wxs module="utils">
+var includes = function (arr, id) {
+  if (!arr || !arr.length) return false
+  for (var i = 0; i < arr.length; i++) {
+    if (arr[i] === id) return true
+  }
+  return false
+}
+module.exports.includes = includes
+</wxs>
+
+<scroll-view scroll-y class="wizard-scroll" enhanced show-scrollbar="{{false}}">
+  <!-- 经营类型 → 选平台 → 确认（对齐 Web：团购组 / 外卖组）-->
+  <view wx:if="{{phase === 'channel' || phase === 'pick' || phase === 'confirm'}}" class="wizard-steps-v2">
+    <view class="wstep {{phase === 'pick' || phase === 'confirm' ? 'done' : phase === 'channel' ? 'on' : ''}}">
+      <text class="wstep-num">1</text><text class="wstep-txt">类型</text>
+    </view>
+    <view class="wstep-line"></view>
+    <view class="wstep {{phase === 'pick' ? 'on' : phase === 'confirm' || phase === 'douyin' || phase === 'generic' ? 'done' : ''}}">
+      <text class="wstep-num">2</text><text class="wstep-txt">选平台</text>
+    </view>
+    <view class="wstep-line"></view>
+    <view class="wstep {{phase === 'confirm' ? 'on' : ''}}">
+      <text class="wstep-num">3</text><text class="wstep-txt">确认</text>
+    </view>
+  </view>
+
+  <view wx:if="{{phase === 'douyin' || phase === 'generic'}}" class="wizard-steps-v2">
+    <view class="wstep done"><text class="wstep-num">1</text><text class="wstep-txt">选平台</text></view>
+    <view class="wstep-line"></view>
+    <view class="wstep {{phase === 'douyin' && douyinStep === 1 ? 'on' : phase === 'douyin' && douyinStep > 1 ? 'done' : phase === 'generic' ? 'on' : ''}}">
+      <text class="wstep-num">2</text><text class="wstep-txt">类目</text>
+    </view>
+    <view class="wstep-line"></view>
+    <view class="wstep {{phase === 'douyin' && douyinStep >= 3 ? 'on' : ''}}">
+      <text class="wstep-num">3</text><text class="wstep-txt">提交</text>
+    </view>
+  </view>
+
+  <view wx:if="{{err}}" class="wizard-err">{{err}}</view>
+
+  <!-- 0. 经营类型 -->
+  <view wx:if="{{phase === 'channel'}}" class="wizard-card">
+    <text class="wizard-title">选择经营类型</text>
+    <view class="channel-grid">
+      <view class="channel-card" bindtap="onPickChannel" data-kind="groupbuy" hover-class="channel-card-hover">
+        <text class="channel-title">团购平台</text>
+        <text class="channel-lines">抖音来客、美团团购、小红书、快手团购、京东本地生活</text>
+      </view>
+      <view class="channel-card" bindtap="onPickChannel" data-kind="waimai" hover-class="channel-card-hover">
+        <text class="channel-title">外卖平台</text>
+        <text class="channel-lines">淘宝闪购、美团外卖、京东外卖</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- Phase: pick（对齐图2：Logo + 描述 + 单选圆点）-->
+  <view wx:if="{{phase === 'pick'}}" class="wizard-card wizard-card-pick">
+    <text class="wizard-title">请选择商品要发布的平台</text>
+    <view class="plat-list-v2">
+      <view
+        wx:for="{{platformRows}}"
+        wx:key="id"
+        class="plat-card-v2 {{selectedPlatformId === item.id ? 'on' : ''}} {{item.selectable ? '' : 'off'}}"
+        data-id="{{item.id}}"
+        bindtap="onPickPlatform"
+      >
+        <image wx:if="{{item.logo}}" class="plat-card-logo" src="{{item.logo}}" mode="aspectFit" />
+        <view wx:else class="plat-card-logo plat-card-logo-ph">{{item.letter}}</view>
+        <view class="plat-card-body">
+          <text class="plat-card-name">{{item.name}}</text>
+          <text class="plat-card-desc">{{item.desc}}</text>
+        </view>
+        <view wx:if="{{item.selectable}}" class="plat-radio {{selectedPlatformId === item.id ? 'on' : ''}}">
+          <text wx:if="{{selectedPlatformId === item.id}}" class="plat-radio-tick">✓</text>
+        </view>
+        <text wx:else class="plat-forbid">未绑定</text>
+      </view>
+    </view>
+    <button class="wizard-btn-quiet" bindtap="onPrev">返回选择类型</button>
+  </view>
+
+  <!-- Phase: confirm -->
+  <view wx:if="{{phase === 'confirm'}}" class="wizard-card">
+    <text class="wizard-title">确认平台</text>
+    <text class="wizard-desc">即将为以下平台上品：</text>
+    <view class="confirm-box">
+      <text class="confirm-name">{{confirmLine}}</text>
+      <text class="confirm-tip">将进入与电脑端相同的后续步骤。</text>
+    </view>
+    <view class="wizard-actions wizard-actions-split">
+      <button class="wizard-btn-muted" bindtap="onPrev">上一步</button>
+      <button class="wizard-btn-next wizard-btn-inline" bindtap="onConfirmPlatforms">确认并继续</button>
+    </view>
+  </view>
+
+  <!-- Phase: generic draft（美团/小红书等）-->
+  <view wx:if="{{phase === 'generic'}}" class="wizard-card">
+    <text class="wizard-title">填写商品资料</text>
+    <text class="wizard-desc">与 Web「上品页面设置」同源，由网关提交至{{confirmLine}}。</text>
+    <text class="meoo-label">商品名称</text>
+    <input class="meoo-input" value="{{genericTitle}}" data-k="genericTitle" bindinput="onField" placeholder="与平台上架展示名称一致" />
+    <text class="meoo-label">售价（元）</text>
+    <input class="meoo-input" type="digit" value="{{genericPriceYuan}}" data-k="genericPriceYuan" bindinput="onField" />
+    <text class="meoo-label">商品说明（选填）</text>
+    <textarea class="meoo-input area" value="{{genericDesc}}" data-k="genericDesc" bindinput="onField" maxlength="2000" />
+    <view wx:if="{{genericTip}}" class="action-msg ok">{{genericTip}}</view>
+    <view class="wizard-actions">
+      <button class="meoo-btn-ghost" bindtap="onPrev">上一步</button>
+      <button class="meoo-btn-primary" bindtap="onSaveGenericDraft" loading="{{genericSaving}}">提交草稿</button>
+    </view>
+  </view>
+
+  <!-- Douyin: category -->
+  <view wx:if="{{phase === 'douyin' && douyinStep === 1}}" class="wizard-card">
+    <text class="wizard-title">选择商品类目</text>
+    <text class="wizard-desc">须选至末级类目，数据与电脑端抖音 wizard 同源。</text>
+    <view wx:if="{{catLoading}}" class="wizard-loading">加载类目中…</view>
+    <block wx:else>
+      <text class="meoo-label">一级类目</text>
+      <picker mode="selector" range="{{cat1Labels}}" value="{{cat1Index}}" bindchange="onCat1Change">
+        <view class="picker-box">{{cat1Labels[cat1Index] || '请选择'}}</view>
+      </picker>
+      <text class="meoo-label">二级类目</text>
+      <picker mode="selector" range="{{cat2Labels}}" value="{{cat2Index}}" bindchange="onCat2Change">
+        <view class="picker-box">{{cat2Labels[cat2Index] || '请选择'}}</view>
+      </picker>
+      <text class="meoo-label">末级类目</text>
+      <picker mode="selector" range="{{cat3Labels}}" value="{{cat3Index}}" bindchange="onCat3Change">
+        <view class="picker-box">{{cat3Labels[cat3Index] || '请选择'}}</view>
+      </picker>
+    </block>
+    <view class="wizard-actions">
+      <button class="meoo-btn-ghost" bindtap="onPrev">上一步</button>
+      <button class="meoo-btn-primary" bindtap="onNextFromCategory">下一步</button>
+    </view>
+  </view>
+
+  <!-- Douyin: type -->
+  <view wx:if="{{phase === 'douyin' && douyinStep === 2}}" class="wizard-card">
+    <text class="wizard-title">选择商品类型</text>
+    <text class="wizard-desc">类目：{{categoryPath}}</text>
+    <view wx:if="{{typesLoading}}" class="wizard-loading">加载类型…</view>
+    <radio-group wx:else name="pt" bindchange="onTypeChange">
+      <label wx:for="{{productTypes}}" wx:key="product_type" class="type-row">
+        <radio value="{{item.product_type}}" checked="{{productType === item.product_type}}" />
+        <text>{{item.label}}</text>
+      </label>
+    </radio-group>
+    <view class="wizard-actions">
+      <button class="meoo-btn-ghost" bindtap="onPrev">上一步</button>
+      <button class="meoo-btn-primary" bindtap="onNextFromType">下一步</button>
+    </view>
+  </view>
+
+  <!-- Douyin: detail（字段对齐 Web buildPayload 默认项，UI 适配小程序）-->
+  <view wx:if="{{phase === 'douyin' && douyinStep === 3}}" class="wizard-card">
+    <text class="wizard-title">商品信息</text>
+    <text class="meoo-label">商品名称</text>
+    <input class="meoo-input" value="{{productName}}" data-k="productName" bindinput="onField" placeholder="如：双人火锅套餐" />
+    <text class="meoo-label">售价（元）</text>
+    <input class="meoo-input" type="digit" value="{{priceYuan}}" data-k="priceYuan" bindinput="onField" />
+    <text class="meoo-label">原价（元，可选）</text>
+    <input class="meoo-input" type="digit" value="{{originYuan}}" data-k="originYuan" bindinput="onField" />
+    <text class="meoo-label">商品说明</text>
+    <textarea class="meoo-input area" value="{{productDesc}}" data-k="productDesc" bindinput="onField" maxlength="2000" placeholder="卖点、使用规则等（与 Web 富文本说明同源字段）" />
+    <text class="meoo-label">头图（必传）</text>
+    <view class="img-row">
+      <image wx:if="{{headUrl}}" class="thumb" src="{{headUrl}}" mode="aspectFill" />
+      <button class="meoo-btn-ghost mini" bindtap="onPickHead" loading="{{headUploading}}">
+        {{headUrl ? '更换头图' : '上传头图'}}
+      </button>
+    </view>
+    <text class="meoo-label">附加图（选填，最多 3 张）</text>
+    <view class="aux-row">
+      <view wx:for="{{auxThumbSlots}}" wx:key="index" class="aux-cell">
+        <image wx:if="{{item.url}}" class="aux-thumb" src="{{item.url}}" mode="aspectFill" />
+        <button wx:else class="aux-add" size="mini" data-slot="{{index}}" bindtap="onPickAux" disabled="{{uploading}}">+</button>
+        <text wx:if="{{item.url}}" class="aux-clear" data-slot="{{index}}" bindtap="onClearAux">清除</text>
+      </view>
+    </view>
+    <text class="meoo-label">核销有效天数</text>
+    <picker mode="selector" range="{{consumeValidDaysOptions}}" value="{{consumeValidDaysIndex}}" bindchange="onConsumeDaysChange">
+      <view class="picker-box">{{consumeValidDaysOptions[consumeValidDaysIndex]}} 天</view>
+    </picker>
+    <text class="meoo-label">售后政策</text>
+    <picker mode="selector" range="{{afterSaleLabels}}" value="{{afterSaleIndex}}" bindchange="onAfterSaleChange">
+      <view class="picker-box">{{afterSaleLabels[afterSaleIndex]}}</view>
+    </picker>
+    <text class="meoo-label">适用门店（至少 1 家）</text>
+    <checkbox-group bindchange="onPoiChange">
+      <label wx:for="{{stores}}" wx:key="id" class="poi-row">
+        <checkbox value="{{item.id}}" checked="{{item.checked}}" />
+        <text>{{item.name}}</text>
+      </label>
+    </checkbox-group>
+    <view wx:if="{{!stores.length && !storesLoading}}" class="meoo-hint">未加载到门店，请确认抖音授权与 POI 认领。</view>
+    <view wx:if="{{actionMsg}}" class="action-msg {{actionOk ? 'ok' : 'bad'}}">{{actionMsg}}</view>
+    <view class="wizard-actions">
+      <button class="meoo-btn-ghost" bindtap="onPrev">上一步</button>
+      <button class="meoo-btn-ghost" bindtap="onSaveDraft" loading="{{saving}}">存草稿</button>
+      <button class="meoo-btn-primary" bindtap="onSubmit" loading="{{saving}}">提交审核</button>
+    </view>
+  </view>
+
+  <view class="wizard-footer-space"></view>
+</scroll-view>
+<view wx:if="{{phase === 'pick'}}" class="wizard-footer-fixed">
+  <button class="wizard-btn-next wizard-btn-block" bindtap="onNextPick">{{nextPickLabel}}</button>
+</view>

@@ -1,0 +1,47 @@
+<scroll-view scroll-y class="dash-page-v2" enhanced show-scrollbar="{{false}}">
+  <view class="dash-head">
+    <view class="dash-head-icon">
+      <image class="dash-hero-ic" src="{{heroIconSrc}}" mode="aspectFit" />
+    </view>
+    <view>
+      <text class="dash-title">经营概览</text>
+      <text class="dash-sub">商家ERP助手</text>
+    </view>
+  </view>
+
+  <view class="dash-range-row">
+    <text
+      wx:for="{{rangeTabs}}"
+      wx:key="id"
+      class="dash-range {{range === item.id ? 'on' : ''}}"
+      data-id="{{item.id}}"
+      bindtap="onRangeTap"
+    >{{item.label}}</text>
+  </view>
+
+  <view class="dash-kpi-grid">
+    <view wx:for="{{kpis}}" wx:key="label" class="dash-kpi-card">
+      <view class="dash-kpi-top">
+        <text class="dash-kpi-label">{{item.label}}</text>
+        <view class="dash-kpi-ibox">
+          <image class="dash-kpi-ic" src="{{item.iconSrc}}" mode="aspectFit" />
+        </view>
+      </view>
+      <text class="dash-kpi-value">{{item.value}}</text>
+      <text wx:if="{{item.delta}}" class="dash-kpi-delta {{item.deltaUp ? 'up' : ''}}">{{item.delta}} ▲</text>
+    </view>
+  </view>
+
+  <view class="dash-chart-card">
+    <view class="dash-chart-head">
+      <text class="dash-chart-title">趋势分析</text>
+      <text class="dash-chart-more">查看更多 ›</text>
+    </view>
+    <view class="dash-chart-ph">
+      <text wx:if="{{chartEmpty}}">暂无数据</text>
+      <text wx:else>趋势图</text>
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="dash-loading">加载中…</view>
+</scroll-view>

@@ -1,0 +1,90 @@
+<view class="ai-page">
+  <view class="ai-head-block">
+    <text class="ai-h1">AI 文章与话题</text>
+    <text class="ai-intro">选择平台上下文与品牌或门店口径，对齐电脑端 AI 文案链路。</text>
+    <view class="ai-two-tabs">
+      <view class="ai-tab {{mainTab === 'article' ? 'on' : ''}}" data-t="article" bindtap="switchMain">AI 文章生成</view>
+      <view class="ai-tab {{mainTab === 'topic' ? 'on' : ''}}" data-t="topic" bindtap="switchMain">AI 话题推荐</view>
+    </view>
+  </view>
+
+  <view class="ai-card">
+    <text class="ai-label">平台</text>
+    <picker mode="selector" range="{{platformOptions}}" range-key="label" value="{{platformIdx}}" bindchange="onPlatformChange">
+      <view class="ai-picker">{{platformOptions[platformIdx].label}}</view>
+    </picker>
+    <text wx:if="{{platformWarn}}" class="ai-warn">{{platformWarn}}</text>
+
+    <text class="ai-label spaced">品牌 / 门店</text>
+    <view class="ai-scope-row">
+      <view class="ai-pill {{scopeMode === 'brand' ? 'on' : ''}}" data-mode="brand" bindtap="toggleScope">品牌</view>
+      <view class="ai-pill {{scopeMode === 'store' ? 'on' : ''}}" data-mode="store" bindtap="toggleScope">门店</view>
+    </view>
+
+    <block wx:if="{{scopeMode === 'brand'}}">
+      <text class="ai-hint">品牌名称 · 可与来客「门店品牌」对齐</text>
+      <input
+        class="ai-input"
+        placeholder="例如：某某餐饮"
+        value="{{brandName}}"
+        bindinput="onBrand"
+      />
+    </block>
+    <block wx:else>
+      <button class="ai-chip-btn" bindtap="openStorePick">选择门店 · {{selSummary}}</button>
+      <text class="ai-hint">来客门店可多选（最多12家）</text>
+    </block>
+
+    <text class="ai-label spaced">文案 AI 模型</text>
+    <text class="ai-hint">{{modelUi}}</text>
+  </view>
+
+  <block wx:if="{{mainTab === 'article'}}">
+    <view class="ai-card flat">
+      <text class="ai-label">写作要点与活动信息 *</text>
+      <textarea class="ai-area-article" maxlength="2000" value="{{articleBrief}}" bindinput="onArticleBrief" placeholder="活动主题、卖点、套餐、适用人群…" />
+      <button class="ai-gen-main" loading="{{articleBusy}}" bindtap="submitArticle">生成文章</button>
+      <text wx:if="{{articleErr}}" class="ai-err">{{articleErr}}</text>
+      <view wx:if="{{articleOut}}" class="ai-out">{{articleOut}}</view>
+      <button wx:if="{{articleOut}}" class="ai-copy" bindtap="copyArticle">复制正文</button>
+    </view>
+  </block>
+
+  <block wx:if="{{mainTab === 'topic'}}">
+    <view class="ai-card flat">
+      <text class="ai-label">账号定位 · 选题背景 *</text>
+      <textarea class="ai-area-topic" maxlength="1500" value="{{topicFocus}}" bindinput="onTopicFocus" placeholder="人群画像、主推品类、竞品参考…" />
+      <button class="ai-gen-main ai-gen-muted" loading="{{topicBusy}}" bindtap="submitTopic">生成话题</button>
+      <text wx:if="{{topicErr}}" class="ai-err">{{topicErr}}</text>
+      <view wx:if="{{topicOut}}" class="ai-out">{{topicOut}}</view>
+      <button wx:if="{{topicOut}}" class="ai-copy" bindtap="copyTopic">复制结果</button>
+    </view>
+  </block>
+
+  <view class="ai-bottom-sp"></view>
+</view>
+
+<view wx:if="{{storeSheet}}" class="sheet-mask" catchtouchmove="noop" bindtap="closeStorePick">
+  <view class="sheet-panel" catchtap="noop">
+    <view class="sheet-head">
+      <text class="sheet-title">来客门店 · 点多选切换</text>
+      <text class="sheet-close" bindtap="closeStorePick">完成</text>
+    </view>
+    <scroll-view scroll-y class="sheet-scroll">
+      <view
+        wx:for="{{storeRows}}"
+        wx:key="id"
+        class="sheet-row"
+        bindtap="onToggleStore"
+        data-id="{{item.id}}"
+        data-name="{{item.name}}"
+      >
+        <view class="sheet-dot {{item._pick ? 'on' : ''}}"></view>
+        <view class="sheet-cell">
+          <text class="sheet-name">{{item.name}}</text>
+          <text wx:if="{{item.address}}" class="sheet-addr">{{item.address}}</text>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+</view>

@@ -1,0 +1,87 @@
+<scroll-view scroll-y class="sub-page" enhanced show-scrollbar="{{false}}">
+  <view class="sub-hero">
+    <text class="sub-hero-deco">👑</text>
+  </view>
+
+  <view class="sub-status-card">
+    <view class="sub-status-left">
+      <view class="sub-crown">👑</view>
+      <view>
+        <text class="sub-status-lab">当前套餐</text>
+        <text class="sub-status-plan">{{displayPlanLabel}}</text>
+        <text class="sub-status-expire">{{expireText || '—'}} 到期</text>
+      </view>
+    </view>
+    <button class="sub-upgrade-btn" bindtap="onOpenSubscribe">升级续费</button>
+  </view>
+
+  <view class="sub-tier-tabs">
+    <view
+      wx:for="{{tiers}}"
+      wx:key="id"
+      class="sub-tier-tab {{activeTierId === item.id ? 'on' : ''}}"
+      data-id="{{item.id}}"
+      bindtap="onPickDisplayTier"
+    >
+      <text wx:if="{{item.id === 'pro'}}" class="sub-tier-crown">👑</text>
+      <text>{{item.label}}</text>
+    </view>
+  </view>
+
+  <view class="sub-table-card">
+    <view class="sub-table-head">
+      <text class="sub-th feature">功能</text>
+      <text class="sub-th {{activeTierId === 'basic' ? 'highlight' : ''}}">基础版</text>
+      <text class="sub-th {{activeTierId === 'pro' ? 'highlight' : ''}}">
+        专业版
+        <text wx:if="{{currentTierId === 'pro'}}" class="sub-current-badge">当前套餐</text>
+      </text>
+      <text class="sub-th {{activeTierId === 'flagship' ? 'highlight' : ''}}">旗舰版</text>
+    </view>
+    <view wx:for="{{featureTable}}" wx:key="key" class="sub-table-row">
+      <view class="sub-td feature">
+        <text class="sub-row-ico">{{item.icon}}</text>
+        <text>{{item.label}}</text>
+      </view>
+      <text class="sub-td {{item.cells[0].highlight ? 'highlight' : ''}} {{item.cells[0].check ? 'check' : ''}}">{{item.cells[0].text}}</text>
+      <text class="sub-td {{item.cells[1].highlight ? 'highlight' : ''}} {{item.cells[1].check ? 'check' : ''}}">{{item.cells[1].text}}</text>
+      <text class="sub-td {{item.cells[2].highlight ? 'highlight' : ''}} {{item.cells[2].check ? 'check' : ''}}">{{item.cells[2].text}}</text>
+    </view>
+  </view>
+
+  <view wx:if="{{expireWarn}}" class="sub-warn">{{expireWarn}}</view>
+
+  <view class="sub-footer">
+    <text class="sub-footer-ico">🛡</text>
+    <text>所有套餐均享受 7 天无理由退款保障</text>
+    <text class="sub-footer-info">ⓘ</text>
+  </view>
+
+  <view wx:if="{{loading}}" class="sub-state">加载中…</view>
+  <view wx:if="{{payErr}}" class="sub-state sub-err">{{payErr}}</view>
+  <view class="sub-bottom-space"></view>
+</scroll-view>
+
+<view wx:if="{{paySheetOpen}}" class="sub-mask" catchtouchmove="true">
+  <view class="sub-sheet" catchtap="noop">
+    <text class="sub-sheet-title">选择套餐与支付</text>
+    <view class="sub-pay-tiers">
+      <view
+        wx:for="{{subscriptionTiers}}"
+        wx:key="label"
+        class="sub-pay-tier {{tierIndex === index ? 'on' : ''}}"
+        data-index="{{index}}"
+        bindtap="onPickTier"
+      >{{item.label}} · ¥{{item.yuan}}</view>
+    </view>
+    <view class="sub-pay-channels">
+      <button class="sub-pay-ch {{channel === 'wechat' ? 'on' : ''}}" data-ch="wechat" bindtap="onPickChannel">微信支付</button>
+      <button class="sub-pay-ch {{channel === 'alipay' ? 'on' : ''}}" data-ch="alipay" bindtap="onPickChannel">支付宝</button>
+    </view>
+    <text wx:if="{{payErr}}" class="sub-sheet-err">{{payErr}}</text>
+    <view class="sub-sheet-actions">
+      <button class="sub-btn-ghost" bindtap="onCloseSubscribe">取消</button>
+      <button class="sub-btn-primary" loading="{{payBusy}}" bindtap="onSubmitPay">提交支付申报</button>
+    </view>
+  </view>
+</view>

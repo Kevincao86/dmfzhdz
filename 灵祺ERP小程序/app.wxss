@@ -1,0 +1,25 @@
+@import './styles/mockup-base.wxss';
+@import './styles/mp-legacy.wxss';
+
+page {
+  background: #f3f6fb;
+  color: #1e293b;
+  font-size: 28rpx;
+  --tab-bar-pad: calc(84rpx + env(safe-area-inset-bottom));
+}
+
+.page-pad-v2 {
+  padding: 0 28rpx 16rpx;
+  box-sizing: border-box;
+  min-height: 100vh;
+}
+
+.page-func-v2 {
+  padding: 0 28rpx 16rpx;
+  box-sizing: border-box;
+  min-height: 100vh;
+}
+
+.hint-v2.err {
+  color: #dc2626;
+}

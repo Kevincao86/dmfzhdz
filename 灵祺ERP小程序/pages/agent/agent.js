@@ -2,6 +2,8 @@ const api = require('../../utils/api.js')
 const aiAgent = require('../../utils/aiAgentMp.js')
 const execMp = require('../../utils/aiAgentExecutionMp.js')
 const previewMp = require('../../utils/aiAgentPreviewMp.js')
+const confirmMp = require('../../utils/aiAgentConfirmMp.js')
+const erpNav = require('../../utils/erpNavMp.js')
 const registry = require('../../utils/aiModelRegistryMp.js')
 const composerMp = require('../../utils/agentComposerMp.js')
 
@@ -13,6 +15,28 @@ const FILTER_TABS = [
 
 const AGENT_WELCOME =
   '你好！我是灵祺 AI 智能体，我可以帮你快速创建各类产品文案和招聘需求文案（Brief）。请告诉我你的需求吧~'
+
+function hasUserChat(messages) {
+  return (messages || []).some((m) => m.role === 'user')
+}
+
+function patchPreviewConfirmed(messages, id) {
+  return (messages || []).map((m) =>
+    m.id === id ? Object.assign({}, m, { previewStatus: 'confirmed' }) : m,
+  )
+}
+
+function appendTaskResult(messages, content, extra) {
+  const msg = Object.assign(
+    {
+      id: `tr-${Date.now()}`,
+      role: 'task_result',
+      content: String(content || '').trim() || '任务已完成。',
+    },
+    extra || {},
+  )
+  return (messages || []).concat([msg])
+}
 
 function buildAgentUserLine(text, attachments) {
   const parts = []
@@ -55,6 +79,10 @@ Page({
     inputFocused: false,
     showPlusPanel: false,
     plusActions: composerMp.PLUS_ACTIONS,
+    shortcuts: aiAgent.AI_AGENT_SHORTCUTS,
+    shortcutsOpen: false,
+    hasChat: false,
+    confirmingPreviewId: '',
   },
 
   onLoad() {
@@ -84,7 +112,7 @@ Page({
             },
           ]
 
-    this.setData({ messages, modelPickerKey: registry.loadPickerKey() })
+    this.setData({ messages, modelPickerKey: registry.loadPickerKey(), hasChat: hasUserChat(messages) })
     this.syncModelPickers()
   },
 
@@ -96,13 +124,18 @@ Page({
       const tabBarPx = Math.round((84 * sys.windowWidth) / 750) + (sys.safeAreaInsets?.bottom || 0)
       const dockPx = Math.round((108 * sys.windowWidth) / 750)
       const plusPx = this.data.showPlusPanel ? Math.round((200 * sys.windowWidth) / 750) : 0
+      const shortcutPx = !this.data.hasChat
+        ? this.data.shortcutsOpen
+          ? Math.round((180 * sys.windowWidth) / 750)
+          : Math.round((72 * sys.windowWidth) / 750)
+        : 0
       const attachPx = this.data.attachments.length
         ? Math.round((88 * sys.windowWidth) / 750)
         : 0
       this.setData({
         statusBarH,
         headerH,
-        scrollBottomPad: headerH + dockPx + attachPx + plusPx + tabBarPx + 16,
+        scrollBottomPad: headerH + dockPx + attachPx + plusPx + shortcutPx + tabBarPx + 16,
       })
     } catch (_) {}
   },
@@ -334,8 +367,35 @@ Page({
       attachmentFull: false,
       modelMenuOpen: false,
       showPlusPanel: false,
+      hasChat: false,
+      shortcutsOpen: false,
+      confirmingPreviewId: '',
     })
     this.recalcLayout()
+  },
+
+  onToggleShortcuts() {
+    if (this.data.busy) return
+    this.setData({ shortcutsOpen: !this.data.shortcutsOpen, showPlusPanel: false, modelMenuOpen: false })
+    this.recalcLayout()
+  },
+
+  onApplyShortcut(e) {
+    const type = e.currentTarget.dataset.type
+    const label = e.currentTarget.dataset.label
+    if (!type || !label || this.data.busy) return
+    this.setData({ shortcutsOpen: false })
+    void this.sendTurn(`使用快捷任务：${label}`)
+  },
+
+  onOpenTaskResultNav(e) {
+    const url = e.currentTarget.dataset.url
+    if (!url) return
+    if (url.includes('/pages/functions/') || url.includes('/pages/agent/') || url.includes('/pages/mine/')) {
+      wx.switchTab({ url })
+      return
+    }
+    wx.navigateTo({ url })
   },
 
   onSend() {
@@ -449,6 +509,7 @@ Page({
       this.setData({
         messages,
         scrollTo: last ? `msg-${last.id}` : '',
+        hasChat: hasUserChat(messages),
       })
     } catch (e) {
       const errMsg = {
@@ -468,52 +529,139 @@ Page({
   onConfirmPreview(e) {
     const id = e.currentTarget.dataset.id
     const taskType = e.currentTarget.dataset.task
-    let messages = (this.data.messages || []).map((m) =>
-      m.id === id ? Object.assign({}, m, { previewStatus: 'confirmed' }) : m,
-    )
-    this._executionState = execMp.syncStageAfterPreviewChange(this._executionState || execMp.createAgentExecutionState(), messages)
-    this.setData({ messages })
-    aiAgent.saveThread(messages)
+    const previewMsg = (this.data.messages || []).find((m) => m.id === id)
+    if (!previewMsg || previewMsg.previewStatus === 'confirmed' || this.data.confirmingPreviewId) return
+
+    const title =
+      (previewMsg.preview && (previewMsg.preview.title || previewMsg.preview.productPlans?.[0]?.slotLabel)) ||
+      '任务'
+    const lastUser = [...(this.data.messages || [])].reverse().find((m) => m.role === 'user')
+    const userBrief = String((lastUser && lastUser.content) || '')
+      .replace(/\[引用[\s\S]*?\n\n/, '')
+      .trim()
 
     if (taskType === 'create_product') {
-      const plan = this._executionState && this._executionState.plan
-      if (
-        plan &&
-        plan.taskTypes.includes('recruit_influencer') &&
-        !execMp.hasPendingPreviewForTask(messages, 'recruit_influencer') &&
-        !execMp.hasConfirmedPreviewForTask(messages, 'recruit_influencer')
-      ) {
-        wx.showLoading({ title: '生成招募预览…', mask: true })
-        void previewMp
-          .spawnRecruitPreviewAfterProductConfirm(plan)
-          .then((recruitMsgs) => {
-            wx.hideLoading()
-            if (!recruitMsgs.length) return
-            const intro = {
-              id: `a-${Date.now()}-recruit-intro`,
-              role: 'assistant',
-              content:
-                '商品方案已确认。接下来是达人招募 Brief 预览，请核对三版文案后在本卡片确认。',
-            }
-            messages = messages.concat([intro]).concat(recruitMsgs)
-            this._executionState = execMp.syncStageAfterPreviewChange(this._executionState, messages)
-            this.setData({ messages, scrollTo: `msg-${recruitMsgs[recruitMsgs.length - 1].id}` })
-            aiAgent.saveThread(messages)
+      let messages = patchPreviewConfirmed(this.data.messages, id)
+      this._executionState = execMp.syncStageAfterPreviewChange(
+        this._executionState || execMp.createAgentExecutionState(),
+        messages,
+      )
+      this.setData({ messages, confirmingPreviewId: id })
+      aiAgent.saveThread(messages)
+      wx.showLoading({ title: '保存草稿…', mask: true })
+      void confirmMp
+        .confirmPreviewMessage(previewMsg, { userBrief })
+        .then((result) => {
+          wx.hideLoading()
+          const ok = Boolean(result.ok)
+          const partial = ok && Number(result.failCount) > 0
+          const body = ok
+            ? `「${title}」已确认。${result.summary || result.message || '已保存至商品列表草稿箱。'}`
+            : `「${title}」${result.message || '保存草稿失败。'}`
+          messages = appendTaskResult(messages, body, {
+            resultSummary: ok ? (partial ? 'partial' : 'confirmed') : 'partial',
+            navUrl: result.navUrl,
           })
-          .catch(() => {
-            wx.hideLoading()
-            wx.showToast({ title: '招募预览生成失败', icon: 'none' })
+          const resultLast = messages[messages.length - 1]
+          this.setData({
+            messages,
+            confirmingPreviewId: '',
+            scrollTo: resultLast ? `msg-${resultLast.id}` : '',
           })
-      } else {
-        wx.showToast({ title: '商品方案已确认', icon: 'success' })
-      }
+          aiAgent.saveThread(messages)
+
+          const plan = this._executionState && this._executionState.plan
+          if (
+            ok &&
+            plan &&
+            plan.taskTypes &&
+            plan.taskTypes.includes('recruit_influencer') &&
+            !execMp.hasPendingPreviewForTask(messages, 'recruit_influencer') &&
+            !execMp.hasConfirmedPreviewForTask(messages, 'recruit_influencer')
+          ) {
+            wx.showLoading({ title: '生成招募预览…', mask: true })
+            void previewMp
+              .spawnRecruitPreviewAfterProductConfirm(plan)
+              .then((recruitMsgs) => {
+                wx.hideLoading()
+                if (!recruitMsgs.length) return
+                const intro = {
+                  id: `a-${Date.now()}-recruit-intro`,
+                  role: 'assistant',
+                  content:
+                    '商品方案已确认。接下来是达人招募 Brief 预览，请核对三版文案后在本卡片确认。',
+                }
+                messages = messages.concat([intro]).concat(recruitMsgs)
+                this._executionState = execMp.syncStageAfterPreviewChange(this._executionState, messages)
+                this.setData({
+                  messages,
+                  scrollTo: `msg-${recruitMsgs[recruitMsgs.length - 1].id}`,
+                })
+                aiAgent.saveThread(messages)
+              })
+              .catch(() => {
+                wx.hideLoading()
+                wx.showToast({ title: '招募预览生成失败', icon: 'none' })
+              })
+          }
+        })
+        .catch((err) => {
+          wx.hideLoading()
+          messages = appendTaskResult(
+            this.data.messages,
+            `「${title}」保存失败：${String((err && err.message) || err || '未知错误').slice(0, 120)}`,
+            { resultSummary: 'partial' },
+          )
+          this.setData({ messages, confirmingPreviewId: '' })
+          aiAgent.saveThread(messages)
+        })
       return
     }
-    if (taskType === 'recruit_influencer') {
-      wx.showToast({ title: 'Brief 已确认', icon: 'success' })
-      setTimeout(() => {
-        wx.navigateTo({ url: '/pages/recruit-hub/recruit-hub' })
-      }, 400)
-    }
+
+    this.setData({ confirmingPreviewId: id })
+    wx.showLoading({ title: '执行中…', mask: true })
+    void confirmMp
+      .confirmPreviewMessage(previewMsg, { userBrief })
+      .then((result) => {
+        wx.hideLoading()
+        let messages = this.data.messages
+        if (result.ok) {
+          messages = patchPreviewConfirmed(messages, id)
+          this._executionState = execMp.syncStageAfterPreviewChange(
+            this._executionState || execMp.createAgentExecutionState(),
+            messages,
+          )
+        }
+        const ok = Boolean(result.ok)
+        const body =
+          taskType === 'recruit_influencer' && ok
+            ? `「${title}」已确认。${result.message || '招募订单已推送运营台（待接单）。'}`
+            : ok
+              ? `「${title}」已确认。${result.message || '可在对应功能模块查看结果。'}`
+              : `「${title}」${result.message || '执行失败。'}`
+        messages = appendTaskResult(messages, body, {
+          resultSummary: ok ? 'confirmed' : 'partial',
+          navUrl: result.navUrl,
+          orderId: result.orderId,
+        })
+        const last = messages[messages.length - 1]
+        this.setData({
+          messages,
+          confirmingPreviewId: '',
+          scrollTo: last ? `msg-${last.id}` : '',
+        })
+        aiAgent.saveThread(messages)
+      })
+      .catch((err) => {
+        wx.hideLoading()
+        const messages = appendTaskResult(
+          this.data.messages,
+          `执行失败：${String((err && err.message) || err || '未知错误').slice(0, 120)}`,
+          { resultSummary: 'partial', navUrl: erpNav.navForTaskType(taskType) },
+        )
+        const last = messages[messages.length - 1]
+        this.setData({ messages, confirmingPreviewId: '', scrollTo: last ? `msg-${last.id}` : '' })
+        aiAgent.saveThread(messages)
+      })
   },
 })

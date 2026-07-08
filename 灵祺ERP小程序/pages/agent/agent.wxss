@@ -577,3 +577,78 @@
   padding: 20rpx 32rpx;
   box-shadow: 0 6rpx 20rpx rgba(14, 165, 233, 0.3);
 }
+
+.btn-v2.primary.disabled,
+.preview-confirm[disabled] {
+  opacity: 0.55;
+}
+
+.shortcuts-wrap {
+  padding: 12rpx 20rpx 0;
+}
+
+.shortcuts-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 20rpx;
+  background: #fff;
+  border: 1rpx solid #e2e8f0;
+  font-size: 24rpx;
+  color: #475569;
+  font-weight: 600;
+}
+
+.shortcuts-chev {
+  font-size: 22rpx;
+  color: #94a3b8;
+}
+
+.shortcuts-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  padding: 14rpx 4rpx 8rpx;
+}
+
+.shortcut-chip {
+  padding: 12rpx 20rpx;
+  border-radius: 999rpx;
+  background: #f8fafc;
+  border: 1rpx solid #e2e8f0;
+  font-size: 22rpx;
+  color: #334155;
+  font-weight: 500;
+}
+
+.task-result-v2 {
+  background: linear-gradient(135deg, #ecfdf5, #f0fdf4);
+  border: 1rpx solid #a7f3d0;
+  border-radius: 20rpx;
+  padding: 20rpx 22rpx;
+  max-width: 100%;
+}
+
+.task-result-title {
+  display: block;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #047857;
+  margin-bottom: 10rpx;
+}
+
+.task-result-body {
+  color: #064e3b;
+  font-size: 26rpx;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.task-result-nav {
+  margin-top: 14rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #059669;
+}

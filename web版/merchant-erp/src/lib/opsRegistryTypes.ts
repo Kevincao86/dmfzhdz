@@ -219,7 +219,7 @@ export type RegistryRecruitmentOrder = {
   orderKind?: RecruitmentOrderKind
   acceptMode?: 'manual' | 'miniprogram' | 'ice'
   linkedMpOrderId?: string
-  recruitmentPlatform?: '抖音' | '小红书'
+  recruitmentPlatform?: '抖音' | '小红书' | '大众点评' | '快手' | '微信视频号'
   iceVideoCount?: number
   iceVideoSlots?: RegistryIceVideoSlot[]
   fulfillmentLoop?: RecruitmentFulfillmentLoop

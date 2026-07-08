@@ -54,7 +54,12 @@ export function patchRecruitmentOrderInSnapshot(
     ...(typeof body.linkedMpOrderId === 'string' && body.linkedMpOrderId.trim()
       ? { linkedMpOrderId: body.linkedMpOrderId.trim() }
       : {}),
-    ...(body.recruitmentPlatform === '抖音' || body.recruitmentPlatform === '小红书'
+    ...(body.recruitmentPlatform &&
+    (body.recruitmentPlatform === '抖音' ||
+      body.recruitmentPlatform === '小红书' ||
+      body.recruitmentPlatform === '大众点评' ||
+      body.recruitmentPlatform === '快手' ||
+      body.recruitmentPlatform === '微信视频号')
       ? { recruitmentPlatform: body.recruitmentPlatform }
       : {}),
     ...(body.workflowStage ? { workflowStage: body.workflowStage } : {}),

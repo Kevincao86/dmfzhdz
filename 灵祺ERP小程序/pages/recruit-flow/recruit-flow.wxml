@@ -1,0 +1,7 @@
+<scroll-view scroll-y class="page-pad-v2" enhanced show-scrollbar="{{false}}">
+  <view wx:for="{{steps}}" wx:key="key" class="flow-v2 {{index === 0 ? 'on' : ''}}">
+    <text class="flow-num">{{index + 1}}</text>
+    <text>{{item.title}}</text>
+  </view>
+  <button class="btn-v2 primary" bindtap="goPick">进入 · 选择发布方式</button>
+</scroll-view>

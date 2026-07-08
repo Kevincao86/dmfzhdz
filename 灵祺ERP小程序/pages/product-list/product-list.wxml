@@ -1,0 +1,99 @@
+<scroll-view scroll-y class="plist-page" enhanced show-scrollbar="{{false}}">
+  <scroll-view scroll-x class="plist-tab-scroll" enhanced show-scrollbar="{{false}}">
+    <view class="plist-tab-row">
+      <view
+        wx:for="{{tabs}}"
+        wx:key="id"
+        class="plist-tab {{activePlat === item.id ? 'on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onTab"
+      >
+        <image wx:if="{{item.logo}}" class="plist-tab-logo" src="{{item.logo}}" mode="aspectFit" />
+        <text>{{item.label}}</text>
+      </view>
+    </view>
+  </scroll-view>
+
+  <view class="plist-actions">
+    <button class="plist-btn-refresh" bindtap="onPullFromPlatform" loading="{{loading}}">
+      <text class="plist-btn-ico">↻</text>
+      <text>刷新列表</text>
+    </button>
+    <button class="plist-btn-sync" bindtap="onSyncPlatform" loading="{{syncingAll}}">
+      <text class="plist-btn-ico">☁</text>
+      <text>{{syncBtnLabel}}</text>
+    </button>
+  </view>
+
+  <view class="plist-filter-bar">
+    <text class="plist-count">共 {{displayItems.length}} 个商品</text>
+    <view class="plist-filter-right">
+      <picker mode="selector" range="{{statusLabels}}" value="{{statusPickerIndex}}" bindchange="onStatusPick">
+        <view class="plist-filter-pill">
+          <text>{{statusLabels[statusPickerIndex]}}</text>
+          <text class="plist-chev">▾</text>
+        </view>
+      </picker>
+      <picker mode="selector" range="{{sortLabels}}" value="{{sortPickerIndex}}" bindchange="onSortPick">
+        <view class="plist-filter-pill">
+          <text>{{sortLabels[sortPickerIndex]}}</text>
+          <text class="plist-chev">▾</text>
+        </view>
+      </picker>
+    </view>
+  </view>
+
+  <view class="plist-store-filter">
+    <view class="plist-search">
+      <text class="plist-search-ico">⌕</text>
+      <input
+        class="plist-search-input"
+        placeholder="搜索商品名称"
+        value="{{keyword}}"
+        bindinput="onKeyword"
+        confirm-type="search"
+      />
+    </view>
+    <picker mode="selector" range="{{storeLabels}}" value="{{storePickerIndex}}" bindchange="onStorePick">
+      <view class="plist-store-pill">
+        <text>{{storeLabels[storePickerIndex]}}</text>
+        <text class="plist-chev">▾</text>
+      </view>
+    </picker>
+  </view>
+
+  <view wx:if="{{note}}" class="plist-note">{{note}}</view>
+  <view wx:if="{{loading}}" class="plist-state">加载中…</view>
+  <view wx:elif="{{errMsg}}" class="plist-state plist-err">{{errMsg}}</view>
+  <view wx:elif="{{!displayItems.length}}" class="plist-state">暂无商品</view>
+  <block wx:else>
+    <view
+      wx:for="{{displayItems}}"
+      wx:key="id"
+      class="plist-card"
+      data-id="{{item.id}}"
+      data-name="{{item.name}}"
+      bindtap="onOpenItem"
+    >
+      <image
+        wx:if="{{item.thumb}}"
+        class="plist-thumb"
+        src="{{item.thumb}}"
+        mode="aspectFill"
+      />
+      <view wx:else class="plist-thumb plist-thumb-ph">图</view>
+      <view class="plist-card-main">
+        <text class="plist-name">{{item.name}}</text>
+        <text class="plist-id">商品ID: {{item.productId}}</text>
+        <text class="plist-price">{{item.priceText}}</text>
+        <text class="plist-badge plist-badge-{{item.statusClass}}">{{item.statusLabel}}</text>
+      </view>
+      <view class="plist-card-side">
+        <text class="plist-more" catchtap="onItemMenu" data-id="{{item.id}}" data-name="{{item.name}}">⋯</text>
+        <text class="plist-chev-r">›</text>
+      </view>
+    </view>
+    <view class="plist-end">— 没有更多了 —</view>
+  </block>
+  <view class="plist-bottom-space"></view>
+</scroll-view>

@@ -1,0 +1,31 @@
+<view class="voice-page">
+  <view class="voice-hero meoo-card">
+    <text class="voice-hero-title">短视频优化 · 语音</text>
+    <text class="voice-hero-desc">口述脚本结构、卖点、时长与结尾 CTA；AI 拆解段落与镜头提示，编辑页做微调。</text>
+  </view>
+
+  <view class="voice-steps meoo-card">
+    <text class="voice-steps-title">流程</text>
+    <view class="voice-step-row">
+      <text class="voice-step-num">1</text>
+      <text class="voice-step-text">按镜头顺序口述脚本与钩子话术</text>
+    </view>
+    <view class="voice-step-row">
+      <text class="voice-step-num">2</text>
+      <text class="voice-step-text">停止后生成短视频优化草稿</text>
+    </view>
+    <view class="voice-step-row">
+      <text class="voice-step-num">3</text>
+      <text class="voice-step-text">编辑页对齐 Web「短视频优化」字段</text>
+    </view>
+  </view>
+
+  <view class="voice-actions">
+    <button class="meoo-btn-primary voice-record-btn" disabled="{{busy}}" bindtap="toggleRecord">
+      {{recording ? '停止并生成草稿' : '开始录音'}}
+    </button>
+    <button class="meoo-btn-ghost skip" disabled="{{busy || recording}}" bindtap="useMock">跳过录音（演示草稿）</button>
+  </view>
+
+  <text wx:if="{{recording}}" class="voice-pulse">录音中…</text>
+</view>

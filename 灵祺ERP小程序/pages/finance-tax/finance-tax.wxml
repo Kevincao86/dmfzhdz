@@ -1,0 +1,1 @@
+<scroll-view scroll-y class="page-pad-v2" enhanced show-scrollbar="{{false}}"><view wx:for="{{rows}}" wx:key="id" class="list-card-v2"><view><text class="list-strong">{{item.title}}</text><text class="list-span">{{item.sub}}</text></view><text class="tag">{{item.tag}}</text></view></scroll-view>

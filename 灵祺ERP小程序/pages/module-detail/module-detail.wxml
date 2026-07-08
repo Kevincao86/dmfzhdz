@@ -1,0 +1,1 @@
+<scroll-view scroll-y class="page-pad-v2" enhanced show-scrollbar="{{false}}"><view class="sec-card-v2"><text class="sec-strong">模块说明</text><text class="body">{{body}}</text></view></scroll-view>

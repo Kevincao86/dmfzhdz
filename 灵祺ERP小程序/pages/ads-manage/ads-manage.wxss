@@ -1,0 +1,342 @@
+.ads-page {
+  min-height: 100vh;
+  background: #f8f5f6;
+  box-sizing: border-box;
+}
+
+.ads-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 24rpx 28rpx 12rpx;
+  background: #fff;
+}
+
+.ads-title {
+  display: block;
+  font-size: 36rpx;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.ads-sub {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #94a3b8;
+}
+
+.ads-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.ads-bell {
+  position: relative;
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+}
+
+.ads-bell-dot {
+  position: absolute;
+  top: 10rpx;
+  right: 10rpx;
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  background: #ef4444;
+}
+
+.ads-new-btn {
+  margin: 0;
+  padding: 0 24rpx;
+  height: 64rpx;
+  line-height: 64rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(95deg, #fb7185, #f43f5e);
+  color: #fff;
+  font-size: 24rpx;
+  font-weight: 600;
+  border: none;
+}
+
+.ads-new-btn::after {
+  border: none;
+}
+
+.ads-today-card {
+  margin: 16rpx 28rpx;
+  padding: 24rpx;
+  background: #fff;
+  border-radius: 24rpx;
+  box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.04);
+}
+
+.ads-today-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16rpx;
+}
+
+.ads-today-title {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.ads-today-more {
+  font-size: 22rpx;
+  color: #94a3b8;
+}
+
+.ads-kpi-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16rpx;
+}
+
+.ads-kpi {
+  padding: 12rpx 0;
+}
+
+.ads-kpi-val {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.ads-kpi-lab {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 20rpx;
+  color: #94a3b8;
+}
+
+.ads-kpi-trend {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 20rpx;
+  color: #f43f5e;
+}
+
+.ads-tab-bar {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border-bottom: 2rpx solid #f1f5f9;
+}
+
+.ads-tab-scroll {
+  flex: 1;
+  white-space: nowrap;
+}
+
+.ads-tab-row {
+  display: inline-flex;
+  gap: 28rpx;
+  padding: 0 28rpx;
+}
+
+.ads-tab {
+  padding: 20rpx 4rpx;
+  font-size: 26rpx;
+  color: #64748b;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.ads-tab.on {
+  color: #f43f5e;
+  font-weight: 700;
+}
+
+.ads-tab.on::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4rpx;
+  background: #f43f5e;
+}
+
+.ads-filter {
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+  padding: 0 24rpx;
+  font-size: 24rpx;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.ads-filter-ico {
+  font-size: 18rpx;
+}
+
+.ads-filter-panel {
+  padding: 12rpx 28rpx;
+  background: #fff;
+  border-bottom: 1rpx solid #f1f5f9;
+}
+
+.ads-filter-tip {
+  font-size: 22rpx;
+  color: #94a3b8;
+}
+
+.ads-state {
+  padding: 48rpx 28rpx;
+  text-align: center;
+  font-size: 26rpx;
+  color: #94a3b8;
+}
+
+.ads-err {
+  color: #dc2626;
+}
+
+.ads-card {
+  display: flex;
+  gap: 16rpx;
+  margin: 16rpx 28rpx 0;
+  padding: 20rpx;
+  background: #fff;
+  border-radius: 24rpx;
+  box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.04);
+}
+
+.ads-thumb {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 16rpx;
+  flex-shrink: 0;
+  background: #fce7f3;
+}
+
+.ads-thumb-ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #f43f5e;
+  font-size: 32rpx;
+  font-weight: 700;
+}
+
+.ads-card-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.ads-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8rpx;
+}
+
+.ads-card-name {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.ads-more {
+  color: #cbd5e1;
+  font-size: 28rpx;
+}
+
+.ads-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+  margin-top: 8rpx;
+}
+
+.ads-status {
+  font-size: 20rpx;
+  font-weight: 600;
+}
+
+.ads-status-running {
+  color: #047857;
+}
+
+.ads-status-paused {
+  color: #64748b;
+}
+
+.ads-status-ended {
+  color: #94a3b8;
+}
+
+.ads-tag {
+  padding: 4rpx 12rpx;
+  border-radius: 999rpx;
+  font-size: 20rpx;
+  color: #64748b;
+  background: #f8fafc;
+}
+
+.ads-metrics {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 12rpx;
+}
+
+.ads-metric {
+  flex: 1;
+}
+
+.ads-metric-lab {
+  display: block;
+  font-size: 20rpx;
+  color: #94a3b8;
+}
+
+.ads-metric-val {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.ads-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12rpx;
+}
+
+.ads-duration {
+  font-size: 20rpx;
+  color: #94a3b8;
+}
+
+.ads-action-btn {
+  margin: 0 !important;
+  border-radius: 999rpx !important;
+  border: 2rpx solid #fda4af !important;
+  background: #fff !important;
+  color: #f43f5e !important;
+  font-size: 22rpx !important;
+}
+
+.ads-data-link {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 20rpx;
+  color: #f43f5e;
+}
+
+.ads-bottom-space {
+  height: 32rpx;
+}

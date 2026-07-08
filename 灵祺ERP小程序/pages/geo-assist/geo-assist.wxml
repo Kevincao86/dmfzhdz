@@ -1,0 +1,104 @@
+<view class="geo-page">
+  <view class="geo-nav">
+    <text class="geo-nav-title">GEO运营优化</text>
+    <view class="geo-nav-report" bindtap="onOpenReport">
+      <text class="geo-nav-report-ico">📄</text>
+      <text>优化报告</text>
+    </view>
+  </view>
+
+  <block wx:if="{{tab === 'overview'}}">
+    <view class="geo-score-card">
+      <view class="geo-score-left">
+        <text class="geo-score-label">GEO综合分</text>
+        <text class="geo-score-sub">基于当前数据评估，您的GEO优化表现良好</text>
+        <view class="geo-score-trend">
+          <text class="geo-trend-up">↑</text>
+          <text>{{scoreTrend}}</text>
+        </view>
+      </view>
+      <view class="geo-gauge">
+        <view class="geo-gauge-ring" style="--pct: {{healthScore}};">
+          <text class="geo-gauge-num">{{healthScore}}</text>
+          <text class="geo-gauge-total">总分 100</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="geo-suggest-head">
+      <text class="geo-suggest-title">优化建议</text>
+      <text class="geo-suggest-more" bindtap="onTab" data-id="health">查看全部 ›</text>
+    </view>
+
+    <view class="geo-suggest-list">
+      <view
+        wx:for="{{suggestions}}"
+        wx:key="id"
+        class="geo-suggest-item"
+        data-id="{{item.id}}"
+        bindtap="onSuggestionTap"
+      >
+        <view class="geo-suggest-icon" style="background: {{item.iconBg}};">{{item.icon}}</view>
+        <view class="geo-suggest-body">
+          <view class="geo-suggest-row1">
+            <text class="geo-suggest-name">{{item.title}}</text>
+            <text class="geo-suggest-badge geo-badge-{{item.statusClass}}">{{item.statusLabel}}</text>
+          </view>
+          <text class="geo-suggest-desc">{{item.desc}}</text>
+        </view>
+        <view class="geo-suggest-right">
+          <text class="geo-suggest-score geo-score-{{item.scoreClass}}">{{item.scoreText}}</text>
+          <text class="geo-suggest-chev">›</text>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{storeSummary}}" class="geo-store-line">{{storeSummary}} · {{scoreSource}}</view>
+  </block>
+
+  <scroll-view wx:if="{{tab !== 'overview'}}" scroll-x class="geo-tabs-scroller" enhanced show-scrollbar="{{false}}">
+    <view class="geo-tabs">
+      <view
+        wx:for="{{tabs}}"
+        wx:key="id"
+        data-id="{{item.id}}"
+        class="geo-tab {{tab === item.id ? 'active' : ''}}"
+        bindtap="onTab"
+      >{{item.label}}</view>
+    </view>
+  </scroll-view>
+
+  <block wx:if="{{tab === 'consult'}}">
+    <view class="geo-card">
+      <text class="geo-card-title">知识包草稿</text>
+      <textarea class="geo-area" maxlength="8000" value="{{geoPack}}" bindinput="onPack" placeholder="维护可被检索摘录的事实文本" />
+      <view class="geo-actions">
+        <button class="geo-btn-ghost" size="mini" bindtap="genQuestion">AI 随机问法</button>
+        <button class="geo-sync-btn" size="mini" loading="{{scoreBusy}}" bindtap="onSyncAiScore">同步评分</button>
+      </view>
+    </view>
+    <view class="geo-card">
+      <text class="geo-card-title">测试问题</text>
+      <textarea class="geo-single" maxlength="500" auto-height="{{true}}" value="{{consultQ}}" bindinput="onConsultQ" />
+      <button class="geo-primary" loading="{{busy}}" bindtap="runConsult">发起咨询</button>
+      <view wx:if="{{consultReply}}" class="geo-reply">{{consultReply}}</view>
+    </view>
+  </block>
+
+  <block wx:if="{{tab !== 'overview' && tab !== 'consult'}}">
+    <view class="geo-card">
+      <text class="geo-card-title">与电脑端一致</text>
+      <text class="geo-card-body">{{paneNote}}</text>
+      <text class="geo-muted geo-muted-block">批量编排、结构化字段与流水线任务请在浏览器打开商家后台「运营 → GEO 运营优化」完成。</text>
+    </view>
+  </block>
+
+  <view class="geo-footer-spacer"></view>
+
+  <view wx:if="{{tab === 'overview'}}" class="geo-fab-wrap">
+    <button class="geo-fab" bindtap="onOpenConsult">
+      <text class="geo-fab-ico">🤖</text>
+      <text>AI咨询优化方案</text>
+    </button>
+  </view>
+</view>

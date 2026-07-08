@@ -1,0 +1,106 @@
+<scroll-view scroll-y class="wallet-page" enhanced show-scrollbar="{{false}}">
+  <view class="wallet-nav">
+    <view class="wallet-nav-spacer"></view>
+    <view class="wallet-nav-detail" bindtap="onShowLedger">
+      <text class="wallet-nav-ico">📄</text>
+      <text>明细</text>
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="wallet-state">加载中…</view>
+  <view wx:elif="{{err}}" class="wallet-state wallet-err">{{err}}</view>
+  <block wx:else>
+    <view class="wallet-account-card">
+      <text class="wallet-card-lab">账户余额</text>
+      <text class="wallet-account-val">¥{{accountBalanceYuan}}</text>
+      <text class="wallet-card-hint">可用于充值积分与业务消费</text>
+      <button wx:if="{{balanceCents > 0}}" class="wallet-refund-btn" size="mini" bindtap="onOpenRefund">申请退款</button>
+    </view>
+
+    <view class="wallet-points-card">
+      <view class="wallet-coin">🪙</view>
+      <text class="wallet-card-lab">积分余额</text>
+      <view class="wallet-points-val-row">
+        <text class="wallet-points-val">{{pointsBalanceText}}</text>
+        <text class="wallet-points-unit">积分</text>
+      </view>
+      <button class="wallet-recharge-btn" bindtap="onOpenRecharge">积分充值</button>
+    </view>
+
+    <view class="wallet-info-row">
+      <view class="wallet-info-col">
+        <text class="wallet-info-ico">💱</text>
+        <text class="wallet-info-main">¥1 = {{pointsPerYuan}}积分</text>
+        <text class="wallet-info-sub">充值比例</text>
+      </view>
+      <view class="wallet-info-divider"></view>
+      <view class="wallet-info-col">
+        <text class="wallet-info-ico">📄</text>
+        <text class="wallet-info-main">Brief {{briefPointsCost}}积分/篇</text>
+        <text class="wallet-info-sub">内容消费</text>
+      </view>
+    </view>
+
+    <view wx:if="{{ledger.length}}" class="wallet-ledger">
+      <text class="wallet-ledger-title">最近明细</text>
+      <view wx:for="{{ledger}}" wx:key="id" class="wallet-ledger-row">
+        <view class="wallet-ledger-main">
+          <text class="wallet-ledger-reason">{{item.reason || '变动'}}</text>
+          <text class="wallet-ledger-time">{{item.created_at}}</text>
+        </view>
+        <text class="wallet-ledger-delta {{item.delta_cents >= 0 ? 'plus' : 'minus'}}">
+          {{item.delta_cents >= 0 ? '+' : '-'}}¥{{item.deltaAbsYuan}}
+        </text>
+      </view>
+    </view>
+  </block>
+  <view class="wallet-bottom-space"></view>
+</scroll-view>
+
+<view wx:if="{{payOpen}}" class="wallet-mask" catchtouchmove="true">
+  <view class="wallet-sheet" catchtap="noop">
+    <text class="wallet-sheet-title">积分充值</text>
+    <view wx:if="{{payStep === 'choose'}}">
+      <view class="wallet-tier-row">
+        <view
+          wx:for="{{rechargeTiers}}"
+          wx:key="label"
+          class="wallet-tier {{!useCustom && tierIndex === index ? 'on' : ''}}"
+          data-index="{{index}}"
+          bindtap="onPickTier"
+        >{{item.label}}</view>
+      </view>
+      <label class="wallet-custom-row">
+        <switch checked="{{useCustom}}" bindchange="onToggleCustom" color="#0ea5e9" />
+        <text>自定义金额</text>
+      </label>
+      <input wx:if="{{useCustom}}" class="wallet-custom-input" type="digit" placeholder="输入充值金额（元）" value="{{customYuan}}" bindinput="onCustomYuan" />
+      <view class="wallet-channel-row">
+        <button class="wallet-channel-btn" data-ch="wechat" bindtap="onPickChannel">微信支付</button>
+        <button class="wallet-channel-btn" data-ch="alipay" bindtap="onPickChannel">支付宝</button>
+      </view>
+    </view>
+    <view wx:else>
+      <text class="wallet-sheet-desc">已选择 {{channel === 'alipay' ? '支付宝' : '微信支付'}}，提交后由运营核对到账。</text>
+      <text wx:if="{{payErr}}" class="wallet-sheet-err">{{payErr}}</text>
+      <view class="wallet-sheet-actions">
+        <button class="wallet-btn-ghost" bindtap="onBackChoose">返回</button>
+        <button class="wallet-btn-primary" loading="{{payBusy}}" bindtap="onPaid">确认已支付</button>
+      </view>
+    </view>
+    <button class="wallet-close" bindtap="onClosePay">关闭</button>
+  </view>
+</view>
+
+<view wx:if="{{refundOpen}}" class="wallet-mask" catchtouchmove="true">
+  <view class="wallet-sheet" catchtap="noop">
+    <text class="wallet-sheet-title">申请退款</text>
+    <input class="wallet-custom-input" type="digit" placeholder="退款金额（元）" value="{{refundYuan}}" bindinput="onRefundYuan" />
+    <text wx:if="{{refundErr}}" class="wallet-sheet-err">{{refundErr}}</text>
+    <view class="wallet-sheet-actions">
+      <button class="wallet-btn-ghost" bindtap="onCloseRefund">取消</button>
+      <button class="wallet-btn-primary" loading="{{refundBusy}}" bindtap="onRefundConfirm">提交</button>
+    </view>
+    <button class="wallet-btn-link" bindtap="onRefundAll">全部退款</button>
+  </view>
+</view>

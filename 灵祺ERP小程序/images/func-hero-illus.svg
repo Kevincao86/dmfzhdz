@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <circle cx="60" cy="62" r="48" fill="#E0F2FE"/>
+  <ellipse cx="60" cy="88" rx="36" ry="8" fill="#BAE6FD" opacity=".6"/>
+  <rect x="34" y="42" width="52" height="40" rx="6" fill="#0284C7"/>
+  <path d="M30 42h60l-6-14H36l-6 14z" fill="#0369A1"/>
+  <rect x="44" y="54" width="14" height="18" rx="2" fill="#E0F2FE"/>
+  <rect x="62" y="54" width="14" height="18" rx="2" fill="#E0F2FE"/>
+  <rect x="52" y="68" width="16" height="14" rx="2" fill="#7DD3FC"/>
+  <circle cx="88" cy="36" r="10" fill="#FEF3C7" stroke="#F59E0B" stroke-width="2"/>
+  <text x="88" y="40" text-anchor="middle" font-size="10" font-weight="700" fill="#D97706">24</text>
+  <rect x="18" y="28" width="22" height="16" rx="4" fill="#fff" stroke="#CBD5E1" stroke-width="1.5"/>
+  <path d="M22 36h14M22 32h10" stroke="#94A3B8" stroke-width="1.5" stroke-linecap="round"/>
+  <rect x="78" y="22" width="20" height="20" rx="5" fill="#EDE9FE" stroke="#A78BFA" stroke-width="1.5"/>
+  <path d="M83 32l4-6 4 6-4 6-4-6z" fill="#7C3AED" opacity=".35"/>
+</svg>

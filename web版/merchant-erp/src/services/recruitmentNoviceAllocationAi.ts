@@ -318,6 +318,7 @@ export async function requestNoviceKolAllocationFromLibrary(params: {
   targetHeadcount: number
   feeType: 'tier' | 'fixed'
   platform?: string
+  industry?: string
 }): Promise<NoviceAllocation | null> {
   const payload = JSON.stringify({
     city: params.city.trim(),
@@ -325,6 +326,7 @@ export async function requestNoviceKolAllocationFromLibrary(params: {
     targetHeadcount: params.targetHeadcount,
     feeType: params.feeType,
     platform: params.platform ?? '抖音',
+    industry: params.industry ?? '',
   })
   const headers = libraryAllocationAuthHeaders()
   for (const url of merchantApiFetchUrls('/api/meoo-ops-novice-kol-allocation')) {
@@ -365,15 +367,18 @@ export async function generateNoviceKolAllocation(params: {
   feeType: 'tier' | 'fixed'
   kolCommissionPct: number
   cityTierBands?: CityKolTierBands
+  platform?: string
 }): Promise<NoviceAllocation> {
   const headcount = clampInt(Number(params.targetHeadcount) || 0, 1, 200)
+  const platform = String(params.platform || '抖音').trim() || '抖音'
   try {
     const fromLibrary = await requestNoviceKolAllocationFromLibrary({
       city: params.city,
       budgetYuan: params.budgetYuan,
       targetHeadcount: headcount,
       feeType: params.feeType,
-      platform: '抖音',
+      platform,
+      industry: params.industry,
     })
     if (fromLibrary) {
       const sum = fromLibrary.v3 + fromLibrary.v4 + fromLibrary.v5 + fromLibrary.v5plus
@@ -381,6 +386,9 @@ export async function generateNoviceKolAllocation(params: {
     }
   } catch {
     /* ignore */
+  }
+  if (platform === '小红书') {
+    return fallbackXiaohongshuNoviceAllocation(params.budgetYuan)
   }
   return fallbackNoviceKolAllocation(params.budgetYuan, headcount, params.feeType, params.city)
 }

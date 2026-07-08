@@ -1,0 +1,13 @@
+<view class="page-agent-v2">
+  <scroll-view scroll-y class="chat-v2 tall" scroll-into-view="{{scrollTo}}" enhanced show-scrollbar="{{false}}">
+    <view wx:for="{{messages}}" wx:key="id" id="msg-{{item.id}}" class="msg {{item.role === 'user' ? 'user' : 'bot'}}">
+      <text wx:if="{{item.role !== 'user'}}" class="ava ava-ai">客</text>
+      <view class="bubble-v2 {{item.role === 'user' ? 'user' : ''}}"><text user-select>{{item.content}}</text></view>
+      <text wx:if="{{item.role === 'user'}}" class="ava ava-me">我</text>
+    </view>
+  </scroll-view>
+  <view class="composer-v2">
+    <input placeholder="输入消息" value="{{input}}" bindinput="onInput" confirm-type="send" bindconfirm="onSend" />
+    <button class="btn-v2 primary sm" bindtap="onSend">发送</button>
+  </view>
+</view>

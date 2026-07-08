@@ -1,0 +1,53 @@
+<scroll-view scroll-y class="page-mine-v2" enhanced show-scrollbar="{{false}}" style="padding-bottom:var(--tab-bar-pad)">
+  <view class="profile-v2">
+    <view class="store-logo-line">
+      <image class="store-logo-img" src="{{storeLogoSrc}}" mode="aspectFit" />
+    </view>
+    <view class="profile-main">
+      <text class="profile-strong">{{storeName}}</text>
+      <text class="profile-span">账号 {{loginName || '—'}}</text>
+      <text wx:if="{{planLabel}}" class="badge-pro">👑 {{planLabel}}</text>
+    </view>
+    <text class="chev">›</text>
+  </view>
+  <view class="sec-card-v2 bind-card-v2">
+    <view class="sec-head-v2 bind-head-v2" bindtap="onToggleBind">
+      <image class="mine-line-ic" src="{{bindIconSrc}}" mode="aspectFit" />
+      <text class="bind-head-title">平台绑定</text>
+      <text class="chev bind-chev {{bindExpanded ? 'bind-chev-open' : ''}}">∨</text>
+    </view>
+    <block wx:if="{{bindExpanded}}">
+      <text wx:if="{{bindingsHint}}" class="hint-v2 bind-hint">{{bindingsHint}}</text>
+      <view wx:for="{{cloudPlatformRows}}" wx:key="id" class="bind-row">
+        <image class="plat-line-ic" src="{{item.iconSrc}}" mode="aspectFit" />
+        <text class="bind-label">{{item.label}}</text>
+        <text class="{{item.bound ? 'ok' : 'warn'}}">{{item.bound ? '已绑定 ✓' : '未绑定 !'}}</text>
+        <text class="chev">›</text>
+      </view>
+      <view wx:for="{{webPlatformRows}}" wx:key="id" class="bind-row">
+        <image class="plat-line-ic" src="{{item.iconSrc}}" mode="aspectFit" />
+        <text class="bind-label">{{item.label}}</text>
+        <text class="warn">{{item.statusText}}</text>
+        <text class="chev">›</text>
+      </view>
+    </block>
+  </view>
+  <view class="menu-v2">
+    <view wx:for="{{menu}}" wx:key="id" class="menu-item-v2" data-action="{{item.action}}" data-url="{{item.url}}" bindtap="onMenuTap">
+      <image class="mine-line-ic mine-menu-ic" src="{{item.iconSrc}}" mode="aspectFit" />
+      <text class="menu-item-title">{{item.title}}</text>
+      <text class="chev">›</text>
+    </view>
+  </view>
+  <button class="logout-v2 danger" bindtap="onLogout">退出登录</button>
+</scroll-view>
+<view wx:if="{{showLogoutConfirm}}" class="logout-mask" catchtouchmove="true">
+  <view class="sec-card-v2 logout-dialog" catchtap="true">
+    <text class="sec-strong">退出当前账号</text>
+    <text class="body">确定退出登录？</text>
+    <view class="logout-actions">
+      <button class="btn-v2" bindtap="onCancelLogout">取消</button>
+      <button class="btn-v2 primary" bindtap="onConfirmLogout">确定</button>
+    </view>
+  </view>
+</view>

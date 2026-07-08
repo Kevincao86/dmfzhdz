@@ -3,13 +3,14 @@ const devAuth = require('../../utils/devAuth.js')
 const membershipMp = require('../../utils/membershipMp.js')
 const platformBindingsMp = require('../../utils/platformBindingsMp.js')
 const mpUi = require('../../utils/mpUiFlags.js')
+const { iconDataUri } = require('../../utils/funcIconAssetsMp.js')
 
 const BASE_MENU = [
   {
     id: 'notify',
     title: '消息通知',
     desc: '业务提醒与系统消息',
-    glyph: '讯',
+    iconKey: 'bell',
     tone: 'cyan',
     url: '/pages/notifications/notifications',
   },
@@ -17,32 +18,32 @@ const BASE_MENU = [
     id: 'wallet',
     title: '我的钱包',
     desc: '余额、充值与账单',
-    glyph: '钱',
-    tone: 'amber',
+    iconKey: 'wallet',
+    tone: 'cyan',
     url: '/pages/wallet/wallet',
   },
   {
     id: 'switch',
     title: '切换账号',
     desc: '使用其他门店账户登录',
-    glyph: '换',
-    tone: 'blue',
+    iconKey: 'switchUser',
+    tone: 'cyan',
     action: 'switch',
   },
   {
     id: 'subscribe',
     title: '订阅与会员',
     desc: '加载会员版本中…',
-    glyph: '订',
-    tone: 'violet',
+    iconKey: 'crown',
+    tone: 'cyan',
     url: '/pages/subscription/subscription',
   },
   {
     id: 'support',
     title: '在线客服',
     desc: '与商家管理后台坐席对话，消息互通',
-    glyph: '服',
-    tone: 'indigo',
+    iconKey: 'headset',
+    tone: 'cyan',
     url: '/pages/support-chat/support-chat',
   },
 ]
@@ -53,6 +54,13 @@ function buildVisibleMenu() {
     if (item.id === 'subscribe' && !mpUi.SHOW_SUBSCRIPTION) return false
     return true
   })
+}
+
+function enrichMenu(items) {
+  return items.map((item) => ({
+    ...item,
+    iconSrc: iconDataUri(item.tone || 'cyan', item.iconKey),
+  }))
 }
 
 Page({
@@ -69,7 +77,10 @@ Page({
     bindingsHint: '',
     cloudPlatformRows: [],
     webPlatformRows: [],
-    menu: buildVisibleMenu(),
+    bindExpanded: false,
+    bindIconSrc: iconDataUri('cyan', 'bind'),
+    storeLogoSrc: iconDataUri('cyan', 'shop'),
+    menu: enrichMenu(buildVisibleMenu()),
   },
 
   onShow() {
@@ -90,6 +101,10 @@ Page({
     } catch (_) {}
     this.setData({ devMode: devAuth.isDevSkipLogin() })
     void this.refreshAccountData()
+  },
+
+  onToggleBind() {
+    this.setData({ bindExpanded: !this.data.bindExpanded })
   },
 
   async refreshAccountData() {
@@ -125,7 +140,7 @@ Page({
 
   patchSubscribeMenuDesc(desc) {
     if (!mpUi.SHOW_SUBSCRIPTION) return
-    const menu = buildVisibleMenu().map((item) =>
+    const menu = enrichMenu(buildVisibleMenu()).map((item) =>
       item.id === 'subscribe' ? Object.assign({}, item, { desc }) : item,
     )
     this.setData({ menu })

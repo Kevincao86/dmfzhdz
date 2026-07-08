@@ -1,0 +1,89 @@
+<scroll-view scroll-y class="fin-page" enhanced show-scrollbar="{{false}}">
+  <view class="fin-hero">
+    <view class="fin-hero-main">
+      <text class="fin-title">财务对账</text>
+      <text class="fin-sub">对账清晰 · 数据准确 · 资金无忧</text>
+    </view>
+    <view class="fin-hero-action" bindtap="onRecords">
+      <text class="fin-hero-ico">📄</text>
+      <text>对账记录</text>
+    </view>
+    <text class="fin-hero-deco">✓</text>
+  </view>
+
+  <view wx:if="{{loading}}" class="fin-state">加载中…</view>
+  <view wx:elif="{{err}}" class="fin-state fin-err">{{err}}</view>
+  <block wx:else>
+    <view wx:for="{{cards}}" wx:key="id" class="fin-card fin-card-{{item.cardType}}">
+      <view class="fin-card-head">
+        <text class="fin-card-ico">{{item.cardType === 'weekly' ? '📋' : '✓'}}</text>
+        <view class="fin-card-title-wrap">
+          <view class="fin-card-title-row">
+            <text class="fin-card-title">{{item.title}}</text>
+            <text class="fin-tag fin-tag-{{item.tagClass}}">{{item.tag}}</text>
+          </view>
+          <text class="fin-card-meta">{{item.period || item.settleTime}}</text>
+        </view>
+        <button
+          class="fin-card-btn {{item.actionGhost ? 'ghost' : ''}}"
+          size="mini"
+          data-id="{{item.id}}"
+          bindtap="onCardAction"
+        >{{item.actionLabel}}</button>
+      </view>
+      <view wx:if="{{item.cardType === 'weekly'}}" class="fin-grid3">
+        <view class="fin-grid-item">
+          <text class="fin-grid-val">￥{{item.payable}}</text>
+          <text class="fin-grid-lab">应结金额(元)</text>
+        </view>
+        <view class="fin-grid-item">
+          <text class="fin-grid-val">￥{{item.actual}}</text>
+          <text class="fin-grid-lab">实结金额(元)</text>
+        </view>
+        <view class="fin-grid-item">
+          <text class="fin-grid-val fin-grid-warn">￥{{item.diff}}</text>
+          <text class="fin-grid-lab">差异金额(元)</text>
+        </view>
+      </view>
+      <view wx:else class="fin-grid4">
+        <view class="fin-grid-item">
+          <text class="fin-grid-val">￥{{item.settlementAmount}}</text>
+          <text class="fin-grid-lab">结款金额</text>
+        </view>
+        <view class="fin-grid-item">
+          <text class="fin-grid-val">{{item.talentCount}}</text>
+          <text class="fin-grid-lab">达人数</text>
+        </view>
+        <view class="fin-grid-item">
+          <text class="fin-grid-val">{{item.orderCount}}</text>
+          <text class="fin-grid-lab">订单数</text>
+        </view>
+        <view class="fin-grid-item">
+          <text class="fin-grid-val fin-grid-ok">{{item.statusText}}</text>
+          <text class="fin-grid-lab">对账状态</text>
+        </view>
+      </view>
+    </view>
+  </block>
+
+  <view class="fin-quick-head">快捷入口</view>
+  <view class="fin-quick-grid">
+    <view
+      wx:for="{{quickEntries}}"
+      wx:key="id"
+      class="fin-quick-item"
+      data-id="{{item.id}}"
+      bindtap="onQuick"
+    >
+      <view class="fin-quick-ico">{{item.icon}}</view>
+      <text class="fin-quick-lab">{{item.label}}</text>
+    </view>
+  </view>
+
+  <view class="fin-security">
+    <text class="fin-security-ico">🛡</text>
+    <text class="fin-security-text">数据安全保障中 | 多重加密保护，确保您的对账数据安全</text>
+    <text class="fin-security-chev">›</text>
+  </view>
+  <view class="fin-bottom-space"></view>
+</scroll-view>

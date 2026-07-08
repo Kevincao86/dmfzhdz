@@ -1,0 +1,370 @@
+.wallet-page {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #e0f2fe 0%, #f3f6fb 280rpx);
+  padding: 0 28rpx;
+  box-sizing: border-box;
+}
+
+.wallet-nav {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 12rpx 0 8rpx;
+}
+
+.wallet-nav-spacer {
+  flex: 1;
+}
+
+.wallet-nav-detail {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  font-size: 24rpx;
+  color: #0284c7;
+}
+
+.wallet-nav-ico {
+  font-size: 24rpx;
+}
+
+.wallet-state {
+  padding: 80rpx 0;
+  text-align: center;
+  font-size: 26rpx;
+  color: #94a3b8;
+}
+
+.wallet-err {
+  color: #dc2626;
+}
+
+.wallet-account-card {
+  margin-bottom: 16rpx;
+  padding: 28rpx 24rpx;
+  background: #fff;
+  border-radius: 24rpx;
+  box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.04);
+}
+
+.wallet-card-lab {
+  display: block;
+  font-size: 24rpx;
+  color: #64748b;
+}
+
+.wallet-account-val {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 48rpx;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.wallet-card-hint {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: #94a3b8;
+}
+
+.wallet-refund-btn {
+  margin: 16rpx 0 0 !important;
+  border-radius: 999rpx !important;
+  background: #f8fafc !important;
+  color: #64748b !important;
+  border: 1rpx solid #e2e8f0 !important;
+}
+
+.wallet-points-card {
+  padding: 36rpx 28rpx 28rpx;
+  background: linear-gradient(180deg, #f0f9ff 0%, #fff 100%);
+  border-radius: 28rpx;
+  box-shadow: 0 12rpx 32rpx rgba(14, 165, 233, 0.12);
+  text-align: center;
+}
+
+.wallet-coin {
+  font-size: 56rpx;
+  margin-bottom: 8rpx;
+}
+
+.wallet-points-val-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8rpx;
+  margin-top: 8rpx;
+}
+
+.wallet-points-val {
+  font-size: 64rpx;
+  font-weight: 800;
+  color: #0284c7;
+  line-height: 1;
+}
+
+.wallet-points-unit {
+  font-size: 26rpx;
+  color: #64748b;
+}
+
+.wallet-recharge-btn {
+  margin-top: 24rpx;
+  width: 100%;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(95deg, #0ea5e9, #38bdf8) !important;
+  color: #fff !important;
+  font-size: 28rpx;
+  font-weight: 700;
+  border: none;
+}
+
+.wallet-recharge-btn::after {
+  border: none;
+}
+
+.wallet-info-row {
+  display: flex;
+  align-items: stretch;
+  margin-top: 20rpx;
+  padding: 24rpx 16rpx;
+  background: #fff;
+  border-radius: 24rpx;
+  box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.04);
+}
+
+.wallet-info-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6rpx;
+}
+
+.wallet-info-ico {
+  font-size: 28rpx;
+}
+
+.wallet-info-main {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.wallet-info-sub {
+  font-size: 20rpx;
+  color: #94a3b8;
+}
+
+.wallet-info-divider {
+  width: 2rpx;
+  background: #f1f5f9;
+  margin: 8rpx 0;
+}
+
+.wallet-ledger {
+  margin-top: 20rpx;
+  padding: 20rpx;
+  background: #fff;
+  border-radius: 24rpx;
+}
+
+.wallet-ledger-title {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 12rpx;
+}
+
+.wallet-ledger-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14rpx 0;
+  border-bottom: 1rpx solid #f1f5f9;
+}
+
+.wallet-ledger-row:last-child {
+  border-bottom: none;
+}
+
+.wallet-ledger-reason {
+  display: block;
+  font-size: 24rpx;
+  color: #334155;
+}
+
+.wallet-ledger-time {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 20rpx;
+  color: #94a3b8;
+}
+
+.wallet-ledger-delta {
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.wallet-ledger-delta.plus {
+  color: #047857;
+}
+
+.wallet-ledger-delta.minus {
+  color: #dc2626;
+}
+
+.wallet-bottom-space {
+  height: 32rpx;
+}
+
+.wallet-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+}
+
+.wallet-sheet {
+  width: 100%;
+  padding: 28rpx 28rpx calc(28rpx + env(safe-area-inset-bottom));
+  background: #fff;
+  border-radius: 28rpx 28rpx 0 0;
+}
+
+.wallet-sheet-title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 16rpx;
+}
+
+.wallet-tier-row {
+  display: flex;
+  gap: 12rpx;
+  margin-bottom: 16rpx;
+}
+
+.wallet-tier {
+  flex: 1;
+  text-align: center;
+  padding: 16rpx 8rpx;
+  border-radius: 16rpx;
+  border: 2rpx solid #e2e8f0;
+  font-size: 24rpx;
+  color: #475569;
+}
+
+.wallet-tier.on {
+  border-color: #0ea5e9;
+  background: #e0f2fe;
+  color: #0284c7;
+  font-weight: 700;
+}
+
+.wallet-custom-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 12rpx;
+  font-size: 24rpx;
+  color: #475569;
+}
+
+.wallet-custom-input {
+  width: 100%;
+  padding: 16rpx 18rpx;
+  margin-bottom: 12rpx;
+  border-radius: 14rpx;
+  border: 1rpx solid #e2e8f0;
+  background: #f8fafc;
+  box-sizing: border-box;
+  font-size: 26rpx;
+}
+
+.wallet-channel-row {
+  display: flex;
+  gap: 12rpx;
+}
+
+.wallet-channel-btn {
+  flex: 1;
+  margin: 0;
+  border-radius: 999rpx;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 24rpx;
+}
+
+.wallet-channel-btn::after {
+  border: none;
+}
+
+.wallet-sheet-desc {
+  display: block;
+  font-size: 24rpx;
+  color: #64748b;
+  line-height: 1.5;
+  margin-bottom: 12rpx;
+}
+
+.wallet-sheet-err {
+  display: block;
+  font-size: 22rpx;
+  color: #dc2626;
+  margin-bottom: 12rpx;
+}
+
+.wallet-sheet-actions {
+  display: flex;
+  gap: 12rpx;
+}
+
+.wallet-btn-ghost {
+  flex: 1;
+  margin: 0;
+  border-radius: 999rpx;
+  background: #f8fafc;
+  color: #475569;
+  border: 1rpx solid #e2e8f0;
+}
+
+.wallet-btn-primary {
+  flex: 1;
+  margin: 0;
+  border-radius: 999rpx;
+  background: linear-gradient(95deg, #0ea5e9, #38bdf8);
+  color: #fff;
+}
+
+.wallet-btn-link {
+  margin-top: 12rpx;
+  background: transparent;
+  color: #0284c7;
+  font-size: 24rpx;
+}
+
+.wallet-btn-link::after {
+  border: none;
+}
+
+.wallet-close {
+  margin-top: 16rpx;
+  background: #f8fafc;
+  color: #64748b;
+  border-radius: 999rpx;
+}
+
+.wallet-close::after {
+  border: none;
+}
