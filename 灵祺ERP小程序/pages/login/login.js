@@ -40,6 +40,7 @@ Page({
   onLoad() {
     this.setData({ devSkip: devAuth.isDevSkipLogin() })
     this._syncModeHint()
+    void api.bootstrapSupabaseConfig()
   },
 
   onUnload() {
