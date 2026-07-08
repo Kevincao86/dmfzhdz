@@ -29,6 +29,7 @@ import tenantsDeleteHandler from '../../../商家管理后台/api/_lib/handlers/
 import paymentOrdersListHandler from '../../../商家管理后台/api/_lib/handlers/meoo-supabase-payment-orders-list.ts'
 import paymentOrdersVerifyHandler from '../../../商家管理后台/api/_lib/handlers/meoo-supabase-payment-orders-verify.ts'
 import paymentOrdersConfirmHandler from '../../../商家管理后台/api/_lib/handlers/meoo-supabase-payment-orders-confirm.ts'
+import tenantBillingHandler from '../api/meoo-tenant-billing.ts'
 import opsSyncRegistryGetHandler from '../api/meoo-ops-registry-ops-get.ts'
 import opsSyncVendorKeysHandler from '../api/meoo-ops-sync-vendor-keys.ts'
 import opsSyncAiHandler from '../api/meoo-ops-sync-ai.ts'
@@ -197,6 +198,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-supabase-payment-orders-list': paymentOrdersListHandler as VercelLikeHandler,
   '/api/meoo-supabase-payment-orders-verify': paymentOrdersVerifyHandler as VercelLikeHandler,
   '/api/meoo-supabase-payment-orders-confirm': paymentOrdersConfirmHandler as VercelLikeHandler,
+  '/api/meoo-tenant-billing': tenantBillingHandler as VercelLikeHandler,
   /** 运营台注册表：Vercel 无法出站访问 ECS Supabase，由浏览器经 /erp-api 直连本机 */
   '/api/meoo-ops-sync-registry': opsSyncRegistryGetHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-hall-registry': mpHallRegistryHandler as VercelLikeHandler,

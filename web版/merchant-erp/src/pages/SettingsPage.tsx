@@ -12,12 +12,11 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { cn } from '../cn'
-import MeooPayQrModal from '../components/MeooPayQrModal'
+import SubscriptionPlansPanel from '../components/SubscriptionPlansPanel'
+import TenantPayModal from '../components/TenantPayModal'
 import {
   computeMemberUsageRemaining,
-  fetchPrimaryTenantId,
   fetchTenantSubscriptionSnapshot,
-  insertMerchantPaymentOrder,
 } from '../lib/tenantBilling'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import AiModelBindingSection from './settings/AiModelBindingSection'
@@ -46,7 +45,11 @@ import {
 import { useMembership } from '../context/MembershipContext'
 import { editionLabel, isPartnerEdition } from '../lib/appEdition'
 import { isPartnerSupportedGroupbuyPlatform } from '../lib/partnerPlatformCopy'
-import { MEMBERSHIP_MONTHLY_YUAN, type MembershipPlan } from '../lib/membershipPlan'
+import { formatErpPointsEquivalentsLine } from '../lib/erpPointsEconomics'
+import {
+  fetchTenantBillingSummary,
+  type TenantBillingSummary,
+} from '../services/tenantBillingClient'
 import PartnerClientsSection from './settings/PartnerClientsSection'
 import { PartnerDouyinApiSection, PartnerKuaishouApiSection } from './settings/apiDocsPartnerContent'
 
@@ -108,12 +111,6 @@ function formatCnDate(d: Date) {
   })
 }
 
-const PLAN_FEATURE_LINES: Record<MembershipPlan, string[]> = {
-  free: ['直连 AI 每月 50 次（豆包/千问/MiniMax/DeepSeek）', '不含 GEO、竞对分析、报税管理'],
-  member: ['全功能开放', 'AI：豆包 / 千问 / MiniMax / DeepSeek'],
-  member_plus: ['全功能开放', '全部 AI 模型（含 OpenAI / Claude / Gemini / Grok）'],
-}
-
 export default function SettingsPage() {
   const location = useLocation()
   const { plan, entitlements, reload: reloadMembership } = useMembership()
@@ -122,6 +119,8 @@ export default function SettingsPage() {
   const [waimaiPlat, setWaimaiPlat] = useState<WaimaiBackendPlatformId>('eleme')
   const [verifyList, setVerifyList] = useState<VerifyItem[]>(VERIFY_INITIAL)
   const [subModalOpen, setSubModalOpen] = useState(false)
+  const [subTierIndex, setSubTierIndex] = useState(0)
+  const [billingSummary, setBillingSummary] = useState<TenantBillingSummary | null | undefined>(undefined)
   const [subSnap, setSubSnap] = useState<
     | undefined
     | {
@@ -134,6 +133,7 @@ export default function SettingsPage() {
   const loadOfficialBilling = useCallback(async () => {
     if (!supabaseConfigured || !supabase) {
       setSubSnap(undefined)
+      setBillingSummary(undefined)
       return
     }
     try {
@@ -143,14 +143,21 @@ export default function SettingsPage() {
         subscriptionDays: snap.subscriptionDays ?? 0,
         opsGiftDays: snap.opsGiftDays ?? 0,
       })
+      try {
+        const summary = await fetchTenantBillingSummary()
+        setBillingSummary(summary)
+      } catch {
+        setBillingSummary(null)
+      }
     } catch {
       setSubSnap({
         serviceExpireAt: null,
         subscriptionDays: 0,
         opsGiftDays: 0,
       })
+      setBillingSummary(null)
     }
-  }, [supabaseConfigured, supabase])
+  }, [])
 
   const closeSubModal = () => {
     setSubModalOpen(false)
@@ -158,23 +165,12 @@ export default function SettingsPage() {
     void reloadMembership({ silent: true })
   }
 
-  const openSubModal = () => setSubModalOpen(true)
+  const openSubModal = (tierIndex = 0) => {
+    setSubTierIndex(tierIndex)
+    setSubModalOpen(true)
+  }
 
-  const submitSubscriptionPaid = async (payload: { amountCents: number; payChannel: 'wechat' | 'alipay' }) => {
-    if (!supabaseConfigured || !supabase) {
-      throw new Error('未配置 Supabase，无法提交订单。')
-    }
-    const tid = await fetchPrimaryTenantId(supabase)
-    if (!tid) {
-      throw new Error('未找到租户关联，请确认已开通商户并完成登录。')
-    }
-    await insertMerchantPaymentOrder(supabase, {
-      tenantId: tid,
-      orderKind: 'subscription',
-      amountCents: payload.amountCents,
-      payChannel: payload.payChannel,
-    })
-    window.alert('已提交支付申报，请等待运营在「订单管理」核对确认；确认后将自动开通对应会员档位。')
+  const refreshAfterPay = () => {
     void loadOfficialBilling()
     void reloadMembership({ silent: true })
   }
@@ -184,7 +180,6 @@ export default function SettingsPage() {
     () => computeMemberUsageRemaining(subSnap?.serviceExpireAt ?? null),
     [subSnap?.serviceExpireAt],
   )
-  const totalEntitlementDays = (subSnap?.subscriptionDays ?? 0) + (subSnap?.opsGiftDays ?? 0)
 
   useEffect(() => {
     if (!supabaseConfigured || !supabase) {
@@ -265,12 +260,13 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <MeooPayQrModal
+      <TenantPayModal
         open={subModalOpen}
         title="订阅灵祺 ERP"
         mode="subscription"
+        initialTierIndex={subTierIndex}
         onClose={closeSubModal}
-        onCompletedPayment={(p) => submitSubscriptionPaid(p)}
+        onPaid={refreshAfterPay}
       />
 
       <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm">
@@ -321,120 +317,75 @@ export default function SettingsPage() {
           )}
 
           {tab === 'subscription' && (
-            <div className="space-y-6">
-              <h3 className="text-lg font-medium text-gray-900">订阅</h3>
-              <p className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600">
-                商家显示名等资料在
-                <strong className="font-medium text-gray-800"> 运营管控台 → 客户管理 </strong>
-                维护。购买<strong className="font-medium text-gray-800"> 会员版 </strong>或
-                <strong className="font-medium text-gray-800"> 会员 Plus </strong>并由运营确认到账后，下方显示
-                <strong className="font-medium text-gray-800"> 订阅时长、赠送时长 </strong>与
-                <strong className="font-medium text-gray-800"> 总剩余时长 </strong>（截止日以云端登记为准）。
-              </p>
-              <div className="max-w-xl">
-                <div className="rounded-xl border border-gray-200 p-5">
-                  <div className="mb-2 flex items-center text-gray-900">
-                    <Crown className="mr-2 h-5 w-5 text-amber-500" />
-                    <span className="font-semibold">订阅与会员</span>
+            <div className="space-y-8">
+              {billingSummary ? (
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white p-5 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-violet-600">AI 积分余额</p>
+                    <p className="mt-2 text-3xl font-bold tabular-nums text-slate-900">
+                      {billingSummary.totalPoints.toLocaleString('zh-CN')}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      套餐桶 {billingSummary.packagePoints.toLocaleString('zh-CN')} · 充值桶{' '}
+                      {billingSummary.rechargePoints.toLocaleString('zh-CN')}
+                    </p>
                   </div>
-                  <p className="mb-3 text-sm text-gray-600">
-                    新注册默认为<strong className="text-gray-900"> 免费版 </strong>，无试用期；升级会员请在下方选择套餐。
-                  </p>
-                  <div className="mb-3 rounded-lg border border-indigo-100 bg-indigo-50/80 px-3 py-2.5 text-sm text-indigo-950">
-                    <p className="font-semibold">
-                      当前版本：{entitlements.planLabel}
-                      {MEMBERSHIP_MONTHLY_YUAN[plan] != null ? (
-                        <span className="ml-1 font-normal text-indigo-800/90">
-                          （¥{MEMBERSHIP_MONTHLY_YUAN[plan]}/月起）
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">会员剩余</p>
+                    <p className="mt-2 text-3xl font-bold tabular-nums text-slate-900">
+                      {billingSummary.remainDays != null && billingSummary.remainDays > 0
+                        ? billingSummary.remainDays
+                        : 0}{' '}
+                      <span className="text-lg font-medium text-slate-500">天</span>
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      月赠 {billingSummary.monthlyGiftPoints.toLocaleString('zh-CN')} 积分
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">钱包余额</p>
+                    <p className="mt-2 text-3xl font-bold tabular-nums text-slate-900">
+                      ¥{(billingSummary.walletBalanceCents / 100).toFixed(2)}
+                    </p>
+                    <a href="/wallet" className="mt-2 inline-block text-xs font-medium text-indigo-600 hover:underline">
+                      前往我的钱包 →
+                    </a>
+                  </div>
+                </div>
+              ) : null}
+
+              <SubscriptionPlansPanel
+                currentPlan={plan}
+                onSelectPlan={(tierIndex) => openSubModal(tierIndex)}
+              />
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-5">
+                <div className="mb-2 flex items-center text-slate-900">
+                  <Crown className="mr-2 h-5 w-5 text-amber-500" />
+                  <span className="font-semibold">当前订阅状态</span>
+                </div>
+                <p className="text-sm text-slate-600">
+                  当前版本：<strong className="text-slate-900">{entitlements.planLabel}</strong>
+                  {billingSummary ? (
+                    <span className="ml-2 text-slate-500">
+                      · 积分 {formatErpPointsEquivalentsLine(billingSummary.totalPoints)}
+                    </span>
+                  ) : null}
+                </p>
+                {subSnap && isPaidMember ? (
+                  <div className="mt-3 space-y-1 text-sm text-slate-700">
+                    <p>
+                      订阅 {subSnap.subscriptionDays} 天 + 赠送 {subSnap.opsGiftDays} 天
+                      {memberUsage.expireDate ? (
+                        <span className="ml-2 text-slate-500">
+                          到期 {formatCnDate(memberUsage.expireDate)}
                         </span>
                       ) : null}
                     </p>
-                    <ul className="mt-1.5 list-inside list-disc text-xs text-indigo-900/85">
-                      {PLAN_FEATURE_LINES[plan].map((line) => (
-                        <li key={line}>{line}</li>
-                      ))}
-                    </ul>
-                    {plan === 'free' && entitlements.directAiRemaining != null ? (
-                      <p className="mt-1.5 text-xs text-indigo-800">
-                        本月直连 AI 剩余{' '}
-                        <span className="font-semibold tabular-nums">{entitlements.directAiRemaining}</span> /{' '}
-                        {entitlements.directAiCallLimit} 次
-                      </p>
-                    ) : null}
-                    <p className="mt-1.5 text-[11px] text-indigo-700/80">
-                      与运营管控台「客户管理 → 会员档位」同步；改档后约 20 秒内自动生效。
-                    </p>
                   </div>
-                  <p className="ui-hint-block text-sm text-gray-600">
-                    <strong className="text-gray-900">会员版 ¥168/月</strong>、
-                    <strong className="text-gray-900"> 会员 Plus ¥598/月</strong>
-                    （含季度套餐）；运营确认到账后自动落位对应版本。
-                  </p>
-                  <div className="mt-4 space-y-1 rounded-lg border border-gray-100 bg-gray-50/80 px-3 py-3 text-sm text-gray-800">
-                    {!supabaseConfigured || !supabase ? (
-                      <p className="text-gray-600">接入 Supabase 登录后可查看会员剩余使用时间。</p>
-                    ) : subSnap === undefined ? (
-                      <p className="text-gray-500">正在加载订阅信息…</p>
-                    ) : !isPaidMember ? (
-                      <p className="text-gray-600">
-                        当前为免费版。购买会员版或会员 Plus 并由运营确认到账后，将在此显示订阅时长与剩余使用时间。
-                      </p>
-                    ) : memberUsage.expireDate || totalEntitlementDays > 0 ? (
-                      <>
-                        <p className="text-gray-800">
-                          <span className="text-gray-500">订阅时长：</span>
-                          <span className="tabular-nums font-medium text-gray-900">{subSnap.subscriptionDays}</span> 天
-                          <span className="mx-2 text-gray-300">+</span>
-                          <span className="text-gray-500">赠送时长：</span>
-                          <span className="tabular-nums font-medium text-gray-900">{subSnap.opsGiftDays}</span> 天
-                        </p>
-                        <p className="pt-1 font-medium text-gray-900">
-                          <span className="text-gray-500">总剩余时长：</span>
-                          <span className="tabular-nums">
-                            {memberUsage.remainDays != null && memberUsage.remainDays > 0
-                              ? memberUsage.remainDays
-                              : 0}
-                          </span>{' '}
-                          天
-                          <span className="ml-2 text-xs font-normal text-gray-400">
-                            （累计权益 {totalEntitlementDays} 天）
-                          </span>
-                        </p>
-                        {memberUsage.expireDate ? (
-                          <p className="pt-1 text-gray-800">
-                            <span className="text-gray-500">会员到期：</span>
-                            {formatCnDate(memberUsage.expireDate)}
-                          </p>
-                        ) : null}
-                        {memberUsage.remainDays != null && memberUsage.remainDays === 0 ? (
-                          <p className="pt-1 text-sm font-medium text-amber-800">今日到期，请尽快续费。</p>
-                        ) : null}
-                        {memberUsage.remainDays != null && memberUsage.remainDays < 0 ? (
-                          <p className="pt-1 text-sm text-amber-800">
-                            会员已过期{' '}
-                            <span className="tabular-nums font-semibold">{Math.abs(memberUsage.remainDays)}</span>{' '}
-                            天，续费后可继续使用。
-                          </p>
-                        ) : null}
-                      </>
-                    ) : (
-                      <p className="text-gray-600">
-                        会员档位已开通，服务截止日待运营登记。请稍后刷新或联系客户经理。
-                      </p>
-                    )}
-                  </div>
-                  <ul className="ui-hint-block mt-3 list-inside list-disc space-y-1 text-sm text-gray-600">
-                    <li>到期成功续费：保持全部编辑与同步能力</li>
-                    <li>续费失败：降级为查看模式（不可新建商品、达人招募等）</li>
-                  </ul>
-                  <button
-                    type="button"
-                    onClick={openSubModal}
-                    className="mt-5 w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-medium text-white hover:bg-indigo-700"
-                  >
-                    打开订阅窗口
-                  </button>
-                </div>
+                ) : (
+                  <p className="mt-2 text-sm text-slate-500">升级会员后在此显示订阅时长与到期日。</p>
+                )}
               </div>
             </div>
           )}

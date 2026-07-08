@@ -170,6 +170,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
+  if (outTradeNo.startsWith('TERP')) {
+    const env = readMerchantSupabaseAdminEnv()
+    if (env.missingParts.length) {
+      res.status(503).send('failure')
+      return
+    }
+    const { createClient } = await import('@supabase/supabase-js')
+    const { confirmTenantPayFromNotify } = await import('../src/lib/tenantPaymentChannels.js')
+    const admin = createClient(env.supabaseUrl, env.serviceRole, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
+    const ok = await confirmTenantPayFromNotify(admin, outTradeNo, tradeNo)
+    res.status(ok ? 200 : 500).send(ok ? 'success' : 'failure')
+    return
+  }
+
   const env = readMerchantSupabaseAdminEnv()
   if (env.missingParts.length) {
     res.status(503).send('failure')

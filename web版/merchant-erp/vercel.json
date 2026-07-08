@@ -82,6 +82,10 @@
       "includeFiles": "vite-plugins/merchantSupabaseAdminEnv.ts",
       "maxDuration": 30
     },
+    "api/meoo-tenant-billing.ts": {
+      "includeFiles": "{vite-plugins,src/lib,商家管理后台/api/_lib}/**",
+      "maxDuration": 30
+    },
     "api/meoo-douyin-goods-category-get.ts": {
       "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 60

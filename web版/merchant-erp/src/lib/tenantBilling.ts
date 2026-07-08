@@ -237,9 +237,9 @@ export async function insertMerchantPaymentOrder(
   supabase: SupabaseClient,
   payload: {
     tenantId: string
-    orderKind: 'subscription' | 'recharge' | 'refund'
+    orderKind: 'subscription' | 'recharge' | 'refund' | 'points_recharge'
     amountCents: number
-    payChannel?: 'wechat' | 'alipay' | null
+    payChannel?: 'wechat' | 'alipay' | 'douyin' | null
     clientNote?: string
   },
 ) {

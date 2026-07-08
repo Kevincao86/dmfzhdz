@@ -1,0 +1,336 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
+import {
+  createAlipayMembershipPayOrder,
+  loadAlipayPayConfig,
+  queryAlipayOrderByOutTradeNo,
+} from './alipayPay.js'
+import {
+  createDouyinPayNativeOrder,
+  isDouyinPayOrderSuccess,
+  loadDouyinPayMerchantConfig,
+  queryDouyinPayOrderByOutTradeNo,
+} from './douyinPayV1.js'
+import {
+  confirmTenantOnlinePaymentOrder,
+  createTenantOnlinePaymentOrder,
+  findTenantOrderByOutTradeNo,
+  isTenantOrderPayExpired,
+  tenantOrderDescription,
+  type TenantOrderKind,
+  type TenantPayChannel,
+  type TenantPaymentOrderRow,
+} from './tenantPaymentShared.js'
+import {
+  createWechatNativeOrder,
+  loadWechatPayConfig,
+  queryWechatOrderByOutTradeNo,
+} from './wechatPayV3.js'
+
+export type TenantPrepayResult =
+  | {
+      ok: true
+      orderId: string
+      outTradeNo: string
+      payMode: string
+      codeUrl?: string
+      qrCode?: string
+      payPageUrl?: string
+    }
+  | { ok: false; error: string; status: number }
+
+export async function createTenantPayPrepay(
+  admin: SupabaseClient,
+  input: {
+    tenantId: string
+    userId: string | null
+    orderKind: TenantOrderKind
+    amountCents: number
+    channel: TenantPayChannel
+    clientNote?: string | null
+  },
+): Promise<TenantPrepayResult> {
+  const channel = input.channel
+  const description = tenantOrderDescription(input.orderKind, input.amountCents)
+
+  if (channel === 'wechat') {
+    const cfgResult = loadWechatPayConfig()
+    if (!cfgResult.ok) return { ok: false, error: cfgResult.error, status: 503 }
+    const cfg = cfgResult.config
+    const order = await createTenantOnlinePaymentOrder(admin, {
+      ...input,
+      payMode: 'wechat_native',
+    })
+    const attach = JSON.stringify({ oid: order.id, kind: input.orderKind }).slice(0, 128)
+    try {
+      const { codeUrl } = await createWechatNativeOrder({
+        cfg,
+        outTradeNo: order.out_trade_no!,
+        description,
+        amountCents: input.amountCents,
+        attach,
+      })
+      return {
+        ok: true,
+        orderId: order.id,
+        outTradeNo: order.out_trade_no!,
+        payMode: 'wechat_native',
+        codeUrl,
+      }
+    } catch (e) {
+      await admin.from('merchant_payment_orders').update({ status: 'cancelled' }).eq('id', order.id)
+      return { ok: false, error: e instanceof Error ? e.message : String(e), status: 502 }
+    }
+  }
+
+  if (channel === 'alipay') {
+    const cfgResult = loadAlipayPayConfig()
+    if (!cfgResult.ok) return { ok: false, error: cfgResult.error, status: 503 }
+    const cfg = cfgResult.config
+    const order = await createTenantOnlinePaymentOrder(admin, {
+      ...input,
+      payMode: cfg.payProduct === 'precreate' ? 'alipay_precreate' : 'alipay_page',
+    })
+    try {
+      const pay = await createAlipayMembershipPayOrder({
+        cfg,
+        outTradeNo: order.out_trade_no!,
+        description,
+        amountCents: input.amountCents,
+      })
+      return {
+        ok: true,
+        orderId: order.id,
+        outTradeNo: order.out_trade_no!,
+        payMode: pay.payMode,
+        qrCode: pay.qrCode,
+        payPageUrl: pay.payPageUrl,
+        codeUrl: pay.qrCode,
+      }
+    } catch (e) {
+      await admin.from('merchant_payment_orders').update({ status: 'cancelled' }).eq('id', order.id)
+      return { ok: false, error: e instanceof Error ? e.message : String(e), status: 502 }
+    }
+  }
+
+  if (channel === 'douyin') {
+    const cfgResult = loadDouyinPayMerchantConfig()
+    if (!cfgResult.ok) return { ok: false, error: cfgResult.error, status: 503 }
+    const cfg = cfgResult.config
+    const order = await createTenantOnlinePaymentOrder(admin, {
+      ...input,
+      payMode: 'douyin_native',
+    })
+    try {
+      const { codeUrl } = await createDouyinPayNativeOrder({
+        cfg,
+        outTradeNo: order.out_trade_no!,
+        description,
+        amountCents: input.amountCents,
+        attach: order.id.slice(0, 64),
+      })
+      return {
+        ok: true,
+        orderId: order.id,
+        outTradeNo: order.out_trade_no!,
+        payMode: 'douyin_native',
+        codeUrl,
+        qrCode: codeUrl,
+      }
+    } catch (e) {
+      await admin.from('merchant_payment_orders').update({ status: 'cancelled' }).eq('id', order.id)
+      return { ok: false, error: e instanceof Error ? e.message : String(e), status: 502 }
+    }
+  }
+
+  return { ok: false, error: 'unsupported_channel', status: 400 }
+}
+
+export async function pollTenantPayOrder(
+  admin: SupabaseClient,
+  outTradeNo: string,
+): Promise<
+  | { ok: true; status: 'pending' | 'paid' | 'expired' | 'cancelled'; orderId?: string }
+  | { ok: false; error: string }
+> {
+  const order = await findTenantOrderByOutTradeNo(admin, outTradeNo)
+  if (!order) return { ok: false, error: 'order_not_found' }
+  if (order.status === 'confirmed') {
+    return { ok: true, status: 'paid', orderId: order.id }
+  }
+  if (order.status === 'cancelled') return { ok: true, status: 'cancelled', orderId: order.id }
+  if (isTenantOrderPayExpired(order)) {
+    await admin
+      .from('merchant_payment_orders')
+      .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+      .eq('id', order.id)
+      .eq('status', 'pending')
+    return { ok: true, status: 'expired', orderId: order.id }
+  }
+
+  const channel = String(order.pay_channel || '').trim() as TenantPayChannel
+  const tradeNo = String(order.out_trade_no || '').trim()
+  if (!tradeNo) return { ok: false, error: 'missing_out_trade_no' }
+
+  try {
+    if (channel === 'wechat') {
+      const cfgResult = loadWechatPayConfig()
+      if (!cfgResult.ok) return { ok: false, error: cfgResult.error }
+      const q = await queryWechatOrderByOutTradeNo(cfgResult.config, tradeNo)
+      if (q.tradeState === 'SUCCESS') {
+        const confirmed = await confirmTenantOnlinePaymentOrder(admin, order, {
+          transactionId: q.transactionId,
+          verifiedCents: order.amount_cents,
+        })
+        if (!confirmed.ok) return { ok: false, error: confirmed.error }
+        return { ok: true, status: 'paid', orderId: order.id }
+      }
+      return { ok: true, status: 'pending', orderId: order.id }
+    }
+
+    if (channel === 'alipay') {
+      const cfgResult = loadAlipayPayConfig()
+      if (!cfgResult.ok) return { ok: false, error: cfgResult.error }
+      const q = await queryAlipayOrderByOutTradeNo(cfgResult.config, tradeNo)
+      if (q.tradeStatus === 'TRADE_SUCCESS' || q.tradeStatus === 'TRADE_FINISHED') {
+        const confirmed = await confirmTenantOnlinePaymentOrder(admin, order, {
+          transactionId: q.tradeNo,
+          verifiedCents: order.amount_cents,
+        })
+        if (!confirmed.ok) return { ok: false, error: confirmed.error }
+        return { ok: true, status: 'paid', orderId: order.id }
+      }
+      return { ok: true, status: 'pending', orderId: order.id }
+    }
+
+    if (channel === 'douyin') {
+      const cfgResult = loadDouyinPayMerchantConfig()
+      if (!cfgResult.ok) return { ok: false, error: cfgResult.error }
+      const q = await queryDouyinPayOrderByOutTradeNo(cfgResult.config, tradeNo)
+      if (isDouyinPayOrderSuccess(q)) {
+        const confirmed = await confirmTenantOnlinePaymentOrder(admin, order, {
+          transactionId: q.transactionId,
+          verifiedCents: order.amount_cents,
+        })
+        if (!confirmed.ok) return { ok: false, error: confirmed.error }
+        return { ok: true, status: 'paid', orderId: order.id }
+      }
+      return { ok: true, status: 'pending', orderId: order.id }
+    }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+
+  return { ok: true, status: 'pending', orderId: order.id }
+}
+
+export async function confirmTenantPayFromNotify(
+  admin: SupabaseClient,
+  outTradeNo: string,
+  transactionId?: string | null,
+): Promise<boolean> {
+  const order = await findTenantOrderByOutTradeNo(admin, outTradeNo)
+  if (!order || !String(order.out_trade_no || '').startsWith('TERP')) return false
+  if (order.status === 'confirmed') return true
+  const result = await confirmTenantOnlinePaymentOrder(admin, order, { transactionId })
+  return result.ok
+}
+
+export type TenantBillingSummary = {
+  membershipPlan: string
+  membershipPlanLabel: string
+  serviceExpireAt: string | null
+  subscriptionDays: number
+  opsGiftDays: number
+  remainDays: number | null
+  walletBalanceCents: number
+  packagePoints: number
+  rechargePoints: number
+  totalPoints: number
+  monthlyGiftPoints: number
+  giftMonth: string | null
+}
+
+export async function buildTenantBillingSummary(
+  admin: SupabaseClient,
+  tenantId: string,
+): Promise<TenantBillingSummary> {
+  const { MEMBERSHIP_PLAN_LABELS, normalizeMembershipPlan } = await import('./membershipPlan.js')
+  const { computeMemberUsageRemaining } = await import('./tenantBilling.js')
+  const { erpMonthlyGiftPointsForPlan } = await import('./erpPointsEconomics.js')
+  const { ensureErpMonthlyGiftPointsGranted, readTenantPointsBalances } = await import('./erpPointsCore.js')
+
+  const { data: tenant, error } = await admin
+    .from('tenants')
+    .select(
+      'membership_plan, service_expire_at, subscription_days, ops_gift_days, official_days, wallet_balance_cents, erp_package_points_balance, erp_recharge_points_balance, erp_points_gift_month',
+    )
+    .eq('id', tenantId)
+    .maybeSingle()
+  if (error) throw error
+
+  const plan = normalizeMembershipPlan(tenant?.membership_plan)
+  await ensureErpMonthlyGiftPointsGranted(admin, tenantId, { plan })
+
+  const refreshed = await admin
+    .from('tenants')
+    .select(
+      'membership_plan, service_expire_at, subscription_days, ops_gift_days, official_days, wallet_balance_cents, erp_package_points_balance, erp_recharge_points_balance, erp_points_gift_month',
+    )
+    .eq('id', tenantId)
+    .maybeSingle()
+
+  const row = refreshed.data
+  const expireIso = typeof row?.service_expire_at === 'string' ? row.service_expire_at : null
+  const usage = computeMemberUsageRemaining(expireIso)
+  const sub = Math.max(0, Math.floor(Number(row?.subscription_days) || 0))
+  const gift = Math.max(0, Math.floor(Number(row?.ops_gift_days) || 0))
+  const pts = readTenantPointsBalances(row)
+
+  return {
+    membershipPlan: plan,
+    membershipPlanLabel: MEMBERSHIP_PLAN_LABELS[plan],
+    serviceExpireAt: expireIso,
+    subscriptionDays: sub,
+    opsGiftDays: gift,
+    remainDays: usage.remainDays,
+    walletBalanceCents: Math.max(0, Math.floor(Number(row?.wallet_balance_cents) || 0)),
+    packagePoints: pts.packagePoints,
+    rechargePoints: pts.rechargePoints,
+    totalPoints: pts.totalPoints,
+    monthlyGiftPoints: erpMonthlyGiftPointsForPlan(plan),
+    giftMonth: typeof row?.erp_points_gift_month === 'string' ? row.erp_points_gift_month : null,
+  }
+}
+
+export async function listTenantPaymentOrders(
+  admin: SupabaseClient,
+  tenantId: string,
+  limit = 50,
+): Promise<TenantPaymentOrderRow[]> {
+  const { data, error } = await admin
+    .from('merchant_payment_orders')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return (data ?? []) as TenantPaymentOrderRow[]
+}
+
+export async function listTenantPointsLedger(
+  admin: SupabaseClient,
+  tenantId: string,
+  limit = 80,
+): Promise<Record<string, unknown>[]> {
+  const { data, error } = await admin
+    .from('tenant_points_ledger')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) {
+    if (/does not exist|Could not find/i.test(error.message)) return []
+    throw error
+  }
+  return data ?? []
+}
