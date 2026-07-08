@@ -5,8 +5,9 @@ import {
   normalizeMembershipPlan,
   type MembershipPlan,
   FREE_DIRECT_AI_CALL_LIMIT,
+  ERP_AGENT_POINTS_PER_TURN,
 } from '../src/lib/membershipPlan.js'
-import { ERP_AGENT_POINTS_PER_TURN, ERP_AGENT_USAGE_KIND } from '../src/lib/erpPointsEconomics.js'
+import { ERP_AGENT_USAGE_KIND } from '../src/lib/erpPointsEconomics.js'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 export type TenantAiContext = {
