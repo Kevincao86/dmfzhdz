@@ -68,7 +68,12 @@ export function loadWechatPayConfig(): WechatPayConfigResult {
   const missing: string[] = []
   const mchId = String(process.env.WECHAT_PAY_MCH_ID || '').trim()
   const appId = String(
-    process.env.WECHAT_PAY_APP_ID || process.env.MP_WECHAT_APPID || process.env.WX_APPID || '',
+    process.env.WECHAT_PAY_APP_ID ||
+      process.env.ERP_MP_WECHAT_APPID ||
+      process.env.MERCHANT_MP_WECHAT_APPID ||
+      process.env.MP_WECHAT_APPID ||
+      process.env.WX_APPID ||
+      '',
   ).trim()
   const apiV3Key = String(process.env.WECHAT_PAY_API_V3_KEY || '').trim()
   const merchantSerial = String(process.env.WECHAT_PAY_MERCHANT_SERIAL || '').trim()
