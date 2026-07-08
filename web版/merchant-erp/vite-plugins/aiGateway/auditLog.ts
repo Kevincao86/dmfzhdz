@@ -5,6 +5,7 @@ import {
   buildClosedLoopSystemAddon,
   buildNineScenarioOverviewAddon,
   buildScenarioWorkflowSystemAddon,
+  isKnownScenarioTaskType,
 } from '../../src/lib/aiAgentScenarioWorkflows.js'
 import { dialogueStyleAddonForPickerKey } from './agentDialogueStyle.js'
 import { sanitizeTokenUsage } from './aiJsonSafe.js'
@@ -47,7 +48,7 @@ function buildAgentSystemContent(
       ? dialogueStyleAddonForPickerKey(req.agentPickerKey.trim())
       : ''
   const parts = [AI_AGENT_SYSTEM_PROMPT, buildNineScenarioOverviewAddon()]
-  if (req.taskType) {
+  if (req.taskType && isKnownScenarioTaskType(req.taskType)) {
     parts.push(buildScenarioWorkflowSystemAddon(req.taskType))
   }
   const loopTypes = req.taskTypes?.length ? req.taskTypes : undefined

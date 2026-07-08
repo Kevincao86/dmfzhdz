@@ -34,7 +34,7 @@ const FUNCTION_SECTIONS = [
   {
     id: 'product',
     title: '商品',
-    layout: 'grid2',
+    layout: 'grid3',
     tone: 'orange',
     rowDesc: '',
     sectionIcon: 'list',
