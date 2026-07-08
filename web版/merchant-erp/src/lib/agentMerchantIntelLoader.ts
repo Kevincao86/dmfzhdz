@@ -107,14 +107,14 @@ function scopesForTask(task?: AiTaskType): {
         onlineProducts: false,
       }
     default:
-      // 日常闲聊不拉 GEO/活动/竞品接口，避免发送后长时间「思考中」才发起流式对话
+      // 日常对话也拉取类目/商品，避免错配组品（如数码店输出餐饮套餐）
       return {
         geo: false,
         activities: false,
         kol: true,
         recruitmentDraft: true,
         competitorRefresh: false,
-        onlineProducts: false,
+        onlineProducts: true,
       }
   }
 }
@@ -397,13 +397,10 @@ export async function loadFullMerchantIntelSnapshot(
   return { ...base, ...enriched }
 }
 
-const CASUAL_INTEL_LINE =
-  '【门店经营情报】当前为日常对话；仅当用户明确讨论经营、商品、推广、招募时再结合 ERP 数据作答，勿主动展开。'
 
 export async function buildAgentMerchantIntelContextAsync(
   taskType?: AiTaskType,
 ): Promise<string> {
-  if (!taskType) return CASUAL_INTEL_LINE
   const full = await loadFullMerchantIntelSnapshot(taskType)
   return buildAgentMerchantIntelContextFromSnapshot(full)
 }

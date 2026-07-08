@@ -3,6 +3,7 @@
  */
 const sessionSync = require('./merchantSessionSyncMp.js')
 const platformBindingsMp = require('./platformBindingsMp.js')
+const industryAlignMp = require('./merchantIndustryAlignMp.js')
 
 function readTenantScopedJson(baseKey) {
   try {
@@ -15,10 +16,6 @@ function readTenantScopedJson(baseKey) {
   } catch (_) {
     return null
   }
-}
-
-function isDigitalIndustry(text) {
-  return /3[Cc]|数码|电子|家电|科技|手机|电脑|智能设备/.test(String(text || ''))
 }
 
 function menuSummary(items, max) {
@@ -41,6 +38,7 @@ function menuSummary(items, max) {
 }
 
 function formatMerchantIntelContext() {
+  const tenantId = wx.getStorageSync(sessionSync.MEOO_ACTIVE_TENANT_ID)
   const marginRaw = readTenantScopedJson('meoo_store_margin_config_v1')
   const menuRaw = readTenantScopedJson('meoo_store_menu_v1')
   const margins = marginRaw && marginRaw.margins ? marginRaw.margins : { douyin: 38, meituan: 35, xhs: 32 }
@@ -49,9 +47,12 @@ function formatMerchantIntelContext() {
   const menuItems = menuRaw && Array.isArray(menuRaw.items) ? menuRaw.items : []
   const storeName = menuRaw && menuRaw.storeName ? String(menuRaw.storeName).trim() : ''
   const displayName = wx.getStorageSync('meoo_erp_merchant_display_name') || ''
+  const draftRows = menuItems.length ? [] : industryAlignMp.loadDraftProductRows(tenantId)
+  const draftSummary = draftRows.length ? industryAlignMp.summarizeDraftRows(draftRows) : ''
 
   const lines = [
-    '【门店经营情报 · 与电脑端同账号云端同步】',
+    '【门店经营情报 · 与电脑端同账号云端同步 · 回复前须先阅读】',
+    '优先使用菜单价目；若无菜单则使用经营类目与商品草稿；所有组品须与类目一致。',
     platformBindingsMp.formatAgentBindingContext(),
   ]
   if (displayName) lines.push(`商户：${displayName}`)
@@ -66,14 +67,12 @@ function formatMerchantIntelContext() {
   }
   if (menuItems.length) {
     lines.push(`价目/商品参考（${menuItems.length} 项）：\n${menuSummary(menuItems)}`)
+  } else if (draftSummary) {
+    lines.push(`价目/商品参考（菜单为空，读草稿箱 ${draftRows.length} 项）：\n${draftSummary}`)
   } else {
-    lines.push('价目/商品参考：暂无；不得虚构与本类目无关的具体商品（如数码店禁止编造餐饮套餐）。')
+    lines.push('价目/商品参考：暂无；须改读经营类目，禁止默认按餐饮举例或捏造套餐。')
   }
-  if (isDigitalIndustry(industryPath) || isDigitalIndustry(displayName) || isDigitalIndustry(storeName)) {
-    lines.push(
-      '【类目约束】本商户为数码/3C 类：方案须围绕数码团购、配件、到店体验、代金券等；禁止输出餐饮菜品、冰饮、火锅、探店套餐。',
-    )
-  }
+  lines.push(industryAlignMp.formatIndustryAlignmentConstraint(industryPath, storeName || displayName))
   return lines.join('\n')
 }
 

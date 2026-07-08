@@ -187,7 +187,6 @@ function buildChatMessages(history, userLine, imageDataUrls) {
   const messages = [{ role: 'system', content: AI_AGENT_SYSTEM_PROMPT }]
   try {
     messages.push({ role: 'system', content: merchantIntelMp.formatMerchantIntelContext() })
-    messages.push({ role: 'system', content: platformBindingsMp.formatAgentBindingContext() })
   } catch (_) {}
   for (const m of history.slice(-20)) {
     if (m.role === 'user' || m.role === 'assistant') {
