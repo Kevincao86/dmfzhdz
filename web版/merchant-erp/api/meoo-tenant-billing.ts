@@ -24,7 +24,7 @@ import {
 import { readMerchantSupabaseAdminEnv } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import { nodeSupabaseClientOptions } from '../src/lib/nodeSupabaseClientOptions.js'
 import { formatThrowableMessage, tenantPayErrorMessage } from '../src/lib/formatDisplayError.js'
-import { wxCodeToOpenId } from '../src/lib/mpAccountAuth.js'
+import { erpWxCodeToOpenId } from '../src/lib/erpMpWechatAccess.js'
 
 export const config = { maxDuration: 30 }
 
@@ -199,7 +199,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         try {
           const stableDevOpenId =
             typeof body.stableDevOpenId === 'string' ? body.stableDevOpenId : undefined
-          const wx = await wxCodeToOpenId(String(body.code).trim(), stableDevOpenId)
+          const wx = await erpWxCodeToOpenId(String(body.code).trim(), stableDevOpenId)
           wechatOpenId = String(wx.openid || '').trim()
         } catch (e) {
           const msg = formatThrowableMessage(e, 'wx_code2session_failed')

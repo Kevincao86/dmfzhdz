@@ -7,7 +7,7 @@ import {
   smsLoginErrorMessage,
 } from './authSmsAuthShared.js'
 import { readMerchantSupabaseAdminEnv } from './merchantSupabaseAdminEnv.js'
-import { wxCodeToOpenId } from '../src/lib/mpAccountAuth.js'
+import { erpWxCodeToOpenId } from '../src/lib/erpMpWechatAccess.js'
 import { supabaseAdminFetch } from '../src/lib/supabaseAdminFetch.js'
 
 const ERP_WX_OPENID_META_KEY = 'erp_wx_openid'
@@ -209,7 +209,7 @@ async function registerMerchantByWxProfile(input: {
 
 export function wxLoginErrorMessage(error: string, detail?: string): string {
   if (error === 'wx_not_configured') {
-    return '微信登录未配置，请联系管理员配置 MP_WECHAT_APPID / MP_WECHAT_SECRET'
+    return '微信登录未配置，请联系管理员配置 ERP_MP_WECHAT_APPID / ERP_MP_WECHAT_SECRET'
   }
   if (error === 'wx_openid_already_bound') {
     return '该微信已绑定其他商家账号，请用原账号登录'
@@ -236,11 +236,11 @@ export async function signInWithWxLoginCode(input: {
 
   let openid = ''
   try {
-    const session = await wxCodeToOpenId(code, input.stableDevOpenId)
+    const session = await erpWxCodeToOpenId(code, input.stableDevOpenId)
     openid = String(session.openid || '').trim()
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    if (/wx_not_configured/i.test(msg)) {
+    if (/erp_wx_not_configured|wx_not_configured/i.test(msg)) {
       return { ok: false, error: 'wx_not_configured', message: wxLoginErrorMessage('wx_not_configured') }
     }
     return { ok: false, error: 'invalid_wx_code', message: wxLoginErrorMessage('invalid_wx_code', msg) }
@@ -301,7 +301,7 @@ export async function tryBindWxCodeAfterLogin(input: {
   const code = String(input.code || '').trim()
   if (!code && !String(input.stableDevOpenId || '').trim()) return
   try {
-    const session = await wxCodeToOpenId(code, input.stableDevOpenId)
+    const session = await erpWxCodeToOpenId(code, input.stableDevOpenId)
     const openid = String(session.openid || '').trim()
     if (!openid) return
     await bindErpWxOpenIdToAuthUser(input.userId, openid, {
