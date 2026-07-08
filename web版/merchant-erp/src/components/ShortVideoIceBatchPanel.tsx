@@ -16,7 +16,7 @@ import {
   Wand2,
   Zap,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../cn'
 import {
   fetchIceExportPreviewUrl,
@@ -145,7 +145,6 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   const [editInstruction, setEditInstruction] = useState('')
   const [jobs, setJobs] = useState<IceBatchJob[]>([])
   const [oneClickBusy, setOneClickBusy] = useState(false)
-  const [batchBusy, setBatchBusy] = useState(false)
   const [downloadBusy, setDownloadBusy] = useState(false)
   const [videoUploading, setVideoUploading] = useState(false)
   const [imageUploading, setImageUploading] = useState(false)
@@ -171,8 +170,6 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   const [aspectId, setAspectId] = useState<(typeof ICE_ASPECT_PRESETS)[number]['id']>('9:16')
   const [clipEndSec, setClipEndSec] = useState(10)
   const [preset, setPreset] = useState('无附加特效')
-  const [batchGenerateEnabled, setBatchGenerateEnabled] = useState(false)
-  const [batchGenerateCount, setBatchGenerateCount] = useState<IceBatchGenerateCount>(10)
   const [dispatchTalent, setDispatchTalent] = useState(false)
   const [dispatchBusy, setDispatchBusy] = useState(false)
   const [dispatchedOrderId, setDispatchedOrderId] = useState<string | null>(null)
@@ -198,11 +195,6 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     cfg?.presets ??
     ICE_EFFECT_PRESETS.map((p) => p.label)
 
-  const pendingCount = jobs.filter((j) => j.phase === 'pending' || j.phase === 'failed').length
-  const effectiveBatchCount = batchGenerateEnabled ? batchGenerateCount : 1
-  const imageBatchRuns =
-    batchGenerateEnabled && imageItems.length > 0 ? batchGenerateCount : 0
-  const totalBatchRuns = pendingCount * effectiveBatchCount + imageBatchRuns
   const doneJobs = jobs.filter((j) => j.phase === 'done')
   const latestDone = doneJobs.length > 0 ? doneJobs[doneJobs.length - 1] : null
   const composedBrief = composeIceEditBrief(editCopy, editInstruction)
@@ -235,15 +227,9 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   )
   const briefOk = editCopy.trim().length >= 2 || editInstruction.trim().length >= 4
   const mediaBusy = videoUploading || imageUploading
-  const anyBusy = oneClickBusy || batchBusy
-  const canSubmit =
-    cfg?.configured &&
-    briefOk &&
-    !batchBusy &&
-    !mediaBusy &&
-    (pendingCount > 0 || imageBatchRuns > 0)
+  const anyBusy = oneClickBusy
   const canOneClickImages =
-    cfg?.configured && imageItems.length > 0 && briefOk && !oneClickBusy && !batchBusy && !mediaBusy
+    cfg?.configured && imageItems.length > 0 && briefOk && !oneClickBusy && !mediaBusy
   const canAiBrief =
     !anyBusy &&
     !mediaBusy &&
@@ -972,177 +958,6 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     }
   }, [latestDone?.exportId])
 
-  const runBatch = async () => {
-    if (!cfg?.configured) {
-      setErr('灵祺AI云剪服务未就绪，请联系运营在管控台配置 AppId 与 AccessKey。')
-      return
-    }
-    if (!briefOk) {
-      setErr('请填写文案框（上屏字幕）或指令框（节奏/BGM/音效）。')
-      return
-    }
-    const pending = jobs.filter((j) => j.phase === 'pending' || j.phase === 'failed')
-    const imageUrls = imageItems.map((x) => icePipelineImageUrl(x))
-    const invalidUrls = findInvalidIcePipelineImageUrl(imageUrls)
-    if (invalidUrls) {
-      setErr(invalidUrls)
-      return
-    }
-    const runImageBatch = batchGenerateEnabled && imageUrls.length > 0
-    if (pending.length === 0 && !runImageBatch) {
-      setErr('请先添加视频素材到队列，或上传多图并启用批量生成')
-      return
-    }
-    setBatchBusy(true)
-    setErr(null)
-    setHint(
-      runImageBatch && pending.length === 0
-        ? `正在批量生成 ${batchGenerateCount} 条多图成片…`
-        : batchGenerateEnabled
-          ? `正在批量生成 ${totalBatchRuns} 条成片…`
-          : `正在提交 ${pending.length} 条单条剪辑任务…`,
-    )
-
-    const brief = composedBrief.trim()
-    let runIndex = 0
-
-    if (runImageBatch) {
-      for (let copy = 0; copy < batchGenerateCount; copy++) {
-        runIndex += 1
-        const runLabel = `多图合成 · ${imageUrls.length} 张 · 第 ${copy + 1}/${batchGenerateCount} 条`
-        const localId = newJobId()
-        setJobs((prev) => [
-          ...prev,
-          {
-            id: localId,
-            label: runLabel,
-            mediaUrl: imageUrls[0]!,
-            imageUrls,
-            phase: 'pipeline',
-            message: `批量 ${runIndex}/${totalBatchRuns} · 多图提交云端…`,
-          },
-        ])
-        if (!(await ensureCloudEditAffordable())) {
-          patchJob(localId, { phase: 'failed', message: '积分不足，已停止批量提交' })
-          setBatchBusy(false)
-          return
-        }
-        const pipe = await postIcePipeline({
-          imageUrls,
-          projectName: `灵祺AI云剪-${runLabel}`.slice(0, 120),
-          editBrief: brief,
-          width: aspect.width,
-          height: aspect.height,
-          clipEndSec,
-          preset,
-        })
-        if (!pipe.ok) {
-          patchJob(localId, { phase: 'failed', message: pipe.message })
-          continue
-        }
-        patchJob(localId, {
-          exportId: pipe.jobId,
-          phase: 'polling',
-          message: `批量 ${runIndex}/${totalBatchRuns} · 云端剪辑中…`,
-        })
-        await pollJob(localId, pipe.jobId)
-      }
-    }
-
-    for (const job of pending) {
-      if (batchGenerateEnabled) {
-        for (let copy = 0; copy < batchGenerateCount; copy++) {
-          runIndex += 1
-          const runLabel = `${job.label} · 第 ${copy + 1}/${batchGenerateCount} 条`
-          const localId = newJobId()
-          setJobs((prev) => [
-            ...prev,
-            {
-              id: localId,
-              label: runLabel,
-              mediaUrl: job.mediaUrl,
-              phase: 'pipeline',
-              message: `批量 ${runIndex}/${totalBatchRuns} · 提交云端剪辑…`,
-            },
-          ])
-          if (!(await ensureCloudEditAffordable())) {
-            patchJob(localId, { phase: 'failed', message: '积分不足，已停止批量提交' })
-            setBatchBusy(false)
-            return
-          }
-          const pipe = await postIcePipeline({
-            mediaUrl: job.mediaUrl,
-            signedMediaUrl: job.signedMediaUrl,
-            projectName: `灵祺AI云剪-${runLabel}`.slice(0, 120),
-            editBrief: brief,
-            width: aspect.width,
-            height: aspect.height,
-            clipEndSec,
-            preset,
-          })
-          if (!pipe.ok) {
-            patchJob(localId, { phase: 'failed', message: pipe.message })
-            continue
-          }
-          patchJob(localId, {
-            exportId: pipe.jobId,
-            phase: 'polling',
-            message: `批量 ${runIndex}/${totalBatchRuns} · 云端剪辑中…`,
-          })
-          await pollJob(localId, pipe.jobId)
-        }
-        patchJob(job.id, {
-          phase: 'done',
-          message: `已按批量设置生成 ${batchGenerateCount} 条，见右侧成片列表`,
-        })
-      } else {
-        runIndex += 1
-        patchJob(job.id, {
-          phase: 'pipeline',
-          message:
-            pending.length > 1
-              ? `单条剪辑 ${runIndex}/${pending.length} · 提交云端…`
-              : '提交云端剪辑…',
-        })
-        if (!(await ensureCloudEditAffordable())) {
-          patchJob(job.id, { phase: 'failed', message: '积分不足，无法提交云剪' })
-          setBatchBusy(false)
-          return
-        }
-        const pipe = await postIcePipeline({
-          mediaUrl: job.mediaUrl,
-          signedMediaUrl: job.signedMediaUrl,
-          projectName: `灵祺AI云剪-${job.label}`.slice(0, 120),
-          editBrief: brief,
-          width: aspect.width,
-          height: aspect.height,
-          clipEndSec,
-          preset,
-        })
-        if (!pipe.ok) {
-          patchJob(job.id, { phase: 'failed', message: pipe.message })
-          continue
-        }
-        patchJob(job.id, {
-          exportId: pipe.jobId,
-          phase: 'polling',
-          message:
-            pending.length > 1
-              ? `单条剪辑 ${runIndex}/${pending.length} · 云端剪辑中…`
-              : '云端剪辑中…',
-        })
-        await pollJob(job.id, pipe.jobId)
-      }
-    }
-
-    setBatchBusy(false)
-    setHint(
-      batchGenerateEnabled
-        ? `批量任务已处理完毕（共 ${totalBatchRuns} 条），请在右侧「成片输出」下载 MP4。`
-        : `剪辑任务已提交完毕（共 ${pending.length} 条），请在右侧「成片输出」下载 MP4。`,
-    )
-  }
-
   return (
     <div className="space-y-6">
       {/* 顶栏 */}
@@ -1192,6 +1007,17 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         ))}
       </ol>
 
+      {(err || hint) && (
+        <div
+          className={cn(
+            'rounded-lg px-4 py-3 text-sm',
+            err ? 'border border-red-200 bg-red-50 text-red-900' : 'border border-zinc-200 bg-zinc-50 text-zinc-700',
+          )}
+        >
+          {err ?? hint}
+        </div>
+      )}
+
       <div className="grid gap-6 xl:grid-cols-12">
         {/* 左侧：输入区 */}
         <div className="space-y-5 xl:col-span-7">
@@ -1201,7 +1027,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               step={1}
               title="素材来源"
               required
-              hint="视频走任务队列批量云剪；多图按顺序合成一条竖屏成片"
+              hint="上传的视频/图片供分镜映射；混剪在上方「一键混剪」提交"
             />
             <div className="flex gap-1 border-b border-zinc-100 px-5">
               <MaterialTabBtn
@@ -1363,7 +1189,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   ))}
                 </ul>
               ) : (
-                <p className="text-xs text-zinc-500">队列为空 — 添加视频素材后才能提交云剪。</p>
+                <p className="text-xs text-zinc-500">队列为空 — 上传视频或图片后用于分镜映射。</p>
               )}
                 </>
               ) : null}
@@ -1595,6 +1421,36 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                     ))}
                   </select>
                 </label>
+                <label className="flex flex-col gap-1 text-xs text-zinc-600">
+                  <span>画幅</span>
+                  <select
+                    value={aspectId}
+                    disabled={anyBusy || planBusy}
+                    onChange={(e) => setAspectId(e.target.value as typeof aspectId)}
+                    className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
+                  >
+                    {ICE_ASPECT_PRESETS.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-xs text-zinc-600">
+                  <span>画面特效</span>
+                  <select
+                    value={preset}
+                    disabled={anyBusy || planBusy}
+                    onChange={(e) => setPreset(e.target.value)}
+                    className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
+                  >
+                    {presetOptions.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <p className="text-[11px] leading-snug text-zinc-500">
                   已上传素材 {mixMaterialPool.length} 个（视频 {jobs.filter((j) => !j.imageUrls?.length).length} · 图片{' '}
                   {imageItems.length}）
@@ -1652,7 +1508,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               </div>
               <button
                 type="button"
-                disabled={!mixReady || oneClickBusy || batchBusy || mediaBusy || planBusy}
+                disabled={!mixReady || oneClickBusy || mediaBusy || planBusy}
                 onClick={() => void runMixOneClick()}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-orange-300 sm:w-auto"
               >
@@ -1674,7 +1530,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   <RequiredMark />
                 </h3>
                 <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
-                  文案框内容上屏展示；指令框控制节奏、转场、BGM 与背景音效。AI 生成会分别填入两框。
+                  剪辑节奏 / BGM / 字幕（与分镜表口播可二选一填写）
                 </p>
               </div>
               <button
@@ -1692,59 +1548,6 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               </button>
             </div>
             <div className="space-y-4 px-5 pb-5 pt-4">
-              <div className="rounded-lg border border-dashed border-violet-200 bg-violet-50/40 px-4 py-3">
-                <p className="mb-3 text-xs font-medium text-violet-900">输出参数</p>
-                <p className="mb-3 text-[11px] leading-relaxed text-violet-800/90">
-                  请先确认画幅、时长与特效，再点「AI 生成文案与指令」；结果将分别填入下方两框。
-                </p>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <Field label="画幅">
-                    <select
-                      value={aspectId}
-                      disabled={anyBusy}
-                      onChange={(e) => setAspectId(e.target.value as typeof aspectId)}
-                      className="w-full rounded-md border border-zinc-300 bg-white px-2 py-2 text-sm"
-                    >
-                      {ICE_ASPECT_PRESETS.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.label}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label={imageItems.length > 0 ? '生成视频时长（秒）' : '输出成片时长（秒）'}>
-                    <input
-                      type="number"
-                      min={1}
-                      max={120}
-                      value={clipEndSec}
-                      disabled={anyBusy}
-                      onChange={(e) => setClipEndSec(Number(e.target.value) || 10)}
-                      className="w-full rounded-md border border-zinc-300 px-2 py-2 text-sm"
-                    />
-                    {imageItems.length === 0 ? (
-                      <span className="mt-1 text-[11px] leading-relaxed text-zinc-500">
-                        从素材前段截取并输出约该时长的 MP4；若原片更短则按原片长度。
-                      </span>
-                    ) : null}
-                  </Field>
-                  <Field label="画面特效">
-                    <select
-                      value={preset}
-                      disabled={anyBusy}
-                      onChange={(e) => setPreset(e.target.value)}
-                      className="w-full rounded-md border border-zinc-300 bg-white px-2 py-2 text-sm"
-                    >
-                      {presetOptions.map((p) => (
-                        <option key={p} value={p}>
-                          {p}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                </div>
-              </div>
-
               <div className="grid gap-4 lg:grid-cols-2">
                 <label className="block rounded-xl border-2 border-orange-200 bg-orange-50/30 p-3 text-xs font-medium text-orange-950">
                   <span className="text-sm font-semibold">文案框</span>
@@ -1818,123 +1621,6 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               ) : null}
             </div>
           </section>
-
-          {/* 批量生成（可选） */}
-          <section className="rounded-xl border border-zinc-200 bg-white shadow-sm">
-            <div className="border-b border-zinc-100 px-5 py-4">
-              <label className="flex cursor-pointer items-start gap-3">
-                <input
-                  type="checkbox"
-                  checked={batchGenerateEnabled}
-                  disabled={anyBusy || mediaBusy}
-                  onChange={(e) => setBatchGenerateEnabled(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-600 focus:ring-orange-500"
-                />
-                <span>
-                  <span className="text-sm font-semibold text-zinc-900">启用批量生成</span>
-                  <p className="mt-1 text-xs font-normal text-zinc-500">
-                    未勾选时每个素材仅生成 1 条成片；勾选后按所选条数依次提交（耗时与条数成正比）。
-                  </p>
-                </span>
-              </label>
-            </div>
-            <div
-              className={cn(
-                'flex flex-wrap gap-2 px-5 py-4 transition-opacity',
-                !batchGenerateEnabled && 'pointer-events-none opacity-40',
-              )}
-            >
-              {ICE_BATCH_GENERATE_COUNTS.map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  disabled={anyBusy || mediaBusy || !batchGenerateEnabled}
-                  onClick={() => setBatchGenerateCount(n)}
-                  className={cn(
-                    'rounded-lg border px-4 py-2 text-sm font-medium transition',
-                    batchGenerateCount === n
-                      ? 'border-orange-500 bg-orange-600 text-white shadow-sm'
-                      : 'border-zinc-300 bg-white text-zinc-800 hover:border-orange-300 hover:bg-orange-50',
-                    (anyBusy || mediaBusy) && 'cursor-not-allowed opacity-50',
-                  )}
-                >
-                  {n} 条
-                </button>
-              ))}
-            </div>
-            {totalBatchRuns > 0 ? (
-              <p className="border-t border-zinc-100 px-5 py-3 text-xs text-zinc-600">
-                {batchGenerateEnabled ? (
-                  <>
-                    {pendingCount > 0 ? (
-                      <>
-                        视频队列 {pendingCount} 个 × {batchGenerateCount} 条
-                        {imageBatchRuns > 0 ? '；' : ''}
-                      </>
-                    ) : null}
-                    {imageBatchRuns > 0 ? (
-                      <>
-                        多图 {imageItems.length} 张 × {batchGenerateCount} 条
-                      </>
-                    ) : null}
-                    {' '}
-                    ≈ 共提交 <strong className="text-zinc-900">{totalBatchRuns}</strong> 次云剪
-                  </>
-                ) : (
-                  <>
-                    当前队列 {pendingCount} 个素材，单条剪辑 ≈ 共提交{' '}
-                    <strong className="text-zinc-900">{totalBatchRuns}</strong> 次云剪任务
-                  </>
-                )}
-              </p>
-            ) : batchGenerateEnabled && imageItems.length > 0 ? (
-              <p className="border-t border-zinc-100 px-5 py-3 text-xs text-zinc-600">
-                已上传 {imageItems.length} 张多图，勾选批量后可点下方「提交灵祺AI云剪」
-              </p>
-            ) : null}
-          </section>
-
-          {/* 提交 */}
-          <div className="sticky bottom-4 z-10 rounded-xl border border-orange-200 bg-orange-50/90 p-4 shadow-lg backdrop-blur-sm">
-            {(err || hint) && (
-              <div
-                className={cn(
-                  'mb-3 rounded-lg px-3 py-2 text-sm',
-                  err ? 'bg-red-100 text-red-900' : 'bg-white/80 text-zinc-700',
-                )}
-              >
-                {err ?? hint}
-              </div>
-            )}
-            <button
-              type="button"
-              disabled={!canSubmit || downloadBusy}
-              onClick={() => void runBatch()}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-orange-600 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {batchBusy ? (
-                <>
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  灵祺AI云剪进行中…
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-5 w-5" />
-                  提交灵祺AI云剪
-                  {totalBatchRuns > 0
-                    ? batchGenerateEnabled
-                      ? `（约 ${totalBatchRuns} 条成片）`
-                      : `（${pendingCount} 条单条剪辑）`
-                    : imageItems.length > 0
-                      ? '（请先勾选批量或添加视频队列）'
-                      : ''}
-                </>
-              )}
-            </button>
-            <p className="mt-2 text-center text-[11px] text-zinc-600">
-              提交后请在右侧「成片输出」查看进度并下载；单条任务约需数分钟。
-            </p>
-          </div>
         </div>
 
         {/* 右侧：成片输出 */}
@@ -2093,7 +1779,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
             </div>
           </section>
 
-          {batchGenerateEnabled && doneJobs.length > 0 ? (
+          {doneJobs.length > 0 ? (
             <div className="mt-5 rounded-xl border border-violet-200 bg-violet-50/60 p-4">
               <label className="flex cursor-pointer items-start gap-3">
                 <input
@@ -2105,7 +1791,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 <span className="text-sm text-violet-950">
                   <span className="font-semibold">派发达人投放</span>
                   <span className="mt-1 block text-xs font-normal text-violet-800/90">
-                    将 {doneJobs.length} 条批量云剪成片推送至运营「商家达人招募订单」，由运营下发云剪单至达人小程序。
+                    将 {doneJobs.length} 条混剪成片推送至运营「商家达人招募订单」，由运营下发云剪单至达人小程序。
                   </span>
                 </span>
               </label>
@@ -2262,15 +1948,6 @@ function RequiredMark() {
     <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
       必填
     </span>
-  )
-}
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <label className="flex flex-col gap-1 text-xs text-zinc-600">
-      <span>{label}</span>
-      {children}
-    </label>
   )
 }
 
