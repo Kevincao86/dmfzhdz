@@ -384,24 +384,21 @@
   flex: 1;
   min-width: 0;
   height: 72rpx;
-  line-height: 72rpx;
-  padding: 0 28rpx;
+  min-height: 72rpx;
+  line-height: 36rpx;
+  padding: 18rpx 24rpx;
   border-radius: 999rpx;
   border: 1rpx solid #e2e8f0;
   font-size: 26rpx;
   background: #f8fafc;
   box-sizing: border-box;
-}
-
-.composer-input.placeholder-center {
-  text-align: center;
+  text-align: left;
 }
 
 .model-chip {
   display: flex;
   align-items: center;
   gap: 4rpx;
-  max-width: 132rpx;
   height: 56rpx;
   padding: 0 16rpx;
   border-radius: 999rpx;
@@ -409,6 +406,10 @@
   background: #f8fafc;
   flex-shrink: 0;
   box-sizing: border-box;
+}
+
+.model-chip-left {
+  max-width: 148rpx;
 }
 
 .model-chip.disabled {
