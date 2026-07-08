@@ -81,7 +81,6 @@ import {
   buildAgentUserHabitsContext,
   hydrateAgentUserHabitsFromCloud,
   loadAgentArchivedSessions,
-  loadAgentUserHabits,
   recordAgentUserInteraction,
   saveAgentArchivedSessions,
 } from '../lib/agentUserHabits'
