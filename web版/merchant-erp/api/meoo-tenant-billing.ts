@@ -13,6 +13,7 @@ import {
   listTenantPaymentOrders,
   listTenantPointsLedger,
   pollTenantPayOrder,
+  purchaseTenantWithWallet,
 } from '../src/lib/tenantPaymentChannels.js'
 import type { TenantOrderKind, TenantPayChannel } from '../src/lib/tenantPaymentShared.js'
 import {
@@ -213,6 +214,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         qrCode: result.qrCode ?? result.codeUrl,
         payPageUrl: result.payPageUrl,
       })
+      return
+    }
+
+    if (action === 'wallet_pay') {
+      const orderKind = parseOrderKind(body.orderKind)
+      const amountCents = Math.floor(Number(body.amountCents) || 0)
+      if (!orderKind || amountCents <= 0) {
+        sendJson(res, 400, { ok: false, error: 'invalid_payload' })
+        return
+      }
+      const result = await purchaseTenantWithWallet(admin, {
+        tenantId: auth.tenantId,
+        userId: auth.userId,
+        orderKind,
+        amountCents,
+        clientNote: typeof body.clientNote === 'string' ? body.clientNote : null,
+      })
+      if (!result.ok) {
+        sendJson(res, result.status, {
+          ok: false,
+          error: result.error,
+          message: result.message || tenantPayErrorMessage(result.error),
+        })
+        return
+      }
+      sendJson(res, 200, { ok: true, orderId: result.orderId })
       return
     }
 

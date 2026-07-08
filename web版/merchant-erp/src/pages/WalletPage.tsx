@@ -60,6 +60,7 @@ const CHANNEL_LABEL: Record<string, string> = {
   wechat: '微信',
   alipay: '支付宝',
   douyin: '抖音',
+  wallet: '余额',
 }
 
 export default function WalletPage() {
@@ -514,6 +515,7 @@ export default function WalletPage() {
         open={payOpen === 'points'}
         title="积分充值"
         mode="points_recharge"
+        walletBalanceCents={balanceCents}
         onClose={() => setPayOpen(null)}
         onPaid={() => reload()}
       />

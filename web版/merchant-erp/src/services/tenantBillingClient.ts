@@ -124,6 +124,19 @@ export async function tenantPayPrepay(input: {
   })
 }
 
+export async function tenantWalletPay(input: {
+  orderKind: Extract<TenantPayOrderKind, 'subscription' | 'points_recharge'>
+  amountCents: number
+  clientNote?: string
+}): Promise<{ orderId: string }> {
+  return billingFetch<{ orderId: string }>({
+    action: 'wallet_pay',
+    orderKind: input.orderKind,
+    amountCents: input.amountCents,
+    clientNote: input.clientNote,
+  })
+}
+
 export async function tenantPayPoll(
   outTradeNo: string,
 ): Promise<{ status: 'pending' | 'paid' | 'expired' | 'cancelled'; orderId?: string }> {

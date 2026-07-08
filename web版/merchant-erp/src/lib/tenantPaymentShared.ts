@@ -43,7 +43,9 @@ export type TenantPaymentOrderRow = {
   client_note?: string | null
 }
 
-const PAY_TTL_MS = 15 * 60 * 1000
+const PAY_TTL_MS = 5 * 60 * 1000
+
+export { PAY_TTL_MS as TENANT_PAY_TTL_MS }
 
 export function makeTenantOutTradeNo(): string {
   const ts = Date.now().toString(36)
@@ -261,4 +263,105 @@ export async function confirmTenantOnlinePaymentOrder(
   }
 
   return { ok: false, error: 'unsupported_order_kind' }
+}
+
+export async function purchaseTenantOrderWithWallet(
+  admin: SupabaseClient,
+  input: {
+    tenantId: string
+    userId: string | null
+    orderKind: 'subscription' | 'points_recharge'
+    amountCents: number
+    clientNote?: string | null
+  },
+): Promise<{ ok: true; orderId: string } | { ok: false; error: string; message?: string }> {
+  const cents = Math.floor(Number(input.amountCents) || 0)
+  if (cents <= 0) return { ok: false, error: 'invalid_amount', message: '金额无效' }
+
+  const { data: tenant, error: te } = await admin
+    .from('tenants')
+    .select('wallet_balance_cents')
+    .eq('id', input.tenantId)
+    .maybeSingle()
+  if (te || !tenant) return { ok: false, error: 'tenant_load_failed', message: '读取账户失败' }
+
+  const balance = Math.max(0, Math.floor(Number(tenant.wallet_balance_cents) || 0))
+  if (balance < cents) {
+    const need = cents - balance
+    return {
+      ok: false,
+      error: 'insufficient_wallet_balance',
+      message: `余额不足，当前可用 ¥${(balance / 100).toFixed(2)}，还需 ¥${(need / 100).toFixed(2)}`,
+    }
+  }
+
+  const nowIso = new Date().toISOString()
+  const outTradeNo = makeTenantOutTradeNo()
+  const row: Record<string, unknown> = {
+    tenant_id: input.tenantId,
+    created_by_user_id: input.userId,
+    order_kind: input.orderKind,
+    amount_cents: cents,
+    pay_channel: 'wallet',
+    pay_mode: 'wallet_balance',
+    pay_source: 'manual',
+    out_trade_no: outTradeNo,
+    client_note: input.clientNote ?? null,
+    status: 'pending',
+    created_at: nowIso,
+    updated_at: nowIso,
+  }
+
+  const { data: order, error: insErr } = await admin
+    .from('merchant_payment_orders')
+    .insert(row)
+    .select('*')
+    .single()
+  if (insErr || !order) {
+    return { ok: false, error: 'create_order_failed', message: formatThrowableMessage(insErr, '创建订单失败') }
+  }
+
+  const orderRow = order as TenantPaymentOrderRow
+  const newBal = balance - cents
+  const { error: upTe } = await admin
+    .from('tenants')
+    .update({ wallet_balance_cents: newBal, updated_at: nowIso })
+    .eq('id', input.tenantId)
+  if (upTe) {
+    await admin.from('merchant_payment_orders').update({ status: 'cancelled' }).eq('id', orderRow.id)
+    return { ok: false, error: 'wallet_deduct_failed', message: '扣减余额失败' }
+  }
+
+  const ledgerReason =
+    input.orderKind === 'subscription' ? '余额支付会员订阅' : '余额支付积分充值'
+  const { error: le } = await admin.from('tenant_wallet_ledger').insert({
+    tenant_id: input.tenantId,
+    delta_cents: -cents,
+    balance_after_cents: newBal,
+    reason: ledgerReason,
+    ref_order_id: orderRow.id,
+  })
+  if (le && !/does not exist/i.test(le.message)) {
+    await admin
+      .from('tenants')
+      .update({ wallet_balance_cents: balance, updated_at: nowIso })
+      .eq('id', input.tenantId)
+    await admin.from('merchant_payment_orders').update({ status: 'cancelled' }).eq('id', orderRow.id)
+    return { ok: false, error: 'ledger_insert_failed', message: '写入钱包流水失败' }
+  }
+
+  const confirmed = await confirmTenantOnlinePaymentOrder(admin, orderRow, {
+    verifiedCents: cents,
+    transactionId: 'wallet_balance',
+  })
+  if (!confirmed.ok) {
+    await admin
+      .from('tenants')
+      .update({ wallet_balance_cents: balance, updated_at: nowIso })
+      .eq('id', input.tenantId)
+    await admin.from('merchant_payment_orders').update({ status: 'cancelled' }).eq('id', orderRow.id)
+    return { ok: false, error: confirmed.error, message: '开通权益失败，余额已退回' }
+  }
+
+  return { ok: true, orderId: orderRow.id }
 }

@@ -1,11 +1,15 @@
-import { Loader2, X } from 'lucide-react'
+import { Loader2, Wallet as WalletIcon, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../cn'
 import { DB_MIGRATION_HINT_ZH, shouldSuggestDbMigration } from '../lib/dbSchemaErrorHint'
+import { formatThrowableMessage } from '../lib/formatDisplayError'
 import {
+  formatYuanFromCents,
   POINTS_RECHARGE_TIERS,
   RECHARGE_TIERS,
   SUBSCRIPTION_TIERS,
+  TENANT_ONLINE_PAY_TTL_MS,
+  TENANT_ONLINE_PAY_TTL_SEC,
   yuanInputToCents,
   type PaymentTier,
 } from '../lib/meooPaymentTiers'
@@ -14,13 +18,20 @@ import { supabase } from '../lib/supabaseClient'
 import {
   tenantPayPoll,
   tenantPayPrepay,
+  tenantWalletPay,
   type TenantPayChannel,
   type TenantPayOrderKind,
 } from '../services/tenantBillingClient'
-import { formatThrowableMessage } from '../lib/formatDisplayError'
 
 function formatThrown(e: unknown): string {
   return formatThrowableMessage(e, '操作失败，请稍后重试')
+}
+
+function formatCountdown(totalSec: number): string {
+  const s = Math.max(0, totalSec)
+  const m = Math.floor(s / 60)
+  const r = s % 60
+  return `${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`
 }
 
 const CHANNELS: { id: TenantPayChannel; label: string; color: string }[] = [
@@ -38,6 +49,8 @@ export type TenantPayModalProps = {
   initialTierIndex?: number
   initialRechargeYuan?: string | null
   rechargeContextHint?: string | null
+  /** 订阅 / 积分充值时可使用余额支付 */
+  walletBalanceCents?: number
 }
 
 export default function TenantPayModal({
@@ -49,6 +62,7 @@ export default function TenantPayModal({
   initialTierIndex = 0,
   initialRechargeYuan = null,
   rechargeContextHint = null,
+  walletBalanceCents,
 }: TenantPayModalProps) {
   const tiers: PaymentTier[] = useMemo(() => {
     if (mode === 'subscription') return SUBSCRIPTION_TIERS
@@ -62,6 +76,8 @@ export default function TenantPayModal({
     return 'recharge'
   }, [mode])
 
+  const canWalletPay = mode !== 'recharge' && walletBalanceCents != null
+
   const [step, setStep] = useState<'choose' | 'pay'>('choose')
   const [channel, setChannel] = useState<TenantPayChannel | null>(null)
   const [tierIndex, setTierIndex] = useState(initialTierIndex)
@@ -73,7 +89,10 @@ export default function TenantPayModal({
   const [qrUrl, setQrUrl] = useState<string | null>(null)
   const [, setOutTradeNo] = useState<string | null>(null)
   const [payPageUrl, setPayPageUrl] = useState<string | null>(null)
+  const [payDeadlineMs, setPayDeadlineMs] = useState<number | null>(null)
+  const [remainSec, setRemainSec] = useState(TENANT_ONLINE_PAY_TTL_SEC)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const timedOutRef = useRef(false)
 
   const stopPoll = useCallback(() => {
     if (pollRef.current) {
@@ -85,6 +104,7 @@ export default function TenantPayModal({
 
   const reset = useCallback(() => {
     stopPoll()
+    timedOutRef.current = false
     setStep('choose')
     setChannel(null)
     setTierIndex(initialTierIndex)
@@ -95,6 +115,8 @@ export default function TenantPayModal({
     setQrUrl(null)
     setOutTradeNo(null)
     setPayPageUrl(null)
+    setPayDeadlineMs(null)
+    setRemainSec(TENANT_ONLINE_PAY_TTL_SEC)
   }, [initialTierIndex, stopPoll])
 
   useEffect(() => {
@@ -108,6 +130,22 @@ export default function TenantPayModal({
   }, [open, mode, initialRechargeYuan, initialTierIndex, reset])
 
   useEffect(() => () => stopPoll(), [stopPoll])
+
+  useEffect(() => {
+    if (!open || step !== 'pay' || !payDeadlineMs) return
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((payDeadlineMs - Date.now()) / 1000))
+      setRemainSec(left)
+      if (left <= 0 && !timedOutRef.current) {
+        timedOutRef.current = true
+        stopPoll()
+        onClose()
+      }
+    }
+    tick()
+    const id = window.setInterval(tick, 1000)
+    return () => window.clearInterval(id)
+  }, [open, step, payDeadlineMs, stopPoll, onClose])
 
   if (!open) return null
 
@@ -138,12 +176,43 @@ export default function TenantPayModal({
             stopPoll()
             setLocalErr('支付已超时或已取消，请重新发起')
             setStep('choose')
+            setPayDeadlineMs(null)
           }
         } catch {
           /* 轮询偶发失败忽略 */
         }
       })()
     }, 2500)
+  }
+
+  const startWalletPay = async () => {
+    setLocalErr(null)
+    const cents = resolveAmountCents()
+    if (cents === null) {
+      setLocalErr('请选择有效档位或填写自定义金额')
+      return
+    }
+    if (walletBalanceCents == null) return
+    if (walletBalanceCents < cents) {
+      setLocalErr(
+        `余额不足，当前可用 ¥${formatYuanFromCents(walletBalanceCents)}，应付 ¥${formatYuanFromCents(cents)}`,
+      )
+      return
+    }
+    setBusy(true)
+    try {
+      await tenantWalletPay({
+        orderKind: orderKind as 'subscription' | 'points_recharge',
+        amountCents: cents,
+      })
+      await onPaid?.()
+      handleClose()
+      window.alert(mode === 'subscription' ? '订阅已开通，权益已到账。' : '积分充值成功，已到账。')
+    } catch (e) {
+      setLocalErr(formatThrown(e))
+    } finally {
+      setBusy(false)
+    }
   }
 
   const startOnlinePay = async (ch: TenantPayChannel) => {
@@ -165,6 +234,8 @@ export default function TenantPayModal({
       setQrUrl(qr)
       setOutTradeNo(prepay.outTradeNo)
       setPayPageUrl(prepay.payPageUrl ?? null)
+      setPayDeadlineMs(Date.now() + TENANT_ONLINE_PAY_TTL_MS)
+      setRemainSec(TENANT_ONLINE_PAY_TTL_SEC)
       setStep('pay')
       startPoll(prepay.outTradeNo)
     } catch (e) {
@@ -213,6 +284,9 @@ export default function TenantPayModal({
 
   const selectedTier = tiers[tierIndex]
   const channelLabel = CHANNELS.find((c) => c.id === channel)?.label ?? '支付'
+  const dueCents = resolveAmountCents()
+  const walletEnough =
+    canWalletPay && dueCents != null && walletBalanceCents != null && walletBalanceCents >= dueCents
 
   return (
     <div
@@ -247,7 +321,9 @@ export default function TenantPayModal({
               </p>
             ) : null}
             <p className="text-sm text-slate-400">
-              支持微信、支付宝、抖音扫码支付；支付完成后权益自动到账。
+              {mode === 'recharge'
+                ? '支持微信、支付宝、抖音扫码支付；支付完成后余额自动到账。'
+                : '可用账户余额直接购买，或使用微信 / 支付宝 / 抖音扫码支付。'}
             </p>
 
             <div className="mt-4 space-y-3">
@@ -310,7 +386,36 @@ export default function TenantPayModal({
               <p className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-200">{localErr}</p>
             ) : null}
 
-            <div className="mt-6 grid gap-2 sm:grid-cols-3">
+            {canWalletPay ? (
+              <div className="mt-5 space-y-2">
+                <p className="text-xs text-slate-400">
+                  账户余额 ¥{formatYuanFromCents(walletBalanceCents ?? 0)}
+                  {dueCents != null ? (
+                    <span className="text-slate-500">
+                      {' '}
+                      · 应付 ¥{formatYuanFromCents(dueCents)}
+                    </span>
+                  ) : null}
+                </p>
+                <button
+                  type="button"
+                  disabled={busy || dueCents == null}
+                  className={cn(
+                    'flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-50',
+                    walletEnough
+                      ? 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500'
+                      : 'bg-slate-700 hover:bg-slate-600',
+                  )}
+                  onClick={() => void startWalletPay()}
+                >
+                  <WalletIcon className="h-4 w-4" />
+                  {busy ? '处理中…' : walletEnough ? '余额支付' : '余额支付（余额不足）'}
+                </button>
+                <p className="text-center text-xs text-slate-500">或使用扫码支付（5 分钟内有效）</p>
+              </div>
+            ) : null}
+
+            <div className={cn('grid gap-2 sm:grid-cols-3', canWalletPay ? 'mt-3' : 'mt-6')}>
               {CHANNELS.map((ch) => (
                 <button
                   key={ch.id}
@@ -327,6 +432,14 @@ export default function TenantPayModal({
         ) : (
           <div className="flex flex-col items-center text-center">
             <p className="text-sm text-slate-300">请使用{channelLabel}扫描二维码完成支付</p>
+            <p
+              className={cn(
+                'mt-2 text-sm font-medium tabular-nums',
+                remainSec <= 60 ? 'text-amber-300' : 'text-cyan-300',
+              )}
+            >
+              支付倒计时 {formatCountdown(remainSec)}
+            </p>
             {polling ? (
               <p className="mt-2 flex items-center gap-2 text-xs text-cyan-300/90">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -356,7 +469,7 @@ export default function TenantPayModal({
               <p className="mt-4 text-sm text-amber-200">未获取到二维码，请尝试其他支付方式</p>
             )}
             <p className="mt-3 max-w-sm text-xs text-slate-400">
-              若已支付但页面未更新，请稍候或点击下方「我已支付」；也可改用人工申报。
+              超时未支付将自动关闭；若已支付但页面未更新，请稍候或点击下方「我已支付」。
             </p>
             {localErr ? (
               <p className="mt-3 w-full rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-200">{localErr}</p>
@@ -378,6 +491,7 @@ export default function TenantPayModal({
                   setStep('choose')
                   setChannel(null)
                   setQrUrl(null)
+                  setPayDeadlineMs(null)
                 }}
               >
                 返回重选

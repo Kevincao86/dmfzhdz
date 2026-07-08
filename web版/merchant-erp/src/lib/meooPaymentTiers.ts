@@ -25,6 +25,9 @@ export const POINTS_RECHARGE_TIERS: PaymentTier[] = ERP_POINTS_RECHARGE_TIERS.ma
   cents: Math.round(t.yuan * 100),
 }))
 
+export const TENANT_ONLINE_PAY_TTL_MS = 5 * 60 * 1000
+export const TENANT_ONLINE_PAY_TTL_SEC = TENANT_ONLINE_PAY_TTL_MS / 1000
+
 /** 自定义金额（元）→ 分，最少 ¥1 */
 export function yuanInputToCents(yuanStr: string): number | null {
   const n = Number(String(yuanStr).replace(/,/g, '').trim())
