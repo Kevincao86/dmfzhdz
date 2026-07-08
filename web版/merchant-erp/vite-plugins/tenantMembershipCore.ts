@@ -6,6 +6,8 @@ import {
   type MembershipPlan,
   FREE_DIRECT_AI_CALL_LIMIT,
 } from '../src/lib/membershipPlan.js'
+import { ERP_AGENT_POINTS_PER_TURN, ERP_AGENT_USAGE_KIND } from '../src/lib/erpPointsEconomics.js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 export type TenantAiContext = {
   tenantId: string
@@ -39,6 +41,61 @@ function serviceRoleHeaders(serviceKey: string): Record<string, string> {
     'Content-Type': 'application/json',
     Prefer: 'return=representation',
   }
+}
+
+function createTenantAdminClient(env: Record<string, string>): SupabaseClient | null {
+  const base = supabaseBase(env)
+  const serviceRole = serviceRoleKey(env)
+  if (!base || !serviceRole) return null
+  return createClient(base, serviceRole, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+}
+
+async function assertPaidAgentPointsAffordable(
+  ctx: TenantAiContext,
+  env: Record<string, string>,
+): Promise<AiAccessCheck | null> {
+  if (ctx.plan === 'free') return null
+  const admin = createTenantAdminClient(env)
+  if (!admin) {
+    return {
+      ok: false,
+      status: 503,
+      error: 'points_billing_unavailable',
+      detail: '积分计费服务未配置，请联系运营',
+    }
+  }
+  const { assertErpAiPointsAffordable } = await import('../src/lib/erpAiPointsSpendCore.js')
+  const result = await assertErpAiPointsAffordable(admin, ctx.tenantId, ERP_AGENT_USAGE_KIND)
+  if (!result.ok) {
+    return {
+      ok: false,
+      status: 402,
+      error: result.error,
+      detail: result.message,
+    }
+  }
+  return null
+}
+
+async function spendPaidAgentPointsAfterSuccess(
+  ctx: TenantAiContext,
+  env: Record<string, string>,
+  idempotencyKey?: string,
+): Promise<void> {
+  if (ctx.plan === 'free') return
+  const admin = createTenantAdminClient(env)
+  if (!admin) return
+  const { spendErpAiPoints } = await import('../src/lib/erpAiPointsSpendCore.js')
+  const key =
+    String(idempotencyKey || '').trim() ||
+    `agent_${ctx.tenantId}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+  void spendErpAiPoints(admin, ctx.tenantId, {
+    kind: ERP_AGENT_USAGE_KIND,
+    idempotencyKey: key,
+    note: 'AI 智能体对话',
+  })
 }
 
 function userJwtHeaders(anon: string, jwt: string): Record<string, string> {
@@ -250,16 +307,21 @@ export async function loadTenantAiContextForUser(
   return null
 }
 
-/** 对话成功后再记次，避免每次请求先 PATCH tenants 拖慢首 token */
+/** 对话成功后再记次/扣积分，避免每次请求先 PATCH tenants 拖慢首 token */
 export function recordDirectAiUsageAfterSuccess(
   ctx: TenantAiContext | undefined,
   env: Record<string, string>,
+  opts?: { idempotencyKey?: string },
 ): void {
-  if (!ctx || ctx.plan !== 'free') return
-  const month = currentUsageMonth()
-  let used = ctx.directAiCallsUsed
-  if (ctx.directAiUsageMonth !== month) used = 0
-  void incrementDirectAiUsage(ctx.tenantId, month, used, env)
+  if (!ctx) return
+  if (ctx.plan === 'free') {
+    const month = currentUsageMonth()
+    let used = ctx.directAiCallsUsed
+    if (ctx.directAiUsageMonth !== month) used = 0
+    void incrementDirectAiUsage(ctx.tenantId, month, used, env)
+    return
+  }
+  void spendPaidAgentPointsAfterSuccess(ctx, env, opts?.idempotencyKey)
 }
 
 export type AiAccessCheck =
@@ -367,6 +429,9 @@ export async function assertAiChatAccess(
         detail: `免费版直连 AI 每月上限 ${FREE_DIRECT_AI_CALL_LIMIT} 次，请升级会员版`,
       }
     }
+  } else if (ctx.plan !== 'free') {
+    const pointsBlock = await assertPaidAgentPointsAffordable(ctx, env)
+    if (pointsBlock) return pointsBlock
   }
 
   return { ok: true, envForChat: env, usageCtx: ctx }
@@ -405,4 +470,4 @@ async function incrementDirectAiUsage(
   }
 }
 
-export { buildTenantEntitlements, normalizeMembershipPlan }
+export { buildTenantEntitlements, normalizeMembershipPlan, ERP_AGENT_POINTS_PER_TURN }

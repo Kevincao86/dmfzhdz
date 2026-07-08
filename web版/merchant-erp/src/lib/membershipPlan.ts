@@ -12,6 +12,8 @@ export const MEMBERSHIP_MONTHLY_YUAN: Partial<Record<MembershipPlan, number>> = 
   member_plus: 598,
 }
 
+import { ERP_AGENT_POINTS_PER_TURN } from './erpPointsEconomics.js'
+
 /** 免费版直连四厂商每月上限 */
 export const FREE_DIRECT_AI_CALL_LIMIT = 50
 
@@ -83,6 +85,8 @@ export type TenantEntitlements = {
   directAiCallsUsed: number
   directAiCallLimit: number | null
   directAiRemaining: number | null
+  /** 付费版智能体：每轮对话积分扣费；免费版为 null */
+  agentPointsPerTurn: number | null
   tokenMixBound: boolean
   features: {
     geo: boolean
@@ -109,6 +113,7 @@ export function buildTenantEntitlements(input: {
     directAiCallsUsed: used,
     directAiCallLimit: limit,
     directAiRemaining: remaining,
+    agentPointsPerTurn: isFree ? null : ERP_AGENT_POINTS_PER_TURN,
     tokenMixBound: !!input.tokenMixBound,
     features: {
       geo: !isFree,

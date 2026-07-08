@@ -2,6 +2,7 @@ import type { AiPermissionId, AiTaskType } from './aiAgentTypes'
 import { AI_AGENT_SHORTCUTS } from './aiAgentTypes'
 import type { MembershipPlan } from './membershipPlan'
 import { MEMBERSHIP_PLAN_LABELS } from './membershipPlan'
+import { ERP_AGENT_POINTS_PER_TURN } from './erpPointsEconomics'
 
 export type AiAgentPlanProfile = {
   plan: MembershipPlan
@@ -16,10 +17,12 @@ export type AiAgentPlanProfile = {
 const BASE_WELCOME =
   '你好，我是灵祺 AI 助手。你可以像普通 AI 一样问我任何问题；若在 ERP 里涉及改商品、发招募单、报税、发布等操作，会先展示预览，**需您确认后**才会调用业务接口。'
 
+const PAID_AGENT_POINTS_HINT = `每轮对话消耗 ${ERP_AGENT_POINTS_PER_TURN} 积分（优先扣套餐月赠积分，不足再扣充值积分）`
+
 const WELCOME_BY_PLAN: Record<MembershipPlan, string> = {
   free: `${BASE_WELCOME}\n\n当前为 **免费版**：可使用豆包/千问/MiniMax/DeepSeek 对话与文生图（每月直连调用 ${50} 次上限）；报税管理、GEO、竞对分析需升级会员。`,
-  member: `${BASE_WELCOME}\n\n当前为 **会员版**：可使用四厂商对话模型；生图时若您选的是豆包等对话模型，系统会自动切换为对应文生图引擎优化出图。`,
-  member_plus: `${BASE_WELCOME}\n\n当前为 **会员 Plus**：可使用全部对话与文生图模型（灵祺高阶版智能AI模型）；复杂任务与一键报税均已开放。`,
+  member: `${BASE_WELCOME}\n\n当前为 **会员版**：可使用四厂商对话模型；${PAID_AGENT_POINTS_HINT}。生图时若您选的是豆包等对话模型，系统会自动切换为对应文生图引擎优化出图。`,
+  member_plus: `${BASE_WELCOME}\n\n当前为 **会员 Plus**：可使用全部对话与文生图模型（灵祺高阶版智能AI模型）；${PAID_AGENT_POINTS_HINT}。复杂任务与一键报税均已开放。`,
 }
 
 function shortcutsForPlan(plan: MembershipPlan) {
@@ -55,7 +58,7 @@ export function buildAiAgentPlanProfile(plan: MembershipPlan): AiAgentPlanProfil
     composerHint:
       plan === 'free'
         ? '可闲聊或问经营问题；报税/GEO 等需升级会员'
-        : '开放对话；选模型后可直接提问，生图需求将自动匹配文生图模型',
+        : `开放对话；每轮消耗 ${ERP_AGENT_POINTS_PER_TURN} 积分（套餐桶优先）`,
     shortcuts: shortcutsForPlan(plan),
     permissions: permissionsForPlan(plan),
   }

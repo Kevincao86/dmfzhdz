@@ -4,7 +4,17 @@
  */
 import type { MembershipPlan } from './membershipPlan.js'
 import { MEMBERSHIP_MONTHLY_YUAN } from './membershipPlan.js'
-import { MP_POINTS_VIDEO_PER_MIN, MP_POINTS_ARTICLE_PER_USE, MP_POINTS_BRIEF_PER_USE } from './mpPointsEconomics.js'
+import {
+  MP_POINTS_VIDEO_PER_MIN,
+  MP_POINTS_ARTICLE_PER_USE,
+  MP_POINTS_BRIEF_PER_USE,
+} from './mpPointsEconomics.js'
+
+/** ERP 智能体对话：每轮成功回复扣费（与文稿检核同档，计入套餐桶优先、充值桶补足） */
+export const ERP_AGENT_POINTS_PER_TURN = MP_POINTS_ARTICLE_PER_USE
+
+export const ERP_AGENT_USAGE_KIND = 'agent' as const
+export type ErpAgentUsageKind = typeof ERP_AGENT_USAGE_KIND
 
 export const ERP_POINT_INTERNAL_COST_YUAN = 0.01
 
