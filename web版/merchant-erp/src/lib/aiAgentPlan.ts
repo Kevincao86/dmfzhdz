@@ -1,8 +1,7 @@
 import type { AiPermissionId, AiTaskType } from './aiAgentTypes'
 import { AI_AGENT_SHORTCUTS } from './aiAgentTypes'
 import type { MembershipPlan } from './membershipPlan'
-import { MEMBERSHIP_PLAN_LABELS } from './membershipPlan'
-import { ERP_AGENT_POINTS_PER_TURN } from './erpPointsEconomics'
+import { MEMBERSHIP_PLAN_LABELS, ERP_AGENT_POINTS_PER_TURN } from './membershipPlan'
 
 export type AiAgentPlanProfile = {
   plan: MembershipPlan

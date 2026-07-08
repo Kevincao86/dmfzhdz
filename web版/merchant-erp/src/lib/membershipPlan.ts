@@ -12,10 +12,13 @@ export const MEMBERSHIP_MONTHLY_YUAN: Partial<Record<MembershipPlan, number>> = 
   member_plus: 598,
 }
 
-import { ERP_AGENT_POINTS_PER_TURN } from './erpPointsEconomics.js'
+import { MP_POINTS_ARTICLE_PER_USE } from './mpPointsEconomics.js'
 
 /** 免费版直连四厂商每月上限 */
 export const FREE_DIRECT_AI_CALL_LIMIT = 50
+
+/** 付费版智能体每轮对话积分（与文稿检核同档） */
+export const ERP_AGENT_POINTS_PER_TURN = MP_POINTS_ARTICLE_PER_USE
 
 /** 各会员档位：抖音来客 / 巨量本地推 每平台可绑定账号数 */
 export function platformBindingLimit(plan: MembershipPlan): number {
