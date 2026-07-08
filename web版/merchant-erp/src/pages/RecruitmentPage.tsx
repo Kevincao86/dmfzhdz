@@ -440,11 +440,12 @@ function CreateForm({ onBack }: { onBack: () => void }) {
 
             <div className="mb-6">
               <p className="mb-2 text-sm font-medium text-gray-800">1 招募模式</p>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-xl border-2 border-blue-500 bg-blue-50/50 p-4 text-left">
-                  <div className="text-sm font-semibold text-blue-900">普通招募</div>
-                  <p className="mt-1 text-xs text-blue-800/90">与星选一致，发布至招募大厅，达人报名后进入反选</p>
-                </div>
+              <p className="mb-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-xs leading-relaxed text-gray-600">
+                发布方式：
+                <span className="font-medium text-gray-800">普通招募（星选大厅）</span>
+                — 与星选一致，达人报名后进入反选
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -452,28 +453,59 @@ function CreateForm({ onBack }: { onBack: () => void }) {
                     setDesignatedOpen(false)
                   }}
                   className={cn(
-                    'rounded-xl border-2 p-4 text-left transition-colors',
-                    recruitMode === 'ai' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300',
+                    'rounded-xl border-2 p-4 text-left transition-all duration-150',
+                    recruitMode === 'ai'
+                      ? 'border-blue-500 bg-blue-50/50 shadow-sm ring-1 ring-blue-500/15'
+                      : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/30',
                   )}
                 >
-                  <div className="flex items-center text-sm font-semibold text-blue-900">
+                  <div
+                    className={cn(
+                      'flex items-center text-sm font-semibold',
+                      recruitMode === 'ai' ? 'text-blue-900' : 'text-gray-900',
+                    )}
+                  >
                     <Sparkles className="mr-2 h-4 w-4" />
                     AI智能匹配
                   </div>
-                  <p className="mt-1 text-xs text-blue-800/90">根据条件自动从星选达人库匹配达人</p>
+                  <p
+                    className={cn(
+                      'mt-1 text-xs',
+                      recruitMode === 'ai' ? 'text-blue-800/90' : 'text-gray-600',
+                    )}
+                  >
+                    根据条件自动从星选达人库匹配达人
+                  </p>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setDesignatedOpen(true)}
+                  onClick={() => {
+                    setRecruitMode('designated')
+                    setDesignatedOpen(true)
+                  }}
                   className={cn(
-                    'rounded-xl border-2 p-4 text-left transition-colors',
-                    recruitMode === 'designated' || designatedOpen
-                      ? 'border-blue-500 bg-blue-50/50'
-                      : 'border-gray-200 hover:border-gray-300',
+                    'rounded-xl border-2 p-4 text-left transition-all duration-150',
+                    recruitMode === 'designated'
+                      ? 'border-blue-500 bg-blue-50/50 shadow-sm ring-1 ring-blue-500/15'
+                      : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/30',
                   )}
                 >
-                  <div className="text-sm font-semibold text-gray-900">指定达人</div>
-                  <p className="mt-1 text-xs text-gray-600">填写达人昵称或达人 ID</p>
+                  <div
+                    className={cn(
+                      'text-sm font-semibold',
+                      recruitMode === 'designated' ? 'text-blue-900' : 'text-gray-900',
+                    )}
+                  >
+                    指定达人
+                  </div>
+                  <p
+                    className={cn(
+                      'mt-1 text-xs',
+                      recruitMode === 'designated' ? 'text-blue-800/90' : 'text-gray-600',
+                    )}
+                  >
+                    填写达人昵称或达人 ID
+                  </p>
                   {recruitMode === 'designated' && designatedInput.trim() ? (
                     <p className="mt-2 truncate text-xs font-medium text-blue-700">已填：{designatedInput.trim()}</p>
                   ) : null}
@@ -928,7 +960,8 @@ function CreateForm({ onBack }: { onBack: () => void }) {
                 <div className="rounded-lg bg-gray-50 p-3">
                   <p className="text-xs text-gray-500">招募模式</p>
                   <p className="text-gray-800">
-                    普通招募（星选大厅）· {recruitMode === 'designated' ? '指定达人' : 'AI智能匹配'}
+                    {recruitMode === 'designated' ? '指定达人' : 'AI智能匹配'}
+                    <span className="text-gray-500"> · 普通招募（星选大厅）</span>
                   </p>
                 </div>
                 <div className="rounded-lg bg-gray-50 p-3">
@@ -984,8 +1017,11 @@ function CreateForm({ onBack }: { onBack: () => void }) {
             <div className="mt-6 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setDesignatedOpen(false)}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                onClick={() => {
+                  if (!designatedInput.trim()) setRecruitMode('ai')
+                  setDesignatedOpen(false)
+                }}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50"
               >
                 取消
               </button>
