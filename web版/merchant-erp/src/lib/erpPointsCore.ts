@@ -150,15 +150,38 @@ export async function creditErpRechargePoints(
   return { newRechargeBalance: next, totalPoints: pkg + next }
 }
 
+export type ErpPointsSpendResult =
+  | {
+      ok: true
+      charged: number
+      fromPackage: number
+      fromRecharge: number
+      packageBalance: number
+      rechargeBalance: number
+      totalBalance: number
+    }
+  | { ok: false; error: 'insufficient'; balance: number }
+
 export async function spendErpPoints(
   admin: SupabaseClient,
   tenantId: string,
   points: number,
   reason: string,
   usageKind?: string | null,
-): Promise<{ ok: true; charged: number } | { ok: false; error: 'insufficient'; balance: number }> {
+): Promise<ErpPointsSpendResult> {
   const need = Math.max(0, Math.floor(Number(points) || 0))
-  if (need <= 0) return { ok: true, charged: 0 }
+  if (need <= 0) {
+    const bal = await readTenantPointsBalancesAfterGift(admin, tenantId)
+    return {
+      ok: true,
+      charged: 0,
+      fromPackage: 0,
+      fromRecharge: 0,
+      packageBalance: bal.packagePoints,
+      rechargeBalance: bal.rechargePoints,
+      totalBalance: bal.totalPoints,
+    }
+  }
 
   const { data: tenant, error } = await admin
     .from('tenants')
@@ -183,8 +206,8 @@ export async function spendErpPoints(
   const total = pkg + rch
   if (need > total) return { ok: false, error: 'insufficient', balance: total }
 
-  let fromPkg = Math.min(pkg, need)
-  let fromRch = need - fromPkg
+  const fromPkg = Math.min(pkg, need)
+  const fromRch = need - fromPkg
   pkg -= fromPkg
   rch -= fromRch
 
@@ -209,5 +232,35 @@ export async function spendErpPoints(
     usageKind,
   })
 
-  return { ok: true, charged: need }
+  return {
+    ok: true,
+    charged: need,
+    fromPackage: fromPkg,
+    fromRecharge: fromRch,
+    packageBalance: pkg,
+    rechargeBalance: rch,
+    totalBalance: pkg + rch,
+  }
+}
+
+async function readTenantPointsBalancesAfterGift(
+  admin: SupabaseClient,
+  tenantId: string,
+): Promise<TenantPointsBalances> {
+  const { data: tenant, error } = await admin
+    .from('tenants')
+    .select('erp_package_points_balance, erp_recharge_points_balance, membership_plan')
+    .eq('id', tenantId)
+    .maybeSingle()
+  if (error) throw error
+  if (!tenant) return { packagePoints: 0, rechargePoints: 0, totalPoints: 0 }
+  await ensureErpMonthlyGiftPointsGranted(admin, tenantId, {
+    plan: normalizeMembershipPlan(tenant.membership_plan),
+  })
+  const refreshed = await admin
+    .from('tenants')
+    .select('erp_package_points_balance, erp_recharge_points_balance')
+    .eq('id', tenantId)
+    .maybeSingle()
+  return readTenantPointsBalances(refreshed.data)
 }

@@ -15,6 +15,11 @@ import {
   pollTenantPayOrder,
 } from '../src/lib/tenantPaymentChannels.js'
 import type { TenantOrderKind, TenantPayChannel } from '../src/lib/tenantPaymentShared.js'
+import {
+  assertErpAiPointsAffordable,
+  parseErpAiPointsUsageKind,
+  spendErpAiPoints,
+} from '../src/lib/erpAiPointsSpendCore.js'
 import { readMerchantSupabaseAdminEnv } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 
 export const config = { maxDuration: 30 }
@@ -96,6 +101,78 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     if (action === 'points_ledger') {
       const ledger = await listTenantPointsLedger(admin, auth.tenantId, 100)
       sendJson(res, 200, { ok: true, ledger })
+      return
+    }
+
+    if (action === 'points_check') {
+      const kind = parseErpAiPointsUsageKind(body.kind)
+      if (!kind) {
+        sendJson(res, 400, { ok: false, error: 'invalid_kind' })
+        return
+      }
+      const durationSec =
+        body.durationSec != null && Number.isFinite(Number(body.durationSec))
+          ? Math.max(1, Math.ceil(Number(body.durationSec)))
+          : undefined
+      const result = await assertErpAiPointsAffordable(admin, auth.tenantId, kind, { durationSec })
+      if (!result.ok) {
+        sendJson(res, 402, {
+          ok: false,
+          error: result.error,
+          message: result.message,
+          required: result.required,
+          balance: result.balance,
+        })
+        return
+      }
+      sendJson(res, 200, {
+        ok: true,
+        balance: result.balance,
+        packageBalance: result.packageBalance,
+        rechargeBalance: result.rechargeBalance,
+      })
+      return
+    }
+
+    if (action === 'points_spend') {
+      const kind = parseErpAiPointsUsageKind(body.kind)
+      if (!kind) {
+        sendJson(res, 400, { ok: false, error: 'invalid_kind' })
+        return
+      }
+      const durationSec =
+        body.durationSec != null && Number.isFinite(Number(body.durationSec))
+          ? Math.max(1, Math.ceil(Number(body.durationSec)))
+          : undefined
+      const idempotencyKey =
+        typeof body.idempotencyKey === 'string' ? body.idempotencyKey.trim() : undefined
+      const note = typeof body.note === 'string' ? body.note.trim() : undefined
+      const result = await spendErpAiPoints(admin, auth.tenantId, {
+        kind,
+        durationSec,
+        idempotencyKey,
+        note,
+      })
+      if (!result.ok) {
+        sendJson(res, result.error === 'insufficient_points' ? 402 : 400, {
+          ok: false,
+          error: result.error,
+          message: result.message,
+          required: result.required,
+          balance: result.balance,
+        })
+        return
+      }
+      sendJson(res, 200, {
+        ok: true,
+        pointsCharged: result.pointsCharged,
+        fromPackage: result.fromPackage,
+        fromRecharge: result.fromRecharge,
+        packageBalance: result.packageBalance,
+        rechargeBalance: result.rechargeBalance,
+        balance: result.balance,
+        already: result.already ?? false,
+      })
       return
     }
 

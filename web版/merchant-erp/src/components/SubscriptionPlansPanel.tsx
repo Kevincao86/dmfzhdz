@@ -3,6 +3,7 @@ import { useMemo } from 'react'
 import { cn } from '../cn'
 import {
   ERP_MONTHLY_GIFT_POINTS,
+  ERP_RECHARGE_POINTS_PER_YUAN,
   formatErpPointsEquivalentsLine,
 } from '../lib/erpPointsEconomics'
 import {
@@ -24,6 +25,11 @@ export type SubscriptionPlanCard = {
   giftPoints: number
 }
 
+function monthlyGiftFeature(plan: MembershipPlan): string {
+  const pts = ERP_MONTHLY_GIFT_POINTS[plan]
+  return `每月 ${pts.toLocaleString('zh-CN')} 积分（套餐桶）`
+}
+
 const PLAN_FEATURES: Record<MembershipPlan, string[]> = {
   free: [
     '商品 / 店铺 / 招募基础',
@@ -36,13 +42,13 @@ const PLAN_FEATURES: Record<MembershipPlan, string[]> = {
     '每平台绑定 5 个账号',
     '直连 AI 不限（四厂商）',
     '本地推优化 + 线索跟进 AI',
-    '每月 6,500 积分（套餐桶）',
+    monthlyGiftFeature('member'),
   ],
   member_plus: [
     '全部 AI 模型（含 OpenAI / Claude）',
     '每平台绑定 50 个账号',
     '一键报税 AI · 代运营多店',
-    '每月 23,000 积分（套餐桶）',
+    monthlyGiftFeature('member_plus'),
     '短视频 / 云剪 / 数字人可用',
   ],
 }
@@ -244,6 +250,7 @@ export default function SubscriptionPlansPanel({
         </p>
         <p className="mt-1">
           新注册默认为免费版；含基础 ERP 与注册赠 100 积分。升级后积分按自然月发放至套餐桶，充值积分单独计入充值桶且不过期。
+          积分充值按 ¥1 = {ERP_RECHARGE_POINTS_PER_YUAN} 积分换算。
         </p>
       </div>
     </div>

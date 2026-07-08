@@ -1,5 +1,6 @@
 /** 订阅 / 充值档位（与扫码示意一致）；金额单位：分 */
 
+import { ERP_POINTS_RECHARGE_TIERS } from './erpPointsEconomics'
 import type { MembershipPlan } from './membershipPlan'
 
 export type PaymentTier = { label: string; yuan: number; cents: number; plan?: MembershipPlan }
@@ -17,13 +18,12 @@ export const RECHARGE_TIERS: PaymentTier[] = [
   { label: '¥500', yuan: 500, cents: 50000 },
 ]
 
-/** ERP 积分充值档位（60% 毛利：¥1 = 40 积分） */
-export const POINTS_RECHARGE_TIERS: PaymentTier[] = [
-  { label: '体验包 · 400积分', yuan: 10, cents: 1000 },
-  { label: '标准包 · 2000积分', yuan: 49, cents: 4900 },
-  { label: '进阶包 · 4000积分', yuan: 99, cents: 9900 },
-  { label: '团队包 · 20000积分', yuan: 499, cents: 49900 },
-]
+/** ERP 积分充值档位（50% 毛利：¥1 = 50 积分；与 erpPointsEconomics 同步） */
+export const POINTS_RECHARGE_TIERS: PaymentTier[] = ERP_POINTS_RECHARGE_TIERS.map((t) => ({
+  label: `${t.label} · ${t.points.toLocaleString('zh-CN')}积分`,
+  yuan: t.yuan,
+  cents: Math.round(t.yuan * 100),
+}))
 
 /** 自定义金额（元）→ 分，最少 ¥1 */
 export function yuanInputToCents(yuanStr: string): number | null {
