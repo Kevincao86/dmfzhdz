@@ -116,3 +116,47 @@ export async function tenantPayPoll(
     outTradeNo,
   })
 }
+
+export type ErpPointsSpendKind =
+  | 'video'
+  | 'article'
+  | 'brief'
+  | 'shortvideo'
+  | 'cloud_edit'
+  | 'digital_human'
+
+export type ErpPointsSpendResult = {
+  pointsCharged: number
+  fromPackage: number
+  fromRecharge: number
+  packageBalance: number
+  rechargeBalance: number
+  balance: number
+  already?: boolean
+}
+
+export async function checkErpPointsAffordable(input: {
+  kind: ErpPointsSpendKind
+  durationSec?: number
+}): Promise<{ balance: number; packageBalance: number; rechargeBalance: number }> {
+  return billingFetch({
+    action: 'points_check',
+    kind: input.kind,
+    durationSec: input.durationSec,
+  })
+}
+
+export async function spendErpPointsForUsage(input: {
+  kind: ErpPointsSpendKind
+  durationSec?: number
+  idempotencyKey?: string
+  note?: string
+}): Promise<ErpPointsSpendResult> {
+  return billingFetch<ErpPointsSpendResult>({
+    action: 'points_spend',
+    kind: input.kind,
+    durationSec: input.durationSec,
+    idempotencyKey: input.idempotencyKey,
+    note: input.note,
+  })
+}
