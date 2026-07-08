@@ -86,7 +86,10 @@
           class="sub-pay-ch {{channel === item.id ? 'on' : ''}}"
           data-ch="{{item.id}}"
           bindtap="onPickChannel"
-        >{{item.label}}</button>
+        >
+          <image class="sub-pay-ch-icon" src="{{item.icon}}" mode="aspectFit" />
+          <text>{{item.label}}</text>
+        </button>
       </view>
       <text wx:if="{{payErr}}" class="sub-sheet-err">{{payErr}}</text>
       <view class="sub-sheet-actions">

@@ -361,6 +361,19 @@
   background: #e0f2fe;
   color: #0369a1;
   font-size: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  padding: 0 12rpx;
+}
+
+.wallet-channel-icon {
+  width: 36rpx;
+  height: 36rpx;
+  flex-shrink: 0;
+  border-radius: 8rpx;
+  background: #fff;
 }
 
 .wallet-channel-btn::after {

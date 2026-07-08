@@ -4,12 +4,7 @@ const devAuth = require('../../utils/devAuth.js')
 const walletUi = require('../../utils/walletUiMp.js')
 const billing = require('../../utils/tenantBillingApiMp.js')
 const payFlow = require('../../utils/tenantPayFlowMp.js')
-
-const CHANNELS = [
-  { id: 'wechat', label: '微信支付' },
-  { id: 'alipay', label: '支付宝' },
-  { id: 'douyin', label: '抖音支付' },
-]
+const payChannels = require('../../utils/tenantPayChannelsMp.js')
 
 function formatPointsLedgerRow(row) {
   const pkg = Number(row.delta_package_points) || 0
@@ -58,7 +53,7 @@ Page({
     qrUrl: '',
     remainSecText: '05:00',
     polling: false,
-    channels: CHANNELS,
+    channels: payChannels.TENANT_PAY_CHANNELS,
   },
 
   onUnload() {
