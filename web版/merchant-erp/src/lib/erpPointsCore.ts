@@ -72,7 +72,6 @@ export async function ensureErpMonthlyGiftPointsGranted(
   const month = opts?.forceMonth ?? shanghaiYearMonth()
   const targetGift = erpMonthlyGiftPointsForPlan(plan)
   const prevMonth = String(tenant.erp_points_gift_month || '').trim()
-  const prevGranted = Math.max(0, Math.floor(Number(tenant.erp_points_gift_granted_month) || 0))
   const pkgBal = Math.max(0, Math.floor(Number(tenant.erp_package_points_balance) || 0))
   const rchBal = Math.max(0, Math.floor(Number(tenant.erp_recharge_points_balance) || 0))
 

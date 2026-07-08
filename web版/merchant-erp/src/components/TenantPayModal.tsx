@@ -72,7 +72,7 @@ export default function TenantPayModal({
   const [polling, setPolling] = useState(false)
   const [localErr, setLocalErr] = useState<string | null>(null)
   const [qrUrl, setQrUrl] = useState<string | null>(null)
-  const [outTradeNo, setOutTradeNo] = useState<string | null>(null)
+  const [, setOutTradeNo] = useState<string | null>(null)
   const [payPageUrl, setPayPageUrl] = useState<string | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 

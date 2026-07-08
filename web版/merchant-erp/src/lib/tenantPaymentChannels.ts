@@ -26,6 +26,8 @@ import {
   queryWechatOrderByOutTradeNo,
 } from './wechatPayV3.js'
 
+export type { TenantPayChannel, TenantOrderKind } from './tenantPaymentShared.js'
+
 export type TenantPrepayResult =
   | {
       ok: true
@@ -206,7 +208,7 @@ export async function pollTenantPayOrder(
       const cfgResult = loadDouyinPayMerchantConfig()
       if (!cfgResult.ok) return { ok: false, error: cfgResult.error }
       const q = await queryDouyinPayOrderByOutTradeNo(cfgResult.config, tradeNo)
-      if (isDouyinPayOrderSuccess(q)) {
+      if (isDouyinPayOrderSuccess(q.tradeState)) {
         const confirmed = await confirmTenantOnlinePaymentOrder(admin, order, {
           transactionId: q.transactionId,
           verifiedCents: order.amount_cents,

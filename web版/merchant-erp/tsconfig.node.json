@@ -26,6 +26,8 @@
     "vite-plugins/**/*.ts",
     "api/**/*.ts",
     "src/services/ai/types.ts",
-    "src/services/ai/modelRegistry.ts"
+    "src/services/ai/modelRegistry.ts",
+    "../../商家管理后台/api/_lib/tenantEntitlementCore.ts",
+    "../../商家管理后台/src/ops/paymentTierLogic.ts"
   ]
 }
