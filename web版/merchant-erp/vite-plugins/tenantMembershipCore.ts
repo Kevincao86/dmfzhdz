@@ -8,6 +8,7 @@ import {
   ERP_AGENT_POINTS_PER_TURN,
 } from '../src/lib/membershipPlan.js'
 import { ERP_AGENT_USAGE_KIND } from '../src/lib/erpPointsEconomics.js'
+import { nodeSupabaseClientOptions } from '../src/lib/nodeSupabaseClientOptions.js'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 export type TenantAiContext = {
@@ -48,9 +49,7 @@ function createTenantAdminClient(env: Record<string, string>): SupabaseClient | 
   const base = supabaseBase(env)
   const serviceRole = serviceRoleKey(env)
   if (!base || !serviceRole) return null
-  return createClient(base, serviceRole, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
+  return createClient(base, serviceRole, nodeSupabaseClientOptions())
 }
 
 async function assertPaidAgentPointsAffordable(
