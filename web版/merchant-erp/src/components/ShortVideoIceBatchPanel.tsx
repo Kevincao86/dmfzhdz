@@ -39,6 +39,11 @@ import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { compressIceImageForUpload, ICE_LOCAL_IMAGE_MAX_BYTES } from '../lib/iceImageUploadCompress'
 import { findInvalidIcePipelineImageUrl } from '../lib/icePipelineImageUrl'
 import { snapshotUploadFiles, isUploadImageFile } from '../lib/iceUploadFileSnapshot'
+import {
+  ICE_IMAGE_UPLOAD_CONCURRENCY,
+  ICE_VIDEO_UPLOAD_CONCURRENCY,
+  runIceUploadPool,
+} from '../lib/iceUploadPool'
 import { MpAddonPointsRateBadge } from './MpAddonPointsRateBadge'
 import { readMpSessionToken } from '../lib/merchantApiAuth'
 import {
@@ -159,6 +164,11 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   const [oneClickBusy, setOneClickBusy] = useState(false)
   const [downloadBusy, setDownloadBusy] = useState(false)
   const [videoUploading, setVideoUploading] = useState(false)
+  const [videoUploadProgress, setVideoUploadProgress] = useState<{
+    done: number
+    total: number
+    fileName?: string
+  } | null>(null)
   const [imageUploading, setImageUploading] = useState(false)
   const [imageUploadProgress, setImageUploadProgress] = useState<{
     index: number
@@ -368,40 +378,53 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         return
       }
       const list = Array.from(files)
+      const videos = list.filter(isVideoFile)
+      const invalid = list.filter((file) => !isVideoFile(file))
       setVideoUploading(true)
+      setVideoUploadProgress(
+        videos.length > 0 ? { done: 0, total: videos.length } : null,
+      )
       setErr(null)
       let added = 0
-      let failed = 0
-      const failSamples: string[] = []
+      let failed = invalid.length
+      const failSamples: string[] = invalid.map(
+        (file) => `「${file.name}」不是支持的视频格式（mp4/mov 等）`,
+      )
       try {
-        for (const file of list) {
-          if (!isVideoFile(file)) {
-            failed += 1
-            const msg = `「${file.name}」不是支持的视频格式（mp4/mov 等）`
-            failSamples.push(msg)
-            continue
-          }
+        let completed = 0
+        await runIceUploadPool(videos, ICE_VIDEO_UPLOAD_CONCURRENCY, async (file) => {
           const r = await uploadIceLocalMediaFile(file)
-          if (!r.ok) {
-            failed += 1
-            failSamples.push(`「${file.name}」：${r.message}`)
-            continue
+          completed += 1
+          setVideoUploadProgress({
+            done: completed,
+            total: videos.length,
+            fileName: file.name,
+          })
+          return { file, r }
+        }).then((outcomes) => {
+          for (const { file, r } of outcomes) {
+            if (!r.ok) {
+              failed += 1
+              failSamples.push(`「${file.name}」：${r.message}`)
+              continue
+            }
+            setJobs((prev) => [
+              ...prev,
+              {
+                id: newJobId(),
+                label: r.label.slice(0, 40),
+                mediaUrl: r.mediaUrl,
+                signedMediaUrl: r.signedMediaUrl,
+                phase: 'pending' as const,
+              },
+            ])
+            added += 1
           }
-          setJobs((prev) => [
-            ...prev,
-            {
-              id: newJobId(),
-              label: r.label.slice(0, 40),
-              mediaUrl: r.mediaUrl,
-              signedMediaUrl: r.signedMediaUrl,
-              phase: 'pending' as const,
-            },
-          ])
-          added += 1
-        }
+        })
       } catch (e) {
         setErr(e instanceof Error ? e.message : '视频上传失败')
       } finally {
+        setVideoUploadProgress(null)
         setVideoUploading(false)
       }
       if (added > 0) {
@@ -444,19 +467,20 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       setMaterialTab('images')
       setErr(null)
       setImageUploadError(null)
+      setImageUploadProgress({ index: 0, total: snapList.length, percent: 0, fileName: '', phase: 'encode' })
       let added = 0
-      let lastFail: string | null = null
+      const failSamples: string[] = []
+      let completed = 0
       try {
-        for (let i = 0; i < snapList.length; i++) {
-          const raw = snapList[i]!
+        await runIceUploadPool(snapList, ICE_IMAGE_UPLOAD_CONCURRENCY, async (raw, i) => {
           if (raw.size > ICE_LOCAL_IMAGE_MAX_BYTES) {
-            lastFail = `「${raw.name}」超过 4MB，请压缩后重试`
-            setImageUploadError(lastFail)
-            setErr(lastFail)
-            break
+            return {
+              ok: false as const,
+              message: `「${raw.name}」超过 4MB，请压缩后重试`,
+            }
           }
           setImageUploadProgress({
-            index: i + 1,
+            index: completed + 1,
             total: snapList.length,
             percent: 8,
             fileName: raw.name,
@@ -464,22 +488,15 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
           })
           const file = await compressIceImageForUpload(raw)
           if (file.size > ICE_LOCAL_IMAGE_MAX_BYTES) {
-            lastFail = `「${raw.name}」压缩后仍超过 4MB，请换更小图片`
-            setImageUploadError(lastFail)
-            setErr(lastFail)
-            break
+            return {
+              ok: false as const,
+              message: `「${raw.name}」压缩后仍超过 4MB，请换更小图片`,
+            }
           }
-          setImageUploadProgress({
-            index: i + 1,
-            total: snapList.length,
-            percent: 10,
-            fileName: raw.name,
-            phase: 'server',
-          })
           const r = await uploadIceLocalMediaFile(file, {
             onProgress: (p) => {
               setImageUploadProgress({
-                index: i + 1,
+                index: completed + 1,
                 total: snapList.length,
                 percent: p.percent,
                 fileName: raw.name,
@@ -487,27 +504,40 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               })
             },
           })
+          completed += 1
+          setImageUploadProgress({
+            index: completed,
+            total: snapList.length,
+            percent: r.ok ? 100 : 0,
+            fileName: raw.name,
+            phase: 'server',
+          })
           if (!r.ok) {
-            lastFail = r.message
-            setImageUploadError(r.message)
-            setErr(r.message)
-            break
+            return { ok: false as const, message: r.message, index: i }
           }
-          setImageItems((prev) => [
-            ...prev,
-            {
+          return {
+            ok: true as const,
+            item: {
               id: newJobId(),
               label: r.label.slice(0, 32),
               mediaUrl: r.mediaUrl,
               pipelineUrl: r.timelineUrl,
               previewUrl: r.mediaUrl,
             },
-          ])
-          added += 1
-        }
+          }
+        }).then((outcomes) => {
+          for (const outcome of outcomes) {
+            if (!outcome.ok) {
+              failSamples.push(outcome.message)
+              continue
+            }
+            setImageItems((prev) => [...prev, outcome.item])
+            added += 1
+          }
+        })
       } catch (e) {
         const msg = e instanceof Error ? e.message : '图片上传失败'
-        lastFail = msg
+        failSamples.push(msg)
         setImageUploadError(msg)
         setErr(msg)
       } finally {
@@ -515,9 +545,16 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         setImageUploading(false)
       }
       if (added > 0) {
-        setImageUploadError(null)
-        setHint(`已上传 ${added} 张图片（素材就绪），请填写指导文案并 AI 规划分镜后一键混剪。`)
-      } else if (lastFail) {
+        setImageUploadError(failSamples.length > 0 ? failSamples[0]! : null)
+        setHint(
+          failSamples.length > 0
+            ? `已上传 ${added} 张图片；${failSamples.length} 张失败（${failSamples.slice(0, 2).join('；')}${failSamples.length > 2 ? '…' : ''}）`
+            : `已上传 ${added} 张图片（素材就绪），请填写指导文案并 AI 规划分镜后一键混剪。`,
+        )
+      } else if (failSamples.length > 0) {
+        const msg = failSamples.slice(0, 3).join('；') + (failSamples.length > 3 ? '…' : '')
+        setImageUploadError(msg)
+        setErr(msg)
         setHint(null)
       }
     },
@@ -1038,7 +1075,16 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 {videoUploading ? (
                   <>
                     <Loader2 className="h-8 w-8 animate-spin text-orange-600" />
-                    <span className="text-sm font-medium text-zinc-800">视频上传中…</span>
+                    <span className="text-sm font-medium text-zinc-800">
+                      {videoUploadProgress
+                        ? `视频上传中 ${videoUploadProgress.done}/${videoUploadProgress.total}（${ICE_VIDEO_UPLOAD_CONCURRENCY} 路并行）`
+                        : '视频上传中…'}
+                    </span>
+                    {videoUploadProgress?.fileName ? (
+                      <span className="max-w-full truncate text-xs text-zinc-500">
+                        {videoUploadProgress.fileName}
+                      </span>
+                    ) : null}
                   </>
                 ) : (
                   <>
