@@ -6,6 +6,8 @@ export type WechatOaConfig = {
   token: string
   encodingAesKey: string
   targetedInviteTemplateId: string
+  /** 私信未读提醒模板（可选，WX_OA_DM_UNREAD_TEMPLATE_ID） */
+  dmUnreadTemplateId: string
   /** 服务号名称（展示用，可选） */
   displayName: string
 }
@@ -18,6 +20,7 @@ export function loadWechatOaConfig(): { ok: true; config: WechatOaConfig } | { o
   const targetedInviteTemplateId = String(
     process.env.WX_OA_TARGETED_INVITE_TEMPLATE_ID || '',
   ).trim()
+  const dmUnreadTemplateId = String(process.env.WX_OA_DM_UNREAD_TEMPLATE_ID || '').trim()
   const displayName = String(process.env.WX_OA_DISPLAY_NAME || '灵祺星选').trim()
   const missing: string[] = []
   if (!appId) missing.push('WX_OA_APPID')
@@ -27,8 +30,18 @@ export function loadWechatOaConfig(): { ok: true; config: WechatOaConfig } | { o
   if (missing.length) return { ok: false, missing }
   return {
     ok: true,
-    config: { appId, secret, token, encodingAesKey, targetedInviteTemplateId, displayName },
+    config: { appId, secret, token, encodingAesKey, targetedInviteTemplateId, dmUnreadTemplateId, displayName },
   }
+}
+
+export function wechatOaDmUnreadTemplateId(): string {
+  return String(process.env.WX_OA_DM_UNREAD_TEMPLATE_ID || '').trim()
+}
+
+/** 服务号 + 私信未读模板均已配置时可推送私信提醒 */
+export function wechatOaDmPushConfigured(): boolean {
+  if (!wechatOaConfigured()) return false
+  return Boolean(wechatOaDmUnreadTemplateId())
 }
 
 export function wechatOaConfigured(): boolean {

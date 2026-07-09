@@ -236,3 +236,22 @@ export async function readParticipantSecret(
   const sec = data && typeof data.device_secret === 'string' ? data.device_secret : ''
   return sec.length >= 16 ? sec : null
 }
+
+/** 管理端按 session id 读取会话（用于私信服务号推送） */
+export async function readSessionByIdAdmin(
+  sb: MpChatDb,
+  sessionId: string,
+): Promise<MpChatSessionRow | null> {
+  const sid = String(sessionId || '').trim()
+  if (!sid) return null
+  const { data, error } = await sb
+    .from('mp_talent_chat_sessions')
+    .select(
+      'id, session_key, talent_key, pr_key, talent_name, pr_name, talent_avatar, pr_avatar, last_text, last_ts, talent_unread, pr_unread, updated_at',
+    )
+    .eq('id', sid)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  if (!data) return null
+  return data as MpChatSessionRow
+}
