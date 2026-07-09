@@ -917,7 +917,9 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     let profiles = mixMaterialProfiles
     if (profiles.length < mixMaterialPool.length) {
       setHint('正在补全素材画面理解…')
-      profiles = await buildMaterialVisionProfiles(mixMaterialPool, (msg) => setHint(msg))
+      profiles = await buildMaterialVisionProfiles(mixMaterialPool, (msg) => setHint(msg), {
+        maxDeepAnalyze: 8,
+      })
       setMixMaterialProfiles(profiles)
     }
 
@@ -1486,7 +1488,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 </h3>
                 <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
                   上传素材后点「AI 分析素材」自动生成指导文案（{MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE}{' '}
-                  积分/次，分析成功后扣减），或手动填写 → AI 规划分镜 → 一键混剪。
+                  积分/次，分析成功后扣减）。素材较多时自动抽样代表画面加速（约 1–3 分钟），或手动填写 → AI 规划分镜 → 一键混剪。
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
