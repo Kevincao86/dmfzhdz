@@ -75,7 +75,7 @@ export async function createWechatOaBindTicketInSnapshot(
   talentMemberId: string,
 ): Promise<
   | { ok: true; ticket: string; sceneStr: string; qrUrl: string; expiresAt: string }
-  | { ok: false; error: string; status: number }
+  | { ok: false; error: string; status: number; message?: string }
 > {
   const cfgResult = loadWechatOaConfig()
   if (!cfgResult.ok) return { ok: false, error: 'wx_oa_not_configured', status: 503 }
