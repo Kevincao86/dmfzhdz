@@ -1,6 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
 import { isPathBlockedForFree, type MembershipPlan } from '../lib/membershipPlan'
-import { XINGXUAN_PARTNER_NAV } from './xingxuanPartnerNav'
 import { PARTNER_STORE_NAV_LABEL } from '../lib/partnerEditionConfig'
 import {
   Bot,
@@ -90,7 +89,7 @@ function partnerOperationChildren(baseChildren: NavChild[]): NavChild[] {
         c.path !== '/operation/competitors',
     )
     .map((c) => (c.path === '/geo' ? { ...c, label: '客户增长' } : c))
-  const xingxuan = XINGXUAN_PARTNER_NAV.map((n) => ({ path: n.path, label: n.label }))
+  const xingxuan: NavChild[] = [{ path: '/recruitment/xingxuan/hall', label: '达人招募' }]
   return [...xingxuan, ...kept]
 }
 
