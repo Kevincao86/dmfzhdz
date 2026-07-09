@@ -41,7 +41,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       ok: true,
       payConfigured: cfg.ok,
       ...(cfg.ok
-        ? { notifyUrl: cfg.config.notifyUrl, mchId: cfg.config.mchId }
+        ? { notifyUrl: cfg.config.notifyUrl, mchId: cfg.config.mchId, appId: cfg.config.appId }
         : { missing: cfg.missing }),
     })
     return

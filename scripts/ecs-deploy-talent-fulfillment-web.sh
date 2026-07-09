@@ -39,7 +39,9 @@ if [[ "$(id -un)" == "root" && "${HOME:-}" == "/root" ]]; then
 fi
 
 echo "== 0) 代码 =="
-if [[ -f "$ROOT/scripts/ecs-git-pull-gitee.sh" ]]; then
+if [[ "${SKIP_BUILD:-0}" == "1" && "${SKIP_GIT_PULL:-0}" == "1" ]]; then
+  echo "SKIP_GIT_PULL=1：跳过 git pull（保留已上传 dist，避免 reset 覆盖）"
+elif [[ -f "$ROOT/scripts/ecs-git-pull-gitee.sh" ]]; then
   bash "$ROOT/scripts/ecs-git-pull-gitee.sh"
 elif [[ -d "$ROOT/.git" ]]; then
   (cd "$ROOT" && git pull --ff-only) || (cd "$ROOT" && git pull)
@@ -70,6 +72,7 @@ if [[ "${SKIP_BUILD:-0}" != "1" ]]; then
   # shellcheck disable=SC1090
   source "$ENV_PROD"
   set +a
+  rm -rf "$FUL/dist"
   (cd "$FUL" && npm ci && npm run build)
 else
   echo "SKIP_BUILD=1，跳过 npm build"

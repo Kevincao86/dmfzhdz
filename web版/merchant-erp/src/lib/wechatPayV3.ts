@@ -64,17 +64,21 @@ function readPemMaterial(opts: {
   return ''
 }
 
-export function loadWechatPayConfig(): WechatPayConfigResult {
-  const missing: string[] = []
-  const mchId = String(process.env.WECHAT_PAY_MCH_ID || '').trim()
-  const appId = String(
+/** 支付用 AppID：须与 WECHAT_PAY_MCH_ID 在商户平台已绑定；勿回落到 ERP 小程序凭证 */
+function resolveWechatPayAppId(): string {
+  return String(
     process.env.WECHAT_PAY_APP_ID ||
-      process.env.ERP_MP_WECHAT_APPID ||
-      process.env.MERCHANT_MP_WECHAT_APPID ||
       process.env.MP_WECHAT_APPID ||
+      process.env.MERCHANT_MP_WECHAT_APPID ||
       process.env.WX_APPID ||
       '',
   ).trim()
+}
+
+export function loadWechatPayConfig(): WechatPayConfigResult {
+  const missing: string[] = []
+  const mchId = String(process.env.WECHAT_PAY_MCH_ID || '').trim()
+  const appId = resolveWechatPayAppId()
   const apiV3Key = String(process.env.WECHAT_PAY_API_V3_KEY || '').trim()
   const merchantSerial = String(process.env.WECHAT_PAY_MERCHANT_SERIAL || '').trim()
   const privateKeyPem = readPemMaterial({

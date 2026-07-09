@@ -1,0 +1,1 @@
+import{i as e}from"./jsx-runtime-n5LQ9ujS.js";var t=e({onProfileDisplayRefresh:()=>o,onShellRefresh:()=>r,triggerProfileDisplayRefresh:()=>s,triggerShellRefresh:()=>i}),n=new Set;function r(e){return n.add(e),()=>n.delete(e)}function i(){n.forEach(e=>e())}var a=new Set;function o(e){return a.add(e),()=>a.delete(e)}function s(){a.forEach(e=>e())}export{i,r as n,t as r,o as t};
