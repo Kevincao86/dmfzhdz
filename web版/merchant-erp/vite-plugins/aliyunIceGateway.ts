@@ -414,6 +414,7 @@ export async function handleAliyunIceRoutes(input: {
     const projectName = String(parsed.projectName ?? 'AI混剪').trim().slice(0, 120)
     const editBrief = String(parsed.editBrief ?? parsed.editInstruction ?? '').trim().slice(0, 500)
 
+    const mixNarrationText = String(parsed.mixNarrationText ?? parsed.narrationText ?? '').trim()
     const mixSegmentsRaw = parsed.mixSegments
     const mixSegments = Array.isArray(mixSegmentsRaw)
       ? mixSegmentsRaw
@@ -425,8 +426,27 @@ export async function handleAliyunIceRoutes(input: {
             const timelineStartSec = Math.max(0, Number(s.timelineStartSec) || 0)
             const timelineEndSec = Math.max(timelineStartSec + 0.35, Number(s.timelineEndSec) || timelineStartSec + 1)
             const caption = String(s.caption ?? '').trim() || undefined
-            if (!/^https?:\/\//i.test(mediaUrl)) return null
-            return { kind, mediaUrl, signedMediaUrl, timelineStartSec, timelineEndSec, caption }
+            const materialIndex = Number.isFinite(Number(s.materialIndex))
+              ? Math.max(0, Number(s.materialIndex))
+              : undefined
+            const urlOk =
+              /^https?:\/\//i.test(mediaUrl) ||
+              mediaUrl.startsWith('oss://') ||
+              (signedMediaUrl ? /^https?:\/\//i.test(signedMediaUrl) : false)
+            if (!urlOk) return null
+            const pipelineUrl =
+              mediaUrl.startsWith('oss://') || /^https?:\/\//i.test(mediaUrl)
+                ? mediaUrl
+                : signedMediaUrl!
+            return {
+              kind,
+              mediaUrl: pipelineUrl,
+              signedMediaUrl,
+              timelineStartSec,
+              timelineEndSec,
+              caption,
+              materialIndex,
+            }
           })
           .filter(Boolean)
       : []
@@ -456,6 +476,7 @@ export async function handleAliyunIceRoutes(input: {
               timelineStartSec: number
               timelineEndSec: number
               caption?: string
+              materialIndex?: number
             }>,
             projectName,
             editBrief,
@@ -464,6 +485,8 @@ export async function handleAliyunIceRoutes(input: {
             totalDurationSec: clipEndSec,
             effectId: effect.id,
             subtitleStyleId: subtitleStyle.id,
+            mixNarrationText,
+            env: rawEnv as Record<string, string | undefined>,
           })
         : pipelineImageUrls.length > 0
         ? await iceRunImagesPipeline(cfg, {

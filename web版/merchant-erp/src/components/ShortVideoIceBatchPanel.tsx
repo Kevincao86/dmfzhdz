@@ -65,7 +65,9 @@ import { analyzeIceMixMaterialsToGuidance } from '../services/iceMixGuidanceAi'
 import {
   assignMixMaterialSlots,
   buildIceMixSegmentsFromScript,
+  collectMixNarrationText,
   composeMixEditBrief,
+  ensureSequentialMixScriptRows,
   inferIceEffectIdFromMixContent,
   mixStoryboardBriefReady,
   MIX_TARGET_TOTAL_OPTIONS,
@@ -720,11 +722,15 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       setErr('请先上传至少一条视频或一张图片素材。')
       return
     }
+    const materialHint = mixMaterialPool
+      .map((m, i) => `素材${i + 1}：${m.label}（${m.kind === 'video' ? '视频' : '图片'}）`)
+      .join('\n')
+    const plannerInput = `${draft}\n\n【混剪素材 ${mixMaterialPool.length} 条，须分段使用不同镜头】\n${materialHint}\n\n规划要求：\n- 分镜段数建议 ${Math.min(mixMaterialPool.length + 1, 8)} 段左右，时间段从 0 连续覆盖至 ${mixTargetSec} 秒，段与段首尾相接、禁止重叠\n- 第 n 段画面应对应素材 ${mixMaterialPool.length > 1 ? 'n（轮询使用各条实拍）' : '1'}\n- 每段填写口播 dialogue（TTS 讲解，观众将听到合成语音）\n- visual 写该段画面内容，dialogue 写该段口播`
     setPlanBusy(true)
     setErr(null)
     setHint('AI 正在通读指导文案并规划混剪分镜…')
     try {
-      const r = await planShortVideoScriptFromGuidance(draft, {
+      const r = await planShortVideoScriptFromGuidance(plannerInput, {
         targetTotalSec: mixTargetSec,
         segmentSec: MIX_DEFAULT_SEGMENT_SEC,
         plannerModel: 'auto',
@@ -736,7 +742,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         setErr(r.message)
         return
       }
-      setScriptRows(r.rows)
+      setScriptRows(ensureSequentialMixScriptRows(r.rows, mixTargetSec))
       const poolLen = mixMaterialPool.length
       if (poolLen > 0) {
         setMaterialSlots(assignMixMaterialSlots(r.rows.length, poolLen))
@@ -892,11 +898,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       setErr('请先规划至少 2 段分镜（指导文案 → AI 规划分镜）')
       return
     }
-    const slots = normalizeMixMaterialSlots(
-      materialSlots,
-      scriptRows.length,
-      mixMaterialPool.length,
-    )
+    const slots = normalizeMixMaterialSlots(materialSlots, scriptRows.length, mixMaterialPool.length)
     const segments = buildIceMixSegmentsFromScript(
       scriptRows,
       slots,
@@ -907,6 +909,12 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       setErr('分镜与素材映射无效，请检查时间段与素材数量')
       return
     }
+    const distinctMaterials = new Set(segments.map((s) => s.materialIndex))
+    if (mixMaterialPool.length >= 2 && distinctMaterials.size < 2) {
+      setErr('混剪须使用至少 2 条不同素材，请确认已上传多条视频')
+      return
+    }
+    const mixNarrationText = collectMixNarrationText(scriptRows)
     const mixBrief = mixEditBrief.trim()
     if (mixBrief.length < 4) {
       setErr('请填写指导文案或在分镜表中填写画面/口播')
@@ -942,7 +950,9 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         timelineStartSec: s.timelineStartSec,
         timelineEndSec: s.timelineEndSec,
         caption: s.caption,
+        materialIndex: s.materialIndex,
       })),
+      mixNarrationText: mixNarrationText.length >= 4 ? mixNarrationText : undefined,
       projectName: `AI混剪-${label}`.slice(0, 120),
       editBrief: mixBrief,
       width: aspect.width,
@@ -1593,7 +1603,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               <div>
                 <span className="text-sm font-medium text-zinc-800">混剪分镜表</span>
                 <p className="mt-1 text-xs text-zinc-500">
-                  每段对应时间轴上一段素材；口播与画面指令将自动用于云端混剪。可为每行选择具体视频/图片（默认按顺序轮询）。
+                  每段对应时间轴上一段素材（自动轮询各条视频/图片）；口播将合成 TTS 讲解并叠加字幕，原片环境音自动压低。
                 </p>
                 <div className="mt-2">
                   <ShortVideoScriptTableEditor

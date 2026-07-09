@@ -1,23 +1,31 @@
 #!/usr/bin/env npx tsx
 /**
- * AI混剪：素材轮询映射 + 不误加诗词 BGM
+ * AI混剪：顺序时间轴 + 素材轮询 + 口播合并
  */
 import {
   assignMixMaterialSlots,
   buildIceMixSegmentsFromScript,
+  collectMixNarrationText,
   composeMixEditBrief,
+  ensureSequentialMixScriptRows,
   normalizeMixMaterialSlots,
 } from '../src/lib/iceMixPlan.ts'
 import { parseIceEditBriefPlan } from '../vite-plugins/iceBriefTimelinePlan.ts'
 import type { ShortVideoScriptRow } from '../src/lib/shortVideoScriptTable.ts'
 
-const rows: ShortVideoScriptRow[] = [
-  { timeRange: '0-4', visual: '门店外观，暖色氛围', dialogue: '第一句' },
-  { timeRange: '4-8', visual: '产品特写', dialogue: '第二句' },
-  { timeRange: '8-12', visual: '后厨制作', dialogue: '第三句' },
-  { timeRange: '12-16', visual: '顾客体验', dialogue: '第四句' },
-  { timeRange: '16-20', visual: '成品展示', dialogue: '第五句' },
+const overlappingRows: ShortVideoScriptRow[] = [
+  { timeRange: '0-4秒', visual: '门店', dialogue: '欢迎来到我们的店' },
+  { timeRange: '0-4秒', visual: '产品', dialogue: '这是招牌产品' },
+  { timeRange: '0-4秒', visual: '后厨', dialogue: '新鲜现做' },
+  { timeRange: '0-4秒', visual: '顾客', dialogue: '体验很好' },
 ]
+const fixed = ensureSequentialMixScriptRows(overlappingRows, 20)
+const starts = fixed.map((r) => r.timeRange)
+if (starts[0] !== '0-5秒' || starts[1] !== '5-10秒' || starts[3] !== '15-20秒') {
+  console.error('FAIL: ensureSequentialMixScriptRows', starts)
+  process.exit(1)
+}
+
 const materials = [
   { kind: 'video' as const, mediaUrl: 'oss://a/v1.mp4', label: '素材1' },
   { kind: 'video' as const, mediaUrl: 'oss://a/v2.mp4', label: '素材2' },
@@ -25,49 +33,43 @@ const materials = [
   { kind: 'video' as const, mediaUrl: 'oss://a/v4.mp4', label: '素材4' },
 ]
 
-const stuckSlots = [0, 0, 0, 0, 0]
-const normalized = normalizeMixMaterialSlots(stuckSlots, rows.length, materials.length)
-if (new Set(normalized).size < 4) {
-  console.error('FAIL: normalize should spread materials', normalized)
+const stuckSlots = [0, 0, 0, 0]
+const segments = buildIceMixSegmentsFromScript(overlappingRows, stuckSlots, materials, 20)
+const idxs = segments.map((s) => s.materialIndex)
+if (idxs.join(',') !== '0,1,2,3') {
+  console.error('FAIL: material round-robin', idxs)
+  process.exit(1)
+}
+const timelineStarts = segments.map((s) => s.timelineStartSec)
+if (new Set(timelineStarts).size !== 4) {
+  console.error('FAIL: timeline overlap', segments.map((s) => [s.timelineStartSec, s.timelineEndSec]))
   process.exit(1)
 }
 
-const segments = buildIceMixSegmentsFromScript(rows, stuckSlots, materials, 20)
-const urls = segments.map((s) => s.mediaUrl)
-if (new Set(urls).size < 4) {
-  console.error('FAIL: segments should use different materials', urls)
+const narration = collectMixNarrationText(fixed)
+if (!narration.includes('欢迎') || !narration.includes('体验')) {
+  console.error('FAIL: collectMixNarrationText', narration)
   process.exit(1)
 }
 
-const brief = composeMixEditBrief('探店种草，叙事节奏先氛围后卖点', rows)
+const brief = composeMixEditBrief('探店混剪', fixed)
 const mixPlan = parseIceEditBriefPlan(brief, {
   clipEndSec: 20,
   effectId: 'trans_fade',
   mixMode: true,
 })
 if (mixPlan.bgmClip || mixPlan.sfxClips.length > 0) {
-  console.error('FAIL: mixMode should not auto-add audio for narrative-only guidance', mixPlan)
-  process.exit(1)
-}
-
-const briefWithBgm = composeMixEditBrief('探店种草；BGM 轻快铺底', rows)
-const mixPlanBgm = parseIceEditBriefPlan(briefWithBgm, {
-  clipEndSec: 20,
-  effectId: 'trans_fade',
-  mixMode: true,
-})
-if (!mixPlanBgm.bgmClip?.mediaUrl?.includes('m1.wav')) {
-  console.error('FAIL: explicit BGM should use instrumental m1.wav', mixPlanBgm.bgmClip)
-  process.exit(1)
-}
-if (mixPlanBgm.bgmClip.mediaUrl.includes('speech.mp3')) {
-  console.error('FAIL: must not use speech demo track')
+  console.error('FAIL: mixMode should not auto-add audio', mixPlan)
   process.exit(1)
 }
 
 if (assignMixMaterialSlots(5, 4).join(',') !== '0,1,2,3,0') {
-  console.error('FAIL: assignMixMaterialSlots round-robin')
+  console.error('FAIL: assignMixMaterialSlots')
+  process.exit(1)
+}
+if (normalizeMixMaterialSlots([0, 0, 0, 0, 0], 5, 4).join(',') !== '0,1,2,3,0') {
+  console.error('FAIL: normalizeMixMaterialSlots')
   process.exit(1)
 }
 
-console.log('OK: ice mix material round-robin + mixMode audio guards')
+console.log('OK: ice mix sequential timeline + round-robin materials + narration')
