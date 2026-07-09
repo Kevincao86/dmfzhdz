@@ -19,11 +19,13 @@ Page({
   },
 
   _pollTimer: null,
+  _statusLoaded: false,
 
   async onShow() {
     const ready = await prepareXingxuanSubPage(this)
     if (!ready) return
-    await this.refreshStatus()
+    await this.refreshStatus({ silent: this._statusLoaded })
+    this._statusLoaded = true
   },
 
   onHide() {
@@ -47,7 +49,7 @@ Page({
     return String((acct && acct.registryMemberId) || participant.resolveTalentMemberId() || '').trim()
   },
 
-  async refreshStatus() {
+  async refreshStatus({ silent = false } = {}) {
     if (!auth.isLoggedIn()) {
       this.setData({
         loading: false,
@@ -67,21 +69,30 @@ Page({
       })
       return false
     }
-    this.setData({ loading: true, talentMemberId, needLogin: false, needProfile: false })
+    if (silent) {
+      if (this.data.talentMemberId !== talentMemberId) {
+        this.setData({ talentMemberId })
+      }
+    } else {
+      this.setData({ loading: true, talentMemberId, needLogin: false, needProfile: false })
+    }
     try {
       const res = await oaBind.getStatus(talentMemberId)
       const bound = !!res.bound
-      this.setData({
-        loading: false,
+      const patch = {
         bound,
         oaDisplayName: res.oaDisplayName || '灵祺星选',
         boundAt: res.boundAt || '',
-      })
+      }
+      if (!silent) patch.loading = false
+      this.setData(patch)
       if (bound) this.stopPoll()
       return bound
     } catch (e) {
-      this.setData({ loading: false })
-      wx.showToast({ title: e.message || '加载失败', icon: 'none' })
+      if (!silent) {
+        this.setData({ loading: false })
+        wx.showToast({ title: e.message || '加载失败', icon: 'none' })
+      }
       return false
     }
   },
@@ -90,7 +101,7 @@ Page({
     this.stopPoll()
     this.setData({ polling: true })
     this._pollTimer = setInterval(() => {
-      this.refreshStatus()
+      this.refreshStatus({ silent: true })
     }, 3000)
   },
 
