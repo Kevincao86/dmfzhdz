@@ -1,6 +1,7 @@
+import { extractVideoFirstFramePureBase64, imageUrlToPureBase64 } from '../lib/videoFrameUtils'
 import { postAiChat } from './ai/aiClient'
 import { postDouyinProductQualityAnalysis } from './douyinAiAssistApi'
-import { postVideoLastFrameFromUrl } from './videoAiApi'
+import { downloadVideoUrlAsBlob, postVideoLastFrameFromUrl } from './videoAiApi'
 import type { IceMixMaterialSlot } from '../lib/iceMixPlan'
 import { runIceUploadPool } from '../lib/iceUploadPool'
 
@@ -18,6 +19,7 @@ const MIX_GUIDANCE_SYSTEM = `你是本地生活/电商短视频编导，负责�
 
 要求：约 150–380 字；具体、可画面化；适合后续 AI 自动规划分镜表。
 禁止：Markdown、JSON、列表编号、「灵祺/云剪/ERP」等平台名；勿写总时长/画幅/BGM 等技术参数。
+若下方【画面理解（AI）】已有内容，必须基于画面细节撰写，禁止写「暂未获取到素材画面」等推脱句。
 只输出指导正文一段。`
 
 const FRAME_VISION_SYSTEM = `你是短视频素材分析师。用户会提供从实拍视频截取的采样帧（可能含门店、产品、人物、环境）。
@@ -34,8 +36,19 @@ function sampleMaterials(materials: IceMixMaterialSlot[], max: number): IceMixMa
   return out
 }
 
-function pickVideoUrl(mat: IceMixMaterialSlot): string {
-  return (mat.signedMediaUrl || mat.mediaUrl || '').trim()
+function isOssMaterialUrl(url: string): boolean {
+  const u = url.trim()
+  return u.startsWith('oss://') || /\.oss-[a-z0-9-]+\.aliyuncs\.com\//i.test(u)
+}
+
+/** 服务端截帧优先 canonical OSS 直链（私有桶由服务端 ICE 凭证重签） */
+function visionUrlCandidates(mat: IceMixMaterialSlot): string[] {
+  const media = (mat.mediaUrl || '').trim()
+  const signed = (mat.signedMediaUrl || '').trim()
+  const out: string[] = []
+  if (media) out.push(media)
+  if (signed && signed !== media) out.push(signed)
+  return out
 }
 
 function buildMaterialInventory(materials: IceMixMaterialSlot[], sampled: IceMixMaterialSlot[]): string {
@@ -58,20 +71,75 @@ async function analyzeImageMaterials(
   const products = images.slice(0, VISION_SAMPLE_MAX).map((m, i) => ({
     id: `ice-mix-img-${i + 1}`,
     name: m.label || `图片素材${i + 1}`,
-    main_image_url: pickVideoUrl(m),
+    main_image_url: visionUrlCandidates(m)[0] || '',
   }))
   try {
     const q = await postDouyinProductQualityAnalysis(products, { timeoutMs: 90_000 })
-    if (!q.ok || !q.items?.length) return ''
-    return q.items
-      .map(
-        (it) =>
-          `${it.productName}：${it.mainImage.comment}${it.suggestions?.length ? `；建议：${it.suggestions.slice(0, 2).join('；')}` : ''}`,
-      )
-      .join('\n')
+    if (q.ok && q.items?.length) {
+      return q.items
+        .map(
+          (it) =>
+            `${it.productName}：${it.mainImage.comment}${it.suggestions?.length ? `；建议：${it.suggestions.slice(0, 2).join('；')}` : ''}`,
+        )
+        .join('\n')
+    }
   } catch {
-    return ''
+    /* fallback below */
   }
+
+  const frames: { label: string; dataUrl: string }[] = []
+  for (const mat of images.slice(0, VISION_SAMPLE_MAX)) {
+    for (const url of visionUrlCandidates(mat)) {
+      try {
+        const pure = await imageUrlToPureBase64(url)
+        if (pure.length >= 64) {
+          frames.push({
+            label: mat.label || '图片素材',
+            dataUrl: `data:image/jpeg;base64,${pure}`,
+          })
+          break
+        }
+      } catch {
+        /* try next url */
+      }
+    }
+  }
+  if (frames.length === 0) return ''
+  return describeVideoFrames(frames)
+}
+
+async function extractOneVideoFrame(
+  mat: IceMixMaterialSlot,
+  onProgress?: (msg: string) => void,
+): Promise<{ label: string; dataUrl: string } | null> {
+  const label = mat.label || '视频素材'
+  const urls = visionUrlCandidates(mat)
+  if (urls.length === 0) return null
+
+  for (const url of urls) {
+    const serverFrame = await postVideoLastFrameFromUrl(url, {
+      frame: 'opening',
+      onProgress,
+    })
+    if (serverFrame.ok) {
+      return { label, dataUrl: `data:image/jpeg;base64,${serverFrame.pureBase64}` }
+    }
+  }
+
+  for (const url of urls) {
+    try {
+      onProgress?.(`服务端截帧失败，正在本地解析「${label}」…`)
+      const blob = await downloadVideoUrlAsBlob(url, { maxAttempts: 2 })
+      const pure = await extractVideoFirstFramePureBase64(blob)
+      if (pure.length >= 64) {
+        return { label, dataUrl: `data:image/jpeg;base64,${pure}` }
+      }
+    } catch {
+      /* try next url */
+    }
+  }
+
+  return null
 }
 
 async function extractVideoFrameDataUrls(
@@ -85,14 +153,7 @@ async function extractVideoFrameDataUrls(
   const out: { label: string; dataUrl: string }[] = []
 
   await runIceUploadPool(picked, VIDEO_FRAME_CONCURRENCY, async (mat) => {
-    const url = pickVideoUrl(mat)
-    if (!url) return null
-    const frame = await postVideoLastFrameFromUrl(url)
-    if (!frame.ok) return null
-    return {
-      label: mat.label || '视频素材',
-      dataUrl: `data:image/jpeg;base64,${frame.pureBase64}`,
-    }
+    return extractOneVideoFrame(mat, onProgress)
   }).then((results) => {
     for (const row of results) {
       if (row) out.push(row)
@@ -135,7 +196,9 @@ async function generateGuidanceText(
     visionNotes ? `\n【画面理解（AI）】\n${visionNotes}` : '',
     `\n目标成片约 ${opts.targetTotalSec} 秒；画幅 ${opts.aspectLabel}。`,
     opts.userHint?.trim() ? `商家补充：${opts.userHint.trim()}` : '',
-    '\n请根据以上素材信息撰写混剪指导文案。',
+    visionNotes
+      ? '\n请根据以上素材画面理解撰写混剪指导文案。'
+      : '\n画面采样未完全成功，请结合素材文件名与清单合理推断，但仍需写出具体可拍的分镜方向，勿写「暂未获取画面」类表述。',
   ]
     .filter(Boolean)
     .join('\n')
@@ -170,7 +233,7 @@ export async function analyzeIceMixMaterialsToGuidance(opts: {
   userHint?: string
   onProgress?: (msg: string) => void
 }): Promise<{ ok: true; guidance: string } | { ok: false; message: string }> {
-  const materials = opts.materials.filter((m) => pickVideoUrl(m))
+  const materials = opts.materials.filter((m) => visionUrlCandidates(m).length > 0)
   if (materials.length === 0) {
     return { ok: false, message: '请先上传至少一条视频或一张图片素材' }
   }
@@ -188,7 +251,16 @@ export async function analyzeIceMixMaterialsToGuidance(opts: {
 
   const visionParts = [imageNotes, videoNotes].filter(Boolean)
   if (visionParts.length === 0 && materials.length > 0) {
-    opts.onProgress?.('画面采样有限，将依据素材清单生成文案…')
+    const ossCount = materials.filter((m) =>
+      visionUrlCandidates(m).some((u) => isOssMaterialUrl(u)),
+    ).length
+    return {
+      ok: false,
+      message:
+        ossCount > 0
+          ? '无法读取已上传 OSS 素材画面，请确认运营台已配置 ICE/OSS 密钥且素材为常见 MP4/MOV 格式，然后重新上传再试。'
+          : '无法从素材中截取有效画面，请确认视频为公网可访问地址或重新本地上传后再试。',
+    }
   }
 
   opts.onProgress?.('AI 正在撰写指导文案…')

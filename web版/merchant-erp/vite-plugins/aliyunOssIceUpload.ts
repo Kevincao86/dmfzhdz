@@ -651,3 +651,43 @@ export async function fetchIceOutputObject(
     return { ok: false, message: e instanceof Error ? e.message : String(e) }
   }
 }
+
+/** 读取 ICE 源素材 / 私有 OSS 对象（混剪素材分析截帧等，不做成片最小体积校验） */
+export async function fetchIceMediaObjectBuffer(
+  cfg: AliyunIceConfig,
+  rawUrl: string,
+): Promise<{ ok: true; buf: Buffer } | { ok: false; message: string }> {
+  const parsed = parseOssObjectUrl(rawUrl)
+  if (parsed) {
+    try {
+      const client = await ossClientForObject(cfg, parsed)
+      const result = await client.get(parsed.objectKey)
+      const raw = result.content
+      const buf = Buffer.isBuffer(raw) ? raw : Buffer.from(raw as Buffer)
+      const xmlErr = sniffOssErrorXml(buf)
+      if (xmlErr) return { ok: false, message: xmlErr }
+      if (buf.length < 256) return { ok: false, message: '素材文件过小或尚未写入完成' }
+      return { ok: true, buf }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      return { ok: false, message: `OSS 读取素材失败：${msg}` }
+    }
+  }
+
+  let fetchUrl = rawUrl.trim()
+  const signed = await signIceOssObjectUrl(cfg, fetchUrl)
+  if (signed) fetchUrl = signed
+  try {
+    const res = await fetch(fetchUrl, { redirect: 'follow' })
+    if (!res.ok) {
+      return { ok: false, message: `拉取素材失败 HTTP ${res.status}` }
+    }
+    const buf = Buffer.from(await res.arrayBuffer())
+    const xmlErr = sniffOssErrorXml(buf)
+    if (xmlErr) return { ok: false, message: xmlErr }
+    if (buf.length < 256) return { ok: false, message: '素材文件过小' }
+    return { ok: true, buf }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) }
+  }
+}
