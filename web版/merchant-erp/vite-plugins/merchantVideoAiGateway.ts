@@ -1856,7 +1856,7 @@ export async function handleMerchantAiVideoRoutes(input: {
     const targetTotalSecRaw = Number(parsed.targetTotalSec)
     const targetTotalSec =
       Number.isFinite(targetTotalSecRaw) && targetTotalSecRaw >= 10
-        ? Math.min(60, Math.max(15, Math.round(targetTotalSecRaw)))
+        ? Math.min(60, Math.max(10, Math.round(targetTotalSecRaw)))
         : 0
     const segmentSec = Math.min(10, Math.max(5, Number(parsed.segmentSec) || 10))
     const forceAiPlanner = parsed.forceAiPlanner !== false
