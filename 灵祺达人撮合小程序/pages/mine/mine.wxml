@@ -110,6 +110,7 @@
         >
           <view class="wb-tile-icon">
             <image class="wb-tile-img" src="{{item.iconSrc}}" mode="aspectFill" />
+            <text class="wb-menu-badge" wx:if="{{item.badge}}">{{item.badge}}</text>
           </view>
           <text class="wb-tile-label">{{item.label}}</text>
         </view>
@@ -137,6 +138,7 @@
             <text class="wb-biz-sub">{{item.sub}}</text>
           </view>
           <view class="wb-biz-right">
+            <text class="wb-menu-badge wb-menu-badge--row" wx:if="{{item.badge}}">{{item.badge}}</text>
             <text class="menu-soon" wx:if="{{item.comingSoon}}">即将开放</text>
             <text class="wb-biz-arrow" wx:else>›</text>
           </view>

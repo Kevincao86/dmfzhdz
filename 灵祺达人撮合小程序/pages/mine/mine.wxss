@@ -475,9 +475,32 @@
   width: 80rpx;
   height: 80rpx;
   border-radius: 20rpx;
-  overflow: hidden;
+  overflow: visible;
   margin-bottom: 8rpx;
   box-shadow: 0 6rpx 16rpx rgba(15, 23, 42, 0.08);
+  position: relative;
+}
+
+.wb-menu-badge {
+  position: absolute;
+  top: -8rpx;
+  right: -8rpx;
+  min-width: 28rpx;
+  height: 28rpx;
+  padding: 0 6rpx;
+  border-radius: 999rpx;
+  background: #ef4444;
+  color: #fff;
+  font-size: 18rpx;
+  font-weight: 700;
+  line-height: 28rpx;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.wb-menu-badge--row {
+  position: static;
+  margin-right: 8rpx;
 }
 
 .wb-tile-img {

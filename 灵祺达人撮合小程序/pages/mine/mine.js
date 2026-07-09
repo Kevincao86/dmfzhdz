@@ -19,6 +19,10 @@ const { attachMenuGlyphs } = require('../../utils/mineMenuIcons.js')
 const identityTheme = require('../../utils/identityTheme.js')
 const accountSessionActions = require('../../utils/accountSessionActions.js')
 const mpMembershipUi = require('../../utils/mpMembershipUi.js')
+const orderCalendar = require('../../utils/orderCalendarEvents.js')
+const appRegistrySync = require('../../utils/applicationsRegistrySync.js')
+const applicationsStore = require('../../utils/applicationsStore.js')
+const prPublishedOrders = require('../../utils/prPublishedOrders.js')
 
 const MY_ORDERS_MENU = {
   key: 'myOrders',
@@ -138,12 +142,23 @@ const guestRoutes = require('../../utils/mpGuestRoutes.js')
 const mpProfileNav = require('../../utils/mpProfileNav.js')
 const mineProfileStats = require('../../utils/mineProfileStats.js')
 
+function patchOrderCalendarMenuItem(item, identity, todoCount) {
+  if (!item || item.key !== 'orderCalendar') return item
+  const badge = todoCount > 0 ? (todoCount > 99 ? '99+' : String(todoCount)) : ''
+  return { ...item, sub: orderCalendar.calendarSubtitle(identity), badge }
+}
+
+function patchMenusCalendarMeta(menus, identity, todoCount) {
+  return (menus || []).map((item) => patchOrderCalendarMenuItem(item, identity, todoCount))
+}
+
 function talentMenusForIdentity(identity) {
+  const calSub = orderCalendar.calendarSubtitle(identity)
   if (identity === 'shoot') {
     return withManualMenu([
       { key: 'profile', label: '拍摄团队信息', sub: '团队资料 · 设备 · 作品集', icon: 'info' },
       { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
-      { key: 'orderCalendar', label: '商单日历', sub: '探店排期与交片进度一览', icon: 'chart' },
+      { key: 'orderCalendar', label: '商单日历', sub: calSub, icon: 'chart' },
       { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
       { key: 'prQuotes', label: '我的报价', sub: '为合作 PR 设置专属报价', icon: 'quote' },
       POINTS_RECHARGE_MENU,
@@ -158,7 +173,7 @@ function talentMenusForIdentity(identity) {
     return withManualMenu([
       { key: 'profile', label: '剪辑团队信息', sub: '团队资料 · 风格 · 作品集', icon: 'info' },
       { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
-      { key: 'orderCalendar', label: '商单日历', sub: '探店排期与交片进度一览', icon: 'chart' },
+      { key: 'orderCalendar', label: '商单日历', sub: calSub, icon: 'chart' },
       { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
       { key: 'prQuotes', label: '我的报价', sub: '为合作 PR 设置专属报价', icon: 'quote' },
       POINTS_RECHARGE_MENU,
@@ -174,7 +189,7 @@ function talentMenusForIdentity(identity) {
     { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
     { key: 'targetedInvites', label: '我的邀约', sub: 'PR 定向合作邀约，接受或拒绝', icon: 'list' },
     { key: 'wechatOaBind', label: '服务号邀约通知', sub: '关注服务号，定向邀约推送到微信', icon: 'star' },
-    { key: 'orderCalendar', label: '商单日历', sub: '探店排期与交片进度一览', icon: 'chart' },
+    { key: 'orderCalendar', label: '商单日历', sub: calSub, icon: 'chart' },
     { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
     { key: 'prQuotes', label: '我的报价', sub: '为合作 PR 设置专属报价', icon: 'quote' },
     POINTS_RECHARGE_MENU,
@@ -187,10 +202,11 @@ function talentMenusForIdentity(identity) {
 }
 
 function buildPrMenus() {
+  const calSub = orderCalendar.calendarSubtitle('pr')
   return withManualMenu([
     { key: 'prProfile', label: '我的 PR 信息', sub: '机构/个人资料与所在城市', icon: 'info' },
     { key: 'prOrders', label: '我的发单', sub: '已发布的招募订单', icon: 'list' },
-    { key: 'orderCalendar', label: '商单日历', sub: '探店排期与交片进度一览', icon: 'chart' },
+    { key: 'orderCalendar', label: '商单日历', sub: calSub, icon: 'chart' },
     POINTS_RECHARGE_MENU,
     MY_ORDERS_MENU,
     { key: 'templates', label: '我的模版', sub: '达人 / 拍摄 / 剪辑报名表单', icon: 'tpl' },
@@ -263,6 +279,7 @@ Page({
     bizMenus: [],
     greeting: '',
     notifyBadge: 0,
+    calendarTodoCount: 0,
     headerBandStyle: '',
     headerInnerStyle: '',
     showWxLoginSheet: false,
@@ -340,6 +357,7 @@ Page({
       }
     }
     void this.refreshNotifyBadge()
+    void this.refreshCalendarTodoBadge()
   },
   refresh() {
     const identity = userProfile.readIdentity()
@@ -451,6 +469,7 @@ Page({
       greeting: workbenchGreeting(displayName),
       statAppliedKey: identity === 'pr' ? 'prOrders' : 'applications',
       notifyBadge: 0,
+      calendarTodoCount: this.data.calendarTodoCount || 0,
       wxLoginNick: wxAcc?.wxNickName || this.data.wxLoginNick || '',
       wxLoginAvatar: wxAcc?.wxAvatarUrl || this.data.wxLoginAvatar || '',
       membershipPlanLabel,
@@ -471,6 +490,43 @@ Page({
   onGoMembership() {
     if (!this.ensureWxLoggedIn()) return
     wx.navigateTo({ url: MENU_URLS.xingxuanMembership })
+  },
+  async refreshCalendarTodoBadge() {
+    if (!auth.isLoggedIn() || !api.hasApi()) return
+    const identity = userProfile.readIdentity()
+    if (!identityTypes.isWorkIdentity(identity)) return
+    try {
+      const isPr = identity === 'pr'
+      const reg = await appRegistrySync.fetchRegistryAndReconcileApplications(
+        isPr ? { includePrOwned: true } : { includeLocalContext: true },
+      )
+      const orders = (reg && reg.mpRecruitmentOrders) || []
+      let events
+      if (isPr) {
+        const account = auth.readAccount()
+        const owned = orders.filter((o) => prPublishedOrders.mpOrderOwnedByCurrentPr(o, account))
+        events = orderCalendar.aggregatePrOrderCalendarEvents(owned)
+      } else {
+        const apps = applicationsStore.readApplications()
+        const ids = apps.map((a) => String(a.applicantId || '').trim()).filter(Boolean)
+        const acct = auth.readAccount()
+        const talentMemberId = String(
+          (acct && acct.registryMemberId) || participant.resolveTalentMemberId() || '',
+        ).trim()
+        events = orderCalendar.aggregateOrderCalendarEvents(orders, {
+          identity,
+          applicantIds: ids,
+          talentMemberId,
+        })
+      }
+      const count = orderCalendar.countActiveTodos(events)
+      const menus = patchMenusCalendarMeta(this.data.menus, identity, count)
+      const quickMenus = patchMenusCalendarMeta(this.data.quickMenus, identity, count)
+      const bizMenus = patchMenusCalendarMeta(this.data.bizMenus, identity, count)
+      const app = getApp()
+      if (app && app.globalData) app.globalData.calendarTodoCount = count
+      this.setData({ calendarTodoCount: count, menus, quickMenus, bizMenus })
+    } catch (_) {}
   },
   async refreshNotifyBadge() {
     const identity = userProfile.readIdentity()

@@ -93,6 +93,78 @@ export async function sendWechatOaTargetedInviteTemplate(
   }
 }
 
+function formatOaCalendarTime10(eventDateKey: string, eventKind?: string): string {
+  const dk = String(eventDateKey || '').trim()
+  if (!dk) return '—'
+  const suffix = eventKind === 'deadline' ? ' 截止' : ''
+  const s = `${dk}${suffix}`
+  return s.length <= 20 ? s : `${s.slice(0, 19)}…`
+}
+
+function oaCalendarProjectLabel(eventTitle: string, eventKind?: string): string {
+  const title = String(eventTitle || '').trim()
+  if (title) return title
+  if (eventKind === 'visit') return '探店提醒'
+  if (eventKind === 'deadline') return '交片提醒'
+  if (eventKind === 'plan_slot') return '可探店提醒'
+  return '日程提醒'
+}
+
+/** 商单日历到点提醒 — 服务号模板（time10/thing13/thing18） */
+export async function sendWechatOaCalendarReminderTemplate(opts: {
+  oaOpenId: string
+  eventTitle: string
+  storeName: string
+  eventDateKey: string
+  eventKind?: string
+  mpOrderId?: string
+}): Promise<void> {
+  const oid = String(opts.oaOpenId || '').trim()
+  if (!oid) return
+  const cfgResult = loadWechatOaConfig()
+  if (!cfgResult.ok) throw new Error('wx_oa_not_configured')
+
+  const templateId = String(cfgResult.config.calendarReminderTemplateId || '').trim()
+  if (!templateId) return
+
+  const mpOrderId = String(opts.mpOrderId || '').trim()
+  const pagePath = 'pages/subpack-mine/mine-order-calendar/mine-order-calendar'
+  const token = await getWechatOfficialAccountAccessToken()
+  const mpAppId = mpWechatAppId()
+
+  const payload: Record<string, unknown> = {
+    touser: oid,
+    template_id: templateId,
+    data: {
+      time10: { value: formatOaCalendarTime10(opts.eventDateKey, opts.eventKind) },
+      thing13: { value: clipThing(opts.storeName || '—') },
+      thing18: { value: clipThing(oaCalendarProjectLabel(opts.eventTitle, opts.eventKind)) },
+    },
+  }
+
+  if (mpAppId) {
+    payload.miniprogram = {
+      appid: mpAppId,
+      pagepath: mpOrderId
+        ? `pages/detail/detail?id=${encodeURIComponent(mpOrderId)}`
+        : pagePath,
+    }
+  }
+
+  const res = await fetch(
+    `https://api.weixin.qq.com/cgi-bin/message/template/send?access_token=${encodeURIComponent(token)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+  )
+  const body = (await res.json()) as { errcode?: number; errmsg?: string }
+  if (body.errcode && body.errcode !== 0) {
+    throw new Error(`oa_template_${body.errcode}:${body.errmsg || 'failed'}`)
+  }
+}
+
 /** 收到客户预约新订单通知 — 复用为私信未读提醒（thing2=提醒文案 thing6=发送方） */
 export async function sendWechatOaDmUnreadTemplate(opts: {
   oaOpenId: string
