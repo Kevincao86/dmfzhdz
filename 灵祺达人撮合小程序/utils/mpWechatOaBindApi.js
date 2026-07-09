@@ -19,6 +19,12 @@ async function call(body) {
     if (code === 'wx_oa_not_configured') {
       throw new Error('服务号通知暂未开通，请联系管理员')
     }
+    if (code === 'wx_oa_ip_not_whitelisted') {
+      throw new Error(
+        (res && res.message) ||
+          '微信服务号未配置服务器 IP 白名单，请联系管理员在公众平台添加 139.196.42.5',
+      )
+    }
     if (/wx_oa_qrcode|invalid credential|access_token/i.test(code)) {
       throw new Error('服务号二维码获取失败，请稍后重试')
     }

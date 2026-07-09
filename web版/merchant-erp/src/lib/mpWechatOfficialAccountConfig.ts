@@ -34,3 +34,20 @@ export function loadWechatOaConfig(): { ok: true; config: WechatOaConfig } | { o
 export function wechatOaConfigured(): boolean {
   return loadWechatOaConfig().ok
 }
+
+/** 轻量 ECS 出口 IP，服务号「IP 白名单」须包含此项 */
+export const WECHAT_OA_SERVER_IP = '139.196.42.5'
+
+export function normalizeWechatOaApiError(errmsg: unknown): { code: string; message: string } {
+  const raw = String(errmsg || '').trim()
+  if (/invalid ip|not in whitelist/i.test(raw)) {
+    return {
+      code: 'wx_oa_ip_not_whitelisted',
+      message: `微信服务号未配置服务器 IP 白名单，请在公众平台添加：${WECHAT_OA_SERVER_IP}`,
+    }
+  }
+  if (/invalid credential|access_token/i.test(raw)) {
+    return { code: 'wx_oa_invalid_credential', message: '服务号 AppSecret 无效或已重置，请检查 WX_OA_SECRET' }
+  }
+  return { code: raw || 'wx_oa_api_failed', message: raw || '微信服务号接口调用失败' }
+}

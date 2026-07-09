@@ -46,6 +46,7 @@ const ZH = {
   unauthorized: '请先登录后再操作',
   member_not_found: '未找到达人资料，请先在「我的信息」完善并保存',
   wx_oa_not_configured: '服务号通知暂未开通，请联系管理员',
+  wx_oa_ip_not_whitelisted: '微信服务号未配置服务器 IP 白名单，请联系管理员添加 139.196.42.5',
 }
 
 function formatMpApiErr(e, fallback) {

@@ -13,7 +13,7 @@ import {
   createWechatOaBindTicketInSnapshot,
   wechatOaBindStatusInSnapshot,
 } from '../src/lib/mpWechatOaBindingCore.js'
-import { loadWechatOaConfig } from '../src/lib/mpWechatOfficialAccountConfig.js'
+import { loadWechatOaConfig, normalizeWechatOaApiError } from '../src/lib/mpWechatOfficialAccountConfig.js'
 
 export const config = { maxDuration: 60 }
 
@@ -121,7 +121,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     if (action === 'create_ticket') {
       const created = await createWechatOaBindTicketInSnapshot(data, talentMemberId)
       if (!created.ok) {
-        sendOpsJson(res, created.status, { ok: false, error: created.error })
+        sendOpsJson(res, created.status, {
+          ok: false,
+          error: created.error,
+          message: (created as { message?: string }).message,
+        })
         return
       }
       await io.save(data)
@@ -138,9 +142,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     sendOpsJson(res, 400, { ok: false, error: 'invalid_action' })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    sendOpsJson(res, 500, {
+    const norm = normalizeWechatOaApiError(msg)
+    sendOpsJson(res, norm.code === 'wx_oa_ip_not_whitelisted' ? 503 : 500, {
       ok: false,
-      error: 'meoo_ops_mp_wechat_oa_bind_failed',
+      error: norm.code,
+      message: norm.message,
       detail: msg.slice(0, 800),
     })
   }

@@ -1,6 +1,6 @@
 /** 服务号 access_token（client_credential），带进程内缓存 */
 
-import { loadWechatOaConfig } from './mpWechatOfficialAccountConfig.js'
+import { loadWechatOaConfig, normalizeWechatOaApiError } from './mpWechatOfficialAccountConfig.js'
 
 let cached: { token: string; expiresAt: number } | null = null
 
@@ -21,7 +21,8 @@ export async function getWechatOfficialAccountAccessToken(): Promise<string> {
     errmsg?: string
   }
   if (!data.access_token) {
-    throw new Error(data.errmsg || `wx_oa_token_${data.errcode ?? res.status}`)
+    const norm = normalizeWechatOaApiError(data.errmsg || `wx_oa_token_${data.errcode ?? res.status}`)
+    throw new Error(norm.code)
   }
   cached = {
     token: data.access_token,
