@@ -168,6 +168,8 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     done: number
     total: number
     fileName?: string
+    percent?: number
+    phase?: 'direct' | 'server' | 'encode'
   } | null>(null)
   const [imageUploading, setImageUploading] = useState(false)
   const [imageUploadProgress, setImageUploadProgress] = useState<{
@@ -393,12 +395,23 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       try {
         let completed = 0
         await runIceUploadPool(videos, ICE_VIDEO_UPLOAD_CONCURRENCY, async (file) => {
-          const r = await uploadIceLocalMediaFile(file)
+          const r = await uploadIceLocalMediaFile(file, {
+            onProgress: (p) => {
+              setVideoUploadProgress({
+                done: completed,
+                total: videos.length,
+                fileName: file.name,
+                percent: p.percent,
+                phase: p.phase,
+              })
+            },
+          })
           completed += 1
           setVideoUploadProgress({
             done: completed,
             total: videos.length,
             fileName: file.name,
+            percent: r.ok ? 100 : undefined,
           })
           return { file, r }
         }).then((outcomes) => {
@@ -1077,7 +1090,13 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                     <Loader2 className="h-8 w-8 animate-spin text-orange-600" />
                     <span className="text-sm font-medium text-zinc-800">
                       {videoUploadProgress
-                        ? `视频上传中 ${videoUploadProgress.done}/${videoUploadProgress.total}（${ICE_VIDEO_UPLOAD_CONCURRENCY} 路并行）`
+                        ? `视频上传中 ${videoUploadProgress.done}/${videoUploadProgress.total}（${ICE_VIDEO_UPLOAD_CONCURRENCY} 路并行${
+                            videoUploadProgress.phase === 'direct'
+                              ? ' · OSS 直传'
+                              : videoUploadProgress.phase === 'server'
+                                ? ' · 服务端写入'
+                                : ''
+                          }${videoUploadProgress.percent != null ? ` · ${videoUploadProgress.percent}%` : ''}）`
                         : '视频上传中…'}
                     </span>
                     {videoUploadProgress?.fileName ? (

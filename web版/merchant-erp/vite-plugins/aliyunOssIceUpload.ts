@@ -90,12 +90,14 @@ export async function createIceSourceUploadPlan(
 
   try {
     const client = await createOssClient(cfg, ossPrefix)
-    const uploadUrl = client.signatureUrl(objectKey, {
-      method: 'PUT',
-      expires: UPLOAD_EXPIRES_SEC,
-      'Content-Type': contentType,
-      secure: true,
-    })
+    const uploadUrl = ensureIceHttpsUrl(
+      client.signatureUrl(objectKey, {
+        method: 'PUT',
+        expires: UPLOAD_EXPIRES_SEC,
+        'Content-Type': contentType,
+        secure: true,
+      }),
+    )
     const mediaUrl = ensureIceHttpsUrl(
       client.signatureUrl(objectKey, { expires: MEDIA_URL_EXPIRES_SEC, secure: true }),
     )

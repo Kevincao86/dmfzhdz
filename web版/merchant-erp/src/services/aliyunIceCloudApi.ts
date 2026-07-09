@@ -165,17 +165,20 @@ const UPLOAD_MULTIPART_PATHS = [
   '/api/merchant/ai/video/ice/multipart',
 ] as const
 
-/** 与后端 ICE_UPLOAD_CHUNK_BYTES 一致：超过则走分片经 BFF 上传 */
+/** 与后端 ICE_UPLOAD_CHUNK_BYTES 一致：Vercel 上超过则走分片经 BFF 上传 */
 const ICE_CLIENT_CHUNK_BYTES = 2 * 1024 * 1024
+/** ECS 单次 JSON base64 直传上限（与 recruitmentVideoLimits 一致） */
+const ICE_ECS_SINGLE_UPLOAD_MAX_BYTES = 38 * 1024 * 1024
 
 const ICE_CONFIG_FETCH_TIMEOUT_MS = 20_000
 const ICE_UPLOAD_INIT_TIMEOUT_MS = 12_000
 const ICE_UPLOAD_BODY_TIMEOUT_MS = 75_000
-/** OSS 直传失败则快速回退服务端写入 */
-const ICE_OSS_PUT_TIMEOUT_MS = 18_000
+/** OSS 直传超时（5MB 弱网留足余量） */
+const ICE_OSS_PUT_TIMEOUT_MS = 120_000
 
-/** 本会话内 OSS 直传已失败过则跳过后续直传（Bucket CORS 通常对所有文件一致） */
-let iceOssDirectDisabledForSession = false
+/** 直传 CORS/网络连续失败次数，达阈值才本会话改走服务端 */
+let iceOssDirectFailStreak = 0
+const ICE_OSS_DIRECT_FAIL_STREAK_MAX = 2
 
 /** 配置接口实际命中的后端：ECS 有 ICE 凭据，Vercel 通常无 */
 let iceConfigBackend: 'ecs' | 'same-origin' | null = null
@@ -189,6 +192,39 @@ function rememberIceConfigBackend(url: string): void {
   else if (typeof window !== 'undefined' && url.startsWith(window.location.origin)) {
     iceConfigBackend = 'same-origin'
   }
+}
+
+function iceClientSingleUploadMaxBytes(): number {
+  if (iceConfigBackend === 'ecs') return ICE_ECS_SINGLE_UPLOAD_MAX_BYTES
+  if (
+    typeof window !== 'undefined' &&
+    window.location.hostname.toLowerCase() === 'cs.mofangdianai.com'
+  ) {
+    return ICE_ECS_SINGLE_UPLOAD_MAX_BYTES
+  }
+  return ICE_CLIENT_CHUNK_BYTES
+}
+
+function shouldSkipIceOssDirect(): boolean {
+  return iceOssDirectFailStreak >= ICE_OSS_DIRECT_FAIL_STREAK_MAX
+}
+
+function noteIceOssDirectFailure(message: string): void {
+  const msg = String(message || '')
+  if (/CORS|Access-Control|跨域|Mixed Content|mixed content/i.test(msg)) {
+    iceOssDirectFailStreak = ICE_OSS_DIRECT_FAIL_STREAK_MAX
+    return
+  }
+  iceOssDirectFailStreak += 1
+}
+
+function noteIceOssDirectSuccess(): void {
+  iceOssDirectFailStreak = 0
+}
+
+/** 预签名 PUT 须 HTTPS，否则 cs 等 HTTPS 页会被浏览器拦截 Mixed Content */
+function normalizeIceOssPutUrl(uploadUrl: string): string {
+  return uploadUrl.trim().replace(/^http:\/\//i, 'https://')
 }
 
 /** 上传 API：配置来自 ECS 时仅走 ECS（Vercel 无 ICE 凭据，回退只会空耗超时） */
@@ -417,7 +453,7 @@ async function uploadIceViaServer(
 
   report(8, 'server')
 
-  if (file.size <= ICE_CLIENT_CHUNK_BYTES) {
+  if (file.size <= iceClientSingleUploadMaxBytes()) {
     report(15, 'encode')
     const contentBase64 = await blobToBase64(file)
     report(45, 'server')
@@ -534,9 +570,10 @@ function putFileToPresignedUrl(
   contentType: string,
   onProgress?: (p: IceUploadProgress) => void,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
+  const putUrl = normalizeIceOssPutUrl(uploadUrl)
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest()
-    xhr.open('PUT', uploadUrl)
+    xhr.open('PUT', putUrl)
     xhr.timeout = ICE_OSS_PUT_TIMEOUT_MS
     xhr.setRequestHeader('Content-Type', contentType)
     xhr.upload.onprogress = (e) => {
@@ -618,13 +655,16 @@ export async function uploadIceLocalMediaFile(
   opts?.onProgress?.({ loaded: 0, total: file.size, percent: 1, phase: 'direct' })
 
   let directFail: { ok: false; message: string } | null = null
-  if (!iceOssDirectDisabledForSession) {
+  if (!shouldSkipIceOssDirect()) {
     const direct = await uploadIceDirectOss(file, (p) =>
       opts?.onProgress?.({ ...p, phase: 'direct' }),
     )
-    if (direct.ok) return direct
+    if (direct.ok) {
+      noteIceOssDirectSuccess()
+      return direct
+    }
     directFail = direct
-    iceOssDirectDisabledForSession = true
+    noteIceOssDirectFailure(direct.message)
   }
 
   opts?.onProgress?.({ loaded: 0, total: file.size, percent: 8, phase: 'server' })
