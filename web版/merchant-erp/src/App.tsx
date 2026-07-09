@@ -1,6 +1,8 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import type { ReactNode } from 'react'
 import { AiAgentProvider } from './context/AiAgentContext'
 import { PartnerClientProvider } from './context/PartnerClientContext'
+import { PartnerTenantProvider, usePartnerTenant } from './context/PartnerTenantContext'
 import { MembershipProvider } from './context/MembershipContext'
 import RequireMembershipFeature from './components/RequireMembershipFeature'
 import MembershipPlanSync from './components/MembershipPlanSync'
@@ -13,6 +15,7 @@ import BriefGenRecordsPage from './pages/BriefGenRecordsPage'
 import DigitalHumanBroadcastPage from './pages/DigitalHumanBroadcastPage'
 import ShortVideoOptimizationPage from './pages/ShortVideoOptimizationPage'
 import { FinanceReconcilePage, FinanceTaxPage } from './pages/FinancePages'
+import PartnerAgentSettlementPage from './pages/finance/PartnerAgentSettlementPage'
 import GeoPage from './pages/GeoPage'
 import HomeDashboard from './pages/HomeDashboard'
 import ActivityCenterPage from './pages/ActivityCenterPage'
@@ -27,6 +30,8 @@ import ProductEditFlowPage from './pages/ProductEditFlowPage'
 import ProductsPage from './pages/ProductsPage'
 import ProductsViewPage from './pages/ProductsViewPage'
 import RecruitmentPage from './pages/RecruitmentPage'
+import { XingxuanPartnerRoutePage, XingxuanPartnerShell } from './pages/partner/XingxuanPartnerShell'
+import { XINGXUAN_PARTNER_NAV } from './config/xingxuanPartnerNav'
 import SettingsPage from './pages/SettingsPage'
 import LocalPromotionAdvertisingPage from './pages/LocalPromotionAdvertisingPage'
 import LocalPromotionLeadsPage from './pages/LocalPromotionLeadsPage'
@@ -43,11 +48,28 @@ function portalEdition() {
   return isPartnerEdition() ? ('partner' as const) : ('merchant' as const)
 }
 
+function MerchantOnlyAiOperationRoute({ children }: { children: ReactNode }) {
+  if (isPartnerEdition()) return <Navigate to="/recruitment/xingxuan/hall" replace />
+  return <>{children}</>
+}
+
+function PartnerRecruitmentRoute() {
+  if (isPartnerEdition()) return <Navigate to="/recruitment/xingxuan/hall" replace />
+  return <RecruitmentPage />
+}
+
+function PartnerAgentSettlementRoute() {
+  const { profile } = usePartnerTenant()
+  if (!isPartnerEdition() || !profile.isParent) return <Navigate to="/finance" replace />
+  return <PartnerAgentSettlementPage />
+}
+
 export default function App() {
   const pubEdition = portalEdition()
   return (
     <BrowserRouter>
       <MembershipProvider>
+      <PartnerTenantProvider>
       <PartnerClientProvider>
       <AiAgentProvider>
         <Routes>
@@ -82,25 +104,70 @@ export default function App() {
           <Route path="products/edit/:platform/:productId" element={<ProductEditFlowPage />} />
           <Route path="products/view" element={<Navigate to="/products/list" replace />} />
           <Route path="operation" element={<Navigate to="/reviews" replace />} />
-          <Route path="recruitment" element={<RecruitmentPage />} />
+          <Route path="recruitment" element={<PartnerRecruitmentRoute />} />
+          <Route path="recruitment/xingxuan" element={<XingxuanPartnerShell />}>
+            {XINGXUAN_PARTNER_NAV.map((item) => (
+              <Route
+                key={item.path}
+                path={item.path.replace('/recruitment/xingxuan/', '')}
+                element={<XingxuanPartnerRoutePage iframePath={item.iframePath} />}
+              />
+            ))}
+          </Route>
           <Route path="activity" element={<ActivityCenterPage />} />
           <Route path="reviews" element={<ReviewsManagementPage />} />
           <Route path="reviews/store" element={<Navigate to="/reviews?kind=store" replace />} />
           <Route path="reviews/product" element={<Navigate to="/reviews?kind=product" replace />} />
           <Route path="geo" element={<GeoPage />} />
           <Route path="operation/competitors" element={<CompetitorAnalysisPage />} />
-          <Route path="ai-operation/article" element={<Navigate to="/ai-operation/content" replace />} />
-          <Route path="ai-operation/topic" element={<Navigate to="/ai-operation/content" replace />} />
-          <Route path="ai-operation/content" element={<BriefContentShell />}>
+          <Route
+            path="ai-operation/article"
+            element={
+              <MerchantOnlyAiOperationRoute>
+                <Navigate to="/ai-operation/content" replace />
+              </MerchantOnlyAiOperationRoute>
+            }
+          />
+          <Route
+            path="ai-operation/topic"
+            element={
+              <MerchantOnlyAiOperationRoute>
+                <Navigate to="/ai-operation/content" replace />
+              </MerchantOnlyAiOperationRoute>
+            }
+          />
+          <Route
+            path="ai-operation/content"
+            element={
+              <MerchantOnlyAiOperationRoute>
+                <BriefContentShell />
+              </MerchantOnlyAiOperationRoute>
+            }
+          >
             <Route index element={<AiOperationContentPage />} />
             <Route path="records" element={<BriefGenRecordsPage />} />
           </Route>
-          <Route path="ai-operation/video-check" element={<ShortVideoOptimizationPage />} />
-          <Route path="ai-operation/digital-human" element={<DigitalHumanBroadcastPage />} />
+          <Route
+            path="ai-operation/video-check"
+            element={
+              <MerchantOnlyAiOperationRoute>
+                <ShortVideoOptimizationPage />
+              </MerchantOnlyAiOperationRoute>
+            }
+          />
+          <Route
+            path="ai-operation/digital-human"
+            element={
+              <MerchantOnlyAiOperationRoute>
+                <DigitalHumanBroadcastPage />
+              </MerchantOnlyAiOperationRoute>
+            }
+          />
           <Route path="advertising" element={<LocalPromotionAdvertisingPage />} />
           <Route path="leads" element={<LocalPromotionLeadsPage />} />
           <Route path="finance" element={<FinanceReconcilePage />} />
           <Route path="finance/tax" element={<FinanceTaxPage />} />
+          <Route path="finance/agent-settlement" element={<PartnerAgentSettlementRoute />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="wallet" element={<WalletPage />} />
         </Route>
@@ -109,6 +176,7 @@ export default function App() {
       </Routes>
       </AiAgentProvider>
       </PartnerClientProvider>
+      </PartnerTenantProvider>
       </MembershipProvider>
     </BrowserRouter>
   )

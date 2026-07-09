@@ -36,6 +36,8 @@ import {
 } from '../services/merchantDashboardApi'
 import { probeMerchantPlatforms, type PlatformConnectivityRow } from '../services/platformConnectivityProbe'
 import AiTokenUsagePanel from '../components/home/AiTokenUsagePanel'
+import { isPartnerEdition } from '../lib/appEdition'
+import PartnerHomeDashboard from './PartnerHomeDashboard'
 
 type PlatformId = MerchantPlatformId
 
@@ -87,6 +89,11 @@ function formatNum(n: number) {
 type DashBundle = Awaited<ReturnType<typeof fetchHomeDashboardByPlatforms>>
 
 export default function HomeDashboard() {
+  if (isPartnerEdition()) return <PartnerHomeDashboard />
+  return <MerchantHomeDashboard />
+}
+
+function MerchantHomeDashboard() {
   const [loading, setLoading] = useState(true)
   const [statsLoading, setStatsLoading] = useState(false)
   const [timeOpen, setTimeOpen] = useState(false)

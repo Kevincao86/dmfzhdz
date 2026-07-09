@@ -30,6 +30,10 @@ import paymentOrdersListHandler from '../../../商家管理后台/api/_lib/handl
 import paymentOrdersVerifyHandler from '../../../商家管理后台/api/_lib/handlers/meoo-supabase-payment-orders-verify.ts'
 import paymentOrdersConfirmHandler from '../../../商家管理后台/api/_lib/handlers/meoo-supabase-payment-orders-confirm.ts'
 import tenantBillingHandler from '../api/meoo-tenant-billing.ts'
+import partnerXingxuanBootstrapHandler from '../api/meoo-partner-xingxuan-bootstrap.ts'
+import partnerAgentsHandler from '../api/meoo-partner-agents.ts'
+import partnerAgentEntitlementsHandler from '../api/meoo-partner-agent-entitlements.ts'
+import partnerAgentSettlementHandler from '../api/meoo-partner-agent-settlement.ts'
 import opsSyncRegistryGetHandler from '../api/meoo-ops-registry-ops-get.ts'
 import opsSyncVendorKeysHandler from '../api/meoo-ops-sync-vendor-keys.ts'
 import opsSyncAiHandler from '../api/meoo-ops-sync-ai.ts'
@@ -200,6 +204,10 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-supabase-payment-orders-verify': paymentOrdersVerifyHandler as VercelLikeHandler,
   '/api/meoo-supabase-payment-orders-confirm': paymentOrdersConfirmHandler as VercelLikeHandler,
   '/api/meoo-tenant-billing': tenantBillingHandler as VercelLikeHandler,
+  '/api/meoo-partner-xingxuan-bootstrap': partnerXingxuanBootstrapHandler as VercelLikeHandler,
+  '/api/meoo-partner-agents': partnerAgentsHandler as VercelLikeHandler,
+  '/api/meoo-partner-agent-entitlements': partnerAgentEntitlementsHandler as VercelLikeHandler,
+  '/api/meoo-partner-agent-settlement': partnerAgentSettlementHandler as VercelLikeHandler,
   /** 运营台注册表：Vercel 无法出站访问 ECS Supabase，由浏览器经 /erp-api 直连本机 */
   '/api/meoo-ops-sync-registry': opsSyncRegistryGetHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-hall-registry': mpHallRegistryHandler as VercelLikeHandler,

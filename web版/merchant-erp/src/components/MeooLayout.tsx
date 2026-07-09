@@ -15,7 +15,10 @@ import {
 import type { AuthChangeEvent } from '@supabase/supabase-js'
 import { useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { childActive, filterNavItemsForPlan, NAV_ITEMS, pathActive } from '../config/nav'
+import { childActive, filterNavItemsForPartnerEdition, filterNavItemsForPlan, NAV_ITEMS, pathActive } from '../config/nav'
+import { isPartnerEdition } from '../lib/appEdition'
+import { usePartnerTenant } from '../context/PartnerTenantContext'
+import { ensurePartnerXingxuanBootstrap } from '../lib/partnerXingxuanBootstrapClient'
 import { useMembership } from '../context/MembershipContext'
 import { cn } from '../cn'
 import AiAgentDrawer, { AiAgentFloatingButton } from './AiAgentDrawer'
@@ -51,7 +54,13 @@ export default function MeooLayout() {
   const [headerSearchQuery, setHeaderSearchQuery] = useState('')
   const { submitTopSearchQuery } = useAiAgent()
   const { plan } = useMembership()
-  const navItems = useMemo(() => filterNavItemsForPlan(NAV_ITEMS, plan), [plan])
+  const { profile } = usePartnerTenant()
+  const navItems = useMemo(() => {
+    const forPlan = filterNavItemsForPlan(NAV_ITEMS, plan)
+    return isPartnerEdition()
+      ? filterNavItemsForPartnerEdition(forPlan, { isParent: profile.isParent })
+      : forPlan
+  }, [plan, profile.isParent])
   const [adminName, setAdminName] = useState('管理员')
   const [enterpriseName, setEnterpriseName] = useState('')
   const [accountType] = useState('主账号')
@@ -97,6 +106,7 @@ export default function MeooLayout() {
           setEnterpriseName('')
         }
         await hydratePlatformBindingsFromCloud(client)
+        if (isPartnerEdition()) void ensurePartnerXingxuanBootstrap()
       })()
     }
     apply()
