@@ -56,7 +56,6 @@ import PartnerClientsSection from './settings/PartnerClientsSection'
 import PartnerAgentManagementSection from './settings/PartnerAgentManagementSection'
 import PartnerEntitlementSection from './settings/PartnerEntitlementSection'
 import { usePartnerTenant } from '../context/PartnerTenantContext'
-import { PartnerDouyinApiSection, PartnerKuaishouApiSection } from './settings/apiDocsPartnerContent'
 
 type VerifyItem = {
   id: string
@@ -493,14 +492,6 @@ export default function SettingsPage() {
               {partnerEdition && profile.isAgent ? (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-950">
                   林客 / 快手服务商应用仅由<strong>总代</strong>维护；子代添加客户时将自动使用总代 SP 凭证。
-                </div>
-              ) : null}
-              {partnerEdition && profile.isParent ? (
-                <div className="rounded-lg border border-cyan-100 bg-cyan-50/60 px-4 py-3 text-sm text-cyan-950">
-                  <PartnerDouyinApiSection />
-                  <div className="mt-6">
-                    <PartnerKuaishouApiSection />
-                  </div>
                 </div>
               ) : null}
               {!partnerEdition || profile.isParent ? (
