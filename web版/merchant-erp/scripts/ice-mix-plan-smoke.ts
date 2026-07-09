@@ -5,12 +5,11 @@ import {
   type IceMixMaterialSlot,
 } from '../src/lib/iceMixPlan.ts'
 import {
-  buildIceMixSegmentsFromEditPlan,
-  buildStructuralMixDecisions,
-  enforceDiverseEditDecisions,
-  fallbackMixEditDecisions,
-  type IceMixMaterialProfile,
-} from '../src/services/iceMixEditPlanAi.ts'
+  buildIceMixSegmentsFromSlots,
+  produceIceMixPackage,
+  resolveMixMaterialSlotMapping,
+  validateMixSegmentDiversity,
+} from '../src/services/iceMixProduceEngine.ts'
 import type { ShortVideoScriptRow } from '../src/lib/shortVideoScriptTable.ts'
 
 const rows: ShortVideoScriptRow[] = [
@@ -29,63 +28,51 @@ const materials: IceMixMaterialSlot[] = [
   { kind: 'video', mediaUrl: 'oss://a/v2.mp4', label: '后厨' },
   { kind: 'video', mediaUrl: 'oss://a/v3.mp4', label: '成品' },
 ]
-const profiles: IceMixMaterialProfile[] = [
-  { index: 0, label: '门店', kind: 'video', description: '门店外观与招牌', estimatedDurationSec: 12 },
-  { index: 1, label: '后厨', kind: 'video', description: '后厨烹饪操作过程', estimatedDurationSec: 12 },
-  { index: 2, label: '成品', kind: 'video', description: '成品摆盘特写', estimatedDurationSec: 12 },
-]
 
-const structural = buildStructuralMixDecisions(fixed, materials, profiles)
-if (new Set(structural.map((d) => d.materialIndex)).size < 2) {
-  console.error('FAIL: structural should use multiple materials', structural)
+const slots = resolveMixMaterialSlotMapping(fixed.length, materials, [0, 0, 0])
+if (new Set(slots).size < 2) {
+  console.error('FAIL: slot mapping must spread materials', slots)
   process.exit(1)
 }
 
-const decisions = fallbackMixEditDecisions(fixed, profiles, materials)
-const allSameMat = new Set(decisions.map((d) => d.materialIndex)).size < 2
-if (allSameMat && materials.length >= 2) {
-  const enforced = enforceDiverseEditDecisions(decisions, fixed, materials, profiles)
-  if (new Set(enforced.map((d) => d.materialIndex)).size < 2) {
-    console.error('FAIL: enforce diversity', enforced)
-    process.exit(1)
-  }
-}
-const seg0 = decisions[0]!
-const seg1 = decisions[1]!
-if (seg0.materialIndex === seg1.materialIndex && seg0.sourceInSec === seg1.sourceInSec) {
-  console.error('FAIL: should pick different clips', decisions)
-  process.exit(1)
-}
-if (seg1.materialIndex !== 1) {
-  console.error('FAIL: kitchen segment should map to material 1', seg1)
+const segments = buildIceMixSegmentsFromSlots(fixed, materials, slots, 12)
+const divErr = validateMixSegmentDiversity(segments, materials)
+if (divErr) {
+  console.error('FAIL: diversity', divErr, segments)
   process.exit(1)
 }
 
-const segments = buildIceMixSegmentsFromEditPlan(fixed, materials, decisions, 12)
-if (segments.some((s) => s.sourceInSec == null || s.sourceInSec < 0)) {
-  console.error('FAIL: missing sourceInSec', segments)
+const matIndices = segments.map((s) => s.materialIndex)
+if (new Set(matIndices).size < 2) {
+  console.error('FAIL: segments must use multiple materials', matIndices)
   process.exit(1)
 }
-if (segments[0]!.timelineStartSec !== 0 || segments[1]!.timelineStartSec > segments[0]!.timelineEndSec) {
+
+if (segments[0]!.timelineStartSec !== 0 || segments[1]!.timelineStartSec < segments[0]!.timelineEndSec - 0.01) {
   console.error('FAIL: timeline overlap', segments)
   process.exit(1)
 }
 
-const shortClipProfiles: IceMixMaterialProfile[] = [
-  { index: 0, label: '短', kind: 'video', description: '门店', estimatedDurationSec: 4 },
-]
-const shortDecisions = fallbackMixEditDecisions(
-  [{ timeRange: '0-4秒', visual: '成品特写', dialogue: 'test' }],
-  shortClipProfiles,
-)
-const clampedIn = shortDecisions[0]!.sourceInSec
-if (clampedIn > 1) {
-  console.error('FAIL: sourceIn should clamp for 4s clip', clampedIn)
+const produced = await produceIceMixPackage({
+  rows: fixed,
+  materials,
+  materialSlots: slots,
+  targetTotalSec: 12,
+  effectId: 'trans_fade',
+  subtitleStyleId: 'viral-white-pop',
+})
+if (!produced.ok) {
+  console.error('FAIL: produceIceMixPackage', produced.message)
   process.exit(1)
 }
+if (produced.output.segments.length < 2) {
+  console.error('FAIL: produce output segments')
+  process.exit(1)
+}
+
 if (clampMixSourceInSec(8, 4, 5) !== 1) {
   console.error('FAIL: clampMixSourceInSec', clampMixSourceInSec(8, 4, 5))
   process.exit(1)
 }
 
-console.log('OK: instruction-driven mix edit plan (semantic match + sourceInSec + clamp)')
+console.log('OK: ICE mix produce engine (forced multi-material + timeline + clamp)')

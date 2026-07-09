@@ -62,15 +62,10 @@ import ShortVideoScriptTableEditor from './ShortVideoScriptTableEditor'
 import { parseGuidanceDocumentFile } from '../lib/shortVideoGuidanceDoc'
 import { planShortVideoScriptFromGuidance } from '../services/shortVideoGuidanceAi'
 import { analyzeIceMixMaterialsToGuidance } from '../services/iceMixGuidanceAi'
-import {
-  buildIceMixSegmentsFromEditPlan,
-  planMixEditFromInstructions,
-  type IceMixMaterialProfile,
-} from '../services/iceMixEditPlanAi'
+import { produceIceMixPackage, composeMixProductionBrief, type IceMixProduceOutput } from '../services/iceMixProduceEngine'
+import type { IceMixMaterialProfile } from '../services/iceMixEditPlanAi'
 import {
   assignMixMaterialSlots,
-  collectMixNarrationText,
-  composeMixEditBrief,
   ensureSequentialMixScriptRows,
   inferIceEffectIdFromMixContent,
   mixStoryboardBriefReady,
@@ -223,7 +218,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   const [mixMaterialProfiles, setMixMaterialProfiles] = useState<IceMixMaterialProfile[]>([])
   const [planBusy, setPlanBusy] = useState(false)
   const [analyzeBusy, setAnalyzeBusy] = useState(false)
-  const [mixTransitionMode, setMixTransitionMode] = useState<'auto' | string>('auto')
+  const [mixTransitionMode, setMixTransitionMode] = useState<'auto' | string>('trans_fade')
   const [mixSubtitleStyleId, setMixSubtitleStyleId] = useState(ICE_SUBTITLE_STYLE_DEFAULT_ID)
   const mixDocInputRef = useRef<HTMLInputElement>(null)
 
@@ -233,7 +228,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   )
 
   const mixEditBrief = useMemo(
-    () => composeMixEditBrief(mixGuidance, scriptRows),
+    () => composeMixProductionBrief(mixGuidance, scriptRows),
     [mixGuidance, scriptRows],
   )
 
@@ -304,12 +299,12 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
 
   const mixReady =
     scriptRows.length >= 2 &&
-    mixMaterialPool.length >= 1 &&
+    mixMaterialPool.length >= 2 &&
     mixStoryboardBriefReady(mixGuidance, scriptRows)
 
   const mixBlockers = useMemo((): string[] => {
     const items: string[] = []
-    if (mixMaterialPool.length < 1) items.push('上传至少 1 条视频或 1 张图片')
+    if (mixMaterialPool.length < 2) items.push('上传至少 2 条不同视频/图片（混剪须多素材拼接）')
     if (scriptRows.length < 2) items.push('分镜至少 2 段（点「AI 规划分镜」）')
     else if (!mixStoryboardBriefReady(mixGuidance, scriptRows)) {
       items.push('填写指导文案，或在分镜表中填写口播/画面指令')
@@ -896,23 +891,22 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       setErr('AI混剪服务未就绪')
       return
     }
-    if (mixMaterialPool.length === 0) {
-      setErr('请先上传视频或图片素材')
+    if (mixMaterialPool.length < 2) {
+      setErr('混剪须至少 2 条不同素材，请继续上传视频或图片')
       return
     }
     if (scriptRows.length < 2) {
       setErr('请先规划至少 2 段分镜（指导文案 → AI 规划分镜）')
       return
     }
-    const mixBrief = mixEditBrief.trim()
-    if (mixBrief.length < 4) {
+    if (!mixStoryboardBriefReady(mixGuidance, scriptRows)) {
       setErr('请填写指导文案或在分镜表中填写画面/口播')
       return
     }
 
     setOneClickBusy(true)
     setErr(null)
-    setHint('ICE 时间线混剪：视觉模型匹配素材与截取点…')
+    setHint('ICE 剪辑引擎：多素材拼接 + 截取 + 转场 + TTS…')
 
     const profiles = mixMaterialPool.map((m, i) => {
       const hit = mixMaterialProfiles.find((p) => p.index === i)
@@ -927,46 +921,45 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       )
     })
 
-    const editPlan = await planMixEditFromInstructions({
-      guidance: mixGuidance.trim() || mixBrief,
+    const slots = normalizeMixMaterialSlots(
+      materialSlots.length === scriptRows.length ? materialSlots : assignMixMaterialSlots(scriptRows.length, mixMaterialPool.length),
+      scriptRows.length,
+      mixMaterialPool.length,
+    )
+
+    const produced = await produceIceMixPackage({
       rows: scriptRows,
       materials: mixMaterialPool,
+      materialSlots: slots,
       materialProfiles: profiles,
       targetTotalSec: mixTargetSec,
+      guidance: mixGuidance.trim(),
+      mixInstruction: mixGuidance.trim(),
+      effectId: resolvedMixEffect.id,
+      subtitleStyleId: mixSubtitleStyleId,
       onProgress: (msg) => setHint(msg),
     })
-    if (!editPlan.ok) {
-      setErr(editPlan.message)
+    if (!produced.ok) {
+      setErr(produced.message)
       setOneClickBusy(false)
       return
     }
 
-    const segments = buildIceMixSegmentsFromEditPlan(
-      scriptRows,
-      mixMaterialPool,
-      editPlan.decisions,
-      mixTargetSec,
-      profiles,
-    )
+    const pack: IceMixProduceOutput = produced.output
+    const segments = pack.segments
     if (segments.length < 2) {
-      setErr('剪辑方案无效，请检查分镜表与指导文案')
+      setErr('剪辑时间线无效，请检查分镜与素材映射')
       setOneClickBusy(false)
       return
     }
 
-    setMaterialSlots(editPlan.decisions.map((d) => d.materialIndex))
-    const clipSummary = editPlan.decisions
-      .map(
-        (d) =>
-          `段${d.segmentIndex + 1}→素材${d.materialIndex + 1}@${d.sourceInSec.toFixed(1)}s`,
-      )
-      .join(' · ')
-    setHint(`剪辑方案：${clipSummary}`)
-    const mixNarrationText = collectMixNarrationText(scriptRows)
+    setMaterialSlots(pack.materialSlots)
+    setHint(`剪辑方案：${pack.summary}`)
+    const mixNarrationText = pack.narrationText
 
     const localId = newJobId()
     const label = `AI混剪 · ${segments.length} 段`
-    setHint(`正在提交 ${segments.length} 段指令混剪…`)
+    setHint(`正在提交 ICE 多轨剪辑（${segments.length} 段拼接）…`)
     setJobs((prev) => [
       ...prev,
       {
@@ -997,12 +990,12 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       })),
       mixNarrationText: mixNarrationText.length >= 4 ? mixNarrationText : undefined,
       projectName: `AI混剪-${label}`.slice(0, 120),
-      editBrief: mixBrief,
+      editBrief: pack.editBrief,
       width: aspect.width,
       height: aspect.height,
       clipEndSec: totalSec,
-      effectId: resolvedMixEffect.id,
-      subtitleStyleId: resolvedMixSubtitleStyle.id,
+      effectId: pack.effectId,
+      subtitleStyleId: pack.subtitleStyleId,
     })
     if (!pipe.ok) {
       patchJob(localId, { phase: 'failed', message: pipe.message })
@@ -1490,11 +1483,10 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   <span className="flex h-6 w-6 items-center justify-center rounded bg-zinc-900 text-[11px] font-bold text-white">
                     2
                   </span>
-                  指导文案与混剪分镜
+                  AI 混剪生成
                 </h3>
                 <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
-                  上传素材后点「AI 分析素材」自动生成指导文案（{MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE}{' '}
-                  积分/次，分析成功后扣减）。素材较多时自动抽样代表画面加速（约 1–3 分钟），或手动填写 → AI 规划分镜 → 一键混剪。
+                  分析素材 → 规划分镜 → 生成成片。引擎使用阿里云 ICE 多轨时间线：多素材截取拼接、叠化转场、AI_TTS 口播、动效字幕（非单条视频轮播）。
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -1640,13 +1632,13 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 value={mixGuidance}
                 disabled={anyBusy || guidanceBusy}
                 onChange={(e) => setMixGuidance(e.target.value)}
-                placeholder="输入商业创意、卖点、场景与叙事意图；可点「AI 分析素材」自动填写，或上传 Word/txt。再点「AI 规划分镜」拆成时间段与口播。"
+                placeholder="商业创意、卖点与叙事；可「AI 分析素材」自动填写。生成时将按分镜拼接多条素材并加转场与 TTS 口播。"
                 className="min-h-[96px] w-full resize-y rounded-lg border border-zinc-300 px-3 py-2.5 text-sm outline-none ring-orange-600/30 focus-visible:ring-2"
               />
               <div>
-                <span className="text-sm font-medium text-zinc-800">混剪分镜表</span>
+                <span className="text-sm font-medium text-zinc-800">分镜表（剪辑时间轴）</span>
                 <p className="mt-1 text-xs text-zinc-500">
-                  一键混剪会理解指导文案 + 分镜画面，自动匹配素材并截取片段；口播合成 TTS 讲解，字幕叠加，非简单「播完一条换下一条」。
+                  每段对应成片时间轴上的一镜：自动轮询分配不同素材并截取片段；口播合成 TTS，字幕带弹入动效。
                 </p>
                 <div className="mt-2">
                   <ShortVideoScriptTableEditor
@@ -1658,7 +1650,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 {mixMaterialPool.length > 0 && scriptRows.length > 0 ? (
                   <div className="mt-3 space-y-2 rounded-lg border border-zinc-100 bg-zinc-50/80 p-3">
                     <p className="text-xs font-medium text-zinc-700">
-                      素材映射（可选参考；一键混剪时 AI 按分镜语义自动选素材并截取，非按顺序轮播）
+                      素材映射（默认轮询不同素材；可手动调整每段用哪条）
                     </p>
                     {scriptRows.map((row, i) => (
                       <label key={i} className="flex flex-wrap items-center gap-2 text-xs text-zinc-600">
@@ -1694,10 +1686,10 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-orange-300 sm:w-auto"
               >
                 {oneClickBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Zap className="h-5 w-5" />}
-                一键混剪（{scriptRows.length} 段）
+                生成混剪成片（{scriptRows.length} 段 · {mixMaterialPool.length} 素材）
               </button>
               <p className="text-xs text-zinc-500">
-                字幕样式与转场将写入云端时间线；口播文案仍来自指导文案 + 分镜表。
+                ICE 云端执行：多素材 In/Out 截取拼接 · 叠化转场 · 原声静音 · AI_TTS 口播 · 动效字幕
               </p>
               {!mixReady && mixBlockers.length > 0 && !oneClickBusy && !guidanceBusy ? (
                 <p className="flex items-start gap-1.5 text-xs text-amber-800">
