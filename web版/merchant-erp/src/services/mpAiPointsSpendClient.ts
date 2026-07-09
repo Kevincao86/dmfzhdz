@@ -1,6 +1,8 @@
 import { readMpSessionToken } from '../lib/merchantApiAuth'
 import { readMpBillingRoleHint } from '../lib/mpBillingRoleHint'
+import { MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE } from '../lib/mpPointsEconomics'
 import { merchantApiFetchUrls } from '../lib/merchantErpApiBase'
+import { checkErpPointsAffordable, spendErpPointsForUsage } from './tenantBillingClient'
 
 export type MpBriefPointsSpendResult = {
   pointsCharged: number
@@ -169,5 +171,51 @@ export async function spendMpMixMaterialAnalyzePoints(opts?: {
     pointsCharged: Math.max(0, Math.floor(Number(data.pointsCharged) || 0)),
     balance: Math.max(0, Math.floor(Number(data.mpAiPointsBalance) || 0)),
     already: data.already === true,
+  }
+}
+
+/**
+ * 混剪「AI 分析素材」积分校验：星选 mp 会话走 mp-auth；CS 商家 Supabase 登录走租户 billing。
+ */
+export async function checkMixMaterialAnalyzeAffordable(): Promise<MpBriefAffordResult> {
+  if (readMpSessionToken()) {
+    return checkMpMixMaterialAnalyzeAffordable()
+  }
+  const required = MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE
+  try {
+    const r = await checkErpPointsAffordable({ kind: 'mix_material_analyze' })
+    const balance = Math.max(
+      0,
+      Math.floor(Number(r.balance) || Number(r.packageBalance) + Number(r.rechargeBalance) || 0),
+    )
+    return { ok: true, balance, required }
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : String(e),
+      error: 'insufficient_points',
+    }
+  }
+}
+
+/**
+ * 混剪「AI 分析素材」成功后扣减：星选 mp 会话走 mp-auth；CS 商家走租户 billing。
+ */
+export async function spendMixMaterialAnalyzePoints(opts?: {
+  idempotencyKey?: string
+  note?: string
+}): Promise<MpBriefPointsSpendResult | null> {
+  if (readMpSessionToken()) {
+    return spendMpMixMaterialAnalyzePoints(opts)
+  }
+  const r = await spendErpPointsForUsage({
+    kind: 'mix_material_analyze',
+    idempotencyKey: opts?.idempotencyKey?.trim() || undefined,
+    note: opts?.note?.trim() || undefined,
+  })
+  return {
+    pointsCharged: Math.max(0, Math.floor(Number(r.pointsCharged) || 0)),
+    balance: Math.max(0, Math.floor(Number(r.balance) || 0)),
+    already: r.already === true,
   }
 }

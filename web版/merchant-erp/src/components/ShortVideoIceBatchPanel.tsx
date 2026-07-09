@@ -53,8 +53,8 @@ import {
   spendMpAddonPoints,
 } from '../services/mpAddonPointsSpendClient'
 import {
-  checkMpMixMaterialAnalyzeAffordable,
-  spendMpMixMaterialAnalyzePoints,
+  checkMixMaterialAnalyzeAffordable,
+  spendMixMaterialAnalyzePoints,
 } from '../services/mpAiPointsSpendClient'
 import { MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE } from '../lib/mpPointsEconomics'
 import { isIceTransientNetworkError } from '../lib/iceTransientNetworkError'
@@ -649,14 +649,16 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       setErr('请先上传至少一条视频或一张图片素材。')
       return
     }
-    const afford = await checkMpMixMaterialAnalyzeAffordable()
+    setErr(null)
+    setHint('正在校验积分…')
+    const afford = await checkMixMaterialAnalyzeAffordable()
     if (!afford.ok) {
+      setHint(null)
       setErr(afford.message)
       return
     }
     const genKey = `mix-analyze-${Date.now()}`
     setAnalyzeBusy(true)
-    setErr(null)
     setHint('AI 正在分析素材画面…')
     try {
       const r = await analyzeIceMixMaterialsToGuidance({
@@ -673,7 +675,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       setMixGuidance(r.guidance)
       setHint('分析完成，正在扣减积分…')
       try {
-        const spend = await spendMpMixMaterialAnalyzePoints({
+        const spend = await spendMixMaterialAnalyzePoints({
           idempotencyKey: genKey,
           note: `mix_material_analyze:${mixMaterialPool.length}素材`,
         })
@@ -1468,6 +1470,11 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               </div>
             </div>
             <div className="space-y-4 px-5 pb-5 pt-4">
+              {(analyzeBusy || (hint && guidanceBusy)) && hint ? (
+                <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-900">
+                  {hint}
+                </div>
+              ) : null}
               <div className="flex flex-wrap items-end gap-4">
                 <label className="flex flex-col gap-1 text-xs text-zinc-600">
                   <span>目标总时长</span>
