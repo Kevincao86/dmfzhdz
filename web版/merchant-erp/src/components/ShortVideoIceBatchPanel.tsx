@@ -912,7 +912,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
 
     setOneClickBusy(true)
     setErr(null)
-    setHint('AI 正在规划剪辑方案（匹配素材+截取点）…')
+    setHint('ICE 时间线混剪：视觉模型匹配素材与截取点…')
 
     const profiles = mixMaterialPool.map((m, i) => {
       const hit = mixMaterialProfiles.find((p) => p.index === i)
@@ -933,6 +933,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       materials: mixMaterialPool,
       materialProfiles: profiles,
       targetTotalSec: mixTargetSec,
+      onProgress: (msg) => setHint(msg),
     })
     if (!editPlan.ok) {
       setErr(editPlan.message)

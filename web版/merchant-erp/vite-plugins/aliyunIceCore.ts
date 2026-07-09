@@ -275,27 +275,28 @@ export function buildTimelineFromMixClips(
   height: number,
   opts?: { forceMuteSource?: boolean },
 ): object {
-  const muteSource = opts?.forceMuteSource ?? Boolean(plan.narrationClip)
+  const muteSource = opts?.forceMuteSource ?? Boolean(plan.narrationClip || plan.mixAiTtsClip)
   const clips: Record<string, unknown>[] = []
   for (let i = 0; i < resolved.length; i++) {
     const seg = resolved[i]!
     const dur = Math.max(0.35, seg.timelineEndSec - seg.timelineStartSec)
     const ref = { MediaId: seg.mediaId.trim() }
     if (seg.kind === 'image') {
-      const clip: Record<string, unknown> = {
-        Type: 'Image',
-        ...ref,
-        In: 0,
-        Out: dur,
-        Duration: dur,
-        TimelineIn: seg.timelineStartSec,
-        TimelineOut: seg.timelineEndSec,
-        Width: width,
-        Height: height,
-      }
-      const effects: Record<string, unknown>[] = []
-      appendClipEffects(effects, plan, dur, i, resolved.length)
-      if (effects.length) clip.Effects = effects
+    const clip: Record<string, unknown> = {
+      Type: 'Image',
+      ...ref,
+      In: 0,
+      Out: dur,
+      Duration: dur,
+      TimelineIn: seg.timelineStartSec,
+      TimelineOut: seg.timelineEndSec,
+      Width: width,
+      Height: height,
+    }
+    const effects: Record<string, unknown>[] = []
+    if (muteSource) effects.push({ Type: 'Volume', Gain: 0 })
+    appendClipEffects(effects, plan, dur, i, resolved.length)
+    if (effects.length) clip.Effects = effects
       clips.push(clip)
       continue
     }
@@ -320,9 +321,9 @@ export function buildTimelineFromMixClips(
       Duration: maxOut,
       TimelineIn: seg.timelineStartSec,
       TimelineOut: seg.timelineEndSec,
-      ...(muteSource ? { Volume: 0 } : {}),
     }
     const effects: Record<string, unknown>[] = []
+    if (muteSource) effects.push({ Type: 'Volume', Gain: 0 })
     appendClipEffects(effects, plan, maxOut, i, resolved.length)
     if (effects.length) clip.Effects = effects
     clips.push(clip)
@@ -1289,21 +1290,16 @@ export async function iceRunMixPipeline(
 
   let finalPlan = plan
   const narrationText = String(input.mixNarrationText ?? '').trim()
-  if (narrationText.length >= 4 && input.env) {
-    const { synthesizeIceMixNarrationMp3 } = await import('./iceMixNarrationTts.js')
-    const tts = await synthesizeIceMixNarrationMp3(cfg, input.env, narrationText)
-    if (tts.ok) {
-      finalPlan = {
-        ...plan,
-        narrationClip: {
-          mediaUrl: tts.timelineUrl,
-          timelineIn: 0,
-          timelineOut: input.totalDurationSec,
-          volume: 1,
-          label: '混剪 TTS 口播',
-        },
-        summary: `${plan.summary}${plan.summary ? ' · ' : ''}TTS 口播`,
-      }
+  if (narrationText.length >= 4) {
+    finalPlan = {
+      ...plan,
+      mixAiTtsClip: {
+        content: narrationText,
+        timelineIn: 0,
+        timelineOut: input.totalDurationSec,
+        voice: 'zhixiaobai',
+      },
+      summary: `${plan.summary}${plan.summary ? ' · ' : ''}ICE AI_TTS 口播`,
     }
   }
 
