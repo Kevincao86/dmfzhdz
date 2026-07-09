@@ -14,6 +14,7 @@ import { $OpenApiUtil } from '@alicloud/openapi-core'
 import {
   buildAudioTracksFromPlan,
   buildSubtitleTracksFromPlan,
+  enhanceIceMixBriefPlan,
   parseIceEditBriefPlan,
   type IceBriefTimelinePlan,
 } from './iceBriefTimelinePlan.js'
@@ -1282,9 +1283,12 @@ export async function iceRunMixPipeline(
       timelineOut: s.timelineEndSec,
     }))
   const plan = await sanitizeIceBriefAudioPlan(
-    captionOverrides.length
-      ? { ...rawPlan, segmentCaptions: captionOverrides, totalDurationSec: input.totalDurationSec }
-      : rawPlan,
+    enhanceIceMixBriefPlan(
+      captionOverrides.length
+        ? { ...rawPlan, segmentCaptions: captionOverrides, totalDurationSec: input.totalDurationSec }
+        : { ...rawPlan, totalDurationSec: input.totalDurationSec },
+      input.effectId,
+    ),
     cfg,
   )
 

@@ -403,9 +403,54 @@ function buildSegmentCaptions(
   return captions
 }
 
+/** AI 混剪：首段居中钩子字幕 + 其余段动效口播字幕 */
+export function buildMixAnimatedSubtitleTracks(
+  captions: Array<{ text: string; timelineIn: number; timelineOut: number }>,
+  subtitleStyleId: string,
+): { SubtitleTracks: Array<{ SubtitleTrackClips: Record<string, unknown>[] }> } | Record<string, never> {
+  const clips: Record<string, unknown>[] = []
+  const mainId =
+    subtitleStyleId === 'classic-white' ? 'viral-white-pop' : subtitleStyleId || ICE_SUBTITLE_STYLE_DEFAULT_ID
+  const mainStyle = resolveIceSubtitleStylePreset(mainId)
+  const hookStyle = resolveIceSubtitleStylePreset('center-hook')
+
+  captions.forEach((cap, i) => {
+    const text = cap.text.trim()
+    if (text.length < 1) return
+    const dur = cap.timelineOut - cap.timelineIn
+    const useHook = i === 0 && dur >= 2 && text.length >= 2
+    const style = useHook ? hookStyle : mainStyle
+    clips.push(buildIceSubtitleTextClip(style, text, cap.timelineIn, cap.timelineOut))
+  })
+
+  if (!clips.length) return {}
+  return { SubtitleTracks: [{ SubtitleTrackClips: clips }] }
+}
+
+/** 混剪成片：强制转场 + 淡入淡出 */
+export function enhanceIceMixBriefPlan(
+  plan: IceBriefTimelinePlan,
+  effectId: string,
+): IceBriefTimelinePlan {
+  const effect = resolveIceEffectPreset(effectId)
+  const transitionSubType = plan.transitionSubType || effect.transitionSubType || 'fade'
+  return {
+    ...plan,
+    fadeClip: true,
+    useFade: true,
+    useTransition: true,
+    transitionSubType,
+    effectId: effect.id,
+    summary: `${plan.summary}${plan.summary ? ' · ' : ''}混剪转场+淡入淡出+动效字幕`,
+  }
+}
+
 export function buildSubtitleTracksFromPlan(
   plan: IceBriefTimelinePlan,
 ): { SubtitleTracks: Array<{ SubtitleTrackClips: Record<string, unknown>[] }> } | Record<string, never> {
+  if (plan.mixAiTtsClip && plan.segmentCaptions.length > 0) {
+    return buildMixAnimatedSubtitleTracks(plan.segmentCaptions, plan.subtitleStyleId)
+  }
   const clips: Record<string, unknown>[] = []
   const style = resolveIceSubtitleStylePreset(plan.subtitleStyleId)
 
