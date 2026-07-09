@@ -9,6 +9,32 @@
   margin-bottom: 24rpx;
 }
 
+.cal-head-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.cal-head-actions {
+  display: flex;
+  gap: 8rpx;
+  flex-shrink: 0;
+}
+
+.cal-chip {
+  padding: 8rpx 16rpx;
+  font-size: 22rpx;
+  color: #0369a1;
+  background: #e0f2fe;
+  border-radius: 999rpx;
+}
+
+.cal-chip--on {
+  color: #fff;
+  background: #0284c7;
+}
+
 .cal-title {
   display: block;
   font-size: 36rpx;
@@ -155,10 +181,18 @@
 }
 
 .cal-event {
+  display: flex;
+  align-items: stretch;
+  gap: 12rpx;
   padding: 20rpx;
   border: 1rpx solid #e2e8f0;
   border-radius: 16rpx;
   margin-bottom: 16rpx;
+}
+
+.cal-event-main {
+  flex: 1;
+  min-width: 0;
 }
 
 .cal-event-top {
@@ -208,4 +242,120 @@
   margin-top: 8rpx;
   font-size: 22rpx;
   color: #94a3b8;
+}
+
+.cal-event-action {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: #0284c7;
+  font-weight: 600;
+}
+
+.cal-todo-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+}
+
+.cal-todo-count {
+  font-size: 22rpx;
+  color: #64748b;
+}
+
+.cal-todo-scroll {
+  white-space: nowrap;
+}
+
+.cal-todo-card {
+  display: inline-flex;
+  flex-direction: column;
+  width: 240rpx;
+  padding: 16rpx;
+  margin-right: 12rpx;
+  border-radius: 16rpx;
+  vertical-align: top;
+}
+
+.cal-todo-card--green { background: #ecfdf5; border: 1rpx solid #bbf7d0; }
+.cal-todo-card--orange { background: #fff7ed; border: 1rpx solid #fed7aa; }
+.cal-todo-card--red { background: #fef2f2; border: 1rpx solid #fecaca; }
+.cal-todo-card--blue { background: #eff6ff; border: 1rpx solid #bfdbfe; }
+
+.cal-todo-date {
+  font-size: 20rpx;
+  color: #64748b;
+}
+
+.cal-todo-title {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #0f172a;
+  margin-top: 6rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cal-todo-action {
+  font-size: 20rpx;
+  color: #0284c7;
+  margin-top: 8rpx;
+}
+
+.cal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  margin-bottom: 16rpx;
+  padding: 0 4rpx;
+}
+
+.cal-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  font-size: 20rpx;
+  color: #64748b;
+}
+
+.cal-legend-tag {
+  display: inline-block;
+  width: 24rpx;
+  height: 24rpx;
+  line-height: 24rpx;
+  text-align: center;
+  font-size: 16rpx;
+  border-radius: 6rpx;
+  color: #fff;
+}
+
+.cal-legend-tag--orange { background: #f97316; }
+.cal-legend-tag--green { background: #22c55e; }
+
+.cal-badge--green { color: #15803d; background: #dcfce7; }
+.cal-badge--orange { color: #c2410c; background: #ffedd5; }
+.cal-badge--red { color: #b91c1c; background: #fee2e2; }
+.cal-badge--blue { color: #1d4ed8; background: #dbeafe; }
+
+.cal-remind-btn {
+  flex-shrink: 0;
+  margin: 0 !important;
+  padding: 0 16rpx !important;
+  font-size: 22rpx !important;
+  color: #0369a1 !important;
+  background: #e0f2fe !important;
+  border: none !important;
+  line-height: 2 !important;
+  align-self: center;
+}
+
+.cal-remind-btn::after {
+  border: none;
+}
+
+.cal-remind-btn--set {
+  color: #64748b !important;
+  background: #f1f5f9 !important;
 }

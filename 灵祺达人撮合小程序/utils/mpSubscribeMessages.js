@@ -5,6 +5,8 @@ const TEMPLATES = {
   videoPass: '50rPxvWW1aBLLLK0cyqV9YJbhlENqbyR4EZc68LDmUI',
   /** 新订单提醒 — 商单订阅匹配 */
   orderMatch: 'oTL0yWf_l6lxYkeUaFJk_AyZ4dYlh_x48fmpMu6vF9E',
+  /** 预约成功通知 — 商单日历提醒 */
+  calendarReminder: 'Sx7mUGpC6VsS5mtBmjaJ3z-O-JjwdNmJjsSSQ1G9keQ',
 }
 
 function requestIds(tmplIds) {
@@ -34,9 +36,15 @@ function requestForOrderSubscription() {
   return requestIds([TEMPLATES.orderMatch])
 }
 
+/** 商单日历设提醒：授权预约通知模板 */
+function requestForCalendarReminder() {
+  return requestIds([TEMPLATES.calendarReminder])
+}
+
 module.exports = {
   TEMPLATES,
   requestForAuditPass,
   requestForVideoReview,
   requestForOrderSubscription,
+  requestForCalendarReminder,
 }

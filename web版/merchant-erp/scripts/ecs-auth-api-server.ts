@@ -152,6 +152,8 @@ import mpHallRegistryHandler from '../api/meoo-ops-mp-hall-registry.ts'
 import mpPublisherDisplayHandler from '../api/meoo-ops-mp-publisher-display.ts'
 import mpFormRelayGroupQrHandler from '../api/meoo-ops-mp-form-relay-group-qr.ts'
 import mpAuthHandler from '../api/meoo-ops-mp-auth.ts'
+import mpCalendarReminderHandler from '../api/meoo-ops-mp-calendar-reminder.ts'
+import { processDueCalendarReminders } from '../src/lib/mpCalendarReminderCore.ts'
 import wechatPayNotifyHandler from '../api/meoo-wechat-pay-notify.ts'
 import alipayPayNotifyHandler from '../api/meoo-alipay-pay-notify.ts'
 import douyinTradeNotifyHandler from '../api/meoo-douyin-trade-notify.ts'
@@ -166,7 +168,7 @@ import apiPingHandler from '../api/ping.ts'
 import merchantSlugHandler from '../api/merchant/[...slug].ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260709-wechat-oa-dm-unread-v15'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260709-mp-calendar-reminder-v16'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -221,6 +223,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-mp-group-qr-upload-body': mpGroupQrUploadBodyHandler as VercelLikeHandler,
   '/api/meoo-ops-content-image-upload': opsContentImageUploadHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-auth': mpAuthHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-calendar-reminder': mpCalendarReminderHandler as VercelLikeHandler,
   '/api/meoo-wechat-pay-notify': wechatPayNotifyHandler as VercelLikeHandler,
   '/api/meoo-alipay-pay-notify': alipayPayNotifyHandler as VercelLikeHandler,
   '/api/meoo-douyin-trade-notify': douyinTradeNotifyHandler as VercelLikeHandler,
@@ -585,4 +588,9 @@ http
     console.log(
       `[ecs-internal-api] http://127.0.0.1:${PORT} revision=${ECS_AUTH_API_ROUTE_REVISION} routes=${n} (含 meoo-ops-sync-registry)`,
     )
+    setInterval(() => {
+      void processDueCalendarReminders().catch((e) => {
+        console.warn('[calendar-reminder] tick failed', e instanceof Error ? e.message : e)
+      })
+    }, 60_000)
   })

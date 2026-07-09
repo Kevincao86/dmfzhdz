@@ -1,17 +1,55 @@
 <view class="cal-page {{lqThemeClass}}">
   <view class="cal-head">
-    <text class="cal-title">商单日历</text>
-    <text class="cal-sub">{{isPr ? '查看发单探店排期与交片截止' : '查看我的探店日程与交片截止'}}</text>
+    <view class="cal-head-row">
+      <view>
+        <text class="cal-title">商单日历</text>
+        <text class="cal-sub">{{pageSub}}</text>
+      </view>
+      <view class="cal-head-actions">
+        <view class="cal-chip" bindtap="onBackToday">今天</view>
+        <view class="cal-chip {{viewMode === 'week' ? 'cal-chip--on' : ''}}" data-mode="week" bindtap="onToggleViewMode">周</view>
+        <view class="cal-chip {{viewMode === 'month' ? 'cal-chip--on' : ''}}" data-mode="month" bindtap="onToggleViewMode">月</view>
+      </view>
+    </view>
   </view>
 
   <view wx:if="{{loading}}" class="cal-state">加载中…</view>
   <view wx:elif="{{err}}" class="cal-state cal-state--err">{{err}}</view>
 
   <block wx:else>
+    <view class="cal-card cal-todo" wx:if="{{upcomingTodos.length}}">
+      <view class="cal-todo-head">
+        <text class="cal-list-title">近 7 天待办</text>
+        <text class="cal-todo-count">{{activeTodoCount}} 项</text>
+      </view>
+      <scroll-view scroll-x class="cal-todo-scroll" enhanced show-scrollbar="{{false}}">
+        <view
+          wx:for="{{upcomingTodos}}"
+          wx:key="id"
+          class="cal-todo-card cal-todo-card--{{item.tone}}"
+          data-url="{{item.navUrl}}"
+          bindtap="onOpenEvent"
+        >
+          <text class="cal-todo-date">{{item.dateShort}}</text>
+          <text class="cal-badge cal-badge--{{item.tone}}">{{item.kindLabel}}</text>
+          <text class="cal-todo-title">{{item.orderTitle}}</text>
+          <text class="cal-todo-action">{{item.actionLabel}} ›</text>
+        </view>
+      </scroll-view>
+    </view>
+
+    <view class="cal-legend">
+      <view class="cal-legend-item"><view class="cal-dot cal-dot--active" /><text>进行中</text></view>
+      <view class="cal-legend-item"><view class="cal-dot cal-dot--pending" /><text>待开始</text></view>
+      <view class="cal-legend-item"><view class="cal-dot cal-dot--ended" /><text>已结束</text></view>
+      <view class="cal-legend-item"><text class="cal-legend-tag cal-legend-tag--orange">橙</text><text>截止/交片</text></view>
+      <view class="cal-legend-item"><text class="cal-legend-tag cal-legend-tag--green">绿</text><text>探店/外拍</text></view>
+    </view>
+
     <view class="cal-card">
       <view class="cal-nav">
         <view class="cal-nav-btn" bindtap="onPrevMonth">‹</view>
-        <text class="cal-nav-label">{{monthLabel}}</text>
+        <text class="cal-nav-label">{{viewMode === 'week' ? '本周' : monthLabel}}</text>
         <view class="cal-nav-btn" bindtap="onNextMonth">›</view>
       </view>
       <view class="cal-week">
@@ -34,27 +72,34 @@
     <view class="cal-card cal-list">
       <text class="cal-list-title">{{selectedDateKey}} 的商单</text>
       <view wx:if="{{!selectedEvents.length}}" class="cal-empty">该日暂无商单安排</view>
-      <view
-        wx:for="{{selectedEvents}}"
-        wx:key="id"
-        class="cal-event"
-        data-id="{{item.mpOrderId}}"
-        data-kind="{{item.kind}}"
-        bindtap="onOpenEvent"
-      >
-        <view class="cal-event-top">
-          <view class="cal-event-left">
-            <text class="cal-badge">{{item.kind === 'visit' ? '探店' : item.kind === 'plan_slot' ? '可探店' : '截止'}}</text>
-            <text class="cal-event-title">{{item.orderTitle}}</text>
-            <text wx:if="{{item.storeName && item.storeName !== item.orderTitle}}" class="cal-event-store">{{item.storeName}}</text>
+      <view wx:for="{{selectedEvents}}" wx:key="id" class="cal-event">
+        <view class="cal-event-main" data-url="{{item.navUrl}}" bindtap="onOpenEvent">
+          <view class="cal-event-top">
+            <view class="cal-event-left">
+              <text class="cal-badge cal-badge--{{item.tone}}">{{item.kindLabel}}</text>
+              <text class="cal-event-title">{{item.orderTitle}}</text>
+              <text wx:if="{{item.storeName && item.storeName !== item.orderTitle}}" class="cal-event-store">{{item.storeName}}</text>
+            </view>
+            <text class="cal-event-status">{{item.statusLabel}}</text>
           </view>
-          <text class="cal-event-status">{{item.statusLabel}}</text>
+          <view class="cal-event-meta">
+            <text wx:if="{{item.timeLabel}}">{{item.timeLabel}}</text>
+            <text wx:if="{{item.applicantName && isPr}}">达人：{{item.applicantName}}</text>
+            <text wx:if="{{item.platform}}">{{item.platform}}</text>
+          </view>
+          <text class="cal-event-action">{{item.actionLabel}} ›</text>
         </view>
-        <view class="cal-event-meta">
-          <text wx:if="{{item.timeLabel}}">{{item.timeLabel}}</text>
-          <text wx:if="{{item.applicantName && isPr}}">达人：{{item.applicantName}}</text>
-          <text wx:if="{{item.platform}}">{{item.platform}}</text>
-        </view>
+        <button
+          class="cal-remind-btn {{item.remindSet ? 'cal-remind-btn--set' : ''}}"
+          size="mini"
+          data-event-id="{{item.id}}"
+          data-mp-order-id="{{item.mpOrderId}}"
+          data-kind="{{item.kind}}"
+          data-date-key="{{item.dateKey}}"
+          data-title="{{item.orderTitle}}"
+          data-store="{{item.storeName}}"
+          bindtap="onSetReminder"
+        >{{item.remindSet ? '已设提醒' : '设提醒'}}</button>
       </view>
     </view>
   </block>

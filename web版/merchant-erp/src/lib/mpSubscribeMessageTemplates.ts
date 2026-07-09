@@ -8,6 +8,8 @@ export const MP_SUBSCRIBE_TEMPLATES = {
   videoPass: '50rPxvWW1aBLLLK0cyqV9YJbhlENqbyR4EZc68LDmUI',
   /** 新订单提醒 — 商单订阅匹配（订单标题/商家/地点/内容/温馨提示） */
   orderMatch: 'oTL0yWf_l6lxYkeUaFJk_AyZ4dYlh_x48fmpMu6vF9E',
+  /** 预约成功通知 — 商单日历探店/交片提醒（time10/thing13/thing18） */
+  calendarReminder: 'Sx7mUGpC6VsS5mtBmjaJ3z-O-JjwdNmJjsSSQ1G9keQ',
 } as const
 
 export type MpSubscribeTemplateKey = keyof typeof MP_SUBSCRIBE_TEMPLATES

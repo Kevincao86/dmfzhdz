@@ -339,3 +339,46 @@ export async function notifySubscribersForNewOrder(
   }
   return { sent, skipped, failed }
 }
+
+function formatCalendarTime10(eventDateKey: string, eventKind?: string): string {
+  const dk = String(eventDateKey || '').trim()
+  if (!dk) return formatTimeCn()
+  const suffix = eventKind === 'deadline' ? ' 截止' : ''
+  const s = `${dk}${suffix}`
+  return s.length <= 20 ? s : `${s.slice(0, 19)}…`
+}
+
+function calendarReminderProjectLabel(eventTitle: string, eventKind?: string): string {
+  const title = String(eventTitle || '').trim()
+  if (title) return title
+  if (eventKind === 'visit') return '探店提醒'
+  if (eventKind === 'deadline') return '交片提醒'
+  if (eventKind === 'plan_slot') return '可探店提醒'
+  return '日程提醒'
+}
+
+/** 商单日历到点提醒 — 小程序订阅消息 */
+export async function notifyCalendarReminderSubscribe(opts: {
+  openId: string
+  eventTitle: string
+  storeName: string
+  eventDateKey: string
+  eventKind?: string
+  mpOrderId?: string
+}): Promise<void> {
+  const openId = String(opts.openId || '').trim()
+  if (!openId) return
+  const mpOrderId = String(opts.mpOrderId || '').trim()
+  await sendMpSubscribeMessage({
+    openId,
+    templateKey: 'calendarReminder',
+    page: mpOrderId
+      ? `pages/subpack-mine/mine-order-calendar/mine-order-calendar?mpOrderId=${encodeURIComponent(mpOrderId)}`
+      : 'pages/subpack-mine/mine-order-calendar/mine-order-calendar',
+    data: {
+      time10: { value: formatCalendarTime10(opts.eventDateKey, opts.eventKind) },
+      thing13: { value: clipThing(opts.storeName || '—') },
+      thing18: { value: clipThing(calendarReminderProjectLabel(opts.eventTitle, opts.eventKind)) },
+    },
+  })
+}
