@@ -304,7 +304,7 @@ export function buildTimelineFromMixClips(
       Out: maxOut,
       Duration: maxOut,
       TimelineIn: seg.timelineStartSec,
-      TimelineOut: seg.timelineStartSec + maxOut,
+      TimelineOut: seg.timelineEndSec,
     }
     const effects: Record<string, unknown>[] = []
     appendClipEffects(effects, plan, maxOut, i, resolved.length)
@@ -1159,6 +1159,7 @@ export async function iceRunMixPipeline(
     imageCount: 0,
     effectId: input.effectId,
     subtitleStyleId: input.subtitleStyleId,
+    mixMode: true,
   })
   const captionOverrides = input.segments
     .filter((s) => s.caption?.trim())

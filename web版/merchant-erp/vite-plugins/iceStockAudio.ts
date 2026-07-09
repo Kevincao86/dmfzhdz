@@ -49,7 +49,7 @@ export async function sanitizeIceBriefAudioPlan(
     ICE_PUBLIC_BGM_URLS.warm,
     ICE_PUBLIC_BGM_URLS.calm,
   ]
-  const sfxFallbacks = [ICE_PUBLIC_SFX_URL, ...bgmFallbacks]
+  const sfxFallbacks = [...bgmFallbacks]
 
   let bgmClip: IceAudioClipPlan | undefined = plan.bgmClip
   if (bgmClip?.mediaUrl) {
