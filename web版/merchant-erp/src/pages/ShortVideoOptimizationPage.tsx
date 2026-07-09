@@ -1,4 +1,4 @@
-import { Cloud, Download, FileText, Film, ImagePlus, Loader2, PauseCircle, Sparkles, Upload, Video, Wand2, X } from 'lucide-react'
+import { Cloud, Download, FileText, Film, ImagePlus, Loader2, PauseCircle, Sparkles, Upload, Wand2, X } from 'lucide-react'
 import { ShortVideoIceBatchPanel } from '../components/ShortVideoIceBatchPanel'
 import ShortVideoScriptTableEditor from '../components/ShortVideoScriptTableEditor'
 import { MpAddonPointsRateBadge } from '../components/MpAddonPointsRateBadge'
@@ -23,6 +23,8 @@ import {
 import {
   VIDEO_ENGINE_LABEL_KLING,
   VIDEO_ENGINE_LABEL_SEEDANCE,
+  VIDEO_ENGINE_HINT_SEEDANCE,
+  VIDEO_ENGINE_HINT_QWEN,
   SEEDANCE_SERVER_AUTO,
   SEEDANCE_AUTO_LABEL,
 } from '../lib/shortVideoUiLabels'
@@ -78,7 +80,7 @@ import {
   type ShortVideoScriptRow,
 } from '../lib/shortVideoScriptTable'
 
-type MainPane = 'optimize' | 'generate' | 'cloud_batch'
+type MainPane = 'generate' | 'cloud_batch'
 
 type StoryFrameItem = {
   id: string
@@ -352,7 +354,6 @@ export default function ShortVideoOptimizationPage() {
   const embedAddonAccess = useMemo(() => readMpEmbedAddonAccess(), [])
   const paneTabs = useMemo(() => {
     const all = [
-      { id: 'optimize' as const, label: '参考画面处理', icon: Video },
       { id: 'generate' as const, label: '短视频生成', icon: Sparkles },
       { id: 'cloud_batch' as const, label: 'AI混剪', icon: Cloud },
     ]
@@ -362,8 +363,8 @@ export default function ShortVideoOptimizationPage() {
       return embedAddonAccess.shortvideo
     })
   }, [embedAddonAccess])
-  const [mainPane, setMainPane] = useState<MainPane>('optimize')
-  const [engine, setEngine] = useState<Engine>('qwen')
+  const [mainPane, setMainPane] = useState<MainPane>('generate')
+  const [engine, setEngine] = useState<Engine>('seedance')
   const [cfg, setCfg] = useState<VideoAiBackendConfig | null>(null)
   const [cfgLoaded, setCfgLoaded] = useState(false)
 
@@ -380,12 +381,6 @@ export default function ShortVideoOptimizationPage() {
   const [auxBusy, setAuxBusy] = useState(false)
   const [hint, setHint] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
-
-  const [optPrompt, setOptPrompt] = useState('')
-  const [thumbUrl, setThumbUrl] = useState<string | null>(null)
-
-  /** 参考帧：JPEG/PNG/base64 payload；来自视频截取或图片读取 */
-  const [framePureB64, setFramePureB64] = useState<string | null>(null)
 
   const [genMode, setGenMode] = useState<'text' | 'frames'>('text')
   const [genPrompt, setGenPrompt] = useState('')
@@ -445,7 +440,7 @@ export default function ShortVideoOptimizationPage() {
   const [sdAspect, setSdAspect] = useState<'16:9' | '9:16' | '1:1'>('9:16')
   const [sdWatermark, setSdWatermark] = useState<'off' | 'on'>('off')
 
-  const [longformEnabled, setLongformEnabled] = useState(false)
+  const [longformEnabled, setLongformEnabled] = useState(true)
   const [longformTargetTotalSec, setLongformTargetTotalSec] = useState(30)
   const [longformSegmentSec, setLongformSegmentSec] = useState(LONGFORM_DEFAULT_SEGMENT_SEC)
 
@@ -554,10 +549,6 @@ export default function ShortVideoOptimizationPage() {
     const plan = planLongformSegmentDurations(nextSec)
     setLongformSegmentSec(Math.max(...plan))
     setScriptRows((prev) => resizeScriptRowsForDurationPlan(prev, plan))
-  }
-
-  const revokeThumb = () => {
-    if (thumbUrl?.startsWith('blob:')) URL.revokeObjectURL(thumbUrl)
   }
 
   const revokeStoryFrame = (item: StoryFrameItem) => {
@@ -753,37 +744,6 @@ export default function ShortVideoOptimizationPage() {
       resultBlobRef.current = null
     }
     setResultUrl(null)
-  }
-
-  const onPickOptimizeMedia = async (files: FileList | null) => {
-    resetOutputs()
-    setFramePureB64(null)
-    revokeThumb()
-    setThumbUrl(null)
-    const f = files?.[0] ?? null
-    if (!f) return
-
-    const mime = (f.type || '').toLowerCase()
-    const nameLow = (f.name || '').toLowerCase()
-    const extVid = /\.(mp4|webm|mov|m4v|avi)$/i.test(nameLow)
-
-    try {
-      if (mime.startsWith('video/') || (!mime && extVid)) {
-        setHint('已从视频中截取一帧；也可直接上传图片作为参考。')
-        const { pureBase64 } = await extractVideoFirstFrame(f)
-        setFramePureB64(pureBase64)
-        setThumbUrl(`data:image/jpeg;base64,${pureBase64}`)
-      } else if (mime.startsWith('image/')) {
-        setHint('已载入参考图像。')
-        const b64 = await readImageFilePureBase64(f)
-        setFramePureB64(b64)
-        setThumbUrl(URL.createObjectURL(f))
-      } else {
-        setErr('请选择图片，或常见格式的视频文件。')
-      }
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : '文件解析失败')
-    }
   }
 
   const validateEngine = (): string | null => {
@@ -1246,32 +1206,6 @@ export default function ShortVideoOptimizationPage() {
     }
   }
 
-  const runLongformOptimize = async () => {
-    const p = optPrompt.trim()
-    setProgress('正在生成分镜脚本…')
-    cancelRef.current = false
-    await execLongformSegments({
-      fetchPlan: (targetTotalSec, segmentSec, segmentCountHint) =>
-        postLongformVideoPlan({
-          plannerModel: 'auto',
-          overallPrompt: p,
-          targetTotalSec,
-          segmentCount: segmentCountHint,
-          segmentSec,
-          mode: 'optimize',
-          negativeHint: undefined,
-        }),
-      resolveImages: async (i, prevVideoUrl) => {
-        if (i === 0) {
-          return [`data:image/jpeg;base64,${framePureB64!.replace(/\s/g, '')}`]
-        }
-        const frameB64 = await resolveSegmentTailFrameBase64(prevVideoUrl, (msg) => setProgress(msg))
-        return [`data:image/jpeg;base64,${frameB64}`]
-      },
-      narrationSource: p,
-    })
-  }
-
   const runLongformGenerate = async () => {
     const scriptUsable = isScriptRowsUsable(scriptRows)
     const txt = scriptUsable ? scriptRowsToOverallPrompt(scriptRows) : genPrompt.trim()
@@ -1359,68 +1293,6 @@ export default function ShortVideoOptimizationPage() {
       })
     }
     return r
-  }
-
-  const submitOptimize = async () => {
-    resetOutputs()
-    const vErr = validateEngine() ?? validateLongform()
-    if (vErr) {
-      setErr(vErr)
-      return
-    }
-    const p = optPrompt.trim()
-    if (!p) {
-      setErr('请输入「希望如何改短视频」的描述。')
-      return
-    }
-    if (!framePureB64) {
-      setErr('请上传源视频（自动截帧）或一张参考图像。')
-      return
-    }
-
-    if (longformEnabled) {
-      setBusy(true)
-      setProgress('排队中……')
-      try {
-        generationBillIdRef.current =
-          typeof crypto !== 'undefined' && 'randomUUID' in crypto
-            ? crypto.randomUUID()
-            : `sv-opt-${Date.now()}`
-        if (!(await ensureShortVideoPointsAffordable(longformTargetTotalSec))) return
-        await runLongformOptimize()
-      } finally {
-        setBusy(false)
-        setProgress(null)
-      }
-      return
-    }
-
-    setBusy(true)
-    setProgress('正在提交视频任务（额度不足将自动切换其它模型）…')
-    try {
-      generationBillIdRef.current =
-        typeof crypto !== 'undefined' && 'randomUUID' in crypto
-          ? crypto.randomUUID()
-          : `sv-opt-${Date.now()}`
-      if (!(await ensureShortVideoPointsAffordable(Number(sdDurationSec)))) return
-      const r = await runSingleShortVideoWithDurationFallback({
-        prompt: withVideoMotionPrompt(p),
-        images_base64: [`data:image/jpeg;base64,${framePureB64.replace(/\s/g, '')}`],
-      })
-      if (!r.ok) {
-        setErr(formatVideoAiUserError(r.message))
-        return
-      }
-      if (r.engineUsed) hintEngineSwitch(r.engineUsed)
-      if (r.modelUsed) setHint(`已使用视频模型：${r.modelUsed}`)
-      setProgress('合成口播配音与中文字幕…')
-      const narration = await resolveNarrationForFinalVideo(p, Number(sdDurationSec))
-      const ok = await commitFinalVideo(r.videoUrl, narration, Number(sdDurationSec))
-      if (!ok) return
-    } finally {
-      setBusy(false)
-      setProgress(null)
-    }
   }
 
   const submitGenerate = async () => {
@@ -1596,12 +1468,11 @@ export default function ShortVideoOptimizationPage() {
 
   useEffect(() => {
     return () => {
-      revokeThumb()
       revokeProductThumb()
       storyFramesRef.current.forEach(revokeStoryFrame)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [thumbUrl, productThumbUrl])
+  }, [productThumbUrl])
 
   return (
     <div
@@ -1618,7 +1489,7 @@ export default function ShortVideoOptimizationPage() {
           <MpAddonPointsRateBadge kind="shortvideo" />
         </div>
         <p className="max-w-2xl text-sm leading-relaxed text-slate-600">
-          参考画面 AI 优化、文案生成短片，或 AI 混剪包装。先选择灵祺视频模型与参数，再上传素材并描述需求即可。
+          推荐流程：短视频生成（30 秒分镜 + 即梦同源 Seedance）→ AI 混剪（字幕/转场包装）。默认已勾选长视频合成与模型2。
           {readMpSessionToken() ? (
             <span className="mt-1 block text-xs text-violet-700">
               星选账号：成片成功后按秒扣积分；套餐 ai_video_quota 次数优先，用尽后扣积分余额。
@@ -1674,7 +1545,7 @@ export default function ShortVideoOptimizationPage() {
             />
             {VIDEO_ENGINE_LABEL_KLING}
             <span className="text-zinc-500">
-              {cfgLoaded ? (cfg?.qwenVideoConfigured ? '· 千问可用' : '· 未开通') : '…'}
+              {cfgLoaded ? (cfg?.qwenVideoConfigured ? `· ${VIDEO_ENGINE_HINT_QWEN}` : '· 未开通') : '…'}
             </span>
           </label>
           <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-800">
@@ -1689,9 +1560,9 @@ export default function ShortVideoOptimizationPage() {
               {cfgLoaded
                 ? cfg?.arkKeyConfigured
                   ? (cfg?.arkVideoModels ?? []).length > 0
-                    ? '· 可用'
-                    : '· 待配置模型'
-                  : '· 未开通'
+                    ? `· ${VIDEO_ENGINE_HINT_SEEDANCE}`
+                    : '· 待配置 Seedance 模型'
+                  : '· 未开通方舟 Key'
                 : '…'}
             </span>
           </label>
@@ -1709,7 +1580,7 @@ export default function ShortVideoOptimizationPage() {
             <span>
               <span className="font-medium">长视频合成（最长约 60 秒）</span>
               <span className="mt-0.5 block text-xs leading-relaxed text-zinc-500">
-                选择目标总时长后，点击「AI 规划分镜」由 AI 通读输入框文案并自动拆成 2～12 段连贯分镜。
+                推荐保持开启：写指导文案 →「AI 规划分镜」→ 生成约 30 秒短片 → 再切 AI 混剪精修。
               </span>
             </span>
           </label>
@@ -1909,103 +1780,22 @@ export default function ShortVideoOptimizationPage() {
         <ShortVideoIceBatchPanel lastResultUrl={resultUrl} />
       </div>
 
-      {mainPane === 'optimize' && (
-        <section className="space-y-8 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-          <div className="flex gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-orange-50 text-orange-700">
-              <Upload className="h-6 w-6" aria-hidden />
-            </div>
-            <div className="space-y-2">
-              <div className="text-base font-medium text-zinc-900">来源素材</div>
-              <div className="text-sm leading-relaxed text-zinc-600">
-                可上传短视频（自动截取一帧）或商品图作为画面参考。
-              </div>
-            </div>
-          </div>
-
-          <label className="flex cursor-pointer flex-col items-center gap-4 rounded-xl border-2 border-dashed border-orange-300 bg-orange-50/60 px-4 py-14 text-center text-sm transition hover:border-orange-500">
-            <Film className="h-11 w-11 text-orange-600" aria-hidden />
-            <div>
-              <div className="font-medium text-orange-950">拖拽或点击选取视频 / 图片</div>
-              <div className="mt-2 text-[13px] text-orange-950/75">建议使用短于 120s 的镜头，以便快速截帧。</div>
-            </div>
-            <input
-              accept="video/*,image/jpeg,image/png,image/webp"
-              type="file"
-              className="hidden"
-              onChange={(e) => void onPickOptimizeMedia(e.target.files)}
-            />
-          </label>
-
-          {thumbUrl ? (
-            <div className="flex flex-wrap gap-6">
-              <figure className="space-y-2">
-                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                <img
-                  alt="参考预览"
-                  src={thumbUrl}
-                  className="max-h-64 max-w-[min(520px,calc(100vw-96px))] rounded-lg border border-zinc-200 object-contain"
-                />
-                <figcaption className="text-xs text-zinc-500">将作为画面参考参与生成。</figcaption>
-              </figure>
-            </div>
-          ) : (
-            <p className="text-sm text-zinc-500">尚未选择素材。</p>
-          )}
-
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-zinc-800">
-              <Sparkles className="mr-1 inline h-4 w-4 text-orange-600" aria-hidden />
-              希望如何改款 / 重写镜头
-            </span>
-            <textarea
-              spellCheck={false}
-              placeholder="示例：提亮餐厅灯光、加入更多人流、突出招牌字体、切换到竖屏观感……"
-              className="min-h-[132px] w-full resize-y rounded-lg border border-zinc-300 px-4 py-3 text-sm outline-none ring-orange-600/35 focus-visible:ring-2"
-              value={optPrompt}
-              onChange={(e) => setOptPrompt(e.target.value)}
-              disabled={busy}
-            />
-          </label>
-
-          {(hint || err) && (
-            <div
-              className={cn(
-                'rounded-lg px-4 py-3 text-sm leading-relaxed',
-                err ? 'border border-red-200 bg-red-50 text-red-900' : 'border border-orange-100 bg-orange-50/80 text-orange-950',
-              )}
-              role={err ? 'alert' : undefined}
-            >
-              {err ?? hint}
-            </div>
-          )}
-
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void submitOptimize()}
-              className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 disabled:pointer-events-none disabled:opacity-50"
-            >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              {busy ? (progress ?? '处理中……') : '提交优化'}
-            </button>
-            {busy ? (
-              <button
-                type="button"
-                onClick={cancelWait}
-                className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-zinc-800 hover:bg-zinc-50"
-              >
-                <PauseCircle className="h-4 w-4" />
-                停止等待
-              </button>
-            ) : null}
-          </div>
-        </section>
-      )}
-
       {mainPane === 'generate' && (
         <section className="space-y-10 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <ol className="grid gap-2 rounded-lg border border-orange-100 bg-orange-50/60 px-4 py-3 text-xs leading-relaxed text-orange-950 sm:grid-cols-2">
+            <li>
+              <span className="font-semibold">① 写指导文案</span>：卖点、场景、运镜（可上传 doc）
+            </li>
+            <li>
+              <span className="font-semibold">② AI 规划分镜</span>：自动拆时间段 + 画面 + 口播
+            </li>
+            <li>
+              <span className="font-semibold">③ 开始生成</span>：模型2 Seedance（即梦同源）竖屏 9:16
+            </li>
+            <li>
+              <span className="font-semibold">④ AI 混剪</span>：上传实拍 + 选爆款字幕/转场下载成片
+            </li>
+          </ol>
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
