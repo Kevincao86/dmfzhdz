@@ -912,7 +912,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
 
     setOneClickBusy(true)
     setErr(null)
-    setHint('正在规划剪辑方案…')
+    setHint('AI 正在规划剪辑方案（匹配素材+截取点）…')
 
     const profiles = mixMaterialPool.map((m, i) => {
       const hit = mixMaterialProfiles.find((p) => p.index === i)

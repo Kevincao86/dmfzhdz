@@ -32,16 +32,33 @@ export type MixEditSegmentDecision = {
   clipNote?: string
 }
 
-const EDIT_PLAN_AI_TIMEOUT_MS = 12_000
+const EDIT_PLAN_AI_TIMEOUT_MS = 30_000
 
 const EDIT_PLAN_SYSTEM = `你是专业短视频混剪剪辑师。须根据【指导文案】【分镜表】【素材画面库】为每一段分镜做剪辑决策：
-1. materialIndex：选用哪条素材（0 起算），按画面语义匹配，不是按顺序轮播；同一条素材可被多段使用，但须截取不同片段
-2. sourceInSec：从该素材视频第几秒开始截取（短视频通常 3–8 秒，sourceInSec 不得超过源片时长减 1 秒；开场→0，过程→1–2s，特写→尽量靠后但留足片段长度；图片固定 0）
-3. 须体现叙事：先氛围后卖点、先全景后特写等，遵循指导文案意图
+1. materialIndex：选用哪条素材（从 0 开始编号，0=第一条），按画面语义匹配；禁止 6 段全用同一条素材（除非只有 1 条素材）
+2. sourceInSec：从该素材视频第几秒开始截取（短视频通常 3–8 秒；开场→0，过程→1–2s，特写→尽量靠后但留足片段长度；图片固定 0）
+3. 同一条素材可被多段复用，但 sourceInSec 须明显不同（至少相差 1.5 秒）
+4. 须体现叙事：先氛围后卖点、先全景后特写，遵循指导文案
 
 只输出 JSON 数组，无 markdown：
 [{"segmentIndex":0,"materialIndex":2,"sourceInSec":0,"clipNote":"门店外观"},...]
-segmentIndex 从 0 起，须覆盖全部分镜段。`
+segmentIndex 从 0 起，须覆盖全部分镜段；materialIndex 从 0 起。`
+
+function normalizeParsedMaterialIndices(
+  decisions: MixEditSegmentDecision[],
+  matCount: number,
+): MixEditSegmentDecision[] {
+  if (matCount <= 0) return decisions
+  const hasZero = decisions.some((d) => d.materialIndex === 0)
+  const oneBased =
+    !hasZero && decisions.every((d) => d.materialIndex >= 1 && d.materialIndex <= matCount)
+  return decisions.map((d) => ({
+    ...d,
+    materialIndex: oneBased
+      ? Math.max(0, d.materialIndex - 1)
+      : Math.max(0, d.materialIndex) % matCount,
+  }))
+}
 
 function parseEditPlanJson(raw: string, segCount: number, matCount: number): MixEditSegmentDecision[] | null {
   const m = raw.match(/\[[\s\S]*\]/)
@@ -60,33 +77,107 @@ function parseEditPlanJson(raw: string, segCount: number, matCount: number): Mix
       if (!Number.isFinite(materialIndex) || materialIndex < 0) continue
       out.push({
         segmentIndex,
-        materialIndex: materialIndex % matCount,
+        materialIndex: Math.max(0, materialIndex),
         sourceInSec,
         clipNote: typeof o.clipNote === 'string' ? o.clipNote.slice(0, 80) : undefined,
       })
     }
     if (out.length < Math.min(2, segCount)) return null
-    return out
+    return normalizeParsedMaterialIndices(out, matCount)
   } catch {
     return null
   }
 }
 
-/** 关键词 fallback：分镜 visual 与素材描述重合度 */
-function scoreMaterialMatch(visual: string, profile: IceMixMaterialProfile): number {
+/** 关键词 fallback：分镜 visual 与素材描述/文件名重合度 */
+function scoreMaterialMatch(
+  visual: string,
+  profile: IceMixMaterialProfile,
+  matLabel?: string,
+): number {
   const v = visual.toLowerCase()
   const d = profile.description.toLowerCase()
-  if (!v.trim() || !d.trim()) return 0
+  const label = (matLabel || profile.label || '').toLowerCase()
+  if (!v.trim()) return 0
   let score = 0
+  if (label && v.includes(label)) score += 8
+  if (label && label.length >= 4 && d.includes(label)) score += 4
+  if (!d.trim()) return score
   const tokens = v.split(/[\s，,、；;。.]+/).filter((t) => t.length >= 2)
   for (const t of tokens) {
     if (d.includes(t)) score += 2
+    if (label.includes(t)) score += 1
   }
   if (/门店|外观|环境|门头/.test(v) && /门店|外观|环境|门头/.test(d)) score += 3
   if (/产品|成品|特写|菜品|商品/.test(v) && /产品|成品|特写|菜|商品/.test(d)) score += 3
   if (/制作|过程|后厨|操作|烹饪/.test(v) && /制作|过程|后厨|操作|烹饪/.test(d)) score += 3
   if (/顾客|体验|试吃|人物/.test(v) && /顾客|体验|试吃|人物|人/.test(d)) score += 3
   return score
+}
+
+function isEditPlanDiverseEnough(
+  decisions: MixEditSegmentDecision[],
+  matCount: number,
+): boolean {
+  if (decisions.length < 2 || matCount < 2) return true
+  const mats = new Set(decisions.map((d) => d.materialIndex))
+  const ins = decisions.map((d) => Math.round(d.sourceInSec * 10) / 10)
+  const distinctIns = new Set(ins)
+  if (mats.size >= 2) return true
+  if (distinctIns.size >= 2 && ins.some((x) => x > 0.05)) return true
+  return false
+}
+
+/** 禁止全段同一素材同一入点：按分镜语义重分配 */
+export function enforceDiverseEditDecisions(
+  decisions: MixEditSegmentDecision[],
+  rows: ShortVideoScriptRow[],
+  materials: IceMixMaterialSlot[],
+  profiles: IceMixMaterialProfile[],
+): MixEditSegmentDecision[] {
+  if (materials.length < 2 || decisions.length < 2) return decisions
+  if (isEditPlanDiverseEnough(decisions, materials.length)) return decisions
+
+  const usedIn = new Map<number, number>()
+  return rows.map((row, segmentIndex) => {
+    const prev = decisions.find((d) => d.segmentIndex === segmentIndex) ?? decisions[segmentIndex]
+    let bestIdx = segmentIndex % materials.length
+    let bestScore = -1
+    for (let mi = 0; mi < materials.length; mi++) {
+      const prof = profiles.find((p) => p.index === mi)
+      const s = scoreMaterialMatch(
+        row.visual,
+        prof ?? {
+          index: mi,
+          label: materials[mi]!.label,
+          kind: materials[mi]!.kind,
+          description: materials[mi]!.label,
+        },
+        materials[mi]!.label,
+      )
+      const usedCount = decisions.filter((d) => d.materialIndex === mi).length
+      const diversityBonus = usedCount === 0 ? 2 : 0
+      if (s + diversityBonus > bestScore) {
+        bestScore = s + diversityBonus
+        bestIdx = mi
+      }
+    }
+    const est =
+      profiles.find((p) => p.index === bestIdx)?.estimatedDurationSec ?? MIX_DEFAULT_SOURCE_DURATION_SEC
+    let sourceInSec = prev?.sourceInSec ?? inferSourceInSec(row.visual, est)
+    const lastIn = usedIn.get(bestIdx)
+    if (lastIn != null && Math.abs(sourceInSec - lastIn) < 1.2) {
+      sourceInSec = clampMixSourceInSec(sourceInSec + 1.5, 3, est)
+    }
+    sourceInSec = clampMixSourceInSec(sourceInSec, 3, est)
+    usedIn.set(bestIdx, sourceInSec)
+    return {
+      segmentIndex,
+      materialIndex: bestIdx,
+      sourceInSec,
+      clipNote: prev?.clipNote,
+    }
+  })
 }
 
 function inferSourceInSec(visual: string, estDur: number): number {
@@ -109,10 +200,10 @@ export function fallbackMixEditDecisions(
 ): MixEditSegmentDecision[] {
   const usedIn = new Map<number, number>()
   return rows.map((row, segmentIndex) => {
-    let bestIdx = 0
+    let bestIdx = segmentIndex % Math.max(1, profiles.length)
     let bestScore = -1
     for (const p of profiles) {
-      const s = scoreMaterialMatch(row.visual, p)
+      const s = scoreMaterialMatch(row.visual, p, p.label)
       if (s > bestScore) {
         bestScore = s
         bestIdx = p.index
@@ -159,7 +250,7 @@ export async function planMixEditFromInstructions(opts: {
   const profileBlock = profiles
     .map(
       (p) =>
-        `素材${p.index}（${p.label}·${p.kind === 'video' ? '视频' : '图片'}）：${p.description}${p.estimatedDurationSec ? `；约${Math.round(p.estimatedDurationSec)}秒` : ''}`,
+        `素材${p.index}（第${p.index + 1}条·${p.label}·${p.kind === 'video' ? '视频' : '图片'}）：${p.description}${p.estimatedDurationSec ? `；约${Math.round(p.estimatedDurationSec)}秒` : ''}`,
     )
     .join('\n')
   const storyboard = rows
@@ -185,19 +276,28 @@ export async function planMixEditFromInstructions(opts: {
   const fallback = fallbackMixEditDecisions(rows, profileList)
 
   async function tryAiEditPlan(): Promise<MixEditSegmentDecision[] | null> {
-    const providers: Array<'doubao' | 'qwen'> = ['doubao', 'qwen']
-    for (const provider of providers) {
+    const attempts: Array<{
+      provider: 'qwen' | 'doubao' | 'tokenmix'
+      modelFamily?: 'openai'
+      model?: string
+    }> = [
+      { provider: 'qwen' },
+      { provider: 'doubao' },
+      { provider: 'tokenmix', modelFamily: 'openai', model: 'gpt-4o' },
+    ]
+    for (const attempt of attempts) {
       try {
         const res = await postAiChat({
-          provider,
-          temperature: 0.25,
+          provider: attempt.provider,
+          ...(attempt.modelFamily ? { modelFamily: attempt.modelFamily, model: attempt.model } : {}),
+          temperature: 0.2,
           messages: [
             { role: 'system', content: EDIT_PLAN_SYSTEM },
             { role: 'user', content: userBlock },
           ],
         })
         const parsed = parseEditPlanJson(res.content?.trim() || '', rows.length, materials.length)
-        if (parsed) return parsed
+        if (parsed && isEditPlanDiverseEnough(parsed, materials.length)) return parsed
       } catch {
         /* try next */
       }
@@ -217,6 +317,8 @@ export async function planMixEditFromInstructions(opts: {
   } catch {
     /* use fallback */
   }
+
+  decisions = enforceDiverseEditDecisions(decisions, rows, materials, profileList)
 
   const bySeg = new Map<number, MixEditSegmentDecision>()
   for (const d of decisions) {

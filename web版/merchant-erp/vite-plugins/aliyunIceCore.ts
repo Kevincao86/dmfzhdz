@@ -267,14 +267,15 @@ export type IceMixResolvedClip = {
   sourceInSec?: number
 }
 
-/** 多素材混剪：视频轨按分镜时间段拼接；有 TTS 口播时原片静音 */
+/** 多素材混剪：视频轨按分镜时间段拼接；混剪默认去掉原声，仅保留 TTS 口播轨 */
 export function buildTimelineFromMixClips(
   resolved: IceMixResolvedClip[],
   plan: IceBriefTimelinePlan,
   width: number,
   height: number,
+  opts?: { forceMuteSource?: boolean },
 ): object {
-  const muteSource = Boolean(plan.narrationClip)
+  const muteSource = opts?.forceMuteSource ?? Boolean(plan.narrationClip)
   const clips: Record<string, unknown>[] = []
   for (let i = 0; i < resolved.length; i++) {
     const seg = resolved[i]!
@@ -1157,12 +1158,29 @@ export async function iceRunMixPipeline(
   const jobKey = `meoo-mix-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const resolved: IceMixResolvedClip[] = []
   const seenMediaIds = new Set<string>()
+  const mediaCache = new Map<
+    string,
+    { mediaId: string; sourceDurationSec?: number; kind: 'video' | 'image' }
+  >()
 
   for (let i = 0; i < input.segments.length; i++) {
     const seg = input.segments[i]!
     const matNo = (seg.materialIndex ?? i) + 1
     const title = `${input.projectName}-素材${matNo}`.slice(0, 120)
+    const cacheKey = `${seg.kind}:${(seg.mediaUrl || seg.signedMediaUrl || '').trim()}`
+    const cached = mediaCache.get(cacheKey)
+
     if (seg.kind === 'image') {
+      if (cached) {
+        resolved.push({
+          kind: 'image',
+          mediaId: cached.mediaId,
+          timelineStartSec: seg.timelineStartSec,
+          timelineEndSec: seg.timelineEndSec,
+          sourceInSec: 0,
+        })
+        continue
+      }
       const up = await registerImageUrlToMediaId(client, cfg, seg.mediaUrl, title)
       if (!up.ok) {
         return { ok: false, message: `第 ${i + 1} 段图片入库失败：${up.message}`, step: 'upload_media' }
@@ -1178,6 +1196,23 @@ export async function iceRunMixPipeline(
         timelineEndSec: seg.timelineEndSec,
         sourceInSec: 0,
       })
+      mediaCache.set(cacheKey, { mediaId: up.mediaId, kind: 'image' })
+      continue
+    }
+    if (cached?.kind === 'video') {
+      resolved.push({
+        kind: 'video',
+        mediaId: cached.mediaId,
+        timelineStartSec: seg.timelineStartSec,
+        timelineEndSec: seg.timelineEndSec,
+        sourceDurationSec: cached.sourceDurationSec,
+        sourceInSec: clampMixSourceInSec(
+          seg.sourceInSec ?? 0,
+          seg.timelineEndSec - seg.timelineStartSec,
+          cached.sourceDurationSec,
+        ),
+      })
+      seenMediaIds.add(cached.mediaId)
       continue
     }
     const up = await ingestVideoUrlToMediaId(
@@ -1201,6 +1236,11 @@ export async function iceRunMixPipeline(
         seg.timelineEndSec - seg.timelineStartSec,
         up.sourceDurationSec,
       ),
+    })
+    mediaCache.set(cacheKey, {
+      mediaId: up.mediaId,
+      sourceDurationSec: up.sourceDurationSec,
+      kind: 'video',
     })
     seenMediaIds.add(up.mediaId)
   }
@@ -1267,7 +1307,9 @@ export async function iceRunMixPipeline(
     }
   }
 
-  const timeline = buildTimelineFromMixClips(resolved, finalPlan, input.width, input.height)
+  const timeline = buildTimelineFromMixClips(resolved, finalPlan, input.width, input.height, {
+    forceMuteSource: true,
+  })
   try {
     const res = await client.submitMediaProducingJob(
       new SubmitMediaProducingJobRequest({
