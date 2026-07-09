@@ -9,6 +9,10 @@ import { runIceUploadPool } from '../lib/iceUploadPool'
 const VISION_SAMPLE_MAX = 8
 const VIDEO_FRAME_SAMPLE_MAX = 4
 const VIDEO_FRAME_CONCURRENCY = 3
+/** 素材分析：超过此数量只抽样深度理解，其余用文件名占位 */
+const MATERIAL_PROFILE_DEEP_MAX = 8
+const MATERIAL_PROFILE_CONCURRENCY = 5
+const MATERIAL_PROFILE_ITEM_TIMEOUT_MS = 45_000
 
 const MIX_GUIDANCE_SYSTEM = `你是本地生活/电商短视频编导，负责根据商家已上传的实拍素材，撰写「AI混剪指导文案」（中文）。
 输出须覆盖：
@@ -120,9 +124,29 @@ async function analyzeImageMaterials(
   return describeVideoFrames(frames)
 }
 
+function stubMaterialProfile(mat: IceMixMaterialSlot, index: number): IceMixMaterialProfile {
+  return {
+    index,
+    label: mat.label || `素材${index + 1}`,
+    kind: mat.kind,
+    description: mat.label || `实拍${mat.kind === 'video' ? '视频' : '图片'}`,
+    estimatedDurationSec: mat.kind === 'video' ? 15 : undefined,
+  }
+}
+
+function withProfileTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((resolve) => {
+      window.setTimeout(() => resolve(fallback), ms)
+    }),
+  ])
+}
+
 async function extractOneVideoFrame(
   mat: IceMixMaterialSlot,
   onProgress?: (msg: string) => void,
+  opts?: { skipLocalDownload?: boolean },
 ): Promise<{ label: string; dataUrl: string } | null> {
   const label = mat.label || '视频素材'
   const urls = visionUrlCandidates(mat)
@@ -137,6 +161,8 @@ async function extractOneVideoFrame(
       return { label, dataUrl: `data:image/jpeg;base64,${serverFrame.pureBase64}` }
     }
   }
+
+  if (opts?.skipLocalDownload) return null
 
   for (const url of urls) {
     try {
@@ -178,6 +204,7 @@ async function extractVideoFrameDataUrls(
 async function describeOneMaterialProfile(
   mat: IceMixMaterialSlot,
   index: number,
+  opts?: { skipLocalDownload?: boolean },
 ): Promise<IceMixMaterialProfile | null> {
   let dataUrl = ''
   if (mat.kind === 'image') {
@@ -193,17 +220,13 @@ async function describeOneMaterialProfile(
       }
     }
   } else {
-    const frame = await extractOneVideoFrame(mat)
+    const frame = await extractOneVideoFrame(mat, undefined, {
+      skipLocalDownload: opts?.skipLocalDownload,
+    })
     if (frame) dataUrl = frame.dataUrl
   }
   if (!dataUrl) {
-    return {
-      index,
-      label: mat.label || `素材${index + 1}`,
-      kind: mat.kind,
-      description: mat.label || `实拍${mat.kind === 'video' ? '视频' : '图片'}`,
-      estimatedDurationSec: mat.kind === 'video' ? 15 : undefined,
-    }
+    return stubMaterialProfile(mat, index)
   }
   try {
     const res = await postAiChat({
@@ -224,34 +247,52 @@ async function describeOneMaterialProfile(
       estimatedDurationSec: mat.kind === 'video' ? 15 : undefined,
     }
   } catch {
-    return {
-      index,
-      label: mat.label || `素材${index + 1}`,
-      kind: mat.kind,
-      description: mat.label,
-      estimatedDurationSec: mat.kind === 'video' ? 15 : undefined,
-    }
+    return stubMaterialProfile(mat, index)
   }
 }
 
-/** 为每条素材建立画面理解（供指令驱动混剪匹配） */
+/** 为每条素材建立画面理解（供指令驱动混剪匹配）；大量素材时只抽样深度分析 */
 export async function buildMaterialVisionProfiles(
   materials: IceMixMaterialSlot[],
   onProgress?: (msg: string) => void,
+  opts?: { maxDeepAnalyze?: number },
 ): Promise<IceMixMaterialProfile[]> {
   const list = materials.filter((m) => visionUrlCandidates(m).length > 0)
   if (list.length === 0) return []
-  onProgress?.(`正在理解 ${list.length} 条素材画面…`)
-  const out: IceMixMaterialProfile[] = []
-  await runIceUploadPool(list, VIDEO_FRAME_CONCURRENCY, async (mat) => {
+
+  const maxDeep = Math.max(2, opts?.maxDeepAnalyze ?? MATERIAL_PROFILE_DEEP_MAX)
+  const deepTargets = list.length <= maxDeep ? list : sampleMaterials(list, maxDeep)
+  const deepTotal = deepTargets.length
+
+  onProgress?.(
+    list.length > maxDeep
+      ? `共 ${list.length} 条素材，抽样理解 ${deepTotal} 条代表画面（约 1–3 分钟）…`
+      : `正在理解 ${list.length} 条素材画面…`,
+  )
+
+  const profileByIndex = new Map<number, IceMixMaterialProfile>()
+  let done = 0
+
+  await runIceUploadPool(deepTargets, MATERIAL_PROFILE_CONCURRENCY, async (mat) => {
     const idx = materials.indexOf(mat)
-    return describeOneMaterialProfile(mat, idx >= 0 ? idx : out.length)
+    const index = idx >= 0 ? idx : done
+    const label = mat.label || `素材${index + 1}`
+    onProgress?.(`正在理解 ${done + 1}/${deepTotal}：${label}`)
+    const prof = await withProfileTimeout(
+      describeOneMaterialProfile(mat, index, { skipLocalDownload: list.length > maxDeep }),
+      MATERIAL_PROFILE_ITEM_TIMEOUT_MS,
+      stubMaterialProfile(mat, index),
+    )
+    done += 1
+    onProgress?.(`已理解 ${done}/${deepTotal} 条代表素材…`)
+    return prof
   }).then((results) => {
     for (const row of results) {
-      if (row) out.push(row)
+      if (row) profileByIndex.set(row.index, row)
     }
   })
-  return out.sort((a, b) => a.index - b.index)
+
+  return materials.map((mat, index) => profileByIndex.get(index) ?? stubMaterialProfile(mat, index))
 }
 
 async function describeVideoFrames(
@@ -337,57 +378,64 @@ export async function analyzeIceMixMaterialsToGuidance(opts: {
     return { ok: false, message: '请先上传至少一条视频或一张图片素材' }
   }
 
-  opts.onProgress?.('AI 正在逐条理解素材画面…')
-  const materialProfiles = await buildMaterialVisionProfiles(materials, opts.onProgress)
+  opts.onProgress?.('AI 正在理解素材画面…')
+  const materialProfiles = await buildMaterialVisionProfiles(materials, opts.onProgress, {
+    maxDeepAnalyze: VISION_SAMPLE_MAX,
+  })
   const sampled = sampleMaterials(materials, VISION_SAMPLE_MAX)
-  const images = sampled.filter((m) => m.kind === 'image')
-  const videos = sampled.filter((m) => m.kind === 'video')
 
-  opts.onProgress?.('AI 正在分析图片素材…')
-  let imageNotes = ''
-  try {
-    imageNotes = await analyzeImageMaterials(images)
-  } catch (e) {
-    if (videos.length === 0) {
-      return { ok: false, message: e instanceof Error ? e.message : String(e) }
-    }
-  }
+  const profileVision = materialProfiles
+    .map((p) => `素材${p.index + 1}：${p.description}`)
+    .filter(isVisionNotesUsable)
+  let visionNotes = profileVision.join('\n')
 
-  let videoNotes = ''
-  if (videos.length > 0) {
-    const frames = await extractVideoFrameDataUrls(videos, opts.onProgress)
-    if (frames.length === 0) {
-      const ossCount = materials.filter((m) =>
-        visionUrlCandidates(m).some((u) => isOssMaterialUrl(u)),
-      ).length
-      return {
-        ok: false,
-        message:
-          ossCount > 0
-            ? '无法从 OSS 素材截取画面，请确认素材为 MP4/MOV 且 ICE/OSS 已配置，然后重新上传再试。'
-            : '无法从素材中截取有效画面，请重新本地上传后再试。',
+  if (profileVision.length < 2) {
+    const images = sampled.filter((m) => m.kind === 'image')
+    const videos = sampled.filter((m) => m.kind === 'video')
+
+    opts.onProgress?.('抽样画面不足，正在补分析图片…')
+    let imageNotes = ''
+    try {
+      imageNotes = await analyzeImageMaterials(images)
+    } catch (e) {
+      if (videos.length === 0) {
+        return { ok: false, message: e instanceof Error ? e.message : String(e) }
       }
     }
-    opts.onProgress?.('AI 正在理解视频画面…')
-    try {
-      videoNotes = await describeVideoFrames(frames)
-    } catch (e) {
-      return { ok: false, message: e instanceof Error ? e.message : 'AI 无法理解视频画面，请稍后重试' }
+
+    let videoNotes = ''
+    if (videos.length > 0) {
+      const frames = await extractVideoFrameDataUrls(videos, opts.onProgress)
+      if (frames.length === 0) {
+        const ossCount = materials.filter((m) =>
+          visionUrlCandidates(m).some((u) => isOssMaterialUrl(u)),
+        ).length
+        return {
+          ok: false,
+          message:
+            ossCount > 0
+              ? '无法从 OSS 素材截取画面，请确认素材为 MP4/MOV 且 ICE/OSS 已配置，然后重新上传再试。'
+              : '无法从素材中截取有效画面，请重新本地上传后再试。',
+        }
+      }
+      opts.onProgress?.('AI 正在理解视频画面…')
+      try {
+        videoNotes = await describeVideoFrames(frames)
+      } catch (e) {
+        return { ok: false, message: e instanceof Error ? e.message : 'AI 无法理解视频画面，请稍后重试' }
+      }
     }
+
+    visionNotes = [profileVision.join('\n'), imageNotes, videoNotes].filter(isVisionNotesUsable).join('\n\n')
   }
 
-  const visionParts = [
-    materialProfiles.map((p) => `素材${p.index + 1}：${p.description}`).join('\n'),
-    imageNotes,
-    videoNotes,
-  ].filter(isVisionNotesUsable)
-  if (visionParts.length === 0) {
+  if (!isVisionNotesUsable(visionNotes)) {
     return { ok: false, message: 'AI 未能从素材中识别有效画面内容，请换更清晰的素材或重新上传后重试。' }
   }
 
   opts.onProgress?.('AI 正在撰写指导文案…')
   const inventory = buildMaterialInventory(materials, sampled)
-  const gen = await generateGuidanceText(inventory, visionParts.join('\n\n'), {
+  const gen = await generateGuidanceText(inventory, visionNotes, {
     targetTotalSec: opts.targetTotalSec,
     aspectLabel: opts.aspectLabel,
     userHint: opts.userHint,
