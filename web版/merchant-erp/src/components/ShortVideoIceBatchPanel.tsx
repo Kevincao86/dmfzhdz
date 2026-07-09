@@ -587,6 +587,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         segmentSec: MIX_DEFAULT_SEGMENT_SEC,
         plannerModel: 'auto',
         mode: 'generate_text',
+        skipReviewPasses: true,
         onProgress: (msg) => setHint(msg),
       })
       if (!r.ok) {
@@ -598,6 +599,8 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       setHint(
         `AI 已规划 ${r.rows.length} 段混剪分镜（约 0–${covered || mixTargetSec} 秒），请核对分镜表与素材映射后一键混剪。`,
       )
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'AI 规划分镜失败，请稍后重试')
     } finally {
       setPlanBusy(false)
     }

@@ -309,6 +309,8 @@ async function enrichVideoPostBody(body: Record<string, unknown>): Promise<Recor
 }
 
 const VIDEO_FETCH_TIMEOUT_MS = 45_000
+/** 分镜策划：服务端单次请求含多轮 AI 重试，须 ≥ 轻量 Nginx proxy_read_timeout（180s） */
+const VIDEO_LONGFORM_PLAN_TIMEOUT_MS = 180_000
 /** 经服务端代理拉取火山/千问 CDN 成片；须 ≥ 轻量 Nginx proxy_read_timeout（180s） */
 const VIDEO_SEGMENT_DOWNLOAD_TIMEOUT_MS = 180_000
 const VIDEO_LAST_FRAME_TIMEOUT_MS = 180_000
@@ -425,6 +427,7 @@ async function fetchVideoPostOnUrls(
   bodyStr: string,
   timeoutMs: number,
   extraHeaders?: Record<string, string>,
+  out?: { lastNetworkErr?: string },
 ): Promise<Response | null> {
   const headers = {
     'Content-Type': 'application/json; charset=utf-8',
@@ -448,7 +451,8 @@ async function fetchVideoPostOnUrls(
         statusText: res.statusText,
         headers: { 'Content-Type': ct || 'application/json; charset=utf-8' },
       })
-    } catch {
+    } catch (e) {
+      if (out) out.lastNetworkErr = formatVideoFetchNetworkErr(e)
       /* try next candidate */
     }
   }
@@ -459,15 +463,16 @@ async function fetchVideoPost(
   path: string,
   body: Record<string, unknown>,
   timeoutMs = VIDEO_FETCH_TIMEOUT_MS,
+  out?: { lastNetworkErr?: string },
 ): Promise<Response | null> {
   const bodyStr = JSON.stringify(await enrichVideoPostBody(body))
   const authHdr = await videoAuthHeaders()
   const primary = videoApiFetchUrls(path, false)
-  const first = await fetchVideoPostOnUrls(primary, bodyStr, timeoutMs, authHdr)
+  const first = await fetchVideoPostOnUrls(primary, bodyStr, timeoutMs, authHdr, out)
   if (first) return first
   const fallback = videoApiFetchUrls(path, true).filter((u) => !primary.includes(u))
   if (fallback.length === 0) return null
-  return fetchVideoPostOnUrls(fallback, bodyStr, timeoutMs, authHdr)
+  return fetchVideoPostOnUrls(fallback, bodyStr, timeoutMs, authHdr, out)
 }
 
 export async function fetchVideoAiConfig(): Promise<VideoAiBackendConfig | null> {
@@ -560,8 +565,14 @@ export async function postLongformVideoPlan(body: {
     '/api/meoo-merchant-ai-video-longform-plan',
     '/api/merchant/ai/video/longform/plan',
   ] as const
+  const networkOut: { lastNetworkErr?: string } = {}
   for (const p of paths) {
-    const res = await fetchVideoPost(p, buildVideoPostBody({ ...body }))
+    const res = await fetchVideoPost(
+      p,
+      buildVideoPostBody({ ...body }),
+      VIDEO_LONGFORM_PLAN_TIMEOUT_MS,
+      networkOut,
+    )
     if (!res) continue
     const j = (await parseJsonSafe<Record<string, unknown>>(res)) ?? {}
     if (!res.ok || !j.ok) {
@@ -571,11 +582,22 @@ export async function postLongformVideoPlan(body: {
     }
     const raw = j.prompts
     const scriptSegments = Array.isArray(j.scriptSegments)
-      ? (j.scriptSegments as Array<Record<string, unknown>>).map((row) => ({
-          timeRange: typeof row.timeRange === 'string' ? row.timeRange : undefined,
-          visual: typeof row.visual === 'string' ? row.visual : undefined,
-          dialogue: typeof row.dialogue === 'string' ? row.dialogue : undefined,
-        }))
+      ? (j.scriptSegments as Array<Record<string, unknown>>).map((row) => {
+          const prompt = typeof row.prompt === 'string' ? row.prompt.trim() : ''
+          const action = typeof row.action === 'string' ? row.action.trim() : ''
+          const visualRaw = typeof row.visual === 'string' ? row.visual.trim() : ''
+          const visual = visualRaw || [prompt, action].filter(Boolean).join('；')
+          const dialogueRaw = typeof row.dialogue === 'string' ? row.dialogue.trim() : ''
+          const dialogue =
+            dialogueRaw ||
+            (typeof row.narration === 'string' ? row.narration.trim() : '') ||
+            (typeof row.voiceover === 'string' ? row.voiceover.trim() : '')
+          return {
+            timeRange: typeof row.timeRange === 'string' ? row.timeRange : undefined,
+            visual: visual || undefined,
+            dialogue: dialogue || undefined,
+          }
+        })
       : undefined
     const prompts = Array.isArray(raw)
       ? raw.map((x) => String(x).trim()).filter(Boolean)
@@ -612,6 +634,12 @@ export async function postLongformVideoPlan(body: {
       planStage:
         typeof j.planStage === 'string' && j.planStage.trim() ? j.planStage.trim() : undefined,
       reviewPass: typeof j.reviewPass === 'number' ? j.reviewPass : undefined,
+    }
+  }
+  if (networkOut.lastNetworkErr) {
+    return {
+      ok: false,
+      message: `分镜策划请求失败：${networkOut.lastNetworkErr}（AI 规划约需 30–90 秒，请稍后重试）`,
     }
   }
   return { ok: false, message: '长片策划失败：视频 AI 接口未部署或不可达' }

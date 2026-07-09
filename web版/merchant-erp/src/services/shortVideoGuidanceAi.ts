@@ -16,6 +16,7 @@ import {
   maxScriptTimeRangeEndSec,
   finalizePlannedScriptRows,
   validateStoryboardRows,
+  scriptRowsFullyFilled,
   type ShortVideoScriptRow,
 } from '../lib/shortVideoScriptTable'
 
@@ -130,15 +131,62 @@ export type ShortVideoScriptPlanMeta = {
   reviewVendors?: string[]
 }
 
-type PlanApiRow = { timeRange?: string; visual?: string; dialogue?: string }
+type PlanApiRow = {
+  timeRange?: string
+  visual?: string
+  dialogue?: string
+  prompt?: string
+  action?: string
+  narration?: string
+  voiceover?: string
+}
 
 function rowsFromPlanSegments(segments: PlanApiRow[] | undefined): ShortVideoScriptRow[] {
   if (!segments?.length) return []
-  return segments.map((s) => ({
-    timeRange: String(s.timeRange ?? '').trim(),
-    visual: String(s.visual ?? '').trim(),
-    dialogue: String(s.dialogue ?? '').trim(),
-  }))
+  return segments.map((s) => {
+    const prompt = String(s.prompt ?? '').trim()
+    const action = String(s.action ?? '').trim()
+    const visual =
+      String(s.visual ?? '').trim() || [prompt, action].filter(Boolean).join('；')
+    const dialogue = String(
+      s.dialogue ?? s.narration ?? s.voiceover ?? '',
+    ).trim()
+    return {
+      timeRange: String(s.timeRange ?? '').trim(),
+      visual,
+      dialogue,
+    }
+  })
+}
+
+function mergePlanRowsWithPrompts(
+  rows: ShortVideoScriptRow[],
+  prompts: string[],
+  segmentSec: number,
+): ShortVideoScriptRow[] {
+  if (prompts.length < 2) return rows
+  const fromPrompts = scriptRowsFromVideoPrompts(prompts, segmentSec)
+  if (rows.length < 2) return fromPrompts
+  return rows.map((r, i) => {
+    const fb = fromPrompts[i] ?? fromPrompts[fromPrompts.length - 1]!
+    return {
+      timeRange: r.timeRange.trim() || fb.timeRange,
+      visual: r.visual.trim() || fb.visual,
+      dialogue: r.dialogue.trim() || fb.dialogue,
+    }
+  })
+}
+
+function applyPlanResponseRows(
+  scriptSegments: PlanApiRow[] | undefined,
+  prompts: string[],
+  segmentSec: number,
+): ShortVideoScriptRow[] {
+  let rows = rowsFromPlanSegments(scriptSegments)
+  if (prompts.length >= 2) {
+    rows = mergePlanRowsWithPrompts(rows, prompts, segmentSec)
+  }
+  return rows
 }
 
 function segmentsPayload(rows: ShortVideoScriptRow[]) {
@@ -162,6 +210,8 @@ export async function planShortVideoScriptFromGuidance(
     mode: LongformPlanMode
     hasProductImage?: boolean
     frameMode?: boolean
+    /** 混剪等轻量场景：仅模型 1 规划，跳过二/三轮复核（更快、更少超时） */
+    skipReviewPasses?: boolean
     onProgress?: (message: string) => void
   },
 ): Promise<
@@ -222,10 +272,7 @@ export async function planShortVideoScriptFromGuidance(
   })
   if (!plan.ok) return plan
 
-  let rows = rowsFromPlanSegments(plan.scriptSegments)
-  if (plan.prompts.length >= 2 && rows.length < 2) {
-    rows = scriptRowsFromVideoPrompts(plan.prompts, opts.segmentSec)
-  }
+  let rows = applyPlanResponseRows(plan.scriptSegments, plan.prompts, opts.segmentSec)
   if (plan.plannerVendor) reviewVendors.push(plan.plannerVendor)
 
   if (
@@ -242,10 +289,7 @@ export async function planShortVideoScriptFromGuidance(
       planStage: 'draft',
     })
     if (!plan.ok) return plan
-    rows = rowsFromPlanSegments(plan.scriptSegments)
-    if (plan.prompts.length >= 2 && rows.length < 2) {
-      rows = scriptRowsFromVideoPrompts(plan.prompts, opts.segmentSec)
-    }
+    rows = applyPlanResponseRows(plan.scriptSegments, plan.prompts, opts.segmentSec)
   }
 
   if (rows.length < 2) {
@@ -259,33 +303,43 @@ export async function planShortVideoScriptFromGuidance(
   let lastValidation = validateStoryboardRows(rows, planner.effectiveTargetSec)
   validationIssues = lastValidation.issues
 
-  opts.onProgress?.('AI 模型 2 正在检查并补全分镜（禁止空白段）…')
-  const review1 = await postLongformVideoPlan({
-    ...baseBody,
-    overallPrompt: plannerInput,
-    planStage: 'review',
-    reviewPass: 1,
-    draftSegments: segmentsPayload(rows),
-    validationIssues,
-  })
-  if (!review1.ok) return review1
-  rows = rowsFromPlanSegments(review1.scriptSegments)
-  if (review1.plannerVendor) reviewVendors.push(review1.plannerVendor)
-  lastValidation = validateStoryboardRows(rows, planner.effectiveTargetSec)
-  validationIssues = lastValidation.issues
+  let review1 = plan
+  let review2 = plan
 
-  opts.onProgress?.('AI 模型 3 正在复核分镜（时间段与文案一一对应）…')
-  const review2 = await postLongformVideoPlan({
-    ...baseBody,
-    overallPrompt: plannerInput,
-    planStage: 'review',
-    reviewPass: 2,
-    draftSegments: segmentsPayload(rows),
-    validationIssues,
-  })
-  if (!review2.ok) return review2
-  rows = rowsFromPlanSegments(review2.scriptSegments)
-  if (review2.plannerVendor) reviewVendors.push(review2.plannerVendor)
+  if (!opts.skipReviewPasses) {
+    opts.onProgress?.('AI 模型 2 正在检查并补全分镜（禁止空白段）…')
+    review1 = await postLongformVideoPlan({
+      ...baseBody,
+      overallPrompt: plannerInput,
+      planStage: 'review',
+      reviewPass: 1,
+      draftSegments: segmentsPayload(rows),
+      validationIssues,
+    })
+    if (!review1.ok) return review1
+    rows = applyPlanResponseRows(review1.scriptSegments, review1.prompts, opts.segmentSec)
+    if (review1.plannerVendor) reviewVendors.push(review1.plannerVendor)
+    lastValidation = validateStoryboardRows(rows, planner.effectiveTargetSec)
+    validationIssues = lastValidation.issues
+
+    opts.onProgress?.('AI 模型 3 正在复核分镜（时间段与文案一一对应）…')
+    review2 = await postLongformVideoPlan({
+      ...baseBody,
+      overallPrompt: plannerInput,
+      planStage: 'review',
+      reviewPass: 2,
+      draftSegments: segmentsPayload(rows),
+      validationIssues,
+    })
+    if (!review2.ok) return review2
+    rows = applyPlanResponseRows(review2.scriptSegments, review2.prompts, opts.segmentSec)
+    if (review2.plannerVendor) reviewVendors.push(review2.plannerVendor)
+  } else if (!scriptRowsFullyFilled(rows)) {
+    return {
+      ok: false,
+      message: `AI 规划的分镜仍有空白段：${validationIssues.join('；') || '画面或口播未填满'}。请补充指导文案后重试。`,
+    }
+  }
 
   if (hasEmbeddedTimes) {
     rows = mergeScriptRowTimeRanges(rows, embeddedRows)
@@ -295,9 +349,10 @@ export async function planShortVideoScriptFromGuidance(
 
   const finalValidation = validateStoryboardRows(rows, planner.effectiveTargetSec)
   if (!finalValidation.ok) {
+    const stageLabel = opts.skipReviewPasses ? 'AI 规划' : '三模型复核'
     return {
       ok: false,
-      message: `三模型复核后仍有未通过项：${finalValidation.issues.join('；')}。请补充指导文案后重试。`,
+      message: `${stageLabel}后仍有未通过项：${finalValidation.issues.join('；')}。请补充指导文案后重试。`,
     }
   }
 
@@ -305,10 +360,16 @@ export async function planShortVideoScriptFromGuidance(
     ok: true,
     rows,
     segmentCount: rows.length,
-    usedAiPlanner: plan.usedAiPlanner || review1.usedAiPlanner || review2.usedAiPlanner,
+    usedAiPlanner:
+      plan.usedAiPlanner ||
+      (!opts.skipReviewPasses && (review1.usedAiPlanner || review2.usedAiPlanner)),
     usedRuleBasedFallback: plan.usedRuleBasedFallback,
-    plannerVendor: review2.plannerVendor ?? review1.plannerVendor ?? plan.plannerVendor,
-    plannerModelId: review2.plannerModelId ?? review1.plannerModelId ?? plan.plannerModelId,
+    plannerVendor: opts.skipReviewPasses
+      ? plan.plannerVendor
+      : (review2.plannerVendor ?? review1.plannerVendor ?? plan.plannerVendor),
+    plannerModelId: opts.skipReviewPasses
+      ? plan.plannerModelId
+      : (review2.plannerModelId ?? review1.plannerModelId ?? plan.plannerModelId),
     reviewVendors,
   }
 }
