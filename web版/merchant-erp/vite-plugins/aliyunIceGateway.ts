@@ -12,6 +12,7 @@ import {
   resolveIceEffectPreset,
 } from './iceEffectPresets.js'
 import {
+  ICE_SUBTITLE_STYLE_DEFAULT_ID,
   ICE_SUBTITLE_STYLE_PRESETS,
   resolveIceSubtitleStylePreset,
 } from './iceSubtitleStylePresets.js'
@@ -407,7 +408,9 @@ export async function handleAliyunIceRoutes(input: {
       ? resolveIceEffectPreset(effectIdRaw)
       : resolveIceEffectPreset(presetLabel)
     const subtitleStyleId = String(parsed.subtitleStyleId ?? '').trim()
-    const subtitleStyle = resolveIceSubtitleStylePreset(subtitleStyleId || undefined)
+    const subtitleStyle = resolveIceSubtitleStylePreset(
+      subtitleStyleId || ICE_SUBTITLE_STYLE_DEFAULT_ID,
+    )
     const projectName = String(parsed.projectName ?? 'AI混剪').trim().slice(0, 120)
     const editBrief = String(parsed.editBrief ?? parsed.editInstruction ?? '').trim().slice(0, 500)
 
