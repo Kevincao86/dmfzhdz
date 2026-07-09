@@ -5,7 +5,17 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { rawBody, sendMerchantJson } from './merchantGatewayShared.js'
 import { mergeVideoAiMerchantEnvWithSnapshot } from '../../vite-plugins/merchantVideoAiGateway.js'
 import { fetchRemoteVideoBuffer } from '../../vite-plugins/videoDownloadProxyCore.js'
-import { concatLocalMp4Buffers, concatRemoteMp4Urls, extractLastFrameJpegFromUrl, muxLocalVideoAudio, postProcessLocalVideo } from '../../vite-plugins/videoConcatServer.js'
+import {
+  concatLocalMp4Buffers,
+  concatRemoteMp4Urls,
+  extractSampleFrameJpegFromBuffer,
+  extractLastFrameJpegFromUrl,
+  muxLocalVideoAudio,
+  postProcessLocalVideo,
+  type VideoSampleFrameMode,
+} from '../../vite-plugins/videoConcatServer.js'
+import { loadIceGatewayConfig } from '../../vite-plugins/aliyunIceGateway.js'
+import { fetchIceMediaObjectBuffer } from '../../vite-plugins/aliyunOssIceUpload.js'
 
 function readBearer(env: Record<string, string | undefined>): string | undefined {
   const t = (env.MERCHANT_AI_DOUBAO_KEY ?? env.ARK_API_KEY ?? '').trim()
@@ -61,13 +71,31 @@ export async function handleVideoLastFrameDirect(req: VercelRequest, res: Vercel
   }
 
   const urlStr = typeof parsed.url === 'string' ? parsed.url.trim() : ''
-  if (!urlStr || !/^https?:\/\//i.test(urlStr)) {
-    sendMerchantJson(res, 400, { ok: false, message: '缺少有效的 http(s) URL。' })
+  if (!urlStr || (!/^https?:\/\//i.test(urlStr) && !urlStr.startsWith('oss://'))) {
+    sendMerchantJson(res, 400, { ok: false, message: '缺少有效的素材 URL。' })
     return
   }
 
+  const frameRaw = String(parsed.frame ?? parsed.frameMode ?? 'last').trim().toLowerCase()
+  const frame: VideoSampleFrameMode = frameRaw === 'opening' || frameRaw === 'first' ? 'opening' : 'last'
+
   const env = await mergeVideoAiMerchantEnvWithSnapshot(process.cwd(), process.env as Record<string, string>)
-  const extracted = await extractLastFrameJpegFromUrl(urlStr, { bearer: readBearer(env) })
+  const bearer = readBearer(env)
+  const iceCfg = await loadIceGatewayConfig(process.cwd(), env)
+
+  let extracted: { ok: true; buffer: Buffer } | { ok: false; message: string } | null = null
+
+  if (iceCfg) {
+    const ossBuf = await fetchIceMediaObjectBuffer(iceCfg, urlStr)
+    if (ossBuf.ok) {
+      extracted = await extractSampleFrameJpegFromBuffer(ossBuf.buf, frame)
+    }
+  }
+
+  if (!extracted?.ok) {
+    extracted = await extractLastFrameJpegFromUrl(urlStr, { bearer, frame })
+  }
+
   if (!extracted.ok) {
     sendMerchantJson(res, 502, { ok: false, message: extracted.message })
     return

@@ -175,9 +175,12 @@ export async function concatLocalMp4Buffers(
   }
 }
 
-/** 从本地 MP4 buffer 截取接近结尾的一帧（JPEG），供长视频分段衔接 */
-export async function extractLastFrameJpegFromBuffer(
+export type VideoSampleFrameMode = 'opening' | 'last'
+
+/** 从本地视频 buffer 截取采样帧（JPEG） */
+export async function extractSampleFrameJpegFromBuffer(
   videoBuf: Buffer,
+  mode: VideoSampleFrameMode = 'last',
 ): Promise<{ ok: true; buffer: Buffer } | { ok: false; message: string }> {
   if (!videoBuf.length) return { ok: false, message: '视频为空' }
   if (videoBuf.length > MAX_SEGMENT_BYTES) {
@@ -190,19 +193,25 @@ export async function extractLastFrameJpegFromBuffer(
   if (!ffmpeg) {
     return {
       ok: false,
-      message: '服务端未安装 ffmpeg，无法截取尾帧。请在 ECS 执行：sudo apt-get install -y ffmpeg',
+      message: '服务端未安装 ffmpeg，无法截取采样帧。请在 ECS 执行：sudo apt-get install -y ffmpeg',
     }
   }
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'meoo-vlastframe-'))
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), `meoo-vframe-${mode}-`))
   try {
     const videoPath = path.join(tmpDir, 'in.mp4')
     const outPath = path.join(tmpDir, 'frame.jpg')
     fs.writeFileSync(videoPath, videoBuf)
-    const attempts: string[][] = [
-      ['-y', '-sseof', '-0.15', '-i', videoPath, '-frames:v', '1', '-q:v', '2', outPath],
-      ['-y', '-i', videoPath, '-vf', 'select=eq(n\\,0)', '-frames:v', '1', '-q:v', '2', outPath],
-    ]
-    let lastErr = 'ffmpeg 截取尾帧失败'
+    const attempts: string[][] =
+      mode === 'opening'
+        ? [
+            ['-y', '-i', videoPath, '-vf', 'select=eq(n\\,0)', '-frames:v', '1', '-q:v', '2', outPath],
+            ['-y', '-ss', '0.5', '-i', videoPath, '-frames:v', '1', '-q:v', '2', outPath],
+          ]
+        : [
+            ['-y', '-sseof', '-0.15', '-i', videoPath, '-frames:v', '1', '-q:v', '2', outPath],
+            ['-y', '-i', videoPath, '-vf', 'select=eq(n\\,0)', '-frames:v', '1', '-q:v', '2', outPath],
+          ]
+    let lastErr = mode === 'opening' ? 'ffmpeg 截取首帧失败' : 'ffmpeg 截取尾帧失败'
     for (const args of attempts) {
       const r = runFfmpeg(ffmpeg, args)
       if (r.ok && fs.existsSync(outPath) && fs.statSync(outPath).size > 256) {
@@ -212,19 +221,26 @@ export async function extractLastFrameJpegFromBuffer(
     }
     return { ok: false, message: lastErr }
   } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : '截取尾帧异常' }
+    return { ok: false, message: e instanceof Error ? e.message : '截取采样帧异常' }
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true })
   }
 }
 
+/** 从本地 MP4 buffer 截取接近结尾的一帧（JPEG），供长视频分段衔接 */
+export async function extractLastFrameJpegFromBuffer(
+  videoBuf: Buffer,
+): Promise<{ ok: true; buffer: Buffer } | { ok: false; message: string }> {
+  return extractSampleFrameJpegFromBuffer(videoBuf, 'last')
+}
+
 export async function extractLastFrameJpegFromUrl(
   urlStr: string,
-  opts?: { bearer?: string },
+  opts?: { bearer?: string; frame?: VideoSampleFrameMode },
 ): Promise<{ ok: true; buffer: Buffer } | { ok: false; message: string }> {
   const fetched = await fetchRemoteVideoBuffer(urlStr, opts)
   if (!fetched.ok) return fetched
-  return extractLastFrameJpegFromBuffer(fetched.buffer)
+  return extractSampleFrameJpegFromBuffer(fetched.buffer, opts?.frame ?? 'last')
 }
 
 export type ComplianceSampleFrameSlot = 'opening' | 'middle' | 'closing'
