@@ -151,6 +151,48 @@ export function toIceTimelineOssUrl(url: string): string {
   return ensureIceHttpsUrl(trimmed)
 }
 
+/** 混剪/云剪提交前：去掉 ?Signature= 等查询参数，转为 ICE 可读的 OSS 直链 */
+export function sanitizeIcePipelineMediaUrl(mediaUrl: string, signedMediaUrl?: string): string {
+  const raw = String(mediaUrl || '').trim()
+  const signed = String(signedMediaUrl || '').trim()
+  const pick = raw || signed
+  if (!pick) return pick
+  if (/[?#]/i.test(pick)) {
+    try {
+      const u = new URL(pick.includes('://') ? pick : `https://${pick}`)
+      if (/^([^.]+)\.oss-[a-z0-9-]+\.aliyuncs\.com$/i.test(u.hostname)) {
+        u.search = ''
+        u.hash = ''
+        return ensureIceHttpsUrl(u.toString())
+      }
+    } catch {
+      /* fall through */
+    }
+    const bare = pick.split('?')[0]!.split('#')[0]!
+    if (/\.oss-[a-z0-9-]+\.aliyuncs\.com\//i.test(bare)) {
+      return toIceTimelineOssUrl(bare)
+    }
+  }
+  return toIceTimelineOssUrl(pick)
+}
+
+export function validateIcePipelineMediaUrl(url: string): string | null {
+  const raw = String(url || '').trim()
+  if (!raw) return '素材地址为空'
+  if (/localhost|127\.0\.0\.1|blob:/i.test(raw)) {
+    return '素材须为 OSS 地址，请使用「本地上传」'
+  }
+  if (/[?#].*signature/i.test(raw)) {
+    return '勿使用带 ?Signature= 的签名链接，请重新本地上传'
+  }
+  const oss = sanitizeIcePipelineMediaUrl(raw)
+  if (raw.startsWith('oss://') || ICE_OSS_HTTPS_RE.test(oss)) return null
+  if (/^https?:\/\//i.test(raw)) {
+    return '须为阿里云 OSS 直链（本地上传后系统自动生成），勿粘贴外链'
+  }
+  return '素材地址无效，请重新本地上传'
+}
+
 export function buildIceCanonicalOssUrl(prefix: ParsedOssPrefix, objectKey: string): string {
   const key = objectKey.replace(/^\/+/, '')
   return ensureIceHttpsUrl(`https://${prefix.bucket}.oss-${prefix.region}.aliyuncs.com/${key}`)

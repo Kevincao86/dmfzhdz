@@ -23,7 +23,7 @@ import { isIceTransientNetworkError } from '../src/lib/iceTransientNetworkError.
 import { clampMixSourceInSec } from '../src/lib/iceMixPlan.js'
 
 export { isIceTransientNetworkError }
-import { ensureIceHttpsUrl, isIceVodOutinBucket, toIceTimelineOssUrl, validateIcePipelineImageUrl } from './aliyunOssIceParse.js'
+import { ensureIceHttpsUrl, isIceVodOutinBucket, toIceTimelineOssUrl, validateIcePipelineImageUrl, sanitizeIcePipelineMediaUrl } from './aliyunOssIceParse.js'
 
 export { ICE_EFFECT_PRESETS } from './iceEffectPresets.js'
 
@@ -633,8 +633,19 @@ async function registerImageUrlToMediaId(
   cfg: AliyunIceConfig,
   imageUrl: string,
   title: string,
+  signedMediaUrl?: string,
 ): Promise<{ ok: true; mediaId: string } | { ok: false; message: string }> {
-  return registerMediaUrlToMediaId(client, cfg, imageUrl, title, 'image')
+  const pipelineUrl = sanitizeIcePipelineMediaUrl(imageUrl, signedMediaUrl)
+  const reg = await registerMediaUrlToMediaId(client, cfg, pipelineUrl, title, 'image')
+  if (reg.ok) return reg
+  const fetchUrl =
+    signedMediaUrl?.trim() && /^https?:\/\//i.test(signedMediaUrl.trim())
+      ? signedMediaUrl.trim()
+      : pipelineUrl
+  if (/^https?:\/\//i.test(fetchUrl)) {
+    return uploadUrlToMediaId(client, cfg, fetchUrl, title)
+  }
+  return reg
 }
 
 function isIceOssHttpsUrl(url: string): boolean {
@@ -678,7 +689,8 @@ async function ingestVideoUrlToMediaId(
   signedMediaUrl: string | undefined,
   title: string,
 ): Promise<{ ok: true; mediaId: string; sourceDurationSec?: number } | { ok: false; message: string }> {
-  const trimmed = mediaUrl.trim()
+  const pipelineUrl = sanitizeIcePipelineMediaUrl(mediaUrl, signedMediaUrl)
+  const trimmed = pipelineUrl.trim()
   const ossCandidate = isIceOssHttpsUrl(trimmed) || trimmed.startsWith('oss://')
 
   if (ossCandidate) {
@@ -1166,7 +1178,11 @@ export async function iceRunMixPipeline(
   >()
 
   for (let i = 0; i < input.segments.length; i++) {
-    const seg = input.segments[i]!
+    const segRaw = input.segments[i]!
+    const seg = {
+      ...segRaw,
+      mediaUrl: sanitizeIcePipelineMediaUrl(segRaw.mediaUrl, segRaw.signedMediaUrl),
+    }
     const matNo = (seg.materialIndex ?? i) + 1
     const title = `${input.projectName}-素材${matNo}`.slice(0, 120)
     const cacheKey = `${seg.kind}:${(seg.mediaUrl || seg.signedMediaUrl || '').trim()}`
@@ -1183,7 +1199,13 @@ export async function iceRunMixPipeline(
         })
         continue
       }
-      const up = await registerImageUrlToMediaId(client, cfg, seg.mediaUrl, title)
+      const up = await registerImageUrlToMediaId(
+        client,
+        cfg,
+        seg.mediaUrl,
+        title,
+        seg.signedMediaUrl,
+      )
       if (!up.ok) {
         return { ok: false, message: `第 ${i + 1} 段图片入库失败：${up.message}`, step: 'upload_media' }
       }
@@ -1294,16 +1316,32 @@ export async function iceRunMixPipeline(
 
   let finalPlan = plan
   const narrationText = String(input.mixNarrationText ?? '').trim()
-  if (narrationText.length >= 4) {
-    finalPlan = {
-      ...plan,
-      mixAiTtsClip: {
-        content: narrationText,
-        timelineIn: 0,
-        timelineOut: input.totalDurationSec,
-        voice: 'zhixiaobai',
-      },
-      summary: `${plan.summary}${plan.summary ? ' · ' : ''}ICE AI_TTS 口播`,
+  if (narrationText.length >= 4 && input.env) {
+    const { synthesizeIceMixNarrationMp3 } = await import('./iceMixNarrationTts.js')
+    const tts = await synthesizeIceMixNarrationMp3(cfg, input.env, narrationText)
+    if (tts.ok) {
+      finalPlan = {
+        ...plan,
+        mixAiTtsClip: undefined,
+        narrationClip: {
+          mediaUrl: tts.timelineUrl,
+          timelineIn: 0,
+          timelineOut: input.totalDurationSec,
+          volume: 1,
+          label: '混剪 TTS 口播',
+        },
+        summary: `${plan.summary}${plan.summary ? ' · ' : ''}CosyVoice 口播`,
+      }
+    } else {
+      finalPlan = {
+        ...plan,
+        mixAiTtsClip: {
+          content: narrationText,
+          timelineIn: 0,
+          timelineOut: input.totalDurationSec,
+        },
+        summary: `${plan.summary}${plan.summary ? ' · ' : ''}ICE AI_TTS 口播（TTS 合成回退）`,
+      }
     }
   }
 

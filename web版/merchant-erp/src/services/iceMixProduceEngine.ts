@@ -5,6 +5,7 @@
 import { postAiChat } from './ai/aiClient'
 import { collectMixMaterialFramesForEditPlan } from './iceMixMaterialFrames'
 import type { IceMixMaterialProfile } from './iceMixEditPlanAi'
+import { validateIceMixMaterialUrl, sanitizeIceMixMaterialUrlForPipeline } from '../lib/icePipelineImageUrl'
 import type { IceMixMaterialSlot, IceMixSegmentPlan } from '../lib/iceMixPlan'
 import {
   assignMixMaterialSlots,
@@ -154,7 +155,7 @@ export function buildIceMixSegmentsFromSlots(
 
     segments.push({
       kind: mat.kind,
-      mediaUrl: mat.mediaUrl,
+      mediaUrl: sanitizeIceMixMaterialUrlForPipeline(mat.mediaUrl || mat.signedMediaUrl || ''),
       signedMediaUrl: mat.signedMediaUrl,
       materialIndex: matIdx,
       timelineStartSec: timelineStart,
@@ -282,6 +283,17 @@ export async function produceIceMixPackage(
   const materials = input.materials
   if (materials.length === 0) return { ok: false, message: '无可用素材' }
   if (input.rows.length < 2) return { ok: false, message: '分镜至少 2 段' }
+
+  for (let mi = 0; mi < materials.length; mi++) {
+    const mat = materials[mi]!
+    const urlErr = validateIceMixMaterialUrl(mat.mediaUrl || mat.signedMediaUrl || '')
+    if (urlErr) {
+      return {
+        ok: false,
+        message: `素材${mi + 1}（${mat.label}）不可用：${urlErr}`,
+      }
+    }
+  }
 
   input.onProgress?.('正在规划多素材拼接与截取点…')
   const total = resolveMixTotalDurationSec(input.rows, input.targetTotalSec)

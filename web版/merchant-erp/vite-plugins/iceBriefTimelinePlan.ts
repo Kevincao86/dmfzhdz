@@ -448,7 +448,7 @@ export function enhanceIceMixBriefPlan(
 export function buildSubtitleTracksFromPlan(
   plan: IceBriefTimelinePlan,
 ): { SubtitleTracks: Array<{ SubtitleTrackClips: Record<string, unknown>[] }> } | Record<string, never> {
-  if (plan.mixAiTtsClip && plan.segmentCaptions.length > 0) {
+  if ((plan.mixAiTtsClip || plan.narrationClip) && plan.segmentCaptions.length > 0) {
     return buildMixAnimatedSubtitleTracks(plan.segmentCaptions, plan.subtitleStyleId)
   }
   const clips: Record<string, unknown>[] = []
