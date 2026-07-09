@@ -1,43 +1,87 @@
-<view class="xingxuan-page {{lqThemeClass}}">
-  <view class="xingxuan-card">
-    <text class="xingxuan-title">关注服务号收邀约</text>
-    <text class="xingxuan-hint">
-      绑定微信服务号「{{oaDisplayName}}」后，PR 定向合作邀约将推送到服务号消息，无需每次授权订阅消息。
-    </text>
+<view class="oa-bind-page {{lqThemeClass}}">
+  <view class="oa-bind-hero">
+    <view class="oa-bind-hero__badge">微信服务号</view>
+    <text class="oa-bind-hero__title">定向邀约通知</text>
+    <text class="oa-bind-hero__sub">绑定「{{oaDisplayName}}」后，PR 定向合作邀约将推送到服务号消息，无需每次授权订阅消息。</text>
   </view>
 
-  <view wx:if="{{loading}}" class="addon-hint" style="margin:24rpx;">加载中…</view>
-
-  <view class="xingxuan-card" wx:elif="{{bound}}">
-    <text class="xingxuan-title" style="color:#059669;">已绑定服务号</text>
-    <text class="xingxuan-hint">定向邀约将推送到「{{oaDisplayName}}」服务号，您也可在「我的邀约」中查看。</text>
-    <text class="xingxuan-hint" wx:if="{{boundAt}}">绑定时间：{{boundAt}}</text>
+  <view wx:if="{{loading}}" class="oa-bind-card oa-bind-card--center">
+    <text class="oa-bind-muted">加载绑定状态…</text>
   </view>
 
-  <view class="xingxuan-card" wx:else>
-    <text class="field-label">步骤</text>
-    <text class="xingxuan-hint">1. 点击下方按钮获取专属二维码</text>
-    <text class="xingxuan-hint">2. 长按识别二维码并关注服务号</text>
-    <text class="xingxuan-hint">3. 关注成功后本页将自动显示「已绑定」</text>
+  <view wx:elif="{{needLogin}}" class="oa-bind-card">
+    <text class="oa-bind-card__title">请先登录</text>
+    <text class="oa-bind-card__desc">登录并完成达人资料后，即可绑定服务号接收邀约通知。</text>
+    <button class="oa-bind-btn oa-bind-btn--primary" bindtap="onGoLogin">去登录</button>
+  </view>
 
-    <button
-      class="xingxuan-btn xingxuan-btn--primary save-btn"
-      loading="{{creating}}"
-      bindtap="onCreateQr"
-    >获取关注二维码</button>
+  <view wx:elif="{{needProfile}}" class="oa-bind-card">
+    <text class="oa-bind-card__title">请先完善达人资料</text>
+    <text class="oa-bind-card__desc">绑定服务号需要关联您的达人账号，请先在「我的信息」保存资料。</text>
+    <button class="oa-bind-btn oa-bind-btn--primary" bindtap="onGoProfile">去完善资料</button>
+  </view>
 
-    <view wx:if="{{qrUrl}}" class="oa-qr-wrap">
-      <image
-        class="oa-qr-img"
-        src="{{qrUrl}}"
-        mode="aspectFit"
-        show-menu-by-longpress="{{true}}"
-        bindtap="onPreviewQr"
-        bindlongpress="onLongPressQr"
-      />
-      <text class="xingxuan-hint">长按识别二维码关注{{oaDisplayName}}</text>
-      <text class="xingxuan-hint" wx:if="{{expiresAt}}">二维码有效期至 {{expiresAt}}</text>
-      <text class="xingxuan-hint" wx:if="{{polling}}">等待关注确认中…</text>
+  <view wx:elif="{{bound}}" class="oa-bind-card oa-bind-card--success">
+    <view class="oa-bind-success-icon">✓</view>
+    <text class="oa-bind-card__title oa-bind-card__title--success">已绑定服务号</text>
+    <text class="oa-bind-card__desc">定向邀约将推送到「{{oaDisplayName}}」服务号，您也可在「我的邀约」中查看。</text>
+    <text class="oa-bind-muted" wx:if="{{boundAt}}">绑定时间：{{boundAt}}</text>
+    <button class="oa-bind-btn oa-bind-btn--ghost" bindtap="onGoInvites">查看我的邀约</button>
+  </view>
+
+  <block wx:else>
+    <view class="oa-bind-card">
+      <text class="oa-bind-card__title">绑定步骤</text>
+      <view class="oa-bind-steps">
+        <view class="oa-bind-step">
+          <view class="oa-bind-step__num">1</view>
+          <view class="oa-bind-step__body">
+            <text class="oa-bind-step__title">获取专属二维码</text>
+            <text class="oa-bind-step__desc">点击下方按钮，生成与您账号关联的关注码</text>
+          </view>
+        </view>
+        <view class="oa-bind-step">
+          <view class="oa-bind-step__num">2</view>
+          <view class="oa-bind-step__body">
+            <text class="oa-bind-step__title">长按识别并关注</text>
+            <text class="oa-bind-step__desc">在微信中关注「{{oaDisplayName}}」服务号</text>
+          </view>
+        </view>
+        <view class="oa-bind-step">
+          <view class="oa-bind-step__num">3</view>
+          <view class="oa-bind-step__body">
+            <text class="oa-bind-step__title">自动完成绑定</text>
+            <text class="oa-bind-step__desc">关注成功后，本页将显示「已绑定」</text>
+          </view>
+        </view>
+      </view>
+
+      <button
+        class="oa-bind-btn oa-bind-btn--primary"
+        loading="{{creating}}"
+        disabled="{{creating}}"
+        bindtap="onCreateQr"
+      >{{qrUrl ? '重新获取二维码' : '获取关注二维码'}}</button>
     </view>
-  </view>
+
+    <view wx:if="{{qrUrl}}" class="oa-bind-card oa-bind-card--qr">
+      <text class="oa-bind-card__title">扫码关注</text>
+      <view class="oa-bind-qr-frame">
+        <image
+          class="oa-bind-qr-img"
+          src="{{qrUrl}}"
+          mode="aspectFit"
+          show-menu-by-longpress="{{true}}"
+          bindtap="onPreviewQr"
+          bindlongpress="onLongPressQr"
+        />
+      </view>
+      <text class="oa-bind-card__desc oa-bind-card__desc--center">长按识别二维码，关注「{{oaDisplayName}}」</text>
+      <text class="oa-bind-muted oa-bind-muted--center" wx:if="{{expiresAt}}">有效期至 {{expiresAt}}</text>
+      <view wx:if="{{polling}}" class="oa-bind-polling">
+        <view class="oa-bind-polling__dot"></view>
+        <text>等待关注确认中…</text>
+      </view>
+    </view>
+  </block>
 </view>

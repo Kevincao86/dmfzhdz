@@ -43,6 +43,9 @@ const ZH = {
   insufficient_points: '积分不足，请先充值或等待下月赠送积分到账',
   profile_parse_failed: '未能从主页解析资料，请复制完整分享口令或手动填写',
   profile_parse_error: '主页解析失败，请稍后重试或手动填写',
+  unauthorized: '请先登录后再操作',
+  member_not_found: '未找到达人资料，请先在「我的信息」完善并保存',
+  wx_oa_not_configured: '服务号通知暂未开通，请联系管理员',
 }
 
 function formatMpApiErr(e, fallback) {

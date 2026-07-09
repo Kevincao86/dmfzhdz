@@ -38,7 +38,12 @@ function pruneTickets(data: RegistrySnapshot): RegistryMpWechatOaBindTicket[] {
 function findMember(data: RegistrySnapshot, talentMemberId: string): RegistryMpTalentMember | null {
   const id = String(talentMemberId || '').trim()
   if (!id) return null
-  return (data.mpTalentMembers ?? []).find((m) => m && String(m.id) === id) || null
+  for (const m of data.mpTalentMembers ?? []) {
+    if (!m) continue
+    if (String(m.id) === id) return m
+    if (m.lingqiTalentId && String(m.lingqiTalentId) === id) return m
+  }
+  return null
 }
 
 export function oaOpenIdForTalentMember(data: RegistrySnapshot, talentMemberId: string): string {
