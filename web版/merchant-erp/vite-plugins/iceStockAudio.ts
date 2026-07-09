@@ -1,6 +1,6 @@
 import type { AliyunIceConfig } from './aliyunIceCore.js'
 import type { IceAudioClipPlan, IceBriefTimelinePlan } from './iceBriefTimelinePlan.js'
-import { ICE_PUBLIC_BGM_URLS, ICE_PUBLIC_SFX_URL } from './iceBriefTimelinePlan.js'
+import { ICE_PUBLIC_BGM_URLS } from './iceBriefTimelinePlan.js'
 import { buildIceCanonicalOssUrl, parseOssUrlPrefix } from './aliyunOssIceParse.js'
 
 export function merchantIceStockAudioBase(cfg?: AliyunIceConfig): string | null {
