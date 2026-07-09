@@ -121,3 +121,53 @@ export async function spendMpBriefPoints(opts?: {
     already: data.already === true,
   }
 }
+
+/** 混剪「AI 分析素材」前校验积分（15 积分/次） */
+export async function checkMpMixMaterialAnalyzeAffordable(): Promise<MpBriefAffordResult> {
+  const token = readMpSessionToken()
+  if (!token) {
+    return { ok: false, message: '请先登录后再使用 AI 分析素材', error: 'login_required' }
+  }
+  const billingRole = readMpBillingRoleHint()
+  const res = await postMpAuthActionRaw({
+    action: 'mp_ai_points_afford',
+    kind: 'mix_material_analyze',
+    ...(billingRole ? { billingRole } : {}),
+  })
+  if (res.ok) {
+    return {
+      ok: true,
+      balance: Math.max(0, Math.floor(Number(res.data.mpAiPointsBalance) || 0)),
+      required: Math.max(0, Math.floor(Number(res.data.pointsRequired) || 0)),
+    }
+  }
+  return {
+    ok: false,
+    message: String(res.data.message || res.data.error || '积分不足'),
+    error: String(res.data.error || ''),
+    balance: res.data.balance != null ? Math.floor(Number(res.data.balance)) : undefined,
+    required: res.data.required != null ? Math.floor(Number(res.data.required)) : undefined,
+  }
+}
+
+/** 混剪「AI 分析素材」成功后扣减积分（15 积分/次） */
+export async function spendMpMixMaterialAnalyzePoints(opts?: {
+  idempotencyKey?: string
+  note?: string
+}): Promise<MpBriefPointsSpendResult | null> {
+  const token = readMpSessionToken()
+  if (!token) return null
+  const billingRole = readMpBillingRoleHint()
+  const data = await postMpAuthAction({
+    action: 'mp_ai_points_spend',
+    kind: 'mix_material_analyze',
+    idempotencyKey: opts?.idempotencyKey?.trim() || undefined,
+    note: opts?.note?.trim() || undefined,
+    ...(billingRole ? { billingRole } : {}),
+  })
+  return {
+    pointsCharged: Math.max(0, Math.floor(Number(data.pointsCharged) || 0)),
+    balance: Math.max(0, Math.floor(Number(data.mpAiPointsBalance) || 0)),
+    already: data.already === true,
+  }
+}

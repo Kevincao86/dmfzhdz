@@ -8,8 +8,8 @@ import type { MpLibraryRole, MpMembershipTier } from './mpMembershipCatalog.js'
 export const MP_POINTS_VIDEO_PER_SEC = 2
 export const MP_POINTS_VIDEO_PER_MIN = MP_POINTS_VIDEO_PER_SEC * 60
 
-/** 短视频 AI 处理（Seedance 成片）：22 积分/秒 */
-export const MP_POINTS_SHORTVIDEO_PER_SEC = 22
+/** 短视频 AI 处理（即梦成片）：80 积分/秒 */
+export const MP_POINTS_SHORTVIDEO_PER_SEC = 80
 
 /** 数字人口播（Seedance 分段 i2v）：28 积分/秒 */
 export const MP_POINTS_DIGITAL_HUMAN_PER_SEC = 28
@@ -17,8 +17,14 @@ export const MP_POINTS_DIGITAL_HUMAN_PER_SEC = 28
 /** 灵祺 AI 云剪（ICE 合成）：8 积分/秒 */
 export const MP_POINTS_CLOUD_EDIT_PER_SEC = 8
 
-/** 短视频 / 数字人成片最低扣费（约 5 秒） */
-export const MP_POINTS_ADDON_VIDEO_MIN_CHARGE = 110
+/** 短视频 AI 成片最低扣费（约 5 秒，80 积分/秒） */
+export const MP_POINTS_SHORTVIDEO_MIN_CHARGE = 400
+
+/** 数字人成片最低扣费（约 5 秒） */
+export const MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE = 110
+
+/** @deprecated 请用 MP_POINTS_SHORTVIDEO_MIN_CHARGE / MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE */
+export const MP_POINTS_ADDON_VIDEO_MIN_CHARGE = MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE
 
 /** 云剪成片最低扣费（默认 10 秒档） */
 export const MP_POINTS_CLOUD_EDIT_MIN_CHARGE = 80
@@ -28,6 +34,9 @@ export const MP_POINTS_ARTICLE_PER_USE = 2
 
 /** AI 爆款 Brief 生成：8 积分/篇（含正文生成 + 外网案例检索） */
 export const MP_POINTS_BRIEF_PER_USE = 8
+
+/** AI 混剪素材分析：15 积分/次（多模态采样 + 指导文案生成） */
+export const MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE = 15
 
 /** 单积分内部 API 成本（元），用于 50% 毛利反推赠送积分 */
 export const MP_POINT_INTERNAL_COST_YUAN = 0.01
@@ -45,6 +54,7 @@ export type MpPointsUsageKind =
   | 'video'
   | 'article'
   | 'brief'
+  | 'mix_material_analyze'
   | 'shortvideo'
   | 'cloud_edit'
   | 'digital_human'
@@ -53,6 +63,7 @@ export const MP_POINTS_USAGE_KIND_LABELS: Record<MpPointsUsageKind, string> = {
   video: '短视频 AI 检核',
   article: '文稿 AI 检核',
   brief: 'AI爆款Brief生成',
+  mix_material_analyze: 'AI 混剪素材分析',
   shortvideo: '短视频 AI 处理',
   cloud_edit: '灵祺 AI 云剪',
   digital_human: '数字人口播',
@@ -85,6 +96,7 @@ export function parseMpPointsUsageKind(raw: unknown): MpPointsUsageKind | null {
     k === 'video' ||
     k === 'article' ||
     k === 'brief' ||
+    k === 'mix_material_analyze' ||
     k === 'shortvideo' ||
     k === 'cloud_edit' ||
     k === 'digital_human'
@@ -97,6 +109,7 @@ export function parseMpPointsUsageKind(raw: unknown): MpPointsUsageKind | null {
 export function formatMpPointsRateLabel(kind: MpPointsUsageKind): string {
   if (kind === 'article') return `${MP_POINTS_ARTICLE_PER_USE} 积分/次`
   if (kind === 'brief') return `${MP_POINTS_BRIEF_PER_USE} 积分/篇`
+  if (kind === 'mix_material_analyze') return `${MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE} 积分/次`
   const rate = mpPointsPerSecForKind(kind)
   if (rate != null) return `${rate} 积分/秒（${rate * 60} 积分/分钟）`
   return '按积分扣费'
@@ -107,7 +120,11 @@ function mpPointsCostForAddonDuration(kind: 'shortvideo' | 'cloud_edit' | 'digit
   const rate = mpPointsPerSecForKind(kind) ?? 0
   const raw = sec * rate
   const min =
-    kind === 'cloud_edit' ? MP_POINTS_CLOUD_EDIT_MIN_CHARGE : MP_POINTS_ADDON_VIDEO_MIN_CHARGE
+    kind === 'cloud_edit'
+      ? MP_POINTS_CLOUD_EDIT_MIN_CHARGE
+      : kind === 'shortvideo'
+        ? MP_POINTS_SHORTVIDEO_MIN_CHARGE
+        : MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE
   return Math.max(min, raw)
 }
 
@@ -120,6 +137,7 @@ export function mpPointsCostForUsage(kind: MpPointsUsageKind, opts?: { durationS
     return sec * MP_POINTS_VIDEO_PER_SEC
   }
   if (kind === 'brief') return MP_POINTS_BRIEF_PER_USE
+  if (kind === 'mix_material_analyze') return MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE
   return MP_POINTS_ARTICLE_PER_USE
 }
 
@@ -256,7 +274,11 @@ export function formatComplianceBillingSuffix(res: {
   if (!res) return ''
   const pts = Number(res.pointsCharged)
   if (!Number.isFinite(pts) || pts <= 0) return ''
-  if (res.billingKind === 'article' || res.billingKind === 'brief') {
+  if (
+    res.billingKind === 'article' ||
+    res.billingKind === 'brief' ||
+    res.billingKind === 'mix_material_analyze'
+  ) {
     return ` · 消耗 ${pts} 积分`
   }
   if (

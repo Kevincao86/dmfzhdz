@@ -10,6 +10,7 @@ import {
   Link2,
   Loader2,
   Plus,
+  ScanEye,
   Trash2,
   Upload,
   Wand2,
@@ -51,10 +52,16 @@ import {
   formatMpAddonPointsSpendHint,
   spendMpAddonPoints,
 } from '../services/mpAddonPointsSpendClient'
+import {
+  checkMpMixMaterialAnalyzeAffordable,
+  spendMpMixMaterialAnalyzePoints,
+} from '../services/mpAiPointsSpendClient'
+import { MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE } from '../lib/mpPointsEconomics'
 import { isIceTransientNetworkError } from '../lib/iceTransientNetworkError'
 import ShortVideoScriptTableEditor from './ShortVideoScriptTableEditor'
 import { parseGuidanceDocumentFile } from '../lib/shortVideoGuidanceDoc'
 import { planShortVideoScriptFromGuidance } from '../services/shortVideoGuidanceAi'
+import { analyzeIceMixMaterialsToGuidance } from '../services/iceMixGuidanceAi'
 import {
   buildIceMixSegmentsFromScript,
   composeMixEditBrief,
@@ -206,6 +213,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   )
   const [materialSlots, setMaterialSlots] = useState<number[]>([])
   const [planBusy, setPlanBusy] = useState(false)
+  const [analyzeBusy, setAnalyzeBusy] = useState(false)
   const [mixTransitionMode, setMixTransitionMode] = useState<'auto' | string>('auto')
   const [mixSubtitleStyleId, setMixSubtitleStyleId] = useState(ICE_SUBTITLE_STYLE_DEFAULT_ID)
   const mixDocInputRef = useRef<HTMLInputElement>(null)
@@ -265,6 +273,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     [clipEndSec],
   )
   const mediaBusy = videoUploading || imageUploading
+  const guidanceBusy = planBusy || analyzeBusy
   const anyBusy = oneClickBusy
 
   const mixMaterialPool = useMemo((): IceMixMaterialSlot[] => {
@@ -634,6 +643,59 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       if (mixDocInputRef.current) mixDocInputRef.current.value = ''
     }
   }, [])
+
+  const runAnalyzeMixMaterials = useCallback(async () => {
+    if (mixMaterialPool.length === 0) {
+      setErr('请先上传至少一条视频或一张图片素材。')
+      return
+    }
+    const afford = await checkMpMixMaterialAnalyzeAffordable()
+    if (!afford.ok) {
+      setErr(afford.message)
+      return
+    }
+    const genKey = `mix-analyze-${Date.now()}`
+    setAnalyzeBusy(true)
+    setErr(null)
+    setHint('AI 正在分析素材画面…')
+    try {
+      const r = await analyzeIceMixMaterialsToGuidance({
+        materials: mixMaterialPool,
+        targetTotalSec: mixTargetSec,
+        aspectLabel: aspect.label,
+        userHint: mixGuidance.trim() || undefined,
+        onProgress: (msg) => setHint(msg),
+      })
+      if (!r.ok) {
+        setErr(r.message)
+        return
+      }
+      setMixGuidance(r.guidance)
+      setHint('分析完成，正在扣减积分…')
+      try {
+        const spend = await spendMpMixMaterialAnalyzePoints({
+          idempotencyKey: genKey,
+          note: `mix_material_analyze:${mixMaterialPool.length}素材`,
+        })
+        if (spend && spend.pointsCharged > 0) {
+          setHint(
+            `AI 已生成指导文案（已扣 ${spend.pointsCharged} 积分，余额 ${spend.balance.toLocaleString('zh-CN')}），可继续点击「AI 规划分镜」。`,
+          )
+        } else if (spend?.already) {
+          setHint('AI 已生成指导文案（积分已扣减），可继续点击「AI 规划分镜」。')
+        } else {
+          setHint('AI 已根据素材生成指导文案，可继续点击「AI 规划分镜」自动填入分镜表。')
+        }
+      } catch (spendErr) {
+        const msg = spendErr instanceof Error ? spendErr.message : String(spendErr)
+        setHint(`AI 已生成指导文案，但积分扣减失败：${msg}`)
+      }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'AI 分析素材失败，请稍后重试')
+    } finally {
+      setAnalyzeBusy(false)
+    }
+  }, [mixMaterialPool, mixTargetSec, aspect.label, mixGuidance])
 
   const runPlanMixScript = useCallback(async () => {
     const draft = mixGuidance.trim()
@@ -1356,7 +1418,8 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   指导文案与混剪分镜
                 </h3>
                 <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
-                  填写指导文案 → AI 规划分镜 → 核对表格与素材映射 → 一键混剪。
+                  上传素材后点「AI 分析素材」自动生成指导文案（{MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE}{' '}
+                  积分/次，分析成功后扣减），或手动填写 → AI 规划分镜 → 一键混剪。
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -1369,7 +1432,20 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 />
                 <button
                   type="button"
-                  disabled={anyBusy || planBusy}
+                  disabled={anyBusy || guidanceBusy || mixMaterialPool.length < 1}
+                  onClick={() => void runAnalyzeMixMaterials()}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-900 hover:bg-violet-100 disabled:opacity-50"
+                >
+                  {analyzeBusy ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <ScanEye className="h-3.5 w-3.5" />
+                  )}
+                  AI 分析素材
+                </button>
+                <button
+                  type="button"
+                  disabled={anyBusy || guidanceBusy}
                   onClick={() => mixDocInputRef.current?.click()}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
                 >
@@ -1378,7 +1454,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 </button>
                 <button
                   type="button"
-                  disabled={anyBusy || planBusy || mixGuidance.trim().length < 4}
+                  disabled={anyBusy || guidanceBusy || mixGuidance.trim().length < 4}
                   onClick={() => void runPlanMixScript()}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-900 hover:bg-orange-100 disabled:opacity-50"
                 >
@@ -1397,7 +1473,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   <span>目标总时长</span>
                   <select
                     value={mixTargetSec}
-                    disabled={anyBusy || planBusy}
+                    disabled={anyBusy || guidanceBusy}
                     onChange={(e) => {
                       const sec = Number(e.target.value)
                       setMixTargetSec(sec)
@@ -1421,7 +1497,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   <span>画幅</span>
                   <select
                     value={aspectId}
-                    disabled={anyBusy || planBusy}
+                    disabled={anyBusy || guidanceBusy}
                     onChange={(e) => setAspectId(e.target.value as typeof aspectId)}
                     className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
                   >
@@ -1436,7 +1512,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   <span>字幕样式</span>
                   <select
                     value={mixSubtitleStyleId}
-                    disabled={anyBusy || planBusy}
+                    disabled={anyBusy || guidanceBusy}
                     onChange={(e) => setMixSubtitleStyleId(e.target.value)}
                     className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
                   >
@@ -1452,7 +1528,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   <span>场景转场</span>
                   <select
                     value={mixTransitionMode}
-                    disabled={anyBusy || planBusy}
+                    disabled={anyBusy || guidanceBusy}
                     onChange={(e) => setMixTransitionMode(e.target.value)}
                     className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
                   >
@@ -1482,9 +1558,9 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               <textarea
                 spellCheck={false}
                 value={mixGuidance}
-                disabled={anyBusy || planBusy}
+                disabled={anyBusy || guidanceBusy}
                 onChange={(e) => setMixGuidance(e.target.value)}
-                placeholder="输入商业创意、卖点、场景与叙事意图；可上传 Word/txt。点击「AI 规划分镜」自动拆成时间段、画面指令与口播文案。"
+                placeholder="输入商业创意、卖点、场景与叙事意图；可点「AI 分析素材」自动填写，或上传 Word/txt。再点「AI 规划分镜」拆成时间段与口播。"
                 className="min-h-[96px] w-full resize-y rounded-lg border border-zinc-300 px-3 py-2.5 text-sm outline-none ring-orange-600/30 focus-visible:ring-2"
               />
               <div>
@@ -1495,7 +1571,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 <div className="mt-2">
                   <ShortVideoScriptTableEditor
                     rows={scriptRows}
-                    disabled={anyBusy || planBusy}
+                    disabled={anyBusy || guidanceBusy}
                     onChange={setScriptRows}
                   />
                 </div>
@@ -1507,7 +1583,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                         <span className="w-24 shrink-0 truncate">{row.timeRange || `段 ${i + 1}`}</span>
                         <select
                           value={materialSlots[i] ?? i % mixMaterialPool.length}
-                          disabled={anyBusy || planBusy}
+                          disabled={anyBusy || guidanceBusy}
                           onChange={(e) => {
                             const idx = Number(e.target.value)
                             setMaterialSlots((prev) => {
@@ -1531,7 +1607,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               </div>
               <button
                 type="button"
-                disabled={!mixReady || oneClickBusy || mediaBusy || planBusy}
+                disabled={!mixReady || oneClickBusy || mediaBusy || guidanceBusy}
                 onClick={() => void runMixOneClick()}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-orange-300 sm:w-auto"
               >
@@ -1541,7 +1617,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               <p className="text-xs text-zinc-500">
                 字幕样式与转场将写入云端时间线；口播文案仍来自指导文案 + 分镜表。
               </p>
-              {!mixReady && mixBlockers.length > 0 && !oneClickBusy && !planBusy ? (
+              {!mixReady && mixBlockers.length > 0 && !oneClickBusy && !guidanceBusy ? (
                 <p className="flex items-start gap-1.5 text-xs text-amber-800">
                   <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                   暂不可混剪：{mixBlockers.join('；')}
