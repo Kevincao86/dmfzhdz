@@ -53,7 +53,7 @@ import {
   spendMpAddonPoints,
 } from '../services/mpAddonPointsSpendClient'
 import { checkMixMaterialAnalyzeAffordable, spendMixMaterialAnalyzePoints } from '../services/mpAiPointsSpendClient'
-import { isIceTransientNetworkError } from '../lib/iceTransientNetworkError'
+import { validateIceMixMaterialUrl } from '../lib/icePipelineImageUrl'
 import ShortVideoScriptTableEditor from './ShortVideoScriptTableEditor'
 import { parseGuidanceDocumentFile } from '../lib/shortVideoGuidanceDoc'
 import { planShortVideoScriptFromGuidance } from '../services/shortVideoGuidanceAi'
@@ -361,6 +361,13 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     const urls = parseUrlLines(urlText)
     if (urls.length === 0) {
       setErr('请粘贴至少一条公网可访问的 https 音视频地址')
+      return
+    }
+    const bad = urls.find((u) => validateIceMixMaterialUrl(u))
+    if (bad) {
+      setErr(
+        '混剪须使用本地上传的 OSS 素材，勿粘贴带签名或外链 URL。请点「本地上传」添加素材。',
+      )
       return
     }
     setErr(null)

@@ -26,7 +26,7 @@ import {
   readAliyunIceConfigFromEnv,
   type AliyunIceConfig,
 } from './aliyunIceCore.js'
-import { describeIceUploadBucketSelection, iceOssUploadAvailable } from './aliyunOssIceParse.js'
+import { describeIceUploadBucketSelection, iceOssUploadAvailable, sanitizeIcePipelineMediaUrl, validateIcePipelineMediaUrl } from './aliyunOssIceParse.js'
 import { evaluateIceOutputReady, fetchIceOutputObject } from './aliyunOssIceUpload.js'
 
 function iceJobDownloadProxyPath(jobId: string, inline?: boolean): string {
@@ -437,10 +437,14 @@ export async function handleAliyunIceRoutes(input: {
               mediaUrl.startsWith('oss://') ||
               (signedMediaUrl ? /^https?:\/\//i.test(signedMediaUrl) : false)
             if (!urlOk) return null
-            const pipelineUrl =
+            const pipelineUrl = sanitizeIcePipelineMediaUrl(
               mediaUrl.startsWith('oss://') || /^https?:\/\//i.test(mediaUrl)
                 ? mediaUrl
-                : signedMediaUrl!
+                : signedMediaUrl || mediaUrl,
+              signedMediaUrl,
+            )
+            const urlErr = validateIcePipelineMediaUrl(pipelineUrl)
+            if (urlErr) return null
             return {
               kind,
               mediaUrl: pipelineUrl,
@@ -455,6 +459,16 @@ export async function handleAliyunIceRoutes(input: {
           })
           .filter(Boolean)
       : []
+
+    if (mixSegments.length >= 2 && mixSegments.length < (Array.isArray(mixSegmentsRaw) ? mixSegmentsRaw.length : 0)) {
+      json(res, 400, {
+        ok: false,
+        message:
+          '部分素材 URL 无效（勿使用带 ?Signature= 的签名链接），请删除后重新本地上传再试。',
+        step: 'validate_mix_urls',
+      })
+      return true
+    }
 
     let pipelineImageUrls = imageUrls
     if (imageUrls.length > 0) {
