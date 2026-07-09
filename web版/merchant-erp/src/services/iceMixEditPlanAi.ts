@@ -4,7 +4,9 @@
 import { postAiChat } from './ai/aiClient'
 import type { IceMixMaterialSlot } from '../lib/iceMixPlan'
 import {
+  clampMixSourceInSec,
   ensureSequentialMixScriptRows,
+  MIX_DEFAULT_SOURCE_DURATION_SEC,
   resolveMixTotalDurationSec,
   type IceMixSegmentPlan,
 } from '../lib/iceMixPlan'
@@ -30,9 +32,11 @@ export type MixEditSegmentDecision = {
   clipNote?: string
 }
 
+const EDIT_PLAN_AI_TIMEOUT_MS = 12_000
+
 const EDIT_PLAN_SYSTEM = `你是专业短视频混剪剪辑师。须根据【指导文案】【分镜表】【素材画面库】为每一段分镜做剪辑决策：
 1. materialIndex：选用哪条素材（0 起算），按画面语义匹配，不是按顺序轮播；同一条素材可被多段使用，但须截取不同片段
-2. sourceInSec：从该素材视频第几秒开始截取（根据分镜 visual：门店/开场→0–2s，过程/操作→素材前 1/3 偏后，成品/特写→素材后 1/3；图片素材固定 0）
+2. sourceInSec：从该素材视频第几秒开始截取（短视频通常 3–8 秒，sourceInSec 不得超过源片时长减 1 秒；开场→0，过程→1–2s，特写→尽量靠后但留足片段长度；图片固定 0）
 3. 须体现叙事：先氛围后卖点、先全景后特写等，遵循指导文案意图
 
 只输出 JSON 数组，无 markdown：
@@ -86,11 +90,16 @@ function scoreMaterialMatch(visual: string, profile: IceMixMaterialProfile): num
 }
 
 function inferSourceInSec(visual: string, estDur: number): number {
-  const v = visual
-  const dur = Math.max(4, estDur)
-  if (/成品|特写|结尾|收尾|logo|招牌菜/.test(v)) return Math.min(dur * 0.55, Math.max(0, dur - 5))
-  if (/过程|制作|烹饪|操作|后厨|加工|搅拌/.test(v)) return Math.min(dur * 0.25, dur - 3)
-  if (/顾客|体验|试吃|互动/.test(v)) return Math.min(dur * 0.4, dur - 3)
+  const dur = Math.max(2, Math.min(estDur || MIX_DEFAULT_SOURCE_DURATION_SEC, 12))
+  if (/成品|特写|结尾|收尾|logo|招牌菜/.test(visual)) {
+    return clampMixSourceInSec(Math.min(dur * 0.35, Math.max(0, dur - 2)), 1, dur)
+  }
+  if (/过程|制作|烹饪|操作|后厨|加工|搅拌/.test(visual)) {
+    return clampMixSourceInSec(Math.min(dur * 0.15, Math.max(0, dur - 1.5)), 1, dur)
+  }
+  if (/顾客|体验|试吃|互动/.test(visual)) {
+    return clampMixSourceInSec(Math.min(dur * 0.25, Math.max(0, dur - 1.5)), 1, dur)
+  }
   return 0
 }
 
@@ -112,14 +121,17 @@ export function fallbackMixEditDecisions(
     if (bestScore <= 0 && profiles.length > 0) {
       bestIdx = profiles[segmentIndex % profiles.length]!.index
     }
-    const est = profiles.find((p) => p.index === bestIdx)?.estimatedDurationSec ?? 12
+    const est =
+      profiles.find((p) => p.index === bestIdx)?.estimatedDurationSec ?? MIX_DEFAULT_SOURCE_DURATION_SEC
+    const clipEst = 4
     let sourceInSec = inferSourceInSec(row.visual, est)
     const prev = usedIn.get(bestIdx)
-    if (prev != null && Math.abs(sourceInSec - prev) < 1.5) {
-      sourceInSec = Math.min(est - 2, sourceInSec + 2.5)
+    if (prev != null && Math.abs(sourceInSec - prev) < 1) {
+      sourceInSec = clampMixSourceInSec(sourceInSec + 1.2, clipEst, est)
     }
+    sourceInSec = clampMixSourceInSec(sourceInSec, clipEst, est)
     usedIn.set(bestIdx, sourceInSec)
-    return { segmentIndex, materialIndex: bestIdx, sourceInSec: Math.max(0, sourceInSec) }
+    return { segmentIndex, materialIndex: bestIdx, sourceInSec }
   })
 }
 
@@ -159,46 +171,68 @@ export async function planMixEditFromInstructions(opts: {
 
   const userBlock = `【指导文案】\n${opts.guidance.trim()}\n\n【素材画面库】\n${profileBlock}\n\n【分镜表】\n${storyboard}\n\n请为段0～段${rows.length - 1} 各输出一条剪辑决策 JSON。`
 
-  const providers: Array<'doubao' | 'qwen'> = ['doubao', 'qwen']
-  let parsed: MixEditSegmentDecision[] | null = null
-  for (const provider of providers) {
-    try {
-      const res = await postAiChat({
-        provider,
-        temperature: 0.25,
-        messages: [
-          { role: 'system', content: EDIT_PLAN_SYSTEM },
-          { role: 'user', content: userBlock },
-        ],
-      })
-      parsed = parseEditPlanJson(res.content?.trim() || '', rows.length, materials.length)
-      if (parsed) break
-    } catch {
-      /* try next */
-    }
-  }
-
-  const decisions =
-    parsed && parsed.length >= 2
-      ? parsed
-      : fallbackMixEditDecisions(rows, profiles.length ? profiles : materials.map((m, i) => ({
+  const profileList =
+    profiles.length > 0
+      ? profiles
+      : materials.map((m, i) => ({
           index: i,
           label: m.label,
           kind: m.kind,
           description: m.label,
-        })))
+        }))
+
+  const fallback = fallbackMixEditDecisions(rows, profileList)
+
+  async function tryAiEditPlan(): Promise<MixEditSegmentDecision[] | null> {
+    const providers: Array<'doubao' | 'qwen'> = ['doubao', 'qwen']
+    for (const provider of providers) {
+      try {
+        const res = await postAiChat({
+          provider,
+          temperature: 0.25,
+          messages: [
+            { role: 'system', content: EDIT_PLAN_SYSTEM },
+            { role: 'user', content: userBlock },
+          ],
+        })
+        const parsed = parseEditPlanJson(res.content?.trim() || '', rows.length, materials.length)
+        if (parsed) return parsed
+      } catch {
+        /* try next */
+      }
+    }
+    return null
+  }
+
+  let decisions = fallback
+  try {
+    const aiDecisions = await Promise.race([
+      tryAiEditPlan(),
+      new Promise<null>((resolve) => {
+        window.setTimeout(() => resolve(null), EDIT_PLAN_AI_TIMEOUT_MS)
+      }),
+    ])
+    if (aiDecisions && aiDecisions.length >= 2) decisions = aiDecisions
+  } catch {
+    /* use fallback */
+  }
 
   const bySeg = new Map<number, MixEditSegmentDecision>()
   for (const d of decisions) {
     bySeg.set(d.segmentIndex, d)
   }
   const filled = rows.map((row, i) => {
-    const hit = bySeg.get(i) ?? fallbackMixEditDecisions([row], profiles)[0]!
+    const tr = parseScriptTimeRangeSeconds(row.timeRange)
+    const clipDur = tr ? Math.max(0.35, tr.end - tr.start) : total / rows.length
+    const hit = bySeg.get(i) ?? fallbackMixEditDecisions([row], profileList)[0]!
+    const matIdx = Math.max(0, hit.materialIndex) % materials.length
+    const estDur =
+      profileList.find((p) => p.index === matIdx)?.estimatedDurationSec ?? MIX_DEFAULT_SOURCE_DURATION_SEC
     return {
       ...hit,
       segmentIndex: i,
-      materialIndex: Math.max(0, hit.materialIndex) % materials.length,
-      sourceInSec: Math.max(0, hit.sourceInSec),
+      materialIndex: matIdx,
+      sourceInSec: clampMixSourceInSec(hit.sourceInSec, clipDur, estDur),
     }
   })
 
@@ -211,6 +245,7 @@ export function buildIceMixSegmentsFromEditPlan(
   materials: IceMixMaterialSlot[],
   decisions: MixEditSegmentDecision[],
   fallbackTotalSec: number,
+  materialProfiles?: IceMixMaterialProfile[],
 ): IceMixSegmentPlan[] {
   const total = resolveMixTotalDurationSec(rows, fallbackTotalSec)
   const orderedRows = ensureSequentialMixScriptRows(rows, total)
@@ -239,7 +274,12 @@ export function buildIceMixSegmentsFromEditPlan(
     if (!mat) continue
 
     const clipDur = timelineEnd - timelineStart
-    const sourceInSec = Math.max(0, dec?.sourceInSec ?? 0)
+    const estDur =
+      materialProfiles?.find((p) => p.index === matIdx)?.estimatedDurationSec ??
+      MIX_DEFAULT_SOURCE_DURATION_SEC
+    const rawIn = Math.max(0, dec?.sourceInSec ?? 0)
+    const sourceInSec =
+      mat.kind === 'video' ? clampMixSourceInSec(rawIn, clipDur, estDur) : 0
 
     segments.push({
       kind: mat.kind,

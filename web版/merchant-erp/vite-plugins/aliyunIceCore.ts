@@ -19,6 +19,7 @@ import {
 } from './iceBriefTimelinePlan.js'
 import { sanitizeIceBriefAudioPlan } from './iceStockAudio.js'
 import { isIceTransientNetworkError } from '../src/lib/iceTransientNetworkError.js'
+import { clampMixSourceInSec } from '../src/lib/iceMixPlan.js'
 
 export { isIceTransientNetworkError }
 import { ensureIceHttpsUrl, isIceVodOutinBucket, toIceTimelineOssUrl, validateIcePipelineImageUrl } from './aliyunOssIceParse.js'
@@ -297,16 +298,24 @@ export function buildTimelineFromMixClips(
       clips.push(clip)
       continue
     }
-    const sourceIn = Math.max(0, seg.sourceInSec ?? 0)
-    const avail =
-      seg.sourceDurationSec && seg.sourceDurationSec > sourceIn
-        ? seg.sourceDurationSec - sourceIn
-        : dur
+    let sourceIn = Math.max(0, seg.sourceInSec ?? 0)
+    const srcDur = seg.sourceDurationSec
+    const minNeed = Math.max(0.35, dur)
+    if (srcDur != null && srcDur > 0) {
+      const maxIn = Math.max(0, srcDur - minNeed)
+      sourceIn = Math.min(sourceIn, maxIn)
+    }
+    const avail = srcDur != null && srcDur > sourceIn ? srcDur - sourceIn : dur
     const maxOut = Math.max(0.35, Math.min(dur, avail))
+    let outPoint = sourceIn + maxOut
+    if (srcDur != null && srcDur > 0 && outPoint > srcDur) {
+      outPoint = srcDur
+      sourceIn = Math.max(0, outPoint - maxOut)
+    }
     const clip: Record<string, unknown> = {
       ...ref,
       In: sourceIn,
-      Out: sourceIn + maxOut,
+      Out: outPoint,
       Duration: maxOut,
       TimelineIn: seg.timelineStartSec,
       TimelineOut: seg.timelineEndSec,
@@ -1187,7 +1196,11 @@ export async function iceRunMixPipeline(
       timelineStartSec: seg.timelineStartSec,
       timelineEndSec: seg.timelineEndSec,
       sourceDurationSec: up.sourceDurationSec,
-      sourceInSec: Math.max(0, seg.sourceInSec ?? 0),
+      sourceInSec: clampMixSourceInSec(
+        seg.sourceInSec ?? 0,
+        seg.timelineEndSec - seg.timelineStartSec,
+        up.sourceDurationSec,
+      ),
     })
     seenMediaIds.add(up.mediaId)
   }
