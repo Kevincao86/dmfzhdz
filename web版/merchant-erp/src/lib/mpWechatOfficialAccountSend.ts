@@ -92,3 +92,59 @@ export async function sendWechatOaTargetedInviteTemplate(
     throw new Error(`oa_template_${body.errcode}:${body.errmsg || 'failed'}`)
   }
 }
+
+/** 收到客户预约新订单通知 — 复用为私信未读提醒（thing2=提醒文案 thing6=发送方） */
+export async function sendWechatOaDmUnreadTemplate(opts: {
+  oaOpenId: string
+  senderName: string
+  sessionId: string
+  hintText?: string
+}): Promise<void> {
+  const oid = String(opts.oaOpenId || '').trim()
+  if (!oid) return
+  const cfgResult = loadWechatOaConfig()
+  if (!cfgResult.ok) throw new Error('wx_oa_not_configured')
+
+  const templateId = String(cfgResult.config.dmUnreadTemplateId || '').trim()
+  if (!templateId) return
+
+  const sessionId = String(opts.sessionId || '').trim()
+  const pagePath = 'pages/subpack-pr/chat/chat'
+  const token = await getWechatOfficialAccountAccessToken()
+  const mpAppId = mpWechatAppId()
+
+  const payload: Record<string, unknown> = {
+    touser: oid,
+    template_id: templateId,
+    data: {
+      thing2: {
+        value: clipThing(opts.hintText || '您有未读私信请查看'),
+      },
+      thing6: {
+        value: clipThing(opts.senderName || '招募方'),
+      },
+    },
+  }
+
+  if (mpAppId) {
+    payload.miniprogram = {
+      appid: mpAppId,
+      pagepath: sessionId
+        ? `${pagePath}?sessionId=${encodeURIComponent(sessionId)}&from=oa`
+        : pagePath,
+    }
+  }
+
+  const res = await fetch(
+    `https://api.weixin.qq.com/cgi-bin/message/template/send?access_token=${encodeURIComponent(token)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+  )
+  const body = (await res.json()) as { errcode?: number; errmsg?: string }
+  if (body.errcode && body.errcode !== 0) {
+    throw new Error(`oa_template_${body.errcode}:${body.errmsg || 'failed'}`)
+  }
+}

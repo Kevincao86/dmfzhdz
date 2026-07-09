@@ -25,6 +25,7 @@ import {
   merchantSupabaseAdminEnvConfigureHint,
   readMerchantSupabaseAdminEnv,
 } from '../../vite-plugins/merchantSupabaseAdminEnv.js'
+import { pushOaDmUnreadAfterChatMessage } from './mpTalentChatDmOaPush.js'
 
 function chatErrorResponse(e: unknown): { status: number; data: Record<string, unknown> } {
   const msg = e instanceof Error ? e.message : String(e)
@@ -237,6 +238,12 @@ export async function handleMpTalentChatBody(
       clientMsgId,
       ts,
     })
+    void pushOaDmUnreadAfterChatMessage(sb, {
+      sessionId,
+      fromRole,
+      supabaseUrl,
+      serviceRole,
+    }).catch(() => {})
     return { status: 200, data: { ok: true } }
   }
 
