@@ -6,6 +6,7 @@ import {
 } from '../src/lib/iceMixPlan.ts'
 import {
   buildIceMixSegmentsFromEditPlan,
+  enforceDiverseEditDecisions,
   fallbackMixEditDecisions,
   type IceMixMaterialProfile,
 } from '../src/services/iceMixEditPlanAi.ts'
@@ -34,6 +35,14 @@ const profiles: IceMixMaterialProfile[] = [
 ]
 
 const decisions = fallbackMixEditDecisions(fixed, profiles)
+const allSameMat = new Set(decisions.map((d) => d.materialIndex)).size < 2
+if (allSameMat && materials.length >= 2) {
+  const enforced = enforceDiverseEditDecisions(decisions, fixed, materials, profiles)
+  if (new Set(enforced.map((d) => d.materialIndex)).size < 2) {
+    console.error('FAIL: enforce diversity', enforced)
+    process.exit(1)
+  }
+}
 const seg0 = decisions[0]!
 const seg1 = decisions[1]!
 if (seg0.materialIndex === seg1.materialIndex && seg0.sourceInSec === seg1.sourceInSec) {
