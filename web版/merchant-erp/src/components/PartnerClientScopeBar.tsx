@@ -2,13 +2,23 @@ import { ChevronDown, Users } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { cn } from '../cn'
 import { usePartnerClients } from '../context/PartnerClientContext'
+import { usePartnerTenant } from '../context/PartnerTenantContext'
+import {
+  PARTNER_HOME_AGGREGATE_LABEL,
+  PARTNER_HOME_AGGREGATE_LABEL_PARENT,
+} from '../lib/partnerEditionConfig'
 import { isPartnerEdition } from '../lib/appEdition'
 
 /** 服务商版顶栏：切换「全部客户」或单一客户数据视图 */
 export default function PartnerClientScopeBar() {
   const enabled = isPartnerEdition()
   const { clients, activeClientId, scopeLabel, setActiveClient, loading } = usePartnerClients()
+  const { profile } = usePartnerTenant()
   const [open, setOpen] = useState(false)
+
+  const aggregateLabel = profile.isAgent
+    ? PARTNER_HOME_AGGREGATE_LABEL
+    : PARTNER_HOME_AGGREGATE_LABEL_PARENT
 
   const grouped = useMemo(() => {
     const map = new Map<string, typeof clients>()
@@ -42,7 +52,7 @@ export default function PartnerClientScopeBar() {
         aria-haspopup="listbox"
       >
         <Users className="h-3.5 w-3.5 shrink-0 text-cyan-600" aria-hidden />
-        <span className="min-w-0 truncate">{scopeLabel || '全部客户'}</span>
+        <span className="min-w-0 truncate">{activeClientId ? scopeLabel : aggregateLabel}</span>
         <ChevronDown className={cn('h-3.5 w-3.5 shrink-0 text-slate-400', open && 'rotate-180')} />
       </button>
 
@@ -72,7 +82,7 @@ export default function PartnerClientScopeBar() {
                   setOpen(false)
                 }}
               >
-                全部客户（汇总）
+                {aggregateLabel}
               </button>
             </li>
             {[...grouped.entries()].map(([provider, rows]) => (

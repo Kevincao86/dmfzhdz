@@ -1,5 +1,7 @@
 import {
+  Building2,
   CalendarDays,
+  Coins,
   Crown,
   Link2,
   Megaphone,
@@ -51,6 +53,9 @@ import {
   type TenantBillingSummary,
 } from '../services/tenantBillingClient'
 import PartnerClientsSection from './settings/PartnerClientsSection'
+import PartnerAgentManagementSection from './settings/PartnerAgentManagementSection'
+import PartnerEntitlementSection from './settings/PartnerEntitlementSection'
+import { usePartnerTenant } from '../context/PartnerTenantContext'
 import { PartnerDouyinApiSection, PartnerKuaishouApiSection } from './settings/apiDocsPartnerContent'
 
 type VerifyItem = {
@@ -83,25 +88,34 @@ const MERCHANT_TABS = [
   { id: 'subscription' as const, label: '订阅', icon: CalendarDays },
 ] as const
 
-const PARTNER_TABS = [
+const PARTNER_TABS_PARENT = [
   { id: 'platforms' as const, label: '平台连接', icon: Link2 },
   { id: 'commercial' as const, label: '商业化后台', icon: Megaphone },
   { id: 'merchant' as const, label: '服务商平台', icon: Store },
   { id: 'partner_clients' as const, label: '客户商家', icon: UserCircle2 },
+  { id: 'partner_agents' as const, label: '代理管理', icon: Building2 },
+  { id: 'partner_entitlements' as const, label: '权益分配', icon: Coins },
   { id: 'accounts' as const, label: '账号管理', icon: Users },
   { id: 'permissions' as const, label: '权限设置', icon: Shield },
   { id: 'subscription' as const, label: '订阅', icon: CalendarDays },
 ] as const
 
-const ALL_TABS = isPartnerEdition() ? PARTNER_TABS : MERCHANT_TABS
+const PARTNER_TABS_AGENT = [
+  { id: 'platforms' as const, label: '平台连接', icon: Link2 },
+  { id: 'commercial' as const, label: '商业化后台', icon: Megaphone },
+  { id: 'partner_clients' as const, label: '客户商家', icon: UserCircle2 },
+  { id: 'partner_entitlements' as const, label: '我的权益', icon: Coins },
+  { id: 'accounts' as const, label: '账号管理', icon: Users },
+  { id: 'permissions' as const, label: '权限设置', icon: Shield },
+  { id: 'subscription' as const, label: '订阅', icon: CalendarDays },
+] as const
 
-const TABS = SHOW_VERIFY_SYSTEM_TAB ? ALL_TABS : ALL_TABS.filter((t) => t.id !== 'verify')
-
-const TAB_IDS = new Set(TABS.map((t) => t.id))
+type MerchantTabId = (typeof MERCHANT_TABS)[number]['id']
+type PartnerParentTabId = (typeof PARTNER_TABS_PARENT)[number]['id']
+type PartnerAgentTabId = (typeof PARTNER_TABS_AGENT)[number]['id']
+type SettingsTabId = MerchantTabId | PartnerParentTabId | PartnerAgentTabId
 
 const MERCHANT_BACKEND_COMING_SOON_MSG = '功能即将开放，敬请期待。'
-
-type SettingsTabId = (typeof ALL_TABS)[number]['id']
 
 function formatCnDate(d: Date) {
   return d.toLocaleDateString('zh-CN', {
@@ -114,6 +128,17 @@ function formatCnDate(d: Date) {
 export default function SettingsPage() {
   const location = useLocation()
   const { plan, entitlements, reload: reloadMembership } = useMembership()
+  const { profile } = usePartnerTenant()
+  const partnerEdition = isPartnerEdition()
+  const tabs = useMemo(() => {
+    const base = partnerEdition
+      ? profile.isAgent
+        ? [...PARTNER_TABS_AGENT]
+        : [...PARTNER_TABS_PARENT]
+      : [...MERCHANT_TABS]
+    return SHOW_VERIFY_SYSTEM_TAB ? base : base.filter((t) => t.id !== 'verify')
+  }, [partnerEdition, profile.isAgent])
+  const tabIds = useMemo(() => new Set(tabs.map((t) => t.id)), [tabs])
   const [tab, setTab] = useState<SettingsTabId>('platforms')
   const [merchantPlat, setMerchantPlat] = useState<MerchantBackendPlatformId>('douyin')
   const [waimaiPlat, setWaimaiPlat] = useState<WaimaiBackendPlatformId>('eleme')
@@ -223,10 +248,10 @@ export default function SettingsPage() {
       setTab('commercial')
     } else if (p.get('upgrade') === '1') {
       setTab('subscription')
-    } else if (ts && TAB_IDS.has(ts as SettingsTabId)) {
+    } else if (ts && tabIds.has(ts as SettingsTabId)) {
       setTab(ts as SettingsTabId)
     }
-  }, [location.search])
+  }, [location.search, tabIds])
 
   useEffect(() => {
     if (tab === 'subscription') void reloadMembership({ silent: true })
@@ -273,7 +298,7 @@ export default function SettingsPage() {
       <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm">
         <div className="border-b border-slate-100 bg-slate-50/60">
           <nav className="flex flex-wrap gap-0.5 px-2 py-1 sm:px-3">
-            {TABS.map((t) => {
+            {tabs.map((t) => {
               const Icon = t.icon
               return (
                 <button
@@ -319,6 +344,13 @@ export default function SettingsPage() {
 
           {tab === 'subscription' && (
             <div className="space-y-8">
+              {partnerEdition && profile.isAgent ? (
+                <div className="rounded-xl border border-violet-200 bg-violet-50/60 px-4 py-4 text-sm text-violet-950">
+                  <p className="font-medium">订阅由总代管理</p>
+                  <p className="mt-2">席位与积分由总代在「权益分配」中划拨；续费请联系总代。</p>
+                </div>
+              ) : (
+                <>
               {billingSummary ? (
                 <div className="grid gap-4 sm:grid-cols-3">
                   <div className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white p-5 shadow-sm">
@@ -388,8 +420,18 @@ export default function SettingsPage() {
                   <p className="mt-2 text-sm text-slate-500">升级会员后在此显示订阅时长与到期日。</p>
                 )}
               </div>
+                </>
+              )}
             </div>
           )}
+
+          {tab === 'partner_clients' && partnerEdition ? <PartnerClientsSection /> : null}
+
+          {tab === 'partner_agents' && partnerEdition && profile.isParent ? (
+            <PartnerAgentManagementSection />
+          ) : null}
+
+          {tab === 'partner_entitlements' && partnerEdition ? <PartnerEntitlementSection /> : null}
 
           {SHOW_VERIFY_SYSTEM_TAB && tab === 'verify' && (
             <div className="space-y-6">
@@ -446,11 +488,14 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {tab === 'partner_clients' && isPartnerEdition() && <PartnerClientsSection />}
-
           {tab === 'merchant' && (
             <div className="space-y-10">
-              {isPartnerEdition() ? (
+              {partnerEdition && profile.isAgent ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-950">
+                  林客 / 快手服务商应用仅由<strong>总代</strong>维护；子代添加客户时将自动使用总代 SP 凭证。
+                </div>
+              ) : null}
+              {partnerEdition && profile.isParent ? (
                 <div className="rounded-lg border border-cyan-100 bg-cyan-50/60 px-4 py-3 text-sm text-cyan-950">
                   <PartnerDouyinApiSection />
                   <div className="mt-6">
@@ -458,6 +503,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
               ) : null}
+              {!partnerEdition || profile.isParent ? (
               <section className="space-y-4">
                 <div>
                   <h3 className="text-lg font-medium text-gray-900">
@@ -520,8 +566,9 @@ export default function SettingsPage() {
                   )}
                 </div>
               </section>
+              ) : null}
 
-              {!isPartnerEdition() ? (
+              {!partnerEdition ? (
               <section className="space-y-4 border-t border-gray-100 pt-8">
                 <div>
                   <h3 className="text-lg font-medium text-gray-900">外卖平台</h3>

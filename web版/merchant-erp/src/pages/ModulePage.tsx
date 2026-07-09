@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import PartnerScopedBanner from '../components/PartnerScopedBanner'
 
 export default function ModulePage({
   title,
@@ -21,6 +22,7 @@ export default function ModulePage({
         </div>
         {actions}
       </div>
+      <PartnerScopedBanner />
       {children ?? (
         <div className="erp-panel p-10 text-center text-slate-500">
           本模块界面已与线上路由对齐；业务数据需连接后端后展示。

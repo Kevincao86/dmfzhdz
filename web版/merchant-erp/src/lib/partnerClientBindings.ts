@@ -4,6 +4,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { MerchantBindingProvider } from './merchantPlatformBindings'
 import { fetchPrimaryTenantId } from './tenantBilling'
+import { fetchPartnerTenantProfile, partnerClientsDataTenantId } from './partnerTenantProfile'
 import { tenantLocalKey } from './tenantLocalState'
 import { writeMerchantSession } from './merchantSession'
 
@@ -17,6 +18,8 @@ export type PartnerClientRow = {
   sealedCredentials: string
   demoMode: boolean
   updatedAt: string
+  ownerAgentTenantId?: string | null
+  createdByTenantId?: string | null
 }
 
 const ACTIVE_CLIENT_KEY = 'meoo_active_partner_client_id'
@@ -50,6 +53,10 @@ function parseRow(raw: Record<string, unknown>): PartnerClientRow | null {
     sealedCredentials: sealed,
     demoMode: Boolean(raw.demo_mode),
     updatedAt: typeof raw.updated_at === 'string' ? raw.updated_at : '',
+    ownerAgentTenantId:
+      typeof raw.owner_agent_tenant_id === 'string' ? raw.owner_agent_tenant_id : null,
+    createdByTenantId:
+      typeof raw.created_by_tenant_id === 'string' ? raw.created_by_tenant_id : null,
   }
 }
 
@@ -100,16 +107,41 @@ export async function listPartnerClients(
 ): Promise<PartnerClientRow[]> {
   const tenantId = await fetchPrimaryTenantId(supabase)
   if (!tenantId) return []
+
+  const profile = await fetchPartnerTenantProfile(supabase, tenantId)
+  const dataTenantId = partnerClientsDataTenantId(profile)
+
   let q = supabase
     .from('tenant_partner_clients')
     .select(
-      'id, provider, merchant_account_id, account_display_name, client_label, client_key, sealed_credentials, demo_mode, updated_at',
+      'id, provider, merchant_account_id, account_display_name, client_label, client_key, sealed_credentials, demo_mode, updated_at, owner_agent_tenant_id, created_by_tenant_id',
     )
-    .eq('tenant_id', tenantId)
+    .eq('tenant_id', dataTenantId)
     .order('updated_at', { ascending: false })
+
+  if (profile.isAgent) q = q.eq('owner_agent_tenant_id', tenantId)
   if (provider) q = q.eq('provider', provider)
+
   const { data, error } = await q
-  if (error || !data) return []
+  if (error) {
+    if (/owner_agent_tenant_id|created_by_tenant_id|does not exist/i.test(error.message)) {
+      let legacy = supabase
+        .from('tenant_partner_clients')
+        .select(
+          'id, provider, merchant_account_id, account_display_name, client_label, client_key, sealed_credentials, demo_mode, updated_at',
+        )
+        .eq('tenant_id', dataTenantId)
+        .order('updated_at', { ascending: false })
+      if (provider) legacy = legacy.eq('provider', provider)
+      const { data: legacyData, error: legacyErr } = await legacy
+      if (legacyErr || !legacyData) return []
+      return legacyData
+        .map((r) => parseRow(r as Record<string, unknown>))
+        .filter((x): x is PartnerClientRow => x != null)
+    }
+    return []
+  }
+  if (!data) return []
   return data
     .map((r) => parseRow(r as Record<string, unknown>))
     .filter((x): x is PartnerClientRow => x != null)
@@ -126,12 +158,15 @@ export async function upsertPartnerClient(
     clientLabel?: string | null
     demoMode?: boolean
     id?: string
+    ownerAgentTenantId?: string | null
   },
 ): Promise<PartnerClientRow | null> {
   const tenantId = await fetchPrimaryTenantId(supabase)
   if (!tenantId) return null
-  const row = {
-    tenant_id: tenantId,
+  const profile = await fetchPartnerTenantProfile(supabase, tenantId)
+  const dataTenantId = partnerClientsDataTenantId(profile)
+  const row: Record<string, unknown> = {
+    tenant_id: dataTenantId,
     provider: input.provider,
     merchant_account_id: input.merchantAccountId.trim(),
     sealed_credentials: input.sealedCredentials.trim(),
@@ -140,15 +175,17 @@ export async function upsertPartnerClient(
     client_label: input.clientLabel ?? null,
     demo_mode: Boolean(input.demoMode),
     updated_at: new Date().toISOString(),
+    created_by_tenant_id: tenantId,
+    owner_agent_tenant_id: profile.isAgent ? tenantId : input.ownerAgentTenantId ?? null,
   }
   if (input.id) {
     const { data, error } = await supabase
       .from('tenant_partner_clients')
       .update(row)
       .eq('id', input.id)
-      .eq('tenant_id', tenantId)
+      .eq('tenant_id', dataTenantId)
       .select(
-        'id, provider, merchant_account_id, account_display_name, client_label, client_key, sealed_credentials, demo_mode, updated_at',
+        'id, provider, merchant_account_id, account_display_name, client_label, client_key, sealed_credentials, demo_mode, updated_at, owner_agent_tenant_id, created_by_tenant_id',
       )
       .maybeSingle()
     if (error || !data) return null
@@ -158,7 +195,7 @@ export async function upsertPartnerClient(
     .from('tenant_partner_clients')
     .upsert(row, { onConflict: 'tenant_id,provider,merchant_account_id' })
     .select(
-      'id, provider, merchant_account_id, account_display_name, client_label, client_key, sealed_credentials, demo_mode, updated_at',
+      'id, provider, merchant_account_id, account_display_name, client_label, client_key, sealed_credentials, demo_mode, updated_at, owner_agent_tenant_id, created_by_tenant_id',
     )
     .maybeSingle()
   if (error || !data) return null
@@ -171,11 +208,13 @@ export async function deletePartnerClient(
 ): Promise<boolean> {
   const tenantId = await fetchPrimaryTenantId(supabase)
   if (!tenantId) return false
+  const profile = await fetchPartnerTenantProfile(supabase, tenantId)
+  const dataTenantId = partnerClientsDataTenantId(profile)
   const { error } = await supabase
     .from('tenant_partner_clients')
     .delete()
     .eq('id', clientId)
-    .eq('tenant_id', tenantId)
+    .eq('tenant_id', dataTenantId)
   return !error
 }
 

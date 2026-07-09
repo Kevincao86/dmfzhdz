@@ -1,5 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 import { isPathBlockedForFree, type MembershipPlan } from '../lib/membershipPlan'
+import { XINGXUAN_PARTNER_NAV } from './xingxuanPartnerNav'
+import { PARTNER_STORE_NAV_LABEL } from '../lib/partnerEditionConfig'
 import {
   Bot,
   Briefcase,
@@ -64,6 +66,67 @@ export const NAV_ITEMS: NavItem[] = [
   },
   { path: '/settings', label: '系统', icon: Settings },
 ]
+
+/** 服务商版（fws）：爆款 Brief / 短视频 AI / 数字人已在星选增值服务中提供 */
+export const PARTNER_EXCLUDED_OPERATION_PATHS = [
+  '/ai-operation/content',
+  '/ai-operation/video-check',
+  '/ai-operation/digital-human',
+] as const
+
+export function isPartnerExcludedOperationPath(path: string): boolean {
+  const p = path.split('?')[0] ?? path
+  return PARTNER_EXCLUDED_OPERATION_PATHS.some(
+    (excluded) => p === excluded || p.startsWith(`${excluded}/`),
+  )
+}
+
+function partnerOperationChildren(baseChildren: NavChild[]): NavChild[] {
+  const kept = baseChildren
+    .filter(
+      (c) =>
+        !c.path.startsWith('/recruitment') &&
+        !isPartnerExcludedOperationPath(c.path) &&
+        c.path !== '/operation/competitors',
+    )
+    .map((c) => (c.path === '/geo' ? { ...c, label: '客户增长' } : c))
+  const xingxuan = XINGXUAN_PARTNER_NAV.map((n) => ({ path: n.path, label: n.label }))
+  return [...xingxuan, ...kept]
+}
+
+function partnerFinanceChildren(isParent: boolean): NavChild[] {
+  const base: NavChild[] = [
+    { path: '/finance', label: '财务对账' },
+    { path: '/finance/tax', label: '报税管理' },
+  ]
+  if (isParent) base.push({ path: '/finance/agent-settlement', label: '代理结算' })
+  return base
+}
+
+export function filterNavItemsForPartnerEdition(
+  items: NavItem[],
+  opts?: { isParent?: boolean },
+): NavItem[] {
+  const isParent = opts?.isParent !== false
+  return items
+    .map((item) => {
+      if (item.path === '/store') return { ...item, label: PARTNER_STORE_NAV_LABEL }
+      if (item.path === '/finance' && item.children?.length) {
+        return { ...item, children: partnerFinanceChildren(isParent) }
+      }
+      if (item.path === '/operation' && item.children?.length) {
+        return { ...item, children: partnerOperationChildren(item.children) }
+      }
+      if (!item.children?.length) {
+        if (item.path === '/recruitment') return null
+        return item
+      }
+      const children = item.children.filter((c) => !isPartnerExcludedOperationPath(c.path))
+      if (children.length === 0) return null
+      return { ...item, children }
+    })
+    .filter((x): x is NavItem => x != null)
+}
 
 export function pathActive(pathname: string, itemPath: string) {
   if (itemPath === '/home') return pathname === '/home'

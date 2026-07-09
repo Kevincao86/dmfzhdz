@@ -4,6 +4,7 @@ import { cn } from '../../cn'
 import MerchantPlatformAccountsPanel from '../../components/settings/MerchantPlatformAccountsPanel'
 import SecretInput from '../../components/SecretInput'
 import { usePartnerClients } from '../../context/PartnerClientContext'
+import { usePartnerTenant } from '../../context/PartnerTenantContext'
 import type { MerchantBindingProvider } from '../../lib/merchantPlatformBindings'
 import {
   applyActivePartnerClient,
@@ -27,6 +28,7 @@ const PARTNER_CLIENT_PLATFORMS = MERCHANT_BACKEND_PLATFORMS.filter((p) =>
 
 export default function PartnerClientsSection() {
   const { reload: reloadCtx, setActiveClientForProvider } = usePartnerClients()
+  const { profile } = usePartnerTenant()
   const [plat, setPlat] = useState<'douyin' | 'kuaishou'>('douyin')
   const [rows, setRows] = useState<PartnerClientRow[]>([])
   const [loading, setLoading] = useState(false)
@@ -93,7 +95,7 @@ export default function PartnerClientsSection() {
 
   const openBindForm = () => {
     if (providerBound === false) {
-      setErr(serviceProviderGateHint(provider))
+      setErr(serviceProviderGateHint(provider, { isAgent: profile.isAgent }))
       return
     }
     setErr(null)
@@ -120,7 +122,7 @@ export default function PartnerClientsSection() {
   const submitBind = async () => {
     if (!supabase) return
     if (providerBound === false) {
-      setErr(serviceProviderGateHint(provider))
+      setErr(serviceProviderGateHint(provider, { isAgent: profile.isAgent }))
       return
     }
     const mid = merchantAccountId.trim()
