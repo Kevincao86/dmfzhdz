@@ -3,6 +3,11 @@
  * 此前 editBrief 仅写入 projectMetadata，成片不会按文案包装。
  */
 import { resolveIceEffectPreset } from './iceEffectPresets.js'
+import {
+  buildIceSubtitleTextClip,
+  ICE_SUBTITLE_STYLE_DEFAULT_ID,
+  resolveIceSubtitleStylePreset,
+} from './iceSubtitleStylePresets.js'
 
 /** IMS 官方文档示例音轨（公网可读，勿用未上传的 meoo-out/stock/*.mp3） */
 export const ICE_PUBLIC_BGM_URLS = {
@@ -37,6 +42,7 @@ export type IceBriefTimelinePlan = {
   effectId: string
   fadeClip: boolean
   transitionSubType?: string
+  subtitleStyleId: string
   titleText?: string
   segmentCaptions: Array<{ text: string; timelineIn: number; timelineOut: number }>
   /** 多图时各张停留秒数，长度与图片数一致 */
@@ -116,6 +122,7 @@ export function parseIceEditBriefPlan(
     clipEndSec: number
     imageCount?: number
     effectId: string
+    subtitleStyleId?: string
   },
 ): IceBriefTimelinePlan {
   const brief = editBrief.trim()
@@ -129,6 +136,7 @@ export function parseIceEditBriefPlan(
   const openingSec = parseOpeningSec(instruction || brief, totalDurationSec)
   const fastPace = /快节奏|紧凑|快剪|切片|吸睛/.test(instruction || brief)
   const effect = resolveIceEffectPreset(opts.effectId)
+  const subtitleStyle = resolveIceSubtitleStylePreset(opts.subtitleStyleId ?? ICE_SUBTITLE_STYLE_DEFAULT_ID)
   const fadeClip = Boolean(effect.fadeClip)
   const transitionSubType = effect.transitionSubType
   const useFade = fadeClip
@@ -162,6 +170,7 @@ export function parseIceEditBriefPlan(
     effectId: effect.id,
     fadeClip,
     transitionSubType,
+    subtitleStyleId: subtitleStyle.id,
     titleText,
     segmentCaptions,
     imageDurations,
@@ -382,44 +391,21 @@ export function buildSubtitleTracksFromPlan(
   plan: IceBriefTimelinePlan,
 ): { SubtitleTracks: Array<{ SubtitleTrackClips: Record<string, unknown>[] }> } | Record<string, never> {
   const clips: Record<string, unknown>[] = []
+  const style = resolveIceSubtitleStylePreset(plan.subtitleStyleId)
 
   if (plan.titleText) {
     const out = Math.min(
       plan.totalDurationSec,
       plan.openingSec > 0 ? plan.openingSec : plan.totalDurationSec * 0.28,
     )
-    clips.push({
-      Type: 'Text',
-      Content: plan.titleText,
-      TimelineIn: 0,
-      TimelineOut: Math.max(1, out),
-      Alignment: 'TopCenter',
-      Y: 0.14,
-      FontSize: 64,
-      FontColor: '#ffffff',
-      Outline: 3,
-      OutlineColour: '#000000',
-      FontFace: { Bold: true },
-    })
+    clips.push(
+      buildIceSubtitleTextClip(style, plan.titleText, 0, Math.max(1, out)),
+    )
   }
 
   for (const cap of plan.segmentCaptions) {
     if (cap.text === plan.titleText) continue
-    clips.push({
-      Type: 'Text',
-      Content: cap.text.replace(/\n/g, '\\N'),
-      TimelineIn: cap.timelineIn,
-      TimelineOut: cap.timelineOut,
-      Alignment: 'BottomCenter',
-      Y: 0.8,
-      FontSize: 44,
-      FontColor: '#ffffff',
-      Outline: 2,
-      OutlineColour: '#000000',
-      AdaptMode: 'AutoWrap',
-      TextWidth: 0.86,
-      FontFace: { Bold: true },
-    })
+    clips.push(buildIceSubtitleTextClip(style, cap.text, cap.timelineIn, cap.timelineOut))
   }
 
   if (!clips.length) return {}

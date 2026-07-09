@@ -12,6 +12,10 @@ import {
   resolveIceEffectPreset,
 } from './iceEffectPresets.js'
 import {
+  ICE_SUBTITLE_STYLE_PRESETS,
+  resolveIceSubtitleStylePreset,
+} from './iceSubtitleStylePresets.js'
+import {
   iceGetProducingJob,
   iceRunImagesPipeline,
   iceRunMixPipeline,
@@ -158,6 +162,7 @@ export async function handleAliyunIceRoutes(input: {
       iceRamIssue: ramProbe.ok ? null : ramProbe.message,
       presets: ICE_EFFECT_PRESETS.map((p) => p.label),
       effectOptions: ICE_EFFECT_PRESETS,
+      subtitleStyleOptions: ICE_SUBTITLE_STYLE_PRESETS,
       urlUploadRequiresVod: Boolean(cfg?.vodStorageLocation?.trim()),
       credentialNote:
         '灵祺AI云剪：本地上传写入运营台「OSS 成片 URL 前缀」对应 Bucket（须 IMS 媒资库已绑定 + RAM 含 oss:PutObject）；StorageLocation（outin-*）用于成片输出与 RegisterMediaInfo；RAM 还须 AliyunICEFullAccess。',
@@ -397,7 +402,12 @@ export async function handleAliyunIceRoutes(input: {
     const height = Math.min(4096, Math.max(128, Number(parsed.height) || 1920))
     const clipEndSec = Math.min(120, Math.max(1, Number(parsed.clipEndSec) || 10))
     const presetLabel = String(parsed.preset ?? '无附加特效').trim()
-    const effect = resolveIceEffectPreset(presetLabel)
+    const effectIdRaw = String(parsed.effectId ?? '').trim()
+    const effect = effectIdRaw
+      ? resolveIceEffectPreset(effectIdRaw)
+      : resolveIceEffectPreset(presetLabel)
+    const subtitleStyleId = String(parsed.subtitleStyleId ?? '').trim()
+    const subtitleStyle = resolveIceSubtitleStylePreset(subtitleStyleId || undefined)
     const projectName = String(parsed.projectName ?? 'AI混剪').trim().slice(0, 120)
     const editBrief = String(parsed.editBrief ?? parsed.editInstruction ?? '').trim().slice(0, 500)
 
@@ -450,6 +460,7 @@ export async function handleAliyunIceRoutes(input: {
             height,
             totalDurationSec: clipEndSec,
             effectId: effect.id,
+            subtitleStyleId: subtitleStyle.id,
           })
         : pipelineImageUrls.length > 0
         ? await iceRunImagesPipeline(cfg, {
@@ -460,6 +471,7 @@ export async function handleAliyunIceRoutes(input: {
             height,
             totalDurationSec: clipEndSec,
             effectId: effect.id,
+            subtitleStyleId: subtitleStyle.id,
           })
         : mediaUrl && /^https?:\/\//i.test(mediaUrl)
           ? await iceRunSinglePipeline(cfg, {
@@ -471,6 +483,7 @@ export async function handleAliyunIceRoutes(input: {
               height,
               clipEndSec,
               effectId: effect.id,
+              subtitleStyleId: subtitleStyle.id,
             })
           : { ok: false as const, message: '请提供 mediaUrl 或 imageUrls（公网 https 图片）', step: 'validate' }
     if (!out.ok) {

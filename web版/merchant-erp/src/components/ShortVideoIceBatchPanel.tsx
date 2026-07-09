@@ -59,7 +59,12 @@ import {
   resolveMixTotalDurationSec,
   type IceMixMaterialSlot,
 } from '../lib/iceMixPlan'
-import { resolveIceEffectPreset } from '../lib/iceEffectPresets'
+import { resolveIceEffectPreset, ICE_MIX_TRANSITION_PRESETS } from '../lib/iceEffectPresets'
+import {
+  ICE_SUBTITLE_STYLE_DEFAULT_ID,
+  ICE_SUBTITLE_STYLE_PRESETS,
+  resolveIceSubtitleStylePreset,
+} from '../lib/iceSubtitleStylePresets'
 import {
   defaultScriptRows,
   maxScriptTimeRangeEndSec,
@@ -189,6 +194,8 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   )
   const [materialSlots, setMaterialSlots] = useState<number[]>([])
   const [planBusy, setPlanBusy] = useState(false)
+  const [mixTransitionMode, setMixTransitionMode] = useState<'auto' | string>('auto')
+  const [mixSubtitleStyleId, setMixSubtitleStyleId] = useState(ICE_SUBTITLE_STYLE_DEFAULT_ID)
   const mixDocInputRef = useRef<HTMLInputElement>(null)
 
   const aspect = useMemo(
@@ -205,6 +212,16 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     const id = inferIceEffectIdFromMixContent(mixGuidance, scriptRows)
     return resolveIceEffectPreset(id)
   }, [mixGuidance, scriptRows])
+
+  const resolvedMixEffect = useMemo(() => {
+    if (mixTransitionMode === 'auto') return inferredMixEffect
+    return resolveIceEffectPreset(mixTransitionMode)
+  }, [mixTransitionMode, inferredMixEffect])
+
+  const resolvedMixSubtitleStyle = useMemo(
+    () => resolveIceSubtitleStylePreset(mixSubtitleStyleId),
+    [mixSubtitleStyleId],
+  )
 
   const doneJobs = jobs.filter((j) => j.phase === 'done')
   const latestDone = doneJobs.length > 0 ? doneJobs[doneJobs.length - 1] : null
@@ -797,7 +814,8 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       width: aspect.width,
       height: aspect.height,
       clipEndSec: totalSec,
-      preset: inferredMixEffect.label,
+      effectId: resolvedMixEffect.id,
+      subtitleStyleId: resolvedMixSubtitleStyle.id,
     })
     if (!pipe.ok) {
       patchJob(localId, { phase: 'failed', message: pipe.message })
@@ -1350,9 +1368,51 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                     ))}
                   </select>
                 </label>
-                <p className="text-[11px] leading-snug text-zinc-500">
+                <label className="flex min-w-[10rem] flex-1 flex-col gap-1 text-xs text-zinc-600">
+                  <span>字幕样式</span>
+                  <select
+                    value={mixSubtitleStyleId}
+                    disabled={anyBusy || planBusy}
+                    onChange={(e) => setMixSubtitleStyleId(e.target.value)}
+                    className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
+                  >
+                    {ICE_SUBTITLE_STYLE_PRESETS.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.tag ? `【${s.tag}】` : ''}
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex min-w-[10rem] flex-1 flex-col gap-1 text-xs text-zinc-600">
+                  <span>场景转场</span>
+                  <select
+                    value={mixTransitionMode}
+                    disabled={anyBusy || planBusy}
+                    onChange={(e) => setMixTransitionMode(e.target.value)}
+                    className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
+                  >
+                    <option value="auto">
+                      智能推断
+                      {mixTransitionMode === 'auto' ? `（${inferredMixEffect.label}）` : ''}
+                    </option>
+                    {ICE_MIX_TRANSITION_PRESETS.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p className="w-full text-[11px] leading-snug text-zinc-500">
                   已上传素材 {mixMaterialPool.length} 个（视频 {jobs.filter((j) => !j.imageUrls?.length).length} · 图片{' '}
                   {imageItems.length}）
+                  <span className="mt-1 block text-zinc-600">
+                    字幕：{resolvedMixSubtitleStyle.label}
+                    {resolvedMixSubtitleStyle.description ? ` — ${resolvedMixSubtitleStyle.description}` : ''}
+                    {' · '}
+                    转场：{resolvedMixEffect.label}
+                    {mixTransitionMode === 'auto' ? '（由文案推断）' : ''}
+                  </span>
                 </p>
               </div>
               <textarea
@@ -1415,8 +1475,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 一键混剪（{scriptRows.length} 段）
               </button>
               <p className="text-xs text-zinc-500">
-                字幕、画面指令与转场由指导文案 + 分镜表自动合成（当前推断转场：
-                <span className="font-medium text-zinc-700">{inferredMixEffect.label}</span>）
+                字幕样式与转场将写入云端时间线；口播文案仍来自指导文案 + 分镜表。
               </p>
               {!mixReady && mixBlockers.length > 0 && !oneClickBusy && !planBusy ? (
                 <p className="flex items-start gap-1.5 text-xs text-amber-800">

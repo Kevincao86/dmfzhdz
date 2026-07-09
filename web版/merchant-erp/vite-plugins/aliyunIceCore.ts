@@ -845,6 +845,7 @@ export async function iceRunImagesPipeline(
     /** 多图合成时的成片总时长（秒），非单张停留时长 */
     totalDurationSec: number
     effectId: string
+    subtitleStyleId?: string
   },
 ): Promise<
   | { ok: true; jobId: string; mediaId?: string }
@@ -955,6 +956,7 @@ export async function iceRunImagesPipeline(
     clipEndSec: input.totalDurationSec,
     imageCount: timelineUrls.length,
     effectId: input.effectId,
+    subtitleStyleId: input.subtitleStyleId,
   })
   const plan = await sanitizeIceBriefAudioPlan(rawPlan, cfg)
   const timelineSources = useMediaIdTimeline ? mediaIds : timelineUrls
@@ -1010,6 +1012,7 @@ export async function iceRunSinglePipeline(
     height: number
     clipEndSec: number
     effectId: string
+    subtitleStyleId?: string
   },
 ): Promise<
   | { ok: true; jobId: string; mediaId?: string }
@@ -1036,6 +1039,7 @@ export async function iceRunSinglePipeline(
     clipEndSec: input.clipEndSec,
     imageCount: 0,
     effectId: input.effectId,
+    subtitleStyleId: input.subtitleStyleId,
   })
   const plan = await sanitizeIceBriefAudioPlan(rawPlan, cfg)
   const timeline = buildTimeline(up.mediaId, plan, up.sourceDurationSec)
@@ -1093,6 +1097,7 @@ export async function iceRunMixPipeline(
     height: number
     totalDurationSec: number
     effectId: string
+    subtitleStyleId?: string
   },
 ): Promise<
   | { ok: true; jobId: string; mediaId?: string }
@@ -1153,6 +1158,7 @@ export async function iceRunMixPipeline(
     clipEndSec: input.totalDurationSec,
     imageCount: 0,
     effectId: input.effectId,
+    subtitleStyleId: input.subtitleStyleId,
   })
   const captionOverrides = input.segments
     .filter((s) => s.caption?.trim())
