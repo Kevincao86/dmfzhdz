@@ -21,6 +21,13 @@ import {
 } from '../../lib/partnerServiceProviderGate'
 import { supabase, supabaseConfigured } from '../../lib/supabaseClient'
 import { toUserFacingError } from '../../lib/userFacingError'
+import {
+  linkeOnboardStatusLabel,
+  listPartnerLinkeOnboarding,
+  retryPartnerLinkeCooperation,
+  startPartnerLinkeInvite,
+  type PartnerLinkeOnboardItem,
+} from '../../services/partnerLinkeOnboardClient'
 
 const PARTNER_CLIENT_PLATFORMS = MERCHANT_BACKEND_PLATFORMS.filter((p) =>
   (['douyin', 'kuaishou'] as const).includes(p.id as 'douyin' | 'kuaishou'),
@@ -40,6 +47,12 @@ export default function PartnerClientsSection() {
   const [accessToken, setAccessToken] = useState('')
   const [appId, setAppId] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [onboardItems, setOnboardItems] = useState<PartnerLinkeOnboardItem[]>([])
+  const [onboardLoading, setOnboardLoading] = useState(false)
+  const [inviteLabel, setInviteLabel] = useState('')
+  const [inviteBusy, setInviteBusy] = useState(false)
+  const [lastAuthUrl, setLastAuthUrl] = useState<string | null>(null)
+  const [bindMode, setBindMode] = useState<'linke_invite' | 'manual'>('linke_invite')
 
   const provider = plat as MerchantBindingProvider
   const platformLabel = plat === 'douyin' ? '抖音来客' : '快手团购'
@@ -57,6 +70,22 @@ export default function PartnerClientsSection() {
     }
   }, [provider])
 
+  const loadOnboarding = useCallback(async () => {
+    if (plat !== 'douyin') {
+      setOnboardItems([])
+      return
+    }
+    setOnboardLoading(true)
+    try {
+      const items = await listPartnerLinkeOnboarding()
+      setOnboardItems(items)
+    } catch {
+      setOnboardItems([])
+    } finally {
+      setOnboardLoading(false)
+    }
+  }, [plat])
+
   const load = useCallback(async () => {
     if (!supabaseConfigured || !supabase) return
     setLoading(true)
@@ -67,12 +96,13 @@ export default function PartnerClientsSection() {
       setRows(list)
       const picked = pickActivePartnerClient(list, provider)
       if (picked) applyActivePartnerClient(picked)
+      await loadOnboarding()
     } catch (e) {
       setErr(toUserFacingError(e, '加载客户绑定'))
     } finally {
       setLoading(false)
     }
-  }, [provider, loadProviderGate])
+  }, [provider, loadProviderGate, loadOnboarding])
 
   useEffect(() => {
     void load()
@@ -117,6 +147,52 @@ export default function PartnerClientsSection() {
     await deletePartnerClient(supabase, id)
     await load()
     void reloadCtx()
+  }
+
+  const submitInvite = async () => {
+    if (providerBound === false) {
+      setErr(serviceProviderGateHint(provider, { isAgent: profile.isAgent }))
+      return
+    }
+    setInviteBusy(true)
+    setErr(null)
+    try {
+      const out = await startPartnerLinkeInvite({
+        clientLabel: inviteLabel.trim() || undefined,
+      })
+      setLastAuthUrl(out.authUrl)
+      setInviteLabel('')
+      await loadOnboarding()
+      await load()
+      void reloadCtx()
+    } catch (e) {
+      setErr(toUserFacingError(e, '生成林客授权'))
+    } finally {
+      setInviteBusy(false)
+    }
+  }
+
+  const copyAuthUrl = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url)
+      setErr(null)
+    } catch {
+      setErr('复制失败，请手动选中链接复制')
+    }
+  }
+
+  const onRetryCooperation = async (id: string) => {
+    setInviteBusy(true)
+    setErr(null)
+    try {
+      const msg = await retryPartnerLinkeCooperation(id)
+      setErr(msg)
+      await loadOnboarding()
+    } catch (e) {
+      setErr(toUserFacingError(e, '重试代运营合作'))
+    } finally {
+      setInviteBusy(false)
+    }
   }
 
   const submitBind = async () => {
@@ -218,13 +294,175 @@ export default function PartnerClientsSection() {
         }
         onSelectActive={onSelectActive}
         onRemove={(id) => void onRemove(id)}
-        onAddClick={openBindForm}
+        onAddClick={() => {
+          if (plat === 'douyin' && bindMode === 'linke_invite') {
+            setBindMode('manual')
+          }
+          openBindForm()
+        }}
         addDisabled={providerBound === false}
       />
 
       {loading ? <p className="text-sm text-gray-500">加载中…</p> : null}
 
-      {bindOpen ? (
+      {plat === 'douyin' ? (
+        <div className="space-y-4 rounded-xl border border-indigo-100 bg-indigo-50/40 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h4 className="font-medium text-gray-900">林客邀请开通（授权 + 代运营）</h4>
+              <p className="mt-1 text-xs text-gray-600">
+                生成官方授权链接 → 商家在<strong>抖音来客</strong>完成授权 → 系统自动写入客户商家并发起代运营合作 →
+                商家在<strong>来客 App</strong>确认合作。Webhook 地址：
+                <code className="mx-1 rounded bg-white px-1 text-[11px]">/erp-api/meoo-douyin-life-webhook</code>
+              </p>
+            </div>
+            <div className="flex gap-2 text-sm">
+              <button
+                type="button"
+                onClick={() => setBindMode('linke_invite')}
+                className={cn(
+                  'rounded-lg border px-3 py-1.5',
+                  bindMode === 'linke_invite'
+                    ? 'border-indigo-300 bg-white text-indigo-800'
+                    : 'border-gray-200 bg-white/60 text-gray-600',
+                )}
+              >
+                邀请开通
+              </button>
+              <button
+                type="button"
+                onClick={() => setBindMode('manual')}
+                className={cn(
+                  'rounded-lg border px-3 py-1.5',
+                  bindMode === 'manual'
+                    ? 'border-indigo-300 bg-white text-indigo-800'
+                    : 'border-gray-200 bg-white/60 text-gray-600',
+                )}
+              >
+                手工录入
+              </button>
+            </div>
+          </div>
+
+          {bindMode === 'linke_invite' ? (
+            <div className="space-y-3">
+              <label className="block text-sm">
+                <span className="text-gray-700">客户备注名（可选）</span>
+                <input
+                  className="mt-1 w-full max-w-md rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  value={inviteLabel}
+                  onChange={(e) => setInviteLabel(e.target.value)}
+                  placeholder="例如：XX火锅人民路店"
+                />
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={inviteBusy || providerBound === false}
+                  onClick={() => void submitInvite()}
+                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+                >
+                  {inviteBusy ? '生成中…' : '生成林客授权链接'}
+                </button>
+                <button
+                  type="button"
+                  disabled={onboardLoading}
+                  onClick={() => void loadOnboarding()}
+                  className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  刷新进度
+                </button>
+              </div>
+              {lastAuthUrl ? (
+                <div className="rounded-lg border border-indigo-200 bg-white p-3 text-sm">
+                  <p className="font-medium text-gray-900">最新授权链接（24 小时内有效）</p>
+                  <p className="mt-1 break-all text-xs text-gray-600">{lastAuthUrl}</p>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void copyAuthUrl(lastAuthUrl)}
+                      className="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50"
+                    >
+                      复制链接
+                    </button>
+                    <a
+                      href={lastAuthUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded border border-indigo-300 px-2 py-1 text-xs text-indigo-700 hover:bg-indigo-50"
+                    >
+                      新窗口打开
+                    </a>
+                  </div>
+                </div>
+              ) : null}
+              {onboardLoading ? <p className="text-sm text-gray-500">开通任务加载中…</p> : null}
+              {onboardItems.length > 0 ? (
+                <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+                  <table className="min-w-[640px] w-full text-left text-sm">
+                    <thead className="border-b bg-gray-50 text-gray-600">
+                      <tr>
+                        <th className="px-3 py-2">客户</th>
+                        <th className="px-3 py-2">授权</th>
+                        <th className="px-3 py-2">代运营</th>
+                        <th className="px-3 py-2">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {onboardItems.map((item) => (
+                        <tr key={item.id} className="border-b border-gray-100 last:border-0">
+                          <td className="px-3 py-2">
+                            <div className="font-medium text-gray-900">
+                              {item.clientLabel || item.merchantAccountId || '—'}
+                            </div>
+                            {item.merchantAccountId ? (
+                              <div className="text-xs text-gray-500">{item.merchantAccountId}</div>
+                            ) : null}
+                          </td>
+                          <td className="px-3 py-2 text-gray-700">{linkeOnboardStatusLabel(item)}</td>
+                          <td className="px-3 py-2 text-xs text-gray-600">
+                            {item.cooperationOrderId ? `单号 ${item.cooperationOrderId}` : '—'}
+                            {item.cooperationError ? (
+                              <div className="text-red-600">{item.cooperationError}</div>
+                            ) : null}
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex flex-wrap gap-1">
+                              {item.authUrl && item.authStatus === 'pending' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => void copyAuthUrl(item.authUrl!)}
+                                  className="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50"
+                                >
+                                  复制授权链
+                                </button>
+                              ) : null}
+                              {item.cooperationStatus === 'failed' ? (
+                                <button
+                                  type="button"
+                                  disabled={inviteBusy}
+                                  onClick={() => void onRetryCooperation(item.id)}
+                                  className="rounded border border-amber-300 px-2 py-1 text-xs text-amber-900 hover:bg-amber-50"
+                                >
+                                  重试代运营
+                                </button>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">暂无开通任务，点击上方按钮生成授权链接。</p>
+              )}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {bindOpen && (plat !== 'douyin' || bindMode === 'manual') ? (
         <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-5 space-y-4">
           <h4 className="font-medium text-gray-900">添加客户 · {platformLabel}商家</h4>
           <p className="text-xs text-gray-600">
