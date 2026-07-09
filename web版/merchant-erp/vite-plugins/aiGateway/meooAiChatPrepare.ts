@@ -113,11 +113,16 @@ export async function prepareMeooAiChat(
   const rawModel = typeof parsed.model === 'string' ? parsed.model.trim() : ''
   const modelFamily = provider === 'tokenmix' ? normalizeAiModelFamily(parsed.modelFamily) : undefined
 
+  const parsedImages = Array.isArray(parsed.imageDataUrls)
+    ? parsed.imageDataUrls
+        .filter((x): x is string => typeof x === 'string' && x.startsWith('data:image/'))
+        .slice(0, MAX_AI_CHAT_IMAGE_ATTACHMENTS)
+    : []
+  /** 豆包 / 通义 / TokenMix 均支持多模态；此前仅 tokenmix 透传导致混剪素材分析「只见编号不见画面」 */
   const imageDataUrls =
-    provider === 'tokenmix' && Array.isArray(parsed.imageDataUrls)
-      ? parsed.imageDataUrls
-          .filter((x): x is string => typeof x === 'string' && x.startsWith('data:image/'))
-          .slice(0, MAX_AI_CHAT_IMAGE_ATTACHMENTS)
+    parsedImages.length > 0 &&
+    (provider === 'tokenmix' || provider === 'doubao' || provider === 'qwen')
+      ? parsedImages
       : undefined
 
   const taskType =

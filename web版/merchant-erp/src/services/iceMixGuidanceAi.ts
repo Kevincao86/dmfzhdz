@@ -19,12 +19,16 @@ const MIX_GUIDANCE_SYSTEM = `你是本地生活/电商短视频编导，负责�
 
 要求：约 150–380 字；具体、可画面化；适合后续 AI 自动规划分镜表。
 禁止：Markdown、JSON、列表编号、「灵祺/云剪/ERP」等平台名；勿写总时长/画幅/BGM 等技术参数。
-若下方【画面理解（AI）】已有内容，必须基于画面细节撰写，禁止写「暂未获取到素材画面」等推脱句。
+禁止：写「暂未获取画面」「仅获得编号」「请补充画面描述」等推脱句——下方【画面理解】已是 AI 看图结果，必须据此撰写。
 只输出指导正文一段。`
 
-const FRAME_VISION_SYSTEM = `你是短视频素材分析师。用户会提供从实拍视频截取的采样帧（可能含门店、产品、人物、环境）。
-请用中文简要描述每张图：场景类型、可见主体、色调氛围、可提炼的卖点线索。
-多张图时用空行分隔，每段开头标注「素材N：」。不要 JSON。`
+const FRAME_VISION_SYSTEM = `你是短视频素材分析师。用户会附上从实拍视频/图片截取的采样帧。
+请用中文描述每张图：场景类型、可见主体（产品/门店/人物/招牌文字等）、色调氛围、可提炼的卖点线索。
+必须基于图像内容描述，不要复述文件名或编号；若确实看不清内容才写「画面模糊」。
+多张图时空行分隔，每段开头标注「素材N：」。不要 JSON。`
+
+const VISION_FAIL_RE =
+  /暂未获取|仅获得编号|尚未获取|无法看到|看不清|没有图|无图|请补充.*画面|缺少.*画面|未提供.*画面/i
 
 function sampleMaterials(materials: IceMixMaterialSlot[], max: number): IceMixMaterialSlot[] {
   if (materials.length <= max) return [...materials]
@@ -53,15 +57,21 @@ function visionUrlCandidates(mat: IceMixMaterialSlot): string[] {
 
 function buildMaterialInventory(materials: IceMixMaterialSlot[], sampled: IceMixMaterialSlot[]): string {
   const lines = [
-    '【素材清单】',
+    '【素材清单（辅助，勿在成稿中复述编号）】',
     `共 ${materials.length} 个（视频 ${materials.filter((m) => m.kind === 'video').length} · 图片 ${materials.filter((m) => m.kind === 'image').length}）`,
-    '本次 AI 采样分析：',
     ...sampled.map(
       (m, i) =>
         `  ${i + 1}. ${m.kind === 'video' ? '视频' : '图片'} · ${m.label || `素材${i + 1}`}`,
     ),
   ]
   return lines.join('\n')
+}
+
+function isVisionNotesUsable(notes: string): boolean {
+  const t = notes.trim()
+  if (t.length < 24) return false
+  if (VISION_FAIL_RE.test(t)) return false
+  return true
 }
 
 async function analyzeImageMaterials(
@@ -76,12 +86,13 @@ async function analyzeImageMaterials(
   try {
     const q = await postDouyinProductQualityAnalysis(products, { timeoutMs: 90_000 })
     if (q.ok && q.items?.length) {
-      return q.items
+      const text = q.items
         .map(
           (it) =>
             `${it.productName}：${it.mainImage.comment}${it.suggestions?.length ? `；建议：${it.suggestions.slice(0, 2).join('；')}` : ''}`,
         )
         .join('\n')
+      if (isVisionNotesUsable(text)) return text
     }
   } catch {
     /* fallback below */
@@ -167,23 +178,30 @@ async function describeVideoFrames(
   frames: { label: string; dataUrl: string }[],
 ): Promise<string> {
   if (frames.length === 0) return ''
-  try {
-    const res = await postAiChat({
-      provider: 'doubao',
-      temperature: 0.35,
-      imageDataUrls: frames.map((f) => f.dataUrl),
-      messages: [
-        { role: 'system', content: FRAME_VISION_SYSTEM },
-        {
-          role: 'user',
-          content: frames.map((f, i) => `素材${i + 1}（${f.label}）`).join('\n'),
-        },
-      ],
-    })
-    return res.content?.trim() || ''
-  } catch {
-    return ''
+  const imageDataUrls = frames.map((f) => f.dataUrl)
+  const userText = frames.map((f, i) => `素材${i + 1}（${f.label}）`).join('\n')
+  const providers: Array<'doubao' | 'qwen' | 'tokenmix'> = ['doubao', 'qwen', 'tokenmix']
+  let lastErr = ''
+  for (const provider of providers) {
+    try {
+      const res = await postAiChat({
+        provider,
+        ...(provider === 'tokenmix' ? { modelFamily: 'openai' as const, model: 'gpt-4o' } : {}),
+        temperature: 0.35,
+        imageDataUrls,
+        messages: [
+          { role: 'system', content: FRAME_VISION_SYSTEM },
+          { role: 'user', content: userText },
+        ],
+      })
+      const text = res.content?.trim() || ''
+      if (isVisionNotesUsable(text)) return text
+      lastErr = '视觉模型未返回有效画面描述'
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+    }
   }
+  throw new Error(lastErr || '视觉模型无法理解素材画面')
 }
 
 async function generateGuidanceText(
@@ -192,13 +210,11 @@ async function generateGuidanceText(
   opts: { targetTotalSec: number; aspectLabel: string; userHint?: string },
 ): Promise<{ ok: true; text: string } | { ok: false; message: string }> {
   const userBlock = [
+    `【画面理解（AI 看图）】\n${visionNotes}`,
     inventory,
-    visionNotes ? `\n【画面理解（AI）】\n${visionNotes}` : '',
     `\n目标成片约 ${opts.targetTotalSec} 秒；画幅 ${opts.aspectLabel}。`,
     opts.userHint?.trim() ? `商家补充：${opts.userHint.trim()}` : '',
-    visionNotes
-      ? '\n请根据以上素材画面理解撰写混剪指导文案。'
-      : '\n画面采样未完全成功，请结合素材文件名与清单合理推断，但仍需写出具体可拍的分镜方向，勿写「暂未获取画面」类表述。',
+    '\n请严格根据「画面理解」中的可见细节撰写混剪指导文案，勿提及素材编号或文件名。',
   ]
     .filter(Boolean)
     .join('\n')
@@ -216,8 +232,8 @@ async function generateGuidanceText(
         ],
       })
       const text = res.content?.trim()
-      if (text && text.length >= 20) return { ok: true, text }
-      lastMsg = 'AI 返回内容过短，请重试'
+      if (text && text.length >= 20 && !VISION_FAIL_RE.test(text)) return { ok: true, text }
+      lastMsg = VISION_FAIL_RE.test(text || '') ? '成稿仍缺少画面细节，请重试' : 'AI 返回内容过短，请重试'
     } catch (e) {
       lastMsg = e instanceof Error ? e.message : String(e)
     }
@@ -243,24 +259,41 @@ export async function analyzeIceMixMaterialsToGuidance(opts: {
   const videos = sampled.filter((m) => m.kind === 'video')
 
   opts.onProgress?.('AI 正在分析图片素材…')
-  const imageNotes = await analyzeImageMaterials(images)
-
-  const frames = await extractVideoFrameDataUrls(videos, opts.onProgress)
-  opts.onProgress?.('AI 正在理解视频画面…')
-  const videoNotes = await describeVideoFrames(frames)
-
-  const visionParts = [imageNotes, videoNotes].filter(Boolean)
-  if (visionParts.length === 0 && materials.length > 0) {
-    const ossCount = materials.filter((m) =>
-      visionUrlCandidates(m).some((u) => isOssMaterialUrl(u)),
-    ).length
-    return {
-      ok: false,
-      message:
-        ossCount > 0
-          ? '无法读取已上传 OSS 素材画面，请确认运营台已配置 ICE/OSS 密钥且素材为常见 MP4/MOV 格式，然后重新上传再试。'
-          : '无法从素材中截取有效画面，请确认视频为公网可访问地址或重新本地上传后再试。',
+  let imageNotes = ''
+  try {
+    imageNotes = await analyzeImageMaterials(images)
+  } catch (e) {
+    if (videos.length === 0) {
+      return { ok: false, message: e instanceof Error ? e.message : String(e) }
     }
+  }
+
+  let videoNotes = ''
+  if (videos.length > 0) {
+    const frames = await extractVideoFrameDataUrls(videos, opts.onProgress)
+    if (frames.length === 0) {
+      const ossCount = materials.filter((m) =>
+        visionUrlCandidates(m).some((u) => isOssMaterialUrl(u)),
+      ).length
+      return {
+        ok: false,
+        message:
+          ossCount > 0
+            ? '无法从 OSS 素材截取画面，请确认素材为 MP4/MOV 且 ICE/OSS 已配置，然后重新上传再试。'
+            : '无法从素材中截取有效画面，请重新本地上传后再试。',
+      }
+    }
+    opts.onProgress?.('AI 正在理解视频画面…')
+    try {
+      videoNotes = await describeVideoFrames(frames)
+    } catch (e) {
+      return { ok: false, message: e instanceof Error ? e.message : 'AI 无法理解视频画面，请稍后重试' }
+    }
+  }
+
+  const visionParts = [imageNotes, videoNotes].filter(isVisionNotesUsable)
+  if (visionParts.length === 0) {
+    return { ok: false, message: 'AI 未能从素材中识别有效画面内容，请换更清晰的素材或重新上传后重试。' }
   }
 
   opts.onProgress?.('AI 正在撰写指导文案…')
