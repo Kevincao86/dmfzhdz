@@ -262,6 +262,8 @@ export type IceMixResolvedClip = {
   timelineStartSec: number
   timelineEndSec: number
   sourceDurationSec?: number
+  /** 源素材内截取起点 */
+  sourceInSec?: number
 }
 
 /** 多素材混剪：视频轨按分镜时间段拼接；有 TTS 口播时原片静音 */
@@ -295,14 +297,16 @@ export function buildTimelineFromMixClips(
       clips.push(clip)
       continue
     }
-    const maxOut =
-      seg.sourceDurationSec && seg.sourceDurationSec > 0
-        ? Math.min(dur, seg.sourceDurationSec)
+    const sourceIn = Math.max(0, seg.sourceInSec ?? 0)
+    const avail =
+      seg.sourceDurationSec && seg.sourceDurationSec > sourceIn
+        ? seg.sourceDurationSec - sourceIn
         : dur
+    const maxOut = Math.max(0.35, Math.min(dur, avail))
     const clip: Record<string, unknown> = {
       ...ref,
-      In: 0,
-      Out: maxOut,
+      In: sourceIn,
+      Out: sourceIn + maxOut,
       Duration: maxOut,
       TimelineIn: seg.timelineStartSec,
       TimelineOut: seg.timelineEndSec,
@@ -1093,6 +1097,8 @@ export async function iceRunMixPipeline(
       timelineEndSec: number
       caption?: string
       materialIndex?: number
+      sourceInSec?: number
+      sourceOutSec?: number
     }>
     projectName: string
     editBrief: string
@@ -1122,10 +1128,18 @@ export async function iceRunMixPipeline(
     }
   })
   const distinctUrls = new Set(urlKeys.filter(Boolean))
-  if (input.segments.length >= 2 && distinctUrls.size < 2) {
+  const sourceIns = input.segments.map((s) => Math.round((s.sourceInSec ?? 0) * 10) / 10)
+  const distinctSourceIns = new Set(sourceIns)
+  if (
+    input.segments.length >= 2 &&
+    distinctUrls.size < 2 &&
+    distinctSourceIns.size < 2 &&
+    sourceIns.every((x) => x < 0.05)
+  ) {
     return {
       ok: false,
-      message: '混剪素材 URL 重复：请确认已上传多条不同视频后再提交',
+      message:
+        '混剪须按指令截取不同片段：多条分镜指向同一素材且未规划截取点，请完善分镜画面描述或重新分析素材',
       step: 'validate',
     }
   }
@@ -1153,6 +1167,7 @@ export async function iceRunMixPipeline(
         mediaId: up.mediaId,
         timelineStartSec: seg.timelineStartSec,
         timelineEndSec: seg.timelineEndSec,
+        sourceInSec: 0,
       })
       continue
     }
@@ -1172,15 +1187,24 @@ export async function iceRunMixPipeline(
       timelineStartSec: seg.timelineStartSec,
       timelineEndSec: seg.timelineEndSec,
       sourceDurationSec: up.sourceDurationSec,
+      sourceInSec: Math.max(0, seg.sourceInSec ?? 0),
     })
     seenMediaIds.add(up.mediaId)
   }
 
-  if (input.segments.filter((s) => s.kind === 'video').length >= 2 && seenMediaIds.size < 2) {
-    return {
-      ok: false,
-      message: '多条视频素材入库后 MediaId 相同，请重新上传不同文件后再混剪',
-      step: 'validate',
+  const videoSegCount = input.segments.filter((s) => s.kind === 'video').length
+  if (videoSegCount >= 2 && seenMediaIds.size < 2) {
+    const videoIns = input.segments
+      .filter((s) => s.kind === 'video')
+      .map((s) => Math.round((s.sourceInSec ?? 0) * 10) / 10)
+    const distinctVideoIns = new Set(videoIns)
+    if (distinctVideoIns.size < 2 && videoIns.every((x) => x < 0.05)) {
+      return {
+        ok: false,
+        message:
+          '混剪须截取源片不同位置：多条视频分镜入库后仍从 0 秒起播，请检查分镜与剪辑方案',
+        step: 'validate',
+      }
     }
   }
 

@@ -703,6 +703,8 @@ export async function postIcePipeline(body: {
     timelineEndSec: number
     caption?: string
     materialIndex?: number
+    sourceInSec?: number
+    sourceOutSec?: number
   }>
   /** 混剪 TTS 口播全文（各段 dialogue 合并） */
   mixNarrationText?: string
