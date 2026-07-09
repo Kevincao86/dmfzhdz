@@ -21,6 +21,10 @@ export type IceMixSegmentPlan = {
   materialIndex: number
   timelineStartSec: number
   timelineEndSec: number
+  /** 源素材内截取起点（秒），混剪非从 0 秒硬切 */
+  sourceInSec?: number
+  /** 源素材内截取终点（秒） */
+  sourceOutSec?: number
   caption?: string
 }
 
@@ -120,7 +124,7 @@ export function normalizeMixMaterialSlots(
   return effective
 }
 
-/** 分镜行 → 时间线段；混剪强制按段轮询不同素材（第 i 段 → 素材 i mod N） */
+/** @deprecated 轮播式映射，仅作兜底；一键混剪请用 buildIceMixSegmentsFromEditPlan */
 export function buildIceMixSegmentsFromScript(
   rows: ShortVideoScriptRow[],
   _materialSlots: number[],

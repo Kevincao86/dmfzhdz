@@ -429,6 +429,9 @@ export async function handleAliyunIceRoutes(input: {
             const materialIndex = Number.isFinite(Number(s.materialIndex))
               ? Math.max(0, Number(s.materialIndex))
               : undefined
+            const sourceInSec = Math.max(0, Number(s.sourceInSec) || 0)
+            const sourceOutSec =
+              Number(s.sourceOutSec) > sourceInSec ? Number(s.sourceOutSec) : undefined
             const urlOk =
               /^https?:\/\//i.test(mediaUrl) ||
               mediaUrl.startsWith('oss://') ||
@@ -446,6 +449,8 @@ export async function handleAliyunIceRoutes(input: {
               timelineEndSec,
               caption,
               materialIndex,
+              sourceInSec,
+              sourceOutSec,
             }
           })
           .filter(Boolean)
@@ -477,6 +482,8 @@ export async function handleAliyunIceRoutes(input: {
               timelineEndSec: number
               caption?: string
               materialIndex?: number
+              sourceInSec?: number
+              sourceOutSec?: number
             }>,
             projectName,
             editBrief,

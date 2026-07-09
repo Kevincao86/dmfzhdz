@@ -1,75 +1,57 @@
 #!/usr/bin/env npx tsx
-/**
- * AI混剪：顺序时间轴 + 素材轮询 + 口播合并
- */
 import {
-  assignMixMaterialSlots,
-  buildIceMixSegmentsFromScript,
-  collectMixNarrationText,
-  composeMixEditBrief,
   ensureSequentialMixScriptRows,
-  normalizeMixMaterialSlots,
+  type IceMixMaterialSlot,
 } from '../src/lib/iceMixPlan.ts'
-import { parseIceEditBriefPlan } from '../vite-plugins/iceBriefTimelinePlan.ts'
+import {
+  buildIceMixSegmentsFromEditPlan,
+  fallbackMixEditDecisions,
+  type IceMixMaterialProfile,
+} from '../src/services/iceMixEditPlanAi.ts'
 import type { ShortVideoScriptRow } from '../src/lib/shortVideoScriptTable.ts'
 
-const overlappingRows: ShortVideoScriptRow[] = [
-  { timeRange: '0-4秒', visual: '门店', dialogue: '欢迎来到我们的店' },
-  { timeRange: '0-4秒', visual: '产品', dialogue: '这是招牌产品' },
-  { timeRange: '0-4秒', visual: '后厨', dialogue: '新鲜现做' },
-  { timeRange: '0-4秒', visual: '顾客', dialogue: '体验很好' },
+const rows: ShortVideoScriptRow[] = [
+  { timeRange: '0-4秒', visual: '门店外观招牌', dialogue: '走进这家藏在巷子里的小店' },
+  { timeRange: '0-4秒', visual: '后厨制作过程', dialogue: '师傅现做现卖' },
+  { timeRange: '0-4秒', visual: '成品特写摆盘', dialogue: '这一口真的绝了' },
 ]
-const fixed = ensureSequentialMixScriptRows(overlappingRows, 20)
-const starts = fixed.map((r) => r.timeRange)
-if (starts[0] !== '0-5秒' || starts[1] !== '5-10秒' || starts[3] !== '15-20秒') {
-  console.error('FAIL: ensureSequentialMixScriptRows', starts)
+const fixed = ensureSequentialMixScriptRows(rows, 12)
+if (fixed[1]?.timeRange !== '4-8秒') {
+  console.error('FAIL: sequential rows', fixed.map((r) => r.timeRange))
   process.exit(1)
 }
 
-const materials = [
-  { kind: 'video' as const, mediaUrl: 'oss://a/v1.mp4', label: '素材1' },
-  { kind: 'video' as const, mediaUrl: 'oss://a/v2.mp4', label: '素材2' },
-  { kind: 'video' as const, mediaUrl: 'oss://a/v3.mp4', label: '素材3' },
-  { kind: 'video' as const, mediaUrl: 'oss://a/v4.mp4', label: '素材4' },
+const materials: IceMixMaterialSlot[] = [
+  { kind: 'video', mediaUrl: 'oss://a/v1.mp4', label: '门店' },
+  { kind: 'video', mediaUrl: 'oss://a/v2.mp4', label: '后厨' },
+  { kind: 'video', mediaUrl: 'oss://a/v3.mp4', label: '成品' },
+]
+const profiles: IceMixMaterialProfile[] = [
+  { index: 0, label: '门店', kind: 'video', description: '门店外观与招牌', estimatedDurationSec: 12 },
+  { index: 1, label: '后厨', kind: 'video', description: '后厨烹饪操作过程', estimatedDurationSec: 12 },
+  { index: 2, label: '成品', kind: 'video', description: '成品摆盘特写', estimatedDurationSec: 12 },
 ]
 
-const stuckSlots = [0, 0, 0, 0]
-const segments = buildIceMixSegmentsFromScript(overlappingRows, stuckSlots, materials, 20)
-const idxs = segments.map((s) => s.materialIndex)
-if (idxs.join(',') !== '0,1,2,3') {
-  console.error('FAIL: material round-robin', idxs)
+const decisions = fallbackMixEditDecisions(fixed, profiles)
+const seg0 = decisions[0]!
+const seg1 = decisions[1]!
+if (seg0.materialIndex === seg1.materialIndex && seg0.sourceInSec === seg1.sourceInSec) {
+  console.error('FAIL: should pick different clips', decisions)
   process.exit(1)
 }
-const timelineStarts = segments.map((s) => s.timelineStartSec)
-if (new Set(timelineStarts).size !== 4) {
-  console.error('FAIL: timeline overlap', segments.map((s) => [s.timelineStartSec, s.timelineEndSec]))
-  process.exit(1)
-}
-
-const narration = collectMixNarrationText(fixed)
-if (!narration.includes('欢迎') || !narration.includes('体验')) {
-  console.error('FAIL: collectMixNarrationText', narration)
+if (seg1.materialIndex !== 1) {
+  console.error('FAIL: kitchen segment should map to material 1', seg1)
   process.exit(1)
 }
 
-const brief = composeMixEditBrief('探店混剪', fixed)
-const mixPlan = parseIceEditBriefPlan(brief, {
-  clipEndSec: 20,
-  effectId: 'trans_fade',
-  mixMode: true,
-})
-if (mixPlan.bgmClip || mixPlan.sfxClips.length > 0) {
-  console.error('FAIL: mixMode should not auto-add audio', mixPlan)
+const segments = buildIceMixSegmentsFromEditPlan(fixed, materials, decisions, 12)
+if (segments.some((s) => s.sourceInSec == null || s.sourceInSec < 0)) {
+  console.error('FAIL: missing sourceInSec', segments)
+  process.exit(1)
+}
+if (segments[0]!.timelineStartSec !== 0 || segments[1]!.timelineStartSec > segments[0]!.timelineEndSec) {
+  console.error('FAIL: timeline overlap', segments)
   process.exit(1)
 }
 
-if (assignMixMaterialSlots(5, 4).join(',') !== '0,1,2,3,0') {
-  console.error('FAIL: assignMixMaterialSlots')
-  process.exit(1)
-}
-if (normalizeMixMaterialSlots([0, 0, 0, 0, 0], 5, 4).join(',') !== '0,1,2,3,0') {
-  console.error('FAIL: normalizeMixMaterialSlots')
-  process.exit(1)
-}
-
-console.log('OK: ice mix sequential timeline + round-robin materials + narration')
+console.log('OK: instruction-driven mix edit plan (semantic match + sourceInSec)')
