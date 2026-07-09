@@ -7,12 +7,15 @@ Page({
   data: {
     loading: true,
     bound: false,
+    needLogin: false,
+    needProfile: false,
     oaDisplayName: '灵祺星选',
     qrUrl: '',
     expiresAt: '',
     polling: false,
     creating: false,
     talentMemberId: '',
+    boundAt: '',
   },
 
   _pollTimer: null,
@@ -45,12 +48,26 @@ Page({
   },
 
   async refreshStatus() {
+    if (!auth.isLoggedIn()) {
+      this.setData({
+        loading: false,
+        bound: false,
+        needLogin: true,
+        needProfile: false,
+      })
+      return false
+    }
     const talentMemberId = this.talentId()
     if (!talentMemberId) {
-      this.setData({ loading: false, bound: false })
-      return
+      this.setData({
+        loading: false,
+        bound: false,
+        needLogin: false,
+        needProfile: true,
+      })
+      return false
     }
-    this.setData({ loading: true, talentMemberId })
+    this.setData({ loading: true, talentMemberId, needLogin: false, needProfile: false })
     try {
       const res = await oaBind.getStatus(talentMemberId)
       const bound = !!res.bound
@@ -78,6 +95,10 @@ Page({
   },
 
   async onCreateQr() {
+    if (!auth.isLoggedIn()) {
+      wx.showToast({ title: '请先登录', icon: 'none' })
+      return
+    }
     const talentMemberId = this.talentId()
     if (!talentMemberId) {
       wx.showToast({ title: '请先完善达人资料', icon: 'none' })
@@ -97,6 +118,18 @@ Page({
       this.setData({ creating: false })
       wx.showToast({ title: e.message || '获取二维码失败', icon: 'none' })
     }
+  },
+
+  onGoLogin() {
+    wx.navigateTo({ url: '/pages/login/login' })
+  },
+
+  onGoProfile() {
+    wx.navigateTo({ url: '/pages/register/register?edit=1' })
+  },
+
+  onGoInvites() {
+    wx.navigateTo({ url: '/pages/subpack-mine/mine-targeted-invites/mine-targeted-invites' })
   },
 
   onPreviewQr() {
