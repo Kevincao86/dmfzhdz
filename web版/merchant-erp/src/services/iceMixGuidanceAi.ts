@@ -1,18 +1,14 @@
 import { extractVideoFirstFramePureBase64, imageUrlToPureBase64 } from '../lib/videoFrameUtils'
 import { postAiChat } from './ai/aiClient'
-import { postDouyinProductQualityAnalysis } from './douyinAiAssistApi'
 import { downloadVideoUrlAsBlob, postVideoLastFrameFromUrl } from './videoAiApi'
 import type { IceMixMaterialSlot } from '../lib/iceMixPlan'
 import type { IceMixMaterialProfile } from './iceMixEditPlanAi'
 import { runIceUploadPool } from '../lib/iceUploadPool'
 
 const VISION_SAMPLE_MAX = 8
-const VIDEO_FRAME_SAMPLE_MAX = 4
-const VIDEO_FRAME_CONCURRENCY = 3
 /** 素材分析：超过此数量只抽样深度理解，其余用文件名占位 */
 const MATERIAL_PROFILE_DEEP_MAX = 8
 const MATERIAL_PROFILE_CONCURRENCY = 5
-const MATERIAL_PROFILE_ITEM_TIMEOUT_MS = 25_000
 const MATERIAL_FRAME_TIMEOUT_MS = 20_000
 const MATERIAL_VISION_BATCH_TIMEOUT_MS = 55_000
 
@@ -47,11 +43,6 @@ function sampleMaterials(materials: IceMixMaterialSlot[], max: number): IceMixMa
   return out
 }
 
-function isOssMaterialUrl(url: string): boolean {
-  const u = url.trim()
-  return u.startsWith('oss://') || /\.oss-[a-z0-9-]+\.aliyuncs\.com\//i.test(u)
-}
-
 /** 服务端截帧优先 canonical OSS 直链（私有桶由服务端 ICE 凭证重签） */
 function visionUrlCandidates(mat: IceMixMaterialSlot): string[] {
   const media = (mat.mediaUrl || '').trim()
@@ -79,51 +70,6 @@ function isVisionNotesUsable(notes: string): boolean {
   if (t.length < 24) return false
   if (VISION_FAIL_RE.test(t)) return false
   return true
-}
-
-async function analyzeImageMaterials(
-  images: IceMixMaterialSlot[],
-): Promise<string> {
-  if (images.length === 0) return ''
-  const products = images.slice(0, VISION_SAMPLE_MAX).map((m, i) => ({
-    id: `ice-mix-img-${i + 1}`,
-    name: m.label || `图片素材${i + 1}`,
-    main_image_url: visionUrlCandidates(m)[0] || '',
-  }))
-  try {
-    const q = await postDouyinProductQualityAnalysis(products, { timeoutMs: 90_000 })
-    if (q.ok && q.items?.length) {
-      const text = q.items
-        .map(
-          (it) =>
-            `${it.productName}：${it.mainImage.comment}${it.suggestions?.length ? `；建议：${it.suggestions.slice(0, 2).join('；')}` : ''}`,
-        )
-        .join('\n')
-      if (isVisionNotesUsable(text)) return text
-    }
-  } catch {
-    /* fallback below */
-  }
-
-  const frames: { label: string; dataUrl: string }[] = []
-  for (const mat of images.slice(0, VISION_SAMPLE_MAX)) {
-    for (const url of visionUrlCandidates(mat)) {
-      try {
-        const pure = await imageUrlToPureBase64(url)
-        if (pure.length >= 64) {
-          frames.push({
-            label: mat.label || '图片素材',
-            dataUrl: `data:image/jpeg;base64,${pure}`,
-          })
-          break
-        }
-      } catch {
-        /* try next url */
-      }
-    }
-  }
-  if (frames.length === 0) return ''
-  return describeVideoFrames(frames)
 }
 
 function stubMaterialProfile(mat: IceMixMaterialSlot, index: number): IceMixMaterialProfile {
@@ -217,27 +163,6 @@ async function extractOneVideoFrame(
   }
 
   return null
-}
-
-async function extractVideoFrameDataUrls(
-  videos: IceMixMaterialSlot[],
-  onProgress?: (msg: string) => void,
-): Promise<{ label: string; dataUrl: string }[]> {
-  const picked = videos.slice(0, VIDEO_FRAME_SAMPLE_MAX)
-  if (picked.length === 0) return []
-
-  onProgress?.(`正在截取 ${picked.length} 条视频采样帧…`)
-  const out: { label: string; dataUrl: string }[] = []
-
-  await runIceUploadPool(picked, VIDEO_FRAME_CONCURRENCY, async (mat) => {
-    return extractOneVideoFrame(mat, onProgress)
-  }).then((results) => {
-    for (const row of results) {
-      if (row) out.push(row)
-    }
-  })
-
-  return out
 }
 
 /** 为每条素材建立画面理解（批量截帧 + 单次 AI 看图，避免 N 次串行调用） */
