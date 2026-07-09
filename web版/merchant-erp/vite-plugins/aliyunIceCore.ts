@@ -264,13 +264,14 @@ export type IceMixResolvedClip = {
   sourceDurationSec?: number
 }
 
-/** 多素材混剪：视频轨按分镜时间段拼接，图片段同多图轮播 */
+/** 多素材混剪：视频轨按分镜时间段拼接；有 TTS 口播时原片静音 */
 export function buildTimelineFromMixClips(
   resolved: IceMixResolvedClip[],
   plan: IceBriefTimelinePlan,
   width: number,
   height: number,
 ): object {
+  const muteSource = Boolean(plan.narrationClip)
   const clips: Record<string, unknown>[] = []
   for (let i = 0; i < resolved.length; i++) {
     const seg = resolved[i]!
@@ -305,6 +306,7 @@ export function buildTimelineFromMixClips(
       Duration: maxOut,
       TimelineIn: seg.timelineStartSec,
       TimelineOut: seg.timelineEndSec,
+      ...(muteSource ? { Volume: 0 } : {}),
     }
     const effects: Record<string, unknown>[] = []
     appendClipEffects(effects, plan, maxOut, i, resolved.length)
@@ -1079,7 +1081,7 @@ export async function iceRunSinglePipeline(
   }
 }
 
-/** AI混剪：多分镜 + 多素材 → 单条 ICE 成片 */
+/** AI混剪：多分镜 + 多素材 + TTS 口播 → 单条 ICE 成片 */
 export async function iceRunMixPipeline(
   cfg: AliyunIceConfig,
   input: {
@@ -1090,6 +1092,7 @@ export async function iceRunMixPipeline(
       timelineStartSec: number
       timelineEndSec: number
       caption?: string
+      materialIndex?: number
     }>
     projectName: string
     editBrief: string
@@ -1098,6 +1101,8 @@ export async function iceRunMixPipeline(
     totalDurationSec: number
     effectId: string
     subtitleStyleId?: string
+    mixNarrationText?: string
+    env?: Record<string, string | undefined>
   },
 ): Promise<
   | { ok: true; jobId: string; mediaId?: string }
@@ -1106,13 +1111,34 @@ export async function iceRunMixPipeline(
   if (!input.segments.length) {
     return { ok: false, message: '混剪分镜为空', step: 'validate' }
   }
+
+  const urlKeys = input.segments.map((s) => {
+    const u = (s.mediaUrl || s.signedMediaUrl || '').trim()
+    try {
+      const parsed = new URL(u.startsWith('oss://') ? `https://x/${u.slice(6)}` : u)
+      return parsed.pathname
+    } catch {
+      return u.split('?')[0]!
+    }
+  })
+  const distinctUrls = new Set(urlKeys.filter(Boolean))
+  if (input.segments.length >= 2 && distinctUrls.size < 2) {
+    return {
+      ok: false,
+      message: '混剪素材 URL 重复：请确认已上传多条不同视频后再提交',
+      step: 'validate',
+    }
+  }
+
   const client = createClient(cfg)
   const jobKey = `meoo-mix-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const resolved: IceMixResolvedClip[] = []
+  const seenMediaIds = new Set<string>()
 
   for (let i = 0; i < input.segments.length; i++) {
     const seg = input.segments[i]!
-    const title = `${input.projectName}-混剪${i + 1}`.slice(0, 120)
+    const matNo = (seg.materialIndex ?? i) + 1
+    const title = `${input.projectName}-素材${matNo}`.slice(0, 120)
     if (seg.kind === 'image') {
       const up = await registerImageUrlToMediaId(client, cfg, seg.mediaUrl, title)
       if (!up.ok) {
@@ -1147,6 +1173,15 @@ export async function iceRunMixPipeline(
       timelineEndSec: seg.timelineEndSec,
       sourceDurationSec: up.sourceDurationSec,
     })
+    seenMediaIds.add(up.mediaId)
+  }
+
+  if (input.segments.filter((s) => s.kind === 'video').length >= 2 && seenMediaIds.size < 2) {
+    return {
+      ok: false,
+      message: '多条视频素材入库后 MediaId 相同，请重新上传不同文件后再混剪',
+      step: 'validate',
+    }
   }
 
   const out = buildOutputConfig(cfg, input.width, input.height, jobKey)
@@ -1174,7 +1209,28 @@ export async function iceRunMixPipeline(
       : rawPlan,
     cfg,
   )
-  const timeline = buildTimelineFromMixClips(resolved, plan, input.width, input.height)
+
+  let finalPlan = plan
+  const narrationText = String(input.mixNarrationText ?? '').trim()
+  if (narrationText.length >= 4 && input.env) {
+    const { synthesizeIceMixNarrationMp3 } = await import('./iceMixNarrationTts.js')
+    const tts = await synthesizeIceMixNarrationMp3(cfg, input.env, narrationText)
+    if (tts.ok) {
+      finalPlan = {
+        ...plan,
+        narrationClip: {
+          mediaUrl: tts.timelineUrl,
+          timelineIn: 0,
+          timelineOut: input.totalDurationSec,
+          volume: 1,
+          label: '混剪 TTS 口播',
+        },
+        summary: `${plan.summary}${plan.summary ? ' · ' : ''}TTS 口播`,
+      }
+    }
+  }
+
+  const timeline = buildTimelineFromMixClips(resolved, finalPlan, input.width, input.height)
   try {
     const res = await client.submitMediaProducingJob(
       new SubmitMediaProducingJobRequest({

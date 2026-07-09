@@ -702,7 +702,10 @@ export async function postIcePipeline(body: {
     timelineStartSec: number
     timelineEndSec: number
     caption?: string
+    materialIndex?: number
   }>
+  /** 混剪 TTS 口播全文（各段 dialogue 合并） */
+  mixNarrationText?: string
   projectName?: string
   /** 剪辑文案指令，写入云端项目描述 */
   editBrief?: string

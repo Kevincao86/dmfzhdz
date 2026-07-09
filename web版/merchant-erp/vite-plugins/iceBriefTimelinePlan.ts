@@ -49,6 +49,8 @@ export type IceBriefTimelinePlan = {
   imageDurations: number[]
   /** 指令框解析：背景音乐 */
   bgmClip?: IceAudioClipPlan
+  /** AI混剪：TTS 口播轨（铺满成片，原视频静音） */
+  narrationClip?: IceAudioClipPlan
   /** 指令框解析：背景音效片段 */
   sfxClips: IceAudioClipPlan[]
   summary: string
@@ -444,8 +446,11 @@ export function buildAudioTracksFromPlan(
   plan: IceBriefTimelinePlan,
 ): { AudioTracks: Array<{ AudioTrackClips: Record<string, unknown>[] }> } | Record<string, never> {
   const clips: Record<string, unknown>[] = []
+  if (plan.narrationClip) {
+    clips.push(buildIceAudioTrackClip(plan.narrationClip))
+  }
   if (plan.bgmClip) {
-    clips.push(buildIceAudioTrackClip(plan.bgmClip))
+    clips.push({ ...buildIceAudioTrackClip(plan.bgmClip), Volume: Math.min(plan.bgmClip.volume, 0.18) })
   }
   for (const sfx of plan.sfxClips) {
     clips.push(buildIceAudioTrackClip(sfx))

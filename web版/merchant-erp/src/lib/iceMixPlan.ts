@@ -30,6 +30,68 @@ export function resolveMixTotalDurationSec(rows: ShortVideoScriptRow[], fallback
   return Math.min(120, Math.max(1, fallbackSec))
 }
 
+/** 去掉签名参数，用于判断是否为同一条 OSS 素材 */
+export function canonicalMixMediaKey(url: string): string {
+  const raw = url.trim()
+  if (!raw) return ''
+  if (raw.startsWith('oss://')) return raw.split('?')[0]!
+  try {
+    const u = new URL(raw)
+    return `${u.hostname}${u.pathname}`
+  } catch {
+    return raw.split('?')[0]!
+  }
+}
+
+/**
+ * 混剪时间轴须首尾相接、无重叠（否则 ICE 只显示第一条）。
+ * AI 分镜若返回重复「0-4秒」等，在此强制按段均分 0→total。
+ */
+export function ensureSequentialMixScriptRows(
+  rows: ShortVideoScriptRow[],
+  totalSec: number,
+): ShortVideoScriptRow[] {
+  if (rows.length === 0) return rows
+  const total = Math.min(120, Math.max(1, totalSec))
+  let lastEnd = 0
+  let sequential = true
+  for (const row of rows) {
+    const tr = parseScriptTimeRangeSeconds(row.timeRange)
+    if (!tr || tr.start + 0.05 < lastEnd) {
+      sequential = false
+      break
+    }
+    lastEnd = tr.end
+  }
+  if (sequential && lastEnd >= total - 0.5) return rows
+
+  const each = total / rows.length
+  return rows.map((row, i) => ({
+    ...row,
+    timeRange: `${formatMixSec(i * each)}-${formatMixSec((i + 1) * each)}秒`,
+  }))
+}
+
+function formatMixSec(n: number): string {
+  const v = Math.round(n * 10) / 10
+  return Number.isInteger(v) ? String(v) : v.toFixed(1)
+}
+
+/** 各段口播合并为 TTS 全文（混剪讲解轨） */
+export function collectMixNarrationText(rows: ShortVideoScriptRow[]): string {
+  return rows
+    .map((r) =>
+      r.dialogue
+        .trim()
+        .replace(/^（无口播）$/i, '')
+        .replace(/^["「]|["」]$/g, ''),
+    )
+    .filter((t) => t.length >= 2)
+    .join('。')
+    .replace(/。+/g, '。')
+    .trim()
+}
+
 /** 混剪默认映射：第 i 段 → 第 (i mod 素材数) 条素材 */
 export function assignMixMaterialSlots(rowCount: number, poolLen: number): number[] {
   if (rowCount <= 0 || poolLen <= 0) return []
@@ -58,21 +120,22 @@ export function normalizeMixMaterialSlots(
   return effective
 }
 
-/** 分镜行 → 时间线段；素材按 materialSlots 或轮询分配 */
+/** 分镜行 → 时间线段；混剪强制按段轮询不同素材（第 i 段 → 素材 i mod N） */
 export function buildIceMixSegmentsFromScript(
   rows: ShortVideoScriptRow[],
-  materialSlots: number[],
+  _materialSlots: number[],
   materials: IceMixMaterialSlot[],
   fallbackTotalSec: number,
 ): IceMixSegmentPlan[] {
   if (!rows.length || !materials.length) return []
-  const slots = normalizeMixMaterialSlots(materialSlots, rows.length, materials.length)
   const total = resolveMixTotalDurationSec(rows, fallbackTotalSec)
+  const orderedRows = ensureSequentialMixScriptRows(rows, total)
+  const slots = normalizeMixMaterialSlots(_materialSlots, orderedRows.length, materials.length)
   const segments: IceMixSegmentPlan[] = []
   let cursor = 0
 
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i]!
+  for (let i = 0; i < orderedRows.length; i++) {
+    const row = orderedRows[i]!
     const tr = parseScriptTimeRangeSeconds(row.timeRange)
     let start: number
     let end: number
@@ -80,7 +143,7 @@ export function buildIceMixSegmentsFromScript(
       start = tr.start
       end = Math.min(total, tr.end)
     } else {
-      const each = total / rows.length
+      const each = total / orderedRows.length
       start = cursor
       end = Math.min(total, cursor + each)
       cursor = end
