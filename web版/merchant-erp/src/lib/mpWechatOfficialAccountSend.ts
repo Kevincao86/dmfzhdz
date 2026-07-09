@@ -16,6 +16,33 @@ function merchantNameForOrder(mp: RegistryMpRecruitmentOrder): string {
   return store || customer || '招募商家'
 }
 
+function prContactForOrder(mp: RegistryMpRecruitmentOrder): string {
+  const meta = mp.mpPublishMeta
+  const m = meta && typeof meta === 'object' && !Array.isArray(meta) ? (meta as Record<string, unknown>) : null
+  const fromMeta = String(m?.prDisplayName || m?.publisherDisplayName || '').trim()
+  if (fromMeta) return fromMeta
+  return String(mp.customerName || '').trim() || 'PR'
+}
+
+function formatTemplateTime2(deadline?: string): string {
+  const raw = String(deadline || '').trim()
+  const d = raw ? new Date(raw.replace(/-/g, '/')) : new Date()
+  if (!Number.isFinite(d.getTime())) return raw.slice(0, 20) || '—'
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function inviteDeadlineForOrder(mp: RegistryMpRecruitmentOrder): string {
+  const meta = mp.mpPublishMeta
+  const m = meta && typeof meta === 'object' && !Array.isArray(meta) ? (meta as Record<string, unknown>) : null
+  const deadline = String(m?.inviteDeadline || '').trim()
+  if (deadline) return deadline
+  const hours = Math.max(1, Math.min(720, Math.floor(Number(m?.inviteResponseHours) || 72)))
+  const d = new Date(Date.now() + hours * 3600000)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:00`
+}
+
 export async function sendWechatOaTargetedInviteTemplate(
   oaOpenId: string,
   mp: RegistryMpRecruitmentOrder,
@@ -34,15 +61,12 @@ export async function sendWechatOaTargetedInviteTemplate(
     touser: oid,
     template_id: cfgResult.config.targetedInviteTemplateId,
     data: {
-      first: { value: clipThing('您收到一条定向合作邀约', 20) },
-      keyword1: { value: clipThing(orderTitle(mp)) },
-      keyword2: { value: clipThing(merchantNameForOrder(mp)) },
-      keyword3: { value: clipThing(String(mp.region || '').trim() || '全国') },
-      remark: { value: clipThing('点击进入小程序查看并回复') },
-      thing1: { value: clipThing('定向合作邀约') },
-      thing2: { value: clipThing(orderTitle(mp)) },
-      thing3: { value: clipThing(merchantNameForOrder(mp)) },
-      thing4: { value: clipThing(String(mp.region || '').trim() || '全国') },
+      /** 52247 会议室预约待审批通知 — PR定向合作邀约 */
+      thing3: { value: clipThing(orderTitle(mp)) },
+      time2: { value: formatTemplateTime2(inviteDeadlineForOrder(mp)) },
+      thing1: { value: clipThing(String(mp.region || '').trim() || '全国') },
+      thing9: { value: clipThing(merchantNameForOrder(mp)) },
+      thing4: { value: clipThing(prContactForOrder(mp)) },
     },
   }
 
