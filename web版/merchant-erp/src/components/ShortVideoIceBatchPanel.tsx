@@ -63,11 +63,13 @@ import { parseGuidanceDocumentFile } from '../lib/shortVideoGuidanceDoc'
 import { planShortVideoScriptFromGuidance } from '../services/shortVideoGuidanceAi'
 import { analyzeIceMixMaterialsToGuidance } from '../services/iceMixGuidanceAi'
 import {
+  assignMixMaterialSlots,
   buildIceMixSegmentsFromScript,
   composeMixEditBrief,
   inferIceEffectIdFromMixContent,
   mixStoryboardBriefReady,
   MIX_TARGET_TOTAL_OPTIONS,
+  normalizeMixMaterialSlots,
   resolveMixTotalDurationSec,
   type IceMixMaterialSlot,
 } from '../lib/iceMixPlan'
@@ -278,7 +280,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
 
   const mixMaterialPool = useMemo((): IceMixMaterialSlot[] => {
     const videos: IceMixMaterialSlot[] = jobs
-      .filter((j) => !j.imageUrls?.length)
+      .filter((j) => isIceSourceMaterialJob(j) && !j.imageUrls?.length)
       .map((j) => ({
         kind: 'video' as const,
         mediaUrl: j.mediaUrl,
@@ -308,14 +310,23 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     return items
   }, [mixMaterialPool.length, scriptRows.length, mixGuidance, scriptRows])
 
+  const mixPoolLenRef = useRef(0)
+
   useEffect(() => {
+    const poolLen = mixMaterialPool.length
+    if (poolLen <= 0 || scriptRows.length <= 0) {
+      setMaterialSlots([])
+      mixPoolLenRef.current = 0
+      return
+    }
+    const prevLen = mixPoolLenRef.current
+    const poolGrew = prevLen > 0 && poolLen > prevLen
+    mixPoolLenRef.current = poolLen
     setMaterialSlots((prev) => {
-      const poolLen = Math.max(1, mixMaterialPool.length)
-      const next: number[] = []
-      for (let i = 0; i < scriptRows.length; i++) {
-        next.push(prev[i] ?? i % poolLen)
+      if (poolGrew || prev.length !== scriptRows.length) {
+        return assignMixMaterialSlots(scriptRows.length, poolLen)
       }
-      return next
+      return normalizeMixMaterialSlots(prev, scriptRows.length, poolLen)
     })
   }, [scriptRows.length, mixMaterialPool.length])
 
@@ -726,6 +737,10 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         return
       }
       setScriptRows(r.rows)
+      const poolLen = mixMaterialPool.length
+      if (poolLen > 0) {
+        setMaterialSlots(assignMixMaterialSlots(r.rows.length, poolLen))
+      }
       const covered = maxScriptTimeRangeEndSec(r.rows)
       setHint(
         `AI 已规划 ${r.rows.length} 段混剪分镜（约 0–${covered || mixTargetSec} 秒），请核对分镜表与素材映射后一键混剪。`,
@@ -877,9 +892,14 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       setErr('请先规划至少 2 段分镜（指导文案 → AI 规划分镜）')
       return
     }
+    const slots = normalizeMixMaterialSlots(
+      materialSlots,
+      scriptRows.length,
+      mixMaterialPool.length,
+    )
     const segments = buildIceMixSegmentsFromScript(
       scriptRows,
-      materialSlots,
+      slots,
       mixMaterialPool,
       mixTargetSec,
     )

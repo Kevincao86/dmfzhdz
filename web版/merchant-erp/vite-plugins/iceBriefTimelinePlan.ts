@@ -9,15 +9,15 @@ import {
   resolveIceSubtitleStylePreset,
 } from './iceSubtitleStylePresets.js'
 
-/** IMS 官方文档示例音轨（公网可读，勿用未上传的 meoo-out/stock/*.mp3） */
+/** IMS 官方文档示例纯音乐（勿用 speech.mp3——其为中文朗诵示范，混剪会听到「沙场秋点兵」等诗词） */
 export const ICE_PUBLIC_BGM_URLS = {
   warm: 'https://ice-document-materials.oss-cn-shanghai.aliyuncs.com/test_media/music/m1.wav',
   upbeat: 'https://ice-document-materials.oss-cn-shanghai.aliyuncs.com/test_media/music/m1.wav',
-  calm: 'https://ice-document-materials.oss-cn-shanghai.aliyuncs.com/test_media/music/speech.mp3',
+  calm: 'https://ice-document-materials.oss-cn-shanghai.aliyuncs.com/test_media/music/m1.wav',
 } as const
 
-export const ICE_PUBLIC_SFX_URL =
-  'https://ice-document-materials.oss-cn-shanghai.aliyuncs.com/test_media/music/speech.mp3'
+/** 混剪默认不注入音效轨；保留常量供旧脚本引用，但不再作为 SFX 回退 */
+export const ICE_PUBLIC_SFX_URL = ICE_PUBLIC_BGM_URLS.warm
 
 export type IceAudioClipPlan = {
   mediaUrl: string
@@ -61,15 +61,16 @@ const ICE_BGM_PRESETS: Record<string, { url: string; label: string }> = {
 }
 
 const ICE_SFX_PRESETS: Array<{ re: RegExp; url: string; label: string; dur: number }> = [
-  { re: /碗|瓷|餐具|碰撞/, url: ICE_PUBLIC_SFX_URL, label: '碗碟音效', dur: 1.2 },
-  { re: /锅|炒|烹|厨房/, url: ICE_PUBLIC_SFX_URL, label: '厨房音效', dur: 2 },
-  { re: /吆喝|人声|喧闹|市井/, url: ICE_PUBLIC_SFX_URL, label: '市井人声', dur: 2.5 },
-  { re: /环境|氛围|街道/, url: ICE_PUBLIC_SFX_URL, label: '环境氛围', dur: 3 },
+  { re: /碗碟音效|餐具碰撞/, url: ICE_PUBLIC_SFX_URL, label: '碗碟音效', dur: 1.2 },
+  { re: /厨房音效|炒菜音效/, url: ICE_PUBLIC_SFX_URL, label: '厨房音效', dur: 2 },
+  { re: /市井人声|吆喝音效/, url: ICE_PUBLIC_SFX_URL, label: '市井人声', dur: 2.5 },
+  { re: /环境音效|街道音效/, url: ICE_PUBLIC_SFX_URL, label: '环境氛围', dur: 3 },
 ]
 
 function splitBriefBlocks(brief: string): { instruction: string; copy: string } {
   const raw = brief.trim()
-  const inst = raw.match(/【剪辑指令】\s*([\s\S]*?)(?=\n*【字幕文案】|$)/)?.[1]?.trim() ?? ''
+  const inst =
+    raw.match(/【剪辑指令】\s*([\s\S]*?)(?=\n*【(?:画面指令|字幕文案)】|$)/)?.[1]?.trim() ?? ''
   const copy = raw.match(/【字幕文案】\s*([\s\S]*?)(?=\n*【|$)/)?.[1]?.trim() ?? ''
   if (inst || copy) return { instruction: inst, copy }
   return { instruction: raw, copy: raw }
@@ -78,7 +79,8 @@ function splitBriefBlocks(brief: string): { instruction: string; copy: string } 
 function parseBgmFromInstruction(instruction: string, total: number): IceAudioClipPlan | undefined {
   const t = instruction.trim()
   if (!t) return undefined
-  if (!/BGM|背景音乐|配乐|背景音/.test(t) && !/温暖|轻快|舒缓|祥和|节奏/.test(t)) {
+  /** 混剪须用户在剪辑指令中明确写 BGM/配乐；勿因「节奏」「氛围」等叙事词误加音轨 */
+  if (!/BGM|背景音乐|配乐|背景音/.test(t)) {
     return undefined
   }
   let key: keyof typeof ICE_BGM_PRESETS = 'warm'
@@ -97,7 +99,8 @@ function parseBgmFromInstruction(instruction: string, total: number): IceAudioCl
 
 function parseSfxFromInstruction(instruction: string, total: number): IceAudioClipPlan[] {
   const out: IceAudioClipPlan[] = []
-  if (!/音效|环境音|碗|锅|吆喝|人声|氛围音/.test(instruction)) return out
+  /** 仅剪辑指令中明确写「音效」时才注入，避免画面描述里的「环境/氛围」误触发 */
+  if (!/音效|SFX|环境音|背景音效/.test(instruction)) return out
   let cursor = Math.min(1.5, total * 0.15)
   for (const row of ICE_SFX_PRESETS) {
     if (!row.re.test(instruction)) continue
@@ -123,6 +126,8 @@ export function parseIceEditBriefPlan(
     imageCount?: number
     effectId: string
     subtitleStyleId?: string
+    /** AI混剪：默认不加 BGM/音效，保留实拍原声 */
+    mixMode?: boolean
   },
 ): IceBriefTimelinePlan {
   const brief = editBrief.trim()
@@ -144,8 +149,15 @@ export function parseIceEditBriefPlan(
   const titleText = extractTitleText(copy || brief)
   const imageDurations = computeImageDurations(imageCount, totalDurationSec, openingSec, fastPace)
   const segmentCaptions = buildSegmentCaptions(copy || brief, totalDurationSec, imageDurations, titleText)
-  const bgmClip = parseBgmFromInstruction(instruction, totalDurationSec)
-  const sfxClips = parseSfxFromInstruction(instruction, totalDurationSec)
+  const wantsBgm = /BGM|背景音乐|配乐|背景音/.test(instruction)
+  const bgmClip =
+    opts.mixMode && !wantsBgm
+      ? undefined
+      : parseBgmFromInstruction(instruction, totalDurationSec)
+  const sfxClips =
+    opts.mixMode && !/音效|SFX|环境音|背景音效/.test(instruction)
+      ? []
+      : parseSfxFromInstruction(instruction, totalDurationSec)
   const clipEndSec = totalDurationSec
 
   const summary = [

@@ -30,6 +30,34 @@ export function resolveMixTotalDurationSec(rows: ShortVideoScriptRow[], fallback
   return Math.min(120, Math.max(1, fallbackSec))
 }
 
+/** 混剪默认映射：第 i 段 → 第 (i mod 素材数) 条素材 */
+export function assignMixMaterialSlots(rowCount: number, poolLen: number): number[] {
+  if (rowCount <= 0 || poolLen <= 0) return []
+  return Array.from({ length: rowCount }, (_, i) => i % poolLen)
+}
+
+/**
+ * 纠正「全部指向素材 0」：常见于先有空池再批量上传，或混剪成片误入素材池。
+ * 当素材数 ≥ 2 且段数 ≥ 2 时，若映射全相同则自动轮询。
+ */
+export function normalizeMixMaterialSlots(
+  slots: number[],
+  rowCount: number,
+  poolLen: number,
+): number[] {
+  const roundRobin = assignMixMaterialSlots(rowCount, poolLen)
+  if (rowCount <= 0 || poolLen <= 0) return roundRobin
+  const effective = Array.from({ length: rowCount }, (_, i) => {
+    const raw = slots[i]
+    const idx = raw == null ? roundRobin[i]! : Math.max(0, raw) % poolLen
+    return idx
+  })
+  if (poolLen < 2 || rowCount < 2) return effective
+  const uniq = new Set(effective)
+  if (uniq.size === 1) return roundRobin
+  return effective
+}
+
 /** 分镜行 → 时间线段；素材按 materialSlots 或轮询分配 */
 export function buildIceMixSegmentsFromScript(
   rows: ShortVideoScriptRow[],
@@ -38,6 +66,7 @@ export function buildIceMixSegmentsFromScript(
   fallbackTotalSec: number,
 ): IceMixSegmentPlan[] {
   if (!rows.length || !materials.length) return []
+  const slots = normalizeMixMaterialSlots(materialSlots, rows.length, materials.length)
   const total = resolveMixTotalDurationSec(rows, fallbackTotalSec)
   const segments: IceMixSegmentPlan[] = []
   let cursor = 0
@@ -58,7 +87,7 @@ export function buildIceMixSegmentsFromScript(
     }
     if (end <= start) continue
 
-    const matIdx = Math.max(0, materialSlots[i] ?? i % materials.length) % materials.length
+    const matIdx = slots[i]!
     const mat = materials[matIdx]
     if (!mat) continue
 
@@ -97,7 +126,7 @@ export function inferIceEffectIdFromMixContent(
   return 'trans_fade'
 }
 
-/** 由指导文案 + 分镜表合成 ICE editBrief（字幕、画面指令、全局节奏/BGM） */
+/** 由指导文案 + 分镜表合成 ICE editBrief（字幕、画面指令；BGM 仅写在剪辑指令段） */
 export function composeMixEditBrief(instruction: string, rows: ShortVideoScriptRow[]): string {
   const inst = String(instruction || '').trim()
   const visualLines = rows.map((r) => r.visual.trim()).filter(Boolean)
