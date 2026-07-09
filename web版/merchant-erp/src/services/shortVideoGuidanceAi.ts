@@ -303,12 +303,16 @@ export async function planShortVideoScriptFromGuidance(
   let lastValidation = validateStoryboardRows(rows, planner.effectiveTargetSec)
   validationIssues = lastValidation.issues
 
-  let review1 = plan
-  let review2 = plan
+  let review1UsedAi = false
+  let review2UsedAi = false
+  let review1Vendor: string | undefined
+  let review2Vendor: string | undefined
+  let review1ModelId: string | undefined
+  let review2ModelId: string | undefined
 
   if (!opts.skipReviewPasses) {
     opts.onProgress?.('AI 模型 2 正在检查并补全分镜（禁止空白段）…')
-    review1 = await postLongformVideoPlan({
+    const review1 = await postLongformVideoPlan({
       ...baseBody,
       overallPrompt: plannerInput,
       planStage: 'review',
@@ -319,11 +323,14 @@ export async function planShortVideoScriptFromGuidance(
     if (!review1.ok) return review1
     rows = applyPlanResponseRows(review1.scriptSegments, review1.prompts, opts.segmentSec)
     if (review1.plannerVendor) reviewVendors.push(review1.plannerVendor)
+    review1UsedAi = review1.usedAiPlanner === true
+    review1Vendor = review1.plannerVendor
+    review1ModelId = review1.plannerModelId
     lastValidation = validateStoryboardRows(rows, planner.effectiveTargetSec)
     validationIssues = lastValidation.issues
 
     opts.onProgress?.('AI 模型 3 正在复核分镜（时间段与文案一一对应）…')
-    review2 = await postLongformVideoPlan({
+    const review2 = await postLongformVideoPlan({
       ...baseBody,
       overallPrompt: plannerInput,
       planStage: 'review',
@@ -334,6 +341,9 @@ export async function planShortVideoScriptFromGuidance(
     if (!review2.ok) return review2
     rows = applyPlanResponseRows(review2.scriptSegments, review2.prompts, opts.segmentSec)
     if (review2.plannerVendor) reviewVendors.push(review2.plannerVendor)
+    review2UsedAi = review2.usedAiPlanner === true
+    review2Vendor = review2.plannerVendor
+    review2ModelId = review2.plannerModelId
   } else if (!scriptRowsFullyFilled(rows)) {
     return {
       ok: false,
@@ -360,16 +370,14 @@ export async function planShortVideoScriptFromGuidance(
     ok: true,
     rows,
     segmentCount: rows.length,
-    usedAiPlanner:
-      plan.usedAiPlanner ||
-      (!opts.skipReviewPasses && (review1.usedAiPlanner || review2.usedAiPlanner)),
+    usedAiPlanner: plan.usedAiPlanner || review1UsedAi || review2UsedAi,
     usedRuleBasedFallback: plan.usedRuleBasedFallback,
     plannerVendor: opts.skipReviewPasses
       ? plan.plannerVendor
-      : (review2.plannerVendor ?? review1.plannerVendor ?? plan.plannerVendor),
+      : (review2Vendor ?? review1Vendor ?? plan.plannerVendor),
     plannerModelId: opts.skipReviewPasses
       ? plan.plannerModelId
-      : (review2.plannerModelId ?? review1.plannerModelId ?? plan.plannerModelId),
+      : (review2ModelId ?? review1ModelId ?? plan.plannerModelId),
     reviewVendors,
   }
 }
