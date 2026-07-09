@@ -61,7 +61,7 @@ import { isIceTransientNetworkError } from '../lib/iceTransientNetworkError'
 import ShortVideoScriptTableEditor from './ShortVideoScriptTableEditor'
 import { parseGuidanceDocumentFile } from '../lib/shortVideoGuidanceDoc'
 import { planShortVideoScriptFromGuidance } from '../services/shortVideoGuidanceAi'
-import { analyzeIceMixMaterialsToGuidance, buildMaterialVisionProfiles } from '../services/iceMixGuidanceAi'
+import { analyzeIceMixMaterialsToGuidance } from '../services/iceMixGuidanceAi'
 import {
   buildIceMixSegmentsFromEditPlan,
   planMixEditFromInstructions,
@@ -912,16 +912,20 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
 
     setOneClickBusy(true)
     setErr(null)
-    setHint('AI 正在理解指令并规划剪辑方案…')
+    setHint('正在规划剪辑方案…')
 
-    let profiles = mixMaterialProfiles
-    if (profiles.length < mixMaterialPool.length) {
-      setHint('正在补全素材画面理解…')
-      profiles = await buildMaterialVisionProfiles(mixMaterialPool, (msg) => setHint(msg), {
-        maxDeepAnalyze: 8,
-      })
-      setMixMaterialProfiles(profiles)
-    }
+    const profiles = mixMaterialPool.map((m, i) => {
+      const hit = mixMaterialProfiles.find((p) => p.index === i)
+      return (
+        hit ?? {
+          index: i,
+          label: m.label || `素材${i + 1}`,
+          kind: m.kind,
+          description: m.label || `实拍${m.kind === 'video' ? '视频' : '图片'}`,
+          estimatedDurationSec: m.kind === 'video' ? 6 : undefined,
+        }
+      )
+    })
 
     const editPlan = await planMixEditFromInstructions({
       guidance: mixGuidance.trim() || mixBrief,
@@ -941,6 +945,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       mixMaterialPool,
       editPlan.decisions,
       mixTargetSec,
+      profiles,
     )
     if (segments.length < 2) {
       setErr('剪辑方案无效，请检查分镜表与指导文案')

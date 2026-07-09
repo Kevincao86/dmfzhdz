@@ -1,5 +1,6 @@
 #!/usr/bin/env npx tsx
 import {
+  clampMixSourceInSec,
   ensureSequentialMixScriptRows,
   type IceMixMaterialSlot,
 } from '../src/lib/iceMixPlan.ts'
@@ -54,4 +55,21 @@ if (segments[0]!.timelineStartSec !== 0 || segments[1]!.timelineStartSec > segme
   process.exit(1)
 }
 
-console.log('OK: instruction-driven mix edit plan (semantic match + sourceInSec)')
+const shortClipProfiles: IceMixMaterialProfile[] = [
+  { index: 0, label: '短', kind: 'video', description: '门店', estimatedDurationSec: 4 },
+]
+const shortDecisions = fallbackMixEditDecisions(
+  [{ timeRange: '0-4秒', visual: '成品特写', dialogue: 'test' }],
+  shortClipProfiles,
+)
+const clampedIn = shortDecisions[0]!.sourceInSec
+if (clampedIn > 1) {
+  console.error('FAIL: sourceIn should clamp for 4s clip', clampedIn)
+  process.exit(1)
+}
+if (clampMixSourceInSec(8, 4, 5) !== 1) {
+  console.error('FAIL: clampMixSourceInSec', clampMixSourceInSec(8, 4, 5))
+  process.exit(1)
+}
+
+console.log('OK: instruction-driven mix edit plan (semantic match + sourceInSec + clamp)')

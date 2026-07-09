@@ -28,6 +28,24 @@ export type IceMixSegmentPlan = {
   caption?: string
 }
 
+/** 手机实拍短片默认时长（秒），用于规划截取点上限 */
+export const MIX_DEFAULT_SOURCE_DURATION_SEC = 6
+
+/** 将源片入点限制在 [0, 源时长 - 片段长] 内，避免 ICE Video.In > duration */
+export function clampMixSourceInSec(
+  sourceInSec: number,
+  clipDurSec: number,
+  sourceDurationSec?: number,
+): number {
+  const clipDur = Math.max(0.35, clipDurSec)
+  let inSec = Math.max(0, sourceInSec)
+  if (sourceDurationSec != null && sourceDurationSec > 0) {
+    const maxIn = Math.max(0, sourceDurationSec - clipDur)
+    inSec = Math.min(inSec, maxIn)
+  }
+  return inSec
+}
+
 export function resolveMixTotalDurationSec(rows: ShortVideoScriptRow[], fallbackSec: number): number {
   const maxEnd = maxScriptTimeRangeEndSec(rows)
   if (maxEnd > 0) return Math.min(120, Math.max(1, maxEnd))
