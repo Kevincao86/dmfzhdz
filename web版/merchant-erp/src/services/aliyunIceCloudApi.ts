@@ -18,6 +18,7 @@ export type AliyunIceCloudConfig = {
   localUploadEnabled?: boolean
   presets: string[]
   effectOptions?: { id: string; label: string }[]
+  subtitleStyleOptions?: Array<{ id: string; label: string; description?: string; tag?: string }>
   credentialNote?: string
   docsUrl?: string
 }
@@ -668,7 +669,10 @@ export async function postIcePipeline(body: {
   width: number
   height: number
   clipEndSec: number
-  preset: string
+  /** @deprecated 请用 effectId */
+  preset?: string
+  effectId?: string
+  subtitleStyleId?: string
   presetLengthSec?: number
 }): Promise<IcePipelineResult> {
   for (const p of PIPELINE_PATHS) {
