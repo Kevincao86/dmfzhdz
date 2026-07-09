@@ -941,21 +941,20 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* 顶栏 */}
-      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-zinc-200 pb-5">
-        <div>
-          <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-zinc-900">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-600 text-white">
-              <Cloud className="h-5 w-5" />
-            </span>
-            灵祺AI混剪
-          </h2>
-          <MpAddonPointsRateBadge kind="cloud_edit" className="mt-2" />
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-600">
-            上传探店/带货素材，填写<strong className="font-medium text-zinc-800">指导文案</strong>并
-            <strong className="font-medium text-zinc-800"> AI 规划分镜</strong>，核对表格后
-            <strong className="font-medium text-zinc-800">一键混剪</strong>，在右侧
-            <strong className="font-medium text-zinc-800">成片输出</strong>下载 MP4。
+      <header className="overflow-hidden rounded-2xl border border-orange-100 bg-gradient-to-br from-orange-50/80 via-white to-cyan-50/40 px-5 py-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="flex items-center gap-3 text-xl font-semibold tracking-tight text-zinc-900">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-rose-500 text-white shadow-md">
+                <Cloud className="h-5 w-5" />
+              </span>
+              灵祺 AI 混剪
+            </h2>
+            <MpAddonPointsRateBadge kind="cloud_edit" className="mt-2" />
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-600">
+              上传探店/带货实拍，填写<strong className="font-medium text-zinc-800">指导文案</strong>并
+              <strong className="font-medium text-zinc-800"> AI 规划分镜</strong>，选字幕样式与转场后
+              <strong className="font-medium text-zinc-800">一键混剪</strong>下载成片。
             {readMpSessionToken() ? (
               <span className="mt-1 block text-xs text-violet-700">
                 星选账号：每条成片成功后按秒扣积分；套餐 ai_video_quota 次数优先，用尽后扣积分余额。
@@ -964,21 +963,21 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
           </p>
         </div>
         <ServiceBadge cfg={cfg} />
+        </div>
       </header>
 
-      {/* 流程指引 */}
       <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
           { n: 1, title: '上传素材', sub: '视频 / 图片，可多段' },
           { n: 2, title: '指导文案', sub: '写卖点或上传 doc/txt' },
           { n: 3, title: 'AI 规划分镜', sub: '时间段 · 画面 · 口播' },
-          { n: 4, title: '一键混剪', sub: '右侧下载成片' },
+          { n: 4, title: '一键混剪', sub: '选字幕转场 · 下载成片' },
         ].map((s) => (
           <li
             key={s.n}
-            className="flex gap-3 rounded-lg border border-zinc-200 bg-zinc-50/80 px-4 py-3"
+            className="flex gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 shadow-sm"
           >
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-600 text-xs font-bold text-white">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-rose-500 text-xs font-bold text-white shadow-sm">
               {s.n}
             </span>
             <div>
@@ -1004,7 +1003,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         {/* 左侧：输入区 */}
         <div className="space-y-5 xl:col-span-7">
           {/* ① 素材 */}
-          <section className="rounded-xl border border-zinc-200 bg-white shadow-sm">
+          <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
             <SectionHead
               step={1}
               title="素材来源"
@@ -1347,7 +1346,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
           </section>
 
           {/* ② 指导文案与分镜 */}
-          <section className="rounded-xl border border-zinc-200 bg-white shadow-sm">
+          <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-100 px-5 py-4">
               <div className="min-w-0 flex-1">
                 <h3 className="flex items-center gap-2 text-sm font-semibold text-zinc-900">

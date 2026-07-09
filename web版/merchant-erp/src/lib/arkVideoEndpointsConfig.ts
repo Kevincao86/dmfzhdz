@@ -126,7 +126,7 @@ export function clampSeedanceVideoDuration(modelId: string, raw: number): number
     max = 15
   } else if (/seedance-1-5|seedance-1\.5/i.test(id)) {
     min = 4
-    max = 12
+    max = 15
   } else if (/seedance-1-0|seedance-1\.0/i.test(id)) {
     min = 2
     max = 12
@@ -177,6 +177,8 @@ export function parseSeedanceCliFlags(flags: string): {
   if (ratio) out.ratio = ratio
   const wm = flags.match(/--wm\s+(true|false)/i)?.[1]
   if (wm) out.watermark = wm.toLowerCase() === 'true'
+  const resolution = flags.match(/--resolution\s+(\S+)/i)?.[1]
+  if (resolution) out.resolution = resolution.toLowerCase()
   return out
 }
 

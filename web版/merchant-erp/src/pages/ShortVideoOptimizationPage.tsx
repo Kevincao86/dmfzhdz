@@ -21,12 +21,11 @@ import {
   SHORT_VIDEO_MOTION_PROMPT_SUFFIX,
 } from '../lib/shortVideoPostProcess'
 import {
-  VIDEO_ENGINE_LABEL_KLING,
   VIDEO_ENGINE_LABEL_SEEDANCE,
   VIDEO_ENGINE_HINT_SEEDANCE,
-  VIDEO_ENGINE_HINT_QWEN,
   SEEDANCE_SERVER_AUTO,
-  SEEDANCE_AUTO_LABEL,
+  SEEDANCE_QUALITY_OPTIONS,
+  type SeedanceQualityId,
 } from '../lib/shortVideoUiLabels'
 import {
   concatVideoBlobsOnServer,
@@ -47,16 +46,7 @@ import { parseGuidanceDocumentFile } from '../lib/shortVideoGuidanceDoc'
 import {
   optimizeShortVideoGuidancePrompt,
   planShortVideoScriptFromGuidance,
-  productFocusPromptSuffix,
 } from '../services/shortVideoGuidanceAi'
-import {
-  appendProductSegmentI2vPrompt,
-  effectiveProductFocusIndices,
-  mergeProductRefImages,
-  prepareShortVideoProductRefDataUrl,
-  resolveProductOverlayWindowForSegment,
-  resolveShortVideoProductOverlayWindow,
-} from '../lib/shortVideoProductFocus'
 import { extractVideoLastFramePureBase64 } from '../lib/videoFrameUtils'
 import {
   defaultScriptRows,
@@ -69,6 +59,7 @@ import {
   scriptRowsToOverallPrompt,
   segmentCountFromTargetTotalSec,
   planLongformSegmentDurations,
+  LONGFORM_SEGMENT_UNIT_SEC,
   planLongformAllFiveSecondDurations,
   formatLongformDurationPlanLabel,
   pickLongformSegmentDurationSec,
@@ -119,10 +110,10 @@ async function storyFrameFileToImageDataUrl(f: File): Promise<string> {
   const b64 = await readImageFilePureBase64(f)
   return `data:image/${f.type.toLowerCase() === 'image/png' ? 'png' : 'jpeg'};base64,${b64}`
 }
-/** 模型1=千问，模型2=豆包/Seedance；额度不足时互备切换 */
-type Engine = 'qwen' | 'seedance'
+/** 短视频生成固定即梦 / Seedance */
+const VIDEO_ENGINE = 'seedance' as const
 const POLL_MS_SD = 5000
-const LONGFORM_DEFAULT_SEGMENT_SEC = 10
+const LONGFORM_DEFAULT_SEGMENT_SEC = LONGFORM_SEGMENT_UNIT_SEC
 const LONGFORM_DEFAULT_TARGET_TOTAL_SEC = 60
 const LONGFORM_MAX_TARGET_TOTAL_SEC = 60
 
@@ -159,8 +150,9 @@ function buildSeedanceFlagsLine(input: {
   fps: string
   aspect: string
   watermark: 'off' | 'on'
+  resolution: SeedanceQualityId
 }): string {
-  return `--dur ${input.durationSec} --fps ${input.fps} --ratio ${input.aspect} --wm ${input.watermark === 'on' ? 'true' : 'false'}`
+  return `--dur ${input.durationSec} --fps ${input.fps} --ratio ${input.aspect} --wm ${input.watermark === 'on' ? 'true' : 'false'} --resolution ${input.resolution}`
 }
 
 async function formatLongformMergedHint(
@@ -174,7 +166,7 @@ async function formatLongformMergedHint(
   const sec = measured > 0 ? Math.round(measured) : approx
   const target = targetTotalSec ?? approx
   const targetNote =
-    Math.abs(sec - target) <= 3 ? '' : `（目标约 ${target} 秒，若偏短请检查 10 秒模型额度）`
+    Math.abs(sec - target) <= 3 ? '' : `（目标约 ${target} 秒，若偏短请检查即梦 15 秒额度）`
   return `已合成约 ${sec} 秒长片（${segmentCount} 段 × ${segmentSec} 秒）${targetNote}，可预览下载。`
 }
 
@@ -314,18 +306,6 @@ async function readImageFilePureBase64(f: File): Promise<string> {
   return blobToPureBase64(f)
 }
 
-function productImageDataUrl(pureB64: string): string {
-  const b = pureB64.replace(/\s/g, '')
-  return b.startsWith('data:image') ? b : `data:image/jpeg;base64,${b}`
-}
-
-function appendProductFocusToPrompt(prompt: string, hasProductImage: boolean): string {
-  const p = prompt.trim()
-  if (!hasProductImage) return p
-  const suffix = productFocusPromptSuffix()
-  return p.includes('【产品呈现】') ? p : `${p}\n${suffix}`
-}
-
 function withVideoMotionPrompt(prompt: string): string {
   const p = prompt.trim()
   if (!p) return SHORT_VIDEO_MOTION_PROMPT_SUFFIX
@@ -366,7 +346,6 @@ export default function ShortVideoOptimizationPage() {
     })
   }, [embedAddonAccess])
   const [mainPane, setMainPane] = useState<MainPane>('generate')
-  const [engine, setEngine] = useState<Engine>('seedance')
   const [cfg, setCfg] = useState<VideoAiBackendConfig | null>(null)
   const [cfgLoaded, setCfgLoaded] = useState(false)
 
@@ -394,8 +373,6 @@ export default function ShortVideoOptimizationPage() {
   )
   const [storyFrames, setStoryFrames] = useState<StoryFrameItem[]>([])
   const [storyDropActive, setStoryDropActive] = useState(false)
-  const [productPureB64, setProductPureB64] = useState<string | null>(null)
-  const [productThumbUrl, setProductThumbUrl] = useState<string | null>(null)
   const generationBillIdRef = useRef('')
 
   const ensureShortVideoPointsAffordable = async (durationSec: number): Promise<boolean> => {
@@ -433,17 +410,15 @@ export default function ShortVideoOptimizationPage() {
   }
 
   const genDocInputRef = useRef<HTMLInputElement>(null)
-  const productImgInputRef = useRef<HTMLInputElement>(null)
   const storyFrameInputRef = useRef<HTMLInputElement>(null)
   const storyFramesRef = useRef(storyFrames)
   storyFramesRef.current = storyFrames
 
-  const [sdModelEp, setSdModelEp] = useState('')
-  /** 火山视频（Seedance）尾随参数，由下方选项拼接，与原先手写 `--dur …` 格式一致 */
-  const [sdDurationSec, setSdDurationSec] = useState<'5' | '10'>('5')
+  const [sdDurationSec, setSdDurationSec] = useState<'5' | '10' | '15'>('15')
   const [sdFps, setSdFps] = useState<'24' | '30'>('24')
   const [sdAspect, setSdAspect] = useState<'16:9' | '9:16' | '1:1'>('9:16')
   const [sdWatermark, setSdWatermark] = useState<'off' | 'on'>('off')
+  const [sdResolution, setSdResolution] = useState<SeedanceQualityId>('720p')
 
   const [longformEnabled, setLongformEnabled] = useState(true)
   const [longformTargetTotalSec, setLongformTargetTotalSec] = useState(LONGFORM_DEFAULT_TARGET_TOTAL_SEC)
@@ -466,8 +441,9 @@ export default function ShortVideoOptimizationPage() {
         fps: sdFps,
         aspect: sdAspect,
         watermark: sdWatermark,
+        resolution: sdResolution,
       }),
-    [longformEnabled, longformDurationPlan, longformSegmentSec, sdDurationSec, sdFps, sdAspect, sdWatermark],
+    [longformEnabled, longformDurationPlan, longformSegmentSec, sdDurationSec, sdFps, sdAspect, sdWatermark, sdResolution],
   )
 
   const seedancePoolModels = useMemo(
@@ -491,7 +467,7 @@ export default function ShortVideoOptimizationPage() {
     ) => {
       if (opts?.resetCancel !== false) cancelRef.current = false
       return runShortVideoJobWithFailover({
-        engine,
+        engine: VIDEO_ENGINE,
         body: {
           prompt: sanitizePromptForVideoModel(body.prompt),
           flags: opts?.flagsOverride ?? seedanceFlagsLine,
@@ -505,7 +481,7 @@ export default function ShortVideoOptimizationPage() {
         allowAutoHalveDuration: opts?.allowAutoHalveDuration,
       })
     },
-    [engine, seedanceFlagsLine, seedancePoolModels],
+    [seedanceFlagsLine, seedancePoolModels],
   )
 
   const [resultUrl, setResultUrl] = useState<string | null>(null)
@@ -528,9 +504,6 @@ export default function ShortVideoOptimizationPage() {
   useEffect(() => {
     void fetchVideoAiConfig().then((c) => {
       setCfg(c)
-      if (c?.arkVideoModels.length) {
-        setSdModelEp(SEEDANCE_SERVER_AUTO)
-      }
       setCfgLoaded(true)
     })
   }, [])
@@ -538,7 +511,7 @@ export default function ShortVideoOptimizationPage() {
   useEffect(() => {
     if (longformEnabled) {
       const plan = planLongformSegmentDurations(longformTargetTotalSec)
-      setSdDurationSec('10')
+      setSdDurationSec('15')
       setLongformSegmentSec(Math.max(...plan))
       setScriptRows((prev) => resizeScriptRowsForDurationPlan(prev, plan))
     }
@@ -607,29 +580,6 @@ export default function ShortVideoOptimizationPage() {
     if (storyFrameInputRef.current) storyFrameInputRef.current.value = ''
   }
 
-  const revokeProductThumb = () => {
-    if (productThumbUrl?.startsWith('blob:')) URL.revokeObjectURL(productThumbUrl)
-  }
-
-  const onPickProductImage = async (files: FileList | null) => {
-    const f = files?.[0] ?? null
-    if (!f) return
-    if (!(f.type || '').toLowerCase().startsWith('image/')) {
-      setErr('请选择 JPG / PNG / WebP 产品图')
-      return
-    }
-    try {
-      const b64 = await readImageFilePureBase64(f)
-      revokeProductThumb()
-      setProductPureB64(b64)
-      setProductThumbUrl(URL.createObjectURL(f))
-      setHint('已载入重点产品图：AI 将在中后段产品特写分镜智能抠图参考，并在指定时段清晰展示。')
-      setErr(null)
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : '产品图读取失败')
-    }
-  }
-
   const onPickGuidanceDoc = async (files: FileList | null) => {
     const f = files?.[0] ?? null
     if (!f) return
@@ -681,7 +631,7 @@ export default function ShortVideoOptimizationPage() {
           segmentSec: longformSegmentSec,
           plannerModel: 'auto',
           mode: genMode === 'text' ? 'generate_text' : 'generate_frames',
-          hasProductImage: Boolean(productPureB64),
+          hasProductImage: false,
           frameMode: genMode === 'frames',
           onProgress: (msg) => setProgress(msg),
         })
@@ -726,7 +676,7 @@ export default function ShortVideoOptimizationPage() {
     setErr(null)
     try {
       const r = await optimizeShortVideoGuidancePrompt(sourceText, {
-        hasProductImage: Boolean(productPureB64),
+        hasProductImage: false,
         frameMode: genMode === 'frames',
       })
       if (!r.ok) {
@@ -752,12 +702,8 @@ export default function ShortVideoOptimizationPage() {
   }
 
   const validateEngine = (): string | null => {
-    if (engine === 'qwen' && !cfg?.qwenVideoConfigured)
-      return `当前环境未开通${VIDEO_ENGINE_LABEL_KLING}（通义千问视频），请在运营台配置 MERCHANT_AI_QWEN_KEY。`
-    if (engine === 'seedance' && !cfg?.arkKeyConfigured)
-      return `当前环境未开通${VIDEO_ENGINE_LABEL_SEEDANCE}，请联系管理员。`
-    if (engine === 'seedance' && !sdModelEp.trim())
-      return cfg?.arkVideoSetupIssue ?? '请先选择视频模型（需配置火山方舟真实 ep- 接入点）。'
+    if (!cfg?.arkKeyConfigured)
+      return `当前环境未开通${VIDEO_ENGINE_LABEL_SEEDANCE}，请在运营台配置火山方舟 Key。`
     return null
   }
 
@@ -768,15 +714,6 @@ export default function ShortVideoOptimizationPage() {
       return '长片分镜策划需至少配置 DeepSeek / MiniMax / Kimi / TokenMix / 千问 / 豆包之一（运营台 · AI 模型）。'
     }
     return null
-  }
-
-  const hintEngineSwitch = (used: 'qwen' | 'seedance') => {
-    if (used === engine) return
-    setHint(
-      used === 'qwen'
-        ? `${VIDEO_ENGINE_LABEL_KLING}（千问）额度不足，已自动切换${VIDEO_ENGINE_LABEL_SEEDANCE}…`
-        : `${VIDEO_ENGINE_LABEL_SEEDANCE}额度不足，已自动切换${VIDEO_ENGINE_LABEL_KLING}（千问）…`,
-    )
   }
 
   const resolveNarrationForFinalVideo = async (guidance: string, targetSec?: number): Promise<string> => {
@@ -903,27 +840,8 @@ export default function ShortVideoOptimizationPage() {
       return promptsOut
     }
 
-    let productRefUrl: string | null = null
-    let productFocusIndices: number[] = []
-    const refreshProductFocus = (rows: string[]) => {
-      if (!input.productPureB64?.trim()) {
-        productFocusIndices = []
-        return
-      }
-      productFocusIndices = effectiveProductFocusIndices(rows)
-    }
-    if (input.productPureB64?.trim()) {
-      try {
-        setProgress('产品图智能抠图，准备特写参考…')
-        productRefUrl = await prepareShortVideoProductRefDataUrl(input.productPureB64)
-      } catch {
-        productRefUrl = productImageDataUrl(input.productPureB64)
-      }
-    }
-
     let prompts = await loadPlan()
     if (!prompts) return
-    refreshProductFocus(prompts)
 
     const segmentUrls: string[] = []
     let prevVideoUrl: string | null = null
@@ -961,6 +879,7 @@ export default function ShortVideoOptimizationPage() {
         fps: sdFps,
         aspect: sdAspect,
         watermark: sdWatermark,
+        resolution: sdResolution,
       })
 
       const segmentProgress = (detail: string) =>
@@ -969,16 +888,9 @@ export default function ShortVideoOptimizationPage() {
       segmentProgress('提交任务…')
 
       let segmentPrompt = withVideoMotionPrompt(planPrompts[i]!)
-      if (productRefUrl && productFocusIndices.includes(i)) {
-        segmentPrompt = appendProductSegmentI2vPrompt(segmentPrompt)
-      }
       if (input.storyboardHintForSegment) {
         const hint = input.storyboardHintForSegment(i)
         if (hint) segmentPrompt = `${segmentPrompt}\n${hint}`
-      }
-
-      if (productRefUrl && productFocusIndices.includes(i)) {
-        images = mergeProductRefImages(productRefUrl, images)
       }
 
       const r = await runShortVideo(
@@ -994,7 +906,7 @@ export default function ShortVideoOptimizationPage() {
       if (!r.ok) {
         if (
           !halvedOnce &&
-          segDur >= 10 &&
+          segDur >= LONGFORM_SEGMENT_UNIT_SEC &&
           shouldFallbackVideoDurationToFiveSec(r.message, segDur, {
             exhaustedAtDuration: r.exhaustedAtDuration,
             triedCount: r.triedCount,
@@ -1007,7 +919,7 @@ export default function ShortVideoOptimizationPage() {
           setLongformSegmentSec(5)
           prompts =
             (await restartLongformAfterHalve({
-              reason: `10秒模型额度已满，自动切换为 5秒 × ${segmentCountHint} 段（目标总时长约 ${targetTotalSec} 秒）…`,
+              reason: `15秒额度已满，自动切换为 5秒 × ${segmentCountHint} 段（目标总时长约 ${targetTotalSec} 秒）…`,
               loadPlan,
               clearSegments: () => {
                 prevVideoUrl = null
@@ -1019,7 +931,6 @@ export default function ShortVideoOptimizationPage() {
               },
             })) ?? null
           if (!prompts) return
-          refreshProductFocus(prompts)
           continue
         }
         const base = formatVideoAiUserError(r.message)
@@ -1033,7 +944,6 @@ export default function ShortVideoOptimizationPage() {
         return
       }
 
-      if (r.engineUsed) hintEngineSwitch(r.engineUsed)
       if (r.modelUsed) setHint((h) => h ?? `已使用视频模型：${r.modelUsed}`)
 
       const videoUrl = String(r.videoUrl || '').trim()
@@ -1079,7 +989,6 @@ export default function ShortVideoOptimizationPage() {
               },
             })) ?? null
           if (!prompts) return
-          refreshProductFocus(prompts)
           continue
         }
       } else {
@@ -1118,6 +1027,7 @@ export default function ShortVideoOptimizationPage() {
         fps: sdFps,
         aspect: sdAspect,
         watermark: sdWatermark,
+        resolution: sdResolution,
       })
       const continuationPrompt = withVideoMotionPrompt(
         `承接上一段结尾画面，同一空间与主体连续运镜，补全至目标 ${targetTotalSec} 秒（衔接段 ${segIdx + 1}）。`,
@@ -1191,19 +1101,6 @@ export default function ShortVideoOptimizationPage() {
         : await resolveNarrationForFinalVideo(input.narrationSource, targetTotalSec)
       const ok = await commitFinalVideo(final, narration, targetTotalSec, {
         preferFullNarration: true,
-        ...(input.productPureB64 && productFocusIndices.length
-          ? (() => {
-              const win = resolveProductOverlayWindowForSegment(
-                segmentActualDurations,
-                productFocusIndices[0]!,
-              )
-              return {
-                productImageBase64: input.productPureB64!,
-                productStartSec: win.startSec,
-                productEndSec: win.endSec,
-              }
-            })()
-          : {}),
       })
       if (!ok) return
       setHint(
@@ -1227,11 +1124,10 @@ export default function ShortVideoOptimizationPage() {
     const planMode: LongformPlanMode =
       genMode === 'text' ? 'generate_text' : 'generate_frames'
 
-    const hasProduct = Boolean(productPureB64)
     const planPromptBase =
       txt ||
       (imgs.length ? `按 ${imgs.length} 个分镜参考（图/视频）生成连贯营销短片` : '生成连贯短片')
-    const planPrompt = appendProductFocusToPrompt(planPromptBase, hasProduct)
+    const planPrompt = planPromptBase
 
     setProgress('正在生成分镜脚本…')
     cancelRef.current = false
@@ -1257,7 +1153,6 @@ export default function ShortVideoOptimizationPage() {
         }
         return undefined
       },
-      productPureB64,
       storyboardHintForSegment: (i) => {
         if (genMode !== 'frames' || i <= 0 || i >= imgs.length) return null
         return `【分镜意向】构图可参考分镜参考 ${i + 1}，须从上一段尾帧自然运镜过渡，禁止静态切镜。`
@@ -1281,19 +1176,20 @@ export default function ShortVideoOptimizationPage() {
     let r = await runShortVideo(body)
     if (
       !r.ok &&
-      requestedDur >= 10 &&
+      requestedDur >= LONGFORM_SEGMENT_UNIT_SEC &&
       shouldFallbackVideoDurationToFiveSec(r.message, requestedDur, {
         exhaustedAtDuration: r.exhaustedAtDuration,
         triedCount: r.triedCount,
       })
     ) {
-      setHint('10秒模型额度已满，自动切换为5秒视频模型…')
+      setHint('15秒额度已满，自动切换为5秒重新提交…')
       setProgress('正在以 5 秒时长重新提交…')
       const flags5 = buildSeedanceFlagsLine({
         durationSec: 5,
         fps: sdFps,
         aspect: sdAspect,
         watermark: sdWatermark,
+        resolution: sdResolution,
       })
       r = await runShortVideo(body, {
         flagsOverride: flags5,
@@ -1361,11 +1257,7 @@ export default function ShortVideoOptimizationPage() {
 
     if (genMode === 'frames' && imgs.length > 1) {
       const targetTotalSec = Math.min(LONGFORM_MAX_TARGET_TOTAL_SEC, Math.max(15, imgs.length * Number(sdDurationSec)))
-      const hasProduct = Boolean(productPureB64)
-      const textBase = appendProductFocusToPrompt(
-        txt || `按 ${imgs.length} 个分镜参考生成连贯营销短片。`,
-        hasProduct,
-      )
+      const textBase = txt || `按 ${imgs.length} 个分镜参考生成连贯营销短片。`
       setHint(
         `检测到 ${imgs.length} 个分镜参考，将分段生成并以尾帧衔接（避免多图拼成幻灯片）；目标约 ${targetTotalSec} 秒。` +
           (longformEnabled ? '' : ' 如需更长成片，请勾选「长视频合成」并选择目标总时长。'),
@@ -1396,7 +1288,6 @@ export default function ShortVideoOptimizationPage() {
             }
             return [imgs[i] ?? imgs[0]!]
           },
-          productPureB64,
           storyboardHintForSegment: (i) => {
             if (i <= 0 || i >= imgs.length) return null
             return `【分镜意向】构图可参考分镜 ${i + 1}，须从上一段尾帧自然过渡，禁止静态切镜。`
@@ -1411,16 +1302,12 @@ export default function ShortVideoOptimizationPage() {
     }
 
     setBusy(true)
-    setProgress('正在提交视频任务（额度不足将自动切换其它模型）…')
+    setProgress('正在提交即梦视频任务…')
     try {
-      const hasProduct = Boolean(productPureB64)
       const textBlock =
         genMode === 'text'
-          ? appendProductFocusToPrompt(txt, hasProduct)
-          : appendProductFocusToPrompt(
-              txt || `连贯演绎 ${imgs.length || 1} 个分镜参考（图/视频）构成的短片。`,
-              hasProduct,
-            )
+          ? txt
+          : txt || `连贯演绎 ${imgs.length || 1} 个分镜参考（图/视频）构成的短片。`
       const shotsNote =
         genMode === 'frames' && imgs.length > 1
           ? `（共 ${imgs.length} 个参考，图/视频按顺序串联镜头）。`
@@ -1442,30 +1329,21 @@ export default function ShortVideoOptimizationPage() {
         setErr(formatVideoAiUserError(r.message))
         return
       }
-      if (r.engineUsed) hintEngineSwitch(r.engineUsed)
       if (r.modelUsed) setHint(`已使用视频模型：${r.modelUsed}`)
       setProgress('合成口播配音与中文字幕…')
       const narrationSource = genMode === 'text' ? txt : txt || textBlock
       const narration = await resolveNarrationForFinalVideo(narrationSource, Number(sdDurationSec))
       const dur = Number(sdDurationSec)
-      const productOverlay =
-        hasProduct && productPureB64
-          ? (() => {
-              const win = resolveShortVideoProductOverlayWindow(dur)
-              return {
-                productImageBase64: productPureB64,
-                productStartSec: win.startSec,
-                productEndSec: win.endSec,
-              }
-            })()
-          : {}
-      const ok = await commitFinalVideo(r.videoUrl, narration, dur, productOverlay)
+      const ok = await commitFinalVideo(r.videoUrl, narration, dur)
       if (!ok) return
     } finally {
       setBusy(false)
       setProgress(null)
     }
   }
+
+  const fieldSelectCls =
+    'rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-500/25 disabled:opacity-60'
 
   const cancelWait = () => {
     cancelRef.current = true
@@ -1476,11 +1354,10 @@ export default function ShortVideoOptimizationPage() {
 
   useEffect(() => {
     return () => {
-      revokeProductThumb()
       storyFramesRef.current.forEach(revokeStoryFrame)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productThumbUrl])
+  }, [])
 
   return (
     <div
@@ -1497,7 +1374,7 @@ export default function ShortVideoOptimizationPage() {
           <MpAddonPointsRateBadge kind="shortvideo" />
         </div>
         <p className="max-w-2xl text-sm leading-relaxed text-slate-600">
-          推荐流程：短视频生成（最长 60 秒分镜 + 即梦同源 Seedance 1.5 Pro）→ AI 混剪（字幕/转场包装）。默认 60 秒长视频合成与模型2。
+          即梦视频生成：写文案 → AI 规划分镜 → 一键出片。包装精修请切上方「AI混剪」Tab。
           {readMpSessionToken() ? (
             <span className="mt-1 block text-xs text-violet-700">
               星选账号：成片成功后按秒扣积分；套餐 ai_video_quota 次数优先，用尽后扣积分余额。
@@ -1515,7 +1392,7 @@ export default function ShortVideoOptimizationPage() {
         </div>
       ) : (
         <>
-      <div className="erp-panel mb-8 flex overflow-hidden p-1">
+      <div className="mb-8 flex overflow-hidden rounded-2xl border border-zinc-200 bg-white p-1.5 shadow-sm">
         {paneTabs.map((t) => {
           const Ico = t.icon
           const active = mainPane === t.id
@@ -1528,9 +1405,9 @@ export default function ShortVideoOptimizationPage() {
                 setMainPane(t.id)
               }}
               className={cn(
-                'flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition',
+                'flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-semibold transition',
                 active
-                  ? 'bg-orange-600 text-white shadow-sm'
+                  ? 'bg-gradient-to-r from-orange-500 to-rose-500 text-white shadow-md shadow-orange-500/25'
                   : 'text-zinc-600 hover:bg-zinc-50',
               )}
             >
@@ -1542,45 +1419,33 @@ export default function ShortVideoOptimizationPage() {
       </div>
 
       {mainPane !== 'cloud_batch' ? (
-      <section className="mb-10 rounded-xl border border-zinc-200 bg-zinc-50/60 px-5 py-4">
-        <div className="flex flex-wrap gap-6">
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-800">
-            <input
-              type="radio"
-              name="vid-engine"
-              checked={engine === 'qwen'}
-              onChange={() => setEngine('qwen')}
-            />
-            {VIDEO_ENGINE_LABEL_KLING}
-            <span className="text-zinc-500">
-              {cfgLoaded ? (cfg?.qwenVideoConfigured ? `· ${VIDEO_ENGINE_HINT_QWEN}` : '· 未开通') : '…'}
+      <section className="mb-8 overflow-hidden rounded-2xl border border-orange-100 bg-gradient-to-br from-orange-50/70 via-white to-cyan-50/30 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-orange-100/80 px-5 py-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-rose-500 text-white shadow-md">
+              <Sparkles className="h-5 w-5" />
             </span>
-          </label>
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-800">
-            <input
-              type="radio"
-              name="vid-engine"
-              checked={engine === 'seedance'}
-              onChange={() => setEngine('seedance')}
-            />
-            {VIDEO_ENGINE_LABEL_SEEDANCE}
-            <span className="text-zinc-500">
-              {cfgLoaded
-                ? cfg?.arkKeyConfigured
-                  ? (cfg?.arkVideoModels ?? []).length > 0
-                    ? `· ${VIDEO_ENGINE_HINT_SEEDANCE}`
-                    : '· 待配置 Seedance 模型'
-                  : '· 未开通方舟 Key'
-                : '…'}
-            </span>
-          </label>
+            <div>
+              <p className="text-sm font-semibold text-zinc-900">{VIDEO_ENGINE_LABEL_SEEDANCE}</p>
+              <p className="text-xs text-zinc-500">
+                {cfgLoaded
+                  ? cfg?.arkKeyConfigured
+                    ? VIDEO_ENGINE_HINT_SEEDANCE
+                    : '未开通火山方舟'
+                  : '加载配置…'}
+              </p>
+            </div>
+          </div>
+          <span className="rounded-full border border-orange-200 bg-white/80 px-3 py-1 text-[11px] font-medium text-orange-800">
+            单段最长 15 秒
+          </span>
         </div>
 
-        <div className="mt-4 rounded-lg border border-zinc-200 bg-white px-4 py-3">
-          <label className="flex cursor-pointer items-start gap-3 text-sm text-zinc-800">
+        <div className="space-y-4 px-5 py-4">
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/80 bg-white/70 px-4 py-3 text-sm text-zinc-800 shadow-sm">
             <input
               type="checkbox"
-              className="mt-1"
+              className="mt-1 accent-orange-600"
               checked={longformEnabled}
               onChange={(e) => setLongformEnabled(e.target.checked)}
               disabled={busy}
@@ -1588,19 +1453,20 @@ export default function ShortVideoOptimizationPage() {
             <span>
               <span className="font-medium">长视频合成（最长 {LONGFORM_MAX_TARGET_TOTAL_SEC} 秒）</span>
               <span className="mt-0.5 block text-xs leading-relaxed text-zinc-500">
-                推荐保持开启：写指导文案 →「AI 规划分镜」→ 生成最长 60 秒短片（默认 6 段 × 10 秒）→ 再切 AI 混剪精修。
+                按 15 秒为单位自动分段（如 60 秒 = 4 段 × 15 秒），写文案后点「AI 规划分镜」再生成。
               </span>
             </span>
           </label>
-          {longformEnabled ? (
-            <div className="mt-3 flex flex-wrap items-end gap-4 border-t border-zinc-100 pt-3">
-              <label className="flex flex-col gap-1 text-xs text-zinc-600">
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            {longformEnabled ? (
+              <label className="flex flex-col gap-1.5 text-xs font-medium text-zinc-600">
                 <span>目标总时长</span>
                 <select
                   value={longformTargetTotalSec}
                   onChange={(e) => onLongformTargetTotalSecChange(Number(e.target.value))}
                   disabled={busy}
-                  className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
+                  className={fieldSelectCls}
                 >
                   {LONGFORM_TARGET_TOTAL_OPTIONS.map((sec) => (
                     <option key={sec} value={sec}>
@@ -1608,179 +1474,92 @@ export default function ShortVideoOptimizationPage() {
                     </option>
                   ))}
                 </select>
-                <span className="text-[11px] leading-snug text-zinc-500">
-                  段数由 AI 按目标总时长自动规划（当前方案 {formatLongformDurationPlanLabel(longformDurationPlan)}）
+                <span className="text-[11px] font-normal leading-snug text-zinc-500">
+                  {formatLongformDurationPlanLabel(longformDurationPlan)}
                 </span>
               </label>
-            </div>
-          ) : null}
-        </div>
+            ) : (
+              <label className="flex flex-col gap-1.5 text-xs font-medium text-zinc-600">
+                <span>单段时长</span>
+                <select
+                  value={sdDurationSec}
+                  onChange={(e) => setSdDurationSec(e.target.value as '5' | '10' | '15')}
+                  disabled={busy}
+                  className={fieldSelectCls}
+                >
+                  <option value="5">5 秒</option>
+                  <option value="10">10 秒</option>
+                  <option value="15">15 秒</option>
+                </select>
+              </label>
+            )}
 
-        {engine === 'qwen' && (
-          <div className="mt-4 space-y-4">
-            <p className="text-xs leading-relaxed text-zinc-500">
-              默认使用通义千问视频模型池；额度不足时自动切换{VIDEO_ENGINE_LABEL_SEEDANCE}（豆包/Seedance）。
-            </p>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <label className="flex flex-col gap-1 text-xs text-zinc-600">
-                <span>时长</span>
-                {longformEnabled ? (
-                  <>
-                    <div className="rounded-lg border border-zinc-300 bg-zinc-50 px-2 py-2 text-sm text-zinc-800">
-                      {formatLongformDurationPlanLabel(longformDurationPlan)}
-                    </div>
-                    <span className="text-[11px] leading-snug text-zinc-500">
-                      随目标总时长自动分配（如 15 秒 = 10+5）
-                    </span>
-                  </>
-                ) : (
-                  <select
-                    value={sdDurationSec}
-                    onChange={(e) => setSdDurationSec(e.target.value as '5' | '10')}
-                    disabled={busy}
-                    className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm disabled:opacity-60"
-                  >
-                    <option value="5">5 秒</option>
-                    <option value="10">10 秒</option>
-                  </select>
-                )}
-              </label>
-              <label className="flex flex-col gap-1 text-xs text-zinc-600">
-                <span>帧率</span>
-                <select
-                  value={sdFps}
-                  onChange={(e) => setSdFps(e.target.value as '24' | '30')}
-                  disabled={busy}
-                  className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
-                >
-                  <option value="24">24 fps</option>
-                  <option value="30">30 fps</option>
-                </select>
-              </label>
-              <label className="flex flex-col gap-1 text-xs text-zinc-600">
-                <span>画面比例</span>
-                <select
-                  value={sdAspect}
-                  onChange={(e) => setSdAspect(e.target.value as typeof sdAspect)}
-                  disabled={busy}
-                  className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
-                >
-                  <option value="16:9">横屏 16:9</option>
-                  <option value="9:16">竖屏 9:16</option>
-                  <option value="1:1">方屏 1:1</option>
-                </select>
-              </label>
-              <label className="flex flex-col gap-1 text-xs text-zinc-600">
-                <span>水印</span>
-                <select
-                  value={sdWatermark}
-                  onChange={(e) => setSdWatermark(e.target.value as 'off' | 'on')}
-                  disabled={busy}
-                  className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
-                >
-                  <option value="off">关闭</option>
-                  <option value="on">开启</option>
-                </select>
-              </label>
-            </div>
-          </div>
-        )}
-
-        {engine === 'seedance' && (
-          <div className="mt-4 space-y-4">
-            <p className="text-xs leading-relaxed text-zinc-500">
-              豆包/Seedance 模型池；额度不足时自动切换{VIDEO_ENGINE_LABEL_KLING}（通义千问）。
-            </p>
-            <label className="flex flex-col gap-1 text-xs text-zinc-600">
-              <span>视频模型</span>
-              {(cfg?.arkVideoModels ?? []).length > 0 ? (
-                <select
-                  value={sdModelEp}
-                  onChange={(e) => setSdModelEp(e.target.value)}
-                  disabled={busy}
-                  className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
-                >
-                  <option value={SEEDANCE_SERVER_AUTO}>{SEEDANCE_AUTO_LABEL}</option>
-                  {cfg!.arkVideoModels.map((row) => (
-                    <option key={row.endpointId} value={row.endpointId}>
-                      {row.label}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-950">
-                  {cfg?.configLoadError
-                    ? `无法加载视频配置（${cfg.configLoadError}）。请检查网络后刷新页面。`
-                    : cfg?.arkVideoSetupIssue ??
-                      '暂无可用模型。请在运营台填写 Seedance 1.5 Pro|doubao-seedance-1-5-pro-251215 或视频 ep- 接入点；勿使用 Doubao-Seed 对话模型的 ep。'}
+            {longformEnabled ? (
+              <label className="flex flex-col gap-1.5 text-xs font-medium text-zinc-600">
+                <span>分段方案</span>
+                <div className={cn(fieldSelectCls, 'bg-zinc-50 text-zinc-800')}>
+                  {formatLongformDurationPlanLabel(longformDurationPlan)}
                 </div>
-              )}
+              </label>
+            ) : null}
+
+            <label className="flex flex-col gap-1.5 text-xs font-medium text-zinc-600">
+              <span>画面质量</span>
+              <select
+                value={sdResolution}
+                onChange={(e) => setSdResolution(e.target.value as SeedanceQualityId)}
+                disabled={busy}
+                className={fieldSelectCls}
+              >
+                {SEEDANCE_QUALITY_OPTIONS.map((q) => (
+                  <option key={q.id} value={q.id}>
+                    {q.label}
+                  </option>
+                ))}
+              </select>
             </label>
 
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <label className="flex flex-col gap-1 text-xs text-zinc-600">
-                <span>时长</span>
-                {longformEnabled ? (
-                  <>
-                    <div className="rounded-lg border border-zinc-300 bg-zinc-50 px-2 py-2 text-sm text-zinc-800">
-                      {formatLongformDurationPlanLabel(longformDurationPlan)}
-                    </div>
-                    <span className="text-[11px] leading-snug text-zinc-500">
-                      随目标总时长自动分配（如 15 秒 = 10+5）
-                    </span>
-                  </>
-                ) : (
-                  <select
-                    value={sdDurationSec}
-                    onChange={(e) => setSdDurationSec(e.target.value as '5' | '10')}
-                    disabled={busy}
-                    className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm disabled:opacity-60"
-                  >
-                    <option value="5">5 秒</option>
-                    <option value="10">10 秒</option>
-                  </select>
-                )}
-              </label>
-              <label className="flex flex-col gap-1 text-xs text-zinc-600">
-                <span>帧率</span>
-                <select
-                  value={sdFps}
-                  onChange={(e) => setSdFps(e.target.value as '24' | '30')}
-                  disabled={busy}
-                  className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
-                >
-                  <option value="24">24 fps</option>
-                  <option value="30">30 fps</option>
-                </select>
-              </label>
-              <label className="flex flex-col gap-1 text-xs text-zinc-600">
-                <span>画面比例</span>
-                <select
-                  value={sdAspect}
-                  onChange={(e) => setSdAspect(e.target.value as typeof sdAspect)}
-                  disabled={busy}
-                  className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
-                >
-                  <option value="16:9">横屏 16:9</option>
-                  <option value="9:16">竖屏 9:16</option>
-                  <option value="1:1">方屏 1:1</option>
-                </select>
-              </label>
-              <label className="flex flex-col gap-1 text-xs text-zinc-600">
-                <span>画面水印</span>
-                <select
-                  value={sdWatermark}
-                  onChange={(e) => setSdWatermark(e.target.value as 'off' | 'on')}
-                  disabled={busy}
-                  className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
-                >
-                  <option value="off">无</option>
-                  <option value="on">有</option>
-                </select>
-              </label>
-            </div>
+            <label className="flex flex-col gap-1.5 text-xs font-medium text-zinc-600">
+              <span>画面比例</span>
+              <select
+                value={sdAspect}
+                onChange={(e) => setSdAspect(e.target.value as typeof sdAspect)}
+                disabled={busy}
+                className={fieldSelectCls}
+              >
+                <option value="9:16">竖屏 9:16</option>
+                <option value="16:9">横屏 16:9</option>
+                <option value="1:1">方屏 1:1</option>
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-1.5 text-xs font-medium text-zinc-600">
+              <span>帧率</span>
+              <select
+                value={sdFps}
+                onChange={(e) => setSdFps(e.target.value as '24' | '30')}
+                disabled={busy}
+                className={fieldSelectCls}
+              >
+                <option value="24">24 fps</option>
+                <option value="30">30 fps</option>
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-1.5 text-xs font-medium text-zinc-600">
+              <span>水印</span>
+              <select
+                value={sdWatermark}
+                onChange={(e) => setSdWatermark(e.target.value as 'off' | 'on')}
+                disabled={busy}
+                className={fieldSelectCls}
+              >
+                <option value="off">无</option>
+                <option value="on">有</option>
+              </select>
+            </label>
           </div>
-        )}
+        </div>
       </section>
       ) : null}
 
@@ -1789,20 +1568,26 @@ export default function ShortVideoOptimizationPage() {
       </div>
 
       {mainPane === 'generate' && (
-        <section className="space-y-10 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-          <ol className="grid gap-2 rounded-lg border border-orange-100 bg-orange-50/60 px-4 py-3 text-xs leading-relaxed text-orange-950 sm:grid-cols-2">
-            <li>
-              <span className="font-semibold">① 写指导文案</span>：卖点、场景、运镜（可上传 doc）
-            </li>
-            <li>
-              <span className="font-semibold">② AI 规划分镜</span>：自动拆时间段 + 画面 + 口播
-            </li>
-            <li>
-              <span className="font-semibold">③ 开始生成</span>：模型2 Seedance 1.5 Pro（即梦同源）竖屏 9:16，最长 60 秒
-            </li>
-            <li>
-              <span className="font-semibold">④ AI 混剪</span>：上传实拍 + 选爆款字幕/转场下载成片
-            </li>
+        <section className="space-y-8 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8">
+          <ol className="grid gap-3 sm:grid-cols-3">
+            {[
+              { n: 1, title: '写指导文案', sub: '卖点、场景、运镜（可上传 doc）' },
+              { n: 2, title: 'AI 规划分镜', sub: '自动拆时间段 + 画面 + 口播' },
+              { n: 3, title: '开始生成', sub: '即梦 Seedance 1.5 Pro · 最长 60 秒' },
+            ].map((s) => (
+              <li
+                key={s.n}
+                className="flex gap-3 rounded-xl border border-orange-100 bg-gradient-to-br from-orange-50/80 to-white px-4 py-3"
+              >
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-600 text-xs font-bold text-white">
+                  {s.n}
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-orange-950">{s.title}</p>
+                  <p className="text-xs leading-relaxed text-orange-900/70">{s.sub}</p>
+                </div>
+              </li>
+            ))}
           </ol>
           <div className="flex flex-wrap gap-3">
             <button
@@ -1918,56 +1703,6 @@ export default function ShortVideoOptimizationPage() {
               </>
             )}
           </label>
-
-          <div className="rounded-xl border border-amber-200/80 bg-amber-50/50 p-4">
-            <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-              <div>
-                <p className="text-sm font-medium text-amber-950">重点突出产品图（选填）</p>
-                <p className="mt-0.5 text-xs text-amber-900/80">
-                  上传清晰产品图后，AI 按文案分镜在中后段安排产品特写：自动抠图作 Seedance 参考，并在该时段叠加清晰产品画面。
-                </p>
-              </div>
-              <input
-                ref={productImgInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="hidden"
-                onChange={(e) => void onPickProductImage(e.target.files)}
-              />
-              <button
-                type="button"
-                disabled={busy || auxBusy}
-                onClick={() => productImgInputRef.current?.click()}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-950 hover:bg-amber-100/80 disabled:opacity-50"
-              >
-                <ImagePlus className="h-3.5 w-3.5" />
-                {productPureB64 ? '更换产品图' : '上传产品图'}
-              </button>
-            </div>
-            {productThumbUrl ? (
-              <div className="flex items-start gap-3">
-                <img
-                  src={productThumbUrl}
-                  alt="重点产品参考"
-                  className="h-24 w-24 rounded-lg border border-amber-200 object-cover"
-                />
-                <button
-                  type="button"
-                  disabled={busy || auxBusy}
-                  onClick={() => {
-                    revokeProductThumb()
-                    setProductPureB64(null)
-                    setProductThumbUrl(null)
-                  }}
-                  className="text-xs text-amber-900/70 underline hover:text-amber-950"
-                >
-                  移除产品图
-                </button>
-              </div>
-            ) : (
-              <p className="text-xs text-amber-900/60">未上传产品图时按纯文案生成。</p>
-            )}
-          </div>
 
           {genMode === 'frames' && (
             <div className="space-y-3 rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-4">
@@ -2105,7 +1840,7 @@ export default function ShortVideoOptimizationPage() {
               type="button"
               disabled={busy || auxBusy}
               onClick={() => void submitGenerate()}
-              className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-6 py-2.5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:pointer-events-none disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-zinc-900 to-zinc-800 px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-zinc-900/20 hover:from-zinc-800 hover:to-zinc-700 disabled:pointer-events-none disabled:opacity-50"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {busy ? (progress ?? '处理中……') : '开始生成短片'}
