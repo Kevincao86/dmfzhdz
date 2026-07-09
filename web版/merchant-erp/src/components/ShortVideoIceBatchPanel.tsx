@@ -52,11 +52,7 @@ import {
   formatMpAddonPointsSpendHint,
   spendMpAddonPoints,
 } from '../services/mpAddonPointsSpendClient'
-import {
-  checkMixMaterialAnalyzeAffordable,
-  spendMixMaterialAnalyzePoints,
-} from '../services/mpAiPointsSpendClient'
-import { MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE } from '../lib/mpPointsEconomics'
+import { checkMixMaterialAnalyzeAffordable, spendMixMaterialAnalyzePoints } from '../services/mpAiPointsSpendClient'
 import { isIceTransientNetworkError } from '../lib/iceTransientNetworkError'
 import ShortVideoScriptTableEditor from './ShortVideoScriptTableEditor'
 import { parseGuidanceDocumentFile } from '../lib/shortVideoGuidanceDoc'
