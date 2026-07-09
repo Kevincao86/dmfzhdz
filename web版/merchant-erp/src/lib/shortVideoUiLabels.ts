@@ -1,10 +1,15 @@
 /** 商户短视频页 · 对外展示名（与运营后台厂商配置解耦） */
-/** 模型1：通义千问视频（兜底）；模型2：豆包/Seedance/方舟（即梦同源引擎，推荐主力） */
+/** 即梦同源：火山方舟 Seedance 1.5 Pro */
 
 export const VIDEO_ENGINE_LABEL_KLING = '灵祺视频模型1'
-export const VIDEO_ENGINE_LABEL_SEEDANCE = '灵祺视频模型2（即梦同源）'
-export const VIDEO_ENGINE_HINT_SEEDANCE = '火山方舟 Seedance，与即梦同款视频引擎'
-export const VIDEO_ENGINE_HINT_QWEN = '通义万相视频，额度不足时自动兜底'
+export const VIDEO_ENGINE_LABEL_SEEDANCE = '即梦视频'
+export const VIDEO_ENGINE_HINT_SEEDANCE = 'Seedance 1.5 Pro · 火山方舟'
+export const VIDEO_ENGINE_HINT_QWEN = '通义万相视频'
+export const SEEDANCE_QUALITY_OPTIONS = [
+  { id: '720p', label: '标准 720p' },
+  { id: '1080p', label: '高清 1080p' },
+] as const
+export type SeedanceQualityId = (typeof SEEDANCE_QUALITY_OPTIONS)[number]['id']
 export const VIDEO_MODEL_DEFAULT_LABEL = '默认'
 
 export const KLING_DEFAULT_MODEL_ID = 'kling-v1-6'

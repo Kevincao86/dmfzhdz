@@ -270,24 +270,19 @@ export function inferScriptSegmentCountFromText(text: string): number {
   return 0
 }
 
-/** 由目标总时长与单段秒数估算段数（2～12），仅作占位/兜底；实际段数以 AI 规划为准 */
+/** 即梦 / Seedance 长视频默认单段上限（秒） */
+export const LONGFORM_SEGMENT_UNIT_SEC = 15
+
+/** 由目标总时长按 15 秒为单位切分（如 60=15×4）；实际段数以 AI 规划为准 */
 export function planLongformSegmentDurations(targetTotalSec: number): number[] {
   const target = Math.max(5, Math.round(targetTotalSec))
-  if (target < 10) {
-    const n = Math.max(2, Math.ceil(target / 5))
-    return Array.from({ length: n }, () => 5)
-  }
-  const tens = Math.floor(target / 10)
-  const rem = target % 10
-  const plan: number[] = []
-  for (let i = 0; i < tens; i++) plan.push(10)
-  if (rem === 5) plan.push(5)
-  else if (rem > 0) {
-    const extra = Math.ceil(rem / 5)
-    for (let i = 0; i < extra; i++) plan.push(5)
-  }
-  if (plan.length < 2) return [5, 5]
-  return plan
+  const unit = LONGFORM_SEGMENT_UNIT_SEC
+  if (target <= unit) return [target]
+  const full = Math.floor(target / unit)
+  const rem = target % unit
+  const plan: number[] = Array.from({ length: full }, () => unit)
+  if (rem > 0) plan.push(rem)
+  return plan.length ? plan : [unit]
 }
 
 /** 10 秒模型不可用时：全程 5 秒分段（如 15 秒 → 5+5+5） */
@@ -303,7 +298,7 @@ export function formatLongformDurationPlanLabel(plan: number[]): string {
   return `${plan.join('+')} 秒（${plan.length} 段）`
 }
 
-/** 第 i 段生成秒数；超出计划段数时按剩余时长补 5/10 秒 */
+/** 第 i 段生成秒数；超出计划段数时按剩余时长补 5/15 秒 */
 export function pickLongformSegmentDurationSec(
   plan: number[],
   index: number,
@@ -313,7 +308,7 @@ export function pickLongformSegmentDurationSec(
   if (index >= 0 && index < plan.length) return plan[index]!
   const remaining = Math.max(0, targetTotalSec - estimatedTotalSec)
   if (remaining <= 5) return 5
-  return 10
+  return LONGFORM_SEGMENT_UNIT_SEC
 }
 
 export function scriptTimeRangesFromDurationPlan(plan: number[]): string[] {
@@ -330,7 +325,7 @@ export function resizeScriptRowsForDurationPlan(
   plan: number[],
 ): ShortVideoScriptRow[] {
   const ranges = scriptTimeRangesFromDurationPlan(plan)
-  const effectiveCount = Math.min(12, Math.max(2, plan.length))
+  const effectiveCount = Math.min(12, Math.max(1, plan.length))
   const base = rows.slice(0, effectiveCount)
   while (base.length < effectiveCount) {
     base.push({ timeRange: ranges[base.length] ?? '', visual: '', dialogue: '' })
@@ -342,6 +337,9 @@ export function resizeScriptRowsForDurationPlan(
 }
 
 export function segmentCountFromTargetTotalSec(targetTotalSec: number, segmentSec: number): number {
+  if (targetTotalSec >= LONGFORM_SEGMENT_UNIT_SEC && segmentSec >= LONGFORM_SEGMENT_UNIT_SEC) {
+    return planLongformSegmentDurations(targetTotalSec).length
+  }
   if (targetTotalSec >= 10 && segmentSec >= 10) {
     return planLongformSegmentDurations(targetTotalSec).length
   }
