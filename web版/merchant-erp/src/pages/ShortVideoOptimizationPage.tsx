@@ -123,8 +123,10 @@ async function storyFrameFileToImageDataUrl(f: File): Promise<string> {
 type Engine = 'qwen' | 'seedance'
 const POLL_MS_SD = 5000
 const LONGFORM_DEFAULT_SEGMENT_SEC = 10
+const LONGFORM_DEFAULT_TARGET_TOTAL_SEC = 60
+const LONGFORM_MAX_TARGET_TOTAL_SEC = 60
 
-const LONGFORM_TARGET_TOTAL_OPTIONS = [15, 30, 45, 60] as const
+const LONGFORM_TARGET_TOTAL_OPTIONS = [60, 45, 30, 15] as const
 
 const PLANNER_VENDOR_DISPLAY: Record<string, string> = {
   deepseek: 'DeepSeek',
@@ -385,7 +387,10 @@ export default function ShortVideoOptimizationPage() {
   const [genMode, setGenMode] = useState<'text' | 'frames'>('text')
   const [genPrompt, setGenPrompt] = useState('')
   const [scriptRows, setScriptRows] = useState<ShortVideoScriptRow[]>(() =>
-    defaultScriptRows(segmentCountFromTargetTotalSec(30, LONGFORM_DEFAULT_SEGMENT_SEC), LONGFORM_DEFAULT_SEGMENT_SEC),
+    defaultScriptRows(
+      segmentCountFromTargetTotalSec(LONGFORM_DEFAULT_TARGET_TOTAL_SEC, LONGFORM_DEFAULT_SEGMENT_SEC),
+      LONGFORM_DEFAULT_SEGMENT_SEC,
+    ),
   )
   const [storyFrames, setStoryFrames] = useState<StoryFrameItem[]>([])
   const [storyDropActive, setStoryDropActive] = useState(false)
@@ -441,7 +446,7 @@ export default function ShortVideoOptimizationPage() {
   const [sdWatermark, setSdWatermark] = useState<'off' | 'on'>('off')
 
   const [longformEnabled, setLongformEnabled] = useState(true)
-  const [longformTargetTotalSec, setLongformTargetTotalSec] = useState(30)
+  const [longformTargetTotalSec, setLongformTargetTotalSec] = useState(LONGFORM_DEFAULT_TARGET_TOTAL_SEC)
   const [longformSegmentSec, setLongformSegmentSec] = useState(LONGFORM_DEFAULT_SEGMENT_SEC)
 
   const longformDurationPlan = useMemo(
@@ -785,7 +790,10 @@ export default function ShortVideoOptimizationPage() {
       extracted.ok && extracted.narrationScript.trim()
         ? extracted.narrationScript.trim()
         : extractShortVideoNarrationScript(g)
-    return finalizeNarrationScript(raw, targetSec && targetSec > 0 ? targetSec : 30)
+    return finalizeNarrationScript(
+      raw,
+      targetSec && targetSec > 0 ? targetSec : LONGFORM_DEFAULT_TARGET_TOTAL_SEC,
+    )
   }
 
   const restartLongformAfterHalve = async (input: {
@@ -1309,7 +1317,7 @@ export default function ShortVideoOptimizationPage() {
     const estSec = longformEnabled
       ? longformTargetTotalSec
       : genMode === 'frames' && storyFrames.length > 1
-        ? Math.min(60, Math.max(15, storyFrames.length * Number(sdDurationSec)))
+        ? Math.min(LONGFORM_MAX_TARGET_TOTAL_SEC, Math.max(15, storyFrames.length * Number(sdDurationSec)))
         : Number(sdDurationSec)
     if (!(await ensureShortVideoPointsAffordable(estSec))) return
 
@@ -1352,7 +1360,7 @@ export default function ShortVideoOptimizationPage() {
     }
 
     if (genMode === 'frames' && imgs.length > 1) {
-      const targetTotalSec = Math.min(60, Math.max(15, imgs.length * Number(sdDurationSec)))
+      const targetTotalSec = Math.min(LONGFORM_MAX_TARGET_TOTAL_SEC, Math.max(15, imgs.length * Number(sdDurationSec)))
       const hasProduct = Boolean(productPureB64)
       const textBase = appendProductFocusToPrompt(
         txt || `按 ${imgs.length} 个分镜参考生成连贯营销短片。`,
@@ -1489,7 +1497,7 @@ export default function ShortVideoOptimizationPage() {
           <MpAddonPointsRateBadge kind="shortvideo" />
         </div>
         <p className="max-w-2xl text-sm leading-relaxed text-slate-600">
-          推荐流程：短视频生成（30 秒分镜 + 即梦同源 Seedance）→ AI 混剪（字幕/转场包装）。默认已勾选长视频合成与模型2。
+          推荐流程：短视频生成（最长 60 秒分镜 + 即梦同源 Seedance 1.5 Pro）→ AI 混剪（字幕/转场包装）。默认 60 秒长视频合成与模型2。
           {readMpSessionToken() ? (
             <span className="mt-1 block text-xs text-violet-700">
               星选账号：成片成功后按秒扣积分；套餐 ai_video_quota 次数优先，用尽后扣积分余额。
@@ -1578,9 +1586,9 @@ export default function ShortVideoOptimizationPage() {
               disabled={busy}
             />
             <span>
-              <span className="font-medium">长视频合成（最长约 60 秒）</span>
+              <span className="font-medium">长视频合成（最长 {LONGFORM_MAX_TARGET_TOTAL_SEC} 秒）</span>
               <span className="mt-0.5 block text-xs leading-relaxed text-zinc-500">
-                推荐保持开启：写指导文案 →「AI 规划分镜」→ 生成约 30 秒短片 → 再切 AI 混剪精修。
+                推荐保持开启：写指导文案 →「AI 规划分镜」→ 生成最长 60 秒短片（默认 6 段 × 10 秒）→ 再切 AI 混剪精修。
               </span>
             </span>
           </label>
@@ -1790,7 +1798,7 @@ export default function ShortVideoOptimizationPage() {
               <span className="font-semibold">② AI 规划分镜</span>：自动拆时间段 + 画面 + 口播
             </li>
             <li>
-              <span className="font-semibold">③ 开始生成</span>：模型2 Seedance（即梦同源）竖屏 9:16
+              <span className="font-semibold">③ 开始生成</span>：模型2 Seedance 1.5 Pro（即梦同源）竖屏 9:16，最长 60 秒
             </li>
             <li>
               <span className="font-semibold">④ AI 混剪</span>：上传实拍 + 选爆款字幕/转场下载成片
