@@ -175,6 +175,7 @@ export type ErpPointsSpendKind =
   | 'video'
   | 'article'
   | 'brief'
+  | 'mix_material_analyze'
   | 'shortvideo'
   | 'cloud_edit'
   | 'digital_human'

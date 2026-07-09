@@ -80,6 +80,10 @@ function formatLedgerNote(row: RegistryMpAiPointsSpendEntry): string | undefined
     const tail = note.slice('cloud_edit:'.length).trim()
     return tail ? `云剪 ${tail}` : '灵祺 AI 云剪'
   }
+  if (note.startsWith('mix_material_analyze:')) {
+    const tail = note.slice('mix_material_analyze:'.length).trim()
+    return tail ? `1次 · ${tail}` : '1次'
+  }
   if (note.startsWith('digital_human:')) {
     const tail = note.slice('digital_human:'.length).trim()
     return tail ? `口播 ${tail}` : '数字人口播'
