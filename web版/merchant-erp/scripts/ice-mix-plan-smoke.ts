@@ -6,6 +6,7 @@ import {
 } from '../src/lib/iceMixPlan.ts'
 import {
   buildIceMixSegmentsFromEditPlan,
+  buildStructuralMixDecisions,
   enforceDiverseEditDecisions,
   fallbackMixEditDecisions,
   type IceMixMaterialProfile,
@@ -34,7 +35,13 @@ const profiles: IceMixMaterialProfile[] = [
   { index: 2, label: '成品', kind: 'video', description: '成品摆盘特写', estimatedDurationSec: 12 },
 ]
 
-const decisions = fallbackMixEditDecisions(fixed, profiles)
+const structural = buildStructuralMixDecisions(fixed, materials, profiles)
+if (new Set(structural.map((d) => d.materialIndex)).size < 2) {
+  console.error('FAIL: structural should use multiple materials', structural)
+  process.exit(1)
+}
+
+const decisions = fallbackMixEditDecisions(fixed, profiles, materials)
 const allSameMat = new Set(decisions.map((d) => d.materialIndex)).size < 2
 if (allSameMat && materials.length >= 2) {
   const enforced = enforceDiverseEditDecisions(decisions, fixed, materials, profiles)

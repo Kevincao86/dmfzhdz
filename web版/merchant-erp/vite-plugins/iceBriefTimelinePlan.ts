@@ -51,6 +51,8 @@ export type IceBriefTimelinePlan = {
   bgmClip?: IceAudioClipPlan
   /** AI混剪：TTS 口播轨（铺满成片，原视频静音） */
   narrationClip?: IceAudioClipPlan
+  /** AI混剪：ICE 内置 AI_TTS（上海区域，优先于外部 MP3） */
+  mixAiTtsClip?: { content: string; timelineIn: number; timelineOut: number; voice?: string }
   /** 指令框解析：背景音效片段 */
   sfxClips: IceAudioClipPlan[]
   summary: string
@@ -442,11 +444,23 @@ function buildIceAudioTrackClip(clip: IceAudioClipPlan): Record<string, unknown>
   return row
 }
 
+function buildIceAiTtsTrackClip(clip: NonNullable<IceBriefTimelinePlan['mixAiTtsClip']>): Record<string, unknown> {
+  return {
+    Type: 'AI_TTS',
+    Content: clip.content.slice(0, 1200),
+    TimelineIn: clip.timelineIn,
+    TimelineOut: clip.timelineOut,
+    ...(clip.voice?.trim() ? { Voice: clip.voice.trim() } : {}),
+  }
+}
+
 export function buildAudioTracksFromPlan(
   plan: IceBriefTimelinePlan,
 ): { AudioTracks: Array<{ AudioTrackClips: Record<string, unknown>[] }> } | Record<string, never> {
   const clips: Record<string, unknown>[] = []
-  if (plan.narrationClip) {
+  if (plan.mixAiTtsClip?.content?.trim()) {
+    clips.push(buildIceAiTtsTrackClip(plan.mixAiTtsClip))
+  } else if (plan.narrationClip) {
     clips.push(buildIceAudioTrackClip(plan.narrationClip))
   }
   if (plan.bgmClip) {
