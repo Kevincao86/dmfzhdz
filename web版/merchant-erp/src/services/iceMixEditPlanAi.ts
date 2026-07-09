@@ -179,6 +179,7 @@ export async function planMixEditFromInstructions(opts: {
           label: m.label,
           kind: m.kind,
           description: m.label,
+          estimatedDurationSec: m.kind === 'video' ? MIX_DEFAULT_SOURCE_DURATION_SEC : undefined,
         }))
 
   const fallback = fallbackMixEditDecisions(rows, profileList)
