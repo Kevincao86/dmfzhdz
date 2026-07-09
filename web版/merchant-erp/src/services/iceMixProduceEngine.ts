@@ -127,7 +127,6 @@ export function buildIceMixSegmentsFromSlots(
       timelineStart = tr.start
       timelineEnd = Math.min(total, tr.end)
     } else {
-      const each = total / orderedRows.length
       timelineStart = (i * total) / orderedRows.length
       timelineEnd = Math.min(total, ((i + 1) * total) / orderedRows.length)
     }
