@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import type { RegistryMpTalentMember, RegistrySnapshot } from './opsRegistryTypes.js'
 import { getWechatOfficialAccountAccessToken } from './mpWechatOfficialAccountAccess.js'
-import { loadWechatOaConfig } from './mpWechatOfficialAccountConfig.js'
+import { loadWechatOaConfig, normalizeWechatOaApiError } from './mpWechatOfficialAccountConfig.js'
 
 export type RegistryMpWechatOaBindTicket = {
   ticket: string
@@ -119,10 +119,12 @@ export async function createWechatOaBindTicketInSnapshot(
   )
   const body = (await res.json()) as { ticket?: string; errcode?: number; errmsg?: string }
   if (!body.ticket) {
+    const norm = normalizeWechatOaApiError(body.errmsg || `wx_oa_qrcode_${body.errcode ?? 'fail'}`)
     return {
       ok: false,
-      error: body.errmsg || `wx_oa_qrcode_${body.errcode ?? 'fail'}`,
-      status: 502,
+      error: norm.code,
+      message: norm.message,
+      status: norm.code === 'wx_oa_ip_not_whitelisted' ? 503 : 502,
     }
   }
   const qrUrl = `https://mp.weixin.qq.com/cgi-bin/showqrcode?ticket=${encodeURIComponent(body.ticket)}`
