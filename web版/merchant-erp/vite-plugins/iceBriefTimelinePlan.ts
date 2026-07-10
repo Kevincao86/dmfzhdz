@@ -427,12 +427,23 @@ export function buildMixAnimatedSubtitleTracks(
   return { SubtitleTracks: [{ SubtitleTrackClips: clips }] }
 }
 
-/** 混剪成片：强制转场 + 淡入淡出 */
+/** 混剪成片：转场 + 淡入淡出（none 时不强加转场） */
 export function enhanceIceMixBriefPlan(
   plan: IceBriefTimelinePlan,
   effectId: string,
 ): IceBriefTimelinePlan {
   const effect = resolveIceEffectPreset(effectId)
+  if (effect.id === 'none') {
+    return {
+      ...plan,
+      fadeClip: false,
+      useFade: false,
+      useTransition: false,
+      transitionSubType: undefined,
+      effectId: effect.id,
+      summary: `${plan.summary}${plan.summary ? ' · ' : ''}混剪直切拼接`,
+    }
+  }
   const transitionSubType = plan.transitionSubType || effect.transitionSubType || 'fade'
   return {
     ...plan,
