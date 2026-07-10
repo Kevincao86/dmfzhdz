@@ -387,7 +387,6 @@ export default function ShortVideoOptimizationPage() {
     billId: string,
     fallbackSec?: number,
   ): Promise<string> => {
-    if (!readMpSessionToken()) return ''
     let dur = Math.max(1, Math.ceil(Number(fallbackSec) || 1))
     try {
       const probed = await probeVideoDurationSec(blob)
@@ -402,7 +401,6 @@ export default function ShortVideoOptimizationPage() {
         idempotencyKey: `shortvideo:${billId}`,
         note: `shortvideo:${billId}`,
       })
-      if (!charge) return ''
       return formatMpAddonPointsSpendHint('shortvideo', charge, dur)
     } catch {
       return ''

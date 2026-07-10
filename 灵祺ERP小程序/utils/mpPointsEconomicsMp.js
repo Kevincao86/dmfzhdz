@@ -1,0 +1,91 @@
+/**
+ * 与 web `mpPointsEconomics.ts` 消耗规则保持一致（ERP 租户积分）
+ */
+const MP_POINTS_SHORTVIDEO_PER_SEC = 80
+const MP_POINTS_SHORTVIDEO_MIN_CHARGE = 400
+
+const MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP = 80
+const MP_POINTS_CLOUD_EDIT_MAX_SEC = 60
+
+const MP_POINTS_CLOUD_EDIT_SMART_PER_SEC = 5
+const MP_POINTS_CLOUD_EDIT_SMART_MIN_CHARGE = 5
+
+const MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE = 15
+
+const MP_POINTS_PER_SEC_BY_KIND = {
+  shortvideo: MP_POINTS_SHORTVIDEO_PER_SEC,
+  cloud_edit_smart: MP_POINTS_CLOUD_EDIT_SMART_PER_SEC,
+}
+
+const MP_POINTS_USAGE_KIND_LABELS = {
+  shortvideo: '短视频 AI 处理',
+  cloud_edit: '灵祺 AI 云剪',
+  cloud_edit_smart: '智能一键成片',
+  mix_material_analyze: 'AI 混剪素材分析',
+}
+
+function mpPointsPerSecForKind(kind) {
+  return MP_POINTS_PER_SEC_BY_KIND[kind] ?? null
+}
+
+function mpPointsCostForAddonDuration(kind, durationSec) {
+  if (kind === 'cloud_edit') return MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP
+  const sec = Math.max(1, Math.ceil(Number(durationSec) || 1))
+  const rate = mpPointsPerSecForKind(kind) || 0
+  const raw = sec * rate
+  const min =
+    kind === 'cloud_edit_smart'
+      ? MP_POINTS_CLOUD_EDIT_SMART_MIN_CHARGE
+      : kind === 'shortvideo'
+        ? MP_POINTS_SHORTVIDEO_MIN_CHARGE
+        : 0
+  return Math.max(min, raw)
+}
+
+function mpPointsCostForUsage(kind, opts) {
+  if (
+    kind === 'shortvideo' ||
+    kind === 'cloud_edit' ||
+    kind === 'cloud_edit_smart'
+  ) {
+    return mpPointsCostForAddonDuration(kind, (opts && opts.durationSec) || 1)
+  }
+  if (kind === 'mix_material_analyze') return MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE
+  return 0
+}
+
+function formatMpPointsRateLabel(kind) {
+  if (kind === 'cloud_edit') {
+    return `${MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP} 积分/条（≤${MP_POINTS_CLOUD_EDIT_MAX_SEC} 秒）`
+  }
+  if (kind === 'mix_material_analyze') {
+    return `${MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE} 积分/次`
+  }
+  const rate = mpPointsPerSecForKind(kind)
+  if (rate != null) return `${rate} 积分/秒`
+  return '按积分扣费'
+}
+
+function formatAddonSpendHint(kind, result, durationSec) {
+  if (!result || (result.pointsCharged <= 0 && !result.already)) return ''
+  const sec =
+    kind !== 'cloud_edit' && durationSec > 0 ? `（${Math.ceil(durationSec)} 秒）` : ''
+  const label = MP_POINTS_USAGE_KIND_LABELS[kind] || kind
+  return ` · ${label}${sec} 消耗 ${result.pointsCharged} 积分，余额 ${result.balance}`
+}
+
+function insufficientMessage(kind, required, balance) {
+  const label = MP_POINTS_USAGE_KIND_LABELS[kind] || '该功能'
+  return `积分不足（当前 ${balance}，需要 ${required}），请先充值后再使用${label}`
+}
+
+module.exports = {
+  MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP,
+  MP_POINTS_CLOUD_EDIT_MAX_SEC,
+  MP_POINTS_CLOUD_EDIT_SMART_PER_SEC,
+  MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE,
+  mpPointsCostForUsage,
+  formatMpPointsRateLabel,
+  formatAddonSpendHint,
+  insufficientMessage,
+}

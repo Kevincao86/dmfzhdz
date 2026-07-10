@@ -108,6 +108,27 @@ function tenantPayPoll(outTradeNo) {
   return billingFetch({ action: 'pay_poll', outTradeNo: String(outTradeNo || '').trim() })
 }
 
+function checkErpPointsAffordable(input) {
+  const payload = { action: 'points_check', kind: input.kind }
+  if (input.durationSec != null) {
+    payload.durationSec = Math.max(1, Math.ceil(Number(input.durationSec) || 1))
+  }
+  return billingFetch(payload)
+}
+
+function spendErpPointsForUsage(input) {
+  const payload = {
+    action: 'points_spend',
+    kind: input.kind,
+  }
+  if (input.durationSec != null) {
+    payload.durationSec = Math.max(1, Math.ceil(Number(input.durationSec) || 1))
+  }
+  if (input.idempotencyKey) payload.idempotencyKey = String(input.idempotencyKey).trim()
+  if (input.note) payload.note = String(input.note).trim()
+  return billingFetch(payload)
+}
+
 module.exports = {
   billingUrl,
   fetchTenantBillingSummary,
@@ -116,4 +137,6 @@ module.exports = {
   tenantPayPrepay,
   tenantWalletPay,
   tenantPayPoll,
+  checkErpPointsAffordable,
+  spendErpPointsForUsage,
 }

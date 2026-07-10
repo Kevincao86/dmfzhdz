@@ -3,6 +3,8 @@ const merchant = require('../../utils/merchantApi.js')
 const videoAi = require('../../utils/videoAiMp.js')
 const iceCloud = require('../../utils/iceCloudMp.js')
 const labels = require('../../utils/shortVideoLabelsMp.js')
+const erpPoints = require('../../utils/erpPointsSpendMp.js')
+const economics = require('../../utils/mpPointsEconomicsMp.js')
 
 const {
   MAIN_TABS,
@@ -35,7 +37,7 @@ function klingModelLabel(id) {
 Page({
   data: {
     mainTabs: MAIN_TABS,
-    mainPane: 'optimize',
+    mainPane: 'generate',
 
     engineLabelKling: VIDEO_ENGINE_LABEL_KLING,
     engineLabelSeedance: VIDEO_ENGINE_LABEL_SEEDANCE,
@@ -136,6 +138,11 @@ Page({
     canOneClickImages: false,
     canAiBrief: false,
     latestDonePreview: '',
+
+    pointsBalance: null,
+    rateShortvideo: economics.formatMpPointsRateLabel('shortvideo'),
+    rateCloudEdit: economics.formatMpPointsRateLabel('cloud_edit'),
+    rateCloudEditSmart: economics.formatMpPointsRateLabel('cloud_edit_smart'),
   },
 
   _frameB64: '',
@@ -155,7 +162,86 @@ Page({
     }
     await this.loadVideoCfg()
     await this.loadIceCfg()
+    await this.loadPointsBalance()
     this.syncIceDerived()
+  },
+
+  async loadPointsBalance() {
+    try {
+      const bal = await erpPoints.fetchPointsBalance()
+      this.setData({ pointsBalance: bal })
+    } catch {
+      /* 余额展示可选 */
+    }
+  },
+
+  estimateShortvideoDurationSec() {
+    if (this.data.longformEnabled) return Number(this.data.longformSegmentCount) * 10
+    return this.data.durationValues[this.data.durationIdx] === '10' ? 10 : 5
+  },
+
+  async ensureShortvideoAffordable() {
+    const dur = this.estimateShortvideoDurationSec()
+    const r = await erpPoints.checkAddonPointsAffordable('shortvideo', dur)
+    if (!r.ok) {
+      this.setData({ err: r.message })
+      return false
+    }
+    return true
+  },
+
+  async chargeShortvideo(billId, durationSec) {
+    const dur = Math.max(1, Math.ceil(Number(durationSec) || 1))
+    try {
+      const spend = await erpPoints.spendAddonPoints({
+        kind: 'shortvideo',
+        durationSec: dur,
+        idempotencyKey: `shortvideo:${billId}`,
+        note: `shortvideo:${billId}`,
+      })
+      await this.loadPointsBalance()
+      const hintExtra = economics.formatAddonSpendHint('shortvideo', spend, dur)
+      if (hintExtra) {
+        const base = String(this.data.hint || '').trim()
+        this.setData({ hint: base ? `${base}${hintExtra}` : hintExtra.trim() })
+      }
+    } catch (e) {
+      const msg = e && e.message ? e.message : '积分扣减失败'
+      this.setData({ hint: `成片完成，但${msg}` })
+    }
+  },
+
+  async ensureCloudEditAffordable() {
+    const clipSec = Number(this.data.clipEndSec) || 10
+    if (clipSec > economics.MP_POINTS_CLOUD_EDIT_MAX_SEC) {
+      this.setData({
+        iceErr: `单条云剪时长不超过 ${economics.MP_POINTS_CLOUD_EDIT_MAX_SEC} 秒（${economics.formatMpPointsRateLabel('cloud_edit')}）`,
+      })
+      return false
+    }
+    const r = await erpPoints.checkAddonPointsAffordable('cloud_edit', clipSec)
+    if (!r.ok) {
+      this.setData({ iceErr: r.message })
+      return false
+    }
+    return true
+  },
+
+  async chargeCloudEdit(iceJobId) {
+    const clipSec = Number(this.data.clipEndSec) || 10
+    const key = String(iceJobId || '').trim() || `ice-${Date.now()}`
+    try {
+      const spend = await erpPoints.spendAddonPoints({
+        kind: 'cloud_edit',
+        durationSec: clipSec,
+        idempotencyKey: `cloud_edit:${key}`,
+        note: `cloud_edit:${key}`,
+      })
+      await this.loadPointsBalance()
+      return economics.formatAddonSpendHint('cloud_edit', spend, clipSec)
+    } catch (e) {
+      return ` · 积分扣减失败：${e && e.message ? e.message : '请稍后查看钱包'}`
+    }
   },
 
   async loadVideoCfg() {
@@ -510,6 +596,7 @@ Page({
       resultSegments: segmentUrls,
       hint: `已生成 ${segmentUrls.length} 段（每段约 10 秒）。网页端会自动拼接为一条成片；下方可逐段预览。`,
     })
+    await this.chargeShortvideo(`longform-opt-${Date.now()}`, plan.prompts.length * 10)
   },
 
   async runLongformGenerate() {
@@ -599,6 +686,7 @@ Page({
       resultSegments: segmentUrls,
       hint: `已生成 ${segmentUrls.length} 段。网页端可自动拼接；下方可逐段预览。`,
     })
+    await this.chargeShortvideo(`longform-gen-${Date.now()}`, plan.prompts.length * 10)
   },
 
   async submitOptimize() {
@@ -618,6 +706,7 @@ Page({
       return
     }
     this._cancelPoll = false
+    if (!(await this.ensureShortvideoAffordable())) return
     this.setData({ busy: true, progress: '排队中……' })
     try {
       if (this.data.longformEnabled) {
@@ -641,8 +730,10 @@ Page({
           return
         }
         const done = await this.pollVideo('kling', r.pollKind, r.taskId, (t) => this.setData({ progress: t }))
-        if (done.ok && done.videoUrl) this.setData({ resultUrl: done.videoUrl })
-        else if (!this.shouldCancel()) this.setData({ err: done.message || '生成未完成' })
+        if (done.ok && done.videoUrl) {
+          this.setData({ resultUrl: done.videoUrl })
+          await this.chargeShortvideo(r.taskId, durNum)
+        } else if (!this.shouldCancel()) this.setData({ err: done.message || '生成未完成' })
       } else {
         const r = await videoAi.postSeedanceStart({
           model: this.data.sdModelIds[this.data.sdModelIdx],
@@ -655,8 +746,10 @@ Page({
           return
         }
         const done = await this.pollVideo('seedance', null, r.taskId, (t) => this.setData({ progress: t }))
-        if (done.ok && done.videoUrl) this.setData({ resultUrl: done.videoUrl })
-        else if (!this.shouldCancel()) this.setData({ err: done.message || '生成未完成' })
+        if (done.ok && done.videoUrl) {
+          this.setData({ resultUrl: done.videoUrl })
+          await this.chargeShortvideo(r.taskId, durNum)
+        } else if (!this.shouldCancel()) this.setData({ err: done.message || '生成未完成' })
       }
     } finally {
       this.setData({ busy: false, progress: '' })
@@ -683,6 +776,7 @@ Page({
       return
     }
     this._cancelPoll = false
+    if (!(await this.ensureShortvideoAffordable())) return
     this.setData({ busy: true, progress: '排队中……' })
     try {
       if (this.data.longformEnabled) {
@@ -705,8 +799,10 @@ Page({
             return
           }
           const done = await this.pollVideo('kling', r.pollKind, r.taskId, (t) => this.setData({ progress: t }))
-          if (done.ok && done.videoUrl) this.setData({ resultUrl: done.videoUrl })
-          else if (!this.shouldCancel()) this.setData({ err: done.message || '生成未完成' })
+          if (done.ok && done.videoUrl) {
+            this.setData({ resultUrl: done.videoUrl })
+            await this.chargeShortvideo(r.taskId, durNum)
+          } else if (!this.shouldCancel()) this.setData({ err: done.message || '生成未完成' })
           return
         }
         if (!imgs.length) {
@@ -728,8 +824,10 @@ Page({
           return
         }
         const done = await this.pollVideo('kling', r.pollKind, r.taskId, (t) => this.setData({ progress: t }))
-        if (done.ok && done.videoUrl) this.setData({ resultUrl: done.videoUrl })
-        else if (!this.shouldCancel()) this.setData({ err: done.message || '生成未完成' })
+        if (done.ok && done.videoUrl) {
+          this.setData({ resultUrl: done.videoUrl })
+          await this.chargeShortvideo(r.taskId, durNum)
+        } else if (!this.shouldCancel()) this.setData({ err: done.message || '生成未完成' })
       } else {
         const textBlock =
           this.data.genMode === 'text'
@@ -746,8 +844,10 @@ Page({
           return
         }
         const done = await this.pollVideo('seedance', null, r.taskId, (t) => this.setData({ progress: t }))
-        if (done.ok && done.videoUrl) this.setData({ resultUrl: done.videoUrl })
-        else if (!this.shouldCancel()) this.setData({ err: done.message || '生成未完成' })
+        if (done.ok && done.videoUrl) {
+          this.setData({ resultUrl: done.videoUrl })
+          await this.chargeShortvideo(r.taskId, durNum)
+        } else if (!this.shouldCancel()) this.setData({ err: done.message || '生成未完成' })
       }
     } finally {
       this.setData({ busy: false, progress: '' })
@@ -1025,6 +1125,7 @@ Page({
       this.setData({ iceErr: '请填写剪辑文案指令（至少 4 个字）' })
       return
     }
+    if (!(await this.ensureCloudEditAffordable())) return
     const imageItems = this.data.imageItems || []
     if (!imageItems.length) {
       this.setData({ iceErr: '请先上传或粘贴至少一张图片' })
@@ -1063,13 +1164,19 @@ Page({
       return
     }
     this.patchJob(localId, { exportId: pipe.jobId, phase: 'polling', message: '多图合成 · 云端剪辑中…' })
-    await iceCloud.pollIceJobForBatch(localId, pipe.jobId, (id, patch) => this.patchJob(id, patch))
-    this.setData({ iceBusy: false, iceHint: '多图一键成片已提交，请在成片输出区查看。' })
+    const ok = await iceCloud.pollIceJobForBatch(localId, pipe.jobId, (id, patch) => this.patchJob(id, patch))
+    let hint = '多图一键成片已提交，请在成片输出区查看。'
+    if (ok) {
+      const chargeHint = await this.chargeCloudEdit(pipe.jobId)
+      if (chargeHint) hint += chargeHint
+    }
+    this.setData({ iceBusy: false, iceHint: hint })
     this.syncIceDerived()
   },
 
   async runIceBatch() {
     if (!this.data.canSubmitIce) return
+    if (!(await this.ensureCloudEditAffordable())) return
     const aspect = this.getIceAspect()
     const editBrief = String(this.data.editBrief || '').trim()
     const pending = (this.data.jobs || []).filter((j) => j.phase === 'pending' || j.phase === 'failed')
@@ -1094,7 +1201,11 @@ Page({
         }
         this.patchJob(job.id, { exportId: pipe.jobId, phase: 'polling', message: '云端剪辑中…' })
         // eslint-disable-next-line no-await-in-loop
-        await iceCloud.pollIceJobForBatch(job.id, pipe.jobId, (id, patch) => this.patchJob(id, patch))
+        const ok = await iceCloud.pollIceJobForBatch(job.id, pipe.jobId, (id, patch) => this.patchJob(id, patch))
+        if (ok) {
+          // eslint-disable-next-line no-await-in-loop
+          await this.chargeCloudEdit(pipe.jobId)
+        }
       }
     }
     this.setData({

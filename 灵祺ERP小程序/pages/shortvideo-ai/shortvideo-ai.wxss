@@ -53,6 +53,28 @@
   line-height: 1.55;
 }
 
+.sv-points-bar {
+  margin: 0 28rpx 16rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 16rpx;
+  background: #f5f3ff;
+  border: 1rpx solid #ddd6fe;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.sv-points-bal {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #5b21b6;
+}
+
+.sv-points-rate {
+  font-size: 22rpx;
+  color: #7c3aed;
+}
+
 .sv-main-tabs {
   display: flex;
   margin: 0 24rpx 20rpx;

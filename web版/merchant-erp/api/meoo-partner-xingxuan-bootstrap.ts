@@ -6,6 +6,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { requireMerchantRegistryAuth } from '../src/lib/merchantRegistryAuth.js'
 import { ensurePartnerXingxuanMpSession } from '../src/lib/partnerXingxuanBootstrapCore.js'
+import { phoneFromAuthUser } from '../src/lib/tenantLocalState.js'
 import { readMerchantSupabaseAdminEnv } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import { nodeSupabaseClientOptions } from '../src/lib/nodeSupabaseClientOptions.js'
 
@@ -57,30 +58,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   const userClient = createClient(supabaseUrl, serviceRole, nodeSupabaseClientOptions())
   const { data: userData } = await userClient.auth.admin.getUserById(auth.userId)
-  const meta = (userData?.user?.user_metadata ?? {}) as { phone?: string; merchant_name?: string }
-  const phone = String(userData?.user?.phone || meta.phone || '').replace(/^\+86/, '')
-
-  const out = await ensurePartnerXingxuanMpSession({
-    supabaseUrl,
-    serviceRole,
-    tenantId: auth.tenantId,
-    phone,
-    companyName: String(tenant.name || meta.merchant_name || '').trim(),
+  const meta = (userData?.user?.user_metadata ?? {}) as { phone?: string; merchant_name?: string; login_name?: string }
+  let phone = phoneFromAuthUser({
+    phone: userData?.user?.phone,
+    user_metadata: meta,
   })
-
-  if (!out.ok) {
-    sendJson(res, 400, { ok: false, error: out.error, message: out.message })
-    return
+  if (!phone && meta.login_name) {
+    const digits = String(meta.login_name).replace(/\D/g, '')
+    if (digits.length === 11 && digits.startsWith('1')) phone = digits
   }
 
-  sendJson(res, 200, {
-    ok: true,
-    mpSessionToken: out.mpSessionToken,
-    accountId: out.accountId,
-    lingqiPrId: out.lingqiPrId,
-    registryPrId: out.registryPrId,
-    created: out.created,
-    account: out.account,
-    billingMode: 'erp_tenant_points',
-  })
+  try {
+    const out = await ensurePartnerXingxuanMpSession({
+      supabaseUrl,
+      serviceRole,
+      tenantId: auth.tenantId,
+      phone,
+      companyName: String(tenant.name || meta.merchant_name || '').trim(),
+    })
+
+    if (!out.ok) {
+      sendJson(res, 400, { ok: false, error: out.error, message: out.message })
+      return
+    }
+
+    sendJson(res, 200, {
+      ok: true,
+      mpSessionToken: out.mpSessionToken,
+      accountId: out.accountId,
+      lingqiPrId: out.lingqiPrId,
+      registryPrId: out.registryPrId,
+      created: out.created,
+      account: out.account,
+      billingMode: 'erp_tenant_points',
+    })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    sendJson(res, 500, {
+      ok: false,
+      error: 'bootstrap_failed',
+      message: msg.includes('mp_account') ? '星选账号写入失败，请联系运营排查' : `星选账号同步异常：${msg.slice(0, 120)}`,
+    })
+  }
 }

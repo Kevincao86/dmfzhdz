@@ -5,7 +5,13 @@
       <text class="sv-header-icon">映</text>
       <text class="sv-header-title">短视频AI处理</text>
     </view>
-    <text class="sv-header-desc">参考画面 AI 优化、文案生成短片，或批量云剪包装。先选择灵祺视频模型与参数，再上传素材并描述需求即可。</text>
+    <text class="sv-header-desc">短视频 AI 生成与 AI 混剪，积分与商家 Web 版共用同一租户钱包。</text>
+  </view>
+
+  <view wx:if="{{pointsBalance != null}}" class="sv-points-bar">
+    <text class="sv-points-bal">积分余额 {{pointsBalance}}</text>
+    <text wx:if="{{mainPane === 'generate'}}" class="sv-points-rate">短视频生成 · {{rateShortvideo}}</text>
+    <text wx:elif="{{mainPane === 'cloud_batch'}}" class="sv-points-rate">云剪 {{rateCloudEdit}} · 智能成片 {{rateCloudEditSmart}}</text>
   </view>
 
   <!-- 顶栏三 Tab（与 Web erp-panel 一致） -->
@@ -246,7 +252,7 @@
           <text class="sv-ice-logo">云</text>
           <text class="sv-ice-title">灵祺AI云剪</text>
         </view>
-        <text class="sv-ice-desc">批量包装探店/带货短片：左侧填写素材与剪辑指令，提交后在成片输出区下载 MP4。</text>
+        <text class="sv-ice-desc">批量包装探店/带货短片；普通云剪 {{rateCloudEdit}}，智能一键成片 {{rateCloudEditSmart}}（与 Web 一致）。</text>
       </view>
       <text class="sv-badge {{iceServiceReady ? 'ok' : ''}}">{{iceServiceReady ? '服务就绪' : '未就绪'}}</text>
     </view>
