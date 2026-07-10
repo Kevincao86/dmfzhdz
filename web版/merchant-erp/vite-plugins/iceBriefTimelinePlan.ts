@@ -427,7 +427,7 @@ export function buildMixAnimatedSubtitleTracks(
   return { SubtitleTracks: [{ SubtitleTrackClips: clips }] }
 }
 
-/** 混剪成片：转场 + 淡入淡出（none 时不强加转场） */
+/** 混剪成片：段间淡入淡出（DLTransition 与多段 MediaURL/MediaId 组合易 InputFile is bad，混剪不用） */
 export function enhanceIceMixBriefPlan(
   plan: IceBriefTimelinePlan,
   effectId: string,
@@ -444,15 +444,14 @@ export function enhanceIceMixBriefPlan(
       summary: `${plan.summary}${plan.summary ? ' · ' : ''}混剪直切拼接`,
     }
   }
-  const transitionSubType = plan.transitionSubType || effect.transitionSubType || 'fade'
   return {
     ...plan,
     fadeClip: true,
     useFade: true,
-    useTransition: true,
-    transitionSubType,
+    useTransition: false,
+    transitionSubType: undefined,
     effectId: effect.id,
-    summary: `${plan.summary}${plan.summary ? ' · ' : ''}混剪转场+淡入淡出+动效字幕`,
+    summary: `${plan.summary}${plan.summary ? ' · ' : ''}混剪淡入淡出（${effect.label}）`,
   }
 }
 
