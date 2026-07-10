@@ -263,14 +263,113 @@ function resolveDayDotPhase(events, nowMs) {
   return 'ended'
 }
 
+function eventTone(kind) {
+  if (kind === 'visit') return 'green'
+  if (kind === 'deadline') return 'orange'
+  return 'blue'
+}
+
+function eventPriority(evt, nowMs) {
+  const phase = resolveEventPhase(evt, nowMs)
+  if (phase === 'ended') return 90
+  if (evt.kind === 'visit') return phase === 'active' ? 1 : 10
+  if (evt.kind === 'deadline') return 5
+  return 20
+}
+
+function buildUpcomingTodos(events, opts) {
+  const days = Math.max(1, Math.min(14, Number((opts && opts.days) || 7)))
+  const now = Date.now()
+  const endMs = now + days * 86400000
+  return (events || [])
+    .filter((e) => e.dayMs >= now - 86400000 && e.dayMs <= endMs)
+    .filter((e) => resolveEventPhase(e, now) !== 'ended')
+    .sort((a, b) => eventPriority(a, now) - eventPriority(b, now) || a.dayMs - b.dayMs)
+    .slice(0, 12)
+}
+
+function countActiveTodos(events) {
+  const now = Date.now()
+  const endMs = now + 7 * 86400000
+  return (events || []).filter(
+    (e) => e.dayMs >= now - 86400000 && e.dayMs <= endMs && resolveEventPhase(e, now) !== 'ended',
+  ).length
+}
+
+function buildWeekCells(anchorDateKey) {
+  const ms = parseVisitDayMs(anchorDateKey || dateKeyFromMs(Date.now()))
+  const d = new Date(ms || Date.now())
+  const weekday = d.getDay()
+  const cells = []
+  for (let i = 0; i < 7; i++) {
+    const cur = new Date(d.getFullYear(), d.getMonth(), d.getDate() - weekday + i)
+    cells.push({
+      dateKey: dateKeyFromMs(cur.getTime()),
+      day: cur.getDate(),
+      inMonth: true,
+      weekday: i,
+    })
+  }
+  return cells
+}
+
+function calendarSubtitle(identity) {
+  if (identity === 'pr') return '排期总览 · 到店跟进 · 交片催办'
+  return '探店签到 · 交片提醒 · 邀约截止'
+}
+
+const WEEKDAY_CN = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+
+function formatTodoDateShort(dateKey, todayKey) {
+  const parts = String(dateKey || '').split('-')
+  if (parts.length < 3) return dateKey
+  const short = `${parts[1]}-${parts[2]}`
+  return dateKey === todayKey ? `${short} 今天` : short
+}
+
+function phaseStatusLabel(phase) {
+  if (phase === 'active') return '进行中'
+  if (phase === 'pending') return '待开始'
+  return '已结束'
+}
+
+function dayEventSummary(events, nowMs) {
+  const list = events || []
+  if (!list.length) return null
+  const phase = resolveDayDotPhase(list, nowMs)
+  if (!phase) return null
+  const now = typeof nowMs === 'number' ? nowMs : Date.now()
+  const count = list.filter((e) => resolveEventPhase(e, now) === phase).length || list.length
+  return {
+    phase,
+    count,
+    label: `${count}项${phaseStatusLabel(phase)}`,
+  }
+}
+
+function weekdayShortFromDateKey(dateKey) {
+  const ms = parseVisitDayMs(dateKey)
+  if (!ms) return ''
+  return (WEEKDAY_CN[new Date(ms).getDay()] || '').replace('周', '')
+}
+
 module.exports = {
   parseVisitDayMs,
   dateKeyFromMs,
   aggregatePrOrderCalendarEvents,
   aggregateTalentOrderCalendarEvents,
   buildMonthGrid,
+  buildWeekCells,
   groupEventsByDate,
   kindLabel,
+  eventTone,
+  buildUpcomingTodos,
+  countActiveTodos,
   resolveEventPhase,
   resolveDayDotPhase,
+  calendarSubtitle,
+  formatTodoDateShort,
+  phaseStatusLabel,
+  dayEventSummary,
+  weekdayShortFromDateKey,
 }

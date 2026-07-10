@@ -489,6 +489,41 @@ function computeRemindAtMs(eventDateKey, preset) {
   return 0
 }
 
+const WEEKDAY_CN = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+
+function formatTodoDateShort(dateKey, todayKey) {
+  const parts = String(dateKey || '').split('-')
+  if (parts.length < 3) return dateKey
+  const short = `${parts[1]}-${parts[2]}`
+  return dateKey === todayKey ? `${short} 今天` : short
+}
+
+function phaseStatusLabel(phase) {
+  if (phase === 'active') return '进行中'
+  if (phase === 'pending') return '待开始'
+  return '已结束'
+}
+
+function dayEventSummary(events, nowMs) {
+  const list = events || []
+  if (!list.length) return null
+  const phase = resolveDayDotPhase(list, nowMs)
+  if (!phase) return null
+  const now = typeof nowMs === 'number' ? nowMs : Date.now()
+  const count = list.filter((e) => resolveEventPhase(e, now) === phase).length || list.length
+  return {
+    phase,
+    count,
+    label: `${count}项${phaseStatusLabel(phase)}`,
+  }
+}
+
+function weekdayShortFromDateKey(dateKey) {
+  const ms = parseVisitDayMs(dateKey)
+  if (!ms) return ''
+  return (WEEKDAY_CN[new Date(ms).getDay()] || '').replace('周', '')
+}
+
 module.exports = {
   parseVisitDayMs,
   dateKeyFromMs,
@@ -507,5 +542,9 @@ module.exports = {
   calendarSubtitle,
   resolveEventNav,
   computeRemindAtMs,
+  formatTodoDateShort,
+  phaseStatusLabel,
+  dayEventSummary,
+  weekdayShortFromDateKey,
   KIND_LABELS,
 }

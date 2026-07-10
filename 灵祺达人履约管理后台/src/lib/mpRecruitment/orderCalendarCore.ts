@@ -314,3 +314,109 @@ export function resolveDayDotPhase(
   if (phases.includes('pending')) return 'pending'
   return 'ended'
 }
+
+export type OrderCalendarEventTone = 'green' | 'orange' | 'blue' | 'red'
+
+export function eventTone(kind: OrderCalendarEventKind): OrderCalendarEventTone {
+  if (kind === 'visit') return 'green'
+  if (kind === 'deadline') return 'orange'
+  return 'blue'
+}
+
+export function eventPriority(evt: OrderCalendarEvent, nowMs = Date.now()): number {
+  const phase = resolveEventPhase(evt, nowMs)
+  if (phase === 'ended') return 90
+  if (evt.kind === 'visit') return phase === 'active' ? 1 : 10
+  if (evt.kind === 'deadline') return 5
+  return 20
+}
+
+export function buildUpcomingTodos(
+  events: OrderCalendarEvent[],
+  opts?: { days?: number; nowMs?: number },
+): OrderCalendarEvent[] {
+  const days = Math.max(1, Math.min(14, Number(opts?.days) || 7))
+  const now = opts?.nowMs ?? Date.now()
+  const endMs = now + days * 86400000
+  return (events || [])
+    .filter((e) => e.dayMs >= now - 86400000 && e.dayMs <= endMs)
+    .filter((e) => resolveEventPhase(e, now) !== 'ended')
+    .sort((a, b) => eventPriority(a, now) - eventPriority(b, now) || a.dayMs - b.dayMs)
+    .slice(0, 12)
+}
+
+export function countActiveTodos(events: OrderCalendarEvent[], nowMs = Date.now()): number {
+  const endMs = nowMs + 7 * 86400000
+  return (events || []).filter(
+    (e) => e.dayMs >= nowMs - 86400000 && e.dayMs <= endMs && resolveEventPhase(e, nowMs) !== 'ended',
+  ).length
+}
+
+export function buildWeekCells(anchorDateKey: string): Array<{
+  dateKey: string
+  day: number
+  inMonth: boolean
+  weekday: number
+}> {
+  const ms = parseVisitDayMs(anchorDateKey || dateKeyFromMs(Date.now()))
+  const d = new Date(ms || Date.now())
+  const weekday = d.getDay()
+  const cells: Array<{ dateKey: string; day: number; inMonth: boolean; weekday: number }> = []
+  for (let i = 0; i < 7; i++) {
+    const cur = new Date(d.getFullYear(), d.getMonth(), d.getDate() - weekday + i)
+    cells.push({
+      dateKey: dateKeyFromMs(cur.getTime()),
+      day: cur.getDate(),
+      inMonth: true,
+      weekday: i,
+    })
+  }
+  return cells
+}
+
+const WEEKDAY_CN = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+
+export function weekdayLabelFromDateKey(dateKey: string): string {
+  const ms = parseVisitDayMs(dateKey)
+  if (!ms) return ''
+  return WEEKDAY_CN[new Date(ms).getDay()] ?? ''
+}
+
+export function formatTodoDateShort(dateKey: string, todayKey: string): string {
+  const parts = String(dateKey || '').split('-')
+  if (parts.length < 3) return dateKey
+  const short = `${parts[1]}-${parts[2]}`
+  return dateKey === todayKey ? `${short} 今天` : short
+}
+
+export function phaseStatusLabel(phase: OrderCalendarDayPhase): string {
+  if (phase === 'active') return '进行中'
+  if (phase === 'pending') return '待开始'
+  return '已结束'
+}
+
+export function dayEventSummary(
+  events: OrderCalendarEvent[],
+  nowMs = Date.now(),
+): { phase: OrderCalendarDayPhase; count: number; label: string } | null {
+  if (!events.length) return null
+  const phase = resolveDayDotPhase(events, nowMs)
+  if (!phase) return null
+  const count = events.filter((e) => resolveEventPhase(e, nowMs) === phase).length || events.length
+  return {
+    phase,
+    count,
+    label: `${count}项${phaseStatusLabel(phase)}`,
+  }
+}
+
+export function calendarPageSubtitle(isPr: boolean): string {
+  return isPr ? '排期总览 · 到店跟进 · 交片催办' : '探店签到 · 交片提醒 · 邀约截止'
+}
+
+export function calendarPageSubtitleForWork(workId: string): string {
+  if (workId === 'pr') return '排期总览 · 到店跟进 · 交片催办'
+  if (workId === 'shoot') return '外拍档期 · 素材交付提醒'
+  if (workId === 'edit') return '剪辑交付 · 云剪任务提醒'
+  return '探店签到 · 交片提醒 · 邀约截止'
+}
