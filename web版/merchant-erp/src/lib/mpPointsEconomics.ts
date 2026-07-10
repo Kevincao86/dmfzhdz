@@ -14,11 +14,15 @@ export const MP_POINTS_SHORTVIDEO_PER_SEC = 80
 /** 数字人口播（Seedance 分段 i2v）：28 积分/秒 */
 export const MP_POINTS_DIGITAL_HUMAN_PER_SEC = 28
 
-/** 灵祺 AI 云剪（ICE 合成）：8 积分/秒 */
-export const MP_POINTS_CLOUD_EDIT_PER_SEC = 8
+/** 灵祺 AI 云剪（ICE 普通合成）：一口价 80 积分/条（≤60 秒） */
+export const MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP = 80
+export const MP_POINTS_CLOUD_EDIT_MAX_SEC = 60
 
-/** 阿里云 IMS 智能一键成片：22 积分/秒 */
-export const MP_POINTS_CLOUD_EDIT_SMART_PER_SEC = 22
+/** @deprecated 普通云剪已改一口价，仅保留兼容引用 */
+export const MP_POINTS_CLOUD_EDIT_PER_SEC = 0
+
+/** 阿里云 IMS 智能一键成片：5 积分/秒 */
+export const MP_POINTS_CLOUD_EDIT_SMART_PER_SEC = 5
 
 /** 短视频 AI 成片最低扣费（约 5 秒，80 积分/秒） */
 export const MP_POINTS_SHORTVIDEO_MIN_CHARGE = 400
@@ -29,11 +33,11 @@ export const MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE = 110
 /** @deprecated 请用 MP_POINTS_SHORTVIDEO_MIN_CHARGE / MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE */
 export const MP_POINTS_ADDON_VIDEO_MIN_CHARGE = MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE
 
-/** 云剪成片最低扣费（默认 10 秒档） */
-export const MP_POINTS_CLOUD_EDIT_MIN_CHARGE = 80
+/** @deprecated 普通云剪已改一口价 */
+export const MP_POINTS_CLOUD_EDIT_MIN_CHARGE = MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP
 
-/** 智能一键成片最低扣费（默认 10 秒档） */
-export const MP_POINTS_CLOUD_EDIT_SMART_MIN_CHARGE = 220
+/** 智能一键成片最低扣费（1 秒档） */
+export const MP_POINTS_CLOUD_EDIT_SMART_MIN_CHARGE = 5
 
 /** AI 文章/文稿检核：2 积分/次 */
 export const MP_POINTS_ARTICLE_PER_USE = 2
@@ -131,6 +135,9 @@ export function formatMpPointsRateLabel(kind: MpPointsUsageKind): string {
   if (kind === 'article') return `${MP_POINTS_ARTICLE_PER_USE} 积分/次`
   if (kind === 'brief') return `${MP_POINTS_BRIEF_PER_USE} 积分/篇`
   if (kind === 'mix_material_analyze') return `${MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE} 积分/次`
+  if (kind === 'cloud_edit') {
+    return `${MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP} 积分/条（≤${MP_POINTS_CLOUD_EDIT_MAX_SEC} 秒）`
+  }
   const rate = mpPointsPerSecForKind(kind)
   if (rate != null) return `${rate} 积分/秒（${rate * 60} 积分/分钟）`
   return '按积分扣费'
@@ -140,17 +147,16 @@ function mpPointsCostForAddonDuration(
   kind: 'shortvideo' | 'cloud_edit' | 'cloud_edit_smart' | 'digital_human',
   durationSec: number,
 ): number {
+  if (kind === 'cloud_edit') return MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP
   const sec = Math.max(1, Math.ceil(Number(durationSec) || 1))
   const rate = mpPointsPerSecForKind(kind) ?? 0
   const raw = sec * rate
   const min =
-    kind === 'cloud_edit'
-      ? MP_POINTS_CLOUD_EDIT_MIN_CHARGE
-      : kind === 'cloud_edit_smart'
-        ? MP_POINTS_CLOUD_EDIT_SMART_MIN_CHARGE
-        : kind === 'shortvideo'
-          ? MP_POINTS_SHORTVIDEO_MIN_CHARGE
-          : MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE
+    kind === 'cloud_edit_smart'
+      ? MP_POINTS_CLOUD_EDIT_SMART_MIN_CHARGE
+      : kind === 'shortvideo'
+        ? MP_POINTS_SHORTVIDEO_MIN_CHARGE
+        : MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE
   return Math.max(min, raw)
 }
 

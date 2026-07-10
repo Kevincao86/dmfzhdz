@@ -5,6 +5,7 @@ import {
   type MpPointsUsageKind,
 } from '../lib/mpPointsEconomics'
 import { merchantApiFetchUrls } from '../lib/merchantErpApiBase'
+import { checkErpPointsAffordable, spendErpPointsForUsage } from './tenantBillingClient'
 
 export type MpAddonGenerationKind = 'shortvideo' | 'cloud_edit' | 'cloud_edit_smart' | 'digital_human'
 
@@ -62,64 +63,108 @@ export function estimateMpAddonPointsCharge(kind: MpAddonGenerationKind, duratio
   return mpPointsCostForUsage(kind, { durationSec })
 }
 
-/** 生成前校验积分（无星选会话时跳过，不阻断 CS 商家独立登录） */
+/** 生成前校验积分：星选 mp 会话优先；否则走 ERP 租户 billing */
 export async function checkMpAddonPointsAffordable(
   kind: MpAddonGenerationKind,
   durationSec: number,
 ): Promise<MpAddonPointsAffordResult> {
-  if (!readMpSessionToken()) {
-    return { ok: true, balance: 0, required: 0, skipped: true }
-  }
   const sec = Math.max(1, Math.ceil(Number(durationSec) || 1))
-  const billingRole = readMpBillingRoleHint()
-  const res = await postMpAuthActionRaw({
-    action: 'mp_ai_points_afford',
-    kind,
-    durationSec: sec,
-    ...(billingRole ? { billingRole } : {}),
-  })
-  if (res.ok) {
+  const required = estimateMpAddonPointsCharge(kind, sec)
+  if (readMpSessionToken()) {
+    const billingRole = readMpBillingRoleHint()
+    const res = await postMpAuthActionRaw({
+      action: 'mp_ai_points_afford',
+      kind,
+      durationSec: sec,
+      ...(billingRole ? { billingRole } : {}),
+    })
+    if (res.ok) {
+      return {
+        ok: true,
+        balance: Math.max(0, Math.floor(Number(res.data.mpAiPointsBalance) || 0)),
+        required: Math.max(0, Math.floor(Number(res.data.pointsRequired) || required)),
+      }
+    }
+    const err = String(res.data.error || '')
+    if (err === 'login_required') {
+      return { ok: true, balance: 0, required: 0, skipped: true }
+    }
     return {
-      ok: true,
-      balance: Math.max(0, Math.floor(Number(res.data.mpAiPointsBalance) || 0)),
-      required: Math.max(0, Math.floor(Number(res.data.pointsRequired) || 0)),
+      ok: false,
+      message: String(res.data.message || res.data.error || '积分不足'),
+      error: err,
+      balance: res.data.balance != null ? Math.floor(Number(res.data.balance)) : undefined,
+      required: res.data.required != null ? Math.floor(Number(res.data.required)) : required,
     }
   }
-  const err = String(res.data.error || '')
-  if (err === 'login_required') {
-    return { ok: true, balance: 0, required: 0, skipped: true }
-  }
-  return {
-    ok: false,
-    message: String(res.data.message || res.data.error || '积分不足'),
-    error: err,
-    balance: res.data.balance != null ? Math.floor(Number(res.data.balance)) : undefined,
-    required: res.data.required != null ? Math.floor(Number(res.data.required)) : undefined,
+  try {
+    const r = await checkErpPointsAffordable({ kind, durationSec: sec })
+    const balance = Math.max(
+      0,
+      Math.floor(Number(r.balance) || Number(r.packageBalance) + Number(r.rechargeBalance) || 0),
+    )
+    if (balance < required) {
+      return {
+        ok: false,
+        message: mpAddonPointsInsufficientMessage(kind, required, balance),
+        error: 'insufficient_points',
+        balance,
+        required,
+      }
+    }
+    return { ok: true, balance, required }
+  } catch (e) {
+    const errObj = e && typeof e === 'object' ? (e as Record<string, unknown>) : {}
+    const status = Number(errObj.status) || 0
+    if (status === 402) {
+      return {
+        ok: false,
+        message: String(errObj.message || '积分不足'),
+        error: 'insufficient_points',
+      }
+    }
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : String(e),
+      error: 'billing_unavailable',
+    }
   }
 }
 
-/** 成片成功后扣减积分；无星选会话时跳过 */
+/** 成片成功后扣减积分：星选 mp 会话优先；否则走 ERP 租户 billing */
 export async function spendMpAddonPoints(opts: {
   kind: MpAddonGenerationKind
   durationSec: number
   idempotencyKey?: string
   note?: string
 }): Promise<MpAddonPointsSpendResult | null> {
-  if (!readMpSessionToken()) return null
   const sec = Math.max(1, Math.ceil(Number(opts.durationSec) || 1))
-  const billingRole = readMpBillingRoleHint()
-  const data = await postMpAuthAction({
-    action: 'mp_ai_points_spend',
+  if (readMpSessionToken()) {
+    const billingRole = readMpBillingRoleHint()
+    const data = await postMpAuthAction({
+      action: 'mp_ai_points_spend',
+      kind: opts.kind,
+      durationSec: sec,
+      idempotencyKey: opts.idempotencyKey?.trim() || undefined,
+      note: opts.note?.trim() || undefined,
+      ...(billingRole ? { billingRole } : {}),
+    })
+    return {
+      pointsCharged: Math.max(0, Math.floor(Number(data.pointsCharged) || 0)),
+      balance: Math.max(0, Math.floor(Number(data.mpAiPointsBalance) || 0)),
+      already: data.already === true,
+    }
+  }
+  const r = await spendErpPointsForUsage({
     kind: opts.kind,
     durationSec: sec,
     idempotencyKey: opts.idempotencyKey?.trim() || undefined,
     note: opts.note?.trim() || undefined,
-    ...(billingRole ? { billingRole } : {}),
   })
   return {
-    pointsCharged: Math.max(0, Math.floor(Number(data.pointsCharged) || 0)),
-    balance: Math.max(0, Math.floor(Number(data.mpAiPointsBalance) || 0)),
-    already: data.already === true,
+    pointsCharged: Math.max(0, Math.floor(Number(r.pointsCharged) || 0)),
+    balance: Math.max(0, Math.floor(Number(r.balance) || 0)),
+    already: r.already === true,
   }
 }
 
@@ -133,7 +178,10 @@ export function formatMpAddonPointsSpendHint(
     return ' · 已消耗套餐额度 1 次'
   }
   const sec =
-    durationSec != null && Number.isFinite(durationSec) && durationSec > 0
+    kind !== 'cloud_edit' &&
+    durationSec != null &&
+    Number.isFinite(durationSec) &&
+    durationSec > 0
       ? `（${Math.ceil(durationSec)} 秒）`
       : ''
   const labels: Record<MpAddonGenerationKind, string> = {

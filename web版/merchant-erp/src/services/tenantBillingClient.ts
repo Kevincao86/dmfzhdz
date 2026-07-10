@@ -178,6 +178,7 @@ export type ErpPointsSpendKind =
   | 'mix_material_analyze'
   | 'shortvideo'
   | 'cloud_edit'
+  | 'cloud_edit_smart'
   | 'digital_human'
 
 export type ErpPointsSpendResult = {

@@ -5,13 +5,16 @@ import App from './App'
 import './index.css'
 import { initTheme } from './lib/theme'
 import './lib/mpAccountClientSync'
+import { bootstrapFwsEmbedSessionFromUrl } from './lib/fwsEmbedSessionBootstrap'
 
 initTheme()
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </StrictMode>,
-)
+void bootstrapFwsEmbedSessionFromUrl().finally(() => {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </StrictMode>,
+  )
+})

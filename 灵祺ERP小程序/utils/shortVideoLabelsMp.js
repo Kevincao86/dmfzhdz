@@ -16,7 +16,6 @@ module.exports = {
   ],
   ICE_BATCH_GENERATE_COUNTS: [10, 20, 50, 100],
   MAIN_TABS: [
-    { id: 'optimize', label: '参考画面处理' },
     { id: 'generate', label: '短视频生成' },
     { id: 'cloud_batch', label: 'AI混剪' },
   ],

@@ -55,6 +55,7 @@ import {
 import PartnerClientsSection from './settings/PartnerClientsSection'
 import PartnerAgentManagementSection from './settings/PartnerAgentManagementSection'
 import PartnerEntitlementSection from './settings/PartnerEntitlementSection'
+import PartnerXingxuanPlatformSection from './settings/PartnerXingxuanPlatformSection'
 import { usePartnerTenant } from '../context/PartnerTenantContext'
 
 type VerifyItem = {
@@ -322,6 +323,7 @@ export default function SettingsPage() {
         <div className="p-6 sm:p-8">
           {tab === 'platforms' && (
             <div className="space-y-8">
+              {isPartnerEdition() ? <PartnerXingxuanPlatformSection /> : null}
               <PlatformConnectionsPanel />
 
               <AiModelBindingSection />
