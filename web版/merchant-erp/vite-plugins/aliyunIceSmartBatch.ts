@@ -109,14 +109,36 @@ type PlannedDialogueRow = {
   rowIndex: number
 }
 
+function scriptRowsCoverTarget(
+  scriptRows: IceSmartBatchScriptRow[],
+  targetSec: number,
+): boolean {
+  let maxEnd = 0
+  let timedCount = 0
+  for (const r of scriptRows) {
+    const p = parseScriptTimeRangeSeconds(String(r.timeRange ?? ''))
+    if (p) {
+      maxEnd = Math.max(maxEnd, p.end)
+      timedCount++
+    }
+  }
+  return timedCount >= 2 && maxEnd >= targetSec - 1
+}
+
+function resolveSpeechRateForTarget(estSec: number, targetSec: number): number {
+  if (estSec <= targetSec + 1.5) return 0
+  const ratio = estSec / Math.max(1, targetSec)
+  // 口播略长时轻微加速，避免截断文案（SpeechRate 正值=加快）
+  return Math.min(180, Math.round((ratio - 1) * 350))
+}
 function planDialogueRowsForTarget(input: {
   scriptRows: IceSmartBatchScriptRow[]
   materialSlots: number[]
   materialCount: number
   targetTotalSec: number
-}): { rows: PlannedDialogueRow[]; padSec: number } {
+}): { rows: PlannedDialogueRow[]; padSec: number; speechRate: number } {
   const target = Math.min(120, Math.max(5, Math.ceil(input.targetTotalSec)))
-  const minTotalSec = Math.max(target - 2, Math.round(target * 0.9))
+  const storyboardMode = scriptRowsCoverTarget(input.scriptRows, target)
   const idealSegs = segmentCountForTarget(target)
 
   const candidates = input.scriptRows
@@ -134,30 +156,38 @@ function planDialogueRowsForTarget(input: {
     estSec: number
   }>
 
-  if (candidates.length === 0) return { rows: [], padSec: target }
+  if (candidates.length === 0) return { rows: [], padSec: target, speechRate: 0 }
 
-  let rows: typeof candidates = []
-  let accSec = 0
-  for (const c of candidates) {
-    rows.push(c)
-    accSec += c.estSec
-    if (rows.length >= idealSegs && accSec >= minTotalSec) break
-  }
-
-  if (rows.length < 2) {
-    rows = candidates.slice(0, Math.min(candidates.length, Math.max(2, idealSegs)))
-    accSec = rows.reduce((s, r) => s + r.estSec, 0)
-  }
-
-  // 仅当明显超长时才截断口播（分组模式时长 = TTS 总长，MaxDuration 无效）
-  if (accSec > target + 2 && rows.length > 0) {
-    const budget = Math.max(12, Math.floor(target * DIALOGUE_CHARS_PER_SEC))
-    const perRow = Math.max(10, Math.floor(budget / rows.length))
-    rows = rows.map((r) => {
-      const dialogue = truncateDialogue(r.dialogue, perRow)
-      return { ...r, dialogue, estSec: estimateSpeechSec(dialogue) }
+  let rows: typeof candidates
+  if (storyboardMode) {
+    rows = candidates.filter((c) => {
+      const row = input.scriptRows[c.rowIndex]
+      const p = parseScriptTimeRangeSeconds(String(row?.timeRange ?? ''))
+      if (!p) return true
+      return p.start < target
     })
-    accSec = rows.reduce((s, r) => s + r.estSec, 0)
+    if (rows.length < 2) rows = candidates
+  } else {
+    const minTotalSec = Math.max(target - 2, Math.round(target * 0.88))
+    rows = []
+    let accSec = 0
+    for (const c of candidates) {
+      rows.push(c)
+      accSec += c.estSec
+      if (rows.length >= idealSegs && accSec >= minTotalSec) break
+    }
+    if (rows.length < 2) {
+      rows = candidates.slice(0, Math.min(candidates.length, Math.max(2, idealSegs)))
+    }
+    let accSec2 = rows.reduce((s, r) => s + r.estSec, 0)
+    if (accSec2 > target * 1.35 && rows.length > 0) {
+      const budget = Math.max(16, Math.floor(target * DIALOGUE_CHARS_PER_SEC))
+      const perRow = Math.max(12, Math.floor(budget / rows.length))
+      rows = rows.map((r) => {
+        const dialogue = truncateDialogue(r.dialogue, perRow)
+        return { ...r, dialogue, estSec: estimateSpeechSec(dialogue) }
+      })
+    }
   }
 
   const planned = rows.map((r) => ({
@@ -167,8 +197,10 @@ function planDialogueRowsForTarget(input: {
     rowIndex: r.rowIndex,
   }))
 
-  const padSec = Math.max(0, Math.round((target - accSec) * 10) / 10)
-  return { rows: planned, padSec }
+  const accSec = planned.reduce((s, r) => s + r.estSec, 0)
+  const padSec = storyboardMode ? 0 : Math.max(0, Math.round((target - accSec) * 10) / 10)
+  const speechRate = resolveSpeechRateForTarget(accSec, target)
+  return { rows: planned, padSec, speechRate }
 }
 
 function buildPadMediaGroups(input: {
@@ -203,7 +235,7 @@ function buildPadMediaGroups(input: {
   ]
 }
 
-function buildDefaultEditingConfig(): Record<string, unknown> {
+function buildDefaultEditingConfig(speechRate = 0): Record<string, unknown> {
   return {
     ProcessConfig: {
       AllowTransition: true,
@@ -218,7 +250,7 @@ function buildDefaultEditingConfig(): Record<string, unknown> {
     MediaConfig: { Volume: 0 },
     SpeechConfig: {
       Volume: 1,
-      SpeechRate: 0,
+      SpeechRate: speechRate,
       AsrConfig: {
         Alignment: 'BottomCenter',
         AdaptMode: 'AutoWrap',
@@ -247,7 +279,7 @@ function buildInputConfig(input: {
   guidance: string
   targetTotalSec: number
   materialSlots?: number[]
-}): Record<string, unknown> {
+}): { inputConfig: Record<string, unknown>; speechRate: number } {
   const urls = input.materials
     .map((m) => ensureIceHttpsUrl(sanitizeIcePipelineMediaUrl(m.mediaUrl)))
     .filter(Boolean)
@@ -263,6 +295,7 @@ function buildInputConfig(input: {
   })
   const planned = plannedResult.rows
   const padGroups = buildPadMediaGroups({ materials: input.materials, padSec: plannedResult.padSec })
+  const speechRate = plannedResult.speechRate
 
   // 分组口播：仅用分镜「口播/文案」列；每组 Volume:0 强制原片消音
   if (planned.length >= 2) {
@@ -278,7 +311,7 @@ function buildInputConfig(input: {
       }
     })
     const mediaGroups = [...padGroups.slice(0, 1), ...speechGroups, ...padGroups.slice(1)]
-    return { MediaGroupArray: mediaGroups }
+    return { inputConfig: { MediaGroupArray: mediaGroups }, speechRate }
   }
 
   // 全局口播：一句短 hook；原片静音
@@ -288,15 +321,18 @@ function buildInputConfig(input: {
     extractShortHookFromGuidance(guidance, Math.min(hookMaxChars, 100))
 
   return {
-    MediaGroupArray: [
-      {
-        GroupName: 'main',
-        MediaArray: urls,
-        SplitMode: 'AverageSplit',
-        Volume: 0,
-      },
-    ],
-    SpeechTextArray: [truncateDialogue(hook, hookMaxChars)],
+    inputConfig: {
+      MediaGroupArray: [
+        {
+          GroupName: 'main',
+          MediaArray: urls,
+          SplitMode: 'AverageSplit',
+          Volume: 0,
+        },
+      ],
+      SpeechTextArray: [truncateDialogue(hook, hookMaxChars)],
+    },
+    speechRate,
   }
 }
 
@@ -375,14 +411,15 @@ export async function iceSubmitSmartBatchJob(
   })
   if (!output.ok) return { ok: false, message: output.message, step: 'output' }
 
-  const inputConfig = buildInputConfig({
+  const built = buildInputConfig({
     materials: input.materials,
     scriptRows,
     guidance,
     targetTotalSec,
     materialSlots: input.materialSlots,
   })
-  const editingConfig = buildDefaultEditingConfig()
+  const inputConfig = built.inputConfig
+  const editingConfig = buildDefaultEditingConfig(built.speechRate)
   const templateIds = (input.templateIds ?? []).filter(Boolean).slice(0, 50)
 
   const client = createClient(cfg)
