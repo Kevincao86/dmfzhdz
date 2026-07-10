@@ -279,20 +279,14 @@ export function buildTimelineFromMixClips(
   opts?: { forceMuteSource?: boolean },
 ): object {
   const muteSource = opts?.forceMuteSource ?? Boolean(plan.narrationClip || plan.mixAiTtsClip)
-  /** DLTransition 与 Timeline MediaURL 组合在 IMS 上易触发 InputFile is bad，混剪转场须走 MediaId */
-  const hasMixTransition = Boolean(plan.transitionSubType?.trim())
   const clips: Record<string, unknown>[] = []
   for (let i = 0; i < resolved.length; i++) {
     const seg = resolved[i]!
     const dur = Math.max(0.35, seg.timelineEndSec - seg.timelineStartSec)
-    const useMediaUrl =
-      !hasMixTransition &&
-      seg.kind === 'video' &&
-      seg.mediaUrl &&
-      isIceCleanOssTimelineUrl(seg.mediaUrl)
-    const ref = useMediaUrl
-      ? { MediaURL: seg.mediaUrl!.trim() }
-      : { MediaId: seg.mediaId.trim() }
+    const ref =
+      seg.kind === 'video' && seg.mediaUrl && isIceCleanOssTimelineUrl(seg.mediaUrl)
+        ? { MediaURL: seg.mediaUrl.trim() }
+        : { MediaId: seg.mediaId.trim() }
     if (seg.kind === 'image') {
       const clip: Record<string, unknown> = {
         Type: 'Image',
