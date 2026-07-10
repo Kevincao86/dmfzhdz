@@ -76,13 +76,6 @@ function normalizeImsMediaUrl(raw: string): string {
   return ensureIceHttpsUrl(u)
 }
 
-function rowDurationSec(row: { timeRange?: string }): number | undefined {
-  const p = parseScriptTimeRangeSeconds(String(row.timeRange ?? ''))
-  if (!p) return undefined
-  const d = p.end - p.start
-  return d > 0 ? d : undefined
-}
-
 function estimateSpeechSec(text: string): number {
   const len = text.trim().length
   if (len <= 0) return 0
