@@ -80,6 +80,10 @@ function formatLedgerNote(row: RegistryMpAiPointsSpendEntry): string | undefined
     const tail = note.slice('cloud_edit:'.length).trim()
     return tail ? `云剪 ${tail}` : '灵祺 AI 云剪'
   }
+  if (note.startsWith('cloud_edit_smart:')) {
+    const tail = note.slice('cloud_edit_smart:'.length).trim()
+    return tail ? `智能成片 ${tail}` : '智能一键成片'
+  }
   if (note.startsWith('mix_material_analyze:')) {
     const tail = note.slice('mix_material_analyze:'.length).trim()
     return tail ? `1次 · ${tail}` : '1次'
@@ -126,7 +130,10 @@ function formatChargeSummary(row: RegistryMpAiPointsSpendEntry): string {
     const unit =
       row.kind === 'video'
         ? 'minutes'
-        : row.kind === 'shortvideo' || row.kind === 'cloud_edit' || row.kind === 'digital_human'
+        : row.kind === 'shortvideo' ||
+            row.kind === 'cloud_edit' ||
+            row.kind === 'cloud_edit_smart' ||
+            row.kind === 'digital_human'
           ? 'times'
           : 'times'
     parts.push(`套餐额度 ${formatQuotaNumber(quotaUnits, unit)}`)

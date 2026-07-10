@@ -6,7 +6,7 @@ import {
 } from '../lib/mpPointsEconomics'
 import { merchantApiFetchUrls } from '../lib/merchantErpApiBase'
 
-export type MpAddonGenerationKind = 'shortvideo' | 'cloud_edit' | 'digital_human'
+export type MpAddonGenerationKind = 'shortvideo' | 'cloud_edit' | 'cloud_edit_smart' | 'digital_human'
 
 export type MpAddonPointsSpendResult = {
   pointsCharged: number
@@ -139,6 +139,7 @@ export function formatMpAddonPointsSpendHint(
   const labels: Record<MpAddonGenerationKind, string> = {
     shortvideo: '短视频 AI',
     cloud_edit: '云剪',
+    cloud_edit_smart: '智能一键成片',
     digital_human: '数字人口播',
   }
   const pts = result.pointsCharged.toLocaleString('zh-CN')
@@ -151,5 +152,13 @@ export function mpAddonPointsInsufficientMessage(
   required: number,
   balance: number,
 ): string {
-  return `积分不足（当前 ${balance.toLocaleString('zh-CN')}，需要 ${required.toLocaleString('zh-CN')}），请先充值或等待会员赠送积分到账后再使用${kind === 'shortvideo' ? '短视频 AI' : kind === 'cloud_edit' ? '云剪' : '数字人口播'}`
+  return `积分不足（当前 ${balance.toLocaleString('zh-CN')}，需要 ${required.toLocaleString('zh-CN')}），请先充值或等待会员赠送积分到账后再使用${
+    kind === 'shortvideo'
+      ? '短视频 AI'
+      : kind === 'cloud_edit'
+        ? '云剪'
+        : kind === 'cloud_edit_smart'
+          ? '智能一键成片'
+          : '数字人口播'
+  }`
 }

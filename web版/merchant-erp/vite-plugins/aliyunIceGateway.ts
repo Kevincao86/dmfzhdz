@@ -26,6 +26,7 @@ import {
   readAliyunIceConfigFromEnv,
   type AliyunIceConfig,
 } from './aliyunIceCore.js'
+import { iceGetSmartBatchJob, iceSubmitSmartBatchJob } from './aliyunIceSmartBatch.js'
 import { describeIceUploadBucketSelection, iceOssUploadAvailable, parseIceMixPipelineSegments } from './aliyunOssIceParse.js'
 import { evaluateIceOutputReady, fetchIceOutputObject } from './aliyunOssIceUpload.js'
 
@@ -33,6 +34,28 @@ function iceJobDownloadProxyPath(jobId: string, inline?: boolean): string {
   const q = new URLSearchParams({ id: jobId })
   if (inline) q.set('inline', '1')
   return `/api/meoo-merchant-ai-video-ice-job-download?${q.toString()}`
+}
+
+function iceSmartBatchDownloadProxyPath(batchJobId: string, inline?: boolean): string {
+  const q = new URLSearchParams({ id: batchJobId })
+  if (inline) q.set('inline', '1')
+  return `/api/meoo-merchant-ai-video-ice-smart-batch-download?${q.toString()}`
+}
+
+function parseSmartBatchTemplateIds(raw: string | undefined): string[] {
+  if (!raw?.trim()) return []
+  return raw
+    .split(/[,;\s]+/)
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .slice(0, 50)
+}
+
+function isSmartBatchEnabled(reg: RegistryVideoAi, configured: boolean): boolean {
+  if (!configured) return false
+  const flag = String(reg.iceSmartBatchEnabled ?? '').trim().toLowerCase()
+  if (flag === '0' || flag === 'false' || flag === 'off') return false
+  return true
 }
 
 function json(res: ServerResponse, status: number, body: unknown) {
@@ -133,6 +156,7 @@ export async function handleAliyunIceRoutes(input: {
 
   if (method === 'GET' && pathname === '/api/merchant/ai/video/ice/config') {
     const envMap = rawEnv as Record<string, string | undefined>
+    const reg = await loadRegistryVideoAi(viteRoot)
     const ossUpload =
       cfg != null ? iceOssUploadAvailable(cfg, envMap) : false
     const bucketSel = cfg
@@ -164,6 +188,8 @@ export async function handleAliyunIceRoutes(input: {
       presets: ICE_EFFECT_PRESETS.map((p) => p.label),
       effectOptions: ICE_EFFECT_PRESETS,
       subtitleStyleOptions: ICE_SUBTITLE_STYLE_PRESETS,
+      smartBatchEnabled: isSmartBatchEnabled(reg, !!cfg),
+      smartBatchTemplateIds: parseSmartBatchTemplateIds(reg.iceSmartBatchTemplateIds),
       urlUploadRequiresVod: Boolean(cfg?.vodStorageLocation?.trim()),
       credentialNote:
         '灵祺AI云剪：本地上传写入运营台「OSS 成片 URL 前缀」对应 Bucket（须 IMS 媒资库已绑定 + RAM 含 oss:PutObject）；StorageLocation（outin-*）用于成片输出与 RegisterMediaInfo；RAM 还须 AliyunICEFullAccess。',
@@ -639,6 +665,166 @@ export async function handleAliyunIceRoutes(input: {
     res.statusCode = 200
     res.setHeader('Content-Length', String(total))
     res.end(payload.buf)
+    return true
+  }
+
+  if (method === 'POST' && pathname === '/api/merchant/ai/video/ice/smart-batch') {
+    let parsed: Record<string, unknown>
+    try {
+      parsed = JSON.parse(bodyRaw || '{}') as Record<string, unknown>
+    } catch {
+      json(res, 400, { ok: false, message: '请求体必须为 JSON' })
+      return true
+    }
+    const reg = await loadRegistryVideoAi(viteRoot)
+    if (!isSmartBatchEnabled(reg, !!cfg)) {
+      json(res, 503, {
+        ok: false,
+        message: '智能一键成片未启用：请在运营台确认 IMS 订阅已开通（iceSmartBatchEnabled）。',
+        step: 'disabled',
+      })
+      return true
+    }
+    const materialsRaw = parsed.materials
+    const materials = Array.isArray(materialsRaw)
+      ? materialsRaw
+          .map((m) => {
+            if (!m || typeof m !== 'object') return null
+            const o = m as Record<string, unknown>
+            const mediaUrl = String(o.mediaUrl ?? o.timelineUrl ?? '').trim()
+            if (!mediaUrl) return null
+            return {
+              kind: (o.kind === 'image' ? 'image' : 'video') as 'video' | 'image',
+              mediaUrl,
+              label: String(o.label ?? '').trim() || undefined,
+            }
+          })
+          .filter(Boolean)
+      : []
+    const scriptRowsRaw = parsed.scriptRows
+    const scriptRows = Array.isArray(scriptRowsRaw)
+      ? scriptRowsRaw
+          .map((r) => {
+            if (!r || typeof r !== 'object') return null
+            const o = r as Record<string, unknown>
+            return {
+              timeRange: String(o.timeRange ?? '').trim() || undefined,
+              visual: String(o.visual ?? '').trim() || undefined,
+              dialogue: String(o.dialogue ?? '').trim() || undefined,
+            }
+          })
+          .filter(Boolean)
+      : []
+    const targetTotalSec = Math.min(120, Math.max(5, Number(parsed.targetTotalSec) || 20))
+    const width = Math.min(4096, Math.max(128, Number(parsed.width) || 1080))
+    const height = Math.min(4096, Math.max(128, Number(parsed.height) || 1920))
+    const guidance = String(parsed.guidance ?? '').trim()
+    const projectName = String(parsed.projectName ?? '智能一键成片').trim().slice(0, 120)
+    const clientToken = `smart-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    const templateIds = parseSmartBatchTemplateIds(
+      String(parsed.templateIds ?? reg.iceSmartBatchTemplateIds ?? '').trim() || undefined,
+    )
+
+    const out = await iceSubmitSmartBatchJob(cfg!, {
+      materials: materials as Array<{ kind: 'video' | 'image'; mediaUrl: string; label?: string }>,
+      scriptRows: scriptRows as Array<{
+        timeRange?: string
+        visual?: string
+        dialogue?: string
+      }>,
+      guidance,
+      targetTotalSec,
+      width,
+      height,
+      projectName,
+      templateIds,
+      clientToken,
+    })
+    if (!out.ok) {
+      json(res, /Invalid|Missing|validate/i.test(out.message) ? 400 : 502, {
+        ok: false,
+        message: out.message,
+        step: out.step,
+      })
+      return true
+    }
+    json(res, 200, {
+      ok: true,
+      batchJobId: out.batchJobId,
+      jobId: out.batchJobId,
+      exportId: out.batchJobId,
+    })
+    return true
+  }
+
+  if (method === 'GET' && pathname === '/api/merchant/ai/video/ice/smart-batch/job') {
+    const batchJobId = searchParams.get('id')?.trim()
+    if (!batchJobId) {
+      json(res, 400, { ok: false, message: '缺少 id 查询参数' })
+      return true
+    }
+    const st = await iceGetSmartBatchJob(cfg!, batchJobId)
+    if (!st.ok) {
+      if (st.transient) {
+        json(res, 200, {
+          ok: true,
+          status: 'Processing',
+          done: false,
+          failed: false,
+          outputPending: false,
+          message: st.message || '查询超时，云端任务可能仍在进行…',
+        })
+        return true
+      }
+      json(res, 502, { ok: false, message: st.message })
+      return true
+    }
+    const outputPending = st.done === false && !st.failed && /Success/i.test(st.status)
+    json(res, 200, {
+      ok: true,
+      status: st.status,
+      done: st.done,
+      failed: st.failed,
+      outputPending: outputPending && Boolean(st.message),
+      outputBytes: st.outputBytes,
+      downloadUrl: st.done ? iceSmartBatchDownloadProxyPath(batchJobId) : undefined,
+      previewUrl: st.done ? iceSmartBatchDownloadProxyPath(batchJobId, true) : undefined,
+      message: st.message,
+      durationSec: st.durationSec,
+    })
+    return true
+  }
+
+  if (method === 'GET' && pathname === '/api/merchant/ai/video/ice/smart-batch/job-download') {
+    const batchJobId = searchParams.get('id')?.trim()
+    if (!batchJobId) {
+      json(res, 400, { ok: false, message: '缺少 id' })
+      return true
+    }
+    const st = await iceGetSmartBatchJob(cfg!, batchJobId)
+    if (!st.ok || !st.done || !st.downloadUrl) {
+      json(res, 404, { ok: false, message: st.ok ? '成片尚未就绪' : st.message })
+      return true
+    }
+    const fetched = await fetchIceOutputObject(cfg!, st.downloadUrl)
+    if (!fetched.ok) {
+      json(res, 502, { ok: false, message: fetched.message })
+      return true
+    }
+    const inline = searchParams.get('inline') === '1'
+    const total = fetched.buf.length
+    res.setHeader('Content-Type', 'video/mp4')
+    res.setHeader('Accept-Ranges', 'bytes')
+    res.setHeader(
+      'Content-Disposition',
+      inline
+        ? `inline; filename="ice-smart-${batchJobId}.mp4"`
+        : `attachment; filename="ice-smart-${batchJobId}.mp4"`,
+    )
+    res.setHeader('Cache-Control', 'private, max-age=300')
+    res.statusCode = 200
+    res.setHeader('Content-Length', String(total))
+    res.end(fetched.buf)
     return true
   }
 

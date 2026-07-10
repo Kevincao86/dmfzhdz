@@ -30,6 +30,10 @@ export type RegistryVideoAi = {
   iceVodStorageLocation?: string
   /** 成片输出到 OSS 时的 URL 前缀（与 region 同地域 bucket） */
   iceOutputOssUrlPrefix?: string
+  /** 智能一键成片：0/false 关闭；留空默认开启（须 IMS 订阅） */
+  iceSmartBatchEnabled?: string
+  /** 逗号分隔 BatchEditingTemplateId */
+  iceSmartBatchTemplateIds?: string
   /** 千问视频：逗号分隔「显示名|模型ID」→ MERCHANT_AI_QWEN_VIDEO_MODELS */
   qwenVideoModels?: string
 }
