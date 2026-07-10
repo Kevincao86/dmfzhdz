@@ -86,6 +86,10 @@ export async function ensurePartnerXingxuanBootstrap(force = false): Promise<Par
         const data = (await res.json().catch(() => ({}))) as Record<string, unknown>
         if (!res.ok || data.ok === false) {
           lastMessage = String(data.message || data.error || lastMessage)
+          if (String(data.error || '') === 'not_partner') {
+            lastMessage =
+              '当前租户尚未标记为服务商版。请刷新页面后重试，或联系运营将租户 edition 设为 partner。'
+          }
           lastError = String(data.error || lastError)
           continue
         }

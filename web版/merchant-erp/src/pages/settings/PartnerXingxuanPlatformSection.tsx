@@ -38,11 +38,11 @@ export default function PartnerXingxuanPlatformSection() {
       return
     }
     setLinked(true)
-    setHint(r.created ? '已自动开通星选 PR 账号并完成关联' : '星选 PR 账号已关联')
+    setHint(r.created ? '已自动开通星选 PR 账号并完成关联' : '星选 PR 账号已关联，可前往「运营 → 星选达人招募」使用')
   }, [])
 
   useEffect(() => {
-    void sync(false)
+    void sync(true)
   }, [sync])
 
   return (
