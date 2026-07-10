@@ -131,11 +131,9 @@ function mpPointsCostForAddonDuration(kind: 'shortvideo' | 'cloud_edit' | 'digit
   const rate = mpPointsPerSecForKind(kind) ?? 0
   const raw = sec * rate
   const min =
-    kind === 'cloud_edit'
-      ? MP_POINTS_CLOUD_EDIT_MIN_CHARGE
-      : kind === 'shortvideo'
-        ? MP_POINTS_SHORTVIDEO_MIN_CHARGE
-        : MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE
+    kind === 'shortvideo'
+      ? MP_POINTS_SHORTVIDEO_MIN_CHARGE
+      : MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE
   return Math.max(min, raw)
 }
 

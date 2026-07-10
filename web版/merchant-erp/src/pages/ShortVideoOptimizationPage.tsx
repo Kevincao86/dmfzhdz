@@ -401,6 +401,7 @@ export default function ShortVideoOptimizationPage() {
         idempotencyKey: `shortvideo:${billId}`,
         note: `shortvideo:${billId}`,
       })
+      if (!charge) return ''
       return formatMpAddonPointsSpendHint('shortvideo', charge, dur)
     } catch {
       return ''
