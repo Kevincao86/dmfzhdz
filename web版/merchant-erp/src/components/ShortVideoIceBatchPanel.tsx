@@ -212,7 +212,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
   const [mixMaterialProfiles, setMixMaterialProfiles] = useState<IceMixMaterialProfile[]>([])
   const [planBusy, setPlanBusy] = useState(false)
   const [analyzeBusy, setAnalyzeBusy] = useState(false)
-  const [mixTransitionMode, setMixTransitionMode] = useState<'auto' | string>('trans_fade')
+  const [mixTransitionMode, setMixTransitionMode] = useState<'auto' | string>('none')
   const [mixSubtitleStyleId, setMixSubtitleStyleId] = useState(ICE_SUBTITLE_STYLE_DEFAULT_ID)
   const mixDocInputRef = useRef<HTMLInputElement>(null)
 
