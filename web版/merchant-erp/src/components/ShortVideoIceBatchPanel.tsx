@@ -7,9 +7,7 @@ import {
   FileText,
   Film,
   ImagePlus,
-  Link2,
   Loader2,
-  Plus,
   ScanEye,
   Trash2,
   Upload,
@@ -162,9 +160,8 @@ type Props = {
   lastResultUrl?: string | null
 }
 
-export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
+export function ShortVideoIceBatchPanel(_props: Props) {
   const [cfg, setCfg] = useState<AliyunIceCloudConfig | null>(null)
-  const [urlText, setUrlText] = useState('')
   const [imageUrlText, setImageUrlText] = useState('')
   const [imageItems, setImageItems] = useState<IceImageItem[]>([])
   const [jobs, setJobs] = useState<IceBatchJob[]>([])
@@ -362,33 +359,6 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       imagePreviewUrlsRef.current = []
     }
   }, [])
-
-  const addUrlsFromText = useCallback(() => {
-    const urls = parseUrlLines(urlText)
-    if (urls.length === 0) {
-      setErr('请粘贴至少一条公网可访问的 https 音视频地址')
-      return
-    }
-    const bad = urls.find((u) => validateIceMixMaterialUrl(u))
-    if (bad) {
-      setErr(
-        '混剪须使用本地上传的 OSS 素材，勿粘贴带签名或外链 URL。请点「本地上传」添加素材。',
-      )
-      return
-    }
-    setErr(null)
-    setJobs((prev) => [
-      ...prev,
-      ...urls.map((mediaUrl, i) => ({
-        id: newJobId(),
-        label: `素材 ${prev.length + i + 1}`,
-        mediaUrl,
-        phase: 'pending' as const,
-      })),
-    ])
-    setUrlText('')
-    setHint(`已加入 ${urls.length} 条素材，请填写指导文案并 AI 规划分镜后一键混剪。`)
-  }, [urlText])
 
   const openLocalFilePicker = useCallback(() => {
     if (anyBusy || mediaBusy) return
@@ -810,20 +780,6 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       return prev.filter((x) => x.id !== id)
     })
   }, [])
-
-  const appendLastResult = useCallback(() => {
-    const u = lastResultUrl?.trim()
-    if (!u || !/^https?:\/\//i.test(u)) {
-      setErr('当前没有可用的 HTTPS 成片链接')
-      return
-    }
-    setJobs((prev) => [
-      ...prev,
-      { id: newJobId(), label: '上一段 AI 成片', mediaUrl: u, phase: 'pending' },
-    ])
-    setHint('已加入上一段生成结果')
-    setErr(null)
-  }, [lastResultUrl])
 
   const removeJob = (id: string) => setJobs((prev) => prev.filter((j) => j.id !== id))
 

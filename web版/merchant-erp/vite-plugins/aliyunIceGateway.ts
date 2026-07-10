@@ -26,7 +26,7 @@ import {
   readAliyunIceConfigFromEnv,
   type AliyunIceConfig,
 } from './aliyunIceCore.js'
-import { describeIceUploadBucketSelection, iceOssUploadAvailable, sanitizeIcePipelineMediaUrl, validateIcePipelineMediaUrl } from './aliyunOssIceParse.js'
+import { describeIceUploadBucketSelection, iceOssUploadAvailable, sanitizeIcePipelineMediaUrl } from './aliyunOssIceParse.js'
 import { evaluateIceOutputReady, fetchIceOutputObject } from './aliyunOssIceUpload.js'
 
 function iceJobDownloadProxyPath(jobId: string, inline?: boolean): string {
@@ -498,7 +498,7 @@ export async function handleAliyunIceRoutes(input: {
         json(res, 400, { ok: false, message: normalizedMix.message, step: 'normalize_mix_media' })
         return true
       }
-      mixSegmentsForPipeline = normalizedMix.segments
+      mixSegmentsForPipeline = normalizedMix.segments as typeof mixSegments
     }
 
     let pipelineImageUrls = imageUrls
