@@ -58,34 +58,42 @@ async function main(): Promise<void> {
     throw new Error(`missing sample mp4: ${SAMPLE_MP4}`)
   }
 
-  console.log(`BASE=${BASE}`)
-  const a = await uploadSampleVideo('a')
-  const b = await uploadSampleVideo('b')
-  console.log('uploaded:', a.timelineUrl.slice(0, 80), '…')
+  const segCount = Math.max(2, Math.min(8, Number(process.env.ICE_MIX_SMOKE_SEGMENTS) || 2))
+  const segDur = Math.max(2, Number(process.env.ICE_MIX_SMOKE_SEG_DUR) || 4)
+  const totalSec = segCount * segDur
+  const effectId = process.env.ICE_MIX_SMOKE_EFFECT ?? 'none'
+  const withNarration = process.env.ICE_MIX_SMOKE_NARRATION === '1'
+  const withCaption = process.env.ICE_MIX_SMOKE_CAPTION === '1'
+  const editBrief =
+    process.env.ICE_MIX_SMOKE_BRIEF ??
+    (withNarration
+      ? '探店种草混剪；多素材拼接；原素材静音，使用 ICE AI_TTS 口播讲解；字幕带弹入动效'
+      : '')
 
-  const signedA = a.mediaUrl.includes('?') ? a.mediaUrl : `${a.timelineUrl}?Signature=smoke-test`
-  const mixSegments = [
-    {
+  console.log(`BASE=${BASE}`)
+  console.log(
+    `segments=${segCount} dur=${segDur}s effect=${effectId} narration=${withNarration} caption=${withCaption}`,
+  )
+
+  const uploads: Array<{ timelineUrl: string; mediaUrl: string }> = []
+  for (let i = 0; i < segCount; i++) {
+    uploads.push(await uploadSampleVideo(String.fromCharCode(97 + (i % 26))))
+  }
+  console.log('uploaded:', uploads[0]!.timelineUrl.slice(0, 80), '…')
+
+  const mixSegments = uploads.map((u, i) => {
+    const signed = u.mediaUrl.includes('?') ? u.mediaUrl : `${u.timelineUrl}?Signature=smoke-test`
+    return {
       kind: 'video' as const,
-      mediaUrl: a.timelineUrl,
-      signedMediaUrl: signedA,
-      timelineStartSec: 0,
-      timelineEndSec: 4,
-      materialIndex: 0,
-      sourceInSec: 0,
-      caption: process.env.ICE_MIX_SMOKE_CAPTION === '1' ? '第一段' : undefined,
-    },
-    {
-      kind: 'video' as const,
-      mediaUrl: b.timelineUrl,
-      signedMediaUrl: b.mediaUrl.includes('?') ? b.mediaUrl : `${b.timelineUrl}?Signature=smoke-test`,
-      timelineStartSec: 4,
-      timelineEndSec: 8,
-      materialIndex: 1,
-      sourceInSec: 0.5,
-      caption: process.env.ICE_MIX_SMOKE_CAPTION === '1' ? '第二段' : undefined,
-    },
-  ]
+      mediaUrl: u.timelineUrl,
+      signedMediaUrl: signed,
+      timelineStartSec: i * segDur,
+      timelineEndSec: (i + 1) * segDur,
+      materialIndex: i,
+      sourceInSec: i * 0.5,
+      caption: withCaption ? `第${i + 1}段口播文案` : undefined,
+    }
+  })
 
   const pipeline = await jsonFetch<{ ok: boolean; message?: string; step?: string; jobId?: string }>(
     '/meoo-merchant-ai-video-ice-pipeline',
@@ -94,13 +102,13 @@ async function main(): Promise<void> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         mixSegments,
-        mixNarrationText: process.env.ICE_MIX_SMOKE_NARRATION === '1' ? '混剪冒烟测试，两段素材拼接。' : undefined,
+        mixNarrationText: withNarration ? '混剪冒烟测试，多段素材拼接与口播讲解。' : undefined,
         projectName: 'ice-mix-http-smoke',
-        editBrief: process.env.ICE_MIX_SMOKE_BRIEF ?? '',
+        editBrief,
         width: 1080,
         height: 1920,
-        clipEndSec: 8,
-        effectId: process.env.ICE_MIX_SMOKE_EFFECT ?? 'none',
+        clipEndSec: totalSec,
+        effectId,
         subtitleStyleId: 'viral-white-pop',
       }),
     },
