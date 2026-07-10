@@ -5,7 +5,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { requireMerchantRegistryAuth } from '../src/lib/merchantRegistryAuth.js'
-import { ensurePartnerXingxuanMpSession } from '../src/lib/partnerXingxuanBootstrapCore.js'
+import { ensurePartnerXingxuanMpSession, ensureTenantPartnerEdition } from '../src/lib/partnerXingxuanBootstrapCore.js'
 import { phoneFromAuthUser } from '../src/lib/tenantLocalState.js'
 import { readMerchantSupabaseAdminEnv } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import { nodeSupabaseClientOptions } from '../src/lib/nodeSupabaseClientOptions.js'
@@ -51,8 +51,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     sendJson(res, 404, { ok: false, error: 'tenant_not_found', message: '租户不存在' })
     return
   }
-  if (String(tenant.edition || '') !== 'partner' && String(tenant.edition || '') !== 'partner_agent') {
-    sendJson(res, 403, { ok: false, error: 'not_partner', message: '仅服务商版可开通星选账号' })
+
+  const base = supabaseUrl.replace(/\/$/, '')
+  const adminHeaders = {
+    apikey: serviceRole,
+    Authorization: `Bearer ${serviceRole}`,
+    'Content-Type': 'application/json',
+  }
+  const editionOk = await ensureTenantPartnerEdition(base, adminHeaders, auth.tenantId, tenant.edition)
+  if (!editionOk.ok) {
+    sendJson(res, 403, { ok: false, error: editionOk.error, message: editionOk.message })
     return
   }
 

@@ -50,6 +50,43 @@ async function fetchTenantPartnerRow(
   return { id: row.id, edition: String(row.edition || 'merchant'), name: row.name ?? null }
 }
 
+/** fws bootstrap：legacy merchant 租户自动升级为 partner，避免误注册商家版导致无法关联星选 */
+export async function ensureTenantPartnerEdition(
+  base: string,
+  headers: Record<string, string>,
+  tenantId: string,
+  currentEdition: string | null | undefined,
+): Promise<
+  | { ok: true; edition: 'partner' | 'partner_agent' }
+  | { ok: false; error: string; message: string }
+> {
+  const ed = String(currentEdition || 'merchant').trim()
+  if (ed === 'partner' || ed === 'partner_agent') {
+    return { ok: true, edition: ed }
+  }
+  if (ed === 'merchant' || ed === '' || ed === 'free') {
+    const url = `${base}/rest/v1/tenants?id=eq.${encodeURIComponent(tenantId)}`
+    const res = await supabaseAdminFetch(url, {
+      method: 'PATCH',
+      headers: { ...headers, Prefer: 'return=representation' },
+      body: JSON.stringify({ edition: 'partner' }),
+    })
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: 'edition_upgrade_failed',
+        message: '租户升级为服务商版失败，请联系运营处理',
+      }
+    }
+    return { ok: true, edition: 'partner' }
+  }
+  return {
+    ok: false,
+    error: 'not_partner',
+    message: `当前租户类型（${ed}）不支持开通星选 PR 账号`,
+  }
+}
+
 async function findMpAccountByOpenId(
   rest: ReturnType<typeof createMpAuthRest>,
   openid: string,
@@ -154,8 +191,9 @@ export async function ensurePartnerXingxuanMpSession(input: {
   if (!tenant) {
     return { ok: false, error: 'tenant_not_found', message: '未找到服务商租户' }
   }
-  if (tenant.edition !== 'partner' && tenant.edition !== 'partner_agent') {
-    return { ok: false, error: 'not_partner_tenant', message: '仅服务商版租户可开通星选 PR 账号' }
+  const editionOk = await ensureTenantPartnerEdition(base, headers, tenant.id, tenant.edition)
+  if (!editionOk.ok) {
+    return { ok: false, error: editionOk.error, message: editionOk.message }
   }
 
   const phone = normalizeCnPhone(input.phone)
