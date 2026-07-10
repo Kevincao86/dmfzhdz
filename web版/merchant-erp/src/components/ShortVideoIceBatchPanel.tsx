@@ -51,7 +51,7 @@ import {
   spendMpAddonPoints,
 } from '../services/mpAddonPointsSpendClient'
 import { checkMixMaterialAnalyzeAffordable, spendMixMaterialAnalyzePoints } from '../services/mpAiPointsSpendClient'
-import { validateIceMixMaterialUrl, sanitizeIceMixMaterialUrlForPipeline } from '../lib/icePipelineImageUrl'
+import { validateIceMixMaterialUrl, sanitizeIceMixMaterialUrlForPipeline, prepareIceMixSegmentForPost } from '../lib/icePipelineImageUrl'
 import { isIceTransientNetworkError } from '../lib/iceTransientNetworkError'
 import ShortVideoScriptTableEditor from './ShortVideoScriptTableEditor'
 import { parseGuidanceDocumentFile } from '../lib/shortVideoGuidanceDoc'
@@ -947,17 +947,19 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     }
     const totalSec = resolveMixTotalDurationSec(scriptRows, mixTargetSec)
     const pipe = await postIcePipeline({
-      mixSegments: segments.map((s) => ({
-        kind: s.kind,
-        mediaUrl: s.mediaUrl,
-        signedMediaUrl: s.signedMediaUrl,
-        timelineStartSec: s.timelineStartSec,
-        timelineEndSec: s.timelineEndSec,
-        caption: s.caption,
-        materialIndex: s.materialIndex,
-        sourceInSec: s.sourceInSec,
-        sourceOutSec: s.sourceOutSec,
-      })),
+      mixSegments: segments.map((s) =>
+        prepareIceMixSegmentForPost({
+          kind: s.kind,
+          mediaUrl: s.mediaUrl,
+          signedMediaUrl: s.signedMediaUrl,
+          timelineStartSec: s.timelineStartSec,
+          timelineEndSec: s.timelineEndSec,
+          caption: s.caption,
+          materialIndex: s.materialIndex,
+          sourceInSec: s.sourceInSec,
+          sourceOutSec: s.sourceOutSec,
+        }),
+      ),
       mixNarrationText: mixNarrationText.length >= 4 ? mixNarrationText : undefined,
       projectName: `AI混剪-${label}`.slice(0, 120),
       editBrief: pack.editBrief,

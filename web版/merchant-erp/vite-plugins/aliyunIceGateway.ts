@@ -26,7 +26,7 @@ import {
   readAliyunIceConfigFromEnv,
   type AliyunIceConfig,
 } from './aliyunIceCore.js'
-import { describeIceUploadBucketSelection, iceOssUploadAvailable, sanitizeIcePipelineMediaUrl } from './aliyunOssIceParse.js'
+import { describeIceUploadBucketSelection, iceOssUploadAvailable, parseIceMixPipelineSegments } from './aliyunOssIceParse.js'
 import { evaluateIceOutputReady, fetchIceOutputObject } from './aliyunOssIceUpload.js'
 
 function iceJobDownloadProxyPath(jobId: string, inline?: boolean): string {
@@ -416,55 +416,7 @@ export async function handleAliyunIceRoutes(input: {
 
     const mixNarrationText = String(parsed.mixNarrationText ?? parsed.narrationText ?? '').trim()
     const mixSegmentsRaw = parsed.mixSegments
-    const mixSegments = Array.isArray(mixSegmentsRaw)
-      ? mixSegmentsRaw
-          .map((row) => {
-            const s = row as Record<string, unknown>
-            const kind = String(s.kind ?? 'video').trim() === 'image' ? 'image' : 'video'
-            const mediaUrl = String(s.mediaUrl ?? '').trim()
-            const signedMediaUrl = String(s.signedMediaUrl ?? '').trim() || undefined
-            const timelineStartSec = Math.max(0, Number(s.timelineStartSec) || 0)
-            const timelineEndSec = Math.max(timelineStartSec + 0.35, Number(s.timelineEndSec) || timelineStartSec + 1)
-            const caption = String(s.caption ?? '').trim() || undefined
-            const materialIndex = Number.isFinite(Number(s.materialIndex))
-              ? Math.max(0, Number(s.materialIndex))
-              : undefined
-            const sourceInSec = Math.max(0, Number(s.sourceInSec) || 0)
-            const sourceOutSec =
-              Number(s.sourceOutSec) > sourceInSec ? Number(s.sourceOutSec) : undefined
-            const urlOk =
-              /^https?:\/\//i.test(mediaUrl) ||
-              mediaUrl.startsWith('oss://') ||
-              (signedMediaUrl ? /^https?:\/\//i.test(signedMediaUrl) : false)
-            if (!urlOk) return null
-            const rawMedia =
-              mediaUrl.startsWith('oss://') || /^https?:\/\//i.test(mediaUrl)
-                ? mediaUrl
-                : signedMediaUrl || mediaUrl
-            const pipelineUrl = sanitizeIcePipelineMediaUrl(rawMedia, signedMediaUrl)
-            if (!/^https?:\/\//i.test(pipelineUrl) && !pipelineUrl.startsWith('oss://')) return null
-            if (/localhost|127\.0\.0\.1|blob:/i.test(pipelineUrl)) return null
-            if (/your-cdn\.com|example\.com|placeholder/i.test(pipelineUrl)) return null
-            if (
-              /[?#].*signature/i.test(String(mediaUrl)) ||
-              /[?#].*signature/i.test(String(signedMediaUrl || ''))
-            ) {
-              return null
-            }
-            return {
-              kind,
-              mediaUrl: pipelineUrl,
-              signedMediaUrl,
-              timelineStartSec,
-              timelineEndSec,
-              caption,
-              materialIndex,
-              sourceInSec,
-              sourceOutSec,
-            }
-          })
-          .filter(Boolean)
-      : []
+    const mixSegments = parseIceMixPipelineSegments(mixSegmentsRaw)
 
     if (mixSegments.length >= 2 && mixSegments.length < (Array.isArray(mixSegmentsRaw) ? mixSegmentsRaw.length : 0)) {
       json(res, 400, {
@@ -563,7 +515,7 @@ export async function handleAliyunIceRoutes(input: {
               effectId: effect.id,
               subtitleStyleId: subtitleStyle.id,
             })
-          : { ok: false as const, message: '请提供 mediaUrl 或 imageUrls（公网 https 图片）', step: 'validate' }
+          : { ok: false as const, message: '请提供 mediaUrl、imageUrls 或 mixSegments（混剪须 ≥2 段有效素材）', step: 'validate' }
     if (!out.ok) {
       const clientErr = /InvalidParameter|MissingParameter/i.test(out.message)
       json(res, clientErr ? 400 : 502, { ok: false, message: out.message, step: out.step })
