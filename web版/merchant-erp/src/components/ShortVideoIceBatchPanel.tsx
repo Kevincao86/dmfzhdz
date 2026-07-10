@@ -256,23 +256,29 @@ export function ShortVideoIceBatchPanel(_props: Props) {
   }, [clipEndSec])
 
   const ensureCloudEditSmartAffordable = useCallback(async (): Promise<boolean> => {
-    const afford = await checkMpAddonPointsAffordable('cloud_edit_smart', clipEndSec)
+    const afford = await checkMpAddonPointsAffordable('cloud_edit_smart', mixTargetSec)
     if (afford.ok) return true
     setErr(afford.message)
     return false
-  }, [clipEndSec])
+  }, [mixTargetSec])
 
   const appendIcePointsCharge = useCallback(
-    async (iceJobId: string, baseMessage: string, kind: MpAddonGenerationKind = 'cloud_edit'): Promise<string> => {
+    async (
+      iceJobId: string,
+      baseMessage: string,
+      kind: MpAddonGenerationKind = 'cloud_edit',
+      durationSec?: number,
+    ): Promise<string> => {
+      const sec = durationSec ?? clipEndSec
       try {
         const charge = await spendMpAddonPoints({
           kind,
-          durationSec: clipEndSec,
+          durationSec: sec,
           idempotencyKey: `${kind}:${iceJobId}`,
           note: `${kind}:${iceJobId}`,
         })
         if (charge) {
-          return baseMessage + formatMpAddonPointsSpendHint(kind, charge, clipEndSec)
+          return baseMessage + formatMpAddonPointsSpendHint(kind, charge, sec)
         }
       } catch {
         /* ignore charge errors */
@@ -836,6 +842,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
   ): Promise<boolean> => {
     const fetchStatus = mode === 'smart_batch' ? fetchIceSmartBatchJobStatus : fetchIceJobStatus
     const chargeKind: MpAddonGenerationKind = mode === 'smart_batch' ? 'cloud_edit_smart' : 'cloud_edit'
+    const chargeSec = mode === 'smart_batch' ? mixTargetSec : clipEndSec
     for (let i = 0; i < POLL_MAX; i++) {
       const st = await fetchStatus(iceJobId)
       if (!st.ok) {
@@ -875,7 +882,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
           st.outputBytes && st.outputBytes > 0
             ? `剪辑完成（约 ${Math.round(st.outputBytes / 1024)} KB），可下载成片`
             : '剪辑完成，可在右侧下载成片'
-        const message = await appendIcePointsCharge(iceJobId, baseMessage, chargeKind)
+        const message = await appendIcePointsCharge(iceJobId, baseMessage, chargeKind, chargeSec)
         patchJob(localJobId, {
           phase: 'done',
           downloadUrl:
@@ -1068,7 +1075,11 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       return
     }
 
-    const totalSec = resolveMixTotalDurationSec(scriptRows, mixTargetSec)
+    const totalSec = mixTargetSec
+    const slots =
+      materialSlots.length === scriptRows.length
+        ? materialSlots
+        : assignMixMaterialSlots(scriptRows.length, mixMaterialPool.length)
     const pipe = await postIceSmartBatch({
       materials: mixMaterialPool.map((m) => ({
         kind: m.kind,
@@ -1082,6 +1093,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       })),
       guidance: mixGuidance.trim(),
       targetTotalSec: totalSec,
+      materialSlots: slots,
       width: aspect.width,
       height: aspect.height,
       projectName: `智能成片-${label}`.slice(0, 120),
@@ -1784,7 +1796,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
               <div className="flex flex-wrap gap-2 text-xs text-zinc-500">
                 <span>普通混剪：分镜精细拼接 · 8 积分/秒</span>
                 {cfg?.smartBatchEnabled ? (
-                  <span>智能成片：阿里云 AI 拆条+转场 · 22 积分/秒</span>
+                  <span>智能成片：阿里云 AI 拆条+转场 · 22 积分/秒 · 仅用分镜「口播」、不含标题/执行文稿</span>
                 ) : (
                   <span className="text-amber-700">智能成片未开通（IMS 订阅）</span>
                 )}

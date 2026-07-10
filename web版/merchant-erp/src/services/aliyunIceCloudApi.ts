@@ -778,6 +778,7 @@ export async function postIceSmartBatch(body: {
   height: number
   projectName?: string
   templateIds?: string[]
+  materialSlots?: number[]
 }): Promise<IcePipelineResult> {
   for (const p of SMART_BATCH_PIPELINE_PATHS) {
     for (const url of merchantApiFetchUrls(p)) {

@@ -750,6 +750,13 @@ export async function handleAliyunIceRoutes(input: {
     const templateIds = parseSmartBatchTemplateIds(
       String(parsed.templateIds ?? reg.iceSmartBatchTemplateIds ?? '').trim() || undefined,
     )
+    const slotsRaw = parsed.materialSlots
+    const materialSlots = Array.isArray(slotsRaw)
+      ? slotsRaw
+          .map((x) => Number(x))
+          .filter((n) => Number.isFinite(n) && n >= 0)
+          .map((n) => Math.floor(n))
+      : []
 
     const out = await iceSubmitSmartBatchJob(cfg!, {
       materials: materials as Array<{ kind: 'video' | 'image'; mediaUrl: string; label?: string }>,
@@ -765,6 +772,7 @@ export async function handleAliyunIceRoutes(input: {
       projectName,
       templateIds,
       clientToken,
+      materialSlots,
     })
     if (!out.ok) {
       json(res, /Invalid|Missing|validate/i.test(out.message) ? 400 : 502, {

@@ -34,6 +34,9 @@ function resolveSdkCtor(mod: unknown): IceClientClass {
 
 const IceClient = resolveSdkCtor(IceModule)
 
+/** 中文口播约 4.5 字/秒（用于控时长） */
+const DIALOGUE_CHARS_PER_SEC = 4.5
+
 function createClient(cfg: AliyunIceConfig): InstanceType<typeof IceClient> {
   return new IceClient(
     new $OpenApiUtil.Config({
@@ -51,10 +54,13 @@ function bodyOf(res: { body?: Record<string, unknown> }): Record<string, unknown
   return res.body
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms))
+}
+
 function normalizeImsMediaUrl(raw: string): string {
   let u = String(raw ?? '').trim()
   if (!u) return u
-  // Aliyun IMS 偶发返回 http:/bucket...（缺一个 /）
   if (/^http:\/(?!\/)/i.test(u)) {
     u = `https://${u.slice('http:/'.length)}`
   }
@@ -65,7 +71,92 @@ function rowDurationSec(row: { timeRange?: string }): number | undefined {
   const p = parseScriptTimeRangeSeconds(String(row.timeRange ?? ''))
   if (!p) return undefined
   const d = p.end - p.start
-  return d > 0 ? Math.min(15, Math.max(2, d)) : undefined
+  return d > 0 ? d : undefined
+}
+
+function estimateSpeechSec(text: string): number {
+  const len = text.trim().length
+  if (len <= 0) return 0
+  return Math.max(2, Math.ceil(len / DIALOGUE_CHARS_PER_SEC))
+}
+
+function truncateDialogue(text: string, maxChars: number): string {
+  const t = text.trim()
+  if (t.length <= maxChars) return t
+  const cut = t.slice(0, maxChars)
+  const lastPunc = Math.max(cut.lastIndexOf('。'), cut.lastIndexOf('，'), cut.lastIndexOf('！'))
+  if (lastPunc >= Math.floor(maxChars * 0.5)) return cut.slice(0, lastPunc + 1)
+  return `${cut}…`
+}
+
+/** 从指导文案取一句短口播（禁止整段执行文稿上屏/入 TTS） */
+function extractShortHookFromGuidance(guidance: string, maxChars: number): string {
+  const t = guidance.trim()
+  if (!t) return '探店好物推荐，快来看看'
+  const sentences = t.split(/(?<=[。！？!?])\s*/).map((s) => s.trim()).filter(Boolean)
+  const pick = sentences.find((s) => s.length >= 6 && s.length <= maxChars) ?? sentences[0] ?? t
+  return truncateDialogue(pick, maxChars)
+}
+
+type PlannedDialogueRow = {
+  dialogue: string
+  materialIndex: number
+  estSec: number
+  rowIndex: number
+}
+
+function planDialogueRowsForTarget(input: {
+  scriptRows: IceSmartBatchScriptRow[]
+  materialSlots: number[]
+  materialCount: number
+  targetTotalSec: number
+}): PlannedDialogueRow[] {
+  const target = Math.min(120, Math.max(5, Math.ceil(input.targetTotalSec)))
+  const candidates = input.scriptRows
+    .map((row, rowIndex) => {
+      const dialogue = String(row.dialogue ?? '').trim()
+      if (dialogue.length < 2) return null
+      const materialIndex =
+        input.materialSlots[rowIndex] ?? rowIndex % Math.max(1, input.materialCount)
+      return { dialogue, materialIndex, rowIndex, estSec: estimateSpeechSec(dialogue) }
+    })
+    .filter(Boolean) as Array<{
+    dialogue: string
+    materialIndex: number
+    rowIndex: number
+    estSec: number
+  }>
+
+  if (candidates.length === 0) return []
+
+  const picked: typeof candidates = []
+  let accSec = 0
+  for (const c of candidates) {
+    if (picked.length >= 1 && accSec + c.estSec > target + 1) break
+    picked.push(c)
+    accSec += c.estSec
+    if (accSec >= target) break
+  }
+
+  let rows = picked.length >= 2 ? picked : candidates.slice(0, Math.min(candidates.length, 2))
+  accSec = rows.reduce((s, r) => s + r.estSec, 0)
+
+  if (accSec > target && rows.length > 0) {
+    const budget = Math.max(8, Math.floor(target * DIALOGUE_CHARS_PER_SEC))
+    const perRow = Math.max(8, Math.floor(budget / rows.length))
+    rows = rows.map((r) => ({
+      ...r,
+      dialogue: truncateDialogue(r.dialogue, perRow),
+      estSec: estimateSpeechSec(truncateDialogue(r.dialogue, perRow)),
+    }))
+  }
+
+  return rows.map((r) => ({
+    dialogue: r.dialogue,
+    materialIndex: r.materialIndex,
+    estSec: r.estSec,
+    rowIndex: r.rowIndex,
+  }))
 }
 
 function buildDefaultEditingConfig(): Record<string, unknown> {
@@ -77,9 +168,18 @@ function buildDefaultEditingConfig(): Record<string, unknown> {
       AllowVfxEffect: false,
       EnableClipSplit: true,
       SingleShotDuration: 4,
+      AlignmentMode: 'Cut',
     },
     MediaConfig: { Volume: 0.15 },
-    SpeechConfig: { Volume: 1 },
+    SpeechConfig: {
+      Volume: 1,
+      SpeechRate: 0,
+      AsrConfig: {
+        Alignment: 'BottomCenter',
+        AdaptMode: 'AutoWrap',
+        Y: 0.82,
+      },
+    },
     BackgroundMusicConfig: { Volume: 0.25 },
   }
 }
@@ -100,51 +200,50 @@ function buildInputConfig(input: {
   materials: IceSmartBatchMaterial[]
   scriptRows: IceSmartBatchScriptRow[]
   guidance: string
+  targetTotalSec: number
+  materialSlots?: number[]
 }): Record<string, unknown> {
   const urls = input.materials
     .map((m) => ensureIceHttpsUrl(sanitizeIcePipelineMediaUrl(m.mediaUrl)))
     .filter(Boolean)
   const guidance = input.guidance.trim()
-  const rows = input.scriptRows.filter(
-    (r) => String(r.dialogue ?? '').trim() || String(r.visual ?? '').trim(),
-  )
+  const targetTotalSec = Math.min(120, Math.max(5, Math.ceil(input.targetTotalSec)))
+  const materialSlots = input.materialSlots ?? []
 
-  const useGrouped =
-    rows.length >= 2 &&
-    rows.some((r) => String(r.dialogue ?? '').trim().length >= 2)
+  const planned = planDialogueRowsForTarget({
+    scriptRows: input.scriptRows,
+    materialSlots,
+    materialCount: input.materials.length,
+    targetTotalSec,
+  })
 
-  if (useGrouped) {
-    const mediaGroups = rows.map((row, i) => {
-      const mat = input.materials[i % input.materials.length]!
+  // 分组口播：仅用分镜「口播/文案」列，禁止 visual 执行文稿、禁止 TitleArray 标题上屏
+  if (planned.length >= 2) {
+    const mediaGroups = planned.map((row, i) => {
+      const mat = input.materials[row.materialIndex % input.materials.length]!
       const url = ensureIceHttpsUrl(sanitizeIcePipelineMediaUrl(mat.mediaUrl))
-      const speech = String(row.dialogue ?? '').trim() || String(row.visual ?? '').trim()
+      const srcRow = input.scriptRows[row.rowIndex]
+      const durFromRange = srcRow ? rowDurationSec(srcRow) : undefined
       const group: Record<string, unknown> = {
-        GroupName: `shot-${i + 1}`.slice(0, 50),
+        GroupName: `seg-${i + 1}`.slice(0, 50),
         MediaArray: [url],
         SplitMode: 'NoSplit',
+        SpeechTextArray: [row.dialogue.slice(0, 200)],
       }
-      if (speech.length >= 2) {
-        group.SpeechTextArray = [speech.slice(0, 1000)]
-      } else {
-        const dur = rowDurationSec(row)
-        if (dur) group.Duration = dur
+      const dur = durFromRange ?? row.estSec
+      if (dur > 0) {
+        group.Duration = Math.min(10, Math.max(2, Math.round(dur * 10) / 10))
       }
       return group
     })
-    return {
-      MediaGroupArray: mediaGroups,
-      TitleArray: guidance ? [guidance.slice(0, 50)] : [`智能成片-${Date.now() % 10000}`],
-    }
+    return { MediaGroupArray: mediaGroups }
   }
 
-  const speech =
-    guidance.length >= 20
-      ? guidance.slice(0, 1000)
-      : rows
-          .map((r) => String(r.dialogue ?? '').trim() || String(r.visual ?? '').trim())
-          .filter(Boolean)
-          .join('，')
-          .slice(0, 1000)
+  // 全局口播：一句短 hook，禁止把整段指导文案塞进 SpeechTextArray / TitleArray
+  const hookMaxChars = Math.max(20, Math.floor(targetTotalSec * DIALOGUE_CHARS_PER_SEC))
+  const hook =
+    planned[0]?.dialogue ??
+    extractShortHookFromGuidance(guidance, Math.min(hookMaxChars, 80))
 
   return {
     MediaGroupArray: [
@@ -154,8 +253,7 @@ function buildInputConfig(input: {
         SplitMode: 'AverageSplit',
       },
     ],
-    SpeechTextArray: speech.length >= 4 ? [speech] : [`${speech || '探店好物推荐，快来看看'}`.slice(0, 1000)],
-    TitleArray: guidance ? [guidance.slice(0, 50)] : ['智能一键成片'],
+    SpeechTextArray: [truncateDialogue(hook, hookMaxChars)],
   }
 }
 
@@ -177,13 +275,14 @@ function buildOutputConfig(
       message: '未配置 OSS 成片 URL 前缀，无法输出智能一键成片。',
     }
   }
+  const maxDuration = Math.min(120, Math.max(5, Math.ceil(input.targetTotalSec)))
   const mediaURL = ensureIceHttpsUrl(`${prefix}/smart-batch/${input.clientToken}_{index}.mp4`)
   return {
     ok: true,
     config: {
       MediaURL: mediaURL,
       Count: 1,
-      MaxDuration: Math.min(120, Math.max(5, Math.ceil(input.targetTotalSec))),
+      MaxDuration: maxDuration,
       Width: input.width,
       Height: input.height,
       Video: { Crf: 27 },
@@ -203,6 +302,7 @@ export async function iceSubmitSmartBatchJob(
     projectName?: string
     templateIds?: string[]
     clientToken: string
+    materialSlots?: number[]
   },
 ): Promise<
   | { ok: true; batchJobId: string }
@@ -213,7 +313,8 @@ export async function iceSubmitSmartBatchJob(
   }
   const guidance = String(input.guidance ?? '').trim()
   const scriptRows = input.scriptRows ?? []
-  if (guidance.length < 20 && !scriptRows.some((r) => String(r.dialogue ?? '').trim().length >= 4)) {
+  const hasDialogue = scriptRows.some((r) => String(r.dialogue ?? '').trim().length >= 2)
+  if (guidance.length < 20 && !hasDialogue) {
     return {
       ok: false,
       message: '请填写至少 20 字指导文案，或在分镜表中填写口播',
@@ -221,9 +322,11 @@ export async function iceSubmitSmartBatchJob(
     }
   }
 
+  const targetTotalSec = Math.min(120, Math.max(5, Math.ceil(input.targetTotalSec)))
+
   const output = buildOutputConfig(cfg, {
     clientToken: input.clientToken,
-    targetTotalSec: input.targetTotalSec,
+    targetTotalSec,
     width: input.width,
     height: input.height,
   })
@@ -233,6 +336,8 @@ export async function iceSubmitSmartBatchJob(
     materials: input.materials,
     scriptRows,
     guidance,
+    targetTotalSec,
+    materialSlots: input.materialSlots,
   })
   const editingConfig = buildDefaultEditingConfig()
   const templateIds = (input.templateIds ?? []).filter(Boolean).slice(0, 50)
