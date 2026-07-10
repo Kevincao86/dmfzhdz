@@ -10,6 +10,11 @@ import { $OpenApiUtil } from '@alicloud/openapi-core'
 import { ensureIceHttpsUrl, sanitizeIcePipelineMediaUrl } from './aliyunOssIceParse.js'
 import { isIceTransientNetworkError } from '../src/lib/iceTransientNetworkError.js'
 import { parseScriptTimeRangeSeconds } from '../src/lib/shortVideoScriptTable.js'
+import {
+  buildSmartBatchAsrConfig,
+  ICE_SUBTITLE_STYLE_DEFAULT_ID,
+  resolveIceSubtitleStylePreset,
+} from '../src/lib/iceSubtitleStylePresets.js'
 import type { AliyunIceConfig } from './aliyunIceCore.js'
 
 type IceClientClass = {
@@ -235,7 +240,8 @@ function buildPadMediaGroups(input: {
   ]
 }
 
-function buildDefaultEditingConfig(speechRate = 0): Record<string, unknown> {
+function buildDefaultEditingConfig(speechRate = 0, subtitleStyleId?: string): Record<string, unknown> {
+  const preset = resolveIceSubtitleStylePreset(subtitleStyleId ?? ICE_SUBTITLE_STYLE_DEFAULT_ID)
   return {
     ProcessConfig: {
       AllowTransition: true,
@@ -251,11 +257,7 @@ function buildDefaultEditingConfig(speechRate = 0): Record<string, unknown> {
     SpeechConfig: {
       Volume: 1,
       SpeechRate: speechRate,
-      AsrConfig: {
-        Alignment: 'BottomCenter',
-        AdaptMode: 'AutoWrap',
-        Y: 0.82,
-      },
+      AsrConfig: buildSmartBatchAsrConfig(preset),
     },
     BackgroundMusicConfig: { Volume: 0.22 },
   }
@@ -382,6 +384,7 @@ export async function iceSubmitSmartBatchJob(
     templateIds?: string[]
     clientToken: string
     materialSlots?: number[]
+    subtitleStyleId?: string
   },
 ): Promise<
   | { ok: true; batchJobId: string }
@@ -419,7 +422,7 @@ export async function iceSubmitSmartBatchJob(
     materialSlots: input.materialSlots,
   })
   const inputConfig = built.inputConfig
-  const editingConfig = buildDefaultEditingConfig(built.speechRate)
+  const editingConfig = buildDefaultEditingConfig(built.speechRate, input.subtitleStyleId)
   const templateIds = (input.templateIds ?? []).filter(Boolean).slice(0, 50)
 
   const client = createClient(cfg)
