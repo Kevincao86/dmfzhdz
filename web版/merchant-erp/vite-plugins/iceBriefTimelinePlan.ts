@@ -146,8 +146,8 @@ export function parseIceEditBriefPlan(
   const fastPace = /快节奏|紧凑|快剪|切片|吸睛/.test(instruction || brief)
   const effect = resolveIceEffectPreset(opts.effectId)
   const subtitleStyle = resolveIceSubtitleStylePreset(opts.subtitleStyleId ?? ICE_SUBTITLE_STYLE_DEFAULT_ID)
-  const fadeClip = Boolean(effect.fadeClip)
-  const transitionSubType = effect.transitionSubType
+  const fadeClip = opts.mixMode ? false : Boolean(effect.fadeClip)
+  const transitionSubType = opts.mixMode ? undefined : effect.transitionSubType
   const useFade = fadeClip
   const useTransition = Boolean(transitionSubType)
   const titleText = extractTitleText(copy || brief)
@@ -427,31 +427,20 @@ export function buildMixAnimatedSubtitleTracks(
   return { SubtitleTracks: [{ SubtitleTrackClips: clips }] }
 }
 
-/** 混剪成片：段间淡入淡出（DLTransition 与多段 MediaURL/MediaId 组合易 InputFile is bad，混剪不用） */
+/** 混剪成片：段间直切（Fade/DLTransition 在多段 IMS 时间线上易 InputFile is bad） */
 export function enhanceIceMixBriefPlan(
   plan: IceBriefTimelinePlan,
   effectId: string,
 ): IceBriefTimelinePlan {
   const effect = resolveIceEffectPreset(effectId)
-  if (effect.id === 'none') {
-    return {
-      ...plan,
-      fadeClip: false,
-      useFade: false,
-      useTransition: false,
-      transitionSubType: undefined,
-      effectId: effect.id,
-      summary: `${plan.summary}${plan.summary ? ' · ' : ''}混剪直切拼接`,
-    }
-  }
   return {
     ...plan,
-    fadeClip: true,
-    useFade: true,
+    fadeClip: false,
+    useFade: false,
     useTransition: false,
     transitionSubType: undefined,
     effectId: effect.id,
-    summary: `${plan.summary}${plan.summary ? ' · ' : ''}混剪淡入淡出（${effect.label}）`,
+    summary: `${plan.summary}${plan.summary ? ' · ' : ''}混剪${effect.id === 'none' ? '直切' : `拼接（${effect.label}·直切稳定模式）`}`,
   }
 }
 
