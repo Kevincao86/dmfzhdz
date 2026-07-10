@@ -34,8 +34,12 @@ function resolveSdkCtor(mod: unknown): IceClientClass {
 
 const IceClient = resolveSdkCtor(IceModule)
 
-/** 中文口播约 4.5 字/秒（用于控时长） */
-const DIALOGUE_CHARS_PER_SEC = 4.5
+/** 中文口播约 4 字/秒（偏保守，避免低估 TTS 时长） */
+const DIALOGUE_CHARS_PER_SEC = 4
+
+function segmentCountForTarget(targetSec: number): number {
+  return Math.max(2, Math.min(8, Math.ceil(targetSec / 4)))
+}
 
 function createClient(cfg: AliyunIceConfig): InstanceType<typeof IceClient> {
   return new IceClient(
@@ -110,8 +114,11 @@ function planDialogueRowsForTarget(input: {
   materialSlots: number[]
   materialCount: number
   targetTotalSec: number
-}): PlannedDialogueRow[] {
+}): { rows: PlannedDialogueRow[]; padSec: number } {
   const target = Math.min(120, Math.max(5, Math.ceil(input.targetTotalSec)))
+  const minTotalSec = Math.max(target - 2, Math.round(target * 0.9))
+  const idealSegs = segmentCountForTarget(target)
+
   const candidates = input.scriptRows
     .map((row, rowIndex) => {
       const dialogue = String(row.dialogue ?? '').trim()
@@ -127,36 +134,73 @@ function planDialogueRowsForTarget(input: {
     estSec: number
   }>
 
-  if (candidates.length === 0) return []
+  if (candidates.length === 0) return { rows: [], padSec: target }
 
-  const picked: typeof candidates = []
+  let rows: typeof candidates = []
   let accSec = 0
   for (const c of candidates) {
-    if (picked.length >= 1 && accSec + c.estSec > target + 1) break
-    picked.push(c)
+    rows.push(c)
     accSec += c.estSec
-    if (accSec >= target) break
+    if (rows.length >= idealSegs && accSec >= minTotalSec) break
   }
 
-  let rows = picked.length >= 2 ? picked : candidates.slice(0, Math.min(candidates.length, 2))
-  accSec = rows.reduce((s, r) => s + r.estSec, 0)
-
-  if (accSec > target && rows.length > 0) {
-    const budget = Math.max(8, Math.floor(target * DIALOGUE_CHARS_PER_SEC))
-    const perRow = Math.max(8, Math.floor(budget / rows.length))
-    rows = rows.map((r) => ({
-      ...r,
-      dialogue: truncateDialogue(r.dialogue, perRow),
-      estSec: estimateSpeechSec(truncateDialogue(r.dialogue, perRow)),
-    }))
+  if (rows.length < 2) {
+    rows = candidates.slice(0, Math.min(candidates.length, Math.max(2, idealSegs)))
+    accSec = rows.reduce((s, r) => s + r.estSec, 0)
   }
 
-  return rows.map((r) => ({
+  // 仅当明显超长时才截断口播（分组模式时长 = TTS 总长，MaxDuration 无效）
+  if (accSec > target + 2 && rows.length > 0) {
+    const budget = Math.max(12, Math.floor(target * DIALOGUE_CHARS_PER_SEC))
+    const perRow = Math.max(10, Math.floor(budget / rows.length))
+    rows = rows.map((r) => {
+      const dialogue = truncateDialogue(r.dialogue, perRow)
+      return { ...r, dialogue, estSec: estimateSpeechSec(dialogue) }
+    })
+    accSec = rows.reduce((s, r) => s + r.estSec, 0)
+  }
+
+  const planned = rows.map((r) => ({
     dialogue: r.dialogue,
     materialIndex: r.materialIndex,
     estSec: r.estSec,
     rowIndex: r.rowIndex,
   }))
+
+  const padSec = Math.max(0, Math.round((target - accSec) * 10) / 10)
+  return { rows: planned, padSec }
+}
+
+function buildPadMediaGroups(input: {
+  materials: IceSmartBatchMaterial[]
+  padSec: number
+}): Array<Record<string, unknown>> {
+  const pad = Math.round(input.padSec * 10) / 10
+  if (pad < 1 || input.materials.length === 0) return []
+  const first = input.materials[0]!
+  const last = input.materials[input.materials.length - 1]!
+  const firstUrl = ensureIceHttpsUrl(sanitizeIcePipelineMediaUrl(first.mediaUrl))
+  const lastUrl = ensureIceHttpsUrl(sanitizeIcePipelineMediaUrl(last.mediaUrl))
+  const openDur = Math.max(1, Math.round((pad / 2) * 10) / 10)
+  const closeDur = Math.max(1, Math.round((pad - openDur) * 10) / 10)
+  return [
+    {
+      GroupName: 'pad-open',
+      MediaArray: [firstUrl],
+      SplitMode: 'NoSplit',
+      Duration: openDur,
+      Volume: 0,
+      DurationAutoAdapt: true,
+    },
+    {
+      GroupName: 'pad-close',
+      MediaArray: [lastUrl],
+      SplitMode: 'NoSplit',
+      Duration: closeDur,
+      Volume: 0,
+      DurationAutoAdapt: true,
+    },
+  ]
 }
 
 function buildDefaultEditingConfig(): Record<string, unknown> {
@@ -168,9 +212,10 @@ function buildDefaultEditingConfig(): Record<string, unknown> {
       AllowVfxEffect: false,
       EnableClipSplit: true,
       SingleShotDuration: 4,
-      AlignmentMode: 'Cut',
+      AlignmentMode: 'AutoSpeed',
     },
-    MediaConfig: { Volume: 0.15 },
+    // 官方示例 Volume:0 = 原片静音，仅保留 TTS + BGM
+    MediaConfig: { Volume: 0 },
     SpeechConfig: {
       Volume: 1,
       SpeechRate: 0,
@@ -180,7 +225,7 @@ function buildDefaultEditingConfig(): Record<string, unknown> {
         Y: 0.82,
       },
     },
-    BackgroundMusicConfig: { Volume: 0.25 },
+    BackgroundMusicConfig: { Volume: 0.22 },
   }
 }
 
@@ -210,40 +255,37 @@ function buildInputConfig(input: {
   const targetTotalSec = Math.min(120, Math.max(5, Math.ceil(input.targetTotalSec)))
   const materialSlots = input.materialSlots ?? []
 
-  const planned = planDialogueRowsForTarget({
+  const plannedResult = planDialogueRowsForTarget({
     scriptRows: input.scriptRows,
     materialSlots,
     materialCount: input.materials.length,
     targetTotalSec,
   })
+  const planned = plannedResult.rows
+  const padGroups = buildPadMediaGroups({ materials: input.materials, padSec: plannedResult.padSec })
 
-  // 分组口播：仅用分镜「口播/文案」列，禁止 visual 执行文稿、禁止 TitleArray 标题上屏
+  // 分组口播：仅用分镜「口播/文案」列；每组 Volume:0 强制原片消音
   if (planned.length >= 2) {
-    const mediaGroups = planned.map((row, i) => {
+    const speechGroups = planned.map((row, i) => {
       const mat = input.materials[row.materialIndex % input.materials.length]!
       const url = ensureIceHttpsUrl(sanitizeIcePipelineMediaUrl(mat.mediaUrl))
-      const srcRow = input.scriptRows[row.rowIndex]
-      const durFromRange = srcRow ? rowDurationSec(srcRow) : undefined
-      const group: Record<string, unknown> = {
+      return {
         GroupName: `seg-${i + 1}`.slice(0, 50),
         MediaArray: [url],
-        SplitMode: 'NoSplit',
-        SpeechTextArray: [row.dialogue.slice(0, 200)],
+        SplitMode: 'NoSplit' as const,
+        Volume: 0,
+        SpeechTextArray: [row.dialogue.slice(0, 240)],
       }
-      const dur = durFromRange ?? row.estSec
-      if (dur > 0) {
-        group.Duration = Math.min(10, Math.max(2, Math.round(dur * 10) / 10))
-      }
-      return group
     })
+    const mediaGroups = [...padGroups.slice(0, 1), ...speechGroups, ...padGroups.slice(1)]
     return { MediaGroupArray: mediaGroups }
   }
 
-  // 全局口播：一句短 hook，禁止把整段指导文案塞进 SpeechTextArray / TitleArray
-  const hookMaxChars = Math.max(20, Math.floor(targetTotalSec * DIALOGUE_CHARS_PER_SEC))
+  // 全局口播：一句短 hook；原片静音
+  const hookMaxChars = Math.max(24, Math.floor(targetTotalSec * DIALOGUE_CHARS_PER_SEC))
   const hook =
     planned[0]?.dialogue ??
-    extractShortHookFromGuidance(guidance, Math.min(hookMaxChars, 80))
+    extractShortHookFromGuidance(guidance, Math.min(hookMaxChars, 100))
 
   return {
     MediaGroupArray: [
@@ -251,6 +293,7 @@ function buildInputConfig(input: {
         GroupName: 'main',
         MediaArray: urls,
         SplitMode: 'AverageSplit',
+        Volume: 0,
       },
     ],
     SpeechTextArray: [truncateDialogue(hook, hookMaxChars)],
