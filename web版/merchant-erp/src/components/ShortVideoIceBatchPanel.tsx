@@ -662,9 +662,11 @@ export function ShortVideoIceBatchPanel(_props: Props) {
         onProgress: (msg) => setHint(msg),
       })
       if (!r.ok) {
+        setHint(null)
         setErr(r.message)
         return
       }
+      setErr(null)
       setMixGuidance(r.guidance)
       setMixMaterialProfiles(r.materialProfiles)
       setHint('分析完成，正在扣减积分…')
@@ -1475,6 +1477,11 @@ export function ShortVideoIceBatchPanel(_props: Props) {
               {(analyzeBusy || (hint && guidanceBusy)) && hint ? (
                 <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-900">
                   {hint}
+                </div>
+              ) : null}
+              {err && !analyzeBusy ? (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
+                  {err}
                 </div>
               ) : null}
               <div className="flex flex-wrap items-end gap-4">
