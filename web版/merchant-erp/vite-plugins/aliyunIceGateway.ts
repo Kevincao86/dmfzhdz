@@ -437,14 +437,20 @@ export async function handleAliyunIceRoutes(input: {
               mediaUrl.startsWith('oss://') ||
               (signedMediaUrl ? /^https?:\/\//i.test(signedMediaUrl) : false)
             if (!urlOk) return null
-            const pipelineUrl = sanitizeIcePipelineMediaUrl(
+            const rawMedia =
               mediaUrl.startsWith('oss://') || /^https?:\/\//i.test(mediaUrl)
                 ? mediaUrl
-                : signedMediaUrl || mediaUrl,
-              signedMediaUrl,
-            )
-            const urlErr = validateIcePipelineMediaUrl(pipelineUrl)
-            if (urlErr) return null
+                : signedMediaUrl || mediaUrl
+            const pipelineUrl = sanitizeIcePipelineMediaUrl(rawMedia, signedMediaUrl)
+            if (!/^https?:\/\//i.test(pipelineUrl) && !pipelineUrl.startsWith('oss://')) return null
+            if (/localhost|127\.0\.0\.1|blob:/i.test(pipelineUrl)) return null
+            if (/your-cdn\.com|example\.com|placeholder/i.test(pipelineUrl)) return null
+            if (
+              /[?#].*signature/i.test(String(mediaUrl)) ||
+              /[?#].*signature/i.test(String(signedMediaUrl || ''))
+            ) {
+              return null
+            }
             return {
               kind,
               mediaUrl: pipelineUrl,
@@ -470,6 +476,31 @@ export async function handleAliyunIceRoutes(input: {
       return true
     }
 
+    let mixSegmentsForPipeline = mixSegments
+    if (mixSegments.length >= 2) {
+      const { ensureIceMixSegmentMediaUrls } = await import('./aliyunOssIceUpload.js')
+      const normalizedMix = await ensureIceMixSegmentMediaUrls(
+        cfg,
+        rawEnv as Record<string, string | undefined>,
+        mixSegments as Array<{
+          kind: 'video' | 'image'
+          mediaUrl: string
+          signedMediaUrl?: string
+          timelineStartSec: number
+          timelineEndSec: number
+          caption?: string
+          materialIndex?: number
+          sourceInSec?: number
+          sourceOutSec?: number
+        }>,
+      )
+      if (!normalizedMix.ok) {
+        json(res, 400, { ok: false, message: normalizedMix.message, step: 'normalize_mix_media' })
+        return true
+      }
+      mixSegmentsForPipeline = normalizedMix.segments
+    }
+
     let pipelineImageUrls = imageUrls
     if (imageUrls.length > 0) {
       const { ensureIcePublicImageUrls } = await import('./aliyunOssIceUpload.js')
@@ -488,7 +519,7 @@ export async function handleAliyunIceRoutes(input: {
     const out =
       mixSegments.length >= 2
         ? await iceRunMixPipeline(cfg, {
-            segments: mixSegments as Array<{
+            segments: mixSegmentsForPipeline as Array<{
               kind: 'video' | 'image'
               mediaUrl: string
               signedMediaUrl?: string

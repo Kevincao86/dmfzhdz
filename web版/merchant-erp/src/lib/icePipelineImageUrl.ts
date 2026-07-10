@@ -65,6 +65,9 @@ export function findInvalidIcePipelineImageUrl(urls: string[]): string | null {
 export function validateIceMixMaterialUrl(url: string): string | null {
   const raw = String(url || '').trim()
   if (!raw) return '素材地址为空'
+  if (isIcePlaceholderExampleUrl(raw)) {
+    return '检测到页面示例占位链接，请删除后点「本地上传」'
+  }
   if (/localhost|127\.0\.0\.1|blob:/i.test(raw)) {
     return '请使用「本地上传」，勿使用本地预览地址'
   }
@@ -72,9 +75,7 @@ export function validateIceMixMaterialUrl(url: string): string | null {
     return '检测到签名链接，请删除该素材并重新本地上传'
   }
   if (raw.startsWith('oss://') || ICE_OSS_HTTPS_RE.test(toBareOssHttps(raw))) return null
-  if (/^https?:\/\//i.test(raw)) {
-    return '须为本系统本地上传生成的 OSS 直链，勿粘贴外链'
-  }
+  if (/^https?:\/\//i.test(raw)) return null
   return '素材地址无效'
 }
 

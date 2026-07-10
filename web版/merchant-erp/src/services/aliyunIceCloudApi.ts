@@ -125,6 +125,8 @@ export type IceBatchJob = {
   id: string
   label: string
   mediaUrl: string
+  /** 无签名 OSS 直链，混剪/云剪时间线优先使用 */
+  timelineUrl?: string
   /** 带签名 OSS 地址，私有 Bucket 时供 ICE URL 拉取回退 */
   signedMediaUrl?: string
   /** 多图一键成片：按顺序合成的图片 OSS/HTTPS 地址 */
