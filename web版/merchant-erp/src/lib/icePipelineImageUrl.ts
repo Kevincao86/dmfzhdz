@@ -82,3 +82,20 @@ export function validateIceMixMaterialUrl(url: string): string | null {
 export function sanitizeIceMixMaterialUrlForPipeline(url: string): string {
   return toBareOssHttps(String(url || '').trim())
 }
+
+/** 提交混剪 API 时：timeline 已是干净 OSS 则勿再带 signedMediaUrl（避免网关误判） */
+export function prepareIceMixSegmentForPost<T extends { mediaUrl: string; signedMediaUrl?: string }>(
+  seg: T,
+): T {
+  const mediaUrl = sanitizeIceMixMaterialUrlForPipeline(seg.mediaUrl || seg.signedMediaUrl || '')
+  const clean =
+    mediaUrl &&
+    (mediaUrl.startsWith('oss://') ||
+      (/^https:\/\/[^/]+\.oss-[a-z0-9-]+\.aliyuncs\.com\//i.test(mediaUrl) &&
+        !mediaUrl.includes('?') &&
+        !/[?#].*signature/i.test(mediaUrl)))
+  if (clean) {
+    return { ...seg, mediaUrl, signedMediaUrl: undefined }
+  }
+  return { ...seg, mediaUrl: mediaUrl || seg.mediaUrl }
+}
