@@ -53,7 +53,7 @@ import {
   spendMpAddonPoints,
 } from '../services/mpAddonPointsSpendClient'
 import { checkMixMaterialAnalyzeAffordable, spendMixMaterialAnalyzePoints } from '../services/mpAiPointsSpendClient'
-import { validateIceMixMaterialUrl } from '../lib/icePipelineImageUrl'
+import { validateIceMixMaterialUrl, sanitizeIceMixMaterialUrlForPipeline } from '../lib/icePipelineImageUrl'
 import { isIceTransientNetworkError } from '../lib/iceTransientNetworkError'
 import ShortVideoScriptTableEditor from './ShortVideoScriptTableEditor'
 import { parseGuidanceDocumentFile } from '../lib/shortVideoGuidanceDoc'
@@ -282,7 +282,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       .filter((j) => isIceSourceMaterialJob(j) && !j.imageUrls?.length)
       .map((j) => ({
         kind: 'video' as const,
-        mediaUrl: j.mediaUrl,
+        mediaUrl: j.timelineUrl?.trim() || sanitizeIceMixMaterialUrlForPipeline(j.mediaUrl),
         signedMediaUrl: j.signedMediaUrl,
         label: j.label,
       }))
@@ -302,12 +302,17 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   const mixBlockers = useMemo((): string[] => {
     const items: string[] = []
     if (mixMaterialPool.length < 2) items.push('上传至少 2 条不同视频/图片（混剪须多素材拼接）')
+    for (let i = 0; i < mixMaterialPool.length; i++) {
+      const m = mixMaterialPool[i]!
+      const urlErr = validateIceMixMaterialUrl(m.mediaUrl || m.signedMediaUrl || '')
+      if (urlErr) items.push(`素材${i + 1}（${m.label}）：${urlErr}`)
+    }
     if (scriptRows.length < 2) items.push('分镜至少 2 段（点「AI 规划分镜」）')
     else if (!mixStoryboardBriefReady(mixGuidance, scriptRows)) {
       items.push('填写指导文案，或在分镜表中填写口播/画面指令')
     }
     return items
-  }, [mixMaterialPool.length, scriptRows.length, mixGuidance, scriptRows])
+  }, [mixMaterialPool, scriptRows.length, mixGuidance, scriptRows])
 
   const mixPoolLenRef = useRef(0)
 
@@ -453,6 +458,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 id: newJobId(),
                 label: r.label.slice(0, 40),
                 mediaUrl: r.mediaUrl,
+                timelineUrl: r.timelineUrl,
                 signedMediaUrl: r.signedMediaUrl,
                 phase: 'pending' as const,
               },
@@ -907,6 +913,10 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       setErr('请填写指导文案或在分镜表中填写画面/口播')
       return
     }
+    if (mixBlockers.length > 0) {
+      setErr(`暂不可混剪：${mixBlockers.join('；')}`)
+      return
+    }
 
     setOneClickBusy(true)
     setErr(null)
@@ -1179,8 +1189,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-950">
                   <p className="font-medium">本地上传未开启</p>
                   <p className="mt-1 text-amber-900/90">
-                    需在运营管理后台「AI模型 → 短视频 API → 灵祺AI云剪」填写 OSS 成片 URL 前缀并保存，然后刷新本页。仍可粘贴下方
-                    HTTPS 链接作为素材。
+                    需在运营管理后台「AI模型 → 短视频 API → 灵祺AI云剪」填写 OSS 成片 URL 前缀并保存，然后刷新本页。
                   </p>
                 </div>
               ) : null}
@@ -1257,43 +1266,9 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 )}
               </label>
 
-              <div className="flex items-center gap-3 text-xs text-zinc-400">
-                <span className="h-px flex-1 bg-zinc-200" />
-                <span className="flex items-center gap-1">
-                  <Link2 className="h-3.5 w-3.5" />
-                  或使用链接
-                </span>
-                <span className="h-px flex-1 bg-zinc-200" />
-              </div>
-
-              <textarea
-                value={urlText}
-                disabled={anyBusy || mediaBusy}
-                onChange={(e) => setUrlText(e.target.value)}
-                placeholder={'https://your-cdn.com/shop-tour-01.mp4\nhttps://your-cdn.com/shop-tour-02.mp4'}
-                className="min-h-[88px] w-full rounded-lg border border-zinc-300 px-3 py-2.5 font-mono text-xs text-zinc-800 placeholder:text-zinc-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-              />
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={anyBusy || mediaBusy}
-                  onClick={addUrlsFromText}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
-                >
-                  <Plus className="h-4 w-4" />
-                  加入素材列表
-                </button>
-                {lastResultUrl ? (
-                  <button
-                    type="button"
-                    disabled={anyBusy || mediaBusy}
-                    onClick={appendLastResult}
-                    className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm text-zinc-800 hover:bg-zinc-50 disabled:opacity-50"
-                  >
-                    使用上一段 AI 成片
-                  </button>
-                ) : null}
-              </div>
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                混剪须使用<strong>本地上传</strong>写入 OSS 的无签名直链；勿粘贴示例 CDN 或带 <code className="font-mono">?Signature=</code> 的地址。若列表中有旧素材，请先删除再重新上传。
+              </p>
 
               {jobs.length > 0 ? (
                 <ul className="divide-y divide-zinc-100 rounded-lg border border-zinc-200">
@@ -1319,7 +1294,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   ))}
                 </ul>
               ) : (
-                <p className="text-xs text-zinc-500">暂无视频 — 上传或粘贴链接后，在第 2 步分镜中映射使用。</p>
+                <p className="text-xs text-zinc-500">暂无视频 — 请本地上传至少 2 条 MP4/MOV，上传后在第 2 步分镜中映射使用。</p>
               )}
                 </>
               ) : null}

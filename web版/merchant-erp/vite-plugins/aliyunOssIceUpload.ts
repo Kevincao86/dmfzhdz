@@ -209,6 +209,111 @@ export async function ensureIcePublicImageUrls(
   return { ok: true, urls: out }
 }
 
+function isIceOssMediaUrl(url: string): boolean {
+  return /^https:\/\/[^/]+\.oss-[a-z0-9-]+\.aliyuncs\.com\//i.test(String(url || '').trim())
+}
+
+async function mirrorExternalVideoToIceOss(
+  cfg: AliyunIceConfig,
+  env: Record<string, string | undefined>,
+  rawUrl: string,
+  index: number,
+): Promise<{ ok: true; timelineUrl: string; mediaUrl: string } | { ok: false; message: string }> {
+  const url = String(rawUrl || '').trim()
+  if (!/^https?:\/\//i.test(url)) {
+    return { ok: false, message: `第 ${index + 1} 段视频地址无效` }
+  }
+  if (isLocalOrPrivateUrl(url)) {
+    return { ok: false, message: `第 ${index + 1} 段为内网地址，请本地上传` }
+  }
+  try {
+    const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(180_000) })
+    if (!res.ok) {
+      return { ok: false, message: `第 ${index + 1} 段视频无法下载（HTTP ${res.status}）` }
+    }
+    const ct = (res.headers.get('content-type') || 'video/mp4').split(';')[0]!.trim()
+    if (!/^video\//i.test(ct) && !/\.(mp4|mov|m4v|webm)(\?|$)/i.test(url)) {
+      return { ok: false, message: `第 ${index + 1} 段链接不是有效视频文件` }
+    }
+    const buf = Buffer.from(await res.arrayBuffer())
+    if (!buf.length) return { ok: false, message: `第 ${index + 1} 段视频内容为空` }
+    if (buf.length > MAX_BYTES) {
+      return { ok: false, message: `第 ${index + 1} 段视频超过 500MB，请压缩后本地上传` }
+    }
+    const ext = /\.mov(\?|$)/i.test(url) ? '.mov' : '.mp4'
+    const put = await putIceSourceObject(cfg, env, {
+      fileName: `ice-mix-mirror-${Date.now()}-${index}${ext}`,
+      contentType: /^video\//i.test(ct) ? ct : 'video/mp4',
+      buffer: buf,
+    })
+    if (!put.ok) return put
+    return {
+      ok: true,
+      timelineUrl: put.timelineUrl ?? toIceTimelineOssUrl(put.mediaUrl),
+      mediaUrl: put.mediaUrl,
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, message: `第 ${index + 1} 段视频转存失败：${msg}` }
+  }
+}
+
+/** 混剪提交前：外链/签名素材统一转为本系统 OSS 无签名直链 */
+export async function ensureIceMixSegmentMediaUrls(
+  cfg: AliyunIceConfig,
+  env: Record<string, string | undefined>,
+  segments: Array<{
+    kind: 'video' | 'image'
+    mediaUrl: string
+    signedMediaUrl?: string
+    timelineStartSec: number
+    timelineEndSec: number
+    caption?: string
+    materialIndex?: number
+    sourceInSec?: number
+    sourceOutSec?: number
+  }>,
+): Promise<
+  | {
+      ok: true
+      segments: typeof segments
+    }
+  | { ok: false; message: string }
+> {
+  const ossPrefix = resolveIceOssUploadPrefix(cfg, env)
+  if (!ossPrefix) {
+    return { ok: false, message: '未配置 OSS 成片前缀，无法混剪。请在运营台配置后使用本地上传。' }
+  }
+
+  const out: typeof segments = []
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i]!
+    let url = toIceTimelineOssUrl(seg.mediaUrl || seg.signedMediaUrl || '')
+    if (!url) return { ok: false, message: `第 ${i + 1} 段素材地址为空` }
+
+    if (urlOnIceOssBucket(url, ossPrefix) || isIceOssMediaUrl(url)) {
+      out.push({ ...seg, mediaUrl: url, signedMediaUrl: undefined })
+      continue
+    }
+
+    if (seg.kind === 'image') {
+      const img = await ensureIcePublicImageUrls(cfg, env, [url])
+      if (!img.ok) return { ok: false, message: img.message.replace('第 1 张', `第 ${i + 1} 段图片`) }
+      out.push({ ...seg, mediaUrl: img.urls[0]!, signedMediaUrl: undefined })
+      continue
+    }
+
+    const mirrored = await mirrorExternalVideoToIceOss(cfg, env, url, i)
+    if (!mirrored.ok) return mirrored
+    out.push({
+      ...seg,
+      mediaUrl: mirrored.timelineUrl,
+      signedMediaUrl: mirrored.mediaUrl,
+    })
+  }
+  return { ok: true, segments: out }
+}
+
 function isOssBucketAclError(msg: string): boolean {
   return /bucket acl|accessdenied|access denied|no right to access/i.test(msg)
 }

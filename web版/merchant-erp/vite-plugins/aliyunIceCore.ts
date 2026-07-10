@@ -595,7 +595,7 @@ async function registerMediaUrlToMediaId(
   cfg: AliyunIceConfig,
   mediaUrl: string,
   title: string,
-  mediaType: 'image' | 'video',
+  mediaType: 'image' | 'video' | 'audio',
 ): Promise<{ ok: true; mediaId: string } | { ok: false; message: string }> {
   const inputURL = normalizeIceRegisterInputUrl(mediaUrl)
   try {
@@ -1177,6 +1177,14 @@ export async function iceRunMixPipeline(
     { mediaId: string; sourceDurationSec?: number; kind: 'video' | 'image' }
   >()
 
+  const ossUrlsForRegion = input.segments.map((s) =>
+    sanitizeIcePipelineMediaUrl(s.mediaUrl, s.signedMediaUrl),
+  )
+  const regionErr = assertIceInputOssRegion(cfg, ossUrlsForRegion.filter((u) => /\.oss-/i.test(u)))
+  if (regionErr) {
+    return { ok: false, message: regionErr.replace('图片', '素材'), step: 'validate' }
+  }
+
   for (let i = 0; i < input.segments.length; i++) {
     const segRaw = input.segments[i]!
     const seg = {
@@ -1320,19 +1328,34 @@ export async function iceRunMixPipeline(
     const { synthesizeIceMixNarrationMp3 } = await import('./iceMixNarrationTts.js')
     const tts = await synthesizeIceMixNarrationMp3(cfg, input.env, narrationText)
     if (tts.ok) {
-      finalPlan = {
-        ...plan,
-        mixAiTtsClip: undefined,
-        narrationClip: {
-          mediaUrl: tts.timelineUrl,
-          timelineIn: 0,
-          timelineOut: input.totalDurationSec,
-          volume: 1,
-          label: '混剪 TTS 口播',
-        },
-        summary: `${plan.summary}${plan.summary ? ' · ' : ''}CosyVoice 口播`,
+      const narTimeline = sanitizeIcePipelineMediaUrl(tts.timelineUrl, tts.mediaUrl)
+      const reg = await registerMediaUrlToMediaId(
+        client,
+        cfg,
+        narTimeline,
+        `${input.projectName}-口播`.slice(0, 120),
+        'audio',
+      )
+      if (reg.ok) {
+        const ready = await waitIceVideoMediaReady(client, reg.mediaId, 16)
+        if (ready.ok) {
+          finalPlan = {
+            ...plan,
+            mixAiTtsClip: undefined,
+            narrationClip: {
+              mediaUrl: narTimeline,
+              mediaId: reg.mediaId,
+              timelineIn: 0,
+              timelineOut: input.totalDurationSec,
+              volume: 1,
+              label: '混剪 TTS 口播',
+            },
+            summary: `${plan.summary}${plan.summary ? ' · ' : ''}CosyVoice 口播（MediaId）`,
+          }
+        }
       }
-    } else {
+    }
+    if (!finalPlan.narrationClip && !finalPlan.mixAiTtsClip) {
       finalPlan = {
         ...plan,
         mixAiTtsClip: {
@@ -1340,7 +1363,7 @@ export async function iceRunMixPipeline(
           timelineIn: 0,
           timelineOut: input.totalDurationSec,
         },
-        summary: `${plan.summary}${plan.summary ? ' · ' : ''}ICE AI_TTS 口播（TTS 合成回退）`,
+        summary: `${plan.summary}${plan.summary ? ' · ' : ''}ICE AI_TTS 口播`,
       }
     }
   }
