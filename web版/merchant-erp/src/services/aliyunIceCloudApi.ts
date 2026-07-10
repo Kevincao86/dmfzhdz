@@ -16,6 +16,9 @@ export type AliyunIceCloudConfig = {
   hasVodOutput?: boolean
   /** 已配置 OSS 前缀时可本地上传至 Bucket */
   localUploadEnabled?: boolean
+  /** 阿里云 IMS 智能一键成片（须订阅） */
+  smartBatchEnabled?: boolean
+  smartBatchTemplateIds?: string[]
   presets: string[]
   effectOptions?: { id: string; label: string }[]
   subtitleStyleOptions?: Array<{ id: string; label: string; description?: string; tag?: string }>
@@ -76,8 +79,12 @@ export function iceExportFileName(label: string): string {
 /**
  * 经 BFF 拉取成片 Blob 再触发下载（可校验非空并展示错误；避免直链 0 字节空文件）。
  */
-export async function downloadIceExportFile(jobId: string, label: string): Promise<void> {
-  const paths = iceJobDownloadProxyPaths(jobId)
+export async function downloadIceExportFile(
+  jobId: string,
+  label: string,
+  opts?: { mixProduceMode?: 'timeline' | 'smart_batch' },
+): Promise<void> {
+  const paths = iceExportDownloadPaths(jobId, opts?.mixProduceMode ?? 'timeline')
   let lastErr = '下载失败'
   for (const p of paths) {
     try {
@@ -131,6 +138,8 @@ export type IceBatchJob = {
   signedMediaUrl?: string
   /** 多图一键成片：按顺序合成的图片 OSS/HTTPS 地址 */
   imageUrls?: string[]
+  /** timeline=普通混剪；smart_batch=智能一键成片 */
+  mixProduceMode?: 'timeline' | 'smart_batch'
   phase: 'pending' | 'pipeline' | 'polling' | 'done' | 'failed'
   message?: string
   exportId?: string
@@ -755,6 +764,87 @@ export async function postIcePipeline(body: {
   return { ok: false, message: '云剪辑接口未部署' }
 }
 
+const SMART_BATCH_PIPELINE_PATHS = [
+  '/api/meoo-merchant-ai-video-ice-smart-batch',
+  '/api/merchant/ai/video/ice/smart-batch',
+] as const
+
+export async function postIceSmartBatch(body: {
+  materials: Array<{ kind: 'video' | 'image'; mediaUrl: string; label?: string }>
+  scriptRows?: Array<{ timeRange?: string; visual?: string; dialogue?: string }>
+  guidance?: string
+  targetTotalSec: number
+  width: number
+  height: number
+  projectName?: string
+  templateIds?: string[]
+}): Promise<IcePipelineResult> {
+  for (const p of SMART_BATCH_PIPELINE_PATHS) {
+    for (const url of merchantApiFetchUrls(p)) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json; charset=utf-8' },
+          body: JSON.stringify(body),
+        })
+        const j = await parseJson<IcePipelineResult & { message?: string; batchJobId?: string }>(res)
+        if (res.status === 404) continue
+        if (!res.ok || !j?.ok) {
+          return { ok: false, message: j?.message ?? `智能成片提交失败 HTTP ${res.status}` }
+        }
+        const jobId = j.jobId || j.batchJobId || j.exportId
+        if (!jobId) return { ok: false, message: '智能成片未返回任务 ID' }
+        return { ok: true, jobId, exportId: jobId }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        return { ok: false, message: msg }
+      }
+    }
+  }
+  return { ok: false, message: '智能一键成片接口未部署' }
+}
+
+export function iceExportDownloadPaths(
+  jobId: string,
+  mode: 'timeline' | 'smart_batch' = 'timeline',
+  inline = false,
+): string[] {
+  const q = new URLSearchParams({ id: jobId })
+  if (inline) q.set('inline', '1')
+  const qs = q.toString()
+  if (mode === 'smart_batch') {
+    return [
+      `/api/meoo-merchant-ai-video-ice-smart-batch-download?${qs}`,
+      `/api/merchant/ai/video/ice/smart-batch/job-download?${qs}`,
+    ]
+  }
+  return iceJobDownloadProxyPaths(jobId, inline)
+}
+
+export async function fetchIceSmartBatchJobStatus(batchJobId: string): Promise<IceJobStatus> {
+  const paths = [
+    `/api/meoo-merchant-ai-video-ice-smart-batch-job?id=${encodeURIComponent(batchJobId)}`,
+    `/api/merchant/ai/video/ice/smart-batch/job?id=${encodeURIComponent(batchJobId)}`,
+  ]
+  for (const p of paths) {
+    for (const url of merchantApiFetchUrls(p)) {
+      try {
+        const res = await fetch(url)
+        if (res.status === 404) continue
+        const j = await parseJson<IceJobStatus & { message?: string }>(res)
+        if (!res.ok || !j?.ok) {
+          return { ok: false, message: j?.message ?? `查询失败 HTTP ${res.status}` }
+        }
+        return j
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        return { ok: false, message: msg }
+      }
+    }
+  }
+  return { ok: false, message: '智能成片状态接口未部署' }
+}
+
 export async function fetchIceJobStatus(jobId: string): Promise<IceJobStatus> {
   const paths = [
     `/api/meoo-merchant-ai-video-ice-job?id=${encodeURIComponent(jobId)}`,
@@ -782,15 +872,14 @@ export async function fetchIceJobStatus(jobId: string): Promise<IceJobStatus> {
 }
 
 /** 拉取成片为 Blob URL（用于内嵌预览；下载请用 triggerIceExportDownload） */
-export async function fetchIceExportPreviewUrl(jobId: string): Promise<string> {
-  const paths = [
-    `/api/meoo-merchant-ai-video-ice-job-download?id=${encodeURIComponent(jobId)}&inline=1`,
-    `/api/meoo-merchant-ai-video-openshot-export-download?id=${encodeURIComponent(jobId)}&inline=1`,
-    `/api/merchant/ai/video/ice/job-download?id=${encodeURIComponent(jobId)}&inline=1`,
-    `/api/merchant/ai/video/openshot/export-download?id=${encodeURIComponent(jobId)}&inline=1`,
-  ]
+export async function fetchIceExportPreviewUrl(
+  jobId: string,
+  opts?: { mixProduceMode?: 'timeline' | 'smart_batch' },
+): Promise<string> {
+  const mode = opts?.mixProduceMode ?? 'timeline'
+  const pathList = iceExportDownloadPaths(jobId, mode, true)
   const urls: string[] = []
-  for (const p of paths) {
+  for (const p of pathList) {
     for (const u of merchantBinaryApiFetchUrls(p)) {
       if (!urls.includes(u)) urls.push(u)
     }

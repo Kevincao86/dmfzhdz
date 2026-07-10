@@ -82,6 +82,9 @@ import icePipelineHandler from '../api/meoo-merchant-ai-video-ice-pipeline.ts'
 import iceOpenshotPipelineHandler from '../api/meoo-merchant-ai-video-openshot-pipeline.ts'
 import iceJobHandler from '../api/meoo-merchant-ai-video-ice-job.ts'
 import iceJobDownloadHandler from '../api/meoo-merchant-ai-video-ice-job-download.ts'
+import iceSmartBatchHandler from '../api/meoo-merchant-ai-video-ice-smart-batch.ts'
+import iceSmartBatchJobHandler from '../api/meoo-merchant-ai-video-ice-smart-batch-job.ts'
+import iceSmartBatchDownloadHandler from '../api/meoo-merchant-ai-video-ice-smart-batch-download.ts'
 import iceOpenshotExportDownloadHandler from '../api/meoo-merchant-ai-video-openshot-export-download.ts'
 import iceOpenshotExportHandler from '../api/meoo-merchant-ai-video-openshot-export.ts'
 import digitalHumanTtsHandler from '../api/meoo-digital-human-tts.ts'
@@ -286,6 +289,10 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-merchant-ai-video-ice-job': iceJobHandler as VercelLikeHandler,
   '/api/meoo-merchant-ai-video-openshot-export': iceOpenshotExportHandler as VercelLikeHandler,
   '/api/meoo-merchant-ai-video-ice-job-download': iceJobDownloadHandler as VercelLikeHandler,
+  '/api/meoo-merchant-ai-video-ice-smart-batch': iceSmartBatchHandler as VercelLikeHandler,
+  '/api/meoo-merchant-ai-video-ice-smart-batch-job': iceSmartBatchJobHandler as VercelLikeHandler,
+  '/api/meoo-merchant-ai-video-ice-smart-batch-download':
+    iceSmartBatchDownloadHandler as VercelLikeHandler,
   '/api/meoo-merchant-ai-video-openshot-export-download':
     iceOpenshotExportDownloadHandler as VercelLikeHandler,
   /** 商家 ERP 达人招募推送 + 小程序侧（与 Vercel 根 api/ 同名路由） */

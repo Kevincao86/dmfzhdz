@@ -15,6 +15,8 @@ const VIDEO_AI_FIELD_KEYS = [
   'iceRegion',
   'iceVodStorageLocation',
   'iceOutputOssUrlPrefix',
+  'iceSmartBatchEnabled',
+  'iceSmartBatchTemplateIds',
   'qwenVideoModels',
 ] as const
 
@@ -68,6 +70,8 @@ export function normalizeRegistryVideoAi(raw: unknown): RegistryVideoAi {
     iceRegion: slice('iceRegion', 64),
     iceVodStorageLocation: slice('iceVodStorageLocation', 520),
     iceOutputOssUrlPrefix: slice('iceOutputOssUrlPrefix', 520),
+    iceSmartBatchEnabled: slice('iceSmartBatchEnabled', 16),
+    iceSmartBatchTemplateIds: slice('iceSmartBatchTemplateIds', 4096),
     qwenVideoModels: slice('qwenVideoModels', 8192),
   }
 }
