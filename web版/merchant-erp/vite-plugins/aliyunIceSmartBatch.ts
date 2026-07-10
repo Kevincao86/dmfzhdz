@@ -51,8 +51,14 @@ function bodyOf(res: { body?: Record<string, unknown> }): Record<string, unknown
   return res.body
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms))
+function normalizeImsMediaUrl(raw: string): string {
+  let u = String(raw ?? '').trim()
+  if (!u) return u
+  // Aliyun IMS 偶发返回 http:/bucket...（缺一个 /）
+  if (/^http:\/(?!\/)/i.test(u)) {
+    u = `https://${u.slice('http:/'.length)}`
+  }
+  return ensureIceHttpsUrl(u)
 }
 
 function rowDurationSec(row: { timeRange?: string }): number | undefined {
@@ -290,13 +296,15 @@ export async function iceGetSmartBatchJob(
 
       const failed = st === 'failed' || subStatus === 'failed'
       const done =
+        !failed &&
         (st === 'finished' || st === 'success') &&
-        (subStatus === 'success' || subStatus === 'finished' || Boolean(firstSub?.mediaURL ?? firstSub?.MediaURL))
+        (subStatus === 'success' || subStatus === 'finished')
 
       let downloadUrl: string | undefined
       let durationSec: number | undefined
       if (done && firstSub) {
-        downloadUrl = String(firstSub.mediaURL ?? firstSub.MediaURL ?? '').trim() || undefined
+        downloadUrl =
+          normalizeImsMediaUrl(String(firstSub.mediaURL ?? firstSub.MediaURL ?? '')) || undefined
         const dur = Number(firstSub.duration ?? firstSub.Duration)
         if (Number.isFinite(dur) && dur > 0) durationSec = dur
       }
