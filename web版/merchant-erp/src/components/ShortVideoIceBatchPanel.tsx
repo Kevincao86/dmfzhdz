@@ -1098,6 +1098,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       height: aspect.height,
       projectName: `智能成片-${label}`.slice(0, 120),
       templateIds: cfg.smartBatchTemplateIds,
+      subtitleStyleId: mixSubtitleStyleId,
     })
 
     if (!pipe.ok) {

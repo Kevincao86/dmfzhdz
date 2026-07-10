@@ -4,5 +4,6 @@ export {
   ICE_SUBTITLE_STYLE_DEFAULT_ID,
   resolveIceSubtitleStylePreset,
   buildIceSubtitleTextClip,
+  buildSmartBatchAsrConfig,
   type IceSubtitleStylePreset,
 } from '../src/lib/iceSubtitleStylePresets.js'

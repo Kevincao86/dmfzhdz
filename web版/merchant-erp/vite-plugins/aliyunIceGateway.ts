@@ -757,6 +757,7 @@ export async function handleAliyunIceRoutes(input: {
           .filter((n) => Number.isFinite(n) && n >= 0)
           .map((n) => Math.floor(n))
       : []
+    const subtitleStyleId = String(parsed.subtitleStyleId ?? '').trim()
 
     const out = await iceSubmitSmartBatchJob(cfg!, {
       materials: materials as Array<{ kind: 'video' | 'image'; mediaUrl: string; label?: string }>,
@@ -773,6 +774,7 @@ export async function handleAliyunIceRoutes(input: {
       templateIds,
       clientToken,
       materialSlots,
+      subtitleStyleId: subtitleStyleId || undefined,
     })
     if (!out.ok) {
       json(res, /Invalid|Missing|validate/i.test(out.message) ? 400 : 502, {

@@ -261,3 +261,47 @@ export function buildIceSubtitleTextClip(
   }
   return clip
 }
+
+/** IMS 批量一键成片 AsrConfig（Y 为字幕框左上角；竖屏底部官方默认 TopCenter + Y≈0.8） */
+export function buildSmartBatchAsrConfig(preset: IceSubtitleStylePreset): Record<string, unknown> {
+  let alignment = preset.alignment
+  let y = preset.y
+
+  if (preset.alignment === 'BottomCenter') {
+    alignment = 'TopCenter'
+    y = Math.min(0.9, Math.max(0.74, preset.y))
+  } else if (preset.alignment === 'Center') {
+    alignment = 'TopCenter'
+    y = Math.min(0.62, Math.max(0.35, preset.y - 0.05))
+  } else if (preset.alignment === 'TopCenter') {
+    y = Math.min(0.2, Math.max(0.06, preset.y))
+  }
+
+  const cfg: Record<string, unknown> = {
+    Alignment: alignment,
+    AdaptMode: preset.adaptMode ?? 'AutoWrap',
+    Y: y,
+    FontSize: preset.fontSize,
+    FontColor: preset.fontColor,
+    Outline: preset.outline,
+    OutlineColour: preset.outlineColour,
+    Font: 'Alibaba PuHuiTi 2.0 65 Medium',
+    SizeRequestType: 'Nominal',
+    Spacing: -1,
+  }
+  if (preset.textWidth != null) cfg.TextWidth = preset.textWidth
+  if (preset.fontFace) cfg.FontFace = preset.fontFace
+  if (preset.aaiMotionInEffect) {
+    cfg.AaiMotionInEffect = preset.aaiMotionInEffect
+    cfg.AaiMotionIn = preset.aaiMotionIn ?? 0.45
+  }
+  if (preset.aaiMotionOutEffect) {
+    cfg.AaiMotionOutEffect = preset.aaiMotionOutEffect
+    cfg.AaiMotionOut = preset.aaiMotionOut ?? 0.35
+  }
+  if (preset.aaiMotionLoopEffect) {
+    cfg.AaiMotionLoopEffect = preset.aaiMotionLoopEffect
+    if (preset.ratio != null) cfg.Ratio = preset.ratio
+  }
+  return cfg
+}
