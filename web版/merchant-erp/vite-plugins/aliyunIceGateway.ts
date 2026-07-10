@@ -127,6 +127,32 @@ export async function fetchIceJobDownloadBuffer(
   return { ok: true, buf: fetched.buf }
 }
 
+/** 供 flat download API 直连，避免 node-mocks-http 丢失 MP4 二进制 */
+export async function fetchIceSmartBatchDownloadBuffer(
+  cfg: AliyunIceConfig,
+  batchJobId: string,
+): Promise<IceJobDownloadPayload> {
+  const st = await iceGetSmartBatchJob(cfg, batchJobId)
+  if (!st.ok) return { ok: false, status: 502, message: st.message }
+  if (st.failed) {
+    return { ok: false, status: 502, message: st.message ?? '智能成片失败' }
+  }
+  if (!st.downloadUrl) {
+    return { ok: false, status: 404, message: '成片地址尚未生成' }
+  }
+  const evalOut = await evaluateIceOutputReady(cfg, st.downloadUrl)
+  if (!evalOut.ready) {
+    return {
+      ok: false,
+      status: 409,
+      message: evalOut.message ?? '成片写入 OSS 中，请稍后在任务列表重试下载',
+    }
+  }
+  const fetched = await fetchIceOutputObject(cfg, st.downloadUrl)
+  if (!fetched.ok) return { ok: false, status: 502, message: fetched.message }
+  return { ok: true, buf: fetched.buf }
+}
+
 /** 兼容旧 OpenShot 路径，统一转发到 ICE */
 const ICE_PATH_ALIASES: Record<string, string> = {
   '/api/merchant/ai/video/openshot/config': '/api/merchant/ai/video/ice/config',
@@ -779,17 +805,31 @@ export async function handleAliyunIceRoutes(input: {
       json(res, 502, { ok: false, message: st.message })
       return true
     }
-    const outputPending = st.done === false && !st.failed && /Success/i.test(st.status)
+    let outputBytes = 0
+    let outputReady = false
+    let pendingMessage = '智能成片已完成，成片正在写入 OSS…'
+    if (st.done && !st.failed) {
+      if (!st.downloadUrl) {
+        pendingMessage =
+          '智能成片已完成，但未解析到成片地址。请确认运营台已配置「OSS 成片 URL 前缀」且 IMS 对 Bucket 有写入权限。'
+      } else {
+        const evalOut = await evaluateIceOutputReady(cfg!, st.downloadUrl)
+        outputBytes = evalOut.bytes
+        outputReady = evalOut.ready
+        if (evalOut.message) pendingMessage = evalOut.message
+      }
+    }
+    const outputPending = st.done && !st.failed && !outputReady
     json(res, 200, {
       ok: true,
       status: st.status,
-      done: st.done,
+      done: outputReady,
       failed: st.failed,
-      outputPending: outputPending && Boolean(st.message),
-      outputBytes: st.outputBytes,
-      downloadUrl: st.done ? iceSmartBatchDownloadProxyPath(batchJobId) : undefined,
-      previewUrl: st.done ? iceSmartBatchDownloadProxyPath(batchJobId, true) : undefined,
-      message: st.message,
+      outputPending,
+      outputBytes: outputBytes > 0 ? outputBytes : undefined,
+      downloadUrl: outputReady ? iceSmartBatchDownloadProxyPath(batchJobId) : undefined,
+      previewUrl: outputReady ? iceSmartBatchDownloadProxyPath(batchJobId, true) : undefined,
+      message: outputPending ? pendingMessage : st.message,
       durationSec: st.durationSec,
     })
     return true
