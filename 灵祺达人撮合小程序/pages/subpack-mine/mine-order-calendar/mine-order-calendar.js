@@ -43,7 +43,7 @@ Page({
     identity: 'talent',
     isPr: false,
     pageSub: '',
-    viewMode: 'month',
+    viewMode: 'week',
     year: 0,
     month: 0,
     monthLabel: '',
@@ -57,6 +57,7 @@ Page({
     activeTodoCount: 0,
     remindOptions: REMIND_OPTIONS,
     myReminders: [],
+    navLabel: '',
   },
 
   async onLoad() {
@@ -72,6 +73,7 @@ Page({
       monthLabel: monthTitle(now.getFullYear(), now.getMonth()),
       selectedDateKey: todayDateKey(),
       todayKey: todayDateKey(),
+      navLabel: '本周',
     })
     await prepareMineSubPage(this)
     syncCalendarChrome(this, identity)
@@ -120,10 +122,13 @@ Page({
 
       const enriched = (events || []).map((evt) => {
         const nav = orderCalendar.resolveEventNav(evt, { isPr })
+        const phase = orderCalendar.resolveEventPhase(evt)
         return {
           ...evt,
           kindLabel: orderCalendar.kindLabel(evt.kind),
           tone: orderCalendar.eventTone(evt.kind),
+          phase,
+          phaseLabel: orderCalendar.phaseStatusLabel(phase),
           actionLabel: nav.actionLabel,
           navUrl: nav.url,
         }
@@ -134,13 +139,17 @@ Page({
       const selectedEvents = (byDate[this.data.selectedDateKey] || []).map((e) => e)
       const upcomingTodos = orderCalendar.buildUpcomingTodos(enriched, { days: 7 }).map((evt) => {
         const nav = orderCalendar.resolveEventNav(evt, { isPr })
+        const phase = orderCalendar.resolveEventPhase(evt)
         return {
           ...evt,
           kindLabel: orderCalendar.kindLabel(evt.kind),
           tone: orderCalendar.eventTone(evt.kind),
+          phase,
+          phaseLabel: orderCalendar.phaseStatusLabel(phase),
           actionLabel: nav.actionLabel,
           navUrl: nav.url,
-          dateShort: String(evt.dateKey || '').slice(5),
+          dateShort: orderCalendar.formatTodoDateShort(evt.dateKey, this.data.todayKey),
+          selected: evt.dateKey === this.data.selectedDateKey,
         }
       })
       const activeTodoCount = orderCalendar.countActiveTodos(enriched)
@@ -173,6 +182,7 @@ Page({
         upcomingTodos,
         activeTodoCount,
         myReminders,
+        navLabel: this.resolveNavLabel(this.data.viewMode, this.data.year, this.data.month),
       })
     } catch (e) {
       this.setData({
@@ -182,6 +192,10 @@ Page({
     }
   },
 
+  resolveNavLabel(viewMode, year, month) {
+    return viewMode === 'week' ? '本周' : monthTitle(year, month)
+  },
+
   buildGridCells(year, month, byDate) {
     const cells =
       this.data.viewMode === 'week'
@@ -189,20 +203,31 @@ Page({
         : orderCalendar.buildMonthGrid(year, month)
     const selectedDateKey = this.data.selectedDateKey
     const todayKey = this.data.todayKey
-    return cells.map((cell) => ({
-      ...cell,
-      count: (byDate[cell.dateKey] || []).length,
-      dotPhase: orderCalendar.resolveDayDotPhase(byDate[cell.dateKey] || []),
-      selected: cell.dateKey === selectedDateKey,
-      isToday: cell.dateKey === todayKey,
-    }))
+    return cells.map((cell) => {
+      const dayEvents = byDate[cell.dateKey] || []
+      const summary = orderCalendar.dayEventSummary(dayEvents)
+      return {
+        ...cell,
+        count: dayEvents.length,
+        dotPhase: orderCalendar.resolveDayDotPhase(dayEvents),
+        summaryLabel: summary ? summary.label : '',
+        summaryPhase: summary ? summary.phase : '',
+        weekdayShort: orderCalendar.weekdayShortFromDateKey(cell.dateKey),
+        selected: cell.dateKey === selectedDateKey,
+        isToday: cell.dateKey === todayKey,
+      }
+    })
   },
 
   onToggleViewMode(e) {
     const mode = String((e.currentTarget.dataset.mode || '')).trim()
     if (!mode || mode === this.data.viewMode) return
     const grid = this.buildGridCells(this.data.year, this.data.month, this.data.byDate)
-    this.setData({ viewMode: mode, grid })
+    this.setData({
+      viewMode: mode,
+      grid,
+      navLabel: this.resolveNavLabel(mode, this.data.year, this.data.month),
+    })
   },
 
   onBackToday() {
@@ -222,6 +247,7 @@ Page({
       selectedDateKey: todayKey,
       selectedEvents,
       grid,
+      navLabel: this.resolveNavLabel(this.data.viewMode, year, month),
     })
   },
 
@@ -243,7 +269,13 @@ Page({
       month = 11
     } else month -= 1
     const grid = this.buildGridCells(year, month, this.data.byDate)
-    this.setData({ year, month, monthLabel: monthTitle(year, month), grid })
+    this.setData({
+      year,
+      month,
+      monthLabel: monthTitle(year, month),
+      grid,
+      navLabel: this.resolveNavLabel(this.data.viewMode, year, month),
+    })
   },
 
   onNextMonth() {
@@ -264,7 +296,13 @@ Page({
       month = 0
     } else month += 1
     const grid = this.buildGridCells(year, month, this.data.byDate)
-    this.setData({ year, month, monthLabel: monthTitle(year, month), grid })
+    this.setData({
+      year,
+      month,
+      monthLabel: monthTitle(year, month),
+      grid,
+      navLabel: this.resolveNavLabel(this.data.viewMode, year, month),
+    })
   },
 
   onSelectDay(e) {
@@ -275,7 +313,32 @@ Page({
       ...cell,
       selected: cell.dateKey === dateKey,
     }))
-    this.setData({ selectedDateKey: dateKey, selectedEvents, grid })
+    const upcomingTodos = (this.data.upcomingTodos || []).map((item) => ({
+      ...item,
+      selected: item.dateKey === dateKey,
+    }))
+    this.setData({ selectedDateKey: dateKey, selectedEvents, grid, upcomingTodos })
+  },
+
+  onOpenTodo(e) {
+    const dateKey = String((e.currentTarget.dataset.dateKey || '')).trim()
+    if (dateKey) {
+      const selectedEvents = this.data.byDate[dateKey] || []
+      const grid = (this.data.grid || []).map((cell) => ({
+        ...cell,
+        selected: cell.dateKey === dateKey,
+      }))
+      const upcomingTodos = (this.data.upcomingTodos || []).map((item) => ({
+        ...item,
+        selected: item.dateKey === dateKey,
+      }))
+      this.setData({ selectedDateKey: dateKey, selectedEvents, grid, upcomingTodos })
+    }
+    this.onOpenEvent(e)
+  },
+
+  onScrollToList() {
+    wx.pageScrollTo({ selector: '#cal-event-list', duration: 280 })
   },
 
   onOpenEvent(e) {
