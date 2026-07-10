@@ -23,7 +23,7 @@ import { isIceTransientNetworkError } from '../src/lib/iceTransientNetworkError.
 import { clampMixSourceInSec } from '../src/lib/iceMixPlan.js'
 
 export { isIceTransientNetworkError }
-import { ensureIceHttpsUrl, isIceVodOutinBucket, toIceTimelineOssUrl, validateIcePipelineImageUrl, sanitizeIcePipelineMediaUrl } from './aliyunOssIceParse.js'
+import { ensureIceHttpsUrl, isIceCleanOssTimelineUrl, isIceVodOutinBucket, toIceTimelineOssUrl, validateIcePipelineImageUrl, sanitizeIcePipelineMediaUrl } from './aliyunOssIceParse.js'
 
 export { ICE_EFFECT_PRESETS } from './iceEffectPresets.js'
 
@@ -261,6 +261,8 @@ export function buildTimelineFromImages(
 export type IceMixResolvedClip = {
   kind: 'video' | 'image'
   mediaId: string
+  /** 无签名 OSS 直链；多段混剪优先 MediaURL，避免 MediaId 入库异常 */
+  mediaUrl?: string
   timelineStartSec: number
   timelineEndSec: number
   sourceDurationSec?: number
@@ -281,23 +283,26 @@ export function buildTimelineFromMixClips(
   for (let i = 0; i < resolved.length; i++) {
     const seg = resolved[i]!
     const dur = Math.max(0.35, seg.timelineEndSec - seg.timelineStartSec)
-    const ref = { MediaId: seg.mediaId.trim() }
+    const ref =
+      seg.kind === 'video' && seg.mediaUrl && isIceCleanOssTimelineUrl(seg.mediaUrl)
+        ? { MediaURL: seg.mediaUrl.trim() }
+        : { MediaId: seg.mediaId.trim() }
     if (seg.kind === 'image') {
-    const clip: Record<string, unknown> = {
-      Type: 'Image',
-      ...ref,
-      In: 0,
-      Out: dur,
-      Duration: dur,
-      TimelineIn: seg.timelineStartSec,
-      TimelineOut: seg.timelineEndSec,
-      Width: width,
-      Height: height,
-    }
-    const effects: Record<string, unknown>[] = []
-    if (muteSource) effects.push({ Type: 'Volume', Gain: 0 })
-    appendClipEffects(effects, plan, dur, i, resolved.length)
-    if (effects.length) clip.Effects = effects
+      const clip: Record<string, unknown> = {
+        Type: 'Image',
+        MediaId: seg.mediaId.trim(),
+        In: 0,
+        Out: dur,
+        Duration: dur,
+        TimelineIn: seg.timelineStartSec,
+        TimelineOut: seg.timelineEndSec,
+        Width: width,
+        Height: height,
+      }
+      const effects: Record<string, unknown>[] = []
+      if (muteSource) effects.push({ Type: 'Volume', Gain: 0 })
+      appendClipEffects(effects, plan, dur, i, resolved.length)
+      if (effects.length) clip.Effects = effects
       clips.push(clip)
       continue
     }
@@ -316,6 +321,7 @@ export function buildTimelineFromMixClips(
       sourceIn = Math.max(0, outPoint - maxOut)
     }
     const clip: Record<string, unknown> = {
+      Type: 'Video',
       ...ref,
       In: sourceIn,
       Out: outPoint,
@@ -1235,6 +1241,7 @@ export async function iceRunMixPipeline(
       resolved.push({
         kind: 'video',
         mediaId: cached.mediaId,
+        mediaUrl: isIceCleanOssTimelineUrl(seg.mediaUrl) ? seg.mediaUrl : undefined,
         timelineStartSec: seg.timelineStartSec,
         timelineEndSec: seg.timelineEndSec,
         sourceDurationSec: cached.sourceDurationSec,
@@ -1260,6 +1267,7 @@ export async function iceRunMixPipeline(
     resolved.push({
       kind: 'video',
       mediaId: up.mediaId,
+      mediaUrl: isIceCleanOssTimelineUrl(seg.mediaUrl) ? seg.mediaUrl : undefined,
       timelineStartSec: seg.timelineStartSec,
       timelineEndSec: seg.timelineEndSec,
       sourceDurationSec: up.sourceDurationSec,
@@ -1369,7 +1377,7 @@ export async function iceRunMixPipeline(
   }
 
   const timeline = buildTimelineFromMixClips(resolved, finalPlan, input.width, input.height, {
-    forceMuteSource: true,
+    forceMuteSource: Boolean(finalPlan.narrationClip || finalPlan.mixAiTtsClip),
   })
   try {
     const res = await client.submitMediaProducingJob(

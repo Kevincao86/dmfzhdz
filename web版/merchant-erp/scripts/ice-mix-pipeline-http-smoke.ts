@@ -73,7 +73,7 @@ async function main(): Promise<void> {
       timelineEndSec: 4,
       materialIndex: 0,
       sourceInSec: 0,
-      caption: '第一段',
+      caption: process.env.ICE_MIX_SMOKE_CAPTION === '1' ? '第一段' : undefined,
     },
     {
       kind: 'video' as const,
@@ -83,7 +83,7 @@ async function main(): Promise<void> {
       timelineEndSec: 8,
       materialIndex: 1,
       sourceInSec: 0.5,
-      caption: '第二段',
+      caption: process.env.ICE_MIX_SMOKE_CAPTION === '1' ? '第二段' : undefined,
     },
   ]
 
@@ -94,13 +94,13 @@ async function main(): Promise<void> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         mixSegments,
-        mixNarrationText: '混剪冒烟测试，两段素材拼接。',
+        mixNarrationText: process.env.ICE_MIX_SMOKE_NARRATION === '1' ? '混剪冒烟测试，两段素材拼接。' : undefined,
         projectName: 'ice-mix-http-smoke',
-        editBrief: '转场叠化；字幕简洁',
+        editBrief: process.env.ICE_MIX_SMOKE_BRIEF ?? '',
         width: 1080,
         height: 1920,
         clipEndSec: 8,
-        effectId: 'trans_fade',
+        effectId: process.env.ICE_MIX_SMOKE_EFFECT ?? 'none',
         subtitleStyleId: 'viral-white-pop',
       }),
     },
