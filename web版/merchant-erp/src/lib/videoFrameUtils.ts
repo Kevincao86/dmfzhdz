@@ -191,6 +191,47 @@ export async function extractVideoLastFramePureBase64(blob: Blob): Promise<strin
   }
 }
 
+async function loadImageFromDataUrl(dataUrl: string): Promise<HTMLImageElement> {
+  const img = new Image()
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve()
+    img.onerror = () => reject(new Error('无法解码采样帧'))
+    img.src = dataUrl
+  })
+  return img
+}
+
+/** 混剪 AI 视觉：压缩采样帧，避免多图请求过大导致超时/401 上游拒收 */
+export async function compressVisionDataUrl(
+  dataUrl: string,
+  maxPx = 720,
+  quality = 0.72,
+): Promise<string> {
+  const trimmed = dataUrl.trim()
+  if (!trimmed.startsWith('data:image/')) return trimmed
+  if (trimmed.length < 120_000) return trimmed
+  try {
+    const img = await loadImageFromDataUrl(trimmed)
+    const w = img.naturalWidth || img.width
+    const h = img.naturalHeight || img.height
+    if (!w || !h) return trimmed
+    const scale = Math.min(1, maxPx / Math.max(w, h))
+    const cw = Math.max(1, Math.round(w * scale))
+    const ch = Math.max(1, Math.round(h * scale))
+    const canvas = document.createElement('canvas')
+    canvas.width = cw
+    canvas.height = ch
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return trimmed
+    ctx.drawImage(img, 0, 0, cw, ch)
+    const jpegBlob = await canvasToBlobJpeg(canvas, quality)
+    const pure = await blobToPureBase64(jpegBlob)
+    return `data:image/jpeg;base64,${pure}`
+  } catch {
+    return trimmed
+  }
+}
+
 export async function imageUrlToPureBase64(url: string): Promise<string> {
   const trimmed = url.trim()
   if (trimmed.startsWith('data:')) {

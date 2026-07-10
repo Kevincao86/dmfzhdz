@@ -1,4 +1,8 @@
-import { extractVideoFirstFramePureBase64, imageUrlToPureBase64 } from '../lib/videoFrameUtils'
+import {
+  compressVisionDataUrl,
+  extractVideoFirstFramePureBase64,
+  imageUrlToPureBase64,
+} from '../lib/videoFrameUtils'
 import { postAiChat } from './ai/aiClient'
 import { downloadVideoUrlAsBlob, postVideoLastFrameFromUrl } from './videoAiApi'
 import type { IceMixMaterialSlot } from '../lib/iceMixPlan'
@@ -10,7 +14,8 @@ const VISION_SAMPLE_MAX = 8
 const MATERIAL_PROFILE_DEEP_MAX = 8
 const MATERIAL_PROFILE_CONCURRENCY = 5
 const MATERIAL_FRAME_TIMEOUT_MS = 20_000
-const MATERIAL_VISION_BATCH_TIMEOUT_MS = 55_000
+const MATERIAL_VISION_BATCH_TIMEOUT_MS = 90_000
+const VISION_FRAMES_PER_AI_CALL = 4
 
 const MIX_GUIDANCE_SYSTEM = `你是本地生活/电商短视频编导，负责根据商家已上传的实拍素材，撰写「AI混剪指导文案」（中文）。
 输出须覆盖：
@@ -237,7 +242,10 @@ export async function buildMaterialVisionProfiles(
       null,
     )
     extracted += 1
-    if (sample) frameSamples.push(sample)
+    if (sample) {
+      const compactUrl = await compressVisionDataUrl(sample.dataUrl)
+      frameSamples.push({ ...sample, dataUrl: compactUrl })
+    }
     return sample
   })
 
@@ -247,17 +255,18 @@ export async function buildMaterialVisionProfiles(
   if (frameSamples.length > 0) {
     onProgress?.(`AI 批量理解 ${frameSamples.length} 张采样画面…`)
     try {
+      const visionFrames = frameSamples.map((f) => ({
+        label: `素材${f.index + 1}（${f.label}）`,
+        dataUrl: f.dataUrl,
+      }))
       batchVisionText = await withProfileTimeout(
-        describeVideoFrames(
-          frameSamples.map((f) => ({
-            label: `素材${f.index + 1}（${f.label}）`,
-            dataUrl: f.dataUrl,
-          })),
-        ),
-        MATERIAL_VISION_BATCH_TIMEOUT_MS,
+        describeVideoFramesBatched(visionFrames),
+        MATERIAL_VISION_BATCH_TIMEOUT_MS * Math.max(1, Math.ceil(visionFrames.length / VISION_FRAMES_PER_AI_CALL)),
         '',
       )
-      if (batchVisionText) {
+      if (!batchVisionText) {
+        visionError = '视觉理解超时，请稍后重试或减少同时上传的素材数量'
+      } else {
         for (const [idx, desc] of parseBatchVisionByIndex(
           batchVisionText,
           frameSamples.map((f) => f.index),
@@ -287,12 +296,12 @@ export async function buildMaterialVisionProfiles(
   return { profiles, batchVisionText, frameCount: frameSamples.length, visionError }
 }
 
-async function describeVideoFrames(
+async function describeVideoFramesOnce(
   frames: { label: string; dataUrl: string }[],
 ): Promise<string> {
   if (frames.length === 0) return ''
   const imageDataUrls = frames.map((f) => f.dataUrl)
-  const userText = frames.map((f, i) => `素材${i + 1}（${f.label}）`).join('\n')
+  const userText = frames.map((f) => f.label).join('\n')
   const providers: Array<'doubao' | 'qwen' | 'tokenmix'> = ['doubao', 'qwen', 'tokenmix']
   let lastErr = ''
   for (const provider of providers) {
@@ -315,6 +324,23 @@ async function describeVideoFrames(
     }
   }
   throw new Error(lastErr || '视觉模型无法理解素材画面')
+}
+
+/** 多图分批调用视觉模型，避免单次 payload 过大 */
+async function describeVideoFramesBatched(
+  frames: { label: string; dataUrl: string }[],
+): Promise<string> {
+  if (frames.length === 0) return ''
+  if (frames.length <= VISION_FRAMES_PER_AI_CALL) {
+    return describeVideoFramesOnce(frames)
+  }
+  const parts: string[] = []
+  for (let i = 0; i < frames.length; i += VISION_FRAMES_PER_AI_CALL) {
+    const chunk = frames.slice(i, i + VISION_FRAMES_PER_AI_CALL)
+    const text = await describeVideoFramesOnce(chunk)
+    if (text) parts.push(text)
+  }
+  return parts.join('\n\n')
 }
 
 async function generateGuidanceText(

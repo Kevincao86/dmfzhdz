@@ -201,15 +201,39 @@ export async function extractSampleFrameJpegFromBuffer(
     const videoPath = path.join(tmpDir, 'in.mp4')
     const outPath = path.join(tmpDir, 'frame.jpg')
     fs.writeFileSync(videoPath, videoBuf)
+    /** 视觉分析用：缩至 720 宽 + 适中 JPEG 质量，避免 8 张 4K 首帧撑爆 AI 网关 */
+    const visionScale = 'scale=720:-1'
     const attempts: string[][] =
       mode === 'opening'
         ? [
-            ['-y', '-i', videoPath, '-vf', 'select=eq(n\\,0)', '-frames:v', '1', '-q:v', '2', outPath],
-            ['-y', '-ss', '0.5', '-i', videoPath, '-frames:v', '1', '-q:v', '2', outPath],
+            [
+              '-y',
+              '-i',
+              videoPath,
+              '-vf',
+              `select=eq(n\\,0),${visionScale}`,
+              '-frames:v',
+              '1',
+              '-q:v',
+              '4',
+              outPath,
+            ],
+            ['-y', '-ss', '0.5', '-i', videoPath, '-vf', visionScale, '-frames:v', '1', '-q:v', '4', outPath],
           ]
         : [
-            ['-y', '-sseof', '-0.15', '-i', videoPath, '-frames:v', '1', '-q:v', '2', outPath],
-            ['-y', '-i', videoPath, '-vf', 'select=eq(n\\,0)', '-frames:v', '1', '-q:v', '2', outPath],
+            ['-y', '-sseof', '-0.15', '-i', videoPath, '-vf', visionScale, '-frames:v', '1', '-q:v', '4', outPath],
+            [
+              '-y',
+              '-i',
+              videoPath,
+              '-vf',
+              `select=eq(n\\,0),${visionScale}`,
+              '-frames:v',
+              '1',
+              '-q:v',
+              '4',
+              outPath,
+            ],
           ]
     let lastErr = mode === 'opening' ? 'ffmpeg 截取首帧失败' : 'ffmpeg 截取尾帧失败'
     for (const args of attempts) {
