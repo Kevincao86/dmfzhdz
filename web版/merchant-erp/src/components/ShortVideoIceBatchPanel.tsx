@@ -66,7 +66,6 @@ import type { IceMixMaterialProfile } from '../services/iceMixEditPlanAi'
 import {
   assignFullMaterialCoverageSlots,
   expandMixRowsForMaterialPool,
-  resolveMixStoryboardSegmentCount,
   syncMixCoverageForAllMaterials,
   inferIceEffectIdFromMixContent,
   mixStoryboardBriefReady,
