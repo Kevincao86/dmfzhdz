@@ -101,27 +101,70 @@ function extractShortHookFromGuidance(guidance: string, maxChars: number): strin
   return truncateDialogue(pick, maxChars)
 }
 
-function resolveSpeechRateForTarget(estSec: number, targetSec: number): number {
-  if (estSec <= targetSec + 1) return 0
-  const ratio = estSec / Math.max(1, targetSec)
-  return Math.min(200, Math.round((ratio - 1) * 400))
+function isPlaceholderDialogue(text: string): boolean {
+  const t = text.trim()
+  if (t.length < 8) return true
+  if (/^精彩片段$/i.test(t)) return true
+  if (/^（无口播）$/i.test(t)) return true
+  return false
 }
 
-/** 全局口播：字数严格按目标时长裁剪（约 4 字/秒） */
+function resolveSpeechRateForTarget(estSec: number, targetSec: number): number {
+  if (estSec > targetSec + 1) {
+    const ratio = estSec / Math.max(1, targetSec)
+    return Math.min(200, Math.round((ratio - 1) * 400))
+  }
+  if (estSec < targetSec - 2) {
+    const ratio = estSec / Math.max(1, targetSec)
+    return Math.max(-120, Math.round((ratio - 1) * 400))
+  }
+  return 0
+}
+
+/** 全局口播：字数须贴近目标秒数（约 3.5～4 字/秒），禁止用「精彩片段」等占位短句 */
 function buildSmartBatchNarration(
   guidance: string,
   scriptRows: IceSmartBatchScriptRow[],
   targetSec: number,
 ): string {
-  const maxChars = Math.max(16, Math.floor(targetSec * DIALOGUE_CHARS_PER_SEC))
+  const minChars = Math.max(28, Math.floor(targetSec * 3.5))
+  const maxChars = Math.max(minChars + 8, Math.floor(targetSec * DIALOGUE_CHARS_PER_SEC))
+  const sentences = guidance
+    .trim()
+    .split(/(?<=[。！？!?])\s*/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 6)
+
   const pool = scriptRows
     .map((r) => String(r.dialogue ?? '').trim())
-    .filter((d) => d.length >= 4 && !/^（无口播）$/i.test(d))
-  const short = pool.find((d) => d.length <= maxChars)
-  if (short) return short
-  const joined = truncateDialogue(pool.slice(0, 3).join('，'), maxChars)
-  if (joined.length >= 8) return joined
-  return extractShortHookFromGuidance(guidance, maxChars)
+    .filter((d) => !isPlaceholderDialogue(d))
+
+  const uniqueParts: string[] = []
+  for (const part of pool) {
+    if (!uniqueParts.includes(part)) uniqueParts.push(part)
+  }
+
+  let narration = uniqueParts.join('，')
+  for (const s of sentences) {
+    if (narration.length >= minChars) break
+    if (!narration.includes(s)) {
+      narration = narration ? `${narration}。${s}` : s
+    }
+  }
+  if (narration.length < minChars) {
+    narration = truncateDialogue(guidance.trim() || narration, maxChars)
+  }
+  if (narration.length < minChars && sentences.length > 0) {
+    narration = truncateDialogue(sentences.join('。'), maxChars)
+  }
+  if (narration.length < minChars) {
+    narration = extractShortHookFromGuidance(guidance, maxChars)
+  }
+  if (narration.length < minChars) {
+    const pad = '值得一看，快来打卡体验'
+    narration = truncateDialogue(`${narration}。${pad}`, maxChars)
+  }
+  return truncateDialogue(narration, maxChars)
 }
 
 export type IceSmartBatchMaterial = {
@@ -151,8 +194,8 @@ function buildDefaultEditingConfig(
       AllowVfxEffect: false,
       EnableClipSplit: true,
       SingleShotDuration: Math.round(shotDur * 100) / 100,
-      /** 以视频总时长为准裁剪，避免口播把成片拉长 */
-      AlignmentMode: 'Cut',
+      /** 口播已按目标秒数填充；AutoSpeed 使音画对齐到目标时长，避免 Cut 裁短 */
+      AlignmentMode: 'AutoSpeed',
     },
     MediaConfig: { Volume: 0 },
     SpeechConfig: {
@@ -188,6 +231,7 @@ function buildInputConfig(input: {
           MediaArray: urls,
           SplitMode: 'AverageSplit',
           Duration: targetTotalSec,
+          DurationAutoAdapt: false,
           Volume: 0,
         },
       ],

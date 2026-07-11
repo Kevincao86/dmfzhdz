@@ -1116,14 +1116,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
         mediaUrl: m.mediaUrl,
         label: m.label,
       })),
-      scriptRows: scriptRows
-        .filter((r) => r.dialogue.trim().length >= 4)
-        .slice(0, 4)
-        .map((r) => ({
-          timeRange: r.timeRange,
-          visual: r.visual,
-          dialogue: r.dialogue,
-        })),
+      scriptRows: [],
       guidance: mixGuidance.trim(),
       targetTotalSec: totalSec,
       width: aspect.width,
