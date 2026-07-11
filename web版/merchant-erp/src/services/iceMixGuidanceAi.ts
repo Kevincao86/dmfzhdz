@@ -5,13 +5,13 @@ import {
 } from '../lib/videoFrameUtils'
 import { postAiChat } from './ai/aiClient'
 import { downloadVideoUrlAsBlob, postVideoLastFrameFromUrl } from './videoAiApi'
-import type { IceMixMaterialSlot } from '../lib/iceMixPlan'
+import { sampleMixMaterialsEvenly, type IceMixMaterialSlot } from '../lib/iceMixPlan'
 import type { IceMixMaterialProfile } from './iceMixEditPlanAi'
 import { runIceUploadPool } from '../lib/iceUploadPool'
 
-const VISION_SAMPLE_MAX = 8
+const VISION_SAMPLE_MAX = 20
 /** 素材分析：超过此数量只抽样深度理解，其余用文件名占位 */
-const MATERIAL_PROFILE_DEEP_MAX = 8
+const MATERIAL_PROFILE_DEEP_MAX = 20
 const MATERIAL_PROFILE_CONCURRENCY = 5
 const MATERIAL_FRAME_TIMEOUT_MS = 20_000
 const MATERIAL_VISION_BATCH_TIMEOUT_MS = 90_000
@@ -39,13 +39,7 @@ const VISION_FAIL_RE =
   /暂未获取|仅获得编号|尚未获取|无法看到|看不清|没有图|无图|请补充.*画面|缺少.*画面|未提供.*画面/i
 
 function sampleMaterials(materials: IceMixMaterialSlot[], max: number): IceMixMaterialSlot[] {
-  if (materials.length <= max) return [...materials]
-  const out: IceMixMaterialSlot[] = []
-  for (let i = 0; i < max; i++) {
-    const idx = Math.floor((i * materials.length) / max)
-    out.push(materials[idx]!)
-  }
-  return out
+  return sampleMixMaterialsEvenly(materials, max)
 }
 
 /** 服务端截帧优先 canonical OSS 直链（私有桶由服务端 ICE 凭证重签） */

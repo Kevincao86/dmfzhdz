@@ -4,7 +4,10 @@
  */
 import { postAiChat } from './ai/aiClient'
 import { collectMixMaterialFramesForEditPlan } from './iceMixMaterialFrames'
-import type { IceMixMaterialSlot } from '../lib/iceMixPlan'
+import {
+  spreadMixMaterialIndex,
+  type IceMixMaterialSlot,
+} from '../lib/iceMixPlan'
 import {
   clampMixSourceInSec,
   ensureSequentialMixScriptRows,
@@ -169,11 +172,19 @@ export function buildStructuralMixDecisions(
 ): MixEditSegmentDecision[] {
   const usedIn = new Map<number, number>()
   return rows.map((row, segmentIndex) => {
-    const cycleIdx = segmentIndex % materials.length
+    const cycleIdx = spreadMixMaterialIndex(segmentIndex, rows.length, materials.length)
     let bestIdx = cycleIdx
     let bestScore = -1
 
-    for (let mi = 0; mi < materials.length; mi++) {
+    const candidatePool =
+      materials.length <= 16
+        ? materials.map((_, mi) => mi)
+        : Array.from({ length: 5 }, (_, d) => {
+            const offset = d - 2
+            return (cycleIdx + offset + materials.length) % materials.length
+          })
+
+    for (const mi of candidatePool) {
       const prof = profileAt(profiles, materials, mi)
       const semantic = scoreMaterialMatch(row.visual, prof, materials[mi]!.label)
       const cycleBonus = mi === cycleIdx ? 3 : 0
@@ -293,7 +304,7 @@ async function tryVisionEditPlan(opts: {
 
   const userBlock = `【指导文案】\n${opts.guidance.trim()}\n\n【素材画面库】\n${profileBlock}\n\n【分镜表】\n${storyboard}\n\n【附图对应关系】\n${frameLegend}\n\n请为段0～段${opts.rows.length - 1} 各输出一条剪辑决策 JSON。`
 
-  const imageDataUrls = opts.frames.map((f) => f.dataUrl).slice(0, 8)
+  const imageDataUrls = opts.frames.map((f) => f.dataUrl).slice(0, 12)
   const providers: Array<'qwen' | 'doubao'> = ['qwen', 'doubao']
 
   for (const provider of providers) {
@@ -359,7 +370,7 @@ export async function planMixEditFromInstructions(opts: {
   try {
     const frames = await Promise.race([
       collectMixMaterialFramesForEditPlan(materials, {
-        maxFrames: Math.min(12, Math.max(6, materials.length * 2)),
+        maxFrames: Math.min(24, Math.max(12, Math.min(materials.length, 16) * 2)),
         onProgress: opts.onProgress,
       }),
       new Promise<Array<{ index: number; label: string; dataUrl: string }>>((resolve) => {

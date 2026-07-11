@@ -65,6 +65,8 @@ import { produceIceMixPackage, composeMixProductionBrief, type IceMixProduceOutp
 import type { IceMixMaterialProfile } from '../services/iceMixEditPlanAi'
 import {
   assignMixMaterialSlots,
+  expandMixRowsForMaterialPool,
+  resolveMixStoryboardSegmentCount,
   ensureSequentialMixScriptRows,
   inferIceEffectIdFromMixContent,
   mixStoryboardBriefReady,
@@ -744,10 +746,16 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       setErr('请先上传至少一条视频或一张图片素材。')
       return
     }
+    const poolLen = mixMaterialPool.length
+    const desiredSegments = resolveMixStoryboardSegmentCount(
+      mixTargetSec,
+      MIX_DEFAULT_SEGMENT_SEC,
+      poolLen,
+    )
     const materialHint = mixMaterialPool
       .map((m, i) => `素材${i + 1}：${m.label}（${m.kind === 'video' ? '视频' : '图片'}）`)
       .join('\n')
-    const plannerInput = `${draft}\n\n【混剪素材 ${mixMaterialPool.length} 条】\n${materialHint}\n\n规划要求：\n- 须理解指导文案叙事，为每段分镜指定最匹配的素材画面（可重复用同条素材的不同片段，禁止机械按顺序轮播）\n- 时间段从 0 连续覆盖至 ${mixTargetSec} 秒，段与段首尾相接\n- 每段 visual 写清该段应呈现的镜头内容；dialogue 写 TTS 口播讲解`
+    const plannerInput = `${draft}\n\n【混剪素材 ${poolLen} 条】\n${materialHint}\n\n规划要求：\n- 须理解指导文案叙事，为每段分镜指定最匹配的素材画面（可重复用同条素材的不同片段，禁止机械只用前几条）\n- 共 ${poolLen} 条素材须尽量分散使用，请规划 ${desiredSegments} 段分镜（单段约 2～4 秒），覆盖更多不同画面\n- 时间段从 0 连续覆盖至 ${mixTargetSec} 秒，段与段首尾相接\n- 每段 visual 写清该段应呈现的镜头内容；dialogue 写 TTS 口播讲解`
     setPlanBusy(true)
     setErr(null)
     setHint('AI 正在通读指导文案并规划混剪分镜…')
@@ -764,14 +772,19 @@ export function ShortVideoIceBatchPanel(_props: Props) {
         setErr(r.message)
         return
       }
-      setScriptRows(ensureSequentialMixScriptRows(r.rows, mixTargetSec))
-      const poolLen = mixMaterialPool.length
+      const expandedRows = expandMixRowsForMaterialPool(
+        r.rows,
+        mixTargetSec,
+        poolLen,
+        MIX_DEFAULT_SEGMENT_SEC,
+      )
+      setScriptRows(expandedRows)
       if (poolLen > 0) {
-        setMaterialSlots(assignMixMaterialSlots(r.rows.length, poolLen))
+        setMaterialSlots(assignMixMaterialSlots(expandedRows.length, poolLen))
       }
-      const covered = maxScriptTimeRangeEndSec(r.rows)
+      const covered = maxScriptTimeRangeEndSec(expandedRows)
       setHint(
-        `AI 已规划 ${r.rows.length} 段混剪分镜（约 0–${covered || mixTargetSec} 秒），请核对分镜表与素材映射后一键混剪。`,
+        `AI 已规划 ${expandedRows.length} 段混剪分镜（约 0–${covered || mixTargetSec} 秒，${poolLen} 条素材均匀映射），请核对分镜表与素材映射后一键混剪。`,
       )
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'AI 规划分镜失败，请稍后重试')
