@@ -157,6 +157,33 @@ export function resolveMixStoryboardSegmentCount(
   return Math.min(materialCount, MIX_MAX_STORYBOARD_SEGMENTS)
 }
 
+/** 混剪 AI 规划失败时：从指导文案机械拆 6～12 段代表性分镜 */
+export function buildMixPlannerFallbackRows(
+  guidance: string,
+  targetTotalSec: number,
+): ShortVideoScriptRow[] {
+  const total = Math.min(120, Math.max(5, Math.ceil(targetTotalSec)))
+  const lines = dialogueLinesFromGuidance(guidance)
+  const segmentCount = Math.min(
+    12,
+    Math.max(6, lines.length >= 6 ? Math.min(lines.length, 12) : Math.ceil(total / 3)),
+  )
+  const each = total / segmentCount
+  const hook = lines[0] || guidance.trim().slice(0, 48) || '精彩片段'
+
+  const rows = Array.from({ length: segmentCount }, (_, i) => {
+    const start = Math.round(i * each * 10) / 10
+    const end = i === segmentCount - 1 ? total : Math.round((i + 1) * each * 10) / 10
+    const line = lines[i % Math.max(1, lines.length)] || hook
+    return {
+      timeRange: `${start}-${end}秒`,
+      visual: line.length >= 8 ? line.slice(0, 72) : `镜头${i + 1}：展示实拍画面`,
+      dialogue: line.slice(0, 120),
+    }
+  })
+  return ensureSequentialMixScriptRows(rows, total)
+}
+
 /** 为每条素材生成一段分镜（时间均分，口播/画面从已有分镜轮询） */
 export function buildAllMaterialCoverageRows(
   materials: Array<{ label: string }>,

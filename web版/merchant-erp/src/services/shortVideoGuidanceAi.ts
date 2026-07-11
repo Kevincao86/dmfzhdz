@@ -4,6 +4,7 @@ import {
   postLongformVideoPlan,
   type LongformPlanMode,
 } from './videoAiApi'
+import { buildMixPlannerFallbackRows } from '../lib/iceMixPlan'
 import {
   scriptRowsFromVideoPrompts,
   parseScriptRowsFromPlainText,
@@ -273,7 +274,21 @@ export async function planShortVideoScriptFromGuidance(
     overallPrompt: plannerInput,
     planStage: 'draft',
   })
-  if (!plan.ok) return plan
+  if (!plan.ok) {
+    if (opts.mixAutoExpandSegments) {
+      const fallbackRows = buildMixPlannerFallbackRows(draft, planner.effectiveTargetSec)
+      if (fallbackRows.length >= 2) {
+        return {
+          ok: true,
+          rows: finalizePlannedScriptRows(fallbackRows, draft, planner.effectiveTargetSec),
+          segmentCount: fallbackRows.length,
+          usedAiPlanner: false,
+          usedRuleBasedFallback: true,
+        }
+      }
+    }
+    return plan
+  }
 
   let rows = applyPlanResponseRows(plan.scriptSegments, plan.prompts, opts.segmentSec)
   if (plan.plannerVendor) reviewVendors.push(plan.plannerVendor)
