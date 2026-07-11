@@ -1,7 +1,7 @@
 /** 混剪素材截帧（供视觉模型匹配），与指导文案分析解耦避免循环依赖 */
 import { extractVideoFirstFramePureBase64, imageUrlToPureBase64 } from '../lib/videoFrameUtils'
 import { downloadVideoUrlAsBlob, postVideoLastFrameFromUrl } from './videoAiApi'
-import type { IceMixMaterialSlot } from '../lib/iceMixPlan'
+import { sampleMixMaterialsEvenly, type IceMixMaterialSlot } from '../lib/iceMixPlan'
 import { runIceUploadPool } from '../lib/iceUploadPool'
 
 const FRAME_CONCURRENCY = 5
@@ -95,10 +95,15 @@ export async function collectMixMaterialFramesForEditPlan(
   materials: IceMixMaterialSlot[],
   opts?: { maxFrames?: number; onProgress?: (msg: string) => void },
 ): Promise<Array<{ index: number; label: string; dataUrl: string }>> {
-  const max = Math.min(materials.length * 2, opts?.maxFrames ?? 12)
+  const max = Math.min(materials.length * 2, opts?.maxFrames ?? 16)
+  const frameMaterialCap = Math.min(materials.length, Math.max(8, Math.ceil(max / 2)))
+  const targets =
+    materials.length <= frameMaterialCap
+      ? materials
+      : sampleMixMaterialsEvenly(materials, frameMaterialCap)
   const out: Array<{ index: number; label: string; dataUrl: string }> = []
 
-  await runIceUploadPool(materials, FRAME_CONCURRENCY, async (mat) => {
+  await runIceUploadPool(targets, FRAME_CONCURRENCY, async (mat) => {
     const idx = materials.indexOf(mat)
     const index = idx >= 0 ? idx : out.length
     if (out.length >= max) return null

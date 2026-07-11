@@ -4,6 +4,8 @@
 import {
   maxScriptTimeRangeEndSec,
   parseScriptTimeRangeSeconds,
+  resizeScriptRows,
+  segmentCountFromTargetTotalSec,
   type ShortVideoScriptRow,
 } from './shortVideoScriptTable'
 
@@ -114,10 +116,68 @@ export function collectMixNarrationText(rows: ShortVideoScriptRow[]): string {
     .trim()
 }
 
-/** 混剪默认映射：第 i 段 → 第 (i mod 素材数) 条素材 */
+/** 在素材池中均匀取第 i 段应对应的下标（段数少于素材数时避免总用前几条） */
+export function spreadMixMaterialIndex(
+  segmentIndex: number,
+  segmentCount: number,
+  poolLen: number,
+): number {
+  if (poolLen <= 0) return 0
+  if (poolLen === 1) return 0
+  if (segmentCount <= 1) return Math.min(segmentIndex, poolLen - 1)
+  if (segmentCount >= poolLen) return segmentIndex % poolLen
+  return Math.round((segmentIndex * (poolLen - 1)) / (segmentCount - 1))
+}
+
+/** 从素材池均匀抽样（用于视觉分析 / 截帧，覆盖首尾与中间） */
+export function sampleMixMaterialsEvenly<T>(items: T[], max: number): T[] {
+  if (items.length <= max) return [...items]
+  if (max <= 1) return [items[0]!]
+  const out: T[] = []
+  for (let i = 0; i < max; i++) {
+    const idx = Math.round((i * (items.length - 1)) / (max - 1))
+    out.push(items[idx]!)
+  }
+  return out
+}
+
+/** 多素材混剪：在目标时长内尽量多分镜，单段不低于约 2 秒 */
+export function resolveMixStoryboardSegmentCount(
+  targetTotalSec: number,
+  segmentSec: number,
+  materialCount: number,
+): number {
+  const base = segmentCountFromTargetTotalSec(targetTotalSec, segmentSec)
+  if (materialCount <= 2) return base
+  const maxByDuration = Math.min(12, Math.max(2, Math.floor(targetTotalSec / 2)))
+  return Math.max(base, Math.min(materialCount, maxByDuration))
+}
+
+/** 分镜段数不足时扩展，并重新拉齐时间段 */
+export function expandMixRowsForMaterialPool(
+  rows: ShortVideoScriptRow[],
+  targetTotalSec: number,
+  materialCount: number,
+  segmentSec: number,
+): ShortVideoScriptRow[] {
+  const desired = resolveMixStoryboardSegmentCount(targetTotalSec, segmentSec, materialCount)
+  if (rows.length >= desired) return ensureSequentialMixScriptRows(rows, targetTotalSec)
+  const segSec = Math.max(2, Math.ceil(targetTotalSec / desired))
+  const expanded = resizeScriptRows(rows, desired, segSec).map((r, i) => {
+    const src = rows[Math.min(i, rows.length - 1)]!
+    return {
+      ...r,
+      visual: r.visual.trim() || src.visual,
+      dialogue: r.dialogue.trim() || src.dialogue,
+    }
+  })
+  return ensureSequentialMixScriptRows(expanded, targetTotalSec)
+}
+
+/** 混剪默认映射：段数少于素材数时均匀覆盖全库，否则轮询 */
 export function assignMixMaterialSlots(rowCount: number, poolLen: number): number[] {
   if (rowCount <= 0 || poolLen <= 0) return []
-  return Array.from({ length: rowCount }, (_, i) => i % poolLen)
+  return Array.from({ length: rowCount }, (_, i) => spreadMixMaterialIndex(i, rowCount, poolLen))
 }
 
 /**
