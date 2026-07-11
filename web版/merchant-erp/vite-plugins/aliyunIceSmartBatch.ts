@@ -1,6 +1,10 @@
 /**
  * 阿里云 IMS 智能一键成片 — SubmitBatchMediaProducingJob / GetBatchMediaProducingJob
  * @see https://help.aliyun.com/zh/ims/developer-reference/api-ice-2020-11-09-submitbatchmediaproducingjob
+ *
+ * 多素材策略（写死）：
+ * - 全部素材放入一组 AverageSplit，总时长 = 用户目标（允许输出 MaxDuration +3 秒）
+ * - 仅一条全局口播（时长按目标秒数裁剪），禁止每素材独立 TTS（否则成片会被口播拉长到数分钟）
  */
 import IceModule, {
   GetBatchMediaProducingJobRequest,
@@ -9,11 +13,6 @@ import IceModule, {
 import { $OpenApiUtil } from '@alicloud/openapi-core'
 import { ensureIceHttpsUrl, sanitizeIcePipelineMediaUrl } from './aliyunOssIceParse.js'
 import { isIceTransientNetworkError } from '../src/lib/iceTransientNetworkError.js'
-import {
-  MIX_MAX_STORYBOARD_SEGMENTS,
-  MIX_MIN_CLIP_SEC,
-} from '../src/lib/iceMixPlan.js'
-import { parseScriptTimeRangeSeconds } from '../src/lib/shortVideoScriptTable.js'
 import {
   buildSmartBatchAsrConfig,
   ICE_SUBTITLE_STYLE_DEFAULT_ID,
@@ -43,33 +42,10 @@ function resolveSdkCtor(mod: unknown): IceClientClass {
 
 const IceClient = resolveSdkCtor(IceModule)
 
-/** 中文口播约 4 字/秒（偏保守，避免低估 TTS 时长） */
+/** 中文口播约 4 字/秒 */
 const DIALOGUE_CHARS_PER_SEC = 4
-
-function resolveSmartBatchSegmentPlan(targetSec: number, materialCount: number): {
-  target: number
-  segmentCount: number
-  shotDurationSec: number
-} {
-  const target = Math.min(120, Math.max(5, Math.ceil(targetSec)))
-  const segmentCount = Math.max(2, Math.min(materialCount, MIX_MAX_STORYBOARD_SEGMENTS))
-  const shotDurationSec = Math.max(
-    MIX_MIN_CLIP_SEC,
-    Math.min(6, target / segmentCount),
-  )
-  return { target, segmentCount, shotDurationSec }
-}
-
-function materialIndexForSegment(
-  segmentIndex: number,
-  segmentCount: number,
-  materialCount: number,
-): number {
-  if (materialCount <= 1) return 0
-  if (segmentCount >= materialCount) return segmentIndex % materialCount
-  if (segmentCount <= 1) return 0
-  return Math.round((segmentIndex * (materialCount - 1)) / (segmentCount - 1))
-}
+/** 成片允许超出用户目标的最长时间（秒） */
+const SMART_BATCH_DURATION_SLACK_SEC = 3
 
 function createClient(cfg: AliyunIceConfig): InstanceType<typeof IceClient> {
   return new IceClient(
@@ -125,162 +101,27 @@ function extractShortHookFromGuidance(guidance: string, maxChars: number): strin
   return truncateDialogue(pick, maxChars)
 }
 
-type PlannedDialogueRow = {
-  dialogue: string
-  materialIndex: number
-  estSec: number
-  rowIndex: number
+function resolveSpeechRateForTarget(estSec: number, targetSec: number): number {
+  if (estSec <= targetSec + 1) return 0
+  const ratio = estSec / Math.max(1, targetSec)
+  return Math.min(200, Math.round((ratio - 1) * 400))
 }
 
-function scriptRowsCoverTarget(
+/** 全局口播：字数严格按目标时长裁剪（约 4 字/秒） */
+function buildSmartBatchNarration(
+  guidance: string,
   scriptRows: IceSmartBatchScriptRow[],
   targetSec: number,
-): boolean {
-  let maxEnd = 0
-  let timedCount = 0
-  for (const r of scriptRows) {
-    const p = parseScriptTimeRangeSeconds(String(r.timeRange ?? ''))
-    if (p) {
-      maxEnd = Math.max(maxEnd, p.end)
-      timedCount++
-    }
-  }
-  return timedCount >= 2 && maxEnd >= targetSec - 1
-}
-
-function resolveSpeechRateForTarget(estSec: number, targetSec: number): number {
-  if (estSec <= targetSec + 1.5) return 0
-  const ratio = estSec / Math.max(1, targetSec)
-  // 口播略长时轻微加速，避免截断文案（SpeechRate 正值=加快）
-  return Math.min(180, Math.round((ratio - 1) * 350))
-}
-function planDialogueRowsForTarget(input: {
-  scriptRows: IceSmartBatchScriptRow[]
-  materialSlots: number[]
-  materialCount: number
-  targetTotalSec: number
-  guidance?: string
-}): { rows: PlannedDialogueRow[]; padSec: number; speechRate: number; shotDurationSec: number } {
-  const { target, segmentCount, shotDurationSec } = resolveSmartBatchSegmentPlan(
-    input.targetTotalSec,
-    input.materialCount,
-  )
-  const storyboardMode = scriptRowsCoverTarget(input.scriptRows, target)
-  const guidance = String(input.guidance ?? '').trim()
-
-  const dialoguePool = input.scriptRows
-    .map((row) => String(row.dialogue ?? '').trim())
-    .filter((d) => d.length >= 2 && !/^（无口播）$/i.test(d))
-
-  const hook =
-    dialoguePool[0] ??
-    extractShortHookFromGuidance(guidance, Math.max(24, Math.floor(target * DIALOGUE_CHARS_PER_SEC)))
-
-  const rows: PlannedDialogueRow[] = Array.from({ length: segmentCount }, (_, i) => {
-    const materialIndex = materialIndexForSegment(i, segmentCount, input.materialCount)
-    const dialogue = dialoguePool[i % Math.max(1, dialoguePool.length)] ?? hook
-    return {
-      dialogue,
-      materialIndex,
-      rowIndex: Math.min(i, Math.max(0, input.scriptRows.length - 1)),
-      estSec: estimateSpeechSec(dialogue),
-    }
-  })
-
-  if (storyboardMode) {
-    const timed = input.scriptRows
-      .map((row, rowIndex) => {
-        const dialogue = String(row.dialogue ?? '').trim()
-        if (dialogue.length < 2) return null
-        const p = parseScriptTimeRangeSeconds(String(row.timeRange ?? ''))
-        if (!p || p.start >= target) return null
-        const materialIndex =
-          input.materialSlots[rowIndex] ??
-          rowIndex % Math.max(1, input.materialCount)
-        return {
-          dialogue,
-          materialIndex,
-          rowIndex,
-          estSec: estimateSpeechSec(dialogue),
-        }
-      })
-      .filter(Boolean) as PlannedDialogueRow[]
-
-    if (timed.length >= segmentCount) {
-      const accSec = timed.reduce((s, r) => s + r.estSec, 0)
-      return {
-        rows: timed.slice(0, segmentCount),
-        padSec: 0,
-        speechRate: resolveSpeechRateForTarget(accSec, target),
-        shotDurationSec,
-      }
-    }
-  }
-
-  const accSec = rows.reduce((s, r) => s + r.estSec, 0)
-  const padSec = 0
-  const speechRate = resolveSpeechRateForTarget(accSec, target)
-  return { rows, padSec, speechRate, shotDurationSec }
-}
-
-function buildPadMediaGroups(input: {
-  materials: IceSmartBatchMaterial[]
-  padSec: number
-}): Array<Record<string, unknown>> {
-  const pad = Math.round(input.padSec * 10) / 10
-  if (pad < 1 || input.materials.length === 0) return []
-  const first = input.materials[0]!
-  const last = input.materials[input.materials.length - 1]!
-  const firstUrl = ensureIceHttpsUrl(sanitizeIcePipelineMediaUrl(first.mediaUrl))
-  const lastUrl = ensureIceHttpsUrl(sanitizeIcePipelineMediaUrl(last.mediaUrl))
-  const openDur = Math.max(1, Math.round((pad / 2) * 10) / 10)
-  const closeDur = Math.max(1, Math.round((pad - openDur) * 10) / 10)
-  return [
-    {
-      GroupName: 'pad-open',
-      MediaArray: [firstUrl],
-      SplitMode: 'NoSplit',
-      Duration: openDur,
-      Volume: 0,
-      DurationAutoAdapt: true,
-    },
-    {
-      GroupName: 'pad-close',
-      MediaArray: [lastUrl],
-      SplitMode: 'NoSplit',
-      Duration: closeDur,
-      Volume: 0,
-      DurationAutoAdapt: true,
-    },
-  ]
-}
-
-function buildDefaultEditingConfig(
-  speechRate = 0,
-  subtitleStyleId?: string,
-  singleShotDuration = 4,
-): Record<string, unknown> {
-  const preset = resolveIceSubtitleStylePreset(subtitleStyleId ?? ICE_SUBTITLE_STYLE_DEFAULT_ID)
-  const shotDur = Math.max(MIX_MIN_CLIP_SEC, Math.min(6, singleShotDuration))
-  return {
-    ProcessConfig: {
-      AllowTransition: true,
-      UseUniformTransition: false,
-      TransitionList: ['linearblur', 'colordistance', 'crosshatch', 'dreamyzoom'],
-      AllowVfxEffect: false,
-      EnableClipSplit: true,
-      SingleShotDuration: Math.round(shotDur * 10) / 10,
-      AlignmentMode: 'AutoSpeed',
-    },
-    // 官方示例 Volume:0 = 原片静音，仅保留 TTS + BGM
-    MediaConfig: { Volume: 0 },
-    SpeechConfig: {
-      Volume: 1,
-      SpeechRate: speechRate,
-      AsrConfig: buildSmartBatchAsrConfig(preset),
-    },
-    BackgroundMusicConfig: { Volume: 0.22 },
-  }
+): string {
+  const maxChars = Math.max(16, Math.floor(targetSec * DIALOGUE_CHARS_PER_SEC))
+  const pool = scriptRows
+    .map((r) => String(r.dialogue ?? '').trim())
+    .filter((d) => d.length >= 4 && !/^（无口播）$/i.test(d))
+  const short = pool.find((d) => d.length <= maxChars)
+  if (short) return short
+  const joined = truncateDialogue(pool.slice(0, 3).join('，'), maxChars)
+  if (joined.length >= 8) return joined
+  return extractShortHookFromGuidance(guidance, maxChars)
 }
 
 export type IceSmartBatchMaterial = {
@@ -295,69 +136,62 @@ export type IceSmartBatchScriptRow = {
   dialogue?: string
 }
 
+function buildDefaultEditingConfig(
+  speechRate = 0,
+  subtitleStyleId?: string,
+  singleShotDuration = 2,
+): Record<string, unknown> {
+  const preset = resolveIceSubtitleStylePreset(subtitleStyleId ?? ICE_SUBTITLE_STYLE_DEFAULT_ID)
+  const shotDur = Math.max(0.45, Math.min(8, singleShotDuration))
+  return {
+    ProcessConfig: {
+      AllowTransition: true,
+      UseUniformTransition: false,
+      TransitionList: ['linearblur', 'colordistance', 'crosshatch', 'dreamyzoom'],
+      AllowVfxEffect: false,
+      EnableClipSplit: true,
+      SingleShotDuration: Math.round(shotDur * 100) / 100,
+      /** 以视频总时长为准裁剪，避免口播把成片拉长 */
+      AlignmentMode: 'Cut',
+    },
+    MediaConfig: { Volume: 0 },
+    SpeechConfig: {
+      Volume: 1,
+      SpeechRate: speechRate,
+      AsrConfig: buildSmartBatchAsrConfig(preset),
+    },
+    BackgroundMusicConfig: { Volume: 0.22 },
+  }
+}
+
 function buildInputConfig(input: {
   materials: IceSmartBatchMaterial[]
   scriptRows: IceSmartBatchScriptRow[]
   guidance: string
   targetTotalSec: number
-  materialSlots?: number[]
 }): { inputConfig: Record<string, unknown>; speechRate: number; shotDurationSec: number } {
   const urls = input.materials
     .map((m) => ensureIceHttpsUrl(sanitizeIcePipelineMediaUrl(m.mediaUrl)))
     .filter(Boolean)
   const guidance = input.guidance.trim()
   const targetTotalSec = Math.min(120, Math.max(5, Math.ceil(input.targetTotalSec)))
-  const materialSlots = input.materialSlots ?? []
-
-  const plannedResult = planDialogueRowsForTarget({
-    scriptRows: input.scriptRows,
-    materialSlots,
-    materialCount: input.materials.length,
-    targetTotalSec,
-    guidance,
-  })
-  const planned = plannedResult.rows
-  const padGroups = buildPadMediaGroups({ materials: input.materials, padSec: plannedResult.padSec })
-  const speechRate = plannedResult.speechRate
-  const shotDurationSec = plannedResult.shotDurationSec
-
-  // 分组口播：每条素材独立一组，确保 IMS 拆条覆盖全部 MediaArray
-  if (planned.length >= 2) {
-    const speechGroups = planned.map((row, i) => {
-      const mat = input.materials[row.materialIndex % input.materials.length]!
-      const url = ensureIceHttpsUrl(sanitizeIcePipelineMediaUrl(mat.mediaUrl))
-      return {
-        GroupName: `seg-${i + 1}`.slice(0, 50),
-        MediaArray: [url],
-        SplitMode: 'NoSplit' as const,
-        Duration: Math.round(shotDurationSec * 10) / 10,
-        DurationAutoAdapt: true,
-        Volume: 0,
-        SpeechTextArray: [row.dialogue.slice(0, 240)],
-      }
-    })
-    const mediaGroups = [...padGroups.slice(0, 1), ...speechGroups, ...padGroups.slice(1)]
-    return { inputConfig: { MediaGroupArray: mediaGroups }, speechRate, shotDurationSec }
-  }
-
-  // 全局口播：所有素材均分时长
-  const hookMaxChars = Math.max(24, Math.floor(targetTotalSec * DIALOGUE_CHARS_PER_SEC))
-  const hook =
-    planned[0]?.dialogue ??
-    extractShortHookFromGuidance(guidance, Math.min(hookMaxChars, 100))
+  const shotDurationSec = Math.max(0.45, Math.round((targetTotalSec / Math.max(1, urls.length)) * 100) / 100)
+  const narration = buildSmartBatchNarration(guidance, input.scriptRows, targetTotalSec)
+  const estSpeech = estimateSpeechSec(narration)
+  const speechRate = resolveSpeechRateForTarget(estSpeech, targetTotalSec)
 
   return {
     inputConfig: {
       MediaGroupArray: [
         {
-          GroupName: 'main',
+          GroupName: 'main-all-materials',
           MediaArray: urls,
           SplitMode: 'AverageSplit',
           Duration: targetTotalSec,
           Volume: 0,
         },
       ],
-      SpeechTextArray: [truncateDialogue(hook, hookMaxChars)],
+      SpeechTextArray: [narration],
     },
     speechRate,
     shotDurationSec,
@@ -382,7 +216,8 @@ function buildOutputConfig(
       message: '未配置 OSS 成片 URL 前缀，无法输出智能一键成片。',
     }
   }
-  const maxDuration = Math.min(120, Math.max(5, Math.ceil(input.targetTotalSec)))
+  const target = Math.min(120, Math.max(5, Math.ceil(input.targetTotalSec)))
+  const maxDuration = Math.min(123, target + SMART_BATCH_DURATION_SLACK_SEC)
   const mediaURL = ensureIceHttpsUrl(`${prefix}/smart-batch/${input.clientToken}_{index}.mp4`)
   return {
     ok: true,
@@ -445,7 +280,6 @@ export async function iceSubmitSmartBatchJob(
     scriptRows,
     guidance,
     targetTotalSec,
-    materialSlots: input.materialSlots,
   })
   const inputConfig = built.inputConfig
   const editingConfig = buildDefaultEditingConfig(
