@@ -30,13 +30,11 @@
       <view class="addon-pair">
         <button
           class="addon-btn addon-btn--ghost addon-pick-btn"
-          open-type="agreePrivacyAuthorization"
-          bindagreeprivacyauthorization="onPickRefImage"
+          bindtap="onPickRefImage"
         >上传参考图</button>
         <button
           class="addon-btn addon-btn--ghost addon-pick-btn"
-          open-type="agreePrivacyAuthorization"
-          bindagreeprivacyauthorization="onPickRefVideo"
+          bindtap="onPickRefVideo"
         >从视频取封面</button>
       </view>
       <image wx:if="{{framePath}}" class="addon-thumb" src="{{framePath}}" mode="aspectFill" />
@@ -52,8 +50,7 @@
       <text class="addon-card__title">文生 / 图生视频</text>
       <button
         class="addon-btn addon-btn--ghost addon-pick-btn"
-        open-type="agreePrivacyAuthorization"
-        bindagreeprivacyauthorization="onPickRefImage"
+        bindtap="onPickRefImage"
       >可选：上传参考图</button>
       <image wx:if="{{framePath}}" class="addon-thumb" src="{{framePath}}" mode="aspectFill" />
       <textarea class="addon-textarea" placeholder="描述场景、主体、镜头与风格" value="{{genPrompt}}" bindinput="onGenPrompt" maxlength="800" />
@@ -78,8 +75,7 @@
         <view class="addon-pair">
           <button
             class="addon-btn addon-btn--ghost addon-pick-btn"
-            open-type="agreePrivacyAuthorization"
-            bindagreeprivacyauthorization="onUploadIceVideo"
+            bindtap="onUploadIceVideo"
           >本地上传视频</button>
         </view>
         <textarea class="addon-textarea addon-textarea--sm" placeholder="粘贴视频 HTTPS 链接，多条用换行分隔" value="{{urlText}}" bindinput="onUrlText" />
@@ -94,8 +90,7 @@
         <view class="addon-pair">
           <button
             class="addon-btn addon-btn--ghost addon-pick-btn"
-            open-type="agreePrivacyAuthorization"
-            bindagreeprivacyauthorization="onUploadIceImage"
+            bindtap="onUploadIceImage"
           >本地上传图片</button>
         </view>
         <textarea class="addon-textarea addon-textarea--sm" placeholder="粘贴图片 HTTPS 链接" value="{{imageUrlText}}" bindinput="onImageUrlText" />

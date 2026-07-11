@@ -5,6 +5,8 @@ const mpAddonIceApi = require('./mpAddonIceApi.js')
 const scriptAi = require('./recruitmentScriptAiCompliance.js')
 const videoAi = require('./recruitmentVideoAiCompliance.js')
 const identityTheme = require('./identityTheme.js')
+const mpPrivacyPageMixin = require('./mpPrivacyPageMixin.js')
+const mpPrivacy = require('./mpPrivacyAuthorize.js')
 
 const PLATFORM_OPTIONS = ['抖音', '小红书', '快手', '视频号']
 const MERGED_TITLE = 'AI审核'
@@ -46,7 +48,7 @@ function resolveInitialMode(canScript, canVideo, hint) {
 }
 
 function createAddonAiCompliancePage(defaultMode) {
-  return {
+  const pageDef = {
     data: {
       lqThemeClass: 'lq-theme-pr',
       platformOptions: PLATFORM_OPTIONS,
@@ -159,13 +161,24 @@ function createAddonAiCompliancePage(defaultMode) {
       this.refreshBatchCount(items)
     },
     onImportTap() {
+      mpPrivacy.resolvePrivacyAuthorization(this, mpPrivacy.PRIVACY_AGREE_BTN_ID)
+      this._doImportPick(true)
+    },
+    _doImportPick(fromPrivacyButton) {
       const mode = this.data.mode
+      const skipPrivacy = !!fromPrivacyButton
       if (mode === 'video') {
-        wx.chooseMedia({
-          count: 9,
-          mediaType: ['video'],
-          sourceType: ['album'],
-          success: (res) => {
+        mpPrivacy
+          .runChooseMedia(
+            {
+              count: 9,
+              mediaType: ['video'],
+              sourceType: ['album', 'camera'],
+            },
+            { purpose: '导入审核视频', androidImageFallback: false, skipPrivacyCheck: skipPrivacy },
+          )
+          .then((res) => {
+            if (!res) return
             const files = (res.tempFiles || []).map((f) => ({
               id: newId(),
               label: (f.tempFilePath || '').split('/').pop() || '视频',
@@ -177,15 +190,24 @@ function createAddonAiCompliancePage(defaultMode) {
             }))
             if (!files.length) return
             this.appendItems(files)
-          },
-        })
+          })
+          .catch((e) => {
+            const msg = String((e && e.message) || e || '')
+            if (!/cancel/i.test(msg)) {
+              wx.showToast({ title: msg.slice(0, 28) || '选择失败', icon: 'none' })
+            }
+          })
         return
       }
-      wx.chooseMessageFile({
-        count: 9,
-        type: 'file',
-        extension: ['txt', 'doc', 'docx'],
-        success: (res) => {
+      mpPrivacy
+        .pickMessageFiles({
+          count: 9,
+          type: 'file',
+          extension: ['txt', 'doc', 'docx'],
+          skipPrivacyCheck: skipPrivacy,
+        })
+        .then((res) => {
+          if (!res) return
           const files = (res.tempFiles || []).map((f) => ({
             id: newId(),
             label: f.name || '文稿',
@@ -197,9 +219,16 @@ function createAddonAiCompliancePage(defaultMode) {
           }))
           if (!files.length) return
           this.appendItems(files)
-        },
-        fail: () => {},
-      })
+        })
+        .catch((e) => {
+          const msg = String((e && e.message) || (e && e.errMsg) || e || '')
+          if (!/cancel/i.test(msg)) {
+            wx.showToast({ title: msg.slice(0, 28) || '选择失败', icon: 'none' })
+          }
+        })
+    },
+    _retryAfterPrivacyAgreed() {
+      this._doImportPick(true)
     },
     readScriptText(item) {
       return new Promise((resolve, reject) => {
@@ -314,6 +343,7 @@ function createAddonAiCompliancePage(defaultMode) {
       }
     },
   }
+  return mpPrivacyPageMixin.mergeIntoPage(pageDef)
 }
 
 module.exports = {

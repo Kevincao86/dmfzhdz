@@ -1,5 +1,6 @@
 const STORAGE_KEY = 'meoo_chat_custom_emojis_v1'
 const MAX_CUSTOM = 60
+const mpPrivacy = require('./mpPrivacyAuthorize.js')
 
 const CHAT_EMOJIS = [
   '😀', '😊', '🙂', '😂', '🥲', '👍', '👏', '🙏', '❤️', '✨',
@@ -76,22 +77,21 @@ function addCustomEmojiFromPath(pathOrUrl) {
 }
 
 function chooseImageForEmoji() {
-  return new Promise((resolve, reject) => {
-    wx.chooseMedia({
-      count: 1,
-      mediaType: ['image'],
-      sourceType: ['album'],
-      success: (res) => {
-        const file = res.tempFiles && res.tempFiles[0]
-        if (!file || !file.tempFilePath) {
-          reject(new Error('cancel'))
-          return
-        }
-        resolve(file.tempFilePath)
+  return mpPrivacy
+    .runChooseMedia(
+      {
+        count: 1,
+        mediaType: ['image'],
+        sourceType: ['album'],
       },
-      fail: (e) => reject(new Error((e && e.errMsg) || 'cancel')),
+      { purpose: '添加自定义表情' },
+    )
+    .then((res) => {
+      if (!res) return Promise.reject(new Error('cancel'))
+      const file = res.tempFiles && res.tempFiles[0]
+      if (!file || !file.tempFilePath) return Promise.reject(new Error('cancel'))
+      return file.tempFilePath
     })
-  })
 }
 
 module.exports = {

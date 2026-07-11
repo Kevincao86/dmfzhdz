@@ -1,15 +1,18 @@
 import {
   compressVisionDataUrl,
-  extractVideoFirstFramePureBase64,
-  imageUrlToPureBase64,
 } from '../lib/videoFrameUtils'
 import { postAiChat } from './ai/aiClient'
-import { downloadVideoUrlAsBlob, postVideoLastFrameFromUrl } from './videoAiApi'
 import { sampleMixMaterialsEvenly, type IceMixMaterialSlot } from '../lib/iceMixPlan'
-import type { IceMixMaterialProfile } from './iceMixEditPlanAi'
+import type { IceMixMaterialProfile, MixMaterialFrameBeat } from './iceMixEditPlanAi'
 import { runIceUploadPool } from '../lib/iceUploadPool'
+import {
+  collectMaterialTimelineFrames,
+  MIX_FRAMES_PER_VIDEO,
+  computeVideoFrameSamplePoints,
+} from './iceMixMaterialFrames'
+import { MIX_DEFAULT_SOURCE_DURATION_SEC } from '../lib/iceMixPlan'
 
-const VISION_SAMPLE_MAX = 20
+const VISION_SAMPLE_MAX = 48
 /** 素材分析：超过此数量只抽样深度理解，其余用文件名占位 */
 const MATERIAL_PROFILE_DEEP_MAX = 48
 const MATERIAL_PROFILE_CONCURRENCY = 5
@@ -30,10 +33,10 @@ const MIX_GUIDANCE_SYSTEM = `你是本地生活/电商短视频编导，负责�
 禁止：写「暂未获取画面」「仅获得编号」「请补充画面描述」等推脱句——下方【画面理解】已是 AI 看图结果，必须据此撰写。
 只输出指导正文一段。`
 
-const FRAME_VISION_SYSTEM = `你是短视频素材分析师。用户会附上从实拍视频/图片截取的采样帧。
-请用中文描述每张图：场景类型、可见主体（产品/门店/人物/招牌文字等）、色调氛围、可提炼的卖点线索。
-必须基于图像内容描述，不要复述文件名或编号；若确实看不清内容才写「画面模糊」。
-多张图时空行分隔，每段开头标注「素材N：」。不要 JSON。`
+const FRAME_VISION_SYSTEM = `你是短视频素材分析师。用户会附上从实拍视频/图片截取的采样帧（标注素材编号与源片时间点，如「素材3·2.4s」）。
+请用中文描述每一帧：场景类型、可见主体（产品/门店/人物/招牌文字等）、动作/状态、色调氛围、可提炼的卖点线索。
+必须基于图像内容描述，不要复述文件名；若确实看不清才写「画面模糊」。
+每张图单独一段，开头必须标注「素材N·Xs：」其中 X 为该帧在源片中的秒数（与标签一致）。不要 JSON。`
 
 const VISION_FAIL_RE =
   /暂未获取|仅获得编号|尚未获取|无法看到|看不清|没有图|无图|请补充.*画面|缺少.*画面|未提供.*画面/i
@@ -88,11 +91,14 @@ function parseBatchVisionByIndex(text: string, indices: number[]): Map<number, s
 
   for (const idx of indices) {
     const n = idx + 1
-    const re = new RegExp(`素材${n}\\s*[：:][\\s\\S]*?(?=\\n素材\\d+\\s*[：:]|$)`)
+    const re = new RegExp(`素材${n}(?:·[\\d.]+s)?\\s*[：:][\\s\\S]*?(?=\\n素材\\d+(?:·[\\d.]+s)?\\s*[：:]|$)`)
     const m = raw.match(re)
     if (!m?.[0]) continue
-    const desc = m[0].replace(new RegExp(`^素材${n}\\s*[：:]\\s*`), '').trim()
-    if (desc.length >= 8 && !VISION_FAIL_RE.test(desc)) map.set(idx, desc)
+    const desc = m[0].replace(new RegExp(`^素材${n}(?:·[\\d.]+s)?\\s*[：:]\\s*`), '').trim()
+    if (desc.length >= 8 && !VISION_FAIL_RE.test(desc)) {
+      const prev = map.get(idx)
+      map.set(idx, prev ? `${prev} ${desc}` : desc)
+    }
   }
 
   if (map.size === 0 && indices.length === 1 && isVisionNotesUsable(raw)) {
@@ -104,14 +110,37 @@ function parseBatchVisionByIndex(text: string, indices: number[]): Map<number, s
     const chunks = raw.split(/\n{2,}/).map((c) => c.trim()).filter(Boolean)
     for (let i = 0; i < Math.min(chunks.length, indices.length); i++) {
       const chunk = chunks[i]!
-      const desc = chunk.replace(/^素材\d+\s*[：:]\s*/, '').trim() || chunk
+      const desc = chunk.replace(/^素材\d+(?:·[\d.]+s)?\s*[：:]\s*/, '').trim() || chunk
       if (desc.length >= 8 && !VISION_FAIL_RE.test(desc)) {
-        map.set(indices[i]!, desc)
+        const idx = indices[i]!
+        const prev = map.get(idx)
+        map.set(idx, prev ? `${prev} ${desc}` : desc)
       }
     }
   }
 
   return map
+}
+
+/** 从批量视觉原文解析逐帧时间轴描述 */
+export function parseBatchVisionFrameTimeline(
+  text: string,
+  materialIndex: number,
+): MixMaterialFrameBeat[] {
+  const raw = text.trim()
+  if (!raw) return []
+  const n = materialIndex + 1
+  const re = new RegExp(`素材${n}·([\\d.]+)s\\s*[：:]([^\\n]+)`, 'g')
+  const beats: MixMaterialFrameBeat[] = []
+  let m: RegExpExecArray | null
+  while ((m = re.exec(raw)) !== null) {
+    const atSec = Math.max(0, Number(m[1]) || 0)
+    const description = String(m[2] ?? '').trim()
+    if (description.length >= 4 && !VISION_FAIL_RE.test(description)) {
+      beats.push({ atSec, description })
+    }
+  }
+  return beats.sort((a, b) => a.atSec - b.atSec)
 }
 
 /** 从 profile 列表或批量视觉原文解析可用画面描述 */
@@ -129,27 +158,22 @@ export function resolveMixVisionNotes(
   return ''
 }
 
-async function collectMaterialFrame(
+async function collectMaterialFramesForVision(
   mat: IceMixMaterialSlot,
   index: number,
-): Promise<{ index: number; label: string; dataUrl: string } | null> {
-  const label = mat.label || `素材${index + 1}`
-  if (mat.kind === 'image') {
-    for (const url of visionUrlCandidates(mat)) {
-      try {
-        const pure = await imageUrlToPureBase64(url)
-        if (pure.length >= 64) {
-          return { index, label, dataUrl: `data:image/jpeg;base64,${pure}` }
-        }
-      } catch {
-        /* try next */
-      }
-    }
-    return null
-  }
-  const frame = await extractOneVideoFrame(mat)
-  if (!frame) return null
-  return { index, label: frame.label, dataUrl: frame.dataUrl }
+  onProgress?: (msg: string) => void,
+): Promise<Array<{ index: number; label: string; dataUrl: string; atSec: number }>> {
+  onProgress?.(`截帧 ${index + 1}：${mat.label || `素材${index + 1}`}（全片 ${MIX_FRAMES_PER_VIDEO} 帧）…`)
+  const timeline = await collectMaterialTimelineFrames(mat, index, {
+    durationSec: mat.kind === 'video' ? MIX_DEFAULT_SOURCE_DURATION_SEC : undefined,
+    skipLocalDownload: true,
+  })
+  return timeline.map((f) => ({
+    index: f.index,
+    label: f.label,
+    dataUrl: f.dataUrl,
+    atSec: f.atSec ?? 0,
+  }))
 }
 
 function withProfileTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
@@ -159,40 +183,6 @@ function withProfileTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<
       window.setTimeout(() => resolve(fallback), ms)
     }),
   ])
-}
-
-async function extractOneVideoFrame(
-  mat: IceMixMaterialSlot,
-  onProgress?: (msg: string) => void,
-): Promise<{ label: string; dataUrl: string } | null> {
-  const label = mat.label || '视频素材'
-  const urls = visionUrlCandidates(mat)
-  if (urls.length === 0) return null
-
-  for (const url of urls) {
-    const serverFrame = await postVideoLastFrameFromUrl(url, {
-      frame: 'opening',
-      onProgress,
-    })
-    if (serverFrame.ok) {
-      return { label, dataUrl: `data:image/jpeg;base64,${serverFrame.pureBase64}` }
-    }
-  }
-
-  for (const url of urls) {
-    try {
-      onProgress?.(`服务端截帧失败，正在本地解析「${label}」…`)
-      const blob = await downloadVideoUrlAsBlob(url, { maxAttempts: 2 })
-      const pure = await extractVideoFirstFramePureBase64(blob)
-      if (pure.length >= 64) {
-        return { label, dataUrl: `data:image/jpeg;base64,${pure}` }
-      }
-    } catch {
-      /* try next url */
-    }
-  }
-
-  return null
 }
 
 export type MaterialVisionBuildResult = {
@@ -219,28 +209,27 @@ export async function buildMaterialVisionProfiles(
 
   onProgress?.(
     list.length > maxDeep
-      ? `共 ${list.length} 条素材，抽样截帧 ${deepTotal} 条（批量 AI 理解，约 1 分钟）…`
-      : `正在截取 ${deepTotal} 条素材画面…`,
+      ? `共 ${list.length} 条素材，抽样密集截帧 ${deepTotal} 条（逐帧 AI 理解）…`
+      : `正在对 ${deepTotal} 条素材逐帧截帧理解…`,
   )
 
-  const frameSamples: { index: number; label: string; dataUrl: string }[] = []
+  const frameSamples: Array<{ index: number; label: string; dataUrl: string; atSec: number }> = []
   let extracted = 0
 
   await runIceUploadPool(deepTargets, MATERIAL_PROFILE_CONCURRENCY, async (mat) => {
     const idx = materials.indexOf(mat)
     const index = idx >= 0 ? idx : extracted
-    onProgress?.(`截帧 ${extracted + 1}/${deepTotal}：${mat.label || `素材${index + 1}`}`)
-    const sample = await withProfileTimeout(
-      collectMaterialFrame(mat, index),
-      MATERIAL_FRAME_TIMEOUT_MS,
-      null,
+    const samples = await withProfileTimeout(
+      collectMaterialFramesForVision(mat, index, onProgress),
+      MATERIAL_FRAME_TIMEOUT_MS * 2,
+      [],
     )
     extracted += 1
-    if (sample) {
+    for (const sample of samples) {
       const compactUrl = await compressVisionDataUrl(sample.dataUrl)
       frameSamples.push({ ...sample, dataUrl: compactUrl })
     }
-    return sample
+    return samples[0] ?? null
   })
 
   let batchVisionText = ''
@@ -250,7 +239,7 @@ export async function buildMaterialVisionProfiles(
     onProgress?.(`AI 批量理解 ${frameSamples.length} 张采样画面…`)
     try {
       const visionFrames = frameSamples.map((f) => ({
-        label: `素材${f.index + 1}（${f.label}）`,
+        label: `素材${f.index + 1}·${f.atSec.toFixed(1)}s（${f.label}）`,
         dataUrl: f.dataUrl,
       }))
       batchVisionText = await withProfileTimeout(
@@ -275,13 +264,27 @@ export async function buildMaterialVisionProfiles(
 
   const profiles = materials.map((mat, index) => {
     const desc = descByIndex.get(index)
-    if (desc && isVisionNotesUsable(desc)) {
+    const frameTimeline = parseBatchVisionFrameTimeline(batchVisionText, index)
+    const mergedDesc =
+      desc && isVisionNotesUsable(desc)
+        ? desc
+        : frameTimeline.map((b) => b.description).join('；')
+    if (mergedDesc && isVisionNotesUsable(mergedDesc)) {
+      const samplePoints =
+        mat.kind === 'video' ? computeVideoFrameSamplePoints(MIX_DEFAULT_SOURCE_DURATION_SEC) : [0]
       return {
         index,
         label: mat.label || `素材${index + 1}`,
         kind: mat.kind,
-        description: desc,
-        estimatedDurationSec: mat.kind === 'video' ? 6 : undefined,
+        description: mergedDesc.slice(0, 480),
+        estimatedDurationSec: mat.kind === 'video' ? MIX_DEFAULT_SOURCE_DURATION_SEC : undefined,
+        frameTimeline:
+          frameTimeline.length > 0
+            ? frameTimeline
+            : samplePoints.map((atSec) => ({
+                atSec,
+                description: mergedDesc.slice(0, 120),
+              })),
       }
     }
     return stubMaterialProfile(mat, index)

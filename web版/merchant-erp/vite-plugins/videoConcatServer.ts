@@ -175,12 +175,33 @@ export async function concatLocalMp4Buffers(
   }
 }
 
-export type VideoSampleFrameMode = 'opening' | 'last'
+export type VideoSampleFrameMode = 'opening' | 'last' | 'atSec'
+
+/** 混剪素材：按源片时长均匀采样关键帧时间点（秒） */
+export function computeVideoFrameSamplePoints(
+  durationSec: number,
+  opts?: { maxFrames?: number; intervalSec?: number },
+): number[] {
+  const dur = Math.max(1.2, Math.min(Number(durationSec) || 6, 45))
+  const maxFrames = Math.max(2, Math.min(opts?.maxFrames ?? 5, 8))
+  const interval = opts?.intervalSec ?? Math.max(0.8, dur / maxFrames)
+  const points: number[] = []
+  for (let t = 0; t < dur - 0.15 && points.length < maxFrames; t += interval) {
+    points.push(Math.round(t * 10) / 10)
+  }
+  if (points.length === 0) points.push(0)
+  const tail = Math.max(0, Math.round((dur - 0.2) * 10) / 10)
+  if (tail > (points[points.length - 1] ?? 0) + 0.35 && points.length < maxFrames) {
+    points.push(tail)
+  }
+  return points
+}
 
 /** 从本地视频 buffer 截取采样帧（JPEG） */
 export async function extractSampleFrameJpegFromBuffer(
   videoBuf: Buffer,
   mode: VideoSampleFrameMode = 'last',
+  atSec?: number,
 ): Promise<{ ok: true; buffer: Buffer } | { ok: false; message: string }> {
   if (!videoBuf.length) return { ok: false, message: '视频为空' }
   if (videoBuf.length > MAX_SEGMENT_BYTES) {
@@ -204,7 +225,15 @@ export async function extractSampleFrameJpegFromBuffer(
     /** 视觉分析用：缩至 720 宽 + 适中 JPEG 质量，避免 8 张 4K 首帧撑爆 AI 网关 */
     const visionScale = 'scale=720:-1'
     const attempts: string[][] =
-      mode === 'opening'
+      mode === 'atSec'
+        ? (() => {
+            const ss = Math.max(0, Math.min(Number(atSec) || 0, 3600))
+            return [
+              ['-y', '-ss', String(ss), '-i', videoPath, '-vf', visionScale, '-frames:v', '1', '-q:v', '4', outPath],
+              ['-y', '-i', videoPath, '-ss', String(ss), '-vf', visionScale, '-frames:v', '1', '-q:v', '4', outPath],
+            ]
+          })()
+        : mode === 'opening'
         ? [
             [
               '-y',
@@ -235,7 +264,12 @@ export async function extractSampleFrameJpegFromBuffer(
               outPath,
             ],
           ]
-    let lastErr = mode === 'opening' ? 'ffmpeg 截取首帧失败' : 'ffmpeg 截取尾帧失败'
+    let lastErr =
+      mode === 'atSec'
+        ? `ffmpeg 截取 ${Math.max(0, Number(atSec) || 0)}s 帧失败`
+        : mode === 'opening'
+        ? 'ffmpeg 截取首帧失败'
+        : 'ffmpeg 截取尾帧失败'
     for (const args of attempts) {
       const r = runFfmpeg(ffmpeg, args)
       if (r.ok && fs.existsSync(outPath) && fs.statSync(outPath).size > 256) {
@@ -260,10 +294,13 @@ export async function extractLastFrameJpegFromBuffer(
 
 export async function extractLastFrameJpegFromUrl(
   urlStr: string,
-  opts?: { bearer?: string; frame?: VideoSampleFrameMode },
+  opts?: { bearer?: string; frame?: VideoSampleFrameMode; atSec?: number },
 ): Promise<{ ok: true; buffer: Buffer } | { ok: false; message: string }> {
   const fetched = await fetchRemoteVideoBuffer(urlStr, opts)
   if (!fetched.ok) return fetched
+  if (opts?.atSec != null && Number.isFinite(Number(opts.atSec))) {
+    return extractSampleFrameJpegFromBuffer(fetched.buffer, 'atSec', Number(opts.atSec))
+  }
   return extractSampleFrameJpegFromBuffer(fetched.buffer, opts?.frame ?? 'last')
 }
 

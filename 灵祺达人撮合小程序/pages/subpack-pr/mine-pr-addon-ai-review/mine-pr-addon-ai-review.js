@@ -199,13 +199,21 @@ Page({
     this.syncItems(items)
   },
   onImportTap() {
+    const mpPrivacy = require('../../../utils/mpPrivacyAuthorize.js')
+    mpPrivacy.resolvePrivacyAuthorization(this, mpPrivacy.PRIVACY_AGREE_BTN_ID)
     const reviewMode = this.data.reviewMode
     if (reviewMode === 'video') {
-      wx.chooseMedia({
-        count: 9,
-        mediaType: ['video'],
-        sourceType: ['album', 'camera'],
-        success: (res) => {
+      mpPrivacy
+        .runChooseMedia(
+          {
+            count: 9,
+            mediaType: ['video'],
+            sourceType: ['album', 'camera'],
+          },
+          { purpose: '导入审核视频', androidImageFallback: false, skipPrivacyCheck: true },
+        )
+        .then((res) => {
+          if (!res) return
           const files = (res.tempFiles || []).map((f, i) => ({
             id: newItemId(),
             label: f.tempFilePath.split('/').pop() || `视频${i + 1}`,
@@ -219,15 +227,24 @@ Page({
           }))
           if (!files.length) return
           this.syncItems([...(this.data.items || []), ...files])
-        },
-      })
+        })
+        .catch((e) => {
+          const msg = String((e && e.message) || e || '')
+          if (!/cancel/i.test(msg)) {
+            wx.showToast({ title: msg.slice(0, 28) || '选择失败', icon: 'none' })
+          }
+        })
       return
     }
-    wx.chooseMessageFile({
-      count: 9,
-      type: 'file',
-      extension: ['txt'],
-      success: (res) => {
+    mpPrivacy
+      .pickMessageFiles({
+        count: 9,
+        type: 'file',
+        extension: ['txt'],
+        skipPrivacyCheck: true,
+      })
+      .then((res) => {
+        if (!res) return
         const files = (res.tempFiles || [])
           .filter((f) => /\.txt$/i.test(String(f.name || f.path || '')))
           .map((f) => ({
@@ -246,8 +263,13 @@ Page({
           return
         }
         this.syncItems([...(this.data.items || []), ...files])
-      },
-    })
+      })
+      .catch((e) => {
+        const msg = String((e && e.message) || e || '')
+        if (!/cancel/i.test(msg)) {
+          wx.showToast({ title: msg.slice(0, 28) || '选择失败', icon: 'none' })
+        }
+      })
   },
   onRemoveItem(e) {
     const id = String((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id) || '')

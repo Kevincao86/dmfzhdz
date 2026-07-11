@@ -719,6 +719,8 @@ export async function postIcePipeline(body: {
   }>
   /** 混剪 TTS 口播全文（各段 dialogue 合并） */
   mixNarrationText?: string
+  /** 混剪口播音色（与数字人口播同源 preset id） */
+  mixVoicePresetId?: string
   projectName?: string
   /** 剪辑文案指令，写入云端项目描述 */
   editBrief?: string

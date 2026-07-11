@@ -77,6 +77,11 @@ import {
 } from '../lib/iceMixPlan'
 import { resolveIceEffectPreset, ICE_MIX_TRANSITION_PRESETS } from '../lib/iceEffectPresets'
 import {
+  ICE_MIX_VOICE_DEFAULT_ID,
+  ICE_MIX_VOICE_PRESETS,
+  voicePresetById,
+} from '../lib/digitalHumanBroadcast'
+import {
   ICE_SUBTITLE_STYLE_DEFAULT_ID,
   ICE_SUBTITLE_STYLE_PRESETS,
   resolveIceSubtitleStylePreset,
@@ -244,6 +249,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
   const [analyzeBusy, setAnalyzeBusy] = useState(false)
   const [mixTransitionMode, setMixTransitionMode] = useState<'auto' | string>('auto')
   const [mixSubtitleStyleId, setMixSubtitleStyleId] = useState(ICE_SUBTITLE_STYLE_DEFAULT_ID)
+  const [mixVoicePresetId, setMixVoicePresetId] = useState(ICE_MIX_VOICE_DEFAULT_ID)
   const mixDocInputRef = useRef<HTMLInputElement>(null)
 
   const aspect = useMemo(
@@ -269,6 +275,10 @@ export function ShortVideoIceBatchPanel(_props: Props) {
   const resolvedMixSubtitleStyle = useMemo(
     () => resolveIceSubtitleStylePreset(mixSubtitleStyleId),
     [mixSubtitleStyleId],
+  )
+  const resolvedMixVoice = useMemo(
+    () => voicePresetById(mixVoicePresetId) ?? ICE_MIX_VOICE_PRESETS[0]!,
+    [mixVoicePresetId],
   )
 
   const doneJobs = jobs.filter((j) => j.phase === 'done')
@@ -1116,6 +1126,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
         }),
       ),
       mixNarrationText: mixNarrationText.length >= 4 ? mixNarrationText : undefined,
+      mixVoicePresetId: mixVoicePresetId || ICE_MIX_VOICE_DEFAULT_ID,
       projectName: `AI混剪-${label}`.slice(0, 120),
       editBrief: pack.editBrief,
       width: aspect.width,
@@ -1785,6 +1796,21 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                   </select>
                 </label>
                 <label className="flex min-w-[10rem] flex-1 flex-col gap-1 text-xs text-zinc-600">
+                  <span>口播音色</span>
+                  <select
+                    value={mixVoicePresetId}
+                    disabled={anyBusy || guidanceBusy}
+                    onChange={(e) => setMixVoicePresetId(e.target.value)}
+                    className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
+                  >
+                    {ICE_MIX_VOICE_PRESETS.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.label}（{v.gender}）
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex min-w-[10rem] flex-1 flex-col gap-1 text-xs text-zinc-600">
                   <span>场景转场</span>
                   <select
                     value={mixTransitionMode}
@@ -1810,6 +1836,8 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                     字幕：{resolvedMixSubtitleStyle.label}
                     {resolvedMixSubtitleStyle.description ? ` — ${resolvedMixSubtitleStyle.description}` : ''}
                     {' · '}
+                    口播：{resolvedMixVoice.label}
+                    {' · '}
                     转场：{resolvedMixEffect.label}
                     {mixTransitionMode === 'auto' ? '（由文案推断）' : ''}
                   </span>
@@ -1826,7 +1854,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
               <div>
                 <span className="text-sm font-medium text-zinc-800">分镜表（剪辑时间轴）</span>
                 <p className="mt-1 text-xs text-zinc-500">
-                  每段对应成片时间轴上的一镜：自动轮询分配不同素材并截取片段；口播合成 TTS，字幕带弹入动效。
+                  每段对应成片时间轴上的一镜：AI 逐帧理解素材后按语义匹配；口播使用所选音色 TTS，字幕带弹入动效。
                 </p>
                 <div className="mt-2 max-h-[min(360px,42vh)] overflow-y-auto rounded-lg border border-zinc-100">
                   <ShortVideoScriptTableEditor

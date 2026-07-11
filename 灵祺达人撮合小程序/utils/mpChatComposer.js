@@ -1,5 +1,6 @@
 const groupChatApi = require('./mpOrderGroupChatApi.js')
 const emojiMod = require('./mpChatEmoji.js')
+const mpPrivacy = require('./mpPrivacyAuthorize.js')
 
 const PLUS_ACTIONS = [
   { id: 'image', label: '照片', iconClass: 'plus-icon--photo' },
@@ -234,41 +235,39 @@ function uploadViaGroupChat(filePath, contentType, fileName) {
 }
 
 function chooseAlbumImage() {
-  return new Promise((resolve, reject) => {
-    wx.chooseMedia({
-      count: 1,
-      mediaType: ['image'],
-      sourceType: ['album'],
-      success: (res) => {
-        const file = res.tempFiles && res.tempFiles[0]
-        if (!file || !file.tempFilePath) {
-          reject(new Error('cancel'))
-          return
-        }
-        resolve({ filePath: file.tempFilePath, contentType: 'image/jpeg', kind: 'image' })
+  return mpPrivacy
+    .runChooseMedia(
+      {
+        count: 1,
+        mediaType: ['image'],
+        sourceType: ['album'],
       },
-      fail: (e) => reject(new Error((e && e.errMsg) || 'cancel')),
+      { purpose: '发送聊天图片' },
+    )
+    .then((res) => {
+      if (!res) return Promise.reject(new Error('cancel'))
+      const file = res.tempFiles && res.tempFiles[0]
+      if (!file || !file.tempFilePath) return Promise.reject(new Error('cancel'))
+      return { filePath: file.tempFilePath, contentType: 'image/jpeg', kind: 'image' }
     })
-  })
 }
 
 function takePhoto() {
-  return new Promise((resolve, reject) => {
-    wx.chooseMedia({
-      count: 1,
-      mediaType: ['image'],
-      sourceType: ['camera'],
-      success: (res) => {
-        const file = res.tempFiles && res.tempFiles[0]
-        if (!file || !file.tempFilePath) {
-          reject(new Error('cancel'))
-          return
-        }
-        resolve({ filePath: file.tempFilePath, contentType: 'image/jpeg', kind: 'image' })
+  return mpPrivacy
+    .runChooseMedia(
+      {
+        count: 1,
+        mediaType: ['image'],
+        sourceType: ['camera'],
       },
-      fail: (e) => reject(new Error((e && e.errMsg) || 'cancel')),
+      { purpose: '聊天拍照发送', needCamera: true },
+    )
+    .then((res) => {
+      if (!res) return Promise.reject(new Error('cancel'))
+      const file = res.tempFiles && res.tempFiles[0]
+      if (!file || !file.tempFilePath) return Promise.reject(new Error('cancel'))
+      return { filePath: file.tempFilePath, contentType: 'image/jpeg', kind: 'image' }
     })
-  })
 }
 
 function chooseLocation() {
@@ -289,26 +288,29 @@ function chooseLocation() {
 }
 
 function chooseFile() {
-  return new Promise((resolve, reject) => {
-    wx.chooseMessageFile({
-      count: 1,
-      type: 'file',
-      success: (res) => {
-        const file = res.tempFiles && res.tempFiles[0]
-        if (!file || !file.path) {
-          reject(new Error('cancel'))
-          return
-        }
-        resolve({
-          kind: 'file',
-          filePath: file.path,
-          fileName: file.name || '文件',
-          contentType: guessContentType(file.path, file.type || 'application/octet-stream'),
+  return mpPrivacy.prepareFilePick().then(
+    () =>
+      new Promise((resolve, reject) => {
+        wx.chooseMessageFile({
+          count: 1,
+          type: 'file',
+          success: (res) => {
+            const file = res.tempFiles && res.tempFiles[0]
+            if (!file || !file.path) {
+              reject(new Error('cancel'))
+              return
+            }
+            resolve({
+              kind: 'file',
+              filePath: file.path,
+              fileName: file.name || '文件',
+              contentType: guessContentType(file.path, file.type || 'application/octet-stream'),
+            })
+          },
+          fail: (e) => reject(new Error((e && e.errMsg) || 'cancel')),
         })
-      },
-      fail: (e) => reject(new Error((e && e.errMsg) || 'cancel')),
-    })
-  })
+      }),
+  )
 }
 
 function createRecorderManager(page) {

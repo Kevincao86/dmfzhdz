@@ -103,12 +103,20 @@ Page({
   },
   /** 防止隐私授权回调与 tap 重复触发导致多次打开相册 */
   _runMediaPickOnce(kind, runner) {
-    if (this._mediaPicking) return
+    if (this._mediaPicking) {
+      wx.showToast({ title: '正在打开相册…', icon: 'none' })
+      return
+    }
     this._mediaPicking = kind
+    const reset = () => {
+      this._mediaPicking = null
+    }
+    const timer = setTimeout(reset, 45000)
     Promise.resolve()
       .then(runner)
       .finally(() => {
-        this._mediaPicking = null
+        clearTimeout(timer)
+        reset()
       })
   },
   onPickRefImage() {

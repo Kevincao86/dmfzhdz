@@ -77,7 +77,17 @@ export async function handleVideoLastFrameDirect(req: VercelRequest, res: Vercel
   }
 
   const frameRaw = String(parsed.frame ?? parsed.frameMode ?? 'last').trim().toLowerCase()
-  const frame: VideoSampleFrameMode = frameRaw === 'opening' || frameRaw === 'first' ? 'opening' : 'last'
+  const atSecRaw = parsed.atSec ?? parsed.ss ?? parsed.timestamp
+  const atSec =
+    atSecRaw != null && String(atSecRaw).trim() !== ''
+      ? Math.max(0, Number(atSecRaw) || 0)
+      : undefined
+  const frame: VideoSampleFrameMode =
+    atSec != null && Number.isFinite(atSec)
+      ? 'atSec'
+      : frameRaw === 'opening' || frameRaw === 'first'
+      ? 'opening'
+      : 'last'
 
   const env = await mergeVideoAiMerchantEnvWithSnapshot(process.cwd(), process.env as Record<string, string>)
   const bearer = readBearer(env)
@@ -88,12 +98,16 @@ export async function handleVideoLastFrameDirect(req: VercelRequest, res: Vercel
   if (iceCfg) {
     const ossBuf = await fetchIceMediaObjectBuffer(iceCfg, urlStr)
     if (ossBuf.ok) {
-      extracted = await extractSampleFrameJpegFromBuffer(ossBuf.buf, frame)
+      extracted = await extractSampleFrameJpegFromBuffer(
+        ossBuf.buf,
+        frame,
+        frame === 'atSec' ? atSec : undefined,
+      )
     }
   }
 
   if (!extracted?.ok) {
-    extracted = await extractLastFrameJpegFromUrl(urlStr, { bearer, frame })
+    extracted = await extractLastFrameJpegFromUrl(urlStr, { bearer, frame, atSec })
   }
 
   if (!extracted.ok) {
