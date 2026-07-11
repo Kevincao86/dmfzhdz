@@ -6,12 +6,13 @@ import type { IceMixMaterialProfile } from './iceMixEditPlanAi'
 import {
   buildIceMixSegmentsFromEditPlan,
   planMixEditFromInstructions,
+  planMixNarrativeFromVision,
+  type MixEditSegmentDecision,
 } from './iceMixEditPlanAi'
 import { validateIceMixMaterialUrl, sanitizeIceMixMaterialUrlForPipeline } from '../lib/icePipelineImageUrl'
 import type { IceMixMaterialSlot, IceMixSegmentPlan } from '../lib/iceMixPlan'
 import {
   assignMixMaterialSlots,
-  buildAllMaterialCoverageRows,
   canonicalMixMediaKey,
   clampMixSourceInSec,
   collectMixNarrationText,
@@ -20,7 +21,6 @@ import {
   MIX_DEFAULT_SOURCE_DURATION_SEC,
   normalizeMixMaterialSlots,
   resolveMixTotalDurationSec,
-  syncMixCoverageForAllMaterials,
 } from '../lib/iceMixPlan'
 import {
   parseScriptTimeRangeSeconds,
@@ -210,26 +210,52 @@ function segmentsCoverAllMaterials(
   return true
 }
 
-/** 每条素材至少一段：按时间均分拼接（兜底，确保无遗漏） */
-function buildSegmentsCoveringAllMaterials(
+/** 仅补齐未使用的素材，保留叙事顺序 */
+function appendMissingMaterialSegments(
+  segments: IceMixSegmentPlan[],
   rows: ShortVideoScriptRow[],
   materials: IceMixMaterialSlot[],
   targetTotalSec: number,
   materialProfiles?: IceMixMaterialProfile[],
 ): IceMixSegmentPlan[] {
-  const coverageRows = buildAllMaterialCoverageRows(
-    materials,
-    targetTotalSec,
-    rows,
-    rows.map((r) => r.dialogue).join(' '),
-  )
-  return buildIceMixSegmentsFromSlots(
-    coverageRows,
-    materials,
-    assignMixMaterialSlots(materials.length, materials.length),
-    targetTotalSec,
-    materialProfiles,
-  )
+  const used = new Set(segments.map((s) => s.materialIndex))
+  const missing: number[] = []
+  for (let i = 0; i < materials.length; i++) {
+    if (!used.has(i)) missing.push(i)
+  }
+  if (missing.length === 0) return segments
+
+  const total = resolveMixTotalDurationSec(rows, targetTotalSec)
+  const clipEach = Math.max(0.45, total / Math.max(materials.length, segments.length + missing.length))
+  let cursor = segments.reduce((m, s) => Math.max(m, s.timelineEndSec), 0)
+  const out = [...segments]
+
+  for (const mi of missing) {
+    const mat = materials[mi]
+    if (!mat) continue
+    const timelineStart = Math.min(total - clipEach, cursor)
+    const timelineEnd = Math.min(total, timelineStart + clipEach)
+    if (timelineEnd <= timelineStart) continue
+    const est =
+      profileAt(materialProfiles, materials, mi).estimatedDurationSec ??
+      MIX_DEFAULT_SOURCE_DURATION_SEC
+    const sourceInSec =
+      mat.kind === 'video'
+        ? clampMixSourceInSec(inferSourceInSec(mat.label, est, mi), clipEach, est)
+        : 0
+    out.push({
+      kind: mat.kind,
+      mediaUrl: sanitizeIceMixMaterialUrlForPipeline(mat.mediaUrl || mat.signedMediaUrl || ''),
+      signedMediaUrl: mat.signedMediaUrl,
+      materialIndex: mi,
+      timelineStartSec: timelineStart,
+      timelineEndSec: timelineEnd,
+      sourceInSec,
+      sourceOutSec: mat.kind === 'video' ? sourceInSec + (timelineEnd - timelineStart) : undefined,
+    })
+    cursor = timelineEnd
+  }
+  return out.sort((a, b) => a.timelineStartSec - b.timelineStartSec)
 }
 
 export function validateMixSegmentDiversity(
@@ -273,19 +299,6 @@ export async function produceIceMixPackage(
   }
 
   input.onProgress?.('正在规划多素材拼接与截取点…')
-  const coverage = syncMixCoverageForAllMaterials(
-    materials,
-    input.targetTotalSec,
-    input.rows,
-    input.guidance || input.mixInstruction || '',
-  )
-  const total = resolveMixTotalDurationSec(coverage.rows, input.targetTotalSec)
-  let rows = ensureSequentialMixScriptRows(coverage.rows, total)
-  const materialSlots = resolveMixMaterialSlotMapping(
-    rows.length,
-    materials,
-    coverage.slots,
-  )
 
   const profileList =
     input.materialProfiles && input.materialProfiles.length > 0
@@ -298,34 +311,78 @@ export async function produceIceMixPackage(
           estimatedDurationSec: m.kind === 'video' ? MIX_DEFAULT_SOURCE_DURATION_SEC : undefined,
         }))
 
-  const editPlan = await planMixEditFromInstructions({
-    guidance: input.guidance || input.mixInstruction || '',
-    rows,
+  const guidance = (input.guidance || input.mixInstruction || '').trim()
+  let rows = ensureSequentialMixScriptRows(
+    input.rows,
+    resolveMixTotalDurationSec(input.rows, input.targetTotalSec),
+  )
+  let materialSlots = resolveMixMaterialSlotMapping(
+    rows.length,
     materials,
-    materialProfiles: profileList,
-    targetTotalSec: input.targetTotalSec,
-    onProgress: input.onProgress,
-  })
+    input.materialSlots,
+  )
+  let narrativeDecisions: MixEditSegmentDecision[] | null = null
+
+  if (guidance.length >= 4) {
+    const narrative = await planMixNarrativeFromVision({
+      guidance,
+      materials,
+      materialProfiles: profileList,
+      targetTotalSec: input.targetTotalSec,
+      onProgress: input.onProgress,
+    })
+    if (narrative.ok) {
+      rows = narrative.rows
+      materialSlots = narrative.materialSlots
+      narrativeDecisions = narrative.decisions
+      input.onProgress?.('叙事分镜已就绪，正在生成剪辑时间线…')
+    }
+  }
+
+  const total = resolveMixTotalDurationSec(rows, input.targetTotalSec)
+  rows = ensureSequentialMixScriptRows(rows, total)
 
   let segments: IceMixSegmentPlan[]
-  if (editPlan.ok) {
+
+  if (narrativeDecisions) {
     segments = sanitizeMixSegments(
       buildIceMixSegmentsFromEditPlan(
         rows,
         materials,
-        editPlan.decisions,
+        narrativeDecisions,
         input.targetTotalSec,
         profileList,
       ),
     )
   } else {
-    segments = buildIceMixSegmentsFromSlots(
+    const editPlan = await planMixEditFromInstructions({
+      guidance,
       rows,
       materials,
-      materialSlots,
-      input.targetTotalSec,
-      profileList,
-    )
+      materialProfiles: profileList,
+      targetTotalSec: input.targetTotalSec,
+      onProgress: input.onProgress,
+    })
+
+    if (editPlan.ok) {
+      segments = sanitizeMixSegments(
+        buildIceMixSegmentsFromEditPlan(
+          rows,
+          materials,
+          editPlan.decisions,
+          input.targetTotalSec,
+          profileList,
+        ),
+      )
+    } else {
+      segments = buildIceMixSegmentsFromSlots(
+        rows,
+        materials,
+        materialSlots,
+        input.targetTotalSec,
+        profileList,
+      )
+    }
   }
 
   if (segments.length < 2) {
@@ -333,8 +390,9 @@ export async function produceIceMixPackage(
   }
 
   if (!segmentsCoverAllMaterials(segments, materials.length)) {
-    input.onProgress?.('补齐未使用的素材片段…')
-    segments = buildSegmentsCoveringAllMaterials(
+    input.onProgress?.('补齐未使用的素材片段（保留叙事顺序）…')
+    segments = appendMissingMaterialSegments(
+      segments,
       rows,
       materials,
       input.targetTotalSec,
