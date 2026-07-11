@@ -20,6 +20,7 @@ import {
   MIX_DEFAULT_SOURCE_DURATION_SEC,
   normalizeMixMaterialSlots,
   resolveMixTotalDurationSec,
+  syncMixCoverageForAllMaterials,
 } from '../lib/iceMixPlan'
 import {
   parseScriptTimeRangeSeconds,
@@ -272,22 +273,18 @@ export async function produceIceMixPackage(
   }
 
   input.onProgress?.('正在规划多素材拼接与截取点…')
-  const total = resolveMixTotalDurationSec(input.rows, input.targetTotalSec)
-  let rows = ensureSequentialMixScriptRows(input.rows, total)
-  if (materials.length > rows.length) {
-    rows = buildAllMaterialCoverageRows(
-      materials,
-      input.targetTotalSec,
-      rows,
-      input.guidance || input.mixInstruction || '',
-    )
-  }
+  const coverage = syncMixCoverageForAllMaterials(
+    materials,
+    input.targetTotalSec,
+    input.rows,
+    input.guidance || input.mixInstruction || '',
+  )
+  const total = resolveMixTotalDurationSec(coverage.rows, input.targetTotalSec)
+  let rows = ensureSequentialMixScriptRows(coverage.rows, total)
   const materialSlots = resolveMixMaterialSlotMapping(
     rows.length,
     materials,
-    input.materialSlots.length === rows.length
-      ? input.materialSlots
-      : assignMixMaterialSlots(rows.length, materials.length),
+    coverage.slots,
   )
 
   const profileList =
