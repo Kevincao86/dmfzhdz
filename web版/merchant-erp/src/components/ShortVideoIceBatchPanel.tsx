@@ -64,13 +64,10 @@ import { analyzeIceMixMaterialsToGuidance } from '../services/iceMixGuidanceAi'
 import { produceIceMixPackage, composeMixProductionBrief, type IceMixProduceOutput } from '../services/iceMixProduceEngine'
 import type { IceMixMaterialProfile } from '../services/iceMixEditPlanAi'
 import {
-  assignMixMaterialSlots,
   assignFullMaterialCoverageSlots,
-  buildAllMaterialCoverageRows,
   expandMixRowsForMaterialPool,
   resolveMixStoryboardSegmentCount,
   syncMixCoverageForAllMaterials,
-  ensureSequentialMixScriptRows,
   inferIceEffectIdFromMixContent,
   mixStoryboardBriefReady,
   MIX_TARGET_TOTAL_OPTIONS,
@@ -1115,7 +1112,6 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     }
 
     const totalSec = mixTargetSec
-    const poolLen = mixMaterialPool.length
     const coverage = syncMixCoverageForAllMaterials(
       mixMaterialPool,
       totalSec,
