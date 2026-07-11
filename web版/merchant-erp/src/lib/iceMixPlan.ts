@@ -4,8 +4,6 @@
 import {
   maxScriptTimeRangeEndSec,
   parseScriptTimeRangeSeconds,
-  resizeScriptRows,
-  segmentCountFromTargetTotalSec,
   type ShortVideoScriptRow,
 } from './shortVideoScriptTable'
 
@@ -146,20 +144,16 @@ export const MIX_MIN_CLIP_SEC = 0.75
 /** 分镜/时间线最多段数（与 IMS 批量成片上限对齐） */
 export const MIX_MAX_STORYBOARD_SEGMENTS = 48
 
-/** 多素材混剪：每条素材至少一段，受目标时长与最短单段约束 */
+/** 多素材混剪：段数 = 素材数，每条素材必须有一段（上限 48） */
 export function resolveMixStoryboardSegmentCount(
-  targetTotalSec: number,
-  segmentSec: number,
+  _targetTotalSec: number,
+  _segmentSec: number,
   materialCount: number,
 ): number {
-  const base = segmentCountFromTargetTotalSec(targetTotalSec, segmentSec)
-  if (materialCount <= 2) return base
-  const maxByDuration = Math.min(
-    MIX_MAX_STORYBOARD_SEGMENTS,
-    Math.max(2, Math.floor(targetTotalSec / MIX_MIN_CLIP_SEC)),
-  )
-  // 每条素材至少一段（在时长允许范围内尽量全覆盖）
-  return Math.max(base, Math.min(materialCount, maxByDuration))
+  if (materialCount <= 2) {
+    return Math.max(2, materialCount)
+  }
+  return Math.min(materialCount, MIX_MAX_STORYBOARD_SEGMENTS)
 }
 
 /** 为每条素材生成一段分镜（时间均分，口播/画面从已有分镜轮询） */
@@ -197,30 +191,39 @@ export function assignFullMaterialCoverageSlots(materialCount: number): number[]
   return Array.from({ length: materialCount }, (_, i) => i)
 }
 
-/** 分镜段数不足时扩展，并重新拉齐时间段 */
+/** 分镜段数不足时扩展为「每条素材一段」 */
 export function expandMixRowsForMaterialPool(
   rows: ShortVideoScriptRow[],
   targetTotalSec: number,
   materialCount: number,
-  segmentSec: number,
+  _segmentSec: number,
+  materialLabels: Array<{ label: string }> = [],
+  guidance = '',
 ): ShortVideoScriptRow[] {
-  const desired = resolveMixStoryboardSegmentCount(targetTotalSec, segmentSec, materialCount)
-  if (rows.length >= desired) return ensureSequentialMixScriptRows(rows, targetTotalSec)
-  const segSec = Math.max(2, Math.ceil(targetTotalSec / desired))
-  const expanded = resizeScriptRows(rows, desired, segSec).map((r, i) => {
-    const src = rows[Math.min(i, rows.length - 1)]!
-    return {
-      ...r,
-      visual: r.visual.trim() || src.visual,
-      dialogue: r.dialogue.trim() || src.dialogue,
-    }
-  })
-  return ensureSequentialMixScriptRows(expanded, targetTotalSec)
+  if (materialCount <= 0) return rows
+  const mats =
+    materialLabels.length >= materialCount
+      ? materialLabels
+      : Array.from({ length: materialCount }, (_, i) => ({ label: `素材${i + 1}` }))
+  return buildAllMaterialCoverageRows(mats, targetTotalSec, rows, guidance)
 }
 
-/** 混剪默认映射：段数少于素材数时均匀覆盖全库，否则轮询 */
+/** 混剪提交前：强制 N 段分镜 + N 条素材一一映射 */
+export function syncMixCoverageForAllMaterials(
+  materials: Array<{ label: string }>,
+  targetTotalSec: number,
+  sourceRows: ShortVideoScriptRow[],
+  guidance = '',
+): { rows: ShortVideoScriptRow[]; slots: number[] } {
+  const rows = buildAllMaterialCoverageRows(materials, targetTotalSec, sourceRows, guidance)
+  const slots = assignFullMaterialCoverageSlots(materials.length)
+  return { rows, slots }
+}
+
+/** 混剪默认映射：段数 = 素材数时 0,1,…,N-1；否则均匀抽样 */
 export function assignMixMaterialSlots(rowCount: number, poolLen: number): number[] {
   if (rowCount <= 0 || poolLen <= 0) return []
+  if (rowCount === poolLen) return assignFullMaterialCoverageSlots(poolLen)
   return Array.from({ length: rowCount }, (_, i) => spreadMixMaterialIndex(i, rowCount, poolLen))
 }
 

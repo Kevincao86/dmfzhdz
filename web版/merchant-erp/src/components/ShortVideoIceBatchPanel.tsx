@@ -69,6 +69,7 @@ import {
   buildAllMaterialCoverageRows,
   expandMixRowsForMaterialPool,
   resolveMixStoryboardSegmentCount,
+  syncMixCoverageForAllMaterials,
   ensureSequentialMixScriptRows,
   inferIceEffectIdFromMixContent,
   mixStoryboardBriefReady,
@@ -358,21 +359,37 @@ export function ShortVideoIceBatchPanel(_props: Props) {
 
   useEffect(() => {
     const poolLen = mixMaterialPool.length
-    if (poolLen <= 0 || scriptRows.length <= 0) {
+    if (poolLen < 2) {
       setMaterialSlots([])
       mixPoolLenRef.current = 0
       return
     }
     const prevLen = mixPoolLenRef.current
-    const poolGrew = prevLen > 0 && poolLen > prevLen
     mixPoolLenRef.current = poolLen
-    setMaterialSlots((prev) => {
-      if (poolGrew || prev.length !== scriptRows.length) {
-        return assignMixMaterialSlots(scriptRows.length, poolLen)
-      }
-      return normalizeMixMaterialSlots(prev, scriptRows.length, poolLen)
-    })
-  }, [scriptRows.length, mixMaterialPool.length])
+    const canCover =
+      scriptRows.length >= 2 ||
+      mixGuidance.trim().length >= 4 ||
+      mixMaterialProfiles.length > 0
+    if (!canCover) return
+
+    if (scriptRows.length !== poolLen || poolLen > prevLen) {
+      const synced = syncMixCoverageForAllMaterials(
+        mixMaterialPool,
+        mixTargetSec,
+        scriptRows.length >= 2 ? scriptRows : [],
+        mixGuidance.trim(),
+      )
+      setScriptRows(synced.rows)
+      setMaterialSlots(synced.slots)
+      return
+    }
+
+    setMaterialSlots((prev) =>
+      prev.length === poolLen
+        ? normalizeMixMaterialSlots(prev, poolLen, poolLen)
+        : assignFullMaterialCoverageSlots(poolLen),
+    )
+  }, [scriptRows.length, mixMaterialPool.length, mixTargetSec, mixGuidance, mixMaterialProfiles.length])
 
   useEffect(() => {
     const maxEnd = maxScriptTimeRangeEndSec(scriptRows)
@@ -779,14 +796,20 @@ export function ShortVideoIceBatchPanel(_props: Props) {
         mixTargetSec,
         poolLen,
         MIX_DEFAULT_SEGMENT_SEC,
+        mixMaterialPool,
+        mixGuidance.trim(),
       )
-      setScriptRows(expandedRows)
-      if (poolLen > 0) {
-        setMaterialSlots(assignMixMaterialSlots(expandedRows.length, poolLen))
-      }
-      const covered = maxScriptTimeRangeEndSec(expandedRows)
+      const synced = syncMixCoverageForAllMaterials(
+        mixMaterialPool,
+        mixTargetSec,
+        expandedRows,
+        mixGuidance.trim(),
+      )
+      setScriptRows(synced.rows)
+      setMaterialSlots(synced.slots)
+      const covered = maxScriptTimeRangeEndSec(synced.rows)
       setHint(
-        `AI 已规划 ${expandedRows.length} 段混剪分镜（约 0–${covered || mixTargetSec} 秒，${poolLen} 条素材均匀映射），请核对分镜表与素材映射后一键混剪。`,
+        `AI 已规划 ${synced.rows.length} 段混剪分镜（${poolLen} 条素材逐条映射，约 0–${covered || mixTargetSec} 秒），请核对后一键混剪。`,
       )
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'AI 规划分镜失败，请稍后重试')
@@ -958,16 +981,17 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       )
     })
 
-    const slots = normalizeMixMaterialSlots(
-      materialSlots.length === scriptRows.length ? materialSlots : assignMixMaterialSlots(scriptRows.length, mixMaterialPool.length),
-      scriptRows.length,
-      mixMaterialPool.length,
+    const coverage = syncMixCoverageForAllMaterials(
+      mixMaterialPool,
+      mixTargetSec,
+      scriptRows,
+      mixGuidance.trim(),
     )
 
     const produced = await produceIceMixPackage({
-      rows: scriptRows,
+      rows: coverage.rows,
       materials: mixMaterialPool,
-      materialSlots: slots,
+      materialSlots: coverage.slots,
       materialProfiles: profiles,
       targetTotalSec: mixTargetSec,
       guidance: mixGuidance.trim(),
@@ -1092,20 +1116,20 @@ export function ShortVideoIceBatchPanel(_props: Props) {
 
     const totalSec = mixTargetSec
     const poolLen = mixMaterialPool.length
-    const coverageRows = buildAllMaterialCoverageRows(
+    const coverage = syncMixCoverageForAllMaterials(
       mixMaterialPool,
       totalSec,
       scriptRows.length >= 2 ? scriptRows : [],
       mixGuidance.trim(),
     )
-    const slots = assignFullMaterialCoverageSlots(poolLen)
+    const slots = coverage.slots
     const pipe = await postIceSmartBatch({
       materials: mixMaterialPool.map((m) => ({
         kind: m.kind,
         mediaUrl: m.mediaUrl,
         label: m.label,
       })),
-      scriptRows: coverageRows.map((r) => ({
+      scriptRows: coverage.rows.map((r) => ({
         timeRange: r.timeRange,
         visual: r.visual,
         dialogue: r.dialogue,
