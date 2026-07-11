@@ -3,7 +3,11 @@
  * 不再使用纯文本 LLM 猜 materialIndex（易全选第一条）。
  */
 import { postAiChat } from './ai/aiClient'
-import { collectMixMaterialFramesForEditPlan } from './iceMixMaterialFrames'
+import {
+  collectMixMaterialFramesForEditPlan,
+  groupMixFramesByMaterialIndex,
+  type MixMaterialFrameSample,
+} from './iceMixMaterialFrames'
 import {
   spreadMixMaterialIndex,
   type IceMixMaterialSlot,
@@ -37,7 +41,7 @@ export type MixEditSegmentDecision = {
   clipNote?: string
 }
 
-const VISION_EDIT_PLAN_TIMEOUT_MS = 22_000
+const VISION_EDIT_PLAN_TIMEOUT_MS = 45_000
 
 const VISION_EDIT_PLAN_SYSTEM = `你是专业短视频混剪剪辑师（探店/餐饮/街头小吃/本地生活带货）。用户会提供【指导文案】【分镜表】以及每条素材的采样截图（附图）。
 须为每一段分镜输出剪辑决策：
@@ -479,4 +483,441 @@ export function buildIceMixSegmentsFromEditPlan(
     })
   }
   return segments
+}
+
+export type MixNarrativeSegment = {
+  segmentIndex: number
+  materialIndex: number
+  sourceInSec: number
+  visual: string
+  dialogue: string
+  clipNote?: string
+}
+
+const NARRATIVE_TEXT_PLAN_SYSTEM = `你是专业短视频混剪导演（探店/餐饮/本地生活）。用户会提供【指导文案】和【素材画面库】（每条素材有 AI 画面描述，materialIndex 从 0 开始）。
+
+任务（强制）：
+1. 通读指导文案，按叙事逻辑排序全部 N 条素材（门头/环境 → 制作过程 → 成品特写 → 试吃/收尾），禁止按上传序号 0,1,2… 机械排列
+2. 每条素材恰好出现一次；为每段输出 visual（画面）、dialogue（口播，须与画面语义对应，从指导文案摘改，禁止「精彩片段」等占位）
+3. segmentIndex 从 0 连续递增，表示成片时间轴顺序
+
+只输出 JSON 对象，无 markdown：
+{"segments":[{"segmentIndex":0,"materialIndex":5,"visual":"门店外观…","dialogue":"走进这家…"},...]}`
+
+const CLIP_POINT_VISION_SYSTEM = `你是混剪剪辑师。用户给出已排好叙事顺序的分镜段，以及对应素材的采样截图（附图）。
+须为每段输出从源素材第几秒起剪（sourceInSec）：
+- 视频：0–8 秒；须与 visual/dialogue 语义匹配（如成品用尾段、过程用中段）
+- 图片：0
+- 同素材复用时 sourceInSec 至少相差 1.5 秒
+
+只输出 JSON 数组：
+[{"segmentIndex":0,"materialIndex":5,"sourceInSec":1.2,"clipNote":"翻炒特写"},...]`
+
+function isMixProfileDescriptionUsable(desc: string): boolean {
+  const t = desc.trim()
+  return t.length >= 24 && !/截帧失败|无法识别|分析失败/i.test(t)
+}
+
+function dialogueLinesFromGuidanceText(guidance: string): string[] {
+  return guidance
+    .trim()
+    .split(/(?<=[。！？!?])\s*/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 4)
+}
+
+function parseNarrativePlanJson(
+  raw: string,
+  matCount: number,
+): MixNarrativeSegment[] | null {
+  const objMatch = raw.match(/\{[\s\S]*"segments"[\s\S]*\}/)
+  const arrMatch = raw.match(/\[[\s\S]*\]/)
+  let arr: unknown[] | null = null
+  if (objMatch) {
+    try {
+      const o = JSON.parse(objMatch[0]) as { segments?: unknown[] }
+      if (Array.isArray(o.segments)) arr = o.segments
+    } catch {
+      /* fall through */
+    }
+  }
+  if (!arr && arrMatch) {
+    try {
+      const parsed = JSON.parse(arrMatch[0]) as unknown
+      if (Array.isArray(parsed)) arr = parsed
+    } catch {
+      return null
+    }
+  }
+  if (!arr) return null
+
+  const out: MixNarrativeSegment[] = []
+  for (const item of arr) {
+    if (!item || typeof item !== 'object') continue
+    const o = item as Record<string, unknown>
+    const segmentIndex = Number(o.segmentIndex)
+    const materialIndex = Number(o.materialIndex)
+    const visual = String(o.visual ?? '').trim()
+    const dialogue = String(o.dialogue ?? '').trim()
+    if (!Number.isFinite(segmentIndex) || segmentIndex < 0) continue
+    if (!Number.isFinite(materialIndex) || materialIndex < 0) continue
+    if (visual.length < 2 && dialogue.length < 2) continue
+    out.push({
+      segmentIndex,
+      materialIndex: Math.max(0, materialIndex),
+      sourceInSec: Math.max(0, Number(o.sourceInSec) || 0),
+      visual: visual || dialogue.slice(0, 72),
+      dialogue: dialogue || visual.slice(0, 120),
+      clipNote: typeof o.clipNote === 'string' ? o.clipNote.slice(0, 80) : undefined,
+    })
+  }
+  if (out.length < Math.min(2, matCount)) return null
+  const hasZero = out.some((d) => d.materialIndex === 0)
+  const oneBased =
+    !hasZero && out.every((d) => d.materialIndex >= 1 && d.materialIndex <= matCount)
+  return out.map((s) => ({
+    ...s,
+    materialIndex: oneBased
+      ? Math.max(0, s.materialIndex - 1)
+      : Math.max(0, s.materialIndex) % matCount,
+  }))
+}
+
+/** 保证每条素材恰好一次，并按叙事 segmentIndex 排序 */
+export function ensureFullMaterialNarrativeCoverage(
+  raw: MixNarrativeSegment[],
+  matCount: number,
+  profiles: IceMixMaterialProfile[],
+  guidance: string,
+  materials: IceMixMaterialSlot[] = [],
+): MixNarrativeSegment[] {
+  const guidanceLines = dialogueLinesFromGuidanceText(guidance)
+  const hook = guidance.trim().slice(0, 48) || '探店好物推荐'
+  const sorted = [...raw].sort((a, b) => a.segmentIndex - b.segmentIndex)
+  const usedMats = new Set<number>()
+  const result: MixNarrativeSegment[] = []
+
+  for (const s of sorted) {
+    const mi = s.materialIndex % matCount
+    if (usedMats.has(mi)) continue
+    usedMats.add(mi)
+    const prof = profileAt(profiles, materials, mi)
+    result.push({
+      segmentIndex: result.length,
+      materialIndex: mi,
+      sourceInSec: s.sourceInSec,
+      visual: s.visual.trim() || prof.description.slice(0, 72) || `素材${mi + 1}画面`,
+      dialogue:
+        s.dialogue.trim() ||
+        guidanceLines[result.length % Math.max(1, guidanceLines.length)] ||
+        hook,
+      clipNote: s.clipNote,
+    })
+  }
+
+  for (let mi = 0; mi < matCount; mi++) {
+    if (usedMats.has(mi)) continue
+    const prof = profileAt(profiles, materials, mi)
+    result.push({
+      segmentIndex: result.length,
+      materialIndex: mi,
+      sourceInSec: 0,
+      visual: prof.description.slice(0, 72) || `素材${mi + 1}画面`,
+      dialogue:
+        guidanceLines[result.length % Math.max(1, guidanceLines.length)] ||
+        hook,
+    })
+  }
+
+  return result.map((s, i) => ({ ...s, segmentIndex: i }))
+}
+
+function narrativeSegmentsToRows(
+  segments: MixNarrativeSegment[],
+  targetTotalSec: number,
+): ShortVideoScriptRow[] {
+  const n = Math.max(2, segments.length)
+  const total = Math.max(5, Math.ceil(targetTotalSec))
+  const each = total / n
+  const rows = segments.map((s, i) => {
+    const start = Math.round(i * each * 10) / 10
+    const end = i === n - 1 ? total : Math.round((i + 1) * each * 10) / 10
+    return {
+      timeRange: `${start}-${end}秒`,
+      visual: s.visual.trim(),
+      dialogue: s.dialogue.trim(),
+    }
+  })
+  return ensureSequentialMixScriptRows(rows, total)
+}
+
+function narrativeSegmentsToDecisions(segments: MixNarrativeSegment[]): MixEditSegmentDecision[] {
+  return segments.map((s, i) => ({
+    segmentIndex: i,
+    materialIndex: s.materialIndex,
+    sourceInSec: s.sourceInSec,
+    clipNote: s.clipNote,
+  }))
+}
+
+async function tryTextNarrativePlan(opts: {
+  guidance: string
+  materials: IceMixMaterialSlot[]
+  profiles: IceMixMaterialProfile[]
+}): Promise<MixNarrativeSegment[] | null> {
+  const matCount = opts.materials.length
+  const profileBlock = opts.profiles
+    .map(
+      (p) =>
+        `素材${p.index}（${p.label}）：${p.description}${p.estimatedDurationSec ? `；约${Math.round(p.estimatedDurationSec)}秒` : ''}`,
+    )
+    .join('\n')
+
+  const userBlock = `【指导文案】\n${opts.guidance.trim()}\n\n【素材画面库 共 ${matCount} 条】\n${profileBlock}\n\n请输出 ${matCount} 段叙事分镜 JSON（每条素材恰好一次，按指导文案叙事排序，非上传序号）。`
+
+  const providers: Array<'doubao' | 'qwen' | 'tokenmix'> = ['doubao', 'qwen', 'tokenmix']
+  for (const provider of providers) {
+    try {
+      const res = await postAiChat({
+        provider,
+        temperature: 0.2,
+        messages: [
+          { role: 'system', content: NARRATIVE_TEXT_PLAN_SYSTEM },
+          { role: 'user', content: userBlock },
+        ],
+      })
+      const parsed = parseNarrativePlanJson(res.content?.trim() || '', matCount)
+      if (parsed && parsed.length >= Math.min(2, matCount)) return parsed
+    } catch {
+      /* try next */
+    }
+  }
+  return null
+}
+
+async function refineClipPointsWithVision(opts: {
+  segments: MixNarrativeSegment[]
+  materials: IceMixMaterialSlot[]
+  profiles: IceMixMaterialProfile[]
+  framesByMaterial: Map<number, MixMaterialFrameSample[]>
+}): Promise<MixEditSegmentDecision[] | null> {
+  const chunkSize = 6
+  const merged = new Map<number, MixEditSegmentDecision>()
+
+  for (let start = 0; start < opts.segments.length; start += chunkSize) {
+    const chunk = opts.segments.slice(start, start + chunkSize)
+    const frameList: MixMaterialFrameSample[] = []
+    for (const seg of chunk) {
+      const frames = opts.framesByMaterial.get(seg.materialIndex) ?? []
+      for (const f of frames.slice(0, 2)) {
+        if (frameList.length < 12) frameList.push(f)
+      }
+    }
+    if (frameList.length < 1) continue
+
+    const storyboard = chunk
+      .map(
+        (s) =>
+          `段${s.segmentIndex} materialIndex=${s.materialIndex} | 画面：${s.visual} | 口播：${s.dialogue}`,
+      )
+      .join('\n')
+    const frameLegend = frameList
+      .map((f, i) => `附图${i + 1} = 素材${f.index}（${f.label}${f.tag ? `·${f.tag}` : ''}）`)
+      .join('\n')
+    const userBlock = `【分镜段】\n${storyboard}\n\n【附图】\n${frameLegend}\n\n请为以上各段输出 sourceInSec。`
+
+    const providers: Array<'qwen' | 'doubao'> = ['qwen', 'doubao']
+    for (const provider of providers) {
+      try {
+        const res = await postAiChat({
+          provider,
+          temperature: 0.12,
+          imageDataUrls: frameList.map((f) => f.dataUrl).slice(0, 12),
+          messages: [
+            { role: 'system', content: CLIP_POINT_VISION_SYSTEM },
+            { role: 'user', content: userBlock },
+          ],
+        })
+        const parsed = parseEditPlanJson(
+          res.content?.trim() || '',
+          opts.segments.length,
+          opts.materials.length,
+        )
+        if (!parsed) continue
+        for (const d of parsed) {
+          merged.set(d.segmentIndex, d)
+        }
+        break
+      } catch {
+        /* try next provider */
+      }
+    }
+  }
+
+  if (merged.size < Math.min(2, opts.segments.length)) return null
+  return opts.segments.map((s, i) => {
+    const hit = merged.get(s.segmentIndex) ?? merged.get(i)
+    const mi = hit?.materialIndex ?? s.materialIndex
+    const est =
+      opts.profiles.find((p) => p.index === mi)?.estimatedDurationSec ??
+      MIX_DEFAULT_SOURCE_DURATION_SEC
+    const sourceInSec = clampMixSourceInSec(hit?.sourceInSec ?? s.sourceInSec, 1.2, est)
+    return {
+      segmentIndex: i,
+      materialIndex: mi,
+      sourceInSec,
+      clipNote: hit?.clipNote ?? s.clipNote,
+    }
+  })
+}
+
+function buildFallbackNarrativeFromProfiles(
+  materials: IceMixMaterialSlot[],
+  profiles: IceMixMaterialProfile[],
+  guidance: string,
+): MixNarrativeSegment[] {
+  const guidanceLines = dialogueLinesFromGuidanceText(guidance)
+  const hook = guidance.trim().slice(0, 48) || '探店好物推荐'
+
+  const scored = materials.map((mat, index) => {
+    const prof = profileAt(profiles, materials, index)
+    let narrativeScore = index
+    const d = prof.description
+    if (/门头|外观|环境|门店|招牌/.test(d)) narrativeScore = 0 + index * 0.01
+    else if (/制作|过程|烹饪|操作|后厨|翻炒|下锅/.test(d)) narrativeScore = 100 + index * 0.01
+    else if (/成品|特写|摆盘|出锅|菜品/.test(d)) narrativeScore = 200 + index * 0.01
+    else if (/试吃|顾客|体验|品尝/.test(d)) narrativeScore = 300 + index * 0.01
+    else narrativeScore = 150 + index * 0.01
+    return { index, prof, narrativeScore, mat }
+  })
+  scored.sort((a, b) => a.narrativeScore - b.narrativeScore)
+
+  return scored.map((item, i) => ({
+    segmentIndex: i,
+    materialIndex: item.index,
+    sourceInSec: inferSourceInSec(item.prof.description, item.prof.estimatedDurationSec ?? 6),
+    visual: item.prof.description.slice(0, 72) || `${item.mat.label}画面`,
+    dialogue:
+      guidanceLines[i % Math.max(1, guidanceLines.length)] ||
+      hook,
+  }))
+}
+
+/**
+ * AI 叙事规划：理解素材画面 → 按指导文案排序 → 口播画面对齐 → 确定截取点。
+ * 输出分镜 rows + 剪辑 decisions（materialIndex 为叙事顺序，非上传顺序）。
+ */
+export async function planMixNarrativeFromVision(opts: {
+  guidance: string
+  materials: IceMixMaterialSlot[]
+  materialProfiles: IceMixMaterialProfile[]
+  targetTotalSec: number
+  onProgress?: (msg: string) => void
+}): Promise<
+  | {
+      ok: true
+      rows: ShortVideoScriptRow[]
+      decisions: MixEditSegmentDecision[]
+      materialSlots: number[]
+    }
+  | { ok: false; message: string }
+> {
+  const materials = opts.materials
+  const guidance = opts.guidance.trim()
+  if (materials.length < 2) return { ok: false, message: '至少 2 条素材' }
+  if (guidance.length < 4) return { ok: false, message: '请先填写指导文案' }
+
+  const profileList =
+    opts.materialProfiles.length > 0
+      ? opts.materialProfiles
+      : materials.map((m, i) => ({
+          index: i,
+          label: m.label,
+          kind: m.kind,
+          description: m.label,
+          estimatedDurationSec: m.kind === 'video' ? MIX_DEFAULT_SOURCE_DURATION_SEC : undefined,
+        }))
+
+  const usableProfiles = profileList.filter((p) => isMixProfileDescriptionUsable(p.description))
+  if (usableProfiles.length < Math.min(materials.length, Math.ceil(materials.length * 0.4))) {
+    return {
+      ok: false,
+      message: '请先点击「AI 分析素材」理解每条素材画面，再规划叙事分镜',
+    }
+  }
+
+  opts.onProgress?.('AI 正在按指导文案规划叙事顺序与口播…')
+  let segments: MixNarrativeSegment[] | null = await tryTextNarrativePlan({
+    guidance,
+    materials,
+    profiles: profileList,
+  })
+
+  if (!segments) {
+    opts.onProgress?.('叙事 JSON 解析失败，按画面语义自动排序…')
+    segments = buildFallbackNarrativeFromProfiles(materials, profileList, guidance)
+  }
+
+  segments = ensureFullMaterialNarrativeCoverage(
+    segments,
+    materials.length,
+    profileList,
+    guidance,
+    materials,
+  )
+
+  opts.onProgress?.('采样素材画面，确定各段截取点…')
+  try {
+    const frames = await Promise.race([
+      collectMixMaterialFramesForEditPlan(materials, {
+        allMaterials: true,
+        maxFrames: materials.length * 2,
+        onProgress: opts.onProgress,
+      }),
+      new Promise<MixMaterialFrameSample[]>((resolve) => {
+        window.setTimeout(() => resolve([]), VISION_EDIT_PLAN_TIMEOUT_MS)
+      }),
+    ])
+
+    if (frames.length >= 1) {
+      const framesByMaterial = groupMixFramesByMaterialIndex(frames)
+      const clipDecisions = await Promise.race([
+        refineClipPointsWithVision({
+          segments,
+          materials,
+          profiles: profileList,
+          framesByMaterial,
+        }),
+        new Promise<null>((resolve) => {
+          window.setTimeout(() => resolve(null), VISION_EDIT_PLAN_TIMEOUT_MS)
+        }),
+      ])
+      if (clipDecisions) {
+        segments = segments.map((s, i) => {
+          const d = clipDecisions.find((x) => x.segmentIndex === i) ?? clipDecisions[i]
+          return d
+            ? { ...s, materialIndex: d.materialIndex, sourceInSec: d.sourceInSec, clipNote: d.clipNote }
+            : s
+        })
+      }
+    }
+  } catch {
+    /* keep text plan sourceInSec */
+  }
+
+  for (const s of segments) {
+    if (materials[s.materialIndex]?.kind === 'image') s.sourceInSec = 0
+    else {
+      const est =
+        profileList.find((p) => p.index === s.materialIndex)?.estimatedDurationSec ??
+        MIX_DEFAULT_SOURCE_DURATION_SEC
+      s.sourceInSec = clampMixSourceInSec(s.sourceInSec, 1.2, est)
+    }
+  }
+
+  const rows = narrativeSegmentsToRows(segments, opts.targetTotalSec)
+  const decisions = narrativeSegmentsToDecisions(segments)
+  const materialSlots = segments.map((s) => s.materialIndex)
+
+  return { ok: true, rows, decisions, materialSlots }
 }

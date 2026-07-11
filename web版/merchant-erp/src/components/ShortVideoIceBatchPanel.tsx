@@ -63,6 +63,7 @@ import { planShortVideoScriptFromGuidance } from '../services/shortVideoGuidance
 import { analyzeIceMixMaterialsToGuidance } from '../services/iceMixGuidanceAi'
 import { produceIceMixPackage, composeMixProductionBrief, type IceMixProduceOutput } from '../services/iceMixProduceEngine'
 import type { IceMixMaterialProfile } from '../services/iceMixEditPlanAi'
+import { planMixNarrativeFromVision } from '../services/iceMixEditPlanAi'
 import {
   assignFullMaterialCoverageSlots,
   expandMixRowsForMaterialPool,
@@ -393,15 +394,22 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       mixMaterialProfiles.length > 0
     if (!canCover) return
 
-    if (scriptRows.length !== poolLen || poolLen > prevLen) {
+    if (scriptRows.length < 2 && mixGuidance.trim().length >= 4) {
       const synced = syncMixCoverageForAllMaterials(
         mixMaterialPool,
         mixTargetSec,
-        scriptRows.length >= 2 ? scriptRows : [],
+        [],
         mixGuidance.trim(),
       )
       setScriptRows(synced.rows)
       setMaterialSlots(synced.slots)
+      return
+    }
+
+    if (poolLen > prevLen && scriptRows.length >= 2) {
+      setMaterialSlots((prev) =>
+        prev.length === poolLen ? prev : assignFullMaterialCoverageSlots(poolLen),
+      )
       return
     }
 
@@ -787,13 +795,47 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       return
     }
     const poolLen = mixMaterialPool.length
+    const usableProfiles = mixMaterialProfiles.filter((p) => p.description.trim().length >= 24)
+
+    setPlanBusy(true)
+    setErr(null)
+
+    if (usableProfiles.length >= Math.min(poolLen, Math.ceil(poolLen * 0.4))) {
+      setHint('AI 正在理解素材画面，按指导文案规划叙事分镜…')
+      try {
+        const narrative = await planMixNarrativeFromVision({
+          guidance: draft,
+          materials: mixMaterialPool,
+          materialProfiles: mixMaterialProfiles,
+          targetTotalSec: mixTargetSec,
+          onProgress: (msg) => setHint(msg),
+        })
+        if (narrative.ok) {
+          setScriptRows(narrative.rows)
+          setMaterialSlots(narrative.materialSlots)
+          const covered = maxScriptTimeRangeEndSec(narrative.rows)
+          setHint(
+            `AI 已按叙事顺序规划 ${narrative.rows.length} 段分镜（${poolLen} 条素材语义匹配，约 0–${covered || mixTargetSec} 秒），请核对后一键混剪。`,
+          )
+          setPlanBusy(false)
+          return
+        }
+        setHint(`${narrative.message}，将尝试通用分镜规划…`)
+      } catch (e) {
+        setHint(
+          e instanceof Error
+            ? `${e.message}，将尝试通用分镜规划…`
+            : '叙事规划失败，将尝试通用分镜规划…',
+        )
+      }
+    } else {
+      setHint('建议先点击「AI 分析素材」；正在按指导文案规划通用分镜…')
+    }
+
     const materialHint = mixMaterialPool
       .map((m, i) => `素材${i + 1}：${m.label}（${m.kind === 'video' ? '视频' : '图片'}）`)
       .join('\n')
-    const plannerInput = `${draft}\n\n【混剪素材 ${poolLen} 条】\n${materialHint}\n\n规划要求：\n- 理解指导文案叙事，输出 6～12 段代表性分镜即可（后续系统会自动扩展为 ${poolLen} 段并逐条映射素材）\n- 每段 visual、dialogue 均须非空；口播可从指导文案拆句改写\n- 时间段从 0 连续覆盖至 ${mixTargetSec} 秒`
-    setPlanBusy(true)
-    setErr(null)
-    setHint('AI 正在通读指导文案并规划混剪分镜…')
+    const plannerInput = `${draft}\n\n【混剪素材 ${poolLen} 条】\n${materialHint}\n\n规划要求：\n- 理解指导文案叙事，输出与素材数量相近的分镜段\n- 每段 visual、dialogue 均须非空；口播从指导文案拆句，须与画面语义对应\n- 时间段从 0 连续覆盖至 ${mixTargetSec} 秒`
     try {
       const r = await planShortVideoScriptFromGuidance(plannerInput, {
         targetTotalSec: mixTargetSec,
@@ -819,24 +861,18 @@ export function ShortVideoIceBatchPanel(_props: Props) {
         mixMaterialPool,
         mixGuidance.trim(),
       )
-      const synced = syncMixCoverageForAllMaterials(
-        mixMaterialPool,
-        mixTargetSec,
-        expandedRows,
-        mixGuidance.trim(),
-      )
-      setScriptRows(synced.rows)
-      setMaterialSlots(synced.slots)
-      const covered = maxScriptTimeRangeEndSec(synced.rows)
+      setScriptRows(expandedRows)
+      setMaterialSlots(assignFullMaterialCoverageSlots(poolLen))
+      const covered = maxScriptTimeRangeEndSec(expandedRows)
       setHint(
-        `AI 已规划 ${synced.rows.length} 段混剪分镜（${poolLen} 条素材逐条映射，约 0–${covered || mixTargetSec} 秒），请核对后一键混剪。`,
+        `AI 已规划 ${expandedRows.length} 段分镜（约 0–${covered || mixTargetSec} 秒）。建议先「AI 分析素材」以获得叙事排序匹配。`,
       )
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'AI 规划分镜失败，请稍后重试')
     } finally {
       setPlanBusy(false)
     }
-  }, [mixGuidance, mixMaterialPool.length, mixTargetSec])
+  }, [mixGuidance, mixMaterialPool, mixMaterialProfiles, mixTargetSec])
 
   const addImageUrlsFromText = useCallback(() => {
     const urls = parseImageUrlLines(imageUrlText)
@@ -1016,17 +1052,10 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       )
     })
 
-    const coverage = syncMixCoverageForAllMaterials(
-      mixMaterialPool,
-      mixTargetSec,
-      scriptRows,
-      mixGuidance.trim(),
-    )
-
     const produced = await produceIceMixPackage({
-      rows: coverage.rows,
+      rows: scriptRows,
       materials: mixMaterialPool,
-      materialSlots: coverage.slots,
+      materialSlots,
       materialProfiles: profiles,
       targetTotalSec: mixTargetSec,
       guidance: mixGuidance.trim(),
@@ -1156,7 +1185,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
         mediaUrl: m.mediaUrl,
         label: m.label,
       })),
-      scriptRows: [],
+      scriptRows: scriptRows.length >= 2 ? scriptRows : [],
       guidance: mixGuidance.trim(),
       targetTotalSec: totalSec,
       width: aspect.width,
@@ -1164,6 +1193,8 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       projectName: `智能成片-${label}`.slice(0, 120),
       templateIds: cfg.smartBatchTemplateIds,
       subtitleStyleId: mixSubtitleStyleId,
+      materialSlots:
+        materialSlots.length === mixMaterialPool.length ? materialSlots : undefined,
     })
 
     if (!pipe.ok) {

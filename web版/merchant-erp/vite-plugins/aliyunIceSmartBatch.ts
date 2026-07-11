@@ -212,10 +212,18 @@ function buildInputConfig(input: {
   scriptRows: IceSmartBatchScriptRow[]
   guidance: string
   targetTotalSec: number
+  materialSlots?: number[]
 }): { inputConfig: Record<string, unknown>; speechRate: number; shotDurationSec: number } {
-  const urls = input.materials
+  const baseUrls = input.materials
     .map((m) => ensureIceHttpsUrl(sanitizeIcePipelineMediaUrl(m.mediaUrl)))
     .filter(Boolean)
+  const slots = (input.materialSlots ?? []).filter(
+    (n) => Number.isFinite(n) && n >= 0 && n < baseUrls.length,
+  )
+  const urls =
+    slots.length === input.materials.length
+      ? slots.map((mi) => baseUrls[mi]!).filter(Boolean)
+      : baseUrls
   const guidance = input.guidance.trim()
   const targetTotalSec = Math.min(120, Math.max(5, Math.ceil(input.targetTotalSec)))
   const shotDurationSec = Math.max(0.45, Math.round((targetTotalSec / Math.max(1, urls.length)) * 100) / 100)
@@ -323,6 +331,7 @@ export async function iceSubmitSmartBatchJob(
     scriptRows,
     guidance,
     targetTotalSec,
+    materialSlots: input.materialSlots,
   })
   const inputConfig = built.inputConfig
   const editingConfig = buildDefaultEditingConfig(

@@ -90,18 +90,31 @@ async function collectMaterialFrame(
   return { index, label: pick.label, dataUrl: pick.dataUrl }
 }
 
-/** 为每条素材截帧，供视觉模型剪辑匹配（视频含首帧+尾帧，最多 12 张） */
+export type MixMaterialFrameSample = {
+  index: number
+  label: string
+  dataUrl: string
+  tag?: string
+}
+
+/** 为每条素材截帧，供视觉模型剪辑匹配（视频含首帧+尾帧；≤40 条时全量采样） */
 export async function collectMixMaterialFramesForEditPlan(
   materials: IceMixMaterialSlot[],
-  opts?: { maxFrames?: number; onProgress?: (msg: string) => void },
-): Promise<Array<{ index: number; label: string; dataUrl: string }>> {
-  const max = Math.min(materials.length * 2, opts?.maxFrames ?? 16)
-  const frameMaterialCap = Math.min(materials.length, Math.max(8, Math.ceil(max / 2)))
+  opts?: { maxFrames?: number; onProgress?: (msg: string) => void; allMaterials?: boolean },
+): Promise<MixMaterialFrameSample[]> {
+  const allMaterials = opts?.allMaterials !== false && materials.length <= 40
+  const max = Math.min(
+    materials.length * 2,
+    opts?.maxFrames ?? (allMaterials ? materials.length * 2 : 24),
+  )
+  const frameMaterialCap = allMaterials
+    ? materials.length
+    : Math.min(materials.length, Math.max(8, Math.ceil(max / 2)))
   const targets =
     materials.length <= frameMaterialCap
       ? materials
       : sampleMixMaterialsEvenly(materials, frameMaterialCap)
-  const out: Array<{ index: number; label: string; dataUrl: string }> = []
+  const out: MixMaterialFrameSample[] = []
 
   await runIceUploadPool(targets, FRAME_CONCURRENCY, async (mat) => {
     const idx = materials.indexOf(mat)
@@ -124,10 +137,28 @@ export async function collectMixMaterialFramesForEditPlan(
     )
     for (const f of frames) {
       if (out.length >= max) break
-      out.push({ index, label: `${f.label}·${f.tag === 'opening' ? '首帧' : '尾帧'}`, dataUrl: f.dataUrl })
+      out.push({
+        index,
+        label: `${f.label}·${f.tag === 'opening' ? '首帧' : '尾帧'}`,
+        dataUrl: f.dataUrl,
+        tag: f.tag,
+      })
     }
     return frames[0] ?? null
   })
 
   return out.sort((a, b) => a.index - b.index || a.label.localeCompare(b.label))
+}
+
+/** 按素材索引分组的多帧采样（叙事规划截取点精修用） */
+export function groupMixFramesByMaterialIndex(
+  frames: MixMaterialFrameSample[],
+): Map<number, MixMaterialFrameSample[]> {
+  const map = new Map<number, MixMaterialFrameSample[]>()
+  for (const f of frames) {
+    const list = map.get(f.index) ?? []
+    list.push(f)
+    map.set(f.index, list)
+  }
+  return map
 }

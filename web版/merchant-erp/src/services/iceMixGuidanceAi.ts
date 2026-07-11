@@ -11,7 +11,7 @@ import { runIceUploadPool } from '../lib/iceUploadPool'
 
 const VISION_SAMPLE_MAX = 20
 /** 素材分析：超过此数量只抽样深度理解，其余用文件名占位 */
-const MATERIAL_PROFILE_DEEP_MAX = 20
+const MATERIAL_PROFILE_DEEP_MAX = 48
 const MATERIAL_PROFILE_CONCURRENCY = 5
 const MATERIAL_FRAME_TIMEOUT_MS = 20_000
 const MATERIAL_VISION_BATCH_TIMEOUT_MS = 90_000
