@@ -4,6 +4,7 @@
 import {
   maxScriptTimeRangeEndSec,
   parseScriptTimeRangeSeconds,
+  dialogueLinesFromGuidance,
   type ShortVideoScriptRow,
 } from './shortVideoScriptTable'
 
@@ -169,18 +170,23 @@ export function buildAllMaterialCoverageRows(
   const dialogues = sourceRows
     .map((r) => r.dialogue.trim())
     .filter((d) => d.length >= 2 && !/^（无口播）$/i.test(d))
+  const guidanceLines = dialogueLinesFromGuidance(guidance)
   const visuals = sourceRows.map((r) => r.visual.trim()).filter((v) => v.length >= 2)
-  const hook = guidance.trim().slice(0, 48)
+  const hook = guidanceLines[0] || guidance.trim().slice(0, 48) || '精彩片段'
 
   const rows = Array.from({ length: n }, (_, i) => {
     const start = Math.round(i * clipSec * 10) / 10
     const end = i === n - 1 ? total : Math.round((i + 1) * clipSec * 10) / 10
+    const matLabel = materials[i]?.label || `素材${i + 1}`
     return {
       timeRange: `${start}-${end}秒`,
       visual:
         visuals[i % Math.max(1, visuals.length)] ||
-        `${materials[i]?.label || `素材${i + 1}`}：展示本条实拍画面`,
-      dialogue: dialogues[i % Math.max(1, dialogues.length)] || hook || '（无口播）',
+        `${matLabel}：展示本条实拍画面`,
+      dialogue:
+        dialogues[i % Math.max(1, dialogues.length)] ||
+        guidanceLines[i % Math.max(1, guidanceLines.length)] ||
+        hook,
     }
   })
   return ensureSequentialMixScriptRows(rows, total)

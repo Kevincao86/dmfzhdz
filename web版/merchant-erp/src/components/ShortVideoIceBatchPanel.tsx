@@ -763,15 +763,10 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       return
     }
     const poolLen = mixMaterialPool.length
-    const desiredSegments = resolveMixStoryboardSegmentCount(
-      mixTargetSec,
-      MIX_DEFAULT_SEGMENT_SEC,
-      poolLen,
-    )
     const materialHint = mixMaterialPool
       .map((m, i) => `素材${i + 1}：${m.label}（${m.kind === 'video' ? '视频' : '图片'}）`)
       .join('\n')
-    const plannerInput = `${draft}\n\n【混剪素材 ${poolLen} 条】\n${materialHint}\n\n规划要求：\n- 须理解指导文案叙事，为每段分镜指定最匹配的素材画面（可重复用同条素材的不同片段，禁止机械只用前几条）\n- 共 ${poolLen} 条素材须尽量分散使用，请规划 ${desiredSegments} 段分镜（单段约 2～4 秒），覆盖更多不同画面\n- 时间段从 0 连续覆盖至 ${mixTargetSec} 秒，段与段首尾相接\n- 每段 visual 写清该段应呈现的镜头内容；dialogue 写 TTS 口播讲解`
+    const plannerInput = `${draft}\n\n【混剪素材 ${poolLen} 条】\n${materialHint}\n\n规划要求：\n- 理解指导文案叙事，输出 6～12 段代表性分镜即可（后续系统会自动扩展为 ${poolLen} 段并逐条映射素材）\n- 每段 visual、dialogue 均须非空；口播可从指导文案拆句改写\n- 时间段从 0 连续覆盖至 ${mixTargetSec} 秒`
     setPlanBusy(true)
     setErr(null)
     setHint('AI 正在通读指导文案并规划混剪分镜…')
@@ -782,6 +777,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
         plannerModel: 'auto',
         mode: 'generate_text',
         skipReviewPasses: true,
+        mixAutoExpandSegments: true,
         onProgress: (msg) => setHint(msg),
       })
       if (!r.ok) {
