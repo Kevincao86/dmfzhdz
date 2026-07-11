@@ -11,6 +11,7 @@ import { validateIceMixMaterialUrl, sanitizeIceMixMaterialUrlForPipeline } from 
 import type { IceMixMaterialSlot, IceMixSegmentPlan } from '../lib/iceMixPlan'
 import {
   assignMixMaterialSlots,
+  buildAllMaterialCoverageRows,
   canonicalMixMediaKey,
   clampMixSourceInSec,
   collectMixNarrationText,
@@ -196,6 +197,40 @@ export function composeMixProductionBrief(
   return composeMixEditBrief(instBlock, rows)
 }
 
+function segmentsCoverAllMaterials(
+  segments: IceMixSegmentPlan[],
+  materialCount: number,
+): boolean {
+  if (materialCount <= 0) return true
+  const used = new Set(segments.map((s) => s.materialIndex))
+  for (let i = 0; i < materialCount; i++) {
+    if (!used.has(i)) return false
+  }
+  return true
+}
+
+/** 每条素材至少一段：按时间均分拼接（兜底，确保无遗漏） */
+function buildSegmentsCoveringAllMaterials(
+  rows: ShortVideoScriptRow[],
+  materials: IceMixMaterialSlot[],
+  targetTotalSec: number,
+  materialProfiles?: IceMixMaterialProfile[],
+): IceMixSegmentPlan[] {
+  const coverageRows = buildAllMaterialCoverageRows(
+    materials,
+    targetTotalSec,
+    rows,
+    rows.map((r) => r.dialogue).join(' '),
+  )
+  return buildIceMixSegmentsFromSlots(
+    coverageRows,
+    materials,
+    assignMixMaterialSlots(materials.length, materials.length),
+    targetTotalSec,
+    materialProfiles,
+  )
+}
+
 export function validateMixSegmentDiversity(
   segments: IceMixSegmentPlan[],
   materials: IceMixMaterialSlot[],
@@ -238,11 +273,21 @@ export async function produceIceMixPackage(
 
   input.onProgress?.('正在规划多素材拼接与截取点…')
   const total = resolveMixTotalDurationSec(input.rows, input.targetTotalSec)
-  const rows = ensureSequentialMixScriptRows(input.rows, total)
+  let rows = ensureSequentialMixScriptRows(input.rows, total)
+  if (materials.length > rows.length) {
+    rows = buildAllMaterialCoverageRows(
+      materials,
+      input.targetTotalSec,
+      rows,
+      input.guidance || input.mixInstruction || '',
+    )
+  }
   const materialSlots = resolveMixMaterialSlotMapping(
     rows.length,
     materials,
-    input.materialSlots,
+    input.materialSlots.length === rows.length
+      ? input.materialSlots
+      : assignMixMaterialSlots(rows.length, materials.length),
   )
 
   const profileList =
@@ -288,6 +333,16 @@ export async function produceIceMixPackage(
 
   if (segments.length < 2) {
     return { ok: false, message: '无法生成分镜时间线，请检查分镜表' }
+  }
+
+  if (!segmentsCoverAllMaterials(segments, materials.length)) {
+    input.onProgress?.('补齐未使用的素材片段…')
+    segments = buildSegmentsCoveringAllMaterials(
+      rows,
+      materials,
+      input.targetTotalSec,
+      profileList,
+    )
   }
 
   const diversityErr = validateMixSegmentDiversity(segments, materials)
