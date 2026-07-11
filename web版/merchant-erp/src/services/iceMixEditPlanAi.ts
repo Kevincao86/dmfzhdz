@@ -256,6 +256,7 @@ export function buildStructuralMixDecisions(
       MIX_DEFAULT_SOURCE_DURATION_SEC
     const tr = parseScriptTimeRangeSeconds(row.timeRange)
     const clipDur = tr ? Math.max(0.35, tr.end - tr.start) : 4
+    const prof = profileAt(profiles, materials, bestIdx)
 
     let sourceInSec = inferSourceInSec(row.visual, est, prof)
     if (materials.length >= 2) {
@@ -407,13 +408,15 @@ export async function planMixEditFromInstructions(opts: {
   const profileList =
     profiles.length > 0
       ? profiles
-      : materials.map((m, i) => ({
-          index: i,
-          label: m.label,
-          kind: m.kind,
-          description: m.label,
-          estimatedDurationSec: m.kind === 'video' ? MIX_DEFAULT_SOURCE_DURATION_SEC : undefined,
-        }))
+      : materials.map(
+          (m, i): IceMixMaterialProfile => ({
+            index: i,
+            label: m.label,
+            kind: m.kind,
+            description: m.label,
+            estimatedDurationSec: m.kind === 'video' ? MIX_DEFAULT_SOURCE_DURATION_SEC : undefined,
+          }),
+        )
 
   let decisions = buildStructuralMixDecisions(rows, materials, profileList)
 
@@ -875,13 +878,15 @@ export async function planMixNarrativeFromVision(opts: {
   const profileList =
     opts.materialProfiles.length > 0
       ? opts.materialProfiles
-      : materials.map((m, i) => ({
-          index: i,
-          label: m.label,
-          kind: m.kind,
-          description: m.label,
-          estimatedDurationSec: m.kind === 'video' ? MIX_DEFAULT_SOURCE_DURATION_SEC : undefined,
-        }))
+      : materials.map(
+          (m, i): IceMixMaterialProfile => ({
+            index: i,
+            label: m.label,
+            kind: m.kind,
+            description: m.label,
+            estimatedDurationSec: m.kind === 'video' ? MIX_DEFAULT_SOURCE_DURATION_SEC : undefined,
+          }),
+        )
 
   const usableProfiles = profileList.filter((p) => isMixProfileDescriptionUsable(p.description))
   if (usableProfiles.length < Math.min(materials.length, Math.ceil(materials.length * 0.4))) {
