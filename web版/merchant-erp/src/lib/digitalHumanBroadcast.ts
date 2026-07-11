@@ -522,10 +522,11 @@ export const CUSTOM_UPLOAD_VOICE_PRESETS: VoicePreset[] = [
   },
 ]
 
-/** AI混剪口播可选音色（与数字人口播同源，不含克隆） */
+/** AI混剪口播可选音色（与数字人口播同源，含语音克隆） */
 export const ICE_MIX_VOICE_PRESETS: VoicePreset[] = [
   ...CUSTOM_UPLOAD_VOICE_PRESETS,
   ...AVATAR_VOICE_PRESETS,
+  VOICE_CLONE_PRESET,
 ]
 
 export const ICE_MIX_VOICE_DEFAULT_ID = CUSTOM_UPLOAD_VOICE_PRESETS[0]!.id

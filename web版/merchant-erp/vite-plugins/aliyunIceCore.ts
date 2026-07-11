@@ -1139,6 +1139,7 @@ export async function iceRunMixPipeline(
     subtitleStyleId?: string
     mixNarrationText?: string
     mixVoicePresetId?: string
+    mixVoiceCloneBase64?: string
     env?: Record<string, string | undefined>
   },
 ): Promise<
@@ -1335,7 +1336,13 @@ export async function iceRunMixPipeline(
   const narrationText = String(input.mixNarrationText ?? '').trim()
   if (narrationText.length >= 4 && input.env) {
     const { synthesizeIceMixNarrationMp3 } = await import('./iceMixNarrationTts.js')
-    const tts = await synthesizeIceMixNarrationMp3(cfg, input.env, narrationText, input.mixVoicePresetId)
+    const tts = await synthesizeIceMixNarrationMp3(
+      cfg,
+      input.env,
+      narrationText,
+      input.mixVoicePresetId,
+      input.mixVoiceCloneBase64,
+    )
     if (tts.ok) {
       const narTimeline = sanitizeIcePipelineMediaUrl(tts.timelineUrl, tts.mediaUrl)
       const reg = await registerMediaUrlToMediaId(

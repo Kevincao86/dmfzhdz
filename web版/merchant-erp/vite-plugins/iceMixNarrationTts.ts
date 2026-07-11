@@ -15,6 +15,7 @@ export async function synthesizeIceMixNarrationMp3(
   env: Record<string, string | undefined>,
   text: string,
   voicePresetId?: string,
+  voiceCloneBase64?: string,
 ): Promise<
   | { ok: true; timelineUrl: string; mediaUrl: string; durationSecEstimate: number }
   | { ok: false; message: string }
@@ -26,10 +27,12 @@ export async function synthesizeIceMixNarrationMp3(
 
   const presetId = String(voicePresetId || ICE_MIX_VOICE_DEFAULT_ID).trim() || ICE_MIX_VOICE_DEFAULT_ID
   const preset = voicePresetById(presetId)
+  const refB64 = String(voiceCloneBase64 ?? '').replace(/\s/g, '')
+  const useClone = presetId === 'v-clone' && refB64.length > 64
 
   let audioBase64: string | null = null
 
-  if (preset && preset.id !== 'v-clone') {
+  if (preset && (useClone || preset.id !== 'v-clone')) {
     const dh = await runDigitalHumanTtsCore(
       {
         text: narration.slice(0, 1200),
@@ -37,6 +40,7 @@ export async function synthesizeIceMixNarrationMp3(
         speechRate: preset.rate,
         speechPitch: preset.pitch,
         trustedServer: true,
+        ...(useClone ? { referenceAudioBase64: refB64 } : {}),
       },
       env as Record<string, string>,
     )
@@ -46,6 +50,9 @@ export async function synthesizeIceMixNarrationMp3(
   }
 
   if (!audioBase64) {
+    if (useClone) {
+      return { ok: false, message: '语音克隆合成失败，请确认已上传样本且运营台已配置通义 Key' }
+    }
     const tts = await synthesizeWithQwenSpeechPool(env as Record<string, string>, {
       text: narration.slice(0, 1200),
       gender: preset?.gender ?? '女',

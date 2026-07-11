@@ -721,6 +721,8 @@ export async function postIcePipeline(body: {
   mixNarrationText?: string
   /** 混剪口播音色（与数字人口播同源 preset id） */
   mixVoicePresetId?: string
+  /** 语音克隆参考音频（纯 base64，v-clone 时必填） */
+  mixVoiceCloneBase64?: string
   projectName?: string
   /** 剪辑文案指令，写入云端项目描述 */
   editBrief?: string

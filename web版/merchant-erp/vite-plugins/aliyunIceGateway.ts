@@ -468,6 +468,8 @@ export async function handleAliyunIceRoutes(input: {
 
     const mixNarrationText = String(parsed.mixNarrationText ?? parsed.narrationText ?? '').trim()
     const mixVoicePresetId = String(parsed.mixVoicePresetId ?? parsed.voicePresetId ?? '').trim() || undefined
+    const mixVoiceCloneBase64 =
+      typeof parsed.mixVoiceCloneBase64 === 'string' ? parsed.mixVoiceCloneBase64.trim() : undefined
     const mixSegmentsRaw = parsed.mixSegments
     const mixSegments = parseIceMixPipelineSegments(mixSegmentsRaw)
 
@@ -544,6 +546,7 @@ export async function handleAliyunIceRoutes(input: {
             subtitleStyleId: subtitleStyle.id,
             mixNarrationText,
             mixVoicePresetId,
+            mixVoiceCloneBase64,
             env: rawEnv as Record<string, string | undefined>,
           })
         : pipelineImageUrls.length > 0

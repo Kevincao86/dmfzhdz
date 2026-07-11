@@ -122,6 +122,7 @@ export async function playDigitalHumanSpeech(
     speechRate: number
     speechPitch: number
     mode: DigitalHumanTtsMode
+    referenceAudioBase64?: string
   },
   callbacks: DigitalHumanTtsCallbacks,
 ): Promise<{
@@ -139,16 +140,18 @@ export async function playDigitalHumanSpeech(
   }
 
   const previewLine = trimmed.split(/\n/)[0]?.slice(0, 36) ?? trimmed.slice(0, 36)
-  const canUseCloud = Boolean(opts.preset?.cloudVoiceId)
+  const canUseCloud = Boolean(opts.preset?.cloudVoiceId) || opts.preset?.id === 'v-clone'
 
   let cloudFallbackReason: string | undefined
 
   if (canUseCloud && opts.preset) {
+    const refB64 = opts.referenceAudioBase64?.replace(/\s/g, '') ?? ''
     const cloud = await synthesizeDigitalHumanSpeech({
       text: trimmed,
       voicePresetId: opts.preset.id,
       speechRate: opts.speechRate,
       speechPitch: opts.speechPitch,
+      ...(refB64.length > 64 ? { referenceAudioBase64: refB64 } : {}),
     })
     if (cloud.ok) {
       if (!cloud.audioBase64 || cloud.audioBase64.length < 64) {
