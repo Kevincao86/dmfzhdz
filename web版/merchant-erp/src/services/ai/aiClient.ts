@@ -2,6 +2,10 @@
  * 智能体：优先 ECS /erp-api（本机 Supabase + 运营台注册表 Key），再回退当前站点 Vercel /api。
  */
 import { supabase, supabaseConfigured } from '../../lib/supabaseClient'
+import {
+  merchantApiAuthHeaders,
+  resolveMerchantApiBearer,
+} from '../../lib/merchantApiAuth'
 import { merchantErpApiCandidates } from '../../lib/merchantErpApiBase'
 import { fetchPrimaryTenantId } from '../../lib/tenantBilling'
 import type { AIChatOkBody, AIChatRequest, AIChatResponse, AIChatStreamEvent } from './types'
@@ -16,10 +20,9 @@ export function isAiRequestAborted(e: unknown): boolean {
   return false
 }
 
-async function bearer(): Promise<string | null> {
-  if (!supabaseConfigured || !supabase) return null
-  const { data } = await supabase.auth.getSession()
-  return data.session?.access_token ?? null
+async function aiAuthHeaders(): Promise<Record<string, string>> {
+  const auth = await resolveMerchantApiBearer()
+  return merchantApiAuthHeaders(auth.token, auth.source)
 }
 
 async function tenantIdForApi(): Promise<string | undefined> {
@@ -63,13 +66,12 @@ export async function postAiChat(
   req: AIChatRequest,
   opts?: { signal?: AbortSignal },
 ): Promise<AIChatResponse> {
-  const token = await bearer()
-  const tenantId = await tenantIdForApi()
+  const [authHeaders, tenantId] = await Promise.all([aiAuthHeaders(), tenantIdForApi()])
   const headers: Record<string, string> = {
     Accept: 'application/json',
     'Content-Type': 'application/json',
+    ...authHeaders,
   }
-  if (token) headers.Authorization = `Bearer ${token}`
 
   const tryPaths = ['/api/meoo-ai-chat', '/api/ai/chat']
   let lastErr = 'no_response'
@@ -236,12 +238,12 @@ export async function streamAiChat(
     signal?: AbortSignal
   },
 ): Promise<AIChatResponse> {
-  const [token, tenantId] = await Promise.all([bearer(), tenantIdForApi()])
+  const [authHeaders, tenantId] = await Promise.all([aiAuthHeaders(), tenantIdForApi()])
   const headers: Record<string, string> = {
     Accept: 'text/event-stream',
     'Content-Type': 'application/json',
+    ...authHeaders,
   }
-  if (token) headers.Authorization = `Bearer ${token}`
 
   const body = JSON.stringify({
     ...req,
@@ -418,13 +420,12 @@ export async function postAiAgentNativeImage(
     signal?: AbortSignal
   },
 ): Promise<AiAgentNativeImageOk | AiAgentNativeImageErr> {
-  const token = await bearer()
-  const tenantId = await tenantIdForApi()
+  const [authHeaders, tenantId] = await Promise.all([aiAuthHeaders(), tenantIdForApi()])
   const headers: Record<string, string> = {
     Accept: 'application/json',
     'Content-Type': 'application/json',
+    ...authHeaders,
   }
-  if (token) headers.Authorization = `Bearer ${token}`
 
   const tryPaths = ['/api/meoo-ai-agent-image']
   let lastErr = 'no_response'
