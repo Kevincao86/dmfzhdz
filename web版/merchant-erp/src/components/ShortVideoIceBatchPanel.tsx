@@ -1107,27 +1107,22 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     }
 
     const totalSec = mixTargetSec
-    const coverage = syncMixCoverageForAllMaterials(
-      mixMaterialPool,
-      totalSec,
-      scriptRows.length >= 2 ? scriptRows : [],
-      mixGuidance.trim(),
-    )
-    const slots = coverage.slots
     const pipe = await postIceSmartBatch({
       materials: mixMaterialPool.map((m) => ({
         kind: m.kind,
         mediaUrl: m.mediaUrl,
         label: m.label,
       })),
-      scriptRows: coverage.rows.map((r) => ({
-        timeRange: r.timeRange,
-        visual: r.visual,
-        dialogue: r.dialogue,
-      })),
+      scriptRows: scriptRows
+        .filter((r) => r.dialogue.trim().length >= 4)
+        .slice(0, 4)
+        .map((r) => ({
+          timeRange: r.timeRange,
+          visual: r.visual,
+          dialogue: r.dialogue,
+        })),
       guidance: mixGuidance.trim(),
       targetTotalSec: totalSec,
-      materialSlots: slots,
       width: aspect.width,
       height: aspect.height,
       projectName: `智能成片-${label}`.slice(0, 120),
