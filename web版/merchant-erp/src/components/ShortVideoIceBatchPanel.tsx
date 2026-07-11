@@ -183,12 +183,6 @@ function icePipelineImageUrl(item: IceImageItem): string {
   return item.pipelineUrl?.trim() || item.mediaUrl
 }
 
-function formatProgress(p?: number): string {
-  if (p == null || Number.isNaN(p)) return ''
-  const n = p <= 1 ? Math.round(p * 100) : Math.round(p)
-  return ` ${n}%`
-}
-
 type Props = {
   lastResultUrl?: string | null
 }
