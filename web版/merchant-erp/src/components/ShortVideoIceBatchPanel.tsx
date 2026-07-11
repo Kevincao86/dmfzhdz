@@ -91,7 +91,35 @@ import {
 
 const MIX_DEFAULT_SEGMENT_SEC = 5
 const POLL_MS = 5000
-const POLL_MAX = 120
+/** 普通混剪 ICE 时间线：最长约 10 分钟 */
+const POLL_MAX_TIMELINE = 120
+/** 智能成片 IMS 批量任务：多素材初始化慢，最长约 30 分钟 */
+const POLL_MAX_SMART_BATCH = 360
+
+function formatIcePollingMessage(
+  status: string | undefined,
+  mode: 'timeline' | 'smart_batch',
+  elapsedSec: number,
+  serverMessage?: string,
+): string {
+  const raw = String(status ?? '').trim()
+  const lower = raw.toLowerCase()
+  const mins = Math.floor(elapsedSec / 60)
+  const secs = elapsedSec % 60
+  const waited = mins > 0 ? `已等待 ${mins} 分 ${secs} 秒` : `已等待 ${secs} 秒`
+
+  if (lower.includes('init')) {
+    return mode === 'smart_batch'
+      ? `IMS 排队初始化中（${waited}；30+ 条素材通常需 5–20 分钟，请耐心等待）`
+      : `云端任务初始化中（${waited}）`
+  }
+  if (lower.includes('process') || lower.includes('running') || lower.includes('editing')) {
+    return `云端合成中（${waited}）${raw ? ` · ${raw}` : ''}`
+  }
+  if (serverMessage?.trim()) return `${serverMessage.trim()}（${waited}）`
+  if (raw) return `剪辑中 ${raw}（${waited}）`
+  return `云端剪辑中（${waited}）`
+}
 
 /** 每条素材批量生成的成片数量 */
 export const ICE_BATCH_GENERATE_COUNTS = [10, 20, 50, 100] as const
@@ -170,7 +198,9 @@ export function ShortVideoIceBatchPanel(_props: Props) {
   const [imageUrlText, setImageUrlText] = useState('')
   const [imageItems, setImageItems] = useState<IceImageItem[]>([])
   const [jobs, setJobs] = useState<IceBatchJob[]>([])
-  const [oneClickBusy, setOneClickBusy] = useState(false)
+  const [mixRenderBusy, setMixRenderBusy] = useState(false)
+  const [smartRenderBusy, setSmartRenderBusy] = useState(false)
+  const [materialMappingOpen, setMaterialMappingOpen] = useState(false)
   const [downloadBusy, setDownloadBusy] = useState(false)
   const [videoUploading, setVideoUploading] = useState(false)
   const [videoUploadProgress, setVideoUploadProgress] = useState<{
@@ -248,6 +278,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
 
   const doneJobs = jobs.filter((j) => j.phase === 'done')
   const latestDone = doneJobs.length > 0 ? doneJobs[doneJobs.length - 1] : null
+  const activeRenderJob = jobs.find((j) => j.phase === 'polling' || j.phase === 'pipeline') ?? null
 
   const ensureCloudEditAffordable = useCallback(async (): Promise<boolean> => {
     const afford = await checkMpAddonPointsAffordable('cloud_edit', clipEndSec)
@@ -290,7 +321,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
   )
   const mediaBusy = videoUploading || imageUploading
   const guidanceBusy = planBusy || analyzeBusy
-  const anyBusy = oneClickBusy
+  const anyBusy = mixRenderBusy || smartRenderBusy
 
   const mixMaterialPool = useMemo((): IceMixMaterialSlot[] => {
     const videos: IceMixMaterialSlot[] = jobs
@@ -862,9 +893,13 @@ export function ShortVideoIceBatchPanel(_props: Props) {
   }
 
   const resumePollJob = async (localJobId: string, iceJobId: string, mode: 'timeline' | 'smart_batch' = 'timeline') => {
+    if (mode === 'smart_batch') setSmartRenderBusy(true)
+    else setMixRenderBusy(true)
     patchJob(localJobId, { phase: 'polling', message: '继续查询云端剪辑状态…' })
     setErr(null)
     const ok = await pollJob(localJobId, iceJobId, mode)
+    if (mode === 'smart_batch') setSmartRenderBusy(false)
+    else setMixRenderBusy(false)
     if (ok) setHint('成片已就绪，可在右侧下载。')
   }
 
@@ -876,8 +911,11 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     const fetchStatus = mode === 'smart_batch' ? fetchIceSmartBatchJobStatus : fetchIceJobStatus
     const chargeKind: MpAddonGenerationKind = mode === 'smart_batch' ? 'cloud_edit_smart' : 'cloud_edit'
     const chargeSec = mode === 'smart_batch' ? mixTargetSec : clipEndSec
-    for (let i = 0; i < POLL_MAX; i++) {
+    const pollMax = mode === 'smart_batch' ? POLL_MAX_SMART_BATCH : POLL_MAX_TIMELINE
+    const startMs = Date.now()
+    for (let i = 0; i < pollMax; i++) {
       const st = await fetchStatus(iceJobId)
+      const elapsedSec = Math.floor((Date.now() - startMs) / 1000)
       if (!st.ok) {
         const transient =
           isIceTransientNetworkError(st.message ?? '') ||
@@ -886,7 +924,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
         patchJob(localJobId, {
           phase: transient ? 'polling' : 'failed',
           message: transient
-            ? `${st.message ?? '查询超时'}（将自动重试）`
+            ? `${st.message ?? '查询超时'}（${formatIcePollingMessage('Processing', mode, elapsedSec)}）`
             : st.message,
         })
         if (transient) {
@@ -905,7 +943,9 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       if (st.outputPending) {
         patchJob(localJobId, {
           phase: 'polling',
-          message: st.message ?? '成片写入 OSS 中，请稍候…',
+          message:
+            st.message ??
+            formatIcePollingMessage('Processing', mode, elapsedSec, '成片写入 OSS 中，请稍候…'),
         })
         await new Promise((r) => setTimeout(r, POLL_MS))
         continue
@@ -929,11 +969,17 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       }
       patchJob(localJobId, {
         phase: 'polling',
-        message: `剪辑中 ${st.status}${formatProgress(st.progress)}`,
+        message: formatIcePollingMessage(st.status, mode, elapsedSec, st.message),
       })
       await new Promise((r) => setTimeout(r, POLL_MS))
     }
-    patchJob(localJobId, { phase: 'failed', message: '剪辑超时，请稍后重试或联系运营' })
+    patchJob(localJobId, {
+      phase: 'failed',
+      message:
+        mode === 'smart_batch'
+          ? '查询超时（云端可能仍在合成）。请点击下方任务卡片「继续查询」，勿重复提交。'
+          : '剪辑超时，请点击任务卡片「继续查询」或稍后重试',
+    })
     return false
   }
 
@@ -959,7 +1005,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       return
     }
 
-    setOneClickBusy(true)
+    setMixRenderBusy(true)
     setErr(null)
     setHint('ICE 剪辑引擎：多素材拼接 + 截取 + 转场 + TTS…')
 
@@ -997,7 +1043,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     })
     if (!produced.ok) {
       setErr(produced.message)
-      setOneClickBusy(false)
+      setMixRenderBusy(false)
       return
     }
 
@@ -1005,7 +1051,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     const segments = pack.segments
     if (segments.length < 2) {
       setErr('剪辑时间线无效，请检查分镜与素材映射')
-      setOneClickBusy(false)
+      setMixRenderBusy(false)
       return
     }
 
@@ -1028,7 +1074,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     ])
     if (!(await ensureCloudEditAffordable())) {
       patchJob(localId, { phase: 'failed', message: '积分不足，无法提交混剪' })
-      setOneClickBusy(false)
+      setMixRenderBusy(false)
       return
     }
     const totalSec = resolveMixTotalDurationSec(scriptRows, mixTargetSec)
@@ -1057,7 +1103,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     })
     if (!pipe.ok) {
       patchJob(localId, { phase: 'failed', message: pipe.message })
-      setOneClickBusy(false)
+      setMixRenderBusy(false)
       return
     }
     patchJob(localId, {
@@ -1067,7 +1113,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       mixProduceMode: 'timeline',
     })
     await pollJob(localId, pipe.jobId, 'timeline')
-    setOneClickBusy(false)
+    setMixRenderBusy(false)
     setHint('AI混剪已提交，请在右侧下载 MP4。')
   }
 
@@ -1085,7 +1131,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       return
     }
 
-    setOneClickBusy(true)
+    setSmartRenderBusy(true)
     setErr(null)
     setHint('IMS 智能一键成片：AI 拆条 + 转场 + 口播合成…')
 
@@ -1105,7 +1151,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
 
     if (!(await ensureCloudEditSmartAffordable())) {
       patchJob(localId, { phase: 'failed', message: '积分不足，无法提交智能成片' })
-      setOneClickBusy(false)
+      setSmartRenderBusy(false)
       return
     }
 
@@ -1128,7 +1174,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
 
     if (!pipe.ok) {
       patchJob(localId, { phase: 'failed', message: pipe.message })
-      setOneClickBusy(false)
+      setSmartRenderBusy(false)
       return
     }
 
@@ -1139,7 +1185,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       mixProduceMode: 'smart_batch',
     })
     await pollJob(localId, pipe.jobId, 'smart_batch')
-    setOneClickBusy(false)
+    setSmartRenderBusy(false)
     setHint('智能一键成片已提交，请在右侧下载 MP4。')
   }
 
@@ -1396,7 +1442,14 @@ export function ShortVideoIceBatchPanel(_props: Props) {
               </p>
 
               {jobs.length > 0 ? (
-                <ul className="divide-y divide-zinc-100 rounded-lg border border-zinc-200">
+                <div className="rounded-lg border border-zinc-200">
+                  <div className="flex items-center justify-between border-b border-zinc-100 bg-zinc-50/80 px-3 py-2 text-xs text-zinc-600">
+                    <span>
+                      已上传 <strong className="text-zinc-800">{jobs.length}</strong> 条视频
+                    </span>
+                    <span className="text-zinc-500">列表可滚动</span>
+                  </div>
+                  <ul className="max-h-[min(240px,32vh)] divide-y divide-zinc-100 overflow-y-auto">
                   {jobs.map((j) => (
                     <li key={j.id} className="flex items-center gap-2 px-3 py-2 text-sm">
                       {j.imageUrls?.length ? (
@@ -1418,6 +1471,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                     </li>
                   ))}
                 </ul>
+                </div>
               ) : (
                 <p className="text-xs text-zinc-500">暂无视频 — 请本地上传至少 2 条 MP4/MOV，上传后在第 2 步分镜中映射使用。</p>
               )}
@@ -1749,18 +1803,31 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                 <p className="mt-1 text-xs text-zinc-500">
                   每段对应成片时间轴上的一镜：自动轮询分配不同素材并截取片段；口播合成 TTS，字幕带弹入动效。
                 </p>
-                <div className="mt-2">
+                <div className="mt-2 max-h-[min(360px,42vh)] overflow-y-auto rounded-lg border border-zinc-100">
                   <ShortVideoScriptTableEditor
                     rows={scriptRows}
                     disabled={anyBusy || guidanceBusy}
+                    compact={scriptRows.length > 8}
                     onChange={setScriptRows}
                   />
                 </div>
                 {mixMaterialPool.length > 0 && scriptRows.length > 0 ? (
-                  <div className="mt-3 space-y-2 rounded-lg border border-zinc-100 bg-zinc-50/80 p-3">
-                    <p className="text-xs font-medium text-zinc-700">
-                      素材映射（默认轮询不同素材；可手动调整每段用哪条）
-                    </p>
+                  <div className="mt-3 rounded-lg border border-zinc-100 bg-zinc-50/80 p-3">
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between gap-2 text-left text-xs font-medium text-zinc-700"
+                      onClick={() => setMaterialMappingOpen((v) => !v)}
+                    >
+                      <span>
+                        素材映射 · {scriptRows.length} 段
+                        {scriptRows.length === mixMaterialPool.length
+                          ? '（已逐条对应全部素材，默认无需调整）'
+                          : '（可展开手动指定每段素材）'}
+                      </span>
+                      <span className="shrink-0 text-zinc-500">{materialMappingOpen ? '收起 ▲' : '展开 ▼'}</span>
+                    </button>
+                    {materialMappingOpen ? (
+                      <div className="mt-2 max-h-[min(200px,28vh)] space-y-1.5 overflow-y-auto sm:grid sm:grid-cols-2 sm:gap-2 sm:space-y-0">
                     {scriptRows.map((row, i) => (
                       <label key={i} className="flex flex-wrap items-center gap-2 text-xs text-zinc-600">
                         <span className="w-24 shrink-0 truncate">{row.timeRange || `段 ${i + 1}`}</span>
@@ -1785,17 +1852,19 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                         </select>
                       </label>
                     ))}
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
               <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                 <button
                   type="button"
-                  disabled={!mixReady || oneClickBusy || mediaBusy || guidanceBusy}
+                  disabled={!mixReady || mixRenderBusy || smartRenderBusy || mediaBusy || guidanceBusy}
                   onClick={() => void runMixOneClick()}
                   className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-orange-300 min-w-[12rem]"
                 >
-                  {oneClickBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Zap className="h-5 w-5" />}
+                  {mixRenderBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Zap className="h-5 w-5" />}
                   普通混剪（{scriptRows.length} 段）
                 </button>
                 <button
@@ -1803,7 +1872,8 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                   disabled={
                     !cfg?.smartBatchEnabled ||
                     !smartBatchReady ||
-                    oneClickBusy ||
+                    mixRenderBusy ||
+                    smartRenderBusy ||
                     mediaBusy ||
                     guidanceBusy
                   }
@@ -1815,7 +1885,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                   onClick={() => void runSmartBatchOneClick()}
                   className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-violet-300 min-w-[12rem]"
                 >
-                  {oneClickBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Wand2 className="h-5 w-5" />}
+                  {smartRenderBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Wand2 className="h-5 w-5" />}
                   智能一键成片
                 </button>
               </div>
@@ -1830,7 +1900,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
               <p className="text-xs text-zinc-500">
                 普通混剪：多素材截取拼接 · TTS 口播 · 动效字幕；智能成片：IMS 自动拆条、随机转场与口播
               </p>
-              {!mixReady && mixBlockers.length > 0 && !oneClickBusy && !guidanceBusy ? (
+              {!mixReady && mixBlockers.length > 0 && !mixRenderBusy && !smartRenderBusy && !guidanceBusy ? (
                 <p className="flex items-start gap-1.5 text-xs text-amber-800">
                   <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                   普通混剪暂不可用：{mixBlockers.join('；')}
@@ -1839,7 +1909,8 @@ export function ShortVideoIceBatchPanel(_props: Props) {
               {cfg?.smartBatchEnabled &&
               !smartBatchReady &&
               smartBatchBlockers.length > 0 &&
-              !oneClickBusy &&
+              !mixRenderBusy &&
+              !smartRenderBusy &&
               !guidanceBusy ? (
                 <p className="flex items-start gap-1.5 text-xs text-amber-800">
                   <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
@@ -1931,7 +2002,16 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                 <div className="mb-5 flex flex-col items-center justify-center rounded-xl border border-dashed border-orange-200 bg-white py-10 text-center">
                   <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
                   <p className="mt-3 text-sm font-medium text-zinc-800">云端剪辑中…</p>
-                  <p className="mt-1 text-xs text-zinc-500">完成后下载按钮将出现在此区域</p>
+                  {activeRenderJob?.message ? (
+                    <p className="mt-2 max-w-sm px-4 text-xs leading-relaxed text-zinc-600">
+                      {activeRenderJob.message}
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-xs text-zinc-500">完成后下载按钮将出现在此区域</p>
+                  )}
+                  <p className="mt-3 text-[11px] text-zinc-500">
+                    智能成片多素材时 IMS 初始化较慢，最长等待约 30 分钟；请勿重复点击提交
+                  </p>
                 </div>
               ) : (
                 <div className="mb-5 rounded-xl border border-dashed border-zinc-200 bg-zinc-50 py-10 text-center">
@@ -2005,6 +2085,18 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                             >
                               <Loader2 className="h-3.5 w-3.5" />
                               继续查询（任务可能仍在云端）
+                            </button>
+                          </div>
+                        ) : null}
+                        {j.phase === 'polling' && j.exportId ? (
+                          <div className="mt-2">
+                            <button
+                              type="button"
+                              disabled={mixRenderBusy || smartRenderBusy}
+                              onClick={() => void resumePollJob(j.id, j.exportId!, j.mixProduceMode ?? 'timeline')}
+                              className="inline-flex w-full items-center justify-center gap-1 rounded-md border border-zinc-300 bg-white py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                            >
+                              刷新状态
                             </button>
                           </div>
                         ) : null}

@@ -231,7 +231,6 @@ function buildInputConfig(input: {
           MediaArray: urls,
           SplitMode: 'AverageSplit',
           Duration: targetTotalSec,
-          DurationAutoAdapt: false,
           Volume: 0,
         },
       ],
