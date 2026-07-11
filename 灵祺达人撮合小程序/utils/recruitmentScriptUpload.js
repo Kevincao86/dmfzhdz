@@ -259,6 +259,8 @@ function uploadViaOss(mpOrderId, applicantId, tempPath, sizeBytes, fileName, con
   })
 }
 
+const mpPrivacy = require('./mpPrivacyAuthorize.js')
+
 function resolveContentType(fileName) {
   const name = String(fileName || '').toLowerCase()
   if (name.endsWith('.doc')) return 'application/msword'
@@ -267,38 +269,41 @@ function resolveContentType(fileName) {
 }
 
 function chooseScriptFile() {
-  return new Promise((resolve, reject) => {
-    wx.chooseMessageFile({
-      count: 1,
-      type: 'file',
-      extension: ['txt', 'doc', 'docx'],
-      success(res) {
-        const f = res.tempFiles && res.tempFiles[0]
-        if (!f || !f.path) {
-          reject(new Error('未选择文件'))
-          return
-        }
-        const fileName = String(f.name || f.path.split('/').pop() || 'script.txt').trim()
-        resolve({
-          tempPath: f.path,
-          sizeBytes: Number(f.size) || 0,
-          fileName,
+  return mpPrivacy.prepareFilePick().then(
+    () =>
+      new Promise((resolve, reject) => {
+        wx.chooseMessageFile({
+          count: 1,
+          type: 'file',
+          extension: ['txt', 'doc', 'docx'],
+          success(res) {
+            const f = res.tempFiles && res.tempFiles[0]
+            if (!f || !f.path) {
+              reject(new Error('未选择文件'))
+              return
+            }
+            const fileName = String(f.name || f.path.split('/').pop() || 'script.txt').trim()
+            resolve({
+              tempPath: f.path,
+              sizeBytes: Number(f.size) || 0,
+              fileName,
+            })
+          },
+          fail(err) {
+            const msg = String((err && err.errMsg) || err || '')
+            if (/cancel/i.test(msg)) {
+              resolve(null)
+              return
+            }
+            if (/chooseMessageFile:fail|privacy|隐私|authorize/i.test(msg)) {
+              reject(new Error('请先同意隐私协议后再选文件，或改用「粘贴链接」'))
+              return
+            }
+            reject(new Error(msg || '未选择文件'))
+          },
         })
-      },
-      fail(err) {
-        const msg = String((err && err.errMsg) || err || '')
-        if (/cancel/i.test(msg)) {
-          resolve(null)
-          return
-        }
-        if (/chooseMessageFile:fail|privacy|隐私|authorize/i.test(msg)) {
-          reject(new Error('请先同意隐私协议后再选文件，或改用「粘贴链接」'))
-          return
-        }
-        reject(new Error(msg || '未选择文件'))
-      },
-    })
-  })
+      }),
+  )
 }
 
 function chooseAndUploadScript(mpOrderId, applicantId, opts) {

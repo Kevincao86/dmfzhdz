@@ -112,7 +112,10 @@
   ],
   "permission": {
     "scope.album": {
-      "desc": "用于云剪素材、参考图与口播视频上传"
+      "desc": "用于从相册选择封面、探店视频、群二维码等素材并上传"
+    },
+    "scope.camera": {
+      "desc": "用于聊天中拍照发送、从相册或相机选择图片与视频素材"
     },
     "scope.writePhotosAlbum": {
       "desc": "用于将 AI 生成视频保存到相册"
@@ -122,7 +125,8 @@
     }
   },
   "usingComponents": {
-    "site-icp-footer": "/components/site-icp-footer/index"
+    "site-icp-footer": "/components/site-icp-footer/index",
+    "mp-privacy-gate": "/components/mp-privacy-gate/index"
   },
   "__usePrivacyCheck__": true
 }

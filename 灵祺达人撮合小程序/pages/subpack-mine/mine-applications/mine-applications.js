@@ -15,7 +15,9 @@ const visitScheduleRuntime = require('../../../utils/visitScheduleRuntime.js')
 const hallFilters = require('../../../utils/recruitmentHallFilters.js')
 const talentFlowSteps = require('../../../utils/talentApplicationFlowSteps.js')
 
-Page({
+const mpPrivacyPageMixin = require('../../../utils/mpPrivacyPageMixin.js')
+
+Page(mpPrivacyPageMixin.mergeIntoPage({
   data: {
     rows: [],
     filteredRows: [],
@@ -444,15 +446,25 @@ Page({
     }
   },
   _runUploadVideoOnce(runner) {
-    if (this._uploadVideoPicking) return
+    if (this._uploadVideoPicking) {
+      wx.showToast({ title: '正在打开相册…', icon: 'none' })
+      return
+    }
     this._uploadVideoPicking = true
+    const reset = () => {
+      this._uploadVideoPicking = false
+    }
+    const timer = setTimeout(reset, 45000)
     Promise.resolve()
       .then(runner)
       .finally(() => {
-        this._uploadVideoPicking = false
+        clearTimeout(timer)
+        reset()
       })
   },
   onUploadVideo(e) {
+    this._pendingUploadKind = 'video'
+    this._pendingUploadEvent = e
     this._runUploadVideoOnce(() => this._doUploadVideo(e))
   },
   onConfirmVisit(e) {
@@ -751,7 +763,18 @@ Page({
     proceed()
   },
   onUploadScript(e) {
+    this._pendingUploadKind = 'script'
+    this._pendingUploadEvent = e
     this._runUploadVideoOnce(() => this._doUploadScript(e))
+  },
+  _retryAfterPrivacyAgreed() {
+    const kind = this._pendingUploadKind
+    const evt = this._pendingUploadEvent
+    if (kind === 'script' && evt) {
+      this._runUploadVideoOnce(() => this._doUploadScript(evt))
+    } else if (kind === 'video' && evt) {
+      this._runUploadVideoOnce(() => this._doUploadVideo(evt))
+    }
   },
   _doUploadScript(e) {
     const { mpOrderId: id, applicantId, key } = this._resolveActionRow(
@@ -783,4 +806,4 @@ Page({
         }
       })
   },
-})
+}))

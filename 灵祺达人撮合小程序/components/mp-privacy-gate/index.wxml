@@ -1,0 +1,14 @@
+<view wx:if="{{show}}" class="mp-privacy-gate">
+  <view class="mp-privacy-gate__mask" catchtap="onCancel"></view>
+  <view class="mp-privacy-gate__panel">
+    <text class="mp-privacy-gate__title">隐私保护提示</text>
+    <text class="mp-privacy-gate__desc">上传图片、视频或文件需先同意《用户隐私保护指引》。</text>
+    <button
+      class="mp-privacy-gate__agree"
+      open-type="agreePrivacyAuthorization"
+      bindagreeprivacyauthorization="onAgree"
+    >同意并继续</button>
+    <text class="mp-privacy-gate__link" bindtap="onOpenContract">查看《用户隐私保护指引》</text>
+    <text class="mp-privacy-gate__cancel" bindtap="onCancel">取消</text>
+  </view>
+</view>

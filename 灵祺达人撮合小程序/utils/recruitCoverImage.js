@@ -1,4 +1,5 @@
 const MAX_DATA_URL_LEN = 120000
+const mpPrivacy = require('./mpPrivacyAuthorize.js')
 
 function readPathAsDataUrl(filePath, attempt) {
   const n = attempt || 0
@@ -36,11 +37,20 @@ function readPathAsDataUrl(filePath, attempt) {
 }
 
 function pickCoverImagePath(resolve, reject) {
-  wx.chooseMedia({
-    count: 1,
-    mediaType: ['image'],
-    sourceType: ['album', 'camera'],
-    success: (res) => {
+  mpPrivacy
+    .runChooseMedia(
+      {
+        count: 1,
+        mediaType: ['image'],
+        sourceType: ['album', 'camera'],
+      },
+      { purpose: '上传封面图片' },
+    )
+    .then((res) => {
+      if (!res) {
+        reject(new Error('cancel'))
+        return
+      }
       const path = res.tempFiles && res.tempFiles[0] && res.tempFiles[0].tempFilePath
       if (!path) {
         reject(new Error('未选择图片'))
@@ -53,12 +63,12 @@ function pickCoverImagePath(resolve, reject) {
         success: (c) => resolve({ path: c.tempFilePath || path }),
         fail: () => resolve({ path }),
       })
-    },
-    fail: (e) => {
-      if (e && e.errMsg && /cancel/.test(e.errMsg)) reject(new Error('cancel'))
-      else reject(new Error('选择图片失败'))
-    },
-  })
+    })
+    .catch((e) => {
+      const msg = String((e && e.message) || e || '')
+      if (/cancel/i.test(msg)) reject(new Error('cancel'))
+      else reject(new Error(msg || '选择图片失败'))
+    })
 }
 
 /** 返回本地 temp 路径（发招募封面、云剪本地上传） */

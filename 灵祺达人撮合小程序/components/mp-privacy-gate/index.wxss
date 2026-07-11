@@ -1,0 +1,75 @@
+.mp-privacy-gate {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+}
+
+.mp-privacy-gate__mask {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.mp-privacy-gate__panel {
+  position: absolute;
+  left: 48rpx;
+  right: 48rpx;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #fff;
+  border-radius: 24rpx;
+  padding: 40rpx 36rpx 32rpx;
+  box-shadow: 0 24rpx 64rpx rgba(15, 23, 42, 0.18);
+}
+
+.mp-privacy-gate__title {
+  display: block;
+  font-size: 34rpx;
+  font-weight: 600;
+  color: #0f172a;
+  text-align: center;
+  margin-bottom: 20rpx;
+}
+
+.mp-privacy-gate__desc {
+  display: block;
+  font-size: 28rpx;
+  line-height: 1.55;
+  color: #475569;
+  text-align: center;
+  margin-bottom: 32rpx;
+}
+
+.mp-privacy-gate__agree {
+  background: linear-gradient(135deg, #0284c7, #0369a1) !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 999rpx !important;
+  font-size: 30rpx !important;
+  font-weight: 600;
+  line-height: 88rpx !important;
+  height: 88rpx !important;
+  margin-bottom: 20rpx;
+}
+
+.mp-privacy-gate__link {
+  display: block;
+  text-align: center;
+  font-size: 26rpx;
+  color: #0284c7;
+  margin-bottom: 16rpx;
+}
+
+.mp-privacy-gate__cancel {
+  display: block;
+  text-align: center;
+  font-size: 26rpx;
+  color: #94a3b8;
+  padding: 8rpx 0;
+}

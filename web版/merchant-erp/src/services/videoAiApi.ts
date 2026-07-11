@@ -887,10 +887,10 @@ export async function downloadVideoUrlAsBlob(
   throw new Error(`下载视频失败（已重试 ${maxAttempts} 次）：${lastErr}`)
 }
 
-/** 服务端 ffmpeg 截取远程视频采样帧（默认尾帧；混剪素材分析用 opening 首帧） */
+/** 服务端 ffmpeg 截取远程视频采样帧（opening/last/atSec） */
 export async function postVideoLastFrameFromUrl(
   url: string,
-  opts?: { onProgress?: (msg: string) => void; frame?: 'opening' | 'last' },
+  opts?: { onProgress?: (msg: string) => void; frame?: 'opening' | 'last'; atSec?: number },
 ): Promise<{ ok: true; pureBase64: string } | { ok: false; message: string }> {
   const trimmed = url.trim()
   if (!trimmed) return { ok: false, message: '缺少视频 URL' }
@@ -898,11 +898,21 @@ export async function postVideoLastFrameFromUrl(
     '/api/meoo-merchant-ai-video-last-frame',
     '/api/merchant/ai/video/last-frame',
   ] as const
-  const frame = opts?.frame === 'opening' ? 'opening' : 'last'
+  const atSec = opts?.atSec != null && Number.isFinite(Number(opts.atSec)) ? Number(opts.atSec) : undefined
+  const frame = atSec != null ? undefined : opts?.frame === 'opening' ? 'opening' : 'last'
   let lastErr = '尾帧截取接口未部署或不可达'
   for (const p of paths) {
-    opts?.onProgress?.(frame === 'opening' ? '服务端截取素材首帧…' : '服务端截取上一段尾帧…')
-    const res = await fetchVideoPost(p, { url: trimmed, frame }, VIDEO_LAST_FRAME_TIMEOUT_MS)
+    opts?.onProgress?.(
+      atSec != null
+        ? `服务端截取素材 ${atSec.toFixed(1)}s 帧…`
+        : frame === 'opening'
+        ? '服务端截取素材首帧…'
+        : '服务端截取上一段尾帧…',
+    )
+    const body: Record<string, unknown> = { url: trimmed }
+    if (atSec != null) body.atSec = atSec
+    else body.frame = frame
+    const res = await fetchVideoPost(p, body, VIDEO_LAST_FRAME_TIMEOUT_MS)
     if (!res) continue
     const j = (await parseJsonSafe<Record<string, unknown>>(res)) ?? {}
     if (!res.ok || !j.ok) {

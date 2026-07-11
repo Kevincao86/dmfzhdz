@@ -1,6 +1,7 @@
 const mpOrderRegistryOps = require('./mpOrderRegistryOps.js')
 const mpGroupQrExpiry = require('./mpGroupQrExpiry.js')
 const mpGroupQrOssUpload = require('./mpGroupQrOssUpload.js')
+const mpPrivacy = require('./mpPrivacyAuthorize.js')
 const api = require('./api.js')
 const auth = require('./auth.js')
 const { normalizeHallPayload } = require('./hallRegistryParse.js')
@@ -111,17 +112,20 @@ async function postGroupQrUrlPatch(id, imageUrl) {
 
 /** 选图并压缩，返回 tempFilePath（用于预览 + OSS 上传） */
 function chooseGroupQrImageFile() {
-  return new Promise((resolve, reject) => {
-    wx.chooseMedia({
-      count: 1,
-      mediaType: ['image'],
-      sourceType: ['album', 'camera'],
-      success: (res) => {
-        const path = res.tempFiles && res.tempFiles[0] && res.tempFiles[0].tempFilePath
-        if (!path) {
-          reject(new Error('未选择图片'))
-          return
-        }
+  return mpPrivacy
+    .runChooseMedia(
+      {
+        count: 1,
+        mediaType: ['image'],
+        sourceType: ['album', 'camera'],
+      },
+      { purpose: '上传群二维码' },
+    )
+    .then((res) => {
+      if (!res) return Promise.reject(new Error('cancel'))
+      const path = res.tempFiles && res.tempFiles[0] && res.tempFiles[0].tempFilePath
+      if (!path) return Promise.reject(new Error('未选择图片'))
+      return new Promise((resolve, reject) => {
         wx.compressImage({
           src: path,
           quality: 72,
@@ -130,13 +134,8 @@ function chooseGroupQrImageFile() {
           success: (c) => resolve(String(c.tempFilePath || path)),
           fail: () => resolve(String(path)),
         })
-      },
-      fail: (e) => {
-        if (e && e.errMsg && /cancel/.test(e.errMsg)) reject(new Error('cancel'))
-        else reject(new Error('选择图片失败'))
-      },
+      })
     })
-  })
 }
 
 /** @deprecated 预览仍可用；发布/补传请走 upload + patch */

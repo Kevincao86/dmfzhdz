@@ -1,6 +1,7 @@
 const api = require('./api.js')
 const ecs = require('./ecs.js')
 const mpApiErrors = require('./mpApiErrors.js')
+const mpPrivacy = require('./mpPrivacyAuthorize.js')
 const ossTransport = require('./mpOssUploadTransport.js')
 
 /** 探店成片最长 3 分钟（与 merchant-erp recruitmentVideoLimits 同步） */
@@ -360,88 +361,15 @@ function uploadViaOss(mpOrderId, applicantId, tempPath, sizeBytes, fileName) {
 }
 
 function ensurePrivacyAuthorizeForMedia() {
-  return new Promise((resolve, reject) => {
-    if (typeof wx.requirePrivacyAuthorize !== 'function') {
-      resolve()
-      return
-    }
-    wx.requirePrivacyAuthorize({
-      success: () => resolve(),
-      fail: (err) => {
-        const msg = String((err && err.errMsg) || '')
-        if (/cancel/i.test(msg)) {
-          reject(new Error('cancel'))
-          return
-        }
-        reject(new Error('需要同意《隐私保护指引》后才能选择视频'))
-      },
-    })
-  })
+  return mpPrivacy.ensurePrivacyAuthorizeForMedia()
 }
 
 function ensureAlbumPermission() {
-  return new Promise((resolve) => {
-    if (typeof wx.getSetting !== 'function') {
-      resolve(true)
-      return
-    }
-    wx.getSetting({
-      success(setting) {
-        const album = setting.authSetting && setting.authSetting['scope.album']
-        if (album === true) {
-          resolve(true)
-          return
-        }
-        if (album === false) {
-          wx.showModal({
-            title: '需要相册权限',
-            content: '请在设置中允许访问相册，以便选择探店视频',
-            confirmText: '去设置',
-            success(modal) {
-              if (modal.confirm && typeof wx.openSetting === 'function') {
-                wx.openSetting({ complete: () => resolve(false) })
-              } else {
-                resolve(false)
-              }
-            },
-            fail: () => resolve(false),
-          })
-          return
-        }
-        if (typeof wx.authorize === 'function') {
-          wx.authorize({
-            scope: 'scope.album',
-            success: () => resolve(true),
-            fail: () => resolve(true),
-          })
-          return
-        }
-        resolve(true)
-      },
-      fail: () => resolve(true),
-    })
-  })
+  return mpPrivacy.ensureAlbumPermission('选择探店视频')
 }
 
 function mapPickMediaError(err) {
-  const msg = String((err && err.errMsg) || err || '')
-  if (/cancel/.test(msg)) return { cancel: true, message: msg }
-  if (/chooseMedia:fail|chooseVideo:fail/i.test(msg)) {
-    return {
-      cancel: false,
-      message: '无法打开相册，请检查微信相册权限后重试；也可尝试从「文件」中选择视频',
-    }
-  }
-  if (/privacy|隐私/.test(msg)) {
-    return {
-      cancel: false,
-      message: '需要同意《隐私保护指引》后才能选择视频，请重新点击上传按钮',
-    }
-  }
-  if (/auth|deny|authorize/i.test(msg)) {
-    return { cancel: false, message: '需要相册权限，请在设置中允许后重试' }
-  }
-  return { cancel: false, message: msg || '未选择视频' }
+  return mpPrivacy.mapPickMediaError(err)
 }
 
 function getVideoDurationSec(tempPath) {

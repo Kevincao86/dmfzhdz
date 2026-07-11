@@ -14,6 +14,8 @@ export type DigitalHumanTtsInput = {
   tenantId?: string
   /** 语音克隆参考音频（纯 base64） */
   referenceAudioBase64?: string
+  /** 混剪/服务端可信调用，跳过登录校验 */
+  trustedServer?: boolean
 }
 
 export type DigitalHumanTtsResult =
@@ -261,7 +263,7 @@ export async function runDigitalHumanTtsCore(
   }
 
   try {
-    if (process.env.MEOO_TTS_SMOKE_SKIP_AUTH !== '1') {
+    if (!input.trustedServer && process.env.MEOO_TTS_SMOKE_SKIP_AUTH !== '1') {
       const user = await resolveTtsUser(authHeader, mpSession, env)
       if (!user) return { ok: false, message: '请先登录后再试听语音' }
     }

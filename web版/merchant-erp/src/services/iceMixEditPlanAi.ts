@@ -6,6 +6,7 @@ import { postAiChat } from './ai/aiClient'
 import {
   collectMixMaterialFramesForEditPlan,
   groupMixFramesByMaterialIndex,
+  MIX_MAX_VISION_FRAMES,
   type MixMaterialFrameSample,
 } from './iceMixMaterialFrames'
 import {
@@ -24,6 +25,11 @@ import {
   type ShortVideoScriptRow,
 } from '../lib/shortVideoScriptTable'
 
+export type MixMaterialFrameBeat = {
+  atSec: number
+  description: string
+}
+
 export type IceMixMaterialProfile = {
   index: number
   label: string
@@ -31,6 +37,8 @@ export type IceMixMaterialProfile = {
   description: string
   /** 估算源片时长（秒），用于规划截取点 */
   estimatedDurationSec?: number
+  /** 逐帧画面理解（源片时间点 → 描述） */
+  frameTimeline?: MixMaterialFrameBeat[]
 }
 
 export type MixEditSegmentDecision = {
@@ -41,14 +49,14 @@ export type MixEditSegmentDecision = {
   clipNote?: string
 }
 
-const VISION_EDIT_PLAN_TIMEOUT_MS = 45_000
+const VISION_EDIT_PLAN_TIMEOUT_MS = 90_000
 
-const VISION_EDIT_PLAN_SYSTEM = `你是专业短视频混剪剪辑师（探店/餐饮/街头小吃/本地生活带货）。用户会提供【指导文案】【分镜表】以及每条素材的采样截图（附图）。
+const VISION_EDIT_PLAN_SYSTEM = `你是专业短视频混剪剪辑师（探店/餐饮/街头小吃/本地生活带货）。用户会提供【指导文案】【分镜表】以及每条素材的多帧采样截图（附图，标注源片秒数如 2.4s）。
 须为每一段分镜输出剪辑决策：
-1. materialIndex：选用哪条素材（从 0 开始），必须按画面语义匹配分镜「画面」描述；禁止全部段都用 materialIndex=0
-2. sourceInSec：从该素材第几秒起截取（视频 0–8s；图片固定 0）；同素材复用时 sourceInSec 至少相差 1.5 秒，避开重复镜头
+1. materialIndex：选用哪条素材（从 0 开始），必须按画面语义匹配分镜「画面」与口播；禁止全部段都用 materialIndex=0
+2. sourceInSec：从该素材第几秒起截取（须与附图秒数/画面语义一致；视频 0–12s；图片固定 0）；同素材复用时 sourceInSec 至少相差 1.5 秒
 3. 叙事顺序（强制）：开场氛围/门头/全景 → 制作过程/操作特写 → 成品/试吃/卖点收尾；口播与画面一一对应
-4. 理解附图：识别食材、烹饪动作、成品摆盘、顾客互动，按语义分配到最匹配分镜
+4. 理解附图：按标注秒数识别食材、烹饪动作、成品摆盘，将最匹配的分镜分配到对应帧附近
 
 只输出 JSON 数组，无 markdown：
 [{"segmentIndex":0,"materialIndex":2,"sourceInSec":0,"clipNote":"门店外观"},...]`
@@ -137,7 +145,9 @@ function isEditPlanDiverseEnough(
   return false
 }
 
-function inferSourceInSec(visual: string, estDur: number): number {
+function inferSourceInSec(visual: string, estDur: number, profile?: IceMixMaterialProfile): number {
+  const fromTimeline = pickSourceInFromFrameTimeline(visual, '', profile?.frameTimeline)
+  if (fromTimeline != null) return fromTimeline
   const dur = Math.max(2, Math.min(estDur || MIX_DEFAULT_SOURCE_DURATION_SEC, 12))
   if (/成品|特写|结尾|收尾|logo|招牌菜/.test(visual)) {
     return clampMixSourceInSec(Math.min(dur * 0.35, Math.max(0, dur - 2)), 1, dur)
@@ -149,6 +159,44 @@ function inferSourceInSec(visual: string, estDur: number): number {
     return clampMixSourceInSec(Math.min(dur * 0.25, Math.max(0, dur - 1.5)), 1, dur)
   }
   return 0
+}
+
+/** 根据逐帧理解，为分镜画面/口播匹配最佳源片截取点 */
+export function pickSourceInFromFrameTimeline(
+  visual: string,
+  dialogue: string,
+  timeline?: MixMaterialFrameBeat[],
+): number | null {
+  if (!timeline?.length) return null
+  const query = `${visual} ${dialogue}`.trim().toLowerCase()
+  if (!query) return timeline[0]!.atSec
+  let bestAt = timeline[0]!.atSec
+  let bestScore = -1
+  for (const beat of timeline) {
+    const d = beat.description.toLowerCase()
+    let score = 0
+    const tokens = query.split(/[\s，,、；;。.]+/).filter((t) => t.length >= 2)
+    for (const t of tokens) {
+      if (d.includes(t)) score += 2
+    }
+    if (/门头|外观|环境|门店/.test(query) && /门头|外观|环境|门店|招牌/.test(d)) score += 4
+    if (/制作|过程|烹饪|操作|后厨/.test(query) && /制作|过程|烹饪|操作|后厨|翻炒|下锅/.test(d)) score += 4
+    if (/成品|特写|摆盘|菜品/.test(query) && /成品|特写|摆盘|菜|出锅/.test(d)) score += 4
+    if (/试吃|顾客|体验/.test(query) && /试吃|顾客|体验|品尝/.test(d)) score += 4
+    if (score > bestScore) {
+      bestScore = score
+      bestAt = beat.atSec
+    }
+  }
+  return bestScore > 0 ? bestAt : timeline[Math.floor(timeline.length / 2)]!.atSec
+}
+
+function profileBlockLine(p: IceMixMaterialProfile): string {
+  const timeline =
+    p.frameTimeline?.length
+      ? `；逐帧：${p.frameTimeline.map((b) => `${b.atSec.toFixed(1)}s ${b.description.slice(0, 36)}`).join(' | ')}`
+      : ''
+  return `素材${p.index}（${p.label}）：${p.description}${p.estimatedDurationSec ? `；约${Math.round(p.estimatedDurationSec)}秒` : ''}${timeline}`
 }
 
 function profileAt(
@@ -209,7 +257,7 @@ export function buildStructuralMixDecisions(
     const tr = parseScriptTimeRangeSeconds(row.timeRange)
     const clipDur = tr ? Math.max(0.35, tr.end - tr.start) : 4
 
-    let sourceInSec = inferSourceInSec(row.visual, est)
+    let sourceInSec = inferSourceInSec(row.visual, est, prof)
     if (materials.length >= 2) {
       sourceInSec = clampMixSourceInSec(
         sourceInSec + (segmentIndex % 3) * 0.8,
@@ -270,7 +318,8 @@ export function fallbackMixEditDecisions(
       profiles.find((p) => p.index === bestIdx)?.estimatedDurationSec ??
       MIX_DEFAULT_SOURCE_DURATION_SEC
     const clipEst = 4
-    let sourceInSec = inferSourceInSec(row.visual, est)
+    const prof = profiles.find((p) => p.index === bestIdx)
+    let sourceInSec = inferSourceInSec(row.visual, est, prof)
     const prev = usedIn.get(bestIdx)
     if (prev != null && Math.abs(sourceInSec - prev) < 1) {
       sourceInSec = clampMixSourceInSec(sourceInSec + 1.2, clipEst, est)
@@ -286,16 +335,11 @@ async function tryVisionEditPlan(opts: {
   rows: ShortVideoScriptRow[]
   materials: IceMixMaterialSlot[]
   profiles: IceMixMaterialProfile[]
-  frames: Array<{ index: number; label: string; dataUrl: string }>
+  frames: MixMaterialFrameSample[]
 }): Promise<MixEditSegmentDecision[] | null> {
   if (opts.frames.length < 1) return null
 
-  const profileBlock = opts.profiles
-    .map(
-      (p) =>
-        `素材${p.index}（${p.label}）：${p.description}${p.estimatedDurationSec ? `；约${Math.round(p.estimatedDurationSec)}秒` : ''}`,
-    )
-    .join('\n')
+  const profileBlock = opts.profiles.map((p) => profileBlockLine(p)).join('\n')
   const storyboard = opts.rows
     .map((r, i) => {
       const tr = parseScriptTimeRangeSeconds(r.timeRange)
@@ -303,12 +347,15 @@ async function tryVisionEditPlan(opts: {
     })
     .join('\n')
   const frameLegend = opts.frames
-    .map((f, i) => `附图${i + 1} = 素材${f.index}（${f.label}）`)
+    .map((f, i) => {
+      const sec = f.atSec != null ? `@${f.atSec.toFixed(1)}s` : ''
+      return `附图${i + 1} = 素材${f.index}${sec}（${f.label}）`
+    })
     .join('\n')
 
   const userBlock = `【指导文案】\n${opts.guidance.trim()}\n\n【素材画面库】\n${profileBlock}\n\n【分镜表】\n${storyboard}\n\n【附图对应关系】\n${frameLegend}\n\n请为段0～段${opts.rows.length - 1} 各输出一条剪辑决策 JSON。`
 
-  const imageDataUrls = opts.frames.map((f) => f.dataUrl).slice(0, 12)
+  const imageDataUrls = opts.frames.map((f) => f.dataUrl).slice(0, 24)
   const providers: Array<'qwen' | 'doubao'> = ['qwen', 'doubao']
 
   for (const provider of providers) {
@@ -374,7 +421,7 @@ export async function planMixEditFromInstructions(opts: {
   try {
     const frames = await Promise.race([
       collectMixMaterialFramesForEditPlan(materials, {
-        maxFrames: Math.min(24, Math.max(12, Math.min(materials.length, 16) * 2)),
+        maxFrames: Math.min(MIX_MAX_VISION_FRAMES, Math.max(24, Math.min(materials.length, 16) * 5)),
         onProgress: opts.onProgress,
       }),
       new Promise<Array<{ index: number; label: string; dataUrl: string }>>((resolve) => {
@@ -504,9 +551,9 @@ const NARRATIVE_TEXT_PLAN_SYSTEM = `你是专业短视频混剪导演（探店/�
 只输出 JSON 对象，无 markdown：
 {"segments":[{"segmentIndex":0,"materialIndex":5,"visual":"门店外观…","dialogue":"走进这家…"},...]}`
 
-const CLIP_POINT_VISION_SYSTEM = `你是混剪剪辑师。用户给出已排好叙事顺序的分镜段，以及对应素材的采样截图（附图）。
+const CLIP_POINT_VISION_SYSTEM = `你是混剪剪辑师。用户给出已排好叙事顺序的分镜段，以及对应素材的多帧采样截图（附图标注源片秒数）。
 须为每段输出从源素材第几秒起剪（sourceInSec）：
-- 视频：0–8 秒；须与 visual/dialogue 语义匹配（如成品用尾段、过程用中段）
+- 视频：须与 visual/dialogue 语义及附图秒数匹配（如口播讲成品则用标注成品画面的秒数附近）
 - 图片：0
 - 同素材复用时 sourceInSec 至少相差 1.5 秒
 
@@ -666,12 +713,7 @@ async function tryTextNarrativePlan(opts: {
   profiles: IceMixMaterialProfile[]
 }): Promise<MixNarrativeSegment[] | null> {
   const matCount = opts.materials.length
-  const profileBlock = opts.profiles
-    .map(
-      (p) =>
-        `素材${p.index}（${p.label}）：${p.description}${p.estimatedDurationSec ? `；约${Math.round(p.estimatedDurationSec)}秒` : ''}`,
-    )
-    .join('\n')
+  const profileBlock = opts.profiles.map((p) => profileBlockLine(p)).join('\n')
 
   const userBlock = `【指导文案】\n${opts.guidance.trim()}\n\n【素材画面库 共 ${matCount} 条】\n${profileBlock}\n\n请输出 ${matCount} 段叙事分镜 JSON（每条素材恰好一次，按指导文案叙事排序，非上传序号）。`
 
@@ -709,8 +751,8 @@ async function refineClipPointsWithVision(opts: {
     const frameList: MixMaterialFrameSample[] = []
     for (const seg of chunk) {
       const frames = opts.framesByMaterial.get(seg.materialIndex) ?? []
-      for (const f of frames.slice(0, 2)) {
-        if (frameList.length < 12) frameList.push(f)
+      for (const f of frames.slice(0, 5)) {
+        if (frameList.length < 24) frameList.push(f)
       }
     }
     if (frameList.length < 1) continue
@@ -722,7 +764,10 @@ async function refineClipPointsWithVision(opts: {
       )
       .join('\n')
     const frameLegend = frameList
-      .map((f, i) => `附图${i + 1} = 素材${f.index}（${f.label}${f.tag ? `·${f.tag}` : ''}）`)
+      .map((f, i) => {
+        const sec = f.atSec != null ? `@${f.atSec.toFixed(1)}s` : ''
+        return `附图${i + 1} = 素材${f.index}${sec}（${f.label}${f.tag ? `·${f.tag}` : ''}）`
+      })
       .join('\n')
     const userBlock = `【分镜段】\n${storyboard}\n\n【附图】\n${frameLegend}\n\n请为以上各段输出 sourceInSec。`
 
@@ -732,7 +777,7 @@ async function refineClipPointsWithVision(opts: {
         const res = await postAiChat({
           provider,
           temperature: 0.12,
-          imageDataUrls: frameList.map((f) => f.dataUrl).slice(0, 12),
+          imageDataUrls: frameList.map((f) => f.dataUrl).slice(0, 24),
           messages: [
             { role: 'system', content: CLIP_POINT_VISION_SYSTEM },
             { role: 'user', content: userBlock },
@@ -795,7 +840,7 @@ function buildFallbackNarrativeFromProfiles(
   return scored.map((item, i) => ({
     segmentIndex: i,
     materialIndex: item.index,
-    sourceInSec: inferSourceInSec(item.prof.description, item.prof.estimatedDurationSec ?? 6),
+    sourceInSec: inferSourceInSec(item.prof.description, item.prof.estimatedDurationSec ?? 6, item.prof),
     visual: item.prof.description.slice(0, 72) || `${item.mat.label}画面`,
     dialogue:
       guidanceLines[i % Math.max(1, guidanceLines.length)] ||
@@ -866,12 +911,17 @@ export async function planMixNarrativeFromVision(opts: {
     materials,
   )
 
-  opts.onProgress?.('采样素材画面，确定各段截取点…')
+  opts.onProgress?.('密集采样素材画面，确定各段截取点…')
   try {
+    const durationMap = new Map<number, number>()
+    for (const p of profileList) {
+      if (p.estimatedDurationSec) durationMap.set(p.index, p.estimatedDurationSec)
+    }
     const frames = await Promise.race([
       collectMixMaterialFramesForEditPlan(materials, {
         allMaterials: true,
-        maxFrames: materials.length * 2,
+        maxFrames: Math.min(MIX_MAX_VISION_FRAMES, materials.length * 5),
+        materialDurations: durationMap,
         onProgress: opts.onProgress,
       }),
       new Promise<MixMaterialFrameSample[]>((resolve) => {
@@ -895,9 +945,25 @@ export async function planMixNarrativeFromVision(opts: {
       if (clipDecisions) {
         segments = segments.map((s, i) => {
           const d = clipDecisions.find((x) => x.segmentIndex === i) ?? clipDecisions[i]
+          const prof = profileList.find((p) => p.index === (d?.materialIndex ?? s.materialIndex))
+          const timelineIn =
+            d?.sourceInSec ??
+            pickSourceInFromFrameTimeline(s.visual, s.dialogue, prof?.frameTimeline) ??
+            s.sourceInSec
           return d
-            ? { ...s, materialIndex: d.materialIndex, sourceInSec: d.sourceInSec, clipNote: d.clipNote }
+            ? {
+                ...s,
+                materialIndex: d.materialIndex,
+                sourceInSec: timelineIn,
+                clipNote: d.clipNote,
+              }
             : s
+        })
+      } else {
+        segments = segments.map((s) => {
+          const prof = profileList.find((p) => p.index === s.materialIndex)
+          const timelineIn = pickSourceInFromFrameTimeline(s.visual, s.dialogue, prof?.frameTimeline)
+          return timelineIn != null ? { ...s, sourceInSec: timelineIn } : s
         })
       }
     }

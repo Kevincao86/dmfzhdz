@@ -79,7 +79,11 @@
         </view>
       </picker>
 
-      <button class="addon-btn addon-btn--accent" bindtap="onImportTap">{{importBtnLabel}}</button>
+      <button
+        class="addon-btn addon-btn--accent"
+        open-type="agreePrivacyAuthorization"
+        bindagreeprivacyauthorization="onImportTap"
+      >{{importBtnLabel}}</button>
       <button wx:if="{{batchCount > 0}}" class="addon-btn" loading="{{batchBusy}}" disabled="{{batchBusy || !!busyId}}" bindtap="onBatchCheck">
         {{batchBusy ? '批量检核中…' : 'AI批量检核（' + batchCount + '）'}}
       </button>
@@ -109,4 +113,5 @@
       </view>
     </view>
   </block>
+  <mp-privacy-gate show="{{showMpPrivacyGate}}" bind:agreed="onMpPrivacyGateAgreed" bind:close="onMpPrivacyGateClose" />
 </view>

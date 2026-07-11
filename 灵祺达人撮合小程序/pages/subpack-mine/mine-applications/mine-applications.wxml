@@ -273,8 +273,7 @@
               class="app-card__btn app-card__btn--grid app-card__btn--upload"
               plain
               hover-class="app-card__btn--hover"
-              open-type="agreePrivacyAuthorization"
-              bindagreeprivacyauthorization="onUploadScript"
+              bindtap="onUploadScript"
               loading="{{uploadingKey === item.mpOrderId + '-' + item.applicantId}}"
               disabled="{{uploadingKey === item.mpOrderId + '-' + item.applicantId || submittingKey === item.mpOrderId + '-' + item.applicantId}}"
               data-id="{{item.mpOrderId}}"
@@ -288,8 +287,7 @@
               class="app-card__btn app-card__btn--upload app-card__btn--pair"
               plain
               hover-class="app-card__btn--hover"
-              open-type="agreePrivacyAuthorization"
-              bindagreeprivacyauthorization="onUploadScript"
+              bindtap="onUploadScript"
               loading="{{uploadingKey === item.mpOrderId + '-' + item.applicantId}}"
               disabled="{{uploadingKey === item.mpOrderId + '-' + item.applicantId || aiDetectBusyKey === item.mpOrderId + '-' + item.applicantId}}"
               data-id="{{item.mpOrderId}}"
@@ -358,8 +356,7 @@
               class="app-card__btn app-card__btn--grid app-card__btn--upload"
               plain
               hover-class="app-card__btn--hover"
-              open-type="agreePrivacyAuthorization"
-              bindagreeprivacyauthorization="onUploadVideo"
+              bindtap="onUploadVideo"
               loading="{{uploadingKey === item.mpOrderId + '-' + item.applicantId}}"
               disabled="{{uploadingKey === item.mpOrderId + '-' + item.applicantId || submittingKey === item.mpOrderId + '-' + item.applicantId}}"
               data-id="{{item.mpOrderId}}"
@@ -436,8 +433,7 @@
             class="app-card__btn app-card__btn--upload"
             plain
             hover-class="app-card__btn--hover"
-            open-type="agreePrivacyAuthorization"
-            bindagreeprivacyauthorization="onUploadVideo"
+            bindtap="onUploadVideo"
             loading="{{uploadingKey === item.mpOrderId + '-' + item.applicantId}}"
             disabled="{{uploadingKey === item.mpOrderId + '-' + item.applicantId}}"
             data-id="{{item.mpOrderId}}"
@@ -469,4 +465,5 @@
   <view wx:if="{{!loading && rows.length > 0 && filteredRows.length === 0}}" class="card state-empty">
     <text class="hint">当前 Tab 或筛选条件下暂无报名</text>
   </view>
+  <mp-privacy-gate show="{{showMpPrivacyGate}}" bind:agreed="onMpPrivacyGateAgreed" bind:close="onMpPrivacyGateClose" />
 </view>
