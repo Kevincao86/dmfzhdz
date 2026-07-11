@@ -8,9 +8,11 @@ import {
   Film,
   ImagePlus,
   Loader2,
+  Pause,
   ScanEye,
   Trash2,
   Upload,
+  Volume2,
   Wand2,
   Zap,
 } from 'lucide-react'
@@ -66,6 +68,7 @@ import type { IceMixMaterialProfile } from '../services/iceMixEditPlanAi'
 import { planMixNarrativeFromVision } from '../services/iceMixEditPlanAi'
 import {
   assignFullMaterialCoverageSlots,
+  collectMixNarrationText,
   expandMixRowsForMaterialPool,
   syncMixCoverageForAllMaterials,
   inferIceEffectIdFromMixContent,
@@ -81,6 +84,12 @@ import {
   ICE_MIX_VOICE_PRESETS,
   voicePresetById,
 } from '../lib/digitalHumanBroadcast'
+import { fileToAudioBlob } from '../lib/digitalHumanAudioChunks'
+import {
+  playDigitalHumanSpeech,
+  primeDigitalHumanAudioPlayback,
+  stopDigitalHumanSpeech,
+} from '../lib/digitalHumanTtsPlayer'
 import {
   ICE_SUBTITLE_STYLE_DEFAULT_ID,
   ICE_SUBTITLE_STYLE_PRESETS,
@@ -94,6 +103,21 @@ import {
   segmentCountFromTargetTotalSec,
   type ShortVideoScriptRow,
 } from '../lib/shortVideoScriptTable'
+
+const MIX_VOICE_PREVIEW_FALLBACK = '大家好，这是一段混剪口播音色试听。'
+
+async function audioBlobToPureBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const raw = String(reader.result ?? '')
+      const comma = raw.indexOf(',')
+      resolve(comma >= 0 ? raw.slice(comma + 1).replace(/\s/g, '') : raw.replace(/\s/g, ''))
+    }
+    reader.onerror = () => reject(new Error('读取语音样本失败'))
+    reader.readAsDataURL(blob)
+  })
+}
 
 const MIX_DEFAULT_SEGMENT_SEC = 5
 const POLL_MS = 5000
@@ -250,6 +274,11 @@ export function ShortVideoIceBatchPanel(_props: Props) {
   const [mixTransitionMode, setMixTransitionMode] = useState<'auto' | string>('auto')
   const [mixSubtitleStyleId, setMixSubtitleStyleId] = useState(ICE_SUBTITLE_STYLE_DEFAULT_ID)
   const [mixVoicePresetId, setMixVoicePresetId] = useState(ICE_MIX_VOICE_DEFAULT_ID)
+  const [mixTtsPlaying, setMixTtsPlaying] = useState(false)
+  const [mixTtsBusy, setMixTtsBusy] = useState(false)
+  const [mixCloneAudioName, setMixCloneAudioName] = useState<string | null>(null)
+  const mixCloneBlobRef = useRef<Blob | null>(null)
+  const mixCloneInputRef = useRef<HTMLInputElement>(null)
   const mixDocInputRef = useRef<HTMLInputElement>(null)
 
   const aspect = useMemo(
@@ -280,6 +309,69 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     () => voicePresetById(mixVoicePresetId) ?? ICE_MIX_VOICE_PRESETS[0]!,
     [mixVoicePresetId],
   )
+
+  const stopMixTts = useCallback(() => {
+    stopDigitalHumanSpeech()
+    setMixTtsPlaying(false)
+    setMixTtsBusy(false)
+  }, [])
+
+  useEffect(() => () => stopMixTts(), [stopMixTts])
+
+  const playMixTtsPreview = useCallback(async () => {
+    if (mixTtsPlaying || mixTtsBusy) {
+      stopMixTts()
+      return
+    }
+    const narration = collectMixNarrationText(scriptRows)
+    const text = narration.length >= 4 ? narration : MIX_VOICE_PREVIEW_FALLBACK
+    if (mixVoicePresetId === 'v-clone' && !mixCloneBlobRef.current) {
+      setErr('请先上传语音克隆样本')
+      return
+    }
+    primeDigitalHumanAudioPlayback()
+    setMixTtsBusy(true)
+    setErr(null)
+    try {
+      let referenceAudioBase64: string | undefined
+      if (mixVoicePresetId === 'v-clone' && mixCloneBlobRef.current) {
+        referenceAudioBase64 = await audioBlobToPureBase64(mixCloneBlobRef.current)
+      }
+      const out = await playDigitalHumanSpeech(
+        text.slice(0, 500),
+        {
+          preset: resolvedMixVoice,
+          speechRate: resolvedMixVoice.rate,
+          speechPitch: resolvedMixVoice.pitch,
+          mode: 'tts',
+          referenceAudioBase64,
+        },
+        {
+          onStart: () => {
+            setMixTtsBusy(false)
+            setMixTtsPlaying(true)
+          },
+          onEnd: () => {
+            setMixTtsPlaying(false)
+            setMixTtsBusy(false)
+          },
+          onError: () => {
+            setMixTtsPlaying(false)
+            setMixTtsBusy(false)
+          },
+        },
+      )
+      if (!out.ok) {
+        setErr(out.message || '语音试听失败')
+      } else if (out.cloudFallbackReason) {
+        setHint(`已改用浏览器试听：${out.cloudFallbackReason}`)
+      }
+    } catch (e) {
+      setMixTtsBusy(false)
+      setMixTtsPlaying(false)
+      setErr(e instanceof Error ? e.message : '语音试听失败')
+    }
+  }, [mixTtsBusy, mixTtsPlaying, mixVoicePresetId, resolvedMixVoice, scriptRows, stopMixTts])
 
   const doneJobs = jobs.filter((j) => j.phase === 'done')
   const latestDone = doneJobs.length > 0 ? doneJobs[doneJobs.length - 1] : null
@@ -1044,6 +1136,10 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       setErr(`暂不可混剪：${mixBlockers.join('；')}`)
       return
     }
+    if (mixVoicePresetId === 'v-clone' && !mixCloneBlobRef.current) {
+      setErr('已选择语音克隆，请先上传语音样本')
+      return
+    }
 
     setMixRenderBusy(true)
     setErr(null)
@@ -1111,6 +1207,10 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       return
     }
     const totalSec = resolveMixTotalDurationSec(scriptRows, mixTargetSec)
+    let mixVoiceCloneBase64: string | undefined
+    if (mixVoicePresetId === 'v-clone' && mixCloneBlobRef.current) {
+      mixVoiceCloneBase64 = await audioBlobToPureBase64(mixCloneBlobRef.current)
+    }
     const pipe = await postIcePipeline({
       mixSegments: segments.map((s) =>
         prepareIceMixSegmentForPost({
@@ -1127,6 +1227,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       ),
       mixNarrationText: mixNarrationText.length >= 4 ? mixNarrationText : undefined,
       mixVoicePresetId: mixVoicePresetId || ICE_MIX_VOICE_DEFAULT_ID,
+      mixVoiceCloneBase64,
       projectName: `AI混剪-${label}`.slice(0, 120),
       editBrief: pack.editBrief,
       width: aspect.width,
@@ -1795,21 +1896,75 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                     ))}
                   </select>
                 </label>
-                <label className="flex min-w-[10rem] flex-1 flex-col gap-1 text-xs text-zinc-600">
+                <div className="flex min-w-[14rem] flex-1 flex-col gap-1 text-xs text-zinc-600">
                   <span>口播音色</span>
-                  <select
-                    value={mixVoicePresetId}
-                    disabled={anyBusy || guidanceBusy}
-                    onChange={(e) => setMixVoicePresetId(e.target.value)}
-                    className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
-                  >
-                    {ICE_MIX_VOICE_PRESETS.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.label}（{v.gender}）
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                  <div className="flex gap-2">
+                    <select
+                      value={mixVoicePresetId}
+                      disabled={anyBusy || guidanceBusy}
+                      onChange={(e) => setMixVoicePresetId(e.target.value)}
+                      className="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
+                    >
+                      {ICE_MIX_VOICE_PRESETS.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.label}（{v.gender}）
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      disabled={anyBusy || guidanceBusy}
+                      onClick={() => void playMixTtsPreview()}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-zinc-300 bg-white px-2.5 py-2 text-sm text-zinc-800 hover:bg-zinc-50 disabled:opacity-50"
+                      title="试听当前音色（优先云端神经语音）"
+                    >
+                      {mixTtsBusy ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : mixTtsPlaying ? (
+                        <Pause className="h-4 w-4" />
+                      ) : (
+                        <Volume2 className="h-4 w-4" />
+                      )}
+                      {mixTtsBusy ? '合成' : mixTtsPlaying ? '停止' : '试听'}
+                    </button>
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <input
+                      ref={mixCloneInputRef}
+                      type="file"
+                      accept="audio/mpeg,audio/wav,audio/mp4,audio/x-m4a,audio/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0]
+                        if (!f) return
+                        void (async () => {
+                          try {
+                            const blob = await fileToAudioBlob(f)
+                            mixCloneBlobRef.current = blob
+                            setMixCloneAudioName(f.name)
+                            setMixVoicePresetId('v-clone')
+                            setHint('语音克隆样本已就绪，试听与成片将模拟该音色')
+                          } catch (err) {
+                            setErr(err instanceof Error ? err.message : '语音样本无效')
+                          } finally {
+                            e.target.value = ''
+                          }
+                        })()
+                      }}
+                    />
+                    <button
+                      type="button"
+                      disabled={anyBusy || guidanceBusy}
+                      onClick={() => mixCloneInputRef.current?.click()}
+                      className="text-[11px] text-violet-700 underline-offset-2 hover:underline"
+                    >
+                      上传样本 · 模拟音色
+                    </button>
+                    {mixCloneAudioName ? (
+                      <span className="text-[11px] text-zinc-500">已上传：{mixCloneAudioName}</span>
+                    ) : null}
+                  </div>
+                </div>
                 <label className="flex min-w-[10rem] flex-1 flex-col gap-1 text-xs text-zinc-600">
                   <span>场景转场</span>
                   <select
