@@ -15,6 +15,7 @@ import {
   resolveLongformPlannerParams,
   maxScriptTimeRangeEndSec,
   finalizePlannedScriptRows,
+  fillBlankScriptRowsFromGuidance,
   validateStoryboardRows,
   scriptRowsFullyFilled,
   type ShortVideoScriptRow,
@@ -212,6 +213,8 @@ export async function planShortVideoScriptFromGuidance(
     frameMode?: boolean
     /** 混剪等轻量场景：仅模型 1 规划，跳过二/三轮复核（更快、更少超时） */
     skipReviewPasses?: boolean
+    /** 混剪：AI 少量分镜即可，空白段自动从指导文案补全，不按目标段数强校验 */
+    mixAutoExpandSegments?: boolean
     onProgress?: (message: string) => void
   },
 ): Promise<
@@ -345,10 +348,18 @@ export async function planShortVideoScriptFromGuidance(
     review2Vendor = review2.plannerVendor
     review2ModelId = review2.plannerModelId
   } else if (!scriptRowsFullyFilled(rows)) {
-    return {
-      ok: false,
-      message: `AI 规划的分镜仍有空白段：${validationIssues.join('；') || '画面或口播未填满'}。请补充指导文案后重试。`,
+    if (opts.mixAutoExpandSegments) {
+      rows = fillBlankScriptRowsFromGuidance(rows, draft)
+    } else {
+      return {
+        ok: false,
+        message: `AI 规划的分镜仍有空白段：${validationIssues.join('；') || '画面或口播未填满'}。请补充指导文案后重试。`,
+      }
     }
+  }
+
+  if (opts.mixAutoExpandSegments && !scriptRowsFullyFilled(rows)) {
+    rows = fillBlankScriptRowsFromGuidance(rows, draft)
   }
 
   if (hasEmbeddedTimes) {
@@ -357,13 +368,17 @@ export async function planShortVideoScriptFromGuidance(
 
   rows = finalizePlannedScriptRows(rows, draft, planner.effectiveTargetSec)
 
-  const finalValidation = validateStoryboardRows(rows, planner.effectiveTargetSec)
-  if (!finalValidation.ok) {
-    const stageLabel = opts.skipReviewPasses ? 'AI 规划' : '三模型复核'
-    return {
-      ok: false,
-      message: `${stageLabel}后仍有未通过项：${finalValidation.issues.join('；')}。请补充指导文案后重试。`,
+  if (!opts.mixAutoExpandSegments) {
+    const finalValidation = validateStoryboardRows(rows, planner.effectiveTargetSec)
+    if (!finalValidation.ok) {
+      const stageLabel = opts.skipReviewPasses ? 'AI 规划' : '三模型复核'
+      return {
+        ok: false,
+        message: `${stageLabel}后仍有未通过项：${finalValidation.issues.join('；')}。请补充指导文案后重试。`,
+      }
     }
+  } else if (rows.length < 2) {
+    return { ok: false, message: 'AI 未返回可用分镜，请补充指导文案后重试' }
   }
 
   return {

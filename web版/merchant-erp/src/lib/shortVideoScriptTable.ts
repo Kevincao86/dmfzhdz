@@ -791,6 +791,36 @@ export function mergeGuidanceScriptTimeTemplates(text: string): ShortVideoScript
   )
 }
 
+/** 从指导文案拆句，供混剪补全空白口播 */
+export function dialogueLinesFromGuidance(guidance: string): string[] {
+  const t = guidance.trim()
+  if (!t) return []
+  const sents = t
+    .split(/(?<=[。！？!?])\s*/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 4)
+  if (sents.length >= 1) return sents
+  return [t.slice(0, 80)]
+}
+
+/** AI 规划后补全空白画面/口播（混剪场景：后续会按素材数扩展） */
+export function fillBlankScriptRowsFromGuidance(
+  rows: ShortVideoScriptRow[],
+  guidance: string,
+): ShortVideoScriptRow[] {
+  const lines = dialogueLinesFromGuidance(guidance)
+  const hook = lines[0] || guidance.trim().slice(0, 48) || '精彩片段，值得一看'
+  const visHint = guidance.trim().slice(0, 60) || '展示实拍画面'
+  return rows.map((r, i) => ({
+    ...r,
+    visual: r.visual.trim().length >= 3 ? r.visual : `${visHint}（段${i + 1}）`,
+    dialogue:
+      r.dialogue.trim().length >= 3
+        ? r.dialogue
+        : (lines[i % Math.max(1, lines.length)] || hook).slice(0, 120),
+  }))
+}
+
 /** 每段画面与口播均须非空 */
 export function scriptRowsFullyFilled(rows: ShortVideoScriptRow[]): boolean {
   if (rows.length < 2) return false
