@@ -141,7 +141,12 @@ export function sampleMixMaterialsEvenly<T>(items: T[], max: number): T[] {
   return out
 }
 
-/** 多素材混剪：在目标时长内尽量多分镜，单段不低于约 2 秒 */
+/** 混剪单段最短时长（秒）；为覆盖全部素材可短于 1 秒 */
+export const MIX_MIN_CLIP_SEC = 0.75
+/** 分镜/时间线最多段数（与 IMS 批量成片上限对齐） */
+export const MIX_MAX_STORYBOARD_SEGMENTS = 48
+
+/** 多素材混剪：每条素材至少一段，受目标时长与最短单段约束 */
 export function resolveMixStoryboardSegmentCount(
   targetTotalSec: number,
   segmentSec: number,
@@ -149,8 +154,47 @@ export function resolveMixStoryboardSegmentCount(
 ): number {
   const base = segmentCountFromTargetTotalSec(targetTotalSec, segmentSec)
   if (materialCount <= 2) return base
-  const maxByDuration = Math.min(12, Math.max(2, Math.floor(targetTotalSec / 2)))
+  const maxByDuration = Math.min(
+    MIX_MAX_STORYBOARD_SEGMENTS,
+    Math.max(2, Math.floor(targetTotalSec / MIX_MIN_CLIP_SEC)),
+  )
+  // 每条素材至少一段（在时长允许范围内尽量全覆盖）
   return Math.max(base, Math.min(materialCount, maxByDuration))
+}
+
+/** 为每条素材生成一段分镜（时间均分，口播/画面从已有分镜轮询） */
+export function buildAllMaterialCoverageRows(
+  materials: Array<{ label: string }>,
+  targetTotalSec: number,
+  sourceRows: ShortVideoScriptRow[],
+  guidance = '',
+): ShortVideoScriptRow[] {
+  const n = Math.max(2, materials.length)
+  const total = Math.max(5, Math.ceil(targetTotalSec))
+  const clipSec = total / n
+  const dialogues = sourceRows
+    .map((r) => r.dialogue.trim())
+    .filter((d) => d.length >= 2 && !/^（无口播）$/i.test(d))
+  const visuals = sourceRows.map((r) => r.visual.trim()).filter((v) => v.length >= 2)
+  const hook = guidance.trim().slice(0, 48)
+
+  const rows = Array.from({ length: n }, (_, i) => {
+    const start = Math.round(i * clipSec * 10) / 10
+    const end = i === n - 1 ? total : Math.round((i + 1) * clipSec * 10) / 10
+    return {
+      timeRange: `${start}-${end}秒`,
+      visual:
+        visuals[i % Math.max(1, visuals.length)] ||
+        `${materials[i]?.label || `素材${i + 1}`}：展示本条实拍画面`,
+      dialogue: dialogues[i % Math.max(1, dialogues.length)] || hook || '（无口播）',
+    }
+  })
+  return ensureSequentialMixScriptRows(rows, total)
+}
+
+/** 每条素材至少出现一次的映射：段 i → 素材 i（段数须 ≥ 素材数） */
+export function assignFullMaterialCoverageSlots(materialCount: number): number[] {
+  return Array.from({ length: materialCount }, (_, i) => i)
 }
 
 /** 分镜段数不足时扩展，并重新拉齐时间段 */

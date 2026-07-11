@@ -65,6 +65,8 @@ import { produceIceMixPackage, composeMixProductionBrief, type IceMixProduceOutp
 import type { IceMixMaterialProfile } from '../services/iceMixEditPlanAi'
 import {
   assignMixMaterialSlots,
+  assignFullMaterialCoverageSlots,
+  buildAllMaterialCoverageRows,
   expandMixRowsForMaterialPool,
   resolveMixStoryboardSegmentCount,
   ensureSequentialMixScriptRows,
@@ -1089,17 +1091,21 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     }
 
     const totalSec = mixTargetSec
-    const slots =
-      materialSlots.length === scriptRows.length
-        ? materialSlots
-        : assignMixMaterialSlots(scriptRows.length, mixMaterialPool.length)
+    const poolLen = mixMaterialPool.length
+    const coverageRows = buildAllMaterialCoverageRows(
+      mixMaterialPool,
+      totalSec,
+      scriptRows.length >= 2 ? scriptRows : [],
+      mixGuidance.trim(),
+    )
+    const slots = assignFullMaterialCoverageSlots(poolLen)
     const pipe = await postIceSmartBatch({
       materials: mixMaterialPool.map((m) => ({
         kind: m.kind,
         mediaUrl: m.mediaUrl,
         label: m.label,
       })),
-      scriptRows: scriptRows.map((r) => ({
+      scriptRows: coverageRows.map((r) => ({
         timeRange: r.timeRange,
         visual: r.visual,
         dialogue: r.dialogue,
