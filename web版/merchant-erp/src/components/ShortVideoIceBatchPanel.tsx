@@ -783,6 +783,9 @@ export function ShortVideoIceBatchPanel(_props: Props) {
         setErr(r.message)
         return
       }
+      if (r.usedRuleBasedFallback) {
+        setHint('AI 分镜 JSON 解析失败，已按指导文案自动生成代表性分镜…')
+      }
       const expandedRows = expandMixRowsForMaterialPool(
         r.rows,
         mixTargetSec,

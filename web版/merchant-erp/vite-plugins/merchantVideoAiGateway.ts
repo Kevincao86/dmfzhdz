@@ -326,6 +326,7 @@ function fixCommonJsonSyntax(raw: string): string {
     .replace(/[\u201c\u201d]/g, '"')
     .replace(/[\u2018\u2019]/g, "'")
     .replace(/,\s*([}\]])/g, '$1')
+    .replace(/\/\/[^\n]*/g, '')
     .replace(/\r\n/g, '\n')
 }
 
@@ -383,6 +384,13 @@ function buildVideoPromptFromSegmentRow(row: unknown): string {
   if (!parts.length) {
     if (action) {
       return `【动作运镜】${action}\n${VIDEO_PROMPT_SUFFIX}`
+    }
+    const dialogue =
+      (typeof o.dialogue === 'string' && o.dialogue.trim()) ||
+      (typeof o.narration === 'string' && o.narration.trim()) ||
+      ''
+    if (dialogue.length >= 4) {
+      return `【画面】${dialogue.slice(0, 100)}\n${VIDEO_PROMPT_SUFFIX}`
     }
     const fallback = extractLongformSegmentPrompt(row)
     if (!fallback) return ''
@@ -448,6 +456,36 @@ function toLongformScriptSegments(
   }))
 }
 
+function longformPlanFromSegments(
+  segs: unknown[],
+  j: Record<string, unknown> | null,
+  targetN: number,
+  segmentSec: number,
+): LongformPlanParsed | null {
+  const scriptSegments = toLongformScriptSegments(segs, segmentSec)
+  const usable = scriptSegments.filter(
+    (s) => s.visual.trim().length >= 2 || s.dialogue.trim().length >= 4,
+  )
+  if (usable.length < 2) return null
+  const prompts = normalizeLongformVideoPrompts(segs, targetN)
+  const narrationScript =
+    (j ? extractNarrationFromPlanJson(j, segs) : '') ||
+    usable.map((s) => s.dialogue).filter(Boolean).join('。')
+  if (prompts) {
+    return { prompts, narrationScript, scriptSegments: usable }
+  }
+  const fallbackPrompts = usable.map((s) => {
+    const body = s.visual.trim() || s.dialogue.trim()
+    return body.includes('【画面约束】') ? body : `${body}\n${VIDEO_PROMPT_SUFFIX}`
+  })
+  if (fallbackPrompts.length < 2) return null
+  return {
+    prompts: fallbackPrompts,
+    narrationScript,
+    scriptSegments: usable,
+  }
+}
+
 function parseLongformPlan(
   text: string,
   n: number,
@@ -460,26 +498,13 @@ function parseLongformPlan(
     const j = parsed as Record<string, unknown>
     const segs = normalizeLongformSegmentsArray(j.segments ?? j.prompts ?? j.scenes ?? j.shots)
     if (segs) {
-      const prompts = normalizeLongformVideoPrompts(segs, targetN)
-      if (prompts) {
-        const narrationScript = extractNarrationFromPlanJson(j, segs) || ''
-        return {
-          prompts,
-          narrationScript,
-          scriptSegments: toLongformScriptSegments(segs, segmentSec),
-        }
-      }
+      const plan = longformPlanFromSegments(segs, j, targetN, segmentSec)
+      if (plan) return plan
     }
   }
   if (Array.isArray(parsed)) {
-    const prompts = normalizeLongformVideoPrompts(parsed, targetN)
-    if (prompts) {
-      return {
-        prompts,
-        narrationScript: '',
-        scriptSegments: toLongformScriptSegments(parsed, segmentSec),
-      }
-    }
+    const plan = longformPlanFromSegments(parsed, null, targetN, segmentSec)
+    if (plan) return plan
   }
   return null
 }
