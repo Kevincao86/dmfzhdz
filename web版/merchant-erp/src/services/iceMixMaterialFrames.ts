@@ -142,7 +142,6 @@ export async function collectMaterialTimelineFrames(
   materialIndex: number,
   opts?: { durationSec?: number; maxFrames?: number; skipLocalDownload?: boolean },
 ): Promise<MixMaterialFrameSample[]> {
-  const label = mat.label || `素材${materialIndex + 1}`
   if (mat.kind === 'image') {
     const one = await collectMaterialFrame(mat, materialIndex, true)
     return one ? [one] : []
