@@ -25,35 +25,44 @@ function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
   ])
 }
 
-async function extractOneVideoFrame(
+async function extractVideoSampleFrames(
   mat: IceMixMaterialSlot,
   opts?: { skipLocalDownload?: boolean },
-): Promise<{ label: string; dataUrl: string } | null> {
+): Promise<Array<{ label: string; dataUrl: string; tag: string }>> {
   const label = mat.label || '视频素材'
   const urls = visionUrlCandidates(mat)
-  if (urls.length === 0) return null
+  if (urls.length === 0) return []
 
+  const out: Array<{ label: string; dataUrl: string; tag: string }> = []
   for (const url of urls) {
-    const serverFrame = await postVideoLastFrameFromUrl(url, { frame: 'opening' })
-    if (serverFrame.ok) {
-      return { label, dataUrl: `data:image/jpeg;base64,${serverFrame.pureBase64}` }
+    for (const frame of ['opening', 'last'] as const) {
+      const serverFrame = await postVideoLastFrameFromUrl(url, { frame })
+      if (serverFrame.ok) {
+        out.push({
+          label,
+          dataUrl: `data:image/jpeg;base64,${serverFrame.pureBase64}`,
+          tag: frame,
+        })
+      }
     }
+    if (out.length > 0) break
   }
 
-  if (opts?.skipLocalDownload) return null
+  if (out.length > 0 || opts?.skipLocalDownload) return out
 
   for (const url of urls) {
     try {
       const blob = await downloadVideoUrlAsBlob(url, { maxAttempts: 2 })
       const pure = await extractVideoFirstFramePureBase64(blob)
       if (pure.length >= 64) {
-        return { label, dataUrl: `data:image/jpeg;base64,${pure}` }
+        out.push({ label, dataUrl: `data:image/jpeg;base64,${pure}`, tag: 'opening' })
+        break
       }
     } catch {
       /* try next url */
     }
   }
-  return null
+  return out
 }
 
 async function collectMaterialFrame(
@@ -75,32 +84,45 @@ async function collectMaterialFrame(
     }
     return null
   }
-  const frame = await extractOneVideoFrame(mat, { skipLocalDownload })
-  if (!frame) return null
-  return { index, label: frame.label, dataUrl: frame.dataUrl }
+  const frame = await extractVideoSampleFrames(mat, { skipLocalDownload })
+  if (frame.length === 0) return null
+  const pick = frame[0]!
+  return { index, label: pick.label, dataUrl: pick.dataUrl }
 }
 
-/** 为每条素材快速截一帧，供视觉模型剪辑匹配（最多 8 条） */
+/** 为每条素材截帧，供视觉模型剪辑匹配（视频含首帧+尾帧，最多 12 张） */
 export async function collectMixMaterialFramesForEditPlan(
   materials: IceMixMaterialSlot[],
   opts?: { maxFrames?: number; onProgress?: (msg: string) => void },
 ): Promise<Array<{ index: number; label: string; dataUrl: string }>> {
-  const max = Math.min(materials.length, opts?.maxFrames ?? 8)
-  const targets = materials.slice(0, max)
+  const max = Math.min(materials.length * 2, opts?.maxFrames ?? 12)
   const out: Array<{ index: number; label: string; dataUrl: string }> = []
 
-  await runIceUploadPool(targets, FRAME_CONCURRENCY, async (mat) => {
+  await runIceUploadPool(materials, FRAME_CONCURRENCY, async (mat) => {
     const idx = materials.indexOf(mat)
     const index = idx >= 0 ? idx : out.length
-    opts?.onProgress?.(`采样素材 ${index + 1}/${max}…`)
-    const sample = await withTimeout(
-      collectMaterialFrame(mat, index, true),
+    if (out.length >= max) return null
+    opts?.onProgress?.(`采样素材 ${index + 1}/${materials.length}…`)
+    if (mat.kind === 'image') {
+      const sample = await withTimeout(
+        collectMaterialFrame(mat, index, true),
+        FRAME_TIMEOUT_MS,
+        null,
+      )
+      if (sample && out.length < max) out.push(sample)
+      return sample
+    }
+    const frames = await withTimeout(
+      extractVideoSampleFrames(mat, { skipLocalDownload: true }),
       FRAME_TIMEOUT_MS,
-      null,
+      [],
     )
-    if (sample) out.push(sample)
-    return sample
+    for (const f of frames) {
+      if (out.length >= max) break
+      out.push({ index, label: `${f.label}·${f.tag === 'opening' ? '首帧' : '尾帧'}`, dataUrl: f.dataUrl })
+    }
+    return frames[0] ?? null
   })
 
-  return out.sort((a, b) => a.index - b.index)
+  return out.sort((a, b) => a.index - b.index || a.label.localeCompare(b.label))
 }

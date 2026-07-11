@@ -2,9 +2,11 @@
  * AI 混剪成片引擎：ICE Timeline 多素材拼接 + 截取 + 转场 + 动效字幕 + AI_TTS。
  * 素材映射以轮询/用户下拉为准，视觉 AI 仅优化截取点，禁止全段指向第一条素材。
  */
-import { postAiChat } from './ai/aiClient'
-import { collectMixMaterialFramesForEditPlan } from './iceMixMaterialFrames'
 import type { IceMixMaterialProfile } from './iceMixEditPlanAi'
+import {
+  buildIceMixSegmentsFromEditPlan,
+  planMixEditFromInstructions,
+} from './iceMixEditPlanAi'
 import { validateIceMixMaterialUrl, sanitizeIceMixMaterialUrlForPipeline } from '../lib/icePipelineImageUrl'
 import type { IceMixMaterialSlot, IceMixSegmentPlan } from '../lib/iceMixPlan'
 import {
@@ -22,8 +24,6 @@ import {
   parseScriptTimeRangeSeconds,
   type ShortVideoScriptRow,
 } from '../lib/shortVideoScriptTable'
-
-const VISION_SOURCE_IN_TIMEOUT_MS = 18_000
 
 export type IceMixProduceInput = {
   rows: ShortVideoScriptRow[]
@@ -168,70 +168,11 @@ export function buildIceMixSegmentsFromSlots(
   return segments
 }
 
-async function refineVideoSourceInWithVision(
-  segments: IceMixSegmentPlan[],
-  rows: ShortVideoScriptRow[],
-  materials: IceMixMaterialSlot[],
-  profiles: IceMixMaterialProfile[] | undefined,
-  guidance: string,
-): Promise<void> {
-  const videoSegs = segments.filter((s) => s.kind === 'video')
-  if (videoSegs.length < 1 || materials.length < 1) return
-
-  const frames = await collectMixMaterialFramesForEditPlan(materials, {
-    maxFrames: Math.min(8, materials.length),
-  })
-  if (frames.length < 1) return
-
-  const storyboard = rows
-    .map((r, i) => {
-      const seg = segments[i]
-      const mi = seg?.materialIndex ?? i % materials.length
-      return `段${i}→素材${mi} | 画面：${r.visual || '（待填）'}`
-    })
-    .join('\n')
-  const frameLegend = frames.map((f, i) => `附图${i + 1}=素材${f.index}`).join('\n')
-
-  const system = `你是短视频剪辑师。用户已固定每段使用哪条素材（materialIndex 不可改）。
-只输出 JSON 数组，为每段视频建议 sourceInSec（从源片第几秒起剪，0–8）：
-[{"segmentIndex":0,"sourceInSec":1.2},...]
-禁止修改 materialIndex。`
-
-  const user = `【指导】${guidance.slice(0, 400)}\n【分镜】\n${storyboard}\n【附图】\n${frameLegend}`
-
-  for (const provider of ['qwen', 'doubao'] as const) {
-    try {
-      const res = await postAiChat({
-        provider,
-        temperature: 0.1,
-        imageDataUrls: frames.map((f) => f.dataUrl).slice(0, 8),
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: user },
-        ],
-      })
-      const m = res.content?.match(/\[[\s\S]*\]/)
-      if (!m) continue
-      const arr = JSON.parse(m[0]) as Array<{ segmentIndex?: number; sourceInSec?: number }>
-      for (const item of arr) {
-        const idx = Number(item.segmentIndex)
-        const inSec = Number(item.sourceInSec)
-        if (!Number.isFinite(idx) || idx < 0 || idx >= segments.length) continue
-        if (!Number.isFinite(inSec) || inSec < 0) continue
-        const seg = segments[idx]!
-        if (seg.kind !== 'video') continue
-        const clipDur = seg.timelineEndSec - seg.timelineStartSec
-        const est =
-          profileAt(profiles, materials, seg.materialIndex).estimatedDurationSec ??
-          MIX_DEFAULT_SOURCE_DURATION_SEC
-        seg.sourceInSec = clampMixSourceInSec(inSec, clipDur, est)
-        seg.sourceOutSec = seg.sourceInSec + clipDur
-      }
-      return
-    } catch {
-      /* next provider */
-    }
-  }
+function sanitizeMixSegments(segments: IceMixSegmentPlan[]): IceMixSegmentPlan[] {
+  return segments.map((s) => ({
+    ...s,
+    mediaUrl: sanitizeIceMixMaterialUrlForPipeline(s.mediaUrl || s.signedMediaUrl || ''),
+  }))
 }
 
 /** 写入 ICE 可解析的剪辑指令：转场、淡入淡出、动效字幕、TTS */
@@ -304,34 +245,49 @@ export async function produceIceMixPackage(
     input.materialSlots,
   )
 
-  let segments = buildIceMixSegmentsFromSlots(
+  const profileList =
+    input.materialProfiles && input.materialProfiles.length > 0
+      ? input.materialProfiles
+      : materials.map((m, i) => ({
+          index: i,
+          label: m.label || `素材${i + 1}`,
+          kind: m.kind,
+          description: m.label || `实拍${m.kind === 'video' ? '视频' : '图片'}`,
+          estimatedDurationSec: m.kind === 'video' ? MIX_DEFAULT_SOURCE_DURATION_SEC : undefined,
+        }))
+
+  const editPlan = await planMixEditFromInstructions({
+    guidance: input.guidance || input.mixInstruction || '',
     rows,
     materials,
-    materialSlots,
-    input.targetTotalSec,
-    input.materialProfiles,
-  )
-  if (segments.length < 2) {
-    return { ok: false, message: '无法生成分镜时间线，请检查分镜表' }
-  }
+    materialProfiles: profileList,
+    targetTotalSec: input.targetTotalSec,
+    onProgress: input.onProgress,
+  })
 
-  try {
-    input.onProgress?.('视觉 AI 优化各段截取位置…')
-    await Promise.race([
-      refineVideoSourceInWithVision(
-        segments,
+  let segments: IceMixSegmentPlan[]
+  if (editPlan.ok) {
+    segments = sanitizeMixSegments(
+      buildIceMixSegmentsFromEditPlan(
         rows,
         materials,
-        input.materialProfiles,
-        input.guidance || input.mixInstruction || '',
+        editPlan.decisions,
+        input.targetTotalSec,
+        profileList,
       ),
-      new Promise<void>((r) => {
-        const t = typeof globalThis !== 'undefined' && 'setTimeout' in globalThis ? globalThis.setTimeout : setTimeout
-        t(r, VISION_SOURCE_IN_TIMEOUT_MS)
-      }),
-    ])
-  } catch {
-    /* keep structural sourceIn */
+    )
+  } else {
+    segments = buildIceMixSegmentsFromSlots(
+      rows,
+      materials,
+      materialSlots,
+      input.targetTotalSec,
+      profileList,
+    )
+  }
+
+  if (segments.length < 2) {
+    return { ok: false, message: '无法生成分镜时间线，请检查分镜表' }
   }
 
   const diversityErr = validateMixSegmentDiversity(segments, materials)
