@@ -36,11 +36,12 @@ export type MixEditSegmentDecision = {
 
 const VISION_EDIT_PLAN_TIMEOUT_MS = 22_000
 
-const VISION_EDIT_PLAN_SYSTEM = `你是专业短视频混剪剪辑师。用户会提供【指导文案】【分镜表】以及每条素材的采样截图（附图）。
+const VISION_EDIT_PLAN_SYSTEM = `你是专业短视频混剪剪辑师（探店/餐饮/街头小吃/本地生活带货）。用户会提供【指导文案】【分镜表】以及每条素材的采样截图（附图）。
 须为每一段分镜输出剪辑决策：
-1. materialIndex：选用哪条素材（从 0 开始，0=第一条），必须按画面语义匹配；禁止全部段都用 materialIndex=0
-2. sourceInSec：从该素材第几秒起截取（视频 0–6s；图片固定 0）；同素材复用时 sourceInSec 至少相差 1.5 秒
-3. 叙事顺序：氛围/全景 → 过程 → 特写/卖点
+1. materialIndex：选用哪条素材（从 0 开始），必须按画面语义匹配分镜「画面」描述；禁止全部段都用 materialIndex=0
+2. sourceInSec：从该素材第几秒起截取（视频 0–8s；图片固定 0）；同素材复用时 sourceInSec 至少相差 1.5 秒，避开重复镜头
+3. 叙事顺序（强制）：开场氛围/门头/全景 → 制作过程/操作特写 → 成品/试吃/卖点收尾；口播与画面一一对应
+4. 理解附图：识别食材、烹饪动作、成品摆盘、顾客互动，按语义分配到最匹配分镜
 
 只输出 JSON 数组，无 markdown：
 [{"segmentIndex":0,"materialIndex":2,"sourceInSec":0,"clipNote":"门店外观"},...]`
@@ -358,7 +359,7 @@ export async function planMixEditFromInstructions(opts: {
   try {
     const frames = await Promise.race([
       collectMixMaterialFramesForEditPlan(materials, {
-        maxFrames: Math.min(8, materials.length),
+        maxFrames: Math.min(12, Math.max(6, materials.length * 2)),
         onProgress: opts.onProgress,
       }),
       new Promise<Array<{ index: number; label: string; dataUrl: string }>>((resolve) => {

@@ -427,20 +427,22 @@ export function buildMixAnimatedSubtitleTracks(
   return { SubtitleTracks: [{ SubtitleTrackClips: clips }] }
 }
 
-/** 混剪成片：段间直切（Fade/DLTransition 在多段 IMS 时间线上易 InputFile is bad） */
+/** 混剪成片：段间叠化转场 + 首尾淡入淡出（短时长，降低 IMS 直切卡顿感） */
 export function enhanceIceMixBriefPlan(
   plan: IceBriefTimelinePlan,
   effectId: string,
 ): IceBriefTimelinePlan {
   const effect = resolveIceEffectPreset(effectId)
+  const transitionSubType = effect.transitionSubType ?? 'fade'
+  const fadeClip = effect.fadeClip || transitionSubType === 'fade'
   return {
     ...plan,
-    fadeClip: false,
-    useFade: false,
-    useTransition: false,
-    transitionSubType: undefined,
-    effectId: effect.id,
-    summary: `${plan.summary}${plan.summary ? ' · ' : ''}混剪${effect.id === 'none' ? '直切' : `拼接（${effect.label}·直切稳定模式）`}`,
+    fadeClip,
+    useFade: fadeClip,
+    useTransition: Boolean(transitionSubType),
+    transitionSubType,
+    effectId: effect.transitionSubType ? effect.id : transitionSubType === 'fade' ? 'trans_fade' : effect.id,
+    summary: `${plan.summary}${plan.summary ? ' · ' : ''}混剪${transitionSubType ? `转场(${effect.label || '叠化'})` : '叠化转场'}`,
   }
 }
 

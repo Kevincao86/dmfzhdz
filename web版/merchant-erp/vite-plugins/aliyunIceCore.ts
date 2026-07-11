@@ -181,7 +181,7 @@ function appendClipEffects(
     effects.push({
       Type: 'DLTransition',
       SubType: transSub,
-      Duration: Math.min(0.9, Math.max(0.35, dur * 0.12)),
+      Duration: Math.min(0.55, Math.max(0.28, dur * 0.1)),
     })
   }
 }
