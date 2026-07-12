@@ -1867,155 +1867,159 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                   {err}
                 </div>
               ) : null}
-              <div className="grid gap-4 rounded-xl border border-zinc-100/80 bg-gradient-to-br from-zinc-50/80 to-white/60 p-4 sm:grid-cols-2 lg:grid-cols-5 lg:items-start">
-                <label className="flex flex-col gap-1 text-xs text-zinc-600">
-                  <span>目标总时长</span>
-                  <select
-                    value={mixTargetSec}
-                    disabled={anyBusy || guidanceBusy}
-                    onChange={(e) => {
-                      const sec = Number(e.target.value)
-                      setMixTargetSec(sec)
-                      setScriptRows(
-                        defaultScriptRows(
-                          segmentCountFromTargetTotalSec(sec, MIX_DEFAULT_SEGMENT_SEC),
-                          MIX_DEFAULT_SEGMENT_SEC,
-                        ),
-                      )
-                    }}
-                    className="h-10 rounded-lg border border-zinc-300 bg-white px-2 text-sm"
-                  >
-                    {MIX_TARGET_TOTAL_OPTIONS.map((sec) => (
-                      <option key={sec} value={sec}>
-                        {sec} 秒
-                      </option>
-                    ))}
-                  </select>
-                  <span className="min-h-[1.25rem]" aria-hidden />
-                </label>
-                <label className="flex flex-col gap-1 text-xs text-zinc-600">
-                  <span>画幅</span>
-                  <select
-                    value={aspectId}
-                    disabled={anyBusy || guidanceBusy}
-                    onChange={(e) => setAspectId(e.target.value as typeof aspectId)}
-                    className="h-10 rounded-lg border border-zinc-300 bg-white px-2 text-sm"
-                  >
-                    {ICE_ASPECT_PRESETS.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.label}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="min-h-[1.25rem]" aria-hidden />
-                </label>
-                <label className="flex flex-col gap-1 text-xs text-zinc-600">
-                  <span>字幕样式</span>
-                  <select
-                    value={mixSubtitleStyleId}
-                    disabled={anyBusy || guidanceBusy}
-                    onChange={(e) => setMixSubtitleStyleId(e.target.value)}
-                    className="h-10 rounded-lg border border-zinc-300 bg-white px-2 text-sm"
-                  >
-                    {ICE_SUBTITLE_STYLE_PRESETS.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.tag ? `【${s.tag}】` : ''}
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="min-h-[1.25rem]" aria-hidden />
-                </label>
-                <div className="flex flex-col gap-1 text-xs text-zinc-600">
-                  <span>口播音色</span>
-                  <div className="flex h-10 gap-2">
+              <div className="space-y-4 rounded-xl border border-zinc-100/80 bg-gradient-to-br from-zinc-50/80 to-white/60 p-4">
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <label className="flex min-w-0 flex-col gap-1.5 text-xs text-zinc-600">
+                    <span className="font-medium text-zinc-700">目标总时长</span>
                     <select
-                      value={mixVoicePresetId}
+                      value={mixTargetSec}
                       disabled={anyBusy || guidanceBusy}
-                      onChange={(e) => setMixVoicePresetId(e.target.value)}
-                      className="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-2 text-sm"
+                      onChange={(e) => {
+                        const sec = Number(e.target.value)
+                        setMixTargetSec(sec)
+                        setScriptRows(
+                          defaultScriptRows(
+                            segmentCountFromTargetTotalSec(sec, MIX_DEFAULT_SEGMENT_SEC),
+                            MIX_DEFAULT_SEGMENT_SEC,
+                          ),
+                        )
+                      }}
+                      className="h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm"
                     >
-                      {ICE_MIX_VOICE_PRESETS.map((v) => (
-                        <option key={v.id} value={v.id}>
-                          {v.label}（{v.gender}）
+                      {MIX_TARGET_TOTAL_OPTIONS.map((sec) => (
+                        <option key={sec} value={sec}>
+                          {sec} 秒
                         </option>
                       ))}
                     </select>
-                    <button
-                      type="button"
+                  </label>
+                  <label className="flex min-w-0 flex-col gap-1.5 text-xs text-zinc-600">
+                    <span className="font-medium text-zinc-700">画幅</span>
+                    <select
+                      value={aspectId}
                       disabled={anyBusy || guidanceBusy}
-                      onClick={() => void playMixTtsPreview()}
-                      className="inline-flex h-10 shrink-0 items-center gap-1 rounded-lg border border-zinc-300 bg-white px-2.5 text-sm text-zinc-800 hover:bg-zinc-50 disabled:opacity-50"
-                      title="试听当前音色（优先云端神经语音）"
+                      onChange={(e) => setAspectId(e.target.value as typeof aspectId)}
+                      className="h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm"
                     >
-                      {mixTtsBusy ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : mixTtsPlaying ? (
-                        <Pause className="h-4 w-4" />
-                      ) : (
-                        <Volume2 className="h-4 w-4" />
-                      )}
-                      {mixTtsBusy ? '合成' : mixTtsPlaying ? '停止' : '试听'}
-                    </button>
-                  </div>
-                  <div className="flex min-h-[1.25rem] flex-wrap items-center gap-2">
-                    <input
-                      ref={mixCloneInputRef}
-                      type="file"
-                      accept="audio/mpeg,audio/wav,audio/mp4,audio/x-m4a,audio/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0]
-                        if (!f) return
-                        void (async () => {
-                          try {
-                            const blob = await fileToAudioBlob(f)
-                            mixCloneBlobRef.current = blob
-                            setMixCloneAudioName(f.name)
-                            setMixVoicePresetId('v-clone')
-                            setHint('语音克隆样本已就绪，试听与成片将模拟该音色')
-                          } catch (err) {
-                            setErr(err instanceof Error ? err.message : '语音样本无效')
-                          } finally {
-                            e.target.value = ''
-                          }
-                        })()
-                      }}
-                    />
-                    <button
-                      type="button"
+                      {ICE_ASPECT_PRESETS.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex min-w-0 flex-col gap-1.5 text-xs text-zinc-600">
+                    <span className="font-medium text-zinc-700">字幕样式</span>
+                    <select
+                      value={mixSubtitleStyleId}
                       disabled={anyBusy || guidanceBusy}
-                      onClick={() => mixCloneInputRef.current?.click()}
-                      className="text-[11px] text-violet-700 underline-offset-2 hover:underline"
+                      onChange={(e) => setMixSubtitleStyleId(e.target.value)}
+                      className="h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm"
                     >
-                      上传样本 · 模拟音色
-                    </button>
-                    {mixCloneAudioName ? (
-                      <span className="truncate text-[11px] text-zinc-500">已上传：{mixCloneAudioName}</span>
-                    ) : null}
-                  </div>
+                      {ICE_SUBTITLE_STYLE_PRESETS.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.tag ? `【${s.tag}】` : ''}
+                          {s.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                 </div>
-                <label className="flex flex-col gap-1 text-xs text-zinc-600">
-                  <span>场景转场</span>
-                  <select
-                    value={mixTransitionMode}
-                    disabled={anyBusy || guidanceBusy}
-                    onChange={(e) => setMixTransitionMode(e.target.value)}
-                    className="h-10 rounded-lg border border-zinc-300 bg-white px-2 text-sm"
-                  >
-                    <option value="auto">
-                      智能推断
-                      {mixTransitionMode === 'auto' ? `（${inferredMixEffect.label}）` : ''}
-                    </option>
-                    {ICE_MIX_TRANSITION_PRESETS.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.label}
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="flex min-w-0 flex-col gap-1.5 text-xs text-zinc-600">
+                    <span className="font-medium text-zinc-700">口播音色</span>
+                    <div className="flex h-10 gap-2">
+                      <select
+                        value={mixVoicePresetId}
+                        disabled={anyBusy || guidanceBusy}
+                        onChange={(e) => setMixVoicePresetId(e.target.value)}
+                        className="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-3 text-sm"
+                        title={resolvedMixVoice.label}
+                      >
+                        {ICE_MIX_VOICE_PRESETS.map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.label}（{v.gender}）
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        disabled={anyBusy || guidanceBusy}
+                        onClick={() => void playMixTtsPreview()}
+                        className="inline-flex h-10 shrink-0 items-center gap-1 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-800 hover:bg-zinc-50 disabled:opacity-50"
+                        title="试听当前音色（优先云端神经语音）"
+                      >
+                        {mixTtsBusy ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : mixTtsPlaying ? (
+                          <Pause className="h-4 w-4" />
+                        ) : (
+                          <Volume2 className="h-4 w-4" />
+                        )}
+                        {mixTtsBusy ? '合成' : mixTtsPlaying ? '停止' : '试听'}
+                      </button>
+                    </div>
+                    <div className="flex min-h-[1.25rem] flex-wrap items-center gap-x-3 gap-y-1">
+                      <input
+                        ref={mixCloneInputRef}
+                        type="file"
+                        accept="audio/mpeg,audio/wav,audio/mp4,audio/x-m4a,audio/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0]
+                          if (!f) return
+                          void (async () => {
+                            try {
+                              const blob = await fileToAudioBlob(f)
+                              mixCloneBlobRef.current = blob
+                              setMixCloneAudioName(f.name)
+                              setMixVoicePresetId('v-clone')
+                              setHint('语音克隆样本已就绪，试听与成片将模拟该音色')
+                            } catch (err) {
+                              setErr(err instanceof Error ? err.message : '语音样本无效')
+                            } finally {
+                              e.target.value = ''
+                            }
+                          })()
+                        }}
+                      />
+                      <button
+                        type="button"
+                        disabled={anyBusy || guidanceBusy}
+                        onClick={() => mixCloneInputRef.current?.click()}
+                        className="text-[11px] text-violet-700 underline-offset-2 hover:underline"
+                      >
+                        上传样本 · 模拟音色
+                      </button>
+                      {mixCloneAudioName ? (
+                        <span className="truncate text-[11px] text-zinc-500">已上传：{mixCloneAudioName}</span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <label className="flex min-w-0 flex-col gap-1.5 text-xs text-zinc-600">
+                    <span className="font-medium text-zinc-700">场景转场</span>
+                    <select
+                      value={mixTransitionMode}
+                      disabled={anyBusy || guidanceBusy}
+                      onChange={(e) => setMixTransitionMode(e.target.value)}
+                      className="h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm"
+                    >
+                      <option value="auto">
+                        智能推断
+                        {mixTransitionMode === 'auto' ? `（${inferredMixEffect.label}）` : ''}
                       </option>
-                    ))}
-                  </select>
-                  <span className="min-h-[1.25rem]" aria-hidden />
-                </label>
-                <p className="col-span-full text-[11px] leading-snug text-zinc-500">
+                      {ICE_MIX_TRANSITION_PRESETS.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.label}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="min-h-[1.25rem]" aria-hidden />
+                  </label>
+                </div>
+
+                <p className="text-[11px] leading-snug text-zinc-500">
                   已上传素材 {mixMaterialPool.length} 个（视频 {jobs.filter((j) => !j.imageUrls?.length).length} · 图片{' '}
                   {imageItems.length}）
                   <span className="mt-1 block text-zinc-600">
