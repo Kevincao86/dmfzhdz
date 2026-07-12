@@ -72,7 +72,8 @@ import {
   expandMixRowsForMaterialPool,
   syncMixCoverageForAllMaterials,
   inferIceEffectIdFromMixContent,
-  mixStoryboardBriefReady,
+  mixStoryboardRowsComplete,
+  mixStoryboardIncompleteHint,
   MIX_TARGET_TOTAL_OPTIONS,
   normalizeMixMaterialSlots,
   resolveMixTotalDurationSec,
@@ -437,32 +438,24 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     return [...videos, ...images]
   }, [jobs, imageItems])
 
-  const mixReady =
-    scriptRows.length >= 2 &&
-    mixMaterialPool.length >= 2 &&
-    mixStoryboardBriefReady(mixGuidance, scriptRows)
+  const storyboardComplete = mixStoryboardRowsComplete(scriptRows)
+  const storyboardGapHint = mixStoryboardIncompleteHint(scriptRows)
 
-  const smartBatchReady =
-    mixMaterialPool.length >= 2 &&
-    (mixGuidance.trim().length >= 20 ||
-      scriptRows.some((r) => String(r.dialogue ?? '').trim().length >= 4))
+  const mixReady = mixMaterialPool.length >= 2 && storyboardComplete
+
+  const smartBatchReady = mixMaterialPool.length >= 2 && storyboardComplete
 
   const smartBatchBlockers = useMemo((): string[] => {
     const items: string[] = []
     if (mixMaterialPool.length < 2) items.push('上传至少 2 条不同视频/图片')
-    if (
-      mixGuidance.trim().length < 20 &&
-      !scriptRows.some((r) => String(r.dialogue ?? '').trim().length >= 4)
-    ) {
-      items.push('填写至少 20 字指导文案，或在分镜表中填写口播')
-    }
+    if (storyboardGapHint) items.push(storyboardGapHint)
     for (let i = 0; i < mixMaterialPool.length; i++) {
       const m = mixMaterialPool[i]!
       const urlErr = validateIceMixMaterialUrl(m.mediaUrl || m.signedMediaUrl || '')
       if (urlErr) items.push(`素材${i + 1}（${m.label}）：${urlErr}`)
     }
     return items
-  }, [mixMaterialPool, mixGuidance, scriptRows])
+  }, [mixMaterialPool, storyboardGapHint])
 
   const mixBlockers = useMemo((): string[] => {
     const items: string[] = []
@@ -472,12 +465,9 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       const urlErr = validateIceMixMaterialUrl(m.mediaUrl || m.signedMediaUrl || '')
       if (urlErr) items.push(`素材${i + 1}（${m.label}）：${urlErr}`)
     }
-    if (scriptRows.length < 2) items.push('分镜至少 2 段（点「AI 规划分镜」）')
-    else if (!mixStoryboardBriefReady(mixGuidance, scriptRows)) {
-      items.push('填写指导文案，或在分镜表中填写口播/画面指令')
-    }
+    if (storyboardGapHint) items.push(storyboardGapHint)
     return items
-  }, [mixMaterialPool, scriptRows.length, mixGuidance, scriptRows])
+  }, [mixMaterialPool, storyboardGapHint])
 
   const mixPoolLenRef = useRef(0)
 
@@ -1128,8 +1118,8 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       setErr('请先规划至少 2 段分镜（指导文案 → AI 规划分镜）')
       return
     }
-    if (!mixStoryboardBriefReady(mixGuidance, scriptRows)) {
-      setErr('请填写指导文案或在分镜表中填写画面/口播')
+    if (!mixStoryboardRowsComplete(scriptRows)) {
+      setErr(storyboardGapHint ?? '请完整填写分镜表每段的画面与口播')
       return
     }
     if (mixBlockers.length > 0) {
@@ -1143,7 +1133,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
 
     setMixRenderBusy(true)
     setErr(null)
-    setHint('ICE 剪辑引擎：多素材拼接 + 截取 + 转场 + TTS…')
+    setHint('普通混剪生成中…')
 
     const profiles = mixMaterialPool.map((m, i) => {
       const hit = mixMaterialProfiles.find((p) => p.index === i)
@@ -1268,7 +1258,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
 
     setSmartRenderBusy(true)
     setErr(null)
-    setHint('IMS 智能一键成片：AI 拆条 + 转场 + 口播合成…')
+    setHint('智能一键成片生成中…')
 
     const localId = newJobId()
     const label = `智能成片 · ${mixMaterialPool.length} 素材`
@@ -1388,12 +1378,35 @@ export function ShortVideoIceBatchPanel(_props: Props) {
   }, [latestDone?.exportId, latestDone?.mixProduceMode])
 
   return (
-    <div className="space-y-6">
-      <header className="overflow-hidden rounded-2xl border border-orange-100 bg-gradient-to-br from-orange-50/80 via-white to-cyan-50/40 px-5 py-5 shadow-sm">
+    <div className="relative -mx-1 overflow-hidden rounded-3xl bg-gradient-to-br from-slate-50 via-orange-50/25 to-violet-50/35 px-3 py-6 sm:-mx-2 sm:px-5 sm:py-8">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-gradient-to-br from-orange-300/25 to-rose-200/20 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -left-20 bottom-20 h-72 w-72 rounded-full bg-gradient-to-tr from-violet-300/20 to-cyan-200/15 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute right-[18%] top-[42%] h-56 w-56 rounded-full bg-gradient-to-b from-amber-200/30 to-transparent blur-2xl"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-[0.35]"
+        style={{
+          backgroundImage:
+            'radial-gradient(circle at 1px 1px, rgb(161 161 170 / 0.12) 1px, transparent 0)',
+          backgroundSize: '28px 28px',
+        }}
+      />
+
+      <div className="relative space-y-6">
+      <header className="overflow-hidden rounded-2xl border border-white/70 bg-white/75 px-5 py-5 shadow-lg shadow-orange-100/30 backdrop-blur-md">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 className="flex items-center gap-3 text-xl font-semibold tracking-tight text-zinc-900">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-rose-500 text-white shadow-md">
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 via-rose-500 to-violet-600 text-white shadow-lg shadow-orange-300/40">
                 <Cloud className="h-5 w-5" />
               </span>
               灵祺 AI 混剪
@@ -1420,20 +1433,25 @@ export function ShortVideoIceBatchPanel(_props: Props) {
 
       <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { n: 1, title: '上传素材', sub: '视频 / 图片，可多段' },
-          { n: 2, title: '指导文案', sub: '写卖点或上传 doc/txt' },
-          { n: 3, title: 'AI 规划分镜', sub: '时间段 · 画面 · 口播' },
-          { n: 4, title: '生成成片', sub: '普通混剪 / 智能一键成片' },
+          { n: 1, title: '上传素材', sub: '视频 / 图片，可多段', accent: 'from-orange-500 to-amber-500' },
+          { n: 2, title: '指导文案', sub: '写卖点或上传 doc/txt', accent: 'from-rose-500 to-orange-500' },
+          { n: 3, title: 'AI 规划分镜', sub: '时间段 · 画面 · 口播', accent: 'from-violet-500 to-fuchsia-500' },
+          { n: 4, title: '生成成片', sub: '普通混剪 / 智能一键成片', accent: 'from-indigo-500 to-violet-600' },
         ].map((s) => (
           <li
             key={s.n}
-            className="flex gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 shadow-sm"
+            className="group flex gap-3 rounded-2xl border border-white/80 bg-white/70 px-4 py-3.5 shadow-md shadow-zinc-200/40 backdrop-blur-sm transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-orange-100/50"
           >
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-rose-500 text-xs font-bold text-white shadow-sm">
+            <span
+              className={cn(
+                'flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-xs font-bold text-white shadow-md',
+                s.accent,
+              )}
+            >
               {s.n}
             </span>
             <div>
-              <p className="text-sm font-medium text-zinc-900">{s.title}</p>
+              <p className="text-sm font-semibold text-zinc-900">{s.title}</p>
               <p className="text-xs text-zinc-500">{s.sub}</p>
             </div>
           </li>
@@ -1443,11 +1461,20 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       {(err || hint) && (
         <div
           className={cn(
-            'rounded-lg px-4 py-3 text-sm',
-            err ? 'border border-red-200 bg-red-50 text-red-900' : 'border border-zinc-200 bg-zinc-50 text-zinc-700',
+            'flex items-start gap-3 rounded-2xl px-4 py-3.5 text-sm shadow-sm backdrop-blur-sm',
+            err
+              ? 'border border-red-200/80 bg-red-50/90 text-red-900'
+              : mixRenderBusy || smartRenderBusy
+                ? 'border border-indigo-200/80 bg-indigo-50/90 text-indigo-900'
+                : 'border border-zinc-200/80 bg-white/80 text-zinc-700',
           )}
         >
-          {err ?? hint}
+          {mixRenderBusy || smartRenderBusy ? (
+            <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-indigo-600" />
+          ) : err ? (
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+          ) : null}
+          <span className="min-w-0 flex-1 leading-relaxed">{err ?? hint}</span>
         </div>
       )}
 
@@ -1455,7 +1482,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
         {/* 左侧：输入区 */}
         <div className="space-y-5 xl:col-span-7">
           {/* ① 素材 */}
-          <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+          <section className="overflow-hidden rounded-2xl border border-white/70 bg-white/80 shadow-lg shadow-zinc-200/30 backdrop-blur-sm">
             <SectionHead
               step={1}
               title="素材来源"
@@ -1771,11 +1798,11 @@ export function ShortVideoIceBatchPanel(_props: Props) {
           </section>
 
           {/* ② 指导文案与分镜 */}
-          <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-100 px-5 py-4">
+          <section className="overflow-hidden rounded-2xl border border-white/70 bg-white/80 shadow-lg shadow-violet-100/25 backdrop-blur-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-violet-100/60 bg-gradient-to-r from-violet-50/50 via-white/40 to-orange-50/40 px-5 py-4">
               <div className="min-w-0 flex-1">
                 <h3 className="flex items-center gap-2 text-sm font-semibold text-zinc-900">
-                  <span className="flex h-6 w-6 items-center justify-center rounded bg-zinc-900 text-[11px] font-bold text-white">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 to-fuchsia-600 text-[11px] font-bold text-white shadow-sm">
                     2
                   </span>
                   AI 混剪生成
@@ -1840,7 +1867,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                   {err}
                 </div>
               ) : null}
-              <div className="flex flex-wrap items-end gap-4">
+              <div className="flex flex-wrap items-end gap-4 rounded-xl border border-zinc-100/80 bg-gradient-to-br from-zinc-50/80 to-white/60 p-4">
                 <label className="flex flex-col gap-1 text-xs text-zinc-600">
                   <span>目标总时长</span>
                   <select
@@ -2004,14 +2031,27 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                 disabled={anyBusy || guidanceBusy}
                 onChange={(e) => setMixGuidance(e.target.value)}
                 placeholder="商业创意、卖点与叙事；可「AI 分析素材」自动填写。生成时将按分镜拼接多条素材并加转场与 TTS 口播。"
-                className="min-h-[96px] w-full resize-y rounded-lg border border-zinc-300 px-3 py-2.5 text-sm outline-none ring-orange-600/30 focus-visible:ring-2"
+                className="min-h-[96px] w-full resize-y rounded-xl border border-zinc-200/80 bg-white/90 px-3 py-2.5 text-sm shadow-inner outline-none ring-orange-500/25 transition focus-visible:border-orange-300 focus-visible:ring-2"
               />
               <div>
-                <span className="text-sm font-medium text-zinc-800">分镜表（剪辑时间轴）</span>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-sm font-semibold text-zinc-800">分镜表（剪辑时间轴）</span>
+                  {storyboardComplete ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-emerald-200/80">
+                      <CheckCircle2 className="h-3 w-3" />
+                      已填完整
+                    </span>
+                  ) : storyboardGapHint ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-medium text-amber-800 ring-1 ring-amber-200/80">
+                      <AlertCircle className="h-3 w-3" />
+                      须逐格填写
+                    </span>
+                  ) : null}
+                </div>
                 <p className="mt-1 text-xs text-zinc-500">
                   每段对应成片时间轴上的一镜：AI 逐帧理解素材后按语义匹配；口播使用所选音色 TTS，字幕带弹入动效。
                 </p>
-                <div className="mt-2 max-h-[min(360px,42vh)] overflow-y-auto rounded-lg border border-zinc-100">
+                <div className="mt-2 max-h-[min(360px,42vh)] overflow-y-auto rounded-xl border border-zinc-200/70 bg-white/90 shadow-inner">
                   <ShortVideoScriptTableEditor
                     rows={scriptRows}
                     disabled={anyBusy || guidanceBusy}
@@ -2065,15 +2105,22 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                   </div>
                 ) : null}
               </div>
+              <div className="rounded-2xl border border-orange-100/80 bg-gradient-to-r from-orange-50/70 via-white/80 to-violet-50/70 p-5 shadow-inner">
+              {(mixRenderBusy || smartRenderBusy) && hint ? (
+                <div className="mb-4 flex items-center gap-3 rounded-xl border border-indigo-200/70 bg-indigo-50/80 px-4 py-3 text-sm font-medium text-indigo-900">
+                  <Loader2 className="h-5 w-5 shrink-0 animate-spin text-indigo-600" />
+                  {hint}
+                </div>
+              ) : null}
               <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                 <button
                   type="button"
                   disabled={!mixReady || mixRenderBusy || smartRenderBusy || mediaBusy || guidanceBusy}
                   onClick={() => void runMixOneClick()}
-                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-orange-300 min-w-[12rem]"
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-orange-300/40 transition hover:from-orange-600 hover:to-amber-700 disabled:cursor-not-allowed disabled:from-orange-200 disabled:to-orange-300 disabled:shadow-none min-w-[12rem]"
                 >
                   {mixRenderBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Zap className="h-5 w-5" />}
-                  普通混剪（{scriptRows.length} 段）
+                  {mixRenderBusy ? '普通混剪生成中…' : `普通混剪（${scriptRows.length} 段）`}
                 </button>
                 <button
                   type="button"
@@ -2091,10 +2138,10 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                       : '需在阿里云开通 IMS 智能一键成片订阅，请联系运营开通'
                   }
                   onClick={() => void runSmartBatchOneClick()}
-                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-violet-300 min-w-[12rem]"
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-violet-300/40 transition hover:from-violet-700 hover:to-fuchsia-700 disabled:cursor-not-allowed disabled:from-violet-200 disabled:to-violet-300 disabled:shadow-none min-w-[12rem]"
                 >
                   {smartRenderBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Wand2 className="h-5 w-5" />}
-                  智能一键成片
+                  {smartRenderBusy ? '智能一键成片生成中…' : '智能一键成片'}
                 </button>
               </div>
               <div className="flex flex-wrap gap-2 text-xs text-zinc-500">
@@ -2125,14 +2172,15 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                   智能成片暂不可用：{smartBatchBlockers.join('；')}
                 </p>
               ) : null}
+              </div>
             </div>
           </section>
         </div>
 
         {/* 右侧：成片输出 */}
         <aside className="xl:col-span-5">
-          <section className="sticky top-4 rounded-xl border-2 border-orange-200 bg-gradient-to-b from-orange-50/80 to-white shadow-sm">
-            <div className="border-b border-orange-100 px-5 py-4">
+          <section className="sticky top-4 overflow-hidden rounded-2xl border border-orange-200/70 bg-white/85 shadow-xl shadow-orange-100/40 backdrop-blur-md">
+            <div className="border-b border-orange-100/80 bg-gradient-to-r from-orange-50/80 via-white/50 to-amber-50/60 px-5 py-4">
               <h3 className="flex items-center gap-2 text-base font-semibold text-zinc-900">
                 <Download className="h-5 w-5 text-orange-600" />
                 成片输出
@@ -2207,9 +2255,11 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                   ) : null}
                 </div>
               ) : anyBusy ? (
-                <div className="mb-5 flex flex-col items-center justify-center rounded-xl border border-dashed border-orange-200 bg-white py-10 text-center">
-                  <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
-                  <p className="mt-3 text-sm font-medium text-zinc-800">云端剪辑中…</p>
+                <div className="mb-5 flex flex-col items-center justify-center rounded-xl border border-dashed border-indigo-200/80 bg-gradient-to-b from-indigo-50/50 to-white py-10 text-center">
+                  <Loader2 className="h-10 w-10 animate-spin text-indigo-500" />
+                  <p className="mt-3 text-sm font-semibold text-zinc-800">
+                    {mixRenderBusy ? '普通混剪生成中…' : smartRenderBusy ? '智能一键成片生成中…' : '云端剪辑中…'}
+                  </p>
                   {activeRenderJob?.message ? (
                     <p className="mt-2 max-w-sm px-4 text-xs leading-relaxed text-zinc-600">
                       {activeRenderJob.message}
@@ -2381,6 +2431,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
           <ConfigFootnote cfg={cfg} />
         </aside>
       </div>
+      </div>
     </div>
   )
 }
@@ -2467,9 +2518,9 @@ function SectionHead({
   hint?: string
 }) {
   return (
-    <div className="border-b border-zinc-100 px-5 py-4">
+    <div className="border-b border-zinc-100/80 bg-gradient-to-r from-zinc-50/60 to-white/40 px-5 py-4">
       <h3 className="flex items-center gap-2 text-sm font-semibold text-zinc-900">
-        <span className="flex h-6 w-6 items-center justify-center rounded bg-zinc-900 text-[11px] font-bold text-white">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-zinc-800 to-zinc-600 text-[11px] font-bold text-white shadow-sm">
           {step}
         </span>
         {title}

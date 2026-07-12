@@ -382,3 +382,29 @@ export function mixStoryboardBriefReady(
   if (rows.some((r) => r.visual.trim().length >= 4)) return true
   return false
 }
+
+/** 分镜表每段画面与口播均已填写（无空格） */
+export function mixStoryboardRowsComplete(
+  rows: Array<{ visual: string; dialogue: string }>,
+): boolean {
+  if (rows.length < 2) return false
+  return rows.every((r) => r.visual.trim().length > 0 && r.dialogue.trim().length > 0)
+}
+
+/** 分镜表未填完整时的提示文案 */
+export function mixStoryboardIncompleteHint(
+  rows: Array<{ visual: string; dialogue: string }>,
+): string | null {
+  if (rows.length < 2) return '分镜至少 2 段（点「AI 规划分镜」）'
+  const gaps = rows
+    .map((r, i) => {
+      const missing: string[] = []
+      if (!r.visual.trim()) missing.push('画面')
+      if (!r.dialogue.trim()) missing.push('口播')
+      return missing.length ? `第 ${i + 1} 段缺${missing.join('、')}` : null
+    })
+    .filter((x): x is string => Boolean(x))
+  if (gaps.length === 0) return null
+  const shown = gaps.slice(0, 3).join('；')
+  return `分镜表须逐格填写完整${gaps.length > 3 ? `（${shown}…）` : `（${shown}）`}`
+}
