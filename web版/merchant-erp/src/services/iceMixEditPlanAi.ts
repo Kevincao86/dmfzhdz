@@ -17,6 +17,7 @@ import {
   inferMixNarrativePattern,
   mixTargetSegmentCount,
   pickMaterialsForNarrativeSlots,
+  resolveMixSegmentDialogue,
   scoreMaterialRoleForSegment,
   segmentRoleForIndex,
   hasStorefrontMixMaterials,
@@ -30,8 +31,10 @@ import {
   type IceMixSegmentPlan,
 } from '../lib/iceMixPlan'
 import {
+  dialogueLinesFromGuidance,
   parseScriptTimeRangeSeconds,
   planLongformAllFiveSecondDurations,
+  sanitizeMixDialogueText,
   scriptTimeRangesFromDurationPlan,
   type ShortVideoScriptRow,
 } from '../lib/shortVideoScriptTable'
@@ -663,8 +666,10 @@ const NARRATIVE_TEXT_PLAN_SYSTEM = `你是专业短视频混剪导演（探店/�
 3. 叙事结构（二选一，素材含门头/店招/门店外观时优先模式A）：
    模式A：门头/门店指引(开场) → 套餐/产品/制作过程(中段) → 结束语/行动号召(收尾)
    模式B：产品/套餐卖点钩子(开场) → 制作/试吃体验(中段) → 门头/到店指引(倒数第二段) → 结束语(收尾)
-3. 每段 visual（画面）与 dialogue（口播）语义一致，从指导文案摘改；禁止「精彩片段」等占位
-4. segmentIndex 从 0 连续递增，表示成片时间轴顺序
+3. 每段 visual（画面描述，给剪辑看）与 dialogue（口播台词，给观众听）语义一致
+4. dialogue 必须是可直接 TTS 朗读的短句（每段 12～28 字），禁止出现「核心卖点」「叙事节奏」「商业创意」「目标受众」等编导结构标签；禁止照搬指导文案整段或编号列表
+5. visual 写该段画面内容；dialogue 写该段旁白，须与 visual 同一段画面匹配（如画面是门头则口播讲到店指引，画面是菜品则口播讲口感）
+6. segmentIndex 从 0 连续递增，表示成片时间轴顺序
 
 只输出 JSON 对象，无 markdown：
 {"segments":[{"segmentIndex":0,"materialIndex":5,"visual":"门店门头…","dialogue":"走进这家…"},...]}`
@@ -684,11 +689,25 @@ function isMixProfileDescriptionUsable(desc: string): boolean {
 }
 
 function dialogueLinesFromGuidanceText(guidance: string): string[] {
-  return guidance
-    .trim()
-    .split(/(?<=[。！？!?])\s*/)
-    .map((s) => s.trim())
-    .filter((s) => s.length >= 4)
+  return dialogueLinesFromGuidance(guidance)
+}
+
+function normalizeNarrativeSegmentDialogues(
+  segments: MixNarrativeSegment[],
+  guidance: string,
+): MixNarrativeSegment[] {
+  const guidanceLines = dialogueLinesFromGuidance(guidance)
+  const hook = sanitizeMixDialogueText(guidance.slice(0, 48)) || '探店好物推荐'
+  return segments.map((s, i) => ({
+    ...s,
+    dialogue: resolveMixSegmentDialogue({
+      rawDialogue: s.dialogue,
+      visual: s.visual,
+      guidanceLines,
+      lineIndex: i,
+      hook,
+    }),
+  }))
 }
 
 function parseNarrativePlanJson(
@@ -723,7 +742,7 @@ function parseNarrativePlanJson(
     const segmentIndex = Number(o.segmentIndex)
     const materialIndex = Number(o.materialIndex)
     const visual = String(o.visual ?? '').trim()
-    const dialogue = String(o.dialogue ?? '').trim()
+    const dialogue = sanitizeMixDialogueText(String(o.dialogue ?? '').trim())
     if (!Number.isFinite(segmentIndex) || segmentIndex < 0) continue
     if (!Number.isFinite(materialIndex) || materialIndex < 0) continue
     if (visual.length < 2 && dialogue.length < 2) continue
@@ -1029,6 +1048,14 @@ function buildFallbackNarrativeFromProfiles(
         hook
     }
 
+    dialogue = resolveMixSegmentDialogue({
+      rawDialogue: dialogue,
+      visual,
+      guidanceLines,
+      lineIndex: i,
+      hook,
+    })
+
     return {
       segmentIndex: i,
       materialIndex: mi,
@@ -1112,6 +1139,8 @@ export async function planMixNarrativeFromVision(opts: {
     opts.targetTotalSec,
     5,
   )
+
+  segments = normalizeNarrativeSegmentDialogues(segments, guidance)
 
   opts.onProgress?.('密集采样素材画面，确定各段截取点…')
   try {

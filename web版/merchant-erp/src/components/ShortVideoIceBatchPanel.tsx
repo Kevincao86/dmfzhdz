@@ -933,7 +933,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     const materialHint = mixMaterialPool
       .map((m, i) => `素材${i + 1}：${m.label}（${m.kind === 'video' ? '视频' : '图片'}）`)
       .join('\n')
-    const plannerInput = `${draft}\n\n【混剪素材 ${poolLen} 条】\n${materialHint}\n\n规划要求：\n- 理解指导文案叙事，输出 ${mixTargetSegmentCount(mixTargetSec, MIX_DEFAULT_SEGMENT_SEC)} 段分镜（匹配目标时长 ${mixTargetSec} 秒，非每条素材一段）\n- 有门头/门店素材时：门头指引(开) → 产品/套餐(中) → 结束语(尾)，或产品钩子(开) → 门头指引(尾前) → 结束语\n- 每段 visual、dialogue 均须非空；口播从指导文案拆句，须与画面语义对应\n- 时间段从 0 连续覆盖至 ${mixTargetSec} 秒`
+    const plannerInput = `${draft}\n\n【混剪素材 ${poolLen} 条】\n${materialHint}\n\n规划要求：\n- 理解指导文案叙事，输出 ${mixTargetSegmentCount(mixTargetSec, MIX_DEFAULT_SEGMENT_SEC)} 段分镜（匹配目标时长 ${mixTargetSec} 秒，非每条素材一段）\n- 有门头/门店素材时：门头指引(开) → 产品/套餐(中) → 结束语(尾)，或产品钩子(开) → 门头指引(尾前) → 结束语\n- 每段 visual、dialogue 均须非空；dialogue 为可朗读旁白短句，禁止写入「核心卖点」「叙事节奏」等指导文案标签；口播须与画面语义对应\n- 时间段从 0 连续覆盖至 ${mixTargetSec} 秒`
     try {
       const r = await planShortVideoScriptFromGuidance(plannerInput, {
         targetTotalSec: mixTargetSec,

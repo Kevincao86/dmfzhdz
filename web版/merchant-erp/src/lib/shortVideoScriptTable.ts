@@ -791,16 +791,81 @@ export function mergeGuidanceScriptTimeTemplates(text: string): ShortVideoScript
   )
 }
 
-/** 从指导文案拆句，供混剪补全空白口播 */
+const MIX_DIALOGUE_META_PREFIX_RE =
+  /^(?:商业创意(?:方向)?|核心卖点|目标受众(?:与使用场景)?|镜头(?:与场景描述)?|叙事节奏(?:与情绪)?|使用场景|场景描述|本段(?:画面)?)[：:，,\s]*/i
+
+/** 去掉指导文案结构标签，得到可朗读口播句 */
+export function sanitizeMixDialogueText(raw: string): string {
+  let s = String(raw ?? '').trim()
+  if (!s) return ''
+
+  s = s.replace(MIX_DIALOGUE_META_PREFIX_RE, '')
+  s = s.replace(/^\d+[.、．)\]]\s*/, '')
+  s = s.replace(/核心卖点[：:]\s*/gi, '')
+  s = s.replace(/叙事节奏(?:与情绪)?[：:]\s*/gi, '')
+
+  const rhythm = s.match(/^叙事节奏由(.+?)过渡到(.+?)/)
+  if (rhythm) {
+    s = `从${rhythm[1]}到${rhythm[2]}，全程实拍看得见。`
+  }
+
+  return s.trim().replace(/\s{2,}/g, ' ').slice(0, 120)
+}
+
+/** 是否为编导备注/结构标签，不宜作为 TTS 口播 */
+export function isMixDialogueMetaInstruction(text: string): boolean {
+  const raw = text.trim()
+  if (raw.length < 4) return true
+  if (/^(?:商业创意|核心卖点|目标受众|镜头与|叙事节奏|本段|成片|须逐|规划要求)/.test(raw)) return true
+  if (/^叙事节奏由.+过渡到/.test(raw)) return true
+  if (/^核心卖点[：:]/.test(raw)) return true
+  const s = sanitizeMixDialogueText(raw)
+  return s.length < 4
+}
+
+function pushUniqueDialogueLine(out: string[], line: string): void {
+  const s = sanitizeMixDialogueText(line)
+  if (s.length < 4 || isMixDialogueMetaInstruction(s)) return
+  if (!out.includes(s)) out.push(s)
+}
+
+/** 从指导文案拆句，供混剪补全空白口播（过滤结构标签，只保留可朗读句） */
 export function dialogueLinesFromGuidance(guidance: string): string[] {
   const t = guidance.trim()
   if (!t) return []
-  const sents = t
-    .split(/(?<=[。！？!?])\s*/)
-    .map((s) => s.trim())
-    .filter((s) => s.length >= 4)
-  if (sents.length >= 1) return sents
-  return [t.slice(0, 80)]
+
+  const out: string[] = []
+
+  const sellingBlock = t.match(
+    /核心卖点[：:]\s*([\s\S]*?)(?=(?:目标受众|镜头(?:与场景)?|叙事节奏|$))/i,
+  )
+  if (sellingBlock?.[1]) {
+    for (const part of sellingBlock[1].split(/(?=\d+[.、．)\]]\s*)/)) {
+      pushUniqueDialogueLine(out, part)
+    }
+  }
+
+  for (const part of t.split(/[\n；;]|(?<=[。！？!?])\s*/)) {
+    for (const sub of part.split(/(?=\d+[.、．)\]]\s*)/)) {
+      pushUniqueDialogueLine(out, sub)
+    }
+  }
+
+  if (out.length >= 1) return out
+  const fb = sanitizeMixDialogueText(t.replace(/\s+/g, ' ').slice(0, 100))
+  return fb.length >= 4 && !isMixDialogueMetaInstruction(fb) ? [fb] : []
+}
+
+/** 分镜表口播列统一清洗（避免指导文案标签进入 TTS） */
+export function sanitizeMixScriptRowsDialogue(rows: ShortVideoScriptRow[]): ShortVideoScriptRow[] {
+  return rows.map((r) => {
+    const dialogue = sanitizeMixDialogueText(r.dialogue)
+    return {
+      ...r,
+      dialogue:
+        dialogue.length >= 4 && !isMixDialogueMetaInstruction(dialogue) ? dialogue : r.dialogue,
+    }
+  })
 }
 
 /** AI 规划后补全空白画面/口播（混剪场景：后续会按素材数扩展） */
@@ -811,14 +876,18 @@ export function fillBlankScriptRowsFromGuidance(
   const lines = dialogueLinesFromGuidance(guidance)
   const hook = lines[0] || guidance.trim().slice(0, 48) || '精彩片段，值得一看'
   const visHint = guidance.trim().slice(0, 60) || '展示实拍画面'
-  return rows.map((r, i) => ({
-    ...r,
-    visual: r.visual.trim().length >= 3 ? r.visual : `${visHint}（段${i + 1}）`,
-    dialogue:
-      r.dialogue.trim().length >= 3
-        ? r.dialogue
-        : (lines[i % Math.max(1, lines.length)] || hook).slice(0, 120),
-  }))
+  return rows.map((r, i) => {
+    const existing = sanitizeMixDialogueText(r.dialogue)
+    const filled =
+      existing.length >= 3 && !isMixDialogueMetaInstruction(existing)
+        ? existing
+        : (lines[i % Math.max(1, lines.length)] || hook).slice(0, 120)
+    return {
+      ...r,
+      visual: r.visual.trim().length >= 3 ? r.visual : `${visHint}（段${i + 1}）`,
+      dialogue: sanitizeMixDialogueText(filled),
+    }
+  })
 }
 
 /** 每段画面与口播均须非空 */
