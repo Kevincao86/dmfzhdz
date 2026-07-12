@@ -158,6 +158,43 @@ export async function extractVideoFirstFramePureBase64(blob: Blob): Promise<stri
   }
 }
 
+/** 从本地视频 Blob 按时间点批量截取采样帧（服务端截帧失败时的浏览器回退） */
+export async function extractVideoFramesAtTimesPureBase64(
+  blob: Blob,
+  atSecs: number[],
+): Promise<Array<{ atSec: number; pureBase64: string }>> {
+  const points = [...new Set(atSecs.map((t) => Math.max(0, Number(t) || 0)))].sort((a, b) => a - b)
+  if (points.length === 0) return []
+
+  const url = URL.createObjectURL(blob)
+  const video = document.createElement('video')
+  video.muted = true
+  video.playsInline = true
+  video.preload = 'auto'
+  video.src = url
+
+  try {
+    video.load()
+    await waitVideoEvent(video, 'loadedmetadata', 60_000)
+    const dur = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : undefined
+    const out: Array<{ atSec: number; pureBase64: string }> = []
+    for (const atSec of points) {
+      const seekTo = dur != null ? Math.min(Math.max(0.05, atSec), Math.max(0.05, dur - 0.12)) : atSec
+      try {
+        const pureBase64 = await captureFrameAtTime(video, seekTo)
+        if (pureBase64.length >= 64) out.push({ atSec, pureBase64 })
+      } catch {
+        /* try next point */
+      }
+    }
+    return out
+  } finally {
+    URL.revokeObjectURL(url)
+    video.removeAttribute('src')
+    video.load()
+  }
+}
+
 export async function extractVideoLastFramePureBase64(blob: Blob): Promise<string> {
   const url = URL.createObjectURL(blob)
   const video = document.createElement('video')

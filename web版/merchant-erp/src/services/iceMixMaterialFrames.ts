@@ -1,5 +1,9 @@
 /** 混剪素材截帧（供视觉模型匹配），与指导文案分析解耦避免循环依赖 */
-import { extractVideoFirstFramePureBase64, imageUrlToPureBase64 } from '../lib/videoFrameUtils'
+import {
+  extractVideoFirstFramePureBase64,
+  extractVideoFramesAtTimesPureBase64,
+  imageUrlToPureBase64,
+} from '../lib/videoFrameUtils'
 import { downloadVideoUrlAsBlob, postVideoLastFrameFromUrl } from './videoAiApi'
 import { sampleMixMaterialsEvenly, type IceMixMaterialSlot } from '../lib/iceMixPlan'
 import { runIceUploadPool } from '../lib/iceUploadPool'
@@ -7,6 +11,8 @@ import { MIX_DEFAULT_SOURCE_DURATION_SEC } from '../lib/iceMixPlan'
 
 const FRAME_CONCURRENCY = 4
 const FRAME_TIMEOUT_MS = 28_000
+/** 单帧服务端截帧超时（避免 180s 挂死） */
+const FRAME_SERVER_TIMEOUT_MS = 18_000
 /** 单条视频最多采样帧数（均匀覆盖全片） */
 export const MIX_FRAMES_PER_VIDEO = 5
 /** 全局视觉匹配帧上限 */
@@ -50,6 +56,53 @@ export function computeVideoFrameSamplePoints(
   return points
 }
 
+async function postVideoFrameWithTimeout(
+  url: string,
+  atSec: number,
+): Promise<{ ok: true; pureBase64: string } | { ok: false; message: string }> {
+  return withTimeout(
+    postVideoLastFrameFromUrl(url, { atSec }),
+    FRAME_SERVER_TIMEOUT_MS,
+    { ok: false, message: '服务端截帧超时' },
+  )
+}
+
+async function extractVideoSampleFramesLocal(
+  urls: string[],
+  samplePoints: number[],
+  label: string,
+): Promise<Array<{ label: string; dataUrl: string; tag: string; atSec: number }>> {
+  const out: Array<{ label: string; dataUrl: string; tag: string; atSec: number }> = []
+  for (const url of urls) {
+    try {
+      const blob = await withTimeout(downloadVideoUrlAsBlob(url, { maxAttempts: 2 }), 45_000, null)
+      if (!blob) continue
+      const localFrames = await withTimeout(
+        extractVideoFramesAtTimesPureBase64(blob, samplePoints),
+        40_000,
+        [],
+      )
+      for (const frame of localFrames) {
+        out.push({
+          label,
+          dataUrl: `data:image/jpeg;base64,${frame.pureBase64}`,
+          tag: `${frame.atSec.toFixed(1)}s`,
+          atSec: frame.atSec,
+        })
+      }
+      if (out.length > 0) return out
+      const pure = await extractVideoFirstFramePureBase64(blob)
+      if (pure.length >= 64) {
+        out.push({ label, dataUrl: `data:image/jpeg;base64,${pure}`, tag: '0.0s', atSec: 0 })
+        return out
+      }
+    } catch {
+      /* try next url */
+    }
+  }
+  return out
+}
+
 async function extractVideoSampleFrames(
   mat: IceMixMaterialSlot,
   opts?: { skipLocalDownload?: boolean; durationSec?: number; maxFrames?: number },
@@ -65,7 +118,7 @@ async function extractVideoSampleFrames(
 
   for (const url of urls) {
     for (const atSec of samplePoints) {
-      const serverFrame = await postVideoLastFrameFromUrl(url, { atSec })
+      const serverFrame = await postVideoFrameWithTimeout(url, atSec)
       if (serverFrame.ok) {
         out.push({
           label,
@@ -79,20 +132,7 @@ async function extractVideoSampleFrames(
   }
 
   if (out.length > 0 || opts?.skipLocalDownload) return out
-
-  for (const url of urls) {
-    try {
-      const blob = await downloadVideoUrlAsBlob(url, { maxAttempts: 2 })
-      const pure = await extractVideoFirstFramePureBase64(blob)
-      if (pure.length >= 64) {
-        out.push({ label, dataUrl: `data:image/jpeg;base64,${pure}`, tag: '0.0s', atSec: 0 })
-        break
-      }
-    } catch {
-      /* try next url */
-    }
-  }
-  return out
+  return extractVideoSampleFramesLocal(urls, samplePoints, label)
 }
 
 async function collectMaterialFrame(
