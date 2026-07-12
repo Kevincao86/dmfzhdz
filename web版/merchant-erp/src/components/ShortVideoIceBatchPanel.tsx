@@ -69,6 +69,7 @@ import { planMixNarrativeFromVision } from '../services/iceMixEditPlanAi'
 import {
   assignMixMaterialSlots,
   buildNarrativeMatchedMixCoverage,
+  ensureMixScriptRowsCoverTarget,
   collectMixNarrationText,
   expandMixRowsForMaterialPool,
   syncMixCoverageForAllMaterials,
@@ -78,7 +79,6 @@ import {
   mixTargetSegmentCount,
   MIX_TARGET_TOTAL_OPTIONS,
   normalizeMixMaterialSlots,
-  resolveMixTotalDurationSec,
   type IceMixMaterialSlot,
 } from '../lib/iceMixPlan'
 import { resolveIceEffectPreset, ICE_MIX_TRANSITION_PRESETS } from '../lib/iceEffectPresets'
@@ -909,7 +909,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
           onProgress: (msg) => setHint(msg),
         })
         if (narrative.ok) {
-          setScriptRows(narrative.rows)
+          setScriptRows(ensureMixScriptRowsCoverTarget(narrative.rows, mixTargetSec, MIX_DEFAULT_SEGMENT_SEC))
           setMaterialSlots(narrative.materialSlots)
           const covered = maxScriptTimeRangeEndSec(narrative.rows)
           setHint(
@@ -1211,7 +1211,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       setMixRenderBusy(false)
       return
     }
-    const totalSec = resolveMixTotalDurationSec(scriptRows, mixTargetSec)
+    const totalSec = mixTargetSec
     let mixVoiceCloneBase64: string | undefined
     if (mixVoicePresetId === 'v-clone' && mixCloneBlobRef.current) {
       mixVoiceCloneBase64 = await audioBlobToPureBase64(mixCloneBlobRef.current)

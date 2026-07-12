@@ -17,6 +17,7 @@ import {
   clampMixSourceInSec,
   collectMixNarrationText,
   composeMixEditBrief,
+  ensureMixScriptRowsCoverTarget,
   ensureSequentialMixScriptRows,
   MIX_DEFAULT_SOURCE_DURATION_SEC,
   normalizeMixMaterialSlots,
@@ -253,7 +254,11 @@ export async function produceIceMixPackage(
 
   const guidance = (input.guidance || input.mixInstruction || '').trim()
   const total = resolveMixTotalDurationSec(input.rows, input.targetTotalSec)
-  const rows = ensureSequentialMixScriptRows(input.rows, total)
+  const rows = ensureMixScriptRowsCoverTarget(
+    ensureSequentialMixScriptRows(input.rows, total),
+    input.targetTotalSec,
+    5,
+  )
   const materialSlots = resolveMixMaterialSlotMapping(rows.length, materials, input.materialSlots)
 
   let decisions: MixEditSegmentDecision[] = buildStoryboardMixDecisions(

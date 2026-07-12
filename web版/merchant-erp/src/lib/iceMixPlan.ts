@@ -5,6 +5,8 @@ import {
   maxScriptTimeRangeEndSec,
   parseScriptTimeRangeSeconds,
   dialogueLinesFromGuidance,
+  planLongformAllFiveSecondDurations,
+  scriptTimeRangesFromDurationPlan,
   segmentCountFromTargetTotalSec,
   type ShortVideoScriptRow,
 } from './shortVideoScriptTable'
@@ -49,9 +51,42 @@ export function clampMixSourceInSec(
 }
 
 export function resolveMixTotalDurationSec(rows: ShortVideoScriptRow[], fallbackSec: number): number {
+  const target = Math.min(120, Math.max(1, Math.ceil(fallbackSec)))
   const maxEnd = maxScriptTimeRangeEndSec(rows)
+  // 混剪：用户选择的目标时长为准，分镜 timeRange 不足时拉伸至目标，不因段数少压短成片
+  if (target >= 5) return target
   if (maxEnd > 0) return Math.min(120, Math.max(1, maxEnd))
-  return Math.min(120, Math.max(1, fallbackSec))
+  return target
+}
+
+/** 分镜段数/时间轴不足时补齐至目标成片时长（如 20 秒 → 4×5 秒） */
+export function ensureMixScriptRowsCoverTarget(
+  rows: ShortVideoScriptRow[],
+  targetTotalSec: number,
+  segmentSec = 5,
+): ShortVideoScriptRow[] {
+  const total = Math.min(120, Math.max(5, Math.ceil(targetTotalSec)))
+  const plan = planLongformAllFiveSecondDurations(total)
+  const targetCount = plan.length
+  const ranges = scriptTimeRangesFromDurationPlan(plan)
+  if (targetCount <= 0) return rows
+
+  const base = rows.slice(0, targetCount)
+  while (base.length < targetCount) {
+    const prev = base[base.length - 1] ?? rows[rows.length - 1]
+    base.push({
+      timeRange: ranges[base.length] ?? `${base.length * segmentSec}-${(base.length + 1) * segmentSec}秒`,
+      visual: prev?.visual?.trim() || '延续上一镜头，平滑过渡',
+      dialogue: prev?.dialogue?.trim() || '',
+    })
+  }
+
+  return base.slice(0, targetCount).map((r, i) => ({
+    ...r,
+    timeRange: ranges[i]!,
+    visual: r.visual.trim() || '展示实拍画面',
+    dialogue: r.dialogue.trim(),
+  }))
 }
 
 /** 去掉签名参数，用于判断是否为同一条 OSS 素材 */
@@ -577,6 +612,72 @@ export function classifyMixMaterialRole(
   return 'other'
 }
 
+/** 与推广/产品明显无关的素材画面特征 */
+const MIX_IRRELEVANT_RE =
+  /截帧失败|无法识别|分析失败|画面模糊|纯风景|天空|云彩|马路|街景|车流|道路|绿化带|无关路人|随手拍|黑屏|测试画面|路面特写|窗外|阴天空/
+
+const MIX_PROMOTION_HINT_RE =
+  /套餐|团购|优惠|菜品|产品|门店|门头|制作|烹饪|试吃|体验|摆盘|食材|招牌|探店|美食|服务|环境|内景|装修|出货|后厨|分量|品牌/
+
+/** 素材是否与推广/产品/门店相关（无关素材直接跳过，不进入成片） */
+export function isMixMaterialPromotionRelevant(
+  prof: MixNarrativeProfileInput,
+  guidance = '',
+): boolean {
+  const desc = narrativeTextBlob(prof.description, prof.label, prof.frameTimeline)
+  if (desc.length < 8) return false
+  if (/截帧失败|无法识别|分析失败|画面模糊/i.test(desc)) return false
+
+  const role = classifyMixMaterialRole(prof.description, prof.label, prof.frameTimeline)
+  if (role === 'storefront' || role === 'product' || role === 'process' || role === 'experience') {
+    return true
+  }
+  if (role === 'ambience' && MIX_PROMOTION_HINT_RE.test(desc)) return true
+  if (MIX_IRRELEVANT_RE.test(desc) && !MIX_PROMOTION_HINT_RE.test(desc)) return false
+
+  if (MIX_PROMOTION_HINT_RE.test(desc)) return true
+  const g = guidance.trim().slice(0, 400)
+  if (g.length >= 4) {
+    const label = (prof.label || '').trim()
+    if (label.length >= 2 && g.includes(label.slice(0, Math.min(6, label.length)))) return true
+  }
+
+  return role !== 'other'
+}
+
+/** 可参与混剪的素材下标（至少保留 2 条，避免无法成片） */
+export function filterMixPromotionRelevantIndices(
+  materials: Array<{ label: string }>,
+  profiles: MixNarrativeProfileInput[],
+  guidance = '',
+): number[] {
+  const relevant: number[] = []
+  const scored: Array<{ idx: number; score: number }> = []
+  for (let i = 0; i < materials.length; i++) {
+    const prof = profiles[i] ?? {
+      index: i,
+      label: materials[i]!.label,
+      description: materials[i]!.label,
+    }
+    const role = classifyMixMaterialRole(prof.description, prof.label, prof.frameTimeline)
+    const roleScore =
+      role === 'product'
+        ? 5
+        : role === 'storefront'
+          ? 5
+          : role === 'process' || role === 'experience'
+            ? 4
+            : role === 'ambience'
+              ? 3
+              : 1
+    scored.push({ idx: i, score: roleScore })
+    if (isMixMaterialPromotionRelevant(prof, guidance)) relevant.push(i)
+  }
+  if (relevant.length >= 2) return relevant
+  scored.sort((a, b) => b.score - a.score)
+  return scored.slice(0, Math.max(2, Math.min(materials.length, 2))).map((s) => s.idx)
+}
+
 /** 分镜行文案/画面推断叙事角色 */
 export function classifyRowNarrativeRole(visual: string, dialogue: string): MixSegmentNarrativeSlot {
   const t = `${visual} ${dialogue}`
@@ -664,7 +765,11 @@ export function pickMaterialsForNarrativeSlots(
   profiles: MixNarrativeProfileInput[],
   guidance: string,
 ): number[] {
-  const n = Math.max(2, Math.min(targetSegmentCount, materials.length))
+  const eligible = new Set(
+    filterMixPromotionRelevantIndices(materials, profiles, guidance),
+  )
+  const poolLen = eligible.size > 0 ? eligible.size : materials.length
+  const n = Math.max(2, Math.min(targetSegmentCount, poolLen))
   const pattern = inferMixNarrativePattern(guidance, profiles)
   const used = new Set<number>()
   const picks: number[] = []
@@ -676,11 +781,13 @@ export function pickMaterialsForNarrativeSlots(
 
     for (let mi = 0; mi < materials.length; mi++) {
       if (used.has(mi)) continue
+      if (eligible.size > 0 && !eligible.has(mi)) continue
       const prof = profiles[mi] ?? {
         index: mi,
         label: materials[mi]!.label,
         description: materials[mi]!.label,
       }
+      if (!isMixMaterialPromotionRelevant(prof, guidance)) continue
       const matRole = classifyMixMaterialRole(prof.description, prof.label, prof.frameTimeline)
       let score = scoreMaterialRoleForSegment(matRole, slotRole)
       if (prof.description.trim().length >= 24) score += 2
@@ -691,7 +798,10 @@ export function pickMaterialsForNarrativeSlots(
     }
 
     if (bestIdx < 0) {
-      bestIdx = spreadMixMaterialIndex(seg, n, materials.length)
+      const candidates = [...eligible].filter((mi) => !used.has(mi))
+      bestIdx =
+        candidates[seg % Math.max(1, candidates.length)] ??
+        spreadMixMaterialIndex(seg, n, materials.length)
       let guard = 0
       while (used.has(bestIdx) && guard++ < materials.length) {
         bestIdx = (bestIdx + 1) % materials.length
