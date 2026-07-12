@@ -5,6 +5,8 @@ import {
   maxScriptTimeRangeEndSec,
   parseScriptTimeRangeSeconds,
   dialogueLinesFromGuidance,
+  sanitizeMixDialogueText,
+  isMixDialogueMetaInstruction,
   planLongformAllFiveSecondDurations,
   scriptTimeRangesFromDurationPlan,
   segmentCountFromTargetTotalSec,
@@ -211,10 +213,18 @@ export function buildMixPlannerFallbackRows(
     const start = Math.round(i * each * 10) / 10
     const end = i === segmentCount - 1 ? total : Math.round((i + 1) * each * 10) / 10
     const line = lines[i % Math.max(1, lines.length)] || hook
+    const visual = line.length >= 8 ? line.slice(0, 72) : `镜头${i + 1}：展示实拍画面`
+    const dialogue = resolveMixSegmentDialogue({
+      rawDialogue: line,
+      visual,
+      guidanceLines: lines,
+      lineIndex: i,
+      hook,
+    })
     return {
       timeRange: `${start}-${end}秒`,
-      visual: line.length >= 8 ? line.slice(0, 72) : `镜头${i + 1}：展示实拍画面`,
-      dialogue: line.slice(0, 120),
+      visual,
+      dialogue,
     }
   })
   return ensureSequentialMixScriptRows(rows, total)
@@ -292,6 +302,14 @@ export function buildNarrativeMatchedMixCoverage(
         guidanceLines[i % Math.max(1, guidanceLines.length)] ||
         hook
     }
+
+    dialogue = resolveMixSegmentDialogue({
+      rawDialogue: dialogue,
+      visual,
+      guidanceLines,
+      lineIndex: i,
+      hook,
+    })
 
     return {
       timeRange: `${start}-${end}秒`,
@@ -587,6 +605,42 @@ const PRODUCT_RE =
 const PROCESS_RE = /制作|烹饪|后厨|操作|翻炒|下锅|加工|过程|熬制|装盘/
 const EXPERIENCE_RE = /试吃|品尝|顾客|体验|人物.*吃|互动|推荐/
 const CLOSING_RE = /下单|团购|赶紧|快来|收藏|关注|就在|欢迎.*到店|点击|马上/
+
+/** 根据画面描述生成短口播（指导文案无法拆出可读句时的回退） */
+export function deriveMixDialogueFromVisual(visual: string, fallback = '值得一看'): string {
+  const v = visual.trim()
+  if (STOREFRONT_RE.test(v)) return '认准这门头，到店不迷路！'
+  if (PROCESS_RE.test(v)) return '后厨现做，新鲜靠谱看得见。'
+  if (PRODUCT_RE.test(v)) return '这一口鲜嫩多汁，太满足了！'
+  if (EXPERIENCE_RE.test(v)) return '试吃一口，真的停不下来。'
+  if (/环境|氛围|装修|餐桌|用餐/.test(v)) return '环境氛围拉满，适合来打卡。'
+  if (CLOSING_RE.test(v) || /结束|号召/.test(v)) return '心动就行动起来，欢迎到店体验！'
+  const short = sanitizeMixDialogueText(v)
+  if (short.length >= 6 && short.length <= 32 && !isMixDialogueMetaInstruction(short)) {
+    if (!/展示|镜头|画面|素材|段\d/.test(short)) return short.slice(0, 28)
+  }
+  return sanitizeMixDialogueText(fallback).slice(0, 28) || '值得一看'
+}
+
+/** 将 AI/回退口播规范为可 TTS 朗读的短句 */
+export function resolveMixSegmentDialogue(opts: {
+  rawDialogue: string
+  visual: string
+  guidanceLines: string[]
+  lineIndex: number
+  hook: string
+}): string {
+  const cleaned = sanitizeMixDialogueText(opts.rawDialogue)
+  if (cleaned.length >= 4 && !isMixDialogueMetaInstruction(cleaned)) return cleaned.slice(0, 120)
+
+  const speakable = opts.guidanceLines
+    .map((l) => sanitizeMixDialogueText(l))
+    .filter((l) => l.length >= 4 && !isMixDialogueMetaInstruction(l))
+  const fromGuidance = speakable[opts.lineIndex % Math.max(1, speakable.length)]
+  if (fromGuidance) return fromGuidance.slice(0, 120)
+
+  return deriveMixDialogueFromVisual(opts.visual, opts.hook).slice(0, 120)
+}
 
 function narrativeTextBlob(
   description: string,
