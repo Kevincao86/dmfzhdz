@@ -261,6 +261,7 @@ export async function produceIceMixPackage(
     materials,
     profileList,
     materialSlots,
+    guidance,
   )
 
   const editPlan = await planMixEditFromInstructions({
