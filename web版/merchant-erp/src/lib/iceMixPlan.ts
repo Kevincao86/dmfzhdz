@@ -5,6 +5,7 @@ import {
   maxScriptTimeRangeEndSec,
   parseScriptTimeRangeSeconds,
   dialogueLinesFromGuidance,
+  segmentCountFromTargetTotalSec,
   type ShortVideoScriptRow,
 } from './shortVideoScriptTable'
 
@@ -184,6 +185,92 @@ export function buildMixPlannerFallbackRows(
   return ensureSequentialMixScriptRows(rows, total)
 }
 
+/** 按目标时长 + 叙事逻辑生成 K 段分镜（K=时长/每段秒数，从素材池语义挑选，非每条素材一段） */
+export function buildNarrativeMatchedMixCoverage(
+  materials: Array<{ label: string }>,
+  targetTotalSec: number,
+  sourceRows: ShortVideoScriptRow[] = [],
+  guidance = '',
+  segmentSec = 5,
+  profiles: MixNarrativeProfileInput[] = [],
+): { rows: ShortVideoScriptRow[]; slots: number[] } {
+  const targetCount = mixTargetSegmentCount(targetTotalSec, segmentSec)
+  const n = Math.max(2, Math.min(targetCount, materials.length))
+  const profileList: MixNarrativeProfileInput[] =
+    profiles.length >= materials.length
+      ? profiles
+      : materials.map((m, i) => ({
+          index: i,
+          label: m.label,
+          description: m.label,
+        }))
+  const pattern = inferMixNarrativePattern(guidance, profileList)
+  const slots = pickMaterialsForNarrativeSlots(n, materials, profileList, guidance)
+  const total = Math.max(5, Math.ceil(targetTotalSec))
+  const each = total / n
+  const guidanceLines = dialogueLinesFromGuidance(guidance)
+  const hook = guidanceLines[0] || guidance.trim().slice(0, 48) || '精彩片段'
+  const dialogues = sourceRows
+    .map((r) => r.dialogue.trim())
+    .filter((d) => d.length >= 2 && !/^（无口播）$/i.test(d))
+  const visuals = sourceRows.map((r) => r.visual.trim()).filter((v) => v.length >= 2)
+
+  const rows = Array.from({ length: n }, (_, i) => {
+    const start = Math.round(i * each * 10) / 10
+    const end = i === n - 1 ? total : Math.round((i + 1) * each * 10) / 10
+    const mi = slots[i]!
+    const matLabel = materials[mi]?.label || `素材${mi + 1}`
+    const prof = profileList[mi]!
+    const slotRole = segmentRoleForIndex(i, n, pattern)
+
+    let visual =
+      visuals[i % Math.max(1, visuals.length)] ||
+      (slotRole === 'storefront' ? `门店门头/环境：${matLabel}` : `${matLabel}：展示实拍画面`)
+    if (slotRole === 'storefront') {
+      const storefrontVisual = visuals.find((v) => STOREFRONT_RE.test(v))
+      if (storefrontVisual) visual = storefrontVisual
+      else if (prof.description.trim().length >= 8) {
+        visual = `门店门头/环境：${prof.description.slice(0, 72)}`
+      }
+    }
+
+    let dialogue = ''
+    if (slotRole === 'closing') {
+      dialogue =
+        guidanceLines.find((l) => CLOSING_RE.test(l)) ||
+        guidanceLines[guidanceLines.length - 1] ||
+        dialogues[dialogues.length - 1] ||
+        `${hook}，欢迎到店体验！`
+    } else if (slotRole === 'storefront') {
+      dialogue =
+        guidanceLines.find((l) => STOREFRONT_RE.test(l)) ||
+        guidanceLines[0] ||
+        dialogues[0] ||
+        `走进${hook}，环境氛围拉满。`
+    } else if (i === 0 && pattern === 'hook_opening') {
+      dialogue = dialogues[0] || guidanceLines[0] || hook
+    } else {
+      const mid = guidanceLines.slice(1, Math.max(1, guidanceLines.length - 1))
+      dialogue =
+        dialogues[i % Math.max(1, dialogues.length)] ||
+        mid[i % Math.max(1, mid.length)] ||
+        guidanceLines[i % Math.max(1, guidanceLines.length)] ||
+        hook
+    }
+
+    return {
+      timeRange: `${start}-${end}秒`,
+      visual: visual.slice(0, 120),
+      dialogue: dialogue.slice(0, 120),
+    }
+  })
+
+  return {
+    rows: ensureSequentialMixScriptRows(rows, total),
+    slots,
+  }
+}
+
 /** 为每条素材生成一段分镜（时间均分，口播/画面从已有分镜轮询） */
 export function buildAllMaterialCoverageRows(
   materials: Array<{ label: string }>,
@@ -224,30 +311,58 @@ export function assignFullMaterialCoverageSlots(materialCount: number): number[]
   return Array.from({ length: materialCount }, (_, i) => i)
 }
 
-/** 分镜段数不足时扩展为「每条素材一段」 */
+/** 分镜段数不足时按目标时长扩展（素材多时语义挑选 K 段，非每条素材一段） */
 export function expandMixRowsForMaterialPool(
   rows: ShortVideoScriptRow[],
   targetTotalSec: number,
   materialCount: number,
-  _segmentSec: number,
+  segmentSec: number,
   materialLabels: Array<{ label: string }> = [],
   guidance = '',
+  profiles: MixNarrativeProfileInput[] = [],
 ): ShortVideoScriptRow[] {
   if (materialCount <= 0) return rows
   const mats =
     materialLabels.length >= materialCount
       ? materialLabels
       : Array.from({ length: materialCount }, (_, i) => ({ label: `素材${i + 1}` }))
+  const targetCount = mixTargetSegmentCount(targetTotalSec, segmentSec)
+  if (materialCount > targetCount) {
+    return buildNarrativeMatchedMixCoverage(
+      mats,
+      targetTotalSec,
+      rows,
+      guidance,
+      segmentSec,
+      profiles,
+    ).rows
+  }
+  if (rows.length >= materialCount) {
+    return ensureSequentialMixScriptRows(rows, Math.max(5, Math.ceil(targetTotalSec)))
+  }
   return buildAllMaterialCoverageRows(mats, targetTotalSec, rows, guidance)
 }
 
-/** 混剪提交前：强制 N 段分镜 + N 条素材一一映射 */
+/** 混剪提交前：按目标时长生成叙事分镜 + 素材映射 */
 export function syncMixCoverageForAllMaterials(
   materials: Array<{ label: string }>,
   targetTotalSec: number,
   sourceRows: ShortVideoScriptRow[],
   guidance = '',
+  profiles: MixNarrativeProfileInput[] = [],
+  segmentSec = 5,
 ): { rows: ShortVideoScriptRow[]; slots: number[] } {
+  const targetCount = mixTargetSegmentCount(targetTotalSec, segmentSec)
+  if (materials.length > targetCount) {
+    return buildNarrativeMatchedMixCoverage(
+      materials,
+      targetTotalSec,
+      sourceRows,
+      guidance,
+      segmentSec,
+      profiles,
+    )
+  }
   const rows = buildAllMaterialCoverageRows(materials, targetTotalSec, sourceRows, guidance)
   const slots = assignFullMaterialCoverageSlots(materials.length)
   return { rows, slots }
@@ -407,4 +522,188 @@ export function mixStoryboardIncompleteHint(
   if (gaps.length === 0) return null
   const shown = gaps.slice(0, 3).join('；')
   return `分镜表须逐格填写完整${gaps.length > 3 ? `（${shown}…）` : `（${shown}）`}`
+}
+
+/** 混剪素材画面叙事角色（探店/本地生活） */
+export type MixMaterialNarrativeRole =
+  | 'storefront'
+  | 'product'
+  | 'process'
+  | 'experience'
+  | 'ambience'
+  | 'other'
+
+/** 成片叙事结构：门头开场 或 卖点钩子开场 */
+export type MixNarrativePattern = 'store_opening' | 'hook_opening'
+
+export type MixNarrativeProfileInput = {
+  index: number
+  label: string
+  description: string
+  frameTimeline?: Array<{ atSec: number; description: string }>
+}
+
+export type MixSegmentNarrativeSlot = MixMaterialNarrativeRole | 'closing'
+
+const STOREFRONT_RE =
+  /门头|店招|招牌|门店外观|门面|入口处|店铺外观|外景|全景.*店|招牌字|店名|导航|地址|欢迎光临|进店/
+const PRODUCT_RE =
+  /套餐|团购|优惠|价格|菜品|产品|成品|摆盘|特写|出货|商品|卖点|分量|食材|出锅/
+const PROCESS_RE = /制作|烹饪|后厨|操作|翻炒|下锅|加工|过程|熬制|装盘/
+const EXPERIENCE_RE = /试吃|品尝|顾客|体验|人物.*吃|互动|推荐/
+const CLOSING_RE = /下单|团购|赶紧|快来|收藏|关注|就在|欢迎.*到店|点击|马上/
+
+function narrativeTextBlob(
+  description: string,
+  label?: string,
+  frameTimeline?: Array<{ atSec: number; description: string }>,
+): string {
+  const beats = frameTimeline?.map((b) => b.description).join(' ') ?? ''
+  return `${description} ${label ?? ''} ${beats}`.toLowerCase()
+}
+
+/** 根据 AI 画面描述判断素材叙事角色 */
+export function classifyMixMaterialRole(
+  description: string,
+  label?: string,
+  frameTimeline?: Array<{ atSec: number; description: string }>,
+): MixMaterialNarrativeRole {
+  const t = narrativeTextBlob(description, label, frameTimeline)
+  if (STOREFRONT_RE.test(t)) return 'storefront'
+  if (PRODUCT_RE.test(t)) return 'product'
+  if (PROCESS_RE.test(t)) return 'process'
+  if (EXPERIENCE_RE.test(t)) return 'experience'
+  if (/环境|氛围|内景|装修|座位|大堂/.test(t)) return 'ambience'
+  return 'other'
+}
+
+/** 分镜行文案/画面推断叙事角色 */
+export function classifyRowNarrativeRole(visual: string, dialogue: string): MixSegmentNarrativeSlot {
+  const t = `${visual} ${dialogue}`
+  if (CLOSING_RE.test(t) || /结束|收尾|行动号召/.test(t)) return 'closing'
+  if (STOREFRONT_RE.test(t)) return 'storefront'
+  if (PRODUCT_RE.test(t)) return 'product'
+  if (PROCESS_RE.test(t)) return 'process'
+  if (EXPERIENCE_RE.test(t)) return 'experience'
+  return 'other'
+}
+
+/** 是否存在门头/门店类素材 */
+export function hasStorefrontMixMaterials(profiles: MixNarrativeProfileInput[]): boolean {
+  return profiles.some(
+    (p) => classifyMixMaterialRole(p.description, p.label, p.frameTimeline) === 'storefront',
+  )
+}
+
+/** 推断叙事结构：有门头素材默认门头开场，否则可用卖点钩子开场 */
+export function inferMixNarrativePattern(
+  guidance: string,
+  profiles: MixNarrativeProfileInput[],
+): MixNarrativePattern {
+  const g = guidance.trim()
+  if (/先卖点|先套餐|先产品|开头.*吸引|钩子|劲爆|开头.*产品/.test(g)) return 'hook_opening'
+  if (/先.*门店|门头.*开场|开头.*环境|先氛围/.test(g)) return 'store_opening'
+  if (hasStorefrontMixMaterials(profiles)) return 'store_opening'
+  if (/门店|地址|导航|怎么找|在哪里|欢迎来|到店/.test(g)) return 'store_opening'
+  return 'hook_opening'
+}
+
+/** 按段序与叙事模式分配该段期望画面角色 */
+export function segmentRoleForIndex(
+  segmentIndex: number,
+  segmentCount: number,
+  pattern: MixNarrativePattern,
+): MixSegmentNarrativeSlot {
+  if (segmentCount <= 1) return 'product'
+  const isFirst = segmentIndex === 0
+  const isLast = segmentIndex === segmentCount - 1
+  const isSecondLast = segmentIndex === segmentCount - 2
+
+  if (isLast) return 'closing'
+
+  if (pattern === 'store_opening') {
+    if (isFirst) return 'storefront'
+    if (isSecondLast && segmentCount >= 4) return 'product'
+    if (isSecondLast) return 'experience'
+    return segmentIndex <= 1 ? 'product' : 'process'
+  }
+
+  // hook_opening：产品钩子 → 中段 → 门头指引 → 结束语
+  if (isFirst) return 'product'
+  if (isSecondLast) return 'storefront'
+  return 'product'
+}
+
+/** 素材角色与分镜槽位匹配得分 */
+export function scoreMaterialRoleForSegment(
+  materialRole: MixMaterialNarrativeRole,
+  slotRole: MixSegmentNarrativeSlot,
+): number {
+  if (slotRole === 'closing') {
+    if (materialRole === 'experience') return 10
+    if (materialRole === 'product') return 8
+    if (materialRole === 'storefront') return 5
+    return 3
+  }
+  if (materialRole === slotRole) return 14
+  const adj: Partial<Record<MixMaterialNarrativeRole, Partial<Record<MixSegmentNarrativeSlot, number>>>> = {
+    storefront: { product: 3, ambience: 6, experience: 2 },
+    product: { process: 8, experience: 6, storefront: 2, ambience: 4 },
+    process: { product: 8, experience: 5 },
+    experience: { product: 6, storefront: 4 },
+    ambience: { storefront: 7, product: 4 },
+    other: { product: 4, process: 3 },
+  }
+  return adj[materialRole]?.[slotRole] ?? 1
+}
+
+/** 按叙事顺序为 K 段分镜挑选素材（每条素材最多用一次） */
+export function pickMaterialsForNarrativeSlots(
+  targetSegmentCount: number,
+  materials: Array<{ label: string }>,
+  profiles: MixNarrativeProfileInput[],
+  guidance: string,
+): number[] {
+  const n = Math.max(2, Math.min(targetSegmentCount, materials.length))
+  const pattern = inferMixNarrativePattern(guidance, profiles)
+  const used = new Set<number>()
+  const picks: number[] = []
+
+  for (let seg = 0; seg < n; seg++) {
+    const slotRole = segmentRoleForIndex(seg, n, pattern)
+    let bestIdx = -1
+    let bestScore = -1
+
+    for (let mi = 0; mi < materials.length; mi++) {
+      if (used.has(mi)) continue
+      const prof = profiles[mi] ?? {
+        index: mi,
+        label: materials[mi]!.label,
+        description: materials[mi]!.label,
+      }
+      const matRole = classifyMixMaterialRole(prof.description, prof.label, prof.frameTimeline)
+      let score = scoreMaterialRoleForSegment(matRole, slotRole)
+      if (prof.description.trim().length >= 24) score += 2
+      if (score > bestScore) {
+        bestScore = score
+        bestIdx = mi
+      }
+    }
+
+    if (bestIdx < 0) {
+      bestIdx = spreadMixMaterialIndex(seg, n, materials.length)
+      let guard = 0
+      while (used.has(bestIdx) && guard++ < materials.length) {
+        bestIdx = (bestIdx + 1) % materials.length
+      }
+    }
+    used.add(bestIdx)
+    picks.push(bestIdx)
+  }
+  return picks
+}
+
+/** 目标时长对应的分镜段数（默认每段 5 秒） */
+export function mixTargetSegmentCount(targetTotalSec: number, segmentSec = 5): number {
+  return segmentCountFromTargetTotalSec(targetTotalSec, segmentSec)
 }

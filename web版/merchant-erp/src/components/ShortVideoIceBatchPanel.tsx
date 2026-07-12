@@ -67,13 +67,15 @@ import { produceIceMixPackage, composeMixProductionBrief, type IceMixProduceOutp
 import type { IceMixMaterialProfile } from '../services/iceMixEditPlanAi'
 import { planMixNarrativeFromVision } from '../services/iceMixEditPlanAi'
 import {
-  assignFullMaterialCoverageSlots,
+  assignMixMaterialSlots,
+  buildNarrativeMatchedMixCoverage,
   collectMixNarrationText,
   expandMixRowsForMaterialPool,
   syncMixCoverageForAllMaterials,
   inferIceEffectIdFromMixContent,
   mixStoryboardRowsComplete,
   mixStoryboardIncompleteHint,
+  mixTargetSegmentCount,
   MIX_TARGET_TOTAL_OPTIONS,
   normalizeMixMaterialSlots,
   resolveMixTotalDurationSec,
@@ -492,6 +494,8 @@ export function ShortVideoIceBatchPanel(_props: Props) {
         mixTargetSec,
         [],
         mixGuidance.trim(),
+        mixMaterialProfiles,
+        MIX_DEFAULT_SEGMENT_SEC,
       )
       setScriptRows(synced.rows)
       setMaterialSlots(synced.slots)
@@ -500,15 +504,17 @@ export function ShortVideoIceBatchPanel(_props: Props) {
 
     if (poolLen > prevLen && scriptRows.length >= 2) {
       setMaterialSlots((prev) =>
-        prev.length === poolLen ? prev : assignFullMaterialCoverageSlots(poolLen),
+        prev.length === scriptRows.length
+          ? prev
+          : assignMixMaterialSlots(scriptRows.length, poolLen),
       )
       return
     }
 
     setMaterialSlots((prev) =>
-      prev.length === poolLen
-        ? normalizeMixMaterialSlots(prev, poolLen, poolLen)
-        : assignFullMaterialCoverageSlots(poolLen),
+      prev.length === scriptRows.length
+        ? normalizeMixMaterialSlots(prev, scriptRows.length, poolLen)
+        : assignMixMaterialSlots(scriptRows.length, poolLen),
     )
   }, [scriptRows.length, mixMaterialPool.length, mixTargetSec, mixGuidance, mixMaterialProfiles.length])
 
@@ -907,7 +913,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
           setMaterialSlots(narrative.materialSlots)
           const covered = maxScriptTimeRangeEndSec(narrative.rows)
           setHint(
-            `AI 已按叙事顺序规划 ${narrative.rows.length} 段分镜（${poolLen} 条素材语义匹配，约 0–${covered || mixTargetSec} 秒），请核对后一键混剪。`,
+            `AI 已按叙事顺序规划 ${narrative.rows.length} 段分镜（${poolLen} 条素材语义匹配，约 0–${covered || mixTargetSec} 秒；含门头素材时优先门店指引开场），请核对后一键混剪。`,
           )
           setPlanBusy(false)
           return
@@ -927,7 +933,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     const materialHint = mixMaterialPool
       .map((m, i) => `素材${i + 1}：${m.label}（${m.kind === 'video' ? '视频' : '图片'}）`)
       .join('\n')
-    const plannerInput = `${draft}\n\n【混剪素材 ${poolLen} 条】\n${materialHint}\n\n规划要求：\n- 理解指导文案叙事，输出与素材数量相近的分镜段\n- 每段 visual、dialogue 均须非空；口播从指导文案拆句，须与画面语义对应\n- 时间段从 0 连续覆盖至 ${mixTargetSec} 秒`
+    const plannerInput = `${draft}\n\n【混剪素材 ${poolLen} 条】\n${materialHint}\n\n规划要求：\n- 理解指导文案叙事，输出 ${mixTargetSegmentCount(mixTargetSec, MIX_DEFAULT_SEGMENT_SEC)} 段分镜（匹配目标时长 ${mixTargetSec} 秒，非每条素材一段）\n- 有门头/门店素材时：门头指引(开) → 产品/套餐(中) → 结束语(尾)，或产品钩子(开) → 门头指引(尾前) → 结束语\n- 每段 visual、dialogue 均须非空；口播从指导文案拆句，须与画面语义对应\n- 时间段从 0 连续覆盖至 ${mixTargetSec} 秒`
     try {
       const r = await planShortVideoScriptFromGuidance(plannerInput, {
         targetTotalSec: mixTargetSec,
@@ -952,12 +958,21 @@ export function ShortVideoIceBatchPanel(_props: Props) {
         MIX_DEFAULT_SEGMENT_SEC,
         mixMaterialPool,
         mixGuidance.trim(),
+        mixMaterialProfiles,
       )
-      setScriptRows(expandedRows)
-      setMaterialSlots(assignFullMaterialCoverageSlots(poolLen))
-      const covered = maxScriptTimeRangeEndSec(expandedRows)
+      const coverage = buildNarrativeMatchedMixCoverage(
+        mixMaterialPool,
+        mixTargetSec,
+        expandedRows,
+        mixGuidance.trim(),
+        MIX_DEFAULT_SEGMENT_SEC,
+        mixMaterialProfiles,
+      )
+      setScriptRows(coverage.rows)
+      setMaterialSlots(coverage.slots)
+      const covered = maxScriptTimeRangeEndSec(coverage.rows)
       setHint(
-        `AI 已规划 ${expandedRows.length} 段分镜（约 0–${covered || mixTargetSec} 秒）。建议先「AI 分析素材」以获得叙事排序匹配。`,
+        `AI 已规划 ${coverage.rows.length} 段分镜（约 0–${covered || mixTargetSec} 秒，按叙事逻辑匹配素材）。建议先「AI 分析素材」以获得门头/产品排序。`,
       )
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'AI 规划分镜失败，请稍后重试')

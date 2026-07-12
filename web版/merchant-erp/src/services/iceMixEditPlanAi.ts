@@ -12,6 +12,14 @@ import {
 import {
   spreadMixMaterialIndex,
   type IceMixMaterialSlot,
+  classifyMixMaterialRole,
+  classifyRowNarrativeRole,
+  inferMixNarrativePattern,
+  mixTargetSegmentCount,
+  pickMaterialsForNarrativeSlots,
+  scoreMaterialRoleForSegment,
+  segmentRoleForIndex,
+  hasStorefrontMixMaterials,
 } from '../lib/iceMixPlan'
 import {
   clampMixSourceInSec,
@@ -55,8 +63,10 @@ const VISION_EDIT_PLAN_SYSTEM = `你是专业短视频混剪剪辑师（探店/�
 须为每一段分镜输出剪辑决策：
 1. materialIndex：选用哪条素材（从 0 开始），必须按画面语义匹配分镜「画面」与口播；禁止全部段都用 materialIndex=0
 2. sourceInSec：从该素材第几秒起截取（须与附图秒数/画面语义一致；视频 0–12s；图片固定 0）；同素材复用时 sourceInSec 至少相差 1.5 秒
-3. 叙事顺序（强制）：开场氛围/门头/全景 → 制作过程/操作特写 → 成品/试吃/卖点收尾；口播与画面一一对应
-4. 理解附图：按标注秒数识别食材、烹饪动作、成品摆盘，将最匹配的分镜分配到对应帧附近
+3. 叙事顺序（强制，二选一）：
+   模式A（有门头/店招素材时优先）：门头门店指引(开场) → 套餐/产品/制作(中段) → 结束语(收尾)
+   模式B：产品/套餐卖点钩子(开场) → 制作/体验(中段) → 门头到店指引(倒数第二段) → 结束语(收尾)
+4. materialIndex 与分镜画面/口播语义一致；sourceInSec 与附图秒数匹配
 
 只输出 JSON 数组，无 markdown：
 [{"segmentIndex":0,"materialIndex":2,"sourceInSec":0,"clipNote":"门店外观"},...]`
@@ -301,18 +311,30 @@ export function buildStoryboardMixDecisions(
   materials: IceMixMaterialSlot[],
   profiles: IceMixMaterialProfile[],
   userSlots?: number[],
+  guidance = '',
 ): MixEditSegmentDecision[] {
   const usedIn = new Map<number, number>()
   const usedMatCount = new Map<number, number>()
+  const pattern = inferMixNarrativePattern(
+    guidance || rows.map((r) => `${r.visual} ${r.dialogue}`).join(' '),
+    profiles,
+  )
 
   return rows.map((row, segmentIndex) => {
     let bestIdx = spreadMixMaterialIndex(segmentIndex, rows.length, materials.length)
     let bestScore = -1
+    const slotRole = segmentRoleForIndex(segmentIndex, rows.length, pattern)
+    const rowRole = classifyRowNarrativeRole(row.visual, row.dialogue)
 
     for (let mi = 0; mi < materials.length; mi++) {
       const prof = profileAt(profiles, materials, mi)
       let score = scoreMaterialMatch(row.visual, prof, materials[mi]!.label)
       score += scoreMaterialMatch(row.dialogue, prof, materials[mi]!.label) * 0.6
+
+      const matRole = classifyMixMaterialRole(prof.description, prof.label, prof.frameTimeline)
+      score += scoreMaterialRoleForSegment(matRole, slotRole) * 1.8
+      if (rowRole === matRole || rowRole === slotRole) score += 8
+      if (slotRole === 'storefront' && matRole === 'storefront') score += 10
 
       const frameIn = pickSourceInFromFrameTimeline(row.visual, row.dialogue, prof.frameTimeline)
       if (frameIn != null && prof.frameTimeline?.length) {
@@ -324,9 +346,6 @@ export function buildStoryboardMixDecisions(
       const used = usedMatCount.get(mi) ?? 0
       if (used > 0) score -= used * 1.2
 
-      const cycleIdx = spreadMixMaterialIndex(segmentIndex, rows.length, materials.length)
-      if (mi === cycleIdx) score += 1.5
-
       if (score > bestScore) {
         bestScore = score
         bestIdx = mi
@@ -334,7 +353,13 @@ export function buildStoryboardMixDecisions(
     }
 
     if (materials.length >= 2 && bestScore < 2) {
-      bestIdx = spreadMixMaterialIndex(segmentIndex, rows.length, materials.length)
+      const picks = pickMaterialsForNarrativeSlots(
+        rows.length,
+        materials,
+        profiles,
+        guidance,
+      )
+      bestIdx = picks[segmentIndex] ?? bestIdx
     }
 
     usedMatCount.set(bestIdx, (usedMatCount.get(bestIdx) ?? 0) + 1)
@@ -629,12 +654,15 @@ export type MixNarrativeSegment = {
 const NARRATIVE_TEXT_PLAN_SYSTEM = `你是专业短视频混剪导演（探店/餐饮/本地生活）。用户会提供【指导文案】和【素材画面库】（每条素材有 AI 画面描述，materialIndex 从 0 开始）。
 
 任务（强制）：
-1. 通读指导文案，按叙事逻辑排序全部 N 条素材（门头/环境 → 制作过程 → 成品特写 → 试吃/收尾），禁止按上传序号 0,1,2… 机械排列
-2. 每条素材恰好出现一次；为每段输出 visual（画面）、dialogue（口播，须与画面语义对应，从指导文案摘改，禁止「精彩片段」等占位）
-3. segmentIndex 从 0 连续递增，表示成片时间轴顺序
+1. 输出恰好 K 段分镜（K 由用户指定，对应目标成片总时长），每段选用 1 条最匹配素材，同一条素材最多出现 1 次
+2. 叙事结构（二选一，素材含门头/店招/门店外观时优先模式A）：
+   模式A：门头/门店指引(开场) → 套餐/产品/制作过程(中段) → 结束语/行动号召(收尾)
+   模式B：产品/套餐卖点钩子(开场) → 制作/试吃体验(中段) → 门头/到店指引(倒数第二段) → 结束语(收尾)
+3. 每段 visual（画面）与 dialogue（口播）语义一致，从指导文案摘改；禁止「精彩片段」等占位
+4. segmentIndex 从 0 连续递增，表示成片时间轴顺序
 
 只输出 JSON 对象，无 markdown：
-{"segments":[{"segmentIndex":0,"materialIndex":5,"visual":"门店外观…","dialogue":"走进这家…"},...]}`
+{"segments":[{"segmentIndex":0,"materialIndex":5,"visual":"门店门头…","dialogue":"走进这家…"},...]}`
 
 const CLIP_POINT_VISION_SYSTEM = `你是混剪剪辑师。用户给出已排好叙事顺序的分镜段，以及对应素材的多帧采样截图（附图标注源片秒数）。
 须为每段输出从源素材第几秒起剪（sourceInSec）：
@@ -796,11 +824,17 @@ async function tryTextNarrativePlan(opts: {
   guidance: string
   materials: IceMixMaterialSlot[]
   profiles: IceMixMaterialProfile[]
+  targetSegmentCount: number
 }): Promise<MixNarrativeSegment[] | null> {
   const matCount = opts.materials.length
+  const k = opts.targetSegmentCount
   const profileBlock = opts.profiles.map((p) => profileBlockLine(p)).join('\n')
+  const hasStore = hasStorefrontMixMaterials(opts.profiles)
+  const patternHint = hasStore
+    ? '检测到门头/门店类素材，优先采用模式A（门头开场）'
+    : '可采用模式B（产品钩子开场，收尾前补门店指引）'
 
-  const userBlock = `【指导文案】\n${opts.guidance.trim()}\n\n【素材画面库 共 ${matCount} 条】\n${profileBlock}\n\n请输出 ${matCount} 段叙事分镜 JSON（每条素材恰好一次，按指导文案叙事排序，非上传序号）。`
+  const userBlock = `【指导文案】\n${opts.guidance.trim()}\n\n【素材画面库 共 ${matCount} 条】\n${profileBlock}\n\n【成片要求】\n- 输出恰好 ${k} 段分镜（对应目标时长，每段约 5 秒）\n- 从 ${matCount} 条素材中各选最匹配的 ${k} 条（每条素材最多用 1 次）\n- ${patternHint}\n\n请输出 ${k} 段叙事分镜 JSON。`
 
   const providers: Array<'doubao' | 'qwen' | 'tokenmix'> = ['doubao', 'qwen', 'tokenmix']
   for (const provider of providers) {
@@ -814,7 +848,7 @@ async function tryTextNarrativePlan(opts: {
         ],
       })
       const parsed = parseNarrativePlanJson(res.content?.trim() || '', matCount)
-      if (parsed && parsed.length >= Math.min(2, matCount)) return parsed
+      if (parsed && parsed.length >= Math.min(2, k)) return parsed.slice(0, k)
     } catch {
       /* try next */
     }
@@ -901,36 +935,92 @@ async function refineClipPointsWithVision(opts: {
   })
 }
 
+const NARRATIVE_CLOSING_RE = /下单|团购|赶紧|快来|收藏|关注|就在|欢迎.*到店|点击|马上|结束|收尾/
+const NARRATIVE_STOREFRONT_RE =
+  /门头|店招|招牌|门店|门面|地址|导航|怎么找|在哪里|欢迎来|进店/
+
+function fitNarrativeSegmentsToTargetDuration(
+  raw: MixNarrativeSegment[],
+  materials: IceMixMaterialSlot[],
+  profiles: IceMixMaterialProfile[],
+  guidance: string,
+  targetTotalSec: number,
+  segmentSec = 5,
+): MixNarrativeSegment[] {
+  const targetCount = mixTargetSegmentCount(targetTotalSec, segmentSec)
+  const usedMats = new Set<number>()
+  const deduped: MixNarrativeSegment[] = []
+  for (const s of [...raw].sort((a, b) => a.segmentIndex - b.segmentIndex)) {
+    const mi = s.materialIndex % materials.length
+    if (usedMats.has(mi)) continue
+    usedMats.add(mi)
+    deduped.push({ ...s, materialIndex: mi, segmentIndex: deduped.length })
+    if (deduped.length >= targetCount) break
+  }
+
+  if (deduped.length === targetCount) {
+    return deduped.map((s, i) => ({ ...s, segmentIndex: i }))
+  }
+
+  return buildFallbackNarrativeFromProfiles(
+    materials,
+    profiles,
+    guidance,
+    targetTotalSec,
+    segmentSec,
+  )
+}
+
 function buildFallbackNarrativeFromProfiles(
   materials: IceMixMaterialSlot[],
   profiles: IceMixMaterialProfile[],
   guidance: string,
+  targetTotalSec: number,
+  segmentSec = 5,
 ): MixNarrativeSegment[] {
   const guidanceLines = dialogueLinesFromGuidanceText(guidance)
   const hook = guidance.trim().slice(0, 48) || '探店好物推荐'
+  const targetCount = mixTargetSegmentCount(targetTotalSec, segmentSec)
+  const picks = pickMaterialsForNarrativeSlots(targetCount, materials, profiles, guidance)
+  const pattern = inferMixNarrativePattern(guidance, profiles)
 
-  const scored = materials.map((mat, index) => {
-    const prof = profileAt(profiles, materials, index)
-    let narrativeScore = index
-    const d = prof.description
-    if (/门头|外观|环境|门店|招牌/.test(d)) narrativeScore = 0 + index * 0.01
-    else if (/制作|过程|烹饪|操作|后厨|翻炒|下锅/.test(d)) narrativeScore = 100 + index * 0.01
-    else if (/成品|特写|摆盘|出锅|菜品/.test(d)) narrativeScore = 200 + index * 0.01
-    else if (/试吃|顾客|体验|品尝/.test(d)) narrativeScore = 300 + index * 0.01
-    else narrativeScore = 150 + index * 0.01
-    return { index, prof, narrativeScore, mat }
+  return picks.map((mi, i) => {
+    const prof = profileAt(profiles, materials, mi)
+    const mat = materials[mi]!
+    const slotRole = segmentRoleForIndex(i, picks.length, pattern)
+    const visualBase = prof.description.slice(0, 96) || `${mat.label}画面`
+    const visual =
+      slotRole === 'storefront' ? `门店门头/环境：${visualBase}` : visualBase
+
+    let dialogue = ''
+    if (slotRole === 'closing') {
+      dialogue =
+        guidanceLines.find((l) => NARRATIVE_CLOSING_RE.test(l)) ||
+        guidanceLines[guidanceLines.length - 1] ||
+        `${hook}，欢迎到店体验！`
+    } else if (slotRole === 'storefront') {
+      dialogue =
+        guidanceLines.find((l) => NARRATIVE_STOREFRONT_RE.test(l)) ||
+        guidanceLines[0] ||
+        `走进${hook}，环境氛围拉满。`
+    } else if (i === 0 && pattern === 'hook_opening') {
+      dialogue = guidanceLines[0] || hook
+    } else {
+      const mid = guidanceLines.slice(1, Math.max(1, guidanceLines.length - 1))
+      dialogue =
+        mid[i % Math.max(1, mid.length)] ||
+        guidanceLines[i % Math.max(1, guidanceLines.length)] ||
+        hook
+    }
+
+    return {
+      segmentIndex: i,
+      materialIndex: mi,
+      sourceInSec: inferSourceInSec(visual, prof.estimatedDurationSec ?? 6, prof),
+      visual,
+      dialogue,
+    }
   })
-  scored.sort((a, b) => a.narrativeScore - b.narrativeScore)
-
-  return scored.map((item, i) => ({
-    segmentIndex: i,
-    materialIndex: item.index,
-    sourceInSec: inferSourceInSec(item.prof.description, item.prof.estimatedDurationSec ?? 6, item.prof),
-    visual: item.prof.description.slice(0, 72) || `${item.mat.label}画面`,
-    dialogue:
-      guidanceLines[i % Math.max(1, guidanceLines.length)] ||
-      hook,
-  }))
 }
 
 /**
@@ -979,23 +1069,32 @@ export async function planMixNarrativeFromVision(opts: {
   }
 
   opts.onProgress?.('AI 正在按指导文案规划叙事顺序与口播…')
+  const targetSegmentCount = mixTargetSegmentCount(opts.targetTotalSec, 5)
   let segments: MixNarrativeSegment[] | null = await tryTextNarrativePlan({
     guidance,
     materials,
     profiles: profileList,
+    targetSegmentCount,
   })
 
   if (!segments) {
-    opts.onProgress?.('叙事 JSON 解析失败，按画面语义自动排序…')
-    segments = buildFallbackNarrativeFromProfiles(materials, profileList, guidance)
+    opts.onProgress?.('叙事 JSON 解析失败，按门头→产品→收尾自动排序…')
+    segments = buildFallbackNarrativeFromProfiles(
+      materials,
+      profileList,
+      guidance,
+      opts.targetTotalSec,
+      5,
+    )
   }
 
-  segments = ensureFullMaterialNarrativeCoverage(
+  segments = fitNarrativeSegmentsToTargetDuration(
     segments,
-    materials.length,
+    materials,
     profileList,
     guidance,
-    materials,
+    opts.targetTotalSec,
+    5,
   )
 
   opts.onProgress?.('密集采样素材画面，确定各段截取点…')
