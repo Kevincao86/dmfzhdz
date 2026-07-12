@@ -14,9 +14,11 @@ import { MIX_DEFAULT_SOURCE_DURATION_SEC } from '../lib/iceMixPlan'
 
 const VISION_SAMPLE_MAX = 48
 /** 素材分析：超过此数量只抽样深度理解，其余用文件名占位 */
-const MATERIAL_PROFILE_DEEP_MAX = 48
-const MATERIAL_PROFILE_CONCURRENCY = 5
-const MATERIAL_FRAME_TIMEOUT_MS = 20_000
+const MATERIAL_PROFILE_DEEP_MAX = 16
+const MATERIAL_PROFILE_CONCURRENCY = 4
+const MATERIAL_FRAME_TIMEOUT_MS = 45_000
+/** 大批量素材分析时每条视频采样帧数（降低服务端压力） */
+const MIX_ANALYZE_FRAMES_PER_VIDEO = 3
 const MATERIAL_VISION_BATCH_TIMEOUT_MS = 90_000
 const VISION_FRAMES_PER_AI_CALL = 4
 
@@ -162,15 +164,27 @@ export function resolveMixVisionNotes(
   return ''
 }
 
+function resolveDeepAnalyzeCap(materialCount: number): number {
+  if (materialCount <= 12) return materialCount
+  return MATERIAL_PROFILE_DEEP_MAX
+}
+
+function resolveAnalyzeFramesPerVideo(materialCount: number): number {
+  return materialCount > 12 ? MIX_ANALYZE_FRAMES_PER_VIDEO : MIX_FRAMES_PER_VIDEO
+}
+
 async function collectMaterialFramesForVision(
   mat: IceMixMaterialSlot,
   index: number,
   onProgress?: (msg: string) => void,
+  opts?: { maxFrames?: number },
 ): Promise<Array<{ index: number; label: string; dataUrl: string; atSec: number }>> {
-  onProgress?.(`截帧 ${index + 1}：${mat.label || `素材${index + 1}`}（全片 ${MIX_FRAMES_PER_VIDEO} 帧）…`)
+  const frameCap = opts?.maxFrames ?? MIX_FRAMES_PER_VIDEO
+  onProgress?.(`截帧 ${index + 1}：${mat.label || `素材${index + 1}`}（全片 ${frameCap} 帧）…`)
   const timeline = await collectMaterialTimelineFrames(mat, index, {
     durationSec: mat.kind === 'video' ? MIX_DEFAULT_SOURCE_DURATION_SEC : undefined,
-    skipLocalDownload: true,
+    maxFrames: frameCap,
+    skipLocalDownload: false,
   })
   return timeline.map((f) => ({
     index: f.index,
@@ -207,14 +221,15 @@ export async function buildMaterialVisionProfiles(
     return { profiles: [], batchVisionText: '', frameCount: 0 }
   }
 
-  const maxDeep = Math.max(2, opts?.maxDeepAnalyze ?? MATERIAL_PROFILE_DEEP_MAX)
+  const maxDeep = Math.max(2, opts?.maxDeepAnalyze ?? resolveDeepAnalyzeCap(list.length))
   const deepTargets = list.length <= maxDeep ? list : sampleMaterials(list, maxDeep)
   const deepTotal = deepTargets.length
+  const framesPerVideo = resolveAnalyzeFramesPerVideo(list.length)
 
   onProgress?.(
     list.length > maxDeep
-      ? `共 ${list.length} 条素材，抽样密集截帧 ${deepTotal} 条（逐帧 AI 理解）…`
-      : `正在对 ${deepTotal} 条素材逐帧截帧理解…`,
+      ? `共 ${list.length} 条素材，抽样密集截帧 ${deepTotal} 条（每条 ${framesPerVideo} 帧）…`
+      : `正在对 ${deepTotal} 条素材逐帧截帧理解（每条 ${framesPerVideo} 帧）…`,
   )
 
   const frameSamples: Array<{ index: number; label: string; dataUrl: string; atSec: number }> = []
@@ -224,8 +239,8 @@ export async function buildMaterialVisionProfiles(
     const idx = materials.indexOf(mat)
     const index = idx >= 0 ? idx : extracted
     const samples = await withProfileTimeout(
-      collectMaterialFramesForVision(mat, index, onProgress),
-      MATERIAL_FRAME_TIMEOUT_MS * 2,
+      collectMaterialFramesForVision(mat, index, onProgress, { maxFrames: framesPerVideo }),
+      MATERIAL_FRAME_TIMEOUT_MS,
       [],
     )
     extracted += 1
@@ -399,7 +414,7 @@ export async function analyzeIceMixMaterialsToGuidance(opts: {
 
   opts.onProgress?.('AI 正在理解素材画面…')
   const visionBuild = await buildMaterialVisionProfiles(materials, opts.onProgress, {
-    maxDeepAnalyze: VISION_SAMPLE_MAX,
+    maxDeepAnalyze: resolveDeepAnalyzeCap(materials.length),
   })
   const materialProfiles = visionBuild.profiles
   const sampled = sampleMaterials(materials, VISION_SAMPLE_MAX)
@@ -408,10 +423,14 @@ export async function analyzeIceMixMaterialsToGuidance(opts: {
 
   if (!isVisionNotesUsable(visionNotes)) {
     if (visionBuild.frameCount === 0) {
+      const deepCap = resolveDeepAnalyzeCap(materials.length)
+      const sampledHint =
+        materials.length > deepCap
+          ? `已对 ${deepCap}/${materials.length} 条抽样截帧，`
+          : `已对 ${materials.length} 条素材截帧，`
       return {
         ok: false,
-        message:
-          '无法从已上传素材截取画面，请确认视频为 MP4/MOV 且为本地上传（勿粘贴外链），然后重试。',
+        message: `${sampledHint}但均未成功。请确认视频为 MP4/MOV 且为本地上传（勿粘贴外链），网络稳定后重试。`,
       }
     }
     const ve = visionBuild.visionError || ''
