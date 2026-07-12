@@ -20,6 +20,7 @@ import {
   scoreMaterialRoleForSegment,
   segmentRoleForIndex,
   hasStorefrontMixMaterials,
+  isMixMaterialPromotionRelevant,
 } from '../lib/iceMixPlan'
 import {
   clampMixSourceInSec,
@@ -30,6 +31,8 @@ import {
 } from '../lib/iceMixPlan'
 import {
   parseScriptTimeRangeSeconds,
+  planLongformAllFiveSecondDurations,
+  scriptTimeRangesFromDurationPlan,
   type ShortVideoScriptRow,
 } from '../lib/shortVideoScriptTable'
 
@@ -328,6 +331,7 @@ export function buildStoryboardMixDecisions(
 
     for (let mi = 0; mi < materials.length; mi++) {
       const prof = profileAt(profiles, materials, mi)
+      if (!isMixMaterialPromotionRelevant(prof, guidance)) continue
       let score = scoreMaterialMatch(row.visual, prof, materials[mi]!.label)
       score += scoreMaterialMatch(row.dialogue, prof, materials[mi]!.label) * 0.6
 
@@ -655,7 +659,8 @@ const NARRATIVE_TEXT_PLAN_SYSTEM = `你是专业短视频混剪导演（探店/�
 
 任务（强制）：
 1. 输出恰好 K 段分镜（K 由用户指定，对应目标成片总时长），每段选用 1 条最匹配素材，同一条素材最多出现 1 次
-2. 叙事结构（二选一，素材含门头/店招/门店外观时优先模式A）：
+2. 跳过与推广/产品/门店毫无关联的素材（如纯风景、马路、截帧失败、无关路人等），materialIndex 不得选用这类素材
+3. 叙事结构（二选一，素材含门头/店招/门店外观时优先模式A）：
    模式A：门头/门店指引(开场) → 套餐/产品/制作过程(中段) → 结束语/行动号召(收尾)
    模式B：产品/套餐卖点钩子(开场) → 制作/试吃体验(中段) → 门头/到店指引(倒数第二段) → 结束语(收尾)
 3. 每段 visual（画面）与 dialogue（口播）语义一致，从指导文案摘改；禁止「精彩片段」等占位
@@ -796,18 +801,23 @@ function narrativeSegmentsToRows(
   segments: MixNarrativeSegment[],
   targetTotalSec: number,
 ): ShortVideoScriptRow[] {
-  const n = Math.max(2, segments.length)
-  const total = Math.max(5, Math.ceil(targetTotalSec))
-  const each = total / n
-  const rows = segments.map((s, i) => {
-    const start = Math.round(i * each * 10) / 10
-    const end = i === n - 1 ? total : Math.round((i + 1) * each * 10) / 10
-    return {
-      timeRange: `${start}-${end}秒`,
-      visual: s.visual.trim(),
-      dialogue: s.dialogue.trim(),
-    }
-  })
+  const total = Math.min(120, Math.max(5, Math.ceil(targetTotalSec)))
+  const plan = planLongformAllFiveSecondDurations(total)
+  const targetCount = plan.length
+  const ranges = scriptTimeRangesFromDurationPlan(plan)
+  const padded: MixNarrativeSegment[] = [...segments]
+  while (padded.length < targetCount) {
+    const prev = padded[padded.length - 1]!
+    padded.push({
+      ...prev,
+      segmentIndex: padded.length,
+    })
+  }
+  const rows = padded.slice(0, targetCount).map((s, i) => ({
+    timeRange: ranges[i]!,
+    visual: s.visual.trim(),
+    dialogue: s.dialogue.trim(),
+  }))
   return ensureSequentialMixScriptRows(rows, total)
 }
 
@@ -952,6 +962,12 @@ function fitNarrativeSegmentsToTargetDuration(
   const deduped: MixNarrativeSegment[] = []
   for (const s of [...raw].sort((a, b) => a.segmentIndex - b.segmentIndex)) {
     const mi = s.materialIndex % materials.length
+    const prof = profiles[mi] ?? {
+      index: mi,
+      label: materials[mi]?.label ?? `素材${mi + 1}`,
+      description: materials[mi]?.label ?? '',
+    }
+    if (!isMixMaterialPromotionRelevant(prof, guidance)) continue
     if (usedMats.has(mi)) continue
     usedMats.add(mi)
     deduped.push({ ...s, materialIndex: mi, segmentIndex: deduped.length })
