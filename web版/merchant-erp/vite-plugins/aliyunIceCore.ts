@@ -1372,14 +1372,13 @@ export async function iceRunMixPipeline(
       }
     }
     if (!finalPlan.narrationClip && !finalPlan.mixAiTtsClip) {
-      finalPlan = {
-        ...plan,
-        mixAiTtsClip: {
-          content: narrationText,
-          timelineIn: 0,
-          timelineOut: input.totalDurationSec,
-        },
-        summary: `${plan.summary}${plan.summary ? ' · ' : ''}ICE AI_TTS 口播`,
+      return {
+        ok: false,
+        message:
+          tts.ok === false
+            ? tts.message || '混剪口播 TTS 合成失败'
+            : '混剪口播音频注册失败，请重试',
+        step: 'mix_tts',
       }
     }
   }

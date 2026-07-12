@@ -17,6 +17,8 @@ export type QwenTtsSynthInput = {
   gender: '男' | '女'
   speechRate?: number
   speechPitch?: number
+  /** 指定 CosyVoice 音色（优先于性别默认） */
+  cosyVoiceId?: string
   /** 语音克隆参考音频（纯 base64） */
   referenceAudioBase64?: string
   referenceText?: string
@@ -94,7 +96,10 @@ async function callQwenTtsOnce(
   if (!isSambert && !isCosy) throw new Error(`不支持的千问 TTS 模型：${modelId}`)
 
   const sambertVoice = sambertVoiceForGender(input.gender)
-  const voice = isSambert ? sambertVoice : cosyVoiceForGender(input.gender)
+  const cosyOverride = String(input.cosyVoiceId ?? '').trim()
+  const voice = isSambert
+    ? sambertVoice
+    : cosyOverride || cosyVoiceForGender(input.gender)
   const rate = toCosyRate(input.speechRate ?? 1)
   const refAudio = input.referenceAudioBase64?.replace(/\s/g, '')
   const refText = (input.referenceText ?? '这是一段语音参考样本。').trim().slice(0, 200)

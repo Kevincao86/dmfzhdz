@@ -5,6 +5,7 @@ import { verifyMpSessionToken } from '../../vite-plugins/aiGateway/authMpSession
 import { voicePresetById } from './digitalHumanBroadcast.js'
 import { isArkQuotaHopableError } from './arkModelCatalog.js'
 import { synthesizeWithQwenSpeechPool } from './qwenCosyVoiceTts.js'
+import { cosyVoiceForCloudVoiceId } from './qwenSpeechCatalog.js'
 
 export type DigitalHumanTtsInput = {
   text: string
@@ -311,6 +312,7 @@ export async function runDigitalHumanTtsCore(
       gender: preset.gender,
       speechRate,
       speechPitch,
+      cosyVoiceId: cosyVoiceForCloudVoiceId(preset.cloudVoiceId),
     })
     if (qwen.ok) {
       return {

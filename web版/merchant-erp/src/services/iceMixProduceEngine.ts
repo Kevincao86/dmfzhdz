@@ -1,12 +1,12 @@
 /**
- * AI 混剪成片引擎：ICE Timeline 多素材拼接 + 截取 + 转场 + 动效字幕 + AI_TTS。
- * 素材映射以轮询/用户下拉为准，视觉 AI 仅优化截取点，禁止全段指向第一条素材。
+ * AI 混剪成片引擎：ICE Timeline 多素材拼接 + 截取 + 转场 + 动效字幕 + TTS。
+ * 按分镜表语义匹配素材与截取点，视觉 AI 精修入点；渲染时尊重用户已确认的分镜。
  */
 import type { IceMixMaterialProfile } from './iceMixEditPlanAi'
 import {
   buildIceMixSegmentsFromEditPlan,
+  buildStoryboardMixDecisions,
   planMixEditFromInstructions,
-  planMixNarrativeFromVision,
   type MixEditSegmentDecision,
 } from './iceMixEditPlanAi'
 import { validateIceMixMaterialUrl, sanitizeIceMixMaterialUrlForPipeline } from '../lib/icePipelineImageUrl'
@@ -198,66 +198,6 @@ export function composeMixProductionBrief(
   return composeMixEditBrief(instBlock, rows)
 }
 
-function segmentsCoverAllMaterials(
-  segments: IceMixSegmentPlan[],
-  materialCount: number,
-): boolean {
-  if (materialCount <= 0) return true
-  const used = new Set(segments.map((s) => s.materialIndex))
-  for (let i = 0; i < materialCount; i++) {
-    if (!used.has(i)) return false
-  }
-  return true
-}
-
-/** 仅补齐未使用的素材，保留叙事顺序 */
-function appendMissingMaterialSegments(
-  segments: IceMixSegmentPlan[],
-  rows: ShortVideoScriptRow[],
-  materials: IceMixMaterialSlot[],
-  targetTotalSec: number,
-  materialProfiles?: IceMixMaterialProfile[],
-): IceMixSegmentPlan[] {
-  const used = new Set(segments.map((s) => s.materialIndex))
-  const missing: number[] = []
-  for (let i = 0; i < materials.length; i++) {
-    if (!used.has(i)) missing.push(i)
-  }
-  if (missing.length === 0) return segments
-
-  const total = resolveMixTotalDurationSec(rows, targetTotalSec)
-  const clipEach = Math.max(0.45, total / Math.max(materials.length, segments.length + missing.length))
-  let cursor = segments.reduce((m, s) => Math.max(m, s.timelineEndSec), 0)
-  const out = [...segments]
-
-  for (const mi of missing) {
-    const mat = materials[mi]
-    if (!mat) continue
-    const timelineStart = Math.min(total - clipEach, cursor)
-    const timelineEnd = Math.min(total, timelineStart + clipEach)
-    if (timelineEnd <= timelineStart) continue
-    const est =
-      profileAt(materialProfiles, materials, mi).estimatedDurationSec ??
-      MIX_DEFAULT_SOURCE_DURATION_SEC
-    const sourceInSec =
-      mat.kind === 'video'
-        ? clampMixSourceInSec(inferSourceInSec(mat.label, est, mi), clipEach, est)
-        : 0
-    out.push({
-      kind: mat.kind,
-      mediaUrl: sanitizeIceMixMaterialUrlForPipeline(mat.mediaUrl || mat.signedMediaUrl || ''),
-      signedMediaUrl: mat.signedMediaUrl,
-      materialIndex: mi,
-      timelineStartSec: timelineStart,
-      timelineEndSec: timelineEnd,
-      sourceInSec,
-      sourceOutSec: mat.kind === 'video' ? sourceInSec + (timelineEnd - timelineStart) : undefined,
-    })
-    cursor = timelineEnd
-  }
-  return out.sort((a, b) => a.timelineStartSec - b.timelineStartSec)
-}
-
 export function validateMixSegmentDiversity(
   segments: IceMixSegmentPlan[],
   materials: IceMixMaterialSlot[],
@@ -298,7 +238,7 @@ export async function produceIceMixPackage(
     }
   }
 
-  input.onProgress?.('正在规划多素材拼接与截取点…')
+  input.onProgress?.('正在按分镜语义匹配素材与截取点…')
 
   const profileList =
     input.materialProfiles && input.materialProfiles.length > 0
@@ -312,105 +252,52 @@ export async function produceIceMixPackage(
         }))
 
   const guidance = (input.guidance || input.mixInstruction || '').trim()
-  let rows = ensureSequentialMixScriptRows(
-    input.rows,
-    resolveMixTotalDurationSec(input.rows, input.targetTotalSec),
-  )
-  let materialSlots = resolveMixMaterialSlotMapping(
-    rows.length,
-    materials,
-    input.materialSlots,
-  )
-  let narrativeDecisions: MixEditSegmentDecision[] | null = null
+  const total = resolveMixTotalDurationSec(input.rows, input.targetTotalSec)
+  const rows = ensureSequentialMixScriptRows(input.rows, total)
+  const materialSlots = resolveMixMaterialSlotMapping(rows.length, materials, input.materialSlots)
 
-  if (guidance.length >= 4) {
-    const narrative = await planMixNarrativeFromVision({
-      guidance,
-      materials,
-      materialProfiles: profileList,
-      targetTotalSec: input.targetTotalSec,
-      onProgress: input.onProgress,
-    })
-    if (narrative.ok) {
-      rows = narrative.rows
-      materialSlots = narrative.materialSlots
-      narrativeDecisions = narrative.decisions
-      input.onProgress?.('叙事分镜已就绪，正在生成剪辑时间线…')
-    }
+  let decisions: MixEditSegmentDecision[] = buildStoryboardMixDecisions(
+    rows,
+    materials,
+    profileList,
+    materialSlots,
+  )
+
+  const editPlan = await planMixEditFromInstructions({
+    guidance:
+      guidance.length >= 4
+        ? guidance
+        : rows.map((r) => `${r.visual} ${r.dialogue}`).join(' ').slice(0, 400),
+    rows,
+    materials,
+    materialProfiles: profileList,
+    targetTotalSec: input.targetTotalSec,
+    seedDecisions: decisions,
+    onProgress: input.onProgress,
+  })
+
+  if (editPlan.ok) {
+    decisions = editPlan.decisions
+    input.onProgress?.('视觉匹配完成，正在生成剪辑时间线…')
   }
 
-  const total = resolveMixTotalDurationSec(rows, input.targetTotalSec)
-  rows = ensureSequentialMixScriptRows(rows, total)
-
-  let segments: IceMixSegmentPlan[]
-
-  if (narrativeDecisions) {
-    segments = sanitizeMixSegments(
-      buildIceMixSegmentsFromEditPlan(
-        rows,
-        materials,
-        narrativeDecisions,
-        input.targetTotalSec,
-        profileList,
-      ),
-    )
-  } else {
-    const editPlan = await planMixEditFromInstructions({
-      guidance,
+  let segments: IceMixSegmentPlan[] = sanitizeMixSegments(
+    buildIceMixSegmentsFromEditPlan(
       rows,
       materials,
-      materialProfiles: profileList,
-      targetTotalSec: input.targetTotalSec,
-      onProgress: input.onProgress,
-    })
-
-    if (editPlan.ok) {
-      segments = sanitizeMixSegments(
-        buildIceMixSegmentsFromEditPlan(
-          rows,
-          materials,
-          editPlan.decisions,
-          input.targetTotalSec,
-          profileList,
-        ),
-      )
-    } else {
-      segments = buildIceMixSegmentsFromSlots(
-        rows,
-        materials,
-        materialSlots,
-        input.targetTotalSec,
-        profileList,
-      )
-    }
-  }
+      decisions,
+      input.targetTotalSec,
+      profileList,
+    ),
+  )
 
   if (segments.length < 2) {
     return { ok: false, message: '无法生成分镜时间线，请检查分镜表' }
   }
 
-  if (!segmentsCoverAllMaterials(segments, materials.length)) {
-    input.onProgress?.('补齐未使用的素材片段（保留叙事顺序）…')
-    segments = appendMissingMaterialSegments(
-      segments,
-      rows,
-      materials,
-      input.targetTotalSec,
-      profileList,
-    )
-  }
-
   const diversityErr = validateMixSegmentDiversity(segments, materials)
-  if (diversityErr && materials.length >= 2) {
-    segments = buildIceMixSegmentsFromSlots(
-      rows,
-      materials,
-      assignMixMaterialSlots(rows.length, materials.length),
-      input.targetTotalSec,
-      input.materialProfiles,
-    )
-    const retryErr = validateMixSegmentDiversity(segments, materials)
-    if (retryErr) return { ok: false, message: retryErr }
+  if (diversityErr) {
+    return { ok: false, message: diversityErr }
   }
 
   const narrationText = collectMixNarrationText(rows)
