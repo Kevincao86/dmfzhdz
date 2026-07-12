@@ -13,6 +13,7 @@ import { Link } from 'react-router-dom'
 import TenantPayModal from '../components/TenantPayModal'
 import { cn } from '../cn'
 import { formatErpPointsEquivalentsLine } from '../lib/erpPointsEconomics'
+import { formatTenantPointsLedgerReason } from '../lib/tenantPointsLedgerDisplay'
 import { formatYuanFromCents, yuanRefundInputToCents } from '../lib/meooPaymentTiers'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { DB_MIGRATION_HINT_ZH, shouldSuggestDbMigration } from '../lib/dbSchemaErrorHint'
@@ -472,7 +473,9 @@ export default function WalletPage() {
                         <td className="whitespace-nowrap px-6 py-3 text-slate-600">
                           {new Date(row.created_at).toLocaleString('zh-CN', { hour12: false })}
                         </td>
-                        <td className="px-6 py-3 text-slate-800">{row.reason}</td>
+                        <td className="px-6 py-3 text-slate-800">
+                          {formatTenantPointsLedgerReason(row.reason, row.usage_kind)}
+                        </td>
                         <td
                           className={cn(
                             'whitespace-nowrap px-6 py-3 tabular-nums',

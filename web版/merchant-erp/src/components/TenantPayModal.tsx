@@ -22,6 +22,7 @@ import {
   type TenantPayChannel,
   type TenantPayOrderKind,
 } from '../services/tenantBillingClient'
+import { buildTenantPayQrDataUrl } from '../lib/tenantPayQrDataUrl'
 
 function formatThrown(e: unknown): string {
   return formatThrowableMessage(e, '操作失败，请稍后重试')
@@ -86,7 +87,7 @@ export default function TenantPayModal({
   const [busy, setBusy] = useState(false)
   const [polling, setPolling] = useState(false)
   const [localErr, setLocalErr] = useState<string | null>(null)
-  const [qrUrl, setQrUrl] = useState<string | null>(null)
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
   const [, setOutTradeNo] = useState<string | null>(null)
   const [payPageUrl, setPayPageUrl] = useState<string | null>(null)
   const [payDeadlineMs, setPayDeadlineMs] = useState<number | null>(null)
@@ -112,7 +113,7 @@ export default function TenantPayModal({
     setUseCustom(false)
     setBusy(false)
     setLocalErr(null)
-    setQrUrl(null)
+    setQrDataUrl(null)
     setOutTradeNo(null)
     setPayPageUrl(null)
     setPayDeadlineMs(null)
@@ -230,10 +231,17 @@ export default function TenantPayModal({
         amountCents: cents,
         channel: ch,
       })
-      const qr = prepay.qrCode || prepay.codeUrl || null
-      setQrUrl(qr)
-      setOutTradeNo(prepay.outTradeNo)
+      const qrText = (prepay.qrCode || prepay.codeUrl || '').trim()
       setPayPageUrl(prepay.payPageUrl ?? null)
+      setOutTradeNo(prepay.outTradeNo)
+      if (ch === 'alipay' && !qrText && prepay.payPageUrl) {
+        setQrDataUrl(null)
+      } else if (qrText) {
+        const dataUrl = await buildTenantPayQrDataUrl(qrText, ch)
+        setQrDataUrl(dataUrl || null)
+      } else {
+        setQrDataUrl(null)
+      }
       setPayDeadlineMs(Date.now() + TENANT_ONLINE_PAY_TTL_MS)
       setRemainSec(TENANT_ONLINE_PAY_TTL_SEC)
       setStep('pay')
@@ -450,25 +458,21 @@ export default function TenantPayModal({
                 等待支付结果…
               </p>
             ) : null}
-            {qrUrl ? (
+            {qrDataUrl ? (
               <img
-                src={
-                  qrUrl.startsWith('data:') || qrUrl.startsWith('http')
-                    ? qrUrl
-                    : `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(qrUrl)}`
-                }
+                src={qrDataUrl}
                 alt="支付二维码"
                 className="mt-4 w-60 rounded-xl border border-white/10 bg-white p-2"
               />
-            ) : payPageUrl ? (
-              <a
-                href={payPageUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-4 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-sky-500"
-              >
-                打开支付宝收银台
-              </a>
+            ) : payPageUrl && channel === 'alipay' ? (
+              <div className="mt-4 h-[300px] w-60 overflow-hidden rounded-xl border border-white/10 bg-white">
+                <iframe
+                  src={payPageUrl}
+                  title="支付宝扫码支付"
+                  className="h-full w-full border-0"
+                  scrolling="no"
+                />
+              </div>
             ) : (
               <p className="mt-4 text-sm text-amber-200">未获取到二维码，请尝试其他支付方式</p>
             )}
@@ -494,7 +498,8 @@ export default function TenantPayModal({
                   stopPoll()
                   setStep('choose')
                   setChannel(null)
-                  setQrUrl(null)
+                  setQrDataUrl(null)
+                  setPayPageUrl(null)
                   setPayDeadlineMs(null)
                 }}
               >
