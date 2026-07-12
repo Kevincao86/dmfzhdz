@@ -277,7 +277,7 @@ export function buildStructuralMixDecisions(
   })
 }
 
-/** 禁止全段同一素材同一入点：按分镜语义重分配 */
+/** 禁止全段同一素材：仅当全部段落在用同一条素材时才重分配 */
 export function enforceDiverseEditDecisions(
   decisions: MixEditSegmentDecision[],
   rows: ShortVideoScriptRow[],
@@ -287,9 +287,76 @@ export function enforceDiverseEditDecisions(
   if (materials.length < 2 || decisions.length < 2) return decisions
   if (isEditPlanDiverseEnough(decisions, materials.length)) return decisions
 
-  return buildStructuralMixDecisions(rows, materials, profiles).map((d, i) => {
-    const prev = decisions.find((x) => x.segmentIndex === i) ?? decisions[i]
-    return prev?.clipNote ? { ...d, clipNote: prev.clipNote } : d
+  const allSameMat = new Set(decisions.map((d) => d.materialIndex)).size === 1
+  if (!allSameMat) return decisions
+
+  return buildStructuralMixDecisions(rows, materials, profiles)
+}
+
+/**
+ * 按分镜表语义匹配素材与截取点（尊重用户分镜顺序，智能选素材/入点）
+ */
+export function buildStoryboardMixDecisions(
+  rows: ShortVideoScriptRow[],
+  materials: IceMixMaterialSlot[],
+  profiles: IceMixMaterialProfile[],
+  userSlots?: number[],
+): MixEditSegmentDecision[] {
+  const usedIn = new Map<number, number>()
+  const usedMatCount = new Map<number, number>()
+
+  return rows.map((row, segmentIndex) => {
+    let bestIdx = spreadMixMaterialIndex(segmentIndex, rows.length, materials.length)
+    let bestScore = -1
+
+    for (let mi = 0; mi < materials.length; mi++) {
+      const prof = profileAt(profiles, materials, mi)
+      let score = scoreMaterialMatch(row.visual, prof, materials[mi]!.label)
+      score += scoreMaterialMatch(row.dialogue, prof, materials[mi]!.label) * 0.6
+
+      const frameIn = pickSourceInFromFrameTimeline(row.visual, row.dialogue, prof.frameTimeline)
+      if (frameIn != null && prof.frameTimeline?.length) {
+        score += 8
+      }
+
+      if (userSlots?.[segmentIndex] === mi) score += 3
+
+      const used = usedMatCount.get(mi) ?? 0
+      if (used > 0) score -= used * 1.2
+
+      const cycleIdx = spreadMixMaterialIndex(segmentIndex, rows.length, materials.length)
+      if (mi === cycleIdx) score += 1.5
+
+      if (score > bestScore) {
+        bestScore = score
+        bestIdx = mi
+      }
+    }
+
+    if (materials.length >= 2 && bestScore < 2) {
+      bestIdx = spreadMixMaterialIndex(segmentIndex, rows.length, materials.length)
+    }
+
+    usedMatCount.set(bestIdx, (usedMatCount.get(bestIdx) ?? 0) + 1)
+
+    const prof = profileAt(profiles, materials, bestIdx)
+    const est =
+      prof.estimatedDurationSec ?? MIX_DEFAULT_SOURCE_DURATION_SEC
+    const tr = parseScriptTimeRangeSeconds(row.timeRange)
+    const clipDur = tr ? Math.max(0.35, tr.end - tr.start) : 4
+
+    let sourceInSec =
+      pickSourceInFromFrameTimeline(row.visual, row.dialogue, prof.frameTimeline) ??
+      inferSourceInSec(row.visual, est, prof)
+
+    const lastIn = usedIn.get(bestIdx)
+    if (lastIn != null && Math.abs(sourceInSec - lastIn) < 1.2) {
+      sourceInSec = clampMixSourceInSec(sourceInSec + 1.6, clipDur, est)
+    }
+    sourceInSec = clampMixSourceInSec(sourceInSec, clipDur, est)
+    usedIn.set(bestIdx, sourceInSec)
+
+    return { segmentIndex, materialIndex: bestIdx, sourceInSec }
   })
 }
 
@@ -389,6 +456,7 @@ export async function planMixEditFromInstructions(opts: {
   materials: IceMixMaterialSlot[]
   materialProfiles: IceMixMaterialProfile[]
   targetTotalSec: number
+  seedDecisions?: MixEditSegmentDecision[]
   onProgress?: (msg: string) => void
 }): Promise<
   | { ok: true; decisions: MixEditSegmentDecision[] }
@@ -418,9 +486,12 @@ export async function planMixEditFromInstructions(opts: {
           }),
         )
 
-  let decisions = buildStructuralMixDecisions(rows, materials, profileList)
+  let decisions =
+    opts.seedDecisions?.length === rows.length
+      ? opts.seedDecisions
+      : buildStructuralMixDecisions(rows, materials, profileList)
 
-  opts.onProgress?.('视觉模型正在匹配素材与截取点…')
+  opts.onProgress?.('视觉模型正在匹配素材画面与口播…')
   try {
     const frames = await Promise.race([
       collectMixMaterialFramesForEditPlan(materials, {
@@ -446,11 +517,22 @@ export async function planMixEditFromInstructions(opts: {
         }),
       ])
       if (visionDecisions && visionDecisions.length >= 2) {
-        decisions = visionDecisions
+        decisions = rows.map((_, i) => {
+          const vis =
+            visionDecisions.find((d) => d.segmentIndex === i) ?? visionDecisions[i]
+          const seed = decisions[i]!
+          if (!vis) return seed
+          return {
+            segmentIndex: i,
+            materialIndex: vis.materialIndex % materials.length,
+            sourceInSec: vis.sourceInSec,
+            clipNote: vis.clipNote ?? seed.clipNote,
+          }
+        })
       }
     }
   } catch {
-    /* keep structural base */
+    /* keep seed / structural base */
   }
 
   decisions = enforceDiverseEditDecisions(decisions, rows, materials, profileList)

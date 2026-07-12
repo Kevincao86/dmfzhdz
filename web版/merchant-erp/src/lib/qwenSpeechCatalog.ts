@@ -59,6 +59,36 @@ export function cosyVoiceForGender(gender: '男' | '女'): string {
   return gender === '女' ? 'longxiaochun_v2' : 'longanyang'
 }
 
+/** MiniMax cloudVoiceId → CosyVoice 音色（千问降级时保持与所选预设一致） */
+export function cosyVoiceForCloudVoiceId(cloudVoiceId: string | undefined): string | undefined {
+  const id = String(cloudVoiceId ?? '').trim()
+  if (!id) return undefined
+  const map: Record<string, string> = {
+    'Chinese (Mandarin)_Reliable_Executive': 'longshu_v2',
+    'Chinese (Mandarin)_Warm_Girl': 'longwan_v2',
+    'Chinese (Mandarin)_News_Anchor': 'longfei_v2',
+    'Chinese (Mandarin)_Sweet_Lady': 'longxiaoxia_v2',
+    'Chinese (Mandarin)_Unrestrained_Young_Man': 'longshuo_v2',
+    'Chinese (Mandarin)_Mature_Woman': 'longyue_v2',
+    'Chinese (Mandarin)_Sincere_Adult': 'longcheng_v2',
+    'Chinese (Mandarin)_Crisp_Girl': 'longxiaochun_v2',
+    'Chinese (Mandarin)_Southern_Young_Man': 'longnan_v3',
+    'Chinese (Mandarin)_Soft_Girl': 'longmiao_v2',
+    'Chinese (Mandarin)_Male_Announcer': 'longanyang',
+    'Chinese (Mandarin)_IntellectualGirl': 'longjing_v2',
+    'Chinese (Mandarin)_Warm-HeartedGirl': 'longwan_v2',
+    'Chinese (Mandarin)_ExplorativeGirl': 'longling_v3',
+    'Chinese (Mandarin)_Laid_BackGirl': 'longxiaoxia_v2',
+    'Chinese (Mandarin)_Pure-hearted_Boy': 'longze_v3',
+    'Chinese (Mandarin)_Wise_Women': 'longyuan_v3',
+    'Chinese (Mandarin)_Humorous_Elder': 'longlaotie_v3',
+    'Chinese (Mandarin)_Warm_Bestie': 'loongbella_v3',
+    'Chinese (Mandarin)_Gentle_Youth': 'longxiaocheng_v2',
+    'Chinese (Mandarin)_Warm-HeartedAunt': 'loongstella_v3',
+  }
+  return map[id]
+}
+
 /** Sambert：model 即 voice */
 export function sambertVoiceForGender(gender: '男' | '女'): string {
   return gender === '女' ? 'sambert-zhichu-v1' : 'sambert-zhinan-v1'

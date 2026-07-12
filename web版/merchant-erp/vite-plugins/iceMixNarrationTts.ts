@@ -8,7 +8,6 @@ import {
   ICE_MIX_VOICE_DEFAULT_ID,
   voicePresetById,
 } from '../src/lib/digitalHumanBroadcast.js'
-import { synthesizeWithQwenSpeechPool } from '../src/lib/qwenCosyVoiceTts.js'
 
 export async function synthesizeIceMixNarrationMp3(
   cfg: AliyunIceConfig,
@@ -27,44 +26,37 @@ export async function synthesizeIceMixNarrationMp3(
 
   const presetId = String(voicePresetId || ICE_MIX_VOICE_DEFAULT_ID).trim() || ICE_MIX_VOICE_DEFAULT_ID
   const preset = voicePresetById(presetId)
+  if (!preset) {
+    return { ok: false, message: `未知口播音色：${presetId}` }
+  }
+
   const refB64 = String(voiceCloneBase64 ?? '').replace(/\s/g, '')
   const useClone = presetId === 'v-clone' && refB64.length > 64
 
-  let audioBase64: string | null = null
-
-  if (preset && (useClone || preset.id !== 'v-clone')) {
-    const dh = await runDigitalHumanTtsCore(
-      {
-        text: narration.slice(0, 1200),
-        voicePresetId: preset.id,
-        speechRate: preset.rate,
-        speechPitch: preset.pitch,
-        trustedServer: true,
-        ...(useClone ? { referenceAudioBase64: refB64 } : {}),
-      },
-      env as Record<string, string>,
-    )
-    if (dh.ok) {
-      audioBase64 = dh.audioBase64
-    }
-  }
-
-  if (!audioBase64) {
-    if (useClone) {
-      return { ok: false, message: '语音克隆合成失败，请确认已上传样本且运营台已配置通义 Key' }
-    }
-    const tts = await synthesizeWithQwenSpeechPool(env as Record<string, string>, {
+  const dh = await runDigitalHumanTtsCore(
+    {
       text: narration.slice(0, 1200),
-      gender: preset?.gender ?? '女',
-      speechRate: preset?.rate ?? 1.02,
-      speechPitch: preset?.pitch ?? 1.02,
-    })
-    if (!tts.ok) {
-      return { ok: false, message: tts.message || '混剪口播 TTS 合成失败' }
+      voicePresetId: preset.id,
+      speechRate: preset.rate,
+      speechPitch: preset.pitch,
+      trustedServer: true,
+      ...(useClone ? { referenceAudioBase64: refB64 } : {}),
+    },
+    env as Record<string, string>,
+  )
+
+  if (!dh.ok) {
+    return {
+      ok: false,
+      message:
+        dh.message ||
+        (useClone
+          ? '语音克隆合成失败，请确认已上传样本且运营台已配置通义 Key'
+          : `口播合成失败（${preset.label}），请检查 MiniMax / 通义 Key 配置后重试`),
     }
-    audioBase64 = tts.audioBase64
   }
 
+  const audioBase64 = dh.audioBase64
   const buf = Buffer.from(audioBase64, 'base64')
   if (buf.length < 128) {
     return { ok: false, message: 'TTS 返回音频无效' }

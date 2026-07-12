@@ -1867,7 +1867,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                   {err}
                 </div>
               ) : null}
-              <div className="flex flex-wrap items-end gap-4 rounded-xl border border-zinc-100/80 bg-gradient-to-br from-zinc-50/80 to-white/60 p-4">
+              <div className="grid gap-4 rounded-xl border border-zinc-100/80 bg-gradient-to-br from-zinc-50/80 to-white/60 p-4 sm:grid-cols-2 lg:grid-cols-5 lg:items-start">
                 <label className="flex flex-col gap-1 text-xs text-zinc-600">
                   <span>目标总时长</span>
                   <select
@@ -1883,7 +1883,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                         ),
                       )
                     }}
-                    className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
+                    className="h-10 rounded-lg border border-zinc-300 bg-white px-2 text-sm"
                   >
                     {MIX_TARGET_TOTAL_OPTIONS.map((sec) => (
                       <option key={sec} value={sec}>
@@ -1891,6 +1891,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                       </option>
                     ))}
                   </select>
+                  <span className="min-h-[1.25rem]" aria-hidden />
                 </label>
                 <label className="flex flex-col gap-1 text-xs text-zinc-600">
                   <span>画幅</span>
@@ -1898,7 +1899,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                     value={aspectId}
                     disabled={anyBusy || guidanceBusy}
                     onChange={(e) => setAspectId(e.target.value as typeof aspectId)}
-                    className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
+                    className="h-10 rounded-lg border border-zinc-300 bg-white px-2 text-sm"
                   >
                     {ICE_ASPECT_PRESETS.map((a) => (
                       <option key={a.id} value={a.id}>
@@ -1906,14 +1907,15 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                       </option>
                     ))}
                   </select>
+                  <span className="min-h-[1.25rem]" aria-hidden />
                 </label>
-                <label className="flex min-w-[10rem] flex-1 flex-col gap-1 text-xs text-zinc-600">
+                <label className="flex flex-col gap-1 text-xs text-zinc-600">
                   <span>字幕样式</span>
                   <select
                     value={mixSubtitleStyleId}
                     disabled={anyBusy || guidanceBusy}
                     onChange={(e) => setMixSubtitleStyleId(e.target.value)}
-                    className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
+                    className="h-10 rounded-lg border border-zinc-300 bg-white px-2 text-sm"
                   >
                     {ICE_SUBTITLE_STYLE_PRESETS.map((s) => (
                       <option key={s.id} value={s.id}>
@@ -1922,15 +1924,16 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                       </option>
                     ))}
                   </select>
+                  <span className="min-h-[1.25rem]" aria-hidden />
                 </label>
-                <div className="flex min-w-[14rem] flex-1 flex-col gap-1 text-xs text-zinc-600">
+                <div className="flex flex-col gap-1 text-xs text-zinc-600">
                   <span>口播音色</span>
-                  <div className="flex gap-2">
+                  <div className="flex h-10 gap-2">
                     <select
                       value={mixVoicePresetId}
                       disabled={anyBusy || guidanceBusy}
                       onChange={(e) => setMixVoicePresetId(e.target.value)}
-                      className="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
+                      className="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-2 text-sm"
                     >
                       {ICE_MIX_VOICE_PRESETS.map((v) => (
                         <option key={v.id} value={v.id}>
@@ -1942,7 +1945,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                       type="button"
                       disabled={anyBusy || guidanceBusy}
                       onClick={() => void playMixTtsPreview()}
-                      className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-zinc-300 bg-white px-2.5 py-2 text-sm text-zinc-800 hover:bg-zinc-50 disabled:opacity-50"
+                      className="inline-flex h-10 shrink-0 items-center gap-1 rounded-lg border border-zinc-300 bg-white px-2.5 text-sm text-zinc-800 hover:bg-zinc-50 disabled:opacity-50"
                       title="试听当前音色（优先云端神经语音）"
                     >
                       {mixTtsBusy ? (
@@ -1955,7 +1958,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                       {mixTtsBusy ? '合成' : mixTtsPlaying ? '停止' : '试听'}
                     </button>
                   </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <div className="flex min-h-[1.25rem] flex-wrap items-center gap-2">
                     <input
                       ref={mixCloneInputRef}
                       type="file"
@@ -1988,17 +1991,17 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                       上传样本 · 模拟音色
                     </button>
                     {mixCloneAudioName ? (
-                      <span className="text-[11px] text-zinc-500">已上传：{mixCloneAudioName}</span>
+                      <span className="truncate text-[11px] text-zinc-500">已上传：{mixCloneAudioName}</span>
                     ) : null}
                   </div>
                 </div>
-                <label className="flex min-w-[10rem] flex-1 flex-col gap-1 text-xs text-zinc-600">
+                <label className="flex flex-col gap-1 text-xs text-zinc-600">
                   <span>场景转场</span>
                   <select
                     value={mixTransitionMode}
                     disabled={anyBusy || guidanceBusy}
                     onChange={(e) => setMixTransitionMode(e.target.value)}
-                    className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
+                    className="h-10 rounded-lg border border-zinc-300 bg-white px-2 text-sm"
                   >
                     <option value="auto">
                       智能推断
@@ -2010,8 +2013,9 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                       </option>
                     ))}
                   </select>
+                  <span className="min-h-[1.25rem]" aria-hidden />
                 </label>
-                <p className="w-full text-[11px] leading-snug text-zinc-500">
+                <p className="col-span-full text-[11px] leading-snug text-zinc-500">
                   已上传素材 {mixMaterialPool.length} 个（视频 {jobs.filter((j) => !j.imageUrls?.length).length} · 图片{' '}
                   {imageItems.length}）
                   <span className="mt-1 block text-zinc-600">
