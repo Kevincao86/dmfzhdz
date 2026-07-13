@@ -122,7 +122,11 @@ export default function PrOrderScriptReviewPage() {
 
   useEffect(() => {
     void load()
-    const t = window.setInterval(() => void load({ silent: true }), 8000)
+    const tick = () => {
+      if (document.visibilityState !== 'visible') return
+      void load({ silent: true })
+    }
+    const t = window.setInterval(tick, 30_000)
     return () => window.clearInterval(t)
   }, [load])
 

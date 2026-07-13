@@ -226,7 +226,7 @@ export default function FormRelayPage() {
   const loadList = useCallback(async () => {
     setLoadingList(true)
     try {
-      const reg = await fetchMpRegistry({})
+      const reg = await fetchMpRegistry({ includePrOwned: true })
       const account = getAccount()
       const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
       const next: RelayRow[] = []

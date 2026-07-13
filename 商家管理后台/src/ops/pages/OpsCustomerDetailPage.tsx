@@ -5,14 +5,13 @@ import { cn } from '../../cn'
 import type { CustomerAccountStatus, OpsCustomer } from '../mockData'
 import { registryTenantToOpsCustomer } from '../mapRegistryTenant'
 import type { TenantUsageMetrics } from '../opsTenantUsageStats'
+import { loadMergedOpsCustomerTenants } from '../mergeOpsCustomerTenants'
 import { fetchRegistry, type RegistryTenant } from '../opsRegistryApi'
 import {
-  fetchSupabaseTenantsForOps,
   fetchTenantInsightsForOps,
   fetchTenantWalletLedgerForOps,
   type OpsTenantSupportSessionSummary,
   type OpsWalletLedgerRow,
-  supabaseRowsToRegistryTenants,
 } from '../supabaseTenantsApi'
 import { formatSupportRelayTime } from '../../lib/supportRelay'
 
@@ -49,25 +48,8 @@ function normMerchantName(name: string): string {
 }
 
 async function loadMergedTenants(): Promise<RegistryTenant[]> {
-  let regTenants: RegistryTenant[] = []
-  try {
-    const reg = await fetchRegistry()
-    regTenants = reg.tenants
-  } catch {
-    regTenants = []
-  }
-  let merged: RegistryTenant[] = [...regTenants]
-  const sb = await fetchSupabaseTenantsForOps()
-  if (sb.ok) {
-    const fromSb = supabaseRowsToRegistryTenants(sb.rows)
-    const loginKey = (login: string | undefined) => String(login ?? '').trim().toLowerCase()
-    const loginSet = new Set(fromSb.map((x) => loginKey(x.loginName)))
-    merged = [
-      ...fromSb,
-      ...regTenants.filter((t) => !loginSet.has(loginKey(t.loginName))),
-    ]
-  }
-  return merged
+  const r = await loadMergedOpsCustomerTenants()
+  return r.tenants
 }
 
 export default function OpsCustomerDetailPage() {

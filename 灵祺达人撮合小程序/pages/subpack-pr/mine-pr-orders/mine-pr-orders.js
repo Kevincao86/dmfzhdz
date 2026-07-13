@@ -471,8 +471,9 @@ Page({
           mpTargetedRecruit.isTargetedInvitePhaseEnded(row.mp),
       )
       .map((row) => row.mpOrderId)
-    if (!ids.length) return
+    if (!ids.length) return false
     await Promise.all(ids.map((id) => mpTargetedRecruitApi.finalizeIfNeeded(id).catch(() => null)))
+    return true
   },
   async load() {
     if (!api.hasApi()) {
@@ -517,11 +518,14 @@ Page({
         const mp = mpList.find((o) => o && o.id === item.mpOrderId)
         return mapRow(item, mp)
       })
-      await this.syncTargetedInvitePhases(rows)
-      const reg2 = await ops.fetchRegistry({ includePrOwned: true })
-      const mpList2 = reg2.mpRecruitmentOrders || []
+      const targetedSynced = await this.syncTargetedInvitePhases(rows)
+      let mpListFinal = mpList
+      if (targetedSynced) {
+        const reg2 = await ops.fetchRegistry({ includePrOwned: true, skipCache: true })
+        mpListFinal = reg2.mpRecruitmentOrders || []
+      }
       const rowsFinal = local.map((item) => {
-        const mp = mpList2.find((o) => o && o.id === item.mpOrderId)
+        const mp = mpListFinal.find((o) => o && o.id === item.mpOrderId)
         return mapRow(item, mp)
       })
       this.setData({

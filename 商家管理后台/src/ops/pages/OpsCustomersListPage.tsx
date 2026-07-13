@@ -7,6 +7,7 @@ import type { CustomerAccountStatus, OpsCustomer } from '../mockData'
 import { tenantsToCustomers } from '../mapRegistryTenant'
 import { postProvisionTenant } from '../provisionTenantApi'
 import { deleteOpsCustomer } from '../opsCustomerDeleteApi'
+import { loadMergedOpsCustomerTenants } from '../mergeOpsCustomerTenants'
 import { fetchRegistry, patchTenant, postManualTenant, type RegistryTenant } from '../opsRegistryApi'
 import { canOpsMasterDeleteCustomer, readOpsSession } from '../opsStaffAuth'
 import { useOpsModuleEdit } from '../useOpsModuleEdit'
@@ -15,7 +16,6 @@ import {
   patchSupabaseTenant,
   resetSupabaseTenantAuthPassword,
   supabaseOpsAvailableOnClient,
-  supabaseRowsToRegistryTenants,
 } from '../supabaseTenantsApi'
 import OpsPageHero from '../OpsPageHero'
 import OpsDeleteSmsConfirmModal from '../components/OpsDeleteSmsConfirmModal'
@@ -106,42 +106,46 @@ export default function OpsCustomersListPage() {
   const canDeleteCustomer = canOpsMasterDeleteCustomer(opsSession)
 
   const reload = useCallback(async () => {
-    let regTenants: RegistryTenant[] = []
-    try {
-      const reg = await fetchRegistry()
-      regTenants = reg.tenants
-      setSyncHint(null)
-    } catch {
-      regTenants = []
-      setSyncHint(
+    const r = await loadMergedOpsCustomerTenants()
+    const hints: string[] = []
+    if (!r.registryOk) {
+      hints.push(
         import.meta.env.DEV
           ? '无法读取注册表（请重启商家管理后台 dev，并确认项目根可写 .meoo-dev-sync）'
           : '本地注册表不可用（线上客户列表以 Supabase 为准；数据经 https://mofangdianai.com/erp-api/meoo-supabase-tenants-list 拉取，请确认 ECS auth-api 已启动）。',
       )
     }
-
-    let merged: RegistryTenant[] = [...regTenants]
-    const sb = await fetchSupabaseTenantsForOps()
-    if (sb.ok) {
-      const fromSb = supabaseRowsToRegistryTenants(sb.rows)
-      const loginKey = (login: string | undefined) => String(login ?? '').trim().toLowerCase()
-      const loginSet = new Set(fromSb.map((x) => loginKey(x.loginName)))
-      merged = [
-        ...fromSb,
-        ...regTenants.filter((t) => !loginSet.has(loginKey(t.loginName))),
-      ]
-    } else if (sb.error !== 'not_configured') {
-      const sbMsg = sb.hint ?? sb.detail ?? `Supabase 列表失败：${sb.error}`
-      // 勿用 prev ??：线上注册表失败时已写入 hint，会盖住 tenants API 真实报错（不便排查密钥/迁移）。
-      setSyncHint((prev) => (prev ? `${prev} | ${sbMsg}` : sbMsg))
+    if (!r.supabaseOk && r.supabaseError && r.supabaseError !== 'not_configured') {
+      const sbMsg = r.supabaseHint ?? r.supabaseDetail ?? `Supabase 列表失败：${r.supabaseError}`
+      hints.push(sbMsg)
     }
-    setTenants(merged)
+    setSyncHint(hints.length ? hints.join(' | ') : null)
+    setTenants(r.tenants)
   }, [])
 
   useEffect(() => {
-    void reload()
-    const t = window.setInterval(() => void reload(), 4000)
-    return () => window.clearInterval(t)
+    let reloadSeq = 0
+    let reloadInflight = false
+    const tick = () => {
+      if (document.visibilityState === 'hidden') return
+      if (reloadInflight) return
+      reloadInflight = true
+      const seq = ++reloadSeq
+      void reload().finally(() => {
+        if (seq === reloadSeq) reloadInflight = false
+      })
+    }
+    tick()
+    const onVis = () => {
+      if (document.visibilityState === 'visible') tick()
+    }
+    document.addEventListener('visibilitychange', onVis)
+    const t = window.setInterval(tick, 30_000)
+    return () => {
+      reloadSeq += 1
+      document.removeEventListener('visibilitychange', onVis)
+      window.clearInterval(t)
+    }
   }, [reload])
 
   useEffect(() => {
