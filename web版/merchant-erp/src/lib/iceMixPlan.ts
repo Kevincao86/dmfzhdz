@@ -23,15 +23,51 @@ export type IceMixMaterialSlot = {
   label: string
 }
 
+/** 单条主推商品（口播规划用） */
+export type MixPromoItem = {
+  mainProduct: string
+  originalPrice: string
+  salePrice: string
+}
+
 /** 混剪主推商品与价格（用户手填，供 AI 规划口播） */
 export type MixPromoContext = {
   mainProduct?: string
   originalPrice?: string
   salePrice?: string
+  /** 多条主推品；规划口播时首条用于报价，其余可在中段口播点名 */
+  items?: MixPromoItem[]
+}
+
+function trimMixPromoItem(item: MixPromoItem): MixPromoItem {
+  return {
+    mainProduct: item.mainProduct.trim(),
+    originalPrice: item.originalPrice.trim(),
+    salePrice: item.salePrice.trim(),
+  }
+}
+
+function isMixPromoItemFilled(item: MixPromoItem): boolean {
+  const t = trimMixPromoItem(item)
+  return Boolean(t.mainProduct || t.originalPrice || t.salePrice)
+}
+
+/** 从面板多条主推品归一化为规划上下文（首条为主报价品） */
+export function mixPromoContextFromItems(items: MixPromoItem[]): MixPromoContext {
+  const filled = items.map(trimMixPromoItem).filter(isMixPromoItemFilled)
+  if (filled.length === 0) return {}
+  const first = filled[0]!
+  return {
+    mainProduct: first.mainProduct || undefined,
+    originalPrice: first.originalPrice || undefined,
+    salePrice: first.salePrice || undefined,
+    items: filled,
+  }
 }
 
 export function isMixPromoFilled(promo?: MixPromoContext): boolean {
   if (!promo) return false
+  if (promo.items?.some(isMixPromoItemFilled)) return true
   return Boolean(
     promo.mainProduct?.trim() || promo.originalPrice?.trim() || promo.salePrice?.trim(),
   )
@@ -39,16 +75,37 @@ export function isMixPromoFilled(promo?: MixPromoContext): boolean {
 
 export function formatMixPromoPlanningBlock(promo?: MixPromoContext): string {
   if (!isMixPromoFilled(promo)) return ''
-  const product = promo!.mainProduct?.trim() || '（未填）'
-  const orig = promo!.originalPrice?.trim() || '（未填）'
-  const sale = promo!.salePrice?.trim() || '（未填）'
+  const items =
+    promo!.items?.filter(isMixPromoItemFilled) ??
+    (promo!.mainProduct?.trim() || promo!.originalPrice?.trim() || promo!.salePrice?.trim()
+      ? [
+          {
+            mainProduct: promo!.mainProduct?.trim() ?? '',
+            originalPrice: promo!.originalPrice?.trim() ?? '',
+            salePrice: promo!.salePrice?.trim() ?? '',
+          },
+        ]
+      : [])
+  const productLines =
+    items.length > 1
+      ? items
+          .map((it, i) => {
+            const product = it.mainProduct || '（未填）'
+            const orig = it.originalPrice || '（未填）'
+            const sale = it.salePrice || '（未填）'
+            return `${i + 1}. ${product} — 原价 ${orig} 元，优惠价 ${sale} 元`
+          })
+          .join('\n')
+      : null
+  const first = items[0]!
+  const product = first.mainProduct || '（未填）'
+  const orig = first.originalPrice || '（未填）'
+  const sale = first.salePrice || '（未填）'
   return `【主推商品与价格（须写入口播）】
-主推商品：${product}
-原价：${orig} 元
-优惠价：${sale} 元
+${productLines ?? `主推商品：${product}\n原价：${orig} 元\n优惠价：${sale} 元`}
 口播要求（写死，禁止违反）：
-- 中段恰好 1 段口播自然带出主推商品名（不含原价/优惠价数字）
-- 最后 1 段口播强调「原价 vs 优惠价」划算（全片仅此 1 段报价）
+- 中段恰好 1 段口播自然带出主推商品名（不含原价/优惠价数字）${items.length > 1 ? '；若有多个主推品可分散在不同中段，但每个品只提 1 次' : ''}
+- 最后 1 段口播强调「原价 vs 优惠价」划算（全片仅此 1 段报价，以首条主推品价格为准）
 - 禁止相邻两段或任意两段口播重复同一报价句；禁止多段复读「原价…优惠价…」`
 }
 
