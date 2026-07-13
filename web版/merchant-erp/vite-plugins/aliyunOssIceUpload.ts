@@ -314,6 +314,130 @@ export async function ensureIceMixSegmentMediaUrls(
   return { ok: true, segments: out }
 }
 
+async function mirrorExternalAudioToIceOss(
+  cfg: AliyunIceConfig,
+  env: Record<string, string | undefined>,
+  rawUrl: string,
+): Promise<{ ok: true; timelineUrl: string } | { ok: false; message: string }> {
+  const url = String(rawUrl || '').trim()
+  if (!/^https?:\/\//i.test(url)) {
+    return { ok: false, message: 'BGM 地址无效' }
+  }
+  if (isLocalOrPrivateUrl(url)) {
+    return { ok: false, message: 'BGM 为内网地址，请重新上传' }
+  }
+  try {
+    const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(90_000) })
+    if (!res.ok) {
+      return { ok: false, message: `BGM 无法下载（HTTP ${res.status}），请换一首或重新上传` }
+    }
+    const ct = (res.headers.get('content-type') || 'audio/mpeg').split(';')[0]!.trim()
+    const buf = Buffer.from(await res.arrayBuffer())
+    if (!buf.length) return { ok: false, message: 'BGM 文件内容为空' }
+    if (buf.length > 20 * 1024 * 1024) {
+      return { ok: false, message: 'BGM 超过 20MB，请压缩后重新上传' }
+    }
+    const ext = /\.wav(\?|$)/i.test(url) ? '.wav' : /\.m4a(\?|$)/i.test(url) ? '.m4a' : '.mp3'
+    const put = await putIceSourceObject(cfg, env, {
+      fileName: `ice-bgm-${Date.now()}${ext}`,
+      contentType: /^audio\//i.test(ct) ? ct : 'audio/mpeg',
+      buffer: buf,
+    })
+    if (!put.ok) return put
+    return { ok: true, timelineUrl: put.timelineUrl ?? toIceTimelineOssUrl(put.mediaUrl) }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, message: `BGM 转存失败：${msg}` }
+  }
+}
+
+async function normalizeIceSmartBatchMediaUrl(
+  cfg: AliyunIceConfig,
+  env: Record<string, string | undefined>,
+  material: { kind: 'video' | 'image'; mediaUrl: string; label?: string },
+  index: number,
+  urlCache: Map<string, string>,
+): Promise<{ ok: true; mediaUrl: string } | { ok: false; message: string }> {
+  const rawKey = String(material.mediaUrl || '').trim()
+  let url = toIceTimelineOssUrl(rawKey)
+  if (!url) return { ok: false, message: `第 ${index + 1} 条素材地址为空` }
+  const cached = urlCache.get(rawKey) ?? urlCache.get(url)
+  if (cached) return { ok: true, mediaUrl: cached }
+
+  const ossPrefix = resolveIceOssUploadPrefix(cfg, env)
+  if (!ossPrefix) {
+    return { ok: false, message: '未配置 OSS 成片前缀，智能成片须使用本地上传素材。' }
+  }
+
+  if (urlOnIceOssBucket(url, ossPrefix) || isIceOssMediaUrl(url)) {
+    urlCache.set(rawKey, url)
+    urlCache.set(url, url)
+    return { ok: true, mediaUrl: url }
+  }
+
+  if (material.kind === 'image') {
+    const img = await ensureIcePublicImageUrls(cfg, env, [url])
+    if (!img.ok) return { ok: false, message: img.message.replace('第 1 张', `第 ${index + 1} 条图片`) }
+    const normalized = img.urls[0]!
+    urlCache.set(rawKey, normalized)
+    urlCache.set(normalized, normalized)
+    return { ok: true, mediaUrl: normalized }
+  }
+
+  const mirrored = await mirrorExternalVideoToIceOss(cfg, env, url, index)
+  if (!mirrored.ok) return mirrored
+  urlCache.set(rawKey, mirrored.timelineUrl)
+  urlCache.set(mirrored.timelineUrl, mirrored.timelineUrl)
+  return { ok: true, mediaUrl: mirrored.timelineUrl }
+}
+
+/** 智能成片提交前：素材须为 IMS 可读的 OSS 无签名直链（与混剪一致） */
+export async function ensureIceSmartBatchMaterialUrls(
+  cfg: AliyunIceConfig,
+  env: Record<string, string | undefined>,
+  materials: Array<{ kind: 'video' | 'image'; mediaUrl: string; label?: string }>,
+): Promise<
+  | { ok: true; materials: Array<{ kind: 'video' | 'image'; mediaUrl: string; label?: string }> }
+  | { ok: false; message: string }
+> {
+  if (materials.length < 2) {
+    return { ok: false, message: '智能成片至少需要 2 条素材' }
+  }
+  const urlCache = new Map<string, string>()
+  const out: Array<{ kind: 'video' | 'image'; mediaUrl: string; label?: string }> = []
+  for (let i = 0; i < materials.length; i++) {
+    const m = materials[i]!
+    const normalized = await normalizeIceSmartBatchMediaUrl(cfg, env, m, i, urlCache)
+    if (!normalized.ok) return normalized
+    out.push({ ...m, mediaUrl: normalized.mediaUrl })
+  }
+  return { ok: true, materials: out }
+}
+
+/** BGM 须写入 ICE 绑定 Bucket；cs/外链自动转存 OSS */
+export async function ensureIceSmartBatchBgmUrl(
+  cfg: AliyunIceConfig,
+  env: Record<string, string | undefined>,
+  rawUrl?: string,
+): Promise<{ ok: true; url?: string } | { ok: false; message: string }> {
+  const url = String(rawUrl ?? '').trim()
+  if (!url) return { ok: true, url: undefined }
+
+  const ossPrefix = resolveIceOssUploadPrefix(cfg, env)
+  if (!ossPrefix) {
+    return { ok: false, message: '未配置 OSS 成片前缀，无法使用背景音乐。' }
+  }
+
+  const timeline = toIceTimelineOssUrl(url)
+  if (urlOnIceOssBucket(timeline, ossPrefix) || isIceOssMediaUrl(timeline)) {
+    return { ok: true, url: timeline }
+  }
+
+  const mirrored = await mirrorExternalAudioToIceOss(cfg, env, url)
+  if (!mirrored.ok) return mirrored
+  return { ok: true, url: mirrored.timelineUrl }
+}
+
 function isOssBucketAclError(msg: string): boolean {
   return /bucket acl|accessdenied|access denied|no right to access/i.test(msg)
 }

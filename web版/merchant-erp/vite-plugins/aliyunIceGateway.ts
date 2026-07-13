@@ -28,7 +28,8 @@ import {
 } from './aliyunIceCore.js'
 import { iceGetSmartBatchJob, iceSubmitSmartBatchJob } from './aliyunIceSmartBatch.js'
 import { describeIceUploadBucketSelection, iceOssUploadAvailable, parseIceMixPipelineSegments } from './aliyunOssIceParse.js'
-import { evaluateIceOutputReady, fetchIceOutputObject } from './aliyunOssIceUpload.js'
+import { evaluateIceOutputReady, fetchIceOutputObject, ensureIceSmartBatchMaterialUrls, ensureIceSmartBatchBgmUrl } from './aliyunOssIceUpload.js'
+import { resolveIceMixBgmUrl, ICE_MIX_BGM_NONE_ID } from '../src/lib/iceMixBgmPresets.js'
 
 function iceJobDownloadProxyPath(jobId: string, inline?: boolean): string {
   const q = new URLSearchParams({ id: jobId })
@@ -771,10 +772,43 @@ export async function handleAliyunIceRoutes(input: {
     void (typeof parsed.mixVoiceCloneBase64 === 'string' ? parsed.mixVoiceCloneBase64.trim() : undefined)
     const transitionMode = String(parsed.transitionMode ?? parsed.effectId ?? 'auto').trim() || 'auto'
     const bgmPresetId = String(parsed.bgmPresetId ?? parsed.mixBgmPresetId ?? '').trim()
-    const mixBgmUrl = String(parsed.mixBgmUrl ?? '').trim() || undefined
+    let mixBgmUrl = String(parsed.mixBgmUrl ?? '').trim() || undefined
+
+    if (materials.length < 2) {
+      json(res, 400, { ok: false, message: '智能成片至少需要 2 条素材', step: 'validate' })
+      return true
+    }
+
+    const normalizedMaterials = await ensureIceSmartBatchMaterialUrls(
+      cfg!,
+      rawEnv as Record<string, string | undefined>,
+      materials as Array<{ kind: 'video' | 'image'; mediaUrl: string; label?: string }>,
+    )
+    if (!normalizedMaterials.ok) {
+      json(res, 400, { ok: false, message: normalizedMaterials.message, step: 'normalize_smart_batch_media' })
+      return true
+    }
+
+    if (bgmPresetId && bgmPresetId !== ICE_MIX_BGM_NONE_ID) {
+      const rawBgm = resolveIceMixBgmUrl({ presetId: bgmPresetId, customUrl: mixBgmUrl })
+      if (rawBgm) {
+        const bgmNorm = await ensureIceSmartBatchBgmUrl(
+          cfg!,
+          rawEnv as Record<string, string | undefined>,
+          rawBgm,
+        )
+        if (!bgmNorm.ok) {
+          json(res, 400, { ok: false, message: bgmNorm.message, step: 'normalize_smart_batch_bgm' })
+          return true
+        }
+        mixBgmUrl = bgmNorm.url
+      }
+    } else {
+      mixBgmUrl = undefined
+    }
 
     const out = await iceSubmitSmartBatchJob(cfg!, {
-      materials: materials as Array<{ kind: 'video' | 'image'; mediaUrl: string; label?: string }>,
+      materials: normalizedMaterials.materials,
       scriptRows: scriptRows as Array<{
         timeRange?: string
         visual?: string
