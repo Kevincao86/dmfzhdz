@@ -1,6 +1,6 @@
 import { readMpSessionToken } from '../lib/merchantApiAuth'
 import { readMpBillingRoleHint } from '../lib/mpBillingRoleHint'
-import { MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE } from '../lib/mpPointsEconomics'
+import { MP_POINTS_BRIEF_PER_USE, MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE } from '../lib/mpPointsEconomics'
 import { merchantApiFetchUrls } from '../lib/merchantErpApiBase'
 import { checkErpPointsAffordable, spendErpPointsForUsage } from './tenantBillingClient'
 
@@ -121,6 +121,52 @@ export async function spendMpBriefPoints(opts?: {
     pointsCharged: Math.max(0, Math.floor(Number(data.pointsCharged) || 0)),
     balance: Math.max(0, Math.floor(Number(data.mpAiPointsBalance) || 0)),
     already: data.already === true,
+  }
+}
+
+/** 爆款 Brief 生成前校验积分：星选 mp 会话走 mp-auth；CS/FWS 商家 Supabase 登录走租户 billing */
+export async function checkBriefPointsAffordable(): Promise<MpBriefAffordResult> {
+  if (readMpSessionToken()) {
+    return checkMpBriefPointsAffordable()
+  }
+  const required = MP_POINTS_BRIEF_PER_USE
+  try {
+    const r = await checkErpPointsAffordable({ kind: 'brief' })
+    const balance = Math.max(
+      0,
+      Math.floor(Number(r.balance) || Number(r.packageBalance) + Number(r.rechargeBalance) || 0),
+    )
+    return { ok: true, balance, required }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    if (/请先登录|未登录|login/i.test(msg)) {
+      return { ok: false, message: '请先登录后再使用 Brief 功能', error: 'login_required' }
+    }
+    return {
+      ok: false,
+      message: msg || '积分不足',
+      error: 'insufficient_points',
+    }
+  }
+}
+
+/** 爆款 Brief 生成成功后扣减：星选 mp 会话走 mp-auth；CS/FWS 商家走租户 billing */
+export async function spendBriefPoints(opts?: {
+  idempotencyKey?: string
+  note?: string
+}): Promise<MpBriefPointsSpendResult | null> {
+  if (readMpSessionToken()) {
+    return spendMpBriefPoints(opts)
+  }
+  const r = await spendErpPointsForUsage({
+    kind: 'brief',
+    idempotencyKey: opts?.idempotencyKey?.trim() || undefined,
+    note: opts?.note?.trim() || undefined,
+  })
+  return {
+    pointsCharged: Math.max(0, Math.floor(Number(r.pointsCharged) || 0)),
+    balance: Math.max(0, Math.floor(Number(r.balance) || 0)),
+    already: r.already === true,
   }
 }
 
