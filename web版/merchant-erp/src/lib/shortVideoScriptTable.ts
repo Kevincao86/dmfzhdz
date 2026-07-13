@@ -864,7 +864,7 @@ export function isMixDialogueMetaInstruction(text: string): boolean {
   if (/前往门店体验/.test(raw) && !/[我你您来走认准进]/.test(raw)) return true
   if (
     /[「"'『][^」"'』]{2,16}[」"'』]的(?:特色|卖点|亮点|优势)/.test(raw) &&
-    !/[我你您来这]/test(raw) &&
+    !/[我你您来这]/.test(raw) &&
     /(?:引入|开篇|开场|并通过|展示|突出|旨在|说明)/.test(raw)
   ) {
     return true
