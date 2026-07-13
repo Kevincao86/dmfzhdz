@@ -71,6 +71,7 @@ import {
   assignMixMaterialSlots,
   buildNarrativeMatchedMixCoverage,
   finalizeMixScriptRows,
+  formatMixPromoPlanningBlock,
   ensureMixScriptRowsCoverTarget,
   collectMixNarrationText,
   expandMixRowsForMaterialPool,
@@ -82,6 +83,7 @@ import {
   MIX_TARGET_TOTAL_OPTIONS,
   normalizeMixMaterialSlots,
   type IceMixMaterialSlot,
+  type MixPromoContext,
 } from '../lib/iceMixPlan'
 import {
   defaultScriptRows,
@@ -265,6 +267,17 @@ export function ShortVideoIceBatchPanel(_props: Props) {
   const [dispatchedOrderId, setDispatchedOrderId] = useState<string | null>(null)
 
   const [mixGuidance, setMixGuidance] = useState('')
+  const [mixMainProduct, setMixMainProduct] = useState('')
+  const [mixOriginalPrice, setMixOriginalPrice] = useState('')
+  const [mixSalePrice, setMixSalePrice] = useState('')
+  const mixPromo = useMemo(
+    (): MixPromoContext => ({
+      mainProduct: mixMainProduct.trim() || undefined,
+      originalPrice: mixOriginalPrice.trim() || undefined,
+      salePrice: mixSalePrice.trim() || undefined,
+    }),
+    [mixMainProduct, mixOriginalPrice, mixSalePrice],
+  )
   const [mixTargetSec, setMixTargetSec] = useState<number>(20)
   const [scriptRows, setScriptRows] = useState<ShortVideoScriptRow[]>(() =>
     defaultScriptRows(
@@ -272,9 +285,12 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       MIX_DEFAULT_SEGMENT_SEC,
     ),
   )
-  const applyScriptRows = useCallback((rows: ShortVideoScriptRow[]) => {
-    setScriptRows(finalizeMixScriptRows(rows))
-  }, [])
+  const applyScriptRows = useCallback(
+    (rows: ShortVideoScriptRow[]) => {
+      setScriptRows(finalizeMixScriptRows(rows, '探店实拍，值得期待', mixPromo))
+    },
+    [mixPromo],
+  )
   const [materialSlots, setMaterialSlots] = useState<number[]>([])
   const [mixMaterialProfiles, setMixMaterialProfiles] = useState<IceMixMaterialProfile[]>([])
   const [planBusy, setPlanBusy] = useState(false)
@@ -914,6 +930,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
           materials: mixMaterialPool,
           materialProfiles: mixMaterialProfiles,
           targetTotalSec: mixTargetSec,
+          promo: mixPromo,
           onProgress: (msg) => setHint(msg),
         })
         if (narrative.ok) {
@@ -941,7 +958,20 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     const materialHint = mixMaterialPool
       .map((m, i) => `素材${i + 1}：${m.label}（${m.kind === 'video' ? '视频' : '图片'}）`)
       .join('\n')
-    const plannerInput = `${draft}\n\n【混剪素材 ${poolLen} 条】\n${materialHint}\n\n规划要求：\n- 理解指导文案叙事，输出 ${mixTargetSegmentCount(mixTargetSec, MIX_DEFAULT_SEGMENT_SEC)} 段分镜（匹配目标时长 ${mixTargetSec} 秒，非每条素材一段）\n- 有门头/门店素材时：门头指引(开) → 产品/套餐(中) → 结束语(尾)，或产品钩子(开) → 门头指引(尾前) → 结束语\n- 每段 visual、dialogue 均须非空；dialogue 仅为可朗读口播短句，禁止写入指导文案摘要/提示语（如「这是一支以…为主题的短视频」）或「核心卖点」「叙事节奏」等标签；口播须与画面语义对应\n- 时间段从 0 连续覆盖至 ${mixTargetSec} 秒`
+    const promoBlock = formatMixPromoPlanningBlock(mixPromo)
+    const plannerInput = [
+      draft,
+      promoBlock,
+      `【混剪素材 ${poolLen} 条】\n${materialHint}`,
+      `规划要求：
+- 理解指导文案叙事，输出 ${mixTargetSegmentCount(mixTargetSec, MIX_DEFAULT_SEGMENT_SEC)} 段分镜（匹配目标时长 ${mixTargetSec} 秒，非每条素材一段）
+- 有门头/门店素材时：门头指引(开) → 产品/套餐(中) → 结束语(尾)，或产品钩子(开) → 门头指引(尾前) → 结束语
+- 每段 visual、dialogue 均须非空；dialogue 仅为可朗读口播短句，禁止写入指导文案摘要/提示语（如「这是一支以…为主题的短视频」）或「核心卖点」「叙事节奏」等标签；口播须与画面语义对应
+- 各段口播不得完全相同；若已填主推商品/价格，须在合适段位写入口播
+- 时间段从 0 连续覆盖至 ${mixTargetSec} 秒`,
+    ]
+      .filter(Boolean)
+      .join('\n\n')
     try {
       const r = await planShortVideoScriptFromGuidance(plannerInput, {
         targetTotalSec: mixTargetSec,
@@ -979,9 +1009,9 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       let plannedRows = coverage.rows
       try {
         setHint('AI 检核口播文稿（剔除提示语、对齐画面）…')
-        plannedRows = await reviewMixScriptRowsWithAi(plannedRows, setHint)
+        plannedRows = await reviewMixScriptRowsWithAi(plannedRows, setHint, mixPromo)
       } catch {
-        plannedRows = finalizeMixScriptRows(plannedRows)
+        plannedRows = finalizeMixScriptRows(plannedRows, '探店实拍，值得期待', mixPromo)
       }
       applyScriptRows(plannedRows)
       setMaterialSlots(coverage.slots)
@@ -994,7 +1024,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     } finally {
       setPlanBusy(false)
     }
-  }, [mixGuidance, mixMaterialPool, mixMaterialProfiles, mixTargetSec])
+  }, [mixGuidance, mixMaterialPool, mixMaterialProfiles, mixTargetSec, mixPromo])
 
   const addImageUrlsFromText = useCallback(() => {
     const urls = parseImageUrlLines(imageUrlText)
@@ -2076,6 +2106,46 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                   </span>
                 </p>
               </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="flex min-w-0 flex-col gap-1.5 text-xs text-zinc-600">
+                  <span className="font-medium text-zinc-700">主推商品</span>
+                  <input
+                    type="text"
+                    value={mixMainProduct}
+                    disabled={anyBusy || guidanceBusy}
+                    onChange={(e) => setMixMainProduct(e.target.value)}
+                    placeholder="如：T骨牛排套餐"
+                    className="h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm outline-none ring-orange-500/25 transition focus-visible:border-orange-300 focus-visible:ring-2"
+                  />
+                </label>
+                <label className="flex min-w-0 flex-col gap-1.5 text-xs text-zinc-600">
+                  <span className="font-medium text-zinc-700">原价（元）</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={mixOriginalPrice}
+                    disabled={anyBusy || guidanceBusy}
+                    onChange={(e) => setMixOriginalPrice(e.target.value)}
+                    placeholder="如：198"
+                    className="h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm outline-none ring-orange-500/25 transition focus-visible:border-orange-300 focus-visible:ring-2"
+                  />
+                </label>
+                <label className="flex min-w-0 flex-col gap-1.5 text-xs text-zinc-600">
+                  <span className="font-medium text-zinc-700">优惠价（元）</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={mixSalePrice}
+                    disabled={anyBusy || guidanceBusy}
+                    onChange={(e) => setMixSalePrice(e.target.value)}
+                    placeholder="如：128"
+                    className="h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm outline-none ring-orange-500/25 transition focus-visible:border-orange-300 focus-visible:ring-2"
+                  />
+                </label>
+              </div>
+              <p className="text-[11px] leading-snug text-zinc-500">
+                填写主推商品与价格后，「AI 规划分镜」会在对应镜头口播中带出商品名与价格划算信息；各段口播不会重复同一句。
+              </p>
               <textarea
                 spellCheck={false}
                 value={mixGuidance}

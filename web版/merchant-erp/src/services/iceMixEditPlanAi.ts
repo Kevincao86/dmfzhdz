@@ -25,6 +25,8 @@ import {
   isMixMaterialPromotionRelevant,
   mixStorefrontGuideDialogue,
   finalizeMixScriptRows,
+  formatMixPromoPlanningBlock,
+  type MixPromoContext,
 } from '../lib/iceMixPlan'
 import {
   clampMixSourceInSec,
@@ -673,8 +675,9 @@ const NARRATIVE_TEXT_PLAN_SYSTEM = `你是专业短视频混剪导演（探店/�
    模式B：产品/套餐卖点钩子(开场) → 制作/试吃体验(中段) → 门头/到店指引(倒数第二段) → 结束语(收尾)
 4. 每段 visual（画面描述，给剪辑看）与 dialogue（口播台词，给观众听）语义一致
 5. dialogue 必须是可直接 TTS 朗读的第一人称/现场旁白短句（每段 12～28 字），禁止指导文案摘要与提示语（如「这是一支以…为主题的短视频」「开篇以门头…引入」「最后以…收尾，结合口播强调…引导用户」）；禁止占位符；禁止「核心卖点」「叙事节奏」「目标受众」等编导标签；禁止第三人称说明「他们注重…」；禁止照搬指导文案整段
-6. visual 写该段画面内容；dialogue 写该段旁白，须与 visual 同一段画面匹配（门头段只讲到店指引/门店信息）
-7. segmentIndex 从 0 连续递增，表示成片时间轴顺序
+6. 各段 dialogue 不得完全相同；若用户提供主推商品/原价/优惠价，须在对应画面段位自然写入口播（产品镜头带商品名，收尾 1～2 段强调价格划算）
+7. visual 写该段画面内容；dialogue 写该段旁白，须与 visual 同一段画面匹配（门头段只讲到店指引/门店信息）
+8. segmentIndex 从 0 连续递增，表示成片时间轴顺序
 
 只输出 JSON 对象，无 markdown：
 {"segments":[{"segmentIndex":0,"materialIndex":5,"visual":"门店门头…","dialogue":"走进这家…"},...]}`
@@ -700,11 +703,13 @@ function dialogueLinesFromGuidanceText(guidance: string): string[] {
 function normalizeNarrativeSegmentDialogues(
   segments: MixNarrativeSegment[],
   guidance: string,
+  promo?: MixPromoContext,
 ): MixNarrativeSegment[] {
   const guidanceLines = dialogueLinesFromGuidance(guidance).filter(
     (l) => !isMixDialogueMetaInstruction(l),
   )
   const hook = pickMixDialogueHook(guidance, '探店好物推荐')
+  const total = segments.length
   return segments.map((s, i) => ({
     ...s,
     dialogue: resolveMixSegmentDialogue({
@@ -713,6 +718,8 @@ function normalizeNarrativeSegmentDialogues(
       guidanceLines,
       lineIndex: i,
       hook,
+      totalRows: total,
+      promo,
     }),
   }))
 }
@@ -832,6 +839,7 @@ export function ensureFullMaterialNarrativeCoverage(
 function narrativeSegmentsToRows(
   segments: MixNarrativeSegment[],
   targetTotalSec: number,
+  promo?: MixPromoContext,
 ): ShortVideoScriptRow[] {
   const total = Math.min(120, Math.max(5, Math.ceil(targetTotalSec)))
   const plan = planLongformAllFiveSecondDurations(total)
@@ -839,10 +847,11 @@ function narrativeSegmentsToRows(
   const ranges = scriptTimeRangesFromDurationPlan(plan)
   const padded: MixNarrativeSegment[] = [...segments]
   while (padded.length < targetCount) {
-    const prev = padded[padded.length - 1]!
+    const src = segments[padded.length % Math.max(1, segments.length)]!
     padded.push({
-      ...prev,
+      ...src,
       segmentIndex: padded.length,
+      dialogue: '',
     })
   }
   const rows = padded.slice(0, targetCount).map((s, i) => ({
@@ -850,7 +859,7 @@ function narrativeSegmentsToRows(
     visual: s.visual.trim(),
     dialogue: s.dialogue.trim(),
   }))
-  return finalizeMixScriptRows(ensureSequentialMixScriptRows(rows, total))
+  return finalizeMixScriptRows(ensureSequentialMixScriptRows(rows, total), '探店实拍，值得期待', promo)
 }
 
 function narrativeSegmentsToDecisions(segments: MixNarrativeSegment[]): MixEditSegmentDecision[] {
@@ -867,6 +876,7 @@ async function tryTextNarrativePlan(opts: {
   materials: IceMixMaterialSlot[]
   profiles: IceMixMaterialProfile[]
   targetSegmentCount: number
+  promo?: MixPromoContext
 }): Promise<MixNarrativeSegment[] | null> {
   const matCount = opts.materials.length
   const k = opts.targetSegmentCount
@@ -875,8 +885,16 @@ async function tryTextNarrativePlan(opts: {
   const patternHint = hasStore
     ? '检测到门头/门店类素材，优先采用模式A（门头开场）'
     : '可采用模式B（产品钩子开场，收尾前补门店指引）'
+  const promoBlock = formatMixPromoPlanningBlock(opts.promo)
 
-  const userBlock = `【指导文案】\n${opts.guidance.trim()}\n\n【素材画面库 共 ${matCount} 条】\n${profileBlock}\n\n【成片要求】\n- 输出恰好 ${k} 段分镜（对应目标时长，每段约 5 秒）\n- 从 ${matCount} 条素材中各选最匹配的 ${k} 条（每条素材最多用 1 次）\n- ${patternHint}\n\n请输出 ${k} 段叙事分镜 JSON。`
+  const userBlock = [
+    `【指导文案】\n${opts.guidance.trim()}`,
+    promoBlock,
+    `【素材画面库 共 ${matCount} 条】\n${profileBlock}`,
+    `【成片要求】\n- 输出恰好 ${k} 段分镜（对应目标时长，每段约 5 秒）\n- 从 ${matCount} 条素材中各选最匹配的 ${k} 条（每条素材最多用 1 次）\n- ${patternHint}\n- 各段口播不得重复同一句\n\n请输出 ${k} 段叙事分镜 JSON。`,
+  ]
+    .filter(Boolean)
+    .join('\n\n')
 
   const providers: Array<'doubao' | 'qwen' | 'tokenmix'> = ['doubao', 'qwen', 'tokenmix']
   for (const provider of providers) {
@@ -1089,6 +1107,7 @@ export async function planMixNarrativeFromVision(opts: {
   materials: IceMixMaterialSlot[]
   materialProfiles: IceMixMaterialProfile[]
   targetTotalSec: number
+  promo?: MixPromoContext
   onProgress?: (msg: string) => void
 }): Promise<
   | {
@@ -1132,6 +1151,7 @@ export async function planMixNarrativeFromVision(opts: {
     materials,
     profiles: profileList,
     targetSegmentCount,
+    promo: opts.promo,
   })
 
   if (!segments) {
@@ -1154,7 +1174,7 @@ export async function planMixNarrativeFromVision(opts: {
     5,
   )
 
-  segments = normalizeNarrativeSegmentDialogues(segments, guidance)
+  segments = normalizeNarrativeSegmentDialogues(segments, guidance, opts.promo)
 
   opts.onProgress?.('密集采样素材画面，确定各段截取点…')
   try {
@@ -1226,12 +1246,12 @@ export async function planMixNarrativeFromVision(opts: {
     }
   }
 
-  const rows = narrativeSegmentsToRows(segments, opts.targetTotalSec)
+  const rows = narrativeSegmentsToRows(segments, opts.targetTotalSec, opts.promo)
   let reviewedRows = rows
   try {
-    reviewedRows = await reviewMixScriptRowsWithAi(rows, opts.onProgress)
+    reviewedRows = await reviewMixScriptRowsWithAi(rows, opts.onProgress, opts.promo)
   } catch {
-    reviewedRows = finalizeMixScriptRows(rows)
+    reviewedRows = finalizeMixScriptRows(rows, '探店实拍，值得期待', opts.promo)
   }
   const decisions = narrativeSegmentsToDecisions(segments)
   const materialSlots = segments.map((s) => s.materialIndex)
