@@ -263,15 +263,13 @@ function TalentApplicationsPage() {
   }
 
   async function reloadApps() {
-    try {
-      const { syncClientStateWithServer } = await import('../lib/mpAccountClientSync')
-      await syncClientStateWithServer().catch(() => null)
-    } catch {
-      /* ignore */
-    }
     const local = readApplications()
     try {
-      const reg = await fetchRegistryAndReconcileApplications({ includeLocalContext: true })
+      const { syncClientStateWithServer } = await import('../lib/mpAccountClientSync')
+      const [, reg] = await Promise.all([
+        syncClientStateWithServer().catch(() => null),
+        fetchRegistryAndReconcileApplications({ includeLocalContext: true }),
+      ])
       const localAfter = readApplications()
       const mpList = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<string, unknown>[]
       const enriched: EnrichedApplication[] = localAfter.map((a) => {

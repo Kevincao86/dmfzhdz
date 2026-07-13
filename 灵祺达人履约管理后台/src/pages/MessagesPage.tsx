@@ -166,7 +166,7 @@ export default function MessagesPage() {
         let merged = readAllNotificationRows()
         let reg: Record<string, unknown> | null = null
         try {
-          reg = (await fetchMpRegistry({ scope: 'full' })) as Record<string, unknown>
+          reg = (await fetchMpRegistry({ includeLocalContext: true })) as Record<string, unknown>
         } catch {
           reg = registryForChatRef.current
         }

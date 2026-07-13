@@ -12,7 +12,9 @@ import {
   loadMpHallRegistryPayload,
   loadTalentInboxForMpSession,
   resolvePublisherDisplayForMpOrder,
+  slimMpRecruitmentOrdersForHallList,
 } from '../src/lib/mpHallRegistryCore.js'
+import type { RegistryMpRecruitmentOrder } from '../src/lib/opsRegistryTypes.js'
 import {
   accountToClientPayload,
   accountPayloadWithMemberExtras,
@@ -570,6 +572,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         slimPrListApplicants: includeAllPrOwned && includeMpOrderIds.length === 0,
         includeOnly,
       })
+      if (
+        includeMpOrderIds.length === 0 &&
+        !includeOnly &&
+        Array.isArray(payload.mpRecruitmentOrders)
+      ) {
+        payload.mpRecruitmentOrders = slimMpRecruitmentOrdersForHallList(
+          payload.mpRecruitmentOrders as RegistryMpRecruitmentOrder[],
+        )
+      }
       sendJson(res, 200, { ok: true, ...payload })
       return
     }

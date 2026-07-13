@@ -86,9 +86,20 @@ async function loadHallList(page) {
 
   page.setData({ loading: true, err: '' })
 
+  const cached = registryCache.load({ allowStale: true })
+  if (cached && cached.data && (cached.data.mpRecruitmentOrders || []).length) {
+    try {
+      page._lastHallRegistry = cached.data
+      applyRows(mapRegistryToRows(cached.data))
+    } catch (e) {
+      console.warn('[hallLoad] stale cache render failed', e)
+    }
+  }
+
   try {
     const reg = await ops.fetchRegistry()
     if (page._hallLoadSeq !== seq) return
+    page._lastHallRegistry = reg
     applyRows(mapRegistryToRows(reg))
   } catch (e) {
     if (page._hallLoadSeq !== seq) return

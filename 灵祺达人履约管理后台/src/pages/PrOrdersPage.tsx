@@ -214,8 +214,10 @@ export default function PrOrdersPage() {
   async function loadPublished() {
     setErr('')
     try {
-      await syncClientStateWithServer().catch(() => null)
-      const reg = await fetchMpRegistry({ includePrOwned: true })
+      const [, reg] = await Promise.all([
+        syncClientStateWithServer().catch(() => null),
+        fetchMpRegistry({ includePrOwned: true }),
+      ])
       const mpList = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<
         string,
         unknown
