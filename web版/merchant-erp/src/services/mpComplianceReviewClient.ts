@@ -74,6 +74,31 @@ export function formatVideoComplianceInline(res: Record<string, unknown> | null 
     typeof res?.pointsCharged === 'number' && res.pointsCharged > 0 ? ` · 消耗 ${res.pointsCharged} 积分` : '',
   )
   if (!res || res.verdict === 'normal') return { text: `AI检测通过${billing}`.trim(), tone: 'pass' }
+
+  const summary = String(res.summary || res.message || '').trim()
+  if (summary && /口播|字幕|画面/.test(summary)) {
+    const body = summary.replace(/^可能违规请注意(审核|修改)[：:]\s*/, '')
+    return { text: `AI检测到：${body}${billing}`.slice(0, 200), tone: 'warn' }
+  }
+
+  const violations = Array.isArray(res.violations) ? res.violations : []
+  if (violations.length) {
+    const v = (violations[0] || {}) as Record<string, unknown>
+    const excerpt = String(v.excerpt || '').trim()
+    const suggestion = String(v.suggestion || '').trim()
+    const channel =
+      v.channel === 'asr' ? '口播' : v.channel === 'subtitle' ? '字幕' : v.channel === 'visual' ? '画面' : ''
+    const time = String(v.timeLabel || '').trim()
+    let line = excerpt ? `「${excerpt.slice(0, 16)}」` : '可能违规内容'
+    if (channel && time && time !== '—') line = `${channel}${time}${line}`
+    if (suggestion) {
+      const alts = /^「/.test(suggestion) ? suggestion : `「${suggestion}」`
+      line += `→${alts.slice(0, 28)}`
+    }
+    const extra = violations.length > 1 ? ` 等${violations.length}处` : ''
+    return { text: `AI检测到：${line}${extra}${billing}`.slice(0, 120), tone: 'warn' }
+  }
+
   const hits = Array.isArray(res.hits) ? res.hits.map((h) => String(h).trim()).filter(Boolean) : []
   if (hits.length) return { text: `AI检测到（${hits.slice(0, 2).join('、')}）请注意修改${billing}`.slice(0, 120), tone: 'warn' }
   const msg = String(res.message || res.summary || '')

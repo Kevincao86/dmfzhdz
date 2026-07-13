@@ -32,6 +32,7 @@ export const DOUYIN_LIFE_VIDEO_COMPLIANCE_RULES = `
 - 须综合【口播 ASR】【画面 OCR】【商单 Brief】判断；任一路径出现高风险表述 → suspect。
 - 仅依据输入中实际出现的文字/画面问题判断，勿臆造。
 - 命中任一高风险词/表述 → suspect；各来源均无明显违规 → normal。
+- verdict=suspect 时须为每条风险表述给出可执行改写建议，格式：「替换词1」「替换词2」。
 `.trim()
 
 /** 高频违规词/短语（本地预扫描 + 辅助模型） */

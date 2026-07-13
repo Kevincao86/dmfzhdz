@@ -2,6 +2,36 @@
  * AI 检核结果 → 列表行内展示文案（成片分通道 / 文稿段落）
  */
 
+function formatVideoViolationSuggestion(suggestion) {
+  const s = String(suggestion || '').trim()
+  if (!s) return ''
+  if (/^「/.test(s)) return s
+  const stripped = s.replace(/^建议(?:改为|用|：|:)\s*/, '').trim()
+  if (/^「/.test(stripped)) return stripped
+  return `「${stripped}」`
+}
+
+function formatVideoViolationLine(v) {
+  const excerpt = String((v && v.excerpt) || '').trim()
+  const suggestion = formatVideoViolationSuggestion(v && v.suggestion)
+  if (!excerpt && !suggestion) return ''
+  const channel =
+    v && v.channel === 'asr'
+      ? '口播'
+      : v && v.channel === 'subtitle'
+        ? '字幕'
+        : v && v.channel === 'visual'
+          ? '画面'
+          : v && v.channel === 'brief'
+            ? 'Brief'
+            : ''
+  const time = String((v && v.timeLabel) || '').trim()
+  const loc = channel && time && time !== '—' ? `${channel}${time}` : channel || ''
+  const head = excerpt ? (loc ? `${loc}「${excerpt}」` : `「${excerpt}」`) : loc
+  if (!suggestion) return head
+  return head ? `${head}→${suggestion}` : suggestion
+}
+
 function formatVideoChannelSummary(res) {
   const summary = String(res.summary || res.message || '').trim()
   if (summary && /口播|字幕|画面/.test(summary)) {
@@ -55,7 +85,16 @@ function formatVideoComplianceInline(res) {
 
   const channelText = formatVideoChannelSummary(res)
   if (channelText) {
-    return { text: `${channelText}，请注意修改${billing}`.slice(0, 140), tone: 'warn' }
+    return { text: `${channelText}${billing}`.slice(0, 200), tone: 'warn' }
+  }
+
+  const violations = Array.isArray(res.violations) ? res.violations : []
+  if (violations.length) {
+    const line = formatVideoViolationLine(violations[0])
+    if (line) {
+      const extra = violations.length > 1 ? ` 等${violations.length}处` : ''
+      return { text: `AI检测到：${line}${extra}${billing}`.slice(0, 160), tone: 'warn' }
+    }
   }
 
   const locations = Array.isArray(res.locations) ? res.locations : []
