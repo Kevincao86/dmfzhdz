@@ -734,6 +734,8 @@ export async function postIcePipeline(body: {
   effectId?: string
   subtitleStyleId?: string
   presetLengthSec?: number
+  bgmPresetId?: string
+  mixBgmUrl?: string
 }): Promise<IcePipelineResult> {
   for (const p of PIPELINE_PATHS) {
     for (const url of merchantApiFetchUrls(p)) {
@@ -788,6 +790,8 @@ export async function postIceSmartBatch(body: {
   mixVoiceCloneBase64?: string
   transitionMode?: 'auto' | string
   effectId?: string
+  bgmPresetId?: string
+  mixBgmUrl?: string
 }): Promise<IcePipelineResult> {
   for (const p of SMART_BATCH_PIPELINE_PATHS) {
     for (const url of merchantApiFetchUrls(p)) {

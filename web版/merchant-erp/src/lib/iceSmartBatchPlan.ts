@@ -17,9 +17,18 @@ function pickSmartBatchSegmentCount(
   materialCount: number,
   targetTotalSec: number,
 ): number {
+  const planned = Math.max(2, Math.ceil(targetTotalSec / 5))
+  const filledRows = scriptRows.filter(
+    (r) =>
+      String(r.visual ?? '').trim().length >= 4 ||
+      String(r.dialogue ?? '').trim().length >= 2,
+  ).length
+  if (filledRows >= 2) {
+    return Math.min(Math.max(filledRows, 2), materialCount, scriptRows.length || planned)
+  }
   const rowCount = scriptRows.filter((r) => String(r.dialogue ?? '').trim().length >= 2).length
   if (rowCount >= 2) return Math.min(rowCount, materialCount)
-  return Math.max(2, Math.min(materialCount, Math.ceil(targetTotalSec / 5)))
+  return Math.max(2, Math.min(materialCount, planned))
 }
 
 /** AI 规划后：按叙事顺序抽取 K 条素材，供 IMS 脚本化自动成片（全局口播 + 平均分配时长） */

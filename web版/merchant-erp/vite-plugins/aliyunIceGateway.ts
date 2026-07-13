@@ -470,6 +470,8 @@ export async function handleAliyunIceRoutes(input: {
     const mixVoicePresetId = String(parsed.mixVoicePresetId ?? parsed.voicePresetId ?? '').trim() || undefined
     const mixVoiceCloneBase64 =
       typeof parsed.mixVoiceCloneBase64 === 'string' ? parsed.mixVoiceCloneBase64.trim() : undefined
+    const bgmPresetId = String(parsed.bgmPresetId ?? parsed.mixBgmPresetId ?? '').trim()
+    const mixBgmUrl = String(parsed.mixBgmUrl ?? '').trim() || undefined
     const mixSegmentsRaw = parsed.mixSegments
     const mixSegments = parseIceMixPipelineSegments(mixSegmentsRaw)
 
@@ -547,6 +549,8 @@ export async function handleAliyunIceRoutes(input: {
             mixNarrationText,
             mixVoicePresetId,
             mixVoiceCloneBase64,
+            bgmPresetId: bgmPresetId || undefined,
+            mixBgmUrl,
             env: rawEnv as Record<string, string | undefined>,
           })
         : pipelineImageUrls.length > 0
@@ -766,6 +770,8 @@ export async function handleAliyunIceRoutes(input: {
     const mixVoicePresetId = String(parsed.mixVoicePresetId ?? parsed.voicePresetId ?? '').trim()
     void (typeof parsed.mixVoiceCloneBase64 === 'string' ? parsed.mixVoiceCloneBase64.trim() : undefined)
     const transitionMode = String(parsed.transitionMode ?? parsed.effectId ?? 'auto').trim() || 'auto'
+    const bgmPresetId = String(parsed.bgmPresetId ?? parsed.mixBgmPresetId ?? '').trim()
+    const mixBgmUrl = String(parsed.mixBgmUrl ?? '').trim() || undefined
 
     const out = await iceSubmitSmartBatchJob(cfg!, {
       materials: materials as Array<{ kind: 'video' | 'image'; mediaUrl: string; label?: string }>,
@@ -785,6 +791,8 @@ export async function handleAliyunIceRoutes(input: {
       subtitleStyleId: subtitleStyleId || undefined,
       mixVoicePresetId: mixVoicePresetId || undefined,
       transitionMode,
+      bgmPresetId: bgmPresetId || undefined,
+      mixBgmUrl,
     })
     if (!out.ok) {
       json(res, /Invalid|Missing|validate/i.test(out.message) ? 400 : 502, {
