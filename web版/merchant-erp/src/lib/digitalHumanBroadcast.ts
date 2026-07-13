@@ -531,33 +531,43 @@ export const ICE_MIX_VOICE_PRESETS: VoicePreset[] = [
 
 export const ICE_MIX_VOICE_DEFAULT_ID = CUSTOM_UPLOAD_VOICE_PRESETS[0]!.id
 
-/** 智能一键成片 IMS SpeechConfig.Voice（与面板口播音色 gender/预设对齐） */
-const IMS_BATCH_VOICE_BY_PRESET: Record<string, string> = {
-  'v-custom-female': 'zhitian',
-  'v-custom-male': 'zhilun',
-  'v-av-real-1': 'zhiru',
-  'v-av-real-2': 'zhitian',
-  'v-av-real-3': 'zhixiang',
-  'v-av-real-4': 'zhijia',
-  'v-av-real-5': 'zhinan',
-  'v-av-real-6': 'zhiyuan',
-  'v-av-real-7': 'zhilun',
-  'v-av-real-8': 'zhibei_emo',
-  'v-av-real-9': 'zhiqing',
-  'v-av-real-10': 'zhitian',
-  'v-av-real-11': 'zhiru',
-  'v-av-real-12': 'zhimiao_emo',
+/** IMS 批量成片内置 TTS 女声池（仅作无 MiniMax/通义时的兜底，主路径走外部 TTS） */
+const IMS_BATCH_FEMALE_VOICES = ['zhitian', 'zhijia', 'zhiyuan', 'zhimiao_emo', 'zhibei_emo'] as const
+const IMS_BATCH_MALE_VOICES = ['zhilun', 'zhiru', 'zhinan', 'zhiqing', 'zhixiang'] as const
+
+function buildImsBatchVoiceByPreset(): Record<string, string> {
+  const map: Record<string, string> = {
+    'v-custom-female': 'zhitian',
+    'v-custom-male': 'zhilun',
+    'v-av-real-8': 'zhitian',
+  }
+  let fi = 0
+  let mi = 0
+  for (const p of ICE_MIX_VOICE_PRESETS) {
+    if (p.id === 'v-clone' || map[p.id]) continue
+    if (p.gender === '男') {
+      map[p.id] = IMS_BATCH_MALE_VOICES[mi % IMS_BATCH_MALE_VOICES.length]!
+      mi += 1
+    } else {
+      map[p.id] = IMS_BATCH_FEMALE_VOICES[fi % IMS_BATCH_FEMALE_VOICES.length]!
+      fi += 1
+    }
+  }
+  return map
 }
 
-/** 映射混剪口播音色 → IMS 批量成片 SpeechConfig.Voice */
+/** 智能一键成片 IMS SpeechConfig.Voice（全量预设 gender 锁定映射） */
+const IMS_BATCH_VOICE_BY_PRESET = buildImsBatchVoiceByPreset()
+
+/** 映射混剪口播音色 → IMS 批量成片 SpeechConfig.Voice（兜底路径） */
 export function resolveImsBatchSpeechVoice(voicePresetId: string): string {
   const id = String(voicePresetId || ICE_MIX_VOICE_DEFAULT_ID).trim()
   const mapped = IMS_BATCH_VOICE_BY_PRESET[id]
   if (mapped) return mapped
-  const preset = voicePresetById(id)
-  if (preset?.gender === '男') return 'zhilun'
-  if (preset?.gender === '女') return 'zhitian'
-  return 'zhitian'
+  const preset = voicePresetById(id) ?? ICE_MIX_VOICE_PRESETS.find((v) => v.id === id)
+  if (preset?.gender === '男') return IMS_BATCH_MALE_VOICES[0]
+  if (preset?.gender === '女') return IMS_BATCH_FEMALE_VOICES[0]
+  return IMS_BATCH_FEMALE_VOICES[0]
 }
 
 /** 全部可选音色：21 套形象专属 + 自定义通用 + 克隆 */

@@ -26,7 +26,7 @@ import {
   readAliyunIceConfigFromEnv,
   type AliyunIceConfig,
 } from './aliyunIceCore.js'
-import { iceGetSmartBatchJob, iceSubmitSmartBatchJob } from './aliyunIceSmartBatch.js'
+import { iceGetSmartBatchJob, iceSubmitSmartBatchJob, buildSmartBatchTimelineProduceInput, merchantIceMixTtsEnvReady } from './aliyunIceSmartBatch.js'
 import { describeIceUploadBucketSelection, iceOssUploadAvailable, parseIceMixPipelineSegments } from './aliyunOssIceParse.js'
 import { evaluateIceOutputReady, fetchIceOutputObject } from './aliyunOssIceUpload.js'
 
@@ -764,7 +764,77 @@ export async function handleAliyunIceRoutes(input: {
       : []
     const subtitleStyleId = String(parsed.subtitleStyleId ?? '').trim()
     const mixVoicePresetId = String(parsed.mixVoicePresetId ?? parsed.voicePresetId ?? '').trim()
+    const mixVoiceCloneBase64 =
+      typeof parsed.mixVoiceCloneBase64 === 'string' ? parsed.mixVoiceCloneBase64.trim() : undefined
     const transitionMode = String(parsed.transitionMode ?? parsed.effectId ?? 'auto').trim() || 'auto'
+    const effectId = String(parsed.effectId ?? transitionMode ?? 'none').trim() || 'none'
+    const effect = resolveIceEffectPreset(effectId)
+    const subtitleStyle = resolveIceSubtitleStylePreset(
+      subtitleStyleId || ICE_SUBTITLE_STYLE_DEFAULT_ID,
+    )
+
+    if (merchantIceMixTtsEnvReady(rawEnv as Record<string, string | undefined>)) {
+      const built = buildSmartBatchTimelineProduceInput({
+        materials: materials as Array<{ kind: 'video' | 'image'; mediaUrl: string; label?: string }>,
+        scriptRows: scriptRows as Array<{
+          timeRange?: string
+          visual?: string
+          dialogue?: string
+        }>,
+        guidance,
+        targetTotalSec,
+        materialSlots,
+      })
+      const { ensureIceMixSegmentMediaUrls } = await import('./aliyunOssIceUpload.js')
+      const normalizedMix = await ensureIceMixSegmentMediaUrls(
+        cfg!,
+        rawEnv as Record<string, string | undefined>,
+        built.segments,
+      )
+      if (!normalizedMix.ok) {
+        json(res, 400, { ok: false, message: normalizedMix.message, step: 'normalize_mix_media' })
+        return true
+      }
+      const timelineOut = await iceRunMixPipeline(cfg!, {
+        segments: normalizedMix.segments as Array<{
+          kind: 'video' | 'image'
+          mediaUrl: string
+          signedMediaUrl?: string
+          timelineStartSec: number
+          timelineEndSec: number
+          caption?: string
+          materialIndex?: number
+          sourceInSec?: number
+          sourceOutSec?: number
+        }>,
+        projectName,
+        editBrief: built.editBrief,
+        width,
+        height,
+        totalDurationSec: targetTotalSec,
+        effectId: effect.id,
+        subtitleStyleId: subtitleStyle.id,
+        mixNarrationText: built.narration,
+        mixVoicePresetId: mixVoicePresetId || undefined,
+        mixVoiceCloneBase64,
+        env: rawEnv as Record<string, string | undefined>,
+      })
+      if (!timelineOut.ok) {
+        json(res, /Invalid|Missing|validate/i.test(timelineOut.message) ? 400 : 502, {
+          ok: false,
+          message: timelineOut.message,
+          step: timelineOut.step,
+        })
+        return true
+      }
+      json(res, 200, {
+        ok: true,
+        jobId: timelineOut.jobId,
+        exportId: timelineOut.jobId,
+        pollMode: 'timeline',
+      })
+      return true
+    }
 
     const out = await iceSubmitSmartBatchJob(cfg!, {
       materials: materials as Array<{ kind: 'video' | 'image'; mediaUrl: string; label?: string }>,
@@ -798,6 +868,7 @@ export async function handleAliyunIceRoutes(input: {
       batchJobId: out.batchJobId,
       jobId: out.batchJobId,
       exportId: out.batchJobId,
+      pollMode: 'smart_batch',
     })
     return true
   }

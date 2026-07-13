@@ -490,3 +490,85 @@ export async function iceGetSmartBatchJob(
   }
   return { ok: false, message: lastMsg || '查询智能成片任务失败', transient: true }
 }
+
+/** 是否可用 MiniMax/通义做与面板一致的口播 TTS */
+export function merchantIceMixTtsEnvReady(env?: Record<string, string | undefined>): boolean {
+  if (!env) return false
+  return Boolean(
+    (env.MERCHANT_AI_MINIMAX_KEY ?? env.MINIMAX_API_KEY ?? '').trim()
+      || (env.MERCHANT_AI_QWEN_KEY ?? env.DASHSCOPE_API_KEY ?? '').trim(),
+  )
+}
+
+export type SmartBatchTimelineProduceInput = {
+  segments: Array<{
+    kind: 'video' | 'image'
+    mediaUrl: string
+    timelineStartSec: number
+    timelineEndSec: number
+    caption?: string
+    materialIndex?: number
+    sourceInSec?: number
+    sourceOutSec?: number
+  }>
+  narration: string
+  editBrief: string
+}
+
+/** 智能成片改走 Timeline + 所选口播音色（MiniMax/通义），与试听/混剪一致 */
+export function buildSmartBatchTimelineProduceInput(input: {
+  materials: IceSmartBatchMaterial[]
+  scriptRows: IceSmartBatchScriptRow[]
+  guidance: string
+  targetTotalSec: number
+  materialSlots?: number[]
+}): SmartBatchTimelineProduceInput {
+  const targetTotalSec = Math.min(120, Math.max(5, Math.ceil(input.targetTotalSec)))
+  const baseUrls = input.materials
+    .map((m) => ensureIceHttpsUrl(sanitizeIcePipelineMediaUrl(m.mediaUrl)))
+    .filter(Boolean)
+  const slots = (input.materialSlots ?? []).filter(
+    (n) => Number.isFinite(n) && n >= 0 && n < baseUrls.length,
+  )
+  const segmentCount = pickSmartBatchSegmentCount(input.scriptRows, baseUrls.length, targetTotalSec)
+  const urls = pickSmartBatchMaterialUrls(baseUrls, slots, segmentCount)
+  const narration = buildSmartBatchNarration(input.guidance, input.scriptRows, targetTotalSec)
+  const each = targetTotalSec / Math.max(1, urls.length)
+
+  const segments = urls.map((url, i) => {
+    const slotMi = slots[i]
+    const matIdx =
+      slotMi != null && slotMi >= 0 && slotMi < input.materials.length
+        ? slotMi
+        : baseUrls.findIndex((u) => u === url)
+    const mat =
+      input.materials[matIdx >= 0 ? matIdx : i] ?? input.materials[i] ?? input.materials[0]!
+    const row = input.scriptRows[i]
+    const start = Math.round(i * each * 10) / 10
+    const end = i === urls.length - 1 ? targetTotalSec : Math.round((i + 1) * each * 10) / 10
+    const clipDur = Math.max(0.45, end - start)
+    const sourceIn =
+      mat.kind === 'video' ? Math.min(1.2 + (i % 4) * 1.35, Math.max(1.2, clipDur)) : 0
+    return {
+      kind: mat.kind,
+      mediaUrl: url,
+      timelineStartSec: start,
+      timelineEndSec: end,
+      caption: String(row?.dialogue ?? '').trim() || undefined,
+      materialIndex: matIdx >= 0 ? matIdx : i,
+      sourceInSec: mat.kind === 'video' ? sourceIn : undefined,
+      sourceOutSec: mat.kind === 'video' ? sourceIn + clipDur : undefined,
+    }
+  })
+
+  const editBrief = [
+    '智能一键成片（口播与所选音色一致）',
+    `目标时长约 ${targetTotalSec} 秒`,
+    '原素材静音，服务端按所选口播音色合成讲解',
+    input.guidance.trim().slice(0, 240),
+  ]
+    .filter(Boolean)
+    .join('；')
+
+  return { segments, narration, editBrief }
+}

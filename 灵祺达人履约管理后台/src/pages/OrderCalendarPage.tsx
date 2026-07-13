@@ -2,14 +2,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   CalendarDays,
+  Bell,
   CheckSquare,
   ChevronLeft,
   ChevronRight,
   Loader2,
   MapPin,
   Tag,
+  X,
 } from 'lucide-react'
 import { fetchMpRegistry } from '../lib/mpApi'
+import {
+  createCalendarReminder,
+  listCalendarReminders,
+  type MpCalendarReminderLeadPreset,
+} from '../lib/mpCalendarReminderApi'
 import { getAccount, getActiveRole } from '../lib/mpSession'
 import { getWorkIdentity } from '../lib/mpWorkIdentity'
 import { mpOrderOwnedByCurrentPr } from '../lib/mpRecruitment/prPublishedOrders'
@@ -21,6 +28,8 @@ import {
   buildUpcomingTodos,
   buildWeekCells,
   calendarPageSubtitleForWork,
+  CALENDAR_REMIND_OPTIONS,
+  computeRemindAtMs,
   countActiveTodos,
   dayEventSummary,
   eventTone,
@@ -116,8 +125,33 @@ export default function OrderCalendarPage() {
   const [events, setEvents] = useState<OrderCalendarEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
+  const [pendingRemindEventIds, setPendingRemindEventIds] = useState<Set<string>>(new Set())
+  const [remindTarget, setRemindTarget] = useState<OrderCalendarEvent | null>(null)
+  const [remindBusy, setRemindBusy] = useState(false)
+  const [toast, setToast] = useState('')
   const eventListRef = useRef<HTMLElement>(null)
   const todoScrollRef = useRef<HTMLDivElement>(null)
+
+  const refreshReminders = useCallback(async () => {
+    try {
+      const rows = await listCalendarReminders()
+      const ids = new Set(
+        rows
+          .filter((r) => r.status === 'pending')
+          .map((r) => String(r.eventId || '').trim())
+          .filter(Boolean),
+      )
+      setPendingRemindEventIds(ids)
+    } catch {
+      setPendingRemindEventIds(new Set())
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!toast) return
+    const t = window.setTimeout(() => setToast(''), 3200)
+    return () => window.clearTimeout(t)
+  }, [toast])
 
   useEffect(() => {
     let cancelled = false
@@ -142,6 +176,7 @@ export default function OrderCalendarPage() {
           list = aggregateTalentOrderCalendarEvents(orders, ids)
         }
         if (!cancelled) setEvents(list)
+        if (!cancelled) await refreshReminders()
       } catch (e) {
         if (!cancelled) setErr(e instanceof Error ? e.message : '加载失败')
       } finally {
@@ -151,7 +186,7 @@ export default function OrderCalendarPage() {
     return () => {
       cancelled = true
     }
-  }, [isPr])
+  }, [isPr, refreshReminders])
 
   const byDate = useMemo(() => groupEventsByDate(events), [events])
   const upcomingTodos = useMemo(() => buildUpcomingTodos(events), [events])
@@ -240,16 +275,55 @@ export default function OrderCalendarPage() {
     eventListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }
 
+  async function onConfirmReminder(preset: MpCalendarReminderLeadPreset) {
+    const evt = remindTarget
+    if (!evt || remindBusy) return
+    const remindAtMs = computeRemindAtMs(evt.dateKey, preset)
+    if (!remindAtMs || remindAtMs <= Date.now()) {
+      setToast('提醒时间已过，请选更早的提醒')
+      return
+    }
+    setRemindBusy(true)
+    try {
+      await createCalendarReminder({
+        eventId: evt.id,
+        mpOrderId: evt.mpOrderId,
+        eventKind: evt.kind,
+        eventDateKey: evt.dateKey,
+        eventTitle: evt.orderTitle,
+        storeName: evt.storeName,
+        leadPreset: preset,
+        remindAt: new Date(remindAtMs).toISOString(),
+        channels: ['subscribe', 'oa'],
+      })
+      setToast('提醒已设置，已与小程序同步')
+      setRemindTarget(null)
+      await refreshReminders()
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : '设置失败')
+    } finally {
+      setRemindBusy(false)
+    }
+  }
+
   const navLabel = viewMode === 'week' ? '本周' : monthTitle(year, month)
 
   return (
     <div className="min-h-full bg-gradient-to-br from-violet-50/80 via-white to-fuchsia-50/40 px-4 py-5 pb-10 lg:px-6 lg:py-6">
+      {toast ? (
+        <div className="fixed bottom-6 left-1/2 z-50 max-w-md -translate-x-1/2 rounded-xl border border-violet-200 bg-white px-4 py-2.5 text-sm text-slate-700 shadow-lg">
+          {toast}
+        </div>
+      ) : null}
       <div className="mx-auto flex max-w-7xl flex-col gap-5 lg:flex-row lg:items-stretch lg:gap-6">
         {/* 左侧功能说明 */}
         <aside className="flex shrink-0 flex-col rounded-[20px] border border-violet-100/80 bg-white/90 p-5 shadow-[0_4px_24px_rgba(124,77,255,0.08)] lg:w-[30%] lg:max-w-sm lg:p-6">
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">近7天待办</h1>
           <p className="mt-2 text-sm leading-relaxed text-slate-500">
             {calendarPageSubtitleForWork(workId)}。横向滑动查看近期事项，在日历中掌握整体进度。
+          </p>
+          <p className="mt-2 text-xs leading-relaxed text-violet-600/90">
+            在电脑端设置的到点提醒会与小程序商单日历同步；微信订阅推送需在小程序内授权一次。
           </p>
 
           <ul className="mt-6 space-y-4">
@@ -562,46 +636,61 @@ export default function OrderCalendarPage() {
                     {selectedEvents.map((evt) => {
                       const tone = eventTone(evt.kind)
                       const phase = resolveEventPhase(evt)
+                      const remindSet = pendingRemindEventIds.has(evt.id)
                       return (
                         <li key={evt.id}>
-                          <Link
-                            to={eventLink(role, evt)}
-                            className="block rounded-xl border border-slate-100 px-3.5 py-3 transition hover:border-violet-200 hover:bg-violet-50/40"
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <span
-                                  className={`mr-2 inline-block rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${toneBadgeClass(tone)}`}
-                                >
-                                  {kindLabel(evt.kind)}
+                          <div className="flex items-stretch gap-2 rounded-xl border border-slate-100 transition hover:border-violet-200 hover:bg-violet-50/40">
+                            <Link
+                              to={eventLink(role, evt)}
+                              className="block min-w-0 flex-1 px-3.5 py-3"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <span
+                                    className={`mr-2 inline-block rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${toneBadgeClass(tone)}`}
+                                  >
+                                    {kindLabel(evt.kind)}
+                                  </span>
+                                  <span className="font-medium text-slate-900">{evt.orderTitle}</span>
+                                  {evt.storeName && evt.storeName !== evt.orderTitle ? (
+                                    <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-slate-500">
+                                      <MapPin className="h-3 w-3 shrink-0" />
+                                      {evt.storeName}
+                                    </p>
+                                  ) : null}
+                                </div>
+                                <span className="flex shrink-0 items-center gap-1 text-xs text-slate-500">
+                                  <span
+                                    className={`h-1.5 w-1.5 rounded-full ${
+                                      phase === 'active'
+                                        ? 'bg-emerald-500'
+                                        : phase === 'pending'
+                                          ? 'bg-violet-400'
+                                          : 'bg-red-400'
+                                    }`}
+                                  />
+                                  {evt.statusLabel}
                                 </span>
-                                <span className="font-medium text-slate-900">{evt.orderTitle}</span>
-                                {evt.storeName && evt.storeName !== evt.orderTitle ? (
-                                  <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-slate-500">
-                                    <MapPin className="h-3 w-3 shrink-0" />
-                                    {evt.storeName}
-                                  </p>
-                                ) : null}
                               </div>
-                              <span className="flex shrink-0 items-center gap-1 text-xs text-slate-500">
-                                <span
-                                  className={`h-1.5 w-1.5 rounded-full ${
-                                    phase === 'active'
-                                      ? 'bg-emerald-500'
-                                      : phase === 'pending'
-                                        ? 'bg-violet-400'
-                                        : 'bg-red-400'
-                                  }`}
-                                />
-                                {evt.statusLabel}
-                              </span>
-                            </div>
-                            <div className="mt-1.5 flex flex-wrap gap-x-3 text-xs text-slate-400">
-                              {evt.timeLabel ? <span>{evt.timeLabel}</span> : null}
-                              {evt.applicantName && isPr ? <span>达人：{evt.applicantName}</span> : null}
-                              {evt.platform ? <span>{evt.platform}</span> : null}
-                            </div>
-                          </Link>
+                              <div className="mt-1.5 flex flex-wrap gap-x-3 text-xs text-slate-400">
+                                {evt.timeLabel ? <span>{evt.timeLabel}</span> : null}
+                                {evt.applicantName && isPr ? <span>达人：{evt.applicantName}</span> : null}
+                                {evt.platform ? <span>{evt.platform}</span> : null}
+                              </div>
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => setRemindTarget(evt)}
+                              className={`m-2 flex shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border px-2.5 py-2 text-[11px] font-medium transition ${
+                                remindSet
+                                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                  : 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100'
+                              }`}
+                            >
+                              <Bell className="h-3.5 w-3.5" />
+                              {remindSet ? '已设提醒' : '设提醒'}
+                            </button>
+                          </div>
                         </li>
                       )
                     })}
@@ -612,6 +701,53 @@ export default function OrderCalendarPage() {
           )}
         </main>
       </div>
+
+      {remindTarget ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="remind-dialog-title"
+        >
+          <div className="w-full max-w-sm rounded-2xl border border-violet-100 bg-white p-5 shadow-xl">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 id="remind-dialog-title" className="text-base font-semibold text-slate-900">
+                  设置到点提醒
+                </h3>
+                <p className="mt-1 truncate text-sm text-slate-500">{remindTarget.orderTitle}</p>
+                <p className="text-xs text-violet-600">{remindTarget.dateKey.replace(/-/g, '/')}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => !remindBusy && setRemindTarget(null)}
+                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                aria-label="关闭"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <ul className="space-y-2">
+              {CALENDAR_REMIND_OPTIONS.map((opt) => (
+                <li key={opt.id}>
+                  <button
+                    type="button"
+                    disabled={remindBusy}
+                    onClick={() => onConfirmReminder(opt.id)}
+                    className="flex w-full items-center justify-between rounded-xl border border-violet-100 px-4 py-3 text-left text-sm font-medium text-slate-800 transition hover:border-violet-300 hover:bg-violet-50 disabled:opacity-60"
+                  >
+                    {opt.label}
+                    {remindBusy ? <Loader2 className="h-4 w-4 animate-spin text-violet-500" /> : null}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-center text-[11px] text-slate-400">
+              提醒数据与小程序共用，到点将通过服务号/订阅消息推送
+            </p>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
