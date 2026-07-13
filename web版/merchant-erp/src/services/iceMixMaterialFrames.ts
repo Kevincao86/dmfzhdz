@@ -13,6 +13,10 @@ const FRAME_CONCURRENCY = 4
 const FRAME_TIMEOUT_MS = 28_000
 /** 单帧服务端截帧超时（避免 180s 挂死） */
 const FRAME_SERVER_TIMEOUT_MS = 18_000
+/** 大批量素材：每条视频采样帧数 */
+const MIX_FRAMES_PER_VIDEO_LARGE = 2
+/** 全量逐条采样上限（超过则均匀抽样） */
+const MIX_FRAME_SAMPLE_MATERIAL_CAP = 16
 /** 单条视频最多采样帧数（均匀覆盖全片） */
 export const MIX_FRAMES_PER_VIDEO = 5
 /** 全局视觉匹配帧上限 */
@@ -151,6 +155,24 @@ async function extractVideoSampleFrames(
   return extractVideoSampleFramesLocal(urls, samplePoints, label)
 }
 
+async function extractVideoSampleFramesWithBudget(
+  mat: IceMixMaterialSlot,
+  opts?: { skipLocalDownload?: boolean; durationSec?: number; maxFrames?: number; budgetMs?: number },
+): Promise<Array<{ label: string; dataUrl: string; tag: string; atSec: number }>> {
+  const budgetMs = Math.max(8_000, opts?.budgetMs ?? FRAME_TIMEOUT_MS)
+  const serverFirst = await withTimeout(
+    extractVideoSampleFrames(mat, { ...opts, skipLocalDownload: true }),
+    Math.min(budgetMs, FRAME_SERVER_TIMEOUT_MS * 2 + 4_000),
+    [],
+  )
+  if (serverFirst.length > 0 || opts?.skipLocalDownload) return serverFirst
+  return withTimeout(
+    extractVideoSampleFrames(mat, { ...opts, skipLocalDownload: false }),
+    budgetMs,
+    serverFirst,
+  )
+}
+
 async function collectMaterialFrame(
   mat: IceMixMaterialSlot,
   index: number,
@@ -202,8 +224,8 @@ export async function collectMaterialTimelineFrames(
     const one = await collectMaterialFrame(mat, materialIndex, true)
     return one ? [one] : []
   }
-  const frames = await extractVideoSampleFrames(mat, {
-    skipLocalDownload: opts?.skipLocalDownload === true,
+  const frames = await extractVideoSampleFramesWithBudget(mat, {
+    skipLocalDownload: opts?.skipLocalDownload,
     durationSec: opts?.durationSec,
     maxFrames: opts?.maxFrames ?? MIX_FRAMES_PER_VIDEO,
   })
@@ -226,8 +248,13 @@ export async function collectMixMaterialFramesForEditPlan(
     materialDurations?: Map<number, number>
   },
 ): Promise<MixMaterialFrameSample[]> {
-  const allMaterials = opts?.allMaterials !== false && materials.length <= 48
-  const perVideoFrames = MIX_FRAMES_PER_VIDEO
+  const allMaterials =
+    opts?.allMaterials !== false &&
+    materials.length <= MIX_FRAME_SAMPLE_MATERIAL_CAP
+  const perVideoFrames =
+    materials.length > MIX_FRAME_SAMPLE_MATERIAL_CAP
+      ? MIX_FRAMES_PER_VIDEO_LARGE
+      : MIX_FRAMES_PER_VIDEO
   const defaultMax = allMaterials
     ? Math.min(MIX_MAX_VISION_FRAMES, materials.length * perVideoFrames)
     : Math.min(32, Math.max(16, Math.min(materials.length, 12) * perVideoFrames))
@@ -256,11 +283,12 @@ export async function collectMixMaterialFramesForEditPlan(
       return sample
     }
     const dur = opts?.materialDurations?.get(index) ?? MIX_DEFAULT_SOURCE_DURATION_SEC
-    const frames = await withTimeout(
-      extractVideoSampleFrames(mat, { skipLocalDownload: true, durationSec: dur }),
-      FRAME_TIMEOUT_MS,
-      [],
-    )
+    const frames = await extractVideoSampleFramesWithBudget(mat, {
+      skipLocalDownload: true,
+      durationSec: dur,
+      maxFrames: perVideoFrames,
+      budgetMs: FRAME_TIMEOUT_MS,
+    })
     for (const f of frames) {
       if (out.length >= max) break
       out.push({

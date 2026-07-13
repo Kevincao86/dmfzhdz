@@ -700,6 +700,34 @@ function isMixProfileDescriptionUsable(desc: string): boolean {
   return t.length >= 24 && !/截帧失败|无法识别|分析失败/i.test(t)
 }
 
+/** 已有「AI 分析素材」结果时，规划分镜不必再对全库逐帧截帧 */
+function profilesReadyForClipRefine(
+  profiles: IceMixMaterialProfile[],
+  materialCount: number,
+): boolean {
+  const minUsable = Math.min(materialCount, Math.max(4, Math.ceil(materialCount * 0.35)))
+  const withTimeline = profiles.filter((p) => (p.frameTimeline?.length ?? 0) >= 1).length
+  const withDesc = profiles.filter((p) => isMixProfileDescriptionUsable(p.description)).length
+  return (
+    withTimeline >= minUsable ||
+    withDesc >= Math.min(materialCount, Math.ceil(materialCount * 0.4))
+  )
+}
+
+function applyClipPointsFromProfiles(
+  segments: MixNarrativeSegment[],
+  profileList: IceMixMaterialProfile[],
+): MixNarrativeSegment[] {
+  return segments.map((s) => {
+    const prof = profileList.find((p) => p.index === s.materialIndex)
+    const est = prof?.estimatedDurationSec ?? MIX_DEFAULT_SOURCE_DURATION_SEC
+    const fromTimeline = pickSourceInFromFrameTimeline(s.visual, s.dialogue, prof?.frameTimeline)
+    const sourceInSec =
+      fromTimeline != null ? fromTimeline : inferSourceInSec(s.visual, est, prof)
+    return { ...s, sourceInSec: clampMixSourceInSec(sourceInSec, 1.2, est) }
+  })
+}
+
 function dialogueLinesFromGuidanceText(guidance: string): string[] {
   return dialogueLinesFromGuidance(guidance)
 }
@@ -1181,64 +1209,68 @@ export async function planMixNarrativeFromVision(opts: {
 
   segments = normalizeNarrativeSegmentDialogues(segments, guidance, opts.promo)
 
-  opts.onProgress?.('密集采样素材画面，确定各段截取点…')
-  try {
-    const durationMap = new Map<number, number>()
-    for (const p of profileList) {
-      if (p.estimatedDurationSec) durationMap.set(p.index, p.estimatedDurationSec)
-    }
-    const frames = await Promise.race([
-      collectMixMaterialFramesForEditPlan(materials, {
-        allMaterials: true,
-        maxFrames: Math.min(MIX_MAX_VISION_FRAMES, materials.length * 5),
-        materialDurations: durationMap,
-        onProgress: opts.onProgress,
-      }),
-      new Promise<MixMaterialFrameSample[]>((resolve) => {
-        window.setTimeout(() => resolve([]), VISION_EDIT_PLAN_TIMEOUT_MS)
-      }),
-    ])
-
-    if (frames.length >= 1) {
-      const framesByMaterial = groupMixFramesByMaterialIndex(frames)
-      const clipDecisions = await Promise.race([
-        refineClipPointsWithVision({
-          segments,
-          materials,
-          profiles: profileList,
-          framesByMaterial,
+  if (profilesReadyForClipRefine(profileList, materials.length)) {
+    opts.onProgress?.('复用 AI 分析结果，匹配各段截取点…')
+    segments = applyClipPointsFromProfiles(segments, profileList)
+  } else {
+    opts.onProgress?.('密集采样素材画面，确定各段截取点…')
+    try {
+      const durationMap = new Map<number, number>()
+      for (const p of profileList) {
+        if (p.estimatedDurationSec) durationMap.set(p.index, p.estimatedDurationSec)
+      }
+      const frames = await Promise.race([
+        collectMixMaterialFramesForEditPlan(materials, {
+          allMaterials: materials.length <= 16,
+          maxFrames: Math.min(MIX_MAX_VISION_FRAMES, materials.length * 3),
+          materialDurations: durationMap,
+          onProgress: opts.onProgress,
         }),
-        new Promise<null>((resolve) => {
-          window.setTimeout(() => resolve(null), VISION_EDIT_PLAN_TIMEOUT_MS)
+        new Promise<MixMaterialFrameSample[]>((resolve) => {
+          window.setTimeout(() => resolve([]), VISION_EDIT_PLAN_TIMEOUT_MS)
         }),
       ])
-      if (clipDecisions) {
-        segments = segments.map((s, i) => {
-          const d = clipDecisions.find((x) => x.segmentIndex === i) ?? clipDecisions[i]
-          const prof = profileList.find((p) => p.index === (d?.materialIndex ?? s.materialIndex))
-          const timelineIn =
-            d?.sourceInSec ??
-            pickSourceInFromFrameTimeline(s.visual, s.dialogue, prof?.frameTimeline) ??
-            s.sourceInSec
-          return d
-            ? {
-                ...s,
-                materialIndex: d.materialIndex,
-                sourceInSec: timelineIn,
-                clipNote: d.clipNote,
-              }
-            : s
-        })
+
+      if (frames.length >= 1) {
+        opts.onProgress?.('视觉模型精修截取点…')
+        const framesByMaterial = groupMixFramesByMaterialIndex(frames)
+        const clipDecisions = await Promise.race([
+          refineClipPointsWithVision({
+            segments,
+            materials,
+            profiles: profileList,
+            framesByMaterial,
+          }),
+          new Promise<null>((resolve) => {
+            window.setTimeout(() => resolve(null), VISION_EDIT_PLAN_TIMEOUT_MS)
+          }),
+        ])
+        if (clipDecisions) {
+          segments = segments.map((s, i) => {
+            const d = clipDecisions.find((x) => x.segmentIndex === i) ?? clipDecisions[i]
+            const prof = profileList.find((p) => p.index === (d?.materialIndex ?? s.materialIndex))
+            const timelineIn =
+              d?.sourceInSec ??
+              pickSourceInFromFrameTimeline(s.visual, s.dialogue, prof?.frameTimeline) ??
+              s.sourceInSec
+            return d
+              ? {
+                  ...s,
+                  materialIndex: d.materialIndex,
+                  sourceInSec: timelineIn,
+                  clipNote: d.clipNote,
+                }
+              : s
+          })
+        } else {
+          segments = applyClipPointsFromProfiles(segments, profileList)
+        }
       } else {
-        segments = segments.map((s) => {
-          const prof = profileList.find((p) => p.index === s.materialIndex)
-          const timelineIn = pickSourceInFromFrameTimeline(s.visual, s.dialogue, prof?.frameTimeline)
-          return timelineIn != null ? { ...s, sourceInSec: timelineIn } : s
-        })
+        segments = applyClipPointsFromProfiles(segments, profileList)
       }
+    } catch {
+      segments = applyClipPointsFromProfiles(segments, profileList)
     }
-  } catch {
-    /* keep text plan sourceInSec */
   }
 
   for (const s of segments) {
