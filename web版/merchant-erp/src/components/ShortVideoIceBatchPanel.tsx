@@ -26,6 +26,7 @@ import {
   fetchAliyunIceCloudConfig,
   fetchIceJobStatus,
   fetchIceSmartBatchJobStatus,
+  postIceSmartBatch,
   ICE_ASPECT_PRESETS,
   postIcePipeline,
   uploadIceLocalMediaFile,
@@ -86,6 +87,7 @@ import {
   type IceMixMaterialSlot,
   type MixPromoContext,
 } from '../lib/iceMixPlan'
+import { buildSmartBatchSubmitPayload } from '../lib/iceSmartBatchPlan'
 import {
   defaultScriptRows,
   maxScriptTimeRangeEndSec,
@@ -1409,15 +1411,24 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     )
     const subset = subsetMixMaterialPoolByIndices(mixMaterialPool, workingProfiles, keepIndices)
     let produceMaterials = subset.materials
-    let produceProfiles = subset.profiles as IceMixMaterialProfile[]
     let produceSlots = materialSlots.map((mi) => subset.remapIndex(mi)).filter((mi) => mi >= 0)
     if (produceMaterials.length < 2) {
       produceMaterials = mixMaterialPool
-      produceProfiles = workingProfiles
       produceSlots = materialSlots
     }
 
-    setHint(`智能成片：已剔除无效镜头，保留 ${produceMaterials.length}/${poolLen} 条素材，正在 AI 匹配剪辑…`)
+    setHint(`智能成片：已剔除无效镜头，保留 ${produceMaterials.length}/${poolLen} 条素材，正在提交 IMS 脚本化成片…`)
+
+    const batchPayload = buildSmartBatchSubmitPayload({
+      materials: produceMaterials.map((m) => ({
+        kind: m.kind,
+        mediaUrl: m.mediaUrl,
+        label: m.label,
+      })),
+      scriptRows: workingRows,
+      materialSlots: produceSlots,
+      targetTotalSec: mixTargetSec,
+    })
 
     const localId = newJobId()
     const label = `智能成片 · ${poolLen} 素材`
@@ -1426,10 +1437,10 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       {
         id: localId,
         label,
-        mediaUrl: produceMaterials[0]!.mediaUrl,
+        mediaUrl: batchPayload.materials[0]!.mediaUrl,
         phase: 'pipeline',
-        message: '智能成片 · 提交云端…',
-        mixProduceMode: 'timeline',
+        message: '智能成片 · 提交 IMS…',
+        mixProduceMode: 'smart_batch',
       },
     ])
 
@@ -1439,70 +1450,30 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       return
     }
 
-    const produced = await produceIceMixPackage({
-      rows: workingRows,
-      materials: produceMaterials,
-      materialSlots: produceSlots,
-      materialProfiles: produceProfiles,
-      targetTotalSec: mixTargetSec,
-      guidance: mixGuidance.trim(),
-      mixInstruction: mixGuidance.trim(),
-      effectId: resolvedMixEffect.id,
-      subtitleStyleId: mixSubtitleStyleId,
-      onProgress: (msg) => setHint(`智能成片 · ${msg}`),
-    })
-    if (!produced.ok) {
-      patchJob(localId, { phase: 'failed', message: produced.message })
-      setErr(produced.message)
-      setSmartRenderBusy(false)
-      return
-    }
-
-    const pack = produced.output
-    const segments = pack.segments
-    if (segments.length < 2) {
-      patchJob(localId, { phase: 'failed', message: '剪辑时间线无效' })
-      setErr('剪辑时间线无效，请检查分镜与素材映射')
-      setSmartRenderBusy(false)
-      return
-    }
-
-    setMaterialSlots(pack.materialSlots)
-    setHint(`智能成片剪辑方案：${pack.summary}`)
-
     let mixVoiceCloneBase64: string | undefined
     if (mixVoicePresetId === 'v-clone' && mixCloneBlobRef.current) {
       mixVoiceCloneBase64 = await audioBlobToPureBase64(mixCloneBlobRef.current)
     }
 
-    const pipe = await postIcePipeline({
-      mixSegments: segments.map((s) =>
-        prepareIceMixSegmentForPost({
-          kind: s.kind,
-          mediaUrl: s.mediaUrl,
-          signedMediaUrl: s.signedMediaUrl,
-          timelineStartSec: s.timelineStartSec,
-          timelineEndSec: s.timelineEndSec,
-          caption: s.caption,
-          materialIndex: s.materialIndex,
-          sourceInSec: s.sourceInSec,
-          sourceOutSec: s.sourceOutSec,
-        }),
-      ),
-      mixNarrationText: pack.narrationText.length >= 4 ? pack.narrationText : undefined,
-      mixVoicePresetId: mixVoicePresetId || ICE_MIX_VOICE_DEFAULT_ID,
-      mixVoiceCloneBase64,
-      projectName: `智能成片-${label}`.slice(0, 120),
-      editBrief: pack.editBrief,
+    const pipe = await postIceSmartBatch({
+      materials: batchPayload.materials,
+      scriptRows: batchPayload.scriptRows,
+      materialSlots: batchPayload.materialSlots,
+      guidance: mixGuidance.trim(),
+      targetTotalSec: mixTargetSec,
       width: aspect.width,
       height: aspect.height,
-      clipEndSec: mixTargetSec,
-      effectId: pack.effectId,
-      subtitleStyleId: pack.subtitleStyleId,
+      projectName: `智能成片-${label}`.slice(0, 120),
+      subtitleStyleId: mixSubtitleStyleId,
+      mixVoicePresetId: mixVoicePresetId || ICE_MIX_VOICE_DEFAULT_ID,
+      mixVoiceCloneBase64,
+      transitionMode: resolvedMixEffect.id === 'none' ? 'none' : 'auto',
+      effectId: resolvedMixEffect.id,
     })
 
     if (!pipe.ok) {
       patchJob(localId, { phase: 'failed', message: pipe.message })
+      setErr(pipe.message)
       setSmartRenderBusy(false)
       return
     }
@@ -1510,10 +1481,10 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     patchJob(localId, {
       exportId: pipe.jobId,
       phase: 'polling',
-      message: '智能成片 · 云端合成中…',
-      mixProduceMode: 'timeline',
+      message: '智能成片 · IMS 合成中…',
+      mixProduceMode: pipe.pollMode ?? 'smart_batch',
     })
-    await pollJob(localId, pipe.jobId, 'timeline')
+    await pollJob(localId, pipe.jobId, pipe.pollMode ?? 'smart_batch')
     setSmartRenderBusy(false)
     setHint('智能一键成片已提交，请在右侧下载 MP4。')
   }

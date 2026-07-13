@@ -281,13 +281,14 @@ export function buildSmartBatchAsrConfig(preset: IceSubtitleStylePreset): Record
     Alignment: alignment,
     AdaptMode: preset.adaptMode ?? 'AutoWrap',
     Y: y,
-    FontSize: preset.fontSize,
+    FontSize: Math.max(40, preset.fontSize),
     FontColor: preset.fontColor,
     Outline: preset.outline,
     OutlineColour: preset.outlineColour,
     Font: 'Alibaba PuHuiTi 2.0 65 Medium',
     SizeRequestType: 'Nominal',
     Spacing: -1,
+    TextWidth: preset.textWidth ?? 0.92,
   }
   if (preset.textWidth != null) cfg.TextWidth = preset.textWidth
   if (preset.fontFace) cfg.FontFace = preset.fontFace

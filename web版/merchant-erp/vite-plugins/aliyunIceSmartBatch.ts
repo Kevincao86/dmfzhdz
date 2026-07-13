@@ -23,6 +23,10 @@ import {
   buildMixSpeakableNarration,
   sanitizeMixDialogueText,
 } from '../src/lib/shortVideoScriptTable.js'
+import {
+  type IceSmartBatchMaterial,
+  type IceSmartBatchScriptRow,
+} from '../src/lib/iceSmartBatchPlan.js'
 import type { AliyunIceConfig } from './aliyunIceCore.js'
 
 type IceClientClass = {
@@ -121,6 +125,8 @@ function buildSmartBatchNarration(
   return buildMixSpeakableNarration(rowDialogues, { targetSec })
 }
 
+export { buildSmartBatchSubmitPayload, type IceSmartBatchMaterial, type IceSmartBatchScriptRow } from '../src/lib/iceSmartBatchPlan.js'
+
 function pickSmartBatchSegmentCount(
   scriptRows: IceSmartBatchScriptRow[],
   materialCount: number,
@@ -137,6 +143,17 @@ function pickSmartBatchMaterialUrls(
   segmentCount: number,
 ): string[] {
   if (baseUrls.length <= segmentCount) return baseUrls
+  const ordered: number[] = []
+  const seen = new Set<number>()
+  for (const mi of slots) {
+    if (mi < 0 || mi >= baseUrls.length || seen.has(mi)) continue
+    seen.add(mi)
+    ordered.push(mi)
+    if (ordered.length >= segmentCount) break
+  }
+  if (ordered.length >= segmentCount) {
+    return ordered.slice(0, segmentCount).map((mi) => baseUrls[mi]!)
+  }
   if (slots.length >= segmentCount) {
     const picked = slots
       .slice(0, segmentCount)
@@ -152,40 +169,30 @@ function pickSmartBatchMaterialUrls(
   return out.length >= 2 ? out : baseUrls.slice(0, Math.max(2, segmentCount))
 }
 
-export type IceSmartBatchMaterial = {
-  kind: 'video' | 'image'
-  mediaUrl: string
-  label?: string
-}
-
-export type IceSmartBatchScriptRow = {
-  timeRange?: string
-  visual?: string
-  dialogue?: string
-}
-
 function buildDefaultEditingConfig(
   speechRate = 0,
   subtitleStyleId?: string,
-  singleShotDuration = 2,
+  singleShotDuration = 3,
   opts?: { voicePresetId?: string; transitionAuto?: boolean },
 ): Record<string, unknown> {
   const preset = resolveIceSubtitleStylePreset(subtitleStyleId ?? ICE_SUBTITLE_STYLE_DEFAULT_ID)
-  const shotDur = Math.max(0.45, Math.min(8, singleShotDuration))
+  /** 单镜头时长 3～5s，避免切换过快导致「卡顿感」（对齐阿里云脚本化成片建议） */
+  const shotDur = Math.max(3, Math.min(5, singleShotDuration))
   const imsVoice = resolveImsBatchSpeechVoice(opts?.voicePresetId ?? '')
   const transitionAuto = opts?.transitionAuto !== false
   return {
     ProcessConfig: {
       AllowTransition: transitionAuto,
-      UseUniformTransition: false,
+      UseUniformTransition: true,
       TransitionList: transitionAuto
-        ? ['wiperight', 'wipeleft', 'directional', 'simplezoom']
+        ? ['directional', 'simplezoom', 'wiperight']
         : [],
       AllowVfxEffect: false,
-      EnableClipSplit: transitionAuto,
+      /** 关闭 AI 二次拆条，避免长素材被切得过碎 */
+      EnableClipSplit: false,
       SingleShotDuration: Math.round(shotDur * 100) / 100,
-      /** 口播按目标字数填充；视频轨对齐口播时长 */
-      AlignmentMode: 'AutoSpeed',
+      /** Cut：保持原速截断，比 AutoSpeed 缩放更流畅 */
+      AlignmentMode: 'Cut',
     },
     MediaConfig: { Volume: 0 },
     SpeechConfig: {
@@ -194,7 +201,7 @@ function buildDefaultEditingConfig(
       Voice: imsVoice,
       AsrConfig: buildSmartBatchAsrConfig(preset),
     },
-    BackgroundMusicConfig: { Volume: 0.22 },
+    BackgroundMusicConfig: { Volume: 0.15 },
   }
 }
 
@@ -218,9 +225,11 @@ function buildInputConfig(input: {
     targetTotalSec,
   )
   const urls = pickSmartBatchMaterialUrls(baseUrls, slots, segmentCount)
-  const guidance = input.guidance.trim()
-  const shotDurationSec = Math.max(0.45, Math.round((targetTotalSec / urls.length) * 100) / 100)
-  const narration = buildSmartBatchNarration(guidance, input.scriptRows, targetTotalSec)
+  const shotDurationSec = Math.max(
+    3,
+    Math.min(5, Math.round((targetTotalSec / Math.max(1, urls.length)) * 100) / 100),
+  )
+  const narration = buildSmartBatchNarration(input.guidance.trim(), input.scriptRows, targetTotalSec)
   const estSpeech = estimateSpeechSec(narration)
   const speechRate = resolveSpeechRateForTarget(estSpeech, targetTotalSec)
 

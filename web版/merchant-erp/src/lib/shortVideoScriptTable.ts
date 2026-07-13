@@ -946,7 +946,7 @@ export function buildMixSpeakableNarration(
 
   if (unique.length === 0) return '探店实拍，品质在线，欢迎到店体验！'
 
-  let narration = unique.join('，').replace(/，+/g, '，').replace(/。+/g, '。').trim()
+  let narration = unique.join('。').replace(/。+/g, '。').replace(/，+/g, '，').trim()
 
   if (minChars > 0 && narration.length < minChars && unique.length >= 1) {
     let guard = 0
