@@ -22,6 +22,94 @@ export type IceMixMaterialSlot = {
   label: string
 }
 
+/** 混剪主推商品与价格（用户手填，供 AI 规划口播） */
+export type MixPromoContext = {
+  mainProduct?: string
+  originalPrice?: string
+  salePrice?: string
+}
+
+export function isMixPromoFilled(promo?: MixPromoContext): boolean {
+  if (!promo) return false
+  return Boolean(
+    promo.mainProduct?.trim() || promo.originalPrice?.trim() || promo.salePrice?.trim(),
+  )
+}
+
+export function formatMixPromoPlanningBlock(promo?: MixPromoContext): string {
+  if (!isMixPromoFilled(promo)) return ''
+  const product = promo!.mainProduct?.trim() || '（未填）'
+  const orig = promo!.originalPrice?.trim() || '（未填）'
+  const sale = promo!.salePrice?.trim() || '（未填）'
+  return `【主推商品与价格（须写入口播）】
+主推商品：${product}
+原价：${orig} 元
+优惠价：${sale} 元
+口播要求：
+- 中段产品/套餐镜头须自然带出主推商品名（勿每段都重复商品名）
+- 收尾 1～2 段须口播强调「原价 vs 优惠价」划算（须可朗读，如「原价${orig}，现在${sale}，太划算了！」）
+- 各段口播不得完全相同，禁止多段复读同一句`
+}
+
+function pickVariant(lines: string[], lineIndex = 0): string {
+  const pool = lines.filter((l) => l.trim().length >= 4)
+  if (pool.length === 0) return ''
+  return pool[lineIndex % pool.length]!
+}
+
+function formatMixPriceYuan(raw?: string): string {
+  const t = String(raw ?? '').trim().replace(/[元￥¥\s]/g, '')
+  if (!t) return ''
+  const n = Number(t)
+  if (Number.isFinite(n) && n > 0) {
+    return Number.isInteger(n) ? String(n) : n.toFixed(1).replace(/\.0$/, '')
+  }
+  return t.slice(0, 8)
+}
+
+/** 按段位生成商品/价格口播（须与画面大致匹配） */
+export function mixPromoDialogueForSegment(
+  visual: string,
+  segmentIndex: number,
+  totalSegments: number,
+  promo?: MixPromoContext,
+): string | null {
+  if (!isMixPromoFilled(promo)) return null
+  const product = promo!.mainProduct?.trim()
+  const orig = formatMixPriceYuan(promo!.originalPrice)
+  const sale = formatMixPriceYuan(promo!.salePrice)
+  const v = visual.trim()
+  const closing = segmentIndex >= totalSegments - 1
+  const priceSlot = segmentIndex >= totalSegments - 2
+
+  if (closing && orig && sale) {
+    if (/门头|门店|环境|全景|用餐|结尾|收尾/.test(v) || closing) {
+      const name = product ? `${product}，` : ''
+      return `${name}原价${orig}，现在${sale}，赶紧冲！`.slice(0, 28)
+    }
+  }
+  if (priceSlot && orig && sale && /套餐|团购|优惠|价格|摆盘|出货|菜品|牛排|肉|铁板/.test(v)) {
+    return pickVariant(
+      [
+        `原价${orig}，优惠价${sale}，真的划算！`,
+        `日常${orig}，活动价${sale}，值！`,
+      ],
+      segmentIndex,
+    ).slice(0, 28)
+  }
+  if (product && /套餐|产品|成品|摆盘|出货|菜品|牛排|肉|铁板|原切|食材/.test(v)) {
+    return pickVariant(
+      [
+        `这款${product}，到店必点！`,
+        `${product}品质在线，值得一试！`,
+        `招牌${product}，分量也很实在！`,
+      ],
+      segmentIndex,
+    ).slice(0, 28)
+  }
+  return null
+}
+
 export type IceMixSegmentPlan = {
   kind: 'video' | 'image'
   mediaUrl: string
@@ -640,27 +728,143 @@ export function mixStorefrontGuideDialogue(storeHint = ''): string {
   return '认准门店门头，导航直达不迷路，欢迎进店体验！'
 }
 
+export type DeriveMixDialogueOpts = {
+  lineIndex?: number
+  totalRows?: number
+  promo?: MixPromoContext
+}
+
 /** 根据画面描述生成短口播（指导文案无法拆出可读句时的回退） */
-export function deriveMixDialogueFromVisual(visual: string, fallback = '值得一看'): string {
+export function deriveMixDialogueFromVisual(
+  visual: string,
+  fallback = '值得一看',
+  opts?: DeriveMixDialogueOpts,
+): string {
   const v = visual.trim()
+  const idx = opts?.lineIndex ?? 0
+  const total = opts?.totalRows ?? 1
+  const promoLine = mixPromoDialogueForSegment(v, idx, total, opts?.promo)
+  if (promoLine && isMixDialogueAlignedWithVisual(v, promoLine)) return promoLine
+
   if (/行走|走路|脚步|人行道|腿部|石板路|走向|徒步|迈步/.test(v)) {
-    return '走，咱们进店看看！'
+    return pickVariant(['走，咱们进店看看！', '就在前面，进店瞧瞧！', '脚步带路，马上到店！'], idx)
   }
   if (STOREFRONT_RE.test(v)) return mixStorefrontGuideDialogue(fallback)
-  if (/生肉|原切|未烹饪|拿起.*肉|红色.*肉|带骨/.test(v) && !/熟|焦|出锅|成品/.test(v)) {
-    return '看这原切品质，新鲜度拉满！'
+  if (/厨师|大厨|手法|娴熟|透明手套|操作台/.test(v)) {
+    return pickVariant(
+      ['师傅手法娴熟，火候拿捏到位！', '后厨现做，看着就放心！', '专业操作，讲究每一个步骤！'],
+      idx,
+    )
   }
-  if (/配菜|煎蛋|意面|玉米|西兰花|副食/.test(v)) return '配菜也很丰富，一份超满足！'
-  if (PROCESS_RE.test(v)) return '后厨现做，新鲜靠谱看得见。'
-  if (PRODUCT_RE.test(v)) return '这一口鲜嫩多汁，太满足了！'
-  if (EXPERIENCE_RE.test(v)) return '试吃一口，真的停不下来。'
-  if (/环境|氛围|装修|餐桌|用餐|全景/.test(v)) return '环境氛围拉满，适合来打卡。'
-  if (CLOSING_RE.test(v) || /结束|号召/.test(v)) return '心动就行动起来，欢迎到店体验！'
+  if (/生肉|原切|未烹饪|拿起.*肉|红色.*肉|带骨/.test(v) && !/熟|焦|出锅|成品/.test(v)) {
+    return pickVariant(
+      ['看这原切品质，新鲜度拉满！', '食材新鲜，纹理一眼能打！', '这块肉成色真好，放心点！'],
+      idx,
+    )
+  }
+  if (/滋滋|冒热气|铁板|焦香|出锅/.test(v)) {
+    return pickVariant(
+      ['铁板滋滋作响，肉香扑鼻！', '现煎出炉，香气挡不住！', '热气腾腾，看着就饿了！'],
+      idx,
+    )
+  }
+  if (/配菜|煎蛋|意面|玉米|西兰花|副食/.test(v)) {
+    return pickVariant(
+      ['配菜丰富，玉米蛋面样样有！', '副食搭配讲究，吃得过瘾！', '一案好料，一口超满足！'],
+      idx,
+    )
+  }
+  if (PROCESS_RE.test(v)) {
+    return pickVariant(
+      ['后厨现做，新鲜靠谱看得见。', '现点现做，每一步都讲究！', '制作全程透明，吃得安心！'],
+      idx,
+    )
+  }
+  if (PRODUCT_RE.test(v)) {
+    return pickVariant(
+      ['这一口鲜嫩多汁，太满足了！', '摆盘精致，分量也很实在！', '出货瞬间，香味直接上头！'],
+      idx,
+    )
+  }
+  if (EXPERIENCE_RE.test(v)) {
+    return pickVariant(['试吃一口，真的停不下来。', '入口惊艳，回味很足！', '吃过就懂，值得再来！'], idx)
+  }
+  if (/环境|氛围|装修|餐桌|用餐|全景/.test(v)) {
+    return pickVariant(['环境氛围拉满，适合来打卡。', '用餐氛围很舒服，拍照也好看！', '店里格调在线，坐着很惬意！'], idx)
+  }
+  if (CLOSING_RE.test(v) || /结束|号召/.test(v)) {
+    return pickVariant(
+      ['心动就行动起来，欢迎到店体验！', '喜欢就别犹豫，赶紧来试试！', '就在附近，随时欢迎到店！'],
+      idx,
+    )
+  }
   const short = sanitizeMixDialogueText(v)
   if (short.length >= 6 && short.length <= 32 && !isMixDialogueMetaInstruction(short)) {
     if (!/展示|镜头|画面|素材|段\d/.test(short)) return short.slice(0, 28)
   }
   return sanitizeMixDialogueText(fallback).slice(0, 28) || '值得一看'
+}
+
+function dialogueDedupeKey(dialogue: string): string {
+  return dialogue.trim().replace(/\s+/g, '')
+}
+
+/** 禁止多段口播完全重复 */
+export function dedupeMixScriptDialogues(
+  rows: ShortVideoScriptRow[],
+  hook = '值得一看',
+  promo?: MixPromoContext,
+): ShortVideoScriptRow[] {
+  const seen = new Set<string>()
+  return rows.map((r, i) => {
+    let dialogue = String(r.dialogue ?? '').trim()
+    let key = dialogueDedupeKey(dialogue)
+    if (key.length >= 4 && seen.has(key)) {
+      dialogue = deriveMixDialogueFromVisual(r.visual, hook, {
+        lineIndex: i + seen.size + 1,
+        totalRows: rows.length,
+        promo,
+      })
+      key = dialogueDedupeKey(dialogue)
+      let guard = 0
+      while (seen.has(key) && guard < 6) {
+        guard += 1
+        dialogue = deriveMixDialogueFromVisual(r.visual, hook, {
+          lineIndex: i + seen.size + guard + 2,
+          totalRows: rows.length,
+          promo,
+        })
+        key = dialogueDedupeKey(dialogue)
+      }
+    }
+    if (key.length >= 4) seen.add(key)
+    return { ...r, dialogue: dialogue.slice(0, 120) }
+  })
+}
+
+function injectMixPromoDialogues(
+  rows: ShortVideoScriptRow[],
+  promo?: MixPromoContext,
+): ShortVideoScriptRow[] {
+  if (!isMixPromoFilled(promo) || rows.length === 0) return rows
+  const productIdx = rows.findIndex((r) =>
+    /套餐|产品|成品|摆盘|出货|菜品|牛排|肉|铁板|原切|食材|配菜/.test(r.visual),
+  )
+  const closingIdx = rows.length - 1
+  const slots = new Set<number>()
+  if (productIdx >= 0) slots.add(productIdx)
+  slots.add(closingIdx)
+  if (rows.length >= 3) slots.add(closingIdx - 1)
+
+  return rows.map((r, i) => {
+    if (!slots.has(i)) return r
+    const promoLine = mixPromoDialogueForSegment(r.visual, i, rows.length, promo)
+    if (!promoLine) return r
+    if (i === closingIdx || isMixDialogueAlignedWithVisual(r.visual, promoLine)) {
+      return { ...r, dialogue: promoLine.slice(0, 120) }
+    }
+    return r
+  })
 }
 
 type MixSceneTag =
@@ -752,10 +956,20 @@ export function isMixDialogueAlignedWithVisual(visual: string, dialogue: string)
   return false
 }
 
+export type AlignMixDialogueOpts = {
+  lineIndex?: number
+  totalRows?: number
+  promo?: MixPromoContext
+}
+
 /** 强制将单行口播与画面对齐 */
-export function alignMixScriptRowDialogueToVisual(row: ShortVideoScriptRow, hook = '值得一看'): ShortVideoScriptRow {
+export function alignMixScriptRowDialogueToVisual(
+  row: ShortVideoScriptRow,
+  hook = '值得一看',
+  opts?: AlignMixDialogueOpts,
+): ShortVideoScriptRow {
   const visual = String(row.visual ?? '').trim()
-  let dialogue = String(row.dialogue ?? '').trim()
+  const dialogue = String(row.dialogue ?? '').trim()
   const cleaned = sanitizeMixDialogueText(dialogue)
   const speakable =
     cleaned.length >= 4 &&
@@ -764,9 +978,19 @@ export function alignMixScriptRowDialogueToVisual(row: ShortVideoScriptRow, hook
   if (speakable && isMixDialogueAlignedWithVisual(visual, cleaned)) {
     return { ...row, dialogue: cleaned.slice(0, 120) }
   }
+  const idx = opts?.lineIndex ?? 0
+  const total = opts?.totalRows ?? 1
+  const promoLine = mixPromoDialogueForSegment(visual, idx, total, opts?.promo)
+  if (promoLine && (idx >= total - 1 || isMixDialogueAlignedWithVisual(visual, promoLine))) {
+    return { ...row, dialogue: promoLine.slice(0, 120) }
+  }
   return {
     ...row,
-    dialogue: deriveMixDialogueFromVisual(visual, hook).slice(0, 120),
+    dialogue: deriveMixDialogueFromVisual(visual, hook, {
+      lineIndex: idx,
+      totalRows: total,
+      promo: opts?.promo,
+    }).slice(0, 120),
   }
 }
 
@@ -774,16 +998,24 @@ export function alignMixScriptRowDialogueToVisual(row: ShortVideoScriptRow, hook
 export function alignMixScriptRowsToVisual(
   rows: ShortVideoScriptRow[],
   hook = '探店实拍，值得期待',
+  promo?: MixPromoContext,
 ): ShortVideoScriptRow[] {
-  return rows.map((r) => alignMixScriptRowDialogueToVisual(r, hook))
+  const total = rows.length
+  return rows.map((r, i) =>
+    alignMixScriptRowDialogueToVisual(r, hook, { lineIndex: i, totalRows: total, promo }),
+  )
 }
 
-/** 规划出口统一终检（purify + 画面对齐） */
+/** 规划出口统一终检（purify + 画面对齐 + 商品价 + 去重） */
 export function finalizeMixScriptRows(
   rows: ShortVideoScriptRow[],
   hook = '探店实拍，值得期待',
+  promo?: MixPromoContext,
 ): ShortVideoScriptRow[] {
-  return alignMixScriptRowsToVisual(purifyMixScriptRowsDialogue(rows), hook)
+  const purified = purifyMixScriptRowsDialogue(rows)
+  const aligned = alignMixScriptRowsToVisual(purified, hook, promo)
+  const withPromo = injectMixPromoDialogues(aligned, promo)
+  return dedupeMixScriptDialogues(withPromo, hook, promo)
 }
 
 /** 将 AI/回退口播规范为可 TTS 朗读的短句 */
@@ -793,6 +1025,8 @@ export function resolveMixSegmentDialogue(opts: {
   guidanceLines: string[]
   lineIndex: number
   hook: string
+  totalRows?: number
+  promo?: MixPromoContext
 }): string {
   const raw = String(opts.rawDialogue ?? '').trim()
   if (raw && isMixDialogueMetaInstruction(raw)) {
@@ -817,7 +1051,21 @@ export function resolveMixSegmentDialogue(opts: {
     return fromGuidance.slice(0, 120)
   }
 
-  return deriveMixDialogueFromVisual(opts.visual, opts.hook).slice(0, 120)
+  const promoLine = mixPromoDialogueForSegment(
+    opts.visual,
+    opts.lineIndex,
+    opts.totalRows ?? Math.max(1, opts.lineIndex + 1),
+    opts.promo,
+  )
+  if (promoLine && isMixDialogueAlignedWithVisual(opts.visual, promoLine)) {
+    return promoLine.slice(0, 120)
+  }
+
+  return deriveMixDialogueFromVisual(opts.visual, opts.hook, {
+    lineIndex: opts.lineIndex,
+    totalRows: opts.totalRows,
+    promo: opts.promo,
+  }).slice(0, 120)
 }
 
 function narrativeTextBlob(
