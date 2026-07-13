@@ -88,15 +88,6 @@ function estimateSpeechSec(text: string): number {
   return Math.max(2, Math.ceil(len / DIALOGUE_CHARS_PER_SEC))
 }
 
-function truncateDialogue(text: string, maxChars: number): string {
-  const t = text.trim()
-  if (t.length <= maxChars) return t
-  const cut = t.slice(0, maxChars)
-  const lastPunc = Math.max(cut.lastIndexOf('。'), cut.lastIndexOf('，'), cut.lastIndexOf('！'))
-  if (lastPunc >= Math.floor(maxChars * 0.5)) return cut.slice(0, lastPunc + 1)
-  return `${cut}…`
-}
-
 function isPlaceholderDialogue(text: string): boolean {
   const t = text.trim()
   if (t.length < 8) return true

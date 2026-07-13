@@ -9,6 +9,7 @@ import {
   purifyMixScriptRowsDialogue,
   sanitizeMixDialogueText,
   isMixDialogueMetaInstruction,
+  buildMixSpeakableNarration,
   planLongformAllFiveSecondDurations,
   scriptTimeRangesFromDurationPlan,
   segmentCountFromTargetTotalSec,
