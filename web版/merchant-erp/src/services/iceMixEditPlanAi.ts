@@ -3,6 +3,7 @@
  * 不再使用纯文本 LLM 猜 materialIndex（易全选第一条）。
  */
 import { postAiChat } from './ai/aiClient'
+import { reviewMixScriptRowsWithAi } from './iceMixDialogueReviewAi'
 import {
   collectMixMaterialFramesForEditPlan,
   groupMixFramesByMaterialIndex,
@@ -23,6 +24,7 @@ import {
   hasStorefrontMixMaterials,
   isMixMaterialPromotionRelevant,
   mixStorefrontGuideDialogue,
+  finalizeMixScriptRows,
 } from '../lib/iceMixPlan'
 import {
   clampMixSourceInSec,
@@ -36,7 +38,6 @@ import {
   parseScriptTimeRangeSeconds,
   pickMixDialogueHook,
   planLongformAllFiveSecondDurations,
-  purifyMixScriptRowsDialogue,
   sanitizeMixDialogueText,
   isMixDialogueMetaInstruction,
   scriptTimeRangesFromDurationPlan,
@@ -671,7 +672,7 @@ const NARRATIVE_TEXT_PLAN_SYSTEM = `你是专业短视频混剪导演（探店/�
    模式A：门头/门店指引(开场) → 套餐/产品/制作过程(中段) → 结束语/行动号召(收尾)
    模式B：产品/套餐卖点钩子(开场) → 制作/试吃体验(中段) → 门头/到店指引(倒数第二段) → 结束语(收尾)
 4. 每段 visual（画面描述，给剪辑看）与 dialogue（口播台词，给观众听）语义一致
-5. dialogue 必须是可直接 TTS 朗读的第一人称/现场旁白短句（每段 12～28 字），禁止指导文案摘要与提示语（如「这是一支以…为主题的短视频」「开篇以门头招牌…引入」）；禁止占位符；禁止「核心卖点」「叙事节奏」「目标受众」等编导标签；禁止照搬指导文案整段
+5. dialogue 必须是可直接 TTS 朗读的第一人称/现场旁白短句（每段 12～28 字），禁止指导文案摘要与提示语（如「这是一支以…为主题的短视频」「开篇以门头…引入」「最后以…收尾，结合口播强调…引导用户」）；禁止占位符；禁止「核心卖点」「叙事节奏」「目标受众」等编导标签；禁止第三人称说明「他们注重…」；禁止照搬指导文案整段
 6. visual 写该段画面内容；dialogue 写该段旁白，须与 visual 同一段画面匹配（门头段只讲到店指引/门店信息）
 7. segmentIndex 从 0 连续递增，表示成片时间轴顺序
 
@@ -849,7 +850,7 @@ function narrativeSegmentsToRows(
     visual: s.visual.trim(),
     dialogue: s.dialogue.trim(),
   }))
-  return purifyMixScriptRowsDialogue(ensureSequentialMixScriptRows(rows, total))
+  return finalizeMixScriptRows(ensureSequentialMixScriptRows(rows, total))
 }
 
 function narrativeSegmentsToDecisions(segments: MixNarrativeSegment[]): MixEditSegmentDecision[] {
@@ -1226,8 +1227,14 @@ export async function planMixNarrativeFromVision(opts: {
   }
 
   const rows = narrativeSegmentsToRows(segments, opts.targetTotalSec)
+  let reviewedRows = rows
+  try {
+    reviewedRows = await reviewMixScriptRowsWithAi(rows, opts.onProgress)
+  } catch {
+    reviewedRows = finalizeMixScriptRows(rows)
+  }
   const decisions = narrativeSegmentsToDecisions(segments)
   const materialSlots = segments.map((s) => s.materialIndex)
 
-  return { ok: true, rows, decisions, materialSlots }
+  return { ok: true, rows: reviewedRows, decisions, materialSlots }
 }
