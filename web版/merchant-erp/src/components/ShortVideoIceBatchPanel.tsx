@@ -81,7 +81,15 @@ import {
   normalizeMixMaterialSlots,
   type IceMixMaterialSlot,
 } from '../lib/iceMixPlan'
-import { resolveIceEffectPreset, ICE_MIX_TRANSITION_PRESETS } from '../lib/iceEffectPresets'
+import {
+  defaultScriptRows,
+  maxScriptTimeRangeEndSec,
+  parseScriptRowsFromPlainText,
+  purifyMixScriptRowsDialogue,
+  resizeScriptRows,
+  segmentCountFromTargetTotalSec,
+  type ShortVideoScriptRow,
+} from '../lib/shortVideoScriptTable'
 import {
   ICE_MIX_VOICE_DEFAULT_ID,
   ICE_MIX_VOICE_PRESETS,
@@ -98,14 +106,7 @@ import {
   ICE_SUBTITLE_STYLE_PRESETS,
   resolveIceSubtitleStylePreset,
 } from '../lib/iceSubtitleStylePresets'
-import {
-  defaultScriptRows,
-  maxScriptTimeRangeEndSec,
-  parseScriptRowsFromPlainText,
-  resizeScriptRows,
-  segmentCountFromTargetTotalSec,
-  type ShortVideoScriptRow,
-} from '../lib/shortVideoScriptTable'
+import { resolveIceEffectPreset, ICE_MIX_TRANSITION_PRESETS } from '../lib/iceEffectPresets'
 
 const MIX_VOICE_PREVIEW_FALLBACK = '大家好，这是一段混剪口播音色试听。'
 
@@ -270,6 +271,9 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       MIX_DEFAULT_SEGMENT_SEC,
     ),
   )
+  const applyScriptRows = useCallback((rows: ShortVideoScriptRow[]) => {
+    setScriptRows(purifyMixScriptRowsDialogue(rows))
+  }, [])
   const [materialSlots, setMaterialSlots] = useState<number[]>([])
   const [mixMaterialProfiles, setMixMaterialProfiles] = useState<IceMixMaterialProfile[]>([])
   const [planBusy, setPlanBusy] = useState(false)
@@ -500,7 +504,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
         mixMaterialProfiles,
         MIX_DEFAULT_SEGMENT_SEC,
       )
-      setScriptRows(synced.rows)
+      applyScriptRows(synced.rows)
       setMaterialSlots(synced.slots)
       return
     }
@@ -814,7 +818,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       const parsedRows = parseScriptRowsFromPlainText(text)
       setMixGuidance(text)
       if (parsedRows.length >= 2) {
-        setScriptRows(resizeScriptRows(parsedRows, parsedRows.length, MIX_DEFAULT_SEGMENT_SEC))
+        applyScriptRows(resizeScriptRows(parsedRows, parsedRows.length, MIX_DEFAULT_SEGMENT_SEC))
         setHint(`已从「${f.name}」解析 ${parsedRows.length} 段分镜，可继续 AI 规划或编辑素材映射。`)
       } else {
         setHint(`已从「${f.name}」载入指导文案，点击「AI 规划分镜」自动填入表格。`)
@@ -912,7 +916,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
           onProgress: (msg) => setHint(msg),
         })
         if (narrative.ok) {
-          setScriptRows(ensureMixScriptRowsCoverTarget(narrative.rows, mixTargetSec, MIX_DEFAULT_SEGMENT_SEC))
+          applyScriptRows(ensureMixScriptRowsCoverTarget(narrative.rows, mixTargetSec, MIX_DEFAULT_SEGMENT_SEC))
           setMaterialSlots(narrative.materialSlots)
           const covered = maxScriptTimeRangeEndSec(narrative.rows)
           setHint(
@@ -971,7 +975,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
         MIX_DEFAULT_SEGMENT_SEC,
         mixMaterialProfiles,
       )
-      setScriptRows(coverage.rows)
+      applyScriptRows(coverage.rows)
       setMaterialSlots(coverage.slots)
       const covered = maxScriptTimeRangeEndSec(coverage.rows)
       setHint(
@@ -1904,7 +1908,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                       onChange={(e) => {
                         const sec = Number(e.target.value)
                         setMixTargetSec(sec)
-                        setScriptRows(
+                        applyScriptRows(
                           defaultScriptRows(
                             segmentCountFromTargetTotalSec(sec, MIX_DEFAULT_SEGMENT_SEC),
                             MIX_DEFAULT_SEGMENT_SEC,
@@ -2095,7 +2099,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                     rows={scriptRows}
                     disabled={anyBusy || guidanceBusy}
                     compact={scriptRows.length > 8}
-                    onChange={setScriptRows}
+                    onChange={applyScriptRows}
                   />
                 </div>
                 {mixMaterialPool.length > 0 && scriptRows.length > 0 ? (
