@@ -11,6 +11,10 @@ import {
   computeVideoFrameSamplePoints,
 } from './iceMixMaterialFrames'
 import { MIX_DEFAULT_SOURCE_DURATION_SEC } from '../lib/iceMixPlan'
+import {
+  ICE_MIX_VISION_PROVIDER_ORDER,
+  ICE_MIX_TEXT_PROVIDER_ORDER,
+} from './iceMixAiModels'
 
 const VISION_SAMPLE_MAX = 48
 /** 素材分析：超过此数量只抽样深度理解，其余用文件名占位 */
@@ -326,14 +330,15 @@ async function describeVideoFramesOnce(
   if (frames.length === 0) return ''
   const imageDataUrls = frames.map((f) => f.dataUrl)
   const userText = frames.map((f) => f.label).join('\n')
-  const providers: Array<'doubao' | 'qwen' | 'tokenmix'> = ['doubao', 'qwen', 'tokenmix']
+  const providers = ICE_MIX_VISION_PROVIDER_ORDER
   let lastErr = ''
-  for (const provider of providers) {
+  for (const { provider, model } of providers) {
     try {
       const res = await postAiChat({
         provider,
-        ...(provider === 'tokenmix' ? { modelFamily: 'openai' as const, model: 'gpt-4o' } : {}),
-        temperature: 0.35,
+        model,
+        ...(provider === 'tokenmix' ? { modelFamily: 'openai' as const } : {}),
+        temperature: 0.25,
         imageDataUrls,
         messages: [
           { role: 'system', content: FRAME_VISION_SYSTEM },
@@ -382,13 +387,14 @@ async function generateGuidanceText(
     .filter(Boolean)
     .join('\n')
 
-  const vendors: Array<'doubao' | 'qwen'> = ['doubao', 'qwen']
+  const vendors = ICE_MIX_TEXT_PROVIDER_ORDER.filter((x) => x.provider !== 'tokenmix')
   let lastMsg = 'AI 未返回指导文案'
-  for (const provider of vendors) {
+  for (const { provider, model } of vendors) {
     try {
       const res = await postAiChat({
         provider,
-        temperature: 0.65,
+        model,
+        temperature: 0.55,
         messages: [
           { role: 'system', content: MIX_GUIDANCE_SYSTEM },
           { role: 'user', content: userBlock },

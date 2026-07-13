@@ -95,7 +95,7 @@ export function requestHasVisionImages(req: AIChatRequest): boolean {
 export async function chatVisionAgentFromRequest(
   req: AIChatRequest,
   env: Record<string, string>,
-  prefer: 'doubao' | 'qwen' = 'doubao',
+  prefer: 'doubao' | 'qwen' = 'qwen',
 ): Promise<AIChatResponse> {
   const imgs = visionImages(req)
   if (!imgs.length) throw new Error('缺少有效图片数据')
@@ -128,8 +128,10 @@ export async function chatVisionAgentFromRequest(
       modelOverride,
       (env.MERCHANT_AI_QWEN_VL_MODEL ?? '').trim(),
       (env.MERCHANT_AI_ICE_VERIFY_MODEL ?? '').trim(),
-      'qwen-vl-plus',
+      'qwen3-vl-plus',
+      'qwen-vl-max',
       'qwen2.5-vl-72b-instruct',
+      'qwen-vl-plus',
     ].filter(Boolean) as string[]
     let lastErr: Error | null = null
     for (const mid of [...new Set(models)]) {
@@ -162,8 +164,8 @@ export async function chatVisionAgentFromRequest(
       modelOverride,
       (env.MERCHANT_AI_DOUBAO_VL_MODEL ?? '').trim(),
       (env.MERCHANT_AI_ICE_VERIFY_MODEL ?? '').trim(),
-      'doubao-1-5-vision-pro-32k-250115',
       'doubao-seed-1-6-vision-250815',
+      'doubao-1-5-vision-pro-32k-250115',
     ].filter(Boolean) as string[]
     let lastErr: Error | null = null
     for (const mid of [...new Set(models)]) {

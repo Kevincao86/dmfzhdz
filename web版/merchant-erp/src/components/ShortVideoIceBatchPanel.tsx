@@ -70,6 +70,8 @@ import { reviewMixScriptRowsWithAi } from '../services/iceMixDialogueReviewAi'
 import {
   assignMixMaterialSlots,
   buildNarrativeMatchedMixCoverage,
+  filterMixPromotionRelevantIndices,
+  subsetMixMaterialPoolByIndices,
   finalizeMixScriptRows,
   formatMixPromoPlanningBlock,
   ensureMixScriptRowsCoverTarget,
@@ -91,6 +93,7 @@ import {
   parseScriptRowsFromPlainText,
   resizeScriptRows,
   segmentCountFromTargetTotalSec,
+  isMixDialogueMetaInstruction,
   type ShortVideoScriptRow,
 } from '../lib/shortVideoScriptTable'
 import {
@@ -1315,22 +1318,119 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       setErr(`暂不可智能成片：${smartBatchBlockers.join('；')}`)
       return
     }
+    if (mixGuidance.trim().length < 4) {
+      setErr('请先填写指导文案或点击「AI 分析素材」')
+      return
+    }
+    if (mixVoicePresetId === 'v-clone' && !mixCloneBlobRef.current) {
+      setErr('已选择语音克隆，请先上传语音样本')
+      return
+    }
 
     setSmartRenderBusy(true)
     setErr(null)
-    setHint('智能一键成片生成中…')
+    setHint('智能成片：准备素材与分镜…')
+
+    let workingProfiles = mixMaterialProfiles
+    let workingRows = scriptRows
+    const poolLen = mixMaterialPool.length
+    const usableProfiles = workingProfiles.filter(
+      (p) => p.description.trim().length >= 24 && !/截帧失败|无法识别|分析失败/i.test(p.description),
+    )
+
+    if (usableProfiles.length < Math.min(poolLen, Math.ceil(poolLen * 0.4))) {
+      setHint('智能成片：AI 分析素材画面…')
+      try {
+        const r = await analyzeIceMixMaterialsToGuidance({
+          materials: mixMaterialPool,
+          targetTotalSec: mixTargetSec,
+          aspectLabel: aspect.label,
+          userHint: mixGuidance.trim() || undefined,
+          onProgress: (msg) => setHint(`智能成片 · ${msg}`),
+        })
+        if (!r.ok) {
+          setErr(r.message)
+          setSmartRenderBusy(false)
+          return
+        }
+        setMixGuidance(r.guidance)
+        workingProfiles = r.materialProfiles
+        setMixMaterialProfiles(r.materialProfiles)
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : 'AI 分析素材失败')
+        setSmartRenderBusy(false)
+        return
+      }
+    }
+
+    const needsPlan =
+      !mixStoryboardRowsComplete(workingRows) ||
+      workingRows.some((r) => isMixDialogueMetaInstruction(r.dialogue.trim()))
+
+    if (needsPlan) {
+      setHint('智能成片：AI 规划分镜（语义匹配素材与口播）…')
+      try {
+        const narrative = await planMixNarrativeFromVision({
+          guidance: mixGuidance.trim(),
+          materials: mixMaterialPool,
+          materialProfiles: workingProfiles,
+          targetTotalSec: mixTargetSec,
+          promo: mixPromo,
+          onProgress: (msg) => setHint(`智能成片 · ${msg}`),
+        })
+        if (narrative.ok) {
+          workingRows = ensureMixScriptRowsCoverTarget(narrative.rows, mixTargetSec, MIX_DEFAULT_SEGMENT_SEC)
+          applyScriptRows(workingRows)
+          setMaterialSlots(narrative.materialSlots)
+        } else {
+          setErr(`${narrative.message}，请先点击「AI 规划分镜」后再试`)
+          setSmartRenderBusy(false)
+          return
+        }
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : 'AI 规划分镜失败')
+        setSmartRenderBusy(false)
+        return
+      }
+    } else {
+      workingRows = finalizeMixScriptRows(workingRows, '探店实拍，值得期待', mixPromo)
+      applyScriptRows(workingRows)
+    }
+
+    if (!mixStoryboardRowsComplete(workingRows)) {
+      setErr(storyboardGapHint ?? '分镜表未填完整，请先 AI 规划分镜')
+      setSmartRenderBusy(false)
+      return
+    }
+
+    const keepIndices = filterMixPromotionRelevantIndices(
+      mixMaterialPool,
+      workingProfiles,
+      mixGuidance.trim(),
+    )
+    const subset = subsetMixMaterialPoolByIndices(mixMaterialPool, workingProfiles, keepIndices)
+    let produceMaterials = subset.materials
+    let produceProfiles = subset.profiles as IceMixMaterialProfile[]
+    let produceSlots = materialSlots.map((mi) => subset.remapIndex(mi)).filter((mi) => mi >= 0)
+    if (produceMaterials.length < 2) {
+      produceMaterials = mixMaterialPool
+      produceProfiles = workingProfiles
+      produceSlots = materialSlots
+    }
+
+    setHint(`智能成片：已剔除无效镜头，保留 ${produceMaterials.length}/${poolLen} 条素材，正在 AI 匹配剪辑…`)
 
     const localId = newJobId()
-    const label = `智能成片 · ${mixMaterialPool.length} 素材`
+    const label = `智能成片 · ${poolLen} 素材`
     setJobs((prev) => [
       ...prev,
       {
         id: localId,
         label,
-        mediaUrl: mixMaterialPool[0]!.mediaUrl,
+        mediaUrl: produceMaterials[0]!.mediaUrl,
         phase: 'pipeline',
         message: '智能成片 · 提交云端…',
-        mixProduceMode: 'smart_batch',
+        mixProduceMode: 'timeline',
       },
     ])
 
@@ -1340,31 +1440,66 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       return
     }
 
-    const totalSec = mixTargetSec
+    const produced = await produceIceMixPackage({
+      rows: workingRows,
+      materials: produceMaterials,
+      materialSlots: produceSlots,
+      materialProfiles: produceProfiles,
+      targetTotalSec: mixTargetSec,
+      guidance: mixGuidance.trim(),
+      mixInstruction: mixGuidance.trim(),
+      effectId: resolvedMixEffect.id,
+      subtitleStyleId: mixSubtitleStyleId,
+      onProgress: (msg) => setHint(`智能成片 · ${msg}`),
+    })
+    if (!produced.ok) {
+      patchJob(localId, { phase: 'failed', message: produced.message })
+      setErr(produced.message)
+      setSmartRenderBusy(false)
+      return
+    }
+
+    const pack = produced.output
+    const segments = pack.segments
+    if (segments.length < 2) {
+      patchJob(localId, { phase: 'failed', message: '剪辑时间线无效' })
+      setErr('剪辑时间线无效，请检查分镜与素材映射')
+      setSmartRenderBusy(false)
+      return
+    }
+
+    setMaterialSlots(pack.materialSlots)
+    setHint(`智能成片剪辑方案：${pack.summary}`)
+
     let mixVoiceCloneBase64: string | undefined
     if (mixVoicePresetId === 'v-clone' && mixCloneBlobRef.current) {
       mixVoiceCloneBase64 = await audioBlobToPureBase64(mixCloneBlobRef.current)
     }
-    const pipe = await postIceSmartBatch({
-      materials: mixMaterialPool.map((m) => ({
-        kind: m.kind,
-        mediaUrl: m.mediaUrl,
-        label: m.label,
-      })),
-      scriptRows: scriptRows.length >= 2 ? scriptRows : [],
-      guidance: mixGuidance.trim(),
-      targetTotalSec: totalSec,
-      width: aspect.width,
-      height: aspect.height,
-      projectName: `智能成片-${label}`.slice(0, 120),
-      templateIds: cfg.smartBatchTemplateIds,
-      subtitleStyleId: mixSubtitleStyleId,
+
+    const pipe = await postIcePipeline({
+      mixSegments: segments.map((s) =>
+        prepareIceMixSegmentForPost({
+          kind: s.kind,
+          mediaUrl: s.mediaUrl,
+          signedMediaUrl: s.signedMediaUrl,
+          timelineStartSec: s.timelineStartSec,
+          timelineEndSec: s.timelineEndSec,
+          caption: s.caption,
+          materialIndex: s.materialIndex,
+          sourceInSec: s.sourceInSec,
+          sourceOutSec: s.sourceOutSec,
+        }),
+      ),
+      mixNarrationText: pack.narrationText.length >= 4 ? pack.narrationText : undefined,
       mixVoicePresetId: mixVoicePresetId || ICE_MIX_VOICE_DEFAULT_ID,
       mixVoiceCloneBase64,
-      transitionMode: mixTransitionMode,
-      effectId: resolvedMixEffect.id,
-      materialSlots:
-        materialSlots.length >= 2 ? materialSlots : undefined,
+      projectName: `智能成片-${label}`.slice(0, 120),
+      editBrief: pack.editBrief,
+      width: aspect.width,
+      height: aspect.height,
+      clipEndSec: mixTargetSec,
+      effectId: pack.effectId,
+      subtitleStyleId: pack.subtitleStyleId,
     })
 
     if (!pipe.ok) {
@@ -1373,14 +1508,13 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       return
     }
 
-    const smartPollMode = pipe.pollMode ?? 'smart_batch'
     patchJob(localId, {
       exportId: pipe.jobId,
       phase: 'polling',
       message: '智能成片 · 云端合成中…',
-      mixProduceMode: smartPollMode,
+      mixProduceMode: 'timeline',
     })
-    await pollJob(localId, pipe.jobId, smartPollMode)
+    await pollJob(localId, pipe.jobId, 'timeline')
     setSmartRenderBusy(false)
     setHint('智能一键成片已提交，请在右侧下载 MP4。')
   }

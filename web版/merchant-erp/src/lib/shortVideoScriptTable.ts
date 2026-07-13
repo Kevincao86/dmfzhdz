@@ -860,6 +860,16 @@ export function isMixDialogueMetaInstruction(text: string): boolean {
   if (/用餐全景/.test(raw) && /最后以|结合|引导|收尾/.test(raw)) return true
   if (/现点现做/.test(raw) && /最后以|结合口播|引导用户|收尾/.test(raw)) return true
 
+  // 指导文案正文句式（非口播，勿进 TTS）
+  if (/背景简洁明亮|强化食物吸引力|叙事节奏由.+转向|情绪从期待/.test(raw)) return true
+  if (/门头信息可作为片尾|配合口播引导用户|线上下单/.test(raw) && !/[我你您来走认准]/.test(raw)) {
+    return true
+  }
+  if (/适合后续 AI|须与画面一一对应|与推广\/产品\/门店毫无关联/.test(raw)) return true
+  if (/环境、产品\/服务、人物动作|光线氛围/.test(raw) && raw.length > 24 && !/[我你您]/.test(raw)) {
+    return true
+  }
+
   // 指导文案整段摘要（「这是一支以…为主题的短视频…」类提示语）
   if (/这是一支以.+为主题的短视频/.test(raw)) return true
   if (/本(支|条|个)?短视频/.test(raw) && /主题|重点展示|目标受众|旨在|目的在于|为核心/.test(raw)) {
@@ -904,6 +914,51 @@ function isMixDialogueMetaInstructionInner(cleaned: string, rawOriginal: string)
   if (/^最后以/.test(cleaned) && /收尾|结合|引导/.test(cleaned)) return true
   if (/结合口播|引导用户|口播强调/.test(cleaned)) return true
   return false
+}
+
+function truncateMixSpeakableText(text: string, maxChars: number): string {
+  const t = text.trim()
+  if (t.length <= maxChars) return t
+  const cut = t.slice(0, maxChars)
+  const lastPunc = Math.max(cut.lastIndexOf('。'), cut.lastIndexOf('，'), cut.lastIndexOf('！'))
+  if (lastPunc >= Math.floor(maxChars * 0.5)) return cut.slice(0, lastPunc + 1)
+  return `${cut}…`
+}
+
+/** 从分镜口播列构建可 TTS 全文：剔除提示语、去重，禁止掺入指导文案 */
+export function buildMixSpeakableNarration(
+  dialogues: string[],
+  opts?: { targetSec?: number },
+): string {
+  const targetSec = opts?.targetSec
+  const targetChars = targetSec ? Math.floor(targetSec * 4) : 480
+  const minChars = targetSec ? Math.max(28, Math.floor(targetSec * 3.6)) : 0
+
+  const unique: string[] = []
+  for (const raw of dialogues) {
+    const cleaned = sanitizeMixDialogueText(String(raw ?? '').trim())
+    if (cleaned.length < 4) continue
+    if (isMixDialogueMetaInstruction(cleaned) || isMixDialogueMetaInstruction(raw)) continue
+    if (!unique.some((u) => u === cleaned || u.includes(cleaned) || cleaned.includes(u))) {
+      unique.push(cleaned)
+    }
+  }
+
+  if (unique.length === 0) return '探店实拍，品质在线，欢迎到店体验！'
+
+  let narration = unique.join('，').replace(/，+/g, '，').replace(/。+/g, '。').trim()
+
+  if (minChars > 0 && narration.length < minChars && unique.length >= 1) {
+    let guard = 0
+    while (narration.length < minChars && guard < unique.length * 2) {
+      const extra = unique[guard % unique.length]!
+      guard += 1
+      if (!narration.includes(extra)) narration = `${narration}，${extra}`
+      else break
+    }
+  }
+
+  return truncateMixSpeakableText(narration, targetChars)
 }
 
 function pushUniqueDialogueLine(out: string[], line: string): void {

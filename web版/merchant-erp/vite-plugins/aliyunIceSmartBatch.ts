@@ -19,7 +19,10 @@ import {
   resolveIceSubtitleStylePreset,
 } from '../src/lib/iceSubtitleStylePresets.js'
 import { resolveImsBatchSpeechVoice } from '../src/lib/digitalHumanBroadcast.js'
-import { sanitizeMixDialogueText } from '../src/lib/shortVideoScriptTable.js'
+import {
+  buildMixSpeakableNarration,
+  sanitizeMixDialogueText,
+} from '../src/lib/shortVideoScriptTable.js'
 import type { AliyunIceConfig } from './aliyunIceCore.js'
 
 type IceClientClass = {
@@ -114,54 +117,17 @@ function resolveSpeechRateForTarget(estSec: number, targetSec: number): number {
   return 0
 }
 
-/** 全局口播：字数贴近目标秒数，避免 IMS AutoSpeed 按短口播压短成片 */
+/** 全局口播：仅分镜口播列，禁止掺入指导文案（防 TTS 念出提示语） */
 function buildSmartBatchNarration(
-  guidance: string,
+  _guidance: string,
   scriptRows: IceSmartBatchScriptRow[],
   targetSec: number,
 ): string {
-  const targetChars = Math.floor(targetSec * DIALOGUE_CHARS_PER_SEC)
-  const minChars = Math.max(28, Math.floor(targetSec * 3.6))
-
   const rowDialogues = scriptRows
     .map((r) => sanitizeMixDialogueText(String(r.dialogue ?? '')))
     .filter((d) => !isPlaceholderDialogue(d))
 
-  const uniqueParts: string[] = []
-  for (const part of rowDialogues) {
-    if (!uniqueParts.includes(part)) uniqueParts.push(part)
-  }
-
-  let narration = uniqueParts.join('，')
-
-  const sentences = guidance
-    .trim()
-    .split(/(?<=[。！？!?])\s*/)
-    .map((s) => sanitizeMixDialogueText(s.trim()))
-    .filter((s) => s.length >= 6)
-
-  for (const s of sentences) {
-    if (narration.length >= minChars) break
-    if (!narration.includes(s)) narration = narration ? `${narration}。${s}` : s
-  }
-
-  let guard = 0
-  while (narration.length < minChars && uniqueParts.length > 0 && guard < 6) {
-    guard += 1
-    narration = `${narration}。${uniqueParts.join('，')}`
-  }
-
-  if (narration.length < minChars) {
-    narration = truncateDialogue(guidance.trim() || narration, targetChars)
-  }
-  if (narration.length < minChars) {
-    narration = truncateDialogue(
-      `${narration}。值得一看，欢迎到店体验，快来打卡吧`,
-      targetChars,
-    )
-  }
-
-  return truncateDialogue(narration, targetChars)
+  return buildMixSpeakableNarration(rowDialogues, { targetSec })
 }
 
 function pickSmartBatchSegmentCount(

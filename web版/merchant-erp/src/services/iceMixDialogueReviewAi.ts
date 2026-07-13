@@ -3,6 +3,7 @@
  */
 import { postAiChat } from './ai/aiClient'
 import { finalizeMixScriptRows, formatMixPromoPlanningBlock, type MixPromoContext } from '../lib/iceMixPlan'
+import { ICE_MIX_TEXT_PROVIDER_ORDER } from './iceMixAiModels'
 import type { ShortVideoScriptRow } from '../lib/shortVideoScriptTable'
 
 const MIX_DIALOGUE_REVIEW_SYSTEM = `你是短视频口播编辑（探店/餐饮）。用户给出混剪分镜表，每段含【画面】与【口播】。
@@ -59,12 +60,13 @@ export async function reviewMixScriptRowsWithAi(
     .filter(Boolean)
     .join('\n\n')
 
-  const providers: Array<'doubao' | 'qwen'> = ['doubao', 'qwen']
-  for (const provider of providers) {
+  const providers = ICE_MIX_TEXT_PROVIDER_ORDER.filter((x) => x.provider !== 'tokenmix')
+  for (const { provider, model } of providers) {
     try {
       const res = await postAiChat({
         provider,
-        temperature: 0.2,
+        model,
+        temperature: 0.15,
         messages: [
           { role: 'system', content: MIX_DIALOGUE_REVIEW_SYSTEM },
           { role: 'user', content: userBlock },

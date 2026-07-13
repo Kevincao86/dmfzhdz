@@ -313,7 +313,7 @@ export async function produceIceMixPackage(
     return { ok: false, message: diversityErr }
   }
 
-  const narrationText = collectMixNarrationText(rows)
+  const narrationText = collectMixNarrationText(rows, input.targetTotalSec)
   const editBrief = composeMixProductionBrief(
     input.mixInstruction || input.guidance || '',
     rows,

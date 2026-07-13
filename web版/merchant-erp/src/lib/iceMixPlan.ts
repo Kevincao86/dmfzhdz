@@ -231,18 +231,14 @@ function formatMixSec(n: number): string {
 }
 
 /** 各段口播合并为 TTS 全文（混剪讲解轨） */
-export function collectMixNarrationText(rows: ShortVideoScriptRow[]): string {
-  return rows
-    .map((r) =>
-      r.dialogue
-        .trim()
-        .replace(/^（无口播）$/i, '')
-        .replace(/^["「]|["」]$/g, ''),
-    )
-    .filter((t) => t.length >= 2)
-    .join('。')
-    .replace(/。+/g, '。')
-    .trim()
+export function collectMixNarrationText(
+  rows: ShortVideoScriptRow[],
+  targetSec?: number,
+): string {
+  return buildMixSpeakableNarration(
+    rows.map((r) => r.dialogue),
+    targetSec != null ? { targetSec } : undefined,
+  )
 }
 
 /** 在素材池中均匀取第 i 段应对应的下标（段数少于素材数时避免总用前几条） */
@@ -1173,6 +1169,44 @@ export function filterMixPromotionRelevantIndices(
     .map((s) => s.idx)
   if (strict.length >= 2) return strict.slice(0, Math.min(materials.length, strict.length))
   return scored.slice(0, Math.max(2, Math.min(materials.length, 2))).map((s) => s.idx)
+}
+
+/** 按有效下标裁剪素材池（剔除马路/截帧失败等无效镜头） */
+export function subsetMixMaterialPoolByIndices(
+  materials: IceMixMaterialSlot[],
+  profiles: MixNarrativeProfileInput[],
+  keepIndices: number[],
+): {
+  materials: IceMixMaterialSlot[]
+  profiles: MixNarrativeProfileInput[]
+  remapIndex: (oldIndex: number) => number
+} {
+  const uniq = [...new Set(keepIndices.filter((i) => i >= 0 && i < materials.length))]
+  if (uniq.length < 2) {
+    return {
+      materials,
+      profiles,
+      remapIndex: (oldIndex) => oldIndex,
+    }
+  }
+  const oldToNew = new Map<number, number>()
+  uniq.forEach((old, ni) => oldToNew.set(old, ni))
+  return {
+    materials: uniq.map((i) => materials[i]!),
+    profiles: uniq.map((i) => {
+      const p = profiles.find((x) => x.index === i) ?? profiles[i]
+      const ni = oldToNew.get(i)!
+      return p
+        ? { ...p, index: ni }
+        : {
+            index: ni,
+            label: materials[i]!.label,
+            kind: materials[i]!.kind,
+            description: materials[i]!.label,
+          }
+    }),
+    remapIndex: (oldIndex) => oldToNew.get(oldIndex) ?? -1,
+  }
 }
 
 /** 分镜行文案/画面推断叙事角色 */
