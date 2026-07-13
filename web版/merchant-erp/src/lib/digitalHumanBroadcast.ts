@@ -531,6 +531,35 @@ export const ICE_MIX_VOICE_PRESETS: VoicePreset[] = [
 
 export const ICE_MIX_VOICE_DEFAULT_ID = CUSTOM_UPLOAD_VOICE_PRESETS[0]!.id
 
+/** 智能一键成片 IMS SpeechConfig.Voice（与面板口播音色 gender/预设对齐） */
+const IMS_BATCH_VOICE_BY_PRESET: Record<string, string> = {
+  'v-custom-female': 'zhitian',
+  'v-custom-male': 'zhilun',
+  'v-av-real-1': 'zhiru',
+  'v-av-real-2': 'zhitian',
+  'v-av-real-3': 'zhixiang',
+  'v-av-real-4': 'zhijia',
+  'v-av-real-5': 'zhinan',
+  'v-av-real-6': 'zhiyuan',
+  'v-av-real-7': 'zhilun',
+  'v-av-real-8': 'zhibei_emo',
+  'v-av-real-9': 'zhiqing',
+  'v-av-real-10': 'zhitian',
+  'v-av-real-11': 'zhiru',
+  'v-av-real-12': 'zhimiao_emo',
+}
+
+/** 映射混剪口播音色 → IMS 批量成片 SpeechConfig.Voice */
+export function resolveImsBatchSpeechVoice(voicePresetId: string): string {
+  const id = String(voicePresetId || ICE_MIX_VOICE_DEFAULT_ID).trim()
+  const mapped = IMS_BATCH_VOICE_BY_PRESET[id]
+  if (mapped) return mapped
+  const preset = voicePresetById(id)
+  if (preset?.gender === '男') return 'zhilun'
+  if (preset?.gender === '女') return 'zhitian'
+  return 'zhitian'
+}
+
 /** 全部可选音色：21 套形象专属 + 自定义通用 + 克隆 */
 export const VOICE_PRESETS: VoicePreset[] = [
   ...AVATAR_VOICE_PRESETS,

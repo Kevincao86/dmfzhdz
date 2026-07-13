@@ -500,7 +500,7 @@ export function buildIceMixSegmentsFromScript(
 /** 目标成片时长选项（秒） */
 export const MIX_TARGET_TOTAL_OPTIONS = [10, 20, 30, 45, 60] as const
 
-/** 从剪辑指令 + 分镜「画面/指令」列推断 ICE 转场/淡入淡出（无需手选特效） */
+/** 从剪辑指令 + 分镜「画面/指令」列推断 ICE 转场（智能推断：按场景切换，默认硬切非叠化） */
 export function inferIceEffectIdFromMixContent(
   instruction: string,
   rows: Array<{ visual: string }>,
@@ -512,11 +512,27 @@ export function inferIceEffectIdFromMixContent(
   if (/向右擦除|擦除|wiperight/i.test(blob)) return 'trans_wipe'
   if (/方向推移|directional/i.test(blob)) return 'trans_directional'
   if (/蔓延溶解|perlin/i.test(blob)) return 'trans_perlin'
-  if (/淡入淡出/.test(blob) && /叠化|溶解/.test(blob)) return 'fade_trans_fade'
+  if (/叠化|溶解/.test(blob) && /淡入淡出/.test(blob)) return 'fade_trans_fade'
   if (/叠化|溶解/.test(blob)) return 'trans_fade'
   if (/淡入淡出|柔和过渡/.test(blob)) return 'fade'
-  if (/转场|切换/.test(blob)) return 'trans_fade'
-  return 'trans_fade'
+
+  const bucket = (visual: string): string => {
+    const v = visual.trim()
+    if (/门头|店招|门店|门面|外景/.test(v)) return 'storefront'
+    if (/厨房|制作|烹饪|后厨|操作|加工/.test(v)) return 'process'
+    if (/成品|菜品|特写|摆盘|牛排|酱汁|美食/.test(v)) return 'product'
+    if (/试吃|品尝|顾客|体验/.test(v)) return 'experience'
+    return 'other'
+  }
+  const buckets = rows.map((r) => bucket(r.visual)).filter((b) => b !== 'other')
+  const unique = new Set(buckets)
+  if (unique.size <= 1) return 'none'
+  if (unique.has('storefront') && (unique.has('product') || unique.has('process'))) {
+    return 'trans_directional'
+  }
+  if (unique.has('process') && unique.has('product')) return 'trans_wipe'
+  if (unique.has('experience') && unique.has('product')) return 'trans_wipe_up'
+  return 'none'
 }
 
 /** 由指导文案 + 分镜表合成 ICE editBrief（字幕、画面指令；BGM 仅写在剪辑指令段） */

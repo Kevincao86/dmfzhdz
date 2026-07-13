@@ -18,6 +18,8 @@ import {
   ICE_SUBTITLE_STYLE_DEFAULT_ID,
   resolveIceSubtitleStylePreset,
 } from '../src/lib/iceSubtitleStylePresets.js'
+import { resolveImsBatchSpeechVoice } from '../src/lib/digitalHumanBroadcast.js'
+import { sanitizeMixDialogueText } from '../src/lib/shortVideoScriptTable.js'
 import type { AliyunIceConfig } from './aliyunIceCore.js'
 
 type IceClientClass = {
@@ -44,8 +46,8 @@ const IceClient = resolveSdkCtor(IceModule)
 
 /** 中文口播约 4 字/秒 */
 const DIALOGUE_CHARS_PER_SEC = 4
-/** 成片允许超出用户目标的最长时间（秒） */
-const SMART_BATCH_DURATION_SLACK_SEC = 3
+/** 成片时长须与用户目标一致（禁止 +3 秒浮动导致偏短） */
+const SMART_BATCH_DURATION_SLACK_SEC = 0
 
 function createClient(cfg: AliyunIceConfig): InstanceType<typeof IceClient> {
   return new IceClient(
@@ -92,15 +94,6 @@ function truncateDialogue(text: string, maxChars: number): string {
   return `${cut}…`
 }
 
-/** 从指导文案取一句短口播（禁止整段执行文稿上屏/入 TTS） */
-function extractShortHookFromGuidance(guidance: string, maxChars: number): string {
-  const t = guidance.trim()
-  if (!t) return '探店好物推荐，快来看看'
-  const sentences = t.split(/(?<=[。！？!?])\s*/).map((s) => s.trim()).filter(Boolean)
-  const pick = sentences.find((s) => s.length >= 6 && s.length <= maxChars) ?? sentences[0] ?? t
-  return truncateDialogue(pick, maxChars)
-}
-
 function isPlaceholderDialogue(text: string): boolean {
   const t = text.trim()
   if (t.length < 8) return true
@@ -121,50 +114,85 @@ function resolveSpeechRateForTarget(estSec: number, targetSec: number): number {
   return 0
 }
 
-/** 全局口播：字数须贴近目标秒数（约 3.5～4 字/秒），禁止用「精彩片段」等占位短句 */
+/** 全局口播：字数贴近目标秒数，避免 IMS AutoSpeed 按短口播压短成片 */
 function buildSmartBatchNarration(
   guidance: string,
   scriptRows: IceSmartBatchScriptRow[],
   targetSec: number,
 ): string {
-  const minChars = Math.max(28, Math.floor(targetSec * 3.5))
-  const maxChars = Math.max(minChars + 8, Math.floor(targetSec * DIALOGUE_CHARS_PER_SEC))
-  const sentences = guidance
-    .trim()
-    .split(/(?<=[。！？!?])\s*/)
-    .map((s) => s.trim())
-    .filter((s) => s.length >= 6)
+  const targetChars = Math.floor(targetSec * DIALOGUE_CHARS_PER_SEC)
+  const minChars = Math.max(28, Math.floor(targetSec * 3.6))
 
-  const pool = scriptRows
-    .map((r) => String(r.dialogue ?? '').trim())
+  const rowDialogues = scriptRows
+    .map((r) => sanitizeMixDialogueText(String(r.dialogue ?? '')))
     .filter((d) => !isPlaceholderDialogue(d))
 
   const uniqueParts: string[] = []
-  for (const part of pool) {
+  for (const part of rowDialogues) {
     if (!uniqueParts.includes(part)) uniqueParts.push(part)
   }
 
   let narration = uniqueParts.join('，')
+
+  const sentences = guidance
+    .trim()
+    .split(/(?<=[。！？!?])\s*/)
+    .map((s) => sanitizeMixDialogueText(s.trim()))
+    .filter((s) => s.length >= 6)
+
   for (const s of sentences) {
     if (narration.length >= minChars) break
-    if (!narration.includes(s)) {
-      narration = narration ? `${narration}。${s}` : s
-    }
+    if (!narration.includes(s)) narration = narration ? `${narration}。${s}` : s
+  }
+
+  let guard = 0
+  while (narration.length < minChars && uniqueParts.length > 0 && guard < 6) {
+    guard += 1
+    narration = `${narration}。${uniqueParts.join('，')}`
+  }
+
+  if (narration.length < minChars) {
+    narration = truncateDialogue(guidance.trim() || narration, targetChars)
   }
   if (narration.length < minChars) {
-    narration = truncateDialogue(guidance.trim() || narration, maxChars)
+    narration = truncateDialogue(
+      `${narration}。值得一看，欢迎到店体验，快来打卡吧`,
+      targetChars,
+    )
   }
-  if (narration.length < minChars && sentences.length > 0) {
-    narration = truncateDialogue(sentences.join('。'), maxChars)
+
+  return truncateDialogue(narration, targetChars)
+}
+
+function pickSmartBatchSegmentCount(
+  scriptRows: IceSmartBatchScriptRow[],
+  materialCount: number,
+  targetTotalSec: number,
+): number {
+  const rowCount = scriptRows.filter((r) => String(r.dialogue ?? '').trim().length >= 2).length
+  if (rowCount >= 2) return Math.min(rowCount, materialCount)
+  return Math.max(2, Math.min(materialCount, Math.ceil(targetTotalSec / 5)))
+}
+
+function pickSmartBatchMaterialUrls(
+  baseUrls: string[],
+  slots: number[],
+  segmentCount: number,
+): string[] {
+  if (baseUrls.length <= segmentCount) return baseUrls
+  if (slots.length >= segmentCount) {
+    const picked = slots
+      .slice(0, segmentCount)
+      .map((mi) => baseUrls[mi]!)
+      .filter(Boolean)
+    if (picked.length >= 2) return picked
   }
-  if (narration.length < minChars) {
-    narration = extractShortHookFromGuidance(guidance, maxChars)
+  const out: string[] = []
+  for (let i = 0; i < segmentCount; i++) {
+    const mi = Math.round((i * (baseUrls.length - 1)) / Math.max(1, segmentCount - 1))
+    out.push(baseUrls[mi]!)
   }
-  if (narration.length < minChars) {
-    const pad = '值得一看，快来打卡体验'
-    narration = truncateDialogue(`${narration}。${pad}`, maxChars)
-  }
-  return truncateDialogue(narration, maxChars)
+  return out.length >= 2 ? out : baseUrls.slice(0, Math.max(2, segmentCount))
 }
 
 export type IceSmartBatchMaterial = {
@@ -183,24 +211,30 @@ function buildDefaultEditingConfig(
   speechRate = 0,
   subtitleStyleId?: string,
   singleShotDuration = 2,
+  opts?: { voicePresetId?: string; transitionAuto?: boolean },
 ): Record<string, unknown> {
   const preset = resolveIceSubtitleStylePreset(subtitleStyleId ?? ICE_SUBTITLE_STYLE_DEFAULT_ID)
   const shotDur = Math.max(0.45, Math.min(8, singleShotDuration))
+  const imsVoice = resolveImsBatchSpeechVoice(opts?.voicePresetId ?? '')
+  const transitionAuto = opts?.transitionAuto !== false
   return {
     ProcessConfig: {
-      AllowTransition: true,
+      AllowTransition: transitionAuto,
       UseUniformTransition: false,
-      TransitionList: ['linearblur', 'colordistance', 'crosshatch', 'dreamyzoom'],
+      TransitionList: transitionAuto
+        ? ['wiperight', 'wipeleft', 'directional', 'simplezoom']
+        : [],
       AllowVfxEffect: false,
-      EnableClipSplit: true,
+      EnableClipSplit: transitionAuto,
       SingleShotDuration: Math.round(shotDur * 100) / 100,
-      /** 口播已按目标秒数填充；AutoSpeed 使音画对齐到目标时长，避免 Cut 裁短 */
+      /** 口播按目标字数填充；视频轨对齐口播时长 */
       AlignmentMode: 'AutoSpeed',
     },
     MediaConfig: { Volume: 0 },
     SpeechConfig: {
       Volume: 1,
       SpeechRate: speechRate,
+      Voice: imsVoice,
       AsrConfig: buildSmartBatchAsrConfig(preset),
     },
     BackgroundMusicConfig: { Volume: 0.22 },
@@ -220,13 +254,15 @@ function buildInputConfig(input: {
   const slots = (input.materialSlots ?? []).filter(
     (n) => Number.isFinite(n) && n >= 0 && n < baseUrls.length,
   )
-  const urls =
-    slots.length === input.materials.length
-      ? slots.map((mi) => baseUrls[mi]!).filter(Boolean)
-      : baseUrls
-  const guidance = input.guidance.trim()
   const targetTotalSec = Math.min(120, Math.max(5, Math.ceil(input.targetTotalSec)))
-  const shotDurationSec = Math.max(0.45, Math.round((targetTotalSec / Math.max(1, urls.length)) * 100) / 100)
+  const segmentCount = pickSmartBatchSegmentCount(
+    input.scriptRows,
+    baseUrls.length,
+    targetTotalSec,
+  )
+  const urls = pickSmartBatchMaterialUrls(baseUrls, slots, segmentCount)
+  const guidance = input.guidance.trim()
+  const shotDurationSec = Math.max(0.45, Math.round((targetTotalSec / urls.length) * 100) / 100)
   const narration = buildSmartBatchNarration(guidance, input.scriptRows, targetTotalSec)
   const estSpeech = estimateSpeechSec(narration)
   const speechRate = resolveSpeechRateForTarget(estSpeech, targetTotalSec)
@@ -235,7 +271,7 @@ function buildInputConfig(input: {
     inputConfig: {
       MediaGroupArray: [
         {
-          GroupName: 'main-all-materials',
+          GroupName: 'main-storyboard-materials',
           MediaArray: urls,
           SplitMode: 'AverageSplit',
           Duration: targetTotalSec,
@@ -297,6 +333,8 @@ export async function iceSubmitSmartBatchJob(
     clientToken: string
     materialSlots?: number[]
     subtitleStyleId?: string
+    mixVoicePresetId?: string
+    transitionMode?: 'auto' | string
   },
 ): Promise<
   | { ok: true; batchJobId: string }
@@ -338,6 +376,10 @@ export async function iceSubmitSmartBatchJob(
     built.speechRate,
     input.subtitleStyleId,
     built.shotDurationSec,
+    {
+      voicePresetId: input.mixVoicePresetId,
+      transitionAuto: input.transitionMode !== 'none' && input.transitionMode !== 'fade',
+    },
   )
   const templateIds = (input.templateIds ?? []).filter(Boolean).slice(0, 50)
 

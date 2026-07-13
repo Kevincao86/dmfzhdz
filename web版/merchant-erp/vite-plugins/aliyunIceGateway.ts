@@ -763,6 +763,8 @@ export async function handleAliyunIceRoutes(input: {
           .map((n) => Math.floor(n))
       : []
     const subtitleStyleId = String(parsed.subtitleStyleId ?? '').trim()
+    const mixVoicePresetId = String(parsed.mixVoicePresetId ?? parsed.voicePresetId ?? '').trim()
+    const transitionMode = String(parsed.transitionMode ?? parsed.effectId ?? 'auto').trim() || 'auto'
 
     const out = await iceSubmitSmartBatchJob(cfg!, {
       materials: materials as Array<{ kind: 'video' | 'image'; mediaUrl: string; label?: string }>,
@@ -780,6 +782,8 @@ export async function handleAliyunIceRoutes(input: {
       clientToken,
       materialSlots,
       subtitleStyleId: subtitleStyleId || undefined,
+      mixVoicePresetId: mixVoicePresetId || undefined,
+      transitionMode,
     })
     if (!out.ok) {
       json(res, /Invalid|Missing|validate/i.test(out.message) ? 400 : 502, {

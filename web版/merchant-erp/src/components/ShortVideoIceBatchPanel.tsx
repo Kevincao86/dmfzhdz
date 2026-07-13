@@ -289,11 +289,6 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     [aspectId],
   )
 
-  const mixEditBrief = useMemo(
-    () => composeMixProductionBrief(mixGuidance, scriptRows),
-    [mixGuidance, scriptRows],
-  )
-
   const inferredMixEffect = useMemo(() => {
     const id = inferIceEffectIdFromMixContent(mixGuidance, scriptRows)
     return resolveIceEffectPreset(id)
@@ -303,6 +298,14 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     if (mixTransitionMode === 'auto') return inferredMixEffect
     return resolveIceEffectPreset(mixTransitionMode)
   }, [mixTransitionMode, inferredMixEffect])
+
+  const mixEditBrief = useMemo(
+    () =>
+      composeMixProductionBrief(mixGuidance, scriptRows, {
+        effectId: resolvedMixEffect.id,
+      }),
+    [mixGuidance, scriptRows, resolvedMixEffect.id],
+  )
 
   const resolvedMixSubtitleStyle = useMemo(
     () => resolveIceSubtitleStylePreset(mixSubtitleStyleId),
@@ -1310,8 +1313,11 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       projectName: `智能成片-${label}`.slice(0, 120),
       templateIds: cfg.smartBatchTemplateIds,
       subtitleStyleId: mixSubtitleStyleId,
+      mixVoicePresetId: mixVoicePresetId || ICE_MIX_VOICE_DEFAULT_ID,
+      transitionMode: mixTransitionMode,
+      effectId: resolvedMixEffect.id,
       materialSlots:
-        materialSlots.length === mixMaterialPool.length ? materialSlots : undefined,
+        materialSlots.length >= 2 ? materialSlots : undefined,
     })
 
     if (!pipe.ok) {
@@ -2022,7 +2028,11 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                     >
                       <option value="auto">
                         智能推断
-                        {mixTransitionMode === 'auto' ? `（${inferredMixEffect.label}）` : ''}
+                        {mixTransitionMode === 'auto'
+                          ? inferredMixEffect.id === 'none'
+                            ? '（按场景硬切）'
+                            : `（${inferredMixEffect.label}）`
+                          : ''}
                       </option>
                       {ICE_MIX_TRANSITION_PRESETS.map((p) => (
                         <option key={p.id} value={p.id}>
@@ -2044,7 +2054,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                     口播：{resolvedMixVoice.label}
                     {' · '}
                     转场：{resolvedMixEffect.label}
-                    {mixTransitionMode === 'auto' ? '（由文案推断）' : ''}
+                    {mixTransitionMode === 'auto' ? '（按画面场景推断，非固定叠化）' : ''}
                   </span>
                 </p>
               </div>
