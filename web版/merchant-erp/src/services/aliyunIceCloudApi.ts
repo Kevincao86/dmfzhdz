@@ -27,7 +27,7 @@ export type AliyunIceCloudConfig = {
 }
 
 export type IcePipelineResult =
-  | { ok: true; jobId: string; exportId: string; projectId?: string }
+  | { ok: true; jobId: string; exportId: string; projectId?: string; pollMode?: 'timeline' | 'smart_batch' }
   | { ok: false; message: string; step?: string }
 
 export type IceJobStatus =
@@ -797,14 +797,16 @@ export async function postIceSmartBatch(body: {
           headers: { 'Content-Type': 'application/json; charset=utf-8' },
           body: JSON.stringify(body),
         })
-        const j = await parseJson<IcePipelineResult & { message?: string; batchJobId?: string }>(res)
+        const j = await parseJson<IcePipelineResult & { message?: string; batchJobId?: string; pollMode?: string }>(res)
         if (res.status === 404) continue
         if (!res.ok || !j?.ok) {
           return { ok: false, message: j?.message ?? `智能成片提交失败 HTTP ${res.status}` }
         }
         const jobId = j.jobId || j.batchJobId || j.exportId
         if (!jobId) return { ok: false, message: '智能成片未返回任务 ID' }
-        return { ok: true, jobId, exportId: jobId }
+        const pollMode =
+          j.pollMode === 'timeline' || j.pollMode === 'smart_batch' ? j.pollMode : 'smart_batch'
+        return { ok: true, jobId, exportId: jobId, pollMode }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         return { ok: false, message: msg }

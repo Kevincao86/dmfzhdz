@@ -289,9 +289,8 @@ export function buildNarrativeMatchedMixCoverage(
     } else if (slotRole === 'storefront') {
       dialogue =
         guidanceLines.find((l) => STOREFRONT_RE.test(l)) ||
-        guidanceLines[0] ||
-        dialogues[0] ||
-        `走进${hook}，环境氛围拉满。`
+        dialogues.find((d) => STOREFRONT_RE.test(d)) ||
+        mixStorefrontGuideDialogue(hook)
     } else if (i === 0 && pattern === 'hook_opening') {
       dialogue = dialogues[0] || guidanceLines[0] || hook
     } else {
@@ -622,10 +621,17 @@ const PROCESS_RE = /制作|烹饪|后厨|操作|翻炒|下锅|加工|过程|熬�
 const EXPERIENCE_RE = /试吃|品尝|顾客|体验|人物.*吃|互动|推荐/
 const CLOSING_RE = /下单|团购|赶紧|快来|收藏|关注|就在|欢迎.*到店|点击|马上/
 
+/** 门头/到店指引口播（写死：仅用于门头镜头段） */
+export function mixStorefrontGuideDialogue(storeHint = ''): string {
+  const hint = sanitizeMixDialogueText(storeHint).slice(0, 16)
+  if (hint.length >= 2) return `认准${hint}这门头，导航直达不迷路，欢迎进店！`
+  return '认准门店门头，导航直达不迷路，欢迎进店体验！'
+}
+
 /** 根据画面描述生成短口播（指导文案无法拆出可读句时的回退） */
 export function deriveMixDialogueFromVisual(visual: string, fallback = '值得一看'): string {
   const v = visual.trim()
-  if (STOREFRONT_RE.test(v)) return '认准这门头，到店不迷路！'
+  if (STOREFRONT_RE.test(v)) return mixStorefrontGuideDialogue(fallback)
   if (PROCESS_RE.test(v)) return '后厨现做，新鲜靠谱看得见。'
   if (PRODUCT_RE.test(v)) return '这一口鲜嫩多汁，太满足了！'
   if (EXPERIENCE_RE.test(v)) return '试吃一口，真的停不下来。'
@@ -684,7 +690,7 @@ export function classifyMixMaterialRole(
 
 /** 与推广/产品明显无关的素材画面特征 */
 const MIX_IRRELEVANT_RE =
-  /截帧失败|无法识别|分析失败|画面模糊|纯风景|天空|云彩|马路|街景|车流|道路|绿化带|无关路人|随手拍|黑屏|测试画面|路面特写|窗外|阴天空/
+  /截帧失败|无法识别|分析失败|画面模糊|纯风景|天空|云彩|马路|街景|车流|道路|绿化带|无关路人|随手拍|黑屏|测试画面|路面特写|窗外|阴天空|自拍|镜子|洗手台|停车场|电梯间|走廊空镜|与.*无关|无关内容|广告贴纸|水印满屏|聊天截图|手机界面|锁屏|桌面录屏/
 
 const MIX_PROMOTION_HINT_RE =
   /套餐|团购|优惠|菜品|产品|门店|门头|制作|烹饪|试吃|体验|摆盘|食材|招牌|探店|美食|服务|环境|内景|装修|出货|后厨|分量|品牌/
@@ -712,7 +718,8 @@ export function isMixMaterialPromotionRelevant(
     if (label.length >= 2 && g.includes(label.slice(0, Math.min(6, label.length)))) return true
   }
 
-  return role !== 'other'
+  if (role === 'other') return false
+  return false
 }
 
 /** 可参与混剪的素材下标（至少保留 2 条，避免无法成片） */
@@ -744,7 +751,23 @@ export function filterMixPromotionRelevantIndices(
     if (isMixMaterialPromotionRelevant(prof, guidance)) relevant.push(i)
   }
   if (relevant.length >= 2) return relevant
+  if (relevant.length === 1 && materials.length >= 2) {
+    const extra = scored.find((s) => s.idx !== relevant[0] && isMixMaterialPromotionRelevant(
+      profiles[s.idx] ?? { index: s.idx, label: materials[s.idx]!.label, description: materials[s.idx]!.label },
+      guidance,
+    ))
+    if (extra) return [relevant[0]!, extra.idx]
+  }
   scored.sort((a, b) => b.score - a.score)
+  const strict = scored
+    .filter((s) =>
+      isMixMaterialPromotionRelevant(
+        profiles[s.idx] ?? { index: s.idx, label: materials[s.idx]!.label, description: materials[s.idx]!.label },
+        guidance,
+      ),
+    )
+    .map((s) => s.idx)
+  if (strict.length >= 2) return strict.slice(0, Math.min(materials.length, strict.length))
   return scored.slice(0, Math.max(2, Math.min(materials.length, 2))).map((s) => s.idx)
 }
 
@@ -766,17 +789,62 @@ export function hasStorefrontMixMaterials(profiles: MixNarrativeProfileInput[]):
   )
 }
 
-/** 推断叙事结构：有门头素材默认门头开场，否则可用卖点钩子开场 */
+/** 推断叙事结构：有门头素材时写死优先门头开场；仅当文案明确要求门头收尾时才用 hook 模式 */
 export function inferMixNarrativePattern(
   guidance: string,
   profiles: MixNarrativeProfileInput[],
 ): MixNarrativePattern {
   const g = guidance.trim()
+  if (hasStorefrontMixMaterials(profiles)) {
+    if (/门头.*收尾|结尾.*门头|收尾.*门头|片尾.*门头|最后.*门头/.test(g)) return 'hook_opening'
+    return 'store_opening'
+  }
   if (/先卖点|先套餐|先产品|开头.*吸引|钩子|劲爆|开头.*产品/.test(g)) return 'hook_opening'
   if (/先.*门店|门头.*开场|开头.*环境|先氛围/.test(g)) return 'store_opening'
-  if (hasStorefrontMixMaterials(profiles)) return 'store_opening'
   if (/门店|地址|导航|怎么找|在哪里|欢迎来|到店/.test(g)) return 'store_opening'
   return 'hook_opening'
+}
+
+/**
+ * 写死门头素材位置：store_opening → 第 1 段；hook_opening → 倒数第 2 段（收尾前到店指引）。
+ */
+export function enforceStorefrontMaterialPlacement(
+  picks: number[],
+  materials: Array<{ label: string }>,
+  profiles: MixNarrativeProfileInput[],
+  guidance: string,
+): number[] {
+  if (picks.length < 2) return picks
+  const pattern = inferMixNarrativePattern(guidance, profiles)
+  let storefrontIdx = -1
+  for (let i = 0; i < profiles.length; i++) {
+    const prof = profiles[i] ?? { index: i, label: materials[i]!.label, description: materials[i]!.label }
+    if (!isMixMaterialPromotionRelevant(prof, guidance)) continue
+    if (classifyMixMaterialRole(prof.description, prof.label, prof.frameTimeline) === 'storefront') {
+      storefrontIdx = i
+      break
+    }
+  }
+  if (storefrontIdx < 0) return picks
+
+  const targetPos = pattern === 'store_opening' ? 0 : Math.max(0, picks.length - 2)
+  const out = [...picks]
+  const currentPos = out.indexOf(storefrontIdx)
+  if (currentPos === targetPos) return out
+
+  if (currentPos >= 0) {
+    const swap = out[targetPos]!
+    out[targetPos] = storefrontIdx
+    out[currentPos] = swap
+    return out
+  }
+
+  const displaced = out[targetPos]!
+  out[targetPos] = storefrontIdx
+  const fallbackPos = out.findIndex((mi, idx) => idx !== targetPos && mi !== storefrontIdx)
+  if (fallbackPos >= 0) out[fallbackPos] = displaced
+  else out[out.length - 1] = displaced
+  return out
 }
 
 /** 按段序与叙事模式分配该段期望画面角色 */
@@ -880,7 +948,7 @@ export function pickMaterialsForNarrativeSlots(
     used.add(bestIdx)
     picks.push(bestIdx)
   }
-  return picks
+  return enforceStorefrontMaterialPlacement(picks, materials, profiles, guidance)
 }
 
 /** 目标时长对应的分镜段数（默认每段 5 秒） */

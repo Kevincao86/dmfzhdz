@@ -22,6 +22,7 @@ import {
   segmentRoleForIndex,
   hasStorefrontMixMaterials,
   isMixMaterialPromotionRelevant,
+  mixStorefrontGuideDialogue,
 } from '../lib/iceMixPlan'
 import {
   clampMixSourceInSec,
@@ -663,13 +664,13 @@ const NARRATIVE_TEXT_PLAN_SYSTEM = `你是专业短视频混剪导演（探店/�
 任务（强制）：
 1. 输出恰好 K 段分镜（K 由用户指定，对应目标成片总时长），每段选用 1 条最匹配素材，同一条素材最多出现 1 次
 2. 跳过与推广/产品/门店毫无关联的素材（如纯风景、马路、截帧失败、无关路人等），materialIndex 不得选用这类素材
-3. 叙事结构（二选一，素材含门头/店招/门店外观时优先模式A）：
+3. 叙事结构（写死：有门头素材默认模式A；仅文案明确要求门头收尾才用模式B）：
    模式A：门头/门店指引(开场) → 套餐/产品/制作过程(中段) → 结束语/行动号召(收尾)
    模式B：产品/套餐卖点钩子(开场) → 制作/试吃体验(中段) → 门头/到店指引(倒数第二段) → 结束语(收尾)
-3. 每段 visual（画面描述，给剪辑看）与 dialogue（口播台词，给观众听）语义一致
-4. dialogue 必须是可直接 TTS 朗读的短句（每段 12～28 字），禁止出现「核心卖点」「叙事节奏」「商业创意」「目标受众」等编导结构标签；禁止照搬指导文案整段或编号列表
-5. visual 写该段画面内容；dialogue 写该段旁白，须与 visual 同一段画面匹配（如画面是门头则口播讲到店指引，画面是菜品则口播讲口感）
-6. segmentIndex 从 0 连续递增，表示成片时间轴顺序
+4. 每段 visual（画面描述，给剪辑看）与 dialogue（口播台词，给观众听）语义一致
+5. dialogue 必须是可直接 TTS 朗读的短句（每段 12～28 字），禁止出现「核心卖点」「叙事节奏」「商业创意」「目标受众」等编导结构标签；禁止照搬指导文案整段或编号列表
+6. visual 写该段画面内容；dialogue 写该段旁白，须与 visual 同一段画面匹配（门头段只讲到店指引/门店信息）
+7. segmentIndex 从 0 连续递增，表示成片时间轴顺序
 
 只输出 JSON 对象，无 markdown：
 {"segments":[{"segmentIndex":0,"materialIndex":5,"visual":"门店门头…","dialogue":"走进这家…"},...]}`
@@ -1036,8 +1037,7 @@ function buildFallbackNarrativeFromProfiles(
     } else if (slotRole === 'storefront') {
       dialogue =
         guidanceLines.find((l) => NARRATIVE_STOREFRONT_RE.test(l)) ||
-        guidanceLines[0] ||
-        `走进${hook}，环境氛围拉满。`
+        mixStorefrontGuideDialogue(hook)
     } else if (i === 0 && pattern === 'hook_opening') {
       dialogue = guidanceLines[0] || hook
     } else {

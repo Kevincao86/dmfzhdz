@@ -389,6 +389,35 @@ export function formatTodoDateShort(dateKey: string, todayKey: string): string {
   return dateKey === todayKey ? `${short} 今天` : short
 }
 
+export type MpCalendarReminderLeadPreset = 'day8' | 'day_before_20' | 'days2_before'
+
+export const CALENDAR_REMIND_OPTIONS: Array<{ id: MpCalendarReminderLeadPreset; label: string }> = [
+  { id: 'day8', label: '当天早上 8:00' },
+  { id: 'day_before_20', label: '前一日晚上 8:00' },
+  { id: 'days2_before', label: '前两日晚上 8:00' },
+]
+
+export function leadPresetLabel(preset: MpCalendarReminderLeadPreset): string {
+  return CALENDAR_REMIND_OPTIONS.find((o) => o.id === preset)?.label ?? preset
+}
+
+/** 与小程序 orderCalendarEvents.computeRemindAtMs 一致 */
+export function computeRemindAtMs(
+  eventDateKey: string,
+  preset: MpCalendarReminderLeadPreset,
+): number {
+  const dayMs = parseVisitDayMs(eventDateKey)
+  if (!dayMs) return 0
+  const d = new Date(dayMs)
+  const y = d.getFullYear()
+  const m = d.getMonth()
+  const day = d.getDate()
+  if (preset === 'day8') return new Date(y, m, day, 8, 0, 0).getTime()
+  if (preset === 'day_before_20') return new Date(y, m, day - 1, 20, 0, 0).getTime()
+  if (preset === 'days2_before') return new Date(y, m, day - 2, 20, 0, 0).getTime()
+  return 0
+}
+
 export function phaseStatusLabel(phase: OrderCalendarDayPhase): string {
   if (phase === 'active') return '进行中'
   if (phase === 'pending') return '待开始'

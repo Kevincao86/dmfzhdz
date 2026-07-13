@@ -1299,6 +1299,10 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     }
 
     const totalSec = mixTargetSec
+    let mixVoiceCloneBase64: string | undefined
+    if (mixVoicePresetId === 'v-clone' && mixCloneBlobRef.current) {
+      mixVoiceCloneBase64 = await audioBlobToPureBase64(mixCloneBlobRef.current)
+    }
     const pipe = await postIceSmartBatch({
       materials: mixMaterialPool.map((m) => ({
         kind: m.kind,
@@ -1314,6 +1318,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       templateIds: cfg.smartBatchTemplateIds,
       subtitleStyleId: mixSubtitleStyleId,
       mixVoicePresetId: mixVoicePresetId || ICE_MIX_VOICE_DEFAULT_ID,
+      mixVoiceCloneBase64,
       transitionMode: mixTransitionMode,
       effectId: resolvedMixEffect.id,
       materialSlots:
@@ -1326,13 +1331,14 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       return
     }
 
+    const smartPollMode = pipe.pollMode ?? 'smart_batch'
     patchJob(localId, {
       exportId: pipe.jobId,
       phase: 'polling',
       message: '智能成片 · 云端合成中…',
-      mixProduceMode: 'smart_batch',
+      mixProduceMode: smartPollMode,
     })
-    await pollJob(localId, pipe.jobId, 'smart_batch')
+    await pollJob(localId, pipe.jobId, smartPollMode)
     setSmartRenderBusy(false)
     setHint('智能一键成片已提交，请在右侧下载 MP4。')
   }
