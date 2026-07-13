@@ -1140,6 +1140,8 @@ export async function iceRunMixPipeline(
     mixNarrationText?: string
     mixVoicePresetId?: string
     mixVoiceCloneBase64?: string
+    bgmPresetId?: string
+    mixBgmUrl?: string
     env?: Record<string, string | undefined>
   },
 ): Promise<
@@ -1381,6 +1383,26 @@ export async function iceRunMixPipeline(
         step: 'mix_tts',
       }
     }
+  }
+
+  const { resolveIceMixBgmUrl } = await import('../src/lib/iceMixBgmPresets.js')
+  const mixBgmResolved = resolveIceMixBgmUrl({
+    presetId: input.bgmPresetId,
+    customUrl: input.mixBgmUrl,
+  })
+  if (mixBgmResolved) {
+    finalPlan = {
+      ...finalPlan,
+      bgmClip: {
+        mediaUrl: mixBgmResolved,
+        timelineIn: 0,
+        timelineOut: input.totalDurationSec,
+        volume: 0.12,
+        loop: true,
+        label: '混剪 BGM',
+      },
+    }
+    finalPlan = await sanitizeIceBriefAudioPlan(finalPlan, cfg)
   }
 
   const timeline = buildTimelineFromMixClips(resolved, finalPlan, input.width, input.height, {

@@ -117,6 +117,12 @@ import {
   resolveIceSubtitleStylePreset,
 } from '../lib/iceSubtitleStylePresets'
 import { resolveIceEffectPreset, ICE_MIX_TRANSITION_PRESETS } from '../lib/iceEffectPresets'
+import {
+  ICE_MIX_BGM_DEFAULT_ID,
+  ICE_MIX_BGM_NONE_ID,
+  ICE_MIX_BGM_PRESETS,
+  resolveIceMixBgmPreset,
+} from '../lib/iceMixBgmPresets'
 
 const MIX_VOICE_PREVIEW_FALLBACK = '大家好，这是一段混剪口播音色试听。'
 
@@ -319,6 +325,28 @@ export function ShortVideoIceBatchPanel(_props: Props) {
   const [planBusy, setPlanBusy] = useState(false)
   const [analyzeBusy, setAnalyzeBusy] = useState(false)
   const [mixTransitionMode, setMixTransitionMode] = useState<'auto' | string>('auto')
+  const [mixBgmPresetId, setMixBgmPresetId] = useState(ICE_MIX_BGM_DEFAULT_ID)
+  const [mixCustomBgmUrl, setMixCustomBgmUrl] = useState('')
+  const [mixCustomBgmName, setMixCustomBgmName] = useState<string | null>(null)
+  const [mixBgmUploadBusy, setMixBgmUploadBusy] = useState(false)
+  const mixBgmInputRef = useRef<HTMLInputElement>(null)
+  const mixBgmPostPayload = useCallback((): { bgmPresetId?: string; mixBgmUrl?: string } => {
+    if (mixBgmPresetId === ICE_MIX_BGM_NONE_ID) return { bgmPresetId: ICE_MIX_BGM_NONE_ID }
+    if (mixBgmPresetId === 'custom') {
+      const url = mixCustomBgmUrl.trim()
+      return url ? { mixBgmUrl: url } : { bgmPresetId: ICE_MIX_BGM_NONE_ID }
+    }
+    return { bgmPresetId: mixBgmPresetId }
+  }, [mixBgmPresetId, mixCustomBgmUrl])
+  const resolvedMixBgm = useMemo(
+    () =>
+      mixBgmPresetId === 'custom'
+        ? mixCustomBgmUrl.trim()
+          ? { id: 'custom', label: mixCustomBgmName ?? '自定义 BGM', description: '本地上传' }
+          : null
+        : resolveIceMixBgmPreset(mixBgmPresetId),
+    [mixBgmPresetId, mixCustomBgmUrl, mixCustomBgmName],
+  )
   const [mixSubtitleStyleId, setMixSubtitleStyleId] = useState(ICE_SUBTITLE_STYLE_DEFAULT_ID)
   const [mixVoicePresetId, setMixVoicePresetId] = useState(ICE_MIX_VOICE_DEFAULT_ID)
   const [mixTtsPlaying, setMixTtsPlaying] = useState(false)
@@ -1310,6 +1338,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       clipEndSec: totalSec,
       effectId: pack.effectId,
       subtitleStyleId: pack.subtitleStyleId,
+      ...mixBgmPostPayload(),
     })
     if (!pipe.ok) {
       patchJob(localId, { phase: 'failed', message: pipe.message })
@@ -1492,6 +1521,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       mixVoiceCloneBase64,
       transitionMode: resolvedMixEffect.id === 'none' ? 'none' : 'auto',
       effectId: resolvedMixEffect.id,
+      ...mixBgmPostPayload(),
     })
 
     if (!pipe.ok) {
@@ -2217,6 +2247,75 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                     </select>
                     <span className="min-h-[1.25rem]" aria-hidden />
                   </label>
+                  <label className="flex min-w-0 flex-col gap-1.5 text-xs text-zinc-600 sm:col-span-2">
+                    <span className="font-medium text-zinc-700">背景 BGM</span>
+                    <select
+                      value={mixBgmPresetId}
+                      disabled={anyBusy || guidanceBusy}
+                      onChange={(e) => setMixBgmPresetId(e.target.value)}
+                      className="h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm"
+                    >
+                      <option value={ICE_MIX_BGM_NONE_ID}>无背景音乐</option>
+                      {ICE_MIX_BGM_PRESETS.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.label}
+                        </option>
+                      ))}
+                      <option value="custom">自定义上传…</option>
+                    </select>
+                    <span className="min-h-[1.25rem] text-[11px] text-zinc-500">
+                      {resolvedMixBgm?.description ?? '不添加 BGM'}
+                    </span>
+                  </label>
+                  {mixBgmPresetId === 'custom' ? (
+                    <div className="flex min-w-0 flex-col justify-end gap-1.5 sm:col-span-2">
+                      <input
+                        ref={mixBgmInputRef}
+                        type="file"
+                        accept="audio/mpeg,audio/wav,audio/mp4,audio/x-m4a,audio/*"
+                        className="hidden"
+                        disabled={anyBusy || guidanceBusy || mixBgmUploadBusy}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0]
+                          if (!file) return
+                          setMixBgmUploadBusy(true)
+                          setErr(null)
+                          setHint('正在上传自定义 BGM…')
+                          try {
+                            const up = await uploadIceLocalMediaFile(file)
+                            if (!up.ok) {
+                              setErr(up.message)
+                              return
+                            }
+                            setMixCustomBgmUrl(up.mediaUrl)
+                            setMixCustomBgmName(file.name)
+                            setHint('自定义 BGM 已上传')
+                          } catch (err) {
+                            setErr(err instanceof Error ? err.message : 'BGM 上传失败')
+                          } finally {
+                            setMixBgmUploadBusy(false)
+                            if (mixBgmInputRef.current) mixBgmInputRef.current.value = ''
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        disabled={anyBusy || guidanceBusy || mixBgmUploadBusy}
+                        onClick={() => mixBgmInputRef.current?.click()}
+                        className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 text-xs font-medium text-violet-800 hover:bg-violet-100 disabled:opacity-50"
+                      >
+                        {mixBgmUploadBusy ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Upload className="h-3.5 w-3.5" />
+                        )}
+                        {mixCustomBgmName ? '更换 BGM 文件' : '上传 BGM 文件'}
+                      </button>
+                      {mixCustomBgmName ? (
+                        <span className="truncate text-[11px] text-zinc-500">{mixCustomBgmName}</span>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
 
                 <p className="text-[11px] leading-snug text-zinc-500">
@@ -2230,6 +2329,8 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                     {' · '}
                     转场：{resolvedMixEffect.label}
                     {mixTransitionMode === 'auto' ? '（按画面场景推断，非固定叠化）' : ''}
+                    {' · '}
+                    BGM：{resolvedMixBgm?.label ?? '无'}
                   </span>
                 </p>
               </div>

@@ -4,7 +4,7 @@
  *
  * 多素材策略（写死）：
  * - 全部素材放入一组 AverageSplit，总时长 = 用户目标（允许输出 MaxDuration +3 秒）
- * - 仅一条全局口播（时长按目标秒数裁剪），禁止每素材独立 TTS（否则成片会被口播拉长到数分钟）
+ * - 分组口播：每段素材 + 对应口播（画面与 TTS 对齐，禁止全局一条口播硬配）
  */
 import IceModule, {
   GetBatchMediaProducingJobRequest,
@@ -21,8 +21,10 @@ import {
 import { resolveImsBatchSpeechVoice } from '../src/lib/digitalHumanBroadcast.js'
 import {
   buildMixSpeakableNarration,
+  parseScriptTimeRangeSeconds,
   sanitizeMixDialogueText,
 } from '../src/lib/shortVideoScriptTable.js'
+import { resolveIceMixBgmUrl } from '../src/lib/iceMixBgmPresets.js'
 import {
   type IceSmartBatchMaterial,
   type IceSmartBatchScriptRow,
@@ -51,8 +53,6 @@ function resolveSdkCtor(mod: unknown): IceClientClass {
 
 const IceClient = resolveSdkCtor(IceModule)
 
-/** 中文口播约 4 字/秒 */
-const DIALOGUE_CHARS_PER_SEC = 4
 /** 成片时长须与用户目标一致（禁止 +3 秒浮动导致偏短） */
 const SMART_BATCH_DURATION_SLACK_SEC = 0
 
@@ -86,12 +86,6 @@ function normalizeImsMediaUrl(raw: string): string {
   return ensureIceHttpsUrl(u)
 }
 
-function estimateSpeechSec(text: string): number {
-  const len = text.trim().length
-  if (len <= 0) return 0
-  return Math.max(2, Math.ceil(len / DIALOGUE_CHARS_PER_SEC))
-}
-
 function isPlaceholderDialogue(text: string): boolean {
   const t = text.trim()
   if (t.length < 8) return true
@@ -100,19 +94,7 @@ function isPlaceholderDialogue(text: string): boolean {
   return false
 }
 
-function resolveSpeechRateForTarget(estSec: number, targetSec: number): number {
-  if (estSec > targetSec + 1) {
-    const ratio = estSec / Math.max(1, targetSec)
-    return Math.min(200, Math.round((ratio - 1) * 400))
-  }
-  if (estSec < targetSec - 2) {
-    const ratio = estSec / Math.max(1, targetSec)
-    return Math.max(-120, Math.round((ratio - 1) * 400))
-  }
-  return 0
-}
-
-/** 全局口播：仅分镜口播列，禁止掺入指导文案（防 TTS 念出提示语） */
+/** 全局口播：仅分镜口播列，禁止掺入指导文案（Timeline 回退路径用） */
 function buildSmartBatchNarration(
   _guidance: string,
   scriptRows: IceSmartBatchScriptRow[],
@@ -132,9 +114,18 @@ function pickSmartBatchSegmentCount(
   materialCount: number,
   targetTotalSec: number,
 ): number {
+  const planned = Math.max(2, Math.ceil(targetTotalSec / 5))
+  const filledRows = scriptRows.filter(
+    (r) =>
+      String(r.visual ?? '').trim().length >= 4 ||
+      String(r.dialogue ?? '').trim().length >= 2,
+  ).length
+  if (filledRows >= 2) {
+    return Math.min(Math.max(filledRows, 2), materialCount, scriptRows.length || planned)
+  }
   const rowCount = scriptRows.filter((r) => String(r.dialogue ?? '').trim().length >= 2).length
   if (rowCount >= 2) return Math.min(rowCount, materialCount)
-  return Math.max(2, Math.min(materialCount, Math.ceil(targetTotalSec / 5)))
+  return Math.max(2, Math.min(materialCount, planned))
 }
 
 function pickSmartBatchMaterialUrls(
@@ -169,31 +160,41 @@ function pickSmartBatchMaterialUrls(
   return out.length >= 2 ? out : baseUrls.slice(0, Math.max(2, segmentCount))
 }
 
+function segmentDurationFromRow(
+  row: IceSmartBatchScriptRow | undefined,
+  fallbackSec: number,
+): number {
+  const range = parseScriptTimeRangeSeconds(String(row?.timeRange ?? ''))
+  if (range && range.end > range.start) {
+    return Math.max(2, Math.min(15, range.end - range.start))
+  }
+  return Math.max(2, Math.min(8, fallbackSec))
+}
+
 function buildDefaultEditingConfig(
   speechRate = 0,
   subtitleStyleId?: string,
   singleShotDuration = 3,
-  opts?: { voicePresetId?: string; transitionAuto?: boolean },
+  opts?: { voicePresetId?: string; transitionAuto?: boolean; groupedSpeech?: boolean; bgmEnabled?: boolean },
 ): Record<string, unknown> {
   const preset = resolveIceSubtitleStylePreset(subtitleStyleId ?? ICE_SUBTITLE_STYLE_DEFAULT_ID)
-  /** 单镜头时长 3～5s，避免切换过快导致「卡顿感」（对齐阿里云脚本化成片建议） */
   const shotDur = Math.max(3, Math.min(5, singleShotDuration))
   const imsVoice = resolveImsBatchSpeechVoice(opts?.voicePresetId ?? '')
   const transitionAuto = opts?.transitionAuto !== false
-  return {
-    ProcessConfig: {
-      AllowTransition: transitionAuto,
-      UseUniformTransition: true,
-      TransitionList: transitionAuto
-        ? ['directional', 'simplezoom', 'wiperight']
-        : [],
-      AllowVfxEffect: false,
-      /** 关闭 AI 二次拆条，避免长素材被切得过碎 */
-      EnableClipSplit: false,
-      SingleShotDuration: Math.round(shotDur * 100) / 100,
-      /** Cut：保持原速截断，比 AutoSpeed 缩放更流畅 */
-      AlignmentMode: 'Cut',
-    },
+  const grouped = opts?.groupedSpeech !== false
+  const processConfig: Record<string, unknown> = {
+    AllowTransition: transitionAuto,
+    UseUniformTransition: true,
+    TransitionList: transitionAuto ? ['directional', 'simplezoom', 'wiperight'] : [],
+    AllowVfxEffect: false,
+    EnableClipSplit: false,
+    SingleShotDuration: Math.round(shotDur * 100) / 100,
+  }
+  if (!grouped) {
+    processConfig.AlignmentMode = 'Cut'
+  }
+  const editing: Record<string, unknown> = {
+    ProcessConfig: processConfig,
     MediaConfig: { Volume: 0 },
     SpeechConfig: {
       Volume: 1,
@@ -201,16 +202,24 @@ function buildDefaultEditingConfig(
       Voice: imsVoice,
       AsrConfig: buildSmartBatchAsrConfig(preset),
     },
-    BackgroundMusicConfig: { Volume: 0.15 },
   }
+  if (opts?.bgmEnabled) {
+    editing.BackgroundMusicConfig = { Volume: 0.12 }
+  } else {
+    editing.BackgroundMusicConfig = { Volume: 0 }
+  }
+  return editing
 }
 
+/** IMS 分组口播：每段 MediaGroup 绑定一条口播，与分镜表顺序一致 */
 function buildInputConfig(input: {
   materials: IceSmartBatchMaterial[]
   scriptRows: IceSmartBatchScriptRow[]
   guidance: string
   targetTotalSec: number
   materialSlots?: number[]
+  bgmPresetId?: string
+  mixBgmUrl?: string
 }): { inputConfig: Record<string, unknown>; speechRate: number; shotDurationSec: number } {
   const baseUrls = input.materials
     .map((m) => ensureIceHttpsUrl(sanitizeIcePipelineMediaUrl(m.mediaUrl)))
@@ -225,29 +234,44 @@ function buildInputConfig(input: {
     targetTotalSec,
   )
   const urls = pickSmartBatchMaterialUrls(baseUrls, slots, segmentCount)
-  const shotDurationSec = Math.max(
+  const rows = input.scriptRows.slice(0, segmentCount)
+  const defaultSegSec = Math.max(
     3,
     Math.min(5, Math.round((targetTotalSec / Math.max(1, urls.length)) * 100) / 100),
   )
-  const narration = buildSmartBatchNarration(input.guidance.trim(), input.scriptRows, targetTotalSec)
-  const estSpeech = estimateSpeechSec(narration)
-  const speechRate = resolveSpeechRateForTarget(estSpeech, targetTotalSec)
+
+  const mediaGroups = urls.map((url, i) => {
+    const row = rows[i]
+    const dialogue = sanitizeMixDialogueText(String(row?.dialogue ?? '')).trim()
+    const group: Record<string, unknown> = {
+      GroupName: `storyboard-${i}`,
+      MediaArray: [url],
+      SplitMode: 'NoSplit',
+      Volume: 0,
+    }
+    if (dialogue.length >= 2 && !isPlaceholderDialogue(dialogue)) {
+      group.SpeechTextArray = [dialogue.slice(0, 200)]
+    } else {
+      group.Duration = segmentDurationFromRow(row, defaultSegSec)
+    }
+    return group
+  })
+
+  const bgmUrl = resolveIceMixBgmUrl({
+    presetId: input.bgmPresetId,
+    customUrl: input.mixBgmUrl,
+  })
+  const inputConfig: Record<string, unknown> = {
+    MediaGroupArray: mediaGroups,
+  }
+  if (bgmUrl) {
+    inputConfig.BackgroundMusicArray = [ensureIceHttpsUrl(bgmUrl)]
+  }
 
   return {
-    inputConfig: {
-      MediaGroupArray: [
-        {
-          GroupName: 'main-storyboard-materials',
-          MediaArray: urls,
-          SplitMode: 'AverageSplit',
-          Duration: targetTotalSec,
-          Volume: 0,
-        },
-      ],
-      SpeechTextArray: [narration],
-    },
-    speechRate,
-    shotDurationSec,
+    inputConfig,
+    speechRate: 0,
+    shotDurationSec: defaultSegSec,
   }
 }
 
@@ -301,6 +325,8 @@ export async function iceSubmitSmartBatchJob(
     subtitleStyleId?: string
     mixVoicePresetId?: string
     transitionMode?: 'auto' | string
+    bgmPresetId?: string
+    mixBgmUrl?: string
   },
 ): Promise<
   | { ok: true; batchJobId: string }
@@ -336,8 +362,13 @@ export async function iceSubmitSmartBatchJob(
     guidance,
     targetTotalSec,
     materialSlots: input.materialSlots,
+    bgmPresetId: input.bgmPresetId,
+    mixBgmUrl: input.mixBgmUrl,
   })
   const inputConfig = built.inputConfig
+  const bgmEnabled = Boolean(
+    resolveIceMixBgmUrl({ presetId: input.bgmPresetId, customUrl: input.mixBgmUrl }),
+  )
   const editingConfig = buildDefaultEditingConfig(
     built.speechRate,
     input.subtitleStyleId,
@@ -345,6 +376,8 @@ export async function iceSubmitSmartBatchJob(
     {
       voicePresetId: input.mixVoicePresetId,
       transitionAuto: input.transitionMode !== 'none' && input.transitionMode !== 'fade',
+      groupedSpeech: true,
+      bgmEnabled,
     },
   )
   const templateIds = (input.templateIds ?? []).filter(Boolean).slice(0, 50)
