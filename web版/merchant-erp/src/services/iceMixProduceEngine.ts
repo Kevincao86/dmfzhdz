@@ -3,6 +3,7 @@
  * 按分镜表语义匹配素材与截取点，视觉 AI 精修入点；渲染时尊重用户已确认的分镜。
  */
 import type { IceMixMaterialProfile } from './iceMixEditPlanAi'
+import { resolveIceEffectPreset } from '../lib/iceEffectPresets'
 import {
   buildIceMixSegmentsFromEditPlan,
   buildStoryboardMixDecisions,
@@ -182,12 +183,18 @@ function sanitizeMixSegments(segments: IceMixSegmentPlan[]): IceMixSegmentPlan[]
 export function composeMixProductionBrief(
   instruction: string,
   rows: ShortVideoScriptRow[],
-  opts?: { hasNarration?: boolean },
+  opts?: { hasNarration?: boolean; effectId?: string },
 ): string {
   const base = String(instruction || '').trim()
+  const effect = resolveIceEffectPreset(opts?.effectId ?? 'none')
+  const transitionHint = effect.transitionSubType
+    ? effect.transitionSubType === 'fade'
+      ? '段间叠化转场'
+      : `段间${effect.label}`
+    : '按画面场景自动硬切切换（非叠化）'
   const productionHints = [
     '多素材按分镜时间轴拼接剪辑（非单条播完切换）',
-    '段间叠化转场 + 镜头淡入淡出',
+    transitionHint,
     '原素材静音，使用 ICE AI_TTS 口播讲解',
     '字幕带弹入/打字机等动效，与口播同步',
   ]
@@ -310,7 +317,7 @@ export async function produceIceMixPackage(
   const editBrief = composeMixProductionBrief(
     input.mixInstruction || input.guidance || '',
     rows,
-    { hasNarration: narrationText.length >= 4 },
+    { hasNarration: narrationText.length >= 4, effectId: input.effectId },
   )
 
   const summary = segments

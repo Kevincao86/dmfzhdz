@@ -427,22 +427,23 @@ export function buildMixAnimatedSubtitleTracks(
   return { SubtitleTracks: [{ SubtitleTrackClips: clips }] }
 }
 
-/** 混剪成片：段间叠化转场 + 首尾淡入淡出（短时长，降低 IMS 直切卡顿感） */
+/** 混剪成片：段间转场（智能推断默认硬切；显式叠化时才用 fade） */
 export function enhanceIceMixBriefPlan(
   plan: IceBriefTimelinePlan,
   effectId: string,
 ): IceBriefTimelinePlan {
   const effect = resolveIceEffectPreset(effectId)
-  const transitionSubType = effect.transitionSubType ?? 'fade'
-  const fadeClip = effect.fadeClip || transitionSubType === 'fade'
+  const transitionSubType = effect.transitionSubType
+  const fadeClip = effect.fadeClip || (transitionSubType === 'fade' && effectId !== 'none')
+  const useTransition = Boolean(transitionSubType) && effectId !== 'none'
   return {
     ...plan,
     fadeClip,
     useFade: fadeClip,
-    useTransition: Boolean(transitionSubType),
-    transitionSubType,
-    effectId: effect.transitionSubType ? effect.id : transitionSubType === 'fade' ? 'trans_fade' : effect.id,
-    summary: `${plan.summary}${plan.summary ? ' · ' : ''}混剪${transitionSubType ? `转场(${effect.label || '叠化'})` : '叠化转场'}`,
+    useTransition,
+    transitionSubType: useTransition ? transitionSubType : undefined,
+    effectId: useTransition ? effect.id : 'none',
+    summary: `${plan.summary}${plan.summary ? ' · ' : ''}混剪${useTransition ? `转场(${effect.label})` : '场景硬切'}`,
   }
 }
 
