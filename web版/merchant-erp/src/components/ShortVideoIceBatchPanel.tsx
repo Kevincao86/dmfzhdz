@@ -869,11 +869,13 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     setAnalyzeBusy(true)
     setHint('AI 正在分析素材画面…')
     try {
+      const promoHint = formatMixPromoPlanningBlock(mixPromo)
+      const userHint = [mixGuidance.trim(), promoHint].filter(Boolean).join('\n\n') || undefined
       const r = await analyzeIceMixMaterialsToGuidance({
         materials: mixMaterialPool,
         targetTotalSec: mixTargetSec,
         aspectLabel: aspect.label,
-        userHint: mixGuidance.trim() || undefined,
+        userHint,
         onProgress: (msg) => setHint(msg),
       })
       if (!r.ok) {
@@ -908,7 +910,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     } finally {
       setAnalyzeBusy(false)
     }
-  }, [mixMaterialPool, mixTargetSec, aspect.label, mixGuidance])
+  }, [mixMaterialPool, mixTargetSec, aspect.label, mixGuidance, mixPromo])
 
   const runPlanMixScript = useCallback(async () => {
     const draft = mixGuidance.trim()
@@ -971,7 +973,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
 - 理解指导文案叙事，输出 ${mixTargetSegmentCount(mixTargetSec, MIX_DEFAULT_SEGMENT_SEC)} 段分镜（匹配目标时长 ${mixTargetSec} 秒，非每条素材一段）
 - 有门头/门店素材时：门头指引(开) → 产品/套餐(中) → 结束语(尾)，或产品钩子(开) → 门头指引(尾前) → 结束语
 - 每段 visual、dialogue 均须非空；dialogue 仅为可朗读口播短句，禁止写入指导文案摘要/提示语（如「这是一支以…为主题的短视频」）或「核心卖点」「叙事节奏」等标签；口播须与画面语义对应
-- 各段口播不得完全相同；若已填主推商品/价格，须在合适段位写入口播
+- 各段口播不得完全相同；若已填主推商品/价格，中段 1 段带商品名、最后 1 段报价
 - 时间段从 0 连续覆盖至 ${mixTargetSec} 秒`,
     ]
       .filter(Boolean)
@@ -1342,11 +1344,13 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     if (usableProfiles.length < Math.min(poolLen, Math.ceil(poolLen * 0.4))) {
       setHint('智能成片：AI 分析素材画面…')
       try {
+        const promoHint = formatMixPromoPlanningBlock(mixPromo)
+        const userHint = [mixGuidance.trim(), promoHint].filter(Boolean).join('\n\n') || undefined
         const r = await analyzeIceMixMaterialsToGuidance({
           materials: mixMaterialPool,
           targetTotalSec: mixTargetSec,
           aspectLabel: aspect.label,
-          userHint: mixGuidance.trim() || undefined,
+          userHint,
           onProgress: (msg) => setHint(`智能成片 · ${msg}`),
         })
         if (!r.ok) {
@@ -2248,7 +2252,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                 </label>
               </div>
               <p className="text-[11px] leading-snug text-zinc-500">
-                填写主推商品与价格后，「AI 规划分镜」会在对应镜头口播中带出商品名与价格划算信息；各段口播不会重复同一句。
+                填写主推商品与价格后，「AI 规划分镜」会在中段 1 段口播带出商品名、在最后 1 段强调原价与优惠价；各段口播不会重复同一句或重复报价。
               </p>
               <textarea
                 spellCheck={false}

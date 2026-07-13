@@ -46,10 +46,10 @@ export function formatMixPromoPlanningBlock(promo?: MixPromoContext): string {
 主推商品：${product}
 原价：${orig} 元
 优惠价：${sale} 元
-口播要求：
-- 中段产品/套餐镜头须自然带出主推商品名（勿每段都重复商品名）
-- 收尾 1～2 段须口播强调「原价 vs 优惠价」划算（须可朗读，如「原价${orig}，现在${sale}，太划算了！」）
-- 各段口播不得完全相同，禁止多段复读同一句`
+口播要求（写死，禁止违反）：
+- 中段恰好 1 段口播自然带出主推商品名（不含原价/优惠价数字）
+- 最后 1 段口播强调「原价 vs 优惠价」划算（全片仅此 1 段报价）
+- 禁止相邻两段或任意两段口播重复同一报价句；禁止多段复读「原价…优惠价…」`
 }
 
 function pickVariant(lines: string[], lineIndex = 0): string {
@@ -68,46 +68,77 @@ function formatMixPriceYuan(raw?: string): string {
   return t.slice(0, 8)
 }
 
-/** 按段位生成商品/价格口播（须与画面大致匹配） */
+const PRODUCT_VISUAL_RE =
+  /套餐|团购|产品|成品|摆盘|出货|菜品|牛排|肉|铁板|原切|食材|配菜|铁盘|意面/
+
+function mixDialogueContainsPrice(promo: MixPromoContext, dialogue: string): boolean {
+  const orig = formatMixPriceYuan(promo.originalPrice)
+  const sale = formatMixPriceYuan(promo.salePrice)
+  const d = dialogue.trim()
+  if (!d) return false
+  if (orig && sale && d.includes(orig) && d.includes(sale)) return true
+  if (/原价|优惠价|活动价|日常价|现在\d|仅需\d/.test(d) && /\d/.test(d)) return true
+  return false
+}
+
+function mixDialogueContainsProductName(product: string, dialogue: string): boolean {
+  const name = product.trim()
+  if (!name || name.length < 2) return false
+  return dialogue.includes(name.slice(0, Math.min(name.length, 6)))
+}
+
+export type MixPromoDialogueSlot = 'product' | 'price'
+
+/** 按段位生成商品/价格口播（须与画面大致匹配；全片商品名 1 次、报价 1 次） */
 export function mixPromoDialogueForSegment(
   visual: string,
   segmentIndex: number,
   totalSegments: number,
   promo?: MixPromoContext,
+  slot?: MixPromoDialogueSlot,
 ): string | null {
   if (!isMixPromoFilled(promo)) return null
   const product = promo!.mainProduct?.trim()
   const orig = formatMixPriceYuan(promo!.originalPrice)
   const sale = formatMixPriceYuan(promo!.salePrice)
   const v = visual.trim()
-  const closing = segmentIndex >= totalSegments - 1
-  const priceSlot = segmentIndex >= totalSegments - 2
+  const isLast = segmentIndex === totalSegments - 1
 
-  if (closing && orig && sale) {
-    if (/门头|门店|环境|全景|用餐|结尾|收尾/.test(v) || closing) {
-      const name = product ? `${product}，` : ''
-      return `${name}原价${orig}，现在${sale}，赶紧冲！`.slice(0, 28)
-    }
-  }
-  if (priceSlot && orig && sale && /套餐|团购|优惠|价格|摆盘|出货|菜品|牛排|肉|铁板/.test(v)) {
+  if (slot === 'price' || (!slot && isLast)) {
+    if (!orig || !sale) return null
+    const name =
+      product && (PRODUCT_VISUAL_RE.test(v) || isLast) ? `${product.slice(0, 12)}，` : ''
     return pickVariant(
       [
-        `原价${orig}，优惠价${sale}，真的划算！`,
-        `日常${orig}，活动价${sale}，值！`,
+        `${name}原价${orig}，现在${sale}，太划算了！`,
+        `${name}日常${orig}，活动价${sale}，赶紧冲！`,
       ],
       segmentIndex,
     ).slice(0, 28)
   }
-  if (product && /套餐|产品|成品|摆盘|出货|菜品|牛排|肉|铁板|原切|食材/.test(v)) {
+
+  if (slot === 'product') {
+    if (!product || !PRODUCT_VISUAL_RE.test(v)) return null
     return pickVariant(
       [
-        `这款${product}，到店必点！`,
-        `${product}品质在线，值得一试！`,
-        `招牌${product}，分量也很实在！`,
+        `这款${product.slice(0, 10)}，到店必点！`,
+        `${product.slice(0, 10)}品质在线，值得一试！`,
+        `招牌${product.slice(0, 10)}，分量也很实在！`,
       ],
       segmentIndex,
     ).slice(0, 28)
   }
+
+  if (!slot && !isLast && product && PRODUCT_VISUAL_RE.test(v)) {
+    return pickVariant(
+      [
+        `这款${product.slice(0, 10)}，到店必点！`,
+        `${product.slice(0, 10)}品质在线，值得一试！`,
+      ],
+      segmentIndex,
+    ).slice(0, 28)
+  }
+
   return null
 }
 
@@ -729,6 +760,10 @@ export type DeriveMixDialogueOpts = {
   lineIndex?: number
   totalRows?: number
   promo?: MixPromoContext
+  /** 全片已出现过报价口播时跳过再生成报价 */
+  skipPromoPrice?: boolean
+  /** 全片已出现过商品名时跳过再生成商品口播 */
+  skipPromoProduct?: boolean
 }
 
 /** 根据画面描述生成短口播（指导文案无法拆出可读句时的回退） */
@@ -740,8 +775,17 @@ export function deriveMixDialogueFromVisual(
   const v = visual.trim()
   const idx = opts?.lineIndex ?? 0
   const total = opts?.totalRows ?? 1
-  const promoLine = mixPromoDialogueForSegment(v, idx, total, opts?.promo)
-  if (promoLine && isMixDialogueAlignedWithVisual(v, promoLine)) return promoLine
+  const isLast = idx === total - 1
+  if (opts?.promo && isMixPromoFilled(opts.promo)) {
+    if (!opts.skipPromoProduct && !isLast) {
+      const productLine = mixPromoDialogueForSegment(v, idx, total, opts.promo, 'product')
+      if (productLine && isMixDialogueAlignedWithVisual(v, productLine)) return productLine
+    }
+    if (!opts.skipPromoPrice && isLast) {
+      const priceLine = mixPromoDialogueForSegment(v, idx, total, opts.promo, 'price')
+      if (priceLine) return priceLine
+    }
+  }
 
   if (/行走|走路|脚步|人行道|腿部|石板路|走向|徒步|迈步/.test(v)) {
     return pickVariant(['走，咱们进店看看！', '就在前面，进店瞧瞧！', '脚步带路，马上到店！'], idx)
@@ -806,37 +850,58 @@ function dialogueDedupeKey(dialogue: string): string {
   return dialogue.trim().replace(/\s+/g, '')
 }
 
-/** 禁止多段口播完全重复 */
+/** 口播是否语义相近（含重复报价、高重叠短句） */
+export function isMixDialogueNearDuplicate(a: string, b: string, promo?: MixPromoContext): boolean {
+  const ka = dialogueDedupeKey(a)
+  const kb = dialogueDedupeKey(b)
+  if (ka.length < 4 || kb.length < 4) return false
+  if (ka === kb) return true
+  if (promo && isMixPromoFilled(promo)) {
+    if (mixDialogueContainsPrice(promo, a) && mixDialogueContainsPrice(promo, b)) return true
+  }
+  const shorter = ka.length <= kb.length ? ka : kb
+  const longer = ka.length <= kb.length ? kb : ka
+  if (shorter.length >= 10 && longer.includes(shorter.slice(0, Math.min(12, shorter.length)))) {
+    return true
+  }
+  return false
+}
+
+/** 禁止多段口播重复或相近（尤其报价句） */
 export function dedupeMixScriptDialogues(
   rows: ShortVideoScriptRow[],
   hook = '值得一看',
   promo?: MixPromoContext,
 ): ShortVideoScriptRow[] {
-  const seen = new Set<string>()
+  const prior: string[] = []
   return rows.map((r, i) => {
     let dialogue = String(r.dialogue ?? '').trim()
-    let key = dialogueDedupeKey(dialogue)
-    if (key.length >= 4 && seen.has(key)) {
+    let guard = 0
+    while (
+      prior.some((p) => isMixDialogueNearDuplicate(p, dialogue, promo)) &&
+      guard < 8
+    ) {
+      guard += 1
       dialogue = deriveMixDialogueFromVisual(r.visual, hook, {
-        lineIndex: i + seen.size + 1,
+        lineIndex: i + guard + prior.length,
         totalRows: rows.length,
         promo,
+        skipPromoPrice: prior.some((p) => promo && mixDialogueContainsPrice(promo, p)),
+        skipPromoProduct:
+          Boolean(promo?.mainProduct?.trim()) &&
+          prior.some((p) => mixDialogueContainsProductName(promo!.mainProduct!, p)),
       })
-      key = dialogueDedupeKey(dialogue)
-      let guard = 0
-      while (seen.has(key) && guard < 6) {
-        guard += 1
-        dialogue = deriveMixDialogueFromVisual(r.visual, hook, {
-          lineIndex: i + seen.size + guard + 2,
-          totalRows: rows.length,
-          promo,
-        })
-        key = dialogueDedupeKey(dialogue)
-      }
     }
-    if (key.length >= 4) seen.add(key)
+    if (dialogue.trim().length >= 4) prior.push(dialogue.trim())
     return { ...r, dialogue: dialogue.slice(0, 120) }
   })
+}
+
+function findMixPromoProductSlotIndex(rows: ShortVideoScriptRow[]): number {
+  for (let i = 0; i < rows.length - 1; i++) {
+    if (PRODUCT_VISUAL_RE.test(String(rows[i]!.visual ?? ''))) return i
+  }
+  return rows.length >= 3 ? Math.floor(rows.length / 2) : 0
 }
 
 function injectMixPromoDialogues(
@@ -844,21 +909,41 @@ function injectMixPromoDialogues(
   promo?: MixPromoContext,
 ): ShortVideoScriptRow[] {
   if (!isMixPromoFilled(promo) || rows.length === 0) return rows
-  const productIdx = rows.findIndex((r) =>
-    /套餐|产品|成品|摆盘|出货|菜品|牛排|肉|铁板|原切|食材|配菜/.test(r.visual),
+  const product = promo!.mainProduct?.trim()
+  const orig = formatMixPriceYuan(promo!.originalPrice)
+  const sale = formatMixPriceYuan(promo!.salePrice)
+  const productSlot = product ? findMixPromoProductSlotIndex(rows) : -1
+  const priceSlot = orig && sale ? rows.length - 1 : -1
+  let productInjected = rows.some(
+    (r) => product && mixDialogueContainsProductName(product, String(r.dialogue ?? '')),
   )
-  const closingIdx = rows.length - 1
-  const slots = new Set<number>()
-  if (productIdx >= 0) slots.add(productIdx)
-  slots.add(closingIdx)
-  if (rows.length >= 3) slots.add(closingIdx - 1)
+  let priceInjected = rows.some((r) => mixDialogueContainsPrice(promo!, String(r.dialogue ?? '')))
 
   return rows.map((r, i) => {
-    if (!slots.has(i)) return r
-    const promoLine = mixPromoDialogueForSegment(r.visual, i, rows.length, promo)
-    if (!promoLine) return r
-    if (i === closingIdx || isMixDialogueAlignedWithVisual(r.visual, promoLine)) {
-      return { ...r, dialogue: promoLine.slice(0, 120) }
+    const dialogue = String(r.dialogue ?? '').trim()
+    if (
+      i === productSlot &&
+      product &&
+      !productInjected &&
+      !mixDialogueContainsProductName(product, dialogue) &&
+      !mixDialogueContainsPrice(promo!, dialogue)
+    ) {
+      const promoLine = mixPromoDialogueForSegment(r.visual, i, rows.length, promo, 'product')
+      if (promoLine) {
+        productInjected = true
+        return { ...r, dialogue: promoLine.slice(0, 120) }
+      }
+    }
+    if (
+      i === priceSlot &&
+      !priceInjected &&
+      !mixDialogueContainsPrice(promo!, dialogue)
+    ) {
+      const promoLine = mixPromoDialogueForSegment(r.visual, i, rows.length, promo, 'price')
+      if (promoLine) {
+        priceInjected = true
+        return { ...r, dialogue: promoLine.slice(0, 120) }
+      }
     }
     return r
   })
