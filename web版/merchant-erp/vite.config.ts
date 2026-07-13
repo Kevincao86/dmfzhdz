@@ -8,6 +8,7 @@ import { mpAuthGatewayPlugin } from './vite-plugins/mpAuthGateway'
 import { mpHallRegistryGatewayPlugin } from './vite-plugins/mpHallRegistryGateway'
 import { mpRecruitApplyLandingPlugin } from './vite-plugins/mpRecruitApplyLandingPlugin'
 import { opsErpSyncGatewayPlugin } from './vite-plugins/opsErpSyncGateway'
+import { meooClientConfigDevPlugin } from './vite-plugins/meooClientConfigDevPlugin'
 import { supportWsProxyToAdminPlugin } from './vite-plugins/supportWsProxyToAdmin'
 
 /**
@@ -17,6 +18,9 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const adminOrigin =
     (env.VITE_MERCHANT_ADMIN_ORIGIN as string | undefined)?.replace(/\/$/, '') || 'http://127.0.0.1:5174'
+  const supabaseUpstream =
+    (env.MEOO_SUPABASE_DEV_UPSTREAM as string | undefined)?.replace(/\/$/, '') ||
+    'https://mofangdianai.com'
 
   return {
     define: {
@@ -37,6 +41,7 @@ export default defineConfig(({ mode }) => {
       mpAuthGatewayPlugin(),
       mpHallRegistryGatewayPlugin(),
       supportWsProxyToAdminPlugin({ adminHttpOrigin: adminOrigin }),
+      meooClientConfigDevPlugin(),
     ],
     /**
      * 使用 IPv4 环回：`localhost` 在部分 macOS/Node 下只监听 [::1]，浏览器访问 http://127.0.0.1 会「拒绝连接」。
@@ -46,6 +51,19 @@ export default defineConfig(({ mode }) => {
       port: mode === 'partner' ? 5175 : 5173,
       strictPort: true,
       host: '127.0.0.1',
+      proxy: {
+        '/auth/v1': { target: supabaseUpstream, changeOrigin: true, secure: true },
+        '/rest/v1': { target: supabaseUpstream, changeOrigin: true, secure: true },
+      },
+    },
+    preview: {
+      port: mode === 'partner' ? 5175 : 5173,
+      strictPort: true,
+      host: '127.0.0.1',
+      proxy: {
+        '/auth/v1': { target: supabaseUpstream, changeOrigin: true, secure: true },
+        '/rest/v1': { target: supabaseUpstream, changeOrigin: true, secure: true },
+      },
     },
   }
 })

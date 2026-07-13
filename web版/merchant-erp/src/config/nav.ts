@@ -47,6 +47,7 @@ export const NAV_ITEMS: NavItem[] = [
       { path: '/reviews', label: '评价管理' },
       { path: '/geo', label: 'GEO运营优化' },
       { path: '/operation/competitors', label: '竞争对手分析' },
+      { path: '/ai-image', label: 'AI 视觉工坊' },
       { path: '/ai-operation/content', label: '爆款 Brief 生成' },
       { path: '/ai-operation/video-check', label: '短视频AI处理' },
       { path: '/ai-operation/digital-human', label: '数字人口播' },

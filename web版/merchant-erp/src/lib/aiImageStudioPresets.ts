@@ -1,0 +1,1326 @@
+/**
+ * 灵祺视觉工坊 — 本地生活商家 AI 出图预设
+ * 参考：有赞智能海报（商品链路+太阳码）、Canva Magic Design（多稿+平台尺寸）、
+ * 即梦 3.0（智能参考+多方案）、稿定（行业模板+批量多端）。
+ */
+
+export type LocalLifeIndustryId =
+  | 'catering'
+  | 'beauty'
+  | 'leisure'
+  | 'hotel'
+  | 'pet'
+  | 'education'
+
+export type PublishChannelId =
+  | 'douyin'
+  | 'xiaohongshu'
+  | 'wechat_moments'
+  | 'meituan'
+  | 'kuaishou'
+  | 'offline_print'
+
+export type VisualPlaybookId =
+  | 'grand_opening'
+  | 'flash_sale'
+  | 'group_buy_new'
+  | 'festival_promo'
+  | 'store_visit'
+  | 'member_recharge'
+  | 'daily_sign'
+  | 'product_hero'
+  | 'logo_brand'
+  | 'menu_board'
+
+export type VisualIntentId = 'poster' | 'product' | 'logo' | 'environment' | 'package' | 'menu'
+
+export type AiImageSizePresetId =
+  | 'moments_vertical'
+  | 'square'
+  | 'landscape'
+  | 'a4_portrait'
+  | 'a4_landscape'
+  | 'print_poster'
+
+export type AiImageStyleId = 'lively' | 'minimal' | 'guochao' | 'fresh' | 'ecommerce' | 'premium'
+
+export type AiImageDeliveryId = 'platform' | 'hd'
+
+export type AiImageSizePreset = {
+  id: AiImageSizePresetId
+  label: string
+  pixelHint: string
+  wanxSize: string
+  aspectRatio: '1:1' | '3:4' | '4:3' | '9:16' | '16:9'
+  doubaoSize: '1K' | '2K'
+}
+
+export const LOCAL_LIFE_INDUSTRIES: Array<{
+  id: LocalLifeIndustryId
+  label: string
+  emoji: string
+  defaultStyle: AiImageStyleId
+  sceneHint: string
+}> = [
+  { id: 'catering', label: '餐饮', emoji: '🍜', defaultStyle: 'lively', sceneHint: '食欲感、烟火气、真实菜品' },
+  { id: 'beauty', label: '美业', emoji: '💅', defaultStyle: 'premium', sceneHint: '高级感、干净通透、轻奢' },
+  { id: 'leisure', label: '休娱', emoji: '🎱', defaultStyle: 'fresh', sceneHint: '年轻活力、社交分享感' },
+  { id: 'hotel', label: '酒旅', emoji: '🏨', defaultStyle: 'minimal', sceneHint: '度假氛围、空间质感' },
+  { id: 'pet', label: '宠物', emoji: '🐾', defaultStyle: 'fresh', sceneHint: '萌宠、治愈、家庭友好' },
+  { id: 'education', label: '教育', emoji: '📚', defaultStyle: 'minimal', sceneHint: '信任感、专业、亲子' },
+]
+
+export const PUBLISH_CHANNELS: Array<{
+  id: PublishChannelId
+  label: string
+  short: string
+  color: string
+  primarySizeId: AiImageSizePresetId
+  extraSizeIds?: AiImageSizePresetId[]
+  publishTips: string[]
+}> = [
+  {
+    id: 'douyin',
+    label: '抖音 / 来客',
+    short: '抖音',
+    color: '#111827',
+    primarySizeId: 'moments_vertical',
+    publishTips: ['竖屏 9:16', '主标题 6 字内更易读', '留底部安全区放团购入口'],
+  },
+  {
+    id: 'xiaohongshu',
+    label: '小红书',
+    short: '小红书',
+    color: '#ff2442',
+    primarySizeId: 'moments_vertical',
+    publishTips: ['封面 3:4 竖图', '强调探店真实感', '副标题可写人均/地址'],
+  },
+  {
+    id: 'wechat_moments',
+    label: '微信朋友圈',
+    short: '朋友圈',
+    color: '#07c160',
+    primarySizeId: 'square',
+    extraSizeIds: ['moments_vertical'],
+    publishTips: ['方形 1:1 传播最广', '价格信息要醒目', 'JPEG ≤3MB'],
+  },
+  {
+    id: 'meituan',
+    label: '美团 / 点评',
+    short: '美团',
+    color: '#ffc300',
+    primarySizeId: 'square',
+    publishTips: ['团购主图偏 1:1', '突出套餐组合与到手价', '避免过多小字'],
+  },
+  {
+    id: 'kuaishou',
+    label: '快手本地',
+    short: '快手',
+    color: '#ff4906',
+    primarySizeId: 'moments_vertical',
+    publishTips: ['竖屏短视频封面同尺寸', '大字报风格转化更好'],
+  },
+  {
+    id: 'offline_print',
+    label: '线下印刷',
+    short: '印刷',
+    color: '#64748b',
+    primarySizeId: 'print_poster',
+    extraSizeIds: ['a4_portrait'],
+    publishTips: ['建议高清 PNG', 'A4 / 大海报分场景选用'],
+  },
+]
+
+export const VISUAL_PLAYBOOKS: Array<{
+  id: VisualPlaybookId
+  label: string
+  desc: string
+  intent: VisualIntentId
+  emoji: string
+  suggestedChannels: PublishChannelId[]
+  styleId: AiImageStyleId
+  titleTemplates: string[]
+  subtitleTemplates: string[]
+  offerTemplates: string[]
+}> = [
+  {
+    id: 'grand_opening',
+    label: '开业引流',
+    desc: '新店开业、试营业、首单立减',
+    intent: 'poster',
+    emoji: '🎉',
+    suggestedChannels: ['douyin', 'wechat_moments', 'meituan'],
+    styleId: 'lively',
+    titleTemplates: ['{store}盛大开业', '开业福利来了', '新店首发 · 限时特惠'],
+    subtitleTemplates: ['前100名到店有礼', '打卡拍照送小食', '附近街坊都在问'],
+    offerTemplates: ['满50减20', '首单8折', '双人餐¥99'],
+  },
+  {
+    id: 'flash_sale',
+    label: '限时秒杀',
+    desc: '48小时闪购、清仓、尾货',
+    intent: 'poster',
+    emoji: '⚡',
+    suggestedChannels: ['douyin', 'kuaishou', 'wechat_moments'],
+    styleId: 'guochao',
+    titleTemplates: ['限时秒杀', '今晚8点开抢', '手慢无 · 最后{offer}'],
+    subtitleTemplates: ['售完即止', '仅限今日', '库存告急'],
+    offerTemplates: ['5折起', '立减30元', '买一送一'],
+  },
+  {
+    id: 'group_buy_new',
+    label: '团购上新',
+    desc: '套餐上架、组合卖点',
+    intent: 'package',
+    emoji: '🛒',
+    suggestedChannels: ['meituan', 'douyin', 'xiaohongshu'],
+    styleId: 'lively',
+    titleTemplates: ['{store}超值团购', '双人/四人餐上新', '这份套餐太划算了'],
+    subtitleTemplates: ['含招牌菜+饮品', '周末通用', '免预约'],
+    offerTemplates: ['¥99双人餐', '原价¥168现¥128', '3-4人餐¥199'],
+  },
+  {
+    id: 'festival_promo',
+    label: '节日大促',
+    desc: '端午、中秋、国庆、情人节',
+    intent: 'poster',
+    emoji: '🏮',
+    suggestedChannels: ['wechat_moments', 'douyin', 'offline_print'],
+    styleId: 'guochao',
+    titleTemplates: ['节日限定福利', '{store}陪你过节', '团圆/聚会首选'],
+    subtitleTemplates: ['节日套餐限时', '提前预约享礼', '送礼/聚餐皆宜'],
+    offerTemplates: ['满200减50', '节日专享8.8折', '赠特色小食'],
+  },
+  {
+    id: 'store_visit',
+    label: '探店种草',
+    desc: '达人招募、UGC、打卡',
+    intent: 'environment',
+    emoji: '📸',
+    suggestedChannels: ['xiaohongshu', 'douyin'],
+    styleId: 'fresh',
+    titleTemplates: ['这家{store}太出片', '本地人私藏好店', '氛围感拉满'],
+    subtitleTemplates: ['适合拍照打卡', '人均友好', '隐藏菜单推荐'],
+    offerTemplates: ['打卡送饮品', '探店套餐', ''],
+  },
+  {
+    id: 'member_recharge',
+    label: '会员储值',
+    desc: '储值送礼、复购锁客',
+    intent: 'poster',
+    emoji: '💳',
+    suggestedChannels: ['wechat_moments', 'meituan'],
+    styleId: 'premium',
+    titleTemplates: ['会员储值加赠', '老客专享回馈', '充300送50'],
+    subtitleTemplates: ['到店核销', '长期有效', '可与活动同享'],
+    offerTemplates: ['充500送100', '储值9折', '赠招牌菜1份'],
+  },
+  {
+    id: 'daily_sign',
+    label: '日签海报',
+    desc: '每日营业、天气联动、社群触达',
+    intent: 'poster',
+    emoji: '☀️',
+    suggestedChannels: ['wechat_moments'],
+    styleId: 'minimal',
+    titleTemplates: ['今日营业中', '早安 · {store}', '美好一天从这里开始'],
+    subtitleTemplates: ['欢迎预约', '今日推荐', ''],
+    offerTemplates: ['', '', ''],
+  },
+  {
+    id: 'product_hero',
+    label: '招牌单品',
+    desc: '爆款菜、引流品、主图',
+    intent: 'product',
+    emoji: '🔥',
+    suggestedChannels: ['meituan', 'douyin', 'xiaohongshu'],
+    styleId: 'ecommerce',
+    titleTemplates: ['招牌{offer}', '镇店之宝', '必点TOP1'],
+    subtitleTemplates: ['销量领先', '回头客最多', '现做现卖'],
+    offerTemplates: ['¥28', '第二份半价', ''],
+  },
+  {
+    id: 'logo_brand',
+    label: '品牌标识',
+    desc: 'Logo、头像、门头字',
+    intent: 'logo',
+    emoji: '✨',
+    suggestedChannels: ['wechat_moments', 'offline_print'],
+    styleId: 'minimal',
+    titleTemplates: ['{store}', '{store} · 本地生活', ''],
+    subtitleTemplates: ['', '', ''],
+    offerTemplates: ['', '', ''],
+  },
+  {
+    id: 'menu_board',
+    label: '菜单价目',
+    desc: '电子菜单、价目视觉',
+    intent: 'menu',
+    emoji: '📋',
+    suggestedChannels: ['offline_print', 'meituan'],
+    styleId: 'lively',
+    titleTemplates: ['{store}价目表', '今日推荐', ''],
+    subtitleTemplates: ['', '', ''],
+    offerTemplates: ['', '', ''],
+  },
+]
+
+export const AI_IMAGE_SIZE_PRESETS: AiImageSizePreset[] = [
+  {
+    id: 'moments_vertical',
+    label: '竖屏',
+    pixelHint: '1080×1920',
+    wanxSize: '720*1280',
+    aspectRatio: '9:16',
+    doubaoSize: '2K',
+  },
+  {
+    id: 'square',
+    label: '方形',
+    pixelHint: '1080×1080',
+    wanxSize: '1024*1024',
+    aspectRatio: '1:1',
+    doubaoSize: '2K',
+  },
+  {
+    id: 'landscape',
+    label: '横屏',
+    pixelHint: '1920×1080',
+    wanxSize: '1280*720',
+    aspectRatio: '16:9',
+    doubaoSize: '2K',
+  },
+  {
+    id: 'a4_portrait',
+    label: 'A4竖',
+    pixelHint: '210×297mm',
+    wanxSize: '832*1184',
+    aspectRatio: '3:4',
+    doubaoSize: '2K',
+  },
+  {
+    id: 'a4_landscape',
+    label: 'A4横',
+    pixelHint: '297×210mm',
+    wanxSize: '1184*832',
+    aspectRatio: '4:3',
+    doubaoSize: '2K',
+  },
+  {
+    id: 'print_poster',
+    label: '大海报',
+    pixelHint: '90×60cm',
+    wanxSize: '1440*960',
+    aspectRatio: '16:9',
+    doubaoSize: '2K',
+  },
+]
+
+export const AI_IMAGE_STYLE_PRESETS: Array<{ id: AiImageStyleId; label: string; promptHint: string }> = [
+  { id: 'lively', label: '烟火气', promptHint: '本地生活烟火气、暖光、真实质感、街头店招感' },
+  { id: 'premium', label: '轻奢', promptHint: '轻奢质感、低饱和、留白、适合美业酒旅' },
+  { id: 'minimal', label: '极简', promptHint: '极简排版、高级灰、信息清晰' },
+  { id: 'guochao', label: '国潮', promptHint: '国潮配色、书法标题、年轻促销感' },
+  { id: 'fresh', label: '清新', promptHint: '明亮自然光、清爽、健康、探店风' },
+  { id: 'ecommerce', label: '电商爆款', promptHint: '电商爆款构图、主体突出、促销标签' },
+]
+
+export type VisualStudioForm = {
+  industry: LocalLifeIndustryId
+  channels: PublishChannelId[]
+  playbook: VisualPlaybookId
+  /** 玩法细分选项 id（节日名称、套餐规格等） */
+  playbookVariantId: string
+  storeName: string
+  headline: string
+  subheadline: string
+  offer: string
+  timeRange: string
+  note: string
+  styleId: AiImageStyleId
+  variantCount: 2 | 4
+  delivery: AiImageDeliveryId
+  multiChannelPack: boolean
+}
+
+export const DEFAULT_VISUAL_STUDIO_FORM: VisualStudioForm = {
+  industry: 'catering',
+  channels: ['douyin', 'wechat_moments'],
+  playbook: 'group_buy_new',
+  playbookVariantId: '',
+  storeName: '',
+  headline: '',
+  subheadline: '',
+  offer: '',
+  timeRange: '',
+  note: '',
+  styleId: 'lively',
+  variantCount: 4,
+  delivery: 'platform',
+  multiChannelPack: true,
+}
+
+export type PlaybookVariantOption = {
+  id: string
+  label: string
+  /** 展示在选项下方的时段说明 */
+  periodLabel: string
+  headline?: string
+  subheadline?: string
+  offer?: string
+  timeRange?: string
+  note?: string
+  styleId?: AiImageStyleId
+}
+
+export type PlaybookVariantConfig = {
+  pickerLabel: string
+  options: PlaybookVariantOption[]
+}
+
+/** 各玩法下的可筛选细分场景（选中后自动写入文案③与时间） */
+export const PLAYBOOK_VARIANT_CONFIGS: Partial<Record<VisualPlaybookId, PlaybookVariantConfig>> = {
+  festival_promo: {
+    pickerLabel: '选择节日',
+    options: [
+      {
+        id: 'spring_festival',
+        label: '春节',
+        periodLabel: '2026年2月17日—3月3日（正月初一至十五）',
+        headline: '春节团圆宴',
+        subheadline: '年夜饭/聚会套餐预订',
+        offer: '满300减80',
+        timeRange: '2026年2月17日—3月3日',
+        note: '恭贺新春 · 需提前预约',
+        styleId: 'guochao',
+      },
+      {
+        id: 'valentine',
+        label: '情人节',
+        periodLabel: '2月14日',
+        headline: '情人节双人餐',
+        subheadline: '浪漫氛围 · 限量席位',
+        offer: '双人套餐¥199',
+        timeRange: '2月14日当天',
+        note: '可赠甜品/玫瑰',
+      },
+      {
+        id: 'dragon_boat',
+        label: '端午节',
+        periodLabel: '2026年5月31日（农历五月初五）',
+        headline: '端午安康 · 节日限定',
+        subheadline: '粽子礼盒/聚餐套餐',
+        offer: '满200减50',
+        timeRange: '2026年5月29日—5月31日',
+        note: '端午安康',
+        styleId: 'guochao',
+      },
+      {
+        id: 'qixi',
+        label: '七夕',
+        periodLabel: '2026年8月19日（农历七月初七）',
+        headline: '七夕约会首选',
+        subheadline: '双人浪漫套餐',
+        offer: '8.8折',
+        timeRange: '2026年8月19日前后3天',
+        note: '提前预约更省心',
+      },
+      {
+        id: 'mid_autumn',
+        label: '中秋节',
+        periodLabel: '2026年9月25日（农历八月十五）',
+        headline: '中秋团圆宴',
+        subheadline: '月饼礼盒 + 聚餐套餐',
+        offer: '满200减50',
+        timeRange: '2026年9月24日—9月26日',
+        note: '团圆/送礼皆宜',
+        styleId: 'guochao',
+      },
+      {
+        id: 'national_day',
+        label: '国庆节',
+        periodLabel: '10月1日—10月7日',
+        headline: '国庆狂欢',
+        subheadline: '假期聚会 · 全家通用',
+        offer: '节日专享8.8折',
+        timeRange: '10月1日—10月7日',
+        note: '假期正常营业',
+      },
+      {
+        id: 'double11',
+        label: '双11',
+        periodLabel: '11月11日',
+        headline: '双11限时钜惠',
+        subheadline: '全年最低价',
+        offer: '5折起',
+        timeRange: '11月10日—11月12日',
+        note: '售完即止',
+      },
+      {
+        id: 'new_year',
+        label: '元旦',
+        periodLabel: '1月1日—1月3日',
+        headline: '元旦迎新',
+        subheadline: '跨年/开年聚餐',
+        offer: '满100减20',
+        timeRange: '1月1日—1月3日',
+        note: '新年快乐',
+      },
+    ],
+  },
+  flash_sale: {
+    pickerLabel: '秒杀时段',
+    options: [
+      {
+        id: 'tonight_8',
+        label: '今晚8点',
+        periodLabel: '今日 20:00—24:00',
+        headline: '今晚8点秒杀',
+        subheadline: '准时开抢 · 手慢无',
+        offer: '5折起',
+        timeRange: '今日 20:00—24:00',
+        note: '售完即止',
+      },
+      {
+        id: 'weekend',
+        label: '周末专场',
+        periodLabel: '周六日全天',
+        headline: '周末限时秒杀',
+        subheadline: '仅限周末',
+        offer: '立减30元',
+        timeRange: '周六日 10:00—22:00',
+      },
+      {
+        id: 'lunch',
+        label: '午间闪购',
+        periodLabel: '11:00—14:00',
+        headline: '午市秒杀',
+        subheadline: '工作日午间专享',
+        offer: '买一送一',
+        timeRange: '工作日 11:00—14:00',
+      },
+      {
+        id: 'clearance',
+        label: '清仓特惠',
+        periodLabel: '售完即止',
+        headline: '清仓最后一批',
+        subheadline: '库存告急',
+        offer: '3折起',
+        timeRange: '售完即止',
+        note: '不退不换',
+      },
+    ],
+  },
+  group_buy_new: {
+    pickerLabel: '套餐规格',
+    options: [
+      {
+        id: 'double',
+        label: '双人餐',
+        periodLabel: '2人适用',
+        headline: '超值双人餐',
+        subheadline: '含招牌菜+饮品',
+        offer: '¥99双人餐',
+        timeRange: '周末通用',
+        note: '免预约',
+      },
+      {
+        id: 'triple',
+        label: '3-4人餐',
+        periodLabel: '3-4人适用',
+        headline: '3-4人欢聚餐',
+        subheadline: '分量足 · 性价比高',
+        offer: '¥168/3-4人',
+        timeRange: '午晚市通用',
+      },
+      {
+        id: 'family',
+        label: '家庭套餐',
+        periodLabel: '4-6人适用',
+        headline: '家庭聚餐套餐',
+        subheadline: '老少皆宜',
+        offer: '¥199家庭餐',
+        timeRange: '全天可用',
+        note: '可外带',
+      },
+      {
+        id: 'lunch_set',
+        label: '午市套餐',
+        periodLabel: '11:00—14:00',
+        headline: '午市工作餐',
+        subheadline: '上菜快 · 管饱',
+        offer: '¥39起',
+        timeRange: '工作日 11:00—14:00',
+      },
+    ],
+  },
+  grand_opening: {
+    pickerLabel: '开业阶段',
+    options: [
+      {
+        id: 'soft_open',
+        label: '试营业',
+        periodLabel: '试营业期间',
+        headline: '试营业福利',
+        subheadline: '前100名到店有礼',
+        offer: '首单8折',
+        timeRange: '试营业期间',
+        note: '欢迎提意见',
+      },
+      {
+        id: 'grand',
+        label: '正式开业',
+        periodLabel: '开业当天',
+        headline: '盛大开业',
+        subheadline: '打卡拍照送小食',
+        offer: '满50减20',
+        timeRange: '开业当天及前后3天',
+        styleId: 'lively',
+      },
+      {
+        id: 'anniversary',
+        label: '周年庆',
+        periodLabel: '店庆期间',
+        headline: '周年庆感恩回馈',
+        subheadline: '老客专享',
+        offer: '全场8.8折',
+        timeRange: '店庆周',
+        note: '感谢一路相伴',
+      },
+    ],
+  },
+  store_visit: {
+    pickerLabel: '种草角度',
+    options: [
+      {
+        id: 'ambiance',
+        label: '氛围打卡',
+        periodLabel: '适合拍照出片',
+        headline: '这家太出片了',
+        subheadline: '氛围感拉满',
+        offer: '打卡送饮品',
+        note: '建议傍晚光线',
+        styleId: 'fresh',
+      },
+      {
+        id: 'hidden_menu',
+        label: '隐藏菜单',
+        periodLabel: '本地人私藏',
+        headline: '隐藏菜单必点',
+        subheadline: '懂行的才知道',
+        offer: '探店套餐',
+        note: '可向店员询问',
+      },
+      {
+        id: 'value',
+        label: '人均友好',
+        periodLabel: '高性价比',
+        headline: '人均不过百',
+        subheadline: '学生党/打工人友好',
+        offer: '人均¥68',
+        note: '真实消费参考',
+      },
+      {
+        id: 'must_try',
+        label: '必点推荐',
+        periodLabel: '招牌必吃',
+        headline: '本地人必点TOP3',
+        subheadline: '回头客最多',
+        offer: '',
+        note: '跟着点不踩雷',
+      },
+    ],
+  },
+  member_recharge: {
+    pickerLabel: '储值档位',
+    options: [
+      {
+        id: 'tier_300',
+        label: '充300送50',
+        periodLabel: '长期有效',
+        headline: '充300送50',
+        subheadline: '老客专享回馈',
+        offer: '到账350元',
+        timeRange: '长期有效',
+        note: '可与活动同享',
+        styleId: 'premium',
+      },
+      {
+        id: 'tier_500',
+        label: '充500送100',
+        periodLabel: '长期有效',
+        headline: '充500送100',
+        subheadline: '到店核销',
+        offer: '到账600元',
+        timeRange: '长期有效',
+      },
+      {
+        id: 'tier_1000',
+        label: '充1000送250',
+        periodLabel: 'VIP专享',
+        headline: '充1000送250',
+        subheadline: '赠招牌菜1份',
+        offer: '到账1250元',
+        timeRange: '长期有效',
+        note: '限量100名',
+      },
+    ],
+  },
+  daily_sign: {
+    pickerLabel: '日签主题',
+    options: [
+      {
+        id: 'morning',
+        label: '早安营业',
+        periodLabel: '今日正常营业',
+        headline: '早安 · 今日营业中',
+        subheadline: '欢迎预约',
+        timeRange: '今日全天',
+        styleId: 'minimal',
+      },
+      {
+        id: 'weekend',
+        label: '周末愉快',
+        periodLabel: '周末欢迎到店',
+        headline: '周末愉快',
+        subheadline: '周末不加价',
+        timeRange: '周六日',
+      },
+      {
+        id: 'rain',
+        label: '雨天提醒',
+        periodLabel: '雨天路滑',
+        headline: '雨天路滑 · 慢走',
+        subheadline: '外卖照常',
+        timeRange: '今日',
+        note: '出行注意安全',
+      },
+      {
+        id: 'recommend',
+        label: '今日推荐',
+        periodLabel: '主厨推荐',
+        headline: '今日推荐',
+        subheadline: '新鲜到货',
+        offer: '限时特价',
+        timeRange: '今日',
+      },
+    ],
+  },
+  product_hero: {
+    pickerLabel: '单品类型',
+    options: [
+      {
+        id: 'signature_dish',
+        label: '招牌菜',
+        periodLabel: '镇店之宝',
+        headline: '招牌必点',
+        subheadline: '销量领先',
+        offer: '¥28',
+        styleId: 'ecommerce',
+      },
+      {
+        id: 'new_product',
+        label: '新品上市',
+        periodLabel: '限时尝鲜',
+        headline: '新品首发',
+        subheadline: '限时尝鲜价',
+        offer: '第二份半价',
+        timeRange: '上新首周',
+      },
+      {
+        id: 'seasonal',
+        label: '时令限定',
+        periodLabel: '本季限定',
+        headline: '时令限定',
+        subheadline: '错过等一年',
+        offer: '限量供应',
+        timeRange: '本季',
+        styleId: 'fresh',
+      },
+      {
+        id: 'drink',
+        label: '饮品甜品',
+        periodLabel: '下午茶时段',
+        headline: '下午茶必点',
+        subheadline: '拍照好看',
+        offer: '¥18起',
+        timeRange: '14:00—17:00',
+      },
+    ],
+  },
+  logo_brand: {
+    pickerLabel: '标识用途',
+    options: [
+      {
+        id: 'avatar',
+        label: '门店头像',
+        periodLabel: '1:1 圆形',
+        headline: '{store}',
+        subheadline: '',
+        note: '适合微信/点评头像',
+        styleId: 'minimal',
+      },
+      {
+        id: 'signboard',
+        label: '门头招牌',
+        periodLabel: '横版大字',
+        headline: '{store}',
+        note: '适合线下门头',
+      },
+      {
+        id: 'wechat',
+        label: '微信头像',
+        periodLabel: '简洁识别',
+        headline: '{store}',
+        subheadline: '本地生活',
+        note: '小尺寸清晰可读',
+        styleId: 'minimal',
+      },
+    ],
+  },
+  menu_board: {
+    pickerLabel: '菜单类型',
+    options: [
+      {
+        id: 'full',
+        label: '全天菜单',
+        periodLabel: '全时段',
+        headline: '价目表',
+        timeRange: '全天供应',
+        styleId: 'lively',
+      },
+      {
+        id: 'lunch',
+        label: '午市价目',
+        periodLabel: '11:00—14:00',
+        headline: '午市菜单',
+        timeRange: '11:00—14:00',
+      },
+      {
+        id: 'dinner',
+        label: '晚市价目',
+        periodLabel: '17:00—22:00',
+        headline: '晚市菜单',
+        timeRange: '17:00—22:00',
+      },
+      {
+        id: 'set',
+        label: '套餐专区',
+        periodLabel: '套餐组合',
+        headline: '超值套餐',
+        subheadline: '组合更省',
+        note: '含多道招牌',
+      },
+    ],
+  },
+}
+
+export function getPlaybookVariantConfig(
+  playbookId: VisualPlaybookId,
+): PlaybookVariantConfig | null {
+  return PLAYBOOK_VARIANT_CONFIGS[playbookId] ?? null
+}
+
+export function resolvePlaybookVariant(
+  playbookId: VisualPlaybookId,
+  variantId: string,
+): PlaybookVariantOption | null {
+  const cfg = getPlaybookVariantConfig(playbookId)
+  if (!cfg || !variantId) return null
+  return cfg.options.find((o) => o.id === variantId) ?? null
+}
+
+export function applyPlaybookVariantToForm(
+  form: VisualStudioForm,
+  variantId: string,
+): VisualStudioForm {
+  const cfg = getPlaybookVariantConfig(form.playbook)
+  if (!cfg) return { ...form, playbookVariantId: variantId }
+  const opt = cfg.options.find((o) => o.id === variantId) ?? cfg.options[0]
+  if (!opt) return { ...form, playbookVariantId: variantId }
+
+  const store = form.storeName.trim() || '本店'
+  const fill = (t: string) => t.replace(/\{store\}/g, store)
+
+  return {
+    ...form,
+    playbookVariantId: opt.id,
+    headline: opt.headline !== undefined ? fill(opt.headline) : form.headline,
+    subheadline: opt.subheadline !== undefined ? opt.subheadline : form.subheadline,
+    offer: opt.offer !== undefined ? opt.offer : form.offer,
+    timeRange: opt.timeRange !== undefined ? opt.timeRange : form.timeRange,
+    note: opt.note !== undefined ? opt.note : form.note,
+    styleId: opt.styleId ?? form.styleId,
+  }
+}
+
+const INTENT_PROMPT: Record<VisualIntentId, string> = {
+  poster: '设计一张中国大陆本地生活门店营销海报，中文标题清晰可读，信息层级：主标题>优惠>副标题。',
+  package: '设计团购套餐宣传图，突出组合内容与到手价，适合美团/抖音团购封面。',
+  product: '设计招牌单品展示图，主体居中、食欲/质感真实，适合平台主图。',
+  logo: '设计简洁品牌 Logo/门店标识，识别度高，适合头像与招牌。',
+  environment: '设计探店氛围图，真实可信的就餐/服务环境，适合小红书种草。',
+  menu: '设计菜单价目视觉，分区清晰、价格可读。',
+}
+
+const VARIANT_SUFFIX = [
+  '构图方案A：大标题居中，促销信息用色块强调。',
+  '构图方案B：左侧主体图、右侧文案区，适合移动端阅读。',
+  '构图方案C：全屏氛围背景+半透明信息条，适合抖音/小红书。',
+  '构图方案D：大字报风格，价格数字超大，适合秒杀/朋友圈。',
+]
+
+export function resolvePlaybook(id: VisualPlaybookId) {
+  return VISUAL_PLAYBOOKS.find((p) => p.id === id) ?? VISUAL_PLAYBOOKS[0]!
+}
+
+export function resolveChannel(id: PublishChannelId) {
+  return PUBLISH_CHANNELS.find((c) => c.id === id) ?? PUBLISH_CHANNELS[0]!
+}
+
+export function resolveAiImageSizePreset(id: AiImageSizePresetId): AiImageSizePreset {
+  return AI_IMAGE_SIZE_PRESETS.find((s) => s.id === id) ?? AI_IMAGE_SIZE_PRESETS[0]!
+}
+
+export function sizeIdsForChannels(channels: PublishChannelId[]): AiImageSizePresetId[] {
+  const set = new Set<AiImageSizePresetId>()
+  for (const ch of channels) {
+    const c = resolveChannel(ch)
+    set.add(c.primarySizeId)
+    for (const ex of c.extraSizeIds ?? []) set.add(ex)
+  }
+  return [...set]
+}
+
+export type CopySuggestion = {
+  headline: string
+  subheadline: string
+  offer: string
+  timeRange?: string
+  note?: string
+}
+
+export type IndustryFieldLabels = {
+  headline: string
+  subheadline: string
+  offer: string
+  timeRange: string
+  note: string
+}
+
+export type IndustryPlaybookOverride = {
+  titleTemplates?: string[]
+  subtitleTemplates?: string[]
+  offerTemplates?: string[]
+  styleId?: AiImageStyleId
+  defaultTimeRange?: string
+  defaultNote?: string
+}
+
+export type IndustryProfile = {
+  id: LocalLifeIndustryId
+  /** 左侧玩法列表优先展示顺序 */
+  recommendedPlaybooks: VisualPlaybookId[]
+  hiddenPlaybooks?: VisualPlaybookId[]
+  defaultStyle: AiImageStyleId
+  fieldLabels: IndustryFieldLabels
+  /** 业态切换提示（展示给用户） */
+  adjustHint: string
+  playbookOverrides: Partial<Record<VisualPlaybookId, IndustryPlaybookOverride>>
+}
+
+export const INDUSTRY_PROFILES: IndustryProfile[] = [
+  {
+    id: 'catering',
+    recommendedPlaybooks: [
+      'group_buy_new',
+      'grand_opening',
+      'flash_sale',
+      'festival_promo',
+      'product_hero',
+      'store_visit',
+      'menu_board',
+      'member_recharge',
+      'daily_sign',
+      'logo_brand',
+    ],
+    defaultStyle: 'lively',
+    adjustHint: '餐饮默认突出菜品食欲、套餐组合与到店优惠',
+    fieldLabels: {
+      headline: '活动主标题',
+      subheadline: '副标题 / 卖点',
+      offer: '价格或优惠',
+      timeRange: '活动时间',
+      note: '使用规则',
+    },
+    playbookOverrides: {
+      group_buy_new: {
+        defaultTimeRange: '周末及节假日通用',
+        defaultNote: '每桌限用1张，不与其它优惠同享',
+      },
+      festival_promo: {
+        titleTemplates: ['{store}节日家宴', '团圆聚餐首选', '节日限定套餐'],
+        defaultTimeRange: '节日档期有效',
+      },
+    },
+  },
+  {
+    id: 'beauty',
+    recommendedPlaybooks: [
+      'member_recharge',
+      'group_buy_new',
+      'flash_sale',
+      'grand_opening',
+      'product_hero',
+      'store_visit',
+      'festival_promo',
+      'daily_sign',
+      'logo_brand',
+    ],
+    hiddenPlaybooks: ['menu_board'],
+    defaultStyle: 'premium',
+    adjustHint: '美业文案侧重项目体验、疗程组合与储值锁客',
+    fieldLabels: {
+      headline: '活动主标题',
+      subheadline: '项目卖点',
+      offer: '体验价 / 套餐价',
+      timeRange: '预约时间',
+      note: '适用项目说明',
+    },
+    playbookOverrides: {
+      group_buy_new: {
+        titleTemplates: ['{store}护理套餐', '新客体验三重礼', '闺蜜同行更划算'],
+        subtitleTemplates: ['含清洁+护理+舒缓', '需提前预约', '限新客首单'],
+        offerTemplates: ['体验价¥99', '疗程卡8折', '双人同行减50'],
+        styleId: 'premium',
+      },
+      product_hero: {
+        titleTemplates: ['招牌{offer}项目', '店长推荐TOP1', '焕肤必选'],
+        subtitleTemplates: ['回头客最多', '效果可见', '专业技师操作'],
+        offerTemplates: ['¥199单次', '3次卡¥499', ''],
+      },
+      member_recharge: {
+        offerTemplates: ['充1000送200', '储值享8.5折', '赠护理1次'],
+      },
+    },
+  },
+  {
+    id: 'leisure',
+    recommendedPlaybooks: [
+      'group_buy_new',
+      'flash_sale',
+      'store_visit',
+      'grand_opening',
+      'festival_promo',
+      'member_recharge',
+      'product_hero',
+      'daily_sign',
+      'logo_brand',
+    ],
+    hiddenPlaybooks: ['menu_board'],
+    defaultStyle: 'fresh',
+    adjustHint: '休娱侧重社交打卡、团购畅玩与年轻氛围',
+    fieldLabels: {
+      headline: '活动主标题',
+      subheadline: '玩法卖点',
+      offer: '团购价',
+      timeRange: '可用时段',
+      note: '人数 / 时长说明',
+    },
+    playbookOverrides: {
+      group_buy_new: {
+        titleTemplates: ['{store}畅玩套餐', '好友局必备', '周末开黑优选'],
+        offerTemplates: ['2小时¥88', '4人团¥199', '平日半价'],
+      },
+      store_visit: {
+        titleTemplates: ['{store}太好玩了', '本地潮玩打卡地', '周末放松首选'],
+      },
+    },
+  },
+  {
+    id: 'hotel',
+    recommendedPlaybooks: [
+      'festival_promo',
+      'group_buy_new',
+      'member_recharge',
+      'store_visit',
+      'grand_opening',
+      'daily_sign',
+      'logo_brand',
+      'product_hero',
+    ],
+    hiddenPlaybooks: ['menu_board', 'flash_sale'],
+    defaultStyle: 'minimal',
+    adjustHint: '酒旅侧重房型套餐、度假氛围与预订转化',
+    fieldLabels: {
+      headline: '活动主标题',
+      subheadline: '套餐亮点',
+      offer: '到手价',
+      timeRange: '入住日期',
+      note: '退改 / 含早说明',
+    },
+    playbookOverrides: {
+      group_buy_new: {
+        titleTemplates: ['{store}度假套餐', '连住更省', '周末微度假'],
+        subtitleTemplates: ['含双早', '可延期', '限量10间'],
+        offerTemplates: ['¥599/晚', '两晚¥999', '家庭房特惠'],
+        styleId: 'minimal',
+      },
+      festival_promo: {
+        titleTemplates: ['节日出游首选', '{store}限定礼遇', '逃离城市计划'],
+      },
+    },
+  },
+  {
+    id: 'pet',
+    recommendedPlaybooks: [
+      'group_buy_new',
+      'product_hero',
+      'member_recharge',
+      'grand_opening',
+      'festival_promo',
+      'store_visit',
+      'daily_sign',
+      'logo_brand',
+    ],
+    hiddenPlaybooks: ['menu_board'],
+    defaultStyle: 'fresh',
+    adjustHint: '宠物店侧重洗护套餐、主粮用品与萌宠治愈感',
+    fieldLabels: {
+      headline: '活动主标题',
+      subheadline: '服务卖点',
+      offer: '套餐价',
+      timeRange: '活动时间',
+      note: '适用犬猫 / 体重说明',
+    },
+    playbookOverrides: {
+      group_buy_new: {
+        titleTemplates: ['{store}洗护套餐', '主子洗澡美容', '新客首单特惠'],
+        subtitleTemplates: ['含洗澡+护理', '需预约', '限小型犬猫'],
+        offerTemplates: ['洗护¥68起', '美容套餐¥128', '新客立减20'],
+        styleId: 'fresh',
+      },
+      product_hero: {
+        titleTemplates: ['爆款{offer}', '铲屎官必囤', '主粮用品TOP1'],
+        subtitleTemplates: ['正品保障', '到店自提', ''],
+        offerTemplates: ['¥89起', '第二件半价', ''],
+      },
+      festival_promo: {
+        titleTemplates: ['节日萌宠礼', '{store}陪你过节', '毛孩子也要仪式感'],
+        defaultTimeRange: '节日期间有效',
+      },
+    },
+  },
+  {
+    id: 'education',
+    recommendedPlaybooks: [
+      'grand_opening',
+      'flash_sale',
+      'member_recharge',
+      'festival_promo',
+      'product_hero',
+      'daily_sign',
+      'logo_brand',
+      'group_buy_new',
+    ],
+    hiddenPlaybooks: ['menu_board', 'store_visit'],
+    defaultStyle: 'minimal',
+    adjustHint: '教育侧重课程体验、报名优惠与信任感',
+    fieldLabels: {
+      headline: '活动主标题',
+      subheadline: '课程卖点',
+      offer: '报名价',
+      timeRange: '开课时间',
+      note: '适用年龄 / 课时',
+    },
+    playbookOverrides: {
+      grand_opening: {
+        titleTemplates: ['{store}开课啦', '试听课免费', '新生报名礼'],
+        offerTemplates: ['试学0元', '报班减300', '团报8折'],
+      },
+      product_hero: {
+        titleTemplates: ['王牌{offer}课程', '家长口碑TOP1', '限时体验课'],
+      },
+      group_buy_new: {
+        titleTemplates: ['{store}课程包', '假期集训营', '多人团报更省'],
+      },
+    },
+  },
+]
+
+export function resolveIndustryProfile(id: LocalLifeIndustryId): IndustryProfile {
+  return INDUSTRY_PROFILES.find((p) => p.id === id) ?? INDUSTRY_PROFILES[0]!
+}
+
+export function getPlaybooksForIndustry(industryId: LocalLifeIndustryId) {
+  const profile = resolveIndustryProfile(industryId)
+  const hidden = new Set(profile.hiddenPlaybooks ?? [])
+  const ordered = profile.recommendedPlaybooks
+    .map((id) => VISUAL_PLAYBOOKS.find((p) => p.id === id))
+    .filter((p): p is (typeof VISUAL_PLAYBOOKS)[number] => !!p && !hidden.has(p.id))
+  const rest = VISUAL_PLAYBOOKS.filter((p) => !hidden.has(p.id) && !ordered.some((o) => o.id === p.id))
+  return [...ordered, ...rest]
+}
+
+function mergeTemplates(base: string[], override?: string[]): string[] {
+  return override?.length ? override : base
+}
+
+function pickAt<T>(arr: T[], index: number): T {
+  return arr[index] ?? arr[0]!
+}
+
+export function applyPlaybookToForm(
+  form: VisualStudioForm,
+  playbookId: VisualPlaybookId,
+  opts?: { keepChannels?: boolean; templateIndex?: number },
+): VisualStudioForm {
+  const pb = resolvePlaybook(playbookId)
+  const profile = resolveIndustryProfile(form.industry)
+  const override = profile.playbookOverrides[playbookId] ?? {}
+  const store = form.storeName.trim() || '本店'
+  const idx = opts?.templateIndex ?? 0
+
+  const titles = mergeTemplates(pb.titleTemplates, override.titleTemplates)
+  const subtitles = mergeTemplates(pb.subtitleTemplates, override.subtitleTemplates)
+  const offers = mergeTemplates(pb.offerTemplates, override.offerTemplates).filter(Boolean)
+
+  const fill = (t: string, offer: string) =>
+    t.replace(/\{store\}/g, store).replace(/\{offer\}/g, offer)
+
+  const offerVal = pickAt(offers, idx) || pickAt(offers, 0) || '限时优惠'
+  const headline = fill(pickAt(titles, idx), offerVal)
+  const subheadline = pickAt(subtitles, idx) ?? ''
+  const styleId = override.styleId ?? pb.styleId ?? profile.defaultStyle
+
+  return {
+    ...form,
+    playbook: playbookId,
+    channels: opts?.keepChannels !== false ? form.channels : pb.suggestedChannels,
+    styleId,
+    headline,
+    subheadline,
+    offer: offerVal,
+    timeRange: override.defaultTimeRange ?? '',
+    note: override.defaultNote ?? '',
+    playbookVariantId: '',
+  }
+}
+
+function withDefaultPlaybookVariant(form: VisualStudioForm): VisualStudioForm {
+  const cfg = getPlaybookVariantConfig(form.playbook)
+  if (!cfg?.options[0]) return form
+  return applyPlaybookVariantToForm(form, cfg.options[0].id)
+}
+
+export function applyPlaybookToFormWithVariants(
+  form: VisualStudioForm,
+  playbookId: VisualPlaybookId,
+  opts?: { keepChannels?: boolean; templateIndex?: number },
+): VisualStudioForm {
+  return withDefaultPlaybookVariant(applyPlaybookToForm(form, playbookId, opts))
+}
+
+export function applyIndustryChange(
+  form: VisualStudioForm,
+  industryId: LocalLifeIndustryId,
+): VisualStudioForm {
+  const profile = resolveIndustryProfile(industryId)
+  let playbook = form.playbook
+  if (profile.hiddenPlaybooks?.includes(playbook)) {
+    playbook = profile.recommendedPlaybooks[0] ?? 'group_buy_new'
+  }
+  const base: VisualStudioForm = {
+    ...form,
+    industry: industryId,
+    styleId: profile.defaultStyle,
+    playbook,
+  }
+  return applyPlaybookToFormWithVariants(base, playbook, { keepChannels: true, templateIndex: 0 })
+}
+
+/** 本地规则文案包（零延迟，对标有赞「AI 帮写卖点」入口） */
+export function generateCopySuggestions(form: VisualStudioForm): CopySuggestion[] {
+  const pb = resolvePlaybook(form.playbook)
+  const profile = resolveIndustryProfile(form.industry)
+  const override = profile.playbookOverrides[form.playbook] ?? {}
+  const variant = resolvePlaybookVariant(form.playbook, form.playbookVariantId)
+  const store = form.storeName.trim() || '本店'
+  const fill = (t: string, offer: string) =>
+    t.replace(/\{store\}/g, store).replace(/\{offer\}/g, offer)
+
+  const titles = mergeTemplates(pb.titleTemplates, override.titleTemplates)
+  const subtitles = mergeTemplates(pb.subtitleTemplates, override.subtitleTemplates)
+  const offers = mergeTemplates(pb.offerTemplates, override.offerTemplates).filter(Boolean)
+
+  const out: CopySuggestion[] = []
+  for (let i = 0; i < Math.min(3, titles.length); i++) {
+    const offer = offers[i] ?? offers[0] ?? '限时优惠'
+    out.push({
+      headline: fill(titles[i]!, offer),
+      subheadline: subtitles[i] ?? subtitles[0] ?? '',
+      offer,
+      timeRange: variant?.timeRange ?? override.defaultTimeRange,
+      note: variant?.note ?? override.defaultNote,
+    })
+  }
+  return out
+}
+
+export function buildVisualStudioPrompt(
+  form: VisualStudioForm,
+  opts?: {
+    channel?: PublishChannelId
+    variantIndex?: number
+    productRefCount?: number
+    styleFromReference?: boolean
+    refineNote?: string
+  },
+): string {
+  const pb = resolvePlaybook(form.playbook)
+  const industry = LOCAL_LIFE_INDUSTRIES.find((x) => x.id === form.industry)
+  const playbookVariant = resolvePlaybookVariant(form.playbook, form.playbookVariantId)
+  const style =
+    opts?.styleFromReference
+      ? '视觉风格参考用户上传的商品/海报图（色调与构图），文案以表单为准。'
+      : AI_IMAGE_STYLE_PRESETS.find((s) => s.id === form.styleId)?.promptHint ?? '商业设计'
+
+  const channel = opts?.channel ? resolveChannel(opts.channel) : null
+  const lines = [
+    INTENT_PROMPT[pb.intent],
+    `业态：${industry?.label ?? '本地生活'}，${industry?.sceneHint ?? ''}。`,
+    `视觉风格：${style}。`,
+    channel ? `投放渠道：${channel.label}，请符合该平台常见封面构图习惯。` : '',
+    playbookVariant
+      ? `活动细分：${playbookVariant.label}（${playbookVariant.periodLabel}），视觉元素可呼应该主题。`
+      : '',
+    form.storeName.trim() ? `门店/品牌名：${form.storeName.trim()}。` : '',
+    form.headline.trim() ? `主标题：「${form.headline.trim()}」（画面中大而清晰）。` : '',
+    form.subheadline.trim() ? `副标题：${form.subheadline.trim()}。` : '',
+    form.offer.trim() ? `核心优惠：${form.offer.trim()}（数字/价格突出）。` : '',
+    form.timeRange.trim() ? `时间：${form.timeRange.trim()}。` : '',
+    form.note.trim() ? `补充说明：${form.note.trim()}。` : '',
+    opts?.productRefCount
+      ? `用户提供了 ${opts.productRefCount} 张实拍商品/菜品图，请在画面中体现真实质感。`
+      : '',
+    '规范：中文排版专业、无乱码水印、无畸形文字；适合中国大陆本地生活商家私域与公域投放。',
+  ].filter(Boolean)
+
+  const vi = opts?.variantIndex ?? 0
+  if (vi >= 0 && vi < VARIANT_SUFFIX.length) {
+    lines.push(VARIANT_SUFFIX[vi]!)
+  }
+  if (opts?.refineNote?.trim()) {
+    lines.push(`修改要求：${opts.refineNote.trim()}`)
+  }
+  return lines.join('\n')
+}
+
+export function preferWanxPosterForIntent(intent: VisualIntentId): boolean {
+  return intent === 'poster' || intent === 'package' || intent === 'menu'
+}
+
+/** @deprecated 兼容旧引用 */
+export type AiImageStudioForm = VisualStudioForm
+export const DEFAULT_AI_IMAGE_STUDIO_FORM = DEFAULT_VISUAL_STUDIO_FORM
+export const buildAiImageStudioPrompt = buildVisualStudioPrompt
