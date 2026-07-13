@@ -29,7 +29,12 @@ import {
   type IceSmartBatchMaterial,
   type IceSmartBatchScriptRow,
 } from '../src/lib/iceSmartBatchPlan.js'
-import type { AliyunIceConfig } from './aliyunIceCore.js'
+import {
+  type AliyunIceConfig,
+  iceRegisterSmartBatchBgmMediaId,
+  iceRegisterSmartBatchMaterials,
+  type IceSmartBatchRegisteredMaterial,
+} from './aliyunIceCore.js'
 
 type IceClientClass = {
   new (config: $OpenApiUtil.Config): {
@@ -128,36 +133,35 @@ function pickSmartBatchSegmentCount(
   return Math.max(2, Math.min(materialCount, planned))
 }
 
-function pickSmartBatchMaterialUrls(
-  baseUrls: string[],
+function pickSmartBatchMaterialIndices(
+  materialCount: number,
   slots: number[],
   segmentCount: number,
-): string[] {
-  if (baseUrls.length <= segmentCount) return baseUrls
+): number[] {
+  if (materialCount <= segmentCount) {
+    return Array.from({ length: materialCount }, (_, i) => i)
+  }
   const ordered: number[] = []
   const seen = new Set<number>()
   for (const mi of slots) {
-    if (mi < 0 || mi >= baseUrls.length || seen.has(mi)) continue
+    if (mi < 0 || mi >= materialCount || seen.has(mi)) continue
     seen.add(mi)
     ordered.push(mi)
     if (ordered.length >= segmentCount) break
   }
   if (ordered.length >= segmentCount) {
-    return ordered.slice(0, segmentCount).map((mi) => baseUrls[mi]!)
+    return ordered.slice(0, segmentCount)
   }
   if (slots.length >= segmentCount) {
-    const picked = slots
-      .slice(0, segmentCount)
-      .map((mi) => baseUrls[mi]!)
-      .filter(Boolean)
+    const picked = slots.slice(0, segmentCount).filter((mi) => mi >= 0 && mi < materialCount)
     if (picked.length >= 2) return picked
   }
-  const out: string[] = []
+  const out: number[] = []
   for (let i = 0; i < segmentCount; i++) {
-    const mi = Math.round((i * (baseUrls.length - 1)) / Math.max(1, segmentCount - 1))
-    out.push(baseUrls[mi]!)
+    const mi = Math.round((i * (materialCount - 1)) / Math.max(1, segmentCount - 1))
+    out.push(mi)
   }
-  return out.length >= 2 ? out : baseUrls.slice(0, Math.max(2, segmentCount))
+  return out.length >= 2 ? out : Array.from({ length: Math.max(2, segmentCount) }, (_, i) => i)
 }
 
 function segmentDurationFromRow(
@@ -213,39 +217,37 @@ function buildDefaultEditingConfig(
 
 /** IMS 分组口播：每段 MediaGroup 绑定一条口播，与分镜表顺序一致 */
 function buildInputConfig(input: {
-  materials: IceSmartBatchMaterial[]
+  materials: IceSmartBatchRegisteredMaterial[]
   scriptRows: IceSmartBatchScriptRow[]
   guidance: string
   targetTotalSec: number
   materialSlots?: number[]
-  bgmPresetId?: string
-  mixBgmUrl?: string
+  bgmMediaId?: string
 }): { inputConfig: Record<string, unknown>; speechRate: number; shotDurationSec: number } {
-  const baseUrls = input.materials
-    .map((m) => ensureIceHttpsUrl(sanitizeIcePipelineMediaUrl(m.mediaUrl)))
-    .filter(Boolean)
+  const materialCount = input.materials.length
   const slots = (input.materialSlots ?? []).filter(
-    (n) => Number.isFinite(n) && n >= 0 && n < baseUrls.length,
+    (n) => Number.isFinite(n) && n >= 0 && n < materialCount,
   )
   const targetTotalSec = Math.min(120, Math.max(5, Math.ceil(input.targetTotalSec)))
   const segmentCount = pickSmartBatchSegmentCount(
     input.scriptRows,
-    baseUrls.length,
+    materialCount,
     targetTotalSec,
   )
-  const urls = pickSmartBatchMaterialUrls(baseUrls, slots, segmentCount)
-  const rows = input.scriptRows.slice(0, segmentCount)
+  const pickedIndices = pickSmartBatchMaterialIndices(materialCount, slots, segmentCount)
+  const rows = input.scriptRows.slice(0, pickedIndices.length)
   const defaultSegSec = Math.max(
     3,
-    Math.min(5, Math.round((targetTotalSec / Math.max(1, urls.length)) * 100) / 100),
+    Math.min(5, Math.round((targetTotalSec / Math.max(1, pickedIndices.length)) * 100) / 100),
   )
 
-  const mediaGroups = urls.map((url, i) => {
+  const mediaGroups = pickedIndices.map((matIndex, i) => {
+    const mat = input.materials[matIndex]!
     const row = rows[i]
     const dialogue = sanitizeMixDialogueText(String(row?.dialogue ?? '')).trim()
     const group: Record<string, unknown> = {
       GroupName: `storyboard-${i}`,
-      MediaArray: [url],
+      MediaArray: [mat.mediaId],
       SplitMode: 'NoSplit',
       Volume: 0,
     }
@@ -257,15 +259,11 @@ function buildInputConfig(input: {
     return group
   })
 
-  const bgmUrl = resolveIceMixBgmUrl({
-    presetId: input.bgmPresetId,
-    customUrl: input.mixBgmUrl,
-  })
   const inputConfig: Record<string, unknown> = {
     MediaGroupArray: mediaGroups,
   }
-  if (bgmUrl) {
-    inputConfig.BackgroundMusicArray = [ensureIceHttpsUrl(bgmUrl)]
+  if (input.bgmMediaId) {
+    inputConfig.BackgroundMusicArray = [input.bgmMediaId]
   }
 
   return {
@@ -356,19 +354,43 @@ export async function iceSubmitSmartBatchJob(
   })
   if (!output.ok) return { ok: false, message: output.message, step: 'output' }
 
+  const materialCount = input.materials.length
+  const slots = (input.materialSlots ?? []).filter(
+    (n) => Number.isFinite(n) && n >= 0 && n < materialCount,
+  )
+  const segmentCount = pickSmartBatchSegmentCount(scriptRows, materialCount, targetTotalSec)
+  const pickedIndices = pickSmartBatchMaterialIndices(materialCount, slots, segmentCount)
+  const projectName = String(input.projectName ?? '智能成片').trim() || '智能成片'
+
+  const registered = await iceRegisterSmartBatchMaterials(
+    cfg,
+    input.materials,
+    projectName,
+    pickedIndices,
+  )
+  if (!registered.ok) return registered
+
+  const bgmUrl = resolveIceMixBgmUrl({
+    presetId: input.bgmPresetId,
+    customUrl: input.mixBgmUrl,
+  })
+  let bgmMediaId: string | undefined
+  if (bgmUrl) {
+    const bgmReg = await iceRegisterSmartBatchBgmMediaId(cfg, bgmUrl, `${projectName}-BGM`)
+    if (!bgmReg.ok) return bgmReg
+    bgmMediaId = bgmReg.mediaId
+  }
+
   const built = buildInputConfig({
-    materials: input.materials,
+    materials: registered.materials,
     scriptRows,
     guidance,
     targetTotalSec,
     materialSlots: input.materialSlots,
-    bgmPresetId: input.bgmPresetId,
-    mixBgmUrl: input.mixBgmUrl,
+    bgmMediaId,
   })
   const inputConfig = built.inputConfig
-  const bgmEnabled = Boolean(
-    resolveIceMixBgmUrl({ presetId: input.bgmPresetId, customUrl: input.mixBgmUrl }),
-  )
+  const bgmEnabled = Boolean(bgmMediaId)
   const editingConfig = buildDefaultEditingConfig(
     built.speechRate,
     input.subtitleStyleId,

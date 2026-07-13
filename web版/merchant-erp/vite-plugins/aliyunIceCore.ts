@@ -1564,3 +1564,100 @@ export async function iceGetProducingJob(
   }
   return { ok: false, message: lastMsg || '查询剪辑任务失败', transient: true }
 }
+
+export type IceSmartBatchRegisteredMaterial = {
+  kind: 'video' | 'image'
+  mediaUrl: string
+  mediaId: string
+  label?: string
+}
+
+/** 智能成片：素材须 RegisterMediaInfo 为 MediaId，否则 IMS 批量任务会报 material query failed */
+export async function iceRegisterSmartBatchMaterials(
+  cfg: AliyunIceConfig,
+  materials: Array<{ kind: 'video' | 'image'; mediaUrl: string; label?: string }>,
+  projectName: string,
+  indicesToRegister?: number[],
+): Promise<
+  | { ok: true; materials: IceSmartBatchRegisteredMaterial[]; idByUrl: Map<string, string> }
+  | { ok: false; message: string; step?: string }
+> {
+  const client = createClient(cfg)
+  const idByUrl = new Map<string, string>()
+  const out: IceSmartBatchRegisteredMaterial[] = []
+  const indexSet =
+    indicesToRegister && indicesToRegister.length
+      ? new Set(indicesToRegister.filter((i) => i >= 0 && i < materials.length))
+      : null
+
+  for (let i = 0; i < materials.length; i++) {
+    const m = materials[i]!
+    const url = sanitizeIcePipelineMediaUrl(m.mediaUrl)
+    if (!url) {
+      return { ok: false, message: `第 ${i + 1} 条素材地址无效`, step: 'register_media' }
+    }
+
+    const needRegister = !indexSet || indexSet.has(i)
+    const cachedId = idByUrl.get(url)
+    if (cachedId) {
+      out.push({ ...m, mediaUrl: url, mediaId: cachedId })
+      continue
+    }
+    if (!needRegister) {
+      out.push({ ...m, mediaUrl: url, mediaId: '' })
+      continue
+    }
+
+    const title = (m.label || `${projectName}-素材${i + 1}`).slice(0, 120)
+    if (m.kind === 'image') {
+      const reg = await registerMediaUrlToMediaId(client, cfg, url, title, 'image')
+      if (!reg.ok) {
+        return {
+          ok: false,
+          message: `第 ${i + 1} 条图片 IMS 入库失败：${reg.message}`,
+          step: 'register_media',
+        }
+      }
+      const ready = await waitIceImageMediaReady(client, reg.mediaId)
+      if (!ready.ok) {
+        return {
+          ok: false,
+          message: `第 ${i + 1} 条图片媒资未就绪：${ready.message}`,
+          step: 'wait_media',
+        }
+      }
+      idByUrl.set(url, reg.mediaId)
+      out.push({ ...m, mediaUrl: url, mediaId: reg.mediaId })
+      continue
+    }
+
+    const up = await ingestVideoUrlToMediaId(client, cfg, url, undefined, title)
+    if (!up.ok) {
+      return {
+        ok: false,
+        message: `第 ${i + 1} 条视频 IMS 入库失败：${up.message}`,
+        step: 'register_media',
+      }
+    }
+    idByUrl.set(url, up.mediaId)
+    out.push({ ...m, mediaUrl: url, mediaId: up.mediaId })
+  }
+
+  return { ok: true, materials: out, idByUrl }
+}
+
+/** 智能成片 BGM 注册为 audio 媒资（私有 Bucket / cs 域名须走 MediaId） */
+export async function iceRegisterSmartBatchBgmMediaId(
+  cfg: AliyunIceConfig,
+  bgmUrl: string,
+  title: string,
+): Promise<{ ok: true; mediaId: string } | { ok: false; message: string; step?: string }> {
+  const client = createClient(cfg)
+  const url = sanitizeIcePipelineMediaUrl(bgmUrl)
+  if (!url) return { ok: false, message: 'BGM 地址无效', step: 'register_bgm' }
+  const reg = await registerMediaUrlToMediaId(client, cfg, url, title.slice(0, 120), 'audio')
+  if (!reg.ok) return { ok: false, message: `BGM IMS 入库失败：${reg.message}`, step: 'register_bgm' }
+  const ready = await waitIceVideoMediaReady(client, reg.mediaId, 16)
+  if (!ready.ok) return { ok: false, message: `BGM 媒资未就绪：${ready.message}`, step: 'wait_bgm' }
+  return { ok: true, mediaId: reg.mediaId }
+}
