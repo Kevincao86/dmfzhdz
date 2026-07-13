@@ -204,7 +204,7 @@ export async function confirmOpsPaymentOrderAdmin(
     }
     if (nextPlan) {
       try {
-        await ensureErpMonthlyGiftPointsGranted(admin, tenantId, { plan: nextPlan })
+        await ensureErpMonthlyGiftPointsGranted(admin as never, tenantId, { plan: nextPlan })
       } catch {
         /* 积分列未迁移时忽略，避免阻断订阅确认 */
       }
@@ -307,7 +307,7 @@ export async function confirmOpsPaymentOrderAdmin(
       return { ok: false, status: 400, body: { ok: false, error: 'invalid_points' } }
     }
     try {
-      await creditErpRechargePoints(admin, tenantId, pts, '积分充值到账（运营确认）', id)
+      await creditErpRechargePoints(admin as never, tenantId, pts, '积分充值到账（运营确认）', id)
     } catch (e) {
       return {
         ok: false,
