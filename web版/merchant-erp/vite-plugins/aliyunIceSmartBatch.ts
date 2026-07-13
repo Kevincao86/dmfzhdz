@@ -381,8 +381,10 @@ export async function iceSubmitSmartBatchJob(
   let bgmMediaId: string | undefined
   if (bgmUrl) {
     const bgmReg = await iceRegisterSmartBatchBgmMediaId(cfg, bgmUrl, `${projectName}-BGM`)
-    if (!bgmReg.ok) return bgmReg
-    bgmMediaId = bgmReg.mediaId
+    if (bgmReg.ok) {
+      bgmMediaId = bgmReg.mediaId
+    }
+    // BGM 为可选增强：入库失败时不阻断智能成片主流程
   }
 
   const built = buildInputConfig({
