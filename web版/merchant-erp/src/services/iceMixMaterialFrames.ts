@@ -22,8 +22,10 @@ function visionUrlCandidates(mat: IceMixMaterialSlot): string[] {
   const media = (mat.mediaUrl || '').trim()
   const signed = (mat.signedMediaUrl || '').trim()
   const out: string[] = []
-  if (media) out.push(media)
-  if (signed && signed !== media) out.push(signed)
+  /** 截帧/下载优先 HTTPS 签名直链（ffmpeg 远程拉取更稳）；其次 oss:// timeline */
+  if (signed && /^https?:\/\//i.test(signed)) out.push(signed)
+  if (media && !out.includes(media)) out.push(media)
+  if (signed && signed !== media && !out.includes(signed)) out.push(signed)
   return out
 }
 
@@ -116,19 +118,33 @@ async function extractVideoSampleFrames(
   })
   const out: Array<{ label: string; dataUrl: string; tag: string; atSec: number }> = []
 
+  const pushFrame = (
+    atSec: number,
+    pureBase64: string,
+  ) => {
+    out.push({
+      label,
+      dataUrl: `data:image/jpeg;base64,${pureBase64}`,
+      tag: `${atSec.toFixed(1)}s`,
+      atSec,
+    })
+  }
+
   for (const url of urls) {
-    for (const atSec of samplePoints) {
-      const serverFrame = await postVideoFrameWithTimeout(url, atSec)
-      if (serverFrame.ok) {
-        out.push({
-          label,
-          dataUrl: `data:image/jpeg;base64,${serverFrame.pureBase64}`,
-          tag: `${atSec.toFixed(1)}s`,
-          atSec,
-        })
+    const firstAt = samplePoints[0] ?? 0
+    const first = await postVideoFrameWithTimeout(url, firstAt)
+    if (first.ok) {
+      pushFrame(firstAt, first.pureBase64)
+      const rest = samplePoints.slice(1)
+      if (rest.length > 0) {
+        const parallel = await Promise.all(rest.map((atSec) => postVideoFrameWithTimeout(url, atSec)))
+        for (let i = 0; i < rest.length; i++) {
+          const frame = parallel[i]
+          if (frame?.ok) pushFrame(rest[i]!, frame.pureBase64)
+        }
       }
+      break
     }
-    if (out.length > 0) break
   }
 
   if (out.length > 0 || opts?.skipLocalDownload) return out
@@ -187,7 +203,7 @@ export async function collectMaterialTimelineFrames(
     return one ? [one] : []
   }
   const frames = await extractVideoSampleFrames(mat, {
-    skipLocalDownload: opts?.skipLocalDownload !== false,
+    skipLocalDownload: opts?.skipLocalDownload === true,
     durationSec: opts?.durationSec,
     maxFrames: opts?.maxFrames ?? MIX_FRAMES_PER_VIDEO,
   })

@@ -17,6 +17,8 @@ const VISION_SAMPLE_MAX = 48
 const MATERIAL_PROFILE_DEEP_MAX = 16
 const MATERIAL_PROFILE_CONCURRENCY = 4
 const MATERIAL_FRAME_TIMEOUT_MS = 45_000
+const MATERIAL_FRAME_TIMEOUT_PER_FRAME_MS = 22_000
+const MATERIAL_FRAME_TIMEOUT_BASE_MS = 25_000
 /** 大批量素材分析时每条视频采样帧数（降低服务端压力） */
 const MIX_ANALYZE_FRAMES_PER_VIDEO = 3
 const MATERIAL_VISION_BATCH_TIMEOUT_MS = 90_000
@@ -57,8 +59,9 @@ function visionUrlCandidates(mat: IceMixMaterialSlot): string[] {
   const media = (mat.mediaUrl || '').trim()
   const signed = (mat.signedMediaUrl || '').trim()
   const out: string[] = []
-  if (media) out.push(media)
-  if (signed && signed !== media) out.push(signed)
+  if (signed && /^https?:\/\//i.test(signed)) out.push(signed)
+  if (media && !out.includes(media)) out.push(media)
+  if (signed && signed !== media && !out.includes(signed)) out.push(signed)
   return out
 }
 
@@ -226,6 +229,10 @@ export async function buildMaterialVisionProfiles(
   const deepTargets = list.length <= maxDeep ? list : sampleMaterials(list, maxDeep)
   const deepTotal = deepTargets.length
   const framesPerVideo = resolveAnalyzeFramesPerVideo(list.length)
+  const materialFrameTimeoutMs = Math.max(
+    MATERIAL_FRAME_TIMEOUT_MS,
+    MATERIAL_FRAME_TIMEOUT_BASE_MS + framesPerVideo * MATERIAL_FRAME_TIMEOUT_PER_FRAME_MS,
+  )
 
   onProgress?.(
     list.length > maxDeep
@@ -241,7 +248,7 @@ export async function buildMaterialVisionProfiles(
     const index = idx >= 0 ? idx : extracted
     const samples = await withProfileTimeout(
       collectMaterialFramesForVision(mat, index, onProgress, { maxFrames: framesPerVideo }),
-      MATERIAL_FRAME_TIMEOUT_MS,
+      materialFrameTimeoutMs,
       [],
     )
     extracted += 1
