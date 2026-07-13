@@ -152,7 +152,9 @@ export async function runMeooAiChatStream(
         msg,
       )
         ? '上游鉴权失败：请核对商家管理后台「豆包」Key 与轻量 auth-api.env，并 systemctl restart meoo-auth-api。'
-        : undefined
+        : /workspace endpoint access denied|workspace.*denied/i.test(msg)
+          ? '通义千问业务空间域名与 API Key 不匹配。请在轻量 auth-api.env 清空 MERCHANT_AI_QWEN_BASE_URL / DASHSCOPE_BASE_URL（留空走公共 DashScope），或改为与 Key 对应的 maas 业务空间地址。'
+          : undefined
     write({
       event: 'error',
       error: 'upstream_error',

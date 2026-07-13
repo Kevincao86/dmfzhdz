@@ -129,7 +129,9 @@ export async function runMeooAiChatCore(
     })
     const authHint = /401|invalid api key|invalid authentication|2049|JWT|TokenMix Key 与/i.test(msg)
       ? '上游 401：请核对运营台 Key 前缀（MiniMax/Kimi 均须 sk-，勿 eyJ JWT）；国内/国际域名须与账号一致。ECS 执行 git pull && sudo systemctl restart meoo-auth-api。探测：GET /erp-api/meoo-ai-vendor-keys-probe（Bearer MEOO_SUPPORT_OPS_HTTP_TOKEN）。'
-      : undefined
+      : /workspace endpoint access denied|workspace.*denied/i.test(msg)
+        ? '通义千问业务空间域名与 API Key 不匹配：请清空 MERCHANT_AI_QWEN_BASE_URL / DASHSCOPE_BASE_URL 走公共 DashScope，或改为正确 maas 业务空间地址后重启 meoo-auth-api。'
+        : undefined
     return {
       status: 502,
       body: {

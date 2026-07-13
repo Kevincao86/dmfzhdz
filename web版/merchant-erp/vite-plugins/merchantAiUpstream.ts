@@ -1563,7 +1563,8 @@ async function callQwenChat(
   chatOverrides?: Record<string, unknown>,
   fetchSignal?: AbortSignal,
 ): Promise<{ text: string; modelUsed: string }> {
-  const endpoints = qwenChatEndpointCandidates(env)
+  /** 公共 DashScope 优先，避免误配业务空间域名导致 403 Workspace endpoint access denied */
+  const endpoints = qwenChatEndpointCandidates(env, { preferDefaultFirst: true })
   let lastErr: Error | undefined
   for (const url of endpoints) {
     const candidates = await resolveQwenLiveChatCandidates(apiKey, env, url)
@@ -3215,25 +3216,34 @@ export async function streamBuiltinAgentChatFromMessages(
     { role: 'user' as const, content: user },
   ]
   if (vendor === 'qwen') {
-    const url = qwenCompatibleChatCompletionsUrl(eff)
+    const endpoints = qwenChatEndpointCandidates(eff, { preferDefaultFirst: true })
     let lastErr: Error | null = null
-    for (const model of qwenChatModelCandidates(eff)) {
-      try {
-        for await (const d of openAiCompatChatStream({
-          url,
-          apiKey: key,
-          model,
-          messages: oaiMessages,
-          temperature: 0.65,
-          signal,
-        })) {
-          if (d.reasoning || d.content) onDelta(d)
+    for (const url of endpoints) {
+      const candidates = await resolveQwenLiveChatCandidates(key, eff, url)
+      for (const model of candidates) {
+        try {
+          for await (const d of openAiCompatChatStream({
+            url,
+            apiKey: key,
+            model,
+            messages: oaiMessages,
+            temperature: 0.65,
+            signal,
+          })) {
+            if (d.reasoning || d.content) onDelta(d)
+          }
+          return { modelUsed: model }
+        } catch (e) {
+          lastErr = e instanceof Error ? e : new Error(String(e))
+          const hopable =
+            isQuotaHopableError(lastErr.message) || isQwenWorkspaceEndpointDenied(lastErr.message)
+          if (!hopable) throw lastErr
         }
-        return { modelUsed: model }
-      } catch (e) {
-        lastErr = e instanceof Error ? e : new Error(String(e))
-        if (!isQuotaHopableError(lastErr.message)) throw lastErr
       }
+      if (lastErr && isQwenWorkspaceEndpointDenied(lastErr.message) && url !== endpoints[endpoints.length - 1]) {
+        continue
+      }
+      if (url !== endpoints[endpoints.length - 1]) continue
     }
     throw lastErr ?? new Error('通义千问流式对话失败（同类模型额度已用尽，已轮询语言模型池）')
   }
@@ -3254,7 +3264,9 @@ export async function streamBuiltinAgentChatFromMessages(
       return { modelUsed: mid }
     } catch (e) {
       lastDoubaoErr = e instanceof Error ? e : new Error(String(e))
-      if (!isArkQuotaHopableError(lastDoubaoErr.message)) throw lastDoubaoErr
+      if (!isArkQuotaHopableError(lastDoubaoErr.message) && !isQuotaHopableError(lastDoubaoErr.message)) {
+        throw lastDoubaoErr
+      }
     }
   }
   throw lastDoubaoErr ?? new Error('豆包流式对话失败：未配置可用模型')
