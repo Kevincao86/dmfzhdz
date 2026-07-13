@@ -520,19 +520,22 @@ export function ShortVideoIceBatchPanel(_props: Props) {
 
   const mixReady = mixMaterialPool.length >= 2 && storyboardComplete
 
-  const smartBatchReady = mixMaterialPool.length >= 2 && storyboardComplete
+  const smartBatchGuidanceReady = mixGuidance.trim().length >= 4
+  /** 智能成片一键流程会自动分析/规划分镜，有指导文案即可点击 */
+  const smartBatchReady =
+    mixMaterialPool.length >= 2 && (storyboardComplete || smartBatchGuidanceReady)
 
   const smartBatchBlockers = useMemo((): string[] => {
     const items: string[] = []
     if (mixMaterialPool.length < 2) items.push('上传至少 2 条不同视频/图片')
-    if (storyboardGapHint) items.push(storyboardGapHint)
+    if (storyboardGapHint && !smartBatchGuidanceReady) items.push(storyboardGapHint)
     for (let i = 0; i < mixMaterialPool.length; i++) {
       const m = mixMaterialPool[i]!
       const urlErr = validateIceMixMaterialUrl(m.mediaUrl || m.signedMediaUrl || '')
       if (urlErr) items.push(`素材${i + 1}（${m.label}）：${urlErr}`)
     }
     return items
-  }, [mixMaterialPool, storyboardGapHint])
+  }, [mixMaterialPool, storyboardGapHint, smartBatchGuidanceReady])
 
   const mixBlockers = useMemo((): string[] => {
     const items: string[] = []
@@ -1384,6 +1387,8 @@ export function ShortVideoIceBatchPanel(_props: Props) {
 
     let workingProfiles = mixMaterialProfiles
     let workingRows = scriptRows
+    let workingGuidance = mixGuidance.trim()
+    let workingSlots = materialSlots
     const poolLen = mixMaterialPool.length
     const usableProfiles = workingProfiles.filter(
       (p) => p.description.trim().length >= 24 && !/截帧失败|无法识别|分析失败/i.test(p.description),
@@ -1393,7 +1398,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       setHint('智能成片：AI 分析素材画面…')
       try {
         const promoHint = formatMixPromoPlanningBlock(mixPromo)
-        const userHint = [mixGuidance.trim(), promoHint].filter(Boolean).join('\n\n') || undefined
+        const userHint = [workingGuidance, promoHint].filter(Boolean).join('\n\n') || undefined
         const r = await analyzeIceMixMaterialsToGuidance({
           materials: mixMaterialPool,
           targetTotalSec: mixTargetSec,
@@ -1406,6 +1411,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
           setSmartRenderBusy(false)
           return
         }
+        workingGuidance = r.guidance.trim()
         setMixGuidance(r.guidance)
         workingProfiles = r.materialProfiles
         setMixMaterialProfiles(r.materialProfiles)
@@ -1424,7 +1430,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       setHint('智能成片：AI 规划分镜（语义匹配素材与口播）…')
       try {
         const narrative = await planMixNarrativeFromVision({
-          guidance: mixGuidance.trim(),
+          guidance: workingGuidance,
           materials: mixMaterialPool,
           materialProfiles: workingProfiles,
           targetTotalSec: mixTargetSec,
@@ -1433,6 +1439,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
         })
         if (narrative.ok) {
           workingRows = ensureMixScriptRowsCoverTarget(narrative.rows, mixTargetSec, MIX_DEFAULT_SEGMENT_SEC)
+          workingSlots = narrative.materialSlots
           applyScriptRows(workingRows)
           setMaterialSlots(narrative.materialSlots)
         } else {
@@ -1456,17 +1463,22 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       return
     }
 
+    workingSlots =
+      workingSlots.length === workingRows.length
+        ? normalizeMixMaterialSlots(workingSlots, workingRows.length, poolLen)
+        : assignMixMaterialSlots(workingRows.length, poolLen)
+
     const keepIndices = filterMixPromotionRelevantIndices(
       mixMaterialPool,
       workingProfiles,
-      mixGuidance.trim(),
+      workingGuidance,
     )
     const subset = subsetMixMaterialPoolByIndices(mixMaterialPool, workingProfiles, keepIndices)
     let produceMaterials = subset.materials
-    let produceSlots = materialSlots.map((mi) => subset.remapIndex(mi)).filter((mi) => mi >= 0)
+    let produceSlots = workingSlots.map((mi) => subset.remapIndex(mi)).filter((mi) => mi >= 0)
     if (produceMaterials.length < 2) {
       produceMaterials = mixMaterialPool
-      produceSlots = materialSlots
+      produceSlots = workingSlots
     }
 
     setHint(`智能成片：已剔除无效镜头，保留 ${produceMaterials.length}/${poolLen} 条素材，正在提交 IMS 脚本化成片…`)
@@ -1482,6 +1494,12 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       targetTotalSec: mixTargetSec,
     })
 
+    if (batchPayload.materials.length < 2) {
+      setErr('智能成片至少需要 2 条有效素材，请检查素材映射后重试')
+      setSmartRenderBusy(false)
+      return
+    }
+
     const localId = newJobId()
     const label = `智能成片 · ${poolLen} 素材`
     setJobs((prev) => [
@@ -1489,7 +1507,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       {
         id: localId,
         label,
-        mediaUrl: batchPayload.materials[0]!.mediaUrl,
+        mediaUrl: batchPayload.materials[0]?.mediaUrl ?? produceMaterials[0]!.mediaUrl,
         phase: 'pipeline',
         message: '智能成片 · 提交 IMS…',
         mixProduceMode: 'smart_batch',
@@ -1511,7 +1529,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       materials: batchPayload.materials,
       scriptRows: batchPayload.scriptRows,
       materialSlots: batchPayload.materialSlots,
-      guidance: mixGuidance.trim(),
+      guidance: workingGuidance,
       targetTotalSec: mixTargetSec,
       width: aspect.width,
       height: aspect.height,

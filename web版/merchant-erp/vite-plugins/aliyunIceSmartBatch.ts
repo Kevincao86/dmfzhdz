@@ -243,11 +243,15 @@ function buildInputConfig(input: {
 
   const mediaGroups = pickedIndices.map((matIndex, i) => {
     const mat = input.materials[matIndex]!
+    const mediaId = String(mat.mediaId ?? '').trim()
+    if (!mediaId) {
+      throw new Error(`第 ${matIndex + 1} 条素材 IMS 媒资 ID 缺失，请重新提交`)
+    }
     const row = rows[i]
     const dialogue = sanitizeMixDialogueText(String(row?.dialogue ?? '')).trim()
     const group: Record<string, unknown> = {
       GroupName: `storyboard-${i}`,
-      MediaArray: [mat.mediaId],
+      MediaArray: [mediaId],
       SplitMode: 'NoSplit',
       Volume: 0,
     }
@@ -389,7 +393,13 @@ export async function iceSubmitSmartBatchJob(
     materialSlots: input.materialSlots,
     bgmMediaId,
   })
-  const inputConfig = built.inputConfig
+  let inputConfig: Record<string, unknown>
+  try {
+    inputConfig = built.inputConfig
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, message: msg, step: 'register_media' }
+  }
   const bgmEnabled = Boolean(bgmMediaId)
   const editingConfig = buildDefaultEditingConfig(
     built.speechRate,
