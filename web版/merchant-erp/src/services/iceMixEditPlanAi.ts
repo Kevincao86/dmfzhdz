@@ -5,6 +5,10 @@
 import { postAiChat } from './ai/aiClient'
 import { reviewMixScriptRowsWithAi } from './iceMixDialogueReviewAi'
 import {
+  ICE_MIX_VISION_PROVIDER_ORDER,
+  ICE_MIX_TEXT_PROVIDER_ORDER,
+} from './iceMixAiModels'
+import {
   collectMixMaterialFramesForEditPlan,
   groupMixFramesByMaterialIndex,
   MIX_MAX_VISION_FRAMES,
@@ -463,13 +467,13 @@ async function tryVisionEditPlan(opts: {
   const userBlock = `【指导文案】\n${opts.guidance.trim()}\n\n【素材画面库】\n${profileBlock}\n\n【分镜表】\n${storyboard}\n\n【附图对应关系】\n${frameLegend}\n\n请为段0～段${opts.rows.length - 1} 各输出一条剪辑决策 JSON。`
 
   const imageDataUrls = opts.frames.map((f) => f.dataUrl).slice(0, 24)
-  const providers: Array<'qwen' | 'doubao'> = ['qwen', 'doubao']
 
-  for (const provider of providers) {
+  for (const { provider, model } of ICE_MIX_VISION_PROVIDER_ORDER) {
     try {
       const res = await postAiChat({
         provider,
-        temperature: 0.15,
+        model,
+        temperature: 0.12,
         imageDataUrls,
         messages: [
           { role: 'system', content: VISION_EDIT_PLAN_SYSTEM },
@@ -896,11 +900,12 @@ async function tryTextNarrativePlan(opts: {
     .filter(Boolean)
     .join('\n\n')
 
-  const providers: Array<'doubao' | 'qwen' | 'tokenmix'> = ['doubao', 'qwen', 'tokenmix']
-  for (const provider of providers) {
+  for (const { provider, model } of ICE_MIX_TEXT_PROVIDER_ORDER) {
     try {
       const res = await postAiChat({
         provider,
+        model,
+        ...(provider === 'tokenmix' ? { modelFamily: 'openai' as const } : {}),
         temperature: 0.2,
         messages: [
           { role: 'system', content: NARRATIVE_TEXT_PLAN_SYSTEM },
@@ -950,11 +955,11 @@ async function refineClipPointsWithVision(opts: {
       .join('\n')
     const userBlock = `【分镜段】\n${storyboard}\n\n【附图】\n${frameLegend}\n\n请为以上各段输出 sourceInSec。`
 
-    const providers: Array<'qwen' | 'doubao'> = ['qwen', 'doubao']
-    for (const provider of providers) {
+    for (const { provider, model } of ICE_MIX_VISION_PROVIDER_ORDER) {
       try {
         const res = await postAiChat({
           provider,
+          model,
           temperature: 0.12,
           imageDataUrls: frameList.map((f) => f.dataUrl).slice(0, 24),
           messages: [
