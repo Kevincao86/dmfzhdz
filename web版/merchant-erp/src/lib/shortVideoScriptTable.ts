@@ -812,19 +812,48 @@ export function sanitizeMixDialogueText(raw: string): string {
   return s.trim().replace(/\s{2,}/g, ' ').slice(0, 120)
 }
 
+/** 从指导文案取首句可朗读口播（禁止回退为摘要/提示语） */
+export function pickMixDialogueHook(guidance: string, fallback = '探店实拍，值得期待'): string {
+  const lines = dialogueLinesFromGuidance(guidance).filter((l) => !isMixDialogueMetaInstruction(l))
+  return lines[0] || fallback
+}
+
 /** 是否为编导备注/结构标签/项目说明，不宜作为 TTS 口播 */
 export function isMixDialogueMetaInstruction(text: string): boolean {
   const raw = String(text ?? '').trim()
   if (raw.length < 4) return true
+
+  // 占位符（AI 未填口播）
+  if (/^[\*＊\s]+$/.test(raw)) return true
+
   if (/^(?:商业创意|核心卖点|目标受众|镜头与|叙事节奏|本段|成片|须逐|规划要求|指导文案|项目说明|视频主题)/.test(raw)) {
     return true
   }
   if (/^叙事节奏由.+过渡到/.test(raw)) return true
   if (/^核心卖点[：:]/.test(raw)) return true
 
+  // 编导分镜/剪辑指令（「开篇以门头…引入」类，非口述稿）
+  if (/^开篇以/.test(raw)) return true
+  if (/^(?:开场|片头|片尾|开头|收尾|中段|结尾)/.test(raw) && /引入|展示|突出|强调|切入|并通过/.test(raw)) {
+    return true
+  }
+  if (/以.{2,28}引入/.test(raw)) return true
+  if (/并通过(?:门店|位置|画面|镜头|招牌|环境|导航)/.test(raw)) return true
+  if (
+    /(?:引入|切入|引出|开篇|开场).*(?:门头|招牌|特色|卖点|套餐|门店)/.test(raw) &&
+    !/[我你您咱来走进认准必须]/.test(raw)
+  ) {
+    return true
+  }
+  if (/^(?:镜头|画面|本段|此段|该段)(?:展示|呈现|突出|强调|说明)/.test(raw)) return true
+  if (/须(?:与|和).*(?:画面|视觉|镜头).*(?:匹配|对应|一致)/.test(raw)) return true
+
   // 指导文案整段摘要（「这是一支以…为主题的短视频…」类提示语）
   if (/这是一支以.+为主题的短视频/.test(raw)) return true
-  if (/本(支|条|个)?短视频/.test(raw) && /主题|重点展示|目标受众|旨在|目的在于/.test(raw)) {
+  if (/本(支|条|个)?短视频/.test(raw) && /主题|重点展示|目标受众|旨在|目的在于|为核心/.test(raw)) {
+    return true
+  }
+  if (/以.+为核心/.test(raw) && /(?:短视频|带货|转化|引流)/.test(raw) && !/[我你您]/.test(raw)) {
     return true
   }
   if (/重点展示.+与.+/.test(raw) && /吸引|目标受众|种草|探店|卖相|门店/.test(raw)) return true
@@ -834,6 +863,13 @@ export function isMixDialogueMetaInstruction(text: string): boolean {
   if (/短视频[，,].{4,}(?:重点|展示|吸引)/.test(raw)) return true
   if (/前往门店体验/.test(raw) && !/[我你您来走认准进]/.test(raw)) return true
   if (
+    /[「"'『][^」"'』]{2,16}[」"'』]的(?:特色|卖点|亮点|优势)/.test(raw) &&
+    !/[我你您来这]/test(raw) &&
+    /(?:引入|开篇|开场|并通过|展示|突出|旨在|说明)/.test(raw)
+  ) {
+    return true
+  }
+  if (
     raw.length > 28 &&
     /(?:短视频|主题|目标受众|重点展示|卖点|种草|探店|门店体验|制作过程|诱人卖相)/.test(raw) &&
     !/[我你您咱来走进认准今天这家必须安利]/.test(raw)
@@ -842,7 +878,18 @@ export function isMixDialogueMetaInstruction(text: string): boolean {
   }
 
   const s = sanitizeMixDialogueText(raw)
-  return s.length < 4
+  if (s.length < 4) return true
+  if (isMixDialogueMetaInstructionInner(s, raw)) return true
+  return false
+}
+
+/** sanitize 后再判一次，避免前缀剥离后仍漏网 */
+function isMixDialogueMetaInstructionInner(cleaned: string, rawOriginal: string): boolean {
+  if (cleaned === rawOriginal) return false
+  if (/^开篇以/.test(cleaned)) return true
+  if (/以.{2,28}引入/.test(cleaned)) return true
+  if (/并通过(?:门店|位置|画面|镜头|招牌)/.test(cleaned)) return true
+  return false
 }
 
 function pushUniqueDialogueLine(out: string[], line: string): void {
@@ -884,6 +931,15 @@ function fallbackSpeakableDialogueFromVisual(visual: string): string {
   v = v.replace(/^门店门头\/环境[：:]\s*/, '')
   v = v.replace(/^画面展示[了]?\s*/, '')
   v = v.replace(/\*+/g, '')
+  if (/门头|招牌|店招|门店外观|门面/.test(v)) {
+    const shop =
+      v.match(/[「"'『]([^」"'』]{2,12})[」"'』]/)?.[1] ||
+      v.match(/招牌[「"'『]?([^」"'』，,。]{2,10})/)?.[1]
+    if (shop) return `认准${shop}这门头，导航直达，欢迎进店！`
+    return '认准门店门头，导航直达，欢迎进店体验！'
+  }
+  if (/制作|烹饪|后厨|操作|淋酱|现做/.test(v)) return '后厨现做，新鲜靠谱看得见。'
+  if (/成品|摆盘|套餐|菜品|牛排|出货/.test(v)) return '这一口鲜嫩多汁，太满足了！'
   const core = v.slice(0, 32).trim()
   if (core.length >= 6) return `${core}，实拍细节很抓人。`
   return '这一幕实拍很带感，继续往下看。'
@@ -916,7 +972,7 @@ export function fillBlankScriptRowsFromGuidance(
   guidance: string,
 ): ShortVideoScriptRow[] {
   const lines = dialogueLinesFromGuidance(guidance).filter((l) => !isMixDialogueMetaInstruction(l))
-  const hook = lines[0] || '实拍很精彩，继续往下看'
+  const hook = pickMixDialogueHook(guidance, '实拍很精彩，继续往下看')
   const visHint = '展示实拍画面'
   return rows.map((r, i) => {
     const existing = sanitizeMixDialogueText(r.dialogue)

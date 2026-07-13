@@ -5,6 +5,7 @@ import {
   maxScriptTimeRangeEndSec,
   parseScriptTimeRangeSeconds,
   dialogueLinesFromGuidance,
+  pickMixDialogueHook,
   purifyMixScriptRowsDialogue,
   sanitizeMixDialogueText,
   isMixDialogueMetaInstruction,
@@ -204,13 +205,13 @@ export function buildMixPlannerFallbackRows(
   targetTotalSec: number,
 ): ShortVideoScriptRow[] {
   const total = Math.min(120, Math.max(5, Math.ceil(targetTotalSec)))
-  const lines = dialogueLinesFromGuidance(guidance)
+  const lines = dialogueLinesFromGuidance(guidance).filter((l) => !isMixDialogueMetaInstruction(l))
   const segmentCount = Math.min(
     12,
     Math.max(6, lines.length >= 6 ? Math.min(lines.length, 12) : Math.ceil(total / 3)),
   )
   const each = total / segmentCount
-  const hook = lines.find((l) => !isMixDialogueMetaInstruction(l)) || '精彩片段'
+  const hook = pickMixDialogueHook(guidance, '精彩片段')
 
   const rows = Array.from({ length: segmentCount }, (_, i) => {
     const start = Math.round(i * each * 10) / 10
@@ -256,8 +257,10 @@ export function buildNarrativeMatchedMixCoverage(
   const slots = pickMaterialsForNarrativeSlots(n, materials, profileList, guidance)
   const total = Math.max(5, Math.ceil(targetTotalSec))
   const each = total / n
-  const guidanceLines = dialogueLinesFromGuidance(guidance)
-  const hook = guidanceLines.find((l) => !isMixDialogueMetaInstruction(l)) || '精彩片段'
+  const guidanceLines = dialogueLinesFromGuidance(guidance).filter(
+    (l) => !isMixDialogueMetaInstruction(l),
+  )
+  const hook = pickMixDialogueHook(guidance, '精彩片段')
   const dialogues = sourceRows
     .map((r) => r.dialogue.trim())
     .filter((d) => d.length >= 2 && !/^（无口播）$/i.test(d))
@@ -627,7 +630,13 @@ const CLOSING_RE = /下单|团购|赶紧|快来|收藏|关注|就在|欢迎.*到
 /** 门头/到店指引口播（写死：仅用于门头镜头段） */
 export function mixStorefrontGuideDialogue(storeHint = ''): string {
   const hint = sanitizeMixDialogueText(storeHint).slice(0, 16)
-  if (hint.length >= 2) return `认准${hint}这门头，导航直达不迷路，欢迎进店！`
+  if (
+    hint.length >= 2 &&
+    !isMixDialogueMetaInstruction(hint) &&
+    !isMixDialogueMetaInstruction(storeHint)
+  ) {
+    return `认准${hint}这门头，导航直达不迷路，欢迎进店！`
+  }
   return '认准门店门头，导航直达不迷路，欢迎进店体验！'
 }
 

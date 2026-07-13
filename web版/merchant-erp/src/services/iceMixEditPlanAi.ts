@@ -34,6 +34,7 @@ import {
 import {
   dialogueLinesFromGuidance,
   parseScriptTimeRangeSeconds,
+  pickMixDialogueHook,
   planLongformAllFiveSecondDurations,
   purifyMixScriptRowsDialogue,
   sanitizeMixDialogueText,
@@ -670,7 +671,7 @@ const NARRATIVE_TEXT_PLAN_SYSTEM = `你是专业短视频混剪导演（探店/�
    模式A：门头/门店指引(开场) → 套餐/产品/制作过程(中段) → 结束语/行动号召(收尾)
    模式B：产品/套餐卖点钩子(开场) → 制作/试吃体验(中段) → 门头/到店指引(倒数第二段) → 结束语(收尾)
 4. 每段 visual（画面描述，给剪辑看）与 dialogue（口播台词，给观众听）语义一致
-5. dialogue 必须是可直接 TTS 朗读的第一人称/现场旁白短句（每段 12～28 字），禁止指导文案摘要与提示语（如「这是一支以…为主题的短视频」）；禁止「核心卖点」「叙事节奏」「目标受众」等编导标签；禁止照搬指导文案整段
+5. dialogue 必须是可直接 TTS 朗读的第一人称/现场旁白短句（每段 12～28 字），禁止指导文案摘要与提示语（如「这是一支以…为主题的短视频」「开篇以门头招牌…引入」）；禁止占位符；禁止「核心卖点」「叙事节奏」「目标受众」等编导标签；禁止照搬指导文案整段
 6. visual 写该段画面内容；dialogue 写该段旁白，须与 visual 同一段画面匹配（门头段只讲到店指引/门店信息）
 7. segmentIndex 从 0 连续递增，表示成片时间轴顺序
 
@@ -702,7 +703,7 @@ function normalizeNarrativeSegmentDialogues(
   const guidanceLines = dialogueLinesFromGuidance(guidance).filter(
     (l) => !isMixDialogueMetaInstruction(l),
   )
-  const hook = guidanceLines[0] || '探店实拍，值得期待'
+  const hook = pickMixDialogueHook(guidance, '探店好物推荐')
   return segments.map((s, i) => ({
     ...s,
     dialogue: resolveMixSegmentDialogue({
@@ -760,7 +761,7 @@ function parseNarrativePlanJson(
       materialIndex: Math.max(0, materialIndex),
       sourceInSec: Math.max(0, Number(o.sourceInSec) || 0),
       visual: visual || dialogue.slice(0, 72),
-      dialogue: dialogue || visual.slice(0, 120),
+      dialogue: dialogue || '',
       clipNote: typeof o.clipNote === 'string' ? o.clipNote.slice(0, 80) : undefined,
     })
   }
@@ -784,8 +785,10 @@ export function ensureFullMaterialNarrativeCoverage(
   guidance: string,
   materials: IceMixMaterialSlot[] = [],
 ): MixNarrativeSegment[] {
-  const guidanceLines = dialogueLinesFromGuidanceText(guidance)
-  const hook = guidance.trim().slice(0, 48) || '探店好物推荐'
+  const guidanceLines = dialogueLinesFromGuidanceText(guidance).filter(
+    (l) => !isMixDialogueMetaInstruction(l),
+  )
+  const hook = pickMixDialogueHook(guidance, '探店好物推荐')
   const sorted = [...raw].sort((a, b) => a.segmentIndex - b.segmentIndex)
   const usedMats = new Set<number>()
   const result: MixNarrativeSegment[] = []
@@ -1022,8 +1025,10 @@ function buildFallbackNarrativeFromProfiles(
   targetTotalSec: number,
   segmentSec = 5,
 ): MixNarrativeSegment[] {
-  const guidanceLines = dialogueLinesFromGuidanceText(guidance)
-  const hook = guidance.trim().slice(0, 48) || '探店好物推荐'
+  const guidanceLines = dialogueLinesFromGuidanceText(guidance).filter(
+    (l) => !isMixDialogueMetaInstruction(l),
+  )
+  const hook = pickMixDialogueHook(guidance, '探店好物推荐')
   const targetCount = mixTargetSegmentCount(targetTotalSec, segmentSec)
   const picks = pickMaterialsForNarrativeSlots(targetCount, materials, profiles, guidance)
   const pattern = inferMixNarrativePattern(guidance, profiles)
