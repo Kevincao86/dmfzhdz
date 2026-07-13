@@ -22,6 +22,7 @@ const EXTRA_LOCAL_KEYS = [
   'meoo_product_edit_library_v1',
   'meoo_product_draft_snapshots_v1',
   'meoo_kol_brief_records',
+  'meoo_viral_brief_gen_records',
   'meoo_kol_selected_brief_payload',
   'meoo_merchant_ai_vendor_keys_v1',
   'meoo_last_recruitment_order_id',

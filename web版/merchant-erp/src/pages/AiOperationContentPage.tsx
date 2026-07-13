@@ -26,7 +26,7 @@ import {
   type ViralBriefResult,
   type ViralBriefStyle,
 } from '../services/viralBriefAi'
-import { spendMpBriefPoints, checkMpBriefPointsAffordable } from '../services/mpAiPointsSpendClient'
+import { spendBriefPoints, checkBriefPointsAffordable } from '../services/mpAiPointsSpendClient'
 import { saveMpBriefGenRecord } from '../services/mpBriefGenRecordsClient'
 import { MP_POINTS_BRIEF_PER_USE } from '../lib/mpPointsEconomics'
 
@@ -141,7 +141,7 @@ export default function AiOperationContentPage() {
   const refreshAffordState = useCallback(async () => {
     setAffordChecking(true)
     try {
-      const result = await checkMpBriefPointsAffordable()
+      const result = await checkBriefPointsAffordable()
       if (result.ok) {
         setCanGenerateBrief(true)
         setAffordHint(null)
@@ -171,7 +171,7 @@ export default function AiOperationContentPage() {
       setBriefErr('请先选择招募订单。')
       return
     }
-    const afford = await checkMpBriefPointsAffordable()
+    const afford = await checkBriefPointsAffordable()
     if (!afford.ok) {
       setCanGenerateBrief(false)
       setAffordHint(afford.message)
@@ -198,7 +198,7 @@ export default function AiOperationContentPage() {
       setBriefResult(textResult)
       setProgressMsg('文字已生成，正在扣减积分…')
       try {
-        const spend = await spendMpBriefPoints({
+        const spend = await spendBriefPoints({
           idempotencyKey: genKey,
           note: `brief:${selectedOrder.id}:${platform}`,
         })

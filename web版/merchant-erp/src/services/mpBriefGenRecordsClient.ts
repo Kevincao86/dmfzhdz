@@ -1,5 +1,9 @@
-import { readMpSessionToken } from '../lib/merchantApiAuth'
+import { readMpSessionToken, resolveMerchantApiBearer } from '../lib/merchantApiAuth'
 import { merchantApiFetchUrls } from '../lib/merchantErpApiBase'
+import {
+  appendErpBriefGenRecord,
+  listErpBriefGenRecords,
+} from '../lib/viralBriefGenRecordsStorage'
 
 export type MpBriefGenRecordRow = {
   id: string
@@ -40,10 +44,22 @@ async function postMpAuthAction(body: Record<string, unknown>): Promise<Record<s
   throw new Error(lastErr)
 }
 
+async function resolveBriefRecordsBackend(): Promise<'mp' | 'erp_local'> {
+  if (readMpSessionToken()) return 'mp'
+  const auth = await resolveMerchantApiBearer()
+  if (auth.source === 'supabase' && auth.token) return 'erp_local'
+  if (auth.source === 'mp_session' && auth.token) return 'mp'
+  throw new Error('请先登录后再使用 Brief 功能')
+}
+
 export async function fetchMpBriefGenRecords(): Promise<{
   records: MpBriefGenRecordRow[]
   retentionDays: number
 }> {
+  const backend = await resolveBriefRecordsBackend()
+  if (backend === 'erp_local') {
+    return listErpBriefGenRecords()
+  }
   const data = await postMpAuthAction({ action: 'mp_brief_gen_records_list' })
   const records = Array.isArray(data.records) ? (data.records as MpBriefGenRecordRow[]) : []
   return {
@@ -62,6 +78,11 @@ export async function saveMpBriefGenRecord(opts: {
   fullMarkdown: string
   idempotencyKey?: string
 }): Promise<void> {
+  const backend = await resolveBriefRecordsBackend()
+  if (backend === 'erp_local') {
+    appendErpBriefGenRecord(opts)
+    return
+  }
   await postMpAuthAction({
     action: 'mp_brief_gen_record_save',
     ...opts,
