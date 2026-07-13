@@ -43,6 +43,37 @@ type VideoChannelLike = {
   issues?: Array<{ timeLabel?: string; phrase?: string }>
 }
 
+function formatVideoViolationSuggestion(suggestion: string): string {
+  const s = String(suggestion || '').trim()
+  if (!s) return ''
+  if (/^「/.test(s)) return s
+  const stripped = s.replace(/^建议(?:改为|用|：|:)\s*/, '').trim()
+  if (/^「/.test(stripped)) return stripped
+  return `「${stripped}」`
+}
+
+function formatVideoViolationLine(v: Record<string, unknown>): string {
+  const excerpt = String(v.excerpt || '').trim()
+  const suggestion = formatVideoViolationSuggestion(String(v.suggestion || ''))
+  if (!excerpt && !suggestion) return ''
+  const channelLabel =
+    v.channel === 'asr'
+      ? '口播'
+      : v.channel === 'subtitle'
+        ? '字幕'
+        : v.channel === 'visual'
+          ? '画面'
+          : v.channel === 'brief'
+            ? 'Brief'
+            : ''
+  const time = String(v.timeLabel || '').trim()
+  const loc =
+    channelLabel && time && time !== '—' ? `${channelLabel}${time}` : channelLabel || ''
+  const head = excerpt ? (loc ? `${loc}「${excerpt}」` : `「${excerpt}」`) : loc
+  if (!suggestion) return head
+  return head ? `${head}→${suggestion}` : suggestion
+}
+
 export function formatVideoComplianceInline(
   res: Record<string, unknown> | null | undefined,
 ): VideoAiInlineStatus {
@@ -68,7 +99,16 @@ export function formatVideoComplianceInline(
 
   const channelText = formatVideoChannelSummary(res)
   if (channelText) {
-    return { text: `${channelText}，请注意修改${billing}`.slice(0, 140), tone: 'warn' }
+    return { text: `${channelText}${billing}`.slice(0, 200), tone: 'warn' }
+  }
+
+  const violations = Array.isArray(res.violations) ? res.violations : []
+  if (violations.length) {
+    const line = formatVideoViolationLine((violations[0] || {}) as Record<string, unknown>)
+    if (line) {
+      const extra = violations.length > 1 ? ` 等${violations.length}处` : ''
+      return { text: `AI检测到：${line}${extra}${billing}`.slice(0, 160), tone: 'warn' }
+    }
   }
 
   const locations = Array.isArray(res.locations) ? res.locations : []

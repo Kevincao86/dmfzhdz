@@ -27,10 +27,14 @@ import { extractVideoMediaForCompliance } from './recruitmentVideoComplianceMedi
 import {
   buildVideoComplianceChannelReport,
   buildVideoComplianceLocationMessage,
+  buildVideoComplianceSummaryWithSuggestions,
+  enrichVideoViolationsWithLocations,
   resolveVideoHitLocations,
   type VideoComplianceChannelReport,
   type VideoComplianceLocation,
+  type VideoComplianceViolation,
 } from './complianceHitLocations.js'
+import { isRetryableAiProviderError } from './aiProviderRetryableError.js'
 import { mpPointsCostForVideoSeconds } from './mpPointsEconomics.js'
 
 export type VideoComplianceInput = {
@@ -51,12 +55,15 @@ export type VideoComplianceInput = {
   preloadedMediaExtract?: Awaited<ReturnType<typeof extractVideoMediaForCompliance>> | null
 }
 
+export type { VideoComplianceViolation } from './complianceHitLocations.js'
+
 export type VideoComplianceResult =
   | {
       ok: true
       verdict: 'normal' | 'suspect'
       message: string
       hits: string[]
+      violations?: VideoComplianceViolation[]
       locations?: VideoComplianceLocation[]
       channelReport?: VideoComplianceChannelReport
       summary?: string
@@ -101,13 +108,6 @@ function providerChain(env: Record<string, string>, preferred?: string): AIProvi
   return chain
 }
 
-function isRetryableAiError(e: unknown): boolean {
-  const msg = (e instanceof Error ? e.message : String(e)).toLowerCase()
-  return /429|quota|rate.?limit|余额|不足|insufficient|exhausted|limit exceeded|too many|resource|额度|欠费|over.?limit|capacity|does not exist|not have access|model.*not.*found|invalid.*model|endpoint.*not|unknown model|model.*unavailable|access.*denied/.test(
-    msg,
-  )
-}
-
 async function callLlmWithFallback(
   env: Record<string, string>,
   preferred: string | undefined,
@@ -144,7 +144,7 @@ async function callLlmWithFallback(
       }
     } catch (e) {
       lastErr = e instanceof Error ? e.message : String(e)
-      if (!isRetryableAiError(e)) throw e
+      if (!isRetryableAiProviderError(e)) throw e
     }
   }
   throw new Error(lastErr || 'all_providers_failed')
@@ -174,6 +174,7 @@ function parseComplianceJson(raw: string): {
   verdict?: 'normal' | 'suspect'
   message?: string
   hits?: string[]
+  violations?: VideoComplianceViolation[]
 } | null {
   const m = /\{[\s\S]*\}/.exec(String(raw || '').trim())
   if (!m) return null
@@ -182,10 +183,77 @@ function parseComplianceJson(raw: string): {
       verdict?: 'normal' | 'suspect'
       message?: string
       hits?: string[]
+      violations?: VideoComplianceViolation[]
     }
   } catch {
     return null
   }
+}
+
+function normalizeVideoViolationChannel(
+  raw: unknown,
+): VideoComplianceViolation['channel'] | undefined {
+  const ch = String(raw || '').trim().toLowerCase()
+  if (ch === 'asr' || ch === '口播') return 'asr'
+  if (ch === 'subtitle' || ch === '字幕' || ch === 'ocr') return 'subtitle'
+  if (ch === 'visual' || ch === '画面') return 'visual'
+  if (ch === 'brief') return 'brief'
+  return undefined
+}
+
+function parseVideoViolations(raw: unknown): VideoComplianceViolation[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((v) => {
+      const row = v as Record<string, unknown>
+      return {
+        excerpt: String(row.excerpt || '').trim(),
+        rule: String(row.rule || '').trim(),
+        suggestion: String(row.suggestion || '').trim(),
+        channel: normalizeVideoViolationChannel(row.channel),
+        timeLabel: String(row.timeLabel || '').trim() || undefined,
+        atSec: typeof row.atSec === 'number' && row.atSec >= 0 ? row.atSec : undefined,
+      }
+    })
+    .filter((v) => v.excerpt || v.rule || v.suggestion)
+    .slice(0, 8)
+}
+
+function defaultLocalHitSuggestion(phrase: string): string {
+  if (/最/.test(phrase)) return '「价格实惠」「性价比不错」'
+  if (/100%|百分百|零风险|永久|万能|根治|速效/.test(phrase)) {
+    return '删除夸大承诺，改为可核实的效果描述'
+  }
+  return '删除或改写该表述，避免绝对化/夸大宣传'
+}
+
+function defaultSemanticHitSuggestion(phrase: string): string {
+  if (/快来|赶紧|速来|必来/.test(phrase)) return '「适合来逛逛」「值得来体验一下」'
+  if (/超有|超级|非常有格调|格调/.test(phrase)) return '「装修很有质感」「氛围挺舒服的」'
+  return '改为客观、可证实的体验描述，避免夸大或强引导'
+}
+
+function ensureViolationsForHits(
+  hits: string[],
+  violations: VideoComplianceViolation[],
+  localPhrases: string[],
+): VideoComplianceViolation[] {
+  const localSet = new Set(localPhrases.map((p) => p.toLowerCase()))
+  const covered = new Set(
+    violations.map((v) => String(v.excerpt || '').trim()).filter(Boolean),
+  )
+  const out = [...violations]
+  for (const h of hits) {
+    if (!h || covered.has(h)) continue
+    const isLocal = localSet.has(h.toLowerCase())
+    out.push({
+      excerpt: h,
+      rule: isLocal ? '命中平台高风险词库' : '语义风险表述（AI复核）',
+      suggestion: isLocal ? defaultLocalHitSuggestion(h) : defaultSemanticHitSuggestion(h),
+    })
+    covered.add(h)
+  }
+  return out.slice(0, 8)
 }
 
 function buildBriefOnlyText(input: VideoComplianceInput, publishCaption: string): string {
@@ -206,11 +274,13 @@ function attachVideoComplianceMeta(
   hits: string[],
   mediaExtract: Awaited<ReturnType<typeof extractVideoMediaForCompliance>> | null,
   briefText: string,
+  violations: VideoComplianceViolation[] = [],
 ): {
   locations: VideoComplianceLocation[]
   channelReport: VideoComplianceChannelReport
   summary: string
   briefHits: string[]
+  violations: VideoComplianceViolation[]
 } {
   const briefHits = hits.filter(
     (p) => briefText.includes(p) && !(mediaExtract?.asrText || '').includes(p),
@@ -231,8 +301,11 @@ function attachVideoComplianceMeta(
     briefText,
     durationSec: mediaExtract?.durationSec,
   })
-  const summary = buildVideoComplianceLocationMessage(locations, channelReport, briefHits)
-  return { locations, channelReport, summary, briefHits }
+  const enrichedViolations = enrichVideoViolationsWithLocations(violations, locations)
+  const summary =
+    buildVideoComplianceSummaryWithSuggestions(enrichedViolations, channelReport, briefHits) ||
+    buildVideoComplianceLocationMessage(locations, channelReport, briefHits)
+  return { locations, channelReport, summary, briefHits, violations: enrichedViolations }
 }
 
 function buildScannedText(
@@ -375,8 +448,9 @@ export async function runRecruitmentVideoComplianceCheck(
     scannedText.slice(0, 6000),
     '',
     '只输出 JSON，不要 Markdown：',
-    '{"verdict":"normal"|"suspect","message":"15-80字结论","hits":["命中的违规词或表述，无则空数组"]}',
-    'verdict=normal 时 message 写「视频正常」；verdict=suspect 时 message 写「可能违规请注意审核：…」',
+    '{"verdict":"normal"|"suspect","message":"15-80字结论","hits":["命中的违规词或表述，无则空数组"],"violations":[{"excerpt":"原文违规片段（须来自口播/字幕/画面，20字内）","rule":"违反的规则要点","suggestion":"「替换词1」「替换词2」","channel":"asr"|"subtitle"|"visual"|"brief"}]}',
+    'verdict=normal 时 violations 为空数组；verdict=suspect 时须为每条风险表述给出 violations（含未命中本地词库的语义风险词）。',
+    'suggestion 须给出 1-2 个可直接替换的短语，用「」包裹，格式示例：「适合来逛逛」「值得来体验一下」。',
     '须综合口播、画面文字与 Brief 判断；任一路径出现绝对化/虚假/误导表述 → suspect。',
   ]
     .filter(Boolean)
@@ -402,6 +476,7 @@ export async function runRecruitmentVideoComplianceCheck(
     let verdict: 'normal' | 'suspect' = 'normal'
     let message = '视频正常'
     let hits: string[] = []
+    let violations: VideoComplianceViolation[] = []
 
     if (parsed?.verdict === 'suspect' || parsed?.verdict === 'normal') {
       verdict = parsed.verdict
@@ -412,6 +487,7 @@ export async function runRecruitmentVideoComplianceCheck(
       hits = Array.isArray(parsed.hits)
         ? parsed.hits.map((h) => String(h).trim()).filter(Boolean).slice(0, 12)
         : []
+      violations = parseVideoViolations(parsed.violations)
     } else if (/suspect|违规|风险|禁止|夸大|误导|绝对化/i.test(text)) {
       verdict = 'suspect'
       message = `可能违规请注意审核：${text.slice(0, 120)}`
@@ -425,13 +501,19 @@ export async function runRecruitmentVideoComplianceCheck(
       hits = [...new Set([...hits, ...mergedLocalHits])].slice(0, 12)
     }
 
+    if (verdict === 'suspect') {
+      violations = ensureViolationsForHits(hits, violations, phrases)
+    }
+
     if (verdict === 'suspect' && !message.includes('可能违规')) {
       message = `可能违规请注意审核：${message}`
     }
 
     const briefText = buildBriefOnlyText(input, publishCaption)
     const meta =
-      verdict === 'suspect' ? attachVideoComplianceMeta(hits, mediaExtract, briefText) : null
+      verdict === 'suspect'
+        ? attachVideoComplianceMeta(hits, mediaExtract, briefText, violations)
+        : null
     if (meta?.summary) {
       message = meta.summary
     }
@@ -441,6 +523,7 @@ export async function runRecruitmentVideoComplianceCheck(
       verdict,
       message,
       hits,
+      violations: meta?.violations,
       locations: meta?.locations,
       channelReport: meta?.channelReport,
       summary: meta?.summary,
@@ -452,7 +535,13 @@ export async function runRecruitmentVideoComplianceCheck(
     const msg = e instanceof Error ? e.message : String(e)
     if (mergedLocalHits.length) {
       const briefText = buildBriefOnlyText(input, publishCaption)
-      const meta = attachVideoComplianceMeta(mergedLocalHits, mediaExtract, briefText)
+      const fallbackViolations = ensureViolationsForHits(mergedLocalHits, [], phrases)
+      const meta = attachVideoComplianceMeta(
+        mergedLocalHits,
+        mediaExtract,
+        briefText,
+        fallbackViolations,
+      )
       return {
         ok: true,
         verdict: 'suspect',
@@ -460,6 +549,7 @@ export async function runRecruitmentVideoComplianceCheck(
           ? `${meta.summary}（AI 暂不可用：${msg.slice(0, 60)}）`
           : `可能违规请注意审核：命中高风险用语「${mergedLocalHits.slice(0, 3).join('、')}」（AI 暂不可用：${msg.slice(0, 80)}）`,
         hits: mergedLocalHits,
+        violations: meta.violations,
         locations: meta.locations,
         channelReport: meta.channelReport,
         summary: meta.summary,

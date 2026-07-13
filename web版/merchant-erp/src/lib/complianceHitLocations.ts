@@ -35,6 +35,15 @@ export type VideoComplianceChannelReport = {
   visual: VideoChannelStatus
 }
 
+export type VideoComplianceViolation = {
+  excerpt: string
+  rule: string
+  suggestion: string
+  channel?: 'asr' | 'subtitle' | 'visual' | 'brief'
+  timeLabel?: string
+  atSec?: number
+}
+
 export type ScriptParagraph = {
   index: number
   text: string
@@ -475,4 +484,91 @@ export function buildScriptComplianceLocationMessage(
     .filter(Boolean)
   if (!parts.length) return ''
   return `可能违规请注意修改：${parts.join('、')}`
+}
+
+/** 规范化 AI 给出的改写建议为「词1」「词2」形式 */
+export function formatVideoViolationSuggestion(suggestion: string): string {
+  const s = String(suggestion || '').trim()
+  if (!s) return ''
+  if (/^「/.test(s)) return s
+  const stripped = s.replace(/^建议(?:改为|用|：|:)\s*/, '').trim()
+  if (/^「/.test(stripped)) return stripped
+  return `「${stripped}」`
+}
+
+export function formatVideoViolationLine(v: VideoComplianceViolation): string {
+  const excerpt = String(v.excerpt || '').trim()
+  const suggestion = formatVideoViolationSuggestion(v.suggestion)
+  if (!excerpt && !suggestion) return ''
+  const channelLabel =
+    v.channel === 'asr'
+      ? '口播'
+      : v.channel === 'subtitle'
+        ? '字幕'
+        : v.channel === 'visual'
+          ? '画面'
+          : v.channel === 'brief'
+            ? 'Brief'
+            : ''
+  const time = String(v.timeLabel || '').trim()
+  const loc =
+    channelLabel && time && time !== '—' ? `${channelLabel}${time}` : channelLabel || ''
+  const head = excerpt ? (loc ? `${loc}「${excerpt}」` : `「${excerpt}」`) : loc
+  if (!suggestion) return head
+  return head ? `${head}→${suggestion}` : suggestion
+}
+
+export function enrichVideoViolationsWithLocations(
+  violations: VideoComplianceViolation[],
+  locations: VideoComplianceLocation[],
+): VideoComplianceViolation[] {
+  return violations.map((v) => {
+    const excerpt = String(v.excerpt || '').trim()
+    if (!excerpt) return v
+    const loc = locations.find(
+      (l) =>
+        l.phrase === excerpt ||
+        excerpt.includes(l.phrase) ||
+        l.phrase.includes(excerpt),
+    )
+    if (!loc) return v
+    return {
+      ...v,
+      channel: v.channel || loc.source,
+      timeLabel: v.timeLabel || loc.timeLabel,
+      atSec: v.atSec ?? loc.atSec,
+    }
+  })
+}
+
+export function buildVideoComplianceSummaryWithSuggestions(
+  violations: VideoComplianceViolation[],
+  channelReport?: VideoComplianceChannelReport,
+  briefHits?: string[],
+): string {
+  const issueLines = violations
+    .slice(0, 4)
+    .map((v) => formatVideoViolationLine(v))
+    .filter(Boolean)
+
+  const normalParts: string[] = []
+  if (channelReport) {
+    if (channelReport.asr.checked && channelReport.asr.normal) normalParts.push('口播正常')
+    if (channelReport.subtitle.checked && channelReport.subtitle.normal) {
+      normalParts.push('字幕正常')
+    }
+    if (channelReport.visual.checked && channelReport.visual.normal) normalParts.push('画面正常')
+  }
+
+  if (!issueLines.length) {
+    if (channelReport) {
+      const base = buildVideoComplianceChannelSummary(channelReport, briefHits)
+      if (base) return base
+    }
+    return ''
+  }
+
+  let msg = `可能违规请注意修改：${issueLines.join('；')}`
+  if (normalParts.length) msg += `；${normalParts.join('；')}`
+  return msg
 }

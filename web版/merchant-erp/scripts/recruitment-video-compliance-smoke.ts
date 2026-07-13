@@ -4,10 +4,13 @@
 import {
   buildVideoComplianceChannelReport,
   buildVideoComplianceChannelSummary,
+  buildVideoComplianceSummaryWithSuggestions,
+  enrichVideoViolationsWithLocations,
   findAsrPhraseMs,
   findAsrPhraseSec,
   findPhraseMsInSegments,
   formatComplianceTimeLabel,
+  formatVideoViolationLine,
   locatePhraseMsInSegment,
   findParagraphNoForExcerpt,
   resolveVideoHitLocations,
@@ -122,6 +125,51 @@ async function main() {
     throw new Error(`expected subtitle/visual normal in: ${summary}`)
   }
 
+  const suggestionSummary = buildVideoComplianceSummaryWithSuggestions(
+    [
+      {
+        excerpt: '快来打卡吧',
+        rule: '营销诱导',
+        suggestion: '「适合来逛逛」「值得来体验一下」',
+        channel: 'asr',
+        timeLabel: '00:28:480',
+      },
+      {
+        excerpt: '超有格调',
+        rule: '夸大宣传',
+        suggestion: '「装修很有质感」「氛围挺舒服的」',
+        channel: 'subtitle',
+        timeLabel: '00:15:000',
+      },
+    ],
+    channelReport,
+  )
+  if (!suggestionSummary.includes('→「适合来逛逛」「值得来体验一下」')) {
+    throw new Error(`expected rewrite suggestion in summary: ${suggestionSummary}`)
+  }
+  if (!suggestionSummary.includes('口播00:28:480「快来打卡吧」')) {
+    throw new Error(`expected located asr line: ${suggestionSummary}`)
+  }
+
+  const violationLine = formatVideoViolationLine({
+    excerpt: '超有格调',
+    rule: '夸大',
+    suggestion: '「装修很有质感」「氛围挺舒服的」',
+    channel: 'asr',
+    timeLabel: '00:01:200',
+  })
+  if (!violationLine.includes('→「装修很有质感」「氛围挺舒服的」')) {
+    throw new Error(`bad violation line: ${violationLine}`)
+  }
+
+  const enriched = enrichVideoViolationsWithLocations(
+    [{ excerpt: '最便宜', rule: '绝对化', suggestion: '「价格实惠」「性价比不错」' }],
+    [{ phrase: '最便宜', source: 'asr', atSec: 8, timeLabel: '00:08:000' }],
+  )
+  if (enriched[0]?.timeLabel !== '00:08:000' || enriched[0]?.channel !== 'asr') {
+    throw new Error(`expected enriched violation location: ${JSON.stringify(enriched)}`)
+  }
+
   const paragraphs = splitScriptParagraphs('第一段正常\n\n第二段周边最便宜\n\n第三段结尾')
   const pNo = findParagraphNoForExcerpt('最便宜', paragraphs)
   if (pNo !== 2) throw new Error(`expected paragraph 2, got ${pNo}`)
@@ -149,6 +197,9 @@ async function main() {
   if (!cheapest.ok) throw new Error(`cheapest case failed: ${cheapest.message}`)
   if (cheapest.verdict !== 'suspect') {
     throw new Error(`expected suspect for 最便宜, got ${cheapest.verdict}`)
+  }
+  if (!cheapest.violations?.length || !cheapest.summary?.includes('→')) {
+    throw new Error(`expected cheapest rewrite suggestion: ${JSON.stringify(cheapest)}`)
   }
 
   const script = await runRecruitmentScriptComplianceCheck(
