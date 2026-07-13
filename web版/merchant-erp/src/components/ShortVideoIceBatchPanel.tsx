@@ -9,6 +9,7 @@ import {
   ImagePlus,
   Loader2,
   Pause,
+  Plus,
   ScanEye,
   Trash2,
   Upload,
@@ -74,6 +75,7 @@ import {
   subsetMixMaterialPoolByIndices,
   finalizeMixScriptRows,
   formatMixPromoPlanningBlock,
+  mixPromoContextFromItems,
   ensureMixScriptRowsCoverTarget,
   collectMixNarrationText,
   expandMixRowsForMaterialPool,
@@ -85,6 +87,7 @@ import {
   MIX_TARGET_TOTAL_OPTIONS,
   normalizeMixMaterialSlots,
   type IceMixMaterialSlot,
+  type MixPromoItem,
   type MixPromoContext,
 } from '../lib/iceMixPlan'
 import { buildSmartBatchSubmitPayload } from '../lib/iceSmartBatchPlan'
@@ -116,6 +119,17 @@ import {
 import { resolveIceEffectPreset, ICE_MIX_TRANSITION_PRESETS } from '../lib/iceEffectPresets'
 
 const MIX_VOICE_PREVIEW_FALLBACK = '大家好，这是一段混剪口播音色试听。'
+
+type MixPromoItemRow = MixPromoItem & { id: string }
+
+function newMixPromoItemRow(): MixPromoItemRow {
+  return {
+    id: `promo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    mainProduct: '',
+    originalPrice: '',
+    salePrice: '',
+  }
+}
 
 async function audioBlobToPureBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -271,17 +285,22 @@ export function ShortVideoIceBatchPanel(_props: Props) {
   const [dispatchedOrderId, setDispatchedOrderId] = useState<string | null>(null)
 
   const [mixGuidance, setMixGuidance] = useState('')
-  const [mixMainProduct, setMixMainProduct] = useState('')
-  const [mixOriginalPrice, setMixOriginalPrice] = useState('')
-  const [mixSalePrice, setMixSalePrice] = useState('')
+  const [mixPromoItems, setMixPromoItems] = useState<MixPromoItemRow[]>([])
   const mixPromo = useMemo(
-    (): MixPromoContext => ({
-      mainProduct: mixMainProduct.trim() || undefined,
-      originalPrice: mixOriginalPrice.trim() || undefined,
-      salePrice: mixSalePrice.trim() || undefined,
-    }),
-    [mixMainProduct, mixOriginalPrice, mixSalePrice],
+    (): MixPromoContext => mixPromoContextFromItems(mixPromoItems),
+    [mixPromoItems],
   )
+  const addMixPromoItem = useCallback(() => {
+    setMixPromoItems((prev) => [...prev, newMixPromoItemRow()])
+  }, [])
+  const updateMixPromoItem = useCallback((id: string, patch: Partial<MixPromoItem>) => {
+    setMixPromoItems((prev) =>
+      prev.map((row) => (row.id === id ? { ...row, ...patch } : row)),
+    )
+  }, [])
+  const removeMixPromoItem = useCallback((id: string) => {
+    setMixPromoItems((prev) => prev.filter((row) => row.id !== id))
+  }, [])
   const [mixTargetSec, setMixTargetSec] = useState<number>(20)
   const [scriptRows, setScriptRows] = useState<ShortVideoScriptRow[]>(() =>
     defaultScriptRows(
@@ -2214,42 +2233,87 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                   </span>
                 </p>
               </div>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <label className="flex min-w-0 flex-col gap-1.5 text-xs text-zinc-600">
-                  <span className="font-medium text-zinc-700">主推商品</span>
-                  <input
-                    type="text"
-                    value={mixMainProduct}
+              <div className="rounded-xl border border-orange-200/80 bg-gradient-to-b from-orange-50/70 to-white p-3 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-zinc-800">主推商品</p>
+                    <p className="mt-0.5 text-[11px] text-zinc-500">
+                      添加后 AI 规划口播会带出商品名与价格（首条用于末段报价）
+                    </p>
+                  </div>
+                  <button
+                    type="button"
                     disabled={anyBusy || guidanceBusy}
-                    onChange={(e) => setMixMainProduct(e.target.value)}
-                    placeholder="如：T骨牛排套餐"
-                    className="h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm outline-none ring-orange-500/25 transition focus-visible:border-orange-300 focus-visible:ring-2"
-                  />
-                </label>
-                <label className="flex min-w-0 flex-col gap-1.5 text-xs text-zinc-600">
-                  <span className="font-medium text-zinc-700">原价（元）</span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={mixOriginalPrice}
-                    disabled={anyBusy || guidanceBusy}
-                    onChange={(e) => setMixOriginalPrice(e.target.value)}
-                    placeholder="如：198"
-                    className="h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm outline-none ring-orange-500/25 transition focus-visible:border-orange-300 focus-visible:ring-2"
-                  />
-                </label>
-                <label className="flex min-w-0 flex-col gap-1.5 text-xs text-zinc-600">
-                  <span className="font-medium text-zinc-700">优惠价（元）</span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={mixSalePrice}
-                    disabled={anyBusy || guidanceBusy}
-                    onChange={(e) => setMixSalePrice(e.target.value)}
-                    placeholder="如：128"
-                    className="h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm outline-none ring-orange-500/25 transition focus-visible:border-orange-300 focus-visible:ring-2"
-                  />
-                </label>
+                    onClick={addMixPromoItem}
+                    className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-orange-500 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-600 disabled:opacity-50"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    添加主推品
+                  </button>
+                </div>
+                {mixPromoItems.length === 0 ? (
+                  <p className="mt-3 rounded-lg border border-dashed border-orange-200/90 bg-white/70 px-3 py-2.5 text-xs text-zinc-500">
+                    尚未添加主推品。点击右上角「添加主推品」填写套餐名称、原价与优惠价。
+                  </p>
+                ) : (
+                  <div className="mt-3 space-y-2">
+                    {mixPromoItems.map((item, index) => (
+                      <div
+                        key={item.id}
+                        className="grid gap-2 rounded-lg border border-orange-100 bg-white/90 p-2.5 sm:grid-cols-[1fr_1fr_1fr_auto]"
+                      >
+                        <label className="flex min-w-0 flex-col gap-1 text-xs text-zinc-600">
+                          <span className="font-medium text-zinc-700">
+                            {mixPromoItems.length > 1 ? `主推商品 ${index + 1}` : '主推商品'}
+                          </span>
+                          <input
+                            type="text"
+                            value={item.mainProduct}
+                            disabled={anyBusy || guidanceBusy}
+                            onChange={(e) => updateMixPromoItem(item.id, { mainProduct: e.target.value })}
+                            placeholder="如：T骨牛排套餐"
+                            className="h-9 w-full rounded-lg border border-zinc-300 bg-white px-2.5 text-sm outline-none ring-orange-500/25 focus-visible:border-orange-300 focus-visible:ring-2"
+                          />
+                        </label>
+                        <label className="flex min-w-0 flex-col gap-1 text-xs text-zinc-600">
+                          <span className="font-medium text-zinc-700">原价（元）</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={item.originalPrice}
+                            disabled={anyBusy || guidanceBusy}
+                            onChange={(e) => updateMixPromoItem(item.id, { originalPrice: e.target.value })}
+                            placeholder="如：198"
+                            className="h-9 w-full rounded-lg border border-zinc-300 bg-white px-2.5 text-sm outline-none ring-orange-500/25 focus-visible:border-orange-300 focus-visible:ring-2"
+                          />
+                        </label>
+                        <label className="flex min-w-0 flex-col gap-1 text-xs text-zinc-600">
+                          <span className="font-medium text-zinc-700">优惠价（元）</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={item.salePrice}
+                            disabled={anyBusy || guidanceBusy}
+                            onChange={(e) => updateMixPromoItem(item.id, { salePrice: e.target.value })}
+                            placeholder="如：128"
+                            className="h-9 w-full rounded-lg border border-zinc-300 bg-white px-2.5 text-sm outline-none ring-orange-500/25 focus-visible:border-orange-300 focus-visible:ring-2"
+                          />
+                        </label>
+                        <div className="flex items-end justify-end pb-0.5">
+                          <button
+                            type="button"
+                            disabled={anyBusy || guidanceBusy}
+                            onClick={() => removeMixPromoItem(item.id)}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 text-zinc-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                            title="移除该主推品"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <p className="text-[11px] leading-snug text-zinc-500">
                 填写主推商品与价格后，「AI 规划分镜」会在中段 1 段口播带出商品名、在最后 1 段强调原价与优惠价；各段口播不会重复同一句或重复报价。
