@@ -552,21 +552,16 @@ export function buildSmartBatchTimelineProduceInput(input: {
     (n) => Number.isFinite(n) && n >= 0 && n < baseUrls.length,
   )
   const segmentCount = pickSmartBatchSegmentCount(input.scriptRows, baseUrls.length, targetTotalSec)
-  const urls = pickSmartBatchMaterialUrls(baseUrls, slots, segmentCount)
+  const pickedIndices = pickSmartBatchMaterialIndices(baseUrls.length, slots, segmentCount)
   const narration = buildSmartBatchNarration(input.guidance, input.scriptRows, targetTotalSec)
-  const each = targetTotalSec / Math.max(1, urls.length)
+  const each = targetTotalSec / Math.max(1, pickedIndices.length)
 
-  const segments = urls.map((url, i) => {
-    const slotMi = slots[i]
-    const matIdx =
-      slotMi != null && slotMi >= 0 && slotMi < input.materials.length
-        ? slotMi
-        : baseUrls.findIndex((u) => u === url)
-    const mat =
-      input.materials[matIdx >= 0 ? matIdx : i] ?? input.materials[i] ?? input.materials[0]!
+  const segments = pickedIndices.map((matIdx, i) => {
+    const mat = input.materials[matIdx] ?? input.materials[i] ?? input.materials[0]!
+    const url = baseUrls[matIdx] ?? baseUrls[i] ?? baseUrls[0]!
     const row = input.scriptRows[i]
     const start = Math.round(i * each * 10) / 10
-    const end = i === urls.length - 1 ? targetTotalSec : Math.round((i + 1) * each * 10) / 10
+    const end = i === pickedIndices.length - 1 ? targetTotalSec : Math.round((i + 1) * each * 10) / 10
     const clipDur = Math.max(0.45, end - start)
     const sourceIn =
       mat.kind === 'video' ? Math.min(1.2 + (i % 4) * 1.35, Math.max(1.2, clipDur)) : 0
