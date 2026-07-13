@@ -1,5 +1,12 @@
 /** IMS 智能一键成片 — 前端/服务端共用的素材与分镜抽取 */
 
+import { spreadMixMaterialIndex } from './iceMixPlan.js'
+import {
+  segmentCountFromTargetTotalSec,
+  scriptTimeRangesFromDurationPlan,
+  planLongformAllFiveSecondDurations,
+} from './shortVideoScriptTable.js'
+
 export type IceSmartBatchMaterial = {
   kind: 'video' | 'image'
   mediaUrl: string
@@ -12,26 +19,76 @@ export type IceSmartBatchScriptRow = {
   dialogue?: string
 }
 
-function pickSmartBatchSegmentCount(
+/** 段数须覆盖用户目标时长（30 秒 → 6×5 秒），不得仅按已有分镜行数缩水 */
+export function pickSmartBatchSegmentCount(
   scriptRows: IceSmartBatchScriptRow[],
   materialCount: number,
   targetTotalSec: number,
 ): number {
-  const planned = Math.max(2, Math.ceil(targetTotalSec / 5))
+  const planned = segmentCountFromTargetTotalSec(targetTotalSec, 5)
   const filledRows = scriptRows.filter(
     (r) =>
       String(r.visual ?? '').trim().length >= 4 ||
       String(r.dialogue ?? '').trim().length >= 2,
   ).length
-  if (filledRows >= 2) {
-    return Math.min(Math.max(filledRows, 2), materialCount, scriptRows.length || planned)
-  }
-  const rowCount = scriptRows.filter((r) => String(r.dialogue ?? '').trim().length >= 2).length
-  if (rowCount >= 2) return Math.min(rowCount, materialCount)
-  return Math.max(2, Math.min(materialCount, planned))
+  const rowBased = filledRows >= 2 ? Math.max(filledRows, 2) : scriptRows.filter((r) => String(r.dialogue ?? '').trim().length >= 2).length
+  const want = Math.max(planned, rowBased >= 2 ? rowBased : 2)
+  return Math.max(2, Math.min(materialCount, want))
 }
 
-/** AI 规划后：按叙事顺序抽取 K 条素材，供 IMS 脚本化自动成片（全局口播 + 平均分配时长） */
+/** 第 i 段分镜 → 素材下标（materialSlots[i] 语义，禁止把 slots 当成无序集合再均匀补位） */
+export function pickSmartBatchMaterialIndices(
+  materialCount: number,
+  slots: number[],
+  segmentCount: number,
+): number[] {
+  if (materialCount <= 0 || segmentCount <= 0) return []
+  if (materialCount <= segmentCount) {
+    return Array.from({ length: segmentCount }, (_, i) => i % materialCount)
+  }
+  const used = new Set<number>()
+  const out: number[] = []
+  for (let i = 0; i < segmentCount; i++) {
+    const raw = slots[i]
+    if (Number.isFinite(raw) && raw! >= 0 && raw! < materialCount && !used.has(raw!)) {
+      used.add(raw!)
+      out.push(raw!)
+      continue
+    }
+    let mi = spreadMixMaterialIndex(i, segmentCount, materialCount)
+    let guard = 0
+    while (used.has(mi) && guard++ < materialCount) {
+      mi = (mi + 1) % materialCount
+    }
+    used.add(mi)
+    out.push(mi)
+  }
+  return out
+}
+
+function padSmartBatchScriptRows(
+  rows: IceSmartBatchScriptRow[],
+  segmentCount: number,
+  targetTotalSec: number,
+): IceSmartBatchScriptRow[] {
+  const plan = planLongformAllFiveSecondDurations(targetTotalSec)
+  const ranges = scriptTimeRangesFromDurationPlan(plan.slice(0, segmentCount))
+  const base = rows.slice(0, segmentCount)
+  while (base.length < segmentCount) {
+    const prev = base[base.length - 1] ?? rows[rows.length - 1]
+    base.push({
+      timeRange: ranges[base.length] ?? '',
+      visual: prev?.visual?.trim() || '延续上一镜头，平滑过渡',
+      dialogue: prev?.dialogue?.trim() || '',
+    })
+  }
+  return base.slice(0, segmentCount).map((r, i) => ({
+    ...r,
+    timeRange: r.timeRange?.trim() ? r.timeRange : (ranges[i] ?? ''),
+  }))
+}
+
+/** AI 规划后：按叙事顺序抽取 K 条素材，供 IMS 脚本化自动成片 */
 export function buildSmartBatchSubmitPayload(input: {
   materials: IceSmartBatchMaterial[]
   scriptRows: IceSmartBatchScriptRow[]
@@ -51,32 +108,17 @@ export function buildSmartBatchSubmitPayload(input: {
   const slots = (input.materialSlots ?? []).filter(
     (n) => Number.isFinite(n) && n >= 0 && n < input.materials.length,
   )
-  const ordered: number[] = []
-  const seen = new Set<number>()
-  for (const mi of slots) {
-    if (seen.has(mi)) continue
-    seen.add(mi)
-    ordered.push(mi)
-    if (ordered.length >= segmentCount) break
-  }
-  if (ordered.length < segmentCount) {
-    for (let i = 0; i < input.materials.length && ordered.length < segmentCount; i++) {
-      const mi = Math.round((i * (input.materials.length - 1)) / Math.max(1, segmentCount - 1))
-      if (!seen.has(mi)) {
-        seen.add(mi)
-        ordered.push(mi)
-      }
-    }
-  }
-  const picked = ordered.slice(0, segmentCount).map((mi) => input.materials[mi]!)
-  const rows = input.scriptRows.slice(0, segmentCount)
-  while (rows.length < segmentCount && input.scriptRows.length > 0) {
-    rows.push(input.scriptRows[rows.length % input.scriptRows.length]!)
-  }
+  const pickedIndices = pickSmartBatchMaterialIndices(
+    input.materials.length,
+    slots,
+    segmentCount,
+  )
+  const picked = pickedIndices.map((mi) => input.materials[mi]!)
+  const rows = padSmartBatchScriptRows(input.scriptRows, segmentCount, input.targetTotalSec)
   return {
     materials: picked.length >= 2 ? picked : input.materials.slice(0, Math.max(2, segmentCount)),
     materialSlots: picked.map((_, i) => i),
-    scriptRows: rows.slice(0, segmentCount),
+    scriptRows: rows,
     segmentCount,
   }
 }
