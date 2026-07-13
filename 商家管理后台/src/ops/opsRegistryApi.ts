@@ -311,6 +311,8 @@ export type RegistryVideoAi = {
   klingApiBase?: string
   arkVideoEndpoints?: string
   arkChatEndpoints?: string
+  arkVisionEndpoints?: string
+  arkVectorEndpoints?: string
   arkVideoApiKey?: string
   iceAppId?: string
   iceAccessKeyId?: string

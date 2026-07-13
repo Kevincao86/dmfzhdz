@@ -484,6 +484,8 @@ export type RegistryFile = {
   helpManualCategories?: RegistryHelpManualCategory[]
   helpManualArticles?: RegistryHelpManualArticle[]
   teamIntro?: RegistryTeamIntro
+  /** 抖音带货等级重置月份（运营台配置） */
+  douyinSalesLevelResetYm?: string
 }
 
 export type RegistrySnapshot = RegistryFile

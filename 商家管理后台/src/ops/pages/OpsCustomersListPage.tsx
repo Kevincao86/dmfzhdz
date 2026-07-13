@@ -12,7 +12,6 @@ import { fetchRegistry, patchTenant, postManualTenant, type RegistryTenant } fro
 import { canOpsMasterDeleteCustomer, readOpsSession } from '../opsStaffAuth'
 import { useOpsModuleEdit } from '../useOpsModuleEdit'
 import {
-  fetchSupabaseTenantsForOps,
   patchSupabaseTenant,
   resetSupabaseTenantAuthPassword,
   supabaseOpsAvailableOnClient,
