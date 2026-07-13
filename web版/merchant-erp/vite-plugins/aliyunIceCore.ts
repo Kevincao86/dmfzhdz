@@ -847,6 +847,37 @@ async function waitIceVideoMediaReady(
   }
 }
 
+/** 音频 BGM：不要求视频 duration，避免误报「视频媒资入库失败」 */
+async function waitIceAudioMediaReady(
+  client: InstanceType<typeof IceClient>,
+  mediaId: string,
+  maxTries = 20,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  for (let i = 0; i < maxTries; i++) {
+    try {
+      const res = await client.getMediaInfo(new GetMediaInfoRequest({ mediaId, outputType: 'oss' }))
+      const info = bodyOf(res)?.mediaInfo as Record<string, unknown> | undefined
+      if (!info) {
+        await sleep(2500)
+        continue
+      }
+      const basic = (info.mediaBasicInfo ?? info.MediaBasicInfo) as Record<string, unknown> | undefined
+      const status = String(info.status ?? basic?.status ?? '').toLowerCase()
+      if (status.includes('fail') || status.includes('error') || status.includes('preparefail')) {
+        return { ok: false, message: `音频媒资入库失败：${status}` }
+      }
+      if (iceMediaInfoLooksReady(info)) return { ok: true }
+    } catch {
+      /* 注册初期可能尚未可查 */
+    }
+    await sleep(2500)
+  }
+  return {
+    ok: false,
+    message: 'BGM 已注册但 IMS 尚未解析完成，请稍后重试或暂时选择「无背景音乐」。',
+  }
+}
+
 function iceOssRegionFromUrl(url: string): string | undefined {
   try {
     const m = new URL(url).hostname.match(/\.oss-([a-z0-9-]+)\.aliyuncs\.com$/i)
@@ -1657,7 +1688,7 @@ export async function iceRegisterSmartBatchBgmMediaId(
   if (!url) return { ok: false, message: 'BGM 地址无效', step: 'register_bgm' }
   const reg = await registerMediaUrlToMediaId(client, cfg, url, title.slice(0, 120), 'audio')
   if (!reg.ok) return { ok: false, message: `BGM IMS 入库失败：${reg.message}`, step: 'register_bgm' }
-  const ready = await waitIceVideoMediaReady(client, reg.mediaId, 16)
+  const ready = await waitIceAudioMediaReady(client, reg.mediaId, 16)
   if (!ready.ok) return { ok: false, message: `BGM 媒资未就绪：${ready.message}`, step: 'wait_bgm' }
   return { ok: true, mediaId: reg.mediaId }
 }

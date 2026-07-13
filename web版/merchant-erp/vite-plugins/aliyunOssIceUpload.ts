@@ -213,6 +213,17 @@ function isIceOssMediaUrl(url: string): boolean {
   return /^https:\/\/[^/]+\.oss-[a-z0-9-]+\.aliyuncs\.com\//i.test(String(url || '').trim())
 }
 
+function isLikelyAudioBuffer(buf: Buffer): boolean {
+  if (buf.length < 12) return false
+  if (buf.subarray(0, 4).toString('ascii') === 'RIFF' && buf.subarray(8, 12).toString('ascii') === 'WAVE') {
+    return true
+  }
+  if (buf.subarray(0, 3).toString('ascii') === 'ID3') return true
+  if (buf[0] === 0xff && (buf[1]! & 0xe0) === 0xe0) return true
+  if (buf.subarray(4, 8).toString('ascii') === 'ftyp') return true
+  return false
+}
+
 async function mirrorExternalVideoToIceOss(
   cfg: AliyunIceConfig,
   env: Record<string, string | undefined>,
@@ -331,9 +342,18 @@ async function mirrorExternalAudioToIceOss(
     if (!res.ok) {
       return { ok: false, message: `BGM 无法下载（HTTP ${res.status}），请换一首或重新上传` }
     }
-    const ct = (res.headers.get('content-type') || 'audio/mpeg').split(';')[0]!.trim()
+    const ct = (res.headers.get('content-type') || '').split(';')[0]!.trim().toLowerCase()
     const buf = Buffer.from(await res.arrayBuffer())
     if (!buf.length) return { ok: false, message: 'BGM 文件内容为空' }
+    if (/^text\/|^application\/(json|xml|html)/.test(ct)) {
+      return {
+        ok: false,
+        message: 'BGM 链接返回的不是音频文件（可能是网页 HTML），请重新上传 MP3/WAV 或换内置 BGM',
+      }
+    }
+    if (!isLikelyAudioBuffer(buf) && !/^audio\//.test(ct)) {
+      return { ok: false, message: 'BGM 文件格式无效，请上传 MP3 / WAV / M4A' }
+    }
     if (buf.length > 20 * 1024 * 1024) {
       return { ok: false, message: 'BGM 超过 20MB，请压缩后重新上传' }
     }
