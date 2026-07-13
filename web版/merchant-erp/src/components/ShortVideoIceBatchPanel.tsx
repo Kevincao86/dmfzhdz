@@ -28,7 +28,6 @@ import {
   fetchIceSmartBatchJobStatus,
   ICE_ASPECT_PRESETS,
   postIcePipeline,
-  postIceSmartBatch,
   uploadIceLocalMediaFile,
   type IceBatchJob,
   type AliyunIceCloudConfig,
