@@ -66,9 +66,11 @@ import { analyzeIceMixMaterialsToGuidance } from '../services/iceMixGuidanceAi'
 import { produceIceMixPackage, composeMixProductionBrief, type IceMixProduceOutput } from '../services/iceMixProduceEngine'
 import type { IceMixMaterialProfile } from '../services/iceMixEditPlanAi'
 import { planMixNarrativeFromVision } from '../services/iceMixEditPlanAi'
+import { reviewMixScriptRowsWithAi } from '../services/iceMixDialogueReviewAi'
 import {
   assignMixMaterialSlots,
   buildNarrativeMatchedMixCoverage,
+  finalizeMixScriptRows,
   ensureMixScriptRowsCoverTarget,
   collectMixNarrationText,
   expandMixRowsForMaterialPool,
@@ -85,7 +87,6 @@ import {
   defaultScriptRows,
   maxScriptTimeRangeEndSec,
   parseScriptRowsFromPlainText,
-  purifyMixScriptRowsDialogue,
   resizeScriptRows,
   segmentCountFromTargetTotalSec,
   type ShortVideoScriptRow,
@@ -272,7 +273,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     ),
   )
   const applyScriptRows = useCallback((rows: ShortVideoScriptRow[]) => {
-    setScriptRows(purifyMixScriptRowsDialogue(rows))
+    setScriptRows(finalizeMixScriptRows(rows))
   }, [])
   const [materialSlots, setMaterialSlots] = useState<number[]>([])
   const [mixMaterialProfiles, setMixMaterialProfiles] = useState<IceMixMaterialProfile[]>([])
@@ -975,11 +976,18 @@ export function ShortVideoIceBatchPanel(_props: Props) {
         MIX_DEFAULT_SEGMENT_SEC,
         mixMaterialProfiles,
       )
-      applyScriptRows(coverage.rows)
+      let plannedRows = coverage.rows
+      try {
+        setHint('AI 检核口播文稿（剔除提示语、对齐画面）…')
+        plannedRows = await reviewMixScriptRowsWithAi(plannedRows, setHint)
+      } catch {
+        plannedRows = finalizeMixScriptRows(plannedRows)
+      }
+      applyScriptRows(plannedRows)
       setMaterialSlots(coverage.slots)
-      const covered = maxScriptTimeRangeEndSec(coverage.rows)
+      const covered = maxScriptTimeRangeEndSec(plannedRows)
       setHint(
-        `AI 已规划 ${coverage.rows.length} 段分镜（约 0–${covered || mixTargetSec} 秒，按叙事逻辑匹配素材）。建议先「AI 分析素材」以获得门头/产品排序。`,
+        `AI 已规划 ${plannedRows.length} 段分镜（约 0–${covered || mixTargetSec} 秒，口播已检核对齐画面）。建议先「AI 分析素材」以获得门头/产品排序。`,
       )
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'AI 规划分镜失败，请稍后重试')

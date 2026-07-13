@@ -85,7 +85,7 @@ export function ensureMixScriptRowsCoverTarget(
     })
   }
 
-  return purifyMixScriptRowsDialogue(
+  return finalizeMixScriptRows(
     base.slice(0, targetCount).map((r, i) => ({
       ...r,
       timeRange: ranges[i]!,
@@ -231,7 +231,7 @@ export function buildMixPlannerFallbackRows(
       dialogue,
     }
   })
-  return purifyMixScriptRowsDialogue(ensureSequentialMixScriptRows(rows, total))
+  return finalizeMixScriptRows(ensureSequentialMixScriptRows(rows, total))
 }
 
 /** 按目标时长 + 叙事逻辑生成 K 段分镜（K=时长/每段秒数，从素材池语义挑选，非每条素材一段） */
@@ -324,7 +324,7 @@ export function buildNarrativeMatchedMixCoverage(
   })
 
   return {
-    rows: purifyMixScriptRowsDialogue(ensureSequentialMixScriptRows(rows, total)),
+    rows: finalizeMixScriptRows(ensureSequentialMixScriptRows(rows, total)),
     slots,
   }
 }
@@ -643,17 +643,147 @@ export function mixStorefrontGuideDialogue(storeHint = ''): string {
 /** 根据画面描述生成短口播（指导文案无法拆出可读句时的回退） */
 export function deriveMixDialogueFromVisual(visual: string, fallback = '值得一看'): string {
   const v = visual.trim()
+  if (/行走|走路|脚步|人行道|腿部|石板路|走向|徒步|迈步/.test(v)) {
+    return '走，咱们进店看看！'
+  }
   if (STOREFRONT_RE.test(v)) return mixStorefrontGuideDialogue(fallback)
+  if (/生肉|原切|未烹饪|拿起.*肉|红色.*肉|带骨/.test(v) && !/熟|焦|出锅|成品/.test(v)) {
+    return '看这原切品质，新鲜度拉满！'
+  }
+  if (/配菜|煎蛋|意面|玉米|西兰花|副食/.test(v)) return '配菜也很丰富，一份超满足！'
   if (PROCESS_RE.test(v)) return '后厨现做，新鲜靠谱看得见。'
   if (PRODUCT_RE.test(v)) return '这一口鲜嫩多汁，太满足了！'
   if (EXPERIENCE_RE.test(v)) return '试吃一口，真的停不下来。'
-  if (/环境|氛围|装修|餐桌|用餐/.test(v)) return '环境氛围拉满，适合来打卡。'
+  if (/环境|氛围|装修|餐桌|用餐|全景/.test(v)) return '环境氛围拉满，适合来打卡。'
   if (CLOSING_RE.test(v) || /结束|号召/.test(v)) return '心动就行动起来，欢迎到店体验！'
   const short = sanitizeMixDialogueText(v)
   if (short.length >= 6 && short.length <= 32 && !isMixDialogueMetaInstruction(short)) {
     if (!/展示|镜头|画面|素材|段\d/.test(short)) return short.slice(0, 28)
   }
   return sanitizeMixDialogueText(fallback).slice(0, 28) || '值得一看'
+}
+
+type MixSceneTag =
+  | 'storefront'
+  | 'process'
+  | 'product_raw'
+  | 'product_cooked'
+  | 'side_dish'
+  | 'dining'
+  | 'walking'
+  | 'experience'
+  | 'closing'
+  | 'other'
+
+function tagVisualScene(visual: string): MixSceneTag[] {
+  const v = visual.trim()
+  const tags = new Set<MixSceneTag>()
+  if (/行走|走路|脚步|人行道|腿部|石板路|走向|徒步|迈步/.test(v)) tags.add('walking')
+  if (STOREFRONT_RE.test(v)) tags.add('storefront')
+  if (/生肉|原切|未烹饪|拿起.*肉|带骨红|红色.*肉/.test(v) && !/熟|焦|出锅|成品/.test(v)) {
+    tags.add('product_raw')
+  }
+  if (/配菜|煎蛋|意面|玉米|西兰花|副食/.test(v)) tags.add('side_dish')
+  if (PROCESS_RE.test(v)) tags.add('process')
+  if (PRODUCT_RE.test(v) && !tags.has('product_raw')) tags.add('product_cooked')
+  if (/环境|氛围|装修|餐桌|用餐|全景|内景/.test(v)) tags.add('dining')
+  if (EXPERIENCE_RE.test(v)) tags.add('experience')
+  if (CLOSING_RE.test(v)) tags.add('closing')
+  if (tags.size === 0) tags.add('other')
+  return [...tags]
+}
+
+function tagDialogueScene(dialogue: string): MixSceneTag[] {
+  const d = dialogue.trim()
+  const tags = new Set<MixSceneTag>()
+  if (/认准|门头|导航|进店|门店|店招/.test(d)) tags.add('storefront')
+  if (/现做|后厨|制作|烹饪|煎|炒|铁板|滋滋|淋酱/.test(d)) tags.add('process')
+  if (/原切|生肉|新鲜|食材|这块肉/.test(d)) tags.add('product_raw')
+  if (/配菜|煎蛋|意面|玉米|西兰花/.test(d)) tags.add('side_dish')
+  if (/鲜嫩|多汁|这一口|出货|摆盘|套餐|菜品|牛排/.test(d)) tags.add('product_cooked')
+  if (/环境|氛围|打卡|用餐|全景|装修/.test(d)) tags.add('dining')
+  if (/试吃|品尝|停不下来/.test(d)) tags.add('experience')
+  if (/下单|团购|欢迎到店|行动起来|体验/.test(d)) tags.add('closing')
+  if (/走.*进店|咱们进店/.test(d)) tags.add('walking')
+  if (tags.size === 0) tags.add('other')
+  return [...tags]
+}
+
+/** 口播是否与当前段画面语义一致 */
+export function isMixDialogueAlignedWithVisual(visual: string, dialogue: string): boolean {
+  const d = String(dialogue ?? '').trim()
+  if (d.length < 4 || isMixDialogueMetaInstruction(d)) return false
+
+  const vTags = tagVisualScene(visual)
+  const dTags = tagDialogueScene(d)
+  const vSet = new Set(vTags.filter((t) => t !== 'other'))
+  const dSet = new Set(dTags.filter((t) => t !== 'other'))
+
+  if (vSet.has('walking') && (dSet.has('dining') || dSet.has('side_dish') || dSet.has('closing'))) {
+    return false
+  }
+  if (vSet.has('product_raw') && dSet.has('side_dish') && !dSet.has('product_raw')) return false
+  if (vSet.has('process') && dSet.has('side_dish') && !vSet.has('side_dish')) return false
+  if (vSet.has('walking') && dSet.has('product_cooked') && !dSet.has('walking')) return false
+  if (vSet.has('product_raw') && dSet.has('dining') && !dSet.has('product_raw')) return false
+
+  if (vSet.size === 0 || dSet.size === 0) return true
+
+  for (const t of vSet) {
+    if (dSet.has(t)) return true
+  }
+
+  const related: Partial<Record<MixSceneTag, MixSceneTag[]>> = {
+    process: ['product_cooked', 'product_raw'],
+    product_raw: ['process', 'product_cooked'],
+    product_cooked: ['process', 'product_raw', 'experience'],
+    storefront: ['walking', 'closing'],
+    walking: ['storefront'],
+    dining: ['experience', 'closing'],
+    experience: ['product_cooked', 'dining'],
+    closing: ['dining', 'storefront', 'experience'],
+  }
+  for (const vt of vSet) {
+    const rel = related[vt] ?? []
+    for (const dt of dSet) {
+      if (rel.includes(dt)) return true
+    }
+  }
+  return false
+}
+
+/** 强制将单行口播与画面对齐 */
+export function alignMixScriptRowDialogueToVisual(row: ShortVideoScriptRow, hook = '值得一看'): ShortVideoScriptRow {
+  const visual = String(row.visual ?? '').trim()
+  let dialogue = String(row.dialogue ?? '').trim()
+  const cleaned = sanitizeMixDialogueText(dialogue)
+  const speakable =
+    cleaned.length >= 4 &&
+    !isMixDialogueMetaInstruction(cleaned) &&
+    !isMixDialogueMetaInstruction(dialogue)
+  if (speakable && isMixDialogueAlignedWithVisual(visual, cleaned)) {
+    return { ...row, dialogue: cleaned.slice(0, 120) }
+  }
+  return {
+    ...row,
+    dialogue: deriveMixDialogueFromVisual(visual, hook).slice(0, 120),
+  }
+}
+
+/** 分镜表口播终检：剔除提示语 + 强制与画面对齐 */
+export function alignMixScriptRowsToVisual(
+  rows: ShortVideoScriptRow[],
+  hook = '探店实拍，值得期待',
+): ShortVideoScriptRow[] {
+  return rows.map((r) => alignMixScriptRowDialogueToVisual(r, hook))
+}
+
+/** 规划出口统一终检（purify + 画面对齐） */
+export function finalizeMixScriptRows(
+  rows: ShortVideoScriptRow[],
+  hook = '探店实拍，值得期待',
+): ShortVideoScriptRow[] {
+  return alignMixScriptRowsToVisual(purifyMixScriptRowsDialogue(rows), hook)
 }
 
 /** 将 AI/回退口播规范为可 TTS 朗读的短句 */
@@ -669,7 +799,13 @@ export function resolveMixSegmentDialogue(opts: {
     /* 指导文案摘要/提示语，不得进入口播列 */
   } else {
     const cleaned = sanitizeMixDialogueText(raw)
-    if (cleaned.length >= 4 && !isMixDialogueMetaInstruction(cleaned)) return cleaned.slice(0, 120)
+    if (
+      cleaned.length >= 4 &&
+      !isMixDialogueMetaInstruction(cleaned) &&
+      isMixDialogueAlignedWithVisual(opts.visual, cleaned)
+    ) {
+      return cleaned.slice(0, 120)
+    }
   }
 
   const speakable = opts.guidanceLines
@@ -677,7 +813,9 @@ export function resolveMixSegmentDialogue(opts: {
     .map((l) => sanitizeMixDialogueText(l))
     .filter((l) => l.length >= 4 && !isMixDialogueMetaInstruction(l))
   const fromGuidance = speakable[opts.lineIndex % Math.max(1, speakable.length)]
-  if (fromGuidance) return fromGuidance.slice(0, 120)
+  if (fromGuidance && isMixDialogueAlignedWithVisual(opts.visual, fromGuidance)) {
+    return fromGuidance.slice(0, 120)
+  }
 
   return deriveMixDialogueFromVisual(opts.visual, opts.hook).slice(0, 120)
 }

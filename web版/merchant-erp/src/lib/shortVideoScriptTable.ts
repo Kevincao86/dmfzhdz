@@ -848,6 +848,18 @@ export function isMixDialogueMetaInstruction(text: string): boolean {
   if (/^(?:镜头|画面|本段|此段|该段)(?:展示|呈现|突出|强调|说明)/.test(raw)) return true
   if (/须(?:与|和).*(?:画面|视觉|镜头).*(?:匹配|对应|一致)/.test(raw)) return true
 
+  // 收尾/转化编导指令（「最后以用餐全景收尾，结合口播强调…引导用户」类）
+  if (/^最后以/.test(raw) && /收尾|结合|引导|强调|口播/.test(raw)) return true
+  if (/以.{2,20}收尾/.test(raw) && /结合|引导|强调|口播|下单/.test(raw)) return true
+  if (/结合口播/.test(raw)) return true
+  if (/口播强调/.test(raw)) return true
+  if (/引导用户/.test(raw)) return true
+  if (/并引导/.test(raw) && /下单|体验|到店|团购/.test(raw)) return true
+  if (/^他们(?:注重|关注|追求|强调)/.test(raw)) return true
+  if (/目标受众|使用场景|商业创意方向/.test(raw) && !/[我你您来这]/.test(raw)) return true
+  if (/用餐全景/.test(raw) && /最后以|结合|引导|收尾/.test(raw)) return true
+  if (/现点现做/.test(raw) && /最后以|结合口播|引导用户|收尾/.test(raw)) return true
+
   // 指导文案整段摘要（「这是一支以…为主题的短视频…」类提示语）
   if (/这是一支以.+为主题的短视频/.test(raw)) return true
   if (/本(支|条|个)?短视频/.test(raw) && /主题|重点展示|目标受众|旨在|目的在于|为核心/.test(raw)) {
@@ -889,6 +901,8 @@ function isMixDialogueMetaInstructionInner(cleaned: string, rawOriginal: string)
   if (/^开篇以/.test(cleaned)) return true
   if (/以.{2,28}引入/.test(cleaned)) return true
   if (/并通过(?:门店|位置|画面|镜头|招牌)/.test(cleaned)) return true
+  if (/^最后以/.test(cleaned) && /收尾|结合|引导/.test(cleaned)) return true
+  if (/结合口播|引导用户|口播强调/.test(cleaned)) return true
   return false
 }
 
