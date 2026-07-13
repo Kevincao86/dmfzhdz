@@ -15,6 +15,7 @@ import { type OpenAiCompatMessage } from './providers/openAiCompatibleFetch.js'
 import { openAiCompatChatStream, type OpenAiStreamDelta } from './openAiCompatStream.js'
 import { toOpenAiChatCompletionMessages } from './openAiChatMessages.js'
 import { streamBuiltinAgentChatFromMessages } from '../merchantAiUpstream.js'
+import { isQuotaHopableError } from '../../src/lib/vendorModelPool.js'
 
 export type AiStreamDeltaHandler = (delta: OpenAiStreamDelta) => void
 
@@ -219,16 +220,43 @@ export async function routeAiChatStream(
     }
     case 'qwen':
     case 'doubao': {
-      const r = await streamBuiltinAgentChatFromMessages(
-        env,
-        req.provider,
-        req.model,
-        req.messages,
-        wrap,
-        signal,
-      )
-      modelUsed = r.modelUsed
-      break
+      const primary = req.provider
+      const alternate: 'doubao' | 'qwen' = primary === 'doubao' ? 'qwen' : 'doubao'
+      let primaryErr = ''
+      try {
+        const r = await streamBuiltinAgentChatFromMessages(
+          env,
+          primary,
+          req.model,
+          req.messages,
+          wrap,
+          signal,
+        )
+        modelUsed = r.modelUsed
+        break
+      } catch (e) {
+        primaryErr = e instanceof Error ? e.message : String(e)
+        if (!isQuotaHopableError(primaryErr)) throw e
+      }
+      try {
+        const r = await streamBuiltinAgentChatFromMessages(
+          env,
+          alternate,
+          undefined,
+          req.messages,
+          wrap,
+          signal,
+        )
+        modelUsed = r.modelUsed
+        break
+      } catch (e) {
+        const altErr = e instanceof Error ? e.message : String(e)
+        throw new Error(
+          `${primaryErr}；${primary === 'doubao' ? '豆包' : '通义千问'}已自动切换${
+            alternate === 'doubao' ? '豆包' : '通义千问'
+          }仍失败：${altErr}`,
+        )
+      }
     }
     default:
       throw new Error(`unknown provider: ${String(req.provider)}`)
