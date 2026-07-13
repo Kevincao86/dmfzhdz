@@ -812,18 +812,41 @@ export function sanitizeMixDialogueText(raw: string): string {
   return s.trim().replace(/\s{2,}/g, ' ').slice(0, 120)
 }
 
-/** 是否为编导备注/结构标签，不宜作为 TTS 口播 */
+/** 是否为编导备注/结构标签/项目说明，不宜作为 TTS 口播 */
 export function isMixDialogueMetaInstruction(text: string): boolean {
-  const raw = text.trim()
+  const raw = String(text ?? '').trim()
   if (raw.length < 4) return true
-  if (/^(?:商业创意|核心卖点|目标受众|镜头与|叙事节奏|本段|成片|须逐|规划要求)/.test(raw)) return true
+  if (/^(?:商业创意|核心卖点|目标受众|镜头与|叙事节奏|本段|成片|须逐|规划要求|指导文案|项目说明|视频主题)/.test(raw)) {
+    return true
+  }
   if (/^叙事节奏由.+过渡到/.test(raw)) return true
   if (/^核心卖点[：:]/.test(raw)) return true
+
+  // 指导文案整段摘要（「这是一支以…为主题的短视频…」类提示语）
+  if (/这是一支以.+为主题的短视频/.test(raw)) return true
+  if (/本(支|条|个)?短视频/.test(raw) && /主题|重点展示|目标受众|旨在|目的在于/.test(raw)) {
+    return true
+  }
+  if (/重点展示.+与.+/.test(raw) && /吸引|目标受众|种草|探店|卖相|门店/.test(raw)) return true
+  if (/吸引目标受众/.test(raw)) return true
+  if (/主题为[「"“]/.test(raw)) return true
+  if (/(?:本片|该条|这支).*(?:旨在|目的在于|用于|展示)/.test(raw)) return true
+  if (/短视频[，,].{4,}(?:重点|展示|吸引)/.test(raw)) return true
+  if (/前往门店体验/.test(raw) && !/[我你您来走认准进]/.test(raw)) return true
+  if (
+    raw.length > 28 &&
+    /(?:短视频|主题|目标受众|重点展示|卖点|种草|探店|门店体验|制作过程|诱人卖相)/.test(raw) &&
+    !/[我你您咱来走进认准今天这家必须安利]/.test(raw)
+  ) {
+    return true
+  }
+
   const s = sanitizeMixDialogueText(raw)
   return s.length < 4
 }
 
 function pushUniqueDialogueLine(out: string[], line: string): void {
+  if (isMixDialogueMetaInstruction(line)) return
   const s = sanitizeMixDialogueText(line)
   if (s.length < 4 || isMixDialogueMetaInstruction(s)) return
   if (!out.includes(s)) out.push(s)
@@ -852,20 +875,39 @@ export function dialogueLinesFromGuidance(guidance: string): string[] {
   }
 
   if (out.length >= 1) return out
-  const fb = sanitizeMixDialogueText(t.replace(/\s+/g, ' ').slice(0, 100))
-  return fb.length >= 4 && !isMixDialogueMetaInstruction(fb) ? [fb] : []
+  return []
 }
 
-/** 分镜表口播列统一清洗（避免指导文案标签进入 TTS） */
-export function sanitizeMixScriptRowsDialogue(rows: ShortVideoScriptRow[]): ShortVideoScriptRow[] {
+/** 根据画面描述生成兜底口播（禁止回退为指导文案摘要） */
+function fallbackSpeakableDialogueFromVisual(visual: string): string {
+  let v = String(visual ?? '').trim()
+  v = v.replace(/^门店门头\/环境[：:]\s*/, '')
+  v = v.replace(/^画面展示[了]?\s*/, '')
+  v = v.replace(/\*+/g, '')
+  const core = v.slice(0, 32).trim()
+  if (core.length >= 6) return `${core}，实拍细节很抓人。`
+  return '这一幕实拍很带感，继续往下看。'
+}
+
+/** 分镜表口播列统一清洗：剔除提示语/编导说明，只保留可朗读口播稿 */
+export function purifyMixScriptRowsDialogue(rows: ShortVideoScriptRow[]): ShortVideoScriptRow[] {
   return rows.map((r) => {
-    const dialogue = sanitizeMixDialogueText(r.dialogue)
+    const raw = String(r.dialogue ?? '').trim()
+    const cleaned = sanitizeMixDialogueText(raw)
+    const ok =
+      cleaned.length >= 4 &&
+      !isMixDialogueMetaInstruction(cleaned) &&
+      !isMixDialogueMetaInstruction(raw)
     return {
       ...r,
-      dialogue:
-        dialogue.length >= 4 && !isMixDialogueMetaInstruction(dialogue) ? dialogue : r.dialogue,
+      dialogue: ok ? cleaned.slice(0, 120) : fallbackSpeakableDialogueFromVisual(r.visual),
     }
   })
+}
+
+/** @deprecated 使用 purifyMixScriptRowsDialogue */
+export function sanitizeMixScriptRowsDialogue(rows: ShortVideoScriptRow[]): ShortVideoScriptRow[] {
+  return purifyMixScriptRowsDialogue(rows)
 }
 
 /** AI 规划后补全空白画面/口播（混剪场景：后续会按素材数扩展） */
@@ -873,15 +915,22 @@ export function fillBlankScriptRowsFromGuidance(
   rows: ShortVideoScriptRow[],
   guidance: string,
 ): ShortVideoScriptRow[] {
-  const lines = dialogueLinesFromGuidance(guidance)
-  const hook = lines[0] || guidance.trim().slice(0, 48) || '精彩片段，值得一看'
-  const visHint = guidance.trim().slice(0, 60) || '展示实拍画面'
+  const lines = dialogueLinesFromGuidance(guidance).filter((l) => !isMixDialogueMetaInstruction(l))
+  const hook = lines[0] || '实拍很精彩，继续往下看'
+  const visHint = '展示实拍画面'
   return rows.map((r, i) => {
     const existing = sanitizeMixDialogueText(r.dialogue)
+    const existingOk =
+      existing.length >= 3 &&
+      !isMixDialogueMetaInstruction(existing) &&
+      !isMixDialogueMetaInstruction(r.dialogue)
+    const candidate = existingOk
+      ? existing
+      : (lines[i % Math.max(1, lines.length)] || hook).slice(0, 120)
     const filled =
-      existing.length >= 3 && !isMixDialogueMetaInstruction(existing)
-        ? existing
-        : (lines[i % Math.max(1, lines.length)] || hook).slice(0, 120)
+      candidate.length >= 4 && !isMixDialogueMetaInstruction(candidate)
+        ? candidate
+        : fallbackSpeakableDialogueFromVisual(r.visual)
     return {
       ...r,
       visual: r.visual.trim().length >= 3 ? r.visual : `${visHint}（段${i + 1}）`,

@@ -5,6 +5,7 @@ import {
   maxScriptTimeRangeEndSec,
   parseScriptTimeRangeSeconds,
   dialogueLinesFromGuidance,
+  purifyMixScriptRowsDialogue,
   sanitizeMixDialogueText,
   isMixDialogueMetaInstruction,
   planLongformAllFiveSecondDurations,
@@ -83,12 +84,14 @@ export function ensureMixScriptRowsCoverTarget(
     })
   }
 
-  return base.slice(0, targetCount).map((r, i) => ({
-    ...r,
-    timeRange: ranges[i]!,
-    visual: r.visual.trim() || '展示实拍画面',
-    dialogue: r.dialogue.trim(),
-  }))
+  return purifyMixScriptRowsDialogue(
+    base.slice(0, targetCount).map((r, i) => ({
+      ...r,
+      timeRange: ranges[i]!,
+      visual: r.visual.trim() || '展示实拍画面',
+      dialogue: r.dialogue.trim(),
+    })),
+  )
 }
 
 /** 去掉签名参数，用于判断是否为同一条 OSS 素材 */
@@ -207,7 +210,7 @@ export function buildMixPlannerFallbackRows(
     Math.max(6, lines.length >= 6 ? Math.min(lines.length, 12) : Math.ceil(total / 3)),
   )
   const each = total / segmentCount
-  const hook = lines[0] || guidance.trim().slice(0, 48) || '精彩片段'
+  const hook = lines.find((l) => !isMixDialogueMetaInstruction(l)) || '精彩片段'
 
   const rows = Array.from({ length: segmentCount }, (_, i) => {
     const start = Math.round(i * each * 10) / 10
@@ -227,7 +230,7 @@ export function buildMixPlannerFallbackRows(
       dialogue,
     }
   })
-  return ensureSequentialMixScriptRows(rows, total)
+  return purifyMixScriptRowsDialogue(ensureSequentialMixScriptRows(rows, total))
 }
 
 /** 按目标时长 + 叙事逻辑生成 K 段分镜（K=时长/每段秒数，从素材池语义挑选，非每条素材一段） */
@@ -254,7 +257,7 @@ export function buildNarrativeMatchedMixCoverage(
   const total = Math.max(5, Math.ceil(targetTotalSec))
   const each = total / n
   const guidanceLines = dialogueLinesFromGuidance(guidance)
-  const hook = guidanceLines[0] || guidance.trim().slice(0, 48) || '精彩片段'
+  const hook = guidanceLines.find((l) => !isMixDialogueMetaInstruction(l)) || '精彩片段'
   const dialogues = sourceRows
     .map((r) => r.dialogue.trim())
     .filter((d) => d.length >= 2 && !/^（无口播）$/i.test(d))
@@ -318,7 +321,7 @@ export function buildNarrativeMatchedMixCoverage(
   })
 
   return {
-    rows: ensureSequentialMixScriptRows(rows, total),
+    rows: purifyMixScriptRowsDialogue(ensureSequentialMixScriptRows(rows, total)),
     slots,
   }
 }
@@ -338,7 +341,7 @@ export function buildAllMaterialCoverageRows(
     .filter((d) => d.length >= 2 && !/^（无口播）$/i.test(d))
   const guidanceLines = dialogueLinesFromGuidance(guidance)
   const visuals = sourceRows.map((r) => r.visual.trim()).filter((v) => v.length >= 2)
-  const hook = guidanceLines[0] || guidance.trim().slice(0, 48) || '精彩片段'
+  const hook = guidanceLines.find((l) => !isMixDialogueMetaInstruction(l)) || '精彩片段'
 
   const rows = Array.from({ length: n }, (_, i) => {
     const start = Math.round(i * clipSec * 10) / 10
@@ -652,10 +655,16 @@ export function resolveMixSegmentDialogue(opts: {
   lineIndex: number
   hook: string
 }): string {
-  const cleaned = sanitizeMixDialogueText(opts.rawDialogue)
-  if (cleaned.length >= 4 && !isMixDialogueMetaInstruction(cleaned)) return cleaned.slice(0, 120)
+  const raw = String(opts.rawDialogue ?? '').trim()
+  if (raw && isMixDialogueMetaInstruction(raw)) {
+    /* 指导文案摘要/提示语，不得进入口播列 */
+  } else {
+    const cleaned = sanitizeMixDialogueText(raw)
+    if (cleaned.length >= 4 && !isMixDialogueMetaInstruction(cleaned)) return cleaned.slice(0, 120)
+  }
 
   const speakable = opts.guidanceLines
+    .filter((l) => !isMixDialogueMetaInstruction(l))
     .map((l) => sanitizeMixDialogueText(l))
     .filter((l) => l.length >= 4 && !isMixDialogueMetaInstruction(l))
   const fromGuidance = speakable[opts.lineIndex % Math.max(1, speakable.length)]

@@ -35,7 +35,9 @@ import {
   dialogueLinesFromGuidance,
   parseScriptTimeRangeSeconds,
   planLongformAllFiveSecondDurations,
+  purifyMixScriptRowsDialogue,
   sanitizeMixDialogueText,
+  isMixDialogueMetaInstruction,
   scriptTimeRangesFromDurationPlan,
   type ShortVideoScriptRow,
 } from '../lib/shortVideoScriptTable'
@@ -668,7 +670,7 @@ const NARRATIVE_TEXT_PLAN_SYSTEM = `你是专业短视频混剪导演（探店/�
    模式A：门头/门店指引(开场) → 套餐/产品/制作过程(中段) → 结束语/行动号召(收尾)
    模式B：产品/套餐卖点钩子(开场) → 制作/试吃体验(中段) → 门头/到店指引(倒数第二段) → 结束语(收尾)
 4. 每段 visual（画面描述，给剪辑看）与 dialogue（口播台词，给观众听）语义一致
-5. dialogue 必须是可直接 TTS 朗读的短句（每段 12～28 字），禁止出现「核心卖点」「叙事节奏」「商业创意」「目标受众」等编导结构标签；禁止照搬指导文案整段或编号列表
+5. dialogue 必须是可直接 TTS 朗读的第一人称/现场旁白短句（每段 12～28 字），禁止指导文案摘要与提示语（如「这是一支以…为主题的短视频」）；禁止「核心卖点」「叙事节奏」「目标受众」等编导标签；禁止照搬指导文案整段
 6. visual 写该段画面内容；dialogue 写该段旁白，须与 visual 同一段画面匹配（门头段只讲到店指引/门店信息）
 7. segmentIndex 从 0 连续递增，表示成片时间轴顺序
 
@@ -697,8 +699,10 @@ function normalizeNarrativeSegmentDialogues(
   segments: MixNarrativeSegment[],
   guidance: string,
 ): MixNarrativeSegment[] {
-  const guidanceLines = dialogueLinesFromGuidance(guidance)
-  const hook = sanitizeMixDialogueText(guidance.slice(0, 48)) || '探店好物推荐'
+  const guidanceLines = dialogueLinesFromGuidance(guidance).filter(
+    (l) => !isMixDialogueMetaInstruction(l),
+  )
+  const hook = guidanceLines[0] || '探店实拍，值得期待'
   return segments.map((s, i) => ({
     ...s,
     dialogue: resolveMixSegmentDialogue({
@@ -743,7 +747,11 @@ function parseNarrativePlanJson(
     const segmentIndex = Number(o.segmentIndex)
     const materialIndex = Number(o.materialIndex)
     const visual = String(o.visual ?? '').trim()
-    const dialogue = sanitizeMixDialogueText(String(o.dialogue ?? '').trim())
+    const dialogueRaw = String(o.dialogue ?? '').trim()
+    let dialogue = sanitizeMixDialogueText(dialogueRaw)
+    if (isMixDialogueMetaInstruction(dialogueRaw) || isMixDialogueMetaInstruction(dialogue)) {
+      dialogue = ''
+    }
     if (!Number.isFinite(segmentIndex) || segmentIndex < 0) continue
     if (!Number.isFinite(materialIndex) || materialIndex < 0) continue
     if (visual.length < 2 && dialogue.length < 2) continue
@@ -838,7 +846,7 @@ function narrativeSegmentsToRows(
     visual: s.visual.trim(),
     dialogue: s.dialogue.trim(),
   }))
-  return ensureSequentialMixScriptRows(rows, total)
+  return purifyMixScriptRowsDialogue(ensureSequentialMixScriptRows(rows, total))
 }
 
 function narrativeSegmentsToDecisions(segments: MixNarrativeSegment[]): MixEditSegmentDecision[] {
