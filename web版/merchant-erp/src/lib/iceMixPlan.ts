@@ -330,6 +330,25 @@ export function collectMixNarrationText(
   )
 }
 
+/** 素材池裁剪后：按分镜行下标重映射 materialSlots，被剔除的位用均匀抽样补位（禁止 filter 丢段） */
+export function remapMixMaterialSlotsForSubset(
+  slots: number[],
+  rowCount: number,
+  poolLen: number,
+  remapIndex: (oldIndex: number) => number,
+): number[] {
+  const count = Math.max(rowCount, slots.length)
+  if (count <= 0 || poolLen <= 0) return []
+  return Array.from({ length: count }, (_, i) => {
+    const raw = slots[i]
+    if (raw != null && raw >= 0) {
+      const remapped = remapIndex(raw)
+      if (remapped >= 0 && remapped < poolLen) return remapped
+    }
+    return spreadMixMaterialIndex(i, count, poolLen)
+  })
+}
+
 /** 在素材池中均匀取第 i 段应对应的下标（段数少于素材数时避免总用前几条） */
 export function spreadMixMaterialIndex(
   segmentIndex: number,

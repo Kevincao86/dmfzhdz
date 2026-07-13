@@ -22,12 +22,16 @@ import { resolveImsBatchSpeechVoice } from '../src/lib/digitalHumanBroadcast.js'
 import {
   buildMixSpeakableNarration,
   parseScriptTimeRangeSeconds,
+  planLongformAllFiveSecondDurations,
   sanitizeMixDialogueText,
+  scriptTimeRangesFromDurationPlan,
 } from '../src/lib/shortVideoScriptTable.js'
 import { resolveIceMixBgmUrl } from '../src/lib/iceMixBgmPresets.js'
 import {
   type IceSmartBatchMaterial,
   type IceSmartBatchScriptRow,
+  pickSmartBatchMaterialIndices,
+  pickSmartBatchSegmentCount,
 } from '../src/lib/iceSmartBatchPlan.js'
 import {
   type AliyunIceConfig,
@@ -114,65 +118,45 @@ function buildSmartBatchNarration(
 
 export { buildSmartBatchSubmitPayload, type IceSmartBatchMaterial, type IceSmartBatchScriptRow } from '../src/lib/iceSmartBatchPlan.js'
 
-function pickSmartBatchSegmentCount(
-  scriptRows: IceSmartBatchScriptRow[],
-  materialCount: number,
-  targetTotalSec: number,
-): number {
-  const planned = Math.max(2, Math.ceil(targetTotalSec / 5))
-  const filledRows = scriptRows.filter(
-    (r) =>
-      String(r.visual ?? '').trim().length >= 4 ||
-      String(r.dialogue ?? '').trim().length >= 2,
-  ).length
-  if (filledRows >= 2) {
-    return Math.min(Math.max(filledRows, 2), materialCount, scriptRows.length || planned)
-  }
-  const rowCount = scriptRows.filter((r) => String(r.dialogue ?? '').trim().length >= 2).length
-  if (rowCount >= 2) return Math.min(rowCount, materialCount)
-  return Math.max(2, Math.min(materialCount, planned))
-}
-
-function pickSmartBatchMaterialIndices(
-  materialCount: number,
-  slots: number[],
+function padSmartBatchRowsForTarget(
+  rows: IceSmartBatchScriptRow[],
   segmentCount: number,
-): number[] {
-  if (materialCount <= segmentCount) {
-    return Array.from({ length: materialCount }, (_, i) => i)
+  targetTotalSec: number,
+): IceSmartBatchScriptRow[] {
+  const plan = planLongformAllFiveSecondDurations(targetTotalSec)
+  const ranges = scriptTimeRangesFromDurationPlan(plan.slice(0, segmentCount))
+  const base = rows.slice(0, segmentCount)
+  while (base.length < segmentCount) {
+    const prev = base[base.length - 1] ?? rows[rows.length - 1]
+    base.push({
+      timeRange: ranges[base.length] ?? '',
+      visual: prev?.visual?.trim() || '延续上一镜头，平滑过渡',
+      dialogue: prev?.dialogue?.trim() || '',
+    })
   }
-  const ordered: number[] = []
-  const seen = new Set<number>()
-  for (const mi of slots) {
-    if (mi < 0 || mi >= materialCount || seen.has(mi)) continue
-    seen.add(mi)
-    ordered.push(mi)
-    if (ordered.length >= segmentCount) break
-  }
-  if (ordered.length >= segmentCount) {
-    return ordered.slice(0, segmentCount)
-  }
-  if (slots.length >= segmentCount) {
-    const picked = slots.slice(0, segmentCount).filter((mi) => mi >= 0 && mi < materialCount)
-    if (picked.length >= 2) return picked
-  }
-  const out: number[] = []
-  for (let i = 0; i < segmentCount; i++) {
-    const mi = Math.round((i * (materialCount - 1)) / Math.max(1, segmentCount - 1))
-    out.push(mi)
-  }
-  return out.length >= 2 ? out : Array.from({ length: Math.max(2, segmentCount) }, (_, i) => i)
+  return base.slice(0, segmentCount).map((r, i) => ({
+    ...r,
+    timeRange: r.timeRange?.trim() ? r.timeRange : (ranges[i] ?? ''),
+  }))
 }
 
 function segmentDurationFromRow(
   row: IceSmartBatchScriptRow | undefined,
   fallbackSec: number,
+  targetTotalSec: number,
+  segmentIndex: number,
+  segmentCount: number,
 ): number {
   const range = parseScriptTimeRangeSeconds(String(row?.timeRange ?? ''))
   if (range && range.end > range.start) {
     return Math.max(2, Math.min(15, range.end - range.start))
   }
-  return Math.max(2, Math.min(8, fallbackSec))
+  const each = targetTotalSec / Math.max(1, segmentCount)
+  if (segmentIndex === segmentCount - 1) {
+    const prevTotal = each * (segmentCount - 1)
+    return Math.max(2, Math.min(15, Math.round((targetTotalSec - prevTotal) * 100) / 100))
+  }
+  return Math.max(2, Math.min(8, Math.round(each * 100) / 100 || fallbackSec))
 }
 
 function buildDefaultEditingConfig(
@@ -235,7 +219,11 @@ function buildInputConfig(input: {
     targetTotalSec,
   )
   const pickedIndices = pickSmartBatchMaterialIndices(materialCount, slots, segmentCount)
-  const rows = input.scriptRows.slice(0, pickedIndices.length)
+  const rows = padSmartBatchRowsForTarget(
+    input.scriptRows.slice(0, segmentCount),
+    segmentCount,
+    targetTotalSec,
+  )
   const defaultSegSec = Math.max(
     3,
     Math.min(5, Math.round((targetTotalSec / Math.max(1, pickedIndices.length)) * 100) / 100),
@@ -249,16 +237,16 @@ function buildInputConfig(input: {
     }
     const row = rows[i]
     const dialogue = sanitizeMixDialogueText(String(row?.dialogue ?? '')).trim()
+    const segDur = segmentDurationFromRow(row, defaultSegSec, targetTotalSec, i, pickedIndices.length)
     const group: Record<string, unknown> = {
       GroupName: `storyboard-${i}`,
       MediaArray: [mediaId],
       SplitMode: 'NoSplit',
       Volume: 0,
+      Duration: Math.round(segDur * 100) / 100,
     }
     if (dialogue.length >= 2 && !isPlaceholderDialogue(dialogue)) {
       group.SpeechTextArray = [dialogue.slice(0, 200)]
-    } else {
-      group.Duration = segmentDurationFromRow(row, defaultSegSec)
     }
     return group
   })

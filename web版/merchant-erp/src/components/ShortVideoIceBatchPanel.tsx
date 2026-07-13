@@ -72,6 +72,7 @@ import {
   assignMixMaterialSlots,
   buildNarrativeMatchedMixCoverage,
   filterMixPromotionRelevantIndices,
+  remapMixMaterialSlotsForSubset,
   subsetMixMaterialPoolByIndices,
   finalizeMixScriptRows,
   formatMixPromoPlanningBlock,
@@ -1475,7 +1476,15 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     )
     const subset = subsetMixMaterialPoolByIndices(mixMaterialPool, workingProfiles, keepIndices)
     let produceMaterials = subset.materials
-    let produceSlots = workingSlots.map((mi) => subset.remapIndex(mi)).filter((mi) => mi >= 0)
+    let produceSlots =
+      subset.materials.length < mixMaterialPool.length
+        ? remapMixMaterialSlotsForSubset(
+            workingSlots,
+            workingRows.length,
+            subset.materials.length,
+            subset.remapIndex,
+          )
+        : workingSlots
     if (produceMaterials.length < 2) {
       produceMaterials = mixMaterialPool
       produceSlots = workingSlots
