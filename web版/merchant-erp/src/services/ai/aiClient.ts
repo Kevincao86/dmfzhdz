@@ -417,6 +417,11 @@ export async function postAiAgentNativeImage(
     referenceImageDataUrl?: string
     imageRoute?: 'builtin' | 'tokenmix'
     tokenmixImageModel?: string
+    exactPrompt?: boolean
+    wanxSize?: string
+    aspectRatio?: '1:1' | '3:4' | '4:3' | '9:16' | '16:9'
+    doubaoSize?: '1K' | '2K' | '4K'
+    preferWanxPosterModel?: boolean
     signal?: AbortSignal
   },
 ): Promise<AiAgentNativeImageOk | AiAgentNativeImageErr> {
@@ -438,6 +443,12 @@ export async function postAiAgentNativeImage(
   if (opts?.imageRoute === 'tokenmix') body.image_route = 'tokenmix'
   const tim = opts?.tokenmixImageModel?.trim()
   if (tim) body.tokenmix_image_model = tim
+  if (opts?.exactPrompt) body.exact_prompt = true
+  const ws = opts?.wanxSize?.trim()
+  if (ws) body.wanx_size = ws
+  if (opts?.aspectRatio) body.aspect_ratio = opts.aspectRatio
+  if (opts?.doubaoSize) body.doubao_size = opts.doubaoSize
+  if (opts?.preferWanxPosterModel) body.prefer_wanx_poster = true
   if (tenantId) body.tenantId = tenantId
 
   for (const p of tryPaths) {

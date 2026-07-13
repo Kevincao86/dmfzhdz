@@ -9,6 +9,7 @@ import MembershipPlanSync from './components/MembershipPlanSync'
 import MeooLayout from './components/MeooLayout'
 import RequireSupabaseAuth from './components/RequireSupabaseAuth'
 import AiAgentPage from './pages/AiAgentPage'
+import AiImageStudioPage from './pages/AiImageStudioPage'
 import AiOperationContentPage from './pages/AiOperationContentPage'
 import BriefContentShell from './pages/BriefContentShell'
 import BriefGenRecordsPage from './pages/BriefGenRecordsPage'
@@ -120,6 +121,7 @@ export default function App() {
           <Route path="reviews/product" element={<Navigate to="/reviews?kind=product" replace />} />
           <Route path="geo" element={<GeoPage />} />
           <Route path="operation/competitors" element={<CompetitorAnalysisPage />} />
+          <Route path="ai-image" element={<AiImageStudioPage />} />
           <Route
             path="ai-operation/article"
             element={

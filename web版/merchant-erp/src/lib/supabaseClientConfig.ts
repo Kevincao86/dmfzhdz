@@ -38,9 +38,38 @@ function readViteClientEnv(key: 'VITE_SUPABASE_URL' | 'VITE_SUPABASE_ANON_KEY'):
   return readNodeProcessEnv(key)
 }
 
+const CLIENT_CONFIG_SESSION_KEY = 'meoo_client_runtime_config_v1'
+
+function readSessionStoredConfig(): MeooClientRuntimeConfig {
+  if (typeof window === 'undefined') return {}
+  try {
+    const raw = sessionStorage.getItem(CLIENT_CONFIG_SESSION_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as MeooClientRuntimeConfig
+    return {
+      supabaseUrl: typeof parsed.supabaseUrl === 'string' ? parsed.supabaseUrl.trim() : undefined,
+      supabaseAnonKey: typeof parsed.supabaseAnonKey === 'string' ? parsed.supabaseAnonKey.trim() : undefined,
+    }
+  } catch {
+    return {}
+  }
+}
+
+function persistRuntimeConfig(cfg: MeooClientRuntimeConfig): void {
+  if (typeof window === 'undefined') return
+  window.__MEOO_CLIENT_CONFIG__ = cfg
+  try {
+    sessionStorage.setItem(CLIENT_CONFIG_SESSION_KEY, JSON.stringify(cfg))
+  } catch {
+    /* private mode / quota */
+  }
+}
+
 function readRuntimeConfig(): MeooClientRuntimeConfig {
   if (typeof window === 'undefined') return {}
-  return window.__MEOO_CLIENT_CONFIG__ ?? {}
+  const fromWindow = window.__MEOO_CLIENT_CONFIG__
+  if (fromWindow?.supabaseAnonKey?.trim()) return fromWindow
+  return readSessionStoredConfig()
 }
 
 /** cs/fws 等子域 Nginx 已反代 /auth/v1、/rest/v1，同源最稳 */
@@ -106,10 +135,10 @@ export async function fetchAndApplyEcsClientConfig(): Promise<boolean> {
       supabaseAnonKey?: string
     }
     if (!res.ok || j.ok === false || !j.supabaseAnonKey?.trim()) return false
-    window.__MEOO_CLIENT_CONFIG__ = {
+    persistRuntimeConfig({
       supabaseUrl: j.supabaseUrl?.trim() || defaultEcsBrowserSupabaseUrl() || undefined,
       supabaseAnonKey: j.supabaseAnonKey.trim(),
-    }
+    })
     return true
   } catch {
     return false
