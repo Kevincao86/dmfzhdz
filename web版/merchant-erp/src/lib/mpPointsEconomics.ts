@@ -48,6 +48,20 @@ export const MP_POINTS_BRIEF_PER_USE = 8
 /** AI 混剪素材分析：15 积分/次（多模态采样 + 指导文案生成） */
 export const MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE = 15
 
+/**
+ * AI 视觉工坊 · 文案包：3 积分/次
+ * 成本测算：qwen 对话 prompt≈1k + 输出≈500 tokens ≈ ¥0.03 API；
+ * 50% 毛利 → 用户付 3÷50=¥0.06，平台 AI 预算 ¥0.03。
+ */
+export const MP_POINTS_VISUAL_STUDIO_COPY_PER_USE = 3
+
+/**
+ * AI 视觉工坊 · 海报生图：8 积分/张
+ * 成本测算：万相 wan2.5 / 海报模型 / 豆包 Seedream 单张异步生图 ≈ ¥0.08；
+ * 50% 毛利 → 用户付 8÷50=¥0.16，平台 AI 预算 ¥0.08。
+ */
+export const MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE = 8
+
 /** 单积分内部 API 成本（元），用于 50% 毛利反推赠送积分 */
 export const MP_POINT_INTERNAL_COST_YUAN = 0.01
 
@@ -69,6 +83,8 @@ export type MpPointsUsageKind =
   | 'cloud_edit'
   | 'cloud_edit_smart'
   | 'digital_human'
+  | 'visual_studio_copy'
+  | 'visual_studio_image'
 
 export const MP_POINTS_USAGE_KIND_LABELS: Record<MpPointsUsageKind, string> = {
   video: '短视频 AI 检核',
@@ -79,6 +95,8 @@ export const MP_POINTS_USAGE_KIND_LABELS: Record<MpPointsUsageKind, string> = {
   cloud_edit: '灵祺 AI 云剪',
   cloud_edit_smart: '智能一键成片',
   digital_human: '数字人口播',
+  visual_studio_copy: 'AI 视觉工坊文案',
+  visual_studio_image: 'AI 视觉工坊生图',
 }
 
 const MP_POINTS_PER_SEC_BY_KIND: Partial<Record<MpPointsUsageKind, number>> = {
@@ -124,7 +142,9 @@ export function parseMpPointsUsageKind(raw: unknown): MpPointsUsageKind | null {
     k === 'shortvideo' ||
     k === 'cloud_edit' ||
     k === 'cloud_edit_smart' ||
-    k === 'digital_human'
+    k === 'digital_human' ||
+    k === 'visual_studio_copy' ||
+    k === 'visual_studio_image'
   ) {
     return k
   }
@@ -135,6 +155,8 @@ export function formatMpPointsRateLabel(kind: MpPointsUsageKind): string {
   if (kind === 'article') return `${MP_POINTS_ARTICLE_PER_USE} 积分/次`
   if (kind === 'brief') return `${MP_POINTS_BRIEF_PER_USE} 积分/篇`
   if (kind === 'mix_material_analyze') return `${MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE} 积分/次`
+  if (kind === 'visual_studio_copy') return `${MP_POINTS_VISUAL_STUDIO_COPY_PER_USE} 积分/次`
+  if (kind === 'visual_studio_image') return `${MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE} 积分/张`
   if (kind === 'cloud_edit') {
     return `${MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP} 积分/条（≤${MP_POINTS_CLOUD_EDIT_MAX_SEC} 秒）`
   }
@@ -175,7 +197,15 @@ export function mpPointsCostForUsage(kind: MpPointsUsageKind, opts?: { durationS
   }
   if (kind === 'brief') return MP_POINTS_BRIEF_PER_USE
   if (kind === 'mix_material_analyze') return MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE
+  if (kind === 'visual_studio_copy') return MP_POINTS_VISUAL_STUDIO_COPY_PER_USE
+  if (kind === 'visual_studio_image') return MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE
   return MP_POINTS_ARTICLE_PER_USE
+}
+
+/** 视觉工坊批量生图积分（按张数） */
+export function mpPointsCostForVisualStudioImages(imageCount: number): number {
+  const n = Math.max(0, Math.floor(Number(imageCount) || 0))
+  return n * MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE
 }
 
 /** 按视频时长（秒）结算积分 */
