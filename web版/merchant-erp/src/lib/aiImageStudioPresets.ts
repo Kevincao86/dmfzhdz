@@ -3,6 +3,8 @@
  * 参考：有赞智能海报（商品链路+太阳码）、Canva Magic Design（多稿+平台尺寸）、
  * 即梦 3.0（智能参考+多方案）、稿定（行业模板+批量多端）。
  */
+import type { PlatformLogoKey } from './platformBranding'
+import { PLATFORM_LOGO_SRC } from './platformBranding'
 
 export type LocalLifeIndustryId =
   | 'catering'
@@ -70,6 +72,82 @@ export const LOCAL_LIFE_INDUSTRIES: Array<{
   { id: 'education', label: '教育', emoji: '📚', defaultStyle: 'minimal', sceneHint: '信任感、专业、亲子' },
 ]
 
+/** 二级业态（一级业态下的细分类目） */
+export type IndustrySubCategory = {
+  id: string
+  industryId: LocalLifeIndustryId
+  label: string
+  sceneHint: string
+  adjustHint?: string
+}
+
+export const INDUSTRY_SUB_CATEGORIES: IndustrySubCategory[] = [
+  { id: 'catering_chinese', industryId: 'catering', label: '中餐正餐', sceneHint: '家常菜、宴席、招牌菜' },
+  { id: 'catering_hotpot', industryId: 'catering', label: '火锅烧烤', sceneHint: '热气腾腾、聚餐氛围' },
+  { id: 'catering_tea', industryId: 'catering', label: '茶饮咖啡', sceneHint: '清爽打卡、轻食下午茶' },
+  { id: 'catering_bakery', industryId: 'catering', label: '烘焙甜品', sceneHint: '精致甜蜜、下午茶' },
+  { id: 'catering_snack', industryId: 'catering', label: '快餐小吃', sceneHint: '便捷管饱、性价比' },
+  { id: 'beauty_hair', industryId: 'beauty', label: '美发造型', sceneHint: '发型设计、染烫护理' },
+  { id: 'beauty_nail', industryId: 'beauty', label: '美甲美睫', sceneHint: '精致细节、少女感' },
+  { id: 'beauty_skin', industryId: 'beauty', label: '皮肤管理', sceneHint: '清洁修护、透亮肌肤' },
+  { id: 'beauty_med', industryId: 'beauty', label: '轻医美', sceneHint: '专业安全、效果可见' },
+  {
+    id: 'leisure_foot_spa',
+    industryId: 'leisure',
+    label: '足浴按摩',
+    sceneHint: '放松解压、洁净舒适、养生疗愈',
+    adjustHint: '足浴按摩侧重环境舒适、技师手法与团购足疗',
+  },
+  { id: 'leisure_billiards', industryId: 'leisure', label: '台球桌游', sceneHint: '好友局、竞技娱乐' },
+  { id: 'leisure_ktv', industryId: 'leisure', label: 'KTV酒吧', sceneHint: '夜生活、聚会嗨玩' },
+  { id: 'leisure_escape', industryId: 'leisure', label: '影院密室', sceneHint: '沉浸式体验、团建' },
+  { id: 'leisure_fitness', industryId: 'leisure', label: '健身运动', sceneHint: '活力自律、塑形锻炼' },
+  { id: 'hotel_stay', industryId: 'hotel', label: '酒店民宿', sceneHint: '住宿体验、空间质感' },
+  { id: 'hotel_spring', industryId: 'hotel', label: '温泉度假', sceneHint: '疗愈放松、度假氛围' },
+  { id: 'hotel_scenic', industryId: 'hotel', label: '景区游乐', sceneHint: '亲子出游、景点打卡' },
+  { id: 'pet_grooming', industryId: 'pet', label: '宠物洗护', sceneHint: '萌宠洗澡美容' },
+  { id: 'pet_clinic', industryId: 'pet', label: '宠物医疗', sceneHint: '专业养护、信任感' },
+  { id: 'pet_supplies', industryId: 'pet', label: '宠物用品', sceneHint: '主粮零食、铲屎官必囤' },
+  { id: 'edu_k12', industryId: 'education', label: 'K12学科', sceneHint: '提分辅导、专业师资' },
+  { id: 'edu_art', industryId: 'education', label: '艺术兴趣', sceneHint: '启蒙培养、兴趣特长' },
+  { id: 'edu_vocational', industryId: 'education', label: '职业技能', sceneHint: '实用技能、就业导向' },
+]
+
+export function getSubCategoriesForIndustry(industryId: LocalLifeIndustryId): IndustrySubCategory[] {
+  return INDUSTRY_SUB_CATEGORIES.filter((s) => s.industryId === industryId)
+}
+
+export function resolveIndustrySubCategory(id: string): IndustrySubCategory | null {
+  return INDUSTRY_SUB_CATEGORIES.find((s) => s.id === id) ?? null
+}
+
+export function defaultSubCategoryForIndustry(industryId: LocalLifeIndustryId): string {
+  return getSubCategoriesForIndustry(industryId)[0]?.id ?? ''
+}
+
+export function resolveIndustrySceneContext(form: {
+  industry: LocalLifeIndustryId
+  industrySubId: string
+}): {
+  label: string
+  sceneHint: string
+  adjustHint?: string
+} {
+  const top = LOCAL_LIFE_INDUSTRIES.find((x) => x.id === form.industry)
+  const sub = form.industrySubId ? resolveIndustrySubCategory(form.industrySubId) : null
+  if (sub) {
+    return {
+      label: `${top?.label ?? '本地生活'}-${sub.label}`,
+      sceneHint: sub.sceneHint,
+      adjustHint: sub.adjustHint,
+    }
+  }
+  return {
+    label: top?.label ?? '本地生活',
+    sceneHint: top?.sceneHint ?? '',
+  }
+}
+
 export const PUBLISH_CHANNELS: Array<{
   id: PublishChannelId
   label: string
@@ -130,6 +208,20 @@ export const PUBLISH_CHANNELS: Array<{
     publishTips: ['建议高清 PNG', 'A4 / 大海报分场景选用'],
   },
 ]
+
+/** 视觉工坊渠道对应平台 Logo */
+export const PUBLISH_CHANNEL_LOGO: Partial<Record<PublishChannelId, PlatformLogoKey>> = {
+  douyin: 'douyin_laike',
+  xiaohongshu: 'xiaohongshu',
+  wechat_moments: 'wechat',
+  meituan: 'dianping',
+  kuaishou: 'kuaishou_local',
+}
+
+export function publishChannelLogoSrc(channelId: PublishChannelId): string | null {
+  const key = PUBLISH_CHANNEL_LOGO[channelId]
+  return key ? PLATFORM_LOGO_SRC[key] : null
+}
 
 export const VISUAL_PLAYBOOKS: Array<{
   id: VisualPlaybookId
@@ -327,6 +419,8 @@ export const AI_IMAGE_STYLE_PRESETS: Array<{ id: AiImageStyleId; label: string; 
 
 export type VisualStudioForm = {
   industry: LocalLifeIndustryId
+  /** 二级业态 id，如 leisure_foot_spa */
+  industrySubId: string
   channels: PublishChannelId[]
   playbook: VisualPlaybookId
   /** 玩法细分选项 id（节日名称、套餐规格等） */
@@ -345,6 +439,7 @@ export type VisualStudioForm = {
 
 export const DEFAULT_VISUAL_STUDIO_FORM: VisualStudioForm = {
   industry: 'catering',
+  industrySubId: 'catering_chinese',
   channels: ['douyin', 'wechat_moments'],
   playbook: 'group_buy_new',
   playbookVariantId: '',
@@ -1474,11 +1569,308 @@ const INDUSTRY_PLAYBOOK_VARIANT_OVERRIDES: Partial<
   },
 }
 
+/** 二级业态：覆盖第二步弹窗标签（优先于一级业态） */
+const INDUSTRY_SUB_PLAYBOOK_VARIANT_OVERRIDES: Partial<
+  Record<string, Partial<Record<VisualPlaybookId, PlaybookVariantConfig>>>
+> = {
+  leisure_foot_spa: {
+    store_visit: {
+      pickerLabel: '种草角度',
+      options: [
+        {
+          id: 'ambiance',
+          label: '环境舒适',
+          periodLabel: '包厢干净整洁',
+          headline: '环境太舒服了',
+          subheadline: '私密安静 · 放松首选',
+          offer: '新客体验价',
+          styleId: 'premium',
+        },
+        {
+          id: 'technique',
+          label: '技师专业',
+          periodLabel: '手法娴熟',
+          headline: '技师手法绝了',
+          subheadline: '放松解压到位',
+          offer: '',
+          note: '回头客推荐',
+        },
+        {
+          id: 'relax',
+          label: '放松解压',
+          periodLabel: '下班放松首选',
+          headline: '打工人放松地',
+          subheadline: '久坐族必备',
+          offer: '足疗¥88起',
+        },
+        {
+          id: 'value',
+          label: '团购足疗',
+          periodLabel: '性价比优选',
+          headline: '足疗团购超值',
+          subheadline: '含泡脚+按摩',
+          offer: '¥99足疗套餐',
+          note: '周末通用',
+        },
+      ],
+    },
+    group_buy_new: {
+      pickerLabel: '团购规格',
+      options: [
+        {
+          id: 'single',
+          label: '单人足疗',
+          periodLabel: '1人适用',
+          headline: '单人足疗套餐',
+          subheadline: '含泡脚+肩颈',
+          offer: '¥88单人足疗',
+          note: '免预约',
+        },
+        {
+          id: 'double',
+          label: '双人套餐',
+          periodLabel: '2人适用',
+          headline: '双人足疗套餐',
+          subheadline: '同行更划算',
+          offer: '¥168双人',
+        },
+        {
+          id: 'overnight',
+          label: '过夜套餐',
+          periodLabel: '含休息区',
+          headline: '过夜足疗套餐',
+          subheadline: '24h营业',
+          offer: '¥199过夜',
+          timeRange: '通宵可用',
+        },
+        {
+          id: 'member',
+          label: '会员专享',
+          periodLabel: '储值更省',
+          headline: '会员足疗特惠',
+          offer: '充300送50',
+        },
+      ],
+    },
+    product_hero: {
+      pickerLabel: '主推项目',
+      options: [
+        {
+          id: 'foot',
+          label: '足疗套餐',
+          periodLabel: '招牌项目',
+          headline: '招牌足疗',
+          offer: '¥88起',
+          styleId: 'premium',
+        },
+        {
+          id: 'body',
+          label: '全身按摩',
+          periodLabel: '深度放松',
+          headline: '全身按摩',
+          offer: '¥128起',
+        },
+        {
+          id: 'combo',
+          label: '足浴+SPA',
+          periodLabel: '组合更省',
+          headline: '足浴SPA组合',
+          offer: '¥199套餐',
+        },
+        {
+          id: 'new',
+          label: '新客体验',
+          periodLabel: '限新客',
+          headline: '新客首单特惠',
+          offer: '体验价¥68',
+        },
+      ],
+    },
+    flash_sale: {
+      pickerLabel: '秒杀时段',
+      options: [
+        {
+          id: 'afternoon',
+          label: '午后特惠',
+          periodLabel: '14:00—17:00',
+          headline: '午后足疗秒杀',
+          offer: '立减30元',
+          timeRange: '14:00—17:00',
+        },
+        {
+          id: 'night',
+          label: '夜间专场',
+          periodLabel: '20:00后',
+          headline: '夜间放松专场',
+          offer: '8折起',
+          timeRange: '20:00—24:00',
+        },
+        {
+          id: 'weekday',
+          label: '工作日',
+          periodLabel: '周一至周五',
+          headline: '工作日特惠',
+          offer: '平日半价',
+        },
+        {
+          id: 'weekend',
+          label: '周末专场',
+          periodLabel: '周六日',
+          headline: '周末足疗专场',
+          offer: '¥99套餐',
+        },
+      ],
+    },
+    daily_sign: {
+      pickerLabel: '日签主题',
+      options: [
+        {
+          id: 'open',
+          label: '正常营业',
+          periodLabel: '今日营业中',
+          headline: '今日正常营业',
+          timeRange: '24h',
+        },
+        {
+          id: 'recommend',
+          label: '今日推荐',
+          periodLabel: '技师推荐',
+          headline: '今日推荐项目',
+          offer: '限时特价',
+        },
+        {
+          id: 'member',
+          label: '会员日',
+          periodLabel: '会员专享',
+          headline: '会员日福利',
+          offer: '储值加赠',
+        },
+        {
+          id: 'holiday',
+          label: '节日营业',
+          periodLabel: '节假日',
+          headline: '节假日正常营业',
+          timeRange: '假期',
+        },
+      ],
+    },
+  },
+  catering_hotpot: {
+    store_visit: {
+      pickerLabel: '种草角度',
+      options: [
+        {
+          id: 'ambiance',
+          label: '氛围打卡',
+          periodLabel: '烟火气十足',
+          headline: '火锅氛围绝了',
+          subheadline: '聚餐首选',
+          offer: '打卡送饮品',
+        },
+        {
+          id: 'must_try',
+          label: '必点锅底',
+          periodLabel: '招牌锅底',
+          headline: '必点锅底TOP3',
+          subheadline: '回头客最多',
+        },
+        {
+          id: 'value',
+          label: '人均友好',
+          periodLabel: '高性价比',
+          headline: '人均不过百',
+          offer: '人均¥68',
+        },
+        {
+          id: 'hidden',
+          label: '隐藏吃法',
+          periodLabel: '懂行才知道',
+          headline: '隐藏吃法推荐',
+          note: '可向店员询问',
+        },
+      ],
+    },
+    group_buy_new: {
+      pickerLabel: '套餐规格',
+      options: [
+        {
+          id: 'double',
+          label: '双人餐',
+          periodLabel: '2人适用',
+          headline: '超值双人火锅',
+          offer: '¥99双人餐',
+        },
+        {
+          id: 'family',
+          label: '家庭套餐',
+          periodLabel: '4-6人',
+          headline: '家庭聚餐套餐',
+          offer: '¥199家庭餐',
+        },
+        {
+          id: 'lunch',
+          label: '午市套餐',
+          periodLabel: '11:00—14:00',
+          headline: '午市火锅套餐',
+          offer: '工作日特惠',
+        },
+        {
+          id: 'weekend',
+          label: '周末套餐',
+          periodLabel: '周六日',
+          headline: '周末火锅专场',
+          offer: '¥168套餐',
+        },
+      ],
+    },
+  },
+  beauty_skin: {
+    store_visit: {
+      pickerLabel: '种草角度',
+      options: [
+        {
+          id: 'effect',
+          label: '效果对比',
+          periodLabel: '真实案例',
+          headline: '效果看得见',
+          subheadline: '透亮肌肤',
+          styleId: 'premium',
+        },
+        {
+          id: 'ambiance',
+          label: '环境高级感',
+          periodLabel: '干净通透',
+          headline: '环境太高级了',
+          offer: '新客体验',
+        },
+        {
+          id: 'experience',
+          label: '体验推荐',
+          periodLabel: '口碑项目',
+          headline: '新客必试护理',
+          offer: '体验价¥99',
+        },
+        {
+          id: 'local',
+          label: '本地口碑',
+          periodLabel: '回头客最多',
+          headline: '本地人私藏美店',
+        },
+      ],
+    },
+  },
+}
+
 export function getPlaybookVariantConfig(
   playbookId: VisualPlaybookId,
   industryId?: LocalLifeIndustryId,
+  industrySubId?: string,
 ): PlaybookVariantConfig | null {
   const base = PLAYBOOK_VARIANT_CONFIGS[playbookId] ?? null
+  if (industrySubId) {
+    const subOverride = INDUSTRY_SUB_PLAYBOOK_VARIANT_OVERRIDES[industrySubId]?.[playbookId]
+    if (subOverride) return subOverride
+  }
   if (!industryId || industryId === 'catering') return base
   const override = INDUSTRY_PLAYBOOK_VARIANT_OVERRIDES[industryId]?.[playbookId]
   if (override) return override
@@ -1489,8 +1881,9 @@ export function resolvePlaybookVariant(
   playbookId: VisualPlaybookId,
   variantId: string,
   industryId?: LocalLifeIndustryId,
+  industrySubId?: string,
 ): PlaybookVariantOption | null {
-  const cfg = getPlaybookVariantConfig(playbookId, industryId)
+  const cfg = getPlaybookVariantConfig(playbookId, industryId, industrySubId)
   if (!cfg || !variantId) return null
   return cfg.options.find((o) => o.id === variantId) ?? null
 }
@@ -1499,7 +1892,7 @@ export function applyPlaybookVariantToForm(
   form: VisualStudioForm,
   variantId: string,
 ): VisualStudioForm {
-  const cfg = getPlaybookVariantConfig(form.playbook, form.industry)
+  const cfg = getPlaybookVariantConfig(form.playbook, form.industry, form.industrySubId)
   if (!cfg) return { ...form, playbookVariantId: variantId }
   const opt = cfg.options.find((o) => o.id === variantId) ?? cfg.options[0]
   if (!opt) return { ...form, playbookVariantId: variantId }
@@ -1873,7 +2266,7 @@ export function applyPlaybookToForm(
 }
 
 function withDefaultPlaybookVariant(form: VisualStudioForm): VisualStudioForm {
-  const cfg = getPlaybookVariantConfig(form.playbook, form.industry)
+  const cfg = getPlaybookVariantConfig(form.playbook, form.industry, form.industrySubId)
   if (!cfg?.options[0]) return form
   const valid =
     form.playbookVariantId && cfg.options.some((o) => o.id === form.playbookVariantId)
@@ -1901,10 +2294,23 @@ export function applyIndustryChange(
   const base: VisualStudioForm = {
     ...form,
     industry: industryId,
+    industrySubId: defaultSubCategoryForIndustry(industryId),
     styleId: profile.defaultStyle,
     playbook,
   }
   return applyPlaybookToFormWithVariants(base, playbook, { keepChannels: true, templateIndex: 0 })
+}
+
+export function applyIndustrySubChange(
+  form: VisualStudioForm,
+  industrySubId: string,
+): VisualStudioForm {
+  const sub = resolveIndustrySubCategory(industrySubId)
+  if (!sub || sub.industryId !== form.industry) {
+    return form
+  }
+  const base: VisualStudioForm = { ...form, industrySubId }
+  return applyPlaybookToFormWithVariants(base, form.playbook, { keepChannels: true, templateIndex: 0 })
 }
 
 /** 本地规则文案包（零延迟，对标有赞「AI 帮写卖点」入口） */
@@ -1912,7 +2318,12 @@ export function generateCopySuggestions(form: VisualStudioForm): CopySuggestion[
   const pb = resolvePlaybook(form.playbook)
   const profile = resolveIndustryProfile(form.industry)
   const override = profile.playbookOverrides[form.playbook] ?? {}
-  const variant = resolvePlaybookVariant(form.playbook, form.playbookVariantId, form.industry)
+  const variant = resolvePlaybookVariant(
+    form.playbook,
+    form.playbookVariantId,
+    form.industry,
+    form.industrySubId,
+  )
   const store = form.storeName.trim() || '本店'
   const fill = (t: string, offer: string) =>
     t.replace(/\{store\}/g, store).replace(/\{offer\}/g, offer)
@@ -1946,8 +2357,13 @@ export function buildVisualStudioPrompt(
   },
 ): string {
   const pb = resolvePlaybook(form.playbook)
-  const industry = LOCAL_LIFE_INDUSTRIES.find((x) => x.id === form.industry)
-  const playbookVariant = resolvePlaybookVariant(form.playbook, form.playbookVariantId, form.industry)
+  const playbookVariant = resolvePlaybookVariant(
+    form.playbook,
+    form.playbookVariantId,
+    form.industry,
+    form.industrySubId,
+  )
+  const sceneCtx = resolveIndustrySceneContext(form)
   const style =
     opts?.styleFromReference
       ? '视觉风格参考用户上传的商品/海报图（色调与构图），文案以表单为准。'
@@ -1956,7 +2372,7 @@ export function buildVisualStudioPrompt(
   const channel = opts?.channel ? resolveChannel(opts.channel) : null
   const lines = [
     INTENT_PROMPT[pb.intent],
-    `业态：${industry?.label ?? '本地生活'}，${industry?.sceneHint ?? ''}。`,
+    `业态：${sceneCtx.label}，${sceneCtx.sceneHint}。`,
     `视觉风格：${style}。`,
     channel ? `投放渠道：${channel.label}，请符合该平台常见封面构图习惯。` : '',
     playbookVariant

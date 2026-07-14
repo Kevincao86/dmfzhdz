@@ -14,6 +14,7 @@ export type PlatformLogoKey =
   | 'eleme_shangou'
   | 'meituan_waimai'
   | 'jd_waimai'
+  | 'wechat'
 
 export const PLATFORM_LOGO_SRC: Record<PlatformLogoKey, string> = {
   douyin: merchantStaticUrl('/platforms/douyin.png'),
@@ -26,6 +27,7 @@ export const PLATFORM_LOGO_SRC: Record<PlatformLogoKey, string> = {
   eleme_shangou: merchantStaticUrl('/platforms/eleme-shangou.png'),
   meituan_waimai: merchantStaticUrl('/platforms/meituan-waimai.png'),
   jd_waimai: merchantStaticUrl('/platforms/jd-waimai.png'),
+  wechat: merchantStaticUrl('/platforms/wechat.png'),
 }
 
 /** 创建商品 / 系统设置商家后台 — 各经营平台 Logo（无图时回退字母占位） */

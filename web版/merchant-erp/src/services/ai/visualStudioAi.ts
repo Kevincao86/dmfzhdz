@@ -5,8 +5,8 @@ import { postAiChat } from './aiClient'
 import type { CopySuggestion, VisualStudioForm } from '../../lib/aiImageStudioPresets'
 import {
   generateCopySuggestions,
-  LOCAL_LIFE_INDUSTRIES,
   PUBLISH_CHANNELS,
+  resolveIndustrySceneContext,
   resolvePlaybook,
   resolvePlaybookVariant,
 } from '../../lib/aiImageStudioPresets'
@@ -121,16 +121,21 @@ export async function fetchVisualStudioCopyFromAi(
   opts?: { signal?: AbortSignal },
 ): Promise<VisualStudioAiCopyResult> {
   const fallback = generateCopySuggestions(form)
-  const industry = LOCAL_LIFE_INDUSTRIES.find((x) => x.id === form.industry)
+  const sceneCtx = resolveIndustrySceneContext(form)
   const pb = resolvePlaybook(form.playbook)
-  const variant = resolvePlaybookVariant(form.playbook, form.playbookVariantId, form.industry)
+  const variant = resolvePlaybookVariant(
+    form.playbook,
+    form.playbookVariantId,
+    form.industry,
+    form.industrySubId,
+  )
   const channels = form.channels
     .map((id) => PUBLISH_CHANNELS.find((c) => c.id === id)?.label ?? id)
     .join('、')
 
   const jsonExample = '[{"headline":"","subheadline":"","offer":"","timeRange":"","note":""}]'
   const userPrompt = [
-    `你是中国大陆本地生活商家营销文案专家。请为「${industry?.label ?? '本地生活'}」门店生成 3 套海报文案。`,
+    `你是中国大陆本地生活商家营销文案专家。请为「${sceneCtx.label}」门店生成 3 套海报文案。`,
     '',
     `门店名：${form.storeName.trim() || '（未填，可用「本店」）'}`,
     `营销玩法：${pb.label}（${pb.desc}）`,
@@ -140,7 +145,7 @@ export async function fetchVisualStudioCopyFromAi(
     '',
     '要求：',
     '1. 每套含 headline（主标题≤12字）、subheadline、offer、timeRange、note',
-    `2. 文案必须符合${industry?.label}行业语感（${industry?.sceneHint}），禁止出现与业态不符的餐饮用语（如隐藏菜单、招牌菜等，除非业态为餐饮）`,
+    `2. 文案必须符合${sceneCtx.label}行业语感（${sceneCtx.sceneHint}），禁止出现与业态不符的用语`,
     `3. 适合${pb.label}场景，可直接用于 AI 海报生图`,
     `4. 只输出 JSON 数组，不要 markdown 代码块，不要任何解释文字，格式：${jsonExample}`,
     '',

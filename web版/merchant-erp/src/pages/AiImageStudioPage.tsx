@@ -3,6 +3,7 @@ import {
   Download,
   ImagePlus,
   Loader2,
+  Printer,
   RefreshCw,
   Sparkles,
   Wand2,
@@ -20,6 +21,7 @@ import {
 } from '../lib/aiImageDelivery'
 import {
   applyIndustryChange,
+  applyIndustrySubChange,
   applyPlaybookToFormWithVariants,
   applyPlaybookVariantToForm,
   buildVisualStudioPrompt,
@@ -27,12 +29,15 @@ import {
   generateCopySuggestions,
   getPlaybookVariantConfig,
   getPlaybooksForIndustry,
+  getSubCategoriesForIndustry,
   LOCAL_LIFE_INDUSTRIES,
   preferWanxPosterForIntent,
+  publishChannelLogoSrc,
   PUBLISH_CHANNELS,
   resolveAiImageSizePreset,
   resolveChannel,
   resolveIndustryProfile,
+  resolveIndustrySceneContext,
   resolvePlaybook,
   type CopySuggestion,
   type LocalLifeIndustryId,
@@ -103,6 +108,7 @@ function ChannelChip({
   disabled?: boolean
 }) {
   const ch = resolveChannel(channelId)
+  const logoSrc = publishChannelLogoSrc(channelId)
   return (
     <button
       type="button"
@@ -115,10 +121,20 @@ function ChannelChip({
           : 'border-slate-200/80 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50',
       )}
     >
-      <span
-        className="h-2 w-2 shrink-0 rounded-full"
-        style={{ backgroundColor: active ? '#fff' : ch.color }}
-      />
+      {logoSrc ? (
+        <img
+          src={logoSrc}
+          alt=""
+          className="h-4 w-4 shrink-0 rounded-sm object-contain"
+        />
+      ) : channelId === 'offline_print' ? (
+        <Printer className="h-3.5 w-3.5 shrink-0 opacity-70" />
+      ) : (
+        <span
+          className="h-2 w-2 shrink-0 rounded-full"
+          style={{ backgroundColor: active ? '#fff' : ch.color }}
+        />
+      )}
       {ch.short}
     </button>
   )
@@ -199,13 +215,15 @@ export default function AiImageStudioPage() {
   const playbook = useMemo(() => resolvePlaybook(form.playbook), [form.playbook])
   const industryProfile = useMemo(() => resolveIndustryProfile(form.industry), [form.industry])
   const playbookVariantConfig = useMemo(
-    () => getPlaybookVariantConfig(form.playbook, form.industry),
-    [form.playbook, form.industry],
+    () => getPlaybookVariantConfig(form.playbook, form.industry, form.industrySubId),
+    [form.playbook, form.industry, form.industrySubId],
   )
   const activePlaybookVariant = useMemo(
     () => playbookVariantConfig?.options.find((o) => o.id === form.playbookVariantId) ?? null,
     [playbookVariantConfig, form.playbookVariantId],
   )
+  const industryScene = useMemo(() => resolveIndustrySceneContext(form), [form.industry, form.industrySubId])
+  const subCategories = useMemo(() => getSubCategoriesForIndustry(form.industry), [form.industry])
   const visiblePlaybooks = useMemo(() => getPlaybooksForIndustry(form.industry), [form.industry])
   const activeChannel = resolveChannel(selectedPreviewChannel)
   const fieldLabels = industryProfile.fieldLabels
@@ -280,6 +298,14 @@ export default function AiImageStudioPage() {
     })
   }
 
+  const changeIndustrySub = (subId: string) => {
+    setForm((f) => {
+      const next = applyIndustrySubChange(f, subId)
+      void loadAiCopy(next)
+      return next
+    })
+  }
+
   const selectPlaybook = (id: VisualPlaybookId) => {
     setForm((f) => {
       const next = applyPlaybookToFormWithVariants(f, id, { keepChannels: true, templateIndex: 0 })
@@ -315,10 +341,9 @@ export default function AiImageStudioPage() {
     const next = [...productRefs]
     for (const file of Array.from(files)) {
       if (!file.type.startsWith('image/')) continue
-      if (next.length >= 4) break
       next.push({ id: `${Date.now()}-${Math.random()}`, dataUrl: await readFileAsDataUrl(file), name: file.name })
     }
-    setProductRefs(next.slice(0, 4))
+    setProductRefs(next)
   }
 
   const pickReferenceImage = () => productRefs[0]?.dataUrl
@@ -490,6 +515,19 @@ export default function AiImageStudioPage() {
               </option>
             ))}
           </select>
+          <label className="pl-1 text-xs text-slate-500">细分类目</label>
+          <select
+            value={form.industrySubId}
+            disabled={busy || subCategories.length === 0}
+            onChange={(e) => changeIndustrySub(e.target.value)}
+            className="rounded-lg border-0 bg-white px-3 py-2 text-sm shadow-sm ring-1 ring-slate-200"
+          >
+            {subCategories.map((sub) => (
+              <option key={sub.id} value={sub.id}>
+                {sub.label}
+              </option>
+            ))}
+          </select>
           <input
             value={form.storeName}
             onChange={(e) => patchForm({ storeName: e.target.value })}
@@ -505,10 +543,8 @@ export default function AiImageStudioPage() {
       )}
 
       <div className="relative mb-5 rounded-xl border border-violet-100/80 bg-gradient-to-r from-violet-50/90 to-indigo-50/50 px-4 py-3 text-sm text-violet-900">
-        <span className="font-medium">
-          {LOCAL_LIFE_INDUSTRIES.find((x) => x.id === form.industry)?.label}业态：
-        </span>
-        {industryProfile.adjustHint}
+        <span className="font-medium">{industryScene.label}：</span>
+        {industryScene.adjustHint ?? industryProfile.adjustHint}
         {industryProfile.hiddenPlaybooks?.length ? (
           <span className="ml-1 text-xs text-violet-600/80">
             （已隐藏：{industryProfile.hiddenPlaybooks.map((id) => resolvePlaybook(id).label).join('、')}）
@@ -729,8 +765,11 @@ export default function AiImageStudioPage() {
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 py-4 text-sm text-slate-600 transition hover:border-violet-200 hover:bg-violet-50/30"
               >
                 <ImagePlus className="h-4 w-4" />
-                上传（最多 4 张）
+                上传参考图
               </button>
+              {productRefs.length > 0 && (
+                <p className="mt-1 text-center text-[11px] text-slate-400">已上传 {productRefs.length} 张</p>
+              )}
               {productRefs.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {productRefs.map((p) => (
