@@ -89,6 +89,56 @@ function padSmartBatchScriptRows(
   }))
 }
 
+function smartBatchMaterialUrlKey(url: string): string {
+  return String(url ?? '').trim().toLowerCase().replace(/\/+$/, '')
+}
+
+/** 按 URL 去重素材池；旧版前端展开重复项时 remap 回池内下标 */
+export function dedupeSmartBatchMaterialPool(materials: IceSmartBatchMaterial[]): {
+  pool: IceSmartBatchMaterial[]
+  remapMaterialIndex: (index: number) => number
+} {
+  const pool: IceSmartBatchMaterial[] = []
+  const urlToIndex = new Map<string, number>()
+  for (const m of materials) {
+    const key = smartBatchMaterialUrlKey(m.mediaUrl)
+    if (!urlToIndex.has(key)) {
+      urlToIndex.set(key, pool.length)
+      pool.push(m)
+    }
+  }
+  const remapMaterialIndex = (index: number): number => {
+    const m = materials[index]
+    if (!m) return 0
+    return urlToIndex.get(smartBatchMaterialUrlKey(m.mediaUrl)) ?? 0
+  }
+  return { pool, remapMaterialIndex }
+}
+
+/** 网关/服务端：去重 + 规划，兼容旧版前端展开的 materials 列表 */
+export function prepareSmartBatchSubmitPayload(input: {
+  materials: IceSmartBatchMaterial[]
+  scriptRows: IceSmartBatchScriptRow[]
+  materialSlots?: number[]
+  targetTotalSec: number
+}) {
+  const { pool, remapMaterialIndex } = dedupeSmartBatchMaterialPool(input.materials)
+  const baseMaterials = pool.length >= 2 ? pool : input.materials
+  const rawSlots = input.materialSlots ?? []
+  const remappedSlots =
+    rawSlots.length > 0
+      ? rawSlots
+          .filter((n) => Number.isFinite(n) && n >= 0 && n < input.materials.length)
+          .map((n) => remapMaterialIndex(Math.floor(n)))
+      : undefined
+  return buildSmartBatchSubmitPayload({
+    materials: baseMaterials,
+    scriptRows: input.scriptRows,
+    materialSlots: remappedSlots,
+    targetTotalSec: input.targetTotalSec,
+  })
+}
+
 /** AI 规划后：按叙事顺序抽取 K 条素材，供 IMS 脚本化自动成片 */
 export function buildSmartBatchSubmitPayload(input: {
   materials: IceSmartBatchMaterial[]
