@@ -94,6 +94,13 @@ export async function retryPartnerLinkeCooperation(onboardingId: string): Promis
   return String(j.message || `合作单 ${j.orderId ?? ''} 已提交`)
 }
 
+export async function deletePartnerLinkeOnboarding(onboardingId: string): Promise<void> {
+  await partnerLinkeFetch('/api/meoo-partner-linke-onboard', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'delete', onboardingId }),
+  })
+}
+
 export function linkeOnboardStatusLabel(item: PartnerLinkeOnboardItem): string {
   if (item.authStatus === 'pending') return '待商家授权'
   if (item.authStatus === 'failed') return '授权失败'

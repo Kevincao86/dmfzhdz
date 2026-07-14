@@ -107,6 +107,11 @@ export function douyinLifeSignV2(
   return createHash('sha256').update(str, 'utf8').digest('hex')
 }
 
+/**
+ * 拼装 auth_with_bind URL。
+ * 新方案（如 21）官方单方案表未列全，统一走「多方案」参数：
+ * solution_keys + multi_solution_data；extra 不得含 JSON 引号。
+ */
 export function buildDouyinAuthWithBindUrl(input: {
   clientKey: string
   clientSecret: string
@@ -115,12 +120,15 @@ export function buildDouyinAuthWithBindUrl(input: {
   outShopId: string
   extra: string
 }): string {
+  const solutionKey = input.solutionKey.trim()
+  const permissionKeys = input.permissionKeys.map((x) => String(x).trim()).filter(Boolean)
+  const multiSolutionData = JSON.stringify({ [solutionKey]: permissionKeys })
   const query: Record<string, string> = {
     client_key: input.clientKey.trim(),
     timestamp: String(Math.floor(Date.now() / 1000)),
     charset: 'UTF-8',
-    solution_key: input.solutionKey.trim(),
-    permission_keys: input.permissionKeys.join(','),
+    solution_keys: solutionKey,
+    multi_solution_data: multiSolutionData,
     out_shop_id: input.outShopId.trim(),
     extra: input.extra.trim(),
   }
@@ -227,22 +235,36 @@ export async function createDouyinPartnerCooperation(input: {
   }
 }
 
+/**
+ * 抖音文档：extra 为普通 string，多方案链路不支持含引号的 JSON。
+ * 格式：v1.<onboardingId>.<tenantId>.<ownerAgentTenantId?>
+ */
 export function buildOnboardInviteExtra(input: {
   onboardingId: string
   dataTenantId: string
   ownerAgentTenantId?: string | null
 }): string {
-  return JSON.stringify({
-    onboardingId: input.onboardingId,
-    tenantId: input.dataTenantId,
-    ownerAgentTenantId: input.ownerAgentTenantId ?? null,
-  })
+  const oid = String(input.onboardingId || '').trim()
+  const tid = String(input.dataTenantId || '').trim()
+  const aid = String(input.ownerAgentTenantId || '').trim()
+  return aid ? `v1.${oid}.${tid}.${aid}` : `v1.${oid}.${tid}`
 }
 
 export function parseOnboardInviteExtra(
   extra: unknown,
 ): { onboardingId?: string; tenantId?: string; ownerAgentTenantId?: string | null } | null {
   if (extra == null || extra === '') return null
+  const text = typeof extra === 'string' ? extra.trim() : ''
+  if (text.startsWith('v1.')) {
+    const m = /^v1\.([0-9a-f-]{36})\.([0-9a-f-]{36})(?:\.([0-9a-f-]{36}))?$/i.exec(text)
+    if (m) {
+      return {
+        onboardingId: m[1],
+        tenantId: m[2],
+        ownerAgentTenantId: m[3] || null,
+      }
+    }
+  }
   try {
     const raw = typeof extra === 'string' ? JSON.parse(extra) : extra
     if (!raw || typeof raw !== 'object') return null
@@ -256,6 +278,30 @@ export function parseOnboardInviteExtra(
   } catch {
     return null
   }
+}
+
+export async function deletePartnerLinkeOnboarding(input: {
+  admin: SupabaseClient
+  dataTenantId: string
+  onboardingId: string
+  ownerAgentTenantId?: string | null
+}): Promise<{ ok: true } | { ok: false; message: string }> {
+  const id = String(input.onboardingId || '').trim()
+  if (!id) return { ok: false, message: '缺少 onboardingId' }
+  let q = input.admin
+    .from('tenant_partner_linke_onboarding')
+    .delete()
+    .eq('tenant_id', input.dataTenantId)
+    .eq('id', id)
+  if (input.ownerAgentTenantId) {
+    q = q.eq('owner_agent_tenant_id', input.ownerAgentTenantId)
+  }
+  const { data, error } = await q.select('id')
+  if (error) return { ok: false, message: error.message.slice(0, 200) }
+  if (!Array.isArray(data) || data.length === 0) {
+    return { ok: false, message: '开通任务不存在或无权删除' }
+  }
+  return { ok: true }
 }
 
 export async function listPartnerLinkeOnboarding(
