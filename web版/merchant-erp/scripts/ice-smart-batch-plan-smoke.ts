@@ -8,6 +8,10 @@ import {
 } from '../src/lib/iceSmartBatchPlan.js'
 
 assert.equal(pickSmartBatchSegmentCount([], 32, 30), 6, '30s → 6 segments')
+assert.equal(pickSmartBatchSegmentCount([], 2, 30), 6, '30s with 2 materials still → 6 segments')
+
+const twoMatIndices = pickSmartBatchMaterialIndices(2, [], 6)
+assert.deepEqual(twoMatIndices, [0, 1, 0, 1, 0, 1], '2 materials cycle for 6 segments')
 
 const indices = pickSmartBatchMaterialIndices(32, [2, 5, 8, 15, 22], 6)
 assert.equal(indices.length, 6, 'must pad to 6 segments')
@@ -33,7 +37,10 @@ const payload = buildSmartBatchSubmitPayload({
 })
 assert.equal(payload.segmentCount, 6, 'payload segment count')
 assert.equal(payload.scriptRows.length, 6, 'rows padded to 6')
-assert.equal(payload.materials.length, 6, 'materials picked')
+assert.equal(payload.materials.length, 32, 'keep full material pool')
+assert.equal(payload.materialSlots.length, 6, 'slots map segments to pool indices')
+assert.equal(payload.materialSlots[0], 2)
+assert.equal(payload.materialSlots[4], 22)
 assert.equal(payload.scriptRows[5]?.timeRange, '25-30秒', 'last row covers 25-30s')
 
 console.log('OK: ice-smart-batch-plan-smoke')

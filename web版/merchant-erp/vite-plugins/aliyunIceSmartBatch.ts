@@ -27,6 +27,7 @@ import {
   scriptTimeRangesFromDurationPlan,
 } from '../src/lib/shortVideoScriptTable.js'
 import { resolveIceMixBgmUrl } from '../src/lib/iceMixBgmPresets.js'
+import { clampMixSourceInSec } from '../src/lib/iceMixPlan.js'
 import {
   type IceSmartBatchMaterial,
   type IceSmartBatchScriptRow,
@@ -207,7 +208,12 @@ function buildInputConfig(input: {
   targetTotalSec: number
   materialSlots?: number[]
   bgmMediaId?: string
-}): { inputConfig: Record<string, unknown>; speechRate: number; shotDurationSec: number } {
+}): {
+  inputConfig: Record<string, unknown>
+  speechRate: number
+  shotDurationSec: number
+  mediaMetaDataArray: Array<Record<string, unknown>>
+} {
   const materialCount = input.materials.length
   const slots = (input.materialSlots ?? []).filter(
     (n) => Number.isFinite(n) && n >= 0 && n < materialCount,
@@ -229,6 +235,8 @@ function buildInputConfig(input: {
     Math.min(5, Math.round((targetTotalSec / Math.max(1, pickedIndices.length)) * 100) / 100),
   )
 
+  const usedIn = new Map<number, number>()
+  const mediaMetaDataArray: Array<Record<string, unknown>> = []
   const mediaGroups = pickedIndices.map((matIndex, i) => {
     const mat = input.materials[matIndex]!
     const mediaId = String(mat.mediaId ?? '').trim()
@@ -238,8 +246,9 @@ function buildInputConfig(input: {
     const row = rows[i]
     const dialogue = sanitizeMixDialogueText(String(row?.dialogue ?? '')).trim()
     const segDur = segmentDurationFromRow(row, defaultSegSec, targetTotalSec, i, pickedIndices.length)
+    const groupName = `storyboard-${i}`
     const group: Record<string, unknown> = {
-      GroupName: `storyboard-${i}`,
+      GroupName: groupName,
       MediaArray: [mediaId],
       SplitMode: 'NoSplit',
       Volume: 0,
@@ -247,6 +256,22 @@ function buildInputConfig(input: {
     }
     if (dialogue.length >= 2 && !isPlaceholderDialogue(dialogue)) {
       group.SpeechTextArray = [dialogue.slice(0, 200)]
+    }
+    if (mat.kind === 'video') {
+      let sourceIn = clampMixSourceInSec((i % 3) * 1.1, segDur)
+      const prev = usedIn.get(matIndex)
+      if (prev != null) {
+        sourceIn = clampMixSourceInSec(prev + Math.max(1.5, segDur * 0.85), segDur)
+      }
+      usedIn.set(matIndex, sourceIn)
+      if (sourceIn > 0.05 || prev != null) {
+        const out = Math.round((sourceIn + segDur) * 100) / 100
+        mediaMetaDataArray.push({
+          Media: mediaId,
+          GroupName: groupName,
+          TimeRangeList: [{ In: Math.round(sourceIn * 100) / 100, Out: out }],
+        })
+      }
     }
     return group
   })
@@ -262,6 +287,7 @@ function buildInputConfig(input: {
     inputConfig,
     speechRate: 0,
     shotDurationSec: defaultSegSec,
+    mediaMetaDataArray,
   }
 }
 
@@ -402,6 +428,13 @@ export async function iceSubmitSmartBatchJob(
       bgmEnabled,
     },
   )
+  if (built.mediaMetaDataArray.length) {
+    const mc = (editingConfig.MediaConfig as Record<string, unknown>) ?? {}
+    editingConfig.MediaConfig = {
+      ...mc,
+      MediaMetaDataArray: built.mediaMetaDataArray,
+    }
+  }
   const templateIds = (input.templateIds ?? []).filter(Boolean).slice(0, 50)
 
   const client = createClient(cfg)
