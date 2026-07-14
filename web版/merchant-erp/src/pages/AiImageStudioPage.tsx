@@ -199,8 +199,8 @@ export default function AiImageStudioPage() {
   const playbook = useMemo(() => resolvePlaybook(form.playbook), [form.playbook])
   const industryProfile = useMemo(() => resolveIndustryProfile(form.industry), [form.industry])
   const playbookVariantConfig = useMemo(
-    () => getPlaybookVariantConfig(form.playbook),
-    [form.playbook],
+    () => getPlaybookVariantConfig(form.playbook, form.industry),
+    [form.playbook, form.industry],
   )
   const activePlaybookVariant = useMemo(
     () => playbookVariantConfig?.options.find((o) => o.id === form.playbookVariantId) ?? null,

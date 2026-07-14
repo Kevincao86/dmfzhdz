@@ -815,17 +815,679 @@ export const PLAYBOOK_VARIANT_CONFIGS: Partial<Record<VisualPlaybookId, Playbook
   },
 }
 
+/** 非餐饮业态：覆盖第二步弹窗标签（餐饮沿用 PLAYBOOK_VARIANT_CONFIGS） */
+const INDUSTRY_PLAYBOOK_VARIANT_OVERRIDES: Partial<
+  Record<LocalLifeIndustryId, Partial<Record<VisualPlaybookId, PlaybookVariantConfig>>>
+> = {
+  leisure: {
+    store_visit: {
+      pickerLabel: '种草角度',
+      options: [
+        {
+          id: 'ambiance',
+          label: '氛围打卡',
+          periodLabel: '适合拍照出片',
+          headline: '这里太出片了',
+          subheadline: '氛围感拉满',
+          offer: '打卡送饮品',
+          note: '建议傍晚光线',
+          styleId: 'fresh',
+        },
+        {
+          id: 'play_pack',
+          label: '畅玩套餐',
+          periodLabel: '团购性价比高',
+          headline: '畅玩套餐超值',
+          subheadline: '周末开黑首选',
+          offer: '2小时¥88',
+          note: '好友同行更划算',
+        },
+        {
+          id: 'social',
+          label: '社交聚会',
+          periodLabel: '好友局首选',
+          headline: '周末好友局',
+          subheadline: '聚会放松好去处',
+          offer: '4人团¥199',
+          note: '提前预约更省心',
+        },
+        {
+          id: 'local_hot',
+          label: '本地潮店',
+          periodLabel: '年轻人打卡地',
+          headline: '本地潮玩打卡地',
+          subheadline: '懂行的才知道',
+          offer: '',
+          note: '本地人私藏',
+        },
+      ],
+    },
+    group_buy_new: {
+      pickerLabel: '团购规格',
+      options: [
+        {
+          id: 'double_play',
+          label: '双人畅玩',
+          periodLabel: '2人适用',
+          headline: '双人畅玩套餐',
+          subheadline: '周末通用',
+          offer: '¥99双人畅玩',
+          timeRange: '周末通用',
+          note: '免预约',
+        },
+        {
+          id: 'group_4',
+          label: '4人团',
+          periodLabel: '3-4人适用',
+          headline: '4人畅玩团',
+          subheadline: '好友局必备',
+          offer: '¥168/4人',
+          timeRange: '午晚通用',
+        },
+        {
+          id: 'weekday',
+          label: '平日套餐',
+          periodLabel: '周一至周五',
+          headline: '平日畅玩特惠',
+          subheadline: '工作日专享价',
+          offer: '平日半价',
+          timeRange: '周一至周五',
+        },
+        {
+          id: 'weekend',
+          label: '周末专场',
+          periodLabel: '周六日',
+          headline: '周末畅玩专场',
+          subheadline: '不加价',
+          offer: '¥199周末团',
+          timeRange: '周六日',
+        },
+      ],
+    },
+    product_hero: {
+      pickerLabel: '主推项目',
+      options: [
+        {
+          id: 'signature',
+          label: '招牌项目',
+          periodLabel: '镇店王牌',
+          headline: '招牌必玩',
+          subheadline: '回头客最多',
+          offer: '¥88起',
+          styleId: 'fresh',
+        },
+        {
+          id: 'new_experience',
+          label: '新品体验',
+          periodLabel: '限时尝鲜',
+          headline: '新品首发',
+          subheadline: '限时尝鲜价',
+          offer: '体验价¥68',
+          timeRange: '上新首周',
+        },
+        {
+          id: 'limited',
+          label: '限时优惠',
+          periodLabel: '本季限定',
+          headline: '限时特惠',
+          subheadline: '售完即止',
+          offer: '立减30元',
+          timeRange: '本季',
+        },
+        {
+          id: 'night_pack',
+          label: '夜场套餐',
+          periodLabel: '晚间时段',
+          headline: '夜场畅玩',
+          subheadline: '越夜越精彩',
+          offer: '¥128夜场',
+          timeRange: '18:00—24:00',
+        },
+      ],
+    },
+    flash_sale: {
+      pickerLabel: '秒杀时段',
+      options: [
+        {
+          id: 'tonight_8',
+          label: '今晚8点',
+          periodLabel: '今日 20:00—24:00',
+          headline: '今晚8点秒杀',
+          subheadline: '准时开抢',
+          offer: '5折起',
+          timeRange: '今日 20:00—24:00',
+        },
+        {
+          id: 'weekend',
+          label: '周末专场',
+          periodLabel: '周六日全天',
+          headline: '周末限时秒杀',
+          offer: '立减30元',
+          timeRange: '周六日 10:00—22:00',
+        },
+        {
+          id: 'weekday',
+          label: '平日闪购',
+          periodLabel: '周一至周五',
+          headline: '平日秒杀',
+          subheadline: '工作日专享',
+          offer: '买一送一',
+          timeRange: '周一至周五',
+        },
+        {
+          id: 'clearance',
+          label: '清仓特惠',
+          periodLabel: '售完即止',
+          headline: '最后一批',
+          offer: '3折起',
+          timeRange: '售完即止',
+        },
+      ],
+    },
+    daily_sign: {
+      pickerLabel: '日签主题',
+      options: [
+        {
+          id: 'morning',
+          label: '早安营业',
+          periodLabel: '今日正常营业',
+          headline: '早安 · 今日营业中',
+          timeRange: '今日全天',
+          styleId: 'minimal',
+        },
+        {
+          id: 'weekend',
+          label: '周末愉快',
+          periodLabel: '周末欢迎到店',
+          headline: '周末愉快',
+          timeRange: '周六日',
+        },
+        {
+          id: 'rain',
+          label: '雨天提醒',
+          periodLabel: '雨天路滑',
+          headline: '雨天路滑 · 慢走',
+          timeRange: '今日',
+          note: '出行注意安全',
+        },
+        {
+          id: 'recommend',
+          label: '今日推荐',
+          periodLabel: '店长推荐',
+          headline: '今日推荐玩法',
+          offer: '限时特价',
+          timeRange: '今日',
+        },
+      ],
+    },
+    member_recharge: {
+      pickerLabel: '储值档位',
+      options: [
+        {
+          id: 'tier_300',
+          label: '充300送50',
+          headline: '充300送50',
+          subheadline: '老客专享回馈',
+          offer: '到账350元',
+          timeRange: '长期有效',
+          styleId: 'premium',
+        },
+        {
+          id: 'tier_500',
+          label: '充500送100',
+          headline: '充500送100',
+          offer: '到账600元',
+          timeRange: '长期有效',
+        },
+        {
+          id: 'tier_1000',
+          label: '充1000送250',
+          headline: '充1000送250',
+          subheadline: '赠畅玩1次',
+          offer: '到账1250元',
+          timeRange: '长期有效',
+          note: '限量100名',
+        },
+      ],
+    },
+  },
+  beauty: {
+    store_visit: {
+      pickerLabel: '种草角度',
+      options: [
+        {
+          id: 'ambiance',
+          label: '氛围打卡',
+          periodLabel: '环境高级感',
+          headline: '这家店太高级了',
+          subheadline: '轻奢氛围拉满',
+          offer: '新客体验价',
+          styleId: 'premium',
+        },
+        {
+          id: 'before_after',
+          label: '效果对比',
+          periodLabel: '真实案例',
+          headline: '效果看得见',
+          subheadline: '专业技师操作',
+          offer: '',
+          note: '案例仅供参考',
+        },
+        {
+          id: 'experience',
+          label: '体验推荐',
+          periodLabel: '新客首选',
+          headline: '新客必试项目',
+          subheadline: '口碑项目TOP1',
+          offer: '体验价¥99',
+        },
+        {
+          id: 'local_hot',
+          label: '本地口碑',
+          periodLabel: '回头客最多',
+          headline: '本地人私藏美店',
+          subheadline: '懂行的才知道',
+          offer: '',
+        },
+      ],
+    },
+    group_buy_new: {
+      pickerLabel: '套餐规格',
+      options: [
+        {
+          id: 'single',
+          label: '单人体验',
+          periodLabel: '1人适用',
+          headline: '单人护理套餐',
+          subheadline: '含清洁+护理',
+          offer: '体验价¥99',
+          note: '需提前预约',
+        },
+        {
+          id: 'double',
+          label: '闺蜜同行',
+          periodLabel: '2人适用',
+          headline: '闺蜜同行套餐',
+          subheadline: '同行更划算',
+          offer: '双人¥168',
+        },
+        {
+          id: 'course',
+          label: '疗程卡',
+          periodLabel: '多次护理',
+          headline: '疗程卡特惠',
+          subheadline: '长期护理更省',
+          offer: '3次卡¥499',
+        },
+        {
+          id: 'new_client',
+          label: '新客专享',
+          periodLabel: '限新客首单',
+          headline: '新客三重礼',
+          offer: '首单立减50',
+          note: '限新客',
+        },
+      ],
+    },
+    product_hero: {
+      pickerLabel: '主推项目',
+      options: [
+        {
+          id: 'signature',
+          label: '招牌项目',
+          periodLabel: '镇店王牌',
+          headline: '招牌必做',
+          offer: '¥199单次',
+          styleId: 'premium',
+        },
+        {
+          id: 'new_service',
+          label: '新品项目',
+          periodLabel: '限时尝鲜',
+          headline: '新品首发',
+          offer: '体验价¥128',
+        },
+        {
+          id: 'seasonal',
+          label: '季节护理',
+          periodLabel: '本季推荐',
+          headline: '季节限定护理',
+          offer: '限时8折',
+        },
+        {
+          id: 'combo',
+          label: '组合套餐',
+          periodLabel: '多项目组合',
+          headline: '焕肤组合',
+          offer: '套餐¥299',
+        },
+      ],
+    },
+  },
+  hotel: {
+    store_visit: {
+      pickerLabel: '种草角度',
+      options: [
+        {
+          id: 'ambiance',
+          label: '度假氛围',
+          periodLabel: '适合拍照出片',
+          headline: '度假感拉满',
+          subheadline: '逃离城市计划',
+          styleId: 'minimal',
+        },
+        {
+          id: 'room_view',
+          label: '房型景观',
+          periodLabel: '窗外美景',
+          headline: '窗外风景绝了',
+          subheadline: '推窗见景',
+        },
+        {
+          id: 'experience',
+          label: '入住体验',
+          periodLabel: '真实住客感受',
+          headline: '入住体验满分',
+          subheadline: '服务贴心',
+        },
+        {
+          id: 'local_hot',
+          label: '周边攻略',
+          periodLabel: '本地人推荐',
+          headline: '周边游玩攻略',
+          offer: '',
+        },
+      ],
+    },
+    group_buy_new: {
+      pickerLabel: '套餐规格',
+      options: [
+        {
+          id: 'single_night',
+          label: '单晚套餐',
+          periodLabel: '1晚适用',
+          headline: '单晚度假套餐',
+          subheadline: '含双早',
+          offer: '¥599/晚',
+        },
+        {
+          id: 'two_nights',
+          label: '连住两晚',
+          periodLabel: '2晚适用',
+          headline: '连住更省',
+          offer: '两晚¥999',
+        },
+        {
+          id: 'family',
+          label: '家庭房',
+          periodLabel: '亲子出行',
+          headline: '家庭房特惠',
+          offer: '家庭房¥799',
+        },
+        {
+          id: 'weekend',
+          label: '周末度假',
+          periodLabel: '周六日',
+          headline: '周末微度假',
+          offer: '周末特惠',
+        },
+      ],
+    },
+    product_hero: {
+      pickerLabel: '主推房型',
+      options: [
+        {
+          id: 'signature',
+          label: '招牌房型',
+          periodLabel: '最受欢迎',
+          headline: '招牌房型',
+          offer: '¥599起',
+        },
+        {
+          id: 'suite',
+          label: '套房升级',
+          periodLabel: '尊享体验',
+          headline: '套房升级',
+          offer: '限时升级',
+        },
+        {
+          id: 'view_room',
+          label: '景观房',
+          periodLabel: '推窗见景',
+          headline: '景观房特惠',
+          offer: '¥699起',
+        },
+        {
+          id: 'seasonal',
+          label: '季节限定',
+          periodLabel: '本季推荐',
+          headline: '季节限定礼遇',
+          offer: '限时优惠',
+        },
+      ],
+    },
+  },
+  pet: {
+    store_visit: {
+      pickerLabel: '种草角度',
+      options: [
+        {
+          id: 'ambiance',
+          label: '萌宠打卡',
+          periodLabel: '治愈氛围',
+          headline: '主子太可爱了',
+          subheadline: '萌宠治愈',
+          styleId: 'fresh',
+        },
+        {
+          id: 'service',
+          label: '服务体验',
+          periodLabel: '洗护美容',
+          headline: '洗护体验满分',
+          subheadline: '专业护理',
+        },
+        {
+          id: 'product',
+          label: '用品推荐',
+          periodLabel: '铲屎官必囤',
+          headline: '铲屎官必囤',
+          offer: '正品保障',
+        },
+        {
+          id: 'local_hot',
+          label: '本地口碑',
+          periodLabel: '回头客最多',
+          headline: '本地萌宠好店',
+        },
+      ],
+    },
+    group_buy_new: {
+      pickerLabel: '套餐规格',
+      options: [
+        {
+          id: 'wash',
+          label: '洗护套餐',
+          periodLabel: '洗澡+护理',
+          headline: '洗护套餐',
+          offer: '洗护¥68起',
+        },
+        {
+          id: 'beauty',
+          label: '美容套餐',
+          periodLabel: '洗澡+美容',
+          headline: '美容套餐',
+          offer: '美容¥128',
+        },
+        {
+          id: 'new_client',
+          label: '新客首单',
+          periodLabel: '限新客',
+          headline: '新客首单特惠',
+          offer: '立减20元',
+        },
+        {
+          id: 'member',
+          label: '会员套餐',
+          periodLabel: '长期护理',
+          headline: '会员护理卡',
+          offer: '3次卡¥299',
+        },
+      ],
+    },
+    product_hero: {
+      pickerLabel: '主推商品',
+      options: [
+        {
+          id: 'food',
+          label: '主粮用品',
+          periodLabel: '正品保障',
+          headline: '爆款主粮',
+          offer: '¥89起',
+        },
+        {
+          id: 'snack',
+          label: '零食玩具',
+          periodLabel: '萌宠最爱',
+          headline: '零食玩具TOP1',
+          offer: '第二件半价',
+        },
+        {
+          id: 'health',
+          label: '保健护理',
+          periodLabel: '健康养护',
+          headline: '健康护理',
+          offer: '限时特价',
+        },
+        {
+          id: 'new_arrival',
+          label: '新品上架',
+          periodLabel: '限时尝鲜',
+          headline: '新品首发',
+          offer: '上新特惠',
+        },
+      ],
+    },
+  },
+  education: {
+    group_buy_new: {
+      pickerLabel: '课程规格',
+      options: [
+        {
+          id: 'trial',
+          label: '试听课',
+          periodLabel: '限新学员',
+          headline: '免费试听课',
+          offer: '试学0元',
+        },
+        {
+          id: 'single',
+          label: '单次体验',
+          periodLabel: '1次课时',
+          headline: '单次体验课',
+          offer: '体验价¥99',
+        },
+        {
+          id: 'package',
+          label: '课时包',
+          periodLabel: '多次课时',
+          headline: '课时包特惠',
+          offer: '10课时¥999',
+        },
+        {
+          id: 'group_buy',
+          label: '团报优惠',
+          periodLabel: '多人同报',
+          headline: '团报更省',
+          offer: '团报8折',
+        },
+      ],
+    },
+    product_hero: {
+      pickerLabel: '主推课程',
+      options: [
+        {
+          id: 'signature',
+          label: '王牌课程',
+          periodLabel: '口碑TOP1',
+          headline: '王牌课程',
+          offer: '限时体验',
+        },
+        {
+          id: 'summer',
+          label: '假期集训',
+          periodLabel: '寒暑假',
+          headline: '假期集训营',
+          offer: '早鸟价',
+        },
+        {
+          id: 'new_class',
+          label: '新开班级',
+          periodLabel: '限额招生',
+          headline: '新开班招生',
+          offer: '报名减300',
+        },
+        {
+          id: 'one_on_one',
+          label: '1对1辅导',
+          periodLabel: '个性化',
+          headline: '1对1辅导',
+          offer: '咨询报价',
+        },
+      ],
+    },
+    daily_sign: {
+      pickerLabel: '日签主题',
+      options: [
+        {
+          id: 'morning',
+          label: '开课提醒',
+          periodLabel: '今日正常上课',
+          headline: '今日正常上课',
+          timeRange: '今日',
+        },
+        {
+          id: 'weekend',
+          label: '周末班',
+          periodLabel: '周末课程',
+          headline: '周末班开课',
+          timeRange: '周六日',
+        },
+        {
+          id: 'holiday',
+          label: '假期通知',
+          periodLabel: '调课安排',
+          headline: '假期调课通知',
+          timeRange: '假期',
+        },
+        {
+          id: 'recommend',
+          label: '今日推荐',
+          periodLabel: '名师推荐',
+          headline: '今日推荐课程',
+          timeRange: '今日',
+        },
+      ],
+    },
+  },
+}
+
 export function getPlaybookVariantConfig(
   playbookId: VisualPlaybookId,
+  industryId?: LocalLifeIndustryId,
 ): PlaybookVariantConfig | null {
-  return PLAYBOOK_VARIANT_CONFIGS[playbookId] ?? null
+  const base = PLAYBOOK_VARIANT_CONFIGS[playbookId] ?? null
+  if (!industryId || industryId === 'catering') return base
+  const override = INDUSTRY_PLAYBOOK_VARIANT_OVERRIDES[industryId]?.[playbookId]
+  if (override) return override
+  return base
 }
 
 export function resolvePlaybookVariant(
   playbookId: VisualPlaybookId,
   variantId: string,
+  industryId?: LocalLifeIndustryId,
 ): PlaybookVariantOption | null {
-  const cfg = getPlaybookVariantConfig(playbookId)
+  const cfg = getPlaybookVariantConfig(playbookId, industryId)
   if (!cfg || !variantId) return null
   return cfg.options.find((o) => o.id === variantId) ?? null
 }
@@ -834,7 +1496,7 @@ export function applyPlaybookVariantToForm(
   form: VisualStudioForm,
   variantId: string,
 ): VisualStudioForm {
-  const cfg = getPlaybookVariantConfig(form.playbook)
+  const cfg = getPlaybookVariantConfig(form.playbook, form.industry)
   if (!cfg) return { ...form, playbookVariantId: variantId }
   const opt = cfg.options.find((o) => o.id === variantId) ?? cfg.options[0]
   if (!opt) return { ...form, playbookVariantId: variantId }
@@ -1208,8 +1870,11 @@ export function applyPlaybookToForm(
 }
 
 function withDefaultPlaybookVariant(form: VisualStudioForm): VisualStudioForm {
-  const cfg = getPlaybookVariantConfig(form.playbook)
+  const cfg = getPlaybookVariantConfig(form.playbook, form.industry)
   if (!cfg?.options[0]) return form
+  const valid =
+    form.playbookVariantId && cfg.options.some((o) => o.id === form.playbookVariantId)
+  if (valid) return applyPlaybookVariantToForm(form, form.playbookVariantId)
   return applyPlaybookVariantToForm(form, cfg.options[0].id)
 }
 
@@ -1244,7 +1909,7 @@ export function generateCopySuggestions(form: VisualStudioForm): CopySuggestion[
   const pb = resolvePlaybook(form.playbook)
   const profile = resolveIndustryProfile(form.industry)
   const override = profile.playbookOverrides[form.playbook] ?? {}
-  const variant = resolvePlaybookVariant(form.playbook, form.playbookVariantId)
+  const variant = resolvePlaybookVariant(form.playbook, form.playbookVariantId, form.industry)
   const store = form.storeName.trim() || '本店'
   const fill = (t: string, offer: string) =>
     t.replace(/\{store\}/g, store).replace(/\{offer\}/g, offer)
@@ -1279,7 +1944,7 @@ export function buildVisualStudioPrompt(
 ): string {
   const pb = resolvePlaybook(form.playbook)
   const industry = LOCAL_LIFE_INDUSTRIES.find((x) => x.id === form.industry)
-  const playbookVariant = resolvePlaybookVariant(form.playbook, form.playbookVariantId)
+  const playbookVariant = resolvePlaybookVariant(form.playbook, form.playbookVariantId, form.industry)
   const style =
     opts?.styleFromReference
       ? '视觉风格参考用户上传的商品/海报图（色调与构图），文案以表单为准。'
