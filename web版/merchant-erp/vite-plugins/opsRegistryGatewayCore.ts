@@ -157,6 +157,28 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
     typeof parsed?.douyinSalesLevelResetYm === 'string' && parsed.douyinSalesLevelResetYm.trim()
       ? parsed.douyinSalesLevelResetYm.trim()
       : undefined
+  // 分销字段：白名单必须透传，否则 load→save 会整表 PATCH 掉渠道/推广员数据
+  const distributionPolicy =
+    parsed?.distributionPolicy &&
+    typeof parsed.distributionPolicy === 'object' &&
+    !Array.isArray(parsed.distributionPolicy)
+      ? parsed.distributionPolicy
+      : undefined
+  const distributionAffiliates = Array.isArray(parsed?.distributionAffiliates)
+    ? parsed!.distributionAffiliates
+    : undefined
+  const distributionPartnerChannels = Array.isArray(parsed?.distributionPartnerChannels)
+    ? parsed!.distributionPartnerChannels
+    : undefined
+  const distributionWithdrawRequests = Array.isArray(parsed?.distributionWithdrawRequests)
+    ? parsed!.distributionWithdrawRequests
+    : undefined
+  const distributionSettlementBatches = Array.isArray(parsed?.distributionSettlementBatches)
+    ? parsed!.distributionSettlementBatches
+    : undefined
+  const distributionWallets = Array.isArray(parsed?.distributionWallets)
+    ? parsed!.distributionWallets
+    : undefined
   return {
     tenants,
     aiModels: ai,
@@ -193,6 +215,12 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
     mpBriefGenRecords,
     mpComplianceReviewRecords,
     ...(douyinSalesLevelResetYm ? { douyinSalesLevelResetYm } : {}),
+    ...(distributionPolicy !== undefined ? { distributionPolicy } : {}),
+    ...(distributionAffiliates !== undefined ? { distributionAffiliates } : {}),
+    ...(distributionPartnerChannels !== undefined ? { distributionPartnerChannels } : {}),
+    ...(distributionWithdrawRequests !== undefined ? { distributionWithdrawRequests } : {}),
+    ...(distributionSettlementBatches !== undefined ? { distributionSettlementBatches } : {}),
+    ...(distributionWallets !== undefined ? { distributionWallets } : {}),
   }
 }
 
