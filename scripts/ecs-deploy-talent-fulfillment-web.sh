@@ -72,6 +72,8 @@ if [[ "${SKIP_BUILD:-0}" != "1" ]]; then
   # shellcheck disable=SC1090
   source "$ENV_PROD"
   set +a
+  # 星选 dr 站：强制商家/星选端标识，避免 envDir 指向商家目录时误吃到 partner 构建变量
+  export VITE_APP_EDITION=merchant
   rm -rf "$FUL/dist"
   (cd "$FUL" && npm ci && npm run build)
 else
