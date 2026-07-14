@@ -17,6 +17,7 @@ import {
   fetchImageBlob,
   pngBlobFromImageUrl,
   readFileAsDataUrl,
+  sliceCarouselFiveStrips,
   triggerBlobDownload,
 } from '../lib/aiImageDelivery'
 import {
@@ -34,6 +35,7 @@ import {
   isPlatformSeriesPlaybook,
   LOCAL_LIFE_INDUSTRIES,
   PLATFORM_SERIES_CHANNELS,
+  platformCarouselMasterGenSize,
   preferWanxPosterForIntent,
   publishChannelLogoSrc,
   PUBLISH_CHANNELS,
@@ -42,6 +44,7 @@ import {
   resolveIndustryProfile,
   resolveIndustrySceneContext,
   resolvePlaybook,
+  resolvePlaybookSizeDisplay,
   resolvePlaybookSizePresetId,
   resolveSeriesSlotLabel,
   type CopySuggestion,
@@ -504,7 +507,113 @@ export default function AiImageStudioPage() {
 
     const refImage = pickReferenceImage()
     const preferPoster = preferWanxPosterForIntent(playbook.intent)
+    const isCarouselFive = form.playbook === 'platform_carousel_five'
 
+    const finishVariantFromBlob = async (
+      job: VariantResult,
+      blob: Blob,
+      ch: ReturnType<typeof resolveChannel>,
+    ) => {
+      job.status = 'done'
+      try {
+        if (form.delivery === 'platform') {
+          const jpeg = await compressImageBlobToJpeg(blob)
+          job.previewUrl = URL.createObjectURL(jpeg)
+          job.fileExt = 'jpg'
+        } else {
+          job.previewUrl = URL.createObjectURL(blob)
+          job.fileExt = 'png'
+        }
+      } catch {
+        job.previewUrl = URL.createObjectURL(blob)
+        job.fileExt = form.delivery === 'platform' ? 'jpg' : 'png'
+      }
+      void spendVisualStudioImagePoints({
+        idempotencyKey: `vs-img-${runId}-${job.id}`,
+        note: `${ch.short} ${resolveSeriesSlotLabel(form.playbook, job.variantIndex)}`,
+      })
+    }
+
+    if (isCarouselFive) {
+      const channelIds = [...new Set(jobList.map((j) => j.channelId))]
+      for (let ci = 0; ci < channelIds.length; ci++) {
+        if (ac.signal.aborted) break
+        const channelId = channelIds[ci]!
+        const ch = resolveChannel(channelId)
+        const channelJobs = jobList
+          .filter((j) => j.channelId === channelId)
+          .sort((a, b) => a.variantIndex - b.variantIndex)
+        channelJobs.forEach((j) => {
+          j.status = 'running'
+        })
+        setVariants([...jobList])
+        setSelectedPreviewChannel(channelId)
+        setSelectedPreviewVariantId(channelJobs[0]?.id ?? null)
+
+        const masterGen = platformCarouselMasterGenSize(channelId)
+        setProgress(
+          `${ch.short} · 五连图横幅 · AI 整理需求（${ci + 1}/${channelIds.length} 平台）`,
+        )
+
+        const promptPack = await fetchVisualStudioImagePromptFromAi(form, {
+          channel: channelId,
+          carouselMaster: true,
+          productRefCount: productRefs.length,
+          styleFromReference: productRefs.length > 0,
+          refineNote: opts?.refine ?? refineNote,
+          signal: ac.signal,
+        })
+        if (ac.signal.aborted) break
+        const prompt = promptPack.ok ? promptPack.prompt : promptPack.fallback
+
+        setProgress(`${ch.short} · 五连图横幅 · 生图中（${masterGen.wanxSize}）`)
+        const out = await postAiAgentNativeImage(prompt, {
+          exactPrompt: true,
+          preferredVendor: 'qwen',
+          referenceImageDataUrl: refImage,
+          wanxSize: masterGen.wanxSize,
+          aspectRatio: '16:9',
+          preferWanxPosterModel: preferPoster,
+          signal: ac.signal,
+        })
+
+        if (!out.ok) {
+          channelJobs.forEach((j) => {
+            j.status = 'error'
+            j.message = out.message
+          })
+          setVariants([...jobList])
+          continue
+        }
+
+        setProgress(
+          `${ch.short} · 裁切为 5 张 ${masterGen.slideSpec.slideWidth}×${masterGen.slideSpec.slideHeight}`,
+        )
+        try {
+          const masterBlob = await fetchImageBlob(out.imageUrl)
+          const strips = await sliceCarouselFiveStrips(masterBlob, masterGen.slideSpec)
+          for (let si = 0; si < channelJobs.length; si++) {
+            const job = channelJobs[si]!
+            const strip = strips[si]
+            if (!strip) {
+              job.status = 'error'
+              job.message = '裁切失败'
+              continue
+            }
+            job.imageUrl = out.imageUrl
+            await finishVariantFromBlob(job, strip, ch)
+            setSelectedPreviewVariantId(job.id)
+          }
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : '裁切失败'
+          channelJobs.forEach((j) => {
+            j.status = 'error'
+            j.message = msg
+          })
+        }
+        setVariants([...jobList])
+      }
+    } else {
     for (let i = 0; i < jobList.length; i++) {
       if (ac.signal.aborted) break
       const job = jobList[i]!
@@ -554,8 +663,8 @@ export default function AiImageStudioPage() {
         continue
       }
 
-      job.status = 'done'
       job.imageUrl = out.imageUrl
+      job.status = 'done'
       void spendVisualStudioImagePoints({
         idempotencyKey: `vs-img-${runId}-${job.id}`,
         note: `${ch.short} 方案${job.variantIndex + 1}`,
@@ -576,6 +685,7 @@ export default function AiImageStudioPage() {
         job.fileExt = form.delivery === 'platform' ? 'jpg' : 'png'
       }
       setVariants([...jobList])
+    }
     }
 
     setBusy(false)
@@ -629,9 +739,8 @@ export default function AiImageStudioPage() {
     () =>
       form.channels.map((id) => {
         const ch = resolveChannel(id)
-        const sizeId = resolvePlaybookSizePresetId(id, form.playbook)
-        const size = resolveAiImageSizePreset(sizeId)
-        return { id, ch, size }
+        const display = resolvePlaybookSizeDisplay(id, form.playbook)
+        return { id, ch, display }
       }),
     [form.channels, form.playbook],
   )
@@ -740,7 +849,7 @@ export default function AiImageStudioPage() {
             </label>
             {isPlatformSeries && (
               <p className="mt-2 text-[10px] leading-relaxed text-orange-700/90">
-                五连图/详情图模式：已锁定抖音、快手、美团，默认三端各出 5 张。
+                五连图：每平台先生成 1 张横幅再裁 5 张；详情图：三端各出 5 段竖图。
               </p>
             )}
           </StudioPanel>
@@ -765,7 +874,7 @@ export default function AiImageStudioPage() {
                   <span className="text-lg">🎠</span>
                   <div>
                     <p className="text-sm font-semibold text-slate-900">五连图</p>
-                    <p className="text-[11px] text-slate-500">门店头图轮播 · 5 张横图横滑衔接</p>
+                    <p className="text-[11px] text-slate-500">先生成超宽横幅，再按平台单张宽度裁 5 张轮播</p>
                   </div>
                 </div>
               </button>
@@ -1038,7 +1147,16 @@ export default function AiImageStudioPage() {
                           setSelectedPreviewVariantId(v.id)
                         }}
                       >
-                        <div className="flex aspect-[3/4] items-center justify-center bg-slate-100">
+                        <div
+                          className={cn(
+                            'flex items-center justify-center bg-slate-100',
+                            form.playbook === 'platform_carousel_five'
+                              ? 'aspect-[16/9]'
+                              : form.playbook === 'platform_detail_page'
+                                ? 'aspect-[9/16]'
+                                : 'aspect-[3/4]',
+                          )}
+                        >
                           {v.status === 'running' || v.status === 'pending' ? (
                             <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
                           ) : v.status === 'error' ? (
@@ -1100,7 +1218,7 @@ export default function AiImageStudioPage() {
                 ) : null}
               </div>
               <ul className="space-y-2">
-                {selectedChannelSpecs.map(({ id, ch, size }) => (
+                {selectedChannelSpecs.map(({ id, ch, display }) => (
                   <li
                     key={id}
                     className="rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5"
@@ -1113,7 +1231,7 @@ export default function AiImageStudioPage() {
                       <span className="text-xs font-semibold text-slate-800">{ch.label}</span>
                     </div>
                     <p className="mt-1 text-[11px] text-slate-600">
-                      {size.label} · {size.pixelHint} · {size.aspectRatio}
+                      {display.label} · {display.pixelHint} · {display.aspectRatio}
                     </p>
                     <p className="mt-0.5 text-[10px] leading-relaxed text-slate-400">
                       {ch.publishTips[0]}

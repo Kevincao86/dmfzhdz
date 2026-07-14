@@ -163,6 +163,88 @@ export const PLATFORM_SERIES_CHANNELS: PublishChannelId[] = ['douyin', 'kuaishou
 
 export const PLATFORM_SERIES_SLOT_COUNT = 5
 
+/** 各平台门店头图轮播「单张」像素（装修规范汇总，用于五连图裁切） */
+export type PlatformCarouselFiveSpec = {
+  channelId: PublishChannelId
+  slideWidth: number
+  slideHeight: number
+  /** 平台侧说明（展示用） */
+  specNote: string
+}
+
+export const PLATFORM_CAROUSEL_FIVE_SPECS: Record<
+  'douyin' | 'kuaishou' | 'meituan',
+  PlatformCarouselFiveSpec
+> = {
+  meituan: {
+    channelId: 'meituan',
+    slideWidth: 750,
+    slideHeight: 420,
+    specNote: '美团/点评轮播单张 750×420（≈16:9），≤3MB',
+  },
+  douyin: {
+    channelId: 'douyin',
+    slideWidth: 750,
+    slideHeight: 422,
+    specNote: '抖音来客店铺入口/海报轮播 750×422',
+  },
+  kuaishou: {
+    channelId: 'kuaishou',
+    slideWidth: 750,
+    slideHeight: 422,
+    specNote: '快手本地海报轮播 16:9 · 750×422',
+  },
+}
+
+export function resolvePlatformCarouselFiveSpec(channelId: PublishChannelId): PlatformCarouselFiveSpec {
+  if (channelId === 'douyin' || channelId === 'kuaishou' || channelId === 'meituan') {
+    return PLATFORM_CAROUSEL_FIVE_SPECS[channelId]
+  }
+  return PLATFORM_CAROUSEL_FIVE_SPECS.meituan
+}
+
+/** 五连图：先出一张超宽主图（API 宽 768–4096），再按单张宽度裁 5 份并缩放到平台尺寸 */
+export function platformCarouselMasterGenSize(channelId: PublishChannelId): {
+  wanxSize: string
+  pixelHint: string
+  slideSpec: PlatformCarouselFiveSpec
+} {
+  const slideSpec = resolvePlatformCarouselFiveSpec(channelId)
+  const idealW = slideSpec.slideWidth * PLATFORM_SERIES_SLOT_COUNT
+  const idealH = slideSpec.slideHeight
+  const ratio = idealW / idealH
+  let h = Math.max(768, Math.min(4096, idealH))
+  let w = Math.round(h * ratio)
+  if (w > 4096) {
+    w = 4096
+    h = Math.max(768, Math.round(w / ratio))
+  }
+  return {
+    wanxSize: `${w}*${h}`,
+    pixelHint: `${idealW}×${idealH}（裁切后 ${slideSpec.slideWidth}×${slideSpec.slideHeight}×5）`,
+    slideSpec,
+  }
+}
+
+export function isCarouselFivePlaybook(playbookId: VisualPlaybookId): boolean {
+  return playbookId === 'platform_carousel_five'
+}
+
+/** 五连图整幅横幅 Prompt 片段（从左到右 5 段，供一次生图） */
+export function buildCarouselFiveMasterPromptExtra(
+  channelId: PublishChannelId,
+): string[] {
+  const spec = resolvePlatformCarouselFiveSpec(channelId)
+  const ch = resolveChannel(channelId)
+  const labels = CAROUSEL_FIVE_SLOTS.map((s) => s.label).join(' → ')
+  return [
+    `【五连图整幅超宽横幅】投放 ${ch.label}，从左到右均分 5 个板块：${labels}。`,
+    '整幅为一张连续横图：背景渐变、光效、装饰线、字体与配色须全幅统一，板块之间可横滑无缝衔接，禁止每段独立换风格或换背景。',
+    ...CAROUSEL_FIVE_SLOTS.map((s, i) => `第 ${i + 1} 段（${s.label}）：${s.prompt.replace(/^五连图第\d+张[^：:]*[：:]/, '')}`),
+    `生成后将按单张宽度 ${spec.slideWidth}px 裁成 5 张 ${spec.slideWidth}×${spec.slideHeight} 上传门店头图轮播。`,
+  ]
+}
+
 export type PlatformSeriesSlot = {
   label: string
   prompt: string
@@ -235,7 +317,7 @@ export const PUBLISH_CHANNELS: Array<{
     primarySizeId: 'moments_vertical',
     carouselSizeId: 'landscape',
     detailSizeId: 'a4_portrait',
-    publishTips: ['竖屏 9:16', '主标题 6 字内更易读', '留底部安全区放团购入口'],
+    publishTips: ['竖屏 9:16', '主标题 6 字内更易读', '留底部安全区放团购入口', '五连图单张 750×422'],
   },
   {
     id: 'xiaohongshu',
@@ -262,7 +344,7 @@ export const PUBLISH_CHANNELS: Array<{
     primarySizeId: 'square',
     carouselSizeId: 'landscape',
     detailSizeId: 'a4_portrait',
-    publishTips: ['团购主图偏 1:1', '突出套餐组合与到手价', '避免过多小字'],
+    publishTips: ['团购主图偏 1:1', '突出套餐组合与到手价', '避免过多小字', '五连图单张 750×420'],
   },
   {
     id: 'kuaishou',
@@ -272,7 +354,7 @@ export const PUBLISH_CHANNELS: Array<{
     primarySizeId: 'moments_vertical',
     carouselSizeId: 'landscape',
     detailSizeId: 'a4_portrait',
-    publishTips: ['竖屏短视频封面同尺寸', '大字报风格转化更好'],
+    publishTips: ['竖屏短视频封面同尺寸', '大字报风格转化更好', '五连图单张 750×422'],
   },
   {
     id: 'offline_print',
@@ -2080,7 +2162,7 @@ const INTENT_PROMPT: Record<VisualIntentId, string> = {
   environment: '设计探店氛围图，真实可信的就餐/服务环境，适合小红书种草。',
   menu: '设计菜单价目视觉，分区清晰、价格可读。',
   carousel:
-    '设计本地生活门店「五连图」轮播单张：16:9 横图，与相邻图色调/装饰可横滑衔接，适合抖音/快手/美团门店头图。',
+    '设计本地生活门店「五连图」完整超宽横幅：从左到右均分 5 个板块，背景/光效/色调无缝衔接，生成后将按平台单张宽度裁成 5 张轮播图。',
   detail:
     '设计团购「详情长图」单段：3:4 竖图，大图+中英标题排版，适合抖音/快手/美团详情页竖向拼接。',
 }
@@ -2120,19 +2202,36 @@ export function resolveSeriesSlotPrompt(playbookId: VisualPlaybookId, index: num
   return slots[index]?.prompt ?? `构图方案${index + 1}。`
 }
 
-/** 按玩法解析出图尺寸（五连图横图 / 详情图竖图 / 默认渠道主尺寸） */
+/** 按玩法解析出图尺寸（五连图=超宽主图 / 详情图竖图 / 默认渠道主尺寸） */
 export function resolvePlaybookSizePresetId(
   channelId: PublishChannelId,
   playbookId: VisualPlaybookId,
 ): AiImageSizePresetId {
-  const ch = resolveChannel(channelId)
   if (playbookId === 'platform_carousel_five') {
-    return ch.carouselSizeId ?? 'landscape'
+    return 'landscape'
   }
   if (playbookId === 'platform_detail_page') {
-    return ch.detailSizeId ?? 'a4_portrait'
+    return resolveChannel(channelId).detailSizeId ?? 'a4_portrait'
   }
-  return ch.primarySizeId
+  return resolveChannel(channelId).primarySizeId
+}
+
+export function resolvePlaybookSizeDisplay(
+  channelId: PublishChannelId,
+  playbookId: VisualPlaybookId,
+): { label: string; pixelHint: string; aspectRatio: string } {
+  if (playbookId === 'platform_carousel_five') {
+    const master = platformCarouselMasterGenSize(channelId)
+    const s = master.slideSpec
+    return {
+      label: '五连图',
+      pixelHint: `主图 ${master.pixelHint} → 单张 ${s.slideWidth}×${s.slideHeight}`,
+      aspectRatio: `${PLATFORM_SERIES_SLOT_COUNT}×16:9`,
+    }
+  }
+  const sizeId = resolvePlaybookSizePresetId(channelId, playbookId)
+  const size = resolveAiImageSizePreset(sizeId)
+  return { label: size.label, pixelHint: size.pixelHint, aspectRatio: size.aspectRatio }
 }
 
 export function effectiveVariantCountForForm(form: VisualStudioForm): number {
@@ -2575,6 +2674,8 @@ export function buildVisualStudioPrompt(
     productRefCount?: number
     styleFromReference?: boolean
     refineNote?: string
+    /** 五连图：一次生成整幅横幅（非单张 slot） */
+    carouselMaster?: boolean
   },
 ): string {
   const pb = resolvePlaybook(form.playbook)
@@ -2592,17 +2693,25 @@ export function buildVisualStudioPrompt(
       : AI_IMAGE_STYLE_PRESETS.find((s) => s.id === form.styleId)?.promptHint ?? '商业设计'
 
   const channel = opts?.channel ? resolveChannel(opts.channel) : null
-  const size = channel
+  const carouselMaster = opts?.carouselMaster === true && form.playbook === 'platform_carousel_five'
+  const sizeDisplay = channel
+    ? resolvePlaybookSizeDisplay(channel.id, form.playbook)
+    : null
+  const size = channel && !carouselMaster
     ? resolveAiImageSizePreset(resolvePlaybookSizePresetId(channel.id, form.playbook))
     : null
   const lines = [
-    INTENT_PROMPT[pb.intent],
+    carouselMaster ? INTENT_PROMPT.carousel : INTENT_PROMPT[pb.intent],
     `【业态锁定】${sceneCtx.label}。${sceneCtx.sceneHint}。画面主体、道具、环境必须严格符合该业态，禁止出现与业态无关的场景（如餐饮禁止酒吧夜场、足浴禁止咖啡厅）。`,
     form.industrySubId === 'leisure_foot_spa'
       ? '【足浴专项】须呈现足浴沙发/足疗椅、足浴桶、技师足部按摩等服务场景；严禁浴缸、酒店客房、海边落地窗、温泉泳池、度假别墅等酒旅元素。'
       : '',
     `视觉风格：${style}。`,
-    channel ? `投放渠道：${channel.label}，${size?.aspectRatio ?? ''} ${size?.pixelHint ?? ''}，请符合该平台常见封面构图。` : '',
+    channel
+      ? carouselMaster
+        ? `投放渠道：${channel.label}，${sizeDisplay?.pixelHint ?? ''}，超宽横幅一次出图。`
+        : `投放渠道：${channel.label}，${size?.aspectRatio ?? ''} ${size?.pixelHint ?? ''}，请符合该平台常见封面构图。`
+      : '',
     variantConfig?.pickerLabel && playbookVariant
       ? `${variantConfig.pickerLabel}：${playbookVariant.label}（${playbookVariant.periodLabel}）。`
       : playbookVariant
@@ -2622,7 +2731,9 @@ export function buildVisualStudioPrompt(
   ].filter(Boolean)
 
   const vi = opts?.variantIndex ?? 0
-  if (isPlatformSeriesPlaybook(form.playbook)) {
+  if (carouselMaster && channel) {
+    lines.push(...buildCarouselFiveMasterPromptExtra(channel.id))
+  } else if (isPlatformSeriesPlaybook(form.playbook)) {
     lines.push(resolveSeriesSlotPrompt(form.playbook, vi))
     lines.push(
       form.playbook === 'platform_carousel_five'
@@ -2647,6 +2758,7 @@ export function buildVisualStudioImageContext(
     productRefCount?: number
     styleFromReference?: boolean
     refineNote?: string
+    carouselMaster?: boolean
   },
 ): Record<string, string | number | boolean | string[]> {
   const pb = resolvePlaybook(form.playbook)
@@ -2660,10 +2772,13 @@ export function buildVisualStudioImageContext(
   const variantConfig = getPlaybookVariantConfig(form.playbook, form.industry, form.industrySubId)
   const stylePreset = AI_IMAGE_STYLE_PRESETS.find((s) => s.id === form.styleId)
   const channel = opts?.channel ? resolveChannel(opts.channel) : null
-  const size = channel
+  const carouselMaster = opts?.carouselMaster === true && form.playbook === 'platform_carousel_five'
+  const sizeDisplay = channel ? resolvePlaybookSizeDisplay(channel.id, form.playbook) : null
+  const size = channel && !carouselMaster
     ? resolveAiImageSizePreset(resolvePlaybookSizePresetId(channel.id, form.playbook))
     : null
   const vi = opts?.variantIndex ?? 0
+  const masterGen = carouselMaster && channel ? platformCarouselMasterGenSize(channel.id) : null
   return {
     industry: sceneCtx.label,
     industrySceneHint: sceneCtx.sceneHint,
@@ -2678,22 +2793,28 @@ export function buildVisualStudioImageContext(
     styleHint: stylePreset?.promptHint ?? '',
     channelLabel: channel?.label ?? '',
     channelShort: channel?.short ?? '',
-    aspectRatio: size?.aspectRatio ?? '',
-    pixelHint: size?.pixelHint ?? '',
+    aspectRatio: carouselMaster ? (sizeDisplay?.aspectRatio ?? '') : (size?.aspectRatio ?? ''),
+    pixelHint: carouselMaster ? (masterGen?.pixelHint ?? sizeDisplay?.pixelHint ?? '') : (size?.pixelHint ?? ''),
+    carouselMaster,
+    carouselMasterWanxSize: masterGen?.wanxSize ?? '',
+    carouselSlideWidth: masterGen?.slideSpec.slideWidth ?? 0,
+    carouselSlideHeight: masterGen?.slideSpec.slideHeight ?? 0,
+    compositionVariant: carouselMaster && channel
+      ? buildCarouselFiveMasterPromptExtra(channel.id).join('\n')
+      : isPlatformSeriesPlaybook(form.playbook)
+        ? resolveSeriesSlotPrompt(form.playbook, vi)
+        : (VARIANT_SUFFIX[vi] ?? VARIANT_SUFFIX[0]!),
+    seriesSlotLabel: isPlatformSeriesPlaybook(form.playbook)
+      ? resolveSeriesSlotLabel(form.playbook, vi)
+      : '',
+    seriesSlotIndex: isPlatformSeriesPlaybook(form.playbook) ? vi + 1 : 0,
+    seriesSlotTotal: platformSeriesSlotCount(form.playbook),
     storeName: form.storeName.trim(),
     headline: form.headline.trim(),
     subheadline: form.subheadline.trim(),
     offer: form.offer.trim(),
     timeRange: form.timeRange.trim(),
     note: form.note.trim(),
-    compositionVariant: isPlatformSeriesPlaybook(form.playbook)
-      ? resolveSeriesSlotPrompt(form.playbook, vi)
-      : (VARIANT_SUFFIX[vi] ?? VARIANT_SUFFIX[0]!),
-    seriesSlotLabel: isPlatformSeriesPlaybook(form.playbook)
-      ? resolveSeriesSlotLabel(form.playbook, vi)
-      : '',
-    seriesSlotIndex: isPlatformSeriesPlaybook(form.playbook) ? vi + 1 : 0,
-    seriesSlotTotal: platformSeriesSlotCount(form.playbook),
     productRefCount: opts?.productRefCount ?? 0,
     styleFromReference: opts?.styleFromReference === true,
     refineNote: opts?.refineNote?.trim() ?? '',
