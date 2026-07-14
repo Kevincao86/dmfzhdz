@@ -4,7 +4,6 @@ import {
   MP_POINTS_BRIEF_PER_USE,
   MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE,
   MP_POINTS_VISUAL_STUDIO_COPY_PER_USE,
-  MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE,
   mpPointsCostForVisualStudioImages,
 } from '../lib/mpPointsEconomics'
 import { merchantApiFetchUrls } from '../lib/merchantErpApiBase'
