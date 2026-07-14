@@ -213,7 +213,7 @@ export const PUBLISH_CHANNELS: Array<{
 export const PUBLISH_CHANNEL_LOGO: Partial<Record<PublishChannelId, PlatformLogoKey>> = {
   douyin: 'douyin_laike',
   xiaohongshu: 'xiaohongshu',
-  wechat_moments: 'wechat',
+  wechat_moments: 'wechat_moments',
   meituan: 'dianping',
   kuaishou: 'kuaishou_local',
 }
