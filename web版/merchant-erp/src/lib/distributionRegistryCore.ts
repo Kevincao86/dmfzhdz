@@ -723,6 +723,21 @@ export type AffiliatePortalSettlementRow = {
   paidAt?: string
 }
 
+export function buildDistributionPromoLinks(refCode: string): {
+  cs: string
+  drPr: string
+  drTalent: string
+  mpPath: string
+} {
+  const code = encodeURIComponent(refCode.trim())
+  return {
+    cs: `https://cs.mofangdianai.com/register?ref=${code}`,
+    drPr: `https://dr.mofangdianai.com/register?ref=${code}&role=pr`,
+    drTalent: `https://dr.mofangdianai.com/register?ref=${code}&role=talent`,
+    mpPath: `/pages/welcome/welcome?ref=${refCode.trim()}`,
+  }
+}
+
 export function buildAffiliatePortalFromSnapshot(
   data: RegistryFile,
   phoneRaw: unknown,

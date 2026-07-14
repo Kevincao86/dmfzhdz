@@ -1,6 +1,7 @@
 import { merchantApiFetchUrls } from '../lib/merchantErpApiBase'
 import { resolveMerchantApiBearer } from '../lib/merchantApiAuth'
 import type { RegistryDistributionSalesperson } from '../lib/distributionRegistryTypes'
+import { buildDistributionPromoLinks } from '../lib/distributionRegistryCore'
 
 export type PartnerSalesperson = RegistryDistributionSalesperson
 
@@ -71,11 +72,5 @@ export function buildPartnerPromoLinks(refCode: string): {
   drTalent: string
   mpPath: string
 } {
-  const code = encodeURIComponent(refCode.trim())
-  return {
-    cs: `https://cs.mofangdianai.com/register?ref=${code}`,
-    drPr: `https://dr.mofangdianai.com/register?ref=${code}&role=pr`,
-    drTalent: `https://dr.mofangdianai.com/register?ref=${code}&role=talent`,
-    mpPath: `/pages/welcome/welcome?ref=${refCode.trim()}`,
-  }
+  return buildDistributionPromoLinks(refCode)
 }
