@@ -225,6 +225,38 @@ export default function AiImageStudioPage() {
   const industryScene = useMemo(() => resolveIndustrySceneContext(form), [form.industry, form.industrySubId])
   const subCategories = useMemo(() => getSubCategoriesForIndustry(form.industry), [form.industry])
   const visiblePlaybooks = useMemo(() => getPlaybooksForIndustry(form.industry), [form.industry])
+  const activeGenerateChannels = useMemo(
+    () => (form.multiChannelPack ? form.channels : [form.channels[0] ?? 'douyin']),
+    [form.channels, form.multiChannelPack],
+  )
+  const generatePlan = useMemo(() => {
+    const channelCount = activeGenerateChannels.length
+    const variantCount = form.variantCount
+    const total = channelCount * variantCount
+    const primary = resolveChannel(activeGenerateChannels[0] ?? 'douyin')
+    if (channelCount === 1) {
+      return {
+        buttonLabel: '一键出图',
+        detail:
+          variantCount > 1
+            ? `${primary.short} · ${variantCount} 种构图版式`
+            : `${primary.short}`,
+        total,
+      }
+    }
+    if (form.multiChannelPack) {
+      return {
+        buttonLabel: `一键出 ${channelCount} 平台套装`,
+        detail: `每平台 ${variantCount} 种构图 · 共 ${total} 张`,
+        total,
+      }
+    }
+    return {
+      buttonLabel: `一键出 ${variantCount} 张构图`,
+      detail: `${primary.short}`,
+      total,
+    }
+  }, [activeGenerateChannels, form.multiChannelPack, form.variantCount])
   const activeChannel = resolveChannel(selectedPreviewChannel)
   const fieldLabels = industryProfile.fieldLabels
   const copySuggestions = useMemo(
@@ -889,14 +921,16 @@ export default function AiImageStudioPage() {
                 ))}
               </ul>
               <p className="mt-2 text-[10px] text-slate-400">
-                {form.multiChannelPack ? '已开启多端套装，各平台各出一套' : '当前仅首渠道出图'}
+                {form.multiChannelPack && form.channels.length > 1
+                  ? `已开启多端套装，${form.channels.length} 个平台各出 ${form.variantCount} 种构图`
+                  : `当前仅 ${resolveChannel(form.channels[0] ?? 'douyin').short} 出图`}
               </p>
             </StudioPanel>
 
           <StudioPanel
             step="4"
             title="生成与方案"
-            subtitle="配置出图数量与格式，一键生成"
+            subtitle={generatePlan.detail}
           >
             <div className="flex flex-wrap items-center gap-2">
               <button
@@ -906,16 +940,17 @@ export default function AiImageStudioPage() {
                 className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 hover:from-slate-800 hover:to-slate-700 disabled:opacity-60"
               >
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
-                一键出 {form.variantCount} 张方案
+                {generatePlan.buttonLabel}
               </button>
               <select
                 value={form.variantCount}
                 disabled={busy}
                 onChange={(e) => patchForm({ variantCount: Number(e.target.value) as 2 | 4 })}
                 className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm"
+                title="每个平台的构图版式数量"
               >
-                <option value={2}>2 张</option>
-                <option value={4}>4 张（推荐）</option>
+                <option value={2}>2 种构图</option>
+                <option value={4}>4 种构图</option>
               </select>
               <select
                 value={form.delivery}
