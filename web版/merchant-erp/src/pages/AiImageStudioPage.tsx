@@ -220,6 +220,7 @@ export default function AiImageStudioPage() {
   const [copyAiBusy, setCopyAiBusy] = useState(false)
   const [copyAiHint, setCopyAiHint] = useState<string | null>(null)
   const [selectedPreviewChannel, setSelectedPreviewChannel] = useState<PublishChannelId>('douyin')
+  const [selectedPreviewVariantId, setSelectedPreviewVariantId] = useState<string | null>(null)
   const [variants, setVariants] = useState<VariantResult[]>([])
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState('')
@@ -470,6 +471,7 @@ export default function AiImageStudioPage() {
         `${ch.short} · 方案 ${job.variantIndex + 1}/${form.variantCount}（${i + 1}/${jobList.length}）· AI 整理出图需求`,
       )
       setSelectedPreviewChannel(job.channelId)
+      setSelectedPreviewVariantId(job.id)
 
       const promptPack = await fetchVisualStudioImagePromptFromAi(form, {
         channel: job.channelId,
@@ -544,9 +546,13 @@ export default function AiImageStudioPage() {
 
   const heroPreview = useMemo(() => {
     const done = variants.filter((v) => v.status === 'done' && v.previewUrl)
+    if (selectedPreviewVariantId) {
+      const picked = done.find((v) => v.id === selectedPreviewVariantId)
+      if (picked?.previewUrl) return picked.previewUrl
+    }
     const forChannel = done.filter((v) => v.channelId === selectedPreviewChannel)
     return (forChannel[0] ?? done[0])?.previewUrl
-  }, [variants, selectedPreviewChannel])
+  }, [variants, selectedPreviewChannel, selectedPreviewVariantId])
 
   const downloadVariant = async (v: VariantResult) => {
     if (!v.previewUrl && !v.imageUrl) return
@@ -906,14 +912,16 @@ export default function AiImageStudioPage() {
                       key={v.id}
                       className={cn(
                         'overflow-hidden rounded-xl border bg-white shadow-sm transition',
-                        v.previewUrl && selectedPreviewChannel === v.channelId && 'ring-2 ring-violet-400',
+                        v.previewUrl && selectedPreviewVariantId === v.id && 'ring-2 ring-violet-400',
                       )}
                     >
                       <button
                         type="button"
                         className="block w-full"
                         onClick={() => {
-                          if (v.previewUrl) setSelectedPreviewChannel(v.channelId)
+                          if (!v.previewUrl) return
+                          setSelectedPreviewChannel(v.channelId)
+                          setSelectedPreviewVariantId(v.id)
                         }}
                       >
                         <div className="flex aspect-[3/4] items-center justify-center bg-slate-100">
@@ -1105,7 +1113,10 @@ export default function AiImageStudioPage() {
                 <button
                   key={cid}
                   type="button"
-                  onClick={() => setSelectedPreviewChannel(cid)}
+                  onClick={() => {
+                    setSelectedPreviewChannel(cid)
+                    setSelectedPreviewVariantId(null)
+                  }}
                   className={cn(
                     'rounded-full px-3 py-1 text-xs font-medium transition-all',
                     selectedPreviewChannel === cid

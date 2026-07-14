@@ -29,7 +29,8 @@ export const PLATFORM_LOGO_SRC: Record<PlatformLogoKey, string> = {
   meituan_waimai: merchantStaticUrl('/platforms/meituan-waimai.png'),
   jd_waimai: merchantStaticUrl('/platforms/jd-waimai.png'),
   wechat: merchantStaticUrl('/platforms/wechat.png'),
-  wechat_moments: merchantStaticUrl('/platforms/wechat-moments.png'),
+  /** 朋友圈彩色快门标：OSS 未同步前走同源静态，避免空白 */
+  wechat_moments: '/platforms/wechat-moments.png',
 }
 
 /** 创建商品 / 系统设置商家后台 — 各经营平台 Logo（无图时回退字母占位） */
