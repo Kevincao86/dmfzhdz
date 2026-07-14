@@ -31,6 +31,7 @@ import {
   generateCopySuggestions,
   getPlaybookVariantConfig,
   getPlaybooksForIndustry,
+  getStylePresetsForIndustrySub,
   getSubCategoriesForIndustry,
   isPlatformSeriesPlaybook,
   LOCAL_LIFE_INDUSTRIES,
@@ -52,6 +53,7 @@ import {
   type PublishChannelId,
   type VisualPlaybookId,
   type VisualStudioForm,
+  type VisualStudioReferenceAnalysis,
 } from '../lib/aiImageStudioPresets'
 import {
   MP_POINTS_VISUAL_STUDIO_COPY_PER_USE,
@@ -59,7 +61,7 @@ import {
   mpPointsCostForVisualStudioImages,
 } from '../lib/mpPointsEconomics'
 import { postAiAgentNativeImage } from '../services/ai/aiClient'
-import { fetchVisualStudioCopyFromAi, fetchVisualStudioImagePromptFromAi } from '../services/ai/visualStudioAi'
+import { fetchVisualStudioCopyFromAi, analyzeVisualStudioReferenceImage, fetchVisualStudioImagePromptFromAi } from '../services/ai/visualStudioAi'
 import {
   checkVisualStudioCopyAffordable,
   checkVisualStudioImageBatchAffordable,
@@ -237,6 +239,9 @@ function DevicePreview({
 export default function AiImageStudioPage() {
   const [form, setForm] = useState<VisualStudioForm>(DEFAULT_VISUAL_STUDIO_FORM)
   const [productRefs, setProductRefs] = useState<Array<{ id: string; dataUrl: string; name: string }>>([])
+  const [referenceAnalysis, setReferenceAnalysis] = useState<VisualStudioReferenceAnalysis | null>(null)
+  const [refAnalyzeBusy, setRefAnalyzeBusy] = useState(false)
+  const [refAnalyzeHint, setRefAnalyzeHint] = useState<string | null>(null)
   const [copyOptions, setCopyOptions] = useState<CopySuggestion[]>([])
   const [copyAiBusy, setCopyAiBusy] = useState(false)
   const [copyAiHint, setCopyAiHint] = useState<string | null>(null)
@@ -250,6 +255,7 @@ export default function AiImageStudioPage() {
   const [storeLoadHint, setStoreLoadHint] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const copyAbortRef = useRef<AbortController | null>(null)
+  const refAnalyzeAbortRef = useRef<AbortController | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const initRef = useRef(false)
 
@@ -264,6 +270,10 @@ export default function AiImageStudioPage() {
     [playbookVariantConfig, form.playbookVariantId],
   )
   const industryScene = useMemo(() => resolveIndustrySceneContext(form), [form.industry, form.industrySubId])
+  const stylePresets = useMemo(
+    () => getStylePresetsForIndustrySub(form.industrySubId, form.industry),
+    [form.industrySubId, form.industry],
+  )
   const subCategories = useMemo(() => getSubCategoriesForIndustry(form.industry), [form.industry])
   const visiblePlaybooks = useMemo(
     () => getPlaybooksForIndustry(form.industry).filter((p) => !isPlatformSeriesPlaybook(p.id)),
@@ -457,6 +467,27 @@ export default function AiImageStudioPage() {
     })
   }
 
+  const analyzeReferenceImage = useCallback(
+    async (dataUrl: string, snapshot: VisualStudioForm) => {
+      refAnalyzeAbortRef.current?.abort()
+      const ac = new AbortController()
+      refAnalyzeAbortRef.current = ac
+      setRefAnalyzeBusy(true)
+      setRefAnalyzeHint('AI 正在理解参考图核心元素…')
+      const res = await analyzeVisualStudioReferenceImage(dataUrl, snapshot, { signal: ac.signal })
+      if (ac.signal.aborted) return
+      setRefAnalyzeBusy(false)
+      if (res.ok) {
+        setReferenceAnalysis(res.analysis)
+        setRefAnalyzeHint('已提取参考图核心元素，出图时将自动并入')
+      } else {
+        setReferenceAnalysis(null)
+        setRefAnalyzeHint(res.message)
+      }
+    },
+    [],
+  )
+
   const onPickProductFiles = async (files: FileList | null) => {
     if (!files?.length) return
     const next = [...productRefs]
@@ -465,6 +496,28 @@ export default function AiImageStudioPage() {
       next.push({ id: `${Date.now()}-${Math.random()}`, dataUrl: await readFileAsDataUrl(file), name: file.name })
     }
     setProductRefs(next)
+    const first = next[0]?.dataUrl
+    if (first) {
+      void analyzeReferenceImage(first, form)
+    } else {
+      setReferenceAnalysis(null)
+      setRefAnalyzeHint(null)
+    }
+  }
+
+  const removeProductRef = (id: string) => {
+    setProductRefs((prev) => {
+      const next = prev.filter((x) => x.id !== id)
+      if (!next.length) {
+        refAnalyzeAbortRef.current?.abort()
+        setReferenceAnalysis(null)
+        setRefAnalyzeHint(null)
+        setRefAnalyzeBusy(false)
+      } else if (prev[0]?.id === id) {
+        void analyzeReferenceImage(next[0]!.dataUrl, form)
+      }
+      return next
+    })
   }
 
   const pickReferenceImage = () => productRefs[0]?.dataUrl
@@ -560,6 +613,7 @@ export default function AiImageStudioPage() {
           carouselMaster: true,
           productRefCount: productRefs.length,
           styleFromReference: productRefs.length > 0,
+          referenceAnalysis,
           refineNote: opts?.refine ?? refineNote,
           signal: ac.signal,
         })
@@ -635,6 +689,7 @@ export default function AiImageStudioPage() {
         variantIndex: job.variantIndex,
         productRefCount: productRefs.length,
         styleFromReference: productRefs.length > 0,
+        referenceAnalysis,
         refineNote: opts?.refine ?? refineNote,
         signal: ac.signal,
       })
@@ -1014,30 +1069,20 @@ export default function AiImageStudioPage() {
               />
             </div>
             <div className="mt-3 flex flex-wrap gap-1.5">
-              {(['lively', 'premium', 'guochao', 'fresh', 'ecommerce', 'minimal'] as const).map((sid) => (
+              {stylePresets.map((sp) => (
                 <button
-                  key={sid}
+                  key={sp.id}
                   type="button"
                   disabled={busy}
-                  onClick={() => patchForm({ styleId: sid })}
+                  onClick={() => patchForm({ styleId: sp.id })}
                   className={cn(
                     'rounded-full px-3 py-1 text-xs font-medium transition-all',
-                    form.styleId === sid
+                    form.styleId === sp.id
                       ? 'bg-slate-900 text-white shadow-sm'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
                   )}
                 >
-                  {sid === 'lively'
-                    ? '烟火气'
-                    : sid === 'premium'
-                      ? '轻奢'
-                      : sid === 'guochao'
-                        ? '国潮'
-                        : sid === 'fresh'
-                          ? '清新'
-                          : sid === 'ecommerce'
-                            ? '爆款'
-                            : '极简'}
+                  {sp.label}
                 </button>
               ))}
             </div>
@@ -1081,24 +1126,62 @@ export default function AiImageStudioPage() {
               </div>
             </StudioPanel>
 
-            <StudioPanel title="智能参考图" subtitle="上传商品/菜品图，AI 对齐真实质感">
+            <StudioPanel title="智能参考图" subtitle="上传商品/菜品图，AI 提取核心元素并并入出图">
               <input
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
                 multiple
                 className="hidden"
-                onChange={(e) => void onPickProductFiles(e.target.files)}
+                onChange={(e) => {
+                  void onPickProductFiles(e.target.files)
+                  e.target.value = ''
+                }}
               />
               <button
                 type="button"
-                disabled={busy}
+                disabled={busy || refAnalyzeBusy}
                 onClick={() => fileInputRef.current?.click()}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 py-4 text-sm text-slate-600 transition hover:border-violet-200 hover:bg-violet-50/30"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 py-4 text-sm text-slate-600 transition hover:border-violet-200 hover:bg-violet-50/30 disabled:opacity-60"
               >
-                <ImagePlus className="h-4 w-4" />
-                上传参考图
+                {refAnalyzeBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+                {refAnalyzeBusy ? 'AI 理解参考图中…' : '上传参考图'}
               </button>
+              {refAnalyzeHint && (
+                <p className="mt-2 text-[11px] leading-relaxed text-violet-600">{refAnalyzeHint}</p>
+              )}
+              {referenceAnalysis && !refAnalyzeBusy && (
+                <div className="mt-2 rounded-xl border border-violet-100 bg-violet-50/40 p-2.5 text-[11px] leading-relaxed text-slate-600">
+                  <p>
+                    <span className="font-medium text-slate-800">主体：</span>
+                    {referenceAnalysis.subject}
+                  </p>
+                  {referenceAnalysis.elements.length > 0 && (
+                    <p className="mt-1">
+                      <span className="font-medium text-slate-800">核心元素：</span>
+                      {referenceAnalysis.elements.slice(0, 6).join('、')}
+                    </p>
+                  )}
+                  {referenceAnalysis.colors && (
+                    <p className="mt-1">
+                      <span className="font-medium text-slate-800">色调：</span>
+                      {referenceAnalysis.colors}
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    disabled={busy || refAnalyzeBusy || !productRefs[0]}
+                    onClick={() => {
+                      const first = productRefs[0]?.dataUrl
+                      if (first) void analyzeReferenceImage(first, form)
+                    }}
+                    className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-violet-600 hover:text-violet-700 disabled:opacity-50"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                    重新理解
+                  </button>
+                </div>
+              )}
               {productRefs.length > 0 && (
                 <p className="mt-1 text-center text-[11px] text-slate-400">已上传 {productRefs.length} 张</p>
               )}
@@ -1114,7 +1197,7 @@ export default function AiImageStudioPage() {
                       <button
                         type="button"
                         className="absolute -right-1 -top-1 rounded-full bg-slate-800 p-0.5 text-white shadow"
-                        onClick={() => setProductRefs((a) => a.filter((x) => x.id !== p.id))}
+                        onClick={() => removeProductRef(p.id)}
                       >
                         <X className="h-3 w-3" />
                       </button>
