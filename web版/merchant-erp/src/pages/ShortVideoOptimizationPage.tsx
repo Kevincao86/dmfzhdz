@@ -450,6 +450,45 @@ export default function ShortVideoOptimizationPage() {
     [cfg?.arkVideoModels],
   )
 
+  /** 生成前门禁：按钮禁用原因（避免可点但点击后无反馈或清空提示） */
+  const generateGateReason = useMemo((): string | null => {
+    if (busy) return '正在生成短片，请稍候…'
+    if (auxBusy) return 'AI 正在处理，请稍候…'
+    if (!cfgLoaded) return '正在加载视频引擎配置…'
+    if (cfg?.configLoadError) {
+      return `视频配置加载失败：${cfg.configLoadError.slice(0, 120)}`
+    }
+    if (!cfg?.arkKeyConfigured) {
+      return `当前环境未开通${VIDEO_ENGINE_LABEL_SEEDANCE}，请在运营台配置火山方舟 Key 后再生成。`
+    }
+    if (!(cfg?.arkVideoModels?.length ?? 0)) {
+      return '火山方舟已配置但未设置视频模型端点，请在运营台 · AI 模型中配置 Seedance 端点。'
+    }
+    if (longformEnabled) {
+      if (genMode === 'text' && !isScriptRowsUsable(scriptRows)) {
+        return '请先填写分镜表：至少 2 段，且每段填写画面或口播文案。'
+      }
+      if (genMode === 'frames' && !isScriptRowsUsable(scriptRows) && storyFrames.length === 0) {
+        return '请填写分镜表，或上传至少一个分镜参考（图/视频）。'
+      }
+    } else if (genMode === 'text' && !genPrompt.trim()) {
+      return '请用文字描述成片内容。'
+    } else if (genMode === 'frames' && storyFrames.length === 0 && !genPrompt.trim()) {
+      return '请填写执导文案或上传至少一个分镜参考（图/视频）。'
+    }
+    return null
+  }, [
+    busy,
+    auxBusy,
+    cfgLoaded,
+    cfg,
+    longformEnabled,
+    genMode,
+    scriptRows,
+    storyFrames.length,
+    genPrompt,
+  ])
+
   const runShortVideo = useCallback(
     async (
       body: {
@@ -701,8 +740,13 @@ export default function ShortVideoOptimizationPage() {
   }
 
   const validateEngine = (): string | null => {
+    if (!cfgLoaded) return '视频引擎配置加载中，请稍候再试。'
+    if (cfg?.configLoadError) return `视频配置不可用：${cfg.configLoadError.slice(0, 160)}`
     if (!cfg?.arkKeyConfigured)
       return `当前环境未开通${VIDEO_ENGINE_LABEL_SEEDANCE}，请在运营台配置火山方舟 Key。`
+    if (!(cfg?.arkVideoModels?.length ?? 0)) {
+      return '火山方舟已配置但未设置视频模型端点，请在运营台配置 Seedance 端点。'
+    }
     return null
   }
 
@@ -1199,7 +1243,16 @@ export default function ShortVideoOptimizationPage() {
   }
 
   const submitGenerate = async () => {
-    resetOutputs()
+    if (generateGateReason) {
+      setErr(generateGateReason)
+      return
+    }
+    setErr(null)
+    if (resultBlobRef.current) {
+      URL.revokeObjectURL(resultBlobRef.current)
+      resultBlobRef.current = null
+    }
+    setResultUrl(null)
     const vErr = validateEngine() ?? validateLongform()
     if (vErr) {
       setErr(vErr)
@@ -1215,6 +1268,8 @@ export default function ShortVideoOptimizationPage() {
         ? Math.min(LONGFORM_MAX_TARGET_TOTAL_SEC, Math.max(15, storyFrames.length * Number(sdDurationSec)))
         : Number(sdDurationSec)
     if (!(await ensureShortVideoPointsAffordable(estSec))) return
+
+    setHint(null)
 
     const txt = genPrompt.trim()
     const scriptUsable = longformEnabled && isScriptRowsUsable(scriptRows)
@@ -1834,11 +1889,13 @@ export default function ShortVideoOptimizationPage() {
             </div>
           )}
 
+          <div className="flex flex-col gap-2">
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
-              disabled={busy || auxBusy}
+              disabled={!!generateGateReason}
               onClick={() => void submitGenerate()}
+              title={generateGateReason ?? undefined}
               className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-zinc-900 to-zinc-800 px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-zinc-900/20 hover:from-zinc-800 hover:to-zinc-700 disabled:pointer-events-none disabled:opacity-50"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
@@ -1852,6 +1909,10 @@ export default function ShortVideoOptimizationPage() {
               >
                 <PauseCircle className="h-4 w-4" /> 停止等待
               </button>
+            ) : null}
+          </div>
+            {generateGateReason && !err ? (
+              <p className="text-xs leading-relaxed text-amber-900">{generateGateReason}</p>
             ) : null}
           </div>
         </section>
