@@ -33,8 +33,18 @@ export type VisualPlaybookId =
   | 'product_hero'
   | 'logo_brand'
   | 'menu_board'
+  | 'platform_carousel_five'
+  | 'platform_detail_page'
 
-export type VisualIntentId = 'poster' | 'product' | 'logo' | 'environment' | 'package' | 'menu'
+export type VisualIntentId =
+  | 'poster'
+  | 'product'
+  | 'logo'
+  | 'environment'
+  | 'package'
+  | 'menu'
+  | 'carousel'
+  | 'detail'
 
 export type AiImageSizePresetId =
   | 'moments_vertical'
@@ -148,12 +158,72 @@ export function resolveIndustrySceneContext(form: {
   }
 }
 
+/** 五连图 / 详情图专用渠道（抖音、快手、美团） */
+export const PLATFORM_SERIES_CHANNELS: PublishChannelId[] = ['douyin', 'kuaishou', 'meituan']
+
+export const PLATFORM_SERIES_SLOT_COUNT = 5
+
+export type PlatformSeriesSlot = {
+  label: string
+  prompt: string
+}
+
+export const CAROUSEL_FIVE_SLOTS: PlatformSeriesSlot[] = [
+  {
+    label: '封面',
+    prompt:
+      '五连图第1张（封面）：门店头图轮播首屏，大标题+品牌氛围，右侧/边缘预留与第2张衔接的延展元素（色调、光效、装饰线连续）。',
+  },
+  {
+    label: '卖点1',
+    prompt:
+      '五连图第2张：承接封面视觉语言，突出核心卖点或服务特色，左右边缘色彩/背景须与相邻图可横滑拼接。',
+  },
+  {
+    label: '卖点2',
+    prompt: '五连图第3张：展示环境/产品/技师团队等信任要素，延续同一套配色与字体风格，适合横向滑动浏览。',
+  },
+  {
+    label: '套餐',
+    prompt: '五连图第4张：团购套餐或价格组合，数字醒目，与前后图背景层次一致，避免突兀换色。',
+  },
+  {
+    label: '行动',
+    prompt: '五连图第5张（收尾）：到店/抢购/预约行动号召，品牌定帧，左侧可与第4张视觉衔接。',
+  },
+]
+
+export const DETAIL_PAGE_SLOTS: PlatformSeriesSlot[] = [
+  {
+    label: '品牌',
+    prompt: '详情长图第1段：品牌/门店介绍，大图+中英文标题，高端商业详情页首屏风格。',
+  },
+  {
+    label: '品质',
+    prompt: '详情长图第2段：服务品质/手法/专业度，可含小图 inset，强调信任感。',
+  },
+  {
+    label: '环境',
+    prompt: '详情长图第3段：门店环境/空间质感，适合竖向拼接在团购详情页。',
+  },
+  {
+    label: '优惠',
+    prompt: '详情长图第4段：套餐内容与到手价，促销信息清晰，与上下段色调统一。',
+  },
+  {
+    label: '引导',
+    prompt: '详情长图第5段：预约/抢购/到店引导，留白底部安全区，适合详情页末尾。',
+  },
+]
+
 export const PUBLISH_CHANNELS: Array<{
   id: PublishChannelId
   label: string
   short: string
   color: string
   primarySizeId: AiImageSizePresetId
+  carouselSizeId?: AiImageSizePresetId
+  detailSizeId?: AiImageSizePresetId
   extraSizeIds?: AiImageSizePresetId[]
   publishTips: string[]
 }> = [
@@ -163,6 +233,8 @@ export const PUBLISH_CHANNELS: Array<{
     short: '抖音',
     color: '#111827',
     primarySizeId: 'moments_vertical',
+    carouselSizeId: 'landscape',
+    detailSizeId: 'a4_portrait',
     publishTips: ['竖屏 9:16', '主标题 6 字内更易读', '留底部安全区放团购入口'],
   },
   {
@@ -188,6 +260,8 @@ export const PUBLISH_CHANNELS: Array<{
     short: '美团',
     color: '#ffc300',
     primarySizeId: 'square',
+    carouselSizeId: 'landscape',
+    detailSizeId: 'a4_portrait',
     publishTips: ['团购主图偏 1:1', '突出套餐组合与到手价', '避免过多小字'],
   },
   {
@@ -196,6 +270,8 @@ export const PUBLISH_CHANNELS: Array<{
     short: '快手',
     color: '#ff4906',
     primarySizeId: 'moments_vertical',
+    carouselSizeId: 'landscape',
+    detailSizeId: 'a4_portrait',
     publishTips: ['竖屏短视频封面同尺寸', '大字报风格转化更好'],
   },
   {
@@ -354,6 +430,30 @@ export const VISUAL_PLAYBOOKS: Array<{
     titleTemplates: ['{store}价目表', '今日推荐', ''],
     subtitleTemplates: ['', '', ''],
     offerTemplates: ['', '', ''],
+  },
+  {
+    id: 'platform_carousel_five',
+    label: '五连图',
+    desc: '门店头图轮播，5 张横滑衔接',
+    intent: 'carousel',
+    emoji: '🎠',
+    suggestedChannels: ['douyin', 'kuaishou', 'meituan'],
+    styleId: 'premium',
+    titleTemplates: ['{store} · 全新升级', 'NEW STORE OPENING', '{store}品质之选'],
+    subtitleTemplates: ['横滑浏览五连图', '豪华阵容 · 舒适体验', '团购热卖中'],
+    offerTemplates: ['限时¥99', '首单立减', ''],
+  },
+  {
+    id: 'platform_detail_page',
+    label: '详情图',
+    desc: '团购详情页竖向长图，5 段拼接',
+    intent: 'detail',
+    emoji: '📱',
+    suggestedChannels: ['douyin', 'kuaishou', 'meituan'],
+    styleId: 'premium',
+    titleTemplates: ['提升服务品质', '{store} · 匠心之作', '放慢脚步 享受生活'],
+    subtitleTemplates: ['IMPROVE SERVICE QUALITY', '专业团队 · 舒适环境', '预约到店更省心'],
+    offerTemplates: ['¥99起', '限时团购', ''],
   },
 ]
 
@@ -905,6 +1005,66 @@ export const PLAYBOOK_VARIANT_CONFIGS: Partial<Record<VisualPlaybookId, Playbook
         headline: '超值套餐',
         subheadline: '组合更省',
         note: '含多道招牌',
+      },
+    ],
+  },
+  platform_carousel_five: {
+    pickerLabel: '五连图主题',
+    options: [
+      {
+        id: 'opening',
+        label: '开业上新',
+        periodLabel: '头图轮播 · 吸睛首屏',
+        headline: 'NEW STORE OPENING',
+        subheadline: '全新团队 · 豪华阵容',
+        styleId: 'premium',
+      },
+      {
+        id: 'quality',
+        label: '品质服务',
+        periodLabel: '环境+手法+信任感',
+        headline: '提升服务品质',
+        subheadline: '手法娴熟 · 舒适体验',
+        styleId: 'premium',
+      },
+      {
+        id: 'promo',
+        label: '团购促销',
+        periodLabel: '价格+套餐组合',
+        headline: '限时团购',
+        subheadline: '超值套餐热卖中',
+        offer: '¥99起',
+        styleId: 'ecommerce',
+      },
+    ],
+  },
+  platform_detail_page: {
+    pickerLabel: '详情图风格',
+    options: [
+      {
+        id: 'luxury',
+        label: '轻奢质感',
+        periodLabel: '大图+中英标题',
+        headline: '提升服务品质',
+        subheadline: 'IMPROVE SERVICE QUALITY',
+        styleId: 'premium',
+      },
+      {
+        id: 'warm',
+        label: '温馨治愈',
+        periodLabel: '慢生活+放松氛围',
+        headline: '放慢脚步 享受生活',
+        subheadline: '预约到店更省心',
+        styleId: 'fresh',
+      },
+      {
+        id: 'deal',
+        label: '团购转化',
+        periodLabel: '价格+抢购引导',
+        headline: '限时特惠',
+        subheadline: '立即抢购',
+        offer: '¥99',
+        styleId: 'ecommerce',
       },
     ],
   },
@@ -1919,6 +2079,10 @@ const INTENT_PROMPT: Record<VisualIntentId, string> = {
   logo: '设计简洁品牌 Logo/门店标识，识别度高，适合头像与招牌。',
   environment: '设计探店氛围图，真实可信的就餐/服务环境，适合小红书种草。',
   menu: '设计菜单价目视觉，分区清晰、价格可读。',
+  carousel:
+    '设计本地生活门店「五连图」轮播单张：16:9 横图，与相邻图色调/装饰可横滑衔接，适合抖音/快手/美团门店头图。',
+  detail:
+    '设计团购「详情长图」单段：3:4 竖图，大图+中英标题排版，适合抖音/快手/美团详情页竖向拼接。',
 }
 
 const VARIANT_SUFFIX = [
@@ -1930,6 +2094,63 @@ const VARIANT_SUFFIX = [
 
 export function resolvePlaybook(id: VisualPlaybookId) {
   return VISUAL_PLAYBOOKS.find((p) => p.id === id) ?? VISUAL_PLAYBOOKS[0]!
+}
+
+export function isPlatformSeriesPlaybook(id: VisualPlaybookId): boolean {
+  return id === 'platform_carousel_five' || id === 'platform_detail_page'
+}
+
+export function platformSeriesSlots(playbookId: VisualPlaybookId): PlatformSeriesSlot[] {
+  if (playbookId === 'platform_carousel_five') return CAROUSEL_FIVE_SLOTS
+  if (playbookId === 'platform_detail_page') return DETAIL_PAGE_SLOTS
+  return []
+}
+
+export function platformSeriesSlotCount(playbookId: VisualPlaybookId): number {
+  return isPlatformSeriesPlaybook(playbookId) ? PLATFORM_SERIES_SLOT_COUNT : 0
+}
+
+export function resolveSeriesSlotLabel(playbookId: VisualPlaybookId, index: number): string {
+  const slots = platformSeriesSlots(playbookId)
+  return slots[index]?.label ?? `图${index + 1}`
+}
+
+export function resolveSeriesSlotPrompt(playbookId: VisualPlaybookId, index: number): string {
+  const slots = platformSeriesSlots(playbookId)
+  return slots[index]?.prompt ?? `构图方案${index + 1}。`
+}
+
+/** 按玩法解析出图尺寸（五连图横图 / 详情图竖图 / 默认渠道主尺寸） */
+export function resolvePlaybookSizePresetId(
+  channelId: PublishChannelId,
+  playbookId: VisualPlaybookId,
+): AiImageSizePresetId {
+  const ch = resolveChannel(channelId)
+  if (playbookId === 'platform_carousel_five') {
+    return ch.carouselSizeId ?? 'landscape'
+  }
+  if (playbookId === 'platform_detail_page') {
+    return ch.detailSizeId ?? 'a4_portrait'
+  }
+  return ch.primarySizeId
+}
+
+export function effectiveVariantCountForForm(form: VisualStudioForm): number {
+  const series = platformSeriesSlotCount(form.playbook)
+  return series > 0 ? series : form.variantCount
+}
+
+export function applyPlatformSeriesPlaybook(
+  form: VisualStudioForm,
+  playbookId: 'platform_carousel_five' | 'platform_detail_page',
+): VisualStudioForm {
+  const channels = PLATFORM_SERIES_CHANNELS.filter((id) => form.channels.includes(id))
+  const nextChannels = channels.length > 0 ? channels : [...PLATFORM_SERIES_CHANNELS]
+  return applyPlaybookToFormWithVariants(
+    { ...form, channels: nextChannels, multiChannelPack: true },
+    playbookId,
+    { keepChannels: true, templateIndex: 0 },
+  )
 }
 
 export function resolveChannel(id: PublishChannelId) {
@@ -2371,7 +2592,9 @@ export function buildVisualStudioPrompt(
       : AI_IMAGE_STYLE_PRESETS.find((s) => s.id === form.styleId)?.promptHint ?? '商业设计'
 
   const channel = opts?.channel ? resolveChannel(opts.channel) : null
-  const size = channel ? resolveAiImageSizePreset(channel.primarySizeId) : null
+  const size = channel
+    ? resolveAiImageSizePreset(resolvePlaybookSizePresetId(channel.id, form.playbook))
+    : null
   const lines = [
     INTENT_PROMPT[pb.intent],
     `【业态锁定】${sceneCtx.label}。${sceneCtx.sceneHint}。画面主体、道具、环境必须严格符合该业态，禁止出现与业态无关的场景（如餐饮禁止酒吧夜场、足浴禁止咖啡厅）。`,
@@ -2399,7 +2622,14 @@ export function buildVisualStudioPrompt(
   ].filter(Boolean)
 
   const vi = opts?.variantIndex ?? 0
-  if (vi >= 0 && vi < VARIANT_SUFFIX.length) {
+  if (isPlatformSeriesPlaybook(form.playbook)) {
+    lines.push(resolveSeriesSlotPrompt(form.playbook, vi))
+    lines.push(
+      form.playbook === 'platform_carousel_five'
+        ? '整套五连图须统一配色、字体与光影，本张仅为系列中的一屏，勿做成独立无关海报。'
+        : '整套详情长图须统一视觉体系，本张仅为竖向拼接的一段，与上下段风格一致。',
+    )
+  } else if (vi >= 0 && vi < VARIANT_SUFFIX.length) {
     lines.push(VARIANT_SUFFIX[vi]!)
   }
   if (opts?.refineNote?.trim()) {
@@ -2430,7 +2660,9 @@ export function buildVisualStudioImageContext(
   const variantConfig = getPlaybookVariantConfig(form.playbook, form.industry, form.industrySubId)
   const stylePreset = AI_IMAGE_STYLE_PRESETS.find((s) => s.id === form.styleId)
   const channel = opts?.channel ? resolveChannel(opts.channel) : null
-  const size = channel ? resolveAiImageSizePreset(channel.primarySizeId) : null
+  const size = channel
+    ? resolveAiImageSizePreset(resolvePlaybookSizePresetId(channel.id, form.playbook))
+    : null
   const vi = opts?.variantIndex ?? 0
   return {
     industry: sceneCtx.label,
@@ -2454,7 +2686,14 @@ export function buildVisualStudioImageContext(
     offer: form.offer.trim(),
     timeRange: form.timeRange.trim(),
     note: form.note.trim(),
-    compositionVariant: VARIANT_SUFFIX[vi] ?? VARIANT_SUFFIX[0]!,
+    compositionVariant: isPlatformSeriesPlaybook(form.playbook)
+      ? resolveSeriesSlotPrompt(form.playbook, vi)
+      : (VARIANT_SUFFIX[vi] ?? VARIANT_SUFFIX[0]!),
+    seriesSlotLabel: isPlatformSeriesPlaybook(form.playbook)
+      ? resolveSeriesSlotLabel(form.playbook, vi)
+      : '',
+    seriesSlotIndex: isPlatformSeriesPlaybook(form.playbook) ? vi + 1 : 0,
+    seriesSlotTotal: platformSeriesSlotCount(form.playbook),
     productRefCount: opts?.productRefCount ?? 0,
     styleFromReference: opts?.styleFromReference === true,
     refineNote: opts?.refineNote?.trim() ?? '',
