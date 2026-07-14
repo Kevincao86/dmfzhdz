@@ -22,14 +22,18 @@ import {
 import {
   applyIndustryChange,
   applyIndustrySubChange,
+  applyPlatformSeriesPlaybook,
   applyPlaybookToFormWithVariants,
   applyPlaybookVariantToForm,
   DEFAULT_VISUAL_STUDIO_FORM,
+  effectiveVariantCountForForm,
   generateCopySuggestions,
   getPlaybookVariantConfig,
   getPlaybooksForIndustry,
   getSubCategoriesForIndustry,
+  isPlatformSeriesPlaybook,
   LOCAL_LIFE_INDUSTRIES,
+  PLATFORM_SERIES_CHANNELS,
   preferWanxPosterForIntent,
   publishChannelLogoSrc,
   PUBLISH_CHANNELS,
@@ -38,6 +42,8 @@ import {
   resolveIndustryProfile,
   resolveIndustrySceneContext,
   resolvePlaybook,
+  resolvePlaybookSizePresetId,
+  resolveSeriesSlotLabel,
   type CopySuggestion,
   type LocalLifeIndustryId,
   type PublishChannelId,
@@ -158,21 +164,33 @@ function DevicePreview({
   previewUrl,
   headline,
   empty,
+  previewAspect,
 }: {
   channelId: PublishChannelId
   previewUrl?: string
   headline: string
   empty?: boolean
+  /** 覆盖渠道默认比例（五连图横图 / 详情图竖图） */
+  previewAspect?: 'vertical' | 'horizontal' | 'square'
 }) {
   const ch = resolveChannel(channelId)
   const logoSrc = publishChannelLogoSrc(channelId)
-  const isVertical = ch.primarySizeId === 'moments_vertical'
+  const isVertical =
+    previewAspect === 'vertical' ||
+    (previewAspect !== 'horizontal' &&
+      previewAspect !== 'square' &&
+      ch.primarySizeId === 'moments_vertical')
+  const isSquare = previewAspect === 'square'
   return (
     <div className="flex flex-col items-center">
       <div
         className={cn(
           'relative overflow-hidden rounded-[2rem] border-[5px] border-slate-800 bg-slate-900 shadow-2xl shadow-slate-400/30 ring-1 ring-white/10',
-          isVertical ? 'h-[min(520px,58vh)] w-[240px]' : 'h-[220px] w-[380px]',
+          isVertical
+            ? 'h-[min(520px,58vh)] w-[240px]'
+            : isSquare
+              ? 'h-[280px] w-[280px]'
+              : 'h-[220px] w-[380px]',
         )}
       >
         <div className="absolute left-1/2 top-2.5 z-10 h-1 w-16 -translate-x-1/2 rounded-full bg-slate-700" />
@@ -244,23 +262,34 @@ export default function AiImageStudioPage() {
   )
   const industryScene = useMemo(() => resolveIndustrySceneContext(form), [form.industry, form.industrySubId])
   const subCategories = useMemo(() => getSubCategoriesForIndustry(form.industry), [form.industry])
-  const visiblePlaybooks = useMemo(() => getPlaybooksForIndustry(form.industry), [form.industry])
+  const visiblePlaybooks = useMemo(
+    () => getPlaybooksForIndustry(form.industry).filter((p) => !isPlatformSeriesPlaybook(p.id)),
+    [form.industry],
+  )
+  const isPlatformSeries = isPlatformSeriesPlaybook(form.playbook)
+  const perPlatformCount = effectiveVariantCountForForm(form)
   const activeGenerateChannels = useMemo(
     () => (form.multiChannelPack ? form.channels : [form.channels[0] ?? 'douyin']),
     [form.channels, form.multiChannelPack],
   )
   const generatePlan = useMemo(() => {
     const channelCount = activeGenerateChannels.length
-    const variantCount = form.variantCount
+    const variantCount = perPlatformCount
     const total = channelCount * variantCount
     const pointsCost = mpPointsCostForVisualStudioImages(total)
     const pointsDetail = `${MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE} 积分/张 × ${total} 张 = ${pointsCost} 积分`
     const primary = resolveChannel(activeGenerateChannels[0] ?? 'douyin')
+    const unitLabel = isPlatformSeries
+      ? form.playbook === 'platform_carousel_five'
+        ? '张五连图'
+        : '张详情图'
+      : '种构图'
     if (channelCount === 1) {
       return {
-        buttonLabel: '一键出图',
-        detail:
-          variantCount > 1
+        buttonLabel: isPlatformSeries ? '生成平台长图' : '一键出图',
+        detail: isPlatformSeries
+          ? `${primary.short} · ${variantCount} ${unitLabel}`
+          : variantCount > 1
             ? `${primary.short} · ${variantCount} 种构图版式`
             : `${primary.short}`,
         total,
@@ -270,21 +299,28 @@ export default function AiImageStudioPage() {
     }
     if (form.multiChannelPack) {
       return {
-        buttonLabel: `一键出 ${channelCount} 平台套装`,
-        detail: `每平台 ${variantCount} 种构图 · 共 ${total} 张`,
+        buttonLabel: isPlatformSeries ? `生成 ${channelCount} 平台长图` : `一键出 ${channelCount} 平台套装`,
+        detail: isPlatformSeries
+          ? `每平台 ${variantCount} ${unitLabel} · 共 ${total} 张`
+          : `每平台 ${variantCount} 种构图 · 共 ${total} 张`,
         total,
         pointsCost,
         pointsDetail,
       }
     }
     return {
-      buttonLabel: `一键出 ${variantCount} 张构图`,
+      buttonLabel: isPlatformSeries ? `生成 ${variantCount} 张` : `一键出 ${variantCount} 张构图`,
       detail: `${primary.short}`,
       total,
       pointsCost,
       pointsDetail,
     }
-  }, [activeGenerateChannels, form.multiChannelPack, form.variantCount])
+  }, [activeGenerateChannels, form.multiChannelPack, form.playbook, isPlatformSeries, perPlatformCount])
+  const previewAspect = useMemo((): 'vertical' | 'horizontal' | 'square' | undefined => {
+    if (form.playbook === 'platform_carousel_five') return 'horizontal'
+    if (form.playbook === 'platform_detail_page') return 'vertical'
+    return undefined
+  }, [form.playbook])
   const activeChannel = resolveChannel(selectedPreviewChannel)
   const fieldLabels = industryProfile.fieldLabels
   const copySuggestions = useMemo(
@@ -388,6 +424,14 @@ export default function AiImageStudioPage() {
     })
   }
 
+  const selectPlatformSeries = (id: 'platform_carousel_five' | 'platform_detail_page') => {
+    setForm((f) => {
+      const next = applyPlatformSeriesPlaybook(f, id)
+      void loadAiCopy(next)
+      return next
+    })
+  }
+
   const selectPlaybookVariant = (variantId: string) => {
     setForm((f) => {
       const next = applyPlaybookVariantToForm(f, variantId)
@@ -425,8 +469,9 @@ export default function AiImageStudioPage() {
   const buildJobs = (): VariantResult[] => {
     const jobs: VariantResult[] = []
     const channels = form.multiChannelPack ? form.channels : [form.channels[0] ?? 'douyin']
+    const slotCount = perPlatformCount
     for (const ch of channels) {
-      for (let vi = 0; vi < form.variantCount; vi++) {
+      for (let vi = 0; vi < slotCount; vi++) {
         jobs.push({
           id: `${ch}-${vi}`,
           channelId: ch,
@@ -464,11 +509,14 @@ export default function AiImageStudioPage() {
       if (ac.signal.aborted) break
       const job = jobList[i]!
       const ch = resolveChannel(job.channelId)
-      const size = resolveAiImageSizePreset(ch.primarySizeId)
+      const size = resolveAiImageSizePreset(resolvePlaybookSizePresetId(job.channelId, form.playbook))
       job.status = 'running'
       setVariants([...jobList])
+      const slotLabel = isPlatformSeries
+        ? resolveSeriesSlotLabel(form.playbook, job.variantIndex)
+        : `方案 ${job.variantIndex + 1}`
       setProgress(
-        `${ch.short} · 方案 ${job.variantIndex + 1}/${form.variantCount}（${i + 1}/${jobList.length}）· AI 整理出图需求`,
+        `${ch.short} · ${slotLabel}/${perPlatformCount}（${i + 1}/${jobList.length}）· AI 整理出图需求`,
       )
       setSelectedPreviewChannel(job.channelId)
       setSelectedPreviewVariantId(job.id)
@@ -485,7 +533,7 @@ export default function AiImageStudioPage() {
       const prompt = promptPack.ok ? promptPack.prompt : promptPack.fallback
 
       setProgress(
-        `${ch.short} · 方案 ${job.variantIndex + 1}/${form.variantCount}（${i + 1}/${jobList.length}）· 生图中`,
+        `${ch.short} · ${slotLabel}/${perPlatformCount}（${i + 1}/${jobList.length}）· 生图中`,
       )
 
       const out = await postAiAgentNativeImage(prompt, {
@@ -558,7 +606,10 @@ export default function AiImageStudioPage() {
     if (!v.previewUrl && !v.imageUrl) return
     const ch = resolveChannel(v.channelId)
     const ext = v.fileExt ?? 'jpg'
-    const name = `${form.storeName || '门店'}-${ch.short}-方案${v.variantIndex + 1}.${ext}`.replace(/\s+/g, '-')
+    const slotPart = isPlatformSeries
+      ? resolveSeriesSlotLabel(form.playbook, v.variantIndex)
+      : `方案${v.variantIndex + 1}`
+    const name = `${form.storeName || '门店'}-${ch.short}-${slotPart}.${ext}`.replace(/\s+/g, '-')
     if (v.previewUrl?.startsWith('blob:')) {
       triggerBlobDownload(await (await fetch(v.previewUrl)).blob(), name)
       return
@@ -578,10 +629,11 @@ export default function AiImageStudioPage() {
     () =>
       form.channels.map((id) => {
         const ch = resolveChannel(id)
-        const size = resolveAiImageSizePreset(ch.primarySizeId)
+        const sizeId = resolvePlaybookSizePresetId(id, form.playbook)
+        const size = resolveAiImageSizePreset(sizeId)
         return { id, ch, size }
       }),
-    [form.channels],
+    [form.channels, form.playbook],
   )
 
   return (
@@ -680,12 +732,74 @@ export default function AiImageStudioPage() {
               <input
                 type="checkbox"
                 checked={form.multiChannelPack}
-                disabled={busy}
+                disabled={busy || isPlatformSeries}
                 onChange={(e) => patchForm({ multiChannelPack: e.target.checked })}
                 className="rounded border-slate-300"
               />
               一键多端套装
             </label>
+            {isPlatformSeries && (
+              <p className="mt-2 text-[10px] leading-relaxed text-orange-700/90">
+                五连图/详情图模式：已锁定抖音、快手、美团，默认三端各出 5 张。
+              </p>
+            )}
+          </StudioPanel>
+
+          <StudioPanel
+            title="本地平台长图素材"
+            subtitle="抖音 · 快手 · 美团 · 门店装修与团购详情"
+          >
+            <div className="grid grid-cols-1 gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => selectPlatformSeries('platform_carousel_five')}
+                className={cn(
+                  'rounded-xl border px-3 py-3 text-left transition-all',
+                  form.playbook === 'platform_carousel_five'
+                    ? 'border-orange-400 bg-gradient-to-r from-orange-50 to-amber-50 shadow-sm ring-1 ring-orange-200'
+                    : 'border-slate-100 bg-white hover:border-orange-200 hover:bg-orange-50/40',
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🎠</span>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">五连图</p>
+                    <p className="text-[11px] text-slate-500">门店头图轮播 · 5 张横图横滑衔接</p>
+                  </div>
+                </div>
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => selectPlatformSeries('platform_detail_page')}
+                className={cn(
+                  'rounded-xl border px-3 py-3 text-left transition-all',
+                  form.playbook === 'platform_detail_page'
+                    ? 'border-violet-400 bg-gradient-to-r from-violet-50 to-indigo-50 shadow-sm ring-1 ring-violet-200'
+                    : 'border-slate-100 bg-white hover:border-violet-200 hover:bg-violet-50/40',
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">📱</span>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">详情图</p>
+                    <p className="text-[11px] text-slate-500">团购详情长图 · 5 段竖图拼接</p>
+                  </div>
+                </div>
+              </button>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1">
+              {PLATFORM_SERIES_CHANNELS.map((cid) => (
+                <ChannelChip
+                  key={cid}
+                  channelId={cid}
+                  active={form.channels.includes(cid)}
+                  disabled={busy || isPlatformSeries}
+                  onClick={() => toggleChannel(cid)}
+                />
+              ))}
+            </div>
           </StudioPanel>
 
           <StudioPanel step="2" title="这次想做什么" subtitle="选玩法后下方可细分场景">
@@ -941,7 +1055,10 @@ export default function AiImageStudioPage() {
                       </button>
                       <div className="flex items-center justify-between px-2 py-1.5">
                         <span className="text-[10px] text-slate-500">
-                          {ch.short} #{v.variantIndex + 1}
+                          {ch.short}{' '}
+                          {isPlatformSeries
+                            ? resolveSeriesSlotLabel(form.playbook, v.variantIndex)
+                            : `#${v.variantIndex + 1}`}
                         </span>
                         {v.status === 'done' && (
                           <button
@@ -1005,9 +1122,11 @@ export default function AiImageStudioPage() {
                 ))}
               </ul>
               <p className="mt-2 text-[10px] text-slate-400">
-                {form.multiChannelPack && form.channels.length > 1
-                  ? `已开启多端套装，${form.channels.length} 个平台各出 ${form.variantCount} 种构图`
-                  : `当前仅 ${resolveChannel(form.channels[0] ?? 'douyin').short} 出图`}
+                {isPlatformSeries
+                  ? `五连图/详情图：${form.channels.filter((c) => PLATFORM_SERIES_CHANNELS.includes(c)).length || PLATFORM_SERIES_CHANNELS.length} 个平台 × ${perPlatformCount} 张`
+                  : form.multiChannelPack && form.channels.length > 1
+                    ? `已开启多端套装，${form.channels.length} 个平台各出 ${form.variantCount} 种构图`
+                    : `当前仅 ${resolveChannel(form.channels[0] ?? 'douyin').short} 出图`}
               </p>
             </StudioPanel>
 
@@ -1028,14 +1147,19 @@ export default function AiImageStudioPage() {
               </button>
               <select
                 value={form.variantCount}
-                disabled={busy}
+                disabled={busy || isPlatformSeries}
                 onChange={(e) => patchForm({ variantCount: Number(e.target.value) as 2 | 4 })}
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm"
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm disabled:opacity-50"
                 title="每个平台的构图版式数量"
               >
                 <option value={2}>2 种构图</option>
                 <option value={4}>4 种构图</option>
               </select>
+              {isPlatformSeries && (
+                <span className="rounded-lg bg-orange-50 px-2.5 py-2 text-xs text-orange-800 ring-1 ring-orange-100">
+                  固定 5 张系列图
+                </span>
+              )}
               <p className="w-full text-[11px] text-slate-500">{generatePlan.pointsDetail}</p>
               <select
                 value={form.delivery}
@@ -1135,6 +1259,7 @@ export default function AiImageStudioPage() {
                 previewUrl={heroPreview}
                 headline={form.headline}
                 empty={!busy && !heroPreview}
+                previewAspect={previewAspect}
               />
             </div>
 
