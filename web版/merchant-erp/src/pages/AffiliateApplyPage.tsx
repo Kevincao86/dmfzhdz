@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Loader2, Share2 } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { ArrowLeft, Loader2, Share2 } from 'lucide-react'
 import { cn } from '../cn'
 import LoginPortalNav from '../components/login/LoginPortalNav'
 import { isPartnerEdition } from '../lib/appEdition'
@@ -25,7 +25,16 @@ const SHELL = cn(
   'backdrop-blur-2xl backdrop-saturate-150',
 )
 
+function affiliateApplyBackFallback(): string {
+  if (typeof window === 'undefined') return '/'
+  const h = window.location.hostname.toLowerCase()
+  if (h.startsWith('dr.') || h.includes('.dr.')) return '/profile'
+  if (h.startsWith('cs.') || h.includes('.cs.')) return '/home'
+  return '/'
+}
+
 export default function AffiliateApplyPage() {
+  const navigate = useNavigate()
   const partnerSite = isPartnerEdition()
   const [realName, setRealName] = useState('')
   const [phone, setPhone] = useState('')
@@ -35,6 +44,14 @@ export default function AffiliateApplyPage() {
   const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(false)
   const [result, setResult] = useState<PublicAffiliateSummary | null>(null)
+
+  const handleBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      navigate(-1)
+      return
+    }
+    navigate(affiliateApplyBackFallback())
+  }
 
   if (partnerSite) {
     return (
@@ -115,6 +132,14 @@ export default function AffiliateApplyPage() {
 
       <div className="mx-auto flex max-w-lg flex-col items-center">
         <div className={SHELL}>
+          <button
+            type="button"
+            onClick={handleBack}
+            className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            返回
+          </button>
           <div className="mb-4 flex items-center gap-2">
             <Share2 className="h-6 w-6 text-indigo-600" />
             <h1 className="text-xl font-bold">申请成为推广员</h1>
