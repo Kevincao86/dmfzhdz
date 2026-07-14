@@ -1,6 +1,7 @@
 import { Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../../cn'
+import { isPartnerEdition } from '../../lib/appEdition'
 import {
   countSubAccountsForJobRole,
   getJobRoleById,
@@ -24,6 +25,11 @@ export default function SubAccountPermissionsPanel() {
   const [renameInput, setRenameInput] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const permEditorRef = useRef<HTMLDivElement>(null)
+  const permissionModules = useMemo(
+    () =>
+      PERMISSION_MODULES.filter((m) => isPartnerEdition() || m.key !== 'distribution'),
+    [],
+  )
 
   const reload = useCallback(() => {
     const list = readJobRoles()
@@ -70,7 +76,7 @@ export default function SubAccountPermissionsPanel() {
 
   const savePermissions = () => {
     if (!selected) return
-    const permissions = PERMISSION_MODULES.map((m) => m.key).filter((k) => draft.has(k))
+    const permissions = permissionModules.map((m) => m.key).filter((k) => draft.has(k))
     upsertJobRole({ ...selected, permissions })
     setSavedHint(true)
     window.setTimeout(() => setSavedHint(false), 2000)
@@ -218,7 +224,7 @@ export default function SubAccountPermissionsPanel() {
             ) : null}
 
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {PERMISSION_MODULES.map((m) => {
+              {permissionModules.map((m) => {
                 const on = draft.has(m.key)
                 return (
                   <label

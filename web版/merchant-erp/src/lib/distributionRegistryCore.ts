@@ -392,6 +392,25 @@ export function upsertAffiliateFromSnapshot(
   return { ok: true, affiliate }
 }
 
+export function listPartnerSalespersonsFromSnapshot(
+  data: RegistryFile,
+  partnerTenantId: string,
+): RegistryDistributionSalesperson[] {
+  ensureDistribution(data)
+  const tid = String(partnerTenantId || '').trim()
+  if (!tid) return []
+  return [...(findPartner(data, tid)?.salespersons ?? [])].sort((a, b) =>
+    a.createdAt < b.createdAt ? 1 : -1,
+  )
+}
+
+function partnerRefSlug(partnerName: string, partnerTenantId: string): string {
+  const fromName = partnerName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase()
+  if (fromName.length >= 2) return fromName
+  const fromId = partnerTenantId.replace(/[^a-zA-Z0-9]/g, '').slice(-4).toUpperCase()
+  return fromId || randomBytes(2).toString('hex').toUpperCase()
+}
+
 export function upsertPartnerSalespersonFromSnapshot(
   data: RegistryFile,
   body: Record<string, unknown>,
@@ -404,16 +423,19 @@ export function upsertPartnerSalespersonFromSnapshot(
   if (!partnerTenantId || !realName || !phone || !employeeCode) {
     return { ok: false, error: 'invalid_fields', status: 400 }
   }
+  const partnerName = String(body.partnerName || partnerTenantId).trim()
   let partner = findPartner(data, partnerTenantId)
   if (!partner) {
     partner = {
       partnerTenantId,
-      partnerName: String(body.partnerName || partnerTenantId).trim(),
+      partnerName,
       channelEnabled: true,
       salespersons: [],
       updatedAt: nowIso(),
     }
     data.distributionPartnerChannels!.push(partner)
+  } else if (partnerName && partnerName !== partnerTenantId) {
+    partner.partnerName = partnerName
   }
   const existingId = String(body.id || '').trim()
   let sp: RegistryDistributionSalesperson
@@ -426,18 +448,22 @@ export function upsertPartnerSalespersonFromSnapshot(
       phone,
       employeeCode,
       status: (body.status as RegistryDistributionSalesperson['status']) || partner.salespersons[idx]!.status,
+      note: typeof body.note === 'string' ? body.note.trim() || undefined : partner.salespersons[idx]!.note,
     }
     partner.salespersons[idx] = sp
   } else {
+    const code = employeeCode.toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 16) || employeeCode
+    const slug = partnerRefSlug(partner.partnerName || partnerName, partnerTenantId)
     sp = {
       id: newId('sp'),
       partnerTenantId,
       realName,
       phone,
       employeeCode,
-      refCode: String(body.refCode || `FWS-${employeeCode.toUpperCase()}`).trim(),
+      refCode: String(body.refCode || `FWS-${slug}-${code}`).trim(),
       status: 'active',
       createdAt: nowIso(),
+      note: typeof body.note === 'string' ? body.note.trim() || undefined : undefined,
     }
     partner.salespersons.push(sp)
   }
