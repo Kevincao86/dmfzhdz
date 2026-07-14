@@ -3,8 +3,10 @@
 import assert from 'node:assert/strict'
 import {
   buildSmartBatchSubmitPayload,
+  dedupeSmartBatchMaterialPool,
   pickSmartBatchMaterialIndices,
   pickSmartBatchSegmentCount,
+  prepareSmartBatchSubmitPayload,
 } from '../src/lib/iceSmartBatchPlan.js'
 
 assert.equal(pickSmartBatchSegmentCount([], 32, 30), 6, '30s → 6 segments')
@@ -42,5 +44,23 @@ assert.equal(payload.materialSlots.length, 6, 'slots map segments to pool indice
 assert.equal(payload.materialSlots[0], 2)
 assert.equal(payload.materialSlots[4], 22)
 assert.equal(payload.scriptRows[5]?.timeRange, '25-30秒', 'last row covers 25-30s')
+
+const expanded = prepareSmartBatchSubmitPayload({
+  materials: [
+    { kind: 'video', mediaUrl: 'https://example.com/a.mp4' },
+    { kind: 'video', mediaUrl: 'https://example.com/b.mp4' },
+    { kind: 'video', mediaUrl: 'https://example.com/a.mp4' },
+    { kind: 'video', mediaUrl: 'https://example.com/b.mp4' },
+  ],
+  scriptRows: [{ dialogue: 'a' }, { dialogue: 'b' }, { dialogue: 'c' }, { dialogue: 'd' }],
+  materialSlots: [0, 1, 2, 3],
+  targetTotalSec: 20,
+})
+assert.equal(expanded.materials.length, 2, 'dedupe expanded pool')
+assert.deepEqual(expanded.materialSlots, [0, 1, 0, 1], 'remap expanded slots')
+
+const { pool, remapMaterialIndex } = dedupeSmartBatchMaterialPool(expanded.materials)
+assert.equal(pool.length, 2)
+assert.equal(remapMaterialIndex(0), 0)
 
 console.log('OK: ice-smart-batch-plan-smoke')

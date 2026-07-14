@@ -27,6 +27,7 @@ import {
   type AliyunIceConfig,
 } from './aliyunIceCore.js'
 import { iceGetSmartBatchJob, iceSubmitSmartBatchJob } from './aliyunIceSmartBatch.js'
+import { prepareSmartBatchSubmitPayload } from '../src/lib/iceSmartBatchPlan.js'
 import { describeIceUploadBucketSelection, iceOssUploadAvailable, parseIceMixPipelineSegments } from './aliyunOssIceParse.js'
 import { evaluateIceOutputReady, fetchIceOutputObject, ensureIceSmartBatchMaterialUrls, ensureIceSmartBatchBgmUrl } from './aliyunOssIceUpload.js'
 import { resolveIceMixBgmUrl, ICE_MIX_BGM_NONE_ID } from '../src/lib/iceMixBgmPresets.js'
@@ -807,13 +808,20 @@ export async function handleAliyunIceRoutes(input: {
       mixBgmUrl = undefined
     }
 
-    const out = await iceSubmitSmartBatchJob(cfg!, {
+    const batchPlan = prepareSmartBatchSubmitPayload({
       materials: normalizedMaterials.materials,
       scriptRows: scriptRows as Array<{
         timeRange?: string
         visual?: string
         dialogue?: string
       }>,
+      materialSlots,
+      targetTotalSec,
+    })
+
+    const out = await iceSubmitSmartBatchJob(cfg!, {
+      materials: batchPlan.materials,
+      scriptRows: batchPlan.scriptRows,
       guidance,
       targetTotalSec,
       width,
@@ -821,7 +829,7 @@ export async function handleAliyunIceRoutes(input: {
       projectName,
       templateIds,
       clientToken,
-      materialSlots,
+      materialSlots: batchPlan.materialSlots,
       subtitleStyleId: subtitleStyleId || undefined,
       mixVoicePresetId: mixVoicePresetId || undefined,
       transitionMode,
