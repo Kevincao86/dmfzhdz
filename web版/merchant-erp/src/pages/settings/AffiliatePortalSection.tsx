@@ -1,4 +1,4 @@
-import { Copy, ExternalLink, Loader2, Share2, Users } from 'lucide-react'
+import { Copy, ExternalLink, Loader2, Share2, Users, Wallet } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { cn } from '../../cn'
@@ -10,6 +10,8 @@ import {
 import {
   fetchAffiliatePortal,
   formatCentsYuan,
+  submitAffiliateWithdraw,
+  withdrawRequestStatusLabel,
   type AffiliatePortalPayload,
 } from '../../lib/distributionAffiliatePortalClient'
 import { toUserFacingError } from '../../lib/userFacingError'
@@ -53,6 +55,8 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
   const [err, setErr] = useState<string | null>(null)
   const [hint, setHint] = useState<string | null>(null)
   const [data, setData] = useState<AffiliatePortalPayload | null>(null)
+  const [withdrawAmount, setWithdrawAmount] = useState('')
+  const [withdrawing, setWithdrawing] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -78,10 +82,43 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
     setTimeout(() => setHint(null), 2200)
   }
 
+  const onWithdrawAll = () => {
+    if (wallet?.availableCents) setWithdrawAmount(formatCentsYuan(wallet.availableCents))
+  }
+
+  const onSubmitWithdraw = async () => {
+    const gate = data?.withdrawGate
+    if (!gate?.open) {
+      setHint(gate?.windowHint ? `${gate.windowHint}，当前不可申请` : '当前不在提现申请时段')
+      setTimeout(() => setHint(null), 2800)
+      return
+    }
+    const yuan = Number(withdrawAmount)
+    if (!Number.isFinite(yuan) || yuan <= 0) {
+      setHint('请输入有效提现金额')
+      setTimeout(() => setHint(null), 2200)
+      return
+    }
+    setWithdrawing(true)
+    setHint(null)
+    try {
+      await submitAffiliateWithdraw(Math.round(yuan * 100))
+      setWithdrawAmount('')
+      setHint('提现申请已提交，请等待运营审核')
+      await load()
+    } catch (e) {
+      setHint(toUserFacingError(e, '提现申请'))
+    } finally {
+      setWithdrawing(false)
+      setTimeout(() => setHint(null), 3200)
+    }
+  }
+
   const affiliate = data?.affiliate ?? null
   const wallet = data?.wallet
   const stats = data?.stats
   const links = data?.promoLinks
+  const withdrawGate = data?.withdrawGate
 
   return (
     <div className="space-y-6">
@@ -244,6 +281,95 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
             </section>
           ) : null}
 
+          {affiliate.status === 'active' && wallet && withdrawGate ? (
+            <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+              <div className="flex items-center gap-2">
+                <Wallet className="h-4 w-4 text-indigo-600" />
+                <h4 className="text-sm font-medium text-gray-900">提现申请</h4>
+              </div>
+              <p className="text-xs text-slate-500">{withdrawGate.windowHint}</p>
+              <p className="text-xs text-slate-600">{withdrawGate.payoutHint}</p>
+              <p className="text-xs text-slate-500">
+                单笔 ¥{formatCentsYuan(withdrawGate.minCents)}–¥{formatCentsYuan(withdrawGate.maxCents)} · 本月上限 ¥
+                {formatCentsYuan(withdrawGate.monthlyCapCents)}
+              </p>
+              <div className="flex flex-wrap items-end gap-3">
+                <label className="block min-w-[160px] flex-1">
+                  <span className="mb-1 block text-xs text-slate-500">提现金额（元）</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    disabled={!withdrawGate.open || withdrawing}
+                    placeholder={`最多 ¥${formatCentsYuan(wallet.availableCents)}`}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={onWithdrawAll}
+                  disabled={!withdrawGate.open || withdrawing || wallet.availableCents <= 0}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  全部提现
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void onSubmitWithdraw()}
+                  disabled={!withdrawGate.open || withdrawing || wallet.availableCents <= 0}
+                  className={cn(
+                    'rounded-lg px-4 py-2 text-sm font-medium text-white',
+                    withdrawGate.open && wallet.availableCents > 0
+                      ? 'bg-indigo-600 hover:bg-indigo-700'
+                      : 'cursor-not-allowed bg-slate-300',
+                  )}
+                >
+                  {withdrawing ? '提交中…' : withdrawGate.open ? '申请提现' : '非申请时段'}
+                </button>
+              </div>
+              {!withdrawGate.open ? (
+                <p className="text-xs text-amber-700">提现按钮仅在每月 {withdrawGate.windowStartDay}–{withdrawGate.windowEndDay} 日开启</p>
+              ) : null}
+              {(data?.withdrawRequests?.length ?? 0) > 0 ? (
+                <div className="overflow-x-auto rounded-lg border border-slate-100">
+                  <table className="min-w-full divide-y divide-slate-100 text-sm">
+                    <thead className="bg-slate-50 text-left text-xs text-slate-500">
+                      <tr>
+                        <th className="px-3 py-2 font-medium">时间</th>
+                        <th className="px-3 py-2 font-medium">金额</th>
+                        <th className="px-3 py-2 font-medium">状态</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {data!.withdrawRequests.map((row) => (
+                        <tr key={row.id}>
+                          <td className="px-3 py-2 text-xs text-slate-600">{formatDate(row.createdAt)}</td>
+                          <td className="px-3 py-2 font-medium">¥{formatCentsYuan(row.amountCents)}</td>
+                          <td className="px-3 py-2 text-xs">
+                            <span
+                              className={cn(
+                                row.status === 'paid' && 'text-emerald-700',
+                                row.status === 'rejected' && 'text-red-600',
+                                row.status === 'pending_review' && 'text-amber-700',
+                              )}
+                            >
+                              {withdrawRequestStatusLabel(row.status)}
+                            </span>
+                            {row.failReason ? (
+                              <span className="ml-1 text-slate-400">({row.failReason})</span>
+                            ) : null}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+
           {affiliate.status === 'active' && (data?.settlements?.length ?? 0) > 0 ? (
             <section className="space-y-3">
               <h4 className="text-sm font-medium text-gray-900">近期结算</h4>
@@ -336,7 +462,7 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
 
       {!loading && !err ? (
         <p className="text-xs text-slate-500">
-          提现申请与发票流程请联系运营；数据与运营台分销中心同步。
+          提现申请提交后由运营审核打款；发票流程请联系运营。数据与运营台分销中心同步。
         </p>
       ) : null}
     </div>

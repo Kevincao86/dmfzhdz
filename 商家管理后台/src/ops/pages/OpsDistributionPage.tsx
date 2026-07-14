@@ -41,6 +41,18 @@ function affiliateStatusLabel(status: string): string {
   return AFFILIATE_STATUS_LABEL[status] ?? status
 }
 
+const WITHDRAW_STATUS_LABEL: Record<string, string> = {
+  pending_review: '待审核',
+  approved: '已通过',
+  rejected: '已拒绝',
+  paid: '已打款',
+  failed: '打款失败',
+}
+
+function withdrawStatusLabel(status: string): string {
+  return WITHDRAW_STATUS_LABEL[status] ?? status
+}
+
 type TabId = 'policy' | 'affiliates' | 'partners' | 'withdraw' | 'settlement'
 
 const TABS: { id: TabId; label: string }[] = [
@@ -763,9 +775,9 @@ export default function OpsDistributionPage() {
                 <tr key={w.id} className="border-t border-slate-800">
                   <td className="p-2 text-white">{w.ownerLabel}</td>
                   <td className="p-2">¥{yuanFromCents(w.amountCents)}</td>
-                  <td className="p-2 text-slate-400">{w.channel}</td>
-                  <td className="p-2">{w.status}</td>
-                  <td className="p-2 text-xs text-slate-500">{w.createdAt}</td>
+                  <td className="p-2 text-slate-400">{w.channel === 'manual_bank' ? '银行转账' : w.channel === 'manual_alipay' ? '支付宝' : w.channel}</td>
+                  <td className="p-2">{withdrawStatusLabel(w.status)}</td>
+                  <td className="p-2 text-xs text-slate-500">{w.createdAt?.slice(0, 16).replace('T', ' ')}</td>
                   {canEdit ? (
                     <td className="p-2 space-x-2">
                       {w.status === 'pending_review' ? (
@@ -792,7 +804,7 @@ export default function OpsDistributionPage() {
               ))}
             </tbody>
           </table>
-          {!withdrawRequests.length ? <p className="p-6 text-center text-slate-500">暂无提现申请（P1：C 端申请提现后出现在此）。</p> : null}
+          {!withdrawRequests.length ? <p className="p-6 text-center text-slate-500">暂无提现申请。推广员在每月 10–15 日提交后将出现在此。</p> : null}
         </div>
       ) : null}
 

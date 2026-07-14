@@ -21,10 +21,16 @@ export type RegistryDistributionPolicy = {
   erp: DistributionProductLineRates
   xingxuan: DistributionProductLineRates
   settleDelayDays: number
+  /** 审核通过后打款周期（工作日），默认 T+3 */
+  payoutDelayDays: number
   minPriceRateForCommission: number
   withdrawMinCents: number
   withdrawMaxCents: number
   withdrawMonthlyCapCents: number
+  /** 每月可申请提现的起始日（含），默认 10 */
+  withdrawWindowStartDay: number
+  /** 每月可申请提现的结束日（含），默认 15 */
+  withdrawWindowEndDay: number
   updatedAt?: string
 }
 
@@ -152,10 +158,13 @@ export const DEFAULT_DISTRIBUTION_POLICY: RegistryDistributionPolicy = {
     maxCommissionMonths: 12,
   },
   settleDelayDays: 7,
+  payoutDelayDays: 3,
   minPriceRateForCommission: 0.85,
   withdrawMinCents: 5000,
   withdrawMaxCents: 500000,
   withdrawMonthlyCapCents: 2000000,
+  withdrawWindowStartDay: 10,
+  withdrawWindowEndDay: 15,
 }
 
 export function mergeDistributionPolicy(

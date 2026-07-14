@@ -7,6 +7,7 @@ import { resolveAffiliateAuthIdentity } from '../src/lib/affiliatePortalAuth.js'
 import {
   buildAffiliatePortalFromSnapshot,
   buildDistributionPromoLinks,
+  createWithdrawRequestFromSnapshot,
 } from '../src/lib/distributionRegistryCore.js'
 import { generateAffiliatePromoWxacodeDataUrl } from '../src/lib/mpAffiliateWxacode.js'
 import { buildAffiliateAttributionsFromSnapshot } from '../src/lib/distributionAttributionCore.js'
@@ -89,6 +90,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     if (req.method === 'POST') {
       const body = rawBody(req)
       const action = String(body.action || '').trim()
+
+      if (action === 'withdraw') {
+        if (!portal.affiliate || portal.affiliate.status !== 'active') {
+          sendJson(res, 403, {
+            ok: false,
+            error: 'affiliate_not_active',
+            message: '推广员审核通过后才可申请提现',
+          })
+          return
+        }
+        const created = createWithdrawRequestFromSnapshot(data, identity, body)
+        if (!created.ok) {
+          sendJson(res, created.status, {
+            ok: false,
+            error: created.error,
+            message: created.message || created.error,
+          })
+          return
+        }
+        await io.save(data)
+        const refreshed = buildAffiliatePortalFromSnapshot(data, identity)
+        sendJson(res, 200, {
+          ok: true,
+          request: created.request,
+          wallet: refreshed.ok ? refreshed.wallet : portal.wallet,
+          stats: refreshed.ok ? refreshed.stats : portal.stats,
+          withdrawRequests: refreshed.ok ? refreshed.withdrawRequests : [],
+          withdrawGate: refreshed.ok ? refreshed.withdrawGate : portal.withdrawGate,
+        })
+        return
+      }
+
       if (action !== 'wxacode') {
         sendJson(res, 400, { ok: false, error: 'unknown_action' })
         return
@@ -138,6 +171,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       promoLinks,
       attributionStats: attributionBundle?.stats ?? null,
       attributions: attributionBundle?.attributions ?? [],
+      withdrawGate: portal.withdrawGate,
+      withdrawRequests: portal.withdrawRequests,
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
