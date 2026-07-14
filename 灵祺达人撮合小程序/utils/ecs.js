@@ -63,6 +63,12 @@ function errMsg(status, data) {
   const mpApiErrors = require('./mpApiErrors.js')
   const d = parseBody(data)
   let detail = String(d.message || d.detail || d.hint || '').trim()
+  if (/^<html/i.test(detail) || /<title>\s*502/i.test(detail)) {
+    detail = ''
+  }
+  if (/502 Bad Gateway/i.test(String(data || ''))) {
+    detail = ''
+  }
   if (/请在轻量执行|请执行迁移|轻量执行迁移|git pull|ecs-deploy-auth-api/i.test(detail)) {
     detail = '后台服务未更新，请稍后再试或联系管理员'
   }
@@ -70,6 +76,9 @@ function errMsg(status, data) {
   if (code === 'applicant_pick_share_table_missing') {
     detail = '分享功能未就绪，请联系运营'
   }
+  if (status === 502) return mpApiErrors.formatMpApiErr(new Error('http_502'), '后台服务正在重启，请稍后重试')
+  if (status === 503) return mpApiErrors.formatMpApiErr(new Error('http_503'), '后台服务暂不可用，请稍后重试')
+  if (status === 504) return mpApiErrors.formatMpApiErr(new Error('http_504'), '请求超时，请检查网络后重试')
   if (detail && /[\u4e00-\u9fa5]/.test(detail)) return detail
   return mpApiErrors.formatMpApiErr(new Error(code), detail || '请求失败，请稍后重试')
 }
