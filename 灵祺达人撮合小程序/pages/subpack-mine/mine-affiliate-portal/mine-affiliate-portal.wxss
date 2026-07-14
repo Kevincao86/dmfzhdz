@@ -268,3 +268,54 @@
 .portal-settle-card {
   margin-bottom: 8rpx;
 }
+
+.attrib-summary {
+  display: block;
+  margin-bottom: 16rpx;
+  font-size: 22rpx;
+  color: #64748b;
+}
+
+.attrib-empty {
+  padding: 24rpx 0;
+  text-align: center;
+  font-size: 24rpx;
+  color: #94a3b8;
+}
+
+.attrib-item {
+  padding: 18rpx 0;
+  border-bottom: 1rpx solid #f1f5f9;
+}
+
+.attrib-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.attrib-item__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+}
+
+.attrib-item__name {
+  flex: 1;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #334155;
+}
+
+.attrib-item__paid {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #059669;
+}
+
+.attrib-item__meta {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: #94a3b8;
+}

@@ -2,6 +2,30 @@ const { syncPageIdentity } = require('../../../utils/pageIdentityChrome.js')
 const affiliateApply = require('../../../utils/mpDistributionAffiliateApply.js')
 const affiliatePortal = require('../../../utils/mpDistributionAffiliatePortal.js')
 
+const SUBJECT_TYPE_LABEL = {
+  erp_merchant: 'ERP 商家',
+  xingxuan_pr: '星选 PR',
+  xingxuan_talent: '星选达人',
+  xingxuan_shoot: '星选拍摄',
+  xingxuan_edit: '星选剪辑',
+}
+
+const LANDING_SURFACE_LABEL = {
+  cs: '商家 ERP',
+  dr: '星选 Web',
+  mp: '星选小程序',
+}
+
+function mapAttributionRows(rows) {
+  return (rows || []).map((row) => ({
+    ...row,
+    subjectTypeLabel: SUBJECT_TYPE_LABEL[row.subjectType] || row.subjectType || '—',
+    landingLabel: LANDING_SURFACE_LABEL[row.landingSurface] || row.landingSurface || '—',
+    boundAtText: String(row.boundAt || '').slice(0, 16).replace('T', ' '),
+    paidYuan: row.firstPaidAt ? affiliatePortal.formatYuan(row.paidAmountCents) : '',
+  }))
+}
+
 function mapPortalView(data) {
   const affiliate = data.affiliate || null
   const wallet = data.wallet
@@ -38,6 +62,14 @@ function mapPortalView(data) {
           settlementTotalYuan: affiliatePortal.formatYuan(stats.settlementTotalCents),
         }
       : { settlementTotalYuan: '0.00' },
+    attributionStats: data.attributionStats
+      ? {
+          registrations: data.attributionStats.registrations || 0,
+          paidCount: data.attributionStats.paidCount || 0,
+          paidAmountYuan: affiliatePortal.formatYuan(data.attributionStats.paidAmountCents),
+        }
+      : null,
+    attributions: mapAttributionRows(data.attributions),
     settlements,
   }
 }
@@ -54,6 +86,8 @@ Page({
     wallet: null,
     stats: { settlementTotalYuan: '0.00' },
     settlements: [],
+    attributionStats: null,
+    attributions: [],
     wxacodePath: '',
     wxacodeLoading: false,
     wxacodeErr: '',

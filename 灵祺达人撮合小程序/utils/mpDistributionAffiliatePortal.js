@@ -50,6 +50,8 @@ async function fetchPortal() {
     stats: data.stats || null,
     settlements: data.settlements || [],
     promoLinks: data.promoLinks || null,
+    attributionStats: data.attributionStats || null,
+    attributions: data.attributions || [],
   }
 }
 

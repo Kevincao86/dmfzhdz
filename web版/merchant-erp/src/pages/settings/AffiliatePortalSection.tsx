@@ -1,14 +1,25 @@
-import { Copy, ExternalLink, Loader2, Share2 } from 'lucide-react'
+import { Copy, ExternalLink, Loader2, Share2, Users } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { cn } from '../../cn'
 import { affiliateStatusLabel } from '../../lib/distributionAffiliateApplyClient'
+import {
+  landingSurfaceLabel,
+  subjectTypeLabel,
+} from '../../lib/distributionAttributionCore'
 import {
   fetchAffiliatePortal,
   formatCentsYuan,
   type AffiliatePortalPayload,
 } from '../../lib/distributionAffiliatePortalClient'
 import { toUserFacingError } from '../../lib/userFacingError'
+
+function formatDate(iso?: string): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (!Number.isFinite(d.getTime())) return iso
+  return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
 
 async function copyText(text: string): Promise<boolean> {
   try {
@@ -260,6 +271,64 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
                   </tbody>
                 </table>
               </div>
+            </section>
+          ) : null}
+
+          {affiliate.status === 'active' ? (
+            <section className="space-y-3">
+              <div className="flex flex-wrap items-end justify-between gap-2">
+                <div>
+                  <h4 className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                    <Users className="h-4 w-4 text-indigo-600" />
+                    推广商户明细
+                  </h4>
+                  <p className="mt-1 text-xs text-slate-500">通过您的链接注册的用户；付费后自动更新金额</p>
+                </div>
+                {data?.attributionStats ? (
+                  <p className="text-xs text-slate-600">
+                    累计注册 {data.attributionStats.registrations} · 已付费 {data.attributionStats.paidCount} · ¥
+                    {formatCentsYuan(data.attributionStats.paidAmountCents)}
+                  </p>
+                ) : null}
+              </div>
+              {!data?.attributions?.length ? (
+                <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                  暂无推广记录，分享链接或太阳码后即可在此查看。
+                </p>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-slate-200">
+                  <table className="min-w-full divide-y divide-slate-100 text-sm">
+                    <thead className="bg-slate-50 text-left text-xs text-slate-500">
+                      <tr>
+                        <th className="px-3 py-2 font-medium">对象</th>
+                        <th className="px-3 py-2 font-medium">类型</th>
+                        <th className="px-3 py-2 font-medium">来源</th>
+                        <th className="px-3 py-2 font-medium">注册时间</th>
+                        <th className="px-3 py-2 font-medium">付费</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {data.attributions.map((row) => (
+                        <tr key={row.id}>
+                          <td className="px-3 py-2 text-slate-800">{row.subjectLabel || '—'}</td>
+                          <td className="px-3 py-2 text-slate-600">{subjectTypeLabel(row.subjectType)}</td>
+                          <td className="px-3 py-2 text-slate-600">{landingSurfaceLabel(row.landingSurface)}</td>
+                          <td className="px-3 py-2 text-slate-600">{formatDate(row.boundAt)}</td>
+                          <td className="px-3 py-2">
+                            {row.firstPaidAt ? (
+                              <span className="font-medium text-emerald-700">
+                                ¥{formatCentsYuan(row.paidAmountCents ?? 0)}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">未付费</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </section>
           ) : null}
         </>
