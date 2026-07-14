@@ -22,7 +22,7 @@ export type IceSmartBatchScriptRow = {
 /** 段数须覆盖用户目标时长（30 秒 → 6×5 秒），不得仅按已有分镜行数缩水 */
 export function pickSmartBatchSegmentCount(
   scriptRows: IceSmartBatchScriptRow[],
-  materialCount: number,
+  _materialCount: number,
   targetTotalSec: number,
 ): number {
   const planned = segmentCountFromTargetTotalSec(targetTotalSec, 5)
