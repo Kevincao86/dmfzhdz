@@ -22,8 +22,6 @@
       <button class="portal-btn portal-btn--ghost" bindtap="onRetryLoad">重新加载</button>
     </view>
 
-    <text class="portal-hint" wx:if="{{hint}}">{{hint}}</text>
-
     <view wx:if="{{!loading && !err && !affiliate}}" class="mp-sub-card portal-empty">
       <view class="mp-empty-v2">
         <text class="mp-empty-v2__icon">📣</text>
@@ -41,46 +39,6 @@
       <text class="portal-status-line">当前状态：{{statusLabel}}</text>
       <text class="portal-status-sub" wx:if="{{affiliate.status === 'pending'}}">审核通过后将展示推广太阳码与链接。</text>
       <button class="portal-btn portal-btn--ghost" bindtap="onGoApply">查看申请 / 重新申请</button>
-    </view>
-
-    <view wx:if="{{promoLinks}}" class="mp-sub-card">
-      <view class="mp-sub-card__head">
-        <view class="mp-sub-card__dot"></view>
-        <text class="mp-sub-card__title">小程序推广太阳码</text>
-      </view>
-      <view class="wxacode-box">
-        <view wx:if="{{wxacodeLoading}}" class="wxacode-box__loading">太阳码生成中…</view>
-        <image
-          wx:elif="{{wxacodePath}}"
-          class="wxacode-box__img"
-          src="{{wxacodePath}}"
-          mode="aspectFit"
-          show-menu-by-longpress
-        />
-        <view wx:else class="wxacode-box__fail">
-          <text>{{wxacodeErr || '太阳码暂不可用'}}</text>
-          <button class="portal-btn portal-btn--ghost portal-btn--sm" bindtap="loadWxacode">重新生成</button>
-        </view>
-      </view>
-      <text class="wxacode-tip">长按识别或保存图片，好友扫码进入小程序并自动绑定你的推广码。</text>
-      <view class="wxacode-actions">
-        <button class="portal-btn portal-btn--primary portal-btn--sm" bindtap="onCopyCode">复制推广码</button>
-        <button class="portal-btn portal-btn--ghost portal-btn--sm" bindtap="onSaveWxacode" disabled="{{!wxacodePath}}">保存太阳码</button>
-      </view>
-    </view>
-
-    <view wx:if="{{promoLinks}}" class="mp-sub-card">
-      <view class="mp-sub-card__head">
-        <view class="mp-sub-card__dot"></view>
-        <text class="mp-sub-card__title">网页推广链接</text>
-      </view>
-      <view class="link-item" wx:for="{{linkRows}}" wx:key="key">
-        <view class="link-item__main">
-          <text class="link-item__label">{{item.label}}</text>
-          <text class="link-item__url">{{item.url}}</text>
-        </view>
-        <button class="link-item__copy" size="mini" data-url="{{item.url}}" data-label="{{item.label}}" bindtap="onCopyLink">复制</button>
-      </view>
     </view>
 
     <view wx:if="{{wallet}}" class="mp-sub-card">
@@ -134,14 +92,64 @@
         >{{withdrawGate.open ? '申请提现' : '非申请时段'}}</button>
       </view>
       <text wx:if="{{!withdrawGate.open}}" class="withdraw-closed">提现按钮仅在每月 {{withdrawGate.windowStartDay}}–{{withdrawGate.windowEndDay}} 日开启</text>
-      <view wx:if="{{withdrawRequests.length}}" class="withdraw-list">
+      <view wx:if="{{withdrawHint}}" class="withdraw-toast">{{withdrawHint}}</view>
+    </view>
+
+    <view wx:if="{{wallet && withdrawGate}}" class="mp-sub-card">
+      <view class="mp-sub-card__head">
+        <view class="mp-sub-card__dot"></view>
+        <text class="mp-sub-card__title">提现申请明细</text>
+      </view>
+      <view wx:if="{{!withdrawRequests.length}}" class="withdraw-empty">暂无提现记录，提交申请后将在此显示进度。</view>
+      <view class="withdraw-list" wx:else>
         <view class="withdraw-item" wx:for="{{withdrawRequests}}" wx:key="id">
           <view class="withdraw-item__row">
             <text class="withdraw-item__amount">¥{{item.amountYuan}}</text>
-            <text class="withdraw-item__status">{{item.statusLabel}}</text>
+            <text class="withdraw-item__status withdraw-item__status--{{item.statusClass}}">{{item.statusLabel}}</text>
           </view>
-          <text class="withdraw-item__meta">{{item.createdAtText}}</text>
+          <text class="withdraw-item__meta">申请 {{item.createdAtText}}{{item.paidAtText ? ' · 打款 ' + item.paidAtText : ''}}</text>
+          <text wx:if="{{item.failReason}}" class="withdraw-item__fail">{{item.failReason}}</text>
         </view>
+      </view>
+    </view>
+
+    <view wx:if="{{promoLinks}}" class="mp-sub-card">
+      <view class="mp-sub-card__head">
+        <view class="mp-sub-card__dot"></view>
+        <text class="mp-sub-card__title">小程序推广太阳码</text>
+      </view>
+      <view class="wxacode-box">
+        <view wx:if="{{wxacodeLoading}}" class="wxacode-box__loading">太阳码生成中…</view>
+        <image
+          wx:elif="{{wxacodePath}}"
+          class="wxacode-box__img"
+          src="{{wxacodePath}}"
+          mode="aspectFit"
+          show-menu-by-longpress
+        />
+        <view wx:else class="wxacode-box__fail">
+          <text>{{wxacodeErr || '太阳码暂不可用'}}</text>
+          <button class="portal-btn portal-btn--ghost portal-btn--sm" bindtap="loadWxacode">重新生成</button>
+        </view>
+      </view>
+      <text class="wxacode-tip">长按识别或保存图片，好友扫码进入小程序并自动绑定你的推广码。</text>
+      <view class="wxacode-actions">
+        <button class="portal-btn portal-btn--primary portal-btn--sm" bindtap="onCopyCode">复制推广码</button>
+        <button class="portal-btn portal-btn--ghost portal-btn--sm" bindtap="onSaveWxacode" disabled="{{!wxacodePath}}">保存太阳码</button>
+      </view>
+    </view>
+
+    <view wx:if="{{promoLinks}}" class="mp-sub-card">
+      <view class="mp-sub-card__head">
+        <view class="mp-sub-card__dot"></view>
+        <text class="mp-sub-card__title">网页推广链接</text>
+      </view>
+      <view class="link-item" wx:for="{{linkRows}}" wx:key="key">
+        <view class="link-item__main">
+          <text class="link-item__label">{{item.label}}</text>
+          <text class="link-item__url">{{item.url}}</text>
+        </view>
+        <button class="link-item__copy" size="mini" data-url="{{item.url}}" data-label="{{item.label}}" bindtap="onCopyLink">复制</button>
       </view>
     </view>
 

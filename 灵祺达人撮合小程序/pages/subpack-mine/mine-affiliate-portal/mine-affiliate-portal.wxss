@@ -355,9 +355,26 @@
   color: #d97706;
 }
 
+.withdraw-toast {
+  margin-top: 16rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 16rpx;
+  background: #f5f3ff;
+  border: 1rpx solid #ddd6fe;
+  font-size: 24rpx;
+  color: #6d28d9;
+  line-height: 1.5;
+}
+
+.withdraw-empty {
+  padding: 24rpx 0;
+  text-align: center;
+  font-size: 24rpx;
+  color: #94a3b8;
+}
+
 .withdraw-list {
-  margin-top: 20rpx;
-  border-top: 1rpx solid #f1f5f9;
+  margin-top: 8rpx;
 }
 
 .withdraw-item {
@@ -383,7 +400,24 @@
 
 .withdraw-item__status {
   font-size: 24rpx;
+  font-weight: 600;
+}
+
+.withdraw-item__status--paid {
   color: #059669;
+}
+
+.withdraw-item__status--pending {
+  color: #d97706;
+}
+
+.withdraw-item__status--approved {
+  color: #2563eb;
+}
+
+.withdraw-item__status--rejected,
+.withdraw-item__status--failed {
+  color: #dc2626;
 }
 
 .withdraw-item__meta {
@@ -391,4 +425,11 @@
   margin-top: 6rpx;
   font-size: 22rpx;
   color: #94a3b8;
+}
+
+.withdraw-item__fail {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #dc2626;
 }

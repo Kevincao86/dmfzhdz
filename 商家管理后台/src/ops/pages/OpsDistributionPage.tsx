@@ -766,7 +766,8 @@ export default function OpsDistributionPage() {
                 <th className="p-2">金额</th>
                 <th className="p-2">渠道</th>
                 <th className="p-2">状态</th>
-                <th className="p-2">时间</th>
+                <th className="p-2">申请时间</th>
+                <th className="p-2">打款时间</th>
                 {canEdit ? <th className="p-2">操作</th> : null}
               </tr>
             </thead>
@@ -778,6 +779,7 @@ export default function OpsDistributionPage() {
                   <td className="p-2 text-slate-400">{w.channel === 'manual_bank' ? '银行转账' : w.channel === 'manual_alipay' ? '支付宝' : w.channel}</td>
                   <td className="p-2">{withdrawStatusLabel(w.status)}</td>
                   <td className="p-2 text-xs text-slate-500">{w.createdAt?.slice(0, 16).replace('T', ' ')}</td>
+                  <td className="p-2 text-xs text-slate-500">{w.paidAt ? w.paidAt.slice(0, 16).replace('T', ' ') : '—'}</td>
                   {canEdit ? (
                     <td className="p-2 space-x-2">
                       {w.status === 'pending_review' ? (
