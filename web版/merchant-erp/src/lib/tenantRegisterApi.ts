@@ -100,6 +100,7 @@ export async function registerMerchantAccount(body: {
   smsCode: string
   password: string
   confirmPassword: string
+  refCode?: string
 }): Promise<RegisterResult> {
   const posted = await postAuthJson<RegisterResult & { message?: string; detail?: string }>(
     '/api/meoo-auth-register',

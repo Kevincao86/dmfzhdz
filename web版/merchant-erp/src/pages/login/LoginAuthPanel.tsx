@@ -21,6 +21,7 @@ import {
   registerPartnerAccount,
   sendAuthSms,
 } from '../../lib/tenantRegisterApi'
+import { clearPendingDistributionRef, readPendingDistributionRef } from '../../lib/pendingDistributionRef'
 import { toUserFacingError } from '../../lib/userFacingError'
 import ErpScanLoginPanel from '../../components/login/ErpScanLoginPanel'
 
@@ -33,6 +34,8 @@ const inputClass =
 const labelClass = 'mb-1.5 block text-sm font-medium text-slate-700'
 
 type Props = {
+  initialMode?: 'login' | 'register'
+  pendingRefCode?: string | null
   infoHint: string | null
   err: string | null
   onInfoHint: (v: string | null) => void
@@ -40,9 +43,17 @@ type Props = {
   onLoginSuccess: () => void
 }
 
-export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLoginSuccess }: Props) {
+export default function LoginAuthPanel({
+  initialMode,
+  pendingRefCode,
+  infoHint,
+  err,
+  onInfoHint,
+  onErr,
+  onLoginSuccess,
+}: Props) {
   const partnerMode = isPartnerEdition()
-  const [mode, setMode] = useState<AuthMode>('login')
+  const [mode, setMode] = useState<AuthMode>(initialMode === 'register' ? 'register' : 'login')
   const [loginMethod, setLoginMethod] = useState<LoginMethod>('password')
   const [busy, setBusy] = useState(false)
 
@@ -291,6 +302,7 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
             smsCode: smsCode.trim(),
             password: regPassword,
             confirmPassword,
+            refCode: pendingRefCode || readPendingDistributionRef() || undefined,
           })
       if (!r.ok) {
         const base = toUserFacingError(r.message ?? r.detail ?? r.error, '注册')
@@ -307,6 +319,7 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
       setLoginName(ln)
       setLoginPhone(mobile)
       setPassword('')
+      if (!partnerMode) clearPendingDistributionRef()
       switchMode('login')
       setLoginMethod('password')
       onInfoHint(r.message ?? '注册成功，请登录')

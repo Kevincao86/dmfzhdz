@@ -5,6 +5,7 @@ const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { attachLoginIdentityIcons } = require('../../utils/loginIdentityIcons.js')
 const mpCdnAssets = require('../../utils/mpCdnAssets.js')
 const mpShare = require('../../utils/mpShare.js')
+const mpPendingDistributionRef = require('../../utils/mpPendingDistributionRef.js')
 
 const SPLASH_IDENTITY_META = [
   { id: 'talent', label: '达人', sub: '浏览商单 · 报名招募' },
@@ -29,9 +30,10 @@ Page({
     pickedId: '',
   },
 
-  onLoad() {
+  onLoad(options) {
     try {
       mpShare.enableShareMenu()
+      mpPendingDistributionRef.captureFromOptions(options || {})
       this.applyNavPadding()
       this.refreshIdentityIcons()
     } catch (e) {

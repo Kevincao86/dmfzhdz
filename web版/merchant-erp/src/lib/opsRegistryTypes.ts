@@ -1010,6 +1010,7 @@ export type RegistryFile = {
   distributionWithdrawRequests?: import('./distributionRegistryTypes.js').RegistryDistributionWithdrawRequest[]
   distributionSettlementBatches?: import('./distributionRegistryTypes.js').RegistryDistributionSettlementBatch[]
   distributionWallets?: import('./distributionRegistryTypes.js').RegistryDistributionWallet[]
+  distributionAttributions?: import('./distributionRegistryTypes.js').RegistryDistributionAttribution[]
 }
 
 export type HelpManualEdition = 'merchant' | 'partner' | 'fulfillment' | 'mp'

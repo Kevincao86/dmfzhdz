@@ -36,6 +36,8 @@ import partnerAgentEntitlementsHandler from '../api/meoo-partner-agent-entitleme
 import partnerAgentSettlementHandler from '../api/meoo-partner-agent-settlement.ts'
 import partnerLinkeOnboardHandler from '../api/meoo-partner-linke-onboard.ts'
 import partnerSalespersonsHandler from '../api/meoo-partner-salespersons.ts'
+import partnerDistributionStatsHandler from '../api/meoo-partner-distribution-stats.ts'
+import partnerSalespersonPortalHandler from '../api/meoo-partner-salesperson-portal.ts'
 import douyinLifeWebhookHandler from '../api/meoo-douyin-life-webhook.ts'
 import opsSyncRegistryGetHandler from '../api/meoo-ops-registry-ops-get.ts'
 import opsSyncVendorKeysHandler from '../api/meoo-ops-sync-vendor-keys.ts'
@@ -222,6 +224,8 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-partner-agent-settlement': partnerAgentSettlementHandler as VercelLikeHandler,
   '/api/meoo-partner-linke-onboard': partnerLinkeOnboardHandler as VercelLikeHandler,
   '/api/meoo-partner-salespersons': partnerSalespersonsHandler as VercelLikeHandler,
+  '/api/meoo-partner-distribution-stats': partnerDistributionStatsHandler as VercelLikeHandler,
+  '/api/meoo-partner-salesperson-portal': partnerSalespersonPortalHandler as VercelLikeHandler,
   '/api/meoo-douyin-life-webhook': douyinLifeWebhookHandler as VercelLikeHandler,
   /** 运营台注册表：Vercel 无法出站访问 ECS Supabase，由浏览器经 /erp-api 直连本机 */
   '/api/meoo-ops-sync-registry': opsSyncRegistryGetHandler as VercelLikeHandler,

@@ -65,6 +65,33 @@ export type RegistryDistributionPartnerChannel = {
   updatedAt?: string
 }
 
+export type DistributionAttributionSubjectType =
+  | 'erp_merchant'
+  | 'xingxuan_pr'
+  | 'xingxuan_talent'
+  | 'xingxuan_shoot'
+  | 'xingxuan_edit'
+
+export type DistributionAttributionLandingSurface = 'cs' | 'dr' | 'mp'
+
+export type RegistryDistributionAttribution = {
+  id: string
+  refCode: string
+  channelType: 'individual' | 'partner'
+  affiliateId?: string
+  partnerTenantId?: string
+  salespersonId?: string
+  subjectType: DistributionAttributionSubjectType
+  subjectRegistryId: string
+  landingSurface: DistributionAttributionLandingSurface
+  subjectLabel?: string
+  boundAt: string
+  activatedAt?: string
+  firstPaidAt?: string
+  paidAmountCents?: number
+  status: 'bound' | 'activated' | 'paid'
+}
+
 export type RegistryDistributionWallet = {
   ownerType: 'individual_affiliate' | 'partner_tenant'
   ownerId: string

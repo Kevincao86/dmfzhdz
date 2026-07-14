@@ -17,6 +17,10 @@ import {
   patchTalentLibraryFeatureAccessFromSnapshot,
 } from './mpLibraryRegistryMutations.js'
 import type { RegistryMpMembershipCheckoutRequest, RegistrySnapshot } from './opsRegistryTypes.js'
+import {
+  markDistributionAttributionPaidFromSnapshot,
+  type DistributionAttributionSubjectType,
+} from './distributionAttributionCore.js'
 
 export type MpMembershipPayChannel = 'wechat' | 'alipay' | 'douyin'
 export type MpMembershipPayMode =
@@ -262,6 +266,19 @@ export function confirmMembershipPayFromSnapshot(
   }
 
   grantMembershipUpgradePackagePoints(data, checkout)
+
+  const target = String(checkout.registryTargetId || checkout.lingqiId || '').trim()
+  if (target) {
+    let subjectType: DistributionAttributionSubjectType = 'xingxuan_talent'
+    if (checkout.role === 'pr') subjectType = 'xingxuan_pr'
+    else if (checkout.role === 'shoot') subjectType = 'xingxuan_shoot'
+    else if (checkout.role === 'edit') subjectType = 'xingxuan_edit'
+    markDistributionAttributionPaidFromSnapshot(data, {
+      subjectType,
+      subjectRegistryId: target,
+      paidAmountCents: Math.floor(Number(checkout.amountCents) || 0),
+    })
+  }
 
   list[idx] = checkout
   data.mpMembershipCheckoutRequests = list

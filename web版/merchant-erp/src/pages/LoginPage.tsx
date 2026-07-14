@@ -6,6 +6,7 @@ import LoginPortalNav from '../components/login/LoginPortalNav'
 import { editionLabel, isPartnerEdition } from '../lib/appEdition'
 import { BRAND_LOGO_URL, BRAND_NAME, BRAND_NAME_SHORT } from '../lib/brand'
 import { supabase, supabaseConfigured, missingSupabaseClientEnvKeys } from '../lib/supabaseClient'
+import { captureDistributionRefFromSearch } from '../lib/pendingDistributionRef'
 import LoginAuthPanel from './login/LoginAuthPanel'
 
 const AUTH_SHELL = cn(
@@ -14,11 +15,20 @@ const AUTH_SHELL = cn(
   'backdrop-blur-2xl backdrop-saturate-150',
 )
 
-export default function LoginPage() {
+export default function LoginPage({ initialMode }: { initialMode?: 'login' | 'register' }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [err, setErr] = useState<string | null>(null)
   const [infoHint, setInfoHint] = useState<string | null>(null)
+  const [pendingRef, setPendingRef] = useState<string | null>(null)
+
+  useEffect(() => {
+    const ref = captureDistributionRefFromSearch(location.search)
+    if (ref) {
+      setPendingRef(ref)
+      setInfoHint(`已识别推广码 ${ref}，完成注册后将计入对应分销员数据`)
+    }
+  }, [location.search])
 
   useEffect(() => {
     const st = (location.state ?? null) as {
@@ -135,6 +145,8 @@ export default function LoginPage() {
           当前版本 · {editionLabel()}
         </div>
         <LoginAuthPanel
+          initialMode={initialMode}
+          pendingRefCode={pendingRef}
           infoHint={infoHint}
           err={err}
           onInfoHint={setInfoHint}
