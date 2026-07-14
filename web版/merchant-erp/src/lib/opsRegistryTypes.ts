@@ -1003,6 +1003,13 @@ export type RegistryFile = {
     active?: boolean
     unboundAt?: string
   }>
+  /** 渠道分销 · 全局策略与 P1/P2 数据（注册表扩展） */
+  distributionPolicy?: import('./distributionRegistryTypes.js').RegistryDistributionPolicy
+  distributionAffiliates?: import('./distributionRegistryTypes.js').RegistryDistributionAffiliate[]
+  distributionPartnerChannels?: import('./distributionRegistryTypes.js').RegistryDistributionPartnerChannel[]
+  distributionWithdrawRequests?: import('./distributionRegistryTypes.js').RegistryDistributionWithdrawRequest[]
+  distributionSettlementBatches?: import('./distributionRegistryTypes.js').RegistryDistributionSettlementBatch[]
+  distributionWallets?: import('./distributionRegistryTypes.js').RegistryDistributionWallet[]
 }
 
 export type HelpManualEdition = 'merchant' | 'partner' | 'fulfillment' | 'mp'

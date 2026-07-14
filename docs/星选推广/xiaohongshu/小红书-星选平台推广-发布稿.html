@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>小红书图文｜灵祺星选平台推广</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #f5f5f5;
+      color: #333;
+      line-height: 1.6;
+    }
+    .toolbar {
+      position: sticky; top: 0; z-index: 99;
+      background: rgba(30, 30, 30, 0.95); color: #fff;
+      padding: 14px 20px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+      backdrop-filter: blur(8px);
+    }
+    .toolbar strong { color: #ff6b6b; margin-right: 6px; }
+    .toolbar button {
+      background: linear-gradient(90deg, #ff6b6b, #ee5a24);
+      color: #fff; border: none; border-radius: 20px;
+      padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    .toolbar button.secondary {
+      background: linear-gradient(90deg, #7c83ff, #0284c7);
+    }
+    .toolbar button:hover { opacity: 0.88; }
+    .toolbar span { font-size: 12px; color: #aaa; }
+    .layout {
+      max-width: 1100px; margin: 0 auto; padding: 24px 16px 60px;
+      display: grid; grid-template-columns: 1fr 380px; gap: 24px;
+    }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+    .meta-box {
+      background: #fff; border-radius: 12px; padding: 18px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.06); font-size: 13px; color: #666;
+      margin-bottom: 16px;
+    }
+    .meta-box h2 { font-size: 15px; color: #111; margin-bottom: 10px; }
+    .meta-box code { background: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+    .carousel-preview {
+      background: #fff; border-radius: 12px; padding: 20px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.06);
+    }
+    .carousel-preview h3 { font-size: 16px; margin-bottom: 14px; color: #111; }
+    .slides {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px;
+    }
+    .slide-card {
+      border-radius: 10px; overflow: hidden; border: 1px solid #eee;
+      background: #fafafa;
+    }
+    .slide-card img { width: 100%; aspect-ratio: 9/16; object-fit: cover; display: block; }
+    .slide-card p {
+      padding: 8px 10px; font-size: 12px; color: #888; text-align: center;
+      background: #fff;
+    }
+    .caption-panel {
+      position: sticky; top: 72px;
+    }
+    .caption-box {
+      background: #fff; border-radius: 12px; padding: 20px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.06);
+    }
+    .caption-box h3 { font-size: 16px; margin-bottom: 12px; color: #111; }
+    .caption-title {
+      background: linear-gradient(135deg, #fff5f5, #fff);
+      border-left: 3px solid #ff6b6b;
+      padding: 12px 14px; border-radius: 0 8px 8px 0;
+      font-size: 15px; font-weight: 700; color: #111; margin-bottom: 14px; line-height: 1.5;
+    }
+    #xhs-caption {
+      font-size: 14px; color: #444; line-height: 1.85; white-space: pre-wrap;
+      background: #fafafa; border-radius: 8px; padding: 14px; border: 1px solid #eee;
+      max-height: 480px; overflow-y: auto;
+    }
+    .tags {
+      margin-top: 14px; display: flex; flex-wrap: wrap; gap: 6px;
+    }
+    .tag {
+      background: #fff0f0; color: #e74c3c; font-size: 12px;
+      padding: 4px 10px; border-radius: 12px;
+    }
+    .steps {
+      margin-top: 16px; font-size: 13px; color: #666; line-height: 1.8;
+    }
+    .steps ol { padding-left: 18px; }
+    .steps li { margin-bottom: 6px; }
+    .phone-mock {
+      max-width: 320px; margin: 0 auto 20px;
+      border-radius: 24px; overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0,0,0,.12);
+      border: 6px solid #111;
+    }
+    .phone-mock img { width: 100%; display: block; }
+  </style>
+</head>
+<body>
+
+<div class="toolbar">
+  <strong>小红书发布稿</strong>
+  <button type="button" onclick="copyCaption()">复制正文文案</button>
+  <button type="button" class="secondary" onclick="copyTitle()">复制标题</button>
+  <button type="button" class="secondary" onclick="copyTags()">复制话题标签</button>
+  <span>6 张竖图轮播 + 正文 · 图片按顺序上传</span>
+</div>
+
+<div class="layout">
+  <div class="main-col">
+    <div class="meta-box">
+      <h2>发布信息</h2>
+      <p><b>笔记类型：</b>图文轮播（6 张，9:16 竖版）</p>
+      <p><b>推荐标题：</b>做探店招募还在群里喊人？这个小程序真的香</p>
+      <p><b>备选标题：</b>本地生活 PR 必备｜达人撮合 + AI 匹配 + 商单日历</p>
+      <p><b>素材目录：</b><code>docs/星选推广/xiaohongshu/</code></p>
+      <p><b>封面：</b>第 1 张 <code>xhs-slide-01-cover.png</code></p>
+    </div>
+
+    <div class="carousel-preview">
+      <h3>📱 轮播图预览（按上传顺序）</h3>
+      <div class="phone-mock">
+        <img src="./xhs-slide-01-cover.png" alt="封面预览" id="preview-main" />
+      </div>
+      <div class="slides">
+        <div class="slide-card" onclick="setPreview('./xhs-slide-01-cover.png')">
+          <img src="./xhs-slide-01-cover.png" alt="P1 封面" />
+          <p>P1 · 封面钩子</p>
+        </div>
+        <div class="slide-card" onclick="setPreview('./xhs-slide-02-pain.png')">
+          <img src="./xhs-slide-02-pain.png" alt="P2 痛点" />
+          <p>P2 · 四大痛点</p>
+        </div>
+        <div class="slide-card" onclick="setPreview('./xhs-slide-03-roles.png')">
+          <img src="./xhs-slide-03-roles.png" alt="P3 四身份" />
+          <p>P3 · 四种身份</p>
+        </div>
+        <div class="slide-card" onclick="setPreview('./xhs-slide-04-ai.png')">
+          <img src="./xhs-slide-04-ai.png" alt="P4 AI撮合" />
+          <p>P4 · AI 智能撮合</p>
+        </div>
+        <div class="slide-card" onclick="setPreview('./xhs-slide-05-flow.png')">
+          <img src="./xhs-slide-05-flow.png" alt="P5 履约流程" />
+          <p>P5 · 发单到履约</p>
+        </div>
+        <div class="slide-card" onclick="setPreview('./xhs-slide-06-cta.png')">
+          <img src="./xhs-slide-06-cta.png" alt="P6 CTA" />
+          <p>P6 · 行动号召</p>
+        </div>
+      </div>
+      <p style="margin-top:12px;font-size:12px;color:#999;">点击缩略图可切换上方手机预览 · 第 6 张可叠加 <code>mp-wxacode.jpg</code> 太阳码后导出</p>
+    </div>
+  </div>
+
+  <div class="caption-panel">
+    <div class="caption-box">
+      <h3>📝 小红书正文（可直接粘贴）</h3>
+      <div class="caption-title" id="xhs-title">做探店招募还在群里喊人？这个小程序真的香</div>
+      <div id="xhs-caption">还在群里发通告找达人？😭
+
+发了一个招募，群里刷屏
+报名表散落三四个链接
+档期对不上，预算问三遍
+成片发了没回，全靠人工催
+
+快，但不沉淀；清楚，但不实时。
+
+最近在用「灵祺星选」——本地生活达人撮合小程序，Web + 小程序双端互通，真的把流程收拢了👇
+
+✨ 四种身份，一个入口
+达人 / PR / 拍摄团队 / 剪辑团队
+同一微信账号随时切换，数据实时同步
+
+🤖 AI 智能撮合，看得见匹配度
+推荐大厅按粉丝、城市、品类算匹配分
+达人找商单、PR 找达人，不用大海捞针
+
+📋 五大 Tab 覆盖全流程
+首页招募大厅 + 急单 + 拍剪任务
+推荐 · 发招募 · 消息 · 我的
+PR 三步发单，达人一键报名
+
+📅 商单日历（新功能！）
+探店排期、交片截止一眼看清
+近 7 天待办横滑直达，还能设提醒推送
+
+🔗 从发单到履约，全程可查
+发布 → 报名 → 排期 → 审片 → 回链核查
+结算走抖音来客/林客，星选专注撮合履约
+
+💡 适合谁？
+· 本地生活 PR / 品牌方发招募
+· 探店达人找商单接急单
+· 拍摄/剪辑团队接单大厅
+· MCN 多达人并行管理
+
+微信搜「灵祺星选」就能用
+找商单 · 发招募 · 一站撮合
+好撮合，成就好履约 ✌️
+
+有问题评论区聊～</div>
+
+      <div class="tags" id="xhs-tags">
+        <span class="tag">#灵祺星选</span>
+        <span class="tag">#本地生活</span>
+        <span class="tag">#探店达人</span>
+        <span class="tag">#达人招募</span>
+        <span class="tag">#PR工具</span>
+        <span class="tag">#MCN</span>
+        <span class="tag">#小程序推荐</span>
+        <span class="tag">#AI撮合</span>
+        <span class="tag">#商单履约</span>
+        <span class="tag">#短视频运营</span>
+      </div>
+
+      <div class="steps">
+        <p><b>发布步骤</b></p>
+        <ol>
+          <li>小红书 App → 发布笔记 → 选「图文」</li>
+          <li>按 P1→P6 顺序上传 6 张竖图（9:16）</li>
+          <li>第 6 张可用 PS/稿定叠加 <code>mp-wxacode.jpg</code> 太阳码</li>
+          <li>粘贴标题 + 正文 + 话题标签</li>
+          <li>封面选 P1，标题用上方推荐标题</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 隐藏：完整 HTML 正文块（部分运营工具可导入） -->
+<div id="xhs-html-block" style="display:none;">
+<section style="max-width:375px;margin:0 auto;font-family:-apple-system,'PingFang SC',sans-serif;color:#333;line-height:1.8;font-size:15px;">
+
+<p style="font-size:17px;font-weight:700;color:#111;margin:0 0 12px;">做探店招募还在群里喊人？这个小程序真的香</p>
+
+<p style="margin:0 0 10px;">还在群里发通告找达人？😭</p>
+<p style="margin:0 0 10px;">发了一个招募，群里刷屏<br/>报名表散落三四个链接<br/>档期对不上，预算问三遍<br/>成片发了没回，全靠人工催</p>
+
+<p style="margin:0 0 10px;">快，但不沉淀；清楚，但不实时。</p>
+
+<p style="margin:0 0 10px;">最近在用「<strong style="color:#7c83ff;">灵祺星选</strong>」——本地生活达人撮合小程序，Web + 小程序双端互通👇</p>
+
+<p style="margin:0 0 8px;font-weight:700;color:#7c83ff;">✨ 四种身份，一个入口</p>
+<p style="margin:0 0 12px;">达人 / PR / 拍摄 / 剪辑 · 同一账号随时切换</p>
+
+<p style="margin:0 0 8px;font-weight:700;color:#7c83ff;">🤖 AI 智能撮合</p>
+<p style="margin:0 0 12px;">推荐大厅看得见匹配度，不用大海捞针</p>
+
+<p style="margin:0 0 8px;font-weight:700;color:#7c83ff;">📋 五大 Tab 全流程</p>
+<p style="margin:0 0 12px;">招募大厅 · 急单 · 拍剪 · 发招募 · 消息</p>
+
+<p style="margin:0 0 8px;font-weight:700;color:#7c83ff;">📅 商单日历（新！）</p>
+<p style="margin:0 0 12px;">探店排期、交片提醒、近7天待办一键直达</p>
+
+<p style="margin:0 0 8px;font-weight:700;color:#7c83ff;">🔗 发单到履约全程可查</p>
+<p style="margin:0 0 12px;">发布→报名→排期→审片→回链 · 结算走抖音来客/林客</p>
+
+<p style="margin:0 0 10px;font-weight:700;">微信搜「灵祺星选」<br/>找商单 · 发招募 · 一站撮合 ✌️</p>
+
+<p style="margin:0;font-size:13px;color:#999;">#灵祺星选 #本地生活 #探店达人 #达人招募 #PR工具 #MCN #小程序推荐 #AI撮合 #商单履约</p>
+
+</section>
+</div>
+
+<script>
+function setPreview(src) {
+  document.getElementById('preview-main').src = src;
+}
+
+function copyText(text, msg) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => alert(msg)).catch(() => fallbackCopy(text, msg));
+  } else {
+    fallbackCopy(text, msg);
+  }
+}
+
+function fallbackCopy(text, msg) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand('copy');
+    alert(msg);
+  } catch (e) {
+    alert('复制失败，请手动选中复制');
+  }
+  document.body.removeChild(ta);
+}
+
+function copyCaption() {
+  const text = document.getElementById('xhs-caption').textContent.trim();
+  copyText(text, '已复制小红书正文！\n\n粘贴到笔记正文区即可');
+}
+
+function copyTitle() {
+  const text = document.getElementById('xhs-title').textContent.trim();
+  copyText(text, '已复制标题！\n\n小红书标题限 20 字，可酌情精简');
+}
+
+function copyTags() {
+  const tags = Array.from(document.querySelectorAll('#xhs-tags .tag'))
+    .map(el => el.textContent.trim())
+    .join(' ');
+  copyText(tags, '已复制话题标签！\n\n发布时在正文末尾或话题区添加');
+}
+
+function copyHtmlBlock() {
+  const el = document.getElementById('xhs-html-block');
+  copyText(el.innerHTML.trim(), '已复制 HTML 正文块');
+}
+</script>
+
+</body>
+</html>

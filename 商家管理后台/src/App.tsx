@@ -21,6 +21,7 @@ import OpsMpMembershipStatusPage from './ops/pages/OpsMpMembershipStatusPage'
 import OpsSupportHubPage from './ops/pages/OpsSupportHubPage'
 import OpsHelpManualPage from './ops/pages/OpsHelpManualPage'
 import OpsTeamIntroPage from './ops/pages/OpsTeamIntroPage'
+import OpsDistributionPage from './ops/pages/OpsDistributionPage'
 import OpsLegalDocPage from './pages/OpsLegalDocPage'
 
 export default function App() {
@@ -56,6 +57,7 @@ export default function App() {
           <Route path="edit-team-library/:entryId/permissions" element={<OpsMpLibraryPermissionPage />} />
           <Route path="payment-orders" element={<OpsPaymentOrdersPage />} />
           <Route path="mp-membership-finance" element={<OpsMpMembershipFinancePage />} />
+          <Route path="distribution" element={<OpsDistributionPage />} />
           <Route path="mp-membership-status/:role/:targetId" element={<OpsMpMembershipStatusPage />} />
           <Route path="ai-models" element={<OpsAiModelsPage />} />
           <Route path="support" element={<OpsSupportHubPage />} />

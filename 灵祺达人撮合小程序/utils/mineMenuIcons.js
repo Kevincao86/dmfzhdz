@@ -28,6 +28,7 @@ const MENU_KEY_ICON = {
   templates: '/images/mine-icons/tpl.png',
   briefTemplates: '/images/mine-icons/brief.png',
   cooperation: '/images/mine-icons/cooperation.png',
+  affiliateApply: '/images/mine-icons/cooperation.png',
   talentWatchlist: '/images/mine-icons/watchlist.png',
   formRelay: '/images/mine-icons/relay.png',
   funnel: '/images/mine-icons/funnel.png',

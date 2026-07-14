@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>灵祺星选 · 四身份会员报价单（可编辑）</title>
+  <style>
+    :root {
+      --brand: #7c83ff;
+      --brand-dark: #5b63e8;
+      --accent-blue: #0284c7;
+      --accent-orange: #ea580c;
+      --accent-green: #16a34a;
+      --bg: #f0eff6;
+      --card: #fff;
+      --text: #1e293b;
+      --muted: #64748b;
+      --border: #e2e8f0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .toolbar {
+      position: sticky; top: 0; z-index: 100;
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+    }
+    .toolbar h1 { font-size: 16px; margin: 0; flex: 1; min-width: 200px; }
+    .toolbar .hint { font-size: 12px; color: var(--muted); }
+    .toolbar button {
+      padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border);
+      background: #fff; cursor: pointer; font-size: 13px;
+    }
+    .toolbar button.primary { background: var(--brand); color: #fff; border-color: var(--brand); }
+    .tabs {
+      display: flex; gap: 8px; padding: 16px 24px 0;
+      flex-wrap: wrap;
+    }
+    .tab {
+      padding: 10px 20px; border-radius: 10px; border: none; cursor: pointer;
+      background: #fff; color: var(--muted); font-size: 14px; font-weight: 500;
+    }
+    .tab.active { background: var(--brand); color: #fff; }
+    .panel { display: none; padding: 20px 24px 40px; }
+    .panel.active { display: block; }
+    .panel-title {
+      font-size: 22px; font-weight: 700; margin-bottom: 4px;
+    }
+    .panel-sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
+    @media (max-width: 1100px) {
+      .pricing-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 640px) {
+      .pricing-grid { grid-template-columns: 1fr; }
+    }
+    .plan-card {
+      background: var(--card);
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    .plan-card.recommended { border-color: var(--brand); box-shadow: 0 0 0 2px rgba(124,131,255,.25); }
+    .plan-head {
+      padding: 20px 18px 16px;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .plan-head.basic { background: linear-gradient(180deg, #eff6ff 0%, #fff 100%); }
+    .plan-head.pro { background: linear-gradient(180deg, #f5f3ff 0%, #fff 100%); }
+    .plan-head.flag { background: linear-gradient(180deg, #fff7ed 0%, #fff 100%); }
+    .plan-head.ent { background: linear-gradient(180deg, #ecfdf5 0%, #fff 100%); }
+    .plan-badge {
+      display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 99px;
+      background: var(--brand); color: #fff; margin-bottom: 8px;
+    }
+    .plan-name { font-size: 18px; font-weight: 700; }
+    .plan-audience { font-size: 12px; color: var(--muted); margin-top: 4px; min-height: 36px; }
+    .plan-price {
+      margin-top: 12px; font-size: 28px; font-weight: 800; color: var(--brand-dark);
+    }
+    .plan-price.free { color: var(--accent-blue); }
+    .plan-price span { font-size: 14px; font-weight: 500; color: var(--muted); }
+    .plan-year { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .plan-body { padding: 16px 18px 20px; flex: 1; }
+    .section-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .05em; color: var(--muted); margin: 14px 0 8px;
+    }
+    .section-label:first-child { margin-top: 0; }
+    .feat { display: flex; gap: 8px; font-size: 12px; margin-bottom: 6px; align-items: flex-start; }
+    .feat .icon-btn {
+      flex-shrink: 0; width: 22px; height: 22px;
+      display: inline-flex; align-items: center; justify-content: center;
+      border: 1px solid transparent; border-radius: 6px;
+      cursor: pointer; font-size: 13px; font-weight: 700;
+      background: transparent; padding: 0; line-height: 1;
+      transition: background .15s, border-color .15s;
+    }
+    .feat .icon-btn:hover { background: rgba(124,131,255,.12); border-color: rgba(124,131,255,.35); }
+    .feat .icon-btn:focus { outline: none; box-shadow: 0 0 0 2px rgba(124,131,255,.35); }
+    .feat.yes .icon-btn { color: #16a34a; }
+    .feat.no .icon-btn { color: #94a3b8; }
+    .feat.partial .icon-btn { color: var(--accent-orange); }
+    .icon-legend {
+      font-size: 11px; color: var(--muted); padding: 6px 10px;
+      background: #f8fafc; border-radius: 8px; border: 1px solid var(--border);
+    }
+    .feat-text { flex: 1; }
+    .feat-val { color: var(--muted); font-size: 11px; }
+    [contenteditable="true"] {
+      outline: none; border-radius: 3px;
+      transition: background .15s;
+    }
+    [contenteditable="true"]:hover { background: rgba(124,131,255,.08); }
+    [contenteditable="true"]:focus { background: rgba(124,131,255,.15); box-shadow: 0 0 0 2px rgba(124,131,255,.3); }
+    .footer-note {
+      margin-top: 24px; padding: 16px; background: #fff; border-radius: 12px;
+      border: 1px dashed var(--border); font-size: 12px; color: var(--muted);
+    }
+    @media print {
+      .toolbar, .tabs { display: none !important; }
+      .panel { display: block !important; page-break-after: always; }
+      body { background: #fff; }
+      [contenteditable="true"]:hover, [contenteditable="true"]:focus { background: transparent; box-shadow: none; }
+      .feat .icon-btn { border: none; background: transparent; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <h1>灵祺星选 · 会员报价单（可编辑）</h1>
+    <span class="icon-legend">点击 <strong style="color:#16a34a">✓</strong> <strong style="color:#ea580c">◐</strong> <strong style="color:#94a3b8">✕</strong> 循环切换</span>
+    <span class="hint">文字/价格可直接改 · Ctrl+P 导出 PDF</span>
+    <button onclick="window.print()">导出 PDF</button>
+    <button class="primary" onclick="alert('修改完成后：文件 → 另存为，或用浏览器截图工具保存为 PNG')">导出说明</button>
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+  <div id="panels"></div>
+
+  <script>
+    const PLANS = {
+      pr: {
+        label: 'PR 版',
+        subtitle: '品牌 PR · MCN · 代运营 — 发单、反选、审片、荐达人',
+        tiers: [
+          { key: 'basic', name: '基础版', head: 'basic', audience: '新手 PR / 试用发单', price: '免费', year: '永久免费', rec: false,
+            sections: [
+              { title: '撮合发单', items: [
+                ['yes', '大厅浏览 + AI 推荐商单'],
+                ['partial', 'PR 发招募（草稿 1 单）'],
+                ['partial', '同时在招', '5 单'],
+                ['no', '模版 / 转发工具'],
+              ]},
+              { title: '履约 & AI 审核', items: [
+                ['no', '反选 / 排期 / 审片'],
+                ['partial', 'AI 合规检核（成片+文稿）', '1 次/月'],
+                ['no', '发布链接 AI 核查'],
+              ]},
+              { title: '达人库 & AI 增值', items: [
+                ['no', '全部达人库 / 智能荐达人'],
+                ['no', 'AI Brief / 云剪 / 数字人'],
+              ]},
+            ]},
+          { key: 'pro', name: '专业版', head: 'pro', audience: '独立 PR / 小型 MCN', price: '¥129', year: '年付 ¥1,238', rec: true,
+            sections: [
+              { title: '撮合发单', items: [
+                ['yes', '发招募 / 模版 / 转发工具'],
+                ['yes', '同时在招', '10 单'],
+                ['yes', '封面海报 / 阶梯档位 / 一口价'],
+              ]},
+              { title: '履约 & AI 审核', items: [
+                ['yes', '反选 / 排期 / 视频·文稿审核'],
+                ['yes', 'AI 合规检核', '50+50 次/月'],
+                ['yes', '发布链接 AI 核查'],
+                ['partial', '审片 AI 检核', '单条'],
+              ]},
+              { title: '达人库 & AI 增值', items: [
+                ['yes', '全部达人库 + 智能荐达人'],
+                ['yes', 'AI Brief / 文章 / 话题', '20 次/月'],
+              ]},
+            ]},
+          { key: 'flag', name: '旗舰版', head: 'flag', audience: '全栈 PR / 内容机构', price: '¥399', year: '年付 ¥3,830', rec: false,
+            sections: [
+              { title: '撮合发单', items: [
+                ['yes', '同时在招', '30 单'],
+                ['yes', '林客挂接 + 定向招募'],
+              ]},
+              { title: '履约 & AI 审核', items: [
+                ['yes', '批量反选 / 档位配额'],
+                ['yes', 'AI 合规检核', '300+300 次/月'],
+                ['yes', '审片 AI 检核', '单条+批量'],
+              ]},
+              { title: '达人库 & AI 增值', items: [
+                ['yes', 'AI Brief 等', '100 次/月'],
+                ['yes', '短视频+云剪+数字人', '120 次/月'],
+                ['yes', '招募分享海报 AI'],
+              ]},
+            ]},
+          { key: 'ent', name: '企业版', head: 'ent', audience: '品牌方 / 代运营团队', price: '¥299', year: '年付 ¥2,870/席位', rec: false,
+            sections: [
+              { title: '撮合发单', items: [
+                ['yes', '同时在招', '不限'],
+                ['yes', 'ERP 星选桥接'],
+              ]},
+              { title: '履约 & AI 审核', items: [
+                ['yes', 'AI 合规检核', '300+300 次/月'],
+                ['yes', '结算 CSV 导出'],
+              ]},
+              { title: '团队', items: [
+                ['yes', '多 PR 席位 / 优先客服 / API'],
+                ['yes', 'AI 增值合计', '600 次/月'],
+              ]},
+            ]},
+        ]},
+      talent: {
+        label: '达人版',
+        subtitle: '探店达人 · 种草博主 — 找商单、交片前 AI 自检',
+        tiers: [
+          { key: 'basic', name: '基础版', head: 'basic', audience: '个人达人尝鲜', price: '免费', year: '永久免费', rec: false,
+            sections: [
+              { title: '找单报名', items: [['yes', '招募大厅 / 急单 / 云剪'], ['partial', '每月报名', '5 单']]},
+              { title: 'AI 审核（自检）', items: [['partial', '成片+文稿 AI 自检', '各 1 次/月'], ['partial', '发布链接核查', '只读']]},
+            ]},
+          { key: 'pro', name: '专业版', head: 'pro', audience: '活跃接单达人', price: '¥49', year: '年付 ¥470', rec: true,
+            sections: [
+              { title: '找单报名', items: [['yes', 'AI 推荐大厅'], ['yes', '每月报名', '30 单']]},
+              { title: 'AI 审核（自检）', items: [['yes', '成片+文稿 AI 自检', '各 30 次/月'], ['yes', '发布链接 AI 核查']]},
+              { title: 'AI 增值', items: [['yes', '口播稿润色', '15 次/月']]},
+            ]},
+          { key: 'flag', name: '旗舰版', head: 'flag', audience: '全职探店 / 种草博主', price: '¥129', year: '年付 ¥1,238', rec: false,
+            sections: [
+              { title: '找单报名', items: [['yes', '每月报名', '不限'], ['yes', '资料加权排序']]},
+              { title: 'AI 审核（自检）', items: [['yes', '成片+文稿 AI 自检', '各 150 次/月'], ['yes', '批量自检']]},
+              { title: 'AI 增值', items: [['yes', '短视频+数字人', '20+10 次/月']]},
+            ]},
+          { key: 'ent', name: '企业版', head: 'ent', audience: 'MCN 经纪 / 多达人', price: '¥199', year: '年付 ¥1,910/席位', rec: false,
+            sections: [
+              { title: '团队', items: [['yes', '多达人档案 / 多席位'], ['yes', 'AI 自检', '各 500 次/月']]},
+            ]},
+        ]},
+      shoot: {
+        label: '拍摄团队版',
+        subtitle: '跟拍 · 摄制组 — 接拍摄单、交片前 AI 自检',
+        tiers: [
+          { key: 'basic', name: '基础版', head: 'basic', audience: '个人摄影师', price: '免费', year: '永久免费', rec: false,
+            sections: [
+              { title: '接单', items: [['partial', '每月报名', '3 单']]},
+              { title: 'AI 审核', items: [['partial', '成片+脚本自检', '各 1 次/月']]},
+            ]},
+          { key: 'pro', name: '专业版', head: 'pro', audience: '小团队 / 兼职跟拍', price: '¥69', year: '年付 ¥662', rec: true,
+            sections: [
+              { title: '接单', items: [['yes', '每月报名', '20 单'], ['yes', '完整团队资料']]},
+              { title: 'AI 审核', items: [['yes', '成片自检', '25 次/月'], ['yes', '脚本检核', '20 次/月'], ['yes', '粗剪预审', '10 次/月']]},
+            ]},
+          { key: 'flag', name: '旗舰版', head: 'flag', audience: '全职拍摄团队', price: '¥199', year: '年付 ¥1,910', rec: false,
+            sections: [
+              { title: '接单', items: [['yes', '每月报名', '不限']]},
+              { title: 'AI 审核', items: [['yes', '成片 120 + 脚本 100 次/月'], ['yes', '批量检核']]},
+            ]},
+          { key: 'ent', name: '工作室版', head: 'ent', audience: '多机位工作室', price: '¥249', year: '年付 ¥2,390/席位', rec: false,
+            sections: [
+              { title: '团队', items: [['yes', '多操作员席位'], ['yes', 'AI 自检', '400+350 次/月']]},
+            ]},
+        ]},
+      edit: {
+        label: '剪辑团队版',
+        subtitle: '剪辑师 · 云剪团队 — 交片前 AI 自检 + 云剪产能',
+        tiers: [
+          { key: 'basic', name: '基础版', head: 'basic', audience: '个人剪辑', price: '免费', year: '永久免费', rec: false,
+            sections: [
+              { title: '接单', items: [['partial', '每月报名', '3 单']]},
+              { title: 'AI 审核', items: [['partial', '成片+字幕自检', '各 1 次/月']]},
+            ]},
+          { key: 'pro', name: '专业版', head: 'pro', audience: '兼职剪辑 / 小工作室', price: '¥79', year: '年付 ¥758', rec: true,
+            sections: [
+              { title: '接单', items: [['yes', '每月报名', '20 单'], ['yes', '批量交片']]},
+              { title: 'AI 审核', items: [['yes', '成片+字幕', '各 30 次/月'], ['yes', '云剪产物预审', '15 次/月']]},
+            ]},
+          { key: 'flag', name: '旗舰版', head: 'flag', audience: '全职剪辑 / 云剪接单', price: '¥229', year: '年付 ¥2,198', rec: false,
+            sections: [
+              { title: 'AI 审核 & 增值', items: [['yes', '成片+字幕', '各 150 次/月'], ['yes', '自用 AI 云剪', '25 条/月'], ['yes', '批量检核']]},
+            ]},
+          { key: 'ent', name: '工作室版', head: 'ent', audience: '后期工作室', price: '¥279', year: '年付 ¥2,678/席位', rec: false,
+            sections: [
+              { title: '团队', items: [['yes', '多席位 / 优先客服'], ['yes', '云剪产能', '120 条/月']]},
+            ]},
+        ]},
+    };
+
+    const tabsEl = document.getElementById('tabs');
+    const panelsEl = document.getElementById('panels');
+    let active = 'pr';
+    const ICON_CYCLE = ['yes', 'partial', 'no'];
+    const ICON_CHAR = { yes: '✓', partial: '◐', no: '✕' };
+
+    function iconChar(type) {
+      return ICON_CHAR[type] || '◐';
+    }
+
+    function renderTier(t) {
+      const priceClass = t.price === '免费' ? 'free' : '';
+      const priceSuffix = t.price !== '免费' && !t.price.includes('/') ? '<span>/月</span>' : (t.price.includes('席位') ? '<span>/席位/月</span>' : '');
+      let body = '';
+      for (const sec of t.sections) {
+        body += `<div class="section-label" contenteditable="true">${sec.title}</div>`;
+        for (const row of sec.items) {
+          const [type, text, val] = row;
+          body += `<div class="feat ${type}">
+            <button type="button" class="icon-btn" data-type="${type}" title="点击切换：✓ 包含 → ◐ 部分 → ✕ 不含" aria-label="切换功能状态">${iconChar(type)}</button>
+            <span class="feat-text"><span contenteditable="true">${text}</span>${val ? `<div class="feat-val" contenteditable="true">${val}</div>` : ''}</span>
+          </div>`;
+        }
+      }
+      return `<div class="plan-card${t.rec ? ' recommended' : ''}">
+        <div class="plan-head ${t.head}">
+          ${t.rec ? '<div class="plan-badge" contenteditable="true">推荐</div>' : ''}
+          <div class="plan-name" contenteditable="true">${t.name}</div>
+          <div class="plan-audience" contenteditable="true">${t.audience}</div>
+          <div class="plan-price ${priceClass}" contenteditable="true">${t.price}${priceSuffix}</div>
+          <div class="plan-year" contenteditable="true">${t.year}</div>
+        </div>
+        <div class="plan-body">${body}</div>
+      </div>`;
+    }
+
+    function bindIconButtons(root) {
+      root.querySelectorAll('.icon-btn').forEach((btn) => {
+        btn.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const feat = btn.closest('.feat');
+          if (!feat) return;
+          const cur = btn.dataset.type || 'yes';
+          const next = ICON_CYCLE[(ICON_CYCLE.indexOf(cur) + 1) % ICON_CYCLE.length];
+          btn.dataset.type = next;
+          btn.textContent = iconChar(next);
+          feat.classList.remove('yes', 'partial', 'no');
+          feat.classList.add(next);
+        };
+        btn.onkeydown = (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            btn.click();
+          }
+        };
+      });
+    }
+
+    function switchTab(tabKey) {
+      active = tabKey;
+      tabsEl.querySelectorAll('.tab').forEach((b) => {
+        b.classList.toggle('active', b.dataset.tab === tabKey);
+      });
+      panelsEl.querySelectorAll('.panel').forEach((p) => {
+        p.classList.toggle('active', p.id === 'panel-' + tabKey);
+      });
+    }
+
+    function init() {
+      tabsEl.innerHTML = Object.entries(PLANS).map(([k, p]) =>
+        `<button class="tab${k === active ? ' active' : ''}" data-tab="${k}">${p.label}</button>`
+      ).join('');
+
+      panelsEl.innerHTML = Object.entries(PLANS).map(([k, p]) =>
+        `<div class="panel${k === active ? ' active' : ''}" id="panel-${k}">
+          <div class="panel-title" contenteditable="true">灵祺星选 · ${p.label}</div>
+          <div class="panel-sub" contenteditable="true">${p.subtitle}</div>
+          <div class="pricing-grid">${p.tiers.map(renderTier).join('')}</div>
+          <div class="footer-note" contenteditable="true">结算走抖音来客/林客；星选不做资金结算。超额 AI 检核 ¥0.8～2/次。新注册送 7 天专业版试用。</div>
+        </div>`
+      ).join('');
+
+      tabsEl.querySelectorAll('.tab').forEach((btn) => {
+        btn.onclick = () => switchTab(btn.dataset.tab);
+      });
+      bindIconButtons(panelsEl);
+    }
+    init();
+  </script>
+</body>
+</html>

@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>灵祺星选升级｜AI 审片审稿，把抖音&小红书规则写进履约流程</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #eef2f7;
+      color: #334155;
+      line-height: 1.75;
+    }
+    .toolbar {
+      position: sticky; top: 0; z-index: 99;
+      background: rgba(15, 23, 42, 0.92); color: #e2e8f0;
+      padding: 14px 24px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+      backdrop-filter: blur(8px);
+    }
+    .toolbar strong { color: #a5b4fc; margin-right: 8px; }
+    .toolbar button {
+      background: linear-gradient(90deg, #7c83ff, #0284c7);
+      color: #fff; border: none; border-radius: 8px;
+      padding: 10px 18px; font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    .toolbar button:hover { opacity: 0.9; }
+    .toolbar span { font-size: 13px; color: #94a3b8; }
+    .preview-wrap {
+      max-width: 720px; margin: 24px auto 80px;
+      background: #fff; box-shadow: 0 20px 60px rgba(15,23,42,.08);
+      border-radius: 4px; overflow: hidden;
+    }
+    .meta-box {
+      padding: 20px 24px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+      font-size: 13px; color: #64748b;
+    }
+    .meta-box h2 { font-size: 15px; color: #0f172a; margin-bottom: 8px; }
+    .meta-box code { background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+    #wechat-article img { max-width: 100%; height: auto; display: block; }
+    @keyframes shimmer {
+      0% { background-position: 200% center; }
+      100% { background-position: -200% center; }
+    }
+    @keyframes pulse-ring {
+      0%, 100% { transform: scale(1); opacity: 0.6; }
+      50% { transform: scale(1.08); opacity: 1; }
+    }
+    .demo-pulse { animation: pulse-ring 2s ease-in-out infinite; }
+  </style>
+</head>
+<body>
+
+<div class="toolbar">
+  <strong>公众号发布稿</strong>
+  <button type="button" onclick="copyArticle()">一键复制正文 HTML</button>
+  <span>复制后 → 公众号后台「新建图文」→ 源码/HTML 模式粘贴；图片需先上传素材库并替换 src</span>
+</div>
+
+<div class="preview-wrap">
+  <div class="meta-box">
+    <h2>发布信息（复制时可忽略本区域）</h2>
+    <p><b>标题：</b>灵祺星选升级｜AI 审片审稿，把抖音&小红书规则写进履约流程</p>
+    <p><b>摘要：</b>内置平台发布规则，达人自检 + PR 批量检核，降低反复修改与审片成本，提升一次过审率。</p>
+    <p><b>作者：</b>灵祺星选 &nbsp;|&nbsp; <b>原文链接：</b>留空或填官网</p>
+    <p><b>封面图：</b><code>xingxuan-mp-ai-compliance-cover-900x383.png</code>（900×383）</p>
+    <p><b>素材目录：</b><code>docs/星选推广/</code> — 含 7 张竖版海报 + 1 张头图 + 1 张扫描动图 GIF</p>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       ▼▼▼ 以下 #wechat-article 为可复制的公众号正文 ▼▼▼
+       ═══════════════════════════════════════════════════════════ -->
+  <div id="wechat-article">
+
+<section style="max-width:677px;margin:0 auto;padding:0;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;color:#334155;line-height:1.8;font-size:16px;letter-spacing:0.02em;">
+
+  <!-- 头图 -->
+  <section style="margin:0;padding:0;line-height:0;">
+    <img src="./xingxuan-mp-ai-compliance-cover-900x383.png" alt="灵祺星选 AI 合规检核" style="width:100%;height:auto;display:block;border-radius:0;" />
+  </section>
+
+  <!-- 导语 -->
+  <section style="padding:20px 16px 8px;">
+    <p style="margin:0 0 12px;font-size:15px;color:#64748b;text-align:center;">—— 灵祺星选 · 功能升级 ——</p>
+    <p style="margin:0;font-size:17px;color:#0f172a;font-weight:600;line-height:1.9;text-align:justify;">
+      做本地生活探店的 PR 都懂：<strong style="color:#7c83ff;">隐性成本往往不在发单，而在审片。</strong>一条成片交上去，平台说违规；改一版，Brief 又对不上；再改一版，投流前才发现「全网最低」这种词……
+    </p>
+  </section>
+
+  <!-- 痛点卡片 -->
+  <section style="padding:8px 16px 16px;">
+    <section style="background:linear-gradient(135deg,#fef2f2 0%,#fff5f5 100%);border-left:4px solid #f87171;border-radius:0 12px 12px 0;padding:16px 18px;">
+      <p style="margin:0 0 10px;font-size:15px;font-weight:700;color:#dc2626;">😫 常见痛点</p>
+      <p style="margin:0;font-size:15px;color:#475569;line-height:1.85;">
+        · PR 逐条肉眼听看，容易漏检<br/>
+        · 达人改三四版，项目周期被拖长<br/>
+        · 平台拒审后才发现极限用语<br/>
+        · 投流前才踩雷，浪费预算和时间
+      </p>
+    </section>
+  </section>
+
+  <!-- 主视觉 Hero -->
+  <section style="padding:8px 16px 4px;line-height:0;">
+    <img src="./xingxuan-ai-compliance-poster-01-hero-9x16.png" alt="AI 合规检核 审片审稿一次过审" width="1080" height="1920" style="width:100%;max-width:677px;height:auto;display:block;margin:0 auto;border-radius:12px;" />
+    <p style="margin:8px 0 0;font-size:13px;color:#94a3b8;text-align:center;line-height:1.6;">▲ AI 合规检核：审片 · 审稿 · 一次过审</p>
+  </section>
+
+  <!-- 核心卖点 -->
+  <section style="padding:16px 16px 8px;">
+    <p style="margin:0 0 14px;font-size:18px;font-weight:800;color:#0f172a;text-align:center;">
+      <span style="background:linear-gradient(90deg,#7c83ff,#0284c7);-webkit-background-clip:text;color:transparent;">✦ 这一次，规则写进 AI 里 ✦</span>
+    </p>
+    <section style="background:#f8fafc;border-radius:12px;padding:16px;margin-bottom:12px;">
+      <p style="margin:0 0 8px;font-size:16px;font-weight:700;color:#1e293b;">🎬 成片 AI 检核（审片）</p>
+      <p style="margin:0;font-size:15px;color:#64748b;line-height:1.85;">内置<strong style="color:#334155;">抖音本地生活短视频规则</strong>，扫描口播、字幕、标题与 Brief，识别极限用语、虚假价格、大小字误导、探店标识缺失等。</p>
+    </section>
+    <section style="background:#f8fafc;border-radius:12px;padding:16px;margin-bottom:12px;">
+      <p style="margin:0 0 8px;font-size:16px;font-weight:700;color:#1e293b;">📝 文稿 AI 检核（审稿）</p>
+      <p style="margin:0;font-size:15px;color:#64748b;line-height:1.85;">对接<strong style="color:#334155;">小红书笔记规范</strong>，逐段标注违规片段 + 规则要点 + 可执行修改建议。</p>
+    </section>
+    <section style="background:#f8fafc;border-radius:12px;padding:16px;">
+      <p style="margin:0 0 8px;font-size:16px;font-weight:700;color:#1e293b;">⚡ PR 批量检核</p>
+      <p style="margin:0;font-size:15px;color:#64748b;line-height:1.85;">审片页 / 审稿页支持<strong style="color:#334155;">单条或批量 AI 检核</strong>，优先处理高风险内容，审片更有依据。</p>
+    </section>
+  </section>
+
+  <!-- 动态 GIF：AI 扫描 -->
+  <section style="padding:12px 16px 4px;">
+    <p style="margin:0 0 10px;font-size:16px;font-weight:700;color:#0f172a;text-align:center;">AI 扫描动效演示</p>
+    <section style="border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;line-height:0;">
+      <img src="./xingxuan-ai-scan-anim.gif" alt="AI 合规扫描动效" style="width:100%;height:auto;display:block;" />
+    </section>
+    <p style="margin:8px 0 0;font-size:13px;color:#94a3b8;text-align:center;line-height:1.6;">▲ 本地词库预扫描 + 大模型深度检核，秒级出结果</p>
+  </section>
+
+  <!-- SVG 动态：脉冲 AI 徽章（公众号部分编辑器支持 SVG） -->
+  <section style="padding:16px;text-align:center;">
+    <svg width="280" height="80" viewBox="0 0 280 80" xmlns="http://www.w3.org/2000/svg" style="display:inline-block;max-width:100%;">
+      <defs>
+        <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" style="stop-color:#7c83ff"/>
+          <stop offset="100%" style="stop-color:#0284c7"/>
+        </linearGradient>
+      </defs>
+      <rect x="4" y="4" width="272" height="72" rx="36" fill="url(#g1)" opacity="0.15">
+        <animate attributeName="opacity" values="0.12;0.22;0.12" dur="2s" repeatCount="indefinite"/>
+      </rect>
+      <rect x="8" y="8" width="264" height="64" rx="32" fill="url(#g1)"/>
+      <text x="140" y="46" text-anchor="middle" fill="#ffffff" font-size="18" font-weight="700" font-family="PingFang SC,Microsoft YaHei,sans-serif">✦ AI 合规检核引擎 ✦</text>
+      <circle cx="40" cy="40" r="6" fill="#fff" opacity="0.9">
+        <animate attributeName="r" values="5;8;5" dur="1.5s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="240" cy="40" r="6" fill="#fff" opacity="0.9">
+        <animate attributeName="r" values="8;5;8" dur="1.5s" repeatCount="indefinite"/>
+      </circle>
+    </svg>
+  </section>
+
+  <!-- 双平台规则图 -->
+  <section style="padding:8px 16px 4px;line-height:0;">
+    <img src="./xingxuan-ai-compliance-poster-05-rules-9x16.png" alt="抖音本地生活与小红书规则内置" style="width:100%;height:auto;display:block;border-radius:12px;" />
+    <p style="margin:8px 0 0;font-size:13px;color:#94a3b8;text-align:center;line-height:1.6;">▲ 不是通用 ChatGPT · 是履约场景专用合规助手</p>
+  </section>
+
+  <!-- 双端协同 -->
+  <section style="padding:16px 16px 8px;">
+    <p style="margin:0 0 14px;font-size:18px;font-weight:800;color:#0f172a;">达人 & PR 双端协同</p>
+    <section style="display:block;">
+      <section style="background:linear-gradient(135deg,#f0eff6,#e8f4fd);border-radius:12px;padding:14px 16px;margin-bottom:10px;">
+        <p style="margin:0;font-size:15px;line-height:1.85;"><strong style="color:#7c83ff;">① 达人 · 交片前自检</strong><br/><span style="color:#64748b;">上传成片/文稿后一键 AI 检核，提前发现违禁词，减少 PR 驳回轮次</span></p>
+      </section>
+      <section style="background:linear-gradient(135deg,#f0eff6,#e8f4fd);border-radius:12px;padding:14px 16px;margin-bottom:10px;">
+        <p style="margin:0;font-size:15px;line-height:1.85;"><strong style="color:#0284c7;">② PR · 审片/审稿页</strong><br/><span style="color:#64748b;">单条或批量 AI 检核，优先看 suspect 条目，备注更有依据</span></p>
+      </section>
+      <section style="background:linear-gradient(135deg,#f0eff6,#e8f4fd);border-radius:12px;padding:14px 16px;">
+        <p style="margin:0;font-size:15px;line-height:1.85;"><strong style="color:#10b981;">③ 修改 · 再检 · 发布</strong><br/><span style="color:#64748b;">按建议改完再检，通过后发布回传，配合链接核查闭环投流</span></p>
+      </section>
+    </section>
+  </section>
+
+  <section style="padding:8px 16px 4px;line-height:0;">
+    <img src="./xingxuan-ai-compliance-poster-02-dual-role-9x16.png" alt="达人 PR 双端 AI 检核" width="1080" height="1920" style="width:100%;max-width:677px;height:auto;display:block;margin:0 auto;border-radius:12px;" />
+  </section>
+
+  <section style="padding:8px 16px 4px;line-height:0;">
+    <img src="./xingxuan-ai-compliance-poster-06-workflow-9x16.png" alt="达人 PR 协同流程" style="width:100%;height:auto;display:block;border-radius:12px;" />
+  </section>
+
+  <!-- 以前 vs 现在 -->
+  <section style="padding:16px 16px 8px;">
+    <p style="margin:0 0 14px;font-size:18px;font-weight:800;color:#0f172a;text-align:center;">以前靠经验猜 · 现在 AI 先筛一遍</p>
+  </section>
+  <section style="padding:8px 16px 4px;line-height:0;">
+    <img src="./xingxuan-ai-compliance-poster-07-compare-9x16.png" alt="以前 vs 现在 痛点对比" style="width:100%;height:auto;display:block;border-radius:12px;" />
+  </section>
+  <section style="padding:8px 16px 4px;line-height:0;">
+    <img src="./xingxuan-ai-compliance-poster-03-before-after-9x16.png" alt="一次过审 降低履约成本" width="1080" height="1920" style="width:100%;max-width:677px;height:auto;display:block;margin:0 auto;border-radius:12px;" />
+  </section>
+
+  <!-- 总览图 -->
+  <section style="padding:8px 16px 4px;line-height:0;">
+    <img src="./xingxuan-ai-compliance-poster-04-overview-9x16.png" alt="AI 合规检核功能总览" style="width:100%;height:auto;display:block;border-radius:12px;" />
+  </section>
+
+  <!-- 价值总结 -->
+  <section style="padding:16px;">
+    <section style="background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);border-radius:16px;padding:24px 20px;color:#e2e8f0;">
+      <p style="margin:0 0 16px;font-size:17px;font-weight:700;color:#fff;text-align:center;">五个版本优势，一句话总结</p>
+      <p style="margin:0 0 10px;font-size:15px;line-height:1.9;">✅ <strong style="color:#a5b4fc;">规则内置</strong> — 按平台规则检核，不是让 PR 凭经验猜</p>
+      <p style="margin:0 0 10px;font-size:15px;line-height:1.9;">✅ <strong style="color:#a5b4fc;">达人先自检</strong> — 问题前置到交片前，减少驳回轮次</p>
+      <p style="margin:0 0 10px;font-size:15px;line-height:1.9;">✅ <strong style="color:#a5b4fc;">PR 批量检核</strong> — 几十条成片秒级初筛，优先高风险</p>
+      <p style="margin:0 0 10px;font-size:15px;line-height:1.9;">✅ <strong style="color:#a5b4fc;">可执行反馈</strong> — 违规片段 + 规则 + 修改建议</p>
+      <p style="margin:0;font-size:15px;line-height:1.9;">✅ <strong style="color:#a5b4fc;">降本增效</strong> — 少改片、少听看、提升一次过审率</p>
+    </section>
+  </section>
+
+  <!-- CTA -->
+  <section style="padding:8px 16px 32px;text-align:center;">
+    <section style="background:linear-gradient(90deg,#7c83ff,#0284c7);border-radius:16px;padding:28px 20px;color:#fff;">
+      <p style="margin:0 0 8px;font-size:20px;font-weight:800;">微信搜「灵祺星选」</p>
+      <p style="margin:0 0 16px;font-size:15px;opacity:0.95;line-height:1.8;">达人 · PR · 拍摄 · 剪辑 一个入口<br/>基础版可免费体验 AI 合规检核</p>
+      <p style="margin:0;font-size:14px;opacity:0.85;">找商单 · 发招募 · 审片审稿 · 履约闭环</p>
+    </section>
+    <p style="margin:20px 0 0;font-size:13px;color:#94a3b8;line-height:1.7;">
+      灵祺星选不做结算，结算在抖音来客 / 抖音林客平台侧完成<br/>
+      — END —
+    </p>
+  </section>
+
+</section>
+
+  </div>
+  <!-- ═══════════════════════════════════════════════════════════
+       ▲▲▲ 可复制区域结束 ▲▲▲
+       ═══════════════════════════════════════════════════════════ -->
+</div>
+
+<script>
+function copyArticle() {
+  const el = document.getElementById('wechat-article');
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  try {
+    document.execCommand('copy');
+    alert('已复制正文 HTML 到剪贴板！\n\n下一步：\n1. 公众号后台 → 新建图文 → 源码/HTML 模式粘贴\n2. 将文中图片上传至素材库，替换 img 的 src 为微信 CDN 地址\n3. 封面选用 xingxuan-mp-ai-compliance-cover-900x383.png');
+  } catch (e) {
+    alert('自动复制失败，请手动选中 #wechat-article 区域后 Cmd+C / Ctrl+C');
+  }
+  sel.removeAllRanges();
+}
+</script>
+
+</body>
+</html>

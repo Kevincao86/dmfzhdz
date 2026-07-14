@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>灵祺星选 · 竖版海报 9:16</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+      background: #e8ecf4;
+      padding: 24px;
+    }
+    .poster {
+      width: 1080px;
+      height: 1920px;
+      position: relative;
+      overflow: hidden;
+      margin: 0 auto 48px;
+      flex-shrink: 0;
+    }
+
+    /* ── 01 生态总览 ── */
+    #poster-01-ecosystem {
+      background: linear-gradient(165deg, #f0eff6 0%, #e8f4fd 45%, #dceeff 100%);
+    }
+    #poster-01-ecosystem .orb1 {
+      position: absolute; width: 420px; height: 420px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(124,131,255,.25), transparent 70%);
+      top: -80px; right: -100px;
+    }
+    #poster-01-ecosystem .orb2 {
+      position: absolute; width: 300px; height: 300px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(2,132,199,.2), transparent 70%);
+      bottom: 200px; left: -80px;
+    }
+    #poster-01-ecosystem .brand {
+      position: absolute; top: 72px; left: 64px;
+      display: flex; align-items: center; gap: 16px;
+    }
+    #poster-01-ecosystem .logo {
+      width: 56px; height: 56px; border-radius: 16px;
+      background: linear-gradient(135deg, #7c83ff, #0284c7);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 28px; font-weight: 800;
+    }
+    #poster-01-ecosystem .brand-name { font-size: 36px; font-weight: 700; color: #1e293b; }
+    #poster-01-ecosystem .headline {
+      position: absolute; top: 180px; left: 64px; right: 64px;
+    }
+    #poster-01-ecosystem .headline h1 {
+      font-size: 72px; font-weight: 900; line-height: 1.15; color: #0f172a;
+      letter-spacing: -1px;
+    }
+    #poster-01-ecosystem .headline h1 em {
+      font-style: normal;
+      background: linear-gradient(90deg, #7c83ff, #0284c7);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    #poster-01-ecosystem .sub {
+      margin-top: 28px; font-size: 32px; color: #64748b; line-height: 1.5;
+    }
+    #poster-01-ecosystem .roles {
+      position: absolute; top: 520px; left: 64px; right: 64px;
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;
+    }
+    #poster-01-ecosystem .role {
+      background: rgba(255,255,255,.85); border-radius: 24px; padding: 28px 12px;
+      text-align: center; box-shadow: 0 8px 32px rgba(124,131,255,.12);
+      border: 1px solid rgba(255,255,255,.9);
+    }
+    #poster-01-ecosystem .role .icon { font-size: 48px; margin-bottom: 12px; }
+    #poster-01-ecosystem .role .label { font-size: 28px; font-weight: 700; color: #334155; }
+    #poster-01-ecosystem .phone-wrap {
+      position: absolute; top: 720px; left: 50%; transform: translateX(-50%);
+      width: 520px;
+    }
+    #poster-01-ecosystem .phone {
+      background: #fff; border-radius: 40px; padding: 24px;
+      box-shadow: 0 24px 80px rgba(15,23,42,.15);
+      border: 3px solid #e2e8f0;
+    }
+    #poster-01-ecosystem .phone-bar {
+      height: 8px; width: 120px; background: #cbd5e1; border-radius: 4px;
+      margin: 0 auto 20px;
+    }
+    #poster-01-ecosystem .hall-card {
+      background: linear-gradient(135deg, #f8fafc, #f0f9ff);
+      border-radius: 20px; padding: 24px 28px; margin-bottom: 16px;
+      display: flex; justify-content: space-between; align-items: center;
+      border: 1px solid #e2e8f0;
+    }
+    #poster-01-ecosystem .hall-card strong { font-size: 30px; color: #1e293b; display: block; }
+    #poster-01-ecosystem .hall-card span { font-size: 22px; color: #64748b; }
+    #poster-01-ecosystem .hall-card .num { font-size: 36px; font-weight: 800; color: #7c83ff; }
+    #poster-01-ecosystem .ai-badge {
+      position: absolute; top: 1580px; left: 64px; right: 64px;
+      background: linear-gradient(90deg, #7c83ff, #0284c7);
+      border-radius: 999px; padding: 32px 48px; text-align: center;
+      color: #fff; font-size: 36px; font-weight: 700;
+      box-shadow: 0 12px 40px rgba(124,131,255,.35);
+    }
+    #poster-01-ecosystem .sparkle {
+      position: absolute; font-size: 32px; opacity: .6;
+    }
+
+    /* ── 02 痛点对比 ── */
+    #poster-02-painpoint {
+      background: linear-gradient(180deg, #faf9ff 0%, #f0eff6 50%, #e8f4fd 100%);
+    }
+    #poster-02-painpoint .brand { position: absolute; top: 72px; left: 64px; display: flex; align-items: center; gap: 16px; }
+    #poster-02-painpoint .logo {
+      width: 56px; height: 56px; border-radius: 16px;
+      background: linear-gradient(135deg, #7c83ff, #0284c7);
+      color: #fff; font-size: 28px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #poster-02-painpoint .brand-name { font-size: 36px; font-weight: 700; color: #1e293b; }
+    #poster-02-painpoint .hook {
+      position: absolute; top: 168px; left: 64px; right: 64px;
+    }
+    #poster-02-painpoint .hook h1 {
+      font-size: 64px; font-weight: 900; line-height: 1.2; color: #0f172a;
+    }
+    #poster-02-painpoint .hook p {
+      margin-top: 32px; font-size: 30px; color: #475569; line-height: 1.7;
+    }
+    #poster-02-painpoint .hl {
+      background: linear-gradient(transparent 60%, #fde68a 60%);
+      font-weight: 700; color: #1e293b;
+    }
+    #poster-02-painpoint .compare {
+      position: absolute; top: 560px; left: 48px; right: 48px;
+      display: flex; gap: 24px; align-items: flex-start;
+    }
+    #poster-02-painpoint .cmp-box {
+      flex: 1; border-radius: 28px; padding: 24px; min-height: 520px;
+    }
+    #poster-02-painpoint .cmp-box.bad {
+      background: #fef2f2; border: 2px solid #fecaca;
+    }
+    #poster-02-painpoint .cmp-box.good {
+      background: #f0fdf4; border: 2px solid #bbf7d0;
+    }
+    #poster-02-painpoint .cmp-tag {
+      font-size: 24px; font-weight: 700; padding: 8px 16px; border-radius: 999px;
+      display: inline-block; margin-bottom: 16px;
+    }
+    #poster-02-painpoint .cmp-box.bad .cmp-tag { background: #fee2e2; color: #b91c1c; }
+    #poster-02-painpoint .cmp-box.good .cmp-tag { background: #dcfce7; color: #15803d; }
+    #poster-02-painpoint .bubble {
+      background: #fff; border-radius: 16px; padding: 16px 20px; margin-bottom: 12px;
+      font-size: 22px; color: #334155; box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    }
+    #poster-02-painpoint .bubble.me { background: #dcfce7; margin-left: 24px; }
+    #poster-02-painpoint .progress-row {
+      background: #fff; border-radius: 16px; padding: 20px; margin-bottom: 12px;
+      font-size: 24px; color: #334155;
+    }
+    #poster-02-painpoint .progress-row.done { color: #15803d; font-weight: 700; }
+    #poster-02-painpoint .features {
+      position: absolute; top: 1140px; left: 64px; right: 64px;
+      display: flex; flex-direction: column; gap: 20px;
+    }
+    #poster-02-painpoint .feat {
+      background: rgba(255,255,255,.9); border-radius: 24px; padding: 28px 32px;
+      display: flex; align-items: center; gap: 24px;
+      box-shadow: 0 4px 20px rgba(124,131,255,.1);
+    }
+    #poster-02-painpoint .feat .fi { font-size: 40px; }
+    #poster-02-painpoint .feat strong { font-size: 32px; color: #1e293b; display: block; }
+    #poster-02-painpoint .feat span { font-size: 24px; color: #64748b; }
+    #poster-02-painpoint .cta {
+      position: absolute; bottom: 80px; left: 64px; right: 64px;
+      background: linear-gradient(90deg, #f97316, #ea580c);
+      border-radius: 999px; padding: 36px; text-align: center;
+      color: #fff; font-size: 38px; font-weight: 800;
+      box-shadow: 0 12px 40px rgba(249,115,22,.4);
+    }
+
+    /* ── 03 数据看板 ── */
+    #poster-03-dashboard {
+      background: linear-gradient(180deg, #f8fafc 0%, #f0eff6 100%);
+    }
+    #poster-03-dashboard .brand { position: absolute; top: 72px; left: 64px; display: flex; align-items: center; gap: 16px; }
+    #poster-03-dashboard .logo {
+      width: 56px; height: 56px; border-radius: 16px;
+      background: linear-gradient(135deg, #7c83ff, #0284c7);
+      color: #fff; font-size: 28px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #poster-03-dashboard .brand-name { font-size: 36px; font-weight: 700; }
+    #poster-03-dashboard .hook { position: absolute; top: 168px; left: 64px; right: 64px; text-align: center; }
+    #poster-03-dashboard .hook h1 { font-size: 68px; font-weight: 900; color: #0f172a; line-height: 1.2; }
+    #poster-03-dashboard .bullets {
+      position: absolute; top: 380px; left: 64px; right: 64px;
+      display: flex; flex-direction: column; gap: 20px;
+    }
+    #poster-03-dashboard .bullet {
+      font-size: 28px; color: #334155; line-height: 1.5; padding: 16px 24px;
+      background: rgba(255,255,255,.7); border-radius: 16px;
+    }
+    #poster-03-dashboard .bullet em {
+      font-style: normal; background: #fef9c3; padding: 2px 8px; border-radius: 6px;
+      font-weight: 700;
+    }
+    #poster-03-dashboard .dash {
+      position: absolute; top: 680px; left: 48px; right: 48px;
+      background: #fff; border-radius: 32px; padding: 40px;
+      box-shadow: 0 20px 60px rgba(15,23,42,.1);
+      transform: perspective(800px) rotateX(2deg);
+    }
+    #poster-03-dashboard .dash-title { font-size: 28px; color: #64748b; margin-bottom: 32px; }
+    #poster-03-dashboard .metrics {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
+    }
+    #poster-03-dashboard .metric {
+      text-align: center; padding: 24px 12px;
+      background: #f8fafc; border-radius: 20px;
+    }
+    #poster-03-dashboard .ring {
+      width: 100px; height: 100px; border-radius: 50%; margin: 0 auto 16px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px; font-weight: 800; color: #fff;
+    }
+    #poster-03-dashboard .ring.a { background: conic-gradient(#7c83ff 0% 85%, #e2e8f0 85%); color: #7c83ff; }
+    #poster-03-dashboard .ring.b { background: conic-gradient(#0284c7 0% 78%, #e2e8f0 78%); color: #0284c7; }
+    #poster-03-dashboard .ring.c { background: conic-gradient(#10b981 0% 92%, #e2e8f0 92%); color: #10b981; }
+    #poster-03-dashboard .ring inner { background: #fff; width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; }
+    #poster-03-dashboard .metric-label { font-size: 24px; color: #64748b; }
+    #poster-03-dashboard .metric-val { font-size: 32px; font-weight: 800; color: #1e293b; margin-top: 8px; }
+    #poster-03-dashboard .assistants {
+      position: absolute; top: 1280px; left: 64px; right: 64px;
+      display: flex; gap: 20px; justify-content: center;
+    }
+    #poster-03-dashboard .asst {
+      background: #fff; border-radius: 20px; padding: 24px 20px; text-align: center;
+      flex: 1; box-shadow: 0 4px 16px rgba(0,0,0,.06);
+    }
+    #poster-03-dashboard .asst .av { font-size: 48px; margin-bottom: 8px; }
+    #poster-03-dashboard .asst span { font-size: 24px; color: #475569; font-weight: 600; }
+    #poster-03-dashboard .tags {
+      position: absolute; bottom: 160px; left: 64px; right: 64px;
+      display: flex; flex-wrap: wrap; gap: 16px; justify-content: center;
+    }
+    #poster-03-dashboard .tag {
+      background: #f1f5f9; color: #475569; font-size: 26px; padding: 14px 28px;
+      border-radius: 999px; font-weight: 600;
+    }
+    #poster-03-dashboard .cta {
+      position: absolute; bottom: 64px; left: 64px; right: 64px;
+      background: linear-gradient(90deg, #f97316, #ea580c);
+      border-radius: 999px; padding: 32px; text-align: center;
+      color: #fff; font-size: 36px; font-weight: 800;
+    }
+
+    /* ── 04 履约闭环 ── */
+    #poster-04-workflow { background: linear-gradient(180deg, #fff 0%, #f0eff6 100%); }
+    #poster-04-workflow .brand { position: absolute; top: 72px; left: 64px; display: flex; align-items: center; gap: 16px; }
+    #poster-04-workflow .logo {
+      width: 56px; height: 56px; border-radius: 16px;
+      background: linear-gradient(135deg, #7c83ff, #0284c7);
+      color: #fff; font-size: 28px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #poster-04-workflow .brand-name { font-size: 36px; font-weight: 700; }
+    #poster-04-workflow .hook { position: absolute; top: 168px; left: 64px; right: 64px; }
+    #poster-04-workflow .hook h1 { font-size: 60px; font-weight: 900; color: #0f172a; line-height: 1.25; }
+    #poster-04-workflow .hook p { margin-top: 24px; font-size: 28px; color: #475569; line-height: 1.7; }
+    #poster-04-workflow .hook em { font-style: normal; background: #fef9c3; padding: 2px 6px; font-weight: 700; }
+    #poster-04-workflow .icons {
+      position: absolute; top: 480px; left: 64px; right: 64px;
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+    }
+    #poster-04-workflow .ic {
+      text-align: center; padding: 20px 8px;
+      background: linear-gradient(180deg, #fdf2f8, #fce7f3);
+      border-radius: 20px;
+    }
+    #poster-04-workflow .ic .emoji { font-size: 40px; }
+    #poster-04-workflow .ic span { font-size: 22px; color: #9d174d; font-weight: 700; display: block; margin-top: 8px; }
+    #poster-04-workflow .table-wrap {
+      position: absolute; top: 660px; left: 48px; right: 48px;
+      background: #fff; border-radius: 28px; overflow: hidden;
+      box-shadow: 0 16px 48px rgba(15,23,42,.08);
+      border: 1px solid #e2e8f0;
+    }
+    #poster-04-workflow .table-head {
+      background: #f8fafc; padding: 24px 32px; font-size: 30px; font-weight: 800; color: #1e293b;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    #poster-04-workflow .row {
+      display: grid; grid-template-columns: 2fr 1fr 1fr;
+      padding: 24px 32px; border-bottom: 1px solid #f1f5f9; align-items: center;
+      font-size: 26px; color: #334155;
+    }
+    #poster-04-workflow .row:last-child { border-bottom: none; }
+    #poster-04-workflow .toggle {
+      width: 52px; height: 28px; background: #ef4444; border-radius: 999px;
+      position: relative; margin-left: auto;
+    }
+    #poster-04-workflow .toggle.on { background: #22c55e; }
+    #poster-04-workflow .toggle::after {
+      content: ''; position: absolute; width: 22px; height: 22px; background: #fff;
+      border-radius: 50%; top: 3px; right: 3px;
+    }
+    #poster-04-workflow .toggle.on::after { right: auto; left: 3px; }
+    #poster-04-workflow .stamp-card {
+      position: absolute; top: 1180px; right: 64px;
+      background: #fff; border-radius: 20px; padding: 28px; width: 340px;
+      box-shadow: 0 12px 40px rgba(0,0,0,.1); border: 2px solid #fecaca;
+    }
+    #poster-04-workflow .stamp-card strong { font-size: 28px; color: #1e293b; }
+    #poster-04-workflow .stamp-card p { font-size: 24px; color: #64748b; margin-top: 12px; }
+    #poster-04-workflow .stamp {
+      position: absolute; top: -20px; right: -20px;
+      width: 80px; height: 80px; border: 4px solid #ef4444; border-radius: 50%;
+      color: #ef4444; font-size: 20px; font-weight: 900;
+      display: flex; align-items: center; justify-content: center;
+      transform: rotate(-15deg); background: rgba(255,255,255,.95);
+    }
+    #poster-04-workflow .pills {
+      position: absolute; bottom: 180px; left: 64px; right: 64px;
+      display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;
+    }
+    #poster-04-workflow .pill {
+      background: #f1f5f9; color: #475569; font-size: 26px; padding: 14px 24px;
+      border-radius: 999px; font-weight: 600;
+    }
+    #poster-04-workflow .cta {
+      position: absolute; bottom: 64px; left: 64px; right: 64px;
+      background: linear-gradient(90deg, #f97316, #ea580c);
+      border-radius: 999px; padding: 32px; text-align: center;
+      color: #fff; font-size: 36px; font-weight: 800;
+    }
+
+    /* ── 05 CTA ── */
+    #poster-05-cta {
+      background: linear-gradient(165deg, #e8f4fd 0%, #f0eff6 40%, #faf9ff 100%);
+    }
+    #poster-05-cta .brand { position: absolute; top: 80px; left: 0; right: 0; text-align: center; }
+    #poster-05-cta .logo-big {
+      width: 88px; height: 88px; border-radius: 24px; margin: 0 auto 16px;
+      background: linear-gradient(135deg, #7c83ff, #0284c7);
+      color: #fff; font-size: 44px; font-weight: 900;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 12px 32px rgba(124,131,255,.35);
+    }
+    #poster-05-cta .brand-name { font-size: 40px; font-weight: 800; color: #1e293b; }
+    #poster-05-cta .hook {
+      position: absolute; top: 280px; left: 64px; right: 64px; text-align: center;
+    }
+    #poster-05-cta .hook h1 {
+      font-size: 72px; font-weight: 900; color: #0f172a; line-height: 1.2;
+    }
+    #poster-05-cta .hook p {
+      margin-top: 36px; font-size: 30px; color: #475569; line-height: 1.8; text-align: left;
+    }
+    #poster-05-cta .hook u { text-decoration: none; border-bottom: 3px solid #f97316; font-weight: 700; color: #1e293b; }
+    #poster-05-cta .btn-main {
+      position: absolute; top: 720px; left: 120px; right: 120px;
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      border-radius: 999px; padding: 40px; text-align: center;
+      color: #fff; font-size: 44px; font-weight: 900;
+      box-shadow: 0 16px 48px rgba(239,68,68,.4);
+    }
+    #poster-05-cta .cards {
+      position: absolute; top: 900px; left: 48px; right: 48px;
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+    }
+    #poster-05-cta .card {
+      background: #fff; border-radius: 24px; padding: 32px 16px; text-align: center;
+      box-shadow: 0 8px 32px rgba(124,131,255,.12);
+    }
+    #poster-05-cta .card .ci { font-size: 48px; margin-bottom: 12px; }
+    #poster-05-cta .card strong { font-size: 28px; color: #1e293b; }
+    #poster-05-cta .ui-preview {
+      position: absolute; bottom: 200px; left: 64px; right: 64px;
+      height: 280px; background: linear-gradient(180deg, rgba(255,255,255,.9), rgba(248,250,252,.95));
+      border-radius: 24px; border: 1px solid #e2e8f0;
+      display: flex; align-items: center; justify-content: center; gap: 24px;
+      transform: perspective(600px) rotateX(8deg);
+      box-shadow: 0 20px 60px rgba(15,23,42,.08);
+    }
+    #poster-05-cta .tab {
+      background: #7c83ff; color: #fff; padding: 16px 28px; border-radius: 12px;
+      font-size: 26px; font-weight: 700;
+    }
+    #poster-05-cta .tab.outline { background: #f1f5f9; color: #64748b; }
+    #poster-05-cta .footer {
+      position: absolute; bottom: 72px; left: 64px; right: 64px;
+      text-align: center; font-size: 32px; color: #64748b; font-weight: 600;
+    }
+    #poster-05-cta .footer strong { color: #7c83ff; }
+  </style>
+</head>
+<body>
+
+<!-- 01 生态总览 -->
+<section class="poster" id="poster-01-ecosystem">
+  <div class="orb1"></div>
+  <div class="orb2"></div>
+  <span class="sparkle" style="top:140px;right:120px">✦</span>
+  <span class="sparkle" style="top:480px;left:80px">✦</span>
+  <div class="brand">
+    <div class="logo">星</div>
+    <span class="brand-name">灵祺星选</span>
+  </div>
+  <div class="headline">
+    <h1>多平台达人招募<br><em>一站智能撮合</em></h1>
+    <p class="sub">达人 · PR · 拍摄 · 剪辑<br>四身份互通 · Web + 小程序双端</p>
+  </div>
+  <div class="roles">
+    <div class="role"><div class="icon">👤</div><div class="label">达人</div></div>
+    <div class="role"><div class="icon">💼</div><div class="label">PR</div></div>
+    <div class="role"><div class="icon">📷</div><div class="label">拍摄</div></div>
+    <div class="role"><div class="icon">✂️</div><div class="label">剪辑</div></div>
+  </div>
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="phone-bar"></div>
+      <div class="hall-card"><div><strong>招募大厅</strong><span>探店 · 种草 · 品宣</span></div><div class="num">128+</div></div>
+      <div class="hall-card"><div><strong>急单大厅</strong><span>短周期高时效</span></div><div class="num">36+</div></div>
+      <div class="hall-card"><div><strong>云剪任务</strong><span>拍剪团队接单</span></div><div class="num">52+</div></div>
+    </div>
+  </div>
+  <div class="ai-badge">✦ AI 智能推荐 · 看得见匹配分</div>
+</section>
+
+<!-- 02 痛点对比 -->
+<section class="poster" id="poster-02-painpoint">
+  <div class="brand">
+    <div class="logo">星</div>
+    <span class="brand-name">灵祺星选</span>
+  </div>
+  <div class="hook">
+    <h1>还在群里发招募？<br>对履约靠截图？</h1>
+    <p>
+      灵祺星选帮你 <span class="hl">7×24 浏览商单</span> ·
+      <span class="hl">AI 置顶高契合招募</span> ·
+      <span class="hl">报名到回链全程可查</span>
+    </p>
+  </div>
+  <div class="compare">
+    <div class="cmp-box bad">
+      <span class="cmp-tag">以前</span>
+      <div class="bubble">【招募】某某品牌探店，预算500…</div>
+      <div class="bubble">我可以！+1</div>
+      <div class="bubble">截图发你了</div>
+      <div class="bubble me">消息太多找不到记录了 😫</div>
+    </div>
+    <div class="cmp-box good">
+      <span class="cmp-tag">现在</span>
+      <div class="progress-row done">✓ 已报名 · 待确认</div>
+      <div class="progress-row done">✓ PR 反选 · 已入选</div>
+      <div class="progress-row done">✓ 云剪交付 · 已发布</div>
+      <div class="progress-row done">✓ 回链核查 · 已完成</div>
+    </div>
+  </div>
+  <div class="features">
+    <div class="feat"><span class="fi">✦</span><div><strong>AI 智能匹配</strong><span>高契合商单优先推荐</span></div></div>
+    <div class="feat"><span class="fi">👆</span><div><strong>一键报名</strong><span>简化流程 · 快速触达</span></div></div>
+    <div class="feat"><span class="fi">📋</span><div><strong>履约可查</strong><span>进度透明 · 回链可追溯</span></div></div>
+  </div>
+  <div class="cta">微信搜「灵祺星选」→</div>
+</section>
+
+<!-- 03 数据看板 -->
+<section class="poster" id="poster-03-dashboard">
+  <div class="brand">
+    <div class="logo">星</div>
+    <span class="brand-name">灵祺星选</span>
+  </div>
+  <div class="hook"><h1>发单太多<br>复盘太耗时？</h1></div>
+  <div class="bullets">
+    <div class="bullet"><em>招募大厅 + 急单 + 云剪</em> 一屏管理，不用来回切群</div>
+    <div class="bullet"><em>PR 反选排期</em> · 视频文稿 AI 合规检核</div>
+    <div class="bullet"><em>发布链接回传</em> · AI 核查闭环 · 结算走来客/林客</div>
+  </div>
+  <div class="dash">
+    <div class="dash-title">数据概览 · PR 工作台</div>
+    <div class="metrics">
+      <div class="metric">
+        <div class="ring a"><div style="width:72px;height:72px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#7c83ff">85%</div></div>
+        <div class="metric-label">报名率</div>
+        <div class="metric-val">↑ 12%</div>
+      </div>
+      <div class="metric">
+        <div class="ring b"><div style="width:72px;height:72px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#0284c7">78%</div></div>
+        <div class="metric-label">履约率</div>
+        <div class="metric-val">↑ 18%</div>
+      </div>
+      <div class="metric">
+        <div class="ring c"><div style="width:72px;height:72px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#10b981">92%</div></div>
+        <div class="metric-label">回链完成</div>
+        <div class="metric-val">↑ 24%</div>
+      </div>
+    </div>
+  </div>
+  <div class="assistants">
+    <div class="asst"><div class="av">🤖</div><span>小灵同学</span></div>
+    <div class="asst"><div class="av">📊</div><span>PR 工作台</span></div>
+    <div class="asst"><div class="av">✅</div><span>达人报名</span></div>
+  </div>
+  <div class="tags">
+    <span class="tag">Web+小程序互通</span>
+    <span class="tag">四身份切换</span>
+    <span class="tag">AI 合规检核</span>
+  </div>
+  <div class="cta">立即体验 · 免费基础版</div>
+</section>
+
+<!-- 04 履约闭环 -->
+<section class="poster" id="poster-04-workflow">
+  <div class="brand">
+    <div class="logo">星</div>
+    <span class="brand-name">灵祺星选</span>
+  </div>
+  <div class="hook">
+    <h1>招募成本高<br>履约难追踪？</h1>
+    <p>从 <em>发布招募</em> 到 <em>达人报名</em>、<em>反选群码</em>、<em>云剪成片</em>、<em>发布回链</em>，灵祺星选全流程自动化跟进，高意向达人不再漏接。</p>
+  </div>
+  <div class="icons">
+    <div class="ic"><div class="emoji">🎯</div><span>智能荐达人</span></div>
+    <div class="ic"><div class="emoji">📅</div><span>反选排期</span></div>
+    <div class="ic"><div class="emoji">🛡️</div><span>AI 检核</span></div>
+    <div class="ic"><div class="emoji">🖼️</div><span>分享海报</span></div>
+  </div>
+  <div class="table-wrap">
+    <div class="table-head">履约闭环</div>
+    <div class="row"><span>发布招募</span><span>已完成</span><div class="toggle on"></div></div>
+    <div class="row"><span>达人报名</span><span>已完成</span><div class="toggle on"></div></div>
+    <div class="row"><span>PR 反选</span><span>已完成</span><div class="toggle on"></div></div>
+    <div class="row"><span>云剪交付</span><span>进行中</span><div class="toggle on"></div></div>
+    <div class="row"><span>回链核查</span><span>待开始</span><div class="toggle"></div></div>
+  </div>
+  <div class="stamp-card">
+    <div class="stamp">已履约</div>
+    <strong>报名详情</strong>
+    <p>匹配分 92%<br>达人 · 已入选<br>状态：履约中</p>
+  </div>
+  <div class="pills">
+    <span class="pill">模板发招募</span>
+    <span class="pill">阶梯档位</span>
+    <span class="pill">5:4 分享海报</span>
+  </div>
+  <div class="cta">咨询 · 微信搜「灵祺星选」</div>
+</section>
+
+<!-- 05 CTA -->
+<section class="poster" id="poster-05-cta">
+  <div class="brand">
+    <div class="logo-big">星</div>
+    <div class="brand-name">灵祺星选</div>
+  </div>
+  <div class="hook">
+    <h1>联系灵祺星选<br>免费试用</h1>
+    <p>已服务本地生活 <u>PR、达人、拍剪团队</u>，真正提升 <u>报名效率</u>、<u>履约完成率</u>、<u>回链核查率</u>。帮助品牌方与 MCN 突破发单与人力瓶颈。</p>
+  </div>
+  <div class="btn-main">✦ 立即咨询</div>
+  <div class="cards">
+    <div class="card"><div class="ci">💬</div><strong>高匹配度</strong></div>
+    <div class="card"><div class="ci">📈</div><strong>快接单</strong></div>
+    <div class="card"><div class="ci">🔄</div><strong>全流程闭环</strong></div>
+  </div>
+  <div class="ui-preview">
+    <span class="tab">推荐大厅 ✦ Ai</span>
+    <span class="tab outline">增值服务</span>
+    <span class="tab outline">数字人口播</span>
+  </div>
+  <div class="footer">微信搜 <strong>「灵祺星选」</strong> · 达人 / PR / 拍摄 / 剪辑</div>
+</section>
+
+</body>
+</html>
