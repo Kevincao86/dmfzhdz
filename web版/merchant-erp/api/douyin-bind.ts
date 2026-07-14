@@ -266,10 +266,15 @@ function accountNameFromPois(pois: unknown[]): string | undefined {
   return undefined
 }
 
+function isServiceProviderBindRole(raw: unknown): boolean {
+  const role = String(raw ?? '').trim().toLowerCase()
+  return role === 'service_provider' || role === 'partner' || role === 'linke'
+}
+
 export async function runDouyinMerchantBind(
   bodyRaw: string,
 ): Promise<{ statusCode: number; body: Record<string, unknown> }> {
-  let body: { appId?: string; appSecret?: string; merchantId?: string }
+  let body: { appId?: string; appSecret?: string; merchantId?: string; bindRole?: string }
   try {
     body = JSON.parse(bodyRaw || '{}') as typeof body
   } catch {
@@ -278,6 +283,7 @@ export async function runDouyinMerchantBind(
   const clientKey = String(body.appId ?? '').trim()
   const clientSecret = String(body.appSecret ?? '').trim()
   const merchantId = String(body.merchantId ?? '').trim()
+  const serviceProviderBind = isServiceProviderBindRole(body.bindRole)
   if (!clientKey || !clientSecret || !merchantId) {
     return {
       statusCode: 400,
@@ -294,22 +300,25 @@ export async function runDouyinMerchantBind(
       douyinExpiresAtMs: 0,
     }
     const token = await ensureDouyinToken(session)
-    let first: Record<string, unknown>
-    try {
-      first = await shopPoiQueryPageWithRetry(merchantId, token, 1, 1)
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      if (isLikelyDouyinClientTokenExpiredBizError(msg)) {
-        invalidateDouyinMerchantClientTokenCache(session)
-        const token2 = await ensureDouyinToken(session)
-        first = await shopPoiQueryPageWithRetry(merchantId, token2, 1, 1)
-      } else {
-        throw e
+    let accountName: string | undefined
+    if (!serviceProviderBind) {
+      let first: Record<string, unknown>
+      try {
+        first = await shopPoiQueryPageWithRetry(merchantId, token, 1, 1)
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        if (isLikelyDouyinClientTokenExpiredBizError(msg)) {
+          invalidateDouyinMerchantClientTokenCache(session)
+          const token2 = await ensureDouyinToken(session)
+          first = await shopPoiQueryPageWithRetry(merchantId, token2, 1, 1)
+        } else {
+          throw e
+        }
       }
+      const d = first.data as Record<string, unknown> | undefined
+      const pois = extractPoisFromShopQueryData(d)
+      accountName = accountNameFromPois(pois)
     }
-    const d = first.data as Record<string, unknown> | undefined
-    const pois = extractPoisFromShopQueryData(d)
-    const accountName = accountNameFromPois(pois)
 
     const secret = merchantDouyinSessionSecret()
     let accessToken: string
@@ -326,9 +335,11 @@ export async function runDouyinMerchantBind(
       body: {
         accessToken,
         accountName: accountName ?? undefined,
-        message: secret
-          ? '已绑定抖音来客（线上加密会话，请在部署环境配置 MERCHANT_DOUYIN_SESSION_SECRET）。'
-          : '已建立直连抖音开放平台的本地会话（仅开发服务器内存）。',
+        message: serviceProviderBind
+          ? '已绑定抖音林客服务商应用（client_token 校验通过）。请前往「客户商家」发起林客授权开通代运营客户；门店列表需在客户授权后按客户 account_id 查询。'
+          : secret
+            ? '已绑定抖音来客（线上加密会话，请在部署环境配置 MERCHANT_DOUYIN_SESSION_SECRET）。'
+            : '已建立直连抖音开放平台的本地会话（仅开发服务器内存）。',
       },
     }
   } catch (e) {
@@ -359,9 +370,17 @@ export async function runDouyinMerchantBind(
       !relayTlsInsecureEnvEnabled()
         ? ' 若中继 HTTPS 为自签或 IP 证书，Vercel 上 Node 校验会失败并表现为 fetch failed：在环境变量增加 DOUYIN_OPENAPI_RELAY_TLS_INSECURE=1（仅用于可信自建中继）；或为中继配置域名与受信任证书后可删除该变量。'
         : ''
+    const merchantUnauthorizedHint =
+      !aborted && /该商家未授权|未获商家授权|2119005|3000004/.test(detail)
+        ? serviceProviderBind
+          ? ' 林客服务商绑定时不应依赖 shop/poi/query 校验服务商根账户；若仍看到此提示，请更新后端至最新版本并重试。'
+          : ' 开放平台「能力/权限」开通不等于商家已授权：请让商家在来客「店铺管理 → 服务方应用授权 → 服务商代理」对你的应用完成授权，或在开放平台「授权管理」向该 merchantId 发起授权。'
+        : ''
     return {
       statusCode: 502,
-      body: { message: `抖音鉴权或门店查询失败：${detail}${whitelistHint}${rateLimitHint}${relayHtmlHint}${relayTlsHint}` },
+      body: {
+        message: `抖音鉴权或门店查询失败：${detail}${merchantUnauthorizedHint}${whitelistHint}${rateLimitHint}${relayHtmlHint}${relayTlsHint}`,
+      },
     }
   }
 }

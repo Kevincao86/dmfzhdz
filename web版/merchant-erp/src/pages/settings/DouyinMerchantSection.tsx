@@ -38,6 +38,7 @@ import {
 } from '../../services/douyinMerchantApi'
 import { PlatformBrandLogo } from '../../lib/platformBranding'
 import { douyinBindCopy } from '../../lib/partnerPlatformCopy'
+import { isPartnerEdition } from '../../lib/appEdition'
 import DouyinBindGuide from './DouyinBindGuide'
 import { MerchantSyncControls } from './MerchantSyncControls'
 
@@ -469,6 +470,7 @@ export default function DouyinMerchantSection() {
         appId: appId.trim(),
         appSecret: appSecret.trim(),
         merchantId: merchantId.trim(),
+        bindRole: isPartnerEdition() ? 'service_provider' : 'merchant',
       })
       if (!r.ok) {
         setBindError(r.message)
