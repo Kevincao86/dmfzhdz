@@ -211,7 +211,7 @@ export const PUBLISH_CHANNELS: Array<{
 
 /** 视觉工坊渠道对应平台 Logo */
 export const PUBLISH_CHANNEL_LOGO: Partial<Record<PublishChannelId, PlatformLogoKey>> = {
-  douyin: 'douyin_laike',
+  douyin: 'douyin',
   xiaohongshu: 'xiaohongshu',
   wechat_moments: 'wechat_moments',
   meituan: 'dianping',
@@ -2364,30 +2364,35 @@ export function buildVisualStudioPrompt(
     form.industrySubId,
   )
   const sceneCtx = resolveIndustrySceneContext(form)
+  const variantConfig = getPlaybookVariantConfig(form.playbook, form.industry, form.industrySubId)
   const style =
     opts?.styleFromReference
       ? '视觉风格参考用户上传的商品/海报图（色调与构图），文案以表单为准。'
       : AI_IMAGE_STYLE_PRESETS.find((s) => s.id === form.styleId)?.promptHint ?? '商业设计'
 
   const channel = opts?.channel ? resolveChannel(opts.channel) : null
+  const size = channel ? resolveAiImageSizePreset(channel.primarySizeId) : null
   const lines = [
     INTENT_PROMPT[pb.intent],
-    `业态：${sceneCtx.label}，${sceneCtx.sceneHint}。`,
+    `【业态锁定】${sceneCtx.label}。${sceneCtx.sceneHint}。画面主体、道具、环境必须严格符合该业态，禁止出现与业态无关的场景（如餐饮禁止酒吧夜场、足浴禁止咖啡厅）。`,
     `视觉风格：${style}。`,
-    channel ? `投放渠道：${channel.label}，请符合该平台常见封面构图习惯。` : '',
-    playbookVariant
-      ? `活动细分：${playbookVariant.label}（${playbookVariant.periodLabel}），视觉元素可呼应该主题。`
-      : '',
-    form.storeName.trim() ? `门店/品牌名：${form.storeName.trim()}。` : '',
-    form.headline.trim() ? `主标题：「${form.headline.trim()}」（画面中大而清晰）。` : '',
+    channel ? `投放渠道：${channel.label}，${size?.aspectRatio ?? ''} ${size?.pixelHint ?? ''}，请符合该平台常见封面构图。` : '',
+    variantConfig?.pickerLabel && playbookVariant
+      ? `${variantConfig.pickerLabel}：${playbookVariant.label}（${playbookVariant.periodLabel}）。`
+      : playbookVariant
+        ? `活动细分：${playbookVariant.label}（${playbookVariant.periodLabel}），视觉元素须呼应该主题。`
+        : '',
+    `营销玩法：${pb.label}（${pb.desc}）。`,
+    form.storeName.trim() ? `门店/品牌名：${form.storeName.trim()}（可出现在画面角落，勿遮挡主信息）。` : '',
+    form.headline.trim() ? `主标题（画面中大而清晰的中文）：「${form.headline.trim()}」。` : '',
     form.subheadline.trim() ? `副标题：${form.subheadline.trim()}。` : '',
-    form.offer.trim() ? `核心优惠：${form.offer.trim()}（数字/价格突出）。` : '',
-    form.timeRange.trim() ? `时间：${form.timeRange.trim()}。` : '',
+    form.offer.trim() ? `核心优惠/价格：${form.offer.trim()}（数字醒目）。` : '',
+    form.timeRange.trim() ? `活动时间：${form.timeRange.trim()}。` : '',
     form.note.trim() ? `补充说明：${form.note.trim()}。` : '',
     opts?.productRefCount
-      ? `用户提供了 ${opts.productRefCount} 张实拍商品/菜品图，请在画面中体现真实质感。`
+      ? `用户提供了 ${opts.productRefCount} 张实拍参考图，画面主体品类、色调与质感须与参考图一致。`
       : '',
-    '规范：中文排版专业、无乱码水印、无畸形文字；适合中国大陆本地生活商家私域与公域投放。',
+    '规范：专业中文海报排版、无乱码水印、无畸形文字；适合中国大陆本地生活商家投放。',
   ].filter(Boolean)
 
   const vi = opts?.variantIndex ?? 0
@@ -2398,6 +2403,59 @@ export function buildVisualStudioPrompt(
     lines.push(`修改要求：${opts.refineNote.trim()}`)
   }
   return lines.join('\n')
+}
+
+/** 汇总视觉工坊出图所需的全部业务上下文，供 AI 打包生图 Prompt */
+export function buildVisualStudioImageContext(
+  form: VisualStudioForm,
+  opts?: {
+    channel?: PublishChannelId
+    variantIndex?: number
+    productRefCount?: number
+    styleFromReference?: boolean
+    refineNote?: string
+  },
+): Record<string, string | number | boolean | string[]> {
+  const pb = resolvePlaybook(form.playbook)
+  const playbookVariant = resolvePlaybookVariant(
+    form.playbook,
+    form.playbookVariantId,
+    form.industry,
+    form.industrySubId,
+  )
+  const sceneCtx = resolveIndustrySceneContext(form)
+  const variantConfig = getPlaybookVariantConfig(form.playbook, form.industry, form.industrySubId)
+  const stylePreset = AI_IMAGE_STYLE_PRESETS.find((s) => s.id === form.styleId)
+  const channel = opts?.channel ? resolveChannel(opts.channel) : null
+  const size = channel ? resolveAiImageSizePreset(channel.primarySizeId) : null
+  const vi = opts?.variantIndex ?? 0
+  return {
+    industry: sceneCtx.label,
+    industrySceneHint: sceneCtx.sceneHint,
+    industrySubId: form.industrySubId,
+    playbook: pb.label,
+    playbookDesc: pb.desc,
+    playbookIntent: pb.intent,
+    playbookVariantPicker: variantConfig?.pickerLabel ?? '',
+    playbookVariantLabel: playbookVariant?.label ?? '',
+    playbookVariantPeriod: playbookVariant?.periodLabel ?? '',
+    styleLabel: stylePreset?.label ?? form.styleId,
+    styleHint: stylePreset?.promptHint ?? '',
+    channelLabel: channel?.label ?? '',
+    channelShort: channel?.short ?? '',
+    aspectRatio: size?.aspectRatio ?? '',
+    pixelHint: size?.pixelHint ?? '',
+    storeName: form.storeName.trim(),
+    headline: form.headline.trim(),
+    subheadline: form.subheadline.trim(),
+    offer: form.offer.trim(),
+    timeRange: form.timeRange.trim(),
+    note: form.note.trim(),
+    compositionVariant: VARIANT_SUFFIX[vi] ?? VARIANT_SUFFIX[0]!,
+    productRefCount: opts?.productRefCount ?? 0,
+    styleFromReference: opts?.styleFromReference === true,
+    refineNote: opts?.refineNote?.trim() ?? '',
+  }
 }
 
 export function preferWanxPosterForIntent(intent: VisualIntentId): boolean {

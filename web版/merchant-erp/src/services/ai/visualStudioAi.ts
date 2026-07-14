@@ -1,9 +1,11 @@
 /**
- * 视觉工坊 AI 接入：文案（LLM）+ 生图（已在页面内 postAiAgentNativeImage）
+ * 视觉工坊 AI 接入：文案（LLM）+ 生图 Prompt 打包（LLM）+ 生图（postAiAgentNativeImage）
  */
 import { postAiChat } from './aiClient'
-import type { CopySuggestion, VisualStudioForm } from '../../lib/aiImageStudioPresets'
+import type { CopySuggestion, PublishChannelId, VisualStudioForm } from '../../lib/aiImageStudioPresets'
 import {
+  buildVisualStudioImageContext,
+  buildVisualStudioPrompt,
   generateCopySuggestions,
   PUBLISH_CHANNELS,
   resolveIndustrySceneContext,
@@ -186,6 +188,82 @@ export async function fetchVisualStudioCopyFromAi(
     return {
       ok: false,
       message: msg.includes('abort') ? '已取消' : `AI 文案暂不可用：${msg.slice(0, 120)}`,
+      fallback,
+    }
+  }
+}
+
+export type VisualStudioImagePromptResult =
+  | { ok: true; prompt: string; source: 'ai' | 'local' }
+  | { ok: false; message: string; fallback: string }
+
+function stripPromptFence(raw: string): string {
+  const t = raw.trim()
+  const m = t.match(/```(?:text|markdown)?\s*([\s\S]*?)```/)
+  return (m?.[1] ?? t).trim()
+}
+
+/**
+ * 调用 LLM 将视觉工坊全部业务信息打包为文生图 Prompt（失败回退本地模板）。
+ */
+export async function fetchVisualStudioImagePromptFromAi(
+  form: VisualStudioForm,
+  opts?: {
+    channel?: PublishChannelId
+    variantIndex?: number
+    productRefCount?: number
+    styleFromReference?: boolean
+    refineNote?: string
+    signal?: AbortSignal
+  },
+): Promise<VisualStudioImagePromptResult> {
+  const fallback = buildVisualStudioPrompt(form, opts)
+  const ctx = buildVisualStudioImageContext(form, opts)
+  const ctxJson = JSON.stringify(ctx, null, 2)
+
+  const userPrompt = [
+    '你是中国大陆本地生活营销海报的「生图 Prompt 工程师」。请根据下列 JSON 业务上下文，输出一段可直接交给文生图模型的中文 Prompt。',
+    '',
+    '要求：',
+    '1. 单段连贯描述，300～600 字，不要 JSON、不要 markdown、不要编号列表',
+    '2. 必须锁定业态与场景：画面主体/环境/道具与 industry、industrySceneHint 一致，严禁业态错配（足浴/SPA 禁止酒吧咖啡厅，餐饮禁止足疗场景）',
+    '3. 必须体现 headline、offer、subheadline 等文案为画面中的中文大字信息',
+    '4. 体现 styleHint、compositionVariant、渠道尺寸与 playbook 玩法',
+    '5. 若有 productRefCount>0 或 styleFromReference，强调与参考图品类色调一致',
+    '6. 结尾注明：专业海报排版、中文清晰可读、无水印乱码',
+    '',
+    '业务上下文 JSON：',
+    ctxJson,
+  ].join('\n')
+
+  try {
+    const res = await postAiChat(
+      {
+        provider: 'qwen',
+        messages: [
+          {
+            role: 'system',
+            content:
+              '你只输出一段中文文生图 Prompt 正文，禁止任何解释、前缀后缀、代码块。Prompt 须让模型生成与业态严格匹配的营销海报。',
+          },
+          { role: 'user', content: userPrompt },
+        ],
+        stream: false,
+        taskType: 'generate_copywriting',
+        temperature: 0.35,
+      },
+      { signal: opts?.signal },
+    )
+    const prompt = stripPromptFence(res.content)
+    if (prompt.length >= 80) {
+      return { ok: true, prompt, source: 'ai' }
+    }
+    return { ok: false, message: 'AI Prompt 过短，已使用本地模板', fallback }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return {
+      ok: false,
+      message: msg.includes('abort') ? '已取消' : `AI 整理出图需求失败：${msg.slice(0, 120)}`,
       fallback,
     }
   }
