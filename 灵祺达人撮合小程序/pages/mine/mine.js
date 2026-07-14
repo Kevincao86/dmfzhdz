@@ -48,7 +48,7 @@ const BRIEF_GEN_MENU = {
 const AFFILIATE_PORTAL_MENU = {
   key: 'affiliatePortal',
   label: '我的推广',
-  sub: '推广码 · 链接 · 佣金与结算',
+  sub: '申请开通 · 推广码 · 佣金结算',
   icon: 'cooperation',
 }
 
@@ -268,7 +268,7 @@ const MENU_URLS = {
 }
 
 /** 未登录也可直接进入（不弹登录窗） */
-const GUEST_FREE_MENU_KEYS = new Set(['applications', 'analytics', 'support', 'favorites', 'manual', 'affiliatePortal', 'affiliateApply'])
+const GUEST_FREE_MENU_KEYS = new Set(['applications', 'analytics', 'support', 'favorites', 'manual'])
 
 function profileMenuLabel(identity) {
   if (identity === 'pr') return '我的 PR 信息'
@@ -784,12 +784,38 @@ Page({
       this.setData({ profileSaving: false })
     }
   },
+  async openAffiliateEntry() {
+    const applyUrl = MENU_URLS.affiliateApply
+    const portalUrl = MENU_URLS.affiliatePortal
+    if (!auth.isLoggedIn()) {
+      guestRoutes.redirectToLogin(applyUrl)
+      return
+    }
+    wx.showLoading({ title: '加载中', mask: true })
+    try {
+      const affiliateApply = require('../../utils/mpDistributionAffiliateApply.js')
+      const affiliate = await affiliateApply.fetchMyStatus()
+      wx.hideLoading()
+      if (affiliate && affiliate.status === 'active') {
+        wx.navigateTo({ url: portalUrl })
+        return
+      }
+      wx.navigateTo({ url: applyUrl })
+    } catch (_) {
+      wx.hideLoading()
+      wx.navigateTo({ url: applyUrl })
+    }
+  },
   onMenuTap(e) {
     const key = e.currentTarget.dataset.key
     const url = MENU_URLS[key]
     if (!url) return
     if (PR_MENU_KEYS.has(key)) {
       identityTheme.applyChrome('pr', { animate: false })
+    }
+    if (key === 'affiliatePortal' || key === 'affiliateApply') {
+      void this.openAffiliateEntry()
+      return
     }
     if (key === 'profile' || key === 'prProfile') {
       if (key === 'prProfile') {

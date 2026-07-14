@@ -1,11 +1,16 @@
 <view class="page page-shell-fixed">
   <view class="card">
     <text class="title">申请成为推广员</text>
-    <text class="sub">个人推广员可推广灵祺 ERP 与星选会员，审核通过后获得专属推广码。</text>
+    <text class="sub">个人推广员可推广灵祺 ERP 与星选会员，审核通过后获得专属推广码与太阳码。与网页版同一套申请与审核流程。</text>
 
-    <view class="result" wx:if="{{result}}">
+    <view wx:if="{{booting}}" class="boot">正在加载您的申请状态…</view>
+
+    <view class="result" wx:if="{{!booting && result}}">
       <text class="result-title">当前状态：{{result.status === 'pending' ? '待审核' : result.status === 'active' ? '已通过' : result.status === 'rejected' ? '未通过' : '已停用'}}</text>
       <text class="result-line" wx:if="{{result.refCode}}">推广码：{{result.refCode}}</text>
+      <button class="btn-link" bindtap="onGoPortal">
+        {{result.status === 'active' ? '进入我的推广中心 →' : '查看我的推广 / 申请进度 →'}}
+      </button>
     </view>
 
     <text class="info" wx:if="{{info}}">{{info}}</text>
@@ -13,18 +18,20 @@
 
     <view class="field">
       <text class="label">真实姓名</text>
-      <input class="input" value="{{realName}}" bindinput="onRealNameInput" placeholder="与后续提现账户一致" maxlength="32" />
+      <input class="input" value="{{realName}}" bindinput="onRealNameInput" placeholder="与后续提现账户一致" maxlength="32" disabled="{{blockResubmit}}" />
     </view>
     <view class="field">
       <text class="label">手机号</text>
-      <input class="input" type="number" value="{{phone}}" bindinput="onPhoneInput" placeholder="11 位大陆手机号" maxlength="11" />
+      <input class="input" type="number" value="{{phone}}" bindinput="onPhoneInput" placeholder="11 位大陆手机号（建议与登录账号一致）" maxlength="11" disabled="{{blockResubmit}}" />
     </view>
     <view class="field">
       <text class="label">备注（选填）</text>
-      <input class="input" value="{{note}}" bindinput="onNoteInput" placeholder="如：主要推广星选会员" maxlength="120" />
+      <input class="input" value="{{note}}" bindinput="onNoteInput" placeholder="如：主要推广星选会员" maxlength="120" disabled="{{blockResubmit}}" />
     </view>
 
-    <button class="btn-primary" loading="{{submitting}}" bindtap="onSubmit">提交申请</button>
-    <button class="btn-secondary" loading="{{checking}}" bindtap="onCheckStatus">查询进度</button>
+    <button class="btn-primary" loading="{{submitting}}" disabled="{{booting || blockResubmit}}" bindtap="onSubmit">
+      {{blockResubmit ? '已提交申请' : '提交申请'}}
+    </button>
+    <button class="btn-secondary" loading="{{checking}}" disabled="{{booting}}" bindtap="onCheckStatus">查询进度</button>
   </view>
 </view>

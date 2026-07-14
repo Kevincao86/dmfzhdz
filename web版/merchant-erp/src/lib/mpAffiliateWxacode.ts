@@ -70,12 +70,18 @@ export async function generateAffiliatePromoWxacodeDataUrl(
   if (hit && hit.expiresAt > Date.now()) return hit.dataUrl
 
   const accessToken = await getMpMiniProgramAccessToken()
-  const path = `pages/welcome/welcome?ref=${encodeURIComponent(code)}`
+  const path = `pages/welcome/welcome?ref=${code}`
+  const scene = `ref=${code}`.slice(0, 32)
   let buf: Buffer
+  // 优先无限量码（check_path:false，体验版/未全量发布更稳），失败再回退有限码
   try {
-    buf = await requestWxacode(accessToken, { path, width })
-  } catch {
-    buf = await requestWxacodeUnlimited(accessToken, 'pages/welcome/welcome', `ref=${code}`.slice(0, 32), width)
+    buf = await requestWxacodeUnlimited(accessToken, 'pages/welcome/welcome', scene, width)
+  } catch (firstErr) {
+    try {
+      buf = await requestWxacode(accessToken, { path, width })
+    } catch {
+      throw firstErr instanceof Error ? firstErr : new Error(String(firstErr))
+    }
   }
 
   const mime = buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xd8 ? 'image/jpeg' : 'image/png'

@@ -1,5 +1,6 @@
 const ecs = require('./ecs.js')
 const auth = require('./auth.js')
+const ossTransport = require('./mpOssUploadTransport.js')
 
 function sessionHeaders() {
   const token = auth.readSessionToken()
@@ -39,6 +40,21 @@ function dataUrlToTempFile(dataUrl) {
   })
 }
 
+function wxacodeErrorLabel(raw) {
+  const msg = String(raw || '').trim()
+  if (!msg) return '太阳码生成失败，请稍后重试'
+  if (/[\u4e00-\u9fa5]/.test(msg)) return msg
+  if (msg === 'wxacode_unavailable' || msg === 'invalid_wxacode_data' || msg === 'wxacode_write_fail') {
+    return '太阳码生成失败，请稍后重试'
+  }
+  if (msg === 'wx_not_configured') return '小程序码服务未配置，请联系管理员'
+  if (msg === 'affiliate_not_active') return '推广员审核通过后才可生成太阳码'
+  if (msg === 'unauthorized') return '请先登录后再查看推广中心'
+  if (/invalid page|page not found|41030/i.test(msg)) return '小程序页面未发布，请稍后重试或联系管理员'
+  if (/access_token|40001|42001/i.test(msg)) return '微信授权失效，请稍后重试'
+  return '太阳码生成失败，请稍后重试'
+}
+
 async function fetchPortal() {
   const data = await ecs.get('/api/meoo-distribution-affiliate-portal', sessionHeaders())
   if (!data || data.ok === false) {
@@ -55,23 +71,38 @@ async function fetchPortal() {
   }
 }
 
+/**
+ * 太阳码体积较大（~130KB base64），走 HTTPS 直连 erp-api，避免云函数回包截断/失败。
+ */
 async function fetchWxacodeImagePath() {
-  const data = await ecs.post(
-    '/api/meoo-distribution-affiliate-portal',
-    { action: 'wxacode' },
-    sessionHeaders(),
-  )
+  let data
+  try {
+    data = await ossTransport.postOssUpload(
+      '/api/meoo-distribution-affiliate-portal',
+      { action: 'wxacode' },
+      sessionHeaders(),
+    )
+  } catch (e) {
+    throw new Error(wxacodeErrorLabel((e && e.message) || 'wxacode_unavailable'))
+  }
   if (!data || data.ok === false) {
-    throw new Error(String((data && (data.message || data.error)) || 'wxacode_unavailable'))
+    throw new Error(
+      wxacodeErrorLabel((data && (data.message || data.error)) || 'wxacode_unavailable'),
+    )
   }
   const dataUrl = data.dataUrl ? String(data.dataUrl).trim() : ''
-  if (!dataUrl) throw new Error('wxacode_unavailable')
-  return dataUrlToTempFile(dataUrl)
+  if (!dataUrl) throw new Error('太阳码生成失败，请稍后重试')
+  try {
+    return await dataUrlToTempFile(dataUrl)
+  } catch (e) {
+    throw new Error(wxacodeErrorLabel((e && e.message) || 'wxacode_write_fail'))
+  }
 }
 
 module.exports = {
   formatYuan,
   settlementStatusLabel,
+  wxacodeErrorLabel,
   fetchPortal,
   fetchWxacodeImagePath,
 }

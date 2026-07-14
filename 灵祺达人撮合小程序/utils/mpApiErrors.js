@@ -50,6 +50,12 @@ const ZH = {
   member_not_found: '未找到达人资料，请先在「我的信息」完善并保存',
   wx_oa_not_configured: '服务号通知暂未开通，请联系管理员',
   wx_oa_ip_not_whitelisted: '微信服务号未配置服务器 IP 白名单，请联系管理员添加 139.196.42.5',
+  wxacode_unavailable: '太阳码生成失败，请稍后重试',
+  wx_not_configured: '小程序码服务未配置，请联系管理员',
+  affiliate_not_active: '推广员审核通过后才可生成太阳码',
+  already_active: '您已是推广员，请前往「我的推广」查看',
+  distribution_disabled: '推广员申请暂未开放，请稍后再试',
+  phone_taken: '该手机号已被其他账号用于推广员申请',
 }
 
 function formatMpApiErr(e, fallback) {
