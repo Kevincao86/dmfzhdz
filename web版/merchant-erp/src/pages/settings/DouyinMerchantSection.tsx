@@ -1,6 +1,7 @@
 import { BookOpen, Search, User } from 'lucide-react'
 import SecretInput from '../../components/SecretInput'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { cn } from '../../cn'
 import MerchantPlatformAccountsPanel from '../../components/settings/MerchantPlatformAccountsPanel'
 import { useMembership } from '../../context/MembershipContext'
@@ -50,6 +51,9 @@ const META_ACCOUNT_NAME = 'meoo_douyin_account_name'
 
 type PageSize = 10 | 50 | 100
 
+const PARTNER_SP_STORES_HINT =
+  '林客服务商绑定仅保存 SP 应用凭证，不在此用根账户查门店。请前往「客户商家」发起林客授权；客户 account_id 授权成功后再查门店与商品。'
+
 /** 门店列表失败但绑定/会话未必失效：反代 HTML、5xx、超时等 */
 function listErrorIndicatesInfrastructure(msg: string): boolean {
   const c = msg ?? ''
@@ -85,6 +89,7 @@ function listErrorIndicatesInvalidSession(msg: string): boolean {
 
 export default function DouyinMerchantSection() {
   const copy = douyinBindCopy()
+  const partnerEdition = isPartnerEdition()
   const { plan, entitlements } = useMembership()
   const bindingLimit = entitlements.platformBindingLimit
   const [accessToken, setAccessToken] = useState<string | null>(() => readMerchantSession(TOKEN_KEY))
@@ -202,6 +207,15 @@ export default function DouyinMerchantSection() {
     }
   }, [accessToken])
 
+  const applyPartnerSpStoresUi = useCallback(() => {
+    setRows([])
+    setTotal(0)
+    setListError(null)
+    setListLoading(false)
+    setStoresHint(PARTNER_SP_STORES_HINT)
+    setLastSyncAt(null)
+  }, [])
+
   const loadStores = useCallback(
     async (opts?: {
       silent?: boolean
@@ -215,6 +229,10 @@ export default function DouyinMerchantSection() {
         setRows([])
         setTotal(0)
         setStoresHint(null)
+        return
+      }
+      if (partnerEdition) {
+        applyPartnerSpStoresUi()
         return
       }
       const mid =
@@ -258,7 +276,7 @@ export default function DouyinMerchantSection() {
       }
       setLastSyncAt(new Date().toLocaleString('zh-CN'))
     },
-    [accessToken, boundMerchantId, page, pageSize, debouncedKeyword],
+    [accessToken, boundMerchantId, page, pageSize, debouncedKeyword, partnerEdition, applyPartnerSpStoresUi],
   )
 
   const persistAuto = (v: boolean) => {
@@ -298,6 +316,7 @@ export default function DouyinMerchantSection() {
    */
   const bindCardTone = useMemo((): 'ok' | 'error' | 'pending' | 'degraded' => {
     if (!accessToken) return 'pending'
+    if (partnerEdition) return 'ok'
     if (listError) {
       if (listErrorIndicatesInfrastructure(listError)) return 'degraded'
       if (listErrorIndicatesInvalidSession(listError)) return 'error'
@@ -305,7 +324,7 @@ export default function DouyinMerchantSection() {
     }
     // 有凭证即视为已绑定；切页/首屏拉门店时不在顶部卡片显示「正在验证」，避免误以为需重新绑定（加载态见下方表格）
     return 'ok'
-  }, [accessToken, listError])
+  }, [accessToken, listError, partnerEdition])
 
   const bindCardShell = useMemo(() => {
     if (bindCardTone === 'error') {
@@ -338,9 +357,11 @@ export default function DouyinMerchantSection() {
       box: 'border-green-200 bg-green-50',
       icon: 'bg-green-100 text-green-600',
       title: copy.cardBoundTitle,
-      subtitle: null as string | null,
+      subtitle: partnerEdition
+        ? '服务商应用凭证有效。代运营客户的门店与商品请在「客户商家」完成林客授权后管理，勿用 SP 根账户在此查门店。'
+        : (null as string | null),
     }
-  }, [bindCardTone, copy])
+  }, [bindCardTone, copy, partnerEdition])
 
   const clampedPage = useMemo(() => Math.min(page, totalPages), [page, totalPages])
 
@@ -505,12 +526,16 @@ export default function DouyinMerchantSection() {
       setAppSecret('')
       setBindOpen(false)
       setPage(1)
-      await loadStores({
-        silent: false,
-        refresh: true,
-        accessTokenOverride: r.accessToken,
-        merchantIdOverride: merchantId.trim(),
-      })
+      if (partnerEdition) {
+        applyPartnerSpStoresUi()
+      } else {
+        await loadStores({
+          silent: false,
+          refresh: true,
+          accessTokenOverride: r.accessToken,
+          merchantIdOverride: merchantId.trim(),
+        })
+      }
     } catch (e) {
       setBindError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -642,21 +667,37 @@ export default function DouyinMerchantSection() {
                 </div>
               </div>
             </div>
-            <MerchantSyncControls
-              bound
-              lastSyncAt={lastSyncAt}
-              isRefreshing={manualRefreshing}
-              onManualRefresh={manualRefresh}
-              onAutoRefresh={autoRefreshRun}
-              autoRefreshEnabled={autoRefresh}
-              onAutoRefreshEnabledChange={persistAuto}
-              showManualRefresh={false}
-            />
+            {!partnerEdition ? (
+              <MerchantSyncControls
+                bound
+                lastSyncAt={lastSyncAt}
+                isRefreshing={manualRefreshing}
+                onManualRefresh={manualRefresh}
+                onAutoRefresh={autoRefreshRun}
+                autoRefreshEnabled={autoRefresh}
+                onAutoRefreshEnabledChange={persistAuto}
+                showManualRefresh={false}
+              />
+            ) : null}
             <p className="mt-3 text-xs text-gray-600">
-              绑定凭证保存在本机浏览器（跨标签页共享）；自动刷新仅重新拉取门店列表，不会因接口失败而解除绑定。只有点击「断开连接」才会清除绑定。
+              {partnerEdition
+                ? '林客 SP 凭证已加密保存；解除绑定请点击上方「移除当前账号」。'
+                : '绑定凭证保存在本机浏览器（跨标签页共享）；自动刷新仅重新拉取门店列表，不会因接口失败而解除绑定。只有点击「断开连接」才会清除绑定。'}
             </p>
           </div>
 
+          {partnerEdition ? (
+            <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-5">
+              <h4 className="text-sm font-semibold text-violet-950">下一步：添加代运营客户</h4>
+              <p className="mt-2 text-sm leading-relaxed text-violet-900/90">{PARTNER_SP_STORES_HINT}</p>
+              <Link
+                to="/settings?tab=partner_clients"
+                className="mt-4 inline-flex rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700"
+              >
+                前往客户商家
+              </Link>
+            </div>
+          ) : (
           <div className="rounded-xl border border-gray-200 bg-white p-5">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <h4 className="text-sm font-semibold text-gray-900">账户门店明细</h4>
@@ -799,6 +840,7 @@ export default function DouyinMerchantSection() {
               。
             </p>
           </div>
+          )}
         </div>
       ) : (
         <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50/80 p-8 text-center text-sm text-gray-600">
