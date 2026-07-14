@@ -164,7 +164,8 @@ function isVendorHopableError(e: unknown): boolean {
   if (lower.includes('401') || lower.includes('unauthorized') || lower.includes('unauthor')) return true
   if (lower.includes('access denied') || lower.includes('access_denied')) return true
   if (lower.includes('403') || lower.includes('forbidden')) return true
-  if (lower.includes('image_generation')) return true
+  if (lower.includes('invalidparameter') || lower.includes('invalid parameter')) return true
+  if (lower.includes('poster-generation') || lower.includes('wanx-poster')) return true
   if (lower.includes('minimax') && (lower.includes('图像') || lower.includes('image')))
     return true
   if (lower.includes('不支持') && (lower.includes('图') || lower.includes('image'))) return true
@@ -574,7 +575,8 @@ export async function runAgentFreeformTextToImage(
       : buildAgentFreeformImagePrompt(userLine)
   let modelId = opts?.preferredModelId?.trim()
   if (!modelId && opts?.preferWanxPoster) {
-    modelId = 'wanx-poster-generation-v1'
+    /** 营销海报走标准万相文生图；wanx-poster-generation-v1 为独立 input 协议且免费额度易耗尽 */
+    modelId = 'wan2.7-image-pro'
   } else if (!modelId && exact && (!preferredVendor || preferredVendor === 'qwen')) {
     modelId = 'wan2.7-image-pro'
   }
