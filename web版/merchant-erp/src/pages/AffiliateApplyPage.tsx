@@ -155,6 +155,14 @@ export default function AffiliateApplyPage() {
                 <p className="mt-1 font-mono text-xs">推广码：{result.refCode}</p>
               ) : null}
               <p className="mt-1 text-emerald-800/80">申请时间：{new Date(result.appliedAt).toLocaleString()}</p>
+              {result.status === 'active' ? (
+                <Link
+                  to="/affiliate/portal"
+                  className="mt-3 inline-flex text-sm font-semibold text-indigo-700 underline"
+                >
+                  进入我的推广中心 →
+                </Link>
+              ) : null}
             </div>
           ) : null}
 
@@ -213,7 +221,11 @@ export default function AffiliateApplyPage() {
           </form>
 
           <p className="mt-4 text-xs leading-relaxed text-slate-500">
-            提交即表示同意平台推广合作规则。审核结果可在本页通过手机号查询；通过后推广链接与素材将在后续版本开放。
+            提交即表示同意平台推广合作规则。审核通过后，请在
+            <Link to="/affiliate/portal" className="mx-0.5 text-indigo-600 underline">
+              我的推广
+            </Link>
+            或系统设置中查看推广码、链接与佣金数据。
           </p>
         </div>
       </div>

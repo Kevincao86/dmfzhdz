@@ -1,0 +1,65 @@
+<view class="page page-shell-fixed">
+  <view class="card">
+    <text class="title">我的推广</text>
+    <text class="sub">查看专属推广码、推广链接与佣金结算数据。</text>
+
+    <view wx:if="{{loading}}" class="info">加载中…</view>
+    <text class="err" wx:if="{{err}}">{{err}}</text>
+    <text class="info" wx:if="{{hint}}">{{hint}}</text>
+
+    <view wx:if="{{!loading && !err && !affiliate}}" class="actions">
+      <text class="sub">您尚未提交推广员申请。</text>
+      <button class="btn-primary" bindtap="onGoApply">申请成为推广员</button>
+    </view>
+
+    <view wx:if="{{affiliate}}" class="result">
+      <text class="result-title">状态：{{statusLabel}}</text>
+      <text class="result-line" wx:if="{{affiliate.refCode}}">推广码：{{affiliate.refCode}}</text>
+      <button wx:if="{{affiliate.refCode}}" class="btn-secondary" bindtap="onCopyCode">复制推广码</button>
+      <text class="result-line" wx:if="{{affiliate.status === 'pending'}}">审核通过后将展示推广链接。</text>
+    </view>
+
+    <view wx:if="{{promoLinks}}">
+      <view class="link-row" wx:for="{{linkRows}}" wx:key="key">
+        <text class="link-label">{{item.label}}</text>
+        <text class="link-url">{{item.url}}</text>
+        <button class="btn-secondary" size="mini" data-url="{{item.url}}" data-label="{{item.label}}" bindtap="onCopyLink">复制</button>
+      </view>
+      <view class="link-row">
+        <text class="link-label">小程序路径</text>
+        <text class="link-url">{{promoLinks.mpPath}}</text>
+        <button class="btn-secondary" size="mini" data-url="{{promoLinks.mpPath}}" data-label="小程序路径" bindtap="onCopyLink">复制</button>
+      </view>
+    </view>
+
+    <view wx:if="{{wallet}}" class="stats-grid">
+      <view class="stat-card">
+        <text class="stat-label">可提现</text>
+        <text class="stat-value">¥{{wallet.availableYuan}}</text>
+      </view>
+      <view class="stat-card">
+        <text class="stat-label">冻结中</text>
+        <text class="stat-value">¥{{wallet.frozenYuan}}</text>
+      </view>
+      <view class="stat-card">
+        <text class="stat-label">已提现</text>
+        <text class="stat-value">¥{{wallet.withdrawnYuan}}</text>
+      </view>
+      <view class="stat-card">
+        <text class="stat-label">累计结算</text>
+        <text class="stat-value">¥{{stats.settlementTotalYuan}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{settlements.length}}">
+      <text class="label" style="margin-top: 28rpx;">近期结算</text>
+      <view class="settle-row" wx:for="{{settlements}}" wx:key="id">
+        {{item.periodStart}} ~ {{item.periodEnd}} · {{item.orderCount}} 单 · ¥{{item.totalYuan}} · {{item.statusLabel}}
+      </view>
+    </view>
+
+    <view class="actions" wx:if="{{affiliate && affiliate.status !== 'active'}}">
+      <button class="btn-secondary" bindtap="onGoApply">查看申请 / 重新申请</button>
+    </view>
+  </view>
+</view>
