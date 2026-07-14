@@ -44,6 +44,8 @@ export type DouyinBindPayload = {
   appId: string
   appSecret: string
   merchantId: string
+  /** 服务商版 fws：林客 SP 绑定，后端仅校验 client_token，不调用 shop/poi/query */
+  bindRole?: 'merchant' | 'service_provider'
 }
 
 export type DouyinBindResult =
@@ -112,6 +114,7 @@ export async function postDouyinBind(
     appId: payload.appId,
     appSecret: payload.appSecret,
     merchantId: payload.merchantId,
+    ...(payload.bindRole ? { bindRole: payload.bindRole } : {}),
   })
 
   const ctrl = new AbortController()
