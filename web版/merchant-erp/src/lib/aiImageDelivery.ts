@@ -66,6 +66,42 @@ export function triggerBlobDownload(blob: Blob, filename: string) {
   URL.revokeObjectURL(url)
 }
 
+export async function sliceCarouselFiveStrips(
+  blob: Blob,
+  spec: { slideWidth: number; slideHeight: number; slotCount?: number },
+): Promise<Blob[]> {
+  const slotCount = spec.slotCount ?? 5
+  const bitmap = await createImageBitmap(blob)
+  const srcW = bitmap.width
+  const srcH = bitmap.height
+  const strips: Blob[] = []
+
+  for (let i = 0; i < slotCount; i++) {
+    const sx = Math.floor((i * srcW) / slotCount)
+    const ex = Math.floor(((i + 1) * srcW) / slotCount)
+    const sw = Math.max(1, ex - sx)
+
+    const canvas = document.createElement('canvas')
+    canvas.width = spec.slideWidth
+    canvas.height = spec.slideHeight
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Canvas 不可用')
+    ctx.drawImage(bitmap, sx, 0, sw, srcH, 0, 0, spec.slideWidth, spec.slideHeight)
+
+    strips.push(
+      await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (b) => (b ? resolve(b) : reject(new Error('PNG 编码失败'))),
+          'image/png',
+        )
+      }),
+    )
+  }
+
+  bitmap.close()
+  return strips
+}
+
 export async function pngBlobFromImageUrl(url: string): Promise<Blob> {
   const src = await fetchImageBlob(url)
   const bitmap = await createImageBitmap(src)

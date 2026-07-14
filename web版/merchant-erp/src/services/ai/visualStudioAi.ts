@@ -215,6 +215,7 @@ export async function fetchVisualStudioImagePromptFromAi(
     styleFromReference?: boolean
     refineNote?: string
     signal?: AbortSignal
+    carouselMaster?: boolean
   },
 ): Promise<VisualStudioImagePromptResult> {
   const fallback = buildVisualStudioPrompt(form, opts)
@@ -228,7 +229,9 @@ export async function fetchVisualStudioImagePromptFromAi(
     '1. 单段连贯描述，300～600 字，不要 JSON、不要 markdown、不要编号列表',
     '2. 必须锁定业态与场景：画面主体/环境/道具与 industry、industrySceneHint 一致，严禁业态错配（足浴/足疗须为足浴沙发/足疗椅场景，禁止浴缸/酒店客房/海边度假；餐饮禁止足疗场景）',
     '3. 必须体现 headline、offer、subheadline 等文案为画面中的中文大字信息',
-    '4. 体现 styleHint、compositionVariant、渠道尺寸与 playbook 玩法',
+    opts?.carouselMaster
+      ? '4. carouselMaster=true：描述一张从左到右连续的超宽横幅，均分 5 段（封面→卖点1→卖点2→套餐→行动），背景与色调全幅无缝衔接，生成后将裁成单张轮播图'
+      : '4. 体现 styleHint、compositionVariant、渠道尺寸与 playbook 玩法',
     '5. 若有 productRefCount>0 或 styleFromReference，强调与参考图品类色调一致',
     '6. 结尾注明：专业海报排版、中文清晰可读、无水印乱码',
     '',
