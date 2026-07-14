@@ -33,7 +33,8 @@ export function pickSmartBatchSegmentCount(
   ).length
   const rowBased = filledRows >= 2 ? Math.max(filledRows, 2) : scriptRows.filter((r) => String(r.dialogue ?? '').trim().length >= 2).length
   const want = Math.max(planned, rowBased >= 2 ? rowBased : 2)
-  return Math.max(2, Math.min(materialCount, want))
+  /** 段数按目标时长铺满（30s→6 段），不得因素材条数少而缩水 */
+  return Math.max(2, want)
 }
 
 /** 第 i 段分镜 → 素材下标（materialSlots[i] 语义，禁止把 slots 当成无序集合再均匀补位） */
@@ -113,11 +114,10 @@ export function buildSmartBatchSubmitPayload(input: {
     slots,
     segmentCount,
   )
-  const picked = pickedIndices.map((mi) => input.materials[mi]!)
   const rows = padSmartBatchScriptRows(input.scriptRows, segmentCount, input.targetTotalSec)
   return {
-    materials: picked.length >= 2 ? picked : input.materials.slice(0, Math.max(2, segmentCount)),
-    materialSlots: picked.map((_, i) => i),
+    materials: input.materials,
+    materialSlots: pickedIndices,
     scriptRows: rows,
     segmentCount,
   }
