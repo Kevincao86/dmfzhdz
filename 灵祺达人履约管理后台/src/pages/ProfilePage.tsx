@@ -143,9 +143,9 @@ export default function ProfilePage() {
       desc: isPr ? '发单与转化概况' : '报名与发单概况',
     },
     {
-      to: '/affiliate/apply',
-      label: '申请推广员',
-      desc: '推广 ERP / 星选会员 · 获取专属码',
+      to: '/affiliate/portal',
+      label: '我的推广',
+      desc: '推广码 · 链接 · 佣金与结算',
     },
     { to: '/help', label: '帮助中心', desc: '使用说明与常见问题' },
     { to: '/profile/support', label: '小灵同学', desc: '我的客服与常见问题' },

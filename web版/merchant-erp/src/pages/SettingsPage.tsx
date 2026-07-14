@@ -56,6 +56,7 @@ import {
 import PartnerClientsSection from './settings/PartnerClientsSection'
 import PartnerAgentManagementSection from './settings/PartnerAgentManagementSection'
 import PartnerDistributionSettingsSection from './settings/PartnerDistributionSettingsSection'
+import AffiliatePortalSection from './settings/AffiliatePortalSection'
 import PartnerEntitlementSection from './settings/PartnerEntitlementSection'
 import PartnerXingxuanPlatformSection from './settings/PartnerXingxuanPlatformSection'
 import { usePartnerTenant } from '../context/PartnerTenantContext'
@@ -88,6 +89,7 @@ const MERCHANT_TABS = [
   { id: 'accounts' as const, label: '账号管理', icon: Users },
   { id: 'permissions' as const, label: '权限设置', icon: Shield },
   { id: 'subscription' as const, label: '订阅', icon: CalendarDays },
+  { id: 'affiliate' as const, label: '我的推广', icon: Share2 },
 ] as const
 
 const PARTNER_TABS_PARENT = [
@@ -641,6 +643,8 @@ export default function SettingsPage() {
           )}
 
           {tab === 'permissions' && <SubAccountPermissionsPanel />}
+
+          {tab === 'affiliate' && !partnerEdition ? <AffiliatePortalSection embedded /> : null}
         </div>
       </div>
     </div>

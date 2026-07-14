@@ -45,19 +45,19 @@ const BRIEF_GEN_MENU = {
   icon: 'tpl',
 }
 
-const AFFILIATE_APPLY_MENU = {
-  key: 'affiliateApply',
-  label: '申请推广员',
-  sub: '推广 ERP / 星选会员 · 获取专属码',
+const AFFILIATE_PORTAL_MENU = {
+  key: 'affiliatePortal',
+  label: '我的推广',
+  sub: '推广码 · 链接 · 佣金与结算',
   icon: 'cooperation',
 }
 
-function injectAffiliateApplyMenu(menus) {
+function injectAffiliatePortalMenu(menus) {
   const list = [...(menus || [])]
-  if (list.some((item) => item.key === 'affiliateApply')) return list
+  if (list.some((item) => item.key === 'affiliatePortal' || item.key === 'affiliateApply')) return list
   const supportIdx = list.findIndex((item) => item.key === 'support')
   const at = supportIdx >= 0 ? supportIdx : list.length
-  list.splice(at, 0, AFFILIATE_APPLY_MENU)
+  list.splice(at, 0, AFFILIATE_PORTAL_MENU)
   return list
 }
 
@@ -82,7 +82,7 @@ function withManualMenu(menus) {
   const supportIdx = list.findIndex((item) => item.key === 'support')
   const insertAt = supportIdx >= 0 ? supportIdx : list.length
   list.splice(insertAt, 0, MANUAL_MENU)
-  return attachMenuGlyphs(injectAffiliateApplyMenu(list))
+  return attachMenuGlyphs(injectAffiliatePortalMenu(list))
 }
 
 function injectBriefGenMenu(menus) {
@@ -263,11 +263,12 @@ const MENU_URLS = {
   briefGen: '/pages/subpack-pr/mine-pr-addon-ai-content/mine-pr-addon-ai-content',
   aiReview: '/pages/subpack-pr/mine-pr-addon-ai-review/mine-pr-addon-ai-review',
   xingxuanMembership: '/pages/subpack-mine/mine-xingxuan-membership/mine-xingxuan-membership',
+  affiliatePortal: '/pages/subpack-mine/mine-affiliate-portal/mine-affiliate-portal',
   affiliateApply: '/pages/subpack-mine/mine-affiliate-apply/mine-affiliate-apply',
 }
 
 /** 未登录也可直接进入（不弹登录窗） */
-const GUEST_FREE_MENU_KEYS = new Set(['applications', 'analytics', 'support', 'favorites', 'manual', 'affiliateApply'])
+const GUEST_FREE_MENU_KEYS = new Set(['applications', 'analytics', 'support', 'favorites', 'manual', 'affiliatePortal', 'affiliateApply'])
 
 function profileMenuLabel(identity) {
   if (identity === 'pr') return '我的 PR 信息'

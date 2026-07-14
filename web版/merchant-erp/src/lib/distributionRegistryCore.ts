@@ -699,3 +699,92 @@ export function applyDistributionRegistryAction(
       return { ok: false, error: 'invalid_action', status: 400 }
   }
 }
+
+export type AffiliatePortalWallet = {
+  availableCents: number
+  frozenCents: number
+  withdrawnCents: number
+}
+
+export type AffiliatePortalStats = {
+  settlementCount: number
+  settlementTotalCents: number
+  withdrawPendingCount: number
+  withdrawPaidCents: number
+}
+
+export type AffiliatePortalSettlementRow = {
+  id: string
+  periodStart: string
+  periodEnd: string
+  totalCents: number
+  orderCount: number
+  status: RegistryDistributionSettlementBatch['status']
+  paidAt?: string
+}
+
+export function buildAffiliatePortalFromSnapshot(
+  data: RegistryFile,
+  phoneRaw: unknown,
+):
+  | {
+      ok: true
+      affiliate: Record<string, unknown> | null
+      wallet: AffiliatePortalWallet | null
+      stats: AffiliatePortalStats | null
+      settlements: AffiliatePortalSettlementRow[]
+    }
+  | { ok: false; error: string; status: number } {
+  const lookup = lookupAffiliateByPhoneFromSnapshot(data, phoneRaw)
+  if (!lookup.ok) return lookup
+  if (!lookup.affiliate) {
+    return { ok: true, affiliate: null, wallet: null, stats: null, settlements: [] }
+  }
+
+  ensureDistribution(data)
+  const affiliate = lookup.affiliate
+  const walletRow = (data.distributionWallets ?? []).find(
+    (w) => w.ownerType === 'individual_affiliate' && w.ownerId === affiliate.id,
+  )
+  const wallet: AffiliatePortalWallet = walletRow
+    ? {
+        availableCents: walletRow.availableCents,
+        frozenCents: walletRow.frozenCents,
+        withdrawnCents: walletRow.withdrawnCents,
+      }
+    : { availableCents: 0, frozenCents: 0, withdrawnCents: 0 }
+
+  const settlements = (data.distributionSettlementBatches ?? [])
+    .filter((b) => b.payeeType === 'individual_affiliate' && b.payeeId === affiliate.id)
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+    .slice(0, 24)
+    .map((b) => ({
+      id: b.id,
+      periodStart: b.periodStart,
+      periodEnd: b.periodEnd,
+      totalCents: b.totalCents,
+      orderCount: b.orderCount,
+      status: b.status,
+      paidAt: b.paidAt,
+    }))
+
+  const withdraws = (data.distributionWithdrawRequests ?? []).filter(
+    (w) => w.ownerType === 'individual_affiliate' && w.ownerId === affiliate.id,
+  )
+  const stats: AffiliatePortalStats = {
+    settlementCount: settlements.length,
+    settlementTotalCents: settlements.reduce((sum, row) => sum + row.totalCents, 0),
+    withdrawPendingCount: withdraws.filter((w) => w.status === 'pending_review').length,
+    withdrawPaidCents: withdraws
+      .filter((w) => w.status === 'paid')
+      .reduce((sum, w) => sum + w.amountCents, 0),
+  }
+
+  return {
+    ok: true,
+    affiliate: publicAffiliateSummary(affiliate),
+    wallet,
+    stats,
+    settlements,
+  }
+}

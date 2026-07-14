@@ -1,0 +1,64 @@
+@import '../mine-affiliate-apply/mine-affiliate-apply.wxss';
+
+.link-row {
+  margin-top: 16rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 16rpx;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+}
+
+.link-label {
+  display: block;
+  font-size: 22rpx;
+  color: #64748b;
+}
+
+.link-url {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #0f172a;
+  word-break: break-all;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16rpx;
+  margin-top: 20rpx;
+}
+
+.stat-card {
+  padding: 20rpx;
+  border-radius: 16rpx;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+}
+
+.stat-label {
+  display: block;
+  font-size: 22rpx;
+  color: #64748b;
+}
+
+.stat-value {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.settle-row {
+  margin-top: 12rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 12rpx;
+  background: #f8fafc;
+  font-size: 24rpx;
+  color: #334155;
+}
+
+.actions {
+  margin-top: 24rpx;
+}
