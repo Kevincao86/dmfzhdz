@@ -531,6 +531,15 @@ export default function AiImageStudioPage() {
     setBusy(false)
     setProgress('')
     abortRef.current = null
+    const failed = jobList.filter((j) => j.status === 'error')
+    if (failed.length > 0) {
+      const firstMsg = failed.find((j) => j.message?.trim())?.message?.trim()
+      setError(
+        firstMsg
+          ? `生图失败：${firstMsg}${failed.length > 1 ? `（${failed.length} 张）` : ''}`
+          : `生图失败（${failed.length} 张），请稍后重试`,
+      )
+    }
   }
 
   const heroPreview = useMemo(() => {
@@ -911,7 +920,12 @@ export default function AiImageStudioPage() {
                           {v.status === 'running' || v.status === 'pending' ? (
                             <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
                           ) : v.status === 'error' ? (
-                            <span className="px-1 text-[10px] text-red-600">失败</span>
+                            <span
+                              className="px-1 text-center text-[10px] leading-tight text-red-600"
+                              title={v.message || '生图失败'}
+                            >
+                              失败
+                            </span>
                           ) : v.previewUrl ? (
                             <img src={v.previewUrl} alt="" className="h-full w-full object-cover" />
                           ) : null}
