@@ -26,6 +26,7 @@ import {
   LINKE_AUTH_SOLUTION_OPTIONS,
 } from '../../lib/partnerLinkeSolutionOptions'
 import {
+  deletePartnerLinkeOnboarding,
   linkeOnboardStatusLabel,
   listPartnerLinkeOnboarding,
   retryPartnerLinkeCooperation,
@@ -196,6 +197,21 @@ export default function PartnerClientsSection() {
       await loadOnboarding()
     } catch (e) {
       setErr(toUserFacingError(e, '重试代运营合作'))
+    } finally {
+      setInviteBusy(false)
+    }
+  }
+
+  const onDeleteOnboarding = async (id: string) => {
+    if (!window.confirm('确定删除该开通任务？删除后旧授权链接将失效。')) return
+    setInviteBusy(true)
+    setErr(null)
+    try {
+      await deletePartnerLinkeOnboarding(id)
+      setLastAuthUrl(null)
+      await loadOnboarding()
+    } catch (e) {
+      setErr(toUserFacingError(e, '删除开通任务'))
     } finally {
       setInviteBusy(false)
     }
@@ -387,8 +403,7 @@ export default function PartnerClientsSection() {
                   ))}
                 </select>
                 <span className="mt-1 block text-xs text-gray-500">
-                  须与开放平台该服务商应用已开通的解决方案一致。默认 21（餐饮团购）；选 1
-                  易出现「获取解决方案信息失败」。
+                  须与开放平台已开通方案一致，且该方案下已开通「商户授权」「门店管理」。若仍报「获取解决方案信息失败」，请到开放平台核对方案审核状态后重新生成链接（勿用旧链接）。
                 </span>
               </label>
               <div className="flex flex-wrap gap-2">
@@ -487,6 +502,14 @@ export default function PartnerClientsSection() {
                                   重试代运营
                                 </button>
                               ) : null}
+                              <button
+                                type="button"
+                                disabled={inviteBusy}
+                                onClick={() => void onDeleteOnboarding(item.id)}
+                                className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-60"
+                              >
+                                删除
+                              </button>
                             </div>
                           </td>
                         </tr>

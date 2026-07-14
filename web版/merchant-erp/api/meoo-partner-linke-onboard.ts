@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js'
 import { requireMerchantRegistryAuth } from '../src/lib/merchantRegistryAuth.js'
 import { fetchPartnerTenantProfile, partnerClientsDataTenantId } from '../src/lib/partnerTenantProfile.js'
 import {
+  deletePartnerLinkeOnboarding,
   listPartnerLinkeOnboarding,
   retryPartnerLinkeCooperation,
   startPartnerLinkeOnboardInvite,
@@ -118,6 +119,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         orderId: out.orderId,
         message: '已重新发起代运营合作，请通知商家在来客 App 确认',
       })
+      return
+    }
+
+    if (action === 'delete') {
+      const onboardingId = String(body.onboardingId || '').trim()
+      if (!onboardingId) {
+        sendJson(res, 400, { ok: false, error: 'missing_id', message: '请提供 onboardingId' })
+        return
+      }
+      const out = await deletePartnerLinkeOnboarding({
+        admin,
+        dataTenantId,
+        onboardingId,
+        ownerAgentTenantId: profile.isAgent ? profile.tenantId : undefined,
+      })
+      if (!out.ok) {
+        sendJson(res, 400, { ok: false, message: out.message })
+        return
+      }
+      sendJson(res, 200, { ok: true, message: '已删除开通任务' })
       return
     }
 
