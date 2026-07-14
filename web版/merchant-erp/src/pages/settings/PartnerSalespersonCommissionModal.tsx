@@ -4,7 +4,10 @@ import type {
   DistributionCommissionOverride,
   DistributionProductLineRates,
 } from '../../lib/distributionRegistryTypes'
-import { formatRatePct } from '../../lib/distributionCommissionDisplay'
+import {
+  formatRatePct,
+  sanitizePartnerSalespersonCommissionOverride,
+} from '../../lib/distributionCommissionDisplay'
 
 function rateInput(
   label: string,
@@ -33,6 +36,27 @@ function rateInput(
   )
 }
 
+function rateReadOnly(label: string, value: number | undefined, hint?: string) {
+  return (
+    <div className="block text-xs text-slate-600">
+      {label}
+      <div className="mt-1 w-full rounded-lg border border-slate-100 bg-slate-100/80 px-3 py-2 text-sm text-slate-700">
+        {formatRatePct(value)}
+      </div>
+      {hint ? <span className="mt-0.5 block text-[11px] leading-snug text-slate-400">{hint}</span> : null}
+    </div>
+  )
+}
+
+function editableRatesOnly(rates?: DistributionProductLineRates): DistributionProductLineRates {
+  if (!rates) return {}
+  const { partnerShareOfPool, salespersonShareOfPool } = rates
+  return {
+    ...(partnerShareOfPool != null ? { partnerShareOfPool } : {}),
+    ...(salespersonShareOfPool != null ? { salespersonShareOfPool } : {}),
+  }
+}
+
 type Props = {
   open: boolean
   title: string
@@ -59,16 +83,16 @@ export default function PartnerSalespersonCommissionModal({
 
   useEffect(() => {
     if (!open) return
-    setErp({ ...(initial?.erp ?? {}) })
-    setXingxuan({ ...(initial?.xingxuan ?? {}) })
+    setErp(editableRatesOnly(initial?.erp))
+    setXingxuan(editableRatesOnly(initial?.xingxuan))
     setNote(initial?.note ?? '')
   }, [open, initial])
 
   if (!open) return null
 
-  const erpPool = erp.partnerPoolRate ?? defaultErp.partnerPoolRate ?? 0
+  const erpPool = defaultErp.partnerPoolRate ?? 0
   const erpSales = erp.salespersonShareOfPool ?? defaultErp.salespersonShareOfPool ?? 0
-  const xxPool = xingxuan.partnerPoolRate ?? defaultXingxuan.partnerPoolRate ?? 0
+  const xxPool = defaultXingxuan.partnerPoolRate ?? 0
   const xxSales = xingxuan.salespersonShareOfPool ?? defaultXingxuan.salespersonShareOfPool ?? 0
 
   return (
@@ -81,7 +105,7 @@ export default function PartnerSalespersonCommissionModal({
               {title}
             </h3>
             <p className="mt-1 text-xs leading-relaxed text-slate-500">
-              调整分销员在渠道分润池中的占比。留空字段沿用服务商默认；「恢复默认」清除个体覆盖。
+              分润池占实收由平台在商家管理后台统一配置，此处仅可调整池内服务商与分销员占比。留空沿用默认；「恢复默认」清除个体覆盖。
             </p>
           </div>
           <button type="button" onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">
@@ -100,7 +124,7 @@ export default function PartnerSalespersonCommissionModal({
           <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3">
             <p className="mb-3 text-sm font-semibold text-slate-800">ERP 商家（cs）</p>
             <div className="space-y-3">
-              {rateInput('分润池占实收', erp.partnerPoolRate, (v) => setErp((p) => ({ ...p, partnerPoolRate: v })))}
+              {rateReadOnly('分润池占实收', defaultErp.partnerPoolRate, '由平台统一配置，不可修改')}
               {rateInput('服务商占池', erp.partnerShareOfPool, (v) => setErp((p) => ({ ...p, partnerShareOfPool: v })), '占分润池')}
               {rateInput('分销员占池', erp.salespersonShareOfPool, (v) => setErp((p) => ({ ...p, salespersonShareOfPool: v })), '占分润池')}
             </div>
@@ -111,7 +135,7 @@ export default function PartnerSalespersonCommissionModal({
           <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3">
             <p className="mb-3 text-sm font-semibold text-slate-800">星选（dr/小程序）</p>
             <div className="space-y-3">
-              {rateInput('分润池占实收', xingxuan.partnerPoolRate, (v) => setXingxuan((p) => ({ ...p, partnerPoolRate: v })))}
+              {rateReadOnly('分润池占实收', defaultXingxuan.partnerPoolRate, '由平台统一配置，不可修改')}
               {rateInput('服务商占池', xingxuan.partnerShareOfPool, (v) => setXingxuan((p) => ({ ...p, partnerShareOfPool: v })), '占分润池')}
               {rateInput('分销员占池', xingxuan.salespersonShareOfPool, (v) => setXingxuan((p) => ({ ...p, salespersonShareOfPool: v })), '占分润池')}
             </div>
@@ -141,7 +165,12 @@ export default function PartnerSalespersonCommissionModal({
               void (async () => {
                 setSaving(true)
                 try {
-                  await onSave({ erp, xingxuan, note: note.trim() || undefined })
+                  const payload = sanitizePartnerSalespersonCommissionOverride({
+                    erp,
+                    xingxuan,
+                    note: note.trim() || undefined,
+                  })
+                  await onSave(payload)
                   onClose()
                 } finally {
                   setSaving(false)

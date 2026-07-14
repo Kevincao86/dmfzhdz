@@ -10,14 +10,43 @@ export function formatRatePct(rate?: number | null): string {
   return `${Math.round(rate * 1000) / 10}%`
 }
 
+/** 服务商 fws 不可改分润池占实收，仅可改池内服务商/分销员占比 */
+const PARTNER_LOCKED_RATE_KEYS = ['partnerPoolRate', 'individualPoolRate', 'maxCommissionMonths'] as const
+
+function stripPartnerLockedRates(
+  rates?: DistributionProductLineRates,
+): DistributionProductLineRates | undefined {
+  if (!rates) return undefined
+  const out = { ...rates }
+  for (const key of PARTNER_LOCKED_RATE_KEYS) delete out[key]
+  return Object.keys(out).length ? out : undefined
+}
+
+export function sanitizePartnerSalespersonCommissionOverride(
+  raw: DistributionCommissionOverride | null,
+): DistributionCommissionOverride | null {
+  if (raw === null) return null
+  const erp = stripPartnerLockedRates(raw.erp)
+  const xingxuan = stripPartnerLockedRates(raw.xingxuan)
+  const note = String(raw.note ?? '').trim()
+  if (!erp && !xingxuan && !note) return null
+  return {
+    ...(erp ? { erp } : {}),
+    ...(xingxuan ? { xingxuan } : {}),
+    ...(note ? { note } : {}),
+  }
+}
+
 export function mergeSalespersonDisplayRates(
   defaults: { erp: DistributionProductLineRates; xingxuan: DistributionProductLineRates },
   salespersonOverride?: DistributionCommissionOverride | null,
 ): { erp: DistributionProductLineRates; xingxuan: DistributionProductLineRates } {
   if (!salespersonOverride) return defaults
+  const erpOv = stripPartnerLockedRates(salespersonOverride.erp)
+  const xxOv = stripPartnerLockedRates(salespersonOverride.xingxuan)
   return {
-    erp: { ...defaults.erp, ...(salespersonOverride.erp ?? {}) },
-    xingxuan: { ...defaults.xingxuan, ...(salespersonOverride.xingxuan ?? {}) },
+    erp: { ...defaults.erp, ...(erpOv ?? {}) },
+    xingxuan: { ...defaults.xingxuan, ...(xxOv ?? {}) },
   }
 }
 
@@ -53,5 +82,6 @@ export function salespersonRatesSummary(
 
 export function hasCommissionOverride(override?: DistributionCommissionOverride | null): boolean {
   if (!override) return false
-  return Boolean(override.erp || override.xingxuan || override.note)
+  const sanitized = sanitizePartnerSalespersonCommissionOverride(override)
+  return Boolean(sanitized)
 }

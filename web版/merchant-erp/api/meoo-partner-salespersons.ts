@@ -15,6 +15,7 @@ import {
   mergeDistributionPolicy,
   type DistributionCommissionOverride,
 } from '../src/lib/distributionRegistryTypes.js'
+import { sanitizePartnerSalespersonCommissionOverride } from '../src/lib/distributionCommissionDisplay.js'
 import { resolvePartnerBillingContext } from '../src/lib/partnerAgentCore.js'
 import type { RegistryFile } from '../src/lib/opsRegistryTypes.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
@@ -65,7 +66,7 @@ function normalizeSalespersonIds(raw: unknown): string[] {
 function parseCommissionOverrideBody(raw: unknown): DistributionCommissionOverride | null {
   if (raw === null) return null
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
-  return raw as DistributionCommissionOverride
+  return sanitizePartnerSalespersonCommissionOverride(raw as DistributionCommissionOverride)
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
