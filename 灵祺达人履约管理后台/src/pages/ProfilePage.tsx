@@ -142,6 +142,11 @@ export default function ProfilePage() {
       label: '数据分析',
       desc: isPr ? '发单与转化概况' : '报名与发单概况',
     },
+    {
+      to: '/affiliate/apply',
+      label: '申请推广员',
+      desc: '推广 ERP / 星选会员 · 获取专属码',
+    },
     { to: '/help', label: '帮助中心', desc: '使用说明与常见问题' },
     { to: '/profile/support', label: '小灵同学', desc: '我的客服与常见问题' },
   ]

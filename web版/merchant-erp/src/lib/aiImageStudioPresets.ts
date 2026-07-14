@@ -54,7 +54,49 @@ export type AiImageSizePresetId =
   | 'a4_landscape'
   | 'print_poster'
 
-export type AiImageStyleId = 'lively' | 'minimal' | 'guochao' | 'fresh' | 'ecommerce' | 'premium'
+export type AiImageStyleId =
+  | 'lively'
+  | 'minimal'
+  | 'guochao'
+  | 'fresh'
+  | 'ecommerce'
+  | 'premium'
+  | 'warm'
+  | 'healing'
+  | 'cute'
+  | 'business'
+  | 'night'
+  | 'festive'
+  | 'natural'
+  | 'retro'
+
+/** 视觉模型对用户参考图的解析结果（用于并入生图 Prompt） */
+export type VisualStudioReferenceAnalysis = {
+  subject: string
+  elements: string[]
+  colors: string
+  texture: string
+  composition: string
+  mood: string
+  mergeInstruction: string
+}
+
+export function formatReferenceAnalysisForPrompt(analysis: VisualStudioReferenceAnalysis): string {
+  const els = analysis.elements.filter(Boolean).slice(0, 8).join('、')
+  return [
+    `【参考图核心元素】主体：${analysis.subject.trim() || '见参考图'}`,
+    els ? `须保留并入新图的关键元素：${els}` : '',
+    analysis.colors.trim() ? `主色调：${analysis.colors.trim()}` : '',
+    analysis.texture.trim() ? `材质质感：${analysis.texture.trim()}` : '',
+    analysis.composition.trim() ? `构图参考：${analysis.composition.trim()}` : '',
+    analysis.mood.trim() ? `氛围：${analysis.mood.trim()}` : '',
+    analysis.mergeInstruction.trim()
+      ? `合成要求：${analysis.mergeInstruction.trim()}（新海报须融入上述元素，文案仍以表单为准）`
+      : '合成要求：将参考图核心主体/商品/场景元素自然融入新海报，保持品类与色调一致。',
+  ]
+    .filter(Boolean)
+    .join('。')
+}
 
 export type AiImageDeliveryId = 'platform' | 'hd'
 
@@ -596,8 +638,88 @@ export const AI_IMAGE_STYLE_PRESETS: Array<{ id: AiImageStyleId; label: string; 
   { id: 'minimal', label: '极简', promptHint: '极简排版、高级灰、信息清晰' },
   { id: 'guochao', label: '国潮', promptHint: '国潮配色、书法标题、年轻促销感' },
   { id: 'fresh', label: '清新', promptHint: '明亮自然光、清爽、健康、探店风' },
-  { id: 'ecommerce', label: '电商爆款', promptHint: '电商爆款构图、主体突出、促销标签' },
+  { id: 'ecommerce', label: '爆款', promptHint: '电商爆款构图、主体突出、促销标签' },
+  { id: 'warm', label: '暖色舒适', promptHint: '暖黄柔光、舒适放松、居家感、亲和力强' },
+  { id: 'healing', label: '养生疗愈', promptHint: '舒缓疗愈、木质与绿植、低对比、养生足浴美业氛围' },
+  { id: 'cute', label: '可爱少女', promptHint: '粉彩马卡龙、圆润字体、少女感、美甲美睫甜品风' },
+  { id: 'business', label: '商务简约', promptHint: '商务可信、蓝灰主色、信息层级清晰、职业培训感' },
+  { id: 'night', label: '夜场霓虹', promptHint: '霓虹灯、暗色背景、高对比、KTV酒吧夜生活' },
+  { id: 'festive', label: '节庆促销', promptHint: '节日元素、红包礼花、强促销、限时抢购' },
+  { id: 'natural', label: '自然纪实', promptHint: '自然光纪实、真实不摆拍、探店种草、景区宠物' },
+  { id: 'retro', label: '复古怀旧', promptHint: '复古胶片、怀旧色调、老招牌、经典国味' },
 ]
+
+const STYLE_BY_INDUSTRY: Record<LocalLifeIndustryId, AiImageStyleId[]> = {
+  catering: ['lively', 'warm', 'fresh', 'guochao', 'ecommerce', 'festive', 'minimal', 'premium', 'retro', 'natural'],
+  beauty: ['premium', 'fresh', 'minimal', 'cute', 'healing', 'natural', 'ecommerce', 'lively', 'warm', 'guochao'],
+  leisure: ['lively', 'premium', 'healing', 'warm', 'minimal', 'fresh', 'night', 'guochao', 'ecommerce', 'festive'],
+  hotel: ['premium', 'natural', 'fresh', 'minimal', 'warm', 'healing', 'lively', 'festive', 'retro', 'ecommerce'],
+  pet: ['cute', 'fresh', 'natural', 'lively', 'warm', 'minimal', 'ecommerce', 'premium', 'festive', 'guochao'],
+  education: ['business', 'fresh', 'minimal', 'premium', 'lively', 'guochao', 'ecommerce', 'warm', 'natural', 'festive'],
+}
+
+/** 二级类目专属风格排序（覆盖一级业态默认） */
+const INDUSTRY_SUB_STYLE_OVERRIDES: Partial<Record<string, AiImageStyleId[]>> = {
+  catering_chinese: ['lively', 'warm', 'guochao', 'retro', 'festive', 'ecommerce', 'premium', 'minimal', 'fresh', 'natural'],
+  catering_hotpot: ['lively', 'warm', 'festive', 'guochao', 'ecommerce', 'premium', 'fresh', 'minimal', 'natural', 'retro'],
+  catering_tea: ['fresh', 'cute', 'minimal', 'premium', 'lively', 'natural', 'ecommerce', 'warm', 'guochao', 'festive'],
+  catering_bakery: ['cute', 'fresh', 'premium', 'warm', 'minimal', 'lively', 'ecommerce', 'festive', 'natural', 'guochao'],
+  catering_snack: ['lively', 'ecommerce', 'warm', 'festive', 'guochao', 'fresh', 'minimal', 'premium', 'natural', 'retro'],
+  beauty_hair: ['premium', 'fresh', 'minimal', 'lively', 'guochao', 'cute', 'ecommerce', 'warm', 'natural', 'festive'],
+  beauty_nail: ['cute', 'fresh', 'premium', 'minimal', 'lively', 'warm', 'ecommerce', 'guochao', 'natural', 'festive'],
+  beauty_skin: ['healing', 'premium', 'fresh', 'minimal', 'natural', 'warm', 'cute', 'ecommerce', 'lively', 'business'],
+  beauty_med: ['business', 'premium', 'minimal', 'fresh', 'healing', 'natural', 'warm', 'lively', 'ecommerce', 'guochao'],
+  leisure_foot_spa: ['healing', 'premium', 'warm', 'lively', 'minimal', 'fresh', 'natural', 'ecommerce', 'guochao', 'business'],
+  leisure_billiards: ['lively', 'night', 'guochao', 'premium', 'ecommerce', 'minimal', 'warm', 'fresh', 'festive', 'retro'],
+  leisure_ktv: ['night', 'lively', 'guochao', 'premium', 'festive', 'ecommerce', 'warm', 'minimal', 'fresh', 'retro'],
+  leisure_escape: ['lively', 'guochao', 'night', 'fresh', 'premium', 'festive', 'minimal', 'warm', 'ecommerce', 'natural'],
+  leisure_fitness: ['lively', 'fresh', 'premium', 'minimal', 'natural', 'business', 'ecommerce', 'warm', 'guochao', 'festive'],
+  hotel_stay: ['premium', 'natural', 'minimal', 'warm', 'fresh', 'healing', 'lively', 'retro', 'ecommerce', 'festive'],
+  hotel_spring: ['healing', 'natural', 'premium', 'warm', 'fresh', 'minimal', 'lively', 'festive', 'ecommerce', 'retro'],
+  hotel_scenic: ['natural', 'fresh', 'lively', 'festive', 'warm', 'premium', 'minimal', 'guochao', 'ecommerce', 'retro'],
+  pet_grooming: ['cute', 'fresh', 'natural', 'lively', 'warm', 'minimal', 'ecommerce', 'premium', 'festive', 'guochao'],
+  pet_clinic: ['business', 'fresh', 'natural', 'premium', 'minimal', 'warm', 'lively', 'healing', 'ecommerce', 'cute'],
+  pet_supplies: ['cute', 'lively', 'ecommerce', 'fresh', 'warm', 'festive', 'minimal', 'natural', 'premium', 'guochao'],
+  edu_k12: ['business', 'fresh', 'lively', 'premium', 'minimal', 'guochao', 'warm', 'ecommerce', 'festive', 'natural'],
+  edu_art: ['cute', 'fresh', 'lively', 'guochao', 'premium', 'minimal', 'warm', 'natural', 'festive', 'ecommerce'],
+  edu_vocational: ['business', 'premium', 'minimal', 'fresh', 'lively', 'warm', 'ecommerce', 'guochao', 'natural', 'festive'],
+}
+
+export function getStyleIdsForIndustrySub(industrySubId: string, industryId?: LocalLifeIndustryId): AiImageStyleId[] {
+  const override = INDUSTRY_SUB_STYLE_OVERRIDES[industrySubId]
+  if (override?.length) return override
+  const sub = resolveIndustrySubCategory(industrySubId)
+  const ind = industryId ?? sub?.industryId
+  if (ind && STYLE_BY_INDUSTRY[ind]?.length) return STYLE_BY_INDUSTRY[ind]
+  return AI_IMAGE_STYLE_PRESETS.slice(0, 10).map((s) => s.id)
+}
+
+export function getStylePresetsForIndustrySub(
+  industrySubId: string,
+  industryId?: LocalLifeIndustryId,
+): Array<{ id: AiImageStyleId; label: string; promptHint: string }> {
+  const ids = getStyleIdsForIndustrySub(industrySubId, industryId)
+  const map = new Map(AI_IMAGE_STYLE_PRESETS.map((s) => [s.id, s]))
+  return ids.map((id) => map.get(id)).filter(Boolean) as Array<{
+    id: AiImageStyleId
+    label: string
+    promptHint: string
+  }>
+}
+
+export function defaultStyleForIndustrySub(industrySubId: string, industryId?: LocalLifeIndustryId): AiImageStyleId {
+  const ids = getStyleIdsForIndustrySub(industrySubId, industryId)
+  return ids[0] ?? 'lively'
+}
+
+export function normalizeStyleIdForSub(
+  styleId: AiImageStyleId,
+  industrySubId: string,
+  industryId?: LocalLifeIndustryId,
+): AiImageStyleId {
+  const ids = getStyleIdsForIndustrySub(industrySubId, industryId)
+  return ids.includes(styleId) ? styleId : (ids[0] ?? styleId)
+}
 
 export type VisualStudioForm = {
   industry: LocalLifeIndustryId
@@ -2629,7 +2751,11 @@ export function applyIndustrySubChange(
   if (!sub || sub.industryId !== form.industry) {
     return form
   }
-  const base: VisualStudioForm = { ...form, industrySubId }
+  const base: VisualStudioForm = {
+    ...form,
+    industrySubId,
+    styleId: normalizeStyleIdForSub(form.styleId, industrySubId, form.industry),
+  }
   return applyPlaybookToFormWithVariants(base, form.playbook, { keepChannels: true, templateIndex: 0 })
 }
 
@@ -2673,6 +2799,7 @@ export function buildVisualStudioPrompt(
     variantIndex?: number
     productRefCount?: number
     styleFromReference?: boolean
+    referenceAnalysis?: VisualStudioReferenceAnalysis | null
     refineNote?: string
     /** 五连图：一次生成整幅横幅（非单张 slot） */
     carouselMaster?: boolean
@@ -2727,6 +2854,7 @@ export function buildVisualStudioPrompt(
     opts?.productRefCount
       ? `用户提供了 ${opts.productRefCount} 张实拍参考图，画面主体品类、色调与质感须与参考图一致。`
       : '',
+    opts?.referenceAnalysis ? formatReferenceAnalysisForPrompt(opts.referenceAnalysis) : '',
     '规范：专业中文海报排版、无乱码水印、无畸形文字；适合中国大陆本地生活商家投放。',
   ].filter(Boolean)
 
@@ -2757,6 +2885,7 @@ export function buildVisualStudioImageContext(
     variantIndex?: number
     productRefCount?: number
     styleFromReference?: boolean
+    referenceAnalysis?: VisualStudioReferenceAnalysis | null
     refineNote?: string
     carouselMaster?: boolean
   },
@@ -2817,6 +2946,9 @@ export function buildVisualStudioImageContext(
     note: form.note.trim(),
     productRefCount: opts?.productRefCount ?? 0,
     styleFromReference: opts?.styleFromReference === true,
+    referenceAnalysisSubject: opts?.referenceAnalysis?.subject ?? '',
+    referenceAnalysisElements: opts?.referenceAnalysis?.elements ?? [],
+    referenceAnalysisMerge: opts?.referenceAnalysis?.mergeInstruction ?? '',
     refineNote: opts?.refineNote?.trim() ?? '',
   }
 }
