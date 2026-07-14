@@ -10,6 +10,7 @@ import {
 } from '../vite-plugins/authRegistrationOtp.js'
 import { provisionMerchantTenant } from '../vite-plugins/authRegisterProvision.js'
 import { phoneAlreadyRegistered, verifyRegisterSmsCode } from '../vite-plugins/authSmsAuthShared.js'
+import { persistBindDistributionAttribution } from '../src/lib/distributionAttributionPersist.js'
 
 export const config = { maxDuration: 60 }
 
@@ -55,6 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       smsCode?: string
       password?: string
       confirmPassword?: string
+      refCode?: string
     }
     const loginName = (body.loginName ?? '').trim()
     const merchantName = (body.merchantName ?? '').trim()
@@ -151,6 +153,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendJson(res, status, { ok: false, error: result.error, message, detail: result.detail })
       return
     }
+
+    const refCode = String(body.refCode || '').trim()
+    if (refCode && result.tenantId) {
+      void persistBindDistributionAttribution({
+        refCode,
+        subjectType: 'erp_merchant',
+        subjectRegistryId: result.tenantId,
+        landingSurface: 'cs',
+        subjectLabel: merchantName,
+      }).catch(() => {})
+    }
+
     sendJson(res, 200, {
       ok: true,
       message: '注册成功，请使用登录名与密码或手机号验证码登录',

@@ -1,6 +1,11 @@
-import { Copy, Loader2, Share2, UserPlus } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { BarChart3, Copy, ExternalLink, Loader2, Share2, UserPlus } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '../../cn'
+import {
+  landingSurfaceLabel,
+  subjectTypeLabel,
+} from '../../lib/distributionAttributionCore'
 import { toUserFacingError } from '../../lib/userFacingError'
 import {
   buildPartnerPromoLinks,
@@ -8,6 +13,12 @@ import {
   upsertPartnerSalesperson,
   type PartnerSalesperson,
 } from '../../services/partnerSalespersonsClient'
+import {
+  fetchPartnerDistributionStats,
+  formatCentsYuan,
+  type PartnerDistributionStats,
+  type PartnerSalespersonStatsRow,
+} from '../../services/partnerDistributionStatsClient'
 
 function normalizePhone(raw: string): string {
   return raw.replace(/\D/g, '').slice(0, 11)
@@ -22,9 +33,25 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
-/** 服务商 fws：分销员配置（仅产出 cs/dr/小程序推广素材，不分销落地） */
+function formatDate(iso?: string): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (!Number.isFinite(d.getTime())) return iso
+  return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
+
+function statsForSalesperson(
+  stats: PartnerDistributionStats | null,
+  row: PartnerSalesperson,
+): PartnerSalespersonStatsRow | null {
+  if (!stats) return null
+  return stats.bySalesperson.find((s) => s.salespersonId === row.id) ?? null
+}
+
+/** 服务商 fws：分销员配置 + 全量/单人数据看板 */
 export default function PartnerDistributionSettingsSection() {
   const [rows, setRows] = useState<PartnerSalesperson[]>([])
+  const [stats, setStats] = useState<PartnerDistributionStats | null>(null)
   const [partnerName, setPartnerName] = useState('')
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -38,11 +65,15 @@ export default function PartnerDistributionSettingsSection() {
     setLoading(true)
     setErr(null)
     try {
-      const data = await fetchPartnerSalespersons()
-      setRows(data.salespersons)
-      setPartnerName(data.partnerName)
+      const [listData, statsData] = await Promise.all([
+        fetchPartnerSalespersons(),
+        fetchPartnerDistributionStats(),
+      ])
+      setRows(listData.salespersons)
+      setPartnerName(listData.partnerName)
+      setStats(statsData)
     } catch (e) {
-      setErr(toUserFacingError(e, '加载分销员'))
+      setErr(toUserFacingError(e, '加载分销数据'))
     } finally {
       setLoading(false)
     }
@@ -51,6 +82,8 @@ export default function PartnerDistributionSettingsSection() {
   useEffect(() => {
     void load()
   }, [load])
+
+  const totals = stats?.totals
 
   const onCreate = async () => {
     const name = realName.trim()
@@ -120,15 +153,25 @@ export default function PartnerDistributionSettingsSection() {
     setHint(ok ? `已复制 ${row.realName} 的推广链接` : '复制失败，请手动选择文本')
   }
 
+  const recentRows = useMemo(() => stats?.recentAttributions ?? [], [stats])
+
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-violet-100 bg-violet-50/50 px-4 py-3 text-sm text-violet-950">
-        <p className="font-medium">分销设置 · 仅配置与素材</p>
+        <p className="font-medium">分销设置 · 配置、素材与数据</p>
         <p className="mt-1 text-violet-900/90">
-          在此新建业务员/分销员并复制推广链接。客户须在 <strong>cs</strong>（ERP）或{' '}
-          <strong>dr / 星选小程序</strong> 完成注册与付费；服务商版 fws{' '}
-          <strong>不做</strong>分销落地注册。
+          在此新建分销员并复制推广链接。客户通过链接在 <strong>cs</strong>（ERP）或{' '}
+          <strong>dr / 星选小程序</strong> 注册后会计入下方看板；付费成功后自动显示付费数据。
           {partnerName ? ` 当前服务商：${partnerName}` : ''}
+        </p>
+        <p className="mt-2">
+          <Link
+            to="/partner/salesperson-portal"
+            className="inline-flex items-center gap-1 font-medium text-violet-700 hover:text-violet-900"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            分销员自助登录（查看本人数据）
+          </Link>
         </p>
       </div>
 
@@ -138,6 +181,36 @@ export default function PartnerDistributionSettingsSection() {
       {hint ? (
         <p className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">{hint}</p>
       ) : null}
+
+      <section className="erp-panel p-6">
+        <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-900">
+          <BarChart3 className="h-5 w-5 text-violet-600" />
+          全量数据看板
+        </h3>
+        {loading && !totals ? (
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            加载统计…
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { label: '累计注册', value: String(totals?.registrations ?? 0) },
+              { label: '已付费用户', value: String(totals?.paidCount ?? 0) },
+              { label: '付费总额', value: formatCentsYuan(totals?.paidAmountCents ?? 0) },
+              {
+                label: 'ERP 注册 / 星选注册',
+                value: `${totals?.erp.registrations ?? 0} / ${totals?.xingxuan.registrations ?? 0}`,
+              },
+            ].map((card) => (
+              <div key={card.label} className="rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3">
+                <p className="text-xs text-slate-500">{card.label}</p>
+                <p className="mt-1 text-xl font-semibold text-slate-900">{card.value}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <section className="erp-panel p-6">
         <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-900">
@@ -217,47 +290,103 @@ export default function PartnerDistributionSettingsSection() {
                   <th className="px-4 py-3 font-medium">手机</th>
                   <th className="px-4 py-3 font-medium">工号</th>
                   <th className="px-4 py-3 font-medium">推广码</th>
+                  <th className="px-4 py-3 font-medium">注册数</th>
+                  <th className="px-4 py-3 font-medium">付费数</th>
+                  <th className="px-4 py-3 font-medium">付费金额</th>
                   <th className="px-4 py-3 font-medium">状态</th>
                   <th className="px-4 py-3 font-medium">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {rows.map((row) => (
+                {rows.map((row) => {
+                  const rowStats = statsForSalesperson(stats, row)
+                  return (
+                    <tr key={row.id} className="bg-white">
+                      <td className="px-4 py-3 font-medium text-slate-900">{row.realName}</td>
+                      <td className="px-4 py-3 text-slate-600">{row.phone}</td>
+                      <td className="px-4 py-3 text-slate-600">{row.employeeCode}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-violet-700">{row.refCode}</td>
+                      <td className="px-4 py-3 text-slate-700">{rowStats?.registrations ?? 0}</td>
+                      <td className="px-4 py-3 text-slate-700">{rowStats?.paidCount ?? 0}</td>
+                      <td className="px-4 py-3 text-slate-700">
+                        {formatCentsYuan(rowStats?.paidAmountCents ?? 0)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={cn(
+                            'rounded-full px-2 py-0.5 text-xs font-medium',
+                            row.status === 'active'
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : 'bg-slate-100 text-slate-500',
+                          )}
+                        >
+                          {row.status === 'active' ? '启用' : '停用'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void onCopyLinks(row)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-700 hover:bg-slate-50"
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                            复制链接
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void onToggleStatus(row)}
+                            className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50"
+                          >
+                            {row.status === 'active' ? '停用' : '启用'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="erp-panel overflow-hidden p-0">
+        <div className="border-b border-slate-100 px-6 py-4">
+          <h3 className="text-lg font-semibold text-slate-900">最近推广记录</h3>
+          <p className="mt-1 text-xs text-slate-500">通过分销链接注册的用户；付费后自动更新金额</p>
+        </div>
+        {!recentRows.length ? (
+          <p className="px-6 py-10 text-center text-sm text-slate-500">暂无推广注册记录。</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="bg-slate-50 text-xs text-slate-500">
+                <tr>
+                  <th className="px-4 py-3 font-medium">分销员</th>
+                  <th className="px-4 py-3 font-medium">对象</th>
+                  <th className="px-4 py-3 font-medium">类型</th>
+                  <th className="px-4 py-3 font-medium">来源</th>
+                  <th className="px-4 py-3 font-medium">注册时间</th>
+                  <th className="px-4 py-3 font-medium">付费</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {recentRows.map((row) => (
                   <tr key={row.id} className="bg-white">
-                    <td className="px-4 py-3 font-medium text-slate-900">{row.realName}</td>
-                    <td className="px-4 py-3 text-slate-600">{row.phone}</td>
-                    <td className="px-4 py-3 text-slate-600">{row.employeeCode}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-violet-700">{row.refCode}</td>
+                    <td className="px-4 py-3 text-slate-700">{row.salespersonName || row.refCode}</td>
+                    <td className="px-4 py-3 text-slate-800">{row.subjectLabel || '—'}</td>
+                    <td className="px-4 py-3 text-slate-600">{subjectTypeLabel(row.subjectType)}</td>
+                    <td className="px-4 py-3 text-slate-600">{landingSurfaceLabel(row.landingSurface)}</td>
+                    <td className="px-4 py-3 text-slate-600">{formatDate(row.boundAt)}</td>
                     <td className="px-4 py-3">
-                      <span
-                        className={cn(
-                          'rounded-full px-2 py-0.5 text-xs font-medium',
-                          row.status === 'active'
-                            ? 'bg-emerald-50 text-emerald-700'
-                            : 'bg-slate-100 text-slate-500',
-                        )}
-                      >
-                        {row.status === 'active' ? '启用' : '停用'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => void onCopyLinks(row)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-700 hover:bg-slate-50"
-                        >
-                          <Copy className="h-3.5 w-3.5" />
-                          复制链接
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void onToggleStatus(row)}
-                          className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50"
-                        >
-                          {row.status === 'active' ? '停用' : '启用'}
-                        </button>
-                      </div>
+                      {row.firstPaidAt ? (
+                        <span className="font-medium text-emerald-700">
+                          {formatCentsYuan(row.paidAmountCents ?? 0)}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">未付费</span>
+                      )}
                     </td>
                   </tr>
                 ))}

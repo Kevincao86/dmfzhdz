@@ -12,6 +12,7 @@ import {
   registerMpPrUser,
   resolveSession,
 } from '../src/lib/mpAccountAuth.js'
+import { persistBindDistributionAttribution } from '../src/lib/distributionAttributionPersist.js'
 
 export const config = { maxDuration: 60 }
 
@@ -68,9 +69,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    let body: { prUser?: RegistryMpPrUser }
+    let body: { prUser?: RegistryMpPrUser; refCode?: string }
     try {
-      body = JSON.parse(rawBody(req) || '{}') as { prUser?: RegistryMpPrUser }
+      body = JSON.parse(rawBody(req) || '{}') as { prUser?: RegistryMpPrUser; refCode?: string }
     } catch {
       sendOpsJson(res, 400, { ok: false, error: 'invalid_json' })
       return
@@ -99,6 +100,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
 
     const saved = await registerMpPrUser(supabaseUrl, serviceRole, prUser, account)
+    const refCode = String(body.refCode || '').trim()
+    if (refCode && saved.id) {
+      const label =
+        saved.accountType === 'personal'
+          ? String(saved.personalName || '').trim()
+          : String(saved.companyName || '').trim()
+      void persistBindDistributionAttribution({
+        refCode,
+        subjectType: 'xingxuan_pr',
+        subjectRegistryId: saved.id,
+        landingSurface: 'mp',
+        subjectLabel: label || undefined,
+      }).catch(() => {})
+    }
     sendOpsJson(res, 200, {
       ok: true,
       id: saved.id,

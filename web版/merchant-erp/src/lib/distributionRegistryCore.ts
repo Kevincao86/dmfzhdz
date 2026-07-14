@@ -67,6 +67,7 @@ function ensureDistribution(data: RegistryFile): void {
   if (!data.distributionWithdrawRequests) data.distributionWithdrawRequests = []
   if (!data.distributionSettlementBatches) data.distributionSettlementBatches = []
   if (!data.distributionWallets) data.distributionWallets = []
+  if (!data.distributionAttributions) data.distributionAttributions = []
 }
 
 function findPartner(data: RegistryFile, partnerTenantId: string): RegistryDistributionPartnerChannel | undefined {

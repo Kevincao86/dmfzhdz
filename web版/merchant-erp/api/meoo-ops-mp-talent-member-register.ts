@@ -8,6 +8,8 @@ import {
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import type { RegistryMpTalentMember } from '../src/lib/opsRegistryTypes.js'
 import { createMpAuthRest, registerMpTalentMember, resolveSession } from '../src/lib/mpAccountAuth.js'
+import { persistBindDistributionAttribution } from '../src/lib/distributionAttributionPersist.js'
+import type { DistributionAttributionSubjectType } from '../src/lib/distributionRegistryTypes.js'
 
 export const config = { maxDuration: 60 }
 
@@ -64,9 +66,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    let body: { member?: RegistryMpTalentMember }
+    let body: { member?: RegistryMpTalentMember; refCode?: string }
     try {
-      body = JSON.parse(rawBody(req) || '{}') as { member?: RegistryMpTalentMember }
+      body = JSON.parse(rawBody(req) || '{}') as { member?: RegistryMpTalentMember; refCode?: string }
     } catch {
       sendOpsJson(res, 400, { ok: false, error: 'invalid_json' })
       return
@@ -98,6 +100,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
 
     const saved = await registerMpTalentMember(supabaseUrl, serviceRole, member, account)
+    const refCode = String(body.refCode || '').trim()
+    if (refCode && saved.id) {
+      let subjectType: DistributionAttributionSubjectType = 'xingxuan_talent'
+      let subjectRegistryId = saved.id
+      if (saved.workIdentity === 'shoot') {
+        subjectType = 'xingxuan_shoot'
+        subjectRegistryId = String(saved.lingqiShootTeamId || saved.id)
+      } else if (saved.workIdentity === 'edit') {
+        subjectType = 'xingxuan_edit'
+        subjectRegistryId = String(saved.lingqiEditTeamId || saved.id)
+      }
+      void persistBindDistributionAttribution({
+        refCode,
+        subjectType,
+        subjectRegistryId,
+        landingSurface: 'mp',
+        subjectLabel: String(saved.wxNickName || saved.contact || '').trim() || undefined,
+      }).catch(() => {})
+    }
     sendOpsJson(res, 200, {
       ok: true,
       id: saved.id,

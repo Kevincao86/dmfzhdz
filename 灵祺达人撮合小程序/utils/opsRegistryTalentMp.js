@@ -2,6 +2,7 @@ const api = require('./api.js')
 const auth = require('./auth.js')
 const userProfile = require('./userProfile.js')
 const accountMemberSync = require('./accountMemberSync.js')
+const mpPendingDistributionRef = require('./mpPendingDistributionRef.js')
 const applicationsStore = require('./applicationsStore.js')
 const registryCache = require('./registryCache.js')
 const { normalizeHallPayload } = require('./hallRegistryParse.js')
@@ -463,6 +464,7 @@ async function registerTalentMember(member) {
   const headers = registerAuthHeaders()
   const account = auth.readAccount()
   const payload = accountMemberSync.mergeMemberForCloudRegister(member, account)
+  const refCode = mpPendingDistributionRef.readRef()
   const paths = [
     '/api/meoo-ops-mp-talent-member-register',
     '/api/ops-sync/mp-talent-members/register',
@@ -470,7 +472,10 @@ async function registerTalentMember(member) {
   let lastErr
   for (const path of paths) {
     try {
-      return await api.post(path, { member: payload }, headers)
+      const body = refCode ? { member: payload, refCode } : { member: payload }
+      const res = await api.post(path, body, headers)
+      if (refCode) mpPendingDistributionRef.clearRef()
+      return res
     } catch (e) {
       lastErr = e
       const msg = String(e && e.message ? e.message : e)
@@ -482,6 +487,7 @@ async function registerTalentMember(member) {
 
 async function registerPrUser(prUser) {
   const headers = registerAuthHeaders()
+  const refCode = mpPendingDistributionRef.readRef()
   const paths = [
     '/api/meoo-ops-mp-pr-user-register',
     '/api/ops-sync/mp-pr-users/register',
@@ -489,7 +495,10 @@ async function registerPrUser(prUser) {
   let lastErr
   for (const path of paths) {
     try {
-      return await api.post(path, { prUser }, headers)
+      const body = refCode ? { prUser, refCode } : { prUser }
+      const res = await api.post(path, body, headers)
+      if (refCode) mpPendingDistributionRef.clearRef()
+      return res
     } catch (e) {
       lastErr = e
       const msg = String(e && e.message ? e.message : e)

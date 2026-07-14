@@ -19,6 +19,7 @@ import {
 } from './erpPointsEconomics.js'
 import type { MembershipPlan } from './membershipPlan.js'
 import { formatThrowableMessage } from './formatDisplayError.js'
+import { persistMarkDistributionAttributionPaid } from './distributionAttributionPersist.js'
 
 export type TenantPayChannel = 'wechat' | 'alipay' | 'douyin'
 export type TenantOrderKind = 'subscription' | 'recharge' | 'points_recharge'
@@ -191,6 +192,11 @@ export async function confirmTenantOnlinePaymentOrder(
       .eq('id', order.id)
       .in('status', ['pending', 'amount_verified'])
     if (upOr) return { ok: false, error: 'order_finalize_failed' }
+    void persistMarkDistributionAttributionPaid({
+      subjectType: 'erp_merchant',
+      subjectRegistryId: tenantId,
+      paidAmountCents: vc,
+    }).catch(() => {})
     return { ok: true }
   }
 
