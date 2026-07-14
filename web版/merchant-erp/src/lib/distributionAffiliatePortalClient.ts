@@ -5,6 +5,8 @@ import type {
   AffiliatePortalSettlementRow,
   AffiliatePortalStats,
   AffiliatePortalWallet,
+  AffiliatePortalWithdrawRow,
+  AffiliateWithdrawGate,
 } from './distributionRegistryCore'
 import type {
   PartnerDistributionAttributionRow,
@@ -26,6 +28,8 @@ export type AffiliatePortalPayload = {
   promoLinks: AffiliatePromoLinks | null
   attributionStats: SalespersonPortalStats | null
   attributions: PartnerDistributionAttributionRow[]
+  withdrawGate: AffiliateWithdrawGate | null
+  withdrawRequests: AffiliatePortalWithdrawRow[]
 }
 
 export function formatCentsYuan(cents: number): string {
@@ -55,10 +59,60 @@ export async function fetchAffiliatePortal(): Promise<AffiliatePortalPayload> {
         promoLinks: (json.promoLinks as AffiliatePromoLinks | null) ?? null,
         attributionStats: (json.attributionStats as SalespersonPortalStats | null) ?? null,
         attributions: (json.attributions as PartnerDistributionAttributionRow[]) ?? [],
+        withdrawGate: (json.withdrawGate as AffiliateWithdrawGate | null) ?? null,
+        withdrawRequests: (json.withdrawRequests as AffiliatePortalWithdrawRow[]) ?? [],
       }
     } catch (e) {
       lastErr = e instanceof Error ? e.message : String(e)
     }
   }
   throw new Error(lastErr)
+}
+
+export async function submitAffiliateWithdraw(amountCents: number): Promise<void> {
+  const { token, source } = await resolveMerchantApiBearer()
+  if (!token) throw new Error('请先登录')
+  if (!Number.isFinite(amountCents) || amountCents <= 0) throw new Error('请输入有效提现金额')
+
+  const headers = {
+    ...merchantApiAuthHeaders(token, source),
+    'Content-Type': 'application/json',
+  }
+  let lastErr = '提现申请失败'
+  for (const url of merchantApiFetchUrls('/api/meoo-distribution-affiliate-portal')) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ action: 'withdraw', amountCents: Math.floor(amountCents) }),
+      })
+      const json = (await res.json().catch(() => ({}))) as Record<string, unknown>
+      if (!res.ok || json.ok === false) {
+        lastErr = String(json.message || json.error || res.statusText || '提现申请失败')
+        if (res.status !== 404) break
+        continue
+      }
+      return
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+    }
+  }
+  throw new Error(lastErr)
+}
+
+export function withdrawRequestStatusLabel(status: string): string {
+  switch (status) {
+    case 'pending_review':
+      return '待审核'
+    case 'approved':
+      return '已通过'
+    case 'rejected':
+      return '已拒绝'
+    case 'paid':
+      return '已打款'
+    case 'failed':
+      return '打款失败'
+    default:
+      return status
+  }
 }

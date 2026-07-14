@@ -87,7 +87,15 @@ export function patchDistributionPolicyFromSnapshot(
   if (body.xingxuan && typeof body.xingxuan === 'object') {
     cur.xingxuan = { ...cur.xingxuan, ...parseRates(body.xingxuan) }
   }
-  for (const key of ['settleDelayDays', 'withdrawMinCents', 'withdrawMaxCents', 'withdrawMonthlyCapCents'] as const) {
+  for (const key of [
+    'settleDelayDays',
+    'payoutDelayDays',
+    'withdrawMinCents',
+    'withdrawMaxCents',
+    'withdrawMonthlyCapCents',
+    'withdrawWindowStartDay',
+    'withdrawWindowEndDay',
+  ] as const) {
     const n = Number(body[key])
     if (Number.isFinite(n) && n >= 0) cur[key] = Math.floor(n)
   }
@@ -563,6 +571,218 @@ function adjustWallet(
   w.updatedAt = nowIso()
 }
 
+function shanghaiCalendarParts(d: Date): { year: number; month: number; day: number; yearMonth: string } {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(d)
+  const pick = (type: string) => Number(parts.find((p) => p.type === type)?.value || 0)
+  const year = pick('year')
+  const month = pick('month')
+  const day = pick('day')
+  return { year, month, day, yearMonth: `${year}-${String(month).padStart(2, '0')}` }
+}
+
+export type AffiliateWithdrawGate = {
+  open: boolean
+  windowStartDay: number
+  windowEndDay: number
+  payoutDelayDays: number
+  windowHint: string
+  payoutHint: string
+  minCents: number
+  maxCents: number
+  monthlyCapCents: number
+}
+
+export function buildWithdrawGateFromPolicy(
+  policyRaw?: RegistryDistributionPolicy | null,
+  now = new Date(),
+): AffiliateWithdrawGate {
+  const policy = mergeDistributionPolicy(policyRaw ?? null)
+  const start = Math.min(28, Math.max(1, policy.withdrawWindowStartDay || 10))
+  const end = Math.min(31, Math.max(start, policy.withdrawWindowEndDay || 15))
+  const payoutDelayDays = Math.max(1, policy.payoutDelayDays || 3)
+  const { day } = shanghaiCalendarParts(now)
+  const open = day >= start && day <= end
+  return {
+    open,
+    windowStartDay: start,
+    windowEndDay: end,
+    payoutDelayDays,
+    windowHint: `每月 ${start}–${end} 日可申请提现`,
+    payoutHint: `审核通过后 T+${payoutDelayDays} 个工作日内打款，逢节假日顺延`,
+    minCents: policy.withdrawMinCents,
+    maxCents: policy.withdrawMaxCents,
+    monthlyCapCents: policy.withdrawMonthlyCapCents,
+  }
+}
+
+export type AffiliatePortalWithdrawRow = {
+  id: string
+  amountCents: number
+  status: RegistryDistributionWithdrawRequest['status']
+  createdAt: string
+  reviewedAt?: string
+  paidAt?: string
+  failReason?: string
+}
+
+function monthWithdrawSubmittedCents(
+  data: RegistryFile,
+  ownerId: string,
+  now = new Date(),
+): number {
+  const ym = shanghaiCalendarParts(now).yearMonth
+  return (data.distributionWithdrawRequests ?? [])
+    .filter(
+      (w) =>
+        w.ownerType === 'individual_affiliate' &&
+        w.ownerId === ownerId &&
+        !['rejected', 'failed'].includes(w.status) &&
+        shanghaiCalendarParts(new Date(w.createdAt)).yearMonth === ym,
+    )
+    .reduce((sum, w) => sum + w.amountCents, 0)
+}
+
+export function createWithdrawRequestFromSnapshot(
+  data: RegistryFile,
+  identity: { phone?: string | null; authUserId?: string | null },
+  body: Record<string, unknown>,
+):
+  | { ok: true; request: RegistryDistributionWithdrawRequest }
+  | { ok: false; error: string; message?: string; status: number } {
+  ensureDistribution(data)
+  const policy = mergeDistributionPolicy(data.distributionPolicy)
+  if (!policy.enabled) {
+    return { ok: false, error: 'distribution_disabled', message: '分销功能暂未开放', status: 403 }
+  }
+
+  const affiliate = resolveAffiliateIdentityFromSnapshot(data, identity)
+  if (!affiliate) {
+    return { ok: false, error: 'affiliate_not_found', message: '未找到推广员身份', status: 404 }
+  }
+  if (affiliate.status !== 'active') {
+    return { ok: false, error: 'affiliate_not_active', message: '推广员审核通过后才可提现', status: 403 }
+  }
+
+  const gate = buildWithdrawGateFromPolicy(policy)
+  if (!gate.open) {
+    return {
+      ok: false,
+      error: 'withdraw_window_closed',
+      message: `${gate.windowHint}，当前不在申请时段`,
+      status: 403,
+    }
+  }
+
+  const amountCents = Math.floor(Number(body.amountCents))
+  if (!Number.isFinite(amountCents) || amountCents <= 0) {
+    return { ok: false, error: 'invalid_amount', message: '请输入有效提现金额', status: 400 }
+  }
+  if (amountCents < gate.minCents) {
+    return {
+      ok: false,
+      error: 'below_min',
+      message: `最低提现 ¥${(gate.minCents / 100).toFixed(2)}`,
+      status: 400,
+    }
+  }
+  if (amountCents > gate.maxCents) {
+    return {
+      ok: false,
+      error: 'above_max',
+      message: `单笔最高提现 ¥${(gate.maxCents / 100).toFixed(2)}`,
+      status: 400,
+    }
+  }
+
+  const monthUsed = monthWithdrawSubmittedCents(data, affiliate.id)
+  if (monthUsed + amountCents > gate.monthlyCapCents) {
+    return {
+      ok: false,
+      error: 'monthly_cap_exceeded',
+      message: `本月提现额度不足（上限 ¥${(gate.monthlyCapCents / 100).toFixed(2)}）`,
+      status: 400,
+    }
+  }
+
+  const walletRow = (data.distributionWallets ?? []).find(
+    (w) => w.ownerType === 'individual_affiliate' && w.ownerId === affiliate.id,
+  )
+  const available = walletRow?.availableCents ?? 0
+  if (available < amountCents) {
+    return { ok: false, error: 'insufficient_balance', message: '可提现余额不足', status: 400 }
+  }
+
+  const pendingSame = (data.distributionWithdrawRequests ?? []).some(
+    (w) =>
+      w.ownerType === 'individual_affiliate' &&
+      w.ownerId === affiliate.id &&
+      w.status === 'pending_review',
+  )
+  if (pendingSame) {
+    return {
+      ok: false,
+      error: 'pending_exists',
+      message: '您有一笔提现申请审核中，请等待处理后再申请',
+      status: 409,
+    }
+  }
+
+  const channelRaw = String(body.channel || 'manual_bank').trim()
+  const channel: RegistryDistributionWithdrawRequest['channel'] =
+    channelRaw === 'manual_alipay' ||
+    channelRaw === 'wechat' ||
+    channelRaw === 'alipay'
+      ? channelRaw
+      : 'manual_bank'
+
+  let payoutAccount: Record<string, string> | undefined
+  if (body.payoutAccount && typeof body.payoutAccount === 'object' && !Array.isArray(body.payoutAccount)) {
+    const parsed = Object.fromEntries(
+      Object.entries(body.payoutAccount as Record<string, unknown>)
+        .map(([k, v]) => [k, String(v || '').trim()])
+        .filter(([, v]) => v),
+    )
+    payoutAccount = Object.keys(parsed).length ? parsed : undefined
+  }
+
+  const request: RegistryDistributionWithdrawRequest = {
+    id: newId('wd'),
+    ownerType: 'individual_affiliate',
+    ownerId: affiliate.id,
+    ownerLabel: affiliate.realName || affiliate.phone,
+    amountCents,
+    channel,
+    payoutAccount,
+    status: 'pending_review',
+    createdAt: nowIso(),
+  }
+  data.distributionWithdrawRequests!.push(request)
+  adjustWallet(data, 'individual_affiliate', affiliate.id, -amountCents, amountCents, 0)
+  return { ok: true, request }
+}
+
+export function withdrawRequestStatusLabel(status: RegistryDistributionWithdrawRequest['status']): string {
+  switch (status) {
+    case 'pending_review':
+      return '待审核'
+    case 'approved':
+      return '已通过'
+    case 'rejected':
+      return '已拒绝'
+    case 'paid':
+      return '已打款'
+    case 'failed':
+      return '打款失败'
+    default:
+      return status
+  }
+}
+
 export function patchWithdrawRequestFromSnapshot(
   data: RegistryFile,
   requestId: string,
@@ -580,7 +800,14 @@ export function patchWithdrawRequestFromSnapshot(
     row.status = 'approved'
     row.reviewedAt = ts
     row.opsNote = String(body.opsNote || row.opsNote || '').trim() || undefined
-    adjustWallet(data, row.ownerType, row.ownerId, -row.amountCents, row.amountCents, 0)
+    const w = (data.distributionWallets ?? []).find(
+      (x) => x.ownerType === row.ownerType && x.ownerId === row.ownerId,
+    )
+    if (w && w.availableCents >= row.amountCents) {
+      adjustWallet(data, row.ownerType, row.ownerId, -row.amountCents, row.amountCents, 0)
+    } else if (!w || w.frozenCents < row.amountCents) {
+      return { ok: false, error: 'insufficient_balance', status: 400 }
+    }
   } else if (action === 'reject') {
     if (row.status !== 'pending_review' && row.status !== 'approved') {
       return { ok: false, error: 'invalid_status', status: 400 }
@@ -588,9 +815,7 @@ export function patchWithdrawRequestFromSnapshot(
     row.status = 'rejected'
     row.reviewedAt = ts
     row.failReason = String(body.failReason || body.opsNote || '已拒绝').trim()
-    if (list[idx]!.status === 'approved') {
-      adjustWallet(data, row.ownerType, row.ownerId, row.amountCents, -row.amountCents, 0)
-    }
+    adjustWallet(data, row.ownerType, row.ownerId, row.amountCents, -row.amountCents, 0)
   } else if (action === 'mark_paid') {
     if (row.status !== 'approved') return { ok: false, error: 'invalid_status', status: 400 }
     row.status = 'paid'
@@ -812,11 +1037,22 @@ export function buildAffiliatePortalFromSnapshot(
       wallet: AffiliatePortalWallet | null
       stats: AffiliatePortalStats | null
       settlements: AffiliatePortalSettlementRow[]
+      withdrawGate: AffiliateWithdrawGate
+      withdrawRequests: AffiliatePortalWithdrawRow[]
     }
   | { ok: false; error: string; status: number } {
+  const withdrawGate = buildWithdrawGateFromPolicy(data.distributionPolicy)
   const affiliate = resolveAffiliateIdentityFromSnapshot(data, identity)
   if (!affiliate) {
-    return { ok: true, affiliate: null, wallet: null, stats: null, settlements: [] }
+    return {
+      ok: true,
+      affiliate: null,
+      wallet: null,
+      stats: null,
+      settlements: [],
+      withdrawGate,
+      withdrawRequests: [],
+    }
   }
   const walletRow = (data.distributionWallets ?? []).find(
     (w) => w.ownerType === 'individual_affiliate' && w.ownerId === affiliate.id,
@@ -855,11 +1091,27 @@ export function buildAffiliatePortalFromSnapshot(
       .reduce((sum, w) => sum + w.amountCents, 0),
   }
 
+  const withdrawRequests = (data.distributionWithdrawRequests ?? [])
+    .filter((w) => w.ownerType === 'individual_affiliate' && w.ownerId === affiliate.id)
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+    .slice(0, 24)
+    .map((w) => ({
+      id: w.id,
+      amountCents: w.amountCents,
+      status: w.status,
+      createdAt: w.createdAt,
+      reviewedAt: w.reviewedAt,
+      paidAt: w.paidAt,
+      failReason: w.failReason,
+    }))
+
   return {
     ok: true,
     affiliate: publicAffiliateSummary(affiliate),
     wallet,
     stats,
     settlements,
+    withdrawGate,
+    withdrawRequests,
   }
 }

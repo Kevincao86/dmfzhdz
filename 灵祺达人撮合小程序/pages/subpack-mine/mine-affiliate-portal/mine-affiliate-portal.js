@@ -76,6 +76,20 @@ function mapPortalView(data) {
       : null,
     attributions: mapAttributionRows(data.attributions),
     settlements,
+    withdrawGate: data.withdrawGate
+      ? {
+          ...data.withdrawGate,
+          minYuan: affiliatePortal.formatYuan(data.withdrawGate.minCents),
+          maxYuan: affiliatePortal.formatYuan(data.withdrawGate.maxCents),
+          monthlyCapYuan: affiliatePortal.formatYuan(data.withdrawGate.monthlyCapCents),
+        }
+      : null,
+    withdrawRequests: (data.withdrawRequests || []).map((row) => ({
+      ...row,
+      amountYuan: affiliatePortal.formatYuan(row.amountCents),
+      statusLabel: affiliatePortal.withdrawStatusLabel(row.status),
+      createdAtText: String(row.createdAt || '').slice(0, 16).replace('T', ' '),
+    })),
   }
 }
 
@@ -93,6 +107,10 @@ Page({
     settlements: [],
     attributionStats: null,
     attributions: [],
+    withdrawGate: null,
+    withdrawAmount: '',
+    withdrawing: false,
+    withdrawRequests: [],
     wxacodePath: '',
     wxacodeLoading: false,
     wxacodeErr: '',
@@ -192,5 +210,36 @@ Page({
         this.setData({ hint: '保存失败，请长按太阳码保存' })
       },
     })
+  },
+  onWithdrawAmountInput(e) {
+    this.setData({ withdrawAmount: (e.detail && e.detail.value) || '' })
+  },
+  onWithdrawAll() {
+    const wallet = this.data.wallet
+    if (!wallet || !wallet.availableYuan) return
+    this.setData({ withdrawAmount: wallet.availableYuan })
+  },
+  async onSubmitWithdraw() {
+    const gate = this.data.withdrawGate
+    if (!gate || !gate.open) {
+      this.setData({ hint: gate && gate.windowHint ? `${gate.windowHint}，当前不可申请` : '当前不在提现申请时段' })
+      return
+    }
+    const yuan = Number(this.data.withdrawAmount)
+    if (!Number.isFinite(yuan) || yuan <= 0) {
+      this.setData({ hint: '请输入有效提现金额' })
+      return
+    }
+    if (this.data.withdrawing) return
+    this.setData({ withdrawing: true, hint: '' })
+    try {
+      await affiliatePortal.submitWithdraw(Math.round(yuan * 100))
+      this.setData({ withdrawAmount: '', hint: '提现申请已提交，请等待运营审核' })
+      await this.loadPortal()
+    } catch (e) {
+      this.setData({ hint: (e && e.message) || '提现申请失败' })
+    } finally {
+      this.setData({ withdrawing: false })
+    }
   },
 })

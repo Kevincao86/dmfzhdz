@@ -20,6 +20,17 @@ function settlementStatusLabel(status) {
   return map[status] || status
 }
 
+function withdrawStatusLabel(status) {
+  const map = {
+    pending_review: '待审核',
+    approved: '已通过',
+    rejected: '已拒绝',
+    paid: '已打款',
+    failed: '打款失败',
+  }
+  return map[status] || status
+}
+
 function dataUrlToTempFile(dataUrl) {
   return new Promise((resolve, reject) => {
     const m = String(dataUrl || '').match(/^data:image\/(\w+);base64,(.+)$/i)
@@ -68,7 +79,21 @@ async function fetchPortal() {
     promoLinks: data.promoLinks || null,
     attributionStats: data.attributionStats || null,
     attributions: data.attributions || [],
+    withdrawGate: data.withdrawGate || null,
+    withdrawRequests: data.withdrawRequests || [],
   }
+}
+
+async function submitWithdraw(amountCents) {
+  const data = await ecs.post(
+    '/api/meoo-distribution-affiliate-portal',
+    { action: 'withdraw', amountCents: Math.floor(Number(amountCents) || 0) },
+    sessionHeaders(),
+  )
+  if (!data || data.ok === false) {
+    throw new Error(String((data && (data.message || data.error)) || 'withdraw_failed'))
+  }
+  return data
 }
 
 /**
@@ -102,7 +127,9 @@ async function fetchWxacodeImagePath() {
 module.exports = {
   formatYuan,
   settlementStatusLabel,
+  withdrawStatusLabel,
   wxacodeErrorLabel,
   fetchPortal,
   fetchWxacodeImagePath,
+  submitWithdraw,
 }

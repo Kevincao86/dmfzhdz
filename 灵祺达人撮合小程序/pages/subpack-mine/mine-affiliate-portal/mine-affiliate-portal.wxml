@@ -108,6 +108,43 @@
       </view>
     </view>
 
+    <view wx:if="{{wallet && withdrawGate}}" class="mp-sub-card">
+      <view class="mp-sub-card__head">
+        <view class="mp-sub-card__dot"></view>
+        <text class="mp-sub-card__title">提现申请</text>
+      </view>
+      <text class="withdraw-hint">{{withdrawGate.windowHint}}</text>
+      <text class="withdraw-hint withdraw-hint--muted">{{withdrawGate.payoutHint}}</text>
+      <text class="withdraw-hint withdraw-hint--muted">单笔 ¥{{withdrawGate.minYuan}}–¥{{withdrawGate.maxYuan}} · 本月上限 ¥{{withdrawGate.monthlyCapYuan}}</text>
+      <view class="withdraw-form">
+        <input
+          class="withdraw-input"
+          type="digit"
+          placeholder="输入提现金额（元）"
+          value="{{withdrawAmount}}"
+          disabled="{{!withdrawGate.open || withdrawing}}"
+          bindinput="onWithdrawAmountInput"
+        />
+        <button class="portal-btn portal-btn--ghost portal-btn--sm" bindtap="onWithdrawAll" disabled="{{!withdrawGate.open || withdrawing}}">全部</button>
+        <button
+          class="portal-btn portal-btn--primary portal-btn--sm"
+          bindtap="onSubmitWithdraw"
+          loading="{{withdrawing}}"
+          disabled="{{!withdrawGate.open || withdrawing}}"
+        >{{withdrawGate.open ? '申请提现' : '非申请时段'}}</button>
+      </view>
+      <text wx:if="{{!withdrawGate.open}}" class="withdraw-closed">提现按钮仅在每月 {{withdrawGate.windowStartDay}}–{{withdrawGate.windowEndDay}} 日开启</text>
+      <view wx:if="{{withdrawRequests.length}}" class="withdraw-list">
+        <view class="withdraw-item" wx:for="{{withdrawRequests}}" wx:key="id">
+          <view class="withdraw-item__row">
+            <text class="withdraw-item__amount">¥{{item.amountYuan}}</text>
+            <text class="withdraw-item__status">{{item.statusLabel}}</text>
+          </view>
+          <text class="withdraw-item__meta">{{item.createdAtText}}</text>
+        </view>
+      </view>
+    </view>
+
     <view wx:if="{{promoLinks && attributionStats}}" class="mp-sub-card">
       <view class="mp-sub-card__head">
         <view class="mp-sub-card__dot"></view>
