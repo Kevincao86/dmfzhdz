@@ -1,9 +1,22 @@
 import { merchantApiFetchUrls } from '../lib/merchantErpApiBase'
 import { resolveMerchantApiBearer } from '../lib/merchantApiAuth'
-import type { RegistryDistributionSalesperson } from '../lib/distributionRegistryTypes'
+import type {
+  DistributionCommissionOverride,
+  DistributionProductLineRates,
+  RegistryDistributionSalesperson,
+} from '../lib/distributionRegistryTypes'
 import { buildDistributionPromoLinks } from '../lib/distributionRegistryCore'
 
 export type PartnerSalesperson = RegistryDistributionSalesperson
+
+export type PartnerCommissionContext = {
+  policyEnabled: boolean
+  channelOverride: DistributionCommissionOverride | null
+  defaults: {
+    erp: DistributionProductLineRates
+    xingxuan: DistributionProductLineRates
+  }
+}
 
 async function partnerApiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const { token } = await resolveMerchantApiBearer()
@@ -37,16 +50,23 @@ export async function fetchPartnerSalespersons(): Promise<{
   partnerTenantId: string
   partnerName: string
   salespersons: PartnerSalesperson[]
+  commissionContext: PartnerCommissionContext
 }> {
   const data = await partnerApiFetch<{
     partnerTenantId: string
     partnerName: string
     salespersons: PartnerSalesperson[]
+    commissionContext: PartnerCommissionContext
   }>('/api/meoo-partner-salespersons')
   return {
     partnerTenantId: data.partnerTenantId ?? '',
     partnerName: data.partnerName ?? '',
     salespersons: data.salespersons ?? [],
+    commissionContext: data.commissionContext ?? {
+      policyEnabled: true,
+      channelOverride: null,
+      defaults: { erp: {}, xingxuan: {} },
+    },
   }
 }
 
@@ -60,10 +80,71 @@ export async function upsertPartnerSalesperson(input: {
 }): Promise<PartnerSalesperson> {
   const data = await partnerApiFetch<{ salesperson: PartnerSalesperson }>('/api/meoo-partner-salespersons', {
     method: 'POST',
-    body: JSON.stringify(input),
+    body: JSON.stringify({ action: 'upsert', ...input }),
   })
   if (!data.salesperson) throw new Error('保存失败')
   return data.salesperson
+}
+
+export async function patchPartnerSalespersonCommission(input: {
+  salespersonId: string
+  commissionOverride: DistributionCommissionOverride | null
+}): Promise<{
+  salespersons: PartnerSalesperson[]
+  commissionContext: PartnerCommissionContext
+}> {
+  const data = await partnerApiFetch<{
+    salespersons: PartnerSalesperson[]
+    commissionContext: PartnerCommissionContext
+  }>('/api/meoo-partner-salespersons', {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'patch_commission',
+      salespersonId: input.salespersonId,
+      commissionOverride: input.commissionOverride,
+    }),
+  })
+  return {
+    salespersons: data.salespersons ?? [],
+    commissionContext: data.commissionContext ?? {
+      policyEnabled: true,
+      channelOverride: null,
+      defaults: { erp: {}, xingxuan: {} },
+    },
+  }
+}
+
+export async function batchPatchPartnerSalespersonCommission(input: {
+  salespersonIds?: string[]
+  applyToAll?: boolean
+  commissionOverride: DistributionCommissionOverride | null
+}): Promise<{
+  updatedCount: number
+  salespersons: PartnerSalesperson[]
+  commissionContext: PartnerCommissionContext
+}> {
+  const data = await partnerApiFetch<{
+    updatedCount: number
+    salespersons: PartnerSalesperson[]
+    commissionContext: PartnerCommissionContext
+  }>('/api/meoo-partner-salespersons', {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'batch_patch_commission',
+      salespersonIds: input.salespersonIds,
+      applyToAll: input.applyToAll,
+      commissionOverride: input.commissionOverride,
+    }),
+  })
+  return {
+    updatedCount: typeof data.updatedCount === 'number' ? data.updatedCount : 0,
+    salespersons: data.salespersons ?? [],
+    commissionContext: data.commissionContext ?? {
+      policyEnabled: true,
+      channelOverride: null,
+      defaults: { erp: {}, xingxuan: {} },
+    },
+  }
 }
 
 export function buildPartnerPromoLinks(refCode: string): {

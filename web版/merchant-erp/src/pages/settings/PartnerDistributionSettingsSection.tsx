@@ -1,16 +1,26 @@
-import { BarChart3, Copy, ExternalLink, Loader2, Share2, UserPlus } from 'lucide-react'
+import { BarChart3, Copy, ExternalLink, Loader2, Percent, Share2, UserPlus } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '../../cn'
 import {
+  hasCommissionOverride,
+  mergeSalespersonDisplayRates,
+  salespersonRatesSummary,
+} from '../../lib/distributionCommissionDisplay'
+import {
   landingSurfaceLabel,
   subjectTypeLabel,
 } from '../../lib/distributionAttributionCore'
+import type { DistributionCommissionOverride } from '../../lib/distributionRegistryTypes'
 import { toUserFacingError } from '../../lib/userFacingError'
+import PartnerSalespersonCommissionModal from './PartnerSalespersonCommissionModal'
 import {
+  batchPatchPartnerSalespersonCommission,
   buildPartnerPromoLinks,
   fetchPartnerSalespersons,
+  patchPartnerSalespersonCommission,
   upsertPartnerSalesperson,
+  type PartnerCommissionContext,
   type PartnerSalesperson,
 } from '../../services/partnerSalespersonsClient'
 import {
@@ -48,9 +58,30 @@ function statsForSalesperson(
   return stats.bySalesperson.find((s) => s.salespersonId === row.id) ?? null
 }
 
+type CommissionModalState =
+  | {
+      kind: 'single'
+      salespersonId: string
+      title: string
+      initial: DistributionCommissionOverride | null
+    }
+  | {
+      kind: 'batch'
+      title: string
+      initial: DistributionCommissionOverride | null
+      salespersonIds: string[]
+    }
+  | {
+      kind: 'all'
+      title: string
+      initial: DistributionCommissionOverride | null
+    }
+  | null
+
 /** 服务商 fws：分销员配置 + 全量/单人数据看板 */
 export default function PartnerDistributionSettingsSection() {
   const [rows, setRows] = useState<PartnerSalesperson[]>([])
+  const [commissionContext, setCommissionContext] = useState<PartnerCommissionContext | null>(null)
   const [stats, setStats] = useState<PartnerDistributionStats | null>(null)
   const [partnerName, setPartnerName] = useState('')
   const [loading, setLoading] = useState(false)
@@ -60,6 +91,13 @@ export default function PartnerDistributionSettingsSection() {
   const [realName, setRealName] = useState('')
   const [phone, setPhone] = useState('')
   const [employeeCode, setEmployeeCode] = useState('')
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [commissionModal, setCommissionModal] = useState<CommissionModalState>(null)
+
+  const policyDefaults = useMemo(() => {
+    if (!commissionContext) return { erp: {}, xingxuan: {} }
+    return commissionContext.defaults
+  }, [commissionContext])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -70,8 +108,10 @@ export default function PartnerDistributionSettingsSection() {
         fetchPartnerDistributionStats(),
       ])
       setRows(listData.salespersons)
+      setCommissionContext(listData.commissionContext)
       setPartnerName(listData.partnerName)
       setStats(statsData)
+      setSelectedIds((prev) => prev.filter((id) => listData.salespersons.some((s) => s.id === id)))
     } catch (e) {
       setErr(toUserFacingError(e, '加载分销数据'))
     } finally {
@@ -152,6 +192,36 @@ export default function PartnerDistributionSettingsSection() {
     const ok = await copyText(text)
     setHint(ok ? `已复制 ${row.realName} 的推广链接` : '复制失败，请手动选择文本')
   }
+
+  const onSaveCommission = async (value: DistributionCommissionOverride | null) => {
+    if (!commissionModal) return
+    setErr(null)
+    if (commissionModal.kind === 'single') {
+      const data = await patchPartnerSalespersonCommission({
+        salespersonId: commissionModal.salespersonId,
+        commissionOverride: value,
+      })
+      setRows(data.salespersons)
+      setCommissionContext(data.commissionContext)
+      setHint(value ? '已保存该分销员佣金比例' : '已恢复该分销员默认比例')
+      return
+    }
+    const data = await batchPatchPartnerSalespersonCommission({
+      salespersonIds: commissionModal.kind === 'batch' ? commissionModal.salespersonIds : undefined,
+      applyToAll: commissionModal.kind === 'all',
+      commissionOverride: value,
+    })
+    setRows(data.salespersons)
+    setCommissionContext(data.commissionContext)
+    setHint(
+      value
+        ? `已更新 ${data.updatedCount} 名分销员佣金比例`
+        : `已恢复 ${data.updatedCount} 名分销员默认比例`,
+    )
+    setSelectedIds([])
+  }
+
+  const activeRows = useMemo(() => rows.filter((r) => r.status === 'active'), [rows])
 
   const recentRows = useMemo(() => stats?.recentAttributions ?? [], [stats])
 
@@ -261,19 +331,62 @@ export default function PartnerDistributionSettingsSection() {
       </section>
 
       <section className="erp-panel overflow-hidden p-0">
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-4">
           <h3 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
             <Share2 className="h-5 w-5 text-violet-600" />
             分销员列表
           </h3>
-          <button
-            type="button"
-            onClick={() => void load()}
-            className="text-sm text-violet-600 hover:text-violet-700"
-          >
-            刷新
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={!activeRows.length}
+              onClick={() =>
+                setCommissionModal({
+                  kind: 'all',
+                  title: '全体分销员 · 佣金比例',
+                  initial: null,
+                })
+              }
+              className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50"
+            >
+              <Percent className="h-3.5 w-3.5" />
+              全体调整比例
+            </button>
+            <button
+              type="button"
+              disabled={!selectedIds.length}
+              onClick={() =>
+                setCommissionModal({
+                  kind: 'batch',
+                  title: `已选 ${selectedIds.length} 人 · 佣金比例`,
+                  initial: null,
+                  salespersonIds: selectedIds,
+                })
+              }
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              批量调整（{selectedIds.length}）
+            </button>
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="text-sm text-violet-600 hover:text-violet-700"
+            >
+              刷新
+            </button>
+          </div>
         </div>
+        {commissionContext ? (
+          <p className="border-b border-slate-100 bg-slate-50/80 px-6 py-2 text-xs text-slate-600">
+            默认比例（未单独设置时）：ERP 分销员占池{' '}
+            {salespersonRatesSummary({ erp: policyDefaults.erp, xingxuan: policyDefaults.xingxuan }).erpSalesPool}
+            ，折合实收{' '}
+            {salespersonRatesSummary({ erp: policyDefaults.erp, xingxuan: policyDefaults.xingxuan }).erpSalesPaid}
+            {' · '}
+            星选占池{' '}
+            {salespersonRatesSummary({ erp: policyDefaults.erp, xingxuan: policyDefaults.xingxuan }).xingxuanSalesPool}
+          </p>
+        ) : null}
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-12 text-slate-500">
             <Loader2 className="h-5 w-5 animate-spin" />
@@ -286,13 +399,24 @@ export default function PartnerDistributionSettingsSection() {
             <table className="min-w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs text-slate-500">
                 <tr>
+                  <th className="px-3 py-3 font-medium">
+                    <input
+                      type="checkbox"
+                      checked={activeRows.length > 0 && selectedIds.length === activeRows.length}
+                      onChange={(e) =>
+                        setSelectedIds(e.target.checked ? activeRows.map((r) => r.id) : [])
+                      }
+                      aria-label="全选启用分销员"
+                    />
+                  </th>
                   <th className="px-4 py-3 font-medium">姓名</th>
                   <th className="px-4 py-3 font-medium">手机</th>
                   <th className="px-4 py-3 font-medium">工号</th>
                   <th className="px-4 py-3 font-medium">推广码</th>
-                  <th className="px-4 py-3 font-medium">注册数</th>
-                  <th className="px-4 py-3 font-medium">付费数</th>
-                  <th className="px-4 py-3 font-medium">付费金额</th>
+                  <th className="px-4 py-3 font-medium">ERP 比例</th>
+                  <th className="px-4 py-3 font-medium">星选比例</th>
+                  <th className="px-4 py-3 font-medium">注册</th>
+                  <th className="px-4 py-3 font-medium">付费</th>
                   <th className="px-4 py-3 font-medium">状态</th>
                   <th className="px-4 py-3 font-medium">操作</th>
                 </tr>
@@ -300,14 +424,41 @@ export default function PartnerDistributionSettingsSection() {
               <tbody className="divide-y divide-slate-100">
                 {rows.map((row) => {
                   const rowStats = statsForSalesperson(stats, row)
+                  const rates = commissionContext
+                    ? mergeSalespersonDisplayRates(policyDefaults, row.commissionOverride)
+                    : null
+                  const rateLabel = rates ? salespersonRatesSummary(rates) : null
+                  const customRate = hasCommissionOverride(row.commissionOverride)
                   return (
                     <tr key={row.id} className="bg-white">
+                      <td className="px-3 py-3">
+                        {row.status === 'active' ? (
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(row.id)}
+                            onChange={(e) =>
+                              setSelectedIds((ids) =>
+                                e.target.checked ? [...ids, row.id] : ids.filter((x) => x !== row.id),
+                              )
+                            }
+                            aria-label={`选择 ${row.realName}`}
+                          />
+                        ) : null}
+                      </td>
                       <td className="px-4 py-3 font-medium text-slate-900">{row.realName}</td>
                       <td className="px-4 py-3 text-slate-600">{row.phone}</td>
                       <td className="px-4 py-3 text-slate-600">{row.employeeCode}</td>
                       <td className="px-4 py-3 font-mono text-xs text-violet-700">{row.refCode}</td>
+                      <td className="px-4 py-3 text-slate-700">
+                        <span className={customRate ? 'font-medium text-violet-700' : ''}>
+                          {rateLabel?.erpSalesPaid ?? '—'}
+                        </span>
+                        {customRate ? (
+                          <span className="ml-1 rounded bg-violet-50 px-1 text-[10px] text-violet-600">自定义</span>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">{rateLabel?.xingxuanSalesPaid ?? '—'}</td>
                       <td className="px-4 py-3 text-slate-700">{rowStats?.registrations ?? 0}</td>
-                      <td className="px-4 py-3 text-slate-700">{rowStats?.paidCount ?? 0}</td>
                       <td className="px-4 py-3 text-slate-700">
                         {formatCentsYuan(rowStats?.paidAmountCents ?? 0)}
                       </td>
@@ -325,6 +476,21 @@ export default function PartnerDistributionSettingsSection() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCommissionModal({
+                                kind: 'single',
+                                salespersonId: row.id,
+                                title: `佣金比例 · ${row.realName}`,
+                                initial: row.commissionOverride ?? null,
+                              })
+                            }
+                            className="inline-flex items-center gap-1 rounded-lg border border-violet-200 px-2.5 py-1 text-xs text-violet-700 hover:bg-violet-50"
+                          >
+                            <Percent className="h-3.5 w-3.5" />
+                            比例
+                          </button>
                           <button
                             type="button"
                             onClick={() => void onCopyLinks(row)}
@@ -350,6 +516,23 @@ export default function PartnerDistributionSettingsSection() {
           </div>
         )}
       </section>
+
+      <PartnerSalespersonCommissionModal
+        open={commissionModal != null}
+        title={commissionModal?.title ?? ''}
+        initial={commissionModal?.initial ?? null}
+        defaultErp={policyDefaults.erp}
+        defaultXingxuan={policyDefaults.xingxuan}
+        onClose={() => setCommissionModal(null)}
+        onSave={async (value) => {
+          try {
+            await onSaveCommission(value)
+          } catch (e) {
+            setErr(toUserFacingError(e, '保存佣金比例'))
+            throw e
+          }
+        }}
+      />
 
       <section className="erp-panel overflow-hidden p-0">
         <div className="border-b border-slate-100 px-6 py-4">
