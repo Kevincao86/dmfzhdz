@@ -51,12 +51,33 @@ export function buildPlanFromScriptRows(
   return { prompts, narrationScript }
 }
 
+export const SCRIPT_ROW_MAX_COUNT = 12
+
 export function defaultScriptRows(count: number, segmentSec: number): ShortVideoScriptRow[] {
   return Array.from({ length: count }, (_, i) => ({
     timeRange: `${i * segmentSec}-${(i + 1) * segmentSec}秒`,
     visual: '',
     dialogue: '',
   }))
+}
+
+/** 手动追加一段空分镜；时间段承接上一段结束秒数 */
+export function appendEmptyScriptRow(
+  rows: ShortVideoScriptRow[],
+  segmentSec: number,
+): ShortVideoScriptRow[] {
+  if (rows.length >= SCRIPT_ROW_MAX_COUNT) return rows
+  const seg = Math.min(15, Math.max(2, Math.round(segmentSec) || 5))
+  let start = maxScriptTimeRangeEndSec(rows)
+  if (start <= 0 && rows.length > 0) start = rows.length * seg
+  return [
+    ...rows,
+    {
+      timeRange: `${start}-${start + seg}秒`,
+      visual: '',
+      dialogue: '',
+    },
+  ]
 }
 
 export function resizeScriptRows(

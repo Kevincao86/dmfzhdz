@@ -54,6 +54,7 @@ import {
   inferScriptSegmentCountFromText,
   parseScriptRowsFromPlainText,
   resizeScriptRows,
+  appendEmptyScriptRow,
   maxScriptTimeRangeEndSec,
   scriptRowsHaveExplicitTimeRanges,
   scriptRowsToOverallPrompt,
@@ -1732,9 +1733,12 @@ export default function ShortVideoOptimizationPage() {
                     rows={scriptRows}
                     disabled={busy || auxBusy}
                     onChange={setScriptRows}
+                    onAddRow={() =>
+                      setScriptRows((prev) => appendEmptyScriptRow(prev, longformSegmentSec))
+                    }
                   />
                   <p className="text-xs text-zinc-500">
-                    段数由 AI 按目标总时长自动规划；规划完成后可直接编辑各段时间段、画面与口播。
+                    支持 AI 自动规划，也可点击「添加时间段」手动编写分镜；各段画面与口播填好后即可生成。
                   </p>
                 </div>
               </>

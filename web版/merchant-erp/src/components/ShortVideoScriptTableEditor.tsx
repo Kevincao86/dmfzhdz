@@ -1,4 +1,5 @@
-import type { ShortVideoScriptRow } from '../lib/shortVideoScriptTable'
+import { Plus } from 'lucide-react'
+import { SCRIPT_ROW_MAX_COUNT, type ShortVideoScriptRow } from '../lib/shortVideoScriptTable'
 
 type Props = {
   rows: ShortVideoScriptRow[]
@@ -6,9 +7,17 @@ type Props = {
   /** 段数较多时压缩行高，配合外层滚动容器 */
   compact?: boolean
   onChange: (rows: ShortVideoScriptRow[]) => void
+  /** 展示「添加时间段」按钮（手动编写分镜） */
+  onAddRow?: () => void
 }
 
-export default function ShortVideoScriptTableEditor({ rows, disabled, compact, onChange }: Props) {
+export default function ShortVideoScriptTableEditor({
+  rows,
+  disabled,
+  compact,
+  onChange,
+  onAddRow,
+}: Props) {
   const updateRow = (index: number, patch: Partial<ShortVideoScriptRow>) => {
     onChange(rows.map((r, i) => (i === index ? { ...r, ...patch } : r)))
   }
@@ -62,6 +71,19 @@ export default function ShortVideoScriptTableEditor({ rows, disabled, compact, o
           ))}
         </tbody>
       </table>
+      {onAddRow ? (
+        <div className="border-t border-zinc-100 bg-zinc-50/80 px-3 py-2">
+          <button
+            type="button"
+            disabled={disabled || rows.length >= SCRIPT_ROW_MAX_COUNT}
+            onClick={onAddRow}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-900 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            添加时间段
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }
