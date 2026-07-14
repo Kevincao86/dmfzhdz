@@ -108,6 +108,22 @@
       </view>
     </view>
 
+    <view wx:if="{{promoLinks && attributionStats}}" class="mp-sub-card">
+      <view class="mp-sub-card__head">
+        <view class="mp-sub-card__dot"></view>
+        <text class="mp-sub-card__title">推广商户明细</text>
+      </view>
+      <text class="attrib-summary">累计注册 {{attributionStats.registrations}} · 已付费 {{attributionStats.paidCount}} · ¥{{attributionStats.paidAmountYuan}}</text>
+      <view wx:if="{{!attributions.length}}" class="attrib-empty">暂无推广记录，分享太阳码或链接后即可在此查看。</view>
+      <view class="attrib-item" wx:for="{{attributions}}" wx:key="id">
+        <view class="attrib-item__row">
+          <text class="attrib-item__name">{{item.subjectLabel || '—'}}</text>
+          <text class="attrib-item__paid">{{item.paidYuan ? '¥' + item.paidYuan : '未付费'}}</text>
+        </view>
+        <text class="attrib-item__meta">{{item.subjectTypeLabel}} · {{item.landingLabel}} · {{item.boundAtText}}</text>
+      </view>
+    </view>
+
     <view wx:if="{{settlements.length}}" class="mp-sub-card portal-settle-card">
       <view class="mp-sub-card__head">
         <view class="mp-sub-card__dot"></view>

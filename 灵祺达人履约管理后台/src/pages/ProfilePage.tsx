@@ -78,6 +78,11 @@ export default function ProfilePage() {
       desc: '会员开通与积分充值支付记录',
     },
     {
+      to: '/affiliate/portal',
+      label: '我的推广',
+      desc: '推广码 · 太阳码 · 佣金与商户明细',
+    },
+    {
       to: profileLink,
       label: profileMenuLabel,
       desc: profileDesc,
@@ -141,11 +146,6 @@ export default function ProfilePage() {
       to: '/profile/analytics',
       label: '数据分析',
       desc: isPr ? '发单与转化概况' : '报名与发单概况',
-    },
-    {
-      to: '/affiliate/portal',
-      label: '我的推广',
-      desc: '推广码 · 链接 · 佣金与结算',
     },
     { to: '/help', label: '帮助中心', desc: '使用说明与常见问题' },
     { to: '/profile/support', label: '小灵同学', desc: '我的客服与常见问题' },

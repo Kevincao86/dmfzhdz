@@ -6,6 +6,10 @@ import type {
   AffiliatePortalStats,
   AffiliatePortalWallet,
 } from './distributionRegistryCore'
+import type {
+  PartnerDistributionAttributionRow,
+  SalespersonPortalStats,
+} from './distributionAttributionCore'
 
 export type AffiliatePromoLinks = {
   cs: string
@@ -20,6 +24,8 @@ export type AffiliatePortalPayload = {
   stats: AffiliatePortalStats | null
   settlements: AffiliatePortalSettlementRow[]
   promoLinks: AffiliatePromoLinks | null
+  attributionStats: SalespersonPortalStats | null
+  attributions: PartnerDistributionAttributionRow[]
 }
 
 export function formatCentsYuan(cents: number): string {
@@ -47,6 +53,8 @@ export async function fetchAffiliatePortal(): Promise<AffiliatePortalPayload> {
         stats: (json.stats as AffiliatePortalStats | null) ?? null,
         settlements: (json.settlements as AffiliatePortalSettlementRow[]) ?? [],
         promoLinks: (json.promoLinks as AffiliatePromoLinks | null) ?? null,
+        attributionStats: (json.attributionStats as SalespersonPortalStats | null) ?? null,
+        attributions: (json.attributions as PartnerDistributionAttributionRow[]) ?? [],
       }
     } catch (e) {
       lastErr = e instanceof Error ? e.message : String(e)

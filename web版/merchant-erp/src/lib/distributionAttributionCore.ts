@@ -373,6 +373,52 @@ export function buildSalespersonPortalFromSnapshot(
   return { stats, attributions }
 }
 
+export function buildAffiliateAttributionsFromSnapshot(
+  data: RegistryFile,
+  affiliateId: string,
+): {
+  stats: SalespersonPortalStats
+  attributions: PartnerDistributionAttributionRow[]
+} {
+  ensureAttributions(data)
+  const aid = String(affiliateId || '').trim()
+  const rows = (data.distributionAttributions ?? []).filter(
+    (row) => row.affiliateId === aid && row.channelType === 'individual',
+  )
+  const stats: SalespersonPortalStats = {
+    registrations: 0,
+    paidCount: 0,
+    paidAmountCents: 0,
+    erp: emptyLineStats(),
+    xingxuan: emptyLineStats(),
+  }
+
+  for (const row of rows) {
+    addAttributionToLineStats(stats, row)
+    if (isXingxuanSubject(row.subjectType)) addAttributionToLineStats(stats.xingxuan, row)
+    else addAttributionToLineStats(stats.erp, row)
+  }
+
+  const attributions = rows
+    .slice()
+    .sort((a, b) => (a.boundAt < b.boundAt ? 1 : -1))
+    .slice(0, 100)
+    .map((row) => ({
+      id: row.id,
+      refCode: row.refCode,
+      salespersonId: row.salespersonId,
+      subjectType: row.subjectType,
+      subjectLabel: row.subjectLabel,
+      landingSurface: row.landingSurface,
+      boundAt: row.boundAt,
+      firstPaidAt: row.firstPaidAt,
+      paidAmountCents: row.paidAmountCents,
+      status: row.status,
+    }))
+
+  return { stats, attributions }
+}
+
 export function subjectTypeLabel(subjectType: DistributionAttributionSubjectType): string {
   switch (subjectType) {
     case 'erp_merchant':

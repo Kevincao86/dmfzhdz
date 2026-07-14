@@ -9,6 +9,7 @@ import {
   buildDistributionPromoLinks,
 } from '../src/lib/distributionRegistryCore.js'
 import { generateAffiliatePromoWxacodeDataUrl } from '../src/lib/mpAffiliateWxacode.js'
+import { buildAffiliateAttributionsFromSnapshot } from '../src/lib/distributionAttributionCore.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 import {
   merchantSupabaseAdminEnvConfigureHint,
@@ -112,6 +113,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         ? buildDistributionPromoLinks(refCode)
         : null
 
+    const affiliateId =
+      portal.affiliate && typeof portal.affiliate.id === 'string' ? portal.affiliate.id.trim() : ''
+    const attributionBundle =
+      affiliateId && portal.affiliate?.status === 'active'
+        ? buildAffiliateAttributionsFromSnapshot(data, affiliateId)
+        : null
+
     sendJson(res, 200, {
       ok: true,
       affiliate: portal.affiliate,
@@ -119,6 +127,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       stats: portal.stats,
       settlements: portal.settlements,
       promoLinks,
+      attributionStats: attributionBundle?.stats ?? null,
+      attributions: attributionBundle?.attributions ?? [],
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
