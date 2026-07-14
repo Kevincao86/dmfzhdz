@@ -103,7 +103,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         const status = msg === 'wx_not_configured' ? 503 : 500
-        sendJson(res, status, { ok: false, error: msg === 'wx_not_configured' ? msg : 'wxacode_unavailable', message: msg.slice(0, 200) })
+        const code = msg === 'wx_not_configured' ? msg : 'wxacode_unavailable'
+        const zh =
+          msg === 'wx_not_configured'
+            ? '小程序码服务未配置，请联系管理员'
+            : /invalid page|page not found|41030/i.test(msg)
+              ? '小程序页面未发布，请稍后重试或联系管理员'
+              : /access_token|40001|42001/i.test(msg)
+                ? '微信授权失效，请稍后重试'
+                : '太阳码生成失败，请稍后重试'
+        sendJson(res, status, { ok: false, error: code, message: zh, detail: msg.slice(0, 200) })
       }
       return
     }

@@ -1,6 +1,11 @@
 const { syncPageIdentity } = require('../../../utils/pageIdentityChrome.js')
 const affiliateApply = require('../../../utils/mpDistributionAffiliateApply.js')
 const affiliatePortal = require('../../../utils/mpDistributionAffiliatePortal.js')
+const auth = require('../../../utils/auth.js')
+const guestRoutes = require('../../../utils/mpGuestRoutes.js')
+
+const PORTAL_URL = '/pages/subpack-mine/mine-affiliate-portal/mine-affiliate-portal'
+const APPLY_URL = '/pages/subpack-mine/mine-affiliate-apply/mine-affiliate-apply'
 
 const SUBJECT_TYPE_LABEL = {
   erp_merchant: 'ERP 商家',
@@ -94,6 +99,10 @@ Page({
   },
   onShow() {
     syncPageIdentity(this)
+    if (!auth.isLoggedIn()) {
+      guestRoutes.redirectToLogin(PORTAL_URL)
+      return
+    }
     this.loadPortal()
   },
   async loadPortal(retry = 0) {
@@ -117,6 +126,10 @@ Page({
         await new Promise((r) => setTimeout(r, 1500))
         return this.loadPortal(retry + 1)
       }
+      if (/unauthorized|请先登录/i.test(msg)) {
+        guestRoutes.redirectToLogin(PORTAL_URL)
+        return
+      }
       this.setData({
         loading: false,
         err: msg,
@@ -130,8 +143,7 @@ Page({
       const path = await affiliatePortal.fetchWxacodeImagePath()
       this.setData({ wxacodePath: path, wxacodeLoading: false })
     } catch (e) {
-      const raw = (e && e.message) || 'wxacode_unavailable'
-      const msg = raw === 'wxacode_unavailable' ? '太阳码生成失败，请稍后重试' : raw
+      const msg = affiliatePortal.wxacodeErrorLabel((e && e.message) || 'wxacode_unavailable')
       this.setData({ wxacodeLoading: false, wxacodeErr: msg })
     }
   },
@@ -139,7 +151,7 @@ Page({
     this.loadPortal()
   },
   onGoApply() {
-    wx.navigateTo({ url: '/pages/subpack-mine/mine-affiliate-apply/mine-affiliate-apply' })
+    wx.navigateTo({ url: APPLY_URL })
   },
   onCopyCode() {
     const code = this.data.affiliate && this.data.affiliate.refCode

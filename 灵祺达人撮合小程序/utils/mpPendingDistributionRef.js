@@ -40,8 +40,20 @@ function clearRef() {
   }
 }
 
+function refFromScene(sceneRaw) {
+  const scene = decodeURIComponent(String(sceneRaw || '').trim())
+  if (!scene) return ''
+  const m = scene.match(/(?:^|&)ref=([^&]+)/i) || scene.match(/^ref=(.+)$/i)
+  if (m) return String(m[1] || '').trim()
+  // 无 key 时：若整段像推广码则直接采用
+  if (/^[A-Za-z0-9_-]{4,32}$/.test(scene)) return scene
+  return ''
+}
+
 function captureFromOptions(options) {
-  const ref = String((options && options.ref) || '').trim()
+  const opt = options || {}
+  let ref = String(opt.ref || '').trim()
+  if (!ref && opt.scene) ref = refFromScene(opt.scene)
   if (ref) saveRef(ref)
   return ref || readRef()
 }

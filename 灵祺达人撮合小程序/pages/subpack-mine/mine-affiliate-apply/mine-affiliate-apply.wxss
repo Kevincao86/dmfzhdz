@@ -98,3 +98,30 @@
   border-radius: 16rpx;
   font-size: 28rpx;
 }
+
+.boot {
+  display: block;
+  margin-top: 24rpx;
+  font-size: 26rpx;
+  color: #64748b;
+}
+
+.btn-link {
+  margin-top: 16rpx;
+  padding: 0;
+  background: transparent;
+  color: #4f46e5;
+  font-size: 26rpx;
+  font-weight: 600;
+  text-align: left;
+  line-height: 1.5;
+}
+
+.btn-link::after {
+  border: none;
+}
+
+.input[disabled] {
+  background: #f8fafc;
+  color: #64748b;
+}
