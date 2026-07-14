@@ -8,6 +8,7 @@ const auth = require('../../../utils/auth.js')
 const participant = require('../../../utils/participant.js')
 const mpSubscribe = require('../../../utils/mpSubscribeMessages.js')
 const calReminder = require('../../../utils/mpCalendarReminderApi.js')
+const orderLabelApi = require('../../../utils/mpOrderCustomLabelApi.js')
 
 const WEEK_LABELS = ['日', '一', '二', '三', '四', '五', '六']
 const REMIND_OPTIONS = [
@@ -57,6 +58,7 @@ Page({
     activeTodoCount: 0,
     remindOptions: REMIND_OPTIONS,
     myReminders: [],
+    orderLabels: [],
     navLabel: '',
   },
 
@@ -159,16 +161,33 @@ Page({
         myReminders = await calReminder.listReminders()
       } catch (_) {}
 
+      let orderLabels = []
+      try {
+        orderLabels = await orderLabelApi.listLabels()
+      } catch (_) {}
+
+      const labelByOrder = {}
+      ;(orderLabels || []).forEach((row) => {
+        const id = String((row && row.mpOrderId) || '').trim()
+        if (id) labelByOrder[id] = row
+      })
+
       const remindPending = new Set(
         (myReminders || [])
           .filter((r) => r && r.status === 'pending')
           .map((r) => String(r.eventId || '').trim())
           .filter(Boolean),
       )
-      const attachRemindFlag = (evt) => ({
-        ...evt,
-        remindSet: remindPending.has(String(evt.id || '').trim()),
-      })
+      const attachFlags = (evt) => {
+        const orderId = String(evt.mpOrderId || '').trim()
+        const label = orderId ? labelByOrder[orderId] : null
+        return {
+          ...evt,
+          remindSet: remindPending.has(String(evt.id || '').trim()),
+          customLabelText: label ? String(label.labelText || '') : '',
+          customLabelColor: label ? String(label.color || 'violet') : '',
+        }
+      }
 
       const app = getApp()
       if (app && app.globalData) app.globalData.calendarTodoCount = activeTodoCount
@@ -178,10 +197,11 @@ Page({
         isPr,
         byDate,
         grid,
-        selectedEvents: selectedEvents.map(attachRemindFlag),
-        upcomingTodos,
+        selectedEvents: selectedEvents.map(attachFlags),
+        upcomingTodos: upcomingTodos.map(attachFlags),
         activeTodoCount,
         myReminders,
+        orderLabels,
         navLabel: this.resolveNavLabel(this.data.viewMode, this.data.year, this.data.month),
       })
     } catch (e) {
@@ -405,6 +425,90 @@ Page({
       await this.reload()
     } catch (err) {
       wx.showToast({ title: (err && err.message) || '设置失败', icon: 'none' })
+    }
+  },
+
+  async onSetLabel(e) {
+    const dataset = e.currentTarget.dataset || {}
+    const mpOrderId = String(dataset.mpOrderId || '').trim()
+    const title = String(dataset.title || '').trim()
+    if (!mpOrderId) return
+
+    const presets = orderLabelApi.LABEL_PRESETS.map((p) => p.text)
+    const existing = (this.data.orderLabels || []).find(
+      (row) => String((row && row.mpOrderId) || '').trim() === mpOrderId,
+    )
+    const itemList = existing ? [...presets, '清除标签', '自定义…'] : [...presets, '自定义…']
+
+    let pickIdx = -1
+    try {
+      const pick = await new Promise((resolve, reject) => {
+        wx.showActionSheet({
+          itemList,
+          success: (res) => resolve(res.tapIndex),
+          fail: reject,
+        })
+      })
+      pickIdx = Number(pick)
+      if (!Number.isFinite(pickIdx) || pickIdx < 0) return
+    } catch (_) {
+      return
+    }
+
+    if (existing && pickIdx === presets.length) {
+      try {
+        await orderLabelApi.deleteLabel(mpOrderId)
+        wx.showToast({ title: '标签已清除', icon: 'success' })
+        await this.reload()
+      } catch (err) {
+        wx.showToast({ title: (err && err.message) || '清除失败', icon: 'none' })
+      }
+      return
+    }
+
+    const customIdx = existing ? presets.length + 1 : presets.length
+    if (pickIdx === customIdx) {
+      try {
+        const modal = await new Promise((resolve, reject) => {
+          wx.showModal({
+            title: '自定义标签',
+            editable: true,
+            placeholderText: '最多16字',
+            content: existing ? String(existing.labelText || '') : '',
+            success: resolve,
+            fail: reject,
+          })
+        })
+        if (!modal || !modal.confirm) return
+        const text = String(modal.content || '')
+          .trim()
+          .replace(/\s+/g, ' ')
+          .slice(0, 16)
+        if (!text) {
+          wx.showToast({ title: '请输入标签', icon: 'none' })
+          return
+        }
+        await orderLabelApi.upsertLabel({ mpOrderId, labelText: text, color: 'violet' })
+        wx.showToast({ title: '标签已保存', icon: 'success' })
+        await this.reload()
+      } catch (err) {
+        wx.showToast({ title: (err && err.message) || '保存失败', icon: 'none' })
+      }
+      return
+    }
+
+    const preset = orderLabelApi.LABEL_PRESETS[pickIdx]
+    if (!preset) return
+    try {
+      await orderLabelApi.upsertLabel({
+        mpOrderId,
+        labelText: preset.text,
+        color: preset.color,
+      })
+      wx.showToast({ title: '标签已保存', icon: 'success' })
+      await this.reload()
+    } catch (err) {
+      wx.showToast({ title: (err && err.message) || '保存失败', icon: 'none' })
     }
   },
 })
