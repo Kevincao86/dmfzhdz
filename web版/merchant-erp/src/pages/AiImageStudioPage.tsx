@@ -45,8 +45,19 @@ import {
   type VisualPlaybookId,
   type VisualStudioForm,
 } from '../lib/aiImageStudioPresets'
+import {
+  MP_POINTS_VISUAL_STUDIO_COPY_PER_USE,
+  MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE,
+  mpPointsCostForVisualStudioImages,
+} from '../lib/mpPointsEconomics'
 import { postAiAgentNativeImage } from '../services/ai/aiClient'
 import { fetchVisualStudioCopyFromAi } from '../services/ai/visualStudioAi'
+import {
+  checkVisualStudioCopyAffordable,
+  checkVisualStudioImageBatchAffordable,
+  spendVisualStudioCopyPoints,
+  spendVisualStudioImagePoints,
+} from '../services/mpAiPointsSpendClient'
 import { fetchStoresForPlatform } from '../services/merchantStoresApi'
 
 type VariantResult = {
@@ -233,6 +244,8 @@ export default function AiImageStudioPage() {
     const channelCount = activeGenerateChannels.length
     const variantCount = form.variantCount
     const total = channelCount * variantCount
+    const pointsCost = mpPointsCostForVisualStudioImages(total)
+    const pointsDetail = `${MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE} 积分/张 × ${total} 张 = ${pointsCost} 积分`
     const primary = resolveChannel(activeGenerateChannels[0] ?? 'douyin')
     if (channelCount === 1) {
       return {
@@ -242,6 +255,8 @@ export default function AiImageStudioPage() {
             ? `${primary.short} · ${variantCount} 种构图版式`
             : `${primary.short}`,
         total,
+        pointsCost,
+        pointsDetail,
       }
     }
     if (form.multiChannelPack) {
@@ -249,12 +264,16 @@ export default function AiImageStudioPage() {
         buttonLabel: `一键出 ${channelCount} 平台套装`,
         detail: `每平台 ${variantCount} 种构图 · 共 ${total} 张`,
         total,
+        pointsCost,
+        pointsDetail,
       }
     }
     return {
       buttonLabel: `一键出 ${variantCount} 张构图`,
       detail: `${primary.short}`,
       total,
+      pointsCost,
+      pointsDetail,
     }
   }, [activeGenerateChannels, form.multiChannelPack, form.variantCount])
   const activeChannel = resolveChannel(selectedPreviewChannel)
@@ -264,10 +283,17 @@ export default function AiImageStudioPage() {
     [copyOptions, form.playbook, form.storeName, form.industry, form.offer],
   )
 
-  const loadAiCopy = useCallback(async (snapshot: VisualStudioForm) => {
+  const loadAiCopy = useCallback(async (snapshot: VisualStudioForm, opts?: { billable?: boolean }) => {
     copyAbortRef.current?.abort()
     const ac = new AbortController()
     copyAbortRef.current = ac
+    if (opts?.billable) {
+      const afford = await checkVisualStudioCopyAffordable()
+      if (!afford.ok) {
+        setCopyAiHint(afford.message)
+        return
+      }
+    }
     setCopyAiBusy(true)
     setCopyAiHint(null)
     const r = await fetchVisualStudioCopyFromAi(snapshot, { signal: ac.signal })
@@ -276,6 +302,13 @@ export default function AiImageStudioPage() {
     copyAbortRef.current = null
     if (r.ok) {
       setCopyOptions(r.items)
+      if (r.source === 'ai' && opts?.billable) {
+        const spendKey = `vs-copy-${snapshot.playbook}-${snapshot.industry}-${Date.now()}`
+        void spendVisualStudioCopyPoints({
+          idempotencyKey: spendKey,
+          note: snapshot.storeName.trim() || resolvePlaybook(snapshot.playbook).label,
+        })
+      }
       setCopyAiHint(r.source === 'ai' ? '已由 AI 模型生成文案' : null)
       return
     }
@@ -355,7 +388,7 @@ export default function AiImageStudioPage() {
   }
 
   const refreshCopy = () => {
-    void loadAiCopy(form)
+    void loadAiCopy(form, { billable: true })
   }
 
   const applyCopy = (c: CopySuggestion) => {
@@ -401,12 +434,18 @@ export default function AiImageStudioPage() {
       setError('请先填写主标题，或点「换一版文案」自动生成')
       return
     }
+    const jobList = buildJobs()
+    const afford = await checkVisualStudioImageBatchAffordable(jobList.length)
+    if (!afford.ok) {
+      setError(afford.message)
+      return
+    }
     abortRef.current?.abort()
     const ac = new AbortController()
     abortRef.current = ac
     setBusy(true)
     setError(null)
-    const jobList = buildJobs()
+    const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     setVariants(jobList)
 
     const refImage = pickReferenceImage()
@@ -451,6 +490,10 @@ export default function AiImageStudioPage() {
 
       job.status = 'done'
       job.imageUrl = out.imageUrl
+      void spendVisualStudioImagePoints({
+        idempotencyKey: `vs-img-${runId}-${job.id}`,
+        note: `${ch.short} 方案${job.variantIndex + 1}`,
+      })
       try {
         if (form.delivery === 'platform') {
           const blob = await fetchImageBlob(out.imageUrl)
@@ -748,12 +791,15 @@ export default function AiImageStudioPage() {
 
           <div className="grid gap-4 lg:grid-cols-2">
             <StudioPanel title="AI 文案包" subtitle="点选后同步填入上方文案">
-              <div className="mb-2 flex justify-end">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-[10px] text-slate-400">
+                  手动「AI 换一版」{MP_POINTS_VISUAL_STUDIO_COPY_PER_USE} 积分/次
+                </p>
                 <button
                   type="button"
                   disabled={busy || copyAiBusy}
                   onClick={refreshCopy}
-                  className="inline-flex items-center gap-1 text-xs font-medium text-violet-600 hover:text-violet-700 disabled:opacity-50"
+                  className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-violet-600 hover:text-violet-700 disabled:opacity-50"
                 >
                   {copyAiBusy ? (
                     <Loader2 className="h-3 w-3 animate-spin" />
@@ -952,6 +998,7 @@ export default function AiImageStudioPage() {
                 <option value={2}>2 种构图</option>
                 <option value={4}>4 种构图</option>
               </select>
+              <p className="w-full text-[11px] text-slate-500">{generatePlan.pointsDetail}</p>
               <select
                 value={form.delivery}
                 disabled={busy}

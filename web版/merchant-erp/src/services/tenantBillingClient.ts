@@ -180,6 +180,8 @@ export type ErpPointsSpendKind =
   | 'cloud_edit'
   | 'cloud_edit_smart'
   | 'digital_human'
+  | 'visual_studio_copy'
+  | 'visual_studio_image'
 
 export type ErpPointsSpendResult = {
   pointsCharged: number
