@@ -12,6 +12,7 @@ import { DOUBAO_VIDEO_CATALOG } from './arkModelCatalog'
 import { QWEN_VIDEO_CATALOG } from './qwenVisionCatalog'
 import {
   isQwenSingleFrameI2vModel,
+  isQwenT2vCompatibleModel,
   isQwenWan27VideoModel,
   sortQwenSingleFrameI2vModels,
 } from './qwenVisionApi'
@@ -162,6 +163,8 @@ function catalogQwenVideoIds(mode: VideoGenMode): string[] {
   if (mode === 'i2v') {
     ids = ids.filter((id) => isQwenSingleFrameI2vModel(id))
     ids = sortQwenSingleFrameI2vModels(ids)
+  } else {
+    ids = ids.filter((id) => isQwenT2vCompatibleModel(id))
   }
   return ids
 }
@@ -213,6 +216,7 @@ export function buildVideoDurationMatchedTryPlan(input: {
     const id = raw.trim()
     if (!id || seen.has(`qwen:${id}`)) return
     if (mode === 'i2v' && !isQwenSingleFrameI2vModel(id)) return
+    if (mode === 't2v' && !isQwenT2vCompatibleModel(id)) return
     if (!videoModelSupportsDuration(id, dur, mode)) return
     seen.add(`qwen:${id}`)
     steps.push({ model: id, preferProvider: 'qwen', label: label ?? id })

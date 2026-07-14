@@ -22,6 +22,7 @@ import {
   buildQwenDhS2vRequest,
   isQwenDhS2vCompatibleModel,
   isQwenSingleFrameI2vModel,
+  isQwenT2vCompatibleModel,
   isQwenWan27I2vModel,
   isQwenWan27VideoModel,
   sortQwenSingleFrameI2vModels,
@@ -921,7 +922,8 @@ async function qwenPostVideoTask(
     reqModel !== SEEDANCE_SERVER_AUTO &&
     !isDoubaoSeedanceModelId(reqModel) &&
     !isArkVideoEndpointId(reqModel) &&
-    videoModelSupportsDuration(reqModel, durationSec, mode)
+    videoModelSupportsDuration(reqModel, durationSec, mode) &&
+    (mode === 'i2v' ? isQwenSingleFrameI2vModel(reqModel) : isQwenT2vCompatibleModel(reqModel))
   ) {
     candidates = [reqModel, ...fromEnv.filter((id) => id !== reqModel)]
   }
@@ -932,6 +934,17 @@ async function qwenPostVideoTask(
       body.prefer_quota_stable === true || String(body.prefer_quota_stable ?? '').trim() === 'true'
     if (preferQuotaStable) {
       candidates = candidates.filter((id) => !isQwenWan27VideoModel(id))
+    }
+  } else {
+    candidates = candidates.filter((id) => isQwenT2vCompatibleModel(id))
+  }
+  if (candidates.length === 0) {
+    return {
+      ok: false,
+      msg:
+        mode === 't2v'
+          ? '未找到可用的千问文生视频模型（wan2.6-t2v / wan2.7-t2v 等）。请到运营台检查千问视觉模型配置，勿混入 vace / videoedit / videoretalk 等视频编辑或口型模型。'
+          : '未找到可用的千问图生视频模型（wan2.6-i2v / wan2.7-i2v 等）。请到运营台检查千问视觉模型配置。',
     }
   }
   for (const modelId of candidates) {

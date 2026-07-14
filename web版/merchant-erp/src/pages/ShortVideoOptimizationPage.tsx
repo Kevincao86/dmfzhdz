@@ -1183,6 +1183,7 @@ export default function ShortVideoOptimizationPage() {
           segmentCount: segmentCountHint,
           segmentSec,
           mode: planMode,
+          forceAiPlanner: scriptUsable ? false : undefined,
           scriptSegments: scriptUsable ? scriptRows : undefined,
         }),
       resolveImages: async (i, prevVideoUrl) => {

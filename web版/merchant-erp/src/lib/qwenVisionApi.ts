@@ -144,6 +144,21 @@ export function isQwenSingleFrameI2vModel(modelId: string): boolean {
   return /-i2v/.test(m) || m === 'wan2.6-i2v' || m === 'wan2.6-i2v-flash'
 }
 
+/** 文生视频（排除 videoretalk / liveportrait / r2v / 口型等需 video_url 的模型） */
+export function isQwenT2vCompatibleModel(modelId: string): boolean {
+  const m = modelId.trim().toLowerCase()
+  if (!m) return false
+  if (
+    /-r2v|kf2v|vace|videoretalk|liveportrait|animate-anyone|videoedit|video-edit|style-transform|s2v|emo-v1|-animate-/.test(
+      m,
+    )
+  ) {
+    return false
+  }
+  if (/-i2v/.test(m) && !/-t2v/.test(m)) return false
+  return /-t2v|\.t2v|wanx.*t2v|happyhorse.*t2v/.test(m) || m === 'wan2.6-t2v' || m === 'wan2.7-t2v'
+}
+
 /** wan2.6 可直接用 base64；wan2.7 需 OSS https，故排后 */
 export function sortQwenSingleFrameI2vModels(ids: readonly string[]): string[] {
   const wan26: string[] = []
