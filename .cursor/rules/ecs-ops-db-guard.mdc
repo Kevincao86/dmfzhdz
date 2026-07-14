@@ -1,5 +1,5 @@
 ---
-description: ECS 固定部署命令 + 禁止擅自动库（动库须用户确认 10 次）
+description: ECS 固定部署命令 + 禁止擅自动库（动库前须备份）
 alwaysApply: true
 ---
 
@@ -52,15 +52,16 @@ Agent 遇到部署、API 502、运营台读不到注册表、达人库显示 0 �
 
 ---
 
-## 动库须用户确认 10 次
+## 动库前须备份（用户明确要求动库时）
 
-若用户明确要求动库，或 Agent 判断只有动库能解，Agent **不得**自行执行，须：
+用户明确要求动库时，Agent **须先备份再执行**，不得无备份直接迁移：
 
-1. **先说明**将执行的具体命令/SQL/API 与风险（覆盖、不可回滚等）
-2. **连续发出 10 条独立提示**，第 k 条末尾必须为：  
-   `【动库确认 k/10】请回复：确认动库 k`
-3. 用户须 **逐条** 回复 `确认动库 1` … `确认动库 10`（共 10 次，缺一不可）
-4. **未凑齐 10 次** → 禁止动库；仅部署 + 只读诊断
-5. 凑齐后仍 **禁止** force push、DROP、无备份的 pg_restore
-
-Agent 不得在一条消息里合并 10 次确认；不得替用户假设同意。
+1. **先备份**轻量 Postgres（`139.196.42.5`，端口 `5433`）到 `~/stack/backups/`，文件名含时间戳。在 ECS 上须 `source ~/stack/db-credentials.txt` 后执行：
+   ```bash
+   source ~/stack/db-credentials.txt
+   export PGPASSWORD="$POSTGRES_PASSWORD"
+   pg_dump -h 127.0.0.1 -p 5433 -U postgres -d postgres -Fc -f ~/stack/backups/postgres-YYYYMMDD-HHMMSS.dump
+   ```
+2. **再执行**具体迁移 SQL 或脚本；`CREATE TABLE IF NOT EXISTS` 类增量迁移优先于全量覆盖。
+3. 迁移后 **重启 PostgREST**（`sudo systemctl restart meoo-postgrest`）并做只读校验（如 `to_regclass`、API smoke）。
+4. **禁止** force push、无备份的 `DROP`、无备份的 `pg_restore` 覆盖全库。
