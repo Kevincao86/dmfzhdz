@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
 import { cn } from '../cn'
 import { BRAND_LOGO_URL, BRAND_NAME_SHORT } from '../lib/brand'
-import { getAppEdition, peerEditionRootUrl } from '../lib/appEdition'
+import { getAppEdition, isPartnerEdition, peerEditionRootUrl } from '../lib/appEdition'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import EditionLandingToggle from './landing/EditionLandingToggle'
 import WebStaticOssImage from '../components/WebStaticOssImage'
@@ -118,6 +118,15 @@ export default function LandingPage() {
                 ? `以${EDITION_LABEL[viewEdition]}进入登录`
                 : `前往${EDITION_LABEL[viewEdition]}`}
             </button>
+            {!isPartnerEdition() ? (
+              <button
+                type="button"
+                onClick={() => nav('/affiliate/apply')}
+                className="mt-2 w-full rounded-xl border border-white/30 bg-white/10 py-2.5 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/15"
+              >
+                申请成为推广员
+              </button>
+            ) : null}
           </div>
 
           <button

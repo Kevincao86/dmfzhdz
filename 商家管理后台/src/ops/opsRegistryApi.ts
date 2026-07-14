@@ -384,6 +384,12 @@ export type RegistryFile = {
   helpManualCategories?: RegistryHelpManualCategory[]
   helpManualArticles?: RegistryHelpManualArticle[]
   teamIntro?: RegistryTeamIntro
+  distributionPolicy?: import('../meooRegistryShared/distributionRegistryTypes.js').RegistryDistributionPolicy
+  distributionAffiliates?: import('../meooRegistryShared/distributionRegistryTypes.js').RegistryDistributionAffiliate[]
+  distributionPartnerChannels?: import('../meooRegistryShared/distributionRegistryTypes.js').RegistryDistributionPartnerChannel[]
+  distributionWithdrawRequests?: import('../meooRegistryShared/distributionRegistryTypes.js').RegistryDistributionWithdrawRequest[]
+  distributionSettlementBatches?: import('../meooRegistryShared/distributionRegistryTypes.js').RegistryDistributionSettlementBatch[]
+  distributionWallets?: import('../meooRegistryShared/distributionRegistryTypes.js').RegistryDistributionWallet[]
 }
 
 export type HelpManualEdition = 'merchant' | 'partner' | 'fulfillment' | 'mp'

@@ -74,7 +74,8 @@
         "mine-manual/mine-manual",
         "mine-support-chat/mine-support-chat",
         "mine-targeted-invites/mine-targeted-invites",
-        "mine-wechat-oa-bind/mine-wechat-oa-bind"
+        "mine-wechat-oa-bind/mine-wechat-oa-bind",
+        "mine-affiliate-apply/mine-affiliate-apply"
       ]
     }
   ],

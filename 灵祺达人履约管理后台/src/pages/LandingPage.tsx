@@ -119,6 +119,13 @@ export default function LandingPage() {
             >
               以{ROLE_LABEL[role]}进入登录
             </button>
+            <button
+              type="button"
+              onClick={() => nav('/affiliate/apply')}
+              className="mt-2 w-full rounded-xl border border-white/30 bg-white/10 py-2.5 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/15"
+            >
+              申请成为推广员
+            </button>
           </div>
 
           <button

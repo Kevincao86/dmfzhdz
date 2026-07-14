@@ -486,6 +486,13 @@ export type RegistryFile = {
   teamIntro?: RegistryTeamIntro
   /** 抖音带货等级重置月份（运营台配置） */
   douyinSalesLevelResetYm?: string
+  /** 渠道分销 · 全局策略与 P1/P2 数据（注册表扩展） */
+  distributionPolicy?: import('./distributionRegistryTypes.js').RegistryDistributionPolicy
+  distributionAffiliates?: import('./distributionRegistryTypes.js').RegistryDistributionAffiliate[]
+  distributionPartnerChannels?: import('./distributionRegistryTypes.js').RegistryDistributionPartnerChannel[]
+  distributionWithdrawRequests?: import('./distributionRegistryTypes.js').RegistryDistributionWithdrawRequest[]
+  distributionSettlementBatches?: import('./distributionRegistryTypes.js').RegistryDistributionSettlementBatch[]
+  distributionWallets?: import('./distributionRegistryTypes.js').RegistryDistributionWallet[]
 }
 
 export type RegistrySnapshot = RegistryFile

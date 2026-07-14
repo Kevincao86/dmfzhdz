@@ -103,6 +103,8 @@ import mpRecruitmentDeleteHandler from '../api/meoo-ops-mp-recruitment-orders-de
 import mpRecruitmentOrdersListHandler from '../api/meoo-ops-mp-recruitment-orders-list.ts'
 import mpLibraryDeleteHandler from '../api/meoo-ops-mp-library-delete.ts'
 import mpLibraryFeaturesHandler from '../api/meoo-ops-mp-library-features.ts'
+import distributionRegistryHandler from '../api/meoo-ops-distribution-registry.ts'
+import distributionAffiliateApplyHandler from '../api/meoo-distribution-affiliate-apply.ts'
 import mpMembershipPlanVersionsHandler from '../api/meoo-ops-mp-membership-plan-versions.ts'
 import mpPrUserFeaturesHandler from '../api/meoo-ops-mp-pr-user-features.ts'
 import helpManualPublicHandler from '../api/meoo-help-manual-public.ts'
@@ -319,6 +321,9 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-mp-library-delete': mpLibraryDeleteHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-library-features': mpLibraryFeaturesHandler as VercelLikeHandler,
   '/api/ops-sync/mp-library/features': mpLibraryFeaturesHandler as VercelLikeHandler,
+  '/api/meoo-ops-distribution-registry': distributionRegistryHandler as VercelLikeHandler,
+  '/api/ops-sync/distribution-registry': distributionRegistryHandler as VercelLikeHandler,
+  '/api/meoo-distribution-affiliate-apply': distributionAffiliateApplyHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-membership-plan-versions': mpMembershipPlanVersionsHandler as VercelLikeHandler,
   '/api/ops-sync/mp-membership-plan-versions': mpMembershipPlanVersionsHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-pr-user-features': mpPrUserFeaturesHandler as VercelLikeHandler,

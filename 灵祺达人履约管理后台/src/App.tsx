@@ -8,6 +8,7 @@ import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
 import DyOAuthCallbackPage from './pages/login/DyOAuthCallbackPage'
 import RegisterPage from './pages/RegisterPage'
+import AffiliateApplyPage from '@merchant/pages/AffiliateApplyPage'
 import HallPage from './pages/HallPage'
 import OrdersPage from './pages/OrdersPage'
 import MessagesPage from './pages/MessagesPage'
@@ -95,6 +96,7 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/login/dy-oauth" element={<DyOAuthCallbackPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/affiliate/apply" element={<AffiliateApplyPage />} />
       <Route path="/help" element={<HelpManualPage edition="fulfillment" />} />
       <Route path="/help/:articleId" element={<HelpManualPage edition="fulfillment" />} />
       <Route path="/team" element={<TeamIntroPage edition="fulfillment" />} />

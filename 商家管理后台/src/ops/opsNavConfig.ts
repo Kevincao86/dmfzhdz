@@ -10,6 +10,7 @@ import {
   Library,
   Megaphone,
   BookOpen,
+  Share2,
   Shield,
   Smartphone,
   UserSearch,
@@ -57,6 +58,7 @@ export const OPS_NAV_GROUPS: OpsNavGroup[] = [
       { kind: 'leaf', to: '/customers', label: '客户管理', icon: Building2, permission: 'customers' },
       { kind: 'leaf', to: '/payment-orders', label: '订单管理', icon: CreditCard, permission: 'payment_orders' },
       { kind: 'leaf', to: '/mp-membership-finance', label: '星选会员财务', icon: Wallet, permission: 'mp_membership_finance' },
+      { kind: 'leaf', to: '/distribution', label: '渠道分销', icon: Share2, permission: 'distribution' },
     ],
   },
   {
