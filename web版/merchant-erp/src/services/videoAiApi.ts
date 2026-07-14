@@ -51,6 +51,20 @@ export function formatVideoAiUserError(msg: string): string {
       `原始信息：${raw}`
     )
   }
+  if (/parse input json error.*video_url|field required:\s*video_url/i.test(raw)) {
+    return (
+      '千问视频模型协议不匹配（该模型需 video_url，不能用于纯文案/分镜生成）。' +
+      '系统会自动切换 wan2.6-t2v 等文生视频模型；若仍失败请检查运营台「千问视觉模型」配置，勿混入 videoretalk / liveportrait 等口型模型。' +
+      `原始信息：${raw}`
+    )
+  }
+  if (/function not supported/i.test(raw)) {
+    return (
+      '千问视频编辑模型（如 vace / videoedit）不支持纯文案文生视频，已自动切换 wan2.6-t2v / wan2.7-t2v 等模型。' +
+      '若仍失败请到运营台「千问视觉模型」中仅保留 *-t2v / *-i2v 模型，勿混入视频编辑或口型模型。' +
+      `原始信息：${raw}`
+    )
+  }
   if (/inappropriate content|content[_\s-]?filter|content policy|safety filter|blocked by safety|moderation|内容审核|敏感内容|不当内容/i.test(raw)) {
     return (
       '视频模型内容安全审核未通过（生成画面被判定可能含不当内容）。' +
@@ -101,7 +115,9 @@ export function isVideoModelHopableError(msg: string): boolean {
   if (/duration must be in|duration customization is not supported|不支持.*时长|时长.*不支持/i.test(raw)) {
     return true
   }
-  if (/does not support content generation|not support.*video|不支持.*视频/i.test(raw)) return true
+  if (/does not support content generation|not support.*video|不支持.*视频|function not supported/i.test(raw)) {
+    return true
+  }
   if (/inappropriate content|content[_\s-]?filter|content policy|safety filter|blocked by safety|moderation|内容审核|敏感内容|不当内容/i.test(raw)) {
     return true
   }

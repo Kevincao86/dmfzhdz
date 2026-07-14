@@ -129,8 +129,10 @@ export function isQwenVideoModelHopableError(msg: string): boolean {
   if (/必须提供图片|图生视频.*必须|media.*required/i.test(raw)) return true
   if (/invalid.*url|url.*not.*valid|图片.*url|参考图.*https/i.test(raw)) return true
   if (/field required:\s*video_url/i.test(raw)) return true
+  if (/parse input json error.*video_url|input json error.*video_url/i.test(raw)) return true
   if (/field required:\s*face_bbox|field required:\s*ext_bbox/i.test(raw)) return true
   if (/duration must be in|duration customization is not supported/i.test(raw)) return true
+  if (/function not supported/i.test(raw)) return true
   return false
 }
 
@@ -188,13 +190,25 @@ export function mergeCatalogModelIds(
 ): string[] {
   const filtered = catalog.filter((e) => kindMatches(e, mode))
   const sorted = [...filtered].sort((a, b) => a.priority - b.priority)
+  const catalogIdSet = new Set(catalog.map((e) => e.modelId))
   const out: string[] = []
   const add = (id: string) => {
     const t = id.trim()
     if (t && !out.includes(t)) out.push(t)
   }
-  if (preferredId?.trim()) add(preferredId.trim())
-  for (const id of parseEnvModelList(envRaw ?? '')) add(id)
+  /** 运营台 env / 手选模型：须在目录中且 kind 匹配；未收录的 ep-/doubao- 接入点仍放行 */
+  const addEnvOrPreferred = (id: string) => {
+    const t = id.trim()
+    if (!t) return
+    const entry = catalog.find((e) => e.modelId === t)
+    if (entry) {
+      if (kindMatches(entry, mode)) add(t)
+      return
+    }
+    if (!catalogIdSet.has(t) && /^(ep-|doubao-)/i.test(t)) add(t)
+  }
+  if (preferredId?.trim()) addEnvOrPreferred(preferredId.trim())
+  for (const id of parseEnvModelList(envRaw ?? '')) addEnvOrPreferred(id)
   for (const e of sorted) add(e.modelId)
   return out
 }
