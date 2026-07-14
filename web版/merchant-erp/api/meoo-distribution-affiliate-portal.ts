@@ -1,10 +1,14 @@
 /**
- * GET /api/meoo-distribution-affiliate-portal
- * 登录用户（Supabase 或 mp 会话）查看个人推广码、钱包与结算摘要
+ * GET/POST /api/meoo-distribution-affiliate-portal
+ * 登录用户查看个人推广码、钱包与结算摘要；POST action=wxacode 生成太阳码
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { resolveAffiliateAuthIdentity } from '../src/lib/affiliatePortalAuth.js'
-import { buildAffiliatePortalFromSnapshot, buildDistributionPromoLinks } from '../src/lib/distributionRegistryCore.js'
+import {
+  buildAffiliatePortalFromSnapshot,
+  buildDistributionPromoLinks,
+} from '../src/lib/distributionRegistryCore.js'
+import { generateAffiliatePromoWxacodeDataUrl } from '../src/lib/mpAffiliateWxacode.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 import {
   merchantSupabaseAdminEnvConfigureHint,
@@ -20,17 +24,28 @@ function sendJson(res: VercelResponse, status: number, body: Record<string, unkn
   res.status(status).send(JSON.stringify(body))
 }
 
+function rawBody(req: VercelRequest): Record<string, unknown> {
+  try {
+    if (typeof req.body === 'string') return JSON.parse(req.body || '{}') as Record<string, unknown>
+    if (Buffer.isBuffer(req.body)) return JSON.parse(req.body.toString('utf8') || '{}') as Record<string, unknown>
+    if (req.body && typeof req.body === 'object') return req.body as Record<string, unknown>
+  } catch {
+    /* ignore */
+  }
+  return {}
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   try {
     if (req.method === 'OPTIONS') {
       res.setHeader('Access-Control-Allow-Origin', '*')
-      res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Mp-Session')
       res.status(204).end()
       return
     }
 
-    if (req.method !== 'GET') {
+    if (req.method !== 'GET' && req.method !== 'POST') {
       sendJson(res, 405, { ok: false, error: 'method_not_allowed' })
       return
     }
@@ -69,6 +84,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       portal.affiliate && typeof portal.affiliate.refCode === 'string'
         ? portal.affiliate.refCode.trim()
         : ''
+
+    if (req.method === 'POST') {
+      const body = rawBody(req)
+      const action = String(body.action || '').trim()
+      if (action !== 'wxacode') {
+        sendJson(res, 400, { ok: false, error: 'unknown_action' })
+        return
+      }
+      if (!portal.affiliate || portal.affiliate.status !== 'active' || !refCode) {
+        sendJson(res, 403, { ok: false, error: 'affiliate_not_active', message: '推广员审核通过后才可生成太阳码' })
+        return
+      }
+      try {
+        const dataUrl = await generateAffiliatePromoWxacodeDataUrl(refCode)
+        sendJson(res, 200, { ok: true, refCode, dataUrl, source: 'wechat_wxacode' })
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        const status = msg === 'wx_not_configured' ? 503 : 500
+        sendJson(res, status, { ok: false, error: msg === 'wx_not_configured' ? msg : 'wxacode_unavailable', message: msg.slice(0, 200) })
+      }
+      return
+    }
+
     const promoLinks =
       portal.affiliate && portal.affiliate.status === 'active' && refCode
         ? buildDistributionPromoLinks(refCode)

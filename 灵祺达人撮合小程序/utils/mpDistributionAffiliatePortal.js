@@ -19,6 +19,26 @@ function settlementStatusLabel(status) {
   return map[status] || status
 }
 
+function dataUrlToTempFile(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const m = String(dataUrl || '').match(/^data:image\/(\w+);base64,(.+)$/i)
+    if (!m) {
+      reject(new Error('invalid_wxacode_data'))
+      return
+    }
+    const ext = m[1].toLowerCase() === 'jpeg' ? 'jpg' : m[1].toLowerCase()
+    const dest = `${wx.env.USER_DATA_PATH}/affiliate-wxacode-${Date.now()}.${ext}`
+    const fs = wx.getFileSystemManager()
+    fs.writeFile({
+      filePath: dest,
+      data: m[2],
+      encoding: 'base64',
+      success: () => resolve(dest),
+      fail: (err) => reject(err || new Error('wxacode_write_fail')),
+    })
+  })
+}
+
 async function fetchPortal() {
   const data = await ecs.get('/api/meoo-distribution-affiliate-portal', sessionHeaders())
   if (!data || data.ok === false) {
@@ -33,8 +53,23 @@ async function fetchPortal() {
   }
 }
 
+async function fetchWxacodeImagePath() {
+  const data = await ecs.post(
+    '/api/meoo-distribution-affiliate-portal',
+    { action: 'wxacode' },
+    sessionHeaders(),
+  )
+  if (!data || data.ok === false) {
+    throw new Error(String((data && (data.message || data.error)) || 'wxacode_unavailable'))
+  }
+  const dataUrl = data.dataUrl ? String(data.dataUrl).trim() : ''
+  if (!dataUrl) throw new Error('wxacode_unavailable')
+  return dataUrlToTempFile(dataUrl)
+}
+
 module.exports = {
   formatYuan,
   settlementStatusLabel,
   fetchPortal,
+  fetchWxacodeImagePath,
 }

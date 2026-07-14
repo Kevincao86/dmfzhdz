@@ -37,7 +37,7 @@ function mapPortalView(data) {
       ? {
           settlementTotalYuan: affiliatePortal.formatYuan(stats.settlementTotalCents),
         }
-      : null,
+      : { settlementTotalYuan: '0.00' },
     settlements,
   }
 }
@@ -52,18 +52,30 @@ Page({
     promoLinks: null,
     linkRows: [],
     wallet: null,
-    stats: null,
+    stats: { settlementTotalYuan: '0.00' },
     settlements: [],
+    wxacodePath: '',
+    wxacodeLoading: false,
+    wxacodeErr: '',
   },
   onShow() {
     syncPageIdentity(this)
     this.loadPortal()
   },
   async loadPortal(retry = 0) {
-    this.setData({ loading: true, err: '', hint: '' })
+    this.setData({
+      loading: true,
+      err: '',
+      hint: '',
+      wxacodePath: '',
+      wxacodeErr: '',
+    })
     try {
       const data = await affiliatePortal.fetchPortal()
       this.setData({ loading: false, ...mapPortalView(data) })
+      if (data.promoLinks && data.affiliate && data.affiliate.status === 'active') {
+        this.loadWxacode()
+      }
     } catch (e) {
       const msg = (e && e.message) || '加载失败'
       const isGateway = /502|503|504|Bad Gateway|后台服务正在重启/i.test(msg)
@@ -75,6 +87,18 @@ Page({
         loading: false,
         err: msg,
       })
+    }
+  },
+  async loadWxacode() {
+    if (this.data.wxacodeLoading) return
+    this.setData({ wxacodeLoading: true, wxacodeErr: '' })
+    try {
+      const path = await affiliatePortal.fetchWxacodeImagePath()
+      this.setData({ wxacodePath: path, wxacodeLoading: false })
+    } catch (e) {
+      const raw = (e && e.message) || 'wxacode_unavailable'
+      const msg = raw === 'wxacode_unavailable' ? '太阳码生成失败，请稍后重试' : raw
+      this.setData({ wxacodeLoading: false, wxacodeErr: msg })
     }
   },
   onRetryLoad() {
@@ -98,6 +122,29 @@ Page({
     wx.setClipboardData({
       data: url,
       success: () => this.setData({ hint: `已复制${label}` }),
+    })
+  },
+  onSaveWxacode() {
+    const path = this.data.wxacodePath
+    if (!path) return
+    wx.saveImageToPhotosAlbum({
+      filePath: path,
+      success: () => this.setData({ hint: '太阳码已保存到相册' }),
+      fail: (err) => {
+        const denied = err && /auth deny|authorize/i.test(String(err.errMsg || ''))
+        if (denied) {
+          wx.showModal({
+            title: '需要相册权限',
+            content: '请在设置中允许保存图片到相册',
+            confirmText: '去设置',
+            success: (res) => {
+              if (res.confirm) wx.openSetting({})
+            },
+          })
+          return
+        }
+        this.setData({ hint: '保存失败，请长按太阳码保存' })
+      },
     })
   },
 })

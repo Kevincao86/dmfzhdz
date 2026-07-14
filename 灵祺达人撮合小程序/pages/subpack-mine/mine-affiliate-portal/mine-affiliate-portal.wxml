@@ -1,68 +1,127 @@
-<view class="page page-shell-fixed">
-  <view class="card">
-    <text class="title">我的推广</text>
-    <text class="sub">查看专属推广码、推广链接与佣金结算数据。</text>
-
-    <view wx:if="{{loading}}" class="info">加载中…</view>
-    <text class="err" wx:if="{{err}}">{{err}}</text>
-    <view wx:if="{{err}}" class="actions">
-      <button class="btn-secondary" bindtap="onRetryLoad">重新加载</button>
-    </view>
-    <text class="info" wx:if="{{hint}}">{{hint}}</text>
-
-    <view wx:if="{{!loading && !err && !affiliate}}" class="actions">
-      <text class="sub">您尚未提交推广员申请。</text>
-      <button class="btn-primary" bindtap="onGoApply">申请成为推广员</button>
-    </view>
-
-    <view wx:if="{{affiliate}}" class="result">
-      <text class="result-title">状态：{{statusLabel}}</text>
-      <text class="result-line" wx:if="{{affiliate.refCode}}">推广码：{{affiliate.refCode}}</text>
-      <button wx:if="{{affiliate.refCode}}" class="btn-secondary" bindtap="onCopyCode">复制推广码</button>
-      <text class="result-line" wx:if="{{affiliate.status === 'pending'}}">审核通过后将展示推广链接。</text>
-    </view>
-
-    <view wx:if="{{promoLinks}}">
-      <view class="link-row" wx:for="{{linkRows}}" wx:key="key">
-        <text class="link-label">{{item.label}}</text>
-        <text class="link-url">{{item.url}}</text>
-        <button class="btn-secondary" size="mini" data-url="{{item.url}}" data-label="{{item.label}}" bindtap="onCopyLink">复制</button>
-      </view>
-      <view class="link-row">
-        <text class="link-label">小程序路径</text>
-        <text class="link-url">{{promoLinks.mpPath}}</text>
-        <button class="btn-secondary" size="mini" data-url="{{promoLinks.mpPath}}" data-label="小程序路径" bindtap="onCopyLink">复制</button>
+<view class="portal-page">
+  <scroll-view scroll-y class="portal-scroll" enhanced show-scrollbar="{{false}}">
+    <view class="mp-sub-hero">
+      <view class="mp-sub-hero__glow"></view>
+      <view class="mp-sub-hero__inner">
+        <text class="mp-sub-hero__eyebrow">AFFILIATE</text>
+        <text class="mp-sub-hero__title">我的推广</text>
+        <text class="mp-sub-hero__sub">专属推广码、链接与佣金数据，扫码即可绑定你的推广关系。</text>
+        <view class="mp-sub-hero__chips" wx:if="{{affiliate && affiliate.refCode}}">
+          <text class="mp-sub-hero__chip mp-sub-hero__chip--green">{{statusLabel}}</text>
+          <text class="mp-sub-hero__chip">{{affiliate.refCode}}</text>
+        </view>
       </view>
     </view>
 
-    <view wx:if="{{wallet}}" class="stats-grid">
-      <view class="stat-card">
-        <text class="stat-label">可提现</text>
-        <text class="stat-value">¥{{wallet.availableYuan}}</text>
-      </view>
-      <view class="stat-card">
-        <text class="stat-label">冻结中</text>
-        <text class="stat-value">¥{{wallet.frozenYuan}}</text>
-      </view>
-      <view class="stat-card">
-        <text class="stat-label">已提现</text>
-        <text class="stat-value">¥{{wallet.withdrawnYuan}}</text>
-      </view>
-      <view class="stat-card">
-        <text class="stat-label">累计结算</text>
-        <text class="stat-value">¥{{stats.settlementTotalYuan}}</text>
+    <view wx:if="{{loading}}" class="portal-loading">
+      <text class="portal-loading__text">加载中…</text>
+    </view>
+
+    <view wx:if="{{err}}" class="mp-sub-card portal-error">
+      <text class="portal-error__text">{{err}}</text>
+      <button class="portal-btn portal-btn--ghost" bindtap="onRetryLoad">重新加载</button>
+    </view>
+
+    <text class="portal-hint" wx:if="{{hint}}">{{hint}}</text>
+
+    <view wx:if="{{!loading && !err && !affiliate}}" class="mp-sub-card portal-empty">
+      <view class="mp-empty-v2">
+        <text class="mp-empty-v2__icon">📣</text>
+        <text class="mp-empty-v2__title">尚未成为推广员</text>
+        <text class="mp-empty-v2__sub">提交申请并通过审核后，即可获取推广码与太阳码。</text>
+        <button class="portal-btn portal-btn--primary" bindtap="onGoApply">申请成为推广员</button>
       </view>
     </view>
 
-    <view wx:if="{{settlements.length}}">
-      <text class="label" style="margin-top: 28rpx;">近期结算</text>
-      <view class="settle-row" wx:for="{{settlements}}" wx:key="id">
-        {{item.periodStart}} ~ {{item.periodEnd}} · {{item.orderCount}} 单 · ¥{{item.totalYuan}} · {{item.statusLabel}}
+    <view wx:if="{{affiliate && affiliate.status !== 'active'}}" class="mp-sub-card">
+      <view class="mp-sub-card__head">
+        <view class="mp-sub-card__dot"></view>
+        <text class="mp-sub-card__title">申请状态</text>
+      </view>
+      <text class="portal-status-line">当前状态：{{statusLabel}}</text>
+      <text class="portal-status-sub" wx:if="{{affiliate.status === 'pending'}}">审核通过后将展示推广太阳码与链接。</text>
+      <button class="portal-btn portal-btn--ghost" bindtap="onGoApply">查看申请 / 重新申请</button>
+    </view>
+
+    <view wx:if="{{promoLinks}}" class="mp-sub-card">
+      <view class="mp-sub-card__head">
+        <view class="mp-sub-card__dot"></view>
+        <text class="mp-sub-card__title">小程序推广太阳码</text>
+      </view>
+      <view class="wxacode-box">
+        <view wx:if="{{wxacodeLoading}}" class="wxacode-box__loading">太阳码生成中…</view>
+        <image
+          wx:elif="{{wxacodePath}}"
+          class="wxacode-box__img"
+          src="{{wxacodePath}}"
+          mode="aspectFit"
+          show-menu-by-longpress
+        />
+        <view wx:else class="wxacode-box__fail">
+          <text>{{wxacodeErr || '太阳码暂不可用'}}</text>
+          <button class="portal-btn portal-btn--ghost portal-btn--sm" bindtap="loadWxacode">重新生成</button>
+        </view>
+      </view>
+      <text class="wxacode-tip">长按识别或保存图片，好友扫码进入小程序并自动绑定你的推广码。</text>
+      <view class="wxacode-actions">
+        <button class="portal-btn portal-btn--primary portal-btn--sm" bindtap="onCopyCode">复制推广码</button>
+        <button class="portal-btn portal-btn--ghost portal-btn--sm" bindtap="onSaveWxacode" disabled="{{!wxacodePath}}">保存太阳码</button>
       </view>
     </view>
 
-    <view class="actions" wx:if="{{affiliate && affiliate.status !== 'active'}}">
-      <button class="btn-secondary" bindtap="onGoApply">查看申请 / 重新申请</button>
+    <view wx:if="{{promoLinks}}" class="mp-sub-card">
+      <view class="mp-sub-card__head">
+        <view class="mp-sub-card__dot"></view>
+        <text class="mp-sub-card__title">网页推广链接</text>
+      </view>
+      <view class="link-item" wx:for="{{linkRows}}" wx:key="key">
+        <view class="link-item__main">
+          <text class="link-item__label">{{item.label}}</text>
+          <text class="link-item__url">{{item.url}}</text>
+        </view>
+        <button class="link-item__copy" size="mini" data-url="{{item.url}}" data-label="{{item.label}}" bindtap="onCopyLink">复制</button>
+      </view>
     </view>
-  </view>
+
+    <view wx:if="{{wallet}}" class="mp-sub-card">
+      <view class="mp-sub-card__head">
+        <view class="mp-sub-card__dot"></view>
+        <text class="mp-sub-card__title">佣金概览</text>
+      </view>
+      <view class="stats-grid">
+        <view class="stat-card stat-card--green">
+          <text class="stat-card__label">可提现</text>
+          <text class="stat-card__value">¥{{wallet.availableYuan}}</text>
+        </view>
+        <view class="stat-card stat-card--amber">
+          <text class="stat-card__label">冻结中</text>
+          <text class="stat-card__value">¥{{wallet.frozenYuan}}</text>
+        </view>
+        <view class="stat-card">
+          <text class="stat-card__label">已提现</text>
+          <text class="stat-card__value">¥{{wallet.withdrawnYuan}}</text>
+        </view>
+        <view class="stat-card stat-card--violet">
+          <text class="stat-card__label">累计结算</text>
+          <text class="stat-card__value">¥{{stats.settlementTotalYuan}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{settlements.length}}" class="mp-sub-card portal-settle-card">
+      <view class="mp-sub-card__head">
+        <view class="mp-sub-card__dot"></view>
+        <text class="mp-sub-card__title">近期结算</text>
+      </view>
+      <view class="settle-item" wx:for="{{settlements}}" wx:key="id">
+        <view class="settle-item__row">
+          <text class="settle-item__period">{{item.periodStart}} ~ {{item.periodEnd}}</text>
+          <text class="settle-item__status">{{item.statusLabel}}</text>
+        </view>
+        <text class="settle-item__meta">{{item.orderCount}} 单 · ¥{{item.totalYuan}}</text>
+      </view>
+    </view>
+
+    <view class="portal-safe-bottom"></view>
+  </scroll-view>
 </view>

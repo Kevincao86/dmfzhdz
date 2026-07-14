@@ -1,0 +1,220 @@
+/* 我的 · 子页统一 Hero / 空状态 / 漏斗可视化 */
+
+.mp-sub-hero {
+  position: relative;
+  margin: 0 0 20rpx;
+  padding: 32rpx 28rpx 28rpx;
+  border-radius: 28rpx;
+  overflow: hidden;
+  background: linear-gradient(135deg, #ffffff 0%, #f5f3ff 52%, #ede9fe 100%);
+  border: 1rpx solid rgba(124, 131, 255, 0.2);
+  box-shadow: 0 12rpx 40rpx rgba(91, 33, 182, 0.1);
+}
+
+.mp-sub-hero--blue {
+  background: linear-gradient(135deg, #ffffff 0%, #eff6ff 55%, #dbeafe 100%);
+  border-color: rgba(59, 130, 246, 0.18);
+  box-shadow: 0 12rpx 40rpx rgba(37, 99, 235, 0.08);
+}
+
+.mp-sub-hero__glow {
+  position: absolute;
+  top: -48rpx;
+  right: -24rpx;
+  width: 220rpx;
+  height: 220rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(124, 131, 255, 0.32) 0%, rgba(124, 131, 255, 0) 70%);
+  pointer-events: none;
+}
+
+.mp-sub-hero__inner {
+  position: relative;
+  z-index: 1;
+}
+
+.mp-sub-hero__eyebrow {
+  display: block;
+  font-size: 20rpx;
+  font-weight: 700;
+  letter-spacing: 3rpx;
+  color: #7c3aed;
+  opacity: 0.85;
+}
+
+.mp-sub-hero__title {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 40rpx;
+  font-weight: 800;
+  color: #1e1b4b;
+  line-height: 1.25;
+}
+
+.mp-sub-hero__sub {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: #64748b;
+}
+
+.mp-sub-hero__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 20rpx;
+}
+
+.mp-sub-hero__chip {
+  padding: 10rpx 18rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #5b21b6;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1rpx solid rgba(196, 181, 253, 0.75);
+  border-radius: 999rpx;
+}
+
+.mp-sub-hero__chip--green { color: #15803d; border-color: #bbf7d0; background: #f0fdf4; }
+.mp-sub-hero__chip--orange { color: #c2410c; border-color: #fed7aa; background: #fff7ed; }
+
+.mp-sub-card {
+  background: #fff;
+  border-radius: 24rpx;
+  padding: 28rpx;
+  margin-bottom: 20rpx;
+  border: 1rpx solid #ede9fe;
+  box-shadow: 0 8rpx 28rpx rgba(124, 77, 255, 0.07);
+}
+
+.mp-sub-card__head {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 16rpx;
+}
+
+.mp-sub-card__dot {
+  width: 8rpx;
+  height: 32rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(180deg, #8b93ff, #b794f6);
+}
+
+.mp-sub-card__title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1e1b4b;
+}
+
+.mp-empty-v2 {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 64rpx 32rpx;
+  text-align: center;
+}
+
+.mp-empty-v2__icon {
+  width: 96rpx;
+  height: 96rpx;
+  line-height: 96rpx;
+  text-align: center;
+  font-size: 44rpx;
+  border-radius: 28rpx;
+  background: linear-gradient(145deg, #ede9fe, #f5f3ff);
+  margin-bottom: 20rpx;
+}
+
+.mp-empty-v2__title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #334155;
+}
+
+.mp-empty-v2__sub {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  line-height: 1.55;
+  color: #94a3b8;
+}
+
+.mp-funnel-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 14rpx 0;
+}
+
+.mp-funnel-bar-label {
+  width: 88rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #475569;
+  flex-shrink: 0;
+}
+
+.mp-funnel-bar-track {
+  flex: 1;
+  height: 20rpx;
+  border-radius: 999rpx;
+  background: #f1f5f9;
+  overflow: hidden;
+}
+
+.mp-funnel-bar-fill {
+  height: 100%;
+  border-radius: 999rpx;
+  background: linear-gradient(90deg, #8b93ff, #c084fc);
+  min-width: 8rpx;
+  transition: width 0.3s ease;
+}
+
+.mp-funnel-bar-count {
+  width: 72rpx;
+  text-align: right;
+  font-size: 30rpx;
+  font-weight: 800;
+  color: #6d28d9;
+  flex-shrink: 0;
+}
+
+.mp-funnel-bar-rate {
+  width: 64rpx;
+  text-align: right;
+  font-size: 22rpx;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.mp-order-mini {
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #f1f5f9;
+}
+
+.mp-order-mini:last-child {
+  border-bottom: none;
+}
+
+.mp-order-mini__title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.mp-order-mini__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 10rpx;
+}
+
+.mp-order-mini__stat {
+  padding: 6rpx 14rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #6d28d9;
+  background: #f5f3ff;
+  border-radius: 8rpx;
+}
