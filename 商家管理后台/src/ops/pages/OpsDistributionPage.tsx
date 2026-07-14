@@ -56,6 +56,7 @@ function rateInput(
   value: number | undefined,
   onChange: (v: number | undefined) => void,
   disabled: boolean,
+  hint?: string,
 ) {
   return (
     <label className="block text-xs text-slate-400">
@@ -74,7 +75,91 @@ function rateInput(
         }}
         placeholder="默认"
       />
+      {hint ? <span className="mt-0.5 block text-[10px] leading-snug text-slate-500">{hint}</span> : null}
     </label>
+  )
+}
+
+function partnerChannelEffective(rates: DistributionProductLineRates) {
+  const pool = rates.partnerPoolRate ?? 0
+  const partnerShare = rates.partnerShareOfPool ?? 0
+  const salesShare = rates.salespersonShareOfPool ?? 0
+  return {
+    partnerOfPaid: pool * partnerShare,
+    salesOfPaid: pool * salesShare,
+  }
+}
+
+function PolicyProductLineCard({
+  title,
+  rates,
+  disabled,
+  onPatch,
+}: {
+  title: string
+  rates: DistributionProductLineRates
+  disabled: boolean
+  onPatch: (patch: Partial<DistributionProductLineRates>) => void
+}) {
+  const effective = partnerChannelEffective(rates)
+  return (
+    <div className="rounded-lg border border-slate-800 p-4">
+      <p className="mb-4 font-medium text-white">{title}</p>
+
+      <div className="rounded-lg border border-indigo-900/40 bg-indigo-950/20 p-3">
+        <p className="text-xs font-medium text-indigo-200">服务商渠道（fws 配置 · FWS- 推广码）</p>
+        <p className="mt-0.5 text-[10px] leading-relaxed text-slate-500">
+          商家/星选用户经服务商分销员推广时，先从实付中划出「分润池」，再在池内分给服务商公司与业务员。
+        </p>
+        <div className="mt-3 space-y-3">
+          {rateInput(
+            '分润池占实收（%）',
+            rates.partnerPoolRate,
+            (v) => onPatch({ partnerPoolRate: v }),
+            disabled,
+            '例：40 表示实付 ¥168 中先划出 ¥67.20 作为渠道池',
+          )}
+          <div className="rounded-md border border-slate-800/80 bg-slate-950/40 p-3">
+            <p className="mb-2 text-[10px] font-medium text-slate-400">池内二次分配（两项建议合计 100%）</p>
+            <div className="grid grid-cols-2 gap-3">
+              {rateInput(
+                '服务商占池（%）',
+                rates.partnerShareOfPool,
+                (v) => onPatch({ partnerShareOfPool: v }),
+                disabled,
+                '占分润池，非占实付',
+              )}
+              {rateInput(
+                '分销员占池（%）',
+                rates.salespersonShareOfPool,
+                (v) => onPatch({ salespersonShareOfPool: v }),
+                disabled,
+                '占分润池，非占实付',
+              )}
+            </div>
+            <p className="mt-2 text-[10px] text-emerald-400/90">
+              折合实收约：服务商 {pct(effective.partnerOfPaid)} · 分销员 {pct(effective.salesOfPaid)}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-lg border border-amber-900/35 bg-amber-950/15 p-3">
+        <p className="text-xs font-medium text-amber-100/90">个人推广员（dr/cs 申请 · IND- 推广码）</p>
+        <p className="mt-0.5 text-[10px] leading-relaxed text-slate-500">
+          与服务商渠道独立：个人推广员直接按实付比例计提，不进入上方分润池。
+        </p>
+        <div className="mt-3">
+          {rateInput(
+            '个人佣金占实收（%）',
+            rates.individualPoolRate,
+            (v) => onPatch({ individualPoolRate: v }),
+            disabled,
+            `例：30 表示实付 ¥168 个人得 ¥50.40`,
+          )}
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -115,31 +200,35 @@ function CommissionOverrideModal({
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div>
             <p className="mb-2 text-sm font-medium text-indigo-300">ERP（cs）</p>
-            <div className="space-y-2">
-              {rateInput('分润池占实收', erp.partnerPoolRate, (v) => setErp((p: DistributionProductLineRates) => ({ ...p, partnerPoolRate: v })), false)}
-              {mode === 'partner' ? (
-                <>
-                  {rateInput('服务商占池', erp.partnerShareOfPool, (v) => setErp((p: DistributionProductLineRates) => ({ ...p, partnerShareOfPool: v })), false)}
-                  {rateInput('分销员占池', erp.salespersonShareOfPool, (v) => setErp((p: DistributionProductLineRates) => ({ ...p, salespersonShareOfPool: v })), false)}
-                </>
-              ) : (
-                rateInput('个人整池', erp.individualPoolRate, (v) => setErp((p: DistributionProductLineRates) => ({ ...p, individualPoolRate: v })), false)
-              )}
-            </div>
+            {mode === 'partner' ? (
+              <div className="space-y-2 rounded-md border border-indigo-900/40 bg-indigo-950/20 p-2">
+                <p className="text-[10px] text-slate-500">服务商渠道覆盖</p>
+                {rateInput('分润池占实收', erp.partnerPoolRate, (v) => setErp((p: DistributionProductLineRates) => ({ ...p, partnerPoolRate: v })), false)}
+                {rateInput('服务商占池', erp.partnerShareOfPool, (v) => setErp((p: DistributionProductLineRates) => ({ ...p, partnerShareOfPool: v })), false, '占分润池')}
+                {rateInput('分销员占池', erp.salespersonShareOfPool, (v) => setErp((p: DistributionProductLineRates) => ({ ...p, salespersonShareOfPool: v })), false, '占分润池')}
+              </div>
+            ) : (
+              <div className="space-y-2 rounded-md border border-amber-900/35 bg-amber-950/15 p-2">
+                <p className="text-[10px] text-slate-500">个人推广员覆盖</p>
+                {rateInput('个人佣金占实收', erp.individualPoolRate, (v) => setErp((p: DistributionProductLineRates) => ({ ...p, individualPoolRate: v })), false)}
+              </div>
+            )}
           </div>
           <div>
             <p className="mb-2 text-sm font-medium text-sky-300">星选（dr/mp）</p>
-            <div className="space-y-2">
-              {rateInput('分润池占实收', xingxuan.partnerPoolRate, (v) => setXingxuan((p: DistributionProductLineRates) => ({ ...p, partnerPoolRate: v })), false)}
-              {mode === 'partner' ? (
-                <>
-                  {rateInput('服务商占池', xingxuan.partnerShareOfPool, (v) => setXingxuan((p: DistributionProductLineRates) => ({ ...p, partnerShareOfPool: v })), false)}
-                  {rateInput('分销员占池', xingxuan.salespersonShareOfPool, (v) => setXingxuan((p: DistributionProductLineRates) => ({ ...p, salespersonShareOfPool: v })), false)}
-                </>
-              ) : (
-                rateInput('个人整池', xingxuan.individualPoolRate, (v) => setXingxuan((p: DistributionProductLineRates) => ({ ...p, individualPoolRate: v })), false)
-              )}
-            </div>
+            {mode === 'partner' ? (
+              <div className="space-y-2 rounded-md border border-indigo-900/40 bg-indigo-950/20 p-2">
+                <p className="text-[10px] text-slate-500">服务商渠道覆盖</p>
+                {rateInput('分润池占实收', xingxuan.partnerPoolRate, (v) => setXingxuan((p: DistributionProductLineRates) => ({ ...p, partnerPoolRate: v })), false)}
+                {rateInput('服务商占池', xingxuan.partnerShareOfPool, (v) => setXingxuan((p: DistributionProductLineRates) => ({ ...p, partnerShareOfPool: v })), false, '占分润池')}
+                {rateInput('分销员占池', xingxuan.salespersonShareOfPool, (v) => setXingxuan((p: DistributionProductLineRates) => ({ ...p, salespersonShareOfPool: v })), false, '占分润池')}
+              </div>
+            ) : (
+              <div className="space-y-2 rounded-md border border-amber-900/35 bg-amber-950/15 p-2">
+                <p className="text-[10px] text-slate-500">个人推广员覆盖</p>
+                {rateInput('个人佣金占实收', xingxuan.individualPoolRate, (v) => setXingxuan((p: DistributionProductLineRates) => ({ ...p, individualPoolRate: v })), false)}
+              </div>
+            )}
           </div>
         </div>
         <label className="mt-4 block text-xs text-slate-400">
@@ -359,20 +448,22 @@ export default function OpsDistributionPage() {
             启用渠道分销
           </label>
           <div className="grid gap-6 lg:grid-cols-2">
-            {(['erp', 'xingxuan'] as const).map((line) => (
-              <div key={line} className="rounded-lg border border-slate-800 p-4">
-                <p className="mb-3 font-medium text-white">{line === 'erp' ? 'ERP · cs' : '星选 · dr/mp'}</p>
-                <div className="grid grid-cols-2 gap-3">
-                  {rateInput('分润池', policy[line].partnerPoolRate, (v) => setPolicy((p) => ({ ...p, [line]: { ...p[line], partnerPoolRate: v } })), !canEdit)}
-                  {rateInput('服务商占池', policy[line].partnerShareOfPool, (v) => setPolicy((p) => ({ ...p, [line]: { ...p[line], partnerShareOfPool: v } })), !canEdit)}
-                  {rateInput('分销员占池', policy[line].salespersonShareOfPool, (v) => setPolicy((p) => ({ ...p, [line]: { ...p[line], salespersonShareOfPool: v } })), !canEdit)}
-                  {rateInput('个人整池', policy[line].individualPoolRate, (v) => setPolicy((p) => ({ ...p, [line]: { ...p[line], individualPoolRate: v } })), !canEdit)}
-                </div>
-              </div>
-            ))}
+            <PolicyProductLineCard
+              title="ERP · cs"
+              rates={policy.erp}
+              disabled={!canEdit}
+              onPatch={(patch) => setPolicy((p) => ({ ...p, erp: { ...p.erp, ...patch } }))}
+            />
+            <PolicyProductLineCard
+              title="星选 · dr/mp"
+              rates={policy.xingxuan}
+              disabled={!canEdit}
+              onPatch={(patch) => setPolicy((p) => ({ ...p, xingxuan: { ...p.xingxuan, ...patch } }))}
+            />
           </div>
-          <p className="mt-4 text-xs text-slate-500">
-            默认：ERP 池 40%（服务商 16% + 分销员 24%）· 个人 30%；星选池 35% · 个人 25%。
+          <p className="mt-4 text-xs leading-relaxed text-slate-500">
+            默认 ERP：服务商渠道 池 40%（池内 40/60 → 实收 16%/24%）· 个人 30%。星选：池 35%（实收 14%/21%）· 个人
+            25%。两条轨道互不影响，同一 ref 码可分别推广 cs 与 dr。
           </p>
         </div>
       ) : null}
