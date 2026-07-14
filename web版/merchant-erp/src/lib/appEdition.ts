@@ -3,11 +3,13 @@
  */
 export type AppEdition = 'merchant' | 'partner'
 
-/** 生产环境：cs.* 商家站、fws.* 服务商站（优先于构建变量，避免 Vercel 配错） */
+/** 生产环境：cs.* 商家站、fws.* 服务商站、dr.* 星选站（优先于构建变量，避免配错/串包） */
 function hostEditionHint(hostname: string): AppEdition | null {
   const h = hostname.toLowerCase()
   if (h === 'localhost' || h === '127.0.0.1') return null
   if (h.startsWith('fws.') || h.includes('.fws.')) return 'partner'
+  // 星选履约站嵌入 @merchant 推广页：绝不能按服务商版拦截个人推广员
+  if (h.startsWith('dr.') || h.includes('.dr.')) return 'merchant'
   if (h.startsWith('cs.') || h.includes('.cs.')) return 'merchant'
   return null
 }
