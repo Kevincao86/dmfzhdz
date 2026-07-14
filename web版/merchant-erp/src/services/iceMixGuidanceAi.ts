@@ -27,6 +27,20 @@ const MATERIAL_FRAME_TIMEOUT_BASE_MS = 25_000
 const MIX_ANALYZE_FRAMES_PER_VIDEO = 3
 const MATERIAL_VISION_BATCH_TIMEOUT_MS = 90_000
 const VISION_FRAMES_PER_AI_CALL = 4
+/** 单次视觉 API 调用超时（避免无限挂起） */
+const VISION_AI_CALL_TIMEOUT_MS = 65_000
+/** 素材分析送入视觉模型的帧数上限（超出则均匀抽样） */
+const VISION_FRAME_CAP_FOR_ANALYZE = 28
+
+function sampleVisionFramesEvenly<T>(frames: T[], cap: number): T[] {
+  if (frames.length <= cap) return frames
+  const out: T[] = []
+  const step = frames.length / cap
+  for (let i = 0; i < cap; i++) {
+    out.push(frames[Math.floor(i * step)]!)
+  }
+  return out
+}
 
 const MIX_GUIDANCE_SYSTEM = `你是本地生活/电商短视频编导，负责根据商家已上传的实拍素材，撰写「AI混剪指导文案」（中文）。
 输出须覆盖：
@@ -267,15 +281,24 @@ export async function buildMaterialVisionProfiles(
   let visionError: string | undefined
   const descByIndex = new Map<number, string>()
   if (frameSamples.length > 0) {
-    onProgress?.(`AI 批量理解 ${frameSamples.length} 张采样画面…`)
+    const visionInput = sampleVisionFramesEvenly(frameSamples, VISION_FRAME_CAP_FOR_ANALYZE)
+    const batchTotal = Math.ceil(visionInput.length / VISION_FRAMES_PER_AI_CALL)
+    onProgress?.(
+      visionInput.length < frameSamples.length
+        ? `AI 批量理解 ${visionInput.length}/${frameSamples.length} 张采样画面（已抽样加速）…`
+        : `AI 批量理解 ${visionInput.length} 张采样画面…`,
+    )
     try {
-      const visionFrames = frameSamples.map((f) => ({
+      const visionFrames = visionInput.map((f) => ({
         label: `素材${f.index + 1}·${f.atSec.toFixed(1)}s（${f.label}）`,
         dataUrl: f.dataUrl,
       }))
       batchVisionText = await withProfileTimeout(
-        describeVideoFramesBatched(visionFrames),
-        MATERIAL_VISION_BATCH_TIMEOUT_MS * Math.max(1, Math.ceil(visionFrames.length / VISION_FRAMES_PER_AI_CALL)),
+        describeVideoFramesBatched(visionFrames, {
+          onProgress: (batchIdx, total) =>
+            onProgress?.(`AI 批量理解画面 ${batchIdx}/${total}…`),
+        }),
+        MATERIAL_VISION_BATCH_TIMEOUT_MS * Math.max(1, batchTotal),
         '',
       )
       if (!batchVisionText) {
@@ -333,23 +356,34 @@ async function describeVideoFramesOnce(
   const providers = ICE_MIX_VISION_PROVIDER_ORDER
   let lastErr = ''
   for (const { provider, model } of providers) {
+    const ac = new AbortController()
+    const timer = window.setTimeout(() => ac.abort(), VISION_AI_CALL_TIMEOUT_MS)
     try {
-      const res = await postAiChat({
-        provider,
-        model,
-        ...(provider === 'tokenmix' ? { modelFamily: 'openai' as const } : {}),
-        temperature: 0.25,
-        imageDataUrls,
-        messages: [
-          { role: 'system', content: FRAME_VISION_SYSTEM },
-          { role: 'user', content: userText },
-        ],
-      })
+      const res = await postAiChat(
+        {
+          provider,
+          model,
+          ...(provider === 'tokenmix' ? { modelFamily: 'openai' as const } : {}),
+          temperature: 0.25,
+          imageDataUrls,
+          messages: [
+            { role: 'system', content: FRAME_VISION_SYSTEM },
+            { role: 'user', content: userText },
+          ],
+        },
+        { signal: ac.signal },
+      )
       const text = res.content?.trim() || ''
       if (isVisionNotesUsable(text)) return text
       lastErr = '视觉模型未返回有效画面描述'
     } catch (e) {
-      lastErr = e instanceof Error ? e.message : String(e)
+      if (e instanceof DOMException && e.name === 'AbortError') {
+        lastErr = `视觉理解超时（${Math.round(VISION_AI_CALL_TIMEOUT_MS / 1000)}秒）`
+      } else {
+        lastErr = e instanceof Error ? e.message : String(e)
+      }
+    } finally {
+      clearTimeout(timer)
     }
   }
   throw new Error(lastErr || '视觉模型无法理解素材画面')
@@ -358,17 +392,28 @@ async function describeVideoFramesOnce(
 /** 多图分批调用视觉模型，避免单次 payload 过大 */
 async function describeVideoFramesBatched(
   frames: { label: string; dataUrl: string }[],
+  opts?: { onProgress?: (batchIdx: number, total: number) => void },
 ): Promise<string> {
   if (frames.length === 0) return ''
   if (frames.length <= VISION_FRAMES_PER_AI_CALL) {
     return describeVideoFramesOnce(frames)
   }
   const parts: string[] = []
+  const batchTotal = Math.ceil(frames.length / VISION_FRAMES_PER_AI_CALL)
   for (let i = 0; i < frames.length; i += VISION_FRAMES_PER_AI_CALL) {
+    const batchIdx = Math.floor(i / VISION_FRAMES_PER_AI_CALL) + 1
+    opts?.onProgress?.(batchIdx, batchTotal)
     const chunk = frames.slice(i, i + VISION_FRAMES_PER_AI_CALL)
-    const text = await describeVideoFramesOnce(chunk)
-    if (text) parts.push(text)
+    try {
+      const text = await describeVideoFramesOnce(chunk)
+      if (text) parts.push(text)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      if (parts.length === 0 && batchIdx >= batchTotal) throw new Error(msg)
+      /* 部分批次失败时继续，尽量产出可用描述 */
+    }
   }
+  if (!parts.length) throw new Error('视觉模型无法理解素材画面')
   return parts.join('\n\n')
 }
 
@@ -390,21 +435,32 @@ async function generateGuidanceText(
   const vendors = ICE_MIX_TEXT_PROVIDER_ORDER.filter((x) => x.provider !== 'tokenmix')
   let lastMsg = 'AI 未返回指导文案'
   for (const { provider, model } of vendors) {
+    const ac = new AbortController()
+    const timer = window.setTimeout(() => ac.abort(), 75_000)
     try {
-      const res = await postAiChat({
-        provider,
-        model,
-        temperature: 0.55,
-        messages: [
-          { role: 'system', content: MIX_GUIDANCE_SYSTEM },
-          { role: 'user', content: userBlock },
-        ],
-      })
+      const res = await postAiChat(
+        {
+          provider,
+          model,
+          temperature: 0.55,
+          messages: [
+            { role: 'system', content: MIX_GUIDANCE_SYSTEM },
+            { role: 'user', content: userBlock },
+          ],
+        },
+        { signal: ac.signal },
+      )
       const text = res.content?.trim()
       if (text && text.length >= 20 && !VISION_FAIL_RE.test(text)) return { ok: true, text }
       lastMsg = VISION_FAIL_RE.test(text || '') ? '成稿仍缺少画面细节，请重试' : 'AI 返回内容过短，请重试'
     } catch (e) {
-      lastMsg = e instanceof Error ? e.message : String(e)
+      if (e instanceof DOMException && e.name === 'AbortError') {
+        lastMsg = '指导文案生成超时，请稍后重试'
+      } else {
+        lastMsg = e instanceof Error ? e.message : String(e)
+      }
+    } finally {
+      clearTimeout(timer)
     }
   }
   return { ok: false, message: lastMsg }
