@@ -1026,6 +1026,7 @@ const INDUSTRY_PLAYBOOK_VARIANT_OVERRIDES: Partial<
         {
           id: 'tier_300',
           label: '充300送50',
+          periodLabel: '长期有效',
           headline: '充300送50',
           subheadline: '老客专享回馈',
           offer: '到账350元',
@@ -1035,6 +1036,7 @@ const INDUSTRY_PLAYBOOK_VARIANT_OVERRIDES: Partial<
         {
           id: 'tier_500',
           label: '充500送100',
+          periodLabel: '长期有效',
           headline: '充500送100',
           offer: '到账600元',
           timeRange: '长期有效',
@@ -1042,6 +1044,7 @@ const INDUSTRY_PLAYBOOK_VARIANT_OVERRIDES: Partial<
         {
           id: 'tier_1000',
           label: '充1000送250',
+          periodLabel: 'VIP专享',
           headline: '充1000送250',
           subheadline: '赠畅玩1次',
           offer: '到账1250元',
