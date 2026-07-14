@@ -44,6 +44,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     image_route?: unknown
     tokenmix_image_model?: unknown
     tenantId?: unknown
+    exact_prompt?: unknown
+    wanx_size?: unknown
+    aspect_ratio?: unknown
+    doubao_size?: unknown
+    prefer_wanx_poster?: unknown
   }
   try {
     body = JSON.parse(rawBody(req) || '{}') as typeof body
@@ -72,6 +77,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     typeof body.tokenmix_image_model === 'string' ? body.tokenmix_image_model.trim() : undefined
   const preferredModelId =
     typeof body.preferred_model_id === 'string' ? body.preferred_model_id.trim() : undefined
+  const exactPrompt = body.exact_prompt === true
+  const wanxSize = typeof body.wanx_size === 'string' ? body.wanx_size.trim() : undefined
+  const arRaw = typeof body.aspect_ratio === 'string' ? body.aspect_ratio.trim() : ''
+  const aspectRatio =
+    arRaw === '1:1' || arRaw === '3:4' || arRaw === '4:3' || arRaw === '9:16' || arRaw === '16:9'
+      ? arRaw
+      : undefined
+  const dsRaw = typeof body.doubao_size === 'string' ? body.doubao_size.trim().toUpperCase() : ''
+  const doubaoSize = dsRaw === '1K' || dsRaw === '2K' || dsRaw === '4K' ? dsRaw : undefined
+  const preferWanxPoster = body.prefer_wanx_poster === true
 
   const { mergeMerchantAiEnvWithRegistrySnapshot } = await import(
     '../vite-plugins/merchantRegistryVendorEnv.js'
@@ -110,6 +125,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       preferredModelId,
       imageRoute,
       tokenmixImageModel,
+      exactPrompt,
+      wanxSize,
+      aspectRatio,
+      doubaoSize,
+      preferWanxPoster,
     })
     if (out.ok) {
       const { recordAiTokenUsageFromVercelRequest, estimateLlmTokensFromText } = await import(

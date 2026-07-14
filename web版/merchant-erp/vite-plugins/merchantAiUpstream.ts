@@ -463,17 +463,23 @@ function buildAgentFreeformImageI2iPrompt(userRequest: string): string {
   return `图生图任务：用户已提供参考图。请在参考图基础上按下列文字说明调整或重绘——若文字与参考图主体冲突，以文字为准。输出须高清、光线自然、构图专业；避免违规、畸形肢体与牛皮癣水印。用户说明：「${desc}」。`
 }
 
+type AgentImageGenOpts = {
+  wanxSize?: string
+  doubaoSize?: '1K' | '2K' | '4K'
+}
+
 async function runAgentT2iSingleVendor(
   model: string,
   key: string,
   env: MerchantAiEnv,
   prompt: string,
   refImage?: string,
+  genOpts?: AgentImageGenOpts,
 ): Promise<string[]> {
   const primaryNorm = normalizeAiModelPreserveCustom(model)
   const ref = refImage?.trim() || undefined
   if (primaryNorm === 'qwen') {
-    const u = await qwenWanxOneImage(key, env, prompt, ref)
+    const u = await qwenWanxOneImage(key, env, prompt, ref, { wanxSize: genOpts?.wanxSize })
     return [u]
   }
   if (primaryNorm === 'minimax') {
@@ -495,7 +501,7 @@ async function runAgentT2iSingleVendor(
     const payload: Record<string, unknown> = {
       model: doubaoImageModelId(env),
       prompt,
-      size: '2K',
+      size: genOpts?.doubaoSize ?? '2K',
       response_format: 'url',
     }
     if (ref) payload.image = ref
@@ -510,11 +516,12 @@ async function runAgentImageGenerateWithBuiltinFailover(
   keyFirst: string,
   prompt: string,
   refImage?: string,
+  genOpts?: AgentImageGenOpts,
 ): Promise<{ urls: string[]; modelUsed: string }> {
   const primaryNorm = normalizeAiModelPreserveCustom(primary)
   let lastErr: unknown = null
   try {
-    const urls = await runAgentT2iSingleVendor(primaryNorm, keyFirst, env, prompt, refImage)
+    const urls = await runAgentT2iSingleVendor(primaryNorm, keyFirst, env, prompt, refImage, genOpts)
     return { urls, modelUsed: primaryNorm }
   } catch (e) {
     lastErr = e
@@ -524,7 +531,7 @@ async function runAgentImageGenerateWithBuiltinFailover(
     const { key } = pickKey(env, alt)
     if (!key) continue
     try {
-      const urls = await runAgentT2iSingleVendor(alt, key, env, prompt, refImage)
+      const urls = await runAgentT2iSingleVendor(alt, key, env, prompt, refImage, genOpts)
       return { urls, modelUsed: alt }
     } catch (e) {
       lastErr = e
@@ -539,11 +546,21 @@ async function runAgentImageGenerateWithBuiltinFailover(
  * `opts.referenceImage` 为 data URL 或公网 URL 时走图生图（万相 ref_image、豆包 image；MiniMax 以提示词吸收参考意图）。
  * @returns vendorUsed 为 qwen | doubao | minimax，供前端同步模型下拉展示。
  */
+export type AgentFreeformImageOpts = {
+  referenceImage?: string
+  exactPrompt?: boolean
+  preferredModelId?: string
+  wanxSize?: string
+  aspectRatio?: '1:1' | '3:4' | '4:3' | '9:16' | '16:9'
+  doubaoSize?: '1K' | '2K' | '4K'
+  preferWanxPoster?: boolean
+}
+
 export async function runAgentFreeformTextToImage(
   env: MerchantAiEnv,
   userLine: string,
   preferredVendor?: 'qwen' | 'doubao' | 'minimax',
-  opts?: { referenceImage?: string; exactPrompt?: boolean; preferredModelId?: string },
+  opts?: AgentFreeformImageOpts,
 ): Promise<
   | { ok: true; imageUrl: string; vendorUsed: 'qwen' | 'doubao' | 'minimax' }
   | { ok: false; message: string }
@@ -555,12 +572,22 @@ export async function runAgentFreeformTextToImage(
     : ref
       ? buildAgentFreeformImageI2iPrompt(userLine)
       : buildAgentFreeformImagePrompt(userLine)
-  const modelId = opts?.preferredModelId?.trim()
+  let modelId = opts?.preferredModelId?.trim()
+  if (!modelId && opts?.preferWanxPoster) {
+    modelId = 'wanx-poster-generation-v1'
+  } else if (!modelId && exact && (!preferredVendor || preferredVendor === 'qwen')) {
+    modelId = 'wan2.7-image-pro'
+  }
   let effEnv = env
-  if (modelId && preferredVendor === 'qwen') {
+  const effVendor = preferredVendor ?? 'qwen'
+  if (modelId && effVendor === 'qwen') {
     effEnv = { ...env, MERCHANT_AI_QWEN_IMAGE_MODEL: modelId }
-  } else if (modelId && preferredVendor === 'doubao') {
+  } else if (modelId && effVendor === 'doubao') {
     effEnv = { ...env, MERCHANT_AI_DOUBAO_IMAGE_MODEL: modelId }
+  }
+  const genOpts: AgentImageGenOpts = {
+    wanxSize: opts?.wanxSize?.trim() || undefined,
+    doubaoSize: opts?.doubaoSize,
   }
   const order = imageVendorOrderPreferring(effEnv, preferredVendor)
   const primary = pickPrimaryVendorWithKey(effEnv, order)
@@ -578,6 +605,7 @@ export async function runAgentFreeformTextToImage(
       key,
       prompt,
       ref,
+      genOpts,
     )
     const u = urls[0]?.trim()
     if (!u) return { ok: false, message: '生图完成但未拿到有效图片地址，请稍后重试。' }
@@ -1855,12 +1883,13 @@ async function qwenWanxOneImage(
   env: MerchantAiEnv,
   prompt: string,
   refImageUrl?: string,
-  opts?: { voucherFaceMode?: boolean; forceT2i?: boolean },
+  opts?: { voucherFaceMode?: boolean; forceT2i?: boolean; wanxSize?: string },
 ): Promise<string> {
   const input: Record<string, unknown> = { prompt }
   let parameterExtras: Record<string, unknown> | undefined
   const useRef = refImageUrl && !opts?.forceT2i
   const voucherNeg = voucherImageNegativePrompt()
+  const wanxSize = opts?.wanxSize?.trim()
   if (useRef) {
     input.ref_image = refImageUrl
     input.negative_prompt = opts?.voucherFaceMode
@@ -1869,12 +1898,14 @@ async function qwenWanxOneImage(
     parameterExtras = {
       ref_strength: opts?.voucherFaceMode ? 0.18 : qwenI2iRefStrength(env),
       ref_mode: 'repaint',
+      ...(wanxSize ? { size: wanxSize } : {}),
     }
   } else {
     parameterExtras = {
       negative_prompt: opts?.voucherFaceMode
         ? `${voucherNeg}, 手机, 数码, 低分辨率, 水印`
         : '手机,智能手机,平板电脑,笔记本电脑,显示器,键盘,鼠标,办公桌面,数码产品特写,与商品标题无关的食物,杂乱拼贴,低分辨率,畸形手指,水印,无关展厅,样板间,办公室,工位',
+      ...(wanxSize ? { size: wanxSize } : {}),
     }
   }
   const mode = useRef ? 'i2i' : 't2i'
