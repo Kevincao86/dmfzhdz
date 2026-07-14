@@ -13,6 +13,26 @@ function isQwenImageModel(modelId: string): boolean {
   return /^qwen-image/i.test(modelId.trim())
 }
 
+/** wan2.7 / wan2.6-image 走 multimodal-generation（messages），非旧版 wanx text2image */
+export function isWan27MultimodalImageModel(modelId: string): boolean {
+  const m = modelId.trim().toLowerCase()
+  return /^wan2\.7-image/.test(m) || m === 'wan2.6-image'
+}
+
+/** wan2.7 支持 1K/2K/4K 缩写或 宽*高 自定义（768–4096） */
+export function normalizeWan27ImageSizeParam(raw?: string): string {
+  const t = String(raw ?? '').trim()
+  if (!t) return '2K'
+  if (/^(1k|2k|4k)$/i.test(t)) return t.toUpperCase()
+  const m = /^(\d{3,4})\s*[*×x]\s*(\d{3,4})$/i.exec(t)
+  if (m) {
+    const w = Math.max(768, Math.min(4096, Number(m[1]) || 1024))
+    const h = Math.max(768, Math.min(4096, Number(m[2]) || 1024))
+    return `${w}*${h}`
+  }
+  return '2K'
+}
+
 function isQwenImageEditModel(modelId: string): boolean {
   const m = modelId.toLowerCase()
   return /qwen-image-edit|imageedit|repaint|out-painting|i2i-preview/.test(m)
@@ -55,7 +75,18 @@ export function buildQwenVisionImageRequest(
     }
   }
 
-  if (isQwenImageModel(modelId)) {
+  if (isQwenImageModel(modelId) || isWan27MultimodalImageModel(modelId)) {
+    const content: Array<Record<string, string>> = [{ text: prompt }]
+    if (ref) content.push({ image: ref })
+    const sizeRaw = opts?.parameterExtras?.size
+    const size =
+      typeof sizeRaw === 'string' && sizeRaw.trim()
+        ? isWan27MultimodalImageModel(modelId)
+          ? normalizeWan27ImageSizeParam(sizeRaw)
+          : sizeRaw.trim()
+        : isWan27MultimodalImageModel(modelId)
+          ? '2K'
+          : '1024*1024'
     return {
       url: `${DASHSCOPE}/api/v1/services/aigc/multimodal-generation/generation`,
       body: {
@@ -64,11 +95,16 @@ export function buildQwenVisionImageRequest(
           messages: [
             {
               role: 'user',
-              content: [{ text: prompt }],
+              content,
             },
           ],
         },
-        parameters,
+        parameters: {
+          ...parameters,
+          size,
+          watermark: false,
+          ...(isWan27MultimodalImageModel(modelId) ? { thinking_mode: true } : {}),
+        },
       },
     }
   }
@@ -123,6 +159,23 @@ export function extractQwenVisionImageUrls(output: Record<string, unknown> | und
   }
   if (typeof output.url === 'string' && output.url.trim()) urls.push(output.url.trim())
   return urls
+}
+
+/** 从百炼同步 multimodal 响应或异步 task 查询结果提取图片 URL */
+export function extractQwenVisionImageUrlsFromPayload(
+  payload: Record<string, unknown> | undefined,
+): string[] {
+  if (!payload) return []
+  const fromOutput = extractQwenVisionImageUrls(
+    (payload.output as Record<string, unknown> | undefined) ?? undefined,
+  )
+  if (fromOutput.length > 0) return fromOutput
+  return extractQwenVisionImageUrls(payload)
+}
+
+/** wan2.7 / qwen-image 等多模态生图：同步返回；旧版 wanx：须 X-DashScope-Async + 轮询 */
+export function qwenVisionImageUsesAsyncHeader(modelId: string): boolean {
+  return !isQwenImageModel(modelId) && !isWan27MultimodalImageModel(modelId)
 }
 
 /** wan2.7 图生视频新协议：input.media 必填，url 须为公网 https */
