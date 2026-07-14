@@ -1,16 +1,19 @@
 /**
- * POST /api/meoo-distribution-affiliate-apply — 个人分销员申请（公开）
- * GET  /api/meoo-distribution-affiliate-apply?phone= — 查询申请状态（公开）
+ * POST /api/meoo-distribution-affiliate-apply — 个人分销员申请（公开，登录态会绑定账号）
+ * GET  /api/meoo-distribution-affiliate-apply?phone= — 按手机号查询（公开）
+ * GET  /api/meoo-distribution-affiliate-apply + Authorization — 按当前登录账号查询
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
   merchantSupabaseAdminEnvConfigureHint,
   readMerchantSupabaseAdminEnv,
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
+import { resolveAffiliateAuthIdentity } from '../src/lib/affiliatePortalAuth.js'
 import {
   applyAffiliateFromSnapshot,
   lookupAffiliateByPhoneFromSnapshot,
   publicAffiliateSummary,
+  resolveAffiliateIdentityFromSnapshot,
 } from '../src/lib/distributionRegistryCore.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 
@@ -19,6 +22,7 @@ export const config = { maxDuration: 30 }
 function sendJson(res: VercelResponse, status: number, body: Record<string, unknown>): void {
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
   res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Mp-Session')
   res.status(status).send(JSON.stringify(body))
 }
 
@@ -38,7 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     if (req.method === 'OPTIONS') {
       res.setHeader('Access-Control-Allow-Origin', '*')
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Mp-Session')
       res.status(204).end()
       return
     }
@@ -56,8 +60,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
+    const env = process.env as Record<string, string>
 
     if (req.method === 'GET') {
+      const identity = await resolveAffiliateAuthIdentity(req, env)
+      if (identity?.authUserId || identity?.phone) {
+        const affiliate = resolveAffiliateIdentityFromSnapshot(data, identity)
+        sendJson(res, 200, {
+          ok: true,
+          affiliate: affiliate ? publicAffiliateSummary(affiliate) : null,
+        })
+        return
+      }
       const phone = String(req.query.phone || '')
       const r = lookupAffiliateByPhoneFromSnapshot(data, phone)
       if (!r.ok) {
@@ -83,6 +97,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendJson(res, 400, { ok: false, error: 'invalid_json' })
       return
     }
+
+    const identity = await resolveAffiliateAuthIdentity(req, env)
+    if (identity?.authUserId) body.authUserId = identity.authUserId
+    if (identity?.phone && !body.phone) body.phone = identity.phone
 
     const result = applyAffiliateFromSnapshot(data, body)
     if (!result.ok) {

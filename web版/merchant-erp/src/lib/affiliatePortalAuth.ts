@@ -1,5 +1,5 @@
 /**
- * 推广员自助中心：从 Supabase JWT 或星选/小程序 mp 会话解析手机号
+ * 推广员自助中心：从 Supabase JWT 或星选/小程序 mp 会话解析身份
  */
 import type { VercelRequest } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
@@ -8,6 +8,11 @@ import { createMpAuthRest, resolveSession } from './mpAccountAuth.js'
 import { phoneFromAuthUser } from './tenantLocalState.js'
 import { readMerchantSupabaseAdminEnv } from '../../vite-plugins/merchantSupabaseAdminEnv.js'
 import { nodeSupabaseClientOptions } from './nodeSupabaseClientOptions.js'
+
+export type AffiliateAuthIdentity = {
+  authUserId?: string
+  phone?: string
+}
 
 function bearerToken(req: VercelRequest): string {
   const mpHdr = req.headers['x-mp-session']
@@ -22,16 +27,22 @@ function phoneFromLoginName(raw: unknown): string | null {
   return /^1\d{10}$/.test(digits) ? digits : null
 }
 
-async function phoneFromMpSession(token: string): Promise<string | null> {
+async function identityFromMpSession(token: string): Promise<AffiliateAuthIdentity | null> {
   const { supabaseUrl, serviceRole } = readMerchantSupabaseAdminEnv()
   if (!supabaseUrl || !serviceRole) return null
   const rest = createMpAuthRest(supabaseUrl, serviceRole)
   const sess = await resolveSession(rest, token)
   if (!sess) return null
-  return phoneFromLoginName(sess.account.login_name)
+  return {
+    authUserId: `mp:${sess.account.id}`,
+    phone: phoneFromLoginName(sess.account.login_name) ?? undefined,
+  }
 }
 
-async function phoneFromSupabaseJwt(token: string, env: Record<string, string>): Promise<string | null> {
+async function identityFromSupabaseJwt(
+  token: string,
+  env: Record<string, string>,
+): Promise<AffiliateAuthIdentity | null> {
   const user = await verifyBearerJwt(`Bearer ${token}`, env)
   if (!user?.id) return null
 
@@ -46,13 +57,16 @@ async function phoneFromSupabaseJwt(token: string, env: Record<string, string>):
     user_metadata: meta,
   })
   if (!phone) phone = phoneFromLoginName(meta.login_name) ?? ''
-  return phone || null
+  return {
+    authUserId: user.id,
+    phone: phone || undefined,
+  }
 }
 
-export async function resolveAffiliatePortalPhone(
+export async function resolveAffiliateAuthIdentity(
   req: VercelRequest,
   env: Record<string, string>,
-): Promise<string | null> {
+): Promise<AffiliateAuthIdentity | null> {
   const token = bearerToken(req)
   if (!token) return null
 
@@ -60,17 +74,26 @@ export async function resolveAffiliatePortalPhone(
     typeof req.headers['x-mp-session'] === 'string' && req.headers['x-mp-session'].trim().length > 0
 
   if (preferMp) {
-    const mpPhone = await phoneFromMpSession(token)
-    if (mpPhone) return mpPhone
+    const mpIdentity = await identityFromMpSession(token)
+    if (mpIdentity) return mpIdentity
   }
 
-  const sbPhone = await phoneFromSupabaseJwt(token, env)
-  if (sbPhone) return sbPhone
+  const sbIdentity = await identityFromSupabaseJwt(token, env)
+  if (sbIdentity) return sbIdentity
 
   if (!preferMp) {
-    const mpPhone = await phoneFromMpSession(token)
-    if (mpPhone) return mpPhone
+    const mpIdentity = await identityFromMpSession(token)
+    if (mpIdentity) return mpIdentity
   }
 
   return null
+}
+
+/** @deprecated 使用 resolveAffiliateAuthIdentity */
+export async function resolveAffiliatePortalPhone(
+  req: VercelRequest,
+  env: Record<string, string>,
+): Promise<string | null> {
+  const identity = await resolveAffiliateAuthIdentity(req, env)
+  return identity?.phone ?? null
 }

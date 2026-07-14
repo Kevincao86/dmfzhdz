@@ -432,11 +432,11 @@ export default function MeooLayout() {
                           className="flex w-full items-center px-4 py-2.5 text-sm text-slate-700 transition-colors hover:bg-slate-50"
                           onClick={() => {
                             setUserOpen(false)
-                            navigate('/affiliate/apply')
+                            navigate('/affiliate/portal')
                           }}
                         >
                           <Share2 className="mr-3 h-4 w-4 text-violet-500" />
-                          申请推广员
+                          我的推广
                         </button>
                       ) : null}
                       <button

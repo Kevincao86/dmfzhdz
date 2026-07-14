@@ -3,7 +3,7 @@
  * 登录用户（Supabase 或 mp 会话）查看个人推广码、钱包与结算摘要
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { resolveAffiliatePortalPhone } from '../src/lib/affiliatePortalAuth.js'
+import { resolveAffiliateAuthIdentity } from '../src/lib/affiliatePortalAuth.js'
 import { buildAffiliatePortalFromSnapshot, buildDistributionPromoLinks } from '../src/lib/distributionRegistryCore.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 import {
@@ -36,12 +36,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
 
     const env = process.env as Record<string, string>
-    const phone = await resolveAffiliatePortalPhone(req, env)
-    if (!phone) {
+    const identity = await resolveAffiliateAuthIdentity(req, env)
+    if (!identity?.authUserId && !identity?.phone) {
       sendJson(res, 401, {
         ok: false,
         error: 'unauthorized',
-        message: '请先登录并绑定手机号后再查看推广中心',
+        message: '请先登录后再查看推广中心',
       })
       return
     }
@@ -59,7 +59,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
-    const portal = buildAffiliatePortalFromSnapshot(data, phone)
+    const portal = buildAffiliatePortalFromSnapshot(data, identity)
     if (!portal.ok) {
       sendJson(res, portal.status, { ok: false, error: portal.error })
       return

@@ -8,7 +8,7 @@ const BASE_NAV = [
   { to: '/team', label: '团队介绍' },
 ] as const
 
-const AFFILIATE_NAV = { to: '/affiliate/apply', label: '推广合作' } as const
+const AFFILIATE_NAV = { to: '/affiliate/portal', label: '我的推广' } as const
 
 type Props = {
   className?: string

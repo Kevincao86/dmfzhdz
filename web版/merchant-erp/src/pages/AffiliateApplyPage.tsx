@@ -1,13 +1,18 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Loader2, Share2 } from 'lucide-react'
 import { cn } from '../cn'
 import LoginPortalNav from '../components/login/LoginPortalNav'
 import { isPartnerEdition } from '../lib/appEdition'
+import { phoneFromAuthUser } from '../lib/tenantLocalState'
+import { supabase, supabaseConfigured } from '../lib/supabaseClient'
+import { readMpSessionToken } from '../lib/merchantApiAuth'
 import {
+  affiliateApplyErrorLabel,
   affiliateStatusLabel,
   applyAsAffiliate,
   fetchAffiliateApplyStatus,
+  fetchMyAffiliateApplyStatus,
   type PublicAffiliateSummary,
 } from '../lib/distributionAffiliateApplyClient'
 
@@ -43,7 +48,39 @@ export default function AffiliateApplyPage() {
   const [info, setInfo] = useState('')
   const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(false)
+  const [booting, setBooting] = useState(true)
   const [result, setResult] = useState<PublicAffiliateSummary | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        if (supabaseConfigured && supabase) {
+          const { data } = await supabase.auth.getSession()
+          const u = data.session?.user
+          if (u && !cancelled) {
+            const meta = u.user_metadata as { login_name?: string; phone?: string } | undefined
+            const mobile = phoneFromAuthUser({ phone: u.phone, user_metadata: meta })
+            if (mobile) setPhone(mobile)
+          }
+        }
+        const mine = await fetchMyAffiliateApplyStatus()
+        if (!cancelled && mine.ok && mine.affiliate) {
+          setResult(mine.affiliate)
+          if (mine.affiliate.status === 'pending') {
+            setInfo('您已有待审核申请，审核通过后将在此与「我的推广」展示推广码。')
+          } else if (mine.affiliate.status === 'active') {
+            setInfo('您已是推广员，请前往「我的推广」查看推广码与佣金数据。')
+          }
+        }
+      } finally {
+        if (!cancelled) setBooting(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const handleBack = () => {
     if (typeof window !== 'undefined' && window.history.length > 1) {
@@ -66,6 +103,10 @@ export default function AffiliateApplyPage() {
     )
   }
 
+  const hasLoggedIn = Boolean(supabaseConfigured && supabase) || Boolean(readMpSessionToken())
+  const blockResubmit =
+    result?.status === 'pending' || result?.status === 'active'
+
   async function onCheckStatus() {
     const p = normalizePhone(phone)
     if (!validPhone(p)) {
@@ -76,7 +117,7 @@ export default function AffiliateApplyPage() {
     setErr('')
     setInfo('')
     try {
-      const r = await fetchAffiliateApplyStatus(p)
+      const r = hasLoggedIn ? await fetchMyAffiliateApplyStatus() : await fetchAffiliateApplyStatus(p)
       if (!r.ok) throw new Error(r.error || '查询失败')
       setResult(r.affiliate)
       if (!r.affiliate) setInfo('暂无该手机号的申请记录，可填写下方表单提交。')
@@ -89,6 +130,14 @@ export default function AffiliateApplyPage() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (blockResubmit) {
+      setInfo(
+        result?.status === 'active'
+          ? '您已是推广员，请前往「我的推广」。'
+          : '您已有待审核申请，无需重复提交。',
+      )
+      return
+    }
     const p = normalizePhone(phone)
     const name = realName.trim()
     if (!name) {
@@ -110,10 +159,19 @@ export default function AffiliateApplyPage() {
           setInfo('您已是通过审核的推广员。')
           return
         }
-        throw new Error(r.error || '提交失败')
+        if (r.error === 'phone_taken' && r.affiliate) {
+          setResult(r.affiliate)
+          setErr(affiliateApplyErrorLabel(r.error))
+          return
+        }
+        throw new Error(affiliateApplyErrorLabel(r.error))
       }
       setResult(r.affiliate ?? null)
-      setInfo(r.created ? '申请已提交，请等待运营审核。' : '您已有待审核申请，请耐心等待。')
+      setInfo(
+        r.created
+          ? '申请已提交，请等待运营审核。'
+          : '您已有待审核申请，无需重复提交；审核结果可在「我的推广」查看。',
+      )
     } catch (e) {
       setErr(e instanceof Error ? e.message : '提交失败')
     } finally {
@@ -148,6 +206,13 @@ export default function AffiliateApplyPage() {
             个人推广员可推广灵祺 ERP 商家会员与星选会员，审核通过后将获得专属推广码。实名认证可在首次提现前完成。
           </p>
 
+          {booting ? (
+            <p className="mt-4 flex items-center gap-2 text-sm text-slate-500">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              正在加载您的申请状态…
+            </p>
+          ) : null}
+
           {result ? (
             <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-900">
               <p className="font-medium">当前状态：{affiliateStatusLabel(result.status)}</p>
@@ -155,14 +220,12 @@ export default function AffiliateApplyPage() {
                 <p className="mt-1 font-mono text-xs">推广码：{result.refCode}</p>
               ) : null}
               <p className="mt-1 text-emerald-800/80">申请时间：{new Date(result.appliedAt).toLocaleString()}</p>
-              {result.status === 'active' ? (
-                <Link
-                  to="/affiliate/portal"
-                  className="mt-3 inline-flex text-sm font-semibold text-indigo-700 underline"
-                >
-                  进入我的推广中心 →
-                </Link>
-              ) : null}
+              <Link
+                to="/affiliate/portal"
+                className="mt-3 inline-flex text-sm font-semibold text-indigo-700 underline"
+              >
+                {result.status === 'active' ? '进入我的推广中心 →' : '查看我的推广 / 申请进度 →'}
+              </Link>
             </div>
           ) : null}
 
@@ -186,7 +249,7 @@ export default function AffiliateApplyPage() {
                 className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2"
                 value={phone}
                 onChange={(e) => setPhone(normalizePhone(e.target.value))}
-                placeholder="11 位大陆手机号"
+                placeholder="11 位大陆手机号（建议与登录账号一致）"
                 inputMode="numeric"
               />
             </label>
@@ -203,11 +266,11 @@ export default function AffiliateApplyPage() {
             <div className="flex flex-wrap gap-2 pt-1">
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || blockResubmit}
                 className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
               >
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                提交申请
+                {blockResubmit ? '已提交申请' : '提交申请'}
               </button>
               <button
                 type="button"
@@ -221,7 +284,7 @@ export default function AffiliateApplyPage() {
           </form>
 
           <p className="mt-4 text-xs leading-relaxed text-slate-500">
-            提交即表示同意平台推广合作规则。审核通过后，请在
+            提交即表示同意平台推广合作规则。每个登录账号仅对应一条推广员申请；审核通过后，请在
             <Link to="/affiliate/portal" className="mx-0.5 text-indigo-600 underline">
               我的推广
             </Link>
