@@ -21,6 +21,17 @@ const LANDING_SURFACE_LABEL = {
   mp: '星选小程序',
 }
 
+function withdrawStatusClass(status) {
+  const map = {
+    pending_review: 'pending',
+    approved: 'approved',
+    rejected: 'rejected',
+    paid: 'paid',
+    failed: 'failed',
+  }
+  return map[status] || 'default'
+}
+
 function mapAttributionRows(rows) {
   return (rows || []).map((row) => ({
     ...row,
@@ -88,7 +99,9 @@ function mapPortalView(data) {
       ...row,
       amountYuan: affiliatePortal.formatYuan(row.amountCents),
       statusLabel: affiliatePortal.withdrawStatusLabel(row.status),
+      statusClass: withdrawStatusClass(row.status),
       createdAtText: String(row.createdAt || '').slice(0, 16).replace('T', ' '),
+      paidAtText: row.paidAt ? String(row.paidAt).slice(0, 16).replace('T', ' ') : '',
     })),
   }
 }
@@ -97,7 +110,7 @@ Page({
   data: {
     loading: true,
     err: '',
-    hint: '',
+    withdrawHint: '',
     affiliate: null,
     statusLabel: '',
     promoLinks: null,
@@ -127,7 +140,6 @@ Page({
     this.setData({
       loading: true,
       err: '',
-      hint: '',
       wxacodePath: '',
       wxacodeErr: '',
     })
@@ -176,7 +188,7 @@ Page({
     if (!code) return
     wx.setClipboardData({
       data: code,
-      success: () => this.setData({ hint: '已复制推广码' }),
+      success: () => wx.showToast({ title: '已复制推广码', icon: 'none' }),
     })
   },
   onCopyLink(e) {
@@ -185,7 +197,7 @@ Page({
     if (!url) return
     wx.setClipboardData({
       data: url,
-      success: () => this.setData({ hint: `已复制${label}` }),
+      success: () => wx.showToast({ title: `已复制${label}`, icon: 'none' }),
     })
   },
   onSaveWxacode() {
@@ -193,7 +205,7 @@ Page({
     if (!path) return
     wx.saveImageToPhotosAlbum({
       filePath: path,
-      success: () => this.setData({ hint: '太阳码已保存到相册' }),
+      success: () => wx.showToast({ title: '太阳码已保存到相册', icon: 'none' }),
       fail: (err) => {
         const denied = err && /auth deny|authorize/i.test(String(err.errMsg || ''))
         if (denied) {
@@ -207,7 +219,7 @@ Page({
           })
           return
         }
-        this.setData({ hint: '保存失败，请长按太阳码保存' })
+        wx.showToast({ title: '保存失败，请长按太阳码保存', icon: 'none' })
       },
     })
   },
@@ -222,22 +234,24 @@ Page({
   async onSubmitWithdraw() {
     const gate = this.data.withdrawGate
     if (!gate || !gate.open) {
-      this.setData({ hint: gate && gate.windowHint ? `${gate.windowHint}，当前不可申请` : '当前不在提现申请时段' })
+      this.setData({
+        withdrawHint: gate && gate.windowHint ? `${gate.windowHint}，当前不可申请` : '当前不在提现申请时段',
+      })
       return
     }
     const yuan = Number(this.data.withdrawAmount)
     if (!Number.isFinite(yuan) || yuan <= 0) {
-      this.setData({ hint: '请输入有效提现金额' })
+      this.setData({ withdrawHint: '请输入有效提现金额' })
       return
     }
     if (this.data.withdrawing) return
-    this.setData({ withdrawing: true, hint: '' })
+    this.setData({ withdrawing: true, withdrawHint: '' })
     try {
       await affiliatePortal.submitWithdraw(Math.round(yuan * 100))
-      this.setData({ withdrawAmount: '', hint: '提现申请已提交，请等待运营审核' })
       await this.loadPortal()
+      this.setData({ withdrawAmount: '', withdrawHint: '提现申请已提交，请等待运营审核' })
     } catch (e) {
-      this.setData({ hint: (e && e.message) || '提现申请失败' })
+      this.setData({ withdrawHint: (e && e.message) || '提现申请失败' })
     } finally {
       this.setData({ withdrawing: false })
     }

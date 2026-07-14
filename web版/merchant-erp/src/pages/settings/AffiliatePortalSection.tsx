@@ -54,6 +54,7 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
   const [hint, setHint] = useState<string | null>(null)
+  const [withdrawHint, setWithdrawHint] = useState<string | null>(null)
   const [data, setData] = useState<AffiliatePortalPayload | null>(null)
   const [withdrawAmount, setWithdrawAmount] = useState('')
   const [withdrawing, setWithdrawing] = useState(false)
@@ -89,28 +90,28 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
   const onSubmitWithdraw = async () => {
     const gate = data?.withdrawGate
     if (!gate?.open) {
-      setHint(gate?.windowHint ? `${gate.windowHint}，当前不可申请` : '当前不在提现申请时段')
-      setTimeout(() => setHint(null), 2800)
+      setWithdrawHint(gate?.windowHint ? `${gate.windowHint}，当前不可申请` : '当前不在提现申请时段')
+      setTimeout(() => setWithdrawHint(null), 2800)
       return
     }
     const yuan = Number(withdrawAmount)
     if (!Number.isFinite(yuan) || yuan <= 0) {
-      setHint('请输入有效提现金额')
-      setTimeout(() => setHint(null), 2200)
+      setWithdrawHint('请输入有效提现金额')
+      setTimeout(() => setWithdrawHint(null), 2200)
       return
     }
     setWithdrawing(true)
-    setHint(null)
+    setWithdrawHint(null)
     try {
       await submitAffiliateWithdraw(Math.round(yuan * 100))
       setWithdrawAmount('')
-      setHint('提现申请已提交，请等待运营审核')
+      setWithdrawHint('提现申请已提交，请等待运营审核')
       await load()
     } catch (e) {
-      setHint(toUserFacingError(e, '提现申请'))
+      setWithdrawHint(toUserFacingError(e, '提现申请'))
     } finally {
       setWithdrawing(false)
-      setTimeout(() => setHint(null), 3200)
+      setTimeout(() => setWithdrawHint(null), 3200)
     }
   }
 
@@ -152,8 +153,6 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
         </div>
       ) : null}
 
-      {hint ? <p className="text-sm text-emerald-700">{hint}</p> : null}
-
       {!loading && !err && !affiliate ? (
         <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-5 py-8 text-center">
           <p className="text-sm text-slate-600">您尚未提交推广员申请。</p>
@@ -194,6 +193,7 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
                 </button>
               </div>
             ) : null}
+            {hint ? <p className="mt-2 text-xs text-emerald-800">{hint}</p> : null}
             {affiliate.status === 'pending' ? (
               <p className="mt-2 text-xs">
                 审核通过后，推广码与链接将在此展示。您也可在
@@ -332,14 +332,31 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
               {!withdrawGate.open ? (
                 <p className="text-xs text-amber-700">提现按钮仅在每月 {withdrawGate.windowStartDay}–{withdrawGate.windowEndDay} 日开启</p>
               ) : null}
-              {(data?.withdrawRequests?.length ?? 0) > 0 ? (
+              {withdrawHint ? (
+                <p className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-800">
+                  {withdrawHint}
+                </p>
+              ) : null}
+            </section>
+          ) : null}
+
+          {affiliate.status === 'active' && withdrawGate ? (
+            <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+              <h4 className="text-sm font-medium text-gray-900">提现申请明细</h4>
+              <p className="text-xs text-slate-500">运营审核并标记打款后，状态将同步更新为「已打款」。</p>
+              {!data?.withdrawRequests?.length ? (
+                <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                  暂无提现记录，提交申请后将在此显示进度。
+                </p>
+              ) : (
                 <div className="overflow-x-auto rounded-lg border border-slate-100">
                   <table className="min-w-full divide-y divide-slate-100 text-sm">
                     <thead className="bg-slate-50 text-left text-xs text-slate-500">
                       <tr>
-                        <th className="px-3 py-2 font-medium">时间</th>
+                        <th className="px-3 py-2 font-medium">申请时间</th>
                         <th className="px-3 py-2 font-medium">金额</th>
                         <th className="px-3 py-2 font-medium">状态</th>
+                        <th className="px-3 py-2 font-medium">打款时间</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 bg-white">
@@ -350,9 +367,12 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
                           <td className="px-3 py-2 text-xs">
                             <span
                               className={cn(
-                                row.status === 'paid' && 'text-emerald-700',
-                                row.status === 'rejected' && 'text-red-600',
-                                row.status === 'pending_review' && 'text-amber-700',
+                                'inline-flex rounded-full px-2 py-0.5 font-medium',
+                                row.status === 'paid' && 'bg-emerald-50 text-emerald-700',
+                                row.status === 'rejected' && 'bg-red-50 text-red-600',
+                                row.status === 'pending_review' && 'bg-amber-50 text-amber-700',
+                                row.status === 'approved' && 'bg-blue-50 text-blue-700',
+                                row.status === 'failed' && 'bg-red-50 text-red-600',
                               )}
                             >
                               {withdrawRequestStatusLabel(row.status)}
@@ -361,12 +381,15 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
                               <span className="ml-1 text-slate-400">({row.failReason})</span>
                             ) : null}
                           </td>
+                          <td className="px-3 py-2 text-xs text-slate-600">
+                            {row.paidAt ? formatDate(row.paidAt) : '—'}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              ) : null}
+              )}
             </section>
           ) : null}
 
