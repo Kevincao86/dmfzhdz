@@ -850,6 +850,8 @@ export type RegistryMpAiPointsSpendEntry = {
     | 'cloud_edit'
     | 'cloud_edit_smart'
     | 'digital_human'
+    | 'visual_studio_copy'
+    | 'visual_studio_image'
   points: number
   balanceAfter: number
   createdAt: string
