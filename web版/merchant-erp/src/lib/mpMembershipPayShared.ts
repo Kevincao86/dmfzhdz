@@ -17,10 +17,8 @@ import {
   patchTalentLibraryFeatureAccessFromSnapshot,
 } from './mpLibraryRegistryMutations.js'
 import type { RegistryMpMembershipCheckoutRequest, RegistrySnapshot } from './opsRegistryTypes.js'
-import {
-  markDistributionAttributionPaidFromSnapshot,
-  type DistributionAttributionSubjectType,
-} from './distributionAttributionCore.js'
+import { markDistributionAttributionPaidFromSnapshot } from './distributionAttributionCore.js'
+import type { DistributionAttributionSubjectType } from './distributionRegistryTypes.js'
 
 export type MpMembershipPayChannel = 'wechat' | 'alipay' | 'douyin'
 export type MpMembershipPayMode =
