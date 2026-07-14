@@ -5,6 +5,9 @@
 
     <view wx:if="{{loading}}" class="info">加载中…</view>
     <text class="err" wx:if="{{err}}">{{err}}</text>
+    <view wx:if="{{err}}" class="actions">
+      <button class="btn-secondary" bindtap="onRetryLoad">重新加载</button>
+    </view>
     <text class="info" wx:if="{{hint}}">{{hint}}</text>
 
     <view wx:if="{{!loading && !err && !affiliate}}" class="actions">

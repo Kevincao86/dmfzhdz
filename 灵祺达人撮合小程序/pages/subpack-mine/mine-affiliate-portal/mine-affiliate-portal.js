@@ -59,17 +59,26 @@ Page({
     syncPageIdentity(this)
     this.loadPortal()
   },
-  async loadPortal() {
+  async loadPortal(retry = 0) {
     this.setData({ loading: true, err: '', hint: '' })
     try {
       const data = await affiliatePortal.fetchPortal()
       this.setData({ loading: false, ...mapPortalView(data) })
     } catch (e) {
+      const msg = (e && e.message) || '加载失败'
+      const isGateway = /502|503|504|Bad Gateway|后台服务正在重启/i.test(msg)
+      if (retry < 1 && isGateway) {
+        await new Promise((r) => setTimeout(r, 1500))
+        return this.loadPortal(retry + 1)
+      }
       this.setData({
         loading: false,
-        err: (e && e.message) || '加载失败',
+        err: msg,
       })
     }
+  },
+  onRetryLoad() {
+    this.loadPortal()
   },
   onGoApply() {
     wx.navigateTo({ url: '/pages/subpack-mine/mine-affiliate-apply/mine-affiliate-apply' })
