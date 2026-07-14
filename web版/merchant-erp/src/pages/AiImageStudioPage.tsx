@@ -488,6 +488,7 @@ export default function AiImageStudioPage() {
 
       const out = await postAiAgentNativeImage(prompt, {
         exactPrompt: true,
+        preferredVendor: 'qwen',
         referenceImageDataUrl: refImage,
         wanxSize: size.wanxSize,
         aspectRatio: size.aspectRatio,

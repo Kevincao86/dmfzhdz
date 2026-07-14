@@ -1,5 +1,5 @@
 import { tokenmixImagesGenerate } from './aiGateway/tokenmixImageGenerate.js'
-import { runAgentFreeformTextToImage } from './merchantAiUpstream.js'
+import { runAgentFreeformTextToImage, type AgentFreeformImageOpts } from './merchantAiUpstream.js'
 
 export type MeooAgentImageRequestInput = {
   prompt: string
@@ -8,6 +8,11 @@ export type MeooAgentImageRequestInput = {
   preferredModelId?: string
   imageRoute: 'builtin' | 'tokenmix'
   tokenmixImageModel?: string
+  exactPrompt?: boolean
+  wanxSize?: string
+  aspectRatio?: '1:1' | '3:4' | '4:3' | '9:16' | '16:9'
+  doubaoSize?: '1K' | '2K' | '4K'
+  preferWanxPoster?: boolean
 }
 
 export type MeooAgentImageOkJson =
@@ -32,8 +37,29 @@ export async function runMeooAgentImageRequest(
   env: Record<string, string>,
   input: MeooAgentImageRequestInput,
 ): Promise<MeooAgentImageResult> {
-  const { prompt, referenceImage, preferredVendor, preferredModelId, imageRoute, tokenmixImageModel } = input
+  const {
+    prompt,
+    referenceImage,
+    preferredVendor,
+    preferredModelId,
+    imageRoute,
+    tokenmixImageModel,
+    exactPrompt,
+    wanxSize,
+    aspectRatio,
+    doubaoSize,
+    preferWanxPoster,
+  } = input
   const tm = (tokenmixImageModel ?? '').trim()
+  const imageOpts: AgentFreeformImageOpts = {
+    referenceImage,
+    exactPrompt,
+    preferredModelId,
+    wanxSize,
+    aspectRatio,
+    doubaoSize,
+    preferWanxPoster,
+  }
 
   if (imageRoute === 'tokenmix' && tm && !referenceImage) {
     try {
@@ -41,10 +67,7 @@ export async function runMeooAgentImageRequest(
       return { ok: true, imageUrl, channel: 'tokenmix', displayModel: modelUsed }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      const out = await runAgentFreeformTextToImage(env, prompt, preferredVendor, {
-        referenceImage,
-        preferredModelId,
-      })
+      const out = await runAgentFreeformTextToImage(env, prompt, preferredVendor, imageOpts)
       if (out.ok) {
         return {
           ok: true,
@@ -58,10 +81,7 @@ export async function runMeooAgentImageRequest(
     }
   }
 
-  const out = await runAgentFreeformTextToImage(env, prompt, preferredVendor, {
-    referenceImage,
-    preferredModelId,
-  })
+  const out = await runAgentFreeformTextToImage(env, prompt, preferredVendor, imageOpts)
   if (!out.ok) return { ok: false, message: out.message }
   const extra: { fallbackNote?: string } = {}
   if (imageRoute === 'tokenmix' && tm && referenceImage) {

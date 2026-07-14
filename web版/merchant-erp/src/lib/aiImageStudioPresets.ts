@@ -410,7 +410,7 @@ export const AI_IMAGE_SIZE_PRESETS: AiImageSizePreset[] = [
 
 export const AI_IMAGE_STYLE_PRESETS: Array<{ id: AiImageStyleId; label: string; promptHint: string }> = [
   { id: 'lively', label: '烟火气', promptHint: '本地生活烟火气、暖光、真实质感、街头店招感' },
-  { id: 'premium', label: '轻奢', promptHint: '轻奢质感、低饱和、留白、适合美业酒旅' },
+  { id: 'premium', label: '轻奢', promptHint: '轻奢质感、低饱和、留白、干净高级、门店商业海报' },
   { id: 'minimal', label: '极简', promptHint: '极简排版、高级灰、信息清晰' },
   { id: 'guochao', label: '国潮', promptHint: '国潮配色、书法标题、年轻促销感' },
   { id: 'fresh', label: '清新', promptHint: '明亮自然光、清爽、健康、探店风' },
@@ -2375,6 +2375,9 @@ export function buildVisualStudioPrompt(
   const lines = [
     INTENT_PROMPT[pb.intent],
     `【业态锁定】${sceneCtx.label}。${sceneCtx.sceneHint}。画面主体、道具、环境必须严格符合该业态，禁止出现与业态无关的场景（如餐饮禁止酒吧夜场、足浴禁止咖啡厅）。`,
+    form.industrySubId === 'leisure_foot_spa'
+      ? '【足浴专项】须呈现足浴沙发/足疗椅、足浴桶、技师足部按摩等服务场景；严禁浴缸、酒店客房、海边落地窗、温泉泳池、度假别墅等酒旅元素。'
+      : '',
     `视觉风格：${style}。`,
     channel ? `投放渠道：${channel.label}，${size?.aspectRatio ?? ''} ${size?.pixelHint ?? ''}，请符合该平台常见封面构图。` : '',
     variantConfig?.pickerLabel && playbookVariant
@@ -2459,7 +2462,7 @@ export function buildVisualStudioImageContext(
 }
 
 export function preferWanxPosterForIntent(intent: VisualIntentId): boolean {
-  return intent === 'poster' || intent === 'package' || intent === 'menu'
+  return intent !== 'logo'
 }
 
 /** @deprecated 兼容旧引用 */
