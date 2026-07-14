@@ -4,9 +4,8 @@
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { resolveAffiliatePortalPhone } from '../src/lib/affiliatePortalAuth.js'
-import { buildAffiliatePortalFromSnapshot } from '../src/lib/distributionRegistryCore.js'
+import { buildAffiliatePortalFromSnapshot, buildDistributionPromoLinks } from '../src/lib/distributionRegistryCore.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
-import { buildPartnerPromoLinks } from '../src/services/partnerSalespersonsClient.js'
 import {
   merchantSupabaseAdminEnvConfigureHint,
   readMerchantSupabaseAdminEnv,
@@ -72,7 +71,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         : ''
     const promoLinks =
       portal.affiliate && portal.affiliate.status === 'active' && refCode
-        ? buildPartnerPromoLinks(refCode)
+        ? buildDistributionPromoLinks(refCode)
         : null
 
     sendJson(res, 200, {
