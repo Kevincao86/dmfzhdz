@@ -22,6 +22,10 @@ import {
 import { supabase, supabaseConfigured } from '../../lib/supabaseClient'
 import { toUserFacingError } from '../../lib/userFacingError'
 import {
+  DEFAULT_LINKE_AUTH_SOLUTION_KEY,
+  LINKE_AUTH_SOLUTION_OPTIONS,
+} from '../../lib/partnerLinkeSolutionOptions'
+import {
   linkeOnboardStatusLabel,
   listPartnerLinkeOnboarding,
   retryPartnerLinkeCooperation,
@@ -50,6 +54,7 @@ export default function PartnerClientsSection() {
   const [onboardItems, setOnboardItems] = useState<PartnerLinkeOnboardItem[]>([])
   const [onboardLoading, setOnboardLoading] = useState(false)
   const [inviteLabel, setInviteLabel] = useState('')
+  const [inviteSolutionKey, setInviteSolutionKey] = useState(DEFAULT_LINKE_AUTH_SOLUTION_KEY)
   const [inviteBusy, setInviteBusy] = useState(false)
   const [lastAuthUrl, setLastAuthUrl] = useState<string | null>(null)
   const [bindMode, setBindMode] = useState<'linke_invite' | 'manual'>('linke_invite')
@@ -159,6 +164,7 @@ export default function PartnerClientsSection() {
     try {
       const out = await startPartnerLinkeInvite({
         clientLabel: inviteLabel.trim() || undefined,
+        solutionKey: inviteSolutionKey,
       })
       setLastAuthUrl(out.authUrl)
       setInviteLabel('')
@@ -357,7 +363,7 @@ export default function PartnerClientsSection() {
           </div>
 
           {bindMode === 'linke_invite' ? (
-            <div className="space-y-3">
+              <div className="space-y-3">
               <label className="block text-sm">
                 <span className="text-gray-700">客户备注名（可选）</span>
                 <input
@@ -366,6 +372,24 @@ export default function PartnerClientsSection() {
                   onChange={(e) => setInviteLabel(e.target.value)}
                   placeholder="例如：XX火锅人民路店"
                 />
+              </label>
+              <label className="block text-sm">
+                <span className="text-gray-700">授权解决方案</span>
+                <select
+                  className="mt-1 w-full max-w-md rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                  value={inviteSolutionKey}
+                  onChange={(e) => setInviteSolutionKey(e.target.value)}
+                >
+                  {LINKE_AUTH_SOLUTION_OPTIONS.map((opt) => (
+                    <option key={opt.key} value={opt.key}>
+                      {opt.key} · {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="mt-1 block text-xs text-gray-500">
+                  须与开放平台该服务商应用已开通的解决方案一致。默认 21（餐饮团购）；选 1
+                  易出现「获取解决方案信息失败」。
+                </span>
               </label>
               <div className="flex flex-wrap gap-2">
                 <button
@@ -415,6 +439,7 @@ export default function PartnerClientsSection() {
                     <thead className="border-b bg-gray-50 text-gray-600">
                       <tr>
                         <th className="px-3 py-2">客户</th>
+                        <th className="px-3 py-2">方案</th>
                         <th className="px-3 py-2">授权</th>
                         <th className="px-3 py-2">代运营</th>
                         <th className="px-3 py-2">操作</th>
@@ -430,6 +455,9 @@ export default function PartnerClientsSection() {
                             {item.merchantAccountId ? (
                               <div className="text-xs text-gray-500">{item.merchantAccountId}</div>
                             ) : null}
+                          </td>
+                          <td className="px-3 py-2 text-xs tabular-nums text-gray-600">
+                            {item.solutionKey || '—'}
                           </td>
                           <td className="px-3 py-2 text-gray-700">{linkeOnboardStatusLabel(item)}</td>
                           <td className="px-3 py-2 text-xs text-gray-600">

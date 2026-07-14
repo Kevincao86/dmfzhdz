@@ -18,8 +18,15 @@ import {
 } from '../../api/douyin-bind.js'
 import { partnerClientsDataTenantId } from './partnerTenantProfile.js'
 import type { PartnerTenantProfile } from './partnerTenantProfile.js'
+import { normalizeLinkeAuthSolutionKey } from './partnerLinkeSolutionOptions.js'
 
 export const DOUYIN_AUTH_WITH_BIND_BASE = 'https://auth.dylk.com/auth-isv/'
+
+export {
+  DEFAULT_LINKE_AUTH_SOLUTION_KEY,
+  LINKE_AUTH_SOLUTION_OPTIONS,
+  normalizeLinkeAuthSolutionKey,
+} from './partnerLinkeSolutionOptions.js'
 
 export type PartnerLinkeOnboardRow = {
   id: string
@@ -77,7 +84,7 @@ function parseOnboardRow(raw: Record<string, unknown>): PartnerLinkeOnboardRow |
     partnerClientId: typeof raw.partner_client_id === 'string' ? raw.partner_client_id : null,
     ownerAgentTenantId:
       typeof raw.owner_agent_tenant_id === 'string' ? raw.owner_agent_tenant_id : null,
-    solutionKey: typeof raw.solution_key === 'string' ? raw.solution_key : '1',
+    solutionKey: normalizeLinkeAuthSolutionKey(raw.solution_key),
     createdAt: typeof raw.created_at === 'string' ? raw.created_at : '',
     updatedAt: typeof raw.updated_at === 'string' ? raw.updated_at : '',
   }
@@ -296,7 +303,7 @@ export async function startPartnerLinkeOnboardInvite(input: {
     dataTenantId,
     ownerAgentTenantId: input.profile.isAgent ? input.profile.tenantId : null,
   })
-  const solutionKey = String(input.solutionKey || '1').trim() || '1'
+  const solutionKey = normalizeLinkeAuthSolutionKey(input.solutionKey)
   const permissionKeys =
     input.permissionKeys && input.permissionKeys.length
       ? input.permissionKeys
