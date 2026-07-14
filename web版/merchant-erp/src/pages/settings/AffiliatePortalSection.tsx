@@ -147,7 +147,13 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
               </div>
             ) : null}
             {affiliate.status === 'pending' ? (
-              <p className="mt-2 text-xs">审核通过后，推广码与链接将在此展示。</p>
+              <p className="mt-2 text-xs">
+                审核通过后，推广码与链接将在此展示。您也可在
+                <Link to="/affiliate/apply" className="mx-1 font-medium underline">
+                  申请页
+                </Link>
+                查看进度。
+              </p>
             ) : null}
             {affiliate.status === 'rejected' || affiliate.status === 'disabled' ? (
               <p className="mt-2 text-xs">

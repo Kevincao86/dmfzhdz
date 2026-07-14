@@ -34,6 +34,8 @@ export type RegistryDistributionAffiliate = {
   realName: string
   phone: string
   status: 'pending' | 'active' | 'disabled' | 'rejected'
+  /** Supabase user id 或 mp:accountId，用于 cs/dr 登录态关联申请 */
+  authUserId?: string
   commissionOverride?: DistributionCommissionOverride | null
   appliedAt: string
   approvedAt?: string

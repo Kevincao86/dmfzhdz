@@ -261,6 +261,58 @@ export function publicAffiliateSummary(affiliate: RegistryDistributionAffiliate)
   }
 }
 
+export function lookupAffiliateByPhoneFromSnapshot(
+  data: RegistryFile,
+  phoneRaw: unknown,
+): | { ok: true; affiliate: RegistryDistributionAffiliate | null }
+  | { ok: false; error: string; status: number } {
+  ensureDistribution(data)
+  const phone = normalizePhone(phoneRaw)
+  if (!phone) return { ok: false, error: 'invalid_phone', status: 400 }
+  const affiliate = (data.distributionAffiliates ?? []).find((a) => a.phone === phone) ?? null
+  return { ok: true, affiliate }
+}
+
+export function lookupAffiliateByAuthUserFromSnapshot(
+  data: RegistryFile,
+  authUserIdRaw: unknown,
+): RegistryDistributionAffiliate | null {
+  ensureDistribution(data)
+  const authUserId = String(authUserIdRaw || '').trim()
+  if (!authUserId) return null
+  return (data.distributionAffiliates ?? []).find((a) => a.authUserId === authUserId) ?? null
+}
+
+export function resolveAffiliateIdentityFromSnapshot(
+  data: RegistryFile,
+  identity: { phone?: string | null; authUserId?: string | null },
+): RegistryDistributionAffiliate | null {
+  ensureDistribution(data)
+  const authUserId = String(identity.authUserId || '').trim()
+  if (authUserId) {
+    const byAuth = lookupAffiliateByAuthUserFromSnapshot(data, authUserId)
+    if (byAuth) return byAuth
+  }
+  const phone = normalizePhone(identity.phone)
+  if (phone) {
+    return (data.distributionAffiliates ?? []).find((a) => a.phone === phone) ?? null
+  }
+  return null
+}
+
+function affiliatePhoneConflict(
+  list: RegistryDistributionAffiliate[],
+  phone: string,
+  authUserId?: string,
+): RegistryDistributionAffiliate | null {
+  const byPhone = list.find((a) => a.phone === phone) ?? null
+  if (!byPhone) return null
+  if (authUserId && byPhone.authUserId && byPhone.authUserId !== authUserId) return byPhone
+  if (authUserId && !byPhone.authUserId) return null
+  if (!authUserId && byPhone.authUserId) return byPhone
+  return byPhone
+}
+
 export function applyAffiliateFromSnapshot(
   data: RegistryFile,
   body: Record<string, unknown>,
@@ -274,10 +326,21 @@ export function applyAffiliateFromSnapshot(
   const phone = normalizePhone(body.phone)
   if (!realName || !phone) return { ok: false, error: 'invalid_fields', status: 400 }
 
+  const authUserId = String(body.authUserId || '').trim() || undefined
   const applySource = parseApplySource(body.applySource)
   const note = String(body.note || '').trim() || undefined
   const list = data.distributionAffiliates!
-  const idx = list.findIndex((a) => a.phone === phone)
+
+  const phoneOwner = affiliatePhoneConflict(list, phone, authUserId)
+  if (phoneOwner && phoneOwner.authUserId && authUserId && phoneOwner.authUserId !== authUserId) {
+    return { ok: false, error: 'phone_taken', status: 409, affiliate: phoneOwner }
+  }
+  if (phoneOwner && phoneOwner.authUserId && !authUserId) {
+    return { ok: false, error: 'phone_taken', status: 409, affiliate: phoneOwner }
+  }
+
+  let idx = authUserId ? list.findIndex((a) => a.authUserId === authUserId) : -1
+  if (idx < 0) idx = list.findIndex((a) => a.phone === phone)
 
   if (idx >= 0) {
     const cur = list[idx]!
@@ -285,14 +348,25 @@ export function applyAffiliateFromSnapshot(
       return { ok: false, error: 'already_active', status: 409, affiliate: cur }
     }
     if (cur.status === 'pending') {
-      return { ok: true, affiliate: cur, created: false }
+      const affiliate: RegistryDistributionAffiliate = {
+        ...cur,
+        realName,
+        phone,
+        ...(authUserId ? { authUserId } : {}),
+        ...(applySource ? { applySource } : {}),
+        ...(note ? { note } : {}),
+      }
+      list[idx] = affiliate
+      return { ok: true, affiliate, created: false }
     }
     const affiliate: RegistryDistributionAffiliate = {
       ...cur,
       realName,
+      phone,
       status: 'pending',
       appliedAt: nowIso(),
       approvedAt: undefined,
+      ...(authUserId ? { authUserId } : {}),
       ...(applySource ? { applySource } : {}),
       ...(note ? { note } : {}),
     }
@@ -307,23 +381,12 @@ export function applyAffiliateFromSnapshot(
     phone,
     status: 'pending',
     appliedAt: nowIso(),
+    ...(authUserId ? { authUserId } : {}),
     ...(applySource ? { applySource } : {}),
     ...(note ? { note } : {}),
   }
   list.push(affiliate)
   return { ok: true, affiliate, created: true }
-}
-
-export function lookupAffiliateByPhoneFromSnapshot(
-  data: RegistryFile,
-  phoneRaw: unknown,
-): | { ok: true; affiliate: RegistryDistributionAffiliate | null }
-  | { ok: false; error: string; status: number } {
-  ensureDistribution(data)
-  const phone = normalizePhone(phoneRaw)
-  if (!phone) return { ok: false, error: 'invalid_phone', status: 400 }
-  const affiliate = (data.distributionAffiliates ?? []).find((a) => a.phone === phone) ?? null
-  return { ok: true, affiliate }
 }
 
 export function patchAffiliateStatusFromSnapshot(
@@ -740,7 +803,7 @@ export function buildDistributionPromoLinks(refCode: string): {
 
 export function buildAffiliatePortalFromSnapshot(
   data: RegistryFile,
-  phoneRaw: unknown,
+  identity: { phone?: string | null; authUserId?: string | null },
 ):
   | {
       ok: true
@@ -750,14 +813,10 @@ export function buildAffiliatePortalFromSnapshot(
       settlements: AffiliatePortalSettlementRow[]
     }
   | { ok: false; error: string; status: number } {
-  const lookup = lookupAffiliateByPhoneFromSnapshot(data, phoneRaw)
-  if (!lookup.ok) return lookup
-  if (!lookup.affiliate) {
+  const affiliate = resolveAffiliateIdentityFromSnapshot(data, identity)
+  if (!affiliate) {
     return { ok: true, affiliate: null, wallet: null, stats: null, settlements: [] }
   }
-
-  ensureDistribution(data)
-  const affiliate = lookup.affiliate
   const walletRow = (data.distributionWallets ?? []).find(
     (w) => w.ownerType === 'individual_affiliate' && w.ownerId === affiliate.id,
   )
