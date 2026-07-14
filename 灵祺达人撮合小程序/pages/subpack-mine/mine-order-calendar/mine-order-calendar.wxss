@@ -395,6 +395,57 @@
 .cal-badge--red { color: #b91c1c; background: #fee2e2; border-color: #fecaca; }
 .cal-badge--blue { color: #6d28d9; background: #ede9fe; border-color: #ddd6fe; }
 
+.cal-user-label {
+  display: inline-block;
+  font-size: 20rpx;
+  padding: 2rpx 10rpx;
+  border-radius: 8rpx;
+  margin-right: 8rpx;
+  border: 1rpx solid transparent;
+}
+
+.cal-user-label--violet { color: #6d28d9; background: #ede9fe; border-color: #ddd6fe; }
+.cal-user-label--emerald { color: #15803d; background: #dcfce7; border-color: #bbf7d0; }
+.cal-user-label--orange { color: #c2410c; background: #ffedd5; border-color: #fed7aa; }
+.cal-user-label--red { color: #b91c1c; background: #fee2e2; border-color: #fecaca; }
+.cal-user-label--blue { color: #1d4ed8; background: #dbeafe; border-color: #bfdbfe; }
+.cal-user-label--pink { color: #be185d; background: #fce7f3; border-color: #fbcfe8; }
+.cal-user-label--slate { color: #475569; background: #f1f5f9; border-color: #e2e8f0; }
+
+.cal-event-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+.cal-label-btn {
+  margin: 0 !important;
+  padding: 0 16rpx !important;
+  font-size: 22rpx !important;
+  color: #c2410c !important;
+  background: #ffedd5 !important;
+  border: none !important;
+  line-height: 2 !important;
+  max-width: 140rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cal-label-btn::after { border: none; }
+
+.cal-label-btn--set { font-weight: 600; }
+
+.cal-label-btn--violet { color: #6d28d9 !important; background: #ede9fe !important; }
+.cal-label-btn--emerald { color: #15803d !important; background: #dcfce7 !important; }
+.cal-label-btn--orange { color: #c2410c !important; background: #ffedd5 !important; }
+.cal-label-btn--red { color: #b91c1c !important; background: #fee2e2 !important; }
+.cal-label-btn--blue { color: #1d4ed8 !important; background: #dbeafe !important; }
+.cal-label-btn--pink { color: #be185d !important; background: #fce7f3 !important; }
+.cal-label-btn--slate { color: #475569 !important; background: #f1f5f9 !important; }
+
 .cal-event-title {
   font-size: 28rpx;
   font-weight: 600;

@@ -9,7 +9,7 @@
       </view>
       <view class="cal-feature cal-feature--orange">
         <text class="cal-feature-icon">◆</text>
-        <text class="cal-feature-text">事项标签快速识别</text>
+        <text class="cal-feature-text">自定义标签小程序同步</text>
       </view>
       <view class="cal-feature cal-feature--violet">
         <text class="cal-feature-icon">▦</text>
@@ -39,6 +39,7 @@
         >
           <text class="cal-todo-date {{item.selected ? 'cal-todo-date--active' : ''}}">{{item.dateShort}}</text>
           <text class="cal-badge cal-badge--{{item.tone}}">{{item.kindLabel}}</text>
+          <text wx:if="{{item.customLabelText}}" class="cal-user-label cal-user-label--{{item.customLabelColor}}">{{item.customLabelText}}</text>
           <text class="cal-todo-title">{{item.orderTitle}}</text>
           <text wx:if="{{item.storeName && item.storeName !== item.orderTitle}}" class="cal-todo-store">📍 {{item.storeName}}</text>
           <view class="cal-todo-status">
@@ -101,6 +102,7 @@
           <view class="cal-event-top">
             <view class="cal-event-left">
               <text class="cal-badge cal-badge--{{item.tone}}">{{item.kindLabel}}</text>
+              <text wx:if="{{item.customLabelText}}" class="cal-user-label cal-user-label--{{item.customLabelColor}}">{{item.customLabelText}}</text>
               <text class="cal-event-title">{{item.orderTitle}}</text>
               <text wx:if="{{item.storeName && item.storeName !== item.orderTitle}}" class="cal-event-store">📍 {{item.storeName}}</text>
             </view>
@@ -116,17 +118,26 @@
           </view>
           <text class="cal-event-action">{{item.actionLabel}} ›</text>
         </view>
-        <button
-          class="cal-remind-btn {{item.remindSet ? 'cal-remind-btn--set' : ''}}"
-          size="mini"
-          data-event-id="{{item.id}}"
-          data-mp-order-id="{{item.mpOrderId}}"
-          data-kind="{{item.kind}}"
-          data-date-key="{{item.dateKey}}"
-          data-title="{{item.orderTitle}}"
-          data-store="{{item.storeName}}"
-          bindtap="onSetReminder"
-        >{{item.remindSet ? '已设提醒' : '设提醒'}}</button>
+        <view class="cal-event-actions">
+          <button
+            class="cal-label-btn {{item.customLabelText ? 'cal-label-btn--set cal-label-btn--' + item.customLabelColor : ''}}"
+            size="mini"
+            data-mp-order-id="{{item.mpOrderId}}"
+            data-title="{{item.orderTitle}}"
+            bindtap="onSetLabel"
+          >{{item.customLabelText || '设标签'}}</button>
+          <button
+            class="cal-remind-btn {{item.remindSet ? 'cal-remind-btn--set' : ''}}"
+            size="mini"
+            data-event-id="{{item.id}}"
+            data-mp-order-id="{{item.mpOrderId}}"
+            data-kind="{{item.kind}}"
+            data-date-key="{{item.dateKey}}"
+            data-title="{{item.orderTitle}}"
+            data-store="{{item.storeName}}"
+            bindtap="onSetReminder"
+          >{{item.remindSet ? '已设提醒' : '设提醒'}}</button>
+        </view>
       </view>
     </view>
   </block>

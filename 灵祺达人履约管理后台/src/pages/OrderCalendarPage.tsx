@@ -17,6 +17,16 @@ import {
   listCalendarReminders,
   type MpCalendarReminderLeadPreset,
 } from '../lib/mpCalendarReminderApi'
+import {
+  deleteOrderCustomLabel,
+  labelsByOrderId,
+  listOrderCustomLabels,
+  ORDER_LABEL_PRESETS,
+  orderLabelBadgeClass,
+  upsertOrderCustomLabel,
+  type MpOrderCustomLabel,
+  type OrderLabelColor,
+} from '../lib/mpOrderCustomLabelApi'
 import { getAccount, getActiveRole } from '../lib/mpSession'
 import { getWorkIdentity } from '../lib/mpWorkIdentity'
 import { mpOrderOwnedByCurrentPr } from '../lib/mpRecruitment/prPublishedOrders'
@@ -57,8 +67,8 @@ const FEATURE_ITEMS = [
   {
     icon: Tag,
     tone: 'orange' as const,
-    title: '事项标签',
-    desc: '快速识别任务类型',
+    title: '自定义标签',
+    desc: '为商单打标，小程序同步',
   },
   {
     icon: CalendarDays,
@@ -128,6 +138,10 @@ export default function OrderCalendarPage() {
   const [pendingRemindEventIds, setPendingRemindEventIds] = useState<Set<string>>(new Set())
   const [remindTarget, setRemindTarget] = useState<OrderCalendarEvent | null>(null)
   const [remindBusy, setRemindBusy] = useState(false)
+  const [labelTarget, setLabelTarget] = useState<OrderCalendarEvent | null>(null)
+  const [labelBusy, setLabelBusy] = useState(false)
+  const [customLabelInput, setCustomLabelInput] = useState('')
+  const [orderLabels, setOrderLabels] = useState<MpOrderCustomLabel[]>([])
   const [toast, setToast] = useState('')
   const eventListRef = useRef<HTMLElement>(null)
   const todoScrollRef = useRef<HTMLDivElement>(null)
@@ -146,6 +160,16 @@ export default function OrderCalendarPage() {
       setPendingRemindEventIds(new Set())
     }
   }, [])
+
+  const refreshLabels = useCallback(async () => {
+    try {
+      setOrderLabels(await listOrderCustomLabels())
+    } catch {
+      setOrderLabels([])
+    }
+  }, [])
+
+  const labelMap = useMemo(() => labelsByOrderId(orderLabels), [orderLabels])
 
   useEffect(() => {
     if (!toast) return
@@ -177,6 +201,7 @@ export default function OrderCalendarPage() {
         }
         if (!cancelled) setEvents(list)
         if (!cancelled) await refreshReminders()
+        if (!cancelled) await refreshLabels()
       } catch (e) {
         if (!cancelled) setErr(e instanceof Error ? e.message : '加载失败')
       } finally {
@@ -186,7 +211,7 @@ export default function OrderCalendarPage() {
     return () => {
       cancelled = true
     }
-  }, [isPr, refreshReminders])
+  }, [isPr, refreshReminders, refreshLabels])
 
   const byDate = useMemo(() => groupEventsByDate(events), [events])
   const upcomingTodos = useMemo(() => buildUpcomingTodos(events), [events])
@@ -275,6 +300,59 @@ export default function OrderCalendarPage() {
     eventListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }
 
+  function openLabelDialog(evt: OrderCalendarEvent) {
+    const existing = labelMap.get(evt.mpOrderId)
+    setCustomLabelInput(existing?.labelText ?? '')
+    setLabelTarget(evt)
+  }
+
+  async function onSaveLabelPreset(text: string, color: OrderLabelColor) {
+    const evt = labelTarget
+    if (!evt || labelBusy) return
+    setLabelBusy(true)
+    try {
+      await upsertOrderCustomLabel({
+        mpOrderId: evt.mpOrderId,
+        labelText: text,
+        color,
+      })
+      setToast('标签已保存，已与小程序同步')
+      setLabelTarget(null)
+      setCustomLabelInput('')
+      await refreshLabels()
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : '保存失败')
+    } finally {
+      setLabelBusy(false)
+    }
+  }
+
+  async function onSaveCustomLabelInput() {
+    const text = customLabelInput.trim().slice(0, 16)
+    if (!text) {
+      setToast('请输入标签文字')
+      return
+    }
+    await onSaveLabelPreset(text, 'violet')
+  }
+
+  async function onClearLabel() {
+    const evt = labelTarget
+    if (!evt || labelBusy) return
+    setLabelBusy(true)
+    try {
+      await deleteOrderCustomLabel(evt.mpOrderId)
+      setToast('标签已清除')
+      setLabelTarget(null)
+      setCustomLabelInput('')
+      await refreshLabels()
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : '清除失败')
+    } finally {
+      setLabelBusy(false)
+    }
+  }
+
   async function onConfirmReminder(preset: MpCalendarReminderLeadPreset) {
     const evt = remindTarget
     if (!evt || remindBusy) return
@@ -323,7 +401,7 @@ export default function OrderCalendarPage() {
             {calendarPageSubtitleForWork(workId)}。横向滑动查看近期事项，在日历中掌握整体进度。
           </p>
           <p className="mt-2 text-xs leading-relaxed text-violet-600/90">
-            在电脑端设置的到点提醒会与小程序商单日历同步；微信订阅推送需在小程序内授权一次。
+            在电脑端设置的到点提醒与自定义标签会与小程序商单日历同步；微信订阅推送需在小程序内授权一次。
           </p>
 
           <ul className="mt-6 space-y-4">
@@ -411,6 +489,7 @@ export default function OrderCalendarPage() {
                         const tone = eventTone(evt.kind)
                         const phase = resolveEventPhase(evt)
                         const selected = evt.dateKey === selectedDateKey
+                        const customLabel = labelMap.get(evt.mpOrderId)
                         return (
                           <Link
                             key={evt.id}
@@ -432,6 +511,13 @@ export default function OrderCalendarPage() {
                             >
                               {kindLabel(evt.kind)}
                             </span>
+                            {customLabel ? (
+                              <span
+                                className={`ml-1 inline-flex rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${orderLabelBadgeClass(customLabel.color)}`}
+                              >
+                                {customLabel.labelText}
+                              </span>
+                            ) : null}
                             <p className="mt-2 truncate text-sm font-semibold text-slate-900">
                               {evt.orderTitle}
                             </p>
@@ -637,6 +723,7 @@ export default function OrderCalendarPage() {
                       const tone = eventTone(evt.kind)
                       const phase = resolveEventPhase(evt)
                       const remindSet = pendingRemindEventIds.has(evt.id)
+                      const customLabel = labelMap.get(evt.mpOrderId)
                       return (
                         <li key={evt.id}>
                           <div className="flex items-stretch gap-2 rounded-xl border border-slate-100 transition hover:border-violet-200 hover:bg-violet-50/40">
@@ -651,6 +738,13 @@ export default function OrderCalendarPage() {
                                   >
                                     {kindLabel(evt.kind)}
                                   </span>
+                                  {customLabel ? (
+                                    <span
+                                      className={`mr-2 inline-block rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${orderLabelBadgeClass(customLabel.color)}`}
+                                    >
+                                      {customLabel.labelText}
+                                    </span>
+                                  ) : null}
                                   <span className="font-medium text-slate-900">{evt.orderTitle}</span>
                                   {evt.storeName && evt.storeName !== evt.orderTitle ? (
                                     <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-slate-500">
@@ -678,18 +772,32 @@ export default function OrderCalendarPage() {
                                 {evt.platform ? <span>{evt.platform}</span> : null}
                               </div>
                             </Link>
-                            <button
-                              type="button"
-                              onClick={() => setRemindTarget(evt)}
-                              className={`m-2 flex shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border px-2.5 py-2 text-[11px] font-medium transition ${
-                                remindSet
-                                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                                  : 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100'
-                              }`}
-                            >
-                              <Bell className="h-3.5 w-3.5" />
-                              {remindSet ? '已设提醒' : '设提醒'}
-                            </button>
+                            <div className="m-2 flex shrink-0 flex-col gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => openLabelDialog(evt)}
+                                className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border px-2.5 py-2 text-[11px] font-medium transition ${
+                                  customLabel
+                                    ? `${orderLabelBadgeClass(customLabel.color)} hover:opacity-90`
+                                    : 'border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100'
+                                }`}
+                              >
+                                <Tag className="h-3.5 w-3.5" />
+                                {customLabel ? customLabel.labelText : '设标签'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setRemindTarget(evt)}
+                                className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border px-2.5 py-2 text-[11px] font-medium transition ${
+                                  remindSet
+                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                    : 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100'
+                                }`}
+                              >
+                                <Bell className="h-3.5 w-3.5" />
+                                {remindSet ? '已设提醒' : '设提醒'}
+                              </button>
+                            </div>
                           </div>
                         </li>
                       )
@@ -744,6 +852,78 @@ export default function OrderCalendarPage() {
             </ul>
             <p className="mt-3 text-center text-[11px] text-slate-400">
               提醒数据与小程序共用，到点将通过服务号/订阅消息推送
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {labelTarget ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="label-dialog-title"
+        >
+          <div className="w-full max-w-sm rounded-2xl border border-violet-100 bg-white p-5 shadow-xl">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 id="label-dialog-title" className="text-base font-semibold text-slate-900">
+                  设置商单标签
+                </h3>
+                <p className="mt-1 truncate text-sm text-slate-500">{labelTarget.orderTitle}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => !labelBusy && setLabelTarget(null)}
+                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                aria-label="关闭"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {ORDER_LABEL_PRESETS.map((preset) => (
+                <button
+                  key={`${preset.text}-${preset.color}`}
+                  type="button"
+                  disabled={labelBusy}
+                  onClick={() => onSaveLabelPreset(preset.text, preset.color)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition hover:opacity-90 disabled:opacity-60 ${orderLabelBadgeClass(preset.color)}`}
+                >
+                  {preset.text}
+                </button>
+              ))}
+            </div>
+            <div className="mt-4 flex gap-2">
+              <input
+                type="text"
+                maxLength={16}
+                value={customLabelInput}
+                onChange={(e) => setCustomLabelInput(e.target.value)}
+                placeholder="自定义标签（最多16字）"
+                className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-violet-400"
+              />
+              <button
+                type="button"
+                disabled={labelBusy}
+                onClick={onSaveCustomLabelInput}
+                className="shrink-0 rounded-xl bg-violet-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-violet-700 disabled:opacity-60"
+              >
+                保存
+              </button>
+            </div>
+            {labelMap.has(labelTarget.mpOrderId) ? (
+              <button
+                type="button"
+                disabled={labelBusy}
+                onClick={onClearLabel}
+                className="mt-3 w-full rounded-xl border border-slate-200 py-2 text-sm text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
+              >
+                清除标签
+              </button>
+            ) : null}
+            <p className="mt-3 text-center text-[11px] text-slate-400">
+              标签按当前身份保存，与小程序商单日历同步
             </p>
           </div>
         </div>
