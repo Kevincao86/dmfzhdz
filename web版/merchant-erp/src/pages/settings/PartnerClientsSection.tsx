@@ -311,10 +311,22 @@ export default function PartnerClientsSection() {
             <div>
               <h4 className="font-medium text-gray-900">林客邀请开通（授权 + 代运营）</h4>
               <p className="mt-1 text-xs text-gray-600">
-                生成官方授权链接 → 商家在<strong>抖音来客</strong>完成授权 → 系统自动写入客户商家并发起代运营合作 →
-                商家在<strong>来客 App</strong>确认合作。Webhook 地址：
+                流程：生成官方授权链接 → 商家在<strong>抖音来客</strong>完成<strong>应用能力授权</strong> →
+                系统写入客户商家并发起代运营合作 → 商家在<strong>来客 App</strong>再确认合作。
+                Webhook：
                 <code className="mx-1 rounded bg-white px-1 text-[11px]">/erp-api/meoo-douyin-life-webhook</code>
               </p>
+              <ul className="mt-2 list-inside list-disc space-y-1 text-xs leading-relaxed text-gray-600">
+                <li>
+                  走「邀请开通」时，即使商家此前已给服务商授过权，仍需点一次本链接，才能把商家账号写回灵祺。
+                </li>
+                <li>
+                  若已有商家账户 ID，可切到「手工录入」，不必再发授权链接；代运营合作确认仍可能要商家在来客点一次。
+                </li>
+                <li>
+                  「应用授权」与「代运营确认」是两步，不是重复授权。完整说明见「服务商平台 → 绑定说明书」。
+                </li>
+              </ul>
             </div>
             <div className="flex gap-2 text-sm">
               <button

@@ -28,7 +28,7 @@ export function douyinBindCopy(): DouyinBindCopy {
       brandAlt: '抖音林客',
       sectionTitle: '抖音林客 · 服务商应用',
       sectionIntro:
-        '绑定生活服务开放平台创建的「服务商应用」（非商家应用）。完成林客授权后，方可在「客户商家」添加代运营商家账号；商品查询默认走 goods_query_type=3。',
+        '绑定生活服务开放平台创建的「服务商应用」（非商家应用）。SP 凭证绑定后，请到「客户商家」走邀请开通或手工录入；应用能力授权与代运营合作确认是两步。商品查询默认 goods_query_type=3。详情见「绑定说明书」。',
       bindButton: '绑定抖音林客',
       addButton: '添加林客账号',
       accountsHeading: '已绑定的林客账号',
