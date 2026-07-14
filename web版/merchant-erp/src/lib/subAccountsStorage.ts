@@ -25,6 +25,7 @@ export const PERMISSION_MODULES = [
   { key: 'finance', label: '财务管理' },
   { key: 'reviews', label: '评论管理' },
   { key: 'leads', label: '线索管理' },
+  { key: 'distribution', label: '分销设置' },
   { key: 'settings', label: '系统设置' },
 ] as const
 
@@ -157,6 +158,15 @@ export function readJobRoles(): JobRoleRecord[] {
     for (const b of seedBuiltInJobRoles()) {
       if (!ids.has(b.id)) {
         out.unshift(b)
+        changed = true
+      }
+    }
+    /** 新增权限模块时，给预置管理员补齐（不影响已自定义岗位） */
+    const admin = out.find((r) => r.id === BUILTIN_IDS.admin)
+    if (admin) {
+      const missing = allPermissionKeys().filter((k) => !admin.permissions.includes(k))
+      if (missing.length) {
+        admin.permissions = [...admin.permissions, ...missing]
         changed = true
       }
     }

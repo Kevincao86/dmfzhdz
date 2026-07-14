@@ -6,6 +6,7 @@ import {
   Link2,
   Megaphone,
   ScanLine,
+  Share2,
   Shield,
   Store,
   Users,
@@ -54,6 +55,7 @@ import {
 } from '../services/tenantBillingClient'
 import PartnerClientsSection from './settings/PartnerClientsSection'
 import PartnerAgentManagementSection from './settings/PartnerAgentManagementSection'
+import PartnerDistributionSettingsSection from './settings/PartnerDistributionSettingsSection'
 import PartnerEntitlementSection from './settings/PartnerEntitlementSection'
 import PartnerXingxuanPlatformSection from './settings/PartnerXingxuanPlatformSection'
 import { usePartnerTenant } from '../context/PartnerTenantContext'
@@ -94,6 +96,7 @@ const PARTNER_TABS_PARENT = [
   { id: 'merchant' as const, label: '服务商平台', icon: Store },
   { id: 'partner_clients' as const, label: '客户商家', icon: UserCircle2 },
   { id: 'partner_agents' as const, label: '代理管理', icon: Building2 },
+  { id: 'partner_distribution' as const, label: '分销设置', icon: Share2 },
   { id: 'partner_entitlements' as const, label: '权益分配', icon: Coins },
   { id: 'accounts' as const, label: '账号管理', icon: Users },
   { id: 'permissions' as const, label: '权限设置', icon: Shield },
@@ -104,6 +107,7 @@ const PARTNER_TABS_AGENT = [
   { id: 'platforms' as const, label: '平台连接', icon: Link2 },
   { id: 'commercial' as const, label: '商业化后台', icon: Megaphone },
   { id: 'partner_clients' as const, label: '客户商家', icon: UserCircle2 },
+  { id: 'partner_distribution' as const, label: '分销设置', icon: Share2 },
   { id: 'partner_entitlements' as const, label: '我的权益', icon: Coins },
   { id: 'accounts' as const, label: '账号管理', icon: Users },
   { id: 'permissions' as const, label: '权限设置', icon: Shield },
@@ -431,6 +435,8 @@ export default function SettingsPage() {
           {tab === 'partner_agents' && partnerEdition && profile.isParent ? (
             <PartnerAgentManagementSection />
           ) : null}
+
+          {tab === 'partner_distribution' && partnerEdition ? <PartnerDistributionSettingsSection /> : null}
 
           {tab === 'partner_entitlements' && partnerEdition ? <PartnerEntitlementSection /> : null}
 
