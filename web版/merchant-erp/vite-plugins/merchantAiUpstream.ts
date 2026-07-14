@@ -28,6 +28,8 @@ import { buildVendorModelCandidates, invokeWithQuotaFailover, isQuotaHopableErro
 import {
   buildQwenVisionImageRequest,
   extractQwenVisionImageUrls,
+  extractQwenVisionImageUrlsFromPayload,
+  qwenVisionImageUsesAsyncHeader,
 } from '../src/lib/qwenVisionApi.js'
 import { parseArkVideoEndpointsRaw } from '../src/lib/arkVideoEndpointsConfig.js'
 import { isDouyinAssistAiVendorId, isValidAiVendorSlug } from '../src/lib/aiVendorCatalogShared.js'
@@ -166,6 +168,7 @@ function isVendorHopableError(e: unknown): boolean {
   if (lower.includes('403') || lower.includes('forbidden')) return true
   if (lower.includes('invalidparameter') || lower.includes('invalid parameter')) return true
   if (lower.includes('poster-generation') || lower.includes('wanx-poster')) return true
+  if (/multimodal-generation|model not found|url error/i.test(raw)) return true
   if (lower.includes('minimax') && (lower.includes('图像') || lower.includes('image')))
     return true
   if (lower.includes('不支持') && (lower.includes('图') || lower.includes('image'))) return true
@@ -1816,13 +1819,16 @@ async function qwenWanxCreateTask(
     parameterExtras: opts?.parameterExtras,
     negativePrompt: opts?.negativePrompt,
   })
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+  }
+  if (qwenVisionImageUsesAsyncHeader(wanxModel)) {
+    headers['X-DashScope-Async'] = 'enable'
+  }
   const res = await fetch(built.url, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'X-DashScope-Async': 'enable',
-    },
+    headers,
     body: JSON.stringify(built.body),
   })
   const data = await readJson(res)
@@ -1833,6 +1839,11 @@ async function qwenWanxCreateTask(
       JSON.stringify(data).slice(0, 400)
     throw new Error(msg || `千问视觉创建任务 HTTP ${res.status}`)
   }
+  const syncUrls = extractQwenVisionImageUrlsFromPayload(data as Record<string, unknown>)
+  if (syncUrls.length > 0) {
+    /** 同步 multimodal 响应：用占位 task id，由 qwenWanxGenerateUrls 直接消费 */
+    return `__sync__:${encodeURIComponent(syncUrls[0]!)}`
+  }
   const output = data.output as Record<string, unknown> | undefined
   const taskId = typeof output?.task_id === 'string' ? output.task_id : ''
   if (!taskId) throw new Error(`千问视觉未返回 task_id：${JSON.stringify(data).slice(0, 280)}`)
@@ -1840,6 +1851,10 @@ async function qwenWanxCreateTask(
 }
 
 async function qwenWanxPollUrls(apiKey: string, taskId: string): Promise<string[]> {
+  if (taskId.startsWith('__sync__:')) {
+    const url = decodeURIComponent(taskId.slice('__sync__:'.length))
+    return url ? [url] : []
+  }
   const url = `https://dashscope.aliyuncs.com/api/v1/tasks/${encodeURIComponent(taskId)}`
   /** 前期更密轮询，任务就绪后尽快返回，降低卡在 Serverless 上限的概率 */
   for (let i = 0; i < 80; i++) {
