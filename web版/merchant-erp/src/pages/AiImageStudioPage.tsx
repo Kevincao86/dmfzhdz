@@ -24,7 +24,6 @@ import {
   applyIndustrySubChange,
   applyPlaybookToFormWithVariants,
   applyPlaybookVariantToForm,
-  buildVisualStudioPrompt,
   DEFAULT_VISUAL_STUDIO_FORM,
   generateCopySuggestions,
   getPlaybookVariantConfig,
@@ -51,7 +50,7 @@ import {
   mpPointsCostForVisualStudioImages,
 } from '../lib/mpPointsEconomics'
 import { postAiAgentNativeImage } from '../services/ai/aiClient'
-import { fetchVisualStudioCopyFromAi } from '../services/ai/visualStudioAi'
+import { fetchVisualStudioCopyFromAi, fetchVisualStudioImagePromptFromAi } from '../services/ai/visualStudioAi'
 import {
   checkVisualStudioCopyAffordable,
   checkVisualStudioImageBatchAffordable,
@@ -136,7 +135,10 @@ function ChannelChip({
         <img
           src={logoSrc}
           alt=""
-          className="h-4 w-4 shrink-0 rounded-sm object-contain"
+          className={cn(
+            'h-4 w-4 shrink-0 rounded-sm object-contain',
+            active && 'bg-white/90 p-0.5',
+          )}
         />
       ) : channelId === 'offline_print' ? (
         <Printer className="h-3.5 w-3.5 shrink-0 opacity-70" />
@@ -163,6 +165,7 @@ function DevicePreview({
   empty?: boolean
 }) {
   const ch = resolveChannel(channelId)
+  const logoSrc = publishChannelLogoSrc(channelId)
   const isVertical = ch.primarySizeId === 'moments_vertical'
   return (
     <div className="flex flex-col items-center">
@@ -173,10 +176,15 @@ function DevicePreview({
         )}
       >
         <div className="absolute left-1/2 top-2.5 z-10 h-1 w-16 -translate-x-1/2 rounded-full bg-slate-700" />
-        <div
-          className="absolute left-3 top-9 z-10 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm"
-          style={{ backgroundColor: ch.color }}
-        >
+        <div className="absolute left-3 top-9 z-10 flex items-center gap-1 rounded-full bg-white/95 px-2 py-0.5 text-[10px] font-semibold text-slate-800 shadow-sm">
+          {logoSrc ? (
+            <img src={logoSrc} alt="" className="h-3.5 w-3.5 shrink-0 rounded-sm object-contain" />
+          ) : (
+            <span
+              className="h-2 w-2 shrink-0 rounded-full"
+              style={{ backgroundColor: ch.color }}
+            />
+          )}
           {ch.short}
         </div>
         {previewUrl ? (
@@ -459,17 +467,24 @@ export default function AiImageStudioPage() {
       job.status = 'running'
       setVariants([...jobList])
       setProgress(
-        `${ch.short} · 方案 ${job.variantIndex + 1}/${form.variantCount}（${i + 1}/${jobList.length}）`,
+        `${ch.short} · 方案 ${job.variantIndex + 1}/${form.variantCount}（${i + 1}/${jobList.length}）· AI 整理出图需求`,
       )
       setSelectedPreviewChannel(job.channelId)
 
-      const prompt = buildVisualStudioPrompt(form, {
+      const promptPack = await fetchVisualStudioImagePromptFromAi(form, {
         channel: job.channelId,
         variantIndex: job.variantIndex,
         productRefCount: productRefs.length,
         styleFromReference: productRefs.length > 0,
         refineNote: opts?.refine ?? refineNote,
+        signal: ac.signal,
       })
+      if (ac.signal.aborted) break
+      const prompt = promptPack.ok ? promptPack.prompt : promptPack.fallback
+
+      setProgress(
+        `${ch.short} · 方案 ${job.variantIndex + 1}/${form.variantCount}（${i + 1}/${jobList.length}）· 生图中`,
+      )
 
       const out = await postAiAgentNativeImage(prompt, {
         exactPrompt: true,
