@@ -14,7 +14,7 @@ function isHallPath(pathname: string): boolean {
   return pathname === '/hall' || pathname === '/' || pathname.startsWith('/hall/')
 }
 
-/** 星选 DR：大厅首页活动海报弹窗 */
+/** 星选 DR：大厅首页活动海报弹窗（面板色随亮/暗主题，避免字色融底） */
 export default function PlatformDecorDrHost() {
   const location = useLocation()
   const [popup, setPopup] = useState<RegistryPlatformDecorItem | null>(null)
@@ -50,11 +50,14 @@ export default function PlatformDecorDrHost() {
   }
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4 backdrop-blur-[1px]">
-      <div className="relative w-full max-w-md overflow-hidden rounded-2xl bg-[var(--shell-surface,#fff)] shadow-2xl">
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center p-4 backdrop-blur-[1px]"
+      style={{ background: 'var(--panel-overlay, rgba(0,0,0,0.5))' }}
+    >
+      <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-[var(--shell-border)] bg-[var(--panel-card)] text-[var(--shell-text)] shadow-2xl">
         <button
           type="button"
-          className="absolute right-2 top-2 z-10 rounded-full bg-black/40 p-1.5 text-white"
+          className="absolute right-2 top-2 z-10 rounded-full bg-black/55 p-1.5 text-white ring-1 ring-white/30"
           aria-label="关闭"
           onClick={close}
         >
@@ -82,12 +85,14 @@ export default function PlatformDecorDrHost() {
           )}
         </button>
         {popup.title ? (
-          <p className="px-4 py-3 text-center text-sm font-semibold text-[var(--shell-text)]">{popup.title}</p>
+          <p className="px-4 py-3 text-center text-sm font-semibold text-[var(--shell-text)]">
+            {popup.title}
+          </p>
         ) : null}
         <div className="border-t border-[var(--shell-border)] px-4 py-3">
           <button
             type="button"
-            className="w-full rounded-xl bg-[var(--shell-text)] py-2.5 text-sm font-medium text-white"
+            className="w-full rounded-xl bg-[var(--identity-primary,#7c3aed)] py-2.5 text-sm font-medium text-white"
             onClick={close}
           >
             关闭

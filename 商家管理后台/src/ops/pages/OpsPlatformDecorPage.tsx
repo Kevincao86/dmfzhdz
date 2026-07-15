@@ -67,15 +67,10 @@ function emptyItem(slotKey: string): RegistryPlatformDecorItem {
   }
 }
 
-function DecorMediaThumb({ item, className }: { item: RegistryPlatformDecorItem; className?: string }) {
+function DecorMediaThumb({ item }: { item: RegistryPlatformDecorItem }) {
   if (!item.imageUrl) {
     return (
-      <div
-        className={
-          className ||
-          'flex h-12 w-12 items-center justify-center rounded bg-slate-800 text-[10px] text-slate-500'
-        }
-      >
+      <div className="flex h-12 w-12 items-center justify-center rounded border border-[var(--ops-border)] bg-[var(--ops-hover)] text-[10px] text-[var(--ops-muted)]">
         无素材
       </div>
     )
@@ -84,7 +79,7 @@ function DecorMediaThumb({ item, className }: { item: RegistryPlatformDecorItem;
     return (
       <video
         src={item.imageUrl}
-        className={className || 'h-12 w-12 rounded object-cover'}
+        className="h-12 w-12 rounded border border-[var(--ops-border)] object-cover"
         muted
         playsInline
         preload="metadata"
@@ -92,7 +87,11 @@ function DecorMediaThumb({ item, className }: { item: RegistryPlatformDecorItem;
     )
   }
   return (
-    <img src={item.imageUrl} alt="" className={className || 'h-12 w-12 rounded object-cover'} />
+    <img
+      src={item.imageUrl}
+      alt=""
+      className="h-12 w-12 rounded border border-[var(--ops-border)] object-cover"
+    />
   )
 }
 
@@ -201,20 +200,20 @@ export default function OpsPlatformDecorPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-4xl space-y-6 text-[var(--ops-text)]">
       <div>
-        <h1 className="text-xl font-semibold text-white">
+        <h1 className="ops-page-title text-xl font-semibold">
           {kind === 'popup' ? '海报弹窗' : '页面广告位'}
         </h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="ops-muted mt-1 text-sm">
           {kind === 'popup'
             ? '活动海报首页弹窗：与公告弹窗互斥，优先紧急/入选/档期类通知。支持 once / daily / always 频控。素材支持静图、GIF、短视频（OSS）。'
             : 'Banner / 条幅按 slotKey 投放。同一槽位取 priority 最小且在有效期内的一条。素材支持静图、GIF、短视频（OSS）。'}
         </p>
-        <ul className="mt-3 space-y-1 rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2 text-xs text-slate-400">
+        <ul className="ops-size-hint-box space-y-1">
           {slotOptions.map((k) => (
             <li key={k}>
-              <span className="text-slate-300">{PLATFORM_DECOR_SLOT_LABELS[k] || k}</span>
+              <strong>{PLATFORM_DECOR_SLOT_LABELS[k] || k}</strong>
               {' · '}
               {PLATFORM_DECOR_SLOT_SIZE_HINTS[k] || '按展示比例出图'}
             </li>
@@ -222,13 +221,9 @@ export default function OpsPlatformDecorPage() {
         </ul>
       </div>
 
-      <OpsEditableSection className="block space-y-4 rounded-xl border border-[var(--ops-border)] bg-[var(--ops-panel)] p-5">
+      <OpsEditableSection className="block space-y-4 rounded-xl border border-[var(--ops-border)] bg-[var(--ops-panel)] p-5 shadow-[var(--ops-card-shadow)]">
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={onAdd}
-            className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-sm text-cyan-200 hover:bg-cyan-500/20"
-          >
+          <button type="button" onClick={onAdd} className="ops-btn-soft">
             新增素材
           </button>
           <button
@@ -239,40 +234,40 @@ export default function OpsPlatformDecorPage() {
           >
             {saving ? '保存中…' : '保存并同步'}
           </button>
-          {updatedAt ? <span className="text-xs text-slate-500">上次保存：{updatedAt}</span> : null}
+          {updatedAt ? <span className="ops-hint">上次保存：{updatedAt}</span> : null}
         </div>
-        {msg ? <p className="text-sm text-amber-200/90">{msg}</p> : null}
+        {msg ? <p className="ops-hint-warn text-sm">{msg}</p> : null}
 
         {!visibleItems.length ? (
-          <p className="py-8 text-center text-sm text-slate-500">暂无素材，点击「新增素材」开始配置。</p>
+          <p className="ops-muted py-8 text-center text-sm">暂无素材，点击「新增素材」开始配置。</p>
         ) : (
-          <ul className="divide-y divide-slate-800 rounded-lg border border-slate-800">
+          <ul className="divide-y divide-[var(--ops-border)] rounded-lg border border-[var(--ops-border)]">
             {visibleItems.map((it) => (
               <li key={it.id} className="flex flex-wrap items-center gap-3 px-3 py-3">
                 <DecorMediaThumb item={it} />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-white">{it.title}</p>
-                  <p className="truncate text-xs text-slate-500">
+                  <p className="truncate text-sm font-medium text-[var(--ops-text)]">{it.title}</p>
+                  <p className="ops-muted truncate text-xs">
                     {PLATFORM_DECOR_SLOT_LABELS[it.slotKey] || it.slotKey}
                     {isDecorVideoMedia(it) ? ' · 视频' : ''}
                     {it.enabled ? '' : ' · 已停用'}
                   </p>
                   {PLATFORM_DECOR_SLOT_SIZE_HINTS[it.slotKey] ? (
-                    <p className="truncate text-[11px] text-slate-600">
+                    <p className="ops-hint truncate text-[11px]">
                       {PLATFORM_DECOR_SLOT_SIZE_HINTS[it.slotKey]}
                     </p>
                   ) : null}
                 </div>
                 <button
                   type="button"
-                  className="text-xs text-cyan-300 hover:underline"
+                  className="text-xs font-medium text-[var(--ops-accent)] hover:underline"
                   onClick={() => setEditingId(it.id)}
                 >
                   编辑
                 </button>
                 <button
                   type="button"
-                  className="text-xs text-rose-300 hover:underline"
+                  className="text-xs font-medium text-[var(--ops-danger)] hover:underline"
                   onClick={() => onRemove(it.id)}
                 >
                   删除
@@ -284,18 +279,22 @@ export default function OpsPlatformDecorPage() {
       </OpsEditableSection>
 
       {editing ? (
-        <OpsEditableSection className="block space-y-4 rounded-xl border border-violet-500/30 bg-[var(--ops-panel)] p-5">
+        <OpsEditableSection className="block space-y-4 rounded-xl border border-[var(--ops-border)] bg-[var(--ops-panel)] p-5 shadow-[var(--ops-card-shadow)] ring-1 ring-[var(--ops-accent-soft)]">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-white">编辑素材</h2>
-            <button type="button" className="text-xs text-slate-400 hover:text-white" onClick={() => setEditingId(null)}>
+            <h2 className="text-sm font-semibold text-[var(--ops-text)]">编辑素材</h2>
+            <button
+              type="button"
+              className="ops-muted text-xs hover:text-[var(--ops-text)]"
+              onClick={() => setEditingId(null)}
+            >
               收起
             </button>
           </div>
 
-          <label className="block text-sm text-slate-300">
+          <label className="ops-label">
             槽位
             <select
-              className="mt-1 w-full rounded-lg border border-slate-600 bg-slate-900/60 px-3 py-2 text-sm text-white"
+              className="ops-field mt-1"
               value={editing.slotKey}
               onChange={(e) => patchItem(editing.id, { slotKey: e.target.value })}
             >
@@ -308,25 +307,25 @@ export default function OpsPlatformDecorPage() {
                 </option>
               ))}
             </select>
-            <p className="mt-1.5 text-xs text-amber-200/80">
+            <p className="ops-hint-warn mt-1.5">
               {PLATFORM_DECOR_SLOT_SIZE_HINTS[editing.slotKey] || '请按该位置实际展示比例出图'}
               ；视频与静图画幅一致即可。
             </p>
           </label>
 
-          <label className="block text-sm text-slate-300">
+          <label className="ops-label">
             标题
             <input
-              className="mt-1 w-full rounded-lg border border-slate-600 bg-slate-900/60 px-3 py-2 text-sm text-white"
+              className="ops-field mt-1"
               value={editing.title}
               onChange={(e) => patchItem(editing.id, { title: e.target.value })}
             />
           </label>
 
           <div className="space-y-2">
-            <p className="text-sm text-slate-300">海报素材（静图 / GIF / 视频）</p>
+            <p className="ops-label">海报素材（静图 / GIF / 视频）</p>
             {editing.imageUrl ? (
-              <div className="overflow-hidden rounded-lg border border-slate-700 bg-slate-950/50">
+              <div className="overflow-hidden rounded-lg border border-[var(--ops-border)] bg-[var(--ops-hover)]">
                 {isDecorVideoMedia(editing) ? (
                   <video
                     src={editing.imageUrl}
@@ -336,11 +335,7 @@ export default function OpsPlatformDecorPage() {
                     muted
                   />
                 ) : (
-                  <img
-                    src={editing.imageUrl}
-                    alt=""
-                    className="max-h-56 w-full object-contain"
-                  />
+                  <img src={editing.imageUrl} alt="" className="max-h-56 w-full object-contain" />
                 )}
               </div>
             ) : null}
@@ -349,7 +344,7 @@ export default function OpsPlatformDecorPage() {
                 type="button"
                 disabled={uploading}
                 onClick={() => fileInputRef.current?.click()}
-                className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-sm text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-50"
+                className="ops-btn-soft"
               >
                 {uploading ? '上传中…' : '本地上传到 OSS'}
               </button>
@@ -358,14 +353,12 @@ export default function OpsPlatformDecorPage() {
                   type="button"
                   disabled={uploading}
                   onClick={() => patchItem(editing.id, { imageUrl: '', mediaType: 'image' })}
-                  className="rounded-lg border border-slate-600 px-3 py-1.5 text-sm text-slate-400 hover:text-white"
+                  className="rounded-lg border border-[var(--ops-border)] px-3 py-1.5 text-sm text-[var(--ops-muted)] hover:text-[var(--ops-text)]"
                 >
                   清除素材
                 </button>
               ) : null}
-              <span className="text-[11px] text-slate-500">
-                图片/GIF ≤8MB；视频 mp4/webm/mov ≤15MB
-              </span>
+              <span className="ops-hint text-[11px]">图片/GIF ≤8MB；视频 mp4/webm/mov ≤15MB</span>
             </div>
             <input
               ref={fileInputRef}
@@ -374,10 +367,10 @@ export default function OpsPlatformDecorPage() {
               className="hidden"
               onChange={(e) => void onUpload(editing.id, e.target.files?.[0] || null)}
             />
-            <label className="block text-xs text-slate-500">
+            <label className="ops-hint block">
               或粘贴已有 HTTPS 地址
               <input
-                className="mt-1 w-full rounded-lg border border-slate-600 bg-slate-900/60 px-3 py-2 text-sm text-white"
+                className="ops-field mt-1"
                 placeholder="https://..."
                 value={editing.imageUrl}
                 onChange={(e) => {
@@ -395,10 +388,10 @@ export default function OpsPlatformDecorPage() {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm text-slate-300">
+            <label className="ops-label">
               跳转类型
               <select
-                className="mt-1 w-full rounded-lg border border-slate-600 bg-slate-900/60 px-3 py-2 text-sm text-white"
+                className="ops-field mt-1"
                 value={editing.linkType}
                 onChange={(e) =>
                   patchItem(editing.id, { linkType: e.target.value as PlatformDecorLinkType })
@@ -409,10 +402,10 @@ export default function OpsPlatformDecorPage() {
                 <option value="web_url">网页 URL</option>
               </select>
             </label>
-            <label className="block text-sm text-slate-300">
+            <label className="ops-label">
               跳转值
               <input
-                className="mt-1 w-full rounded-lg border border-slate-600 bg-slate-900/60 px-3 py-2 text-sm text-white"
+                className="ops-field mt-1"
                 placeholder={editing.linkType === 'mp_path' ? '/pages/...' : 'https://...'}
                 value={editing.linkValue || ''}
                 onChange={(e) => patchItem(editing.id, { linkValue: e.target.value })}
@@ -421,10 +414,10 @@ export default function OpsPlatformDecorPage() {
           </div>
 
           {kind === 'popup' ? (
-            <label className="block text-sm text-slate-300">
+            <label className="ops-label">
               频控
               <select
-                className="mt-1 w-full rounded-lg border border-slate-600 bg-slate-900/60 px-3 py-2 text-sm text-white"
+                className="ops-field mt-1"
                 value={editing.freq || 'daily'}
                 onChange={(e) => patchItem(editing.id, { freq: e.target.value as PlatformDecorFreq })}
               >
@@ -436,40 +429,40 @@ export default function OpsPlatformDecorPage() {
           ) : null}
 
           <div className="grid gap-3 sm:grid-cols-3">
-            <label className="block text-sm text-slate-300">
+            <label className="ops-label">
               开始时间
               <input
                 type="datetime-local"
-                className="mt-1 w-full rounded-lg border border-slate-600 bg-slate-900/60 px-3 py-2 text-sm text-white [color-scheme:dark]"
+                className="ops-field mt-1"
                 value={toDatetimeLocalValue(editing.startAt)}
                 onChange={(e) =>
                   patchItem(editing.id, { startAt: fromDatetimeLocalValue(e.target.value) })
                 }
               />
             </label>
-            <label className="block text-sm text-slate-300">
+            <label className="ops-label">
               结束时间
               <input
                 type="datetime-local"
-                className="mt-1 w-full rounded-lg border border-slate-600 bg-slate-900/60 px-3 py-2 text-sm text-white [color-scheme:dark]"
+                className="ops-field mt-1"
                 value={toDatetimeLocalValue(editing.endAt)}
                 onChange={(e) =>
                   patchItem(editing.id, { endAt: fromDatetimeLocalValue(e.target.value) })
                 }
               />
             </label>
-            <label className="block text-sm text-slate-300">
+            <label className="ops-label">
               优先级（小优先）
               <input
                 type="number"
-                className="mt-1 w-full rounded-lg border border-slate-600 bg-slate-900/60 px-3 py-2 text-sm text-white"
+                className="ops-field mt-1"
                 value={editing.priority}
                 onChange={(e) => patchItem(editing.id, { priority: Number(e.target.value) || 100 })}
               />
             </label>
           </div>
 
-          <label className="flex items-center gap-2 text-sm text-slate-300">
+          <label className="flex items-center gap-2 text-sm text-[var(--ops-text)]">
             <input
               type="checkbox"
               checked={editing.enabled}

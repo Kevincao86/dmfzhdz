@@ -698,16 +698,19 @@
   max-width: 620rpx;
   max-height: 86vh;
   overflow: auto;
-  background: #111827;
+  /* 固定高对比卡片：不随系统暗色把字色冲掉 */
+  background: #ffffff;
   border-radius: 28rpx;
   padding: 28rpx 24rpx 32rpx;
   box-sizing: border-box;
+  box-shadow: 0 16rpx 48rpx rgba(15, 23, 42, 0.28);
 }
 
 .decor-popup__img {
   width: 100%;
   display: block;
   border-radius: 16rpx;
+  background: #0f172a;
 }
 
 .decor-popup__title {
@@ -715,7 +718,7 @@
   margin: 20rpx 0 8rpx;
   font-size: 30rpx;
   font-weight: 700;
-  color: #f8fafc;
+  color: #0f172a;
   text-align: center;
 }
 
