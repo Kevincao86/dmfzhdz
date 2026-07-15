@@ -16,6 +16,7 @@ html[data-theme='light'] {
   --ops-input-text: #0f172a;
   --ops-accent: #4f46e5;
   --ops-accent-soft: rgba(79, 70, 229, 0.1);
+  --ops-danger: #dc2626;
   --ops-nav-active-bg: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
   --ops-nav-active-shadow: 0 4px 14px rgba(79, 70, 229, 0.28);
   --ops-card-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.04);
@@ -36,6 +37,7 @@ html[data-theme='dark'] {
   --ops-input-text: #e2e8f0;
   --ops-accent: #818cf8;
   --ops-accent-soft: rgba(129, 140, 248, 0.12);
+  --ops-danger: #fb7185;
   --ops-nav-active-bg: linear-gradient(135deg, #4338ca 0%, #6366f1 100%);
   --ops-nav-active-shadow: 0 4px 16px rgba(67, 56, 202, 0.35);
   --ops-card-shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 32px rgba(0, 0, 0, 0.28);
@@ -88,6 +90,74 @@ html[data-theme='dark'] .ops-sidebar {
 
 .ops-muted {
   color: var(--ops-muted);
+}
+
+/* 表单控件：随亮/暗主题，避免写死 text-white / slate-900 */
+.ops-field {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid var(--ops-border);
+  background: var(--ops-input-bg);
+  color: var(--ops-input-text);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+.ops-field:focus {
+  outline: 2px solid color-mix(in srgb, var(--ops-accent) 45%, transparent);
+  outline-offset: 1px;
+}
+
+.ops-label {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--ops-text);
+}
+
+.ops-hint {
+  font-size: 0.75rem;
+  color: var(--ops-muted);
+}
+
+.ops-hint-warn {
+  font-size: 0.75rem;
+  color: #b45309;
+}
+
+html[data-theme='dark'] .ops-hint-warn {
+  color: #fcd34d;
+}
+
+.ops-btn-soft {
+  border-radius: 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--ops-accent) 45%, var(--ops-border));
+  background: var(--ops-accent-soft);
+  color: var(--ops-accent);
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+.ops-btn-soft:hover {
+  filter: brightness(1.05);
+}
+
+.ops-btn-soft:disabled {
+  opacity: 0.5;
+}
+
+.ops-size-hint-box {
+  margin-top: 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--ops-border);
+  background: var(--ops-hover);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--ops-muted);
+}
+
+.ops-size-hint-box strong {
+  color: var(--ops-text);
+  font-weight: 500;
 }
 
 .ops-page-title {

@@ -175,7 +175,7 @@ export default function ProfilePage() {
       {decorBanner?.imageUrl ? (
         <button
           type="button"
-          className="block w-full overflow-hidden rounded-xl border border-[var(--shell-border)] bg-[var(--shell-surface)] text-left"
+          className="block w-full overflow-hidden rounded-xl border border-[var(--shell-border)] bg-[var(--panel-card)] text-left"
           onClick={() => openDecorLink(decorBanner)}
         >
           {isDecorVideoMedia(decorBanner) ? (
@@ -195,7 +195,9 @@ export default function ProfilePage() {
             />
           )}
           {decorBanner.title ? (
-            <p className="px-3 py-2 text-sm font-medium text-[var(--shell-text)]">{decorBanner.title}</p>
+            <p className="border-t border-[var(--shell-border)] px-3 py-2 text-sm font-medium text-[var(--shell-text)]">
+              {decorBanner.title}
+            </p>
           ) : null}
         </button>
       ) : null}

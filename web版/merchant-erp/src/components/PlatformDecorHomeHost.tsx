@@ -87,22 +87,24 @@ export default function PlatformDecorHomeHost() {
       {banner?.imageUrl ? (
         <button
           type="button"
-          className="mb-4 block w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 text-left shadow-sm"
+          className="mb-4 block w-full overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm"
           onClick={() => openDecorLink(banner)}
         >
           <DecorMedia item={banner} className="max-h-40 w-full object-cover" alt={banner.title || '活动'} />
           {banner.title ? (
-            <p className="px-3 py-2 text-sm font-medium text-slate-700">{banner.title}</p>
+            <p className="border-t border-slate-100 px-3 py-2 text-sm font-medium text-slate-800">
+              {banner.title}
+            </p>
           ) : null}
         </button>
       ) : null}
 
       {popupOpen && popup?.imageUrl ? (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-[2px]">
-          <div className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-900/55 p-4 backdrop-blur-[2px]">
+          <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
             <button
               type="button"
-              className="absolute right-2 top-2 z-10 rounded-full bg-black/40 p-1.5 text-white hover:bg-black/55"
+              className="absolute right-2 top-2 z-10 rounded-full bg-black/55 p-1.5 text-white ring-1 ring-white/40 hover:bg-black/70"
               aria-label="关闭"
               onClick={closePopup}
             >
@@ -112,12 +114,12 @@ export default function PlatformDecorHomeHost() {
               openDecorLink(popup)
               closePopup()
             }}>
-              <DecorMedia item={popup} className="w-full object-cover" alt={popup.title || '活动海报'} />
+              <DecorMedia item={popup} className="w-full object-cover bg-slate-900" alt={popup.title || '活动海报'} />
             </button>
             {popup.title ? (
-              <p className="px-4 py-3 text-center text-sm font-semibold text-slate-800">{popup.title}</p>
+              <p className="px-4 py-3 text-center text-sm font-semibold text-slate-900">{popup.title}</p>
             ) : null}
-            <div className="border-t border-slate-100 px-4 py-3">
+            <div className="border-t border-slate-200 px-4 py-3">
               <button
                 type="button"
                 className="w-full rounded-xl bg-slate-900 py-2.5 text-sm font-medium text-white"
