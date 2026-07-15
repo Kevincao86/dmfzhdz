@@ -10,10 +10,11 @@ import {
 } from '../src/lib/iceSmartBatchPlan.js'
 
 assert.equal(pickSmartBatchSegmentCount([], 32, 30), 6, '30s → 6 segments')
-assert.equal(pickSmartBatchSegmentCount([], 2, 30), 6, '30s with 2 materials still → 6 segments')
+assert.equal(pickSmartBatchSegmentCount([], 2, 30), 2, '2 materials cap segments to pool size')
 
 const twoMatIndices = pickSmartBatchMaterialIndices(2, [], 6)
-assert.deepEqual(twoMatIndices, [0, 1, 0, 1, 0, 1], '2 materials cycle for 6 segments')
+assert.deepEqual(twoMatIndices, [0, 1], '2 materials: no cycling reuse')
+assert.equal(new Set(twoMatIndices).size, twoMatIndices.length, 'all picked indices unique')
 
 const indices = pickSmartBatchMaterialIndices(32, [2, 5, 8, 15, 22], 6)
 assert.equal(indices.length, 6, 'must pad to 6 segments')
@@ -43,7 +44,26 @@ assert.equal(payload.materials.length, 32, 'keep full material pool')
 assert.equal(payload.materialSlots.length, 6, 'slots map segments to pool indices')
 assert.equal(payload.materialSlots[0], 2)
 assert.equal(payload.materialSlots[4], 22)
+assert.equal(new Set(payload.materialSlots).size, payload.materialSlots.length, 'no duplicate materials')
 assert.equal(payload.scriptRows[5]?.timeRange, '25-30秒', 'last row covers 25-30s')
+
+const twoMatPayload = buildSmartBatchSubmitPayload({
+  materials: [
+    { kind: 'video', mediaUrl: 'https://example.com/a.mp4' },
+    { kind: 'video', mediaUrl: 'https://example.com/b.mp4' },
+  ],
+  scriptRows: [
+    { timeRange: '0-5秒', dialogue: 'a' },
+    { timeRange: '5-10秒', dialogue: 'b' },
+    { timeRange: '10-15秒', dialogue: 'c' },
+    { timeRange: '15-20秒', dialogue: 'd' },
+    { timeRange: '20-25秒', dialogue: 'e' },
+    { timeRange: '25-30秒', dialogue: 'f' },
+  ],
+  targetTotalSec: 30,
+})
+assert.equal(twoMatPayload.segmentCount, 2, '2 materials → 2 segments for 30s')
+assert.deepEqual(twoMatPayload.materialSlots, [0, 1], 'each material used once')
 
 const expanded = prepareSmartBatchSubmitPayload({
   materials: [
@@ -57,7 +77,8 @@ const expanded = prepareSmartBatchSubmitPayload({
   targetTotalSec: 20,
 })
 assert.equal(expanded.materials.length, 2, 'dedupe expanded pool')
-assert.deepEqual(expanded.materialSlots, [0, 1, 0, 1], 'remap expanded slots')
+assert.equal(expanded.segmentCount, 2, 'deduped pool caps segment count')
+assert.deepEqual(expanded.materialSlots, [0, 1], 'remap expanded slots without reuse')
 
 const { pool, remapMaterialIndex } = dedupeSmartBatchMaterialPool(expanded.materials)
 assert.equal(pool.length, 2)

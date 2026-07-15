@@ -80,6 +80,16 @@ export function appendEmptyScriptRow(
   ]
 }
 
+/** 删除指定分镜行；至少保留 2 段 */
+export function removeScriptRowAt(
+  rows: ShortVideoScriptRow[],
+  index: number,
+): ShortVideoScriptRow[] {
+  if (rows.length <= 2) return rows
+  if (!Number.isFinite(index) || index < 0 || index >= rows.length) return rows
+  return rows.filter((_, i) => i !== index)
+}
+
 export function resizeScriptRows(
   rows: ShortVideoScriptRow[],
   count: number,
