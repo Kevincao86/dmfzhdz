@@ -1548,7 +1548,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       subtitleStyleId: mixSubtitleStyleId,
       mixVoicePresetId: mixVoicePresetId || ICE_MIX_VOICE_DEFAULT_ID,
       mixVoiceCloneBase64,
-      transitionMode: resolvedMixEffect.id === 'none' ? 'none' : 'auto',
+      transitionMode: 'none',
       effectId: resolvedMixEffect.id,
       ...mixBgmPostPayload(),
     })

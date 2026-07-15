@@ -27,7 +27,6 @@ import {
   scriptTimeRangesFromDurationPlan,
 } from '../src/lib/shortVideoScriptTable.js'
 import { resolveIceMixBgmUrl } from '../src/lib/iceMixBgmPresets.js'
-import { clampMixSourceInSec } from '../src/lib/iceMixPlan.js'
 import {
   type IceSmartBatchMaterial,
   type IceSmartBatchScriptRow,
@@ -167,17 +166,18 @@ function buildDefaultEditingConfig(
   opts?: { voicePresetId?: string; transitionAuto?: boolean; groupedSpeech?: boolean; bgmEnabled?: boolean },
 ): Record<string, unknown> {
   const preset = resolveIceSubtitleStylePreset(subtitleStyleId ?? ICE_SUBTITLE_STYLE_DEFAULT_ID)
-  const shotDur = Math.max(3, Math.min(5, singleShotDuration))
+  /** 须 ≥ 最长分镜段，否则 IMS 会在段内再切子镜头并叠转场，造成画面反复抖动 */
+  const shotDur = Math.max(3, Math.min(15, Math.round(singleShotDuration * 100) / 100))
   const imsVoice = resolveImsBatchSpeechVoice(opts?.voicePresetId ?? '')
-  const transitionAuto = opts?.transitionAuto !== false
+  const transitionAuto = opts?.transitionAuto === true
   const grouped = opts?.groupedSpeech !== false
   const processConfig: Record<string, unknown> = {
     AllowTransition: transitionAuto,
-    UseUniformTransition: true,
+    UseUniformTransition: transitionAuto,
     TransitionList: transitionAuto ? ['directional', 'simplezoom', 'wiperight'] : [],
     AllowVfxEffect: false,
     EnableClipSplit: false,
-    SingleShotDuration: Math.round(shotDur * 100) / 100,
+    SingleShotDuration: shotDur,
   }
   if (!grouped) {
     processConfig.AlignmentMode = 'Cut'
@@ -235,8 +235,12 @@ function buildInputConfig(input: {
     Math.min(5, Math.round((targetTotalSec / Math.max(1, pickedIndices.length)) * 100) / 100),
   )
 
-  const usedIn = new Map<number, number>()
-  const mediaMetaDataArray: Array<Record<string, unknown>> = []
+  const segmentDurations = pickedIndices.map((_, i) => {
+    const row = rows[i]
+    return segmentDurationFromRow(row, defaultSegSec, targetTotalSec, i, pickedIndices.length)
+  })
+  const maxSegDur = Math.max(...segmentDurations, defaultSegSec)
+
   const mediaGroups = pickedIndices.map((matIndex, i) => {
     const mat = input.materials[matIndex]!
     const mediaId = String(mat.mediaId ?? '').trim()
@@ -245,7 +249,7 @@ function buildInputConfig(input: {
     }
     const row = rows[i]
     const dialogue = sanitizeMixDialogueText(String(row?.dialogue ?? '')).trim()
-    const segDur = segmentDurationFromRow(row, defaultSegSec, targetTotalSec, i, pickedIndices.length)
+    const segDur = segmentDurations[i]!
     const groupName = `storyboard-${i}`
     const group: Record<string, unknown> = {
       GroupName: groupName,
@@ -256,22 +260,6 @@ function buildInputConfig(input: {
     }
     if (dialogue.length >= 2 && !isPlaceholderDialogue(dialogue)) {
       group.SpeechTextArray = [dialogue.slice(0, 200)]
-    }
-    if (mat.kind === 'video') {
-      let sourceIn = clampMixSourceInSec((i % 3) * 1.1, segDur)
-      const prev = usedIn.get(matIndex)
-      if (prev != null) {
-        sourceIn = clampMixSourceInSec(prev + Math.max(1.5, segDur * 0.85), segDur)
-      }
-      usedIn.set(matIndex, sourceIn)
-      if (sourceIn > 0.05 || prev != null) {
-        const out = Math.round((sourceIn + segDur) * 100) / 100
-        mediaMetaDataArray.push({
-          Media: mediaId,
-          GroupName: groupName,
-          TimeRangeList: [{ In: Math.round(sourceIn * 100) / 100, Out: out }],
-        })
-      }
     }
     return group
   })
@@ -286,8 +274,8 @@ function buildInputConfig(input: {
   return {
     inputConfig,
     speechRate: 0,
-    shotDurationSec: defaultSegSec,
-    mediaMetaDataArray,
+    shotDurationSec: maxSegDur,
+    mediaMetaDataArray: [],
   }
 }
 
@@ -423,18 +411,11 @@ export async function iceSubmitSmartBatchJob(
     built.shotDurationSec,
     {
       voicePresetId: input.mixVoicePresetId,
-      transitionAuto: input.transitionMode !== 'none' && input.transitionMode !== 'fade',
+      transitionAuto: false,
       groupedSpeech: true,
       bgmEnabled,
     },
   )
-  if (built.mediaMetaDataArray.length) {
-    const mc = (editingConfig.MediaConfig as Record<string, unknown>) ?? {}
-    editingConfig.MediaConfig = {
-      ...mc,
-      MediaMetaDataArray: built.mediaMetaDataArray,
-    }
-  }
   const templateIds = (input.templateIds ?? []).filter(Boolean).slice(0, 50)
 
   const client = createClient(cfg)
@@ -596,8 +577,6 @@ export function buildSmartBatchTimelineProduceInput(input: {
     const start = Math.round(i * each * 10) / 10
     const end = i === pickedIndices.length - 1 ? targetTotalSec : Math.round((i + 1) * each * 10) / 10
     const clipDur = Math.max(0.45, end - start)
-    const sourceIn =
-      mat.kind === 'video' ? Math.min(1.2 + (i % 4) * 1.35, Math.max(1.2, clipDur)) : 0
     return {
       kind: mat.kind,
       mediaUrl: url,
@@ -605,8 +584,8 @@ export function buildSmartBatchTimelineProduceInput(input: {
       timelineEndSec: end,
       caption: String(row?.dialogue ?? '').trim() || undefined,
       materialIndex: matIdx >= 0 ? matIdx : i,
-      sourceInSec: mat.kind === 'video' ? sourceIn : undefined,
-      sourceOutSec: mat.kind === 'video' ? sourceIn + clipDur : undefined,
+      sourceInSec: mat.kind === 'video' ? 0 : undefined,
+      sourceOutSec: mat.kind === 'video' ? clipDur : undefined,
     }
   })
 
