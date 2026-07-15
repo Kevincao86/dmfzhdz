@@ -10,7 +10,9 @@ const TEXT_MODELS = [
 
 function mpAuthHeaders() {
   const token = sessionStore.readSessionToken()
-  return token ? { 'X-Mp-Session': token } : {}
+  if (!token) return {}
+  // 同时带 Bearer：部分网关（如 meoo-ai-agent-image 旧逻辑）只认 Authorization
+  return { 'X-Mp-Session': token, Authorization: `Bearer ${token}` }
 }
 
 function douyinBearerHeaders() {

@@ -10,6 +10,7 @@ import {
   sendMerchantJson,
 } from './merchant/merchantGatewayShared.js'
 import { verifyBearerJwt } from '../vite-plugins/aiGateway/authSupabase.js'
+import { verifyMpSessionToken } from '../vite-plugins/aiGateway/authMpSession.js'
 import { assertAiChatAccess } from '../vite-plugins/tenantMembershipCore.js'
 import { runMeooAgentImageRequest } from '../vite-plugins/meooAgentImageCore.js'
 
@@ -18,11 +19,14 @@ export const config = { maxDuration: 300 }
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (handleMerchantApiOptions(req, res)) return
   res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Mp-Session')
   if (req.method !== 'POST') {
     sendMerchantJson(res, 405, { ok: false, error: 'method_not_allowed' })
     return
   }
   const auth = typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined
+  const mpSessionRaw = req.headers['x-mp-session']
+  const mpSession = typeof mpSessionRaw === 'string' ? mpSessionRaw.trim() : ''
   let user: Awaited<ReturnType<typeof verifyBearerJwt>>
   try {
     user = await verifyBearerJwt(auth, process.env as Record<string, string>)
@@ -30,6 +34,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const msg = e instanceof Error ? e.message : String(e)
     sendMerchantJson(res, 503, { ok: false, error: 'auth_lookup_failed', detail: msg.slice(0, 400) })
     return
+  }
+  // 小程序只带 X-Mp-Session（无 Bearer JWT）时须单独校验，与 meoo-ai-chat 一致
+  if (!user && mpSession) {
+    try {
+      user = await verifyMpSessionToken(mpSession, process.env as Record<string, string>)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      sendMerchantJson(res, 503, { ok: false, error: 'auth_lookup_failed', detail: msg.slice(0, 400) })
+      return
+    }
   }
   if (!user) {
     sendMerchantJson(res, 401, { ok: false, error: 'unauthorized' })
@@ -100,7 +114,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       ? 'tokenmix'
       : preferredVendor ?? 'qwen'
   const userJwt =
-    typeof auth === 'string' && auth.startsWith('Bearer ') ? auth.slice('Bearer '.length).trim() : undefined
+    (typeof auth === 'string' && auth.startsWith('Bearer ')
+      ? auth.slice('Bearer '.length).trim()
+      : '') || mpSession || undefined
   const access = await assertAiChatAccess(
     user.id,
     accessProvider,
