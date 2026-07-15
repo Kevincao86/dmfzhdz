@@ -1,4 +1,8 @@
-const AVATAR_CDN = 'https://mofangdianai.com/digital-human/avatars'
+/** 与商家 ERP merchantStaticUrl 同源 OSS（根域 /digital-human 曾 500，勿再走 mofangdianai.com） */
+const AVATAR_CDN =
+  'https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/web-static/merchant/digital-human/avatars'
+/** 换图后递增，破小程序/CDN 缓存 */
+const AVATAR_ASSET_VERSION = 'dh20260715a'
 
 const VOICE_TUNING = {
   'av-real-1': { rate: 0.94, pitch: 0.96, cloudVoiceId: 'Chinese (Mandarin)_Reliable_Executive' },
@@ -38,7 +42,7 @@ const CARTOON_AVATARS = [
 
 const PRESET_AVATARS = [...REAL_AVATARS, ...CARTOON_AVATARS].map((a) => ({
   ...a,
-  previewUrl: a.previewUrl || `${AVATAR_CDN}/${a.id}.jpg`,
+  previewUrl: a.previewUrl || `${AVATAR_CDN}/${a.id}.jpg?v=${AVATAR_ASSET_VERSION}`,
   voicePresetId: `v-${a.id}`,
 }))
 
