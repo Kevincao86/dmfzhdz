@@ -24,47 +24,37 @@ export function isAddonOpenForAll(): boolean {
   return truthyEnv(import.meta.env.VITE_MP_ADDON_OPEN_ALL)
 }
 
+function allAddonOn(): MpAddonAccess {
+  return {
+    shortvideo: true,
+    cloudEdit: true,
+    digitalHuman: true,
+    visualStudio: true,
+    brief: true,
+    aiVideoReview: true,
+    aiReview: true,
+    any: true,
+  }
+}
+
 export function readAccountAddonAccess(account?: MpAccount | null): MpAddonAccess {
   if (import.meta.env.DEV && isDevPreviewSession()) {
-    return {
-      shortvideo: true,
-      cloudEdit: true,
-      digitalHuman: true,
-      brief: true,
-      aiVideoReview: true,
-      aiReview: true,
-      any: true,
-    }
+    return allAddonOn()
   }
   if (isAddonOpenForAll()) {
-    return {
-      shortvideo: true,
-      cloudEdit: true,
-      digitalHuman: true,
-      brief: true,
-      aiVideoReview: true,
-      aiReview: true,
-      any: true,
-    }
+    return allAddonOn()
   }
   const acc = account ?? getAccount()
   const allow = parseAllowlist()
   if (allow.size && accountAddonBetaKeys(acc).some((k) => allow.has(k))) {
-    return {
-      shortvideo: true,
-      cloudEdit: true,
-      digitalHuman: true,
-      brief: true,
-      aiVideoReview: true,
-      aiReview: true,
-      any: true,
-    }
+    return allAddonOn()
   }
   const raw = readAccountPrFeatureAccess(acc)
   return {
     shortvideo: raw.shortvideo === true,
     cloudEdit: raw.cloudEdit === true,
     digitalHuman: raw.digitalHuman === true,
+    visualStudio: raw.visualStudio === true,
     brief: raw.brief === true,
     aiVideoReview: raw.aiVideoReview === true,
     aiReview: raw.aiReview === true,
@@ -100,12 +90,19 @@ export function canUsePaidAddons(account?: MpAccount | null): boolean {
   return shouldShowAddonsNav(account)
 }
 
-export type AddonNavPerm = 'shortvideo' | 'brief' | 'digitalHuman' | 'aiVideoReview' | 'aiReview'
+export type AddonNavPerm =
+  | 'shortvideo'
+  | 'brief'
+  | 'digitalHuman'
+  | 'visualStudio'
+  | 'aiVideoReview'
+  | 'aiReview'
 
 export function isAddonNavPermEnabled(access: MpAddonAccess, perm: AddonNavPerm): boolean {
   if (perm === 'shortvideo') return access.shortvideo || access.cloudEdit
   if (perm === 'brief') return access.brief
   if (perm === 'aiVideoReview') return access.aiVideoReview
   if (perm === 'aiReview') return access.aiReview || access.aiVideoReview
+  if (perm === 'visualStudio') return access.visualStudio
   return access.digitalHuman
 }

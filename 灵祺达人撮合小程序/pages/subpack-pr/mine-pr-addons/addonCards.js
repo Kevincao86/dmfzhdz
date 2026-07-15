@@ -47,6 +47,15 @@ const AI_ADDONS = [
     tone: 'rose',
     url: '/pages/subpack-pr/mine-pr-addon-digital-human/mine-pr-addon-digital-human',
   },
+  {
+    key: 'visualStudio',
+    perm: 'visualStudio',
+    title: 'AI 视觉工坊',
+    sub: '多端海报 · AI 文案 · 一键出图',
+    glyph: '◈',
+    tone: 'indigo',
+    url: '/pages/subpack-pr/mine-pr-addon-visual-studio/mine-pr-addon-visual-studio',
+  },
 ]
 
 function buildAiAddonsFromAccount(account) {
@@ -57,6 +66,7 @@ function buildAiAddonsFromAccount(account) {
     if (item.perm === 'shortvideo') return access.shortvideo
     if (item.perm === 'brief') return access.brief
     if (item.perm === 'digitalHuman') return access.digitalHuman
+    if (item.perm === 'visualStudio') return access.visualStudio
     if (item.perm === 'aiReview') return access.aiReview || access.aiVideoReview
     return false
   })

@@ -8,6 +8,36 @@
   box-sizing: border-box;
 }
 
+.addon-mini-hero {
+  margin: 0 0 4rpx;
+  padding: 32rpx 28rpx 28rpx;
+  border-radius: 0 0 32rpx 32rpx;
+  box-shadow: 0 10rpx 28rpx rgba(15, 23, 42, 0.12);
+}
+
+.addon-mini-hero--violet {
+  background: linear-gradient(145deg, #7c3aed 0%, #8b5cf6 50%, #a78bfa 100%);
+}
+
+.addon-mini-hero--rose {
+  background: linear-gradient(145deg, #e11d48 0%, #f43f5e 48%, #fb7185 100%);
+}
+
+.addon-mini-hero__title {
+  display: block;
+  font-size: 40rpx;
+  font-weight: 800;
+  color: #fff;
+}
+
+.addon-mini-hero__sub {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.9);
+}
+
 .addon-scroll {
   height: 100vh;
   box-sizing: border-box;

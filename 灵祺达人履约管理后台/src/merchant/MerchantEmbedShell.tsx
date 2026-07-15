@@ -24,6 +24,7 @@ function resolveAddonNavTarget(pathname: string): string | null {
   }
   if (pathname === '/addons/shortvideo') return '/addons/shortvideo'
   if (pathname === '/addons/digital-human') return '/addons/digital-human'
+  if (pathname === '/addons/ai-image') return '/addons/ai-image'
   return null
 }
 

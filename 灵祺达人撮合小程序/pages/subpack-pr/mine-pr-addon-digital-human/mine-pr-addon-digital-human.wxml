@@ -1,4 +1,8 @@
 <scroll-view class="addon-page addon-scroll {{lqThemeClass}}" scroll-y enhanced show-scrollbar="{{false}}">
+  <view class="addon-mini-hero addon-mini-hero--rose">
+    <text class="addon-mini-hero__title">数字人口播</text>
+    <text class="addon-mini-hero__sub">选形象 · TTS 配音 · 口播成片一键生成</text>
+  </view>
   <view class="addon-tabs">
     <view class="addon-tab {{mainTab === 'create' ? 'addon-tab--on' : ''}}" data-tab="create" bindtap="onTab">创作口播</view>
     <view class="addon-tab {{mainTab === 'works' ? 'addon-tab--on' : ''}}" data-tab="works" bindtap="onTab">作品库</view>
