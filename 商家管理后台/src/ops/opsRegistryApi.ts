@@ -390,6 +390,7 @@ export type RegistryFile = {
   distributionWithdrawRequests?: import('../meooRegistryShared/distributionRegistryTypes.js').RegistryDistributionWithdrawRequest[]
   distributionSettlementBatches?: import('../meooRegistryShared/distributionRegistryTypes.js').RegistryDistributionSettlementBatch[]
   distributionWallets?: import('../meooRegistryShared/distributionRegistryTypes.js').RegistryDistributionWallet[]
+  platformDecoration?: import('../meooRegistryShared/platformDecorTypes.js').RegistryPlatformDecoration
 }
 
 export type HelpManualEdition = 'merchant' | 'partner' | 'fulfillment' | 'mp'
