@@ -2,7 +2,7 @@
 const AVATAR_CDN =
   'https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/web-static/merchant/digital-human/avatars'
 /** 换图后递增，破小程序/CDN 缓存 */
-const AVATAR_ASSET_VERSION = 'dh20260715a'
+const AVATAR_ASSET_VERSION = 'dh20260715b'
 
 const VOICE_TUNING = {
   'av-real-1': { rate: 0.94, pitch: 0.96, cloudVoiceId: 'Chinese (Mandarin)_Reliable_Executive' },
@@ -35,14 +35,14 @@ const REAL_AVATARS = [
 ]
 
 const CARTOON_AVATARS = [
-  { id: 'cartoon-1', name: '小祺', tag: '卡通 IP', gender: '女', style: 'cartoon', bodyFrame: 'half', previewUrl: 'https://api.dicebear.com/7.x/adventurer/png?seed=XiaoQi&size=256' },
-  { id: 'cartoon-2', name: '阿灵', tag: '种草达人', gender: '女', style: 'cartoon', bodyFrame: 'half', previewUrl: 'https://api.dicebear.com/7.x/lorelei/png?seed=A-Ling&size=256' },
-  { id: 'cartoon-3', name: '团子', tag: '萌系讲解', gender: '女', style: 'cartoon', bodyFrame: 'half', previewUrl: 'https://api.dicebear.com/7.x/fun-emoji/png?seed=TuanZi&size=256' },
+  { id: 'cartoon-1', name: '小祺', tag: '卡通 IP', gender: '女', style: 'cartoon', bodyFrame: 'half' },
+  { id: 'cartoon-2', name: '阿灵', tag: '种草达人', gender: '女', style: 'cartoon', bodyFrame: 'half' },
+  { id: 'cartoon-3', name: '团子', tag: '萌系讲解', gender: '女', style: 'cartoon', bodyFrame: 'half' },
 ]
 
 const PRESET_AVATARS = [...REAL_AVATARS, ...CARTOON_AVATARS].map((a) => ({
   ...a,
-  previewUrl: a.previewUrl || `${AVATAR_CDN}/${a.id}.jpg?v=${AVATAR_ASSET_VERSION}`,
+  previewUrl: `${AVATAR_CDN}/${a.id}.jpg?v=${AVATAR_ASSET_VERSION}`,
   voicePresetId: `v-${a.id}`,
 }))
 
