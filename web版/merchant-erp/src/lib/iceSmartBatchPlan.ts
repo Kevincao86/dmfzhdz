@@ -3,9 +3,10 @@
 import { spreadMixMaterialIndex } from './iceMixPlan.js'
 import {
   segmentCountFromTargetTotalSec,
-  scriptTimeRangesFromDurationPlan,
-  planLongformAllFiveSecondDurations,
 } from './shortVideoScriptTable.js'
+
+/** 单段视频最长占用（秒）；超出时 IMS 会循环同一镜头导致末段画面重复 */
+export const SMART_BATCH_MAX_VIDEO_SEGMENT_SEC = 4
 
 export type IceSmartBatchMaterial = {
   kind: 'video' | 'image'
@@ -19,7 +20,38 @@ export type IceSmartBatchScriptRow = {
   dialogue?: string
 }
 
-/** 段数须覆盖用户目标时长（30 秒 → 6×5 秒），不得仅按已有分镜行数缩水 */
+/** 各段时长（秒）之和 = 目标总时长，避免 27s 目标却按 6×5s 提交导致末段循环补时 */
+export function distributeSmartBatchSegmentDurations(
+  segmentCount: number,
+  targetTotalSec: number,
+): number[] {
+  const n = Math.max(2, segmentCount)
+  const target = Math.min(120, Math.max(5, Math.ceil(targetTotalSec)))
+  const each = target / n
+  const out: number[] = []
+  let used = 0
+  for (let i = 0; i < n; i++) {
+    if (i === n - 1) {
+      out.push(Math.max(2, Math.round((target - used) * 100) / 100))
+      continue
+    }
+    const d = Math.max(2, Math.min(SMART_BATCH_MAX_VIDEO_SEGMENT_SEC, Math.round(each * 100) / 100))
+    out.push(d)
+    used += d
+  }
+  return out
+}
+
+export function scriptTimeRangesFromSegmentDurations(durations: number[]): string[] {
+  let t = 0
+  return durations.map((d) => {
+    const start = Math.round(t * 100) / 100
+    t = Math.round((t + d) * 100) / 100
+    return `${start}-${t}秒`
+  })
+}
+
+/** 段数须覆盖用户目标时长，且单段不宜过长以免 IMS 循环短视频素材 */
 export function pickSmartBatchSegmentCount(
   scriptRows: IceSmartBatchScriptRow[],
   materialCount: number,
@@ -32,7 +64,10 @@ export function pickSmartBatchSegmentCount(
       String(r.dialogue ?? '').trim().length >= 2,
   ).length
   const rowBased = filledRows >= 2 ? Math.max(filledRows, 2) : scriptRows.filter((r) => String(r.dialogue ?? '').trim().length >= 2).length
-  const want = Math.max(planned, rowBased >= 2 ? rowBased : 2)
+  const minNoLoop = Math.ceil(
+    Math.min(120, Math.max(5, Math.ceil(targetTotalSec))) / SMART_BATCH_MAX_VIDEO_SEGMENT_SEC,
+  )
+  const want = Math.max(planned, rowBased >= 2 ? rowBased : 2, minNoLoop)
   /** 全片每条素材最多用一次：段数不超过可用素材条数（≥2 条时） */
   const capByMaterials = materialCount >= 2 ? materialCount : want
   return Math.max(2, Math.min(want, capByMaterials))
@@ -71,20 +106,19 @@ function padSmartBatchScriptRows(
   segmentCount: number,
   targetTotalSec: number,
 ): IceSmartBatchScriptRow[] {
-  const plan = planLongformAllFiveSecondDurations(targetTotalSec)
-  const ranges = scriptTimeRangesFromDurationPlan(plan.slice(0, segmentCount))
+  const durations = distributeSmartBatchSegmentDurations(segmentCount, targetTotalSec)
+  const ranges = scriptTimeRangesFromSegmentDurations(durations)
   const base = rows.slice(0, segmentCount)
   while (base.length < segmentCount) {
-    const prev = base[base.length - 1] ?? rows[rows.length - 1]
     base.push({
       timeRange: ranges[base.length] ?? '',
-      visual: prev?.visual?.trim() || '延续上一镜头，平滑过渡',
-      dialogue: prev?.dialogue?.trim() || '',
+      visual: '',
+      dialogue: '',
     })
   }
   return base.slice(0, segmentCount).map((r, i) => ({
     ...r,
-    timeRange: r.timeRange?.trim() ? r.timeRange : (ranges[i] ?? ''),
+    timeRange: ranges[i] ?? '',
   }))
 }
 

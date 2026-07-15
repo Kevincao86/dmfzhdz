@@ -21,17 +21,17 @@ import {
 import { resolveImsBatchSpeechVoice } from '../src/lib/digitalHumanBroadcast.js'
 import {
   buildMixSpeakableNarration,
-  parseScriptTimeRangeSeconds,
-  planLongformAllFiveSecondDurations,
   sanitizeMixDialogueText,
-  scriptTimeRangesFromDurationPlan,
 } from '../src/lib/shortVideoScriptTable.js'
 import { resolveIceMixBgmUrl } from '../src/lib/iceMixBgmPresets.js'
 import {
   type IceSmartBatchMaterial,
   type IceSmartBatchScriptRow,
+  distributeSmartBatchSegmentDurations,
   pickSmartBatchMaterialIndices,
   pickSmartBatchSegmentCount,
+  scriptTimeRangesFromSegmentDurations,
+  SMART_BATCH_MAX_VIDEO_SEGMENT_SEC,
 } from '../src/lib/iceSmartBatchPlan.js'
 import {
   type AliyunIceConfig,
@@ -123,40 +123,36 @@ function padSmartBatchRowsForTarget(
   segmentCount: number,
   targetTotalSec: number,
 ): IceSmartBatchScriptRow[] {
-  const plan = planLongformAllFiveSecondDurations(targetTotalSec)
-  const ranges = scriptTimeRangesFromDurationPlan(plan.slice(0, segmentCount))
+  const durations = distributeSmartBatchSegmentDurations(segmentCount, targetTotalSec)
+  const ranges = scriptTimeRangesFromSegmentDurations(durations)
   const base = rows.slice(0, segmentCount)
   while (base.length < segmentCount) {
-    const prev = base[base.length - 1] ?? rows[rows.length - 1]
     base.push({
       timeRange: ranges[base.length] ?? '',
-      visual: prev?.visual?.trim() || '延续上一镜头，平滑过渡',
-      dialogue: prev?.dialogue?.trim() || '',
+      visual: '',
+      dialogue: '',
     })
   }
   return base.slice(0, segmentCount).map((r, i) => ({
     ...r,
-    timeRange: r.timeRange?.trim() ? r.timeRange : (ranges[i] ?? ''),
+    timeRange: ranges[i] ?? '',
   }))
 }
 
-function segmentDurationFromRow(
-  row: IceSmartBatchScriptRow | undefined,
-  fallbackSec: number,
-  targetTotalSec: number,
-  segmentIndex: number,
+function capSmartBatchVideoSegmentSec(
+  kind: 'video' | 'image',
+  rawSec: number,
   segmentCount: number,
+  targetTotalSec: number,
 ): number {
-  const range = parseScriptTimeRangeSeconds(String(row?.timeRange ?? ''))
-  if (range && range.end > range.start) {
-    return Math.max(2, Math.min(15, range.end - range.start))
+  if (kind === 'image') return Math.max(2, Math.min(15, rawSec))
+  const minNoLoop = Math.ceil(
+    Math.min(120, Math.max(5, Math.ceil(targetTotalSec))) / SMART_BATCH_MAX_VIDEO_SEGMENT_SEC,
+  )
+  if (segmentCount >= minNoLoop) {
+    return Math.max(2, Math.min(SMART_BATCH_MAX_VIDEO_SEGMENT_SEC, rawSec))
   }
-  const each = targetTotalSec / Math.max(1, segmentCount)
-  if (segmentIndex === segmentCount - 1) {
-    const prevTotal = each * (segmentCount - 1)
-    return Math.max(2, Math.min(15, Math.round((targetTotalSec - prevTotal) * 100) / 100))
-  }
-  return Math.max(2, Math.min(8, Math.round(each * 100) / 100 || fallbackSec))
+  return Math.max(2, Math.min(8, rawSec))
 }
 
 function buildDefaultEditingConfig(
@@ -224,22 +220,20 @@ function buildInputConfig(input: {
     materialCount,
     targetTotalSec,
   )
-  const pickedIndices = pickSmartBatchMaterialIndices(materialCount, slots, segmentCount)
+  const pickedIndices =
+    slots.length >= segmentCount
+      ? slots.slice(0, segmentCount)
+      : pickSmartBatchMaterialIndices(materialCount, slots, segmentCount)
+  if (new Set(pickedIndices).size !== pickedIndices.length) {
+    throw new Error('智能成片素材映射存在重复，请检查分镜与素材映射')
+  }
   const rows = padSmartBatchRowsForTarget(
     input.scriptRows.slice(0, segmentCount),
     segmentCount,
     targetTotalSec,
   )
-  const defaultSegSec = Math.max(
-    3,
-    Math.min(5, Math.round((targetTotalSec / Math.max(1, pickedIndices.length)) * 100) / 100),
-  )
-
-  const segmentDurations = pickedIndices.map((_, i) => {
-    const row = rows[i]
-    return segmentDurationFromRow(row, defaultSegSec, targetTotalSec, i, pickedIndices.length)
-  })
-  const maxSegDur = Math.max(...segmentDurations, defaultSegSec)
+  const segmentDurations = distributeSmartBatchSegmentDurations(segmentCount, targetTotalSec)
+  const maxSegDur = Math.max(...segmentDurations.map((d) => d), 3)
 
   const mediaGroups = pickedIndices.map((matIndex, i) => {
     const mat = input.materials[matIndex]!
@@ -249,7 +243,7 @@ function buildInputConfig(input: {
     }
     const row = rows[i]
     const dialogue = sanitizeMixDialogueText(String(row?.dialogue ?? '')).trim()
-    const segDur = segmentDurations[i]!
+    const segDur = capSmartBatchVideoSegmentSec(mat.kind, segmentDurations[i]!, segmentCount, targetTotalSec)
     const groupName = `storyboard-${i}`
     const group: Record<string, unknown> = {
       GroupName: groupName,
