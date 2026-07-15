@@ -1,24 +1,7 @@
 const prFeatureAccess = require('../../../utils/prFeatureAccess.js')
 
 const AI_ADDONS = [
-  {
-    key: 'aiContent',
-    perm: 'brief',
-    title: '爆款 Brief 生成',
-    sub: '抖音/小红书钩子 · 分镜 · 话题 · 审片清单',
-    glyph: '✎',
-    tone: 'sky',
-    url: '/pages/subpack-pr/mine-pr-addon-ai-content/mine-pr-addon-ai-content',
-  },
-  {
-    key: 'aiReview',
-    perm: 'aiReview',
-    title: 'AI审核',
-    sub: '文稿/短视频 · 单条与批量 AI 检核',
-    glyph: '✓',
-    tone: 'teal',
-    url: '/pages/subpack-pr/mine-pr-addon-ai-review/mine-pr-addon-ai-review',
-  },
+  // 爆款 Brief / AI审核 已在「我的」菜单单独入口，不在此 hub 重复
   {
     key: 'shortvideo',
     perm: 'shortvideo',
@@ -64,10 +47,8 @@ function buildAiAddonsFromAccount(account) {
     if (item.onlyWithoutShortvideo) return access.cloudEdit && !access.shortvideo
     if (item.perm === 'cloudEdit') return false
     if (item.perm === 'shortvideo') return access.shortvideo
-    if (item.perm === 'brief') return access.brief
     if (item.perm === 'digitalHuman') return access.digitalHuman
     if (item.perm === 'visualStudio') return access.visualStudio
-    if (item.perm === 'aiReview') return access.aiReview || access.aiVideoReview
     return false
   })
   return cards.map((item) => ({
