@@ -78,6 +78,13 @@ export default function ProfilePage() {
         ? '剪辑团队信息'
         : '我的信息'
 
+  /** 个人推广入口：须始终展示（勿按服务商/会员状态隐藏；线上曾被旧 bundle 漏掉） */
+  const affiliateMenuItem = {
+    to: '/affiliate/portal',
+    label: '我的推广',
+    desc: '推广码 · 太阳码 · 佣金与商户明细',
+  }
+
   const menuItems = [
     {
       to: '/profile/points-recharge',
@@ -89,11 +96,7 @@ export default function ProfilePage() {
       label: '我的订单',
       desc: '会员开通与积分充值支付记录',
     },
-    {
-      to: '/affiliate/portal',
-      label: '我的推广',
-      desc: '推广码 · 太阳码 · 佣金与商户明细',
-    },
+    affiliateMenuItem,
     {
       to: profileLink,
       label: profileMenuLabel,

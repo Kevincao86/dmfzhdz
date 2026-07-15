@@ -8401,6 +8401,203 @@ html[data-theme='dark'] .hall-order-card__detail {
   font-weight: 700;
 }
 
+/* —— 黑暗模式：AI Token 面板（此前写死白底导致「一半黑一半白」） —— */
+html[data-theme='dark'] .ai-token-panel {
+  border-color: rgba(129, 140, 248, 0.28);
+  background: linear-gradient(145deg, #1a1a28 0%, #141422 48%, #1e1b2e 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04),
+    0 16px 40px -18px rgba(0, 0, 0, 0.55);
+}
+
+html[data-theme='dark'] .ai-token-panel__glow {
+  background: radial-gradient(circle, rgba(129, 140, 248, 0.22) 0%, transparent 68%);
+}
+
+html[data-theme='dark'] .ai-token-panel__title {
+  color: #f1f5f9;
+}
+
+html[data-theme='dark'] .ai-token-panel__sub,
+html[data-theme='dark'] .ai-token-panel__loading,
+html[data-theme='dark'] .ai-token-panel__custom,
+html[data-theme='dark'] .ai-token-panel__empty,
+html[data-theme='dark'] .ai-token-panel__bar-col span {
+  color: #94a3b8;
+}
+
+html[data-theme='dark'] .ai-token-panel__empty p {
+  color: #cbd5e1;
+}
+
+html[data-theme='dark'] .ai-token-panel__tabs {
+  background: rgba(15, 15, 20, 0.75);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+html[data-theme='dark'] .ai-token-panel__tabs button {
+  color: #94a3b8;
+}
+
+html[data-theme='dark'] .ai-token-panel__custom input {
+  background: #0f0f14;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+  color-scheme: dark;
+}
+
+html[data-theme='dark'] .ai-token-panel__stat--violet {
+  color: #c4b5fd;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.22), rgba(99, 102, 241, 0.1));
+  border-color: rgba(139, 92, 246, 0.28);
+}
+
+html[data-theme='dark'] .ai-token-panel__stat--blue {
+  color: #93c5fd;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(14, 165, 233, 0.1));
+  border-color: rgba(59, 130, 246, 0.28);
+}
+
+html[data-theme='dark'] .ai-token-panel__stat--green {
+  color: #6ee7b7;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(20, 184, 166, 0.1));
+  border-color: rgba(16, 185, 129, 0.28);
+}
+
+html[data-theme='dark'] .ai-token-panel__stat--amber {
+  color: #fcd34d;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.22), rgba(251, 191, 36, 0.1));
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+html[data-theme='dark'] .ai-token-panel__chart {
+  background: rgba(15, 15, 20, 0.65);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+html[data-theme='dark'] .ai-token-panel__list li {
+  background: rgba(15, 15, 20, 0.72);
+  color: #e2e8f0;
+}
+
+html[data-theme='dark'] .ai-token-panel__list em {
+  color: #94a3b8;
+}
+
+html[data-theme='dark'] .ai-token-panel__list strong {
+  color: #a5b4fc;
+}
+
+/* —— 黑暗模式：主内容区残留白底 / 浅色字融底（深度兜底） —— */
+html[data-theme='dark'] .app-site-footer {
+  background: rgba(20, 20, 34, 0.88) !important;
+  border-top-color: var(--shell-border) !important;
+  color: var(--shell-muted);
+}
+
+html[data-theme='dark'] .app-main :is(
+  .bg-white,
+  .bg-white\/95,
+  .bg-white\/90,
+  .bg-white\/80,
+  .bg-white\/70,
+  .bg-white\/60
+) {
+  background-color: var(--panel-card) !important;
+  color: var(--shell-text);
+}
+
+html[data-theme='dark'] .app-main :is(
+  .bg-slate-50,
+  .bg-slate-50\/80,
+  .bg-slate-50\/90,
+  .bg-gray-50,
+  .bg-gray-50\/90,
+  .bg-zinc-50,
+  .bg-zinc-50\/60,
+  .bg-\[\#f8fafc\],
+  .bg-\[\#fff\],
+  .bg-\[\#ffffff\]
+) {
+  background-color: #141422 !important;
+  color: var(--shell-text);
+}
+
+html[data-theme='dark'] .app-main :is(
+  .bg-slate-100,
+  .bg-slate-200,
+  .bg-gray-100,
+  .bg-zinc-100
+) {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+html[data-theme='dark'] .app-main :is(
+  .border-gray-100,
+  .border-gray-200,
+  .border-gray-300,
+  .border-slate-100,
+  .border-slate-200,
+  .border-slate-300,
+  .border-zinc-100,
+  .border-zinc-200
+) {
+  border-color: var(--shell-border) !important;
+}
+
+html[data-theme='dark'] .app-main :is(
+  .text-slate-900,
+  .text-slate-800,
+  .text-slate-700,
+  .text-gray-900,
+  .text-gray-800,
+  .text-gray-700,
+  .text-zinc-900,
+  .text-zinc-800
+) {
+  color: var(--shell-text) !important;
+}
+
+html[data-theme='dark'] .app-main :is(
+  .text-slate-600,
+  .text-slate-500,
+  .text-gray-600,
+  .text-gray-500,
+  .text-zinc-600,
+  .text-zinc-500
+) {
+  color: var(--shell-muted) !important;
+}
+
+html[data-theme='dark'] .app-main input:not([type='checkbox']):not([type='radio']),
+html[data-theme='dark'] .app-main select,
+html[data-theme='dark'] .app-main textarea {
+  background-color: #0f0f14 !important;
+  border-color: var(--shell-border) !important;
+  color: var(--shell-text) !important;
+  color-scheme: dark;
+}
+
+html[data-theme='dark'] .app-main :is(.bg-indigo-50, .bg-indigo-50\/40, .bg-violet-50, .bg-violet-100) {
+  background-color: rgba(124, 58, 237, 0.16) !important;
+}
+
+html[data-theme='dark'] .app-main :is(.bg-amber-50, .bg-amber-50\/60, .bg-amber-50\/80, .bg-orange-50) {
+  background-color: rgba(245, 158, 11, 0.14) !important;
+}
+
+html[data-theme='dark'] .app-main :is(.bg-emerald-50, .bg-emerald-50\/50, .bg-green-50) {
+  background-color: rgba(16, 185, 129, 0.14) !important;
+}
+
+html[data-theme='dark'] .app-main :is(.bg-red-50, .bg-rose-50) {
+  background-color: rgba(244, 63, 94, 0.14) !important;
+}
+
+html[data-theme='dark'] .app-main :is(.bg-sky-50, .bg-cyan-50, .bg-blue-50) {
+  background-color: rgba(14, 165, 233, 0.14) !important;
+}
+
 /* —— 升级会员 / 会员报价页 —— */
 .app-topbar__upgrade-btn {
   display: inline-flex;
