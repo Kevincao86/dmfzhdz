@@ -9,16 +9,23 @@ async function fileToBase64(file: File): Promise<string> {
 }
 
 export async function uploadOpsContentImage(file: File): Promise<
-  | { ok: true; imageUrl: string }
+  | { ok: true; imageUrl: string; mediaType: 'image' | 'video' }
   | { ok: false; error: string; detail?: string }
 > {
   const contentBase64 = await fileToBase64(file)
+  const guessedType =
+    file.type ||
+    (/\.(mp4|webm|mov|m4v)$/i.test(file.name)
+      ? 'video/mp4'
+      : /\.gif$/i.test(file.name)
+        ? 'image/gif'
+        : 'image/jpeg')
   const res = await fetchOpsErpApi('/api/meoo-ops-content-image-upload', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       fileName: file.name,
-      contentType: file.type || 'image/jpeg',
+      contentType: guessedType,
       contentBase64,
     }),
   })
@@ -40,5 +47,6 @@ export async function uploadOpsContentImage(file: File): Promise<
   if (!/^https?:\/\//i.test(imageUrl)) {
     return { ok: false, error: 'invalid_image_url' }
   }
-  return { ok: true, imageUrl }
+  const mediaType = data.mediaType === 'video' || /^video\//i.test(guessedType) ? 'video' : 'image'
+  return { ok: true, imageUrl, mediaType }
 }

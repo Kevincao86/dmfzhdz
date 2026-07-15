@@ -92,9 +92,29 @@ function openDecorLink(item) {
   }
 }
 
+function isDecorVideoMedia(item) {
+  if (!item) return false
+  if (String(item.mediaType || '').toLowerCase() === 'video') return true
+  if (String(item.mediaType || '').toLowerCase() === 'image') return false
+  const u = String(item.imageUrl || '')
+    .trim()
+    .toLowerCase()
+    .split(/[?#]/)[0]
+  return /\.(mp4|webm|mov|m4v)$/.test(u)
+}
+
+/** 拉取后补齐 isVideo，便于 wxml 判断 */
+async function fetchDecorItemWithMeta(slotKey, identity) {
+  const item = await fetchDecorItem(slotKey, identity)
+  if (!item || !item.imageUrl) return null
+  return { ...item, isVideo: isDecorVideoMedia(item) }
+}
+
 module.exports = {
   fetchDecorItem,
+  fetchDecorItemWithMeta,
   shouldShowByFreq,
   dismissItem,
   openDecorLink,
+  isDecorVideoMedia,
 }

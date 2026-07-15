@@ -6,7 +6,9 @@ import { uploadMerchantProductImage } from '../vite-plugins/merchantProductImage
 
 export const config = { maxDuration: 60 }
 
-const MAX_BYTES = 5 * 1024 * 1024
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024
+/** 短视频海报；base64 JSON 体积约 ×1.33，勿过大 */
+const MAX_VIDEO_BYTES = 15 * 1024 * 1024
 
 function sendJson(res: VercelResponse, status: number, body: Record<string, unknown>): void {
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
@@ -62,14 +64,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendJson(res, 400, { ok: false, error: 'invalid_base64' })
       return
     }
-    if (!buf.length || buf.length > MAX_BYTES) {
-      sendJson(res, 400, { ok: false, error: 'invalid_size' })
+    const lowerName = fileName.toLowerCase()
+    const isVideo =
+      /^video\/(mp4|webm|quicktime|x-m4v)$/i.test(contentType) ||
+      /\.(mp4|webm|mov|m4v)$/i.test(lowerName)
+    const maxBytes = isVideo ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES
+    if (!buf.length || buf.length > maxBytes) {
+      sendJson(res, 400, {
+        ok: false,
+        error: 'invalid_size',
+        detail: isVideo
+          ? `视频不超过 ${MAX_VIDEO_BYTES / (1024 * 1024)}MB`
+          : `图片/GIF 不超过 ${MAX_IMAGE_BYTES / (1024 * 1024)}MB`,
+      })
       return
     }
 
-    const safeMime = /^image\/(jpeg|jpg|png|webp|gif)$/i.test(contentType)
-      ? contentType.toLowerCase()
-      : 'image/jpeg'
+    let safeMime = 'image/jpeg'
+    if (isVideo) {
+      if (/webm/i.test(contentType) || lowerName.endsWith('.webm')) safeMime = 'video/webm'
+      else if (/quicktime|mov/i.test(contentType) || lowerName.endsWith('.mov'))
+        safeMime = 'video/quicktime'
+      else safeMime = 'video/mp4'
+    } else if (/^image\/(jpeg|jpg|png|webp|gif)$/i.test(contentType)) {
+      safeMime = contentType.toLowerCase()
+    } else if (lowerName.endsWith('.gif')) {
+      safeMime = 'image/gif'
+    } else if (lowerName.endsWith('.png')) {
+      safeMime = 'image/png'
+    } else if (lowerName.endsWith('.webp')) {
+      safeMime = 'image/webp'
+    }
 
     try {
       const uploaded = await uploadMerchantProductImage({
@@ -78,7 +103,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         safeMime,
         originalName: fileName,
       })
-      sendJson(res, 200, { ok: true, imageUrl: uploaded.publicUrl })
+      sendJson(res, 200, {
+        ok: true,
+        imageUrl: uploaded.publicUrl,
+        mediaType: isVideo ? 'video' : 'image',
+      })
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       sendJson(res, 502, { ok: false, error: 'upload_failed', detail: msg.slice(0, 300) })

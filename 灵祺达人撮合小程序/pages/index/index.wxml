@@ -45,7 +45,19 @@
         </view>
       </view>
       <view class="home-decor-banner" wx:elif="{{decorBanner}}" bindtap="onDecorBannerTap">
-        <image class="home-decor-banner__img" src="{{decorBanner.imageUrl}}" mode="aspectFill" />
+        <video
+          wx:if="{{decorBanner.isVideo}}"
+          class="home-decor-banner__img"
+          src="{{decorBanner.imageUrl}}"
+          autoplay
+          muted
+          loop
+          show-center-play-btn="{{false}}"
+          show-play-btn="{{false}}"
+          controls="{{false}}"
+          object-fit="cover"
+        />
+        <image wx:else class="home-decor-banner__img" src="{{decorBanner.imageUrl}}" mode="aspectFill" />
         <text wx:if="{{decorBanner.title}}" class="home-decor-banner__title">{{decorBanner.title}}</text>
       </view>
     </view>
@@ -289,7 +301,20 @@
     catchtouchmove="noopSheetTap"
   >
     <view class="decor-popup" catchtap="noopSheetTap">
+      <video
+        wx:if="{{decorPopup.isVideo}}"
+        class="decor-popup__img"
+        src="{{decorPopup.imageUrl}}"
+        autoplay
+        muted
+        loop
+        show-center-play-btn="{{false}}"
+        controls="{{false}}"
+        object-fit="contain"
+        bindtap="onDecorPopupTap"
+      />
       <image
+        wx:else
         class="decor-popup__img"
         src="{{decorPopup.imageUrl}}"
         mode="widthFix"

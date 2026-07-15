@@ -7,8 +7,33 @@ import {
   openDecorLink,
   shouldShowDecorPopup,
 } from '../lib/platformDecorClient'
-import type { RegistryPlatformDecorItem } from '../lib/platformDecorTypes'
+import { isDecorVideoMedia, type RegistryPlatformDecorItem } from '../lib/platformDecorTypes'
 import { useTenantAnnouncements } from '../context/TenantAnnouncementContext'
+
+function DecorMedia({
+  item,
+  className,
+  alt,
+}: {
+  item: RegistryPlatformDecorItem
+  className?: string
+  alt?: string
+}) {
+  if (isDecorVideoMedia(item)) {
+    return (
+      <video
+        src={item.imageUrl}
+        className={className}
+        autoPlay
+        muted
+        loop
+        playsInline
+        controls={false}
+      />
+    )
+  }
+  return <img src={item.imageUrl} alt={alt || item.title || '活动'} className={className} />
+}
 
 function isHomePath(pathname: string): boolean {
   return pathname === '/' || pathname === ''
@@ -65,7 +90,7 @@ export default function PlatformDecorHomeHost() {
           className="mb-4 block w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 text-left shadow-sm"
           onClick={() => openDecorLink(banner)}
         >
-          <img src={banner.imageUrl} alt={banner.title || '活动'} className="max-h-40 w-full object-cover" />
+          <DecorMedia item={banner} className="max-h-40 w-full object-cover" alt={banner.title || '活动'} />
           {banner.title ? (
             <p className="px-3 py-2 text-sm font-medium text-slate-700">{banner.title}</p>
           ) : null}
@@ -87,7 +112,7 @@ export default function PlatformDecorHomeHost() {
               openDecorLink(popup)
               closePopup()
             }}>
-              <img src={popup.imageUrl} alt={popup.title || '活动海报'} className="w-full object-cover" />
+              <DecorMedia item={popup} className="w-full object-cover" alt={popup.title || '活动海报'} />
             </button>
             {popup.title ? (
               <p className="px-4 py-3 text-center text-sm font-semibold text-slate-800">{popup.title}</p>

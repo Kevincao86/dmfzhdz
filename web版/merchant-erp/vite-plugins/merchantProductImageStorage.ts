@@ -318,6 +318,9 @@ function extFromMimeAndName(mime: string, name: string): string {
   if (m.includes('gif')) return 'gif'
   if (m.includes('bmp')) return 'bmp'
   if (m.includes('jpeg') || m.includes('jpg')) return 'jpg'
+  if (m.includes('webm')) return 'webm'
+  if (m.includes('quicktime')) return 'mov'
+  if (m.includes('mp4') || m.includes('m4v')) return 'mp4'
   const base = name.split(/[/\\]/).pop() ?? ''
   const hit = /\.([a-z0-9]{1,8})$/i.exec(base)
   if (hit && /^[a-z0-9]+$/i.test(hit[1]!)) return hit[1]!.toLowerCase()
