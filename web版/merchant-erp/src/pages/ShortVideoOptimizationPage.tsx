@@ -55,6 +55,7 @@ import {
   parseScriptRowsFromPlainText,
   resizeScriptRows,
   appendEmptyScriptRow,
+  removeScriptRowAt,
   maxScriptTimeRangeEndSec,
   scriptRowsHaveExplicitTimeRanges,
   scriptRowsToOverallPrompt,
@@ -1736,9 +1737,12 @@ export default function ShortVideoOptimizationPage() {
                     onAddRow={() =>
                       setScriptRows((prev) => appendEmptyScriptRow(prev, longformSegmentSec))
                     }
+                    onRemoveRow={(index) =>
+                      setScriptRows((prev) => removeScriptRowAt(prev, index))
+                    }
                   />
                   <p className="text-xs text-zinc-500">
-                    支持 AI 自动规划，也可点击「添加时间段」手动编写分镜；各段画面与口播填好后即可生成。
+                    支持 AI 自动规划，也可点击「添加时间段」手动编写分镜；各段画面与口播填好后即可生成；至少保留 2 段，多余段可点右侧删除。
                   </p>
                 </div>
               </>

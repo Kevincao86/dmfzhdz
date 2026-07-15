@@ -98,6 +98,8 @@ import {
   parseScriptRowsFromPlainText,
   resizeScriptRows,
   segmentCountFromTargetTotalSec,
+  appendEmptyScriptRow,
+  removeScriptRowAt,
   isMixDialogueMetaInstruction,
   type ShortVideoScriptRow,
 } from '../lib/shortVideoScriptTable'
@@ -2470,7 +2472,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                   ) : null}
                 </div>
                 <p className="mt-1 text-xs text-zinc-500">
-                  每段对应成片时间轴上的一镜：AI 逐帧理解素材后按语义匹配；口播使用所选音色 TTS，字幕带弹入动效。
+                  每段对应成片时间轴上的一镜：AI 逐帧理解素材后按语义匹配；口播使用所选音色 TTS，字幕带弹入动效。可手动添加或删除时间段（至少保留 2 段）。
                 </p>
                 <div className="mt-2 max-h-[min(360px,42vh)] overflow-y-auto rounded-xl border border-zinc-200/70 bg-white/90 shadow-inner">
                   <ShortVideoScriptTableEditor
@@ -2478,6 +2480,20 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                     disabled={anyBusy || guidanceBusy}
                     compact={scriptRows.length > 8}
                     onChange={applyScriptRows}
+                    onAddRow={() =>
+                      applyScriptRows(appendEmptyScriptRow(scriptRows, MIX_DEFAULT_SEGMENT_SEC))
+                    }
+                    onRemoveRow={(index) => {
+                      const nextRows = removeScriptRowAt(scriptRows, index)
+                      applyScriptRows(nextRows)
+                      setMaterialSlots((prev) =>
+                        normalizeMixMaterialSlots(
+                          prev.filter((_, i) => i !== index),
+                          nextRows.length,
+                          mixMaterialPool.length,
+                        ),
+                      )
+                    }}
                   />
                 </div>
                 {mixMaterialPool.length > 0 && scriptRows.length > 0 ? (

@@ -22,7 +22,7 @@ export type IceSmartBatchScriptRow = {
 /** 段数须覆盖用户目标时长（30 秒 → 6×5 秒），不得仅按已有分镜行数缩水 */
 export function pickSmartBatchSegmentCount(
   scriptRows: IceSmartBatchScriptRow[],
-  _materialCount: number,
+  materialCount: number,
   targetTotalSec: number,
 ): number {
   const planned = segmentCountFromTargetTotalSec(targetTotalSec, 5)
@@ -33,30 +33,29 @@ export function pickSmartBatchSegmentCount(
   ).length
   const rowBased = filledRows >= 2 ? Math.max(filledRows, 2) : scriptRows.filter((r) => String(r.dialogue ?? '').trim().length >= 2).length
   const want = Math.max(planned, rowBased >= 2 ? rowBased : 2)
-  /** 段数按目标时长铺满（30s→6 段），不得因素材条数少而缩水 */
-  return Math.max(2, want)
+  /** 全片每条素材最多用一次：段数不超过可用素材条数（≥2 条时） */
+  const capByMaterials = materialCount >= 2 ? materialCount : want
+  return Math.max(2, Math.min(want, capByMaterials))
 }
 
-/** 第 i 段分镜 → 素材下标（materialSlots[i] 语义，禁止把 slots 当成无序集合再均匀补位） */
+/** 第 i 段分镜 → 素材下标（每条素材全片最多出现一次） */
 export function pickSmartBatchMaterialIndices(
   materialCount: number,
   slots: number[],
   segmentCount: number,
 ): number[] {
   if (materialCount <= 0 || segmentCount <= 0) return []
-  if (materialCount <= segmentCount) {
-    return Array.from({ length: segmentCount }, (_, i) => i % materialCount)
-  }
+  const effectiveCount = Math.min(segmentCount, materialCount)
   const used = new Set<number>()
   const out: number[] = []
-  for (let i = 0; i < segmentCount; i++) {
+  for (let i = 0; i < effectiveCount; i++) {
     const raw = slots[i]
     if (Number.isFinite(raw) && raw! >= 0 && raw! < materialCount && !used.has(raw!)) {
       used.add(raw!)
       out.push(raw!)
       continue
     }
-    let mi = spreadMixMaterialIndex(i, segmentCount, materialCount)
+    let mi = spreadMixMaterialIndex(i, effectiveCount, materialCount)
     let guard = 0
     while (used.has(mi) && guard++ < materialCount) {
       mi = (mi + 1) % materialCount

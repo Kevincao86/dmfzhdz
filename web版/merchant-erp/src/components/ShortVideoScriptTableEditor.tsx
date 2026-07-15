@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import { SCRIPT_ROW_MAX_COUNT, type ShortVideoScriptRow } from '../lib/shortVideoScriptTable'
 
 type Props = {
@@ -9,6 +9,8 @@ type Props = {
   onChange: (rows: ShortVideoScriptRow[]) => void
   /** 展示「添加时间段」按钮（手动编写分镜） */
   onAddRow?: () => void
+  /** 删除指定行（至少保留 2 段） */
+  onRemoveRow?: (index: number) => void
 }
 
 export default function ShortVideoScriptTableEditor({
@@ -17,12 +19,14 @@ export default function ShortVideoScriptTableEditor({
   compact,
   onChange,
   onAddRow,
+  onRemoveRow,
 }: Props) {
   const updateRow = (index: number, patch: Partial<ShortVideoScriptRow>) => {
     onChange(rows.map((r, i) => (i === index ? { ...r, ...patch } : r)))
   }
 
   const textRows = compact ? 1 : 3
+  const canRemove = Boolean(onRemoveRow) && rows.length > 2
 
   return (
     <div className="overflow-x-auto rounded-lg border border-zinc-200">
@@ -32,6 +36,7 @@ export default function ShortVideoScriptTableEditor({
             <th className="w-[7.5rem] px-3 py-2.5">时间段</th>
             <th className="px-3 py-2.5">画面 / 指令</th>
             <th className="px-3 py-2.5">口播 / 文案</th>
+            {onRemoveRow ? <th className="w-12 px-2 py-2.5 text-center">操作</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -67,6 +72,19 @@ export default function ShortVideoScriptTableEditor({
                   className="w-full resize-y rounded-md border border-zinc-300 px-2 py-1.5 text-xs leading-relaxed outline-none ring-orange-600/30 focus-visible:ring-2"
                 />
               </td>
+              {onRemoveRow ? (
+                <td className="px-2 py-2 text-center">
+                  <button
+                    type="button"
+                    disabled={disabled || !canRemove}
+                    onClick={() => onRemoveRow(i)}
+                    title={canRemove ? '删除该时间段' : '至少保留 2 段分镜'}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </td>
+              ) : null}
             </tr>
           ))}
         </tbody>
