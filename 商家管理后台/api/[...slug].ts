@@ -36,6 +36,7 @@ const ROUTES: Record<string, () => Promise<HandlerModule>> = {
   'meoo-ops-staff-mutate': () => import('./_lib/handlers/meoo-ops-staff-mutate.js'),
   'meoo-ops-sync-registry': () => import('./_lib/handlers/meoo-ops-sync-registry.js'),
   'meoo-ops-team-intro-set': () => import('./_lib/handlers/meoo-ops-team-intro-set.js'),
+  'meoo-ops-platform-decor-set': () => import('./_lib/handlers/meoo-ops-platform-decor-set.js'),
   'meoo-supabase-payment-orders-confirm': () => import('./_lib/handlers/meoo-supabase-payment-orders-confirm.js'),
   'meoo-supabase-payment-orders-list': () => import('./_lib/handlers/meoo-supabase-payment-orders-list.js'),
   'meoo-supabase-payment-orders-verify': () => import('./_lib/handlers/meoo-supabase-payment-orders-verify.js'),

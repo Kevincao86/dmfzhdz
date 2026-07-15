@@ -53,6 +53,12 @@ import {
 import type { HelpManualEdition } from '../src/lib/helpManualTypes.js'
 import { resolveTeamIntro, setTeamIntro } from '../src/lib/teamIntroRegistryCore.js'
 import type { RegistryTeamIntro } from '../src/lib/teamIntroTypes.js'
+import {
+  pickActiveDecorItem,
+  listActiveDecorByPrefix,
+  setPlatformDecoration,
+} from '../src/lib/platformDecorRegistryCore.js'
+import type { RegistryPlatformDecoration } from '../src/lib/platformDecorTypes.js'
 import { isEditTeamIceMpOrder } from '../src/lib/iceOrderDetect.js'
 import {
   handleIceMpConfirm,
@@ -191,6 +197,8 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
           url !== '/api/meoo-help-manual-defaults' &&
           url !== '/api/meoo-ops-team-intro-set' &&
           url !== '/api/meoo-team-intro-public' &&
+          url !== '/api/meoo-ops-platform-decor-set' &&
+          url !== '/api/meoo-platform-decor-public' &&
           url !== '/api/meoo-ops-mp-recruitment-ice-submit' &&
           url !== '/api/meoo-ops-mp-recruitment-ice-confirm' &&
           url !== '/api/meoo-ops-mp-visit-schedule-set' &&
@@ -299,6 +307,40 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
             setTeamIntro(data, intro)
             writeRegistry(viteRoot, data)
             json(res, 200, { ok: true, paragraphCount: intro.paragraphs.length })
+            return
+          }
+
+          if (method === 'GET' && url === '/api/meoo-platform-decor-public') {
+            const data = ensureRegistry(viteRoot)
+            const q = new URL(req.url || '/', 'http://local').searchParams
+            const slotKey = String(q.get('slotKey') || '').trim()
+            const prefix = String(q.get('prefix') || '').trim()
+            const identity = String(q.get('identity') || '').trim() || undefined
+            if (prefix) {
+              const items = listActiveDecorByPrefix(data, prefix, { identity })
+              json(res, 200, { ok: true, items, item: items[0] || null })
+              return
+            }
+            if (!slotKey) {
+              json(res, 400, { ok: false, error: 'missing_slotKey' })
+              return
+            }
+            json(res, 200, { ok: true, item: pickActiveDecorItem(data, slotKey, { identity }) })
+            return
+          }
+
+          if (method === 'POST' && url === '/api/meoo-ops-platform-decor-set') {
+            const raw = await readBody(req)
+            const body = JSON.parse(raw || '{}') as { decoration?: RegistryPlatformDecoration }
+            const decoration = body.decoration
+            if (!decoration || !Array.isArray(decoration.items)) {
+              json(res, 400, { ok: false, error: 'invalid_decoration' })
+              return
+            }
+            const data = ensureRegistry(viteRoot)
+            setPlatformDecoration(data, decoration)
+            writeRegistry(viteRoot, data)
+            json(res, 200, { ok: true, itemCount: decoration.items.length })
             return
           }
 

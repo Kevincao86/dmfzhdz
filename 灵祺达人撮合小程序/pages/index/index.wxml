@@ -18,7 +18,7 @@
         </view>
       </view>
 
-      <view class="home-banner-v2" bindtap="goVerifyTalent">
+      <view class="home-banner-v2" bindtap="goVerifyTalent" wx:if="{{!decorBanner}}">
         <view class="home-banner-v2__deco home-banner-v2__deco--star" />
         <view class="home-banner-v2__copy">
           <text class="home-banner-v2__title">{{bannerTitle}}</text>
@@ -43,6 +43,10 @@
           <text class="home-banner-v2__notice-dot"></text>
           <text>今日新增招募 {{todayCount}} 条</text>
         </view>
+      </view>
+      <view class="home-decor-banner" wx:elif="{{decorBanner}}" bindtap="onDecorBannerTap">
+        <image class="home-decor-banner__img" src="{{decorBanner.imageUrl}}" mode="aspectFill" />
+        <text wx:if="{{decorBanner.title}}" class="home-decor-banner__title">{{decorBanner.title}}</text>
       </view>
     </view>
 
@@ -277,6 +281,23 @@
       <text wx:else class="sel-popup-body">{{opsBroadcastPopup.body}}</text>
       <text class="sel-popup-tip">平台公告，可在「我的 → 消息通知 → 系统」再次查看</text>
       <button class="sel-popup-btn" bindtap="onOpsBroadcastPopupDismiss">我知道了</button>
+    </view>
+  </view>
+  <view
+    class="sel-popup-mask"
+    wx:if="{{showDecorPopup && decorPopup}}"
+    catchtouchmove="noopSheetTap"
+  >
+    <view class="decor-popup" catchtap="noopSheetTap">
+      <image
+        class="decor-popup__img"
+        src="{{decorPopup.imageUrl}}"
+        mode="widthFix"
+        bindtap="onDecorPopupTap"
+        show-menu-by-longpress
+      />
+      <text wx:if="{{decorPopup.title}}" class="decor-popup__title">{{decorPopup.title}}</text>
+      <button class="sel-popup-btn" bindtap="onDecorPopupDismiss">关闭</button>
     </view>
   </view>
   <image wx:if="{{shareCoverPreloadUrl}}" class="share-cover-preload" src="{{shareCoverPreloadUrl}}" aria-hidden="true" />

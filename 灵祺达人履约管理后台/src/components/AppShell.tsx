@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import PlatformDecorDrHost from './PlatformDecorDrHost'
 import ThemeToggle from './ThemeToggle'
 import IdentitySwitchPanel from './IdentitySwitchPanel'
 import AppTopBar from './AppTopBar'
@@ -119,6 +120,7 @@ export default function AppShell() {
         <main className="app-main">
           <Outlet key={`${shellWorkId}-${role}`} />
         </main>
+        <PlatformDecorDrHost />
         <footer className="app-site-footer">
           <SiteIcpFooter className="text-[var(--shell-muted)]" />
         </footer>

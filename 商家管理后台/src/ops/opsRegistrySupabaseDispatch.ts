@@ -26,6 +26,7 @@ import {
 import { setHelpManualForEdition } from '../meooRegistryShared/helpManualRegistryCore.js'
 import type { HelpManualEdition } from '../meooRegistryShared/helpManualTypes.js'
 import { setTeamIntro } from '../meooRegistryShared/teamIntroRegistryCore.js'
+import { setPlatformDecoration } from '../meooRegistryShared/platformDecorRegistryCore.js'
 import type { RegistrySnapshotIo } from './registrySnapshotIo.js'
 
 function sha256Hex(plain: string): string {
@@ -605,6 +606,20 @@ export async function dispatchOpsRegistrySupabase(opts: {
       setTeamIntro(data, intro)
       await io.save(data)
       return { status: 200, body: { ok: true, paragraphCount: intro.paragraphs.length } }
+    }
+
+    if (method === 'POST' && urlPath === '/api/ops-sync/platform-decor/set') {
+      const body = JSON.parse(bodyRaw || '{}') as {
+        decoration?: import('../meooRegistryShared/platformDecorTypes.js').RegistryPlatformDecoration
+      }
+      const decoration = body.decoration
+      if (!decoration || !Array.isArray(decoration.items)) {
+        return { status: 400, body: { ok: false, error: 'invalid_decoration' } }
+      }
+      const data = await io.load()
+      setPlatformDecoration(data, decoration)
+      await io.save(data)
+      return { status: 200, body: { ok: true, itemCount: decoration.items.length } }
     }
 
     if (method === 'POST' && urlPath === '/api/ops-sync/talent-pool/append') {
