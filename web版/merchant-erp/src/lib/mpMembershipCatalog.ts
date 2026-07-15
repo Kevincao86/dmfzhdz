@@ -122,6 +122,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       addon_shortvideo: dash(),
       addon_cloud_edit: dash(),
       addon_digital_human: dash(),
+      addon_visual_studio: dash(),
       addon_ai_video_review: dash(),
       addon_ai_script_review: dash(),
       ai_brief_gen: b(true),
@@ -146,6 +147,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       addon_shortvideo: b(true),
       addon_cloud_edit: b(true),
       addon_digital_human: b(true),
+      addon_visual_studio: b(true),
       addon_ai_video_review: b(true),
       addon_ai_script_review: b(true),
       ai_brief_gen: b(true),
@@ -170,6 +172,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       addon_shortvideo: b(true),
       addon_cloud_edit: b(true),
       addon_digital_human: b(true),
+      addon_visual_studio: b(true),
       addon_ai_video_review: b(true),
       addon_ai_script_review: b(true),
       ai_brief_gen: b(true),
@@ -194,6 +197,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       addon_shortvideo: b(true),
       addon_cloud_edit: b(true),
       addon_digital_human: b(true),
+      addon_visual_studio: b(true),
       addon_ai_video_review: b(true),
       addon_ai_script_review: b(true),
       ai_brief_gen: b(true),
@@ -214,6 +218,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       addon_shortvideo: dash(),
       addon_cloud_edit: dash(),
       addon_digital_human: dash(),
+      addon_visual_studio: dash(),
       addon_ai_video_review: dash(),
       addon_ai_script_review: dash(),
       ai_brief_gen: b(true),
@@ -232,6 +237,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       addon_shortvideo: b(true),
       addon_cloud_edit: b(true),
       addon_digital_human: b(true),
+      addon_visual_studio: b(true),
       addon_ai_video_review: b(true),
       addon_ai_script_review: b(true),
       ai_brief_gen: b(true),
@@ -250,6 +256,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       addon_shortvideo: b(true),
       addon_cloud_edit: b(true),
       addon_digital_human: b(true),
+      addon_visual_studio: b(true),
       addon_ai_video_review: b(true),
       addon_ai_script_review: b(true),
       ai_brief_gen: b(true),
@@ -268,6 +275,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       addon_shortvideo: b(true),
       addon_cloud_edit: b(true),
       addon_digital_human: b(true),
+      addon_visual_studio: b(true),
       addon_ai_video_review: b(true),
       addon_ai_script_review: b(true),
       ai_brief_gen: b(true),
@@ -284,6 +292,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       addon_shortvideo: dash(),
       addon_cloud_edit: dash(),
       addon_digital_human: dash(),
+      addon_visual_studio: dash(),
       addon_ai_video_review: dash(),
       addon_ai_script_review: dash(),
       ai_brief_gen: b(true),
@@ -297,6 +306,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       addon_shortvideo: b(true),
       addon_cloud_edit: b(true),
       addon_digital_human: b(true),
+      addon_visual_studio: b(true),
       addon_ai_video_review: b(true),
       addon_ai_script_review: b(true),
       ai_brief_gen: b(true),
@@ -310,6 +320,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       addon_shortvideo: b(true),
       addon_cloud_edit: b(true),
       addon_digital_human: b(true),
+      addon_visual_studio: b(true),
       addon_ai_video_review: b(true),
       addon_ai_script_review: b(true),
       ai_brief_gen: b(true),
@@ -323,6 +334,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       addon_shortvideo: b(true),
       addon_cloud_edit: b(true),
       addon_digital_human: b(true),
+      addon_visual_studio: b(true),
       addon_ai_video_review: b(true),
       addon_ai_script_review: b(true),
       ai_brief_gen: b(true),
@@ -337,6 +349,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       portfolio_showcase: b(true),
       addon_shortvideo: dash(),
       addon_digital_human: dash(),
+      addon_visual_studio: dash(),
       addon_ai_video_review: dash(),
       addon_ai_script_review: dash(),
       ai_brief_gen: b(true),
@@ -350,6 +363,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       portfolio_showcase: b(true),
       addon_shortvideo: b(true),
       addon_digital_human: b(true),
+      addon_visual_studio: b(true),
       addon_ai_video_review: b(true),
       addon_ai_script_review: b(true),
       ai_brief_gen: b(true),
@@ -363,6 +377,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       portfolio_showcase: b(true),
       addon_shortvideo: b(true),
       addon_digital_human: b(true),
+      addon_visual_studio: b(true),
       addon_ai_video_review: b(true),
       addon_ai_script_review: b(true),
       ai_brief_gen: b(true),
@@ -376,6 +391,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       portfolio_showcase: b(true),
       addon_shortvideo: b(true),
       addon_digital_human: b(true),
+      addon_visual_studio: b(true),
       addon_ai_video_review: b(true),
       addon_ai_script_review: b(true),
       ai_brief_gen: b(true),
@@ -415,6 +431,7 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     { key: 'addon_shortvideo', label: '短视频 AI 处理', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_cloud_edit', label: '灵祺 AI 云剪', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_digital_human', label: '数字人口播', group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_visual_studio', label: 'AI 视觉工坊', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_ai_video_review', label: 'AI短视频审核（2 积分/秒）', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_ai_script_review', label: 'AI文稿审核（2 积分/次）', group: 'AI 增值', kind: 'boolean' },
     { key: 'ai_brief_gen', label: 'AI爆款Brief生成（8 积分/篇）', group: 'AI 增值', kind: 'boolean' },
@@ -444,6 +461,7 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     { key: 'addon_shortvideo', label: '短视频 AI 处理', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_cloud_edit', label: '灵祺 AI 云剪', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_digital_human', label: '数字人口播', group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_visual_studio', label: 'AI 视觉工坊', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_ai_video_review', label: 'AI短视频审核（2 积分/秒）', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_ai_script_review', label: 'AI文稿审核（2 积分/次）', group: 'AI 增值', kind: 'boolean' },
     { key: 'ai_brief_gen', label: 'AI爆款Brief生成（8 积分/篇）', group: 'AI 增值', kind: 'boolean' },
@@ -458,6 +476,7 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     { key: 'addon_shortvideo', label: '短视频 AI 处理', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_cloud_edit', label: '灵祺 AI 云剪', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_digital_human', label: '数字人口播', group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_visual_studio', label: 'AI 视觉工坊', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_ai_video_review', label: 'AI短视频审核（2 积分/秒）', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_ai_script_review', label: 'AI文稿审核（2 积分/次）', group: 'AI 增值', kind: 'boolean' },
     { key: 'ai_brief_gen', label: 'AI爆款Brief生成（8 积分/篇）', group: 'AI 增值', kind: 'boolean' },
@@ -470,6 +489,7 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     { key: 'portfolio_showcase', label: '作品集 / 档期展示', group: '接单展示', kind: 'boolean' },
     { key: 'addon_shortvideo', label: '短视频 AI 处理', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_digital_human', label: '数字人口播', group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_visual_studio', label: 'AI 视觉工坊', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_ai_video_review', label: 'AI短视频审核（2 积分/秒）', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_ai_script_review', label: 'AI文稿审核（2 积分/次）', group: 'AI 增值', kind: 'boolean' },
     { key: 'ai_brief_gen', label: 'AI爆款Brief生成（8 积分/篇）', group: 'AI 增值', kind: 'boolean' },
@@ -621,7 +641,7 @@ function applyLegacyAddonsBundle(
   if (typeof access?.addons !== 'boolean') return
   const overrides = access?.overrides
   const bundleOn = access.addons === true
-  for (const key of ['addon_shortvideo', 'addon_cloud_edit', 'addon_digital_human'] as const) {
+  for (const key of ['addon_shortvideo', 'addon_cloud_edit', 'addon_digital_human', 'addon_visual_studio'] as const) {
     if (overrides && Object.prototype.hasOwnProperty.call(overrides, key)) continue
     out[key] = bundleOn
   }
@@ -636,6 +656,7 @@ export type MpAddonSubmoduleAccess = {
   shortvideo: boolean
   cloudEdit: boolean
   digitalHuman: boolean
+  visualStudio: boolean
   brief: boolean
   aiVideoReview: boolean
   aiReview: boolean
@@ -660,6 +681,7 @@ export function resolveAddonSubmoduleAccess(cells: Record<string, TierCell>): Mp
     submoduleEnabled(cells, 'addon_cloud_edit', legacy ? ['addons'] : []) ||
     submoduleEnabled(cells, 'cloud_edit', legacy ? ['addons'] : [])
   const digitalHuman = submoduleEnabled(cells, 'addon_digital_human', legacy ? ['addons'] : [])
+  const visualStudio = submoduleEnabled(cells, 'addon_visual_studio', legacy ? ['addons'] : [])
   const brief = cells.ai_brief_gen === true
   const aiVideoReview = submoduleEnabled(cells, 'addon_ai_video_review', [])
   const aiReview = submoduleEnabled(cells, 'addon_ai_script_review', [])
@@ -667,10 +689,11 @@ export function resolveAddonSubmoduleAccess(cells: Record<string, TierCell>): Mp
     shortvideo,
     cloudEdit,
     digitalHuman,
+    visualStudio,
     brief,
     aiVideoReview,
     aiReview,
-    any: shortvideo || cloudEdit || digitalHuman || brief || aiVideoReview || aiReview,
+    any: shortvideo || cloudEdit || digitalHuman || visualStudio || brief || aiVideoReview || aiReview,
   }
 }
 
@@ -923,6 +946,7 @@ export function normalizeStoredPlanVersion(
     if (perms.addon_shortvideo !== false) perms.addon_shortvideo = true
     if (perms.addon_cloud_edit !== false) perms.addon_cloud_edit = true
     if (perms.addon_digital_human !== false) perms.addon_digital_human = true
+    if (perms.addon_visual_studio !== false) perms.addon_visual_studio = true
     if (role === 'edit' && perms.cloud_edit !== false) perms.cloud_edit = true
   }
   if (role === 'talent' || role === 'pr') {
@@ -1112,7 +1136,7 @@ function tierCellForPlan(
     if (v?.permissions) {
       if (key in v.permissions) return v.permissions[key] as TierCell
       if (v.permissions.addons === true) {
-        if (key === 'addon_shortvideo' || key === 'addon_cloud_edit' || key === 'addon_digital_human') {
+        if (key === 'addon_shortvideo' || key === 'addon_cloud_edit' || key === 'addon_digital_human' || key === 'addon_visual_studio') {
           return true
         }
         if (key === 'cloud_edit') return true

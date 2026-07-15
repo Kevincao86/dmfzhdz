@@ -28,6 +28,7 @@ export type MpAccount = {
     shortvideo?: boolean
     cloudEdit?: boolean
     digitalHuman?: boolean
+    visualStudio?: boolean
     brief?: boolean
     aiVideoReview?: boolean
     aiReview?: boolean

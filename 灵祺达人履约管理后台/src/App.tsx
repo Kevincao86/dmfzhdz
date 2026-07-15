@@ -62,6 +62,7 @@ const AiContentAddonPage = lazy(() => import('@merchant/pages/AiOperationContent
 const BriefGenRecordsPage = lazy(() => import('@merchant/pages/BriefGenRecordsPage'))
 const DigitalHumanAddonPage = lazy(() => import('@merchant/pages/DigitalHumanBroadcastPage'))
 const AiScriptReviewAddonPage = lazy(() => import('@merchant/pages/AiScriptReviewAddonPage'))
+const AiImageAddonPage = lazy(() => import('@merchant/pages/AiImageStudioPage'))
 
 function AddonPageFallback() {
   return (
@@ -167,6 +168,7 @@ export default function App() {
           <Route path="ai-video-review" element={<Navigate to="/addons/ai-review?mode=video" replace />} />
           <Route path="ai-review" element={<LazyAddonPage><AiScriptReviewAddonPage /></LazyAddonPage>} />
           <Route path="digital-human" element={<LazyAddonPage><DigitalHumanAddonPage /></LazyAddonPage>} />
+          <Route path="ai-image" element={<LazyAddonPage><AiImageAddonPage /></LazyAddonPage>} />
         </Route>
       </Route>
       <Route path="*" element={<RootRedirect />} />

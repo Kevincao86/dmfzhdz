@@ -93,18 +93,20 @@ async function postDouyinAiAssist(body) {
 
 async function postAiChat(messages, opts) {
   const o = opts || {}
+  const body = {
+    provider: o.provider || 'qwen',
+    ...(o.model ? { model: o.model } : {}),
+    messages,
+    stream: false,
+  }
+  if (o.taskType) body.taskType = o.taskType
+  if (o.temperature != null) body.temperature = o.temperature
+  if (Array.isArray(o.imageDataUrls) && o.imageDataUrls.length) {
+    body.imageDataUrls = o.imageDataUrls
+  }
   let r
   try {
-    r = await postPaths(
-      ['/api/meoo-ai-chat', '/api/ai/chat'],
-      {
-        provider: o.provider || 'qwen',
-        ...(o.model ? { model: o.model } : {}),
-        messages,
-        stream: false,
-      },
-      mpAuthHeaders(),
-    )
+    r = await postPaths(['/api/meoo-ai-chat', '/api/ai/chat'], body, mpAuthHeaders())
   } catch (e) {
     return { ok: false, message: String(e && e.message ? e.message : e) }
   }
@@ -113,6 +115,27 @@ async function postAiChat(messages, opts) {
   const content = String(d.content || d.text || (d.message && d.message.content) || '').trim()
   if (!content) return { ok: false, message: 'AI 未返回内容' }
   return { ok: true, content }
+}
+
+async function postAiAgentImage(prompt, opts) {
+  const o = opts || {}
+  const body = { prompt: String(prompt || '').trim() }
+  if (o.preferredVendor) body.preferred_vendor = o.preferredVendor
+  if (o.referenceImage) body.reference_image = o.referenceImage
+  if (o.aspectRatio) body.aspect_ratio = o.aspectRatio
+  if (o.exactPrompt) body.exact_prompt = true
+  if (o.preferWanxPoster) body.prefer_wanx_poster = true
+  let r
+  try {
+    r = await postPaths(['/api/meoo-ai-agent-image'], body, mpAuthHeaders())
+  } catch (e) {
+    return { ok: false, message: String(e && e.message ? e.message : e) }
+  }
+  if (!r.ok) return r
+  const d = r.data || {}
+  const imageUrl = String(d.imageUrl || d.url || d.image_url || '').trim()
+  if (!imageUrl) return { ok: false, message: '未返回图片地址' }
+  return { ok: true, imageUrl, vendorUsed: d.vendorUsed || d.channel || '' }
 }
 
 async function postDouyinLinkForDh(url) {
@@ -257,6 +280,7 @@ module.exports = {
   hasDouyinLinkeToken,
   postDouyinAiAssist,
   postAiChat,
+  postAiAgentImage,
   postDouyinLinkForDh,
   fetchVideoAiConfig,
   postShortVideoWithFailover,

@@ -1,4 +1,8 @@
 <scroll-view class="addon-page addon-scroll {{lqThemeClass}}" scroll-y enhanced show-scrollbar="{{false}}">
+  <view class="addon-mini-hero addon-mini-hero--violet">
+    <text class="addon-mini-hero__title">短视频 AI 处理</text>
+    <text class="addon-mini-hero__sub">参考画面优化 · 文生/图生视频 · 灵祺 AI 云剪</text>
+  </view>
   <view class="addon-tabs">
     <view wx:if="{{showShortvideo}}" class="addon-tab {{mainPane === 'optimize' ? 'addon-tab--on' : ''}}" data-pane="optimize" bindtap="onPane">参考画面优化</view>
     <view wx:if="{{showShortvideo}}" class="addon-tab {{mainPane === 'generate' ? 'addon-tab--on' : ''}}" data-pane="generate" bindtap="onPane">短视频生成</view>

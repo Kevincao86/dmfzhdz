@@ -10,16 +10,19 @@ function expandLegacy(raw) {
   const shortvideo = raw.shortvideo === true || (legacy && raw.shortvideo !== false)
   const cloudEdit = raw.cloudEdit === true || (legacy && raw.cloudEdit !== false)
   const digitalHuman = raw.digitalHuman === true || (legacy && raw.digitalHuman !== false)
+  const visualStudio = raw.visualStudio === true || (legacy && raw.visualStudio !== false)
   const brief = raw.brief === true
   const aiVideoReview = raw.aiVideoReview === true
   const aiReview = raw.aiReview === true
-  const any = legacy || shortvideo || cloudEdit || digitalHuman || brief || aiVideoReview || aiReview
+  const any =
+    legacy || shortvideo || cloudEdit || digitalHuman || visualStudio || brief || aiVideoReview || aiReview
   return {
     addons: any,
     recommendHall: raw.recommendHall === true,
     shortvideo,
     cloudEdit,
     digitalHuman,
+    visualStudio,
     brief,
     aiVideoReview,
     aiReview,
@@ -46,6 +49,7 @@ function canUseAddonPerm(account, perm) {
   if (perm === 'cloudEdit') return access.cloudEdit
   if (perm === 'brief') return access.brief
   if (perm === 'digitalHuman') return access.digitalHuman
+  if (perm === 'visualStudio') return access.visualStudio
   if (perm === 'aiVideoReview') return access.aiVideoReview
   if (perm === 'aiReview') return access.aiReview
   return false
@@ -62,6 +66,7 @@ function patchAccountPrFeatureAccess(account, access) {
       shortvideo: typeof access.shortvideo === 'boolean' ? access.shortvideo : prev.shortvideo,
       cloudEdit: typeof access.cloudEdit === 'boolean' ? access.cloudEdit : prev.cloudEdit,
       digitalHuman: typeof access.digitalHuman === 'boolean' ? access.digitalHuman : prev.digitalHuman,
+      visualStudio: typeof access.visualStudio === 'boolean' ? access.visualStudio : prev.visualStudio,
       brief: typeof access.brief === 'boolean' ? access.brief : prev.brief,
       aiVideoReview: typeof access.aiVideoReview === 'boolean' ? access.aiVideoReview : prev.aiVideoReview,
       aiReview: typeof access.aiReview === 'boolean' ? access.aiReview : prev.aiReview,

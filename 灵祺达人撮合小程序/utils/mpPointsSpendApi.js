@@ -92,10 +92,72 @@ function affordActionFromError(err) {
   return 'none'
 }
 
+const VISUAL_STUDIO_COPY_POINTS = 3
+const VISUAL_STUDIO_IMAGE_POINTS = 8
+
+async function spendPointsKind(kind, opts) {
+  try {
+    const data = await postAuthAction({
+      action: 'mp_ai_points_spend',
+      kind,
+      idempotencyKey: opts && opts.idempotencyKey ? String(opts.idempotencyKey) : undefined,
+      note: opts && opts.note ? String(opts.note) : undefined,
+      ...mpBillingRoleHint.billingRolePayload(),
+    })
+    return {
+      pointsCharged: Number(data.pointsCharged || 0),
+      balance: Number(data.mpAiPointsBalance || 0),
+      already: data.already === true,
+    }
+  } catch (e) {
+    throw new Error(mpApiErrors.formatMpApiErr(e, '积分扣减失败'))
+  }
+}
+
+async function assertVisualStudioCopyAffordable() {
+  const result = await checkPointsAffordable('visual_studio_copy')
+  if (!result.ok) {
+    const err = new Error(result.message || '积分不足')
+    err.code = result.error
+    throw err
+  }
+  return result
+}
+
+async function assertVisualStudioImageAffordable(count) {
+  const n = Math.max(1, Number(count) || 1)
+  const result = await checkPointsAffordable('visual_studio_image', { count: n })
+  if (!result.ok) {
+    // 后端若未认 count，至少按单张校验；前端按张循环 spend
+    const once = await checkPointsAffordable('visual_studio_image')
+    if (!once.ok) {
+      const err = new Error(once.message || result.message || '积分不足')
+      err.code = once.error || result.error
+      throw err
+    }
+    return once
+  }
+  return result
+}
+
+async function spendVisualStudioCopyPoints(opts) {
+  return spendPointsKind('visual_studio_copy', opts)
+}
+
+async function spendVisualStudioImagePoints(opts) {
+  return spendPointsKind('visual_studio_image', opts)
+}
+
 module.exports = {
   BRIEF_POINTS_PER_USE,
+  VISUAL_STUDIO_COPY_POINTS,
+  VISUAL_STUDIO_IMAGE_POINTS,
   checkPointsAffordable,
   assertBriefAffordable,
   spendBriefPoints,
+  assertVisualStudioCopyAffordable,
+  assertVisualStudioImageAffordable,
+  spendVisualStudioCopyPoints,
+  spendVisualStudioImagePoints,
   affordActionFromError,
 }

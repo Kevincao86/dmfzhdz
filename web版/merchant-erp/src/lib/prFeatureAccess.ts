@@ -16,6 +16,7 @@ export const DEFAULT_PR_FEATURE_ACCESS = {
   shortvideo: false,
   cloudEdit: false,
   digitalHuman: false,
+  visualStudio: false,
   brief: false,
   aiVideoReview: false,
   aiReview: false,

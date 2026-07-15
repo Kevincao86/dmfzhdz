@@ -17,7 +17,11 @@ const CLOUD_CALL_AI_MS = 120000
 function cloudCallTimeoutMs(path) {
   const p = String(path || '')
   if (/video-upload|ice-multipart|group-qr-upload-body/i.test(p)) return CLOUD_CALL_UPLOAD_MS
-  if (/meoo-ai-chat|meoo-douyin-goods-ai-assist|merchant\/douyin\/goods\/ai\/assist|\/api\/ai\/chat/i.test(p)) {
+  if (
+    /meoo-ai-chat|meoo-ai-agent-image|meoo-douyin-goods-ai-assist|merchant\/douyin\/goods\/ai\/assist|\/api\/ai\/chat/i.test(
+      p,
+    )
+  ) {
     return CLOUD_CALL_AI_MS
   }
   if (/registry|hall-registry|hall_registry|meoo-ops-mp-auth|publisher-display|form-relay-group-qr|group-qr-upload-init|group-qr-upload-body|recruitment-orders-patch/i.test(p)) return CLOUD_CALL_REGISTRY_MS

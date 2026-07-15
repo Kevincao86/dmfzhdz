@@ -8,4 +8,5 @@ export const ADDON_NAV: ReadonlyArray<{ to: string; label: string; perm: AddonNa
   { to: '/addons/ai-review', label: 'AI审核', perm: 'aiReview' },
   { to: '/addons/shortvideo', label: '短视频AI处理', perm: 'shortvideo' },
   { to: '/addons/digital-human', label: '数字人口播', perm: 'digitalHuman' },
+  { to: '/addons/ai-image', label: 'AI 视觉工坊', perm: 'visualStudio' },
 ]

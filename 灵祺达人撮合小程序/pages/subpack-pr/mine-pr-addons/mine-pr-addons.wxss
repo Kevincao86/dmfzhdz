@@ -175,6 +175,11 @@
   color: #0f766e;
 }
 
+.addon-card--indigo .addon-card__icon-wrap {
+  background: linear-gradient(135deg, #e0e7ff, #c7d2fe);
+  color: #4338ca;
+}
+
 .addon-card__glyph {
   font-size: 36rpx;
   font-weight: 700;

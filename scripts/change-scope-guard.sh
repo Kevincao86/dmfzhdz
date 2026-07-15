@@ -30,6 +30,7 @@ list_scopes() {
   ops_home          运营台首页看板
   recommend_hall    推荐大厅全部达人池（慎用，见 recommend-all-talents-lock）
   mp_auth           小程序登录/会话
+  ai_vision_workshop AI视觉工坊（DR增值嵌入 + 撮合小程序原生页 + 会员权限位）
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -128,6 +129,40 @@ auth.js
 pages/login/
 PAT
       ;;
+    ai_vision_workshop)
+      cat <<'PAT'
+AiImageStudioPage
+aiImageStudio
+visualStudio
+visual_studio
+addon_visual_studio
+mpVisualStudioAi
+mine-pr-addon-visual-studio
+mine-pr-addon-shortvideo
+mine-pr-addon-digital-human
+mine-pr-addons
+addonCards
+mpFeatureFlags
+mpEmbedAddonAccess
+mpMembershipCatalog
+mpPointsSpendApi
+mpAddonMerchantApi
+mpAddonPageGate
+prFeatureAccess
+addonAccess
+embedPages
+MerchantEmbedShell
+mp-addon-page
+App.tsx
+authMpSession
+mpSession
+change-scope-guard
+撮合小程序/app.json
+撮合小程序/pages/mine/mine.js
+撮合小程序/utils/ecs.js
+撮合小程序/utils/cloudEcs.js
+PAT
+      ;;
     *)
       echo ""
       ;;
@@ -141,10 +176,11 @@ if [[ -z "$PATTERNS" ]]; then
   exit 1
 fi
 
+# 关闭 quotepath，避免中文路径被 octal 转义导致白名单匹配失败
 if [[ "$MODE" == "staged" ]]; then
-  CHANGED_RAW="$(git diff --cached --name-only --diff-filter=ACMRT 2>/dev/null || true)"
+  CHANGED_RAW="$(git -c core.quotepath=false diff --cached --name-only --diff-filter=ACMRT 2>/dev/null || true)"
 else
-  CHANGED_RAW="$(git diff --name-only --diff-filter=ACMRT "$AGAINST" 2>/dev/null || true)"
+  CHANGED_RAW="$(git -c core.quotepath=false diff --name-only --diff-filter=ACMRT "$AGAINST" 2>/dev/null || true)"
 fi
 
 CHANGED=()
@@ -169,9 +205,12 @@ file_allowed() {
 $PATTERNS
 EOF
   local extra
-  for extra in "${EXTRA_ALLOW[@]}"; do
-    [[ -n "$extra" && "$f" == *"$extra"* ]] && return 0
-  done
+  # bash 3.2 + set -u：空数组展开会报 unbound
+  if ((${#EXTRA_ALLOW[@]} > 0)); then
+    for extra in "${EXTRA_ALLOW[@]}"; do
+      [[ -n "$extra" && "$f" == *"$extra"* ]] && return 0
+    done
+  fi
   return 1
 }
 
@@ -184,13 +223,13 @@ done
 
 if [[ ${#FORBIDDEN[@]} -gt 0 ]]; then
   echo "========================================"
-  echo "【越界通知】scope=$SCOPE — 以下文件不在白名单，禁止修改"
+  echo "【越界通知】scope=${SCOPE} — 以下文件不在白名单，禁止修改"
   echo "========================================"
   echo ""
   echo "越界文件:"
   printf '  - %s\n' "${FORBIDDEN[@]}"
   echo ""
-  echo "本次允许 scope: $SCOPE"
+  echo "本次允许 scope: ${SCOPE}"
   echo "白名单关键词:"
   while IFS= read -r pat; do
     [[ -n "$pat" ]] && echo "  · *${pat}*"
@@ -206,5 +245,6 @@ EOF
   exit 2
 fi
 
-echo "OK: scope=$SCOPE，${#CHANGED[@]} 个文件均在白名单内"
+echo "OK: scope=${SCOPE}, ${#CHANGED[@]} files in whitelist"
 exit 0
+

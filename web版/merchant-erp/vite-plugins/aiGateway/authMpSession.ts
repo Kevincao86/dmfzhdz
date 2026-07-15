@@ -65,7 +65,8 @@ async function mpAccountHasAddonAccess(
       const shortvideo = cells.addon_shortvideo?.enabled === true
       const cloud = cells.addon_cloud_edit?.enabled === true || cells.cloud_edit?.enabled === true
       const digital = cells.addon_digital_human?.enabled === true
-      if (brief || shortvideo || cloud || digital) return true
+      const visual = cells.addon_visual_studio?.enabled === true
+      if (brief || shortvideo || cloud || digital || visual) return true
     }
   } catch {
     /* registry optional */
