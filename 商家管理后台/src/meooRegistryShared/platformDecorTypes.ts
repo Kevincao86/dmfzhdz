@@ -41,13 +41,36 @@ export const PLATFORM_DECOR_SLOT_LABELS: Record<string, string> = {
   'cs.login.banner': '商家 ERP · 登录/注册页',
 }
 
+/**
+ * 各槽位建议像素（宽×高）。按 @2x / 常见手机宽约 750 设计；视频同画幅即可。
+ */
+export const PLATFORM_DECOR_SLOT_SIZE_HINTS: Record<string, string> = {
+  'mp.home.popup': '建议 750×1000（竖版 3:4，居中弹窗）',
+  'mp.home.banner': '建议 750×320（横版 Banner，约 21:9）',
+  'mp.mine.entry': '建议 750×180（横条）',
+  'mp.hall.strip': '建议 750×96（细条）',
+  'dr.home.popup': '建议 720×960（竖版 3:4）',
+  'dr.profile.banner': '建议 1200×360（横版，约 10:3）',
+  'dr.hall.banner': '建议 1200×360（横版）',
+  'dr.login.side': '建议 480×640（竖版，侧栏/底部）',
+  'cs.home.popup': '建议 720×900（竖版，工作台弹窗）',
+  'cs.home.banner': '建议 1440×320（宽屏横 Banner）',
+  'cs.settings.affiliate': '建议 1200×280（横条）',
+  'cs.login.banner': '建议 1440×400（登录页横 Banner）',
+}
+
+export type PlatformDecorMediaType = 'image' | 'video'
+
 export type RegistryPlatformDecorItem = {
   id: string
   /** 弹窗用 slotKey 含 .popup；Banner/条幅用其它 slotKey */
   slotKey: string
   enabled: boolean
   title: string
+  /** 海报素材 URL（静图 / GIF / 视频均可） */
   imageUrl: string
+  /** 缺省时按 URL 后缀推断；GIF 仍按 image 展示 */
+  mediaType?: PlatformDecorMediaType
   linkType: PlatformDecorLinkType
   linkValue?: string
   /** 仅弹窗：身份过滤 */
@@ -58,6 +81,20 @@ export type RegistryPlatformDecorItem = {
   freq?: PlatformDecorFreq
   priority: number
   updatedAt?: string
+}
+
+/** 是否按视频播放（GIF 走图片） */
+export function isDecorVideoMedia(item: {
+  mediaType?: string | null
+  imageUrl?: string | null
+}): boolean {
+  if (String(item.mediaType || '').toLowerCase() === 'video') return true
+  if (String(item.mediaType || '').toLowerCase() === 'image') return false
+  const u = String(item.imageUrl || '')
+    .trim()
+    .toLowerCase()
+    .split(/[?#]/)[0]
+  return /\.(mp4|webm|mov|m4v)$/.test(u)
 }
 
 export type RegistryPlatformDecoration = {

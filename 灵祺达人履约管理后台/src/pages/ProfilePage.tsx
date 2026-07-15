@@ -11,7 +11,7 @@ import {
   fetchPlatformDecorItem,
   openDecorLink,
 } from '@merchant/lib/platformDecorClient'
-import type { RegistryPlatformDecorItem } from '@merchant/lib/platformDecorTypes'
+import { isDecorVideoMedia, type RegistryPlatformDecorItem } from '@merchant/lib/platformDecorTypes'
 
 export default function ProfilePage() {
   const acc = getAccount()
@@ -178,11 +178,22 @@ export default function ProfilePage() {
           className="block w-full overflow-hidden rounded-xl border border-[var(--shell-border)] bg-[var(--shell-surface)] text-left"
           onClick={() => openDecorLink(decorBanner)}
         >
-          <img
-            src={decorBanner.imageUrl}
-            alt={decorBanner.title || '活动'}
-            className="max-h-40 w-full object-cover"
-          />
+          {isDecorVideoMedia(decorBanner) ? (
+            <video
+              src={decorBanner.imageUrl}
+              className="max-h-40 w-full object-cover"
+              autoPlay
+              muted
+              loop
+              playsInline
+            />
+          ) : (
+            <img
+              src={decorBanner.imageUrl}
+              alt={decorBanner.title || '活动'}
+              className="max-h-40 w-full object-cover"
+            />
+          )}
           {decorBanner.title ? (
             <p className="px-3 py-2 text-sm font-medium text-[var(--shell-text)]">{decorBanner.title}</p>
           ) : null}

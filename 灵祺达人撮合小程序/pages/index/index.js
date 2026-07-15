@@ -233,7 +233,7 @@ Page({
   async loadDecorBanner() {
     try {
       const identity = this.data.workIdentity || userProfile.readIdentity() || ''
-      const item = await mpPlatformDecor.fetchDecorItem('mp.home.banner', identity)
+      const item = await mpPlatformDecor.fetchDecorItemWithMeta('mp.home.banner', identity)
       this.setData({ decorBanner: item && item.imageUrl ? item : null })
     } catch (_) {
       this.setData({ decorBanner: null })
@@ -257,7 +257,7 @@ Page({
     this._decorPopupLoading = true
     try {
       const identity = this.data.workIdentity || userProfile.readIdentity() || ''
-      const item = await mpPlatformDecor.fetchDecorItem('mp.home.popup', identity)
+      const item = await mpPlatformDecor.fetchDecorItemWithMeta('mp.home.popup', identity)
       if (
         !item ||
         !item.imageUrl ||

@@ -7,7 +7,7 @@ import {
   openDecorLink,
   shouldShowDecorPopup,
 } from '@merchant/lib/platformDecorClient'
-import type { RegistryPlatformDecorItem } from '@merchant/lib/platformDecorTypes'
+import { isDecorVideoMedia, type RegistryPlatformDecorItem } from '@merchant/lib/platformDecorTypes'
 import { getWorkIdentity } from '../lib/mpWorkIdentity'
 
 function isHallPath(pathname: string): boolean {
@@ -68,7 +68,18 @@ export default function PlatformDecorDrHost() {
             close()
           }}
         >
-          <img src={popup.imageUrl} alt={popup.title || '活动海报'} className="w-full object-cover" />
+          {isDecorVideoMedia(popup) ? (
+            <video
+              src={popup.imageUrl}
+              className="w-full object-cover"
+              autoPlay
+              muted
+              loop
+              playsInline
+            />
+          ) : (
+            <img src={popup.imageUrl} alt={popup.title || '活动海报'} className="w-full object-cover" />
+          )}
         </button>
         {popup.title ? (
           <p className="px-4 py-3 text-center text-sm font-semibold text-[var(--shell-text)]">{popup.title}</p>

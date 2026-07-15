@@ -19,7 +19,7 @@ import {
   fetchPlatformDecorItem,
   openDecorLink,
 } from '../../lib/platformDecorClient'
-import type { RegistryPlatformDecorItem } from '../../lib/platformDecorTypes'
+import { isDecorVideoMedia, type RegistryPlatformDecorItem } from '../../lib/platformDecorTypes'
 
 function formatDate(iso?: string): string {
   if (!iso) return '—'
@@ -151,11 +151,22 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
           className="block w-full overflow-hidden rounded-2xl border border-indigo-100 bg-indigo-50/40 text-left"
           onClick={() => openDecorLink(decorBanner)}
         >
-          <img
-            src={decorBanner.imageUrl}
-            alt={decorBanner.title || '推广活动'}
-            className="max-h-36 w-full object-cover"
-          />
+          {isDecorVideoMedia(decorBanner) ? (
+            <video
+              src={decorBanner.imageUrl}
+              className="max-h-36 w-full object-cover"
+              autoPlay
+              muted
+              loop
+              playsInline
+            />
+          ) : (
+            <img
+              src={decorBanner.imageUrl}
+              alt={decorBanner.title || '推广活动'}
+              className="max-h-36 w-full object-cover"
+            />
+          )}
           {decorBanner.title ? (
             <p className="px-3 py-2 text-sm font-medium text-indigo-900">{decorBanner.title}</p>
           ) : null}

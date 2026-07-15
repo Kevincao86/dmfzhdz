@@ -43,12 +43,20 @@ export function normalizeDecorItem(raw: unknown): RegistryPlatformDecorItem | nu
   const imageUrl = String(o.imageUrl || '').trim()
   if (!slotKey || !imageUrl) return null
   const id = String(o.id || '').trim() || newId()
+  const mediaRaw = String(o.mediaType || '').trim().toLowerCase()
+  const mediaType =
+    mediaRaw === 'video'
+      ? ('video' as const)
+      : mediaRaw === 'image'
+        ? ('image' as const)
+        : undefined
   return {
     id,
     slotKey,
     enabled: o.enabled !== false,
     title: String(o.title || '').trim() || slotKey,
     imageUrl,
+    ...(mediaType ? { mediaType } : {}),
     linkType: normalizeLinkType(o.linkType),
     linkValue: String(o.linkValue || '').trim() || undefined,
     identities: normalizeIdentities(o.identities),
