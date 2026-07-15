@@ -71,7 +71,7 @@ const AI_REVIEW_MENU = {
 const ADDONS_HUB_MENU = {
   key: 'addonsHub',
   label: '增值服务',
-  sub: 'Brief · 审核 · 短视频 · 数字人 · 视觉工坊',
+  sub: '短视频 · 数字人 · 视觉工坊 · 云剪',
   icon: 'wallet',
 }
 
