@@ -68,27 +68,6 @@ const AI_REVIEW_MENU = {
   icon: 'briefTemplates',
 }
 
-const SHORTVIDEO_MENU = {
-  key: 'shortvideoAddon',
-  label: '短视频 AI 处理',
-  sub: '参考画面 · 文生/图生视频',
-  icon: 'tpl',
-}
-
-const DIGITAL_HUMAN_MENU = {
-  key: 'digitalHumanAddon',
-  label: '数字人口播',
-  sub: 'TTS 配音 · 口播视频一键生成',
-  icon: 'cooperation',
-}
-
-const VISUAL_STUDIO_MENU = {
-  key: 'visualStudioAddon',
-  label: 'AI 视觉工坊',
-  sub: '多端海报 · AI 文案 · 一键出图',
-  icon: 'star',
-}
-
 const ADDONS_HUB_MENU = {
   key: 'addonsHub',
   label: '增值服务',
@@ -153,24 +132,18 @@ function filterMenusForAccount(menus, account, identity) {
     list = attachMenuGlyphs(injectAiReviewMenu(list))
   }
   const access = prFeatureAccess.readAccountPrFeatureAccess(account)
-  if (access.shortvideo || access.cloudEdit) {
-    list = attachMenuGlyphs(injectAfterKey(list, 'aiReview', SHORTVIDEO_MENU))
-  }
-  if (access.digitalHuman) {
-    list = attachMenuGlyphs(injectAfterKey(list, 'shortvideoAddon', DIGITAL_HUMAN_MENU))
-  }
-  if (access.visualStudio) {
-    list = attachMenuGlyphs(injectAfterKey(list, 'digitalHumanAddon', VISUAL_STUDIO_MENU))
-  }
+  // 短视频 / 数字人 / 视觉工坊仅在「增值服务」hub 内进入，不在「我的」重复列出
   if (mpFeatureFlags.ADDONS_NAV_VISIBLE && access.any) {
-    list = attachMenuGlyphs(injectAfterKey(list, 'visualStudioAddon', ADDONS_HUB_MENU))
+    const afterKey = list.some((i) => i.key === 'aiReview')
+      ? 'aiReview'
+      : list.some((i) => i.key === 'briefGen')
+        ? 'briefGen'
+        : 'orderCalendar'
+    list = attachMenuGlyphs(injectAfterKey(list, afterKey, ADDONS_HUB_MENU))
   }
   return list.filter((item) => {
     if (item.key === 'briefGen') return mpBriefAccess.canUseBriefFeature(account)
     if (item.key === 'aiReview') return mpAiReviewAccess.canUseAiReviewFeature(account)
-    if (item.key === 'shortvideoAddon') return access.shortvideo || access.cloudEdit
-    if (item.key === 'digitalHumanAddon') return access.digitalHuman
-    if (item.key === 'visualStudioAddon') return access.visualStudio
     if (item.key === 'addonsHub') return mpFeatureFlags.ADDONS_NAV_VISIBLE && access.any
     return true
   })
@@ -318,9 +291,6 @@ const MENU_URLS = {
   pointsRecharge: '/pages/subpack-mine/mine-xingxuan-points-recharge/mine-xingxuan-points-recharge',
   briefGen: '/pages/subpack-pr/mine-pr-addon-ai-content/mine-pr-addon-ai-content',
   aiReview: '/pages/subpack-pr/mine-pr-addon-ai-review/mine-pr-addon-ai-review',
-  shortvideoAddon: '/pages/subpack-pr/mine-pr-addon-shortvideo/mine-pr-addon-shortvideo',
-  digitalHumanAddon: '/pages/subpack-pr/mine-pr-addon-digital-human/mine-pr-addon-digital-human',
-  visualStudioAddon: '/pages/subpack-pr/mine-pr-addon-visual-studio/mine-pr-addon-visual-studio',
   addonsHub: '/pages/subpack-pr/mine-pr-addons/mine-pr-addons',
   xingxuanMembership: '/pages/subpack-mine/mine-xingxuan-membership/mine-xingxuan-membership',
   affiliatePortal: '/pages/subpack-mine/mine-affiliate-portal/mine-affiliate-portal',
