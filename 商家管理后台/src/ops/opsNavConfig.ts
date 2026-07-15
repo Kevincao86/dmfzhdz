@@ -10,9 +10,11 @@ import {
   Library,
   Megaphone,
   BookOpen,
+  PanelTop,
   Share2,
   Shield,
   Smartphone,
+  Sparkles,
   UserSearch,
   Users,
   Wallet,
@@ -70,6 +72,38 @@ export const OPS_NAV_GROUPS: OpsNavGroup[] = [
     ],
   },
   {
+    id: 'platform-decor',
+    label: '平台装修',
+    entries: [
+      {
+        kind: 'leaf',
+        to: '/platform-decor?kind=popup',
+        label: '海报弹窗',
+        icon: Sparkles,
+        permission: 'platform_decor',
+      },
+      {
+        kind: 'leaf',
+        to: '/platform-decor?kind=banner',
+        label: '页面广告位',
+        icon: PanelTop,
+        permission: 'platform_decor',
+      },
+      {
+        kind: 'parent',
+        id: 'help-manual-hub',
+        label: '帮助手册',
+        icon: BookOpen,
+        children: [
+          { kind: 'leaf', to: '/help-manual?edition=merchant', label: '商家版', icon: BookOpen, permission: 'help_manual' },
+          { kind: 'leaf', to: '/help-manual?edition=partner', label: '服务商版', icon: BookOpen, permission: 'help_manual' },
+          { kind: 'leaf', to: '/help-manual?edition=fulfillment', label: '履约版', icon: BookOpen, permission: 'help_manual' },
+          { kind: 'leaf', to: '/help-manual?edition=mp', label: '小程序', icon: Smartphone, permission: 'help_manual' },
+        ],
+      },
+    ],
+  },
+  {
     id: 'recruit',
     label: '招募订单',
     entries: [
@@ -100,18 +134,6 @@ export const OPS_NAV_GROUPS: OpsNavGroup[] = [
         children: [
           { kind: 'leaf', to: '/support?channel=erp', label: '商家 ERP', icon: Headphones, permission: 'support' },
           { kind: 'leaf', to: '/support?channel=mp', label: '星选小程序', icon: Smartphone, permission: 'support_mp' },
-        ],
-      },
-      {
-        kind: 'parent',
-        id: 'help-manual-hub',
-        label: '帮助手册',
-        icon: BookOpen,
-        children: [
-          { kind: 'leaf', to: '/help-manual?edition=merchant', label: '商家版', icon: BookOpen, permission: 'help_manual' },
-          { kind: 'leaf', to: '/help-manual?edition=partner', label: '服务商版', icon: BookOpen, permission: 'help_manual' },
-          { kind: 'leaf', to: '/help-manual?edition=fulfillment', label: '履约版', icon: BookOpen, permission: 'help_manual' },
-          { kind: 'leaf', to: '/help-manual?edition=mp', label: '小程序', icon: Smartphone, permission: 'help_manual' },
         ],
       },
       { kind: 'leaf', to: '/team-intro', label: '团队介绍', icon: Users, permission: 'team_intro' },
@@ -177,6 +199,13 @@ export function resolveOpsPageMeta(pathname: string, search = ''): { title: stri
         mp: '帮助手册 · 小程序',
       }
       return { title: labels[ed] || '帮助手册', group }
+    }
+    if (path === '/platform-decor') {
+      const kind = new URLSearchParams(search).get('kind') || 'popup'
+      return {
+        title: kind === 'banner' ? '页面广告位' : '海报弹窗',
+        group,
+      }
     }
     return { title: best.label, group }
   }

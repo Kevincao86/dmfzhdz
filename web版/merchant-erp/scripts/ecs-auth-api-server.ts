@@ -116,6 +116,8 @@ import helpManualDefaultsHandler from '../api/meoo-help-manual-defaults.ts'
 import helpManualSetHandler from '../api/meoo-ops-help-manual-set.ts'
 import teamIntroPublicHandler from '../api/meoo-team-intro-public.ts'
 import teamIntroSetHandler from '../api/meoo-ops-team-intro-set.ts'
+import platformDecorPublicHandler from '../api/meoo-platform-decor-public.ts'
+import platformDecorSetHandler from '../api/meoo-ops-platform-decor-set.ts'
 import mpTalentMemberRegisterHandler from '../api/meoo-ops-mp-talent-member-register.ts'
 import mpTalentPrQuotesHandler from '../api/meoo-ops-mp-talent-pr-quotes.ts'
 import mpTalentCooperationStatsHandler from '../api/meoo-ops-mp-talent-cooperation-stats.ts'
@@ -341,6 +343,8 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-help-manual-set': helpManualSetHandler as VercelLikeHandler,
   '/api/meoo-team-intro-public': teamIntroPublicHandler as VercelLikeHandler,
   '/api/meoo-ops-team-intro-set': teamIntroSetHandler as VercelLikeHandler,
+  '/api/meoo-platform-decor-public': platformDecorPublicHandler as VercelLikeHandler,
+  '/api/meoo-ops-platform-decor-set': platformDecorSetHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-talent-member-register': mpTalentMemberRegisterHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-talent-pr-quotes': mpTalentPrQuotesHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-talent-cooperation-stats': mpTalentCooperationStatsHandler as VercelLikeHandler,

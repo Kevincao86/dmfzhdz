@@ -15,6 +15,11 @@ import {
   type AffiliatePortalPayload,
 } from '../../lib/distributionAffiliatePortalClient'
 import { toUserFacingError } from '../../lib/userFacingError'
+import {
+  fetchPlatformDecorItem,
+  openDecorLink,
+} from '../../lib/platformDecorClient'
+import type { RegistryPlatformDecorItem } from '../../lib/platformDecorTypes'
 
 function formatDate(iso?: string): string {
   if (!iso) return '—'
@@ -58,6 +63,7 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
   const [data, setData] = useState<AffiliatePortalPayload | null>(null)
   const [withdrawAmount, setWithdrawAmount] = useState('')
   const [withdrawing, setWithdrawing] = useState(false)
+  const [decorBanner, setDecorBanner] = useState<RegistryPlatformDecorItem | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -76,6 +82,12 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    void fetchPlatformDecorItem('cs.settings.affiliate').then((item) => {
+      setDecorBanner(item && item.imageUrl ? item : null)
+    })
+  }, [])
 
   const onCopy = async (text: string, label: string) => {
     const ok = await copyText(text)
@@ -132,6 +144,23 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
           查看专属推广码、推广链接与佣金结算。未申请者可先提交推广员申请。
         </p>
       </div>
+
+      {decorBanner?.imageUrl ? (
+        <button
+          type="button"
+          className="block w-full overflow-hidden rounded-2xl border border-indigo-100 bg-indigo-50/40 text-left"
+          onClick={() => openDecorLink(decorBanner)}
+        >
+          <img
+            src={decorBanner.imageUrl}
+            alt={decorBanner.title || '推广活动'}
+            className="max-h-36 w-full object-cover"
+          />
+          {decorBanner.title ? (
+            <p className="px-3 py-2 text-sm font-medium text-indigo-900">{decorBanner.title}</p>
+          ) : null}
+        </button>
+      ) : null}
 
       {loading ? (
         <div className="flex items-center gap-2 py-10 text-sm text-gray-500">

@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { getAccount } from '../lib/mpSession'
 import { getWorkIdentity, WORK_EDITION_LABEL } from '../lib/mpWorkIdentity'
 import { readMember, memberTypeLabel } from '../lib/mpSync/talentMember'
@@ -7,11 +7,23 @@ import { prDisplayName, readPrProfile } from '../lib/mpSync/userProfile'
 import { resolveShellDisplayName } from '../lib/shellDisplayName'
 import { ProfileMenuList, ProfileMineHeader } from '../components/ui/MockupLayouts'
 import { readApplications, readPublishedOrders } from '../lib/mpSync/applicationsStore'
+import {
+  fetchPlatformDecorItem,
+  openDecorLink,
+} from '@merchant/lib/platformDecorClient'
+import type { RegistryPlatformDecorItem } from '@merchant/lib/platformDecorTypes'
 
 export default function ProfilePage() {
   const acc = getAccount()
   const workId = getWorkIdentity()
   const isPr = workId === 'pr'
+  const [decorBanner, setDecorBanner] = useState<RegistryPlatformDecorItem | null>(null)
+
+  useEffect(() => {
+    void fetchPlatformDecorItem('dr.profile.banner', workId).then((item) => {
+      setDecorBanner(item && item.imageUrl ? item : null)
+    })
+  }, [workId])
   const member = readMember()
   const pr = readPrProfile()
   const edition = WORK_EDITION_LABEL[workId]
@@ -159,6 +171,23 @@ export default function ProfilePage() {
         roleBadge={edition}
         stats={stats}
       />
+
+      {decorBanner?.imageUrl ? (
+        <button
+          type="button"
+          className="block w-full overflow-hidden rounded-xl border border-[var(--shell-border)] bg-[var(--shell-surface)] text-left"
+          onClick={() => openDecorLink(decorBanner)}
+        >
+          <img
+            src={decorBanner.imageUrl}
+            alt={decorBanner.title || '活动'}
+            className="max-h-40 w-full object-cover"
+          />
+          {decorBanner.title ? (
+            <p className="px-3 py-2 text-sm font-medium text-[var(--shell-text)]">{decorBanner.title}</p>
+          ) : null}
+        </button>
+      ) : null}
 
       <dl className="surface-card rounded-xl border p-4 space-y-3 text-sm">
         <div className="flex justify-between gap-4">

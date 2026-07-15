@@ -26,6 +26,7 @@ import AiAgentDrawer, { AiAgentFloatingButton } from './AiAgentDrawer'
 import FloatingOnlineSupport from './FloatingOnlineSupport'
 import TenantAnnouncementBell from './TenantAnnouncementBell'
 import TenantUrgentAnnouncementModal from './TenantUrgentAnnouncementModal'
+import PlatformDecorHomeHost from './PlatformDecorHomeHost'
 import { TenantAnnouncementProvider } from '../context/TenantAnnouncementContext'
 import PartnerClientScopeBar from './PartnerClientScopeBar'
 import OpsRegistryBridge from './OpsRegistryBridge'
@@ -470,6 +471,7 @@ export default function MeooLayout() {
         </header>
 
         <main className="erp-main erp-main-surface flex-1 overflow-auto p-6 lg:p-8">
+          <PlatformDecorHomeHost />
           <Outlet />
         </main>
 
@@ -537,6 +539,7 @@ export default function MeooLayout() {
       </div>
       <OpsRegistryBridge />
       <TenantUrgentAnnouncementModal />
+      {/* 活动海报弹层在 PlatformDecorHomeHost 内，与紧急公告互斥 */}
     </div>
     </TenantAnnouncementProvider>
   )

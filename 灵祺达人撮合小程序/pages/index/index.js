@@ -15,6 +15,7 @@ const listKeywordSearch = require('../../utils/listKeywordSearch.js')
 const selectionHomePopup = require('../../utils/selectionHomePopup.js')
 const scheduleHomePopup = require('../../utils/scheduleHomePopup.js')
 const opsBroadcastHomePopup = require('../../utils/opsBroadcastHomePopup.js')
+const mpPlatformDecor = require('../../utils/mpPlatformDecor.js')
 const memberStore = require('../../utils/talentMember.js')
 const regionFilterPicker = require('../../utils/regionFilterPicker.js')
 const budgetDisplayUtil = require('../../utils/recruitmentBudgetDisplay.js')
@@ -163,6 +164,9 @@ Page({
     schedulePopup: null,
     showOpsBroadcastPopup: false,
     opsBroadcastPopup: null,
+    showDecorPopup: false,
+    decorPopup: null,
+    decorBanner: null,
     ...HOME_BANNER_TALENT,
   },
   onLoad() {
@@ -210,6 +214,7 @@ Page({
       })
   },
   async tryShowInboxPopup() {
+    void this.loadDecorBanner()
     await this.tryShowSelectionPopup()
     if (!this.data.showSelectionPopup) {
       await this.tryShowSchedulePopup()
@@ -217,6 +222,71 @@ Page({
     if (!this.data.showSelectionPopup && !this.data.showSchedulePopup) {
       await this.tryShowOpsBroadcastPopup()
     }
+    if (
+      !this.data.showSelectionPopup &&
+      !this.data.showSchedulePopup &&
+      !this.data.showOpsBroadcastPopup
+    ) {
+      await this.tryShowDecorPopup()
+    }
+  },
+  async loadDecorBanner() {
+    try {
+      const identity = this.data.workIdentity || userProfile.readIdentity() || ''
+      const item = await mpPlatformDecor.fetchDecorItem('mp.home.banner', identity)
+      this.setData({ decorBanner: item && item.imageUrl ? item : null })
+    } catch (_) {
+      this.setData({ decorBanner: null })
+    }
+  },
+  onDecorBannerTap() {
+    const item = this.data.decorBanner
+    if (item) mpPlatformDecor.openDecorLink(item)
+  },
+  async tryShowDecorPopup() {
+    if (
+      this._decorPopupLoading ||
+      this.data.showDecorPopup ||
+      this.data.showSelectionPopup ||
+      this.data.showSchedulePopup ||
+      this.data.showOpsBroadcastPopup ||
+      this.data.showPriceSheet
+    ) {
+      return
+    }
+    this._decorPopupLoading = true
+    try {
+      const identity = this.data.workIdentity || userProfile.readIdentity() || ''
+      const item = await mpPlatformDecor.fetchDecorItem('mp.home.popup', identity)
+      if (
+        !item ||
+        !item.imageUrl ||
+        !mpPlatformDecor.shouldShowByFreq(item) ||
+        this.data.showSelectionPopup ||
+        this.data.showSchedulePopup ||
+        this.data.showOpsBroadcastPopup
+      ) {
+        return
+      }
+      this.setData({ showDecorPopup: true, decorPopup: item })
+    } catch (e) {
+      console.warn('[index] decor popup', e)
+    } finally {
+      this._decorPopupLoading = false
+    }
+  },
+  onDecorPopupDismiss() {
+    const item = this.data.decorPopup
+    if (item) mpPlatformDecor.dismissItem(item)
+    this.setData({ showDecorPopup: false, decorPopup: null })
+  },
+  onDecorPopupTap() {
+    const item = this.data.decorPopup
+    if (item) {
+      mpPlatformDecor.dismissItem(item)
+      mpPlatformDecor.openDecorLink(item)
+    }
+    this.setData({ showDecorPopup: false, decorPopup: null })
   },
   async tryShowSelectionPopup() {
     if (this._selectionPopupLoading || this.data.showSelectionPopup || this.data.showPriceSheet) return
@@ -315,6 +385,7 @@ Page({
     const row = this.data.opsBroadcastPopup
     if (row) opsBroadcastHomePopup.dismissOpsBroadcastNotice(row)
     this.setData({ showOpsBroadcastPopup: false, opsBroadcastPopup: null })
+    void this.tryShowDecorPopup()
   },
   onPreviewSelectionQr() {
     const url = this.data.selectionPopup && this.data.selectionPopup.imageUrl
