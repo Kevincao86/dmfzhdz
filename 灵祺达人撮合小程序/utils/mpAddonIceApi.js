@@ -12,6 +12,10 @@ const ICE_ASPECT_PRESETS = [
 ]
 
 const ICE_BATCH_COUNTS = [10, 20, 50, 100]
+/** 与星选 ShortVideoIceBatchPanel / iceMixPlan.MIX_TARGET_TOTAL_OPTIONS 对齐 */
+const MIX_TARGET_TOTAL_OPTIONS = [10, 20, 30, 45, 60]
+/** 短视频生成单段时长（星选关闭长视频时） */
+const SHORT_VIDEO_DURATION_OPTIONS = ['5', '10', '15']
 
 function mpAuthHeaders() {
   const token = sessionStore.readSessionToken()
@@ -209,6 +213,8 @@ function iceDownloadPath(jobId) {
 module.exports = {
   ICE_ASPECT_PRESETS,
   ICE_BATCH_COUNTS,
+  MIX_TARGET_TOTAL_OPTIONS,
+  SHORT_VIDEO_DURATION_OPTIONS,
   fetchIceConfig,
   uploadIceLocalFile,
   postIcePipeline,
