@@ -11,7 +11,7 @@ function newJobId() {
 Page({
   behaviors: [require('../../../behaviors/identityTheme')],
   data: {
-    mainPane: 'optimize',
+    mainPane: 'generate',
     engine: 'qwen',
     optPrompt: '',
     genPrompt: '',
@@ -51,10 +51,10 @@ Page({
   onShow() {
     if (!mpAddonPageGate.ensureAddonPageAccess('shortvideo')) return
     const access = prFeatureAccess.readAccountPrFeatureAccess(auth.readAccount())
-    let mainPane = 'optimize'
+    let mainPane = 'generate'
     if (this._initialPane === 'cloud' && access.cloudEdit) mainPane = 'cloud'
     else if (!access.shortvideo && access.cloudEdit) mainPane = 'cloud'
-    else if (access.shortvideo) mainPane = 'optimize'
+    else if (access.shortvideo) mainPane = 'generate'
     this.setData({
       showShortvideo: access.shortvideo,
       showCloudEdit: access.cloudEdit,
@@ -155,14 +155,9 @@ Page({
     )
   },
   async onGenerate() {
-    const pane = this.data.mainPane
-    const prompt = String(pane === 'optimize' ? this.data.optPrompt : this.data.genPrompt).trim()
+    const prompt = String(this.data.genPrompt || '').trim()
     if (!prompt) {
       wx.showToast({ title: '请填写提示词', icon: 'none' })
-      return
-    }
-    if (pane === 'optimize' && !this.data.framePureB64) {
-      wx.showToast({ title: '请先上传参考画面', icon: 'none' })
       return
     }
     this._cancelled = false
@@ -171,9 +166,9 @@ Page({
       const body = {
         prompt,
         flags: this.flagsLine(),
-        images_base64: pane === 'optimize' || this.data.framePureB64 ? [this.data.framePureB64] : undefined,
+        images_base64: this.data.framePureB64 ? [this.data.framePureB64] : undefined,
       }
-      if (pane === 'generate' && !body.images_base64) delete body.images_base64
+      if (!body.images_base64) delete body.images_base64
       const start = await addonApi.postShortVideoWithFailover({ engine: this.data.engine, body })
       if (!start.ok) {
         this.setData({ err: start.message || '发起失败' })

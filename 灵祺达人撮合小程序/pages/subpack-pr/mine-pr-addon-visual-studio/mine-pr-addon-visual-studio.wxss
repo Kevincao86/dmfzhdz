@@ -156,6 +156,19 @@
   background: #0f172a;
 }
 
+.vs-save-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 88rpx;
+  line-height: 1.3;
+  box-sizing: border-box;
+}
+
+.vs-save-btn--hover {
+  opacity: 0.88;
+}
+
 .addon-pair {
   display: flex;
   gap: 16rpx;

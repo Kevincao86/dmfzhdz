@@ -132,14 +132,56 @@ function ensureScopeAuthorized(scope, modalTitle, modalContent) {
   })
 }
 
+/**
+ * 相册/相机：新版微信已弱化 scope.album / scope.camera，
+ * wx.authorize 常失败但 chooseMedia 仍可正常选文件。
+ * 仅当用户曾明确拒绝（authSetting === false）时引导去设置；未声明则直接放行。
+ */
+function ensureDeprecatedMediaScope(scope, modalTitle, modalContent) {
+  return new Promise((resolve) => {
+    if (typeof wx.getSetting !== 'function') {
+      resolve(true)
+      return
+    }
+    wx.getSetting({
+      success(setting) {
+        const st = setting.authSetting && setting.authSetting[scope]
+        if (st === false) {
+          wx.showModal({
+            title: modalTitle,
+            content: modalContent,
+            confirmText: '去设置',
+            success(modal) {
+              if (modal.confirm && typeof wx.openSetting === 'function') {
+                wx.openSetting({
+                  success(s) {
+                    resolve(!!(s.authSetting && s.authSetting[scope]))
+                  },
+                  fail: () => resolve(false),
+                })
+              } else {
+                resolve(false)
+              }
+            },
+            fail: () => resolve(false),
+          })
+          return
+        }
+        resolve(true)
+      },
+      fail: () => resolve(true),
+    })
+  })
+}
+
 function ensureAlbumPermission(purpose) {
   const hint = purpose || '上传图片或视频'
-  return ensureScopeAuthorized('scope.album', '需要相册权限', `请在设置中允许访问相册，以便${hint}`)
+  return ensureDeprecatedMediaScope('scope.album', '需要相册权限', `请在设置中允许访问相册，以便${hint}`)
 }
 
 function ensureCameraPermission(purpose) {
   const hint = purpose || '拍照或拍摄素材'
-  return ensureScopeAuthorized('scope.camera', '需要相机权限', `请在设置中允许使用相机，以便${hint}`)
+  return ensureDeprecatedMediaScope('scope.camera', '需要相机权限', `请在设置中允许使用相机，以便${hint}`)
 }
 
 function prepareMediaPick(opts) {
