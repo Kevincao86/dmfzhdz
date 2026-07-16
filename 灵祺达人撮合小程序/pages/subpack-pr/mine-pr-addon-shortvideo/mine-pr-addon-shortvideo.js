@@ -3,6 +3,7 @@ const prFeatureAccess = require('../../../utils/prFeatureAccess.js')
 const auth = require('../../../utils/auth.js')
 const media = require('../../../utils/mpAddonMedia.js')
 const iceApi = require('../../../utils/mpAddonIceApi.js')
+const addonApi = require('../../../utils/mpAddonMerchantApi.js')
 
 function newJobId() {
   return `ice-${Date.now()}-${Math.floor(Math.random() * 10000)}`
@@ -12,12 +13,14 @@ Page({
   behaviors: [require('../../../behaviors/identityTheme')],
   data: {
     mainPane: 'generate',
-    engine: 'qwen',
+    /** 与星选 ShortVideoOptimizationPage 一致：固定 Seedance */
+    engine: 'seedance',
     optPrompt: '',
     genPrompt: '',
     framePath: '',
     framePureB64: '',
-    durationSec: '5',
+    durationOptions: iceApi.SHORT_VIDEO_DURATION_OPTIONS || ['5', '10', '15'],
+    durationSec: '15',
     aspect: '9:16',
     busy: false,
     err: '',
@@ -33,7 +36,8 @@ Page({
     editCopy: '',
     editInstruction: '',
     iceAspectId: '9:16',
-    clipEndSec: 10,
+    mixTargetOptions: iceApi.MIX_TARGET_TOTAL_OPTIONS || [10, 20, 30, 45, 60],
+    clipEndSec: 20,
     icePreset: '无附加特效',
     batchEnabled: false,
     batchCount: 10,
@@ -83,9 +87,6 @@ Page({
   onPane(e) {
     this.setData({ mainPane: e.currentTarget.dataset.pane, err: '', progress: '', iceErr: '', iceProgress: '' })
   },
-  onEngine(e) {
-    this.setData({ engine: e.currentTarget.dataset.engine })
-  },
   onOptPrompt(e) {
     this.setData({ optPrompt: e.detail.value })
   },
@@ -93,7 +94,8 @@ Page({
     this.setData({ genPrompt: e.detail.value })
   },
   onDuration(e) {
-    this.setData({ durationSec: e.currentTarget.dataset.val })
+    const val = String(e.currentTarget.dataset.val || '15')
+    this.setData({ durationSec: val })
   },
   onAspect(e) {
     this.setData({ aspect: e.currentTarget.dataset.val })
@@ -216,7 +218,7 @@ Page({
     this.setData({ iceAspectId: e.currentTarget.dataset.id })
   },
   onClipEnd(e) {
-    this.setData({ clipEndSec: Number(e.currentTarget.dataset.val) || 10 })
+    this.setData({ clipEndSec: Number(e.currentTarget.dataset.val) || 20 })
   },
   onIcePreset(e) {
     this.setData({ icePreset: e.currentTarget.dataset.val })

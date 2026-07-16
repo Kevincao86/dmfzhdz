@@ -143,7 +143,10 @@ mine-pr-addon-digital-human
 mine-pr-addons
 mine-pr-addon-ai-content
 mpAddonRecruitOrders
+mpAddonIceApi
 mpPrivacyAuthorize
+OpsAccountsPermissionsPage
+opsStaffAuth
 addonCards
 mpFeatureFlags
 mpEmbedAddonAccess

@@ -11,14 +11,16 @@
   <block wx:if="{{mainPane === 'generate' && showShortvideo}}">
     <view class="addon-card">
       <text class="addon-card__title">视频 AI 引擎</text>
-      <view class="addon-pair">
-        <view class="addon-pair__opt {{engine === 'qwen' ? 'addon-pair__opt--on' : ''}}" data-engine="qwen" bindtap="onEngine">千问</view>
-        <view class="addon-pair__opt {{engine === 'seedance' ? 'addon-pair__opt--on' : ''}}" data-engine="seedance" bindtap="onEngine">豆包</view>
-      </view>
-      <text class="addon-label">成片时长</text>
+      <text class="addon-card__sub">即梦 / Seedance（与星选平台同源）</text>
+      <text class="addon-label">单段时长</text>
       <view class="addon-chips">
-        <view class="addon-chip {{durationSec === '5' ? 'addon-chip--on' : ''}}" data-val="5" bindtap="onDuration">5 秒</view>
-        <view class="addon-chip {{durationSec === '10' ? 'addon-chip--on' : ''}}" data-val="10" bindtap="onDuration">10 秒</view>
+        <view
+          wx:for="{{durationOptions}}"
+          wx:key="*this"
+          class="addon-chip {{durationSec === item ? 'addon-chip--on' : ''}}"
+          data-val="{{item}}"
+          bindtap="onDuration"
+        >{{item}} 秒</view>
       </view>
       <text class="addon-label">画面比例</text>
       <view class="addon-chips">
@@ -98,11 +100,15 @@
       <view class="addon-chips">
         <view wx:for="{{['9:16','16:9','1:1']}}" wx:key="*this" class="addon-chip {{iceAspectId === item ? 'addon-chip--on' : ''}}" data-id="{{item}}" bindtap="onIceAspect">{{item}}</view>
       </view>
-      <text class="addon-label">单段时长（秒）</text>
+      <text class="addon-label">目标总时长（秒）</text>
       <view class="addon-chips">
-        <view class="addon-chip {{clipEndSec === 10 ? 'addon-chip--on' : ''}}" data-val="10" bindtap="onClipEnd">10</view>
-        <view class="addon-chip {{clipEndSec === 15 ? 'addon-chip--on' : ''}}" data-val="15" bindtap="onClipEnd">15</view>
-        <view class="addon-chip {{clipEndSec === 30 ? 'addon-chip--on' : ''}}" data-val="30" bindtap="onClipEnd">30</view>
+        <view
+          wx:for="{{mixTargetOptions}}"
+          wx:key="*this"
+          class="addon-chip {{clipEndSec === item ? 'addon-chip--on' : ''}}"
+          data-val="{{item}}"
+          bindtap="onClipEnd"
+        >{{item}}</view>
       </view>
       <text class="addon-label">画面特效</text>
       <view class="addon-chips">

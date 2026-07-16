@@ -1,5 +1,5 @@
 import { Plus, Shield, Trash2, UserCog } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { cn } from '../../cn'
 import SecretInput from '../../components/SecretInput'
@@ -55,6 +55,7 @@ export default function OpsAccountsPermissionsPage() {
   const [editId, setEditId] = useState<string | null>(null)
   const [formErr, setFormErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const formPanelRef = useRef<HTMLElement | null>(null)
 
   const [form, setForm] = useState({
     phone: '',
@@ -127,6 +128,12 @@ export default function OpsAccountsPermissionsPage() {
     setEditId(null)
   }
 
+  const scrollFormIntoView = () => {
+    window.setTimeout(() => {
+      formPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 40)
+  }
+
   const openEdit = (a: OpsStaffAccount) => {
     setEditId(a.id)
     setCreateOpen(false)
@@ -142,6 +149,7 @@ export default function OpsAccountsPermissionsPage() {
       dataScope: a.dataScope ?? defaultDataScope(),
     })
     setFormErr(null)
+    scrollFormIntoView()
   }
 
   const toggleGrant = (key: OpsPermissionKey, field: 'view' | 'edit') => {
@@ -392,6 +400,7 @@ export default function OpsAccountsPermissionsPage() {
             onClick={() => {
               resetForm()
               setCreateOpen(true)
+              scrollFormIntoView()
             }}
             className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -475,10 +484,32 @@ export default function OpsAccountsPermissionsPage() {
       </section>
 
       {createOpen || editing ? (
-        <section className="rounded-xl border border-indigo-500/40 bg-slate-900 p-5">
-          <h2 className="mb-4 text-sm font-semibold text-slate-200">
-            {editing ? `编辑子账号 · ${editing.phone}` : '新建子账号'}
-          </h2>
+        <section
+          ref={formPanelRef}
+          className="rounded-xl border border-indigo-500/40 bg-slate-900 p-5 pb-24"
+        >
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-slate-200">
+              {editing ? `编辑子账号 · ${editing.phone}` : '新建子账号'}
+            </h2>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void (editing ? handleUpdate() : handleCreate())}
+                className="rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+              >
+                {busy ? '保存中…' : editing ? '保存' : '创建'}
+              </button>
+              <button
+                type="button"
+                onClick={resetForm}
+                className="rounded-lg border border-slate-600 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800"
+              >
+                取消
+              </button>
+            </div>
+          </div>
           <div className="grid gap-4 md:grid-cols-2">
             {!editing ? (
               <div>
@@ -590,7 +621,7 @@ export default function OpsAccountsPermissionsPage() {
             {form.dataScope.mode !== 'national' ? (
               <>
                 {form.dataScope.mode === 'provinces' || form.dataScope.mode === 'cities' ? (
-                  <div className="mb-2 flex flex-wrap gap-1.5">
+                  <div className="mb-2 flex max-h-40 flex-wrap gap-1.5 overflow-y-auto">
                     {provinceOpts.map((p) => (
                       <button
                         key={p}
@@ -618,7 +649,7 @@ export default function OpsAccountsPermissionsPage() {
                   </div>
                 ) : null}
                 {form.dataScope.mode === 'cities' ? (
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex max-h-48 flex-wrap gap-1.5 overflow-y-auto">
                     {cityOpts.map((c) => (
                       <button
                         key={c}
@@ -650,7 +681,7 @@ export default function OpsAccountsPermissionsPage() {
 
           {formErr ? <p className="mt-3 text-sm text-rose-400">{formErr}</p> : null}
 
-          <div className="mt-4 flex gap-2">
+          <div className="sticky bottom-0 z-20 -mx-5 mt-4 flex gap-2 border-t border-slate-800 bg-slate-900/95 px-5 py-3 backdrop-blur">
             <button
               type="button"
               disabled={busy}
