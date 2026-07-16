@@ -113,9 +113,15 @@
     <text class="vs-progress" wx:if="{{progress}}">{{progress}}</text>
     <text class="vs-err" wx:if="{{err}}">{{err}}</text>
     <view class="vs-result" wx:if="{{resultUrl}}">
-      <image class="vs-result__img" src="{{resultUrl}}" mode="widthFix" show-menu-by-longpress />
-      <button class="addon-btn" bindtap="onSaveAlbum">保存到相册</button>
-      <button class="addon-btn addon-btn--ghost" bindtap="onPreview">全屏预览</button>
+      <image
+        class="vs-result__img"
+        src="{{resultUrl}}"
+        mode="widthFix"
+        show-menu-by-longpress
+        bindtap="onPreview"
+      />
+      <view class="addon-btn vs-save-btn" hover-class="vs-save-btn--hover" catchtap="onSaveAlbum">保存到相册</view>
+      <view class="addon-btn addon-btn--ghost vs-save-btn" hover-class="vs-save-btn--hover" catchtap="onPreview">全屏预览</view>
     </view>
     <button class="addon-btn addon-btn--ghost" bindtap="onPrevStep">上一步</button>
   </view>

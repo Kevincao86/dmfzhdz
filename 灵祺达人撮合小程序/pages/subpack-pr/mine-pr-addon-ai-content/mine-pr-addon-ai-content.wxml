@@ -10,7 +10,7 @@
         </view>
       </view>
       <view class="addon-hero-brief__steps">
-        <text class="addon-hero-brief__step">{{isPr ? '选择招募订单' : '选择商单'}}</text>
+        <text class="addon-hero-brief__step">{{isPr ? '选择招募订单' : '选择已报名商单'}}</text>
         <text class="addon-hero-brief__step-arrow">›</text>
         <text class="addon-hero-brief__step">通读需求</text>
         <text class="addon-hero-brief__step-arrow">›</text>

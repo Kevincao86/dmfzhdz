@@ -141,6 +141,9 @@ mine-pr-addon-visual-studio
 mine-pr-addon-shortvideo
 mine-pr-addon-digital-human
 mine-pr-addons
+mine-pr-addon-ai-content
+mpAddonRecruitOrders
+mpPrivacyAuthorize
 addonCards
 mpFeatureFlags
 mpEmbedAddonAccess

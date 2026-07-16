@@ -230,49 +230,91 @@ Page({
     if (!this.data.resultUrl) return
     wx.previewImage({ urls: [this.data.resultUrl], current: this.data.resultUrl })
   },
+  _writeDataUrlTemp(dataUrl) {
+    return new Promise((resolve, reject) => {
+      const m = String(dataUrl || '').match(/^data:image\/(\w+);base64,(.+)$/i)
+      if (!m) {
+        reject(new Error('invalid_data_url'))
+        return
+      }
+      const ext = m[1] === 'png' ? 'png' : 'jpg'
+      const dest = `${wx.env.USER_DATA_PATH}/vs-save-${Date.now()}.${ext}`
+      wx.getFileSystemManager().writeFile({
+        filePath: dest,
+        data: m[2],
+        encoding: 'base64',
+        success: () => resolve(dest),
+        fail: (e) => reject(new Error((e && e.errMsg) || '写临时文件失败')),
+      })
+    })
+  },
+  _resolveLocalImagePath(url) {
+    const s = String(url || '').trim()
+    if (!s) return Promise.reject(new Error('empty'))
+    if (/^wxfile:|^http:\/\/tmp/i.test(s) || s.indexOf(wx.env.USER_DATA_PATH) === 0) {
+      return Promise.resolve(s)
+    }
+    if (s.startsWith('data:image/')) return this._writeDataUrlTemp(s)
+    return new Promise((resolve, reject) => {
+      wx.downloadFile({
+        url: s,
+        success: (res) => {
+          if (res.statusCode === 200 && res.tempFilePath) resolve(res.tempFilePath)
+          else reject(new Error('download_failed'))
+        },
+        fail: () => {
+          wx.getImageInfo({
+            src: s,
+            success: (info) => {
+              if (info && info.path) resolve(info.path)
+              else reject(new Error('download_failed'))
+            },
+            fail: () => reject(new Error('download_failed')),
+          })
+        },
+      })
+    })
+  },
   onSaveAlbum() {
     const url = this.data.resultUrl
     if (!url) return
-    wx.showLoading({ title: '保存中' })
-    const savePath = (filePath) => {
-      wx.saveImageToPhotosAlbum({
-        filePath,
-        success: () => wx.showToast({ title: '已保存', icon: 'success' }),
-        fail: (err) => {
-          const msg = String((err && err.errMsg) || '')
-          if (/auth deny|authorize/i.test(msg)) {
-            wx.showModal({
-              title: '需要相册权限',
-              content: '请在设置中允许保存到相册',
-              confirmText: '去设置',
-              success: (r) => {
-                if (r.confirm) wx.openSetting({})
-              },
-            })
-          } else {
-            wx.showToast({ title: '保存失败', icon: 'none' })
-          }
-        },
-        complete: () => wx.hideLoading(),
+    if (this._savingAlbum) return
+    this._savingAlbum = true
+    wx.showLoading({ title: '保存中', mask: true })
+    const finish = () => {
+      this._savingAlbum = false
+      wx.hideLoading()
+    }
+    const savePath = (filePath) =>
+      new Promise((resolve, reject) => {
+        wx.saveImageToPhotosAlbum({
+          filePath,
+          success: () => resolve(),
+          fail: (err) => reject(err),
+        })
       })
-    }
-    if (/^wxfile:|^http:\/\/tmp/i.test(url)) {
-      savePath(url)
-      return
-    }
-    wx.downloadFile({
-      url,
-      success: (res) => {
-        if (res.statusCode === 200 && res.tempFilePath) savePath(res.tempFilePath)
-        else {
-          wx.hideLoading()
-          wx.showToast({ title: '下载失败', icon: 'none' })
+
+    this._resolveLocalImagePath(url)
+      .then((filePath) => savePath(filePath))
+      .then(() => {
+        finish()
+        wx.showToast({ title: '已保存', icon: 'success' })
+      })
+      .catch((err) => {
+        finish()
+        const msg = String((err && err.errMsg) || (err && err.message) || err || '')
+        if (/auth deny|authorize|writePhotosAlbum/i.test(msg)) {
+          wx.showModal({
+            title: '需要相册权限',
+            content: '请在设置中允许保存到相册',
+            confirmText: '去设置',
+            success: (r) => {
+              if (r.confirm) wx.openSetting({})
+            },
+          })
+          return
         }
-      },
-      fail: () => {
-        wx.hideLoading()
-        wx.showToast({ title: '下载失败', icon: 'none' })
-      },
-    })
+        wx.showToast({ title: /download/i.test(msg) ? '下载失败，请长按图片保存' : '保存失败', icon: 'none' })
+      })
   },
 })

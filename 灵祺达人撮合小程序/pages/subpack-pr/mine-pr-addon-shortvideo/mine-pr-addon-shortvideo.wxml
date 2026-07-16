@@ -1,15 +1,14 @@
 <scroll-view class="addon-page addon-scroll {{lqThemeClass}}" scroll-y enhanced show-scrollbar="{{false}}">
   <view class="addon-mini-hero addon-mini-hero--violet">
     <text class="addon-mini-hero__title">短视频 AI 处理</text>
-    <text class="addon-mini-hero__sub">参考画面优化 · 文生/图生视频 · 灵祺 AI 云剪</text>
+    <text class="addon-mini-hero__sub">短视频生成 · AI 混剪</text>
   </view>
   <view class="addon-tabs">
-    <view wx:if="{{showShortvideo}}" class="addon-tab {{mainPane === 'optimize' ? 'addon-tab--on' : ''}}" data-pane="optimize" bindtap="onPane">参考画面优化</view>
     <view wx:if="{{showShortvideo}}" class="addon-tab {{mainPane === 'generate' ? 'addon-tab--on' : ''}}" data-pane="generate" bindtap="onPane">短视频生成</view>
-    <view wx:if="{{showCloudEdit}}" class="addon-tab {{mainPane === 'cloud' ? 'addon-tab--on' : ''}}" data-pane="cloud" bindtap="onPane">灵祺 AI 云剪</view>
+    <view wx:if="{{showCloudEdit}}" class="addon-tab {{mainPane === 'cloud' ? 'addon-tab--on' : ''}}" data-pane="cloud" bindtap="onPane">AI 混剪</view>
   </view>
 
-  <block wx:if="{{mainPane !== 'cloud' && showShortvideo}}">
+  <block wx:if="{{mainPane === 'generate' && showShortvideo}}">
     <view class="addon-card">
       <text class="addon-card__title">视频 AI 引擎</text>
       <view class="addon-pair">
@@ -29,28 +28,7 @@
       </view>
     </view>
 
-    <view class="addon-card" wx:if="{{mainPane === 'optimize'}}">
-      <text class="addon-card__title">参考画面优化</text>
-      <view class="addon-pair">
-        <button
-          class="addon-btn addon-btn--ghost addon-pick-btn"
-          bindtap="onPickRefImage"
-        >上传参考图</button>
-        <button
-          class="addon-btn addon-btn--ghost addon-pick-btn"
-          bindtap="onPickRefVideo"
-        >从视频取封面</button>
-      </view>
-      <image wx:if="{{framePath}}" class="addon-thumb" src="{{framePath}}" mode="aspectFill" />
-      <textarea class="addon-textarea" placeholder="描述镜头运动、主体动作、氛围等" value="{{optPrompt}}" bindinput="onOptPrompt" maxlength="800" />
-      <text class="addon-err" wx:if="{{err}}">{{err}}</text>
-      <text class="addon-progress" wx:if="{{progress}}">{{progress}}</text>
-      <button class="addon-btn" loading="{{busy}}" disabled="{{busy}}" bindtap="onGenerate">开始生成</button>
-      <video wx:if="{{resultUrl}}" class="addon-video" src="{{resultUrl}}" controls />
-      <button wx:if="{{resultUrl}}" class="addon-btn addon-btn--ghost" bindtap="onSaveVideo">保存到相册</button>
-    </view>
-
-    <view class="addon-card" wx:else>
+    <view class="addon-card">
       <text class="addon-card__title">文生 / 图生视频</text>
       <button
         class="addon-btn addon-btn--ghost addon-pick-btn"
@@ -66,9 +44,9 @@
     </view>
   </block>
 
-  <block wx:elif="{{showCloudEdit}}">
+  <block wx:elif="{{mainPane === 'cloud' && showCloudEdit}}">
     <view class="addon-card">
-      <text class="addon-card__title">灵祺 AI 云剪</text>
+      <text class="addon-card__title">AI 混剪</text>
       <text class="addon-card__sub">批量素材上传、AI 文案指令、阿里云 ICE 合成（与星选平台同源）</text>
       <view class="addon-warn" wx:if="{{!iceConfigured}}">运营台尚未配置 ICE，请联系灵祺运营开通云剪能力。</view>
       <view class="addon-tabs addon-tabs--inner">
