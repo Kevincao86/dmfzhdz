@@ -90,6 +90,56 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
     )
   }
 
+  if (m.role === 'tool_status') {
+    return (
+      <div className="flex justify-start">
+        <div className="max-w-[min(100%,42rem)] rounded-2xl border border-slate-200 bg-slate-50/95 px-4 py-2.5 text-[13px] text-slate-700 shadow-sm">
+          <p className="leading-relaxed">{m.content}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (m.role === 'needs_upload') {
+    return (
+      <div className="flex justify-start">
+        <div className="max-w-[min(100%,42rem)] rounded-2xl border border-amber-200/90 bg-amber-50/95 px-4 py-3 text-sm text-amber-950 shadow-sm ring-1 ring-amber-100/70">
+          <p className="mb-1 text-xs font-semibold text-amber-900">需要上传素材</p>
+          <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
+          {m.toolName ? (
+            <p className="mt-2 text-[11px] text-amber-800/80">工具：{m.toolName}</p>
+          ) : null}
+        </div>
+      </div>
+    )
+  }
+
+  if (m.role === 'tool_result') {
+    const imgs = m.imageUrls?.filter(Boolean) ?? []
+    return (
+      <div className="flex justify-start">
+        <div className="max-w-[min(100%,42rem)] rounded-2xl border border-indigo-200/90 bg-indigo-50/90 px-4 py-3 text-sm text-indigo-950 shadow-sm ring-1 ring-indigo-100/60">
+          <p className="mb-1 text-xs font-semibold text-indigo-900">
+            工具结果{m.toolName ? ` · ${m.toolName}` : ''}
+          </p>
+          {imgs.length > 0 ? (
+            <div className="mb-2 flex flex-wrap gap-2">
+              {imgs.map((src, i) => (
+                <img
+                  key={i}
+                  src={src}
+                  alt=""
+                  className="max-h-[min(70vh,28rem)] w-full max-w-full rounded-lg border border-indigo-100 object-contain"
+                />
+              ))}
+            </div>
+          ) : null}
+          <p className="whitespace-pre-wrap leading-relaxed">{formatAssistantDisplayText(m.content)}</p>
+        </div>
+      </div>
+    )
+  }
+
   const isUser = m.role === 'user'
   const isSystem = m.role === 'system'
   const imgs = m.imageUrls?.filter(Boolean) ?? []

@@ -27,6 +27,10 @@ export async function chatDeepseek(req: AIChatRequest, env: Record<string, strin
       ? { thinking: { type: 'enabled' }, reasoning_effort: 'medium' }
       : { thinking: { type: 'disabled' } }),
   }
+  if (req.tools?.length) {
+    body.tools = req.tools
+    if (req.tool_choice != null) body.tool_choice = req.tool_choice
+  }
 
   const r = await fetch(`${base}/chat/completions`, {
     method: 'POST',
@@ -50,14 +54,22 @@ export async function chatDeepseek(req: AIChatRequest, env: Record<string, strin
         : rawText.slice(0, 400)
     throw new Error(msg || `DeepSeek HTTP ${r.status}`)
   }
-  const choices = raw.choices as Array<{ message?: { content?: string } }> | undefined
-  const content = choices?.[0]?.message?.content ?? ''
+  const choices = raw.choices as Array<{
+    message?: {
+      content?: string
+      tool_calls?: AIChatResponse['tool_calls']
+    }
+  }> | undefined
+  const message = choices?.[0]?.message
+  const content = message?.content ?? ''
   const usage = raw.usage as Record<string, unknown> | undefined
+  const tool_calls = message?.tool_calls
   return {
     provider: 'deepseek',
     model: typeof raw.model === 'string' ? raw.model : model,
     content: typeof content === 'string' ? content : '',
     raw,
     usage,
+    ...(tool_calls?.length ? { tool_calls } : {}),
   }
 }

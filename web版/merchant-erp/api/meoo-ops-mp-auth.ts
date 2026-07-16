@@ -80,7 +80,10 @@ import { parseMpPointsUsageKind } from '../src/lib/mpPointsEconomics.js'
 import { loadWechatPayConfig } from '../src/lib/wechatPayV3.js'
 import { loadAlipayPayConfig } from '../src/lib/alipayPay.js'
 import { listMyPaymentOrdersFromSnapshot } from '../src/lib/mpMyPaymentOrdersGet.js'
-import { ensureMonthlyGiftPointsGranted } from '../src/lib/mpAiPointsSpendCore.js'
+import {
+  ensureMonthlyGiftPointsGranted,
+  reconcileAccountPointsBucketsWithLedger,
+} from '../src/lib/mpAiPointsSpendCore.js'
 import type { MpLibraryRole } from '../src/lib/mpMembershipCatalog.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 import type { RegistryMpTalentMember } from '../src/lib/opsRegistryTypes.js'
@@ -1353,8 +1356,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           : undefined
       const gift = ensureMonthlyGiftPointsGranted(data, account, { roleHint })
       const expired = expireStalePointsCheckoutsInSnapshot(data)
+      const reconciled = reconcileAccountPointsBucketsWithLedger(data, account, { roleHint })
       const orders = listMyPaymentOrdersFromSnapshot(data, account, { roleHint })
-      if (gift.granted > 0 || expired) {
+      if (gift.granted > 0 || expired || reconciled) {
         await io.save(data)
       }
       sendJson(res, 200, { ok: true, ...orders })

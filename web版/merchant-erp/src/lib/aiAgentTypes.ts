@@ -67,7 +67,15 @@ export const AI_AGENT_SHORTCUTS: { type: AiTaskType; label: string }[] = [
 ]
 
 /** 对话与任务流消息角色 */
-export type AiAgentMessageRole = 'user' | 'assistant' | 'system' | 'task_preview' | 'task_result'
+export type AiAgentMessageRole =
+  | 'user'
+  | 'assistant'
+  | 'system'
+  | 'task_preview'
+  | 'task_result'
+  | 'tool_status'
+  | 'tool_result'
+  | 'needs_upload'
 
 /** 场景任务预览确认状态（每项任务独立） */
 export type AiPreviewStatus = 'pending' | 'confirmed' | 'cancelled'
@@ -196,6 +204,10 @@ export type AiAgentMessage = {
   thinkingText?: string
   /** 达人招募确认后的订单明细（仅 task_result） */
   recruitmentOrder?: AiRecruitmentOrderDetail
+  /** tool_status / tool_result / needs_upload 关联的工具名 */
+  toolName?: string
+  /** 结构化工具结果（可选） */
+  toolResult?: Record<string, unknown>
 }
 
 /** 侧边栏「历史对话」快照（条数由上下文裁剪，最多 10 条） */
@@ -228,7 +240,14 @@ export function createAgentMessage(
   extra?: Partial<
     Pick<
       AiAgentMessage,
-      'preview' | 'previewStatus' | 'resultSummary' | 'recruitmentOrder' | 'imageUrls' | 'videoUrls'
+      | 'preview'
+      | 'previewStatus'
+      | 'resultSummary'
+      | 'recruitmentOrder'
+      | 'imageUrls'
+      | 'videoUrls'
+      | 'toolName'
+      | 'toolResult'
     >
   >,
 ): AiAgentMessage {

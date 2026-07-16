@@ -18,6 +18,7 @@ const opsBroadcastHomePopup = require('../../utils/opsBroadcastHomePopup.js')
 const mpPlatformDecor = require('../../utils/mpPlatformDecor.js')
 const memberStore = require('../../utils/talentMember.js')
 const regionFilterPicker = require('../../utils/regionFilterPicker.js')
+const hallRegionLocate = require('../../utils/hallRegionLocate.js')
 const budgetDisplayUtil = require('../../utils/recruitmentBudgetDisplay.js')
 
 const HOME_CATEGORY_CHIPS = [
@@ -175,6 +176,21 @@ Page({
     regionState.regionFilterLabel = '城市'
     this.setData(regionState)
     console.log('[mp] build', mpBuild.ID)
+    void this.applyHallLocateFilter()
+  },
+  async applyHallLocateFilter() {
+    try {
+      const hit = await hallRegionLocate.resolveHallRegionFilter()
+      if (!hit || !hit.province) return
+      const regionState = regionFilterPicker.initRegionFilterState(hit.province, hit.city || '全部')
+      if (regionState.filterProvince === '全部' && regionState.filterCity === '全部') {
+        regionState.regionFilterLabel = '城市'
+      }
+      this.setData(regionState)
+      this.applyFilters()
+    } catch (e) {
+      console.warn('[index] hall locate', e)
+    }
   },
   onShareAppMessage() {
     mpShare.enableShareMenu()
@@ -547,6 +563,9 @@ Page({
     )
     if (next.filterProvince === '全部' && next.filterCity === '全部') {
       next.regionFilterLabel = '城市'
+      hallRegionLocate.clearStoredFilter()
+    } else {
+      hallRegionLocate.writeStoredFilter(next.filterProvince, next.filterCity)
     }
     this.setData(next)
     this.applyFilters()

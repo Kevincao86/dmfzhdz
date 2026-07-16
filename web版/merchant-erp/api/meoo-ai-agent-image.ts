@@ -77,7 +77,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
   const refRaw = typeof body.reference_image === 'string' ? body.reference_image.trim() : ''
   if (refRaw.length > 2_800_000) {
-    sendMerchantJson(res, 400, { ok: false, error: 'reference_image_too_large' })
+    sendMerchantJson(res, 400, {
+      ok: false,
+      error: 'reference_image_too_large',
+      message: '参考图过大，请压缩后再试（建议边长不超过 1280 像素）',
+    })
     return
   }
   const referenceImage = refRaw.length > 0 ? refRaw : undefined

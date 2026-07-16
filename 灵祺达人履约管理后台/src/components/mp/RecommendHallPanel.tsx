@@ -29,6 +29,12 @@ import { useRecruitmentNav } from '../../lib/useRecruitmentNav'
 import { showDemoOrders } from '../../lib/mpDemoMode'
 import { canUsePrRecommendHall } from '../../lib/prFeatureAccess'
 import PrFeatureLocked from './PrFeatureLocked'
+import {
+  clearStoredHallRegion,
+  resolveHallRegionFilter,
+  writeStoredHallRegion,
+} from '../../lib/mpSync/hallRegionLocate'
+import { findProvinceForCity } from '../../lib/mpSync/chinaRegion'
 
 type FilterMenu = 'platform' | 'category' | 'budget' | 'city' | null
 
@@ -40,6 +46,23 @@ function SupplierRecommendOrders() {
   const [filterPlatform, setFilterPlatform] = useState('全部')
   const [filterCategory, setFilterCategory] = useState('全部')
   const [filterCity, setFilterCity] = useState('全部')
+
+  useEffect(() => {
+    let cancelled = false
+    void resolveHallRegionFilter().then((hit) => {
+      if (cancelled || !hit?.city) return
+      setFilterCity(hit.city)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const setFilterCityPersist = useCallback((c: string) => {
+    setFilterCity(c)
+    if (c === '全部') clearStoredHallRegion()
+    else writeStoredHallRegion(findProvinceForCity(c) || '全部', c)
+  }, [])
   const [priceSelected, setPriceSelected] = useState<string[]>([])
   const [openMenu, setOpenMenu] = useState<FilterMenu>(null)
   const [showPriceSheet, setShowPriceSheet] = useState(false)
@@ -308,7 +331,7 @@ function SupplierRecommendOrders() {
                 <span className="recommend-hall-filter-v2__arrow" aria-hidden>▾</span>
               </button>
               {openMenu === 'city'
-                ? renderFilterMenu(cityFilterOptions, filterCity, setFilterCity)
+                ? renderFilterMenu(cityFilterOptions, filterCity, setFilterCityPersist)
                 : null}
             </div>
           </div>

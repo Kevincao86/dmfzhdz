@@ -13,6 +13,7 @@ import {
   describeDirectLlmKeyDebug,
   formatDirectLlmKeyDebugHint,
 } from './directLlmKeyDebug.js'
+import { extractToolCallsFromChatRaw } from '../../src/lib/aiAgentTools/extractToolCalls.js'
 
 export async function runMeooAiChatCore(
   bodyRaw: string,
@@ -50,12 +51,20 @@ export async function runMeooAiChatCore(
 
   try {
     const res = await routeAiChat(req, chatEnv)
+    const toolCalls =
+      res.tool_calls?.length
+        ? res.tool_calls
+        : extractToolCallsFromChatRaw(res.raw)
     /** 勿把 SDK 完整 raw 对象写入 HTTP 响应：常含循环引用，JSON.stringify 会抛错导致 Vercel 500 */
     const okBody: Record<string, unknown> = {
       ok: true,
       provider: res.provider,
       model: res.model,
       content: res.content,
+    }
+    if (toolCalls.length) {
+      // 服务端不执行工具：媒体/商品 OSS·ICE 留在浏览器会话由客户端执行
+      okBody.tool_calls = toolCalls
     }
     const usageSafe = sanitizeTokenUsage(res.usage)
     if (usageSafe) okBody.usage = usageSafe
@@ -69,7 +78,11 @@ export async function runMeooAiChatCore(
       provider: res.provider,
       modelFamily: req.modelFamily ?? null,
       model: res.model,
-      outputSummary: summarizeText(res.content),
+      outputSummary: summarizeText(
+        toolCalls.length
+          ? `${res.content || ''} [tool_calls:${toolCalls.map((t) => t.function.name).join(',')}]`
+          : res.content,
+      ),
       tokenUsage: usageSafe ?? null,
       status: 'ok',
     })

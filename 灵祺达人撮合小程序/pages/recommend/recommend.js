@@ -27,6 +27,7 @@ const recommendPageMode = require('../../utils/recommendPageMode.js')
 const prFeatureAccess = require('../../utils/prFeatureAccess.js')
 const sessionStore = require('../../utils/mpSessionStore.js')
 const regionFilterPicker = require('../../utils/regionFilterPicker.js')
+const hallRegionLocate = require('../../utils/hallRegionLocate.js')
 
 function buildPrHotTalentRows(rows, limit = 9) {
   const list = (rows || []).filter((r) => r && !r.isPreview)
@@ -672,6 +673,22 @@ Page({
       isPrMode: mode.isPrMode,
       talentTestMode: mode.talentTestMode,
     })
+    void this.applyHallLocateFilter()
+  },
+  async applyHallLocateFilter() {
+    try {
+      const hit = await hallRegionLocate.resolveHallRegionFilter()
+      if (!hit || !hit.province) return
+      const regionState = regionFilterPicker.initRegionFilterState(hit.province, hit.city || '全部')
+      if (regionState.filterProvince === '全部' && regionState.filterCity === '全部') {
+        regionState.regionFilterLabel = '地区'
+      }
+      this.setData(regionState)
+      if (this.data.isPrMode) this.applyTalentFilters()
+      else this.applyOrderFilters()
+    } catch (e) {
+      console.warn('[recommend] hall locate', e)
+    }
   },
   onShareAppMessage() {
     mpShare.enableShareMenu()
@@ -1324,13 +1341,22 @@ Page({
     )
     if (next.filterProvince === '全部' && next.filterCity === '全部') {
       next.regionFilterLabel = '地区'
+      hallRegionLocate.clearStoredFilter()
+    } else {
+      hallRegionLocate.writeStoredFilter(next.filterProvince, next.filterCity)
     }
     this.setData(next)
     if (this.data.isPrMode) this.applyTalentFilters()
     else this.applyOrderFilters()
   },
   onCityFilter(e) {
-    this.setData({ filterCity: this.data.cityFilters[Number(e.detail.value)] || '全部' })
+    const filterCity = this.data.cityFilters[Number(e.detail.value)] || '全部'
+    this.setData({ filterCity })
+    if (filterCity === '全部' && this.data.filterProvince === '全部') {
+      hallRegionLocate.clearStoredFilter()
+    } else {
+      hallRegionLocate.writeStoredFilter(this.data.filterProvince, filterCity)
+    }
     if (this.data.isPrMode) this.applyTalentFilters()
     else this.applyOrderFilters()
   },

@@ -54,6 +54,11 @@ import { openTalentProfileHref, shortProfileLinkButtonLabel } from '../../lib/mp
 import HallCityFilter from './HallCityFilter'
 import PrMatchOrderPicker from './PrMatchOrderPicker'
 import { EmptyState } from '../ui/MockupLayouts'
+import {
+  clearStoredHallRegion,
+  resolveHallRegionFilter,
+  writeStoredHallRegion,
+} from '../../lib/mpSync/hallRegionLocate'
 
 const TAG_FILTERS = ['全部', '优质', '推荐', '新锐', '会员', '美食', '亲子', '美妆']
 const GENDER_FILTERS = ['全部', '男', '女']
@@ -143,6 +148,17 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
   const [filterPlatform, setFilterPlatform] = useState('全部')
   const [filterProvince, setFilterProvince] = useState('全部')
   const [filterCity, setFilterCity] = useState('全部')
+  useEffect(() => {
+    let cancelled = false
+    void resolveHallRegionFilter().then((hit) => {
+      if (cancelled || !hit) return
+      setFilterProvince(hit.province || '全部')
+      setFilterCity(hit.city || '全部')
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
   const [filterTag, setFilterTag] = useState('全部')
   const [filterGender, setFilterGender] = useState('全部')
   const [filterFollowers, setFilterFollowers] = useState('全部')
@@ -594,6 +610,8 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
             onChange={(prov, c) => {
               setFilterProvince(prov)
               setFilterCity(c)
+              if (prov === '全部' && c === '全部') clearStoredHallRegion()
+              else writeStoredHallRegion(prov, c)
             }}
           />
         </label>

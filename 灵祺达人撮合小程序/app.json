@@ -111,7 +111,9 @@
     "wxfaa08012777a431e"
   ],
   "requiredPrivateInfos": [
-    "chooseLocation"
+    "chooseLocation",
+    "getFuzzyLocation",
+    "getLocation"
   ],
   "permission": {
     "scope.album": {
@@ -124,7 +126,10 @@
       "desc": "用于将 AI 生成视频保存到相册"
     },
     "scope.userLocation": {
-      "desc": "用于发招募单时选择商家位置，便于达人导航到店"
+      "desc": "用于大厅按当前城市筛选商单/达人，以及发招募时选择商家位置"
+    },
+    "scope.userFuzzyLocation": {
+      "desc": "用于招募大厅与推荐大厅自动定位到当前城市"
     }
   },
   "usingComponents": {

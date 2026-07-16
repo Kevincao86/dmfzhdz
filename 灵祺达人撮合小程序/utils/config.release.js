@@ -9,10 +9,10 @@ module.exports = {
   /** 仅开发者工具内可选 IP 直连（真机须合法域名） */
   MP_ERP_IP: '139.196.42.5',
   MP_ERP_HOST: 'mofangdianai.com',
-  MP_BUILD_ID: 'mp-20260626-oss-hardlock',
-  /** 模拟定位已移除：资料页仅手动选择省/市 */
-  MP_USE_FUZZY_LOCATION: false,
-  MP_IP_LOCATE_ENABLED: false,
+  MP_BUILD_ID: 'mp-20260717-hall-locate-points',
+  /** 大厅默认筛选：模糊定位优先，失败再 IP */
+  MP_USE_FUZZY_LOCATION: true,
+  MP_IP_LOCATE_ENABLED: true,
   /** 分享封面远程 CDN（可选）；默认走 RECRUIT_COVER_CDN_BASE/share/… */
   MP_SHARE_COVER_URL: '',
   /** 星选 Web / ECS 静态封面（真机 downloadFile 合法域名，优先于 OSS） */
