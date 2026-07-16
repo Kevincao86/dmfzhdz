@@ -14,6 +14,7 @@ import {
   applySpendPackageFirstToTarget,
   grantPackagePointsDeltaToTarget,
   readMpPointsBucketsForTarget,
+  writeMpPointsBucketsToTarget,
   type MpPointsBuckets,
 } from './mpAiPointsBuckets.js'
 import {
@@ -75,6 +76,48 @@ export function readAccountMpAiPointsBalance(
   opts?: { roleHint?: MpLibraryRole | null },
 ): number {
   return readAccountMpPointsBuckets(data, account, opts).total
+}
+
+/**
+ * 流水已扣但桶未同步时：以同账号最新 ledger.balanceAfter 纠偏套餐/充值桶。
+ * 返回是否写入了 registry（调用方决定是否 save）。
+ */
+export function reconcileAccountPointsBucketsWithLedger(
+  data: RegistrySnapshot,
+  account: MpAccountRow,
+  opts?: { roleHint?: MpLibraryRole | null },
+): boolean {
+  const accountId = String(account.id || '').trim()
+  if (!accountId) return false
+  const role = resolvePointsLibraryRole(data, account, opts)
+  const target = resolveRegistryTargetIdForAccount(data, account, role)
+  if (!target) return false
+
+  const latest = (data.mpAiPointsSpendLedger ?? []).find(
+    (row) => String(row.accountId || '').trim() === accountId,
+  )
+  if (!latest) return false
+  const after = Math.max(0, Math.floor(Number(latest.balanceAfter) || 0))
+  const buckets = readMpPointsBucketsForTarget(data, role, target)
+  if (buckets.total === after) return false
+  // 仅在「桶高于流水剩余」时纠偏（避免覆盖充值到账尚未写入流水的场景）
+  if (buckets.total < after) return false
+
+  const needReduce = buckets.total - after
+  let pkg = buckets.package
+  let rech = buckets.recharge
+  const fromPkg = Math.min(pkg, needReduce)
+  pkg -= fromPkg
+  rech -= needReduce - fromPkg
+  if (rech < 0) {
+    pkg = Math.max(0, pkg + rech)
+    rech = 0
+  }
+  return writeMpPointsBucketsToTarget(data, role, target, {
+    package: pkg,
+    recharge: rech,
+    total: pkg + rech,
+  })
 }
 
 export function resolveAccountLibraryRole(data: RegistrySnapshot, account: MpAccountRow): MpLibraryRole {

@@ -26,6 +26,11 @@ import { EmptyState, FilterToolbar, StatusTabBar } from '../ui/MockupLayouts'
 import { showDemoOrders } from '../../lib/mpDemoMode'
 import { useRecruitmentNav } from '../../lib/useRecruitmentNav'
 import { resolveOrderCoverUrl } from '../../lib/mpSync/recruitCoverLibrary'
+import {
+  clearStoredHallRegion,
+  resolveHallRegionFilter,
+  writeStoredHallRegion,
+} from '../../lib/mpSync/hallRegionLocate'
 
 type HallTab = 'normal' | 'urgent' | 'paichian'
 type PaichianSubTab = 'shoot' | 'edit' | 'ice'
@@ -93,6 +98,18 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
   const [iceRows, setIceRows] = useState<RecruitmentOrderRow[]>([])
   const [displayRows, setDisplayRows] = useState<RecruitmentOrderRow[]>([])
   const [mpById, setMpById] = useState<Map<string, Record<string, unknown>>>(new Map())
+
+  useEffect(() => {
+    let cancelled = false
+    void resolveHallRegionFilter().then((hit) => {
+      if (cancelled || !hit) return
+      setFilterProvince(hit.province || '全部')
+      setFilterCity(hit.city || '全部')
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const filterOpts = useMemo(
     () => ({
@@ -293,6 +310,8 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
           onChange={(prov, c) => {
             setFilterProvince(prov)
             setFilterCity(c)
+            if (prov === '全部' && c === '全部') clearStoredHallRegion()
+            else writeStoredHallRegion(prov, c)
           }}
         />
         <select

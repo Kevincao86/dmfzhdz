@@ -16,10 +16,10 @@ import {
   compressImageBlobToJpeg,
   fetchImageBlob,
   pngBlobFromImageUrl,
-  readFileAsDataUrl,
   sliceCarouselFiveStrips,
   triggerBlobDownload,
 } from '../lib/aiImageDelivery'
+import { compressImageFileToDataUrl } from '../lib/aiImageCompress'
 import {
   applyIndustryChange,
   applyIndustrySubChange,
@@ -491,9 +491,17 @@ export default function AiImageStudioPage() {
   const onPickProductFiles = async (files: FileList | null) => {
     if (!files?.length) return
     const next = [...productRefs]
-    for (const file of Array.from(files)) {
-      if (!file.type.startsWith('image/')) continue
-      next.push({ id: `${Date.now()}-${Math.random()}`, dataUrl: await readFileAsDataUrl(file), name: file.name })
+    try {
+      for (const file of Array.from(files)) {
+        if (!file.type.startsWith('image/')) continue
+        // 压缩后再存，避免 data URL 过大导致图生图 reference_image_too_large
+        const dataUrl = await compressImageFileToDataUrl(file, 1280, 0.82)
+        next.push({ id: `${Date.now()}-${Math.random()}`, dataUrl, name: file.name })
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '参考图处理失败'
+      setRefAnalyzeHint(msg)
+      return
     }
     setProductRefs(next)
     const first = next[0]?.dataUrl

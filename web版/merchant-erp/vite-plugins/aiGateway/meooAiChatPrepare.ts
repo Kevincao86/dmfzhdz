@@ -147,6 +147,9 @@ export async function prepareMeooAiChat(
     }
   }
 
+  const tools = Array.isArray(parsed.tools) ? parsed.tools : undefined
+  const tool_choice = parsed.tool_choice
+
   const req: AIChatRequest = {
     provider,
     model: rawModel ? rawModel : undefined,
@@ -161,6 +164,8 @@ export async function prepareMeooAiChat(
     stream: parsed.stream === true,
     taskType,
     ...(taskTypes?.length ? { taskTypes } : {}),
+    ...(tools?.length ? { tools } : {}),
+    ...(tool_choice != null ? { tool_choice } : {}),
   }
 
   return { ok: true, user, req, chatEnv, env, usageCtx }

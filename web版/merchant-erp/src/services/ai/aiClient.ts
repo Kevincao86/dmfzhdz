@@ -104,13 +104,14 @@ export async function postAiChat(
         json = null
       }
       if (res.ok && json && typeof json === 'object' && (json as { ok?: boolean }).ok === true) {
-        const b = json as AIChatOkBody
+        const b = json as AIChatOkBody & { tool_calls?: AIChatResponse['tool_calls'] }
         return {
           provider: b.provider,
           model: b.model,
-          content: b.content,
+          content: b.content ?? '',
           raw: b.raw,
           usage: b.usage,
+          ...(b.tool_calls?.length ? { tool_calls: b.tool_calls } : {}),
         }
       }
       if (res.status !== 404) {

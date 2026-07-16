@@ -18,6 +18,31 @@ export type AIMessageRole = 'system' | 'user' | 'assistant' | 'tool'
 export type AIMessage = {
   role: AIMessageRole
   content: string
+  /** assistant 发起的 tool_calls（多轮时回传） */
+  tool_calls?: AIToolCall[]
+  /** role=tool 时对应的 call id */
+  tool_call_id?: string
+  name?: string
+}
+
+/** OpenAI-compatible function tool call */
+export type AIToolCall = {
+  id: string
+  type: 'function'
+  function: {
+    name: string
+    arguments: string
+  }
+}
+
+/** OpenAI Chat Completions tools 项 */
+export type AIChatTool = {
+  type: 'function'
+  function: {
+    name: string
+    description: string
+    parameters: Record<string, unknown>
+  }
 }
 
 export type AIChatRequest = {
@@ -39,6 +64,9 @@ export type AIChatRequest = {
   agentPickerKey?: string
   /** 客户端已知租户 id 时传入，便于 Vercel 服务端经 RLS 校验（与 MembershipContext 一致） */
   tenantId?: string
+  /** OpenAI-compatible tools；有则透传上游，服务端不执行 */
+  tools?: AIChatTool[]
+  tool_choice?: 'none' | 'auto' | 'required' | { type: 'function'; function: { name: string } }
 }
 
 export type AIChatResponse = {
@@ -47,6 +75,8 @@ export type AIChatResponse = {
   content: string
   raw?: Record<string, unknown>
   usage?: Record<string, unknown>
+  /** 上游返回的 tool_calls（客户端执行，服务端不代跑） */
+  tool_calls?: AIToolCall[]
 }
 
 export type AIChatErrorBody = {

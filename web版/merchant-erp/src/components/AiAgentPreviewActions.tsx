@@ -22,6 +22,7 @@ export function AiAgentPreviewActions({
     previewSubmitPlatforms,
     togglePreviewSubmitPlatform,
     confirmPendingTask,
+    submitPendingTaskToPlatforms,
     modifyPendingTask,
     cancelPendingTask,
     isPreviewLoading,
@@ -32,14 +33,15 @@ export function AiAgentPreviewActions({
   const taskType = previewMsg?.preview?.taskType ?? null
   const loading = isPreviewLoading(previewMessageId)
   const confirming = isPreviewConfirming(previewMessageId)
+  const isProduct = taskType === 'create_product'
 
   const confirmLabel =
     confirmLabelOverride ??
     (loading
       ? '正在生成预览…'
       : confirming
-        ? taskType === 'create_product'
-          ? '正在保存至草稿箱…'
+        ? isProduct
+          ? '处理中…'
           : '正在生成订单…'
         : aiTaskConfirmLabel(taskType))
 
@@ -50,7 +52,7 @@ export function AiAgentPreviewActions({
       {showProductPlatforms ? (
         <div>
           <p className="mb-2 text-[11px] font-medium text-slate-600">
-            草稿归属平台（可多选，保存后请在商品列表选择类目提交）
+            目标平台（可多选；提交至平台前请确认类目/门店已在「创建商品」页配置过）
           </p>
           <div className="flex flex-wrap gap-2">
             {selectablePlatforms.map((p) => {
@@ -82,17 +84,44 @@ export function AiAgentPreviewActions({
       ) : null}
 
       <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => confirmPendingTask(previewMessageId)}
-          disabled={confirmDisabled}
-          className={cn(
-            'rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-xs font-medium text-white shadow-sm hover:brightness-110',
-            confirmDisabled && 'cursor-not-allowed opacity-50',
-          )}
-        >
-          {confirmLabel}
-        </button>
+        {isProduct ? (
+          <>
+            <button
+              type="button"
+              onClick={() => confirmPendingTask(previewMessageId, { productSubmitMode: 'draft' })}
+              disabled={confirmDisabled}
+              className={cn(
+                'rounded-xl border border-indigo-200 bg-white px-4 py-2 text-xs font-medium text-indigo-800 hover:bg-indigo-50',
+                confirmDisabled && 'cursor-not-allowed opacity-50',
+              )}
+            >
+              {confirming ? '处理中…' : '保存至草稿'}
+            </button>
+            <button
+              type="button"
+              onClick={() => submitPendingTaskToPlatforms(previewMessageId)}
+              disabled={confirmDisabled}
+              className={cn(
+                'rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-xs font-medium text-white shadow-sm hover:brightness-110',
+                confirmDisabled && 'cursor-not-allowed opacity-50',
+              )}
+            >
+              {confirming ? '提交中…' : '提交至平台'}
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={() => confirmPendingTask(previewMessageId)}
+            disabled={confirmDisabled}
+            className={cn(
+              'rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-xs font-medium text-white shadow-sm hover:brightness-110',
+              confirmDisabled && 'cursor-not-allowed opacity-50',
+            )}
+          >
+            {confirmLabel}
+          </button>
+        )}
         <button
           type="button"
           onClick={() => modifyPendingTask(previewMessageId)}

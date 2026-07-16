@@ -56,12 +56,16 @@ export async function chatKimi(req: AIChatRequest, env: Record<string, string>):
             model,
             messages,
             temperature,
+            ...(req.tools?.length
+              ? { tools: req.tools, tool_choice: req.tool_choice }
+              : {}),
           })
           return {
             provider: 'kimi',
             model: completion.model,
             content: completion.content,
             raw: completion.raw,
+            ...(completion.tool_calls?.length ? { tool_calls: completion.tool_calls } : {}),
           }
         } catch (e) {
           lastErr = e instanceof Error ? e.message : String(e)

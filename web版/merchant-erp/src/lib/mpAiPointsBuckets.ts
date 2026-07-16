@@ -54,13 +54,13 @@ export function currentGiftMonthKey(d = new Date()): string {
   return shanghaiDateString(d).slice(0, 7)
 }
 
-function syncTalentEntryBalance(data: RegistrySnapshot, targetId: string, total: number): void {
+function syncTalentEntryBalance(data: RegistrySnapshot, targetId: string, buckets: MpPointsBuckets): void {
   const id = String(targetId || '').trim()
   if (!id) return
   const entries = data.talentLibraryEntries ?? []
   const eidx = entries.findIndex((e) => e.id === id || String(e.lingqiTalentId || '').trim() === id)
   if (eidx < 0) return
-  entries[eidx] = { ...entries[eidx]!, mpAiPointsBalance: total }
+  entries[eidx] = withPointsBuckets({ ...entries[eidx]! } as RegistryTalentLibraryEntry, buckets)
   data.talentLibraryEntries = entries
 }
 
@@ -92,6 +92,59 @@ export function readMpPointsBucketsForTarget(
   if (!entry?.memberId) return { package: 0, recharge: 0, total: 0 }
   const member = (data.mpTalentMembers ?? []).find((m) => m.id === entry.memberId)
   return readPointsBuckets(member)
+}
+
+/** 将双桶写回计费目标（用于流水对齐纠偏） */
+export function writeMpPointsBucketsToTarget(
+  data: RegistrySnapshot,
+  role: MpLibraryRole,
+  targetId: string,
+  buckets: MpPointsBuckets,
+): boolean {
+  const id = String(targetId || '').trim()
+  if (!id) return false
+  const next = {
+    package: Math.max(0, Math.floor(Number(buckets.package) || 0)),
+    recharge: Math.max(0, Math.floor(Number(buckets.recharge) || 0)),
+    total: Math.max(0, Math.floor(Number(buckets.total) || 0)),
+  }
+  next.total = next.package + next.recharge
+
+  if (role === 'pr') {
+    const users = data.mpPrUsers ?? []
+    const idx = users.findIndex((u) => u.id === id || u.lingqiPrId === id)
+    if (idx < 0) return false
+    users[idx] = withPointsBuckets({ ...users[idx]!, updatedAt: new Date().toISOString() }, next)
+    data.mpPrUsers = users
+    return true
+  }
+
+  if (role === 'talent') {
+    const members = data.mpTalentMembers ?? []
+    const midx = members.findIndex((m) => m.id === id || String(m.lingqiTalentId || '').trim() === id)
+    if (midx >= 0) {
+      members[midx] = withPointsBuckets({ ...members[midx]!, updatedAt: new Date().toISOString() }, next)
+      data.mpTalentMembers = members
+      syncTalentEntryBalance(data, id, next)
+      return true
+    }
+    const entries = data.talentLibraryEntries ?? []
+    const eidx = entries.findIndex((e) => e.id === id || String(e.lingqiTalentId || '').trim() === id)
+    if (eidx < 0) return false
+    entries[eidx] = withPointsBuckets({ ...entries[eidx]! } as RegistryTalentLibraryEntry, next)
+    data.talentLibraryEntries = entries
+    return true
+  }
+
+  const listKey = role === 'shoot' ? 'shootTeamLibraryEntries' : 'editTeamLibraryEntries'
+  const teamEntry = (data[listKey] ?? []).find((e) => e.id === id)
+  if (!teamEntry?.memberId) return false
+  const members = data.mpTalentMembers ?? []
+  const midx = members.findIndex((m) => m.id === teamEntry.memberId)
+  if (midx < 0) return false
+  members[midx] = withPointsBuckets({ ...members[midx]!, updatedAt: new Date().toISOString() }, next)
+  data.mpTalentMembers = members
+  return true
 }
 
 export type PointsBucketMutationResult =
@@ -159,7 +212,7 @@ export function applyPackageGrantToTarget(
       }
       members[midx] = withPointsBuckets({ ...prev, updatedAt: new Date().toISOString() }, next, patch)
       data.mpTalentMembers = members
-      syncTalentEntryBalance(data, id, next.total)
+      syncTalentEntryBalance(data, id, next)
       return { ok: true, buckets: next, granted: delta }
     }
 
@@ -248,8 +301,7 @@ export function applyRechargeCreditToTarget(
       members[midx] = withPointsBuckets({ ...prev, updatedAt: new Date().toISOString() }, next)
       data.mpTalentMembers = members
       if (eidx >= 0) {
-        entries[eidx] = { ...entries[eidx]!, mpAiPointsBalance: next.total }
-        data.talentLibraryEntries = entries
+        syncTalentEntryBalance(data, id, next)
       }
       return { ok: true, buckets: next }
     }
@@ -268,8 +320,7 @@ export function applyRechargeCreditToTarget(
           }
           members[mi] = withPointsBuckets({ ...member, updatedAt: new Date().toISOString() }, next)
           data.mpTalentMembers = members
-          entries[eidx] = { ...entry, mpAiPointsBalance: next.total }
-          data.talentLibraryEntries = entries
+          syncTalentEntryBalance(data, id, next)
           return { ok: true, buckets: next }
         }
       }
@@ -342,8 +393,7 @@ export function applySpendPackageFirstToTarget(
       members[midx] = withPointsBuckets({ ...prev, updatedAt: new Date().toISOString() }, next)
       data.mpTalentMembers = members
       if (eidx >= 0) {
-        entries[eidx] = { ...entries[eidx]!, mpAiPointsBalance: next.total }
-        data.talentLibraryEntries = entries
+        syncTalentEntryBalance(data, id, next)
       }
       return { ok: true, buckets: next }
     }
@@ -359,8 +409,7 @@ export function applySpendPackageFirstToTarget(
           if (!next) return { ok: false, error: 'insufficient_points' }
           members[mi] = withPointsBuckets({ ...member, updatedAt: new Date().toISOString() }, next)
           data.mpTalentMembers = members
-          entries[eidx] = { ...entry, mpAiPointsBalance: next.total }
-          data.talentLibraryEntries = entries
+          syncTalentEntryBalance(data, id, next)
           return { ok: true, buckets: next }
         }
       }
@@ -457,7 +506,7 @@ function clearMonthlyGiftGrantOnTarget(
     if (midx >= 0) {
       members[midx] = { ...members[midx]!, ...patch, updatedAt: new Date().toISOString() }
       data.mpTalentMembers = members
-      syncTalentEntryBalance(data, id, readPointsBuckets(members[midx]).total)
+      syncTalentEntryBalance(data, id, readPointsBuckets(members[midx]))
     }
   }
 }
@@ -497,7 +546,7 @@ export function normalizeLegacyPointsBucketsOnTarget(
       const changed = apply(members[midx]!, (next) => {
         members[midx] = { ...members[midx]!, ...next, updatedAt: new Date().toISOString() }
         data.mpTalentMembers = members
-        syncTalentEntryBalance(data, id, readPointsBuckets(members[midx]).total)
+        syncTalentEntryBalance(data, id, readPointsBuckets(members[midx]))
       })
       if (changed) return true
     }

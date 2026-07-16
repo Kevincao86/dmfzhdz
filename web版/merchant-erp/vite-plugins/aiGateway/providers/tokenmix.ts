@@ -25,15 +25,42 @@ export async function chatTokenMix(req: AIChatRequest, env: Record<string, strin
       model,
       messages: toOpenAiChatCompletionMessages(req),
       temperature: req.temperature ?? 0.7,
+      ...(req.tools?.length
+        ? {
+            tools: req.tools as Parameters<typeof client.chat.completions.create>[0]['tools'],
+            ...(req.tool_choice != null
+              ? {
+                  tool_choice: req.tool_choice as Parameters<
+                    typeof client.chat.completions.create
+                  >[0]['tool_choice'],
+                }
+              : {}),
+          }
+        : {}),
     })
-    const msg = completion.choices[0]?.message?.content
+    const choiceMsg = completion.choices[0]?.message
+    const msg = choiceMsg?.content
     const content = typeof msg === 'string' ? msg : ''
+    const rawCalls = choiceMsg?.tool_calls
+    const tool_calls =
+      Array.isArray(rawCalls) && rawCalls.length
+        ? rawCalls.map((c, i) => ({
+            id: c.id || `call_${i}`,
+            type: 'function' as const,
+            function: {
+              name: c.function?.name || '',
+              arguments:
+                typeof c.function?.arguments === 'string' ? c.function.arguments : '{}',
+            },
+          })).filter((c) => c.function.name)
+        : undefined
     return {
       provider: 'tokenmix',
       model: completion.model ?? model,
       content,
       raw: completion as unknown as Record<string, unknown>,
       usage: completion.usage as unknown as Record<string, unknown>,
+      ...(tool_calls?.length ? { tool_calls } : {}),
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

@@ -53,6 +53,7 @@ import {
 } from '../lib/aiAgentActionParse'
 import { splitAssistantStreamView } from '../lib/assistantThinkingText'
 import type { CreatePlatformId } from '../constants/productCreatePlatforms'
+import { isCreatePlatformId } from '../constants/productCreatePlatforms'
 import { listProductPlansFromPreview } from '../lib/aiAgentProductPlans'
 import {
   hasConfirmedPreviewForTask,
@@ -86,6 +87,13 @@ import {
 } from '../lib/agentUserHabits'
 import { fetchAiProductPlan, fetchAiProductPlansBatch } from '../services/storeIntelApi'
 import { enrichAiProductPlanPreview } from '../services/aiAgentProductPlanEnrich'
+import {
+  executeAiAgentToolCalls,
+  listAiAgentTools,
+  toOpenAiTools,
+  type AiAgentClientToolResult,
+  type AiAgentToolCall,
+} from '../lib/aiAgentTools'
 import {
   buildAiRecruitmentBriefPreview,
   buildLocalRecruitmentBriefPreview,
@@ -255,6 +263,10 @@ function sessionTitleFromMessages(msgs: AiAgentMessage[]): string {
   return raw.length <= 32 ? raw : `${raw.slice(0, 31)}…`
 }
 
+function strFromUnknown(v: unknown): string {
+  return typeof v === 'string' ? v.trim() : v == null ? '' : String(v).trim()
+}
+
 type AiAgentContextValue = {
   drawerOpen: boolean
   openDrawer: (ctx?: AiAgentOpenContext) => void
@@ -274,8 +286,10 @@ type AiAgentContextValue = {
   isPreviewLoading: (previewMessageId: string) => boolean
   /** 指定预览是否正在提交/执行 */
   isPreviewConfirming: (previewMessageId: string) => boolean
-  confirmPendingTask: (previewMessageId: string) => void
+  confirmPendingTask: (previewMessageId: string, opts?: { productSubmitMode?: 'draft' | 'submit' }) => void
   savePendingTaskToDrafts: (previewMessageId: string) => void
+  /** 创建商品：提交至平台（等价 confirmPendingTask(..., { productSubmitMode: 'submit' })） */
+  submitPendingTaskToPlatforms: (previewMessageId: string) => void
   cancelPendingTask: (previewMessageId: string) => void
   modifyPendingTask: (previewMessageId: string) => void
   /** @deprecated 使用 isPreviewConfirming(id) */
@@ -1195,6 +1209,138 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     [pushCreateProductPreview, pushRecruitInfluencerPreview, pushTaxFilingPreview, pushPreview],
   )
 
+  const applyClientToolResults = useCallback(
+    (
+      results: AiAgentClientToolResult[],
+      ctx: { pageLabel?: string; userBrief: string; assistantContent?: string },
+    ) => {
+      const pageLabel = ctx.pageLabel
+      for (const r of results) {
+        if (r.needsUpload) {
+          setMessages((prev) => {
+            const next = [
+              ...prev,
+              createAgentMessage('needs_upload', r.message || '请上传相关素材后继续。', {
+                toolName: r.tool,
+                toolResult: r.data,
+              }),
+            ]
+            messagesRef.current = next
+            return next
+          })
+          continue
+        }
+
+        if (r.tool === 'generate_image') {
+          setMessages((prev) => {
+            const next = [
+              ...prev,
+              createAgentMessage(
+                'tool_result',
+                r.ok ? r.message || '图片已生成' : r.message || '生图失败',
+                {
+                  toolName: r.tool,
+                  imageUrls: r.imageUrl ? [r.imageUrl] : undefined,
+                  toolResult: r.data,
+                  resultSummary: r.ok ? 'confirmed' : 'partial',
+                },
+              ),
+            ]
+            messagesRef.current = next
+            return next
+          })
+          continue
+        }
+
+        if (r.tool === 'create_product' && r.needsConfirm) {
+          const brief =
+            strFromUnknown(r.planDraft?.brief) ||
+            ctx.userBrief ||
+            strFromUnknown(r.planDraft?.productName)
+          const platforms = r.platforms?.filter((p): p is CreatePlatformId => isCreatePlatformId(p))
+          if (platforms?.length) {
+            setPreviewSubmitPlatforms(platforms)
+          }
+          setMessages((prev) => {
+            const next = [
+              ...prev,
+              createAgentMessage('tool_result', r.message || '已准备创建商品预览', {
+                toolName: r.tool,
+                toolResult: { ...(r.planDraft ?? {}), mode: r.mode },
+              }),
+            ]
+            messagesRef.current = next
+            return next
+          })
+          executionStateRef.current = markPreviewsActive(executionStateRef.current)
+          pushCreateProductPreview(brief, pageLabel, {
+            assistantContent: ctx.assistantContent,
+          })
+          continue
+        }
+
+        if (r.tool === 'recruit_influencer' && r.needsConfirm) {
+          const brief = strFromUnknown(r.data?.brief) || ctx.userBrief
+          setMessages((prev) => {
+            const next = [
+              ...prev,
+              createAgentMessage('tool_result', r.message || '已准备达人招募预览', {
+                toolName: r.tool,
+                toolResult: r.data,
+              }),
+            ]
+            messagesRef.current = next
+            return next
+          })
+          executionStateRef.current = markPreviewsActive(executionStateRef.current)
+          pushRecruitInfluencerPreview(brief, pageLabel, ctx.assistantContent)
+          continue
+        }
+
+        if (
+          (r.tool === 'generate_copy' || r.scenarioKey === 'generate_copywriting') &&
+          r.needsConfirm
+        ) {
+          setMessages((prev) => {
+            const next = [
+              ...prev,
+              createAgentMessage('tool_result', r.message || '已准备文案预览', {
+                toolName: r.tool,
+                toolResult: r.data,
+              }),
+            ]
+            messagesRef.current = next
+            return next
+          })
+          pushPreview(
+            'generate_copywriting',
+            r.message || '根据你的描述，我准备执行推广文案生成（预览）。请确认后继续。',
+            pageLabel,
+          )
+          continue
+        }
+
+        setMessages((prev) => {
+          const next = [
+            ...prev,
+            createAgentMessage(
+              'tool_result',
+              r.message || (r.ok ? `工具 ${r.tool} 已完成` : `工具 ${r.tool} 失败`),
+              {
+                toolName: r.tool,
+                toolResult: r.data,
+                resultSummary: r.ok ? 'confirmed' : 'partial',
+              },
+            ),
+          ]
+          messagesRef.current = next
+          return next
+        })
+      }
+    },
+    [pushCreateProductPreview, pushRecruitInfluencerPreview, pushPreview],
+  )
+
   const runGatewayForSnapshot = useCallback(
     async (
       snapshot: AiAgentMessage[],
@@ -1236,6 +1382,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         }
 
         const deferredTaskTypes = executionStateRef.current.plan?.taskTypes
+        const openAiTools = toOpenAiTools(listAiAgentTools())
         const chatReq = {
           provider: parsed.provider,
           model: chatModel || undefined,
@@ -1245,47 +1392,98 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           taskType,
           ...(deferredTaskTypes?.length ? { taskTypes: deferredTaskTypes } : {}),
           agentPickerKey: userPickerKey,
+          ...(openAiTools.length
+            ? { tools: openAiTools, tool_choice: 'auto' as const }
+            : {}),
         }
 
-        /** 纯闲聊非流式；方案/融资/政策等深度问题走流式 + 完整系统提示 */
+        /**
+         * 有 tools 时走非流式，以便拿到完整 tool_calls（客户端再执行）。
+         * 无 tools 时：闲聊非流式；深度问题走流式。
+         */
         const useDeepReply = shouldUseFullAgentSystemPrompt(trimmed, taskType)
-        const res = taskType || useDeepReply
-          ? await streamAiChat(
-              { ...chatReq, stream: true as const },
-              {
-                signal,
-                onEvent: (ev) => {
-                  if (ev.event === 'thinking') {
-                    setStreamingReply((r) => ({
-                      thinking: ev.text,
-                      content: r?.content ?? '',
-                    }))
-                    setMessages((prev) =>
-                      prev.map((m) =>
-                        m.id === placeholder.id ? { ...m, thinkingText: ev.text } : m,
-                      ),
-                    )
-                  }
-                  if (ev.event === 'content') {
-                    const displayPartial = formatAssistantDisplayText(ev.text)
-                    setStreamingReply((r) => ({
-                      thinking: r?.thinking ?? '',
-                      content: ev.text,
-                    }))
-                    setMessages((prev) =>
-                      prev.map((m) =>
-                        m.id === placeholder.id
-                          ? { ...m, content: displayPartial || ev.text.trim() }
-                          : m,
-                      ),
-                    )
-                  }
+        const useToolRound = openAiTools.length > 0
+        const res = useToolRound
+          ? await postAiChat(chatReq, { signal })
+          : taskType || useDeepReply
+            ? await streamAiChat(
+                { ...chatReq, stream: true as const },
+                {
+                  signal,
+                  onEvent: (ev) => {
+                    if (ev.event === 'thinking') {
+                      setStreamingReply((r) => ({
+                        thinking: ev.text,
+                        content: r?.content ?? '',
+                      }))
+                      setMessages((prev) =>
+                        prev.map((m) =>
+                          m.id === placeholder.id ? { ...m, thinkingText: ev.text } : m,
+                        ),
+                      )
+                    }
+                    if (ev.event === 'content') {
+                      const displayPartial = formatAssistantDisplayText(ev.text)
+                      setStreamingReply((r) => ({
+                        thinking: r?.thinking ?? '',
+                        content: ev.text,
+                      }))
+                      setMessages((prev) =>
+                        prev.map((m) =>
+                          m.id === placeholder.id
+                            ? { ...m, content: displayPartial || ev.text.trim() }
+                            : m,
+                        ),
+                      )
+                    }
+                  },
                 },
-              },
-            )
-          : await postAiChat(chatReq, { signal })
+              )
+            : await postAiChat(chatReq, { signal })
 
         setStreamingReply(null)
+
+        const toolCalls = (res.tool_calls ?? []) as AiAgentToolCall[]
+        if (toolCalls.length) {
+          const callNames = toolCalls.map((c) => c.function.name).join('、')
+          const assistText =
+            formatAssistantDisplayText(res.content?.trim() || '') ||
+            `正在调用工具：${callNames}`
+          setMessages((prev) => {
+            const next = prev.map((m) =>
+              m.id === placeholder.id
+                ? {
+                    ...m,
+                    content: assistText,
+                    isStreaming: false,
+                    toolName: callNames,
+                    toolResult: { tool_calls: toolCalls },
+                  }
+                : m,
+            )
+            messagesRef.current = next
+            return next
+          })
+          setMessages((prev) => {
+            const next = [
+              ...prev,
+              createAgentMessage('tool_status', `执行工具：${callNames}…`, {
+                toolName: callNames,
+              }),
+            ]
+            messagesRef.current = next
+            return next
+          })
+
+          const results = await executeAiAgentToolCalls(toolCalls, { signal })
+          applyClientToolResults(results, {
+            pageLabel: previewPage ?? pageContext?.pageLabel,
+            userBrief: trimmed,
+            assistantContent: res.content,
+          })
+          return
+        }
+
         const { thinking, answer } = splitAssistantStreamView(res.content)
         const visibleRaw = answer.trim() || res.content.trim()
         const deferPreview = shouldDeferTaskPreview(
@@ -1374,6 +1572,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       endAiRun,
       appendStoppedMessage,
       resolveMerchantIntelBlock,
+      applyClientToolResults,
     ],
   )
 
@@ -1639,11 +1838,12 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   )
 
   const confirmPendingTask = useCallback(
-    (previewMessageId: string) => {
+    (previewMessageId: string, opts?: { productSubmitMode?: 'draft' | 'submit' }) => {
       const pending = messagesRef.current.find((m) => m.id === previewMessageId)
       if (!pending || pending.previewStatus !== 'pending' || !pending.preview) return
       const p = pending.preview
       const title = p.title ?? '任务'
+      const productMode = opts?.productSubmitMode === 'submit' ? 'submit' : 'draft'
       recordAgentUserInteraction(authUserIdRef.current, {
         taskType: p.taskType,
         platforms: previewSubmitPlatforms.length ? previewSubmitPlatforms : undefined,
@@ -1677,20 +1877,53 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           setConfirmingPreviewId(previewMessageId)
           setTaskConfirming(true)
           try {
-            const results = await submitAiProductPlansToPlatforms(plans, submitPlatforms, 'draft')
+            // 提交平台前尽量补全主图/文案，降低审核报错
+            let readyPlans = plans
+            if (productMode === 'submit') {
+              const enriched = await Promise.all(
+                plans.map(async (pl) => {
+                  const need =
+                    !String(pl.productName || '').trim() ||
+                    !String(pl.headUrl || '').startsWith('https://')
+                  if (!need) return pl
+                  try {
+                    return await enrichAiProductPlanPreview(
+                      pl,
+                      pl.productName || title,
+                      modelPickerKey,
+                      {},
+                    )
+                  } catch {
+                    return pl
+                  }
+                }),
+              )
+              readyPlans = enriched
+            }
+            const results = await submitAiProductPlansToPlatforms(
+              readyPlans,
+              submitPlatforms,
+              productMode,
+            )
             const okCount = results.filter((r) => r.ok).length
             const failCount = results.length - okCount
             const summary = formatAiProductSubmitSummary(results)
             const resultSummary = okCount > 0 ? (failCount > 0 ? 'partial' : 'confirmed') : 'partial'
+            const successLine =
+              productMode === 'submit'
+                ? `「${title}」已提交至所选平台（成功 ${okCount} 项）。\n${summary}`
+                : `「${title}」已确认。共 ${okCount} 项已保存至商品列表草稿箱，请在编辑页选择类目与门店后提交审核。\n${summary}`
+            const failLine =
+              productMode === 'submit'
+                ? `「${title}」提交平台失败。\n${summary}`
+                : `「${title}」保存草稿失败。\n${summary}`
 
             setMessages((prev) => {
               const next = [
                 ...prev,
                 createAgentMessage(
                   'task_result',
-                  okCount > 0
-                    ? `「${title}」已确认。共 ${okCount} 项已保存至商品列表草稿箱，请在编辑页选择类目与门店后提交审核。\n${summary}`
-                    : `「${title}」保存草稿失败。\n${summary}`,
+                  okCount > 0 ? successLine : failLine,
                   { resultSummary },
                 ),
               ]
@@ -1907,7 +2140,22 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         return next
       })
     },
-    [navigate, previewSubmitPlatforms, patchPreviewStatus, appendAssistantLine, pushRecruitInfluencerPreview, pageContext?.pageLabel],
+    [
+      navigate,
+      previewSubmitPlatforms,
+      patchPreviewStatus,
+      appendAssistantLine,
+      pushRecruitInfluencerPreview,
+      pageContext?.pageLabel,
+      modelPickerKey,
+    ],
+  )
+
+  const submitPendingTaskToPlatforms = useCallback(
+    (previewMessageId: string) => {
+      confirmPendingTask(previewMessageId, { productSubmitMode: 'submit' })
+    },
+    [confirmPendingTask],
   )
 
   const cancelPendingTask = useCallback(
@@ -2079,6 +2327,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       taskConfirming,
       confirmPendingTask,
       savePendingTaskToDrafts,
+      submitPendingTaskToPlatforms,
       cancelPendingTask,
       modifyPendingTask,
       previewSubmitPlatforms,
@@ -2120,6 +2369,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       isPreviewConfirming,
       confirmPendingTask,
       savePendingTaskToDrafts,
+      submitPendingTaskToPlatforms,
       cancelPendingTask,
       modifyPendingTask,
       previewSubmitPlatforms,

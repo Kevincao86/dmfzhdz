@@ -9,7 +9,12 @@ import {
   resolvePlanGiftPoints,
   type MpLibraryRole,
 } from './mpMembershipCatalog.js'
-import { readAccountMpPointsBuckets, resolvePointsLibraryRole } from './mpAiPointsSpendCore.js'
+import {
+  readAccountMpPointsBuckets,
+  reconcileAccountPointsBucketsWithLedger,
+  resolvePointsLibraryRole,
+  resolveRegistryTargetIdForAccount,
+} from './mpAiPointsSpendCore.js'
 import type { RegistrySnapshot } from './opsRegistryTypes.js'
 import { findRegistryMemberForAccount, findRegistryPrForAccount } from './mpRegistryProfileGet.js'
 import { shanghaiDateString } from '../../vite-plugins/aiTokenUsageCore.js'
@@ -25,6 +30,8 @@ export type MpAiPointsBalanceSummary = {
   monthlySpent: number
   packageRemaining: number
   rechargeBalance: number
+  billingRole?: MpLibraryRole
+  targetId?: string
 }
 
 function currentGiftMonthKey(d = new Date()): string {
@@ -95,7 +102,12 @@ export function buildMpAiPointsBalanceSummary(
   const monthlyGiftQuota = resolvePlanGiftPoints(plan, role)
   const monthlyGiftGranted = readGiftMonth(data, account, role) === month
   const monthlySpent = sumMonthlySpend(data, String(account.id || ''), month)
+  // 有本月消耗时先按流水纠偏桶，避免「明细已扣、概览仍满额」
+  if (monthlySpent > 0) {
+    reconcileAccountPointsBucketsWithLedger(data, account, opts)
+  }
   const buckets = readAccountMpPointsBuckets(data, account, opts)
+  const targetId = resolveRegistryTargetIdForAccount(data, account, role)
 
   return {
     balance: buckets.total,
@@ -108,5 +120,7 @@ export function buildMpAiPointsBalanceSummary(
     monthlySpent,
     packageRemaining: buckets.package,
     rechargeBalance: buckets.recharge,
+    billingRole: role,
+    targetId: targetId || undefined,
   }
 }
