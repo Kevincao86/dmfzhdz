@@ -25,6 +25,7 @@ export const OPS_PERMISSION_MODULE_KEYS = [
   'announcements',
   'payment_orders',
   'mp_membership_finance',
+  'distribution',
   'recruitment_orders',
   'mp_recruitment_orders',
   'talent_library',
@@ -35,6 +36,7 @@ export const OPS_PERMISSION_MODULE_KEYS = [
   'support',
   'support_mp',
   'help_manual',
+  'platform_decor',
   'team_intro',
 ] as const
 
