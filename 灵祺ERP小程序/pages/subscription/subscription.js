@@ -185,7 +185,7 @@ Page({
     this.stopPayTimers()
     this.setData({
       payStep: 'choose',
-      channel: '',
+      channel: 'wechat',
       qrUrl: '',
       polling: false,
       payErr: '',
