@@ -44,7 +44,7 @@ function canUsePrAddons(account) {
 
 function canUseAddonPerm(account, perm) {
   const access = readAccountPrFeatureAccess(account)
-  if (!access.any) return false
+  // 单能力判断不依赖 any：未开通项仍可在入口展示，点击走升级提示
   if (perm === 'shortvideo') return access.shortvideo || access.cloudEdit
   if (perm === 'cloudEdit') return access.cloudEdit
   if (perm === 'brief') return access.brief

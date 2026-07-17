@@ -4,6 +4,17 @@ const userProfile = require('./userProfile.js')
 const mpFeatureFlags = require('./mpFeatureFlags.js')
 const mpBriefAccess = require('./mpBriefAccess.js')
 const mpAiReviewAccess = require('./mpAiReviewAccess.js')
+const upgradeHint = require('./mpAddonUpgradeHint.js')
+
+const PERM_TITLE = {
+  shortvideo: '短视频 AI 处理',
+  cloudEdit: 'AI 混剪',
+  digitalHuman: '数字人口播',
+  visualStudio: 'AI 视觉工坊',
+  brief: 'AI 爆款 Brief',
+  aiReview: '文稿 AI 审核',
+  aiVideoReview: '短视频 AI 审核',
+}
 
 const ALLOWED_IDENTITIES = new Set(['pr', 'talent', 'shoot', 'edit'])
 
@@ -26,23 +37,37 @@ function ensureAddonPageAccess(requiredPerm) {
     wx.navigateBack()
     return false
   }
-  if (!prFeatureAccess.canUsePrAddons(account)) {
+  if (requiredPerm && !prFeatureAccess.canUseAddonPerm(account, requiredPerm)) {
+    const m = upgradeHint.upgradeModalContent(account, requiredPerm, PERM_TITLE[requiredPerm] || '该功能')
     wx.showModal({
-      title: '增值服务待开通',
-      content: '需由灵祺运营在后台开通后方可使用。如有合作意向请联系灵祺运营。',
-      showCancel: false,
-      confirmText: '知道了',
-      complete: () => wx.navigateBack(),
+      title: m.title,
+      content: m.content,
+      confirmText: m.confirmText,
+      cancelText: '返回',
+      success(res) {
+        if (res.confirm) {
+          wx.navigateTo({ url: m.upgradeUrl }).catch(() => wx.navigateBack())
+        } else {
+          wx.navigateBack()
+        }
+      },
     })
     return false
   }
-  if (requiredPerm && !prFeatureAccess.canUseAddonPerm(account, requiredPerm)) {
+  if (!prFeatureAccess.canUsePrAddons(account)) {
+    const m = upgradeHint.upgradeModalContent(account, requiredPerm || 'shortvideo', '增值服务')
     wx.showModal({
-      title: '功能待开通',
-      content: '该增值功能需由灵祺运营在后台开通后方可使用。如有合作意向请联系灵祺运营。',
-      showCancel: false,
-      confirmText: '知道了',
-      complete: () => wx.navigateBack(),
+      title: m.title,
+      content: m.content,
+      confirmText: m.confirmText,
+      cancelText: '返回',
+      success(res) {
+        if (res.confirm) {
+          wx.navigateTo({ url: m.upgradeUrl }).catch(() => wx.navigateBack())
+        } else {
+          wx.navigateBack()
+        }
+      },
     })
     return false
   }

@@ -4,6 +4,7 @@ import {
   isAddonNavPermEnabled,
   readAccountAddonAccess,
 } from '../lib/addonAccess'
+import { upgradePromptMessage, membershipUpgradePath } from '../lib/addonUpgradeHint'
 import { getAccount } from '../lib/mpSession'
 import { pullRegistryProfileAfterLogin } from '../lib/registryProfileSync'
 import { onShellRefresh } from '../lib/shellRefresh'
@@ -40,8 +41,18 @@ export default function MerchantEmbedShell() {
   const addonEnabled = addonAccess.any
   const [syncing, setSyncing] = useState(true)
 
-  const visibleNav = useMemo(
+  const unlockedNav = useMemo(
     () => ADDON_NAV.filter((t) => isAddonNavPermEnabled(addonAccess, t.perm)),
+    [addonAccess],
+  )
+
+  /** 全部矩阵能力入口都展示；未开通项点击提示升级 */
+  const allNav = useMemo(
+    () =>
+      ADDON_NAV.map((t) => ({
+        ...t,
+        unlocked: isAddonNavPermEnabled(addonAccess, t.perm),
+      })),
     [addonAccess],
   )
 
@@ -66,17 +77,26 @@ export default function MerchantEmbedShell() {
   }, [])
 
   useEffect(() => {
-    if (syncing || !addonEnabled || !visibleNav.length) return
+    if (syncing || !addonEnabled || !unlockedNav.length) return
     const target = resolveAddonNavTarget(location.pathname)
     if (!target) {
       if (location.pathname === '/addons' || location.pathname.startsWith('/addons/')) {
-        navigate(visibleNav[0]!.to, { replace: true })
+        navigate(unlockedNav[0]!.to, { replace: true })
       }
       return
     }
-    if (visibleNav.some((t) => t.to === target)) return
-    navigate(visibleNav[0]!.to, { replace: true })
-  }, [syncing, addonEnabled, visibleNav, location.pathname, navigate])
+    if (unlockedNav.some((t) => t.to === target)) return
+    navigate(unlockedNav[0]!.to, { replace: true })
+  }, [syncing, addonEnabled, unlockedNav, location.pathname, navigate])
+
+  const onNavClick = (t: (typeof allNav)[number]) => {
+    if (!t.unlocked) {
+      window.alert(upgradePromptMessage(t.label, t.perm))
+      navigate(membershipUpgradePath())
+      return
+    }
+    if (location.pathname !== t.to) navigate(t.to)
+  }
 
   return (
     <MerchantEmbedProviders>
@@ -87,28 +107,29 @@ export default function MerchantEmbedShell() {
           </div>
         ) : addonEnabled ? (
           <>
-            {visibleNav.length > 0 ? (
+            {allNav.length > 0 ? (
               <nav
                 className="shrink-0 border-b border-[var(--shell-border)] bg-[var(--panel-card)] px-4 py-2.5 md:px-6"
                 aria-label="增值服务"
               >
                 <div className="flex flex-wrap gap-2">
-                  {visibleNav.map((t) => {
+                  {allNav.map((t) => {
                     const active = isAddonNavTargetActive(t.to, location.pathname)
                     return (
                       <button
                         key={t.to}
                         type="button"
-                        onClick={() => {
-                          if (location.pathname !== t.to) navigate(t.to)
-                        }}
+                        onClick={() => onNavClick(t)}
                         className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                           active
                             ? 'bg-violet-600 text-white shadow-sm'
-                            : 'text-[var(--shell-muted)] hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]'
+                            : t.unlocked
+                              ? 'text-[var(--shell-muted)] hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]'
+                              : 'text-[var(--shell-muted)] opacity-60 hover:bg-[var(--shell-hover)]'
                         }`}
+                        title={t.unlocked ? t.label : upgradePromptMessage(t.label, t.perm)}
                       >
-                        {t.label}
+                        {t.unlocked ? t.label : `${t.label} · 需升级`}
                       </button>
                     )
                   })}
@@ -124,6 +145,18 @@ export default function MerchantEmbedShell() {
         ) : (
           <div className="erp-main merchant-embed-main flex-1 overflow-auto p-6 lg:p-8">
             <AddonComingSoon />
+            <div className="mt-4 flex flex-wrap gap-2">
+              {allNav.map((t) => (
+                <button
+                  key={t.to}
+                  type="button"
+                  onClick={() => onNavClick(t)}
+                  className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-sm text-violet-800"
+                >
+                  {t.label} · 升级解锁
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>

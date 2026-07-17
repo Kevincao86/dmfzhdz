@@ -15,6 +15,8 @@ export type IceEffectPreset = {
 /** 与运营台 / GET ice/config 的 effectOptions 同步 */
 export const ICE_EFFECT_PRESETS: readonly IceEffectPreset[] = [
   { id: 'none', label: '无附加特效' },
+  /** 按素材内容自动挑选转场（服务端映射为随机/智能转场策略） */
+  { id: 'smart', label: '智能（按内容自动转场）', transitionSubType: 'random' },
   { id: 'fade', label: '淡入淡出', fadeClip: true },
   { id: 'trans_fade', label: '叠化转场', transitionSubType: 'fade' },
   { id: 'trans_wipe', label: '向右擦除', transitionSubType: 'wiperight' },

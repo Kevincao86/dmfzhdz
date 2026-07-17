@@ -432,6 +432,18 @@
   font-weight: 600;
 }
 
+.addon-points-tip {
+  margin: 12rpx 0 8rpx;
+  padding: 14rpx 18rpx;
+  border-radius: 12rpx;
+  background: rgba(124, 58, 237, 0.08);
+  color: #5b21b6;
+  font-size: 22rpx;
+  line-height: 1.45;
+}
+.addon-card--locked {
+  opacity: 0.72;
+}
 .addon-job-row__head {
   display: flex;
   align-items: center;
@@ -534,4 +546,33 @@
   font-size: 24rpx;
   line-height: 1.6;
   color: var(--lq-text, #1e293b);
+}
+
+/* 积分消耗提醒条 */
+.addon-points-tip {
+  margin: 12rpx 0 8rpx;
+  padding: 16rpx 18rpx;
+  border-radius: 12rpx;
+  background: #f5f3ff;
+  border: 1rpx solid #ddd6fe;
+  font-size: 22rpx;
+  line-height: 1.55;
+  color: #5b21b6;
+}
+
+.addon-card--locked {
+  position: relative;
+  opacity: 0.72;
+}
+
+.addon-card__lock {
+  position: absolute;
+  top: 16rpx;
+  right: 16rpx;
+  font-size: 28rpx;
+  line-height: 1;
+}
+
+.addon-tab--locked {
+  opacity: 0.55;
 }

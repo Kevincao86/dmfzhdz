@@ -21,6 +21,7 @@ const LONGFORM_TARGET_TOTAL_OPTIONS = ['15', '30', '45', '60']
 /** 与星选 iceEffectPresets / GET ice/config effectOptions 对齐（接口失败时本地兜底） */
 const ICE_EFFECT_PRESET_LABELS = [
   '无附加特效',
+  '智能（按内容自动转场）',
   '淡入淡出',
   '叠化转场',
   '向右擦除',

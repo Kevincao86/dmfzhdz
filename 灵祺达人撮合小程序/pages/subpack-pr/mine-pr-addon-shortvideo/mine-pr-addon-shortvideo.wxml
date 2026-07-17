@@ -4,14 +4,23 @@
     <text class="addon-mini-hero__sub">短视频生成 · AI 混剪</text>
   </view>
   <view class="addon-tabs">
-    <view wx:if="{{showShortvideo}}" class="addon-tab {{mainPane === 'generate' ? 'addon-tab--on' : ''}}" data-pane="generate" bindtap="onPane">短视频生成</view>
-    <view wx:if="{{showCloudEdit}}" class="addon-tab {{mainPane === 'cloud' ? 'addon-tab--on' : ''}}" data-pane="cloud" bindtap="onPane">AI 混剪</view>
+    <view
+      class="addon-tab {{mainPane === 'generate' ? 'addon-tab--on' : ''}} {{!showShortvideo ? 'addon-tab--locked' : ''}}"
+      data-pane="generate"
+      bindtap="onPane"
+    >短视频生成{{!showShortvideo ? ' · 需升级' : ''}}</view>
+    <view
+      class="addon-tab {{mainPane === 'cloud' ? 'addon-tab--on' : ''}} {{!showCloudEdit ? 'addon-tab--locked' : ''}}"
+      data-pane="cloud"
+      bindtap="onPane"
+    >AI 混剪{{!showCloudEdit ? ' · 需升级' : ''}}</view>
   </view>
 
   <block wx:if="{{mainPane === 'generate' && showShortvideo}}">
     <view class="addon-card">
       <text class="addon-card__title">视频 AI 引擎</text>
       <text class="addon-card__sub">即梦 / Seedance（与星选平台同源）</text>
+      <view class="addon-points-tip">{{pointsHintGenerate}}</view>
       <view class="addon-pair" style="margin-bottom:12px">
         <view class="addon-pair__opt {{longformEnabled ? 'addon-pair__opt--on' : ''}}" data-on="1" bindtap="onLongformMode">长视频 · 目标总时长</view>
         <view class="addon-pair__opt {{!longformEnabled ? 'addon-pair__opt--on' : ''}}" data-on="0" bindtap="onLongformMode">短片 · 单段时长</view>
@@ -50,10 +59,17 @@
     </view>
   </block>
 
+  <view class="addon-card" wx:elif="{{mainPane === 'generate' && !showShortvideo}}">
+    <text class="addon-card__title">短视频生成未开通</text>
+    <text class="addon-card__sub">请升级至含「短视频 AI 处理」的会员档位后使用。</text>
+    <button class="addon-btn" data-pane="generate" bindtap="onPane">查看升级说明</button>
+  </view>
+
   <block wx:elif="{{mainPane === 'cloud' && showCloudEdit}}">
     <view class="addon-card">
       <text class="addon-card__title">AI 混剪</text>
       <text class="addon-card__sub">批量上传素材、AI 文案指令、一键成片（与星选平台同源）</text>
+      <view class="addon-points-tip">{{pointsHintMix}}</view>
       <view class="addon-warn" wx:if="{{!iceConfigured}}">云剪能力尚未开通，请联系灵祺运营开通后再使用。</view>
       <view class="addon-tabs addon-tabs--inner">
         <view class="addon-tab {{materialTab === 'video' ? 'addon-tab--on' : ''}}" data-tab="video" bindtap="onMaterialTab">视频队列</view>

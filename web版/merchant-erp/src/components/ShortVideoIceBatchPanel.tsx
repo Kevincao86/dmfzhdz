@@ -2261,7 +2261,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                       className="h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm"
                     >
                       <option value="auto">
-                        智能推断
+                        智能（按内容自动转场）
                         {mixTransitionMode === 'auto'
                           ? inferredMixEffect.id === 'none'
                             ? '（按场景硬切）'

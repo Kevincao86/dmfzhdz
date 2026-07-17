@@ -3,6 +3,7 @@ const auth = require('../../../utils/auth.js')
 const prFeatureAccess = require('../../../utils/prFeatureAccess.js')
 const identityTheme = require('../../../utils/identityTheme.js')
 const mpFeatureFlags = require('../../../utils/mpFeatureFlags.js')
+const upgradeHint = require('../../../utils/mpAddonUpgradeHint.js')
 const { buildAiAddonsFromAccount } = require('./addonCards.js')
 
 Page({
@@ -35,27 +36,15 @@ Page({
   onAddonTap(e) {
     const url = e.currentTarget.dataset.url
     if (!url) return
-    const perm = e.currentTarget.dataset.perm
-    if (perm && !prFeatureAccess.canUseAddonPerm(auth.readAccount(), perm)) {
-      wx.showModal({
-        title: '功能待开通',
-        content: '该增值功能需由灵祺运营在后台开通后方可使用。如有合作意向请联系灵祺运营。',
-        showCancel: false,
-        confirmText: '知道了',
-      })
-      return
-    }
-    if (!this.data.addonsEnabled) {
-      wx.showModal({
-        title: '增值服务待开通',
-        content: '需由灵祺运营在后台开通后方可使用。如有合作意向请联系灵祺运营。',
-        showCancel: false,
-        confirmText: '知道了',
-      })
-      return
-    }
     if (!auth.isLoggedIn()) {
       wx.showToast({ title: '请先登录', icon: 'none' })
+      return
+    }
+    const perm = e.currentTarget.dataset.perm
+    const title = e.currentTarget.dataset.title || '该功能'
+    const account = auth.readAccount()
+    if (perm && !prFeatureAccess.canUseAddonPerm(account, perm)) {
+      upgradeHint.showUpgradeModal(account, perm, title)
       return
     }
     wx.navigateTo({
