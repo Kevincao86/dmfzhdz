@@ -53,8 +53,8 @@
   <block wx:elif="{{mainPane === 'cloud' && showCloudEdit}}">
     <view class="addon-card">
       <text class="addon-card__title">AI 混剪</text>
-      <text class="addon-card__sub">批量素材上传、AI 文案指令、阿里云 ICE 合成（与星选平台同源）</text>
-      <view class="addon-warn" wx:if="{{!iceConfigured}}">运营台尚未配置 ICE，请联系灵祺运营开通云剪能力。</view>
+      <text class="addon-card__sub">批量上传素材、AI 文案指令、一键成片（与星选平台同源）</text>
+      <view class="addon-warn" wx:if="{{!iceConfigured}}">云剪能力尚未开通，请联系灵祺运营开通后再使用。</view>
       <view class="addon-tabs addon-tabs--inner">
         <view class="addon-tab {{materialTab === 'video' ? 'addon-tab--on' : ''}}" data-tab="video" bindtap="onMaterialTab">视频队列</view>
         <view class="addon-tab {{materialTab === 'images' ? 'addon-tab--on' : ''}}" data-tab="images" bindtap="onMaterialTab">多图成片</view>
@@ -64,13 +64,15 @@
           <button
             class="addon-btn addon-btn--ghost addon-pick-btn"
             bindtap="onUploadIceVideo"
-          >本地上传视频</button>
+          >批量上传视频</button>
         </view>
-        <textarea class="addon-textarea addon-textarea--sm" placeholder="粘贴视频 HTTPS 链接，多条用换行分隔" value="{{urlText}}" bindinput="onUrlText" />
+        <textarea class="addon-textarea addon-textarea--sm" placeholder="也可粘贴视频链接，多条用换行分隔" value="{{urlText}}" bindinput="onUrlText" />
         <button class="addon-btn addon-btn--ghost" bindtap="onAddVideoUrls">加入队列</button>
         <view wx:for="{{videoJobs}}" wx:key="id" class="addon-job-row">
-          <text class="addon-job-row__title">{{item.label}}</text>
-          <text class="addon-job-row__meta">{{item.mediaUrl}}</text>
+          <view class="addon-job-row__head">
+            <image wx:if="{{item.thumb}}" class="addon-job-row__thumb" src="{{item.thumb}}" mode="aspectFill" />
+            <text class="addon-job-row__title">{{item.label}}</text>
+          </view>
           <button class="addon-out__btn" data-id="{{item.id}}" bindtap="onRemoveJob">移除</button>
         </view>
       </block>
@@ -79,9 +81,9 @@
           <button
             class="addon-btn addon-btn--ghost addon-pick-btn"
             bindtap="onUploadIceImage"
-          >本地上传图片</button>
+          >上传图片</button>
         </view>
-        <textarea class="addon-textarea addon-textarea--sm" placeholder="粘贴图片 HTTPS 链接" value="{{imageUrlText}}" bindinput="onImageUrlText" />
+        <textarea class="addon-textarea addon-textarea--sm" placeholder="也可粘贴图片链接" value="{{imageUrlText}}" bindinput="onImageUrlText" />
         <button class="addon-btn addon-btn--ghost" bindtap="onAddImageUrls">加入图片列表</button>
         <view class="addon-avatar-grid">
           <view wx:for="{{imageItems}}" wx:key="id" class="addon-avatar">
@@ -126,7 +128,7 @@
       </view>
       <text class="addon-err" wx:if="{{iceErr}}">{{iceErr}}</text>
       <text class="addon-progress" wx:if="{{iceProgress}}">{{iceProgress}}</text>
-      <button class="addon-btn" loading="{{iceBusy}}" disabled="{{iceBusy || !iceConfigured}}" bindtap="onSubmitIce">提交云剪</button>
+      <button class="addon-btn" loading="{{iceBusy}}" disabled="{{iceBusy || !iceConfigured}}" bindtap="onSubmitIce">开始混剪</button>
       <video wx:if="{{iceResultUrl}}" class="addon-video" src="{{iceResultUrl}}" controls />
       <button wx:if="{{iceResultUrl}}" class="addon-btn addon-btn--ghost" bindtap="onSaveVideo">保存到相册</button>
     </view>
