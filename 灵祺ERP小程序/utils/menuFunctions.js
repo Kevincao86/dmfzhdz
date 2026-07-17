@@ -107,6 +107,13 @@ const FUNCTION_SECTIONS = [
       },
       {
         kind: 'link',
+        url: '/pages/ai-visual-studio/ai-visual-studio',
+        title: 'AI视觉工坊',
+        desc: '多端海报 · AI文案出图',
+        iconKey: 'paint',
+      },
+      {
+        kind: 'link',
         url: '/pages/shortvideo-ai/shortvideo-ai',
         title: '短视频AI处理',
         desc: '智能剪辑与创作',
