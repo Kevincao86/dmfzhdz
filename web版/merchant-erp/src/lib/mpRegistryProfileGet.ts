@@ -45,6 +45,14 @@ function prPhoneKey(u: RegistryMpPrUser): string {
     .slice(-11)
 }
 
+/** 登录手机号与会员联系方式不一致时，不采纳该绑定（避免共用 LQ-D 绑错人） */
+function memberPhoneMatchesAccount(member: RegistryMpTalentMember, phone: string): boolean {
+  if (phone.length < 11) return true
+  const mPhone = memberPhoneKey(member)
+  if (!mPhone) return true
+  return mPhone === phone
+}
+
 export function findRegistryMemberForAccount(
   data: RegistryFile,
   account: MpAccountRow,
@@ -57,15 +65,15 @@ export function findRegistryMemberForAccount(
 
   if (memberId) {
     const hit = members.find((m) => m.id === memberId)
-    if (hit) return hit
+    if (hit && memberPhoneMatchesAccount(hit, phone)) return hit
   }
   if (talentId) {
     const hit = members.find((m) => String(m.lingqiTalentId || '').trim() === talentId)
-    if (hit) return hit
+    if (hit && memberPhoneMatchesAccount(hit, phone)) return hit
   }
   if (openId) {
     const hit = members.find((m) => String(m.wxOpenId || '').trim() === openId)
-    if (hit) return hit
+    if (hit && memberPhoneMatchesAccount(hit, phone)) return hit
   }
   if (phone.length >= 11) {
     const hits = members.filter((m) => memberPhoneKey(m) === phone)
@@ -154,13 +162,21 @@ export async function mpAuthGetRegistryProfile(
   const accMemberId = String(account.registry_member_id || '').trim()
   const accPrId = String(account.lingqi_pr_id || '').trim()
   const accRegistryPrId = String(account.registry_pr_id || '').trim()
+  const phone = accountPhoneKey(account)
+  const boundByMemberId = accMemberId
+    ? (data.mpTalentMembers ?? []).find((m) => m.id === accMemberId)
+    : null
+  const safeAccMemberId =
+    boundByMemberId && !memberPhoneMatchesAccount(boundByMemberId, phone) ? '' : accMemberId
+  // enrich 已按登录手机号纠偏；优先用 enrich 结果，避免账号上错绑的 LQ-D 覆盖
+  const safeAccTalentId = String(member?.lingqiTalentId || accTalentId || '').trim()
   let talentMember = member ? registryMemberToClientDraft(member) : null
   if (talentMember && typeof talentMember === 'object') {
     talentMember = {
       ...talentMember,
-      // 大厅站内信按 registry 会员 id 匹配（如 LQ-D-000015）；勿用错误的 registry_member_id 覆盖
-      id: member?.id || accMemberId || talentMember.id,
-      lingqiTalentId: accTalentId || member?.lingqiTalentId || talentMember.lingqiTalentId,
+      // 大厅站内信按 registry 会员 id 匹配；勿用「同 LQ-D 但手机号不同」的错误绑定覆盖
+      id: member?.id || safeAccMemberId || talentMember.id,
+      lingqiTalentId: safeAccTalentId || talentMember.lingqiTalentId,
       mpMembershipPlan: member?.mpMembershipPlan || 'basic',
       mpMembershipExpiresAt: member?.mpMembershipExpiresAt,
     }

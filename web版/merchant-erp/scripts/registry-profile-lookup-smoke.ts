@@ -20,6 +20,41 @@ const data = {
       paymentMethod: '支付宝',
       updatedAt: '2026/6/7',
     },
+    // 共用 LQ-D-000012：达人库是 A 手机，会员表是 B 手机
+    {
+      id: 'TL-12-A',
+      lingqiTalentId: 'LQ-D-000012',
+      platform: '抖音' as const,
+      platformAccount: '85403247047',
+      platformNickname: '肖肖公主',
+      followers: 1000,
+      contact: '15757468650',
+      wechatId: '15757468650',
+      province: '浙江省',
+      city: '宁波市',
+      gender: '男',
+      quotePrice: '50',
+      douyinSalesLevel: 'LV3',
+      alipayAccount: '15757468650',
+      paymentMethod: '支付宝',
+      updatedAt: '2026/7/13',
+    },
+    {
+      id: 'TL-12-B',
+      lingqiTalentId: 'LQ-D-000012',
+      platform: '抖音' as const,
+      platformAccount: 'xiejinchao9527',
+      platformNickname: '极道视界',
+      followers: 700,
+      contact: '13806831505',
+      wechatId: '13806831505',
+      province: '浙江省',
+      city: '温州市',
+      gender: '男',
+      quotePrice: '1000',
+      paymentMethod: '支付宝',
+      updatedAt: '2026/7/18',
+    },
   ],
   mpTalentMembers: [
     {
@@ -52,6 +87,28 @@ const data = {
       memberType: 'douyin' as const,
       registeredAt: '2026/6/4',
       updatedAt: '2026/6/4',
+    },
+    {
+      id: 'MTM-12',
+      lingqiTalentId: 'LQ-D-000012',
+      contact: '13806831505',
+      wechatId: '13806831505',
+      wxNickName: '极道视界',
+      wxAvatarUrl: '',
+      memberType: 'douyin' as const,
+      province: '浙江省',
+      city: '温州市',
+      platformProfiles: {
+        douyin: {
+          enabled: true,
+          platformAccount: 'xiejinchao9527',
+          platformNickname: '极道视界',
+          followers: 700,
+          quotePrice: '1000',
+        },
+      },
+      registeredAt: '2026/6/15',
+      updatedAt: '2026/7/18',
     },
   ],
 }
@@ -96,4 +153,46 @@ if (!libOnly || !libOnly.platformProfiles?.douyin) {
   process.exit(1)
 }
 
-console.log('OK: registry member lookup + talent library merge for LQ-D-000009')
+// —— 共用 LQ-D：登录 157… 不应拿到 138… 的会员，应从达人库回填肖肖公主 ——
+const conflictAccount = {
+  id: 'acc-157',
+  registry_member_id: 'MTM-12',
+  lingqi_talent_id: 'LQ-D-000012',
+  login_name: '15757468650',
+} as MpAccountRow
+
+const conflictHit = findRegistryMemberForAccount(data, conflictAccount)
+if (conflictHit) {
+  console.error('FAIL: must not bind MTM with different phone via shared LQ-D', conflictHit.contact)
+  process.exit(1)
+}
+
+const conflictEnriched = enrichMemberFromRegistrySources(data, conflictAccount, conflictHit)
+const conflictDraft = registryMemberToClientDraft(conflictEnriched!)
+const conflictDy = (conflictDraft.platformProfiles as Record<string, Record<string, unknown>>)?.douyin
+if (
+  !conflictDy ||
+  conflictDy.platformNickname !== '肖肖公主' ||
+  conflictDy.platformAccount !== '85403247047'
+) {
+  console.error('FAIL: expected library profile for 15757468650', conflictDy)
+  process.exit(1)
+}
+if (String(conflictDraft.contact || '') !== '15757468650') {
+  console.error('FAIL: contact must be login phone', conflictDraft.contact)
+  process.exit(1)
+}
+if (String(conflictDraft.province || '') !== '浙江省' || String(conflictDraft.city || '') !== '宁波市') {
+  console.error('FAIL: province/city from library', conflictDraft.province, conflictDraft.city)
+  process.exit(1)
+}
+if (String(conflictDraft.gender || '') !== '男') {
+  console.error('FAIL: gender from library', conflictDraft.gender)
+  process.exit(1)
+}
+if (String(conflictDraft.id || '') === 'MTM-12') {
+  console.error('FAIL: must not stamp wrong MTM id from other phone', conflictDraft.id)
+  process.exit(1)
+}
+
+console.log('OK: registry member lookup + talent library merge + shared LQ-D phone guard')
