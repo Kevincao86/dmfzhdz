@@ -97,6 +97,7 @@ import recruitmentOrdersAppendHandler from '../api/meoo-ops-recruitment-orders-a
 import recruitmentOrdersPatchHandler from '../api/meoo-ops-recruitment-orders-patch.ts'
 import mpRecruitmentApplyHandler from '../api/meoo-ops-mp-recruitment-orders-apply.ts'
 import mpRecruitmentCancelApplyHandler from '../api/meoo-ops-mp-recruitment-orders-cancel-apply.ts'
+import mpRecruitmentReviewCancelApplyHandler from '../api/meoo-ops-mp-recruitment-orders-review-cancel-apply.ts'
 import mpRecruitmentAppendHandler from '../api/meoo-ops-mp-recruitment-orders-append.ts'
 import mpTargetedRecruitHandler from '../api/meoo-ops-mp-targeted-recruit.ts'
 import mpWechatOaBindHandler from '../api/meoo-ops-mp-wechat-oa-bind.ts'
@@ -318,6 +319,10 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-mp-recruitment-orders-apply': mpRecruitmentApplyHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-orders-cancel-apply': mpRecruitmentCancelApplyHandler as VercelLikeHandler,
   '/api/ops-sync/mp-recruitment-orders/cancel-apply': mpRecruitmentCancelApplyHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-recruitment-orders-review-cancel-apply':
+    mpRecruitmentReviewCancelApplyHandler as VercelLikeHandler,
+  '/api/ops-sync/mp-recruitment-orders/review-cancel-apply':
+    mpRecruitmentReviewCancelApplyHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-orders-append': mpRecruitmentAppendHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-targeted-recruit': mpTargetedRecruitHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-wechat-oa-bind': mpWechatOaBindHandler as VercelLikeHandler,

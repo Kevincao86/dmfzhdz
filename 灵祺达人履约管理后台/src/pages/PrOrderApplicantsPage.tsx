@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { appendTalentInbox, clearMpRegistryCache, fetchMpRegistry, fetchTalentCooperationStats } from '../lib/mpApi'
+import { appendTalentInbox, clearMpRegistryCache, fetchMpRegistry, fetchTalentCooperationStats, reviewCancelMpRecruitmentApply } from '../lib/mpApi'
 import {
   enrichApplicantRow,
   hallLabelFromMp,
@@ -138,6 +138,7 @@ export default function PrOrderApplicantsPage() {
   const [iceCompleted, setIceCompleted] = useState(0)
   const [icePendingReview, setIcePendingReview] = useState(0)
   const [iceReviewBusyId, setIceReviewBusyId] = useState('')
+  const [cancelReviewBusyId, setCancelReviewBusyId] = useState('')
   const [iceRejectModal, setIceRejectModal] = useState(false)
   const [iceRejectTargetId, setIceRejectTargetId] = useState('')
   const [iceRejectTargetName, setIceRejectTargetName] = useState('')
@@ -721,6 +722,40 @@ export default function PrOrderApplicantsPage() {
     }
   }
 
+  async function onApproveCancelRequest(a: EnrichedApplicantRow) {
+    const aid = String(a?.id || '').trim()
+    if (!aid || !mpOrderId || cancelReviewBusyId) return
+    if (!confirm(`确认同意「${String(a.displayName || '达人')}」取消报名？同意后将移除该报名记录。`)) return
+    setCancelReviewBusyId(aid)
+    try {
+      await reviewCancelMpRecruitmentApply(mpOrderId, aid, 'approve')
+      clearMpRegistryCache()
+      alert('已同意取消报名')
+      await loadOrder()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '操作失败')
+    } finally {
+      setCancelReviewBusyId('')
+    }
+  }
+
+  async function onRejectCancelRequest(a: EnrichedApplicantRow) {
+    const aid = String(a?.id || '').trim()
+    if (!aid || !mpOrderId || cancelReviewBusyId) return
+    if (!confirm(`拒绝「${String(a.displayName || '达人')}」的取消报名申请？达人将继续保留报名。`)) return
+    setCancelReviewBusyId(aid)
+    try {
+      await reviewCancelMpRecruitmentApply(mpOrderId, aid, 'reject')
+      clearMpRegistryCache()
+      alert('已拒绝取消申请')
+      await loadOrder()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '操作失败')
+    } finally {
+      setCancelReviewBusyId('')
+    }
+  }
+
   function onIceOpenReject(a: IceApplicantRow) {
     if (!a?.id) return
     setIceRejectModal(true)
@@ -961,6 +996,9 @@ export default function PrOrderApplicantsPage() {
                     {a.selectionNotified ? (
                       <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">已发通知</span>
                     ) : null}
+                    {String(a.cancelRequestStatus || '') === 'pending' ? (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">申请取消报名</span>
+                    ) : null}
                     {Number(a.matchScore) > 0 ? <MatchScoreBadge score={Number(a.matchScore)} /> : null}
                   </div>
                 </div>
@@ -990,6 +1028,33 @@ export default function PrOrderApplicantsPage() {
                 </button>
               )}
             </div>
+
+            {String(a.cancelRequestStatus || '') === 'pending' ? (
+              <div className="mt-3 p-3 rounded-lg border border-amber-200 bg-amber-50 text-xs space-y-2">
+                <p className="text-amber-900">
+                  达人在报名截止后申请取消报名
+                  {a.cancelRequestedAt ? `（${String(a.cancelRequestedAt)}）` : ''}，请核实后确认。
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={cancelReviewBusyId === String(a.id)}
+                    className="px-3 py-1 rounded-lg border border-green-500 text-green-700 text-sm"
+                    onClick={() => void onApproveCancelRequest(a)}
+                  >
+                    同意取消
+                  </button>
+                  <button
+                    type="button"
+                    disabled={cancelReviewBusyId === String(a.id)}
+                    className="px-3 py-1 rounded-lg border border-slate-400 text-slate-700 text-sm"
+                    onClick={() => void onRejectCancelRequest(a)}
+                  >
+                    拒绝申请
+                  </button>
+                </div>
+              </div>
+            ) : null}
 
             {isIce && a.iceDouyinUrl ? (
               <div className="mt-3 p-3 rounded-lg bg-slate-50 border text-xs space-y-2">

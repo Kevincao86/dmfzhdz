@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { fetchMpRegistry, clearMpRegistryCache, bumpMpRecruitmentEngagement, cancelMpRecruitmentApply } from '../lib/mpApi'
+import { resolveSignupDeadlineMsFromMp } from '../lib/mpRecruitment/listFilters'
 import { getAccount, getActiveRole } from '../lib/mpSession'
 import { hasAppliedToOrder, upsertApplication, markApplicationWithdrawn } from '../lib/mpSync/applicationsStore'
 import {
@@ -385,11 +386,27 @@ export default function RecruitmentDetailPage() {
 
   async function onCancelApply() {
     if (!id || !visitApplicantId || cancellingApply) return
-    const ok = window.confirm('确定取消该商单的报名吗？取消后可重新报名。')
+    const deadlineMs = mpRaw ? resolveSignupDeadlineMsFromMp(mpRaw as Record<string, unknown>) : 0
+    const afterDeadline = deadlineMs > 0 && Date.now() >= deadlineMs
+    const ok = window.confirm(
+      afterDeadline
+        ? '报名已截止，取消需 PR 审核确认。提交后将显示「取消审核中」，PR 通过后才会真正取消。是否提交申请？'
+        : '确定取消该商单的报名吗？取消后可重新报名。',
+    )
     if (!ok) return
     setCancellingApply(true)
     try {
-      await cancelMpRecruitmentApply(id, visitApplicantId)
+      const result = (await cancelMpRecruitmentApply(id, visitApplicantId)) as {
+        cancelled?: boolean
+        cancelRequested?: boolean
+        needsPrReview?: boolean
+      }
+      if (result?.cancelRequested || result?.needsPrReview || result?.cancelled === false) {
+        clearMpRegistryCache()
+        window.alert('已提交取消申请，等待 PR 审核')
+        window.location.reload()
+        return
+      }
       markApplicationWithdrawn(id)
       clearMpRegistryCache()
       await flushClientStateSync()

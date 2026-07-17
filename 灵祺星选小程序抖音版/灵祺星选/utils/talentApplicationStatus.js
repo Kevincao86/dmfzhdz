@@ -405,6 +405,16 @@ function resolveApplicationDisplayStatusCore(mp, applicant, mpOrderId, opts) {
     return { tabId: 'cancelled', label: '已取消', tone: 'cancelled', showConfirmBtn: false }
   }
 
+  if (applicant && String(applicant.cancelRequestStatus || '').trim() === 'pending') {
+    return {
+      tabId: 'registered',
+      label: '取消审核中',
+      tone: 'pending',
+      showConfirmBtn: false,
+      showCancelBtn: false,
+    }
+  }
+
   const progress = resolveTalentApplicationProgress(mp, applicant, mpOrderId)
   if (progress.id === 'completed') {
     return { tabId: 'completed', label: '已完成', tone: 'completed', showConfirmBtn: false }
@@ -524,6 +534,7 @@ function isApplicantPassedForCancel(applicant, isIce) {
 function canTalentCancelMpApplication(mp, applicant, mpOrderId) {
   if (!mp || !applicant) return false
   if (String(applicant.taskStatus || '') === 'rejected') return false
+  if (String(applicant.cancelRequestStatus || '').trim() === 'pending') return false
   const isIce = isIceMpOrder(mp) || /^MP-ICE-/i.test(String(mpOrderId || mp.id || ''))
   if (isApplicantPassedForCancel(applicant, isIce)) return false
   if (isIce) {

@@ -6,6 +6,43 @@ export type CancelMpRecruitmentApplyResult =
   | { ok: true; data: RegistryFile; body: Record<string, unknown> }
   | { ok: false; status: number; error: string; message?: string; code?: string }
 
+function parseTs(text: unknown): number {
+  if (!text) return 0
+  const t = Date.parse(String(text).trim().replace(/-/g, '/'))
+  return Number.isFinite(t) ? t : 0
+}
+
+function pickField(summary: string, key: string): string {
+  const re = new RegExp(`${key}[:：]([^；;\\n]+)`)
+  const m = String(summary || '').match(re)
+  return m ? m[1].trim() : ''
+}
+
+/** 与 listFilters.resolveSignupDeadlineMsFromMp 一致，用于判断是否需 PR 审核取消 */
+export function resolveSignupDeadlineMsForCancel(mp: Record<string, unknown>): number {
+  const summary = [mp.recruitmentInfo, mp.taskDetail, mp.merchantRequirements].filter(Boolean).join('\n')
+  const meta =
+    mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+      ? (mp.mpPublishMeta as Record<string, unknown>)
+      : null
+  const fromSignup = parseTs(meta?.signupDeadline) || parseTs(pickField(summary, '报名截止'))
+  if (fromSignup > 0) return fromSignup
+  const deliveryMs = parseTs(meta?.deliveryDeadline) || parseTs(pickField(summary, '交付截止'))
+  const deadlineField = parseTs(mp.deadline)
+  if (deadlineField > 0 && (!deliveryMs || deadlineField !== deliveryMs)) return deadlineField
+  const pub = parseTs(mp.createdAt || mp.updatedAt)
+  if (mp.urgent && pub > 0) return pub + 86400000
+  return pub > 0 ? pub + 7 * 86400000 : 0
+}
+
+export function isMpSignupDeadlinePassedForCancel(
+  mp: Record<string, unknown>,
+  nowMs = Date.now(),
+): boolean {
+  const deadlineMs = resolveSignupDeadlineMsForCancel(mp)
+  return deadlineMs > 0 && nowMs >= deadlineMs
+}
+
 function isApplicantPassed(applicant: Record<string, unknown>, isIce = false): boolean {
   if (String(applicant.completedAt || '').trim()) return true
   if (isIce) {
@@ -36,7 +73,13 @@ function isApplicantSelectionNotified(
   return ids.map(String).includes(id)
 }
 
-/** 达人是否可在「已报名」阶段取消报名（服务端校验） */
+export function isApplicantCancelRequestPending(
+  applicant: Record<string, unknown> | null | undefined,
+): boolean {
+  return String(applicant?.cancelRequestStatus || '').trim() === 'pending'
+}
+
+/** 达人是否可在「已报名」阶段取消报名 / 提交取消申请（服务端校验） */
 export function canTalentCancelMpApplication(
   mp: Record<string, unknown> | null,
   applicant: Record<string, unknown> | null,
@@ -44,6 +87,7 @@ export function canTalentCancelMpApplication(
 ): boolean {
   if (!mp || !applicant) return false
   if (String(applicant.taskStatus || '') === 'rejected') return false
+  if (isApplicantCancelRequestPending(applicant)) return false
 
   const isIce = isIceMpOrder(mp) || /^MP-ICE-/i.test(String(mpOrderId || mp.id || ''))
   if (isApplicantPassed(applicant, isIce)) return false
@@ -105,10 +149,32 @@ function releaseIceSlotsForApplicant(
   return slots
 }
 
+function removeApplicantFromOrder(
+  cur: RegistryMpRecruitmentOrder,
+  appId: string,
+): RegistryMpRecruitmentOrder {
+  const applicants = [...(cur.applicants ?? [])]
+  const appIdx = applicants.findIndex((a) => a.id === appId)
+  if (appIdx < 0) return cur
+  applicants.splice(appIdx, 1)
+  const selectedApplicantIds = (cur.selectedApplicantIds ?? []).filter((id) => String(id) !== appId)
+  const notifiedApplicantIds = (cur.notifiedApplicantIds ?? []).filter((id) => String(id) !== appId)
+  const iceVideoSlots = isIceMpOrder(cur) ? releaseIceSlotsForApplicant(cur, appId) : cur.iceVideoSlots
+  return withSyncedApplicantCount({
+    ...cur,
+    applicants,
+    selectedApplicantIds,
+    notifiedApplicantIds,
+    iceVideoSlots,
+    updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+  })
+}
+
 export function cancelMpRecruitmentApplicationInSnapshot(
   data: RegistryFile,
   mpOrderId: string,
   applicantId: string,
+  nowMs = Date.now(),
 ): CancelMpRecruitmentApplyResult {
   const orderId = String(mpOrderId || '').trim()
   const appId = String(applicantId || '').trim()
@@ -129,7 +195,26 @@ export function cancelMpRecruitmentApplicationInSnapshot(
   }
 
   const applicant = applicants[appIdx]!
-  if (!canTalentCancelMpApplication(cur as unknown as Record<string, unknown>, applicant as unknown as Record<string, unknown>, orderId)) {
+  const mpRec = cur as unknown as Record<string, unknown>
+  const appRec = applicant as unknown as Record<string, unknown>
+
+  if (isApplicantCancelRequestPending(appRec)) {
+    return {
+      ok: true,
+      data,
+      body: {
+        ok: true,
+        mpOrderId: orderId,
+        applicantId: appId,
+        cancelled: false,
+        cancelRequested: true,
+        needsPrReview: true,
+        message: '取消申请已提交，等待 PR 审核',
+      },
+    }
+  }
+
+  if (!canTalentCancelMpApplication(mpRec, appRec, orderId)) {
     return {
       ok: false,
       status: 403,
@@ -139,24 +224,127 @@ export function cancelMpRecruitmentApplicationInSnapshot(
     }
   }
 
-  applicants.splice(appIdx, 1)
-  const selectedApplicantIds = (cur.selectedApplicantIds ?? []).filter((id) => String(id) !== appId)
-  const notifiedApplicantIds = (cur.notifiedApplicantIds ?? []).filter((id) => String(id) !== appId)
-  const iceVideoSlots = isIceMpOrder(cur) ? releaseIceSlotsForApplicant(cur, appId) : cur.iceVideoSlots
+  const needsPrReview = isMpSignupDeadlinePassedForCancel(mpRec, nowMs)
+  if (needsPrReview) {
+    const nowLabel = new Date(nowMs).toLocaleString('zh-CN', { hour12: false })
+    applicants[appIdx] = {
+      ...applicant,
+      cancelRequestStatus: 'pending',
+      cancelRequestedAt: nowLabel,
+      cancelRequestReviewedAt: undefined,
+      cancelRequestRejectReason: undefined,
+    }
+    cur = withSyncedApplicantCount({
+      ...cur,
+      applicants,
+      updatedAt: nowLabel,
+    })
+    data.mpRecruitmentOrders[idx] = cur
+    return {
+      ok: true,
+      data,
+      body: {
+        ok: true,
+        mpOrderId: orderId,
+        applicantId: appId,
+        cancelled: false,
+        cancelRequested: true,
+        needsPrReview: true,
+        message: '报名已截止，取消申请已提交，待 PR 审核确认',
+      },
+    }
+  }
 
-  cur = withSyncedApplicantCount({
-    ...cur,
-    applicants,
-    selectedApplicantIds,
-    notifiedApplicantIds,
-    iceVideoSlots,
-    updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
-  })
+  cur = removeApplicantFromOrder(cur, appId)
   data.mpRecruitmentOrders[idx] = cur
 
   return {
     ok: true,
     data,
     body: { ok: true, mpOrderId: orderId, applicantId: appId, cancelled: true },
+  }
+}
+
+export function reviewCancelMpRecruitmentApplicationInSnapshot(
+  data: RegistryFile,
+  mpOrderId: string,
+  applicantId: string,
+  action: 'approve' | 'reject',
+  rejectReason?: string,
+): CancelMpRecruitmentApplyResult {
+  const orderId = String(mpOrderId || '').trim()
+  const appId = String(applicantId || '').trim()
+  if (!orderId || !appId) {
+    return { ok: false, status: 400, error: 'invalid_review', message: '参数不完整' }
+  }
+  if (action !== 'approve' && action !== 'reject') {
+    return { ok: false, status: 400, error: 'invalid_action', message: '无效操作' }
+  }
+
+  const idx = data.mpRecruitmentOrders?.findIndex((o) => o.id === orderId) ?? -1
+  if (!data.mpRecruitmentOrders || idx < 0) {
+    return { ok: false, status: 404, error: 'not_found', message: '商单不存在' }
+  }
+
+  let cur = data.mpRecruitmentOrders[idx]!
+  const applicants = [...(cur.applicants ?? [])]
+  const appIdx = applicants.findIndex((a) => a.id === appId)
+  if (appIdx < 0) {
+    return { ok: false, status: 404, error: 'applicant_not_found', message: '未找到报名记录' }
+  }
+
+  const applicant = applicants[appIdx]!
+  if (String(applicant.cancelRequestStatus || '').trim() !== 'pending') {
+    return {
+      ok: false,
+      status: 409,
+      error: 'no_pending_cancel',
+      code: 'no_pending_cancel',
+      message: '该达人没有待审核的取消申请',
+    }
+  }
+
+  const nowLabel = new Date().toLocaleString('zh-CN', { hour12: false })
+
+  if (action === 'approve') {
+    cur = removeApplicantFromOrder(cur, appId)
+    data.mpRecruitmentOrders[idx] = cur
+    return {
+      ok: true,
+      data,
+      body: {
+        ok: true,
+        mpOrderId: orderId,
+        applicantId: appId,
+        cancelled: true,
+        reviewed: 'approve',
+      },
+    }
+  }
+
+  const reason = String(rejectReason || '').trim().slice(0, 200)
+  applicants[appIdx] = {
+    ...applicant,
+    cancelRequestStatus: 'rejected',
+    cancelRequestReviewedAt: nowLabel,
+    cancelRequestRejectReason: reason || undefined,
+  }
+  cur = withSyncedApplicantCount({
+    ...cur,
+    applicants,
+    updatedAt: nowLabel,
+  })
+  data.mpRecruitmentOrders[idx] = cur
+
+  return {
+    ok: true,
+    data,
+    body: {
+      ok: true,
+      mpOrderId: orderId,
+      applicantId: appId,
+      cancelled: false,
+      reviewed: 'reject',
+    },
   }
 }

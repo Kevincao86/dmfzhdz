@@ -592,6 +592,26 @@ export async function cancelMpRecruitmentApply(mpOrderId: string, applicantId: s
   )
 }
 
+export async function reviewCancelMpRecruitmentApply(
+  mpOrderId: string,
+  applicantId: string,
+  action: 'approve' | 'reject',
+  rejectReason?: string,
+) {
+  return postMpWithFallback(
+    [
+      '/api/meoo-ops-mp-recruitment-orders-review-cancel-apply',
+      '/api/ops-sync/mp-recruitment-orders/review-cancel-apply',
+    ],
+    {
+      mpOrderId,
+      applicantId,
+      action,
+      ...(rejectReason ? { rejectReason } : {}),
+    },
+  )
+}
+
 export async function submitEditDeliverLinks(
   mpOrderId: string,
   applicantId: string,

@@ -433,6 +433,31 @@ async function cancelMpRecruitmentApply(mpOrderId, applicantId) {
   throw lastErr || new Error('取消报名接口不可用')
 }
 
+async function reviewCancelMpRecruitmentApply(mpOrderId, applicantId, action, rejectReason) {
+  const paths = [
+    '/api/meoo-ops-mp-recruitment-orders-review-cancel-apply',
+    '/api/ops-sync/mp-recruitment-orders/review-cancel-apply',
+  ]
+  const body = {
+    mpOrderId: String(mpOrderId || '').trim(),
+    applicantId: String(applicantId || '').trim(),
+    action: action === 'reject' ? 'reject' : 'approve',
+  }
+  const reason = String(rejectReason || '').trim()
+  if (reason) body.rejectReason = reason
+  let lastErr
+  for (const path of paths) {
+    try {
+      return await api.post(path, body)
+    } catch (e) {
+      lastErr = e
+      const msg = String(e && e.message ? e.message : e)
+      if (!/404|not_found/i.test(msg)) throw e
+    }
+  }
+  throw lastErr || new Error('审核取消报名接口不可用')
+}
+
 async function submitEditDeliverLinks(mpOrderId, applicantId, deliverText) {
   const paths = [
     '/api/meoo-ops-mp-recruitment-edit-deliver-submit',
@@ -788,6 +813,7 @@ module.exports = {
   bumpMpRecruitmentEngagement,
   applyToMpOrder,
   cancelMpRecruitmentApply,
+  reviewCancelMpRecruitmentApply,
   submitEditDeliverLinks,
   registerTalentMember,
   registerPrUser,

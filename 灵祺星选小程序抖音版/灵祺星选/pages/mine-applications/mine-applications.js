@@ -438,17 +438,48 @@ Page({
     }
     const key = `${id}-${applicantId}`
     if (this.data.cancelApplyKey === key) return
+    const listFilters = require('../../utils/recruitmentListFilters.js')
+    const mp = (row && row.progressMp) || null
+    const deadlineMs = mp ? listFilters.resolveSignupDeadlineMs(mp) : 0
+    const afterDeadline = deadlineMs > 0 && Date.now() >= deadlineMs
     wx.showModal({
-      title: '取消报名',
-      content: '确定取消该商单的报名吗？取消后可重新报名。',
-      confirmText: '确定取消',
+      title: afterDeadline ? '申请取消报名' : '取消报名',
+      content: afterDeadline
+        ? '报名已截止，取消需 PR 审核确认。提交后将显示「取消审核中」，PR 通过后才会真正取消。'
+        : '确定取消该商单的报名吗？取消后可重新报名。',
+      confirmText: afterDeadline ? '提交申请' : '确定取消',
       cancelText: '再想想',
       success: (res) => {
         if (!res.confirm) return
         this.setData({ cancelApplyKey: key })
         ops
           .cancelMpRecruitmentApply(id, applicantId)
-          .then(() => {
+          .then((result) => {
+            const requested = !!(result && (result.cancelRequested || result.needsPrReview))
+            if (requested) {
+              const rows = (this.data.rows || []).map((r) => {
+                if (!r || r.mpOrderId !== id) return r
+                const progressMe = r.progressMe
+                  ? { ...r.progressMe, cancelRequestStatus: 'pending' }
+                  : { id: applicantId, cancelRequestStatus: 'pending' }
+                return {
+                  ...r,
+                  progressMe,
+                  displayTabId: 'registered',
+                  displayStatusLabel: '取消审核中',
+                  displayStatusTone: 'pending',
+                  showCancelBtn: false,
+                }
+              })
+              this.setData({
+                cancelApplyKey: '',
+                rows,
+                filteredRows: this.applyFilters(rows),
+              })
+              wx.showToast({ title: '已提交，待PR审核', icon: 'none' })
+              void this.load({ silent: true })
+              return
+            }
             applicationsStore.markApplicationWithdrawn(id)
             try {
               const iceOrderStats = require('../../utils/iceOrderStats.js')
