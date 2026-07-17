@@ -1,0 +1,117 @@
+<scroll-view class="vs-page" scroll-y enhanced show-scrollbar="{{false}}">
+  <view class="vs-hero">
+    <text class="vs-hero__badge">与商家 Web 同源</text>
+    <text class="vs-hero__title">灵祺视觉工坊</text>
+    <text class="vs-hero__sub">选渠道 · AI 文案 · 一键出图 · 保存相册（{{copyPoints}} 积分/文案 · {{imagePoints}} 积分/张）</text>
+  </view>
+
+  <view class="vs-wizard">
+    <view
+      wx:for="{{wizardSteps}}"
+      wx:key="n"
+      class="vs-wizard__step {{step === item.n ? 'on' : ''}}"
+      data-step="{{item.n}}"
+      bindtap="onStep"
+    >{{item.n}}.{{item.label}}</view>
+  </view>
+
+  <view class="vs-card" wx:if="{{step === 1}}">
+    <text class="vs-card__title">投放渠道</text>
+    <text class="vs-card__sub">可多选，出图时按主渠道构图</text>
+    <view class="vs-chips">
+      <view
+        wx:for="{{channels}}"
+        wx:key="id"
+        class="vs-chip {{item.on ? 'on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onToggleChannel"
+      >{{item.label}}</view>
+    </view>
+    <text class="vs-label">业态</text>
+    <view class="vs-chips">
+      <view
+        wx:for="{{industries}}"
+        wx:key="id"
+        class="vs-chip {{industry === item.id ? 'on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onIndustry"
+      >{{item.label}}</view>
+    </view>
+    <text class="vs-label">门店 / 品牌名</text>
+    <input class="vs-input" placeholder="如：灵祺小馆" value="{{storeName}}" bindinput="onStoreName" />
+    <button class="vs-btn" bindtap="onNextStep">下一步：选玩法</button>
+  </view>
+
+  <view class="vs-card" wx:elif="{{step === 2}}">
+    <text class="vs-card__title">这次想做什么</text>
+    <view class="vs-playbooks">
+      <view
+        wx:for="{{playbooks}}"
+        wx:key="id"
+        class="vs-playbook {{playbook === item.id ? 'on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onPlaybook"
+      >
+        <text class="vs-playbook__title">{{item.label}}</text>
+        <text class="vs-playbook__desc">{{item.desc}}</text>
+      </view>
+    </view>
+    <view class="vs-pair">
+      <button class="vs-btn ghost" bindtap="onPrevStep">上一步</button>
+      <button class="vs-btn" bindtap="onNextStep">下一步：文案</button>
+    </view>
+  </view>
+
+  <view class="vs-card" wx:elif="{{step === 3}}">
+    <text class="vs-card__title">海报文案</text>
+    <text class="vs-card__sub">可手填，或用 AI 生成 3 套方案（{{copyPoints}} 积分/次）</text>
+    <button class="vs-btn ghost" loading="{{copyBusy}}" bindtap="onAiCopy">AI 生成文案包</button>
+    <view class="vs-copy-list" wx:if="{{copyItems.length}}">
+      <view
+        wx:for="{{copyItems}}"
+        wx:key="index"
+        class="vs-copy {{copyIndex === index ? 'on' : ''}}"
+        data-index="{{index}}"
+        bindtap="onPickCopy"
+      >
+        <text class="vs-copy__h">{{item.headline}}</text>
+        <text class="vs-copy__s">{{item.subheadline}}</text>
+        <text class="vs-copy__o" wx:if="{{item.offer}}">{{item.offer}}</text>
+      </view>
+    </view>
+    <text class="vs-label">主标题</text>
+    <input class="vs-input" value="{{headline}}" bindinput="onHeadline" maxlength="16" />
+    <text class="vs-label">副标题</text>
+    <input class="vs-input" value="{{subheadline}}" bindinput="onSubheadline" />
+    <text class="vs-label">优惠信息</text>
+    <input class="vs-input" value="{{offer}}" bindinput="onOffer" placeholder="如：¥99 双人餐" />
+    <text class="vs-err" wx:if="{{err}}">{{err}}</text>
+    <view class="vs-pair">
+      <button class="vs-btn ghost" bindtap="onPrevStep">上一步</button>
+      <button class="vs-btn" bindtap="onNextStep">下一步：出图</button>
+    </view>
+  </view>
+
+  <view class="vs-card" wx:elif="{{step === 4}}">
+    <text class="vs-card__title">生成海报</text>
+    <text class="vs-card__sub">可选上传参考图对齐色调；出图 {{imagePoints}} 积分/张</text>
+    <view class="vs-ref" bindtap="onPickRef">
+      <image wx:if="{{refPath}}" class="vs-ref__img" src="{{refPath}}" mode="aspectFill" />
+      <view wx:else class="vs-ref__empty"><text>+ 参考图（可选）</text></view>
+    </view>
+    <view class="vs-chips">
+      <view class="vs-chip {{aspect === '3:4' ? 'on' : ''}}" data-val="3:4" bindtap="onAspect">竖版 3:4</view>
+      <view class="vs-chip {{aspect === '1:1' ? 'on' : ''}}" data-val="1:1" bindtap="onAspect">方形 1:1</view>
+      <view class="vs-chip {{aspect === '9:16' ? 'on' : ''}}" data-val="9:16" bindtap="onAspect">竖屏 9:16</view>
+    </view>
+    <button class="vs-btn" loading="{{genBusy}}" bindtap="onGenerate">一键出图</button>
+    <text class="vs-progress" wx:if="{{progress}}">{{progress}}</text>
+    <text class="vs-err" wx:if="{{err}}">{{err}}</text>
+    <view class="vs-result" wx:if="{{resultUrl}}">
+      <image class="vs-result__img" src="{{resultUrl}}" mode="widthFix" show-menu-by-longpress bindtap="onPreview" />
+      <button class="vs-btn" bindtap="onSaveAlbum">保存到相册</button>
+      <button class="vs-btn ghost" bindtap="onPreview">全屏预览</button>
+    </view>
+    <button class="vs-btn ghost" bindtap="onPrevStep">上一步</button>
+  </view>
+</scroll-view>

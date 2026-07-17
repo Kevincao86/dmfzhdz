@@ -13,6 +13,8 @@
     <text wx:if="{{mainPane === 'generate'}}" class="sv-points-rate">短视频生成 · {{rateShortvideo}}</text>
     <text wx:elif="{{mainPane === 'cloud_batch'}}" class="sv-points-rate">云剪 {{rateCloudEdit}} · 智能成片 {{rateCloudEditSmart}}</text>
   </view>
+  <view wx:if="{{mainPane === 'generate' && pointsHintGenerate}}" class="sv-points-tip">{{pointsHintGenerate}}</view>
+  <view wx:if="{{mainPane === 'cloud_batch' && pointsHintMix}}" class="sv-points-tip">{{pointsHintMix}}</view>
 
   <!-- 顶栏三 Tab（与 Web erp-panel 一致） -->
   <view class="sv-main-tabs">

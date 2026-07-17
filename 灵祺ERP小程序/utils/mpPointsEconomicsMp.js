@@ -12,6 +12,9 @@ const MP_POINTS_CLOUD_EDIT_SMART_MIN_CHARGE = 5
 
 const MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE = 15
 
+const MP_POINTS_VISUAL_STUDIO_COPY_PER_USE = 3
+const MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE = 8
+
 const MP_POINTS_PER_SEC_BY_KIND = {
   shortvideo: MP_POINTS_SHORTVIDEO_PER_SEC,
   cloud_edit_smart: MP_POINTS_CLOUD_EDIT_SMART_PER_SEC,
@@ -22,6 +25,8 @@ const MP_POINTS_USAGE_KIND_LABELS = {
   cloud_edit: '灵祺 AI 云剪',
   cloud_edit_smart: '智能一键成片',
   mix_material_analyze: 'AI 混剪素材分析',
+  visual_studio_copy: 'AI 视觉工坊文案',
+  visual_studio_image: 'AI 视觉工坊生图',
 }
 
 function mpPointsPerSecForKind(kind) {
@@ -51,6 +56,11 @@ function mpPointsCostForUsage(kind, opts) {
     return mpPointsCostForAddonDuration(kind, (opts && opts.durationSec) || 1)
   }
   if (kind === 'mix_material_analyze') return MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE
+  if (kind === 'visual_studio_copy') return MP_POINTS_VISUAL_STUDIO_COPY_PER_USE
+  if (kind === 'visual_studio_image') {
+    const n = Math.max(1, Math.ceil(Number((opts && opts.count) || 1) || 1))
+    return n * MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE
+  }
   return 0
 }
 
@@ -60,6 +70,12 @@ function formatMpPointsRateLabel(kind) {
   }
   if (kind === 'mix_material_analyze') {
     return `${MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE} 积分/次`
+  }
+  if (kind === 'visual_studio_copy') {
+    return `${MP_POINTS_VISUAL_STUDIO_COPY_PER_USE} 积分/次`
+  }
+  if (kind === 'visual_studio_image') {
+    return `${MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE} 积分/张`
   }
   const rate = mpPointsPerSecForKind(kind)
   if (rate != null) return `${rate} 积分/秒`
@@ -84,6 +100,8 @@ module.exports = {
   MP_POINTS_CLOUD_EDIT_MAX_SEC,
   MP_POINTS_CLOUD_EDIT_SMART_PER_SEC,
   MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE,
+  MP_POINTS_VISUAL_STUDIO_COPY_PER_USE,
+  MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE,
   mpPointsCostForUsage,
   formatMpPointsRateLabel,
   formatAddonSpendHint,

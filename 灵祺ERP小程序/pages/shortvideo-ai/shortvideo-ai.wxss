@@ -75,6 +75,17 @@
   color: #7c3aed;
 }
 
+.sv-points-tip {
+  margin: 0 28rpx 16rpx;
+  padding: 16rpx 18rpx;
+  border-radius: 12rpx;
+  background: #fff7ed;
+  border: 1rpx solid #fed7aa;
+  font-size: 22rpx;
+  line-height: 1.55;
+  color: #9a3412;
+}
+
 .sv-main-tabs {
   display: flex;
   margin: 0 24rpx 20rpx;

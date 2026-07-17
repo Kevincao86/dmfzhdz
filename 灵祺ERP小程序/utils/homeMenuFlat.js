@@ -27,6 +27,8 @@ const GRID_VISUAL = {
   评价管理: { glyph: '评', tone: 'green' },
   'GEO 运营优化': { glyph: '址', tone: 'green' },
   'AI 文章与话题': { glyph: '文', tone: 'purple' },
+  AI视觉工坊: { glyph: '视', tone: 'indigo' },
+  'AI 视觉工坊': { glyph: '视', tone: 'indigo' },
   短视频AI处理: { glyph: '剪', tone: 'orange' },
   '短视频优化 · 看板': { glyph: '视', tone: 'orange' },
   直播间分析: { glyph: '播', tone: 'pink' },
