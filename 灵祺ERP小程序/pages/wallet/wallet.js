@@ -146,7 +146,7 @@ Page({
       payTitle: title,
       payTiers: tiers,
       payStep: 'choose',
-      channel: '',
+      channel: 'wechat',
       tierIndex: 0,
       useCustom: false,
       customYuan: '',

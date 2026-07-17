@@ -62,14 +62,7 @@ Page({
   },
 
   onGuestBrowse() {
-    if (devAuth.isDevSkipLogin()) {
-      devAuth.applyDevSession()
-    } else {
-      try {
-        wx.setStorageSync('meoo_guest_browse', '1')
-      } catch (_) {}
-    }
-    wx.switchTab({ url: '/pages/functions/functions' })
+    // 已取消免登录预览入口；保留方法避免历史绑定报错
   },
 
   onDevPreview() {

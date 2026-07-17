@@ -105,10 +105,9 @@
       disabled="{{busy || wxBusy}}"
       bindtap="onWxLogin"
     >
-      <text class="wx-icon">微</text>
+      <image class="wx-icon" src="/images/payment/wechat.png" mode="aspectFit" />
       <text>微信一键登录</text>
     </button>
-    <button class="btn-v2 guest-browse" bindtap="onGuestBrowse">免登录游览</button>
     <view wx:if="{{mode === 'login'}}" class="auth-foot">
       <text class="auth-link">忘记密码？</text>
       <text class="auth-link">登录遇到问题？</text>
