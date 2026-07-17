@@ -72,31 +72,20 @@ function getFuzzyLatLng() {
       }
       resolve({ lat, lng })
     }
-    if (typeof wx.getFuzzyLocation === 'function') {
-      wx.getFuzzyLocation({
-        type: 'wgs84',
-        success(res) {
-          done(Number(res.latitude), Number(res.longitude))
-        },
-        fail() {
-          done(null, null)
-        },
-      })
+    // getFuzzyLocation 与 getLocation 在 requiredPrivateInfos 互斥，只声明模糊定位
+    if (typeof wx.getFuzzyLocation !== 'function') {
+      done(null, null)
       return
     }
-    if (typeof wx.getLocation === 'function') {
-      wx.getLocation({
-        type: 'wgs84',
-        success(res) {
-          done(Number(res.latitude), Number(res.longitude))
-        },
-        fail() {
-          done(null, null)
-        },
-      })
-      return
-    }
-    done(null, null)
+    wx.getFuzzyLocation({
+      type: 'wgs84',
+      success(res) {
+        done(Number(res.latitude), Number(res.longitude))
+      },
+      fail() {
+        done(null, null)
+      },
+    })
   })
 }
 
