@@ -98,7 +98,7 @@
       </view>
     </view>
     <view wx:else>
-      <text class="sub-sheet-desc">请使用{{channel === 'alipay' ? '支付宝' : '抖音'}}扫码完成支付</text>
+      <text class="sub-sheet-desc">请使用微信完成支付</text>
       <text class="sub-countdown">剩余 {{remainSecText}}</text>
       <image wx:if="{{qrUrl}}" class="sub-qr" src="{{qrUrl}}" mode="aspectFit" show-menu-by-longpress="{{true}}" />
       <text wx:if="{{polling}}" class="sub-sheet-desc">等待支付完成，约 20 秒内与电脑端同步…</text>

@@ -154,7 +154,7 @@ Page({
     this.setData({
       paySheetOpen: true,
       payErr: '',
-      channel: '',
+      channel: 'wechat',
       payStep: 'choose',
       qrUrl: '',
       remainSecText: '05:00',
