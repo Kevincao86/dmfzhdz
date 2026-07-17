@@ -126,7 +126,10 @@ export function findTalentLibraryEntriesForAccount(
   return entries.filter((e) => {
     const entryPhone = libraryEntryPhoneKey(e)
     const entryTalent = String(e.lingqiTalentId || '').trim()
-    if (phone.length >= 11 && entryPhone === phone) return true
+    // 优先且严格：登录手机号一致（避免共用 LQ-D 时把别人资料合进来）
+    if (phone.length >= 11) {
+      return entryPhone === phone
+    }
     if (talentId && entryTalent === talentId) return true
     return false
   })
@@ -162,6 +165,7 @@ function mergeScalarFields(
   }
   if (!String(next.province || '').trim() && donor.province) next.province = String(donor.province).trim()
   if (!String(next.city || '').trim() && donor.city) next.city = String(donor.city).trim()
+  if (!String(next.gender || '').trim() && donor.gender) next.gender = String(donor.gender).trim()
   if (!String(next.contact || '').trim() && 'contact' in donor) {
     next.contact = String(donor.contact || '').trim()
   }
@@ -188,12 +192,29 @@ export function enrichMemberFromRegistrySources(
 
   if (!member && libEntries.length === 0 && siblings.length === 0) return null
 
+  const members = data.mpTalentMembers ?? []
+  const boundMember = memberId ? members.find((m) => m.id === memberId) : null
+  const boundMemberPhone = boundMember ? memberPhoneKey(boundMember) : ''
+  const safeMemberId =
+    memberId && boundMemberPhone && phone.length >= 11 && boundMemberPhone !== phone
+      ? ''
+      : memberId
+  const libTalentId = String(libEntries[0]?.lingqiTalentId || '').trim()
+  const boundTalentMember = accTalentId
+    ? members.find((m) => String(m.lingqiTalentId || '').trim() === accTalentId)
+    : null
+  const boundTalentPhone = boundTalentMember ? memberPhoneKey(boundTalentMember) : ''
+  const safeTalentId =
+    accTalentId && boundTalentPhone && phone.length >= 11 && boundTalentPhone !== phone
+      ? libTalentId || undefined
+      : accTalentId || libTalentId || undefined
+
   const now = new Date().toLocaleString('zh-CN', { hour12: false })
   let base: RegistryMpTalentMember =
     member ??
     ({
-      id: memberId || `MTM-${Date.now()}`,
-      lingqiTalentId: accTalentId || undefined,
+      id: safeMemberId || `MTM-${Date.now()}`,
+      lingqiTalentId: safeTalentId,
       contact: phone || '',
       wechatId: phone || '',
       wxNickName: '',
@@ -203,11 +224,11 @@ export function enrichMemberFromRegistrySources(
       updatedAt: now,
     } as RegistryMpTalentMember)
 
-  if (memberId) base = { ...base, id: memberId }
-  if (accTalentId) base = { ...base, lingqiTalentId: accTalentId }
+  if (safeMemberId) base = { ...base, id: safeMemberId }
+  if (safeTalentId) base = { ...base, lingqiTalentId: safeTalentId }
   if (phone.length >= 11) {
-    if (!String(base.contact || '').trim()) base = { ...base, contact: phone }
-    if (!String(base.wechatId || '').trim()) base = { ...base, wechatId: phone }
+    // 登录手机号为准，避免共用 LQ-D 时残留他人 contact
+    base = { ...base, contact: phone, wechatId: String(base.wechatId || '').trim() || phone }
   }
 
   let platformProfiles = memberProfilesToLooseMap(base as MemberWithPlatformProfiles)
