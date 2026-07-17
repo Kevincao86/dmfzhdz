@@ -82,6 +82,12 @@ const SECTIONS = [
       },
       {
         kind: 'link',
+        url: '/pages/ai-visual-studio/ai-visual-studio',
+        title: 'AI 视觉工坊',
+        desc: '多端海报 · AI 文案 · 一键出图（对齐电脑端）',
+      },
+      {
+        kind: 'link',
         url: '/pages/shortvideo-ai/shortvideo-ai',
         title: '短视频AI处理',
         desc: '可灵成片 · ICE 云剪 · 对齐电脑端',

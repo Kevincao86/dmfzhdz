@@ -34,6 +34,21 @@ function klingModelLabel(id) {
   return row.id === KLING_DEFAULT_MODEL_ID ? VIDEO_MODEL_DEFAULT_LABEL : row.label
 }
 
+const SMART_EFFECT_LABEL = '智能（按内容自动转场）'
+
+function ensureSmartInPresets(presets) {
+  const list = Array.isArray(presets) ? presets.map(String).filter(Boolean) : []
+  if (!list.length) return ['无附加特效', SMART_EFFECT_LABEL, '淡入淡出']
+  if (list.some((p) => /智能/.test(p))) return list
+  const noneIdx = list.findIndex((p) => /无附加/.test(p))
+  if (noneIdx >= 0) {
+    list.splice(noneIdx + 1, 0, SMART_EFFECT_LABEL)
+    return list
+  }
+  list.unshift(SMART_EFFECT_LABEL)
+  return list
+}
+
 Page({
   data: {
     mainTabs: MAIN_TABS,
@@ -129,8 +144,10 @@ Page({
     aspectId: '9:16',
     aspectPresetIdx: 0,
     clipEndSec: 10,
-    presetOptions: ['无附加特效', '淡入淡出'],
+    presetOptions: ['无附加特效', SMART_EFFECT_LABEL, '淡入淡出'],
     presetIdx: 0,
+    pointsHintGenerate: '',
+    pointsHintMix: '',
 
     pendingCount: 0,
     totalBatchRuns: 0,
@@ -164,6 +181,7 @@ Page({
     await this.loadIceCfg()
     await this.loadPointsBalance()
     this.syncIceDerived()
+    this.refreshPointsHints()
   },
 
   async loadPointsBalance() {
@@ -213,13 +231,14 @@ Page({
 
   async ensureCloudEditAffordable() {
     const clipSec = Number(this.data.clipEndSec) || 10
-    if (clipSec > economics.MP_POINTS_CLOUD_EDIT_MAX_SEC) {
+    const kind = this.isSmartPreset() ? 'cloud_edit_smart' : 'cloud_edit'
+    if (kind === 'cloud_edit' && clipSec > economics.MP_POINTS_CLOUD_EDIT_MAX_SEC) {
       this.setData({
         iceErr: `单条云剪时长不超过 ${economics.MP_POINTS_CLOUD_EDIT_MAX_SEC} 秒（${economics.formatMpPointsRateLabel('cloud_edit')}）`,
       })
       return false
     }
-    const r = await erpPoints.checkAddonPointsAffordable('cloud_edit', clipSec)
+    const r = await erpPoints.checkAddonPointsAffordable(kind, clipSec)
     if (!r.ok) {
       this.setData({ iceErr: r.message })
       return false
@@ -229,16 +248,17 @@ Page({
 
   async chargeCloudEdit(iceJobId) {
     const clipSec = Number(this.data.clipEndSec) || 10
+    const kind = this.isSmartPreset() ? 'cloud_edit_smart' : 'cloud_edit'
     const key = String(iceJobId || '').trim() || `ice-${Date.now()}`
     try {
       const spend = await erpPoints.spendAddonPoints({
-        kind: 'cloud_edit',
+        kind,
         durationSec: clipSec,
-        idempotencyKey: `cloud_edit:${key}`,
-        note: `cloud_edit:${key}`,
+        idempotencyKey: `${kind}:${key}`,
+        note: `${kind}:${key}`,
       })
       await this.loadPointsBalance()
-      return economics.formatAddonSpendHint('cloud_edit', spend, clipSec)
+      return economics.formatAddonSpendHint(kind, spend, clipSec)
     } catch (e) {
       return ` · 积分扣减失败：${e && e.message ? e.message : '请稍后查看钱包'}`
     }
@@ -280,8 +300,11 @@ Page({
 
   async loadIceCfg() {
     const cfg = await videoAi.fetchAliyunIceCloudConfig()
-    const presets =
-      cfg && Array.isArray(cfg.presets) && cfg.presets.length ? cfg.presets : ['无附加特效', '淡入淡出']
+    const presets = ensureSmartInPresets(
+      cfg && Array.isArray(cfg.presets) && cfg.presets.length
+        ? cfg.presets
+        : ['无附加特效', '淡入淡出'],
+    )
     const ready = Boolean(cfg && cfg.configured && (cfg.hasOssOutput || cfg.hasVodOutput))
     this.setData({
       iceCfg: cfg,
@@ -291,6 +314,39 @@ Page({
       presetIdx: 0,
     })
     this.syncIceDerived()
+    this.refreshPointsHints()
+  },
+
+  isSmartPreset() {
+    return /智能/.test(String(this.data.presetOptions[this.data.presetIdx] || ''))
+  },
+
+  resolvePipelinePreset() {
+    const label = this.data.presetOptions[this.data.presetIdx] || '无附加特效'
+    if (/智能/.test(String(label))) return '随机转场'
+    return label
+  },
+
+  resolveEditBriefForSubmit() {
+    let brief = String(this.data.editBrief || '').trim()
+    if (this.isSmartPreset()) {
+      brief = `${brief}\n【智能特效】请根据素材画面与节奏自动选择合适的转场与特效，避免生硬硬切。`.trim()
+    }
+    return brief
+  },
+
+  refreshPointsHints() {
+    const genSec = this.estimateShortvideoDurationSec()
+    const mixKind = this.isSmartPreset() ? 'cloud_edit_smart' : 'cloud_edit'
+    const mixSec = Number(this.data.clipEndSec) || 10
+    const genCost = economics.mpPointsCostForUsage('shortvideo', { durationSec: genSec })
+    const mixCost = economics.mpPointsCostForUsage(mixKind, { durationSec: mixSec })
+    this.setData({
+      pointsHintGenerate: `消耗提醒：短视频生成 ${economics.formatMpPointsRateLabel('shortvideo')}；当前约 ${genSec} 秒预计 ${genCost} 积分（与 Web 同一租户钱包）。`,
+      pointsHintMix: this.isSmartPreset()
+        ? `消耗提醒：智能混剪 ${economics.formatMpPointsRateLabel('cloud_edit_smart')}；当前约 ${mixSec} 秒预计 ${mixCost} 积分。`
+        : `消耗提醒：AI 混剪 ${economics.formatMpPointsRateLabel('cloud_edit')}；预计 ${mixCost} 积分/条。`,
+    })
   },
 
   syncIceDerived() {
@@ -352,7 +408,7 @@ Page({
       patch.durationIdx = 1
       patch.sdDurationIdx = 1
     }
-    this.setData(patch)
+    this.setData(patch, () => this.refreshPointsHints())
   },
 
   onPlannerChange(e) {
@@ -363,7 +419,9 @@ Page({
   onSegmentCountChange(e) {
     const opts = this.data.longformSegmentOptions
     const ix = Number(e.detail.value) || 0
-    this.setData({ longformSegmentIdx: ix, longformSegmentCount: opts[ix] || 6 })
+    this.setData({ longformSegmentIdx: ix, longformSegmentCount: opts[ix] || 6 }, () =>
+      this.refreshPointsHints(),
+    )
   },
 
   klingModelChange(e) {
@@ -373,7 +431,7 @@ Page({
     this.setData({ aspectIdx: Number(e.detail.value) || 0 })
   },
   durationChange(e) {
-    this.setData({ durationIdx: Number(e.detail.value) || 0 })
+    this.setData({ durationIdx: Number(e.detail.value) || 0 }, () => this.refreshPointsHints())
   },
   kModeChange(e) {
     this.setData({ kModeIdx: Number(e.detail.value) || 0 })
@@ -382,7 +440,7 @@ Page({
     this.setData({ sdModelIdx: Number(e.detail.value) || 0 })
   },
   sdDurChange(e) {
-    this.setData({ sdDurationIdx: Number(e.detail.value) || 0 })
+    this.setData({ sdDurationIdx: Number(e.detail.value) || 0 }, () => this.refreshPointsHints())
   },
   sdFpsChange(e) {
     this.setData({ sdFpsIdx: Number(e.detail.value) || 0 })
@@ -1074,7 +1132,7 @@ Page({
       imageLabels: imageItems.map((x) => x.label),
       aspectLabel: aspect.label,
       clipEndSec: Number(this.data.clipEndSec) || 10,
-      preset: this.data.presetOptions[this.data.presetIdx] || '无附加特效',
+      preset: this.resolvePipelinePreset(),
       userHint: String(this.data.editBrief || '').trim() || undefined,
     })
     this.setData({ briefAiLoading: false })
@@ -1104,11 +1162,11 @@ Page({
   },
 
   onClipEnd(e) {
-    this.setData({ clipEndSec: Number(e.detail.value) || 10 })
+    this.setData({ clipEndSec: Number(e.detail.value) || 10 }, () => this.refreshPointsHints())
   },
 
   presetChange(e) {
-    this.setData({ presetIdx: Number(e.detail.value) || 0 })
+    this.setData({ presetIdx: Number(e.detail.value) || 0 }, () => this.refreshPointsHints())
   },
 
   getIceAspect() {
@@ -1152,11 +1210,11 @@ Page({
     const pipe = await videoAi.postIcePipeline({
       imageUrls,
       projectName: `灵祺AI云剪-${label}`.slice(0, 120),
-      editBrief: String(this.data.editBrief || '').trim(),
+      editBrief: this.resolveEditBriefForSubmit(),
       width: aspect.width,
       height: aspect.height,
       clipEndSec: Number(this.data.clipEndSec) || 10,
-      preset: this.data.presetOptions[this.data.presetIdx] || '无附加特效',
+      preset: this.resolvePipelinePreset(),
     })
     if (!pipe.ok) {
       this.patchJob(localId, { phase: 'failed', message: pipe.message })
@@ -1178,7 +1236,7 @@ Page({
     if (!this.data.canSubmitIce) return
     if (!(await this.ensureCloudEditAffordable())) return
     const aspect = this.getIceAspect()
-    const editBrief = String(this.data.editBrief || '').trim()
+    const editBrief = this.resolveEditBriefForSubmit()
     const pending = (this.data.jobs || []).filter((j) => j.phase === 'pending' || j.phase === 'failed')
     const batchN = this.data.batchGenerateEnabled ? this.data.batchGenerateCount : 1
     this.setData({ iceBusy: true, iceErr: '', iceHint: '' })
@@ -1193,7 +1251,7 @@ Page({
           width: aspect.width,
           height: aspect.height,
           clipEndSec: Number(this.data.clipEndSec) || 10,
-          preset: this.data.presetOptions[this.data.presetIdx] || '无附加特效',
+          preset: this.resolvePipelinePreset(),
         })
         if (!pipe.ok) {
           this.patchJob(job.id, { phase: 'failed', message: pipe.message })

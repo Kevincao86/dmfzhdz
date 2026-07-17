@@ -13,11 +13,18 @@ function readBalance(summaryOrResult) {
   return pkg + rec
 }
 
-function checkAddonPointsAffordable(kind, durationSec) {
-  const sec = Math.max(1, Math.ceil(Number(durationSec) || 1))
-  const required = economics.mpPointsCostForUsage(kind, { durationSec: sec })
+function checkAddonPointsAffordable(kind, durationSec, extra) {
+  const flatKinds = new Set(['visual_studio_copy', 'visual_studio_image', 'mix_material_analyze'])
+  const sec = flatKinds.has(kind) ? undefined : Math.max(1, Math.ceil(Number(durationSec) || 1))
+  const count = extra && extra.count != null ? Number(extra.count) : 1
+  const required = economics.mpPointsCostForUsage(kind, {
+    durationSec: sec || 1,
+    count,
+  })
+  const payload = { kind }
+  if (sec != null) payload.durationSec = sec
   return billing
-    .checkErpPointsAffordable({ kind, durationSec: sec })
+    .checkErpPointsAffordable(payload)
     .then((r) => {
       const balance = readBalance(r)
       if (balance < required) {
@@ -37,19 +44,66 @@ function checkAddonPointsAffordable(kind, durationSec) {
 }
 
 function spendAddonPoints(opts) {
-  const sec = Math.max(1, Math.ceil(Number(opts.durationSec) || 1))
-  return billing
-    .spendErpPointsForUsage({
-      kind: opts.kind,
-      durationSec: sec,
-      idempotencyKey: opts.idempotencyKey,
-      note: opts.note,
-    })
-    .then((r) => ({
-      pointsCharged: Math.max(0, Math.floor(Number(r.pointsCharged) || 0)),
-      balance: readBalance(r),
-      already: r.already === true,
-    }))
+  const flatKinds = new Set(['visual_studio_copy', 'visual_studio_image', 'mix_material_analyze'])
+  const kind = opts.kind
+  const sec = flatKinds.has(kind)
+    ? undefined
+    : Math.max(1, Math.ceil(Number(opts.durationSec) || 1))
+  const payload = {
+    kind,
+    idempotencyKey: opts.idempotencyKey,
+    note: opts.note,
+  }
+  if (sec != null) payload.durationSec = sec
+  return billing.spendErpPointsForUsage(payload).then((r) => ({
+    pointsCharged: Math.max(0, Math.floor(Number(r.pointsCharged) || 0)),
+    balance: readBalance(r),
+    already: r.already === true,
+  }))
+}
+
+async function assertVisualStudioCopyAffordable() {
+  const r = await checkAddonPointsAffordable('visual_studio_copy')
+  if (!r.ok) {
+    const err = new Error(r.message || '积分不足')
+    err.code = 'points_insufficient'
+    throw err
+  }
+  return r
+}
+
+async function spendVisualStudioCopyPoints(opts) {
+  return spendAddonPoints({
+    kind: 'visual_studio_copy',
+    idempotencyKey: opts && opts.idempotencyKey,
+    note: (opts && opts.note) || '视觉工坊文案包',
+  })
+}
+
+async function assertVisualStudioImageAffordable(count) {
+  const r = await checkAddonPointsAffordable('visual_studio_image', 1, { count: count || 1 })
+  if (!r.ok) {
+    const err = new Error(r.message || '积分不足')
+    err.code = 'points_insufficient'
+    throw err
+  }
+  return r
+}
+
+async function spendVisualStudioImagePoints(opts) {
+  return spendAddonPoints({
+    kind: 'visual_studio_image',
+    idempotencyKey: opts && opts.idempotencyKey,
+    note: (opts && opts.note) || '视觉工坊生图',
+  })
+}
+
+function affordActionFromError(e) {
+  const msg = String((e && e.message) || e || '')
+  if (/积分不足|points_insufficient|余额不足/i.test(msg) || (e && e.code === 'points_insufficient')) {
+    return 'recharge'
+  }
+  return ''
 }
 
 function fetchPointsBalance() {
@@ -60,4 +114,11 @@ module.exports = {
   checkAddonPointsAffordable,
   spendAddonPoints,
   fetchPointsBalance,
+  assertVisualStudioCopyAffordable,
+  spendVisualStudioCopyPoints,
+  assertVisualStudioImageAffordable,
+  spendVisualStudioImagePoints,
+  affordActionFromError,
+  VISUAL_STUDIO_COPY_POINTS: economics.MP_POINTS_VISUAL_STUDIO_COPY_PER_USE,
+  VISUAL_STUDIO_IMAGE_POINTS: economics.MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE,
 }

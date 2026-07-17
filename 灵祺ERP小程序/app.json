@@ -37,6 +37,7 @@
     "pages/leads-center/leads-center",
     "pages/geo-assist/geo-assist",
     "pages/ai-content/ai-content",
+    "pages/ai-visual-studio/ai-visual-studio",
     "pages/shortvideo-ai/shortvideo-ai",
     "pages/notifications/notifications",
     "pages/subscription/subscription",
