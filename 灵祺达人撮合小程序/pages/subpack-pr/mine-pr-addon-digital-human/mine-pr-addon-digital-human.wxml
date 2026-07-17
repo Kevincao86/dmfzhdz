@@ -1,7 +1,7 @@
 <scroll-view class="addon-page addon-scroll {{lqThemeClass}}" scroll-y enhanced show-scrollbar="{{false}}">
   <view class="addon-mini-hero addon-mini-hero--rose">
     <text class="addon-mini-hero__title">数字人口播</text>
-    <text class="addon-mini-hero__sub">选形象 · TTS 配音 · 口播成片一键生成</text>
+    <text class="addon-mini-hero__sub">选形象 · 配音试听 · 口播成片一键生成</text>
   </view>
   <view class="addon-tabs">
     <view class="addon-tab {{mainTab === 'create' ? 'addon-tab--on' : ''}}" data-tab="create" bindtap="onTab">创作口播</view>
@@ -21,18 +21,37 @@
 
     <view class="addon-card" wx:if="{{step === 1}}">
       <text class="addon-card__title">选择形象</text>
+      <text class="addon-card__sub">点选头像即可试听预设配音；也可创建自己的形象与音色</text>
       <view class="addon-chips">
         <view class="addon-chip {{avatarFilter === 'all' ? 'addon-chip--on' : ''}}" data-filter="all" bindtap="onAvatarFilter">全部</view>
         <view class="addon-chip {{avatarFilter === 'realistic' ? 'addon-chip--on' : ''}}" data-filter="realistic" bindtap="onAvatarFilter">写实</view>
         <view class="addon-chip {{avatarFilter === 'cartoon' ? 'addon-chip--on' : ''}}" data-filter="cartoon" bindtap="onAvatarFilter">卡通</view>
+        <view class="addon-chip {{avatarFilter === 'custom' ? 'addon-chip--on' : ''}}" data-filter="custom" bindtap="onAvatarFilter">我的形象</view>
       </view>
       <view class="addon-avatar-grid">
         <view wx:for="{{filteredAvatars}}" wx:key="id" class="addon-avatar" data-id="{{item.id}}" bindtap="onAvatar">
           <image class="addon-avatar__img {{avatarId === item.id ? 'addon-avatar__img--on' : ''}}" src="{{item.previewUrl}}" mode="aspectFill" />
           <text class="addon-avatar__name">{{item.name}}</text>
-          <text class="addon-avatar__tag">{{item.tag}}</text>
+          <text class="addon-avatar__tag">{{item.voiceLabel || item.tag}}</text>
+          <text class="addon-avatar__hint" wx:if="{{avatarId === item.id && ttsPlaying}}">试听中…</text>
+          <text class="addon-avatar__hint" wx:elif="{{avatarId === item.id && ttsBusy}}">合成中…</text>
+          <text class="addon-avatar__hint" wx:elif="{{avatarId === item.id}}">点击可再试听</text>
         </view>
       </view>
+      <text class="addon-err" wx:if="{{err}}">{{err}}</text>
+
+      <view class="addon-create-box">
+        <text class="addon-card__title">创建形象</text>
+        <text class="addon-card__sub">上传照片后，再上传一段自己的声音样本，生成音色并保存</text>
+        <text class="addon-label">形象名称</text>
+        <input class="addon-input" placeholder="如：店长小美" value="{{createName}}" bindinput="onCreateName" />
+        <button class="addon-btn addon-btn--ghost" bindtap="onPickCreatePhoto">{{createPhotoPath ? '已选照片 · 重新选择' : '上传照片'}}</button>
+        <image wx:if="{{createPhotoPath}}" class="addon-thumb" src="{{createPhotoPath}}" mode="aspectFill" />
+        <button class="addon-btn addon-btn--ghost" bindtap="onPickCreateVoice">{{createVoiceName ? '已选音色 · ' + createVoiceName : '上传自己的音色样本'}}</button>
+        <text class="addon-hint" wx:if="{{createVoiceName}}">将用该样本生成专属音色（试听时可验证）</text>
+        <button class="addon-btn" loading="{{createBusy}}" disabled="{{createBusy}}" bindtap="onSaveCreateAvatar">生成音色并保存形象</button>
+      </view>
+
       <button class="addon-btn" bindtap="onNextStep">下一步：创作内容</button>
     </view>
 
@@ -86,18 +105,10 @@
 
     <view class="addon-card" wx:elif="{{step === 4}}">
       <text class="addon-card__title">预览确认</text>
-      <text class="addon-card__sub">选择 TTS 音色并试听（与星选平台同源 MiniMax 神经语音）</text>
-      <text class="addon-label">TTS 语音</text>
-      <picker mode="selector" range="{{voiceLabels}}" value="{{voiceIndex}}" bindchange="onVoicePick">
-        <view class="addon-input">{{voiceLabel || '请选择音色'}}</view>
-      </picker>
-      <text class="addon-label">语速 {{speechRate}}</text>
-      <slider min="80" max="120" step="1" value="{{speechRate * 100}}" bindchange="onSpeechRateChange" show-value="{{false}}" activeColor="#2563eb" />
+      <text class="addon-card__sub">形象 {{selectedAvatarName}} · 配音 {{voiceLabel}}；确认口播与参数后提交合成</text>
       <view class="addon-out">
         <text class="addon-out__text">{{script}}</text>
       </view>
-      <text class="addon-err" wx:if="{{err}}">{{err}}</text>
-      <button class="addon-btn addon-btn--ghost" loading="{{ttsBusy}}" bindtap="onTtsPreview">{{ttsPlaying ? '播放中…' : 'TTS 试听'}}</button>
       <view class="addon-pair">
         <button class="addon-btn addon-btn--ghost" bindtap="onPrevStep">上一步</button>
         <button class="addon-btn" bindtap="onNextStep">提交合成</button>

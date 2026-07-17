@@ -44,7 +44,12 @@ const PRESET_AVATARS = [...REAL_AVATARS, ...CARTOON_AVATARS].map((a) => ({
   ...a,
   previewUrl: `${AVATAR_CDN}/${a.id}.jpg?v=${AVATAR_ASSET_VERSION}`,
   voicePresetId: `v-${a.id}`,
+  voiceLabel: `${a.name} · ${a.tag}`,
+  custom: false,
 }))
+
+const CUSTOM_AVATARS_KEY = 'meoo_mp_digital_human_custom_avatars_v1'
+const TTS_PREVIEW_SAMPLE = '大家好，我是您的数字人主播，这是一段音色试听。'
 
 const BACKGROUNDS = [
   { id: 'studio', label: '演播室' },
@@ -137,7 +142,16 @@ function voiceOptionsForAvatar(avatarId) {
   return ordered
 }
 
-function voiceById(voiceId, avatarId) {
+function voiceById(voiceId, avatarId, customAvatar) {
+  if (customAvatar && customAvatar.referenceAudioBase64) {
+    return {
+      voicePresetId: 'v-clone',
+      speechRate: Number(customAvatar.speechRate) || 1,
+      speechPitch: Number(customAvatar.speechPitch) || 1,
+      label: customAvatar.voiceLabel || '我的音色',
+      referenceAudioBase64: customAvatar.referenceAudioBase64,
+    }
+  }
   const hit = ALL_VOICE_OPTIONS.find((v) => v.id === voiceId)
   if (hit) {
     return {
@@ -149,6 +163,45 @@ function voiceById(voiceId, avatarId) {
     }
   }
   return { ...voiceForAvatar(avatarId), label: '默认音色' }
+}
+
+function loadCustomAvatars() {
+  try {
+    const raw = wx.getStorageSync(CUSTOM_AVATARS_KEY)
+    const list = typeof raw === 'string' ? JSON.parse(raw) : raw
+    if (!Array.isArray(list)) return []
+    return list
+      .filter((a) => a && a.id && a.previewUrl)
+      .map((a) => ({
+        ...a,
+        custom: true,
+        style: a.style || 'realistic',
+        tag: a.tag || '自定义',
+        voiceLabel: a.voiceLabel || '我的音色',
+        voicePresetId: a.voicePresetId || 'v-clone',
+      }))
+  } catch (_) {
+    return []
+  }
+}
+
+function saveCustomAvatars(list) {
+  wx.setStorageSync(CUSTOM_AVATARS_KEY, JSON.stringify((list || []).slice(0, 20)))
+}
+
+function upsertCustomAvatar(avatar) {
+  const list = loadCustomAvatars().filter((a) => a.id !== avatar.id)
+  list.unshift(avatar)
+  saveCustomAvatars(list)
+  return list
+}
+
+function allAvatars() {
+  return [...loadCustomAvatars(), ...PRESET_AVATARS]
+}
+
+function findAvatar(avatarId) {
+  return allAvatars().find((a) => a.id === avatarId) || PRESET_AVATARS[0]
 }
 
 function loadWorks() {
@@ -179,9 +232,14 @@ module.exports = {
   SUBTITLE_STYLES,
   WIZARD_STEPS,
   ALL_VOICE_OPTIONS,
+  TTS_PREVIEW_SAMPLE,
   voiceForAvatar,
   voiceOptionsForAvatar,
   voiceById,
+  loadCustomAvatars,
+  upsertCustomAvatar,
+  allAvatars,
+  findAvatar,
   loadWorks,
   upsertWork,
 }

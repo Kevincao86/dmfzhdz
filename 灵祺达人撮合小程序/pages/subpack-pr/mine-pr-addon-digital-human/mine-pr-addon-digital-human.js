@@ -10,12 +10,13 @@ Page({
     step: 1,
     wizardSteps: dhPresets.WIZARD_STEPS,
     avatarFilter: 'all',
-    avatars: dhPresets.PRESET_AVATARS,
-    filteredAvatars: dhPresets.PRESET_AVATARS,
+    avatars: dhPresets.allAvatars(),
+    filteredAvatars: dhPresets.allAvatars(),
     backgrounds: dhPresets.BACKGROUNDS,
     gestures: dhPresets.GESTURES,
     subtitleStyles: dhPresets.SUBTITLE_STYLES,
     avatarId: 'av-real-1',
+    selectedAvatarName: '晓晨',
     backgroundId: 'studio',
     gestureId: 'none',
     subtitleId: 'bottom-white',
@@ -30,25 +31,30 @@ Page({
     renderBusy: false,
     aiScriptBusy: false,
     linkBusy: false,
+    createBusy: false,
     err: '',
     progress: '',
     previewUrl: '',
     ttsPlaying: false,
-    voiceOptions: [],
-    voiceLabels: [],
-    voiceIndex: 0,
-    voiceId: '',
-    voiceLabel: '',
-    speechRate: 1,
+    voiceId: 'v-av-real-1',
+    voiceLabel: '晓晨 · 商务男声',
+    speechRate: 0.94,
+    createName: '',
+    createPhotoPath: '',
+    createVoicePath: '',
+    createVoiceName: '',
+    createVoiceBase64: '',
   },
   onShow() {
     if (!mpAddonPageGate.ensureAddonPageAccess('digitalHuman')) return
-    this.applyAvatarFilter(this.data.avatarFilter)
-    this.syncVoiceOptions(this.data.avatarId)
+    this.reloadAvatars(this.data.avatarFilter)
     this.setData({ works: dhPresets.loadWorks() })
   },
   onUnload() {
     this._cancelled = true
+    this.stopAudio()
+  },
+  stopAudio() {
     if (this._audioCtx) {
       try {
         this._audioCtx.stop()
@@ -56,6 +62,7 @@ Page({
       } catch (_) {}
       this._audioCtx = null
     }
+    this.setData({ ttsPlaying: false })
   },
   onTab(e) {
     const tab = e.currentTarget.dataset.tab
@@ -67,58 +74,208 @@ Page({
     this.setData({ step })
   },
   onNextStep() {
+    if (this.data.step === 1 && !this.data.avatarId) {
+      wx.showToast({ title: '请先选择形象', icon: 'none' })
+      return
+    }
     if (this.data.step < 5) this.setData({ step: this.data.step + 1 })
   },
   onPrevStep() {
     if (this.data.step > 1) this.setData({ step: this.data.step - 1 })
   },
-  applyAvatarFilter(filter) {
-    const avatars = this.data.avatars
-    const filteredAvatars =
-      filter === 'all' ? avatars : avatars.filter((a) => a.style === filter)
-    this.setData({ avatarFilter: filter, filteredAvatars })
+  reloadAvatars(filter) {
+    const avatars = dhPresets.allAvatars()
+    let filteredAvatars = avatars
+    if (filter === 'custom') filteredAvatars = avatars.filter((a) => a.custom)
+    else if (filter === 'realistic' || filter === 'cartoon') {
+      filteredAvatars = avatars.filter((a) => a.style === filter)
+    }
+    const cur = avatars.find((a) => a.id === this.data.avatarId) || avatars[0]
+    this.setData({
+      avatarFilter: filter || 'all',
+      avatars,
+      filteredAvatars,
+      avatarId: cur ? cur.id : '',
+      selectedAvatarName: cur ? cur.name : '',
+      voiceId: cur ? cur.voicePresetId || `v-${cur.id}` : '',
+      voiceLabel: cur ? cur.voiceLabel || cur.tag : '',
+      speechRate: cur && cur.custom ? Number(cur.speechRate) || 1 : dhPresets.voiceForAvatar(cur && cur.id).speechRate,
+    })
   },
   onAvatarFilter(e) {
-    this.applyAvatarFilter(e.currentTarget.dataset.filter)
+    this.reloadAvatars(e.currentTarget.dataset.filter)
   },
   onAvatar(e) {
     const avatarId = e.currentTarget.dataset.id
-    this.setData({ avatarId, previewUrl: '', err: '' })
-    this.syncVoiceOptions(avatarId)
-  },
-  syncVoiceOptions(avatarId) {
-    const voiceOptions = dhPresets.voiceOptionsForAvatar(avatarId)
-    const preferId = `v-${avatarId}`
-    let voiceIndex = Math.max(
-      0,
-      voiceOptions.findIndex((v) => v.id === preferId || v.id === this.data.voiceId),
-    )
-    if (voiceIndex < 0) voiceIndex = 0
-    const selected = voiceOptions[voiceIndex] || voiceOptions[0]
+    const av = dhPresets.findAvatar(avatarId)
     this.setData({
-      voiceOptions,
-      voiceLabels: voiceOptions.map((v) => v.label),
-      voiceIndex,
-      voiceId: selected ? selected.id : '',
-      voiceLabel: selected ? selected.label : '',
-      speechRate: selected ? selected.speechRate : 1,
+      avatarId,
+      selectedAvatarName: av.name,
+      voiceId: av.voicePresetId || `v-${avatarId}`,
+      voiceLabel: av.voiceLabel || av.tag,
+      speechRate: av.custom ? Number(av.speechRate) || 1 : dhPresets.voiceForAvatar(avatarId).speechRate,
+      previewUrl: '',
+      err: '',
+    })
+    void this.previewAvatarVoice(av)
+  },
+  selectedAvatar() {
+    return dhPresets.findAvatar(this.data.avatarId)
+  },
+  voiceParams() {
+    const av = this.selectedAvatar()
+    const base = dhPresets.voiceById(this.data.voiceId, this.data.avatarId, av && av.custom ? av : null)
+    return {
+      ...base,
+      speechRate: Number(this.data.speechRate) || base.speechRate || 1,
+    }
+  },
+  async previewAvatarVoice(av) {
+    const voice = dhPresets.voiceById(av.voicePresetId || `v-${av.id}`, av.id, av.custom ? av : null)
+    this.stopAudio()
+    this.setData({ ttsBusy: true, err: '' })
+    try {
+      const body = {
+        text: dhPresets.TTS_PREVIEW_SAMPLE,
+        voicePresetId: voice.voicePresetId,
+        speechRate: voice.speechRate,
+        speechPitch: voice.speechPitch || 1,
+      }
+      if (voice.referenceAudioBase64) body.referenceAudioBase64 = voice.referenceAudioBase64
+      const r = await addonApi.postDigitalHumanTts(body)
+      if (!r.ok) {
+        this.setData({ err: r.message || '试听失败' })
+        return
+      }
+      const path = media.writeBase64TempFile(r.audioBase64, 'mp3')
+      const ctx = wx.createInnerAudioContext()
+      this._audioCtx = ctx
+      ctx.src = path
+      ctx.onPlay(() => this.setData({ ttsPlaying: true }))
+      ctx.onEnded(() => {
+        this.setData({ ttsPlaying: false })
+        ctx.destroy()
+        if (this._audioCtx === ctx) this._audioCtx = null
+      })
+      ctx.onError(() => {
+        this.setData({ ttsPlaying: false, err: '音频播放失败' })
+        ctx.destroy()
+      })
+      ctx.play()
+    } catch (e) {
+      this.setData({ err: String(e.message || e).slice(0, 80) })
+    } finally {
+      this.setData({ ttsBusy: false })
+    }
+  },
+  onCreateName(e) {
+    this.setData({ createName: e.detail.value })
+  },
+  onPickCreatePhoto() {
+    media
+      .chooseImage()
+      .then((img) => {
+        this.setData({ createPhotoPath: img.path, err: '' })
+      })
+      .catch((e) => {
+        if (!/cancel|取消/i.test(String(e.message || ''))) {
+          wx.showToast({ title: String(e.message || '选择失败').slice(0, 24), icon: 'none' })
+        }
+      })
+  },
+  onPickCreateVoice() {
+    wx.chooseMessageFile({
+      count: 1,
+      type: 'file',
+      extension: ['mp3', 'wav', 'm4a', 'aac'],
+      success: async (res) => {
+        const f = res.tempFiles && res.tempFiles[0]
+        if (!f || !f.path) return
+        try {
+          const b64 = await media.readFileBase64(f.path)
+          if (!b64 || b64.length < 64) {
+            wx.showToast({ title: '音频过短，请换一段', icon: 'none' })
+            return
+          }
+          this.setData({
+            createVoicePath: f.path,
+            createVoiceName: String(f.name || '音色样本').slice(0, 28),
+            createVoiceBase64: b64,
+            err: '',
+          })
+        } catch (e) {
+          wx.showToast({ title: String(e.message || '读取失败').slice(0, 24), icon: 'none' })
+        }
+      },
+      fail: (err) => {
+        const msg = String((err && err.errMsg) || '')
+        if (!/cancel|取消/i.test(msg)) {
+          wx.showToast({ title: '请选择音频文件', icon: 'none' })
+        }
+      },
     })
   },
-  onVoicePick(e) {
-    const voiceIndex = Number(e.detail.value) || 0
-    const selected = (this.data.voiceOptions || [])[voiceIndex]
-    if (!selected) return
-    this.setData({
-      voiceIndex,
-      voiceId: selected.id,
-      voiceLabel: selected.label,
-      speechRate: selected.speechRate,
-    })
-  },
-  onSpeechRateChange(e) {
-    const raw = Number(e.detail.value)
-    const speechRate = Math.round((Number.isFinite(raw) ? raw : 100)) / 100
-    this.setData({ speechRate: Math.min(1.2, Math.max(0.8, speechRate)) })
+  async onSaveCreateAvatar() {
+    const name = String(this.data.createName || '').trim() || '我的形象'
+    if (!this.data.createPhotoPath) {
+      wx.showToast({ title: '请先上传照片', icon: 'none' })
+      return
+    }
+    if (!this.data.createVoiceBase64) {
+      wx.showToast({ title: '请先上传音色样本', icon: 'none' })
+      return
+    }
+    this.setData({ createBusy: true, err: '' })
+    try {
+      const r = await addonApi.postDigitalHumanTts({
+        text: dhPresets.TTS_PREVIEW_SAMPLE,
+        voicePresetId: 'v-clone',
+        speechRate: 1,
+        speechPitch: 1,
+        referenceAudioBase64: this.data.createVoiceBase64,
+      })
+      if (!r.ok) {
+        this.setData({ err: r.message || '音色生成失败，请换一段更清晰的录音' })
+        return
+      }
+      const id = `custom-${Date.now()}`
+      const avatar = {
+        id,
+        name,
+        tag: '自定义',
+        voiceLabel: `${name} · 我的音色`,
+        gender: '女',
+        style: 'realistic',
+        bodyFrame: 'half',
+        previewUrl: this.data.createPhotoPath,
+        custom: true,
+        voicePresetId: 'v-clone',
+        speechRate: 1,
+        speechPitch: 1,
+        referenceAudioBase64: this.data.createVoiceBase64,
+      }
+      dhPresets.upsertCustomAvatar(avatar)
+      this.setData({
+        createName: '',
+        createPhotoPath: '',
+        createVoicePath: '',
+        createVoiceName: '',
+        createVoiceBase64: '',
+        avatarId: id,
+        selectedAvatarName: name,
+        voiceId: 'v-clone',
+        voiceLabel: avatar.voiceLabel,
+        avatarFilter: 'custom',
+      })
+      this.reloadAvatars('custom')
+      this.setData({ avatarId: id, selectedAvatarName: name, voiceLabel: avatar.voiceLabel })
+      wx.showToast({ title: '形象已保存', icon: 'success' })
+      void this.previewAvatarVoice(avatar)
+    } catch (e) {
+      this.setData({ err: String(e.message || e).slice(0, 80) })
+    } finally {
+      this.setData({ createBusy: false })
+    }
   },
   onDriveMode(e) {
     this.setData({ driveMode: e.currentTarget.dataset.mode })
@@ -146,16 +303,6 @@ Page({
   },
   onAiTopic(e) {
     this.setData({ aiTopic: e.detail.value })
-  },
-  selectedAvatar() {
-    return this.data.avatars.find((a) => a.id === this.data.avatarId) || this.data.avatars[0]
-  },
-  voiceParams() {
-    const base = dhPresets.voiceById(this.data.voiceId, this.data.avatarId)
-    return {
-      ...base,
-      speechRate: Number(this.data.speechRate) || base.speechRate || 1,
-    }
   },
   async onAiScript() {
     const topic = String(this.data.aiTopic || this.data.script || '').trim()
@@ -209,53 +356,6 @@ Page({
       this.setData({ linkBusy: false })
     }
   },
-  async onTtsPreview() {
-    const text = String(this.data.script || '').trim()
-    if (text.length < 4) {
-      wx.showToast({ title: '口播稿至少 4 字', icon: 'none' })
-      return
-    }
-    if (this._audioCtx) {
-      try {
-        this._audioCtx.stop()
-        this._audioCtx.destroy()
-      } catch (_) {}
-      this._audioCtx = null
-    }
-    this.setData({ ttsBusy: true, err: '' })
-    try {
-      const voice = this.voiceParams()
-      const r = await addonApi.postDigitalHumanTts({
-        text: text.slice(0, 600),
-        voicePresetId: voice.voicePresetId,
-        speechRate: voice.speechRate,
-        speechPitch: voice.speechPitch,
-      })
-      if (!r.ok) {
-        this.setData({ err: r.message || '试听失败' })
-        return
-      }
-      const path = media.writeBase64TempFile(r.audioBase64, 'mp3')
-      const ctx = wx.createInnerAudioContext()
-      this._audioCtx = ctx
-      ctx.src = path
-      ctx.onPlay(() => this.setData({ ttsPlaying: true }))
-      ctx.onEnded(() => {
-        this.setData({ ttsPlaying: false })
-        ctx.destroy()
-        if (this._audioCtx === ctx) this._audioCtx = null
-      })
-      ctx.onError(() => {
-        this.setData({ ttsPlaying: false, err: '音频播放失败' })
-        ctx.destroy()
-      })
-      ctx.play()
-    } catch (e) {
-      this.setData({ err: String(e.message || e).slice(0, 80) })
-    } finally {
-      this.setData({ ttsBusy: false })
-    }
-  },
   async onGenerate() {
     const text = String(this.data.script || '').trim()
     if (text.length < 8) {
@@ -267,18 +367,25 @@ Page({
     this.setData({ renderBusy: true, err: '', progress: '合成配音…', previewUrl: '', step: 5 })
     try {
       const voice = this.voiceParams()
-      const tts = await addonApi.postDigitalHumanTts({
+      const ttsBody = {
         text: text.slice(0, 800),
         voicePresetId: voice.voicePresetId,
         speechRate: voice.speechRate,
-        speechPitch: voice.speechPitch,
-      })
+        speechPitch: voice.speechPitch || 1,
+      }
+      if (voice.referenceAudioBase64) ttsBody.referenceAudioBase64 = voice.referenceAudioBase64
+      const tts = await addonApi.postDigitalHumanTts(ttsBody)
       if (!tts.ok) {
         this.setData({ err: tts.message || '配音失败' })
         return
       }
       this.setData({ progress: '加载形象…' })
-      const avatarB64 = await media.downloadUrlBase64(avatar.previewUrl)
+      let avatarB64 = ''
+      if (avatar.custom && avatar.previewUrl && !/^https?:\/\//i.test(avatar.previewUrl)) {
+        avatarB64 = await media.readFileBase64(avatar.previewUrl)
+      } else {
+        avatarB64 = await media.downloadUrlBase64(avatar.previewUrl)
+      }
       this.setData({ progress: '提交口型驱动…' })
       const start = await addonApi.postDhS2vStart({
         image_base64: avatarB64,
@@ -328,7 +435,7 @@ Page({
   onOpenWork(e) {
     const url = e.currentTarget.dataset.url
     if (!url) return
-    this.setData({ mainTab: 'create', previewUrl: url, step: 4, progress: '', err: '' })
+    this.setData({ mainTab: 'create', previewUrl: url, step: 5, progress: '', err: '' })
   },
   onSaveWork(e) {
     const url = e.currentTarget.dataset.url

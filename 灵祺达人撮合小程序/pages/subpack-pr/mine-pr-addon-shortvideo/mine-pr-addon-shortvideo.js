@@ -6,7 +6,7 @@ const iceApi = require('../../../utils/mpAddonIceApi.js')
 const addonApi = require('../../../utils/mpAddonMerchantApi.js')
 
 function newJobId() {
-  return `ice-${Date.now()}-${Math.floor(Math.random() * 10000)}`
+  return `mix-${Date.now()}-${Math.floor(Math.random() * 10000)}`
 }
 
 Page({
@@ -56,15 +56,24 @@ Page({
   onShow() {
     if (!mpAddonPageGate.ensureAddonPageAccess('shortvideo')) return
     const access = prFeatureAccess.readAccountPrFeatureAccess(auth.readAccount())
-    let mainPane = 'generate'
-    if (this._initialPane === 'cloud' && access.cloudEdit) mainPane = 'cloud'
-    else if (!access.shortvideo && access.cloudEdit) mainPane = 'cloud'
-    else if (access.shortvideo) mainPane = 'generate'
-    this.setData({
+    const patch = {
       showShortvideo: access.shortvideo,
       showCloudEdit: access.cloudEdit,
-      mainPane,
-    })
+    }
+    // 选相册会触发 onShow；勿把用户已选的「AI 混剪」重置回「短视频生成」
+    if (!this._paneLocked) {
+      let mainPane = 'generate'
+      if (this._initialPane === 'cloud' && access.cloudEdit) mainPane = 'cloud'
+      else if (!access.shortvideo && access.cloudEdit) mainPane = 'cloud'
+      else if (access.shortvideo) mainPane = 'generate'
+      patch.mainPane = mainPane
+      this._paneLocked = true
+    } else if (this.data.mainPane === 'cloud' && !access.cloudEdit && access.shortvideo) {
+      patch.mainPane = 'generate'
+    } else if (this.data.mainPane === 'generate' && !access.shortvideo && access.cloudEdit) {
+      patch.mainPane = 'cloud'
+    }
+    this.setData(patch)
     this.loadIceConfig()
   },
   onUnload() {
@@ -90,6 +99,7 @@ Page({
     }
   },
   onPane(e) {
+    this._paneLocked = true
     this.setData({ mainPane: e.currentTarget.dataset.pane, err: '', progress: '', iceErr: '', iceProgress: '' })
   },
   onLongformMode(e) {
@@ -259,51 +269,67 @@ Page({
     }
     const jobs = [...this.data.videoJobs]
     urls.forEach((u, i) => {
-      jobs.push({ id: newJobId(), label: `视频${jobs.length + i + 1}`, mediaUrl: u, phase: 'pending' })
+      jobs.push({ id: newJobId(), label: `视频 ${jobs.length + i + 1}`, mediaUrl: u, phase: 'pending' })
     })
-    this.setData({ videoJobs: jobs, urlText: '' })
+    this.setData({ videoJobs: jobs, urlText: '', mainPane: 'cloud' })
   },
   onAddImageUrls() {
     const urls = iceApi.parseUrlLines(this.data.imageUrlText)
     if (!urls.length) return
     const items = [...this.data.imageItems]
     urls.forEach((u, i) => {
-      items.push({ id: newJobId(), label: `图片${items.length + i + 1}`, mediaUrl: u })
+      items.push({ id: newJobId(), label: `图片 ${items.length + i + 1}`, mediaUrl: u })
     })
-    this.setData({ imageItems: items, imageUrlText: '' })
+    this.setData({ imageItems: items, imageUrlText: '', mainPane: 'cloud' })
   },
   onUploadIceVideo() {
-    this._runMediaPickOnce('ice-video', () =>
+    this._paneLocked = true
+    this._runMediaPickOnce('mix-video', () =>
       media
-        .chooseVideo()
-        .then((v) => {
-          this.setData({ iceProgress: '上传视频中…' })
-          return iceApi.uploadIceLocalFile(v.path, `ice-${Date.now()}.mp4`, 'video/mp4').then((up) => ({ up, v }))
-        })
-        .then(({ up }) => {
-          if (!up.ok) {
-            wx.showToast({ title: up.message || '上传失败', icon: 'none' })
-            this.setData({ iceProgress: '' })
-            return
+        .chooseVideos(9)
+        .then(async (files) => {
+          const jobs = [...this.data.videoJobs]
+          const total = files.length
+          let okCount = 0
+          for (let i = 0; i < total; i += 1) {
+            const v = files[i]
+            this.setData({ iceProgress: `上传视频 ${i + 1}/${total}…`, mainPane: 'cloud' })
+            const up = await iceApi.uploadIceLocalFile(v.path, `mix-${Date.now()}-${i}.mp4`, 'video/mp4')
+            if (!up.ok) {
+              wx.showToast({ title: up.message || '上传失败', icon: 'none' })
+              continue
+            }
+            okCount += 1
+            jobs.push({
+              id: newJobId(),
+              label: `视频 ${jobs.length + 1}`,
+              mediaUrl: up.mediaUrl,
+              thumb: v.thumb || '',
+              phase: 'pending',
+            })
+            this.setData({ videoJobs: jobs })
           }
-          const jobs = [...this.data.videoJobs, { id: newJobId(), label: up.label || '本地视频', mediaUrl: up.mediaUrl, phase: 'pending' }]
-          this.setData({ videoJobs: jobs, iceProgress: '' })
+          this.setData({ iceProgress: '', mainPane: 'cloud' })
+          if (okCount > 0) {
+            wx.showToast({ title: `已加入 ${okCount} 条`, icon: 'success' })
+          }
         })
         .catch((e) => {
           if (!/cancel|取消/i.test(String(e.message || ''))) {
             wx.showToast({ title: String(e.message || '上传失败').slice(0, 28), icon: 'none' })
           }
-          this.setData({ iceProgress: '' })
+          this.setData({ iceProgress: '', mainPane: 'cloud' })
         }),
     )
   },
   onUploadIceImage() {
-    this._runMediaPickOnce('ice-image', () =>
+    this._paneLocked = true
+    this._runMediaPickOnce('mix-image', () =>
       media
         .chooseImage()
         .then((img) => {
-          this.setData({ iceProgress: '上传图片中…' })
-          return iceApi.uploadIceLocalFile(img.path, `ice-${Date.now()}.jpg`, 'image/jpeg').then((up) => ({ up, img }))
+          this.setData({ iceProgress: '上传图片中…', mainPane: 'cloud' })
+          return iceApi.uploadIceLocalFile(img.path, `mix-${Date.now()}.jpg`, 'image/jpeg').then((up) => ({ up, img }))
         })
         .then(({ up, img }) => {
           if (!up.ok) {
@@ -311,17 +337,18 @@ Page({
             this.setData({ iceProgress: '' })
             return
           }
+          const n = this.data.imageItems.length + 1
           const items = [
             ...this.data.imageItems,
-            { id: newJobId(), label: up.label || '本地图片', mediaUrl: up.mediaUrl, previewUrl: img.path },
+            { id: newJobId(), label: `图片 ${n}`, mediaUrl: up.mediaUrl, previewUrl: img.path },
           ]
-          this.setData({ imageItems: items, iceProgress: '' })
+          this.setData({ imageItems: items, iceProgress: '', mainPane: 'cloud' })
         })
         .catch((e) => {
           if (!/cancel|取消/i.test(String(e.message || ''))) {
             wx.showToast({ title: String(e.message || '上传失败').slice(0, 28), icon: 'none' })
           }
-          this.setData({ iceProgress: '' })
+          this.setData({ iceProgress: '', mainPane: 'cloud' })
         }),
     )
   },
@@ -359,7 +386,7 @@ Page({
   },
   async onSubmitIce() {
     if (!this.data.iceConfigured) {
-      wx.showToast({ title: '云剪未配置，请联系运营', icon: 'none' })
+      wx.showToast({ title: '混剪未开通，请联系运营', icon: 'none' })
       return
     }
     const brief = this.composedBrief().trim()
@@ -375,12 +402,12 @@ Page({
       return
     }
     this._cancelled = false
-    this.setData({ iceBusy: true, iceErr: '', iceProgress: '提交云剪…', iceResultUrl: '' })
+    this.setData({ iceBusy: true, iceErr: '', iceProgress: '提交混剪…', iceResultUrl: '' })
     try {
       if (imageUrls.length) {
         const pipe = await iceApi.postIcePipeline({
           imageUrls,
-          projectName: '灵祺AI云剪-多图成片',
+          projectName: '灵祺AI混剪-多图成片',
           editBrief: brief,
           width: aspect.width,
           height: aspect.height,
@@ -398,7 +425,7 @@ Page({
           this.setData({ iceErr: done.message })
           return
         }
-        this.setData({ iceResultUrl: done.videoUrl, iceProgress: '云剪完成' })
+        this.setData({ iceResultUrl: done.videoUrl, iceProgress: '混剪完成' })
         return
       }
       const job = pending[0]
@@ -407,7 +434,7 @@ Page({
         this.setData({ iceProgress: `提交第 ${i + 1}/${runs} 条…` })
         const pipe = await iceApi.postIcePipeline({
           mediaUrl: job.mediaUrl,
-          projectName: `灵祺AI云剪-${job.label}`.slice(0, 120),
+          projectName: `灵祺AI混剪-${job.label}`.slice(0, 120),
           editBrief: brief,
           width: aspect.width,
           height: aspect.height,
@@ -427,7 +454,7 @@ Page({
         }
         this.setData({ iceResultUrl: done.videoUrl })
       }
-      this.setData({ iceProgress: '云剪完成' })
+      this.setData({ iceProgress: '混剪完成' })
     } catch (e) {
       this.setData({ iceErr: String(e.message || e).slice(0, 100) })
     } finally {

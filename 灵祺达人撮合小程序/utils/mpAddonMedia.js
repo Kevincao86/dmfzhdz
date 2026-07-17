@@ -31,6 +31,43 @@ function chooseVideo() {
   })
 }
 
+/** AI 混剪：一次最多选多条视频（相册） */
+function chooseVideos(maxCount) {
+  const count = Math.min(9, Math.max(1, Number(maxCount) || 9))
+  const privacy = require('./mpPrivacyAuthorize.js')
+  return privacy.ensurePrivacyAuthorizeForMedia().then(
+    () =>
+      new Promise((resolve, reject) => {
+        wx.chooseMedia({
+          count,
+          mediaType: ['video'],
+          sourceType: ['album', 'camera'],
+          maxDuration: 60,
+          success(res) {
+            const files = (res.tempFiles || [])
+              .filter((f) => f && f.tempFilePath)
+              .map((f) => ({
+                path: f.tempFilePath,
+                thumb: String(f.thumbTempFilePath || '').trim(),
+                sizeBytes: Number(f.size) || 0,
+                durationSec: Number(f.duration) || 0,
+              }))
+            if (!files.length) {
+              reject(new Error('cancel'))
+              return
+            }
+            resolve(files)
+          },
+          fail(err) {
+            const msg = String((err && err.errMsg) || err || '')
+            if (/cancel|取消/i.test(msg)) reject(new Error('cancel'))
+            else reject(new Error(msg || '选择视频失败'))
+          },
+        })
+      }),
+  )
+}
+
 function chooseAndUploadRecruitVideo(mpOrderId, applicantId) {
   return videoUpload.chooseAndUploadVideo(mpOrderId, applicantId)
 }
@@ -154,6 +191,7 @@ module.exports = {
   readFileBase64,
   chooseImage,
   chooseVideo,
+  chooseVideos,
   chooseAndUploadRecruitVideo,
   downloadUrlBase64,
   saveVideoToAlbum,
