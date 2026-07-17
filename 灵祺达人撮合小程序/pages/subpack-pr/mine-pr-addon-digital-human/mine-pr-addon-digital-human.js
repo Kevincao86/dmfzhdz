@@ -2,6 +2,7 @@ const mpAddonPageGate = require('../../../utils/mpAddonPageGate.js')
 const addonApi = require('../../../utils/mpAddonMerchantApi.js')
 const media = require('../../../utils/mpAddonMedia.js')
 const dhPresets = require('../../../utils/mpDigitalHumanPresets.js')
+const pointsHints = require('../../../utils/mpAddonPointsHints.js')
 
 Page({
   behaviors: [require('../../../behaviors/identityTheme')],
@@ -44,11 +45,18 @@ Page({
     createVoicePath: '',
     createVoiceName: '',
     createVoiceBase64: '',
+    voiceOptions: dhPresets.ALL_VOICE_OPTIONS,
+    voiceLabels: dhPresets.ALL_VOICE_OPTIONS.map((v) => v.label),
+    voiceIndex: 0,
+    pointsHint: pointsHints.bannerText('digital_human', 15),
   },
   onShow() {
     if (!mpAddonPageGate.ensureAddonPageAccess('digitalHuman')) return
     this.reloadAvatars(this.data.avatarFilter)
-    this.setData({ works: dhPresets.loadWorks() })
+    this.setData({
+      works: dhPresets.loadWorks(),
+      pointsHint: pointsHints.bannerText('digital_human', 15),
+    })
   },
   onUnload() {
     this._cancelled = true
@@ -108,30 +116,46 @@ Page({
   onAvatar(e) {
     const avatarId = e.currentTarget.dataset.id
     const av = dhPresets.findAvatar(avatarId)
+    const preferId = av.voicePresetId || `v-${avatarId}`
+    const voiceOptions = dhPresets.voiceOptionsForAvatar(avatarId)
+    let voiceIndex = Math.max(0, voiceOptions.findIndex((v) => v.id === preferId))
+    const selected = voiceOptions[voiceIndex] || voiceOptions[0]
     this.setData({
       avatarId,
       selectedAvatarName: av.name,
-      voiceId: av.voicePresetId || `v-${avatarId}`,
-      voiceLabel: av.voiceLabel || av.tag,
-      speechRate: av.custom ? Number(av.speechRate) || 1 : dhPresets.voiceForAvatar(avatarId).speechRate,
+      voiceOptions,
+      voiceLabels: voiceOptions.map((v) => v.label),
+      voiceIndex,
+      voiceId: selected ? selected.id : preferId,
+      voiceLabel: selected ? selected.label : av.voiceLabel || av.tag,
+      speechRate: av.custom
+        ? Number(av.speechRate) || 1
+        : selected
+          ? selected.speechRate
+          : dhPresets.voiceForAvatar(avatarId).speechRate,
       previewUrl: '',
       err: '',
     })
-    void this.previewAvatarVoice(av)
+    void this.previewSelectedVoice()
   },
-  selectedAvatar() {
-    return dhPresets.findAvatar(this.data.avatarId)
+  onVoicePick(e) {
+    const voiceIndex = Number(e.detail.value) || 0
+    const selected = (this.data.voiceOptions || [])[voiceIndex]
+    if (!selected) return
+    this.setData({
+      voiceIndex,
+      voiceId: selected.id,
+      voiceLabel: selected.label,
+      speechRate: selected.speechRate,
+    })
+    void this.previewSelectedVoice()
   },
-  voiceParams() {
+  onPreviewVoiceTap() {
+    void this.previewSelectedVoice()
+  },
+  async previewSelectedVoice() {
     const av = this.selectedAvatar()
-    const base = dhPresets.voiceById(this.data.voiceId, this.data.avatarId, av && av.custom ? av : null)
-    return {
-      ...base,
-      speechRate: Number(this.data.speechRate) || base.speechRate || 1,
-    }
-  },
-  async previewAvatarVoice(av) {
-    const voice = dhPresets.voiceById(av.voicePresetId || `v-${av.id}`, av.id, av.custom ? av : null)
+    const voice = this.voiceParams()
     this.stopAudio()
     this.setData({ ttsBusy: true, err: '' })
     try {
@@ -166,6 +190,17 @@ Page({
       this.setData({ err: String(e.message || e).slice(0, 80) })
     } finally {
       this.setData({ ttsBusy: false })
+    }
+  },
+  selectedAvatar() {
+    return dhPresets.findAvatar(this.data.avatarId)
+  },
+  voiceParams() {
+    const av = this.selectedAvatar()
+    const base = dhPresets.voiceById(this.data.voiceId, this.data.avatarId, av && av.custom ? av : null)
+    return {
+      ...base,
+      speechRate: Number(this.data.speechRate) || base.speechRate || 1,
     }
   },
   onCreateName(e) {
@@ -270,7 +305,7 @@ Page({
       this.reloadAvatars('custom')
       this.setData({ avatarId: id, selectedAvatarName: name, voiceLabel: avatar.voiceLabel })
       wx.showToast({ title: '形象已保存', icon: 'success' })
-      void this.previewAvatarVoice(avatar)
+      void this.previewSelectedVoice()
     } catch (e) {
       this.setData({ err: String(e.message || e).slice(0, 80) })
     } finally {

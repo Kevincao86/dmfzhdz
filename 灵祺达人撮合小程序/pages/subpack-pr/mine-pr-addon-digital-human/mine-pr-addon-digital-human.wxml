@@ -21,7 +21,8 @@
 
     <view class="addon-card" wx:if="{{step === 1}}">
       <text class="addon-card__title">选择形象</text>
-      <text class="addon-card__sub">点选头像即可试听预设配音；也可创建自己的形象与音色</text>
+      <text class="addon-card__sub">点选头像试听；也可下方更换预设音色。成片按秒扣积分。</text>
+      <view class="addon-points-tip">{{pointsHint}}</view>
       <view class="addon-chips">
         <view class="addon-chip {{avatarFilter === 'all' ? 'addon-chip--on' : ''}}" data-filter="all" bindtap="onAvatarFilter">全部</view>
         <view class="addon-chip {{avatarFilter === 'realistic' ? 'addon-chip--on' : ''}}" data-filter="realistic" bindtap="onAvatarFilter">写实</view>
@@ -38,6 +39,11 @@
           <text class="addon-avatar__hint" wx:elif="{{avatarId === item.id}}">点击可再试听</text>
         </view>
       </view>
+      <text class="addon-label">预设音色（可改）</text>
+      <picker mode="selector" range="{{voiceLabels}}" value="{{voiceIndex}}" bindchange="onVoicePick">
+        <view class="addon-input">{{voiceLabel || '请选择音色'}}</view>
+      </picker>
+      <button class="addon-btn addon-btn--ghost" loading="{{ttsBusy}}" bindtap="onPreviewVoiceTap">{{ttsPlaying ? '播放中…' : '试听当前音色'}}</button>
       <text class="addon-err" wx:if="{{err}}">{{err}}</text>
 
       <view class="addon-create-box">

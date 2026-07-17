@@ -8,18 +8,11 @@
     <text class="addon-hero__sub">与星选平台同源能力，数据经 ECS 互通</text>
   </view>
 
-  <view class="addon-locked" wx:if="{{!addonsEnabled}}">
-    <view class="addon-locked__icon">🔒</view>
-    <text class="addon-locked__title">增值能力待开通</text>
-    <text class="addon-locked__desc">需由灵祺运营在后台为您开通后方可使用。</text>
-    <text class="addon-locked__link" bindtap="onContactOps">联系运营申请开通</text>
-  </view>
-
   <view class="addon-section">
     <view class="addon-section__head">
       <text class="addon-section__title">AI 运营工具</text>
-      <text class="addon-section__tag" wx:if="{{addonsEnabled}}">已开通</text>
-      <text class="addon-section__tag addon-section__tag--muted" wx:else>待开通</text>
+      <text class="addon-section__tag" wx:if="{{addonsEnabled}}">按档位开通</text>
+      <text class="addon-section__tag addon-section__tag--muted" wx:else>可升级解锁</text>
     </view>
     <view class="addon-grid">
       <view
@@ -29,6 +22,7 @@
         catchtap="onAddonTap"
         data-url="{{item.url}}"
         data-perm="{{item.perm}}"
+        data-title="{{item.title}}"
         hover-class="addon-card--hover"
       >
         <view class="addon-card__icon-wrap">
@@ -39,7 +33,7 @@
           <text class="addon-card__sub">{{item.sub}}</text>
         </view>
         <text class="addon-card__arrow">›</text>
-        <view class="addon-card__lock" wx:if="{{!addonsEnabled}}">🔒</view>
+        <view class="addon-card__lock" wx:if="{{item.locked}}">🔒</view>
       </view>
     </view>
   </view>

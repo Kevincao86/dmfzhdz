@@ -1,25 +1,15 @@
 const prFeatureAccess = require('../../../utils/prFeatureAccess.js')
+const upgradeHint = require('../../../utils/mpAddonUpgradeHint.js')
 
 const AI_ADDONS = [
-  // 爆款 Brief / AI审核 已在「我的」菜单单独入口，不在此 hub 重复
   {
     key: 'shortvideo',
     perm: 'shortvideo',
     title: '短视频 AI 处理',
-    sub: '参考画面 · 文生/图生视频',
+    sub: '文生/图生视频 · AI 混剪',
     glyph: '▶',
     tone: 'violet',
     url: '/pages/subpack-pr/mine-pr-addon-shortvideo/mine-pr-addon-shortvideo',
-  },
-  {
-    key: 'cloudEdit',
-    perm: 'cloudEdit',
-    title: '灵祺 AI 云剪',
-    sub: '批量素材 · ICE 多图/视频成片',
-    glyph: '✂',
-    tone: 'amber',
-    url: '/pages/subpack-pr/mine-pr-addon-shortvideo/mine-pr-addon-shortvideo?pane=cloud',
-    onlyWithoutShortvideo: true,
   },
   {
     key: 'digitalHuman',
@@ -41,20 +31,24 @@ const AI_ADDONS = [
   },
 ]
 
+/** 展示矩阵中可售卖的 AI 增值卡片；未开通标 locked，点击提示升级 */
 function buildAiAddonsFromAccount(account) {
-  const access = prFeatureAccess.readAccountPrFeatureAccess(account)
-  const cards = AI_ADDONS.filter((item) => {
-    if (item.onlyWithoutShortvideo) return access.cloudEdit && !access.shortvideo
-    if (item.perm === 'cloudEdit') return false
-    if (item.perm === 'shortvideo') return access.shortvideo
-    if (item.perm === 'digitalHuman') return access.digitalHuman
-    if (item.perm === 'visualStudio') return access.visualStudio
-    return false
+  return AI_ADDONS.map((item) => {
+    const unlocked = prFeatureAccess.canUseAddonPerm(account, item.perm)
+    const upgradePlan = unlocked ? '' : upgradeHint.suggestUpgradePlanLabel(account, item.perm)
+    return {
+      ...item,
+      unlocked,
+      locked: !unlocked,
+      upgradePlan,
+      cardClass: `addon-card--${item.tone}${unlocked ? '' : ' addon-card--locked'}`,
+      sub: unlocked
+        ? item.sub
+        : upgradePlan
+          ? `需升级至${upgradePlan}`
+          : '需升级会员后使用',
+    }
   })
-  return cards.map((item) => ({
-    ...item,
-    cardClass: `addon-card--${item.tone}`,
-  }))
 }
 
 module.exports = {

@@ -4,6 +4,23 @@ const auth = require('../../../utils/auth.js')
 const media = require('../../../utils/mpAddonMedia.js')
 const iceApi = require('../../../utils/mpAddonIceApi.js')
 const addonApi = require('../../../utils/mpAddonMerchantApi.js')
+const pointsHints = require('../../../utils/mpAddonPointsHints.js')
+const upgradeHint = require('../../../utils/mpAddonUpgradeHint.js')
+
+const SMART_EFFECT_LABEL = '智能（按内容自动转场）'
+
+function ensureSmartInPresets(presets) {
+  const list = Array.isArray(presets) ? presets.map(String).filter(Boolean) : []
+  if (!list.length) return iceApi.ICE_EFFECT_PRESET_LABELS.slice()
+  if (list.some((p) => /智能/.test(p))) return list
+  const noneIdx = list.findIndex((p) => /无附加/.test(p))
+  if (noneIdx >= 0) {
+    list.splice(noneIdx + 1, 0, SMART_EFFECT_LABEL)
+    return list
+  }
+  list.unshift(SMART_EFFECT_LABEL)
+  return list
+}
 
 function newJobId() {
   return `mix-${Date.now()}-${Math.floor(Math.random() * 10000)}`
@@ -49,6 +66,8 @@ Page({
     briefAiBusy: false,
     showShortvideo: true,
     showCloudEdit: true,
+    pointsHintGenerate: pointsHints.bannerText('shortvideo', 60),
+    pointsHintMix: pointsHints.bannerText('cloud_edit'),
   },
   onLoad(options) {
     this._initialPane = String((options && options.pane) || '').trim()
@@ -82,35 +101,47 @@ Page({
   async loadIceConfig() {
     try {
       const cfg = await iceApi.fetchIceConfig()
-      const presets =
-        (cfg && cfg.presets && cfg.presets.length && cfg.presets) ||
-        iceApi.ICE_EFFECT_PRESET_LABELS ||
-        ['无附加特效']
+      const presets = ensureSmartInPresets(
+        (cfg && cfg.presets && cfg.presets.length && cfg.presets) || iceApi.ICE_EFFECT_PRESET_LABELS,
+      )
       this.setData({
         iceConfigured: !!(cfg && cfg.configured),
         icePresets: presets,
         icePreset: this.data.icePreset && presets.includes(this.data.icePreset) ? this.data.icePreset : presets[0],
       })
     } catch (_) {
+      const presets = ensureSmartInPresets(iceApi.ICE_EFFECT_PRESET_LABELS)
       this.setData({
-        icePresets: iceApi.ICE_EFFECT_PRESET_LABELS || ['无附加特效'],
+        icePresets: presets,
         icePreset: '无附加特效',
       })
     }
   },
   onPane(e) {
+    const pane = e.currentTarget.dataset.pane
+    const account = auth.readAccount()
+    if (pane === 'generate' && !this.data.showShortvideo) {
+      upgradeHint.showUpgradeModal(account, 'shortvideo', '短视频 AI 处理')
+      return
+    }
+    if (pane === 'cloud' && !this.data.showCloudEdit) {
+      upgradeHint.showUpgradeModal(account, 'cloudEdit', 'AI 混剪')
+      return
+    }
     this._paneLocked = true
-    this.setData({ mainPane: e.currentTarget.dataset.pane, err: '', progress: '', iceErr: '', iceProgress: '' })
+    this.setData({ mainPane: pane, err: '', progress: '', iceErr: '', iceProgress: '' })
   },
   onLongformMode(e) {
     const longformEnabled = String(e.currentTarget.dataset.on) === '1'
     const durationOptions = longformEnabled
       ? iceApi.LONGFORM_TARGET_TOTAL_OPTIONS || ['15', '30', '45', '60']
       : iceApi.SHORT_VIDEO_DURATION_OPTIONS || ['5', '10', '15']
+    const durationSec = longformEnabled ? '60' : '15'
     this.setData({
       longformEnabled,
       durationOptions,
-      durationSec: longformEnabled ? '60' : '15',
+      durationSec,
+      pointsHintGenerate: pointsHints.bannerText('shortvideo', Number(durationSec)),
     })
   },
   onOptPrompt(e) {
@@ -121,7 +152,12 @@ Page({
   },
   onDuration(e) {
     const val = String(e.currentTarget.dataset.val || '15')
-    this.setData({ durationSec: val })
+    const kind = this.data.icePreset && /智能/.test(this.data.icePreset) ? 'cloud_edit_smart' : 'cloud_edit'
+    this.setData({
+      durationSec: val,
+      pointsHintGenerate: pointsHints.bannerText('shortvideo', Number(val) || 15),
+      pointsHintMix: pointsHints.bannerText(kind, Number(this.data.clipEndSec) || 20),
+    })
   },
   onAspect(e) {
     this.setData({ aspect: e.currentTarget.dataset.val })
@@ -244,10 +280,20 @@ Page({
     this.setData({ iceAspectId: e.currentTarget.dataset.id })
   },
   onClipEnd(e) {
-    this.setData({ clipEndSec: Number(e.currentTarget.dataset.val) || 20 })
+    const clipEndSec = Number(e.currentTarget.dataset.val) || 20
+    const smart = /智能/.test(String(this.data.icePreset || ''))
+    this.setData({
+      clipEndSec,
+      pointsHintMix: pointsHints.bannerText(smart ? 'cloud_edit_smart' : 'cloud_edit', clipEndSec),
+    })
   },
   onIcePreset(e) {
-    this.setData({ icePreset: e.currentTarget.dataset.val })
+    const icePreset = e.currentTarget.dataset.val
+    const smart = /智能/.test(String(icePreset || ''))
+    this.setData({
+      icePreset,
+      pointsHintMix: pointsHints.bannerText(smart ? 'cloud_edit_smart' : 'cloud_edit', this.data.clipEndSec),
+    })
   },
   onBatchToggle() {
     this.setData({ batchEnabled: !this.data.batchEnabled })
@@ -389,11 +435,16 @@ Page({
       wx.showToast({ title: '混剪未开通，请联系运营', icon: 'none' })
       return
     }
-    const brief = this.composedBrief().trim()
+    let brief = this.composedBrief().trim()
     if (brief.length < 4) {
       wx.showToast({ title: '请填写剪辑文案或指令', icon: 'none' })
       return
     }
+    const smartPreset = /智能/.test(String(this.data.icePreset || ''))
+    if (smartPreset) {
+      brief = `${brief}\n【智能特效】请根据素材画面与节奏自动选择合适的转场与特效，避免生硬硬切。`
+    }
+    const pipelinePreset = smartPreset ? '随机转场' : this.data.icePreset
     const aspect = this.iceAspect()
     const pending = this.data.videoJobs.filter((j) => j.phase === 'pending' || j.phase === 'failed')
     const imageUrls = this.data.imageItems.map((x) => x.mediaUrl)
@@ -412,7 +463,7 @@ Page({
           width: aspect.width,
           height: aspect.height,
           clipEndSec: this.data.clipEndSec,
-          preset: this.data.icePreset,
+          preset: pipelinePreset,
         })
         if (!pipe.ok) {
           this.setData({ iceErr: pipe.message })
@@ -439,7 +490,7 @@ Page({
           width: aspect.width,
           height: aspect.height,
           clipEndSec: this.data.clipEndSec,
-          preset: this.data.icePreset,
+          preset: pipelinePreset,
         })
         if (!pipe.ok) {
           this.setData({ iceErr: pipe.message })
