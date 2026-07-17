@@ -14,8 +14,35 @@ const ICE_ASPECT_PRESETS = [
 const ICE_BATCH_COUNTS = [10, 20, 50, 100]
 /** 与星选 ShortVideoIceBatchPanel / iceMixPlan.MIX_TARGET_TOTAL_OPTIONS 对齐 */
 const MIX_TARGET_TOTAL_OPTIONS = [10, 20, 30, 45, 60]
-/** 短视频生成单段时长（星选关闭长视频时） */
+/** 短视频生成：短片单段（星选关闭长视频时） */
 const SHORT_VIDEO_DURATION_OPTIONS = ['5', '10', '15']
+/** 与星选 ShortVideoOptimizationPage 长视频目标总时长对齐 */
+const LONGFORM_TARGET_TOTAL_OPTIONS = ['15', '30', '45', '60']
+/** 与星选 iceEffectPresets / GET ice/config effectOptions 对齐（接口失败时本地兜底） */
+const ICE_EFFECT_PRESET_LABELS = [
+  '无附加特效',
+  '淡入淡出',
+  '叠化转场',
+  '向右擦除',
+  '向左擦除',
+  '向上擦除',
+  '向下擦除',
+  '放大切换',
+  '蔓延溶解',
+  '方向推移',
+  '中心旋转',
+  '开幕转场',
+  '波纹转场',
+  '燃烧转场',
+  '故障转场',
+  '像素溶解',
+  '向上弹动',
+  '轻微摇摆',
+  '爱心遮罩',
+  '万花筒',
+  '随机转场',
+  '淡入淡出+叠化',
+]
 
 function mpAuthHeaders() {
   const token = sessionStore.readSessionToken()
@@ -76,15 +103,40 @@ async function getPaths(paths, headers) {
 }
 
 async function fetchIceConfig() {
-  const r = await getPaths(
-    [
-      '/api/meoo-merchant-ai-video-ice-config',
-      '/api/merchant/ai/video/ice/config',
-    ],
-    mpAuthHeaders(),
-  )
-  if (!r.ok) return null
-  return r.data || null
+  try {
+    const r = await getPaths(
+      [
+        '/api/meoo-merchant-ai-video-ice-config',
+        '/api/merchant/ai/video/ice/config',
+      ],
+      mpAuthHeaders(),
+    )
+    if (r.ok && r.data) {
+      const d = r.data
+      const fromOpts =
+        Array.isArray(d.effectOptions) && d.effectOptions.length
+          ? d.effectOptions.map((o) => (o && o.label ? String(o.label) : '')).filter(Boolean)
+          : []
+      const fromPresets = Array.isArray(d.presets) ? d.presets.map(String).filter(Boolean) : []
+      const presets = fromOpts.length ? fromOpts : fromPresets.length ? fromPresets : ICE_EFFECT_PRESET_LABELS
+      return {
+        ...d,
+        configured: !!d.configured,
+        presets,
+        effectOptions:
+          d.effectOptions && d.effectOptions.length
+            ? d.effectOptions
+            : ICE_EFFECT_PRESET_LABELS.map((label, i) => ({ id: `local_${i}`, label })),
+      }
+    }
+  } catch (_) {
+    /* fall through */
+  }
+  return {
+    configured: false,
+    presets: ICE_EFFECT_PRESET_LABELS,
+    effectOptions: ICE_EFFECT_PRESET_LABELS.map((label, i) => ({ id: `local_${i}`, label })),
+  }
 }
 
 async function uploadIceLocalFile(filePath, fileName, contentType) {
@@ -215,6 +267,8 @@ module.exports = {
   ICE_BATCH_COUNTS,
   MIX_TARGET_TOTAL_OPTIONS,
   SHORT_VIDEO_DURATION_OPTIONS,
+  LONGFORM_TARGET_TOTAL_OPTIONS,
+  ICE_EFFECT_PRESET_LABELS,
   fetchIceConfig,
   uploadIceLocalFile,
   postIcePipeline,

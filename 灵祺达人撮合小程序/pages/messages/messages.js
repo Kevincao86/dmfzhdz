@@ -40,7 +40,7 @@ Page({
   data: {
     recHeadBandStyle: '',
     recHeadInnerStyle: '',
-    chatConfigured: false,
+    chatConfigured: api.hasApi(),
     loading: true,
     refreshing: false,
     err: '',

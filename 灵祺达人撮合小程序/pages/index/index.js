@@ -206,16 +206,26 @@ Page({
     applyNavLayout(this)
     identityTheme.applyTabHomeChrome()
     const identity = userProfile.readIdentity()
+    const identityChanged = this._lastHallIdentity !== identity
     const patch = { workIdentity: identity, ...homeBannerForIdentity(identity) }
-    if (this._lastHallIdentity !== identity) {
+    if (identityChanged) {
       patch.paichianSubTab = hallIdentity.defaultPaichianSubTab(identity)
       this._lastHallIdentity = identity
     }
-    this.setData({ ...patch, loading: true, err: '' })
+    const hasRows = Array.isArray(this.data.displayRows) && this.data.displayRows.length > 0
+    const fresh = this._lastHallLoadedAt && Date.now() - this._lastHallLoadedAt < 45000
+    if (hasRows && fresh && !identityChanged) {
+      this.setData(patch)
+      return
+    }
+    this.setData({ ...patch, loading: !hasRows, err: '' })
     if (api.base()) {
       console.log('[mp] MERCHANT_API_BASE_URL=', api.base())
     }
     void loadHallList(this)
+      .then(() => {
+        this._lastHallLoadedAt = Date.now()
+      })
       .catch((e) => {
         console.error('[index] loadHallList', e)
         this.setData({

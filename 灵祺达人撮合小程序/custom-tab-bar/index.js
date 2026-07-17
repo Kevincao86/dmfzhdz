@@ -17,7 +17,8 @@ Component({
       this.applyIdentityLayout()
       identityTheme.syncTabBar()
       chatBadgeWatcher.syncBarFromGlobal()
-      void chatBadgeWatcher.refreshNow()
+      // 冷启动拉一次角标即可；勿在每次 Tab show 全量请求（会导致底栏切换卡顿）
+      void chatBadgeWatcher.refreshNow({ minIntervalMs: 0 })
     },
   },
   pageLifetimes: {
@@ -25,7 +26,7 @@ Component({
       this.applyIdentityLayout()
       identityTheme.syncTabBar()
       chatBadgeWatcher.syncBarFromGlobal()
-      void chatBadgeWatcher.refreshNow()
+      void chatBadgeWatcher.refreshNow({ minIntervalMs: 20000 })
     },
   },
   methods: {

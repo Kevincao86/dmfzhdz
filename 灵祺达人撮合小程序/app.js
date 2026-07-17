@@ -88,10 +88,21 @@ App({
   onShow() {
     if (isWelcomeRoute()) return
 
+    const now = Date.now()
+    const lastHeavy = Number(this.globalData && this.globalData._lastAppShowHeavyAt) || 0
+    // 切 Tab 也会触发 App.onShow；30s 内跳过重网络，避免底栏卡顿
+    if (now - lastHeavy < 30000) {
+      try {
+        require('./utils/chatBadgeWatcher.js').syncBarFromGlobal()
+      } catch (_) {}
+      return
+    }
+    if (this.globalData) this.globalData._lastAppShowHeavyAt = now
+
     setTimeout(() => {
       try {
         const chatBadgeWatcher = require('./utils/chatBadgeWatcher.js')
-        void chatBadgeWatcher.refreshNow()
+        void chatBadgeWatcher.refreshNow({ minIntervalMs: 20000 })
       } catch (_) {}
       try {
         const auth = require('./utils/auth.js')

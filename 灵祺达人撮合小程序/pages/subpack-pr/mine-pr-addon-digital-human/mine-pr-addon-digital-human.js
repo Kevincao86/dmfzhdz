@@ -34,10 +34,17 @@ Page({
     progress: '',
     previewUrl: '',
     ttsPlaying: false,
+    voiceOptions: [],
+    voiceLabels: [],
+    voiceIndex: 0,
+    voiceId: '',
+    voiceLabel: '',
+    speechRate: 1,
   },
   onShow() {
     if (!mpAddonPageGate.ensureAddonPageAccess('digitalHuman')) return
     this.applyAvatarFilter(this.data.avatarFilter)
+    this.syncVoiceOptions(this.data.avatarId)
     this.setData({ works: dhPresets.loadWorks() })
   },
   onUnload() {
@@ -75,7 +82,43 @@ Page({
     this.applyAvatarFilter(e.currentTarget.dataset.filter)
   },
   onAvatar(e) {
-    this.setData({ avatarId: e.currentTarget.dataset.id, previewUrl: '', err: '' })
+    const avatarId = e.currentTarget.dataset.id
+    this.setData({ avatarId, previewUrl: '', err: '' })
+    this.syncVoiceOptions(avatarId)
+  },
+  syncVoiceOptions(avatarId) {
+    const voiceOptions = dhPresets.voiceOptionsForAvatar(avatarId)
+    const preferId = `v-${avatarId}`
+    let voiceIndex = Math.max(
+      0,
+      voiceOptions.findIndex((v) => v.id === preferId || v.id === this.data.voiceId),
+    )
+    if (voiceIndex < 0) voiceIndex = 0
+    const selected = voiceOptions[voiceIndex] || voiceOptions[0]
+    this.setData({
+      voiceOptions,
+      voiceLabels: voiceOptions.map((v) => v.label),
+      voiceIndex,
+      voiceId: selected ? selected.id : '',
+      voiceLabel: selected ? selected.label : '',
+      speechRate: selected ? selected.speechRate : 1,
+    })
+  },
+  onVoicePick(e) {
+    const voiceIndex = Number(e.detail.value) || 0
+    const selected = (this.data.voiceOptions || [])[voiceIndex]
+    if (!selected) return
+    this.setData({
+      voiceIndex,
+      voiceId: selected.id,
+      voiceLabel: selected.label,
+      speechRate: selected.speechRate,
+    })
+  },
+  onSpeechRateChange(e) {
+    const raw = Number(e.detail.value)
+    const speechRate = Math.round((Number.isFinite(raw) ? raw : 100)) / 100
+    this.setData({ speechRate: Math.min(1.2, Math.max(0.8, speechRate)) })
   },
   onDriveMode(e) {
     this.setData({ driveMode: e.currentTarget.dataset.mode })
@@ -108,7 +151,11 @@ Page({
     return this.data.avatars.find((a) => a.id === this.data.avatarId) || this.data.avatars[0]
   },
   voiceParams() {
-    return dhPresets.voiceForAvatar(this.data.avatarId)
+    const base = dhPresets.voiceById(this.data.voiceId, this.data.avatarId)
+    return {
+      ...base,
+      speechRate: Number(this.data.speechRate) || base.speechRate || 1,
+    }
   },
   async onAiScript() {
     const topic = String(this.data.aiTopic || this.data.script || '').trim()

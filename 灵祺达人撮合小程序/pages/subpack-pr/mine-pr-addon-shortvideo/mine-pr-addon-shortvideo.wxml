@@ -12,7 +12,11 @@
     <view class="addon-card">
       <text class="addon-card__title">视频 AI 引擎</text>
       <text class="addon-card__sub">即梦 / Seedance（与星选平台同源）</text>
-      <text class="addon-label">单段时长</text>
+      <view class="addon-pair" style="margin-bottom:12px">
+        <view class="addon-pair__opt {{longformEnabled ? 'addon-pair__opt--on' : ''}}" data-on="1" bindtap="onLongformMode">长视频 · 目标总时长</view>
+        <view class="addon-pair__opt {{!longformEnabled ? 'addon-pair__opt--on' : ''}}" data-on="0" bindtap="onLongformMode">短片 · 单段时长</view>
+      </view>
+      <text class="addon-label">{{longformEnabled ? '目标总时长' : '单段时长'}}</text>
       <view class="addon-chips">
         <view
           wx:for="{{durationOptions}}"

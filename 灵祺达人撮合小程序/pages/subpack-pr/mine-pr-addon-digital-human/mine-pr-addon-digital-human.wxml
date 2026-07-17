@@ -86,11 +86,18 @@
 
     <view class="addon-card" wx:elif="{{step === 4}}">
       <text class="addon-card__title">预览确认</text>
-      <text class="addon-card__sub">MiniMax 神经语音试听，确认口播与参数后提交合成</text>
+      <text class="addon-card__sub">选择 TTS 音色并试听（与星选平台同源 MiniMax 神经语音）</text>
+      <text class="addon-label">TTS 语音</text>
+      <picker mode="selector" range="{{voiceLabels}}" value="{{voiceIndex}}" bindchange="onVoicePick">
+        <view class="addon-input">{{voiceLabel || '请选择音色'}}</view>
+      </picker>
+      <text class="addon-label">语速 {{speechRate}}</text>
+      <slider min="80" max="120" step="1" value="{{speechRate * 100}}" bindchange="onSpeechRateChange" show-value="{{false}}" activeColor="#2563eb" />
       <view class="addon-out">
         <text class="addon-out__text">{{script}}</text>
       </view>
-      <button class="addon-btn addon-btn--ghost" loading="{{ttsBusy}}" bindtap="onTtsPreview">{{ttsPlaying ? '播放中…' : '试听配音'}}</button>
+      <text class="addon-err" wx:if="{{err}}">{{err}}</text>
+      <button class="addon-btn addon-btn--ghost" loading="{{ttsBusy}}" bindtap="onTtsPreview">{{ttsPlaying ? '播放中…' : 'TTS 试听'}}</button>
       <view class="addon-pair">
         <button class="addon-btn addon-btn--ghost" bindtap="onPrevStep">上一步</button>
         <button class="addon-btn" bindtap="onNextStep">提交合成</button>

@@ -19,15 +19,16 @@ Page({
     genPrompt: '',
     framePath: '',
     framePureB64: '',
-    durationOptions: iceApi.SHORT_VIDEO_DURATION_OPTIONS || ['5', '10', '15'],
-    durationSec: '15',
+    longformEnabled: true,
+    durationOptions: iceApi.LONGFORM_TARGET_TOTAL_OPTIONS || ['15', '30', '45', '60'],
+    durationSec: '60',
     aspect: '9:16',
     busy: false,
     err: '',
     progress: '',
     resultUrl: '',
     iceConfigured: false,
-    icePresets: ['无附加特效'],
+    icePresets: iceApi.ICE_EFFECT_PRESET_LABELS || ['无附加特效'],
     materialTab: 'video',
     videoJobs: [],
     imageItems: [],
@@ -72,20 +73,35 @@ Page({
   async loadIceConfig() {
     try {
       const cfg = await iceApi.fetchIceConfig()
-      if (cfg && cfg.configured) {
-        const presets = (cfg.effectOptions && cfg.effectOptions.map((o) => o.label)) || cfg.presets || ['无附加特效']
-        this.setData({
-          iceConfigured: true,
-          icePresets: presets,
-          icePreset: presets[0] || '无附加特效',
-        })
-      }
+      const presets =
+        (cfg && cfg.presets && cfg.presets.length && cfg.presets) ||
+        iceApi.ICE_EFFECT_PRESET_LABELS ||
+        ['无附加特效']
+      this.setData({
+        iceConfigured: !!(cfg && cfg.configured),
+        icePresets: presets,
+        icePreset: this.data.icePreset && presets.includes(this.data.icePreset) ? this.data.icePreset : presets[0],
+      })
     } catch (_) {
-      /* ignore */
+      this.setData({
+        icePresets: iceApi.ICE_EFFECT_PRESET_LABELS || ['无附加特效'],
+        icePreset: '无附加特效',
+      })
     }
   },
   onPane(e) {
     this.setData({ mainPane: e.currentTarget.dataset.pane, err: '', progress: '', iceErr: '', iceProgress: '' })
+  },
+  onLongformMode(e) {
+    const longformEnabled = String(e.currentTarget.dataset.on) === '1'
+    const durationOptions = longformEnabled
+      ? iceApi.LONGFORM_TARGET_TOTAL_OPTIONS || ['15', '30', '45', '60']
+      : iceApi.SHORT_VIDEO_DURATION_OPTIONS || ['5', '10', '15']
+    this.setData({
+      longformEnabled,
+      durationOptions,
+      durationSec: longformEnabled ? '60' : '15',
+    })
   },
   onOptPrompt(e) {
     this.setData({ optPrompt: e.detail.value })

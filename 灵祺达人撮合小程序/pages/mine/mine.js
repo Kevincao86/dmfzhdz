@@ -362,10 +362,7 @@ Page({
     if (!auth.isLoggedIn()) {
       if (wxAccount.readWxAccount()) wxAccount.clearWxAccount()
     }
-    try {
-      const chat = require('../../utils/talentChat.js')
-      if (chat.canChat()) await chat.syncProfile()
-    } catch (_) {}
+    // 先本地渲染，网络同步延后，避免切到「我的」卡顿
     try {
       this.refresh()
     } catch (e) {
@@ -382,30 +379,42 @@ Page({
       wx.showToast({ title: '我的页加载失败', icon: 'none' })
       return
     }
-    if (auth.isLoggedIn()) {
-      try {
-        const acct = auth.readAccount()
-        if (acct) require('../../utils/accountMemberSync.js').syncWxAccountFromAuthAccount(acct)
-      } catch (_) {}
-      try {
-        await auth.refreshSession()
-        const acct = auth.readAccount()
-        if (acct) require('../../utils/accountMemberSync.js').syncLocalProfilesFromAccount(acct)
-      } catch (_) {}
-      try {
-        await require('../../utils/registryProfileSync.js').pullRegistryProfileAfterLogin()
-      } catch (_) {}
-      try {
-        await switchWorkIdentity.ensureWorkIdentityIfNeeded()
-      } catch (_) {}
-      try {
-        this.refresh()
-      } catch (e) {
-        console.error('[mine] refresh after sync', e)
-      }
-    }
     void this.refreshNotifyBadge()
     void this.refreshCalendarTodoBadge()
+
+    const now = Date.now()
+    if (this._lastMineSyncAt && now - this._lastMineSyncAt < 45000) return
+    this._lastMineSyncAt = now
+
+    setTimeout(() => {
+      void (async () => {
+        try {
+          const chat = require('../../utils/talentChat.js')
+          if (chat.canChat()) await chat.syncProfile()
+        } catch (_) {}
+        if (!auth.isLoggedIn()) return
+        try {
+          const acct = auth.readAccount()
+          if (acct) require('../../utils/accountMemberSync.js').syncWxAccountFromAuthAccount(acct)
+        } catch (_) {}
+        try {
+          await auth.refreshSession()
+          const acct = auth.readAccount()
+          if (acct) require('../../utils/accountMemberSync.js').syncLocalProfilesFromAccount(acct)
+        } catch (_) {}
+        try {
+          await require('../../utils/registryProfileSync.js').pullRegistryProfileAfterLogin()
+        } catch (_) {}
+        try {
+          await switchWorkIdentity.ensureWorkIdentityIfNeeded()
+        } catch (_) {}
+        try {
+          this.refresh()
+        } catch (e) {
+          console.error('[mine] refresh after sync', e)
+        }
+      })()
+    }, 80)
   },
   refresh() {
     const identity = userProfile.readIdentity()
