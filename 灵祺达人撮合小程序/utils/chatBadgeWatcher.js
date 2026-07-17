@@ -8,10 +8,11 @@ const registryCache = require('./registryCache.js')
 const mpOrderGroupChatApi = require('./mpOrderGroupChatApi.js')
 const groupReadState = require('./mpOrderGroupChatReadState.js')
 
-const POLL_MS = chat.POLL_MS || 2500
+const POLL_MS = Math.max(Number(chat.POLL_MS) || 0, 15000)
 
 let pollTimer = null
 let refreshing = false
+let lastNetworkRefreshAt = 0
 
 function getAppSafe() {
   try {
@@ -113,12 +114,21 @@ async function refreshNow(options) {
 
   if (typeof opts.explicitCount === 'number') {
     applyBadgeToBar(bar, opts.explicitCount)
+    lastNetworkRefreshAt = Date.now()
     return opts.explicitCount
   }
 
   if (!hasMessageIdentity()) {
     applyBadgeToBar(bar, 0)
     return 0
+  }
+
+  const minIntervalMs =
+    typeof opts.minIntervalMs === 'number' ? opts.minIntervalMs : 12000
+  const elapsed = Date.now() - lastNetworkRefreshAt
+  if (minIntervalMs > 0 && elapsed < minIntervalMs) {
+    syncBarFromGlobal()
+    return getAppSafe()?.globalData?.chatBadge || 0
   }
 
   refreshing = true
@@ -130,6 +140,7 @@ async function refreshNow(options) {
     ])
     const total = chatCount + ntfCount + groupCount
     applyBadgeToBar(bar, total)
+    lastNetworkRefreshAt = Date.now()
     return total
   } catch (e) {
     console.warn('[chatBadgeWatcher] refresh', e)

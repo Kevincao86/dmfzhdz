@@ -86,6 +86,71 @@ function voiceForAvatar(avatarId) {
   }
 }
 
+/** 与星选 DigitalHumanBroadcastPage VOICE_PRESETS 对齐的可选项 */
+const CUSTOM_VOICE_OPTIONS = [
+  {
+    id: 'v-custom-female',
+    label: '自定义形象 · 亲和女声',
+    gender: '女',
+    speechRate: 1,
+    speechPitch: 1.02,
+    cloudVoiceId: 'Chinese (Mandarin)_Warm_Girl',
+  },
+  {
+    id: 'v-custom-male',
+    label: '自定义形象 · 稳重男声',
+    gender: '男',
+    speechRate: 0.94,
+    speechPitch: 0.96,
+    cloudVoiceId: 'Chinese (Mandarin)_Reliable_Executive',
+  },
+]
+
+const AVATAR_VOICE_OPTIONS = PRESET_AVATARS.map((a) => {
+  const t = VOICE_TUNING[a.id] || { rate: 1, pitch: 1, cloudVoiceId: 'Chinese (Mandarin)_Warm_Girl' }
+  return {
+    id: `v-${a.id}`,
+    label: `${a.name} · ${a.tag}`,
+    gender: a.gender,
+    avatarId: a.id,
+    speechRate: t.rate,
+    speechPitch: t.pitch,
+    cloudVoiceId: t.cloudVoiceId,
+  }
+})
+
+const ALL_VOICE_OPTIONS = [...AVATAR_VOICE_OPTIONS, ...CUSTOM_VOICE_OPTIONS]
+
+function voiceOptionsForAvatar(avatarId) {
+  const av = PRESET_AVATARS.find((a) => a.id === avatarId)
+  const paired = AVATAR_VOICE_OPTIONS.find((v) => v.avatarId === avatarId)
+  const sameGender = ALL_VOICE_OPTIONS.filter((v) => !av || v.gender === av.gender)
+  const rest = ALL_VOICE_OPTIONS.filter((v) => !sameGender.includes(v))
+  const ordered = []
+  if (paired) ordered.push(paired)
+  sameGender.forEach((v) => {
+    if (!ordered.find((x) => x.id === v.id)) ordered.push(v)
+  })
+  rest.forEach((v) => {
+    if (!ordered.find((x) => x.id === v.id)) ordered.push(v)
+  })
+  return ordered
+}
+
+function voiceById(voiceId, avatarId) {
+  const hit = ALL_VOICE_OPTIONS.find((v) => v.id === voiceId)
+  if (hit) {
+    return {
+      voicePresetId: hit.id,
+      speechRate: hit.speechRate,
+      speechPitch: hit.speechPitch,
+      cloudVoiceId: hit.cloudVoiceId,
+      label: hit.label,
+    }
+  }
+  return { ...voiceForAvatar(avatarId), label: '默认音色' }
+}
+
 function loadWorks() {
   try {
     const raw = wx.getStorageSync(WORKS_KEY)
@@ -113,7 +178,10 @@ module.exports = {
   GESTURES,
   SUBTITLE_STYLES,
   WIZARD_STEPS,
+  ALL_VOICE_OPTIONS,
   voiceForAvatar,
+  voiceOptionsForAvatar,
+  voiceById,
   loadWorks,
   upsertWork,
 }

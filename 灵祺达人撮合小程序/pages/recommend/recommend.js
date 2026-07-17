@@ -703,11 +703,25 @@ Page({
     require('../../utils/identityTheme.js').applyTabHomeChrome()
     applyCapsulePadding(this, null, { band: 'recHeadBandStyle', right: 'recHeadInnerStyle' })
     const mode = recommendPageMode.resolveRecommendPageMode()
+    const hasRows = Array.isArray(this.data.displayRows) && this.data.displayRows.length > 0
+    const modeKey = `${mode.identity}|${mode.isPrMode}|${mode.talentTestMode}`
+    const fresh =
+      this._lastRecommendLoadedAt &&
+      this._lastRecommendModeKey === modeKey &&
+      Date.now() - this._lastRecommendLoadedAt < 45000
+    if (hasRows && fresh) {
+      this.setData({
+        identity: mode.identity,
+        isPrMode: mode.isPrMode,
+        talentTestMode: mode.talentTestMode,
+      })
+      return
+    }
     this.setData({
       identity: mode.identity,
       isPrMode: mode.isPrMode,
       talentTestMode: mode.talentTestMode,
-      loading: true,
+      loading: !hasRows,
       err: '',
     })
     try {
@@ -746,13 +760,13 @@ Page({
       } else {
         this._favoriteTalentIds = new Set()
       }
-      if ((isPr || mode.accountPr) && auth.isLoggedIn()) {
-        try {
-          await require('../../utils/registryProfileSync.js').pullRegistryProfileAfterLogin()
-        } catch (_) {}
-        try {
-          await require('../../utils/mpAccountClientSync.js').pullAfterLogin()
-        } catch (_) {}
+      // 切 Tab 不做全量 registry 同步；仅在冷加载时后台拉一次
+      if ((isPr || mode.accountPr) && auth.isLoggedIn() && !this._recommendSyncedOnce) {
+        this._recommendSyncedOnce = true
+        void Promise.resolve()
+          .then(() => require('../../utils/registryProfileSync.js').pullRegistryProfileAfterLogin())
+          .then(() => require('../../utils/mpAccountClientSync.js').pullAfterLogin())
+          .catch(() => {})
       }
       const account = sessionStore.readAccount()
       const prRecommendLocked =
@@ -763,10 +777,17 @@ Page({
       this.setData({ prRecommendLocked })
       if (!isPrMode) hallCountdownTick.startHallCountdownTick(this, 'orderDisplayRows')
       else hallCountdownTick.stopHallCountdownTick(this)
-      if (isPrMode && !prRecommendLocked) this.loadTalentList()
-      else if (!isPrMode) this.loadOrderList()
-      else if (prRecommendLocked) {
+      const markLoaded = () => {
+        this._lastRecommendLoadedAt = Date.now()
+        this._lastRecommendModeKey = modeKey
+      }
+      if (isPrMode && !prRecommendLocked) {
+        Promise.resolve(this.loadTalentList()).finally(markLoaded)
+      } else if (!isPrMode) {
+        Promise.resolve(this.loadOrderList()).finally(markLoaded)
+      } else if (prRecommendLocked) {
         this.setData({ loading: false, err: '', allRows: [], displayRows: [] })
+        markLoaded()
       }
     } catch (e) {
       console.error('[recommend] onShow', e)

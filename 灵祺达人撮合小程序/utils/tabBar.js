@@ -18,7 +18,8 @@ function setTabBarForPage(page, pagePath) {
   if (!bar) return
   const idx = (bar.data.list || []).findIndex((i) => i.pagePath === pagePath)
   if (idx >= 0) bar.setData({ selected: idx })
-  void refreshChatTabBadge(page)
+  // 仅同步本地角标，避免每次切 Tab 都 syncProfile + listSessions
+  chatBadgeWatcher.syncBarFromGlobal()
 }
 
 /** 更新消息 Tab 未读角标（系统通知 + 私信 + 群聊合计） */
