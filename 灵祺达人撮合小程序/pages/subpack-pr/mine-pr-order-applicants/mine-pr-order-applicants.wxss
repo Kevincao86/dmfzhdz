@@ -350,6 +350,32 @@
   color: #dc2626;
 }
 
+.cancel-req-block {
+  margin: 12rpx 0 4rpx;
+  padding: 16rpx;
+  border-radius: 16rpx;
+  background: #fffbeb;
+  border: 1rpx solid #fde68a;
+}
+
+.cancel-req-hint {
+  display: block;
+  font-size: 22rpx;
+  color: #92400e;
+  line-height: 1.5;
+}
+
+.cancel-req-actions {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 12rpx;
+}
+
+.applicant-card-v2__tag--cancel-req {
+  color: #92400e;
+  background: #fef3c7;
+}
+
 .ice-app-review {
   display: flex;
   gap: 12rpx;

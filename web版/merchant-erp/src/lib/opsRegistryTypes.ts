@@ -321,6 +321,11 @@ export type RegistryMpRecruitmentApplicant = {
   scriptSubmittedAt?: string
   scriptSubmitCount?: number
   talentMemberId?: string
+  /** 报名截止后达人申请取消：pending 待 PR 审核 / rejected 已驳回 */
+  cancelRequestStatus?: 'pending' | 'rejected'
+  cancelRequestedAt?: string
+  cancelRequestReviewedAt?: string
+  cancelRequestRejectReason?: string
   /** 星选增值：履约时间线（系统事件 + 手动备注） */
   fulfillmentTimeline?: MpFulfillmentTimelineEvent[]
 }

@@ -116,6 +116,7 @@ Page({
     chattingId: '',
     mpOrder: null,
     iceReviewBusyId: '',
+    cancelReviewBusyId: '',
     iceRejectModal: false,
     iceRejectTargetId: '',
     iceRejectTargetName: '',
@@ -1118,6 +1119,60 @@ Page({
     } finally {
       wx.hideLoading()
       this.setData({ iceReviewBusyId: '' })
+    }
+  },
+  async onApproveCancelRequest(e) {
+    const a = findApplicantById(this.data.applicants, e.currentTarget.dataset.id)
+    if (!a || !a.id || this.data.cancelReviewBusyId) return
+    const name = a.displayName || '达人'
+    const confirmed = await new Promise((resolve) => {
+      wx.showModal({
+        title: '同意取消报名',
+        content: `确认同意「${name}」取消报名？同意后将移除该报名记录。`,
+        confirmText: '同意取消',
+        cancelText: '再想想',
+        success: (res) => resolve(!!res.confirm),
+      })
+    })
+    if (!confirmed) return
+    this.setData({ cancelReviewBusyId: a.id })
+    wx.showLoading({ title: '提交中…', mask: true })
+    try {
+      await ops.reviewCancelMpRecruitmentApply(this.data.mpOrderId, a.id, 'approve')
+      wx.showToast({ title: '已同意取消', icon: 'success' })
+      await this.loadOrder()
+    } catch (err) {
+      wx.showToast({ title: String(err.message || '操作失败').slice(0, 28), icon: 'none' })
+    } finally {
+      wx.hideLoading()
+      this.setData({ cancelReviewBusyId: '' })
+    }
+  },
+  async onRejectCancelRequest(e) {
+    const a = findApplicantById(this.data.applicants, e.currentTarget.dataset.id)
+    if (!a || !a.id || this.data.cancelReviewBusyId) return
+    const name = a.displayName || '达人'
+    const confirmed = await new Promise((resolve) => {
+      wx.showModal({
+        title: '拒绝取消申请',
+        content: `拒绝「${name}」的取消报名申请？达人将继续保留报名。`,
+        confirmText: '拒绝申请',
+        cancelText: '再想想',
+        success: (res) => resolve(!!res.confirm),
+      })
+    })
+    if (!confirmed) return
+    this.setData({ cancelReviewBusyId: a.id })
+    wx.showLoading({ title: '提交中…', mask: true })
+    try {
+      await ops.reviewCancelMpRecruitmentApply(this.data.mpOrderId, a.id, 'reject')
+      wx.showToast({ title: '已拒绝申请', icon: 'success' })
+      await this.loadOrder()
+    } catch (err) {
+      wx.showToast({ title: String(err.message || '操作失败').slice(0, 28), icon: 'none' })
+    } finally {
+      wx.hideLoading()
+      this.setData({ cancelReviewBusyId: '' })
     }
   },
   onIceOpenReject(e) {

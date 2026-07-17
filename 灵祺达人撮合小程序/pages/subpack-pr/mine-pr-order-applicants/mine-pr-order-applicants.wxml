@@ -107,6 +107,7 @@
               class="applicant-card-v2__tag"
             >{{tag}}</text>
             <text wx:if="{{item.selectionNotified}}" class="applicant-card-v2__tag applicant-card-v2__tag--notify">已发通知</text>
+            <text wx:if="{{item.cancelRequestStatus === 'pending'}}" class="applicant-card-v2__tag applicant-card-v2__tag--cancel-req">申请取消报名</text>
             <text wx:if="{{item.matchScore > 0}}" class="applicant-card-v2__tag applicant-card-v2__tag--match">匹配 {{item.matchScore}}</text>
             <text wx:if="{{item.creditScore > 0}}" class="applicant-card-v2__tag applicant-card-v2__tag--credit">信用 {{item.creditScore}}</text>
             <text wx:if="{{item.inCooperationPool}}" class="applicant-card-v2__tag applicant-card-v2__tag--pool">合作池</text>
@@ -132,6 +133,28 @@
         class="applicant-card-v2__pick applicant-card-v2__pick--readonly {{item.selected ? 'applicant-card-v2__pick--on' : ''}}"
       >{{item.selected ? '已入选' : '未入选'}}</text>
       <text wx:else class="applicant-card-v2__ice-status">{{item.iceTaskStatus}}</text>
+    </view>
+
+    <view wx:if="{{item.cancelRequestStatus === 'pending'}}" class="cancel-req-block">
+      <text class="cancel-req-hint">达人在报名截止后申请取消报名{{item.cancelRequestedAt ? '（' + item.cancelRequestedAt + '）' : ''}}，请核实后确认。</text>
+      <view class="cancel-req-actions">
+        <button
+          class="ice-app-pass"
+          size="mini"
+          plain
+          disabled="{{cancelReviewBusyId === item.id}}"
+          data-id="{{item.id}}"
+          catchtap="onApproveCancelRequest"
+        >同意取消</button>
+        <button
+          class="ice-app-reject"
+          size="mini"
+          plain
+          disabled="{{cancelReviewBusyId === item.id}}"
+          data-id="{{item.id}}"
+          catchtap="onRejectCancelRequest"
+        >拒绝申请</button>
+      </view>
     </view>
 
     <view class="applicant-card-v2__grid">
