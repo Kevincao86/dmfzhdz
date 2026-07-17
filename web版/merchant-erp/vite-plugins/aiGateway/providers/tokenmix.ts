@@ -41,18 +41,22 @@ export async function chatTokenMix(req: AIChatRequest, env: Record<string, strin
     const choiceMsg = completion.choices[0]?.message
     const msg = choiceMsg?.content
     const content = typeof msg === 'string' ? msg : ''
-    const rawCalls = choiceMsg?.tool_calls
+    const rawCalls = choiceMsg?.tool_calls as
+      | Array<{ id?: string; function?: { name?: string; arguments?: string } }>
+      | undefined
     const tool_calls =
       Array.isArray(rawCalls) && rawCalls.length
-        ? rawCalls.map((c, i) => ({
-            id: c.id || `call_${i}`,
-            type: 'function' as const,
-            function: {
-              name: c.function?.name || '',
-              arguments:
-                typeof c.function?.arguments === 'string' ? c.function.arguments : '{}',
-            },
-          })).filter((c) => c.function.name)
+        ? rawCalls
+            .map((c, i) => ({
+              id: c.id || `call_${i}`,
+              type: 'function' as const,
+              function: {
+                name: c.function?.name || '',
+                arguments:
+                  typeof c.function?.arguments === 'string' ? c.function.arguments : '{}',
+              },
+            }))
+            .filter((c) => c.function.name)
         : undefined
     return {
       provider: 'tokenmix',
