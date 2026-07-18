@@ -1,6 +1,63 @@
 import type { AiOpsPlanGenerateInput, AiOpsPlanResult } from './aiOpsPlanTypes'
 
 const PREFIX = 'meoo_ai_ops_plans_v1'
+const INTEL_PREFIX = 'meoo_ai_ops_intel_v1'
+
+/** FWS 可编辑门店情报（按客户 scope 持久化） */
+export type AiOpsPlanEditableIntel = {
+  storeName: string
+  industryPath: string
+  menuSummary: string
+  competitorSummary: string
+  marginDouyin: string
+  marginMeituan: string
+  marginXhs: string
+}
+
+export function emptyAiOpsPlanEditableIntel(): AiOpsPlanEditableIntel {
+  return {
+    storeName: '',
+    industryPath: '',
+    menuSummary: '',
+    competitorSummary: '',
+    marginDouyin: '',
+    marginMeituan: '',
+    marginXhs: '',
+  }
+}
+
+function intelStorageKey(scopeId: string): string {
+  const s = String(scopeId || 'default').trim() || 'default'
+  return `${INTEL_PREFIX}:${s}`
+}
+
+export function loadAiOpsPlanEditableIntel(scopeId: string): AiOpsPlanEditableIntel | null {
+  try {
+    const raw = localStorage.getItem(intelStorageKey(scopeId))
+    if (!raw) return null
+    const o = JSON.parse(raw) as Partial<AiOpsPlanEditableIntel>
+    if (!o || typeof o !== 'object') return null
+    return {
+      storeName: String(o.storeName || ''),
+      industryPath: String(o.industryPath || ''),
+      menuSummary: String(o.menuSummary || ''),
+      competitorSummary: String(o.competitorSummary || ''),
+      marginDouyin: String(o.marginDouyin || ''),
+      marginMeituan: String(o.marginMeituan || ''),
+      marginXhs: String(o.marginXhs || ''),
+    }
+  } catch {
+    return null
+  }
+}
+
+export function saveAiOpsPlanEditableIntel(scopeId: string, intel: AiOpsPlanEditableIntel): void {
+  try {
+    localStorage.setItem(intelStorageKey(scopeId), JSON.stringify(intel))
+  } catch {
+    /* quota */
+  }
+}
 
 export type AiOpsPlanHistoryItem = {
   id: string
