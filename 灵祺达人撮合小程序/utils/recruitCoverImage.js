@@ -1,5 +1,6 @@
 const MAX_DATA_URL_LEN = 120000
 const mpPrivacy = require('./mpPrivacyAuthorize.js')
+const mpImageOss = require('./mpImageOssUpload.js')
 
 function readPathAsDataUrl(filePath, attempt) {
   const n = attempt || 0
@@ -82,8 +83,16 @@ function chooseCoverImageDataUrl() {
   return chooseCoverImageFile().then((picked) => readPathAsDataUrl(picked.path, 0))
 }
 
+/** 选图并上传 OSS，返回 https URL（发单封面主路径） */
+function chooseCoverImageOssUrl() {
+  return chooseCoverImageFile().then((picked) =>
+    mpImageOss.uploadImageFileToOss(picked.path, { purpose: 'cover', fileName: 'mp-recruit-cover.jpg' }),
+  )
+}
+
 module.exports = {
   chooseCoverImageDataUrl,
+  chooseCoverImageOssUrl,
   chooseCoverImageFile,
   readPathAsDataUrl,
   MAX_DATA_URL_LEN,

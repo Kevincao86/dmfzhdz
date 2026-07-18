@@ -607,10 +607,13 @@ Page({
   },
   async onCoverUpload() {
     try {
-      const dataUrl = await recruitCoverImage.chooseCoverImageDataUrl()
-      this.setData({ 'form.coverImage': dataUrl, 'form.coverLibraryId': '' })
+      wx.showLoading({ title: '上传封面', mask: true })
+      const imageUrl = await recruitCoverImage.chooseCoverImageOssUrl()
+      this.setData({ 'form.coverImage': imageUrl, 'form.coverLibraryId': '' })
       this.syncCoverPreview()
+      wx.hideLoading()
     } catch (e) {
+      wx.hideLoading()
       const msg = String((e && e.message) || e || '')
       if (/cancel/i.test(msg)) return
       wx.showToast({ title: msg.slice(0, 28) || '上传失败', icon: 'none' })

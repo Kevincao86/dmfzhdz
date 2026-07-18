@@ -47,31 +47,19 @@ function pickWxAvatar(...values) {
   return ''
 }
 
-function readFileBase64(filePath) {
-  return new Promise((resolve, reject) => {
-    wx.getFileSystemManager().readFile({
-      filePath,
-      encoding: 'base64',
-      success(res) {
-        resolve(String(res.data || ''))
-      },
-      fail(err) {
-        reject(err || new Error('读取头像失败'))
-      },
-    })
-  })
-}
-
-/** chooseAvatar 临时路径 → data URL，便于跨会话展示与同步云端 */
+/** chooseAvatar 临时路径 → OSS https（失败时再尝试本地保存，不再落 dataURL） */
 async function persistWxAvatarUrl(url) {
   const u = String(url || '').trim()
   if (!u) return ''
   if (!isLocalTempAvatar(u)) return u
   try {
-    const b64 = await readFileBase64(u)
-    if (!b64) return u
-    return `data:image/jpeg;base64,${b64}`
-  } catch {
+    const mpImageOss = require('./mpImageOssUpload.js')
+    return await mpImageOss.uploadImageFileToOss(u, {
+      purpose: 'avatar',
+      fileName: 'mp-wx-avatar.jpg',
+    })
+  } catch (e) {
+    const msg = String((e && e.message) || e || '')
     try {
       const saved = await new Promise((resolve, reject) => {
         wx.saveFile({
@@ -80,9 +68,12 @@ async function persistWxAvatarUrl(url) {
           fail: reject,
         })
       })
+      if (msg) {
+        console.warn('[wxProfileDisplay] avatar OSS failed, kept local file:', msg)
+      }
       return saved
     } catch {
-      return u
+      throw new Error(msg || '头像上传失败，请重试')
     }
   }
 }

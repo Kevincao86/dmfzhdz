@@ -5,7 +5,7 @@
 const HARD_ERP_API = 'https://mofangdianai.com/erp-api'
 
 const OSS_UPLOAD_PATH_RE =
-  /upload-body|upload-init|ice-multipart|ice-upload|group-qr-upload|script-upload|video-upload|recruitment-video/i
+  /upload-body|upload-init|ice-multipart|ice-upload|group-qr-upload|script-upload|video-upload|recruitment-video|content-image-upload/i
 
 const UPLOAD_TIMEOUT_MS = 180000
 
