@@ -81,14 +81,25 @@ export function defaultEcsBrowserSupabaseUrl(): string {
   return ''
 }
 
+function isLoopbackUrl(raw: string): boolean {
+  try {
+    const u = new URL(raw)
+    return u.hostname === '127.0.0.1' || u.hostname === 'localhost'
+  } catch {
+    return /^(https?:\/\/)?(127\.0\.0\.1|localhost)(:|\/|$)/i.test(raw)
+  }
+}
+
 export function effectiveSupabaseUrl(raw: string | undefined): string {
   const trimmed = (raw ?? '').trim().replace(/\/$/, '')
   if (!trimmed) return ''
   if (typeof window !== 'undefined') {
     const origin = window.location.origin
     const host = window.location.hostname.toLowerCase()
+    const loopback = isLoopbackUrl(trimmed)
     if (ECS_HOSTS_WITH_SAME_ORIGIN_PROXY.has(host)) {
-      if (trimmed === origin) return origin
+      // 轻量内网 PostgREST（127.0.0.1:8888）浏览器不可达 → 同源反代
+      if (trimmed === origin || loopback) return origin
       // 新 ECS 备案后：Nginx 已反代 /auth/v1、/rest/v1，根域或旧 env 一律改同源
       if (
         trimmed === 'https://mofangdianai.com' ||
@@ -97,6 +108,9 @@ export function effectiveSupabaseUrl(raw: string | undefined): string {
       ) {
         return origin
       }
+    }
+    if (loopback && (host === 'mofangdianai.com' || host === 'www.mofangdianai.com')) {
+      return 'https://mofangdianai.com'
     }
   }
   return trimmed
@@ -135,8 +149,10 @@ export async function fetchAndApplyEcsClientConfig(): Promise<boolean> {
       supabaseAnonKey?: string
     }
     if (!res.ok || j.ok === false || !j.supabaseAnonKey?.trim()) return false
+    const publicUrl =
+      effectiveSupabaseUrl(j.supabaseUrl?.trim()) || defaultEcsBrowserSupabaseUrl() || undefined
     persistRuntimeConfig({
-      supabaseUrl: j.supabaseUrl?.trim() || defaultEcsBrowserSupabaseUrl() || undefined,
+      supabaseUrl: publicUrl,
       supabaseAnonKey: j.supabaseAnonKey.trim(),
     })
     return true
