@@ -10,15 +10,32 @@ function sendJson(res: VercelResponse, status: number, body: Record<string, unkn
   res.status(status).send(JSON.stringify(body))
 }
 
+function isLoopbackUrl(raw: string): boolean {
+  try {
+    const u = new URL(raw)
+    return u.hostname === '127.0.0.1' || u.hostname === 'localhost'
+  } catch {
+    return /^(https?:\/\/)?(127\.0\.0\.1|localhost)(:|\/|$)/i.test(raw)
+  }
+}
+
+/** 浏览器可达的 Supabase/GoTrue 根；勿把轻量内网 SUPABASE_URL=127.0.0.1:8888 下发给前端 */
 function readPublicSupabaseUrl(): string {
-  return (
-    process.env.MEOO_SUPABASE_PUBLIC_URL ??
-    process.env.VITE_SUPABASE_URL ??
-    process.env.SUPABASE_URL ??
-    MEOO_ECS_POSTGREST_PUBLIC_DEFAULT
-  )
-    .trim()
-    .replace(/\/$/, '')
+  const candidates = [
+    process.env.MEOO_SUPABASE_PUBLIC_URL,
+    process.env.VITE_SUPABASE_URL,
+    process.env.SUPABASE_URL,
+    MEOO_ECS_POSTGREST_PUBLIC_DEFAULT,
+  ]
+  for (const c of candidates) {
+    const t = String(c ?? '')
+      .trim()
+      .replace(/\/$/, '')
+    if (!t) continue
+    if (isLoopbackUrl(t)) continue
+    return t
+  }
+  return MEOO_ECS_POSTGREST_PUBLIC_DEFAULT
 }
 
 function readPublicAnonKey(): string {
