@@ -16,9 +16,13 @@ import { usePartnerClients } from '../context/PartnerClientContext'
 import { isPartnerEdition } from '../lib/appEdition'
 import {
   deleteAiOpsPlanHistoryItem,
+  emptyAiOpsPlanEditableIntel,
+  loadAiOpsPlanEditableIntel,
   loadAiOpsPlanHistory,
   resolveAiOpsPlanScopeId,
+  saveAiOpsPlanEditableIntel,
   saveAiOpsPlanHistoryItem,
+  type AiOpsPlanEditableIntel,
   type AiOpsPlanHistoryItem,
 } from '../lib/aiOpsPlanStorage'
 import {
@@ -253,6 +257,7 @@ export default function AiOpsPlanPage() {
   const [history, setHistory] = useState<AiOpsPlanHistoryItem[]>([])
   const [tenantUserId, setTenantUserId] = useState('')
   const [toast, setToast] = useState<string | null>(null)
+  const [editIntel, setEditIntel] = useState<AiOpsPlanEditableIntel>(() => emptyAiOpsPlanEditableIntel())
 
   const intel = useMemo(() => loadMerchantIntelSnapshot(), [plan, loading])
 
@@ -281,6 +286,31 @@ export default function AiOpsPlanPage() {
     setHistory(loadAiOpsPlanHistory(scopeId))
   }, [scopeId])
 
+  /** FWS：切换客户时加载已保存情报，无则用本地快照预填（可改） */
+  useEffect(() => {
+    if (!partner) return
+    const saved = loadAiOpsPlanEditableIntel(scopeId)
+    if (saved) {
+      setEditIntel(saved)
+      return
+    }
+    const snap = loadMerchantIntelSnapshot()
+    const label =
+      activeClient?.clientLabel ||
+      activeClient?.accountDisplayName ||
+      activeClient?.merchantAccountId ||
+      ''
+    setEditIntel({
+      storeName: snap.storeName || label || '',
+      industryPath: snap.industryPath || '',
+      menuSummary: snap.menuSummary || snap.draftProductsSummary || '',
+      competitorSummary: snap.competitorSummary || '',
+      marginDouyin: snap.margins?.douyin != null ? String(snap.margins.douyin) : '',
+      marginMeituan: snap.margins?.meituan != null ? String(snap.margins.meituan) : '',
+      marginXhs: snap.margins?.xhs != null ? String(snap.margins.xhs) : '',
+    })
+  }, [partner, scopeId, activeClient?.id])
+
   const partnerBlocked = partner && !activeClient
 
   const flash = (msg: string) => {
@@ -288,7 +318,36 @@ export default function AiOpsPlanPage() {
     window.setTimeout(() => setToast(null), 1800)
   }
 
+  const patchEditIntel = (patch: Partial<AiOpsPlanEditableIntel>) => {
+    setEditIntel((prev) => {
+      const next = { ...prev, ...patch }
+      if (partner && scopeId) saveAiOpsPlanEditableIntel(scopeId, next)
+      return next
+    })
+  }
+
   const buildInput = useCallback((): AiOpsPlanGenerateInput => {
+    if (partner) {
+      const dy = Number(editIntel.marginDouyin)
+      const mt = Number(editIntel.marginMeituan)
+      const xhs = Number(editIntel.marginXhs)
+      return {
+        platforms: platforms.map(String),
+        budgetYuan: Number(budgetYuan) || 0,
+        periodStart,
+        periodEnd,
+        goalsNote: goalsNote.trim() || undefined,
+        storeName: editIntel.storeName.trim() || undefined,
+        menuSummary: editIntel.menuSummary.trim() || undefined,
+        industryPath: editIntel.industryPath.trim() || undefined,
+        competitorSummary: editIntel.competitorSummary.trim() || undefined,
+        margins: {
+          douyin: Number.isFinite(dy) ? dy : 0,
+          meituan: Number.isFinite(mt) ? mt : 0,
+          xhs: Number.isFinite(xhs) ? xhs : 0,
+        },
+      }
+    }
     const snap = loadMerchantIntelSnapshot()
     return {
       platforms: platforms.map(String),
@@ -302,7 +361,7 @@ export default function AiOpsPlanPage() {
       industryPath: snap.industryPath,
       competitorSummary: snap.competitorSummary,
     }
-  }, [platforms, budgetYuan, periodStart, periodEnd, goalsNote])
+  }, [partner, editIntel, platforms, budgetYuan, periodStart, periodEnd, goalsNote])
 
   const onGenerate = async () => {
     if (partnerBlocked) {
@@ -372,7 +431,9 @@ export default function AiOpsPlanPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-gray-900">AI 运营方案</h1>
           <p className="mt-1 max-w-2xl text-sm text-gray-500">
-            勾选多平台并填写预算与周期，结合门店菜单与毛利生成运营方案、执行计划、预算、日历、达人明细与组品货盘。
+            {partner
+              ? '服务商版：可自行编辑客户门店情报（菜单/毛利/竞品等），再结合平台与预算生成六块方案。'
+              : '勾选多平台并填写预算与周期，结合门店菜单与毛利生成运营方案、执行计划、预算、日历、达人明细与组品货盘。'}
           </p>
           {partner ? (
             <p className="mt-1 text-xs text-gray-400">当前客户：{scopeLabel}</p>
@@ -387,40 +448,145 @@ export default function AiOpsPlanPage() {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
         <section className="space-y-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <div className="space-y-2 rounded-lg border border-gray-100 bg-gray-50/80 p-3">
-            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">门店情报</div>
-            <div className="flex flex-wrap gap-2 text-xs">
-              <span
-                className={cn(
-                  'inline-flex items-center gap-1 rounded-full px-2 py-0.5',
-                  hasMenu ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800',
-                )}
-              >
-                {hasMenu ? <CheckCircle2 className="h-3.5 w-3.5" /> : <CircleAlert className="h-3.5 w-3.5" />}
-                菜单 {hasMenu ? `${intel.menuItemCount || '草稿'} 项` : '未配置'}
-              </span>
-              <span
-                className={cn(
-                  'inline-flex items-center gap-1 rounded-full px-2 py-0.5',
-                  hasMargins ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800',
-                )}
-              >
-                {hasMargins ? <CheckCircle2 className="h-3.5 w-3.5" /> : <CircleAlert className="h-3.5 w-3.5" />}
-                毛利 {hasMargins ? '已配置' : '未配置'}
-              </span>
+          {partner ? (
+            <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-600">
+                  门店情报（可编辑）
+                </div>
+                <button
+                  type="button"
+                  className="text-[11px] text-blue-700 hover:underline"
+                  disabled={partnerBlocked}
+                  onClick={() => {
+                    const snap = loadMerchantIntelSnapshot()
+                    const label =
+                      activeClient?.clientLabel ||
+                      activeClient?.accountDisplayName ||
+                      activeClient?.merchantAccountId ||
+                      ''
+                    const next: AiOpsPlanEditableIntel = {
+                      storeName: snap.storeName || label || '',
+                      industryPath: snap.industryPath || '',
+                      menuSummary: snap.menuSummary || snap.draftProductsSummary || '',
+                      competitorSummary: snap.competitorSummary || '',
+                      marginDouyin: snap.margins?.douyin != null ? String(snap.margins.douyin) : '',
+                      marginMeituan: snap.margins?.meituan != null ? String(snap.margins.meituan) : '',
+                      marginXhs: snap.margins?.xhs != null ? String(snap.margins.xhs) : '',
+                    }
+                    setEditIntel(next)
+                    saveAiOpsPlanEditableIntel(scopeId, next)
+                    flash('已从本地快照重新填入')
+                  }}
+                >
+                  从本地快照填入
+                </button>
+              </div>
+              <p className="text-[11px] leading-relaxed text-slate-500">
+                代运营场景下可直接改客户信息；内容按当前客户保存在本机，生成方案时以此为准（不强制走商家菜单页）。
+              </p>
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-gray-700">门店名称</span>
+                <input
+                  value={editIntel.storeName}
+                  disabled={partnerBlocked}
+                  onChange={(e) => patchEditIntel({ storeName: e.target.value })}
+                  className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100"
+                  placeholder="客户门店名"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-gray-700">经营类目</span>
+                <input
+                  value={editIntel.industryPath}
+                  disabled={partnerBlocked}
+                  onChange={(e) => patchEditIntel({ industryPath: e.target.value })}
+                  className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100"
+                  placeholder="如 餐饮 > 火锅"
+                />
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {(
+                  [
+                    ['marginDouyin', '抖音毛利%'],
+                    ['marginMeituan', '美团毛利%'],
+                    ['marginXhs', '小红书毛利%'],
+                  ] as const
+                ).map(([key, label]) => (
+                  <label key={key} className="block">
+                    <span className="mb-1 block text-[11px] font-medium text-gray-700">{label}</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={0.1}
+                      value={editIntel[key]}
+                      disabled={partnerBlocked}
+                      onChange={(e) => patchEditIntel({ [key]: e.target.value })}
+                      className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100"
+                    />
+                  </label>
+                ))}
+              </div>
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-gray-700">菜单价目摘要</span>
+                <textarea
+                  value={editIntel.menuSummary}
+                  disabled={partnerBlocked}
+                  onChange={(e) => patchEditIntel({ menuSummary: e.target.value })}
+                  rows={4}
+                  className="w-full resize-y rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100"
+                  placeholder="菜名 价格；可多行粘贴"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-gray-700">竞品摘要</span>
+                <textarea
+                  value={editIntel.competitorSummary}
+                  disabled={partnerBlocked}
+                  onChange={(e) => patchEditIntel({ competitorSummary: e.target.value })}
+                  rows={3}
+                  className="w-full resize-y rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100"
+                  placeholder="周边竞品定价与套餐要点"
+                />
+              </label>
             </div>
-            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-blue-700">
-              <Link to="/store/menu" className="hover:underline">
-                菜单价目表
-              </Link>
-              <Link to="/products" className="hover:underline">
-                门店毛利配置
-              </Link>
-              <Link to="/operation/competitors" className="hover:underline">
-                竞品分析
-              </Link>
+          ) : (
+            <div className="space-y-2 rounded-lg border border-gray-100 bg-gray-50/80 p-3">
+              <div className="text-xs font-medium uppercase tracking-wide text-gray-500">门店情报</div>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5',
+                    hasMenu ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800',
+                  )}
+                >
+                  {hasMenu ? <CheckCircle2 className="h-3.5 w-3.5" /> : <CircleAlert className="h-3.5 w-3.5" />}
+                  菜单 {hasMenu ? `${intel.menuItemCount || '草稿'} 项` : '未配置'}
+                </span>
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5',
+                    hasMargins ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800',
+                  )}
+                >
+                  {hasMargins ? <CheckCircle2 className="h-3.5 w-3.5" /> : <CircleAlert className="h-3.5 w-3.5" />}
+                  毛利 {hasMargins ? '已配置' : '未配置'}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-blue-700">
+                <Link to="/store/menu" className="hover:underline">
+                  菜单价目表
+                </Link>
+                <Link to="/products" className="hover:underline">
+                  门店毛利配置
+                </Link>
+                <Link to="/operation/competitors" className="hover:underline">
+                  竞品分析
+                </Link>
+              </div>
             </div>
-          </div>
+          )}
 
           {partnerBlocked ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
