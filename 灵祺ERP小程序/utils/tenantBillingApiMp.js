@@ -54,13 +54,22 @@ function billingFetchOnce(body) {
   })
 }
 
-function billingFetch(body) {
+function billingFetch(body, opts) {
+  const refreshCodeOnRetry = opts && typeof opts.refreshCodeOnRetry === 'function' ? opts.refreshCodeOnRetry : null
   return billingFetchOnce(body).catch((e) => {
     const status = e && e.status ? Number(e.status) : 0
-    if (status === 502 || status === 504) {
-      return new Promise((r) => setTimeout(r, 800)).then(() => billingFetchOnce(body))
+    if (status !== 502 && status !== 504) throw e
+    // 含 wx.login code 的请求禁止原样重试（code 一次性，会报 code been used）
+    if (body && body.code && !refreshCodeOnRetry) {
+      throw e
     }
-    throw e
+    return new Promise((r) => setTimeout(r, 800)).then(() => {
+      if (!refreshCodeOnRetry) return billingFetchOnce(body)
+      return Promise.resolve(refreshCodeOnRetry()).then((patch) => {
+        const next = Object.assign({}, body, patch && typeof patch === 'object' ? patch : {})
+        return billingFetchOnce(next)
+      })
+    })
   })
 }
 
@@ -92,7 +101,9 @@ function tenantPayPrepay(input) {
   if (input.openid) payload.openid = input.openid
   if (input.code) payload.code = input.code
   if (input.stableDevOpenId) payload.stableDevOpenId = input.stableDevOpenId
-  return billingFetch(payload)
+  const refreshCodeOnRetry =
+    typeof input.refreshCodeOnRetry === 'function' ? input.refreshCodeOnRetry : null
+  return billingFetch(payload, { refreshCodeOnRetry })
 }
 
 function tenantWalletPay(input) {

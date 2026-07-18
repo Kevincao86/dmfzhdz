@@ -66,8 +66,13 @@ Page({
         { 'X-Mp-Session': token },
       )
       if (!data || data.ok === false) throw new Error(String((data && data.error) || 'load_failed'))
-      const balance = Math.max(0, Math.floor(Number(data.mpAiPointsBalance) || 0))
       const s = data.mpAiPointsSummary && typeof data.mpAiPointsSummary === 'object' ? data.mpAiPointsSummary : null
+      const packageRemaining = s ? Math.max(0, Math.floor(Number(s.packageRemaining) || 0)) : 0
+      const rechargeBalance = s ? Math.max(0, Math.floor(Number(s.rechargeBalance) || 0)) : 0
+      // 总余额 = 套餐剩余 + 充值积分（与 summary.balance 对齐，不用滞后的顶层字段）
+      const balance = s
+        ? Math.max(0, Math.floor(Number(s.balance) || packageRemaining + rechargeBalance))
+        : Math.max(0, Math.floor(Number(data.mpAiPointsBalance) || 0))
       this.setData({
         loading: false,
         balance,
@@ -76,10 +81,10 @@ Page({
         monthlyGiftQuotaLabel: s ? Math.max(0, Math.floor(Number(s.monthlyGiftQuota) || 0)).toLocaleString('zh-CN') : '0',
         monthlySpent: s ? Math.max(0, Math.floor(Number(s.monthlySpent) || 0)) : 0,
         monthlySpentLabel: s ? Math.max(0, Math.floor(Number(s.monthlySpent) || 0)).toLocaleString('zh-CN') : '0',
-        packageRemaining: s ? Math.max(0, Math.floor(Number(s.packageRemaining) || 0)) : 0,
-        packageRemainingLabel: s ? Math.max(0, Math.floor(Number(s.packageRemaining) || 0)).toLocaleString('zh-CN') : '0',
-        rechargeBalance: s ? Math.max(0, Math.floor(Number(s.rechargeBalance) || 0)) : 0,
-        rechargeBalanceLabel: s ? Math.max(0, Math.floor(Number(s.rechargeBalance) || 0)).toLocaleString('zh-CN') : '0',
+        packageRemaining,
+        packageRemainingLabel: packageRemaining.toLocaleString('zh-CN'),
+        rechargeBalance,
+        rechargeBalanceLabel: rechargeBalance.toLocaleString('zh-CN'),
         showQuotaSummary: Boolean(s),
       })
     } catch (e) {

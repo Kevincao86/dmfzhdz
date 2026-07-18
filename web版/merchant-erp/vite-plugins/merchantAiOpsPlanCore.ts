@@ -90,43 +90,31 @@ const SYSTEM_PROMPT = `你是资深本地生活/餐饮多平台运营总监，�
     "background": "门店与商圈背景 2～4 句",
     "positioning": "一句话定位",
     "targetAudience": "核心人群画像",
-    "goals": ["可量化目标1（含数字/周期）","目标2","目标3"],
-    "contentPillars": ["内容支柱1","内容支柱2","内容支柱3"],
-    "monthlyThemes": ["月主题/周主题1","主题2"],
+    "goals": ["可量化目标1","目标2","目标3"],
+    "contentPillars": ["内容支柱1","内容支柱2"],
+    "monthlyThemes": ["月主题1","主题2"],
     "platformStrategy": [{
       "platform":"抖音",
-      "approach":"打法与玩法（≥40字）",
-      "contentTypes":"内容形态（探店/短视频/直播等）",
+      "approach":"打法（≥40字）",
+      "contentTypes":"内容形态",
       "publishFreq":"发布频次",
-      "kpi":"可量化 KPI",
-      "examples":"2～3 个选题示例"
+      "kpi":"KPI",
+      "examples":"选题示例"
     }],
-    "risks": ["风险与对策1","风险与对策2"]
+    "risks": ["风险与对策"]
   },
   "executionPlan": {
-    "overview": "执行总览（节奏、关键节点、协作方式）",
-    "phases": [{
-      "phase":"阶段名",
-      "dateRange":"YYYY-MM-DD～YYYY-MM-DD",
-      "actions":"本阶段动作（具体）",
-      "ownerRole":"负责人角色",
-      "deliverable":"交付物",
-      "successMetric":"成功指标"
-    }],
-    "weeklyActions": [{
-      "week":"第1周",
-      "dateRange":"YYYY-MM-DD～YYYY-MM-DD",
-      "focus":"本周重点",
-      "tasks":"任务清单（分号分隔）",
-      "ownerRole":"角色"
-    }],
+    "overview": "执行总览",
+    "phases": [{"phase":"阶段","dateRange":"YYYY-MM-DD～YYYY-MM-DD","actions":"动作","ownerRole":"角色","deliverable":"产出","successMetric":"指标"}],
+    "weeklyActions": [{"week":"第1周","dateRange":"YYYY-MM-DD～YYYY-MM-DD","focus":"重点","tasks":"任务","ownerRole":"角色"}],
     "hourlySchedule": [{
+      "scene":"live",
       "date":"YYYY-MM-DD",
-      "timeStart":"09:00",
-      "timeEnd":"10:00",
-      "task":"具体任务（可执行）",
-      "ownerRole":"店长/运营/达人/设计 等",
-      "location":"门店/线上/拍摄点",
+      "timeStart":"19:00",
+      "timeEnd":"21:00",
+      "task":"直播场控/开播/投流盯盘等",
+      "ownerRole":"角色",
+      "location":"门店直播间",
       "deliverable":"产出",
       "notes":"备注"
     }]
@@ -134,66 +122,60 @@ const SYSTEM_PROMPT = `你是资深本地生活/餐饮多平台运营总监，�
   "marketingBudget": {
     "totalBudget": 数字,
     "contingencyPct": 5,
-    "channels": [{
-      "channel":"达人投放",
-      "month":"YYYY-MM",
-      "amountYuan":数字,
-      "ratioPct":数字,
-      "note":"说明"
+    "channels": [{"channel":"短视频达人","month":"YYYY-MM","amountYuan":数字,"ratioPct":数字,"note":"说明"}],
+    "roiSummary":"整体投产比与回本节奏总述",
+    "roiAnalysis": [{
+      "channel":"抖音短视频",
+      "investYuan":数字,
+      "expectedGmvYuan":数字,
+      "expectedOrders":数字,
+      "roi":数字,
+      "paybackDays":数字,
+      "note":"假设说明"
     }],
-    "assumptions":"预算假设与控费规则"
+    "assumptions":"预算假设"
   },
   "calendar": {
-    "milestones": [{
-      "date":"YYYY-MM-DD",
-      "time":"10:00",
-      "item":"事项",
-      "dependency":"依赖",
-      "ownerRole":"角色",
-      "statusHint":"状态建议"
-    }]
+    "milestones": [{"date":"YYYY-MM-DD","time":"","item":"事项","dependency":"依赖","ownerRole":"角色","statusHint":"建议"}]
   },
   "talentBudget": {
+    "budgetLines": [{
+      "category":"短视频达人|短视频本地推|直播达人|直播投流|其它",
+      "platform":"抖音",
+      "tier":"头部|腰部|尾部|KOC",
+      "headcount":数字,
+      "unitBudgetYuan":数字,
+      "trafficBudgetYuan":数字,
+      "subtotalYuan":数字,
+      "note":"说明"
+    }],
     "talentRows": [{
       "platform":"抖音",
       "tier":"腰部",
-      "talentType":"探店/测评/种草",
+      "talentType":"探店/直播",
       "headcount":2,
       "unitBudgetYuan":数字,
       "subtotalYuan":数字,
-      "contentForm":"图文/短视频/直播",
-      "publishWindow":"周末 11:00-13:00 / 18:00-21:00",
+      "contentForm":"短视频/直播",
+      "publishWindow":"周末晚间（仅直播写具体时段）",
       "note":""
     }]
   },
   "productBoard": {
-    "combos": [{
-      "name":"套餐名",
-      "items":"菜品组合",
-      "priceYuan":数字,
-      "originYuan":数字,
-      "marginHint":"毛利说明",
-      "platforms":"抖音/美团",
-      "sellingPoint":"卖点",
-      "stockHint":"库存/核销提示"
-    }]
+    "combos": [{"name":"套餐","items":"组合","priceYuan":数字,"originYuan":数字,"marginHint":"毛利","platforms":"抖音","sellingPoint":"卖点","stockHint":"库存"}]
   }
 }
 
-硬性要求（必须全部满足）：
-1. 只基于用户提供的菜单/毛利/类目/竞品/预算/平台产出；缺菜单时不要编造具体店内菜名，在 risks/assumptions 标明「需补充菜单价目表」，组品给通用价带建议即可。
-2. marketingBudget.channels 金额合计应接近 totalBudget（误差≤5%）；totalBudget 使用用户给出的总预算；按月拆分（month 字段）。
-3. talentBudget 各行小计 = 人数×单场预算；达人渠道小计之和应与营销预算里「达人」相关渠道金额大致对齐。
-4. calendar.milestones 日期必须落在用户 periodStart～periodEnd 内，至少 10 条，且尽量带 time（小时）。
-5. platformStrategy 仅覆盖用户勾选的平台，每平台字段写全（approach/contentTypes/publishFreq/kpi/examples）。
-6. 组品售价须结合毛利率倒推合理；有菜单时 combo items 优先用菜单真实品名；至少 3～6 个套餐。
-7. 【最重要】executionPlan.hourlySchedule 必须详细，落到小时单位：
-   - 至少输出 24～60 条小时级任务；
-   - 覆盖周期内多个工作日与至少 2 个周末；
-   - timeStart/timeEnd 用 HH:mm，单条时长 0.5～3 小时；
-   - 任务覆盖：内容策划、拍摄、剪辑、达人对接、上架审核、投放盯盘、核销复盘、私域转化等；
-   - 同一日期按时间排序，动作具体可执行，禁止空泛「推进运营」。
-8. phases ≥3、weeklyActions 覆盖完整周期每周、goals ≥3 条且可量化。`
+硬性要求：
+1. 只基于用户提供的菜单/毛利/类目/竞品/预算/平台；缺菜单勿编造菜名。
+2. marketingBudget.channels 合计≈totalBudget（误差≤5%）；须含 roiSummary + roiAnalysis（≥3 行，含投入/预计GMV/订单/ROI/回本天数）。
+3. talentBudget.budgetLines 必须细致：至少覆盖「短视频达人（按头部/腰部/尾部分行写人数与单价）」「短视频本地推预算」「直播达人预算」「直播投流预算」；subtotalYuan=人数×单价+投流（投流类可 headcount=0）。
+4. calendar.milestones 日期落在周期内，≥10 条；非直播事项 time 可留空。
+5. platformStrategy 仅用户勾选平台。
+6. 组品 3～6 个，优先真实菜单名。
+7. 【执行时间粒度】phases/weeklyActions 用日/周即可；hourlySchedule 仅允许 scene="live" 的直播相关任务（开播、场控、直播投流盯盘等），禁止给拍摄/剪辑/上架等非直播事项写小时。无直播计划时可输出空数组 []。
+8. 短视频的 publishWindow 用「工作日/周末 上午/晚间」等粗粒度；仅直播行可写具体 HH:mm。
+9. phases≥3、weeklyActions 覆盖每周、goals≥3。`
 
 async function enrichCombosFromProductPlan(
   plan: AiOpsPlanResult,
@@ -315,7 +297,7 @@ export async function runAiOpsPlanCore(
     body.menuSummary ? `菜单价目参考：\n${body.menuSummary}` : '菜单价目：未提供',
     body.competitorSummary ? `竞品摘要：\n${body.competitorSummary}` : '',
     body.goalsNote ? `商家补充目标：${body.goalsNote}` : '',
-    '请生成完整六块详细方案 JSON；具体执行方案必须含 hourlySchedule（小时级排期，≥24 条）。',
+    '请生成完整六块详细方案 JSON；须含 ROI 投产分析与 budgetLines 细致预算；hourlySchedule 仅直播。',
   ]
     .filter(Boolean)
     .join('\n\n')
@@ -334,15 +316,19 @@ export async function runAiOpsPlanCore(
     if (
       plan &&
       isAiOpsPlanResultUsable(plan) &&
-      plan.executionPlan.hourlySchedule.length < 12
+      (plan.marketingBudget.roiAnalysis.length < 2 || plan.talentBudget.budgetLines.length < 3)
     ) {
       obj = await llmJson(
         aiEnv,
         SYSTEM_PROMPT,
-        `${userPrompt}\n\n上次 hourlySchedule 过少（仅 ${plan.executionPlan.hourlySchedule.length} 条）。请保留并加细其它块，重点补全 hourlySchedule 至 24～60 条（HH:mm，覆盖多日与周末），输出完整 JSON。`,
+        `${userPrompt}\n\n上次 ROI 或 budgetLines 不足。请补全 roiAnalysis（≥3）与 budgetLines（短视频分层人数、本地推、直播达人、直播投流），hourlySchedule 仅直播，输出完整 JSON。`,
       )
       const denser = normalizeAiOpsPlanResult(obj)
-      if (denser && denser.executionPlan.hourlySchedule.length > plan.executionPlan.hourlySchedule.length) {
+      if (
+        denser &&
+        (denser.marketingBudget.roiAnalysis.length > plan.marketingBudget.roiAnalysis.length ||
+          denser.talentBudget.budgetLines.length > plan.talentBudget.budgetLines.length)
+      ) {
         plan = denser
       }
     }

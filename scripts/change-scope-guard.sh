@@ -32,6 +32,7 @@ list_scopes() {
   mp_auth           小程序登录/会话
   ai_vision_workshop AI视觉工坊（DR增值嵌入 + 撮合小程序原生页 + 会员权限位）
   merchant_ai_ops_mix 商家 ERP：AI运营方案 + AI混剪去重
+  erp_pay_points       ERP小程序支付 + 星选积分余额对齐
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -173,11 +174,29 @@ PAT
     merchant_ai_ops_mix)
       cat <<'PAT'
 aiOpsPlanTypes
+aiOpsPlanExport
 AiOpsPlanPage
 merchantAiOpsPlanCore
 meoo-ai-ops-plan
 iceMixEditPlanAi
 iceMixProduceEngine
+change-scope-guard
+PAT
+      ;;
+    erp_pay_points)
+      cat <<'PAT'
+tenantBillingApiMp
+tenantPayFlowMp
+formatDisplayErrorMp
+meoo-tenant-billing
+authWxLoginShared
+mpRegistryProfileGet
+mine-xingxuan-points-recharge
+XingxuanPointsRechargePage
+aiOpsPlanTypes
+aiOpsPlanExport
+AiOpsPlanPage
+merchantAiOpsPlanCore
 change-scope-guard
 PAT
       ;;

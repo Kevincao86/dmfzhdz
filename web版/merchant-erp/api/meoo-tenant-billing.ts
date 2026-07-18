@@ -24,7 +24,7 @@ import {
 import { readMerchantSupabaseAdminEnv } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import { nodeSupabaseClientOptions } from '../src/lib/nodeSupabaseClientOptions.js'
 import { formatThrowableMessage, tenantPayErrorMessage } from '../src/lib/formatDisplayError.js'
-import { erpWxCodeToOpenId } from '../src/lib/erpMpWechatAccess.js'
+import { resolveErpWxOpenIdForPay } from '../vite-plugins/authWxLoginShared.js'
 
 export const config = { maxDuration: 30 }
 
@@ -189,23 +189,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const payModeRaw = String(body.payMode || 'native').trim()
       const wechatPayMode = payModeRaw === 'jsapi' ? ('jsapi' as const) : ('native' as const)
       let wechatOpenId = String(body.openid || '').trim()
-      if (
-        channel === 'wechat' &&
-        wechatPayMode === 'jsapi' &&
-        !wechatOpenId &&
-        typeof body.code === 'string' &&
-        body.code.trim()
-      ) {
-        try {
-          const stableDevOpenId =
-            typeof body.stableDevOpenId === 'string' ? body.stableDevOpenId : undefined
-          const wx = await erpWxCodeToOpenId(String(body.code).trim(), stableDevOpenId)
-          wechatOpenId = String(wx.openid || '').trim()
-        } catch (e) {
-          const msg = formatThrowableMessage(e, 'wx_code2session_failed')
-          sendJson(res, 400, { ok: false, error: msg, message: msg })
+      if (channel === 'wechat' && wechatPayMode === 'jsapi' && !wechatOpenId) {
+        const resolved = await resolveErpWxOpenIdForPay({
+          userId: auth.userId,
+          code: typeof body.code === 'string' ? body.code : undefined,
+          stableDevOpenId:
+            typeof body.stableDevOpenId === 'string' ? body.stableDevOpenId : undefined,
+        })
+        if ('error' in resolved) {
+          sendJson(res, 400, {
+            ok: false,
+            error: resolved.error,
+            message: resolved.message,
+          })
           return
         }
+        wechatOpenId = resolved.openid
       }
       const result = await createTenantPayPrepay(admin, {
         tenantId: auth.tenantId,

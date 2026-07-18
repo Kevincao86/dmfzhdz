@@ -130,6 +130,8 @@ async function startOnlinePay(input) {
   }
   if (channel === 'wechat') {
     Object.assign(prepayPayload, await fetchWxPrepayPayload())
+    // 502 重试时重新 wx.login，避免 code been used
+    prepayPayload.refreshCodeOnRetry = () => fetchWxPrepayPayload()
   }
   const prepay = await billing.tenantPayPrepay(prepayPayload)
   const outTradeNo = String(prepay.outTradeNo || '').trim()
