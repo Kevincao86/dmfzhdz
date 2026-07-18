@@ -26,7 +26,7 @@ export type AiOpsPlanWeeklyAction = {
   ownerRole: string
 }
 
-/** 落到小时的执行排期（核心加细字段） */
+/** 仅直播场景需要小时级 */
 export type AiOpsPlanHourlySlot = {
   date: string
   timeStart: string
@@ -36,6 +36,8 @@ export type AiOpsPlanHourlySlot = {
   location: string
   deliverable: string
   notes: string
+  /** live | other；非 live 前端不展示小时 */
+  scene: string
 }
 
 export type AiOpsPlanBudgetChannel = {
@@ -43,6 +45,16 @@ export type AiOpsPlanBudgetChannel = {
   amountYuan: number
   ratioPct: number
   month: string
+  note: string
+}
+
+export type AiOpsPlanRoiRow = {
+  channel: string
+  investYuan: number
+  expectedGmvYuan: number
+  expectedOrders: number
+  roi: number
+  paybackDays: number
   note: string
 }
 
@@ -64,6 +76,18 @@ export type AiOpsPlanTalentRow = {
   subtotalYuan: number
   contentForm: string
   publishWindow: string
+  note: string
+}
+
+/** 细致预算分配：短视频分层人数、本地推、直播达人、直播投流等 */
+export type AiOpsPlanBudgetLine = {
+  category: string
+  platform: string
+  tier: string
+  headcount: number
+  unitBudgetYuan: number
+  trafficBudgetYuan: number
+  subtotalYuan: number
   note: string
 }
 
@@ -93,7 +117,7 @@ export type AiOpsPlanResult = {
     overview: string
     phases: AiOpsPlanPhase[]
     weeklyActions: AiOpsPlanWeeklyAction[]
-    /** 小时级排期，至少覆盖周期内关键工作日 */
+    /** 仅直播相关小时排期 */
     hourlySchedule: AiOpsPlanHourlySlot[]
   }
   marketingBudget: {
@@ -101,12 +125,15 @@ export type AiOpsPlanResult = {
     channels: AiOpsPlanBudgetChannel[]
     assumptions: string
     contingencyPct: number
+    roiSummary: string
+    roiAnalysis: AiOpsPlanRoiRow[]
   }
   calendar: {
     milestones: AiOpsPlanMilestone[]
   }
   talentBudget: {
     talentRows: AiOpsPlanTalentRow[]
+    budgetLines: AiOpsPlanBudgetLine[]
   }
   productBoard: {
     combos: AiOpsPlanCombo[]
@@ -203,6 +230,16 @@ export function normalizeAiOpsPlanResult(raw: unknown): AiOpsPlanResult | null {
     : Array.isArray(talent?.talent_rows)
       ? talent!.talent_rows
       : []
+  const budgetLinesRaw = Array.isArray(talent?.budgetLines)
+    ? talent!.budgetLines
+    : Array.isArray(talent?.budget_lines)
+      ? talent!.budget_lines
+      : []
+  const roiRaw = Array.isArray(budget?.roiAnalysis)
+    ? budget!.roiAnalysis
+    : Array.isArray(budget?.roi_analysis)
+      ? budget!.roi_analysis
+      : []
   const combosRaw = Array.isArray(board?.combos) ? board!.combos : []
 
   return {
@@ -254,18 +291,28 @@ export function normalizeAiOpsPlanResult(raw: unknown): AiOpsPlanResult | null {
         .slice(0, 24),
       hourlySchedule: hourlyRaw
         .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
-        .map((r) => ({
-          date: asStr(r.date),
-          timeStart: asStr(r.timeStart ?? r.time_start ?? r.start),
-          timeEnd: asStr(r.timeEnd ?? r.time_end ?? r.end),
-          task: asStr(r.task ?? r.item ?? r.actions),
-          ownerRole: asStr(r.ownerRole ?? r.owner_role),
-          location: asStr(r.location),
-          deliverable: asStr(r.deliverable),
-          notes: asStr(r.notes),
-        }))
-        .filter((r) => r.date || r.task)
-        .slice(0, 120),
+        .map((r) => {
+          const task = asStr(r.task ?? r.item ?? r.actions)
+          const sceneRaw = asStr(r.scene).toLowerCase()
+          const isLive =
+            sceneRaw === 'live' ||
+            sceneRaw === '直播' ||
+            /直播/.test(task) ||
+            /直播/.test(asStr(r.notes))
+          return {
+            date: asStr(r.date),
+            timeStart: asStr(r.timeStart ?? r.time_start ?? r.start),
+            timeEnd: asStr(r.timeEnd ?? r.time_end ?? r.end),
+            task,
+            ownerRole: asStr(r.ownerRole ?? r.owner_role),
+            location: asStr(r.location),
+            deliverable: asStr(r.deliverable),
+            notes: asStr(r.notes),
+            scene: isLive ? 'live' : sceneRaw || 'other',
+          }
+        })
+        .filter((r) => (r.date || r.task) && r.scene === 'live')
+        .slice(0, 40),
     },
     marketingBudget: {
       totalBudget: asNum(budget?.totalBudget ?? budget?.total_budget),
@@ -282,6 +329,20 @@ export function normalizeAiOpsPlanResult(raw: unknown): AiOpsPlanResult | null {
         .slice(0, 30),
       assumptions: asStr(budget?.assumptions),
       contingencyPct: asNum(budget?.contingencyPct ?? budget?.contingency_pct),
+      roiSummary: asStr(budget?.roiSummary ?? budget?.roi_summary),
+      roiAnalysis: roiRaw
+        .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
+        .map((r) => ({
+          channel: asStr(r.channel),
+          investYuan: asNum(r.investYuan ?? r.invest_yuan),
+          expectedGmvYuan: asNum(r.expectedGmvYuan ?? r.expected_gmv_yuan ?? r.gmv),
+          expectedOrders: asNum(r.expectedOrders ?? r.expected_orders),
+          roi: asNum(r.roi),
+          paybackDays: asNum(r.paybackDays ?? r.payback_days),
+          note: asStr(r.note),
+        }))
+        .filter((r) => r.channel)
+        .slice(0, 20),
     },
     calendar: {
       milestones: milestonesRaw
@@ -313,6 +374,20 @@ export function normalizeAiOpsPlanResult(raw: unknown): AiOpsPlanResult | null {
         }))
         .filter((r) => r.platform || r.tier)
         .slice(0, 50),
+      budgetLines: budgetLinesRaw
+        .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
+        .map((r) => ({
+          category: asStr(r.category),
+          platform: asStr(r.platform),
+          tier: asStr(r.tier),
+          headcount: Math.max(0, Math.round(asNum(r.headcount))),
+          unitBudgetYuan: asNum(r.unitBudgetYuan ?? r.unit_budget_yuan),
+          trafficBudgetYuan: asNum(r.trafficBudgetYuan ?? r.traffic_budget_yuan),
+          subtotalYuan: asNum(r.subtotalYuan ?? r.subtotal_yuan),
+          note: asStr(r.note),
+        }))
+        .filter((r) => r.category || r.platform)
+        .slice(0, 40),
     },
     productBoard: {
       combos: combosRaw
@@ -347,6 +422,8 @@ export function isAiOpsPlanResultUsable(plan: AiOpsPlanResult): boolean {
     plan.marketingBudget.channels.length > 0 ||
     plan.calendar.milestones.length > 0 ||
     plan.talentBudget.talentRows.length > 0 ||
+    plan.talentBudget.budgetLines.length > 0 ||
+    plan.marketingBudget.roiAnalysis.length > 0 ||
     plan.productBoard.combos.length > 0
   )
 }
@@ -403,7 +480,7 @@ export function aiOpsPlanToMarkdown(plan: AiOpsPlanResult, meta?: { title?: stri
     lines.push('')
   }
   if (plan.executionPlan.hourlySchedule.length) {
-    lines.push('### 小时级排期', '')
+    lines.push('### 直播小时级排期', '')
     lines.push(
       '| 日期 | 开始 | 结束 | 任务 | 角色 | 地点 | 产出 | 备注 |',
       '| --- | --- | --- | --- | --- | --- | --- | --- |',
@@ -428,6 +505,22 @@ export function aiOpsPlanToMarkdown(plan: AiOpsPlanResult, meta?: { title?: stri
     }
     lines.push('')
   }
+  if (plan.marketingBudget.roiSummary) {
+    lines.push(`**ROI 总述：** ${plan.marketingBudget.roiSummary}`, '')
+  }
+  if (plan.marketingBudget.roiAnalysis.length) {
+    lines.push('### ROI 预计投产', '')
+    lines.push(
+      '| 渠道 | 投入 | 预计GMV | 预计订单 | ROI | 回本天数 | 说明 |',
+      '| --- | --- | --- | --- | --- | --- | --- |',
+    )
+    for (const r of plan.marketingBudget.roiAnalysis) {
+      lines.push(
+        `| ${r.channel} | ${r.investYuan} | ${r.expectedGmvYuan} | ${r.expectedOrders} | ${r.roi} | ${r.paybackDays} | ${r.note} |`,
+      )
+    }
+    lines.push('')
+  }
   if (plan.marketingBudget.assumptions) {
     lines.push(`**假设：** ${plan.marketingBudget.assumptions}`, '')
   }
@@ -443,7 +536,19 @@ export function aiOpsPlanToMarkdown(plan: AiOpsPlanResult, meta?: { title?: stri
     lines.push('')
   }
 
-  lines.push('## 5. 预算分配明细（达人）', '')
+  lines.push('## 5. 预算分配明细', '')
+  if (plan.talentBudget.budgetLines.length) {
+    lines.push(
+      '| 类别 | 平台 | 层级 | 人数 | 单场/人 | 投流预算 | 小计 | 备注 |',
+      '| --- | --- | --- | --- | --- | --- | --- | --- |',
+    )
+    for (const r of plan.talentBudget.budgetLines) {
+      lines.push(
+        `| ${r.category} | ${r.platform} | ${r.tier} | ${r.headcount} | ${r.unitBudgetYuan} | ${r.trafficBudgetYuan} | ${r.subtotalYuan} | ${r.note} |`,
+      )
+    }
+    lines.push('')
+  }
   if (plan.talentBudget.talentRows.length) {
     lines.push(
       '| 平台 | 层级 | 类型 | 人数 | 单场 | 小计 | 内容形态 | 发布窗口 | 备注 |',

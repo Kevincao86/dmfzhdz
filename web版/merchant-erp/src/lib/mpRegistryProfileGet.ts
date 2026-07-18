@@ -6,7 +6,7 @@ import { enrichMemberFromRegistrySources } from './mpRegistryProfileEnrich.js'
 import { registryMemberToClientDraft, registryPrToClientDraft } from './registryMemberClientMap.js'
 import {
   ensureMonthlyGiftPointsGranted,
-  readAccountMpAiPointsBalance,
+  reconcileAccountPointsBucketsWithLedger,
   resolvePointsLibraryRole,
   resolveRegistryTargetIdForAccount,
 } from './mpAiPointsSpendCore.js'
@@ -207,11 +207,11 @@ export async function mpAuthGetRegistryProfile(
     registryDirty = true
   }
   const gift = ensureMonthlyGiftPointsGranted(data, account, { roleHint: pointsRole })
-  const mpAiPointsBalance =
-    gift.granted > 0
-      ? gift.newBalance
-      : readAccountMpAiPointsBalance(data, account, { roleHint: pointsRole })
-  if (gift.granted > 0 || registryDirty || salesReset.changed) {
+  // 先按流水纠偏双桶，再统一用 summary.balance 作为「当前余额」
+  const reconciled = reconcileAccountPointsBucketsWithLedger(data, account, { roleHint: pointsRole })
+  const mpAiPointsSummary = buildMpAiPointsBalanceSummary(data, account, { roleHint: pointsRole })
+  const mpAiPointsBalance = Math.max(0, Math.floor(Number(mpAiPointsSummary.balance) || 0))
+  if (gift.granted > 0 || registryDirty || salesReset.changed || reconciled) {
     await io.save(data)
   }
   const memberAfterReset = findRegistryMemberForAccount(data, account)
@@ -220,7 +220,6 @@ export async function mpAuthGetRegistryProfile(
     memberAfterReset,
     douyinSalesLevelResetYm,
   )
-  const mpAiPointsSummary = buildMpAiPointsBalanceSummary(data, account, { roleHint: pointsRole })
   const libRole = pr ? 'pr' : 'talent'
   const accessRecord = pr
     ? buildMembershipAccessRecord('pr', pr)

@@ -74,6 +74,14 @@ function tenantPayErrorMessage(code, missing) {
   return msg
 }
 
+function friendlyWxCodeError(text) {
+  const t = String(text || '')
+  if (/code been used|invalid code|40163|40029|wx_code_used|wx_code2session/i.test(t)) {
+    return '微信授权已失效，请重新点击微信支付'
+  }
+  return ''
+}
+
 function billingApiErrorMessage(json, statusText, status) {
   const j = json && typeof json === 'object' ? json : {}
   const gateway = formatHttpGatewayError(status, statusText)
@@ -81,10 +89,16 @@ function billingApiErrorMessage(json, statusText, status) {
     return gateway
   }
   const message = formatThrowableMessage(j.message, '')
+  const wxMsg = friendlyWxCodeError(message)
+  if (wxMsg) return wxMsg
   if (message) return message
   const detail = formatThrowableMessage(j.detail, '')
+  const wxDetail = friendlyWxCodeError(detail)
+  if (wxDetail) return wxDetail
   if (detail) return detail
   const errRaw = formatThrowableMessage(j.error, '')
+  const wxErr = friendlyWxCodeError(errRaw)
+  if (wxErr) return wxErr
   if (errRaw) {
     const missing = Array.isArray(j.missing)
       ? j.missing.filter((x) => typeof x === 'string')

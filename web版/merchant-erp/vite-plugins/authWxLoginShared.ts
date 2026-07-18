@@ -29,6 +29,65 @@ function wxOpenIdFromUserRecord(user: Record<string, unknown>): string {
   return String(raw || '').trim()
 }
 
+/** 支付前优先复用已绑定 openid，避免反复消耗 wx.login code */
+export async function resolveErpWxOpenIdForPay(input: {
+  userId: string
+  code?: string
+  stableDevOpenId?: string
+}): Promise<{ openid: string; from: 'metadata' | 'code' } | { error: string; message: string }> {
+  const userId = String(input.userId || '').trim()
+  if (!userId) {
+    return { error: 'invalid_user', message: '缺少用户身份，请重新登录后支付' }
+  }
+
+  const { supabaseUrl, serviceRole, missingParts } = readMerchantSupabaseAdminEnv()
+  if (missingParts.length === 0) {
+    try {
+      const base = supabaseUrl.replace(/\/$/, '')
+      const getRes = await supabaseAdminFetch(`${base}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
+        headers: {
+          apikey: serviceRole,
+          Authorization: `Bearer ${serviceRole}`,
+        },
+      })
+      if (getRes.ok) {
+        const user = (await getRes.json()) as Record<string, unknown>
+        const cached = wxOpenIdFromUserRecord(user)
+        if (cached) return { openid: cached, from: 'metadata' }
+      }
+    } catch {
+      /* 继续走 code */
+    }
+  }
+
+  const code = String(input.code || '').trim()
+  if (!code && !String(input.stableDevOpenId || '').trim()) {
+    return {
+      error: 'wx_openid_required',
+      message: '请先用微信登录绑定账号，或重新点击微信支付',
+    }
+  }
+
+  try {
+    const session = await erpWxCodeToOpenId(code, input.stableDevOpenId)
+    const openid = String(session.openid || '').trim()
+    if (!openid) {
+      return { error: 'invalid_wx_code', message: '微信授权失败，请重新点击支付' }
+    }
+    void bindErpWxOpenIdToAuthUser(userId, openid)
+    return { openid, from: 'code' }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    if (/code been used|invalid code|40163|40029/i.test(msg)) {
+      return {
+        error: 'wx_code_used',
+        message: '微信授权已失效，请重新点击微信支付',
+      }
+    }
+    return { error: 'invalid_wx_code', message: msg.slice(0, 160) || '微信授权失败，请重试' }
+  }
+}
+
 function loginNameFromUserRecord(user: Record<string, unknown>): string {
   const meta = user.user_metadata as { login_name?: string } | undefined
   const fromMeta = typeof meta?.login_name === 'string' ? meta.login_name.trim() : ''

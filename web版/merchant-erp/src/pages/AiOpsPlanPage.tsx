@@ -26,9 +26,16 @@ import {
   type AiOpsPlanHistoryItem,
 } from '../lib/aiOpsPlanStorage'
 import {
+  exportAiOpsPlanExcel,
+  exportAiOpsPlanPdf,
+  exportAiOpsPlanWord,
+} from '../lib/aiOpsPlanExport'
+import {
   AI_OPS_PLAN_TABS,
   aiOpsPlanToMarkdown,
+  normalizeAiOpsPlanResult,
   type AiOpsPlanGenerateInput,
+  type AiOpsPlanMilestone,
   type AiOpsPlanResult,
   type AiOpsPlanTabId,
 } from '../lib/aiOpsPlanTypes'
@@ -66,6 +73,129 @@ function TableShell({
         </thead>
         <tbody className="divide-y divide-gray-100 bg-white">{children}</tbody>
       </table>
+    </div>
+  )
+}
+
+function CalendarMonthGrid({ milestones }: { milestones: AiOpsPlanMilestone[] }) {
+  const byDate = useMemo(() => {
+    const m = new Map<string, AiOpsPlanMilestone[]>()
+    for (const item of milestones) {
+      const d = String(item.date || '').slice(0, 10)
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) continue
+      const list = m.get(d) ?? []
+      list.push(item)
+      m.set(d, list)
+    }
+    return m
+  }, [milestones])
+
+  const months = useMemo(() => {
+    const keys = [...byDate.keys()].sort()
+    if (!keys.length) return [] as { y: number; m: number }[]
+    const start = keys[0]!
+    const end = keys[keys.length - 1]!
+    let y = Number(start.slice(0, 4))
+    let m = Number(start.slice(5, 7))
+    const ey = Number(end.slice(0, 4))
+    const em = Number(end.slice(5, 7))
+    const out: { y: number; m: number }[] = []
+    while (y < ey || (y === ey && m <= em)) {
+      out.push({ y, m })
+      m += 1
+      if (m > 12) {
+        m = 1
+        y += 1
+      }
+      if (out.length > 6) break
+    }
+    return out
+  }, [byDate])
+
+  const weekLabels = ['一', '二', '三', '四', '五', '六', '日']
+
+  return (
+    <div className="space-y-6">
+      {months.map(({ y, m }) => {
+        const first = new Date(y, m - 1, 1)
+        const daysInMonth = new Date(y, m, 0).getDate()
+        const startPad = (first.getDay() + 6) % 7
+        const cells: (number | null)[] = [
+          ...Array.from({ length: startPad }, () => null),
+          ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+        ]
+        while (cells.length % 7 !== 0) cells.push(null)
+        return (
+          <div key={`${y}-${m}`} className="rounded-xl border border-gray-200 bg-white p-3">
+            <div className="mb-3 text-sm font-semibold text-gray-900">
+              {y}年{m}月
+            </div>
+            <div className="grid grid-cols-7 gap-1 text-center text-[11px] text-gray-500">
+              {weekLabels.map((w) => (
+                <div key={w} className="py-1 font-medium">
+                  {w}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {cells.map((day, idx) => {
+                if (day == null) {
+                  return <div key={`e-${idx}`} className="min-h-[72px] rounded-md bg-gray-50/50" />
+                }
+                const iso = `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                const items = byDate.get(iso) ?? []
+                return (
+                  <div
+                    key={iso}
+                    className={cn(
+                      'min-h-[72px] rounded-md border px-1.5 py-1 text-left',
+                      items.length ? 'border-blue-200 bg-blue-50/40' : 'border-transparent bg-gray-50/40',
+                    )}
+                  >
+                    <div className="text-xs font-medium tabular-nums text-gray-700">{day}</div>
+                    <ul className="mt-0.5 space-y-0.5">
+                      {items.slice(0, 3).map((it, i) => (
+                        <li
+                          key={`${it.item}-${i}`}
+                          className="truncate text-[10px] leading-tight text-blue-900"
+                          title={`${it.time ? `${it.time} ` : ''}${it.item}`}
+                        >
+                          {it.time ? (
+                            <span className="tabular-nums text-blue-600">{it.time} </span>
+                          ) : null}
+                          {it.item}
+                        </li>
+                      ))}
+                      {items.length > 3 ? (
+                        <li className="text-[10px] text-gray-400">+{items.length - 3}</li>
+                      ) : null}
+                    </ul>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+      <div className="space-y-2">
+        <h3 className="text-sm font-semibold text-gray-900">日程清单</h3>
+        <ul className="space-y-2 text-sm text-gray-700">
+          {milestones.map((r, i) => (
+            <li key={`${r.date}-${i}`} className="flex gap-3 border-b border-gray-100 pb-2">
+              <span className="w-36 shrink-0 tabular-nums text-blue-700">
+                {r.date}
+                {r.time ? ` ${r.time}` : ''}
+              </span>
+              <span className="flex-1">
+                <span className="font-medium text-gray-900">{r.item}</span>
+                {r.ownerRole ? (
+                  <span className="ml-2 text-xs text-gray-500">· {r.ownerRole}</span>
+                ) : null}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   )
 }
@@ -145,7 +275,12 @@ function ResultPanel({ plan, tab }: { plan: AiOpsPlanResult; tab: AiOpsPlanTabId
     )
   }
   if (tab === 'exec') {
-    const hourly = plan.executionPlan.hourlySchedule
+    const hourly = (plan.executionPlan.hourlySchedule || []).filter(
+      (r) =>
+        r.scene === 'live' ||
+        /直播/.test(r.task || '') ||
+        /直播/.test(r.notes || ''),
+    )
     return (
       <div className="space-y-5">
         {plan.executionPlan.overview ? (
@@ -190,8 +325,8 @@ function ResultPanel({ plan, tab }: { plan: AiOpsPlanResult; tab: AiOpsPlanTabId
         {hourly.length ? (
           <div>
             <h3 className="mb-2 text-sm font-semibold text-gray-900">
-              小时级排期
-              <span className="ml-2 font-normal text-gray-500">（{hourly.length} 条）</span>
+              直播小时级排期
+              <span className="ml-2 font-normal text-gray-500">（仅直播 · {hourly.length} 条）</span>
             </h3>
             <TableShell
               headers={['日期', '开始', '结束', '任务', '角色', '地点', '产出', '备注']}
@@ -211,7 +346,7 @@ function ResultPanel({ plan, tab }: { plan: AiOpsPlanResult; tab: AiOpsPlanTabId
             </TableShell>
           </div>
         ) : (
-          <p className="text-sm text-amber-700">暂无小时级排期，请重新生成方案</p>
+          <p className="text-sm text-gray-500">无直播场次时不展示小时排期（阶段/周计划即可）</p>
         )}
       </div>
     )
@@ -243,6 +378,34 @@ function ResultPanel({ plan, tab }: { plan: AiOpsPlanResult; tab: AiOpsPlanTabId
             ))}
           </TableShell>
         ) : null}
+        {plan.marketingBudget.roiSummary ? (
+          <p className="rounded-lg border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-sm text-gray-800">
+            <span className="font-medium text-emerald-800">ROI 预计投产 · </span>
+            {plan.marketingBudget.roiSummary}
+          </p>
+        ) : null}
+        {(plan.marketingBudget.roiAnalysis || []).length ? (
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-gray-900">ROI 分渠道分析</h3>
+            <TableShell
+              headers={['渠道', '投入(元)', '预计GMV', '预计订单', 'ROI', '回本(天)', '说明']}
+            >
+              {(plan.marketingBudget.roiAnalysis || []).map((r, i) => (
+                <tr key={`${r.channel}-${i}`}>
+                  <td className="px-3 py-2 font-medium">{r.channel}</td>
+                  <td className="px-3 py-2 tabular-nums">{r.investYuan.toLocaleString('zh-CN')}</td>
+                  <td className="px-3 py-2 tabular-nums">
+                    {r.expectedGmvYuan.toLocaleString('zh-CN')}
+                  </td>
+                  <td className="px-3 py-2 tabular-nums">{r.expectedOrders}</td>
+                  <td className="px-3 py-2 tabular-nums font-medium text-emerald-700">{r.roi}</td>
+                  <td className="px-3 py-2 tabular-nums">{r.paybackDays || '—'}</td>
+                  <td className="px-3 py-2 text-gray-600">{r.note}</td>
+                </tr>
+              ))}
+            </TableShell>
+          </div>
+        ) : null}
         {plan.marketingBudget.assumptions ? (
           <p className="text-sm text-gray-600">
             <span className="font-medium text-gray-800">假设 · </span>
@@ -254,52 +417,67 @@ function ResultPanel({ plan, tab }: { plan: AiOpsPlanResult; tab: AiOpsPlanTabId
   }
   if (tab === 'calendar') {
     return plan.calendar.milestones.length ? (
-      <div className="relative space-y-0 border-l-2 border-blue-100 pl-4">
-        {plan.calendar.milestones.map((r, i) => (
-          <div key={`${r.date}-${i}`} className="relative pb-5 last:pb-0">
-            <span className="absolute -left-[1.35rem] top-1.5 h-2.5 w-2.5 rounded-full bg-blue-500 ring-4 ring-white" />
-            <div className="text-xs font-medium tabular-nums text-blue-700">
-              {r.date || '—'}
-              {r.time ? ` ${r.time}` : ''}
-            </div>
-            <div className="mt-0.5 text-sm font-medium text-gray-900">{r.item}</div>
-            {(r.ownerRole || r.dependency || r.statusHint) && (
-              <div className="mt-1 text-xs text-gray-500">
-                {r.ownerRole ? `角色：${r.ownerRole}` : ''}
-                {r.ownerRole && (r.dependency || r.statusHint) ? ' · ' : ''}
-                {r.dependency ? `依赖：${r.dependency}` : ''}
-                {r.dependency && r.statusHint ? ' · ' : ''}
-                {r.statusHint ? `建议：${r.statusHint}` : ''}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+      <CalendarMonthGrid milestones={plan.calendar.milestones} />
     ) : (
       <p className="text-sm text-gray-500">暂无里程碑</p>
     )
   }
   if (tab === 'talent') {
-    return plan.talentBudget.talentRows.length ? (
-      <TableShell
-        headers={['平台', '层级', '类型', '人数', '单场', '小计', '内容形态', '发布窗口', '备注']}
-      >
-        {plan.talentBudget.talentRows.map((r, i) => (
-          <tr key={`${r.platform}-${i}`}>
-            <td className="px-3 py-2 font-medium">{r.platform}</td>
-            <td className="px-3 py-2">{r.tier}</td>
-            <td className="px-3 py-2">{r.talentType}</td>
-            <td className="px-3 py-2 tabular-nums">{r.headcount}</td>
-            <td className="px-3 py-2 tabular-nums">{r.unitBudgetYuan.toLocaleString('zh-CN')}</td>
-            <td className="px-3 py-2 tabular-nums">{r.subtotalYuan.toLocaleString('zh-CN')}</td>
-            <td className="px-3 py-2">{r.contentForm}</td>
-            <td className="px-3 py-2 text-gray-600">{r.publishWindow}</td>
-            <td className="px-3 py-2 text-gray-600">{r.note}</td>
-          </tr>
-        ))}
-      </TableShell>
-    ) : (
-      <p className="text-sm text-gray-500">暂无达人预算明细</p>
+    const lines = plan.talentBudget.budgetLines || []
+    const rows = plan.talentBudget.talentRows || []
+    if (!lines.length && !rows.length) {
+      return <p className="text-sm text-gray-500">暂无预算分配明细</p>
+    }
+    return (
+      <div className="space-y-5">
+        {lines.length ? (
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-gray-900">细致预算分配</h3>
+            <TableShell
+              headers={['类别', '平台', '层级', '人数', '单场/人', '投流预算', '小计', '备注']}
+            >
+              {lines.map((r, i) => (
+                <tr key={`${r.category}-${i}`}>
+                  <td className="px-3 py-2 font-medium">{r.category}</td>
+                  <td className="px-3 py-2">{r.platform}</td>
+                  <td className="px-3 py-2">{r.tier}</td>
+                  <td className="px-3 py-2 tabular-nums">{r.headcount}</td>
+                  <td className="px-3 py-2 tabular-nums">{r.unitBudgetYuan.toLocaleString('zh-CN')}</td>
+                  <td className="px-3 py-2 tabular-nums">
+                    {r.trafficBudgetYuan.toLocaleString('zh-CN')}
+                  </td>
+                  <td className="px-3 py-2 tabular-nums font-medium">
+                    {r.subtotalYuan.toLocaleString('zh-CN')}
+                  </td>
+                  <td className="px-3 py-2 text-gray-600">{r.note}</td>
+                </tr>
+              ))}
+            </TableShell>
+          </div>
+        ) : null}
+        {rows.length ? (
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-gray-900">达人明细</h3>
+            <TableShell
+              headers={['平台', '层级', '类型', '人数', '单场', '小计', '内容形态', '发布窗口', '备注']}
+            >
+              {rows.map((r, i) => (
+                <tr key={`${r.platform}-${i}`}>
+                  <td className="px-3 py-2 font-medium">{r.platform}</td>
+                  <td className="px-3 py-2">{r.tier}</td>
+                  <td className="px-3 py-2">{r.talentType}</td>
+                  <td className="px-3 py-2 tabular-nums">{r.headcount}</td>
+                  <td className="px-3 py-2 tabular-nums">{r.unitBudgetYuan.toLocaleString('zh-CN')}</td>
+                  <td className="px-3 py-2 tabular-nums">{r.subtotalYuan.toLocaleString('zh-CN')}</td>
+                  <td className="px-3 py-2">{r.contentForm}</td>
+                  <td className="px-3 py-2 text-gray-600">{r.publishWindow}</td>
+                  <td className="px-3 py-2 text-gray-600">{r.note}</td>
+                </tr>
+              ))}
+            </TableShell>
+          </div>
+        ) : null}
+      </div>
     )
   }
   return plan.productBoard.combos.length ? (
@@ -486,15 +664,47 @@ export default function AiOpsPlanPage() {
     }
   }
 
+  const exportBase = `ai-ops-plan-${periodStart || 'export'}`
+
   const onExportJson = () => {
     if (!plan) return
     const blob = new Blob([JSON.stringify(plan, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `ai-ops-plan-${periodStart || 'export'}.json`
+    a.download = `${exportBase}.json`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  const onExportExcel = () => {
+    if (!plan) return
+    try {
+      exportAiOpsPlanExcel(plan, exportBase)
+      flash('已下载 Excel')
+    } catch {
+      flash('Excel 导出失败')
+    }
+  }
+
+  const onExportWord = () => {
+    if (!plan) return
+    try {
+      exportAiOpsPlanWord(plan, exportBase)
+      flash('已下载 Word')
+    } catch {
+      flash('Word 导出失败')
+    }
+  }
+
+  const onExportPdf = () => {
+    if (!plan) return
+    try {
+      exportAiOpsPlanPdf(plan, exportBase)
+      flash('已打开打印窗口，可另存为 PDF')
+    } catch {
+      flash('PDF 导出失败')
+    }
   }
 
   const hasMenu = (intel.menuItemCount || 0) > 0 || !!intel.draftProductsSummary
@@ -755,7 +965,7 @@ export default function AiOpsPlanPage() {
                       type="button"
                       className="min-w-0 flex-1 text-left"
                       onClick={() => {
-                        setPlan(h.plan)
+                        setPlan(normalizeAiOpsPlanResult(h.plan) || h.plan)
                         setTab('ops')
                         setPlatforms(
                           (h.platforms.filter(Boolean) as RecruitmentPlatform[]).length
@@ -833,22 +1043,43 @@ export default function AiOpsPlanPage() {
                     </button>
                   ))}
                 </nav>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={() => void onCopyMarkdown()}
                     className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
                   >
                     <ClipboardCopy className="h-3.5 w-3.5" />
-                    复制 Markdown
+                    Markdown
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onExportExcel}
+                    className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Excel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onExportWord}
+                    className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+                  >
+                    Word
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onExportPdf}
+                    className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+                  >
+                    PDF
                   </button>
                   <button
                     type="button"
                     onClick={onExportJson}
                     className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
                   >
-                    <Download className="h-3.5 w-3.5" />
-                    导出 JSON
+                    JSON
                   </button>
                 </div>
               </div>

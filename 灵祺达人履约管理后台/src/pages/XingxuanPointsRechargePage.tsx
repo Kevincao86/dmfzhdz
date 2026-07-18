@@ -300,18 +300,25 @@ export default function XingxuanPointsRechargePage() {
         /* profile sync optional */
       }
       const profile = await fetchRegistryProfile()
-      setBalance(Math.max(0, Math.floor(Number(profile.mpAiPointsBalance) || 0)))
       const s = profile.mpAiPointsSummary
       if (s) {
+        const packageRemaining = Math.max(0, Math.floor(Number(s.packageRemaining) || 0))
+        const rechargeBalance = Math.max(0, Math.floor(Number(s.rechargeBalance) || 0))
+        const balance = Math.max(
+          0,
+          Math.floor(Number(s.balance) || packageRemaining + rechargeBalance),
+        )
+        setBalance(balance)
         setPointsSummary({
           monthlyGiftQuota: s.monthlyGiftQuota,
           monthlySpent: s.monthlySpent,
-          packageRemaining: s.packageRemaining,
-          rechargeBalance: s.rechargeBalance,
+          packageRemaining,
+          rechargeBalance,
           membershipExpired: s.membershipExpired,
           membershipExpiresAt: s.membershipExpiresAt,
         })
       } else {
+        setBalance(Math.max(0, Math.floor(Number(profile.mpAiPointsBalance) || 0)))
         setPointsSummary(null)
       }
     } catch (e) {
