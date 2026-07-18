@@ -144,6 +144,7 @@ import {
 } from '../lib/aiVideoPoster'
 import { modelPickerKeyForNativeImageVendor } from '../services/ai/aiImageIntentRouting'
 import { shouldRouteToAgentNativeImage } from '../services/ai/agentModelRoute'
+import { detectIceMixVideoIntent } from '../services/ai/aiImageIntentRouting'
 import {
   agentNativeImageRouteFromPickerKey,
   effectiveChatPickerKey,
@@ -1606,13 +1607,20 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       const visionUrls = attachmentVisionUrls(attachments)
       const pq = pendingQuoteRef.current
       if ((!trimmed && attachments.length === 0 && !pq) || aiSending) return
+      const videoCount = attachments.filter((a) => a.kind === 'video').length
+      const imageCount = attachments.filter((a) => a.kind === 'image').length
       let line =
         trimmed ||
-        (attachments.some((a) => a.kind === 'video')
-          ? '请结合附带的视频（已提供首帧截图）说明你的需求。'
+        (videoCount
+          ? `请结合我附带的 ${videoCount} 个视频（下方为关键帧截图，供你理解画面）说明需求。`
           : attachments.length
             ? '请结合附图说明你的需求。'
             : '')
+      if (videoCount > 0 && trimmed) {
+        line = `${trimmed}\n\n【附件说明】已上传 ${videoCount} 个视频` +
+          (imageCount ? `、${imageCount} 张图片` : '') +
+          '；下列图片为视频关键帧/原图，请据此理解画面与指令（勿当成「要我生图」）。'
+      }
       if (pq) {
         const who = pq.role === 'user' ? '我' : '助手'
         const shortId = pq.quotedMessageId.slice(0, 8)
@@ -1621,9 +1629,6 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         setPendingQuote(null)
       }
       setSidebarActiveArchiveId(null)
-      for (const a of attachments) {
-        if (a.kind === 'video') revokeComposerAttachment(a)
-      }
       setPendingComposerAttachments([])
       const activePickerKey = modelPickerKey
       const bubbleImageUrls: string[] = []
@@ -1642,6 +1647,12 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         messagesRef.current = next
         return next
       })
+      // 气泡仍引用 blob 预览，延后释放以免缩略图立刻失效
+      window.setTimeout(() => {
+        for (const a of attachments) {
+          if (a.kind === 'video') revokeComposerAttachment(a)
+        }
+      }, 120_000)
       setInputDraft('')
       recordAgentUserInteraction(authUserIdRef.current, {
         userText: trimmed || line,
@@ -1654,6 +1665,27 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           setAiSending(true)
           try {
             const strippedLine = line.replace(/\[引用[\s\S]*?\n\n/, '').trim()
+            // 混剪：已有素材时引导到短视频 AI（真正的 ICE 混剪），勿走文生图
+            if (detectIceMixVideoIntent(strippedLine) && (visionUrls.length > 0 || attachments.length > 0)) {
+              const n = Math.max(visionUrls.length, attachments.length)
+              const assist = createAgentMessage(
+                'assistant',
+                [
+                  `已识别到 **AI 混剪** 需求，并收到约 **${n}** 份素材关键帧/图片。`,
+                  '对话里我只能根据关键帧理解画面；真正的多视频拼接、口播与成片请在「短视频 AI · AI混剪」完成：',
+                  '1. 打开下方入口，把原视频/图片上传到混剪素材池',
+                  '2. 填写或生成指导文案 → AI 规划分镜 → 一键混剪',
+                  '',
+                  '👉 [前往短视频 AI（AI混剪）](/ai-operation/video-check)',
+                ].join('\n'),
+              )
+              setMessages((prev) => {
+                const next = [...prev, assist]
+                messagesRef.current = next
+                return next
+              })
+              return
+            }
             if (
               !visionUrls.length &&
               !attachments.length &&
@@ -1678,10 +1710,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
             const imagePickerKey = resolveImagePickerKeyForUserLine(
               activePickerKey,
               modelPickerOptions,
-              line,
+              strippedLine,
               visionUrls.length > 0,
             )
-            if (shouldRouteToAgentNativeImage(imagePickerKey, line, visionUrls)) {
+            if (shouldRouteToAgentNativeImage(imagePickerKey, strippedLine, visionUrls)) {
               const imgPlaceholder = createAgentMessage('assistant', '正在生成图片，请稍候…')
               imgPlaceholder.isStreaming = true
               setMessages((prev) => {
