@@ -307,7 +307,7 @@ Page({
         amountCents: cents,
         channel: ch,
       })
-      if (ch === 'wechat') {
+      if (ch === 'wechat' && result.payMode === 'wechat_jsapi') {
         wx.showToast({ title: '支付成功', icon: 'success' })
         this.onClosePay()
         this.reload()

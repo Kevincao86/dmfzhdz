@@ -26,9 +26,11 @@ import {
   buildJsapiPayParams,
   createWechatJsapiOrder,
   createWechatNativeOrder,
+  erpWechatJsapiEnabled,
   loadWechatPayConfig,
   queryWechatOrderByOutTradeNo,
   resolveErpJsapiPayAppId,
+  wechatNativeCodeUrlToDataUrl,
   withWechatPayAppId,
 } from './wechatPayV3.js'
 
@@ -109,7 +111,12 @@ export async function createTenantPayPrepay(
     const cfgResult = loadWechatPayConfig()
     if (!cfgResult.ok) return fail(cfgResult.error, 503, cfgResult.missing)
     const cfg = cfgResult.config
-    const wechatPayMode = input.wechatPayMode === 'jsapi' ? 'wechat_jsapi' : 'wechat_native'
+    /**
+     * ERP 小程序请求 jsapi 时：仅当 WECHAT_PAY_ERP_JSAPI=1 且商户已绑 ERP AppID 才走 JSAPI；
+     * 否则走已关联的默认支付 AppID（星选）Native 扫码——轻量实测唯一可用路径。
+     */
+    const wantJsapi = input.wechatPayMode === 'jsapi' && erpWechatJsapiEnabled()
+    const wechatPayMode = wantJsapi ? 'wechat_jsapi' : 'wechat_native'
     const orderResult = await createOrder(wechatPayMode)
     if ('ok' in orderResult && orderResult.ok === false) return orderResult
     const order = orderResult as TenantPaymentOrderRow
@@ -118,7 +125,6 @@ export async function createTenantPayPrepay(
       if (wechatPayMode === 'wechat_jsapi') {
         const openid = String(input.wechatOpenId || '').trim()
         if (!openid) return fail('missing_openid', 400)
-        // ERP 小程序 openid 对应 ERP_MP AppID；不得用星选 WECHAT_PAY_APP_ID 下单
         const erpAppId = resolveErpJsapiPayAppId()
         if (!erpAppId) return fail('erp_wx_not_configured', 503)
         const jsapiCfg = withWechatPayAppId(cfg, erpAppId)
@@ -145,12 +151,19 @@ export async function createTenantPayPrepay(
         amountCents: input.amountCents,
         attach,
       })
+      let qrCode = ''
+      try {
+        qrCode = await wechatNativeCodeUrlToDataUrl(codeUrl)
+      } catch {
+        qrCode = ''
+      }
       return {
         ok: true,
         orderId: order.id,
         outTradeNo: order.out_trade_no!,
         payMode: 'wechat_native',
         codeUrl,
+        qrCode: qrCode || undefined,
       }
     } catch (e) {
       await admin.from('merchant_payment_orders').update({ status: 'cancelled' }).eq('id', order.id)
@@ -163,7 +176,7 @@ export async function createTenantPayPrepay(
           status: 400,
         }
       }
-      if (/appid和mch_id不匹配|mch_id.*appid|appid.*mch/i.test(msg)) {
+      if (/appid和mch_id不匹配|mch_id.*appid|appid.*mch|APPID_MCHID_NOT_MATCH/i.test(msg)) {
         return {
           ok: false,
           error: 'wechat_appid_mch_mismatch',

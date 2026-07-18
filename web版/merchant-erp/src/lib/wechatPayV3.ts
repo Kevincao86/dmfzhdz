@@ -94,6 +94,35 @@ export function withWechatPayAppId(cfg: WechatPayConfig, appId: string): WechatP
   return { ...cfg, appId: id }
 }
 
+/**
+ * 是否启用 ERP 小程序 JSAPI。
+ * 默认关闭：当前商户号仅关联星选 AppID（实测 APPID_MCHID_NOT_MATCH），
+ * 在微信商户平台绑定灵祺ERP AppID 后设 WECHAT_PAY_ERP_JSAPI=1 再开。
+ */
+export function erpWechatJsapiEnabled(): boolean {
+  const v = String(process.env.WECHAT_PAY_ERP_JSAPI || '').trim().toLowerCase()
+  return v === '1' || v === 'true' || v === 'yes'
+}
+
+/** Native code_url → data URL，供小程序 <image> 直接展示（无 qrcode 依赖时返回空，由端上兜底） */
+export async function wechatNativeCodeUrlToDataUrl(codeUrl: string): Promise<string> {
+  const text = String(codeUrl || '').trim()
+  if (!text) return ''
+  if (/^data:image\//i.test(text)) return text
+  try {
+    const mod = await import('qrcode')
+    const QRCode = mod.default || mod
+    return await QRCode.toDataURL(text, {
+      width: 280,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+      color: { dark: '#111827', light: '#ffffff' },
+    })
+  } catch {
+    return ''
+  }
+}
+
 export function loadWechatPayConfig(): WechatPayConfigResult {
   const missing: string[] = []
   const mchId = String(process.env.WECHAT_PAY_MCH_ID || '').trim()

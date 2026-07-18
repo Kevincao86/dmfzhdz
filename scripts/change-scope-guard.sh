@@ -194,6 +194,8 @@ authWxLoginShared
 erpMpWechatAccess
 wechatPayV3
 tenantPaymentChannels
+subscription/subscription
+wallet/wallet
 mpRegistryProfileGet
 mine-xingxuan-points-recharge
 XingxuanPointsRechargePage
@@ -202,6 +204,7 @@ aiOpsPlanExport
 AiOpsPlanPage
 merchantAiOpsPlanCore
 ecs-setup-erp-mp-wechat-env
+ecs-probe-erp-wechat-native-pay
 change-scope-guard
 PAT
       ;;
