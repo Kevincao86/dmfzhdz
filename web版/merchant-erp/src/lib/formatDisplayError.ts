@@ -32,12 +32,18 @@ export function formatThrowableMessage(value: unknown, fallback = '操作失败�
 
 const TENANT_PAY_ERROR_ZH: Record<string, string> = {
   wechat_pay_not_configured: '微信支付未在服务器配置，请联系管理员',
+  erp_wx_not_configured: '商家 ERP 小程序微信未配置（ERP_MP_WECHAT_APPID），请联系管理员',
+  wechat_appid_openid_mismatch:
+    '微信 AppID 与用户 openid 不匹配，请确认商户号已关联灵祺ERP小程序后重试',
+  wechat_appid_mch_mismatch:
+    '微信 AppID 与商户号未关联，请在微信商户平台为当前商户号绑定灵祺ERP小程序 AppID',
   alipay_not_configured: '支付宝未在服务器配置，请联系管理员',
   douyinpay_not_configured: '抖音支付未在服务器配置，请联系管理员',
   douyin_pay_not_configured: '抖音支付未在服务器配置，请联系管理员',
   invalid_amount: '金额无效',
   invalid_payload: '请求参数无效',
   missing_out_trade_no: '缺少订单号',
+  missing_openid: '无法获取微信 openid，请重新登录后再试',
   order_not_found: '订单不存在',
   unsupported_channel: '不支持的支付方式',
   create_order_failed: '创建支付订单失败',

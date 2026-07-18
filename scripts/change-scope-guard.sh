@@ -188,8 +188,12 @@ PAT
 tenantBillingApiMp
 tenantPayFlowMp
 formatDisplayErrorMp
+formatDisplayError
 meoo-tenant-billing
 authWxLoginShared
+erpMpWechatAccess
+wechatPayV3
+tenantPaymentChannels
 mpRegistryProfileGet
 mine-xingxuan-points-recharge
 XingxuanPointsRechargePage
@@ -197,6 +201,7 @@ aiOpsPlanTypes
 aiOpsPlanExport
 AiOpsPlanPage
 merchantAiOpsPlanCore
+ecs-setup-erp-mp-wechat-env
 change-scope-guard
 PAT
       ;;

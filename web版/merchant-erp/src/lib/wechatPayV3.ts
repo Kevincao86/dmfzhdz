@@ -64,15 +64,34 @@ function readPemMaterial(opts: {
   return ''
 }
 
-/** 支付用 AppID：须与 WECHAT_PAY_MCH_ID 在商户平台已绑定；勿回落到 ERP 小程序凭证 */
+/** 默认支付 AppID（星选 Native / 撮合 JSAPI）：须与 WECHAT_PAY_MCH_ID 绑定；勿回落到 ERP 小程序 */
 function resolveWechatPayAppId(): string {
   return String(
     process.env.WECHAT_PAY_APP_ID ||
       process.env.MP_WECHAT_APPID ||
-      process.env.MERCHANT_MP_WECHAT_APPID ||
       process.env.WX_APPID ||
       '',
   ).trim()
+}
+
+/**
+ * 商家 ERP 小程序 JSAPI 专用 AppID：必须与 code2session / openid 同源（ERP_MP_WECHAT_*）。
+ * 与默认 WECHAT_PAY_APP_ID（星选）分离，避免「appid和openid不匹配」。
+ */
+export function resolveErpJsapiPayAppId(): string {
+  return String(
+    process.env.WECHAT_PAY_ERP_APP_ID ||
+      process.env.ERP_MP_WECHAT_APPID ||
+      process.env.MERCHANT_MP_WECHAT_APPID ||
+      '',
+  ).trim()
+}
+
+/** 同一商户证书下，按小程序场景覆盖下单/签名用的 appId */
+export function withWechatPayAppId(cfg: WechatPayConfig, appId: string): WechatPayConfig {
+  const id = String(appId || '').trim()
+  if (!id || id === cfg.appId) return cfg
+  return { ...cfg, appId: id }
 }
 
 export function loadWechatPayConfig(): WechatPayConfigResult {
