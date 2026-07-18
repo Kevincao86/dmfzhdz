@@ -1,0 +1,79 @@
+import type { AiOpsPlanGenerateInput, AiOpsPlanResult } from './aiOpsPlanTypes'
+
+const PREFIX = 'meoo_ai_ops_plans_v1'
+
+export type AiOpsPlanHistoryItem = {
+  id: string
+  title: string
+  createdAt: string
+  platforms: string[]
+  budgetYuan: number
+  periodStart: string
+  periodEnd: string
+  plan: AiOpsPlanResult
+}
+
+function storageKey(scopeId: string): string {
+  const s = String(scopeId || 'default').trim() || 'default'
+  return `${PREFIX}:${s}`
+}
+
+export function resolveAiOpsPlanScopeId(opts: {
+  tenantUserId?: string | null
+  partnerClientId?: string | null
+}): string {
+  const tenant = String(opts.tenantUserId || 'anon').trim() || 'anon'
+  const client = String(opts.partnerClientId || '').trim()
+  return client ? `${tenant}:pc:${client}` : tenant
+}
+
+export function loadAiOpsPlanHistory(scopeId: string): AiOpsPlanHistoryItem[] {
+  try {
+    const raw = localStorage.getItem(storageKey(scopeId))
+    if (!raw) return []
+    const arr = JSON.parse(raw) as unknown
+    if (!Array.isArray(arr)) return []
+    return arr
+      .filter((x): x is AiOpsPlanHistoryItem => !!x && typeof x === 'object' && !!(x as AiOpsPlanHistoryItem).id)
+      .slice(0, 40)
+  } catch {
+    return []
+  }
+}
+
+export function saveAiOpsPlanHistoryItem(
+  scopeId: string,
+  input: AiOpsPlanGenerateInput,
+  plan: AiOpsPlanResult,
+  title?: string,
+): AiOpsPlanHistoryItem {
+  const item: AiOpsPlanHistoryItem = {
+    id: `ops-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    title:
+      title?.trim() ||
+      `${input.periodStart || ''}～${input.periodEnd || ''} · ${(input.platforms || []).slice(0, 3).join('/') || '多平台'}`,
+    createdAt: new Date().toISOString(),
+    platforms: [...(input.platforms || [])],
+    budgetYuan: Number(input.budgetYuan) || 0,
+    periodStart: input.periodStart || '',
+    periodEnd: input.periodEnd || '',
+    plan,
+  }
+  const prev = loadAiOpsPlanHistory(scopeId)
+  const next = [item, ...prev].slice(0, 40)
+  try {
+    localStorage.setItem(storageKey(scopeId), JSON.stringify(next))
+  } catch {
+    /* quota */
+  }
+  return item
+}
+
+export function deleteAiOpsPlanHistoryItem(scopeId: string, id: string): void {
+  const next = loadAiOpsPlanHistory(scopeId).filter((x) => x.id !== id)
+  try {
+    localStorage.setItem(storageKey(scopeId), JSON.stringify(next))
+  } catch {
+    /* ignore */
+  }
+}

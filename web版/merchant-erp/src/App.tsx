@@ -26,6 +26,7 @@ import StoreDetailPage from './pages/StoreDetailPage'
 import StoreInfoPage from './pages/StoreInfoPage'
 import StoreMenuPage from './pages/StoreMenuPage'
 import CompetitorAnalysisPage from './pages/CompetitorAnalysisPage'
+import AiOpsPlanPage from './pages/AiOpsPlanPage'
 import ProductCreateFlowPage from './pages/ProductCreateFlowPage'
 import ProductEditFlowPage from './pages/ProductEditFlowPage'
 import ProductsPage from './pages/ProductsPage'
@@ -128,6 +129,7 @@ export default function App() {
           <Route path="reviews/product" element={<Navigate to="/reviews?kind=product" replace />} />
           <Route path="geo" element={<GeoPage />} />
           <Route path="operation/competitors" element={<CompetitorAnalysisPage />} />
+          <Route path="operation/ai-ops-plan" element={<AiOpsPlanPage />} />
           <Route path="ai-image" element={<AiImageStudioPage />} />
           <Route
             path="ai-operation/article"
