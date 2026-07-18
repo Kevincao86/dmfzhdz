@@ -1,5 +1,5 @@
 /**
- * 小程序在线支付流程：微信 JSAPI / 扫码轮询 / 5 分钟倒计时
+ * 小程序在线支付流程：微信 JSAPI（可选）/ Native 扫码轮询 / 5 分钟倒计时
  */
 const billing = require('./tenantBillingApiMp.js')
 const wxAccount = require('./wxAccountMp.js')
@@ -40,6 +40,24 @@ function invokeWechatPay(jsapiParams) {
       },
     })
   })
+}
+
+/** code_url / 支付串 → 可给 <image> 用的二维码图（优先用服务端 data URL） */
+function resolvePayQrImageUrl(prepay) {
+  const fromServer = String((prepay && prepay.qrCode) || '').trim()
+  if (/^data:image\//i.test(fromServer) || /^https?:\/\//i.test(fromServer)) {
+    return fromServer
+  }
+  const codeUrl = String((prepay && (prepay.codeUrl || prepay.qrCode)) || '').trim()
+  if (!codeUrl) return ''
+  if (/^data:image\//i.test(codeUrl) || /^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i.test(codeUrl)) {
+    return codeUrl
+  }
+  // 兜底：把 weixin:// 等支付串编成二维码图（开发者工具/真机均可展示）
+  return (
+    'https://api.qrserver.com/v1/create-qr-code/?size=280x280&margin=8&data=' +
+    encodeURIComponent(codeUrl)
+  )
 }
 
 function pollPayUntilDone(outTradeNo, opts) {
@@ -118,7 +136,9 @@ async function fetchWxPrepayPayload() {
 }
 
 /**
- * 发起在线支付；微信走 JSAPI，支付宝/抖音返回二维码 URL 供展示并轮询。
+ * 发起在线支付。
+ * 微信：若服务端返回 jsapiParams 则调起收银台；否则返回二维码（Native，当前商户可用路径）。
+ * 支付宝/抖音：返回二维码 URL 供展示并轮询。
  */
 async function startOnlinePay(input) {
   const channel = input.channel
@@ -130,7 +150,6 @@ async function startOnlinePay(input) {
   }
   if (channel === 'wechat') {
     Object.assign(prepayPayload, await fetchWxPrepayPayload())
-    // 502 重试时重新 wx.login，避免 code been used
     prepayPayload.refreshCodeOnRetry = () => fetchWxPrepayPayload()
   }
   const prepay = await billing.tenantPayPrepay(prepayPayload)
@@ -139,18 +158,22 @@ async function startOnlinePay(input) {
 
   if (channel === 'wechat') {
     const jsapiParams = normalizeJsapiParams(prepay.jsapiParams)
-    if (!jsapiParams) {
-      if (prepay.codeUrl) {
-        throw new Error('当前环境不支持微信扫码，请在真机使用微信支付')
-      }
-      throw new Error('微信下单参数无效，请稍后重试')
+    if (jsapiParams) {
+      await invokeWechatPay(jsapiParams)
+      await pollPayUntilDone(outTradeNo)
+      return { outTradeNo, payMode: 'wechat_jsapi' }
     }
-    await invokeWechatPay(jsapiParams)
-    await pollPayUntilDone(outTradeNo)
-    return { outTradeNo, payMode: 'wechat_jsapi' }
+    const qrUrl = resolvePayQrImageUrl(prepay)
+    if (!qrUrl) throw new Error('未获取到微信支付码，请稍后重试')
+    return {
+      outTradeNo,
+      payMode: 'wechat_native',
+      qrUrl,
+      codeUrl: String(prepay.codeUrl || '').trim() || null,
+    }
   }
 
-  const qrUrl = String(prepay.qrCode || prepay.codeUrl || '').trim()
+  const qrUrl = resolvePayQrImageUrl(prepay)
   if (!qrUrl) throw new Error('未获取到支付二维码，请稍后重试')
   return {
     outTradeNo,
@@ -174,4 +197,5 @@ module.exports = {
   createPayCountdown,
   startOnlinePay,
   formatPayError,
+  resolvePayQrImageUrl,
 }
