@@ -4,8 +4,14 @@ const mpApiErrors = require('./mpApiErrors.js')
 const mpPrivacy = require('./mpPrivacyAuthorize.js')
 const ossTransport = require('./mpOssUploadTransport.js')
 
-/** 探店成片最长 3 分钟（与 merchant-erp recruitmentVideoLimits 同步） */
+/**
+ * 探店成片业务上限 180 秒（与 merchant-erp recruitmentVideoLimits 同步）。
+ * 微信 chooseMedia/chooseVideo 的 maxDuration 仅约束「拍摄」，平台上限 60s；
+ * 从相册选取可超过 60s，由 assertVideoDuration 拦到 180s。
+ */
 const MAX_VIDEO_DURATION_SEC = 180
+/** 微信拍摄视频 API 上限（秒），不可改为 180 */
+const WECHAT_CAPTURE_MAX_DURATION_SEC = 60
 const MAX_DIRECT_BODY_MB = 38
 const MAX_OSS_BODY_MB = 200
 /** 分片原始字节（base64 后约 1MB） */
@@ -393,7 +399,9 @@ function getVideoDurationSec(tempPath) {
 function assertVideoDuration(durationSec) {
   const d = Number(durationSec) || 0
   if (d > 0 && d > MAX_VIDEO_DURATION_SEC) {
-    throw new Error(`视频时长超过 ${MAX_VIDEO_DURATION_SEC} 秒（3 分钟），请剪辑后重试`)
+    throw new Error(
+      `视频时长超过 ${MAX_VIDEO_DURATION_SEC} 秒（相册最长约 3 分钟；拍摄最长 ${WECHAT_CAPTURE_MAX_DURATION_SEC} 秒），请剪辑后重试`,
+    )
   }
 }
 
@@ -411,7 +419,7 @@ function pickVideoWithChooseMedia() {
       count: 1,
       mediaType: ['video'],
       sourceType: ['album', 'camera'],
-      maxDuration: 60,
+      maxDuration: WECHAT_CAPTURE_MAX_DURATION_SEC,
       success(res) {
         const f = res.tempFiles && res.tempFiles[0]
         if (!f || !f.tempFilePath) {
@@ -442,7 +450,7 @@ function pickVideoWithChooseVideo() {
     wx.chooseVideo({
       sourceType: ['album', 'camera'],
       compressed: false,
-      maxDuration: 60,
+      maxDuration: WECHAT_CAPTURE_MAX_DURATION_SEC,
       success(chooseRes) {
         resolve({
           tempPath: chooseRes.tempFilePath,

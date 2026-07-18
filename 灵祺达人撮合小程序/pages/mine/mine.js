@@ -723,7 +723,12 @@ Page({
     const url = e.detail?.avatarUrl
     if (!url) return
     this.setData({ avatarUrl: url })
-    await this.persistProfileDisplay(this.data.profileNick, url)
+    wx.showLoading({ title: '上传头像', mask: true })
+    try {
+      await this.persistProfileDisplay(this.data.profileNick, url)
+    } finally {
+      wx.hideLoading()
+    }
   },
   async onProfileNickBlur() {
     if (!this.data.wxLoggedIn || this.data.profileSaving) return
@@ -746,12 +751,22 @@ Page({
     }
     this.setData({ profileSaving: true })
     try {
-      const avatarPersisted = await wxProfileDisplay.persistWxAvatarUrl(av)
+      let avatarPersisted
+      try {
+        avatarPersisted = await wxProfileDisplay.persistWxAvatarUrl(av)
+      } catch (e) {
+        const msg = String((e && e.message) || e || '头像上传失败')
+        wx.showToast({ title: msg.slice(0, 28), icon: 'none' })
+        return false
+      }
       wxAccount.writeWxAccount({ wxNickName: n, wxAvatarUrl: avatarPersisted })
       const avFinal = avatarPersisted || av
+      const syncWarns = []
       try {
         await auth.updateWxProfile(n, avFinal)
-      } catch (_) {}
+      } catch (e) {
+        syncWarns.push(String((e && e.message) || '账号资料同步失败'))
+      }
       const identity = userProfile.readIdentity()
       const ts = new Date().toLocaleString('zh-CN', { hour12: false })
       if (identity === 'talent') {
@@ -766,7 +781,9 @@ Page({
                 member.lingqiTalentId = reg.lingqiTalentId
                 memberStore.writeMember(member)
               }
-            } catch (_) {}
+            } catch (e) {
+              syncWarns.push(String((e && e.message) || '达人资料同步失败'))
+            }
           }
         }
       } else {
@@ -797,7 +814,9 @@ Page({
               saved.id = reg.id || saved.id
               userProfile.writePrProfile(saved)
             }
-          } catch (_) {}
+          } catch (e) {
+            syncWarns.push(String((e && e.message) || 'PR 资料同步失败'))
+          }
         }
       }
       try {
@@ -811,13 +830,23 @@ Page({
           }
           await chat.syncProfile(part)
         }
-      } catch (_) {}
+      } catch (e) {
+        syncWarns.push(String((e && e.message) || '聊天资料同步失败'))
+      }
       this.refresh()
       try {
         const chat = require('../../utils/talentChat.js')
         if (chat.canChat()) void chat.syncProfile()
       } catch (_) {}
-      wx.showToast({ title: '已更新', icon: 'success', duration: 1200 })
+      if (syncWarns.length) {
+        wx.showToast({
+          title: `已保存本地，云端同步异常：${syncWarns[0].slice(0, 16)}`,
+          icon: 'none',
+          duration: 2500,
+        })
+      } else {
+        wx.showToast({ title: '已更新', icon: 'success', duration: 1200 })
+      }
       return true
     } finally {
       this.setData({ profileSaving: false })
