@@ -2,13 +2,14 @@
  * AI 混剪成片引擎：ICE Timeline 多素材拼接 + 截取 + 转场 + 动效字幕 + TTS。
  * 按分镜表语义匹配素材与截取点，视觉 AI 精修入点；渲染时尊重用户已确认的分镜。
  */
-import type { IceMixMaterialProfile } from './iceMixEditPlanAi'
 import { resolveIceEffectPreset } from '../lib/iceEffectPresets'
 import {
+  areMixMaterialsVisuallySimilar,
   buildIceMixSegmentsFromEditPlan,
   buildStoryboardMixDecisions,
   enforceDiverseEditDecisions,
   planMixEditFromInstructions,
+  type IceMixMaterialProfile,
   type MixEditSegmentDecision,
 } from './iceMixEditPlanAi'
 import { validateIceMixMaterialUrl, sanitizeIceMixMaterialUrlForPipeline } from '../lib/icePipelineImageUrl'
@@ -210,6 +211,7 @@ export function composeMixProductionBrief(
 export function validateMixSegmentDiversity(
   segments: IceMixSegmentPlan[],
   materials: IceMixMaterialSlot[],
+  profiles?: IceMixMaterialProfile[],
 ): string | null {
   if (segments.length < 2) return '分镜至少 2 段'
   if (materials.length < 1) return null
@@ -226,6 +228,33 @@ export function validateMixSegmentDiversity(
   }
   if (materials.length >= 2 && new Set(matKeys).size < 2) {
     return '须使用至少 2 条不同素材；请上传多条视频/图片或检查素材映射'
+  }
+  if (profiles?.length) {
+    for (let i = 0; i < segments.length; i++) {
+      for (let j = i + 1; j < segments.length; j++) {
+        const ai = segments[i]!.materialIndex
+        const bi = segments[j]!.materialIndex
+        const pa =
+          profiles.find((p) => p.index === ai) ||
+          ({
+            index: ai,
+            label: materials[ai]?.label || '',
+            kind: materials[ai]?.kind || 'video',
+            description: materials[ai]?.label || '',
+          } as IceMixMaterialProfile)
+        const pb =
+          profiles.find((p) => p.index === bi) ||
+          ({
+            index: bi,
+            label: materials[bi]?.label || '',
+            kind: materials[bi]?.kind || 'video',
+            description: materials[bi]?.label || '',
+          } as IceMixMaterialProfile)
+        if (areMixMaterialsVisuallySimilar(pa, pb, materials[ai], materials[bi])) {
+          return `存在相似/同画面素材（素材${ai + 1} 与 素材${bi + 1}），请更换差异更大的片源后重试`
+        }
+      }
+    }
   }
   return null
 }
@@ -319,7 +348,7 @@ export async function produceIceMixPackage(
     return { ok: false, message: '无法生成分镜时间线，请检查分镜表' }
   }
 
-  const diversityErr = validateMixSegmentDiversity(segments, materials)
+  const diversityErr = validateMixSegmentDiversity(segments, materials, profileList)
   if (diversityErr) {
     return { ok: false, message: diversityErr }
   }
