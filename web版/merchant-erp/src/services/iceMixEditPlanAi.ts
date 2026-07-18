@@ -78,12 +78,13 @@ const VISION_EDIT_PLAN_TIMEOUT_MS = 90_000
 
 const VISION_EDIT_PLAN_SYSTEM = `你是专业短视频混剪剪辑师（探店/餐饮/街头小吃/本地生活带货）。用户会提供【指导文案】【分镜表】以及每条素材的多帧采样截图（附图，标注源片秒数如 2.4s）。
 须为每一段分镜输出剪辑决策：
-1. materialIndex：选用哪条素材（从 0 开始），必须按画面语义匹配分镜「画面」与口播；禁止全部段都用 materialIndex=0
-2. sourceInSec：从该素材第几秒起截取（须与附图秒数/画面语义一致；视频 0–12s；图片固定 0）；同素材复用时 sourceInSec 至少相差 1.5 秒
-3. 叙事顺序（强制，二选一）：
+1. materialIndex：选用哪条素材（从 0 开始），必须按画面语义匹配分镜「画面」与口播
+2. 【硬性禁止重复】每一条素材在全片最多使用 1 次（每个 materialIndex 在数组中最多出现一次）。分镜数多于素材数时：优先覆盖全部素材，多余分镜合并到相邻段的语义说明中仍不得重复 materialIndex——此时须减少输出段数至不超过素材数，或仅输出前 N 段（N=素材数）
+3. sourceInSec：从该素材第几秒起截取（须与附图秒数/画面语义一致；视频 0–12s；图片固定 0）；禁止用相近入点伪造「不同画面」
+4. 叙事顺序（强制，二选一）：
    模式A（有门头/店招素材时优先）：门头门店指引(开场) → 套餐/产品/制作(中段) → 结束语(收尾)
    模式B：产品/套餐卖点钩子(开场) → 制作/体验(中段) → 门头到店指引(倒数第二段) → 结束语(收尾)
-4. materialIndex 与分镜画面/口播语义一致；sourceInSec 与附图秒数匹配
+5. materialIndex 与分镜画面/口播语义一致；sourceInSec 与附图秒数匹配
 
 只输出 JSON 数组，无 markdown：
 [{"segmentIndex":0,"materialIndex":2,"sourceInSec":0,"clipNote":"门店外观"},...]`
@@ -159,17 +160,87 @@ function scoreMaterialMatch(
   return score
 }
 
+/** 硬规则：每条素材全片最多 1 次；段数≤素材数时须全部唯一 */
 function isEditPlanDiverseEnough(
   decisions: MixEditSegmentDecision[],
   matCount: number,
 ): boolean {
-  if (decisions.length < 2 || matCount < 2) return true
-  const mats = new Set(decisions.map((d) => d.materialIndex))
-  const ins = decisions.map((d) => Math.round(d.sourceInSec * 10) / 10)
-  const distinctIns = new Set(ins)
-  if (mats.size >= 2) return true
-  if (distinctIns.size >= 2 && ins.some((x) => x > 0.05)) return true
-  return false
+  if (decisions.length < 2 || matCount < 1) return true
+  const mats = decisions.map((d) => d.materialIndex)
+  const unique = new Set(mats)
+  if (unique.size !== mats.length) return false
+  if (decisions.length <= matCount && unique.size !== decisions.length) return false
+  return true
+}
+
+/**
+ * 强制每条素材全片最多出现一次；若段数 > 素材数则截断到素材数并轮换填满唯一映射。
+ * 同素材禁止相近入点（防御性）。
+ */
+export function enforceUniqueMaterialEditDecisions(
+  decisions: MixEditSegmentDecision[],
+  rows: ShortVideoScriptRow[],
+  materials: IceMixMaterialSlot[],
+  profiles: IceMixMaterialProfile[],
+): MixEditSegmentDecision[] {
+  if (!decisions.length || !materials.length) return decisions
+  const maxSeg = Math.min(decisions.length, rows.length, materials.length)
+  const used = new Set<number>()
+  const usedIn = new Map<number, number>()
+  const out: MixEditSegmentDecision[] = []
+
+  const scoreMi = (mi: number, row: ShortVideoScriptRow, segIdx: number) => {
+    const prof = profileAt(profiles, materials, mi)
+    let score = scoreMaterialMatch(row.visual, prof, materials[mi]!.label)
+    score += scoreMaterialMatch(row.dialogue, prof, materials[mi]!.label) * 0.6
+    if (!isMixMaterialPromotionRelevant(prof, '')) score -= 2
+    score += (segIdx % materials.length === mi ? 1 : 0)
+    return score
+  }
+
+  for (let i = 0; i < maxSeg; i++) {
+    const seed = decisions[i] ?? decisions[0]!
+    const row = rows[i]!
+    const tr = parseScriptTimeRangeSeconds(row.timeRange)
+    const clipDur = tr ? Math.max(0.35, tr.end - tr.start) : 4
+
+    let bestIdx = -1
+    let bestScore = -1e9
+    const prefer = Math.max(0, seed.materialIndex) % materials.length
+    for (let mi = 0; mi < materials.length; mi++) {
+      if (used.has(mi)) continue
+      let score = scoreMi(mi, row, i)
+      if (mi === prefer) score += 12
+      if (score > bestScore) {
+        bestScore = score
+        bestIdx = mi
+      }
+    }
+    if (bestIdx < 0) {
+      // 理论不应发生（maxSeg≤materials.length）
+      bestIdx = spreadMixMaterialIndex(i, maxSeg, materials.length)
+      while (used.has(bestIdx) && used.size < materials.length) {
+        bestIdx = (bestIdx + 1) % materials.length
+      }
+    }
+
+    const prof = profileAt(profiles, materials, bestIdx)
+    const est = prof.estimatedDurationSec ?? MIX_DEFAULT_SOURCE_DURATION_SEC
+    let sourceInSec = clampMixSourceInSec(seed.sourceInSec || 0, clipDur, est)
+    const lastIn = usedIn.get(bestIdx)
+    if (lastIn != null && Math.abs(sourceInSec - lastIn) < 1.5) {
+      sourceInSec = clampMixSourceInSec(sourceInSec + 2, clipDur, est)
+    }
+    used.add(bestIdx)
+    usedIn.set(bestIdx, sourceInSec)
+    out.push({
+      segmentIndex: i,
+      materialIndex: bestIdx,
+      sourceInSec,
+      clipNote: seed.clipNote,
+    })
+  }
+  return out
 }
 
 function inferSourceInSec(visual: string, estDur: number, profile?: IceMixMaterialProfile): number {
@@ -243,15 +314,17 @@ function profileAt(
   )
 }
 
-/** 结构化分配：轮询素材 + 语义微调 + 错开截取点，保证多素材分散 */
+/** 结构化分配：语义选材后硬唯一（素材不得重复） */
 export function buildStructuralMixDecisions(
   rows: ShortVideoScriptRow[],
   materials: IceMixMaterialSlot[],
   profiles: IceMixMaterialProfile[],
 ): MixEditSegmentDecision[] {
   const usedIn = new Map<number, number>()
-  return rows.map((row, segmentIndex) => {
-    const cycleIdx = spreadMixMaterialIndex(segmentIndex, rows.length, materials.length)
+  const usedMat = new Set<number>()
+  const capped = rows.slice(0, materials.length)
+  const raw = capped.map((row, segmentIndex) => {
+    const cycleIdx = spreadMixMaterialIndex(segmentIndex, capped.length, materials.length)
     let bestIdx = cycleIdx
     let bestScore = -1
 
@@ -264,6 +337,7 @@ export function buildStructuralMixDecisions(
           })
 
     for (const mi of candidatePool) {
+      if (usedMat.has(mi)) continue
       const prof = profileAt(profiles, materials, mi)
       const semantic = scoreMaterialMatch(row.visual, prof, materials[mi]!.label)
       const cycleBonus = mi === cycleIdx ? 3 : 0
@@ -274,9 +348,20 @@ export function buildStructuralMixDecisions(
       }
     }
 
-    if (materials.length >= 2 && bestScore < 4) {
-      bestIdx = cycleIdx
+    if (usedMat.has(bestIdx) || (materials.length >= 2 && bestScore < 4 && !usedMat.has(cycleIdx))) {
+      bestIdx = -1
+      for (let mi = 0; mi < materials.length; mi++) {
+        if (usedMat.has(mi)) continue
+        const score = scoreMaterialMatch(row.visual, profileAt(profiles, materials, mi), materials[mi]!.label)
+        if (score > bestScore || bestIdx < 0) {
+          bestScore = score
+          bestIdx = mi
+        }
+      }
+      if (bestIdx < 0) bestIdx = cycleIdx
     }
+
+    usedMat.add(bestIdx)
 
     const est =
       profileAt(profiles, materials, bestIdx).estimatedDurationSec ??
@@ -302,22 +387,21 @@ export function buildStructuralMixDecisions(
 
     return { segmentIndex, materialIndex: bestIdx, sourceInSec }
   })
+  return enforceUniqueMaterialEditDecisions(raw, capped, materials, profiles)
 }
 
-/** 禁止全段同一素材：仅当全部段落在用同一条素材时才重分配 */
+/** 禁止重复素材/重复画面：始终走硬唯一分配 */
 export function enforceDiverseEditDecisions(
   decisions: MixEditSegmentDecision[],
   rows: ShortVideoScriptRow[],
   materials: IceMixMaterialSlot[],
   profiles: IceMixMaterialProfile[],
 ): MixEditSegmentDecision[] {
-  if (materials.length < 2 || decisions.length < 2) return decisions
-  if (isEditPlanDiverseEnough(decisions, materials.length)) return decisions
-
-  const allSameMat = new Set(decisions.map((d) => d.materialIndex)).size === 1
-  if (!allSameMat) return decisions
-
-  return buildStructuralMixDecisions(rows, materials, profiles)
+  if (!materials.length || !decisions.length) return decisions
+  if (isEditPlanDiverseEnough(decisions, materials.length) && decisions.length <= materials.length) {
+    return decisions.slice(0, Math.min(decisions.length, materials.length))
+  }
+  return enforceUniqueMaterialEditDecisions(decisions, rows, materials, profiles)
 }
 
 /**
@@ -331,19 +415,22 @@ export function buildStoryboardMixDecisions(
   guidance = '',
 ): MixEditSegmentDecision[] {
   const usedIn = new Map<number, number>()
-  const usedMatCount = new Map<number, number>()
+  const usedMats = new Set<number>()
   const pattern = inferMixNarrativePattern(
     guidance || rows.map((r) => `${r.visual} ${r.dialogue}`).join(' '),
     profiles,
   )
+  const segCount = Math.min(rows.length, materials.length)
 
-  return rows.map((row, segmentIndex) => {
-    let bestIdx = spreadMixMaterialIndex(segmentIndex, rows.length, materials.length)
-    let bestScore = -1
-    const slotRole = segmentRoleForIndex(segmentIndex, rows.length, pattern)
+  const raw = rows.slice(0, segCount).map((row, segmentIndex) => {
+    let bestIdx = -1
+    let bestScore = -1e9
+    const slotRole = segmentRoleForIndex(segmentIndex, segCount, pattern)
     const rowRole = classifyRowNarrativeRole(row.visual, row.dialogue)
+    const cycleIdx = spreadMixMaterialIndex(segmentIndex, segCount, materials.length)
 
     for (let mi = 0; mi < materials.length; mi++) {
+      if (usedMats.has(mi)) continue
       const prof = profileAt(profiles, materials, mi)
       if (!isMixMaterialPromotionRelevant(prof, guidance)) continue
       let score = scoreMaterialMatch(row.visual, prof, materials[mi]!.label)
@@ -360,9 +447,7 @@ export function buildStoryboardMixDecisions(
       }
 
       if (userSlots?.[segmentIndex] === mi) score += 3
-
-      const used = usedMatCount.get(mi) ?? 0
-      if (used > 0) score -= used * 1.2
+      if (mi === cycleIdx) score += 2
 
       if (score > bestScore) {
         bestScore = score
@@ -370,21 +455,18 @@ export function buildStoryboardMixDecisions(
       }
     }
 
-    if (materials.length >= 2 && bestScore < 2) {
-      const picks = pickMaterialsForNarrativeSlots(
-        rows.length,
-        materials,
-        profiles,
-        guidance,
-      )
-      bestIdx = picks[segmentIndex] ?? bestIdx
+    if (bestIdx < 0) {
+      const picks = pickMaterialsForNarrativeSlots(segCount, materials, profiles, guidance)
+      bestIdx = picks[segmentIndex] ?? cycleIdx
+      if (usedMats.has(bestIdx)) {
+        bestIdx = [...Array(materials.length).keys()].find((mi) => !usedMats.has(mi)) ?? cycleIdx
+      }
     }
 
-    usedMatCount.set(bestIdx, (usedMatCount.get(bestIdx) ?? 0) + 1)
+    usedMats.add(bestIdx)
 
     const prof = profileAt(profiles, materials, bestIdx)
-    const est =
-      prof.estimatedDurationSec ?? MIX_DEFAULT_SOURCE_DURATION_SEC
+    const est = prof.estimatedDurationSec ?? MIX_DEFAULT_SOURCE_DURATION_SEC
     const tr = parseScriptTimeRangeSeconds(row.timeRange)
     const clipDur = tr ? Math.max(0.35, tr.end - tr.start) : 4
 
@@ -393,14 +475,16 @@ export function buildStoryboardMixDecisions(
       inferSourceInSec(row.visual, est, prof)
 
     const lastIn = usedIn.get(bestIdx)
-    if (lastIn != null && Math.abs(sourceInSec - lastIn) < 1.2) {
-      sourceInSec = clampMixSourceInSec(sourceInSec + 1.6, clipDur, est)
+    if (lastIn != null && Math.abs(sourceInSec - lastIn) < 1.5) {
+      sourceInSec = clampMixSourceInSec(sourceInSec + 2, clipDur, est)
     }
     sourceInSec = clampMixSourceInSec(sourceInSec, clipDur, est)
     usedIn.set(bestIdx, sourceInSec)
 
     return { segmentIndex, materialIndex: bestIdx, sourceInSec }
   })
+
+  return enforceUniqueMaterialEditDecisions(raw, rows.slice(0, segCount), materials, profiles)
 }
 
 export function fallbackMixEditDecisions(

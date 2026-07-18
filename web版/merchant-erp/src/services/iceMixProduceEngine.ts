@@ -7,6 +7,7 @@ import { resolveIceEffectPreset } from '../lib/iceEffectPresets'
 import {
   buildIceMixSegmentsFromEditPlan,
   buildStoryboardMixDecisions,
+  enforceDiverseEditDecisions,
   planMixEditFromInstructions,
   type MixEditSegmentDecision,
 } from './iceMixEditPlanAi'
@@ -211,19 +212,20 @@ export function validateMixSegmentDiversity(
   materials: IceMixMaterialSlot[],
 ): string | null {
   if (segments.length < 2) return '分镜至少 2 段'
-  if (materials.length < 2) return null
+  if (materials.length < 1) return null
+  const indices = segments.map((s) => s.materialIndex)
+  if (new Set(indices).size !== indices.length) {
+    return '存在重复素材画面：同一素材不得在成片中出现两次，请减少分镜或增加素材后重试'
+  }
   const matKeys = segments.map((s) => {
     const mat = materials[s.materialIndex] ?? materials[0]!
     return canonicalMixMediaKey(mat.mediaUrl || mat.signedMediaUrl || '')
   })
-  if (new Set(matKeys).size < 2) {
-    return '须使用至少 2 条不同素材；请上传多条视频/图片或检查素材映射'
+  if (new Set(matKeys).size !== matKeys.length) {
+    return '存在重复素材文件（相同媒体）：请勿上传重复片源'
   }
-  const ins = segments
-    .filter((s) => s.kind === 'video')
-    .map((s) => Math.round((s.sourceInSec ?? 0) * 10) / 10)
-  if (ins.length >= 2 && new Set(ins).size < 2 && new Set(matKeys).size < 2) {
-    return '视频截取点过于集中，请调整分镜或素材'
+  if (materials.length >= 2 && new Set(matKeys).size < 2) {
+    return '须使用至少 2 条不同素材；请上传多条视频/图片或检查素材映射'
   }
   return null
 }
@@ -294,9 +296,18 @@ export async function produceIceMixPackage(
     input.onProgress?.('视觉匹配完成，正在生成剪辑时间线…')
   }
 
+  // 硬去重：同一素材/画面不得重复出现；段数超过素材数时截断
+  decisions = enforceDiverseEditDecisions(decisions, rows, materials, profileList)
+  const mixRows = rows.slice(0, decisions.length)
+  if (mixRows.length < rows.length) {
+    input.onProgress?.(
+      `已按「素材不重复」规则将分镜从 ${rows.length} 段收束为 ${mixRows.length} 段（≤素材数）`,
+    )
+  }
+
   let segments: IceMixSegmentPlan[] = sanitizeMixSegments(
     buildIceMixSegmentsFromEditPlan(
-      rows,
+      mixRows,
       materials,
       decisions,
       input.targetTotalSec,
@@ -313,10 +324,10 @@ export async function produceIceMixPackage(
     return { ok: false, message: diversityErr }
   }
 
-  const narrationText = collectMixNarrationText(rows, input.targetTotalSec)
+  const narrationText = collectMixNarrationText(mixRows, input.targetTotalSec)
   const editBrief = composeMixProductionBrief(
     input.mixInstruction || input.guidance || '',
-    rows,
+    mixRows,
     { hasNarration: narrationText.length >= 4, effectId: input.effectId },
   )
 

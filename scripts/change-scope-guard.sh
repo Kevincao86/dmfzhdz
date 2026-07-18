@@ -31,6 +31,7 @@ list_scopes() {
   recommend_hall    推荐大厅全部达人池（慎用，见 recommend-all-talents-lock）
   mp_auth           小程序登录/会话
   ai_vision_workshop AI视觉工坊（DR增值嵌入 + 撮合小程序原生页 + 会员权限位）
+  merchant_ai_ops_mix 商家 ERP：AI运营方案 + AI混剪去重
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -167,6 +168,17 @@ change-scope-guard
 撮合小程序/pages/mine/mine.js
 撮合小程序/utils/ecs.js
 撮合小程序/utils/cloudEcs.js
+PAT
+      ;;
+    merchant_ai_ops_mix)
+      cat <<'PAT'
+aiOpsPlanTypes
+AiOpsPlanPage
+merchantAiOpsPlanCore
+meoo-ai-ops-plan
+iceMixEditPlanAi
+iceMixProduceEngine
+change-scope-guard
 PAT
       ;;
     *)

@@ -74,10 +74,22 @@ function ResultPanel({ plan, tab }: { plan: AiOpsPlanResult; tab: AiOpsPlanTabId
   if (tab === 'ops') {
     return (
       <div className="space-y-5">
+        {plan.opsPlan.background ? (
+          <p className="text-sm leading-relaxed text-gray-700">
+            <span className="font-medium text-gray-900">背景 · </span>
+            {plan.opsPlan.background}
+          </p>
+        ) : null}
         {plan.opsPlan.positioning ? (
           <p className="rounded-lg border border-blue-100 bg-blue-50/60 px-4 py-3 text-sm leading-relaxed text-gray-800">
             <span className="font-medium text-blue-800">定位 · </span>
             {plan.opsPlan.positioning}
+          </p>
+        ) : null}
+        {plan.opsPlan.targetAudience ? (
+          <p className="text-sm text-gray-700">
+            <span className="font-medium text-gray-900">人群 · </span>
+            {plan.opsPlan.targetAudience}
           </p>
         ) : null}
         {plan.opsPlan.goals.length ? (
@@ -90,15 +102,30 @@ function ResultPanel({ plan, tab }: { plan: AiOpsPlanResult; tab: AiOpsPlanTabId
             </ul>
           </div>
         ) : null}
+        {plan.opsPlan.contentPillars.length ? (
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-gray-900">内容支柱</h3>
+            <p className="text-sm text-gray-700">{plan.opsPlan.contentPillars.join(' · ')}</p>
+          </div>
+        ) : null}
+        {plan.opsPlan.monthlyThemes.length ? (
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-gray-900">月度/周主题</h3>
+            <p className="text-sm text-gray-700">{plan.opsPlan.monthlyThemes.join(' · ')}</p>
+          </div>
+        ) : null}
         {plan.opsPlan.platformStrategy.length ? (
           <div>
             <h3 className="mb-2 text-sm font-semibold text-gray-900">分平台策略</h3>
-            <TableShell headers={['平台', '打法', 'KPI']}>
+            <TableShell headers={['平台', '打法', '内容形态', '频次', 'KPI', '选题示例']}>
               {plan.opsPlan.platformStrategy.map((r, i) => (
                 <tr key={`${r.platform}-${i}`}>
                   <td className="px-3 py-2 font-medium text-gray-900">{r.platform}</td>
-                  <td className="px-3 py-2 text-gray-700">{r.approach}</td>
+                  <td className="max-w-xs px-3 py-2 text-gray-700">{r.approach}</td>
+                  <td className="px-3 py-2 text-gray-700">{r.contentTypes}</td>
+                  <td className="px-3 py-2 text-gray-700">{r.publishFreq}</td>
                   <td className="px-3 py-2 text-gray-700">{r.kpi}</td>
+                  <td className="max-w-xs px-3 py-2 text-gray-600">{r.examples}</td>
                 </tr>
               ))}
             </TableShell>
@@ -106,7 +133,7 @@ function ResultPanel({ plan, tab }: { plan: AiOpsPlanResult; tab: AiOpsPlanTabId
         ) : null}
         {plan.opsPlan.risks.length ? (
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-gray-900">风险</h3>
+            <h3 className="mb-2 text-sm font-semibold text-gray-900">风险与对策</h3>
             <ul className="list-disc space-y-1 pl-5 text-sm text-amber-900/90">
               {plan.opsPlan.risks.map((g) => (
                 <li key={g}>{g}</li>
@@ -118,18 +145,27 @@ function ResultPanel({ plan, tab }: { plan: AiOpsPlanResult; tab: AiOpsPlanTabId
     )
   }
   if (tab === 'exec') {
+    const hourly = plan.executionPlan.hourlySchedule
     return (
       <div className="space-y-5">
+        {plan.executionPlan.overview ? (
+          <p className="rounded-lg border border-slate-100 bg-slate-50/80 px-4 py-3 text-sm leading-relaxed text-gray-800">
+            <span className="font-medium text-slate-800">执行总览 · </span>
+            {plan.executionPlan.overview}
+          </p>
+        ) : null}
         {plan.executionPlan.phases.length ? (
           <div>
             <h3 className="mb-2 text-sm font-semibold text-gray-900">阶段执行</h3>
-            <TableShell headers={['阶段', '动作', '角色', '产出']}>
+            <TableShell headers={['阶段', '日期', '动作', '角色', '产出', '成功指标']}>
               {plan.executionPlan.phases.map((r, i) => (
                 <tr key={`${r.phase}-${i}`}>
                   <td className="px-3 py-2 font-medium">{r.phase}</td>
-                  <td className="px-3 py-2">{r.actions}</td>
+                  <td className="px-3 py-2 tabular-nums text-gray-600">{r.dateRange}</td>
+                  <td className="max-w-xs px-3 py-2">{r.actions}</td>
                   <td className="px-3 py-2">{r.ownerRole}</td>
                   <td className="px-3 py-2">{r.deliverable}</td>
+                  <td className="px-3 py-2 text-gray-600">{r.successMetric}</td>
                 </tr>
               ))}
             </TableShell>
@@ -138,17 +174,45 @@ function ResultPanel({ plan, tab }: { plan: AiOpsPlanResult; tab: AiOpsPlanTabId
         {plan.executionPlan.weeklyActions.length ? (
           <div>
             <h3 className="mb-2 text-sm font-semibold text-gray-900">周计划</h3>
-            <TableShell headers={['周次', '重点', '任务']}>
+            <TableShell headers={['周次', '日期', '重点', '任务', '角色']}>
               {plan.executionPlan.weeklyActions.map((r, i) => (
                 <tr key={`${r.week}-${i}`}>
                   <td className="px-3 py-2 font-medium">{r.week}</td>
+                  <td className="px-3 py-2 tabular-nums text-gray-600">{r.dateRange}</td>
                   <td className="px-3 py-2">{r.focus}</td>
-                  <td className="px-3 py-2">{r.tasks}</td>
+                  <td className="max-w-sm px-3 py-2">{r.tasks}</td>
+                  <td className="px-3 py-2">{r.ownerRole}</td>
                 </tr>
               ))}
             </TableShell>
           </div>
         ) : null}
+        {hourly.length ? (
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-gray-900">
+              小时级排期
+              <span className="ml-2 font-normal text-gray-500">（{hourly.length} 条）</span>
+            </h3>
+            <TableShell
+              headers={['日期', '开始', '结束', '任务', '角色', '地点', '产出', '备注']}
+            >
+              {hourly.map((r, i) => (
+                <tr key={`${r.date}-${r.timeStart}-${i}`}>
+                  <td className="px-3 py-2 tabular-nums font-medium text-gray-900">{r.date}</td>
+                  <td className="px-3 py-2 tabular-nums">{r.timeStart}</td>
+                  <td className="px-3 py-2 tabular-nums">{r.timeEnd}</td>
+                  <td className="max-w-xs px-3 py-2 text-gray-800">{r.task}</td>
+                  <td className="px-3 py-2">{r.ownerRole}</td>
+                  <td className="px-3 py-2 text-gray-600">{r.location}</td>
+                  <td className="px-3 py-2 text-gray-600">{r.deliverable}</td>
+                  <td className="max-w-xs px-3 py-2 text-gray-500">{r.notes}</td>
+                </tr>
+              ))}
+            </TableShell>
+          </div>
+        ) : (
+          <p className="text-sm text-amber-700">暂无小时级排期，请重新生成方案</p>
+        )}
       </div>
     )
   }
@@ -160,12 +224,18 @@ function ResultPanel({ plan, tab }: { plan: AiOpsPlanResult; tab: AiOpsPlanTabId
           <span className="text-lg font-semibold tabular-nums text-gray-900">
             ¥{plan.marketingBudget.totalBudget.toLocaleString('zh-CN')}
           </span>
+          {plan.marketingBudget.contingencyPct ? (
+            <span className="ml-3 text-gray-500">
+              预备金 {plan.marketingBudget.contingencyPct}%
+            </span>
+          ) : null}
         </p>
         {plan.marketingBudget.channels.length ? (
-          <TableShell headers={['渠道', '金额(元)', '占比%', '说明']}>
+          <TableShell headers={['渠道', '月份', '金额(元)', '占比%', '说明']}>
             {plan.marketingBudget.channels.map((r, i) => (
               <tr key={`${r.channel}-${i}`}>
                 <td className="px-3 py-2 font-medium">{r.channel}</td>
+                <td className="px-3 py-2 tabular-nums text-gray-600">{r.month || '—'}</td>
                 <td className="px-3 py-2 tabular-nums">{r.amountYuan.toLocaleString('zh-CN')}</td>
                 <td className="px-3 py-2 tabular-nums">{r.ratioPct}</td>
                 <td className="px-3 py-2 text-gray-600">{r.note}</td>
@@ -188,10 +258,15 @@ function ResultPanel({ plan, tab }: { plan: AiOpsPlanResult; tab: AiOpsPlanTabId
         {plan.calendar.milestones.map((r, i) => (
           <div key={`${r.date}-${i}`} className="relative pb-5 last:pb-0">
             <span className="absolute -left-[1.35rem] top-1.5 h-2.5 w-2.5 rounded-full bg-blue-500 ring-4 ring-white" />
-            <div className="text-xs font-medium tabular-nums text-blue-700">{r.date || '—'}</div>
+            <div className="text-xs font-medium tabular-nums text-blue-700">
+              {r.date || '—'}
+              {r.time ? ` ${r.time}` : ''}
+            </div>
             <div className="mt-0.5 text-sm font-medium text-gray-900">{r.item}</div>
-            {(r.dependency || r.statusHint) && (
+            {(r.ownerRole || r.dependency || r.statusHint) && (
               <div className="mt-1 text-xs text-gray-500">
+                {r.ownerRole ? `角色：${r.ownerRole}` : ''}
+                {r.ownerRole && (r.dependency || r.statusHint) ? ' · ' : ''}
                 {r.dependency ? `依赖：${r.dependency}` : ''}
                 {r.dependency && r.statusHint ? ' · ' : ''}
                 {r.statusHint ? `建议：${r.statusHint}` : ''}
@@ -206,14 +281,19 @@ function ResultPanel({ plan, tab }: { plan: AiOpsPlanResult; tab: AiOpsPlanTabId
   }
   if (tab === 'talent') {
     return plan.talentBudget.talentRows.length ? (
-      <TableShell headers={['平台', '层级', '人数', '单场预算', '小计', '备注']}>
+      <TableShell
+        headers={['平台', '层级', '类型', '人数', '单场', '小计', '内容形态', '发布窗口', '备注']}
+      >
         {plan.talentBudget.talentRows.map((r, i) => (
           <tr key={`${r.platform}-${i}`}>
             <td className="px-3 py-2 font-medium">{r.platform}</td>
             <td className="px-3 py-2">{r.tier}</td>
+            <td className="px-3 py-2">{r.talentType}</td>
             <td className="px-3 py-2 tabular-nums">{r.headcount}</td>
             <td className="px-3 py-2 tabular-nums">{r.unitBudgetYuan.toLocaleString('zh-CN')}</td>
             <td className="px-3 py-2 tabular-nums">{r.subtotalYuan.toLocaleString('zh-CN')}</td>
+            <td className="px-3 py-2">{r.contentForm}</td>
+            <td className="px-3 py-2 text-gray-600">{r.publishWindow}</td>
             <td className="px-3 py-2 text-gray-600">{r.note}</td>
           </tr>
         ))}
@@ -223,15 +303,19 @@ function ResultPanel({ plan, tab }: { plan: AiOpsPlanResult; tab: AiOpsPlanTabId
     )
   }
   return plan.productBoard.combos.length ? (
-    <TableShell headers={['套餐', '包含', '售价', '毛利提示', '平台', '卖点']}>
+    <TableShell headers={['套餐', '包含', '售价', '原价', '毛利', '平台', '卖点', '库存']}>
       {plan.productBoard.combos.map((r, i) => (
         <tr key={`${r.name}-${i}`}>
           <td className="px-3 py-2 font-medium">{r.name}</td>
           <td className="max-w-xs px-3 py-2 text-gray-700">{r.items}</td>
           <td className="px-3 py-2 tabular-nums">¥{r.priceYuan}</td>
+          <td className="px-3 py-2 tabular-nums text-gray-600">
+            {r.originYuan ? `¥${r.originYuan}` : '—'}
+          </td>
           <td className="px-3 py-2 text-gray-600">{r.marginHint}</td>
           <td className="px-3 py-2">{r.platforms}</td>
           <td className="max-w-xs px-3 py-2 text-gray-600">{r.sellingPoint}</td>
+          <td className="px-3 py-2 text-gray-500">{r.stockHint}</td>
         </tr>
       ))}
     </TableShell>
