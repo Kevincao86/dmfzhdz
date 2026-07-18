@@ -43,19 +43,24 @@ bash scripts/ecs-deploy-light-safe.sh       # 再部署
 cd ~/app && bash scripts/ecs-git-pull-gitee.sh && bash scripts/ecs-deploy-auth-api.sh
 ```
 
-**新ECS** — 商家 ERP（`cs`）：
+**新ECS** — 商家 / 服务商前端（**写死：本机构建**，见 `ecs-new-ecs-local-build-only.mdc`）：
 
 ```bash
-cd ~/app && git pull && MEOO_API_UPSTREAM=https://mofangdianai.com bash scripts/ecs-deploy-merchant-cs-web.sh
+bash scripts/ecs-deploy-cs-web-local-build.sh          # cs
+bash scripts/ecs-deploy-fws-web-local-build.sh         # fws
+bash scripts/ecs-deploy-new-ecs-web-local-build.sh     # cs+fws
 ```
 
-**新ECS** — 运营台（`admin`）：
+**禁止**在新ECS（`8.160.173.236`）上直接 `npm run build`（2G 会 OOM 卡死）。远程仅允许 `SKIP_BUILD=1`。
+
+**新ECS** — 运营台（`admin`，同样优先本机构建再 `SKIP_BUILD=1`）：
 
 ```bash
-cd ~/app && git pull && bash scripts/ecs-deploy-ops-admin-web.sh
+# 本机构建运营台 dist 后，再 SSH 新ECS：
+cd ~/app && bash scripts/ecs-git-pull-gitee.sh && SKIP_BUILD=1 bash scripts/ecs-deploy-ops-admin-web.sh
 ```
 
-**两台都要**（本机一键）：
+**两台都要**（本机一键；含轻量 + 本机构建 cs）：
 
 ```bash
 bash scripts/ecs-deploy-light-and-cs-remote.sh
