@@ -3,6 +3,7 @@
  */
 import type { AIChatRequest } from '../src/services/ai/types.js'
 import {
+  ensureMarketingRoiFallback,
   isAiOpsPlanResultUsable,
   normalizeAiOpsPlanResult,
   type AiOpsPlanResult,
@@ -105,7 +106,7 @@ const SYSTEM_PROMPT = `你是资深本地生活/餐饮多平台运营总监，�
   },
   "executionPlan": {
     "overview": "执行总览",
-    "phases": [{"phase":"阶段","dateRange":"YYYY-MM-DD～YYYY-MM-DD","actions":"动作","ownerRole":"角色","deliverable":"产出","successMetric":"指标"}],
+    "phases": [{"phase":"阶段","dateRange":"YYYY-MM-DD～YYYY-MM-DD","actions":"动作","ownerRole":"角色","deliverable":"产出","successMetric":"指标","detailItems":[{"day":"YYYY-MM-DD","task":"当日任务","ownerRole":"角色","deliverable":"产出"}]}],
     "weeklyActions": [{"week":"第1周","dateRange":"YYYY-MM-DD～YYYY-MM-DD","focus":"重点","tasks":"任务","ownerRole":"角色"}],
     "hourlySchedule": [{
       "scene":"live",
@@ -175,7 +176,8 @@ const SYSTEM_PROMPT = `你是资深本地生活/餐饮多平台运营总监，�
 6. 组品 3～6 个，优先真实菜单名。
 7. 【执行时间粒度】phases/weeklyActions 用日/周即可；hourlySchedule 仅允许 scene="live" 的直播相关任务（开播、场控、直播投流盯盘等），禁止给拍摄/剪辑/上架等非直播事项写小时。无直播计划时可输出空数组 []。
 8. 短视频的 publishWindow 用「工作日/周末 上午/晚间」等粗粒度；仅直播行可写具体 HH:mm。
-9. phases≥3、weeklyActions 覆盖每周、goals≥3。`
+9. phases≥3、weeklyActions 覆盖每周、goals≥3；每个 phase 必须带 detailItems（≥3 条日粒度任务）。
+10. marketingBudget.roiAnalysis 与 roiSummary 不得省略（≥3 行 ROI）。`
 
 async function enrichCombosFromProductPlan(
   plan: AiOpsPlanResult,
@@ -345,6 +347,8 @@ export async function runAiOpsPlanCore(
         marketingBudget: { ...plan.marketingBudget, totalBudget: budgetYuan },
       }
     }
+
+    plan = ensureMarketingRoiFallback(plan)
 
     plan = await enrichCombosFromProductPlan(
       plan,

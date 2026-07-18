@@ -9,6 +9,13 @@ export type AiOpsPlanPlatformStrategy = {
   examples: string
 }
 
+export type AiOpsPlanPhaseDetailItem = {
+  day: string
+  task: string
+  ownerRole: string
+  deliverable: string
+}
+
 export type AiOpsPlanPhase = {
   phase: string
   dateRange: string
@@ -16,6 +23,7 @@ export type AiOpsPlanPhase = {
   ownerRole: string
   deliverable: string
   successMetric: string
+  detailItems: AiOpsPlanPhaseDetailItem[]
 }
 
 export type AiOpsPlanWeeklyAction = {
@@ -268,14 +276,33 @@ export function normalizeAiOpsPlanResult(raw: unknown): AiOpsPlanResult | null {
       overview: asStr(exec?.overview),
       phases: phasesRaw
         .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
-        .map((r) => ({
-          phase: asStr(r.phase),
-          dateRange: asStr(r.dateRange ?? r.date_range),
-          actions: asStr(r.actions),
-          ownerRole: asStr(r.ownerRole ?? r.owner_role),
-          deliverable: asStr(r.deliverable),
-          successMetric: asStr(r.successMetric ?? r.success_metric),
-        }))
+        .map((r) => {
+          const detailRaw = Array.isArray(r.detailItems)
+            ? r.detailItems
+            : Array.isArray(r.detail_items)
+              ? r.detail_items
+              : Array.isArray(r.dailyTasks)
+                ? r.dailyTasks
+                : []
+          return {
+            phase: asStr(r.phase),
+            dateRange: asStr(r.dateRange ?? r.date_range),
+            actions: asStr(r.actions),
+            ownerRole: asStr(r.ownerRole ?? r.owner_role),
+            deliverable: asStr(r.deliverable),
+            successMetric: asStr(r.successMetric ?? r.success_metric),
+            detailItems: detailRaw
+              .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
+              .map((d) => ({
+                day: asStr(d.day ?? d.date),
+                task: asStr(d.task ?? d.item ?? d.actions),
+                ownerRole: asStr(d.ownerRole ?? d.owner_role),
+                deliverable: asStr(d.deliverable),
+              }))
+              .filter((d) => d.day || d.task)
+              .slice(0, 40),
+          }
+        })
         .filter((r) => r.phase || r.actions)
         .slice(0, 24),
       weeklyActions: weeklyRaw
@@ -426,6 +453,70 @@ export function isAiOpsPlanResultUsable(plan: AiOpsPlanResult): boolean {
     plan.marketingBudget.roiAnalysis.length > 0 ||
     plan.productBoard.combos.length > 0
   )
+}
+
+/** 模型未返回 ROI 时，按渠道金额合成保守投产预估 */
+export function ensureMarketingRoiFallback(plan: AiOpsPlanResult): AiOpsPlanResult {
+  if ((plan.marketingBudget.roiAnalysis || []).length >= 2) {
+    if (!plan.marketingBudget.roiSummary) {
+      const totalInvest = plan.marketingBudget.roiAnalysis.reduce((s, r) => s + r.investYuan, 0)
+      const totalGmv = plan.marketingBudget.roiAnalysis.reduce((s, r) => s + r.expectedGmvYuan, 0)
+      const roi = totalInvest > 0 ? Math.round((totalGmv / totalInvest) * 100) / 100 : 0
+      return {
+        ...plan,
+        marketingBudget: {
+          ...plan.marketingBudget,
+          roiSummary: `周期内预计总投入约 ¥${Math.round(totalInvest).toLocaleString('zh-CN')}，预计带动 GMV 约 ¥${Math.round(totalGmv).toLocaleString('zh-CN')}，综合 ROI 约 ${roi}（保守估算，含核销与复购）。`,
+        },
+      }
+    }
+    return plan
+  }
+  const channels = plan.marketingBudget.channels.length
+    ? plan.marketingBudget.channels
+    : [
+        {
+          channel: '综合投放',
+          amountYuan: plan.marketingBudget.totalBudget || 0,
+          ratioPct: 100,
+          month: '',
+          note: '',
+        },
+      ]
+  const roiAnalysis = channels
+    .filter((c) => c.amountYuan > 0)
+    .slice(0, 8)
+    .map((c) => {
+      const invest = c.amountYuan
+      const isLive = /直播/.test(c.channel)
+      const isLocal = /本地推|投流|信息流/.test(c.channel)
+      const mult = isLive ? 3.2 : isLocal ? 2.4 : 2.8
+      const expectedGmvYuan = Math.round(invest * mult)
+      const aov = isLive ? 180 : 120
+      const expectedOrders = Math.max(1, Math.round(expectedGmvYuan / aov))
+      return {
+        channel: c.channel,
+        investYuan: invest,
+        expectedGmvYuan,
+        expectedOrders,
+        roi: Math.round(mult * 100) / 100,
+        paybackDays: isLive ? 18 : isLocal ? 25 : 21,
+        note: c.note || '按同类本地生活投放中位转化保守估算',
+      }
+    })
+  const totalInvest = roiAnalysis.reduce((s, r) => s + r.investYuan, 0)
+  const totalGmv = roiAnalysis.reduce((s, r) => s + r.expectedGmvYuan, 0)
+  const roi = totalInvest > 0 ? Math.round((totalGmv / totalInvest) * 100) / 100 : 0
+  return {
+    ...plan,
+    marketingBudget: {
+      ...plan.marketingBudget,
+      roiAnalysis,
+      roiSummary:
+        plan.marketingBudget.roiSummary ||
+        `周期内预计总投入约 ¥${Math.round(totalInvest).toLocaleString('zh-CN')}，预计带动 GMV 约 ¥${Math.round(totalGmv).toLocaleString('zh-CN')}，综合 ROI 约 ${roi}（保守估算；实际受货盘、核销与达人质量影响）。`,
+    },
+  }
 }
 
 export function aiOpsPlanToMarkdown(plan: AiOpsPlanResult, meta?: { title?: string }): string {

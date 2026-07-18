@@ -33,6 +33,7 @@ import {
 import {
   AI_OPS_PLAN_TABS,
   aiOpsPlanToMarkdown,
+  ensureMarketingRoiFallback,
   normalizeAiOpsPlanResult,
   type AiOpsPlanGenerateInput,
   type AiOpsPlanMilestone,
@@ -77,14 +78,32 @@ function TableShell({
   )
 }
 
-function CalendarMonthGrid({ milestones }: { milestones: AiOpsPlanMilestone[] }) {
+function normalizePlanDate(raw: string): string {
+  const s = String(raw || '').trim()
+  const m1 = s.match(/(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})/)
+  if (m1) {
+    return `${m1[1]}-${m1[2]!.padStart(2, '0')}-${m1[3]!.padStart(2, '0')}`
+  }
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10)
+  return ''
+}
+
+function CalendarMonthGrid({
+  milestones,
+  periodStart,
+  periodEnd,
+}: {
+  milestones: AiOpsPlanMilestone[]
+  periodStart?: string
+  periodEnd?: string
+}) {
   const byDate = useMemo(() => {
     const m = new Map<string, AiOpsPlanMilestone[]>()
     for (const item of milestones) {
-      const d = String(item.date || '').slice(0, 10)
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) continue
+      const d = normalizePlanDate(item.date)
+      if (!d) continue
       const list = m.get(d) ?? []
-      list.push(item)
+      list.push({ ...item, date: d })
       m.set(d, list)
     }
     return m
@@ -92,30 +111,39 @@ function CalendarMonthGrid({ milestones }: { milestones: AiOpsPlanMilestone[] })
 
   const months = useMemo(() => {
     const keys = [...byDate.keys()].sort()
-    if (!keys.length) return [] as { y: number; m: number }[]
-    const start = keys[0]!
-    const end = keys[keys.length - 1]!
+    let start = keys[0] || normalizePlanDate(periodStart || '')
+    let end = keys[keys.length - 1] || normalizePlanDate(periodEnd || '')
+    if (!start && !end) {
+      const now = new Date()
+      start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+      end = start
+    }
+    if (!start) start = end
+    if (!end) end = start
     let y = Number(start.slice(0, 4))
-    let m = Number(start.slice(5, 7))
+    let mo = Number(start.slice(5, 7))
     const ey = Number(end.slice(0, 4))
     const em = Number(end.slice(5, 7))
     const out: { y: number; m: number }[] = []
-    while (y < ey || (y === ey && m <= em)) {
-      out.push({ y, m })
-      m += 1
-      if (m > 12) {
-        m = 1
+    while (y < ey || (y === ey && mo <= em)) {
+      out.push({ y, m: mo })
+      mo += 1
+      if (mo > 12) {
+        mo = 1
         y += 1
       }
       if (out.length > 6) break
     }
-    return out
-  }, [byDate])
+    return out.length ? out : [{ y: new Date().getFullYear(), m: new Date().getMonth() + 1 }]
+  }, [byDate, periodStart, periodEnd])
 
   const weekLabels = ['一', '二', '三', '四', '五', '六', '日']
+  const [picked, setPicked] = useState<string | null>(null)
+  const pickedItems = picked ? byDate.get(picked) ?? [] : []
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      <p className="text-xs text-gray-500">月历视图 · 点击有事项的日期可查看当日安排</p>
       {months.map(({ y, m }) => {
         const first = new Date(y, m - 1, 1)
         const daysInMonth = new Date(y, m, 0).getDate()
@@ -126,81 +154,183 @@ function CalendarMonthGrid({ milestones }: { milestones: AiOpsPlanMilestone[] })
         ]
         while (cells.length % 7 !== 0) cells.push(null)
         return (
-          <div key={`${y}-${m}`} className="rounded-xl border border-gray-200 bg-white p-3">
-            <div className="mb-3 text-sm font-semibold text-gray-900">
-              {y}年{m}月
+          <div key={`${y}-${m}`} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div className="border-b border-gray-100 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-gray-900">
+              {y} 年 {m} 月
             </div>
-            <div className="grid grid-cols-7 gap-1 text-center text-[11px] text-gray-500">
+            <div className="grid grid-cols-7 border-b border-gray-100 bg-white text-center text-[11px] font-medium text-gray-500">
               {weekLabels.map((w) => (
-                <div key={w} className="py-1 font-medium">
+                <div key={w} className="py-2">
                   {w}
                 </div>
               ))}
             </div>
-            <div className="grid grid-cols-7 gap-1">
+            <div className="grid grid-cols-7">
               {cells.map((day, idx) => {
                 if (day == null) {
-                  return <div key={`e-${idx}`} className="min-h-[72px] rounded-md bg-gray-50/50" />
+                  return (
+                    <div
+                      key={`e-${idx}`}
+                      className="min-h-[88px] border-b border-r border-gray-50 bg-gray-50/40"
+                    />
+                  )
                 }
                 const iso = `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`
                 const items = byDate.get(iso) ?? []
+                const active = picked === iso
                 return (
-                  <div
+                  <button
                     key={iso}
+                    type="button"
+                    onClick={() => setPicked(items.length ? iso : null)}
                     className={cn(
-                      'min-h-[72px] rounded-md border px-1.5 py-1 text-left',
-                      items.length ? 'border-blue-200 bg-blue-50/40' : 'border-transparent bg-gray-50/40',
+                      'min-h-[88px] border-b border-r border-gray-100 px-1.5 py-1.5 text-left transition',
+                      items.length ? 'bg-blue-50/50 hover:bg-blue-50' : 'bg-white hover:bg-gray-50',
+                      active && 'ring-2 ring-inset ring-blue-500',
                     )}
                   >
-                    <div className="text-xs font-medium tabular-nums text-gray-700">{day}</div>
-                    <ul className="mt-0.5 space-y-0.5">
-                      {items.slice(0, 3).map((it, i) => (
+                    <div
+                      className={cn(
+                        'text-xs font-semibold tabular-nums',
+                        items.length ? 'text-blue-700' : 'text-gray-600',
+                      )}
+                    >
+                      {day}
+                      {items.length ? (
+                        <span className="ml-1 rounded-full bg-blue-600 px-1.5 text-[10px] font-medium text-white">
+                          {items.length}
+                        </span>
+                      ) : null}
+                    </div>
+                    <ul className="mt-1 space-y-0.5">
+                      {items.slice(0, 2).map((it, i) => (
                         <li
                           key={`${it.item}-${i}`}
-                          className="truncate text-[10px] leading-tight text-blue-900"
-                          title={`${it.time ? `${it.time} ` : ''}${it.item}`}
+                          className="truncate text-[10px] leading-tight text-blue-950"
+                          title={it.item}
                         >
-                          {it.time ? (
-                            <span className="tabular-nums text-blue-600">{it.time} </span>
-                          ) : null}
+                          {it.time ? `${it.time} ` : ''}
                           {it.item}
                         </li>
                       ))}
-                      {items.length > 3 ? (
-                        <li className="text-[10px] text-gray-400">+{items.length - 3}</li>
+                      {items.length > 2 ? (
+                        <li className="text-[10px] text-blue-500">+{items.length - 2}</li>
                       ) : null}
                     </ul>
-                  </div>
+                  </button>
                 )
               })}
             </div>
           </div>
         )
       })}
-      <div className="space-y-2">
-        <h3 className="text-sm font-semibold text-gray-900">日程清单</h3>
-        <ul className="space-y-2 text-sm text-gray-700">
+      {picked && pickedItems.length ? (
+        <div className="rounded-lg border border-blue-100 bg-blue-50/40 px-4 py-3">
+          <div className="mb-2 text-sm font-semibold text-blue-900">{picked} 当日事项</div>
+          <ul className="space-y-2 text-sm text-gray-800">
+            {pickedItems.map((r, i) => (
+              <li key={`${r.item}-${i}`}>
+                <span className="font-medium">
+                  {r.time ? `${r.time} · ` : ''}
+                  {r.item}
+                </span>
+                {r.ownerRole ? <span className="ml-2 text-xs text-gray-500">{r.ownerRole}</span> : null}
+                {r.statusHint ? <div className="text-xs text-gray-500">建议：{r.statusHint}</div> : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      <details className="rounded-lg border border-gray-200 bg-white">
+        <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-gray-700">
+          展开全部日程清单（{milestones.length}）
+        </summary>
+        <ul className="space-y-2 border-t border-gray-100 px-3 py-3 text-sm text-gray-700">
           {milestones.map((r, i) => (
-            <li key={`${r.date}-${i}`} className="flex gap-3 border-b border-gray-100 pb-2">
+            <li key={`${r.date}-${i}`} className="flex gap-3 border-b border-gray-50 pb-2 last:border-0">
               <span className="w-36 shrink-0 tabular-nums text-blue-700">
-                {r.date}
+                {normalizePlanDate(r.date) || r.date}
                 {r.time ? ` ${r.time}` : ''}
               </span>
-              <span className="flex-1">
-                <span className="font-medium text-gray-900">{r.item}</span>
-                {r.ownerRole ? (
-                  <span className="ml-2 text-xs text-gray-500">· {r.ownerRole}</span>
-                ) : null}
-              </span>
+              <span className="flex-1 font-medium text-gray-900">{r.item}</span>
             </li>
           ))}
         </ul>
-      </div>
+      </details>
     </div>
   )
 }
 
-function ResultPanel({ plan, tab }: { plan: AiOpsPlanResult; tab: AiOpsPlanTabId }) {
+function parsePhaseRange(dateRange: string): { start: string; end: string } | null {
+  const parts = String(dateRange || '').split(/[~～\-至到]/).map((x) => normalizePlanDate(x.trim())).filter(Boolean)
+  if (parts.length >= 2) return { start: parts[0]!, end: parts[1]! }
+  if (parts.length === 1) return { start: parts[0]!, end: parts[0]! }
+  return null
+}
+
+function inIsoRange(iso: string, start: string, end: string): boolean {
+  return iso >= start && iso <= end
+}
+
+function buildPhaseDetailItems(
+  plan: AiOpsPlanResult,
+  phase: AiOpsPlanResult['executionPlan']['phases'][number],
+): { day: string; task: string; ownerRole: string; deliverable: string }[] {
+  if (phase.detailItems?.length) return phase.detailItems
+  const range = parsePhaseRange(phase.dateRange)
+  const out: { day: string; task: string; ownerRole: string; deliverable: string }[] = []
+  if (range) {
+    for (const w of plan.executionPlan.weeklyActions || []) {
+      const wr = parsePhaseRange(w.dateRange)
+      if (!wr) continue
+      if (wr.end < range.start || wr.start > range.end) continue
+      out.push({
+        day: wr.start,
+        task: `${w.week} ${w.focus}：${w.tasks}`,
+        ownerRole: w.ownerRole || phase.ownerRole,
+        deliverable: '',
+      })
+    }
+    for (const h of plan.executionPlan.hourlySchedule || []) {
+      const d = normalizePlanDate(h.date)
+      if (!d || !inIsoRange(d, range.start, range.end)) continue
+      if (h.scene !== 'live' && !/直播/.test(h.task)) continue
+      out.push({
+        day: `${d} ${h.timeStart}-${h.timeEnd}`,
+        task: h.task,
+        ownerRole: h.ownerRole || phase.ownerRole,
+        deliverable: h.deliverable,
+      })
+    }
+  }
+  if (!out.length && phase.actions) {
+    for (const part of phase.actions.split(/[；;。\n]/).map((x) => x.trim()).filter(Boolean)) {
+      out.push({
+        day: phase.dateRange || '—',
+        task: part,
+        ownerRole: phase.ownerRole,
+        deliverable: phase.deliverable,
+      })
+    }
+  }
+  return out.slice(0, 40)
+}
+
+function ResultPanel({
+  plan,
+  tab,
+  periodStart,
+  periodEnd,
+}: {
+  plan: AiOpsPlanResult
+  tab: AiOpsPlanTabId
+  periodStart?: string
+  periodEnd?: string
+}) {
+  const [phaseIdx, setPhaseIdx] = useState<number | null>(null)
+  const openPhase = phaseIdx != null ? plan.executionPlan.phases[phaseIdx] : null
+  const phaseDetails = openPhase ? buildPhaseDetailItems(plan, openPhase) : []
+
   if (tab === 'ops') {
     return (
       <div className="space-y-5">
@@ -292,7 +422,7 @@ function ResultPanel({ plan, tab }: { plan: AiOpsPlanResult; tab: AiOpsPlanTabId
         {plan.executionPlan.phases.length ? (
           <div>
             <h3 className="mb-2 text-sm font-semibold text-gray-900">阶段执行</h3>
-            <TableShell headers={['阶段', '日期', '动作', '角色', '产出', '成功指标']}>
+            <TableShell headers={['阶段', '日期', '动作', '角色', '产出', '成功指标', '操作']}>
               {plan.executionPlan.phases.map((r, i) => (
                 <tr key={`${r.phase}-${i}`}>
                   <td className="px-3 py-2 font-medium">{r.phase}</td>
@@ -301,9 +431,67 @@ function ResultPanel({ plan, tab }: { plan: AiOpsPlanResult; tab: AiOpsPlanTabId
                   <td className="px-3 py-2">{r.ownerRole}</td>
                   <td className="px-3 py-2">{r.deliverable}</td>
                   <td className="px-3 py-2 text-gray-600">{r.successMetric}</td>
+                  <td className="px-3 py-2">
+                    <button
+                      type="button"
+                      onClick={() => setPhaseIdx(i)}
+                      className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-blue-700"
+                    >
+                      查看
+                    </button>
+                  </td>
                 </tr>
               ))}
             </TableShell>
+          </div>
+        ) : null}
+        {openPhase ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="max-h-[85vh] w-full max-w-2xl overflow-auto rounded-xl bg-white shadow-xl">
+              <div className="sticky top-0 flex items-start justify-between gap-3 border-b border-gray-100 bg-white px-5 py-4">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900">{openPhase.phase} · 细分安排</h3>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {openPhase.dateRange} · {openPhase.ownerRole || '未指定角色'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPhaseIdx(null)}
+                  className="rounded-md border border-gray-200 px-2.5 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                >
+                  关闭
+                </button>
+              </div>
+              <div className="space-y-3 px-5 py-4 text-sm">
+                {openPhase.actions ? (
+                  <p className="rounded-lg bg-slate-50 px-3 py-2 text-gray-700">
+                    <span className="font-medium text-gray-900">阶段要点 · </span>
+                    {openPhase.actions}
+                  </p>
+                ) : null}
+                {openPhase.deliverable || openPhase.successMetric ? (
+                  <p className="text-xs text-gray-500">
+                    {openPhase.deliverable ? `产出：${openPhase.deliverable}` : ''}
+                    {openPhase.deliverable && openPhase.successMetric ? ' · ' : ''}
+                    {openPhase.successMetric ? `成功指标：${openPhase.successMetric}` : ''}
+                  </p>
+                ) : null}
+                <TableShell headers={['日期/时段', '任务', '角色', '产出']}>
+                  {phaseDetails.map((d, i) => (
+                    <tr key={`${d.day}-${i}`}>
+                      <td className="px-3 py-2 tabular-nums text-gray-600">{d.day || '—'}</td>
+                      <td className="px-3 py-2 text-gray-800">{d.task}</td>
+                      <td className="px-3 py-2">{d.ownerRole || '—'}</td>
+                      <td className="px-3 py-2 text-gray-600">{d.deliverable || '—'}</td>
+                    </tr>
+                  ))}
+                </TableShell>
+                {!phaseDetails.length ? (
+                  <p className="text-sm text-gray-500">暂无细分任务，请重新生成方案以获取日粒度安排</p>
+                ) : null}
+              </div>
+            </div>
           </div>
         ) : null}
         {plan.executionPlan.weeklyActions.length ? (
@@ -378,15 +566,16 @@ function ResultPanel({ plan, tab }: { plan: AiOpsPlanResult; tab: AiOpsPlanTabId
             ))}
           </TableShell>
         ) : null}
-        {plan.marketingBudget.roiSummary ? (
-          <p className="rounded-lg border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-sm text-gray-800">
-            <span className="font-medium text-emerald-800">ROI 预计投产 · </span>
-            {plan.marketingBudget.roiSummary}
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 px-4 py-3">
+          <h3 className="mb-1 text-sm font-semibold text-emerald-900">ROI 预计投产分析</h3>
+          <p className="text-sm text-gray-800">
+            {plan.marketingBudget.roiSummary ||
+              '暂无 ROI 总述（请重新生成方案；服务端会按渠道自动补全估算）'}
           </p>
-        ) : null}
+        </div>
         {(plan.marketingBudget.roiAnalysis || []).length ? (
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-gray-900">ROI 分渠道分析</h3>
+            <h3 className="mb-2 text-sm font-semibold text-gray-900">ROI 分渠道明细</h3>
             <TableShell
               headers={['渠道', '投入(元)', '预计GMV', '预计订单', 'ROI', '回本(天)', '说明']}
             >
@@ -405,7 +594,9 @@ function ResultPanel({ plan, tab }: { plan: AiOpsPlanResult; tab: AiOpsPlanTabId
               ))}
             </TableShell>
           </div>
-        ) : null}
+        ) : (
+          <p className="text-sm text-amber-700">ROI 明细为空，请点击「生成方案」重新生成</p>
+        )}
         {plan.marketingBudget.assumptions ? (
           <p className="text-sm text-gray-600">
             <span className="font-medium text-gray-800">假设 · </span>
@@ -417,7 +608,11 @@ function ResultPanel({ plan, tab }: { plan: AiOpsPlanResult; tab: AiOpsPlanTabId
   }
   if (tab === 'calendar') {
     return plan.calendar.milestones.length ? (
-      <CalendarMonthGrid milestones={plan.calendar.milestones} />
+      <CalendarMonthGrid
+        milestones={plan.calendar.milestones}
+        periodStart={periodStart}
+        periodEnd={periodEnd}
+      />
     ) : (
       <p className="text-sm text-gray-500">暂无里程碑</p>
     )
@@ -646,7 +841,7 @@ export default function AiOpsPlanPage() {
       setErr(r.message)
       return
     }
-    setPlan(r.plan)
+    setPlan(ensureMarketingRoiFallback(r.plan))
     setTab('ops')
     const item = saveAiOpsPlanHistoryItem(scopeId, input, r.plan)
     setHistory(loadAiOpsPlanHistory(scopeId))
@@ -665,17 +860,6 @@ export default function AiOpsPlanPage() {
   }
 
   const exportBase = `ai-ops-plan-${periodStart || 'export'}`
-
-  const onExportJson = () => {
-    if (!plan) return
-    const blob = new Blob([JSON.stringify(plan, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${exportBase}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
 
   const onExportExcel = () => {
     if (!plan) return
@@ -965,7 +1149,10 @@ export default function AiOpsPlanPage() {
                       type="button"
                       className="min-w-0 flex-1 text-left"
                       onClick={() => {
-                        setPlan(normalizeAiOpsPlanResult(h.plan) || h.plan)
+                        {
+                          const n = normalizeAiOpsPlanResult(h.plan) || h.plan
+                          setPlan(ensureMarketingRoiFallback(n))
+                        }
                         setTab('ops')
                         setPlatforms(
                           (h.platforms.filter(Boolean) as RecruitmentPlatform[]).length
@@ -1046,45 +1233,43 @@ export default function AiOpsPlanPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => void onCopyMarkdown()}
-                    className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+                    onClick={onExportWord}
+                    className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
                   >
-                    <ClipboardCopy className="h-3.5 w-3.5" />
-                    Markdown
+                    <Download className="h-3.5 w-3.5" />
+                    导出 Word
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onExportPdf}
+                    className="inline-flex items-center gap-1 rounded-md bg-slate-800 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-slate-900"
+                  >
+                    导出 PDF
                   </button>
                   <button
                     type="button"
                     onClick={onExportExcel}
                     className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
                   >
-                    <Download className="h-3.5 w-3.5" />
                     Excel
                   </button>
                   <button
                     type="button"
-                    onClick={onExportWord}
+                    onClick={() => void onCopyMarkdown()}
                     className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
                   >
-                    Word
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onExportPdf}
-                    className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
-                  >
-                    PDF
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onExportJson}
-                    className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
-                  >
-                    JSON
+                    <ClipboardCopy className="h-3.5 w-3.5" />
+                    Markdown
                   </button>
                 </div>
               </div>
               <div className="flex-1 overflow-auto p-4">
-                <ResultPanel plan={plan} tab={tab} />
+                <ResultPanel
+                  plan={plan}
+                  tab={tab}
+                  periodStart={periodStart}
+                  periodEnd={periodEnd}
+                />
               </div>
             </div>
           ) : null}

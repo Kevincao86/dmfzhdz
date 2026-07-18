@@ -79,7 +79,7 @@ const VISION_EDIT_PLAN_TIMEOUT_MS = 90_000
 const VISION_EDIT_PLAN_SYSTEM = `你是专业短视频混剪剪辑师（探店/餐饮/街头小吃/本地生活带货）。用户会提供【指导文案】【分镜表】以及每条素材的多帧采样截图（附图，标注源片秒数如 2.4s）。
 须为每一段分镜输出剪辑决策：
 1. materialIndex：选用哪条素材（从 0 开始），必须按画面语义匹配分镜「画面」与口播
-2. 【硬性禁止重复】每一条素材在全片最多使用 1 次（每个 materialIndex 在数组中最多出现一次）。分镜数多于素材数时：优先覆盖全部素材，多余分镜合并到相邻段的语义说明中仍不得重复 materialIndex——此时须减少输出段数至不超过素材数，或仅输出前 N 段（N=素材数）
+2. 【硬性禁止重复】每一条素材在全片最多使用 1 次（每个 materialIndex 最多出现一次）。画面语义高度相似的素材（同场景/同构图/同主体）也视为重复，不得选用。分镜数多于可用素材数时：减少输出段数至不超过可用素材数
 3. sourceInSec：从该素材第几秒起截取（须与附图秒数/画面语义一致；视频 0–12s；图片固定 0）；禁止用相近入点伪造「不同画面」
 4. 叙事顺序（强制，二选一）：
    模式A（有门头/店招素材时优先）：门头门店指引(开场) → 套餐/产品/制作(中段) → 结束语(收尾)
@@ -160,6 +160,55 @@ function scoreMaterialMatch(
   return score
 }
 
+/** 画面指纹：描述 + 逐帧摘要，用于识别「不同文件但同画面」 */
+export function mixMaterialVisualFingerprint(
+  profile: IceMixMaterialProfile,
+  mat?: IceMixMaterialSlot,
+): string {
+  const beats = (profile.frameTimeline || [])
+    .slice(0, 6)
+    .map((b) => b.description)
+    .join(' ')
+  const raw = `${profile.description || ''} ${profile.label || ''} ${mat?.label || ''} ${beats}`
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+  return raw.slice(0, 240)
+}
+
+function visualTokenSet(fp: string): Set<string> {
+  return new Set(
+    fp
+      .split(/[\s，,、；;。.\/|_+\-]+/)
+      .map((t) => t.trim())
+      .filter((t) => t.length >= 2),
+  )
+}
+
+/** 两素材画面是否高度相似（禁止在成片中同时出现） */
+export function areMixMaterialsVisuallySimilar(
+  a: IceMixMaterialProfile,
+  b: IceMixMaterialProfile,
+  matA?: IceMixMaterialSlot,
+  matB?: IceMixMaterialSlot,
+): boolean {
+  if (a.index === b.index) return true
+  const fa = mixMaterialVisualFingerprint(a, matA)
+  const fb = mixMaterialVisualFingerprint(b, matB)
+  if (!fa || !fb) return false
+  if (fa === fb) return true
+  // 短描述完全包含
+  if (fa.length >= 12 && fb.length >= 12 && (fa.includes(fb) || fb.includes(fa))) return true
+  const ta = visualTokenSet(fa)
+  const tb = visualTokenSet(fb)
+  if (ta.size < 3 || tb.size < 3) return false
+  let inter = 0
+  for (const t of ta) if (tb.has(t)) inter += 1
+  const union = ta.size + tb.size - inter
+  const jaccard = union > 0 ? inter / union : 0
+  return jaccard >= 0.62 || inter >= 6
+}
+
 /** 硬规则：每条素材全片最多 1 次；段数≤素材数时须全部唯一 */
 function isEditPlanDiverseEnough(
   decisions: MixEditSegmentDecision[],
@@ -186,8 +235,16 @@ export function enforceUniqueMaterialEditDecisions(
   if (!decisions.length || !materials.length) return decisions
   const maxSeg = Math.min(decisions.length, rows.length, materials.length)
   const used = new Set<number>()
+  const usedProfiles: IceMixMaterialProfile[] = []
   const usedIn = new Map<number, number>()
   const out: MixEditSegmentDecision[] = []
+
+  const conflictsUsed = (mi: number) => {
+    const prof = profileAt(profiles, materials, mi)
+    return usedProfiles.some((u) =>
+      areMixMaterialsVisuallySimilar(u, prof, materials[u.index], materials[mi]),
+    )
+  }
 
   const scoreMi = (mi: number, row: ShortVideoScriptRow, segIdx: number) => {
     const prof = profileAt(profiles, materials, mi)
@@ -195,6 +252,7 @@ export function enforceUniqueMaterialEditDecisions(
     score += scoreMaterialMatch(row.dialogue, prof, materials[mi]!.label) * 0.6
     if (!isMixMaterialPromotionRelevant(prof, '')) score -= 2
     score += (segIdx % materials.length === mi ? 1 : 0)
+    if (conflictsUsed(mi)) score -= 50
     return score
   }
 
@@ -208,7 +266,7 @@ export function enforceUniqueMaterialEditDecisions(
     let bestScore = -1e9
     const prefer = Math.max(0, seed.materialIndex) % materials.length
     for (let mi = 0; mi < materials.length; mi++) {
-      if (used.has(mi)) continue
+      if (used.has(mi) || conflictsUsed(mi)) continue
       let score = scoreMi(mi, row, i)
       if (mi === prefer) score += 12
       if (score > bestScore) {
@@ -217,11 +275,8 @@ export function enforceUniqueMaterialEditDecisions(
       }
     }
     if (bestIdx < 0) {
-      // 理论不应发生（maxSeg≤materials.length）
-      bestIdx = spreadMixMaterialIndex(i, maxSeg, materials.length)
-      while (used.has(bestIdx) && used.size < materials.length) {
-        bestIdx = (bestIdx + 1) % materials.length
-      }
+      // 无可用「非相似」素材则停止加段，避免同画面
+      break
     }
 
     const prof = profileAt(profiles, materials, bestIdx)
@@ -232,6 +287,7 @@ export function enforceUniqueMaterialEditDecisions(
       sourceInSec = clampMixSourceInSec(sourceInSec + 2, clipDur, est)
     }
     used.add(bestIdx)
+    usedProfiles.push(profileAt(profiles, materials, bestIdx))
     usedIn.set(bestIdx, sourceInSec)
     out.push({
       segmentIndex: i,
