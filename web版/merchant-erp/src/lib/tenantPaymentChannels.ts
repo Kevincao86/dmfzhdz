@@ -28,6 +28,8 @@ import {
   createWechatNativeOrder,
   loadWechatPayConfig,
   queryWechatOrderByOutTradeNo,
+  resolveErpJsapiPayAppId,
+  withWechatPayAppId,
 } from './wechatPayV3.js'
 
 export type { TenantPayChannel, TenantOrderKind } from './tenantPaymentShared.js'
@@ -116,8 +118,12 @@ export async function createTenantPayPrepay(
       if (wechatPayMode === 'wechat_jsapi') {
         const openid = String(input.wechatOpenId || '').trim()
         if (!openid) return fail('missing_openid', 400)
+        // ERP 小程序 openid 对应 ERP_MP AppID；不得用星选 WECHAT_PAY_APP_ID 下单
+        const erpAppId = resolveErpJsapiPayAppId()
+        if (!erpAppId) return fail('erp_wx_not_configured', 503)
+        const jsapiCfg = withWechatPayAppId(cfg, erpAppId)
         const { prepayId } = await createWechatJsapiOrder({
-          cfg,
+          cfg: jsapiCfg,
           outTradeNo: order.out_trade_no!,
           description,
           amountCents: input.amountCents,
@@ -129,7 +135,7 @@ export async function createTenantPayPrepay(
           orderId: order.id,
           outTradeNo: order.out_trade_no!,
           payMode: 'wechat_jsapi',
-          jsapiParams: buildJsapiPayParams(cfg, prepayId),
+          jsapiParams: buildJsapiPayParams(jsapiCfg, prepayId),
         }
       }
       const { codeUrl } = await createWechatNativeOrder({
@@ -149,6 +155,22 @@ export async function createTenantPayPrepay(
     } catch (e) {
       await admin.from('merchant_payment_orders').update({ status: 'cancelled' }).eq('id', order.id)
       const msg = formatThrowableMessage(e, 'wechat_prepay_failed')
+      if (/appid和openid不匹配|openid.*appid|appid.*openid/i.test(msg)) {
+        return {
+          ok: false,
+          error: 'wechat_appid_openid_mismatch',
+          message: tenantPayErrorMessage('wechat_appid_openid_mismatch'),
+          status: 400,
+        }
+      }
+      if (/appid和mch_id不匹配|mch_id.*appid|appid.*mch/i.test(msg)) {
+        return {
+          ok: false,
+          error: 'wechat_appid_mch_mismatch',
+          message: tenantPayErrorMessage('wechat_appid_mch_mismatch'),
+          status: 400,
+        }
+      }
       return { ok: false, error: msg, message: msg, status: 502 }
     }
   }

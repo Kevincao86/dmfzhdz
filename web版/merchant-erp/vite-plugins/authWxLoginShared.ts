@@ -29,7 +29,10 @@ function wxOpenIdFromUserRecord(user: Record<string, unknown>): string {
   return String(raw || '').trim()
 }
 
-/** 支付前优先复用已绑定 openid，避免反复消耗 wx.login code */
+/**
+ * 支付用 openid：有 wx.login code 时优先 code2session（与当前 ERP 小程序 AppID 同源），
+ * 避免复用 metadata 里陈旧/错绑的 openid 导致「appid和openid不匹配」。
+ */
 export async function resolveErpWxOpenIdForPay(input: {
   userId: string
   code?: string
@@ -40,51 +43,56 @@ export async function resolveErpWxOpenIdForPay(input: {
     return { error: 'invalid_user', message: '缺少用户身份，请重新登录后支付' }
   }
 
-  const { supabaseUrl, serviceRole, missingParts } = readMerchantSupabaseAdminEnv()
-  if (missingParts.length === 0) {
-    try {
-      const base = supabaseUrl.replace(/\/$/, '')
-      const getRes = await supabaseAdminFetch(`${base}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
-        headers: {
-          apikey: serviceRole,
-          Authorization: `Bearer ${serviceRole}`,
-        },
-      })
-      if (getRes.ok) {
-        const user = (await getRes.json()) as Record<string, unknown>
-        const cached = wxOpenIdFromUserRecord(user)
-        if (cached) return { openid: cached, from: 'metadata' }
-      }
-    } catch {
-      /* 继续走 code */
-    }
-  }
-
   const code = String(input.code || '').trim()
-  if (!code && !String(input.stableDevOpenId || '').trim()) {
-    return {
-      error: 'wx_openid_required',
-      message: '请先用微信登录绑定账号，或重新点击微信支付',
+  const stableDev = String(input.stableDevOpenId || '').trim()
+  if (code || stableDev) {
+    try {
+      const session = await erpWxCodeToOpenId(code, stableDev || undefined)
+      const openid = String(session.openid || '').trim()
+      if (!openid) {
+        return { error: 'invalid_wx_code', message: '微信授权失败，请重新点击支付' }
+      }
+      void bindErpWxOpenIdToAuthUser(userId, openid)
+      return { openid, from: 'code' }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      if (/code been used|invalid code|40163|40029/i.test(msg)) {
+        // code 已用尽时回退已绑定 openid（须为本 ERP 小程序）
+        const cached = await readErpWxOpenIdFromAuthUser(userId)
+        if (cached) return { openid: cached, from: 'metadata' }
+        return {
+          error: 'wx_code_used',
+          message: '微信授权已失效，请重新点击微信支付',
+        }
+      }
+      return { error: 'invalid_wx_code', message: msg.slice(0, 160) || '微信授权失败，请重试' }
     }
   }
 
+  const cached = await readErpWxOpenIdFromAuthUser(userId)
+  if (cached) return { openid: cached, from: 'metadata' }
+  return {
+    error: 'wx_openid_required',
+    message: '请先用微信登录绑定账号，或重新点击微信支付',
+  }
+}
+
+async function readErpWxOpenIdFromAuthUser(userId: string): Promise<string> {
+  const { supabaseUrl, serviceRole, missingParts } = readMerchantSupabaseAdminEnv()
+  if (missingParts.length) return ''
   try {
-    const session = await erpWxCodeToOpenId(code, input.stableDevOpenId)
-    const openid = String(session.openid || '').trim()
-    if (!openid) {
-      return { error: 'invalid_wx_code', message: '微信授权失败，请重新点击支付' }
-    }
-    void bindErpWxOpenIdToAuthUser(userId, openid)
-    return { openid, from: 'code' }
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    if (/code been used|invalid code|40163|40029/i.test(msg)) {
-      return {
-        error: 'wx_code_used',
-        message: '微信授权已失效，请重新点击微信支付',
-      }
-    }
-    return { error: 'invalid_wx_code', message: msg.slice(0, 160) || '微信授权失败，请重试' }
+    const base = supabaseUrl.replace(/\/$/, '')
+    const getRes = await supabaseAdminFetch(`${base}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
+      headers: {
+        apikey: serviceRole,
+        Authorization: `Bearer ${serviceRole}`,
+      },
+    })
+    if (!getRes.ok) return ''
+    const user = (await getRes.json()) as Record<string, unknown>
+    return wxOpenIdFromUserRecord(user)
+  } catch {
+    return ''
   }
 }
 

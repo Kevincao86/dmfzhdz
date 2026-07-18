@@ -33,6 +33,11 @@ function formatThrowableMessage(value, fallback) {
 
 const TENANT_PAY_ERROR_ZH = {
   wechat_pay_not_configured: '微信支付未在服务器配置，请联系管理员',
+  erp_wx_not_configured: '商家 ERP 小程序微信未配置，请联系管理员',
+  wechat_appid_openid_mismatch:
+    '微信 AppID 与用户 openid 不匹配，请确认商户号已关联灵祺ERP小程序后重试',
+  wechat_appid_mch_mismatch:
+    '微信 AppID 与商户号未关联，请在微信商户平台绑定灵祺ERP小程序后重试',
   alipay_not_configured: '支付宝未在服务器配置，请联系管理员',
   douyinpay_not_configured: '抖音支付未在服务器配置，请联系管理员',
   douyin_pay_not_configured: '抖音支付未在服务器配置，请联系管理员',
@@ -78,6 +83,12 @@ function friendlyWxCodeError(text) {
   const t = String(text || '')
   if (/code been used|invalid code|40163|40029|wx_code_used|wx_code2session/i.test(t)) {
     return '微信授权已失效，请重新点击微信支付'
+  }
+  if (/appid和openid不匹配|wechat_appid_openid_mismatch/i.test(t)) {
+    return '微信 AppID 与用户 openid 不匹配，请确认商户号已关联灵祺ERP小程序后重试'
+  }
+  if (/appid和mch_id不匹配|wechat_appid_mch_mismatch/i.test(t)) {
+    return '微信 AppID 与商户号未关联，请在微信商户平台绑定灵祺ERP小程序后重试'
   }
   return ''
 }

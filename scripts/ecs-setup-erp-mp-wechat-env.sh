@@ -9,7 +9,9 @@
 # 已在轻量 SSH 内：
 #   bash ~/app/scripts/ecs-setup-erp-mp-wechat-env.sh --appid ... --secret '...' --local
 #
-# ERP 小程序内微信支付须 AppID 一致时加：--sync-wechat-pay-appid
+# 注意：不要再加 --sync-wechat-pay-appid。
+# 星选 Native 须用 WECHAT_PAY_APP_ID/MP_WECHAT_APPID；ERP JSAPI 代码侧读 ERP_MP_WECHAT_APPID，
+# 把 WECHAT_PAY_APP_ID 改成 ERP 会破坏星选扫码（appid和mch_id不匹配）。
 
 set -euo pipefail
 
@@ -21,7 +23,8 @@ ENV_FILE="${AUTH_API_ENV:-$HOME/stack/auth-api.env}"
 LIGHT_HOST="${LIGHT_HOST:-admin@139.196.42.5}"
 
 usage() {
-  echo "用法: $0 --appid <ERP小程序AppID> --secret <AppSecret> [--local] [--sync-wechat-pay-appid]"
+  echo "用法: $0 --appid <ERP小程序AppID> --secret <AppSecret> [--local]"
+  echo "已弃用: --sync-wechat-pay-appid（会覆盖星选支付 AppID，禁止使用）"
   exit 1
 }
 
@@ -30,13 +33,18 @@ while [[ $# -gt 0 ]]; do
     --appid) APPID="${2:-}"; shift 2 ;;
     --secret) SECRET="${2:-}"; shift 2 ;;
     --local) LOCAL=1; shift ;;
-    --sync-wechat-pay-appid) SYNC_PAY=1; shift ;;
+    --sync-wechat-pay-appid)
+      echo "FAIL: --sync-wechat-pay-appid 已弃用（会破坏星选 WECHAT_PAY_APP_ID）。ERP JSAPI 自动使用 ERP_MP_WECHAT_APPID。" >&2
+      exit 1
+      ;;
     -h|--help) usage ;;
     *) echo "未知参数: $1"; usage ;;
   esac
 done
 
 [[ -n "$APPID" && -n "$SECRET" ]] || usage
+# SYNC_PAY 永久关闭，防止误覆盖星选支付 AppID
+SYNC_PAY=0
 
 write_erp_mp_env() {
   local env_file="$1"
