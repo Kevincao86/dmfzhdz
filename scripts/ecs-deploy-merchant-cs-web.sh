@@ -13,13 +13,16 @@
 #   cd ~/app && git pull
 #   MEOO_API_UPSTREAM=https://mofangdianai.com bash scripts/ecs-deploy-merchant-cs-web.sh
 #
-# 2G OOM：本机构建后 scp dist，再 SKIP_BUILD=1 执行本脚本
+# 新ECS（2G）禁止在本机 npm build：务必本机构建后 SKIP_BUILD=1
+#   bash scripts/ecs-deploy-cs-web-local-build.sh
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=ecs-resolve-admin-home.sh
 source "$ROOT/scripts/ecs-resolve-admin-home.sh"
+# shellcheck source=ecs-refuse-remote-web-build.sh
+source "$ROOT/scripts/ecs-refuse-remote-web-build.sh"
 
 ERP="$ROOT/web版/merchant-erp"
 ENV_PROD="$ERP/.env.production"
@@ -63,6 +66,7 @@ if grep -qE '^VITE_SUPABASE_URL=https://mofangdianai.com' "$ENV_PROD"; then
 fi
 
 echo "== 2) npm build =="
+ecs_refuse_remote_web_build_if_new_ecs
 if [[ "${SKIP_BUILD:-0}" != "1" ]]; then
   set -a
   # shellcheck disable=SC1090

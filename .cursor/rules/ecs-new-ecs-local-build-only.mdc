@@ -1,0 +1,43 @@
+---
+description: 新ECS 前端发版必须本机构建，禁止在新ECS 上 npm/vite build
+alwaysApply: true
+---
+
+# 新ECS 前端发版（写死：本机构建）
+
+**新ECS**（`8.160.173.236`，约 2G 内存）**禁止**在机器上执行 `npm ci` / `npm run build` / `vite build` / `tsc -b`。  
+远程构建会 OOM、卡死 SSH，曾导致整机不可用。
+
+## 固定命令（Agent 唯一允许）
+
+**商家 cs：**
+
+```bash
+bash scripts/ecs-deploy-cs-web-local-build.sh
+```
+
+**服务商 fws：**
+
+```bash
+bash scripts/ecs-deploy-fws-web-local-build.sh
+```
+
+**cs + fws 一起：**
+
+```bash
+bash scripts/ecs-deploy-new-ecs-web-local-build.sh
+```
+
+流程写死：本机 `npm run build`（或 `build:partner`）→ `rsync` dist → 新ECS 上 `SKIP_BUILD=1` 只写 Nginx/配置。
+
+## 禁止
+
+- `ssh admin@8.160.173.236 '... npm run build ...'`
+- 在新ECS 上直接跑 `ecs-deploy-merchant-cs-web.sh` / `ecs-deploy-partner-fws-web.sh` 且 **未** 设 `SKIP_BUILD=1`
+- 对用户说「到新ECS 上构建再部署」
+
+## 与 deploy-targets 的关系
+
+改了 `web版/merchant-erp/src/**` 等需重新打包时：  
+`→ 部署 **新ECS**（商家 cs）` / `→ 部署 **新ECS**（服务商 fws）`  
+且必须走上述本机构建脚本，不得远程 build。
