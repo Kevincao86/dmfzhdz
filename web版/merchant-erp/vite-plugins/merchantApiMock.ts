@@ -141,6 +141,45 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
       return
     }
 
+    if (loc.pathname === '/api/meoo-ai-ops-plan') {
+      const method = req.method ?? 'GET'
+      if (method === 'OPTIONS') {
+        res.statusCode = 204
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        res.end()
+        return
+      }
+      if (method !== 'POST') {
+        res.statusCode = 405
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.end(JSON.stringify({ ok: false, error: 'method_not_allowed' }))
+        return
+      }
+      try {
+        const bodyRaw = await readBody(req as IncomingMessage)
+        const auth = req.headers['authorization']
+        const aiEnv = await mergeMerchantAiEnvWithRegistrySnapshot(viteRoot, env)
+        const ops = await import('./merchantAiOpsPlanCore.js')
+        const out = await ops.runAiOpsPlanCore(
+          bodyRaw,
+          typeof auth === 'string' ? auth : undefined,
+          aiEnv,
+        )
+        res.statusCode = out.status
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.end(JSON.stringify(out.body))
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        res.statusCode = 500
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.end(JSON.stringify({ ok: false, error: 'internal_error', detail: msg.slice(0, 600) }))
+      }
+      return
+    }
+
     const storeIntelPaths = [
       '/api/meoo-store-menu-recognize',
       '/api/meoo-store-menu-excel-recognize',

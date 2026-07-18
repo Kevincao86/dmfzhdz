@@ -52,6 +52,7 @@ import meooAiVendorFullModelProbeHandler from '../api/meoo-ai-vendor-full-model-
 import meooAiAgentImageHandler from '../api/meoo-ai-agent-image.ts'
 import meooMpRegionLocateHandler from '../api/meoo-mp-region-locate.ts'
 import meooAiProductPlanHandler from '../api/meoo-ai-product-plan.ts'
+import meooAiOpsPlanHandler from '../api/meoo-ai-ops-plan.ts'
 import meooStoreMenuRecognizeHandler from '../api/meoo-store-menu-recognize.ts'
 import meooStoreMenuExcelRecognizeHandler from '../api/meoo-store-menu-excel-recognize.ts'
 import meooCompetitorAnalysisHandler from '../api/meoo-competitor-analysis.ts'
@@ -182,7 +183,7 @@ import apiPingHandler from '../api/ping.ts'
 import merchantSlugHandler from '../api/merchant/[...slug].ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260709-ice-upload-https-v17'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260718-ai-ops-plan-v1'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -263,6 +264,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-mp-region-locate': meooMpRegionLocateHandler as VercelLikeHandler,
   /** 门店情报：菜单识图 / 竞品 / 商品方案（须合并运营台 vendorKeys） */
   '/api/meoo-ai-product-plan': meooAiProductPlanHandler as VercelLikeHandler,
+  '/api/meoo-ai-ops-plan': meooAiOpsPlanHandler as VercelLikeHandler,
   '/api/meoo-store-menu-recognize': meooStoreMenuRecognizeHandler as VercelLikeHandler,
   '/api/meoo-store-menu-excel-recognize': meooStoreMenuExcelRecognizeHandler as VercelLikeHandler,
   '/api/meoo-competitor-analysis': meooCompetitorAnalysisHandler as VercelLikeHandler,
