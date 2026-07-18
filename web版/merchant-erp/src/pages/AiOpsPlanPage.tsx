@@ -311,8 +311,6 @@ export default function AiOpsPlanPage() {
     })
   }, [partner, scopeId, activeClient?.id])
 
-  const partnerBlocked = partner && !activeClient
-
   const flash = (msg: string) => {
     setToast(msg)
     window.setTimeout(() => setToast(null), 1800)
@@ -364,10 +362,6 @@ export default function AiOpsPlanPage() {
   }, [partner, editIntel, platforms, budgetYuan, periodStart, periodEnd, goalsNote])
 
   const onGenerate = async () => {
-    if (partnerBlocked) {
-      setErr('请先在顶栏选择代运营客户')
-      return
-    }
     if (!platforms.length) {
       setErr('请至少勾选一个平台')
       return
@@ -432,11 +426,13 @@ export default function AiOpsPlanPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-gray-900">AI 运营方案</h1>
           <p className="mt-1 max-w-2xl text-sm text-gray-500">
             {partner
-              ? '服务商版：可自行编辑客户门店情报（菜单/毛利/竞品等），再结合平台与预算生成六块方案。'
+              ? '服务商版：无需选择客户，可直接编辑门店情报并生成方案；若顶栏已选客户则按客户分别保存历史与情报草稿。'
               : '勾选多平台并填写预算与周期，结合门店菜单与毛利生成运营方案、执行计划、预算、日历、达人明细与组品货盘。'}
           </p>
           {partner ? (
-            <p className="mt-1 text-xs text-gray-400">当前客户：{scopeLabel}</p>
+            <p className="mt-1 text-xs text-gray-400">
+              存储范围：{activeClient ? scopeLabel : '未选客户（本机通用草稿）'}
+            </p>
           ) : null}
         </div>
         {toast ? (
@@ -457,7 +453,6 @@ export default function AiOpsPlanPage() {
                 <button
                   type="button"
                   className="text-[11px] text-blue-700 hover:underline"
-                  disabled={partnerBlocked}
                   onClick={() => {
                     const snap = loadMerchantIntelSnapshot()
                     const label =
@@ -483,15 +478,14 @@ export default function AiOpsPlanPage() {
                 </button>
               </div>
               <p className="text-[11px] leading-relaxed text-slate-500">
-                代运营场景下可直接改客户信息；内容按当前客户保存在本机，生成方案时以此为准（不强制走商家菜单页）。
+                可直接填写或粘贴门店信息，无需绑定/选择客户；生成时以此为准。选了顶栏客户时，草稿与历史按客户隔离保存。
               </p>
               <label className="block">
                 <span className="mb-1 block text-xs font-medium text-gray-700">门店名称</span>
                 <input
                   value={editIntel.storeName}
-                  disabled={partnerBlocked}
                   onChange={(e) => patchEditIntel({ storeName: e.target.value })}
-                  className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100"
+                  className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   placeholder="客户门店名"
                 />
               </label>
@@ -499,9 +493,8 @@ export default function AiOpsPlanPage() {
                 <span className="mb-1 block text-xs font-medium text-gray-700">经营类目</span>
                 <input
                   value={editIntel.industryPath}
-                  disabled={partnerBlocked}
                   onChange={(e) => patchEditIntel({ industryPath: e.target.value })}
-                  className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100"
+                  className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   placeholder="如 餐饮 > 火锅"
                 />
               </label>
@@ -521,9 +514,8 @@ export default function AiOpsPlanPage() {
                       max={100}
                       step={0.1}
                       value={editIntel[key]}
-                      disabled={partnerBlocked}
                       onChange={(e) => patchEditIntel({ [key]: e.target.value })}
-                      className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100"
+                      className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                     />
                   </label>
                 ))}
@@ -532,10 +524,9 @@ export default function AiOpsPlanPage() {
                 <span className="mb-1 block text-xs font-medium text-gray-700">菜单价目摘要</span>
                 <textarea
                   value={editIntel.menuSummary}
-                  disabled={partnerBlocked}
                   onChange={(e) => patchEditIntel({ menuSummary: e.target.value })}
                   rows={4}
-                  className="w-full resize-y rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100"
+                  className="w-full resize-y rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   placeholder="菜名 价格；可多行粘贴"
                 />
               </label>
@@ -543,10 +534,9 @@ export default function AiOpsPlanPage() {
                 <span className="mb-1 block text-xs font-medium text-gray-700">竞品摘要</span>
                 <textarea
                   value={editIntel.competitorSummary}
-                  disabled={partnerBlocked}
                   onChange={(e) => patchEditIntel({ competitorSummary: e.target.value })}
                   rows={3}
-                  className="w-full resize-y rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100"
+                  className="w-full resize-y rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   placeholder="周边竞品定价与套餐要点"
                 />
               </label>
@@ -587,12 +577,6 @@ export default function AiOpsPlanPage() {
               </div>
             </div>
           )}
-
-          {partnerBlocked ? (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              请先在顶栏选择代运营客户后再生成方案。
-            </div>
-          ) : null}
 
           <RecruitmentPlatformPicker
             mode="multi"
@@ -659,13 +643,11 @@ export default function AiOpsPlanPage() {
 
           <button
             type="button"
-            disabled={loading || partnerBlocked}
+            disabled={loading}
             onClick={() => void onGenerate()}
             className={cn(
               'inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition',
-              loading || partnerBlocked
-                ? 'cursor-not-allowed bg-blue-300'
-                : 'bg-blue-600 hover:bg-blue-700',
+              loading ? 'cursor-not-allowed bg-blue-300' : 'bg-blue-600 hover:bg-blue-700',
             )}
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
