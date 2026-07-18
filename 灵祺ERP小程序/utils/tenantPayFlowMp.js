@@ -1,5 +1,5 @@
 /**
- * 小程序在线支付流程：微信 JSAPI（可选）/ Native 扫码轮询 / 5 分钟倒计时
+ * 小程序在线支付：微信与达人小程序一致走 JSAPI（wx.requestPayment）；支付宝/抖音扫码轮询
  */
 const billing = require('./tenantBillingApiMp.js')
 const wxAccount = require('./wxAccountMp.js')
@@ -25,15 +25,26 @@ function formatCountdown(totalSec) {
   return `${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`
 }
 
-function invokeWechatPay(jsapiParams) {
+/** 与达人 mpMembershipApi.requestWxPayment 一致 */
+function requestWxPayment(jsapiParams) {
+  const p = normalizeJsapiParams(jsapiParams)
+  if (!p) return Promise.reject(new Error('微信下单参数无效，请稍后重试'))
   return new Promise((resolve, reject) => {
     wx.requestPayment({
-      ...jsapiParams,
+      timeStamp: p.timeStamp,
+      nonceStr: p.nonceStr,
+      package: p.package,
+      signType: p.signType,
+      paySign: p.paySign,
       success: () => resolve({ ok: true }),
-      fail: (e) => {
-        const msg = e && e.errMsg ? String(e.errMsg) : '支付已取消'
+      fail: (err) => {
+        const msg = String((err && err.errMsg) || 'requestPayment:fail')
         if (/cancel/i.test(msg)) {
           reject(new Error('您已取消支付'))
+          return
+        }
+        if (/no permission/i.test(msg)) {
+          reject(new Error('暂无微信支付权限，请使用真机调试或联系管理员'))
           return
         }
         reject(new Error(msg))
@@ -42,7 +53,6 @@ function invokeWechatPay(jsapiParams) {
   })
 }
 
-/** code_url / 支付串 → 可给 <image> 用的二维码图（优先用服务端 data URL） */
 function resolvePayQrImageUrl(prepay) {
   const fromServer = String((prepay && prepay.qrCode) || '').trim()
   if (/^data:image\//i.test(fromServer) || /^https?:\/\//i.test(fromServer)) {
@@ -53,7 +63,6 @@ function resolvePayQrImageUrl(prepay) {
   if (/^data:image\//i.test(codeUrl) || /^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i.test(codeUrl)) {
     return codeUrl
   }
-  // 兜底：把 weixin:// 等支付串编成二维码图（开发者工具/真机均可展示）
   return (
     'https://api.qrserver.com/v1/create-qr-code/?size=280x280&margin=8&data=' +
     encodeURIComponent(codeUrl)
@@ -137,7 +146,7 @@ async function fetchWxPrepayPayload() {
 
 /**
  * 发起在线支付。
- * 微信：若服务端返回 jsapiParams 则调起收银台；否则返回二维码（Native，当前商户可用路径）。
+ * 微信：与达人小程序一致，仅 JSAPI（wx.requestPayment）；不接受 Native 扫码。
  * 支付宝/抖音：返回二维码 URL 供展示并轮询。
  */
 async function startOnlinePay(input) {
@@ -157,20 +166,18 @@ async function startOnlinePay(input) {
   if (!outTradeNo) throw new Error('下单失败，缺少订单号')
 
   if (channel === 'wechat') {
+    const payMode = String(prepay.payMode || '').trim()
+    if (payMode && payMode !== 'wechat_jsapi') {
+      throw new Error('支付通道异常，请稍后重试')
+    }
+    if (prepay.codeUrl && !prepay.jsapiParams) {
+      throw new Error('小程序不支持扫码支付，请更新后台后重试')
+    }
     const jsapiParams = normalizeJsapiParams(prepay.jsapiParams)
-    if (jsapiParams) {
-      await invokeWechatPay(jsapiParams)
-      await pollPayUntilDone(outTradeNo)
-      return { outTradeNo, payMode: 'wechat_jsapi' }
-    }
-    const qrUrl = resolvePayQrImageUrl(prepay)
-    if (!qrUrl) throw new Error('未获取到微信支付码，请稍后重试')
-    return {
-      outTradeNo,
-      payMode: 'wechat_native',
-      qrUrl,
-      codeUrl: String(prepay.codeUrl || '').trim() || null,
-    }
+    if (!jsapiParams) throw new Error('微信下单参数无效，请稍后重试')
+    await requestWxPayment(jsapiParams)
+    await pollPayUntilDone(outTradeNo)
+    return { outTradeNo, payMode: 'wechat_jsapi' }
   }
 
   const qrUrl = resolvePayQrImageUrl(prepay)
@@ -192,7 +199,8 @@ module.exports = {
   TENANT_ONLINE_PAY_TTL_SEC: tiersUtil.TENANT_ONLINE_PAY_TTL_SEC,
   normalizeJsapiParams,
   formatCountdown,
-  invokeWechatPay,
+  invokeWechatPay: requestWxPayment,
+  requestWxPayment,
   pollPayUntilDone,
   createPayCountdown,
   startOnlinePay,

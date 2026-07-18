@@ -37,7 +37,7 @@ const TENANT_PAY_ERROR_ZH = {
   wechat_appid_openid_mismatch:
     '微信 AppID 与用户 openid 不匹配，请确认商户号已关联灵祺ERP小程序后重试',
   wechat_appid_mch_mismatch:
-    '微信 AppID 与商户号未关联，请在微信商户平台绑定灵祺ERP小程序后重试',
+    '商户号未关联灵祺ERP小程序。请在微信支付商户平台关联 AppID wxdf5f53fb6b14ace9 后重试',
   alipay_not_configured: '支付宝未在服务器配置，请联系管理员',
   douyinpay_not_configured: '抖音支付未在服务器配置，请联系管理员',
   douyin_pay_not_configured: '抖音支付未在服务器配置，请联系管理员',

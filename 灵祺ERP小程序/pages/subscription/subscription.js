@@ -234,8 +234,8 @@ Page({
         amountCents: tier.cents,
         channel: ch,
       })
-      // 仅微信 JSAPI 调起收银台成功后直接结束；Native 与支付宝/抖音走扫码页
-      if (ch === 'wechat' && result.payMode === 'wechat_jsapi') {
+      // 微信与达人小程序一致：JSAPI 调起成功即结束；支付宝/抖音走扫码页
+      if (ch === 'wechat') {
         wx.showToast({ title: '支付成功，权益已到账', icon: 'success' })
         this.onCloseSubscribe()
         this.reload()
