@@ -83,42 +83,117 @@ async function llmJson(
   throw new Error(errors.slice(0, 3).join('；') || '运营方案模型调用失败')
 }
 
-const SYSTEM_PROMPT = `你是餐饮/本地生活多平台运营方案策划。根据门店菜单、毛利率、类目、竞品、总预算、周期与勾选平台，输出可执行的结构化运营总方案。
+const SYSTEM_PROMPT = `你是资深本地生活/餐饮多平台运营总监，输出可直接落地执行的完整运营方案（对齐「运营方案 / 具体执行方案 / 营销预算 / 项目进度日历 / 达人明细及预算 / 组品货盘」六块）。
 只输出一个 JSON 对象（不要 Markdown），结构必须为：
 {
   "opsPlan": {
-    "goals": ["目标1"],
+    "background": "门店与商圈背景 2～4 句",
     "positioning": "一句话定位",
-    "platformStrategy": [{"platform":"抖音","approach":"打法","kpi":"KPI"}],
-    "risks": ["风险1"]
+    "targetAudience": "核心人群画像",
+    "goals": ["可量化目标1（含数字/周期）","目标2","目标3"],
+    "contentPillars": ["内容支柱1","内容支柱2","内容支柱3"],
+    "monthlyThemes": ["月主题/周主题1","主题2"],
+    "platformStrategy": [{
+      "platform":"抖音",
+      "approach":"打法与玩法（≥40字）",
+      "contentTypes":"内容形态（探店/短视频/直播等）",
+      "publishFreq":"发布频次",
+      "kpi":"可量化 KPI",
+      "examples":"2～3 个选题示例"
+    }],
+    "risks": ["风险与对策1","风险与对策2"]
   },
   "executionPlan": {
-    "phases": [{"phase":"阶段","actions":"动作","ownerRole":"角色","deliverable":"产出"}],
-    "weeklyActions": [{"week":"第1周","focus":"重点","tasks":"任务"}]
+    "overview": "执行总览（节奏、关键节点、协作方式）",
+    "phases": [{
+      "phase":"阶段名",
+      "dateRange":"YYYY-MM-DD～YYYY-MM-DD",
+      "actions":"本阶段动作（具体）",
+      "ownerRole":"负责人角色",
+      "deliverable":"交付物",
+      "successMetric":"成功指标"
+    }],
+    "weeklyActions": [{
+      "week":"第1周",
+      "dateRange":"YYYY-MM-DD～YYYY-MM-DD",
+      "focus":"本周重点",
+      "tasks":"任务清单（分号分隔）",
+      "ownerRole":"角色"
+    }],
+    "hourlySchedule": [{
+      "date":"YYYY-MM-DD",
+      "timeStart":"09:00",
+      "timeEnd":"10:00",
+      "task":"具体任务（可执行）",
+      "ownerRole":"店长/运营/达人/设计 等",
+      "location":"门店/线上/拍摄点",
+      "deliverable":"产出",
+      "notes":"备注"
+    }]
   },
   "marketingBudget": {
     "totalBudget": 数字,
-    "channels": [{"channel":"达人投放","amountYuan":数字,"ratioPct":数字,"note":"说明"}],
-    "assumptions": "预算假设"
+    "contingencyPct": 5,
+    "channels": [{
+      "channel":"达人投放",
+      "month":"YYYY-MM",
+      "amountYuan":数字,
+      "ratioPct":数字,
+      "note":"说明"
+    }],
+    "assumptions":"预算假设与控费规则"
   },
   "calendar": {
-    "milestones": [{"date":"YYYY-MM-DD","item":"事项","dependency":"依赖","statusHint":"建议"}]
+    "milestones": [{
+      "date":"YYYY-MM-DD",
+      "time":"10:00",
+      "item":"事项",
+      "dependency":"依赖",
+      "ownerRole":"角色",
+      "statusHint":"状态建议"
+    }]
   },
   "talentBudget": {
-    "talentRows": [{"platform":"抖音","tier":"腰部","headcount":2,"unitBudgetYuan":数字,"subtotalYuan":数字,"note":""}]
+    "talentRows": [{
+      "platform":"抖音",
+      "tier":"腰部",
+      "talentType":"探店/测评/种草",
+      "headcount":2,
+      "unitBudgetYuan":数字,
+      "subtotalYuan":数字,
+      "contentForm":"图文/短视频/直播",
+      "publishWindow":"周末 11:00-13:00 / 18:00-21:00",
+      "note":""
+    }]
   },
   "productBoard": {
-    "combos": [{"name":"套餐名","items":"菜品组合","priceYuan":数字,"marginHint":"毛利说明","platforms":"抖音/美团","sellingPoint":"卖点"}]
+    "combos": [{
+      "name":"套餐名",
+      "items":"菜品组合",
+      "priceYuan":数字,
+      "originYuan":数字,
+      "marginHint":"毛利说明",
+      "platforms":"抖音/美团",
+      "sellingPoint":"卖点",
+      "stockHint":"库存/核销提示"
+    }]
   }
 }
 
-硬性要求：
+硬性要求（必须全部满足）：
 1. 只基于用户提供的菜单/毛利/类目/竞品/预算/平台产出；缺菜单时不要编造具体店内菜名，在 risks/assumptions 标明「需补充菜单价目表」，组品给通用价带建议即可。
-2. marketingBudget.channels 金额合计应接近 totalBudget（误差≤5%）；totalBudget 使用用户给出的总预算。
+2. marketingBudget.channels 金额合计应接近 totalBudget（误差≤5%）；totalBudget 使用用户给出的总预算；按月拆分（month 字段）。
 3. talentBudget 各行小计 = 人数×单场预算；达人渠道小计之和应与营销预算里「达人」相关渠道金额大致对齐。
-4. calendar.milestones 日期必须落在用户 periodStart～periodEnd 内。
-5. platformStrategy 仅覆盖用户勾选的平台。
-6. 组品售价须结合毛利率倒推合理；有菜单时 combo items 优先用菜单真实品名。`
+4. calendar.milestones 日期必须落在用户 periodStart～periodEnd 内，至少 10 条，且尽量带 time（小时）。
+5. platformStrategy 仅覆盖用户勾选的平台，每平台字段写全（approach/contentTypes/publishFreq/kpi/examples）。
+6. 组品售价须结合毛利率倒推合理；有菜单时 combo items 优先用菜单真实品名；至少 3～6 个套餐。
+7. 【最重要】executionPlan.hourlySchedule 必须详细，落到小时单位：
+   - 至少输出 24～60 条小时级任务；
+   - 覆盖周期内多个工作日与至少 2 个周末；
+   - timeStart/timeEnd 用 HH:mm，单条时长 0.5～3 小时；
+   - 任务覆盖：内容策划、拍摄、剪辑、达人对接、上架审核、投放盯盘、核销复盘、私域转化等；
+   - 同一日期按时间排序，动作具体可执行，禁止空泛「推进运营」。
+8. phases ≥3、weeklyActions 覆盖完整周期每周、goals ≥3 条且可量化。`
 
 async function enrichCombosFromProductPlan(
   plan: AiOpsPlanResult,
@@ -161,9 +236,11 @@ async function enrichCombosFromProductPlan(
           ? (p.comboLines as unknown[]).map((x) => String(x)).join('、')
           : '',
         priceYuan: Number(p.suggestedPriceYuan) || 0,
+        originYuan: Number(p.originPriceYuan ?? p.originYuan) || 0,
         marginHint: String(p.marginNote ?? '').trim(),
         platforms: body.platforms.slice(0, 3).join('/'),
         sellingPoint: String(p.description ?? '').trim().slice(0, 80),
+        stockHint: '',
       }))
       .filter((c) => c.name)
     if (!extra.length) return plan
@@ -238,7 +315,7 @@ export async function runAiOpsPlanCore(
     body.menuSummary ? `菜单价目参考：\n${body.menuSummary}` : '菜单价目：未提供',
     body.competitorSummary ? `竞品摘要：\n${body.competitorSummary}` : '',
     body.goalsNote ? `商家补充目标：${body.goalsNote}` : '',
-    '请生成完整六块方案 JSON。',
+    '请生成完整六块详细方案 JSON；具体执行方案必须含 hourlySchedule（小时级排期，≥24 条）。',
   ]
     .filter(Boolean)
     .join('\n\n')
@@ -253,6 +330,21 @@ export async function runAiOpsPlanCore(
         `${userPrompt}\n\n上次输出无效，请严格按 schema 重新输出完整 JSON。`,
       )
       plan = normalizeAiOpsPlanResult(obj)
+    }
+    if (
+      plan &&
+      isAiOpsPlanResultUsable(plan) &&
+      plan.executionPlan.hourlySchedule.length < 12
+    ) {
+      obj = await llmJson(
+        aiEnv,
+        SYSTEM_PROMPT,
+        `${userPrompt}\n\n上次 hourlySchedule 过少（仅 ${plan.executionPlan.hourlySchedule.length} 条）。请保留并加细其它块，重点补全 hourlySchedule 至 24～60 条（HH:mm，覆盖多日与周末），输出完整 JSON。`,
+      )
+      const denser = normalizeAiOpsPlanResult(obj)
+      if (denser && denser.executionPlan.hourlySchedule.length > plan.executionPlan.hourlySchedule.length) {
+        plan = denser
+      }
     }
     if (!plan || !isAiOpsPlanResultUsable(plan)) {
       return {
