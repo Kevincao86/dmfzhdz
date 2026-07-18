@@ -49,33 +49,18 @@ REMOTE
 }
 
 deploy_cs() {
-  ssh_run "$CS_HOST" bash -s <<'REMOTE'
-set -euo pipefail
-cd ~/app
-if [[ -f scripts/ecs-git-pull-gitee.sh ]]; then
-  bash scripts/ecs-git-pull-gitee.sh
-else
-  git fetch origin main && git pull origin main
-fi
-echo "HEAD: $(git log -1 --oneline)"
-MEOO_API_UPSTREAM=https://mofangdianai.com MEOO_LIGHT_IP=139.196.42.5 \
-  bash scripts/ecs-deploy-merchant-cs-web.sh
-REMOTE
+  # 写死：新ECS 禁止远程 npm build，本机构建再 rsync
+  echo ""
+  echo "======== 本机构建部署 cs → $CS_HOST ========"
+  CS_HOST="$CS_HOST" MEOO_API_UPSTREAM=https://mofangdianai.com MEOO_LIGHT_IP=139.196.42.5 \
+    bash "$ROOT/scripts/ecs-deploy-cs-web-local-build.sh"
 }
 
 deploy_fws() {
-  ssh_run "$CS_HOST" bash -s <<'REMOTE'
-set -euo pipefail
-cd ~/app
-if [[ -f scripts/ecs-git-pull-gitee.sh ]]; then
-  bash scripts/ecs-git-pull-gitee.sh
-else
-  git fetch origin main && git pull origin main
-fi
-echo "HEAD: $(git log -1 --oneline)"
-MEOO_API_UPSTREAM=https://mofangdianai.com MEOO_LIGHT_IP=139.196.42.5 \
-  bash scripts/ecs-deploy-partner-fws-web.sh
-REMOTE
+  echo ""
+  echo "======== 本机构建部署 fws → $CS_HOST ========"
+  CS_HOST="$CS_HOST" MEOO_API_UPSTREAM=https://mofangdianai.com MEOO_LIGHT_IP=139.196.42.5 \
+    bash "$ROOT/scripts/ecs-deploy-fws-web-local-build.sh"
 }
 
 echo "部署目标: 轻量=$LIGHT_HOST (DEPLOY_LIGHT=$DEPLOY_LIGHT), cs ECS=$CS_HOST (DEPLOY_CS=$DEPLOY_CS, DEPLOY_FWS=$DEPLOY_FWS)"
