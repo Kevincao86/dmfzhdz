@@ -26,7 +26,6 @@ import {
   buildJsapiPayParams,
   createWechatJsapiOrder,
   createWechatNativeOrder,
-  erpWechatJsapiEnabled,
   loadWechatPayConfig,
   queryWechatOrderByOutTradeNo,
   resolveErpJsapiPayAppId,
@@ -111,12 +110,8 @@ export async function createTenantPayPrepay(
     const cfgResult = loadWechatPayConfig()
     if (!cfgResult.ok) return fail(cfgResult.error, 503, cfgResult.missing)
     const cfg = cfgResult.config
-    /**
-     * ERP 小程序请求 jsapi 时：仅当 WECHAT_PAY_ERP_JSAPI=1 且商户已绑 ERP AppID 才走 JSAPI；
-     * 否则走已关联的默认支付 AppID（星选）Native 扫码——轻量实测唯一可用路径。
-     */
-    const wantJsapi = input.wechatPayMode === 'jsapi' && erpWechatJsapiEnabled()
-    const wechatPayMode = wantJsapi ? 'wechat_jsapi' : 'wechat_native'
+    // 与达人小程序一致：小程序传 jsapi → 必须 JSAPI 调起；Web 扫码才走 native
+    const wechatPayMode = input.wechatPayMode === 'jsapi' ? 'wechat_jsapi' : 'wechat_native'
     const orderResult = await createOrder(wechatPayMode)
     if ('ok' in orderResult && orderResult.ok === false) return orderResult
     const order = orderResult as TenantPaymentOrderRow
@@ -125,6 +120,7 @@ export async function createTenantPayPrepay(
       if (wechatPayMode === 'wechat_jsapi') {
         const openid = String(input.wechatOpenId || '').trim()
         if (!openid) return fail('missing_openid', 400)
+        // ERP 小程序 openid 对应 ERP_MP AppID（等同达人用 MP_WECHAT_APPID）
         const erpAppId = resolveErpJsapiPayAppId()
         if (!erpAppId) return fail('erp_wx_not_configured', 503)
         const jsapiCfg = withWechatPayAppId(cfg, erpAppId)

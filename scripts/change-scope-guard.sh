@@ -205,6 +205,7 @@ AiOpsPlanPage
 merchantAiOpsPlanCore
 ecs-setup-erp-mp-wechat-env
 ecs-probe-erp-wechat-native-pay
+ecs-probe-erp-wechat-jsapi-ready
 change-scope-guard
 PAT
       ;;

@@ -97,7 +97,7 @@
       <text wx:if="{{payErr}}" class="wallet-sheet-err">{{payErr}}</text>
     </view>
     <view wx:else>
-      <text class="wallet-sheet-desc">请长按识别二维码完成支付</text>
+      <text class="wallet-sheet-desc">请使用对应 App 扫码完成支付</text>
       <text class="wallet-countdown">剩余 {{remainSecText}}</text>
       <image wx:if="{{qrUrl}}" class="wallet-qr" src="{{qrUrl}}" mode="aspectFit" show-menu-by-longpress="{{true}}" />
       <text wx:if="{{polling}}" class="wallet-sheet-desc">等待支付完成…</text>
