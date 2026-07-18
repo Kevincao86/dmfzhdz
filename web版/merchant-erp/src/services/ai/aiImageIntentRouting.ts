@@ -6,10 +6,20 @@ import type { AiModelPickerOption } from './modelRegistry'
 const COPYWRITING_HINT =
   /话术|文案|脚本|口播|推广语|广告语|slogan|标题|描述|方案|计划|报告|清单|列表|邮件|短信|推文|种草|攻略|字幕|旁白|台词|宣传语|种草文案/i
 
+/** 短视频混剪 / 剪辑（有素材时须走对话或混剪页，禁止误入文生图/图生图） */
+export function detectIceMixVideoIntent(text: string): boolean {
+  const t = text.trim()
+  if (t.length < 2) return false
+  return /混剪|AI\s*剪辑|智能剪辑|一键成片|视频拼接|素材剪辑|帮我剪(?:辑|一下|一剪)|剪成片|多素材.*(?:剪|拼)|(?:剪|拼).*(?:视频|成片)/i.test(
+    t,
+  )
+}
+
 /** 用户是否在描述「要生成/设计画面」类需求（非仅含「图片」二字） */
 export function detectImageGenerationIntent(text: string): boolean {
   const t = text.trim()
   if (t.length < 2) return false
+  if (detectIceMixVideoIntent(t)) return false
   if (COPYWRITING_HINT.test(t)) return false
   if (/生图|文生图|图生图|作图|出图|AI绘画|帮我画|画一张|画一幅|画个|P图|抠图|换背景/i.test(t)) return true
   if (/帮我生成|生成一张|生成一幅|生成个/i.test(t)) {

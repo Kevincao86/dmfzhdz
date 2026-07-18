@@ -126,14 +126,14 @@ export function imagePickerKeyForChatSelection(
   return options.find((o) => o.key === 'img::v::auto')?.key ?? 'img::v::auto'
 }
 
-/** 生图意图或附图时：若当前为对话模型，自动解析为文生图 picker */
+/** 明确生图意图时：若当前为对话模型，自动解析为文生图 picker（附图≠生图，混剪/识图仍走对话） */
 export function resolveImagePickerKeyForUserLine(
   chatPickerKey: string,
   options: readonly { key: string; capability?: string }[],
   userLine: string,
-  hasComposerImages: boolean,
+  _hasComposerImages: boolean,
 ): string {
   if (isAgentImagePickerKey(chatPickerKey)) return chatPickerKey
-  if (!hasComposerImages && !detectImageGenerationIntent(userLine)) return chatPickerKey
+  if (!detectImageGenerationIntent(userLine)) return chatPickerKey
   return imagePickerKeyForChatSelection(chatPickerKey, options)
 }

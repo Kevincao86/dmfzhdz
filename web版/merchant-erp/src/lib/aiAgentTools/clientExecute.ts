@@ -34,8 +34,8 @@ async function executeOne(call: AiAgentToolCall): Promise<AiAgentClientToolResul
       ok: true,
       needsUpload: true,
       message: brief
-        ? `混剪需求已记录：「${brief.slice(0, 80)}」。请上传视频/图片素材后继续，或前往「短视频 AI」页完成混剪。`
-        : '请上传混剪素材后继续。',
+        ? `混剪需求已记录：「${brief.slice(0, 80)}」。请打开「短视频 AI · AI混剪」上传/核对素材池后规划分镜并一键成片：/ai-operation/video-check`
+        : '请打开「短视频 AI · AI混剪」上传至少 2 条素材后继续：/ai-operation/video-check',
       data: { brief, duration_sec: args.duration_sec },
     }
   }
