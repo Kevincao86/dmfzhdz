@@ -1,4 +1,4 @@
-import { ChevronDown, Film, ImagePlus, Loader2, Mic, Send, Square } from 'lucide-react'
+import { ChevronDown, Film, ImagePlus, Loader2, Mic, Paperclip, Send, Square } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAiAgent } from '../context/AiAgentContext'
 import { MAX_AI_CHAT_IMAGE_ATTACHMENTS } from '../services/ai/types'
@@ -16,8 +16,8 @@ const FILTER_TABS: { id: ModelFilterTab; label: string; short: string }[] = [
   { id: 'image', label: '文生图 / 图生图', short: '生图' },
 ]
 
-const MEDIA_ACCEPT =
-  'image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm,video/*,.mp4,.mov,.m4v,.webm'
+const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif'
+const VIDEO_ACCEPT = 'video/mp4,video/quicktime,video/webm,video/x-m4v,video/*,.mp4,.mov,.m4v,.webm,.avi,.mkv'
 
 function readMediaFilesFromClipboard(ev: React.ClipboardEvent<HTMLTextAreaElement>): File[] {
   const out: File[] = []
@@ -99,6 +99,26 @@ function AttachmentPreview({
   )
 }
 
+function reportAttachResult(r: {
+  added: number
+  skippedOversize: number
+  skippedUnsupported: number
+  skippedFull: number
+}) {
+  const parts: string[] = []
+  if (r.added > 0) parts.push(`已添加 ${r.added} 个附件`)
+  if (r.skippedOversize > 0) parts.push(`${r.skippedOversize} 个视频超过 100MB 已跳过`)
+  if (r.skippedUnsupported > 0) parts.push(`${r.skippedUnsupported} 个文件格式不支持`)
+  if (r.skippedFull > 0) parts.push(`已达上限 ${MAX_AI_CHAT_IMAGE_ATTACHMENTS} 个，余下未加入`)
+  if (!parts.length) {
+    window.alert('未添加任何附件。请选择图片，或 MP4/MOV/WebM 等视频（可多选，单文件 ≤100MB）。')
+    return
+  }
+  if (r.skippedOversize || r.skippedUnsupported || r.skippedFull) {
+    window.alert(parts.join('\n'))
+  }
+}
+
 export function AiAgentComposerBar({ layout }: { layout: Layout }) {
   const {
     inputDraft,
@@ -116,15 +136,18 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
     clearPendingQuote,
   } = useAiAgent()
 
-  const fileRef = useRef<HTMLInputElement>(null)
+  const imageFileRef = useRef<HTMLInputElement>(null)
+  const videoFileRef = useRef<HTMLInputElement>(null)
   const recRef = useRef<SpeechRecognition | null>(null)
   const imeComposingRef = useRef(false)
   const filterWrapRef = useRef<HTMLDivElement>(null)
   const modelWrapRef = useRef<HTMLDivElement>(null)
+  const attachWrapRef = useRef<HTMLDivElement>(null)
   const [listening, setListening] = useState(false)
   const [modelFilter, setModelFilter] = useState<ModelFilterTab>('all')
   const [filterOpen, setFilterOpen] = useState(false)
   const [modelOpen, setModelOpen] = useState(false)
+  const [attachOpen, setAttachOpen] = useState(false)
 
   const filteredModelOptions = useMemo(() => {
     if (modelFilter === 'all') return modelPickerOptions
@@ -137,6 +160,8 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
   )
 
   const filterShort = FILTER_TABS.find((t) => t.id === modelFilter)?.short ?? '全部'
+  const videoCount = pendingComposerAttachments.filter((a) => a.kind === 'video').length
+  const imageCount = pendingComposerAttachments.filter((a) => a.kind === 'image').length
 
   useEffect(() => {
     if (filteredModelOptions.some((o) => o.key === modelPickerKey)) return
@@ -147,9 +172,10 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
   const closeMenus = useCallback(() => {
     setFilterOpen(false)
     setModelOpen(false)
+    setAttachOpen(false)
   }, [])
 
-  useClickOutside([filterWrapRef, modelWrapRef], closeMenus, filterOpen || modelOpen)
+  useClickOutside([filterWrapRef, modelWrapRef, attachWrapRef], closeMenus, filterOpen || modelOpen || attachOpen)
 
   const stopListening = useCallback(() => {
     try {
@@ -195,6 +221,14 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
     }
   }, [listening, setInputDraft, stopListening, closeMenus])
 
+  const onPickFiles = useCallback(
+    async (list: FileList | File[] | null) => {
+      const r = await addComposerMediaFiles(list)
+      reportAttachResult(r)
+    },
+    [addComposerMediaFiles],
+  )
+
   const rows = layout === 'centered' ? 4 : 2
   const disabled = aiSending
   const modelShort = shortModelLabel(currentModel?.label ?? '模型')
@@ -208,14 +242,26 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
       )}
     >
       <input
-        ref={fileRef}
+        ref={imageFileRef}
         type="file"
-        accept={MEDIA_ACCEPT}
+        accept={IMAGE_ACCEPT}
         multiple
         className="hidden"
         onChange={(e) => {
-          void addComposerMediaFiles(e.target.files).finally(() => {
-            if (fileRef.current) fileRef.current.value = ''
+          void onPickFiles(e.target.files).finally(() => {
+            if (imageFileRef.current) imageFileRef.current.value = ''
+          })
+        }}
+      />
+      <input
+        ref={videoFileRef}
+        type="file"
+        accept={VIDEO_ACCEPT}
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          void onPickFiles(e.target.files).finally(() => {
+            if (videoFileRef.current) videoFileRef.current.value = ''
           })
         }}
       />
@@ -240,14 +286,22 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
         ) : null}
 
         {pendingComposerAttachments.length > 0 ? (
-          <div className="mb-2 flex flex-wrap gap-2">
-            {pendingComposerAttachments.map((att, i) => (
-              <AttachmentPreview
-                key={`${att.kind}-${i}`}
-                att={att}
-                onRemove={() => removeComposerAttachment(i)}
-              />
-            ))}
+          <div className="mb-2 space-y-1.5">
+            <p className="text-[11px] text-slate-500">
+              已选 {pendingComposerAttachments.length}/{MAX_AI_CHAT_IMAGE_ATTACHMENTS}
+              {imageCount ? ` · 图片 ${imageCount}` : ''}
+              {videoCount ? ` · 视频 ${videoCount}` : ''}
+              （可继续批量添加）
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {pendingComposerAttachments.map((att, i) => (
+                <AttachmentPreview
+                  key={`${att.kind}-${i}-${att.kind === 'video' ? att.name : i}`}
+                  att={att}
+                  onRemove={() => removeComposerAttachment(i)}
+                />
+              ))}
+            </div>
           </div>
         ) : null}
 
@@ -258,7 +312,7 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
             const files = readMediaFilesFromClipboard(e)
             if (!files.length) return
             e.preventDefault()
-            void addComposerMediaFiles(files)
+            void onPickFiles(files)
           }}
           onCompositionStart={() => {
             imeComposingRef.current = true
@@ -276,8 +330,8 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
           disabled={disabled}
           placeholder={
             modelFilter === 'image'
-              ? '文生图：描述画面；图生图：先上传参考图/视频首帧再写修改要求…'
-              : '随便问：生活、学习、写作，或门店经营问题；可上传图片/视频…'
+              ? '文生图：描述画面；图生图：先上传参考图/视频再写修改要求…'
+              : '随便问：生活、学习、写作，或门店经营问题；可上传图片，或批量上传视频做混剪…'
           }
           className={cn(
             'w-full resize-none border-0 bg-transparent px-0 py-0 text-[15px] leading-relaxed text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-0 disabled:opacity-50',
@@ -287,16 +341,69 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
       </div>
 
       <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-2 py-2 sm:px-3">
-        <button
-          type="button"
-          disabled={disabled || aiSending || attachmentFull}
-          onClick={() => fileRef.current?.click()}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200/90 bg-slate-50 text-slate-600 hover:bg-white disabled:opacity-40"
-          title={`上传图片或视频（最多 ${MAX_AI_CHAT_IMAGE_ATTACHMENTS} 个，视频单文件 ≤100MB）`}
-          aria-label="上传图片或视频"
-        >
-          <ImagePlus className="h-4 w-4" />
-        </button>
+        <div ref={attachWrapRef} className="relative">
+          <button
+            type="button"
+            disabled={disabled || aiSending || attachmentFull}
+            onClick={() => {
+              setFilterOpen(false)
+              setModelOpen(false)
+              setAttachOpen((v) => !v)
+            }}
+            className={cn(
+              'flex h-9 items-center gap-1 rounded-xl border border-slate-200/90 bg-slate-50 px-2.5 text-slate-600 hover:bg-white disabled:opacity-40',
+              attachOpen && 'border-indigo-300 bg-indigo-50 text-indigo-800',
+            )}
+            title={`添加附件（最多 ${MAX_AI_CHAT_IMAGE_ATTACHMENTS} 个；视频单文件 ≤100MB，支持批量）`}
+            aria-label="添加附件"
+            aria-expanded={attachOpen}
+            aria-haspopup="menu"
+          >
+            <Paperclip className="h-4 w-4" />
+            <span className="hidden text-[11px] font-medium sm:inline">附件</span>
+            <ChevronDown className={cn('h-3 w-3 opacity-60', attachOpen && 'rotate-180')} />
+          </button>
+          {attachOpen ? (
+            <div
+              role="menu"
+              className="absolute bottom-full left-0 z-50 mb-1.5 min-w-[11.5rem] overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg shadow-slate-900/10"
+            >
+              <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                上传
+              </p>
+              <button
+                type="button"
+                role="menuitem"
+                disabled={attachmentFull}
+                onClick={() => {
+                  setAttachOpen(false)
+                  imageFileRef.current?.click()
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+              >
+                <ImagePlus className="h-4 w-4 text-slate-500" />
+                上传图片（可多选）
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                disabled={attachmentFull}
+                onClick={() => {
+                  setAttachOpen(false)
+                  videoFileRef.current?.click()
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+              >
+                <Film className="h-4 w-4 text-violet-600" />
+                批量上传视频
+              </button>
+              <p className="border-t border-slate-100 px-3 py-2 text-[10px] leading-relaxed text-slate-400">
+                支持 MP4 / MOV / WebM，单文件 ≤100MB，合计最多 {MAX_AI_CHAT_IMAGE_ATTACHMENTS}{' '}
+                个附件
+              </p>
+            </div>
+          ) : null}
+        </div>
 
         <div className="flex min-w-0 flex-1 items-center justify-end gap-1 sm:gap-1.5">
           <div ref={filterWrapRef} className="relative">
@@ -305,6 +412,7 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
               disabled={aiSending || disabled}
               onClick={() => {
                 setModelOpen(false)
+                setAttachOpen(false)
                 setFilterOpen((v) => !v)
               }}
               className={cn(
@@ -352,6 +460,7 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
               disabled={aiSending || disabled}
               onClick={() => {
                 setFilterOpen(false)
+                setAttachOpen(false)
                 setModelOpen((v) => !v)
               }}
               className={cn(

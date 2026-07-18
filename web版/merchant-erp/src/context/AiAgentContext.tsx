@@ -310,9 +310,14 @@ type AiAgentContextValue = {
   streamingReply: { thinking: string; content: string } | null
   /** 终止当前进行中的对话/生图请求 */
   stopAiGeneration: () => void
-  /** 主输入区待发送的图片/视频（最多 8 个） */
+  /** 主输入区待发送的图片/视频（最多 8 个，支持批量选视频） */
   pendingComposerAttachments: AiComposerAttachment[]
-  addComposerMediaFiles: (files: FileList | File[] | null) => Promise<void>
+  addComposerMediaFiles: (files: FileList | File[] | null) => Promise<{
+    added: number
+    skippedOversize: number
+    skippedUnsupported: number
+    skippedFull: number
+  }>
   removeComposerAttachment: (index: number) => void
   clearComposerAttachments: () => void
   /** 发送下一条用户消息时，将附在正文前的「引用」片段 */
@@ -504,36 +509,54 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const addComposerMediaFiles = useCallback(async (files: FileList | File[] | null) => {
-    if (!files?.length) return
-    const added: AiComposerAttachment[] = []
+    const empty = { added: 0, skippedOversize: 0, skippedUnsupported: 0, skippedFull: 0 }
+    if (!files?.length) return empty
+    const staged: AiComposerAttachment[] = []
+    let skippedOversize = 0
+    let skippedUnsupported = 0
     for (const file of Array.from(files)) {
       try {
         if (isComposerImageFile(file)) {
-          added.push({ kind: 'image', url: await compressImageFileToDataUrl(file) })
+          staged.push({ kind: 'image', url: await compressImageFileToDataUrl(file) })
         } else if (isComposerVideoFile(file)) {
-          if (file.size > MAX_COMPOSER_VIDEO_BYTES) continue
+          if (file.size > MAX_COMPOSER_VIDEO_BYTES) {
+            skippedOversize += 1
+            continue
+          }
           const posterUrl = await extractVideoPosterDataUrl(file)
           const previewUrl = URL.createObjectURL(file)
-          added.push({
+          staged.push({
             kind: 'video',
             previewUrl,
             posterUrl,
             name: file.name || 'video.mp4',
           })
+        } else {
+          skippedUnsupported += 1
         }
       } catch {
-        /* 跳过无法解析的文件 */
+        skippedUnsupported += 1
       }
     }
-    if (!added.length) return
+    if (!staged.length) {
+      return { ...empty, skippedOversize, skippedUnsupported }
+    }
+    let skippedFull = 0
+    let added = 0
     setPendingComposerAttachments((prev) => {
       const next = [...prev]
-      for (const att of added) {
-        if (next.length >= MAX_COMPOSER_ATTACHMENTS) break
+      for (const att of staged) {
+        if (next.length >= MAX_COMPOSER_ATTACHMENTS) {
+          skippedFull += 1
+          if (att.kind === 'video') revokeComposerAttachment(att)
+          continue
+        }
         next.push(att)
+        added += 1
       }
-      return next.length === prev.length ? prev : next
+      return added === 0 ? prev : next
     })
+    return { added, skippedOversize, skippedUnsupported, skippedFull }
   }, [])
 
   const clearPendingQuote = useCallback(() => setPendingQuote(null), [])
