@@ -9,7 +9,7 @@ module.exports = {
   /** 仅开发者工具内可选 IP 直连（真机须合法域名） */
   MP_ERP_IP: '139.196.42.5',
   MP_ERP_HOST: 'mofangdianai.com',
-  MP_BUILD_ID: 'mp-20260717-points-upgrade',
+  MP_BUILD_ID: 'mp-20260719-hall-locate',
   /** 大厅默认筛选：模糊定位优先，失败再 IP */
   MP_USE_FUZZY_LOCATION: true,
   MP_IP_LOCATE_ENABLED: true,

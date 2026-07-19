@@ -28,6 +28,8 @@ const prFeatureAccess = require('../../utils/prFeatureAccess.js')
 const sessionStore = require('../../utils/mpSessionStore.js')
 const regionFilterPicker = require('../../utils/regionFilterPicker.js')
 const hallRegionLocate = require('../../utils/hallRegionLocate.js')
+const mpPrivacyPageMixin = require('../../utils/mpPrivacyPageMixin.js')
+const mpPrivacyAuthorize = require('../../utils/mpPrivacyAuthorize.js')
 
 function buildPrHotTalentRows(rows, limit = 9) {
   const list = (rows || []).filter((r) => r && !r.isPreview)
@@ -576,7 +578,7 @@ async function ensurePrTalentScoredPool(page, pool, board, matchOrderId, reg) {
   return scored
 }
 
-Page({
+Page(mpPrivacyPageMixin.mergeIntoPage({
   behaviors: [require('../../behaviors/identityTheme')],
   data: {
     recHeadBandStyle: '',
@@ -677,6 +679,10 @@ Page({
   },
   async applyHallLocateFilter() {
     try {
+      const needPrivacy = await mpPrivacyAuthorize.queryNeedAuthorization()
+      if (needPrivacy && !this.data.showMpPrivacyGate) {
+        this.setData({ showMpPrivacyGate: true })
+      }
       const hit = await hallRegionLocate.resolveHallRegionFilter()
       if (!hit || !hit.province) return
       const regionState = regionFilterPicker.initRegionFilterState(hit.province, hit.city || '全部')
@@ -689,6 +695,9 @@ Page({
     } catch (e) {
       console.warn('[recommend] hall locate', e)
     }
+  },
+  _retryAfterPrivacyAgreed() {
+    void this.applyHallLocateFilter()
   },
   onShareAppMessage() {
     mpShare.enableShareMenu()
@@ -1604,4 +1613,4 @@ Page({
       wx.showToast({ title: String(err.message || '无法发起会话'), icon: 'none' })
     }
   },
-})
+}))

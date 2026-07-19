@@ -326,4 +326,5 @@
     </view>
   </view>
   <image wx:if="{{shareCoverPreloadUrl}}" class="share-cover-preload" src="{{shareCoverPreloadUrl}}" aria-hidden="true" />
+  <mp-privacy-gate show="{{showMpPrivacyGate}}" bind:agreed="onMpPrivacyGateAgreed" bind:close="onMpPrivacyGateClose" />
 </view>
