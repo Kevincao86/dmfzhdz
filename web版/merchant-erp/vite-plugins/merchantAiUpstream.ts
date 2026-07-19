@@ -164,6 +164,8 @@ function isVendorHopableError(e: unknown): boolean {
   if (lower.includes('invalid authentication') || lower.includes('authentication failed')) return true
   if (/invalid.*auth|auth.*invalid|鉴权失败|认证失败|api key.*invalid/i.test(raw)) return true
   if (lower.includes('401') || lower.includes('unauthorized') || lower.includes('unauthor')) return true
+  if (/\b402\b/.test(raw) || lower.includes('promotional credits') || lower.includes('paid balance'))
+    return true
   if (lower.includes('access denied') || lower.includes('access_denied')) return true
   if (lower.includes('403') || lower.includes('forbidden')) return true
   if (lower.includes('invalidparameter') || lower.includes('invalid parameter')) return true
@@ -2544,6 +2546,62 @@ const ADVERTISING_AI_VENDOR_ORDER = [
   'qwen',
   'doubao',
 ] as const
+
+/** 运营方案等长 JSON：国内优先，失败自动换下一可用厂商 */
+export const OPS_PLAN_AI_VENDOR_ORDER = [
+  'qwen',
+  'doubao',
+  'minimax',
+  'deepseek',
+  'kimi',
+  'openai',
+  'claude',
+  'gemini',
+  'grok',
+] as const
+
+/**
+ * 多厂商文本轮询：任一成功即返回。
+ * 通义会去掉业务空间 BASE_URL，强制公共 DashScope，避免 Workspace endpoint access denied。
+ */
+export async function merchantChatTextWithVendorFailover(
+  env: MerchantAiEnv,
+  system: string,
+  user: string,
+  order: readonly string[] = OPS_PLAN_AI_VENDOR_ORDER,
+): Promise<{ ok: true; text: string; modelUsed: string } | { ok: false; message: string; errors: string[] }> {
+  const errors: string[] = []
+  const base = { ...(env as Record<string, string>) }
+  // 运营方案勿走误配的业务空间域名（轻量曾配 MERCHANT_AI_QWEN_BASE_URL=ws-*.maas）
+  const envQwenPublic: MerchantAiEnv = {
+    ...base,
+    MERCHANT_AI_QWEN_BASE_URL: '',
+    DASHSCOPE_BASE_URL: '',
+  }
+  for (const vendor of order) {
+    const { key } = textVendorKeyInfo(env, vendor)
+    if (!key) continue
+    const eff = vendor === 'qwen' ? envQwenPublic : env
+    try {
+      const text = await callModelText(vendor, key, eff, system, user)
+      const trimmed = text.trim()
+      if (trimmed) return { ok: true, text: trimmed, modelUsed: vendor }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      errors.push(`${vendor}: ${msg.slice(0, 160)}`)
+      // 超时/额度/鉴权/工作空间拒绝一律换下一厂商
+      void isVendorHopableError(e)
+    }
+  }
+  return {
+    ok: false,
+    message:
+      errors.length > 0
+        ? `全部模型不可用：${errors.slice(0, 4).join('；')}`
+        : '未配置任一 AI Key（千问 / 豆包 / MiniMax / DeepSeek / Kimi / TokenMix）',
+    errors,
+  }
+}
 
 export async function generateAdvertisingAiText(
   env: MerchantAiEnv,
