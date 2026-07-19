@@ -20,6 +20,8 @@ const memberStore = require('../../utils/talentMember.js')
 const regionFilterPicker = require('../../utils/regionFilterPicker.js')
 const hallRegionLocate = require('../../utils/hallRegionLocate.js')
 const budgetDisplayUtil = require('../../utils/recruitmentBudgetDisplay.js')
+const mpPrivacyPageMixin = require('../../utils/mpPrivacyPageMixin.js')
+const mpPrivacyAuthorize = require('../../utils/mpPrivacyAuthorize.js')
 
 const HOME_CATEGORY_CHIPS = [
   { id: 'all', label: '全部' },
@@ -119,7 +121,7 @@ function applyNavLayout(page) {
   }
 }
 
-Page({
+Page(mpPrivacyPageMixin.mergeIntoPage({
   behaviors: [require('../../behaviors/identityTheme')],
   data: {
     navTopStyle: '',
@@ -180,6 +182,11 @@ Page({
   },
   async applyHallLocateFilter() {
     try {
+      // 真机未同意隐私时先弹门，避免 getFuzzyLocation 挂起；同时仍走 IP 兜底
+      const needPrivacy = await mpPrivacyAuthorize.queryNeedAuthorization()
+      if (needPrivacy && !this.data.showMpPrivacyGate) {
+        this.setData({ showMpPrivacyGate: true })
+      }
       const hit = await hallRegionLocate.resolveHallRegionFilter()
       if (!hit || !hit.province) return
       const regionState = regionFilterPicker.initRegionFilterState(hit.province, hit.city || '全部')
@@ -191,6 +198,9 @@ Page({
     } catch (e) {
       console.warn('[index] hall locate', e)
     }
+  },
+  _retryAfterPrivacyAgreed() {
+    void this.applyHallLocateFilter()
   },
   onShareAppMessage() {
     mpShare.enableShareMenu()
@@ -633,4 +643,4 @@ Page({
     }
     wx.navigateTo({ url: `/pages/subpack-core/detail/detail?id=${encodeURIComponent(id)}` })
   },
-})
+}))

@@ -1,12 +1,17 @@
 /**
- * 大厅省/市默认筛选：GPS/模糊定位优先 → IP 兜底；用户手动选择写入本地偏好。
+ * 大厅省/市默认筛选：模糊定位优先 → IP 兜底；用户手动选择写入本地偏好。
+ *
+ * 真机注意：未同意隐私时 getFuzzyLocation 可能一直不回调（开发者工具常直接成功）。
+ * 须超时 + 隐私未授权时跳过 GPS，保证 IP 兜底能跑到。
  */
 const config = require('./config.js')
 const api = require('./api.js')
 const ecs = require('./ecs.js')
 const china = require('./chinaRegion.js')
+const nearestCity = require('./chinaNearestCity.js')
 
 const STORAGE_KEY = 'hall_region_filter_v1'
+const FUZZY_TIMEOUT_MS = 3500
 
 function readStoredFilter() {
   try {
@@ -63,22 +68,46 @@ async function fetchLocate(lat, lng) {
   return { province: province || '全部', city: city || '全部', source: data.source || 'api' }
 }
 
+/** 隐私尚未同意时勿调 getFuzzyLocation，否则真机可能挂起不回调 */
+function privacyAllowsFuzzyLocation() {
+  return new Promise((resolve) => {
+    if (typeof wx.getPrivacySetting !== 'function') {
+      resolve(true)
+      return
+    }
+    wx.getPrivacySetting({
+      success(res) {
+        resolve(!(res && res.needAuthorization))
+      },
+      fail() {
+        resolve(true)
+      },
+    })
+  })
+}
+
 function getFuzzyLatLng() {
   return new Promise((resolve) => {
+    let settled = false
     const done = (lat, lng) => {
-      if (lat == null || lng == null) {
+      if (settled) return
+      settled = true
+      if (timer) clearTimeout(timer)
+      if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) {
         resolve(null)
         return
       }
       resolve({ lat, lng })
     }
-    // getFuzzyLocation 与 getLocation 在 requiredPrivateInfos 互斥，只声明模糊定位
+    const timer = setTimeout(() => done(null, null), FUZZY_TIMEOUT_MS)
+
     if (typeof wx.getFuzzyLocation !== 'function') {
       done(null, null)
       return
     }
+    // 国内逆地理用 gcj02，与 chinaNearestCity 一致
     wx.getFuzzyLocation({
-      type: 'wgs84',
+      type: 'gcj02',
       success(res) {
         done(Number(res.latitude), Number(res.longitude))
       },
@@ -87,6 +116,18 @@ function getFuzzyLatLng() {
       },
     })
   })
+}
+
+function resolveFromCoordsLocal(lat, lng) {
+  try {
+    const hit = nearestCity.resolveNearestCity(lat, lng)
+    if (!hit) return null
+    const resolved = china.resolveRegionNames(hit.province, hit.city)
+    if (resolved) return { province: resolved.province, city: resolved.city, source: 'gps-local' }
+    return { province: hit.province, city: hit.city, source: 'gps-local' }
+  } catch (_) {
+    return null
+  }
 }
 
 /**
@@ -101,10 +142,15 @@ async function resolveHallRegionFilter() {
 
   if (useFuzzy) {
     try {
-      const coords = await getFuzzyLatLng()
-      if (coords) {
-        const hit = await fetchLocate(coords.lat, coords.lng)
-        if (hit) return hit
+      const allowFuzzy = await privacyAllowsFuzzyLocation()
+      if (allowFuzzy) {
+        const coords = await getFuzzyLatLng()
+        if (coords) {
+          const local = resolveFromCoordsLocal(coords.lat, coords.lng)
+          if (local) return local
+          const hit = await fetchLocate(coords.lat, coords.lng)
+          if (hit) return hit
+        }
       }
     } catch (_) {}
   }

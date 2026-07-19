@@ -33,6 +33,7 @@ list_scopes() {
   ai_vision_workshop AI视觉工坊（DR增值嵌入 + 撮合小程序原生页 + 会员权限位）
   merchant_ai_ops_mix 商家 ERP：AI运营方案 + AI混剪去重
   erp_pay_points       ERP小程序支付 + 星选积分余额对齐
+  mp_hall_region       小程序招募/推荐大厅城市自动定位
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -212,6 +213,20 @@ merchantAiOpsPlanCore
 ecs-setup-erp-mp-wechat-env
 ecs-probe-erp-wechat-native-pay
 ecs-probe-erp-wechat-jsapi-ready
+change-scope-guard
+PAT
+      ;;
+    mp_hall_region)
+      cat <<'PAT'
+hallRegionLocate
+chinaNearestCity
+chinaCityCenters
+meoo-mp-region-locate
+pages/index/index
+pages/recommend/recommend
+mpPrivacyPageMixin
+config.release.js
+mpBuild.js
 change-scope-guard
 PAT
       ;;

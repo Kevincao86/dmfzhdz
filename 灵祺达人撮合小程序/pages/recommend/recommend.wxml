@@ -524,4 +524,5 @@
       </scroll-view>
     </view>
   </view>
+  <mp-privacy-gate show="{{showMpPrivacyGate}}" bind:agreed="onMpPrivacyGateAgreed" bind:close="onMpPrivacyGateClose" />
 </view>
