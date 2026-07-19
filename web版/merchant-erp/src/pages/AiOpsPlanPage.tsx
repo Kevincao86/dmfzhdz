@@ -34,7 +34,6 @@ import {
   exportAiOpsPlanWord,
 } from '../lib/aiOpsPlanExport'
 import {
-  AI_OPS_MERCHANT_CATEGORIES,
   AI_OPS_PLAN_TABS,
   aiOpsPlanToMarkdown,
   ensureMarketingRoiFallback,
@@ -45,12 +44,36 @@ import {
   type AiOpsPlanTabId,
 } from '../lib/aiOpsPlanTypes'
 import { loadMerchantIntelSnapshot } from '../lib/agentMerchantContext'
+import { findNodeById, MOCK_CATEGORY_TREE } from '../data/douyinCategoryMock'
+import {
+  loadDouyinGoodsCategoryTreeForPicker,
+  pickerChildrenOf,
+  pickerLabelsForPath,
+} from '../lib/douyinGoodsCategoryPicker'
 import type { CreatePlatformId } from '../constants/merchantPlatforms'
 import type { RecruitmentPlatform } from '../lib/recruitmentPlatformOptions'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { generateAiOpsPlan } from '../services/aiOpsPlanApi'
 import { fetchMerchantProductList } from '../services/merchantProductListApi'
+import {
+  fetchDouyinGoodsCategoryChildren,
+  mergeDouyinCategoryChildrenIntoTree,
+  normalizeCategoryTree,
+  type DouyinCategoryTreeNode,
+} from '../services/douyinProductApi'
+import {
+  fetchStoreGrossMarginAdvisor,
+  type GrossMarginAdvisorResult,
+} from '../services/storeGrossMarginAdvisorApi'
 import { cn } from '../cn'
+
+type MarginAdvisorOk = Extract<GrossMarginAdvisorResult, { ok: true }>
+
+function clampMarginPctStr(raw: string | number): string {
+  const x = Math.round(Number(raw))
+  if (!Number.isFinite(x)) return '0'
+  return String(Math.min(100, Math.max(0, x)))
+}
 
 function defaultPeriod(): { start: string; end: string } {
   const start = new Date()
@@ -855,7 +878,7 @@ export default function AiOpsPlanPage() {
   const [editIntel, setEditIntel] = useState<AiOpsPlanEditableIntel>(() => emptyAiOpsPlanEditableIntel())
   /** 商家版：无菜单时用已上架套餐规划的提示 */
   const [menuFallbackHint, setMenuFallbackHint] = useState<string | null>(null)
-  /** 服务商：客户方案 | 洽谈空白预览 */
+  /** 服务商：客户方案 | 新客户洽谈 */
   const [partnerMode, setPartnerMode] = useState<'client' | 'prospect'>('client')
   const [storeScope, setStoreScope] = useState<'all' | 'selected'>('all')
   const [storeCatalog, setStoreCatalog] = useState<DouyinStoreRow[]>([])
@@ -863,6 +886,16 @@ export default function AiOpsPlanPage() {
   const [storeSearch, setStoreSearch] = useState('')
   const [selectedStoreIds, setSelectedStoreIds] = useState<string[]>([])
   const [manualStoreNames, setManualStoreNames] = useState('')
+  /** 与商品管理同源：抖音一级/二级类目 + 行业建议毛利 */
+  const [catTree, setCatTree] = useState<DouyinCategoryTreeNode[]>([])
+  const [catTreeSource, setCatTreeSource] = useState<'none' | 'douyin' | 'demo'>('none')
+  const [catTreeSyncing, setCatTreeSyncing] = useState(false)
+  const [cat1, setCat1] = useState('')
+  const [cat2, setCat2] = useState('')
+  const [cat2Filter, setCat2Filter] = useState('')
+  const [marginAdvisor, setMarginAdvisor] = useState<MarginAdvisorOk | null>(null)
+  const [marginAdvisorLoading, setMarginAdvisorLoading] = useState(false)
+  const [marginAdvisorError, setMarginAdvisorError] = useState<string | null>(null)
 
   const intel = useMemo(() => loadMerchantIntelSnapshot(), [plan, loading])
 
@@ -969,6 +1002,113 @@ export default function AiOpsPlanPage() {
         (s.city || '').toLowerCase().includes(q),
     )
   }, [storeCatalog, storeSearch])
+
+  const l1CatOptions = useMemo(() => pickerChildrenOf(catTree, null), [catTree])
+  const l2CatOptions = useMemo(() => (cat1 ? pickerChildrenOf(catTree, cat1) : []), [catTree, cat1])
+  const l2CatFiltered = useMemo(() => {
+    const q = cat2Filter.trim().toLowerCase()
+    if (!q) return l2CatOptions
+    return l2CatOptions.filter((n) => n.name.toLowerCase().includes(q))
+  }, [l2CatOptions, cat2Filter])
+
+  const syncOpsPlanCategories = useCallback(async () => {
+    setCatTreeSyncing(true)
+    try {
+      const cat = await loadDouyinGoodsCategoryTreeForPicker()
+      if (!cat.ok) {
+        const normalized = normalizeCategoryTree(
+          MOCK_CATEGORY_TREE as unknown as Record<string, unknown>[],
+        )
+        setCatTree(normalized)
+        setCatTreeSource('demo')
+        setToast('抖音类目同步失败，已加载示例类目（与商品管理一致）')
+        window.setTimeout(() => setToast(null), 1800)
+        return
+      }
+      setCatTree(cat.tree)
+      setCatTreeSource('douyin')
+      setToast(`已同步抖音来客类目（${cat.tree.length} 个一级，与商品管理同源）`)
+      window.setTimeout(() => setToast(null), 1800)
+    } catch {
+      const normalized = normalizeCategoryTree(
+        MOCK_CATEGORY_TREE as unknown as Record<string, unknown>[],
+      )
+      setCatTree(normalized)
+      setCatTreeSource('demo')
+      setToast('类目请求异常，已加载示例类目')
+      window.setTimeout(() => setToast(null), 1800)
+    } finally {
+      setCatTreeSyncing(false)
+    }
+  }, [])
+
+  /** 服务商进入新客户洽谈时自动拉类目树 */
+  useEffect(() => {
+    if (!partner) return
+    if (catTree.length || catTreeSyncing) return
+    void syncOpsPlanCategories()
+  }, [partner, catTree.length, catTreeSyncing, syncOpsPlanCategories])
+
+  /** 选定一级后再拉直系子类目（与门店毛利配置一致） */
+  useEffect(() => {
+    if (catTreeSource !== 'douyin' || !cat1 || catTreeSyncing) return
+    let cancelled = false
+    void (async () => {
+      const kids = await fetchDouyinGoodsCategoryChildren(cat1)
+      if (cancelled || !kids.length) return
+      setCatTree((prev) => mergeDouyinCategoryChildrenIntoTree(prev, cat1, kids))
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [cat1, catTreeSource, catTreeSyncing])
+
+  /** 二级类目变更 → 写 industryPath + 拉行业建议毛利 */
+  useEffect(() => {
+    if (!partner || !cat1 || !cat2 || !catTree.length) return
+    const node = findNodeById(catTree as never[], cat2) as DouyinCategoryTreeNode | null
+    if (!node || node.enable === false) return
+    const { path } = pickerLabelsForPath(catTree, [cat1, cat2])
+    const t = window.setTimeout(() => {
+      setEditIntel((prev) => {
+        if (!path || prev.industryPath === path) return prev
+        const next = { ...prev, industryPath: path }
+        if (scopeId) saveAiOpsPlanEditableIntel(scopeId, next)
+        return next
+      })
+      setMarginAdvisorLoading(true)
+      setMarginAdvisorError(null)
+      void fetchStoreGrossMarginAdvisor({ categoryId: cat2, industryPath: path }).then((r) => {
+        setMarginAdvisorLoading(false)
+        if (r.ok) {
+          setMarginAdvisor(r)
+          // 空值时自动填入建议；已有手填则保留
+          setEditIntel((prev) => {
+            const next = { ...prev, industryPath: path || prev.industryPath }
+            let changed = false
+            if (!String(prev.marginDouyin).trim() || prev.marginDouyin === '0') {
+              next.marginDouyin = clampMarginPctStr(r.suggestedPercent.douyin)
+              changed = true
+            }
+            if (!String(prev.marginMeituan).trim() || prev.marginMeituan === '0') {
+              next.marginMeituan = clampMarginPctStr(r.suggestedPercent.meituan)
+              changed = true
+            }
+            if (!String(prev.marginXhs).trim() || prev.marginXhs === '0') {
+              next.marginXhs = clampMarginPctStr(r.suggestedPercent.xhs)
+              changed = true
+            }
+            if ((changed || path) && scopeId) saveAiOpsPlanEditableIntel(scopeId, next)
+            return next
+          })
+        } else {
+          setMarginAdvisor(null)
+          setMarginAdvisorError(r.message)
+        }
+      })
+    }, 280)
+    return () => window.clearTimeout(t)
+  }, [partner, cat1, cat2, catTree, scopeId])
 
   const resolveSelectedStoreNames = useCallback((): string[] => {
     if (storeScope === 'all' && storeCatalog.length) {
@@ -1106,7 +1246,7 @@ export default function AiOpsPlanPage() {
       return
     }
     if (partner && partnerMode === 'prospect' && !editIntel.industryPath.trim()) {
-      setErr('洽谈预览请先选择商家类目（用于按行业查询各平台转化率测算 ROI）')
+      setErr('新客户洽谈请先选择商品品类与二级类目（与商品管理同源，用于行业建议毛利与 ROI）')
       return
     }
     setLoading(true)
@@ -1189,14 +1329,14 @@ export default function AiOpsPlanPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-gray-900">AI 运营方案</h1>
           <p className="mt-1 max-w-2xl text-sm text-gray-500">
             {partner
-              ? '三步生成：选目标 → 填情报/门店 → 出方案。支持按客户存档，或「洽谈预览」空白填写给未签约商户看方案。'
+              ? '三步生成：选目标 → 填情报/门店 → 出方案。支持按客户存档，或「新客户洽谈」给未签约商户预览方案。'
               : '三步生成：选目标 → 选门店（支持连锁多选/全选）→ 出方案。ROI 按各平台行业中位转化测算，非拍脑袋假设。'}
           </p>
           {partner ? (
             <p className="mt-1 text-xs text-gray-400">
               存储范围：
               {partnerMode === 'prospect'
-                ? '洽谈预览（空白草稿，与客户档案隔离）'
+                ? '新客户洽谈（空白草稿，与客户档案隔离）'
                 : activeClient
                   ? scopeLabel
                   : '未选客户（本机通用草稿）'}
@@ -1217,7 +1357,7 @@ export default function AiOpsPlanPage() {
               {(
                 [
                   ['client', '按客户存方案'],
-                  ['prospect', '洽谈空白预览'],
+                  ['prospect', '新客户洽谈'],
                 ] as const
               ).map(([id, label]) => (
                 <button
@@ -1372,7 +1512,7 @@ export default function AiOpsPlanPage() {
             <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-xs font-medium uppercase tracking-wide text-slate-600">
-                  ③ {partnerMode === 'prospect' ? '洽谈商户情报（空白填写）' : '门店情报（可编辑）'}
+                  ③ {partnerMode === 'prospect' ? '新客户情报（空白填写）' : '门店情报（可编辑）'}
                 </div>
                 {partnerMode === 'client' ? (
                   <button
@@ -1417,7 +1557,7 @@ export default function AiOpsPlanPage() {
               </div>
               <p className="text-[11px] leading-relaxed text-slate-500">
                 {partnerMode === 'prospect'
-                  ? '用于尚未合作的商户：手动填写店名、类目、菜单/套餐与竞品即可生成可对外展示的方案预览，历史单独保存在「洽谈预览」。'
+                  ? '用于尚未合作的商户：填写店名、类目（与商品管理同源）、菜单/套餐与竞品即可生成方案预览；历史单独保存在「新客户洽谈」。'
                   : '可直接填写或粘贴门店信息；选了顶栏客户时，草稿与历史按客户隔离保存。'}
               </p>
               <label className="block">
@@ -1427,75 +1567,166 @@ export default function AiOpsPlanPage() {
                   onChange={(e) => patchEditIntel({ storeName: e.target.value })}
                   className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   placeholder={
-                    partnerMode === 'prospect' ? '洽谈商户 / 品牌名（可多店用顿号）' : '客户门店名'
+                    partnerMode === 'prospect' ? '新客户商户 / 品牌名（可多店用顿号）' : '客户门店名'
                   }
                 />
               </label>
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium text-gray-700">
-                  商家类目{partnerMode === 'prospect' ? '（必选）' : ''}
-                </span>
-                <select
-                  value={
-                    AI_OPS_MERCHANT_CATEGORIES.find((c) => c.path === editIntel.industryPath)?.id ||
-                    (editIntel.industryPath ? '__custom__' : '')
-                  }
-                  onChange={(e) => {
-                    const id = e.target.value
-                    if (!id) {
-                      patchEditIntel({ industryPath: '' })
-                      return
-                    }
-                    if (id === '__custom__') return
-                    const hit = AI_OPS_MERCHANT_CATEGORIES.find((c) => c.id === id)
-                    if (hit) patchEditIntel({ industryPath: hit.path })
-                  }}
-                  className="mb-1.5 w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                >
-                  <option value="">请选择商家类目</option>
-                  {AI_OPS_MERCHANT_CATEGORIES.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.label}
-                    </option>
-                  ))}
-                  {editIntel.industryPath &&
-                  !AI_OPS_MERCHANT_CATEGORIES.some((c) => c.path === editIntel.industryPath) ? (
-                    <option value="__custom__">自定义：{editIntel.industryPath}</option>
-                  ) : null}
-                </select>
-                <input
-                  value={editIntel.industryPath}
-                  onChange={(e) => patchEditIntel({ industryPath: e.target.value })}
-                  className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  placeholder="或细化路径，如 餐饮 > 火锅烧烤"
-                />
-                {partnerMode === 'prospect' ? (
-                  <p className="mt-1 text-[11px] text-slate-500">
-                    类目用于查询该业态在各投放平台的中位核销转化率，进而测算 ROI。
+
+              <div className="space-y-2 rounded-lg border border-amber-100 bg-amber-50/40 p-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs font-medium text-gray-800">
+                    经营类目{partnerMode === 'prospect' ? '（必选）' : ''}
+                    <span className="ml-1 font-normal text-gray-500">与商品管理同源</span>
+                  </span>
+                  <button
+                    type="button"
+                    disabled={catTreeSyncing}
+                    onClick={() => void syncOpsPlanCategories()}
+                    className="text-[11px] text-blue-700 hover:underline disabled:opacity-50"
+                  >
+                    {catTreeSyncing ? '同步中…' : '同步抖音类目'}
+                  </button>
+                </div>
+                {catTree.length ? (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <label className="block">
+                      <span className="mb-1 block text-[11px] font-medium text-gray-700">
+                        商品品类 <span className="text-red-500">*</span>
+                      </span>
+                      <select
+                        value={cat1}
+                        onChange={(e) => {
+                          setCat1(e.target.value)
+                          setCat2('')
+                          setCat2Filter('')
+                          setMarginAdvisor(null)
+                        }}
+                        className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      >
+                        <option value="">请选择一级</option>
+                        {l1CatOptions.map((n) => (
+                          <option key={n.category_id} value={n.category_id} disabled={!n.enable}>
+                            {!n.enable ? `${n.name}（不可用）` : n.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-[11px] font-medium text-gray-700">
+                        二级类目 <span className="text-red-500">*</span>
+                      </span>
+                      <div className="relative mb-1">
+                        <Search className="pointer-events-none absolute left-2 top-1.5 h-3.5 w-3.5 text-gray-400" />
+                        <input
+                          value={cat2Filter}
+                          onChange={(e) => setCat2Filter(e.target.value)}
+                          disabled={!cat1}
+                          placeholder="筛选二级类目"
+                          className="w-full rounded-lg border border-gray-200 bg-white py-1.5 pl-7 pr-2 text-xs outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-50"
+                        />
+                      </div>
+                      <select
+                        value={cat2}
+                        disabled={!cat1}
+                        onChange={(e) => setCat2(e.target.value)}
+                        className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-50"
+                      >
+                        <option value="">请选择二级</option>
+                        {l2CatFiltered.map((n) => (
+                          <option key={n.category_id} value={n.category_id} disabled={!n.enable}>
+                            {!n.enable ? `${n.name}（不可用）` : n.name}
+                          </option>
+                        ))}
+                      </select>
+                      {cat1 && cat2Filter && !l2CatFiltered.length ? (
+                        <p className="mt-1 text-[10px] text-amber-700">无匹配二级类目，请调整筛选词</p>
+                      ) : null}
+                    </label>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-gray-500">
+                    请先同步抖音来客类目（失败时自动用示例树，与商品门店毛利配置一致）。
+                  </p>
+                )}
+                {editIntel.industryPath ? (
+                  <p className="text-[11px] text-gray-600">
+                    已选路径：<span className="font-medium text-gray-900">{editIntel.industryPath}</span>
+                    {catTreeSource !== 'none' ? (
+                      <span className="ml-1 text-gray-400">
+                        · {catTreeSource === 'douyin' ? '抖音开放平台' : '本地示例'}
+                      </span>
+                    ) : null}
                   </p>
                 ) : null}
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {(
-                  [
-                    ['marginDouyin', '抖音毛利%'],
-                    ['marginMeituan', '美团毛利%'],
-                    ['marginXhs', '小红书毛利%'],
-                  ] as const
-                ).map(([key, label]) => (
-                  <label key={key} className="block">
-                    <span className="mb-1 block text-[11px] font-medium text-gray-700">{label}</span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      step={0.1}
-                      value={editIntel[key]}
-                      onChange={(e) => patchEditIntel({ [key]: e.target.value })}
-                      className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                    />
-                  </label>
-                ))}
+              </div>
+
+              <div className="space-y-2 rounded-lg border border-amber-100 bg-white p-2.5">
+                <div className="text-xs font-medium text-gray-800">商家毛利设置（%）</div>
+                {marginAdvisorLoading ? (
+                  <p className="flex items-center gap-1.5 text-[11px] text-amber-900">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    正在根据所选类目拉取行业建议毛利率…
+                  </p>
+                ) : null}
+                {marginAdvisorError ? (
+                  <p className="text-[11px] text-amber-900">
+                    建议值暂不可用：{marginAdvisorError}
+                    <span className="mt-0.5 block text-gray-600">仍可手动填写下方比例。</span>
+                  </p>
+                ) : null}
+                {marginAdvisor && !marginAdvisorLoading ? (
+                  <p className="text-[11px] leading-snug text-gray-600">
+                    <span className="font-medium text-gray-800">
+                      {marginAdvisor.industryName} · {marginAdvisor.industryPath}
+                    </span>{' '}
+                    {marginAdvisor.benchmarkNote}
+                  </p>
+                ) : null}
+                <div className="space-y-2">
+                  {(
+                    [
+                      ['marginDouyin', 'douyin', '抖音来客'] as const,
+                      ['marginMeituan', 'meituan', '美团点评'] as const,
+                      ['marginXhs', 'xhs', '小红书'] as const,
+                    ] as const
+                  ).map(([key, advKey, label]) => (
+                    <div key={key} className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-gray-700">{label}</div>
+                        {marginAdvisor ? (
+                          <div className="text-[10px] text-gray-500">
+                            行业建议 {marginAdvisor.suggestedPercent[advKey]}%
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {marginAdvisor ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              patchEditIntel({
+                                [key]: clampMarginPctStr(marginAdvisor.suggestedPercent[advKey]),
+                              })
+                            }
+                            className="shrink-0 rounded-md border border-amber-300 bg-white px-1.5 py-0.5 text-[10px] text-amber-800 hover:bg-amber-50"
+                          >
+                            采用建议
+                          </button>
+                        ) : null}
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={1}
+                          value={editIntel[key]}
+                          onChange={(e) => patchEditIntel({ [key]: e.target.value })}
+                          className="w-16 rounded-lg border border-gray-300 px-2 py-1 text-right text-xs tabular-nums outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        />
+                        <span className="text-gray-500">%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
               <label className="block">
                 <span className="mb-1 block text-xs font-medium text-gray-700">菜单价目摘要</span>
