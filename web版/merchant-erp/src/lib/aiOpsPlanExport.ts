@@ -89,7 +89,7 @@ export function exportAiOpsPlanExcel(plan: AiOpsPlanResult, basename: string) {
         r.note,
       ]),
       [],
-      ['ROI渠道', '投入', '预计GMV', '预计订单', 'ROI', '回本天数', '说明'],
+      ['ROI渠道', '投入', '周期预计GMV', '预计订单', '毛利ROI', '回本天数', '说明'],
       ...plan.marketingBudget.roiAnalysis.map((r) => [
         r.channel,
         r.investYuan,
