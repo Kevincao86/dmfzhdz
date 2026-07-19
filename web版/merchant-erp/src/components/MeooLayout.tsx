@@ -123,10 +123,8 @@ export default function MeooLayout() {
     const paths: string[] = []
     for (const item of navItems) {
       if (!item.children) continue
-      if (
-        item.children.some((c) => childActive(pathname, c.path)) ||
-        pathActive(pathname, item.path)
-      ) {
+      // 有子菜单时只按子项匹配展开，避免父 path 前缀误开其它组（如 /operation vs AI 创作）
+      if (item.children.some((c) => childActive(pathname, c.path))) {
         paths.push(item.path)
       }
     }
