@@ -1,7 +1,6 @@
 /**
  * AI 运营方案：菜单/毛利/预算/多平台 → 六块结构化 JSON
  */
-import type { AIChatRequest } from '../src/services/ai/types.js'
 import {
   ensureMarketingRoiFallback,
   isAiOpsPlanResultUsable,
@@ -9,8 +8,7 @@ import {
   type AiOpsPlanResult,
 } from '../src/lib/aiOpsPlanTypes.js'
 import { verifyBearerJwt } from './aiGateway/authSupabase.js'
-import { chatTokenMix } from './aiGateway/providers/tokenmix.js'
-import { merchantAgentChatFromMessages } from './merchantAiUpstream.js'
+import { merchantChatTextWithVendorFailover } from './merchantAiUpstream.js'
 import { runAiProductPlanCore } from './merchantStoreIntelCore.js'
 
 async function mergeStoreIntelAiEnv(env: Record<string, string>): Promise<Record<string, string>> {
@@ -33,55 +31,17 @@ async function llmJson(
   system: string,
   user: string,
 ): Promise<Record<string, unknown>> {
-  const errors: string[] = []
-  const messages = [
-    { role: 'system' as const, content: system },
-    { role: 'user' as const, content: user },
-  ]
-
-  const qwenKey = (env.MERCHANT_AI_QWEN_KEY ?? env.DASHSCOPE_API_KEY ?? '').trim()
-  if (qwenKey) {
-    try {
-      const { text } = await merchantAgentChatFromMessages(env, 'qwen', undefined, system, user)
-      return extractJsonObject(text)
-    } catch (e) {
-      errors.push(`通义：${e instanceof Error ? e.message : String(e)}`)
-    }
+  // 千问→豆包→MiniMax→DeepSeek→Kimi→TokenMix… 任一可用即产出；失败换下一台
+  const out = await merchantChatTextWithVendorFailover(env, system, user)
+  if (!out.ok) {
+    throw new Error(out.message || '运营方案模型调用失败')
   }
-
-  const doubaoKey = (env.MERCHANT_AI_DOUBAO_KEY ?? env.ARK_API_KEY ?? '').trim()
-  if (doubaoKey) {
-    try {
-      const { text } = await merchantAgentChatFromMessages(env, 'doubao', undefined, system, user)
-      return extractJsonObject(text)
-    } catch (e) {
-      errors.push(`豆包：${e instanceof Error ? e.message : String(e)}`)
-    }
+  try {
+    return extractJsonObject(out.text)
+  } catch (e) {
+    const parseMsg = e instanceof Error ? e.message : String(e)
+    throw new Error(`${out.modelUsed} 已响应但 ${parseMsg}；请重试生成`)
   }
-
-  const tokenmixKey = (env.TOKENMIX_API_KEY ?? '').trim()
-  if (tokenmixKey) {
-    try {
-      const req: AIChatRequest = {
-        provider: 'tokenmix',
-        modelFamily: 'openai',
-        model: (env.MERCHANT_AI_PLAN_JSON_MODEL ?? 'gpt-4o').trim() || 'gpt-4o',
-        messages,
-        temperature: 0.35,
-      }
-      const res = await chatTokenMix(req, env)
-      return extractJsonObject(res.content)
-    } catch (e) {
-      errors.push(`TokenMix：${e instanceof Error ? e.message : String(e)}`)
-    }
-  }
-
-  if (!qwenKey && !doubaoKey && !tokenmixKey) {
-    throw new Error(
-      '未配置运营方案 LLM：请设置 MERCHANT_AI_QWEN_KEY / MERCHANT_AI_DOUBAO_KEY / TOKENMIX_API_KEY 之一',
-    )
-  }
-  throw new Error(errors.slice(0, 3).join('；') || '运营方案模型调用失败')
 }
 
 const SYSTEM_PROMPT = `你是资深本地生活/餐饮多平台运营总监，输出可直接落地执行的完整运营方案（对齐「运营方案 / 具体执行方案 / 营销预算 / 项目进度日历 / 达人明细及预算 / 组品货盘」六块）。

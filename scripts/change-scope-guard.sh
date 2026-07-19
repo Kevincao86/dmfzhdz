@@ -177,9 +177,14 @@ aiOpsPlanTypes
 aiOpsPlanExport
 AiOpsPlanPage
 merchantAiOpsPlanCore
+merchantAiUpstream
 meoo-ai-ops-plan
 iceMixEditPlanAi
 iceMixProduceEngine
+ProfilePage
+check-dr-affiliate-menu
+ecs-deploy-talent-fulfillment
+灵祺达人履约管理后台/dist
 change-scope-guard
 PAT
       ;;

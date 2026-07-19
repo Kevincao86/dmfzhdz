@@ -86,6 +86,9 @@ if [[ ! -f "$FUL/dist/index.html" ]]; then
 fi
 echo "OK: dist 已生成 ($(du -sh "$FUL/dist" | awk '{print $1}'))"
 
+echo "== 2b) 门禁：我的推广入口 =="
+bash "$ROOT/scripts/check-dr-affiliate-menu.sh"
+
 echo "== 3) Nginx =="
 if [[ ! -f "$NGINX_TEMPLATE" ]]; then
   echo "缺少 $NGINX_TEMPLATE"
