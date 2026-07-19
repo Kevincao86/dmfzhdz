@@ -41,9 +41,11 @@ import {
   type AiOpsPlanTabId,
 } from '../lib/aiOpsPlanTypes'
 import { loadMerchantIntelSnapshot } from '../lib/agentMerchantContext'
+import type { CreatePlatformId } from '../constants/merchantPlatforms'
 import type { RecruitmentPlatform } from '../lib/recruitmentPlatformOptions'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { generateAiOpsPlan } from '../services/aiOpsPlanApi'
+import { fetchMerchantProductList } from '../services/merchantProductListApi'
 import { cn } from '../cn'
 
 function defaultPeriod(): { start: string; end: string } {
@@ -51,6 +53,57 @@ function defaultPeriod(): { start: string; end: string } {
   const end = new Date(start.getTime() + 30 * 86400000)
   const fmt = (d: Date) => d.toISOString().slice(0, 10)
   return { start: fmt(start), end: fmt(end) }
+}
+
+/** 投放平台 → 商品列表 API 平台（仅已绑定且可拉 online 的） */
+function recruitmentToGoodsPlatform(p: RecruitmentPlatform): CreatePlatformId | null {
+  if (p === '抖音') return 'douyin'
+  if (p === '快手') return 'kuaishou'
+  if (p === '小红书') return 'xiaohongshu'
+  if (p === '大众点评') return 'meituan'
+  return null
+}
+
+function isOnlineShelfSaleStatus(saleStatus: string): boolean {
+  const s = String(saleStatus || '').trim()
+  if (/下架|封禁|停售|下线|offline/i.test(s)) return false
+  return true
+}
+
+/**
+ * 无菜单价目表时：按勾选且已绑定平台，抓取商品列表中「已上架」套餐作规划输入。
+ */
+async function fetchOnlineListedPackagesSummary(
+  platforms: RecruitmentPlatform[],
+): Promise<string> {
+  const ids = [
+    ...new Set(
+      platforms.map(recruitmentToGoodsPlatform).filter((x): x is CreatePlatformId => !!x),
+    ),
+  ]
+  if (!ids.length) {
+    // 未勾选可拉商品的平台时，仍尝试抖音/快手（常见绑定）
+    ids.push('douyin', 'kuaishou')
+  }
+  const blocks: string[] = []
+  await Promise.all(
+    ids.map(async (platform) => {
+      const r = await fetchMerchantProductList(platform, { page: 1, pageSize: 40, full: true })
+      if (!r.ok || !r.items.length) return
+      const online = r.items.filter((p) => isOnlineShelfSaleStatus(p.saleStatus))
+      const pick = (online.length ? online : r.items).slice(0, 16)
+      if (!pick.length) return
+      const label = pick[0]?.platform || platform
+      const lines = pick.map((p) => {
+        const price = p.price > 0 ? ` ¥${p.price}` : ''
+        const sale = p.saleStatus && p.saleStatus !== '—' ? ` · ${p.saleStatus}` : ''
+        return `- ${p.name}${price}${sale}`
+      })
+      blocks.push(`【${label}·已上架】${pick.length} 个\n${lines.join('\n')}`)
+    }),
+  )
+  if (!blocks.length) return ''
+  return `【已上架套餐·来自商品列表】\n${blocks.join('\n\n')}`
 }
 
 function TableShell({
@@ -715,6 +768,8 @@ export default function AiOpsPlanPage() {
   const [tenantUserId, setTenantUserId] = useState('')
   const [toast, setToast] = useState<string | null>(null)
   const [editIntel, setEditIntel] = useState<AiOpsPlanEditableIntel>(() => emptyAiOpsPlanEditableIntel())
+  /** 商家版：无菜单时用已上架套餐规划的提示 */
+  const [menuFallbackHint, setMenuFallbackHint] = useState<string | null>(null)
 
   const intel = useMemo(() => loadMerchantIntelSnapshot(), [plan, loading])
 
@@ -781,11 +836,23 @@ export default function AiOpsPlanPage() {
     })
   }
 
-  const buildInput = useCallback((): AiOpsPlanGenerateInput => {
+  const buildInput = useCallback(async (): Promise<AiOpsPlanGenerateInput> => {
     if (partner) {
       const dy = Number(editIntel.marginDouyin)
       const mt = Number(editIntel.marginMeituan)
       const xhs = Number(editIntel.marginXhs)
+      let menuSummary = editIntel.menuSummary.trim() || undefined
+      if (!menuSummary && platforms.length) {
+        const online = await fetchOnlineListedPackagesSummary(platforms)
+        if (online) {
+          menuSummary = online
+          setMenuFallbackHint('未填菜单价目表，已用绑定平台「已上架套餐」生成方案')
+        } else {
+          setMenuFallbackHint(null)
+        }
+      } else {
+        setMenuFallbackHint(null)
+      }
       return {
         platforms: platforms.map(String),
         budgetYuan: Number(budgetYuan) || 0,
@@ -793,7 +860,7 @@ export default function AiOpsPlanPage() {
         periodEnd,
         goalsNote: goalsNote.trim() || undefined,
         storeName: editIntel.storeName.trim() || undefined,
-        menuSummary: editIntel.menuSummary.trim() || undefined,
+        menuSummary,
         industryPath: editIntel.industryPath.trim() || undefined,
         competitorSummary: editIntel.competitorSummary.trim() || undefined,
         margins: {
@@ -804,6 +871,19 @@ export default function AiOpsPlanPage() {
       }
     }
     const snap = loadMerchantIntelSnapshot()
+    let menuSummary = snap.menuSummary?.trim() || ''
+    if (!menuSummary && platforms.length) {
+      const online = await fetchOnlineListedPackagesSummary(platforms)
+      if (online) {
+        menuSummary = online
+        setMenuFallbackHint('未上传菜单价目表，已抓取商品列表中已上架套餐用于规划')
+      } else {
+        menuSummary = snap.draftProductsSummary?.trim() || ''
+        setMenuFallbackHint(menuSummary ? '未上传菜单价目表，已用草稿箱商品摘要规划' : null)
+      }
+    } else {
+      setMenuFallbackHint(null)
+    }
     return {
       platforms: platforms.map(String),
       budgetYuan: Number(budgetYuan) || 0,
@@ -811,7 +891,7 @@ export default function AiOpsPlanPage() {
       periodEnd,
       goalsNote: goalsNote.trim() || undefined,
       storeName: snap.storeName,
-      menuSummary: snap.menuSummary || snap.draftProductsSummary,
+      menuSummary: menuSummary || undefined,
       margins: snap.margins,
       industryPath: snap.industryPath,
       competitorSummary: snap.competitorSummary,
@@ -834,18 +914,21 @@ export default function AiOpsPlanPage() {
     }
     setLoading(true)
     setErr(null)
-    const input = buildInput()
-    const r = await generateAiOpsPlan(input)
-    setLoading(false)
-    if (!r.ok) {
-      setErr(r.message)
-      return
+    try {
+      const input = await buildInput()
+      const r = await generateAiOpsPlan(input)
+      if (!r.ok) {
+        setErr(r.message)
+        return
+      }
+      setPlan(ensureMarketingRoiFallback(r.plan))
+      setTab('ops')
+      const item = saveAiOpsPlanHistoryItem(scopeId, input, r.plan)
+      setHistory(loadAiOpsPlanHistory(scopeId))
+      flash(`已生成并保存：${item.title}`)
+    } finally {
+      setLoading(false)
     }
-    setPlan(ensureMarketingRoiFallback(r.plan))
-    setTab('ops')
-    const item = saveAiOpsPlanHistoryItem(scopeId, input, r.plan)
-    setHistory(loadAiOpsPlanHistory(scopeId))
-    flash(`已生成并保存：${item.title}`)
   }
 
   const onCopyMarkdown = async () => {
@@ -891,7 +974,8 @@ export default function AiOpsPlanPage() {
     }
   }
 
-  const hasMenu = (intel.menuItemCount || 0) > 0 || !!intel.draftProductsSummary
+  const hasMenu = (intel.menuItemCount || 0) > 0
+  const hasDraftMenu = !hasMenu && !!intel.draftProductsSummary
   const hasMargins =
     Number(intel.margins?.douyin) > 0 ||
     Number(intel.margins?.meituan) > 0 ||
@@ -1026,11 +1110,26 @@ export default function AiOpsPlanPage() {
                 <span
                   className={cn(
                     'inline-flex items-center gap-1 rounded-full px-2 py-0.5',
-                    hasMenu ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800',
+                    hasMenu
+                      ? 'bg-emerald-50 text-emerald-800'
+                      : hasDraftMenu || menuFallbackHint
+                        ? 'bg-sky-50 text-sky-800'
+                        : 'bg-amber-50 text-amber-800',
                   )}
                 >
-                  {hasMenu ? <CheckCircle2 className="h-3.5 w-3.5" /> : <CircleAlert className="h-3.5 w-3.5" />}
-                  菜单 {hasMenu ? `${intel.menuItemCount || '草稿'} 项` : '未配置'}
+                  {hasMenu ? (
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  ) : (
+                    <CircleAlert className="h-3.5 w-3.5" />
+                  )}
+                  菜单{' '}
+                  {hasMenu
+                    ? `${intel.menuItemCount} 项`
+                    : hasDraftMenu
+                      ? '草稿项'
+                      : menuFallbackHint
+                        ? '将用已上架套餐'
+                        : '未填写'}
                 </span>
                 <span
                   className={cn(
@@ -1042,12 +1141,15 @@ export default function AiOpsPlanPage() {
                   毛利 {hasMargins ? '已配置' : '未配置'}
                 </span>
               </div>
+              <p className="text-[11px] leading-relaxed text-gray-500">
+                未上传菜单价目表时，生成方案将自动抓取已绑定平台「商品列表」中的已上架套餐。
+              </p>
               <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-blue-700">
                 <Link to="/store/menu" className="hover:underline">
                   菜单价目表
                 </Link>
                 <Link to="/products" className="hover:underline">
-                  门店毛利配置
+                  商品列表 / 毛利
                 </Link>
                 <Link to="/operation/competitors" className="hover:underline">
                   竞品分析
@@ -1113,6 +1215,12 @@ export default function AiOpsPlanPage() {
             />
           </label>
 
+          {menuFallbackHint ? (
+            <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800">
+              {menuFallbackHint}
+            </div>
+          ) : null}
+
           {err ? (
             <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {err}
@@ -1129,7 +1237,7 @@ export default function AiOpsPlanPage() {
             )}
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            {loading ? '正在生成…' : '生成方案'}
+            {loading ? '正在生成（约 1～2 分钟）…' : '生成方案'}
           </button>
 
           <div className="border-t border-gray-100 pt-3">
