@@ -1159,6 +1159,22 @@ function extractChatCompletionText(data: Record<string, unknown>): string {
 }
 
 const UPSTREAM_CHAT_TIMEOUT_MS = 45_000
+/** 运营方案等长 JSON 任务可临时加长；其它对话仍用默认 45s */
+let upstreamChatTimeoutOverrideMs: number | null = null
+
+export async function withUpstreamChatTimeoutMs<T>(ms: number, fn: () => Promise<T>): Promise<T> {
+  const prev = upstreamChatTimeoutOverrideMs
+  upstreamChatTimeoutOverrideMs = Math.max(15_000, Math.floor(ms))
+  try {
+    return await fn()
+  } finally {
+    upstreamChatTimeoutOverrideMs = prev
+  }
+}
+
+function resolveUpstreamChatTimeoutMs(): number {
+  return upstreamChatTimeoutOverrideMs ?? UPSTREAM_CHAT_TIMEOUT_MS
+}
 
 function combineUpstreamAbortSignals(a?: AbortSignal, b?: AbortSignal): AbortSignal | undefined {
   if (!a) return b
@@ -1173,10 +1189,11 @@ function combineUpstreamAbortSignals(a?: AbortSignal, b?: AbortSignal): AbortSig
 }
 
 function upstreamChatTimeoutSignal(): AbortSignal {
+  const ms = resolveUpstreamChatTimeoutMs()
   const AS = AbortSignal as typeof AbortSignal & { timeout?: (n: number) => AbortSignal }
-  if (typeof AS.timeout === 'function') return AS.timeout(UPSTREAM_CHAT_TIMEOUT_MS)
+  if (typeof AS.timeout === 'function') return AS.timeout(ms)
   const c = new AbortController()
-  const t = setTimeout(() => c.abort(), UPSTREAM_CHAT_TIMEOUT_MS)
+  const t = setTimeout(() => c.abort(), ms)
   ;(t as { unref?: () => void }).unref?.()
   return c.signal
 }
@@ -1269,7 +1286,7 @@ async function callMinimaxChat(
     throw lastErr ?? new Error('MiniMax 文案请求失败')
   }
 
-  /** 国际站先试 M 系列；国内 api.minimaxi.com 在 abab6.5s-chat 前先试更常见的 abab6.5-chat，减少 2061「套餐不含该模型」 */
+  /** 国际站先试 M 系列；国内勿试 abab5.5s-chat（多数套餐 2061 不支持） */
   const pairs: Array<[string, string]> = [
     ['https://api.minimax.io/v1/chat/completions', 'MiniMax-M2.7'],
     ['https://api.minimax.io/v1/chat/completions', 'MiniMax-M2.5'],
@@ -1278,7 +1295,6 @@ async function callMinimaxChat(
     ['https://api.minimaxi.com/v1/chat/completions', 'abab6.5-chat'],
     ['https://api.minimaxi.com/v1/chat/completions', 'abab6.5t-chat'],
     ['https://api.minimaxi.com/v1/chat/completions', 'abab6.5s-chat'],
-    ['https://api.minimaxi.com/v1/chat/completions', 'abab5.5s-chat'],
   ]
   let lastErr: Error | null = null
   for (const [url, mmModel] of pairs) {
@@ -2564,6 +2580,14 @@ export const OPS_PLAN_AI_VENDOR_ORDER = [
  * 多厂商文本轮询：任一成功即返回。
  * 通义会去掉业务空间 BASE_URL，强制公共 DashScope，避免 Workspace endpoint access denied。
  */
+function isUsableChatText(text: string): boolean {
+  const t = text.trim()
+  if (!t) return false
+  // 空对象 / 仅括号：视为无效，继续轮询下一厂商
+  if (/^\{\s*\}$/.test(t) || /^\[\s*\]$/.test(t)) return false
+  return t.length >= 8
+}
+
 export async function merchantChatTextWithVendorFailover(
   env: MerchantAiEnv,
   system: string,
@@ -2585,7 +2609,8 @@ export async function merchantChatTextWithVendorFailover(
     try {
       const text = await callModelText(vendor, key, eff, system, user)
       const trimmed = text.trim()
-      if (trimmed) return { ok: true, text: trimmed, modelUsed: vendor }
+      if (isUsableChatText(trimmed)) return { ok: true, text: trimmed, modelUsed: vendor }
+      errors.push(`${vendor}: 输出过短或为空 JSON`)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       errors.push(`${vendor}: ${msg.slice(0, 160)}`)
@@ -2597,7 +2622,7 @@ export async function merchantChatTextWithVendorFailover(
     ok: false,
     message:
       errors.length > 0
-        ? `全部模型不可用：${errors.slice(0, 4).join('；')}`
+        ? `全部模型不可用：${errors.slice(0, 6).join('；')}`
         : '未配置任一 AI Key（千问 / 豆包 / MiniMax / DeepSeek / Kimi / TokenMix）',
     errors,
   }

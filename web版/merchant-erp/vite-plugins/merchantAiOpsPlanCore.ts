@@ -8,7 +8,11 @@ import {
   type AiOpsPlanResult,
 } from '../src/lib/aiOpsPlanTypes.js'
 import { verifyBearerJwt } from './aiGateway/authSupabase.js'
-import { merchantChatTextWithVendorFailover } from './merchantAiUpstream.js'
+import {
+  merchantChatTextWithVendorFailover,
+  OPS_PLAN_AI_VENDOR_ORDER,
+  withUpstreamChatTimeoutMs,
+} from './merchantAiUpstream.js'
 import { runAiProductPlanCore } from './merchantStoreIntelCore.js'
 
 async function mergeStoreIntelAiEnv(env: Record<string, string>): Promise<Record<string, string>> {
@@ -23,25 +27,41 @@ function extractJsonObject(text: string): Record<string, unknown> {
   const start = raw.indexOf('{')
   const end = raw.lastIndexOf('}')
   if (start < 0 || end <= start) throw new Error('模型未返回有效 JSON')
-  return JSON.parse(raw.slice(start, end + 1)) as Record<string, unknown>
+  const obj = JSON.parse(raw.slice(start, end + 1)) as Record<string, unknown>
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj) || Object.keys(obj).length === 0) {
+    throw new Error('模型返回空 JSON 对象')
+  }
+  return obj
 }
 
+/** 六块方案生成慢，单厂商最长约 120s；解析失败则换下一厂商（勿把空 {} 当成功） */
 async function llmJson(
   env: Record<string, string>,
   system: string,
   user: string,
 ): Promise<Record<string, unknown>> {
-  // 千问→豆包→MiniMax→DeepSeek→Kimi→TokenMix… 任一可用即产出；失败换下一台
-  const out = await merchantChatTextWithVendorFailover(env, system, user)
-  if (!out.ok) {
-    throw new Error(out.message || '运营方案模型调用失败')
-  }
-  try {
-    return extractJsonObject(out.text)
-  } catch (e) {
-    const parseMsg = e instanceof Error ? e.message : String(e)
-    throw new Error(`${out.modelUsed} 已响应但 ${parseMsg}；请重试生成`)
-  }
+  return withUpstreamChatTimeoutMs(120_000, async () => {
+    const errors: string[] = []
+    for (const vendor of OPS_PLAN_AI_VENDOR_ORDER) {
+      const out = await merchantChatTextWithVendorFailover(env, system, user, [vendor])
+      if (!out.ok) {
+        if (out.errors?.length) errors.push(...out.errors)
+        else if (out.message) errors.push(out.message)
+        continue
+      }
+      try {
+        return extractJsonObject(out.text)
+      } catch (e) {
+        const parseMsg = e instanceof Error ? e.message : String(e)
+        errors.push(`${vendor}: ${parseMsg}`)
+      }
+    }
+    throw new Error(
+      errors.length
+        ? `全部模型不可用：${errors.slice(0, 6).join('；')}`
+        : '运营方案模型调用失败',
+    )
+  })
 }
 
 const SYSTEM_PROMPT = `你是资深本地生活/餐饮多平台运营总监，输出可直接落地执行的完整运营方案（对齐「运营方案 / 具体执行方案 / 营销预算 / 项目进度日历 / 达人明细及预算 / 组品货盘」六块）。
@@ -128,16 +148,17 @@ const SYSTEM_PROMPT = `你是资深本地生活/餐饮多平台运营总监，�
 }
 
 硬性要求：
-1. 只基于用户提供的菜单/毛利/类目/竞品/预算/平台；缺菜单勿编造菜名。
+1. 只基于用户提供的菜单价目/已上架套餐/毛利/类目/竞品/预算/平台；无菜单时用「已上架套餐」清单组品，勿编造菜名。
 2. marketingBudget.channels 合计≈totalBudget（误差≤5%）；须含 roiSummary + roiAnalysis（≥3 行，含投入/预计GMV/订单/ROI/回本天数）。
 3. talentBudget.budgetLines 必须细致：至少覆盖「短视频达人（按头部/腰部/尾部分行写人数与单价）」「短视频本地推预算」「直播达人预算」「直播投流预算」；subtotalYuan=人数×单价+投流（投流类可 headcount=0）。
-4. calendar.milestones 日期落在周期内，≥10 条；非直播事项 time 可留空。
+4. calendar.milestones 日期落在周期内，≥8 条；非直播事项 time 可留空。
 5. platformStrategy 仅用户勾选平台。
-6. 组品 3～6 个，优先真实菜单名。
+6. 组品 3～6 个，优先真实菜单名或已上架套餐名。
 7. 【执行时间粒度】phases/weeklyActions 用日/周即可；hourlySchedule 仅允许 scene="live" 的直播相关任务（开播、场控、直播投流盯盘等），禁止给拍摄/剪辑/上架等非直播事项写小时。无直播计划时可输出空数组 []。
 8. 短视频的 publishWindow 用「工作日/周末 上午/晚间」等粗粒度；仅直播行可写具体 HH:mm。
-9. phases≥3、weeklyActions 覆盖每周、goals≥3；每个 phase 必须带 detailItems（≥3 条日粒度任务）。
-10. marketingBudget.roiAnalysis 与 roiSummary 不得省略（≥3 行 ROI）。`
+9. phases≥3、weeklyActions 覆盖每周、goals≥3；每个 phase 必须带 detailItems（≥2 条日粒度任务）。
+10. marketingBudget.roiAnalysis 与 roiSummary 不得省略（≥3 行 ROI）。
+11. 输出须紧凑完整：字段值简洁，避免冗长复述，确保 JSON 可一次完整返回。`
 
 async function enrichCombosFromProductPlan(
   plan: AiOpsPlanResult,
@@ -256,10 +277,14 @@ export async function runAiOpsPlanCore(
     body.storeName ? `门店：${body.storeName}` : '',
     body.industryPath ? `经营类目：${body.industryPath}` : '',
     marginLine,
-    body.menuSummary ? `菜单价目参考：\n${body.menuSummary}` : '菜单价目：未提供',
+    body.menuSummary
+      ? String(body.menuSummary).includes('已上架套餐')
+        ? `已上架套餐参考（无菜单价目表，请据此组品规划）：\n${body.menuSummary}`
+        : `菜单价目参考：\n${body.menuSummary}`
+      : '菜单价目：未提供（请按类目与平台常规套餐结构规划，勿捏造具体菜名）',
     body.competitorSummary ? `竞品摘要：\n${body.competitorSummary}` : '',
     body.goalsNote ? `商家补充目标：${body.goalsNote}` : '',
-    '请生成完整六块详细方案 JSON；须含 ROI 投产分析与 budgetLines 细致预算；hourlySchedule 仅直播。',
+    '请生成完整六块方案 JSON（字段简洁）；须含 ROI 与 budgetLines；hourlySchedule 仅直播。',
   ]
     .filter(Boolean)
     .join('\n\n')
@@ -271,10 +296,11 @@ export async function runAiOpsPlanCore(
       obj = await llmJson(
         aiEnv,
         SYSTEM_PROMPT,
-        `${userPrompt}\n\n上次输出无效，请严格按 schema 重新输出完整 JSON。`,
+        `${userPrompt}\n\n上次输出无效，请严格按 schema 重新输出完整 JSON（字段值尽量短）。`,
       )
       plan = normalizeAiOpsPlanResult(obj)
     }
+    // 仅在可用方案但 ROI/预算行偏少时补强一次，避免多轮拖垮总时长
     if (
       plan &&
       isAiOpsPlanResultUsable(plan) &&
@@ -283,11 +309,12 @@ export async function runAiOpsPlanCore(
       obj = await llmJson(
         aiEnv,
         SYSTEM_PROMPT,
-        `${userPrompt}\n\n上次 ROI 或 budgetLines 不足。请补全 roiAnalysis（≥3）与 budgetLines（短视频分层人数、本地推、直播达人、直播投流），hourlySchedule 仅直播，输出完整 JSON。`,
+        `${userPrompt}\n\n请补全 roiAnalysis（≥3）与 budgetLines（短视频分层、本地推、直播达人、直播投流），输出完整 JSON。`,
       )
       const denser = normalizeAiOpsPlanResult(obj)
       if (
         denser &&
+        isAiOpsPlanResultUsable(denser) &&
         (denser.marketingBudget.roiAnalysis.length > plan.marketingBudget.roiAnalysis.length ||
           denser.talentBudget.budgetLines.length > plan.talentBudget.budgetLines.length)
       ) {
