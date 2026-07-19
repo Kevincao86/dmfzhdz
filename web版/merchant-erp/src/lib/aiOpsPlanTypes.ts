@@ -272,20 +272,201 @@ const DEFAULT_ROI_BENCH: AiOpsRoiIndustryBench = {
   roiMid: 2.6,
   paybackDays: 21,
   aovYuan: 130,
-  evidence: '本地生活餐饮多平台综合核销转化约 2%～5%（跨平台案例库中位），按保守中位测算',
+  evidence: '本地生活多平台综合核销转化约 2%～5%（跨平台案例库中位），按保守中位测算',
 }
 
-export function resolveAiOpsRoiIndustryBench(channel: string): AiOpsRoiIndustryBench {
-  const t = String(channel || '')
-  for (const b of AI_OPS_ROI_INDUSTRY_BENCHES) {
-    if (b.match.test(t)) return b
+/** 服务商洽谈空白页 / 类目选择：一级商家类目 */
+export const AI_OPS_MERCHANT_CATEGORIES: Array<{ id: string; label: string; path: string }> = [
+  { id: 'catering', label: '餐饮美食', path: '餐饮 > 正餐/小吃' },
+  { id: 'hotpot', label: '火锅烧烤', path: '餐饮 > 火锅烧烤' },
+  { id: 'tea', label: '茶饮咖啡', path: '餐饮 > 茶饮咖啡' },
+  { id: 'beauty', label: '丽人美业', path: '丽人 > 美发美甲/医美' },
+  { id: 'leisure', label: '休闲娱乐', path: '休闲娱乐 > 桌游剧本/KTV' },
+  { id: 'fitness', label: '运动健身', path: '运动健身 > 健身房/瑜伽' },
+  { id: 'edu', label: '教育培训', path: '教育培训 > 兴趣/早教' },
+  { id: 'retail', label: '零售商超', path: '购物 > 商超便利' },
+  { id: 'hotel', label: '酒店民宿', path: '酒店旅游 > 民宿客栈' },
+  { id: 'parent', label: '亲子乐园', path: '亲子 > 乐园游乐' },
+  { id: 'auto', label: '汽车服务', path: '爱车 > 洗车保养' },
+  { id: 'pet', label: '宠物服务', path: '生活服务 > 宠物' },
+]
+
+type IndustryRoiMod = {
+  match: RegExp
+  label: string
+  /** 相对餐饮基准的转化倍率 */
+  convMul: number
+  roiMul: number
+  aovMul: number
+  note: string
+}
+
+const INDUSTRY_ROI_MODS: IndustryRoiMod[] = [
+  {
+    match: /火锅|烧烤/,
+    label: '火锅烧烤',
+    convMul: 1.05,
+    roiMul: 1.05,
+    aovMul: 1.25,
+    note: '聚餐客单高、周末核销强',
+  },
+  {
+    match: /茶饮|咖啡|奶茶/,
+    label: '茶饮咖啡',
+    convMul: 1.15,
+    roiMul: 1.1,
+    aovMul: 0.55,
+    note: '客单低但转化与复购快',
+  },
+  {
+    match: /丽人|美发|美甲|医美|美容|美业/,
+    label: '丽人美业',
+    convMul: 0.85,
+    roiMul: 0.92,
+    aovMul: 1.55,
+    note: '决策周期长、客单高',
+  },
+  {
+    match: /休闲|娱乐|密室|剧本|KTV|网咖/,
+    label: '休闲娱乐',
+    convMul: 1.05,
+    roiMul: 1.05,
+    aovMul: 1.15,
+    note: '周末场次驱动核销',
+  },
+  {
+    match: /健身|瑜伽|运动/,
+    label: '运动健身',
+    convMul: 0.8,
+    roiMul: 0.9,
+    aovMul: 1.8,
+    note: '体验课转化中等、卡项客单高',
+  },
+  {
+    match: /教育|培训|早教|兴趣/,
+    label: '教育培训',
+    convMul: 0.65,
+    roiMul: 0.85,
+    aovMul: 2.2,
+    note: '长决策、高客单',
+  },
+  {
+    match: /零售|商超|便利|数码|购物/,
+    label: '零售商超',
+    convMul: 0.95,
+    roiMul: 0.95,
+    aovMul: 0.85,
+    note: '到店频次高、客单中低',
+  },
+  {
+    match: /酒店|民宿|旅游/,
+    label: '酒店民宿',
+    convMul: 0.75,
+    roiMul: 0.9,
+    aovMul: 2.5,
+    note: '预订转化低于堂食、客单高',
+  },
+  {
+    match: /亲子|乐园/,
+    label: '亲子乐园',
+    convMul: 1.0,
+    roiMul: 1.0,
+    aovMul: 1.2,
+    note: '周末家庭客为主',
+  },
+  {
+    match: /汽车|洗车|保养/,
+    label: '汽车服务',
+    convMul: 0.7,
+    roiMul: 0.88,
+    aovMul: 1.3,
+    note: '到店服务型、转化偏搜索场',
+  },
+  {
+    match: /宠物/,
+    label: '宠物服务',
+    convMul: 0.9,
+    roiMul: 0.95,
+    aovMul: 1.1,
+    note: '本地刚需、复购稳定',
+  },
+  {
+    match: /餐饮|美食|正餐|小吃/,
+    label: '餐饮美食',
+    convMul: 1,
+    roiMul: 1,
+    aovMul: 1,
+    note: '本地生活基准业态',
+  },
+]
+
+function resolveIndustryRoiMod(industryPath?: string): IndustryRoiMod | null {
+  const t = String(industryPath || '').trim()
+  if (!t) return null
+  for (const m of INDUSTRY_ROI_MODS) {
+    if (m.match.test(t)) return m
   }
-  return DEFAULT_ROI_BENCH
+  return null
 }
 
-export function formatAiOpsRoiEvidenceNote(channel: string, bench?: AiOpsRoiIndustryBench): string {
-  const b = bench || resolveAiOpsRoiIndustryBench(channel)
+function round1(n: number): number {
+  return Math.round(n * 10) / 10
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100
+}
+
+export function resolveAiOpsRoiIndustryBench(
+  channel: string,
+  industryPath?: string,
+): AiOpsRoiIndustryBench {
+  const t = String(channel || '')
+  let base = DEFAULT_ROI_BENCH
+  for (const b of AI_OPS_ROI_INDUSTRY_BENCHES) {
+    if (b.match.test(t)) {
+      base = b
+      break
+    }
+  }
+  const mod = resolveIndustryRoiMod(industryPath)
+  if (!mod || (mod.convMul === 1 && mod.roiMul === 1 && mod.aovMul === 1)) return base
+  return {
+    ...base,
+    platformLabel: `${base.platformLabel}·${mod.label}`,
+    convLow: round1(base.convLow * mod.convMul),
+    convHigh: round1(base.convHigh * mod.convMul),
+    roiMid: round2(base.roiMid * mod.roiMul),
+    aovYuan: Math.round(base.aovYuan * mod.aovMul),
+    evidence: `${base.evidence}；业态校正（${mod.label}）：${mod.note}`,
+  }
+}
+
+export function formatAiOpsRoiEvidenceNote(
+  channel: string,
+  bench?: AiOpsRoiIndustryBench,
+  industryPath?: string,
+): string {
+  const b = bench || resolveAiOpsRoiIndustryBench(channel, industryPath)
   return `${b.platformLabel}行业中位核销转化 ${b.convLow}%～${b.convHigh}%；${b.evidence}；测算 ROI≈${b.roiMid}、回本约${b.paybackDays}天`
+}
+
+/** 按勾选平台 + 商家类目生成「转化率查询表」，供模型测算 ROI（禁止假设转化率） */
+export function buildAiOpsRoiLookupForPrompt(platforms: string[], industryPath?: string): string {
+  const plats = platforms.length ? platforms : ['抖音', '小红书']
+  const lines = plats.map((p) => {
+    const b = resolveAiOpsRoiIndustryBench(p, industryPath)
+    return `- ${p}：核销转化 ${b.convLow}%～${b.convHigh}% · 参考 ROI≈${b.roiMid} · 客单约¥${b.aovYuan}（${b.evidence}）`
+  })
+  const ind = industryPath?.trim() || '未指定（按本地生活综合）'
+  return [
+    `【转化率查询结果 · 须据此填写 roiAnalysis，禁止写「假设转化率」】`,
+    `商家类目：${ind}`,
+    ...lines,
+    `- 抖音直播（若方案含直播）：8%～15%（再按业态校正）`,
+    `- 抖音本地推：1.8%～3.5%（再按业态校正）`,
+    `- 美团/点评搜索场：5%～12%（再按业态校正）`,
+  ].join('\n')
 }
 
 function looksLikeAssumedConvNote(note: string): boolean {
@@ -586,8 +767,12 @@ export function isAiOpsPlanResultUsable(plan: AiOpsPlanResult): boolean {
   )
 }
 
-/** 用行业分平台转化率区间重写 ROI 说明，并在缺失时按渠道合成投产 */
-export function ensureMarketingRoiFallback(plan: AiOpsPlanResult): AiOpsPlanResult {
+/** 用「勾选平台 × 商家类目」查询转化率区间，重写 ROI 说明并在缺失时按渠道合成投产 */
+export function ensureMarketingRoiFallback(
+  plan: AiOpsPlanResult,
+  opts?: { industryPath?: string },
+): AiOpsPlanResult {
+  const industryPath = opts?.industryPath?.trim() || undefined
   let roiAnalysis = [...(plan.marketingBudget.roiAnalysis || [])]
 
   if (roiAnalysis.length < 2) {
@@ -606,7 +791,7 @@ export function ensureMarketingRoiFallback(plan: AiOpsPlanResult): AiOpsPlanResu
       .filter((c) => c.amountYuan > 0)
       .slice(0, 8)
       .map((c) => {
-        const bench = resolveAiOpsRoiIndustryBench(c.channel)
+        const bench = resolveAiOpsRoiIndustryBench(c.channel, industryPath)
         const invest = c.amountYuan
         const expectedGmvYuan = Math.round(invest * bench.roiMid)
         const expectedOrders = Math.max(1, Math.round(expectedGmvYuan / bench.aovYuan))
@@ -617,18 +802,18 @@ export function ensureMarketingRoiFallback(plan: AiOpsPlanResult): AiOpsPlanResu
           expectedOrders,
           roi: Math.round(bench.roiMid * 100) / 100,
           paybackDays: bench.paybackDays,
-          note: formatAiOpsRoiEvidenceNote(c.channel, bench),
+          note: formatAiOpsRoiEvidenceNote(c.channel, bench, industryPath),
         }
       })
   } else {
     roiAnalysis = roiAnalysis.map((r) => {
-      const bench = resolveAiOpsRoiIndustryBench(r.channel)
+      const bench = resolveAiOpsRoiIndustryBench(r.channel, industryPath)
       const note =
         !r.note?.trim() || looksLikeAssumedConvNote(r.note)
-          ? formatAiOpsRoiEvidenceNote(r.channel, bench)
+          ? formatAiOpsRoiEvidenceNote(r.channel, bench, industryPath)
           : /行业中位|核销转化\s*\d/.test(r.note)
             ? r.note
-            : `${r.note}；依据：${formatAiOpsRoiEvidenceNote(r.channel, bench)}`
+            : `${r.note}；依据：${formatAiOpsRoiEvidenceNote(r.channel, bench, industryPath)}`
       // 若模型只给了「假设转化率」类说明且 ROI/GMV 明显不合理，按行业中位校正
       let expectedGmvYuan = r.expectedGmvYuan
       let expectedOrders = r.expectedOrders

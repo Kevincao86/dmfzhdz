@@ -49,16 +49,8 @@ export type IceJobStatus =
 
 /** 成片下载/预览代理（勿用 ICE 返回的 OSS 直链） */
 export function iceJobDownloadProxyPaths(jobId: string, inline = false): string[] {
-  const q = new URLSearchParams({ id: jobId })
-  if (inline) q.set('inline', '1')
-  const qs = q.toString()
-  const paths = [
-    `/api/meoo-merchant-ai-video-ice-job-download?${qs}`,
-    `/api/meoo-merchant-ai-video-openshot-export-download?${qs}`,
-    `/api/merchant/ai/video/ice/job-download?${qs}`,
-  ]
   const urls: string[] = []
-  for (const p of paths) {
+  for (const p of iceExportDownloadPaths(jobId, 'timeline', inline)) {
     for (const u of merchantBinaryApiFetchUrls(p)) {
       if (!urls.includes(u)) urls.push(u)
     }
@@ -85,8 +77,14 @@ export async function downloadIceExportFile(
   opts?: { mixProduceMode?: 'timeline' | 'smart_batch' },
 ): Promise<void> {
   const paths = iceExportDownloadPaths(jobId, opts?.mixProduceMode ?? 'timeline')
-  let lastErr = '下载失败'
+  const urls: string[] = []
   for (const p of paths) {
+    for (const u of merchantBinaryApiFetchUrls(p)) {
+      if (!urls.includes(u)) urls.push(u)
+    }
+  }
+  let lastErr = '下载失败'
+  for (const p of urls) {
     try {
       const res = await fetch(p)
       const ct = (res.headers.get('content-type') ?? '').toLowerCase()
@@ -820,6 +818,7 @@ export async function postIceSmartBatch(body: {
   return { ok: false, message: '智能一键成片接口未部署' }
 }
 
+/** 相对路径；调用方再经 merchantBinaryApiFetchUrls 展开（勿在此处展开后再二次包装） */
 export function iceExportDownloadPaths(
   jobId: string,
   mode: 'timeline' | 'smart_batch' = 'timeline',
@@ -834,7 +833,11 @@ export function iceExportDownloadPaths(
       `/api/merchant/ai/video/ice/smart-batch/job-download?${qs}`,
     ]
   }
-  return iceJobDownloadProxyPaths(jobId, inline)
+  return [
+    `/api/meoo-merchant-ai-video-ice-job-download?${qs}`,
+    `/api/meoo-merchant-ai-video-openshot-export-download?${qs}`,
+    `/api/merchant/ai/video/ice/job-download?${qs}`,
+  ]
 }
 
 export async function fetchIceSmartBatchJobStatus(batchJobId: string): Promise<IceJobStatus> {
@@ -896,10 +899,16 @@ export async function fetchIceExportPreviewUrl(
   const pathList = iceExportDownloadPaths(jobId, mode, true)
   const urls: string[] = []
   for (const p of pathList) {
+    // 已是绝对地址则不再二次包装（否则会变成 /https://… → 404「预览接口未部署」）
+    if (/^https?:\/\//i.test(p)) {
+      if (!urls.includes(p)) urls.push(p)
+      continue
+    }
     for (const u of merchantBinaryApiFetchUrls(p)) {
       if (!urls.includes(u)) urls.push(u)
     }
   }
+  let lastDetail = ''
   for (let i = 0; i < urls.length; i += 1) {
     const url = urls[i]!
     try {
@@ -909,10 +918,17 @@ export async function fetchIceExportPreviewUrl(
       if (!res.ok) {
         const j = ct.includes('json') ? await parseJson<{ message?: string }>(res) : null
         const detail = j?.message ?? `预览加载失败 HTTP ${res.status}`
+        lastDetail = detail
         if (res.status === 409) {
           throw new Error(`${detail}（成片尚未写入完成，请稍后重试）`)
         }
-        if (i < urls.length - 1 && (res.status === 500 || res.status === 502)) continue
+        // 任务不存在/未完成：继续试下一候选；勿误报「未部署」
+        if (
+          i < urls.length - 1 &&
+          (res.status === 500 || res.status === 502 || res.status === 503 || /NoMatchedJobId|job id/i.test(detail))
+        ) {
+          continue
+        }
         throw new Error(detail)
       }
       if (ct.includes('json') || ct.includes('text/html')) {
@@ -926,9 +942,10 @@ export async function fetchIceExportPreviewUrl(
       return URL.createObjectURL(blob)
     } catch (e) {
       if (i === urls.length - 1) throw e
+      lastDetail = e instanceof Error ? e.message : String(e)
     }
   }
-  throw new Error('预览接口未部署')
+  throw new Error(lastDetail || '预览接口未部署')
 }
 
 /** @deprecated 请用 triggerIceExportDownload；保留供需要 Blob 的场景 */
