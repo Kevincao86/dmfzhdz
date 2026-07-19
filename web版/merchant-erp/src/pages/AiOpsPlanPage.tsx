@@ -842,10 +842,18 @@ function ResultPanel({
           <div>
             <h3 className="mb-2 text-sm font-semibold text-gray-900">ROI 分渠道明细</h3>
             <p className="mb-2 text-[11px] leading-relaxed text-gray-500">
-              说明列须为各平台行业中位核销转化区间与依据（如抖音短视频 2.5%～6%、直播 8%～15%），不再使用「假设转化率」。
+              预计GMV=活动周期总产出（不是每天）；毛利ROI=(周期GMV×品类毛利率)÷投入；回本=投入÷日均毛利。说明列含行业核销转化区间与计算口径。
             </p>
             <TableShell
-              headers={['渠道', '投入(元)', '预计GMV', '预计订单', 'ROI', '回本(天)', '说明']}
+              headers={[
+                '渠道',
+                '投入(元)',
+                '周期预计GMV',
+                '预计订单',
+                '毛利ROI',
+                '回本(天)',
+                '说明',
+              ]}
             >
               {(plan.marketingBudget.roiAnalysis || []).map((r, i) => (
                 <tr key={`${r.channel}-${i}`}>
@@ -1400,13 +1408,15 @@ export default function AiOpsPlanPage() {
         setErr(r.message)
         return
       }
-      setPlan(
-        ensureMarketingRoiFallback(r.plan, {
-          industryPath: input.industryPath,
-        }),
-      )
+      const planFixed = ensureMarketingRoiFallback(r.plan, {
+        industryPath: input.industryPath,
+        margins: input.margins,
+        periodStart: input.periodStart,
+        periodEnd: input.periodEnd,
+      })
+      setPlan(planFixed)
       setTab('ops')
-      const item = saveAiOpsPlanHistoryItem(scopeId, input, r.plan)
+      const item = saveAiOpsPlanHistoryItem(scopeId, input, planFixed)
       setHistory(loadAiOpsPlanHistory(scopeId))
       flash(`已生成并保存：${item.title}`)
     } finally {
@@ -2108,6 +2118,13 @@ export default function AiOpsPlanPage() {
                             ensureMarketingRoiFallback(n, {
                               industryPath:
                                 editIntel.industryPath || intel.industryPath || undefined,
+                              margins: {
+                                douyin: Number(editIntel.marginDouyin) || 0,
+                                meituan: Number(editIntel.marginMeituan) || 0,
+                                xhs: Number(editIntel.marginXhs) || 0,
+                              },
+                              periodStart: h.periodStart || periodStart,
+                              periodEnd: h.periodEnd || periodEnd,
                             }),
                           )
                         }

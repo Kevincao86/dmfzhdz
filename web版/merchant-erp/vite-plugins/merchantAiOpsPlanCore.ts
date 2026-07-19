@@ -113,7 +113,7 @@ const SYSTEM_PROMPT = `你是资深本地生活/餐饮多平台运营总监，�
       "expectedOrders":数字,
       "roi":数字,
       "paybackDays":数字,
-      "note":"假设说明"
+      "note":"行业转化区间+周期合计GMV口径说明"
     }],
     "assumptions":"预算假设"
   },
@@ -158,8 +158,9 @@ const SYSTEM_PROMPT = `你是资深本地生活/餐饮多平台运营总监，�
 7. 【执行时间粒度】phases/weeklyActions 用日/周即可；hourlySchedule 仅允许 scene="live" 的直播相关任务（开播、场控、直播投流盯盘等），禁止给拍摄/剪辑/上架等非直播事项写小时。无直播计划时可输出空数组 []。
 8. 短视频的 publishWindow 用「工作日/周末 上午/晚间」等粗粒度；仅直播行可写具体 HH:mm。
 9. phases≥3、weeklyActions 覆盖每周、goals≥3；每个 phase 必须带 detailItems（≥2 条日粒度任务）。
-10. 【ROI 事实依据】roiAnalysis[].note 与 assumptions 禁止写「假设转化率」；必须按平台给出行业中位核销转化区间并简述依据：抖音短视频达人 2.5%～6%、抖音本地推 1.8%～3.5%、抖音直播 8%～15%、小红书 0.9%～2.4%、美团/点评搜索场 5%～12%、快手 2%～5%、视频号 1.5%～4%。ROI/GMV/订单须与上述区间及客单中位自洽。
-11. 输出须紧凑完整：字段值简洁，避免冗长复述，确保 JSON 可一次完整返回。`
+10. 【ROI 事实依据】roiAnalysis[].note 与 assumptions 禁止写「假设转化率」；必须按平台给出行业中位核销转化区间并简述依据：抖音短视频达人 2.5%～6%、抖音本地推 1.8%～3.5%、抖音直播 8%～15%、小红书 0.9%～2.4%、美团/点评搜索场 5%～12%、快手 2%～5%、视频号 1.5%～4%。
+11. 【ROI 口径写死】expectedGmvYuan=活动周期总 GMV（不是每天）；roi 字段填毛利 ROI=(周期GMV×对应平台品类毛利率)÷投入；paybackDays=投入÷日均毛利=投入×活动天数÷(周期GMV×毛利率)。禁止把行业经验回本天数原样填进 paybackDays 而与投入/GMV/毛利不一致。
+12. 输出须紧凑完整：字段值简洁，避免冗长复述，确保 JSON 可一次完整返回。`
 
 async function enrichCombosFromProductPlan(
   plan: AiOpsPlanResult,
@@ -358,7 +359,12 @@ export async function runAiOpsPlanCore(
       }
     }
 
-    plan = ensureMarketingRoiFallback(plan, { industryPath: body.industryPath })
+    plan = ensureMarketingRoiFallback(plan, {
+      industryPath: body.industryPath,
+      margins: body.margins,
+      periodStart,
+      periodEnd,
+    })
 
     plan = await enrichCombosFromProductPlan(
       plan,
