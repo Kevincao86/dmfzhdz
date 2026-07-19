@@ -181,6 +181,7 @@ merchantAiUpstream
 meoo-ai-ops-plan
 iceMixEditPlanAi
 iceMixProduceEngine
+aliyunIceCloudApi
 ProfilePage
 check-dr-affiliate-menu
 ecs-deploy-talent-fulfillment

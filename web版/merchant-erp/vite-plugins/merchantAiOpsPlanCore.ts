@@ -2,6 +2,7 @@
  * AI 运营方案：菜单/毛利/预算/多平台 → 六块结构化 JSON
  */
 import {
+  buildAiOpsRoiLookupForPrompt,
   ensureMarketingRoiFallback,
   isAiOpsPlanResultUsable,
   normalizeAiOpsPlanResult,
@@ -305,7 +306,8 @@ export async function runAiOpsPlanCore(
       : '菜单价目：未提供（请按类目与平台常规套餐结构规划，勿捏造具体菜名）',
     body.competitorSummary ? `竞品摘要：\n${body.competitorSummary}` : '',
     body.goalsNote ? `商家补充目标：${body.goalsNote}` : '',
-    '请生成完整六块方案 JSON（字段简洁）；ROI 说明须写各平台行业中位转化区间与依据，禁止「假设转化率」；须含 budgetLines；hourlySchedule 仅直播。',
+    buildAiOpsRoiLookupForPrompt(platforms, body.industryPath),
+    '请生成完整六块方案 JSON（字段简洁）；roiAnalysis 必须按上方【转化率查询结果】测算 GMV/订单/ROI，说明列写清平台×类目转化区间，禁止「假设转化率」；须含 budgetLines；hourlySchedule 仅直播。',
   ]
     .filter(Boolean)
     .join('\n\n')
@@ -356,7 +358,7 @@ export async function runAiOpsPlanCore(
       }
     }
 
-    plan = ensureMarketingRoiFallback(plan)
+    plan = ensureMarketingRoiFallback(plan, { industryPath: body.industryPath })
 
     plan = await enrichCombosFromProductPlan(
       plan,

@@ -34,6 +34,7 @@ import {
   exportAiOpsPlanWord,
 } from '../lib/aiOpsPlanExport'
 import {
+  AI_OPS_MERCHANT_CATEGORIES,
   AI_OPS_PLAN_TABS,
   aiOpsPlanToMarkdown,
   ensureMarketingRoiFallback,
@@ -135,6 +136,54 @@ const GOAL_TEMPLATES: Array<{ id: string; label: string; note: string; budget: s
     label: '直播冲刺',
     note: '安排 2～4 场本地直播，配合直播投流与货盘秒杀。',
     budget: '40000',
+  },
+  {
+    id: 'fukou',
+    label: '复购锁客',
+    note: '老客召回与储值/次卡，私域+短视频种草，提高 30 日复购率。',
+    budget: '18000',
+  },
+  {
+    id: 'kaidian',
+    label: '新店冷启',
+    note: '开业 30 天冷启动：探店达人+点评好评+引流套餐，快速堆评价与核销。',
+    budget: '35000',
+  },
+  {
+    id: 'jieri',
+    label: '节日大促',
+    note: '围绕节点（情人节/圣诞/春节等）做主题套餐与限时秒杀，集中投放短视频。',
+    budget: '45000',
+  },
+  {
+    id: 'pinpai',
+    label: '品牌种草',
+    note: '小红书/视频号内容种草为主，弱转化强心智，配合少量到店转化链路。',
+    budget: '28000',
+  },
+  {
+    id: 'benditui',
+    label: '本地推放量',
+    note: '信息流/本地推为主、达人为辅，按平台中位转化控 CPA，日更素材测款。',
+    budget: '32000',
+  },
+  {
+    id: 'pingjia',
+    label: '评价口碑',
+    note: '冲好评与差评治理，内容侧曝光招牌菜，转化侧引导晒图核销。',
+    budget: '15000',
+  },
+  {
+    id: 'tuangou',
+    label: '团购冲量',
+    note: '主推高性价比团购套餐，美团/抖音双端货盘对齐，冲核销单量。',
+    budget: '22000',
+  },
+  {
+    id: 'shequn',
+    label: '社群私域',
+    note: '视频号+社群裂变，老带新券与到店核销，降低公域获客依赖。',
+    budget: '16000',
   },
 ]
 
@@ -1056,6 +1105,10 @@ export default function AiOpsPlanPage() {
       setErr('请填写活动起止日期')
       return
     }
+    if (partner && partnerMode === 'prospect' && !editIntel.industryPath.trim()) {
+      setErr('洽谈预览请先选择商家类目（用于按行业查询各平台转化率测算 ROI）')
+      return
+    }
     setLoading(true)
     setErr(null)
     try {
@@ -1065,7 +1118,11 @@ export default function AiOpsPlanPage() {
         setErr(r.message)
         return
       }
-      setPlan(ensureMarketingRoiFallback(r.plan))
+      setPlan(
+        ensureMarketingRoiFallback(r.plan, {
+          industryPath: input.industryPath,
+        }),
+      )
       setTab('ops')
       const item = saveAiOpsPlanHistoryItem(scopeId, input, r.plan)
       setHistory(loadAiOpsPlanHistory(scopeId))
@@ -1375,13 +1432,48 @@ export default function AiOpsPlanPage() {
                 />
               </label>
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-gray-700">经营类目</span>
+                <span className="mb-1 block text-xs font-medium text-gray-700">
+                  商家类目{partnerMode === 'prospect' ? '（必选）' : ''}
+                </span>
+                <select
+                  value={
+                    AI_OPS_MERCHANT_CATEGORIES.find((c) => c.path === editIntel.industryPath)?.id ||
+                    (editIntel.industryPath ? '__custom__' : '')
+                  }
+                  onChange={(e) => {
+                    const id = e.target.value
+                    if (!id) {
+                      patchEditIntel({ industryPath: '' })
+                      return
+                    }
+                    if (id === '__custom__') return
+                    const hit = AI_OPS_MERCHANT_CATEGORIES.find((c) => c.id === id)
+                    if (hit) patchEditIntel({ industryPath: hit.path })
+                  }}
+                  className="mb-1.5 w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                >
+                  <option value="">请选择商家类目</option>
+                  {AI_OPS_MERCHANT_CATEGORIES.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
+                    </option>
+                  ))}
+                  {editIntel.industryPath &&
+                  !AI_OPS_MERCHANT_CATEGORIES.some((c) => c.path === editIntel.industryPath) ? (
+                    <option value="__custom__">自定义：{editIntel.industryPath}</option>
+                  ) : null}
+                </select>
                 <input
                   value={editIntel.industryPath}
                   onChange={(e) => patchEditIntel({ industryPath: e.target.value })}
                   className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  placeholder="如 餐饮 > 火锅"
+                  placeholder="或细化路径，如 餐饮 > 火锅烧烤"
                 />
+                {partnerMode === 'prospect' ? (
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    类目用于查询该业态在各投放平台的中位核销转化率，进而测算 ROI。
+                  </p>
+                ) : null}
               </label>
               <div className="grid grid-cols-3 gap-2">
                 {(
@@ -1584,7 +1676,12 @@ export default function AiOpsPlanPage() {
                       onClick={() => {
                         {
                           const n = normalizeAiOpsPlanResult(h.plan) || h.plan
-                          setPlan(ensureMarketingRoiFallback(n))
+                          setPlan(
+                            ensureMarketingRoiFallback(n, {
+                              industryPath:
+                                editIntel.industryPath || intel.industryPath || undefined,
+                            }),
+                          )
                         }
                         setTab('ops')
                         setPlatforms(
