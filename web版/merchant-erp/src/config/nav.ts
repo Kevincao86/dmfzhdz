@@ -8,6 +8,7 @@ import {
   Megaphone,
   Package,
   Settings,
+  Sparkles,
   Store,
   UserPlus,
   Wallet,
@@ -47,6 +48,14 @@ export const NAV_ITEMS: NavItem[] = [
       { path: '/reviews', label: '评价管理' },
       { path: '/geo', label: 'GEO运营优化' },
       { path: '/operation/competitors', label: '竞争对手分析' },
+    ],
+  },
+  {
+    /** 分组键，非真实路由；子项 path 保持不变 */
+    path: '/ai-create',
+    label: 'AI 创作',
+    icon: Sparkles,
+    children: [
       { path: '/operation/ai-ops-plan', label: 'AI 运营方案' },
       { path: '/ai-image', label: 'AI 视觉工坊' },
       { path: '/ai-operation/content', label: '爆款 Brief 生成' },
@@ -95,6 +104,11 @@ function partnerOperationChildren(baseChildren: NavChild[]): NavChild[] {
   return [...xingxuan, ...kept]
 }
 
+/** 服务商：AI 创作仅保留仍可用的入口（排除星选已覆盖的三项） */
+function partnerAiCreateChildren(baseChildren: NavChild[]): NavChild[] {
+  return baseChildren.filter((c) => !isPartnerExcludedOperationPath(c.path))
+}
+
 function partnerFinanceChildren(isParent: boolean): NavChild[] {
   const base: NavChild[] = [
     { path: '/finance', label: '财务对账' },
@@ -118,6 +132,11 @@ export function filterNavItemsForPartnerEdition(
       if (item.path === '/operation' && item.children?.length) {
         return { ...item, children: partnerOperationChildren(item.children) }
       }
+      if (item.path === '/ai-create' && item.children?.length) {
+        const children = partnerAiCreateChildren(item.children)
+        if (children.length === 0) return null
+        return { ...item, children }
+      }
       if (!item.children?.length) {
         if (item.path === '/recruitment') return null
         return item
@@ -131,6 +150,15 @@ export function filterNavItemsForPartnerEdition(
 
 export function pathActive(pathname: string, itemPath: string) {
   if (itemPath === '/home') return pathname === '/home'
+  /** 分组键非真实路由，勿用前缀匹配 */
+  if (itemPath === '/ai-create') return false
+  /**
+   * 「运营」父 path 与「AI 创作」子项 `/operation/ai-ops-plan` 共用前缀，
+   * 父级高亮/展开只认子项，避免误开运营组。
+   */
+  if (itemPath === '/operation') {
+    return pathname === '/operation'
+  }
   return pathname === itemPath || pathname.startsWith(`${itemPath}/`)
 }
 

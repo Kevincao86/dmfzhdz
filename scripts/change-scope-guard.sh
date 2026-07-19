@@ -34,6 +34,7 @@ list_scopes() {
   merchant_ai_ops_mix 商家 ERP：AI运营方案 + AI混剪去重
   erp_pay_points       ERP小程序支付 + 星选积分余额对齐
   mp_hall_region       小程序招募/推荐大厅城市自动定位
+  merchant_nav         商家/服务商 ERP 侧栏导航信息架构
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -227,6 +228,13 @@ pages/recommend/recommend
 mpPrivacyPageMixin
 config.release.js
 mpBuild.js
+change-scope-guard
+PAT
+      ;;
+    merchant_nav)
+      cat <<'PAT'
+config/nav.ts
+MeooLayout.tsx
 change-scope-guard
 PAT
       ;;
