@@ -175,7 +175,7 @@ const GOAL_TEMPLATES: Array<{ id: string; label: string; note: string; budget: s
   {
     id: 'jieri',
     label: '节日大促',
-    note: '围绕节点（情人节/圣诞/春节等）做主题套餐与限时秒杀，集中投放短视频。',
+    note: '围绕节点做主题套餐与限时秒杀，集中投放短视频。',
     budget: '45000',
   },
   {
@@ -209,6 +209,114 @@ const GOAL_TEMPLATES: Array<{ id: string; label: string; note: string; budget: s
     budget: '16000',
   },
 ]
+
+type FestivalTag = { id: string; label: string; date?: string }
+
+/** 店庆/周年庆：不依赖日历，始终可选 */
+const EXTRA_PROMO_TAGS: FestivalTag[] = [
+  { id: 'dianqing', label: '店庆' },
+  { id: 'zhounian', label: '周年庆' },
+]
+
+/** 公历固定促销节点（月-日） */
+const FIXED_PROMO_MD: Array<{ id: string; label: string; md: string }> = [
+  { id: 'yuandan', label: '元旦', md: '01-01' },
+  { id: 'qingren', label: '情人节', md: '02-14' },
+  { id: 'funv', label: '妇女节', md: '03-08' },
+  { id: 'wuyi', label: '劳动节', md: '05-01' },
+  { id: 'ertong', label: '儿童节', md: '06-01' },
+  { id: 'qixi_solar', label: '七夕（公历习惯档）', md: '08-07' },
+  { id: 'jiaoshi', label: '教师节', md: '09-10' },
+  { id: 'guoqing', label: '国庆节', md: '10-01' },
+  { id: 'shuang11', label: '双十一', md: '11-11' },
+  { id: 'shuang12', label: '双十二', md: '12-12' },
+  { id: 'shengdan', label: '圣诞节', md: '12-25' },
+]
+
+/**
+ * 农历节日对应公历日期（本地生活促销常用；覆盖近三年）。
+ * 清明为节气，按公历近似写入。
+ */
+const LUNAR_PROMO_BY_YEAR: Record<number, Array<{ id: string; label: string; md: string }>> = {
+  2025: [
+    { id: 'chunjie', label: '春节', md: '01-29' },
+    { id: 'yuanxiao', label: '元宵节', md: '02-12' },
+    { id: 'qingming', label: '清明节', md: '04-04' },
+    { id: 'duanwu', label: '端午节', md: '05-31' },
+    { id: 'qixi', label: '七夕', md: '08-29' },
+    { id: 'zhongqiu', label: '中秋节', md: '10-06' },
+    { id: 'chongyang', label: '重阳节', md: '10-29' },
+  ],
+  2026: [
+    { id: 'chunjie', label: '春节', md: '02-17' },
+    { id: 'yuanxiao', label: '元宵节', md: '03-03' },
+    { id: 'qingming', label: '清明节', md: '04-05' },
+    { id: 'duanwu', label: '端午节', md: '06-19' },
+    { id: 'qixi', label: '七夕', md: '08-19' },
+    { id: 'zhongqiu', label: '中秋节', md: '09-25' },
+    { id: 'chongyang', label: '重阳节', md: '10-18' },
+  ],
+  2027: [
+    { id: 'chunjie', label: '春节', md: '02-06' },
+    { id: 'yuanxiao', label: '元宵节', md: '02-20' },
+    { id: 'qingming', label: '清明节', md: '04-05' },
+    { id: 'duanwu', label: '端午节', md: '06-09' },
+    { id: 'qixi', label: '七夕', md: '08-08' },
+    { id: 'zhongqiu', label: '中秋节', md: '09-15' },
+    { id: 'chongyang', label: '重阳节', md: '10-08' },
+  ],
+}
+
+function parseYmd(s: string): { y: number; m: number; d: number } | null {
+  const m = String(s || '')
+    .trim()
+    .match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (!m) return null
+  return { y: Number(m[1]), m: Number(m[2]), d: Number(m[3]) }
+}
+
+function ymdCmp(a: string, b: string): number {
+  return a.slice(0, 10).localeCompare(b.slice(0, 10))
+}
+
+/** 抓取活动周期内的节日节点（公历固定 + 农历近似） */
+function listFestivalsInPeriod(periodStart: string, periodEnd: string): FestivalTag[] {
+  const start = String(periodStart || '').slice(0, 10)
+  const end = String(periodEnd || '').slice(0, 10)
+  if (!start || !end || ymdCmp(start, end) > 0) return []
+  const ys = parseYmd(start)?.y
+  const ye = parseYmd(end)?.y
+  if (ys == null || ye == null) return []
+  const out: FestivalTag[] = []
+  const seen = new Set<string>()
+  for (let y = ys; y <= ye; y++) {
+    const lunar = LUNAR_PROMO_BY_YEAR[y] || []
+    const all = [
+      ...FIXED_PROMO_MD.map((x) => ({ ...x, date: `${y}-${x.md}` })),
+      ...lunar.map((x) => ({ ...x, date: `${y}-${x.md}` })),
+    ]
+    for (const f of all) {
+      if (ymdCmp(f.date, start) < 0 || ymdCmp(f.date, end) > 0) continue
+      const id = `${f.id}-${f.date}`
+      if (seen.has(id)) continue
+      seen.add(id)
+      out.push({ id, label: f.label, date: f.date })
+    }
+  }
+  out.sort((a, b) => ymdCmp(a.date || '', b.date || ''))
+  return out
+}
+
+function buildJieriGoalsNote(
+  selectedLabels: string[],
+  periodStart: string,
+  periodEnd: string,
+): string {
+  const nodes = selectedLabels.length ? selectedLabels.join('、') : '所选节日/店庆节点'
+  const range =
+    periodStart && periodEnd ? `活动周期 ${periodStart}～${periodEnd}。` : ''
+  return `围绕节点（${nodes}）做主题套餐与限时秒杀，集中投放短视频。${range}`.trim()
+}
 
 function TableShell({
   headers,
@@ -868,6 +976,8 @@ export default function AiOpsPlanPage() {
   const [periodEnd, setPeriodEnd] = useState(period0.end)
   const [goalsNote, setGoalsNote] = useState('')
   const [goalTemplateId, setGoalTemplateId] = useState<string | null>(null)
+  /** 节日大促：周期内节日 + 店庆/周年庆已选标签 id */
+  const [selectedFestivalIds, setSelectedFestivalIds] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [plan, setPlan] = useState<AiOpsPlanResult | null>(null)
@@ -1002,6 +1112,38 @@ export default function AiOpsPlanPage() {
         (s.city || '').toLowerCase().includes(q),
     )
   }, [storeCatalog, storeSearch])
+
+  const periodFestivalTags = useMemo(
+    () => listFestivalsInPeriod(periodStart, periodEnd),
+    [periodStart, periodEnd],
+  )
+
+  const jieriSelectableTags = useMemo(
+    () => [...periodFestivalTags, ...EXTRA_PROMO_TAGS],
+    [periodFestivalTags],
+  )
+
+  /** 周期变化时：去掉已不在列表中的节日勾选，并刷新节日大促文案 */
+  useEffect(() => {
+    if (goalTemplateId !== 'jieri') return
+    const allow = new Set(jieriSelectableTags.map((t) => t.id))
+    setSelectedFestivalIds((prev) => {
+      const next = prev.filter((id) => allow.has(id))
+      const labels = jieriSelectableTags.filter((t) => next.includes(t.id)).map((t) => t.label)
+      setGoalsNote(buildJieriGoalsNote(labels, periodStart, periodEnd))
+      return next
+    })
+  }, [goalTemplateId, jieriSelectableTags, periodStart, periodEnd])
+
+  const toggleFestivalTag = (tag: FestivalTag) => {
+    setSelectedFestivalIds((prev) => {
+      const on = prev.includes(tag.id)
+      const next = on ? prev.filter((x) => x !== tag.id) : [...prev, tag.id]
+      const labels = jieriSelectableTags.filter((t) => next.includes(t.id)).map((t) => t.label)
+      setGoalsNote(buildJieriGoalsNote(labels, periodStart, periodEnd))
+      return next
+    })
+  }
 
   const l1CatOptions = useMemo(() => pickerChildrenOf(catTree, null), [catTree])
   const l2CatOptions = useMemo(() => (cat1 ? pickerChildrenOf(catTree, cat1) : []), [catTree, cat1])
@@ -1392,8 +1534,14 @@ export default function AiOpsPlanPage() {
                   type="button"
                   onClick={() => {
                     setGoalTemplateId(t.id)
-                    setGoalsNote(t.note)
                     setBudgetYuan(t.budget)
+                    if (t.id === 'jieri') {
+                      setSelectedFestivalIds([])
+                      setGoalsNote(buildJieriGoalsNote([], periodStart, periodEnd))
+                    } else {
+                      setSelectedFestivalIds([])
+                      setGoalsNote(t.note)
+                    }
                   }}
                   className={cn(
                     'rounded-full border px-2.5 py-1 text-xs transition',
@@ -1406,6 +1554,48 @@ export default function AiOpsPlanPage() {
                 </button>
               ))}
             </div>
+            {goalTemplateId === 'jieri' ? (
+              <div className="rounded-lg border border-rose-100 bg-rose-50/50 p-2.5">
+                <p className="mb-1.5 text-[11px] leading-relaxed text-rose-900/80">
+                  已根据活动周期抓取节日节点，请点选标签；另可加「店庆 / 周年庆」。改日期后列表会自动刷新。
+                </p>
+                {!periodStart || !periodEnd ? (
+                  <p className="text-[11px] text-amber-800">请先填写下方开始/结束日期以抓取节日。</p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {periodFestivalTags.length === 0 ? (
+                      <span className="text-[11px] text-gray-500">
+                        该周期内无常见节日，仍可选店庆/周年庆。
+                      </span>
+                    ) : null}
+                    {jieriSelectableTags.map((tag) => {
+                      const on = selectedFestivalIds.includes(tag.id)
+                      return (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          onClick={() => toggleFestivalTag(tag)}
+                          className={cn(
+                            'rounded-full border px-2.5 py-1 text-xs transition',
+                            on
+                              ? 'border-rose-500 bg-rose-100 text-rose-900'
+                              : 'border-gray-200 bg-white text-gray-700 hover:border-rose-300',
+                          )}
+                          title={tag.date || tag.label}
+                        >
+                          {tag.label}
+                          {tag.date ? (
+                            <span className="ml-1 text-[10px] opacity-70">
+                              {tag.date.slice(5)}
+                            </span>
+                          ) : null}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
 
           <div className="space-y-2 rounded-lg border border-gray-100 bg-gray-50/80 p-3">
@@ -1851,6 +2041,13 @@ export default function AiOpsPlanPage() {
               />
             </label>
           </div>
+          {goalTemplateId === 'jieri' ? (
+            <p className="text-[11px] text-rose-800/80">
+              节日大促：本周期抓到 {periodFestivalTags.length} 个节日节点
+              {selectedFestivalIds.length ? `，已选 ${selectedFestivalIds.length} 项` : ''}
+              （含店庆/周年庆可选）。上方标签区可勾选。
+            </p>
+          ) : null}
 
           <label className="block">
             <span className="mb-1.5 block text-sm font-medium text-gray-700">补充目标（可选）</span>
