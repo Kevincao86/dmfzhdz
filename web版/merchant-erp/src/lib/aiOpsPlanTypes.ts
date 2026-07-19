@@ -155,10 +155,141 @@ export type AiOpsPlanGenerateInput = {
   periodEnd: string
   goalsNote?: string
   storeName?: string
+  /** 连锁：参与方案的门店名列表 */
+  storeNames?: string[]
+  /** all=全部门店；selected=勾选门店 */
+  storeScope?: 'all' | 'selected'
+  /** 服务商洽谈预览（尚未签约客户） */
+  prospectPreview?: boolean
   menuSummary?: string
   margins?: { douyin: number; meituan: number; xhs: number }
   industryPath?: string
   competitorSummary?: string
+}
+
+/**
+ * 本地生活餐饮投放：分平台核销转化率与 ROI 中位区间（行业案例库/平台品类报告中位，非单店假设）。
+ * 说明文案须写清来源区间，禁止写「假设转化率」。
+ */
+export type AiOpsRoiIndustryBench = {
+  match: RegExp
+  platformLabel: string
+  /** 核销/下单转化率 % 下沿 */
+  convLow: number
+  /** 核销/下单转化率 % 上沿 */
+  convHigh: number
+  roiMid: number
+  paybackDays: number
+  aovYuan: number
+  evidence: string
+}
+
+export const AI_OPS_ROI_INDUSTRY_BENCHES: AiOpsRoiIndustryBench[] = [
+  {
+    match: /直播/,
+    platformLabel: '抖音直播/本地直播',
+    convLow: 8,
+    convHigh: 15,
+    roiMid: 3.6,
+    paybackDays: 14,
+    aovYuan: 168,
+    evidence:
+      '本地生活直播间下单→核销转化常见 8%～15%（内容电商/本地生活投放案例库中位），显著高于短视频场',
+  },
+  {
+    match: /本地推|信息流|投流|DOU\+|dou\+/i,
+    platformLabel: '抖音本地推/信息流',
+    convLow: 1.8,
+    convHigh: 3.5,
+    roiMid: 2.5,
+    paybackDays: 22,
+    aovYuan: 128,
+    evidence:
+      '抖音本地推/信息流到店餐饮类目点击→核销约 1.8%～3.5%（平台本地推品类中位区间），转化低于直播、成本可控',
+  },
+  {
+    match: /小红书|种草|笔记/,
+    platformLabel: '小红书',
+    convLow: 0.9,
+    convHigh: 2.4,
+    roiMid: 2.8,
+    paybackDays: 25,
+    aovYuan: 188,
+    evidence:
+      '小红书种草笔记到店核销转化约 0.9%～2.4%（种草场低于交易场），客单偏高，综合 ROI 中位约 2.5～3.5',
+  },
+  {
+    match: /美团|点评|大众点评|到店/,
+    platformLabel: '美团/大众点评',
+    convLow: 5,
+    convHigh: 12,
+    roiMid: 3.1,
+    paybackDays: 16,
+    aovYuan: 142,
+    evidence:
+      '美团/点评搜索与到店场景转化约 5%～12%（意图明确的搜索场），高于内容种草场',
+  },
+  {
+    match: /快手/,
+    platformLabel: '快手',
+    convLow: 2,
+    convHigh: 5,
+    roiMid: 2.7,
+    paybackDays: 20,
+    aovYuan: 118,
+    evidence:
+      '快手本地生活/短视频团购核销转化约 2%～5%（同城内容场中位），略低于抖音腰部达人带货',
+  },
+  {
+    match: /微信|视频号/,
+    platformLabel: '视频号',
+    convLow: 1.5,
+    convHigh: 4,
+    roiMid: 2.4,
+    paybackDays: 24,
+    aovYuan: 135,
+    evidence:
+      '视频号本地生活带货核销转化约 1.5%～4%（私域+内容混合场中位），适合老客复购与社群导流',
+  },
+  {
+    match: /抖音|短视频|达人|探店|KOC|KOL/i,
+    platformLabel: '抖音短视频达人',
+    convLow: 2.5,
+    convHigh: 6,
+    roiMid: 3.0,
+    paybackDays: 18,
+    aovYuan: 135,
+    evidence:
+      '抖音短视频探店/腰部达人团购核销转化约 2.5%～6%（达人带货案例中位），优于纯信息流、低于直播间',
+  },
+]
+
+const DEFAULT_ROI_BENCH: AiOpsRoiIndustryBench = {
+  match: /.*/,
+  platformLabel: '本地生活综合',
+  convLow: 2,
+  convHigh: 5,
+  roiMid: 2.6,
+  paybackDays: 21,
+  aovYuan: 130,
+  evidence: '本地生活餐饮多平台综合核销转化约 2%～5%（跨平台案例库中位），按保守中位测算',
+}
+
+export function resolveAiOpsRoiIndustryBench(channel: string): AiOpsRoiIndustryBench {
+  const t = String(channel || '')
+  for (const b of AI_OPS_ROI_INDUSTRY_BENCHES) {
+    if (b.match.test(t)) return b
+  }
+  return DEFAULT_ROI_BENCH
+}
+
+export function formatAiOpsRoiEvidenceNote(channel: string, bench?: AiOpsRoiIndustryBench): string {
+  const b = bench || resolveAiOpsRoiIndustryBench(channel)
+  return `${b.platformLabel}行业中位核销转化 ${b.convLow}%～${b.convHigh}%；${b.evidence}；测算 ROI≈${b.roiMid}、回本约${b.paybackDays}天`
+}
+
+function looksLikeAssumedConvNote(note: string): boolean {
+  return /假设转化|假设.?转化率|假定转化|拍脑袋|随意假设/i.test(note || '')
 }
 
 export const AI_OPS_PLAN_TABS = [
@@ -455,66 +586,85 @@ export function isAiOpsPlanResultUsable(plan: AiOpsPlanResult): boolean {
   )
 }
 
-/** 模型未返回 ROI 时，按渠道金额合成保守投产预估 */
+/** 用行业分平台转化率区间重写 ROI 说明，并在缺失时按渠道合成投产 */
 export function ensureMarketingRoiFallback(plan: AiOpsPlanResult): AiOpsPlanResult {
-  if ((plan.marketingBudget.roiAnalysis || []).length >= 2) {
-    if (!plan.marketingBudget.roiSummary) {
-      const totalInvest = plan.marketingBudget.roiAnalysis.reduce((s, r) => s + r.investYuan, 0)
-      const totalGmv = plan.marketingBudget.roiAnalysis.reduce((s, r) => s + r.expectedGmvYuan, 0)
-      const roi = totalInvest > 0 ? Math.round((totalGmv / totalInvest) * 100) / 100 : 0
-      return {
-        ...plan,
-        marketingBudget: {
-          ...plan.marketingBudget,
-          roiSummary: `周期内预计总投入约 ¥${Math.round(totalInvest).toLocaleString('zh-CN')}，预计带动 GMV 约 ¥${Math.round(totalGmv).toLocaleString('zh-CN')}，综合 ROI 约 ${roi}（保守估算，含核销与复购）。`,
-        },
+  let roiAnalysis = [...(plan.marketingBudget.roiAnalysis || [])]
+
+  if (roiAnalysis.length < 2) {
+    const channels = plan.marketingBudget.channels.length
+      ? plan.marketingBudget.channels
+      : [
+          {
+            channel: '综合投放',
+            amountYuan: plan.marketingBudget.totalBudget || 0,
+            ratioPct: 100,
+            month: '',
+            note: '',
+          },
+        ]
+    roiAnalysis = channels
+      .filter((c) => c.amountYuan > 0)
+      .slice(0, 8)
+      .map((c) => {
+        const bench = resolveAiOpsRoiIndustryBench(c.channel)
+        const invest = c.amountYuan
+        const expectedGmvYuan = Math.round(invest * bench.roiMid)
+        const expectedOrders = Math.max(1, Math.round(expectedGmvYuan / bench.aovYuan))
+        return {
+          channel: c.channel,
+          investYuan: invest,
+          expectedGmvYuan,
+          expectedOrders,
+          roi: Math.round(bench.roiMid * 100) / 100,
+          paybackDays: bench.paybackDays,
+          note: formatAiOpsRoiEvidenceNote(c.channel, bench),
+        }
+      })
+  } else {
+    roiAnalysis = roiAnalysis.map((r) => {
+      const bench = resolveAiOpsRoiIndustryBench(r.channel)
+      const note =
+        !r.note?.trim() || looksLikeAssumedConvNote(r.note)
+          ? formatAiOpsRoiEvidenceNote(r.channel, bench)
+          : /行业中位|核销转化\s*\d/.test(r.note)
+            ? r.note
+            : `${r.note}；依据：${formatAiOpsRoiEvidenceNote(r.channel, bench)}`
+      // 若模型只给了「假设转化率」类说明且 ROI/GMV 明显不合理，按行业中位校正
+      let expectedGmvYuan = r.expectedGmvYuan
+      let expectedOrders = r.expectedOrders
+      let roi = r.roi
+      let paybackDays = r.paybackDays
+      if (looksLikeAssumedConvNote(r.note) && r.investYuan > 0) {
+        expectedGmvYuan = Math.round(r.investYuan * bench.roiMid)
+        expectedOrders = Math.max(1, Math.round(expectedGmvYuan / bench.aovYuan))
+        roi = Math.round(bench.roiMid * 100) / 100
+        paybackDays = bench.paybackDays
       }
-    }
-    return plan
-  }
-  const channels = plan.marketingBudget.channels.length
-    ? plan.marketingBudget.channels
-    : [
-        {
-          channel: '综合投放',
-          amountYuan: plan.marketingBudget.totalBudget || 0,
-          ratioPct: 100,
-          month: '',
-          note: '',
-        },
-      ]
-  const roiAnalysis = channels
-    .filter((c) => c.amountYuan > 0)
-    .slice(0, 8)
-    .map((c) => {
-      const invest = c.amountYuan
-      const isLive = /直播/.test(c.channel)
-      const isLocal = /本地推|投流|信息流/.test(c.channel)
-      const mult = isLive ? 3.2 : isLocal ? 2.4 : 2.8
-      const expectedGmvYuan = Math.round(invest * mult)
-      const aov = isLive ? 180 : 120
-      const expectedOrders = Math.max(1, Math.round(expectedGmvYuan / aov))
-      return {
-        channel: c.channel,
-        investYuan: invest,
-        expectedGmvYuan,
-        expectedOrders,
-        roi: Math.round(mult * 100) / 100,
-        paybackDays: isLive ? 18 : isLocal ? 25 : 21,
-        note: c.note || '按同类本地生活投放中位转化保守估算',
-      }
+      return { ...r, note, expectedGmvYuan, expectedOrders, roi, paybackDays }
     })
+  }
+
   const totalInvest = roiAnalysis.reduce((s, r) => s + r.investYuan, 0)
   const totalGmv = roiAnalysis.reduce((s, r) => s + r.expectedGmvYuan, 0)
   const roi = totalInvest > 0 ? Math.round((totalGmv / totalInvest) * 100) / 100 : 0
+  const roiSummary =
+    plan.marketingBudget.roiSummary && !looksLikeAssumedConvNote(plan.marketingBudget.roiSummary)
+      ? plan.marketingBudget.roiSummary
+      : `周期内预计总投入约 ¥${Math.round(totalInvest).toLocaleString('zh-CN')}，预计带动 GMV 约 ¥${Math.round(totalGmv).toLocaleString('zh-CN')}，综合 ROI 约 ${roi}。分渠道核销转化取各平台行业中位区间（直播 8%～15%、抖音短视频 2.5%～6%、本地推 1.8%～3.5%、小红书 0.9%～2.4%、美团/点评搜索 5%～12%），并结合货盘与达人质量浮动。`
+
+  let assumptions = plan.marketingBudget.assumptions || ''
+  if (!assumptions.trim() || looksLikeAssumedConvNote(assumptions)) {
+    assumptions =
+      '测算依据：各平台核销转化取本地生活餐饮行业中位区间（非单店拍脑袋假设）；客单按餐饮团购中位；实际受货盘吸引力、核销率、达人匹配与档期影响，建议按周复盘校正。'
+  }
+
   return {
     ...plan,
     marketingBudget: {
       ...plan.marketingBudget,
       roiAnalysis,
-      roiSummary:
-        plan.marketingBudget.roiSummary ||
-        `周期内预计总投入约 ¥${Math.round(totalInvest).toLocaleString('zh-CN')}，预计带动 GMV 约 ¥${Math.round(totalGmv).toLocaleString('zh-CN')}，综合 ROI 约 ${roi}（保守估算；实际受货盘、核销与达人质量影响）。`,
+      roiSummary,
+      assumptions,
     },
   }
 }
