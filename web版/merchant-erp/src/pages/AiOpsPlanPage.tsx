@@ -6,6 +6,7 @@ import {
   Download,
   History,
   Loader2,
+  Search,
   Sparkles,
   Trash2,
 } from 'lucide-react'
@@ -14,6 +15,8 @@ import { Link } from 'react-router-dom'
 import RecruitmentPlatformPicker from '../components/recruitment/RecruitmentPlatformPicker'
 import { usePartnerClients } from '../context/PartnerClientContext'
 import { isPartnerEdition } from '../lib/appEdition'
+import { readMerchantSession } from '../lib/merchantSession'
+import { getDouyinStores, type DouyinStoreRow } from '../services/douyinMerchantApi'
 import {
   deleteAiOpsPlanHistoryItem,
   emptyAiOpsPlanEditableIntel,
@@ -105,6 +108,35 @@ async function fetchOnlineListedPackagesSummary(
   if (!blocks.length) return ''
   return `【已上架套餐·来自商品列表】\n${blocks.join('\n\n')}`
 }
+
+const PROSPECT_SCOPE_CLIENT = '__prospect_blank__'
+
+const GOAL_TEMPLATES: Array<{ id: string; label: string; note: string; budget: string }> = [
+  {
+    id: 'xin',
+    label: '拉新到店',
+    note: '提升新客到店与核销，主推引流款与周末场，控制获客成本占比。',
+    budget: '30000',
+  },
+  {
+    id: 'zhoumo',
+    label: '冲周末堂食',
+    note: '聚焦周五至周日堂食高峰，短视频+本地推组合拉满翻台。',
+    budget: '25000',
+  },
+  {
+    id: 'cost',
+    label: '控达人成本',
+    note: '腰尾部达人与 KOC 为主，压缩头部占比，保证 ROI 中位以上。',
+    budget: '20000',
+  },
+  {
+    id: 'live',
+    label: '直播冲刺',
+    note: '安排 2～4 场本地直播，配合直播投流与货盘秒杀。',
+    budget: '40000',
+  },
+]
 
 function TableShell({
   headers,
@@ -629,6 +661,9 @@ function ResultPanel({
         {(plan.marketingBudget.roiAnalysis || []).length ? (
           <div>
             <h3 className="mb-2 text-sm font-semibold text-gray-900">ROI 分渠道明细</h3>
+            <p className="mb-2 text-[11px] leading-relaxed text-gray-500">
+              说明列须为各平台行业中位核销转化区间与依据（如抖音短视频 2.5%～6%、直播 8%～15%），不再使用「假设转化率」。
+            </p>
             <TableShell
               headers={['渠道', '投入(元)', '预计GMV', '预计订单', 'ROI', '回本(天)', '说明']}
             >
@@ -652,7 +687,7 @@ function ResultPanel({
         )}
         {plan.marketingBudget.assumptions ? (
           <p className="text-sm text-gray-600">
-            <span className="font-medium text-gray-800">假设 · </span>
+            <span className="font-medium text-gray-800">测算依据 · </span>
             {plan.marketingBudget.assumptions}
           </p>
         ) : null}
@@ -760,6 +795,7 @@ export default function AiOpsPlanPage() {
   const [periodStart, setPeriodStart] = useState(period0.start)
   const [periodEnd, setPeriodEnd] = useState(period0.end)
   const [goalsNote, setGoalsNote] = useState('')
+  const [goalTemplateId, setGoalTemplateId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [plan, setPlan] = useState<AiOpsPlanResult | null>(null)
@@ -770,6 +806,14 @@ export default function AiOpsPlanPage() {
   const [editIntel, setEditIntel] = useState<AiOpsPlanEditableIntel>(() => emptyAiOpsPlanEditableIntel())
   /** 商家版：无菜单时用已上架套餐规划的提示 */
   const [menuFallbackHint, setMenuFallbackHint] = useState<string | null>(null)
+  /** 服务商：客户方案 | 洽谈空白预览 */
+  const [partnerMode, setPartnerMode] = useState<'client' | 'prospect'>('client')
+  const [storeScope, setStoreScope] = useState<'all' | 'selected'>('all')
+  const [storeCatalog, setStoreCatalog] = useState<DouyinStoreRow[]>([])
+  const [storeLoading, setStoreLoading] = useState(false)
+  const [storeSearch, setStoreSearch] = useState('')
+  const [selectedStoreIds, setSelectedStoreIds] = useState<string[]>([])
+  const [manualStoreNames, setManualStoreNames] = useState('')
 
   const intel = useMemo(() => loadMerchantIntelSnapshot(), [plan, loading])
 
@@ -777,9 +821,13 @@ export default function AiOpsPlanPage() {
     () =>
       resolveAiOpsPlanScopeId({
         tenantUserId,
-        partnerClientId: partner ? activeClient?.id : null,
+        partnerClientId: partner
+          ? partnerMode === 'prospect'
+            ? PROSPECT_SCOPE_CLIENT
+            : activeClient?.id || null
+          : null,
       }),
-    [tenantUserId, partner, activeClient?.id],
+    [tenantUserId, partner, partnerMode, activeClient?.id],
   )
 
   useEffect(() => {
@@ -798,12 +846,51 @@ export default function AiOpsPlanPage() {
     setHistory(loadAiOpsPlanHistory(scopeId))
   }, [scopeId])
 
-  /** FWS：切换客户时加载已保存情报，无则用本地快照预填（可改） */
+  /** 拉取连锁门店（抖音来客已认领），供多选 / 全选 */
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const tok = readMerchantSession('meoo_douyin_merchant_token')
+      if (!tok) {
+        setStoreCatalog([])
+        return
+      }
+      setStoreLoading(true)
+      const mid = readMerchantSession('meoo_douyin_merchant_id') || undefined
+      const all: DouyinStoreRow[] = []
+      for (let page = 1; page <= 8; page++) {
+        const r = await getDouyinStores({
+          accessToken: tok,
+          page,
+          pageSize: 50,
+          merchantId: mid,
+          claimScope: 'claimed',
+          relationType: 'all',
+        })
+        if (!r.ok || !r.items.length) break
+        all.push(...r.items)
+        if (all.length >= (r.total || all.length) || r.items.length < 50) break
+      }
+      if (!cancelled) {
+        setStoreCatalog(all)
+        setStoreLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  /** FWS：切换客户 / 洽谈模式时加载情报 */
   useEffect(() => {
     if (!partner) return
     const saved = loadAiOpsPlanEditableIntel(scopeId)
     if (saved) {
       setEditIntel(saved)
+      return
+    }
+    if (partnerMode === 'prospect') {
+      setEditIntel(emptyAiOpsPlanEditableIntel())
       return
     }
     const snap = loadMerchantIntelSnapshot()
@@ -821,7 +908,33 @@ export default function AiOpsPlanPage() {
       marginMeituan: snap.margins?.meituan != null ? String(snap.margins.meituan) : '',
       marginXhs: snap.margins?.xhs != null ? String(snap.margins.xhs) : '',
     })
-  }, [partner, scopeId, activeClient?.id])
+  }, [partner, scopeId, activeClient?.id, partnerMode])
+
+  const filteredStores = useMemo(() => {
+    const q = storeSearch.trim().toLowerCase()
+    if (!q) return storeCatalog
+    return storeCatalog.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        (s.address || '').toLowerCase().includes(q) ||
+        (s.city || '').toLowerCase().includes(q),
+    )
+  }, [storeCatalog, storeSearch])
+
+  const resolveSelectedStoreNames = useCallback((): string[] => {
+    if (storeScope === 'all' && storeCatalog.length) {
+      return storeCatalog.map((s) => s.name).filter(Boolean)
+    }
+    if (selectedStoreIds.length) {
+      const map = new Map(storeCatalog.map((s) => [s.id, s.name]))
+      return selectedStoreIds.map((id) => map.get(id) || id).filter(Boolean)
+    }
+    const manual = manualStoreNames
+      .split(/[,，、\n]/)
+      .map((x) => x.trim())
+      .filter(Boolean)
+    return manual
+  }, [storeScope, storeCatalog, selectedStoreIds, manualStoreNames])
 
   const flash = (msg: string) => {
     setToast(msg)
@@ -837,12 +950,26 @@ export default function AiOpsPlanPage() {
   }
 
   const buildInput = useCallback(async (): Promise<AiOpsPlanGenerateInput> => {
+    let storeNames = resolveSelectedStoreNames()
+    if (!storeNames.length && partner && editIntel.storeName.trim()) {
+      storeNames = editIntel.storeName
+        .split(/[,，、\n]/)
+        .map((x) => x.trim())
+        .filter(Boolean)
+    }
+    const storeNameJoined =
+      storeNames.length > 0
+        ? storeScope === 'all' && storeCatalog.length
+          ? `全部门店（${storeNames.length}家）`
+          : storeNames.slice(0, 6).join('、') + (storeNames.length > 6 ? '等' : '')
+        : undefined
+
     if (partner) {
       const dy = Number(editIntel.marginDouyin)
       const mt = Number(editIntel.marginMeituan)
       const xhs = Number(editIntel.marginXhs)
       let menuSummary = editIntel.menuSummary.trim() || undefined
-      if (!menuSummary && platforms.length) {
+      if (!menuSummary && platforms.length && partnerMode !== 'prospect') {
         const online = await fetchOnlineListedPackagesSummary(platforms)
         if (online) {
           menuSummary = online
@@ -859,7 +986,10 @@ export default function AiOpsPlanPage() {
         periodStart,
         periodEnd,
         goalsNote: goalsNote.trim() || undefined,
-        storeName: editIntel.storeName.trim() || undefined,
+        storeName: storeNameJoined || editIntel.storeName.trim() || undefined,
+        storeNames: storeNames.length ? storeNames : undefined,
+        storeScope: storeNames.length || storeScope === 'all' ? storeScope : undefined,
+        prospectPreview: partnerMode === 'prospect',
         menuSummary,
         industryPath: editIntel.industryPath.trim() || undefined,
         competitorSummary: editIntel.competitorSummary.trim() || undefined,
@@ -890,13 +1020,27 @@ export default function AiOpsPlanPage() {
       periodStart,
       periodEnd,
       goalsNote: goalsNote.trim() || undefined,
-      storeName: snap.storeName,
+      storeName: storeNameJoined || snap.storeName,
+      storeNames: storeNames.length ? storeNames : undefined,
+      storeScope: storeNames.length || storeScope === 'all' ? storeScope : undefined,
       menuSummary: menuSummary || undefined,
       margins: snap.margins,
       industryPath: snap.industryPath,
       competitorSummary: snap.competitorSummary,
     }
-  }, [partner, editIntel, platforms, budgetYuan, periodStart, periodEnd, goalsNote])
+  }, [
+    partner,
+    partnerMode,
+    editIntel,
+    platforms,
+    budgetYuan,
+    periodStart,
+    periodEnd,
+    goalsNote,
+    resolveSelectedStoreNames,
+    storeScope,
+    storeCatalog.length,
+  ])
 
   const onGenerate = async () => {
     if (!platforms.length) {
@@ -988,12 +1132,17 @@ export default function AiOpsPlanPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-gray-900">AI 运营方案</h1>
           <p className="mt-1 max-w-2xl text-sm text-gray-500">
             {partner
-              ? '服务商版：无需选择客户，可直接编辑门店情报并生成方案；若顶栏已选客户则按客户分别保存历史与情报草稿。'
-              : '勾选多平台并填写预算与周期，结合门店菜单与毛利生成运营方案、执行计划、预算、日历、达人明细与组品货盘。'}
+              ? '三步生成：选目标 → 填情报/门店 → 出方案。支持按客户存档，或「洽谈预览」空白填写给未签约商户看方案。'
+              : '三步生成：选目标 → 选门店（支持连锁多选/全选）→ 出方案。ROI 按各平台行业中位转化测算，非拍脑袋假设。'}
           </p>
           {partner ? (
             <p className="mt-1 text-xs text-gray-400">
-              存储范围：{activeClient ? scopeLabel : '未选客户（本机通用草稿）'}
+              存储范围：
+              {partnerMode === 'prospect'
+                ? '洽谈预览（空白草稿，与客户档案隔离）'
+                : activeClient
+                  ? scopeLabel
+                  : '未选客户（本机通用草稿）'}
             </p>
           ) : null}
         </div>
@@ -1004,43 +1153,215 @@ export default function AiOpsPlanPage() {
         ) : null}
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
         <section className="space-y-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          {partner ? (
+            <div className="flex gap-2 rounded-lg border border-gray-200 bg-gray-50 p-1">
+              {(
+                [
+                  ['client', '按客户存方案'],
+                  ['prospect', '洽谈空白预览'],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => {
+                    setPartnerMode(id)
+                    setPlan(null)
+                    setErr(null)
+                  }}
+                  className={cn(
+                    'flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition',
+                    partnerMode === id
+                      ? 'bg-white text-blue-700 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900',
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="space-y-2">
+            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
+              ① 目标模板
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {GOAL_TEMPLATES.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => {
+                    setGoalTemplateId(t.id)
+                    setGoalsNote(t.note)
+                    setBudgetYuan(t.budget)
+                  }}
+                  className={cn(
+                    'rounded-full border px-2.5 py-1 text-xs transition',
+                    goalTemplateId === t.id
+                      ? 'border-blue-500 bg-blue-50 text-blue-800'
+                      : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300',
+                  )}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2 rounded-lg border border-gray-100 bg-gray-50/80 p-3">
+            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
+              ② 门店范围（连锁可多选）
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs">
+              <button
+                type="button"
+                onClick={() => setStoreScope('all')}
+                className={cn(
+                  'rounded-full px-2.5 py-1 font-medium',
+                  storeScope === 'all'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-700 ring-1 ring-gray-200',
+                )}
+              >
+                全部门店{storeCatalog.length ? `（${storeCatalog.length}）` : ''}
+              </button>
+              <button
+                type="button"
+                onClick={() => setStoreScope('selected')}
+                className={cn(
+                  'rounded-full px-2.5 py-1 font-medium',
+                  storeScope === 'selected'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-700 ring-1 ring-gray-200',
+                )}
+              >
+                选择多家
+              </button>
+            </div>
+            {storeScope === 'selected' ? (
+              <div className="space-y-2">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5 text-gray-400" />
+                  <input
+                    value={storeSearch}
+                    onChange={(e) => setStoreSearch(e.target.value)}
+                    placeholder="搜索门店名 / 地址 / 城市"
+                    className="w-full rounded-lg border border-gray-200 bg-white py-1.5 pl-8 pr-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+                {storeLoading ? (
+                  <p className="text-[11px] text-gray-500">正在拉取门店列表…</p>
+                ) : storeCatalog.length ? (
+                  <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-gray-200 bg-white p-2">
+                    {filteredStores.map((s) => {
+                      const on = selectedStoreIds.includes(s.id)
+                      return (
+                        <label
+                          key={s.id}
+                          className="flex cursor-pointer items-start gap-2 rounded px-1 py-1 text-xs hover:bg-gray-50"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={on}
+                            onChange={() =>
+                              setSelectedStoreIds((prev) =>
+                                on ? prev.filter((x) => x !== s.id) : [...prev, s.id],
+                              )
+                            }
+                            className="mt-0.5"
+                          />
+                          <span>
+                            <span className="font-medium text-gray-900">{s.name}</span>
+                            {s.address ? (
+                              <span className="mt-0.5 block text-[11px] text-gray-500">
+                                {s.address}
+                              </span>
+                            ) : null}
+                          </span>
+                        </label>
+                      )
+                    })}
+                    {!filteredStores.length ? (
+                      <p className="px-1 py-2 text-[11px] text-gray-500">无匹配门店</p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <textarea
+                    value={manualStoreNames}
+                    onChange={(e) => setManualStoreNames(e.target.value)}
+                    rows={2}
+                    placeholder="未绑定来客时，可手动填写门店名，顿号/逗号分隔"
+                    className="w-full resize-y rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                )}
+                <p className="text-[11px] text-gray-500">
+                  已选 {selectedStoreIds.length || manualStoreNames.split(/[,，、\n]/).filter((x) => x.trim()).length}{' '}
+                  家
+                </p>
+              </div>
+            ) : (
+              <p className="text-[11px] leading-relaxed text-gray-500">
+                {storeCatalog.length
+                  ? `将按全部 ${storeCatalog.length} 家已认领门店做连锁统一方案（执行可按店拆分）。`
+                  : '未拉取到绑定门店时，按品牌整体规划；也可切「选择多家」手动填写店名。'}
+              </p>
+            )}
+          </div>
+
           {partner ? (
             <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-xs font-medium uppercase tracking-wide text-slate-600">
-                  门店情报（可编辑）
+                  ③ {partnerMode === 'prospect' ? '洽谈商户情报（空白填写）' : '门店情报（可编辑）'}
                 </div>
-                <button
-                  type="button"
-                  className="text-[11px] text-blue-700 hover:underline"
-                  onClick={() => {
-                    const snap = loadMerchantIntelSnapshot()
-                    const label =
-                      activeClient?.clientLabel ||
-                      activeClient?.accountDisplayName ||
-                      activeClient?.merchantAccountId ||
-                      ''
-                    const next: AiOpsPlanEditableIntel = {
-                      storeName: snap.storeName || label || '',
-                      industryPath: snap.industryPath || '',
-                      menuSummary: snap.menuSummary || snap.draftProductsSummary || '',
-                      competitorSummary: snap.competitorSummary || '',
-                      marginDouyin: snap.margins?.douyin != null ? String(snap.margins.douyin) : '',
-                      marginMeituan: snap.margins?.meituan != null ? String(snap.margins.meituan) : '',
-                      marginXhs: snap.margins?.xhs != null ? String(snap.margins.xhs) : '',
-                    }
-                    setEditIntel(next)
-                    saveAiOpsPlanEditableIntel(scopeId, next)
-                    flash('已从本地快照重新填入')
-                  }}
-                >
-                  从本地快照填入
-                </button>
+                {partnerMode === 'client' ? (
+                  <button
+                    type="button"
+                    className="text-[11px] text-blue-700 hover:underline"
+                    onClick={() => {
+                      const snap = loadMerchantIntelSnapshot()
+                      const label =
+                        activeClient?.clientLabel ||
+                        activeClient?.accountDisplayName ||
+                        activeClient?.merchantAccountId ||
+                        ''
+                      const next: AiOpsPlanEditableIntel = {
+                        storeName: snap.storeName || label || '',
+                        industryPath: snap.industryPath || '',
+                        menuSummary: snap.menuSummary || snap.draftProductsSummary || '',
+                        competitorSummary: snap.competitorSummary || '',
+                        marginDouyin: snap.margins?.douyin != null ? String(snap.margins.douyin) : '',
+                        marginMeituan: snap.margins?.meituan != null ? String(snap.margins.meituan) : '',
+                        marginXhs: snap.margins?.xhs != null ? String(snap.margins.xhs) : '',
+                      }
+                      setEditIntel(next)
+                      saveAiOpsPlanEditableIntel(scopeId, next)
+                      flash('已从本地快照重新填入')
+                    }}
+                  >
+                    从本地快照填入
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="text-[11px] text-blue-700 hover:underline"
+                    onClick={() => {
+                      setEditIntel(emptyAiOpsPlanEditableIntel())
+                      saveAiOpsPlanEditableIntel(scopeId, emptyAiOpsPlanEditableIntel())
+                      flash('已清空为空白洽谈页')
+                    }}
+                  >
+                    清空重填
+                  </button>
+                )}
               </div>
               <p className="text-[11px] leading-relaxed text-slate-500">
-                可直接填写或粘贴门店信息，无需绑定/选择客户；生成时以此为准。选了顶栏客户时，草稿与历史按客户隔离保存。
+                {partnerMode === 'prospect'
+                  ? '用于尚未合作的商户：手动填写店名、类目、菜单/套餐与竞品即可生成可对外展示的方案预览，历史单独保存在「洽谈预览」。'
+                  : '可直接填写或粘贴门店信息；选了顶栏客户时，草稿与历史按客户隔离保存。'}
               </p>
               <label className="block">
                 <span className="mb-1 block text-xs font-medium text-gray-700">门店名称</span>
@@ -1048,7 +1369,9 @@ export default function AiOpsPlanPage() {
                   value={editIntel.storeName}
                   onChange={(e) => patchEditIntel({ storeName: e.target.value })}
                   className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  placeholder="客户门店名"
+                  placeholder={
+                    partnerMode === 'prospect' ? '洽谈商户 / 品牌名（可多店用顿号）' : '客户门店名'
+                  }
                 />
               </label>
               <label className="block">
@@ -1105,7 +1428,9 @@ export default function AiOpsPlanPage() {
             </div>
           ) : (
             <div className="space-y-2 rounded-lg border border-gray-100 bg-gray-50/80 p-3">
-              <div className="text-xs font-medium uppercase tracking-wide text-gray-500">门店情报</div>
+              <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                ③ 门店情报
+              </div>
               <div className="flex flex-wrap gap-2 text-xs">
                 <span
                   className={cn(
