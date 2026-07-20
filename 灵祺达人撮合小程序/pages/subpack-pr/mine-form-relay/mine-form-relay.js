@@ -13,6 +13,7 @@ const formRelaySourceParse = require('../../../utils/formRelaySourceParse.js')
 const mpGroupQr = require('../../../utils/mpGroupQr.js')
 const formRelayGroupQrFeature = require('../../../utils/formRelayGroupQrFeature.js')
 const shareCopy = require('../../../utils/recruitmentShareCopy.js')
+const mpApplyShortLink = require('../../../utils/mpApplyShortLink.js')
 const userProfile = require('../../../utils/userProfile.js')
 const participant = require('../../../utils/participant.js')
 const auth = require('../../../utils/auth.js')
@@ -508,18 +509,57 @@ Page({
     if (!preview || !preview.sourceUrl) return
     formRelaySourceMpLink.openFormRelaySourceLink(preview.sourceOpen, preview.sourceUrl)
   },
-  onCopyShareLink(e) {
+  async onCopyShareLink(e) {
     const id = String((e.currentTarget.dataset && e.currentTarget.dataset.id) || '').trim()
     if (!id) return
-    const link = shareCopy.buildRecruitmentApplyLink(id)
-    if (!link) {
-      wx.showToast({ title: '链接生成失败', icon: 'none' })
-      return
+    const row =
+      (this.data.rows || []).find((r) => String(r.mpOrderId || '') === id) ||
+      null
+    const title = row
+      ? String(row.title || row.customerName || '').trim()
+      : String(this.data.doneId) === id
+        ? String(this.data.title || '').trim()
+        : ''
+    wx.showLoading({ title: '生成链接…', mask: true })
+    try {
+      const out = await mpApplyShortLink.fetchApplyShortLink(id, title)
+      const link = out && out.link ? String(out.link).trim() : ''
+      wx.hideLoading()
+      if (!link) {
+        wx.showToast({ title: '链接生成失败', icon: 'none' })
+        return
+      }
+      if (out.source === 'local_fallback' || out.source === 'hash_fallback') {
+        wx.showModal({
+          title: '提示',
+          content:
+            '微信短链服务暂不可用，已复制备用链接；若群聊无法打开，请稍后重试「复制分享」或使用小程序内转发。',
+          showCancel: false,
+          success: () => {
+            wx.setClipboardData({
+              data: link,
+              success: () => wx.showToast({ title: '已复制备用链接', icon: 'success' }),
+            })
+          },
+        })
+        return
+      }
+      wx.setClipboardData({
+        data: link,
+        success: () => wx.showToast({ title: '已复制分享链接', icon: 'success' }),
+      })
+    } catch (err) {
+      wx.hideLoading()
+      const fallback = shareCopy.buildRecruitmentApplyLink(id)
+      if (!fallback) {
+        wx.showToast({ title: '链接生成失败', icon: 'none' })
+        return
+      }
+      wx.setClipboardData({
+        data: fallback,
+        success: () => wx.showToast({ title: '已复制备用链接', icon: 'none' }),
+      })
     }
-    wx.setClipboardData({
-      data: link,
-      success: () => wx.showToast({ title: '已复制分享链接', icon: 'success' }),
-    })
   },
   goApplicants(e) {
     const id = String((e.currentTarget.dataset && e.currentTarget.dataset.id) || '').trim()

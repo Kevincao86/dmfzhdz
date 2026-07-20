@@ -29,6 +29,7 @@ import {
   buildQwenVisionImageRequest,
   extractQwenVisionImageUrls,
   extractQwenVisionImageUrlsFromPayload,
+  isWan27MultimodalImageModel,
   qwenVisionImageUsesAsyncHeader,
 } from '../src/lib/qwenVisionApi.js'
 import { parseArkVideoEndpointsRaw } from '../src/lib/arkVideoEndpointsConfig.js'
@@ -1925,14 +1926,72 @@ async function qwenWanxOneImage(
 ): Promise<string> {
   const input: Record<string, unknown> = { prompt }
   let parameterExtras: Record<string, unknown> | undefined
-  const useRef = refImageUrl && !opts?.forceT2i
+  const useRef = Boolean(refImageUrl && !opts?.forceT2i)
   const voucherNeg = voucherImageNegativePrompt()
   const wanxSize = opts?.wanxSize?.trim()
+  const preferred = qwenWanxModelId(env)
+  /**
+   * 视觉工坊默认 wan2.7-image-pro（image_t2i）。有参考图时若切纯 i2i 目录会丢掉 wan2.7，
+   * 改走 edit 系列且把 ref_strength 泄漏进 multimodal → 方案墙整批失败。
+   * 有 ref 时优先仍走 multimodal + content.image，再回退经典 i2i。
+   */
+  const preferMultimodalRef =
+    useRef && (isWan27MultimodalImageModel(preferred) || /^qwen-image(?!-edit)/i.test(preferred.trim()))
+  const negWithRef = opts?.voucherFaceMode
+    ? `${voucherNeg}, 模糊, 低质量, 畸形文字`
+    : '模糊, 低质量, 畸形文字, 水印, 与商品无关的展厅, 卖场内景, 样板间, 办公室, 工位, 数码卖场, 奢侈品橱窗, 空镜走廊, 无关餐饮'
+  const negT2i = opts?.voucherFaceMode
+    ? `${voucherNeg}, 手机, 数码, 低分辨率, 水印`
+    : '手机,智能手机,平板电脑,笔记本电脑,显示器,键盘,鼠标,办公桌面,数码产品特写,与商品标题无关的食物,杂乱拼贴,低分辨率,畸形手指,水印,无关展厅,样板间,办公室,工位'
+
+  const tryModels = async (
+    models: string[],
+    extras: Record<string, unknown> | undefined,
+    ref: string | undefined,
+    negativePrompt: string | undefined,
+  ): Promise<string> => {
+    let lastErr: Error | null = null
+    for (const wanxModel of models) {
+      try {
+        const taskId = await qwenWanxCreateTask(apiKey, env, prompt, {
+          refImageUrl: ref,
+          parameterExtras: extras,
+          negativePrompt,
+          modelOverride: wanxModel,
+        })
+        const urls = await qwenWanxPollUrls(apiKey, taskId)
+        return urls[0]!
+      } catch (e) {
+        lastErr = e instanceof Error ? e : new Error(String(e))
+        if (!isArkQuotaHopableError(lastErr.message) && !isVendorHopableError(e)) throw lastErr
+      }
+    }
+    throw lastErr ?? new Error('千问视觉生图失败（已轮询同型全部模型）')
+  }
+
+  if (preferMultimodalRef) {
+    const mmExtras: Record<string, unknown> = {
+      ...(wanxSize ? { size: wanxSize } : {}),
+    }
+    try {
+      return await tryModels(
+        qwenWanxModelCandidates(env, 't2i').filter(
+          (id) => isWan27MultimodalImageModel(id) || /^qwen-image(?!-edit)/i.test(id),
+        ),
+        mmExtras,
+        refImageUrl,
+        undefined,
+      )
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      console.warn('[qwenWanxOneImage] multimodal+ref 失败，回退经典 i2i', msg.slice(0, 160))
+      /* fall through to classic i2i */
+    }
+  }
+
   if (useRef) {
     input.ref_image = refImageUrl
-    input.negative_prompt = opts?.voucherFaceMode
-      ? `${voucherNeg}, 模糊, 低质量, 畸形文字`
-      : '模糊, 低质量, 畸形文字, 水印, 与商品无关的展厅, 卖场内景, 样板间, 办公室, 工位, 数码卖场, 奢侈品橱窗, 空镜走廊, 无关餐饮'
+    input.negative_prompt = negWithRef
     parameterExtras = {
       ref_strength: opts?.voucherFaceMode ? 0.18 : qwenI2iRefStrength(env),
       ref_mode: 'repaint',
@@ -1940,35 +1999,21 @@ async function qwenWanxOneImage(
     }
   } else {
     parameterExtras = {
-      negative_prompt: opts?.voucherFaceMode
-        ? `${voucherNeg}, 手机, 数码, 低分辨率, 水印`
-        : '手机,智能手机,平板电脑,笔记本电脑,显示器,键盘,鼠标,办公桌面,数码产品特写,与商品标题无关的食物,杂乱拼贴,低分辨率,畸形手指,水印,无关展厅,样板间,办公室,工位',
+      negative_prompt: negT2i,
       ...(wanxSize ? { size: wanxSize } : {}),
     }
   }
   const mode = useRef ? 'i2i' : 't2i'
-  let lastErr: Error | null = null
-  for (const wanxModel of qwenWanxModelCandidates(env, mode)) {
-    try {
-      const taskId = await qwenWanxCreateTask(apiKey, env, prompt, {
-        refImageUrl: useRef ? refImageUrl : undefined,
-        parameterExtras,
-        negativePrompt:
-          typeof input.negative_prompt === 'string'
-            ? input.negative_prompt
-            : typeof parameterExtras?.negative_prompt === 'string'
-              ? parameterExtras.negative_prompt
-              : undefined,
-        modelOverride: wanxModel,
-      })
-      const urls = await qwenWanxPollUrls(apiKey, taskId)
-      return urls[0]!
-    } catch (e) {
-      lastErr = e instanceof Error ? e : new Error(String(e))
-      if (!isArkQuotaHopableError(lastErr.message) && !isVendorHopableError(e)) throw lastErr
-    }
-  }
-  throw lastErr ?? new Error('千问视觉生图失败（已轮询同型全部模型）')
+  return tryModels(
+    qwenWanxModelCandidates(env, mode),
+    parameterExtras,
+    useRef ? refImageUrl : undefined,
+    typeof input.negative_prompt === 'string'
+      ? input.negative_prompt
+      : typeof parameterExtras?.negative_prompt === 'string'
+        ? parameterExtras.negative_prompt
+        : undefined,
+  )
 }
 
 async function minimaxImageUrls(apiKey: string, body: Record<string, unknown>): Promise<string[]> {

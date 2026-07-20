@@ -54,13 +54,21 @@ export function buildQwenVisionImageRequest(
   },
 ): QwenVisionRequest {
   const ref = opts?.refImageUrl?.trim()
-  const parameters = {
-    size: '1024*1024',
-    n: 1,
-    ...(opts?.parameterExtras ?? {}),
+  const rawExtras = { ...(opts?.parameterExtras ?? {}) }
+  /** multimodal / edit 不认旧版 wanx 的 ref_strength / ref_mode，带上会 InvalidParameter */
+  const { ref_strength: _rs, ref_mode: _rm, ...safeExtras } = rawExtras as Record<string, unknown> & {
+    ref_strength?: unknown
+    ref_mode?: unknown
   }
+  void _rs
+  void _rm
 
   if (isQwenImageEditModel(modelId) && ref) {
+    const parameters = {
+      size: '1024*1024',
+      n: 1,
+      ...safeExtras,
+    }
     return {
       url: `${DASHSCOPE}/api/v1/services/aigc/image2image/image-synthesis`,
       body: {
@@ -78,7 +86,7 @@ export function buildQwenVisionImageRequest(
   if (isQwenImageModel(modelId) || isWan27MultimodalImageModel(modelId)) {
     const content: Array<Record<string, string>> = [{ text: prompt }]
     if (ref) content.push({ image: ref })
-    const sizeRaw = opts?.parameterExtras?.size
+    const sizeRaw = safeExtras.size
     const size =
       typeof sizeRaw === 'string' && sizeRaw.trim()
         ? isWan27MultimodalImageModel(modelId)
@@ -87,6 +95,8 @@ export function buildQwenVisionImageRequest(
         : isWan27MultimodalImageModel(modelId)
           ? '2K'
           : '1024*1024'
+    const { size: _dropSize, ...restExtras } = safeExtras
+    void _dropSize
     return {
       url: `${DASHSCOPE}/api/v1/services/aigc/multimodal-generation/generation`,
       body: {
@@ -100,7 +110,8 @@ export function buildQwenVisionImageRequest(
           ],
         },
         parameters: {
-          ...parameters,
+          n: 1,
+          ...restExtras,
           size,
           watermark: false,
           ...(isWan27MultimodalImageModel(modelId) ? { thinking_mode: true } : {}),
@@ -109,6 +120,11 @@ export function buildQwenVisionImageRequest(
     }
   }
 
+  const parameters = {
+    size: '1024*1024',
+    n: 1,
+    ...rawExtras,
+  }
   const input: Record<string, unknown> = { prompt }
   if (ref) {
     input.ref_image = ref
