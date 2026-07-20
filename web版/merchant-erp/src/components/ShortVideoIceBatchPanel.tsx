@@ -87,6 +87,12 @@ import {
   mixTargetSegmentCount,
   MIX_TARGET_TOTAL_OPTIONS,
   normalizeMixMaterialSlots,
+  ICE_MIX_BATCH_COUNTS,
+  type IceMixBatchCount,
+  buildVariantMaterialSlots,
+  rotateMaterialsForVariant,
+  formatIceMixBrandBatchLabel,
+  sanitizeIceMixBrandName,
   type IceMixMaterialSlot,
   type MixPromoItem,
   type MixPromoContext,
@@ -185,9 +191,9 @@ function formatIcePollingMessage(
   return `云端剪辑中（${waited}）`
 }
 
-/** 每条素材批量生成的成片数量 */
-export const ICE_BATCH_GENERATE_COUNTS = [10, 20, 50, 100] as const
-export type IceBatchGenerateCount = (typeof ICE_BATCH_GENERATE_COUNTS)[number]
+/** 批量剪辑条数：10 / 20 / 30 / 50 */
+export const ICE_BATCH_GENERATE_COUNTS = ICE_MIX_BATCH_COUNTS
+export type IceBatchGenerateCount = IceMixBatchCount
 
 const PHASE_LABEL: Record<IceBatchJob['phase'], string> = {
   pending: '待提交',
@@ -355,6 +361,8 @@ export function ShortVideoIceBatchPanel(_props: Props) {
   const [mixTtsPlaying, setMixTtsPlaying] = useState(false)
   const [mixTtsBusy, setMixTtsBusy] = useState(false)
   const [mixCloneAudioName, setMixCloneAudioName] = useState<string | null>(null)
+  const [batchGenerateCount, setBatchGenerateCount] = useState<IceMixBatchCount>(10)
+  const [batchBrandName, setBatchBrandName] = useState('')
   const mixCloneBlobRef = useRef<Blob | null>(null)
   const mixCloneInputRef = useRef<HTMLInputElement>(null)
   const mixDocInputRef = useRef<HTMLInputElement>(null)
@@ -1249,10 +1257,16 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       setErr('已选择语音克隆，请先上传语音样本')
       return
     }
+    const brand = sanitizeIceMixBrandName(batchBrandName)
+    if (!brand) {
+      setErr('请先填写品牌名（用于下载命名，如：优雅浅爱）')
+      return
+    }
+    const batchTotal = batchGenerateCount
 
     setMixRenderBusy(true)
     setErr(null)
-    setHint('普通混剪生成中…')
+    setHint(`普通混剪批量生成中（共 ${batchTotal} 条）…`)
 
     const profiles = mixMaterialPool.map((m, i) => {
       const hit = mixMaterialProfiles.find((p) => p.index === i)
@@ -1267,99 +1281,122 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       )
     })
 
-    const produced = await produceIceMixPackage({
-      rows: scriptRows,
-      materials: mixMaterialPool,
-      materialSlots,
-      materialProfiles: profiles,
-      targetTotalSec: mixTargetSec,
-      guidance: mixGuidance.trim(),
-      mixInstruction: mixGuidance.trim(),
-      effectId: resolvedMixEffect.id,
-      subtitleStyleId: mixSubtitleStyleId,
-      onProgress: (msg) => setHint(msg),
-    })
-    if (!produced.ok) {
-      setErr(produced.message)
-      setMixRenderBusy(false)
-      return
-    }
-
-    const pack: IceMixProduceOutput = produced.output
-    const segments = pack.segments
-    if (segments.length < 2) {
-      setErr('剪辑时间线无效，请检查分镜与素材映射')
-      setMixRenderBusy(false)
-      return
-    }
-
-    setMaterialSlots(pack.materialSlots)
-    setHint(`剪辑方案：${pack.summary}`)
-    const mixNarrationText = pack.narrationText
-
-    const localId = newJobId()
-    const label = `AI混剪 · ${segments.length} 段`
-    setHint(`正在提交 ICE 多轨剪辑（${segments.length} 段拼接）…`)
-    setJobs((prev) => [
-      ...prev,
-      {
-        id: localId,
-        label,
-        mediaUrl: segments[0]!.mediaUrl,
-        phase: 'pipeline',
-        message: '混剪 · 提交云端…',
-      },
-    ])
-    if (!(await ensureCloudEditAffordable())) {
-      patchJob(localId, { phase: 'failed', message: '积分不足，无法提交混剪' })
-      setMixRenderBusy(false)
-      return
-    }
-    const totalSec = mixTargetSec
     let mixVoiceCloneBase64: string | undefined
     if (mixVoicePresetId === 'v-clone' && mixCloneBlobRef.current) {
       mixVoiceCloneBase64 = await audioBlobToPureBase64(mixCloneBlobRef.current)
     }
-    const pipe = await postIcePipeline({
-      mixSegments: segments.map((s) =>
-        prepareIceMixSegmentForPost({
-          kind: s.kind,
-          mediaUrl: s.mediaUrl,
-          signedMediaUrl: s.signedMediaUrl,
-          timelineStartSec: s.timelineStartSec,
-          timelineEndSec: s.timelineEndSec,
-          caption: s.caption,
-          materialIndex: s.materialIndex,
-          sourceInSec: s.sourceInSec,
-          sourceOutSec: s.sourceOutSec,
-        }),
-      ),
-      mixNarrationText: mixNarrationText.length >= 4 ? mixNarrationText : undefined,
-      mixVoicePresetId: mixVoicePresetId || ICE_MIX_VOICE_DEFAULT_ID,
-      mixVoiceCloneBase64,
-      projectName: `AI混剪-${label}`.slice(0, 120),
-      editBrief: pack.editBrief,
-      width: aspect.width,
-      height: aspect.height,
-      clipEndSec: totalSec,
-      effectId: pack.effectId,
-      subtitleStyleId: pack.subtitleStyleId,
-      ...mixBgmPostPayload(),
-    })
-    if (!pipe.ok) {
-      patchJob(localId, { phase: 'failed', message: pipe.message })
-      setMixRenderBusy(false)
-      return
+
+    const baseSlots =
+      materialSlots.length === scriptRows.length
+        ? normalizeMixMaterialSlots(materialSlots, scriptRows.length, mixMaterialPool.length)
+        : assignMixMaterialSlots(scriptRows.length, mixMaterialPool.length)
+
+    let okCount = 0
+    let lastErr = ''
+
+    for (let vi = 0; vi < batchTotal; vi++) {
+      const label = formatIceMixBrandBatchLabel(brand, vi + 1)
+      setHint(`普通混剪 ${vi + 1}/${batchTotal}：${label} · 规划差异化素材…`)
+
+      const variantSlots = buildVariantMaterialSlots(
+        baseSlots,
+        mixMaterialPool.length,
+        scriptRows.length,
+        vi,
+      )
+
+      const produced = await produceIceMixPackage({
+        rows: scriptRows,
+        materials: mixMaterialPool,
+        materialSlots: variantSlots,
+        materialProfiles: profiles,
+        targetTotalSec: mixTargetSec,
+        guidance: mixGuidance.trim(),
+        mixInstruction: mixGuidance.trim(),
+        effectId: resolvedMixEffect.id,
+        subtitleStyleId: mixSubtitleStyleId,
+        variantIndex: vi,
+        onProgress: (msg) => setHint(`普通混剪 ${vi + 1}/${batchTotal}：${msg}`),
+      })
+      if (!produced.ok) {
+        lastErr = produced.message
+        setHint(`普通混剪 ${vi + 1}/${batchTotal} 规划失败：${produced.message}`)
+        continue
+      }
+
+      const pack: IceMixProduceOutput = produced.output
+      const segments = pack.segments
+      if (segments.length < 2) {
+        lastErr = '剪辑时间线无效'
+        continue
+      }
+
+      const localId = newJobId()
+      setJobs((prev) => [
+        ...prev,
+        {
+          id: localId,
+          label,
+          mediaUrl: segments[0]!.mediaUrl,
+          phase: 'pipeline',
+          message: `混剪 ${vi + 1}/${batchTotal} · 提交云端…`,
+        },
+      ])
+      if (!(await ensureCloudEditAffordable())) {
+        patchJob(localId, { phase: 'failed', message: '积分不足，无法提交混剪' })
+        lastErr = '积分不足'
+        break
+      }
+      const totalSec = mixTargetSec
+      const pipe = await postIcePipeline({
+        mixSegments: segments.map((s) =>
+          prepareIceMixSegmentForPost({
+            kind: s.kind,
+            mediaUrl: s.mediaUrl,
+            signedMediaUrl: s.signedMediaUrl,
+            timelineStartSec: s.timelineStartSec,
+            timelineEndSec: s.timelineEndSec,
+            caption: s.caption,
+            materialIndex: s.materialIndex,
+            sourceInSec: s.sourceInSec,
+            sourceOutSec: s.sourceOutSec,
+          }),
+        ),
+        mixNarrationText: pack.narrationText.length >= 4 ? pack.narrationText : undefined,
+        mixVoicePresetId: mixVoicePresetId || ICE_MIX_VOICE_DEFAULT_ID,
+        mixVoiceCloneBase64,
+        projectName: `AI混剪-${label}`.slice(0, 120),
+        editBrief: pack.editBrief,
+        width: aspect.width,
+        height: aspect.height,
+        clipEndSec: totalSec,
+        effectId: pack.effectId,
+        subtitleStyleId: pack.subtitleStyleId,
+        ...mixBgmPostPayload(),
+      })
+      if (!pipe.ok) {
+        patchJob(localId, { phase: 'failed', message: pipe.message })
+        lastErr = pipe.message
+        continue
+      }
+      patchJob(localId, {
+        exportId: pipe.jobId,
+        phase: 'polling',
+        message: `混剪 ${vi + 1}/${batchTotal} · 云端合成中…`,
+        mixProduceMode: 'timeline',
+      })
+      const done = await pollJob(localId, pipe.jobId, 'timeline')
+      if (done) okCount += 1
+      else lastErr = lastErr || '云端合成未完成'
     }
-    patchJob(localId, {
-      exportId: pipe.jobId,
-      phase: 'polling',
-      message: '混剪 · 云端合成中…',
-      mixProduceMode: 'timeline',
-    })
-    await pollJob(localId, pipe.jobId, 'timeline')
+
     setMixRenderBusy(false)
-    setHint('AI混剪已提交，请在右侧下载 MP4。')
+    if (okCount > 0) {
+      setHint(`普通混剪完成 ${okCount}/${batchTotal} 条，下载文件名为「${brand}1」…「${brand}${batchTotal}」`)
+      if (okCount < batchTotal && lastErr) setErr(`部分失败：${lastErr}`)
+    } else {
+      setErr(lastErr || '普通混剪全部失败')
+    }
   }
 
   const runSmartBatchOneClick = async () => {
@@ -1383,10 +1420,16 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       setErr('已选择语音克隆，请先上传语音样本')
       return
     }
+    const brand = sanitizeIceMixBrandName(batchBrandName)
+    if (!brand) {
+      setErr('请先填写品牌名（用于下载命名，如：优雅浅爱）')
+      return
+    }
+    const batchTotal = batchGenerateCount
 
     setSmartRenderBusy(true)
     setErr(null)
-    setHint('智能成片：准备素材与分镜…')
+    setHint(`智能成片批量准备中（共 ${batchTotal} 条）…`)
 
     let workingProfiles = mixMaterialProfiles
     let workingRows = scriptRows
@@ -1492,83 +1535,104 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       produceSlots = workingSlots
     }
 
-    setHint(`智能成片：已剔除无效镜头，保留 ${produceMaterials.length}/${poolLen} 条素材，正在提交 IMS 脚本化成片…`)
-
-    const batchPayload = buildSmartBatchSubmitPayload({
-      materials: produceMaterials.map((m) => ({
-        kind: m.kind,
-        mediaUrl: m.mediaUrl,
-        label: m.label,
-      })),
-      scriptRows: workingRows,
-      materialSlots: produceSlots,
-      targetTotalSec: mixTargetSec,
-    })
-
-    if (batchPayload.materials.length < 2) {
-      setErr('智能成片至少需要 2 条有效素材，请检查素材映射后重试')
-      setSmartRenderBusy(false)
-      return
-    }
-
-    const localId = newJobId()
-    const label = `智能成片 · ${poolLen} 素材`
-    setJobs((prev) => [
-      ...prev,
-      {
-        id: localId,
-        label,
-        mediaUrl: batchPayload.materials[0]?.mediaUrl ?? produceMaterials[0]!.mediaUrl,
-        phase: 'pipeline',
-        message: '智能成片 · 提交 IMS…',
-        mixProduceMode: 'smart_batch',
-      },
-    ])
-
-    if (!(await ensureCloudEditSmartAffordable())) {
-      patchJob(localId, { phase: 'failed', message: '积分不足，无法提交智能成片' })
-      setSmartRenderBusy(false)
-      return
-    }
+    setHint(`智能成片：已剔除无效镜头，保留 ${produceMaterials.length}/${poolLen} 条素材，开始批量提交（${batchTotal} 条）…`)
 
     let mixVoiceCloneBase64: string | undefined
     if (mixVoicePresetId === 'v-clone' && mixCloneBlobRef.current) {
       mixVoiceCloneBase64 = await audioBlobToPureBase64(mixCloneBlobRef.current)
     }
 
-    const pipe = await postIceSmartBatch({
-      materials: batchPayload.materials,
-      scriptRows: batchPayload.scriptRows,
-      materialSlots: batchPayload.materialSlots,
-      guidance: workingGuidance,
-      targetTotalSec: mixTargetSec,
-      width: aspect.width,
-      height: aspect.height,
-      projectName: `智能成片-${label}`.slice(0, 120),
-      subtitleStyleId: mixSubtitleStyleId,
-      mixVoicePresetId: mixVoicePresetId || ICE_MIX_VOICE_DEFAULT_ID,
-      mixVoiceCloneBase64,
-      transitionMode: 'none',
-      effectId: resolvedMixEffect.id,
-      ...mixBgmPostPayload(),
-    })
+    const baseProduceSlots = produceSlots
+    let okCount = 0
+    let lastErr = ''
 
-    if (!pipe.ok) {
-      patchJob(localId, { phase: 'failed', message: pipe.message })
-      setErr(pipe.message)
-      setSmartRenderBusy(false)
-      return
+    for (let vi = 0; vi < batchTotal; vi++) {
+      const label = formatIceMixBrandBatchLabel(brand, vi + 1)
+      setHint(`智能成片 ${vi + 1}/${batchTotal}：${label} · 差异化素材顺序…`)
+
+      const rotatedMaterials = rotateMaterialsForVariant(produceMaterials, vi)
+      const variantSlots = buildVariantMaterialSlots(
+        baseProduceSlots,
+        rotatedMaterials.length,
+        workingRows.length,
+        vi,
+      )
+      const batchPayload = buildSmartBatchSubmitPayload({
+        materials: rotatedMaterials.map((m) => ({
+          kind: m.kind,
+          mediaUrl: m.mediaUrl,
+          label: m.label,
+        })),
+        scriptRows: workingRows,
+        materialSlots: variantSlots,
+        targetTotalSec: mixTargetSec,
+      })
+
+      if (batchPayload.materials.length < 2) {
+        lastErr = '有效素材不足 2 条'
+        continue
+      }
+
+      const localId = newJobId()
+      setJobs((prev) => [
+        ...prev,
+        {
+          id: localId,
+          label,
+          mediaUrl: batchPayload.materials[0]?.mediaUrl ?? rotatedMaterials[0]!.mediaUrl,
+          phase: 'pipeline',
+          message: `智能成片 ${vi + 1}/${batchTotal} · 提交 IMS…`,
+          mixProduceMode: 'smart_batch',
+        },
+      ])
+
+      if (!(await ensureCloudEditSmartAffordable())) {
+        patchJob(localId, { phase: 'failed', message: '积分不足，无法提交智能成片' })
+        lastErr = '积分不足'
+        break
+      }
+
+      const pipe = await postIceSmartBatch({
+        materials: batchPayload.materials,
+        scriptRows: batchPayload.scriptRows,
+        materialSlots: batchPayload.materialSlots,
+        guidance: workingGuidance,
+        targetTotalSec: mixTargetSec,
+        width: aspect.width,
+        height: aspect.height,
+        projectName: `智能成片-${label}`.slice(0, 120),
+        subtitleStyleId: mixSubtitleStyleId,
+        mixVoicePresetId: mixVoicePresetId || ICE_MIX_VOICE_DEFAULT_ID,
+        mixVoiceCloneBase64,
+        transitionMode: 'none',
+        effectId: resolvedMixEffect.id,
+        ...mixBgmPostPayload(),
+      })
+
+      if (!pipe.ok) {
+        patchJob(localId, { phase: 'failed', message: pipe.message })
+        lastErr = pipe.message
+        continue
+      }
+
+      patchJob(localId, {
+        exportId: pipe.jobId,
+        phase: 'polling',
+        message: `智能成片 ${vi + 1}/${batchTotal} · IMS 合成中…`,
+        mixProduceMode: pipe.pollMode ?? 'smart_batch',
+      })
+      const done = await pollJob(localId, pipe.jobId, pipe.pollMode ?? 'smart_batch')
+      if (done) okCount += 1
+      else lastErr = lastErr || '云端合成未完成'
     }
 
-    patchJob(localId, {
-      exportId: pipe.jobId,
-      phase: 'polling',
-      message: '智能成片 · IMS 合成中…',
-      mixProduceMode: pipe.pollMode ?? 'smart_batch',
-    })
-    await pollJob(localId, pipe.jobId, pipe.pollMode ?? 'smart_batch')
     setSmartRenderBusy(false)
-    setHint('智能一键成片已提交，请在右侧下载 MP4。')
+    if (okCount > 0) {
+      setHint(`智能成片完成 ${okCount}/${batchTotal} 条，下载文件名为「${brand}1」…「${brand}${batchTotal}」`)
+      if (okCount < batchTotal && lastErr) setErr(`部分失败：${lastErr}`)
+    } else {
+      setErr(lastErr || '智能成片全部失败')
+    }
   }
 
   const downloadJob = async (job: IceBatchJob) => {
@@ -1584,6 +1648,39 @@ export function ShortVideoIceBatchPanel(_props: Props) {
         mixProduceMode: job.mixProduceMode ?? 'timeline',
       })
       setHint('下载已开始，请查看浏览器下载栏')
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e))
+    } finally {
+      setDownloadBusy(false)
+    }
+  }
+
+  const downloadAllDoneJobs = async () => {
+    const list = jobs
+      .filter((j) => j.phase === 'done' && j.exportId && !isIceSourceMaterialJob(j))
+      .slice()
+      .sort((a, b) => {
+        const ma = String(a.label).match(/^(.*?)(\d+)$/)
+        const mb = String(b.label).match(/^(.*?)(\d+)$/)
+        if (ma && mb && ma[1] === mb[1]) return Number(ma[2]) - Number(mb[2])
+        return String(a.label).localeCompare(String(b.label), 'zh')
+      })
+    if (!list.length) {
+      setErr('暂无可下载成片')
+      return
+    }
+    setDownloadBusy(true)
+    setErr(null)
+    try {
+      for (let i = 0; i < list.length; i++) {
+        const job = list[i]!
+        setHint(`按品牌名排序下载 ${i + 1}/${list.length}：${job.label}`)
+        await downloadIceExportFile(job.exportId!, job.label, {
+          mixProduceMode: job.mixProduceMode ?? 'timeline',
+        })
+        await new Promise((r) => setTimeout(r, 450))
+      }
+      setHint(`已依次下载 ${list.length} 条（按品牌名序号）`)
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
@@ -2549,6 +2646,44 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                   {hint}
                 </div>
               ) : null}
+              <div className="mb-4 grid gap-3 sm:grid-cols-2">
+                <label className="block text-xs font-medium text-zinc-700">
+                  批量剪辑条数
+                  <div className="mt-1.5 flex flex-wrap gap-2">
+                    {ICE_BATCH_GENERATE_COUNTS.map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        disabled={mixRenderBusy || smartRenderBusy || mediaBusy || guidanceBusy}
+                        onClick={() => setBatchGenerateCount(n)}
+                        className={cn(
+                          'rounded-lg border px-3 py-1.5 text-sm font-semibold transition',
+                          batchGenerateCount === n
+                            ? 'border-violet-500 bg-violet-600 text-white shadow-sm'
+                            : 'border-zinc-200 bg-white text-zinc-700 hover:border-violet-300',
+                        )}
+                      >
+                        {n} 条
+                      </button>
+                    ))}
+                  </div>
+                </label>
+                <label className="block text-xs font-medium text-zinc-700">
+                  品牌名（下载命名）
+                  <input
+                    type="text"
+                    value={batchBrandName}
+                    disabled={mixRenderBusy || smartRenderBusy || mediaBusy || guidanceBusy}
+                    onChange={(e) => setBatchBrandName(e.target.value)}
+                    placeholder="如：优雅浅爱 → 优雅浅爱1…N"
+                    className="mt-1.5 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none ring-violet-400 focus:ring-2 disabled:bg-zinc-50"
+                  />
+                </label>
+              </div>
+              <p className="mb-3 text-xs text-zinc-500">
+                将按所选条数批量生成；每条自动轮转素材顺序与截取点以保持画面差异。下载文件名为「品牌名1」至「品牌名
+                {batchGenerateCount}」。
+              </p>
               <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                 <button
                   type="button"
@@ -2557,7 +2692,9 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                   className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-orange-300/40 transition hover:from-orange-600 hover:to-amber-700 disabled:cursor-not-allowed disabled:from-orange-200 disabled:to-orange-300 disabled:shadow-none min-w-[12rem]"
                 >
                   {mixRenderBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Zap className="h-5 w-5" />}
-                  {mixRenderBusy ? '普通混剪生成中…' : `普通混剪（${scriptRows.length} 段）`}
+                  {mixRenderBusy
+                    ? '普通混剪批量生成中…'
+                    : `普通混剪（${batchGenerateCount} 条 · ${scriptRows.length} 段）`}
                 </button>
                 <button
                   type="button"
@@ -2578,7 +2715,9 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                   className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-violet-300/40 transition hover:from-violet-700 hover:to-fuchsia-700 disabled:cursor-not-allowed disabled:from-violet-200 disabled:to-violet-300 disabled:shadow-none min-w-[12rem]"
                 >
                   {smartRenderBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Wand2 className="h-5 w-5" />}
-                  {smartRenderBusy ? '智能一键成片生成中…' : '智能一键成片'}
+                  {smartRenderBusy
+                    ? '智能成片批量生成中…'
+                    : `智能一键成片（${batchGenerateCount} 条）`}
                 </button>
               </div>
               <div className="flex flex-wrap gap-2 text-xs text-zinc-500">
@@ -2720,11 +2859,33 @@ export function ShortVideoIceBatchPanel(_props: Props) {
 
               {jobs.some((j) => !isIceSourceMaterialJob(j)) ? (
                 <div>
-                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
-                    混剪任务
-                  </p>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                      混剪任务
+                    </p>
+                    {doneJobs.length > 1 ? (
+                      <button
+                        type="button"
+                        disabled={downloadBusy || mixRenderBusy || smartRenderBusy}
+                        onClick={() => void downloadAllDoneJobs()}
+                        className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        按品牌名依次下载（{doneJobs.length}）
+                      </button>
+                    ) : null}
+                  </div>
                   <ul className="max-h-[320px] space-y-2 overflow-y-auto">
-                    {jobs.filter((j) => !isIceSourceMaterialJob(j)).map((j) => (
+                    {jobs
+                      .filter((j) => !isIceSourceMaterialJob(j))
+                      .slice()
+                      .sort((a, b) => {
+                        const ma = String(a.label).match(/^(.*?)(\d+)$/)
+                        const mb = String(b.label).match(/^(.*?)(\d+)$/)
+                        if (ma && mb && ma[1] === mb[1]) return Number(ma[2]) - Number(mb[2])
+                        return String(a.label).localeCompare(String(b.label), 'zh')
+                      })
+                      .map((j) => (
                       <li
                         key={j.id}
                         className={cn(

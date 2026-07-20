@@ -200,7 +200,12 @@ merchantAiUpstream
 meoo-ai-ops-plan
 iceMixEditPlanAi
 iceMixProduceEngine
+iceMixPlan
+ShortVideoIceBatchPanel
+ShortVideoOptimizationPage
 aliyunIceCloudApi
+aliyunIceSmartBatch
+iceSmartBatchPlan
 ProfilePage
 check-dr-affiliate-menu
 ecs-deploy-talent-fulfillment

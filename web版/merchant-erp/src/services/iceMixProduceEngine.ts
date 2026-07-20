@@ -41,6 +41,8 @@ export type IceMixProduceInput = {
   mixInstruction?: string
   effectId: string
   subtitleStyleId: string
+  /** 批量第几条（0-based）：影响截取起点错位，提升条间差异 */
+  variantIndex?: number
   onProgress?: (msg: string) => void
 }
 
@@ -54,7 +56,12 @@ export type IceMixProduceOutput = {
   summary: string
 }
 
-function inferSourceInSec(visual: string, estDur: number, segmentIndex: number): number {
+function inferSourceInSec(
+  visual: string,
+  estDur: number,
+  segmentIndex: number,
+  variantIndex = 0,
+): number {
   const dur = Math.max(2, Math.min(estDur || MIX_DEFAULT_SOURCE_DURATION_SEC, 15))
   let base = 0
   if (/成品|特写|结尾|收尾|logo|招牌菜/.test(visual)) {
@@ -64,7 +71,7 @@ function inferSourceInSec(visual: string, estDur: number, segmentIndex: number):
   } else if (/顾客|体验|试吃|互动/.test(visual)) {
     base = clampMixSourceInSec(Math.min(dur * 0.28, Math.max(0, dur - 1.5)), 1, dur)
   }
-  const stagger = (segmentIndex % 4) * 1.35
+  const stagger = (segmentIndex % 4) * 1.35 + (variantIndex % 7) * 0.85
   return clampMixSourceInSec(base + stagger, 1.2, dur)
 }
 
@@ -343,6 +350,21 @@ export async function produceIceMixPackage(
       profileList,
     ),
   )
+
+  const variantIndex = Math.max(0, Math.floor(Number(input.variantIndex) || 0))
+  if (variantIndex > 0) {
+    segments = segments.map((s, i) => {
+      if (s.kind !== 'video') return s
+      const clipDur = Math.max(0.4, s.timelineEndSec - s.timelineStartSec)
+      const offset = (variantIndex % 7) * 0.85 + (i % 3) * 0.45
+      const sourceInSec = clampMixSourceInSec((s.sourceInSec ?? 0) + offset, clipDur, 18)
+      return {
+        ...s,
+        sourceInSec,
+        sourceOutSec: sourceInSec + clipDur,
+      }
+    })
+  }
 
   if (segments.length < 2) {
     return { ok: false, message: '无法生成分镜时间线，请检查分镜表' }
