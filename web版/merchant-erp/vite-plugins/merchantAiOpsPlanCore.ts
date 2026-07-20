@@ -21,18 +21,72 @@ async function mergeStoreIntelAiEnv(env: Record<string, string>): Promise<Record
   return mergeMerchantAiEnvWithRegistrySnapshot(process.cwd(), env)
 }
 
+/** 截断 JSON 补全引号/括号，尽量救回 DeepSeek 等长输出被截断的结果 */
+function repairTruncatedJson(text: string): string {
+  let s = text.trim()
+  const fenced = s.match(/```(?:json)?\s*([\s\S]*)/i)
+  if (fenced?.[1]) s = fenced[1].replace(/```\s*$/, '').trim()
+  const start = s.indexOf('{')
+  if (start < 0) return s
+  s = s.slice(start)
+  let inString = false
+  let escape = false
+  const stack: Array<'{' | '['> = []
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i]!
+    if (escape) {
+      escape = false
+      continue
+    }
+    if (c === '\\' && inString) {
+      escape = true
+      continue
+    }
+    if (c === '"') {
+      inString = !inString
+      continue
+    }
+    if (inString) continue
+    if (c === '{' || c === '[') stack.push(c)
+    else if (c === '}' || c === ']') stack.pop()
+  }
+  if (inString) s += '"'
+  s = s.replace(/,\s*$/, '')
+  while (stack.length) {
+    const open = stack.pop()
+    s += open === '{' ? '}' : ']'
+  }
+  return s
+}
+
 function extractJsonObject(text: string): Record<string, unknown> {
   const t = text.trim()
   const fenced = t.match(/```(?:json)?\s*([\s\S]*?)```/i)
   const raw = fenced?.[1]?.trim() ?? t
   const start = raw.indexOf('{')
-  const end = raw.lastIndexOf('}')
-  if (start < 0 || end <= start) throw new Error('模型未返回有效 JSON')
-  const obj = JSON.parse(raw.slice(start, end + 1)) as Record<string, unknown>
-  if (!obj || typeof obj !== 'object' || Array.isArray(obj) || Object.keys(obj).length === 0) {
-    throw new Error('模型返回空 JSON 对象')
+  if (start < 0) throw new Error('模型未返回有效 JSON')
+  const tryParse = (slice: string): Record<string, unknown> | null => {
+    try {
+      const obj = JSON.parse(slice) as Record<string, unknown>
+      if (!obj || typeof obj !== 'object' || Array.isArray(obj) || Object.keys(obj).length === 0) {
+        return null
+      }
+      return obj
+    } catch {
+      return null
+    }
   }
-  return obj
+  const end = raw.lastIndexOf('}')
+  if (end > start) {
+    const hit = tryParse(raw.slice(start, end + 1))
+    if (hit) return hit
+  }
+  const repaired = tryParse(repairTruncatedJson(raw.slice(start)))
+  if (repaired) {
+    console.warn('[meoo-ai-ops-plan] JSON truncated; repaired and accepted')
+    return repaired
+  }
+  throw new Error('模型未返回有效 JSON（可能输出过长被截断）')
 }
 
 /** 按起始下标旋转厂商顺序，便于重试时换一家先试 */
@@ -43,9 +97,13 @@ function rotateOpsPlanVendors(offset: number): string[] {
   return [...base.slice(n), ...base.slice(0, n)]
 }
 
+function vendorTimeoutMs(vendor: string): number {
+  if (vendor === 'qwen' || vendor === 'doubao' || vendor === 'deepseek') return 110_000
+  return 45_000
+}
+
 /**
- * 六块方案：对已配置 Key 的厂商逐个轮询（超时/额度/解析失败一律换下一家）。
- * 单厂商约 70s，整体控制在 Nginx 300s 内尽量多试几家。
+ * 六块方案：已配置 Key 的厂商逐个轮询；鉴权/额度错误秒切，长输出厂商给足时间。
  */
 async function llmJson(
   env: Record<string, string>,
@@ -56,8 +114,9 @@ async function llmJson(
   const vendors = rotateOpsPlanVendors(rotateOffset)
   const errors: string[] = []
   for (const vendor of vendors) {
+    const t0 = Date.now()
     try {
-      const obj = await withUpstreamChatTimeoutMs(70_000, async () => {
+      const obj = await withUpstreamChatTimeoutMs(vendorTimeoutMs(vendor), async () => {
         const out = await merchantChatTextWithVendorFailover(env, system, user, [vendor])
         if (!out.ok) {
           throw new Error(
@@ -66,12 +125,16 @@ async function llmJson(
         }
         return extractJsonObject(out.text)
       })
-      console.log(`[meoo-ai-ops-plan] llmJson ok vendor=${vendor}`)
+      console.log(
+        `[meoo-ai-ops-plan] llmJson ok vendor=${vendor} ms=${Date.now() - t0}`,
+      )
       return obj
     } catch (e) {
       const parseMsg = e instanceof Error ? e.message : String(e)
       errors.push(`${vendor}: ${parseMsg.slice(0, 120)}`)
-      console.warn(`[meoo-ai-ops-plan] llmJson hop vendor=${vendor}: ${parseMsg.slice(0, 160)}`)
+      console.warn(
+        `[meoo-ai-ops-plan] llmJson hop vendor=${vendor} ms=${Date.now() - t0}: ${parseMsg.slice(0, 160)}`,
+      )
     }
   }
   throw new Error(
@@ -210,15 +273,13 @@ const SYSTEM_PROMPT = `你是资深本地生活/餐饮多平台运营总监，�
 1. 只基于用户提供的菜单价目/已上架套餐/毛利/类目/竞品/预算/平台/门店范围；无菜单时用「已上架套餐」清单组品，勿编造菜名。多门店时方案须覆盖所选门店（或注明分店差异）。
 2. marketingBudget.channels 合计≈totalBudget（误差≤5%）；须含 roiSummary + roiAnalysis（≥3 行，含投入/预计GMV/订单/ROI/回本天数）。
 3. talentBudget.budgetLines 必须细致：至少覆盖「短视频达人（按头部/腰部/尾部分行写人数与单价）」「短视频本地推预算」「直播达人预算」「直播投流预算」；subtotalYuan=人数×单价+投流（投流类可 headcount=0）。
-4. calendar.milestones 日期落在周期内，≥12 条；必须覆盖 kind：collab_confirm、talent_list、shoot_start、shoot_end、merchant_video_confirm、video_publish、live_confirm、live_talent_script、live_warmup、live_go；video_publish/live_* 必须带具体 time（HH:mm）；发布时间按平台×类目高峰窗口填写。
-5. platformStrategy 仅用户勾选平台；每行须有 detail。
-6. 组品 3～6 个，优先真实菜单名或已上架套餐名。
-7. 【执行时间粒度】phases/weeklyActions 用日/周即可；hourlySchedule 仅允许 scene="live" 的直播相关任务；无直播计划时可输出空数组 []。
-8. 短视频的 publishWindow 可用粗粒度；calendar 中 video_publish 必须写具体 HH:mm。
-9. phases≥3、weeklyActions 覆盖每周、goals≥3；每个 phase 的 detailItems≥4，且每条必须含 howTo（怎么做）。
-10. 【ROI 事实依据】roiAnalysis[].note 与 assumptions 禁止写「假设转化率」；必须按平台给出行业中位核销转化区间并简述依据：抖音短视频达人 2.5%～6%、抖音本地推 1.8%～3.5%、抖音直播 8%～15%、小红书 0.9%～2.4%、美团/点评搜索场 5%～12%、快手 2%～5%、视频号 1.5%～4%。
-11. 【ROI/GMV 口径写死】expectedGmvYuan=活动周期总 GMV（不是每天）=客单×预估单量；必须 ≥ max(投入×行业GMV投产中位, 投入÷品类毛利率×1.2)，禁止出现「核销GMV≤总预算」导致商家亏损；roi=毛利ROI=(周期GMV×毛利率)÷投入；paybackDays=投入×活动天数÷(周期GMV×毛利率)。goals / goalsDetail 中的核销GMV必须与 roiAnalysis 同量级。
-12. 列表摘要可短；backgroundDetail / activitiesDetail / audienceDetail / platformStrategy.detail / detailItems.howTo / weeklyActions.detail / goalsDetail.rationale 须可执行（每段建议 80～220 字，勿超长复述）；必须一次输出完整可解析 JSON，禁止截断。`
+4. calendar.milestones 日期落在周期内，≥8 条并覆盖 kind：collab_confirm、talent_list、shoot_start、shoot_end、merchant_video_confirm、video_publish、live_confirm、live_talent_script、live_warmup、live_go（缺的服务端会补）；video_publish/live_* 带 HH:mm。
+5. platformStrategy 仅用户勾选平台；每行 detail≤120字。
+6. 组品 3～5 个，优先真实菜单名或已上架套餐名。
+7. phases/weeklyActions 用日/周；hourlySchedule 仅 live；无直播可 []。
+8. phases≥3、goals≥3；每个 phase 的 detailItems≥2（含 howTo，≤60字）。
+9. 【ROI】禁止「假设转化率」；按平台行业中位核销转化写 note；expectedGmvYuan=周期总GMV=客单×单量，且 ≥ max(投入×投产中位, 投入÷毛利率×1.2)；roi=毛利ROI。
+10. Detail/howTo/rationale 各段≤120字；输出必须是完整可解析 JSON，控制总长，禁止截断。`
 
 async function enrichCombosFromProductPlan(
   plan: AiOpsPlanResult,
@@ -366,7 +427,7 @@ export async function runAiOpsPlanCore(
     body.competitorSummary ? `竞品摘要：\n${body.competitorSummary}` : '',
     body.goalsNote ? `商家补充目标：${body.goalsNote}` : '',
     buildAiOpsRoiLookupForPrompt(platforms, body.industryPath),
-    '请生成完整六块方案 JSON；roiAnalysis 必须按上方【转化率查询结果】测算 GMV/订单/ROI（客单×单量），且核销GMV须覆盖毛利盈亏线（≥投入÷毛利率×1.2），禁止目标GMV低于预算；goalsDetail 与 roiAnalysis 对齐；须含 budgetLines、Detail/howTo、≥12 条带 kind 的日历节点；hourlySchedule 仅直播。',
+    '请生成完整六块方案 JSON（紧凑、可一次解析完）；roiAnalysis 按【转化率查询结果】写 GMV/订单/ROI（客单×单量且覆盖毛利盈亏线）；goalsDetail 对齐；须含 budgetLines；Detail/howTo 短而可执行；日历≥8 条带 kind；hourlySchedule 仅直播。',
   ]
     .filter(Boolean)
     .join('\n\n')
