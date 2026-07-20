@@ -189,6 +189,7 @@ ProfilePage
 check-dr-affiliate-menu
 ecs-deploy-talent-fulfillment
 灵祺达人履约管理后台/dist
+recruitmentPublishLinkMatchCore
 change-scope-guard
 PAT
       ;;
