@@ -26,7 +26,10 @@ import type { RegistryMpTalentMember } from './opsRegistryTypes.js'
 import { supabaseAdminFetch } from './supabaseAdminFetch.js'
 import { hydrateRecommendHallInlineImagesToOss } from './recommendHallInlineImagesOss.js'
 import { hydrateRecommendHallAvatarsFromAccounts } from './recommendHallMemberAvatars.js'
-import { readMpFormRelayGroupQrViaPg } from './registrySnapshotPgAppend.js'
+import {
+  readMpFormRelayGroupQrViaPg,
+  readMpRecruitmentOrdersByIdsViaPg,
+} from './registrySnapshotPgAppend.js'
 import { isFormRelayGroupQrRelay, readExternalFormRelay } from './formRelayPlatforms.js'
 
 function looksLikePhone(raw: string): boolean {
@@ -847,6 +850,48 @@ export async function loadMpHallRegistryPayload(opts?: {
     talentAccount,
     includeRecommendPool,
     hallMergeOpts,
+  }
+
+  /** 详情/单单页：PG 按 id 抽取，跳过整列 mpRecruitmentOrders */
+  const detailFastPath =
+    hallMergeOpts.includeOnly === true &&
+    includeMpOrderIds.length > 0 &&
+    !includeRecommendPool &&
+    !includeAllPrOwned &&
+    opts?.prOwnedList !== true
+
+  if (detailFastPath) {
+    try {
+      const pg = await readMpRecruitmentOrdersByIdsViaPg(includeMpOrderIds)
+      if (pg.ok) {
+        let partial: Partial<RegistryFile> = {
+          mpRecruitmentOrders: pg.orders as RegistryMpRecruitmentOrder[],
+          mpPrUsers: pg.mpPrUsers as RegistryMpPrUser[],
+          mpGroupQrByOrderId: pg.groupQrByOrderId,
+        }
+        const needsInboxSlice =
+          missingParts.length === 0 && (!!prOwnerKeys || !!talentAccount || !!talentMember)
+        if (needsInboxSlice) {
+          try {
+            const inboxPartial = await fetchRegistryTalentInboxFromDb(supabaseUrl, serviceRole)
+            if (Array.isArray(inboxPartial.mpTalentInbox)) {
+              partial = { ...partial, mpTalentInbox: inboxPartial.mpTalentInbox }
+            }
+          } catch {
+            /* inbox optional */
+          }
+        }
+        const payload = await tryLoadHallFromPartial(async () => partial, buildOpts)
+        return finalizeRecommendHallPayload(payload!, includeRecommendPool, {
+          supabaseUrl,
+          serviceRole,
+        })
+      }
+      attempts.push(`detail_pg_fast:${pg.error}`)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      attempts.push(`detail_pg_fast_ex:${msg.slice(0, 160)}`)
+    }
   }
 
   if (missingParts.length === 0) {

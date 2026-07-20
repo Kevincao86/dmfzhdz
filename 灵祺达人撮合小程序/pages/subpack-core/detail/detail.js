@@ -694,7 +694,7 @@ Page({
     this.setData({ loading: true, err: '' })
     const listFilters = require('../../../utils/recruitmentListFilters.js')
     try {
-      const reg = await ops.fetchRegistry({ includeMpOrderIds: [id], includeLocalContext: true })
+      const reg = await ops.fetchRegistry({ includeMpOrderIds: [id], includeOnly: true })
       this._orderReg = reg
       if (!Array.isArray(reg.mpPrUsers) || !reg.mpPrUsers.length) {
         try {

@@ -214,7 +214,7 @@ export default function RecruitmentDetailPage() {
       setLoading(true)
       setErr('')
       try {
-        const reg = await fetchMpRegistry({ includeMpOrderIds: [id] })
+        const reg = await fetchMpRegistry({ includeMpOrderIds: [id], includeOnly: true })
         reconcileApplicationsFromRegistry(reg)
         const list = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<string, unknown>[]
         const mp = list.find((o) => o && o.id === id)
@@ -433,7 +433,7 @@ export default function RecruitmentDetailPage() {
 
   async function reloadOrder() {
     if (!id) return
-    const reg = await fetchMpRegistry({ includeMpOrderIds: [id] })
+    const reg = await fetchMpRegistry({ includeMpOrderIds: [id], includeOnly: true })
     const list = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<string, unknown>[]
     const mp = list.find((o) => o && o.id === id)
     if (!mp) return

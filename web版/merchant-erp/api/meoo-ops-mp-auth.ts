@@ -563,7 +563,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       }
       const includeRecommendPool = body.includeRecommendPool === true
       const includeAllPrOwned = body.includePrOwned === true
-      const includeOnly = body.includeOnly === true
+      /** 带指定单号且非 PR 全量/推荐池 → 默认 includeOnly（详情秒开）；显式 false 可关 */
+      const includeOnly =
+        body.includeOnly === true ||
+        (body.includeOnly !== false &&
+          includeMpOrderIds.length > 0 &&
+          includeMpOrderIds.length <= 30 &&
+          !includeAllPrOwned &&
+          !includeRecommendPool)
       const payload = await loadMpHallRegistryPayload({
         includeMpOrderIds,
         prOwnerKeys,
