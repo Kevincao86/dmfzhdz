@@ -1,0 +1,429 @@
+{
+  "meta": {
+    "对应模块": "5 + 6",
+    "建议时长": "90min（5400 秒）",
+    "转化钩子": "续订：下月旺季专题",
+    "时间": "口播（逐字念） | 画面/动作",
+    "00:00–01:00": "第四周：线索跟进加月度复盘。价值图指经营清晰度。 | 价值一图",
+    "01:00–02:00": "钩子：续订下月旺季专题。 | 价值一图",
+    "02:00–03:00": "今天两段：线索，复盘。 | 价值一图",
+    "03:00–04:00": "打码客户信息。 | 价值一图",
+    "04:00–05:00": "报税边界预告：辅助整理不是代报税。 | 价值一图",
+    "05:00–06:00": "复盘内容作业：能发即合格。 | 复盘",
+    "06:00–07:00": "点评价格是否与在售一致。 | 复盘",
+    "07:00–08:00": "表扬发出去的同学。 | 复盘",
+    "08:00–09:00": "投流没有跟进等于买电话簿不打电话。 | 复盘",
+    "09:00–10:00": "复盘表六指标预告。 | 复盘",
+    "10:00–11:00": "弹幕：你现在线索跟不跟得上？ | 复盘",
+    "11:00–12:00": "作业五点四加六点四。 | 复盘",
+    "12:00–13:00": "进入线索主课。 | 复盘",
+    "13:00–14:00": "GEO一句话：先占位再投流。 | 复盘",
+    "14:00–15:00": "开主课。 | 复盘",
+    "15:00–16:00": "GEO页快速指待优化。 | 线索+复盘表",
+    "16:00–17:00": "竞对报告只定一个差距。 | 线索+复盘表",
+    "17:00–18:00": "打开线索绑定示意。 | 线索+复盘表",
+    "18:00–19:00": "线索列表。 | 线索+复盘表",
+    "19:00–20:00": "AI生成跟进话术：问诊建议邀约。 | 线索+复盘表",
+    "20:00–21:00": "回填跟进，避免重复骚扰。 | 线索+复盘表",
+    "21:00–22:00": "打码示范。 | 线索+复盘表",
+    "22:00–23:00": "学员生成话术。 | 线索+复盘表",
+    "23:00–24:00": "切换复盘表。 | 线索+复盘表",
+    "24:00–25:00": "六指标逐项讲。 | 线索+复盘表",
+    "25:00–26:00": "现场填示例店数据。 | 线索+复盘表",
+    "26:00–27:00": "复盘三问。 | 线索+复盘表",
+    "27:00–28:00": "哪个数最差。 | 线索+复盘表",
+    "28:00–29:00": "卡在人还是流程。 | 线索+复盘表",
+    "29:00–30:00": "下月只加一个动作。 | 线索+复盘表",
+    "30:00–31:00": "对账早发现，不替会计做账。 | 线索+复盘表",
+    "31:00–32:00": "报税边界念两遍。 | 线索+复盘表",
+    "32:00–33:00": "续订：下月模块七专题标题公布。 | 线索+复盘表",
+    "33:00–34:00": "更新权口播。 | 线索+复盘表",
+    "34:00–35:00": "主课收口。 | 线索+复盘表",
+    "35:00–36:00": "线索加复盘都是清晰度。 | 线索+复盘表",
+    "36:00–37:00": "鼓励填表。 | 线索+复盘表",
+    "37:00–38:00": "预告下月专题内容方向。 | 线索+复盘表",
+    "38:00–39:00": "价值图总回收六词。 | 线索+复盘表",
+    "39:00–40:00": "进入答疑。 | 线索+复盘表",
+    "40:00–41:00": "GEO页快速指待优化。（第40分钟提醒：看弹幕，确认学员跟得上，必要时放慢点击。） | 线索+复盘表",
+    "41:00–42:00": "竞对报告只定一个差距。（第41分钟提醒：看弹幕，确认学员跟得上，必要时放慢点击。） | 线索+复盘表",
+    "42:00–43:00": "打开线索绑定示意。（第42分钟提醒：看弹幕，确认学员跟得上，必要时放慢点击。） | 线索+复盘表",
+    "43:00–44:00": "线索列表。（第43分钟提醒：看弹幕，确认学员跟得上，必要时放慢点击。） | 线索+复盘表",
+    "44:00–45:00": "AI生成跟进话术：问诊建议邀约。（第44分钟提醒：看弹幕，确认学员跟得上，必要时放慢点击。） | 线索+复盘表",
+    "45:00–46:00": "回填跟进，避免重复骚扰。（第45分钟提醒：看弹幕，确认学员跟得上，必要时放慢点击。） | 线索+复盘表",
+    "46:00–47:00": "打码示范。（第46分钟提醒：看弹幕，确认学员跟得上，必要时放慢点击。） | 线索+复盘表",
+    "47:00–48:00": "学员生成话术。（第47分钟提醒：看弹幕，确认学员跟得上，必要时放慢点击。） | 线索+复盘表",
+    "48:00–49:00": "切换复盘表。（第48分钟提醒：看弹幕，确认学员跟得上，必要时放慢点击。） | 线索+复盘表",
+    "49:00–50:00": "六指标逐项讲。（第49分钟提醒：看弹幕，确认学员跟得上，必要时放慢点击。） | 线索+复盘表",
+    "50:00–51:00": "现场填示例店数据。（第50分钟提醒：看弹幕，确认学员跟得上，必要时放慢点击。） | 线索+复盘表",
+    "51:00–52:00": "复盘三问。（第51分钟提醒：看弹幕，确认学员跟得上，必要时放慢点击。） | 线索+复盘表",
+    "52:00–53:00": "哪个数最差。（第52分钟提醒：看弹幕，确认学员跟得上，必要时放慢点击。） | 线索+复盘表",
+    "53:00–54:00": "卡在人还是流程。（第53分钟提醒：看弹幕，确认学员跟得上，必要时放慢点击。） | 线索+复盘表",
+    "54:00–55:00": "下月只加一个动作。（第54分钟提醒：看弹幕，确认学员跟得上，必要时放慢点击。） | 线索+复盘表",
+    "55:00–56:00": "对账早发现，不替会计做账。（第55分钟提醒：看弹幕，确认学员跟得上，必要时放慢点击。） | 线索+复盘表",
+    "56:00–57:00": "报税边界念两遍。（第56分钟提醒：看弹幕，确认学员跟得上，必要时放慢点击。） | 线索+复盘表",
+    "57:00–58:00": "续订：下月模块七专题标题公布。（第57分钟提醒：看弹幕，确认学员跟得上，必要时放慢点击。） | 线索+复盘表",
+    "58:00–59:00": "更新权口播。（第58分钟提醒：看弹幕，确认学员跟得上，必要时放慢点击。） | 线索+复盘表",
+    "59:00–60:00": "主课收口。（第59分钟提醒：看弹幕，确认学员跟得上，必要时放慢点击。） | 线索+复盘表",
+    "60:00–61:00": "答疑线索绑定。 | 答疑",
+    "61:00–62:00": "答疑无真实线索怎么办。 | 答疑",
+    "62:00–63:00": "答疑复盘数怎么估节省。 | 答疑",
+    "63:00–64:00": "答疑报税边界再念。 | 答疑",
+    "64:00–65:00": "答疑对账异常怎么标。 | 答疑",
+    "65:00–66:00": "共性问题回看五六点录播。 | 答疑",
+    "66:00–67:00": "无人问则带填复盘表一行。 | 答疑",
+    "67:00–68:00": "鼓励交作业。 | 答疑",
+    "68:00–69:00": "转续订。 | 答疑",
+    "69:00–70:00": "公布下月专题名。 | 答疑",
+    "70:00–71:00": "权益表。 | 答疑",
+    "71:00–72:00": "开通助教。 | 答疑",
+    "72:00–73:00": "倒数。 | 答疑",
+    "73:00–74:00": "感谢陪伴四周。 | 答疑",
+    "74:00–75:00": "强调不是一次课。 | 答疑",
+    "75:00–76:00": "钩子续订。 | 答疑",
+    "76:00–77:00": "答疑结束。 | 答疑",
+    "77:00–78:00": "看转化。 | 答疑",
+    "78:00–79:00": "确认预告文案一致。 | 答疑",
+    "79:00–80:00": "进入下单。 | 答疑",
+    "80:00–81:00": "下单五权益慢念。 | 续订转化",
+    "81:00–82:00": "续订理由：月更加换季。 | 续订转化",
+    "82:00–83:00": "下月专题标题再念。 | 续订转化",
+    "83:00–84:00": "作业五点四六点四。 | 续订转化",
+    "84:00–85:00": "感谢完课同学。 | 续订转化",
+    "85:00–86:00": "工具SKU为准。 | 续订转化",
+    "86:00–87:00": "价值图定格。 | 续订转化",
+    "87:00–88:00": "下课。 | 续订转化",
+    "88:00–89:00": "结束语：持续跟着干。 | 续订转化",
+    "89:00–90:00": "直播结束。 | 续订转化",
+    "课名": "第 4 周直播｜线索跟进 + 月度复盘",
+    "课号": "L4"
+  },
+  "slides": [
+    {
+      "index": 1,
+      "file": "01-cover.jpg",
+      "kind": "cover",
+      "htag": "封面",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course L4 · 第 4 周直播｜线索跟进 + 月度复盘. Cover slide. Huge title: 第 4 周直播｜线索跟进 + 月度复盘. Subtitle: . Badge: 课号 L4. Line: . Duration: 90min（5400 秒）. Visual metaphor: local store owner, multi-platform apps, AI pipeline ribbon.",
+      "meta": {
+        "kind": "cover",
+        "htag": "封面",
+        "module": "",
+        "dur": "90min（5400 秒）",
+        "gain": "",
+        "visual": "local store owner, multi-platform apps, AI pipeline ribbon"
+      }
+    },
+    {
+      "index": 2,
+      "file": "02-goal.jpg",
+      "kind": "goal",
+      "htag": "本课目标",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course L4 · 第 4 周直播｜线索跟进 + 月度复盘. Learning goals slide. Title: 本课你将带走. Lead: . 3-5 goal cards: .",
+      "meta": {
+        "kind": "goal",
+        "htag": "本课目标",
+        "lead": "",
+        "items": []
+      }
+    },
+    {
+      "index": 3,
+      "file": "03-insight.jpg",
+      "kind": "insight",
+      "htag": "为什么现在必须改",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course L4 · 第 4 周直播｜线索跟进 + 月度复盘. Insight slide. Title: 为什么现在必须改. Big statement: 散点经营一定累：同一件事拆到多个后台、多个人、多轮微信确认。. Supporting bullets: 多入口 = 多口径 | 无状态 = 月底对不清 | 无确认 = AI 不能替你签字.",
+      "meta": {
+        "kind": "insight",
+        "htag": "为什么现在必须改",
+        "lead": "散点经营一定累：同一件事拆到多个后台、多个人、多轮微信确认。",
+        "items": [
+          "多入口 = 多口径",
+          "无状态 = 月底对不清",
+          "无确认 = AI 不能替你签字"
+        ]
+      }
+    },
+    {
+      "index": 4,
+      "file": "04-map.jpg",
+      "kind": "map",
+      "htag": "灵祺流水线一览",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course L4 · 第 4 周直播｜线索跟进 + 月度复盘. Module map slide. Title: 灵祺流水线一览. Nodes: 开团/组品 → 招达人 → 做内容 → 曝光获客 → 对账复盘. Caption: AI 提案 · 你确认 · 少雇人少外包少踩坑.",
+      "meta": {
+        "kind": "map",
+        "htag": "灵祺流水线一览",
+        "steps": [
+          "开团/组品",
+          "招达人",
+          "做内容",
+          "曝光获客",
+          "对账复盘"
+        ],
+        "note": "AI 提案 · 你确认 · 少雇人少外包少踩坑"
+      }
+    },
+    {
+      "index": 5,
+      "file": "05-insight.jpg",
+      "kind": "insight",
+      "htag": "人机分工",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course L4 · 第 4 周直播｜线索跟进 + 月度复盘. Insight slide. Title: 人机分工. Big statement: AI 负责提案与草稿，你负责确认与签字。. Supporting bullets: 可预览 | 可回退 | 关键动作有状态.",
+      "meta": {
+        "kind": "insight",
+        "htag": "人机分工",
+        "lead": "AI 负责提案与草稿，你负责确认与签字。",
+        "items": [
+          "可预览",
+          "可回退",
+          "关键动作有状态"
+        ]
+      }
+    },
+    {
+      "index": 6,
+      "file": "06-split.jpg",
+      "kind": "split",
+      "htag": "旧方式 vs 流水线",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course L4 · 第 4 周直播｜线索跟进 + 月度复盘. Two-column contrast slide. Title: 旧方式 vs 流水线. Left: 旧：微信群跟单 + 表格 + 外包突击. Right: 新：订单状态机 + AI 产线 + 预览确认.",
+      "meta": {
+        "kind": "split",
+        "htag": "旧方式 vs 流水线",
+        "left": "旧：微信群跟单 + 表格 + 外包突击",
+        "right": "新：订单状态机 + AI 产线 + 预览确认"
+      }
+    },
+    {
+      "index": 7,
+      "file": "07-insight.jpg",
+      "kind": "insight",
+      "htag": "本课边界",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course L4 · 第 4 周直播｜线索跟进 + 月度复盘. Insight slide. Title: 本课边界. Big statement: 先对齐概念与路径，敏感信息打码，用测试店心态点一遍。. Supporting bullets: 不堆无关按钮 | 一课一个主动作 | 作业可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "本课边界",
+        "lead": "先对齐概念与路径，敏感信息打码，用测试店心态点一遍。",
+        "items": [
+          "不堆无关按钮",
+          "一课一个主动作",
+          "作业可验收"
+        ]
+      }
+    },
+    {
+      "index": 8,
+      "file": "08-checklist.jpg",
+      "kind": "checklist",
+      "htag": "听课检查清单",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course L4 · 第 4 周直播｜线索跟进 + 月度复盘. Checklist slide. Title: 听课检查清单. Checked steps: 能复述本课目标 | 能指出卡点在哪一步 | 能说出下一动作入口 | 完成作业打卡.",
+      "meta": {
+        "kind": "checklist",
+        "htag": "听课检查清单",
+        "items": [
+          "能复述本课目标",
+          "能指出卡点在哪一步",
+          "能说出下一动作入口",
+          "完成作业打卡"
+        ]
+      }
+    },
+    {
+      "index": 9,
+      "file": "09-quote.jpg",
+      "kind": "quote",
+      "htag": "金句",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course L4 · 第 4 周直播｜线索跟进 + 月度复盘. Quote/takeaway slide. Title: 记住这句话. Large quote: 把今天的要点落到测试店里点一遍. Side notes: 少雇人 | 少外包 | 少踩坑.",
+      "meta": {
+        "kind": "quote",
+        "htag": "金句",
+        "quote": "把今天的要点落到测试店里点一遍",
+        "points": [
+          "少雇人",
+          "少外包",
+          "少踩坑"
+        ]
+      }
+    },
+    {
+      "index": 10,
+      "file": "10-insight.jpg",
+      "kind": "insight",
+      "htag": "常见踩坑",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course L4 · 第 4 周直播｜线索跟进 + 月度复盘. Insight slide. Title: 常见踩坑. Big statement: 最容易翻车的不是不会用，而是跳过确认、跳过状态、跳过核对。. Supporting bullets: 未预览就发布 | 状态卡在群聊里 | 月底才想起对账.",
+      "meta": {
+        "kind": "insight",
+        "htag": "常见踩坑",
+        "lead": "最容易翻车的不是不会用，而是跳过确认、跳过状态、跳过核对。",
+        "items": [
+          "未预览就发布",
+          "状态卡在群聊里",
+          "月底才想起对账"
+        ]
+      }
+    },
+    {
+      "index": 11,
+      "file": "11-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 1",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course L4 · 第 4 周直播｜线索跟进 + 月度复盘. Insight slide. Title: 落地提醒 · 1. Big statement: L4 第 4 周直播｜线索跟进 + 月度复盘：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 1",
+        "lead": "L4 第 4 周直播｜线索跟进 + 月度复盘：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 12,
+      "file": "12-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 2",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course L4 · 第 4 周直播｜线索跟进 + 月度复盘. Insight slide. Title: 落地提醒 · 2. Big statement: L4 第 4 周直播｜线索跟进 + 月度复盘：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 2",
+        "lead": "L4 第 4 周直播｜线索跟进 + 月度复盘：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 13,
+      "file": "13-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 3",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course L4 · 第 4 周直播｜线索跟进 + 月度复盘. Insight slide. Title: 落地提醒 · 3. Big statement: L4 第 4 周直播｜线索跟进 + 月度复盘：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 3",
+        "lead": "L4 第 4 周直播｜线索跟进 + 月度复盘：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 14,
+      "file": "14-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 4",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course L4 · 第 4 周直播｜线索跟进 + 月度复盘. Insight slide. Title: 落地提醒 · 4. Big statement: L4 第 4 周直播｜线索跟进 + 月度复盘：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 4",
+        "lead": "L4 第 4 周直播｜线索跟进 + 月度复盘：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 15,
+      "file": "15-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 5",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course L4 · 第 4 周直播｜线索跟进 + 月度复盘. Insight slide. Title: 落地提醒 · 5. Big statement: L4 第 4 周直播｜线索跟进 + 月度复盘：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 5",
+        "lead": "L4 第 4 周直播｜线索跟进 + 月度复盘：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 16,
+      "file": "16-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 6",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course L4 · 第 4 周直播｜线索跟进 + 月度复盘. Insight slide. Title: 落地提醒 · 6. Big statement: L4 第 4 周直播｜线索跟进 + 月度复盘：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 6",
+        "lead": "L4 第 4 周直播｜线索跟进 + 月度复盘：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 17,
+      "file": "17-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 7",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course L4 · 第 4 周直播｜线索跟进 + 月度复盘. Insight slide. Title: 落地提醒 · 7. Big statement: L4 第 4 周直播｜线索跟进 + 月度复盘：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 7",
+        "lead": "L4 第 4 周直播｜线索跟进 + 月度复盘：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 18,
+      "file": "18-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 8",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course L4 · 第 4 周直播｜线索跟进 + 月度复盘. Insight slide. Title: 落地提醒 · 8. Big statement: L4 第 4 周直播｜线索跟进 + 月度复盘：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 8",
+        "lead": "L4 第 4 周直播｜线索跟进 + 月度复盘：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 19,
+      "file": "19-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 9",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course L4 · 第 4 周直播｜线索跟进 + 月度复盘. Insight slide. Title: 落地提醒 · 9. Big statement: L4 第 4 周直播｜线索跟进 + 月度复盘：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 9",
+        "lead": "L4 第 4 周直播｜线索跟进 + 月度复盘：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 20,
+      "file": "20-end.jpg",
+      "kind": "end",
+      "htag": "结束",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course L4 · 第 4 周直播｜线索跟进 + 月度复盘. Closing slide. Title: 本课结束. Course L4 第 4 周直播｜线索跟进 + 月度复盘. Takeaway: . CTA: 下一课继续实操. Inspiring local-business + AI visual.",
+      "meta": {
+        "kind": "end",
+        "htag": "结束",
+        "gain": "把今天的要点落到测试店里点一遍"
+      }
+    }
+  ]
+}

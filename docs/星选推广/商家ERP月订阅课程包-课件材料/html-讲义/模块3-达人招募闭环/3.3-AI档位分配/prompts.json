@@ -1,0 +1,511 @@
+{
+  "meta": {
+    "课号": "3.3",
+    "课名": "AI 档位分配：预算怎么拆到达人档",
+    "建议时长": "15min",
+    "所属模块": "模块 3｜达人招募闭环",
+    "学员收获": "会用智能分配，避免预算拍脑袋",
+    "建议录屏文件名": "3.3-AI档位分配.mp4",
+    "时间": "秒序 | 口播（逐字念） | 画面动作",
+    "00:00–00:05": "0000–0005 | 课号三点三：AI档位分配，预算怎么拆到达人档。 | 片头·3000元两种拆法",
+    "00:05–00:10": "0005–0010 | 目标：会用智能分配，避免预算拍脑袋。 | 片头·3000元两种拆法",
+    "00:10–00:15": "0010–0015 | 同样三千元预算，可以砸一个较大达人， | 片头·3000元两种拆法",
+    "00:15–00:20": "0015–0020 | 也可以拆成头部试水、腰部放量、尾部内容测试。 | 片头·3000元两种拆法",
+    "00:20–00:25": "0020–0025 | 没有绝对正确，只有适不适合你的阶段。 | 片头·3000元两种拆法",
+    "00:25–00:30": "0025–0030 | 打开智能分配或档位建议入口，以产品页面为准。 | 片头·3000元两种拆法",
+    "00:30–00:35": "0030–0035 | AI给出建议档位与人数后， | 片头·3000元两种拆法",
+    "00:35–00:40": "0035–0040 | 你根据品类调整：美业更吃颜值与案例前后对比； | 片头·3000元两种拆法",
+    "00:40–00:45": "0040–0045 | 餐饮更吃分量与环境真实感；休闲更吃体验完整度。 | 片头·3000元两种拆法",
+    "00:45–00:50": "0045–0050 | 分配是建议，确认权在你。 | 片头·3000元两种拆法",
+    "00:50–00:55": "0050–0055 | 不要把AI建议当成必须执行的军令。 | 片头·3000元两种拆法",
+    "00:55–01:00": "0055–0060 | 反例：全部预算砸一个「看起来很火」的号， | 片头·3000元两种拆法",
+    "01:00–01:05": "0060–0065 | 结果内容风格完全不对，回链数据也救不了匹配失败。 | 打开智能分配",
+    "01:05–01:10": "0065–0070 | 正例：留一小部分做测试档，验证话术和接待流程，再放量。 | 打开智能分配",
+    "01:10–01:15": "0070–0075 | 和三点二的关系：发单时人数档位可以先框架，用本集细拆。 | 打开智能分配",
+    "01:15–01:20": "0075–0080 | 和三点四的关系：档位定了，反选才有标准， | 打开智能分配",
+    "01:20–01:25": "0080–0085 | 不会只看粉丝数。暂停： | 打开智能分配",
+    "01:25–01:30": "0085–0090 | 对你的一笔预算做一次分配微调并截图。 | 打开智能分配",
+    "01:30–01:35": "0090–0095 | 好，三点三结束，下一集讲履约状态机。 | 打开智能分配",
+    "01:35–01:40": "0095–0100 | 我们展开讲：课号三点三：AI档位分配， | 打开智能分配",
+    "01:40–01:45": "0100–0105 | 预算怎么拆到达人档。为什么要强调这一点？ | 打开智能分配",
+    "01:45–01:50": "0105–0110 | 因为现场一忙最容易省掉这一步， | 打开智能分配",
+    "01:50–01:55": "0110–0115 | 而返工成本通常高于你现在多花的一分钟。 | 打开智能分配",
+    "01:55–02:00": "0115–0120 | 我们展开讲：目标：会用智能分配，避免预算拍脑袋。 | 打开智能分配",
+    "02:00–02:05": "0120–0125 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 打开智能分配",
+    "02:05–02:10": "0125–0130 | 听懂不等于会做，会做才算合格。 | 打开智能分配",
+    "02:10–02:15": "0130–0135 | 我们展开讲：同样三千元预算，可以砸一个较大达人， | 打开智能分配",
+    "02:15–02:20": "0135–0140 | 也可以拆成头部试水、腰部放量、尾部内容测试。 | 打开智能分配",
+    "02:20–02:25": "0140–0145 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 打开智能分配",
+    "02:25–02:30": "0145–0150 | 不截图不留痕。这些都会在下周复盘时暴露。 | 打开智能分配",
+    "02:30–02:35": "0150–0155 | 我们展开讲：没有绝对正确，只有适不适合你的阶段。 | 打开智能分配",
+    "02:35–02:40": "0155–0160 | 正例是什么？每一步都有入口、有确认、有结果物。 | 打开智能分配",
+    "02:40–02:45": "0160–0165 | 结果物可以是草稿、订单、话术截图或复盘表。 | 打开智能分配",
+    "02:45–02:50": "0165–0170 | 我们展开讲：打开智能分配或档位建议入口， | 打开智能分配",
+    "02:50–02:55": "0170–0175 | 以产品页面为准。自检三问：我刚才做到哪一步了？ | 打开智能分配",
+    "02:55–03:00": "0175–0180 | 哪一步还不敢自己点？我需要回看哪一个课号补齐？ | 打开智能分配",
+    "03:00–03:05": "0180–0185 | 我们展开讲：AI给出建议档位与人数后， | 打开智能分配",
+    "03:05–03:10": "0185–0190 | 你根据品类调整：美业更吃颜值与案例前后对比； | 打开智能分配",
+    "03:10–03:15": "0190–0195 | 餐饮更吃分量与环境真实感；休闲更吃体验完整度。 | 打开智能分配",
+    "03:15–03:20": "0195–0200 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 打开智能分配",
+    "03:20–03:25": "0200–0205 | 分工清楚，学习效率更高。 | 打开智能分配",
+    "03:25–03:30": "0205–0210 | 我们展开讲：分配是建议，确认权在你。演示默认测试店。 | 打开智能分配",
+    "03:30–03:35": "0210–0215 | 生产环境涉及改价、发单、结款，必须二次确认， | 打开智能分配",
+    "03:35–03:40": "0215–0220 | 不要直播手滑。我们展开讲： | 打开智能分配",
+    "03:40–03:45": "0220–0225 | 不要把AI建议当成必须执行的军令。 | 打开智能分配",
+    "03:45–03:50": "0225–0230 | 交作业打码：手机号、客户名、真实账单。 | 打开智能分配",
+    "03:50–03:55": "0230–0235 | 保护隐私，也是职业习惯。 | 打开智能分配",
+    "03:55–04:00": "0235–0240 | 我们展开讲：反例：全部预算砸一个「看起来很火」的号， | 打开智能分配",
+    "04:00–04:05": "0240–0245 | 结果内容风格完全不对，回链数据也救不了匹配失败。 | 按品类调整建议",
+    "04:05–04:10": "0245–0250 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 按品类调整建议",
+    "04:10–04:15": "0250–0255 | 每一步都要能复用到下周、下月。 | 按品类调整建议",
+    "04:15–04:20": "0255–0260 | 我们展开讲：正例：留一小部分做测试档， | 按品类调整建议",
+    "04:20–04:25": "0260–0265 | 验证话术和接待流程，再放量。跟不上就暂停。 | 按品类调整建议",
+    "04:25–04:30": "0265–0270 | 暂停重做三十秒，胜过假装看完却一步都没点过。 | 按品类调整建议",
+    "04:30–04:35": "0270–0275 | 我们展开讲：和三点二的关系：发单时人数档位可以先框架， | 按品类调整建议",
+    "04:35–04:40": "0275–0280 | 用本集细拆。为什么要强调这一点？ | 按品类调整建议",
+    "04:40–04:45": "0280–0285 | 因为现场一忙最容易省掉这一步， | 按品类调整建议",
+    "04:45–04:50": "0285–0290 | 而返工成本通常高于你现在多花的一分钟。 | 按品类调整建议",
+    "04:50–04:55": "0290–0295 | 我们展开讲：和三点四的关系：档位定了，反选才有标准， | 按品类调整建议",
+    "04:55–05:00": "0295–0300 | 不会只看粉丝数。怎么做才算到位？ | 按品类调整建议",
+    "05:00–05:05": "0300–0305 | 请对照屏幕把动作做完，而不是只听懂。 | 按品类调整建议",
+    "05:05–05:10": "0305–0310 | 听懂不等于会做，会做才算合格。 | 按品类调整建议",
+    "05:10–05:15": "0310–0315 | 我们展开讲：暂停：对你的一笔预算做一次分配微调并截图。 | 按品类调整建议",
+    "05:15–05:20": "0315–0320 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 按品类调整建议",
+    "05:20–05:25": "0320–0325 | 不截图不留痕。这些都会在下周复盘时暴露。 | 按品类调整建议",
+    "05:25–05:30": "0325–0330 | 我们展开讲：好，三点三结束，下一集讲履约状态机。 | 按品类调整建议",
+    "05:30–05:35": "0330–0335 | 正例是什么？每一步都有入口、有确认、有结果物。 | 按品类调整建议",
+    "05:35–05:40": "0335–0340 | 结果物可以是草稿、订单、话术截图或复盘表。 | 按品类调整建议",
+    "05:40–05:45": "0340–0345 | 我们展开讲：课号三点三：AI档位分配， | 按品类调整建议",
+    "05:45–05:50": "0345–0350 | 预算怎么拆到达人档。自检三问：我刚才做到哪一步了？ | 按品类调整建议",
+    "05:50–05:55": "0350–0355 | 哪一步还不敢自己点？我需要回看哪一个课号补齐？ | 按品类调整建议",
+    "05:55–06:00": "0355–0360 | 我们展开讲：目标：会用智能分配，避免预算拍脑袋。 | 按品类调整建议",
+    "06:00–06:05": "0360–0365 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 按品类调整建议",
+    "06:05–06:10": "0365–0370 | 分工清楚，学习效率更高。 | 按品类调整建议",
+    "06:10–06:15": "0370–0375 | 我们展开讲：同样三千元预算，可以砸一个较大达人， | 按品类调整建议",
+    "06:15–06:20": "0375–0380 | 也可以拆成头部试水、腰部放量、尾部内容测试。 | 按品类调整建议",
+    "06:20–06:25": "0380–0385 | 演示默认测试店。生产环境涉及改价、发单、结款， | 按品类调整建议",
+    "06:25–06:30": "0385–0390 | 必须二次确认，不要直播手滑。 | 按品类调整建议",
+    "06:30–06:35": "0390–0395 | 我们展开讲：没有绝对正确，只有适不适合你的阶段。 | 按品类调整建议",
+    "06:35–06:40": "0395–0400 | 交作业打码：手机号、客户名、真实账单。 | 按品类调整建议",
+    "06:40–06:45": "0400–0405 | 保护隐私，也是职业习惯。 | 按品类调整建议",
+    "06:45–06:50": "0405–0410 | 我们展开讲：打开智能分配或档位建议入口， | 按品类调整建议",
+    "06:50–06:55": "0410–0415 | 以产品页面为准。和课程总定位对齐：我们要的是流水线， | 按品类调整建议",
+    "06:55–07:00": "0415–0420 | 不是单点技巧。每一步都要能复用到下周、下月。 | 按品类调整建议",
+    "07:00–07:05": "0420–0425 | 我们展开讲：AI给出建议档位与人数后， | 按品类调整建议",
+    "07:05–07:10": "0425–0430 | 你根据品类调整：美业更吃颜值与案例前后对比； | 按品类调整建议",
+    "07:10–07:15": "0430–0435 | 餐饮更吃分量与环境真实感；休闲更吃体验完整度。 | 按品类调整建议",
+    "07:15–07:20": "0435–0440 | 跟不上就暂停。暂停重做三十秒， | 按品类调整建议",
+    "07:20–07:25": "0440–0445 | 胜过假装看完却一步都没点过。 | 按品类调整建议",
+    "07:25–07:30": "0445–0450 | 我们展开讲：分配是建议，确认权在你。 | 按品类调整建议",
+    "07:30–07:35": "0450–0455 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 按品类调整建议",
+    "07:35–07:40": "0455–0460 | 而返工成本通常高于你现在多花的一分钟。 | 按品类调整建议",
+    "07:40–07:45": "0460–0465 | 我们展开讲：不要把AI建议当成必须执行的军令。 | 按品类调整建议",
+    "07:45–07:50": "0465–0470 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 按品类调整建议",
+    "07:50–07:55": "0470–0475 | 听懂不等于会做，会做才算合格。 | 按品类调整建议",
+    "07:55–08:00": "0475–0480 | 我们展开讲：反例：全部预算砸一个「看起来很火」的号， | 按品类调整建议",
+    "08:00–08:05": "0480–0485 | 结果内容风格完全不对，回链数据也救不了匹配失败。 | 反例正例",
+    "08:05–08:10": "0485–0490 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 反例正例",
+    "08:10–08:15": "0490–0495 | 不截图不留痕。这些都会在下周复盘时暴露。 | 反例正例",
+    "08:15–08:20": "0495–0500 | 我们展开讲：正例：留一小部分做测试档， | 反例正例",
+    "08:20–08:25": "0500–0505 | 验证话术和接待流程，再放量。 | 反例正例",
+    "08:25–08:30": "0505–0510 | 正例是什么？每一步都有入口、有确认、有结果物。 | 反例正例",
+    "08:30–08:35": "0510–0515 | 结果物可以是草稿、订单、话术截图或复盘表。 | 反例正例",
+    "08:35–08:40": "0515–0520 | 我们展开讲：和三点二的关系：发单时人数档位可以先框架， | 反例正例",
+    "08:40–08:45": "0520–0525 | 用本集细拆。自检三问：我刚才做到哪一步了？ | 反例正例",
+    "08:45–08:50": "0525–0530 | 哪一步还不敢自己点？我需要回看哪一个课号补齐？ | 反例正例",
+    "08:50–08:55": "0530–0535 | 我们展开讲：和三点四的关系：档位定了，反选才有标准， | 反例正例",
+    "08:55–09:00": "0535–0540 | 不会只看粉丝数。如果带着店员一起学，让店员负责点选， | 反例正例",
+    "09:00–09:05": "0540–0545 | 你负责拍板。分工清楚，学习效率更高。 | 反例正例",
+    "09:05–09:10": "0545–0550 | 我们展开讲：暂停：对你的一笔预算做一次分配微调并截图。 | 反例正例",
+    "09:10–09:15": "0550–0555 | 演示默认测试店。生产环境涉及改价、发单、结款， | 反例正例",
+    "09:15–09:20": "0555–0560 | 必须二次确认，不要直播手滑。 | 反例正例",
+    "09:20–09:25": "0560–0565 | 我们展开讲：好，三点三结束，下一集讲履约状态机。 | 反例正例",
+    "09:25–09:30": "0565–0570 | 交作业打码：手机号、客户名、真实账单。 | 反例正例",
+    "09:30–09:35": "0570–0575 | 保护隐私，也是职业习惯。 | 反例正例",
+    "09:35–09:40": "0575–0580 | 我们展开讲：课号三点三：AI档位分配， | 反例正例",
+    "09:40–09:45": "0580–0585 | 预算怎么拆到达人档。和课程总定位对齐： | 反例正例",
+    "09:45–09:50": "0585–0590 | 我们要的是流水线，不是单点技巧。 | 反例正例",
+    "09:50–09:55": "0590–0595 | 每一步都要能复用到下周、下月。 | 反例正例",
+    "09:55–10:00": "0595–0600 | 我们展开讲：目标：会用智能分配，避免预算拍脑袋。 | 反例正例",
+    "10:00–10:05": "0600–0605 | 跟不上就暂停。暂停重做三十秒， | 反例正例",
+    "10:05–10:10": "0605–0610 | 胜过假装看完却一步都没点过。 | 反例正例",
+    "10:10–10:15": "0610–0615 | 我们展开讲：同样三千元预算，可以砸一个较大达人， | 反例正例",
+    "10:15–10:20": "0615–0620 | 也可以拆成头部试水、腰部放量、尾部内容测试。 | 反例正例",
+    "10:20–10:25": "0620–0625 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 反例正例",
+    "10:25–10:30": "0625–0630 | 而返工成本通常高于你现在多花的一分钟。 | 反例正例",
+    "10:30–10:35": "0630–0635 | 我们展开讲：没有绝对正确，只有适不适合你的阶段。 | 反例正例",
+    "10:35–10:40": "0635–0640 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 反例正例",
+    "10:40–10:45": "0640–0645 | 听懂不等于会做，会做才算合格。 | 反例正例",
+    "10:45–10:50": "0645–0650 | 我们展开讲：打开智能分配或档位建议入口， | 反例正例",
+    "10:50–10:55": "0650–0655 | 以产品页面为准。反例是什么？ | 反例正例",
+    "10:55–11:00": "0655–0660 | 跳步、凭感觉、只在微信里同步、不截图不留痕。 | 反例正例",
+    "11:00–11:05": "0660–0665 | 这些都会在下周复盘时暴露。 | 反例正例",
+    "11:05–11:10": "0665–0670 | 我们展开讲：AI给出建议档位与人数后， | 反例正例",
+    "11:10–11:15": "0670–0675 | 你根据品类调整：美业更吃颜值与案例前后对比； | 反例正例",
+    "11:15–11:20": "0675–0680 | 餐饮更吃分量与环境真实感；休闲更吃体验完整度。 | 反例正例",
+    "11:20–11:25": "0680–0685 | 正例是什么？每一步都有入口、有确认、有结果物。 | 反例正例",
+    "11:25–11:30": "0685–0690 | 结果物可以是草稿、订单、话术截图或复盘表。 | 反例正例",
+    "11:30–11:35": "0690–0695 | 我们展开讲：分配是建议，确认权在你。 | 反例正例",
+    "11:35–11:40": "0695–0700 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 反例正例",
+    "11:40–11:45": "0700–0705 | 我需要回看哪一个课号补齐？ | 反例正例",
+    "11:45–11:50": "0705–0710 | 我们展开讲：不要把AI建议当成必须执行的军令。 | 反例正例",
+    "11:50–11:55": "0710–0715 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 反例正例",
+    "11:55–12:00": "0715–0720 | 分工清楚，学习效率更高。 | 反例正例",
+    "12:00–12:05": "0720–0725 | 我们展开讲：反例：全部预算砸一个「看起来很火」的号， | 暂停练习",
+    "12:05–12:10": "0725–0730 | 结果内容风格完全不对，回链数据也救不了匹配失败。 | 暂停练习",
+    "12:10–12:15": "0730–0735 | 演示默认测试店。生产环境涉及改价、发单、结款， | 暂停练习",
+    "12:15–12:20": "0735–0740 | 必须二次确认，不要直播手滑。 | 暂停练习",
+    "12:20–12:25": "0740–0745 | 我们展开讲：正例：留一小部分做测试档， | 暂停练习",
+    "12:25–12:30": "0745–0750 | 验证话术和接待流程，再放量。 | 暂停练习",
+    "12:30–12:35": "0750–0755 | 交作业打码：手机号、客户名、真实账单。 | 暂停练习",
+    "12:35–12:40": "0755–0760 | 保护隐私，也是职业习惯。 | 暂停练习",
+    "12:40–12:45": "0760–0765 | 我们展开讲：和三点二的关系：发单时人数档位可以先框架， | 暂停练习",
+    "12:45–12:50": "0765–0770 | 用本集细拆。和课程总定位对齐：我们要的是流水线， | 暂停练习",
+    "12:50–12:55": "0770–0775 | 不是单点技巧。每一步都要能复用到下周、下月。 | 暂停练习",
+    "12:55–13:00": "0775–0780 | 我们展开讲：和三点四的关系：档位定了，反选才有标准， | 暂停练习",
+    "13:00–13:05": "0780–0785 | 不会只看粉丝数。跟不上就暂停。 | 暂停练习",
+    "13:05–13:10": "0785–0790 | 暂停重做三十秒，胜过假装看完却一步都没点过。 | 暂停练习",
+    "13:10–13:15": "0790–0795 | 我们展开讲：暂停：对你的一笔预算做一次分配微调并截图。 | 暂停练习",
+    "13:15–13:20": "0795–0800 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 暂停练习",
+    "13:20–13:25": "0800–0805 | 而返工成本通常高于你现在多花的一分钟。 | 暂停练习",
+    "13:25–13:30": "0805–0810 | 我们展开讲：好，三点三结束，下一集讲履约状态机。 | 暂停练习",
+    "13:30–13:35": "0810–0815 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 暂停练习",
+    "13:35–13:40": "0815–0820 | 听懂不等于会做，会做才算合格。 | 暂停练习",
+    "13:40–13:45": "0820–0825 | 我们展开讲：课号三点三：AI档位分配， | 暂停练习",
+    "13:45–13:50": "0825–0830 | 预算怎么拆到达人档。反例是什么？ | 暂停练习",
+    "13:50–13:55": "0830–0835 | 跳步、凭感觉、只在微信里同步、不截图不留痕。 | 暂停练习",
+    "13:55–14:00": "0835–0840 | 这些都会在下周复盘时暴露。 | 暂停练习",
+    "14:00–14:05": "0840–0845 | 我们展开讲：目标：会用智能分配，避免预算拍脑袋。 | 片尾预告3.4",
+    "14:05–14:10": "0845–0850 | 正例是什么？每一步都有入口、有确认、有结果物。 | 片尾预告3.4",
+    "14:10–14:15": "0850–0855 | 结果物可以是草稿、订单、话术截图或复盘表。 | 片尾预告3.4",
+    "14:15–14:20": "0855–0860 | 我们展开讲：同样三千元预算，可以砸一个较大达人， | 片尾预告3.4",
+    "14:20–14:25": "0860–0865 | 也可以拆成头部试水、腰部放量、尾部内容测试。 | 片尾预告3.4",
+    "14:25–14:30": "0865–0870 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 片尾预告3.4",
+    "14:30–14:35": "0870–0875 | 我需要回看哪一个课号补齐？ | 片尾预告3.4",
+    "14:35–14:40": "0875–0880 | 我们展开讲：没有绝对正确，只有适不适合你的阶段。 | 片尾预告3.4",
+    "14:40–14:45": "0880–0885 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 片尾预告3.4",
+    "14:45–14:50": "0885–0890 | 分工清楚，学习效率更高。 | 片尾预告3.4",
+    "14:50–14:55": "0890–0895 | 我们展开讲：打开智能分配或档位建议入口， | 片尾预告3.4",
+    "14:55–15:00": "0895–0900 | 以产品页面为准。演示默认测试店。 | 片尾预告3.4"
+  },
+  "slides": [
+    {
+      "index": 1,
+      "file": "01-cover.jpg",
+      "kind": "cover",
+      "htag": "封面",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.3 · AI 档位分配：预算怎么拆到达人档. Cover slide. Huge title: AI 档位分配：预算怎么拆到达人档. Subtitle: 模块 3｜达人招募闭环. Badge: 课号 3.3. Line: 会用智能分配，避免预算拍脑袋. Duration: 15min. Visual metaphor: local store owner, multi-platform apps, AI pipeline ribbon.",
+      "meta": {
+        "kind": "cover",
+        "htag": "封面",
+        "module": "模块 3｜达人招募闭环",
+        "dur": "15min",
+        "gain": "会用智能分配，避免预算拍脑袋",
+        "visual": "local store owner, multi-platform apps, AI pipeline ribbon"
+      }
+    },
+    {
+      "index": 2,
+      "file": "02-goal.jpg",
+      "kind": "goal",
+      "htag": "本课目标",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.3 · AI 档位分配：预算怎么拆到达人档. Learning goals slide. Title: 本课你将带走. Lead: 理解预算可拆：头部试水 + 腰部放量 + 尾部测试。. 3-5 goal cards: 会用智能分配，避免预算拍脑袋.",
+      "meta": {
+        "kind": "goal",
+        "htag": "本课目标",
+        "lead": "理解预算可拆：头部试水 + 腰部放量 + 尾部测试。",
+        "items": [
+          "会用智能分配，避免预算拍脑袋"
+        ]
+      }
+    },
+    {
+      "index": 3,
+      "file": "03-insight.jpg",
+      "kind": "insight",
+      "htag": "讲义要点",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.3 · AI 档位分配：预算怎么拆到达人档. Insight slide. Title: 讲义要点. Big statement: 同样 3000 元预算，可以砸 1 个较大达人，或拆成头部试水 + 腰部放量 + 尾部内容测试。. Supporting bullets: AI 给出建议档位与人数后，按品类调整：美业更吃颜值与案例，餐饮更吃分量与环境。 分配是建议，确认权在你。.",
+      "meta": {
+        "kind": "insight",
+        "htag": "讲义要点",
+        "lead": "同样 3000 元预算，可以砸 1 个较大达人，或拆成头部试水 + 腰部放量 + 尾部内容测试。",
+        "items": [
+          "AI 给出建议档位与人数后，按品类调整：美业更吃颜值与案例，餐饮更吃分量与环境。 分配是建议，确认权在你。"
+        ]
+      }
+    },
+    {
+      "index": 4,
+      "file": "04-checklist.jpg",
+      "kind": "checklist",
+      "htag": "演示 / 操作路径",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.3 · AI 档位分配：预算怎么拆到达人档. Checklist slide. Title: 演示 / 操作路径. Checked steps: 打开档位/智能分配入口，展示建议结果并手动微调一档。.",
+      "meta": {
+        "kind": "checklist",
+        "htag": "演示 / 操作路径",
+        "items": [
+          "打开档位/智能分配入口，展示建议结果并手动微调一档。"
+        ]
+      }
+    },
+    {
+      "index": 5,
+      "file": "05-quote.jpg",
+      "kind": "quote",
+      "htag": "口播与转化要点",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.3 · AI 档位分配：预算怎么拆到达人档. Quote/takeaway slide. Title: 记住这句话. Large quote: 「预算别拍脑袋——先看 AI 拆法，再按品类改。」. Side notes: .",
+      "meta": {
+        "kind": "quote",
+        "htag": "口播与转化要点",
+        "quote": "「预算别拍脑袋——先看 AI 拆法，再按品类改。」",
+        "points": []
+      }
+    },
+    {
+      "index": 6,
+      "file": "06-insight.jpg",
+      "kind": "insight",
+      "htag": "讲义深化",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.3 · AI 档位分配：预算怎么拆到达人档. Insight slide. Title: 讲义深化. Big statement: 同样 3000 元预算，可以砸 1 个较大达人，或拆成头部试水 + 腰部放量 + 尾部内容测试。. Supporting bullets: AI 给出建议档位与人数后，按品类调整：美业更吃颜值与案例，餐饮更吃分量与环境。 分配是建议，确认权在你。.",
+      "meta": {
+        "kind": "insight",
+        "htag": "讲义深化",
+        "lead": "同样 3000 元预算，可以砸 1 个较大达人，或拆成头部试水 + 腰部放量 + 尾部内容测试。",
+        "items": [
+          "AI 给出建议档位与人数后，按品类调整：美业更吃颜值与案例，餐饮更吃分量与环境。 分配是建议，确认权在你。"
+        ]
+      }
+    },
+    {
+      "index": 7,
+      "file": "07-insight.jpg",
+      "kind": "insight",
+      "htag": "为什么现在必须改",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.3 · AI 档位分配：预算怎么拆到达人档. Insight slide. Title: 为什么现在必须改. Big statement: 散点经营一定累：同一件事拆到多个后台、多个人、多轮微信确认。. Supporting bullets: 多入口 = 多口径 | 无状态 = 月底对不清 | 无确认 = AI 不能替你签字.",
+      "meta": {
+        "kind": "insight",
+        "htag": "为什么现在必须改",
+        "lead": "散点经营一定累：同一件事拆到多个后台、多个人、多轮微信确认。",
+        "items": [
+          "多入口 = 多口径",
+          "无状态 = 月底对不清",
+          "无确认 = AI 不能替你签字"
+        ]
+      }
+    },
+    {
+      "index": 8,
+      "file": "08-map.jpg",
+      "kind": "map",
+      "htag": "灵祺流水线一览",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.3 · AI 档位分配：预算怎么拆到达人档. Module map slide. Title: 灵祺流水线一览. Nodes: 开团/组品 → 招达人 → 做内容 → 曝光获客 → 对账复盘. Caption: AI 提案 · 你确认 · 少雇人少外包少踩坑.",
+      "meta": {
+        "kind": "map",
+        "htag": "灵祺流水线一览",
+        "steps": [
+          "开团/组品",
+          "招达人",
+          "做内容",
+          "曝光获客",
+          "对账复盘"
+        ],
+        "note": "AI 提案 · 你确认 · 少雇人少外包少踩坑"
+      }
+    },
+    {
+      "index": 9,
+      "file": "09-insight.jpg",
+      "kind": "insight",
+      "htag": "人机分工",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.3 · AI 档位分配：预算怎么拆到达人档. Insight slide. Title: 人机分工. Big statement: AI 负责提案与草稿，你负责确认与签字。. Supporting bullets: 可预览 | 可回退 | 关键动作有状态.",
+      "meta": {
+        "kind": "insight",
+        "htag": "人机分工",
+        "lead": "AI 负责提案与草稿，你负责确认与签字。",
+        "items": [
+          "可预览",
+          "可回退",
+          "关键动作有状态"
+        ]
+      }
+    },
+    {
+      "index": 10,
+      "file": "10-split.jpg",
+      "kind": "split",
+      "htag": "旧方式 vs 流水线",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.3 · AI 档位分配：预算怎么拆到达人档. Two-column contrast slide. Title: 旧方式 vs 流水线. Left: 旧：微信群跟单 + 表格 + 外包突击. Right: 新：订单状态机 + AI 产线 + 预览确认.",
+      "meta": {
+        "kind": "split",
+        "htag": "旧方式 vs 流水线",
+        "left": "旧：微信群跟单 + 表格 + 外包突击",
+        "right": "新：订单状态机 + AI 产线 + 预览确认"
+      }
+    },
+    {
+      "index": 11,
+      "file": "11-insight.jpg",
+      "kind": "insight",
+      "htag": "本课边界",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.3 · AI 档位分配：预算怎么拆到达人档. Insight slide. Title: 本课边界. Big statement: 先对齐概念与路径，敏感信息打码，用测试店心态点一遍。. Supporting bullets: 不堆无关按钮 | 一课一个主动作 | 作业可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "本课边界",
+        "lead": "先对齐概念与路径，敏感信息打码，用测试店心态点一遍。",
+        "items": [
+          "不堆无关按钮",
+          "一课一个主动作",
+          "作业可验收"
+        ]
+      }
+    },
+    {
+      "index": 12,
+      "file": "12-checklist.jpg",
+      "kind": "checklist",
+      "htag": "听课检查清单",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.3 · AI 档位分配：预算怎么拆到达人档. Checklist slide. Title: 听课检查清单. Checked steps: 能复述本课目标 | 能指出卡点在哪一步 | 能说出下一动作入口 | 完成作业打卡.",
+      "meta": {
+        "kind": "checklist",
+        "htag": "听课检查清单",
+        "items": [
+          "能复述本课目标",
+          "能指出卡点在哪一步",
+          "能说出下一动作入口",
+          "完成作业打卡"
+        ]
+      }
+    },
+    {
+      "index": 13,
+      "file": "13-quote.jpg",
+      "kind": "quote",
+      "htag": "金句",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.3 · AI 档位分配：预算怎么拆到达人档. Quote/takeaway slide. Title: 记住这句话. Large quote: 会用智能分配，避免预算拍脑袋. Side notes: 少雇人 | 少外包 | 少踩坑.",
+      "meta": {
+        "kind": "quote",
+        "htag": "金句",
+        "quote": "会用智能分配，避免预算拍脑袋",
+        "points": [
+          "少雇人",
+          "少外包",
+          "少踩坑"
+        ]
+      }
+    },
+    {
+      "index": 14,
+      "file": "14-insight.jpg",
+      "kind": "insight",
+      "htag": "常见踩坑",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.3 · AI 档位分配：预算怎么拆到达人档. Insight slide. Title: 常见踩坑. Big statement: 最容易翻车的不是不会用，而是跳过确认、跳过状态、跳过核对。. Supporting bullets: 未预览就发布 | 状态卡在群聊里 | 月底才想起对账.",
+      "meta": {
+        "kind": "insight",
+        "htag": "常见踩坑",
+        "lead": "最容易翻车的不是不会用，而是跳过确认、跳过状态、跳过核对。",
+        "items": [
+          "未预览就发布",
+          "状态卡在群聊里",
+          "月底才想起对账"
+        ]
+      }
+    },
+    {
+      "index": 15,
+      "file": "15-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 1",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.3 · AI 档位分配：预算怎么拆到达人档. Insight slide. Title: 落地提醒 · 1. Big statement: 3.3 AI 档位分配：预算怎么拆到达人档：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 1",
+        "lead": "3.3 AI 档位分配：预算怎么拆到达人档：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 16,
+      "file": "16-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 2",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.3 · AI 档位分配：预算怎么拆到达人档. Insight slide. Title: 落地提醒 · 2. Big statement: 3.3 AI 档位分配：预算怎么拆到达人档：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 2",
+        "lead": "3.3 AI 档位分配：预算怎么拆到达人档：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 17,
+      "file": "17-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 3",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.3 · AI 档位分配：预算怎么拆到达人档. Insight slide. Title: 落地提醒 · 3. Big statement: 3.3 AI 档位分配：预算怎么拆到达人档：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 3",
+        "lead": "3.3 AI 档位分配：预算怎么拆到达人档：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 18,
+      "file": "18-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 4",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.3 · AI 档位分配：预算怎么拆到达人档. Insight slide. Title: 落地提醒 · 4. Big statement: 3.3 AI 档位分配：预算怎么拆到达人档：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 4",
+        "lead": "3.3 AI 档位分配：预算怎么拆到达人档：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 19,
+      "file": "19-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 5",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.3 · AI 档位分配：预算怎么拆到达人档. Insight slide. Title: 落地提醒 · 5. Big statement: 3.3 AI 档位分配：预算怎么拆到达人档：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 5",
+        "lead": "3.3 AI 档位分配：预算怎么拆到达人档：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 20,
+      "file": "20-end.jpg",
+      "kind": "end",
+      "htag": "结束",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.3 · AI 档位分配：预算怎么拆到达人档. Closing slide. Title: 本课结束. Course 3.3 AI 档位分配：预算怎么拆到达人档. Takeaway: 会用智能分配，避免预算拍脑袋. CTA: 下一课继续实操. Inspiring local-business + AI visual.",
+      "meta": {
+        "kind": "end",
+        "htag": "结束",
+        "gain": "会用智能分配，避免预算拍脑袋"
+      }
+    }
+  ]
+}

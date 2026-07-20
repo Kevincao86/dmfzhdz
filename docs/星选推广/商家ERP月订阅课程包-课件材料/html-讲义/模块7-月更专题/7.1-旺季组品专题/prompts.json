@@ -1,0 +1,595 @@
+{
+  "meta": {
+    "课号": "7.1",
+    "课名": "旺季组品专题（暑期 / 国庆 / 春节）",
+    "建议时长": "20–25min",
+    "所属模块": "模块 7｜月更专题",
+    "学员收获": "当季用 AI 批量打草稿，再人工定 1–2 个主推",
+    "建议录屏文件名": "YYYY-MM-旺季组品专题.mp4",
+    "时间": "秒序 | 口播（逐字念） | 画面动作",
+    "00:00–00:05": "0000–0005 | 模块七月更专题。课号七点一：旺季组品专题。 | 片头·定旺季主题",
+    "00:05–00:10": "0005–0010 | 标题里的季节词每月可替换：暑期、国庆、春节。 | 片头·定旺季主题",
+    "00:10–00:15": "0010–0015 | 开场先定本月旺季主题：人群一句，价格带一句。 | 片头·定旺季主题",
+    "00:15–00:20": "0015–0020 | 然后用AI创建商品连打三个草稿，不同价格带或人群。 | 片头·定旺季主题",
+    "00:20–00:25": "0020–0025 | 人工只定一到两个作主推，其余进备选。 | 片头·定旺季主题",
+    "00:25–00:30": "0025–0030 | 同步写一版当季Brief钩子，接到招募。 | 片头·定旺季主题",
+    "00:30–00:35": "0030–0035 | 旺季不是多上架，是主推清晰，达人和内容对齐主推。 | 片头·定旺季主题",
+    "00:35–00:40": "0035–0040 | 续订话术：功能会月更，场景会换季，续订是更新权。 | 片头·定旺季主题",
+    "00:40–00:45": "0040–0045 | 可选作业：交一个当季主推草稿截图。 | 片头·定旺季主题",
+    "00:45–00:50": "0045–0050 | 本专题教案下月改标题即可复用。 | 片头·定旺季主题",
+    "00:50–00:55": "0050–0055 | 我们展开讲：模块七月更专题。 | 片头·定旺季主题",
+    "00:55–01:00": "0055–0060 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 片头·定旺季主题",
+    "01:00–01:05": "0060–0065 | 而返工成本通常高于你现在多花的一分钟。 | AI草稿1",
+    "01:05–01:10": "0065–0070 | 我们展开讲：课号七点一：旺季组品专题。 | AI草稿1",
+    "01:10–01:15": "0070–0075 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | AI草稿1",
+    "01:15–01:20": "0075–0080 | 听懂不等于会做，会做才算合格。 | AI草稿1",
+    "01:20–01:25": "0080–0085 | 我们展开讲：标题里的季节词每月可替换：暑期、国庆、 | AI草稿1",
+    "01:25–01:30": "0085–0090 | 春节。反例是什么？跳步、凭感觉、只在微信里同步、 | AI草稿1",
+    "01:30–01:35": "0090–0095 | 不截图不留痕。这些都会在下周复盘时暴露。 | AI草稿1",
+    "01:35–01:40": "0095–0100 | 我们展开讲：开场先定本月旺季主题：人群一句， | AI草稿1",
+    "01:40–01:45": "0100–0105 | 价格带一句。正例是什么？ | AI草稿1",
+    "01:45–01:50": "0105–0110 | 每一步都有入口、有确认、有结果物。 | AI草稿1",
+    "01:50–01:55": "0110–0115 | 结果物可以是草稿、订单、话术截图或复盘表。 | AI草稿1",
+    "01:55–02:00": "0115–0120 | 我们展开讲：然后用AI创建商品连打三个草稿， | AI草稿1",
+    "02:00–02:05": "0120–0125 | 不同价格带或人群。自检三问：我刚才做到哪一步了？ | AI草稿1",
+    "02:05–02:10": "0125–0130 | 哪一步还不敢自己点？我需要回看哪一个课号补齐？ | AI草稿1",
+    "02:10–02:15": "0130–0135 | 我们展开讲：人工只定一到两个作主推，其余进备选。 | AI草稿1",
+    "02:15–02:20": "0135–0140 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | AI草稿1",
+    "02:20–02:25": "0140–0145 | 分工清楚，学习效率更高。 | AI草稿1",
+    "02:25–02:30": "0145–0150 | 我们展开讲：同步写一版当季Brief钩子，接到招募。 | AI草稿1",
+    "02:30–02:35": "0150–0155 | 演示默认测试店。生产环境涉及改价、发单、结款， | AI草稿1",
+    "02:35–02:40": "0155–0160 | 必须二次确认，不要直播手滑。 | AI草稿1",
+    "02:40–02:45": "0160–0165 | 我们展开讲：旺季不是多上架，是主推清晰， | AI草稿1",
+    "02:45–02:50": "0165–0170 | 达人和内容对齐主推。交作业打码：手机号、客户名、 | AI草稿1",
+    "02:50–02:55": "0170–0175 | 真实账单。保护隐私，也是职业习惯。 | AI草稿1",
+    "02:55–03:00": "0175–0180 | 我们展开讲：续订话术：功能会月更，场景会换季， | AI草稿1",
+    "03:00–03:05": "0180–0185 | 续订是更新权。和课程总定位对齐：我们要的是流水线， | AI草稿1",
+    "03:05–03:10": "0185–0190 | 不是单点技巧。每一步都要能复用到下周、下月。 | AI草稿1",
+    "03:10–03:15": "0190–0195 | 我们展开讲：可选作业：交一个当季主推草稿截图。 | AI草稿1",
+    "03:15–03:20": "0195–0200 | 跟不上就暂停。暂停重做三十秒， | AI草稿1",
+    "03:20–03:25": "0200–0205 | 胜过假装看完却一步都没点过。 | AI草稿1",
+    "03:25–03:30": "0205–0210 | 我们展开讲：本专题教案下月改标题即可复用。 | AI草稿1",
+    "03:30–03:35": "0210–0215 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | AI草稿1",
+    "03:35–03:40": "0215–0220 | 而返工成本通常高于你现在多花的一分钟。 | AI草稿1",
+    "03:40–03:45": "0220–0225 | 我们展开讲：模块七月更专题。 | AI草稿1",
+    "03:45–03:50": "0225–0230 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | AI草稿1",
+    "03:50–03:55": "0230–0235 | 听懂不等于会做，会做才算合格。 | AI草稿1",
+    "03:55–04:00": "0235–0240 | 我们展开讲：课号七点一：旺季组品专题。 | AI草稿1",
+    "04:00–04:05": "0240–0245 | 反例是什么？跳步、凭感觉、只在微信里同步、 | AI草稿1",
+    "04:05–04:10": "0245–0250 | 不截图不留痕。这些都会在下周复盘时暴露。 | AI草稿1",
+    "04:10–04:15": "0250–0255 | 我们展开讲：标题里的季节词每月可替换：暑期、国庆、 | AI草稿1",
+    "04:15–04:20": "0255–0260 | 春节。正例是什么？每一步都有入口、有确认、有结果物。 | AI草稿1",
+    "04:20–04:25": "0260–0265 | 结果物可以是草稿、订单、话术截图或复盘表。 | AI草稿1",
+    "04:25–04:30": "0265–0270 | 我们展开讲：开场先定本月旺季主题：人群一句， | AI草稿1",
+    "04:30–04:35": "0270–0275 | 价格带一句。自检三问：我刚才做到哪一步了？ | AI草稿1",
+    "04:35–04:40": "0275–0280 | 哪一步还不敢自己点？我需要回看哪一个课号补齐？ | AI草稿1",
+    "04:40–04:45": "0280–0285 | 我们展开讲：然后用AI创建商品连打三个草稿， | AI草稿1",
+    "04:45–04:50": "0285–0290 | 不同价格带或人群。如果带着店员一起学，让店员负责点选， | AI草稿1",
+    "04:50–04:55": "0290–0295 | 你负责拍板。分工清楚，学习效率更高。 | AI草稿1",
+    "04:55–05:00": "0295–0300 | 我们展开讲：人工只定一到两个作主推，其余进备选。 | AI草稿1",
+    "05:00–05:05": "0300–0305 | 演示默认测试店。生产环境涉及改价、发单、结款， | AI草稿1",
+    "05:05–05:10": "0305–0310 | 必须二次确认，不要直播手滑。 | AI草稿1",
+    "05:10–05:15": "0310–0315 | 我们展开讲：同步写一版当季Brief钩子，接到招募。 | AI草稿1",
+    "05:15–05:20": "0315–0320 | 交作业打码：手机号、客户名、真实账单。 | AI草稿1",
+    "05:20–05:25": "0320–0325 | 保护隐私，也是职业习惯。 | AI草稿1",
+    "05:25–05:30": "0325–0330 | 我们展开讲：旺季不是多上架，是主推清晰， | AI草稿1",
+    "05:30–05:35": "0330–0335 | 达人和内容对齐主推。和课程总定位对齐： | AI草稿1",
+    "05:35–05:40": "0335–0340 | 我们要的是流水线，不是单点技巧。 | AI草稿1",
+    "05:40–05:45": "0340–0345 | 每一步都要能复用到下周、下月。 | AI草稿1",
+    "05:45–05:50": "0345–0350 | 我们展开讲：续订话术：功能会月更，场景会换季， | AI草稿1",
+    "05:50–05:55": "0350–0355 | 续订是更新权。跟不上就暂停。 | AI草稿1",
+    "05:55–06:00": "0355–0360 | 暂停重做三十秒，胜过假装看完却一步都没点过。 | AI草稿1",
+    "06:00–06:05": "0360–0365 | 我们展开讲：可选作业：交一个当季主推草稿截图。 | AI草稿2",
+    "06:05–06:10": "0365–0370 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | AI草稿2",
+    "06:10–06:15": "0370–0375 | 而返工成本通常高于你现在多花的一分钟。 | AI草稿2",
+    "06:15–06:20": "0375–0380 | 我们展开讲：本专题教案下月改标题即可复用。 | AI草稿2",
+    "06:20–06:25": "0380–0385 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | AI草稿2",
+    "06:25–06:30": "0385–0390 | 听懂不等于会做，会做才算合格。 | AI草稿2",
+    "06:30–06:35": "0390–0395 | 我们展开讲：模块七月更专题。 | AI草稿2",
+    "06:35–06:40": "0395–0400 | 反例是什么？跳步、凭感觉、只在微信里同步、 | AI草稿2",
+    "06:40–06:45": "0400–0405 | 不截图不留痕。这些都会在下周复盘时暴露。 | AI草稿2",
+    "06:45–06:50": "0405–0410 | 我们展开讲：课号七点一：旺季组品专题。 | AI草稿2",
+    "06:50–06:55": "0410–0415 | 正例是什么？每一步都有入口、有确认、有结果物。 | AI草稿2",
+    "06:55–07:00": "0415–0420 | 结果物可以是草稿、订单、话术截图或复盘表。 | AI草稿2",
+    "07:00–07:05": "0420–0425 | 我们展开讲：标题里的季节词每月可替换：暑期、国庆、 | AI草稿2",
+    "07:05–07:10": "0425–0430 | 春节。自检三问：我刚才做到哪一步了？ | AI草稿2",
+    "07:10–07:15": "0430–0435 | 哪一步还不敢自己点？我需要回看哪一个课号补齐？ | AI草稿2",
+    "07:15–07:20": "0435–0440 | 我们展开讲：开场先定本月旺季主题：人群一句， | AI草稿2",
+    "07:20–07:25": "0440–0445 | 价格带一句。如果带着店员一起学，让店员负责点选， | AI草稿2",
+    "07:25–07:30": "0445–0450 | 你负责拍板。分工清楚，学习效率更高。 | AI草稿2",
+    "07:30–07:35": "0450–0455 | 我们展开讲：然后用AI创建商品连打三个草稿， | AI草稿2",
+    "07:35–07:40": "0455–0460 | 不同价格带或人群。演示默认测试店。 | AI草稿2",
+    "07:40–07:45": "0460–0465 | 生产环境涉及改价、发单、结款，必须二次确认， | AI草稿2",
+    "07:45–07:50": "0465–0470 | 不要直播手滑。我们展开讲：人工只定一到两个作主推， | AI草稿2",
+    "07:50–07:55": "0470–0475 | 其余进备选。交作业打码：手机号、客户名、真实账单。 | AI草稿2",
+    "07:55–08:00": "0475–0480 | 保护隐私，也是职业习惯。 | AI草稿2",
+    "08:00–08:05": "0480–0485 | 我们展开讲：同步写一版当季Brief钩子，接到招募。 | AI草稿2",
+    "08:05–08:10": "0485–0490 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | AI草稿2",
+    "08:10–08:15": "0490–0495 | 每一步都要能复用到下周、下月。 | AI草稿2",
+    "08:15–08:20": "0495–0500 | 我们展开讲：旺季不是多上架，是主推清晰， | AI草稿2",
+    "08:20–08:25": "0500–0505 | 达人和内容对齐主推。跟不上就暂停。 | AI草稿2",
+    "08:25–08:30": "0505–0510 | 暂停重做三十秒，胜过假装看完却一步都没点过。 | AI草稿2",
+    "08:30–08:35": "0510–0515 | 我们展开讲：续订话术：功能会月更，场景会换季， | AI草稿2",
+    "08:35–08:40": "0515–0520 | 续订是更新权。为什么要强调这一点？ | AI草稿2",
+    "08:40–08:45": "0520–0525 | 因为现场一忙最容易省掉这一步， | AI草稿2",
+    "08:45–08:50": "0525–0530 | 而返工成本通常高于你现在多花的一分钟。 | AI草稿2",
+    "08:50–08:55": "0530–0535 | 我们展开讲：可选作业：交一个当季主推草稿截图。 | AI草稿2",
+    "08:55–09:00": "0535–0540 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | AI草稿2",
+    "09:00–09:05": "0540–0545 | 听懂不等于会做，会做才算合格。 | AI草稿2",
+    "09:05–09:10": "0545–0550 | 我们展开讲：本专题教案下月改标题即可复用。 | AI草稿2",
+    "09:10–09:15": "0550–0555 | 反例是什么？跳步、凭感觉、只在微信里同步、 | AI草稿2",
+    "09:15–09:20": "0555–0560 | 不截图不留痕。这些都会在下周复盘时暴露。 | AI草稿2",
+    "09:20–09:25": "0560–0565 | 我们展开讲：模块七月更专题。 | AI草稿2",
+    "09:25–09:30": "0565–0570 | 正例是什么？每一步都有入口、有确认、有结果物。 | AI草稿2",
+    "09:30–09:35": "0570–0575 | 结果物可以是草稿、订单、话术截图或复盘表。 | AI草稿2",
+    "09:35–09:40": "0575–0580 | 我们展开讲：课号七点一：旺季组品专题。 | AI草稿2",
+    "09:40–09:45": "0580–0585 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | AI草稿2",
+    "09:45–09:50": "0585–0590 | 我需要回看哪一个课号补齐？ | AI草稿2",
+    "09:50–09:55": "0590–0595 | 我们展开讲：标题里的季节词每月可替换：暑期、国庆、 | AI草稿2",
+    "09:55–10:00": "0595–0600 | 春节。如果带着店员一起学，让店员负责点选，你负责拍板。 | AI草稿2",
+    "10:00–10:05": "0600–0605 | 分工清楚，学习效率更高。 | AI草稿3",
+    "10:05–10:10": "0605–0610 | 我们展开讲：开场先定本月旺季主题：人群一句， | AI草稿3",
+    "10:10–10:15": "0610–0615 | 价格带一句。演示默认测试店。 | AI草稿3",
+    "10:15–10:20": "0615–0620 | 生产环境涉及改价、发单、结款，必须二次确认， | AI草稿3",
+    "10:20–10:25": "0620–0625 | 不要直播手滑。我们展开讲： | AI草稿3",
+    "10:25–10:30": "0625–0630 | 然后用AI创建商品连打三个草稿，不同价格带或人群。 | AI草稿3",
+    "10:30–10:35": "0630–0635 | 交作业打码：手机号、客户名、真实账单。 | AI草稿3",
+    "10:35–10:40": "0635–0640 | 保护隐私，也是职业习惯。 | AI草稿3",
+    "10:40–10:45": "0640–0645 | 我们展开讲：人工只定一到两个作主推，其余进备选。 | AI草稿3",
+    "10:45–10:50": "0645–0650 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | AI草稿3",
+    "10:50–10:55": "0650–0655 | 每一步都要能复用到下周、下月。 | AI草稿3",
+    "10:55–11:00": "0655–0660 | 我们展开讲：同步写一版当季Brief钩子，接到招募。 | AI草稿3",
+    "11:00–11:05": "0660–0665 | 跟不上就暂停。暂停重做三十秒， | AI草稿3",
+    "11:05–11:10": "0665–0670 | 胜过假装看完却一步都没点过。 | AI草稿3",
+    "11:10–11:15": "0670–0675 | 我们展开讲：旺季不是多上架，是主推清晰， | AI草稿3",
+    "11:15–11:20": "0675–0680 | 达人和内容对齐主推。为什么要强调这一点？ | AI草稿3",
+    "11:20–11:25": "0680–0685 | 因为现场一忙最容易省掉这一步， | AI草稿3",
+    "11:25–11:30": "0685–0690 | 而返工成本通常高于你现在多花的一分钟。 | AI草稿3",
+    "11:30–11:35": "0690–0695 | 我们展开讲：续订话术：功能会月更，场景会换季， | AI草稿3",
+    "11:35–11:40": "0695–0700 | 续订是更新权。怎么做才算到位？ | AI草稿3",
+    "11:40–11:45": "0700–0705 | 请对照屏幕把动作做完，而不是只听懂。 | AI草稿3",
+    "11:45–11:50": "0705–0710 | 听懂不等于会做，会做才算合格。 | AI草稿3",
+    "11:50–11:55": "0710–0715 | 我们展开讲：可选作业：交一个当季主推草稿截图。 | AI草稿3",
+    "11:55–12:00": "0715–0720 | 反例是什么？跳步、凭感觉、只在微信里同步、 | AI草稿3",
+    "12:00–12:05": "0720–0725 | 不截图不留痕。这些都会在下周复盘时暴露。 | AI草稿3",
+    "12:05–12:10": "0725–0730 | 我们展开讲：本专题教案下月改标题即可复用。 | AI草稿3",
+    "12:10–12:15": "0730–0735 | 正例是什么？每一步都有入口、有确认、有结果物。 | AI草稿3",
+    "12:15–12:20": "0735–0740 | 结果物可以是草稿、订单、话术截图或复盘表。 | AI草稿3",
+    "12:20–12:25": "0740–0745 | 我们展开讲：模块七月更专题。 | AI草稿3",
+    "12:25–12:30": "0745–0750 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | AI草稿3",
+    "12:30–12:35": "0750–0755 | 我需要回看哪一个课号补齐？ | AI草稿3",
+    "12:35–12:40": "0755–0760 | 我们展开讲：课号七点一：旺季组品专题。 | AI草稿3",
+    "12:40–12:45": "0760–0765 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | AI草稿3",
+    "12:45–12:50": "0765–0770 | 分工清楚，学习效率更高。 | AI草稿3",
+    "12:50–12:55": "0770–0775 | 我们展开讲：标题里的季节词每月可替换：暑期、国庆、 | AI草稿3",
+    "12:55–13:00": "0775–0780 | 春节。演示默认测试店。 | AI草稿3",
+    "13:00–13:05": "0780–0785 | 生产环境涉及改价、发单、结款，必须二次确认， | AI草稿3",
+    "13:05–13:10": "0785–0790 | 不要直播手滑。我们展开讲：开场先定本月旺季主题： | AI草稿3",
+    "13:10–13:15": "0790–0795 | 人群一句，价格带一句。 | AI草稿3",
+    "13:15–13:20": "0795–0800 | 交作业打码：手机号、客户名、真实账单。 | AI草稿3",
+    "13:20–13:25": "0800–0805 | 保护隐私，也是职业习惯。 | AI草稿3",
+    "13:25–13:30": "0805–0810 | 我们展开讲：然后用AI创建商品连打三个草稿， | AI草稿3",
+    "13:30–13:35": "0810–0815 | 不同价格带或人群。和课程总定位对齐：我们要的是流水线， | AI草稿3",
+    "13:35–13:40": "0815–0820 | 不是单点技巧。每一步都要能复用到下周、下月。 | AI草稿3",
+    "13:40–13:45": "0820–0825 | 我们展开讲：人工只定一到两个作主推，其余进备选。 | AI草稿3",
+    "13:45–13:50": "0825–0830 | 跟不上就暂停。暂停重做三十秒， | AI草稿3",
+    "13:50–13:55": "0830–0835 | 胜过假装看完却一步都没点过。 | AI草稿3",
+    "13:55–14:00": "0835–0840 | 我们展开讲：同步写一版当季Brief钩子，接到招募。 | AI草稿3",
+    "14:00–14:05": "0840–0845 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 选定主推+Brief钩子",
+    "14:05–14:10": "0845–0850 | 而返工成本通常高于你现在多花的一分钟。 | 选定主推+Brief钩子",
+    "14:10–14:15": "0850–0855 | 我们展开讲：旺季不是多上架，是主推清晰， | 选定主推+Brief钩子",
+    "14:15–14:20": "0855–0860 | 达人和内容对齐主推。怎么做才算到位？ | 选定主推+Brief钩子",
+    "14:20–14:25": "0860–0865 | 请对照屏幕把动作做完，而不是只听懂。 | 选定主推+Brief钩子",
+    "14:25–14:30": "0865–0870 | 听懂不等于会做，会做才算合格。 | 选定主推+Brief钩子",
+    "14:30–14:35": "0870–0875 | 我们展开讲：续订话术：功能会月更，场景会换季， | 选定主推+Brief钩子",
+    "14:35–14:40": "0875–0880 | 续订是更新权。反例是什么？ | 选定主推+Brief钩子",
+    "14:40–14:45": "0880–0885 | 跳步、凭感觉、只在微信里同步、不截图不留痕。 | 选定主推+Brief钩子",
+    "14:45–14:50": "0885–0890 | 这些都会在下周复盘时暴露。 | 选定主推+Brief钩子",
+    "14:50–14:55": "0890–0895 | 我们展开讲：可选作业：交一个当季主推草稿截图。 | 选定主推+Brief钩子",
+    "14:55–15:00": "0895–0900 | 正例是什么？每一步都有入口、有确认、有结果物。 | 选定主推+Brief钩子",
+    "15:00–15:05": "0900–0905 | 结果物可以是草稿、订单、话术截图或复盘表。 | 选定主推+Brief钩子",
+    "15:05–15:10": "0905–0910 | 我们展开讲：本专题教案下月改标题即可复用。 | 选定主推+Brief钩子",
+    "15:10–15:15": "0910–0915 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 选定主推+Brief钩子",
+    "15:15–15:20": "0915–0920 | 我需要回看哪一个课号补齐？我们展开讲：模块七月更专题。 | 选定主推+Brief钩子",
+    "15:20–15:25": "0920–0925 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 选定主推+Brief钩子",
+    "15:25–15:30": "0925–0930 | 分工清楚，学习效率更高。 | 选定主推+Brief钩子",
+    "15:30–15:35": "0930–0935 | 我们展开讲：课号七点一：旺季组品专题。演示默认测试店。 | 选定主推+Brief钩子",
+    "15:35–15:40": "0935–0940 | 生产环境涉及改价、发单、结款，必须二次确认， | 选定主推+Brief钩子",
+    "15:40–15:45": "0940–0945 | 不要直播手滑。我们展开讲：标题里的季节词每月可替换： | 选定主推+Brief钩子",
+    "15:45–15:50": "0945–0950 | 暑期、国庆、春节。交作业打码：手机号、客户名、 | 选定主推+Brief钩子",
+    "15:50–15:55": "0950–0955 | 真实账单。保护隐私，也是职业习惯。 | 选定主推+Brief钩子",
+    "15:55–16:00": "0955–0960 | 我们展开讲：开场先定本月旺季主题：人群一句， | 选定主推+Brief钩子",
+    "16:00–16:05": "0960–0965 | 价格带一句。和课程总定位对齐：我们要的是流水线， | 选定主推+Brief钩子",
+    "16:05–16:10": "0965–0970 | 不是单点技巧。每一步都要能复用到下周、下月。 | 选定主推+Brief钩子",
+    "16:10–16:15": "0970–0975 | 我们展开讲：然后用AI创建商品连打三个草稿， | 选定主推+Brief钩子",
+    "16:15–16:20": "0975–0980 | 不同价格带或人群。跟不上就暂停。 | 选定主推+Brief钩子",
+    "16:20–16:25": "0980–0985 | 暂停重做三十秒，胜过假装看完却一步都没点过。 | 选定主推+Brief钩子",
+    "16:25–16:30": "0985–0990 | 我们展开讲：人工只定一到两个作主推，其余进备选。 | 选定主推+Brief钩子",
+    "16:30–16:35": "0990–0995 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 选定主推+Brief钩子",
+    "16:35–16:40": "0995–1000 | 而返工成本通常高于你现在多花的一分钟。 | 选定主推+Brief钩子",
+    "16:40–16:45": "1000–1005 | 我们展开讲：同步写一版当季Brief钩子，接到招募。 | 选定主推+Brief钩子",
+    "16:45–16:50": "1005–1010 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 选定主推+Brief钩子",
+    "16:50–16:55": "1010–1015 | 听懂不等于会做，会做才算合格。 | 选定主推+Brief钩子",
+    "16:55–17:00": "1015–1020 | 我们展开讲：旺季不是多上架，是主推清晰， | 选定主推+Brief钩子",
+    "17:00–17:05": "1020–1025 | 达人和内容对齐主推。反例是什么？ | 选定主推+Brief钩子",
+    "17:05–17:10": "1025–1030 | 跳步、凭感觉、只在微信里同步、不截图不留痕。 | 选定主推+Brief钩子",
+    "17:10–17:15": "1030–1035 | 这些都会在下周复盘时暴露。 | 选定主推+Brief钩子",
+    "17:15–17:20": "1035–1040 | 我们展开讲：续订话术：功能会月更，场景会换季， | 选定主推+Brief钩子",
+    "17:20–17:25": "1040–1045 | 续订是更新权。正例是什么？ | 选定主推+Brief钩子",
+    "17:25–17:30": "1045–1050 | 每一步都有入口、有确认、有结果物。 | 选定主推+Brief钩子",
+    "17:30–17:35": "1050–1055 | 结果物可以是草稿、订单、话术截图或复盘表。 | 选定主推+Brief钩子",
+    "17:35–17:40": "1055–1060 | 我们展开讲：可选作业：交一个当季主推草稿截图。 | 选定主推+Brief钩子",
+    "17:40–17:45": "1060–1065 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 选定主推+Brief钩子",
+    "17:45–17:50": "1065–1070 | 我需要回看哪一个课号补齐？ | 选定主推+Brief钩子",
+    "17:50–17:55": "1070–1075 | 我们展开讲：本专题教案下月改标题即可复用。 | 选定主推+Brief钩子",
+    "17:55–18:00": "1075–1080 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 选定主推+Brief钩子",
+    "18:00–18:05": "1080–1085 | 分工清楚，学习效率更高。我们展开讲：模块七月更专题。 | 续订收口+片尾",
+    "18:05–18:10": "1085–1090 | 演示默认测试店。生产环境涉及改价、发单、结款， | 续订收口+片尾",
+    "18:10–18:15": "1090–1095 | 必须二次确认，不要直播手滑。 | 续订收口+片尾",
+    "18:15–18:20": "1095–1100 | 我们展开讲：课号七点一：旺季组品专题。 | 续订收口+片尾",
+    "18:20–18:25": "1100–1105 | 交作业打码：手机号、客户名、真实账单。 | 续订收口+片尾",
+    "18:25–18:30": "1105–1110 | 保护隐私，也是职业习惯。 | 续订收口+片尾",
+    "18:30–18:35": "1110–1115 | 我们展开讲：标题里的季节词每月可替换：暑期、国庆、 | 续订收口+片尾",
+    "18:35–18:40": "1115–1120 | 春节。和课程总定位对齐：我们要的是流水线， | 续订收口+片尾",
+    "18:40–18:45": "1120–1125 | 不是单点技巧。每一步都要能复用到下周、下月。 | 续订收口+片尾",
+    "18:45–18:50": "1125–1130 | 我们展开讲：开场先定本月旺季主题：人群一句， | 续订收口+片尾",
+    "18:50–18:55": "1130–1135 | 价格带一句。跟不上就暂停。 | 续订收口+片尾",
+    "18:55–19:00": "1135–1140 | 暂停重做三十秒，胜过假装看完却一步都没点过。 | 续订收口+片尾",
+    "19:00–19:05": "1140–1145 | 我们展开讲：然后用AI创建商品连打三个草稿， | 续订收口+片尾",
+    "19:05–19:10": "1145–1150 | 不同价格带或人群。为什么要强调这一点？ | 续订收口+片尾",
+    "19:10–19:15": "1150–1155 | 因为现场一忙最容易省掉这一步， | 续订收口+片尾",
+    "19:15–19:20": "1155–1160 | 而返工成本通常高于你现在多花的一分钟。 | 续订收口+片尾",
+    "19:20–19:25": "1160–1165 | 我们展开讲：人工只定一到两个作主推，其余进备选。 | 续订收口+片尾",
+    "19:25–19:30": "1165–1170 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 续订收口+片尾",
+    "19:30–19:35": "1170–1175 | 听懂不等于会做，会做才算合格。 | 续订收口+片尾",
+    "19:35–19:40": "1175–1180 | 我们展开讲：同步写一版当季Brief钩子，接到招募。 | 续订收口+片尾",
+    "19:40–19:45": "1180–1185 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 续订收口+片尾",
+    "19:45–19:50": "1185–1190 | 不截图不留痕。这些都会在下周复盘时暴露。 | 续订收口+片尾",
+    "19:50–19:55": "1190–1195 | 我们展开讲：旺季不是多上架，是主推清晰， | 续订收口+片尾",
+    "19:55–20:00": "1195–1200 | 达人和内容对齐主推。正例是什么？ | 续订收口+片尾",
+    "20:00–20:05": "1200–1205 | 每一步都有入口、有确认、有结果物。 | 续订收口+片尾",
+    "20:05–20:10": "1205–1210 | 结果物可以是草稿、订单、话术截图或复盘表。 | 续订收口+片尾",
+    "20:10–20:15": "1210–1215 | 我们展开讲：续订话术：功能会月更，场景会换季， | 续订收口+片尾",
+    "20:15–20:20": "1215–1220 | 续订是更新权。自检三问：我刚才做到哪一步了？ | 续订收口+片尾",
+    "20:20–20:25": "1220–1225 | 哪一步还不敢自己点？我需要回看哪一个课号补齐？ | 续订收口+片尾",
+    "20:25–20:30": "1225–1230 | 我们展开讲：可选作业：交一个当季主推草稿截图。 | 续订收口+片尾",
+    "20:30–20:35": "1230–1235 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 续订收口+片尾",
+    "20:35–20:40": "1235–1240 | 分工清楚，学习效率更高。 | 续订收口+片尾",
+    "20:40–20:45": "1240–1245 | 我们展开讲：本专题教案下月改标题即可复用。 | 续订收口+片尾",
+    "20:45–20:50": "1245–1250 | 演示默认测试店。生产环境涉及改价、发单、结款， | 续订收口+片尾",
+    "20:50–20:55": "1250–1255 | 必须二次确认，不要直播手滑。 | 续订收口+片尾",
+    "20:55–21:00": "1255–1260 | 我们展开讲：模块七月更专题。 | 续订收口+片尾",
+    "21:00–21:05": "1260–1265 | 交作业打码：手机号、客户名、真实账单。 | 续订收口+片尾",
+    "21:05–21:10": "1265–1270 | 保护隐私，也是职业习惯。 | 续订收口+片尾",
+    "21:10–21:15": "1270–1275 | 我们展开讲：课号七点一：旺季组品专题。 | 续订收口+片尾",
+    "21:15–21:20": "1275–1280 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 续订收口+片尾",
+    "21:20–21:25": "1280–1285 | 每一步都要能复用到下周、下月。 | 续订收口+片尾",
+    "21:25–21:30": "1285–1290 | 我们展开讲：标题里的季节词每月可替换：暑期、国庆、 | 续订收口+片尾",
+    "21:30–21:35": "1290–1295 | 春节。跟不上就暂停。暂停重做三十秒， | 续订收口+片尾",
+    "21:35–21:40": "1295–1300 | 胜过假装看完却一步都没点过。 | 续订收口+片尾",
+    "21:40–21:45": "1300–1305 | 我们展开讲：开场先定本月旺季主题：人群一句， | 续订收口+片尾",
+    "21:45–21:50": "1305–1310 | 价格带一句。为什么要强调这一点？ | 续订收口+片尾",
+    "21:50–21:55": "1310–1315 | 因为现场一忙最容易省掉这一步， | 续订收口+片尾",
+    "21:55–22:00": "1315–1320 | 而返工成本通常高于你现在多花的一分钟。 | 续订收口+片尾"
+  },
+  "slides": [
+    {
+      "index": 1,
+      "file": "01-cover.jpg",
+      "kind": "cover",
+      "htag": "封面",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 7.1 · 旺季组品专题（暑期 / 国庆 / 春节）. Cover slide. Huge title: 旺季组品专题（暑期 / 国庆 / 春节）. Subtitle: 模块 7｜月更专题. Badge: 课号 7.1. Line: 当季用 AI 批量打草稿，再人工定 1–2 个主推. Duration: 20–25min. Visual metaphor: local store owner, multi-platform apps, AI pipeline ribbon.",
+      "meta": {
+        "kind": "cover",
+        "htag": "封面",
+        "module": "模块 7｜月更专题",
+        "dur": "20–25min",
+        "gain": "当季用 AI 批量打草稿，再人工定 1–2 个主推",
+        "visual": "local store owner, multi-platform apps, AI pipeline ribbon"
+      }
+    },
+    {
+      "index": 2,
+      "file": "02-goal.jpg",
+      "kind": "goal",
+      "htag": "本课目标",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 7.1 · 旺季组品专题（暑期 / 国庆 / 春节）. Learning goals slide. Title: 本课你将带走. Lead: 围绕当季人群与价格带，快速产出可测草稿包。. 3-5 goal cards: 当季用 AI 批量打草稿，再人工定 1–2 个主推.",
+      "meta": {
+        "kind": "goal",
+        "htag": "本课目标",
+        "lead": "围绕当季人群与价格带，快速产出可测草稿包。",
+        "items": [
+          "当季用 AI 批量打草稿，再人工定 1–2 个主推"
+        ]
+      }
+    },
+    {
+      "index": 3,
+      "file": "03-agenda.jpg",
+      "kind": "agenda",
+      "htag": "本课结构",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 7.1 · 旺季组品专题（暑期 / 国庆 / 春节）. Agenda slide. Title: 本课结构. Numbered outline cards: 开场定季 | 现场动作 | 收口.",
+      "meta": {
+        "kind": "agenda",
+        "htag": "本课结构",
+        "items": [
+          "开场定季",
+          "现场动作",
+          "收口"
+        ]
+      }
+    },
+    {
+      "index": 4,
+      "file": "04-insight.jpg",
+      "kind": "insight",
+      "htag": "开场定季",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 7.1 · 旺季组品专题（暑期 / 国庆 / 春节）. Insight slide. Title: 开场定季. Big statement: 说明本月旺季主题（例：暑期亲子 / 国庆聚会 / 春节家宴），人群与价格带各写一句。. Supporting bullets: .",
+      "meta": {
+        "kind": "insight",
+        "htag": "开场定季",
+        "lead": "说明本月旺季主题（例：暑期亲子 / 国庆聚会 / 春节家宴），人群与价格带各写一句。",
+        "items": []
+      }
+    },
+    {
+      "index": 5,
+      "file": "05-cards.jpg",
+      "kind": "cards",
+      "htag": "现场动作",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 7.1 · 旺季组品专题（暑期 / 国庆 / 春节）. Card grid slide. Title: 现场动作. Cards: 用 AI 创建商品连打 3 个草稿…: 用 AI 创建商品连打 3 个草稿（不同价格带或人群）。 ; 人工只定 1–2 个作主推，其余进…: 人工只定 1–2 个作主推，其余进备选。 ; 同步写一版当季 Brief 钩子（…: 同步写一版当季 Brief 钩子（可接到招募）。.",
+      "meta": {
+        "kind": "cards",
+        "htag": "现场动作",
+        "cards": [
+          {
+            "t": "用 AI 创建商品连打 3 个草稿…",
+            "b": "用 AI 创建商品连打 3 个草稿（不同价格带或人群）。"
+          },
+          {
+            "t": "人工只定 1–2 个作主推，其余进…",
+            "b": "人工只定 1–2 个作主推，其余进备选。"
+          },
+          {
+            "t": "同步写一版当季 Brief 钩子（…",
+            "b": "同步写一版当季 Brief 钩子（可接到招募）。"
+          }
+        ]
+      }
+    },
+    {
+      "index": 6,
+      "file": "06-insight.jpg",
+      "kind": "insight",
+      "htag": "收口",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 7.1 · 旺季组品专题（暑期 / 国庆 / 春节）. Insight slide. Title: 收口. Big statement: 旺季不是多上架，是主推清晰 + 达人/内容对齐主推。. Supporting bullets: .",
+      "meta": {
+        "kind": "insight",
+        "htag": "收口",
+        "lead": "旺季不是多上架，是主推清晰 + 达人/内容对齐主推。",
+        "items": []
+      }
+    },
+    {
+      "index": 7,
+      "file": "07-checklist.jpg",
+      "kind": "checklist",
+      "htag": "演示 / 操作路径",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 7.1 · 旺季组品专题（暑期 / 国庆 / 春节）. Checklist slide. Title: 演示 / 操作路径. Checked steps: 创建商品场景 ×3；测试店。.",
+      "meta": {
+        "kind": "checklist",
+        "htag": "演示 / 操作路径",
+        "items": [
+          "创建商品场景 ×3；测试店。"
+        ]
+      }
+    },
+    {
+      "index": 8,
+      "file": "08-quote.jpg",
+      "kind": "quote",
+      "htag": "口播与转化要点",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 7.1 · 旺季组品专题（暑期 / 国庆 / 春节）. Quote/takeaway slide. Title: 记住这句话. Large quote: 「功能会月更，场景会换季——续订是更新权。」. Side notes: .",
+      "meta": {
+        "kind": "quote",
+        "htag": "口播与转化要点",
+        "quote": "「功能会月更，场景会换季——续订是更新权。」",
+        "points": []
+      }
+    },
+    {
+      "index": 9,
+      "file": "09-homework.jpg",
+      "kind": "homework",
+      "htag": "作业 / 验收",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 7.1 · 旺季组品专题（暑期 / 国庆 / 春节）. Homework slide. Title: 作业 / 验收. Action items: 可选：交 1 个当季主推草稿截图。.",
+      "meta": {
+        "kind": "homework",
+        "htag": "作业 / 验收",
+        "items": [
+          "可选：交 1 个当季主推草稿截图。"
+        ]
+      }
+    },
+    {
+      "index": 10,
+      "file": "10-insight.jpg",
+      "kind": "insight",
+      "htag": "现场动作",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 7.1 · 旺季组品专题（暑期 / 国庆 / 春节）. Insight slide. Title: 现场动作. Big statement: 用 AI 创建商品连打 3 个草稿（不同价格带或人群）。. Supporting bullets: 用 AI 创建商品连打 3 个草稿（不同价格带或人群）。 | 人工只定 1–2 个作主推，其余进备选。 | 同步写一版当季 Brief 钩子（可接到招募）。.",
+      "meta": {
+        "kind": "insight",
+        "htag": "现场动作",
+        "lead": "用 AI 创建商品连打 3 个草稿（不同价格带或人群）。",
+        "items": [
+          "用 AI 创建商品连打 3 个草稿（不同价格带或人群）。",
+          "人工只定 1–2 个作主推，其余进备选。",
+          "同步写一版当季 Brief 钩子（可接到招募）。"
+        ]
+      }
+    },
+    {
+      "index": 11,
+      "file": "11-insight.jpg",
+      "kind": "insight",
+      "htag": "为什么现在必须改",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 7.1 · 旺季组品专题（暑期 / 国庆 / 春节）. Insight slide. Title: 为什么现在必须改. Big statement: 散点经营一定累：同一件事拆到多个后台、多个人、多轮微信确认。. Supporting bullets: 多入口 = 多口径 | 无状态 = 月底对不清 | 无确认 = AI 不能替你签字.",
+      "meta": {
+        "kind": "insight",
+        "htag": "为什么现在必须改",
+        "lead": "散点经营一定累：同一件事拆到多个后台、多个人、多轮微信确认。",
+        "items": [
+          "多入口 = 多口径",
+          "无状态 = 月底对不清",
+          "无确认 = AI 不能替你签字"
+        ]
+      }
+    },
+    {
+      "index": 12,
+      "file": "12-map.jpg",
+      "kind": "map",
+      "htag": "灵祺流水线一览",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 7.1 · 旺季组品专题（暑期 / 国庆 / 春节）. Module map slide. Title: 灵祺流水线一览. Nodes: 开团/组品 → 招达人 → 做内容 → 曝光获客 → 对账复盘. Caption: AI 提案 · 你确认 · 少雇人少外包少踩坑.",
+      "meta": {
+        "kind": "map",
+        "htag": "灵祺流水线一览",
+        "steps": [
+          "开团/组品",
+          "招达人",
+          "做内容",
+          "曝光获客",
+          "对账复盘"
+        ],
+        "note": "AI 提案 · 你确认 · 少雇人少外包少踩坑"
+      }
+    },
+    {
+      "index": 13,
+      "file": "13-insight.jpg",
+      "kind": "insight",
+      "htag": "人机分工",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 7.1 · 旺季组品专题（暑期 / 国庆 / 春节）. Insight slide. Title: 人机分工. Big statement: AI 负责提案与草稿，你负责确认与签字。. Supporting bullets: 可预览 | 可回退 | 关键动作有状态.",
+      "meta": {
+        "kind": "insight",
+        "htag": "人机分工",
+        "lead": "AI 负责提案与草稿，你负责确认与签字。",
+        "items": [
+          "可预览",
+          "可回退",
+          "关键动作有状态"
+        ]
+      }
+    },
+    {
+      "index": 14,
+      "file": "14-split.jpg",
+      "kind": "split",
+      "htag": "旧方式 vs 流水线",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 7.1 · 旺季组品专题（暑期 / 国庆 / 春节）. Two-column contrast slide. Title: 旧方式 vs 流水线. Left: 旧：微信群跟单 + 表格 + 外包突击. Right: 新：订单状态机 + AI 产线 + 预览确认.",
+      "meta": {
+        "kind": "split",
+        "htag": "旧方式 vs 流水线",
+        "left": "旧：微信群跟单 + 表格 + 外包突击",
+        "right": "新：订单状态机 + AI 产线 + 预览确认"
+      }
+    },
+    {
+      "index": 15,
+      "file": "15-insight.jpg",
+      "kind": "insight",
+      "htag": "本课边界",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 7.1 · 旺季组品专题（暑期 / 国庆 / 春节）. Insight slide. Title: 本课边界. Big statement: 先对齐概念与路径，敏感信息打码，用测试店心态点一遍。. Supporting bullets: 不堆无关按钮 | 一课一个主动作 | 作业可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "本课边界",
+        "lead": "先对齐概念与路径，敏感信息打码，用测试店心态点一遍。",
+        "items": [
+          "不堆无关按钮",
+          "一课一个主动作",
+          "作业可验收"
+        ]
+      }
+    },
+    {
+      "index": 16,
+      "file": "16-checklist.jpg",
+      "kind": "checklist",
+      "htag": "听课检查清单",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 7.1 · 旺季组品专题（暑期 / 国庆 / 春节）. Checklist slide. Title: 听课检查清单. Checked steps: 能复述本课目标 | 能指出卡点在哪一步 | 能说出下一动作入口 | 完成作业打卡.",
+      "meta": {
+        "kind": "checklist",
+        "htag": "听课检查清单",
+        "items": [
+          "能复述本课目标",
+          "能指出卡点在哪一步",
+          "能说出下一动作入口",
+          "完成作业打卡"
+        ]
+      }
+    },
+    {
+      "index": 17,
+      "file": "17-quote.jpg",
+      "kind": "quote",
+      "htag": "金句",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 7.1 · 旺季组品专题（暑期 / 国庆 / 春节）. Quote/takeaway slide. Title: 记住这句话. Large quote: 当季用 AI 批量打草稿，再人工定 1–2 个主推. Side notes: 少雇人 | 少外包 | 少踩坑.",
+      "meta": {
+        "kind": "quote",
+        "htag": "金句",
+        "quote": "当季用 AI 批量打草稿，再人工定 1–2 个主推",
+        "points": [
+          "少雇人",
+          "少外包",
+          "少踩坑"
+        ]
+      }
+    },
+    {
+      "index": 18,
+      "file": "18-insight.jpg",
+      "kind": "insight",
+      "htag": "常见踩坑",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 7.1 · 旺季组品专题（暑期 / 国庆 / 春节）. Insight slide. Title: 常见踩坑. Big statement: 最容易翻车的不是不会用，而是跳过确认、跳过状态、跳过核对。. Supporting bullets: 未预览就发布 | 状态卡在群聊里 | 月底才想起对账.",
+      "meta": {
+        "kind": "insight",
+        "htag": "常见踩坑",
+        "lead": "最容易翻车的不是不会用，而是跳过确认、跳过状态、跳过核对。",
+        "items": [
+          "未预览就发布",
+          "状态卡在群聊里",
+          "月底才想起对账"
+        ]
+      }
+    },
+    {
+      "index": 19,
+      "file": "19-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 1",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 7.1 · 旺季组品专题（暑期 / 国庆 / 春节）. Insight slide. Title: 落地提醒 · 1. Big statement: 7.1 旺季组品专题（暑期 / 国庆 / 春节）：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 1",
+        "lead": "7.1 旺季组品专题（暑期 / 国庆 / 春节）：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 20,
+      "file": "20-end.jpg",
+      "kind": "end",
+      "htag": "结束",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 7.1 · 旺季组品专题（暑期 / 国庆 / 春节）. Closing slide. Title: 本课结束. Course 7.1 旺季组品专题（暑期 / 国庆 / 春节）. Takeaway: 当季用 AI 批量打草稿，再人工定 1–2 个主推. CTA: 下一课继续实操. Inspiring local-business + AI visual.",
+      "meta": {
+        "kind": "end",
+        "htag": "结束",
+        "gain": "当季用 AI 批量打草稿，再人工定 1–2 个主推"
+      }
+    }
+  ]
+}

@@ -1,0 +1,549 @@
+{
+  "meta": {
+    "课号": "4.4",
+    "课名": "数字人口播：没人出镜也能讲卖点",
+    "建议时长": "18min",
+    "所属模块": "模块 4｜内容产能",
+    "学员收获": "会用 TTS + 字幕完成口播场景",
+    "建议录屏文件名": "4.4-数字人口播.mp4",
+    "时间": "秒序 | 口播（逐字念） | 画面动作",
+    "00:00–00:05": "0000–0005 | 课号四点四：数字人口播，没人出镜也能讲卖点。 | 片头",
+    "00:05–00:10": "0005–0010 | 适用：老板不愿出镜、店员不稳定、多店需统一话术。 | 片头",
+    "00:10–00:15": "0010–0015 | 流程：稿件确认，选择音色，生成口播，叠加字幕， | 片头",
+    "00:15–00:20": "0015–0020 | 导出预览。数字人解决的是稳定表达， | 片头",
+    "00:20–00:25": "0020–0025 | 信任仍靠真实门店画面与可核验优惠。 | 片头",
+    "00:25–00:30": "0025–0030 | 不要用数字人念虚假折扣。 | 片头",
+    "00:30–00:35": "0030–0035 | 口播稿避免绝对化医疗或功效承诺。 | 片头",
+    "00:35–00:40": "0035–0040 | 和四点二四点三组合：数字人讲卖点，实拍画面做证明。 | 片头",
+    "00:40–00:45": "0040–0045 | 暂停：用一段短稿跑通预览。下一集四点五交脚本或成片。 | 适用场景说明",
+    "00:45–00:50": "0045–0050 | 本集结束。我们展开讲：课号四点四：数字人口播， | 适用场景说明",
+    "00:50–00:55": "0050–0055 | 没人出镜也能讲卖点。为什么要强调这一点？ | 适用场景说明",
+    "00:55–01:00": "0055–0060 | 因为现场一忙最容易省掉这一步， | 适用场景说明",
+    "01:00–01:05": "0060–0065 | 而返工成本通常高于你现在多花的一分钟。 | 适用场景说明",
+    "01:05–01:10": "0065–0070 | 我们展开讲：适用：老板不愿出镜、店员不稳定、 | 适用场景说明",
+    "01:10–01:15": "0070–0075 | 多店需统一话术。怎么做才算到位？ | 适用场景说明",
+    "01:15–01:20": "0075–0080 | 请对照屏幕把动作做完，而不是只听懂。 | 适用场景说明",
+    "01:20–01:25": "0080–0085 | 听懂不等于会做，会做才算合格。 | 适用场景说明",
+    "01:25–01:30": "0085–0090 | 我们展开讲：流程：稿件确认，选择音色，生成口播， | 适用场景说明",
+    "01:30–01:35": "0090–0095 | 叠加字幕，导出预览。反例是什么？ | 适用场景说明",
+    "01:35–01:40": "0095–0100 | 跳步、凭感觉、只在微信里同步、不截图不留痕。 | 适用场景说明",
+    "01:40–01:45": "0100–0105 | 这些都会在下周复盘时暴露。 | 适用场景说明",
+    "01:45–01:50": "0105–0110 | 我们展开讲：数字人解决的是稳定表达， | 适用场景说明",
+    "01:50–01:55": "0110–0115 | 信任仍靠真实门店画面与可核验优惠。 | 适用场景说明",
+    "01:55–02:00": "0115–0120 | 正例是什么？每一步都有入口、有确认、有结果物。 | 适用场景说明",
+    "02:00–02:05": "0120–0125 | 结果物可以是草稿、订单、话术截图或复盘表。 | 稿件→音色→生成→字幕",
+    "02:05–02:10": "0125–0130 | 我们展开讲：不要用数字人念虚假折扣。 | 稿件→音色→生成→字幕",
+    "02:10–02:15": "0130–0135 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 稿件→音色→生成→字幕",
+    "02:15–02:20": "0135–0140 | 我需要回看哪一个课号补齐？ | 稿件→音色→生成→字幕",
+    "02:20–02:25": "0140–0145 | 我们展开讲：口播稿避免绝对化医疗或功效承诺。 | 稿件→音色→生成→字幕",
+    "02:25–02:30": "0145–0150 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 稿件→音色→生成→字幕",
+    "02:30–02:35": "0150–0155 | 分工清楚，学习效率更高。 | 稿件→音色→生成→字幕",
+    "02:35–02:40": "0155–0160 | 我们展开讲：和四点二四点三组合：数字人讲卖点， | 稿件→音色→生成→字幕",
+    "02:40–02:45": "0160–0165 | 实拍画面做证明。演示默认测试店。 | 稿件→音色→生成→字幕",
+    "02:45–02:50": "0165–0170 | 生产环境涉及改价、发单、结款，必须二次确认， | 稿件→音色→生成→字幕",
+    "02:50–02:55": "0170–0175 | 不要直播手滑。我们展开讲：暂停：用一段短稿跑通预览。 | 稿件→音色→生成→字幕",
+    "02:55–03:00": "0175–0180 | 交作业打码：手机号、客户名、真实账单。 | 稿件→音色→生成→字幕",
+    "03:00–03:05": "0180–0185 | 保护隐私，也是职业习惯。 | 稿件→音色→生成→字幕",
+    "03:05–03:10": "0185–0190 | 我们展开讲：下一集四点五交脚本或成片。 | 稿件→音色→生成→字幕",
+    "03:10–03:15": "0190–0195 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 稿件→音色→生成→字幕",
+    "03:15–03:20": "0195–0200 | 每一步都要能复用到下周、下月。我们展开讲：本集结束。 | 稿件→音色→生成→字幕",
+    "03:20–03:25": "0200–0205 | 跟不上就暂停。暂停重做三十秒， | 稿件→音色→生成→字幕",
+    "03:25–03:30": "0205–0210 | 胜过假装看完却一步都没点过。 | 稿件→音色→生成→字幕",
+    "03:30–03:35": "0210–0215 | 我们展开讲：课号四点四：数字人口播， | 稿件→音色→生成→字幕",
+    "03:35–03:40": "0215–0220 | 没人出镜也能讲卖点。为什么要强调这一点？ | 稿件→音色→生成→字幕",
+    "03:40–03:45": "0220–0225 | 因为现场一忙最容易省掉这一步， | 稿件→音色→生成→字幕",
+    "03:45–03:50": "0225–0230 | 而返工成本通常高于你现在多花的一分钟。 | 稿件→音色→生成→字幕",
+    "03:50–03:55": "0230–0235 | 我们展开讲：适用：老板不愿出镜、店员不稳定、 | 稿件→音色→生成→字幕",
+    "03:55–04:00": "0235–0240 | 多店需统一话术。怎么做才算到位？ | 稿件→音色→生成→字幕",
+    "04:00–04:05": "0240–0245 | 请对照屏幕把动作做完，而不是只听懂。 | 稿件→音色→生成→字幕",
+    "04:05–04:10": "0245–0250 | 听懂不等于会做，会做才算合格。 | 稿件→音色→生成→字幕",
+    "04:10–04:15": "0250–0255 | 我们展开讲：流程：稿件确认，选择音色，生成口播， | 稿件→音色→生成→字幕",
+    "04:15–04:20": "0255–0260 | 叠加字幕，导出预览。反例是什么？ | 稿件→音色→生成→字幕",
+    "04:20–04:25": "0260–0265 | 跳步、凭感觉、只在微信里同步、不截图不留痕。 | 稿件→音色→生成→字幕",
+    "04:25–04:30": "0265–0270 | 这些都会在下周复盘时暴露。 | 稿件→音色→生成→字幕",
+    "04:30–04:35": "0270–0275 | 我们展开讲：数字人解决的是稳定表达， | 稿件→音色→生成→字幕",
+    "04:35–04:40": "0275–0280 | 信任仍靠真实门店画面与可核验优惠。 | 稿件→音色→生成→字幕",
+    "04:40–04:45": "0280–0285 | 正例是什么？每一步都有入口、有确认、有结果物。 | 稿件→音色→生成→字幕",
+    "04:45–04:50": "0285–0290 | 结果物可以是草稿、订单、话术截图或复盘表。 | 稿件→音色→生成→字幕",
+    "04:50–04:55": "0290–0295 | 我们展开讲：不要用数字人念虚假折扣。 | 稿件→音色→生成→字幕",
+    "04:55–05:00": "0295–0300 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 稿件→音色→生成→字幕",
+    "05:00–05:05": "0300–0305 | 我需要回看哪一个课号补齐？ | 稿件→音色→生成→字幕",
+    "05:05–05:10": "0305–0310 | 我们展开讲：口播稿避免绝对化医疗或功效承诺。 | 稿件→音色→生成→字幕",
+    "05:10–05:15": "0310–0315 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 稿件→音色→生成→字幕",
+    "05:15–05:20": "0315–0320 | 分工清楚，学习效率更高。 | 稿件→音色→生成→字幕",
+    "05:20–05:25": "0320–0325 | 我们展开讲：和四点二四点三组合：数字人讲卖点， | 稿件→音色→生成→字幕",
+    "05:25–05:30": "0325–0330 | 实拍画面做证明。演示默认测试店。 | 稿件→音色→生成→字幕",
+    "05:30–05:35": "0330–0335 | 生产环境涉及改价、发单、结款，必须二次确认， | 稿件→音色→生成→字幕",
+    "05:35–05:40": "0335–0340 | 不要直播手滑。我们展开讲：暂停：用一段短稿跑通预览。 | 稿件→音色→生成→字幕",
+    "05:40–05:45": "0340–0345 | 交作业打码：手机号、客户名、真实账单。 | 稿件→音色→生成→字幕",
+    "05:45–05:50": "0345–0350 | 保护隐私，也是职业习惯。 | 稿件→音色→生成→字幕",
+    "05:50–05:55": "0350–0355 | 我们展开讲：下一集四点五交脚本或成片。 | 稿件→音色→生成→字幕",
+    "05:55–06:00": "0355–0360 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 稿件→音色→生成→字幕",
+    "06:00–06:05": "0360–0365 | 每一步都要能复用到下周、下月。我们展开讲：本集结束。 | 稿件→音色→生成→字幕",
+    "06:05–06:10": "0365–0370 | 跟不上就暂停。暂停重做三十秒， | 稿件→音色→生成→字幕",
+    "06:10–06:15": "0370–0375 | 胜过假装看完却一步都没点过。 | 稿件→音色→生成→字幕",
+    "06:15–06:20": "0375–0380 | 我们展开讲：课号四点四：数字人口播， | 稿件→音色→生成→字幕",
+    "06:20–06:25": "0380–0385 | 没人出镜也能讲卖点。为什么要强调这一点？ | 稿件→音色→生成→字幕",
+    "06:25–06:30": "0385–0390 | 因为现场一忙最容易省掉这一步， | 稿件→音色→生成→字幕",
+    "06:30–06:35": "0390–0395 | 而返工成本通常高于你现在多花的一分钟。 | 稿件→音色→生成→字幕",
+    "06:35–06:40": "0395–0400 | 我们展开讲：适用：老板不愿出镜、店员不稳定、 | 稿件→音色→生成→字幕",
+    "06:40–06:45": "0400–0405 | 多店需统一话术。怎么做才算到位？ | 稿件→音色→生成→字幕",
+    "06:45–06:50": "0405–0410 | 请对照屏幕把动作做完，而不是只听懂。 | 稿件→音色→生成→字幕",
+    "06:50–06:55": "0410–0415 | 听懂不等于会做，会做才算合格。 | 稿件→音色→生成→字幕",
+    "06:55–07:00": "0415–0420 | 我们展开讲：流程：稿件确认，选择音色，生成口播， | 稿件→音色→生成→字幕",
+    "07:00–07:05": "0420–0425 | 叠加字幕，导出预览。反例是什么？ | 稿件→音色→生成→字幕",
+    "07:05–07:10": "0425–0430 | 跳步、凭感觉、只在微信里同步、不截图不留痕。 | 稿件→音色→生成→字幕",
+    "07:10–07:15": "0430–0435 | 这些都会在下周复盘时暴露。 | 稿件→音色→生成→字幕",
+    "07:15–07:20": "0435–0440 | 我们展开讲：数字人解决的是稳定表达， | 稿件→音色→生成→字幕",
+    "07:20–07:25": "0440–0445 | 信任仍靠真实门店画面与可核验优惠。 | 稿件→音色→生成→字幕",
+    "07:25–07:30": "0445–0450 | 正例是什么？每一步都有入口、有确认、有结果物。 | 稿件→音色→生成→字幕",
+    "07:30–07:35": "0450–0455 | 结果物可以是草稿、订单、话术截图或复盘表。 | 稿件→音色→生成→字幕",
+    "07:35–07:40": "0455–0460 | 我们展开讲：不要用数字人念虚假折扣。 | 稿件→音色→生成→字幕",
+    "07:40–07:45": "0460–0465 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 稿件→音色→生成→字幕",
+    "07:45–07:50": "0465–0470 | 我需要回看哪一个课号补齐？ | 稿件→音色→生成→字幕",
+    "07:50–07:55": "0470–0475 | 我们展开讲：口播稿避免绝对化医疗或功效承诺。 | 稿件→音色→生成→字幕",
+    "07:55–08:00": "0475–0480 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 稿件→音色→生成→字幕",
+    "08:00–08:05": "0480–0485 | 分工清楚，学习效率更高。 | 强调真实画面背书",
+    "08:05–08:10": "0485–0490 | 我们展开讲：和四点二四点三组合：数字人讲卖点， | 强调真实画面背书",
+    "08:10–08:15": "0490–0495 | 实拍画面做证明。演示默认测试店。 | 强调真实画面背书",
+    "08:15–08:20": "0495–0500 | 生产环境涉及改价、发单、结款，必须二次确认， | 强调真实画面背书",
+    "08:20–08:25": "0500–0505 | 不要直播手滑。我们展开讲：暂停：用一段短稿跑通预览。 | 强调真实画面背书",
+    "08:25–08:30": "0505–0510 | 交作业打码：手机号、客户名、真实账单。 | 强调真实画面背书",
+    "08:30–08:35": "0510–0515 | 保护隐私，也是职业习惯。 | 强调真实画面背书",
+    "08:35–08:40": "0515–0520 | 我们展开讲：下一集四点五交脚本或成片。 | 强调真实画面背书",
+    "08:40–08:45": "0520–0525 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 强调真实画面背书",
+    "08:45–08:50": "0525–0530 | 每一步都要能复用到下周、下月。我们展开讲：本集结束。 | 强调真实画面背书",
+    "08:50–08:55": "0530–0535 | 跟不上就暂停。暂停重做三十秒， | 强调真实画面背书",
+    "08:55–09:00": "0535–0540 | 胜过假装看完却一步都没点过。 | 强调真实画面背书",
+    "09:00–09:05": "0540–0545 | 我们展开讲：课号四点四：数字人口播， | 强调真实画面背书",
+    "09:05–09:10": "0545–0550 | 没人出镜也能讲卖点。为什么要强调这一点？ | 强调真实画面背书",
+    "09:10–09:15": "0550–0555 | 因为现场一忙最容易省掉这一步， | 强调真实画面背书",
+    "09:15–09:20": "0555–0560 | 而返工成本通常高于你现在多花的一分钟。 | 强调真实画面背书",
+    "09:20–09:25": "0560–0565 | 我们展开讲：适用：老板不愿出镜、店员不稳定、 | 强调真实画面背书",
+    "09:25–09:30": "0565–0570 | 多店需统一话术。怎么做才算到位？ | 强调真实画面背书",
+    "09:30–09:35": "0570–0575 | 请对照屏幕把动作做完，而不是只听懂。 | 强调真实画面背书",
+    "09:35–09:40": "0575–0580 | 听懂不等于会做，会做才算合格。 | 强调真实画面背书",
+    "09:40–09:45": "0580–0585 | 我们展开讲：流程：稿件确认，选择音色，生成口播， | 强调真实画面背书",
+    "09:45–09:50": "0585–0590 | 叠加字幕，导出预览。反例是什么？ | 强调真实画面背书",
+    "09:50–09:55": "0590–0595 | 跳步、凭感觉、只在微信里同步、不截图不留痕。 | 强调真实画面背书",
+    "09:55–10:00": "0595–0600 | 这些都会在下周复盘时暴露。 | 强调真实画面背书",
+    "10:00–10:05": "0600–0605 | 我们展开讲：数字人解决的是稳定表达， | 强调真实画面背书",
+    "10:05–10:10": "0605–0610 | 信任仍靠真实门店画面与可核验优惠。 | 强调真实画面背书",
+    "10:10–10:15": "0610–0615 | 正例是什么？每一步都有入口、有确认、有结果物。 | 强调真实画面背书",
+    "10:15–10:20": "0615–0620 | 结果物可以是草稿、订单、话术截图或复盘表。 | 强调真实画面背书",
+    "10:20–10:25": "0620–0625 | 我们展开讲：不要用数字人念虚假折扣。 | 强调真实画面背书",
+    "10:25–10:30": "0625–0630 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 强调真实画面背书",
+    "10:30–10:35": "0630–0635 | 我需要回看哪一个课号补齐？ | 强调真实画面背书",
+    "10:35–10:40": "0635–0640 | 我们展开讲：口播稿避免绝对化医疗或功效承诺。 | 强调真实画面背书",
+    "10:40–10:45": "0640–0645 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 强调真实画面背书",
+    "10:45–10:50": "0645–0650 | 分工清楚，学习效率更高。 | 强调真实画面背书",
+    "10:50–10:55": "0650–0655 | 我们展开讲：和四点二四点三组合：数字人讲卖点， | 强调真实画面背书",
+    "10:55–11:00": "0655–0660 | 实拍画面做证明。演示默认测试店。 | 强调真实画面背书",
+    "11:00–11:05": "0660–0665 | 生产环境涉及改价、发单、结款，必须二次确认， | 强调真实画面背书",
+    "11:05–11:10": "0665–0670 | 不要直播手滑。我们展开讲：暂停：用一段短稿跑通预览。 | 强调真实画面背书",
+    "11:10–11:15": "0670–0675 | 交作业打码：手机号、客户名、真实账单。 | 强调真实画面背书",
+    "11:15–11:20": "0675–0680 | 保护隐私，也是职业习惯。 | 强调真实画面背书",
+    "11:20–11:25": "0680–0685 | 我们展开讲：下一集四点五交脚本或成片。 | 强调真实画面背书",
+    "11:25–11:30": "0685–0690 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 强调真实画面背书",
+    "11:30–11:35": "0690–0695 | 每一步都要能复用到下周、下月。我们展开讲：本集结束。 | 强调真实画面背书",
+    "11:35–11:40": "0695–0700 | 跟不上就暂停。暂停重做三十秒， | 强调真实画面背书",
+    "11:40–11:45": "0700–0705 | 胜过假装看完却一步都没点过。 | 强调真实画面背书",
+    "11:45–11:50": "0705–0710 | 我们展开讲：课号四点四：数字人口播， | 强调真实画面背书",
+    "11:50–11:55": "0710–0715 | 没人出镜也能讲卖点。为什么要强调这一点？ | 强调真实画面背书",
+    "11:55–12:00": "0715–0720 | 因为现场一忙最容易省掉这一步， | 强调真实画面背书",
+    "12:00–12:05": "0720–0725 | 而返工成本通常高于你现在多花的一分钟。 | 强调真实画面背书",
+    "12:05–12:10": "0725–0730 | 我们展开讲：适用：老板不愿出镜、店员不稳定、 | 强调真实画面背书",
+    "12:10–12:15": "0730–0735 | 多店需统一话术。怎么做才算到位？ | 强调真实画面背书",
+    "12:15–12:20": "0735–0740 | 请对照屏幕把动作做完，而不是只听懂。 | 强调真实画面背书",
+    "12:20–12:25": "0740–0745 | 听懂不等于会做，会做才算合格。 | 强调真实画面背书",
+    "12:25–12:30": "0745–0750 | 我们展开讲：流程：稿件确认，选择音色，生成口播， | 强调真实画面背书",
+    "12:30–12:35": "0750–0755 | 叠加字幕，导出预览。反例是什么？ | 强调真实画面背书",
+    "12:35–12:40": "0755–0760 | 跳步、凭感觉、只在微信里同步、不截图不留痕。 | 强调真实画面背书",
+    "12:40–12:45": "0760–0765 | 这些都会在下周复盘时暴露。 | 强调真实画面背书",
+    "12:45–12:50": "0765–0770 | 我们展开讲：数字人解决的是稳定表达， | 强调真实画面背书",
+    "12:50–12:55": "0770–0775 | 信任仍靠真实门店画面与可核验优惠。 | 强调真实画面背书",
+    "12:55–13:00": "0775–0780 | 正例是什么？每一步都有入口、有确认、有结果物。 | 强调真实画面背书",
+    "13:00–13:05": "0780–0785 | 结果物可以是草稿、订单、话术截图或复盘表。 | 片尾预告4.5",
+    "13:05–13:10": "0785–0790 | 我们展开讲：不要用数字人念虚假折扣。 | 片尾预告4.5",
+    "13:10–13:15": "0790–0795 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 片尾预告4.5",
+    "13:15–13:20": "0795–0800 | 我需要回看哪一个课号补齐？ | 片尾预告4.5",
+    "13:20–13:25": "0800–0805 | 我们展开讲：口播稿避免绝对化医疗或功效承诺。 | 片尾预告4.5",
+    "13:25–13:30": "0805–0810 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 片尾预告4.5",
+    "13:30–13:35": "0810–0815 | 分工清楚，学习效率更高。 | 片尾预告4.5",
+    "13:35–13:40": "0815–0820 | 我们展开讲：和四点二四点三组合：数字人讲卖点， | 片尾预告4.5",
+    "13:40–13:45": "0820–0825 | 实拍画面做证明。演示默认测试店。 | 片尾预告4.5",
+    "13:45–13:50": "0825–0830 | 生产环境涉及改价、发单、结款，必须二次确认， | 片尾预告4.5",
+    "13:50–13:55": "0830–0835 | 不要直播手滑。我们展开讲：暂停：用一段短稿跑通预览。 | 片尾预告4.5",
+    "13:55–14:00": "0835–0840 | 交作业打码：手机号、客户名、真实账单。 | 片尾预告4.5",
+    "14:00–14:05": "0840–0845 | 保护隐私，也是职业习惯。 | 片尾预告4.5",
+    "14:05–14:10": "0845–0850 | 我们展开讲：下一集四点五交脚本或成片。 | 片尾预告4.5",
+    "14:10–14:15": "0850–0855 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 片尾预告4.5",
+    "14:15–14:20": "0855–0860 | 每一步都要能复用到下周、下月。我们展开讲：本集结束。 | 片尾预告4.5",
+    "14:20–14:25": "0860–0865 | 跟不上就暂停。暂停重做三十秒， | 片尾预告4.5",
+    "14:25–14:30": "0865–0870 | 胜过假装看完却一步都没点过。 | 片尾预告4.5",
+    "14:30–14:35": "0870–0875 | 我们展开讲：课号四点四：数字人口播， | 片尾预告4.5",
+    "14:35–14:40": "0875–0880 | 没人出镜也能讲卖点。为什么要强调这一点？ | 片尾预告4.5",
+    "14:40–14:45": "0880–0885 | 因为现场一忙最容易省掉这一步， | 片尾预告4.5",
+    "14:45–14:50": "0885–0890 | 而返工成本通常高于你现在多花的一分钟。 | 片尾预告4.5",
+    "14:50–14:55": "0890–0895 | 我们展开讲：适用：老板不愿出镜、店员不稳定、 | 片尾预告4.5",
+    "14:55–15:00": "0895–0900 | 多店需统一话术。怎么做才算到位？ | 片尾预告4.5",
+    "15:00–15:05": "0900–0905 | 请对照屏幕把动作做完，而不是只听懂。 | 片尾预告4.5",
+    "15:05–15:10": "0905–0910 | 听懂不等于会做，会做才算合格。 | 片尾预告4.5",
+    "15:10–15:15": "0910–0915 | 我们展开讲：流程：稿件确认，选择音色，生成口播， | 片尾预告4.5",
+    "15:15–15:20": "0915–0920 | 叠加字幕，导出预览。反例是什么？ | 片尾预告4.5",
+    "15:20–15:25": "0920–0925 | 跳步、凭感觉、只在微信里同步、不截图不留痕。 | 片尾预告4.5",
+    "15:25–15:30": "0925–0930 | 这些都会在下周复盘时暴露。 | 片尾预告4.5",
+    "15:30–15:35": "0930–0935 | 我们展开讲：数字人解决的是稳定表达， | 片尾预告4.5",
+    "15:35–15:40": "0935–0940 | 信任仍靠真实门店画面与可核验优惠。 | 片尾预告4.5",
+    "15:40–15:45": "0940–0945 | 正例是什么？每一步都有入口、有确认、有结果物。 | 片尾预告4.5",
+    "15:45–15:50": "0945–0950 | 结果物可以是草稿、订单、话术截图或复盘表。 | 片尾预告4.5",
+    "15:50–15:55": "0950–0955 | 我们展开讲：不要用数字人念虚假折扣。 | 片尾预告4.5",
+    "15:55–16:00": "0955–0960 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 片尾预告4.5",
+    "16:00–16:05": "0960–0965 | 我需要回看哪一个课号补齐？ | 片尾预告4.5",
+    "16:05–16:10": "0965–0970 | 我们展开讲：口播稿避免绝对化医疗或功效承诺。 | 片尾预告4.5",
+    "16:10–16:15": "0970–0975 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 片尾预告4.5",
+    "16:15–16:20": "0975–0980 | 分工清楚，学习效率更高。 | 片尾预告4.5",
+    "16:20–16:25": "0980–0985 | 我们展开讲：和四点二四点三组合：数字人讲卖点， | 片尾预告4.5",
+    "16:25–16:30": "0985–0990 | 实拍画面做证明。演示默认测试店。 | 片尾预告4.5",
+    "16:30–16:35": "0990–0995 | 生产环境涉及改价、发单、结款，必须二次确认， | 片尾预告4.5",
+    "16:35–16:40": "0995–1000 | 不要直播手滑。我们展开讲：暂停：用一段短稿跑通预览。 | 片尾预告4.5",
+    "16:40–16:45": "1000–1005 | 交作业打码：手机号、客户名、真实账单。 | 片尾预告4.5",
+    "16:45–16:50": "1005–1010 | 保护隐私，也是职业习惯。 | 片尾预告4.5",
+    "16:50–16:55": "1010–1015 | 我们展开讲：下一集四点五交脚本或成片。 | 片尾预告4.5",
+    "16:55–17:00": "1015–1020 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 片尾预告4.5",
+    "17:00–17:05": "1020–1025 | 每一步都要能复用到下周、下月。我们展开讲：本集结束。 | 片尾预告4.5",
+    "17:05–17:10": "1025–1030 | 跟不上就暂停。暂停重做三十秒， | 片尾预告4.5",
+    "17:10–17:15": "1030–1035 | 胜过假装看完却一步都没点过。 | 片尾预告4.5",
+    "17:15–17:20": "1035–1040 | 我们展开讲：课号四点四：数字人口播， | 片尾预告4.5",
+    "17:20–17:25": "1040–1045 | 没人出镜也能讲卖点。为什么要强调这一点？ | 片尾预告4.5",
+    "17:25–17:30": "1045–1050 | 因为现场一忙最容易省掉这一步， | 片尾预告4.5",
+    "17:30–17:35": "1050–1055 | 而返工成本通常高于你现在多花的一分钟。 | 片尾预告4.5",
+    "17:35–17:40": "1055–1060 | 我们展开讲：适用：老板不愿出镜、店员不稳定、 | 片尾预告4.5",
+    "17:40–17:45": "1060–1065 | 多店需统一话术。怎么做才算到位？ | 片尾预告4.5",
+    "17:45–17:50": "1065–1070 | 请对照屏幕把动作做完，而不是只听懂。 | 片尾预告4.5",
+    "17:50–17:55": "1070–1075 | 听懂不等于会做，会做才算合格。 | 片尾预告4.5",
+    "17:55–18:00": "1075–1080 | 我们展开讲：流程：稿件确认，选择音色，生成口播， | 片尾预告4.5"
+  },
+  "slides": [
+    {
+      "index": 1,
+      "file": "01-cover.jpg",
+      "kind": "cover",
+      "htag": "封面",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 4.4 · 数字人口播：没人出镜也能讲卖点. Cover slide. Huge title: 数字人口播：没人出镜也能讲卖点. Subtitle: 模块 4｜内容产能. Badge: 课号 4.4. Line: 会用 TTS + 字幕完成口播场景. Duration: 18min. Visual metaphor: local store owner, multi-platform apps, AI pipeline ribbon.",
+      "meta": {
+        "kind": "cover",
+        "htag": "封面",
+        "module": "模块 4｜内容产能",
+        "dur": "18min",
+        "gain": "会用 TTS + 字幕完成口播场景",
+        "visual": "local store owner, multi-platform apps, AI pipeline ribbon"
+      }
+    },
+    {
+      "index": 2,
+      "file": "02-goal.jpg",
+      "kind": "goal",
+      "htag": "本课目标",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 4.4 · 数字人口播：没人出镜也能讲卖点. Learning goals slide. Title: 本课你将带走. Lead: 解决不愿出镜/店员不稳定时的稳定表达。. 3-5 goal cards: 会用 TTS + 字幕完成口播场景.",
+      "meta": {
+        "kind": "goal",
+        "htag": "本课目标",
+        "lead": "解决不愿出镜/店员不稳定时的稳定表达。",
+        "items": [
+          "会用 TTS + 字幕完成口播场景"
+        ]
+      }
+    },
+    {
+      "index": 3,
+      "file": "03-insight.jpg",
+      "kind": "insight",
+      "htag": "讲义要点",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 4.4 · 数字人口播：没人出镜也能讲卖点. Insight slide. Title: 讲义要点. Big statement: 适用：老板不愿出镜、店员不稳定、多店需统一话术。. Supporting bullets: 流程：稿件确认 → 选择音色 → 生成口播 → 叠加字幕 → 导出预览。 | 注意：数字人解决「稳定表达」，信任仍靠真实门店画面与可核验优惠。.",
+      "meta": {
+        "kind": "insight",
+        "htag": "讲义要点",
+        "lead": "适用：老板不愿出镜、店员不稳定、多店需统一话术。",
+        "items": [
+          "流程：稿件确认 → 选择音色 → 生成口播 → 叠加字幕 → 导出预览。",
+          "注意：数字人解决「稳定表达」，信任仍靠真实门店画面与可核验优惠。"
+        ]
+      }
+    },
+    {
+      "index": 4,
+      "file": "04-checklist.jpg",
+      "kind": "checklist",
+      "htag": "演示 / 操作路径",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 4.4 · 数字人口播：没人出镜也能讲卖点. Checklist slide. Title: 演示 / 操作路径. Checked steps: 数字人口播相关入口完整走一版短稿。.",
+      "meta": {
+        "kind": "checklist",
+        "htag": "演示 / 操作路径",
+        "items": [
+          "数字人口播相关入口完整走一版短稿。"
+        ]
+      }
+    },
+    {
+      "index": 5,
+      "file": "05-quote.jpg",
+      "kind": "quote",
+      "htag": "口播与转化要点",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 4.4 · 数字人口播：没人出镜也能讲卖点. Quote/takeaway slide. Title: 记住这句话. Large quote: 「数字人讲卖点，真门店画面背书。」. Side notes: .",
+      "meta": {
+        "kind": "quote",
+        "htag": "口播与转化要点",
+        "quote": "「数字人讲卖点，真门店画面背书。」",
+        "points": []
+      }
+    },
+    {
+      "index": 6,
+      "file": "06-insight.jpg",
+      "kind": "insight",
+      "htag": "讲义深化",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 4.4 · 数字人口播：没人出镜也能讲卖点. Insight slide. Title: 讲义深化. Big statement: 适用：老板不愿出镜、店员不稳定、多店需统一话术。. Supporting bullets: 流程：稿件确认 → 选择音色 → 生成口播 → 叠加字幕 → 导出预览。 | 注意：数字人解决「稳定表达」，信任仍靠真实门店画面与可核验优惠。.",
+      "meta": {
+        "kind": "insight",
+        "htag": "讲义深化",
+        "lead": "适用：老板不愿出镜、店员不稳定、多店需统一话术。",
+        "items": [
+          "流程：稿件确认 → 选择音色 → 生成口播 → 叠加字幕 → 导出预览。",
+          "注意：数字人解决「稳定表达」，信任仍靠真实门店画面与可核验优惠。"
+        ]
+      }
+    },
+    {
+      "index": 7,
+      "file": "07-insight.jpg",
+      "kind": "insight",
+      "htag": "为什么现在必须改",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 4.4 · 数字人口播：没人出镜也能讲卖点. Insight slide. Title: 为什么现在必须改. Big statement: 散点经营一定累：同一件事拆到多个后台、多个人、多轮微信确认。. Supporting bullets: 多入口 = 多口径 | 无状态 = 月底对不清 | 无确认 = AI 不能替你签字.",
+      "meta": {
+        "kind": "insight",
+        "htag": "为什么现在必须改",
+        "lead": "散点经营一定累：同一件事拆到多个后台、多个人、多轮微信确认。",
+        "items": [
+          "多入口 = 多口径",
+          "无状态 = 月底对不清",
+          "无确认 = AI 不能替你签字"
+        ]
+      }
+    },
+    {
+      "index": 8,
+      "file": "08-map.jpg",
+      "kind": "map",
+      "htag": "灵祺流水线一览",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 4.4 · 数字人口播：没人出镜也能讲卖点. Module map slide. Title: 灵祺流水线一览. Nodes: 开团/组品 → 招达人 → 做内容 → 曝光获客 → 对账复盘. Caption: AI 提案 · 你确认 · 少雇人少外包少踩坑.",
+      "meta": {
+        "kind": "map",
+        "htag": "灵祺流水线一览",
+        "steps": [
+          "开团/组品",
+          "招达人",
+          "做内容",
+          "曝光获客",
+          "对账复盘"
+        ],
+        "note": "AI 提案 · 你确认 · 少雇人少外包少踩坑"
+      }
+    },
+    {
+      "index": 9,
+      "file": "09-insight.jpg",
+      "kind": "insight",
+      "htag": "人机分工",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 4.4 · 数字人口播：没人出镜也能讲卖点. Insight slide. Title: 人机分工. Big statement: AI 负责提案与草稿，你负责确认与签字。. Supporting bullets: 可预览 | 可回退 | 关键动作有状态.",
+      "meta": {
+        "kind": "insight",
+        "htag": "人机分工",
+        "lead": "AI 负责提案与草稿，你负责确认与签字。",
+        "items": [
+          "可预览",
+          "可回退",
+          "关键动作有状态"
+        ]
+      }
+    },
+    {
+      "index": 10,
+      "file": "10-split.jpg",
+      "kind": "split",
+      "htag": "旧方式 vs 流水线",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 4.4 · 数字人口播：没人出镜也能讲卖点. Two-column contrast slide. Title: 旧方式 vs 流水线. Left: 旧：微信群跟单 + 表格 + 外包突击. Right: 新：订单状态机 + AI 产线 + 预览确认.",
+      "meta": {
+        "kind": "split",
+        "htag": "旧方式 vs 流水线",
+        "left": "旧：微信群跟单 + 表格 + 外包突击",
+        "right": "新：订单状态机 + AI 产线 + 预览确认"
+      }
+    },
+    {
+      "index": 11,
+      "file": "11-insight.jpg",
+      "kind": "insight",
+      "htag": "本课边界",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 4.4 · 数字人口播：没人出镜也能讲卖点. Insight slide. Title: 本课边界. Big statement: 先对齐概念与路径，敏感信息打码，用测试店心态点一遍。. Supporting bullets: 不堆无关按钮 | 一课一个主动作 | 作业可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "本课边界",
+        "lead": "先对齐概念与路径，敏感信息打码，用测试店心态点一遍。",
+        "items": [
+          "不堆无关按钮",
+          "一课一个主动作",
+          "作业可验收"
+        ]
+      }
+    },
+    {
+      "index": 12,
+      "file": "12-checklist.jpg",
+      "kind": "checklist",
+      "htag": "听课检查清单",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 4.4 · 数字人口播：没人出镜也能讲卖点. Checklist slide. Title: 听课检查清单. Checked steps: 能复述本课目标 | 能指出卡点在哪一步 | 能说出下一动作入口 | 完成作业打卡.",
+      "meta": {
+        "kind": "checklist",
+        "htag": "听课检查清单",
+        "items": [
+          "能复述本课目标",
+          "能指出卡点在哪一步",
+          "能说出下一动作入口",
+          "完成作业打卡"
+        ]
+      }
+    },
+    {
+      "index": 13,
+      "file": "13-quote.jpg",
+      "kind": "quote",
+      "htag": "金句",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 4.4 · 数字人口播：没人出镜也能讲卖点. Quote/takeaway slide. Title: 记住这句话. Large quote: 会用 TTS + 字幕完成口播场景. Side notes: 少雇人 | 少外包 | 少踩坑.",
+      "meta": {
+        "kind": "quote",
+        "htag": "金句",
+        "quote": "会用 TTS + 字幕完成口播场景",
+        "points": [
+          "少雇人",
+          "少外包",
+          "少踩坑"
+        ]
+      }
+    },
+    {
+      "index": 14,
+      "file": "14-insight.jpg",
+      "kind": "insight",
+      "htag": "常见踩坑",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 4.4 · 数字人口播：没人出镜也能讲卖点. Insight slide. Title: 常见踩坑. Big statement: 最容易翻车的不是不会用，而是跳过确认、跳过状态、跳过核对。. Supporting bullets: 未预览就发布 | 状态卡在群聊里 | 月底才想起对账.",
+      "meta": {
+        "kind": "insight",
+        "htag": "常见踩坑",
+        "lead": "最容易翻车的不是不会用，而是跳过确认、跳过状态、跳过核对。",
+        "items": [
+          "未预览就发布",
+          "状态卡在群聊里",
+          "月底才想起对账"
+        ]
+      }
+    },
+    {
+      "index": 15,
+      "file": "15-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 1",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 4.4 · 数字人口播：没人出镜也能讲卖点. Insight slide. Title: 落地提醒 · 1. Big statement: 4.4 数字人口播：没人出镜也能讲卖点：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 1",
+        "lead": "4.4 数字人口播：没人出镜也能讲卖点：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 16,
+      "file": "16-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 2",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 4.4 · 数字人口播：没人出镜也能讲卖点. Insight slide. Title: 落地提醒 · 2. Big statement: 4.4 数字人口播：没人出镜也能讲卖点：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 2",
+        "lead": "4.4 数字人口播：没人出镜也能讲卖点：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 17,
+      "file": "17-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 3",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 4.4 · 数字人口播：没人出镜也能讲卖点. Insight slide. Title: 落地提醒 · 3. Big statement: 4.4 数字人口播：没人出镜也能讲卖点：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 3",
+        "lead": "4.4 数字人口播：没人出镜也能讲卖点：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 18,
+      "file": "18-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 4",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 4.4 · 数字人口播：没人出镜也能讲卖点. Insight slide. Title: 落地提醒 · 4. Big statement: 4.4 数字人口播：没人出镜也能讲卖点：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 4",
+        "lead": "4.4 数字人口播：没人出镜也能讲卖点：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 19,
+      "file": "19-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 5",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 4.4 · 数字人口播：没人出镜也能讲卖点. Insight slide. Title: 落地提醒 · 5. Big statement: 4.4 数字人口播：没人出镜也能讲卖点：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 5",
+        "lead": "4.4 数字人口播：没人出镜也能讲卖点：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 20,
+      "file": "20-end.jpg",
+      "kind": "end",
+      "htag": "结束",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 4.4 · 数字人口播：没人出镜也能讲卖点. Closing slide. Title: 本课结束. Course 4.4 数字人口播：没人出镜也能讲卖点. Takeaway: 会用 TTS + 字幕完成口播场景. CTA: 下一课继续实操. Inspiring local-business + AI visual.",
+      "meta": {
+        "kind": "end",
+        "htag": "结束",
+        "gain": "会用 TTS + 字幕完成口播场景"
+      }
+    }
+  ]
+}

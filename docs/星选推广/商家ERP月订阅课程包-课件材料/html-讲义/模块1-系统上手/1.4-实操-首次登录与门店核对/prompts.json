@@ -1,0 +1,372 @@
+{
+  "meta": {
+    "课号": "1.4",
+    "课名": "【实操】完成首次登录与门店核对",
+    "建议时长": "作业",
+    "所属模块": "模块 1｜系统上手",
+    "学员收获": "提交店铺信息页截图，证明已开通可操作",
+    "建议录屏文件名": "作业说明-1.4.txt",
+    "时间": "秒序 | 口播（逐字念） | 画面动作",
+    "00:00–00:05": "0000–0005 | 课号一点四，实操作业说明。时长很短，但必须做。 | 片头",
+    "00:05–00:10": "0005–0010 | 作业要求：登录商家ERP，完善或核对店铺信息与门店， | 片头",
+    "00:10–00:15": "0010–0015 | 截图店铺信息页，手机号打码，提交到学员群。 | 片头",
+    "00:15–00:20": "0015–0020 | 验收标准三条：能登录；店铺信息与真实门店一致； | 片头",
+    "00:20–00:25": "0020–0025 | 知道首页待办在哪里。三条缺一，重做。 | 展示合格/不合格截图样例",
+    "00:25–00:30": "0025–0030 | 不合格示例：截图含完整手机号；店名为空； | 展示合格/不合格截图样例",
+    "00:30–00:35": "0030–0035 | 截的是无关页面。合格示例：关键字段清晰， | 展示合格/不合格截图样例",
+    "00:35–00:40": "0035–0040 | 敏感信息马赛克。做不出来，回看一点一，不要硬扛。 | 展示合格/不合格截图样例",
+    "00:40–00:45": "0040–0045 | 做完才能进模块二的AI实操，否则你后面截图也会乱。 | 展示合格/不合格截图样例",
+    "00:45–00:50": "0045–0050 | 提交格式按社群规则：图片或链接。 | 展示合格/不合格截图样例",
+    "00:50–00:55": "0050–0055 | 文件名可写店名加一点四。好，作业说明结束，去做。 | 展示合格/不合格截图样例",
+    "00:55–01:00": "0055–0060 | 我们展开讲：课号一点四，实操作业说明。 | 展示合格/不合格截图样例",
+    "01:00–01:05": "0060–0065 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 展示合格/不合格截图样例",
+    "01:05–01:10": "0065–0070 | 而返工成本通常高于你现在多花的一分钟。 | 展示合格/不合格截图样例",
+    "01:10–01:15": "0070–0075 | 我们展开讲：时长很短，但必须做。 | 展示合格/不合格截图样例",
+    "01:15–01:20": "0075–0080 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 展示合格/不合格截图样例",
+    "01:20–01:25": "0080–0085 | 听懂不等于会做，会做才算合格。 | 展示合格/不合格截图样例",
+    "01:25–01:30": "0085–0090 | 我们展开讲：作业要求：登录商家ERP， | 展示合格/不合格截图样例",
+    "01:30–01:35": "0090–0095 | 完善或核对店铺信息与门店，截图店铺信息页，手机号打码， | 展示合格/不合格截图样例",
+    "01:35–01:40": "0095–0100 | 提交到学员群。反例是什么？ | 展示合格/不合格截图样例",
+    "01:40–01:45": "0100–0105 | 跳步、凭感觉、只在微信里同步、不截图不留痕。 | 展示合格/不合格截图样例",
+    "01:45–01:50": "0105–0110 | 这些都会在下周复盘时暴露。 | 展示合格/不合格截图样例",
+    "01:50–01:55": "0110–0115 | 我们展开讲：验收标准三条：能登录； | 展示合格/不合格截图样例",
+    "01:55–02:00": "0115–0120 | 店铺信息与真实门店一致；知道首页待办在哪里。 | 展示合格/不合格截图样例",
+    "02:00–02:05": "0120–0125 | 正例是什么？每一步都有入口、有确认、有结果物。 | 字幕验收三条",
+    "02:05–02:10": "0125–0130 | 结果物可以是草稿、订单、话术截图或复盘表。 | 字幕验收三条",
+    "02:10–02:15": "0130–0135 | 我们展开讲：三条缺一，重做。 | 字幕验收三条",
+    "02:15–02:20": "0135–0140 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 字幕验收三条",
+    "02:20–02:25": "0140–0145 | 我需要回看哪一个课号补齐？ | 字幕验收三条",
+    "02:25–02:30": "0145–0150 | 我们展开讲：不合格示例：截图含完整手机号；店名为空； | 字幕验收三条",
+    "02:30–02:35": "0150–0155 | 截的是无关页面。如果带着店员一起学，让店员负责点选， | 片尾",
+    "02:35–02:40": "0155–0160 | 你负责拍板。分工清楚，学习效率更高。 | 片尾",
+    "02:40–02:45": "0160–0165 | 我们展开讲：合格示例：关键字段清晰，敏感信息马赛克。 | 片尾",
+    "02:45–02:50": "0165–0170 | 演示默认测试店。生产环境涉及改价、发单、结款， | 片尾",
+    "02:50–02:55": "0170–0175 | 必须二次确认，不要直播手滑。 | 片尾",
+    "02:55–03:00": "0175–0180 | 我们展开讲：做不出来，回看一点一，不要硬扛。 | 片尾"
+  },
+  "slides": [
+    {
+      "index": 1,
+      "file": "01-cover.jpg",
+      "kind": "cover",
+      "htag": "封面",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 1.4 · 【实操】完成首次登录与门店核对. Cover slide. Huge title: 【实操】完成首次登录与门店核对. Subtitle: 模块 1｜系统上手. Badge: 课号 1.4. Line: 提交店铺信息页截图，证明已开通可操作. Duration: 作业. Visual metaphor: local store owner, multi-platform apps, AI pipeline ribbon.",
+      "meta": {
+        "kind": "cover",
+        "htag": "封面",
+        "module": "模块 1｜系统上手",
+        "dur": "作业",
+        "gain": "提交店铺信息页截图，证明已开通可操作",
+        "visual": "local store owner, multi-platform apps, AI pipeline ribbon"
+      }
+    },
+    {
+      "index": 2,
+      "file": "02-goal.jpg",
+      "kind": "goal",
+      "htag": "本课目标",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 1.4 · 【实操】完成首次登录与门店核对. Learning goals slide. Title: 本课你将带走. Lead: 用截图证明学员已完成登录与门店核对。. 3-5 goal cards: 提交店铺信息页截图，证明已开通可操作.",
+      "meta": {
+        "kind": "goal",
+        "htag": "本课目标",
+        "lead": "用截图证明学员已完成登录与门店核对。",
+        "items": [
+          "提交店铺信息页截图，证明已开通可操作"
+        ]
+      }
+    },
+    {
+      "index": 3,
+      "file": "03-agenda.jpg",
+      "kind": "agenda",
+      "htag": "本课结构",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 1.4 · 【实操】完成首次登录与门店核对. Agenda slide. Title: 本课结构. Numbered outline cards: 学员要做什么.",
+      "meta": {
+        "kind": "agenda",
+        "htag": "本课结构",
+        "items": [
+          "学员要做什么"
+        ]
+      }
+    },
+    {
+      "index": 4,
+      "file": "04-insight.jpg",
+      "kind": "insight",
+      "htag": "讲义要点",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 1.4 · 【实操】完成首次登录与门店核对. Insight slide. Title: 讲义要点. Big statement: 本课为实操作业课，可不单独长录屏；可用 2–3 分钟「作业说明」短视频。. Supporting bullets: .",
+      "meta": {
+        "kind": "insight",
+        "htag": "讲义要点",
+        "lead": "本课为实操作业课，可不单独长录屏；可用 2–3 分钟「作业说明」短视频。",
+        "items": []
+      }
+    },
+    {
+      "index": 5,
+      "file": "05-cards.jpg",
+      "kind": "cards",
+      "htag": "学员要做什么",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 1.4 · 【实操】完成首次登录与门店核对. Card grid slide. Title: 学员要做什么. Cards: 登录 cs.mofangdiana…: 登录 cs.mofangdianai.com ; 完善/核对店铺信息与门店: 完善/核对店铺信息与门店 ; 截图店铺信息页（手机号打码）: 截图店铺信息页（手机号打码） ; 提交到学员群（按社群规则）: 提交到学员群（按社群规则）.",
+      "meta": {
+        "kind": "cards",
+        "htag": "学员要做什么",
+        "cards": [
+          {
+            "t": "登录 cs.mofangdiana…",
+            "b": "登录 cs.mofangdianai.com"
+          },
+          {
+            "t": "完善/核对店铺信息与门店",
+            "b": "完善/核对店铺信息与门店"
+          },
+          {
+            "t": "截图店铺信息页（手机号打码）",
+            "b": "截图店铺信息页（手机号打码）"
+          },
+          {
+            "t": "提交到学员群（按社群规则）",
+            "b": "提交到学员群（按社群规则）"
+          }
+        ]
+      }
+    },
+    {
+      "index": 6,
+      "file": "06-checklist.jpg",
+      "kind": "checklist",
+      "htag": "演示 / 操作路径",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 1.4 · 【实操】完成首次登录与门店核对. Checklist slide. Title: 演示 / 操作路径. Checked steps: 展示一张打码后的合格截图样例（可用马赛克示例图）。.",
+      "meta": {
+        "kind": "checklist",
+        "htag": "演示 / 操作路径",
+        "items": [
+          "展示一张打码后的合格截图样例（可用马赛克示例图）。"
+        ]
+      }
+    },
+    {
+      "index": 7,
+      "file": "07-quote.jpg",
+      "kind": "quote",
+      "htag": "口播与转化要点",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 1.4 · 【实操】完成首次登录与门店核对. Quote/takeaway slide. Title: 记住这句话. Large quote: 「做完截图丢群。做不出来回看 1.1，别硬扛。」. Side notes: .",
+      "meta": {
+        "kind": "quote",
+        "htag": "口播与转化要点",
+        "quote": "「做完截图丢群。做不出来回看 1.1，别硬扛。」",
+        "points": []
+      }
+    },
+    {
+      "index": 8,
+      "file": "08-homework.jpg",
+      "kind": "homework",
+      "htag": "作业 / 验收",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 1.4 · 【实操】完成首次登录与门店核对. Homework slide. Title: 作业 / 验收. Action items: 能登录 | 店铺信息已填写且与真实门店一致 | 知道首页待办在哪里.",
+      "meta": {
+        "kind": "homework",
+        "htag": "作业 / 验收",
+        "items": [
+          "能登录",
+          "店铺信息已填写且与真实门店一致",
+          "知道首页待办在哪里"
+        ]
+      }
+    },
+    {
+      "index": 9,
+      "file": "09-insight.jpg",
+      "kind": "insight",
+      "htag": "讲义深化",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 1.4 · 【实操】完成首次登录与门店核对. Insight slide. Title: 讲义深化. Big statement: 本课为实操作业课，可不单独长录屏；可用 2–3 分钟「作业说明」短视频。. Supporting bullets: .",
+      "meta": {
+        "kind": "insight",
+        "htag": "讲义深化",
+        "lead": "本课为实操作业课，可不单独长录屏；可用 2–3 分钟「作业说明」短视频。",
+        "items": []
+      }
+    },
+    {
+      "index": 10,
+      "file": "10-insight.jpg",
+      "kind": "insight",
+      "htag": "学员要做什么",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 1.4 · 【实操】完成首次登录与门店核对. Insight slide. Title: 学员要做什么. Big statement: 登录 cs.mofangdianai.com. Supporting bullets: 登录 cs.mofangdianai.com | 完善/核对店铺信息与门店 | 截图店铺信息页（手机号打码） | 提交到学员群（按社群规则）.",
+      "meta": {
+        "kind": "insight",
+        "htag": "学员要做什么",
+        "lead": "登录 cs.mofangdianai.com",
+        "items": [
+          "登录 cs.mofangdianai.com",
+          "完善/核对店铺信息与门店",
+          "截图店铺信息页（手机号打码）",
+          "提交到学员群（按社群规则）"
+        ]
+      }
+    },
+    {
+      "index": 11,
+      "file": "11-insight.jpg",
+      "kind": "insight",
+      "htag": "为什么现在必须改",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 1.4 · 【实操】完成首次登录与门店核对. Insight slide. Title: 为什么现在必须改. Big statement: 散点经营一定累：同一件事拆到多个后台、多个人、多轮微信确认。. Supporting bullets: 多入口 = 多口径 | 无状态 = 月底对不清 | 无确认 = AI 不能替你签字.",
+      "meta": {
+        "kind": "insight",
+        "htag": "为什么现在必须改",
+        "lead": "散点经营一定累：同一件事拆到多个后台、多个人、多轮微信确认。",
+        "items": [
+          "多入口 = 多口径",
+          "无状态 = 月底对不清",
+          "无确认 = AI 不能替你签字"
+        ]
+      }
+    },
+    {
+      "index": 12,
+      "file": "12-map.jpg",
+      "kind": "map",
+      "htag": "灵祺流水线一览",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 1.4 · 【实操】完成首次登录与门店核对. Module map slide. Title: 灵祺流水线一览. Nodes: 开团/组品 → 招达人 → 做内容 → 曝光获客 → 对账复盘. Caption: AI 提案 · 你确认 · 少雇人少外包少踩坑.",
+      "meta": {
+        "kind": "map",
+        "htag": "灵祺流水线一览",
+        "steps": [
+          "开团/组品",
+          "招达人",
+          "做内容",
+          "曝光获客",
+          "对账复盘"
+        ],
+        "note": "AI 提案 · 你确认 · 少雇人少外包少踩坑"
+      }
+    },
+    {
+      "index": 13,
+      "file": "13-insight.jpg",
+      "kind": "insight",
+      "htag": "人机分工",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 1.4 · 【实操】完成首次登录与门店核对. Insight slide. Title: 人机分工. Big statement: AI 负责提案与草稿，你负责确认与签字。. Supporting bullets: 可预览 | 可回退 | 关键动作有状态.",
+      "meta": {
+        "kind": "insight",
+        "htag": "人机分工",
+        "lead": "AI 负责提案与草稿，你负责确认与签字。",
+        "items": [
+          "可预览",
+          "可回退",
+          "关键动作有状态"
+        ]
+      }
+    },
+    {
+      "index": 14,
+      "file": "14-split.jpg",
+      "kind": "split",
+      "htag": "旧方式 vs 流水线",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 1.4 · 【实操】完成首次登录与门店核对. Two-column contrast slide. Title: 旧方式 vs 流水线. Left: 旧：微信群跟单 + 表格 + 外包突击. Right: 新：订单状态机 + AI 产线 + 预览确认.",
+      "meta": {
+        "kind": "split",
+        "htag": "旧方式 vs 流水线",
+        "left": "旧：微信群跟单 + 表格 + 外包突击",
+        "right": "新：订单状态机 + AI 产线 + 预览确认"
+      }
+    },
+    {
+      "index": 15,
+      "file": "15-insight.jpg",
+      "kind": "insight",
+      "htag": "本课边界",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 1.4 · 【实操】完成首次登录与门店核对. Insight slide. Title: 本课边界. Big statement: 先对齐概念与路径，敏感信息打码，用测试店心态点一遍。. Supporting bullets: 不堆无关按钮 | 一课一个主动作 | 作业可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "本课边界",
+        "lead": "先对齐概念与路径，敏感信息打码，用测试店心态点一遍。",
+        "items": [
+          "不堆无关按钮",
+          "一课一个主动作",
+          "作业可验收"
+        ]
+      }
+    },
+    {
+      "index": 16,
+      "file": "16-checklist.jpg",
+      "kind": "checklist",
+      "htag": "听课检查清单",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 1.4 · 【实操】完成首次登录与门店核对. Checklist slide. Title: 听课检查清单. Checked steps: 能复述本课目标 | 能指出卡点在哪一步 | 能说出下一动作入口 | 完成作业打卡.",
+      "meta": {
+        "kind": "checklist",
+        "htag": "听课检查清单",
+        "items": [
+          "能复述本课目标",
+          "能指出卡点在哪一步",
+          "能说出下一动作入口",
+          "完成作业打卡"
+        ]
+      }
+    },
+    {
+      "index": 17,
+      "file": "17-quote.jpg",
+      "kind": "quote",
+      "htag": "金句",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 1.4 · 【实操】完成首次登录与门店核对. Quote/takeaway slide. Title: 记住这句话. Large quote: 提交店铺信息页截图，证明已开通可操作. Side notes: 少雇人 | 少外包 | 少踩坑.",
+      "meta": {
+        "kind": "quote",
+        "htag": "金句",
+        "quote": "提交店铺信息页截图，证明已开通可操作",
+        "points": [
+          "少雇人",
+          "少外包",
+          "少踩坑"
+        ]
+      }
+    },
+    {
+      "index": 18,
+      "file": "18-insight.jpg",
+      "kind": "insight",
+      "htag": "常见踩坑",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 1.4 · 【实操】完成首次登录与门店核对. Insight slide. Title: 常见踩坑. Big statement: 最容易翻车的不是不会用，而是跳过确认、跳过状态、跳过核对。. Supporting bullets: 未预览就发布 | 状态卡在群聊里 | 月底才想起对账.",
+      "meta": {
+        "kind": "insight",
+        "htag": "常见踩坑",
+        "lead": "最容易翻车的不是不会用，而是跳过确认、跳过状态、跳过核对。",
+        "items": [
+          "未预览就发布",
+          "状态卡在群聊里",
+          "月底才想起对账"
+        ]
+      }
+    },
+    {
+      "index": 19,
+      "file": "19-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 1",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 1.4 · 【实操】完成首次登录与门店核对. Insight slide. Title: 落地提醒 · 1. Big statement: 1.4 【实操】完成首次登录与门店核对：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 1",
+        "lead": "1.4 【实操】完成首次登录与门店核对：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 20,
+      "file": "20-end.jpg",
+      "kind": "end",
+      "htag": "结束",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 1.4 · 【实操】完成首次登录与门店核对. Closing slide. Title: 本课结束. Course 1.4 【实操】完成首次登录与门店核对. Takeaway: 提交店铺信息页截图，证明已开通可操作. CTA: 下一课继续实操. Inspiring local-business + AI visual.",
+      "meta": {
+        "kind": "end",
+        "htag": "结束",
+        "gain": "提交店铺信息页截图，证明已开通可操作"
+      }
+    }
+  ]
+}

@@ -1,0 +1,523 @@
+{
+  "meta": {
+    "课号": "3.5",
+    "课名": "结款与核对：怎么证明达人真的发了",
+    "建议时长": "15min",
+    "所属模块": "模块 3｜达人招募闭环",
+    "学员收获": "建立「无回链不轻易结尾款」纪律",
+    "建议录屏文件名": "3.5-结款核对.mp4",
+    "时间": "秒序 | 口播（逐字念） | 画面动作",
+    "00:00–00:05": "0000–0005 | 课号三点五：结款与核对，怎么证明达人真的发了。 | 片头·无回链不轻易结尾款",
+    "00:05–00:10": "0005–0010 | 纪律先立：无回链，不轻易结尾款。 | 片头·无回链不轻易结尾款",
+    "00:10–00:15": "0010–0015 | 结款依据应来自系统可核对信息：回链、发布凭证、 | 片头·无回链不轻易结尾款",
+    "00:15–00:20": "0015–0020 | AI核查结果，以产品展示为准。 | 片头·无回链不轻易结尾款",
+    "00:20–00:25": "0020–0025 | 课程不讲内部运维细节；学员侧会三件事就够。 | 片头·无回链不轻易结尾款",
+    "00:25–00:30": "0025–0030 | 第一，在订单里找到回链或凭证入口。 | 片头·无回链不轻易结尾款",
+    "00:30–00:35": "0030–0035 | 找不到入口，先别打款，先找页面或问助教路径， | 片头·无回链不轻易结尾款",
+    "00:35–00:40": "0035–0040 | 不要回到纯微信结款。第二， | 片头·无回链不轻易结尾款",
+    "00:40–00:45": "0040–0045 | 核对是否符合Brief：卖点、时长、平台、是否露店。 | 片头·无回链不轻易结尾款",
+    "00:45–00:50": "0045–0050 | 不符合就标记异常再沟通。 | 片头·无回链不轻易结尾款",
+    "00:50–00:55": "0050–0055 | 第三，异常先标记再沟通，不要先打款再追片。 | 片头·无回链不轻易结尾款",
+    "00:55–01:00": "0055–0060 | 先打款，你就从甲方变成催债人。 | 片头·无回链不轻易结尾款",
+    "01:00–01:05": "0060–0065 | 和三点一呼应：无回链正是亏钱三件套最后一环。 | 订单里找回链/凭证入口",
+    "01:05–01:10": "0065–0070 | 和价值图呼应：这是省试错的最后一公里。 | 订单里找回链/凭证入口",
+    "01:10–01:15": "0070–0075 | 演示时真实结算账号、金额必须打码。好，三点五结束。 | 订单里找回链/凭证入口",
+    "01:15–01:20": "0075–0080 | 下一集三点六交招募单截图。 | 订单里找回链/凭证入口",
+    "01:20–01:25": "0080–0085 | 我们展开讲：课号三点五：结款与核对， | 订单里找回链/凭证入口",
+    "01:25–01:30": "0085–0090 | 怎么证明达人真的发了。 | 订单里找回链/凭证入口",
+    "01:30–01:35": "0090–0095 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 订单里找回链/凭证入口",
+    "01:35–01:40": "0095–0100 | 而返工成本通常高于你现在多花的一分钟。 | 订单里找回链/凭证入口",
+    "01:40–01:45": "0100–0105 | 我们展开讲：纪律先立：无回链，不轻易结尾款。 | 订单里找回链/凭证入口",
+    "01:45–01:50": "0105–0110 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 订单里找回链/凭证入口",
+    "01:50–01:55": "0110–0115 | 听懂不等于会做，会做才算合格。 | 订单里找回链/凭证入口",
+    "01:55–02:00": "0115–0120 | 我们展开讲：结款依据应来自系统可核对信息：回链、 | 订单里找回链/凭证入口",
+    "02:00–02:05": "0120–0125 | 发布凭证、AI核查结果，以产品展示为准。 | 订单里找回链/凭证入口",
+    "02:05–02:10": "0125–0130 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 订单里找回链/凭证入口",
+    "02:10–02:15": "0130–0135 | 不截图不留痕。这些都会在下周复盘时暴露。 | 订单里找回链/凭证入口",
+    "02:15–02:20": "0135–0140 | 我们展开讲：课程不讲内部运维细节；学员侧会三件事就够。 | 订单里找回链/凭证入口",
+    "02:20–02:25": "0140–0145 | 正例是什么？每一步都有入口、有确认、有结果物。 | 订单里找回链/凭证入口",
+    "02:25–02:30": "0145–0150 | 结果物可以是草稿、订单、话术截图或复盘表。 | 订单里找回链/凭证入口",
+    "02:30–02:35": "0150–0155 | 我们展开讲：第一，在订单里找到回链或凭证入口。 | 订单里找回链/凭证入口",
+    "02:35–02:40": "0155–0160 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 订单里找回链/凭证入口",
+    "02:40–02:45": "0160–0165 | 我需要回看哪一个课号补齐？ | 订单里找回链/凭证入口",
+    "02:45–02:50": "0165–0170 | 我们展开讲：找不到入口，先别打款， | 订单里找回链/凭证入口",
+    "02:50–02:55": "0170–0175 | 先找页面或问助教路径，不要回到纯微信结款。 | 订单里找回链/凭证入口",
+    "02:55–03:00": "0175–0180 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 订单里找回链/凭证入口",
+    "03:00–03:05": "0180–0185 | 分工清楚，学习效率更高。 | 订单里找回链/凭证入口",
+    "03:05–03:10": "0185–0190 | 我们展开讲：第二，核对是否符合Brief：卖点、时长、 | 订单里找回链/凭证入口",
+    "03:10–03:15": "0190–0195 | 平台、是否露店。演示默认测试店。 | 订单里找回链/凭证入口",
+    "03:15–03:20": "0195–0200 | 生产环境涉及改价、发单、结款，必须二次确认， | 订单里找回链/凭证入口",
+    "03:20–03:25": "0200–0205 | 不要直播手滑。我们展开讲：不符合就标记异常再沟通。 | 订单里找回链/凭证入口",
+    "03:25–03:30": "0205–0210 | 交作业打码：手机号、客户名、真实账单。 | 订单里找回链/凭证入口",
+    "03:30–03:35": "0210–0215 | 保护隐私，也是职业习惯。 | 订单里找回链/凭证入口",
+    "03:35–03:40": "0215–0220 | 我们展开讲：第三，异常先标记再沟通，不要先打款再追片。 | 订单里找回链/凭证入口",
+    "03:40–03:45": "0220–0225 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 订单里找回链/凭证入口",
+    "03:45–03:50": "0225–0230 | 每一步都要能复用到下周、下月。 | 订单里找回链/凭证入口",
+    "03:50–03:55": "0230–0235 | 我们展开讲：先打款，你就从甲方变成催债人。 | 订单里找回链/凭证入口",
+    "03:55–04:00": "0235–0240 | 跟不上就暂停。暂停重做三十秒， | 订单里找回链/凭证入口",
+    "04:00–04:05": "0240–0245 | 胜过假装看完却一步都没点过。 | 订单里找回链/凭证入口",
+    "04:05–04:10": "0245–0250 | 我们展开讲：和三点一呼应： | 订单里找回链/凭证入口",
+    "04:10–04:15": "0250–0255 | 无回链正是亏钱三件套最后一环。 | 订单里找回链/凭证入口",
+    "04:15–04:20": "0255–0260 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 订单里找回链/凭证入口",
+    "04:20–04:25": "0260–0265 | 而返工成本通常高于你现在多花的一分钟。 | 订单里找回链/凭证入口",
+    "04:25–04:30": "0265–0270 | 我们展开讲：和价值图呼应：这是省试错的最后一公里。 | 订单里找回链/凭证入口",
+    "04:30–04:35": "0270–0275 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 订单里找回链/凭证入口",
+    "04:35–04:40": "0275–0280 | 听懂不等于会做，会做才算合格。 | 订单里找回链/凭证入口",
+    "04:40–04:45": "0280–0285 | 我们展开讲：演示时真实结算账号、金额必须打码。 | 订单里找回链/凭证入口",
+    "04:45–04:50": "0285–0290 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 订单里找回链/凭证入口",
+    "04:50–04:55": "0290–0295 | 不截图不留痕。这些都会在下周复盘时暴露。 | 订单里找回链/凭证入口",
+    "04:55–05:00": "0295–0300 | 我们展开讲：好，三点五结束。 | 订单里找回链/凭证入口",
+    "05:00–05:05": "0300–0305 | 正例是什么？每一步都有入口、有确认、有结果物。 | 对照Brief核对",
+    "05:05–05:10": "0305–0310 | 结果物可以是草稿、订单、话术截图或复盘表。 | 对照Brief核对",
+    "05:10–05:15": "0310–0315 | 我们展开讲：下一集三点六交招募单截图。 | 对照Brief核对",
+    "05:15–05:20": "0315–0320 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 对照Brief核对",
+    "05:20–05:25": "0320–0325 | 我需要回看哪一个课号补齐？ | 对照Brief核对",
+    "05:25–05:30": "0325–0330 | 我们展开讲：课号三点五：结款与核对， | 对照Brief核对",
+    "05:30–05:35": "0330–0335 | 怎么证明达人真的发了。 | 对照Brief核对",
+    "05:35–05:40": "0335–0340 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 对照Brief核对",
+    "05:40–05:45": "0340–0345 | 分工清楚，学习效率更高。 | 对照Brief核对",
+    "05:45–05:50": "0345–0350 | 我们展开讲：纪律先立：无回链，不轻易结尾款。 | 对照Brief核对",
+    "05:50–05:55": "0350–0355 | 演示默认测试店。生产环境涉及改价、发单、结款， | 对照Brief核对",
+    "05:55–06:00": "0355–0360 | 必须二次确认，不要直播手滑。 | 对照Brief核对",
+    "06:00–06:05": "0360–0365 | 我们展开讲：结款依据应来自系统可核对信息：回链、 | 对照Brief核对",
+    "06:05–06:10": "0365–0370 | 发布凭证、AI核查结果，以产品展示为准。 | 对照Brief核对",
+    "06:10–06:15": "0370–0375 | 交作业打码：手机号、客户名、真实账单。 | 对照Brief核对",
+    "06:15–06:20": "0375–0380 | 保护隐私，也是职业习惯。 | 对照Brief核对",
+    "06:20–06:25": "0380–0385 | 我们展开讲：课程不讲内部运维细节；学员侧会三件事就够。 | 对照Brief核对",
+    "06:25–06:30": "0385–0390 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 对照Brief核对",
+    "06:30–06:35": "0390–0395 | 每一步都要能复用到下周、下月。 | 对照Brief核对",
+    "06:35–06:40": "0395–0400 | 我们展开讲：第一，在订单里找到回链或凭证入口。 | 对照Brief核对",
+    "06:40–06:45": "0400–0405 | 跟不上就暂停。暂停重做三十秒， | 对照Brief核对",
+    "06:45–06:50": "0405–0410 | 胜过假装看完却一步都没点过。 | 对照Brief核对",
+    "06:50–06:55": "0410–0415 | 我们展开讲：找不到入口，先别打款， | 对照Brief核对",
+    "06:55–07:00": "0415–0420 | 先找页面或问助教路径，不要回到纯微信结款。 | 对照Brief核对",
+    "07:00–07:05": "0420–0425 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 对照Brief核对",
+    "07:05–07:10": "0425–0430 | 而返工成本通常高于你现在多花的一分钟。 | 对照Brief核对",
+    "07:10–07:15": "0430–0435 | 我们展开讲：第二，核对是否符合Brief：卖点、时长、 | 对照Brief核对",
+    "07:15–07:20": "0435–0440 | 平台、是否露店。怎么做才算到位？ | 对照Brief核对",
+    "07:20–07:25": "0440–0445 | 请对照屏幕把动作做完，而不是只听懂。 | 对照Brief核对",
+    "07:25–07:30": "0445–0450 | 听懂不等于会做，会做才算合格。 | 对照Brief核对",
+    "07:30–07:35": "0450–0455 | 我们展开讲：不符合就标记异常再沟通。 | 对照Brief核对",
+    "07:35–07:40": "0455–0460 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 对照Brief核对",
+    "07:40–07:45": "0460–0465 | 不截图不留痕。这些都会在下周复盘时暴露。 | 对照Brief核对",
+    "07:45–07:50": "0465–0470 | 我们展开讲：第三，异常先标记再沟通，不要先打款再追片。 | 对照Brief核对",
+    "07:50–07:55": "0470–0475 | 正例是什么？每一步都有入口、有确认、有结果物。 | 对照Brief核对",
+    "07:55–08:00": "0475–0480 | 结果物可以是草稿、订单、话术截图或复盘表。 | 对照Brief核对",
+    "08:00–08:05": "0480–0485 | 我们展开讲：先打款，你就从甲方变成催债人。 | 异常标记",
+    "08:05–08:10": "0485–0490 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 异常标记",
+    "08:10–08:15": "0490–0495 | 我需要回看哪一个课号补齐？ | 异常标记",
+    "08:15–08:20": "0495–0500 | 我们展开讲：和三点一呼应： | 异常标记",
+    "08:20–08:25": "0500–0505 | 无回链正是亏钱三件套最后一环。 | 异常标记",
+    "08:25–08:30": "0505–0510 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 异常标记",
+    "08:30–08:35": "0510–0515 | 分工清楚，学习效率更高。 | 异常标记",
+    "08:35–08:40": "0515–0520 | 我们展开讲：和价值图呼应：这是省试错的最后一公里。 | 异常标记",
+    "08:40–08:45": "0520–0525 | 演示默认测试店。生产环境涉及改价、发单、结款， | 异常标记",
+    "08:45–08:50": "0525–0530 | 必须二次确认，不要直播手滑。 | 异常标记",
+    "08:50–08:55": "0530–0535 | 我们展开讲：演示时真实结算账号、金额必须打码。 | 异常标记",
+    "08:55–09:00": "0535–0540 | 交作业打码：手机号、客户名、真实账单。 | 异常标记",
+    "09:00–09:05": "0540–0545 | 保护隐私，也是职业习惯。我们展开讲：好，三点五结束。 | 异常标记",
+    "09:05–09:10": "0545–0550 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 异常标记",
+    "09:10–09:15": "0550–0555 | 每一步都要能复用到下周、下月。 | 异常标记",
+    "09:15–09:20": "0555–0560 | 我们展开讲：下一集三点六交招募单截图。跟不上就暂停。 | 异常标记",
+    "09:20–09:25": "0560–0565 | 暂停重做三十秒，胜过假装看完却一步都没点过。 | 异常标记",
+    "09:25–09:30": "0565–0570 | 我们展开讲：课号三点五：结款与核对， | 异常标记",
+    "09:30–09:35": "0570–0575 | 怎么证明达人真的发了。 | 异常标记",
+    "09:35–09:40": "0575–0580 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 异常标记",
+    "09:40–09:45": "0580–0585 | 而返工成本通常高于你现在多花的一分钟。 | 异常标记",
+    "09:45–09:50": "0585–0590 | 我们展开讲：纪律先立：无回链，不轻易结尾款。 | 异常标记",
+    "09:50–09:55": "0590–0595 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 异常标记",
+    "09:55–10:00": "0595–0600 | 听懂不等于会做，会做才算合格。 | 异常标记",
+    "10:00–10:05": "0600–0605 | 我们展开讲：结款依据应来自系统可核对信息：回链、 | 异常标记",
+    "10:05–10:10": "0605–0610 | 发布凭证、AI核查结果，以产品展示为准。 | 异常标记",
+    "10:10–10:15": "0610–0615 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 异常标记",
+    "10:15–10:20": "0615–0620 | 不截图不留痕。这些都会在下周复盘时暴露。 | 异常标记",
+    "10:20–10:25": "0620–0625 | 我们展开讲：课程不讲内部运维细节；学员侧会三件事就够。 | 异常标记",
+    "10:25–10:30": "0625–0630 | 正例是什么？每一步都有入口、有确认、有结果物。 | 异常标记",
+    "10:30–10:35": "0630–0635 | 结果物可以是草稿、订单、话术截图或复盘表。 | 异常标记",
+    "10:35–10:40": "0635–0640 | 我们展开讲：第一，在订单里找到回链或凭证入口。 | 异常标记",
+    "10:40–10:45": "0640–0645 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 异常标记",
+    "10:45–10:50": "0645–0650 | 我需要回看哪一个课号补齐？ | 异常标记",
+    "10:50–10:55": "0650–0655 | 我们展开讲：找不到入口，先别打款， | 异常标记",
+    "10:55–11:00": "0655–0660 | 先找页面或问助教路径，不要回到纯微信结款。 | 异常标记",
+    "11:00–11:05": "0660–0665 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 异常标记",
+    "11:05–11:10": "0665–0670 | 分工清楚，学习效率更高。 | 异常标记",
+    "11:10–11:15": "0670–0675 | 我们展开讲：第二，核对是否符合Brief：卖点、时长、 | 异常标记",
+    "11:15–11:20": "0675–0680 | 平台、是否露店。演示默认测试店。 | 异常标记",
+    "11:20–11:25": "0680–0685 | 生产环境涉及改价、发单、结款，必须二次确认， | 异常标记",
+    "11:25–11:30": "0685–0690 | 不要直播手滑。我们展开讲：不符合就标记异常再沟通。 | 异常标记",
+    "11:30–11:35": "0690–0695 | 交作业打码：手机号、客户名、真实账单。 | 异常标记",
+    "11:35–11:40": "0695–0700 | 保护隐私，也是职业习惯。 | 异常标记",
+    "11:40–11:45": "0700–0705 | 我们展开讲：第三，异常先标记再沟通，不要先打款再追片。 | 异常标记",
+    "11:45–11:50": "0705–0710 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 异常标记",
+    "11:50–11:55": "0710–0715 | 每一步都要能复用到下周、下月。 | 异常标记",
+    "11:55–12:00": "0715–0720 | 我们展开讲：先打款，你就从甲方变成催债人。 | 异常标记",
+    "12:00–12:05": "0720–0725 | 跟不上就暂停。暂停重做三十秒， | 片尾预告3.6",
+    "12:05–12:10": "0725–0730 | 胜过假装看完却一步都没点过。 | 片尾预告3.6",
+    "12:10–12:15": "0730–0735 | 我们展开讲：和三点一呼应： | 片尾预告3.6",
+    "12:15–12:20": "0735–0740 | 无回链正是亏钱三件套最后一环。 | 片尾预告3.6",
+    "12:20–12:25": "0740–0745 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 片尾预告3.6",
+    "12:25–12:30": "0745–0750 | 而返工成本通常高于你现在多花的一分钟。 | 片尾预告3.6",
+    "12:30–12:35": "0750–0755 | 我们展开讲：和价值图呼应：这是省试错的最后一公里。 | 片尾预告3.6",
+    "12:35–12:40": "0755–0760 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 片尾预告3.6",
+    "12:40–12:45": "0760–0765 | 听懂不等于会做，会做才算合格。 | 片尾预告3.6",
+    "12:45–12:50": "0765–0770 | 我们展开讲：演示时真实结算账号、金额必须打码。 | 片尾预告3.6",
+    "12:50–12:55": "0770–0775 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 片尾预告3.6",
+    "12:55–13:00": "0775–0780 | 不截图不留痕。这些都会在下周复盘时暴露。 | 片尾预告3.6",
+    "13:00–13:05": "0780–0785 | 我们展开讲：好，三点五结束。 | 片尾预告3.6",
+    "13:05–13:10": "0785–0790 | 正例是什么？每一步都有入口、有确认、有结果物。 | 片尾预告3.6",
+    "13:10–13:15": "0790–0795 | 结果物可以是草稿、订单、话术截图或复盘表。 | 片尾预告3.6",
+    "13:15–13:20": "0795–0800 | 我们展开讲：下一集三点六交招募单截图。 | 片尾预告3.6",
+    "13:20–13:25": "0800–0805 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 片尾预告3.6",
+    "13:25–13:30": "0805–0810 | 我需要回看哪一个课号补齐？ | 片尾预告3.6",
+    "13:30–13:35": "0810–0815 | 我们展开讲：课号三点五：结款与核对， | 片尾预告3.6",
+    "13:35–13:40": "0815–0820 | 怎么证明达人真的发了。 | 片尾预告3.6",
+    "13:40–13:45": "0820–0825 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 片尾预告3.6",
+    "13:45–13:50": "0825–0830 | 分工清楚，学习效率更高。 | 片尾预告3.6",
+    "13:50–13:55": "0830–0835 | 我们展开讲：纪律先立：无回链，不轻易结尾款。 | 片尾预告3.6",
+    "13:55–14:00": "0835–0840 | 演示默认测试店。生产环境涉及改价、发单、结款， | 片尾预告3.6",
+    "14:00–14:05": "0840–0845 | 必须二次确认，不要直播手滑。 | 片尾预告3.6",
+    "14:05–14:10": "0845–0850 | 我们展开讲：结款依据应来自系统可核对信息：回链、 | 片尾预告3.6",
+    "14:10–14:15": "0850–0855 | 发布凭证、AI核查结果，以产品展示为准。 | 片尾预告3.6",
+    "14:15–14:20": "0855–0860 | 交作业打码：手机号、客户名、真实账单。 | 片尾预告3.6",
+    "14:20–14:25": "0860–0865 | 保护隐私，也是职业习惯。 | 片尾预告3.6",
+    "14:25–14:30": "0865–0870 | 我们展开讲：课程不讲内部运维细节；学员侧会三件事就够。 | 片尾预告3.6",
+    "14:30–14:35": "0870–0875 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 片尾预告3.6",
+    "14:35–14:40": "0875–0880 | 每一步都要能复用到下周、下月。 | 片尾预告3.6",
+    "14:40–14:45": "0880–0885 | 我们展开讲：第一，在订单里找到回链或凭证入口。 | 片尾预告3.6",
+    "14:45–14:50": "0885–0890 | 跟不上就暂停。暂停重做三十秒， | 片尾预告3.6",
+    "14:50–14:55": "0890–0895 | 胜过假装看完却一步都没点过。 | 片尾预告3.6",
+    "14:55–15:00": "0895–0900 | 我们展开讲：找不到入口，先别打款， | 片尾预告3.6"
+  },
+  "slides": [
+    {
+      "index": 1,
+      "file": "01-cover.jpg",
+      "kind": "cover",
+      "htag": "封面",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.5 · 结款与核对：怎么证明达人真的发了. Cover slide. Huge title: 结款与核对：怎么证明达人真的发了. Subtitle: 模块 3｜达人招募闭环. Badge: 课号 3.5. Line: 建立「无回链不轻易结尾款」纪律. Duration: 15min. Visual metaphor: local store owner, multi-platform apps, AI pipeline ribbon.",
+      "meta": {
+        "kind": "cover",
+        "htag": "封面",
+        "module": "模块 3｜达人招募闭环",
+        "dur": "15min",
+        "gain": "建立「无回链不轻易结尾款」纪律",
+        "visual": "local store owner, multi-platform apps, AI pipeline ribbon"
+      }
+    },
+    {
+      "index": 2,
+      "file": "02-goal.jpg",
+      "kind": "goal",
+      "htag": "本课目标",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.5 · 结款与核对：怎么证明达人真的发了. Learning goals slide. Title: 本课你将带走. Lead: 学员会在订单里找回链/凭证并核对 Brief。. 3-5 goal cards: 建立「无回链不轻易结尾款」纪律.",
+      "meta": {
+        "kind": "goal",
+        "htag": "本课目标",
+        "lead": "学员会在订单里找回链/凭证并核对 Brief。",
+        "items": [
+          "建立「无回链不轻易结尾款」纪律"
+        ]
+      }
+    },
+    {
+      "index": 3,
+      "file": "03-cards.jpg",
+      "kind": "cards",
+      "htag": "核心要点",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.5 · 结款与核对：怎么证明达人真的发了. Card grid slide. Title: 核心要点. Cards: 在订单里找到回链/凭证入口；: 在订单里找到回链/凭证入口； ; 核对是否符合 Brief；: 核对是否符合 Brief； ; 异常先标记再沟通，不要先打款再追片。: 异常先标记再沟通，不要先打款再追片。.",
+      "meta": {
+        "kind": "cards",
+        "htag": "核心要点",
+        "cards": [
+          {
+            "t": "在订单里找到回链/凭证入口；",
+            "b": "在订单里找到回链/凭证入口；"
+          },
+          {
+            "t": "核对是否符合 Brief；",
+            "b": "核对是否符合 Brief；"
+          },
+          {
+            "t": "异常先标记再沟通，不要先打款再追片。",
+            "b": "异常先标记再沟通，不要先打款再追片。"
+          }
+        ]
+      }
+    },
+    {
+      "index": 4,
+      "file": "04-checklist.jpg",
+      "kind": "checklist",
+      "htag": "演示 / 操作路径",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.5 · 结款与核对：怎么证明达人真的发了. Checklist slide. Title: 演示 / 操作路径. Checked steps: 订单详情中的回链/凭证相关入口（以产品为准）。.",
+      "meta": {
+        "kind": "checklist",
+        "htag": "演示 / 操作路径",
+        "items": [
+          "订单详情中的回链/凭证相关入口（以产品为准）。"
+        ]
+      }
+    },
+    {
+      "index": 5,
+      "file": "05-quote.jpg",
+      "kind": "quote",
+      "htag": "口播与转化要点",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.5 · 结款与核对：怎么证明达人真的发了. Quote/takeaway slide. Title: 记住这句话. Large quote: 「先核对再打款——这是省试错的最后一公里。」. Side notes: .",
+      "meta": {
+        "kind": "quote",
+        "htag": "口播与转化要点",
+        "quote": "「先核对再打款——这是省试错的最后一公里。」",
+        "points": []
+      }
+    },
+    {
+      "index": 6,
+      "file": "06-insight.jpg",
+      "kind": "insight",
+      "htag": "讲义深化",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.5 · 结款与核对：怎么证明达人真的发了. Insight slide. Title: 讲义深化. Big statement: 结款依据应来自系统可核对信息：回链、发布凭证、AI 核查结果（以产品展示为准）。. Supporting bullets: 在订单里找到回链/凭证入口； | 核对是否符合 Brief； | 异常先标记再沟通，不要先打款再追片。.",
+      "meta": {
+        "kind": "insight",
+        "htag": "讲义深化",
+        "lead": "结款依据应来自系统可核对信息：回链、发布凭证、AI 核查结果（以产品展示为准）。",
+        "items": [
+          "在订单里找到回链/凭证入口；",
+          "核对是否符合 Brief；",
+          "异常先标记再沟通，不要先打款再追片。"
+        ]
+      }
+    },
+    {
+      "index": 7,
+      "file": "07-insight.jpg",
+      "kind": "insight",
+      "htag": "为什么现在必须改",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.5 · 结款与核对：怎么证明达人真的发了. Insight slide. Title: 为什么现在必须改. Big statement: 散点经营一定累：同一件事拆到多个后台、多个人、多轮微信确认。. Supporting bullets: 多入口 = 多口径 | 无状态 = 月底对不清 | 无确认 = AI 不能替你签字.",
+      "meta": {
+        "kind": "insight",
+        "htag": "为什么现在必须改",
+        "lead": "散点经营一定累：同一件事拆到多个后台、多个人、多轮微信确认。",
+        "items": [
+          "多入口 = 多口径",
+          "无状态 = 月底对不清",
+          "无确认 = AI 不能替你签字"
+        ]
+      }
+    },
+    {
+      "index": 8,
+      "file": "08-map.jpg",
+      "kind": "map",
+      "htag": "灵祺流水线一览",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.5 · 结款与核对：怎么证明达人真的发了. Module map slide. Title: 灵祺流水线一览. Nodes: 开团/组品 → 招达人 → 做内容 → 曝光获客 → 对账复盘. Caption: AI 提案 · 你确认 · 少雇人少外包少踩坑.",
+      "meta": {
+        "kind": "map",
+        "htag": "灵祺流水线一览",
+        "steps": [
+          "开团/组品",
+          "招达人",
+          "做内容",
+          "曝光获客",
+          "对账复盘"
+        ],
+        "note": "AI 提案 · 你确认 · 少雇人少外包少踩坑"
+      }
+    },
+    {
+      "index": 9,
+      "file": "09-insight.jpg",
+      "kind": "insight",
+      "htag": "人机分工",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.5 · 结款与核对：怎么证明达人真的发了. Insight slide. Title: 人机分工. Big statement: AI 负责提案与草稿，你负责确认与签字。. Supporting bullets: 可预览 | 可回退 | 关键动作有状态.",
+      "meta": {
+        "kind": "insight",
+        "htag": "人机分工",
+        "lead": "AI 负责提案与草稿，你负责确认与签字。",
+        "items": [
+          "可预览",
+          "可回退",
+          "关键动作有状态"
+        ]
+      }
+    },
+    {
+      "index": 10,
+      "file": "10-split.jpg",
+      "kind": "split",
+      "htag": "旧方式 vs 流水线",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.5 · 结款与核对：怎么证明达人真的发了. Two-column contrast slide. Title: 旧方式 vs 流水线. Left: 旧：微信群跟单 + 表格 + 外包突击. Right: 新：订单状态机 + AI 产线 + 预览确认.",
+      "meta": {
+        "kind": "split",
+        "htag": "旧方式 vs 流水线",
+        "left": "旧：微信群跟单 + 表格 + 外包突击",
+        "right": "新：订单状态机 + AI 产线 + 预览确认"
+      }
+    },
+    {
+      "index": 11,
+      "file": "11-insight.jpg",
+      "kind": "insight",
+      "htag": "本课边界",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.5 · 结款与核对：怎么证明达人真的发了. Insight slide. Title: 本课边界. Big statement: 先对齐概念与路径，敏感信息打码，用测试店心态点一遍。. Supporting bullets: 不堆无关按钮 | 一课一个主动作 | 作业可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "本课边界",
+        "lead": "先对齐概念与路径，敏感信息打码，用测试店心态点一遍。",
+        "items": [
+          "不堆无关按钮",
+          "一课一个主动作",
+          "作业可验收"
+        ]
+      }
+    },
+    {
+      "index": 12,
+      "file": "12-checklist.jpg",
+      "kind": "checklist",
+      "htag": "听课检查清单",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.5 · 结款与核对：怎么证明达人真的发了. Checklist slide. Title: 听课检查清单. Checked steps: 能复述本课目标 | 能指出卡点在哪一步 | 能说出下一动作入口 | 完成作业打卡.",
+      "meta": {
+        "kind": "checklist",
+        "htag": "听课检查清单",
+        "items": [
+          "能复述本课目标",
+          "能指出卡点在哪一步",
+          "能说出下一动作入口",
+          "完成作业打卡"
+        ]
+      }
+    },
+    {
+      "index": 13,
+      "file": "13-quote.jpg",
+      "kind": "quote",
+      "htag": "金句",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.5 · 结款与核对：怎么证明达人真的发了. Quote/takeaway slide. Title: 记住这句话. Large quote: 建立「无回链不轻易结尾款」纪律. Side notes: 少雇人 | 少外包 | 少踩坑.",
+      "meta": {
+        "kind": "quote",
+        "htag": "金句",
+        "quote": "建立「无回链不轻易结尾款」纪律",
+        "points": [
+          "少雇人",
+          "少外包",
+          "少踩坑"
+        ]
+      }
+    },
+    {
+      "index": 14,
+      "file": "14-insight.jpg",
+      "kind": "insight",
+      "htag": "常见踩坑",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.5 · 结款与核对：怎么证明达人真的发了. Insight slide. Title: 常见踩坑. Big statement: 最容易翻车的不是不会用，而是跳过确认、跳过状态、跳过核对。. Supporting bullets: 未预览就发布 | 状态卡在群聊里 | 月底才想起对账.",
+      "meta": {
+        "kind": "insight",
+        "htag": "常见踩坑",
+        "lead": "最容易翻车的不是不会用，而是跳过确认、跳过状态、跳过核对。",
+        "items": [
+          "未预览就发布",
+          "状态卡在群聊里",
+          "月底才想起对账"
+        ]
+      }
+    },
+    {
+      "index": 15,
+      "file": "15-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 1",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.5 · 结款与核对：怎么证明达人真的发了. Insight slide. Title: 落地提醒 · 1. Big statement: 3.5 结款与核对：怎么证明达人真的发了：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 1",
+        "lead": "3.5 结款与核对：怎么证明达人真的发了：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 16,
+      "file": "16-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 2",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.5 · 结款与核对：怎么证明达人真的发了. Insight slide. Title: 落地提醒 · 2. Big statement: 3.5 结款与核对：怎么证明达人真的发了：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 2",
+        "lead": "3.5 结款与核对：怎么证明达人真的发了：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 17,
+      "file": "17-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 3",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.5 · 结款与核对：怎么证明达人真的发了. Insight slide. Title: 落地提醒 · 3. Big statement: 3.5 结款与核对：怎么证明达人真的发了：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 3",
+        "lead": "3.5 结款与核对：怎么证明达人真的发了：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 18,
+      "file": "18-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 4",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.5 · 结款与核对：怎么证明达人真的发了. Insight slide. Title: 落地提醒 · 4. Big statement: 3.5 结款与核对：怎么证明达人真的发了：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 4",
+        "lead": "3.5 结款与核对：怎么证明达人真的发了：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 19,
+      "file": "19-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 5",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.5 · 结款与核对：怎么证明达人真的发了. Insight slide. Title: 落地提醒 · 5. Big statement: 3.5 结款与核对：怎么证明达人真的发了：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 5",
+        "lead": "3.5 结款与核对：怎么证明达人真的发了：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 20,
+      "file": "20-end.jpg",
+      "kind": "end",
+      "htag": "结束",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.5 · 结款与核对：怎么证明达人真的发了. Closing slide. Title: 本课结束. Course 3.5 结款与核对：怎么证明达人真的发了. Takeaway: 建立「无回链不轻易结尾款」纪律. CTA: 下一课继续实操. Inspiring local-business + AI visual.",
+      "meta": {
+        "kind": "end",
+        "htag": "结束",
+        "gain": "建立「无回链不轻易结尾款」纪律"
+      }
+    }
+  ]
+}

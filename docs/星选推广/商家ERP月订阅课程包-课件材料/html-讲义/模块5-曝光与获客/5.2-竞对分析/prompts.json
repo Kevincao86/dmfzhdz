@@ -1,0 +1,523 @@
+{
+  "meta": {
+    "课号": "5.2",
+    "课名": "竞对分析：抄作业不如看差距",
+    "建议时长": "15min",
+    "所属模块": "模块 5｜曝光与获客",
+    "学员收获": "会选 POI 并读懂 AI 报告差距",
+    "建议录屏文件名": "5.2-竞对分析.mp4",
+    "时间": "秒序 | 口播（逐字念） | 画面动作",
+    "00:00–00:05": "0000–0005 | 课号五点二：竞对分析，抄作业不如看差距。 | 片头",
+    "00:05–00:10": "0005–0010 | 演示：选POI，打开AI报告。重点看三类差距。 | 片头",
+    "00:10–00:15": "0010–0015 | 第一，套餐结构：价格带、组合方式。 | 片头",
+    "00:15–00:20": "0015–0020 | 第二，内容节奏：更新频率、题材。 | 片头",
+    "00:20–00:25": "0020–0025 | 第三，达人合作痕迹：是否持续有探店。 | 片头",
+    "00:25–00:30": "0025–0030 | 输出动作：只定一个本周要追的差距，不要一次改十个。 | 片头",
+    "00:30–00:35": "0030–0035 | 一次改十个等于一个都不改。 | 片头",
+    "00:35–00:40": "0035–0040 | 不要点名攻击具体竞品商户，我们看结构差距，不看撕逼。 | 片头",
+    "00:40–00:45": "0040–0045 | 暂停：选出一个本周动作写下来。 | 选POI",
+    "00:45–00:50": "0045–0050 | 下一集五点三，本地推线索怎么跟。本集结束。 | 选POI",
+    "00:50–00:55": "0050–0055 | 我们展开讲：课号五点二：竞对分析，抄作业不如看差距。 | 选POI",
+    "00:55–01:00": "0055–0060 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 选POI",
+    "01:00–01:05": "0060–0065 | 而返工成本通常高于你现在多花的一分钟。 | 选POI",
+    "01:05–01:10": "0065–0070 | 我们展开讲：演示：选POI，打开AI报告。 | 选POI",
+    "01:10–01:15": "0070–0075 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 选POI",
+    "01:15–01:20": "0075–0080 | 听懂不等于会做，会做才算合格。 | 选POI",
+    "01:20–01:25": "0080–0085 | 我们展开讲：重点看三类差距。 | 选POI",
+    "01:25–01:30": "0085–0090 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 选POI",
+    "01:30–01:35": "0090–0095 | 不截图不留痕。这些都会在下周复盘时暴露。 | 选POI",
+    "01:35–01:40": "0095–0100 | 我们展开讲：第一，套餐结构：价格带、组合方式。 | 选POI",
+    "01:40–01:45": "0100–0105 | 正例是什么？每一步都有入口、有确认、有结果物。 | 选POI",
+    "01:45–01:50": "0105–0110 | 结果物可以是草稿、订单、话术截图或复盘表。 | 选POI",
+    "01:50–01:55": "0110–0115 | 我们展开讲：第二，内容节奏：更新频率、题材。 | 选POI",
+    "01:55–02:00": "0115–0120 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 选POI",
+    "02:00–02:05": "0120–0125 | 我需要回看哪一个课号补齐？ | 选POI",
+    "02:05–02:10": "0125–0130 | 我们展开讲：第三，达人合作痕迹：是否持续有探店。 | 选POI",
+    "02:10–02:15": "0130–0135 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 选POI",
+    "02:15–02:20": "0135–0140 | 分工清楚，学习效率更高。 | 选POI",
+    "02:20–02:25": "0140–0145 | 我们展开讲：输出动作：只定一个本周要追的差距， | 选POI",
+    "02:25–02:30": "0145–0150 | 不要一次改十个。演示默认测试店。 | 选POI",
+    "02:30–02:35": "0150–0155 | 生产环境涉及改价、发单、结款，必须二次确认， | 选POI",
+    "02:35–02:40": "0155–0160 | 不要直播手滑。我们展开讲：一次改十个等于一个都不改。 | 选POI",
+    "02:40–02:45": "0160–0165 | 交作业打码：手机号、客户名、真实账单。 | 选POI",
+    "02:45–02:50": "0165–0170 | 保护隐私，也是职业习惯。 | 选POI",
+    "02:50–02:55": "0170–0175 | 我们展开讲：不要点名攻击具体竞品商户，我们看结构差距， | 选POI",
+    "02:55–03:00": "0175–0180 | 不看撕逼。和课程总定位对齐：我们要的是流水线， | 选POI",
+    "03:00–03:05": "0180–0185 | 不是单点技巧。每一步都要能复用到下周、下月。 | 读报告三类差距",
+    "03:05–03:10": "0185–0190 | 我们展开讲：暂停：选出一个本周动作写下来。 | 读报告三类差距",
+    "03:10–03:15": "0190–0195 | 跟不上就暂停。暂停重做三十秒， | 读报告三类差距",
+    "03:15–03:20": "0195–0200 | 胜过假装看完却一步都没点过。 | 读报告三类差距",
+    "03:20–03:25": "0200–0205 | 我们展开讲：下一集五点三，本地推线索怎么跟。 | 读报告三类差距",
+    "03:25–03:30": "0205–0210 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 读报告三类差距",
+    "03:30–03:35": "0210–0215 | 而返工成本通常高于你现在多花的一分钟。 | 读报告三类差距",
+    "03:35–03:40": "0215–0220 | 我们展开讲：本集结束。 | 读报告三类差距",
+    "03:40–03:45": "0220–0225 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 读报告三类差距",
+    "03:45–03:50": "0225–0230 | 听懂不等于会做，会做才算合格。 | 读报告三类差距",
+    "03:50–03:55": "0230–0235 | 我们展开讲：课号五点二：竞对分析，抄作业不如看差距。 | 读报告三类差距",
+    "03:55–04:00": "0235–0240 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 读报告三类差距",
+    "04:00–04:05": "0240–0245 | 不截图不留痕。这些都会在下周复盘时暴露。 | 读报告三类差距",
+    "04:05–04:10": "0245–0250 | 我们展开讲：演示：选POI，打开AI报告。 | 读报告三类差距",
+    "04:10–04:15": "0250–0255 | 正例是什么？每一步都有入口、有确认、有结果物。 | 读报告三类差距",
+    "04:15–04:20": "0255–0260 | 结果物可以是草稿、订单、话术截图或复盘表。 | 读报告三类差距",
+    "04:20–04:25": "0260–0265 | 我们展开讲：重点看三类差距。 | 读报告三类差距",
+    "04:25–04:30": "0265–0270 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 读报告三类差距",
+    "04:30–04:35": "0270–0275 | 我需要回看哪一个课号补齐？ | 读报告三类差距",
+    "04:35–04:40": "0275–0280 | 我们展开讲：第一，套餐结构：价格带、组合方式。 | 读报告三类差距",
+    "04:40–04:45": "0280–0285 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 读报告三类差距",
+    "04:45–04:50": "0285–0290 | 分工清楚，学习效率更高。 | 读报告三类差距",
+    "04:50–04:55": "0290–0295 | 我们展开讲：第二，内容节奏：更新频率、题材。 | 读报告三类差距",
+    "04:55–05:00": "0295–0300 | 演示默认测试店。生产环境涉及改价、发单、结款， | 读报告三类差距",
+    "05:00–05:05": "0300–0305 | 必须二次确认，不要直播手滑。 | 读报告三类差距",
+    "05:05–05:10": "0305–0310 | 我们展开讲：第三，达人合作痕迹：是否持续有探店。 | 读报告三类差距",
+    "05:10–05:15": "0310–0315 | 交作业打码：手机号、客户名、真实账单。 | 读报告三类差距",
+    "05:15–05:20": "0315–0320 | 保护隐私，也是职业习惯。 | 读报告三类差距",
+    "05:20–05:25": "0320–0325 | 我们展开讲：输出动作：只定一个本周要追的差距， | 读报告三类差距",
+    "05:25–05:30": "0325–0330 | 不要一次改十个。和课程总定位对齐：我们要的是流水线， | 读报告三类差距",
+    "05:30–05:35": "0330–0335 | 不是单点技巧。每一步都要能复用到下周、下月。 | 读报告三类差距",
+    "05:35–05:40": "0335–0340 | 我们展开讲：一次改十个等于一个都不改。跟不上就暂停。 | 读报告三类差距",
+    "05:40–05:45": "0340–0345 | 暂停重做三十秒，胜过假装看完却一步都没点过。 | 读报告三类差距",
+    "05:45–05:50": "0345–0350 | 我们展开讲：不要点名攻击具体竞品商户，我们看结构差距， | 读报告三类差距",
+    "05:50–05:55": "0350–0355 | 不看撕逼。为什么要强调这一点？ | 读报告三类差距",
+    "05:55–06:00": "0355–0360 | 因为现场一忙最容易省掉这一步， | 读报告三类差距",
+    "06:00–06:05": "0360–0365 | 而返工成本通常高于你现在多花的一分钟。 | 读报告三类差距",
+    "06:05–06:10": "0365–0370 | 我们展开讲：暂停：选出一个本周动作写下来。 | 读报告三类差距",
+    "06:10–06:15": "0370–0375 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 读报告三类差距",
+    "06:15–06:20": "0375–0380 | 听懂不等于会做，会做才算合格。 | 读报告三类差距",
+    "06:20–06:25": "0380–0385 | 我们展开讲：下一集五点三，本地推线索怎么跟。 | 读报告三类差距",
+    "06:25–06:30": "0385–0390 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 读报告三类差距",
+    "06:30–06:35": "0390–0395 | 不截图不留痕。这些都会在下周复盘时暴露。 | 读报告三类差距",
+    "06:35–06:40": "0395–0400 | 我们展开讲：本集结束。 | 读报告三类差距",
+    "06:40–06:45": "0400–0405 | 正例是什么？每一步都有入口、有确认、有结果物。 | 读报告三类差距",
+    "06:45–06:50": "0405–0410 | 结果物可以是草稿、订单、话术截图或复盘表。 | 读报告三类差距",
+    "06:50–06:55": "0410–0415 | 我们展开讲：课号五点二：竞对分析，抄作业不如看差距。 | 读报告三类差距",
+    "06:55–07:00": "0415–0420 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 读报告三类差距",
+    "07:00–07:05": "0420–0425 | 我需要回看哪一个课号补齐？ | 读报告三类差距",
+    "07:05–07:10": "0425–0430 | 我们展开讲：演示：选POI，打开AI报告。 | 读报告三类差距",
+    "07:10–07:15": "0430–0435 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 读报告三类差距",
+    "07:15–07:20": "0435–0440 | 分工清楚，学习效率更高。我们展开讲：重点看三类差距。 | 读报告三类差距",
+    "07:20–07:25": "0440–0445 | 演示默认测试店。生产环境涉及改价、发单、结款， | 读报告三类差距",
+    "07:25–07:30": "0445–0450 | 必须二次确认，不要直播手滑。 | 读报告三类差距",
+    "07:30–07:35": "0450–0455 | 我们展开讲：第一，套餐结构：价格带、组合方式。 | 读报告三类差距",
+    "07:35–07:40": "0455–0460 | 交作业打码：手机号、客户名、真实账单。 | 读报告三类差距",
+    "07:40–07:45": "0460–0465 | 保护隐私，也是职业习惯。 | 读报告三类差距",
+    "07:45–07:50": "0465–0470 | 我们展开讲：第二，内容节奏：更新频率、题材。 | 读报告三类差距",
+    "07:50–07:55": "0470–0475 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 读报告三类差距",
+    "07:55–08:00": "0475–0480 | 每一步都要能复用到下周、下月。 | 读报告三类差距",
+    "08:00–08:05": "0480–0485 | 我们展开讲：第三，达人合作痕迹：是否持续有探店。 | 只定一个动作",
+    "08:05–08:10": "0485–0490 | 跟不上就暂停。暂停重做三十秒， | 只定一个动作",
+    "08:10–08:15": "0490–0495 | 胜过假装看完却一步都没点过。 | 只定一个动作",
+    "08:15–08:20": "0495–0500 | 我们展开讲：输出动作：只定一个本周要追的差距， | 只定一个动作",
+    "08:20–08:25": "0500–0505 | 不要一次改十个。为什么要强调这一点？ | 只定一个动作",
+    "08:25–08:30": "0505–0510 | 因为现场一忙最容易省掉这一步， | 只定一个动作",
+    "08:30–08:35": "0510–0515 | 而返工成本通常高于你现在多花的一分钟。 | 只定一个动作",
+    "08:35–08:40": "0515–0520 | 我们展开讲：一次改十个等于一个都不改。 | 只定一个动作",
+    "08:40–08:45": "0520–0525 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 只定一个动作",
+    "08:45–08:50": "0525–0530 | 听懂不等于会做，会做才算合格。 | 只定一个动作",
+    "08:50–08:55": "0530–0535 | 我们展开讲：不要点名攻击具体竞品商户，我们看结构差距， | 只定一个动作",
+    "08:55–09:00": "0535–0540 | 不看撕逼。反例是什么？ | 只定一个动作",
+    "09:00–09:05": "0540–0545 | 跳步、凭感觉、只在微信里同步、不截图不留痕。 | 只定一个动作",
+    "09:05–09:10": "0545–0550 | 这些都会在下周复盘时暴露。 | 只定一个动作",
+    "09:10–09:15": "0550–0555 | 我们展开讲：暂停：选出一个本周动作写下来。 | 只定一个动作",
+    "09:15–09:20": "0555–0560 | 正例是什么？每一步都有入口、有确认、有结果物。 | 只定一个动作",
+    "09:20–09:25": "0560–0565 | 结果物可以是草稿、订单、话术截图或复盘表。 | 只定一个动作",
+    "09:25–09:30": "0565–0570 | 我们展开讲：下一集五点三，本地推线索怎么跟。 | 只定一个动作",
+    "09:30–09:35": "0570–0575 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 只定一个动作",
+    "09:35–09:40": "0575–0580 | 我需要回看哪一个课号补齐？我们展开讲：本集结束。 | 只定一个动作",
+    "09:40–09:45": "0580–0585 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 只定一个动作",
+    "09:45–09:50": "0585–0590 | 分工清楚，学习效率更高。 | 只定一个动作",
+    "09:50–09:55": "0590–0595 | 我们展开讲：课号五点二：竞对分析，抄作业不如看差距。 | 只定一个动作",
+    "09:55–10:00": "0595–0600 | 演示默认测试店。生产环境涉及改价、发单、结款， | 只定一个动作",
+    "10:00–10:05": "0600–0605 | 必须二次确认，不要直播手滑。 | 只定一个动作",
+    "10:05–10:10": "0605–0610 | 我们展开讲：演示：选POI，打开AI报告。 | 只定一个动作",
+    "10:10–10:15": "0610–0615 | 交作业打码：手机号、客户名、真实账单。 | 只定一个动作",
+    "10:15–10:20": "0615–0620 | 保护隐私，也是职业习惯。我们展开讲：重点看三类差距。 | 只定一个动作",
+    "10:20–10:25": "0620–0625 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 只定一个动作",
+    "10:25–10:30": "0625–0630 | 每一步都要能复用到下周、下月。 | 只定一个动作",
+    "10:30–10:35": "0630–0635 | 我们展开讲：第一，套餐结构：价格带、组合方式。 | 只定一个动作",
+    "10:35–10:40": "0635–0640 | 跟不上就暂停。暂停重做三十秒， | 只定一个动作",
+    "10:40–10:45": "0640–0645 | 胜过假装看完却一步都没点过。 | 只定一个动作",
+    "10:45–10:50": "0645–0650 | 我们展开讲：第二，内容节奏：更新频率、题材。 | 只定一个动作",
+    "10:50–10:55": "0650–0655 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 只定一个动作",
+    "10:55–11:00": "0655–0660 | 而返工成本通常高于你现在多花的一分钟。 | 只定一个动作",
+    "11:00–11:05": "0660–0665 | 我们展开讲：第三，达人合作痕迹：是否持续有探店。 | 只定一个动作",
+    "11:05–11:10": "0665–0670 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 只定一个动作",
+    "11:10–11:15": "0670–0675 | 听懂不等于会做，会做才算合格。 | 只定一个动作",
+    "11:15–11:20": "0675–0680 | 我们展开讲：输出动作：只定一个本周要追的差距， | 只定一个动作",
+    "11:20–11:25": "0680–0685 | 不要一次改十个。反例是什么？ | 只定一个动作",
+    "11:25–11:30": "0685–0690 | 跳步、凭感觉、只在微信里同步、不截图不留痕。 | 只定一个动作",
+    "11:30–11:35": "0690–0695 | 这些都会在下周复盘时暴露。 | 只定一个动作",
+    "11:35–11:40": "0695–0700 | 我们展开讲：一次改十个等于一个都不改。 | 只定一个动作",
+    "11:40–11:45": "0700–0705 | 正例是什么？每一步都有入口、有确认、有结果物。 | 只定一个动作",
+    "11:45–11:50": "0705–0710 | 结果物可以是草稿、订单、话术截图或复盘表。 | 只定一个动作",
+    "11:50–11:55": "0710–0715 | 我们展开讲：不要点名攻击具体竞品商户，我们看结构差距， | 只定一个动作",
+    "11:55–12:00": "0715–0720 | 不看撕逼。自检三问：我刚才做到哪一步了？ | 只定一个动作",
+    "12:00–12:05": "0720–0725 | 哪一步还不敢自己点？我需要回看哪一个课号补齐？ | 片尾预告5.3",
+    "12:05–12:10": "0725–0730 | 我们展开讲：暂停：选出一个本周动作写下来。 | 片尾预告5.3",
+    "12:10–12:15": "0730–0735 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 片尾预告5.3",
+    "12:15–12:20": "0735–0740 | 分工清楚，学习效率更高。 | 片尾预告5.3",
+    "12:20–12:25": "0740–0745 | 我们展开讲：下一集五点三，本地推线索怎么跟。 | 片尾预告5.3",
+    "12:25–12:30": "0745–0750 | 演示默认测试店。生产环境涉及改价、发单、结款， | 片尾预告5.3",
+    "12:30–12:35": "0750–0755 | 必须二次确认，不要直播手滑。我们展开讲：本集结束。 | 片尾预告5.3",
+    "12:35–12:40": "0755–0760 | 交作业打码：手机号、客户名、真实账单。 | 片尾预告5.3",
+    "12:40–12:45": "0760–0765 | 保护隐私，也是职业习惯。 | 片尾预告5.3",
+    "12:45–12:50": "0765–0770 | 我们展开讲：课号五点二：竞对分析，抄作业不如看差距。 | 片尾预告5.3",
+    "12:50–12:55": "0770–0775 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 片尾预告5.3",
+    "12:55–13:00": "0775–0780 | 每一步都要能复用到下周、下月。 | 片尾预告5.3",
+    "13:00–13:05": "0780–0785 | 我们展开讲：演示：选POI，打开AI报告。 | 片尾预告5.3",
+    "13:05–13:10": "0785–0790 | 跟不上就暂停。暂停重做三十秒， | 片尾预告5.3",
+    "13:10–13:15": "0790–0795 | 胜过假装看完却一步都没点过。 | 片尾预告5.3",
+    "13:15–13:20": "0795–0800 | 我们展开讲：重点看三类差距。 | 片尾预告5.3",
+    "13:20–13:25": "0800–0805 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 片尾预告5.3",
+    "13:25–13:30": "0805–0810 | 而返工成本通常高于你现在多花的一分钟。 | 片尾预告5.3",
+    "13:30–13:35": "0810–0815 | 我们展开讲：第一，套餐结构：价格带、组合方式。 | 片尾预告5.3",
+    "13:35–13:40": "0815–0820 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 片尾预告5.3",
+    "13:40–13:45": "0820–0825 | 听懂不等于会做，会做才算合格。 | 片尾预告5.3",
+    "13:45–13:50": "0825–0830 | 我们展开讲：第二，内容节奏：更新频率、题材。 | 片尾预告5.3",
+    "13:50–13:55": "0830–0835 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 片尾预告5.3",
+    "13:55–14:00": "0835–0840 | 不截图不留痕。这些都会在下周复盘时暴露。 | 片尾预告5.3",
+    "14:00–14:05": "0840–0845 | 我们展开讲：第三，达人合作痕迹：是否持续有探店。 | 片尾预告5.3",
+    "14:05–14:10": "0845–0850 | 正例是什么？每一步都有入口、有确认、有结果物。 | 片尾预告5.3",
+    "14:10–14:15": "0850–0855 | 结果物可以是草稿、订单、话术截图或复盘表。 | 片尾预告5.3",
+    "14:15–14:20": "0855–0860 | 我们展开讲：输出动作：只定一个本周要追的差距， | 片尾预告5.3",
+    "14:20–14:25": "0860–0865 | 不要一次改十个。自检三问：我刚才做到哪一步了？ | 片尾预告5.3",
+    "14:25–14:30": "0865–0870 | 哪一步还不敢自己点？我需要回看哪一个课号补齐？ | 片尾预告5.3",
+    "14:30–14:35": "0870–0875 | 我们展开讲：一次改十个等于一个都不改。 | 片尾预告5.3",
+    "14:35–14:40": "0875–0880 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 片尾预告5.3",
+    "14:40–14:45": "0880–0885 | 分工清楚，学习效率更高。 | 片尾预告5.3",
+    "14:45–14:50": "0885–0890 | 我们展开讲：不要点名攻击具体竞品商户，我们看结构差距， | 片尾预告5.3",
+    "14:50–14:55": "0890–0895 | 不看撕逼。演示默认测试店。 | 片尾预告5.3",
+    "14:55–15:00": "0895–0900 | 生产环境涉及改价、发单、结款，必须二次确认， | 片尾预告5.3"
+  },
+  "slides": [
+    {
+      "index": 1,
+      "file": "01-cover.jpg",
+      "kind": "cover",
+      "htag": "封面",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.2 · 竞对分析：抄作业不如看差距. Cover slide. Huge title: 竞对分析：抄作业不如看差距. Subtitle: 模块 5｜曝光与获客. Badge: 课号 5.2. Line: 会选 POI 并读懂 AI 报告差距. Duration: 15min. Visual metaphor: local store owner, multi-platform apps, AI pipeline ribbon.",
+      "meta": {
+        "kind": "cover",
+        "htag": "封面",
+        "module": "模块 5｜曝光与获客",
+        "dur": "15min",
+        "gain": "会选 POI 并读懂 AI 报告差距",
+        "visual": "local store owner, multi-platform apps, AI pipeline ribbon"
+      }
+    },
+    {
+      "index": 2,
+      "file": "02-goal.jpg",
+      "kind": "goal",
+      "htag": "本课目标",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.2 · 竞对分析：抄作业不如看差距. Learning goals slide. Title: 本课你将带走. Lead: 只定 1 个本周要追的差距。. 3-5 goal cards: 会选 POI 并读懂 AI 报告差距.",
+      "meta": {
+        "kind": "goal",
+        "htag": "本课目标",
+        "lead": "只定 1 个本周要追的差距。",
+        "items": [
+          "会选 POI 并读懂 AI 报告差距"
+        ]
+      }
+    },
+    {
+      "index": 3,
+      "file": "03-cards.jpg",
+      "kind": "cards",
+      "htag": "核心要点",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.2 · 竞对分析：抄作业不如看差距. Card grid slide. Title: 核心要点. Cards: 套餐结构（价格带、组合方式）: 套餐结构（价格带、组合方式） ; 内容节奏（更新频率、题材）: 内容节奏（更新频率、题材） ; 达人/合作痕迹（是否持续有探店）: 达人/合作痕迹（是否持续有探店）.",
+      "meta": {
+        "kind": "cards",
+        "htag": "核心要点",
+        "cards": [
+          {
+            "t": "套餐结构（价格带、组合方式）",
+            "b": "套餐结构（价格带、组合方式）"
+          },
+          {
+            "t": "内容节奏（更新频率、题材）",
+            "b": "内容节奏（更新频率、题材）"
+          },
+          {
+            "t": "达人/合作痕迹（是否持续有探店）",
+            "b": "达人/合作痕迹（是否持续有探店）"
+          }
+        ]
+      }
+    },
+    {
+      "index": 4,
+      "file": "04-checklist.jpg",
+      "kind": "checklist",
+      "htag": "演示 / 操作路径",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.2 · 竞对分析：抄作业不如看差距. Checklist slide. Title: 演示 / 操作路径. Checked steps: 竞对分析：选 POI → 生成/打开报告 → 圈出一个差距。.",
+      "meta": {
+        "kind": "checklist",
+        "htag": "演示 / 操作路径",
+        "items": [
+          "竞对分析：选 POI → 生成/打开报告 → 圈出一个差距。"
+        ]
+      }
+    },
+    {
+      "index": 5,
+      "file": "05-quote.jpg",
+      "kind": "quote",
+      "htag": "口播与转化要点",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.2 · 竞对分析：抄作业不如看差距. Quote/takeaway slide. Title: 记住这句话. Large quote: 「抄作业不如看差距——本周只追一个。」. Side notes: .",
+      "meta": {
+        "kind": "quote",
+        "htag": "口播与转化要点",
+        "quote": "「抄作业不如看差距——本周只追一个。」",
+        "points": []
+      }
+    },
+    {
+      "index": 6,
+      "file": "06-insight.jpg",
+      "kind": "insight",
+      "htag": "讲义深化",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.2 · 竞对分析：抄作业不如看差距. Insight slide. Title: 讲义深化. Big statement: 重点看三类差距：. Supporting bullets: 套餐结构（价格带、组合方式） | 内容节奏（更新频率、题材） | 达人/合作痕迹（是否持续有探店）.",
+      "meta": {
+        "kind": "insight",
+        "htag": "讲义深化",
+        "lead": "重点看三类差距：",
+        "items": [
+          "套餐结构（价格带、组合方式）",
+          "内容节奏（更新频率、题材）",
+          "达人/合作痕迹（是否持续有探店）"
+        ]
+      }
+    },
+    {
+      "index": 7,
+      "file": "07-insight.jpg",
+      "kind": "insight",
+      "htag": "为什么现在必须改",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.2 · 竞对分析：抄作业不如看差距. Insight slide. Title: 为什么现在必须改. Big statement: 散点经营一定累：同一件事拆到多个后台、多个人、多轮微信确认。. Supporting bullets: 多入口 = 多口径 | 无状态 = 月底对不清 | 无确认 = AI 不能替你签字.",
+      "meta": {
+        "kind": "insight",
+        "htag": "为什么现在必须改",
+        "lead": "散点经营一定累：同一件事拆到多个后台、多个人、多轮微信确认。",
+        "items": [
+          "多入口 = 多口径",
+          "无状态 = 月底对不清",
+          "无确认 = AI 不能替你签字"
+        ]
+      }
+    },
+    {
+      "index": 8,
+      "file": "08-map.jpg",
+      "kind": "map",
+      "htag": "灵祺流水线一览",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.2 · 竞对分析：抄作业不如看差距. Module map slide. Title: 灵祺流水线一览. Nodes: 开团/组品 → 招达人 → 做内容 → 曝光获客 → 对账复盘. Caption: AI 提案 · 你确认 · 少雇人少外包少踩坑.",
+      "meta": {
+        "kind": "map",
+        "htag": "灵祺流水线一览",
+        "steps": [
+          "开团/组品",
+          "招达人",
+          "做内容",
+          "曝光获客",
+          "对账复盘"
+        ],
+        "note": "AI 提案 · 你确认 · 少雇人少外包少踩坑"
+      }
+    },
+    {
+      "index": 9,
+      "file": "09-insight.jpg",
+      "kind": "insight",
+      "htag": "人机分工",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.2 · 竞对分析：抄作业不如看差距. Insight slide. Title: 人机分工. Big statement: AI 负责提案与草稿，你负责确认与签字。. Supporting bullets: 可预览 | 可回退 | 关键动作有状态.",
+      "meta": {
+        "kind": "insight",
+        "htag": "人机分工",
+        "lead": "AI 负责提案与草稿，你负责确认与签字。",
+        "items": [
+          "可预览",
+          "可回退",
+          "关键动作有状态"
+        ]
+      }
+    },
+    {
+      "index": 10,
+      "file": "10-split.jpg",
+      "kind": "split",
+      "htag": "旧方式 vs 流水线",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.2 · 竞对分析：抄作业不如看差距. Two-column contrast slide. Title: 旧方式 vs 流水线. Left: 旧：微信群跟单 + 表格 + 外包突击. Right: 新：订单状态机 + AI 产线 + 预览确认.",
+      "meta": {
+        "kind": "split",
+        "htag": "旧方式 vs 流水线",
+        "left": "旧：微信群跟单 + 表格 + 外包突击",
+        "right": "新：订单状态机 + AI 产线 + 预览确认"
+      }
+    },
+    {
+      "index": 11,
+      "file": "11-insight.jpg",
+      "kind": "insight",
+      "htag": "本课边界",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.2 · 竞对分析：抄作业不如看差距. Insight slide. Title: 本课边界. Big statement: 先对齐概念与路径，敏感信息打码，用测试店心态点一遍。. Supporting bullets: 不堆无关按钮 | 一课一个主动作 | 作业可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "本课边界",
+        "lead": "先对齐概念与路径，敏感信息打码，用测试店心态点一遍。",
+        "items": [
+          "不堆无关按钮",
+          "一课一个主动作",
+          "作业可验收"
+        ]
+      }
+    },
+    {
+      "index": 12,
+      "file": "12-checklist.jpg",
+      "kind": "checklist",
+      "htag": "听课检查清单",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.2 · 竞对分析：抄作业不如看差距. Checklist slide. Title: 听课检查清单. Checked steps: 能复述本课目标 | 能指出卡点在哪一步 | 能说出下一动作入口 | 完成作业打卡.",
+      "meta": {
+        "kind": "checklist",
+        "htag": "听课检查清单",
+        "items": [
+          "能复述本课目标",
+          "能指出卡点在哪一步",
+          "能说出下一动作入口",
+          "完成作业打卡"
+        ]
+      }
+    },
+    {
+      "index": 13,
+      "file": "13-quote.jpg",
+      "kind": "quote",
+      "htag": "金句",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.2 · 竞对分析：抄作业不如看差距. Quote/takeaway slide. Title: 记住这句话. Large quote: 会选 POI 并读懂 AI 报告差距. Side notes: 少雇人 | 少外包 | 少踩坑.",
+      "meta": {
+        "kind": "quote",
+        "htag": "金句",
+        "quote": "会选 POI 并读懂 AI 报告差距",
+        "points": [
+          "少雇人",
+          "少外包",
+          "少踩坑"
+        ]
+      }
+    },
+    {
+      "index": 14,
+      "file": "14-insight.jpg",
+      "kind": "insight",
+      "htag": "常见踩坑",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.2 · 竞对分析：抄作业不如看差距. Insight slide. Title: 常见踩坑. Big statement: 最容易翻车的不是不会用，而是跳过确认、跳过状态、跳过核对。. Supporting bullets: 未预览就发布 | 状态卡在群聊里 | 月底才想起对账.",
+      "meta": {
+        "kind": "insight",
+        "htag": "常见踩坑",
+        "lead": "最容易翻车的不是不会用，而是跳过确认、跳过状态、跳过核对。",
+        "items": [
+          "未预览就发布",
+          "状态卡在群聊里",
+          "月底才想起对账"
+        ]
+      }
+    },
+    {
+      "index": 15,
+      "file": "15-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 1",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.2 · 竞对分析：抄作业不如看差距. Insight slide. Title: 落地提醒 · 1. Big statement: 5.2 竞对分析：抄作业不如看差距：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 1",
+        "lead": "5.2 竞对分析：抄作业不如看差距：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 16,
+      "file": "16-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 2",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.2 · 竞对分析：抄作业不如看差距. Insight slide. Title: 落地提醒 · 2. Big statement: 5.2 竞对分析：抄作业不如看差距：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 2",
+        "lead": "5.2 竞对分析：抄作业不如看差距：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 17,
+      "file": "17-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 3",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.2 · 竞对分析：抄作业不如看差距. Insight slide. Title: 落地提醒 · 3. Big statement: 5.2 竞对分析：抄作业不如看差距：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 3",
+        "lead": "5.2 竞对分析：抄作业不如看差距：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 18,
+      "file": "18-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 4",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.2 · 竞对分析：抄作业不如看差距. Insight slide. Title: 落地提醒 · 4. Big statement: 5.2 竞对分析：抄作业不如看差距：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 4",
+        "lead": "5.2 竞对分析：抄作业不如看差距：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 19,
+      "file": "19-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 5",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.2 · 竞对分析：抄作业不如看差距. Insight slide. Title: 落地提醒 · 5. Big statement: 5.2 竞对分析：抄作业不如看差距：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 5",
+        "lead": "5.2 竞对分析：抄作业不如看差距：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 20,
+      "file": "20-end.jpg",
+      "kind": "end",
+      "htag": "结束",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.2 · 竞对分析：抄作业不如看差距. Closing slide. Title: 本课结束. Course 5.2 竞对分析：抄作业不如看差距. Takeaway: 会选 POI 并读懂 AI 报告差距. CTA: 下一课继续实操. Inspiring local-business + AI visual.",
+      "meta": {
+        "kind": "end",
+        "htag": "结束",
+        "gain": "会选 POI 并读懂 AI 报告差距"
+      }
+    }
+  ]
+}
