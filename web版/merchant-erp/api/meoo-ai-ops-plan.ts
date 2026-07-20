@@ -15,7 +15,7 @@ import {
   sendErpAiPointsGateError,
 } from './_lib/erpAiApiPointsGate.js'
 
-export const config = { maxDuration: 120 }
+export const config = { maxDuration: 300 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (handleMerchantApiOptions(req, res)) return

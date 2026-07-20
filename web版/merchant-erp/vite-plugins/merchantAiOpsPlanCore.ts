@@ -35,17 +35,29 @@ function extractJsonObject(text: string): Record<string, unknown> {
   return obj
 }
 
-/** 六块方案生成慢：单厂商约 90s；最多试 2 家，避免多轮叠加被网关掐断成裸 502 */
+/** 按起始下标旋转厂商顺序，便于重试时换一家先试 */
+function rotateOpsPlanVendors(offset: number): string[] {
+  const base = [...OPS_PLAN_AI_VENDOR_ORDER]
+  if (!base.length) return base
+  const n = ((offset % base.length) + base.length) % base.length
+  return [...base.slice(n), ...base.slice(0, n)]
+}
+
+/**
+ * 六块方案：对已配置 Key 的厂商逐个轮询（超时/额度/解析失败一律换下一家）。
+ * 单厂商约 70s，整体控制在 Nginx 300s 内尽量多试几家。
+ */
 async function llmJson(
   env: Record<string, string>,
   system: string,
   user: string,
+  rotateOffset = 0,
 ): Promise<Record<string, unknown>> {
-  const vendors = OPS_PLAN_AI_VENDOR_ORDER.slice(0, 2)
+  const vendors = rotateOpsPlanVendors(rotateOffset)
   const errors: string[] = []
   for (const vendor of vendors) {
     try {
-      const obj = await withUpstreamChatTimeoutMs(90_000, async () => {
+      const obj = await withUpstreamChatTimeoutMs(70_000, async () => {
         const out = await merchantChatTextWithVendorFailover(env, system, user, [vendor])
         if (!out.ok) {
           throw new Error(
@@ -54,16 +66,18 @@ async function llmJson(
         }
         return extractJsonObject(out.text)
       })
+      console.log(`[meoo-ai-ops-plan] llmJson ok vendor=${vendor}`)
       return obj
     } catch (e) {
       const parseMsg = e instanceof Error ? e.message : String(e)
-      errors.push(`${vendor}: ${parseMsg}`)
+      errors.push(`${vendor}: ${parseMsg.slice(0, 120)}`)
+      console.warn(`[meoo-ai-ops-plan] llmJson hop vendor=${vendor}: ${parseMsg.slice(0, 160)}`)
     }
   }
   throw new Error(
     errors.length
-      ? `全部模型不可用：${errors.slice(0, 6).join('；')}`
-      : '运营方案模型调用失败',
+      ? `全部模型不可用：${errors.slice(0, 8).join('；')}`
+      : '运营方案模型调用失败（未配置可用 AI Key）',
   )
 }
 
@@ -358,14 +372,15 @@ export async function runAiOpsPlanCore(
     .join('\n\n')
 
   try {
-    let obj = await llmJson(aiEnv, SYSTEM_PROMPT, userPrompt)
+    let obj = await llmJson(aiEnv, SYSTEM_PROMPT, userPrompt, 0)
     let plan = normalizeAiOpsPlanResult(obj)
-    // 仅重试一次；ROI/日历/目标由 enrichAiOpsPlanPostProcess 补齐，不再二次全量 densify（易超时致裸 502）
+    // 仅重试一次（旋转厂商起点）；ROI/日历/目标由 enrichAiOpsPlanPostProcess 补齐
     if (!plan || !isAiOpsPlanResultUsable(plan)) {
       obj = await llmJson(
         aiEnv,
         SYSTEM_PROMPT,
         `${userPrompt}\n\n上次输出无效或 JSON 截断，请严格按 schema 重新输出完整 JSON；Detail/howTo 各段≤200字。`,
+        3,
       )
       plan = normalizeAiOpsPlanResult(obj)
     }
