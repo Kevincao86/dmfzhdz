@@ -410,6 +410,121 @@ function normalizePlanDate(raw: string): string {
   return ''
 }
 
+/** 对齐腾讯文档「项目进度日历」周表：一行一周、格内写事项 */
+function CalendarWeekBoard({
+  milestones,
+  periodStart,
+  periodEnd,
+}: {
+  milestones: AiOpsPlanMilestone[]
+  periodStart?: string
+  periodEnd?: string
+}) {
+  const byDate = useMemo(() => {
+    const m = new Map<string, AiOpsPlanMilestone[]>()
+    for (const item of milestones) {
+      const d = normalizePlanDate(item.date)
+      if (!d) continue
+      const list = m.get(d) ?? []
+      list.push({ ...item, date: d })
+      m.set(d, list)
+    }
+    return m
+  }, [milestones])
+
+  const weeks = useMemo(() => {
+    const keys = [...byDate.keys()].sort()
+    let start = keys[0] || normalizePlanDate(periodStart || '')
+    let end = keys[keys.length - 1] || normalizePlanDate(periodEnd || '')
+    if (!start || !end) return [] as string[][]
+    // 对齐到周一
+    const startDt = new Date(`${start}T00:00:00`)
+    const pad = (startDt.getDay() + 6) % 7
+    startDt.setDate(startDt.getDate() - pad)
+    const endDt = new Date(`${end}T00:00:00`)
+    const out: string[][] = []
+    const cur = new Date(startDt)
+    while (cur <= endDt && out.length < 12) {
+      const row: string[] = []
+      for (let i = 0; i < 7; i++) {
+        const y = cur.getFullYear()
+        const mo = String(cur.getMonth() + 1).padStart(2, '0')
+        const da = String(cur.getDate()).padStart(2, '0')
+        row.push(`${y}-${mo}-${da}`)
+        cur.setDate(cur.getDate() + 1)
+      }
+      out.push(row)
+    }
+    return out
+  }, [byDate, periodStart, periodEnd])
+
+  if (!weeks.length) return null
+  const weekLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+
+  return (
+    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="border-b border-slate-100 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-gray-900">
+        周表进度（对齐运营方案日历节点）
+        <span className="ml-2 font-normal text-xs text-gray-500">共 {milestones.length} 个节点</span>
+      </div>
+      <table className="min-w-[920px] w-full border-collapse text-left text-xs">
+        <thead>
+          <tr className="bg-white text-gray-500">
+            {weekLabels.map((w) => (
+              <th key={w} className="border-b border-r border-slate-100 px-2 py-2 font-medium">
+                {w}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {weeks.map((row, wi) => (
+            <tr key={`w-${wi}`} className="align-top">
+              {row.map((iso) => {
+                const items = byDate.get(iso) ?? []
+                const inPeriod =
+                  (!periodStart || iso >= normalizePlanDate(periodStart)) &&
+                  (!periodEnd || iso <= normalizePlanDate(periodEnd))
+                return (
+                  <td
+                    key={iso}
+                    className={cn(
+                      'min-h-[96px] w-[14%] border-b border-r border-slate-100 px-1.5 py-1.5',
+                      items.length ? 'bg-blue-50/40' : 'bg-white',
+                      !inPeriod && 'opacity-40',
+                    )}
+                  >
+                    <div className="mb-1 text-[11px] font-semibold tabular-nums text-slate-700">
+                      {iso.slice(5)}
+                    </div>
+                    <ul className="space-y-1">
+                      {items.slice(0, 4).map((it, i) => (
+                        <li
+                          key={`${it.item}-${i}`}
+                          className="rounded bg-white/80 px-1 py-0.5 text-[10px] leading-snug text-slate-800"
+                          title={it.item}
+                        >
+                          {it.time ? (
+                            <span className="font-medium text-blue-700">{it.time} </span>
+                          ) : null}
+                          {it.item}
+                        </li>
+                      ))}
+                      {items.length > 4 ? (
+                        <li className="text-[10px] text-blue-600">+{items.length - 4}</li>
+                      ) : null}
+                    </ul>
+                  </td>
+                )
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 function CalendarMonthGrid({
   milestones,
   periodStart,
@@ -465,6 +580,11 @@ function CalendarMonthGrid({
 
   return (
     <div className="space-y-4">
+      <CalendarWeekBoard
+        milestones={milestones}
+        periodStart={periodStart}
+        periodEnd={periodEnd}
+      />
       <p className="text-xs text-gray-500">月历视图 · 点击有事项的日期可查看当日安排</p>
       {months.map(({ y, m }) => {
         const first = new Date(y, m - 1, 1)
@@ -629,7 +749,13 @@ function CalendarMonthGrid({
 }
 
 function parsePhaseRange(dateRange: string): { start: string; end: string } | null {
-  const parts = String(dateRange || '').split(/[~～\-至到]/).map((x) => normalizePlanDate(x.trim())).filter(Boolean)
+  // 勿用「-」直接 split，会拆坏 YYYY-MM-DD～YYYY-MM-DD
+  const isos = [...String(dateRange || '').matchAll(/(\d{4}-\d{2}-\d{2})/g)].map((m) => m[1]!)
+  if (isos.length >= 2) return { start: isos[0]!, end: isos[1]! }
+  if (isos.length === 1) return { start: isos[0]!, end: isos[0]! }
+  const parts = [...String(dateRange || '').matchAll(/(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})/g)].map(
+    (m) => `${m[1]}-${m[2]!.padStart(2, '0')}-${m[3]!.padStart(2, '0')}`,
+  )
   if (parts.length >= 2) return { start: parts[0]!, end: parts[1]! }
   if (parts.length === 1) return { start: parts[0]!, end: parts[0]! }
   return null
@@ -643,24 +769,50 @@ function buildPhaseDetailItems(
   plan: AiOpsPlanResult,
   phase: AiOpsPlanResult['executionPlan']['phases'][number],
 ): { day: string; task: string; ownerRole: string; deliverable: string; howTo: string }[] {
-  if (phase.detailItems?.length) {
-    return phase.detailItems.map((d) => ({
+  const range = parsePhaseRange(phase.dateRange)
+  const out: { day: string; task: string; ownerRole: string; deliverable: string; howTo: string }[] =
+    []
+  const seen = new Set<string>()
+  const push = (row: {
+    day: string
+    task: string
+    ownerRole: string
+    deliverable: string
+    howTo: string
+  }) => {
+    const key = `${normalizePlanDate(row.day) || row.day}|${row.task.slice(0, 24)}`
+    if (!row.task.trim() || seen.has(key)) return
+    seen.add(key)
+    out.push(row)
+  }
+
+  for (const d of phase.detailItems || []) {
+    push({
       day: d.day,
       task: d.task,
       ownerRole: d.ownerRole,
       deliverable: d.deliverable,
       howTo: d.howTo || '',
-    }))
+    })
   }
-  const range = parsePhaseRange(phase.dateRange)
-  const out: { day: string; task: string; ownerRole: string; deliverable: string; howTo: string }[] =
-    []
+
   if (range) {
+    for (const m of plan.calendar.milestones || []) {
+      const d = normalizePlanDate(m.date)
+      if (!d || !inIsoRange(d, range.start, range.end)) continue
+      push({
+        day: m.time ? `${d} ${m.time}` : d,
+        task: m.item,
+        ownerRole: m.ownerRole || phase.ownerRole,
+        deliverable: m.statusHint || '',
+        howTo: m.dependency ? `依赖：${m.dependency}${m.statusHint ? `；${m.statusHint}` : ''}` : m.statusHint || '',
+      })
+    }
     for (const w of plan.executionPlan.weeklyActions || []) {
       const wr = parsePhaseRange(w.dateRange)
       if (!wr) continue
       if (wr.end < range.start || wr.start > range.end) continue
-      out.push({
+      push({
         day: wr.start,
         task: `${w.week} ${w.focus}：${w.tasks}`,
         ownerRole: w.ownerRole || phase.ownerRole,
@@ -672,7 +824,7 @@ function buildPhaseDetailItems(
       const d = normalizePlanDate(h.date)
       if (!d || !inIsoRange(d, range.start, range.end)) continue
       if (h.scene !== 'live' && !/直播/.test(h.task)) continue
-      out.push({
+      push({
         day: `${d} ${h.timeStart}-${h.timeEnd}`,
         task: h.task,
         ownerRole: h.ownerRole || phase.ownerRole,
@@ -683,7 +835,7 @@ function buildPhaseDetailItems(
   }
   if (!out.length && phase.actions) {
     for (const part of phase.actions.split(/[；;。\n]/).map((x) => x.trim()).filter(Boolean)) {
-      out.push({
+      push({
         day: phase.dateRange || '—',
         task: part,
         ownerRole: phase.ownerRole,
@@ -692,7 +844,9 @@ function buildPhaseDetailItems(
       })
     }
   }
-  return out.slice(0, 40)
+  return out
+    .sort((a, b) => (normalizePlanDate(a.day) || a.day).localeCompare(normalizePlanDate(b.day) || b.day))
+    .slice(0, 48)
 }
 
 function ResultPanel({
@@ -745,6 +899,10 @@ function ResultPanel({
     const openSection = opsDetailKey ? sectionDetail[opsDetailKey] : null
     return (
       <div className="space-y-5">
+        <div className="rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2 text-xs text-slate-600">
+          布局对齐标杆方案：一、背景与目标 · 二、组品与活动玩法 · 三、节点主题 · 四、内容与分平台策略
+        </div>
+        <h3 className="text-sm font-semibold text-gray-900">一、活动背景与目标</h3>
         {(ops.background || ops.backgroundDetail) ? (
           <div className="flex items-start justify-between gap-3">
             <p className="text-sm leading-relaxed text-gray-700">
@@ -760,15 +918,6 @@ function ResultPanel({
             {ops.positioning}
           </p>
         ) : null}
-        {(ops.activities || ops.activitiesDetail || ops.monthlyThemes.length) ? (
-          <div className="flex items-start justify-between gap-3">
-            <p className="text-sm text-gray-700">
-              <span className="font-medium text-gray-900">活动 · </span>
-              {ops.activities || ops.monthlyThemes.join(' · ') || '见详情'}
-            </p>
-            <ViewDetailBtn onClick={() => setOpsDetailKey('activities')} />
-          </div>
-        ) : null}
         {(ops.targetAudience || ops.audienceDetail) ? (
           <div className="flex items-start justify-between gap-3">
             <p className="text-sm text-gray-700">
@@ -781,7 +930,7 @@ function ResultPanel({
         {ops.goals.length || ops.goalsDetail.length ? (
           <div>
             <div className="mb-2 flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-gray-900">目标</h3>
+              <h4 className="text-sm font-semibold text-gray-900">目标 KPI</h4>
               <ViewDetailBtn onClick={() => setOpsDetailKey('goals')} label="查看明细" />
             </div>
             <ul className="list-disc space-y-1 pl-5 text-sm text-gray-700">
@@ -791,24 +940,39 @@ function ResultPanel({
             </ul>
           </div>
         ) : null}
+        <h3 className="text-sm font-semibold text-gray-900">二、组品策略与活动玩法</h3>
+        {(ops.activities || ops.activitiesDetail || ops.monthlyThemes.length) ? (
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-sm text-gray-700">
+              <span className="font-medium text-gray-900">活动 · </span>
+              {ops.activities || ops.monthlyThemes.join(' · ') || '见详情'}
+            </p>
+            <ViewDetailBtn onClick={() => setOpsDetailKey('activities')} />
+          </div>
+        ) : null}
+        <h3 className="text-sm font-semibold text-gray-900">三、节点活动主题</h3>
+        {ops.monthlyThemes.length ? (
+          <ul className="list-disc space-y-1 pl-5 text-sm text-gray-700">
+            {ops.monthlyThemes.map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-gray-500">重新生成后将输出「日期 + 主题 + 话题#」节点</p>
+        )}
+        <h3 className="text-sm font-semibold text-gray-900">四、内容营销与分平台策略</h3>
         {ops.contentPillars.length ? (
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h3 className="mb-1 text-sm font-semibold text-gray-900">内容支柱</h3>
+              <h4 className="mb-1 text-sm font-medium text-gray-800">内容支柱</h4>
               <p className="text-sm text-gray-700">{ops.contentPillars.join(' · ')}</p>
             </div>
             <ViewDetailBtn onClick={() => setOpsDetailKey('pillars')} />
           </div>
         ) : null}
-        {ops.monthlyThemes.length ? (
-          <div>
-            <h3 className="mb-2 text-sm font-semibold text-gray-900">月度/周主题</h3>
-            <p className="text-sm text-gray-700">{ops.monthlyThemes.join(' · ')}</p>
-          </div>
-        ) : null}
         {ops.platformStrategy.length ? (
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-gray-900">分平台策略</h3>
+            <h4 className="mb-2 text-sm font-medium text-gray-800">分平台策略</h4>
             <TableShell headers={['平台', '打法', '内容形态', '频次', 'KPI', '选题示例', '操作']}>
               {ops.platformStrategy.map((r, i) => (
                 <tr key={`${r.platform}-${i}`}>
@@ -913,7 +1077,10 @@ function ResultPanel({
                   <td className="px-3 py-2">{r.deliverable}</td>
                   <td className="px-3 py-2 text-gray-600">{r.successMetric}</td>
                   <td className="px-3 py-2">
-                    <ViewDetailBtn onClick={() => setPhaseIdx(i)} />
+                    <ViewDetailBtn
+                      onClick={() => setPhaseIdx(i)}
+                      label={`查看(${Math.max(r.detailItems?.length || 0, 1)})`}
+                    />
                   </td>
                 </tr>
               ))}
@@ -923,7 +1090,7 @@ function ResultPanel({
         {openPhase ? (
           <DetailModal
             title={`${openPhase.phase} · 细分安排`}
-            subtitle={`${openPhase.dateRange} · ${openPhase.ownerRole || '未指定角色'}`}
+            subtitle={`${openPhase.dateRange} · ${openPhase.ownerRole || '未指定角色'} · ${phaseDetails.length} 条日任务`}
             onClose={() => setPhaseIdx(null)}
           >
             {openPhase.actions ? (
