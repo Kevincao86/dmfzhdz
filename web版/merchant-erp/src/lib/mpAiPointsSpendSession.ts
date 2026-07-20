@@ -1,11 +1,4 @@
 import { createMpAuthRest, reconcileAccountPrFromRegistry, resolveSession } from './mpAccountAuth.js'
-import { createClient } from '@supabase/supabase-js'
-import { nodeSupabaseClientOptions } from './nodeSupabaseClientOptions.js'
-import {
-  assertPartnerXingxuanErpAffordable,
-  resolvePartnerErpBillingTenantId,
-  spendPartnerXingxuanAsErpPoints,
-} from './partnerXingxuanBilling.js'
 import { createRegistrySnapshotIoFetch } from './registrySnapshotIoFetch.js'
 import type { MpLibraryRole } from './mpMembershipCatalog.js'
 import {
@@ -18,6 +11,10 @@ import type { MpPointsUsageKind } from './mpPointsEconomics.js'
 
 export type { MpAiPointsSpendResult }
 
+/**
+ * 星选小程序「积分充值/我的订单」展示的是注册表套餐桶+充值桶。
+ * 扣费/预检必须与之对齐；禁止改扣 ERP 租户积分（否则界面 64 仍能用、余额不减）。
+ */
 export async function spendMpAiPointsForSessionToken(
   supabaseUrl: string,
   serviceRole: string,
@@ -40,11 +37,6 @@ export async function spendMpAiPointsForSessionToken(
     return { ok: false, error: 'not_found', message: '登录已过期，请重新登录' }
   }
   const account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
-  const billingTenantId = await resolvePartnerErpBillingTenantId(supabaseUrl, serviceRole, account)
-  if (billingTenantId) {
-    const admin = createClient(supabaseUrl, serviceRole, nodeSupabaseClientOptions())
-    return spendPartnerXingxuanAsErpPoints(admin, billingTenantId, opts)
-  }
   const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
   const data = await io.load()
   const result = spendMpAiPointsWithSnapshot(data, account, opts)
@@ -71,11 +63,6 @@ export async function assertMpAiPointsAffordableForSessionToken(
     return { ok: false, error: 'not_found', message: '登录已过期，请重新登录' }
   }
   const account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
-  const billingTenantId = await resolvePartnerErpBillingTenantId(supabaseUrl, serviceRole, account)
-  if (billingTenantId) {
-    const admin = createClient(supabaseUrl, serviceRole, nodeSupabaseClientOptions())
-    return assertPartnerXingxuanErpAffordable(admin, billingTenantId, kind, opts)
-  }
   const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
   const data = await io.load()
   const gift = ensureMonthlyGiftPointsGranted(data, account, { roleHint: opts?.roleHint })

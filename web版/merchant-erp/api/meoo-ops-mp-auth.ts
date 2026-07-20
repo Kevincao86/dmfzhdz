@@ -1197,12 +1197,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         roleHint,
       })
       if (!result.ok) {
-        sendJson(res, mpPointsSpendHttpStatus(result.error), {
+        // 返回 200 + ok:false，便于小程序拿到 required/balance（非 2xx 时 ecs 会丢 body）
+        sendJson(res, 200, {
           ok: false,
           error: result.error,
           message: result.message,
           required: result.required,
           balance: result.balance,
+          remaining:
+            result.balance != null && result.required != null
+              ? Math.floor(Number(result.balance) || 0) - Math.floor(Number(result.required) || 0)
+              : undefined,
         })
         return
       }
@@ -1210,6 +1215,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         ok: true,
         pointsRequired: result.pointsCharged,
         mpAiPointsBalance: result.newBalance,
+        remaining: Math.max(
+          0,
+          Math.floor(Number(result.newBalance) || 0) - Math.floor(Number(result.pointsCharged) || 0),
+        ),
       })
       return
     }

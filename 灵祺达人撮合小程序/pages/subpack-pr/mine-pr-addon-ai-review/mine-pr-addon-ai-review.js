@@ -6,7 +6,6 @@ const scriptAiCompliance = require('../../../utils/recruitmentScriptAiCompliance
 const iceApi = require('../../../utils/mpAddonIceApi.js')
 const mpComplianceReviewRecords = require('../../../utils/mpComplianceReviewRecordsApi.js')
 const addonAiComplianceCapabilities = require('../../../utils/addonAiComplianceCapabilities.js')
-const mpPointsSpend = require('../../../utils/mpPointsSpendApi.js')
 
 const SCRIPT_PLATFORM_OPTIONS = ['小红书', '大众点评']
 const VIDEO_PLATFORM_OPTIONS = ['抖音', '快手', '视频号']
@@ -361,15 +360,14 @@ Page({
     })
     const platform = this.data.platform
     if (this.data.reviewMode === 'video') {
-      const durationSec =
+      let durationSec =
         prepared.durationSec != null && Number(prepared.durationSec) > 0
           ? Math.max(1, Math.ceil(Number(prepared.durationSec)))
           : undefined
-      if (durationSec != null) {
-        const afford = await mpPointsSpend.checkPointsAffordable('video', { durationSec })
-        if (!afford.ok) {
-          throw new Error(afford.message || '积分不足，请充值积分或升级套餐后再试')
-        }
+      if (durationSec == null && prepared.filePath) {
+        durationSec = await videoAiCompliance.resolveVideoDurationSec({
+          filePath: prepared.filePath,
+        })
       }
       const res = await videoAiCompliance.checkVideoCompliance({
         mpOrderId: 'addon',
@@ -377,6 +375,7 @@ Page({
         platform,
         applicantName: prepared.label,
         videoUrl: prepared.videoUrl,
+        filePath: prepared.filePath,
         durationSec,
       })
       const st = videoAiCompliance.formatInlineStatus(res)
@@ -386,7 +385,7 @@ Page({
         statusTone: st.tone,
         detail: String((res && res.message) || ''),
         videoUrl: prepared.videoUrl,
-        durationSec,
+        durationSec: durationSec || res.durationSec,
       })
       await this.persistRecord(prepared, res, st)
       return
