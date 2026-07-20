@@ -1555,3 +1555,66 @@ export function pickMaterialsForNarrativeSlots(
 export function mixTargetSegmentCount(targetTotalSec: number, segmentSec = 5): number {
   return segmentCountFromTargetTotalSec(targetTotalSec, segmentSec)
 }
+
+/** 批量成片条数（普通混剪 / 智能一键成片共用） */
+export const ICE_MIX_BATCH_COUNTS = [10, 20, 30, 50] as const
+export type IceMixBatchCount = (typeof ICE_MIX_BATCH_COUNTS)[number]
+
+/** 品牌名清洗：用于下载文件名「品牌名1…N」 */
+export function sanitizeIceMixBrandName(raw: string): string {
+  return String(raw || '')
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '')
+    .replace(/\s+/g, '')
+    .trim()
+    .slice(0, 40)
+}
+
+/** 第 index 条（1-based）下载/任务标签，如 优雅浅爱3 */
+export function formatIceMixBrandBatchLabel(brandName: string, index1Based: number): string {
+  const brand = sanitizeIceMixBrandName(brandName) || '成片'
+  const n = Math.max(1, Math.floor(Number(index1Based) || 1))
+  return `${brand}${n}`
+}
+
+/**
+ * 批量第 variantIndex 条（0-based）的素材映射：轮转 + 偶奇反转 + 中段对调，
+ * 保证同模板下各条画面顺序有差异。
+ */
+export function buildVariantMaterialSlots(
+  baseSlots: number[],
+  materialCount: number,
+  segmentCount: number,
+  variantIndex: number,
+): number[] {
+  const n = Math.max(1, materialCount)
+  const len = Math.max(1, segmentCount)
+  const base =
+    baseSlots.length > 0
+      ? Array.from({ length: len }, (_, i) => {
+          const v = Number(baseSlots[i % baseSlots.length])
+          return Number.isFinite(v) ? ((v % n) + n) % n : i % n
+        })
+      : Array.from({ length: len }, (_, i) => i % n)
+  const shift = ((variantIndex % n) + n) % n
+  let next = base.map((s) => (s + shift) % n)
+  if (variantIndex % 2 === 1) next = [...next].reverse()
+  if (variantIndex % 3 === 2 && next.length > 2) {
+    const mid = Math.floor(next.length / 2)
+    next = [...next.slice(mid), ...next.slice(0, mid)]
+  }
+  if (variantIndex % 5 === 4 && next.length > 3) {
+    const a = [...next]
+    const t = a[1]!
+    a[1] = a[a.length - 2]!
+    a[a.length - 2] = t
+    next = a
+  }
+  return next
+}
+
+/** 批量变体：素材池整体轮转（智能成片侧再喂一轮序） */
+export function rotateMaterialsForVariant<T>(materials: readonly T[], variantIndex: number): T[] {
+  if (materials.length <= 1) return [...materials]
+  const k = ((variantIndex % materials.length) + materials.length) % materials.length
+  return [...materials.slice(k), ...materials.slice(0, k)]
+}
