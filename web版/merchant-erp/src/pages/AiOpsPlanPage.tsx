@@ -34,12 +34,14 @@ import {
   exportAiOpsPlanWord,
 } from '../lib/aiOpsPlanExport'
 import {
+  AI_OPS_MILESTONE_KIND_LABELS,
   AI_OPS_PLAN_TABS,
   aiOpsPlanToMarkdown,
-  ensureMarketingRoiFallback,
+  enrichAiOpsPlanPostProcess,
   normalizeAiOpsPlanResult,
   type AiOpsPlanGenerateInput,
   type AiOpsPlanMilestone,
+  type AiOpsPlanMilestoneKind,
   type AiOpsPlanResult,
   type AiOpsPlanTabId,
 } from '../lib/aiOpsPlanTypes'
@@ -348,6 +350,56 @@ function TableShell({
   )
 }
 
+function DetailModal({
+  title,
+  subtitle,
+  onClose,
+  children,
+}: {
+  title: string
+  subtitle?: string
+  onClose: () => void
+  children: ReactNode
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="max-h-[85vh] w-full max-w-2xl overflow-auto rounded-xl bg-white shadow-xl">
+        <div className="sticky top-0 flex items-start justify-between gap-3 border-b border-gray-100 bg-white px-5 py-4">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+            {subtitle ? <p className="mt-1 text-xs text-gray-500">{subtitle}</p> : null}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-gray-200 px-2.5 py-1 text-xs text-gray-600 hover:bg-gray-50"
+          >
+            关闭
+          </button>
+        </div>
+        <div className="space-y-3 px-5 py-4 text-sm text-gray-800">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+function ViewDetailBtn({ onClick, label = '查看' }: { onClick: () => void; label?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="shrink-0 rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-blue-700"
+    >
+      {label}
+    </button>
+  )
+}
+
+function milestoneKindLabel(kind?: AiOpsPlanMilestoneKind | string): string {
+  if (!kind) return ''
+  return AI_OPS_MILESTONE_KIND_LABELS[kind as AiOpsPlanMilestoneKind] || String(kind)
+}
+
 function normalizePlanDate(raw: string): string {
   const s = String(raw || '').trim()
   const m1 = s.match(/(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})/)
@@ -498,16 +550,41 @@ function CalendarMonthGrid({
         <div className="rounded-lg border border-blue-100 bg-blue-50/40 px-4 py-3">
           <div className="mb-2 text-sm font-semibold text-blue-900">{picked} 当日事项</div>
           <ul className="space-y-2 text-sm text-gray-800">
-            {pickedItems.map((r, i) => (
-              <li key={`${r.item}-${i}`}>
-                <span className="font-medium">
-                  {r.time ? `${r.time} · ` : ''}
-                  {r.item}
-                </span>
-                {r.ownerRole ? <span className="ml-2 text-xs text-gray-500">{r.ownerRole}</span> : null}
-                {r.statusHint ? <div className="text-xs text-gray-500">建议：{r.statusHint}</div> : null}
-              </li>
-            ))}
+            {pickedItems.map((r, i) => {
+              const needTime =
+                (r.kind === 'video_publish' ||
+                  r.kind === 'live_go' ||
+                  r.kind === 'live_warmup' ||
+                  /发布|开播|预热/.test(r.item)) &&
+                !r.time
+              return (
+                <li key={`${r.item}-${i}`} className="rounded-md bg-white/70 px-3 py-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {r.kind ? (
+                      <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-800">
+                        {milestoneKindLabel(r.kind)}
+                      </span>
+                    ) : null}
+                    <span className="font-medium">
+                      {r.time ? `${r.time} · ` : ''}
+                      {r.item}
+                    </span>
+                  </div>
+                  {r.ownerRole ? (
+                    <div className="mt-0.5 text-xs text-gray-500">角色：{r.ownerRole}</div>
+                  ) : null}
+                  {r.dependency ? (
+                    <div className="text-xs text-gray-500">依赖：{r.dependency}</div>
+                  ) : null}
+                  {r.statusHint ? (
+                    <div className="text-xs text-gray-500">建议：{r.statusHint}</div>
+                  ) : null}
+                  {needTime ? (
+                    <div className="text-xs text-amber-700">建议补全具体发布时间</div>
+                  ) : null}
+                </li>
+              )
+            })}
           </ul>
         </div>
       ) : null}
@@ -517,12 +594,32 @@ function CalendarMonthGrid({
         </summary>
         <ul className="space-y-2 border-t border-gray-100 px-3 py-3 text-sm text-gray-700">
           {milestones.map((r, i) => (
-            <li key={`${r.date}-${i}`} className="flex gap-3 border-b border-gray-50 pb-2 last:border-0">
-              <span className="w-36 shrink-0 tabular-nums text-blue-700">
+            <li
+              key={`${r.date}-${i}`}
+              className="flex flex-col gap-0.5 border-b border-gray-50 pb-2 last:border-0 sm:flex-row sm:gap-3"
+            >
+              <span className="w-40 shrink-0 tabular-nums text-blue-700">
                 {normalizePlanDate(r.date) || r.date}
                 {r.time ? ` ${r.time}` : ''}
               </span>
-              <span className="flex-1 font-medium text-gray-900">{r.item}</span>
+              <span className="flex-1">
+                {r.kind ? (
+                  <span className="mr-1.5 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-700">
+                    {milestoneKindLabel(r.kind)}
+                  </span>
+                ) : null}
+                <span className="font-medium text-gray-900">{r.item}</span>
+                {r.dependency ? (
+                  <span className="mt-0.5 block text-xs text-gray-500">依赖：{r.dependency}</span>
+                ) : null}
+                {r.ownerRole ? (
+                  <span className="block text-xs text-gray-500">角色：{r.ownerRole}</span>
+                ) : null}
+                {!r.time &&
+                (r.kind === 'video_publish' || r.kind === 'live_go' || r.kind === 'live_warmup') ? (
+                  <span className="block text-xs text-amber-700">建议补全具体时间</span>
+                ) : null}
+              </span>
             </li>
           ))}
         </ul>
@@ -545,10 +642,19 @@ function inIsoRange(iso: string, start: string, end: string): boolean {
 function buildPhaseDetailItems(
   plan: AiOpsPlanResult,
   phase: AiOpsPlanResult['executionPlan']['phases'][number],
-): { day: string; task: string; ownerRole: string; deliverable: string }[] {
-  if (phase.detailItems?.length) return phase.detailItems
+): { day: string; task: string; ownerRole: string; deliverable: string; howTo: string }[] {
+  if (phase.detailItems?.length) {
+    return phase.detailItems.map((d) => ({
+      day: d.day,
+      task: d.task,
+      ownerRole: d.ownerRole,
+      deliverable: d.deliverable,
+      howTo: d.howTo || '',
+    }))
+  }
   const range = parsePhaseRange(phase.dateRange)
-  const out: { day: string; task: string; ownerRole: string; deliverable: string }[] = []
+  const out: { day: string; task: string; ownerRole: string; deliverable: string; howTo: string }[] =
+    []
   if (range) {
     for (const w of plan.executionPlan.weeklyActions || []) {
       const wr = parsePhaseRange(w.dateRange)
@@ -559,6 +665,7 @@ function buildPhaseDetailItems(
         task: `${w.week} ${w.focus}：${w.tasks}`,
         ownerRole: w.ownerRole || phase.ownerRole,
         deliverable: '',
+        howTo: w.detail || '',
       })
     }
     for (const h of plan.executionPlan.hourlySchedule || []) {
@@ -570,6 +677,7 @@ function buildPhaseDetailItems(
         task: h.task,
         ownerRole: h.ownerRole || phase.ownerRole,
         deliverable: h.deliverable,
+        howTo: h.notes || '',
       })
     }
   }
@@ -580,6 +688,7 @@ function buildPhaseDetailItems(
         task: part,
         ownerRole: phase.ownerRole,
         deliverable: phase.deliverable,
+        howTo: '',
       })
     }
   }
@@ -598,57 +707,110 @@ function ResultPanel({
   periodEnd?: string
 }) {
   const [phaseIdx, setPhaseIdx] = useState<number | null>(null)
+  const [opsDetailKey, setOpsDetailKey] = useState<string | null>(null)
+  const [platformIdx, setPlatformIdx] = useState<number | null>(null)
+  const [weekIdx, setWeekIdx] = useState<number | null>(null)
+  const [hourlyIdx, setHourlyIdx] = useState<number | null>(null)
   const openPhase = phaseIdx != null ? plan.executionPlan.phases[phaseIdx] : null
   const phaseDetails = openPhase ? buildPhaseDetailItems(plan, openPhase) : []
+  const openPlatform =
+    platformIdx != null ? plan.opsPlan.platformStrategy[platformIdx] : null
+  const openWeek =
+    weekIdx != null ? plan.executionPlan.weeklyActions[weekIdx] : null
 
   if (tab === 'ops') {
+    const ops = plan.opsPlan
+    const sectionDetail: Record<string, { title: string; body: string }> = {
+      background: {
+        title: '背景详情',
+        body: ops.backgroundDetail || ops.background || '暂无详情',
+      },
+      activities: {
+        title: '活动详情',
+        body: ops.activitiesDetail || ops.activities || ops.monthlyThemes.join(' · ') || '暂无详情',
+      },
+      audience: {
+        title: '人群详情',
+        body: ops.audienceDetail || ops.targetAudience || '暂无详情',
+      },
+      goals: {
+        title: '目标明细（客单×单量）',
+        body: '',
+      },
+      pillars: {
+        title: '内容支柱详情',
+        body: ops.contentPillars.join('\n') || '暂无详情',
+      },
+    }
+    const openSection = opsDetailKey ? sectionDetail[opsDetailKey] : null
     return (
       <div className="space-y-5">
-        {plan.opsPlan.background ? (
-          <p className="text-sm leading-relaxed text-gray-700">
-            <span className="font-medium text-gray-900">背景 · </span>
-            {plan.opsPlan.background}
-          </p>
+        {(ops.background || ops.backgroundDetail) ? (
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-sm leading-relaxed text-gray-700">
+              <span className="font-medium text-gray-900">背景 · </span>
+              {ops.background || ops.backgroundDetail.slice(0, 80)}
+            </p>
+            <ViewDetailBtn onClick={() => setOpsDetailKey('background')} />
+          </div>
         ) : null}
-        {plan.opsPlan.positioning ? (
+        {ops.positioning ? (
           <p className="rounded-lg border border-blue-100 bg-blue-50/60 px-4 py-3 text-sm leading-relaxed text-gray-800">
             <span className="font-medium text-blue-800">定位 · </span>
-            {plan.opsPlan.positioning}
+            {ops.positioning}
           </p>
         ) : null}
-        {plan.opsPlan.targetAudience ? (
-          <p className="text-sm text-gray-700">
-            <span className="font-medium text-gray-900">人群 · </span>
-            {plan.opsPlan.targetAudience}
-          </p>
+        {(ops.activities || ops.activitiesDetail || ops.monthlyThemes.length) ? (
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-sm text-gray-700">
+              <span className="font-medium text-gray-900">活动 · </span>
+              {ops.activities || ops.monthlyThemes.join(' · ') || '见详情'}
+            </p>
+            <ViewDetailBtn onClick={() => setOpsDetailKey('activities')} />
+          </div>
         ) : null}
-        {plan.opsPlan.goals.length ? (
+        {(ops.targetAudience || ops.audienceDetail) ? (
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-sm text-gray-700">
+              <span className="font-medium text-gray-900">人群 · </span>
+              {ops.targetAudience || ops.audienceDetail.slice(0, 80)}
+            </p>
+            <ViewDetailBtn onClick={() => setOpsDetailKey('audience')} />
+          </div>
+        ) : null}
+        {ops.goals.length || ops.goalsDetail.length ? (
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-gray-900">目标</h3>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-gray-900">目标</h3>
+              <ViewDetailBtn onClick={() => setOpsDetailKey('goals')} label="查看明细" />
+            </div>
             <ul className="list-disc space-y-1 pl-5 text-sm text-gray-700">
-              {plan.opsPlan.goals.map((g) => (
+              {ops.goals.map((g) => (
                 <li key={g}>{g}</li>
               ))}
             </ul>
           </div>
         ) : null}
-        {plan.opsPlan.contentPillars.length ? (
-          <div>
-            <h3 className="mb-2 text-sm font-semibold text-gray-900">内容支柱</h3>
-            <p className="text-sm text-gray-700">{plan.opsPlan.contentPillars.join(' · ')}</p>
+        {ops.contentPillars.length ? (
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="mb-1 text-sm font-semibold text-gray-900">内容支柱</h3>
+              <p className="text-sm text-gray-700">{ops.contentPillars.join(' · ')}</p>
+            </div>
+            <ViewDetailBtn onClick={() => setOpsDetailKey('pillars')} />
           </div>
         ) : null}
-        {plan.opsPlan.monthlyThemes.length ? (
+        {ops.monthlyThemes.length ? (
           <div>
             <h3 className="mb-2 text-sm font-semibold text-gray-900">月度/周主题</h3>
-            <p className="text-sm text-gray-700">{plan.opsPlan.monthlyThemes.join(' · ')}</p>
+            <p className="text-sm text-gray-700">{ops.monthlyThemes.join(' · ')}</p>
           </div>
         ) : null}
-        {plan.opsPlan.platformStrategy.length ? (
+        {ops.platformStrategy.length ? (
           <div>
             <h3 className="mb-2 text-sm font-semibold text-gray-900">分平台策略</h3>
-            <TableShell headers={['平台', '打法', '内容形态', '频次', 'KPI', '选题示例']}>
-              {plan.opsPlan.platformStrategy.map((r, i) => (
+            <TableShell headers={['平台', '打法', '内容形态', '频次', 'KPI', '选题示例', '操作']}>
+              {ops.platformStrategy.map((r, i) => (
                 <tr key={`${r.platform}-${i}`}>
                   <td className="px-3 py-2 font-medium text-gray-900">{r.platform}</td>
                   <td className="max-w-xs px-3 py-2 text-gray-700">{r.approach}</td>
@@ -656,20 +818,68 @@ function ResultPanel({
                   <td className="px-3 py-2 text-gray-700">{r.publishFreq}</td>
                   <td className="px-3 py-2 text-gray-700">{r.kpi}</td>
                   <td className="max-w-xs px-3 py-2 text-gray-600">{r.examples}</td>
+                  <td className="px-3 py-2">
+                    <ViewDetailBtn onClick={() => setPlatformIdx(i)} />
+                  </td>
                 </tr>
               ))}
             </TableShell>
           </div>
         ) : null}
-        {plan.opsPlan.risks.length ? (
+        {ops.risks.length ? (
           <div>
             <h3 className="mb-2 text-sm font-semibold text-gray-900">风险与对策</h3>
             <ul className="list-disc space-y-1 pl-5 text-sm text-amber-900/90">
-              {plan.opsPlan.risks.map((g) => (
+              {ops.risks.map((g) => (
                 <li key={g}>{g}</li>
               ))}
             </ul>
           </div>
+        ) : null}
+        {openSection ? (
+          <DetailModal
+            title={openSection.title}
+            onClose={() => setOpsDetailKey(null)}
+          >
+            {opsDetailKey === 'goals' ? (
+              ops.goalsDetail.length ? (
+                <TableShell headers={['指标', '目标', '客单', '订单', 'GMV', '测算说明']}>
+                  {ops.goalsDetail.map((g, i) => (
+                    <tr key={`${g.metric}-${i}`}>
+                      <td className="px-3 py-2 font-medium">{g.metric}</td>
+                      <td className="px-3 py-2">{g.target}</td>
+                      <td className="px-3 py-2 tabular-nums">{g.aovYuan || '—'}</td>
+                      <td className="px-3 py-2 tabular-nums">{g.orders || '—'}</td>
+                      <td className="px-3 py-2 tabular-nums">
+                        {g.gmvYuan ? `¥${g.gmvYuan.toLocaleString('zh-CN')}` : '—'}
+                      </td>
+                      <td className="max-w-xs px-3 py-2 text-gray-600">{g.rationale}</td>
+                    </tr>
+                  ))}
+                </TableShell>
+              ) : (
+                <ul className="list-disc space-y-1 pl-5">
+                  {ops.goals.map((g) => (
+                    <li key={g}>{g}</li>
+                  ))}
+                </ul>
+              )
+            ) : (
+              <p className="whitespace-pre-wrap leading-relaxed text-gray-700">{openSection.body}</p>
+            )}
+          </DetailModal>
+        ) : null}
+        {openPlatform ? (
+          <DetailModal
+            title={`${openPlatform.platform} · 策略详情`}
+            subtitle={`${openPlatform.publishFreq || ''} ${openPlatform.kpi ? `· KPI ${openPlatform.kpi}` : ''}`}
+            onClose={() => setPlatformIdx(null)}
+          >
+            <p className="whitespace-pre-wrap leading-relaxed">
+              {openPlatform.detail ||
+                `${openPlatform.approach}\n\n内容形态：${openPlatform.contentTypes}\n选题示例：${openPlatform.examples}`}
+            </p>
+          </DetailModal>
         ) : null}
       </div>
     )
@@ -681,6 +891,7 @@ function ResultPanel({
         /直播/.test(r.task || '') ||
         /直播/.test(r.notes || ''),
     )
+    const openHourly = hourlyIdx != null ? hourly[hourlyIdx] : null
     return (
       <div className="space-y-5">
         {plan.executionPlan.overview ? (
@@ -702,13 +913,7 @@ function ResultPanel({
                   <td className="px-3 py-2">{r.deliverable}</td>
                   <td className="px-3 py-2 text-gray-600">{r.successMetric}</td>
                   <td className="px-3 py-2">
-                    <button
-                      type="button"
-                      onClick={() => setPhaseIdx(i)}
-                      className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-blue-700"
-                    >
-                      查看
-                    </button>
+                    <ViewDetailBtn onClick={() => setPhaseIdx(i)} />
                   </td>
                 </tr>
               ))}
@@ -716,58 +921,44 @@ function ResultPanel({
           </div>
         ) : null}
         {openPhase ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="max-h-[85vh] w-full max-w-2xl overflow-auto rounded-xl bg-white shadow-xl">
-              <div className="sticky top-0 flex items-start justify-between gap-3 border-b border-gray-100 bg-white px-5 py-4">
-                <div>
-                  <h3 className="text-base font-semibold text-gray-900">{openPhase.phase} · 细分安排</h3>
-                  <p className="mt-1 text-xs text-gray-500">
-                    {openPhase.dateRange} · {openPhase.ownerRole || '未指定角色'}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setPhaseIdx(null)}
-                  className="rounded-md border border-gray-200 px-2.5 py-1 text-xs text-gray-600 hover:bg-gray-50"
-                >
-                  关闭
-                </button>
-              </div>
-              <div className="space-y-3 px-5 py-4 text-sm">
-                {openPhase.actions ? (
-                  <p className="rounded-lg bg-slate-50 px-3 py-2 text-gray-700">
-                    <span className="font-medium text-gray-900">阶段要点 · </span>
-                    {openPhase.actions}
-                  </p>
-                ) : null}
-                {openPhase.deliverable || openPhase.successMetric ? (
-                  <p className="text-xs text-gray-500">
-                    {openPhase.deliverable ? `产出：${openPhase.deliverable}` : ''}
-                    {openPhase.deliverable && openPhase.successMetric ? ' · ' : ''}
-                    {openPhase.successMetric ? `成功指标：${openPhase.successMetric}` : ''}
-                  </p>
-                ) : null}
-                <TableShell headers={['日期/时段', '任务', '角色', '产出']}>
-                  {phaseDetails.map((d, i) => (
-                    <tr key={`${d.day}-${i}`}>
-                      <td className="px-3 py-2 tabular-nums text-gray-600">{d.day || '—'}</td>
-                      <td className="px-3 py-2 text-gray-800">{d.task}</td>
-                      <td className="px-3 py-2">{d.ownerRole || '—'}</td>
-                      <td className="px-3 py-2 text-gray-600">{d.deliverable || '—'}</td>
-                    </tr>
-                  ))}
-                </TableShell>
-                {!phaseDetails.length ? (
-                  <p className="text-sm text-gray-500">暂无细分任务，请重新生成方案以获取日粒度安排</p>
-                ) : null}
-              </div>
-            </div>
-          </div>
+          <DetailModal
+            title={`${openPhase.phase} · 细分安排`}
+            subtitle={`${openPhase.dateRange} · ${openPhase.ownerRole || '未指定角色'}`}
+            onClose={() => setPhaseIdx(null)}
+          >
+            {openPhase.actions ? (
+              <p className="rounded-lg bg-slate-50 px-3 py-2 text-gray-700">
+                <span className="font-medium text-gray-900">阶段要点 · </span>
+                {openPhase.actions}
+              </p>
+            ) : null}
+            {openPhase.deliverable || openPhase.successMetric ? (
+              <p className="text-xs text-gray-500">
+                {openPhase.deliverable ? `产出：${openPhase.deliverable}` : ''}
+                {openPhase.deliverable && openPhase.successMetric ? ' · ' : ''}
+                {openPhase.successMetric ? `成功指标：${openPhase.successMetric}` : ''}
+              </p>
+            ) : null}
+            <TableShell headers={['日期/时段', '任务', '怎么做', '角色', '产出']}>
+              {phaseDetails.map((d, i) => (
+                <tr key={`${d.day}-${i}`}>
+                  <td className="px-3 py-2 tabular-nums text-gray-600">{d.day || '—'}</td>
+                  <td className="px-3 py-2 text-gray-800">{d.task}</td>
+                  <td className="max-w-xs px-3 py-2 text-gray-600">{d.howTo || '—'}</td>
+                  <td className="px-3 py-2">{d.ownerRole || '—'}</td>
+                  <td className="px-3 py-2 text-gray-600">{d.deliverable || '—'}</td>
+                </tr>
+              ))}
+            </TableShell>
+            {!phaseDetails.length ? (
+              <p className="text-sm text-gray-500">暂无细分任务，请重新生成方案以获取日粒度安排</p>
+            ) : null}
+          </DetailModal>
         ) : null}
         {plan.executionPlan.weeklyActions.length ? (
           <div>
             <h3 className="mb-2 text-sm font-semibold text-gray-900">周计划</h3>
-            <TableShell headers={['周次', '日期', '重点', '任务', '角色']}>
+            <TableShell headers={['周次', '日期', '重点', '任务', '角色', '操作']}>
               {plan.executionPlan.weeklyActions.map((r, i) => (
                 <tr key={`${r.week}-${i}`}>
                   <td className="px-3 py-2 font-medium">{r.week}</td>
@@ -775,10 +966,36 @@ function ResultPanel({
                   <td className="px-3 py-2">{r.focus}</td>
                   <td className="max-w-sm px-3 py-2">{r.tasks}</td>
                   <td className="px-3 py-2">{r.ownerRole}</td>
+                  <td className="px-3 py-2">
+                    <ViewDetailBtn onClick={() => setWeekIdx(i)} />
+                  </td>
                 </tr>
               ))}
             </TableShell>
           </div>
+        ) : null}
+        {openWeek ? (
+          <DetailModal
+            title={`${openWeek.week} · 执行详情`}
+            subtitle={openWeek.dateRange}
+            onClose={() => setWeekIdx(null)}
+          >
+            <p>
+              <span className="font-medium">重点 · </span>
+              {openWeek.focus}
+            </p>
+            <p className="whitespace-pre-wrap leading-relaxed">
+              <span className="font-medium">任务 · </span>
+              {openWeek.tasks}
+            </p>
+            <p className="whitespace-pre-wrap leading-relaxed text-gray-700">
+              <span className="font-medium text-gray-900">怎么做 · </span>
+              {openWeek.detail || '重新生成方案后可获得本周分步说明'}
+            </p>
+            {openWeek.ownerRole ? (
+              <p className="text-xs text-gray-500">负责角色：{openWeek.ownerRole}</p>
+            ) : null}
+          </DetailModal>
         ) : null}
         {hourly.length ? (
           <div>
@@ -787,7 +1004,7 @@ function ResultPanel({
               <span className="ml-2 font-normal text-gray-500">（仅直播 · {hourly.length} 条）</span>
             </h3>
             <TableShell
-              headers={['日期', '开始', '结束', '任务', '角色', '地点', '产出', '备注']}
+              headers={['日期', '开始', '结束', '任务', '角色', '地点', '操作']}
             >
               {hourly.map((r, i) => (
                 <tr key={`${r.date}-${r.timeStart}-${i}`}>
@@ -797,8 +1014,9 @@ function ResultPanel({
                   <td className="max-w-xs px-3 py-2 text-gray-800">{r.task}</td>
                   <td className="px-3 py-2">{r.ownerRole}</td>
                   <td className="px-3 py-2 text-gray-600">{r.location}</td>
-                  <td className="px-3 py-2 text-gray-600">{r.deliverable}</td>
-                  <td className="max-w-xs px-3 py-2 text-gray-500">{r.notes}</td>
+                  <td className="px-3 py-2">
+                    <ViewDetailBtn onClick={() => setHourlyIdx(i)} />
+                  </td>
                 </tr>
               ))}
             </TableShell>
@@ -806,6 +1024,30 @@ function ResultPanel({
         ) : (
           <p className="text-sm text-gray-500">无直播场次时不展示小时排期（阶段/周计划即可）</p>
         )}
+        {openHourly ? (
+          <DetailModal
+            title={`直播排期 · ${openHourly.date} ${openHourly.timeStart}-${openHourly.timeEnd}`}
+            subtitle={openHourly.location || undefined}
+            onClose={() => setHourlyIdx(null)}
+          >
+            <p>
+              <span className="font-medium">任务 · </span>
+              {openHourly.task}
+            </p>
+            <p>
+              <span className="font-medium">角色 · </span>
+              {openHourly.ownerRole || '—'}
+            </p>
+            <p>
+              <span className="font-medium">产出 · </span>
+              {openHourly.deliverable || '—'}
+            </p>
+            <p className="whitespace-pre-wrap text-gray-700">
+              <span className="font-medium text-gray-900">备注 / 场控要点 · </span>
+              {openHourly.notes || '—'}
+            </p>
+          </DetailModal>
+        ) : null}
       </div>
     )
   }
@@ -1413,11 +1655,12 @@ export default function AiOpsPlanPage() {
         setErr(r.message)
         return
       }
-      const planFixed = ensureMarketingRoiFallback(r.plan, {
+      const planFixed = enrichAiOpsPlanPostProcess(r.plan, {
         industryPath: input.industryPath,
         margins: input.margins,
         periodStart: input.periodStart,
         periodEnd: input.periodEnd,
+        platforms: input.platforms,
       })
       setPlan(planFixed)
       setTab('ops')
@@ -2151,7 +2394,7 @@ export default function AiOpsPlanPage() {
                         {
                           const n = normalizeAiOpsPlanResult(h.plan) || h.plan
                           setPlan(
-                            ensureMarketingRoiFallback(n, {
+                            enrichAiOpsPlanPostProcess(n, {
                               industryPath:
                                 editIntel.industryPath || intel.industryPath || undefined,
                               margins: {
@@ -2161,6 +2404,7 @@ export default function AiOpsPlanPage() {
                               },
                               periodStart: h.periodStart || periodStart,
                               periodEnd: h.periodEnd || periodEnd,
+                              platforms: h.platforms?.length ? h.platforms.map(String) : platforms,
                             }),
                           )
                         }

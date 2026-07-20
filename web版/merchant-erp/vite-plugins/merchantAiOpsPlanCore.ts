@@ -3,7 +3,7 @@
  */
 import {
   buildAiOpsRoiLookupForPrompt,
-  ensureMarketingRoiFallback,
+  enrichAiOpsPlanPostProcess,
   isAiOpsPlanResultUsable,
   normalizeAiOpsPlanResult,
   type AiOpsPlanResult,
@@ -69,26 +69,60 @@ const SYSTEM_PROMPT = `你是资深本地生活/餐饮多平台运营总监，�
 只输出一个 JSON 对象（不要 Markdown），结构必须为：
 {
   "opsPlan": {
-    "background": "门店与商圈背景 2～4 句",
+    "background": "门店与商圈背景摘要（≤80字）",
+    "backgroundDetail": "背景详情≥4句：门店数/商圈/品类优势/竞争格局/本次活动动机",
     "positioning": "一句话定位",
-    "targetAudience": "核心人群画像",
-    "goals": ["可量化目标1","目标2","目标3"],
+    "activities": "活动主题与玩法摘要",
+    "activitiesDetail": "活动详情：主题、玩法机制、节奏（种草→转化→复购）、主推套餐与权益",
+    "targetAudience": "核心人群摘要",
+    "audienceDetail": "人群详情：年龄段、场景（约会/家庭等）、消费动机、决策链路",
+    "goals": ["可量化目标1（须含客单×单量推导的核销GMV）","目标2","目标3"],
+    "goalsDetail": [{
+      "metric":"抖音短视频核销GMV",
+      "target":"≥¥xxx（客单约¥AOV×约N单）",
+      "rationale":"测算说明",
+      "gmvYuan":数字,
+      "orders":数字,
+      "aovYuan":数字
+    }],
     "contentPillars": ["内容支柱1","内容支柱2"],
     "monthlyThemes": ["月主题1","主题2"],
     "platformStrategy": [{
       "platform":"抖音",
-      "approach":"打法（≥40字）",
+      "approach":"打法摘要",
       "contentTypes":"内容形态",
       "publishFreq":"发布频次",
       "kpi":"KPI",
-      "examples":"选题示例"
+      "examples":"选题示例",
+      "detail":"该平台怎么做：选题池、达人分层、发布节奏、投流策略（≥80字）"
     }],
     "risks": ["风险与对策"]
   },
   "executionPlan": {
     "overview": "执行总览",
-    "phases": [{"phase":"阶段","dateRange":"YYYY-MM-DD～YYYY-MM-DD","actions":"动作","ownerRole":"角色","deliverable":"产出","successMetric":"指标","detailItems":[{"day":"YYYY-MM-DD","task":"当日任务","ownerRole":"角色","deliverable":"产出"}]}],
-    "weeklyActions": [{"week":"第1周","dateRange":"YYYY-MM-DD～YYYY-MM-DD","focus":"重点","tasks":"任务","ownerRole":"角色"}],
+    "phases": [{
+      "phase":"阶段",
+      "dateRange":"YYYY-MM-DD～YYYY-MM-DD",
+      "actions":"动作摘要",
+      "ownerRole":"角色",
+      "deliverable":"产出",
+      "successMetric":"指标",
+      "detailItems":[{
+        "day":"YYYY-MM-DD",
+        "task":"当日任务（做什么）",
+        "howTo":"怎么做：步骤/标准/协作方",
+        "ownerRole":"角色",
+        "deliverable":"产出"
+      }]
+    }],
+    "weeklyActions": [{
+      "week":"第1周",
+      "dateRange":"YYYY-MM-DD～YYYY-MM-DD",
+      "focus":"重点",
+      "tasks":"任务摘要",
+      "ownerRole":"角色",
+      "detail":"本周怎么做：关键节点、协作与验收标准"
+    }],
     "hourlySchedule": [{
       "scene":"live",
       "date":"YYYY-MM-DD",
@@ -113,12 +147,20 @@ const SYSTEM_PROMPT = `你是资深本地生活/餐饮多平台运营总监，�
       "expectedOrders":数字,
       "roi":数字,
       "paybackDays":数字,
-      "note":"行业转化区间+周期合计GMV口径说明"
+      "note":"行业转化区间+客单×单量+周期合计GMV口径说明"
     }],
     "assumptions":"预算假设"
   },
   "calendar": {
-    "milestones": [{"date":"YYYY-MM-DD","time":"","item":"事项","dependency":"依赖","ownerRole":"角色","statusHint":"建议"}]
+    "milestones": [{
+      "date":"YYYY-MM-DD",
+      "time":"HH:mm",
+      "kind":"collab_confirm|talent_list|shoot_start|shoot_end|merchant_video_confirm|video_publish|live_confirm|live_talent_script|live_warmup|live_go|other",
+      "item":"事项",
+      "dependency":"依赖",
+      "ownerRole":"角色",
+      "statusHint":"建议"
+    }]
   },
   "talentBudget": {
     "budgetLines": [{
@@ -152,15 +194,15 @@ const SYSTEM_PROMPT = `你是资深本地生活/餐饮多平台运营总监，�
 1. 只基于用户提供的菜单价目/已上架套餐/毛利/类目/竞品/预算/平台/门店范围；无菜单时用「已上架套餐」清单组品，勿编造菜名。多门店时方案须覆盖所选门店（或注明分店差异）。
 2. marketingBudget.channels 合计≈totalBudget（误差≤5%）；须含 roiSummary + roiAnalysis（≥3 行，含投入/预计GMV/订单/ROI/回本天数）。
 3. talentBudget.budgetLines 必须细致：至少覆盖「短视频达人（按头部/腰部/尾部分行写人数与单价）」「短视频本地推预算」「直播达人预算」「直播投流预算」；subtotalYuan=人数×单价+投流（投流类可 headcount=0）。
-4. calendar.milestones 日期落在周期内，≥8 条；非直播事项 time 可留空。
-5. platformStrategy 仅用户勾选平台。
+4. calendar.milestones 日期落在周期内，≥12 条；必须覆盖 kind：collab_confirm、talent_list、shoot_start、shoot_end、merchant_video_confirm、video_publish、live_confirm、live_talent_script、live_warmup、live_go；video_publish/live_* 必须带具体 time（HH:mm）；发布时间按平台×类目高峰窗口填写。
+5. platformStrategy 仅用户勾选平台；每行须有 detail。
 6. 组品 3～6 个，优先真实菜单名或已上架套餐名。
-7. 【执行时间粒度】phases/weeklyActions 用日/周即可；hourlySchedule 仅允许 scene="live" 的直播相关任务（开播、场控、直播投流盯盘等），禁止给拍摄/剪辑/上架等非直播事项写小时。无直播计划时可输出空数组 []。
-8. 短视频的 publishWindow 用「工作日/周末 上午/晚间」等粗粒度；仅直播行可写具体 HH:mm。
-9. phases≥3、weeklyActions 覆盖每周、goals≥3；每个 phase 必须带 detailItems（≥2 条日粒度任务）。
+7. 【执行时间粒度】phases/weeklyActions 用日/周即可；hourlySchedule 仅允许 scene="live" 的直播相关任务；无直播计划时可输出空数组 []。
+8. 短视频的 publishWindow 可用粗粒度；calendar 中 video_publish 必须写具体 HH:mm。
+9. phases≥3、weeklyActions 覆盖每周、goals≥3；每个 phase 的 detailItems≥4，且每条必须含 howTo（怎么做）。
 10. 【ROI 事实依据】roiAnalysis[].note 与 assumptions 禁止写「假设转化率」；必须按平台给出行业中位核销转化区间并简述依据：抖音短视频达人 2.5%～6%、抖音本地推 1.8%～3.5%、抖音直播 8%～15%、小红书 0.9%～2.4%、美团/点评搜索场 5%～12%、快手 2%～5%、视频号 1.5%～4%。
-11. 【ROI 口径写死】expectedGmvYuan=活动周期总 GMV（不是每天）；roi 字段填毛利 ROI=(周期GMV×对应平台品类毛利率)÷投入；paybackDays=投入÷日均毛利=投入×活动天数÷(周期GMV×毛利率)。禁止把行业经验回本天数原样填进 paybackDays 而与投入/GMV/毛利不一致。
-12. 输出须紧凑完整：字段值简洁，避免冗长复述，确保 JSON 可一次完整返回。`
+11. 【ROI/GMV 口径写死】expectedGmvYuan=活动周期总 GMV（不是每天）=客单×预估单量；必须 ≥ max(投入×行业GMV投产中位, 投入÷品类毛利率×1.2)，禁止出现「核销GMV≤总预算」导致商家亏损；roi=毛利ROI=(周期GMV×毛利率)÷投入；paybackDays=投入×活动天数÷(周期GMV×毛利率)。goals / goalsDetail 中的核销GMV必须与 roiAnalysis 同量级。
+12. 列表摘要可短，但 backgroundDetail / activitiesDetail / audienceDetail / platformStrategy.detail / detailItems.howTo / weeklyActions.detail / goalsDetail.rationale 必须可执行、写清步骤与标准；确保 JSON 一次完整返回。`
 
 async function enrichCombosFromProductPlan(
   plan: AiOpsPlanResult,
@@ -308,7 +350,7 @@ export async function runAiOpsPlanCore(
     body.competitorSummary ? `竞品摘要：\n${body.competitorSummary}` : '',
     body.goalsNote ? `商家补充目标：${body.goalsNote}` : '',
     buildAiOpsRoiLookupForPrompt(platforms, body.industryPath),
-    '请生成完整六块方案 JSON（字段简洁）；roiAnalysis 必须按上方【转化率查询结果】测算 GMV/订单/ROI，说明列写清平台×类目转化区间，禁止「假设转化率」；须含 budgetLines；hourlySchedule 仅直播。',
+    '请生成完整六块方案 JSON；roiAnalysis 必须按上方【转化率查询结果】测算 GMV/订单/ROI（客单×单量），且核销GMV须覆盖毛利盈亏线（≥投入÷毛利率×1.2），禁止目标GMV低于预算；goalsDetail 与 roiAnalysis 对齐；须含 budgetLines、Detail/howTo、≥12 条带 kind 的日历节点；hourlySchedule 仅直播。',
   ]
     .filter(Boolean)
     .join('\n\n')
@@ -359,11 +401,12 @@ export async function runAiOpsPlanCore(
       }
     }
 
-    plan = ensureMarketingRoiFallback(plan, {
+    plan = enrichAiOpsPlanPostProcess(plan, {
       industryPath: body.industryPath,
       margins: body.margins,
       periodStart,
       periodEnd,
+      platforms,
     })
 
     plan = await enrichCombosFromProductPlan(

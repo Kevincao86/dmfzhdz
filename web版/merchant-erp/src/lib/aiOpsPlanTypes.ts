@@ -7,6 +7,8 @@ export type AiOpsPlanPlatformStrategy = {
   publishFreq: string
   kpi: string
   examples: string
+  /** 分平台策略展开详情 */
+  detail: string
 }
 
 export type AiOpsPlanPhaseDetailItem = {
@@ -14,6 +16,8 @@ export type AiOpsPlanPhaseDetailItem = {
   task: string
   ownerRole: string
   deliverable: string
+  /** 怎么做：步骤 / 标准 / 协作方 */
+  howTo: string
 }
 
 export type AiOpsPlanPhase = {
@@ -32,6 +36,44 @@ export type AiOpsPlanWeeklyAction = {
   focus: string
   tasks: string
   ownerRole: string
+  detail: string
+}
+
+export type AiOpsPlanGoalDetail = {
+  metric: string
+  target: string
+  rationale: string
+  gmvYuan: number
+  orders: number
+  aovYuan: number
+}
+
+/** 进度日历必选节点类型 */
+export type AiOpsPlanMilestoneKind =
+  | 'collab_confirm'
+  | 'talent_list'
+  | 'shoot_start'
+  | 'shoot_end'
+  | 'merchant_video_confirm'
+  | 'video_publish'
+  | 'live_confirm'
+  | 'live_talent_script'
+  | 'live_warmup'
+  | 'live_go'
+  | 'other'
+
+export const AI_OPS_MILESTONE_KIND_LABELS: Record<AiOpsPlanMilestoneKind, string> = {
+  collab_confirm: '确认合作时间',
+  talent_list: '运营方达人名单',
+  shoot_start: '探店起拍',
+  shoot_end: '探店截止',
+  merchant_video_confirm: '商家视频确认',
+  video_publish: '视频投放发布',
+  live_confirm: '直播档期确认',
+  live_talent_script: '直播达人/口播/福袋确认',
+  live_warmup: '直播预热',
+  live_go: '正式开播',
+  other: '其它',
 }
 
 /** 仅直播场景需要小时级 */
@@ -73,6 +115,7 @@ export type AiOpsPlanMilestone = {
   dependency: string
   ownerRole: string
   statusHint: string
+  kind: AiOpsPlanMilestoneKind
 }
 
 export type AiOpsPlanTalentRow = {
@@ -113,9 +156,15 @@ export type AiOpsPlanCombo = {
 export type AiOpsPlanResult = {
   opsPlan: {
     background: string
+    backgroundDetail: string
     positioning: string
+    /** 活动主题/玩法摘要 */
+    activities: string
+    activitiesDetail: string
     targetAudience: string
+    audienceDetail: string
     goals: string[]
+    goalsDetail: AiOpsPlanGoalDetail[]
     contentPillars: string[]
     monthlyThemes: string[]
     platformStrategy: AiOpsPlanPlatformStrategy[]
@@ -580,6 +629,99 @@ function asStrArr(v: unknown): string[] {
   return v.map(asStr).filter(Boolean).slice(0, 40)
 }
 
+const MILESTONE_KIND_SET = new Set<string>([
+  'collab_confirm',
+  'talent_list',
+  'shoot_start',
+  'shoot_end',
+  'merchant_video_confirm',
+  'video_publish',
+  'live_confirm',
+  'live_talent_script',
+  'live_warmup',
+  'live_go',
+  'other',
+])
+
+export function normalizeMilestoneKind(raw: unknown, itemText = ''): AiOpsPlanMilestoneKind {
+  const k = asStr(raw).toLowerCase().replace(/-/g, '_')
+  if (MILESTONE_KIND_SET.has(k)) return k as AiOpsPlanMilestoneKind
+  const t = itemText
+  if (/确认合作|合作时间|签约确认/.test(t)) return 'collab_confirm'
+  if (/达人名单|合作达人|人选确认/.test(t)) return 'talent_list'
+  if (/探店起|首次探店|开拍|拍摄启动/.test(t)) return 'shoot_start'
+  if (/探店止|探店结束|拍摄截止|成片交付/.test(t)) return 'shoot_end'
+  if (/视频确认|成片确认|商家确认/.test(t)) return 'merchant_video_confirm'
+  if (/发布|投放|上线短视频|笔记上线/.test(t)) return 'video_publish'
+  if (/直播确认|档期确认|直播排期确认/.test(t)) return 'live_confirm'
+  if (/口播|福袋|直播达人确认|脚本确认/.test(t)) return 'live_talent_script'
+  if (/预热/.test(t)) return 'live_warmup'
+  if (/开播|首场直播|正式直播/.test(t)) return 'live_go'
+  return 'other'
+}
+
+/** 按类目×平台给出短视频高峰发布时间（HH:mm） */
+export function resolveAiOpsPublishWindows(
+  platform: string,
+  industryPath?: string,
+): { times: string[]; reason: string } {
+  const p = platform || '抖音'
+  const path = industryPath || ''
+  const isDining = /餐饮|美食|火锅|烧烤|饮品|咖啡|茶饮|小吃|正餐/.test(path)
+  const isLeisure = /休闲|娱乐|足疗|按摩|影院|电影|洗浴|美容|美发|丽人|到店/.test(path)
+  const peak = isDining || isLeisure
+  if (/小红书|种草|笔记/.test(p)) {
+    return {
+      times: peak ? ['12:00', '20:00'] : ['19:30'],
+      reason: peak
+        ? '小红书到店类目午间/晚间种草高峰，利于收藏与到店决策'
+        : '小红书通用晚高峰曝光窗口',
+    }
+  }
+  if (/美团|点评|大众点评/.test(p)) {
+    return {
+      times: peak ? ['10:30', '18:00'] : ['12:00', '18:00'],
+      reason: '点评/美团搜索与到店决策高峰，利于评价与核销转化',
+    }
+  }
+  if (/快手/.test(p)) {
+    return {
+      times: peak ? ['12:00', '19:30'] : ['19:30'],
+      reason: '快手同城内容晚高峰曝光更集中',
+    }
+  }
+  if (/微信|视频号/.test(p)) {
+    return {
+      times: ['12:00', '20:30'],
+      reason: '视频号私域+晚间刷流窗口，利于转发与复购',
+    }
+  }
+  // 抖音默认
+  return {
+    times: peak ? ['11:30', '17:30', '19:30'] : ['12:00', '19:30'],
+    reason: peak
+      ? '抖音到店/餐饮午高峰与下班后刷流峰值，利于团购曝光与核销'
+      : '抖音短视频通用午晚高峰窗口',
+  }
+}
+
+function addDaysIso(iso: string, days: number): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso.trim())
+  if (!m) return iso
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])))
+  d.setUTCDate(d.getUTCDate() + days)
+  const y = d.getUTCFullYear()
+  const mo = String(d.getUTCMonth() + 1).padStart(2, '0')
+  const da = String(d.getUTCDate()).padStart(2, '0')
+  return `${y}-${mo}-${da}`
+}
+
+function clampIsoInPeriod(iso: string, start: string, end: string): string {
+  if (iso < start) return start
+  if (iso > end) return end
+  return iso
+}
+
 /** 宽松解析模型 JSON → 六块结构（缺字段补空） */
 export function normalizeAiOpsPlanResult(raw: unknown): AiOpsPlanResult | null {
   if (!raw || typeof raw !== 'object') return null
@@ -639,13 +781,34 @@ export function normalizeAiOpsPlanResult(raw: unknown): AiOpsPlanResult | null {
       ? budget!.roi_analysis
       : []
   const combosRaw = Array.isArray(board?.combos) ? board!.combos : []
+  const goalsDetailRaw = Array.isArray(ops?.goalsDetail)
+    ? ops!.goalsDetail
+    : Array.isArray(ops?.goals_detail)
+      ? ops!.goals_detail
+      : []
 
   return {
     opsPlan: {
       background: asStr(ops?.background),
+      backgroundDetail: asStr(ops?.backgroundDetail ?? ops?.background_detail),
       positioning: asStr(ops?.positioning),
+      activities: asStr(ops?.activities ?? ops?.activity),
+      activitiesDetail: asStr(ops?.activitiesDetail ?? ops?.activities_detail),
       targetAudience: asStr(ops?.targetAudience ?? ops?.target_audience),
+      audienceDetail: asStr(ops?.audienceDetail ?? ops?.audience_detail),
       goals: asStrArr(ops?.goals),
+      goalsDetail: goalsDetailRaw
+        .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
+        .map((g) => ({
+          metric: asStr(g.metric ?? g.name),
+          target: asStr(g.target ?? g.value),
+          rationale: asStr(g.rationale ?? g.note),
+          gmvYuan: asNum(g.gmvYuan ?? g.gmv_yuan ?? g.gmv),
+          orders: asNum(g.orders ?? g.expectedOrders),
+          aovYuan: asNum(g.aovYuan ?? g.aov_yuan ?? g.aov),
+        }))
+        .filter((g) => g.metric || g.target)
+        .slice(0, 20),
       contentPillars: asStrArr(ops?.contentPillars ?? ops?.content_pillars),
       monthlyThemes: asStrArr(ops?.monthlyThemes ?? ops?.monthly_themes),
       platformStrategy: platformStrategyRaw
@@ -657,6 +820,7 @@ export function normalizeAiOpsPlanResult(raw: unknown): AiOpsPlanResult | null {
           publishFreq: asStr(r.publishFreq ?? r.publish_freq),
           kpi: asStr(r.kpi),
           examples: asStr(r.examples ?? r.contentExamples),
+          detail: asStr(r.detail ?? r.strategyDetail),
         }))
         .filter((r) => r.platform || r.approach)
         .slice(0, 12),
@@ -688,6 +852,7 @@ export function normalizeAiOpsPlanResult(raw: unknown): AiOpsPlanResult | null {
                 task: asStr(d.task ?? d.item ?? d.actions),
                 ownerRole: asStr(d.ownerRole ?? d.owner_role),
                 deliverable: asStr(d.deliverable),
+                howTo: asStr(d.howTo ?? d.how_to ?? d.steps),
               }))
               .filter((d) => d.day || d.task)
               .slice(0, 40),
@@ -703,6 +868,7 @@ export function normalizeAiOpsPlanResult(raw: unknown): AiOpsPlanResult | null {
           focus: asStr(r.focus),
           tasks: asStr(r.tasks),
           ownerRole: asStr(r.ownerRole ?? r.owner_role),
+          detail: asStr(r.detail ?? r.weekDetail),
         }))
         .filter((r) => r.week || r.focus)
         .slice(0, 24),
@@ -771,9 +937,10 @@ export function normalizeAiOpsPlanResult(raw: unknown): AiOpsPlanResult | null {
           dependency: asStr(r.dependency),
           ownerRole: asStr(r.ownerRole ?? r.owner_role),
           statusHint: asStr(r.statusHint ?? r.status_hint),
+          kind: normalizeMilestoneKind(r.kind ?? r.type, asStr(r.item ?? r.title)),
         }))
         .filter((r) => r.date || r.item)
-        .slice(0, 60),
+        .slice(0, 80),
     },
     talentBudget: {
       talentRows: talentRaw
@@ -868,22 +1035,40 @@ export function ensureMarketingRoiFallback(
     note: string
   }): AiOpsPlanRoiRow => {
     const bench = resolveAiOpsRoiIndustryBench(r.channel, industryPath)
+    const marginPct = resolveChannelMarginPct(r.channel, margins)
     let expectedGmvYuan = r.expectedGmvYuan
     let expectedOrders = r.expectedOrders
-    if (
+
+    const breakEvenGmv =
+      r.investYuan > 0 && marginPct > 0
+        ? Math.round((r.investYuan / (marginPct / 100)) * 1.2)
+        : 0
+    const industryGmv = r.investYuan > 0 ? Math.round(r.investYuan * bench.roiMid) : 0
+    const floorGmv = Math.max(breakEvenGmv, industryGmv)
+
+    const gmvInvestRatio = r.investYuan > 0 ? expectedGmvYuan / r.investYuan : 0
+    const provisional = computeAiOpsRoiMetrics({
+      investYuan: r.investYuan,
+      expectedGmvYuan: Math.max(0, expectedGmvYuan),
+      marginPct,
+      periodDays,
+    })
+    const needRecalc =
       r.investYuan > 0 &&
       (expectedGmvYuan <= 0 ||
         looksLikeAssumedConvNote(r.note) ||
-        expectedGmvYuan / r.investYuan < 0.3 ||
-        expectedGmvYuan / r.investYuan > 20)
-    ) {
-      expectedGmvYuan = Math.round(r.investYuan * bench.roiMid)
+        gmvInvestRatio < 1.5 ||
+        gmvInvestRatio > 20 ||
+        provisional.marginRoi < 1 ||
+        (floorGmv > 0 && expectedGmvYuan < floorGmv))
+
+    if (needRecalc && floorGmv > 0) {
+      expectedGmvYuan = floorGmv
       expectedOrders = Math.max(1, Math.round(expectedGmvYuan / bench.aovYuan))
     } else if (expectedOrders <= 0 && expectedGmvYuan > 0) {
       expectedOrders = Math.max(1, Math.round(expectedGmvYuan / bench.aovYuan))
     }
 
-    const marginPct = resolveChannelMarginPct(r.channel, margins)
     const m = computeAiOpsRoiMetrics({
       investYuan: r.investYuan,
       expectedGmvYuan,
@@ -904,8 +1089,9 @@ export function ensureMarketingRoiFallback(
           : `${cleanedNote}；依据：${evidence}`
     const note =
       `${baseNote}；口径：周期合计GMV（非日GMV）¥${expectedGmvYuan.toLocaleString('zh-CN')}` +
+      `≈客单¥${bench.aovYuan}×约${expectedOrders}单` +
       `×品类毛利${marginPct}%→预计毛利¥${m.grossProfitYuan.toLocaleString('zh-CN')}` +
-      `；毛利ROI=${m.marginRoi}（GMV投产=${m.gmvRoi}）` +
+      `；毛利ROI=${m.marginRoi}（GMV投产=${m.gmvRoi}；盈亏线×1.2≈¥${breakEvenGmv.toLocaleString('zh-CN')}）` +
       `；回本=投入÷日均毛利≈${m.paybackDays || '—'}天（活动${periodDays}天）`
 
     return {
@@ -994,16 +1180,299 @@ export function ensureMarketingRoiFallback(
   }
 }
 
+export type AiOpsPlanEnrichOpts = {
+  industryPath?: string
+  margins?: AiOpsPlatformMargins | null
+  periodStart?: string
+  periodEnd?: string
+  platforms?: string[]
+}
+
+/** 将运营目标中的核销 GMV 与 roiAnalysis 对齐（客单×单量） */
+export function alignOpsPlanGoalsToRoi(
+  plan: AiOpsPlanResult,
+  opts?: AiOpsPlanEnrichOpts,
+): AiOpsPlanResult {
+  const industryPath = opts?.industryPath?.trim() || undefined
+  const rows = plan.marketingBudget.roiAnalysis || []
+  if (!rows.length) return plan
+
+  const goalsDetail: AiOpsPlanGoalDetail[] = rows.map((r) => {
+    const bench = resolveAiOpsRoiIndustryBench(r.channel, industryPath)
+    const aov = bench.aovYuan
+    const orders =
+      r.expectedOrders > 0 ? r.expectedOrders : Math.max(1, Math.round(r.expectedGmvYuan / aov))
+    const gmv = r.expectedGmvYuan
+    return {
+      metric: `${r.channel}核销GMV`,
+      target: `≥ ¥${gmv.toLocaleString('zh-CN')}（客单约¥${aov} × 约 ${orders} 单）`,
+      rationale:
+        `按投入 ¥${r.investYuan.toLocaleString('zh-CN')}、行业GMV投产中位与毛利盈亏线（≥投入÷毛利率×1.2）取高测算；` +
+        `禁止目标核销GMV低于投放预算导致商家亏损。毛利ROI≈${r.roi}。`,
+      gmvYuan: gmv,
+      orders,
+      aovYuan: aov,
+    }
+  })
+
+  const totalGmv = rows.reduce((s, r) => s + r.expectedGmvYuan, 0)
+  const totalOrders = rows.reduce((s, r) => s + (r.expectedOrders || 0), 0)
+  const avgAov =
+    totalOrders > 0
+      ? Math.round(totalGmv / totalOrders)
+      : resolveAiOpsRoiIndustryBench(rows[0]?.channel || '抖音', industryPath).aovYuan
+  goalsDetail.push({
+    metric: '活动周期合计核销GMV',
+    target: `≥ ¥${Math.round(totalGmv).toLocaleString('zh-CN')}（综合客单约¥${avgAov} × 约 ${totalOrders} 单）`,
+    rationale: plan.marketingBudget.roiSummary || '分渠道测算合计；须覆盖投放成本对应的毛利盈亏线。',
+    gmvYuan: Math.round(totalGmv),
+    orders: totalOrders,
+    aovYuan: avgAov,
+  })
+
+  const gmvGoalLines = goalsDetail.map((g) => `${g.metric} ${g.target}`)
+  const keptGoals = (plan.opsPlan.goals || []).filter(
+    (g) => !/核销\s*GMV|GMV\s*[≥>=]|预计\s*GMV|成交额|核销额/i.test(g),
+  )
+  const goals = [...gmvGoalLines, ...keptGoals].slice(0, 12)
+
+  const nonGmvExisting = (plan.opsPlan.goalsDetail || []).filter(
+    (g) => g.gmvYuan <= 0 && !/核销\s*GMV|GMV/i.test(g.metric),
+  )
+
+  return {
+    ...plan,
+    opsPlan: {
+      ...plan.opsPlan,
+      goals,
+      goalsDetail: [...goalsDetail, ...nonGmvExisting].slice(0, 20),
+    },
+  }
+}
+
+const REQUIRED_MILESTONE_KINDS: AiOpsPlanMilestoneKind[] = [
+  'collab_confirm',
+  'talent_list',
+  'shoot_start',
+  'shoot_end',
+  'merchant_video_confirm',
+  'video_publish',
+  'live_confirm',
+  'live_talent_script',
+  'live_warmup',
+  'live_go',
+]
+
+/** 补齐必选进度节点与类目高峰发布时间 */
+export function ensureCalendarMilestones(
+  plan: AiOpsPlanResult,
+  opts?: AiOpsPlanEnrichOpts,
+): AiOpsPlanResult {
+  const start = (opts?.periodStart || '').trim()
+  const end = (opts?.periodEnd || '').trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) {
+    return plan
+  }
+  const industryPath = opts?.industryPath?.trim() || undefined
+  const platforms =
+    opts?.platforms?.length
+      ? opts.platforms
+      : plan.opsPlan.platformStrategy.map((p) => p.platform).filter(Boolean)
+  const primaryPlat = platforms[0] || '抖音'
+  const publishWin = resolveAiOpsPublishWindows(primaryPlat, industryPath)
+  const days = Math.max(1, aiOpsPeriodDays(start, end))
+
+  const existing = [...(plan.calendar.milestones || [])].map((m) => ({
+    ...m,
+    kind: m.kind || normalizeMilestoneKind(m.kind, m.item),
+  }))
+  const have = new Set<string>(
+    existing.map((m) => m.kind).filter((k) => k && k !== 'other'),
+  )
+
+  const templates: Array<{
+    kind: AiOpsPlanMilestoneKind
+    offset: number
+    time: string
+    item: string
+    dependency: string
+    ownerRole: string
+    statusHint: string
+  }> = [
+    {
+      kind: 'collab_confirm',
+      offset: 0,
+      time: '11:00',
+      item: '确认合作时间与档期（商家×运营方）',
+      dependency: '签约/预算确认',
+      ownerRole: '运营负责人',
+      statusHint: '书面确认探店与直播窗口',
+    },
+    {
+      kind: 'talent_list',
+      offset: Math.min(2, days - 1),
+      time: '15:00',
+      item: '运营方给出达人名单并锁定人选',
+      dependency: '确认合作时间',
+      ownerRole: '运营/媒介',
+      statusHint: '含层级、报价、内容形式',
+    },
+    {
+      kind: 'shoot_start',
+      offset: Math.min(3, Math.max(1, Math.floor(days * 0.12))),
+      time: '14:00',
+      item: '探店拍摄起止：开始日（到店拍摄）',
+      dependency: '达人名单确认',
+      ownerRole: '达人/拍摄',
+      statusHint: '商家备场、出餐样片',
+    },
+    {
+      kind: 'shoot_end',
+      offset: Math.min(Math.max(5, Math.floor(days * 0.28)), days - 1),
+      time: '18:00',
+      item: '探店拍摄起止：结束日（成片交付）',
+      dependency: '探店开拍',
+      ownerRole: '达人/剪辑',
+      statusHint: '交付可审成片',
+    },
+    {
+      kind: 'merchant_video_confirm',
+      offset: Math.min(Math.max(6, Math.floor(days * 0.32)), days - 1),
+      time: '16:00',
+      item: '商家视频确认（口播、字幕、套餐露出）',
+      dependency: '成片交付',
+      ownerRole: '商家运营',
+      statusHint: '书面确认后才可投放',
+    },
+    {
+      kind: 'video_publish',
+      offset: Math.min(Math.max(7, Math.floor(days * 0.38)), days - 1),
+      time: publishWin.times[0] || '19:30',
+      item: `${primaryPlat}视频投放发布（${publishWin.times.join('/')} 高峰窗口；${publishWin.reason}）`,
+      dependency: '商家视频确认',
+      ownerRole: '达人/运营',
+      statusHint: '按类目最大曝光窗口发布',
+    },
+    {
+      kind: 'live_confirm',
+      offset: Math.min(Math.max(10, Math.floor(days * 0.55)), days - 1),
+      time: '11:00',
+      item: '直播档期确认（门店/设备/主播）',
+      dependency: '短视频起量复盘',
+      ownerRole: '直播运营',
+      statusHint: '锁定开播日与时长',
+    },
+    {
+      kind: 'live_talent_script',
+      offset: Math.min(Math.max(12, Math.floor(days * 0.62)), days - 1),
+      time: '15:00',
+      item: '直播达人确认：口播稿、福袋、专属券',
+      dependency: '直播档期确认',
+      ownerRole: '直播运营/达人',
+      statusHint: '口播稿与福袋规则书面确认',
+    },
+    {
+      kind: 'live_warmup',
+      offset: Math.min(Math.max(14, Math.floor(days * 0.72)), days - 1),
+      time: '12:00',
+      item: '直播预热（短视频预告+社群/门店物料）',
+      dependency: '口播稿/福袋确认',
+      ownerRole: '运营',
+      statusHint: '预热至少提前 48 小时',
+    },
+    {
+      kind: 'live_go',
+      offset: Math.min(Math.max(16, Math.floor(days * 0.85)), days - 1),
+      time: '19:00',
+      item: '正式开播带货',
+      dependency: '直播预热完成',
+      ownerRole: '直播运营',
+      statusHint: '场控+投流盯盘',
+    },
+  ]
+
+  const extras: AiOpsPlanMilestone[] = []
+  for (const t of templates) {
+    if (have.has(t.kind)) continue
+    if (!REQUIRED_MILESTONE_KINDS.includes(t.kind)) continue
+    const date = clampIsoInPeriod(addDaysIso(start, t.offset), start, end)
+    extras.push({
+      date,
+      time: t.time,
+      item: t.item,
+      dependency: t.dependency,
+      ownerRole: t.ownerRole,
+      statusHint: t.statusHint,
+      kind: t.kind,
+    })
+    have.add(t.kind)
+  }
+
+  // 若已有 video_publish 但无具体时间，补上高峰时刻
+  const patched = existing.map((m) => {
+    if (m.kind === 'video_publish' && !m.time) {
+      return {
+        ...m,
+        time: publishWin.times[0] || '19:30',
+        item: m.item.includes('高峰')
+          ? m.item
+          : `${m.item}（建议 ${publishWin.times.join('/')}；${publishWin.reason}）`,
+      }
+    }
+    return m
+  })
+
+  const milestones = [...patched, ...extras]
+    .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))
+    .slice(0, 80)
+
+  return {
+    ...plan,
+    calendar: { milestones },
+  }
+}
+
+/** 服务端/客户端统一后处理：ROI → 目标对齐 → 日历补全 */
+export function enrichAiOpsPlanPostProcess(
+  plan: AiOpsPlanResult,
+  opts?: AiOpsPlanEnrichOpts,
+): AiOpsPlanResult {
+  let next = ensureMarketingRoiFallback(plan, opts)
+  next = alignOpsPlanGoalsToRoi(next, opts)
+  next = ensureCalendarMilestones(next, opts)
+  return next
+}
+
 export function aiOpsPlanToMarkdown(plan: AiOpsPlanResult, meta?: { title?: string }): string {
   const lines: string[] = []
   if (meta?.title) lines.push(`# ${meta.title}`, '')
   lines.push('## 1. 运营方案', '')
   if (plan.opsPlan.background) lines.push(`**背景：** ${plan.opsPlan.background}`, '')
+  if (plan.opsPlan.backgroundDetail) {
+    lines.push('**背景详情：**', plan.opsPlan.backgroundDetail, '')
+  }
   if (plan.opsPlan.positioning) lines.push(`**定位：** ${plan.opsPlan.positioning}`, '')
+  if (plan.opsPlan.activities) lines.push(`**活动：** ${plan.opsPlan.activities}`, '')
+  if (plan.opsPlan.activitiesDetail) {
+    lines.push('**活动详情：**', plan.opsPlan.activitiesDetail, '')
+  }
   if (plan.opsPlan.targetAudience) lines.push(`**人群：** ${plan.opsPlan.targetAudience}`, '')
+  if (plan.opsPlan.audienceDetail) {
+    lines.push('**人群详情：**', plan.opsPlan.audienceDetail, '')
+  }
   if (plan.opsPlan.goals.length) {
     lines.push('**目标：**')
     for (const g of plan.opsPlan.goals) lines.push(`- ${g}`)
+    lines.push('')
+  }
+  if (plan.opsPlan.goalsDetail.length) {
+    lines.push('### 目标明细（客单×单量）', '')
+    lines.push('| 指标 | 目标 | 客单 | 订单 | GMV | 测算说明 |', '| --- | --- | --- | --- | --- | --- |')
+    for (const g of plan.opsPlan.goalsDetail) {
+      lines.push(
+        `| ${g.metric} | ${g.target} | ${g.aovYuan || '—'} | ${g.orders || '—'} | ${g.gmvYuan || '—'} | ${g.rationale} |`,
+      )
+    }
     lines.push('')
   }
   if (plan.opsPlan.contentPillars.length) {
@@ -1018,6 +1487,7 @@ export function aiOpsPlanToMarkdown(plan: AiOpsPlanResult, meta?: { title?: stri
       lines.push(
         `| ${r.platform} | ${r.approach} | ${r.contentTypes} | ${r.publishFreq} | ${r.kpi} | ${r.examples} |`,
       )
+      if (r.detail) lines.push(`- **${r.platform} 策略详情：** ${r.detail}`)
     }
     lines.push('')
   }
@@ -1035,6 +1505,16 @@ export function aiOpsPlanToMarkdown(plan: AiOpsPlanResult, meta?: { title?: stri
       lines.push(
         `| ${r.phase} | ${r.dateRange} | ${r.actions} | ${r.ownerRole} | ${r.deliverable} | ${r.successMetric} |`,
       )
+      if (r.detailItems?.length) {
+        lines.push(`#### ${r.phase} 日任务`)
+        lines.push('| 日期 | 任务 | 怎么做 | 角色 | 产出 |', '| --- | --- | --- | --- | --- |')
+        for (const d of r.detailItems) {
+          lines.push(
+            `| ${d.day} | ${d.task} | ${d.howTo || '—'} | ${d.ownerRole} | ${d.deliverable} |`,
+          )
+        }
+        lines.push('')
+      }
     }
     lines.push('')
   }
@@ -1042,6 +1522,7 @@ export function aiOpsPlanToMarkdown(plan: AiOpsPlanResult, meta?: { title?: stri
     lines.push('| 周次 | 日期 | 重点 | 任务 | 角色 |', '| --- | --- | --- | --- | --- |')
     for (const r of plan.executionPlan.weeklyActions) {
       lines.push(`| ${r.week} | ${r.dateRange} | ${r.focus} | ${r.tasks} | ${r.ownerRole} |`)
+      if (r.detail) lines.push(`- **${r.week} 详情：** ${r.detail}`)
     }
     lines.push('')
   }
@@ -1093,10 +1574,14 @@ export function aiOpsPlanToMarkdown(plan: AiOpsPlanResult, meta?: { title?: stri
 
   lines.push('## 4. 项目进度日历', '')
   if (plan.calendar.milestones.length) {
-    lines.push('| 日期 | 时间 | 事项 | 依赖 | 角色 | 状态建议 |', '| --- | --- | --- | --- | --- | --- |')
+    lines.push(
+      '| 日期 | 时间 | 类型 | 事项 | 依赖 | 角色 | 状态建议 |',
+      '| --- | --- | --- | --- | --- | --- | --- |',
+    )
     for (const r of plan.calendar.milestones) {
+      const kindLabel = AI_OPS_MILESTONE_KIND_LABELS[r.kind] || r.kind || '其它'
       lines.push(
-        `| ${r.date} | ${r.time} | ${r.item} | ${r.dependency} | ${r.ownerRole} | ${r.statusHint} |`,
+        `| ${r.date} | ${r.time} | ${kindLabel} | ${r.item} | ${r.dependency} | ${r.ownerRole} | ${r.statusHint} |`,
       )
     }
     lines.push('')
