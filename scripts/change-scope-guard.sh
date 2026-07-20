@@ -248,6 +248,7 @@ erpAiPointsSpendCore
 mpAiPointsSpendCore
 mpAiPointsSpendSession
 mpAiPointsBuckets
+mpMembershipQuota
 mpAddonPointsSpendClient
 mpAiPointsSpendClient
 mpPointsSpendApi
@@ -261,6 +262,9 @@ meoo-ai-product-plan
 meoo-ai-ops-plan
 meoo-ai-agent-image
 meoo-mp-recruitment-ai
+meoo-mp-recruitment-video-compliance
+meoo-mp-recruitment-script-compliance
+recruitmentVideoComplianceCore
 meoo-tenant-billing
 meoo-ops-mp-auth
 mpCompliancePointsGate

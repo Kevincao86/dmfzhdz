@@ -35,7 +35,6 @@ import {
   type VideoComplianceViolation,
 } from './complianceHitLocations.js'
 import { isRetryableAiProviderError } from './aiProviderRetryableError.js'
-import { mpPointsCostForVideoSeconds } from './mpPointsEconomics.js'
 import { isVisualForceHitPhrase } from './videoVisualRiskTaxonomy.js'
 
 export type VideoComplianceInput = {
@@ -347,17 +346,15 @@ function buildScannedText(
 function videoComplianceBilling(mediaExtract: { durationSec?: number } | null | undefined): {
   durationSec?: number
   videoMinutesBilled?: number
-  pointsCharged?: number
 } {
   const durationSec = mediaExtract?.durationSec
   if (durationSec == null || !Number.isFinite(durationSec) || durationSec <= 0) {
-    return { durationSec: undefined, videoMinutesBilled: undefined, pointsCharged: mpPointsCostForVideoSeconds(1) }
+    return { durationSec: undefined, videoMinutesBilled: undefined }
   }
   const sec = Math.max(1, Math.ceil(durationSec))
   return {
     durationSec: sec,
     videoMinutesBilled: Math.max(1, Math.ceil(sec / 60)),
-    pointsCharged: mpPointsCostForVideoSeconds(sec),
   }
 }
 

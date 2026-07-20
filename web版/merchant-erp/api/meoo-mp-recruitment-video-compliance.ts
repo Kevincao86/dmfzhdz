@@ -18,6 +18,13 @@ import { parseMpBillingRole } from '../src/lib/mpBillingRoleHint.js'
 
 export const config = { maxDuration: 120 }
 
+function readClientDurationSec(body: Record<string, unknown>): number | null {
+  const raw = body.durationSec ?? body.videoDurationSec ?? body.duration
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n <= 0) return null
+  return Math.max(1, Math.ceil(n))
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (handleMerchantApiOptions(req, res)) return
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -47,6 +54,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    const billingRole = parseMpBillingRole(body.billingRole ?? body.libraryRole)
+    const clientDurationSec = readClientDurationSec(body)
+
+    // 客户端时长已知时先拦余额，避免余额不足仍走重 ASR/抽帧
+    if (clientDurationSec != null) {
+      const earlyGate = await requireMpAiPointsAffordable(token, 'video', {
+        durationSec: clientDurationSec,
+        roleHint: billingRole,
+      })
+      if (!earlyGate.ok) {
+        sendPointsGateError(res, sendMerchantJson, earlyGate)
+        return
+      }
+    }
+
     const { runRecruitmentVideoComplianceCheck, preloadVideoComplianceMedia } = await import(
       '../src/lib/recruitmentVideoComplianceCore.js'
     )
@@ -68,8 +90,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const billingSec =
       preloadedMediaExtract?.durationSec != null && Number(preloadedMediaExtract.durationSec) > 0
         ? Math.max(1, Math.ceil(Number(preloadedMediaExtract.durationSec)))
-        : 1
-    const billingRole = parseMpBillingRole(body.billingRole ?? body.libraryRole)
+        : clientDurationSec != null
+          ? clientDurationSec
+          : 1
+
+    // 以实测时长再校验一次（套餐桶+充值桶合计）；不足则不得进入 LLM 检核
     const preciseGate = await requireMpAiPointsAffordable(token, 'video', {
       durationSec: billingSec,
       roleHint: billingRole,
@@ -107,7 +132,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    const durationSec = Number(out.durationSec) || 1
+    const durationSec = Math.max(
+      1,
+      Math.ceil(Number(out.durationSec) || billingSec || clientDurationSec || 1),
+    )
+    if (durationSec > billingSec) {
+      const finalGate = await requireMpAiPointsAffordable(token, 'video', {
+        durationSec,
+        roleHint: billingRole,
+      })
+      if (!finalGate.ok) {
+        sendPointsGateError(res, sendMerchantJson, finalGate)
+        return
+      }
+    }
+
     const spend = await chargeMpAiPointsAfterSuccess(token, 'video', {
       durationSec,
       note: typeof body.mpOrderId === 'string' ? `video:${body.mpOrderId}` : 'video_compliance',
@@ -124,11 +163,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    // 消耗积分仅以真实扣减为准，禁止回传估算值误导前端
     sendMerchantJson(res, 200, {
       ...out,
       pointsCharged: spend.pointsCharged,
       mpAiPointsBalance: spend.newBalance,
       billingKind: 'video' as const,
+      durationSec,
+      videoMinutesBilled: Math.max(1, Math.ceil(durationSec / 60)),
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

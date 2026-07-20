@@ -224,7 +224,7 @@ export type MpQuotaSpendSplit = {
   quotaApplied: boolean
 }
 
-/** 视频：分钟桶；文稿：次桶；Brief 仅校验 boolean 开通，不走次数桶 */
+/** 视频检核：一律积分（参考分钟不抵扣）；文稿：次桶；Brief 仅校验 boolean 开通 */
 export function computeQuotaSpendSplit(
   role: MpLibraryRole,
   kind: MpPointsUsageKind,
@@ -273,15 +273,15 @@ export function computeQuotaSpendSplit(
   }
   if (kind === 'video') {
     const durationSec = Math.max(1, Math.ceil(Number(opts?.durationSec) || 1))
-    const durationMin = durationSec / 60
-    const availableMin = unlimited ? durationMin : Math.max(0, limit - usedBefore)
-    const freeMin = Math.min(availableMin, durationMin)
-    const chargeSec = Math.max(0, durationSec - freeMin * 60)
+    /**
+     * 成片 AI 检核：套餐「参考分钟/月」仅作权益展示，实际一律按积分扣（套餐桶+充值桶）。
+     * 与目录文案「实际按积分扣 / 2 积分/秒」对齐，禁止用参考分钟抵扣后出现「余额不足仍能检核」。
+     */
     return {
       quotaKey,
-      quotaUnitsUsed: freeMin,
-      pointsRequired: chargeSec > 0 ? mpPointsCostForUsage('video', { durationSec: chargeSec }) : 0,
-      quotaApplied: freeMin > 0,
+      quotaUnitsUsed: 0,
+      pointsRequired: mpPointsCostForUsage('video', { durationSec }),
+      quotaApplied: false,
     }
   }
   if (unlimited || usedBefore < limit) {

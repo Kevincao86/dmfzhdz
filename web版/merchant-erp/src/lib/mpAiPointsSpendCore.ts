@@ -222,7 +222,7 @@ export function computeMpAiPointsCharge(
 }
 
 export function formatMpAiPointsInsufficient(balance: number, required: number): string {
-  return `积分不足（当前 ${balance.toLocaleString('zh-CN')}，需要 ${required.toLocaleString('zh-CN')}），请先充值或等待会员赠送积分到账`
+  return `积分不足（当前 ${balance.toLocaleString('zh-CN')}，需要 ${required.toLocaleString('zh-CN')}），请充值积分或升级套餐后再试`
 }
 
 export function spendMpAiPointsWithSnapshot(
