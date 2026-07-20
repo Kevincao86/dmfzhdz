@@ -676,19 +676,17 @@ def build_index(items: list[tuple[str, str, str, int, int]]) -> None:
         by_mod.setdefault(mod, []).append((code, title, href, planned, have))
 
     blocks = [
-        "<!DOCTYPE html><html lang=zh-CN><head><meta charset=utf-8><title>灵祺商家ERP月订阅 · AI生图讲义</title>",
+        "<!DOCTYPE html><html lang=zh-CN><head><meta charset=utf-8><title>灵祺商家ERP月订阅 · 讲义</title>",
         "<style>body{font-family:PingFang SC,Microsoft YaHei,sans-serif;max-width:960px;margin:40px auto;padding:0 20px;background:#0b1220;color:#e2e8f0}",
         "a{color:#5eead4} h1{color:#fff} h2{margin-top:2em;color:#94a3b8;font-size:1rem;text-transform:none}",
-        "li{margin:.45em 0}.ok{color:#34d399}.bad{color:#fbbf24}</style></head><body>",
-        "<h1>灵祺商家ERP月订阅课程 · AI生图讲义</h1>",
+        "li{margin:.45em 0}</style></head><body>",
+        "<h1>灵祺商家ERP月订阅课程 · 讲义</h1>",
         "<p>每课 ≥20 页图片幻灯。打开单课后用 ← → / 空格翻页。</p>",
-        "<p>重新规划：<code>python3 _gen_ai_image_decks.py --plan-only</code>；有图后写 HTML：<code>python3 _gen_ai_image_decks.py --html-only</code></p>",
     ]
     for mod, rows in sorted(by_mod.items()):
         blocks.append(f"<h2>{esc(mod)}</h2><ul>")
         for code, title, href, planned, have in rows:
-            flag = f'<span class="ok">已生图 {have}/{planned}</span>' if have >= MIN_SLIDES else f'<span class="bad">生图中 {have}/{planned}</span>'
-            blocks.append(f'<li><a href="{esc(href)}">{esc(code)} {esc(title)}</a> · {flag}</li>')
+            blocks.append(f'<li><a href="{esc(href)}">{esc(code)} {esc(title)}</a></li>')
         blocks.append("</ul>")
     blocks.append("</body></html>")
     OUT.mkdir(parents=True, exist_ok=True)
