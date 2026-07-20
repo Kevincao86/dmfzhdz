@@ -35,34 +35,36 @@ function extractJsonObject(text: string): Record<string, unknown> {
   return obj
 }
 
-/** 六块方案生成慢，单厂商最长约 120s；解析失败则换下一厂商（勿把空 {} 当成功） */
+/** 六块方案生成慢：单厂商约 90s；最多试 2 家，避免多轮叠加被网关掐断成裸 502 */
 async function llmJson(
   env: Record<string, string>,
   system: string,
   user: string,
 ): Promise<Record<string, unknown>> {
-  return withUpstreamChatTimeoutMs(120_000, async () => {
-    const errors: string[] = []
-    for (const vendor of OPS_PLAN_AI_VENDOR_ORDER) {
-      const out = await merchantChatTextWithVendorFailover(env, system, user, [vendor])
-      if (!out.ok) {
-        if (out.errors?.length) errors.push(...out.errors)
-        else if (out.message) errors.push(out.message)
-        continue
-      }
-      try {
+  const vendors = OPS_PLAN_AI_VENDOR_ORDER.slice(0, 2)
+  const errors: string[] = []
+  for (const vendor of vendors) {
+    try {
+      const obj = await withUpstreamChatTimeoutMs(90_000, async () => {
+        const out = await merchantChatTextWithVendorFailover(env, system, user, [vendor])
+        if (!out.ok) {
+          throw new Error(
+            (out.errors?.length ? out.errors.join('；') : out.message) || `${vendor} 调用失败`,
+          )
+        }
         return extractJsonObject(out.text)
-      } catch (e) {
-        const parseMsg = e instanceof Error ? e.message : String(e)
-        errors.push(`${vendor}: ${parseMsg}`)
-      }
+      })
+      return obj
+    } catch (e) {
+      const parseMsg = e instanceof Error ? e.message : String(e)
+      errors.push(`${vendor}: ${parseMsg}`)
     }
-    throw new Error(
-      errors.length
-        ? `全部模型不可用：${errors.slice(0, 6).join('；')}`
-        : '运营方案模型调用失败',
-    )
-  })
+  }
+  throw new Error(
+    errors.length
+      ? `全部模型不可用：${errors.slice(0, 6).join('；')}`
+      : '运营方案模型调用失败',
+  )
 }
 
 const SYSTEM_PROMPT = `你是资深本地生活/餐饮多平台运营总监，输出可直接落地执行的完整运营方案（对齐「运营方案 / 具体执行方案 / 营销预算 / 项目进度日历 / 达人明细及预算 / 组品货盘」六块）。
@@ -202,7 +204,7 @@ const SYSTEM_PROMPT = `你是资深本地生活/餐饮多平台运营总监，�
 9. phases≥3、weeklyActions 覆盖每周、goals≥3；每个 phase 的 detailItems≥4，且每条必须含 howTo（怎么做）。
 10. 【ROI 事实依据】roiAnalysis[].note 与 assumptions 禁止写「假设转化率」；必须按平台给出行业中位核销转化区间并简述依据：抖音短视频达人 2.5%～6%、抖音本地推 1.8%～3.5%、抖音直播 8%～15%、小红书 0.9%～2.4%、美团/点评搜索场 5%～12%、快手 2%～5%、视频号 1.5%～4%。
 11. 【ROI/GMV 口径写死】expectedGmvYuan=活动周期总 GMV（不是每天）=客单×预估单量；必须 ≥ max(投入×行业GMV投产中位, 投入÷品类毛利率×1.2)，禁止出现「核销GMV≤总预算」导致商家亏损；roi=毛利ROI=(周期GMV×毛利率)÷投入；paybackDays=投入×活动天数÷(周期GMV×毛利率)。goals / goalsDetail 中的核销GMV必须与 roiAnalysis 同量级。
-12. 列表摘要可短，但 backgroundDetail / activitiesDetail / audienceDetail / platformStrategy.detail / detailItems.howTo / weeklyActions.detail / goalsDetail.rationale 必须可执行、写清步骤与标准；确保 JSON 一次完整返回。`
+12. 列表摘要可短；backgroundDetail / activitiesDetail / audienceDetail / platformStrategy.detail / detailItems.howTo / weeklyActions.detail / goalsDetail.rationale 须可执行（每段建议 80～220 字，勿超长复述）；必须一次输出完整可解析 JSON，禁止截断。`
 
 async function enrichCombosFromProductPlan(
   plan: AiOpsPlanResult,
@@ -358,39 +360,23 @@ export async function runAiOpsPlanCore(
   try {
     let obj = await llmJson(aiEnv, SYSTEM_PROMPT, userPrompt)
     let plan = normalizeAiOpsPlanResult(obj)
+    // 仅重试一次；ROI/日历/目标由 enrichAiOpsPlanPostProcess 补齐，不再二次全量 densify（易超时致裸 502）
     if (!plan || !isAiOpsPlanResultUsable(plan)) {
       obj = await llmJson(
         aiEnv,
         SYSTEM_PROMPT,
-        `${userPrompt}\n\n上次输出无效，请严格按 schema 重新输出完整 JSON（字段值尽量短）。`,
+        `${userPrompt}\n\n上次输出无效或 JSON 截断，请严格按 schema 重新输出完整 JSON；Detail/howTo 各段≤200字。`,
       )
       plan = normalizeAiOpsPlanResult(obj)
-    }
-    // 仅在可用方案但 ROI/预算行偏少时补强一次，避免多轮拖垮总时长
-    if (
-      plan &&
-      isAiOpsPlanResultUsable(plan) &&
-      (plan.marketingBudget.roiAnalysis.length < 2 || plan.talentBudget.budgetLines.length < 3)
-    ) {
-      obj = await llmJson(
-        aiEnv,
-        SYSTEM_PROMPT,
-        `${userPrompt}\n\n请补全 roiAnalysis（≥3）与 budgetLines（短视频分层、本地推、直播达人、直播投流），输出完整 JSON。`,
-      )
-      const denser = normalizeAiOpsPlanResult(obj)
-      if (
-        denser &&
-        isAiOpsPlanResultUsable(denser) &&
-        (denser.marketingBudget.roiAnalysis.length > plan.marketingBudget.roiAnalysis.length ||
-          denser.talentBudget.budgetLines.length > plan.talentBudget.budgetLines.length)
-      ) {
-        plan = denser
-      }
     }
     if (!plan || !isAiOpsPlanResultUsable(plan)) {
       return {
         status: 502,
-        body: { ok: false, error: 'ops_plan_parse_failed', message: '方案解析失败，请重试' },
+        body: {
+          ok: false,
+          error: 'ops_plan_parse_failed',
+          message: '方案解析失败，请稍后重试（模型输出不完整）',
+        },
       }
     }
 
@@ -401,27 +387,37 @@ export async function runAiOpsPlanCore(
       }
     }
 
-    plan = enrichAiOpsPlanPostProcess(plan, {
-      industryPath: body.industryPath,
-      margins: body.margins,
-      periodStart,
-      periodEnd,
-      platforms,
-    })
-
-    plan = await enrichCombosFromProductPlan(
-      plan,
-      {
-        storeName: body.storeName,
-        menuSummary: body.menuSummary,
-        margins: body.margins,
+    try {
+      plan = enrichAiOpsPlanPostProcess(plan, {
         industryPath: body.industryPath,
-        competitorSummary: body.competitorSummary,
+        margins: body.margins,
+        periodStart,
+        periodEnd,
         platforms,
-      },
-      authHeader,
-      env,
-    )
+      })
+    } catch (postErr) {
+      console.error(
+        '[meoo-ai-ops-plan] enrichAiOpsPlanPostProcess failed',
+        postErr instanceof Error ? postErr.message : postErr,
+      )
+    }
+
+    // 组品不足时再补；失败忽略。有菜单草稿时优先跳过二次 LLM，降低超时概率
+    if (plan.productBoard.combos.length < 2) {
+      plan = await enrichCombosFromProductPlan(
+        plan,
+        {
+          storeName: body.storeName,
+          menuSummary: body.menuSummary,
+          margins: body.margins,
+          industryPath: body.industryPath,
+          competitorSummary: body.competitorSummary,
+          platforms,
+        },
+        authHeader,
+        env,
+      )
+    }
 
     return {
       status: 200,
@@ -439,9 +435,15 @@ export async function runAiOpsPlanCore(
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
+    console.error('[meoo-ai-ops-plan] failed', msg.slice(0, 400))
     return {
       status: 502,
-      body: { ok: false, error: 'ops_plan_failed', detail: msg.slice(0, 600), message: msg.slice(0, 200) },
+      body: {
+        ok: false,
+        error: 'ops_plan_failed',
+        detail: msg.slice(0, 600),
+        message: msg.slice(0, 200) || '生成失败，请稍后重试',
+      },
     }
   }
 }

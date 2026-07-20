@@ -67,8 +67,15 @@ export async function generateAiOpsPlan(
       lastErr = '方案内容不完整，请重试'
       continue
     }
-    const msg = String(json?.message || json?.detail || json?.error || `HTTP ${res.status}`).trim()
-    lastErr = msg || lastErr
+    if (res.status === 502 || res.status === 504) {
+      const soft = String(json?.message || json?.detail || '').trim()
+      lastErr =
+        soft ||
+        '生成超时或服务暂时中断（常见于部署重启/模型过慢），请稍等 10 秒后重试，勿连续连点'
+    } else {
+      const msg = String(json?.message || json?.detail || json?.error || `HTTP ${res.status}`).trim()
+      lastErr = msg || lastErr
+    }
     if ((res.status === 404 || res.status >= 502) && i < targets.length - 1) continue
     break
   }

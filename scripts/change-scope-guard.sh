@@ -178,6 +178,7 @@ PAT
       cat <<'PAT'
 aiOpsPlanTypes
 aiOpsPlanExport
+aiOpsPlanApi
 AiOpsPlanPage
 merchantAiOpsPlanCore
 merchantAiUpstream
