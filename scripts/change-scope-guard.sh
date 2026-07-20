@@ -292,8 +292,6 @@ merchantAiUpstream
 AiImageStudioPage
 AiOpsPlanPage
 aiOpsPlanApi
-mine-pr-addon-shortvideo
-mine-pr-addon-digital-human
 change-scope-guard
 PAT
       ;;

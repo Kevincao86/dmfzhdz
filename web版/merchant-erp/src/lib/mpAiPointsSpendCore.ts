@@ -221,6 +221,18 @@ export function computeMpAiPointsCharge(
   return mpPointsCostForUsage(kind, opts)
 }
 
+/** 预估消耗：余额(套餐桶+充值桶) - 预估消耗；负值=不可用 */
+export function estimateMpAiPointsAffordability(
+  balance: number,
+  kind: MpPointsUsageKind,
+  opts?: { durationSec?: number },
+): { required: number; balance: number; remaining: number; ok: boolean } {
+  const required = Math.max(0, Math.floor(Number(computeMpAiPointsCharge(kind, opts)) || 0))
+  const bal = Math.max(0, Math.floor(Number(balance) || 0))
+  const remaining = bal - required
+  return { required, balance: bal, remaining, ok: required > 0 && remaining >= 0 }
+}
+
 export function formatMpAiPointsInsufficient(balance: number, required: number): string {
   return `积分不足（当前 ${balance.toLocaleString('zh-CN')}，需要 ${required.toLocaleString('zh-CN')}），请充值积分或升级套餐后再试`
 }
@@ -271,15 +283,29 @@ export function spendMpAiPointsWithSnapshot(
     return { ok: false, error: 'not_found', message: '当前档位未开通 AI Brief 生成，请升级会员后使用' }
   }
 
-  const points = split.pointsRequired
-  if (points <= 0 && !(split.quotaApplied && split.quotaUnitsUsed > 0)) {
+  // 预估消耗 vs 双桶余额：remaining < 0 禁止；计价以价目表为准
+  const balanceBefore = readAccountMpAiPointsBalance(data, account, roleOpts)
+  const estimate = estimateMpAiPointsAffordability(balanceBefore, opts.kind, {
+    durationSec: opts.durationSec,
+  })
+  const points = Math.max(estimate.required, split.pointsRequired)
+  if (points <= 0) {
     return { ok: false, error: 'invalid_amount', message: '无效扣费金额' }
   }
+  if (balanceBefore < points) {
+    return {
+      ok: false,
+      error: 'insufficient_points',
+      message: formatMpAiPointsInsufficient(balanceBefore, points),
+      required: points,
+      balance: balanceBefore,
+    }
+  }
 
-  let balanceAfter = readAccountMpAiPointsBalance(data, account, roleOpts)
-  if (points > 0) {
-    const balanceBefore = balanceAfter
-    if (balanceBefore < points) {
+  let balanceAfter = balanceBefore
+  const applied = applySpendPackageFirstToTarget(data, role, target, points)
+  if (!applied.ok) {
+    if (applied.error === 'insufficient_points') {
       return {
         ok: false,
         error: 'insufficient_points',
@@ -288,22 +314,9 @@ export function spendMpAiPointsWithSnapshot(
         balance: balanceBefore,
       }
     }
-
-    const applied = applySpendPackageFirstToTarget(data, role, target, points)
-    if (!applied.ok) {
-      if (applied.error === 'insufficient_points') {
-        return {
-          ok: false,
-          error: 'insufficient_points',
-          message: formatMpAiPointsInsufficient(balanceBefore, points),
-          required: points,
-          balance: balanceBefore,
-        }
-      }
-      return { ok: false, error: 'not_found', message: '未找到账号资料，请先完善注册信息' }
-    }
-    balanceAfter = applied.buckets.total
+    return { ok: false, error: 'not_found', message: '未找到账号资料，请先完善注册信息' }
   }
+  balanceAfter = applied.buckets.total
 
   if (split.quotaApplied && split.quotaKey && split.quotaUnitsUsed > 0) {
     applyQuotaUsageToTarget(data, role, target, split.quotaKey, split.quotaUnitsUsed)
@@ -337,10 +350,25 @@ export function assertMpAiPointsAffordable(
   if (kind === 'brief' && resolveEffectiveQuotaCell(account, data, 'ai_brief_gen', roleOpts) !== true) {
     return { ok: false, error: 'not_found', message: '当前档位未开通 AI Brief 生成，请升级会员后使用' }
   }
-  const split = computeAccountQuotaSpendSplit(data, account, kind, opts)
-  const points = split.pointsRequired
+  // 先按价目表预估，再与套餐桶+充值桶合计比对（remaining < 0 一律禁止）
   const balance = readAccountMpAiPointsBalance(data, account, roleOpts)
-  if (points > 0 && balance < points) {
+  const estimate = estimateMpAiPointsAffordability(balance, kind, opts)
+  if (estimate.required <= 0) {
+    return { ok: false, error: 'invalid_amount', message: '无效扣费金额' }
+  }
+  if (!estimate.ok) {
+    return {
+      ok: false,
+      error: 'insufficient_points',
+      message: formatMpAiPointsInsufficient(estimate.balance, estimate.required),
+      required: estimate.required,
+      balance: estimate.balance,
+    }
+  }
+  // 配额拆分仅作记账辅助；计价以 estimate.required 为准
+  const split = computeAccountQuotaSpendSplit(data, account, kind, opts)
+  const points = Math.max(estimate.required, split.pointsRequired)
+  if (balance < points) {
     return {
       ok: false,
       error: 'insufficient_points',
@@ -348,9 +376,6 @@ export function assertMpAiPointsAffordable(
       required: points,
       balance,
     }
-  }
-  if (points <= 0 && !(split.quotaApplied && split.quotaUnitsUsed > 0)) {
-    return { ok: false, error: 'invalid_amount', message: '无效扣费金额' }
   }
   return { ok: true, pointsCharged: points, newBalance: balance }
 }
