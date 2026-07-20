@@ -81,7 +81,7 @@ function mapUsage(raw) {
       : []
   const ledger = Array.isArray(raw.pointsLedger) ? raw.pointsLedger.map(mapLedgerRow) : []
   return {
-    deductOrderNote: String(raw.deductOrderNote || '先消耗套餐额度，用尽后再扣积分。'),
+    deductOrderNote: String(raw.deductOrderNote || 'AI 功能按积分扣减（套餐赠送积分优先）；余额不足请充值或升级套餐。'),
     quotaMonth: String(raw.quotaMonth || ''),
     pointsSummary: summary
       ? {

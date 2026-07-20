@@ -460,7 +460,6 @@ Page({
         videoUrl: done.videoUrl,
         createdAt: new Date().toISOString(),
       }
-      const works = dhPresets.upsertWork(work)
       let progress = '合成完成'
       try {
         const charge = await mpPointsSpend.spendAddonPoints('digital_human', {
@@ -471,10 +470,15 @@ Page({
         if (charge && charge.pointsCharged > 0) {
           progress = `合成完成 · 消耗 ${charge.pointsCharged} 积分`
         }
+        const works = dhPresets.upsertWork(work)
+        this.setData({ previewUrl: done.videoUrl, progress, works })
       } catch (spendErr) {
-        progress = `合成完成 · 积分扣减失败：${String(spendErr.message || '').slice(0, 24)}`
+        this.setData({
+          previewUrl: '',
+          err: String(spendErr.message || '积分不足，请充值或升级套餐').slice(0, 80),
+          progress: '',
+        })
       }
-      this.setData({ previewUrl: done.videoUrl, progress, works })
     } catch (e) {
       this.setData({ err: String(e.message || e).slice(0, 100) })
     } finally {

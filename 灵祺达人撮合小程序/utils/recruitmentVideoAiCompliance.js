@@ -80,8 +80,13 @@ async function checkVideoCompliance(payload) {
     throw new Error('未配置后台地址，无法 AI 检核')
   }
   const token = auth.readSessionToken()
+  const rawDur =
+    payload && (payload.durationSec != null ? payload.durationSec : payload.videoDurationSec)
+  const durationSec =
+    rawDur != null && Number(rawDur) > 0 ? Math.max(1, Math.ceil(Number(rawDur))) : undefined
   const body = {
     ...(payload || {}),
+    ...(durationSec != null ? { durationSec } : {}),
     ...(token ? { sessionToken: token, token } : {}),
     ...mpBillingRoleHint.billingRolePayload(),
   }

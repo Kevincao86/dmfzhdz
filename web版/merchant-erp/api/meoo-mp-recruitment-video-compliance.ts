@@ -87,14 +87,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const preloadedMediaExtract = videoUrl
       ? await preloadVideoComplianceMedia({ videoUrl, mpOrderId: usageCtx.mpOrderId }, env, usageCtx)
       : null
-    const billingSec =
+    const probedSec =
       preloadedMediaExtract?.durationSec != null && Number(preloadedMediaExtract.durationSec) > 0
         ? Math.max(1, Math.ceil(Number(preloadedMediaExtract.durationSec)))
-        : clientDurationSec != null
-          ? clientDurationSec
-          : 1
+        : null
+    const billingSec = probedSec ?? clientDurationSec
+    if (billingSec == null) {
+      sendMerchantJson(res, 422, {
+        ok: false,
+        message: '无法获取视频时长，请重新选择视频后再检核',
+        error: 'duration_required',
+      })
+      return
+    }
 
-    // 以实测时长再校验一次（套餐桶+充值桶合计）；不足则不得进入 LLM 检核
+    // 以实测/客户端时长校验套餐桶+充值桶合计；不足则不得进入 LLM 检核
     const preciseGate = await requireMpAiPointsAffordable(token, 'video', {
       durationSec: billingSec,
       roleHint: billingRole,

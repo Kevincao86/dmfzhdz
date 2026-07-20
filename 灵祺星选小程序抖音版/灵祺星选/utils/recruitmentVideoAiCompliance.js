@@ -2,14 +2,16 @@
  * 探店成片抖音生活服务违规 AI 检核（PR 审核 / 达人自检）
  * 成片检核含 ASR+多帧视觉，单独加长超时，避免 request:fail interrupted。
  */
-const api = require('./api.js')
+const ecs = require('./ecs.js')
 const auth = require('./auth.js')
 const config = require('./config.js')
 const mpRuntime = require('./mpRuntime.js')
+const cloudEcs = require('./cloudEcs.js')
 const { formatVideoComplianceInline } = require('./complianceInlineStatusFormat.js')
 const mpBillingRoleHint = require('./mpBillingRoleHint.js')
 
 const API_PATHS = ['/api/meoo-mp-recruitment-video-compliance']
+/** 微信侧长耗时接口；上限给足，避免加密抽帧视觉被中断 */
 const VIDEO_COMPLIANCE_TIMEOUT_MS = 180000
 
 function authHeaders() {
@@ -27,7 +29,7 @@ function resolveApiUrl(path) {
   return `${base}${p}`
 }
 
-function postVideoComplianceDirect(path, body) {
+function postVideoComplianceDirect(path, body, headers) {
   const fullUrl = resolveApiUrl(path)
   if (!fullUrl) return Promise.reject(new Error('未配置后台地址，无法 AI 检核'))
   return new Promise((resolve, reject) => {
@@ -41,7 +43,7 @@ function postVideoComplianceDirect(path, body) {
       header: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        ...authHeaders(),
+        ...headers,
       },
       data: body,
       success(res) {
@@ -74,27 +76,31 @@ function postVideoComplianceDirect(path, body) {
 }
 
 async function checkVideoCompliance(payload) {
-  if (!api.hasApi()) {
+  if (!ecs.hasBase()) {
     throw new Error('未配置后台地址，无法 AI 检核')
   }
   const token = auth.readSessionToken()
+  const rawDur =
+    payload && (payload.durationSec != null ? payload.durationSec : payload.videoDurationSec)
+  const durationSec =
+    rawDur != null && Number(rawDur) > 0 ? Math.max(1, Math.ceil(Number(rawDur))) : undefined
   const body = {
     ...(payload || {}),
+    ...(durationSec != null ? { durationSec } : {}),
     ...(token ? { sessionToken: token, token } : {}),
     ...mpBillingRoleHint.billingRolePayload(),
   }
   let lastErr
   for (const path of API_PATHS) {
     try {
-      let res
-      try {
-        res = await postVideoComplianceDirect(path, body)
-      } catch (directErr) {
-        // 直连失败再回退 tryPaths（兼容旧鉴权头等）
-        const msg = String(directErr && directErr.message ? directErr.message : directErr)
-        if (/超时|interrupted/i.test(msg)) throw directErr
-        res = await api.tryPaths('POST', [path], body)
-      }
+      // 备案直连：走加长超时；云代理仍走 ecs（云函数侧需另行加长）
+      const useDirect =
+        mpRuntime.shouldForceDirect(config) ||
+        !mpRuntime.shouldUseCloudProxy(config) ||
+        !cloudEcs.cloudReady()
+      const res = useDirect
+        ? await postVideoComplianceDirect(path, body, authHeaders())
+        : await ecs.post(path, body, authHeaders())
       if (!res || res.ok === false) {
         throw new Error((res && res.message) || 'AI 检核失败')
       }
