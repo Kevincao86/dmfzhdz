@@ -2567,17 +2567,22 @@ export function ShortVideoIceBatchPanel(_props: Props) {
               </div>
               <div className="rounded-xl border border-violet-200/80 bg-gradient-to-b from-violet-50/80 to-white p-3 shadow-sm">
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="block text-xs font-medium text-zinc-700">
+                  {/* 勿用 label 包裹多按钮：点击 10/20… 会被 label 连带激活首个控件，条数卡在 1 */}
+                  <div className="block text-xs font-medium text-zinc-700">
                     批量剪辑条数
-                    <div className="mt-1.5 flex flex-wrap gap-2">
+                    <div className="mt-1.5 flex flex-wrap gap-2" role="group" aria-label="批量剪辑条数">
                       {ICE_BATCH_GENERATE_COUNTS.map((n) => (
                         <button
                           key={n}
                           type="button"
-                          disabled={mixRenderBusy || smartRenderBusy || mediaBusy || guidanceBusy}
-                          onClick={() => onSelectBatchCount(n)}
+                          disabled={anyBusy || guidanceBusy}
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            onSelectBatchCount(n)
+                          }}
                           className={cn(
-                            'rounded-lg border px-3 py-1.5 text-sm font-semibold transition',
+                            'rounded-lg border px-3 py-1.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50',
                             batchGenerateCount === n
                               ? 'border-violet-500 bg-violet-600 text-white shadow-sm'
                               : 'border-zinc-200 bg-white text-zinc-700 hover:border-violet-300',
@@ -2587,13 +2592,13 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                         </button>
                       ))}
                     </div>
-                  </label>
+                  </div>
                   <label className="block text-xs font-medium text-zinc-700">
                     品牌名（下载命名）
                     <input
                       type="text"
                       value={batchBrandName}
-                      disabled={mixRenderBusy || smartRenderBusy || mediaBusy || guidanceBusy}
+                      disabled={anyBusy || guidanceBusy}
                       onChange={(e) => setBatchBrandName(e.target.value)}
                       placeholder="如：优雅浅爱 → 优雅浅爱1…N"
                       className="mt-1.5 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none ring-violet-400 focus:ring-2 disabled:bg-zinc-50"
