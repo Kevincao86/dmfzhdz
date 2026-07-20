@@ -502,6 +502,8 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
       if (pathname.startsWith('/api/merchant/local-promotion/')) {
         let bodyRawLp = ''
         if (method === 'POST') bodyRawLp = await bodyReader()
+        const authHeader =
+          typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined
         const lpDone = await handleLocalPromotionRoutes(
           method,
           pathname,
@@ -509,6 +511,7 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
           res,
           bodyRawLp,
           env as MerchantAiEnv,
+          { authHeader, env: env as Record<string, string> },
         )
         if (lpDone) return true
       }
@@ -516,6 +519,8 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
       if (pathname.startsWith('/api/merchant/qianchuan/')) {
         let bodyRawQc = ''
         if (method === 'POST') bodyRawQc = await bodyReader()
+        const authHeader =
+          typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined
         const qcDone = await handleQianchuanRoutes(
           method,
           pathname,
@@ -523,6 +528,7 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
           res,
           bodyRawQc,
           env as MerchantAiEnv,
+          { authHeader, env: env as Record<string, string> },
         )
         if (qcDone) return true
       }
@@ -534,6 +540,8 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
       ) {
         let bodyRawXhsAd = ''
         if (method === 'POST') bodyRawXhsAd = await bodyReader()
+        const authHeader =
+          typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined
         const xhsAdDone = await handleXhsCommercialRoutes(
           method,
           pathname,
@@ -541,6 +549,7 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
           res,
           bodyRawXhsAd,
           env as MerchantAiEnv,
+          { authHeader, env: env as Record<string, string> },
         )
         if (xhsAdDone) return true
       }
@@ -624,7 +633,12 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
         }
         const { mergeMerchantAiEnvWithRegistrySnapshot } = await import('./merchantRegistryVendorEnv.js')
         const aiEnv = await mergeMerchantAiEnvWithRegistrySnapshot(viteRoot, env as MerchantAiEnv)
-        await handleDouyinGoodsAiAssist(res, body, aiEnv)
+        const authHeader =
+          typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined
+        await handleDouyinGoodsAiAssist(res, body, aiEnv, {
+          authHeader,
+          env: env as Record<string, string>,
+        })
         return true
       }
 
@@ -753,7 +767,12 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
         }
         const { mergeMerchantAiEnvWithRegistrySnapshot } = await import('./merchantRegistryVendorEnv.js')
         const aiEnv = await mergeMerchantAiEnvWithRegistrySnapshot(viteRoot, env as MerchantAiEnv)
-        await handleDouyinGoodsAiAssist(res, body, aiEnv)
+        const authHeader =
+          typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined
+        await handleDouyinGoodsAiAssist(res, body, aiEnv, {
+          authHeader,
+          env: env as Record<string, string>,
+        })
         return true
       }
 
@@ -1469,22 +1488,49 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
         }
         const { mergeMerchantAiEnvWithRegistrySnapshot } = await import('./merchantRegistryVendorEnv.js')
         const aiEnv = await mergeMerchantAiEnvWithRegistrySnapshot(viteRoot, env as MerchantAiEnv)
-        const aiRes = await generateReviewReplyByAi(aiEnv, {
-          platformLabel: REVIEW_PLATFORM_LABELS[platform],
-          userName: reviewCtx.userName,
-          reviewText: reviewCtx.reviewText,
-          ratingStars: reviewCtx.ratingStars,
-          sentiment: reviewCtx.sentiment,
-          storeName: reviewCtx.storeName,
-          storeId: reviewCtx.storeId,
-          productName: reviewCtx.productName,
-          reviewKind: reviewCtx.reviewKind,
-        })
+        const authHeader =
+          typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined
+        const { runErpAiWithPointsBilling } = await import('../api/_lib/erpAiApiPointsGate.js')
+        const billed = await runErpAiWithPointsBilling(
+          authHeader,
+          'review_ai',
+          env as Record<string, string>,
+          { note: '评价回复 AI' },
+          () =>
+            generateReviewReplyByAi(aiEnv, {
+              platformLabel: REVIEW_PLATFORM_LABELS[platform],
+              userName: reviewCtx.userName,
+              reviewText: reviewCtx.reviewText,
+              ratingStars: reviewCtx.ratingStars,
+              sentiment: reviewCtx.sentiment,
+              storeName: reviewCtx.storeName,
+              storeId: reviewCtx.storeId,
+              productName: reviewCtx.productName,
+              reviewKind: reviewCtx.reviewKind,
+            }),
+        )
+        if (billed.blocked) {
+          json(res, billed.status, {
+            ok: false,
+            error: billed.error,
+            message: billed.message,
+            required: billed.required,
+            balance: billed.balance,
+          })
+          return true
+        }
+        const aiRes = billed.result
         if (aiRes.ok === false) {
           json(res, 502, { ok: false, message: aiRes.message })
           return true
         }
-        json(res, 200, { ok: true, suggestion: aiRes.text, modelUsed: aiRes.modelUsed })
+        json(res, 200, {
+          ok: true,
+          suggestion: aiRes.text,
+          modelUsed: aiRes.modelUsed,
+          pointsCharged: aiRes.pointsCharged,
+          pointsBalance: aiRes.pointsBalance,
+        })
         return true
       }
 

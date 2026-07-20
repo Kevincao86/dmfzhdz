@@ -1,6 +1,8 @@
 const mpAddonPageGate = require('../../utils/mpAddonPageGate.js')
 const media = require('../../utils/mpAddonMedia.js')
 const iceApi = require('../../utils/mpAddonIceApi.js')
+const addonApi = require('../../utils/mpAddonMerchantApi.js')
+const mpPointsSpend = require('../../utils/mpPointsSpendApi.js')
 
 function newJobId() {
   return `ice-${Date.now()}-${Math.floor(Math.random() * 10000)}`
@@ -140,6 +142,13 @@ Page({
       wx.showToast({ title: '请先上传参考画面', icon: 'none' })
       return
     }
+    const durationSec = Math.max(1, Math.ceil(Number(this.data.durationSec) || 5))
+    try {
+      await mpPointsSpend.assertAddonAffordable('shortvideo', durationSec)
+    } catch (e) {
+      this.setData({ err: String(e.message || '积分不足').slice(0, 100) })
+      return
+    }
     this._cancelled = false
     this.setData({ busy: true, err: '', progress: '提交任务…', resultUrl: '' })
     try {
@@ -162,7 +171,20 @@ Page({
         this.setData({ err: done.message })
         return
       }
-      this.setData({ resultUrl: done.videoUrl, progress: '生成完成' })
+      let progress = '生成完成'
+      try {
+        const charge = await mpPointsSpend.spendAddonPoints('shortvideo', {
+          durationSec,
+          idempotencyKey: `shortvideo:${start.taskId || Date.now()}`,
+          note: `shortvideo:${start.taskId || ''}`,
+        })
+        if (charge && charge.pointsCharged > 0) {
+          progress = `生成完成 · 消耗 ${charge.pointsCharged} 积分`
+        }
+      } catch (spendErr) {
+        progress = `生成完成 · 积分扣减失败：${String(spendErr.message || '').slice(0, 24)}`
+      }
+      this.setData({ resultUrl: done.videoUrl, progress })
     } catch (e) {
       this.setData({ err: String(e.message || e).slice(0, 100) })
     } finally {
@@ -297,6 +319,12 @@ Page({
   },
   async onAiIceBrief() {
     const aspect = this.iceAspect()
+    try {
+      await mpPointsSpend.assertAddonAffordable('mix_material_analyze', 1)
+    } catch (e) {
+      this.setData({ iceErr: String(e.message || '积分不足').slice(0, 80) })
+      return
+    }
     this.setData({ briefAiBusy: true, iceErr: '' })
     try {
       const r = await iceApi.generateIceEditBriefAi({
@@ -311,6 +339,15 @@ Page({
       if (!r.ok) {
         this.setData({ iceErr: r.message })
         return
+      }
+      try {
+        await mpPointsSpend.spendAddonPoints('mix_material_analyze', {
+          durationSec: 1,
+          idempotencyKey: `ice_brief:${Date.now()}`,
+          note: 'ICE 混剪 AI Brief',
+        })
+      } catch (_) {
+        /* 生成成功但扣费失败时仍保留文案 */
       }
       this.setData({ editCopy: r.copy, editInstruction: r.instruction })
     } catch (e) {
@@ -329,6 +366,15 @@ Page({
       wx.showToast({ title: '请填写剪辑文案或指令', icon: 'none' })
       return
     }
+    const smartPreset = /智能/.test(String(this.data.icePreset || ''))
+    const mixKind = smartPreset ? 'cloud_edit_smart' : 'cloud_edit'
+    const clipEndSec = Math.max(1, Math.ceil(Number(this.data.clipEndSec) || 10))
+    try {
+      await mpPointsSpend.assertAddonAffordable(mixKind, clipEndSec)
+    } catch (e) {
+      this.setData({ iceErr: String(e.message || '积分不足').slice(0, 100) })
+      return
+    }
     const aspect = this.iceAspect()
     const pending = this.data.videoJobs.filter((j) => j.phase === 'pending' || j.phase === 'failed')
     const imageUrls = this.data.imageItems.map((x) => x.mediaUrl)
@@ -338,6 +384,21 @@ Page({
     }
     this._cancelled = false
     this.setData({ iceBusy: true, iceErr: '', iceProgress: '提交云剪…', iceResultUrl: '' })
+    const chargeMix = async (jobId) => {
+      try {
+        const charge = await mpPointsSpend.spendAddonPoints(mixKind, {
+          durationSec: clipEndSec,
+          idempotencyKey: `${mixKind}:${jobId || Date.now()}`,
+          note: `${mixKind}:${jobId || ''}`,
+        })
+        if (charge && charge.pointsCharged > 0) {
+          return `云剪完成 · 消耗 ${charge.pointsCharged} 积分`
+        }
+      } catch (spendErr) {
+        return `云剪完成 · 积分扣减失败：${String(spendErr.message || '').slice(0, 24)}`
+      }
+      return '云剪完成'
+    }
     try {
       if (imageUrls.length) {
         const pipe = await iceApi.postIcePipeline({
@@ -360,7 +421,7 @@ Page({
           this.setData({ iceErr: done.message })
           return
         }
-        this.setData({ iceResultUrl: done.videoUrl, iceProgress: '云剪完成' })
+        this.setData({ iceResultUrl: done.videoUrl, iceProgress: await chargeMix(pipe.jobId) })
         return
       }
       const job = pending[0]
@@ -387,9 +448,8 @@ Page({
           this.setData({ iceErr: done.message })
           return
         }
-        this.setData({ iceResultUrl: done.videoUrl })
+        this.setData({ iceResultUrl: done.videoUrl, iceProgress: await chargeMix(`${pipe.jobId}:${i}`) })
       }
-      this.setData({ iceProgress: '云剪完成' })
     } catch (e) {
       this.setData({ iceErr: String(e.message || e).slice(0, 100) })
     } finally {

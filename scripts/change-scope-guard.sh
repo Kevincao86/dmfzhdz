@@ -272,6 +272,15 @@ mpMembershipCatalog
 ai-points-pricing
 meooRegistryShared
 mp-change-blast-radius-check
+merchantAdAiPoints
+localPromotionGateway
+qianchuanGateway
+xhsCommercialGateway
+merchantApiGatewayCore
+merchantAiUpstream
+AiImageStudioPage
+mine-pr-addon-shortvideo
+mine-pr-addon-digital-human
 change-scope-guard
 PAT
       ;;

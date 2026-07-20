@@ -68,6 +68,7 @@ import {
   spendVisualStudioCopyPoints,
   spendVisualStudioImagePoints,
 } from '../services/mpAiPointsSpendClient'
+import { readMpSessionToken } from '../lib/merchantApiAuth'
 import { fetchStoresForPlatform } from '../services/merchantStoresApi'
 
 type VariantResult = {
@@ -589,10 +590,13 @@ export default function AiImageStudioPage() {
         job.previewUrl = URL.createObjectURL(blob)
         job.fileExt = form.delivery === 'platform' ? 'jpg' : 'png'
       }
-      void spendVisualStudioImagePoints({
-        idempotencyKey: `vs-img-${runId}-${job.id}`,
-        note: `${ch.short} ${resolveSeriesSlotLabel(form.playbook, job.variantIndex)}`,
-      })
+      // ERP JWT 生图已由 /api/meoo-ai-agent-image 扣 agent_image；仅星选 mp 会话在此扣 visual_studio_image
+      if (readMpSessionToken()) {
+        void spendVisualStudioImagePoints({
+          idempotencyKey: `vs-img-${runId}-${job.id}`,
+          note: `${ch.short} ${resolveSeriesSlotLabel(form.playbook, job.variantIndex)}`,
+        })
+      }
     }
 
     if (isCarouselFive) {
@@ -728,10 +732,12 @@ export default function AiImageStudioPage() {
 
       job.imageUrl = out.imageUrl
       job.status = 'done'
-      void spendVisualStudioImagePoints({
-        idempotencyKey: `vs-img-${runId}-${job.id}`,
-        note: `${ch.short} 方案${job.variantIndex + 1}`,
-      })
+      if (readMpSessionToken()) {
+        void spendVisualStudioImagePoints({
+          idempotencyKey: `vs-img-${runId}-${job.id}`,
+          note: `${ch.short} 方案${job.variantIndex + 1}`,
+        })
+      }
       try {
         if (form.delivery === 'platform') {
           const blob = await fetchImageBlob(out.imageUrl)
