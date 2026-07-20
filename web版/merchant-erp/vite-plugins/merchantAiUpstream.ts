@@ -2563,17 +2563,20 @@ const ADVERTISING_AI_VENDOR_ORDER = [
   'doubao',
 ] as const
 
-/** 运营方案等长 JSON：国内优先，失败自动换下一可用厂商 */
+/**
+ * 运营方案等长 JSON：有额度/响应快的厂商优先，失败自动换下一已配置 Key 的厂商。
+ * TokenMix 系（openai/claude/gemini/grok）走同一 TOKENMIX_API_KEY，额度共用但模型不同可轮询。
+ */
 export const OPS_PLAN_AI_VENDOR_ORDER = [
-  'qwen',
-  'doubao',
-  'minimax',
   'deepseek',
+  'minimax',
   'kimi',
   'openai',
   'claude',
   'gemini',
   'grok',
+  'qwen',
+  'doubao',
 ] as const
 
 /**
