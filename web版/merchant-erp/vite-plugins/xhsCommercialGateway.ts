@@ -4,7 +4,7 @@
  */
 import type { ServerResponse } from 'node:http'
 import type { MerchantAiEnv } from './merchantAiUpstream.js'
-import { generateAdvertisingAiText } from './merchantAiUpstream.js'
+import { generateAdvertisingAiTextBilled, type AdAiBillingOpts } from './merchantAdAiPoints.js'
 import {
   buildAdInsightPrompt,
   emptyAdvertisingClues,
@@ -145,6 +145,7 @@ export async function handleXhsCommercialRoutes(
   res: ServerResponse,
   bodyRaw: string,
   aiEnv: MerchantAiEnv,
+  billing?: AdAiBillingOpts,
 ): Promise<boolean> {
   if (
     !pathname.startsWith('/api/merchant/xhs-commercial/') &&
@@ -280,13 +281,29 @@ export async function handleXhsCommercialRoutes(
       clues,
       channelStats,
     })
-    const aiRes = await generateAdvertisingAiText(aiEnv, { system, user })
+    const adOut = await generateAdvertisingAiTextBilled(
+      aiEnv,
+      { system, user },
+      billing,
+      '小红书聚光广告洞察 AI',
+    )
+    if (adOut.blocked) {
+      json(res, adOut.status, adOut.body)
+      return true
+    }
+    const aiRes = adOut.result
     if (aiRes.ok === false) {
       json(res, 502, { ok: false, message: aiRes.message })
       return true
     }
     const { insight, actions } = parseAdInsightResponse(aiRes.text)
-    json(res, 200, { ok: true, insight, actions })
+    json(res, 200, {
+      ok: true,
+      insight,
+      actions,
+      pointsCharged: aiRes.pointsCharged,
+      pointsBalance: aiRes.pointsBalance,
+    })
     return true
   }
 
@@ -329,10 +346,20 @@ export async function handleXhsCommercialRoutes(
     const clue = j.clue as Record<string, unknown> | undefined
     const name = String(clue?.name ?? '顾客')
     const phone = String(clue?.phone ?? '')
-    const aiRes = await generateAdvertisingAiText(aiEnv, {
-      system: '你是小红书种小草线索跟进顾问。请用中文输出简短礼貌的跟进话术，80字以内。',
-      user: `线索：${JSON.stringify(clue)}。电话：${phone}。顾客：${name}。`,
-    })
+    const adOut = await generateAdvertisingAiTextBilled(
+      aiEnv,
+      {
+        system: '你是小红书种小草线索跟进顾问。请用中文输出简短礼貌的跟进话术，80字以内。',
+        user: `线索：${JSON.stringify(clue)}。电话：${phone}。顾客：${name}。`,
+      },
+      billing,
+      '小红书种小草线索话术 AI',
+    )
+    if (adOut.blocked) {
+      json(res, adOut.status, adOut.body)
+      return true
+    }
+    const aiRes = adOut.result
     if (aiRes.ok === false) {
       json(res, 502, { ok: false, message: aiRes.message })
       return true
@@ -340,6 +367,8 @@ export async function handleXhsCommercialRoutes(
     json(res, 200, {
       ok: true,
       suggestion: aiRes.text || '您好，感谢关注，方便留个方便联系的时间吗？',
+      pointsCharged: aiRes.pointsCharged,
+      pointsBalance: aiRes.pointsBalance,
     })
     return true
   }

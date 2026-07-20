@@ -2774,6 +2774,7 @@ export async function handleDouyinGoodsAiAssist(
   res: ServerResponse,
   body: Record<string, unknown>,
   envIn: MerchantAiEnv,
+  billing?: { authHeader?: string; env?: Record<string, string> },
 ): Promise<void> {
   const env = envIn
   const action = String(body.action ?? '')
@@ -2793,6 +2794,47 @@ export async function handleDouyinGoodsAiAssist(
     : []
   const imageRole = String(body.image_role ?? 'head').trim() || 'head'
   const goodsLock = goodsAiLockSuffixFromBody(body)
+
+  const billKind = isImageAction ? ('agent_image' as const) : ('goods_ai' as const)
+  let billGate: { tenantId: string; userId: string } | null = null
+  let billed = false
+  const billEnv = (billing?.env || (process.env as Record<string, string>)) as Record<string, string>
+  if (billing?.authHeader) {
+    const { requireErpAiPointsAffordable, chargeErpAiPointsAfterSuccess } = await import(
+      '../api/_lib/erpAiApiPointsGate.js'
+    )
+    const gate = await requireErpAiPointsAffordable(billing.authHeader, billKind, billEnv)
+    if (!gate.ok) {
+      json(res, gate.status, {
+        ok: false,
+        error: gate.error,
+        message: gate.message,
+        required: gate.required,
+        balance: gate.balance,
+      })
+      return
+    }
+    billGate = { tenantId: gate.tenantId, userId: gate.userId }
+  }
+  const sendBillableOk = async (payload: Record<string, unknown>) => {
+    if (billGate && !billed && billing?.authHeader) {
+      billed = true
+      const { chargeErpAiPointsAfterSuccess } = await import('../api/_lib/erpAiApiPointsGate.js')
+      const charge = await chargeErpAiPointsAfterSuccess(billing.authHeader, billKind, billEnv, {
+        tenantId: billGate.tenantId,
+        idempotencyKey: `${billKind}:${billGate.userId}:${action || 'assist'}:${Date.now().toString(36)}`,
+        note: isImageAction ? '商品向导 AI 生图' : `商品向导 AI:${action || 'assist'}`,
+      })
+      if (charge) {
+        payload = {
+          ...payload,
+          pointsCharged: charge.pointsCharged,
+          pointsBalance: charge.balance,
+        }
+      }
+    }
+    json(res, 200, payload)
+  }
 
   if (action === 'analyze_product_quality') {
     const rawList = body.products
@@ -2868,15 +2910,14 @@ export async function handleDouyinGoodsAiAssist(
         }
       }
       if (parsed.error) {
-        json(res, 200, {
-          ok: true,
+        await sendBillableOk({ ok: true,
           quality_items: [],
           quality_parse_error: parsed.error,
           quality_raw_excerpt: stripAssistantJsonFence(text).slice(0, 1600),
         })
         return
       }
-      json(res, 200, { ok: true, quality_items: parsed.items })
+      await sendBillableOk({ ok: true, quality_items: parsed.items })
       return
     } catch (e) {
       const aborted =
@@ -2945,8 +2986,7 @@ export async function handleDouyinGoodsAiAssist(
           listingTitle,
           imageUserLine,
         )
-        json(res, 200, {
-          ok: true,
+        await sendBillableOk({ ok: true,
           image_urls: urls,
           image_meta: {
             requested_model: requestedVendor,
@@ -2978,8 +3018,7 @@ export async function handleDouyinGoodsAiAssist(
         listingTitle,
         imageUserLine,
       )
-      json(res, 200, {
-        ok: true,
+      await sendBillableOk({ ok: true,
         image_urls: enhanced,
         image_meta: {
           requested_model: requestedVendor,
@@ -3036,16 +3075,14 @@ export async function handleDouyinGoodsAiAssist(
       const text = rawScore.trim()
       const parsed = parseGeoAiScoreFromModelText(text)
       if (!parsed) {
-        json(res, 200, {
-          ok: true,
+        await sendBillableOk({ ok: true,
           geo_ai_score: null,
           geo_ai_parse_error: '模型输出不是合法 JSON，请前端回退规则评分',
           geo_ai_raw_excerpt: stripAssistantJsonFence(text).slice(0, 1600),
         })
         return
       }
-      json(res, 200, {
-        ok: true,
+      await sendBillableOk({ ok: true,
         geo_ai_score: parsed,
         ...(scoreVendor !== requestedVendor ? { ai_vendor_used: scoreVendor } : {}),
       })
@@ -3078,8 +3115,7 @@ export async function handleDouyinGoodsAiAssist(
         json(res, 400, { ok: false, message: '模型未返回有效咨询文案，请重试或手动输入' })
         return
       }
-      json(res, 200, {
-        ok: true,
+      await sendBillableOk({ ok: true,
         description: description.slice(0, 120),
         ...(qVendor !== requestedVendor ? { ai_vendor_used: qVendor } : {}),
       })
@@ -3106,8 +3142,7 @@ export async function handleDouyinGoodsAiAssist(
         user,
       )
       const description = consultRaw.trim()
-      json(res, 200, {
-        ok: true,
+      await sendBillableOk({ ok: true,
         description,
         ...(consultVendor !== requestedVendor ? { ai_vendor_used: consultVendor } : {}),
       })
@@ -3122,8 +3157,7 @@ export async function handleDouyinGoodsAiAssist(
         user,
       )
       const title = sliceTitle(titleRaw.replace(/^["'「]|["'」]$/g, '').trim(), 40)
-      json(res, 200, {
-        ok: true,
+      await sendBillableOk({ ok: true,
         title: title || titleDraft.slice(0, 40),
         ...(titleVendor !== requestedVendor ? { ai_vendor_used: titleVendor } : {}),
       })
@@ -3138,8 +3172,7 @@ export async function handleDouyinGoodsAiAssist(
         user,
       )
       const description = sanitizeDouyinProductDescriptionCompliance(descRaw.trim())
-      json(res, 200, {
-        ok: true,
+      await sendBillableOk({ ok: true,
         description,
         ...(descVendor !== requestedVendor ? { ai_vendor_used: descVendor } : {}),
       })
@@ -3160,8 +3193,7 @@ export async function handleDouyinGoodsAiAssist(
             fast: false,
           })
       const description = articleRaw.trim()
-      json(res, 200, {
-        ok: true,
+      await sendBillableOk({ ok: true,
         description,
         ...(articleVendor !== requestedVendor ? { ai_vendor_used: articleVendor } : {}),
       })
@@ -3180,8 +3212,7 @@ export async function handleDouyinGoodsAiAssist(
         user,
       )
       const description = topicRaw.trim()
-      json(res, 200, {
-        ok: true,
+      await sendBillableOk({ ok: true,
         description,
         ...(topicVendor !== requestedVendor ? { ai_vendor_used: topicVendor } : {}),
       })
@@ -3200,8 +3231,7 @@ export async function handleDouyinGoodsAiAssist(
         user,
       )
       const description = dhRaw.trim()
-      json(res, 200, {
-        ok: true,
+      await sendBillableOk({ ok: true,
         description,
         ...(dhVendor !== requestedVendor ? { ai_vendor_used: dhVendor } : {}),
       })

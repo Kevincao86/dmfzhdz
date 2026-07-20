@@ -5,7 +5,7 @@
  */
 import type { ServerResponse } from 'node:http'
 import type { MerchantAiEnv } from './merchantAiUpstream.js'
-import { generateAdvertisingAiText } from './merchantAiUpstream.js'
+import { generateAdvertisingAiTextBilled, type AdAiBillingOpts } from './merchantAdAiPoints.js'
 import {
   buildAdInsightPrompt,
   emptyAdvertisingClues,
@@ -180,6 +180,7 @@ export async function handleQianchuanRoutes(
   res: ServerResponse,
   bodyRaw: string,
   aiEnv: MerchantAiEnv,
+  billing?: AdAiBillingOpts,
 ): Promise<boolean> {
   if (!pathname.startsWith('/api/merchant/qianchuan/')) return false
 
@@ -485,15 +486,31 @@ export async function handleQianchuanRoutes(
     const promotionName = String(j.promotionName ?? '千川广告')
     const convertState = String(j.convertStateLabel ?? j.convertState ?? '新线索')
     const storeName = String(j.storeName ?? '本店')
-    const aiRes = await generateAdvertisingAiText(aiEnv, {
-      system: '你是电商/直播商家线索跟进顾问。请用中文输出简短礼貌的跟进话术，80字以内，不要编造具体优惠金额。',
-      user: `线索状态：${convertState}。来源广告：${promotionName}。联系电话：${phone}。门店：${storeName}。顾客：${name}。`,
-    })
+    const adOut = await generateAdvertisingAiTextBilled(
+      aiEnv,
+      {
+        system:
+          '你是电商/直播商家线索跟进顾问。请用中文输出简短礼貌的跟进话术，80字以内，不要编造具体优惠金额。',
+        user: `线索状态：${convertState}。来源广告：${promotionName}。联系电话：${phone}。门店：${storeName}。顾客：${name}。`,
+      },
+      billing,
+      '千川线索话术 AI',
+    )
+    if (adOut.blocked) {
+      json(res, adOut.status, adOut.body)
+      return true
+    }
+    const aiRes = adOut.result
     if (aiRes.ok === false) {
       json(res, 502, { ok: false, message: aiRes.message })
       return true
     }
-    json(res, 200, { ok: true, suggestion: aiRes.text })
+    json(res, 200, {
+      ok: true,
+      suggestion: aiRes.text,
+      pointsCharged: aiRes.pointsCharged,
+      pointsBalance: aiRes.pointsBalance,
+    })
     return true
   }
 
@@ -514,13 +531,29 @@ export async function handleQianchuanRoutes(
       clues,
       channelStats,
     })
-    const aiRes = await generateAdvertisingAiText(aiEnv, { system, user })
+    const adOut = await generateAdvertisingAiTextBilled(
+      aiEnv,
+      { system, user },
+      billing,
+      '千川广告洞察 AI',
+    )
+    if (adOut.blocked) {
+      json(res, adOut.status, adOut.body)
+      return true
+    }
+    const aiRes = adOut.result
     if (aiRes.ok === false) {
       json(res, 502, { ok: false, message: aiRes.message })
       return true
     }
     const { insight, actions } = parseAdInsightResponse(aiRes.text)
-    json(res, 200, { ok: true, insight, actions })
+    json(res, 200, {
+      ok: true,
+      insight,
+      actions,
+      pointsCharged: aiRes.pointsCharged,
+      pointsBalance: aiRes.pointsBalance,
+    })
     return true
   }
 

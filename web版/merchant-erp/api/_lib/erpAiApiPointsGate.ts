@@ -143,3 +143,61 @@ export function sendErpAiPointsGateError(
 export function authHeaderFromRequest(req: VercelRequest): string | undefined {
   return typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined
 }
+
+/** Node Gateway：从 IncomingMessage 风格 headers 取 Bearer */
+export function authHeaderFromNodeHeaders(
+  headers: Record<string, string | string[] | undefined> | undefined,
+): string | undefined {
+  if (!headers) return undefined
+  const raw = headers.authorization ?? headers.Authorization
+  if (typeof raw === 'string' && raw.trim()) return raw.trim()
+  if (Array.isArray(raw) && typeof raw[0] === 'string' && raw[0].trim()) return raw[0].trim()
+  return undefined
+}
+
+/**
+ * 商家网关 AI：先校验积分 → 执行 → 成功后扣减。
+ * run 返回 ok:false 不扣费；blocked 时调用方应直接写 HTTP 响应。
+ */
+export async function runErpAiWithPointsBilling<T extends { ok: boolean }>(
+  authHeader: string | undefined,
+  kind: ErpAiUsageKind,
+  env: Record<string, string>,
+  opts: { note: string; idempotencyKey?: string },
+  run: () => Promise<T>,
+): Promise<
+  | { blocked: true; status: number; error: string; message: string; required?: number; balance?: number }
+  | { blocked: false; result: T & { pointsCharged?: number; pointsBalance?: number } }
+> {
+  const gate = await requireErpAiPointsAffordable(authHeader, kind, env)
+  if (!gate.ok) {
+    return {
+      blocked: true,
+      status: gate.status,
+      error: gate.error,
+      message: gate.message,
+      required: gate.required,
+      balance: gate.balance,
+    }
+  }
+  const result = await run()
+  if (!result || result.ok === false) {
+    return { blocked: false, result }
+  }
+  const charge = await chargeErpAiPointsAfterSuccess(authHeader, kind, env, {
+    tenantId: gate.tenantId,
+    idempotencyKey:
+      opts.idempotencyKey ||
+      `${kind}:${gate.userId}:${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+    note: opts.note,
+  })
+  if (!charge) return { blocked: false, result }
+  return {
+    blocked: false,
+    result: {
+      ...result,
+      pointsCharged: charge.pointsCharged,
+      pointsBalance: charge.balance,
+    },
+  }
+}

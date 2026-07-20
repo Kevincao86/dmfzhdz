@@ -74,6 +74,15 @@ export const MP_POINTS_OPS_PLAN_PER_USE = 30
 /** 招募大厅 AI（标签/匹配/排期）：5 积分/次；短 prompt≈¥0.05 */
 export const MP_POINTS_RECRUITMENT_AI_PER_USE = 5
 
+/** 商品向导 AI（标题/卖点/质检等文本）：5 积分/次；≈¥0.05 */
+export const MP_POINTS_GOODS_AI_PER_USE = 5
+
+/** 投流/线索 AI（广告洞察、跟进话术）：5 积分/次；≈¥0.05 */
+export const MP_POINTS_AD_AI_PER_USE = 5
+
+/** 评价回复 AI：3 积分/次；≈¥0.03 */
+export const MP_POINTS_REVIEW_AI_PER_USE = 3
+
 /** 单积分内部 API 成本（元） */
 export const MP_POINT_INTERNAL_COST_YUAN = 0.01
 
@@ -111,6 +120,9 @@ export type MpPointsUsageKind =
   | 'ops_plan'
   | 'agent_image'
   | 'recruitment_ai'
+  | 'goods_ai'
+  | 'ad_ai'
+  | 'review_ai'
 
 export const MP_POINTS_USAGE_KIND_LABELS: Record<MpPointsUsageKind, string> = {
   video: '短视频 AI 检核',
@@ -127,6 +139,9 @@ export const MP_POINTS_USAGE_KIND_LABELS: Record<MpPointsUsageKind, string> = {
   ops_plan: 'AI 运营方案',
   agent_image: 'AI 智能体生图',
   recruitment_ai: '招募大厅 AI',
+  goods_ai: '商品向导 AI',
+  ad_ai: '投流/线索 AI',
+  review_ai: '评价回复 AI',
 }
 
 const MP_POINTS_PER_SEC_BY_KIND: Partial<Record<MpPointsUsageKind, number>> = {
@@ -178,7 +193,10 @@ export function parseMpPointsUsageKind(raw: unknown): MpPointsUsageKind | null {
     k === 'product_plan' ||
     k === 'ops_plan' ||
     k === 'agent_image' ||
-    k === 'recruitment_ai'
+    k === 'recruitment_ai' ||
+    k === 'goods_ai' ||
+    k === 'ad_ai' ||
+    k === 'review_ai'
   ) {
     return k
   }
@@ -196,6 +214,9 @@ export function formatMpPointsRateLabel(kind: MpPointsUsageKind): string {
   if (kind === 'product_plan') return `${MP_POINTS_PRODUCT_PLAN_PER_USE} 积分/次`
   if (kind === 'ops_plan') return `${MP_POINTS_OPS_PLAN_PER_USE} 积分/次`
   if (kind === 'recruitment_ai') return `${MP_POINTS_RECRUITMENT_AI_PER_USE} 积分/次`
+  if (kind === 'goods_ai') return `${MP_POINTS_GOODS_AI_PER_USE} 积分/次`
+  if (kind === 'ad_ai') return `${MP_POINTS_AD_AI_PER_USE} 积分/次`
+  if (kind === 'review_ai') return `${MP_POINTS_REVIEW_AI_PER_USE} 积分/次`
   if (kind === 'cloud_edit') {
     return `${MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP} 积分/条（≤${MP_POINTS_CLOUD_EDIT_MAX_SEC} 秒）`
   }
@@ -243,6 +264,9 @@ export function mpPointsCostForUsage(kind: MpPointsUsageKind, opts?: { durationS
   if (kind === 'product_plan') return MP_POINTS_PRODUCT_PLAN_PER_USE
   if (kind === 'ops_plan') return MP_POINTS_OPS_PLAN_PER_USE
   if (kind === 'recruitment_ai') return MP_POINTS_RECRUITMENT_AI_PER_USE
+  if (kind === 'goods_ai') return MP_POINTS_GOODS_AI_PER_USE
+  if (kind === 'ad_ai') return MP_POINTS_AD_AI_PER_USE
+  if (kind === 'review_ai') return MP_POINTS_REVIEW_AI_PER_USE
   return MP_POINTS_ARTICLE_PER_USE
 }
 
