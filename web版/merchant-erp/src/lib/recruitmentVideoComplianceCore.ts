@@ -442,10 +442,25 @@ export async function runRecruitmentVideoComplianceCheck(
   const { system, phrases } = videoComplianceRulesForPlatform(platformNorm)
   const localHits = localRiskScan(scannedText, phrases)
   const visualHits = mediaExtract?.visualHits ?? []
-  const mergedLocalHits = [...new Set([...localHits, ...visualHits])].slice(0, 12)
+  const mergedLocalHits = [...new Set([...localHits, ...visualHits])].slice(0, 16)
   const mediaNotes = mediaExtract?.mediaNotes?.length
     ? `\n【成片检核说明】${mediaExtract.mediaNotes.join('；')}`
     : ''
+  const visualForceHits = visualHits.filter((h) =>
+    /着装擦边|姿态擦边|二维码|打码|联系方式|双关暗示|色情导流|低俗导流/.test(h),
+  )
+  const visualBlock =
+    visualForceHits.length > 0
+      ? [
+          '',
+          '【画面视觉命中（抽帧视觉已检出，属高风险，禁止因「美食探店/客观价签」豁免为 normal）】',
+          visualForceHits.join('、'),
+          ...(mediaExtract?.frameSlotHits || [])
+            .filter((f) => f.hits?.some((h) => visualForceHits.includes(h)))
+            .slice(0, 6)
+            .map((f) => `- ${f.slot}: ${f.hits.filter((h) => visualForceHits.includes(h)).join('、')}`),
+        ].join('\n')
+      : ''
   const user = [
     `【平台】${platformNorm}`,
     `【商单】${String(input.orderTitle || input.mpOrderId || '').trim()}`,
@@ -453,6 +468,7 @@ export async function runRecruitmentVideoComplianceCheck(
     `【达人】${String(input.applicantName || input.applicantId || '').trim()}`,
     videoUrl ? `【成片地址】${videoUrl.slice(0, 240)}` : '',
     mediaNotes,
+    visualBlock,
     '【待检核文字（商单 Brief / 口播 ASR / 画面 OCR / 发布描述等）】',
     scannedText.slice(0, 6000),
     '',
@@ -460,8 +476,9 @@ export async function runRecruitmentVideoComplianceCheck(
     '{"verdict":"normal"|"suspect","message":"15-80字结论","hits":["命中的违规词或表述，无则空数组"],"violations":[{"excerpt":"原文违规片段（须来自口播/字幕/画面，20字内）","rule":"违反的规则要点","suggestion":"「替换词1」「替换词2」","channel":"asr"|"subtitle"|"visual"|"brief"}]}',
     'verdict=normal 时 violations 为空数组；verdict=suspect 时须为每条风险表述给出 violations（含未命中本地词库的语义风险词）。',
     'suggestion 须给出 1-2 个可直接替换的短语，用「」包裹，格式示例：「适合来逛逛」「值得来体验一下」。',
-    '须综合口播、画面文字、画面视觉与 Brief 判断；任一路径出现绝对化/虚假/误导，或擦边×导流/站外联系 → suspect。',
-    '美食语境客观描述可豁免双关误伤；擦边出镜与二维码特写/打码指认/站外话术组合须标「色情导流/低俗导流」或「违规导流」。',
+    '须综合口播、画面文字、画面视觉与 Brief 判断；任一路径出现绝对化/虚假/误导，或擦边/导流/站外联系 → suspect。',
+    '若上方【画面视觉命中】非空，verdict 必须为 suspect，message/rule 须写明「色情导流/低俗导流」或对应视觉命中，不得判 normal。',
+    '美食语境客观描述仅在无画面擦边命中时可豁免双关误伤。',
   ]
     .filter(Boolean)
     .join('\n')
@@ -505,10 +522,24 @@ export async function runRecruitmentVideoComplianceCheck(
 
     if (mergedLocalHits.length && verdict === 'normal') {
       verdict = 'suspect'
-      hits = [...new Set([...hits, ...mergedLocalHits])].slice(0, 12)
-      message = `可能违规请注意审核：命中高风险用语「${mergedLocalHits.slice(0, 3).join('、')}」`
+      hits = [...new Set([...hits, ...mergedLocalHits])].slice(0, 16)
+      const visualLead = mergedLocalHits.filter((h) =>
+        /着装擦边|姿态擦边|二维码|打码|联系方式|双关暗示|色情导流|低俗导流/.test(h),
+      )
+      message = visualLead.length
+        ? `可能违规请注意审核：画面/导流风险「${visualLead.slice(0, 3).join('、')}」`
+        : `可能违规请注意审核：命中高风险用语「${mergedLocalHits.slice(0, 3).join('、')}」`
     } else if (mergedLocalHits.length) {
-      hits = [...new Set([...hits, ...mergedLocalHits])].slice(0, 12)
+      hits = [...new Set([...hits, ...mergedLocalHits])].slice(0, 16)
+    }
+
+    // 视觉擦边/导流命中：无论 LLM 如何表述，强制 suspect
+    if (visualForceHits.length) {
+      verdict = 'suspect'
+      hits = [...new Set([...hits, ...visualForceHits])].slice(0, 16)
+      if (!/色情导流|低俗导流|擦边|导流/.test(message)) {
+        message = `可能违规请注意审核：画面视觉命中「${visualForceHits.slice(0, 3).join('、')}」`
+      }
     }
 
     if (verdict === 'suspect') {

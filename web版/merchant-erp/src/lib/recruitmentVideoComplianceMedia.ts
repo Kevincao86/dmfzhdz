@@ -26,6 +26,16 @@ const FRAME_OCR_RISK_PHRASES = [
   ]),
 ]
 
+const VISION_FORCE_HIT_PHRASES = [
+  '着装擦边',
+  '姿态擦边',
+  '二维码特写导流',
+  '打码指认导流',
+  '联系方式露出',
+  '双关暗示话术',
+  '色情导流风险',
+] as const
+
 export type VideoMediaComplianceExtract = {
   asrText: string
   asrSegments: AsrTimedSegment[]
@@ -53,6 +63,10 @@ function parseVisionComplianceJson(raw: string): {
   ocrText?: string
   visualHits?: string[]
   visualNotes?: string
+  hasPerson?: boolean
+  attireRisk?: string
+  poseRisk?: string
+  divertRisk?: string
 } | null {
   const m = /\{[\s\S]*\}/.exec(String(raw || '').trim())
   if (!m) return null
@@ -61,34 +75,124 @@ function parseVisionComplianceJson(raw: string): {
       ocrText?: string
       visualHits?: string[]
       visualNotes?: string
+      hasPerson?: boolean
+      attireRisk?: string
+      poseRisk?: string
+      divertRisk?: string
     }
   } catch {
     return null
   }
 }
 
-const FRAME_VISION_SYSTEM = `你是本地生活探店短视频合规审核助手（适用抖音/快手/视频号）。用户会提供从探店成片截取的 1 张关键帧（含字幕、价格贴纸、大字小字、出镜人物、画面元素）。
-请完成：
-1. OCR：识别帧内所有可见中文/英文文字（含字幕、贴纸、价签、标题），写入 ocrText；
-2. 广告合规：检查大小字误导、未标注广告、绝对化/极限用语出现在画面文字等；
-3. 擦边/低俗视觉：薄透深领出镜、超短裤突出身体、弯腰俯拍胸口/臀部等挑逗构图 → visualHits 写入如「着装擦边」「姿态擦边」；
-4. 导流视觉：清晰可扫二维码被特写/强调、故意打码区+手指指认、画面露出微信号/手机号 → visualHits 写入如「二维码特写导流」「打码指认导流」「联系方式露出」；
-5. 误伤豁免：纯食物/货架特写、价签二维码非强调一闪而过、正常探店出镜无擦边 → 不要因女主出镜或包装码误报；
-6. visualHits 可含 OCR 违规词或上述画面问题短语；无则空数组。
-只输出 JSON，不要 Markdown：
-{"ocrText":"…","visualHits":["…"],"visualNotes":"10-40字说明"}`
+/** 结构化字段强制落 visualHits，避免模型只写 notes 不报 hits */
+function forceHitsFromVisionFields(parsed: {
+  ocrText?: string
+  visualHits?: string[]
+  hasPerson?: boolean
+  attireRisk?: string
+  poseRisk?: string
+  divertRisk?: string
+}): string[] {
+  const hits: string[] = []
+  const attire = String(parsed.attireRisk || 'none').toLowerCase()
+  const pose = String(parsed.poseRisk || 'none').toLowerCase()
+  const divert = String(parsed.divertRisk || 'none').toLowerCase()
+  const ocr = String(parsed.ocrText || '')
+  const hasPerson = parsed.hasPerson === true
+
+  if (attire.includes('sheer') || attire.includes('deep') || attire.includes('both') || attire.includes('short')) {
+    hits.push('着装擦边')
+  }
+  if (pose.includes('bend') || pose.includes('chest')) {
+    hits.push('姿态擦边')
+  }
+  if (divert.includes('qr')) hits.push('二维码特写导流')
+  if (divert.includes('blur')) hits.push('打码指认导流')
+  if (divert.includes('contact')) hits.push('联系方式露出')
+
+  if (Array.isArray(parsed.visualHits)) {
+    for (const h of parsed.visualHits) {
+      const s = String(h || '').trim()
+      if (s) hits.push(s)
+    }
+  }
+
+  if (hasPerson && /非常肥美|好大一只|duang大/i.test(ocr)) {
+    hits.push('双关暗示话术')
+  }
+
+  const edge = hits.some((h) => /着装擦边|姿态擦边|双关暗示/.test(h))
+  const divertHit = hits.some((h) => /二维码|打码|联系方式|导流/.test(h))
+  if (edge && divertHit) hits.push('色情导流风险')
+  // 人物擦边出镜本身按抖音口径也要升风险（即使暂未见导流码）
+  if (edge && !hits.includes('色情导流风险')) {
+    hits.push('色情导流风险')
+  }
+
+  return [...new Set(hits)].filter(Boolean).slice(0, 16)
+}
+
+const FRAME_VISION_SYSTEM = `你是本地生活探店短视频合规审核助手（适用抖音/快手/视频号）。用户提供 1 张成片关键帧。
+必须从严识别「低俗擦边 / 色情导流」视觉风险，对齐抖音专项口径：重点不是裸露，而是擦边出镜吸引流量。
+
+请完成并只输出 JSON（不要 Markdown）：
+{
+  "ocrText":"帧内全部可见文字",
+  "hasPerson":true或false,
+  "attireRisk":"none|sheer_or_deep_neck|short_bottoms|both",
+  "poseRisk":"none|bend_over|chest_closeup",
+  "divertRisk":"none|qr_closeup|blur_point|contact_shown",
+  "visualHits":["着装擦边等标准短语"],
+  "visualNotes":"10-40字"
+}
+
+强制规则：
+1. OCR：字幕/贴纸/价签/标题全部写入 ocrText。
+2. 出镜人穿薄透白衣/明显透视、深V或大领口露出大片上胸 → attireRisk=sheer_or_deep_neck 或 both，visualHits 必含「着装擦边」。
+3. 超短热裤突出身体 → attireRisk 含 short_bottoms，visualHits 必含「着装擦边」。
+4. 弯腰俯拍导致领口敞开/胸口或臀部构图 → poseRisk=bend_over 或 chest_closeup，visualHits 必含「姿态擦边」。
+5. 清晰二维码被特写/强调 → divertRisk=qr_closeup，visualHits 必含「二维码特写导流」。
+6. 故意打码区+手指指认 → divertRisk=blur_point，visualHits 必含「打码指认导流」。
+7. 画面露出微信号/手机号 → divertRisk=contact_shown，visualHits 必含「联系方式露出」。
+8. 仅食物/货架无人出镜 → hasPerson=false，attire/pose 为 none。
+9. 正常着装探店（不透、领口正常、无弯腰怼胸）→ attire/pose 可为 none；不要因「有美女出镜」误报。
+10. 广告极限用语出现在画面文字时，visualHits 可附带该词原文。`
+
+function slotLabel(slot: ComplianceSampleFrameSlot, atSec?: number): string {
+  if (slot === 'opening') return '开头'
+  if (slot === 'middle') return '中段'
+  if (slot === 'closing') return '结尾'
+  if (typeof atSec === 'number' && Number.isFinite(atSec)) return `约${Math.round(atSec)}秒`
+  const m = /^t(\d+)s$/i.exec(slot)
+  if (m) return `约${m[1]}秒`
+  return String(slot)
+}
+
+async function mapPool<T, R>(items: T[], concurrency: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length)
+  let cursor = 0
+  async function worker() {
+    while (cursor < items.length) {
+      const idx = cursor++
+      out[idx] = await fn(items[idx]!, idx)
+    }
+  }
+  const n = Math.max(1, Math.min(concurrency, items.length || 1))
+  await Promise.all(Array.from({ length: n }, () => worker()))
+  return out
+}
 
 async function analyzeSingleFrame(
   slot: ComplianceSampleFrameSlot,
   dataUrl: string,
   env: Record<string, string>,
   usageRecord?: AiTokenUsageRecordOpts & { token?: string },
+  atSec?: number,
 ): Promise<{ ocrText: string; visualHits: string[]; visualNotes: string }> {
   const provider = (env.MERCHANT_AI_ICE_VERIFY_PROVIDER || env.MERCHANT_MP_AI_PROVIDER || 'doubao').trim()
   const model = (env.MERCHANT_AI_ICE_VERIFY_MODEL || '').trim() || undefined
-  const slotLabel =
-    slot === 'opening' ? '开头' : slot === 'middle' ? '中段' : '结尾'
-  const prompt = `这是探店成片的${slotLabel}关键帧，请 OCR 全部可见文字并检核画面违规风险。`
+  const prompt = `这是探店成片的${slotLabel(slot, atSec)}关键帧。请 OCR 全部可见文字，并按强制规则输出 attireRisk/poseRisk/divertRisk 与 visualHits（有擦边必须报，勿漏报）。`
   try {
     const res = await routeAiChat(
       {
@@ -104,24 +208,21 @@ async function analyzeSingleFrame(
       env,
     )
     void voidRecordLlmTokenUsage(usageRecord ? { ...usageRecord, env } : { env }, {
-        provider: res.provider || provider,
-        model: res.model,
-        usage: coerceLlmUsage(res.usage),
-        inputText: `${FRAME_VISION_SYSTEM}\n${prompt}`,
-        outputText: String(res.content ?? ''),
-        token: usageRecord?.token,
-      },
-    )
+      provider: res.provider || provider,
+      model: res.model,
+      usage: coerceLlmUsage(res.usage),
+      inputText: `${FRAME_VISION_SYSTEM}\n${prompt}`,
+      outputText: String(res.content ?? ''),
+      token: usageRecord?.token,
+    })
     const parsed = parseVisionComplianceJson(res.content || '')
-    const ocrText = String(parsed?.ocrText || res.content || '').trim()
-    const visualHits = Array.isArray(parsed?.visualHits)
-      ? parsed!.visualHits!.map((h) => String(h).trim()).filter(Boolean).slice(0, 12)
-      : []
-    const visualNotes = String(parsed?.visualNotes || '').trim()
+    const ocrText = String(parsed?.ocrText || '').trim() || String(res.content || '').trim()
+    const forced = forceHitsFromVisionFields(parsed || { ocrText })
     const ocrHits = localRiskScan(ocrText)
+    const visualNotes = String(parsed?.visualNotes || '').trim()
     return {
       ocrText,
-      visualHits: [...new Set([...visualHits, ...ocrHits])].slice(0, 12),
+      visualHits: [...new Set([...forced, ...ocrHits])].slice(0, 16),
       visualNotes,
     }
   } catch {
@@ -162,20 +263,31 @@ export async function extractVideoMediaForCompliance(
     notes.push('口播 ASR 未识别（可能无旁白或 Key/时长限制）')
   }
 
+  // 口播双关：有人物向字幕常见夸赞时，留给视觉帧与 ASR 组合；ASR 单独命中双关+后续视觉擦边会在 core 合并
+  if (/非常肥美|好大一只/.test(asrText)) {
+    notes.push('口播含可能双关表述，将结合画面人物出镜综合判定')
+  }
+
   const durationSec = framePack.ok ? framePack.durationSec : undefined
   let ocrText = ''
   let visualHits: string[] = []
   const frameSlotHits: VideoMediaComplianceExtract['frameSlotHits'] = []
 
   if (framePack.ok && framePack.frames.length) {
-    const ocrParts: string[] = []
-    for (const f of framePack.frames) {
+    notes.push(`已加密抽帧 ${framePack.frames.length} 张做画面检核`)
+    const visionResults = await mapPool(framePack.frames, 3, async (f) => {
       const vision = await analyzeSingleFrame(
         f.slot,
         `data:image/jpeg;base64,${f.buffer.toString('base64')}`,
         env,
         usageRecord,
+        'atSec' in f ? Number((f as { atSec?: number }).atSec) : undefined,
       )
+      return { frame: f, vision }
+    })
+
+    const ocrParts: string[] = []
+    for (const { frame: f, vision } of visionResults) {
       if (vision.ocrText) ocrParts.push(`【${f.slot}】${vision.ocrText}`)
       const slotOcr = String(vision.ocrText || '').trim()
       const slotHits = vision.visualHits.length ? vision.visualHits : localRiskScan(slotOcr)
@@ -183,22 +295,33 @@ export async function extractVideoMediaForCompliance(
         frameSlotHits.push({ slot: f.slot, hits: slotHits, ocrText: slotOcr })
       }
       if (vision.visualHits.length) visualHits.push(...vision.visualHits)
-      if (vision.visualNotes) notes.push(vision.visualNotes)
+      if (vision.visualNotes) notes.push(`${slotLabel(f.slot)}：${vision.visualNotes}`)
     }
     ocrText = ocrParts.join('\n')
     if (ocrText.length >= 4) notes.push('已 OCR 画面字幕/贴纸文字')
     else notes.push('画面 OCR 未提取到有效文字')
+
+    // ASR 双关 + 任意帧着装/姿态擦边 → 升色情导流
+    const edgeVisual = visualHits.some((h) => /着装擦边|姿态擦边/.test(h))
+    if (edgeVisual && /非常肥美|好大一只|duang大/i.test(asrText)) {
+      visualHits.push('双关暗示话术', '色情导流风险')
+    }
   } else {
     notes.push(
       framePack.ok ? '未能截取关键帧' : `关键帧截取失败：${'message' in framePack ? framePack.message : '未知'}`,
     )
   }
 
+  const mergedVisual = [...new Set(visualHits)].slice(0, 16)
+  if (mergedVisual.some((h) => VISION_FORCE_HIT_PHRASES.some((p) => h.includes(p)))) {
+    notes.push(`画面视觉命中：${mergedVisual.filter((h) => VISION_FORCE_HIT_PHRASES.some((p) => h.includes(p))).join('、')}`)
+  }
+
   return {
     asrText,
     asrSegments,
     ocrText,
-    visualHits: [...new Set(visualHits)].slice(0, 12),
+    visualHits: mergedVisual,
     frameSlotHits,
     durationSec,
     mediaNotes: notes,
