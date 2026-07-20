@@ -8,14 +8,15 @@ const MP_SHARE_APP_NAME = () =>
 export function buildRecruitmentDetailPageUrl(orderId: string): string {
   const id = String(orderId || '').trim()
   if (!id) return ''
-  return `pages/detail/detail?id=${encodeURIComponent(id)}`
+  /** 须与撮合小程序 app.json subPackages root=pages/subpack-core 一致；勿用已下线的 pages/detail/detail */
+  return `pages/subpack-core/detail/detail?id=${encodeURIComponent(id)}`
 }
 
 /** 明文 URL Scheme（微信外或部分场景；path 与 query 分离） */
 export function buildRecruitmentPlainSchemeLink(orderId: string): string {
   const id = String(orderId || '').trim()
   if (!id) return ''
-  const path = 'pages/detail/detail'
+  const path = 'pages/subpack-core/detail/detail'
   const query = `id=${encodeURIComponent(id)}`
   return `weixin://dl/business/?appid=${MP_APP_ID()}&path=${encodeURIComponent(path)}&query=${encodeURIComponent(query)}`
 }

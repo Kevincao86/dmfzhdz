@@ -1,7 +1,10 @@
 import { tokenmixImagesGenerate } from './aiGateway/tokenmixImageGenerate.js'
 import { runAgentFreeformTextToImage, type AgentFreeformImageOpts } from './merchantAiUpstream.js'
 
-/** data URL / 裸 base64 → OSS 公网 https（万相等图生图常拒 data:） */
+/**
+ * data URL / 裸 base64 → OSS 公网 https（旧版 wanx 图生图常拒 data:）。
+ * OSS 不可用时回退原始 data URL，供 wan2.7 multimodal / 豆包等可吃内联图的链路继续生图，避免方案墙整批失败。
+ */
 async function resolveReferenceImageToHttps(
   env: Record<string, string>,
   referenceImage: string | undefined,
@@ -44,16 +47,20 @@ async function resolveReferenceImageToHttps(
     const { putIceSourceObject } = await import('./aliyunOssIceUpload.js')
     const cfg = await loadIceGatewayConfig(process.cwd(), env)
     if (!cfg) {
-      return { ok: false, message: '参考图存储未配置（OSS），请联系管理员' }
+      console.warn('[meoo-agent-image] OSS 未配置，参考图回退 data URL')
+      return { ok: true, url: t.startsWith('data:') ? t : `data:${contentType};base64,${buffer.toString('base64')}` }
     }
     const put = await putIceSourceObject(cfg, env, { fileName, contentType, buffer })
     if (!put.ok || !put.mediaUrl) {
-      return { ok: false, message: '参考图上传失败，请稍后重试' }
+      const detail = !put.ok && 'message' in put ? String(put.message || '').slice(0, 120) : ''
+      console.warn('[meoo-agent-image] 参考图 OSS 上传失败，回退 data URL', detail)
+      return { ok: true, url: t.startsWith('data:') ? t : `data:${contentType};base64,${buffer.toString('base64')}` }
     }
     return { ok: true, url: put.mediaUrl }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    return { ok: false, message: `参考图处理失败：${msg.slice(0, 160)}` }
+    console.warn('[meoo-agent-image] 参考图处理异常，回退 data URL', msg.slice(0, 160))
+    return { ok: true, url: t.startsWith('data:') ? t : `data:${contentType};base64,${buffer.toString('base64')}` }
   }
 }
 

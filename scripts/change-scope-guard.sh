@@ -31,6 +31,7 @@ list_scopes() {
   recommend_hall    推荐大厅全部达人池（慎用，见 recommend-all-talents-lock）
   mp_auth           小程序登录/会话
   ai_vision_workshop AI视觉工坊（DR增值嵌入 + 撮合小程序原生页 + 会员权限位）
+  form_relay_share   转发代收「复制分享」短链（微信 genwxashortlink + 详情页路径）
   merchant_ai_ops_mix 商家 ERP：AI运营方案 + AI混剪去重
   erp_pay_points       ERP小程序支付 + 星选积分余额对齐
   mp_hall_region       小程序招募/推荐大厅城市自动定位
@@ -142,6 +143,11 @@ visualStudio
 visual_studio
 addon_visual_studio
 mpVisualStudioAi
+meooAgentImageCore
+meoo-ai-agent-image
+merchantAiUpstream
+qwenVisionApi
+qwenVisionCatalog
 mine-pr-addon-visual-studio
 mine-pr-addon-shortvideo
 mine-pr-addon-digital-human
@@ -172,6 +178,15 @@ change-scope-guard
 撮合小程序/pages/mine/mine.js
 撮合小程序/utils/ecs.js
 撮合小程序/utils/cloudEcs.js
+PAT
+      ;;
+    form_relay_share)
+      cat <<'PAT'
+mine-form-relay
+mpRecruitmentApplyShortLink
+mpApplyShortLink
+recruitmentShareCopy
+change-scope-guard
 PAT
       ;;
     merchant_ai_ops_mix)
