@@ -2799,10 +2799,8 @@ export async function handleDouyinGoodsAiAssist(
   let billGate: { tenantId: string; userId: string } | null = null
   let billed = false
   const billEnv = (billing?.env || (process.env as Record<string, string>)) as Record<string, string>
-  if (billing?.authHeader) {
-    const { requireErpAiPointsAffordable, chargeErpAiPointsAfterSuccess } = await import(
-      '../api/_lib/erpAiApiPointsGate.js'
-    )
+  if (billing) {
+    const { requireErpAiPointsAffordable } = await import('../api/_lib/erpAiApiPointsGate.js')
     const gate = await requireErpAiPointsAffordable(billing.authHeader, billKind, billEnv)
     if (!gate.ok) {
       json(res, gate.status, {
