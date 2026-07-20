@@ -269,6 +269,7 @@ mine-pr-addon-digital-human
 mpViralBriefAi
 SubscriptionPlansPanel
 mpMembershipCatalog
+opsRegistryTypes
 ai-points-pricing
 meooRegistryShared
 mp-change-blast-radius-check

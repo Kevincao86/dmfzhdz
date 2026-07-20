@@ -857,6 +857,13 @@ export type RegistryMpAiPointsSpendEntry = {
     | 'digital_human'
     | 'visual_studio_copy'
     | 'visual_studio_image'
+    | 'product_plan'
+    | 'ops_plan'
+    | 'agent_image'
+    | 'recruitment_ai'
+    | 'goods_ai'
+    | 'ad_ai'
+    | 'review_ai'
   points: number
   balanceAfter: number
   createdAt: string
