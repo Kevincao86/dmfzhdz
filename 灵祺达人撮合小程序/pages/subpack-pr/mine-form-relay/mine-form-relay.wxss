@@ -604,3 +604,136 @@
   color: #7c3aed;
   font-weight: 700;
 }
+
+.relay-share-sheet-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 10000;
+  background: rgba(53, 50, 74, 0.32);
+  display: flex;
+  align-items: flex-end;
+}
+
+.relay-share-sheet {
+  width: 100%;
+  max-height: 78vh;
+  padding: 28rpx 28rpx calc(28rpx + env(safe-area-inset-bottom));
+  background: #fff;
+  border-radius: 32rpx 32rpx 0 0;
+  box-shadow: 0 -12rpx 48rpx rgba(15, 23, 42, 0.12);
+  box-sizing: border-box;
+}
+
+.relay-share-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8rpx;
+}
+
+.relay-share-sheet-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.relay-share-sheet-close {
+  font-size: 44rpx;
+  color: #94a3b8;
+  line-height: 1;
+  padding: 0 8rpx;
+}
+
+.relay-share-sheet-sub {
+  display: block;
+  font-size: 24rpx;
+  color: #64748b;
+  margin-bottom: 16rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.relay-share-label {
+  display: block;
+  font-size: 24rpx;
+  color: #64748b;
+  margin-bottom: 12rpx;
+}
+
+.relay-share-copy-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-bottom: 16rpx;
+}
+
+.relay-share-copy-chip {
+  padding: 10rpx 22rpx;
+  border-radius: 999rpx;
+  border: 1rpx solid #e2e8f0;
+  background: #f8fafc;
+  font-size: 24rpx;
+  color: #475569;
+}
+
+.relay-share-copy-chip--on {
+  border-color: #c4b5fd;
+  background: #f5f3ff;
+  color: #5b21b6;
+  font-weight: 600;
+}
+
+.relay-share-preview {
+  max-height: 280rpx;
+  padding: 16rpx 18rpx;
+  margin-bottom: 8rpx;
+  border-radius: 16rpx;
+  background: #f8fafc;
+  border: 1rpx solid #e2e8f0;
+  box-sizing: border-box;
+}
+
+.relay-share-preview-text {
+  display: block;
+  font-size: 24rpx;
+  line-height: 1.65;
+  color: #334155;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.relay-share-sheet-item {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 28rpx 8rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #0f172a;
+  text-align: center;
+  border-top: 1rpx solid #e2e8f0;
+}
+
+.relay-share-sheet-btn {
+  margin: 0;
+  background: #fff;
+  border: none;
+  border-radius: 0;
+  line-height: 1.4;
+}
+
+.relay-share-sheet-btn::after {
+  border: none;
+}
+
+.relay-share-sheet-cancel {
+  margin-top: 12rpx;
+  padding: 24rpx 8rpx;
+  text-align: center;
+  font-size: 28rpx;
+  color: #64748b;
+}
