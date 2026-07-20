@@ -11,17 +11,33 @@ import {
   findPhraseMsInSegments,
   formatComplianceTimeLabel,
   formatVideoViolationLine,
+  frameSlotToApproxSec,
   locatePhraseMsInSegment,
   findParagraphNoForExcerpt,
   resolveVideoHitLocations,
   splitScriptParagraphs,
 } from '../src/lib/complianceHitLocations.js'
+import { computeComplianceFrameSamplePlan } from '../vite-plugins/videoConcatServer.js'
 import { runRecruitmentVideoComplianceCheck } from '../src/lib/recruitmentVideoComplianceCore.js'
 import { runRecruitmentScriptComplianceCheck } from '../src/lib/recruitmentScriptComplianceCore.js'
 
 const fakeEnv = { MERCHANT_AI_DOUBAO_KEY: 'sk-smoke-invalid' }
 
 async function main() {
+  const plan58 = computeComplianceFrameSamplePlan(58)
+  if (plan58.length < 5 || plan58.length > 6) {
+    throw new Error(`expected 5-6 compliance frames for 58s, got ${plan58.length}`)
+  }
+  if (plan58[0]?.slot !== 'opening' || plan58[plan58.length - 1]?.slot !== 'closing') {
+    throw new Error(`expected opening/closing ends, got ${JSON.stringify(plan58)}`)
+  }
+  if (!plan58.some((p) => p.slot === 'middle')) {
+    throw new Error(`expected middle slot in plan, got ${JSON.stringify(plan58)}`)
+  }
+  if (frameSlotToApproxSec('t25s', 58) !== 25) {
+    throw new Error(`expected t25s → 25, got ${frameSlotToApproxSec('t25s', 58)}`)
+  }
+
   if (formatComplianceTimeLabel(5200) !== '00:05:200') {
     throw new Error(`expected 00:05:200 for 5200ms, got ${formatComplianceTimeLabel(5200)}`)
   }

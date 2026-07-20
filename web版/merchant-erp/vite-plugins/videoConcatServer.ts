@@ -304,13 +304,42 @@ export async function extractLastFrameJpegFromUrl(
   return extractSampleFrameJpegFromBuffer(fetched.buffer, opts?.frame ?? 'last')
 }
 
-export type ComplianceSampleFrameSlot = 'opening' | 'middle' | 'closing'
+/** opening/middle/closing 兼容旧调用；加密抽帧额外使用 t12s 等形式 */
+export type ComplianceSampleFrameSlot = string
 
-/** 成片合规：首/中/尾三帧 JPEG（单次下载，供 OCR + 画面检核） */
+/** 成片合规抽帧时间点：按时长加密采样（含首/中/尾），上限控制成本与 120s API 时限 */
+export function computeComplianceFrameSamplePlan(
+  durationSec: number,
+): Array<{ slot: ComplianceSampleFrameSlot; atSec: number }> {
+  const dur = Math.max(1.2, Number(durationSec) || 1.2)
+  const maxFrames = dur <= 15 ? 4 : dur <= 35 ? 5 : 6
+  const secs = new Set<number>()
+  secs.add(0)
+  secs.add(Math.max(0, Math.round((dur - 0.25) * 10) / 10))
+  secs.add(Math.round((dur / 2) * 10) / 10)
+  if (dur > 10) secs.add(Math.min(5, Math.round((dur / 4) * 10) / 10))
+  if (dur > 20) secs.add(Math.round(dur * 0.75 * 10) / 10)
+  const step = Math.max(6, dur / Math.max(2, maxFrames - 1))
+  for (let t = step; t < dur - 0.4 && secs.size < maxFrames + 2; t += step) {
+    secs.add(Math.round(t * 10) / 10)
+  }
+  const sorted = [...secs].sort((a, b) => a - b).slice(0, maxFrames)
+  const midIdx = Math.floor(sorted.length / 2)
+  return sorted.map((atSec, i) => {
+    let slot: ComplianceSampleFrameSlot
+    if (i === 0) slot = 'opening'
+    else if (i === sorted.length - 1) slot = 'closing'
+    else if (i === midIdx) slot = 'middle'
+    else slot = `t${Math.round(atSec)}s`
+    return { slot, atSec }
+  })
+}
+
+/** 成片合规：按时长加密抽帧 JPEG（单次下载，供 OCR + 画面检核） */
 export async function extractComplianceSampleFramesFromBuffer(
   videoBuf: Buffer,
 ): Promise<
-  | { ok: true; frames: Array<{ slot: ComplianceSampleFrameSlot; buffer: Buffer }>; durationSec?: number }
+  | { ok: true; frames: Array<{ slot: ComplianceSampleFrameSlot; buffer: Buffer; atSec?: number }>; durationSec?: number }
   | { ok: false; message: string }
 > {
   if (!videoBuf.length) return { ok: false, message: '视频为空' }
@@ -328,63 +357,43 @@ export async function extractComplianceSampleFramesFromBuffer(
     }
   }
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'meoo-vframes-'))
-  const slotPlans: Array<{ slot: ComplianceSampleFrameSlot; args: (videoPath: string, outPath: string) => string[] }> = [
-    {
-      slot: 'opening',
-      args: (videoPath, outPath) => [
-        '-y',
-        '-i',
-        videoPath,
-        '-vf',
-        'select=eq(n\\,0)',
-        '-frames:v',
-        '1',
-        '-q:v',
-        '2',
-        outPath,
-      ],
-    },
-    {
-      slot: 'middle',
-      args: (videoPath, outPath) => [
-        '-y',
-        '-sseof',
-        '-30',
-        '-i',
-        videoPath,
-        '-frames:v',
-        '1',
-        '-q:v',
-        '2',
-        outPath,
-      ],
-    },
-    {
-      slot: 'closing',
-      args: (videoPath, outPath) => [
-        '-y',
-        '-sseof',
-        '-0.15',
-        '-i',
-        videoPath,
-        '-frames:v',
-        '1',
-        '-q:v',
-        '2',
-        outPath,
-      ],
-    },
-  ]
   try {
     const videoPath = path.join(tmpDir, 'in.mp4')
     fs.writeFileSync(videoPath, videoBuf)
     const durationSec = probeVideoDurationSec(ffmpeg, videoPath) ?? undefined
-    const frames: Array<{ slot: ComplianceSampleFrameSlot; buffer: Buffer }> = []
-    for (const { slot, args } of slotPlans) {
-      const outPath = path.join(tmpDir, `${slot}.jpg`)
-      const r = runFfmpeg(ffmpeg, args(videoPath, outPath))
-      if (r.ok && fs.existsSync(outPath) && fs.statSync(outPath).size > 256) {
-        frames.push({ slot, buffer: fs.readFileSync(outPath) })
+    const plan = computeComplianceFrameSamplePlan(durationSec ?? 30)
+    const visionScale = 'scale=720:-1'
+    const frames: Array<{ slot: ComplianceSampleFrameSlot; buffer: Buffer; atSec?: number }> = []
+    for (const { slot, atSec } of plan) {
+      const outPath = path.join(tmpDir, `${slot.replace(/[^\w.-]/g, '_')}.jpg`)
+      const ss = Math.max(0, atSec)
+      const attempts: string[][] =
+        slot === 'opening' && ss <= 0.05
+          ? [
+              [
+                '-y',
+                '-i',
+                videoPath,
+                '-vf',
+                `select=eq(n\\,0),${visionScale}`,
+                '-frames:v',
+                '1',
+                '-q:v',
+                '4',
+                outPath,
+              ],
+              ['-y', '-ss', '0.3', '-i', videoPath, '-vf', visionScale, '-frames:v', '1', '-q:v', '4', outPath],
+            ]
+          : [
+              ['-y', '-ss', String(ss), '-i', videoPath, '-vf', visionScale, '-frames:v', '1', '-q:v', '4', outPath],
+              ['-y', '-i', videoPath, '-ss', String(ss), '-vf', visionScale, '-frames:v', '1', '-q:v', '4', outPath],
+            ]
+      for (const args of attempts) {
+        const r = runFfmpeg(ffmpeg, args)
+        if (r.ok && fs.existsSync(outPath) && fs.statSync(outPath).size > 256) {
+          frames.push({ slot, buffer: fs.readFileSync(outPath), atSec: ss })
+          break
+        }
       }
     }
     if (!frames.length) return { ok: false, message: '未能截取任何关键帧' }

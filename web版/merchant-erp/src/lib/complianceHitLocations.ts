@@ -62,14 +62,21 @@ export function frameSlotToApproxSec(
   slot: ComplianceSampleFrameSlot,
   durationSec: number | null | undefined,
 ): number {
+  const timed = /^t(\d+(?:\.\d+)?)s$/i.exec(String(slot || '').trim())
+  if (timed) {
+    const sec = Number(timed[1])
+    if (Number.isFinite(sec) && sec >= 0) return Math.max(0, Math.round(sec))
+  }
   const dur = Number(durationSec)
   if (!Number.isFinite(dur) || dur <= 0) {
     if (slot === 'opening') return 1
     if (slot === 'middle') return 15
-    return 28
+    if (slot === 'closing') return 28
+    return 15
   }
   if (slot === 'opening') return 1
   if (slot === 'closing') return Math.max(1, Math.round(dur - 1))
+  if (slot === 'middle') return Math.max(1, Math.round(dur / 2))
   if (dur > 60) return Math.max(1, Math.round(dur - 30))
   return Math.max(1, Math.round(dur / 2))
 }
