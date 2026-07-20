@@ -70,6 +70,8 @@ function upstreamRequest(t, method, body, headers) {
     const reqPath = t.mode === 'ip' ? t.path : `${new URL(t.fullUrl).pathname}${new URL(t.fullUrl).search}`
     const timeoutMs = /video-upload|ice-multipart|group-qr-upload-body/i.test(reqPath)
       ? 120000
+      : /meoo-mp-recruitment-video-compliance|recruitment-video-compliance/i.test(reqPath)
+        ? 180000
       : /registry|hall-registry|publisher-display|form-relay-group-qr|group-qr-upload-init|group-qr-upload-body|meoo-ops-mp-auth|recruitment-orders-patch/i.test(reqPath)
         ? 45000
         : 20000

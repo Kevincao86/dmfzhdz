@@ -312,17 +312,14 @@ export function computeComplianceFrameSamplePlan(
   durationSec: number,
 ): Array<{ slot: ComplianceSampleFrameSlot; atSec: number }> {
   const dur = Math.max(1.2, Number(durationSec) || 1.2)
-  const maxFrames = dur <= 15 ? 4 : dur <= 35 ? 5 : 6
+  /** 上限 4 帧：兼顾擦边覆盖与小程序/网关超时（约 60–120s） */
+  const maxFrames = dur <= 20 ? 3 : 4
   const secs = new Set<number>()
   secs.add(0)
   secs.add(Math.max(0, Math.round((dur - 0.25) * 10) / 10))
   secs.add(Math.round((dur / 2) * 10) / 10)
-  if (dur > 10) secs.add(Math.min(5, Math.round((dur / 4) * 10) / 10))
-  if (dur > 20) secs.add(Math.round(dur * 0.75 * 10) / 10)
-  const step = Math.max(6, dur / Math.max(2, maxFrames - 1))
-  for (let t = step; t < dur - 0.4 && secs.size < maxFrames + 2; t += step) {
-    secs.add(Math.round(t * 10) / 10)
-  }
+  if (dur > 12) secs.add(Math.min(5, Math.round((dur / 4) * 10) / 10))
+  if (dur > 24 && secs.size < maxFrames) secs.add(Math.round(dur * 0.75 * 10) / 10)
   const sorted = [...secs].sort((a, b) => a - b).slice(0, maxFrames)
   const midIdx = Math.floor(sorted.length / 2)
   return sorted.map((atSec, i) => {
