@@ -1,0 +1,564 @@
+{
+  "meta": {
+    "课号": "5.3",
+    "课名": "本地推线索：线索进 ERP 怎么跟",
+    "建议时长": "18min",
+    "所属模块": "模块 5｜曝光与获客",
+    "学员收获": "完成线索进入 → AI 话术 → 跟进最小闭环",
+    "建议录屏文件名": "5.3-本地推线索.mp4",
+    "时间": "秒序 | 口播（逐字念） | 画面动作",
+    "00:00–00:05": "0000–0005 | 课号五点三：本地推线索，线索进ERP怎么跟。 | 片头",
+    "00:05–00:10": "0005–0010 | 这是第四周直播主课之一。 | 片头",
+    "00:10–00:15": "0010–0015 | 完成投流或线索相关绑定，按页面指引。线索列表出现新客。 | 片头",
+    "00:15–00:20": "0015–0020 | 用AI生成跟进话术：问诊需求，给套餐建议， | 片头",
+    "00:20–00:25": "0020–0025 | 邀约到店或私信。跟进结果回填，避免重复骚扰。 | 片头",
+    "00:25–00:30": "0025–0030 | 投流没有线索跟进，等于买了电话簿不打电话。 | 片头",
+    "00:30–00:35": "0030–0035 | 客户手机号必须打码，群里交作业也一样。 | 片头",
+    "00:35–00:40": "0035–0040 | 暂停：生成一版话术截图，五点四要交。下一集作业说明。 | 片头",
+    "00:40–00:45": "0040–0045 | 本集结束。我们展开讲：课号五点三：本地推线索， | 投流/线索绑定示意",
+    "00:45–00:50": "0045–0050 | 线索进ERP怎么跟。为什么要强调这一点？ | 投流/线索绑定示意",
+    "00:50–00:55": "0050–0055 | 因为现场一忙最容易省掉这一步， | 投流/线索绑定示意",
+    "00:55–01:00": "0055–0060 | 而返工成本通常高于你现在多花的一分钟。 | 投流/线索绑定示意",
+    "01:00–01:05": "0060–0065 | 我们展开讲：这是第四周直播主课之一。 | 投流/线索绑定示意",
+    "01:05–01:10": "0065–0070 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 投流/线索绑定示意",
+    "01:10–01:15": "0070–0075 | 听懂不等于会做，会做才算合格。 | 投流/线索绑定示意",
+    "01:15–01:20": "0075–0080 | 我们展开讲：完成投流或线索相关绑定，按页面指引。 | 投流/线索绑定示意",
+    "01:20–01:25": "0080–0085 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 投流/线索绑定示意",
+    "01:25–01:30": "0085–0090 | 不截图不留痕。这些都会在下周复盘时暴露。 | 投流/线索绑定示意",
+    "01:30–01:35": "0090–0095 | 我们展开讲：线索列表出现新客。 | 投流/线索绑定示意",
+    "01:35–01:40": "0095–0100 | 正例是什么？每一步都有入口、有确认、有结果物。 | 投流/线索绑定示意",
+    "01:40–01:45": "0100–0105 | 结果物可以是草稿、订单、话术截图或复盘表。 | 投流/线索绑定示意",
+    "01:45–01:50": "0105–0110 | 我们展开讲：用AI生成跟进话术：问诊需求，给套餐建议， | 投流/线索绑定示意",
+    "01:50–01:55": "0110–0115 | 邀约到店或私信。自检三问：我刚才做到哪一步了？ | 投流/线索绑定示意",
+    "01:55–02:00": "0115–0120 | 哪一步还不敢自己点？我需要回看哪一个课号补齐？ | 投流/线索绑定示意",
+    "02:00–02:05": "0120–0125 | 我们展开讲：跟进结果回填，避免重复骚扰。 | 投流/线索绑定示意",
+    "02:05–02:10": "0125–0130 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 投流/线索绑定示意",
+    "02:10–02:15": "0130–0135 | 分工清楚，学习效率更高。 | 投流/线索绑定示意",
+    "02:15–02:20": "0135–0140 | 我们展开讲：投流没有线索跟进，等于买了电话簿不打电话。 | 投流/线索绑定示意",
+    "02:20–02:25": "0140–0145 | 演示默认测试店。生产环境涉及改价、发单、结款， | 投流/线索绑定示意",
+    "02:25–02:30": "0145–0150 | 必须二次确认，不要直播手滑。 | 投流/线索绑定示意",
+    "02:30–02:35": "0150–0155 | 我们展开讲：客户手机号必须打码，群里交作业也一样。 | 投流/线索绑定示意",
+    "02:35–02:40": "0155–0160 | 交作业打码：手机号、客户名、真实账单。 | 投流/线索绑定示意",
+    "02:40–02:45": "0160–0165 | 保护隐私，也是职业习惯。 | 投流/线索绑定示意",
+    "02:45–02:50": "0165–0170 | 我们展开讲：暂停：生成一版话术截图，五点四要交。 | 投流/线索绑定示意",
+    "02:50–02:55": "0170–0175 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 投流/线索绑定示意",
+    "02:55–03:00": "0175–0180 | 每一步都要能复用到下周、下月。 | 投流/线索绑定示意",
+    "03:00–03:05": "0180–0185 | 我们展开讲：下一集作业说明。跟不上就暂停。 | 线索列表",
+    "03:05–03:10": "0185–0190 | 暂停重做三十秒，胜过假装看完却一步都没点过。 | 线索列表",
+    "03:10–03:15": "0190–0195 | 我们展开讲：本集结束。 | 线索列表",
+    "03:15–03:20": "0195–0200 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 线索列表",
+    "03:20–03:25": "0200–0205 | 而返工成本通常高于你现在多花的一分钟。 | 线索列表",
+    "03:25–03:30": "0205–0210 | 我们展开讲：课号五点三：本地推线索， | 线索列表",
+    "03:30–03:35": "0210–0215 | 线索进ERP怎么跟。怎么做才算到位？ | 线索列表",
+    "03:35–03:40": "0215–0220 | 请对照屏幕把动作做完，而不是只听懂。 | 线索列表",
+    "03:40–03:45": "0220–0225 | 听懂不等于会做，会做才算合格。 | 线索列表",
+    "03:45–03:50": "0225–0230 | 我们展开讲：这是第四周直播主课之一。 | 线索列表",
+    "03:50–03:55": "0230–0235 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 线索列表",
+    "03:55–04:00": "0235–0240 | 不截图不留痕。这些都会在下周复盘时暴露。 | 线索列表",
+    "04:00–04:05": "0240–0245 | 我们展开讲：完成投流或线索相关绑定，按页面指引。 | 线索列表",
+    "04:05–04:10": "0245–0250 | 正例是什么？每一步都有入口、有确认、有结果物。 | 线索列表",
+    "04:10–04:15": "0250–0255 | 结果物可以是草稿、订单、话术截图或复盘表。 | 线索列表",
+    "04:15–04:20": "0255–0260 | 我们展开讲：线索列表出现新客。 | 线索列表",
+    "04:20–04:25": "0260–0265 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 线索列表",
+    "04:25–04:30": "0265–0270 | 我需要回看哪一个课号补齐？ | 线索列表",
+    "04:30–04:35": "0270–0275 | 我们展开讲：用AI生成跟进话术：问诊需求，给套餐建议， | 线索列表",
+    "04:35–04:40": "0275–0280 | 邀约到店或私信。如果带着店员一起学，让店员负责点选， | 线索列表",
+    "04:40–04:45": "0280–0285 | 你负责拍板。分工清楚，学习效率更高。 | 线索列表",
+    "04:45–04:50": "0285–0290 | 我们展开讲：跟进结果回填，避免重复骚扰。 | 线索列表",
+    "04:50–04:55": "0290–0295 | 演示默认测试店。生产环境涉及改价、发单、结款， | 线索列表",
+    "04:55–05:00": "0295–0300 | 必须二次确认，不要直播手滑。 | 线索列表",
+    "05:00–05:05": "0300–0305 | 我们展开讲：投流没有线索跟进，等于买了电话簿不打电话。 | 线索列表",
+    "05:05–05:10": "0305–0310 | 交作业打码：手机号、客户名、真实账单。 | 线索列表",
+    "05:10–05:15": "0310–0315 | 保护隐私，也是职业习惯。 | 线索列表",
+    "05:15–05:20": "0315–0320 | 我们展开讲：客户手机号必须打码，群里交作业也一样。 | 线索列表",
+    "05:20–05:25": "0320–0325 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 线索列表",
+    "05:25–05:30": "0325–0330 | 每一步都要能复用到下周、下月。 | 线索列表",
+    "05:30–05:35": "0330–0335 | 我们展开讲：暂停：生成一版话术截图，五点四要交。 | 线索列表",
+    "05:35–05:40": "0335–0340 | 跟不上就暂停。暂停重做三十秒， | 线索列表",
+    "05:40–05:45": "0340–0345 | 胜过假装看完却一步都没点过。 | 线索列表",
+    "05:45–05:50": "0345–0350 | 我们展开讲：下一集作业说明。 | 线索列表",
+    "05:50–05:55": "0350–0355 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 线索列表",
+    "05:55–06:00": "0355–0360 | 而返工成本通常高于你现在多花的一分钟。 | 线索列表",
+    "06:00–06:05": "0360–0365 | 我们展开讲：本集结束。 | AI生成跟进话术",
+    "06:05–06:10": "0365–0370 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | AI生成跟进话术",
+    "06:10–06:15": "0370–0375 | 听懂不等于会做，会做才算合格。 | AI生成跟进话术",
+    "06:15–06:20": "0375–0380 | 我们展开讲：课号五点三：本地推线索， | AI生成跟进话术",
+    "06:20–06:25": "0380–0385 | 线索进ERP怎么跟。反例是什么？ | AI生成跟进话术",
+    "06:25–06:30": "0385–0390 | 跳步、凭感觉、只在微信里同步、不截图不留痕。 | AI生成跟进话术",
+    "06:30–06:35": "0390–0395 | 这些都会在下周复盘时暴露。 | AI生成跟进话术",
+    "06:35–06:40": "0395–0400 | 我们展开讲：这是第四周直播主课之一。 | AI生成跟进话术",
+    "06:40–06:45": "0400–0405 | 正例是什么？每一步都有入口、有确认、有结果物。 | AI生成跟进话术",
+    "06:45–06:50": "0405–0410 | 结果物可以是草稿、订单、话术截图或复盘表。 | AI生成跟进话术",
+    "06:50–06:55": "0410–0415 | 我们展开讲：完成投流或线索相关绑定，按页面指引。 | AI生成跟进话术",
+    "06:55–07:00": "0415–0420 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | AI生成跟进话术",
+    "07:00–07:05": "0420–0425 | 我需要回看哪一个课号补齐？ | AI生成跟进话术",
+    "07:05–07:10": "0425–0430 | 我们展开讲：线索列表出现新客。 | AI生成跟进话术",
+    "07:10–07:15": "0430–0435 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | AI生成跟进话术",
+    "07:15–07:20": "0435–0440 | 分工清楚，学习效率更高。 | AI生成跟进话术",
+    "07:20–07:25": "0440–0445 | 我们展开讲：用AI生成跟进话术：问诊需求，给套餐建议， | AI生成跟进话术",
+    "07:25–07:30": "0445–0450 | 邀约到店或私信。演示默认测试店。 | AI生成跟进话术",
+    "07:30–07:35": "0450–0455 | 生产环境涉及改价、发单、结款，必须二次确认， | AI生成跟进话术",
+    "07:35–07:40": "0455–0460 | 不要直播手滑。我们展开讲：跟进结果回填，避免重复骚扰。 | AI生成跟进话术",
+    "07:40–07:45": "0460–0465 | 交作业打码：手机号、客户名、真实账单。 | AI生成跟进话术",
+    "07:45–07:50": "0465–0470 | 保护隐私，也是职业习惯。 | AI生成跟进话术",
+    "07:50–07:55": "0470–0475 | 我们展开讲：投流没有线索跟进，等于买了电话簿不打电话。 | AI生成跟进话术",
+    "07:55–08:00": "0475–0480 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | AI生成跟进话术",
+    "08:00–08:05": "0480–0485 | 每一步都要能复用到下周、下月。 | AI生成跟进话术",
+    "08:05–08:10": "0485–0490 | 我们展开讲：客户手机号必须打码，群里交作业也一样。 | AI生成跟进话术",
+    "08:10–08:15": "0490–0495 | 跟不上就暂停。暂停重做三十秒， | AI生成跟进话术",
+    "08:15–08:20": "0495–0500 | 胜过假装看完却一步都没点过。 | AI生成跟进话术",
+    "08:20–08:25": "0500–0505 | 我们展开讲：暂停：生成一版话术截图，五点四要交。 | AI生成跟进话术",
+    "08:25–08:30": "0505–0510 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | AI生成跟进话术",
+    "08:30–08:35": "0510–0515 | 而返工成本通常高于你现在多花的一分钟。 | AI生成跟进话术",
+    "08:35–08:40": "0515–0520 | 我们展开讲：下一集作业说明。 | AI生成跟进话术",
+    "08:40–08:45": "0520–0525 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | AI生成跟进话术",
+    "08:45–08:50": "0525–0530 | 听懂不等于会做，会做才算合格。我们展开讲：本集结束。 | AI生成跟进话术",
+    "08:50–08:55": "0530–0535 | 反例是什么？跳步、凭感觉、只在微信里同步、 | AI生成跟进话术",
+    "08:55–09:00": "0535–0540 | 不截图不留痕。这些都会在下周复盘时暴露。 | AI生成跟进话术",
+    "09:00–09:05": "0540–0545 | 我们展开讲：课号五点三：本地推线索， | AI生成跟进话术",
+    "09:05–09:10": "0545–0550 | 线索进ERP怎么跟。正例是什么？ | AI生成跟进话术",
+    "09:10–09:15": "0550–0555 | 每一步都有入口、有确认、有结果物。 | AI生成跟进话术",
+    "09:15–09:20": "0555–0560 | 结果物可以是草稿、订单、话术截图或复盘表。 | AI生成跟进话术",
+    "09:20–09:25": "0560–0565 | 我们展开讲：这是第四周直播主课之一。 | AI生成跟进话术",
+    "09:25–09:30": "0565–0570 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | AI生成跟进话术",
+    "09:30–09:35": "0570–0575 | 我需要回看哪一个课号补齐？ | AI生成跟进话术",
+    "09:35–09:40": "0575–0580 | 我们展开讲：完成投流或线索相关绑定，按页面指引。 | AI生成跟进话术",
+    "09:40–09:45": "0580–0585 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | AI生成跟进话术",
+    "09:45–09:50": "0585–0590 | 分工清楚，学习效率更高。我们展开讲：线索列表出现新客。 | AI生成跟进话术",
+    "09:50–09:55": "0590–0595 | 演示默认测试店。生产环境涉及改价、发单、结款， | AI生成跟进话术",
+    "09:55–10:00": "0595–0600 | 必须二次确认，不要直播手滑。 | AI生成跟进话术",
+    "10:00–10:05": "0600–0605 | 我们展开讲：用AI生成跟进话术：问诊需求，给套餐建议， | 回填跟进结果",
+    "10:05–10:10": "0605–0610 | 邀约到店或私信。交作业打码：手机号、客户名、真实账单。 | 回填跟进结果",
+    "10:10–10:15": "0610–0615 | 保护隐私，也是职业习惯。 | 回填跟进结果",
+    "10:15–10:20": "0615–0620 | 我们展开讲：跟进结果回填，避免重复骚扰。 | 回填跟进结果",
+    "10:20–10:25": "0620–0625 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 回填跟进结果",
+    "10:25–10:30": "0625–0630 | 每一步都要能复用到下周、下月。 | 回填跟进结果",
+    "10:30–10:35": "0630–0635 | 我们展开讲：投流没有线索跟进，等于买了电话簿不打电话。 | 回填跟进结果",
+    "10:35–10:40": "0635–0640 | 跟不上就暂停。暂停重做三十秒， | 回填跟进结果",
+    "10:40–10:45": "0640–0645 | 胜过假装看完却一步都没点过。 | 回填跟进结果",
+    "10:45–10:50": "0645–0650 | 我们展开讲：客户手机号必须打码，群里交作业也一样。 | 回填跟进结果",
+    "10:50–10:55": "0650–0655 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 回填跟进结果",
+    "10:55–11:00": "0655–0660 | 而返工成本通常高于你现在多花的一分钟。 | 回填跟进结果",
+    "11:00–11:05": "0660–0665 | 我们展开讲：暂停：生成一版话术截图，五点四要交。 | 回填跟进结果",
+    "11:05–11:10": "0665–0670 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 回填跟进结果",
+    "11:10–11:15": "0670–0675 | 听懂不等于会做，会做才算合格。 | 回填跟进结果",
+    "11:15–11:20": "0675–0680 | 我们展开讲：下一集作业说明。 | 回填跟进结果",
+    "11:20–11:25": "0680–0685 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 回填跟进结果",
+    "11:25–11:30": "0685–0690 | 不截图不留痕。这些都会在下周复盘时暴露。 | 回填跟进结果",
+    "11:30–11:35": "0690–0695 | 我们展开讲：本集结束。 | 回填跟进结果",
+    "11:35–11:40": "0695–0700 | 正例是什么？每一步都有入口、有确认、有结果物。 | 回填跟进结果",
+    "11:40–11:45": "0700–0705 | 结果物可以是草稿、订单、话术截图或复盘表。 | 回填跟进结果",
+    "11:45–11:50": "0705–0710 | 我们展开讲：课号五点三：本地推线索， | 回填跟进结果",
+    "11:50–11:55": "0710–0715 | 线索进ERP怎么跟。自检三问：我刚才做到哪一步了？ | 回填跟进结果",
+    "11:55–12:00": "0715–0720 | 哪一步还不敢自己点？我需要回看哪一个课号补齐？ | 回填跟进结果",
+    "12:00–12:05": "0720–0725 | 我们展开讲：这是第四周直播主课之一。 | 回填跟进结果",
+    "12:05–12:10": "0725–0730 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 回填跟进结果",
+    "12:10–12:15": "0730–0735 | 分工清楚，学习效率更高。 | 回填跟进结果",
+    "12:15–12:20": "0735–0740 | 我们展开讲：完成投流或线索相关绑定，按页面指引。 | 回填跟进结果",
+    "12:20–12:25": "0740–0745 | 演示默认测试店。生产环境涉及改价、发单、结款， | 回填跟进结果",
+    "12:25–12:30": "0745–0750 | 必须二次确认，不要直播手滑。 | 回填跟进结果",
+    "12:30–12:35": "0750–0755 | 我们展开讲：线索列表出现新客。 | 回填跟进结果",
+    "12:35–12:40": "0755–0760 | 交作业打码：手机号、客户名、真实账单。 | 回填跟进结果",
+    "12:40–12:45": "0760–0765 | 保护隐私，也是职业习惯。 | 回填跟进结果",
+    "12:45–12:50": "0765–0770 | 我们展开讲：用AI生成跟进话术：问诊需求，给套餐建议， | 回填跟进结果",
+    "12:50–12:55": "0770–0775 | 邀约到店或私信。和课程总定位对齐：我们要的是流水线， | 回填跟进结果",
+    "12:55–13:00": "0775–0780 | 不是单点技巧。每一步都要能复用到下周、下月。 | 回填跟进结果",
+    "13:00–13:05": "0780–0785 | 我们展开讲：跟进结果回填，避免重复骚扰。跟不上就暂停。 | 回填跟进结果",
+    "13:05–13:10": "0785–0790 | 暂停重做三十秒，胜过假装看完却一步都没点过。 | 回填跟进结果",
+    "13:10–13:15": "0790–0795 | 我们展开讲：投流没有线索跟进，等于买了电话簿不打电话。 | 回填跟进结果",
+    "13:15–13:20": "0795–0800 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 回填跟进结果",
+    "13:20–13:25": "0800–0805 | 而返工成本通常高于你现在多花的一分钟。 | 回填跟进结果",
+    "13:25–13:30": "0805–0810 | 我们展开讲：客户手机号必须打码，群里交作业也一样。 | 回填跟进结果",
+    "13:30–13:35": "0810–0815 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 回填跟进结果",
+    "13:35–13:40": "0815–0820 | 听懂不等于会做，会做才算合格。 | 回填跟进结果",
+    "13:40–13:45": "0820–0825 | 我们展开讲：暂停：生成一版话术截图，五点四要交。 | 回填跟进结果",
+    "13:45–13:50": "0825–0830 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 回填跟进结果",
+    "13:50–13:55": "0830–0835 | 不截图不留痕。这些都会在下周复盘时暴露。 | 回填跟进结果",
+    "13:55–14:00": "0835–0840 | 我们展开讲：下一集作业说明。 | 回填跟进结果",
+    "14:00–14:05": "0840–0845 | 正例是什么？每一步都有入口、有确认、有结果物。 | 片尾",
+    "14:05–14:10": "0845–0850 | 结果物可以是草稿、订单、话术截图或复盘表。 | 片尾",
+    "14:10–14:15": "0850–0855 | 我们展开讲：本集结束。 | 片尾",
+    "14:15–14:20": "0855–0860 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 片尾",
+    "14:20–14:25": "0860–0865 | 我需要回看哪一个课号补齐？ | 片尾",
+    "14:25–14:30": "0865–0870 | 我们展开讲：课号五点三：本地推线索， | 片尾",
+    "14:30–14:35": "0870–0875 | 线索进ERP怎么跟。如果带着店员一起学， | 片尾",
+    "14:35–14:40": "0875–0880 | 让店员负责点选，你负责拍板。分工清楚，学习效率更高。 | 片尾",
+    "14:40–14:45": "0880–0885 | 我们展开讲：这是第四周直播主课之一。演示默认测试店。 | 片尾",
+    "14:45–14:50": "0885–0890 | 生产环境涉及改价、发单、结款，必须二次确认， | 片尾",
+    "14:50–14:55": "0890–0895 | 不要直播手滑。我们展开讲：完成投流或线索相关绑定， | 片尾",
+    "14:55–15:00": "0895–0900 | 按页面指引。交作业打码：手机号、客户名、真实账单。 | 片尾",
+    "15:00–15:05": "0900–0905 | 保护隐私，也是职业习惯。我们展开讲：线索列表出现新客。 | 片尾",
+    "15:05–15:10": "0905–0910 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 片尾",
+    "15:10–15:15": "0910–0915 | 每一步都要能复用到下周、下月。 | 片尾",
+    "15:15–15:20": "0915–0920 | 我们展开讲：用AI生成跟进话术：问诊需求，给套餐建议， | 片尾",
+    "15:20–15:25": "0920–0925 | 邀约到店或私信。跟不上就暂停。 | 片尾",
+    "15:25–15:30": "0925–0930 | 暂停重做三十秒，胜过假装看完却一步都没点过。 | 片尾",
+    "15:30–15:35": "0930–0935 | 我们展开讲：跟进结果回填，避免重复骚扰。 | 片尾",
+    "15:35–15:40": "0935–0940 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 片尾",
+    "15:40–15:45": "0940–0945 | 而返工成本通常高于你现在多花的一分钟。 | 片尾",
+    "15:45–15:50": "0945–0950 | 我们展开讲：投流没有线索跟进，等于买了电话簿不打电话。 | 片尾",
+    "15:50–15:55": "0950–0955 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 片尾",
+    "15:55–16:00": "0955–0960 | 听懂不等于会做，会做才算合格。 | 片尾",
+    "16:00–16:05": "0960–0965 | 我们展开讲：客户手机号必须打码，群里交作业也一样。 | 片尾",
+    "16:05–16:10": "0965–0970 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 片尾",
+    "16:10–16:15": "0970–0975 | 不截图不留痕。这些都会在下周复盘时暴露。 | 片尾",
+    "16:15–16:20": "0975–0980 | 我们展开讲：暂停：生成一版话术截图，五点四要交。 | 片尾",
+    "16:20–16:25": "0980–0985 | 正例是什么？每一步都有入口、有确认、有结果物。 | 片尾",
+    "16:25–16:30": "0985–0990 | 结果物可以是草稿、订单、话术截图或复盘表。 | 片尾",
+    "16:30–16:35": "0990–0995 | 我们展开讲：下一集作业说明。 | 片尾",
+    "16:35–16:40": "0995–1000 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 片尾",
+    "16:40–16:45": "1000–1005 | 我需要回看哪一个课号补齐？我们展开讲：本集结束。 | 片尾",
+    "16:45–16:50": "1005–1010 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 片尾",
+    "16:50–16:55": "1010–1015 | 分工清楚，学习效率更高。 | 片尾",
+    "16:55–17:00": "1015–1020 | 我们展开讲：课号五点三：本地推线索， | 片尾",
+    "17:00–17:05": "1020–1025 | 线索进ERP怎么跟。演示默认测试店。 | 片尾",
+    "17:05–17:10": "1025–1030 | 生产环境涉及改价、发单、结款，必须二次确认， | 片尾",
+    "17:10–17:15": "1030–1035 | 不要直播手滑。我们展开讲：这是第四周直播主课之一。 | 片尾",
+    "17:15–17:20": "1035–1040 | 交作业打码：手机号、客户名、真实账单。 | 片尾",
+    "17:20–17:25": "1040–1045 | 保护隐私，也是职业习惯。 | 片尾",
+    "17:25–17:30": "1045–1050 | 我们展开讲：完成投流或线索相关绑定，按页面指引。 | 片尾",
+    "17:30–17:35": "1050–1055 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 片尾",
+    "17:35–17:40": "1055–1060 | 每一步都要能复用到下周、下月。 | 片尾",
+    "17:40–17:45": "1060–1065 | 我们展开讲：线索列表出现新客。跟不上就暂停。 | 片尾",
+    "17:45–17:50": "1065–1070 | 暂停重做三十秒，胜过假装看完却一步都没点过。 | 片尾",
+    "17:50–17:55": "1070–1075 | 我们展开讲：用AI生成跟进话术：问诊需求，给套餐建议， | 片尾",
+    "17:55–18:00": "1075–1080 | 邀约到店或私信。为什么要强调这一点？ | 片尾"
+  },
+  "slides": [
+    {
+      "index": 1,
+      "file": "01-cover.jpg",
+      "kind": "cover",
+      "htag": "封面",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.3 · 本地推线索：线索进 ERP 怎么跟. Cover slide. Huge title: 本地推线索：线索进 ERP 怎么跟. Subtitle: 模块 5｜曝光与获客. Badge: 课号 5.3. Line: 完成线索进入 → AI 话术 → 跟进最小闭环. Duration: 18min. Visual metaphor: local store owner, multi-platform apps, AI pipeline ribbon.",
+      "meta": {
+        "kind": "cover",
+        "htag": "封面",
+        "module": "模块 5｜曝光与获客",
+        "dur": "18min",
+        "gain": "完成线索进入 → AI 话术 → 跟进最小闭环",
+        "visual": "local store owner, multi-platform apps, AI pipeline ribbon"
+      }
+    },
+    {
+      "index": 2,
+      "file": "02-goal.jpg",
+      "kind": "goal",
+      "htag": "本课目标",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.3 · 本地推线索：线索进 ERP 怎么跟. Learning goals slide. Title: 本课你将带走. Lead: 投流线索进系统并能生成跟进话术。. 3-5 goal cards: 完成线索进入 → AI 话术 → 跟进最小闭环.",
+      "meta": {
+        "kind": "goal",
+        "htag": "本课目标",
+        "lead": "投流线索进系统并能生成跟进话术。",
+        "items": [
+          "完成线索进入 → AI 话术 → 跟进最小闭环"
+        ]
+      }
+    },
+    {
+      "index": 3,
+      "file": "03-cards.jpg",
+      "kind": "cards",
+      "htag": "核心要点",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.3 · 本地推线索：线索进 ERP 怎么跟. Card grid slide. Title: 核心要点. Cards: 完成投流/线索相关绑定（按页面指引…: 完成投流/线索相关绑定（按页面指引）。 ; 线索列表出现新客。: 线索列表出现新客。 ; AI 生成跟进话术: 问诊需求 → 给套餐建议 → 邀约到店/私信。 ; 跟进结果回填，避免重复骚扰。: 跟进结果回填，避免重复骚扰。.",
+      "meta": {
+        "kind": "cards",
+        "htag": "核心要点",
+        "cards": [
+          {
+            "t": "完成投流/线索相关绑定（按页面指引…",
+            "b": "完成投流/线索相关绑定（按页面指引）。"
+          },
+          {
+            "t": "线索列表出现新客。",
+            "b": "线索列表出现新客。"
+          },
+          {
+            "t": "AI 生成跟进话术",
+            "b": "问诊需求 → 给套餐建议 → 邀约到店/私信。"
+          },
+          {
+            "t": "跟进结果回填，避免重复骚扰。",
+            "b": "跟进结果回填，避免重复骚扰。"
+          }
+        ]
+      }
+    },
+    {
+      "index": 4,
+      "file": "04-checklist.jpg",
+      "kind": "checklist",
+      "htag": "演示 / 操作路径",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.3 · 本地推线索：线索进 ERP 怎么跟. Checklist slide. Title: 演示 / 操作路径. Checked steps: 投流绑定入口 + 线索列表 + AI 话术。.",
+      "meta": {
+        "kind": "checklist",
+        "htag": "演示 / 操作路径",
+        "items": [
+          "投流绑定入口 + 线索列表 + AI 话术。"
+        ]
+      }
+    },
+    {
+      "index": 5,
+      "file": "05-quote.jpg",
+      "kind": "quote",
+      "htag": "口播与转化要点",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.3 · 本地推线索：线索进 ERP 怎么跟. Quote/takeaway slide. Title: 记住这句话. Large quote: 第 4 周直播主课之一。. Side notes: .",
+      "meta": {
+        "kind": "quote",
+        "htag": "口播与转化要点",
+        "quote": "第 4 周直播主课之一。",
+        "points": []
+      }
+    },
+    {
+      "index": 6,
+      "file": "06-insight.jpg",
+      "kind": "insight",
+      "htag": "讲义深化",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.3 · 本地推线索：线索进 ERP 怎么跟. Insight slide. Title: 讲义深化. Big statement: 投流没有线索跟进，等于买了电话簿不打电话。. Supporting bullets: 完成投流/线索相关绑定（按页面指引）。 | 线索列表出现新客。 | AI 生成跟进话术：问诊需求 → 给套餐建议 → 邀约到店/私信。 | 跟进结果回填，避免重复骚扰。.",
+      "meta": {
+        "kind": "insight",
+        "htag": "讲义深化",
+        "lead": "投流没有线索跟进，等于买了电话簿不打电话。",
+        "items": [
+          "完成投流/线索相关绑定（按页面指引）。",
+          "线索列表出现新客。",
+          "AI 生成跟进话术：问诊需求 → 给套餐建议 → 邀约到店/私信。",
+          "跟进结果回填，避免重复骚扰。"
+        ]
+      }
+    },
+    {
+      "index": 7,
+      "file": "07-insight.jpg",
+      "kind": "insight",
+      "htag": "为什么现在必须改",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.3 · 本地推线索：线索进 ERP 怎么跟. Insight slide. Title: 为什么现在必须改. Big statement: 散点经营一定累：同一件事拆到多个后台、多个人、多轮微信确认。. Supporting bullets: 多入口 = 多口径 | 无状态 = 月底对不清 | 无确认 = AI 不能替你签字.",
+      "meta": {
+        "kind": "insight",
+        "htag": "为什么现在必须改",
+        "lead": "散点经营一定累：同一件事拆到多个后台、多个人、多轮微信确认。",
+        "items": [
+          "多入口 = 多口径",
+          "无状态 = 月底对不清",
+          "无确认 = AI 不能替你签字"
+        ]
+      }
+    },
+    {
+      "index": 8,
+      "file": "08-map.jpg",
+      "kind": "map",
+      "htag": "灵祺流水线一览",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.3 · 本地推线索：线索进 ERP 怎么跟. Module map slide. Title: 灵祺流水线一览. Nodes: 开团/组品 → 招达人 → 做内容 → 曝光获客 → 对账复盘. Caption: AI 提案 · 你确认 · 少雇人少外包少踩坑.",
+      "meta": {
+        "kind": "map",
+        "htag": "灵祺流水线一览",
+        "steps": [
+          "开团/组品",
+          "招达人",
+          "做内容",
+          "曝光获客",
+          "对账复盘"
+        ],
+        "note": "AI 提案 · 你确认 · 少雇人少外包少踩坑"
+      }
+    },
+    {
+      "index": 9,
+      "file": "09-insight.jpg",
+      "kind": "insight",
+      "htag": "人机分工",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.3 · 本地推线索：线索进 ERP 怎么跟. Insight slide. Title: 人机分工. Big statement: AI 负责提案与草稿，你负责确认与签字。. Supporting bullets: 可预览 | 可回退 | 关键动作有状态.",
+      "meta": {
+        "kind": "insight",
+        "htag": "人机分工",
+        "lead": "AI 负责提案与草稿，你负责确认与签字。",
+        "items": [
+          "可预览",
+          "可回退",
+          "关键动作有状态"
+        ]
+      }
+    },
+    {
+      "index": 10,
+      "file": "10-split.jpg",
+      "kind": "split",
+      "htag": "旧方式 vs 流水线",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.3 · 本地推线索：线索进 ERP 怎么跟. Two-column contrast slide. Title: 旧方式 vs 流水线. Left: 旧：微信群跟单 + 表格 + 外包突击. Right: 新：订单状态机 + AI 产线 + 预览确认.",
+      "meta": {
+        "kind": "split",
+        "htag": "旧方式 vs 流水线",
+        "left": "旧：微信群跟单 + 表格 + 外包突击",
+        "right": "新：订单状态机 + AI 产线 + 预览确认"
+      }
+    },
+    {
+      "index": 11,
+      "file": "11-insight.jpg",
+      "kind": "insight",
+      "htag": "本课边界",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.3 · 本地推线索：线索进 ERP 怎么跟. Insight slide. Title: 本课边界. Big statement: 先对齐概念与路径，敏感信息打码，用测试店心态点一遍。. Supporting bullets: 不堆无关按钮 | 一课一个主动作 | 作业可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "本课边界",
+        "lead": "先对齐概念与路径，敏感信息打码，用测试店心态点一遍。",
+        "items": [
+          "不堆无关按钮",
+          "一课一个主动作",
+          "作业可验收"
+        ]
+      }
+    },
+    {
+      "index": 12,
+      "file": "12-checklist.jpg",
+      "kind": "checklist",
+      "htag": "听课检查清单",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.3 · 本地推线索：线索进 ERP 怎么跟. Checklist slide. Title: 听课检查清单. Checked steps: 能复述本课目标 | 能指出卡点在哪一步 | 能说出下一动作入口 | 完成作业打卡.",
+      "meta": {
+        "kind": "checklist",
+        "htag": "听课检查清单",
+        "items": [
+          "能复述本课目标",
+          "能指出卡点在哪一步",
+          "能说出下一动作入口",
+          "完成作业打卡"
+        ]
+      }
+    },
+    {
+      "index": 13,
+      "file": "13-quote.jpg",
+      "kind": "quote",
+      "htag": "金句",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.3 · 本地推线索：线索进 ERP 怎么跟. Quote/takeaway slide. Title: 记住这句话. Large quote: 完成线索进入 → AI 话术 → 跟进最小闭环. Side notes: 少雇人 | 少外包 | 少踩坑.",
+      "meta": {
+        "kind": "quote",
+        "htag": "金句",
+        "quote": "完成线索进入 → AI 话术 → 跟进最小闭环",
+        "points": [
+          "少雇人",
+          "少外包",
+          "少踩坑"
+        ]
+      }
+    },
+    {
+      "index": 14,
+      "file": "14-insight.jpg",
+      "kind": "insight",
+      "htag": "常见踩坑",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.3 · 本地推线索：线索进 ERP 怎么跟. Insight slide. Title: 常见踩坑. Big statement: 最容易翻车的不是不会用，而是跳过确认、跳过状态、跳过核对。. Supporting bullets: 未预览就发布 | 状态卡在群聊里 | 月底才想起对账.",
+      "meta": {
+        "kind": "insight",
+        "htag": "常见踩坑",
+        "lead": "最容易翻车的不是不会用，而是跳过确认、跳过状态、跳过核对。",
+        "items": [
+          "未预览就发布",
+          "状态卡在群聊里",
+          "月底才想起对账"
+        ]
+      }
+    },
+    {
+      "index": 15,
+      "file": "15-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 1",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.3 · 本地推线索：线索进 ERP 怎么跟. Insight slide. Title: 落地提醒 · 1. Big statement: 5.3 本地推线索：线索进 ERP 怎么跟：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 1",
+        "lead": "5.3 本地推线索：线索进 ERP 怎么跟：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 16,
+      "file": "16-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 2",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.3 · 本地推线索：线索进 ERP 怎么跟. Insight slide. Title: 落地提醒 · 2. Big statement: 5.3 本地推线索：线索进 ERP 怎么跟：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 2",
+        "lead": "5.3 本地推线索：线索进 ERP 怎么跟：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 17,
+      "file": "17-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 3",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.3 · 本地推线索：线索进 ERP 怎么跟. Insight slide. Title: 落地提醒 · 3. Big statement: 5.3 本地推线索：线索进 ERP 怎么跟：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 3",
+        "lead": "5.3 本地推线索：线索进 ERP 怎么跟：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 18,
+      "file": "18-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 4",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.3 · 本地推线索：线索进 ERP 怎么跟. Insight slide. Title: 落地提醒 · 4. Big statement: 5.3 本地推线索：线索进 ERP 怎么跟：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 4",
+        "lead": "5.3 本地推线索：线索进 ERP 怎么跟：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 19,
+      "file": "19-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 5",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.3 · 本地推线索：线索进 ERP 怎么跟. Insight slide. Title: 落地提醒 · 5. Big statement: 5.3 本地推线索：线索进 ERP 怎么跟：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 5",
+        "lead": "5.3 本地推线索：线索进 ERP 怎么跟：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 20,
+      "file": "20-end.jpg",
+      "kind": "end",
+      "htag": "结束",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 5.3 · 本地推线索：线索进 ERP 怎么跟. Closing slide. Title: 本课结束. Course 5.3 本地推线索：线索进 ERP 怎么跟. Takeaway: 完成线索进入 → AI 话术 → 跟进最小闭环. CTA: 下一课继续实操. Inspiring local-business + AI visual.",
+      "meta": {
+        "kind": "end",
+        "htag": "结束",
+        "gain": "完成线索进入 → AI 话术 → 跟进最小闭环"
+      }
+    }
+  ]
+}

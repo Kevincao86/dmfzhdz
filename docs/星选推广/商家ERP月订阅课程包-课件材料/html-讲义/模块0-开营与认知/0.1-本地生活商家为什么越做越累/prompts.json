@@ -1,0 +1,484 @@
+{
+  "meta": {
+    "课号": "0.1",
+    "课名": "本地生活商家为什么越做越累",
+    "建议时长": "12–15min",
+    "所属模块": "模块 0｜开营与认知",
+    "学员收获": "认清「多平台 + 内容 + 达人」三座山",
+    "建议录屏文件名": "0.1-为什么越做越累.mp4",
+    "时间": "秒序 | 口播（逐字念） | 画面动作",
+    "00:00–00:05": "0000–0005 | 家人们好，欢迎来到本地生活商家AI经营实操营。 | 片头字幕：0.1 本地生活商家为什么越做越累",
+    "00:05–00:10": "0005–0010 | 我是本课主讲。今天课号零点一， | 片头字幕：0.1 本地生活商家为什么越做越累",
+    "00:10–00:15": "0010–0015 | 课名：本地生活商家为什么越做越累。 | 片头字幕：0.1 本地生活商家为什么越做越累",
+    "00:15–00:20": "0015–0020 | 请先别急着记任何按钮， | 片头字幕：0.1 本地生活商家为什么越做越累",
+    "00:20–00:25": "0020–0025 | 先把一件事想清楚：你到底累在哪里。 | 片头字幕：0.1 本地生活商家为什么越做越累",
+    "00:25–00:30": "0025–0030 | 我先问你一句，请你诚实回答自己：平台是不是越开越多， | 片头字幕：0.1 本地生活商家为什么越做越累",
+    "00:30–00:35": "0030–0035 | 人是不是越招越多，可你还是觉得更累了？ | 面向镜头，停顿提问",
+    "00:35–00:40": "0035–0040 | 如果这句话扎心，你不是个例。 | 面向镜头，停顿提问",
+    "00:40–00:45": "0040–0045 | 今天我们就拆开这个「越做越累」。 | 面向镜头，停顿提问",
+    "00:45–00:50": "0045–0050 | 先给结论：累，往往不在你不够勤奋，而在经营链路断了。 | 面向镜头，停顿提问",
+    "00:50–00:55": "0050–0055 | 链路断了是什么意思？同一件事被拆到五个地方、五个后台、 | 面向镜头，停顿提问",
+    "00:55–01:00": "0055–0060 | 五个人去重复做，老板变成最高级的复制粘贴员和群管理员。 | 面向镜头，停顿提问",
+    "01:00–01:05": "0060–0065 | 第一座山，叫多平台。美团一套后台，抖音一套， | 字幕：结论·链路断裂",
+    "01:05–01:10": "0065–0070 | 小红书一套，有的店还有高德、企微私域。 | 字幕：结论·链路断裂",
+    "01:10–01:15": "0070–0075 | 商品要重复维护，活动规则各写各的， | 字幕：结论·链路断裂",
+    "01:15–01:20": "0075–0080 | 价盘一改就要改好几处。 | 字幕：结论·链路断裂",
+    "01:20–01:25": "0080–0085 | 你不是不会经营，是同一份套餐说明被拆成五份工。 | 字幕：结论·链路断裂",
+    "01:25–01:30": "0085–0090 | 很多人以为再雇一个运营就能解决，结果人多了， | 字幕：结论·链路断裂",
+    "01:30–01:35": "0090–0095 | 沟通会更多，口径更容易乱，管理半径被拉长。 | 字幕：结论·链路断裂",
+    "01:35–01:40": "0095–0100 | 第二座山，叫内容。短视频和直播几乎成了标配。 | 字幕：结论·链路断裂",
+    "01:40–01:45": "0100–0105 | 拍摄谁来？剪辑谁来？口播稿谁写？ | 字幕：结论·链路断裂",
+    "01:45–01:50": "0105–0110 | 旺季求人改片，淡季又不知道发什么。 | 字幕：结论·链路断裂",
+    "01:50–01:55": "0110–0115 | 外包一条片子不便宜，改一版又加钱； | 字幕：结论·链路断裂",
+    "01:55–02:00": "0115–0120 | 让店员加班拍，产能又不稳定。 | 字幕：结论·链路断裂",
+    "02:00–02:05": "0120–0125 | 你不是不想做内容，是内容没有产线，只有突击。 | 字幕：第一座山·多平台",
+    "02:05–02:10": "0125–0130 | 于是内容变成情绪劳动：今天催剪辑，明天催出镜， | 字幕：第一座山·多平台",
+    "02:10–02:15": "0130–0135 | 后天发现价格字幕还是旧的，客诉风险已经埋下。 | 字幕：第一座山·多平台",
+    "02:15–02:20": "0135–0140 | 第三座山，叫达人。探店、种草、星选合作， | 字幕：第一座山·多平台",
+    "02:20–02:25": "0140–0145 | 钱经常从微信转出去，跟单靠群消息和表格。 | 字幕：第一座山·多平台",
+    "02:25–02:30": "0145–0150 | 人来了片没回，回了链不对，对了款扯皮。 | 字幕：第一座山·多平台",
+    "02:30–02:35": "0150–0155 | 这类亏损，很少只是因为坑位费贵， | 字幕：第一座山·多平台",
+    "02:35–02:40": "0155–0160 | 更多是不确定：不确定人来不来，不确定片回不回， | 字幕：第一座山·多平台",
+    "02:40–02:45": "0160–0165 | 不确定链对不对。群发一波达人看起来热闹，匹配度却很低； | 字幕：第一座山·多平台",
+    "02:45–02:50": "0165–0170 | 跟单一乱，进度全断在聊天记录里， | 字幕：第一座山·多平台",
+    "02:50–02:55": "0170–0175 | 月底你甚至说不清钱花到哪去了。 | 字幕：第一座山·多平台",
+    "02:55–03:00": "0175–0180 | 三座山叠在一起，画面就是这样：雇人增加管理半径， | 字幕：第一座山·多平台",
+    "03:00–03:05": "0180–0185 | 外包增加沟通成本，老板自己变成最高级群管理员。 | 字幕：第一座山·多平台",
+    "03:05–03:10": "0185–0190 | 手机从早响到晚，生意却没有更轻松。 | 字幕：第一座山·多平台",
+    "03:10–03:15": "0190–0195 | 所以请记住：问题不是你不会拍抖音， | 字幕：第一座山·多平台",
+    "03:15–03:20": "0195–0200 | 而是门店、商品、达人、剪辑、对账散在五个地方。 | 字幕：第一座山·多平台",
+    "03:20–03:25": "0200–0205 | 散点经营，一定累。那我们这门课到底教什么？ | 字幕：第一座山·多平台",
+    "03:25–03:30": "0205–0210 | 定位请听清楚，后面每集都会用到：不是教你怎么开抖音， | 字幕：第一座山·多平台",
+    "03:30–03:35": "0210–0215 | 是教你怎么用AI，把开团、招达人、做内容、 | 字幕：第一座山·多平台",
+    "03:35–03:40": "0215–0220 | 对账做成一条流水线。目标六个字：少雇人、少外包、 | 字幕：第一座山·多平台",
+    "03:40–03:45": "0220–0225 | 少踩坑。请你跟着念一遍：少雇人、少外包、少踩坑。 | 字幕：第一座山·多平台",
+    "03:45–03:50": "0225–0230 | 念完你就知道，我们买课不是买热闹，是买流水线。 | 字幕：第一座山·多平台",
+    "03:50–03:55": "0230–0235 | 流水线不是让你变成机器人， | 字幕：第一座山·多平台",
+    "03:55–04:00": "0235–0240 | 而是让关键动作有入口、有状态、有确认。 | 字幕：第一座山·多平台",
+    "04:00–04:05": "0240–0245 | AI负责提案，你负责签字。 | 字幕：第二座山·内容",
+    "04:05–04:10": "0245–0250 | 这一点在零点二和模块二会反复讲。 | 字幕：第二座山·内容",
+    "04:10–04:15": "0250–0255 | 回到三座山怎么解：多平台，我们用统一经营中枢去收； | 字幕：第二座山·内容",
+    "04:15–04:20": "0255–0260 | 内容，用短视频AI、云剪、数字人口播去建产线； | 字幕：第二座山·内容",
+    "04:20–04:25": "0260–0265 | 达人，用可追踪的招募订单去替微信群。 | 字幕：第二座山·内容",
+    "04:25–04:30": "0265–0270 | 你现在立刻要做什么？今天只做认知动作： | 字幕：第二座山·内容",
+    "04:30–04:35": "0270–0275 | 承认自己卡在哪一座山。 | 字幕：第二座山·内容",
+    "04:35–04:40": "0275–0280 | 在心里选一个主山，后面作业围着它打。 | 字幕：第二座山·内容",
+    "04:40–04:45": "0280–0285 | 如果你最痛达人钱打水漂，第二第三周招募闭环就是主线； | 字幕：第二座山·内容",
+    "04:45–04:50": "0285–0290 | 如果你最痛内容外包贵，第四模块就是主线。 | 字幕：第二座山·内容",
+    "04:50–04:55": "0290–0295 | 再提醒：本地生活没有标准答案能抄一辈子， | 字幕：第二座山·内容",
+    "04:55–05:00": "0295–0300 | 但有标准工作流能复用每个月。 | 字幕：第二座山·内容",
+    "05:00–05:05": "0300–0305 | 月订阅的意义，就是工作流跟着旺季和产品一起更新。 | 字幕：第二座山·内容",
+    "05:05–05:10": "0305–0310 | 好，零点一收尾。你带走三座山：多平台、内容、达人； | 字幕：第二座山·内容",
+    "05:10–05:15": "0310–0315 | 带走一句定位：AI流水线，少雇人少外包少踩坑。 | 字幕：第二座山·内容",
+    "05:15–05:20": "0315–0320 | 下一集零点二，投屏价值图， | 字幕：第二座山·内容",
+    "05:20–05:25": "0320–0325 | 把省成本、提效率六个结果词对齐到灵祺商家ERP。 | 字幕：第二座山·内容",
+    "05:25–05:30": "0325–0330 | 免费试听建议零点一加零点二连着看； | 字幕：第二座山·内容",
+    "05:30–05:35": "0330–0335 | 正式学员看完零点三再开通工具，别卡在登录门口。 | 字幕：第二座山·内容",
+    "05:35–05:40": "0335–0340 | 演示和作业用测试心态，敏感信息打码。 | 字幕：第二座山·内容",
+    "05:40–05:45": "0340–0345 | 本集结束，把「我最痛的一座山」记在备忘录。我们下集见。 | 字幕：第二座山·内容",
+    "05:45–05:50": "0345–0350 | 我们展开讲：家人们好， | 字幕：第二座山·内容",
+    "05:50–05:55": "0350–0355 | 欢迎来到本地生活商家AI经营实操营。 | 字幕：第二座山·内容",
+    "05:55–06:00": "0355–0360 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 字幕：第二座山·内容",
+    "06:00–06:05": "0360–0365 | 而返工成本通常高于你现在多花的一分钟。 | 字幕：第三座山·达人",
+    "06:05–06:10": "0365–0370 | 我们展开讲：我是本课主讲。 | 字幕：第三座山·达人",
+    "06:10–06:15": "0370–0375 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 字幕：第三座山·达人",
+    "06:15–06:20": "0375–0380 | 听懂不等于会做，会做才算合格。 | 字幕：第三座山·达人",
+    "06:20–06:25": "0380–0385 | 我们展开讲：今天课号零点一， | 字幕：第三座山·达人",
+    "06:25–06:30": "0385–0390 | 课名：本地生活商家为什么越做越累。 | 字幕：第三座山·达人",
+    "06:30–06:35": "0390–0395 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 字幕：第三座山·达人",
+    "06:35–06:40": "0395–0400 | 不截图不留痕。这些都会在下周复盘时暴露。 | 字幕：第三座山·达人",
+    "06:40–06:45": "0400–0405 | 我们展开讲：请先别急着记任何按钮， | 字幕：第三座山·达人",
+    "06:45–06:50": "0405–0410 | 先把一件事想清楚：你到底累在哪里。 | 字幕：第三座山·达人",
+    "06:50–06:55": "0410–0415 | 正例是什么？每一步都有入口、有确认、有结果物。 | 字幕：第三座山·达人",
+    "06:55–07:00": "0415–0420 | 结果物可以是草稿、订单、话术截图或复盘表。 | 字幕：第三座山·达人",
+    "07:00–07:05": "0420–0425 | 我们展开讲：我先问你一句， | 字幕：第三座山·达人",
+    "07:05–07:10": "0425–0430 | 请你诚实回答自己：平台是不是越开越多， | 字幕：第三座山·达人",
+    "07:10–07:15": "0430–0435 | 人是不是越招越多，可你还是觉得更累了？ | 字幕：第三座山·达人",
+    "07:15–07:20": "0435–0440 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 字幕：第三座山·达人",
+    "07:20–07:25": "0440–0445 | 我需要回看哪一个课号补齐？ | 字幕：第三座山·达人",
+    "07:25–07:30": "0445–0450 | 我们展开讲：如果这句话扎心，你不是个例。 | 字幕：第三座山·达人",
+    "07:30–07:35": "0450–0455 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 字幕：第三座山·达人",
+    "07:35–07:40": "0455–0460 | 分工清楚，学习效率更高。 | 字幕：第三座山·达人",
+    "07:40–07:45": "0460–0465 | 我们展开讲：今天我们就拆开这个「越做越累」。 | 字幕：第三座山·达人",
+    "07:45–07:50": "0465–0470 | 演示默认测试店。生产环境涉及改价、发单、结款， | 字幕：第三座山·达人",
+    "07:50–07:55": "0470–0475 | 必须二次确认，不要直播手滑。 | 字幕：第三座山·达人",
+    "07:55–08:00": "0475–0480 | 我们展开讲：先给结论：累，往往不在你不够勤奋， | 字幕：第三座山·达人",
+    "08:00–08:05": "0480–0485 | 而在经营链路断了。交作业打码：手机号、客户名、 | 字幕：老板=群管理员",
+    "08:05–08:10": "0485–0490 | 真实账单。保护隐私，也是职业习惯。 | 字幕：老板=群管理员",
+    "08:10–08:15": "0490–0495 | 我们展开讲：链路断了是什么意思？ | 字幕：老板=群管理员",
+    "08:15–08:20": "0495–0500 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 字幕：老板=群管理员",
+    "08:20–08:25": "0500–0505 | 每一步都要能复用到下周、下月。 | 字幕：老板=群管理员",
+    "08:25–08:30": "0505–0510 | 我们展开讲：同一件事被拆到五个地方、五个后台、 | 字幕：老板=群管理员",
+    "08:30–08:35": "0510–0515 | 五个人去重复做，老板变成最高级的复制粘贴员和群管理员。 | 字幕：老板=群管理员",
+    "08:35–08:40": "0515–0520 | 跟不上就暂停。暂停重做三十秒， | 字幕：老板=群管理员",
+    "08:40–08:45": "0520–0525 | 胜过假装看完却一步都没点过。 | 字幕：老板=群管理员",
+    "08:45–08:50": "0525–0530 | 我们展开讲：第一座山，叫多平台。 | 字幕：老板=群管理员",
+    "08:50–08:55": "0530–0535 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 字幕：老板=群管理员",
+    "08:55–09:00": "0535–0540 | 而返工成本通常高于你现在多花的一分钟。 | 字幕：老板=群管理员",
+    "09:00–09:05": "0540–0545 | 我们展开讲：美团一套后台，抖音一套，小红书一套， | 字幕：老板=群管理员",
+    "09:05–09:10": "0545–0550 | 有的店还有高德、企微私域。 | 字幕：老板=群管理员",
+    "09:10–09:15": "0550–0555 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 字幕：老板=群管理员",
+    "09:15–09:20": "0555–0560 | 听懂不等于会做，会做才算合格。 | 字幕：老板=群管理员",
+    "09:20–09:25": "0560–0565 | 我们展开讲：商品要重复维护，活动规则各写各的， | 字幕：课程定位句",
+    "09:25–09:30": "0565–0570 | 价盘一改就要改好几处。 | 字幕：课程定位句",
+    "09:30–09:35": "0570–0575 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 字幕：课程定位句",
+    "09:35–09:40": "0575–0580 | 不截图不留痕。这些都会在下周复盘时暴露。 | 字幕：课程定位句",
+    "09:40–09:45": "0580–0585 | 我们展开讲：你不是不会经营， | 字幕：课程定位句",
+    "09:45–09:50": "0585–0590 | 是同一份套餐说明被拆成五份工。 | 字幕：课程定位句",
+    "09:50–09:55": "0590–0595 | 正例是什么？每一步都有入口、有确认、有结果物。 | 字幕：课程定位句",
+    "09:55–10:00": "0595–0600 | 结果物可以是草稿、订单、话术截图或复盘表。 | 字幕：课程定位句",
+    "10:00–10:05": "0600–0605 | 我们展开讲：很多人以为再雇一个运营就能解决， | 字幕：课程定位句",
+    "10:05–10:10": "0605–0610 | 结果人多了，沟通会更多，口径更容易乱，管理半径被拉长。 | 字幕：课程定位句",
+    "10:10–10:15": "0610–0615 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 字幕：课程定位句",
+    "10:15–10:20": "0615–0620 | 我需要回看哪一个课号补齐？ | 字幕：课程定位句",
+    "10:20–10:25": "0620–0625 | 我们展开讲：第二座山，叫内容。 | 字幕：课程定位句",
+    "10:25–10:30": "0625–0630 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 字幕：课程定位句",
+    "10:30–10:35": "0630–0635 | 分工清楚，学习效率更高。 | 字幕：课程定位句",
+    "10:35–10:40": "0635–0640 | 我们展开讲：短视频和直播几乎成了标配。演示默认测试店。 | 字幕：课程定位句",
+    "10:40–10:45": "0640–0645 | 生产环境涉及改价、发单、结款，必须二次确认， | 字幕：课程定位句",
+    "10:45–10:50": "0645–0650 | 不要直播手滑。我们展开讲：拍摄谁来？ | 字幕：课程定位句",
+    "10:50–10:55": "0650–0655 | 交作业打码：手机号、客户名、真实账单。 | 字幕：课程定位句",
+    "10:55–11:00": "0655–0660 | 保护隐私，也是职业习惯。 | 字幕：课程定位句",
+    "11:00–11:05": "0660–0665 | 我们展开讲：剪辑谁来？ | 字幕：课程定位句",
+    "11:05–11:10": "0665–0670 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 字幕：课程定位句",
+    "11:10–11:15": "0670–0675 | 每一步都要能复用到下周、下月。 | 字幕：课程定位句",
+    "11:15–11:20": "0675–0680 | 我们展开讲：口播稿谁写？跟不上就暂停。 | 字幕：课程定位句",
+    "11:20–11:25": "0680–0685 | 暂停重做三十秒，胜过假装看完却一步都没点过。 | 字幕：少雇人少外包少踩坑",
+    "11:25–11:30": "0685–0690 | 我们展开讲：旺季求人改片，淡季又不知道发什么。 | 字幕：少雇人少外包少踩坑",
+    "11:30–11:35": "0690–0695 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 字幕：少雇人少外包少踩坑",
+    "11:35–11:40": "0695–0700 | 而返工成本通常高于你现在多花的一分钟。 | 字幕：少雇人少外包少踩坑",
+    "11:40–11:45": "0700–0705 | 我们展开讲：外包一条片子不便宜，改一版又加钱； | 字幕：少雇人少外包少踩坑",
+    "11:45–11:50": "0705–0710 | 让店员加班拍，产能又不稳定。 | 字幕：少雇人少外包少踩坑",
+    "11:50–11:55": "0710–0715 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 字幕：少雇人少外包少踩坑",
+    "11:55–12:00": "0715–0720 | 听懂不等于会做，会做才算合格。 | 字幕：少雇人少外包少踩坑",
+    "12:00–12:05": "0720–0725 | 我们展开讲：你不是不想做内容，是内容没有产线， | 字幕：少雇人少外包少踩坑",
+    "12:05–12:10": "0725–0730 | 只有突击。反例是什么？ | 字幕：少雇人少外包少踩坑",
+    "12:10–12:15": "0730–0735 | 跳步、凭感觉、只在微信里同步、不截图不留痕。 | 字幕：少雇人少外包少踩坑",
+    "12:15–12:20": "0735–0740 | 这些都会在下周复盘时暴露。 | 字幕：少雇人少外包少踩坑",
+    "12:20–12:25": "0740–0745 | 我们展开讲：于是内容变成情绪劳动：今天催剪辑， | 字幕：少雇人少外包少踩坑",
+    "12:25–12:30": "0745–0750 | 明天催出镜，后天发现价格字幕还是旧的， | 字幕：少雇人少外包少踩坑",
+    "12:30–12:35": "0750–0755 | 客诉风险已经埋下。正例是什么？ | 字幕：少雇人少外包少踩坑",
+    "12:35–12:40": "0755–0760 | 每一步都有入口、有确认、有结果物。 | 字幕：少雇人少外包少踩坑",
+    "12:40–12:45": "0760–0765 | 结果物可以是草稿、订单、话术截图或复盘表。 | 字幕：少雇人少外包少踩坑",
+    "12:45–12:50": "0765–0770 | 我们展开讲：第三座山，叫达人。 | 字幕：少雇人少外包少踩坑",
+    "12:50–12:55": "0770–0775 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 字幕：少雇人少外包少踩坑",
+    "12:55–13:00": "0775–0780 | 我需要回看哪一个课号补齐？ | 字幕：少雇人少外包少踩坑",
+    "13:00–13:05": "0780–0785 | 我们展开讲：探店、种草、星选合作，钱经常从微信转出去， | 片尾：预告0.2",
+    "13:05–13:10": "0785–0790 | 跟单靠群消息和表格。如果带着店员一起学， | 片尾：预告0.2",
+    "13:10–13:15": "0790–0795 | 让店员负责点选，你负责拍板。分工清楚，学习效率更高。 | 片尾：预告0.2",
+    "13:15–13:20": "0795–0800 | 我们展开讲：人来了片没回，回了链不对，对了款扯皮。 | 片尾：预告0.2",
+    "13:20–13:25": "0800–0805 | 演示默认测试店。生产环境涉及改价、发单、结款， | 片尾：预告0.2",
+    "13:25–13:30": "0805–0810 | 必须二次确认，不要直播手滑。 | 片尾：预告0.2",
+    "13:30–13:35": "0810–0815 | 我们展开讲：这类亏损，很少只是因为坑位费贵， | 片尾：预告0.2",
+    "13:35–13:40": "0815–0820 | 更多是不确定：不确定人来不来，不确定片回不回， | 片尾：预告0.2",
+    "13:40–13:45": "0820–0825 | 不确定链对不对。交作业打码：手机号、客户名、真实账单。 | 片尾：预告0.2",
+    "13:45–13:50": "0825–0830 | 保护隐私，也是职业习惯。 | 片尾：预告0.2",
+    "13:50–13:55": "0830–0835 | 我们展开讲：群发一波达人看起来热闹，匹配度却很低； | 片尾：预告0.2",
+    "13:55–14:00": "0835–0840 | 跟单一乱，进度全断在聊天记录里， | 片尾：预告0.2"
+  },
+  "slides": [
+    {
+      "index": 1,
+      "file": "01-cover.jpg",
+      "kind": "cover",
+      "htag": "封面",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 0.1 · 本地生活商家为什么越做越累. Cover slide. Huge title: 本地生活商家为什么越做越累. Subtitle: 模块 0｜开营与认知. Badge: 课号 0.1. Line: 认清「多平台 + 内容 + 达人」三座山. Duration: 12–15min. Visual metaphor: local store owner, multi-platform apps, AI pipeline ribbon.",
+      "meta": {
+        "kind": "cover",
+        "htag": "封面",
+        "module": "模块 0｜开营与认知",
+        "dur": "12–15min",
+        "gain": "认清「多平台 + 内容 + 达人」三座山",
+        "visual": "local store owner, multi-platform apps, AI pipeline ribbon"
+      }
+    },
+    {
+      "index": 2,
+      "file": "02-goal.jpg",
+      "kind": "goal",
+      "htag": "本课目标",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 0.1 · 本地生活商家为什么越做越累. Learning goals slide. Title: 本课你将带走. Lead: 让学员承认：累不在勤奋不够，而在经营链路断裂；为本课程「流水线」定位铺垫。. 3-5 goal cards: 认清「多平台 + 内容 + 达人」三座山.",
+      "meta": {
+        "kind": "goal",
+        "htag": "本课目标",
+        "lead": "让学员承认：累不在勤奋不够，而在经营链路断裂；为本课程「流水线」定位铺垫。",
+        "items": [
+          "认清「多平台 + 内容 + 达人」三座山"
+        ]
+      }
+    },
+    {
+      "index": 3,
+      "file": "03-agenda.jpg",
+      "kind": "agenda",
+      "htag": "本课结构",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 0.1 · 本地生活商家为什么越做越累. Agenda slide. Title: 本课结构. Numbered outline cards: 第一座山：多平台 | 第二座山：内容 | 第三座山：达人 | 叠加结果.",
+      "meta": {
+        "kind": "agenda",
+        "htag": "本课结构",
+        "items": [
+          "第一座山：多平台",
+          "第二座山：内容",
+          "第三座山：达人",
+          "叠加结果"
+        ]
+      }
+    },
+    {
+      "index": 4,
+      "file": "04-insight.jpg",
+      "kind": "insight",
+      "htag": "讲义要点",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 0.1 · 本地生活商家为什么越做越累. Insight slide. Title: 讲义要点. Big statement: 很多本地生活老板有同一种感觉：平台越开越多，人越招越多，生意却没有更轻松。. Supporting bullets: .",
+      "meta": {
+        "kind": "insight",
+        "htag": "讲义要点",
+        "lead": "很多本地生活老板有同一种感觉：平台越开越多，人越招越多，生意却没有更轻松。",
+        "items": []
+      }
+    },
+    {
+      "index": 5,
+      "file": "05-insight.jpg",
+      "kind": "insight",
+      "htag": "第一座山：多平台",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 0.1 · 本地生活商家为什么越做越累. Insight slide. Title: 第一座山：多平台. Big statement: 美团、抖音、小红书、高德……后台各不相同，商品要重复维护，活动规则各写各的。你不是不会经营，是同一件事被拆成五份工。. Supporting bullets: .",
+      "meta": {
+        "kind": "insight",
+        "htag": "第一座山：多平台",
+        "lead": "美团、抖音、小红书、高德……后台各不相同，商品要重复维护，活动规则各写各的。你不是不会经营，是同一件事被拆成五份工。",
+        "items": []
+      }
+    },
+    {
+      "index": 6,
+      "file": "06-insight.jpg",
+      "kind": "insight",
+      "htag": "第二座山：内容",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 0.1 · 本地生活商家为什么越做越累. Insight slide. Title: 第二座山：内容. Big statement: 短视频和直播成了标配，但拍摄、剪辑、口播往往靠外包或店员加班。产能不稳定：旺季求人改片，淡季又不知道发什么。. Supporting bullets: .",
+      "meta": {
+        "kind": "insight",
+        "htag": "第二座山：内容",
+        "lead": "短视频和直播成了标配，但拍摄、剪辑、口播往往靠外包或店员加班。产能不稳定：旺季求人改片，淡季又不知道发什么。",
+        "items": []
+      }
+    },
+    {
+      "index": 7,
+      "file": "07-insight.jpg",
+      "kind": "insight",
+      "htag": "第三座山：达人",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 0.1 · 本地生活商家为什么越做越累. Insight slide. Title: 第三座山：达人. Big statement: 探店、种草、星选合作，钱从微信转出去，跟单靠表格和群消息。常见结局：人来了片没回、回了链不对、对了款扯皮。. Supporting bullets: .",
+      "meta": {
+        "kind": "insight",
+        "htag": "第三座山：达人",
+        "lead": "探店、种草、星选合作，钱从微信转出去，跟单靠表格和群消息。常见结局：人来了片没回、回了链不对、对了款扯皮。",
+        "items": []
+      }
+    },
+    {
+      "index": 8,
+      "file": "08-insight.jpg",
+      "kind": "insight",
+      "htag": "叠加结果",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 0.1 · 本地生活商家为什么越做越累. Insight slide. Title: 叠加结果. Big statement: 雇人增加管理半径，外包增加沟通成本，老板自己变成「最高级群管理员」。. Supporting bullets: 下一课用一张图对齐「省什么、提什么」。.",
+      "meta": {
+        "kind": "insight",
+        "htag": "叠加结果",
+        "lead": "雇人增加管理半径，外包增加沟通成本，老板自己变成「最高级群管理员」。",
+        "items": [
+          "下一课用一张图对齐「省什么、提什么」。"
+        ]
+      }
+    },
+    {
+      "index": 9,
+      "file": "09-checklist.jpg",
+      "kind": "checklist",
+      "htag": "演示 / 操作路径",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 0.1 · 本地生活商家为什么越做越累. Checklist slide. Title: 演示 / 操作路径. Checked steps: 本课口述为主，可不进 ERP。 | 可选三栏白板：多平台 / 内容 / 达人。.",
+      "meta": {
+        "kind": "checklist",
+        "htag": "演示 / 操作路径",
+        "items": [
+          "本课口述为主，可不进 ERP。",
+          "可选三栏白板：多平台 / 内容 / 达人。"
+        ]
+      }
+    },
+    {
+      "index": 10,
+      "file": "10-quote.jpg",
+      "kind": "quote",
+      "htag": "口播与转化要点",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 0.1 · 本地生活商家为什么越做越累. Quote/takeaway slide. Title: 记住这句话. Large quote: 痛点开场：「门店、商品、达人、剪辑、对账散在五个地方。」. Side notes: 本课先认同，不急着堆功能。.",
+      "meta": {
+        "kind": "quote",
+        "htag": "口播与转化要点",
+        "quote": "痛点开场：「门店、商品、达人、剪辑、对账散在五个地方。」",
+        "points": [
+          "本课先认同，不急着堆功能。"
+        ]
+      }
+    },
+    {
+      "index": 11,
+      "file": "11-insight.jpg",
+      "kind": "insight",
+      "htag": "讲义深化",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 0.1 · 本地生活商家为什么越做越累. Insight slide. Title: 讲义深化. Big statement: 很多本地生活老板有同一种感觉：平台越开越多，人越招越多，生意却没有更轻松。. Supporting bullets: .",
+      "meta": {
+        "kind": "insight",
+        "htag": "讲义深化",
+        "lead": "很多本地生活老板有同一种感觉：平台越开越多，人越招越多，生意却没有更轻松。",
+        "items": []
+      }
+    },
+    {
+      "index": 12,
+      "file": "12-insight.jpg",
+      "kind": "insight",
+      "htag": "为什么现在必须改",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 0.1 · 本地生活商家为什么越做越累. Insight slide. Title: 为什么现在必须改. Big statement: 散点经营一定累：同一件事拆到多个后台、多个人、多轮微信确认。. Supporting bullets: 多入口 = 多口径 | 无状态 = 月底对不清 | 无确认 = AI 不能替你签字.",
+      "meta": {
+        "kind": "insight",
+        "htag": "为什么现在必须改",
+        "lead": "散点经营一定累：同一件事拆到多个后台、多个人、多轮微信确认。",
+        "items": [
+          "多入口 = 多口径",
+          "无状态 = 月底对不清",
+          "无确认 = AI 不能替你签字"
+        ]
+      }
+    },
+    {
+      "index": 13,
+      "file": "13-map.jpg",
+      "kind": "map",
+      "htag": "灵祺流水线一览",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 0.1 · 本地生活商家为什么越做越累. Module map slide. Title: 灵祺流水线一览. Nodes: 开团/组品 → 招达人 → 做内容 → 曝光获客 → 对账复盘. Caption: AI 提案 · 你确认 · 少雇人少外包少踩坑.",
+      "meta": {
+        "kind": "map",
+        "htag": "灵祺流水线一览",
+        "steps": [
+          "开团/组品",
+          "招达人",
+          "做内容",
+          "曝光获客",
+          "对账复盘"
+        ],
+        "note": "AI 提案 · 你确认 · 少雇人少外包少踩坑"
+      }
+    },
+    {
+      "index": 14,
+      "file": "14-insight.jpg",
+      "kind": "insight",
+      "htag": "人机分工",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 0.1 · 本地生活商家为什么越做越累. Insight slide. Title: 人机分工. Big statement: AI 负责提案与草稿，你负责确认与签字。. Supporting bullets: 可预览 | 可回退 | 关键动作有状态.",
+      "meta": {
+        "kind": "insight",
+        "htag": "人机分工",
+        "lead": "AI 负责提案与草稿，你负责确认与签字。",
+        "items": [
+          "可预览",
+          "可回退",
+          "关键动作有状态"
+        ]
+      }
+    },
+    {
+      "index": 15,
+      "file": "15-split.jpg",
+      "kind": "split",
+      "htag": "旧方式 vs 流水线",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 0.1 · 本地生活商家为什么越做越累. Two-column contrast slide. Title: 旧方式 vs 流水线. Left: 旧：微信群跟单 + 表格 + 外包突击. Right: 新：订单状态机 + AI 产线 + 预览确认.",
+      "meta": {
+        "kind": "split",
+        "htag": "旧方式 vs 流水线",
+        "left": "旧：微信群跟单 + 表格 + 外包突击",
+        "right": "新：订单状态机 + AI 产线 + 预览确认"
+      }
+    },
+    {
+      "index": 16,
+      "file": "16-insight.jpg",
+      "kind": "insight",
+      "htag": "本课边界",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 0.1 · 本地生活商家为什么越做越累. Insight slide. Title: 本课边界. Big statement: 先对齐概念与路径，敏感信息打码，用测试店心态点一遍。. Supporting bullets: 不堆无关按钮 | 一课一个主动作 | 作业可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "本课边界",
+        "lead": "先对齐概念与路径，敏感信息打码，用测试店心态点一遍。",
+        "items": [
+          "不堆无关按钮",
+          "一课一个主动作",
+          "作业可验收"
+        ]
+      }
+    },
+    {
+      "index": 17,
+      "file": "17-checklist.jpg",
+      "kind": "checklist",
+      "htag": "听课检查清单",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 0.1 · 本地生活商家为什么越做越累. Checklist slide. Title: 听课检查清单. Checked steps: 能复述本课目标 | 能指出卡点在哪一步 | 能说出下一动作入口 | 完成作业打卡.",
+      "meta": {
+        "kind": "checklist",
+        "htag": "听课检查清单",
+        "items": [
+          "能复述本课目标",
+          "能指出卡点在哪一步",
+          "能说出下一动作入口",
+          "完成作业打卡"
+        ]
+      }
+    },
+    {
+      "index": 18,
+      "file": "18-quote.jpg",
+      "kind": "quote",
+      "htag": "金句",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 0.1 · 本地生活商家为什么越做越累. Quote/takeaway slide. Title: 记住这句话. Large quote: 认清「多平台 + 内容 + 达人」三座山. Side notes: 少雇人 | 少外包 | 少踩坑.",
+      "meta": {
+        "kind": "quote",
+        "htag": "金句",
+        "quote": "认清「多平台 + 内容 + 达人」三座山",
+        "points": [
+          "少雇人",
+          "少外包",
+          "少踩坑"
+        ]
+      }
+    },
+    {
+      "index": 19,
+      "file": "19-insight.jpg",
+      "kind": "insight",
+      "htag": "常见踩坑",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 0.1 · 本地生活商家为什么越做越累. Insight slide. Title: 常见踩坑. Big statement: 最容易翻车的不是不会用，而是跳过确认、跳过状态、跳过核对。. Supporting bullets: 未预览就发布 | 状态卡在群聊里 | 月底才想起对账.",
+      "meta": {
+        "kind": "insight",
+        "htag": "常见踩坑",
+        "lead": "最容易翻车的不是不会用，而是跳过确认、跳过状态、跳过核对。",
+        "items": [
+          "未预览就发布",
+          "状态卡在群聊里",
+          "月底才想起对账"
+        ]
+      }
+    },
+    {
+      "index": 20,
+      "file": "20-end.jpg",
+      "kind": "end",
+      "htag": "结束",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 0.1 · 本地生活商家为什么越做越累. Closing slide. Title: 本课结束. Course 0.1 本地生活商家为什么越做越累. Takeaway: 认清「多平台 + 内容 + 达人」三座山. CTA: 下一课继续实操. Inspiring local-business + AI visual.",
+      "meta": {
+        "kind": "end",
+        "htag": "结束",
+        "gain": "认清「多平台 + 内容 + 达人」三座山"
+      }
+    }
+  ]
+}

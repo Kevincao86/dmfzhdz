@@ -1,0 +1,474 @@
+{
+  "meta": {
+    "课号": "6.2",
+    "课名": "报税相关导出（会员）",
+    "建议时长": "12min",
+    "所属模块": "模块 6｜财务与经营盘点",
+    "学员收获": "会导出，并守住边界",
+    "建议录屏文件名": "6.2-报税导出说明.mp4",
+    "时间": "秒序 | 口播（逐字念） | 画面动作",
+    "00:00–00:05": "0000–0005 | 课号六点二：报税相关导出，会员能力。本集是合规红线课。 | 片头",
+    "00:05–00:10": "0005–0010 | 会员若含报税相关导出：能做的是辅助整理经营数据， | 片头",
+    "00:10–00:15": "0010–0015 | 减少手工抄表；不能做的是系统不等于代报税， | 片头",
+    "00:15–00:20": "0015–0020 | 最终申报以财务或税务师为准。 | 片头",
+    "00:20–00:25": "0020–0025 | 口播与文案必须带这句边界，避免合规误解。 | 片头",
+    "00:25–00:30": "0025–0030 | 我演示导出入口示意，若当前账号无会员，就讲边界也成立。 | 片头",
+    "00:30–00:35": "0030–0035 | 辅助整理，不是代报税。请跟我念一遍。 | 片头",
+    "00:35–00:40": "0035–0040 | 下一集六点三，月度经营复盘模板。本集结束。 | 片头",
+    "00:40–00:45": "0040–0045 | 我们展开讲：课号六点二：报税相关导出，会员能力。 | 导出入口示意",
+    "00:45–00:50": "0045–0050 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 导出入口示意",
+    "00:50–00:55": "0050–0055 | 而返工成本通常高于你现在多花的一分钟。 | 导出入口示意",
+    "00:55–01:00": "0055–0060 | 我们展开讲：本集是合规红线课。 | 导出入口示意",
+    "01:00–01:05": "0060–0065 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 导出入口示意",
+    "01:05–01:10": "0065–0070 | 听懂不等于会做，会做才算合格。 | 导出入口示意",
+    "01:10–01:15": "0070–0075 | 我们展开讲：会员若含报税相关导出： | 导出入口示意",
+    "01:15–01:20": "0075–0080 | 能做的是辅助整理经营数据，减少手工抄表； | 导出入口示意",
+    "01:20–01:25": "0080–0085 | 不能做的是系统不等于代报税， | 导出入口示意",
+    "01:25–01:30": "0085–0090 | 最终申报以财务或税务师为准。 | 导出入口示意",
+    "01:30–01:35": "0090–0095 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 导出入口示意",
+    "01:35–01:40": "0095–0100 | 不截图不留痕。这些都会在下周复盘时暴露。 | 导出入口示意",
+    "01:40–01:45": "0100–0105 | 我们展开讲：口播与文案必须带这句边界，避免合规误解。 | 导出入口示意",
+    "01:45–01:50": "0105–0110 | 正例是什么？每一步都有入口、有确认、有结果物。 | 导出入口示意",
+    "01:50–01:55": "0110–0115 | 结果物可以是草稿、订单、话术截图或复盘表。 | 导出入口示意",
+    "01:55–02:00": "0115–0120 | 我们展开讲：我演示导出入口示意，若当前账号无会员， | 导出入口示意",
+    "02:00–02:05": "0120–0125 | 就讲边界也成立。自检三问：我刚才做到哪一步了？ | 导出入口示意",
+    "02:05–02:10": "0125–0130 | 哪一步还不敢自己点？我需要回看哪一个课号补齐？ | 导出入口示意",
+    "02:10–02:15": "0130–0135 | 我们展开讲：辅助整理，不是代报税。 | 导出入口示意",
+    "02:15–02:20": "0135–0140 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 导出入口示意",
+    "02:20–02:25": "0140–0145 | 分工清楚，学习效率更高。我们展开讲：请跟我念一遍。 | 导出入口示意",
+    "02:25–02:30": "0145–0150 | 演示默认测试店。生产环境涉及改价、发单、结款， | 导出入口示意",
+    "02:30–02:35": "0150–0155 | 必须二次确认，不要直播手滑。 | 导出入口示意",
+    "02:35–02:40": "0155–0160 | 我们展开讲：下一集六点三，月度经营复盘模板。 | 导出入口示意",
+    "02:40–02:45": "0160–0165 | 交作业打码：手机号、客户名、真实账单。 | 导出入口示意",
+    "02:45–02:50": "0165–0170 | 保护隐私，也是职业习惯。我们展开讲：本集结束。 | 导出入口示意",
+    "02:50–02:55": "0170–0175 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 导出入口示意",
+    "02:55–03:00": "0175–0180 | 每一步都要能复用到下周、下月。 | 导出入口示意",
+    "03:00–03:05": "0180–0185 | 我们展开讲：课号六点二：报税相关导出，会员能力。 | 字幕：能做/不能做",
+    "03:05–03:10": "0185–0190 | 跟不上就暂停。暂停重做三十秒， | 字幕：能做/不能做",
+    "03:10–03:15": "0190–0195 | 胜过假装看完却一步都没点过。 | 字幕：能做/不能做",
+    "03:15–03:20": "0195–0200 | 我们展开讲：本集是合规红线课。 | 字幕：能做/不能做",
+    "03:20–03:25": "0200–0205 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 字幕：能做/不能做",
+    "03:25–03:30": "0205–0210 | 而返工成本通常高于你现在多花的一分钟。 | 字幕：能做/不能做",
+    "03:30–03:35": "0210–0215 | 我们展开讲：会员若含报税相关导出： | 字幕：能做/不能做",
+    "03:35–03:40": "0215–0220 | 能做的是辅助整理经营数据，减少手工抄表； | 字幕：能做/不能做",
+    "03:40–03:45": "0220–0225 | 不能做的是系统不等于代报税， | 字幕：能做/不能做",
+    "03:45–03:50": "0225–0230 | 最终申报以财务或税务师为准。 | 字幕：能做/不能做",
+    "03:50–03:55": "0230–0235 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 字幕：能做/不能做",
+    "03:55–04:00": "0235–0240 | 听懂不等于会做，会做才算合格。 | 字幕：能做/不能做",
+    "04:00–04:05": "0240–0245 | 我们展开讲：口播与文案必须带这句边界，避免合规误解。 | 字幕：能做/不能做",
+    "04:05–04:10": "0245–0250 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 字幕：能做/不能做",
+    "04:10–04:15": "0250–0255 | 不截图不留痕。这些都会在下周复盘时暴露。 | 字幕：能做/不能做",
+    "04:15–04:20": "0255–0260 | 我们展开讲：我演示导出入口示意，若当前账号无会员， | 字幕：能做/不能做",
+    "04:20–04:25": "0260–0265 | 就讲边界也成立。正例是什么？ | 字幕：能做/不能做",
+    "04:25–04:30": "0265–0270 | 每一步都有入口、有确认、有结果物。 | 字幕：能做/不能做",
+    "04:30–04:35": "0270–0275 | 结果物可以是草稿、订单、话术截图或复盘表。 | 字幕：能做/不能做",
+    "04:35–04:40": "0275–0280 | 我们展开讲：辅助整理，不是代报税。 | 字幕：能做/不能做",
+    "04:40–04:45": "0280–0285 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 字幕：能做/不能做",
+    "04:45–04:50": "0285–0290 | 我需要回看哪一个课号补齐？我们展开讲：请跟我念一遍。 | 字幕：能做/不能做",
+    "04:50–04:55": "0290–0295 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 字幕：能做/不能做",
+    "04:55–05:00": "0295–0300 | 分工清楚，学习效率更高。 | 字幕：能做/不能做",
+    "05:00–05:05": "0300–0305 | 我们展开讲：下一集六点三，月度经营复盘模板。 | 字幕：能做/不能做",
+    "05:05–05:10": "0305–0310 | 演示默认测试店。生产环境涉及改价、发单、结款， | 字幕：能做/不能做",
+    "05:10–05:15": "0310–0315 | 必须二次确认，不要直播手滑。我们展开讲：本集结束。 | 字幕：能做/不能做",
+    "05:15–05:20": "0315–0320 | 交作业打码：手机号、客户名、真实账单。 | 字幕：能做/不能做",
+    "05:20–05:25": "0320–0325 | 保护隐私，也是职业习惯。 | 字幕：能做/不能做",
+    "05:25–05:30": "0325–0330 | 我们展开讲：课号六点二：报税相关导出，会员能力。 | 字幕：能做/不能做",
+    "05:30–05:35": "0330–0335 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 字幕：能做/不能做",
+    "05:35–05:40": "0335–0340 | 每一步都要能复用到下周、下月。 | 字幕：能做/不能做",
+    "05:40–05:45": "0340–0345 | 我们展开讲：本集是合规红线课。跟不上就暂停。 | 字幕：能做/不能做",
+    "05:45–05:50": "0345–0350 | 暂停重做三十秒，胜过假装看完却一步都没点过。 | 字幕：能做/不能做",
+    "05:50–05:55": "0350–0355 | 我们展开讲：会员若含报税相关导出： | 字幕：能做/不能做",
+    "05:55–06:00": "0355–0360 | 能做的是辅助整理经营数据，减少手工抄表； | 字幕：能做/不能做",
+    "06:00–06:05": "0360–0365 | 不能做的是系统不等于代报税， | 边界念两遍",
+    "06:05–06:10": "0365–0370 | 最终申报以财务或税务师为准。 | 边界念两遍",
+    "06:10–06:15": "0370–0375 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 边界念两遍",
+    "06:15–06:20": "0375–0380 | 而返工成本通常高于你现在多花的一分钟。 | 边界念两遍",
+    "06:20–06:25": "0380–0385 | 我们展开讲：口播与文案必须带这句边界，避免合规误解。 | 边界念两遍",
+    "06:25–06:30": "0385–0390 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 边界念两遍",
+    "06:30–06:35": "0390–0395 | 听懂不等于会做，会做才算合格。 | 边界念两遍",
+    "06:35–06:40": "0395–0400 | 我们展开讲：我演示导出入口示意，若当前账号无会员， | 边界念两遍",
+    "06:40–06:45": "0400–0405 | 就讲边界也成立。反例是什么？ | 边界念两遍",
+    "06:45–06:50": "0405–0410 | 跳步、凭感觉、只在微信里同步、不截图不留痕。 | 边界念两遍",
+    "06:50–06:55": "0410–0415 | 这些都会在下周复盘时暴露。 | 边界念两遍",
+    "06:55–07:00": "0415–0420 | 我们展开讲：辅助整理，不是代报税。 | 边界念两遍",
+    "07:00–07:05": "0420–0425 | 正例是什么？每一步都有入口、有确认、有结果物。 | 边界念两遍",
+    "07:05–07:10": "0425–0430 | 结果物可以是草稿、订单、话术截图或复盘表。 | 边界念两遍",
+    "07:10–07:15": "0430–0435 | 我们展开讲：请跟我念一遍。 | 边界念两遍",
+    "07:15–07:20": "0435–0440 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 边界念两遍",
+    "07:20–07:25": "0440–0445 | 我需要回看哪一个课号补齐？ | 边界念两遍",
+    "07:25–07:30": "0445–0450 | 我们展开讲：下一集六点三，月度经营复盘模板。 | 边界念两遍",
+    "07:30–07:35": "0450–0455 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 边界念两遍",
+    "07:35–07:40": "0455–0460 | 分工清楚，学习效率更高。我们展开讲：本集结束。 | 边界念两遍",
+    "07:40–07:45": "0460–0465 | 演示默认测试店。生产环境涉及改价、发单、结款， | 边界念两遍",
+    "07:45–07:50": "0465–0470 | 必须二次确认，不要直播手滑。 | 边界念两遍",
+    "07:50–07:55": "0470–0475 | 我们展开讲：课号六点二：报税相关导出，会员能力。 | 边界念两遍",
+    "07:55–08:00": "0475–0480 | 交作业打码：手机号、客户名、真实账单。 | 边界念两遍",
+    "08:00–08:05": "0480–0485 | 保护隐私，也是职业习惯。我们展开讲：本集是合规红线课。 | 边界念两遍",
+    "08:05–08:10": "0485–0490 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 边界念两遍",
+    "08:10–08:15": "0490–0495 | 每一步都要能复用到下周、下月。 | 边界念两遍",
+    "08:15–08:20": "0495–0500 | 我们展开讲：会员若含报税相关导出： | 边界念两遍",
+    "08:20–08:25": "0500–0505 | 能做的是辅助整理经营数据，减少手工抄表； | 边界念两遍",
+    "08:25–08:30": "0505–0510 | 不能做的是系统不等于代报税， | 边界念两遍",
+    "08:30–08:35": "0510–0515 | 最终申报以财务或税务师为准。跟不上就暂停。 | 边界念两遍",
+    "08:35–08:40": "0515–0520 | 暂停重做三十秒，胜过假装看完却一步都没点过。 | 边界念两遍",
+    "08:40–08:45": "0520–0525 | 我们展开讲：口播与文案必须带这句边界，避免合规误解。 | 边界念两遍",
+    "08:45–08:50": "0525–0530 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 边界念两遍",
+    "08:50–08:55": "0530–0535 | 而返工成本通常高于你现在多花的一分钟。 | 边界念两遍",
+    "08:55–09:00": "0535–0540 | 我们展开讲：我演示导出入口示意，若当前账号无会员， | 边界念两遍",
+    "09:00–09:05": "0540–0545 | 就讲边界也成立。怎么做才算到位？ | 片尾预告6.3",
+    "09:05–09:10": "0545–0550 | 请对照屏幕把动作做完，而不是只听懂。 | 片尾预告6.3",
+    "09:10–09:15": "0550–0555 | 听懂不等于会做，会做才算合格。 | 片尾预告6.3",
+    "09:15–09:20": "0555–0560 | 我们展开讲：辅助整理，不是代报税。 | 片尾预告6.3",
+    "09:20–09:25": "0560–0565 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 片尾预告6.3",
+    "09:25–09:30": "0565–0570 | 不截图不留痕。这些都会在下周复盘时暴露。 | 片尾预告6.3",
+    "09:30–09:35": "0570–0575 | 我们展开讲：请跟我念一遍。 | 片尾预告6.3",
+    "09:35–09:40": "0575–0580 | 正例是什么？每一步都有入口、有确认、有结果物。 | 片尾预告6.3",
+    "09:40–09:45": "0580–0585 | 结果物可以是草稿、订单、话术截图或复盘表。 | 片尾预告6.3",
+    "09:45–09:50": "0585–0590 | 我们展开讲：下一集六点三，月度经营复盘模板。 | 片尾预告6.3",
+    "09:50–09:55": "0590–0595 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 片尾预告6.3",
+    "09:55–10:00": "0595–0600 | 我需要回看哪一个课号补齐？我们展开讲：本集结束。 | 片尾预告6.3",
+    "10:00–10:05": "0600–0605 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 片尾预告6.3",
+    "10:05–10:10": "0605–0610 | 分工清楚，学习效率更高。 | 片尾预告6.3",
+    "10:10–10:15": "0610–0615 | 我们展开讲：课号六点二：报税相关导出，会员能力。 | 片尾预告6.3",
+    "10:15–10:20": "0615–0620 | 演示默认测试店。生产环境涉及改价、发单、结款， | 片尾预告6.3",
+    "10:20–10:25": "0620–0625 | 必须二次确认，不要直播手滑。 | 片尾预告6.3",
+    "10:25–10:30": "0625–0630 | 我们展开讲：本集是合规红线课。 | 片尾预告6.3",
+    "10:30–10:35": "0630–0635 | 交作业打码：手机号、客户名、真实账单。 | 片尾预告6.3",
+    "10:35–10:40": "0635–0640 | 保护隐私，也是职业习惯。 | 片尾预告6.3",
+    "10:40–10:45": "0640–0645 | 我们展开讲：会员若含报税相关导出： | 片尾预告6.3",
+    "10:45–10:50": "0645–0650 | 能做的是辅助整理经营数据，减少手工抄表； | 片尾预告6.3",
+    "10:50–10:55": "0650–0655 | 不能做的是系统不等于代报税， | 片尾预告6.3",
+    "10:55–11:00": "0655–0660 | 最终申报以财务或税务师为准。 | 片尾预告6.3",
+    "11:00–11:05": "0660–0665 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 片尾预告6.3",
+    "11:05–11:10": "0665–0670 | 每一步都要能复用到下周、下月。 | 片尾预告6.3",
+    "11:10–11:15": "0670–0675 | 我们展开讲：口播与文案必须带这句边界，避免合规误解。 | 片尾预告6.3",
+    "11:15–11:20": "0675–0680 | 跟不上就暂停。暂停重做三十秒， | 片尾预告6.3",
+    "11:20–11:25": "0680–0685 | 胜过假装看完却一步都没点过。 | 片尾预告6.3",
+    "11:25–11:30": "0685–0690 | 我们展开讲：我演示导出入口示意，若当前账号无会员， | 片尾预告6.3",
+    "11:30–11:35": "0690–0695 | 就讲边界也成立。为什么要强调这一点？ | 片尾预告6.3",
+    "11:35–11:40": "0695–0700 | 因为现场一忙最容易省掉这一步， | 片尾预告6.3",
+    "11:40–11:45": "0700–0705 | 而返工成本通常高于你现在多花的一分钟。 | 片尾预告6.3",
+    "11:45–11:50": "0705–0710 | 我们展开讲：辅助整理，不是代报税。 | 片尾预告6.3",
+    "11:50–11:55": "0710–0715 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 片尾预告6.3",
+    "11:55–12:00": "0715–0720 | 听懂不等于会做，会做才算合格。 | 片尾预告6.3"
+  },
+  "slides": [
+    {
+      "index": 1,
+      "file": "01-cover.jpg",
+      "kind": "cover",
+      "htag": "封面",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 6.2 · 报税相关导出（会员）. Cover slide. Huge title: 报税相关导出（会员）. Subtitle: 模块 6｜财务与经营盘点. Badge: 课号 6.2. Line: 会导出，并守住边界. Duration: 12min. Visual metaphor: local store owner, multi-platform apps, AI pipeline ribbon.",
+      "meta": {
+        "kind": "cover",
+        "htag": "封面",
+        "module": "模块 6｜财务与经营盘点",
+        "dur": "12min",
+        "gain": "会导出，并守住边界",
+        "visual": "local store owner, multi-platform apps, AI pipeline ribbon"
+      }
+    },
+    {
+      "index": 2,
+      "file": "02-goal.jpg",
+      "kind": "goal",
+      "htag": "本课目标",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 6.2 · 报税相关导出（会员）. Learning goals slide. Title: 本课你将带走. Lead: 说明：辅助整理 ≠ 代报税。. 3-5 goal cards: 会导出，并守住边界.",
+      "meta": {
+        "kind": "goal",
+        "htag": "本课目标",
+        "lead": "说明：辅助整理 ≠ 代报税。",
+        "items": [
+          "会导出，并守住边界"
+        ]
+      }
+    },
+    {
+      "index": 3,
+      "file": "03-split.jpg",
+      "kind": "split",
+      "htag": "对照理解",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 6.2 · 报税相关导出（会员）. Two-column contrast slide. Title: 对照理解. Left: 能做：辅助整理经营数据，减少手工抄表；. Right: 不能做：系统不等于代报税，最终申报以财务/税务师为准。.",
+      "meta": {
+        "kind": "split",
+        "htag": "对照理解",
+        "left": "能做：辅助整理经营数据，减少手工抄表；",
+        "right": "不能做：系统不等于代报税，最终申报以财务/税务师为准。"
+      }
+    },
+    {
+      "index": 4,
+      "file": "04-checklist.jpg",
+      "kind": "checklist",
+      "htag": "演示 / 操作路径",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 6.2 · 报税相关导出（会员）. Checklist slide. Title: 演示 / 操作路径. Checked steps: 会员导出入口示意（无会员则说明边界即可）。.",
+      "meta": {
+        "kind": "checklist",
+        "htag": "演示 / 操作路径",
+        "items": [
+          "会员导出入口示意（无会员则说明边界即可）。"
+        ]
+      }
+    },
+    {
+      "index": 5,
+      "file": "05-quote.jpg",
+      "kind": "quote",
+      "htag": "口播与转化要点",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 6.2 · 报税相关导出（会员）. Quote/takeaway slide. Title: 记住这句话. Large quote: 「辅助整理，不是代报税。」——必说。. Side notes: .",
+      "meta": {
+        "kind": "quote",
+        "htag": "口播与转化要点",
+        "quote": "「辅助整理，不是代报税。」——必说。",
+        "points": []
+      }
+    },
+    {
+      "index": 6,
+      "file": "06-insight.jpg",
+      "kind": "insight",
+      "htag": "讲义深化",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 6.2 · 报税相关导出（会员）. Insight slide. Title: 讲义深化. Big statement: 会员若含报税相关导出：. Supporting bullets: 能做：辅助整理经营数据，减少手工抄表； | 不能做：系统不等于代报税，最终申报以财务/税务师为准。.",
+      "meta": {
+        "kind": "insight",
+        "htag": "讲义深化",
+        "lead": "会员若含报税相关导出：",
+        "items": [
+          "能做：辅助整理经营数据，减少手工抄表；",
+          "不能做：系统不等于代报税，最终申报以财务/税务师为准。"
+        ]
+      }
+    },
+    {
+      "index": 7,
+      "file": "07-insight.jpg",
+      "kind": "insight",
+      "htag": "为什么现在必须改",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 6.2 · 报税相关导出（会员）. Insight slide. Title: 为什么现在必须改. Big statement: 散点经营一定累：同一件事拆到多个后台、多个人、多轮微信确认。. Supporting bullets: 多入口 = 多口径 | 无状态 = 月底对不清 | 无确认 = AI 不能替你签字.",
+      "meta": {
+        "kind": "insight",
+        "htag": "为什么现在必须改",
+        "lead": "散点经营一定累：同一件事拆到多个后台、多个人、多轮微信确认。",
+        "items": [
+          "多入口 = 多口径",
+          "无状态 = 月底对不清",
+          "无确认 = AI 不能替你签字"
+        ]
+      }
+    },
+    {
+      "index": 8,
+      "file": "08-map.jpg",
+      "kind": "map",
+      "htag": "灵祺流水线一览",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 6.2 · 报税相关导出（会员）. Module map slide. Title: 灵祺流水线一览. Nodes: 开团/组品 → 招达人 → 做内容 → 曝光获客 → 对账复盘. Caption: AI 提案 · 你确认 · 少雇人少外包少踩坑.",
+      "meta": {
+        "kind": "map",
+        "htag": "灵祺流水线一览",
+        "steps": [
+          "开团/组品",
+          "招达人",
+          "做内容",
+          "曝光获客",
+          "对账复盘"
+        ],
+        "note": "AI 提案 · 你确认 · 少雇人少外包少踩坑"
+      }
+    },
+    {
+      "index": 9,
+      "file": "09-insight.jpg",
+      "kind": "insight",
+      "htag": "人机分工",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 6.2 · 报税相关导出（会员）. Insight slide. Title: 人机分工. Big statement: AI 负责提案与草稿，你负责确认与签字。. Supporting bullets: 可预览 | 可回退 | 关键动作有状态.",
+      "meta": {
+        "kind": "insight",
+        "htag": "人机分工",
+        "lead": "AI 负责提案与草稿，你负责确认与签字。",
+        "items": [
+          "可预览",
+          "可回退",
+          "关键动作有状态"
+        ]
+      }
+    },
+    {
+      "index": 10,
+      "file": "10-split.jpg",
+      "kind": "split",
+      "htag": "旧方式 vs 流水线",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 6.2 · 报税相关导出（会员）. Two-column contrast slide. Title: 旧方式 vs 流水线. Left: 旧：微信群跟单 + 表格 + 外包突击. Right: 新：订单状态机 + AI 产线 + 预览确认.",
+      "meta": {
+        "kind": "split",
+        "htag": "旧方式 vs 流水线",
+        "left": "旧：微信群跟单 + 表格 + 外包突击",
+        "right": "新：订单状态机 + AI 产线 + 预览确认"
+      }
+    },
+    {
+      "index": 11,
+      "file": "11-insight.jpg",
+      "kind": "insight",
+      "htag": "本课边界",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 6.2 · 报税相关导出（会员）. Insight slide. Title: 本课边界. Big statement: 先对齐概念与路径，敏感信息打码，用测试店心态点一遍。. Supporting bullets: 不堆无关按钮 | 一课一个主动作 | 作业可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "本课边界",
+        "lead": "先对齐概念与路径，敏感信息打码，用测试店心态点一遍。",
+        "items": [
+          "不堆无关按钮",
+          "一课一个主动作",
+          "作业可验收"
+        ]
+      }
+    },
+    {
+      "index": 12,
+      "file": "12-checklist.jpg",
+      "kind": "checklist",
+      "htag": "听课检查清单",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 6.2 · 报税相关导出（会员）. Checklist slide. Title: 听课检查清单. Checked steps: 能复述本课目标 | 能指出卡点在哪一步 | 能说出下一动作入口 | 完成作业打卡.",
+      "meta": {
+        "kind": "checklist",
+        "htag": "听课检查清单",
+        "items": [
+          "能复述本课目标",
+          "能指出卡点在哪一步",
+          "能说出下一动作入口",
+          "完成作业打卡"
+        ]
+      }
+    },
+    {
+      "index": 13,
+      "file": "13-quote.jpg",
+      "kind": "quote",
+      "htag": "金句",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 6.2 · 报税相关导出（会员）. Quote/takeaway slide. Title: 记住这句话. Large quote: 会导出，并守住边界. Side notes: 少雇人 | 少外包 | 少踩坑.",
+      "meta": {
+        "kind": "quote",
+        "htag": "金句",
+        "quote": "会导出，并守住边界",
+        "points": [
+          "少雇人",
+          "少外包",
+          "少踩坑"
+        ]
+      }
+    },
+    {
+      "index": 14,
+      "file": "14-insight.jpg",
+      "kind": "insight",
+      "htag": "常见踩坑",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 6.2 · 报税相关导出（会员）. Insight slide. Title: 常见踩坑. Big statement: 最容易翻车的不是不会用，而是跳过确认、跳过状态、跳过核对。. Supporting bullets: 未预览就发布 | 状态卡在群聊里 | 月底才想起对账.",
+      "meta": {
+        "kind": "insight",
+        "htag": "常见踩坑",
+        "lead": "最容易翻车的不是不会用，而是跳过确认、跳过状态、跳过核对。",
+        "items": [
+          "未预览就发布",
+          "状态卡在群聊里",
+          "月底才想起对账"
+        ]
+      }
+    },
+    {
+      "index": 15,
+      "file": "15-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 1",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 6.2 · 报税相关导出（会员）. Insight slide. Title: 落地提醒 · 1. Big statement: 6.2 报税相关导出（会员）：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 1",
+        "lead": "6.2 报税相关导出（会员）：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 16,
+      "file": "16-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 2",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 6.2 · 报税相关导出（会员）. Insight slide. Title: 落地提醒 · 2. Big statement: 6.2 报税相关导出（会员）：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 2",
+        "lead": "6.2 报税相关导出（会员）：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 17,
+      "file": "17-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 3",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 6.2 · 报税相关导出（会员）. Insight slide. Title: 落地提醒 · 3. Big statement: 6.2 报税相关导出（会员）：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 3",
+        "lead": "6.2 报税相关导出（会员）：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 18,
+      "file": "18-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 4",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 6.2 · 报税相关导出（会员）. Insight slide. Title: 落地提醒 · 4. Big statement: 6.2 报税相关导出（会员）：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 4",
+        "lead": "6.2 报税相关导出（会员）：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 19,
+      "file": "19-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 5",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 6.2 · 报税相关导出（会员）. Insight slide. Title: 落地提醒 · 5. Big statement: 6.2 报税相关导出（会员）：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 5",
+        "lead": "6.2 报税相关导出（会员）：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 20,
+      "file": "20-end.jpg",
+      "kind": "end",
+      "htag": "结束",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 6.2 · 报税相关导出（会员）. Closing slide. Title: 本课结束. Course 6.2 报税相关导出（会员）. Takeaway: 会导出，并守住边界. CTA: 下一课继续实操. Inspiring local-business + AI visual.",
+      "meta": {
+        "kind": "end",
+        "htag": "结束",
+        "gain": "会导出，并守住边界"
+      }
+    }
+  ]
+}

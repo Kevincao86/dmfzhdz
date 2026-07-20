@@ -1,0 +1,487 @@
+{
+  "meta": {
+    "课号": "3.1",
+    "课名": "为什么「找达人」最容易钱打水漂",
+    "建议时长": "12min",
+    "所属模块": "模块 3｜达人招募闭环",
+    "学员收获": "识别亏钱三件套：群发、跟单乱、无回链",
+    "建议录屏文件名": "3.1-找达人为什么亏钱.mp4",
+    "时间": "秒序 | 口播（逐字念） | 画面动作",
+    "00:00–00:05": "0000–0005 | 课号三点一：为什么找达人最容易钱打水漂。 | 片头",
+    "00:05–00:10": "0005–0010 | 本集先纠偏：达人合作亏钱，很少只亏在坑位费贵， | 片头",
+    "00:10–00:15": "0010–0015 | 更多亏在不确定。不确定有三件套：群发、跟单乱、无回链。 | 片头",
+    "00:15–00:20": "0015–0020 | 第一件：群发。同一套话术轰炸几十上百个达人， | 片头",
+    "00:20–00:25": "0020–0025 | 看起来热闹，匹配度却很低。 | 片头",
+    "00:25–00:30": "0025–0030 | 对方回了也不知道适不适合你的品类和门店调性。 | 片头",
+    "00:30–00:35": "0030–0035 | 你把筛选工作甩给命运，命运就用浪费预算回报你。 | 片头",
+    "00:35–00:40": "0035–0040 | 第二件：跟单乱。进度在微信里，人一忙全断。 | 片头",
+    "00:40–00:45": "0040–0045 | 谁答应周几到店，谁说片子后天交，全靠翻聊天记录。 | 字幕：亏钱三件套",
+    "00:45–00:50": "0045–0050 | 换一个对接人，信息就断层。 | 字幕：亏钱三件套",
+    "00:50–00:55": "0050–0055 | 月底你甚至说不清哪些合作还活着。第三件：无回链。 | 字幕：亏钱三件套",
+    "00:55–01:00": "0055–0060 | 片发了但对不上，结款靠感觉。 | 字幕：亏钱三件套",
+    "01:00–01:05": "0060–0065 | 有人说发了，链接找不到； | 字幕：亏钱三件套",
+    "01:05–01:10": "0065–0070 | 有人链接有了，内容却和Brief不符。 | 字幕：亏钱三件套",
+    "01:10–01:15": "0070–0075 | 你先打款再追片，主动权就没了。 | 字幕：亏钱三件套",
+    "01:15–01:20": "0075–0080 | ERP要你改变的习惯是：一切以订单状态为准， | 字幕：亏钱三件套",
+    "01:20–01:25": "0080–0085 | 不以群消息为准。群可以沟通温度，但状态必须进系统。 | 字幕：亏钱三件套",
+    "01:25–01:30": "0085–0090 | 下一集三点二，我们从Brief走到发招募单， | 字幕：亏钱三件套",
+    "01:30–01:35": "0090–0095 | 让订单在大厅可见，或至少进入可追踪状态。 | 字幕：亏钱三件套",
+    "01:35–01:40": "0095–0100 | 学习期可以用测试招募或草稿，先练手形。 | 字幕：亏钱三件套",
+    "01:40–01:45": "0100–0105 | 请你对照自己：过去三个月有没有付过一笔说不清回链的钱？ | 字幕：亏钱三件套",
+    "01:45–01:50": "0105–0110 | 有的话，三点一就已经值回。 | 字幕：亏钱三件套",
+    "01:50–01:55": "0110–0115 | 好，本集结束，我们进入发单全流程。 | 字幕：亏钱三件套",
+    "01:55–02:00": "0115–0120 | 我们展开讲：课号三点一：为什么找达人最容易钱打水漂。 | 字幕：亏钱三件套",
+    "02:00–02:05": "0120–0125 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 群发",
+    "02:05–02:10": "0125–0130 | 而返工成本通常高于你现在多花的一分钟。 | 群发",
+    "02:10–02:15": "0130–0135 | 我们展开讲：本集先纠偏：达人合作亏钱， | 群发",
+    "02:15–02:20": "0135–0140 | 很少只亏在坑位费贵，更多亏在不确定。 | 群发",
+    "02:20–02:25": "0140–0145 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 群发",
+    "02:25–02:30": "0145–0150 | 听懂不等于会做，会做才算合格。 | 群发",
+    "02:30–02:35": "0150–0155 | 我们展开讲：不确定有三件套：群发、跟单乱、无回链。 | 群发",
+    "02:35–02:40": "0155–0160 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 群发",
+    "02:40–02:45": "0160–0165 | 不截图不留痕。这些都会在下周复盘时暴露。 | 群发",
+    "02:45–02:50": "0165–0170 | 我们展开讲：第一件：群发。 | 群发",
+    "02:50–02:55": "0170–0175 | 正例是什么？每一步都有入口、有确认、有结果物。 | 群发",
+    "02:55–03:00": "0175–0180 | 结果物可以是草稿、订单、话术截图或复盘表。 | 群发",
+    "03:00–03:05": "0180–0185 | 我们展开讲：同一套话术轰炸几十上百个达人，看起来热闹， | 群发",
+    "03:05–03:10": "0185–0190 | 匹配度却很低。自检三问：我刚才做到哪一步了？ | 群发",
+    "03:10–03:15": "0190–0195 | 哪一步还不敢自己点？我需要回看哪一个课号补齐？ | 群发",
+    "03:15–03:20": "0195–0200 | 我们展开讲：对方回了也不知道适不适合你的 | 群发",
+    "03:20–03:25": "0200–0205 | 品类和门店调性。如果带着店员一起学，让店员负责点选， | 群发",
+    "03:25–03:30": "0205–0210 | 你负责拍板。分工清楚，学习效率更高。 | 群发",
+    "03:30–03:35": "0210–0215 | 我们展开讲：你把筛选工作甩给命运， | 群发",
+    "03:35–03:40": "0215–0220 | 命运就用浪费预算回报你。演示默认测试店。 | 群发",
+    "03:40–03:45": "0220–0225 | 生产环境涉及改价、发单、结款，必须二次确认， | 群发",
+    "03:45–03:50": "0225–0230 | 不要直播手滑。我们展开讲：第二件：跟单乱。 | 群发",
+    "03:50–03:55": "0230–0235 | 交作业打码：手机号、客户名、真实账单。 | 群发",
+    "03:55–04:00": "0235–0240 | 保护隐私，也是职业习惯。 | 群发",
+    "04:00–04:05": "0240–0245 | 我们展开讲：进度在微信里，人一忙全断。 | 跟单乱",
+    "04:05–04:10": "0245–0250 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 跟单乱",
+    "04:10–04:15": "0250–0255 | 每一步都要能复用到下周、下月。 | 跟单乱",
+    "04:15–04:20": "0255–0260 | 我们展开讲：谁答应周几到店，谁说片子后天交， | 跟单乱",
+    "04:20–04:25": "0260–0265 | 全靠翻聊天记录。跟不上就暂停。 | 跟单乱",
+    "04:25–04:30": "0265–0270 | 暂停重做三十秒，胜过假装看完却一步都没点过。 | 跟单乱",
+    "04:30–04:35": "0270–0275 | 我们展开讲：换一个对接人，信息就断层。 | 跟单乱",
+    "04:35–04:40": "0275–0280 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 跟单乱",
+    "04:40–04:45": "0280–0285 | 而返工成本通常高于你现在多花的一分钟。 | 跟单乱",
+    "04:45–04:50": "0285–0290 | 我们展开讲：月底你甚至说不清哪些合作还活着。 | 跟单乱",
+    "04:50–04:55": "0290–0295 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 跟单乱",
+    "04:55–05:00": "0295–0300 | 听懂不等于会做，会做才算合格。 | 跟单乱",
+    "05:00–05:05": "0300–0305 | 我们展开讲：第三件：无回链。 | 跟单乱",
+    "05:05–05:10": "0305–0310 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 跟单乱",
+    "05:10–05:15": "0310–0315 | 不截图不留痕。这些都会在下周复盘时暴露。 | 跟单乱",
+    "05:15–05:20": "0315–0320 | 我们展开讲：片发了但对不上，结款靠感觉。 | 跟单乱",
+    "05:20–05:25": "0320–0325 | 正例是什么？每一步都有入口、有确认、有结果物。 | 跟单乱",
+    "05:25–05:30": "0325–0330 | 结果物可以是草稿、订单、话术截图或复盘表。 | 跟单乱",
+    "05:30–05:35": "0330–0335 | 我们展开讲：有人说发了，链接找不到； | 跟单乱",
+    "05:35–05:40": "0335–0340 | 有人链接有了，内容却和Brief不符。 | 跟单乱",
+    "05:40–05:45": "0340–0345 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 跟单乱",
+    "05:45–05:50": "0345–0350 | 我需要回看哪一个课号补齐？ | 跟单乱",
+    "05:50–05:55": "0350–0355 | 我们展开讲：你先打款再追片，主动权就没了。 | 跟单乱",
+    "05:55–06:00": "0355–0360 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 跟单乱",
+    "06:00–06:05": "0360–0365 | 分工清楚，学习效率更高。 | 无回链",
+    "06:05–06:10": "0365–0370 | 我们展开讲：ERP要你改变的习惯是： | 无回链",
+    "06:10–06:15": "0370–0375 | 一切以订单状态为准，不以群消息为准。演示默认测试店。 | 无回链",
+    "06:15–06:20": "0375–0380 | 生产环境涉及改价、发单、结款，必须二次确认， | 无回链",
+    "06:20–06:25": "0380–0385 | 不要直播手滑。我们展开讲：群可以沟通温度， | 无回链",
+    "06:25–06:30": "0385–0390 | 但状态必须进系统。交作业打码：手机号、客户名、 | 无回链",
+    "06:30–06:35": "0390–0395 | 真实账单。保护隐私，也是职业习惯。 | 无回链",
+    "06:35–06:40": "0395–0400 | 我们展开讲：下一集三点二， | 无回链",
+    "06:40–06:45": "0400–0405 | 我们从Brief走到发招募单，让订单在大厅可见， | 无回链",
+    "06:45–06:50": "0405–0410 | 或至少进入可追踪状态。 | 无回链",
+    "06:50–06:55": "0410–0415 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 无回链",
+    "06:55–07:00": "0415–0420 | 每一步都要能复用到下周、下月。 | 无回链",
+    "07:00–07:05": "0420–0425 | 我们展开讲：学习期可以用测试招募或草稿，先练手形。 | 无回链",
+    "07:05–07:10": "0425–0430 | 跟不上就暂停。暂停重做三十秒， | 无回链",
+    "07:10–07:15": "0430–0435 | 胜过假装看完却一步都没点过。 | 无回链",
+    "07:15–07:20": "0435–0440 | 我们展开讲：请你对照自己： | 无回链",
+    "07:20–07:25": "0440–0445 | 过去三个月有没有付过一笔说不清回链的钱？ | 无回链",
+    "07:25–07:30": "0445–0450 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 无回链",
+    "07:30–07:35": "0450–0455 | 而返工成本通常高于你现在多花的一分钟。 | 无回链",
+    "07:35–07:40": "0455–0460 | 我们展开讲：有的话，三点一就已经值回。 | 无回链",
+    "07:40–07:45": "0460–0465 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 无回链",
+    "07:45–07:50": "0465–0470 | 听懂不等于会做，会做才算合格。 | 无回链",
+    "07:50–07:55": "0470–0475 | 我们展开讲：好，本集结束，我们进入发单全流程。 | 无回链",
+    "07:55–08:00": "0475–0480 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 无回链",
+    "08:00–08:05": "0480–0485 | 不截图不留痕。这些都会在下周复盘时暴露。 | 字幕：以订单状态为准",
+    "08:05–08:10": "0485–0490 | 我们展开讲：课号三点一：为什么找达人最容易钱打水漂。 | 字幕：以订单状态为准",
+    "08:10–08:15": "0490–0495 | 正例是什么？每一步都有入口、有确认、有结果物。 | 字幕：以订单状态为准",
+    "08:15–08:20": "0495–0500 | 结果物可以是草稿、订单、话术截图或复盘表。 | 字幕：以订单状态为准",
+    "08:20–08:25": "0500–0505 | 我们展开讲：本集先纠偏：达人合作亏钱， | 字幕：以订单状态为准",
+    "08:25–08:30": "0505–0510 | 很少只亏在坑位费贵，更多亏在不确定。 | 字幕：以订单状态为准",
+    "08:30–08:35": "0510–0515 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 字幕：以订单状态为准",
+    "08:35–08:40": "0515–0520 | 我需要回看哪一个课号补齐？ | 字幕：以订单状态为准",
+    "08:40–08:45": "0520–0525 | 我们展开讲：不确定有三件套：群发、跟单乱、无回链。 | 字幕：以订单状态为准",
+    "08:45–08:50": "0525–0530 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 字幕：以订单状态为准",
+    "08:50–08:55": "0530–0535 | 分工清楚，学习效率更高。我们展开讲：第一件：群发。 | 字幕：以订单状态为准",
+    "08:55–09:00": "0535–0540 | 演示默认测试店。生产环境涉及改价、发单、结款， | 字幕：以订单状态为准",
+    "09:00–09:05": "0540–0545 | 必须二次确认，不要直播手滑。 | 字幕：以订单状态为准",
+    "09:05–09:10": "0545–0550 | 我们展开讲：同一套话术轰炸几十上百个达人，看起来热闹， | 字幕：以订单状态为准",
+    "09:10–09:15": "0550–0555 | 匹配度却很低。交作业打码：手机号、客户名、真实账单。 | 字幕：以订单状态为准",
+    "09:15–09:20": "0555–0560 | 保护隐私，也是职业习惯。 | 字幕：以订单状态为准",
+    "09:20–09:25": "0560–0565 | 我们展开讲：对方回了也不知道适不适合你的 | 字幕：以订单状态为准",
+    "09:25–09:30": "0565–0570 | 品类和门店调性。和课程总定位对齐：我们要的是流水线， | 字幕：以订单状态为准",
+    "09:30–09:35": "0570–0575 | 不是单点技巧。每一步都要能复用到下周、下月。 | 字幕：以订单状态为准",
+    "09:35–09:40": "0575–0580 | 我们展开讲：你把筛选工作甩给命运， | 字幕：以订单状态为准",
+    "09:40–09:45": "0580–0585 | 命运就用浪费预算回报你。跟不上就暂停。 | 字幕：以订单状态为准",
+    "09:45–09:50": "0585–0590 | 暂停重做三十秒，胜过假装看完却一步都没点过。 | 字幕：以订单状态为准",
+    "09:50–09:55": "0590–0595 | 我们展开讲：第二件：跟单乱。 | 字幕：以订单状态为准",
+    "09:55–10:00": "0595–0600 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 字幕：以订单状态为准",
+    "10:00–10:05": "0600–0605 | 而返工成本通常高于你现在多花的一分钟。 | 片尾预告3.2",
+    "10:05–10:10": "0605–0610 | 我们展开讲：进度在微信里，人一忙全断。 | 片尾预告3.2",
+    "10:10–10:15": "0610–0615 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 片尾预告3.2",
+    "10:15–10:20": "0615–0620 | 听懂不等于会做，会做才算合格。 | 片尾预告3.2",
+    "10:20–10:25": "0620–0625 | 我们展开讲：谁答应周几到店，谁说片子后天交， | 片尾预告3.2",
+    "10:25–10:30": "0625–0630 | 全靠翻聊天记录。反例是什么？ | 片尾预告3.2",
+    "10:30–10:35": "0630–0635 | 跳步、凭感觉、只在微信里同步、不截图不留痕。 | 片尾预告3.2",
+    "10:35–10:40": "0635–0640 | 这些都会在下周复盘时暴露。 | 片尾预告3.2",
+    "10:40–10:45": "0640–0645 | 我们展开讲：换一个对接人，信息就断层。 | 片尾预告3.2",
+    "10:45–10:50": "0645–0650 | 正例是什么？每一步都有入口、有确认、有结果物。 | 片尾预告3.2",
+    "10:50–10:55": "0650–0655 | 结果物可以是草稿、订单、话术截图或复盘表。 | 片尾预告3.2",
+    "10:55–11:00": "0655–0660 | 我们展开讲：月底你甚至说不清哪些合作还活着。 | 片尾预告3.2",
+    "11:00–11:05": "0660–0665 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 片尾预告3.2",
+    "11:05–11:10": "0665–0670 | 我需要回看哪一个课号补齐？我们展开讲：第三件：无回链。 | 片尾预告3.2",
+    "11:10–11:15": "0670–0675 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 片尾预告3.2",
+    "11:15–11:20": "0675–0680 | 分工清楚，学习效率更高。 | 片尾预告3.2",
+    "11:20–11:25": "0680–0685 | 我们展开讲：片发了但对不上，结款靠感觉。 | 片尾预告3.2",
+    "11:25–11:30": "0685–0690 | 演示默认测试店。生产环境涉及改价、发单、结款， | 片尾预告3.2",
+    "11:30–11:35": "0690–0695 | 必须二次确认，不要直播手滑。 | 片尾预告3.2",
+    "11:35–11:40": "0695–0700 | 我们展开讲：有人说发了，链接找不到； | 片尾预告3.2",
+    "11:40–11:45": "0700–0705 | 有人链接有了，内容却和Brief不符。 | 片尾预告3.2",
+    "11:45–11:50": "0705–0710 | 交作业打码：手机号、客户名、真实账单。 | 片尾预告3.2",
+    "11:50–11:55": "0710–0715 | 保护隐私，也是职业习惯。 | 片尾预告3.2",
+    "11:55–12:00": "0715–0720 | 我们展开讲：你先打款再追片，主动权就没了。 | 片尾预告3.2"
+  },
+  "slides": [
+    {
+      "index": 1,
+      "file": "01-cover.jpg",
+      "kind": "cover",
+      "htag": "封面",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.1 · 为什么「找达人」最容易钱打水漂. Cover slide. Huge title: 为什么「找达人」最容易钱打水漂. Subtitle: 模块 3｜达人招募闭环. Badge: 课号 3.1. Line: 识别亏钱三件套：群发、跟单乱、无回链. Duration: 12min. Visual metaphor: local store owner, multi-platform apps, AI pipeline ribbon.",
+      "meta": {
+        "kind": "cover",
+        "htag": "封面",
+        "module": "模块 3｜达人招募闭环",
+        "dur": "12min",
+        "gain": "识别亏钱三件套：群发、跟单乱、无回链",
+        "visual": "local store owner, multi-platform apps, AI pipeline ribbon"
+      }
+    },
+    {
+      "index": 2,
+      "file": "02-goal.jpg",
+      "kind": "goal",
+      "htag": "本课目标",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.1 · 为什么「找达人」最容易钱打水漂. Learning goals slide. Title: 本课你将带走. Lead: 把问题从「坑位费贵」纠偏到「不确定」。. 3-5 goal cards: 识别亏钱三件套：群发、跟单乱、无回链.",
+      "meta": {
+        "kind": "goal",
+        "htag": "本课目标",
+        "lead": "把问题从「坑位费贵」纠偏到「不确定」。",
+        "items": [
+          "识别亏钱三件套：群发、跟单乱、无回链"
+        ]
+      }
+    },
+    {
+      "index": 3,
+      "file": "03-cards.jpg",
+      "kind": "cards",
+      "htag": "核心要点",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.1 · 为什么「找达人」最容易钱打水漂. Card grid slide. Title: 核心要点. Cards: 群发: 同一套话术轰炸，匹配度低。 ; 跟单乱: 进度在微信里，人一忙全断。 ; 无回链: 片发了但对不上，结款靠感觉。.",
+      "meta": {
+        "kind": "cards",
+        "htag": "核心要点",
+        "cards": [
+          {
+            "t": "群发",
+            "b": "同一套话术轰炸，匹配度低。"
+          },
+          {
+            "t": "跟单乱",
+            "b": "进度在微信里，人一忙全断。"
+          },
+          {
+            "t": "无回链",
+            "b": "片发了但对不上，结款靠感觉。"
+          }
+        ]
+      }
+    },
+    {
+      "index": 4,
+      "file": "04-checklist.jpg",
+      "kind": "checklist",
+      "htag": "演示 / 操作路径",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.1 · 为什么「找达人」最容易钱打水漂. Checklist slide. Title: 演示 / 操作路径. Checked steps: 可不进系统；可对比「微信群截图 vs 订单状态」示意。.",
+      "meta": {
+        "kind": "checklist",
+        "htag": "演示 / 操作路径",
+        "items": [
+          "可不进系统；可对比「微信群截图 vs 订单状态」示意。"
+        ]
+      }
+    },
+    {
+      "index": 5,
+      "file": "05-quote.jpg",
+      "kind": "quote",
+      "htag": "口播与转化要点",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.1 · 为什么「找达人」最容易钱打水漂. Quote/takeaway slide. Title: 记住这句话. Large quote: 「跟单乱？看闭环回放。」——第 2 周转化钩子预埋。. Side notes: .",
+      "meta": {
+        "kind": "quote",
+        "htag": "口播与转化要点",
+        "quote": "「跟单乱？看闭环回放。」——第 2 周转化钩子预埋。",
+        "points": []
+      }
+    },
+    {
+      "index": 6,
+      "file": "06-insight.jpg",
+      "kind": "insight",
+      "htag": "讲义深化",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.1 · 为什么「找达人」最容易钱打水漂. Insight slide. Title: 讲义深化. Big statement: 达人合作亏钱，很少亏在「坑位费贵」，更多亏在「不确定」。. Supporting bullets: 群发：同一套话术轰炸，匹配度低。 | 跟单乱：进度在微信里，人一忙全断。 | 无回链：片发了但对不上，结款靠感觉。.",
+      "meta": {
+        "kind": "insight",
+        "htag": "讲义深化",
+        "lead": "达人合作亏钱，很少亏在「坑位费贵」，更多亏在「不确定」。",
+        "items": [
+          "群发：同一套话术轰炸，匹配度低。",
+          "跟单乱：进度在微信里，人一忙全断。",
+          "无回链：片发了但对不上，结款靠感觉。"
+        ]
+      }
+    },
+    {
+      "index": 7,
+      "file": "07-insight.jpg",
+      "kind": "insight",
+      "htag": "为什么现在必须改",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.1 · 为什么「找达人」最容易钱打水漂. Insight slide. Title: 为什么现在必须改. Big statement: 散点经营一定累：同一件事拆到多个后台、多个人、多轮微信确认。. Supporting bullets: 多入口 = 多口径 | 无状态 = 月底对不清 | 无确认 = AI 不能替你签字.",
+      "meta": {
+        "kind": "insight",
+        "htag": "为什么现在必须改",
+        "lead": "散点经营一定累：同一件事拆到多个后台、多个人、多轮微信确认。",
+        "items": [
+          "多入口 = 多口径",
+          "无状态 = 月底对不清",
+          "无确认 = AI 不能替你签字"
+        ]
+      }
+    },
+    {
+      "index": 8,
+      "file": "08-map.jpg",
+      "kind": "map",
+      "htag": "灵祺流水线一览",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.1 · 为什么「找达人」最容易钱打水漂. Module map slide. Title: 灵祺流水线一览. Nodes: 开团/组品 → 招达人 → 做内容 → 曝光获客 → 对账复盘. Caption: AI 提案 · 你确认 · 少雇人少外包少踩坑.",
+      "meta": {
+        "kind": "map",
+        "htag": "灵祺流水线一览",
+        "steps": [
+          "开团/组品",
+          "招达人",
+          "做内容",
+          "曝光获客",
+          "对账复盘"
+        ],
+        "note": "AI 提案 · 你确认 · 少雇人少外包少踩坑"
+      }
+    },
+    {
+      "index": 9,
+      "file": "09-insight.jpg",
+      "kind": "insight",
+      "htag": "人机分工",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.1 · 为什么「找达人」最容易钱打水漂. Insight slide. Title: 人机分工. Big statement: AI 负责提案与草稿，你负责确认与签字。. Supporting bullets: 可预览 | 可回退 | 关键动作有状态.",
+      "meta": {
+        "kind": "insight",
+        "htag": "人机分工",
+        "lead": "AI 负责提案与草稿，你负责确认与签字。",
+        "items": [
+          "可预览",
+          "可回退",
+          "关键动作有状态"
+        ]
+      }
+    },
+    {
+      "index": 10,
+      "file": "10-split.jpg",
+      "kind": "split",
+      "htag": "旧方式 vs 流水线",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.1 · 为什么「找达人」最容易钱打水漂. Two-column contrast slide. Title: 旧方式 vs 流水线. Left: 旧：微信群跟单 + 表格 + 外包突击. Right: 新：订单状态机 + AI 产线 + 预览确认.",
+      "meta": {
+        "kind": "split",
+        "htag": "旧方式 vs 流水线",
+        "left": "旧：微信群跟单 + 表格 + 外包突击",
+        "right": "新：订单状态机 + AI 产线 + 预览确认"
+      }
+    },
+    {
+      "index": 11,
+      "file": "11-insight.jpg",
+      "kind": "insight",
+      "htag": "本课边界",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.1 · 为什么「找达人」最容易钱打水漂. Insight slide. Title: 本课边界. Big statement: 先对齐概念与路径，敏感信息打码，用测试店心态点一遍。. Supporting bullets: 不堆无关按钮 | 一课一个主动作 | 作业可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "本课边界",
+        "lead": "先对齐概念与路径，敏感信息打码，用测试店心态点一遍。",
+        "items": [
+          "不堆无关按钮",
+          "一课一个主动作",
+          "作业可验收"
+        ]
+      }
+    },
+    {
+      "index": 12,
+      "file": "12-checklist.jpg",
+      "kind": "checklist",
+      "htag": "听课检查清单",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.1 · 为什么「找达人」最容易钱打水漂. Checklist slide. Title: 听课检查清单. Checked steps: 能复述本课目标 | 能指出卡点在哪一步 | 能说出下一动作入口 | 完成作业打卡.",
+      "meta": {
+        "kind": "checklist",
+        "htag": "听课检查清单",
+        "items": [
+          "能复述本课目标",
+          "能指出卡点在哪一步",
+          "能说出下一动作入口",
+          "完成作业打卡"
+        ]
+      }
+    },
+    {
+      "index": 13,
+      "file": "13-quote.jpg",
+      "kind": "quote",
+      "htag": "金句",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.1 · 为什么「找达人」最容易钱打水漂. Quote/takeaway slide. Title: 记住这句话. Large quote: 识别亏钱三件套：群发、跟单乱、无回链. Side notes: 少雇人 | 少外包 | 少踩坑.",
+      "meta": {
+        "kind": "quote",
+        "htag": "金句",
+        "quote": "识别亏钱三件套：群发、跟单乱、无回链",
+        "points": [
+          "少雇人",
+          "少外包",
+          "少踩坑"
+        ]
+      }
+    },
+    {
+      "index": 14,
+      "file": "14-insight.jpg",
+      "kind": "insight",
+      "htag": "常见踩坑",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.1 · 为什么「找达人」最容易钱打水漂. Insight slide. Title: 常见踩坑. Big statement: 最容易翻车的不是不会用，而是跳过确认、跳过状态、跳过核对。. Supporting bullets: 未预览就发布 | 状态卡在群聊里 | 月底才想起对账.",
+      "meta": {
+        "kind": "insight",
+        "htag": "常见踩坑",
+        "lead": "最容易翻车的不是不会用，而是跳过确认、跳过状态、跳过核对。",
+        "items": [
+          "未预览就发布",
+          "状态卡在群聊里",
+          "月底才想起对账"
+        ]
+      }
+    },
+    {
+      "index": 15,
+      "file": "15-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 1",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.1 · 为什么「找达人」最容易钱打水漂. Insight slide. Title: 落地提醒 · 1. Big statement: 3.1 为什么「找达人」最容易钱打水漂：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 1",
+        "lead": "3.1 为什么「找达人」最容易钱打水漂：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 16,
+      "file": "16-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 2",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.1 · 为什么「找达人」最容易钱打水漂. Insight slide. Title: 落地提醒 · 2. Big statement: 3.1 为什么「找达人」最容易钱打水漂：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 2",
+        "lead": "3.1 为什么「找达人」最容易钱打水漂：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 17,
+      "file": "17-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 3",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.1 · 为什么「找达人」最容易钱打水漂. Insight slide. Title: 落地提醒 · 3. Big statement: 3.1 为什么「找达人」最容易钱打水漂：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 3",
+        "lead": "3.1 为什么「找达人」最容易钱打水漂：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 18,
+      "file": "18-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 4",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.1 · 为什么「找达人」最容易钱打水漂. Insight slide. Title: 落地提醒 · 4. Big statement: 3.1 为什么「找达人」最容易钱打水漂：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 4",
+        "lead": "3.1 为什么「找达人」最容易钱打水漂：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 19,
+      "file": "19-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 5",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.1 · 为什么「找达人」最容易钱打水漂. Insight slide. Title: 落地提醒 · 5. Big statement: 3.1 为什么「找达人」最容易钱打水漂：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 5",
+        "lead": "3.1 为什么「找达人」最容易钱打水漂：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 20,
+      "file": "20-end.jpg",
+      "kind": "end",
+      "htag": "结束",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 3.1 · 为什么「找达人」最容易钱打水漂. Closing slide. Title: 本课结束. Course 3.1 为什么「找达人」最容易钱打水漂. Takeaway: 识别亏钱三件套：群发、跟单乱、无回链. CTA: 下一课继续实操. Inspiring local-business + AI visual.",
+      "meta": {
+        "kind": "end",
+        "htag": "结束",
+        "gain": "识别亏钱三件套：群发、跟单乱、无回链"
+      }
+    }
+  ]
+}

@@ -1,0 +1,568 @@
+{
+  "meta": {
+    "课号": "2.1",
+    "课名": "AI 智能体总览：九大快捷场景",
+    "建议时长": "18min",
+    "所属模块": "模块 2｜AI 智能体",
+    "学员收获": "知道入口与主要场景；先选场景再说话",
+    "建议录屏文件名": "2.1-九大场景总览.mp4",
+    "时间": "秒序 | 口播（逐字念） | 画面动作",
+    "00:00–00:05": "0000–0005 | 模块二开始。课号二点一：AI智能体总览，九大快捷场景。 | 片头·打开AI智能体",
+    "00:05–00:10": "0005–0010 | 目标：知道入口，形成先选场景再说话的习惯。 | 片头·打开AI智能体",
+    "00:10–00:15": "0010–0015 | 演示用测试店。打开AI智能体。 | 片头·打开AI智能体",
+    "00:15–00:20": "0015–0020 | 把AI想成会本地生活的店长助理。 | 片头·打开AI智能体",
+    "00:20–00:25": "0020–0025 | 你先选场景，再说需求，比一上来长篇大论更稳， | 片头·打开AI智能体",
+    "00:25–00:30": "0025–0030 | 也更省额度。我们扫一眼快捷场景， | 片头·打开AI智能体",
+    "00:30–00:35": "0030–0035 | 名称以你后台九宫格为准，可能微调。 | 片头·打开AI智能体",
+    "00:35–00:40": "0035–0040 | 先看创建商品，团购套餐都在这条。 | 片头·打开AI智能体",
+    "00:40–00:45": "0040–0045 | 再看招募达人或写Brief，这是模块三的上游弹药， | 片头·打开AI智能体",
+    "00:45–00:50": "0045–0050 | Brief不清楚，达人再多也是噪音。 | 片头·打开AI智能体",
+    "00:50–00:55": "0050–0055 | 再看处理评价或差评回复，目标是止损加改进， | 片头·打开AI智能体",
+    "00:55–01:00": "0055–0060 | 不是怼赢顾客。内容相关场景：脚本、短视频等， | 片头·打开AI智能体",
+    "01:00–01:05": "0060–0065 | 对应模块四。线索或经营辅助类场景，对应模块五。 | 指向创建商品",
+    "01:05–01:10": "0065–0070 | 其余场景你先建立地图感，不必今天全做。 | 指向创建商品",
+    "01:10–01:15": "0070–0075 | 地图的意义是：以后卡住，知道回哪个格子。 | 指向创建商品",
+    "01:15–01:20": "0075–0080 | 使用口诀请跟我念：选场景，说清楚约束，看方案， | 指向创建商品",
+    "01:20–01:25": "0080–0085 | 确认执行，预览核对。约束包括什么？ | 指向创建商品",
+    "01:25–01:30": "0085–0090 | 价格带、人群、禁忌、可用时段、是否含酒水、 | 指向创建商品",
+    "01:30–01:35": "0090–0095 | 是否周末通用。说得越清，返工越少。 | 指向创建商品",
+    "01:35–01:40": "0095–0100 | 反例：只说帮我做一个套餐，AI只能猜。 | 指向创建商品",
+    "01:40–01:45": "0100–0105 | 正例：周末双人餐人均八十八，含锅底两荤两素，家庭向， | 指向创建商品",
+    "01:45–01:50": "0105–0110 | 不含酒水。本模块后面几课， | 指向创建商品",
+    "01:50–01:55": "0110–0115 | 会把创建商品、Brief、差评三条主链路跑穿。 | 指向创建商品",
+    "01:55–02:00": "0115–0120 | 今天只建立入口肌肉记忆。 | 指向创建商品",
+    "02:00–02:05": "0120–0125 | 请你现在暂停，自己点进智能体，指认三个主场景位置。 | 指向创建商品",
+    "02:05–02:10": "0125–0130 | 指得出来，二点一就算过关。 | 指向创建商品",
+    "02:10–02:15": "0130–0135 | 下一集二点二，专讲预览确认机制：为什么不会乱改你的店。 | 指向创建商品",
+    "02:15–02:20": "0135–0140 | 这是信任课，也是转化课。好，二点一结束。 | 指向创建商品",
+    "02:20–02:25": "0140–0145 | 先选场景，再说话。我们下集见。我们展开讲：模块二开始。 | 指向创建商品",
+    "02:25–02:30": "0145–0150 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 指向创建商品",
+    "02:30–02:35": "0150–0155 | 而返工成本通常高于你现在多花的一分钟。 | 指向创建商品",
+    "02:35–02:40": "0155–0160 | 我们展开讲：课号二点一：AI智能体总览，九大快捷场景。 | 指向创建商品",
+    "02:40–02:45": "0160–0165 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 指向创建商品",
+    "02:45–02:50": "0165–0170 | 听懂不等于会做，会做才算合格。 | 指向创建商品",
+    "02:50–02:55": "0170–0175 | 我们展开讲：目标：知道入口，形成先选场景再说话的习惯。 | 指向创建商品",
+    "02:55–03:00": "0175–0180 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 指向创建商品",
+    "03:00–03:05": "0180–0185 | 不截图不留痕。这些都会在下周复盘时暴露。 | 指向Brief/招募",
+    "03:05–03:10": "0185–0190 | 我们展开讲：演示用测试店。 | 指向Brief/招募",
+    "03:10–03:15": "0190–0195 | 正例是什么？每一步都有入口、有确认、有结果物。 | 指向Brief/招募",
+    "03:15–03:20": "0195–0200 | 结果物可以是草稿、订单、话术截图或复盘表。 | 指向Brief/招募",
+    "03:20–03:25": "0200–0205 | 我们展开讲：打开AI智能体。 | 指向Brief/招募",
+    "03:25–03:30": "0205–0210 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 指向Brief/招募",
+    "03:30–03:35": "0210–0215 | 我需要回看哪一个课号补齐？ | 指向Brief/招募",
+    "03:35–03:40": "0215–0220 | 我们展开讲：把AI想成会本地生活的店长助理。 | 指向Brief/招募",
+    "03:40–03:45": "0220–0225 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 指向Brief/招募",
+    "03:45–03:50": "0225–0230 | 分工清楚，学习效率更高。 | 指向Brief/招募",
+    "03:50–03:55": "0230–0235 | 我们展开讲：你先选场景，再说需求， | 指向Brief/招募",
+    "03:55–04:00": "0235–0240 | 比一上来长篇大论更稳，也更省额度。演示默认测试店。 | 指向Brief/招募",
+    "04:00–04:05": "0240–0245 | 生产环境涉及改价、发单、结款，必须二次确认， | 指向Brief/招募",
+    "04:05–04:10": "0245–0250 | 不要直播手滑。我们展开讲：我们扫一眼快捷场景， | 指向Brief/招募",
+    "04:10–04:15": "0250–0255 | 名称以你后台九宫格为准，可能微调。 | 指向Brief/招募",
+    "04:15–04:20": "0255–0260 | 交作业打码：手机号、客户名、真实账单。 | 指向Brief/招募",
+    "04:20–04:25": "0260–0265 | 保护隐私，也是职业习惯。 | 指向Brief/招募",
+    "04:25–04:30": "0265–0270 | 我们展开讲：先看创建商品，团购套餐都在这条。 | 指向Brief/招募",
+    "04:30–04:35": "0270–0275 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 指向Brief/招募",
+    "04:35–04:40": "0275–0280 | 每一步都要能复用到下周、下月。 | 指向Brief/招募",
+    "04:40–04:45": "0280–0285 | 我们展开讲：再看招募达人或写Brief， | 指向Brief/招募",
+    "04:45–04:50": "0285–0290 | 这是模块三的上游弹药，Brief不清楚， | 指向Brief/招募",
+    "04:50–04:55": "0290–0295 | 达人再多也是噪音。跟不上就暂停。 | 指向Brief/招募",
+    "04:55–05:00": "0295–0300 | 暂停重做三十秒，胜过假装看完却一步都没点过。 | 指向Brief/招募",
+    "05:00–05:05": "0300–0305 | 我们展开讲：再看处理评价或差评回复，目标是止损加改进， | 指向评价",
+    "05:05–05:10": "0305–0310 | 不是怼赢顾客。为什么要强调这一点？ | 指向评价",
+    "05:10–05:15": "0310–0315 | 因为现场一忙最容易省掉这一步， | 指向评价",
+    "05:15–05:20": "0315–0320 | 而返工成本通常高于你现在多花的一分钟。 | 指向评价",
+    "05:20–05:25": "0320–0325 | 我们展开讲：内容相关场景：脚本、短视频等，对应模块四。 | 指向评价",
+    "05:25–05:30": "0325–0330 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 指向评价",
+    "05:30–05:35": "0330–0335 | 听懂不等于会做，会做才算合格。 | 指向评价",
+    "05:35–05:40": "0335–0340 | 我们展开讲：线索或经营辅助类场景，对应模块五。 | 指向评价",
+    "05:40–05:45": "0340–0345 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 指向评价",
+    "05:45–05:50": "0345–0350 | 不截图不留痕。这些都会在下周复盘时暴露。 | 指向评价",
+    "05:50–05:55": "0350–0355 | 我们展开讲：其余场景你先建立地图感，不必今天全做。 | 指向评价",
+    "05:55–06:00": "0355–0360 | 正例是什么？每一步都有入口、有确认、有结果物。 | 指向评价",
+    "06:00–06:05": "0360–0365 | 结果物可以是草稿、订单、话术截图或复盘表。 | 指向评价",
+    "06:05–06:10": "0365–0370 | 我们展开讲：地图的意义是：以后卡住，知道回哪个格子。 | 指向评价",
+    "06:10–06:15": "0370–0375 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 指向评价",
+    "06:15–06:20": "0375–0380 | 我需要回看哪一个课号补齐？ | 指向评价",
+    "06:20–06:25": "0380–0385 | 我们展开讲：使用口诀请跟我念：选场景，说清楚约束， | 指向评价",
+    "06:25–06:30": "0385–0390 | 看方案，确认执行，预览核对。 | 指向评价",
+    "06:30–06:35": "0390–0395 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 指向评价",
+    "06:35–06:40": "0395–0400 | 分工清楚，学习效率更高。 | 指向评价",
+    "06:40–06:45": "0400–0405 | 我们展开讲：约束包括什么？演示默认测试店。 | 指向评价",
+    "06:45–06:50": "0405–0410 | 生产环境涉及改价、发单、结款，必须二次确认， | 指向评价",
+    "06:50–06:55": "0410–0415 | 不要直播手滑。我们展开讲：价格带、人群、禁忌、 | 指向评价",
+    "06:55–07:00": "0415–0420 | 可用时段、是否含酒水、是否周末通用。 | 指向评价",
+    "07:00–07:05": "0420–0425 | 交作业打码：手机号、客户名、真实账单。 | 指向内容/线索",
+    "07:05–07:10": "0425–0430 | 保护隐私，也是职业习惯。 | 指向内容/线索",
+    "07:10–07:15": "0430–0435 | 我们展开讲：说得越清，返工越少。 | 指向内容/线索",
+    "07:15–07:20": "0435–0440 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 指向内容/线索",
+    "07:20–07:25": "0440–0445 | 每一步都要能复用到下周、下月。 | 指向内容/线索",
+    "07:25–07:30": "0445–0450 | 我们展开讲：反例：只说帮我做一个套餐，AI只能猜。 | 指向内容/线索",
+    "07:30–07:35": "0450–0455 | 跟不上就暂停。暂停重做三十秒， | 指向内容/线索",
+    "07:35–07:40": "0455–0460 | 胜过假装看完却一步都没点过。 | 指向内容/线索",
+    "07:40–07:45": "0460–0465 | 我们展开讲：正例：周末双人餐人均八十八， | 指向内容/线索",
+    "07:45–07:50": "0465–0470 | 含锅底两荤两素，家庭向，不含酒水。 | 指向内容/线索",
+    "07:50–07:55": "0470–0475 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 指向内容/线索",
+    "07:55–08:00": "0475–0480 | 而返工成本通常高于你现在多花的一分钟。 | 指向内容/线索",
+    "08:00–08:05": "0480–0485 | 我们展开讲：本模块后面几课， | 指向内容/线索",
+    "08:05–08:10": "0485–0490 | 会把创建商品、Brief、差评三条主链路跑穿。 | 指向内容/线索",
+    "08:10–08:15": "0490–0495 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 指向内容/线索",
+    "08:15–08:20": "0495–0500 | 听懂不等于会做，会做才算合格。 | 指向内容/线索",
+    "08:20–08:25": "0500–0505 | 我们展开讲：今天只建立入口肌肉记忆。 | 指向内容/线索",
+    "08:25–08:30": "0505–0510 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 指向内容/线索",
+    "08:30–08:35": "0510–0515 | 不截图不留痕。这些都会在下周复盘时暴露。 | 指向内容/线索",
+    "08:35–08:40": "0515–0520 | 我们展开讲：请你现在暂停，自己点进智能体， | 指向内容/线索",
+    "08:40–08:45": "0520–0525 | 指认三个主场景位置。正例是什么？ | 指向内容/线索",
+    "08:45–08:50": "0525–0530 | 每一步都有入口、有确认、有结果物。 | 指向内容/线索",
+    "08:50–08:55": "0530–0535 | 结果物可以是草稿、订单、话术截图或复盘表。 | 指向内容/线索",
+    "08:55–09:00": "0535–0540 | 我们展开讲：指得出来，二点一就算过关。 | 指向内容/线索",
+    "09:00–09:05": "0540–0545 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 字幕：使用口诀",
+    "09:05–09:10": "0545–0550 | 我需要回看哪一个课号补齐？ | 字幕：使用口诀",
+    "09:10–09:15": "0550–0555 | 我们展开讲：下一集二点二， | 字幕：使用口诀",
+    "09:15–09:20": "0555–0560 | 专讲预览确认机制：为什么不会乱改你的店。 | 字幕：使用口诀",
+    "09:20–09:25": "0560–0565 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 字幕：使用口诀",
+    "09:25–09:30": "0565–0570 | 分工清楚，学习效率更高。 | 字幕：使用口诀",
+    "09:30–09:35": "0570–0575 | 我们展开讲：这是信任课，也是转化课。演示默认测试店。 | 字幕：使用口诀",
+    "09:35–09:40": "0575–0580 | 生产环境涉及改价、发单、结款，必须二次确认， | 字幕：使用口诀",
+    "09:40–09:45": "0580–0585 | 不要直播手滑。我们展开讲：好，二点一结束。 | 字幕：使用口诀",
+    "09:45–09:50": "0585–0590 | 交作业打码：手机号、客户名、真实账单。 | 字幕：使用口诀",
+    "09:50–09:55": "0590–0595 | 保护隐私，也是职业习惯。我们展开讲：先选场景，再说话。 | 字幕：使用口诀",
+    "09:55–10:00": "0595–0600 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 字幕：使用口诀",
+    "10:00–10:05": "0600–0605 | 每一步都要能复用到下周、下月。我们展开讲：我们下集见。 | 字幕：使用口诀",
+    "10:05–10:10": "0605–0610 | 跟不上就暂停。暂停重做三十秒， | 字幕：使用口诀",
+    "10:10–10:15": "0610–0615 | 胜过假装看完却一步都没点过。我们展开讲：模块二开始。 | 字幕：使用口诀",
+    "10:15–10:20": "0615–0620 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 字幕：使用口诀",
+    "10:20–10:25": "0620–0625 | 而返工成本通常高于你现在多花的一分钟。 | 字幕：使用口诀",
+    "10:25–10:30": "0625–0630 | 我们展开讲：课号二点一：AI智能体总览，九大快捷场景。 | 字幕：使用口诀",
+    "10:30–10:35": "0630–0635 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 字幕：使用口诀",
+    "10:35–10:40": "0635–0640 | 听懂不等于会做，会做才算合格。 | 字幕：使用口诀",
+    "10:40–10:45": "0640–0645 | 我们展开讲：目标：知道入口，形成先选场景再说话的习惯。 | 字幕：使用口诀",
+    "10:45–10:50": "0645–0650 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 字幕：使用口诀",
+    "10:50–10:55": "0650–0655 | 不截图不留痕。这些都会在下周复盘时暴露。 | 字幕：使用口诀",
+    "10:55–11:00": "0655–0660 | 我们展开讲：演示用测试店。 | 字幕：使用口诀",
+    "11:00–11:05": "0660–0665 | 正例是什么？每一步都有入口、有确认、有结果物。 | 字幕：使用口诀",
+    "11:05–11:10": "0665–0670 | 结果物可以是草稿、订单、话术截图或复盘表。 | 字幕：使用口诀",
+    "11:10–11:15": "0670–0675 | 我们展开讲：打开AI智能体。 | 字幕：使用口诀",
+    "11:15–11:20": "0675–0680 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 字幕：使用口诀",
+    "11:20–11:25": "0680–0685 | 我需要回看哪一个课号补齐？ | 字幕：使用口诀",
+    "11:25–11:30": "0685–0690 | 我们展开讲：把AI想成会本地生活的店长助理。 | 字幕：使用口诀",
+    "11:30–11:35": "0690–0695 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 字幕：使用口诀",
+    "11:35–11:40": "0695–0700 | 分工清楚，学习效率更高。 | 字幕：使用口诀",
+    "11:40–11:45": "0700–0705 | 我们展开讲：你先选场景，再说需求， | 字幕：使用口诀",
+    "11:45–11:50": "0705–0710 | 比一上来长篇大论更稳，也更省额度。演示默认测试店。 | 字幕：使用口诀",
+    "11:50–11:55": "0710–0715 | 生产环境涉及改价、发单、结款，必须二次确认， | 字幕：使用口诀",
+    "11:55–12:00": "0715–0720 | 不要直播手滑。我们展开讲：我们扫一眼快捷场景， | 字幕：使用口诀",
+    "12:00–12:05": "0720–0725 | 名称以你后台九宫格为准，可能微调。 | 字幕：使用口诀",
+    "12:05–12:10": "0725–0730 | 交作业打码：手机号、客户名、真实账单。 | 字幕：使用口诀",
+    "12:10–12:15": "0730–0735 | 保护隐私，也是职业习惯。 | 字幕：使用口诀",
+    "12:15–12:20": "0735–0740 | 我们展开讲：先看创建商品，团购套餐都在这条。 | 字幕：使用口诀",
+    "12:20–12:25": "0740–0745 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 字幕：使用口诀",
+    "12:25–12:30": "0745–0750 | 每一步都要能复用到下周、下月。 | 字幕：使用口诀",
+    "12:30–12:35": "0750–0755 | 我们展开讲：再看招募达人或写Brief， | 字幕：使用口诀",
+    "12:35–12:40": "0755–0760 | 这是模块三的上游弹药，Brief不清楚， | 字幕：使用口诀",
+    "12:40–12:45": "0760–0765 | 达人再多也是噪音。跟不上就暂停。 | 字幕：使用口诀",
+    "12:45–12:50": "0765–0770 | 暂停重做三十秒，胜过假装看完却一步都没点过。 | 字幕：使用口诀",
+    "12:50–12:55": "0770–0775 | 我们展开讲：再看处理评价或差评回复，目标是止损加改进， | 字幕：使用口诀",
+    "12:55–13:00": "0775–0780 | 不是怼赢顾客。为什么要强调这一点？ | 字幕：使用口诀",
+    "13:00–13:05": "0780–0785 | 因为现场一忙最容易省掉这一步， | 暂停练习提示",
+    "13:05–13:10": "0785–0790 | 而返工成本通常高于你现在多花的一分钟。 | 暂停练习提示",
+    "13:10–13:15": "0790–0795 | 我们展开讲：内容相关场景：脚本、短视频等，对应模块四。 | 暂停练习提示",
+    "13:15–13:20": "0795–0800 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 暂停练习提示",
+    "13:20–13:25": "0800–0805 | 听懂不等于会做，会做才算合格。 | 暂停练习提示",
+    "13:25–13:30": "0805–0810 | 我们展开讲：线索或经营辅助类场景，对应模块五。 | 暂停练习提示",
+    "13:30–13:35": "0810–0815 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 暂停练习提示",
+    "13:35–13:40": "0815–0820 | 不截图不留痕。这些都会在下周复盘时暴露。 | 暂停练习提示",
+    "13:40–13:45": "0820–0825 | 我们展开讲：其余场景你先建立地图感，不必今天全做。 | 暂停练习提示",
+    "13:45–13:50": "0825–0830 | 正例是什么？每一步都有入口、有确认、有结果物。 | 暂停练习提示",
+    "13:50–13:55": "0830–0835 | 结果物可以是草稿、订单、话术截图或复盘表。 | 暂停练习提示",
+    "13:55–14:00": "0835–0840 | 我们展开讲：地图的意义是：以后卡住，知道回哪个格子。 | 暂停练习提示",
+    "14:00–14:05": "0840–0845 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 暂停练习提示",
+    "14:05–14:10": "0845–0850 | 我需要回看哪一个课号补齐？ | 暂停练习提示",
+    "14:10–14:15": "0850–0855 | 我们展开讲：使用口诀请跟我念：选场景，说清楚约束， | 暂停练习提示",
+    "14:15–14:20": "0855–0860 | 看方案，确认执行，预览核对。 | 暂停练习提示",
+    "14:20–14:25": "0860–0865 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 暂停练习提示",
+    "14:25–14:30": "0865–0870 | 分工清楚，学习效率更高。 | 暂停练习提示",
+    "14:30–14:35": "0870–0875 | 我们展开讲：约束包括什么？演示默认测试店。 | 暂停练习提示",
+    "14:35–14:40": "0875–0880 | 生产环境涉及改价、发单、结款，必须二次确认， | 暂停练习提示",
+    "14:40–14:45": "0880–0885 | 不要直播手滑。我们展开讲：价格带、人群、禁忌、 | 暂停练习提示",
+    "14:45–14:50": "0885–0890 | 可用时段、是否含酒水、是否周末通用。 | 暂停练习提示",
+    "14:50–14:55": "0890–0895 | 交作业打码：手机号、客户名、真实账单。 | 暂停练习提示",
+    "14:55–15:00": "0895–0900 | 保护隐私，也是职业习惯。 | 暂停练习提示",
+    "15:00–15:05": "0900–0905 | 我们展开讲：说得越清，返工越少。 | 暂停练习提示",
+    "15:05–15:10": "0905–0910 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 暂停练习提示",
+    "15:10–15:15": "0910–0915 | 每一步都要能复用到下周、下月。 | 暂停练习提示",
+    "15:15–15:20": "0915–0920 | 我们展开讲：反例：只说帮我做一个套餐，AI只能猜。 | 暂停练习提示",
+    "15:20–15:25": "0920–0925 | 跟不上就暂停。暂停重做三十秒， | 暂停练习提示",
+    "15:25–15:30": "0925–0930 | 胜过假装看完却一步都没点过。 | 暂停练习提示",
+    "15:30–15:35": "0930–0935 | 我们展开讲：正例：周末双人餐人均八十八， | 暂停练习提示",
+    "15:35–15:40": "0935–0940 | 含锅底两荤两素，家庭向，不含酒水。 | 暂停练习提示",
+    "15:40–15:45": "0940–0945 | 为什么要强调这一点？因为现场一忙最容易省掉这一步， | 暂停练习提示",
+    "15:45–15:50": "0945–0950 | 而返工成本通常高于你现在多花的一分钟。 | 暂停练习提示",
+    "15:50–15:55": "0950–0955 | 我们展开讲：本模块后面几课， | 暂停练习提示",
+    "15:55–16:00": "0955–0960 | 会把创建商品、Brief、差评三条主链路跑穿。 | 暂停练习提示",
+    "16:00–16:05": "0960–0965 | 怎么做才算到位？请对照屏幕把动作做完，而不是只听懂。 | 片尾预告2.2",
+    "16:05–16:10": "0965–0970 | 听懂不等于会做，会做才算合格。 | 片尾预告2.2",
+    "16:10–16:15": "0970–0975 | 我们展开讲：今天只建立入口肌肉记忆。 | 片尾预告2.2",
+    "16:15–16:20": "0975–0980 | 反例是什么？跳步、凭感觉、只在微信里同步、 | 片尾预告2.2",
+    "16:20–16:25": "0980–0985 | 不截图不留痕。这些都会在下周复盘时暴露。 | 片尾预告2.2",
+    "16:25–16:30": "0985–0990 | 我们展开讲：请你现在暂停，自己点进智能体， | 片尾预告2.2",
+    "16:30–16:35": "0990–0995 | 指认三个主场景位置。正例是什么？ | 片尾预告2.2",
+    "16:35–16:40": "0995–1000 | 每一步都有入口、有确认、有结果物。 | 片尾预告2.2",
+    "16:40–16:45": "1000–1005 | 结果物可以是草稿、订单、话术截图或复盘表。 | 片尾预告2.2",
+    "16:45–16:50": "1005–1010 | 我们展开讲：指得出来，二点一就算过关。 | 片尾预告2.2",
+    "16:50–16:55": "1010–1015 | 自检三问：我刚才做到哪一步了？哪一步还不敢自己点？ | 片尾预告2.2",
+    "16:55–17:00": "1015–1020 | 我需要回看哪一个课号补齐？ | 片尾预告2.2",
+    "17:00–17:05": "1020–1025 | 我们展开讲：下一集二点二， | 片尾预告2.2",
+    "17:05–17:10": "1025–1030 | 专讲预览确认机制：为什么不会乱改你的店。 | 片尾预告2.2",
+    "17:10–17:15": "1030–1035 | 如果带着店员一起学，让店员负责点选，你负责拍板。 | 片尾预告2.2",
+    "17:15–17:20": "1035–1040 | 分工清楚，学习效率更高。 | 片尾预告2.2",
+    "17:20–17:25": "1040–1045 | 我们展开讲：这是信任课，也是转化课。演示默认测试店。 | 片尾预告2.2",
+    "17:25–17:30": "1045–1050 | 生产环境涉及改价、发单、结款，必须二次确认， | 片尾预告2.2",
+    "17:30–17:35": "1050–1055 | 不要直播手滑。我们展开讲：好，二点一结束。 | 片尾预告2.2",
+    "17:35–17:40": "1055–1060 | 交作业打码：手机号、客户名、真实账单。 | 片尾预告2.2",
+    "17:40–17:45": "1060–1065 | 保护隐私，也是职业习惯。我们展开讲：先选场景，再说话。 | 片尾预告2.2",
+    "17:45–17:50": "1065–1070 | 和课程总定位对齐：我们要的是流水线，不是单点技巧。 | 片尾预告2.2",
+    "17:50–17:55": "1070–1075 | 每一步都要能复用到下周、下月。我们展开讲：我们下集见。 | 片尾预告2.2",
+    "17:55–18:00": "1075–1080 | 跟不上就暂停。暂停重做三十秒， | 片尾预告2.2"
+  },
+  "slides": [
+    {
+      "index": 1,
+      "file": "01-cover.jpg",
+      "kind": "cover",
+      "htag": "封面",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 2.1 · AI 智能体总览：九大快捷场景. Cover slide. Huge title: AI 智能体总览：九大快捷场景. Subtitle: 模块 2｜AI 智能体. Badge: 课号 2.1. Line: 知道入口与主要场景；先选场景再说话. Duration: 18min. Visual metaphor: local store owner, multi-platform apps, AI pipeline ribbon.",
+      "meta": {
+        "kind": "cover",
+        "htag": "封面",
+        "module": "模块 2｜AI 智能体",
+        "dur": "18min",
+        "gain": "知道入口与主要场景；先选场景再说话",
+        "visual": "local store owner, multi-platform apps, AI pipeline ribbon"
+      }
+    },
+    {
+      "index": 2,
+      "file": "02-goal.jpg",
+      "kind": "goal",
+      "htag": "本课目标",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 2.1 · AI 智能体总览：九大快捷场景. Learning goals slide. Title: 本课你将带走. Lead: 形成「先选场景再说话」习惯，扫一眼智能体能力地图。. 3-5 goal cards: 知道入口与主要场景；先选场景再说话.",
+      "meta": {
+        "kind": "goal",
+        "htag": "本课目标",
+        "lead": "形成「先选场景再说话」习惯，扫一眼智能体能力地图。",
+        "items": [
+          "知道入口与主要场景；先选场景再说话"
+        ]
+      }
+    },
+    {
+      "index": 3,
+      "file": "03-cards.jpg",
+      "kind": "cards",
+      "htag": "核心要点",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 2.1 · AI 智能体总览：九大快捷场景. Card grid slide. Title: 核心要点. Cards: 创建商品（团购/套餐）: 创建商品（团购/套餐） ; 招募达人 / 写 Brief: 招募达人 / 写 Brief ; 处理评价 / 差评回复: 处理评价 / 差评回复 ; 内容相关（脚本、短视频等）: 内容相关（脚本、短视频等） ; 线索/经营辅助类场景: 线索/经营辅助类场景.",
+      "meta": {
+        "kind": "cards",
+        "htag": "核心要点",
+        "cards": [
+          {
+            "t": "创建商品（团购/套餐）",
+            "b": "创建商品（团购/套餐）"
+          },
+          {
+            "t": "招募达人 / 写 Brief",
+            "b": "招募达人 / 写 Brief"
+          },
+          {
+            "t": "处理评价 / 差评回复",
+            "b": "处理评价 / 差评回复"
+          },
+          {
+            "t": "内容相关（脚本、短视频等）",
+            "b": "内容相关（脚本、短视频等）"
+          },
+          {
+            "t": "线索/经营辅助类场景",
+            "b": "线索/经营辅助类场景"
+          }
+        ]
+      }
+    },
+    {
+      "index": 4,
+      "file": "04-checklist.jpg",
+      "kind": "checklist",
+      "htag": "演示 / 操作路径",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 2.1 · AI 智能体总览：九大快捷场景. Checklist slide. Title: 演示 / 操作路径. Checked steps: 打开 AI 智能体 → 展示快捷场景入口（勿在本课完整跑完组品）。.",
+      "meta": {
+        "kind": "checklist",
+        "htag": "演示 / 操作路径",
+        "items": [
+          "打开 AI 智能体 → 展示快捷场景入口（勿在本课完整跑完组品）。"
+        ]
+      }
+    },
+    {
+      "index": 5,
+      "file": "05-quote.jpg",
+      "kind": "quote",
+      "htag": "口播与转化要点",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 2.1 · AI 智能体总览：九大快捷场景. Quote/takeaway slide. Title: 记住这句话. Large quote: 「先选场景再说话——比跟 AI 闲聊稳十倍。」. Side notes: .",
+      "meta": {
+        "kind": "quote",
+        "htag": "口播与转化要点",
+        "quote": "「先选场景再说话——比跟 AI 闲聊稳十倍。」",
+        "points": []
+      }
+    },
+    {
+      "index": 6,
+      "file": "06-insight.jpg",
+      "kind": "insight",
+      "htag": "讲义深化",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 2.1 · AI 智能体总览：九大快捷场景. Insight slide. Title: 讲义深化. Big statement: 把 AI 想成「会本地生活的店长助理」。你先选场景，再说需求，比一上来长篇大论更稳。. Supporting bullets: 创建商品（团购/套餐） | 招募达人 / 写 Brief | 处理评价 / 差评回复 | 内容相关（脚本、短视频等）.",
+      "meta": {
+        "kind": "insight",
+        "htag": "讲义深化",
+        "lead": "把 AI 想成「会本地生活的店长助理」。你先选场景，再说需求，比一上来长篇大论更稳。",
+        "items": [
+          "创建商品（团购/套餐）",
+          "招募达人 / 写 Brief",
+          "处理评价 / 差评回复",
+          "内容相关（脚本、短视频等）"
+        ]
+      }
+    },
+    {
+      "index": 7,
+      "file": "07-insight.jpg",
+      "kind": "insight",
+      "htag": "为什么现在必须改",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 2.1 · AI 智能体总览：九大快捷场景. Insight slide. Title: 为什么现在必须改. Big statement: 散点经营一定累：同一件事拆到多个后台、多个人、多轮微信确认。. Supporting bullets: 多入口 = 多口径 | 无状态 = 月底对不清 | 无确认 = AI 不能替你签字.",
+      "meta": {
+        "kind": "insight",
+        "htag": "为什么现在必须改",
+        "lead": "散点经营一定累：同一件事拆到多个后台、多个人、多轮微信确认。",
+        "items": [
+          "多入口 = 多口径",
+          "无状态 = 月底对不清",
+          "无确认 = AI 不能替你签字"
+        ]
+      }
+    },
+    {
+      "index": 8,
+      "file": "08-map.jpg",
+      "kind": "map",
+      "htag": "灵祺流水线一览",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 2.1 · AI 智能体总览：九大快捷场景. Module map slide. Title: 灵祺流水线一览. Nodes: 开团/组品 → 招达人 → 做内容 → 曝光获客 → 对账复盘. Caption: AI 提案 · 你确认 · 少雇人少外包少踩坑.",
+      "meta": {
+        "kind": "map",
+        "htag": "灵祺流水线一览",
+        "steps": [
+          "开团/组品",
+          "招达人",
+          "做内容",
+          "曝光获客",
+          "对账复盘"
+        ],
+        "note": "AI 提案 · 你确认 · 少雇人少外包少踩坑"
+      }
+    },
+    {
+      "index": 9,
+      "file": "09-insight.jpg",
+      "kind": "insight",
+      "htag": "人机分工",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 2.1 · AI 智能体总览：九大快捷场景. Insight slide. Title: 人机分工. Big statement: AI 负责提案与草稿，你负责确认与签字。. Supporting bullets: 可预览 | 可回退 | 关键动作有状态.",
+      "meta": {
+        "kind": "insight",
+        "htag": "人机分工",
+        "lead": "AI 负责提案与草稿，你负责确认与签字。",
+        "items": [
+          "可预览",
+          "可回退",
+          "关键动作有状态"
+        ]
+      }
+    },
+    {
+      "index": 10,
+      "file": "10-split.jpg",
+      "kind": "split",
+      "htag": "旧方式 vs 流水线",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 2.1 · AI 智能体总览：九大快捷场景. Two-column contrast slide. Title: 旧方式 vs 流水线. Left: 旧：微信群跟单 + 表格 + 外包突击. Right: 新：订单状态机 + AI 产线 + 预览确认.",
+      "meta": {
+        "kind": "split",
+        "htag": "旧方式 vs 流水线",
+        "left": "旧：微信群跟单 + 表格 + 外包突击",
+        "right": "新：订单状态机 + AI 产线 + 预览确认"
+      }
+    },
+    {
+      "index": 11,
+      "file": "11-insight.jpg",
+      "kind": "insight",
+      "htag": "本课边界",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 2.1 · AI 智能体总览：九大快捷场景. Insight slide. Title: 本课边界. Big statement: 先对齐概念与路径，敏感信息打码，用测试店心态点一遍。. Supporting bullets: 不堆无关按钮 | 一课一个主动作 | 作业可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "本课边界",
+        "lead": "先对齐概念与路径，敏感信息打码，用测试店心态点一遍。",
+        "items": [
+          "不堆无关按钮",
+          "一课一个主动作",
+          "作业可验收"
+        ]
+      }
+    },
+    {
+      "index": 12,
+      "file": "12-checklist.jpg",
+      "kind": "checklist",
+      "htag": "听课检查清单",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 2.1 · AI 智能体总览：九大快捷场景. Checklist slide. Title: 听课检查清单. Checked steps: 能复述本课目标 | 能指出卡点在哪一步 | 能说出下一动作入口 | 完成作业打卡.",
+      "meta": {
+        "kind": "checklist",
+        "htag": "听课检查清单",
+        "items": [
+          "能复述本课目标",
+          "能指出卡点在哪一步",
+          "能说出下一动作入口",
+          "完成作业打卡"
+        ]
+      }
+    },
+    {
+      "index": 13,
+      "file": "13-quote.jpg",
+      "kind": "quote",
+      "htag": "金句",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 2.1 · AI 智能体总览：九大快捷场景. Quote/takeaway slide. Title: 记住这句话. Large quote: 知道入口与主要场景；先选场景再说话. Side notes: 少雇人 | 少外包 | 少踩坑.",
+      "meta": {
+        "kind": "quote",
+        "htag": "金句",
+        "quote": "知道入口与主要场景；先选场景再说话",
+        "points": [
+          "少雇人",
+          "少外包",
+          "少踩坑"
+        ]
+      }
+    },
+    {
+      "index": 14,
+      "file": "14-insight.jpg",
+      "kind": "insight",
+      "htag": "常见踩坑",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 2.1 · AI 智能体总览：九大快捷场景. Insight slide. Title: 常见踩坑. Big statement: 最容易翻车的不是不会用，而是跳过确认、跳过状态、跳过核对。. Supporting bullets: 未预览就发布 | 状态卡在群聊里 | 月底才想起对账.",
+      "meta": {
+        "kind": "insight",
+        "htag": "常见踩坑",
+        "lead": "最容易翻车的不是不会用，而是跳过确认、跳过状态、跳过核对。",
+        "items": [
+          "未预览就发布",
+          "状态卡在群聊里",
+          "月底才想起对账"
+        ]
+      }
+    },
+    {
+      "index": 15,
+      "file": "15-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 1",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 2.1 · AI 智能体总览：九大快捷场景. Insight slide. Title: 落地提醒 · 1. Big statement: 2.1 AI 智能体总览：九大快捷场景：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 1",
+        "lead": "2.1 AI 智能体总览：九大快捷场景：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 16,
+      "file": "16-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 2",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 2.1 · AI 智能体总览：九大快捷场景. Insight slide. Title: 落地提醒 · 2. Big statement: 2.1 AI 智能体总览：九大快捷场景：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 2",
+        "lead": "2.1 AI 智能体总览：九大快捷场景：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 17,
+      "file": "17-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 3",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 2.1 · AI 智能体总览：九大快捷场景. Insight slide. Title: 落地提醒 · 3. Big statement: 2.1 AI 智能体总览：九大快捷场景：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 3",
+        "lead": "2.1 AI 智能体总览：九大快捷场景：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 18,
+      "file": "18-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 4",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 2.1 · AI 智能体总览：九大快捷场景. Insight slide. Title: 落地提醒 · 4. Big statement: 2.1 AI 智能体总览：九大快捷场景：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 4",
+        "lead": "2.1 AI 智能体总览：九大快捷场景：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 19,
+      "file": "19-insight.jpg",
+      "kind": "insight",
+      "htag": "落地提醒 · 5",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 2.1 · AI 智能体总览：九大快捷场景. Insight slide. Title: 落地提醒 · 5. Big statement: 2.1 AI 智能体总览：九大快捷场景：把概念变成可重复动作，而不是一次性热闹。. Supporting bullets: 入口清晰 | 状态可追踪 | 结果可验收.",
+      "meta": {
+        "kind": "insight",
+        "htag": "落地提醒 · 5",
+        "lead": "2.1 AI 智能体总览：九大快捷场景：把概念变成可重复动作，而不是一次性热闹。",
+        "items": [
+          "入口清晰",
+          "状态可追踪",
+          "结果可验收"
+        ]
+      }
+    },
+    {
+      "index": 20,
+      "file": "20-end.jpg",
+      "kind": "end",
+      "htag": "结束",
+      "prompt": "Professional 16:9 Chinese business training PowerPoint slide for 灵祺商家ERP 本地生活商家AI经营实操营. Deep navy (#0b1220) background, teal (#2dd4bf) accents, crisp white Chinese typography, clean infographic layout, premium consulting look. NO purple gradients, NO neon glow overload, NO English-only text. All key Chinese labels must be sharp and readable. Single cohesive full-bleed slide. Course 2.1 · AI 智能体总览：九大快捷场景. Closing slide. Title: 本课结束. Course 2.1 AI 智能体总览：九大快捷场景. Takeaway: 知道入口与主要场景；先选场景再说话. CTA: 下一课继续实操. Inspiring local-business + AI visual.",
+      "meta": {
+        "kind": "end",
+        "htag": "结束",
+        "gain": "知道入口与主要场景；先选场景再说话"
+      }
+    }
+  ]
+}

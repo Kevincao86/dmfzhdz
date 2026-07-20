@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>7.4 直播专场：本月新功能演示</title>
+<style>
+  html,body{height:100%;margin:0;background:#05080f;color:#fff;font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;overflow:hidden}
+  .deck{position:relative;width:100vw;height:100vh}
+  .slide{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:#05080f}
+  .slide.active{display:flex}
+  .slide img{width:100vw;height:100vh;object-fit:contain;background:#0b1220}
+  .bar{position:fixed;left:0;right:0;bottom:0;height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;
+    background:linear-gradient(transparent,rgba(0,0,0,.72));font-size:13px;color:#cbd5e1;z-index:5}
+  .bar b{color:#5eead4}
+  .hint{opacity:.75}
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+<section class="slide"><img src="slides/01-cover.jpg" alt="封面"/></section>
+<section class="slide"><img src="slides/02-goal.jpg" alt="本课目标"/></section>
+<section class="slide"><img src="slides/03-agenda.jpg" alt="本课结构"/></section>
+<section class="slide"><img src="slides/04-cards.jpg" alt="结构模板（每月套用）"/></section>
+<section class="slide"><img src="slides/05-insight.jpg" alt="口播"/></section>
+<section class="slide"><img src="slides/06-checklist.jpg" alt="演示 / 操作路径"/></section>
+<section class="slide"><img src="slides/07-quote.jpg" alt="口播与转化要点"/></section>
+<section class="slide"><img src="slides/08-insight.jpg" alt="结构模板（每月套用）"/></section>
+<section class="slide"><img src="slides/09-insight.jpg" alt="为什么现在必须改"/></section>
+<section class="slide"><img src="slides/10-map.jpg" alt="灵祺流水线一览"/></section>
+<section class="slide"><img src="slides/11-insight.jpg" alt="人机分工"/></section>
+<section class="slide"><img src="slides/12-split.jpg" alt="旧方式 vs 流水线"/></section>
+<section class="slide"><img src="slides/13-insight.jpg" alt="本课边界"/></section>
+<section class="slide"><img src="slides/14-checklist.jpg" alt="听课检查清单"/></section>
+<section class="slide"><img src="slides/15-quote.jpg" alt="金句"/></section>
+<section class="slide"><img src="slides/16-insight.jpg" alt="常见踩坑"/></section>
+<section class="slide"><img src="slides/17-insight.jpg" alt="落地提醒 · 1"/></section>
+<section class="slide"><img src="slides/18-insight.jpg" alt="落地提醒 · 2"/></section>
+<section class="slide"><img src="slides/19-insight.jpg" alt="落地提醒 · 3"/></section>
+<section class="slide"><img src="slides/20-end.jpg" alt="结束"/></section>
+</div>
+<div class="bar">
+  <span>7.4 · 直播专场：本月新功能演示</span>
+  <span><b id="idx">1</b> / 20　<span class="hint">← → / 空格翻页</span></span>
+</div>
+<script>
+const slides=[...document.querySelectorAll('.slide')];
+let i=0;
+function show(n){
+  i=Math.max(0,Math.min(slides.length-1,n));
+  slides.forEach((s,k)=>s.classList.toggle('active',k===i));
+  document.getElementById('idx').textContent=String(i+1);
+  history.replaceState(null,'','#'+(i+1));
+}
+document.addEventListener('keydown',e=>{
+  if(['ArrowRight','PageDown',' ','Enter'].includes(e.key)){e.preventDefault();show(i+1)}
+  if(['ArrowLeft','PageUp'].includes(e.key)){e.preventDefault();show(i-1)}
+  if(e.key==='Home')show(0);
+  if(e.key==='End')show(slides.length-1);
+});
+document.addEventListener('click',e=>{
+  if(e.clientX>innerWidth*0.55)show(i+1); else show(i-1);
+});
+const h=parseInt((location.hash||'#1').slice(1),10); show(isNaN(h)?0:h-1);
+</script>
+</body>
+</html>
