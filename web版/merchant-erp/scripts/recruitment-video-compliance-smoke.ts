@@ -18,6 +18,11 @@ import {
   splitScriptParagraphs,
 } from '../src/lib/complianceHitLocations.js'
 import { computeComplianceFrameSamplePlan } from '../vite-plugins/videoConcatServer.js'
+import {
+  forceHitsFromVisionRiskFields,
+  isVisualForceHitPhrase,
+  scanSensitiveMediaPhrases,
+} from '../src/lib/videoVisualRiskTaxonomy.js'
 import { runRecruitmentVideoComplianceCheck } from '../src/lib/recruitmentVideoComplianceCore.js'
 import { runRecruitmentScriptComplianceCheck } from '../src/lib/recruitmentScriptComplianceCore.js'
 
@@ -37,6 +42,24 @@ async function main() {
   if (frameSlotToApproxSec('t25s', 58) !== 25) {
     throw new Error(`expected t25s → 25, got ${frameSlotToApproxSec('t25s', 58)}`)
   }
+
+  const edgeHits = forceHitsFromVisionRiskFields({
+    hasPerson: true,
+    riskClasses: ['attire_edge', 'pose_edge'],
+    ocrText: '非常肥美',
+  })
+  if (!edgeHits.includes('着装擦边') || !edgeHits.includes('色情导流风险')) {
+    throw new Error(`expected attire+soft_porn hits, got ${JSON.stringify(edgeHits)}`)
+  }
+  const violHits = forceHitsFromVisionRiskFields({ riskClasses: ['violence_fight', 'gore_injury'] })
+  if (!violHits.includes('暴力打斗画面') || !violHits.includes('血腥伤害画面')) {
+    throw new Error(`expected violence/gore hits, got ${JSON.stringify(violHits)}`)
+  }
+  if (!isVisualForceHitPhrase('危险动作画面')) {
+    throw new Error('dangerous_act label should force hit')
+  }
+  const asrSense = scanSensitiveMediaPhrases('现场有人打架还流血了')
+  if (!asrSense.length) throw new Error('expected sensitive media phrase scan hits')
 
   if (formatComplianceTimeLabel(5200) !== '00:05:200') {
     throw new Error(`expected 00:05:200 for 5200ms, got ${formatComplianceTimeLabel(5200)}`)

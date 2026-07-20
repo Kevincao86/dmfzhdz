@@ -36,6 +36,7 @@ import {
 } from './complianceHitLocations.js'
 import { isRetryableAiProviderError } from './aiProviderRetryableError.js'
 import { mpPointsCostForVideoSeconds } from './mpPointsEconomics.js'
+import { isVisualForceHitPhrase } from './videoVisualRiskTaxonomy.js'
 
 export type VideoComplianceInput = {
   mpOrderId?: string
@@ -227,8 +228,14 @@ function defaultLocalHitSuggestion(phrase: string): string {
   if (/微信|加V|加薇|加微|薇信|私信|扫码|线下|私下|站外|绕过|脱离|VX|wx|电话|淘宝|天猫|下载抖音/.test(phrase)) {
     return '删除站外联系/导流话术，改为引导平台内团购核销或到店体验'
   }
-  if (/着装擦边|姿态擦边|二维码特写|打码指认|联系方式露出|色情导流|低俗导流/.test(phrase)) {
-    return '调整出镜着装与构图，去掉二维码/打码指认，避免擦边导流观感'
+  if (/着装擦边|姿态擦边|敏感裸露|色情导流|低俗导流|双关暗示/.test(phrase)) {
+    return '调整出镜着装与构图，去掉性暗示话术，避免擦边/色情导流观感'
+  }
+  if (/二维码特写|打码指认|联系方式露出/.test(phrase)) {
+    return '去掉二维码特写/打码指认/站外联系方式，仅引导平台内团购'
+  }
+  if (/暴力打斗|血腥伤害|危险动作/.test(phrase)) {
+    return '删除暴力、血腥或危险动作画面与相关口播，改为安全合规内容'
   }
   return '删除或改写该表述，避免绝对化/夸大宣传'
 }
@@ -236,8 +243,8 @@ function defaultLocalHitSuggestion(phrase: string): string {
 function defaultSemanticHitSuggestion(phrase: string): string {
   if (/快来|赶紧|速来|必来/.test(phrase)) return '「适合来逛逛」「值得来体验一下」'
   if (/超有|超级|非常有格调|格调/.test(phrase)) return '「装修很有质感」「氛围挺舒服的」'
-  if (/肥美|擦边|导流|二维码|打码|私信|微信/.test(phrase)) {
-    return '改为客观探店描述；去掉站外导流与擦边暗示，美食夸赞对准菜品而非人'
+  if (/肥美|擦边|导流|二维码|打码|私信|微信|暴力|血腥|危险/.test(phrase)) {
+    return '改为客观探店描述；去掉站外导流、擦边暗示、暴力危险元素'
   }
   return '改为客观、可证实的体验描述，避免夸大或强引导'
 }
@@ -446,19 +453,20 @@ export async function runRecruitmentVideoComplianceCheck(
   const mediaNotes = mediaExtract?.mediaNotes?.length
     ? `\n【成片检核说明】${mediaExtract.mediaNotes.join('；')}`
     : ''
-  const visualForceHits = visualHits.filter((h) =>
-    /着装擦边|姿态擦边|二维码|打码|联系方式|双关暗示|色情导流|低俗导流/.test(h),
-  )
+  const visualForceHits = visualHits.filter((h) => isVisualForceHitPhrase(h))
   const visualBlock =
     visualForceHits.length > 0
       ? [
           '',
-          '【画面视觉命中（抽帧视觉已检出，属高风险，禁止因「美食探店/客观价签」豁免为 normal）】',
+          '【画面敏感分类命中（抽帧视觉已检出，属高风险；禁止因美食探店/种草豁免为 normal）】',
           visualForceHits.join('、'),
           ...(mediaExtract?.frameSlotHits || [])
-            .filter((f) => f.hits?.some((h) => visualForceHits.includes(h)))
+            .filter((f) => f.hits?.some((h) => isVisualForceHitPhrase(h)))
             .slice(0, 6)
-            .map((f) => `- ${f.slot}: ${f.hits.filter((h) => visualForceHits.includes(h)).join('、')}`),
+            .map(
+              (f) =>
+                `- ${f.slot}: ${f.hits.filter((h) => isVisualForceHitPhrase(h)).join('、')}`,
+            ),
         ].join('\n')
       : ''
   const user = [
@@ -476,9 +484,9 @@ export async function runRecruitmentVideoComplianceCheck(
     '{"verdict":"normal"|"suspect","message":"15-80字结论","hits":["命中的违规词或表述，无则空数组"],"violations":[{"excerpt":"原文违规片段（须来自口播/字幕/画面，20字内）","rule":"违反的规则要点","suggestion":"「替换词1」「替换词2」","channel":"asr"|"subtitle"|"visual"|"brief"}]}',
     'verdict=normal 时 violations 为空数组；verdict=suspect 时须为每条风险表述给出 violations（含未命中本地词库的语义风险词）。',
     'suggestion 须给出 1-2 个可直接替换的短语，用「」包裹，格式示例：「适合来逛逛」「值得来体验一下」。',
-    '须综合口播、画面文字、画面视觉与 Brief 判断；任一路径出现绝对化/虚假/误导，或擦边/导流/站外联系 → suspect。',
-    '若上方【画面视觉命中】非空，verdict 必须为 suspect，message/rule 须写明「色情导流/低俗导流」或对应视觉命中，不得判 normal。',
-    '美食语境客观描述仅在无画面擦边命中时可豁免双关误伤。',
+    '须综合口播、画面文字、画面敏感分类与 Brief 判断；绝对化/虚假/误导，或擦边/暴力/血腥/危险/导流 → suspect。',
+    '若上方【画面敏感分类命中】非空，verdict 必须为 suspect；rule 写明对应类目（色情导流/暴力打斗/血腥伤害/危险动作/违规导流等），不得判 normal。',
+    '美食语境客观描述仅在无画面敏感命中时可豁免双关误伤。',
   ]
     .filter(Boolean)
     .join('\n')
@@ -523,22 +531,20 @@ export async function runRecruitmentVideoComplianceCheck(
     if (mergedLocalHits.length && verdict === 'normal') {
       verdict = 'suspect'
       hits = [...new Set([...hits, ...mergedLocalHits])].slice(0, 16)
-      const visualLead = mergedLocalHits.filter((h) =>
-        /着装擦边|姿态擦边|二维码|打码|联系方式|双关暗示|色情导流|低俗导流/.test(h),
-      )
+      const visualLead = mergedLocalHits.filter((h) => isVisualForceHitPhrase(h))
       message = visualLead.length
-        ? `可能违规请注意审核：画面/导流风险「${visualLead.slice(0, 3).join('、')}」`
+        ? `可能违规请注意审核：画面敏感「${visualLead.slice(0, 3).join('、')}」`
         : `可能违规请注意审核：命中高风险用语「${mergedLocalHits.slice(0, 3).join('、')}」`
     } else if (mergedLocalHits.length) {
       hits = [...new Set([...hits, ...mergedLocalHits])].slice(0, 16)
     }
 
-    // 视觉擦边/导流命中：无论 LLM 如何表述，强制 suspect
+    // 画面敏感分类命中：无论 LLM 如何表述，强制 suspect
     if (visualForceHits.length) {
       verdict = 'suspect'
       hits = [...new Set([...hits, ...visualForceHits])].slice(0, 16)
-      if (!/色情导流|低俗导流|擦边|导流/.test(message)) {
-        message = `可能违规请注意审核：画面视觉命中「${visualForceHits.slice(0, 3).join('、')}」`
+      if (!/色情导流|低俗导流|擦边|导流|暴力|血腥|危险|裸露/.test(message)) {
+        message = `可能违规请注意审核：画面敏感分类「${visualForceHits.slice(0, 3).join('、')}」`
       }
     }
 
