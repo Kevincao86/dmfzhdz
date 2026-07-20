@@ -1,5 +1,9 @@
 import * as XLSX from 'xlsx'
-import { aiOpsPlanToMarkdown, type AiOpsPlanResult } from './aiOpsPlanTypes'
+import {
+  AI_OPS_MILESTONE_KIND_LABELS,
+  aiOpsPlanToMarkdown,
+  type AiOpsPlanResult,
+} from './aiOpsPlanTypes'
 
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
@@ -20,48 +24,71 @@ export function exportAiOpsPlanExcel(plan: AiOpsPlanResult, basename: string) {
     wb,
     sheetFromAoA([
       ['背景', plan.opsPlan.background],
+      ['背景详情', plan.opsPlan.backgroundDetail],
       ['定位', plan.opsPlan.positioning],
+      ['活动', plan.opsPlan.activities],
+      ['活动详情', plan.opsPlan.activitiesDetail],
       ['人群', plan.opsPlan.targetAudience],
+      ['人群详情', plan.opsPlan.audienceDetail],
       ['目标', plan.opsPlan.goals.join('；')],
       ['内容支柱', plan.opsPlan.contentPillars.join(' / ')],
-      ...[
-        ['平台', '打法', '内容形态', '频次', 'KPI', '示例'] as (string | number)[],
-        ...plan.opsPlan.platformStrategy.map((r) => [
-          r.platform,
-          r.approach,
-          r.contentTypes,
-          r.publishFreq,
-          r.kpi,
-          r.examples,
-        ]),
-      ],
+      [],
+      ['指标', '目标', '客单', '订单', 'GMV', '测算说明'],
+      ...plan.opsPlan.goalsDetail.map((g) => [
+        g.metric,
+        g.target,
+        g.aovYuan,
+        g.orders,
+        g.gmvYuan,
+        g.rationale,
+      ]),
+      [],
+      ['平台', '打法', '内容形态', '频次', 'KPI', '示例', '详情'] as (string | number)[],
+      ...plan.opsPlan.platformStrategy.map((r) => [
+        r.platform,
+        r.approach,
+        r.contentTypes,
+        r.publishFreq,
+        r.kpi,
+        r.examples,
+        r.detail,
+      ]),
     ]),
     '运营方案',
   )
+  const phaseDetailRows: (string | number)[][] = []
+  for (const r of plan.executionPlan.phases) {
+    phaseDetailRows.push([r.phase, r.dateRange, r.actions, r.ownerRole, r.deliverable, r.successMetric, ''])
+    for (const d of r.detailItems || []) {
+      phaseDetailRows.push([
+        `  ${r.phase}`,
+        d.day,
+        d.task,
+        d.ownerRole,
+        d.deliverable,
+        '',
+        d.howTo || '',
+      ])
+    }
+  }
   XLSX.utils.book_append_sheet(
     wb,
     sheetFromAoA([
       ['总览', plan.executionPlan.overview],
-      ['阶段', '日期', '动作', '角色', '产出', '成功指标'],
-      ...plan.executionPlan.phases.map((r) => [
-        r.phase,
-        r.dateRange,
-        r.actions,
-        r.ownerRole,
-        r.deliverable,
-        r.successMetric,
-      ]),
+      ['阶段', '日期', '动作/任务', '角色', '产出', '成功指标', '怎么做'],
+      ...phaseDetailRows,
       [],
-      ['周次', '日期', '重点', '任务', '角色'],
+      ['周次', '日期', '重点', '任务', '角色', '详情'],
       ...plan.executionPlan.weeklyActions.map((r) => [
         r.week,
         r.dateRange,
         r.focus,
         r.tasks,
         r.ownerRole,
+        r.detail,
       ]),
       [],
-      ['直播小时排期', '开始', '结束', '任务', '角色', '地点'],
+      ['直播小时排期', '开始', '结束', '任务', '角色', '地点', '备注'],
       ...plan.executionPlan.hourlySchedule.map((r) => [
         r.date,
         r.timeStart,
@@ -69,6 +96,7 @@ export function exportAiOpsPlanExcel(plan: AiOpsPlanResult, basename: string) {
         r.task,
         r.ownerRole,
         r.location,
+        r.notes,
       ]),
     ]),
     '具体执行方案',
@@ -105,10 +133,11 @@ export function exportAiOpsPlanExcel(plan: AiOpsPlanResult, basename: string) {
   XLSX.utils.book_append_sheet(
     wb,
     sheetFromAoA([
-      ['日期', '时间', '事项', '依赖', '角色', '建议'],
+      ['日期', '时间', '类型', '事项', '依赖', '角色', '建议'],
       ...plan.calendar.milestones.map((r) => [
         r.date,
         r.time,
+        AI_OPS_MILESTONE_KIND_LABELS[r.kind] || r.kind || '',
         r.item,
         r.dependency,
         r.ownerRole,
