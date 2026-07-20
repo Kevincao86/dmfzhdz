@@ -1665,7 +1665,10 @@ async function callModelText(
       const e = env as Record<string, string | undefined>
       const base = (e.DEEPSEEK_BASE_URL ?? 'https://api.deepseek.com').trim().replace(/\/$/, '')
       const mid = (e.DEEPSEEK_MODEL ?? 'deepseek-chat').trim()
-      return openAiStyleChat(`${base}/chat/completions`, apiKey, mid, system, user)
+      // 运营方案等长 JSON 易截断，抬高 max_tokens
+      return openAiStyleChat(`${base}/chat/completions`, apiKey, mid, system, user, {
+        max_tokens: 8192,
+      })
     }
     case 'kimi': {
       const e = env as Record<string, string | undefined>
@@ -2564,19 +2567,18 @@ const ADVERTISING_AI_VENDOR_ORDER = [
 ] as const
 
 /**
- * 运营方案等长 JSON：有额度/响应快的厂商优先，失败自动换下一已配置 Key 的厂商。
- * TokenMix 系（openai/claude/gemini/grok）走同一 TOKENMIX_API_KEY，额度共用但模型不同可轮询。
+ * 运营方案长 JSON：优先能稳定出完整结构化稿的厂商（千问/豆包/DeepSeek）。
+ * TokenMix 促销额度常拒长任务、Kimi/Grok 易鉴权失败，放最后或跳过。
  */
 export const OPS_PLAN_AI_VENDOR_ORDER = [
+  'qwen',
+  'doubao',
   'deepseek',
   'minimax',
   'kimi',
   'openai',
   'claude',
   'gemini',
-  'grok',
-  'qwen',
-  'doubao',
 ] as const
 
 /**
