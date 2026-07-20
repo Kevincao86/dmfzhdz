@@ -148,7 +148,16 @@ async function fetchRegistryOnce(opts) {
       ).trim()
     }
     if (includeRecommendPool) body.includeRecommendPool = true
-    if (opts && opts.includeOnly) body.includeOnly = true
+    // 指定单号默认 includeOnly：详情/报名/PR 子页秒开；显式 false 可关
+    const wantIncludeOnly =
+      opts && opts.includeOnly === false
+        ? false
+        : !!(opts && opts.includeOnly) ||
+          (includeMpOrderIds.length > 0 &&
+            includeMpOrderIds.length <= 30 &&
+            !includePrOwned &&
+            !includeRecommendPool)
+    if (wantIncludeOnly) body.includeOnly = true
     const raw = await api.post(HALL_POST, body, registerAuthHeaders())
     return normalizeHallPayload(raw)
   } catch (e2) {

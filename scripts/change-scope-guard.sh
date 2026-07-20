@@ -37,6 +37,7 @@ list_scopes() {
   mp_hall_region       小程序招募/推荐大厅城市自动定位
   merchant_nav         商家/服务商 ERP 侧栏导航信息架构
   ai_points            全端 AI 积分扣减 / 60% 毛利定价
+  mp_order_detail_fast 商单详情秒开（hall_registry includeOnly + PG 按 id）
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -312,6 +313,18 @@ merchantAiUpstream
 AiImageStudioPage
 AiOpsPlanPage
 aiOpsPlanApi
+change-scope-guard
+PAT
+      ;;
+    mp_order_detail_fast)
+      cat <<'PAT'
+mpHallRegistryCore
+registrySnapshotPgAppend
+meoo-ops-mp-auth
+opsRegistryTalentMp
+subpack-core/detail/detail
+灵祺达人履约管理后台/src/lib/mpApi.ts
+RecruitmentDetailPage
 change-scope-guard
 PAT
       ;;

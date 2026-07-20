@@ -357,6 +357,8 @@ export async function fetchMpRegistry(opts?: {
   includePrOwned?: boolean
   /** 合并本机报名/发单中的 mpOrderId（仅「我的报名」等场景，大厅勿开） */
   includeLocalContext?: boolean
+  /** 仅返回指定单（详情秒开）；指定 ids 且非 PR/推荐池时默认 true */
+  includeOnly?: boolean
   /** hall：仅招募单（大厅列表）；full：完整注册表（消息/聊天等） */
   scope?: 'hall' | 'full'
   /** PR 推荐大厅：经 hall_registry POST 附带达人/团队库（须已登录） */
@@ -370,6 +372,13 @@ export async function fetchMpRegistry(opts?: {
     : [...new Set(explicitIds)].slice(0, 120)
   const includePrOwned = opts?.includePrOwned === true
   const includeRecommendPool = opts?.includeRecommendPool === true
+  const includeOnly =
+    opts?.includeOnly === true ||
+    (opts?.includeOnly !== false &&
+      includeMpOrderIds.length > 0 &&
+      includeMpOrderIds.length <= 30 &&
+      !includePrOwned &&
+      !includeRecommendPool)
   const scope = opts?.scope === 'full' ? 'full' : 'hall'
 
   const now = Date.now()
@@ -382,7 +391,7 @@ export async function fetchMpRegistry(opts?: {
     return cached.data
   }
   const inflightKey = bypassHallCache
-    ? `${cacheKey}:ids:${[...includeMpOrderIds].sort().join(',')}${includePrOwned ? ':pr' : ''}${opts?.includeLocalContext ? ':ctx' : ''}`
+    ? `${cacheKey}:ids:${[...includeMpOrderIds].sort().join(',')}${includePrOwned ? ':pr' : ''}${opts?.includeLocalContext ? ':ctx' : ''}${includeOnly ? ':only' : ''}`
     : cacheKey
   const inflight = hallRegistryInflight[inflightKey]
   if (inflight) return inflight
@@ -395,6 +404,7 @@ export async function fetchMpRegistry(opts?: {
       includeMpOrderIds,
       includePrOwned,
       includeRecommendPool,
+      includeOnly,
     })
   }
 

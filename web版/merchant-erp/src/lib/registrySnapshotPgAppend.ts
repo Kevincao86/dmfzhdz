@@ -279,6 +279,127 @@ export async function readMpGroupQrSideMapViaPg(
   }
 }
 
+/**
+ * 商单详情快路径：PG 只返回指定 id 的订单 + 对应群码 + mpPrUsers，
+ * 避免 PostgREST 整列拉 mpRecruitmentOrders（1MB+）导致详情进页超时。
+ */
+export async function readMpRecruitmentOrdersByIdsViaPg(
+  mpOrderIds: string[],
+): Promise<
+  | {
+      ok: true
+      orders: RegistryMpRecruitmentOrder[]
+      mpPrUsers: unknown[]
+      groupQrByOrderId: Record<string, string>
+    }
+  | { ok: false; error: string }
+> {
+  const cs = readRegistryPgConnectionString()
+  if (!cs) return { ok: false, error: 'pg_not_configured' }
+
+  const ids = [...new Set(mpOrderIds.map((id) => String(id || '').trim()).filter(Boolean))].slice(
+    0,
+    120,
+  )
+  if (!ids.length) {
+    return { ok: true, orders: [], mpPrUsers: [], groupQrByOrderId: {} }
+  }
+
+  const client = new Client({ connectionString: cs })
+  await client.connect()
+  try {
+    const row = await client.query<{
+      orders: unknown
+      mp_pr_users: unknown
+      group_qr: unknown
+    }>(
+      `SELECT
+         COALESCE(
+           (
+             SELECT jsonb_agg(o ORDER BY ord.ordinality)
+             FROM jsonb_array_elements(COALESCE(s.registry->'mpRecruitmentOrders', '[]'::jsonb))
+               WITH ORDINALITY AS ord(o, ordinality)
+             WHERE o->>'id' = ANY($1::text[])
+           ),
+           '[]'::jsonb
+         ) AS orders,
+         COALESCE(s.registry->'mpPrUsers', '[]'::jsonb) AS mp_pr_users,
+         COALESCE(
+           (
+             SELECT jsonb_object_agg(e.key, e.value)
+             FROM jsonb_each(COALESCE(s.registry->'mpGroupQrByOrderId', '{}'::jsonb)) e
+             WHERE e.key = ANY($1::text[])
+           ),
+           '{}'::jsonb
+         ) AS group_qr
+       FROM ops_registry_snapshot s
+       WHERE s.id = 1
+       LIMIT 1`,
+      [ids],
+    )
+    const hit = row.rows[0]
+    if (!hit) return { ok: false, error: 'snapshot_missing' }
+
+    const ordersRaw = hit.orders
+    const orders = Array.isArray(ordersRaw)
+      ? (ordersRaw as RegistryMpRecruitmentOrder[])
+      : typeof ordersRaw === 'string'
+        ? (() => {
+            try {
+              const parsed = JSON.parse(ordersRaw) as unknown
+              return Array.isArray(parsed) ? (parsed as RegistryMpRecruitmentOrder[]) : []
+            } catch {
+              return []
+            }
+          })()
+        : []
+
+    const prRaw = hit.mp_pr_users
+    const mpPrUsers = Array.isArray(prRaw)
+      ? prRaw
+      : typeof prRaw === 'string'
+        ? (() => {
+            try {
+              const parsed = JSON.parse(prRaw) as unknown
+              return Array.isArray(parsed) ? parsed : []
+            } catch {
+              return []
+            }
+          })()
+        : []
+
+    const qrRaw = hit.group_qr
+    let groupQrByOrderId: Record<string, string> = {}
+    if (qrRaw && typeof qrRaw === 'object' && !Array.isArray(qrRaw)) {
+      for (const [k, v] of Object.entries(qrRaw as Record<string, unknown>)) {
+        const key = String(k || '').trim()
+        const val = String(v || '').trim()
+        if (key && val) groupQrByOrderId[key] = val
+      }
+    } else if (typeof qrRaw === 'string' && qrRaw.trim()) {
+      try {
+        const parsed = JSON.parse(qrRaw) as unknown
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+            const key = String(k || '').trim()
+            const val = String(v || '').trim()
+            if (key && val) groupQrByOrderId[key] = val
+          }
+        }
+      } catch {
+        groupQrByOrderId = {}
+      }
+    }
+
+    return { ok: true, orders, mpPrUsers, groupQrByOrderId }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, error: msg.slice(0, 240) }
+  } finally {
+    await client.end()
+  }
+}
+
 /** 达人扫码进群：PG 直读 side map（绕过大厅切片/缓存，仅 group_qr 转发单） */
 export async function readMpFormRelayGroupQrViaPg(
   mpOrderId: string,
