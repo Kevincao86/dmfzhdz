@@ -144,7 +144,7 @@
     <view wx:if="{{doneId}}" class="relay-done">
       <text class="relay-done__text">已生成代收单 {{doneId}}</text>
       <view class="relay-done__actions">
-        <button class="relay-btn relay-btn--ghost" size="mini" bindtap="onCopyShareLink" data-id="{{doneId}}">复制分享链接</button>
+        <button class="relay-btn relay-btn--ghost" size="mini" bindtap="onOpenShare" data-id="{{doneId}}">分享</button>
         <button class="relay-btn" size="mini" bindtap="goApplicants" data-id="{{doneId}}">查看报名</button>
       </view>
     </view>
@@ -219,9 +219,37 @@
       <text class="hint relay-row__time">{{item.createdAt}}</text>
       <view class="relay-row__actions">
         <button wx:if="{{item.isGroupQrRelay && groupQrFeatureEnabled}}" class="relay-btn relay-btn--ghost" size="mini" bindtap="onReuploadGroupQr" data-id="{{item.mpOrderId}}">补传群码</button>
-        <button class="relay-btn relay-btn--ghost" size="mini" bindtap="onCopyShareLink" data-id="{{item.mpOrderId}}">复制分享</button>
+        <button class="relay-btn relay-btn--ghost" size="mini" bindtap="onOpenShare" data-id="{{item.mpOrderId}}">分享</button>
         <button class="relay-btn" size="mini" bindtap="goApplicants" data-id="{{item.mpOrderId}}">报名管理</button>
       </view>
+    </view>
+  </view>
+
+  <view class="relay-share-sheet-mask" wx:if="{{showShareSheet}}" bindtap="onCloseShareSheet">
+    <view class="relay-share-sheet" catchtap="noopShareSheetTap">
+      <view class="relay-share-sheet-head">
+        <text class="relay-share-sheet-title">分享代收单</text>
+        <text class="relay-share-sheet-close" bindtap="onCloseShareSheet">×</text>
+      </view>
+      <text wx:if="{{shareTitle}}" class="relay-share-sheet-sub">{{shareTitle}}</text>
+
+      <text class="relay-share-label">选择文案</text>
+      <view class="relay-share-copy-options">
+        <view
+          wx:for="{{shareCopyOptions}}"
+          wx:key="id"
+          class="relay-share-copy-chip {{shareCopyKind === item.id ? 'relay-share-copy-chip--on' : ''}}"
+          data-kind="{{item.id}}"
+          bindtap="onSelectShareCopy"
+        >{{item.label}}</view>
+      </view>
+      <scroll-view class="relay-share-preview" scroll-y>
+        <text class="relay-share-preview-text">{{shareCopyLoading ? '文案生成中…' : (shareCopyPreview || '暂无文案')}}</text>
+      </scroll-view>
+
+      <view class="relay-share-sheet-item" bindtap="onCopySelectedShareText">复制所选文案</view>
+      <button class="relay-share-sheet-item relay-share-sheet-btn" open-type="share">分享小程序卡片</button>
+      <view class="relay-share-sheet-cancel" bindtap="onCloseShareSheet">取消</view>
     </view>
   </view>
 </view>

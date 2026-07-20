@@ -14,10 +14,38 @@ const mpGroupQr = require('../../../utils/mpGroupQr.js')
 const formRelayGroupQrFeature = require('../../../utils/formRelayGroupQrFeature.js')
 const shareCopy = require('../../../utils/recruitmentShareCopy.js')
 const mpApplyShortLink = require('../../../utils/mpApplyShortLink.js')
+const mpShare = require('../../../utils/mpShare.js')
+const recruitCoverLib = require('../../../utils/recruitCoverLibrary.js')
+const recruitShareCover = require('../../../utils/recruitShareCover.js')
 const userProfile = require('../../../utils/userProfile.js')
 const participant = require('../../../utils/participant.js')
 const auth = require('../../../utils/auth.js')
 const { resolveApplicantCountFromMp } = require('../../../utils/mpRecruitCount.js')
+
+const SHARE_COPY_OPTIONS = [
+  { id: 'full', label: '完整招募文案' },
+  { id: 'short', label: '简短邀请' },
+  { id: 'link', label: '仅报名链接' },
+]
+
+function buildRelaySharePayload(order) {
+  if (!order || !order.id) return null
+  const share = {
+    title: shareCopy.buildShareTitle(order) || order.title || '灵祺星选转发代收',
+    path: `/pages/subpack-core/detail/detail?id=${encodeURIComponent(order.id)}`,
+  }
+  const coverUrl = recruitCoverLib.resolveOrderCoverUrl(order)
+  return recruitShareCover.attachShareCoverPromise(share, coverUrl)
+}
+
+function buildShortInviteText(order, link) {
+  const title = String((order && (order.title || order.customerName)) || '转发代收招募').trim()
+  const id = String((order && order.id) || '').trim()
+  const parts = [`【转发代收】${title}`, '']
+  if (link) parts.push(`报名地址：${link}`)
+  if (id) parts.push(`招募单号：${id}`)
+  return parts.join('\n')
+}
 
 function platformLabelsFromList() {
   const feature = require('../../../utils/formRelayGroupQrFeature.js')
@@ -114,8 +142,17 @@ Page({
     loadingList: true,
     mineGuestMode: false,
     groupQrFeatureEnabled: formRelayGroupQrFeature.isFormRelayGroupQrFeatureEnabled(),
+    showShareSheet: false,
+    shareOrderId: '',
+    shareTitle: '',
+    shareCopyOptions: SHARE_COPY_OPTIONS,
+    shareCopyKind: 'full',
+    shareCopyPreview: '',
+    shareCopyLoading: false,
+    shareApplyLink: '',
   },
   pendingOrder: null,
+  _relayOrdersById: {},
   async onShow() {
     const ready = await prepareMineSubPage(this)
     if (!ready) {
@@ -344,6 +381,7 @@ Page({
       const acct = auth.readAccount()
       const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
       const rows = []
+      const orderMap = {}
       for (const mp of mpList) {
         if (!mp || typeof mp !== 'object') continue
         const relay = formRelayPlatforms.readExternalFormRelay(mp)
@@ -351,6 +389,7 @@ Page({
         if (!prPublishedOrders.mpOrderOwnedByCurrentPr(mp, acct)) continue
         const mpOrderId = String(mp.id || '').trim()
         if (!mpOrderId) continue
+        orderMap[mpOrderId] = mp
         rows.push({
           mpOrderId,
           title: String(mp.title || mp.customerName || mpOrderId),
@@ -367,6 +406,7 @@ Page({
         const tb = Date.parse(String(b.createdAt).replace(/\//g, '-')) || 0
         return tb - ta
       })
+      this._relayOrdersById = orderMap
       this.setData({ rows, loadingList: false })
     } catch (e) {
       this.setData({
@@ -470,6 +510,8 @@ Page({
       })
       applicationsStore.addPublishedOrder({ mpOrderId: finalOrder.id, title: finalOrder.title, hall: 'normal' })
       this.pendingOrder = null
+      if (!this._relayOrdersById) this._relayOrdersById = {}
+      this._relayOrdersById[String(finalOrder.id)] = finalOrder
       this.setData(
         Object.assign(
           {
@@ -509,57 +551,113 @@ Page({
     if (!preview || !preview.sourceUrl) return
     formRelaySourceMpLink.openFormRelaySourceLink(preview.sourceOpen, preview.sourceUrl)
   },
-  async onCopyShareLink(e) {
-    const id = String((e.currentTarget.dataset && e.currentTarget.dataset.id) || '').trim()
-    if (!id) return
-    const row =
-      (this.data.rows || []).find((r) => String(r.mpOrderId || '') === id) ||
-      null
-    const title = row
-      ? String(row.title || row.customerName || '').trim()
-      : String(this.data.doneId) === id
-        ? String(this.data.title || '').trim()
-        : ''
-    wx.showLoading({ title: '生成链接…', mask: true })
+  resolveShareOrder(id) {
+    const oid = String(id || '').trim()
+    if (!oid) return null
+    const cached = this._relayOrdersById && this._relayOrdersById[oid]
+    if (cached && typeof cached === 'object') return cached
+    if (this.pendingOrder && String(this.pendingOrder.id) === oid) return this.pendingOrder
+    const row = (this.data.rows || []).find((r) => String(r.mpOrderId || '') === oid)
+    if (!row) return null
+    return {
+      id: oid,
+      title: String(row.title || ''),
+      customerName: String(row.title || ''),
+      platform: String(row.platformLabel || '抖音'),
+      recruitmentInfo: '',
+    }
+  },
+  async refreshShareCopyPreview() {
+    const order = this.resolveShareOrder(this.data.shareOrderId)
+    if (!order) {
+      this.setData({ shareCopyPreview: '', shareCopyLoading: false })
+      return
+    }
+    const kind = String(this.data.shareCopyKind || 'full')
+    const link = String(this.data.shareApplyLink || '').trim()
+    this.setData({ shareCopyLoading: true })
     try {
-      const out = await mpApplyShortLink.fetchApplyShortLink(id, title)
-      const link = out && out.link ? String(out.link).trim() : ''
-      wx.hideLoading()
-      if (!link) {
-        wx.showToast({ title: '链接生成失败', icon: 'none' })
-        return
+      let text = ''
+      if (kind === 'link') {
+        text = link || shareCopy.buildRecruitmentApplyLink(order.id) || ''
+      } else if (kind === 'short') {
+        text = buildShortInviteText(order, link || shareCopy.buildRecruitmentApplyLink(order.id))
+      } else {
+        text = await shareCopy.buildGroupCopyTextAsync(order, userProfile.readPrProfile())
       }
-      if (out.source === 'local_fallback' || out.source === 'hash_fallback') {
-        wx.showModal({
-          title: '提示',
-          content:
-            '微信短链服务暂不可用，已复制备用链接；若群聊无法打开，请稍后重试「复制分享」或使用小程序内转发。',
-          showCancel: false,
-          success: () => {
-            wx.setClipboardData({
-              data: link,
-              success: () => wx.showToast({ title: '已复制备用链接', icon: 'success' }),
-            })
-          },
-        })
-        return
-      }
-      wx.setClipboardData({
-        data: link,
-        success: () => wx.showToast({ title: '已复制分享链接', icon: 'success' }),
-      })
-    } catch (err) {
-      wx.hideLoading()
-      const fallback = shareCopy.buildRecruitmentApplyLink(id)
-      if (!fallback) {
-        wx.showToast({ title: '链接生成失败', icon: 'none' })
-        return
-      }
-      wx.setClipboardData({
-        data: fallback,
-        success: () => wx.showToast({ title: '已复制备用链接', icon: 'none' }),
+      if (String(this.data.shareOrderId) !== String(order.id)) return
+      this.setData({ shareCopyPreview: text, shareCopyLoading: false })
+    } catch (_) {
+      if (String(this.data.shareOrderId) !== String(order.id)) return
+      this.setData({
+        shareCopyPreview: buildShortInviteText(order, link || shareCopy.buildRecruitmentApplyLink(order.id)),
+        shareCopyLoading: false,
       })
     }
+  },
+  async openShareSheet(id) {
+    const order = this.resolveShareOrder(id)
+    if (!order || !order.id) {
+      wx.showToast({ title: '订单不存在', icon: 'none' })
+      return
+    }
+    this.setData({
+      showShareSheet: true,
+      shareOrderId: String(order.id),
+      shareTitle: shareCopy.buildShareTitle(order) || order.title || '',
+      shareCopyKind: 'full',
+      shareCopyPreview: '',
+      shareCopyLoading: true,
+      shareApplyLink: shareCopy.buildRecruitmentApplyLink(order.id),
+    })
+    this.refreshShareCopyPreview()
+    try {
+      const out = await mpApplyShortLink.fetchApplyShortLink(order.id, order.title)
+      const link = out && out.link ? String(out.link).trim() : ''
+      if (link && String(this.data.shareOrderId) === String(order.id)) {
+        this.setData({ shareApplyLink: link }, () => this.refreshShareCopyPreview())
+      }
+    } catch (_) {}
+  },
+  onOpenShare(e) {
+    const id = String((e.currentTarget.dataset && e.currentTarget.dataset.id) || '').trim()
+    if (!id) return
+    void this.openShareSheet(id)
+  },
+  onCloseShareSheet() {
+    this.setData({
+      showShareSheet: false,
+      shareOrderId: '',
+      shareTitle: '',
+      shareCopyPreview: '',
+      shareCopyLoading: false,
+      shareApplyLink: '',
+    })
+  },
+  noopShareSheetTap() {},
+  onSelectShareCopy(e) {
+    const kind = String((e.currentTarget.dataset && e.currentTarget.dataset.kind) || '').trim()
+    if (!kind || kind === this.data.shareCopyKind) return
+    this.setData({ shareCopyKind: kind }, () => this.refreshShareCopyPreview())
+  },
+  onCopySelectedShareText() {
+    const text = String(this.data.shareCopyPreview || '').trim()
+    if (!text) {
+      wx.showToast({ title: '文案生成中', icon: 'none' })
+      return
+    }
+    wx.setClipboardData({
+      data: text,
+      success: () => {
+        wx.showToast({ title: '已复制文案', icon: 'success' })
+      },
+    })
+  },
+  onShareAppMessage() {
+    const order = this.resolveShareOrder(this.data.shareOrderId)
+    const payload = buildRelaySharePayload(order)
+    if (!payload) return mpShare.defaultShare('/pages/index/index')
+    return payload
   },
   goApplicants(e) {
     const id = String((e.currentTarget.dataset && e.currentTarget.dataset.id) || '').trim()
