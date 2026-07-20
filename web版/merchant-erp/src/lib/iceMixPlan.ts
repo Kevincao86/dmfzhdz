@@ -1576,6 +1576,112 @@ export function formatIceMixBrandBatchLabel(brandName: string, index1Based: numb
   return `${brand}${n}`
 }
 
+const BATCH_DIALOGUE_HOOKS = [
+  '家人们看过来！',
+  '今天必须安利——',
+  '路过千万别错过：',
+  '探店实测告诉你：',
+  '想吃好吃的看这里：',
+  '本地人私藏推荐：',
+  '这波优惠太香了：',
+  '打工人周末去哪：',
+] as const
+
+const BATCH_VISUAL_LENSES = [
+  '换机位跟拍：',
+  '慢动作特写：',
+  '俯拍记录：',
+  '侧面推进：',
+  '近景捕捉：',
+  '环境交代：',
+  '手持跟镜：',
+  '焦点切换：',
+] as const
+
+function stripBatchDialogueHook(dialogue: string): string {
+  let t = String(dialogue || '').trim()
+  for (const h of BATCH_DIALOGUE_HOOKS) {
+    if (t.startsWith(h)) t = t.slice(h.length).trim()
+  }
+  return t.replace(/^(家人们|宝子们|朋友们)[，,：:\s]*/u, '').trim()
+}
+
+function stripBatchVisualLens(visual: string): string {
+  let t = String(visual || '').trim()
+  for (const p of BATCH_VISUAL_LENSES) {
+    if (t.startsWith(p)) t = t.slice(p.length).trim()
+  }
+  return t
+}
+
+/**
+ * 批量第 variantIndex 条（0-based）分镜差异化：口播钩子 + 画面机位描述不同，
+ * 并轻度打乱中段内容，避免多条成片口播/画面雷同触发平台同质化限流。
+ */
+export function diversifyMixScriptRowsForBatch(
+  baseRows: ShortVideoScriptRow[],
+  variantIndex: number,
+  fallbackDialogue = '探店实拍，值得期待',
+): ShortVideoScriptRow[] {
+  const vi = Math.max(0, Math.floor(Number(variantIndex) || 0))
+  const cloned = baseRows.map((r) => ({
+    timeRange: String(r.timeRange || ''),
+    visual: String(r.visual || ''),
+    dialogue: String(r.dialogue || ''),
+  }))
+  if (vi === 0 || cloned.length === 0) return cloned
+
+  const body = cloned.map((row, i) => {
+    const hook = BATCH_DIALOGUE_HOOKS[(vi + i) % BATCH_DIALOGUE_HOOKS.length]!
+    const lens = BATCH_VISUAL_LENSES[(vi * 3 + i) % BATCH_VISUAL_LENSES.length]!
+    const coreDialogue = stripBatchDialogueHook(row.dialogue) || fallbackDialogue
+    const coreVisual = stripBatchVisualLens(row.visual) || `分镜画面 ${i + 1}`
+    let dialogue = `${hook}${coreDialogue}`
+    if (vi % 2 === 1 && !/[！!～]$/.test(dialogue)) dialogue = `${dialogue}！`
+    if (vi % 3 === 2) dialogue = dialogue.replace(/非常|特别|真的/g, '超级')
+    if (vi % 4 === 3) dialogue = dialogue.replace(/推荐|安利/g, '种草')
+    let visual = `${lens}${coreVisual}`
+    if (vi % 2 === 1) visual = visual.replace(/特写/g, '近景').replace(/全景/g, '远景交代')
+    if (vi % 3 === 1) visual = `${visual}（节奏略加快）`
+    return { ...row, visual, dialogue }
+  })
+
+  // 中段口播/画面交叉换位，保持时间轴不变
+  if (body.length >= 4 && vi % 2 === 1) {
+    const a = 1
+    const b = Math.min(body.length - 2, 2)
+    if (a !== b) {
+      const tmpV = body[a]!.visual
+      const tmpD = body[a]!.dialogue
+      body[a] = { ...body[a]!, visual: body[b]!.visual, dialogue: body[b]!.dialogue }
+      body[b] = { ...body[b]!, visual: tmpV, dialogue: tmpD }
+    }
+  }
+  if (body.length >= 3 && vi % 3 === 2) {
+    const mid = Math.floor(body.length / 2)
+    const prev = body[mid - 1]!
+    const cur = body[mid]!
+    body[mid - 1] = { ...prev, dialogue: cur.dialogue, visual: prev.visual }
+    body[mid] = { ...cur, dialogue: prev.dialogue, visual: cur.visual }
+  }
+  return body
+}
+
+/** 由基准分镜扩展为 N 套差异分镜（第 1 套为原文，其余差异化） */
+export function buildBatchStoryboardsFromBase(
+  baseRows: ShortVideoScriptRow[],
+  count: number,
+  fallbackDialogue = '探店实拍，值得期待',
+): ShortVideoScriptRow[][] {
+  const n = Math.max(1, Math.floor(Number(count) || 1))
+  const base = baseRows.map((r) => ({
+    timeRange: String(r.timeRange || ''),
+    visual: String(r.visual || ''),
+    dialogue: String(r.dialogue || ''),
+  }))
+  return Array.from({ length: n }, (_, i) => diversifyMixScriptRowsForBatch(base, i, fallbackDialogue))
+}
+
 /**
  * 批量第 variantIndex 条（0-based）的素材映射：轮转 + 偶奇反转 + 中段对调，
  * 保证同模板下各条画面顺序有差异。

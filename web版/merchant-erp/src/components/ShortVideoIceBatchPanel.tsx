@@ -93,6 +93,8 @@ import {
   rotateMaterialsForVariant,
   formatIceMixBrandBatchLabel,
   sanitizeIceMixBrandName,
+  buildBatchStoryboardsFromBase,
+  diversifyMixScriptRowsForBatch,
   type IceMixMaterialSlot,
   type MixPromoItem,
   type MixPromoContext,
@@ -191,7 +193,7 @@ function formatIcePollingMessage(
   return `云端剪辑中（${waited}）`
 }
 
-/** 批量剪辑条数：10 / 20 / 30 / 50 */
+/** 批量剪辑条数：1 / 10 / 20 / 30 / 50 */
 export const ICE_BATCH_GENERATE_COUNTS = ICE_MIX_BATCH_COUNTS
 export type IceBatchGenerateCount = IceMixBatchCount
 
@@ -317,17 +319,62 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     setMixPromoItems((prev) => prev.filter((row) => row.id !== id))
   }, [])
   const [mixTargetSec, setMixTargetSec] = useState<number>(20)
-  const [scriptRows, setScriptRows] = useState<ShortVideoScriptRow[]>(() =>
+  const [batchGenerateCount, setBatchGenerateCount] = useState<IceMixBatchCount>(1)
+  const [batchBrandName, setBatchBrandName] = useState('')
+  const [activeStoryboardIndex, setActiveStoryboardIndex] = useState(0)
+  const [batchStoryboards, setBatchStoryboards] = useState<ShortVideoScriptRow[][]>(() => [
     defaultScriptRows(
       segmentCountFromTargetTotalSec(20, MIX_DEFAULT_SEGMENT_SEC),
       MIX_DEFAULT_SEGMENT_SEC,
     ),
-  )
+  ])
+  const scriptRows = batchStoryboards[activeStoryboardIndex] ?? batchStoryboards[0] ?? []
   const applyScriptRows = useCallback(
     (rows: ShortVideoScriptRow[]) => {
-      setScriptRows(finalizeMixScriptRows(rows, '探店实拍，值得期待', mixPromo))
+      const finalized = finalizeMixScriptRows(rows, '探店实拍，值得期待', mixPromo)
+      setBatchStoryboards((prev) => {
+        const next = prev.length > 0 ? [...prev] : [finalized]
+        const idx = Math.min(activeStoryboardIndex, Math.max(0, next.length - 1))
+        next[idx] = finalized
+        return next
+      })
     },
-    [mixPromo],
+    [mixPromo, activeStoryboardIndex],
+  )
+  const applyBatchStoryboards = useCallback(
+    (boards: ShortVideoScriptRow[][], focusIndex = 0) => {
+      const normalized = boards.map((rows) =>
+        finalizeMixScriptRows(rows, '探店实拍，值得期待', mixPromo),
+      )
+      const safe = normalized.length > 0 ? normalized : [
+        defaultScriptRows(
+          segmentCountFromTargetTotalSec(mixTargetSec, MIX_DEFAULT_SEGMENT_SEC),
+          MIX_DEFAULT_SEGMENT_SEC,
+        ),
+      ]
+      setBatchStoryboards(safe)
+      setActiveStoryboardIndex(Math.min(Math.max(0, focusIndex), safe.length - 1))
+    },
+    [mixPromo, mixTargetSec],
+  )
+  const onSelectBatchCount = useCallback(
+    (n: IceMixBatchCount) => {
+      setBatchGenerateCount(n)
+      setBatchStoryboards((prev) => {
+        const base =
+          prev[activeStoryboardIndex] ??
+          prev[0] ??
+          defaultScriptRows(
+            segmentCountFromTargetTotalSec(mixTargetSec, MIX_DEFAULT_SEGMENT_SEC),
+            MIX_DEFAULT_SEGMENT_SEC,
+          )
+        return buildBatchStoryboardsFromBase(base, n, '探店实拍，值得期待').map((rows) =>
+          finalizeMixScriptRows(rows, '探店实拍，值得期待', mixPromo),
+        )
+      })
+      setActiveStoryboardIndex(0)
+    },
+    [activeStoryboardIndex, mixPromo, mixTargetSec],
   )
   const [materialSlots, setMaterialSlots] = useState<number[]>([])
   const [mixMaterialProfiles, setMixMaterialProfiles] = useState<IceMixMaterialProfile[]>([])
@@ -361,8 +408,6 @@ export function ShortVideoIceBatchPanel(_props: Props) {
   const [mixTtsPlaying, setMixTtsPlaying] = useState(false)
   const [mixTtsBusy, setMixTtsBusy] = useState(false)
   const [mixCloneAudioName, setMixCloneAudioName] = useState<string | null>(null)
-  const [batchGenerateCount, setBatchGenerateCount] = useState<IceMixBatchCount>(1)
-  const [batchBrandName, setBatchBrandName] = useState('')
   const mixCloneBlobRef = useRef<Blob | null>(null)
   const mixCloneInputRef = useRef<HTMLInputElement>(null)
   const mixDocInputRef = useRef<HTMLInputElement>(null)
@@ -1001,11 +1046,21 @@ export function ShortVideoIceBatchPanel(_props: Props) {
           onProgress: (msg) => setHint(msg),
         })
         if (narrative.ok) {
-          applyScriptRows(ensureMixScriptRowsCoverTarget(narrative.rows, mixTargetSec, MIX_DEFAULT_SEGMENT_SEC))
+          const coveredRows = ensureMixScriptRowsCoverTarget(
+            narrative.rows,
+            mixTargetSec,
+            MIX_DEFAULT_SEGMENT_SEC,
+          )
+          applyBatchStoryboards(
+            buildBatchStoryboardsFromBase(coveredRows, batchGenerateCount, '探店实拍，值得期待'),
+            0,
+          )
           setMaterialSlots(narrative.materialSlots)
-          const covered = maxScriptTimeRangeEndSec(narrative.rows)
+          const covered = maxScriptTimeRangeEndSec(coveredRows)
           setHint(
-            `AI 已按叙事顺序规划 ${narrative.rows.length} 段分镜（${poolLen} 条素材语义匹配，约 0–${covered || mixTargetSec} 秒；含门头素材时优先门店指引开场），请核对后一键混剪。`,
+            batchGenerateCount > 1
+              ? `AI 已规划基准分镜，并生成 ${batchGenerateCount} 套差异分镜（口播/画面不同，约 0–${covered || mixTargetSec} 秒），可切换核对后批量成片。`
+              : `AI 已按叙事顺序规划 ${coveredRows.length} 段分镜（${poolLen} 条素材语义匹配，约 0–${covered || mixTargetSec} 秒；含门头素材时优先门店指引开场），请核对后一键混剪。`,
           )
           setPlanBusy(false)
           return
@@ -1080,18 +1135,31 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       } catch {
         plannedRows = finalizeMixScriptRows(plannedRows, '探店实拍，值得期待', mixPromo)
       }
-      applyScriptRows(plannedRows)
+      applyBatchStoryboards(
+        buildBatchStoryboardsFromBase(plannedRows, batchGenerateCount, '探店实拍，值得期待'),
+        0,
+      )
       setMaterialSlots(coverage.slots)
       const covered = maxScriptTimeRangeEndSec(plannedRows)
       setHint(
-        `AI 已规划 ${plannedRows.length} 段分镜（约 0–${covered || mixTargetSec} 秒，口播已检核对齐画面）。建议先「AI 分析素材」以获得门头/产品排序。`,
+        batchGenerateCount > 1
+          ? `AI 已规划基准分镜并扩展为 ${batchGenerateCount} 套差异分镜（约 0–${covered || mixTargetSec} 秒）。每条视频对应一套口播与画面，降低同质化风险。`
+          : `AI 已规划 ${plannedRows.length} 段分镜（约 0–${covered || mixTargetSec} 秒，口播已检核对齐画面）。建议先「AI 分析素材」以获得门头/产品排序。`,
       )
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'AI 规划分镜失败，请稍后重试')
     } finally {
       setPlanBusy(false)
     }
-  }, [mixGuidance, mixMaterialPool, mixMaterialProfiles, mixTargetSec, mixPromo])
+  }, [
+    mixGuidance,
+    mixMaterialPool,
+    mixMaterialProfiles,
+    mixTargetSec,
+    mixPromo,
+    batchGenerateCount,
+    applyBatchStoryboards,
+  ])
 
   const addImageUrlsFromText = useCallback(() => {
     const urls = parseImageUrlLines(imageUrlText)
@@ -1263,6 +1331,21 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       return
     }
     const batchTotal = batchGenerateCount
+    const boards =
+      batchStoryboards.length >= batchTotal
+        ? batchStoryboards.slice(0, batchTotal)
+        : buildBatchStoryboardsFromBase(
+            scriptRows,
+            batchTotal,
+            '探店实拍，值得期待',
+          ).map((rows) => finalizeMixScriptRows(rows, '探店实拍，值得期待', mixPromo))
+    for (let i = 0; i < boards.length; i++) {
+      if (!mixStoryboardRowsComplete(boards[i]!)) {
+        setErr(`第 ${i + 1} 套分镜未填完整，请切换「分镜 ${i + 1}」补全或重新 AI 规划分镜`)
+        setActiveStoryboardIndex(i)
+        return
+      }
+    }
 
     setMixRenderBusy(true)
     setErr(null)
@@ -1296,17 +1379,20 @@ export function ShortVideoIceBatchPanel(_props: Props) {
 
     for (let vi = 0; vi < batchTotal; vi++) {
       const label = formatIceMixBrandBatchLabel(brand, vi + 1)
-      setHint(`普通混剪 ${vi + 1}/${batchTotal}：${label} · 规划差异化素材…`)
+      const variantRows =
+        boards[vi] ??
+        diversifyMixScriptRowsForBatch(scriptRows, vi, '探店实拍，值得期待')
+      setHint(`普通混剪 ${vi + 1}/${batchTotal}：${label} · 独立分镜成片…`)
 
       const variantSlots = buildVariantMaterialSlots(
         baseSlots,
         mixMaterialPool.length,
-        scriptRows.length,
+        variantRows.length,
         vi,
       )
 
       const produced = await produceIceMixPackage({
-        rows: scriptRows,
+        rows: variantRows,
         materials: mixMaterialPool,
         materialSlots: variantSlots,
         materialProfiles: profiles,
@@ -1486,7 +1572,10 @@ export function ShortVideoIceBatchPanel(_props: Props) {
         if (narrative.ok) {
           workingRows = ensureMixScriptRowsCoverTarget(narrative.rows, mixTargetSec, MIX_DEFAULT_SEGMENT_SEC)
           workingSlots = narrative.materialSlots
-          applyScriptRows(workingRows)
+          applyBatchStoryboards(
+            buildBatchStoryboardsFromBase(workingRows, batchTotal, '探店实拍，值得期待'),
+            0,
+          )
           setMaterialSlots(narrative.materialSlots)
         } else {
           setErr(`${narrative.message}，请先点击「AI 规划分镜」后再试`)
@@ -1500,7 +1589,12 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       }
     } else {
       workingRows = finalizeMixScriptRows(workingRows, '探店实拍，值得期待', mixPromo)
-      applyScriptRows(workingRows)
+      if (batchStoryboards.length < batchTotal) {
+        applyBatchStoryboards(
+          buildBatchStoryboardsFromBase(workingRows, batchTotal, '探店实拍，值得期待'),
+          0,
+        )
+      }
     }
 
     if (!mixStoryboardRowsComplete(workingRows)) {
@@ -1542,19 +1636,28 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       mixVoiceCloneBase64 = await audioBlobToPureBase64(mixCloneBlobRef.current)
     }
 
+    const boards =
+      batchStoryboards.length >= batchTotal
+        ? batchStoryboards.slice(0, batchTotal)
+        : buildBatchStoryboardsFromBase(workingRows, batchTotal, '探店实拍，值得期待').map((rows) =>
+            finalizeMixScriptRows(rows, '探店实拍，值得期待', mixPromo),
+          )
+
     const baseProduceSlots = produceSlots
     let okCount = 0
     let lastErr = ''
 
     for (let vi = 0; vi < batchTotal; vi++) {
       const label = formatIceMixBrandBatchLabel(brand, vi + 1)
-      setHint(`智能成片 ${vi + 1}/${batchTotal}：${label} · 差异化素材顺序…`)
+      const variantRows =
+        boards[vi] ?? diversifyMixScriptRowsForBatch(workingRows, vi, '探店实拍，值得期待')
+      setHint(`智能成片 ${vi + 1}/${batchTotal}：${label} · 独立分镜…`)
 
       const rotatedMaterials = rotateMaterialsForVariant(produceMaterials, vi)
       const variantSlots = buildVariantMaterialSlots(
         baseProduceSlots,
         rotatedMaterials.length,
-        workingRows.length,
+        variantRows.length,
         vi,
       )
       const batchPayload = buildSmartBatchSubmitPayload({
@@ -1563,7 +1666,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
           mediaUrl: m.mediaUrl,
           label: m.label,
         })),
-        scriptRows: workingRows,
+        scriptRows: variantRows,
         materialSlots: variantSlots,
         targetTotalSec: mixTargetSec,
       })
@@ -2229,11 +2332,13 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                       onChange={(e) => {
                         const sec = Number(e.target.value)
                         setMixTargetSec(sec)
-                        applyScriptRows(
-                          defaultScriptRows(
-                            segmentCountFromTargetTotalSec(sec, MIX_DEFAULT_SEGMENT_SEC),
-                            MIX_DEFAULT_SEGMENT_SEC,
-                          ),
+                        const base = defaultScriptRows(
+                          segmentCountFromTargetTotalSec(sec, MIX_DEFAULT_SEGMENT_SEC),
+                          MIX_DEFAULT_SEGMENT_SEC,
+                        )
+                        applyBatchStoryboards(
+                          buildBatchStoryboardsFromBase(base, batchGenerateCount, '探店实拍，值得期待'),
+                          0,
                         )
                       }}
                       className="h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm"
@@ -2460,6 +2565,47 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                   </span>
                 </p>
               </div>
+              <div className="rounded-xl border border-violet-200/80 bg-gradient-to-b from-violet-50/80 to-white p-3 shadow-sm">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block text-xs font-medium text-zinc-700">
+                    批量剪辑条数
+                    <div className="mt-1.5 flex flex-wrap gap-2">
+                      {ICE_BATCH_GENERATE_COUNTS.map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          disabled={mixRenderBusy || smartRenderBusy || mediaBusy || guidanceBusy}
+                          onClick={() => onSelectBatchCount(n)}
+                          className={cn(
+                            'rounded-lg border px-3 py-1.5 text-sm font-semibold transition',
+                            batchGenerateCount === n
+                              ? 'border-violet-500 bg-violet-600 text-white shadow-sm'
+                              : 'border-zinc-200 bg-white text-zinc-700 hover:border-violet-300',
+                          )}
+                        >
+                          {n} 条
+                        </button>
+                      ))}
+                    </div>
+                  </label>
+                  <label className="block text-xs font-medium text-zinc-700">
+                    品牌名（下载命名）
+                    <input
+                      type="text"
+                      value={batchBrandName}
+                      disabled={mixRenderBusy || smartRenderBusy || mediaBusy || guidanceBusy}
+                      onChange={(e) => setBatchBrandName(e.target.value)}
+                      placeholder="如：优雅浅爱 → 优雅浅爱1…N"
+                      className="mt-1.5 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none ring-violet-400 focus:ring-2 disabled:bg-zinc-50"
+                    />
+                  </label>
+                </div>
+                <p className="mt-2 text-[11px] leading-snug text-zinc-500">
+                  {batchGenerateCount === 1
+                    ? '当前 1 条：下方仅 1 套分镜表，按该分镜生成成片。'
+                    : `当前 ${batchGenerateCount} 条：将生成 ${batchGenerateCount} 套口播/画面不同的分镜，每套对应一条视频，降低抖音同质化限流风险。下载名为「品牌名1」…「品牌名${batchGenerateCount}」。`}
+                </p>
+              </div>
               <div className="rounded-xl border border-orange-200/80 bg-gradient-to-b from-orange-50/70 to-white p-3 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
@@ -2555,7 +2701,12 @@ export function ShortVideoIceBatchPanel(_props: Props) {
               />
               <div>
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-sm font-semibold text-zinc-800">分镜表（剪辑时间轴）</span>
+                  <span className="text-sm font-semibold text-zinc-800">
+                    分镜表（剪辑时间轴）
+                    {batchGenerateCount > 1
+                      ? ` · 第 ${activeStoryboardIndex + 1}/${batchGenerateCount} 套`
+                      : ''}
+                  </span>
                   {storyboardComplete ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-emerald-200/80">
                       <CheckCircle2 className="h-3 w-3" />
@@ -2568,8 +2719,30 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                     </span>
                   ) : null}
                 </div>
+                {batchGenerateCount > 1 ? (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {Array.from({ length: batchGenerateCount }, (_, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        disabled={anyBusy || guidanceBusy}
+                        onClick={() => setActiveStoryboardIndex(i)}
+                        className={cn(
+                          'rounded-md border px-2.5 py-1 text-[11px] font-semibold transition',
+                          activeStoryboardIndex === i
+                            ? 'border-violet-500 bg-violet-600 text-white'
+                            : 'border-zinc-200 bg-white text-zinc-600 hover:border-violet-300',
+                        )}
+                      >
+                        分镜 {i + 1}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
                 <p className="mt-1 text-xs text-zinc-500">
-                  每段对应成片时间轴上的一镜：AI 逐帧理解素材后按语义匹配；口播使用所选音色 TTS，字幕带弹入动效。可手动添加或删除时间段（至少保留 2 段）。
+                  {batchGenerateCount > 1
+                    ? '每套分镜对应一条成片；切换上方「分镜 N」可核对/修改该条的口播与画面。AI 规划会一次生成多套差异文案。'
+                    : '每段对应成片时间轴上的一镜：AI 逐帧理解素材后按语义匹配；口播使用所选音色 TTS，字幕带弹入动效。可手动添加或删除时间段（至少保留 2 段）。'}
                 </p>
                 <div className="mt-2 max-h-[min(360px,42vh)] overflow-y-auto rounded-xl border border-zinc-200/70 bg-white/90 shadow-inner">
                   <ShortVideoScriptTableEditor
@@ -2646,43 +2819,10 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                   {hint}
                 </div>
               ) : null}
-              <div className="mb-4 grid gap-3 sm:grid-cols-2">
-                <label className="block text-xs font-medium text-zinc-700">
-                  批量剪辑条数
-                  <div className="mt-1.5 flex flex-wrap gap-2">
-                    {ICE_BATCH_GENERATE_COUNTS.map((n) => (
-                      <button
-                        key={n}
-                        type="button"
-                        disabled={mixRenderBusy || smartRenderBusy || mediaBusy || guidanceBusy}
-                        onClick={() => setBatchGenerateCount(n)}
-                        className={cn(
-                          'rounded-lg border px-3 py-1.5 text-sm font-semibold transition',
-                          batchGenerateCount === n
-                            ? 'border-violet-500 bg-violet-600 text-white shadow-sm'
-                            : 'border-zinc-200 bg-white text-zinc-700 hover:border-violet-300',
-                        )}
-                      >
-                        {n} 条
-                      </button>
-                    ))}
-                  </div>
-                </label>
-                <label className="block text-xs font-medium text-zinc-700">
-                  品牌名（下载命名）
-                  <input
-                    type="text"
-                    value={batchBrandName}
-                    disabled={mixRenderBusy || smartRenderBusy || mediaBusy || guidanceBusy}
-                    onChange={(e) => setBatchBrandName(e.target.value)}
-                    placeholder="如：优雅浅爱 → 优雅浅爱1…N"
-                    className="mt-1.5 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none ring-violet-400 focus:ring-2 disabled:bg-zinc-50"
-                  />
-                </label>
-              </div>
               <p className="mb-3 text-xs text-zinc-500">
-                将按所选条数批量生成；每条自动轮转素材顺序与截取点以保持画面差异。下载文件名为「品牌名1」至「品牌名
-                {batchGenerateCount}」。
+                {batchGenerateCount === 1
+                  ? '将按当前这一套分镜表生成 1 条成片。'
+                  : `将按 ${batchGenerateCount} 套差异分镜分别成片（口播与画面不同），文件名「${sanitizeIceMixBrandName(batchBrandName) || '品牌名'}1」…「${sanitizeIceMixBrandName(batchBrandName) || '品牌名'}${batchGenerateCount}」。`}
               </p>
               <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                 <button
