@@ -18,7 +18,7 @@ function cloudCallTimeoutMs(path) {
   const p = String(path || '')
   if (/video-upload|ice-multipart|group-qr-upload-body/i.test(p)) return CLOUD_CALL_UPLOAD_MS
   if (
-    /meoo-ai-chat|meoo-ai-agent-image|meoo-douyin-goods-ai-assist|merchant\/douyin\/goods\/ai\/assist|\/api\/ai\/chat/i.test(
+    /meoo-ai-chat|meoo-ai-agent-image|meoo-douyin-goods-ai-assist|merchant\/douyin\/goods\/ai\/assist|\/api\/ai\/chat|meoo-mp-recruitment-video-compliance|recruitment-video-compliance/i.test(
       p,
     )
   ) {

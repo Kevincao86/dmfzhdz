@@ -25,8 +25,8 @@ const fakeEnv = { MERCHANT_AI_DOUBAO_KEY: 'sk-smoke-invalid' }
 
 async function main() {
   const plan58 = computeComplianceFrameSamplePlan(58)
-  if (plan58.length < 5 || plan58.length > 6) {
-    throw new Error(`expected 5-6 compliance frames for 58s, got ${plan58.length}`)
+  if (plan58.length < 3 || plan58.length > 4) {
+    throw new Error(`expected 3-4 compliance frames for 58s, got ${plan58.length}`)
   }
   if (plan58[0]?.slot !== 'opening' || plan58[plan58.length - 1]?.slot !== 'closing') {
     throw new Error(`expected opening/closing ends, got ${JSON.stringify(plan58)}`)

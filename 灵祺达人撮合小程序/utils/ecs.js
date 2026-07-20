@@ -19,6 +19,9 @@ function devRequestTimeoutMs() {
 
 function requestTimeoutMs(path) {
   const p = String(path || '')
+  if (/meoo-mp-recruitment-video-compliance|recruitment-video-compliance/i.test(p)) {
+    return 180000
+  }
   if (
     /meoo-ai-chat|meoo-ai-agent-image|meoo-douyin-goods-ai-assist|merchant\/douyin\/goods\/ai\/assist|\/api\/ai\/chat/i.test(
       p,

@@ -275,27 +275,43 @@ export async function extractVideoMediaForCompliance(
 
   if (framePack.ok && framePack.frames.length) {
     notes.push(`已加密抽帧 ${framePack.frames.length} 张做画面检核`)
-    const visionResults = await mapPool(framePack.frames, 3, async (f) => {
-      const vision = await analyzeSingleFrame(
-        f.slot,
-        `data:image/jpeg;base64,${f.buffer.toString('base64')}`,
-        env,
-        usageRecord,
-        'atSec' in f ? Number((f as { atSec?: number }).atSec) : undefined,
-      )
-      return { frame: f, vision }
-    })
-
     const ocrParts: string[] = []
-    for (const { frame: f, vision } of visionResults) {
-      if (vision.ocrText) ocrParts.push(`【${f.slot}】${vision.ocrText}`)
-      const slotOcr = String(vision.ocrText || '').trim()
-      const slotHits = vision.visualHits.length ? vision.visualHits : localRiskScan(slotOcr)
-      if (slotOcr || slotHits.length) {
-        frameSlotHits.push({ slot: f.slot, hits: slotHits, ocrText: slotOcr })
+    /** 分批并发；一旦命中擦边/导流即提前结束，避免小程序超时 */
+    const batchSize = 2
+    let stoppedEarly = false
+    for (let i = 0; i < framePack.frames.length; i += batchSize) {
+      const batch = framePack.frames.slice(i, i + batchSize)
+      const visionResults = await mapPool(batch, batchSize, async (f) => {
+        const vision = await analyzeSingleFrame(
+          f.slot,
+          `data:image/jpeg;base64,${f.buffer.toString('base64')}`,
+          env,
+          usageRecord,
+          'atSec' in f ? Number((f as { atSec?: number }).atSec) : undefined,
+        )
+        return { frame: f, vision }
+      })
+      for (const { frame: f, vision } of visionResults) {
+        if (vision.ocrText) ocrParts.push(`【${f.slot}】${vision.ocrText}`)
+        const slotOcr = String(vision.ocrText || '').trim()
+        const slotHits = vision.visualHits.length ? vision.visualHits : localRiskScan(slotOcr)
+        if (slotOcr || slotHits.length) {
+          frameSlotHits.push({ slot: f.slot, hits: slotHits, ocrText: slotOcr })
+        }
+        if (vision.visualHits.length) visualHits.push(...vision.visualHits)
+        if (vision.visualNotes) notes.push(`${slotLabel(f.slot)}：${vision.visualNotes}`)
       }
-      if (vision.visualHits.length) visualHits.push(...vision.visualHits)
-      if (vision.visualNotes) notes.push(`${slotLabel(f.slot)}：${vision.visualNotes}`)
+      const edgeOrDivert = visualHits.some((h) =>
+        /着装擦边|姿态擦边|二维码特写|打码指认|联系方式露出|色情导流/.test(h),
+      )
+      if (edgeOrDivert && i + batchSize < framePack.frames.length) {
+        notes.push('画面已命中擦边/导流风险，提前结束剩余抽帧视觉以控制耗时')
+        stoppedEarly = true
+        break
+      }
+    }
+    if (stoppedEarly) {
+      /* keep notes */
     }
     ocrText = ocrParts.join('\n')
     if (ocrText.length >= 4) notes.push('已 OCR 画面字幕/贴纸文字')
