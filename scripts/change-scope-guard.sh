@@ -250,6 +250,7 @@ mpAiPointsSpendCore
 mpAiPointsSpendSession
 mpAiPointsBuckets
 mpMembershipQuota
+mpMyUsageDetailsGet
 mpAddonPointsSpendClient
 mpAiPointsSpendClient
 mpPointsSpendApi
@@ -266,6 +267,9 @@ meoo-mp-recruitment-ai
 meoo-mp-recruitment-video-compliance
 meoo-mp-recruitment-script-compliance
 recruitmentVideoComplianceCore
+recruitmentVideoAiCompliance
+mine-pr-addon-ai-review
+mine-my-orders
 meoo-tenant-billing
 meoo-ops-mp-auth
 mpCompliancePointsGate

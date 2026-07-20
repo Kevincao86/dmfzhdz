@@ -17,16 +17,16 @@ function rateLine(kind) {
 
 function bannerText(kind, durationSec) {
   const r = RATES[kind]
-  if (!r) return '本功能按积分扣费；优先消耗套餐次数，超出后扣积分。'
+  if (!r) return '本功能按积分扣费（套餐赠送积分优先，不足再扣充值积分）。'
   if (kind === 'cloud_edit') {
-    return `消耗提醒：${r.label} ${rateLine(kind)}；优先消耗套餐次数，超出后扣积分。`
+    return `消耗提醒：${r.label} ${rateLine(kind)}；一律按积分扣（套餐桶优先）。`
   }
   const sec = Math.max(1, Math.ceil(Number(durationSec) || 0))
   if (sec > 0 && r.perSec) {
     const est = sec * r.perSec
-    return `消耗提醒：${r.label} ${rateLine(kind)}；当前约 ${sec} 秒预计 ${est} 积分（优先套餐次数）。`
+    return `消耗提醒：${r.label} ${rateLine(kind)}；当前约 ${sec} 秒预计 ${est} 积分（套餐桶优先）。`
   }
-  return `消耗提醒：${r.label} ${rateLine(kind)}；优先消耗套餐次数，超出后扣积分。`
+  return `消耗提醒：${r.label} ${rateLine(kind)}；一律按积分扣（套餐桶优先）。`
 }
 
 module.exports = {

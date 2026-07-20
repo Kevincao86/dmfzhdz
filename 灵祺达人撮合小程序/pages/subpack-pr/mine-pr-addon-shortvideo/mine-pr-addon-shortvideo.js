@@ -264,10 +264,14 @@ Page({
         if (charge && charge.pointsCharged > 0) {
           progress = `生成完成 · 消耗 ${charge.pointsCharged} 积分`
         }
+        this.setData({ resultUrl: done.videoUrl, progress })
       } catch (spendErr) {
-        progress = `生成完成 · 积分扣减失败：${String(spendErr.message || '').slice(0, 24)}`
+        this.setData({
+          resultUrl: '',
+          err: String(spendErr.message || '积分不足，请充值或升级套餐').slice(0, 80),
+          progress: '',
+        })
       }
-      this.setData({ resultUrl: done.videoUrl, progress })
     } catch (e) {
       this.setData({ err: String(e.message || e).slice(0, 100) })
     } finally {
@@ -506,12 +510,15 @@ Page({
           note: `${mixKind}:${jobId || ''}`,
         })
         if (charge && charge.pointsCharged > 0) {
-          return `混剪完成 · 消耗 ${charge.pointsCharged} 积分`
+          return { ok: true, text: `混剪完成 · 消耗 ${charge.pointsCharged} 积分` }
         }
+        return { ok: true, text: '混剪完成' }
       } catch (spendErr) {
-        return `混剪完成 · 积分扣减失败：${String(spendErr.message || '').slice(0, 24)}`
+        return {
+          ok: false,
+          text: String(spendErr.message || '积分不足，请充值或升级套餐').slice(0, 80),
+        }
       }
-      return '混剪完成'
     }
     try {
       if (imageUrls.length) {
@@ -535,7 +542,12 @@ Page({
           this.setData({ iceErr: done.message })
           return
         }
-        this.setData({ iceResultUrl: done.videoUrl, iceProgress: await chargeMix(pipe.jobId) })
+        const billed = await chargeMix(pipe.jobId)
+        if (!billed.ok) {
+          this.setData({ iceResultUrl: '', iceErr: billed.text, iceProgress: '' })
+          return
+        }
+        this.setData({ iceResultUrl: done.videoUrl, iceProgress: billed.text })
         return
       }
       const job = pending[0]
@@ -562,7 +574,12 @@ Page({
           this.setData({ iceErr: done.message })
           return
         }
-        this.setData({ iceResultUrl: done.videoUrl, iceProgress: await chargeMix(`${pipe.jobId}:${i}`) })
+        const billed = await chargeMix(`${pipe.jobId}:${i}`)
+        if (!billed.ok) {
+          this.setData({ iceResultUrl: '', iceErr: billed.text, iceProgress: '' })
+          return
+        }
+        this.setData({ iceResultUrl: done.videoUrl, iceProgress: billed.text })
       }
     } catch (e) {
       this.setData({ iceErr: String(e.message || e).slice(0, 100) })

@@ -218,7 +218,8 @@ export function buildMyUsageDetailsFromSnapshot(
   const quotaMonth = currentGiftMonthKey()
 
   return {
-    deductOrderNote: '先消耗套餐额度（次数/分钟），套餐额度用尽后再从积分余额扣减。',
+    deductOrderNote:
+      'AI 视频/文稿检核、短视频/云剪/数字人、Brief 等均按积分扣减（套餐赠送积分桶优先，不足再扣充值积分）；余额不足请充值或升级套餐。',
     quotaMonth,
     pointsSummary: buildMpAiPointsBalanceSummary(data, account, opts),
     pointsLedger: listAccountPointsLedger(data, accountIdOf(account)),

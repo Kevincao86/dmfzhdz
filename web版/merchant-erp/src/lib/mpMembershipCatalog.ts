@@ -421,7 +421,7 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     },
     {
       key: 'ai_compliance_copy',
-      label: 'AI 合规检核 · 文稿（参考次/月，2 积分/次）',
+      label: 'AI 合规检核 · 文稿（参考次/月，实际按 2 积分/次扣）',
       group: '履约闭环',
       kind: 'quota',
     },
@@ -453,7 +453,7 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     },
     {
       key: 'ai_selfcheck_copy',
-      label: '文稿 AI 合规自检（参考次/月，2 积分/次）',
+      label: '文稿 AI 合规自检（参考次/月，实际按 2 积分/次扣）',
       group: 'AI 审核',
       kind: 'quota',
     },
