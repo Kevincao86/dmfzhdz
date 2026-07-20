@@ -53,6 +53,11 @@ import {
 import type { CreatePlatformId } from '../constants/merchantPlatforms'
 import type { RecruitmentPlatform } from '../lib/recruitmentPlatformOptions'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
+import {
+  formatMpPointsRateLabel,
+  MP_POINTS_OPS_PLAN_PER_USE,
+  MP_POINTS_USAGE_KIND_LABELS,
+} from '../lib/mpPointsEconomics'
 import { generateAiOpsPlan } from '../services/aiOpsPlanApi'
 import { fetchMerchantProductList } from '../services/merchantProductListApi'
 import {
@@ -1418,7 +1423,15 @@ export default function AiOpsPlanPage() {
       setTab('ops')
       const item = saveAiOpsPlanHistoryItem(scopeId, input, planFixed)
       setHistory(loadAiOpsPlanHistory(scopeId))
-      flash(`已生成并保存：${item.title}`)
+      const charged =
+        typeof r.pointsCharged === 'number' && r.pointsCharged > 0
+          ? r.pointsCharged
+          : MP_POINTS_OPS_PLAN_PER_USE
+      const balTip =
+        typeof r.pointsBalance === 'number'
+          ? `，余额 ${r.pointsBalance.toLocaleString('zh-CN')}`
+          : ''
+      flash(`已生成并保存：${item.title}（已扣 ${charged} 积分${balTip}）`)
     } finally {
       setLoading(false)
     }
@@ -1478,11 +1491,23 @@ export default function AiOpsPlanPage() {
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
       <header className="flex flex-wrap items-end justify-between gap-3 border-b border-gray-200 pb-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-gray-900">AI 运营方案</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">AI 运营方案</h1>
+            <span
+              className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-900"
+              title="生成成功后扣减；优先扣套餐积分，不足再扣充值积分。失败不扣。"
+            >
+              {MP_POINTS_USAGE_KIND_LABELS.ops_plan} · {formatMpPointsRateLabel('ops_plan')}
+            </span>
+          </div>
           <p className="mt-1 max-w-2xl text-sm text-gray-500">
             {partner
               ? '三步生成：选目标 → 填情报/门店 → 出方案。支持按客户存档，或「新客户洽谈」给未签约商户预览方案。'
               : '三步生成：选目标 → 选门店（支持连锁多选/全选）→ 出方案。ROI 按各平台行业中位转化测算，非拍脑袋假设。'}
+          </p>
+          <p className="mt-1 max-w-2xl text-xs text-gray-400">
+            积分消耗：每次成功生成扣 {MP_POINTS_OPS_PLAN_PER_USE}{' '}
+            积分（套餐桶优先，不足再扣充值桶）；生成失败不扣费。
           </p>
           {partner ? (
             <p className="mt-1 text-xs text-gray-400">
@@ -2082,6 +2107,15 @@ export default function AiOpsPlanPage() {
             </div>
           ) : null}
 
+          <div className="rounded-lg border border-amber-100 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
+            <p className="font-medium">
+              本次将消耗 {MP_POINTS_OPS_PLAN_PER_USE} 积分（{formatMpPointsRateLabel('ops_plan')}）
+            </p>
+            <p className="mt-0.5 text-amber-800/90">
+              扣减关系：方案生成成功后由服务端扣费；优先消耗套餐积分，不足部分扣充值积分；失败或中断不扣。
+            </p>
+          </div>
+
           <button
             type="button"
             disabled={loading}
@@ -2092,7 +2126,9 @@ export default function AiOpsPlanPage() {
             )}
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            {loading ? '正在生成（约 1～2 分钟）…' : '生成方案'}
+            {loading
+              ? '正在生成（约 1～2 分钟）…'
+              : `生成方案（${MP_POINTS_OPS_PLAN_PER_USE} 积分）`}
           </button>
 
           <div className="border-t border-gray-100 pt-3">
@@ -2168,7 +2204,8 @@ export default function AiOpsPlanPage() {
               <Sparkles className="mb-3 h-8 w-8 text-gray-300" />
               <p className="text-sm font-medium text-gray-700">填写左侧参数后生成方案</p>
               <p className="mt-1 max-w-sm text-xs text-gray-400">
-                将输出六块内容：运营方案、执行方案、营销预算、进度日历、达人预算明细、组品货盘
+                将输出六块内容：运营方案、执行方案、营销预算、进度日历、达人预算明细、组品货盘。成功生成扣{' '}
+                {MP_POINTS_OPS_PLAN_PER_USE} 积分（套餐优先）。
               </p>
             </div>
           ) : null}

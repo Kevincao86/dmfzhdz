@@ -13,9 +13,16 @@ async function bearer(): Promise<string | null> {
   return data.session?.access_token ?? null
 }
 
+export type GenerateAiOpsPlanOk = {
+  ok: true
+  plan: AiOpsPlanResult
+  pointsCharged?: number
+  pointsBalance?: number
+}
+
 export async function generateAiOpsPlan(
   body: AiOpsPlanGenerateInput,
-): Promise<{ ok: true; plan: AiOpsPlanResult } | { ok: false; message: string }> {
+): Promise<GenerateAiOpsPlanOk | { ok: false; message: string }> {
   const token = await bearer()
   const headers: Record<string, string> = {
     Accept: 'application/json',
@@ -46,7 +53,17 @@ export async function generateAiOpsPlan(
     }
     if (res.ok && json?.ok) {
       const plan = normalizeAiOpsPlanResult(json.plan)
-      if (plan && isAiOpsPlanResultUsable(plan)) return { ok: true, plan }
+      if (plan && isAiOpsPlanResultUsable(plan)) {
+        const pointsCharged =
+          typeof json.pointsCharged === 'number' && Number.isFinite(json.pointsCharged)
+            ? Math.max(0, Math.floor(json.pointsCharged))
+            : undefined
+        const pointsBalance =
+          typeof json.pointsBalance === 'number' && Number.isFinite(json.pointsBalance)
+            ? Math.max(0, Math.floor(json.pointsBalance))
+            : undefined
+        return { ok: true, plan, pointsCharged, pointsBalance }
+      }
       lastErr = '方案内容不完整，请重试'
       continue
     }
