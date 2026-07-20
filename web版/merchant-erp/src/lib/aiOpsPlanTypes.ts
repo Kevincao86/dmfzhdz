@@ -1250,6 +1250,247 @@ export function alignOpsPlanGoalsToRoi(
   }
 }
 
+
+function parseIsoDateRange(dateRange: string): { start: string; end: string } | null {
+  const isos = [...String(dateRange || '').matchAll(/(\d{4}-\d{2}-\d{2})/g)].map((m) => m[1]!)
+  if (isos.length >= 2) return { start: isos[0]!, end: isos[1]! }
+  if (isos.length === 1) return { start: isos[0]!, end: isos[0]! }
+  const cn = [...String(dateRange || '').matchAll(/(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})/g)].map(
+    (m) => `${m[1]}-${m[2]!.padStart(2, '0')}-${m[3]!.padStart(2, '0')}`,
+  )
+  if (cn.length >= 2) return { start: cn[0]!, end: cn[1]! }
+  if (cn.length === 1) return { start: cn[0]!, end: cn[0]! }
+  return null
+}
+
+function listIsoDaysInclusive(start: string, end: string, maxDays = 45): string[] {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end) || start > end) {
+    return []
+  }
+  const out: string[] = []
+  let cur = start
+  while (cur <= end && out.length < maxDays) {
+    out.push(cur)
+    cur = addDaysIso(cur, 1)
+  }
+  return out
+}
+
+type PhaseKind = 'seed' | 'convert' | 'repurchase' | 'generic'
+
+function detectPhaseKind(phaseName: string): PhaseKind {
+  const n = phaseName || ''
+  if (/种草|预热|筹备|启动|冷启/.test(n)) return 'seed'
+  if (/转化|投放|爆发|冲刺|核销/.test(n)) return 'convert'
+  if (/复购|沉淀|会员|收尾|复盘/.test(n)) return 'repurchase'
+  return 'generic'
+}
+
+function phaseDayPlaybook(
+  kind: PhaseKind,
+  dayIndex: number,
+  totalDays: number,
+  phaseName: string,
+  ownerFallback: string,
+): AiOpsPlanPhaseDetailItem {
+  const owner = ownerFallback || '运营负责人'
+  const seed: Array<Omit<AiOpsPlanPhaseDetailItem, 'day'>> = [
+    {
+      task: '确认项目执行口径与对接人',
+      howTo: '对齐预算/平台/成功指标；书面确认探店与直播窗口，建群同步日报节奏。',
+      ownerRole: owner,
+      deliverable: '执行口径确认纪要',
+    },
+    {
+      task: '锁定补贴/本地推预算池',
+      howTo: '按渠道拆分达人费与投流；登记可用券面/让利上限，避免超发。',
+      ownerRole: '投放/运营',
+      deliverable: '预算池锁定表',
+    },
+    {
+      task: '确认活动货盘与主推券面',
+      howTo: '选定 3～5 个主推组品；写清原价/活动价/库存与核销规则。',
+      ownerRole: '商品运营',
+      deliverable: '活动货盘清单',
+    },
+    {
+      task: '达人招募启动（Brief+档期）',
+      howTo: '按探店/团购/颜值分层邀约；Brief 含钩子句、POI、挂链与禁止项。',
+      ownerRole: '媒介',
+      deliverable: '达人邀约表',
+    },
+    {
+      task: '摄影师/物料到场补拍',
+      howTo: '补门头、出餐、核销动作空镜，供云剪与官号二次创作。',
+      ownerRole: '内容',
+      deliverable: '空镜素材包',
+    },
+    {
+      task: '达人到店探店拍摄',
+      howTo: '按 Brief 拍钩子-体验-核销三幕式；当场核对套餐露出与口播。',
+      ownerRole: '达人/内容',
+      deliverable: '探店原始素材',
+    },
+  ]
+  const convert: Array<Omit<AiOpsPlanPhaseDetailItem, 'day'>> = [
+    {
+      task: '成片联合审片（商家×运营）',
+      howTo: '核对口播、字幕、套餐露出与合规；书面确认后方可发布。',
+      ownerRole: '商家运营',
+      deliverable: '审片确认单',
+    },
+    {
+      task: '创建话题/打卡挑战标签',
+      howTo: '上线活动#话题与 POI 入口文案；官号置顶活动说明。',
+      ownerRole: '运营',
+      deliverable: '话题页与物料',
+    },
+    {
+      task: '预热短视频与海报发布',
+      howTo: '官号+达人协同发预告；挂团购组件，投流小预算测点击。',
+      ownerRole: '投放',
+      deliverable: '预热内容上线',
+    },
+    {
+      task: '正片集中发布+本地推优化',
+      howTo: '按类目高峰窗口发布；盯 CTR/进店，放大过验素材。',
+      ownerRole: '投放/达人',
+      deliverable: '发布与投流日报',
+    },
+    {
+      task: '直播彩排（设备/口播/福袋）',
+      howTo: '走一遍货盘讲解与福袋规则；检查推流、灯光、收银核销。',
+      ownerRole: '直播运营',
+      deliverable: '彩排 checklist',
+    },
+    {
+      task: '正式开播带货盯盘',
+      howTo: '场控+投流协同；实时替换高转化话术与券面。',
+      ownerRole: '直播运营',
+      deliverable: '直播战报初稿',
+    },
+  ]
+  const repurchase: Array<Omit<AiOpsPlanPhaseDetailItem, 'day'>> = [
+    {
+      task: '核销催单与好评引导',
+      howTo: '未核销用户短信/社群提醒；到店引导晒图返券或积分。',
+      ownerRole: '客服',
+      deliverable: '催核销记录',
+    },
+    {
+      task: '会员沉淀与复购券投放',
+      howTo: '沉淀新客进社群/会员；推次单复购券或升杯套餐。',
+      ownerRole: '私域',
+      deliverable: '会员池增量',
+    },
+    {
+      task: '数据复盘与战报输出',
+      howTo: '汇总曝光/进店/核销GMV/好评；沉淀可复用脚本与达人池。',
+      ownerRole: owner,
+      deliverable: '周期战报',
+    },
+    {
+      task: '下一轮货盘与达人储备',
+      howTo: '根据战报调整券面与达人层级；预锁下一节点档期。',
+      ownerRole: '运营/媒介',
+      deliverable: '下轮启动清单',
+    },
+  ]
+  const generic: Array<Omit<AiOpsPlanPhaseDetailItem, 'day'>> = [
+    {
+      task: `${phaseName || '阶段'}关键动作推进`,
+      howTo: '对照周计划拆日任务；日清阻塞项并同步甲方。',
+      ownerRole: owner,
+      deliverable: '日报',
+    },
+    {
+      task: '内容生产与审核',
+      howTo: '完成拍摄/剪辑/商家确认，确保挂链与 POI 正确。',
+      ownerRole: '内容',
+      deliverable: '可发布成片',
+    },
+    {
+      task: '投放与转化盯盘',
+      howTo: '按 ROI 调整预算；同步核销与库存风险。',
+      ownerRole: '投放',
+      deliverable: '盯盘纪要',
+    },
+    {
+      task: '复盘优化',
+      howTo: '记录有效钩子与达人表现，沉淀到素材库。',
+      ownerRole: owner,
+      deliverable: '优化清单',
+    },
+  ]
+  const pack =
+    kind === 'seed' ? seed : kind === 'convert' ? convert : kind === 'repurchase' ? repurchase : generic
+  const tpl = pack[Math.min(dayIndex, pack.length - 1)]!
+  // 长阶段在包内循环时带序号，避免同文案堆叠
+  const cycle = Math.floor(dayIndex / pack.length)
+  const task =
+    cycle > 0 && dayIndex >= pack.length ? `${tpl.task}（第${cycle + 1}轮推进）` : tpl.task
+  return {
+    day: '',
+    task,
+    howTo: tpl.howTo,
+    ownerRole: tpl.ownerRole,
+    deliverable: tpl.deliverable,
+  }
+}
+
+/** 阶段细分不足时按日补齐（对齐万象城日历粒度：确认→货盘→招募→拍摄→审片→话题→预热→开播→战报） */
+export function ensurePhaseDetailDensity(plan: AiOpsPlanResult): AiOpsPlanResult {
+  const phases = (plan.executionPlan.phases || []).map((phase) => {
+    const range = parseIsoDateRange(phase.dateRange)
+    if (!range) return phase
+    const days = listIsoDaysInclusive(range.start, range.end, 40)
+    if (!days.length) return phase
+    const kind = detectPhaseKind(phase.phase)
+    const existing = [...(phase.detailItems || [])]
+    const byDay = new Map<string, AiOpsPlanPhaseDetailItem>()
+    for (const d of existing) {
+      const iso = (d.day.match(/\d{4}-\d{2}-\d{2}/) || [])[0] || ''
+      if (iso) byDay.set(iso, { ...d, day: iso, howTo: d.howTo || '' })
+    }
+    // 短阶段每日；>10 天则隔日，保证最少 4 条、最多 16 条
+    const step = days.length > 10 ? 2 : 1
+    const targetDays = days.filter((_, i) => i % step === 0).slice(0, 16)
+    if (targetDays.length < 4) {
+      for (const d of days) {
+        if (!targetDays.includes(d)) targetDays.push(d)
+        if (targetDays.length >= 4) break
+      }
+    }
+    const merged: AiOpsPlanPhaseDetailItem[] = []
+    targetDays.forEach((iso, idx) => {
+      const hit = byDay.get(iso)
+      if (hit && hit.task.trim()) {
+        merged.push({
+          ...hit,
+          howTo:
+            hit.howTo?.trim() ||
+            phaseDayPlaybook(kind, idx, targetDays.length, phase.phase, phase.ownerRole).howTo,
+        })
+        byDay.delete(iso)
+        return
+      }
+      const gen = phaseDayPlaybook(kind, idx, targetDays.length, phase.phase, phase.ownerRole)
+      merged.push({ ...gen, day: iso })
+    })
+    // 保留无法归日的模型原创任务
+    for (const d of existing) {
+      const iso = (d.day.match(/\d{4}-\d{2}-\d{2}/) || [])[0] || ''
+      if (!iso && d.task.trim()) merged.push(d)
+    }
+    return { ...phase, detailItems: merged.slice(0, 24) }
+  })
+  return {
+    ...plan,
+    executionPlan: { ...plan.executionPlan, phases },
+  }
+}
+
+
 const REQUIRED_MILESTONE_KINDS: AiOpsPlanMilestoneKind[] = [
   'collab_confirm',
   'talent_list',
@@ -1422,9 +1663,124 @@ export function ensureCalendarMilestones(
     return m
   })
 
+  // 对齐万象城进度表：补充确认货盘/话题/彩排/战报等逐日节点
+  const denseTemplates: Array<{
+    offset: number
+    time: string
+    item: string
+    dependency: string
+    ownerRole: string
+    statusHint: string
+  }> = [
+    {
+      offset: Math.min(1, days - 1),
+      time: '10:30',
+      item: '确认项目执行情况与甲方对接节奏',
+      dependency: '签约/预算确认',
+      ownerRole: '运营负责人',
+      statusHint: '建立日报与验收标准',
+    },
+    {
+      offset: Math.min(2, days - 1),
+      time: '14:00',
+      item: '锁定补贴/本地推等投放资源',
+      dependency: '执行口径确认',
+      ownerRole: '投放',
+      statusHint: '登记可用预算池',
+    },
+    {
+      offset: Math.min(Math.max(3, Math.floor(days * 0.1)), days - 1),
+      time: '15:00',
+      item: '确认活动货盘与主推券面',
+      dependency: '预算池锁定',
+      ownerRole: '商品运营',
+      statusHint: '输出可上架组品清单',
+    },
+    {
+      offset: Math.min(Math.max(4, Math.floor(days * 0.18)), days - 1),
+      time: '11:00',
+      item: '达人招募推进（Brief 与档期确认）',
+      dependency: '货盘确认',
+      ownerRole: '媒介',
+      statusHint: '分层邀约并锁档',
+    },
+    {
+      offset: Math.min(Math.max(5, Math.floor(days * 0.22)), days - 1),
+      time: '14:00',
+      item: '摄影师到场补拍空镜/云剪素材',
+      dependency: '达人档期',
+      ownerRole: '内容',
+      statusHint: '门头出餐核销空镜齐套',
+    },
+    {
+      offset: Math.min(Math.max(8, Math.floor(days * 0.35)), days - 1),
+      time: '16:00',
+      item: '联合审片并创建活动话题#',
+      dependency: '成片交付',
+      ownerRole: '运营/商家',
+      statusHint: '话题页与 POI 文案上线',
+    },
+    {
+      offset: Math.min(Math.max(9, Math.floor(days * 0.42)), days - 1),
+      time: '12:00',
+      item: '发布预热短视频与直播预告海报',
+      dependency: '话题创建',
+      ownerRole: '运营',
+      statusHint: '官号+达人协同预热',
+    },
+    {
+      offset: Math.min(Math.max(15, Math.floor(days * 0.8)), days - 1),
+      time: '17:00',
+      item: '直播彩排（设备/口播/福袋）',
+      dependency: '直播档期确认',
+      ownerRole: '直播运营',
+      statusHint: '开播前至少彩排一次',
+    },
+    {
+      offset: Math.min(Math.max(days - 3, Math.floor(days * 0.9)), days - 1),
+      time: '18:00',
+      item: '数据复盘输出周期战报',
+      dependency: '投放与直播完成',
+      ownerRole: '运营负责人',
+      statusHint: '含 GMV/核销/内容复盘',
+    },
+    {
+      offset: Math.max(0, days - 1),
+      time: '11:00',
+      item: '启动下一轮货盘与达人储备',
+      dependency: '战报确认',
+      ownerRole: '运营/媒介',
+      statusHint: '预锁下一节点',
+    },
+  ]
+
+  const existingKeys = new Set(
+    [...patched, ...extras].map((m) => `${m.date}|${m.item.slice(0, 18)}`),
+  )
+  for (const t of denseTemplates) {
+    const date = clampIsoInPeriod(addDaysIso(start, t.offset), start, end)
+    const key = `${date}|${t.item.slice(0, 18)}`
+    if (existingKeys.has(key)) continue
+    // 避免与同日已有明确 kind 节点语义完全重复
+    const sameDay = [...patched, ...extras].some(
+      (m) => m.date === date && (m.item.includes(t.item.slice(0, 6)) || t.item.includes(m.item.slice(0, 6))),
+    )
+    if (sameDay) continue
+    extras.push({
+      date,
+      time: t.time,
+      item: t.item,
+      dependency: t.dependency,
+      ownerRole: t.ownerRole,
+      statusHint: t.statusHint,
+      kind: 'other',
+    })
+    existingKeys.add(key)
+  }
+
   const milestones = [...patched, ...extras]
     .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))
-    .slice(0, 80)
+    .slice(0, 120)
 
   return {
     ...plan,
@@ -1432,13 +1788,14 @@ export function ensureCalendarMilestones(
   }
 }
 
-/** 服务端/客户端统一后处理：ROI → 目标对齐 → 日历补全 */
+/** 服务端/客户端统一后处理：ROI → 目标对齐 → 阶段日粒度 → 日历补全 */
 export function enrichAiOpsPlanPostProcess(
   plan: AiOpsPlanResult,
   opts?: AiOpsPlanEnrichOpts,
 ): AiOpsPlanResult {
   let next = ensureMarketingRoiFallback(plan, opts)
   next = alignOpsPlanGoalsToRoi(next, opts)
+  next = ensurePhaseDetailDensity(next)
   next = ensureCalendarMilestones(next, opts)
   return next
 }
@@ -1447,6 +1804,7 @@ export function aiOpsPlanToMarkdown(plan: AiOpsPlanResult, meta?: { title?: stri
   const lines: string[] = []
   if (meta?.title) lines.push(`# ${meta.title}`, '')
   lines.push('## 1. 运营方案', '')
+  lines.push('### 一、活动背景与目标', '')
   if (plan.opsPlan.background) lines.push(`**背景：** ${plan.opsPlan.background}`, '')
   if (plan.opsPlan.backgroundDetail) {
     lines.push('**背景详情：**', plan.opsPlan.backgroundDetail, '')
