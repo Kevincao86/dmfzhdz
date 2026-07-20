@@ -224,12 +224,21 @@ function defaultLocalHitSuggestion(phrase: string): string {
   if (/100%|百分百|零风险|永久|万能|根治|速效/.test(phrase)) {
     return '删除夸大承诺，改为可核实的效果描述'
   }
+  if (/微信|加V|加薇|加微|薇信|私信|扫码|线下|私下|站外|绕过|脱离|VX|wx|电话|淘宝|天猫|下载抖音/.test(phrase)) {
+    return '删除站外联系/导流话术，改为引导平台内团购核销或到店体验'
+  }
+  if (/着装擦边|姿态擦边|二维码特写|打码指认|联系方式露出|色情导流|低俗导流/.test(phrase)) {
+    return '调整出镜着装与构图，去掉二维码/打码指认，避免擦边导流观感'
+  }
   return '删除或改写该表述，避免绝对化/夸大宣传'
 }
 
 function defaultSemanticHitSuggestion(phrase: string): string {
   if (/快来|赶紧|速来|必来/.test(phrase)) return '「适合来逛逛」「值得来体验一下」'
   if (/超有|超级|非常有格调|格调/.test(phrase)) return '「装修很有质感」「氛围挺舒服的」'
+  if (/肥美|擦边|导流|二维码|打码|私信|微信/.test(phrase)) {
+    return '改为客观探店描述；去掉站外导流与擦边暗示，美食夸赞对准菜品而非人'
+  }
   return '改为客观、可证实的体验描述，避免夸大或强引导'
 }
 
@@ -451,7 +460,8 @@ export async function runRecruitmentVideoComplianceCheck(
     '{"verdict":"normal"|"suspect","message":"15-80字结论","hits":["命中的违规词或表述，无则空数组"],"violations":[{"excerpt":"原文违规片段（须来自口播/字幕/画面，20字内）","rule":"违反的规则要点","suggestion":"「替换词1」「替换词2」","channel":"asr"|"subtitle"|"visual"|"brief"}]}',
     'verdict=normal 时 violations 为空数组；verdict=suspect 时须为每条风险表述给出 violations（含未命中本地词库的语义风险词）。',
     'suggestion 须给出 1-2 个可直接替换的短语，用「」包裹，格式示例：「适合来逛逛」「值得来体验一下」。',
-    '须综合口播、画面文字与 Brief 判断；任一路径出现绝对化/虚假/误导表述 → suspect。',
+    '须综合口播、画面文字、画面视觉与 Brief 判断；任一路径出现绝对化/虚假/误导，或擦边×导流/站外联系 → suspect。',
+    '美食语境客观描述可豁免双关误伤；擦边出镜与二维码特写/打码指认/站外话术组合须标「色情导流/低俗导流」或「违规导流」。',
   ]
     .filter(Boolean)
     .join('\n')

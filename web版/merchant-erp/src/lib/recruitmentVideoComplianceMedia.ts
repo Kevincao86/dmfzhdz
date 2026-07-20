@@ -12,8 +12,19 @@ import {
   type ComplianceSampleFrameSlot,
 } from '../../vite-plugins/videoConcatServer.js'
 import { DOUYIN_LIFE_VIDEO_RISK_PHRASES } from './douyinLifeServiceVideoComplianceRules.js'
+import { KUAISHOU_VIDEO_RISK_PHRASES } from './kuaishouVideoComplianceRules.js'
+import { WECHAT_CHANNELS_VIDEO_RISK_PHRASES } from './wechatChannelsVideoComplianceRules.js'
 import { transcribeRemoteVideoAudioDetailed } from './digitalHumanDouyinLinkCore.js'
 import type { AsrTimedSegment } from './complianceHitLocations.js'
+
+/** 抽帧 OCR 本地预扫：合并三端短视频词表（导流词各端已对齐） */
+const FRAME_OCR_RISK_PHRASES = [
+  ...new Set([
+    ...DOUYIN_LIFE_VIDEO_RISK_PHRASES,
+    ...KUAISHOU_VIDEO_RISK_PHRASES,
+    ...WECHAT_CHANNELS_VIDEO_RISK_PHRASES,
+  ]),
+]
 
 export type VideoMediaComplianceExtract = {
   asrText: string
@@ -32,7 +43,7 @@ function readVisionBearer(env: Record<string, string>): string | undefined {
 function localRiskScan(text: string): string[] {
   const t = text.toLowerCase()
   const hits: string[] = []
-  for (const phrase of DOUYIN_LIFE_VIDEO_RISK_PHRASES) {
+  for (const phrase of FRAME_OCR_RISK_PHRASES) {
     if (t.includes(phrase.toLowerCase())) hits.push(phrase)
   }
   return hits
@@ -56,11 +67,14 @@ function parseVisionComplianceJson(raw: string): {
   }
 }
 
-const FRAME_VISION_SYSTEM = `你是抖音生活服务短视频合规审核助手。用户会提供从探店成片截取的 1 张关键帧（含字幕、价格贴纸、大字小字、画面元素）。
+const FRAME_VISION_SYSTEM = `你是本地生活探店短视频合规审核助手（适用抖音/快手/视频号）。用户会提供从探店成片截取的 1 张关键帧（含字幕、价格贴纸、大字小字、出镜人物、画面元素）。
 请完成：
 1. OCR：识别帧内所有可见中文/英文文字（含字幕、贴纸、价签、标题），写入 ocrText；
-2. 画面合规：检查大小字误导、未标注广告、绝对化/极限用语出现在画面文字等；
-3. visualHits 只列本帧 OCR 原文中出现的违规词或画面问题短语；无则空数组。
+2. 广告合规：检查大小字误导、未标注广告、绝对化/极限用语出现在画面文字等；
+3. 擦边/低俗视觉：薄透深领出镜、超短裤突出身体、弯腰俯拍胸口/臀部等挑逗构图 → visualHits 写入如「着装擦边」「姿态擦边」；
+4. 导流视觉：清晰可扫二维码被特写/强调、故意打码区+手指指认、画面露出微信号/手机号 → visualHits 写入如「二维码特写导流」「打码指认导流」「联系方式露出」；
+5. 误伤豁免：纯食物/货架特写、价签二维码非强调一闪而过、正常探店出镜无擦边 → 不要因女主出镜或包装码误报；
+6. visualHits 可含 OCR 违规词或上述画面问题短语；无则空数组。
 只输出 JSON，不要 Markdown：
 {"ocrText":"…","visualHits":["…"],"visualNotes":"10-40字说明"}`
 
