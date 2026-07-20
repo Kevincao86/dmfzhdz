@@ -52,11 +52,10 @@ function createTenantAdminClient(env: Record<string, string>): SupabaseClient | 
   return createClient(base, serviceRole, nodeSupabaseClientOptions())
 }
 
-async function assertPaidAgentPointsAffordable(
+async function assertAgentPointsAffordable(
   ctx: TenantAiContext,
   env: Record<string, string>,
 ): Promise<AiAccessCheck | null> {
-  if (ctx.plan === 'free') return null
   const admin = createTenantAdminClient(env)
   if (!admin) {
     return {
@@ -79,12 +78,11 @@ async function assertPaidAgentPointsAffordable(
   return null
 }
 
-async function spendPaidAgentPointsAfterSuccess(
+async function spendAgentPointsAfterSuccess(
   ctx: TenantAiContext,
   env: Record<string, string>,
   idempotencyKey?: string,
 ): Promise<void> {
-  if (ctx.plan === 'free') return
   const admin = createTenantAdminClient(env)
   if (!admin) return
   const { spendErpAiPoints } = await import('../src/lib/erpAiPointsSpendCore.js')
@@ -319,9 +317,9 @@ export function recordDirectAiUsageAfterSuccess(
     let used = ctx.directAiCallsUsed
     if (ctx.directAiUsageMonth !== month) used = 0
     void incrementDirectAiUsage(ctx.tenantId, month, used, env)
-    return
   }
-  void spendPaidAgentPointsAfterSuccess(ctx, env, opts?.idempotencyKey)
+  /** 免费版也扣积分（注册赠送/月赠），凡 AI token 对话一律计费 */
+  void spendAgentPointsAfterSuccess(ctx, env, opts?.idempotencyKey)
 }
 
 export type AiAccessCheck =
@@ -429,10 +427,10 @@ export async function assertAiChatAccess(
         detail: `免费版直连 AI 每月上限 ${FREE_DIRECT_AI_CALL_LIMIT} 次，请升级会员版`,
       }
     }
-  } else if (ctx.plan !== 'free') {
-    const pointsBlock = await assertPaidAgentPointsAffordable(ctx, env)
-    if (pointsBlock) return pointsBlock
   }
+
+  const pointsBlock = await assertAgentPointsAffordable(ctx, env)
+  if (pointsBlock) return pointsBlock
 
   return { ok: true, envForChat: env, usageCtx: ctx }
 }

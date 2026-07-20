@@ -195,7 +195,8 @@ if [[ "$domain_count" -eq 1 ]]; then
     shared_infra) label='共享网络层' ;;
     *) label="$key" ;;
   esac
-  echo "OK: 改动范围集中在「$label」，未检出跨域误伤"
+  # 仅输出 ASCII key，避免部分环境 UTF-8 与 set -u 组合导致 echo 误解析
+  echo "OK: 改动范围集中在 domain=${key}，未检出跨域误伤"
 else
   echo "OK: 改动未命中已知跨域风险模式"
 fi

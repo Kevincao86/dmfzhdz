@@ -3,6 +3,7 @@ const addonApi = require('../../../utils/mpAddonMerchantApi.js')
 const media = require('../../../utils/mpAddonMedia.js')
 const dhPresets = require('../../../utils/mpDigitalHumanPresets.js')
 const pointsHints = require('../../../utils/mpAddonPointsHints.js')
+const mpPointsSpend = require('../../../utils/mpPointsSpendApi.js')
 
 Page({
   behaviors: [require('../../../behaviors/identityTheme')],
@@ -397,6 +398,14 @@ Page({
       wx.showToast({ title: '口播稿至少 8 字', icon: 'none' })
       return
     }
+    /** 口播时长粗估：约 4 字/秒，最低按 5 秒计费 */
+    const durationSec = Math.max(5, Math.ceil(text.length / 4))
+    try {
+      await mpPointsSpend.assertAddonAffordable('digital_human', durationSec)
+    } catch (e) {
+      this.setData({ err: String(e.message || '积分不足').slice(0, 100) })
+      return
+    }
     const avatar = this.selectedAvatar()
     this._cancelled = false
     this.setData({ renderBusy: true, err: '', progress: '合成配音…', previewUrl: '', step: 5 })
@@ -452,7 +461,20 @@ Page({
         createdAt: new Date().toISOString(),
       }
       const works = dhPresets.upsertWork(work)
-      this.setData({ previewUrl: done.videoUrl, progress: '合成完成', works })
+      let progress = '合成完成'
+      try {
+        const charge = await mpPointsSpend.spendAddonPoints('digital_human', {
+          durationSec,
+          idempotencyKey: `digital_human:${start.taskId || work.id}`,
+          note: `digital_human:${start.taskId || work.id}`,
+        })
+        if (charge && charge.pointsCharged > 0) {
+          progress = `合成完成 · 消耗 ${charge.pointsCharged} 积分`
+        }
+      } catch (spendErr) {
+        progress = `合成完成 · 积分扣减失败：${String(spendErr.message || '').slice(0, 24)}`
+      }
+      this.setData({ previewUrl: done.videoUrl, progress, works })
     } catch (e) {
       this.setData({ err: String(e.message || e).slice(0, 100) })
     } finally {

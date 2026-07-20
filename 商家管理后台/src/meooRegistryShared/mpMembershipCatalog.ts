@@ -742,7 +742,7 @@ export type MpMembershipPlanVersion = {
   sortOrder?: number
   /** 内置四档（basic/pro/flagship/enterprise）不可删除 */
   builtin?: boolean
-  /** 每月赠送积分（运营台可编辑；空则按月付折后价 × 50% 毛利自动推算） */
+  /** 每月赠送积分（运营台可编辑；空则按月付折后价 × 40% AI 成本占比（60% 毛利）自动推算） */
   giftPointsMonthly?: number | null
 }
 
@@ -791,7 +791,7 @@ export const MP_PLAN_PAGE_META: Record<
     title: '灵祺星选 · PR 版',
     subtitle: '品牌 PR · MCN · 代运营 — 发单、反选、审片、荐达人',
     footerNote:
-      '结算与资金由 PR 与达人线下完成，星选不代管资金。AI 检核按积分结算：视频 2 积分/秒、文稿 2 积分/次、Brief 8 积分/篇；超额可充值（¥1=50 积分）。',
+      '结算与资金由 PR 与达人线下完成，星选不代管资金。AI 检核按积分结算：视频 2 积分/秒、文稿 2 积分/次、Brief 8 积分/篇；超额可充值（¥1=40 积分，60% 毛利）。',
   },
   talent: {
     title: '灵祺星选 · 达人版',

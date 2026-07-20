@@ -5,6 +5,7 @@ const media = require('../../../utils/mpAddonMedia.js')
 const iceApi = require('../../../utils/mpAddonIceApi.js')
 const addonApi = require('../../../utils/mpAddonMerchantApi.js')
 const pointsHints = require('../../../utils/mpAddonPointsHints.js')
+const mpPointsSpend = require('../../../utils/mpPointsSpendApi.js')
 const upgradeHint = require('../../../utils/mpAddonUpgradeHint.js')
 
 const SMART_EFFECT_LABEL = '智能（按内容自动转场）'
@@ -224,6 +225,13 @@ Page({
       wx.showToast({ title: '请填写提示词', icon: 'none' })
       return
     }
+    const durationSec = Math.max(1, Math.ceil(Number(this.data.durationSec) || 15))
+    try {
+      await mpPointsSpend.assertAddonAffordable('shortvideo', durationSec)
+    } catch (e) {
+      this.setData({ err: String(e.message || '积分不足').slice(0, 100) })
+      return
+    }
     this._cancelled = false
     this.setData({ busy: true, err: '', progress: '提交任务…', resultUrl: '' })
     try {
@@ -246,7 +254,20 @@ Page({
         this.setData({ err: done.message })
         return
       }
-      this.setData({ resultUrl: done.videoUrl, progress: '生成完成' })
+      let progress = '生成完成'
+      try {
+        const charge = await mpPointsSpend.spendAddonPoints('shortvideo', {
+          durationSec,
+          idempotencyKey: `shortvideo:${start.taskId || Date.now()}`,
+          note: `shortvideo:${start.taskId || ''}`,
+        })
+        if (charge && charge.pointsCharged > 0) {
+          progress = `生成完成 · 消耗 ${charge.pointsCharged} 积分`
+        }
+      } catch (spendErr) {
+        progress = `生成完成 · 积分扣减失败：${String(spendErr.message || '').slice(0, 24)}`
+      }
+      this.setData({ resultUrl: done.videoUrl, progress })
     } catch (e) {
       this.setData({ err: String(e.message || e).slice(0, 100) })
     } finally {
@@ -408,6 +429,12 @@ Page({
   },
   async onAiIceBrief() {
     const aspect = this.iceAspect()
+    try {
+      await mpPointsSpend.assertAddonAffordable('mix_material_analyze', 1)
+    } catch (e) {
+      this.setData({ iceErr: String(e.message || '积分不足').slice(0, 80) })
+      return
+    }
     this.setData({ briefAiBusy: true, iceErr: '' })
     try {
       const r = await iceApi.generateIceEditBriefAi({
@@ -422,6 +449,15 @@ Page({
       if (!r.ok) {
         this.setData({ iceErr: r.message })
         return
+      }
+      try {
+        await mpPointsSpend.spendAddonPoints('mix_material_analyze', {
+          durationSec: 1,
+          idempotencyKey: `ice_brief:${Date.now()}`,
+          note: 'ICE 混剪 AI Brief',
+        })
+      } catch (_) {
+        /* 生成成功但扣费失败时仍保留文案 */
       }
       this.setData({ editCopy: r.copy, editInstruction: r.instruction })
     } catch (e) {
@@ -445,6 +481,8 @@ Page({
       brief = `${brief}\n【智能特效】请根据素材画面与节奏自动选择合适的转场与特效，避免生硬硬切。`
     }
     const pipelinePreset = smartPreset ? '随机转场' : this.data.icePreset
+    const mixKind = smartPreset ? 'cloud_edit_smart' : 'cloud_edit'
+    const clipEndSec = Math.max(1, Math.ceil(Number(this.data.clipEndSec) || 20))
     const aspect = this.iceAspect()
     const pending = this.data.videoJobs.filter((j) => j.phase === 'pending' || j.phase === 'failed')
     const imageUrls = this.data.imageItems.map((x) => x.mediaUrl)
@@ -452,8 +490,29 @@ Page({
       wx.showToast({ title: '请先添加素材', icon: 'none' })
       return
     }
+    try {
+      await mpPointsSpend.assertAddonAffordable(mixKind, clipEndSec)
+    } catch (e) {
+      this.setData({ iceErr: String(e.message || '积分不足').slice(0, 100) })
+      return
+    }
     this._cancelled = false
     this.setData({ iceBusy: true, iceErr: '', iceProgress: '提交混剪…', iceResultUrl: '' })
+    const chargeMix = async (jobId) => {
+      try {
+        const charge = await mpPointsSpend.spendAddonPoints(mixKind, {
+          durationSec: clipEndSec,
+          idempotencyKey: `${mixKind}:${jobId || Date.now()}`,
+          note: `${mixKind}:${jobId || ''}`,
+        })
+        if (charge && charge.pointsCharged > 0) {
+          return `混剪完成 · 消耗 ${charge.pointsCharged} 积分`
+        }
+      } catch (spendErr) {
+        return `混剪完成 · 积分扣减失败：${String(spendErr.message || '').slice(0, 24)}`
+      }
+      return '混剪完成'
+    }
     try {
       if (imageUrls.length) {
         const pipe = await iceApi.postIcePipeline({
@@ -476,7 +535,7 @@ Page({
           this.setData({ iceErr: done.message })
           return
         }
-        this.setData({ iceResultUrl: done.videoUrl, iceProgress: '混剪完成' })
+        this.setData({ iceResultUrl: done.videoUrl, iceProgress: await chargeMix(pipe.jobId) })
         return
       }
       const job = pending[0]
@@ -503,9 +562,8 @@ Page({
           this.setData({ iceErr: done.message })
           return
         }
-        this.setData({ iceResultUrl: done.videoUrl })
+        this.setData({ iceResultUrl: done.videoUrl, iceProgress: await chargeMix(`${pipe.jobId}:${i}`) })
       }
-      this.setData({ iceProgress: '混剪完成' })
     } catch (e) {
       this.setData({ iceErr: String(e.message || e).slice(0, 100) })
     } finally {

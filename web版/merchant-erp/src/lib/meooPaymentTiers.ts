@@ -18,7 +18,7 @@ export const RECHARGE_TIERS: PaymentTier[] = [
   { label: '¥500', yuan: 500, cents: 50000 },
 ]
 
-/** ERP 积分充值档位（50% 毛利：¥1 = 50 积分；与 erpPointsEconomics 同步） */
+/** ERP 积分充值档位（60% 毛利：¥1 = 40 积分；与 erpPointsEconomics 同步） */
 export const POINTS_RECHARGE_TIERS: PaymentTier[] = ERP_POINTS_RECHARGE_TIERS.map((t) => ({
   label: `${t.label} · ${t.points.toLocaleString('zh-CN')}积分`,
   yuan: t.yuan,

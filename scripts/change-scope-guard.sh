@@ -35,6 +35,7 @@ list_scopes() {
   erp_pay_points       ERP小程序支付 + 星选积分余额对齐
   mp_hall_region       小程序招募/推荐大厅城市自动定位
   merchant_nav         商家/服务商 ERP 侧栏导航信息架构
+  ai_points            全端 AI 积分扣减 / 60% 毛利定价
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -235,6 +236,42 @@ PAT
       cat <<'PAT'
 config/nav.ts
 MeooLayout.tsx
+change-scope-guard
+PAT
+      ;;
+    ai_points)
+      cat <<'PAT'
+mpPointsEconomics
+erpPointsEconomics
+erpAiPointsSpendCore
+mpAiPointsSpendCore
+mpAiPointsSpendSession
+mpAiPointsBuckets
+mpAddonPointsSpendClient
+mpAiPointsSpendClient
+mpPointsSpendApi
+mpAddonPointsHints
+mpPointsEconomicsMp
+erpPointsSpendMp
+meooPaymentTiers
+tenantMembershipCore
+erpAiApiPointsGate
+meoo-ai-product-plan
+meoo-ai-ops-plan
+meoo-ai-agent-image
+meoo-mp-recruitment-ai
+meoo-tenant-billing
+meoo-ops-mp-auth
+mpCompliancePointsGate
+partnerXingxuanBilling
+mine-pr-addon-shortvideo
+mine-pr-addon-digital-human
+mpViralBriefAi
+SubscriptionPlansPanel
+mpMembershipCatalog
+ai-points-pricing
+meooRegistryShared
+mp-change-blast-radius-check
 change-scope-guard
 PAT
       ;;
