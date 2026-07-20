@@ -1557,7 +1557,7 @@ export function mixTargetSegmentCount(targetTotalSec: number, segmentSec = 5): n
 }
 
 /** 批量成片条数（普通混剪 / 智能一键成片共用） */
-export const ICE_MIX_BATCH_COUNTS = [10, 20, 30, 50] as const
+export const ICE_MIX_BATCH_COUNTS = [1, 10, 20, 30, 50] as const
 export type IceMixBatchCount = (typeof ICE_MIX_BATCH_COUNTS)[number]
 
 /** 品牌名清洗：用于下载文件名「品牌名1…N」 */
