@@ -107,7 +107,10 @@ function frameSlotToBase64(
 async function frameBase64FromBuffer(buf: Buffer, slot: FrameSlot): Promise<string | null> {
   const extracted = await extractComplianceSampleFramesFromBuffer(buf)
   if (extracted.ok) {
-    const fromSample = frameSlotToBase64(extracted.frames, slot)
+    const fromSample = frameSlotToBase64(
+      extracted.frames as Array<{ slot: FrameSlot; buffer: Buffer }>,
+      slot,
+    )
     if (fromSample) return fromSample
   }
   if (slot === 'closing') {
