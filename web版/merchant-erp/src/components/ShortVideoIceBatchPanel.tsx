@@ -361,7 +361,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
   const [mixTtsPlaying, setMixTtsPlaying] = useState(false)
   const [mixTtsBusy, setMixTtsBusy] = useState(false)
   const [mixCloneAudioName, setMixCloneAudioName] = useState<string | null>(null)
-  const [batchGenerateCount, setBatchGenerateCount] = useState<IceMixBatchCount>(10)
+  const [batchGenerateCount, setBatchGenerateCount] = useState<IceMixBatchCount>(1)
   const [batchBrandName, setBatchBrandName] = useState('')
   const mixCloneBlobRef = useRef<Blob | null>(null)
   const mixCloneInputRef = useRef<HTMLInputElement>(null)
