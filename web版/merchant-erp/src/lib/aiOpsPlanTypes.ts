@@ -1289,7 +1289,6 @@ function detectPhaseKind(phaseName: string): PhaseKind {
 function phaseDayPlaybook(
   kind: PhaseKind,
   dayIndex: number,
-  totalDays: number,
   phaseName: string,
   ownerFallback: string,
 ): AiOpsPlanPhaseDetailItem {
@@ -1469,12 +1468,12 @@ export function ensurePhaseDetailDensity(plan: AiOpsPlanResult): AiOpsPlanResult
           ...hit,
           howTo:
             hit.howTo?.trim() ||
-            phaseDayPlaybook(kind, idx, targetDays.length, phase.phase, phase.ownerRole).howTo,
+            phaseDayPlaybook(kind, idx, phase.phase, phase.ownerRole).howTo,
         })
         byDay.delete(iso)
         return
       }
-      const gen = phaseDayPlaybook(kind, idx, targetDays.length, phase.phase, phase.ownerRole)
+      const gen = phaseDayPlaybook(kind, idx, phase.phase, phase.ownerRole)
       merged.push({ ...gen, day: iso })
     })
     // 保留无法归日的模型原创任务
