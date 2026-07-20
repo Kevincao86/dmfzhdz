@@ -8,6 +8,12 @@ import {
   sendMerchantJson,
 } from './merchant/merchantGatewayShared.js'
 import { runAiProductPlanCore } from '../vite-plugins/merchantStoreIntelCore.js'
+import {
+  authHeaderFromRequest,
+  chargeErpAiPointsAfterSuccess,
+  requireErpAiPointsAffordable,
+  sendErpAiPointsGateError,
+} from './_lib/erpAiApiPointsGate.js'
 
 export const config = { maxDuration: 120 }
 
@@ -19,8 +25,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
   try {
-    const auth = typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined
-    const out = await runAiProductPlanCore(rawBody(req), auth, process.env as Record<string, string>)
+    const auth = authHeaderFromRequest(req)
+    const env = process.env as Record<string, string>
+    const gate = await requireErpAiPointsAffordable(auth, 'product_plan', env)
+    if (!gate.ok) {
+      sendErpAiPointsGateError(res, sendMerchantJson, gate)
+      return
+    }
+    const out = await runAiProductPlanCore(rawBody(req), auth, env)
+    if (out.status >= 200 && out.status < 300 && out.body?.ok !== false) {
+      const charge = await chargeErpAiPointsAfterSuccess(auth, 'product_plan', env, {
+        tenantId: gate.tenantId,
+        idempotencyKey: `product_plan:${gate.userId}:${Date.now().toString(36)}`,
+        note: 'AI 商品上架方案',
+      })
+      if (charge) {
+        out.body = {
+          ...out.body,
+          pointsCharged: charge.pointsCharged,
+          pointsBalance: charge.balance,
+        }
+      }
+    }
     sendMerchantJson(res, out.status, out.body)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

@@ -137,6 +137,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
+  /** 商家/服务商 JWT：生图前校验积分；星选 mp: 会话由前端视觉工坊单独扣费 */
+  const isMpSession = user.id.startsWith('mp:')
+  let erpTenantId: string | undefined
+  if (!isMpSession) {
+    const { requireErpAiPointsAffordable, sendErpAiPointsGateError } = await import(
+      './_lib/erpAiApiPointsGate.js'
+    )
+    const gate = await requireErpAiPointsAffordable(auth, 'agent_image', env0, {
+      tenantIdHint: typeof body.tenantId === 'string' ? body.tenantId.trim() : undefined,
+    })
+    if (!gate.ok) {
+      sendErpAiPointsGateError(res, sendMerchantJson, gate)
+      return
+    }
+    erpTenantId = gate.tenantId
+  }
+
   try {
     const out = await runMeooAgentImageRequest(access.envForChat, {
       prompt,
@@ -165,7 +182,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         outputText: 'image_generated',
         usage: estimateLlmTokensFromText(prompt, 'image'),
       })
-      sendMerchantJson(res, 200, out)
+      let pointsCharged: number | undefined
+      let pointsBalance: number | undefined
+      if (!isMpSession && erpTenantId) {
+        const { chargeErpAiPointsAfterSuccess } = await import('./_lib/erpAiApiPointsGate.js')
+        const charge = await chargeErpAiPointsAfterSuccess(auth, 'agent_image', env0, {
+          tenantId: erpTenantId,
+          idempotencyKey: `agent_image:${erpTenantId}:${Date.now().toString(36)}`,
+          note: 'AI 智能体生图',
+        })
+        if (charge) {
+          pointsCharged = charge.pointsCharged
+          pointsBalance = charge.balance
+        }
+      }
+      sendMerchantJson(res, 200, {
+        ...out,
+        ...(pointsCharged != null ? { pointsCharged, pointsBalance } : {}),
+      })
     } else {
       sendMerchantJson(res, 502, { ok: false, error: 'image_generation_failed', detail: out.message })
     }

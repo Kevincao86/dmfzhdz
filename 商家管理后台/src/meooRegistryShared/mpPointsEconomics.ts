@@ -1,6 +1,7 @@
 /**
- * 星选 AI 积分经济：消耗规则、50% 毛利下的赠送额度与充值换算。
- * 1 积分内部成本 = MP_POINT_INTERNAL_COST_YUAN；用户支付价中 50% 用于覆盖 AI 成本。
+ * 星选 AI 积分经济：消耗规则、60% 毛利下的赠送额度与充值换算。
+ * 1 积分内部成本 = MP_POINT_INTERNAL_COST_YUAN；用户支付价中 40% 用于覆盖 AI 成本。
+ * 权威源以 web版/merchant-erp/src/lib/mpPointsEconomics.ts 为准。
  */
 import type { MpLibraryRole, MpMembershipTier } from './mpMembershipCatalog.js'
 
@@ -45,17 +46,20 @@ export const MP_POINTS_BRIEF_PER_USE = 8
 /** AI 混剪素材分析：15 积分/次（多模态采样 + 指导文案生成） */
 export const MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE = 15
 
-/** 单积分内部 API 成本（元），用于 50% 毛利反推赠送积分 */
+/** 单积分内部 API 成本（元） */
 export const MP_POINT_INTERNAL_COST_YUAN = 0.01
 
-/** 订阅价中用于 AI 成本的比例（其余 50% 为毛利） */
-export const MP_POINT_PROFIT_MARGIN = 0.5
+/** 目标毛利率 60% → AI 成本占比 40%（历史字段名 PROFIT_MARGIN 实为成本占比） */
+export const MP_POINT_GROSS_MARGIN = 0.6
+export const MP_POINT_AI_COST_SHARE = 1 - MP_POINT_GROSS_MARGIN
+/** @deprecated 请用 MP_POINT_AI_COST_SHARE */
+export const MP_POINT_PROFIT_MARGIN = MP_POINT_AI_COST_SHARE
 
 /** 基础版（免费）注册赠送 */
 export const MP_BASIC_GIFT_POINTS = 100
 
-/** 积分充值：50% 毛利 → ¥1 可购 50 积分（成本 ¥0.5） */
-export const MP_RECHARGE_POINTS_PER_YUAN = Math.floor(MP_POINT_PROFIT_MARGIN / MP_POINT_INTERNAL_COST_YUAN)
+/** 积分充值：60% 毛利 → ¥1 可购 40 积分 */
+export const MP_RECHARGE_POINTS_PER_YUAN = Math.floor(MP_POINT_AI_COST_SHARE / MP_POINT_INTERNAL_COST_YUAN)
 
 export type MpPointsUsageKind =
   | 'video'
@@ -176,11 +180,11 @@ export function mpPointsEquivalents(points: number): MpPointsEquivalents {
   }
 }
 
-/** 月付折后价（元）→ 赠送积分（50% 毛利，未取整） */
+/** 月付折后价（元）→ 赠送积分（60% 毛利，未取整） */
 export function computeGiftPointsForMonthlyPrice(priceYuan: number | null | undefined): number {
   const price = Number(priceYuan)
   if (!Number.isFinite(price) || price <= 0) return MP_BASIC_GIFT_POINTS
-  const budget = price * MP_POINT_PROFIT_MARGIN
+  const budget = price * MP_POINT_AI_COST_SHARE
   return Math.max(MP_BASIC_GIFT_POINTS, Math.floor(budget / MP_POINT_INTERNAL_COST_YUAN))
 }
 
@@ -346,7 +350,7 @@ export function articleUsesFromGiftPoints(points: number): number {
   return Math.max(0, Math.floor(p / MP_POINTS_ARTICLE_PER_USE))
 }
 
-/** 常用充值档位（折后价 yuan；积分固定，优惠档可低于 ¥1=50 积分换算） */
+/** 常用充值档位（折后价 yuan；积分固定，优惠档可高于 ¥1=40 积分基准） */
 export type MpRechargeTierPreset = {
   yuan: number
   points: number
@@ -357,9 +361,9 @@ export type MpRechargeTierPreset = {
 
 export const MP_RECHARGE_TIER_PRESETS: MpRechargeTierPreset[] = [
   { yuan: 10, points: computeRechargePoints(10), label: '体验包' },
-  { yuan: 45, points: 2500, label: '标准包', listPriceYuan: 50 },
-  { yuan: 88, points: 5000, label: '进阶包', listPriceYuan: 100 },
-  { yuan: 438, points: 25000, label: '团队包', listPriceYuan: 500 },
+  { yuan: 45, points: 2000, label: '标准包', listPriceYuan: 50 },
+  { yuan: 88, points: 4000, label: '进阶包', listPriceYuan: 100 },
+  { yuan: 438, points: 20000, label: '团队包', listPriceYuan: 500 },
 ]
 
 export function findRechargeTierPresetByPoints(points: number): MpRechargeTierPreset | undefined {
