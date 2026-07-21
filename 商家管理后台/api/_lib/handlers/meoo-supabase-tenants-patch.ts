@@ -3,6 +3,9 @@
  * 使用 fetch 调 PostgREST，避免 @supabase/supabase-js 在 Vercel 上崩溃（与 meoo-supabase-tenants-list 一致）。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { createClient } from '@supabase/supabase-js'
+import { ensureErpMonthlyGiftPointsGranted } from '../../../../web版/merchant-erp/src/lib/erpPointsCore.js'
+import { normalizeMembershipPlan } from '../../../../web版/merchant-erp/src/lib/membershipPlan.js'
 import { buildOpsGiftDaysPatch, readEntitlementDays } from '../tenantEntitlementCore.js'
 
 export const config = { maxDuration: 60 }
@@ -211,6 +214,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         const t = await r.text()
         jsonSend(res, 502, { ok: false, error: 'patch_failed', detail: t.slice(0, 400) })
         return
+      }
+      if (
+        body.membershipPlan === 'free' ||
+        body.membershipPlan === 'member' ||
+        body.membershipPlan === 'member_plus'
+      ) {
+        try {
+          const admin = createClient(base, serviceRole, {
+            auth: { persistSession: false, autoRefreshToken: false },
+          })
+          await ensureErpMonthlyGiftPointsGranted(admin, id, {
+            plan: normalizeMembershipPlan(String(body.membershipPlan)),
+          })
+        } catch {
+          /* 改档已成功；积分可在商户打开钱包时再补 */
+        }
       }
       jsonSend(res, 200, { ok: true })
       return

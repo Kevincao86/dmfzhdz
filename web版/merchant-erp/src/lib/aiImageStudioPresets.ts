@@ -2652,6 +2652,38 @@ export function resolveIndustryProfile(id: LocalLifeIndustryId): IndustryProfile
   return INDUSTRY_PROFILES.find((p) => p.id === id) ?? INDUSTRY_PROFILES[0]!
 }
 
+/** 智能参考图上传区文案：按业态避免一律写成「菜品图」 */
+export function referenceUploadSubtitle(
+  industryId: LocalLifeIndustryId,
+  industrySubId?: string,
+): string {
+  const sub = String(industrySubId || '').trim()
+  if (industryId === 'catering') return '上传商品/菜品图，AI 提取核心元素并并入出图'
+  if (sub === 'leisure_foot_spa') return '上传门店环境/足浴服务场景图，AI 提取核心元素并并入出图'
+  if (industryId === 'beauty') return '上传项目效果图或门店图，AI 提取核心元素并并入出图'
+  if (industryId === 'leisure') return '上传门店环境/玩法场景图，AI 提取核心元素并并入出图'
+  if (industryId === 'hotel') return '上传客房/空间实拍图，AI 提取核心元素并并入出图'
+  if (industryId === 'pet') return '上传门店或萌宠相关实拍图，AI 提取核心元素并并入出图'
+  if (industryId === 'education') return '上传教室/课程场景图，AI 提取核心元素并并入出图'
+  return '上传商品或门店实拍图，AI 提取核心元素并并入出图'
+}
+
+/** 非餐饮业态出图时强制禁止菜品/餐桌错配 */
+export function nonCateringFoodBanLine(
+  industryId: LocalLifeIndustryId,
+  industrySubId?: string,
+): string {
+  if (industryId === 'catering') return ''
+  const sub = String(industrySubId || '').trim()
+  const focus =
+    sub === 'leisure_foot_spa'
+      ? '须呈现足浴沙发/足疗椅、足浴桶、技师服务等场景'
+      : industryId === 'beauty'
+        ? '须呈现美业服务/门店空间场景'
+        : '须呈现与当前业态一致的服务或空间场景'
+  return `【严禁餐饮错配】当前业态不是餐饮：${focus}；禁止出现菜品、餐桌摆盘、火锅海鲜、饮品特写等美食摄影；即使文案含「美食」也只作文字卖点，不得画成餐厅菜品海报。`
+}
+
 export function getPlaybooksForIndustry(industryId: LocalLifeIndustryId) {
   const profile = resolveIndustryProfile(industryId)
   const hidden = new Set(profile.hiddenPlaybooks ?? [])
@@ -2830,8 +2862,9 @@ export function buildVisualStudioPrompt(
   const lines = [
     carouselMaster ? INTENT_PROMPT.carousel : INTENT_PROMPT[pb.intent],
     `【业态锁定】${sceneCtx.label}。${sceneCtx.sceneHint}。画面主体、道具、环境必须严格符合该业态，禁止出现与业态无关的场景（如餐饮禁止酒吧夜场、足浴禁止咖啡厅）。`,
+    nonCateringFoodBanLine(form.industry, form.industrySubId),
     form.industrySubId === 'leisure_foot_spa'
-      ? '【足浴专项】须呈现足浴沙发/足疗椅、足浴桶、技师足部按摩等服务场景；严禁浴缸、酒店客房、海边落地窗、温泉泳池、度假别墅等酒旅元素。'
+      ? '【足浴专项】须呈现足浴沙发/足疗椅、足浴桶、技师足部按摩等服务场景；严禁浴缸、酒店客房、海边落地窗、温泉泳池、度假别墅等酒旅元素；严禁菜品/餐桌美食摄影。'
       : '',
     `视觉风格：${style}。`,
     channel

@@ -4,6 +4,8 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { probeTokenMixUsage } from '../../../web版/merchant-erp/vite-plugins/tokenmixUsageProbe.js'
+import { ensureErpMonthlyGiftPointsGranted } from '../../../web版/merchant-erp/src/lib/erpPointsCore.js'
+import { normalizeMembershipPlan } from '../../../web版/merchant-erp/src/lib/membershipPlan.js'
 import { buildOpsGiftDaysPatch, readEntitlementDays } from './tenantEntitlementCore.js'
 
 export type TenantMutationResult =
@@ -33,6 +35,10 @@ export async function opsTenantPatchAdmin(
   if (body.membershipPlan === 'free' || body.membershipPlan === 'member' || body.membershipPlan === 'member_plus') {
     patch.membership_plan = body.membershipPlan
   }
+  const planChanged =
+    body.membershipPlan === 'free' ||
+    body.membershipPlan === 'member' ||
+    body.membershipPlan === 'member_plus'
 
   const giftProvided = typeof body.opsGiftDays === 'number' && Number.isFinite(body.opsGiftDays)
   if (giftProvided) {
@@ -72,6 +78,18 @@ export async function opsTenantPatchAdmin(
       body: { ok: false, error: 'patch_failed', detail: error.message },
     }
   }
+
+  // 运营改档后立即按新档补发/补差当月套餐桶积分（避免「已是 Plus 但积分仍是免费档余额」）
+  if (planChanged) {
+    try {
+      await ensureErpMonthlyGiftPointsGranted(admin, id, {
+        plan: normalizeMembershipPlan(String(body.membershipPlan)),
+      })
+    } catch {
+      /* 积分补发失败不阻断改档；商户打开钱包时会再走 ensure */
+    }
+  }
+
   return { ok: true }
 }
 

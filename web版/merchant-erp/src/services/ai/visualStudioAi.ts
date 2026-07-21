@@ -8,6 +8,7 @@ import {
   buildVisualStudioPrompt,
   formatReferenceAnalysisForPrompt,
   generateCopySuggestions,
+  nonCateringFoodBanLine,
   PUBLISH_CHANNELS,
   resolveIndustrySceneContext,
   resolvePlaybook,
@@ -100,22 +101,34 @@ export async function analyzeVisualStudioReferenceImage(
   opts?: { signal?: AbortSignal },
 ): Promise<VisualStudioReferenceAnalysisResult> {
   const sceneCtx = resolveIndustrySceneContext(form)
+  const foodBan = form.industry === 'catering' ? '' : nonCateringFoodBanLine(form.industry, form.industrySubId)
+  const subjectHint =
+    form.industry === 'catering'
+      ? '商品/菜品/环境/人物'
+      : form.industrySubId === 'leisure_foot_spa'
+        ? '足浴空间/服务场景/人物'
+        : '商品/服务场景/环境/人物'
+  const elementHint =
+    form.industry === 'catering'
+      ? '如具体菜品名、道具、招牌色块'
+      : '如空间道具、服务动作、门店色块、材质'
   const jsonExample =
     '{"subject":"","elements":[],"colors":"","texture":"","composition":"","mood":"","mergeInstruction":""}'
   const userPrompt = [
     `你是本地生活营销海报的视觉分析师。请理解用户上传的参考图，提取可并入新海报的核心元素。`,
     '',
     `业态：${sceneCtx.label}（${sceneCtx.sceneHint}）`,
+    foodBan,
     form.storeName.trim() ? `门店/品牌：${form.storeName.trim()}` : '',
     '',
     '请输出 JSON（不要 markdown），字段：',
-    '- subject：画面主体（商品/菜品/环境/人物，一句话）',
-    '- elements：须保留并入新图的关键元素数组（3～8 项，如具体菜品名、道具、招牌色块）',
+    `- subject：画面主体（${subjectHint}，一句话）`,
+    `- elements：须保留并入新图的关键元素数组（3～8 项，${elementHint}）`,
     '- colors：主色调与配色',
     '- texture：材质与真实质感描述',
     '- composition：构图与景别参考',
     '- mood：氛围',
-    '- mergeInstruction：如何将这些元素合成进新营销海报（中文，50～120 字）',
+    '- mergeInstruction：如何将这些元素合成进新营销海报（中文，50～120 字；须符合业态，非餐饮禁止写成菜品合成）',
     '',
     `格式示例：${jsonExample}`,
   ]
@@ -362,6 +375,7 @@ export async function fetchVisualStudioImagePromptFromAi(
   const refBlock = opts?.referenceAnalysis
     ? formatReferenceAnalysisForPrompt(opts.referenceAnalysis)
     : ''
+  const foodBan = nonCateringFoodBanLine(form.industry, form.industrySubId)
 
   const userPrompt = [
     '你是中国大陆本地生活营销海报的「生图 Prompt 工程师」。请根据下列 JSON 业务上下文，输出一段可直接交给文生图模型的中文 Prompt。',
@@ -369,11 +383,12 @@ export async function fetchVisualStudioImagePromptFromAi(
     '要求：',
     '1. 单段连贯描述，300～600 字，不要 JSON、不要 markdown、不要编号列表',
     '2. 必须锁定业态与场景：画面主体/环境/道具与 industry、industrySceneHint 一致，严禁业态错配（足浴/足疗须为足浴沙发/足疗椅场景，禁止浴缸/酒店客房/海边度假；餐饮禁止足疗场景）',
+    foodBan ? `2b. ${foodBan}` : '',
     '3. 必须体现 headline、offer、subheadline 等文案为画面中的中文大字信息',
     opts?.carouselMaster
       ? '4. carouselMaster=true：描述一张从左到右连续的超宽横幅，均分 5 段（封面→卖点1→卖点2→套餐→行动），背景与色调全幅无缝衔接，生成后将裁成单张轮播图'
       : '4. 体现 styleHint、compositionVariant、渠道尺寸与 playbook 玩法',
-    '5. 若有 productRefCount>0 或 styleFromReference，强调与参考图品类色调一致',
+    '5. 若有 productRefCount>0 或 styleFromReference，强调与参考图品类色调一致（非餐饮参考图不得被理解成菜品）',
     refBlock
       ? '6. 必须严格遵循下方「参考图核心元素」：提取的主体/元素须自然融入新海报，不可忽略'
       : '6. 结尾注明：专业海报排版、中文清晰可读、无水印乱码',
@@ -395,7 +410,9 @@ export async function fetchVisualStudioImagePromptFromAi(
           {
             role: 'system',
             content:
-              '你只输出一段中文文生图 Prompt 正文，禁止任何解释、前缀后缀、代码块。Prompt 须让模型生成与业态严格匹配的营销海报。',
+              form.industry === 'catering'
+                ? '你只输出一段中文文生图 Prompt 正文，禁止任何解释、前缀后缀、代码块。Prompt 须让模型生成与业态严格匹配的营销海报。'
+                : '你只输出一段中文文生图 Prompt 正文，禁止任何解释、前缀后缀、代码块。Prompt 须让模型生成与业态严格匹配的营销海报；严禁描述菜品、餐桌、摆盘等餐饮画面。',
           },
           { role: 'user', content: userPrompt },
         ],
