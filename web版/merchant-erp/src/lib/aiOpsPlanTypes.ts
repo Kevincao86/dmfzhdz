@@ -208,6 +208,11 @@ export type AiOpsPlanGenerateInput = {
   storeNames?: string[]
   /** all=全部门店；selected=勾选门店 */
   storeScope?: 'all' | 'selected'
+  /**
+   * 门店所在城市（AI 抓取地址推断）。达人方案写死须按此城从达人库取数；
+   * 无同城数据时服务端回退全国本地生活达人。
+   */
+  city?: string
   /** 服务商洽谈预览（尚未签约客户） */
   prospectPreview?: boolean
   menuSummary?: string
