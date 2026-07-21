@@ -2,6 +2,7 @@
  * 评论管理：经网关代理各平台「评价查询、回复评价」OpenAPI；本地 dev 由 Vite 插件转发（抖音走 goodlife/v1/akte/comment/*）。
  */
 
+import { merchantApiAuthHeaders, resolveMerchantApiBearer } from '../lib/merchantApiAuth'
 import { readMerchantSession } from '../lib/merchantSession'
 import { isLikelyRouteMiss404, isLikelyHtmlApiResponse, merchantApiFetchUrlCandidates } from './douyinProductApi'
 import type { StorePlatformTab } from './merchantStoresApi'
@@ -365,12 +366,23 @@ export async function postReviewAiSuggest(
   })
   const paths = ['/api/meoo-merchant-reviews-ai-suggest', '/api/merchant/reviews/ai-suggest']
   try {
+    // AI 积分门禁验的是 ERP 登录 JWT；平台来客 token 只能放在 X-Meoo-*，不能占 Authorization
+    const auth = await resolveMerchantApiBearer()
+    if (!auth.token) {
+      return { ok: false, message: '请先登录' }
+    }
+    const platformHdrs = { ...(postHeaders(platform) as Record<string, string>) }
+    delete platformHdrs.Authorization
+    const headers: Record<string, string> = {
+      ...platformHdrs,
+      ...merchantApiAuthHeaders(auth.token, auth.source),
+    }
     let res: Response | null = null
     let data: Record<string, unknown> = {}
     for (const target of merchantApiFetchUrlCandidates(paths)) {
       const r = await fetch(target, {
         method: 'POST',
-        headers: postHeaders(platform),
+        headers,
         body,
       })
       const text = await r.text()
