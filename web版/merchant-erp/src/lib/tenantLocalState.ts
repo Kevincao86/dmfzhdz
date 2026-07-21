@@ -30,6 +30,7 @@ const EXTRA_LOCAL_KEYS = [
   'meoo_recruitment_create_draft_v1',
   'meoo_store_menu_v1',
   'meoo_store_menu_items_v1',
+  'meoo_store_contact_override_v1',
   'meoo_competitor_reports_v1',
   'meoo_competitor_selected_poi_v1',
 ] as const

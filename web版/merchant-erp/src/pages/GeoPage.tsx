@@ -57,6 +57,7 @@ import {
 } from '../lib/geoScoresFromDouyinRows'
 import { computePerStoreGeoDiagnostics } from '../lib/geoStoreDiagnostics'
 import { listChainBrandOptions } from '../lib/storeBrandGroup'
+import { applyStoreContactOverrides } from '../lib/storeContactOverride'
 import {
   GEO_TEXT_AI_MODEL_OPTIONS,
   coerceGeoTextAiModel,
@@ -271,7 +272,7 @@ export default function GeoPage() {
         }
         const d = await getDouyinStoreDetail({ accessToken: tok, poiId: pid })
         if (cancelled || !d.ok) return
-        setActiveStores(d.items.slice(0, 1))
+        setActiveStores(applyStoreContactOverrides('douyin', d.items.slice(0, 1)))
         if (d.accountName) setAccountNameFromApi((prev) => d.accountName ?? prev)
         return
       }
@@ -287,7 +288,7 @@ export default function GeoPage() {
           storeBrand: kw,
         })
         if (cancelled || !agg.ok) return
-        setActiveStores(agg.items)
+        setActiveStores(applyStoreContactOverrides('douyin', agg.items))
         if (agg.accountName) setAccountNameFromApi((prev) => agg.accountName ?? prev)
         return
       }
@@ -297,7 +298,7 @@ export default function GeoPage() {
         storeBrand: undefined,
       })
       if (cancelled || !agg.ok) return
-      setActiveStores(agg.items)
+      setActiveStores(applyStoreContactOverrides('douyin', agg.items))
       if (agg.accountName) setAccountNameFromApi((prev) => agg.accountName ?? prev)
     }
 
@@ -456,7 +457,7 @@ export default function GeoPage() {
           setStoresSyncErr(d.message)
           return
         }
-        rows = d.items.slice(0, 1)
+        rows = applyStoreContactOverrides('douyin', d.items.slice(0, 1))
         if (d.accountName) resolvedAccount = d.accountName
       } else {
         const agg = await fetchAllDouyinClaimedStoresPages({
@@ -468,7 +469,7 @@ export default function GeoPage() {
           setStoresSyncErr(agg.message)
           return
         }
-        rows = agg.items
+        rows = applyStoreContactOverrides('douyin', agg.items)
         if (agg.accountName) resolvedAccount = agg.accountName
       }
       if (rows.length === 0) {

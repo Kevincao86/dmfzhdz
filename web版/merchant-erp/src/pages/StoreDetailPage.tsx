@@ -1,7 +1,12 @@
 import { ArrowLeft, MapPin, Phone, Store } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import StoreContactEditModal from '../components/store/StoreContactEditModal'
 import { readMerchantSession } from '../lib/merchantSession'
+import {
+  getStoreContactOverride,
+  mergeStoreContactOverride,
+} from '../lib/storeContactOverride'
 import type { DouyinStoreRow } from '../services/douyinMerchantApi'
 import { getDouyinStoreDetail, type DouyinStoreDetailResult } from '../services/douyinMerchantApi'
 import type { StorePlatformTab } from '../services/merchantStoresApi'
@@ -25,12 +30,21 @@ export default function StoreDetailPage() {
   const taskIdsFromUrl = (searchParams.get('taskIds') ?? '').trim()
 
   const [row, setRow] = useState<DouyinStoreRow | null>(null)
+  const [apiPhone, setApiPhone] = useState<string | undefined>()
+  const [apiBusinessHours, setApiBusinessHours] = useState<string | undefined>()
   const [certInfo, setCertInfo] = useState<Record<string, unknown> | null>(null)
   const [certInfoError, setCertInfoError] = useState<string | null>(null)
   const [taskQuery, setTaskQuery] = useState<Record<string, unknown> | null>(null)
   const [taskQueryError, setTaskQueryError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [editOpen, setEditOpen] = useState(false)
+
+  const applyMerged = useCallback((platformTab: string, base: DouyinStoreRow) => {
+    setApiPhone(base.phone)
+    setApiBusinessHours(base.businessHours)
+    setRow(mergeStoreContactOverride(platformTab, base))
+  }, [])
 
   const load = useCallback(async () => {
     if (!isPlatform(platform) || !poiId) {
@@ -76,12 +90,12 @@ export default function StoreDetailPage() {
         rowItem = { ...rowItem, organization: company }
       }
     }
-    setRow(rowItem)
+    if (rowItem) applyMerged(platform, rowItem)
     if (res.certInfo) setCertInfo(res.certInfo)
     if (res.certInfoError) setCertInfoError(res.certInfoError)
     if (res.taskQuery) setTaskQuery(res.taskQuery)
     if (res.taskQueryError) setTaskQueryError(res.taskQueryError)
-  }, [platform, poiId, taskIdsFromUrl])
+  }, [platform, poiId, taskIdsFromUrl, applyMerged])
 
   useEffect(() => {
     void load()
@@ -95,6 +109,11 @@ export default function StoreDetailPage() {
     certData?.subject && typeof certData.subject === 'object'
       ? (certData.subject as Record<string, unknown>)
       : null
+
+  const ov = platform && poiId ? getStoreContactOverride(platform, poiId) : null
+  const phoneManual = Boolean(ov?.phone?.trim()) && !apiPhone?.trim()
+  const hoursManual = Boolean(ov?.businessHours?.trim()) && !apiBusinessHours?.trim()
+  const canFill = !apiPhone?.trim() || !apiBusinessHours?.trim()
 
   return (
     <div className="mx-auto max-w-4xl space-y-4">
@@ -133,10 +152,16 @@ export default function StoreDetailPage() {
         ) : null}
       </div>
 
-      {loading && <div className="rounded-lg border border-gray-200 bg-white p-8 text-center text-gray-500">加载中…</div>}
+      {loading && (
+        <div className="rounded-lg border border-gray-200 bg-white p-8 text-center text-gray-500">
+          加载中…
+        </div>
+      )}
 
       {error && !loading && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{error}</div>
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {error}
+        </div>
       )}
 
       {!loading && row && (
@@ -174,15 +199,19 @@ export default function StoreDetailPage() {
                   营业电话
                 </span>
               </dt>
-              <dd className="text-gray-900">{row.phone ?? '—'}</dd>
+              <dd className="text-gray-900">
+                {row.phone?.trim() ? row.phone : '—'}
+                {phoneManual ? <span className="ml-2 text-xs text-blue-600">手动补充</span> : null}
+              </dd>
             </div>
             <div className="flex gap-2">
               <dt className="w-28 shrink-0 text-gray-500">营业信息</dt>
               <dd className="text-gray-900">
                 <div>{row.businessStatus ?? row.status ?? '—'}</div>
-                {row.businessHours ? (
-                  <div className="mt-0.5 text-xs text-gray-600">{row.businessHours}</div>
-                ) : null}
+                <div className="mt-0.5 text-xs text-gray-600">
+                  {row.businessHours?.trim() ? row.businessHours : '—'}
+                  {hoursManual ? <span className="ml-2 text-blue-600">手动补充</span> : null}
+                </div>
               </dd>
             </div>
             <div className="flex gap-2">
@@ -192,9 +221,23 @@ export default function StoreDetailPage() {
                   详细地址
                 </span>
               </dt>
-              <dd className="text-gray-900">{row.addressHierarchy ?? row.address ?? row.city ?? '—'}</dd>
+              <dd className="text-gray-900">
+                {row.addressHierarchy ?? row.address ?? row.city ?? '—'}
+              </dd>
             </div>
           </dl>
+
+          {canFill ? (
+            <button
+              type="button"
+              onClick={() => setEditOpen(true)}
+              className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100"
+            >
+              {phoneManual || hoursManual
+                ? '修改补充的电话 / 营业时间'
+                : '平台未返回时：手动补充电话 / 营业时间'}
+            </button>
+          ) : null}
 
           {certInfoError ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
@@ -242,7 +285,9 @@ export default function StoreDetailPage() {
               </pre>
             </details>
           ) : taskIdsFromUrl ? (
-            <p className="text-xs text-gray-500">已携带任务编号，但未获取到任务结果（请确认权限或任务编号是否正确）。</p>
+            <p className="text-xs text-gray-500">
+              已携带任务编号，但未获取到任务结果（请确认权限或任务编号是否正确）。
+            </p>
           ) : null}
 
           {certInfo ? (
@@ -256,10 +301,33 @@ export default function StoreDetailPage() {
 
           <details className="rounded-lg border border-gray-100 bg-gray-50 p-3 text-xs text-gray-600">
             <summary className="cursor-pointer font-medium text-gray-700">门店原始数据</summary>
-            <p className="mt-2">电话、营业时间等以抖音来客返回为准。</p>
+            <p className="mt-2">
+              电话、营业时间优先以来客接口为准；接口未返回时可手动补充（按商户账号保存在本机）。
+            </p>
           </details>
         </div>
       )}
+
+      {platform && poiId ? (
+        <StoreContactEditModal
+          open={editOpen}
+          platform={platform}
+          poiId={poiId}
+          storeName={row?.name}
+          platformPhone={apiPhone}
+          platformBusinessHours={apiBusinessHours}
+          onClose={() => setEditOpen(false)}
+          onSaved={() => {
+            if (!row) return
+            const base: DouyinStoreRow = {
+              ...row,
+              phone: apiPhone,
+              businessHours: apiBusinessHours,
+            }
+            setRow(mergeStoreContactOverride(platform, base))
+          }}
+        />
+      ) : null}
     </div>
   )
 }
