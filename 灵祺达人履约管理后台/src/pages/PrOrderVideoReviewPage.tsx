@@ -17,6 +17,10 @@ import PrLinkeSettlementBanner from '../components/mp/PrLinkeSettlementBanner'
 import { maybeFlagPrLinkeSettlementReminder } from '../lib/mpSync/prDouyinCpsSync'
 import type { RecruitmentCpsLinkage } from '@merchant/lib/opsRegistryTypes'
 import {
+  isApplicantIcePublishLink,
+  toPlayableRecruitmentVideoUrl,
+} from '@merchant/lib/mpRecruitmentVideoCore'
+import {
   createVideoReviewShareLink,
   fetchVideoReviewShareFeedback,
   formatShareTimeLabel,
@@ -127,11 +131,14 @@ export default function PrOrderVideoReviewPage() {
         })
         .map((a, i) => {
           const enriched = enrichApplicantRow(a, i, regTyped, mp)
-          const visitVideoUrl = String(a.videoUrl || '').trim()
-          const url = ice
-            ? String(a.videoUrl || a.douyinPublishUrl || '').trim()
+          const visitVideoUrl = toPlayableRecruitmentVideoUrl(String(a.videoUrl || '').trim())
+          const rawUrl = ice
+            ? String(a.douyinPublishUrl || a.videoUrl || '').trim()
             : visitVideoUrl
-          const isIceLink = ice && !!String(a.douyinPublishUrl || '').trim()
+          const isIceLink = isApplicantIcePublishLink(ice, a)
+          const url = isIceLink
+            ? String(a.douyinPublishUrl || a.videoUrl || '').trim()
+            : toPlayableRecruitmentVideoUrl(rawUrl)
           const rawStatus = applicantVideoStatusRaw(a)
           const videoStatus = rawStatus || 'pending'
           return {

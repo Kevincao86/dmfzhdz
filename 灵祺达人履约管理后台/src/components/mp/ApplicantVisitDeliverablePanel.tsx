@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import type { EnrichedApplicantRow } from '../../lib/mpSync/applicationDisplay'
 import { videoStatusLabel } from '../../lib/mpSync/recruitmentVideo'
+import {
+  isExternalPublishPageUrl,
+  toPlayableRecruitmentVideoUrl,
+} from '@merchant/lib/mpRecruitmentVideoCore'
 
 type Props = {
   applicant: EnrichedApplicantRow
@@ -26,8 +30,12 @@ export default function ApplicantVisitDeliverablePanel({
   const [previewOpen, setPreviewOpen] = useState(false)
   const [downloading, setDownloading] = useState(false)
 
-  const videoUrl = String(applicant.visitVideoUrl || applicant.videoUrl || '').trim()
-  const publishUrl = String(applicant.visitPublishUrl || applicant.douyinPublishUrl || '').trim()
+  const rawVideoUrl = String(applicant.visitVideoUrl || applicant.videoUrl || '').trim()
+  const isPublishPage = isExternalPublishPageUrl(rawVideoUrl)
+  const videoUrl = isPublishPage ? '' : toPlayableRecruitmentVideoUrl(rawVideoUrl)
+  const publishUrl = String(
+    applicant.visitPublishUrl || applicant.douyinPublishUrl || (isPublishPage ? rawVideoUrl : ''),
+  ).trim()
   const videoStatus = String(applicant.videoStatus || '').trim()
   const hasVideo = !!videoUrl
   const hasPublish = showPublishLink && (!!publishUrl || videoStatus === 'passed')

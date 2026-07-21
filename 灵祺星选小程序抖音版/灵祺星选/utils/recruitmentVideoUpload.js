@@ -78,6 +78,44 @@ function isApplicantVideoVisibleOnPrReview(a, isIce) {
   return !!url
 }
 
+/** OSS 成片预览：去掉签名参数，避免 7 天过期后黑屏 */
+function toPlayableRecruitmentVideoUrl(url) {
+  const raw = String(url || '').trim()
+  if (!raw) return raw
+  if (!/oss-[a-z0-9-]+\.aliyuncs\.com/i.test(raw) && !raw.startsWith('oss://')) return raw
+  try {
+    const u = new URL(raw.includes('://') ? raw : `https://${raw}`)
+    if (/^([^.]+)\.oss-[a-z0-9-]+\.aliyuncs\.com$/i.test(u.hostname)) {
+      u.protocol = 'https:'
+      u.search = ''
+      u.hash = ''
+      return u.toString()
+    }
+  } catch (_) {}
+  const bare = raw.split('?')[0].split('#')[0]
+  return bare || raw
+}
+
+function isExternalPublishPageUrl(url) {
+  const raw = String(url || '').trim()
+  if (!raw) return false
+  const bare = (toPlayableRecruitmentVideoUrl(raw).split('?')[0] || raw)
+  if (/\.(mp4|mov|m4v|webm)$/i.test(bare) && /oss-[a-z0-9-]+\.aliyuncs\.com/i.test(bare)) {
+    return false
+  }
+  return /(?:^https?:\/\/)?(?:[\w.-]+\.)?(?:douyin\.com|iesdouyin\.com|xiaohongshu\.com|xhslink\.com|bilibili\.com)\b/i.test(
+    raw,
+  )
+}
+
+function isApplicantIcePublishLink(isIce, a) {
+  if (!isIce || !a) return false
+  if (String(a.douyinPublishUrl || '').trim()) return true
+  const links = Array.isArray(a.editDeliverLinks) ? a.editDeliverLinks : []
+  if (links.some((u) => String(u || '').trim())) return true
+  return isExternalPublishPageUrl(String(a.videoUrl || ''))
+}
+
 async function postPaths(paths, body) {
   let lastErr
   for (const path of paths) {
@@ -650,6 +688,8 @@ function previewUploadedVideo(videoUrl) {
 module.exports = {
   videoStatusLabel,
   isApplicantVideoVisibleOnPrReview,
+  isApplicantIcePublishLink,
+  toPlayableRecruitmentVideoUrl,
   submitCountLabel,
   chooseVideoFile,
   chooseAndUploadVideo,

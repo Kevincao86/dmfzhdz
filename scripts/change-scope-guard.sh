@@ -25,6 +25,7 @@ list_scopes() {
 
   group_qr          群二维码上传/展示/清理（不含探店视频/ICE/其它上传）
   recruit_video     探店成片上传
+  video_review_play 链接/视频审核预览（ICE短链误判 + OSS签名过期）
   ops_pr_library    运营台 PR 用户库
   ops_talent_library 运营台达人库
   ops_home          运营台首页看板
@@ -88,6 +89,19 @@ PAT
 recruitmentVideoUpload
 recruitment-video-upload
 meoo-ops-mp-recruitment-video-upload
+PAT
+      ;;
+    video_review_play)
+      cat <<'PAT'
+mpRecruitmentVideoCore
+mpRecruitmentIceCore
+videoReviewShareHandler
+meoo-ops-mp-recruitment-video-upload
+PrOrderVideoReviewPage
+ApplicantVisitDeliverablePanel
+mine-pr-order-video-review
+recruitmentVideoUpload
+change-scope-guard
 PAT
       ;;
     ops_pr_library)
