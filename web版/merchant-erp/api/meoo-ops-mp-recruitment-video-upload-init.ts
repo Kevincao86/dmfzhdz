@@ -70,7 +70,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     sendOpsJson(res, 200, {
       ok: true,
       uploadUrl: plan.uploadUrl,
-      mediaUrl: plan.mediaUrl,
+      mediaUrl: plan.timelineUrl || plan.mediaUrl,
+      timelineUrl: plan.timelineUrl,
       contentType: plan.contentType,
       objectKey: plan.objectKey,
     })

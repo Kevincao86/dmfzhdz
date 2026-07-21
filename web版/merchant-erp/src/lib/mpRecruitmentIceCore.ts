@@ -700,6 +700,7 @@ export async function submitEditTeamDeliverLinks(
     applicants[idx] = {
       ...app,
       editDeliverLinks: links,
+      douyinPublishUrl: links[0],
       videoUrl: links[0],
       videoStatus: 'pending',
       videoRejectReason: undefined,
@@ -730,6 +731,7 @@ export async function submitEditTeamDeliverLinks(
   applicants[idx] = {
     ...app,
     editDeliverLinks: links,
+    douyinPublishUrl: links[0],
     videoUrl: links[0],
     videoStatus: 'passed',
     aiVerifyStatus: 'passed',

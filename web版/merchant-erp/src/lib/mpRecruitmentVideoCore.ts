@@ -9,9 +9,49 @@ import { isIceMpOrder, maybeAdvanceIceMpToSettlement, syncEditSlotReviewFromAppl
 import { resolveDouyinVideoPublishUrl } from './digitalHumanDouyinLinkCore.js'
 import { verifyRecruitmentPublishWithAi } from './recruitmentPublishLinkVerifyCore.js'
 import { isEditTeamIceMpOrder } from './iceOrderDetect.js'
+import { toIceTimelineOssUrl } from '../../vite-plugins/aliyunOssIceParse.js'
 
 function nowCn() {
   return new Date().toLocaleString('zh-CN', { hour12: false })
+}
+
+/** 探店成片预览/下载：OSS 公有读直链（去掉 7 天签名，避免过期 403 黑屏） */
+export function toPlayableRecruitmentVideoUrl(url: string): string {
+  const raw = String(url || '').trim()
+  if (!raw) return raw
+  if (/oss-[a-z0-9-]+\.aliyuncs\.com/i.test(raw) || raw.startsWith('oss://')) {
+    return toIceTimelineOssUrl(raw)
+  }
+  return raw
+}
+
+/** 抖音/小红书等页面短链（不可用 video 标签直接播放） */
+export function isExternalPublishPageUrl(url: string): boolean {
+  const raw = String(url || '').trim()
+  if (!raw) return false
+  const bare = toPlayableRecruitmentVideoUrl(raw).split('?')[0] || raw
+  if (/\.(mp4|mov|m4v|webm)$/i.test(bare) && /oss-[a-z0-9-]+\.aliyuncs\.com/i.test(bare)) {
+    return false
+  }
+  return /(?:^https?:\/\/)?(?:[\w.-]+\.)?(?:douyin\.com|iesdouyin\.com|xiaohongshu\.com|xhslink\.com|bilibili\.com)\b/i.test(
+    raw,
+  )
+}
+
+/** 云剪「链接审核」：含剪辑回传 editDeliverLinks（历史上只写了 videoUrl） */
+export function isApplicantIcePublishLink(
+  isIce: boolean,
+  applicant: {
+    douyinPublishUrl?: string
+    videoUrl?: string
+    editDeliverLinks?: string[] | null
+  } | null | undefined,
+): boolean {
+  if (!isIce || !applicant) return false
+  if (String(applicant.douyinPublishUrl || '').trim()) return true
+  const links = Array.isArray(applicant.editDeliverLinks) ? applicant.editDeliverLinks : []
+  if (links.some((u) => String(u || '').trim())) return true
+  return isExternalPublishPageUrl(String(applicant.videoUrl || ''))
 }
 
 function isSelectedVisitApplicant(
@@ -82,7 +122,7 @@ export function patchApplicantVideoDraft(
   videoUrl: string,
 ): { ok: true; mp: RegistryMpRecruitmentOrder } | { ok: false; error: string } {
   const aid = String(applicantId || '').trim()
-  const url = String(videoUrl || '').trim()
+  const url = toPlayableRecruitmentVideoUrl(videoUrl)
   if (!aid || !url) return { ok: false, error: 'invalid_draft' }
   const target = (mp.applicants || []).find((a) => String(a.id) === aid)
   if (!target) return { ok: false, error: 'applicant_not_found' }
@@ -116,7 +156,7 @@ export function patchApplicantVideoSubmit(
   const target = (mp.applicants || []).find((a) => String(a.id) === aid)
   if (!target) return { ok: false, error: 'applicant_not_found' }
   const status = String(target.videoStatus || '')
-  const url = String(videoUrl || target.videoUrl || '').trim()
+  const url = toPlayableRecruitmentVideoUrl(videoUrl || target.videoUrl || '')
   if (!url) return { ok: false, error: 'no_video' }
   if (status === 'pending') return { ok: false, error: 'already_submitted' }
   if (status === 'passed') return { ok: false, error: 'already_passed' }
@@ -175,7 +215,7 @@ export function patchApplicantVideoReview(
   let target: RegistryMpRecruitmentApplicant | null = null
   const applicants = (mp.applicants || []).map((a) => {
     if (String(a.id) !== aid) return a
-    const isIceLink = !!(a.douyinPublishUrl?.trim() && isIceMpOrder(mp))
+    const isIceLink = isApplicantIcePublishLink(isIceMpOrder(mp), a)
     const visitFilePass = isVisitFileVideoPrPass(mp, a, action)
     target = {
       ...a,
@@ -218,7 +258,7 @@ export function buildVideoReviewInboxEntries(
   const orderTitle = String(mp.title || mp.id)
   const ownerName = String(reviewedApplicant.platformNickname || reviewedApplicant.name || '达人')
   const passed = action === 'pass'
-  const isIceLink = !!(reviewedApplicant.douyinPublishUrl?.trim() && isIceMpOrder(mp))
+  const isIceLink = isApplicantIcePublishLink(isIceMpOrder(mp), reviewedApplicant)
   const visitAwaitingPublish =
     passed &&
     !isIceMpOrder(mp) &&

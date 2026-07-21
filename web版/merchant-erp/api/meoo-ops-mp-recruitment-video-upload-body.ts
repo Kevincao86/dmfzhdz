@@ -118,13 +118,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
-    const result = applyVideoDraftToSnapshot(data, mpOrderId, applicantId, put.mediaUrl)
+    const result = applyVideoDraftToSnapshot(data, mpOrderId, applicantId, put.timelineUrl || put.mediaUrl)
     if (!result.ok) {
       sendOpsJson(res, result.status, { ok: false, error: result.error })
       return
     }
     await io.save(data)
-    sendOpsJson(res, 200, { ok: true, videoUrl: put.mediaUrl })
+    sendOpsJson(res, 200, { ok: true, videoUrl: put.timelineUrl || put.mediaUrl })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     sendOpsJson(res, 500, {

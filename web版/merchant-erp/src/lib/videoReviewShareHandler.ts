@@ -2,6 +2,10 @@ import { randomBytes } from 'node:crypto'
 import { PostgrestClient } from '@supabase/postgrest-js'
 import { erpAwareFetch } from './erpAwareHttpsFetch.js'
 import { createRegistrySnapshotIoFetch } from './registrySnapshotIoFetch.js'
+import {
+  isApplicantIcePublishLink,
+  toPlayableRecruitmentVideoUrl,
+} from './mpRecruitmentVideoCore.js'
 
 export type VideoReviewShareDb = PostgrestClient
 
@@ -341,13 +345,11 @@ export async function handleVideoReviewShareBody(
     const isIce = isIceMpOrder(mp)
     const applicants = Array.isArray(mp.applicants) ? (mp.applicants as Record<string, unknown>[]) : []
     const videos: VideoReviewShareVideo[] = applicants
-      .filter((a) => isApplicantVisible(a, isIce))
+      .filter((a) => isApplicantVisible(a, isIce) && !isApplicantIcePublishLink(isIce, a))
       .map((a, i) => ({
         applicantId: String(a.id || ''),
         displayName: displayNameForApplicant(a, i),
-        videoUrl: isIce
-          ? String(a.videoUrl || a.douyinPublishUrl || '').trim()
-          : String(a.videoUrl || '').trim(),
+        videoUrl: toPlayableRecruitmentVideoUrl(String(a.videoUrl || '').trim()),
         videoStatus: String(a.videoStatus || 'pending'),
         videoSubmittedAt: String(a.videoSubmittedAt || ''),
       }))

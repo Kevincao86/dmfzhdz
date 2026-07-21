@@ -17,9 +17,11 @@ function mapCards(applicants, reg, isIce, mp) {
     .filter((a) => videoUpload.isApplicantVideoVisibleOnPrReview(a, isIce))
     .map((a, i) => {
       const enriched = appDisplay.enrichApplicantRow(a, i, reg || {}, mp)
-      const visitVideoUrl = String(a.videoUrl || '').trim()
-      const url = isIce ? String(a.videoUrl || a.douyinPublishUrl || '').trim() : visitVideoUrl
-      const isIceLink = isIce && !!String(a.douyinPublishUrl || '').trim()
+      const visitVideoUrl = videoUpload.toPlayableRecruitmentVideoUrl(String(a.videoUrl || '').trim())
+      const isIceLink = videoUpload.isApplicantIcePublishLink(isIce, a)
+      const url = isIceLink
+        ? String(a.douyinPublishUrl || a.videoUrl || '').trim()
+        : visitVideoUrl
       const publishUrl = String(a.visitPublishUrl || a.douyinPublishUrl || '').trim()
       const rawStatus = String(a.videoStatus || '').trim()
       const videoStatus = rawStatus || 'pending'
