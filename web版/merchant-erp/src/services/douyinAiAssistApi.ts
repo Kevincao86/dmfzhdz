@@ -6,6 +6,10 @@
  */
 
 import { isValidAiVendorSlug } from '../lib/aiVendorCatalogShared'
+import {
+  merchantApiAuthHeaders,
+  resolveMerchantApiBearer,
+} from '../lib/merchantApiAuth'
 import { merchantApiFetchUrls } from '../lib/merchantErpApiBase'
 import { readMerchantSession } from '../lib/merchantSession'
 
@@ -20,13 +24,16 @@ function url(path: string) {
   return candidates[0] ?? path
 }
 
-function authHeaders(): HeadersInit {
-  const token = readMerchantSession('meoo_douyin_merchant_token')
+/** AI 积分门禁验 ERP JWT；来客 token 仅放 X-Meoo-Douyin-Token */
+async function authHeaders(): Promise<Record<string, string>> {
+  const douyin = readMerchantSession('meoo_douyin_merchant_token')
+  const auth = await resolveMerchantApiBearer()
   const h: Record<string, string> = {
     Accept: 'application/json',
     'Content-Type': 'application/json',
+    ...merchantApiAuthHeaders(auth.token, auth.source),
   }
-  if (token) h.Authorization = `Bearer ${token}`
+  if (douyin) h['X-Meoo-Douyin-Token'] = douyin
   return h
 }
 
@@ -219,7 +226,7 @@ async function postAiAssistFetch(
   signal?: AbortSignal,
 ): Promise<Response> {
   const bodyStr = JSON.stringify(bodyObj)
-  const headers = authHeaders()
+  const headers = await authHeaders()
   for (const p of AI_ASSIST_PATHS) {
     for (const target of assistFetchUrlCandidates(p)) {
       const res = await fetch(target, { method: 'POST', headers, body: bodyStr, signal })
