@@ -84,10 +84,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const targetHeadcount = Number(body.targetHeadcount)
     const feeType = body.feeType === 'fixed' ? 'fixed' : 'tier'
 
-    if (!city) {
-      sendOpsJson(res, 400, { ok: false, error: 'city_required' })
-      return
-    }
+    // city 可空：空则走全国本地生活达人回退（写死规则）
     if (!Number.isFinite(budgetYuan) || budgetYuan <= 0) {
       sendOpsJson(res, 400, { ok: false, error: 'invalid_budget' })
       return
@@ -131,6 +128,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
             filterCity: pricingContext.filterCity,
             filterPlatform: pricingContext.filterPlatform,
             tierAvgs: pricingContext.tierAvgs,
+            citySource: pricingContext.citySource,
           }
         : undefined,
     })

@@ -272,7 +272,7 @@ const SYSTEM_PROMPT = `你是资深本地生活/餐饮多平台运营总监。�
 硬性要求：
 1. 只基于用户提供的菜单价目/已上架套餐/毛利/类目/竞品/预算/平台/门店范围；无菜单时用「已上架套餐」清单组品，勿编造菜名。多门店时方案须覆盖所选门店（或注明分店差异）。
 2. marketingBudget.channels 合计≈totalBudget（误差≤5%）；须含 roiSummary + roiAnalysis（≥3 行，含投入/预计GMV/订单/ROI/回本天数）。
-3. talentBudget.budgetLines 必须细致：至少覆盖「短视频达人（按头部/腰部/尾部分行写人数与单价）」「短视频本地推预算」「直播达人预算」「直播投流预算」；subtotalYuan=人数×单价+投流（投流类可 headcount=0）。talentRows≥6，note 写粉丝量级/标签。
+3. 【达人写死】talentBudget 必须基于用户消息中的「灵祺达人库」段：先按门店城市取同城达人数据；若该城无数据则已注入全国本地生活达人行情。人数/单价/标签须贴近库内均价与样本，禁止脱离库数据凭空编造；无同城时须在 note 注明「按全国本地生活达人行情」。budgetLines 至少覆盖「短视频达人（按头部/腰部/尾部分行）」「短视频本地推」「直播达人」「直播投流」；subtotalYuan=人数×单价+投流；talentRows≥6。
 4. calendar.milestones 日期落在周期内，≥12 条；除必选 kind（collab_confirm→live_go）外，另给 other：确认货盘、造话题#、预热物料、直播彩排、数据战报等；video_publish/live_* 带 HH:mm。缺项服务端会补全。
 5. platformStrategy 仅用户勾选平台；examples 须像爆款钩子文案；detail≤120字且含 POI/挂链或投流之一。
 6. 组品 3～5 个，优先真实菜单名或已上架套餐名；sellingPoint 写清券面/让利卖点。
@@ -361,6 +361,7 @@ export async function runAiOpsPlanCore(
     storeName?: string
     storeNames?: string[]
     storeScope?: 'all' | 'selected'
+    city?: string
     prospectPreview?: boolean
     menuSummary?: string
     margins?: { douyin: number; meituan: number; xhs: number }
@@ -411,12 +412,64 @@ export async function runAiOpsPlanCore(
     return ''
   })()
 
+  const storeCity = String(body.city || '').trim()
+  const talentPlatform = (() => {
+    const joined = platforms.join(' ')
+    if (/小红书/.test(joined)) return '小红书' as const
+    if (/快手/.test(joined)) return '快手' as const
+    return '抖音' as const
+  })()
+
+  let talentLibraryBlock = ''
+  let talentLibraryMeta: {
+    city: string
+    citySource: string
+    matchedEntries: number
+  } | null = null
+  try {
+    const { loadRegistrySnapshotForServer } = await import('../src/lib/registrySnapshotServerLoad.js')
+    const { buildTalentLibraryPlanPromptBlock, resolveTalentLibraryEntriesForCity } = await import(
+      '../src/lib/talentLibraryTierPricing.js'
+    )
+    const reg = await loadRegistrySnapshotForServer(process.cwd())
+    const entries = reg?.talentLibraryEntries ?? []
+    if (entries.length) {
+      const resolved = resolveTalentLibraryEntriesForCity({
+        entries,
+        city: storeCity,
+        platform: talentPlatform,
+      })
+      talentLibraryBlock = buildTalentLibraryPlanPromptBlock({
+        entries,
+        city: storeCity,
+        platform: talentPlatform,
+      })
+      talentLibraryMeta = {
+        city: storeCity || resolved.filterCity,
+        citySource: resolved.source,
+        matchedEntries:
+          resolved.source === 'city' ? resolved.cityMatchedCount : resolved.nationwideLocalLifeCount || resolved.entries.length,
+      }
+    } else {
+      talentLibraryBlock =
+        '【灵祺达人库】当前库内暂无达人条目；talentBudget 须按本地生活探店常规档位保守估算，并在 note 标明「达人库暂空」。'
+    }
+  } catch (e) {
+    console.warn(
+      '[meoo-ai-ops-plan] talent library inject failed',
+      e instanceof Error ? e.message.slice(0, 160) : e,
+    )
+    talentLibraryBlock =
+      '【灵祺达人库】读取失败；talentBudget 须保守估算并在 note 标明「达人库暂不可用」。'
+  }
+
   const userPrompt = [
     body.prospectPreview ? '场景：服务商洽谈预览方案（客户尚未签约，输出可对外展示的专业方案草稿）。' : '',
     `勾选平台：${platforms.join('、')}`,
     `总预算（元）：${budgetYuan}`,
     `周期：${periodStart} ～ ${periodEnd}`,
     storeLine,
+    storeCity ? `门店所在城市（地址推断，达人方案须优先同城达人库）：${storeCity}` : '门店所在城市：未解析到（达人方案须用全国本地生活达人库）',
     body.industryPath ? `经营类目：${body.industryPath}` : '',
     marginLine,
     body.menuSummary
@@ -426,8 +479,9 @@ export async function runAiOpsPlanCore(
       : '菜单价目：未提供（请按类目与平台常规套餐结构规划，勿捏造具体菜名）',
     body.competitorSummary ? `竞品摘要：\n${body.competitorSummary}` : '',
     body.goalsNote ? `商家补充目标：${body.goalsNote}` : '',
+    talentLibraryBlock,
     buildAiOpsRoiLookupForPrompt(platforms, body.industryPath),
-    '请生成完整六块方案 JSON（紧凑、可一次解析完）；roiAnalysis 按【转化率查询结果】写 GMV/订单/ROI（客单×单量且覆盖毛利盈亏线）；goalsDetail 对齐；须含 budgetLines；Detail/howTo 短而可执行；日历≥8 条带 kind；hourlySchedule 仅直播。',
+    '请生成完整六块方案 JSON（紧凑、可一次解析完）；roiAnalysis 按【转化率查询结果】写 GMV/订单/ROI（客单×单量且覆盖毛利盈亏线）；goalsDetail 对齐；须含 budgetLines 且严格依据【灵祺达人库】；Detail/howTo 短而可执行；日历≥8 条带 kind；hourlySchedule 仅直播。',
   ]
     .filter(Boolean)
     .join('\n\n')
@@ -506,6 +560,8 @@ export async function runAiOpsPlanCore(
           periodStart,
           periodEnd,
           storeName: body.storeName || '',
+          city: storeCity,
+          talentLibrary: talentLibraryMeta,
         },
       },
     }

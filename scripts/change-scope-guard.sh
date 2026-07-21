@@ -199,6 +199,11 @@ AiOpsPlanPage
 merchantAiOpsPlanCore
 merchantAiUpstream
 meoo-ai-ops-plan
+talentLibraryTierPricing
+meoo-ops-novice-kol-allocation
+aiAgentRecruitmentAllocation
+aiAgentRecruitmentParse
+services/ai/types
 iceMixEditPlanAi
 iceMixProduceEngine
 iceMixPlan

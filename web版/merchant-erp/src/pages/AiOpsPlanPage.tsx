@@ -46,6 +46,7 @@ import {
   type AiOpsPlanTabId,
 } from '../lib/aiOpsPlanTypes'
 import { loadMerchantIntelSnapshot } from '../lib/agentMerchantContext'
+import { inferCityFromChineseAddress } from '../lib/douyinStoreCityResolve'
 import { findNodeById, MOCK_CATEGORY_TREE } from '../data/douyinCategoryMock'
 import {
   loadDouyinGoodsCategoryTreeForPicker,
@@ -1689,6 +1690,36 @@ export default function AiOpsPlanPage() {
     return manual
   }, [storeScope, storeCatalog, selectedStoreIds, manualStoreNames])
 
+  /** AI 抓取门店地址 → 城市；达人方案须按此城读达人库 */
+  const resolveSelectedStoreCity = useCallback((): string => {
+    const pickCity = (s: DouyinStoreRow): string => {
+      const direct = String(s.city || '').trim()
+      if (direct) return direct
+      if (s.address) {
+        const inferred = inferCityFromChineseAddress(s.address)
+        if (inferred) return inferred
+      }
+      if (s.addressHierarchy) {
+        const inferred = inferCityFromChineseAddress(s.addressHierarchy)
+        if (inferred) return inferred
+      }
+      return ''
+    }
+    const rows =
+      storeScope === 'all' && storeCatalog.length
+        ? storeCatalog
+        : selectedStoreIds.length
+          ? selectedStoreIds
+              .map((id) => storeCatalog.find((s) => s.id === id))
+              .filter((s): s is DouyinStoreRow => !!s)
+          : storeCatalog.slice(0, 1)
+    for (const s of rows) {
+      const c = pickCity(s)
+      if (c) return c
+    }
+    return ''
+  }, [storeScope, storeCatalog, selectedStoreIds])
+
   const flash = (msg: string) => {
     setToast(msg)
     window.setTimeout(() => setToast(null), 1800)
@@ -1716,6 +1747,7 @@ export default function AiOpsPlanPage() {
           ? `全部门店（${storeNames.length}家）`
           : storeNames.slice(0, 6).join('、') + (storeNames.length > 6 ? '等' : '')
         : undefined
+    const storeCity = resolveSelectedStoreCity()
 
     if (partner) {
       const dy = Number(editIntel.marginDouyin)
@@ -1742,6 +1774,7 @@ export default function AiOpsPlanPage() {
         storeName: storeNameJoined || editIntel.storeName.trim() || undefined,
         storeNames: storeNames.length ? storeNames : undefined,
         storeScope: storeNames.length || storeScope === 'all' ? storeScope : undefined,
+        city: storeCity || undefined,
         prospectPreview: partnerMode === 'prospect',
         menuSummary,
         industryPath: editIntel.industryPath.trim() || undefined,
@@ -1776,6 +1809,7 @@ export default function AiOpsPlanPage() {
       storeName: storeNameJoined || snap.storeName,
       storeNames: storeNames.length ? storeNames : undefined,
       storeScope: storeNames.length || storeScope === 'all' ? storeScope : undefined,
+      city: storeCity || undefined,
       menuSummary: menuSummary || undefined,
       margins: snap.margins,
       industryPath: snap.industryPath,
@@ -1791,6 +1825,7 @@ export default function AiOpsPlanPage() {
     periodEnd,
     goalsNote,
     resolveSelectedStoreNames,
+    resolveSelectedStoreCity,
     storeScope,
     storeCatalog.length,
   ])

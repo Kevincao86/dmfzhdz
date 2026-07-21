@@ -9,6 +9,8 @@ import type { RegistryTalentLibraryEntry } from './opsRegistryTypes'
 
 export type TierAvgPrices = Record<KolTierKey, { avgYuan: number; sampleCount: number }>
 
+export type TalentLibraryCitySource = 'city' | 'nationwide_local_life'
+
 export type TalentLibraryPricingContext = {
   tierAvgs: TierAvgPrices
   filterCity: string
@@ -16,6 +18,8 @@ export type TalentLibraryPricingContext = {
   totalEntries: number
   matchedEntries: number
   priceSource: 'library' | 'city_bands'
+  /** 同城命中 vs 全国本地生活回退 */
+  citySource?: TalentLibraryCitySource
 }
 
 export type TierAllocationResult = {
@@ -61,6 +65,133 @@ export function cityMatchesTalentEntry(entryCity: string | undefined, targetCity
   return normalizeRecruitmentCity(ec) === target
 }
 
+/** 严格同城：entry.city 为空不算该城有数据 */
+export function cityMatchesTalentEntryStrict(
+  entryCity: string | undefined,
+  targetCity: string,
+): boolean {
+  const target = normalizeRecruitmentCity(targetCity)
+  if (!target) return false
+  const ec = String(entryCity || '').trim()
+  if (!ec) return false
+  return normalizeRecruitmentCity(ec) === target
+}
+
+/** 本地生活相关达人（标签/昵称含探店、团购、餐饮等） */
+export function isLocalLifeTalentEntry(entry: RegistryTalentLibraryEntry): boolean {
+  const tags = Array.isArray(entry.accountTags) ? entry.accountTags.map((t) => String(t)) : []
+  const blob = [...tags, entry.platformNickname || '', entry.douyinSalesLevel || ''].join(' ')
+  return /本地生活|探店|团购|餐饮|美食|到店|生活服务|种草|带货/.test(blob)
+}
+
+export type TalentLibraryCityResolve = {
+  /** 供均价/方案使用的达人子集（已按平台过滤） */
+  entries: RegistryTalentLibraryEntry[]
+  filterCity: string
+  platform: RegistryTalentLibraryEntry['platform']
+  source: TalentLibraryCitySource
+  cityMatchedCount: number
+  nationwideLocalLifeCount: number
+  totalEntries: number
+}
+
+function platformFilter(
+  entries: RegistryTalentLibraryEntry[],
+  platform: RegistryTalentLibraryEntry['platform'],
+): RegistryTalentLibraryEntry[] {
+  return entries.filter((e) => e.platform === platform)
+}
+
+/**
+ * 写死规则：达人方案/招募须先按门店城市从达人库取数；
+ * 该城无数据时，回退为全国「本地生活」达人；仍无则用全平台库内条目。
+ */
+export function resolveTalentLibraryEntriesForCity(params: {
+  entries: RegistryTalentLibraryEntry[]
+  city: string
+  platform?: RegistryTalentLibraryEntry['platform']
+}): TalentLibraryCityResolve {
+  const all = Array.isArray(params.entries) ? params.entries : []
+  const city = params.city.trim()
+  const platform = params.platform ?? '抖音'
+  const byPlatform = platformFilter(all, platform)
+
+  const cityMatched = city
+    ? byPlatform.filter((e) => cityMatchesTalentEntryStrict(e.city, city))
+    : []
+  if (cityMatched.length > 0) {
+    return {
+      entries: cityMatched,
+      filterCity: city,
+      platform,
+      source: 'city',
+      cityMatchedCount: cityMatched.length,
+      nationwideLocalLifeCount: 0,
+      totalEntries: all.length,
+    }
+  }
+
+  const nationwideLocalLife = byPlatform.filter(isLocalLifeTalentEntry)
+  if (nationwideLocalLife.length > 0) {
+    return {
+      entries: nationwideLocalLife,
+      filterCity: city || '全国',
+      platform,
+      source: 'nationwide_local_life',
+      cityMatchedCount: 0,
+      nationwideLocalLifeCount: nationwideLocalLife.length,
+      totalEntries: all.length,
+    }
+  }
+
+  return {
+    entries: byPlatform,
+    filterCity: city || '全国',
+    platform,
+    source: 'nationwide_local_life',
+    cityMatchedCount: 0,
+    nationwideLocalLifeCount: 0,
+    totalEntries: all.length,
+  }
+}
+
+/** 注入 AI 运营方案 / 智能体：脱敏达人库摘要（不含联系方式） */
+export function buildTalentLibraryPlanPromptBlock(params: {
+  entries: RegistryTalentLibraryEntry[]
+  city: string
+  platform?: RegistryTalentLibraryEntry['platform']
+  maxSamples?: number
+}): string {
+  const resolved = resolveTalentLibraryEntriesForCity({
+    entries: params.entries,
+    city: params.city,
+    platform: params.platform,
+  })
+  const ctx = computeTalentLibraryTierAveragesFromResolved(resolved)
+  const sourceLabel =
+    resolved.source === 'city'
+      ? `同城「${resolved.filterCity}」达人库（${resolved.cityMatchedCount} 人）`
+      : resolved.nationwideLocalLifeCount > 0
+        ? `该城暂无达人库数据，已回退全国本地生活达人（${resolved.nationwideLocalLifeCount} 人）`
+        : `该城暂无达人库数据，已回退全国平台达人库（${resolved.entries.length} 人）`
+
+  const samples = resolved.entries.slice(0, Math.max(4, Math.min(12, params.maxSamples ?? 8))).map((e) => {
+    const tags = Array.isArray(e.accountTags) ? e.accountTags.slice(0, 4).join('/') : ''
+    const fans = Number(e.followers) > 0 ? `粉丝${e.followers}` : ''
+    const quote = String(e.quotePrice || '').trim()
+    const cityLabel = String(e.city || '').trim() || '未填城'
+    return `- ${e.platformNickname || e.platformAccount || '达人'}（${cityLabel}${fans ? `·${fans}` : ''}${quote ? `·报价${quote}` : ''}${tags ? `·${tags}` : ''}）`
+  })
+
+  return [
+    '【灵祺达人库 · 达人方案必须基于本段，禁止凭空编造档位人数与报价】',
+    `数据来源：${sourceLabel}；平台 ${resolved.platform}。`,
+    formatTierAvgSummary(ctx),
+    samples.length ? `样本（脱敏）：\n${samples.join('\n')}` : '样本：库内暂无可展示条目。',
+    '撰写 talentBudget / 达人招募方案时：人数、单价、标签须贴近上述均价与样本；无同城时须注明已按全国本地生活达人行情估算。',
+  ].join('\n')
+}
+
 function emptyTierAvgs(): TierAvgPrices {
   return {
     v3: { avgYuan: 0, sampleCount: 0 },
@@ -97,21 +228,13 @@ function fillMissingTierPrices(
   return { avgs: next, priceSource: usedLibrary ? 'library' : 'city_bands' }
 }
 
-/** 从达人库条目按城市/平台统计各档位均价 */
-export function computeTalentLibraryTierAverages(params: {
-  entries: RegistryTalentLibraryEntry[]
-  city: string
-  platform?: RegistryTalentLibraryEntry['platform']
-}): TalentLibraryPricingContext {
-  const city = params.city.trim()
-  const platform = params.platform ?? '抖音'
+function accumulateTierFromEntries(entries: RegistryTalentLibraryEntry[]): {
+  rawAvgs: TierAvgPrices
+  matched: number
+} {
   const buckets: Record<KolTierKey, number[]> = { v3: [], v4: [], v5: [], v5plus: [] }
-  const entries = Array.isArray(params.entries) ? params.entries : []
   let matched = 0
-
   for (const entry of entries) {
-    if (entry.platform !== platform) continue
-    if (!cityMatchesTalentEntry(entry.city, city)) continue
     const price = parseQuotePriceYuan(entry.quotePrice)
     if (!price || price <= 0) continue
     matched += 1
@@ -121,7 +244,6 @@ export function computeTalentLibraryTierAverages(params: {
     })
     buckets[tier].push(price)
   }
-
   const rawAvgs = emptyTierAvgs()
   for (const key of ['v3', 'v4', 'v5', 'v5plus'] as const) {
     const list = buckets[key]
@@ -129,18 +251,39 @@ export function computeTalentLibraryTierAverages(params: {
     const sum = list.reduce((a, b) => a + b, 0)
     rawAvgs[key] = { avgYuan: Math.round(sum / list.length), sampleCount: list.length }
   }
+  return { rawAvgs, matched }
+}
 
-  const bands = resolveCityKolTierBands(city)
+/** 对已 resolve 的子集统计档位均价（不再二次按城过滤） */
+export function computeTalentLibraryTierAveragesFromResolved(
+  resolved: TalentLibraryCityResolve,
+): TalentLibraryPricingContext {
+  const { rawAvgs, matched } = accumulateTierFromEntries(resolved.entries)
+  const bands = resolveCityKolTierBands(resolved.filterCity)
   const filled = fillMissingTierPrices(rawAvgs, bands)
-
   return {
     tierAvgs: filled.avgs,
-    filterCity: city,
-    filterPlatform: platform,
-    totalEntries: entries.length,
+    filterCity: resolved.filterCity,
+    filterPlatform: resolved.platform,
+    totalEntries: resolved.totalEntries,
     matchedEntries: matched,
     priceSource: filled.priceSource,
+    citySource: resolved.source,
   }
+}
+
+/** 从达人库条目按城市/平台统计各档位均价（无同城则全国本地生活回退） */
+export function computeTalentLibraryTierAverages(params: {
+  entries: RegistryTalentLibraryEntry[]
+  city: string
+  platform?: RegistryTalentLibraryEntry['platform']
+}): TalentLibraryPricingContext {
+  const resolved = resolveTalentLibraryEntriesForCity({
+    entries: params.entries,
+    city: params.city,
+    platform: params.platform,
+  })
+  return computeTalentLibraryTierAveragesFromResolved(resolved)
 }
 
 function tierCount(map: TierAllocationResult, tier: KolTierKey): number {
@@ -234,9 +377,13 @@ export function formatTierAvgSummary(ctx: TalentLibraryPricingContext): string {
     const suffix = t.sampleCount > 0 ? `（库内${t.sampleCount}人）` : '（城市参考）'
     parts.push(`${label} ¥${t.avgYuan}/人${suffix}`)
   }
+  const cityTag =
+    ctx.citySource === 'nationwide_local_life'
+      ? `全国本地生活回退·${ctx.filterCity || '全国'}`
+      : ctx.filterCity || '全国'
   const scope =
     ctx.priceSource === 'library'
-      ? `达人库均价（${ctx.filterCity || '全国'}·${ctx.filterPlatform}，匹配${ctx.matchedEntries}条）`
+      ? `达人库均价（${cityTag}·${ctx.filterPlatform}，匹配${ctx.matchedEntries}条）`
       : `城市档位参考价（${ctx.filterCity || '默认'}）`
   return `${scope}：${parts.join('；')}`
 }
@@ -279,11 +426,12 @@ export function buildNoviceAllocationFromTalentLibrary(params: {
     }
   }
 
-  const ctx = computeTalentLibraryTierAverages({
+  const resolved = resolveTalentLibraryEntriesForCity({
     entries: params.entries,
     city,
     platform: params.platform ?? '抖音',
   })
+  const ctx = computeTalentLibraryTierAveragesFromResolved(resolved)
   const tierPrices: Record<KolTierKey, number> = {
     v3: ctx.tierAvgs.v3.avgYuan,
     v4: ctx.tierAvgs.v4.avgYuan,
@@ -308,6 +456,13 @@ export function buildNoviceAllocationFromTalentLibrary(params: {
     ? `行业「${params.industry.trim()}」按毛利特性与平台佣金口径估算。`
     : ''
 
+  const cityNote =
+    resolved.source === 'city'
+      ? `按门店城市「${city}」达人库（${resolved.cityMatchedCount} 人）各档均价拆分。`
+      : city
+        ? `达人库暂无「${city}」同城数据，已优先使用全国本地生活达人行情。`
+        : '未解析到门店城市，已优先使用全国本地生活达人行情。'
+
   return {
     v3: alloc.v3,
     v4: alloc.v4,
@@ -315,8 +470,8 @@ export function buildNoviceAllocationFromTalentLibrary(params: {
     v5plus: alloc.v5plus,
     notes:
       (ctx.priceSource === 'library'
-        ? '按星选达人库各档位平均报价，结合总预算、行业与目标人数自动拆分档位。'
-        : '达人库同城样本不足，已结合城市档位参考价估算。') +
+        ? `${cityNote}结合总预算、行业与目标人数自动拆分档位。`
+        : `${cityNote}库内报价样本不足，已结合城市档位参考价估算。`) +
       (industryNote ? ` ${industryNote}` : ''),
     costHint: `${avgLine}。目标 ${headcount} 人；${budgetNote}。${tierLine}`,
     source: ctx.priceSource === 'library' ? 'library' : 'fallback',
