@@ -27,6 +27,7 @@ import StoreInfoPage from './pages/StoreInfoPage'
 import StoreMenuPage from './pages/StoreMenuPage'
 import CompetitorAnalysisPage from './pages/CompetitorAnalysisPage'
 import AiOpsPlanPage from './pages/AiOpsPlanPage'
+import CourseRecordWorkshopPage from './pages/CourseRecordWorkshopPage'
 import ProductCreateFlowPage from './pages/ProductCreateFlowPage'
 import ProductEditFlowPage from './pages/ProductEditFlowPage'
 import ProductsPage from './pages/ProductsPage'
@@ -56,6 +57,12 @@ function portalEdition() {
 function MerchantOnlyAiOperationRoute({ children }: { children: ReactNode }) {
   if (isPartnerEdition()) return <Navigate to="/recruitment/xingxuan/hall" replace />
   return <>{children}</>
+}
+
+/** 录播工坊：仅服务商 AI 创作入口 */
+function PartnerRecordWorkshopRoute() {
+  if (!isPartnerEdition()) return <Navigate to="/operation/ai-ops-plan" replace />
+  return <CourseRecordWorkshopPage />
 }
 
 function PartnerRecruitmentRoute() {
@@ -130,6 +137,7 @@ export default function App() {
           <Route path="geo" element={<GeoPage />} />
           <Route path="operation/competitors" element={<CompetitorAnalysisPage />} />
           <Route path="operation/ai-ops-plan" element={<AiOpsPlanPage />} />
+          <Route path="ai-create/record-workshop" element={<PartnerRecordWorkshopRoute />} />
           <Route path="ai-image" element={<AiImageStudioPage />} />
           <Route
             path="ai-operation/article"

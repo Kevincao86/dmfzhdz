@@ -104,9 +104,13 @@ function partnerOperationChildren(baseChildren: NavChild[]): NavChild[] {
   return [...xingxuan, ...kept]
 }
 
-/** 服务商：AI 创作仅保留仍可用的入口（排除星选已覆盖的三项） */
+/** 服务商：AI 创作仅保留仍可用的入口（排除星选已覆盖的三项）+ 录播工坊 */
 function partnerAiCreateChildren(baseChildren: NavChild[]): NavChild[] {
-  return baseChildren.filter((c) => !isPartnerExcludedOperationPath(c.path))
+  const kept = baseChildren.filter((c) => !isPartnerExcludedOperationPath(c.path))
+  if (!kept.some((c) => c.path === '/ai-create/record-workshop')) {
+    kept.push({ path: '/ai-create/record-workshop', label: '录播工坊' })
+  }
+  return kept
 }
 
 function partnerFinanceChildren(isParent: boolean): NavChild[] {
