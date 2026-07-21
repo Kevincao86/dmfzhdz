@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>口播稿总目录 · 展示 PPT</title>
+<style>
+  :root {
+    --bg: #070b14;
+    --panel: #0e1628;
+    --line: rgba(94, 234, 212, 0.22);
+    --text: #e8eef7;
+    --muted: #94a3b8;
+    --accent: #5eead4;
+    --accent-dim: #2dd4bf;
+    --warm: #fbbf24;
+    --card: #121c31;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    height: 100%; margin: 0;
+    background: var(--bg); color: var(--text);
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    overflow: hidden;
+  }
+  .deck { position: relative; width: 100vw; height: 100vh; }
+  .slide {
+    position: absolute; inset: 0;
+    display: none; padding: clamp(28px, 5vw, 64px) clamp(28px, 6vw, 80px) 72px;
+    background:
+      radial-gradient(1200px 600px at 10% -10%, rgba(94,234,212,.12), transparent 55%),
+      radial-gradient(900px 500px at 100% 0%, rgba(56,189,248,.08), transparent 50%),
+      linear-gradient(160deg, #070b14 0%, #0b1220 55%, #0a101c 100%);
+  }
+  .slide.active { display: flex; flex-direction: column; justify-content: center; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 10px;
+    color: var(--accent); font-size: clamp(12px, 1.4vw, 15px);
+    letter-spacing: .14em; text-transform: uppercase; margin-bottom: 14px;
+  }
+  .eyebrow::before {
+    content: ""; width: 28px; height: 2px; background: var(--accent);
+  }
+  h1 {
+    margin: 0 0 16px; font-size: clamp(28px, 4.6vw, 56px);
+    line-height: 1.15; font-weight: 700; letter-spacing: -.02em;
+  }
+  h2 {
+    margin: 0 0 18px; font-size: clamp(24px, 3.2vw, 40px);
+    line-height: 1.2; font-weight: 700;
+  }
+  .lead {
+    margin: 0; max-width: 48ch;
+    font-size: clamp(16px, 1.8vw, 22px); line-height: 1.55; color: var(--muted);
+  }
+  .brand {
+    font-size: clamp(18px, 2.2vw, 28px); color: var(--accent); font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .grid {
+    display: grid; gap: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+    margin-top: 28px;
+  }
+  .card {
+    background: linear-gradient(180deg, rgba(18,28,49,.95), rgba(14,22,40,.9));
+    border: 1px solid var(--line); border-radius: 16px;
+    padding: 18px 20px; min-height: 110px;
+  }
+  .card .n {
+    color: var(--accent); font-size: 13px; letter-spacing: .08em; margin-bottom: 8px;
+  }
+  .card .t { font-size: clamp(16px, 1.6vw, 20px); font-weight: 600; margin-bottom: 6px; }
+  .card .d { color: var(--muted); font-size: 14px; line-height: 1.45; }
+  .list {
+    margin: 18px 0 0; padding: 0; list-style: none;
+    display: grid; gap: 10px;
+  }
+  .list li {
+    display: grid; grid-template-columns: 72px 1fr; gap: 14px; align-items: start;
+    padding: 12px 16px; border-radius: 12px;
+    background: rgba(18,28,49,.72); border: 1px solid rgba(148,163,184,.12);
+  }
+  .list .code {
+    color: var(--accent); font-weight: 700; font-size: 15px; padding-top: 2px;
+  }
+  .list .name { font-size: clamp(15px, 1.5vw, 18px); font-weight: 600; }
+  .list .meta { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .cols {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 22px;
+  }
+  @media (max-width: 860px) {
+    .cols { grid-template-columns: 1fr; }
+    .list li { grid-template-columns: 56px 1fr; }
+  }
+  .pill-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+  .pill {
+    border: 1px solid var(--line); color: var(--accent);
+    border-radius: 999px; padding: 8px 14px; font-size: 14px;
+    background: rgba(94,234,212,.06);
+  }
+  .quote {
+    margin-top: 28px; padding: 22px 24px; border-left: 3px solid var(--accent);
+    background: rgba(94,234,212,.06); border-radius: 0 14px 14px 0;
+    font-size: clamp(18px, 2vw, 26px); line-height: 1.45; max-width: 36ch;
+  }
+  .steps { display: grid; gap: 12px; margin-top: 24px; }
+  .step {
+    display: grid; grid-template-columns: 42px 1fr; gap: 14px; align-items: center;
+    padding: 14px 16px; border-radius: 12px; background: var(--card);
+    border: 1px solid rgba(148,163,184,.14);
+  }
+  .step i {
+    width: 42px; height: 42px; border-radius: 50%;
+    display: grid; place-items: center;
+    background: rgba(94,234,212,.12); color: var(--accent); font-style: normal; font-weight: 700;
+  }
+  .bar {
+    position: fixed; left: 0; right: 0; bottom: 0; height: 48px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 18px;
+    background: linear-gradient(transparent, rgba(0,0,0,.78));
+    font-size: 13px; color: #cbd5e1; z-index: 5;
+  }
+  .bar b { color: var(--accent); }
+  .hint { opacity: .7; }
+  .tiny { color: var(--muted); font-size: 14px; margin-top: 10px; }
+  .mod-title { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .mod-title .count {
+    color: var(--warm); font-size: 14px; font-weight: 600; letter-spacing: .04em;
+  }
+  .end-mark { color: var(--accent); font-size: clamp(20px, 2.4vw, 28px); margin-top: 18px; }
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+
+  <!-- 1 封面 -->
+  <section class="slide" data-title="封面">
+    <div class="brand">灵祺 · 星选商家 ERP</div>
+    <div class="eyebrow">月订阅课程包</div>
+    <h1>演讲口播稿总目录</h1>
+    <p class="lead">九大子项目 · 40 堂课表 · 四周直播编排<br/>投屏展示用 PPT（对着开场白口播稿念）</p>
+    <div class="pill-row">
+      <span class="pill">录播投屏</span>
+      <span class="pill">开课前开场</span>
+      <span class="pill">← → / 空格翻页</span>
+    </div>
+  </section>
+
+  <!-- 2 今天开场 -->
+  <section class="slide" data-title="今天开场">
+    <div class="eyebrow">开课前</div>
+    <h2>今天先把「地图」讲清楚</h2>
+    <p class="lead">不急着点功能。先知道：我们学什么、按什么顺序学、每周直播练什么。</p>
+    <div class="grid">
+      <div class="card"><div class="n">01</div><div class="t">学什么</div><div class="d">模块 0～7 + 直播场次，覆盖开营到月更</div></div>
+      <div class="card"><div class="n">02</div><div class="t">怎么学</div><div class="d">讲义投屏 + 口播稿翻页；赶进度用一口气版</div></div>
+      <div class="card"><div class="n">03</div><div class="t">怎么练</div><div class="d">每周实操作业 + 四周直播现场做</div></div>
+    </div>
+  </section>
+
+  <!-- 3 怎么用 -->
+  <section class="slide" data-title="怎么用">
+    <div class="eyebrow">录播用法</div>
+    <h2>三步就能开录</h2>
+    <div class="steps">
+      <div class="step"><i>1</i><div><strong>打开讲义</strong><div class="tiny">html-讲义/index.html → 进入对应课</div></div></div>
+      <div class="step"><i>2</i><div><strong>打开口播稿</strong><div class="tiny">同目录 口播稿.md，按「按页口播」翻页念</div></div></div>
+      <div class="step"><i>3</i><div><strong>赶进度</strong><div class="tiny">先念「一口气版」，再回看补演示</div></div></div>
+    </div>
+  </section>
+
+  <!-- 4 九子项目 -->
+  <section class="slide" data-title="九子项目">
+    <div class="eyebrow">课程结构</div>
+    <h2>九个子项目，一张图装下</h2>
+    <div class="grid">
+      <div class="card"><div class="n">模块 0 · 3 课</div><div class="t">开营与认知</div><div class="d">为什么累、ERP 省什么、怎么学</div></div>
+      <div class="card"><div class="n">模块 1 · 4 课</div><div class="t">系统上手</div><div class="d">登录门店、看板、权益、首次核对</div></div>
+      <div class="card"><div class="n">模块 2 · 6 课</div><div class="t">AI 智能体</div><div class="d">场景、确认机制、组品、Brief、差评</div></div>
+      <div class="card"><div class="n">模块 3 · 6 课</div><div class="t">达人招募闭环</div><div class="d">发单、档位、履约、结款、测试单</div></div>
+      <div class="card"><div class="n">模块 4 · 5 课</div><div class="t">内容产能</div><div class="d">成本、分镜、云剪、数字人、成片</div></div>
+      <div class="card"><div class="n">模块 5 · 4 课</div><div class="t">曝光与获客</div><div class="d">GEO、竞对、线索、跟进话术</div></div>
+      <div class="card"><div class="n">模块 6 · 4 课</div><div class="t">财务与经营盘点</div><div class="d">对账、报税导出、月复盘</div></div>
+      <div class="card"><div class="n">模块 7 · 4 课</div><div class="t">月更专题</div><div class="d">旺季组品、选达人、管多店、新功能</div></div>
+      <div class="card"><div class="n">直播 · 4 场</div><div class="t">场次编排</div><div class="d">四周：组品 → 招募 → 口播 → 复盘</div></div>
+    </div>
+  </section>
+
+  <!-- 5 模块0-1 -->
+  <section class="slide" data-title="模块0-1">
+    <div class="eyebrow">入门段</div>
+    <div class="mod-title"><h2>模块 0 + 1</h2><span class="count">开营认知 · 系统上手</span></div>
+    <ul class="list">
+      <li><span class="code">0.1</span><div><div class="name">本地生活商家为什么越做越累</div><div class="meta">多平台 / 内容 / 达人三座山</div></div></li>
+      <li><span class="code">0.2</span><div><div class="name">一张图看懂灵祺商家 ERP 能帮你省什么</div><div class="meta">流水线视角，不是功能清单</div></div></li>
+      <li><span class="code">0.3</span><div><div class="name">月订阅怎么学：直播节奏 + 作业 + 开通</div><div class="meta">学 · 练 · 用</div></div></li>
+      <li><span class="code">1.1–1.4</span><div><div class="name">登录门店 → 看板 → 权益额度 → 首次核对实操</div><div class="meta">正式学员务必完成 0.3 + 1.4</div></div></li>
+    </ul>
+  </section>
+
+  <!-- 6 模块2 -->
+  <section class="slide" data-title="模块2">
+    <div class="eyebrow">核心能力</div>
+    <div class="mod-title"><h2>模块 2 · AI 智能体</h2><span class="count">6 课</span></div>
+    <ul class="list">
+      <li><span class="code">2.1</span><div><div class="name">九大快捷场景总览</div></div></li>
+      <li><span class="code">2.2</span><div><div class="name">「预览确认」：为什么不会乱改你的店</div></div></li>
+      <li><span class="code">2.3</span><div><div class="name">AI 创建商品六步走（团购 / 套餐）</div></div></li>
+      <li><span class="code">2.4</span><div><div class="name">AI 写招募 Brief：三版话术怎么选</div></div></li>
+      <li><span class="code">2.5</span><div><div class="name">AI 差评回复与评价管理</div></div></li>
+      <li><span class="code">2.6</span><div><div class="name">【实操】1 个商品草稿 + 1 份 Brief</div></div></li>
+    </ul>
+  </section>
+
+  <!-- 7 模块3 -->
+  <section class="slide" data-title="模块3">
+    <div class="eyebrow">钱最容易打水漂的地方</div>
+    <div class="mod-title"><h2>模块 3 · 达人招募闭环</h2><span class="count">6 课</span></div>
+    <ul class="list">
+      <li><span class="code">3.1</span><div><div class="name">为什么「找达人」最容易亏钱</div></div></li>
+      <li><span class="code">3.2</span><div><div class="name">发招募单：从 Brief 到大厅可见</div></div></li>
+      <li><span class="code">3.3</span><div><div class="name">AI 档位分配：预算怎么拆到达人档</div></div></li>
+      <li><span class="code">3.4</span><div><div class="name">报名 → 反选 → 探店 → 审片 → 回链</div></div></li>
+      <li><span class="code">3.5</span><div><div class="name">结款与核对：证明达人真的发了</div></div></li>
+      <li><span class="code">3.6</span><div><div class="name">【实操】发一单测试 / 草稿招募</div></div></li>
+    </ul>
+  </section>
+
+  <!-- 8 模块4-5 -->
+  <section class="slide" data-title="模块4-5">
+    <div class="eyebrow">产能与获客</div>
+    <div class="cols">
+      <div>
+        <div class="mod-title"><h2>模块 4</h2><span class="count">内容产能 · 5 课</span></div>
+        <ul class="list">
+          <li><span class="code">4.1</span><div><div class="name">拍摄 / 剪辑 / 口播成本</div></div></li>
+          <li><span class="code">4.2</span><div><div class="name">短视频 AI 分镜与分段</div></div></li>
+          <li><span class="code">4.3</span><div><div class="name">云剪 / 混剪成片</div></div></li>
+          <li><span class="code">4.4</span><div><div class="name">数字人口播</div></div></li>
+          <li><span class="code">4.5</span><div><div class="name">【实操】脚本或成片草稿</div></div></li>
+        </ul>
+      </div>
+      <div>
+        <div class="mod-title"><h2>模块 5</h2><span class="count">曝光获客 · 4 课</span></div>
+        <ul class="list">
+          <li><span class="code">5.1</span><div><div class="name">GEO：本地搜索为什么重要</div></div></li>
+          <li><span class="code">5.2</span><div><div class="name">竞对分析：看差距</div></div></li>
+          <li><span class="code">5.3</span><div><div class="name">本地推线索进 ERP 怎么跟</div></div></li>
+          <li><span class="code">5.4</span><div><div class="name">【实操】线索跟进话术</div></div></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9 模块6-7 -->
+  <section class="slide" data-title="模块6-7">
+    <div class="eyebrow">盘点与月更</div>
+    <div class="cols">
+      <div>
+        <div class="mod-title"><h2>模块 6</h2><span class="count">财务盘点 · 4 课</span></div>
+        <ul class="list">
+          <li><span class="code">6.1</span><div><div class="name">对账：平台账单怎么对上</div></div></li>
+          <li><span class="code">6.2</span><div><div class="name">报税相关导出（会员）</div></div></li>
+          <li><span class="code">6.3</span><div><div class="name">月度经营复盘模板</div></div></li>
+          <li><span class="code">6.4</span><div><div class="name">【实操】填本月复盘表</div></div></li>
+        </ul>
+      </div>
+      <div>
+        <div class="mod-title"><h2>模块 7</h2><span class="count">月更专题 · 4 课</span></div>
+        <ul class="list">
+          <li><span class="code">7.1</span><div><div class="name">旺季组品（暑期 / 国庆 / 春节）</div></div></li>
+          <li><span class="code">7.2</span><div><div class="name">探店达人怎么选</div></div></li>
+          <li><span class="code">7.3</span><div><div class="name">一人管多家店</div></div></li>
+          <li><span class="code">7.4</span><div><div class="name">本月新功能演示</div></div></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10 四周直播 -->
+  <section class="slide" data-title="四周直播">
+    <div class="eyebrow">直播场次编排</div>
+    <h2>四周，把「会」变成「做过」</h2>
+    <ul class="list">
+      <li><span class="code">第 1 周</span><div><div class="name">开营 + AI 组品现场做</div><div class="meta">对齐认知，当场出组品</div></div></li>
+      <li><span class="code">第 2 周</span><div><div class="name">现场发一单招募</div><div class="meta">Brief → 发单 → 大厅可见</div></div></li>
+      <li><span class="code">第 3 周</span><div><div class="name">现场出一条口播 / 混剪</div><div class="meta">内容产能闭环</div></div></li>
+      <li><span class="code">第 4 周</span><div><div class="name">线索跟进 + 月度复盘</div><div class="meta">获客与经营收尾</div></div></li>
+    </ul>
+  </section>
+
+  <!-- 11 学练用 -->
+  <section class="slide" data-title="学练用">
+    <div class="eyebrow">订阅方法论</div>
+    <h2>月订阅 = 学 + 练 + 用</h2>
+    <div class="grid">
+      <div class="card"><div class="n">学</div><div class="t">直播 + 录播库</div><div class="d">每周 1–2 场直播（含回放）+ 模块 0–7</div></div>
+      <div class="card"><div class="n">练</div><div class="t">每周一小作业</div><div class="d">组品 / Brief / 成片 / 对账，选一完成</div></div>
+      <div class="card"><div class="n">用</div><div class="t">ERP 真机练习</div><div class="d">打开 cs.mofangdianai.com，用额度测一遍</div></div>
+    </div>
+    <div class="quote">散点经营一定累；流水线才省人、省口径、省月底扯皮。</div>
+  </section>
+
+  <!-- 12 课表速览 -->
+  <section class="slide" data-title="课表速览">
+    <div class="eyebrow">全部课表</div>
+    <h2>40 堂课，按模块推进</h2>
+    <div class="grid">
+      <div class="card"><div class="n">0.x</div><div class="t">3 课 · 开营</div><div class="d">累因 → 省什么 → 怎么学</div></div>
+      <div class="card"><div class="n">1.x</div><div class="t">4 课 · 上手</div><div class="d">登录到首次核对</div></div>
+      <div class="card"><div class="n">2.x</div><div class="t">6 课 · AI</div><div class="d">场景到实操产出</div></div>
+      <div class="card"><div class="n">3.x</div><div class="t">6 课 · 达人</div><div class="d">发单到结款核对</div></div>
+      <div class="card"><div class="n">4.x</div><div class="t">5 课 · 内容</div><div class="d">成本到成片草稿</div></div>
+      <div class="card"><div class="n">5.x</div><div class="t">4 课 · 获客</div><div class="d">GEO 到线索话术</div></div>
+      <div class="card"><div class="n">6.x</div><div class="t">4 课 · 财务</div><div class="d">对账到月复盘</div></div>
+      <div class="card"><div class="n">7.x + L</div><div class="t">4+4 · 月更/直播</div><div class="d">专题加深 + 四周实战</div></div>
+    </div>
+    <p class="tiny">完整链接表见同目录《口播稿总目录.md》</p>
+  </section>
+
+  <!-- 13 今天带走 -->
+  <section class="slide" data-title="今天带走">
+    <div class="eyebrow">开场收束</div>
+    <h2>开课前，请带走这三句</h2>
+    <div class="steps">
+      <div class="step"><i>1</i><div><strong>先看地图，再进单课</strong><div class="tiny">别从功能海里游泳，按模块 0→7 推进</div></div></div>
+      <div class="step"><i>2</i><div><strong>录播对着「按页口播」念</strong><div class="tiny">讲义全屏 + 口播稿另屏，翻页同步</div></div></div>
+      <div class="step"><i>3</i><div><strong>正式学员先完成 0.3 + 1.4</strong><div class="tiny">学会怎么学，再完成首次登录与门店核对</div></div></div>
+    </div>
+  </section>
+
+  <!-- 14 结束 -->
+  <section class="slide" data-title="结束">
+    <div class="brand">灵祺 · 星选商家 ERP</div>
+    <div class="eyebrow">开始上课</div>
+    <h1>下一页，进入模块 0</h1>
+    <p class="lead">建议首课：0.1 本地生活商家为什么越做越累<br/>讲义：html-讲义/index.html</p>
+    <div class="end-mark">口播稿总目录 PPT · 完</div>
+    <div class="pill-row">
+      <span class="pill">开场白 → 开场白口播稿-总目录.md</span>
+      <span class="pill">课表 → 口播稿总目录.md</span>
+    </div>
+  </section>
+
+</div>
+
+<div class="bar">
+  <span>口播稿总目录 · 展示 PPT</span>
+  <span><b id="idx">1</b> / <span id="total">14</span>　<span class="hint">← → / 空格翻页 · 点击右半屏下一页</span></span>
+</div>
+
+<script>
+const slides = [...document.querySelectorAll('.slide')];
+document.getElementById('total').textContent = String(slides.length);
+let i = 0;
+function show(n) {
+  i = Math.max(0, Math.min(slides.length - 1, n));
+  slides.forEach((s, k) => s.classList.toggle('active', k === i));
+  document.getElementById('idx').textContent = String(i + 1);
+  history.replaceState(null, '', '#' + (i + 1));
+}
+document.addEventListener('keydown', (e) => {
+  if (['ArrowRight', 'PageDown', ' ', 'Enter'].includes(e.key)) { e.preventDefault(); show(i + 1); }
+  if (['ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); show(i - 1); }
+  if (e.key === 'Home') show(0);
+  if (e.key === 'End') show(slides.length - 1);
+});
+document.addEventListener('click', (e) => {
+  if (e.target.closest('.bar')) return;
+  if (e.clientX > innerWidth * 0.55) show(i + 1); else show(i - 1);
+});
+const h = parseInt((location.hash || '#1').slice(1), 10);
+show(Number.isNaN(h) ? 0 : h - 1);
+</script>
+</body>
+</html>
