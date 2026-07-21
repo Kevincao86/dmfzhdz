@@ -44,6 +44,7 @@ import {
   resolveChannel,
   resolveIndustryProfile,
   resolveIndustrySceneContext,
+  referenceUploadSubtitle,
   resolvePlaybook,
   resolvePlaybookSizeDisplay,
   resolvePlaybookSizePresetId,
@@ -1140,7 +1141,10 @@ export default function AiImageStudioPage() {
               </div>
             </StudioPanel>
 
-            <StudioPanel title="智能参考图" subtitle="上传商品/菜品图，AI 提取核心元素并并入出图">
+            <StudioPanel
+              title="智能参考图"
+              subtitle={referenceUploadSubtitle(form.industry, form.industrySubId)}
+            >
               <input
                 ref={fileInputRef}
                 type="file"

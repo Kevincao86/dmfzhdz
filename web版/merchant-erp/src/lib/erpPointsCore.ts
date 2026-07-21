@@ -52,7 +52,7 @@ async function insertPointsLedger(
   if (error && !/does not exist|Could not find/i.test(error.message)) throw error
 }
 
-/** 自然月首次访问时，按当前会员档位发放月赠积分至套餐桶 */
+/** 自然月首次访问时，按当前会员档位发放月赠积分至套餐桶；同月内升级档位则补差至新档额度 */
 export async function ensureErpMonthlyGiftPointsGranted(
   admin: SupabaseClient,
   tenantId: string,
@@ -74,15 +74,39 @@ export async function ensureErpMonthlyGiftPointsGranted(
   const prevMonth = String(tenant.erp_points_gift_month || '').trim()
   const pkgBal = Math.max(0, Math.floor(Number(tenant.erp_package_points_balance) || 0))
   const rchBal = Math.max(0, Math.floor(Number(tenant.erp_recharge_points_balance) || 0))
+  const prevGranted = Math.max(0, Math.floor(Number(tenant.erp_points_gift_granted_month) || 0))
+  const nowIso = new Date().toISOString()
 
+  // 同月已发过：升级档位时补差（与星选 grantPackagePointsDelta 一致），不重置已消耗部分
   if (prevMonth === month) {
-    return { granted: 0, newPackageBalance: pkgBal }
+    const topUp = Math.max(0, targetGift - prevGranted)
+    if (topUp <= 0) {
+      return { granted: 0, newPackageBalance: pkgBal }
+    }
+    const newPkg = pkgBal + topUp
+    const { error: upErr } = await admin
+      .from('tenants')
+      .update({
+        erp_package_points_balance: newPkg,
+        erp_points_gift_granted_month: targetGift,
+        updated_at: nowIso,
+      })
+      .eq('id', tenantId)
+    if (upErr) throw upErr
+    await insertPointsLedger(admin, {
+      tenantId,
+      deltaPackage: topUp,
+      deltaRecharge: 0,
+      balancePackageAfter: newPkg,
+      balanceRechargeAfter: rchBal,
+      reason: `会员升级补差积分（${month}·${plan}）`,
+    })
+    return { granted: topUp, newPackageBalance: newPkg }
   }
 
   // 新自然月：套餐桶重置为当月赠送额度（未用完不结转）
   const delta = targetGift - pkgBal
   const newPkg = targetGift
-  const nowIso = new Date().toISOString()
   const { error: upErr } = await admin
     .from('tenants')
     .update({
