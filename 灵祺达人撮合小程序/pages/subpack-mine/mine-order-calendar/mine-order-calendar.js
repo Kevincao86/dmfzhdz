@@ -60,6 +60,13 @@ Page({
     myReminders: [],
     orderLabels: [],
     navLabel: '',
+    labelSheetOpen: false,
+    labelSheetTitle: '',
+    labelSheetMpOrderId: '',
+    labelSheetHasExisting: false,
+    labelPresets: orderLabelApi.LABEL_PRESETS,
+    labelCustomText: '',
+    labelBusy: false,
   },
 
   async onLoad() {
@@ -428,87 +435,101 @@ Page({
     }
   },
 
-  async onSetLabel(e) {
-    const dataset = e.currentTarget.dataset || {}
+  onSetLabel(e) {
+    const dataset = (e && e.currentTarget && e.currentTarget.dataset) || {}
     const mpOrderId = String(dataset.mpOrderId || '').trim()
     const title = String(dataset.title || '').trim()
-    if (!mpOrderId) return
-
-    const presets = orderLabelApi.LABEL_PRESETS.map((p) => p.text)
+    if (!mpOrderId) {
+      wx.showToast({ title: '商单信息缺失，请下拉刷新', icon: 'none' })
+      return
+    }
     const existing = (this.data.orderLabels || []).find(
       (row) => String((row && row.mpOrderId) || '').trim() === mpOrderId,
     )
-    const itemList = existing ? [...presets, '清除标签', '自定义…'] : [...presets, '自定义…']
+    this.setData({
+      labelSheetOpen: true,
+      labelSheetTitle: title || mpOrderId,
+      labelSheetMpOrderId: mpOrderId,
+      labelSheetHasExisting: !!existing,
+      labelCustomText: existing ? String(existing.labelText || '') : '',
+      labelBusy: false,
+    })
+  },
 
-    let pickIdx = -1
+  onCloseLabelSheet() {
+    if (this.data.labelBusy) return
+    this.setData({
+      labelSheetOpen: false,
+      labelSheetMpOrderId: '',
+      labelSheetTitle: '',
+      labelSheetHasExisting: false,
+      labelCustomText: '',
+    })
+  },
+
+  onLabelSheetNoop() {},
+
+  onLabelCustomInput(e) {
+    this.setData({
+      labelCustomText: String((e && e.detail && e.detail.value) || '')
+        .replace(/\s+/g, ' ')
+        .slice(0, 16),
+    })
+  },
+
+  async onPickLabelPreset(e) {
+    const dataset = (e && e.currentTarget && e.currentTarget.dataset) || {}
+    const text = String(dataset.text || '').trim()
+    const color = String(dataset.color || 'violet').trim() || 'violet'
+    const mpOrderId = String(this.data.labelSheetMpOrderId || '').trim()
+    if (!mpOrderId || !text || this.data.labelBusy) return
+    this.setData({ labelBusy: true })
     try {
-      const pick = await new Promise((resolve, reject) => {
-        wx.showActionSheet({
-          itemList,
-          success: (res) => resolve(res.tapIndex),
-          fail: reject,
-        })
-      })
-      pickIdx = Number(pick)
-      if (!Number.isFinite(pickIdx) || pickIdx < 0) return
-    } catch (_) {
-      return
-    }
-
-    if (existing && pickIdx === presets.length) {
-      try {
-        await orderLabelApi.deleteLabel(mpOrderId)
-        wx.showToast({ title: '标签已清除', icon: 'success' })
-        await this.reload()
-      } catch (err) {
-        wx.showToast({ title: (err && err.message) || '清除失败', icon: 'none' })
-      }
-      return
-    }
-
-    const customIdx = existing ? presets.length + 1 : presets.length
-    if (pickIdx === customIdx) {
-      try {
-        const modal = await new Promise((resolve, reject) => {
-          wx.showModal({
-            title: '自定义标签',
-            editable: true,
-            placeholderText: '最多16字',
-            content: existing ? String(existing.labelText || '') : '',
-            success: resolve,
-            fail: reject,
-          })
-        })
-        if (!modal || !modal.confirm) return
-        const text = String(modal.content || '')
-          .trim()
-          .replace(/\s+/g, ' ')
-          .slice(0, 16)
-        if (!text) {
-          wx.showToast({ title: '请输入标签', icon: 'none' })
-          return
-        }
-        await orderLabelApi.upsertLabel({ mpOrderId, labelText: text, color: 'violet' })
-        wx.showToast({ title: '标签已保存', icon: 'success' })
-        await this.reload()
-      } catch (err) {
-        wx.showToast({ title: (err && err.message) || '保存失败', icon: 'none' })
-      }
-      return
-    }
-
-    const preset = orderLabelApi.LABEL_PRESETS[pickIdx]
-    if (!preset) return
-    try {
-      await orderLabelApi.upsertLabel({
-        mpOrderId,
-        labelText: preset.text,
-        color: preset.color,
-      })
+      await orderLabelApi.upsertLabel({ mpOrderId, labelText: text, color })
       wx.showToast({ title: '标签已保存', icon: 'success' })
+      this.setData({ labelSheetOpen: false, labelBusy: false })
       await this.reload()
     } catch (err) {
+      this.setData({ labelBusy: false })
       wx.showToast({ title: (err && err.message) || '保存失败', icon: 'none' })
+    }
+  },
+
+  async onSaveCustomLabel() {
+    const mpOrderId = String(this.data.labelSheetMpOrderId || '').trim()
+    const text = String(this.data.labelCustomText || '')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .slice(0, 16)
+    if (!mpOrderId || this.data.labelBusy) return
+    if (!text) {
+      wx.showToast({ title: '请输入标签', icon: 'none' })
+      return
+    }
+    this.setData({ labelBusy: true })
+    try {
+      await orderLabelApi.upsertLabel({ mpOrderId, labelText: text, color: 'violet' })
+      wx.showToast({ title: '标签已保存', icon: 'success' })
+      this.setData({ labelSheetOpen: false, labelBusy: false })
+      await this.reload()
+    } catch (err) {
+      this.setData({ labelBusy: false })
+      wx.showToast({ title: (err && err.message) || '保存失败', icon: 'none' })
+    }
+  },
+
+  async onClearLabel() {
+    const mpOrderId = String(this.data.labelSheetMpOrderId || '').trim()
+    if (!mpOrderId || this.data.labelBusy) return
+    this.setData({ labelBusy: true })
+    try {
+      await orderLabelApi.deleteLabel(mpOrderId)
+      wx.showToast({ title: '标签已清除', icon: 'success' })
+      this.setData({ labelSheetOpen: false, labelBusy: false })
+      await this.reload()
+    } catch (err) {
+      this.setData({ labelBusy: false })
+      wx.showToast({ title: (err && err.message) || '清除失败', icon: 'none' })
     }
   },
 })

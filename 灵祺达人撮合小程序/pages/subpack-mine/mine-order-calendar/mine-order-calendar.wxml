@@ -122,9 +122,10 @@
           <button
             class="cal-label-btn {{item.customLabelText ? 'cal-label-btn--set cal-label-btn--' + item.customLabelColor : ''}}"
             size="mini"
+            hover-class="cal-label-btn--hover"
             data-mp-order-id="{{item.mpOrderId}}"
             data-title="{{item.orderTitle}}"
-            bindtap="onSetLabel"
+            catchtap="onSetLabel"
           >{{item.customLabelText || '设标签'}}</button>
           <button
             class="cal-remind-btn {{item.remindSet ? 'cal-remind-btn--set' : ''}}"
@@ -135,10 +136,48 @@
             data-date-key="{{item.dateKey}}"
             data-title="{{item.orderTitle}}"
             data-store="{{item.storeName}}"
-            bindtap="onSetReminder"
+            catchtap="onSetReminder"
           >{{item.remindSet ? '已设提醒' : '设提醒'}}</button>
         </view>
       </view>
     </view>
   </block>
+
+  <view wx:if="{{labelSheetOpen}}" class="cal-label-mask" catchtouchmove="onLabelSheetNoop" catchtap="onCloseLabelSheet">
+    <view class="cal-label-sheet" catchtap="onLabelSheetNoop">
+      <view class="cal-label-sheet-head">
+        <view class="cal-label-sheet-titles">
+          <text class="cal-label-sheet-title">设置商单标签</text>
+          <text class="cal-label-sheet-sub">{{labelSheetTitle}}</text>
+        </view>
+        <view class="cal-label-sheet-close" catchtap="onCloseLabelSheet">×</view>
+      </view>
+      <view class="cal-label-presets">
+        <view
+          wx:for="{{labelPresets}}"
+          wx:key="text"
+          class="cal-label-chip cal-label-chip--{{item.color}}"
+          data-text="{{item.text}}"
+          data-color="{{item.color}}"
+          catchtap="onPickLabelPreset"
+        >{{item.text}}</view>
+      </view>
+      <view class="cal-label-custom-row">
+        <input
+          class="cal-label-input"
+          maxlength="16"
+          placeholder="自定义标签（最多16字）"
+          value="{{labelCustomText}}"
+          bindinput="onLabelCustomInput"
+        />
+        <view class="cal-label-save {{labelBusy ? 'cal-label-save--busy' : ''}}" catchtap="onSaveCustomLabel">保存</view>
+      </view>
+      <view
+        wx:if="{{labelSheetHasExisting}}"
+        class="cal-label-clear {{labelBusy ? 'cal-label-save--busy' : ''}}"
+        catchtap="onClearLabel"
+      >清除标签</view>
+      <text class="cal-label-hint">标签按当前身份保存，与网页商单日历同步</text>
+    </view>
+  </view>
 </view>
