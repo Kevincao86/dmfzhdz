@@ -94,6 +94,7 @@ PAT
     video_review_play)
       cat <<'PAT'
 mpRecruitmentVideoCore
+mpRecruitmentVideoPlayUrl
 mpRecruitmentIceCore
 videoReviewShareHandler
 meoo-ops-mp-recruitment-video-upload

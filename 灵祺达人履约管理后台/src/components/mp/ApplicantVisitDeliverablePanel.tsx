@@ -4,7 +4,7 @@ import { videoStatusLabel } from '../../lib/mpSync/recruitmentVideo'
 import {
   isExternalPublishPageUrl,
   toPlayableRecruitmentVideoUrl,
-} from '@merchant/lib/mpRecruitmentVideoCore'
+} from '@merchant/lib/mpRecruitmentVideoPlayUrl'
 
 type Props = {
   applicant: EnrichedApplicantRow
