@@ -36,6 +36,7 @@ list_scopes() {
   erp_pay_points       ERP小程序支付 + 星选积分余额对齐
   mp_hall_region       小程序招募/推荐大厅城市自动定位
   merchant_nav         商家/服务商 ERP 侧栏导航信息架构
+  partner_record_workshop 服务商 AI 创作 · 录播工坊（半自动）
   ai_points            全端 AI 积分扣减 / 60% 毛利定价
   mp_order_detail_fast 商单详情秒开（hall_registry includeOnly + PG 按 id）
 
@@ -264,6 +265,15 @@ PAT
       cat <<'PAT'
 config/nav.ts
 MeooLayout.tsx
+change-scope-guard
+PAT
+      ;;
+    partner_record_workshop)
+      cat <<'PAT'
+config/nav.ts
+App.tsx
+CourseRecordWorkshopPage
+courseRecordWorkshop
 change-scope-guard
 PAT
       ;;
