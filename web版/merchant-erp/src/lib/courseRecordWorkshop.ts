@@ -1,6 +1,7 @@
 /**
  * 录播工坊：口播稿解析与时间轴导出（半自动录屏）
  */
+import { postAiChat } from '../services/ai/aiClient'
 
 export type CourseRecordPage = {
   pageNo: number
@@ -28,16 +29,18 @@ export function parseOralScriptMarkdown(raw: string): CourseRecordPage[] {
   }
 
   if (hits.length > 0) {
-    return hits.map((h, i) => {
-      const bodyStart = h.endTitle
-      const bodyEnd = i + 1 < hits.length ? hits[i + 1]!.index : text.length
-      const script = text
-        .slice(bodyStart, bodyEnd)
-        .replace(/^[\s>\-*]+/gm, '')
-        .replace(/\n{3,}/g, '\n\n')
-        .trim()
-      return { pageNo: h.pageNo, title: h.title, script }
-    }).filter((p) => p.script.length > 0 || p.title)
+    return hits
+      .map((h, i) => {
+        const bodyStart = h.endTitle
+        const bodyEnd = i + 1 < hits.length ? hits[i + 1]!.index : text.length
+        const script = text
+          .slice(bodyStart, bodyEnd)
+          .replace(/^[\s>\-*]+/gm, '')
+          .replace(/\n{3,}/g, '\n\n')
+          .trim()
+        return { pageNo: h.pageNo, title: h.title, script }
+      })
+      .filter((p) => p.script.length > 0 || p.title)
   }
 
   const blocks = text
@@ -55,9 +58,86 @@ export function parseOralScriptMarkdown(raw: string): CourseRecordPage[] {
   })
 }
 
+export function pagesToOralMarkdown(pages: CourseRecordPage[]): string {
+  return pages
+    .map((p) => `### 第 ${p.pageNo} 页 · ${p.title}\n${p.script.trim()}`)
+    .join('\n\n')
+}
+
+function stripJsonFence(raw: string): string {
+  const t = raw.trim()
+  const m = t.match(/```(?:json)?\s*([\s\S]*?)```/)
+  return (m?.[1] ?? t).trim()
+}
+
+function pagesFromAiJson(content: string): CourseRecordPage[] | null {
+  const cleaned = stripJsonFence(content)
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(cleaned)
+  } catch {
+    const arr = cleaned.match(/\[[\s\S]*\]/)
+    if (!arr) return null
+    try {
+      parsed = JSON.parse(arr[0])
+    } catch {
+      return null
+    }
+  }
+  const list = Array.isArray(parsed)
+    ? parsed
+    : parsed && typeof parsed === 'object' && Array.isArray((parsed as { pages?: unknown }).pages)
+      ? (parsed as { pages: unknown[] }).pages
+      : null
+  if (!list?.length) return null
+  const out: CourseRecordPage[] = []
+  list.forEach((row, i) => {
+    if (!row || typeof row !== 'object') return
+    const o = row as Record<string, unknown>
+    const script = String(o.script ?? o.text ?? o.content ?? '').trim()
+    if (!script) return
+    const pageNo = Number(o.pageNo ?? o.page ?? o.index ?? i + 1)
+    const title = String(o.title ?? o.name ?? `第 ${pageNo} 页`).trim() || `第 ${pageNo} 页`
+    out.push({
+      pageNo: Number.isFinite(pageNo) && pageNo > 0 ? Math.floor(pageNo) : i + 1,
+      title: title.slice(0, 48),
+      script,
+    })
+  })
+  return out.length ? out : null
+}
+
+const AI_PARSE_SYSTEM = `你是录播课口播稿分页助手。把用户给出的口播/讲稿按「幻灯页」切成多页。
+只输出 JSON（不要 Markdown 说明），结构：
+{"pages":[{"pageNo":1,"title":"封面","script":"该页完整口播正文"},...]}
+规则：
+1. 若原文已有「第 N 页」标题，优先按此切分并保留语意标题。
+2. 若无页码，按话题/段落合理分页，每页口播约 30～120 字为宜，勿过碎。
+3. script 为可直接朗读的完整中文，去掉「讲师备注」类旁注。
+4. pageNo 从 1 连续递增。`
+
+/** AI 模型解析分页；失败抛错由调用方回退规则解析 */
+export async function parseOralScriptWithAi(raw: string): Promise<CourseRecordPage[]> {
+  const text = String(raw || '').trim()
+  if (!text) throw new Error('口播稿为空')
+  const res = await postAiChat({
+    provider: 'doubao',
+    temperature: 0.2,
+    messages: [
+      { role: 'system', content: AI_PARSE_SYSTEM },
+      {
+        role: 'user',
+        content: `请解析下列口播稿并分页：\n\n${text.slice(0, 14000)}`,
+      },
+    ],
+  })
+  const pages = pagesFromAiJson(res.content || '')
+  if (!pages?.length) throw new Error('模型未返回有效分页 JSON')
+  return pages.map((p, i) => ({ ...p, pageNo: i + 1 }))
+}
+
 export function estimateSpeechSec(script: string): number {
   const chars = script.replace(/\s/g, '').length
-  // 约 4.2 字/秒（口播偏慢）
   return Math.max(3, Math.round((chars / 4.2) * 10) / 10)
 }
 
@@ -132,3 +212,6 @@ export const SAMPLE_OPENING_ORAL_SCRIPT = `### 第 1 页 · 封面
 ### 第 14 页 · 结束
 好地图讲完了。下一页进入模块零——建议首课零点一。我们正式开始。
 `
+
+export const VOICE_PREVIEW_FALLBACK =
+  '大家好，这是灵祺录播工坊的口播音色试听，请确认音量与语速是否合适。'
