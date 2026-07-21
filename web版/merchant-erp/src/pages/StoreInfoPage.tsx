@@ -2,7 +2,12 @@ import { RefreshCw, Search } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { cn } from '../cn'
+import StoreContactEditModal from '../components/store/StoreContactEditModal'
 import StorePlatformSwitcher from '../components/store/StorePlatformSwitcher'
+import {
+  applyStoreContactOverrides,
+  getStoreContactOverride,
+} from '../lib/storeContactOverride'
 import type { DouyinStoreRow } from '../services/douyinMerchantApi'
 import { fetchStoresForPlatform, type StorePlatformTab } from '../services/merchantStoresApi'
 
@@ -42,9 +47,12 @@ export default function StoreInfoPage() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState<PageSizeOption>(10)
   const [rows, setRows] = useState<DouyinStoreRow[]>([])
+  /** 平台原始行（未合并手填），用于判断哪些字段可编辑 */
+  const [apiRows, setApiRows] = useState<DouyinStoreRow[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [editTarget, setEditTarget] = useState<DouyinStoreRow | null>(null)
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedKw(keyword.trim()), 300)
@@ -82,11 +90,13 @@ export default function StoreInfoPage() {
       setLoading(false)
       if (!res.ok) {
         setRows([])
+        setApiRows([])
         setTotal(0)
         setError(res.message)
         return
       }
-      setRows(res.items)
+      setApiRows(res.items)
+      setRows(applyStoreContactOverrides(tab, res.items))
       setTotal(res.total)
     },
     [
@@ -317,7 +327,15 @@ export default function StoreInfoPage() {
               </tr>
             )}
             {!loading &&
-              rows.map((row) => (
+              rows.map((row) => {
+                const apiRow = apiRows.find((r) => r.id === row.id)
+                const ov = getStoreContactOverride(tab, row.id)
+                const phoneManual = Boolean(ov?.phone?.trim()) && !apiRow?.phone?.trim()
+                const hoursManual =
+                  Boolean(ov?.businessHours?.trim()) && !apiRow?.businessHours?.trim()
+                const canFill =
+                  !apiRow?.phone?.trim() || !apiRow?.businessHours?.trim()
+                return (
                 <tr key={`${tab}-${row.id}`} className="border-b border-gray-100 hover:bg-gray-50/80">
                   <td className="px-3 py-3">
                     <div className="flex items-start gap-2">
@@ -342,15 +360,37 @@ export default function StoreInfoPage() {
                     </div>
                   </td>
                   <td className="px-3 py-3 text-gray-700">{row.organization ?? '—'}</td>
-                  <td className="px-3 py-3 text-gray-700">{row.phone ?? '—'}</td>
+                  <td className="px-3 py-3 text-gray-700">
+                    <div>{row.phone?.trim() ? row.phone : '—'}</div>
+                    {phoneManual ? (
+                      <div className="mt-0.5 text-[11px] text-blue-600">手动补充</div>
+                    ) : null}
+                  </td>
                   <td className="px-3 py-3 text-gray-700">
                     <div>{row.businessStatus ?? row.status ?? '—'}</div>
-                    <div className="mt-0.5 text-xs text-gray-500">{row.businessHours ?? ''}</div>
+                    <div className="mt-0.5 text-xs text-gray-500">
+                      {row.businessHours?.trim() ? row.businessHours : '—'}
+                    </div>
+                    {hoursManual ? (
+                      <div className="mt-0.5 text-[11px] text-blue-600">营业时间手动补充</div>
+                    ) : null}
                   </td>
                   <td className="max-w-[240px] px-3 py-3 text-gray-700">
                     {row.addressHierarchy ?? row.address ?? row.city ?? '—'}
                   </td>
                   <td className="px-3 py-3 text-right">
+                    {canFill ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setEditTarget(row)}
+                          className="text-blue-600 hover:underline"
+                        >
+                          {phoneManual || hoursManual ? '改补充' : '补充电话/时间'}
+                        </button>
+                        <span className="mx-2 text-gray-300">|</span>
+                      </>
+                    ) : null}
                     <Link
                       to={`/store/decoration?plat=${tab}&poiId=${encodeURIComponent(row.id)}`}
                       className="text-blue-600 hover:underline"
@@ -366,10 +406,24 @@ export default function StoreInfoPage() {
                     </Link>
                   </td>
                 </tr>
-              ))}
+                )
+              })}
           </tbody>
         </table>
       </div>
+
+      <StoreContactEditModal
+        open={Boolean(editTarget)}
+        platform={tab}
+        poiId={editTarget?.id ?? ''}
+        storeName={editTarget?.name}
+        platformPhone={apiRows.find((r) => r.id === editTarget?.id)?.phone}
+        platformBusinessHours={apiRows.find((r) => r.id === editTarget?.id)?.businessHours}
+        onClose={() => setEditTarget(null)}
+        onSaved={() => {
+          setRows(applyStoreContactOverrides(tab, apiRows))
+        }}
+      />
 
       {!loading && (
         <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-gray-600">
