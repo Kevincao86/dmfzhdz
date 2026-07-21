@@ -19,7 +19,7 @@ import type { RecruitmentCpsLinkage } from '@merchant/lib/opsRegistryTypes'
 import {
   isApplicantIcePublishLink,
   toPlayableRecruitmentVideoUrl,
-} from '@merchant/lib/mpRecruitmentVideoCore'
+} from '@merchant/lib/mpRecruitmentVideoPlayUrl'
 import {
   createVideoReviewShareLink,
   fetchVideoReviewShareFeedback,

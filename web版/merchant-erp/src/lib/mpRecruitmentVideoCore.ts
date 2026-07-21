@@ -9,49 +9,19 @@ import { isIceMpOrder, maybeAdvanceIceMpToSettlement, syncEditSlotReviewFromAppl
 import { resolveDouyinVideoPublishUrl } from './digitalHumanDouyinLinkCore.js'
 import { verifyRecruitmentPublishWithAi } from './recruitmentPublishLinkVerifyCore.js'
 import { isEditTeamIceMpOrder } from './iceOrderDetect.js'
-import { toIceTimelineOssUrl } from '../../vite-plugins/aliyunOssIceParse.js'
+import {
+  isApplicantIcePublishLink,
+  toPlayableRecruitmentVideoUrl,
+} from './mpRecruitmentVideoPlayUrl.js'
+
+export {
+  isApplicantIcePublishLink,
+  isExternalPublishPageUrl,
+  toPlayableRecruitmentVideoUrl,
+} from './mpRecruitmentVideoPlayUrl.js'
 
 function nowCn() {
   return new Date().toLocaleString('zh-CN', { hour12: false })
-}
-
-/** 探店成片预览/下载：OSS 公有读直链（去掉 7 天签名，避免过期 403 黑屏） */
-export function toPlayableRecruitmentVideoUrl(url: string): string {
-  const raw = String(url || '').trim()
-  if (!raw) return raw
-  if (/oss-[a-z0-9-]+\.aliyuncs\.com/i.test(raw) || raw.startsWith('oss://')) {
-    return toIceTimelineOssUrl(raw)
-  }
-  return raw
-}
-
-/** 抖音/小红书等页面短链（不可用 video 标签直接播放） */
-export function isExternalPublishPageUrl(url: string): boolean {
-  const raw = String(url || '').trim()
-  if (!raw) return false
-  const bare = toPlayableRecruitmentVideoUrl(raw).split('?')[0] || raw
-  if (/\.(mp4|mov|m4v|webm)$/i.test(bare) && /oss-[a-z0-9-]+\.aliyuncs\.com/i.test(bare)) {
-    return false
-  }
-  return /(?:^https?:\/\/)?(?:[\w.-]+\.)?(?:douyin\.com|iesdouyin\.com|xiaohongshu\.com|xhslink\.com|bilibili\.com)\b/i.test(
-    raw,
-  )
-}
-
-/** 云剪「链接审核」：含剪辑回传 editDeliverLinks（历史上只写了 videoUrl） */
-export function isApplicantIcePublishLink(
-  isIce: boolean,
-  applicant: {
-    douyinPublishUrl?: string
-    videoUrl?: string
-    editDeliverLinks?: string[] | null
-  } | null | undefined,
-): boolean {
-  if (!isIce || !applicant) return false
-  if (String(applicant.douyinPublishUrl || '').trim()) return true
-  const links = Array.isArray(applicant.editDeliverLinks) ? applicant.editDeliverLinks : []
-  if (links.some((u) => String(u || '').trim())) return true
-  return isExternalPublishPageUrl(String(applicant.videoUrl || ''))
 }
 
 function isSelectedVisitApplicant(
