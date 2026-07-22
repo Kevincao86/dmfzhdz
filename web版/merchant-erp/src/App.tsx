@@ -27,7 +27,6 @@ import StoreInfoPage from './pages/StoreInfoPage'
 import StoreMenuPage from './pages/StoreMenuPage'
 import CompetitorAnalysisPage from './pages/CompetitorAnalysisPage'
 import AiOpsPlanPage from './pages/AiOpsPlanPage'
-import CourseRecordWorkshopPage from './pages/CourseRecordWorkshopPage'
 import ProductCreateFlowPage from './pages/ProductCreateFlowPage'
 import ProductEditFlowPage from './pages/ProductEditFlowPage'
 import ProductsPage from './pages/ProductsPage'
@@ -59,10 +58,10 @@ function MerchantOnlyAiOperationRoute({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
-/** 录播工坊：仅服务商 AI 创作入口 */
+/** 录播工坊：服务商版已隐藏，直链也跳转走 */
 function PartnerRecordWorkshopRoute() {
-  if (!isPartnerEdition()) return <Navigate to="/operation/ai-ops-plan" replace />
-  return <CourseRecordWorkshopPage />
+  if (isPartnerEdition()) return <Navigate to="/ai-image" replace />
+  return <Navigate to="/operation/ai-ops-plan" replace />
 }
 
 function PartnerRecruitmentRoute() {
