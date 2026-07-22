@@ -1,0 +1,96 @@
+.dh-page {
+  min-height: 100vh;
+  background: #f3f6fb;
+  padding-bottom: 48rpx;
+}
+
+.dh-hero {
+  margin: 16rpx 24rpx;
+  padding: 28rpx 24rpx;
+  border-radius: 28rpx;
+  background: linear-gradient(160deg, #fff7ed 0%, #ffedd5 45%, #fff 100%);
+}
+
+.dh-title {
+  display: block;
+  font-size: 40rpx;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.dh-sub {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.dh-card {
+  margin: 0 24rpx 16rpx;
+  padding: 22rpx;
+  background: #fff;
+  border-radius: 24rpx;
+}
+
+.dh-label {
+  display: block;
+  font-size: 22rpx;
+  color: #64748b;
+  margin: 8rpx 0;
+}
+
+.dh-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-bottom: 12rpx;
+}
+
+.dh-chip {
+  padding: 10rpx 22rpx;
+  border-radius: 999rpx;
+  background: #f1f5f9;
+  font-size: 24rpx;
+  color: #475569;
+}
+
+.dh-chip.on {
+  background: #ea580c;
+  color: #fff;
+}
+
+.dh-area {
+  width: 100%;
+  min-height: 280rpx;
+  box-sizing: border-box;
+  padding: 16rpx 20rpx;
+  background: #f8fafc;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+}
+
+.dh-btns {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 20rpx;
+}
+
+.dh-btn {
+  flex: 1;
+  background: #ea580c !important;
+  color: #fff !important;
+  border-radius: 999rpx !important;
+  font-size: 28rpx !important;
+}
+
+.dh-btn.ghost {
+  background: #e2e8f0 !important;
+  color: #334155 !important;
+}
+
+.dh-err {
+  margin: 0 24rpx;
+  color: #dc2626;
+  font-size: 26rpx;
+}

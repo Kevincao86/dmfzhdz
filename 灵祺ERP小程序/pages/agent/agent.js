@@ -16,7 +16,7 @@ const FILTER_TABS = [
 ]
 
 const AGENT_WELCOME =
-  '你好！我是灵祺 AI 智能体，我可以帮你快速创建各类产品文案和招聘需求文案（Brief）。请告诉我你的需求吧~'
+  '你好！我是灵祺小助理，我可以帮你快速创建各类产品文案和招聘需求文案（Brief）。请告诉我你的需求吧~'
 
 function hasUserChat(messages) {
   return (messages || []).some((m) => m.role === 'user')
@@ -515,7 +515,7 @@ Page({
     if (!api.isRealAuthed()) {
       wx.showModal({
         title: '请先登录',
-        content: '灵祺 AI 智能体需登录后使用。请完成登录后再发送消息（免登录游览不支持 AI 对话）。',
+        content: '灵祺小助理需登录后使用。请完成登录后再发送消息（免登录游览不支持 AI 对话）。',
         confirmText: '去登录',
         cancelText: '取消',
         success: (r) => {

@@ -17,9 +17,10 @@ const TASK_NAV = {
 const MODULE_PAGES = {
   store_info: '/pages/store-list/store-list?mode=info',
   store_decoration: '/pages/store-list/store-list?mode=decoration',
-  store_menu: '/pages/module-detail/module-detail?k=store_menu',
-  competitors: '/pages/module-detail/module-detail?k=competitors',
-  digital_human: '/pages/module-detail/module-detail?k=digital_human',
+  store_menu: '/pages/store-menu/store-menu',
+  competitors: '/pages/competitors/competitors',
+  digital_human: '/pages/digital-human/digital-human',
+  ai_ops_plan: '/pages/ai-ops-plan/ai-ops-plan',
   settings: '/pages/mine/mine',
 }
 

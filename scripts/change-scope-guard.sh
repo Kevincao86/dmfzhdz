@@ -40,6 +40,7 @@ list_scopes() {
   partner_record_workshop 服务商 AI 创作 · 录播工坊（半自动）
   ai_points            全端 AI 积分扣减 / 60% 毛利定价
   mp_order_detail_fast 商单详情秒开（hall_registry includeOnly + PG 按 id）
+  erp_merchant_mp      商家管理 ERP 小程序（改名/菜单对齐商家Web/缺口页）
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -355,6 +356,12 @@ opsRegistryTalentMp
 subpack-core/detail/detail
 灵祺达人履约管理后台/src/lib/mpApi.ts
 RecruitmentDetailPage
+change-scope-guard
+PAT
+      ;;
+    erp_merchant_mp)
+      cat <<'PAT'
+灵祺ERP小程序/
 change-scope-guard
 PAT
       ;;
