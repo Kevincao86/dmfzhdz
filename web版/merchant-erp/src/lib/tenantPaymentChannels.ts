@@ -32,6 +32,14 @@ import {
   wechatNativeCodeUrlToDataUrl,
   withWechatPayAppId,
 } from './wechatPayV3.js'
+import {
+  buildVirtualPaymentClientParams,
+  loadWechatVirtualPayConfig,
+  mergeXpayOpenIdIntoClientNote,
+  parseXpayOpenIdFromClientNote,
+  queryXpayOrder,
+  resolveXpayProductId,
+} from './wechatVirtualPay.js'
 
 export type { TenantPayChannel, TenantOrderKind } from './tenantPaymentShared.js'
 
@@ -45,6 +53,12 @@ export type TenantPrepayResult =
       qrCode?: string
       payPageUrl?: string
       jsapiParams?: ReturnType<typeof buildJsapiPayParams>
+      virtualPayParams?: {
+        mode: 'short_series_goods'
+        signData: string
+        paySig: string
+        signature: string
+      }
     }
   | { ok: false; error: string; status: number; message?: string; missing?: string[] }
 
@@ -57,9 +71,10 @@ export async function createTenantPayPrepay(
     amountCents: number
     channel: TenantPayChannel
     clientNote?: string | null
-    /** 小程序内微信支付传 jsapi + openid；Web 扫码默认 native */
-    wechatPayMode?: 'native' | 'jsapi'
+    /** 小程序：virtual=虚拟支付；jsapi=旧 JSAPI；Web 扫码 native */
+    wechatPayMode?: 'native' | 'jsapi' | 'virtual'
     wechatOpenId?: string | null
+    wechatSessionKey?: string | null
   },
 ): Promise<TenantPrepayResult> {
   const channel = input.channel
@@ -107,6 +122,56 @@ export async function createTenantPayPrepay(
   })
 
   if (channel === 'wechat') {
+    // —— 小程序虚拟支付（审核要求：虚拟商品必须 requestVirtualPayment）——
+    if (input.wechatPayMode === 'virtual') {
+      const xpayCfg = loadWechatVirtualPayConfig()
+      if (!xpayCfg.ok) return fail(xpayCfg.error, 503, xpayCfg.missing)
+      const openid = String(input.wechatOpenId || '').trim()
+      const sessionKey = String(input.wechatSessionKey || '').trim()
+      if (!openid) return fail('missing_openid', 400)
+      if (!sessionKey) return fail('missing_session_key', 400)
+
+      const noteWithOpenId = mergeXpayOpenIdIntoClientNote(input.clientNote, openid)
+      const orderResult = await createTenantOnlinePaymentOrder(admin, {
+        ...input,
+        clientNote: noteWithOpenId,
+        payMode: 'wechat_virtual',
+      })
+      if ('ok' in orderResult && orderResult.ok === false) return orderResult
+      const order = orderResult as TenantPaymentOrderRow
+      const productId = resolveXpayProductId(xpayCfg.config, input.orderKind, input.amountCents)
+      const attach = JSON.stringify({
+        oid: order.id,
+        kind: input.orderKind,
+        cents: input.amountCents,
+      }).slice(0, 1024)
+      try {
+        const virtualPayParams = buildVirtualPaymentClientParams({
+          config: xpayCfg.config,
+          sessionKey,
+          outTradeNo: order.out_trade_no!,
+          productId,
+          goodsPriceCents: input.amountCents,
+          attach,
+        })
+        return {
+          ok: true,
+          orderId: order.id,
+          outTradeNo: order.out_trade_no!,
+          payMode: 'wechat_virtual',
+          virtualPayParams,
+        }
+      } catch (e) {
+        await admin.from('merchant_payment_orders').update({ status: 'cancelled' }).eq('id', order.id)
+        return {
+          ok: false,
+          error: 'xpay_prepay_failed',
+          message: formatThrowableMessage(e, 'xpay_prepay_failed'),
+          status: 502,
+        }
+      }
+    }
+
     const cfgResult = loadWechatPayConfig()
     if (!cfgResult.ok) return fail(cfgResult.error, 503, cfgResult.missing)
     const cfg = cfgResult.config
@@ -316,6 +381,31 @@ export async function pollTenantPayOrder(
 
   try {
     if (channel === 'wechat') {
+      const payMode = String(order.pay_mode || '').trim()
+      if (payMode === 'wechat_virtual') {
+        const xpayCfg = loadWechatVirtualPayConfig()
+        if (!xpayCfg.ok) return { ok: false, error: xpayCfg.error }
+        const openid = parseXpayOpenIdFromClientNote(order.client_note)
+        try {
+          const q = await queryXpayOrder({
+            config: xpayCfg.config,
+            outTradeNo: tradeNo,
+            openid: openid || undefined,
+          })
+          if (q.paid) {
+            const confirmed = await confirmTenantOnlinePaymentOrder(admin, order, {
+              transactionId: q.transactionId,
+              verifiedCents: order.amount_cents,
+            })
+            if (!confirmed.ok) return { ok: false, error: confirmed.error }
+            return { ok: true, status: 'paid', orderId: order.id }
+          }
+        } catch {
+          /* 查单失败保持 pending，等发货推送或下次轮询 */
+        }
+        return { ok: true, status: 'pending', orderId: order.id }
+      }
+
       const cfgResult = loadWechatPayConfig()
       if (!cfgResult.ok) return { ok: false, error: cfgResult.error }
       const q = await queryWechatOrderByOutTradeNo(cfgResult.config, tradeNo)

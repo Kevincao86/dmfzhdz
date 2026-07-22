@@ -237,7 +237,15 @@ Page({
   },
 
   onToggleCustom(e) {
-    this.setData({ useCustom: !!e.detail.value })
+    const on = !!e.detail.value
+    this.setData({ useCustom: on })
+    if (on) {
+      wx.showToast({
+        title: '微信虚拟支付仅支持档位，自定义请用支付宝/抖音',
+        icon: 'none',
+        duration: 2800,
+      })
+    }
   },
 
   onCustomYuan(e) {
@@ -295,6 +303,10 @@ Page({
 
   async onPickChannel(e) {
     const ch = e.currentTarget.dataset.ch
+    if (ch === 'wechat' && this.data.useCustom) {
+      this.setData({ payErr: '微信支付（虚拟支付）仅支持上方固定档位，自定义金额请选支付宝或抖音' })
+      return
+    }
     const cents = this.resolveCents()
     if (cents === null) {
       wx.showToast({ title: '金额无效', icon: 'none' })

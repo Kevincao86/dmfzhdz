@@ -12,6 +12,15 @@
 # 注意：不要再加 --sync-wechat-pay-appid。
 # 星选 Native 须用 WECHAT_PAY_APP_ID/MP_WECHAT_APPID；ERP JSAPI 代码侧读 ERP_MP_WECHAT_APPID，
 # 把 WECHAT_PAY_APP_ID 改成 ERP 会破坏星选扫码（appid和mch_id不匹配）。
+#
+# 虚拟支付（审核要求）还需在轻量 auth-api.env 手动配置：
+#   ERP_MP_XPAY_OFFER_ID=...
+#   ERP_MP_XPAY_APP_KEY=...          # 现网 AppKey（env=0）
+#   ERP_MP_XPAY_APP_KEY_SANDBOX=...  # 沙箱（env=1）
+#   ERP_MP_XPAY_ENV=0
+#   ERP_MP_XPAY_PRODUCT_MAP={"16800":"erp_subscription_16800","1000":"erp_points_1000",...}
+# 发货订阅 URL：https://mofangdianai.com/erp-api/meoo-xpay-goods-notify
+# 道具 ID 默认约定 erp_{orderKind}_{amountCents}，须在 MP 虚拟支付后台发布同名道具且价格一致。
 
 set -euo pipefail
 
