@@ -431,11 +431,12 @@ async function blobToU8(blob: Blob): Promise<Uint8Array> {
   return new Uint8Array(await blob.arrayBuffer())
 }
 
-/** 统一压成 JPEG，避免 webp/png 在 wasm ffmpeg 里兼容差异 */
+/** 统一压成较小 JPEG，降低 wasm 内存峰值 */
 async function rasterizeSlideJpeg(
   imageBlob: Blob,
   canvasW: number,
   canvasH: number,
+  quality = 0.72,
 ): Promise<Uint8Array> {
   const bmp = await createImageBitmap(imageBlob)
   const canvas = document.createElement('canvas')
@@ -449,7 +450,7 @@ async function rasterizeSlideJpeg(
     canvas.toBlob(
       (b) => (b ? resolve(b) : reject(new Error('JPEG 编码失败'))),
       'image/jpeg',
-      0.9,
+      quality,
     )
   })
   return blobToU8(jpeg)
@@ -466,8 +467,320 @@ async function ffmpegDeleteQuiet(
   }
 }
 
+function isFfmpegMemoryError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e)
+  return /memory access out of bounds|out of memory|OOM|Cannot enlarge memory|Aborted\(OOM\)/i.test(
+    msg,
+  )
+}
+
+const CR_FFMPEG_CORE_VER = '0.12.10'
+let crFfmpegRef: import('@ffmpeg/ffmpeg').FFmpeg | null = null
+let crFfmpegLoadPromise: Promise<import('@ffmpeg/ffmpeg').FFmpeg> | null = null
+
+async function disposeCourseRecordFfmpeg() {
+  if (crFfmpegRef) {
+    try {
+      crFfmpegRef.terminate()
+    } catch {
+      /* ignore */
+    }
+  }
+  crFfmpegRef = null
+  crFfmpegLoadPromise = null
+}
+
+/** 录播工坊独立 ffmpeg 实例，OOM 后可销毁重建（不污染全局拼接单例） */
+async function loadCourseRecordFfmpeg(): Promise<import('@ffmpeg/ffmpeg').FFmpeg> {
+  if (crFfmpegRef?.loaded) return crFfmpegRef
+  if (crFfmpegLoadPromise) return crFfmpegLoadPromise
+
+  crFfmpegLoadPromise = (async () => {
+    const { FFmpeg } = await import('@ffmpeg/ffmpeg')
+    const { toBlobURL } = await import('@ffmpeg/util')
+    const ffmpeg = new FFmpeg()
+    const bases = [
+      `${typeof window !== 'undefined' ? window.location.origin : ''}/ffmpeg`,
+      `https://cdn.jsdelivr.net/npm/@ffmpeg/core@${CR_FFMPEG_CORE_VER}/dist/esm`,
+    ].filter((b) => b.startsWith('http'))
+    let lastErr = '无法加载视频引擎'
+    for (const base of bases) {
+      try {
+        await ffmpeg.load({
+          coreURL: await toBlobURL(`${base}/ffmpeg-core.js`, 'text/javascript'),
+          wasmURL: await toBlobURL(`${base}/ffmpeg-core.wasm`, 'application/wasm'),
+        })
+        crFfmpegRef = ffmpeg
+        return ffmpeg
+      } catch (e) {
+        lastErr = e instanceof Error ? e.message : String(e)
+      }
+    }
+    throw new Error(`${lastErr}。请刷新页面后重试。`)
+  })()
+
+  try {
+    return await crFfmpegLoadPromise
+  } catch (e) {
+    crFfmpegLoadPromise = null
+    throw e
+  }
+}
+
+async function encodeOneStillSlide(
+  ffmpeg: import('@ffmpeg/ffmpeg').FFmpeg,
+  slide: CourseRecordVideoSlide,
+  opts: { width: number; height: number; fps: number; gapSec: number; jpegQuality: number },
+  outName: string,
+): Promise<void> {
+  const imgName = 'cr_one.jpg'
+  const audName = 'cr_one.mp3'
+  await ffmpegDeleteQuiet(ffmpeg, imgName)
+  await ffmpegDeleteQuiet(ffmpeg, audName)
+  await ffmpegDeleteQuiet(ffmpeg, outName)
+
+  const jpeg = await rasterizeSlideJpeg(slide.imageBlob, opts.width, opts.height, opts.jpegQuality)
+  await ffmpeg.writeFile(imgName, jpeg)
+  await ffmpeg.writeFile(audName, await blobToU8(slide.audioBlob))
+
+  const dur = Math.max(0.4, slide.durationSec + opts.gapSec)
+  const fps = opts.fps
+  const vf = `scale=${opts.width}:${opts.height}:force_original_aspect_ratio=decrease,pad=${opts.width}:${opts.height}:(ow-iw)/2:(oh-ih)/2,setsar=1`
+
+  // 低帧率静图：帧数≈时长，显著降低 wasm 内存（避免 loop 按高帧率铺开）
+  let code = await ffmpeg.exec([
+    '-y',
+    '-loop',
+    '1',
+    '-framerate',
+    String(fps),
+    '-t',
+    dur.toFixed(3),
+    '-i',
+    imgName,
+    '-i',
+    audName,
+    '-vf',
+    vf,
+    '-r',
+    String(fps),
+    '-c:v',
+    'libx264',
+    '-preset',
+    'ultrafast',
+    '-crf',
+    '28',
+    '-pix_fmt',
+    'yuv420p',
+    '-threads',
+    '1',
+    '-g',
+    String(Math.max(fps, 2)),
+    '-bf',
+    '0',
+    '-c:a',
+    'aac',
+    '-b:a',
+    '96k',
+    '-ac',
+    '1',
+    '-ar',
+    '44100',
+    '-shortest',
+    '-movflags',
+    '+faststart',
+    outName,
+  ])
+
+  if (code !== 0) {
+    code = await ffmpeg.exec([
+      '-y',
+      '-loop',
+      '1',
+      '-framerate',
+      '1',
+      '-t',
+      dur.toFixed(3),
+      '-i',
+      imgName,
+      '-i',
+      audName,
+      '-vf',
+      vf,
+      '-c:v',
+      'libx264',
+      '-preset',
+      'ultrafast',
+      '-pix_fmt',
+      'yuv420p',
+      '-threads',
+      '1',
+      '-c:a',
+      'aac',
+      '-shortest',
+      '-movflags',
+      '+faststart',
+      outName,
+    ])
+  }
+
+  await ffmpegDeleteQuiet(ffmpeg, imgName)
+  await ffmpegDeleteQuiet(ffmpeg, audName)
+  if (code !== 0) throw new Error(`第 ${slide.pageNo} 页编码失败（ffmpeg exit ${code}）`)
+}
+
+async function concatTwoMp4InFs(
+  ffmpeg: import('@ffmpeg/ffmpeg').FFmpeg,
+  aName: string,
+  bName: string,
+  outName: string,
+): Promise<void> {
+  const listName = 'cr_concat.txt'
+  await ffmpegDeleteQuiet(ffmpeg, listName)
+  await ffmpegDeleteQuiet(ffmpeg, outName)
+  await ffmpeg.writeFile(listName, `file '${aName}'\nfile '${bName}'\n`)
+
+  let code = await ffmpeg.exec([
+    '-y',
+    '-f',
+    'concat',
+    '-safe',
+    '0',
+    '-i',
+    listName,
+    '-c',
+    'copy',
+    '-movflags',
+    '+faststart',
+    outName,
+  ])
+  if (code !== 0) {
+    code = await ffmpeg.exec([
+      '-y',
+      '-f',
+      'concat',
+      '-safe',
+      '0',
+      '-i',
+      listName,
+      '-c:v',
+      'libx264',
+      '-preset',
+      'ultrafast',
+      '-pix_fmt',
+      'yuv420p',
+      '-threads',
+      '1',
+      '-c:a',
+      'aac',
+      '-movflags',
+      '+faststart',
+      outName,
+    ])
+  }
+  await ffmpegDeleteQuiet(ffmpeg, listName)
+  if (code !== 0) throw new Error(`合并片段失败（ffmpeg exit ${code}）`)
+}
+
+async function composeCourseRecordVideoOnce(
+  slides: CourseRecordVideoSlide[],
+  opts: {
+    width: number
+    height: number
+    fps: number
+    gapSec: number
+    jpegQuality: number
+    onProgress?: (message: string, ratio: number) => void
+    signal?: AbortSignal
+  },
+): Promise<Blob> {
+  const assertNotAborted = () => {
+    if (opts.signal?.aborted) throw new Error('已取消')
+  }
+
+  opts.onProgress?.('加载视频引擎…', 0.02)
+  const ffmpeg = await loadCourseRecordFfmpeg()
+  assertNotAborted()
+
+  const accA = 'cr_acc_a.mp4'
+  const accB = 'cr_acc_b.mp4'
+  const segName = 'cr_seg.mp4'
+  let accName = accA
+  let nextAccName = accB
+
+  await ffmpegDeleteQuiet(ffmpeg, accA)
+  await ffmpegDeleteQuiet(ffmpeg, accB)
+  await ffmpegDeleteQuiet(ffmpeg, segName)
+
+  try {
+    const total = slides.length
+    for (let i = 0; i < total; i++) {
+      assertNotAborted()
+      const slide = slides[i]!
+      opts.onProgress?.(
+        `编码第 ${slide.pageNo} 页（${i + 1}/${total}）· ${slide.title}`,
+        0.05 + (0.85 * i) / total,
+      )
+
+      await encodeOneStillSlide(
+        ffmpeg,
+        slide,
+        {
+          width: opts.width,
+          height: opts.height,
+          fps: opts.fps,
+          gapSec: i < total - 1 ? opts.gapSec : 0,
+          jpegQuality: opts.jpegQuality,
+        },
+        segName,
+      )
+
+      if (i === 0) {
+        const code = await ffmpeg.exec([
+          '-y',
+          '-i',
+          segName,
+          '-c',
+          'copy',
+          '-movflags',
+          '+faststart',
+          accName,
+        ])
+        await ffmpegDeleteQuiet(ffmpeg, segName)
+        if (code !== 0) throw new Error(`第 ${slide.pageNo} 页成片无效`)
+      } else {
+        opts.onProgress?.(`合并至第 ${slide.pageNo} 页…`, 0.05 + (0.85 * (i + 0.5)) / total)
+        await concatTwoMp4InFs(ffmpeg, accName, segName, nextAccName)
+        await ffmpegDeleteQuiet(ffmpeg, accName)
+        await ffmpegDeleteQuiet(ffmpeg, segName)
+        const tmp = accName
+        accName = nextAccName
+        nextAccName = tmp
+      }
+    }
+
+    opts.onProgress?.('导出 MP4…', 0.96)
+    const raw = await ffmpeg.readFile(accName)
+    if (!(raw instanceof Uint8Array) || raw.length < 1024) {
+      throw new Error('成片文件无效，请重试')
+    }
+    const copy = new Uint8Array(raw.length)
+    copy.set(raw)
+    opts.onProgress?.('完成', 1)
+    return new Blob([copy], { type: 'video/mp4' })
+  } finally {
+    await ffmpegDeleteQuiet(ffmpeg, accA)
+    await ffmpegDeleteQuiet(ffmpeg, accB)
+    await ffmpegDeleteQuiet(ffmpeg, segName)
+    await ffmpegDeleteQuiet(ffmpeg, 'cr_one.jpg')
+    await ffmpegDeleteQuiet(ffmpeg, 'cr_one.mp3')
+    await ffmpegDeleteQuiet(ffmpeg, 'cr_concat.txt')
+  }
+}
+
 /**
- * 浏览器端 ffmpeg.wasm：每页静图时长对齐音频，离线合成 MP4（远快于实时 MediaRecorder）。
+ * 浏览器端 ffmpeg.wasm：每页静图对齐音频时长，离线合成 MP4。
+ * 采用「逐页编码 + 增量合并」，避免 20 段同时驻留 MEMFS 导致 memory access out of bounds。
  */
 export async function composeCourseRecordVideo(params: {
   slides: CourseRecordVideoSlide[]
@@ -481,167 +794,53 @@ export async function composeCourseRecordVideo(params: {
   const slides = params.slides.filter((s) => s.imageBlob && s.audioBlob && s.durationSec > 0)
   if (!slides.length) throw new Error('没有可合成的页（需同时有图片与音频）')
 
-  const width = params.width ?? 1280
-  const height = params.height ?? 720
-  const fps = Math.max(1, Math.min(6, params.fps ?? 2))
-  const gapSec = Math.max(0, params.gapSec ?? 0.12)
-  const signal = params.signal
-  const assertNotAborted = () => {
-    if (signal?.aborted) throw new Error('已取消')
+  const profiles = [
+    {
+      width: params.width ?? 960,
+      height: params.height ?? 540,
+      fps: Math.max(1, Math.min(2, params.fps ?? 1)),
+      gapSec: Math.max(0, params.gapSec ?? 0.08),
+      jpegQuality: 0.72,
+      label: '标清',
+    },
+    {
+      width: 854,
+      height: 480,
+      fps: 1,
+      gapSec: 0.05,
+      jpegQuality: 0.65,
+      label: '省内存',
+    },
+  ]
+
+  let lastErr = '视频合成失败'
+  for (let pi = 0; pi < profiles.length; pi++) {
+    const profile = profiles[pi]!
+    try {
+      if (pi > 0) {
+        params.onProgress?.(`内存不足，改用${profile.label}参数重试…`, 0.03)
+        await disposeCourseRecordFfmpeg()
+      }
+      return await composeCourseRecordVideoOnce(slides, {
+        ...profile,
+        onProgress: params.onProgress,
+        signal: params.signal,
+      })
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+      if (params.signal?.aborted) throw new Error('已取消')
+      if (isFfmpegMemoryError(e) || /ffmpeg exit/i.test(lastErr)) {
+        await disposeCourseRecordFfmpeg()
+        continue
+      }
+      throw e instanceof Error ? e : new Error(lastErr)
+    }
   }
 
-  params.onProgress?.('加载视频引擎…', 0.02)
-  const { loadFfmpeg } = await import('./concatVideoSegments')
-  const ffmpeg = await loadFfmpeg()
-  assertNotAborted()
-
-  const cleanup: string[] = []
-  const segNames: string[] = []
-
-  try {
-    const total = slides.length
-    for (let i = 0; i < total; i++) {
-      assertNotAborted()
-      const slide = slides[i]!
-      params.onProgress?.(
-        `编码第 ${slide.pageNo} 页（${i + 1}/${total}）· ${slide.title}`,
-        0.05 + (0.75 * i) / total,
-      )
-
-      const imgName = `cr_img_${i}.jpg`
-      const audName = `cr_aud_${i}.mp3`
-      const segName = `cr_seg_${i}.mp4`
-      cleanup.push(imgName, audName, segName)
-
-      const jpeg = await rasterizeSlideJpeg(slide.imageBlob, width, height)
-      await ffmpeg.writeFile(imgName, jpeg)
-      await ffmpeg.writeFile(audName, await blobToU8(slide.audioBlob))
-
-      const dur = Math.max(0.4, slide.durationSec + (i < total - 1 ? gapSec : 0))
-      const vf = `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps}`
-
-      let code = await ffmpeg.exec([
-        '-y',
-        '-loop',
-        '1',
-        '-framerate',
-        String(fps),
-        '-i',
-        imgName,
-        '-i',
-        audName,
-        '-vf',
-        vf,
-        '-c:v',
-        'libx264',
-        '-preset',
-        'ultrafast',
-        '-tune',
-        'stillimage',
-        '-pix_fmt',
-        'yuv420p',
-        '-c:a',
-        'aac',
-        '-b:a',
-        '128k',
-        '-shortest',
-        '-t',
-        dur.toFixed(3),
-        '-movflags',
-        '+faststart',
-        segName,
-      ])
-
-      if (code !== 0) {
-        code = await ffmpeg.exec([
-          '-y',
-          '-loop',
-          '1',
-          '-i',
-          imgName,
-          '-i',
-          audName,
-          '-vf',
-          vf,
-          '-c:v',
-          'libx264',
-          '-preset',
-          'ultrafast',
-          '-pix_fmt',
-          'yuv420p',
-          '-c:a',
-          'aac',
-          '-shortest',
-          '-movflags',
-          '+faststart',
-          segName,
-        ])
-      }
-      if (code !== 0) {
-        throw new Error(`第 ${slide.pageNo} 页编码失败（ffmpeg exit ${code}）`)
-      }
-      segNames.push(segName)
-      await ffmpegDeleteQuiet(ffmpeg, imgName)
-      await ffmpegDeleteQuiet(ffmpeg, audName)
-    }
-
-    assertNotAborted()
-    params.onProgress?.('合并成片 MP4…', 0.88)
-    const listName = 'cr_list.txt'
-    const outName = 'cr_out.mp4'
-    cleanup.push(listName, outName)
-    const listBody = segNames.map((n) => `file '${n}'`).join('\n')
-    await ffmpeg.writeFile(listName, listBody)
-
-    let mergeCode = await ffmpeg.exec([
-      '-y',
-      '-f',
-      'concat',
-      '-safe',
-      '0',
-      '-i',
-      listName,
-      '-c',
-      'copy',
-      '-movflags',
-      '+faststart',
-      outName,
-    ])
-    if (mergeCode !== 0) {
-      mergeCode = await ffmpeg.exec([
-        '-y',
-        '-f',
-        'concat',
-        '-safe',
-        '0',
-        '-i',
-        listName,
-        '-c:v',
-        'libx264',
-        '-preset',
-        'ultrafast',
-        '-pix_fmt',
-        'yuv420p',
-        '-c:a',
-        'aac',
-        '-movflags',
-        '+faststart',
-        outName,
-      ])
-    }
-    if (mergeCode !== 0) throw new Error(`合并成片失败（ffmpeg exit ${mergeCode}）`)
-
-    const raw = await ffmpeg.readFile(outName)
-    if (!(raw instanceof Uint8Array) || raw.length < 1024) {
-      throw new Error('成片文件无效，请重试')
-    }
-    const copy = new Uint8Array(raw.length)
-    copy.set(raw)
-    params.onProgress?.('完成', 1)
-    return new Blob([copy], { type: 'video/mp4' })
-  } finally {
-    for (const n of cleanup) {
-      await ffmpegDeleteQuiet(ffmpeg, n)
-    }
-  }
+  await disposeCourseRecordFfmpeg()
+  throw new Error(
+    /memory access out of bounds|out of memory/i.test(lastErr)
+      ? '浏览器内存不足，无法一次合成全部页。请关闭其它标签页后重试，或减少页数分批生成。'
+      : lastErr,
+  )
 }
