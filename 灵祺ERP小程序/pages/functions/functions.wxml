@@ -2,7 +2,7 @@
   <view class="func-top">
     <view>
       <text class="func-h1">商家能力中心</text>
-      <text class="func-p">店铺 · 商品 · 运营 · 投流 · 线索 · 财务</text>
+      <text class="func-p">店铺 · 商品 · 运营 · AI创作 · 投流 · 线索 · 财务</text>
     </view>
     <image class="func-illus-img" src="/images/func-hero-illus.svg" mode="aspectFit" />
   </view>

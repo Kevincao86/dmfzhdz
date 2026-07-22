@@ -1,4 +1,4 @@
-/** 「功能」Tab — 与 Web merchant-erp/src/config/nav.ts 模块对齐 */
+/** 「功能」Tab — 严格对齐商家 Web merchant-erp/src/config/nav.ts NAV_ITEMS */
 const FUNCTION_SECTIONS = [
   {
     id: 'store',
@@ -17,17 +17,17 @@ const FUNCTION_SECTIONS = [
       },
       {
         kind: 'link',
+        url: '/pages/store-menu/store-menu',
+        title: '菜单价目表',
+        desc: '价目与电脑端云端同步',
+        iconKey: 'list',
+      },
+      {
+        kind: 'link',
         url: '/pages/store-list/store-list?mode=decoration',
         title: '店铺装修',
         desc: '自定义店铺页面',
         iconKey: 'paint',
-      },
-      {
-        kind: 'link',
-        url: '/pages/dashboard/dashboard',
-        title: '经营概览',
-        desc: '数据看板与分析',
-        iconKey: 'chart',
       },
     ],
   },
@@ -79,17 +79,17 @@ const FUNCTION_SECTIONS = [
       },
       {
         kind: 'link',
-        url: '/pages/reviews-list/reviews-list',
-        title: '评价管理',
-        desc: '查看与回复评价',
-        iconKey: 'chat',
-      },
-      {
-        kind: 'link',
         url: '/pages/activity-center/activity-center',
         title: '活动中心',
         desc: '创建与管理活动',
         iconKey: 'gift',
+      },
+      {
+        kind: 'link',
+        url: '/pages/reviews-list/reviews-list',
+        title: '评价管理',
+        desc: '查看与回复评价',
+        iconKey: 'chat',
       },
       {
         kind: 'link',
@@ -100,10 +100,27 @@ const FUNCTION_SECTIONS = [
       },
       {
         kind: 'link',
-        url: '/pages/ai-content/ai-content',
-        title: 'AI文章与话题',
-        desc: '智能生成内容',
-        iconKey: 'ai',
+        url: '/pages/competitors/competitors',
+        title: '竞争对手分析',
+        desc: '竞品情报与对比',
+        iconKey: 'chart',
+      },
+    ],
+  },
+  {
+    id: 'ai-create',
+    title: 'AI 创作',
+    layout: 'grid3',
+    tone: 'violet',
+    rowDesc: '',
+    sectionIcon: 'ai',
+    items: [
+      {
+        kind: 'link',
+        url: '/pages/ai-ops-plan/ai-ops-plan',
+        title: 'AI 运营方案',
+        desc: '多平台结构化方案',
+        iconKey: 'chart',
       },
       {
         kind: 'link',
@@ -114,6 +131,13 @@ const FUNCTION_SECTIONS = [
       },
       {
         kind: 'link',
+        url: '/pages/ai-content/ai-content',
+        title: '爆款 Brief 生成',
+        desc: '智能生成内容',
+        iconKey: 'ai',
+      },
+      {
+        kind: 'link',
         url: '/pages/shortvideo-ai/shortvideo-ai',
         title: '短视频AI处理',
         desc: '智能剪辑与创作',
@@ -121,17 +145,10 @@ const FUNCTION_SECTIONS = [
       },
       {
         kind: 'link',
-        url: '/pages/recruit-brief-records/recruit-brief-records',
-        title: 'Brief记录',
-        desc: '达人 Brief 历史',
-        iconKey: 'list',
-      },
-      {
-        kind: 'mod',
-        key: 'competitors',
-        title: '竞争对手分析',
-        desc: '竞品情报与对比',
-        iconKey: 'chart',
+        url: '/pages/digital-human/digital-human',
+        title: '数字人口播',
+        desc: '口播 TTS 试听',
+        iconKey: 'mic',
       },
     ],
   },
@@ -156,7 +173,7 @@ const FUNCTION_SECTIONS = [
   {
     id: 'finance',
     title: '财务',
-    layout: 'grid2',
+    layout: 'grid3',
     tone: 'amber',
     rowDesc: '订单结算与财务管理',
     sectionIcon: 'wallet',
@@ -173,6 +190,13 @@ const FUNCTION_SECTIONS = [
         url: '/pages/finance-tax/finance-tax',
         title: '报税管理',
         desc: '税务申报辅助',
+        iconKey: 'chart',
+      },
+      {
+        kind: 'link',
+        url: '/pages/dashboard/dashboard',
+        title: '经营概览',
+        desc: '数据看板与分析',
         iconKey: 'chart',
       },
     ],

@@ -175,6 +175,54 @@ async function fetchTenantStoreIntel(tenantId) {
   return rows && rows[0] ? rows[0] : null
 }
 
+/**
+ * 与 Web upsertMenuItemsCloud 对齐：双写 tenant_store_intel 菜单字段，保留已有 margin_config。
+ */
+async function upsertTenantStoreMenu(tenantId, opts) {
+  const tid = String(tenantId || '').trim()
+  if (!tid) throw new Error('缺少租户')
+  const items = Array.isArray(opts && opts.items) ? opts.items : []
+  const storeName = String((opts && opts.storeName) || '').trim()
+  let margin_config = null
+  try {
+    const cur = await fetchTenantStoreIntel(tid)
+    if (cur && cur.margin_config) margin_config = cur.margin_config
+  } catch (_) {}
+  const body = {
+    tenant_id: tid,
+    menu_items: items,
+    menu_store_name: storeName || null,
+    menu_item_count: items.length,
+    updated_at: new Date().toISOString(),
+  }
+  if (margin_config) body.margin_config = margin_config
+
+  await withAuthRetry(async () => {
+    const token = api.getAccessToken()
+    await new Promise((resolve, reject) => {
+      wx.request({
+        url: `${baseUrl()}/rest/v1/tenant_store_intel?on_conflict=tenant_id`,
+        method: 'POST',
+        header: Object.assign(headers(token), {
+          Prefer: 'resolution=merge-duplicates,return=minimal',
+        }),
+        data: body,
+        success(res) {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve()
+            return
+          }
+          reject(httpError(res, `保存价目失败 ${res.statusCode}`))
+        },
+        fail(err) {
+          rejectWxFail(reject, err)
+        },
+      })
+    })
+  })
+  return { ok: true }
+}
+
 async function fetchSupportRelayMessages(sessionId) {
   const token = api.getAccessToken()
   const sid = encodeURIComponent(String(sessionId || '').trim())
@@ -268,6 +316,7 @@ module.exports = {
   fetchTenantWalletSummary,
   fetchTenantMembershipRow,
   fetchTenantStoreIntel,
+  upsertTenantStoreMenu,
   fetchMerchantBindings,
   fetchSupportRelayMessages,
   insertSupportRelayMessage,
