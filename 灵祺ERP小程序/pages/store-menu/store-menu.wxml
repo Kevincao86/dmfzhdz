@@ -1,0 +1,44 @@
+<scroll-view scroll-y class="sm-page" enhanced show-scrollbar="{{false}}">
+  <view class="sm-hero">
+    <text class="sm-title">菜单价目表</text>
+    <text class="sm-sub">与电脑端云端同步；可本地增删改。Excel/拍照识别请在电脑端完成。</text>
+  </view>
+
+  <view class="sm-card">
+    <text class="sm-label">门店名称</text>
+    <input class="sm-input" value="{{storeName}}" placeholder="选填" bindinput="onStoreName" />
+    <view class="sm-row-btns">
+      <button class="sm-btn ghost" size="mini" loading="{{busy}}" bindtap="onSyncCloud">从云端同步</button>
+      <button class="sm-btn" size="mini" bindtap="onSaveStoreName">保存门店名</button>
+    </view>
+    <text wx:if="{{updatedAt}}" class="sm-meta">更新：{{updatedAt}}</text>
+  </view>
+
+  <view class="sm-card">
+    <view class="sm-card-head">
+      <text class="sm-card-title">价目（{{items.length}}）</text>
+      <button class="sm-btn" size="mini" bindtap="onAdd">新增</button>
+    </view>
+    <view wx:if="{{!items.length}}" class="sm-empty">暂无价目，可新增或从云端同步</view>
+    <view wx:for="{{items}}" wx:key="index" class="sm-item">
+      <view class="sm-item-main" data-idx="{{index}}" bindtap="onEdit">
+        <text class="sm-item-name">{{item.category ? '[' + item.category + '] ' : ''}}{{item.name}}</text>
+        <text class="sm-item-price">¥{{item.priceYuan}}</text>
+      </view>
+      <text class="sm-del" data-idx="{{index}}" bindtap="onDelete">删</text>
+    </view>
+  </view>
+</scroll-view>
+
+<view wx:if="{{editing}}" class="sm-mask" catchtouchmove="true">
+  <view class="sm-sheet">
+    <text class="sm-sheet-title">{{editIndex >= 0 ? '编辑价目' : '新增价目'}}</text>
+    <input class="sm-input" placeholder="名称" value="{{formName}}" bindinput="onFormName" />
+    <input class="sm-input" type="digit" placeholder="价格（元）" value="{{formPrice}}" bindinput="onFormPrice" />
+    <input class="sm-input" placeholder="分类（选填）" value="{{formCategory}}" bindinput="onFormCategory" />
+    <view class="sm-row-btns">
+      <button class="sm-btn ghost" bindtap="onCancelEdit">取消</button>
+      <button class="sm-btn primary" bindtap="onSaveItem">保存</button>
+    </view>
+  </view>
+</view>

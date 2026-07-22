@@ -38,6 +38,12 @@
     "pages/geo-assist/geo-assist",
     "pages/ai-content/ai-content",
     "pages/ai-visual-studio/ai-visual-studio",
+    "pages/ai-ops-plan/ai-ops-plan",
+    "pages/store-menu/store-menu",
+    "pages/competitors/competitors",
+    "pages/digital-human/digital-human",
+    "pages/partner-xingxuan-hub/partner-xingxuan-hub",
+    "pages/fws-web/fws-web",
     "pages/shortvideo-ai/shortvideo-ai",
     "pages/notifications/notifications",
     "pages/subscription/subscription",
@@ -58,7 +64,7 @@
     "list": [
       {
         "pagePath": "pages/agent/agent",
-        "text": "灵祺AI"
+        "text": "灵祺助手"
       },
       {
         "pagePath": "pages/functions/functions",
@@ -72,7 +78,7 @@
   },
   "permission": {
     "scope.record": {
-      "desc": "用于智能体语音输入、商品与招募语音录入"
+      "desc": "用于小助理语音输入、商品与招募语音录入"
     },
     "scope.camera": {
       "desc": "用于拍摄商品图、评论截图等附件上传"
