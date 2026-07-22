@@ -320,17 +320,13 @@ export function probeAudioDurationSec(blob: Blob): Promise<number | null> {
   })
 }
 
-function pickRecorderMime(): string {
-  const candidates = [
-    'video/webm;codecs=vp9,opus',
-    'video/webm;codecs=vp8,opus',
-    'video/webm;codecs=vp9',
-    'video/webm',
-  ]
-  for (const t of candidates) {
-    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(t)) return t
-  }
-  return 'video/webm'
+export type CourseRecordVideoSlide = {
+  pageNo: number
+  title: string
+  imageBlob: Blob
+  audioBlob: Blob
+  /** 展示与成片均用此时长（优先真实音频时长） */
+  durationSec: number
 }
 
 function drawImageContain(
@@ -351,18 +347,44 @@ function drawImageContain(
   ctx.drawImage(img, x, y, w, h)
 }
 
-export type CourseRecordVideoSlide = {
-  pageNo: number
-  title: string
-  imageBlob: Blob
-  audioBlob: Blob
-  /** 展示与成片均用此时长（优先真实音频时长） */
-  durationSec: number
+async function blobToU8(blob: Blob): Promise<Uint8Array> {
+  return new Uint8Array(await blob.arrayBuffer())
+}
+
+/** 统一压成 JPEG，避免 webp/png 在 wasm ffmpeg 里兼容差异 */
+async function rasterizeSlideJpeg(
+  imageBlob: Blob,
+  canvasW: number,
+  canvasH: number,
+): Promise<Uint8Array> {
+  const bmp = await createImageBitmap(imageBlob)
+  const canvas = document.createElement('canvas')
+  canvas.width = canvasW
+  canvas.height = canvasH
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('无法创建画布')
+  drawImageContain(ctx, bmp, canvasW, canvasH, bmp.width, bmp.height)
+  bmp.close()
+  const jpeg = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error('JPEG 编码失败'))),
+      'image/jpeg',
+      0.9,
+    )
+  })
+  return blobToU8(jpeg)
+}
+
+async function ffmpegDeleteQuiet(ffmpeg: { deleteFile: (n: string) => Promise<void> }, name: string) {
+  try {
+    await ffmpeg.deleteFile(name)
+  } catch {
+    /* ignore */
+  }
 }
 
 /**
- * 浏览器端：每页图片展示时长 = 对应页音频时长，合成可下载 WebM。
- * （Safari 部分版本对 MediaRecorder 支持有限，失败时抛错提示改用 Chrome。）
+ * 浏览器端 ffmpeg.wasm：每页静图时长对齐音频，离线合成 MP4（远快于实时 MediaRecorder）。
  */
 export async function composeCourseRecordVideo(params: {
   slides: CourseRecordVideoSlide[]
@@ -375,168 +397,168 @@ export async function composeCourseRecordVideo(params: {
 }): Promise<Blob> {
   const slides = params.slides.filter((s) => s.imageBlob && s.audioBlob && s.durationSec > 0)
   if (!slides.length) throw new Error('没有可合成的页（需同时有图片与音频）')
-  if (typeof MediaRecorder === 'undefined') {
-    throw new Error('当前浏览器不支持 MediaRecorder，请用 Chrome / Edge 生成视频')
-  }
 
   const width = params.width ?? 1280
   const height = params.height ?? 720
-  const fps = params.fps ?? 30
-  const gapSec = Math.max(0, params.gapSec ?? 0.25)
+  const fps = Math.max(1, Math.min(6, params.fps ?? 2))
+  const gapSec = Math.max(0, params.gapSec ?? 0.12)
   const signal = params.signal
-
-  const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
-  const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('无法创建画布')
-
-  const audioCtx = new AudioContext()
-  const dest = audioCtx.createMediaStreamDestination()
-  // 静音扬声器，避免合成时外放；录音仍从 dest 取音轨
-  const silent = audioCtx.createGain()
-  silent.gain.value = 0
-  silent.connect(audioCtx.destination)
-
-  const canvasStream = canvas.captureStream(fps)
-  const combined = new MediaStream([
-    ...canvasStream.getVideoTracks(),
-    ...dest.stream.getAudioTracks(),
-  ])
-  const mimeType = pickRecorderMime()
-  const chunks: BlobPart[] = []
-  const recorder = new MediaRecorder(combined, {
-    mimeType,
-    videoBitsPerSecond: 4_000_000,
-    audioBitsPerSecond: 128_000,
-  })
-  recorder.ondataavailable = (ev) => {
-    if (ev.data.size > 0) chunks.push(ev.data)
+  const assertNotAborted = () => {
+    if (signal?.aborted) throw new Error('已取消')
   }
 
-  const stopPromise = new Promise<Blob>((resolve, reject) => {
-    recorder.onerror = () => reject(new Error('录制失败'))
-    recorder.onstop = () => {
-      resolve(new Blob(chunks, { type: mimeType.split(';')[0] || 'video/webm' }))
-    }
-  })
+  params.onProgress?.('加载视频引擎…', 0.02)
+  const { loadFfmpeg } = await import('./concatVideoSegments')
+  const ffmpeg = await loadFfmpeg()
+  assertNotAborted()
 
-  if (audioCtx.state === 'suspended') await audioCtx.resume()
-  recorder.start(250)
-
-  let drawRaf = 0
-  let currentImg: HTMLImageElement | null = null
-  let currentNatural = { w: width, h: height }
-
-  const paintLoop = () => {
-    if (currentImg) {
-      drawImageContain(ctx, currentImg, width, height, currentNatural.w, currentNatural.h)
-    }
-    drawRaf = requestAnimationFrame(paintLoop)
-  }
-  paintLoop()
-
-  const loadImage = (blob: Blob) =>
-    new Promise<HTMLImageElement>((resolve, reject) => {
-      const url = URL.createObjectURL(blob)
-      const img = new Image()
-      img.onload = () => {
-        URL.revokeObjectURL(url)
-        resolve(img)
-      }
-      img.onerror = () => {
-        URL.revokeObjectURL(url)
-        reject(new Error('图片加载失败'))
-      }
-      img.src = url
-    })
-
-  const waitSec = (sec: number) =>
-    new Promise<void>((resolve, reject) => {
-      if (signal?.aborted) {
-        reject(new Error('已取消'))
-        return
-      }
-      const t = window.setTimeout(() => resolve(), Math.max(0, sec * 1000))
-      signal?.addEventListener(
-        'abort',
-        () => {
-          window.clearTimeout(t)
-          reject(new Error('已取消'))
-        },
-        { once: true },
-      )
-    })
+  const cleanup: string[] = []
+  const segNames: string[] = []
 
   try {
     const total = slides.length
     for (let i = 0; i < total; i++) {
-      if (signal?.aborted) throw new Error('已取消')
+      assertNotAborted()
       const slide = slides[i]!
       params.onProgress?.(
-        `合成第 ${slide.pageNo} 页（${i + 1}/${total}）· ${slide.title}`,
-        i / total,
+        `编码第 ${slide.pageNo} 页（${i + 1}/${total}）· ${slide.title}`,
+        0.05 + (0.75 * i) / total,
       )
 
-      const img = await loadImage(slide.imageBlob)
-      currentImg = img
-      currentNatural = { w: img.naturalWidth || width, h: img.naturalHeight || height }
-      drawImageContain(ctx, img, width, height, currentNatural.w, currentNatural.h)
+      const imgName = `cr_img_${i}.jpg`
+      const audName = `cr_aud_${i}.mp3`
+      const segName = `cr_seg_${i}.mp4`
+      cleanup.push(imgName, audName, segName)
 
-      const audioBuf = await audioCtx.decodeAudioData(await slide.audioBlob.arrayBuffer())
-      const src = audioCtx.createBufferSource()
-      src.buffer = audioBuf
-      src.connect(dest)
-      src.connect(silent)
+      const jpeg = await rasterizeSlideJpeg(slide.imageBlob, width, height)
+      await ffmpeg.writeFile(imgName, jpeg)
+      await ffmpeg.writeFile(audName, await blobToU8(slide.audioBlob))
 
-      const playSec = Math.max(slide.durationSec, audioBuf.duration || 0)
-      await new Promise<void>((resolve, reject) => {
-        const timer = window.setTimeout(() => resolve(), Math.ceil(playSec * 1000) + 40)
-        src.onended = () => {
-          window.clearTimeout(timer)
-          resolve()
-        }
-        try {
-          src.start(0)
-        } catch (e) {
-          window.clearTimeout(timer)
-          reject(e instanceof Error ? e : new Error('音频播放失败'))
-        }
-        signal?.addEventListener(
-          'abort',
-          () => {
-            window.clearTimeout(timer)
-            try {
-              src.stop()
-            } catch {
-              /* ignore */
-            }
-            reject(new Error('已取消'))
-          },
-          { once: true },
-        )
-      })
+      const dur = Math.max(0.4, slide.durationSec + (i < total - 1 ? gapSec : 0))
+      const vf = `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps}`
 
-      if (i < total - 1 && gapSec > 0) await waitSec(gapSec)
+      let code = await ffmpeg.exec([
+        '-y',
+        '-loop',
+        '1',
+        '-framerate',
+        String(fps),
+        '-i',
+        imgName,
+        '-i',
+        audName,
+        '-vf',
+        vf,
+        '-c:v',
+        'libx264',
+        '-preset',
+        'ultrafast',
+        '-tune',
+        'stillimage',
+        '-pix_fmt',
+        'yuv420p',
+        '-c:a',
+        'aac',
+        '-b:a',
+        '128k',
+        '-shortest',
+        '-t',
+        dur.toFixed(3),
+        '-movflags',
+        '+faststart',
+        segName,
+      ])
+
+      if (code !== 0) {
+        code = await ffmpeg.exec([
+          '-y',
+          '-loop',
+          '1',
+          '-i',
+          imgName,
+          '-i',
+          audName,
+          '-vf',
+          vf,
+          '-c:v',
+          'libx264',
+          '-preset',
+          'ultrafast',
+          '-pix_fmt',
+          'yuv420p',
+          '-c:a',
+          'aac',
+          '-shortest',
+          '-movflags',
+          '+faststart',
+          segName,
+        ])
+      }
+      if (code !== 0) {
+        throw new Error(`第 ${slide.pageNo} 页编码失败（ffmpeg exit ${code}）`)
+      }
+      segNames.push(segName)
+      await ffmpegDeleteQuiet(ffmpeg, imgName)
+      await ffmpegDeleteQuiet(ffmpeg, audName)
     }
 
-    params.onProgress?.('收尾封装…', 0.98)
-    await waitSec(0.35)
-    recorder.stop()
-    const blob = await stopPromise
+    assertNotAborted()
+    params.onProgress?.('合并成片 MP4…', 0.88)
+    const listName = 'cr_list.txt'
+    const outName = 'cr_out.mp4'
+    cleanup.push(listName, outName)
+    const listBody = segNames.map((n) => `file '${n}'`).join('\n')
+    await ffmpeg.writeFile(listName, listBody)
+
+    let mergeCode = await ffmpeg.exec([
+      '-y',
+      '-f',
+      'concat',
+      '-safe',
+      '0',
+      '-i',
+      listName,
+      '-c',
+      'copy',
+      '-movflags',
+      '+faststart',
+      outName,
+    ])
+    if (mergeCode !== 0) {
+      mergeCode = await ffmpeg.exec([
+        '-y',
+        '-f',
+        'concat',
+        '-safe',
+        '0',
+        '-i',
+        listName,
+        '-c:v',
+        'libx264',
+        '-preset',
+        'ultrafast',
+        '-pix_fmt',
+        'yuv420p',
+        '-c:a',
+        'aac',
+        '-movflags',
+        '+faststart',
+        outName,
+      ])
+    }
+    if (mergeCode !== 0) throw new Error(`合并成片失败（ffmpeg exit ${mergeCode}）`)
+
+    const raw = await ffmpeg.readFile(outName)
+    if (!(raw instanceof Uint8Array) || raw.length < 1024) {
+      throw new Error('成片文件无效，请重试')
+    }
+    const copy = new Uint8Array(raw.length)
+    copy.set(raw)
     params.onProgress?.('完成', 1)
-    return blob
-  } catch (e) {
-    try {
-      if (recorder.state !== 'inactive') recorder.stop()
-    } catch {
-      /* ignore */
-    }
-    throw e
+    return new Blob([copy], { type: 'video/mp4' })
   } finally {
-    cancelAnimationFrame(drawRaf)
-    canvasStream.getTracks().forEach((t) => t.stop())
-    dest.stream.getTracks().forEach((t) => t.stop())
-    void audioCtx.close()
+    for (const n of cleanup) {
+      await ffmpegDeleteQuiet(ffmpeg, n)
+    }
   }
 }
