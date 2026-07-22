@@ -132,13 +132,31 @@ export async function createTenantPayPrepay(
       if (!sessionKey) return fail('missing_session_key', 400)
 
       const noteWithOpenId = mergeXpayOpenIdIntoClientNote(input.clientNote, openid)
-      const orderResult = await createTenantOnlinePaymentOrder(admin, {
-        ...input,
-        clientNote: noteWithOpenId,
-        payMode: 'wechat_virtual',
-      })
-      if ('ok' in orderResult && orderResult.ok === false) return orderResult
-      const order = orderResult as TenantPaymentOrderRow
+      let order: TenantPaymentOrderRow
+      try {
+        order = await createTenantOnlinePaymentOrder(admin, {
+          ...input,
+          clientNote: noteWithOpenId,
+          payMode: 'wechat_virtual',
+        })
+      } catch (e) {
+        const msg = formatThrowableMessage(e, 'create_order_failed')
+        if (/schema cache|could not find the .* column of .* in the schema cache/i.test(msg)) {
+          return fail('postgrest_schema_cache_stale', 503)
+        }
+        if (
+          /relation .* does not exist|could not find the table|column .* does not exist/i.test(msg) &&
+          !/schema cache/i.test(msg)
+        ) {
+          return fail('db_migration_required', 503)
+        }
+        return {
+          ok: false,
+          error: msg || 'create_order_failed',
+          message: msg || tenantPayErrorMessage('create_order_failed'),
+          status: 502,
+        }
+      }
       const productId = resolveXpayProductId(xpayCfg.config, input.orderKind, input.amountCents)
       const attach = JSON.stringify({
         oid: order.id,
