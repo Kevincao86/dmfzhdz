@@ -16,7 +16,8 @@ export function parseOralScriptMarkdown(raw: string): CourseRecordPage[] {
     .trim()
   if (!text) return []
 
-  const headingRe = /^###\s*第\s*(\d+)\s*页(?:\s*[·•.\-—]\s*(.+))?$/gm
+  // 兼容 #～####、有无空格、·/—/： 等标题分隔
+  const headingRe = /^#{1,4}\s*第\s*(\d+)\s*页(?:\s*[·•.\-—|:：]\s*(.+))?$/gm
   const hits: { pageNo: number; title: string; index: number; endTitle: number }[] = []
   let m: RegExpExecArray | null
   while ((m = headingRe.exec(text)) != null) {
@@ -33,11 +34,7 @@ export function parseOralScriptMarkdown(raw: string): CourseRecordPage[] {
       .map((h, i) => {
         const bodyStart = h.endTitle
         const bodyEnd = i + 1 < hits.length ? hits[i + 1]!.index : text.length
-        const script = text
-          .slice(bodyStart, bodyEnd)
-          .replace(/^[\s>\-*]+/gm, '')
-          .replace(/\n{3,}/g, '\n\n')
-          .trim()
+        const script = cleanOralPageScript(text.slice(bodyStart, bodyEnd))
         return { pageNo: h.pageNo, title: h.title, script }
       })
       .filter((p) => p.script.length > 0 || p.title)
@@ -50,12 +47,34 @@ export function parseOralScriptMarkdown(raw: string): CourseRecordPage[] {
   return blocks.map((block, i) => {
     const lines = block.split('\n')
     const first = lines[0]!.replace(/^#+\s*/, '').trim()
-    const rest = lines.slice(1).join('\n').trim()
+    const rest = cleanOralPageScript(lines.slice(1).join('\n'))
     if (rest) {
       return { pageNo: i + 1, title: first.slice(0, 40), script: rest }
     }
-    return { pageNo: i + 1, title: `第 ${i + 1} 页`, script: first }
+    return { pageNo: i + 1, title: `第 ${i + 1} 页`, script: cleanOralPageScript(first) }
   })
+}
+
+/** 去掉幻灯备注行，保留可朗读正文 */
+function cleanOralPageScript(raw: string): string {
+  return String(raw || '')
+    .replace(/^>\s*幻灯文件[：:].*$/gim, '')
+    .replace(/^>\s*slide\s*file[：:].*$/gim, '')
+    .replace(/^[\s>\-*]+/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+/** 是否已是「第 N 页」Markdown 分页稿（可走本地规则，无需调模型） */
+export function hasMarkdownPageHeadings(raw: string): boolean {
+  const text = String(raw || '')
+  const re = /^#{1,4}\s*第\s*\d+\s*页/gm
+  let n = 0
+  while (re.exec(text) != null) {
+    n += 1
+    if (n >= 2) return true
+  }
+  return n >= 1 && text.length < 800
 }
 
 export function pagesToOralMarkdown(pages: CourseRecordPage[]): string {
@@ -107,33 +126,94 @@ function pagesFromAiJson(content: string): CourseRecordPage[] | null {
   return out.length ? out : null
 }
 
-const AI_PARSE_SYSTEM = `你是录播课口播稿分页助手。把用户给出的口播/讲稿按「幻灯页」切成多页。
-只输出 JSON（不要 Markdown 说明），结构：
-{"pages":[{"pageNo":1,"title":"封面","script":"该页完整口播正文"},...]}
-规则：
-1. 若原文已有「第 N 页」标题，优先按此切分并保留语意标题。
-2. 若无页码，按话题/段落合理分页，每页口播约 30～120 字为宜，勿过碎。
-3. script 为可直接朗读的完整中文，去掉「讲师备注」类旁注。
-4. pageNo 从 1 连续递增。`
+const AI_PARSE_SYSTEM = `你是录播课口播稿分页助手。把口播/讲稿按幻灯页切开。
+只输出 JSON（禁止 Markdown、禁止解释）：{"pages":[{"pageNo":1,"title":"短标题","script":"该页口播正文"},...]}
+规则：保留原文口语；有「第N页」则按此切；无页码则按话题切，每页约 40～150 字；pageNo 从 1 递增。`
 
-/** AI 模型解析分页；失败抛错由调用方回退规则解析 */
-export async function parseOralScriptWithAi(raw: string): Promise<CourseRecordPage[]> {
-  const text = String(raw || '').trim()
-  if (!text) throw new Error('口播稿为空')
+function splitTextForAiParse(text: string, maxChars = 4500): string[] {
+  if (text.length <= maxChars) return [text]
+  const parts: string[] = []
+  let rest = text
+  while (rest.length > maxChars) {
+    const window = rest.slice(0, maxChars)
+    let cut = window.lastIndexOf('\n\n')
+    if (cut < maxChars * 0.4) cut = window.lastIndexOf('\n')
+    if (cut < maxChars * 0.4) cut = maxChars
+    parts.push(rest.slice(0, cut).trim())
+    rest = rest.slice(cut).trim()
+  }
+  if (rest) parts.push(rest)
+  return parts.filter(Boolean)
+}
+
+async function aiParseOralChunk(
+  chunk: string,
+  provider: 'qwen' | 'doubao',
+): Promise<CourseRecordPage[]> {
   const res = await postAiChat({
-    provider: 'doubao',
-    temperature: 0.2,
+    provider,
+    temperature: 0.1,
+    stream: false,
+    taskType: 'generate_copywriting',
     messages: [
       { role: 'system', content: AI_PARSE_SYSTEM },
       {
         role: 'user',
-        content: `请解析下列口播稿并分页：\n\n${text.slice(0, 14000)}`,
+        content: `请解析下列口播稿并分页（只输出 JSON）：\n\n${chunk}`,
       },
     ],
   })
   const pages = pagesFromAiJson(res.content || '')
   if (!pages?.length) throw new Error('模型未返回有效分页 JSON')
-  return pages.map((p, i) => ({ ...p, pageNo: i + 1 }))
+  return pages
+}
+
+export type ParseOralScriptAiResult = {
+  pages: CourseRecordPage[]
+  /** markdown=本地识别 MD 分页；ai=模型分页 */
+  source: 'markdown' | 'ai'
+}
+
+/** AI/智能解析分页；已是 MD「第 N 页」结构时直接本地解析，避免上游超时 */
+export async function parseOralScriptWithAi(raw: string): Promise<ParseOralScriptAiResult> {
+  const text = String(raw || '').trim()
+  if (!text) throw new Error('口播稿为空')
+
+  if (hasMarkdownPageHeadings(text)) {
+    const local = parseOralScriptMarkdown(text)
+    if (local.length >= 1) {
+      return {
+        pages: local.map((p, i) => ({ ...p, pageNo: i + 1 })),
+        source: 'markdown',
+      }
+    }
+  }
+
+  const chunks = splitTextForAiParse(text, 4500)
+  const providers: Array<'qwen' | 'doubao'> = ['qwen', 'doubao']
+  let lastErr = 'AI 解析失败'
+  for (const provider of providers) {
+    try {
+      const merged: CourseRecordPage[] = []
+      for (let ci = 0; ci < chunks.length; ci++) {
+        const part = await aiParseOralChunk(chunks[ci]!, provider)
+        for (const p of part) {
+          merged.push({
+            ...p,
+            pageNo: merged.length + 1,
+            title: p.title || `第 ${merged.length + 1} 页`,
+            script: cleanOralPageScript(p.script),
+          })
+        }
+      }
+      if (merged.length) return { pages: merged, source: 'ai' }
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+      // 超时/上游错误换下一家；其它错误也继续试
+      continue
+    }
+  }
+  throw new Error(lastErr)
 }
 
 export function estimateSpeechSec(script: string): number {

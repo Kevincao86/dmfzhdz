@@ -176,9 +176,13 @@ export default function CourseRecordWorkshopPage() {
     setParseBusy(true)
     setHint(null)
     try {
-      const next = await parseOralScriptWithAi(rawScript)
-      applyPages(next, true)
-      setHint(`AI 解析完成：${next.length} 页（已回写口播稿）`)
+      const r = await parseOralScriptWithAi(rawScript)
+      applyPages(r.pages, true)
+      setHint(
+        r.source === 'markdown'
+          ? `已识别 Markdown「第 N 页」格式，本地解析 ${r.pages.length} 页（无需调模型）`
+          : `AI 解析完成：${r.pages.length} 页（已回写口播稿）`,
+      )
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       const fallback = parseOralScriptMarkdown(rawScript)
