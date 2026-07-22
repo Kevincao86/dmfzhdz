@@ -156,6 +156,84 @@ export function resolveTalentLibraryEntriesForCity(params: {
 }
 
 /** 注入 AI 运营方案 / 智能体：脱敏达人库摘要（不含联系方式） */
+function formatTalentLibrarySampleLine(e: RegistryTalentLibraryEntry): string {
+  const tags = Array.isArray(e.accountTags) ? e.accountTags.slice(0, 4).join('/') : ''
+  const fans = Number(e.followers) > 0 ? `粉丝${e.followers}` : ''
+  const quote = String(e.quotePrice || '').trim()
+  const cityLabel = String(e.city || '').trim() || '未填城'
+  const level = String(e.douyinSalesLevel || '').trim()
+  const levelBit = level ? `·等级${level}` : ''
+  return `- ${e.platformNickname || e.platformAccount || '达人'}（${cityLabel}${fans ? `·${fans}` : ''}${quote ? `·报价${quote}` : ''}${levelBit}${tags ? `·${tags}` : ''}）`
+}
+
+function talentEntryDisplayName(e: RegistryTalentLibraryEntry): string {
+  return String(e.platformNickname || e.platformAccount || '').trim() || '达人'
+}
+
+/** 星选达人库分层：头部=5级及以上(V5/V5+)，腰尾=3–4级(V3/V4) */
+export type TalentLibraryPlanInsight = {
+  sourceLabel: string
+  citySource: TalentLibraryCitySource | 'empty'
+  filterCity: string
+  platform: string
+  /** 头部：销售等级 5 级及以上（V5 / V5+） */
+  headCount: number
+  /** 腰尾部：销售等级 3–4 级（V3 / V4） */
+  midTailCount: number
+  headSamples: string[]
+  midTailSamples: string[]
+  tierAvgSummary: string
+  matchedEntries: number
+}
+
+export function buildTalentLibraryPlanInsight(params: {
+  entries: RegistryTalentLibraryEntry[]
+  city: string
+  platform?: RegistryTalentLibraryEntry['platform']
+  maxSamplesPerBand?: number
+}): TalentLibraryPlanInsight {
+  const resolved = resolveTalentLibraryEntriesForCity({
+    entries: params.entries,
+    city: params.city,
+    platform: params.platform,
+  })
+  const ctx = computeTalentLibraryTierAveragesFromResolved(resolved)
+  const perBand = Math.max(3, Math.min(8, params.maxSamplesPerBand ?? 5))
+  const sourceLabel =
+    resolved.source === 'city'
+      ? `同城「${resolved.filterCity}」星选达人库（${resolved.cityMatchedCount} 人）`
+      : resolved.nationwideLocalLifeCount > 0
+        ? `该城暂无达人库数据，已回退全国本地生活达人（${resolved.nationwideLocalLifeCount} 人）`
+        : `该城暂无达人库数据，已回退全国平台达人库（${resolved.entries.length} 人）`
+
+  const headEntries: RegistryTalentLibraryEntry[] = []
+  const midTailEntries: RegistryTalentLibraryEntry[] = []
+  for (const e of resolved.entries) {
+    const tier = inferKolTierFromApplicant({
+      douyinSalesLevel: e.douyinSalesLevel,
+      followers: e.followers,
+    })
+    if (tier === 'v5' || tier === 'v5plus') headEntries.push(e)
+    else midTailEntries.push(e)
+  }
+
+  return {
+    sourceLabel,
+    citySource: resolved.source,
+    filterCity: resolved.filterCity || params.city || '',
+    platform: resolved.platform,
+    headCount: headEntries.length,
+    midTailCount: midTailEntries.length,
+    headSamples: headEntries.slice(0, perBand).map(talentEntryDisplayName),
+    midTailSamples: midTailEntries.slice(0, perBand).map(talentEntryDisplayName),
+    tierAvgSummary: formatTierAvgSummary(ctx),
+    matchedEntries:
+      resolved.source === 'city'
+        ? resolved.cityMatchedCount
+        : resolved.nationwideLocalLifeCount || resolved.entries.length,
+  }
+}
+
 export function buildTalentLibraryPlanPromptBlock(params: {
   entries: RegistryTalentLibraryEntry[]
   city: string
@@ -167,28 +245,32 @@ export function buildTalentLibraryPlanPromptBlock(params: {
     city: params.city,
     platform: params.platform,
   })
-  const ctx = computeTalentLibraryTierAveragesFromResolved(resolved)
-  const sourceLabel =
-    resolved.source === 'city'
-      ? `同城「${resolved.filterCity}」达人库（${resolved.cityMatchedCount} 人）`
-      : resolved.nationwideLocalLifeCount > 0
-        ? `该城暂无达人库数据，已回退全国本地生活达人（${resolved.nationwideLocalLifeCount} 人）`
-        : `该城暂无达人库数据，已回退全国平台达人库（${resolved.entries.length} 人）`
+  const insight = buildTalentLibraryPlanInsight(params)
+  const perBand = Math.max(3, Math.min(8, Math.ceil((params.maxSamples ?? 10) / 2)))
 
-  const samples = resolved.entries.slice(0, Math.max(4, Math.min(12, params.maxSamples ?? 8))).map((e) => {
-    const tags = Array.isArray(e.accountTags) ? e.accountTags.slice(0, 4).join('/') : ''
-    const fans = Number(e.followers) > 0 ? `粉丝${e.followers}` : ''
-    const quote = String(e.quotePrice || '').trim()
-    const cityLabel = String(e.city || '').trim() || '未填城'
-    return `- ${e.platformNickname || e.platformAccount || '达人'}（${cityLabel}${fans ? `·${fans}` : ''}${quote ? `·报价${quote}` : ''}${tags ? `·${tags}` : ''}）`
-  })
+  const headEntries: RegistryTalentLibraryEntry[] = []
+  const midTailEntries: RegistryTalentLibraryEntry[] = []
+  for (const e of resolved.entries) {
+    const tier = inferKolTierFromApplicant({
+      douyinSalesLevel: e.douyinSalesLevel,
+      followers: e.followers,
+    })
+    if (tier === 'v5' || tier === 'v5plus') headEntries.push(e)
+    else midTailEntries.push(e)
+  }
+
+  const headLines = headEntries.slice(0, perBand).map(formatTalentLibrarySampleLine)
+  const midTailLines = midTailEntries.slice(0, perBand).map(formatTalentLibrarySampleLine)
 
   return [
-    '【灵祺达人库 · 达人方案必须基于本段，禁止凭空编造档位人数与报价】',
-    `数据来源：${sourceLabel}；平台 ${resolved.platform}。`,
-    formatTierAvgSummary(ctx),
-    samples.length ? `样本（脱敏）：\n${samples.join('\n')}` : '样本：库内暂无可展示条目。',
-    '撰写 talentBudget / 达人招募方案时：人数、单价、标签须贴近上述均价与样本；无同城时须注明已按全国本地生活达人行情估算。',
+    '【灵祺星选达人库 · 达人方案必须基于本段，禁止凭空编造档位人数与报价】',
+    `数据来源：${insight.sourceLabel}；平台 ${insight.platform}。`,
+    insight.tierAvgSummary,
+    `【头部达人 · 销售等级 5 级及以上（对应库内 V5 / V5+）】共 ${insight.headCount} 人` +
+      (headLines.length ? `；样本（脱敏）：\n${headLines.join('\n')}` : '；暂无样本。'),
+    `【腰尾部达人 · 销售等级 3–4 级（对应库内 V3 / V4）】共 ${insight.midTailCount} 人` +
+      (midTailLines.length ? `；样本（脱敏）：\n${midTailLines.join('\n')}` : '；暂无样本。'),
+    '撰写 talentBudget 时须分别写清：①头部（5级及以上）人数/单价/预算行；②腰尾部（3–4级）人数/单价/预算行；budgetLines.tier：头部=库内V5/V5+，腰部≈V4，尾部≈V3；note 可点名上述样本昵称；人数/单价须贴近库内均价；无同城时须注明已按全国本地生活达人行情估算。',
   ].join('\n')
 }
 

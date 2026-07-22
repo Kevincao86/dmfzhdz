@@ -1311,11 +1311,43 @@ function ResultPanel({
   if (tab === 'talent') {
     const lines = plan.talentBudget.budgetLines || []
     const rows = plan.talentBudget.talentRows || []
-    if (!lines.length && !rows.length) {
+    const lib = plan.talentBudget.libraryInsight
+    if (!lines.length && !rows.length && !lib) {
       return <p className="text-sm text-gray-500">暂无预算分配明细</p>
     }
     return (
       <div className="space-y-5">
+        {lib ? (
+          <div className="rounded-xl border border-violet-100 bg-violet-50/50 p-4 text-sm text-slate-700">
+            <p className="font-semibold text-slate-900">星选达人库参考</p>
+            <p className="mt-1 text-xs text-slate-500">{lib.sourceLabel}</p>
+            {lib.tierAvgSummary ? (
+              <p className="mt-2 text-xs leading-relaxed text-slate-600">{lib.tierAvgSummary}</p>
+            ) : null}
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border border-white/80 bg-white/80 p-3">
+                <p className="text-xs font-medium text-violet-700">
+                  头部 · 5 级及以上（{lib.headCount} 人）
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                  {lib.headSamples.length
+                    ? `代表：${lib.headSamples.join('、')}`
+                    : '库内暂无头部样本'}
+                </p>
+              </div>
+              <div className="rounded-lg border border-white/80 bg-white/80 p-3">
+                <p className="text-xs font-medium text-amber-700">
+                  腰尾部 · 3–4 级（{lib.midTailCount} 人）
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                  {lib.midTailSamples.length
+                    ? `代表：${lib.midTailSamples.join('、')}`
+                    : '库内暂无腰尾样本'}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : null}
         {lines.length ? (
           <div>
             <h3 className="mb-2 text-sm font-semibold text-gray-900">细致预算分配</h3>

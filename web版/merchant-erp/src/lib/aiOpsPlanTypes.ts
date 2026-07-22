@@ -142,6 +142,22 @@ export type AiOpsPlanBudgetLine = {
   note: string
 }
 
+/** 星选达人库分层摘要（服务端注入，供达人预算页展示） */
+export type AiOpsPlanTalentLibraryInsight = {
+  sourceLabel: string
+  citySource: string
+  filterCity: string
+  platform: string
+  /** 头部：销售等级 5 级及以上 */
+  headCount: number
+  /** 腰尾部：销售等级 3–4 级 */
+  midTailCount: number
+  headSamples: string[]
+  midTailSamples: string[]
+  tierAvgSummary: string
+  matchedEntries: number
+}
+
 export type AiOpsPlanCombo = {
   name: string
   items: string
@@ -191,6 +207,8 @@ export type AiOpsPlanResult = {
   talentBudget: {
     talentRows: AiOpsPlanTalentRow[]
     budgetLines: AiOpsPlanBudgetLine[]
+    /** 服务端注入：星选达人库头部(5+) / 腰尾(3-4) 分层摘要 */
+    libraryInsight?: AiOpsPlanTalentLibraryInsight
   }
   productBoard: {
     combos: AiOpsPlanCombo[]
@@ -977,6 +995,39 @@ export function normalizeAiOpsPlanResult(raw: unknown): AiOpsPlanResult | null {
         }))
         .filter((r) => r.category || r.platform)
         .slice(0, 40),
+      ...((): { libraryInsight?: AiOpsPlanTalentLibraryInsight } => {
+        const raw = (talent?.libraryInsight ?? talent?.library_insight) as
+          | Record<string, unknown>
+          | undefined
+        if (!raw || typeof raw !== 'object') return {}
+        const headSamples = Array.isArray(raw.headSamples)
+          ? raw.headSamples.map((x) => asStr(x)).filter(Boolean).slice(0, 12)
+          : Array.isArray(raw.head_samples)
+            ? raw.head_samples.map((x) => asStr(x)).filter(Boolean).slice(0, 12)
+            : []
+        const midTailSamples = Array.isArray(raw.midTailSamples)
+          ? raw.midTailSamples.map((x) => asStr(x)).filter(Boolean).slice(0, 12)
+          : Array.isArray(raw.mid_tail_samples)
+            ? raw.mid_tail_samples.map((x) => asStr(x)).filter(Boolean).slice(0, 12)
+            : []
+        return {
+          libraryInsight: {
+            sourceLabel: asStr(raw.sourceLabel ?? raw.source_label),
+            citySource: asStr(raw.citySource ?? raw.city_source),
+            filterCity: asStr(raw.filterCity ?? raw.filter_city),
+            platform: asStr(raw.platform),
+            headCount: Math.max(0, Math.round(asNum(raw.headCount ?? raw.head_count))),
+            midTailCount: Math.max(0, Math.round(asNum(raw.midTailCount ?? raw.mid_tail_count))),
+            headSamples,
+            midTailSamples,
+            tierAvgSummary: asStr(raw.tierAvgSummary ?? raw.tier_avg_summary),
+            matchedEntries: Math.max(
+              0,
+              Math.round(asNum(raw.matchedEntries ?? raw.matched_entries)),
+            ),
+          },
+        }
+      })(),
     },
     productBoard: {
       combos: combosRaw
@@ -1950,6 +2001,15 @@ export function aiOpsPlanToMarkdown(plan: AiOpsPlanResult, meta?: { title?: stri
   }
 
   lines.push('## 5. 预算分配明细', '')
+  if (plan.talentBudget.libraryInsight) {
+    const li = plan.talentBudget.libraryInsight
+    lines.push(
+      `**星选达人库：** ${li.sourceLabel}`,
+      `- 头部（5级及以上）：${li.headCount} 人${li.headSamples.length ? `；代表 ${li.headSamples.join('、')}` : ''}`,
+      `- 腰尾部（3–4级）：${li.midTailCount} 人${li.midTailSamples.length ? `；代表 ${li.midTailSamples.join('、')}` : ''}`,
+      '',
+    )
+  }
   if (plan.talentBudget.budgetLines.length) {
     lines.push(
       '| 类别 | 平台 | 层级 | 人数 | 单场/人 | 投流预算 | 小计 | 备注 |',
