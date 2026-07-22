@@ -14,18 +14,25 @@ import {
   Upload,
   Clapperboard,
   Volume2,
+  ImagePlus,
+  Film,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../cn'
 import {
+  composeCourseRecordVideo,
   estimateSpeechSec,
   formatTimelineChecklist,
+  matchImagesToCoursePages,
   pagesToOralMarkdown,
   parseOralScriptMarkdown,
   parseOralScriptWithAi,
+  probeAudioDurationSec,
+  revokeCourseRecordPageImages,
   SAMPLE_OPENING_ORAL_SCRIPT,
   VOICE_PREVIEW_FALLBACK,
   type CourseRecordPage,
+  type CourseRecordPageImage,
 } from '../lib/courseRecordWorkshop'
 import {
   ICE_MIX_VOICE_DEFAULT_ID,
@@ -76,9 +83,13 @@ export default function CourseRecordWorkshopPage() {
   const cloneBlobRef = useRef<Blob | null>(null)
   const cloneInputRef = useRef<HTMLInputElement>(null)
   const scriptInputRef = useRef<HTMLInputElement>(null)
+  const slideInputRef = useRef<HTMLInputElement>(null)
 
   const [audios, setAudios] = useState<Record<number, PageAudio>>({})
+  const [pageImages, setPageImages] = useState<Record<number, CourseRecordPageImage>>({})
   const [busyAll, setBusyAll] = useState(false)
+  const [videoBusy, setVideoBusy] = useState(false)
+  const [videoProgress, setVideoProgress] = useState<string | null>(null)
   const [parseBusy, setParseBusy] = useState(false)
   const [uploadBusy, setUploadBusy] = useState(false)
   const [voicePreviewBusy, setVoicePreviewBusy] = useState(false)
@@ -89,6 +100,7 @@ export default function CourseRecordWorkshopPage() {
   const [guidePlaying, setGuidePlaying] = useState(false)
   const audioElRef = useRef<HTMLAudioElement | null>(null)
   const guideStopRef = useRef(false)
+  const videoAbortRef = useRef<AbortController | null>(null)
 
   const resolvedVoice = useMemo(
     () => voicePresetById(voicePresetId) ?? ICE_MIX_VOICE_PRESETS[0]!,
@@ -109,9 +121,46 @@ export default function CourseRecordWorkshopPage() {
       })
       return {}
     })
+    setPageImages((prev) => {
+      revokeCourseRecordPageImages(Object.values(prev))
+      return {}
+    })
     setGuideIndex(null)
     setGuidePlaying(false)
   }, [])
+
+  const clearPageImages = useCallback(() => {
+    setPageImages((prev) => {
+      revokeCourseRecordPageImages(Object.values(prev))
+      return {}
+    })
+    setHint('已清空课件图片')
+  }, [])
+
+  const onUploadSlides = useCallback(
+    (fileList: FileList | null) => {
+      if (!fileList?.length) return
+      if (!pages.length) {
+        window.alert('请先解析口播分页，再上传编号图片')
+        return
+      }
+      const { matched, unmatchedNames, missingPageNos } = matchImagesToCoursePages(
+        Array.from(fileList),
+        pages,
+      )
+      setPageImages((prev) => {
+        revokeCourseRecordPageImages(Object.values(prev))
+        const next: Record<number, CourseRecordPageImage> = {}
+        for (const m of matched) next[m.pageNo] = m
+        return next
+      })
+      const parts = [`已匹配 ${matched.length}/${pages.length} 页图片`]
+      if (missingPageNos.length) parts.push(`缺页：${missingPageNos.slice(0, 12).join(',')}${missingPageNos.length > 12 ? '…' : ''}`)
+      if (unmatchedNames.length) parts.push(`未用：${unmatchedNames.slice(0, 3).join('、')}`)
+      setHint(parts.join(' · '))
+    },
+    [pages],
+  )
 
   const parseScriptRules = useCallback(() => {
     const next = parseOralScriptMarkdown(rawScript)
@@ -148,11 +197,13 @@ export default function CourseRecordWorkshopPage() {
   useEffect(() => {
     return () => {
       guideStopRef.current = true
+      videoAbortRef.current?.abort()
       stopDigitalHumanSpeech()
       audioElRef.current?.pause()
       Object.values(audios).forEach((a) => {
         if (a.blobUrl) URL.revokeObjectURL(a.blobUrl)
       })
+      revokeCourseRecordPageImages(Object.values(pageImages))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- cleanup on unmount only
   }, [])
@@ -240,11 +291,12 @@ export default function CourseRecordWorkshopPage() {
       if (!out.ok) return { status: 'error', message: out.message }
       const blob = base64ToMp3Blob(out.audioBase64)
       const blobUrl = URL.createObjectURL(blob)
+      const probed = await probeAudioDurationSec(blob)
       return {
         status: 'done',
         blob,
         blobUrl,
-        durationSec: estimateSpeechSec(text),
+        durationSec: probed ?? estimateSpeechSec(text),
       }
     },
     [voicePresetId, resolvedVoice, resolveCloneB64],
@@ -385,6 +437,76 @@ export default function CourseRecordWorkshopPage() {
     if (!n) window.alert('暂无已生成音频')
   }
 
+  const imageMatchedCount = useMemo(
+    () => pages.filter((p) => pageImages[p.pageNo]).length,
+    [pages, pageImages],
+  )
+  const videoReadyCount = useMemo(
+    () =>
+      pages.filter(
+        (p) => pageImages[p.pageNo] && audios[p.pageNo]?.status === 'done' && audios[p.pageNo]?.blob,
+      ).length,
+    [pages, pageImages, audios],
+  )
+
+  const generateAndDownloadVideo = async () => {
+    const slides = []
+    for (const page of pages) {
+      const img = pageImages[page.pageNo]
+      const a = audios[page.pageNo]
+      if (!img || !a?.blob || a.status !== 'done') continue
+      let durationSec = a.durationSec
+      if (!(durationSec && durationSec > 0)) {
+        durationSec = (await probeAudioDurationSec(a.blob)) ?? estimateSpeechSec(page.script)
+      }
+      slides.push({
+        pageNo: page.pageNo,
+        title: page.title,
+        imageBlob: img.file,
+        audioBlob: a.blob,
+        durationSec,
+      })
+    }
+    if (!slides.length) {
+      window.alert('请先生成音频，并上传与页码对应的课件图片（如 01.png / page-12.jpg）')
+      return
+    }
+    if (slides.length < pages.length) {
+      const ok = window.confirm(
+        `仅 ${slides.length}/${pages.length} 页同时具备图片+音频，将只合成这些页。继续？`,
+      )
+      if (!ok) return
+    }
+
+    videoAbortRef.current?.abort()
+    const ac = new AbortController()
+    videoAbortRef.current = ac
+    setVideoBusy(true)
+    setVideoProgress('准备合成…')
+    setHint(null)
+    try {
+      const blob = await composeCourseRecordVideo({
+        slides,
+        onProgress: (msg) => setVideoProgress(msg),
+        signal: ac.signal,
+      })
+      const safeTitle = (courseTitle || '录播').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 40)
+      downloadBlob(blob, `${safeTitle}-图文录播.webm`)
+      setHint(`已下载视频（${slides.length} 页，约 ${(blob.size / (1024 * 1024)).toFixed(1)} MB）`)
+      setVideoProgress(null)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      if (msg !== '已取消') {
+        setHint(`视频合成失败：${msg}`)
+        window.alert(`视频合成失败：${msg}`)
+      }
+      setVideoProgress(null)
+    } finally {
+      setVideoBusy(false)
+      videoAbortRef.current = null
+    }
+  }
+
   const onUploadScript = async (file: File) => {
     setUploadBusy(true)
     setHint(null)
@@ -420,8 +542,8 @@ export default function CourseRecordWorkshopPage() {
         </div>
         <h1 className="text-2xl font-bold text-slate-900">半自动录播工坊</h1>
         <p className="max-w-3xl text-sm leading-relaxed text-slate-600">
-          粘贴或上传口播稿 → AI/规则分页 → 选音色并试听 → 一键生成每页 MP3 → 另窗 PPT + OBS
-          录屏，点「开始导播」同步翻页。
+          粘贴或上传口播稿 → AI/规则分页 → 选音色并试听 → 一键生成每页 MP3 → 上传编号课件图（与页码对齐）→
+          按音频时长出成片下载；也可另窗 PPT + OBS，点「开始导播」同步翻页。
         </p>
       </header>
 
@@ -624,6 +746,113 @@ export default function CourseRecordWorkshopPage() {
           <Download className="h-4 w-4" />
           导出时间轴清单
         </button>
+        <button
+          type="button"
+          disabled={videoBusy || videoReadyCount === 0}
+          className={cn(
+            'inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white',
+            videoBusy ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700',
+            'disabled:opacity-50',
+          )}
+          onClick={() => void generateAndDownloadVideo()}
+          title="每页图片展示时长 = 对应页音频时长"
+        >
+          {videoBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Film className="h-4 w-4" />}
+          {videoBusy ? '正在合成视频…' : '生成录播视频并下载'}
+        </button>
+        {videoBusy ? (
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700"
+            onClick={() => videoAbortRef.current?.abort()}
+          >
+            <Square className="h-4 w-4" />
+            取消合成
+          </button>
+        ) : null}
+      </section>
+      {videoProgress ? (
+        <p className="text-sm text-indigo-700">{videoProgress}</p>
+      ) : null}
+
+      <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">课件图片（按页编号）</h2>
+            <p className="mt-0.5 text-xs text-slate-500">
+              文件名含页码即可：如 <code className="rounded bg-slate-100 px-1">01.png</code>、
+              <code className="rounded bg-slate-100 px-1">page-12.jpg</code>、
+              <code className="rounded bg-slate-100 px-1">第3页.webp</code>
+              。展示时长自动对齐该页音频。
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <input
+              ref={slideInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif,.png,.jpg,.jpeg,.webp"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                onUploadSlides(e.target.files)
+                e.target.value = ''
+              }}
+            />
+            <button
+              type="button"
+              disabled={!pages.length || videoBusy}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+              onClick={() => slideInputRef.current?.click()}
+            >
+              <ImagePlus className="h-3.5 w-3.5" />
+              上传编号图片
+            </button>
+            {imageMatchedCount > 0 ? (
+              <button
+                type="button"
+                disabled={videoBusy}
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                onClick={clearPageImages}
+              >
+                清空图片
+              </button>
+            ) : null}
+          </div>
+        </div>
+        <p className="text-xs text-slate-500">
+          图片已匹配 <b>{imageMatchedCount}</b>/{pages.length} · 可出成片（图+音齐全）{' '}
+          <b>{videoReadyCount}</b>/{pages.length}
+        </p>
+        {imageMatchedCount > 0 ? (
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {pages.map((page) => {
+              const img = pageImages[page.pageNo]
+              const a = audios[page.pageNo]
+              const dur =
+                a?.status === 'done' && a.durationSec
+                  ? a.durationSec
+                  : estimateSpeechSec(page.script)
+              return (
+                <div
+                  key={page.pageNo}
+                  className="w-24 shrink-0 overflow-hidden rounded-lg border border-slate-100 bg-slate-50"
+                >
+                  {img ? (
+                    <img src={img.previewUrl} alt="" className="h-16 w-full object-cover" />
+                  ) : (
+                    <div className="flex h-16 items-center justify-center text-[10px] text-slate-400">
+                      缺图
+                    </div>
+                  )}
+                  <div className="px-1.5 py-1 text-[10px] leading-tight text-slate-600">
+                    <div className="font-semibold text-teal-700">P{page.pageNo}</div>
+                    <div>{a?.status === 'done' ? `音 ${dur.toFixed(1)}s` : `估 ${dur.toFixed(1)}s`}</div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        ) : null}
       </section>
 
       {current ? (
@@ -641,15 +870,41 @@ export default function CourseRecordWorkshopPage() {
         <ul className="divide-y divide-slate-100">
           {pages.map((page) => {
             const a = audios[page.pageNo]
+            const img = pageImages[page.pageNo]
             const previewing = pagePreviewBusy === page.pageNo
+            const audioSec =
+              a?.status === 'done' && a.durationSec
+                ? a.durationSec
+                : estimateSpeechSec(page.script)
             return (
               <li key={page.pageNo} className="flex flex-col gap-3 p-4 md:flex-row md:items-start">
-                <div className="w-16 shrink-0 text-sm font-bold text-teal-700">P{page.pageNo}</div>
+                <div className="flex w-28 shrink-0 flex-col gap-1">
+                  <div className="text-sm font-bold text-teal-700">P{page.pageNo}</div>
+                  {img ? (
+                    <img
+                      src={img.previewUrl}
+                      alt=""
+                      className="h-16 w-full rounded-lg object-cover ring-1 ring-slate-200"
+                      title={img.fileName}
+                    />
+                  ) : (
+                    <div className="flex h-16 items-center justify-center rounded-lg border border-dashed border-slate-200 text-[10px] text-slate-400">
+                      未配图
+                    </div>
+                  )}
+                </div>
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="font-medium text-slate-900">{page.title}</div>
                   <p className="line-clamp-3 text-xs leading-relaxed text-slate-600 md:text-sm">{page.script}</p>
                   <div className="text-[11px] text-slate-400">
-                    预估 ~{estimateSpeechSec(page.script)}s
+                    {a?.status === 'done' ? (
+                      <>
+                        音频 {audioSec.toFixed(1)}s
+                        {img ? ' · 成片本页同时长' : ' · 配图后可入成片'}
+                      </>
+                    ) : (
+                      <>预估 ~{estimateSpeechSec(page.script)}s</>
+                    )}
                     {a?.status === 'error' ? ` · ${a.message}` : null}
                     {a?.status === 'done' ? ' · 已生成' : null}
                     {a?.status === 'running' ? ' · 合成中…' : null}
@@ -700,9 +955,9 @@ export default function CourseRecordWorkshopPage() {
       </section>
 
       <aside className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
-        <b className="text-slate-800">录屏步骤：</b>
-        1）本机打开课程 PPT/HTML 全屏；2）OBS 选该窗口；3）音色试听确认后生成音频并「开始导播」；4）听到页码提示后翻
-        PPT；5）导出时间轴清单归档。
+        <b className="text-slate-800">用法：</b>
+        生成全部页音频后，上传与页码对应的课件图 →「生成录播视频并下载」（WebM，Chrome/Edge 最佳）。也可继续用 OBS
+        导播录屏。
       </aside>
     </div>
   )
