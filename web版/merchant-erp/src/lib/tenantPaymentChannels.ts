@@ -122,7 +122,7 @@ export async function createTenantPayPrepay(
   })
 
   if (channel === 'wechat') {
-    // —— 小程序虚拟支付（审核要求：虚拟商品必须 requestVirtualPayment）——
+    // 可选：显式传 virtual 才走米大师（默认与达人一致用 JSAPI）
     if (input.wechatPayMode === 'virtual') {
       const xpayCfg = loadWechatVirtualPayConfig()
       if (!xpayCfg.ok) return fail(xpayCfg.error, 503, xpayCfg.missing)
