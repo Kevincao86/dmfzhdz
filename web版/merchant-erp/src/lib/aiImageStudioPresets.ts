@@ -735,6 +735,8 @@ export type VisualStudioForm = {
   offer: string
   timeRange: string
   note: string
+  /** 参考关键词：可 AI 生成或手填，与参考图一并约束出图 */
+  referenceKeywords: string
   styleId: AiImageStyleId
   variantCount: 2 | 4
   delivery: AiImageDeliveryId
@@ -753,6 +755,7 @@ export const DEFAULT_VISUAL_STUDIO_FORM: VisualStudioForm = {
   offer: '',
   timeRange: '',
   note: '',
+  referenceKeywords: '',
   styleId: 'lively',
   variantCount: 4,
   delivery: 'platform',
@@ -2884,10 +2887,16 @@ export function buildVisualStudioPrompt(
     form.offer.trim() ? `核心优惠/价格：${form.offer.trim()}（数字醒目）。` : '',
     form.timeRange.trim() ? `活动时间：${form.timeRange.trim()}。` : '',
     form.note.trim() ? `补充说明：${form.note.trim()}。` : '',
+    form.referenceKeywords.trim()
+      ? `【参考关键词】须在画面元素、道具、氛围或构图中体现：${form.referenceKeywords.trim()}。`
+      : '',
     opts?.productRefCount
       ? `用户提供了 ${opts.productRefCount} 张实拍参考图，画面主体品类、色调与质感须与参考图一致。`
       : '',
     opts?.referenceAnalysis ? formatReferenceAnalysisForPrompt(opts.referenceAnalysis) : '',
+    opts?.productRefCount || form.referenceKeywords.trim() || opts?.referenceAnalysis
+      ? '若同时有参考图与参考关键词：先理解参考图主体/色调/元素，再结合参考关键词与上方业态/玩法/文案条件综合出图，禁止只复刻参考图而忽略营销文案。'
+      : '',
     '规范：专业中文海报排版、无乱码水印、无畸形文字；适合中国大陆本地生活商家投放。',
   ].filter(Boolean)
 
@@ -2977,6 +2986,7 @@ export function buildVisualStudioImageContext(
     offer: form.offer.trim(),
     timeRange: form.timeRange.trim(),
     note: form.note.trim(),
+    referenceKeywords: form.referenceKeywords.trim(),
     productRefCount: opts?.productRefCount ?? 0,
     styleFromReference: opts?.styleFromReference === true,
     referenceAnalysisSubject: opts?.referenceAnalysis?.subject ?? '',

@@ -343,6 +343,99 @@ export async function fetchVisualStudioCopyFromAi(
   }
 }
 
+function localReferenceKeywordsFallback(form: VisualStudioForm): string {
+  const pb = resolvePlaybook(form.playbook)
+  const sceneCtx = resolveIndustrySceneContext(form)
+  const parts = [
+    sceneCtx.label,
+    pb.label,
+    form.headline.trim(),
+    form.offer.trim(),
+    form.styleId,
+  ].filter(Boolean)
+  return parts.slice(0, 8).join('、')
+}
+
+export type VisualStudioReferenceKeywordsResult =
+  | { ok: true; keywords: string; source: 'ai' | 'local' }
+  | { ok: false; message: string; fallback: string }
+
+/** AI 根据业态/玩法/文案生成参考关键词（可手改），失败回退本地拼接 */
+export async function fetchVisualStudioReferenceKeywordsFromAi(
+  form: VisualStudioForm,
+  opts?: { signal?: AbortSignal; referenceAnalysis?: VisualStudioReferenceAnalysis | null },
+): Promise<VisualStudioReferenceKeywordsResult> {
+  const fallback = localReferenceKeywordsFallback(form)
+  const sceneCtx = resolveIndustrySceneContext(form)
+  const pb = resolvePlaybook(form.playbook)
+  const variant = resolvePlaybookVariant(
+    form.playbook,
+    form.playbookVariantId,
+    form.industry,
+    form.industrySubId,
+  )
+  const refHint = opts?.referenceAnalysis
+    ? [
+        opts.referenceAnalysis.subject,
+        ...(opts.referenceAnalysis.elements || []).slice(0, 4),
+        opts.referenceAnalysis.mood,
+      ]
+        .filter(Boolean)
+        .join('、')
+    : ''
+
+  const userPrompt = [
+    '你是本地生活营销海报的视觉关键词助手。请根据下列条件输出 6～12 个中文参考关键词（用顿号或逗号分隔的一行）。',
+    '关键词须利于文生图：含场景、道具、光影、色调、氛围、构图倾向；不要整句广告文案。',
+    `业态：${sceneCtx.label}（${sceneCtx.sceneHint}）`,
+    nonCateringFoodBanLine(form.industry, form.industrySubId),
+    `玩法：${pb.label}`,
+    variant ? `细分：${variant.label}` : '',
+    form.storeName.trim() ? `门店：${form.storeName.trim()}` : '',
+    form.headline.trim() ? `主标题：${form.headline.trim()}` : '',
+    form.subheadline.trim() ? `副标题：${form.subheadline.trim()}` : '',
+    form.offer.trim() ? `优惠：${form.offer.trim()}` : '',
+    refHint ? `参考图理解：${refHint}` : '',
+    '只输出关键词一行，不要编号、不要解释。',
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  try {
+    const res = await postAiChat(
+      {
+        provider: 'qwen',
+        messages: [
+          {
+            role: 'system',
+            content: '你只输出一行中文关键词，用顿号分隔，禁止其它文字。',
+          },
+          { role: 'user', content: userPrompt },
+        ],
+        stream: false,
+        taskType: 'generate_copywriting',
+        temperature: 0.45,
+      },
+      { signal: opts?.signal },
+    )
+    const keywords = stripPromptFence(res.content)
+      .replace(/^关键词[：:]\s*/i, '')
+      .replace(/\n+/g, '、')
+      .trim()
+    if (keywords.length >= 4) {
+      return { ok: true, keywords: keywords.slice(0, 200), source: 'ai' }
+    }
+    return { ok: false, message: 'AI 关键词过短，已使用本地关键词', fallback }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return {
+      ok: false,
+      message: msg.includes('abort') ? '已取消' : `AI 关键词暂不可用：${msg.slice(0, 100)}`,
+      fallback,
+    }
+  }
+}
+
 export type VisualStudioImagePromptResult =
   | { ok: true; prompt: string; source: 'ai' | 'local' }
   | { ok: false; message: string; fallback: string }
@@ -389,6 +482,12 @@ export async function fetchVisualStudioImagePromptFromAi(
       ? '4. carouselMaster=true：描述一张从左到右连续的超宽横幅，均分 5 段（封面→卖点1→卖点2→套餐→行动），背景与色调全幅无缝衔接，生成后将裁成单张轮播图'
       : '4. 体现 styleHint、compositionVariant、渠道尺寸与 playbook 玩法',
     '5. 若有 productRefCount>0 或 styleFromReference，强调与参考图品类色调一致（非餐饮参考图不得被理解成菜品）',
+    form.referenceKeywords.trim()
+      ? `5b. 必须把参考关键词融入画面元素/氛围：${form.referenceKeywords.trim()}`
+      : '',
+    refBlock || form.referenceKeywords.trim()
+      ? '5c. 若同时有参考图理解结果与参考关键词：综合两者，并严格服从上方业态/玩法/文案条件，禁止只复刻参考图'
+      : '',
     refBlock
       ? '6. 必须严格遵循下方「参考图核心元素」：提取的主体/元素须自然融入新海报，不可忽略'
       : '6. 结尾注明：专业海报排版、中文清晰可读、无水印乱码',

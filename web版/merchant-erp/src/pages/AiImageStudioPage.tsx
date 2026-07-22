@@ -62,7 +62,7 @@ import {
   mpPointsCostForVisualStudioImages,
 } from '../lib/mpPointsEconomics'
 import { postAiAgentNativeImage } from '../services/ai/aiClient'
-import { fetchVisualStudioCopyFromAi, analyzeVisualStudioReferenceImage, fetchVisualStudioImagePromptFromAi } from '../services/ai/visualStudioAi'
+import { fetchVisualStudioCopyFromAi, analyzeVisualStudioReferenceImage, fetchVisualStudioImagePromptFromAi, fetchVisualStudioReferenceKeywordsFromAi } from '../services/ai/visualStudioAi'
 import {
   checkVisualStudioCopyAffordable,
   checkVisualStudioImageBatchAffordable,
@@ -247,6 +247,8 @@ export default function AiImageStudioPage() {
   const [copyOptions, setCopyOptions] = useState<CopySuggestion[]>([])
   const [copyAiBusy, setCopyAiBusy] = useState(false)
   const [copyAiHint, setCopyAiHint] = useState<string | null>(null)
+  const [keywordsAiBusy, setKeywordsAiBusy] = useState(false)
+  const [keywordsAiHint, setKeywordsAiHint] = useState<string | null>(null)
   const [selectedPreviewChannel, setSelectedPreviewChannel] = useState<PublishChannelId>('douyin')
   const [selectedPreviewVariantId, setSelectedPreviewVariantId] = useState<string | null>(null)
   const [variants, setVariants] = useState<VariantResult[]>([])
@@ -257,6 +259,7 @@ export default function AiImageStudioPage() {
   const [storeLoadHint, setStoreLoadHint] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const copyAbortRef = useRef<AbortController | null>(null)
+  const keywordsAbortRef = useRef<AbortController | null>(null)
   const refAnalyzeAbortRef = useRef<AbortController | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const initRef = useRef(false)
@@ -458,6 +461,30 @@ export default function AiImageStudioPage() {
   const refreshCopy = () => {
     void loadAiCopy(form, { billable: true })
   }
+
+  const refreshReferenceKeywords = useCallback(async () => {
+    keywordsAbortRef.current?.abort()
+    const ac = new AbortController()
+    keywordsAbortRef.current = ac
+    setKeywordsAiBusy(true)
+    setKeywordsAiHint(null)
+    const r = await fetchVisualStudioReferenceKeywordsFromAi(form, {
+      signal: ac.signal,
+      referenceAnalysis,
+    })
+    if (ac.signal.aborted) return
+    setKeywordsAiBusy(false)
+    keywordsAbortRef.current = null
+    if (r.ok) {
+      patchForm({ referenceKeywords: r.keywords })
+      setKeywordsAiHint(r.source === 'ai' ? '已由 AI 生成参考关键词，可继续手改' : '已用本地规则生成，可继续手改')
+      return
+    }
+    if (r.message !== '已取消') {
+      patchForm({ referenceKeywords: r.fallback })
+      setKeywordsAiHint(r.message)
+    }
+  }, [form, referenceAnalysis, patchForm])
 
   const applyCopy = (c: CopySuggestion) => {
     patchForm({
@@ -1104,42 +1131,77 @@ export default function AiImageStudioPage() {
           </StudioPanel>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <StudioPanel title="AI 文案包" subtitle="点选后同步填入上方文案">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <p className="text-[10px] text-slate-400">
-                  手动「AI 换一版」{MP_POINTS_VISUAL_STUDIO_COPY_PER_USE} 积分/次
-                </p>
-                <button
-                  type="button"
-                  disabled={busy || copyAiBusy}
-                  onClick={refreshCopy}
-                  className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-violet-600 hover:text-violet-700 disabled:opacity-50"
-                >
-                  {copyAiBusy ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-3 w-3" />
-                  )}
-                  {copyAiBusy ? '生成中…' : 'AI 换一版'}
-                </button>
-              </div>
-              {copyAiHint && <p className="mb-2 text-[11px] text-violet-600">{copyAiHint}</p>}
-              <div className="space-y-2">
-                {copySuggestions.map((c, i) => (
+            <div className="space-y-4">
+              <StudioPanel title="AI 文案包" subtitle="点选后同步填入上方文案">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-[10px] text-slate-400">
+                    手动「AI 换一版」{MP_POINTS_VISUAL_STUDIO_COPY_PER_USE} 积分/次
+                  </p>
                   <button
-                    key={i}
                     type="button"
-                    disabled={busy}
-                    onClick={() => applyCopy(c)}
-                    className="w-full rounded-xl border border-slate-100 bg-gradient-to-r from-slate-50/80 to-white p-3 text-left text-sm transition hover:border-violet-200 hover:shadow-sm"
+                    disabled={busy || copyAiBusy}
+                    onClick={refreshCopy}
+                    className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-violet-600 hover:text-violet-700 disabled:opacity-50"
                   >
-                    <p className="font-medium text-slate-900">{c.headline}</p>
-                    {c.subheadline && <p className="mt-0.5 text-xs text-slate-500">{c.subheadline}</p>}
-                    {c.offer && <p className="mt-1 text-xs font-semibold text-orange-600">{c.offer}</p>}
+                    {copyAiBusy ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3 w-3" />
+                    )}
+                    {copyAiBusy ? '生成中…' : 'AI 换一版'}
                   </button>
-                ))}
-              </div>
-            </StudioPanel>
+                </div>
+                {copyAiHint && <p className="mb-2 text-[11px] text-violet-600">{copyAiHint}</p>}
+                <div className="space-y-2">
+                  {copySuggestions.map((c, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      disabled={busy}
+                      onClick={() => applyCopy(c)}
+                      className="w-full rounded-xl border border-slate-100 bg-gradient-to-r from-slate-50/80 to-white p-3 text-left text-sm transition hover:border-violet-200 hover:shadow-sm"
+                    >
+                      <p className="font-medium text-slate-900">{c.headline}</p>
+                      {c.subheadline && <p className="mt-0.5 text-xs text-slate-500">{c.subheadline}</p>}
+                      {c.offer && <p className="mt-1 text-xs font-semibold text-orange-600">{c.offer}</p>}
+                    </button>
+                  ))}
+                </div>
+              </StudioPanel>
+
+              <StudioPanel
+                title="参考关键词"
+                subtitle="可 AI 生成或手填；与参考图一并约束出图"
+              >
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-[10px] text-slate-400">顿号分隔，如：烟火气、红油、特写、暖光</p>
+                  <button
+                    type="button"
+                    disabled={busy || keywordsAiBusy}
+                    onClick={() => void refreshReferenceKeywords()}
+                    className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-violet-600 hover:text-violet-700 disabled:opacity-50"
+                  >
+                    {keywordsAiBusy ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3 w-3" />
+                    )}
+                    {keywordsAiBusy ? '生成中…' : 'AI 生成'}
+                  </button>
+                </div>
+                {keywordsAiHint && (
+                  <p className="mb-2 text-[11px] text-violet-600">{keywordsAiHint}</p>
+                )}
+                <textarea
+                  value={form.referenceKeywords}
+                  onChange={(e) => patchForm({ referenceKeywords: e.target.value })}
+                  disabled={busy}
+                  rows={3}
+                  placeholder="输入或点「AI 生成」参考关键词，出图时与参考图一并理解"
+                  className="w-full rounded-xl border border-slate-200/80 bg-slate-50/50 px-3 py-2.5 text-sm focus:border-violet-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-100"
+                />
+              </StudioPanel>
+            </div>
 
             <StudioPanel
               title="智能参考图"

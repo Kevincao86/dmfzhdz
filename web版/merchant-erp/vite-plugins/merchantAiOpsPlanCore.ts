@@ -272,7 +272,7 @@ const SYSTEM_PROMPT = `你是资深本地生活/餐饮多平台运营总监。�
 硬性要求：
 1. 只基于用户提供的菜单价目/已上架套餐/毛利/类目/竞品/预算/平台/门店范围；无菜单时用「已上架套餐」清单组品，勿编造菜名。多门店时方案须覆盖所选门店（或注明分店差异）。
 2. marketingBudget.channels 合计≈totalBudget（误差≤5%）；须含 roiSummary + roiAnalysis（≥3 行，含投入/预计GMV/订单/ROI/回本天数）。
-3. 【达人写死】talentBudget 必须基于用户消息中的「灵祺达人库」段：先按门店城市取同城达人数据；若该城无数据则已注入全国本地生活达人行情。人数/单价/标签须贴近库内均价与样本，禁止脱离库数据凭空编造；无同城时须在 note 注明「按全国本地生活达人行情」。budgetLines 至少覆盖「短视频达人（按头部/腰部/尾部分行）」「短视频本地推」「直播达人」「直播投流」；subtotalYuan=人数×单价+投流；talentRows≥6。
+3. 【达人写死】talentBudget 必须基于用户消息中的「灵祺星选达人库」段：先按门店城市取同城；无同城则已注入全国本地生活行情。必须读清并写明：头部（销售等级5级及以上 / V5·V5+）人数与样本、腰尾部（3–4级 / V3·V4）人数与样本；budgetLines 至少覆盖「短视频达人（头部/腰部/尾部分行）」「短视频本地推」「直播达人」「直播投流」；tier 与库分层对齐；人数/单价禁止脱离库数据；无同城时 note 注明「按全国本地生活达人行情」；subtotalYuan=人数×单价+投流；talentRows≥6。
 4. calendar.milestones 日期落在周期内，≥12 条；除必选 kind（collab_confirm→live_go）外，另给 other：确认货盘、造话题#、预热物料、直播彩排、数据战报等；video_publish/live_* 带 HH:mm。缺项服务端会补全。
 5. platformStrategy 仅用户勾选平台；examples 须像爆款钩子文案；detail≤120字且含 POI/挂链或投流之一。
 6. 组品 3～5 个，优先真实菜单名或已上架套餐名；sellingPoint 写清券面/让利卖点。
@@ -425,16 +425,29 @@ export async function runAiOpsPlanCore(
     city: string
     citySource: string
     matchedEntries: number
+    headCount: number
+    midTailCount: number
+    headSamples: string[]
+    midTailSamples: string[]
+    sourceLabel: string
+    tierAvgSummary: string
   } | null = null
   try {
     const { loadRegistrySnapshotForServer } = await import('../src/lib/registrySnapshotServerLoad.js')
-    const { buildTalentLibraryPlanPromptBlock, resolveTalentLibraryEntriesForCity } = await import(
-      '../src/lib/talentLibraryTierPricing.js'
-    )
+    const {
+      buildTalentLibraryPlanPromptBlock,
+      buildTalentLibraryPlanInsight,
+      resolveTalentLibraryEntriesForCity,
+    } = await import('../src/lib/talentLibraryTierPricing.js')
     const reg = await loadRegistrySnapshotForServer(process.cwd())
     const entries = reg?.talentLibraryEntries ?? []
     if (entries.length) {
       const resolved = resolveTalentLibraryEntriesForCity({
+        entries,
+        city: storeCity,
+        platform: talentPlatform,
+      })
+      const insight = buildTalentLibraryPlanInsight({
         entries,
         city: storeCity,
         platform: talentPlatform,
@@ -447,12 +460,17 @@ export async function runAiOpsPlanCore(
       talentLibraryMeta = {
         city: storeCity || resolved.filterCity,
         citySource: resolved.source,
-        matchedEntries:
-          resolved.source === 'city' ? resolved.cityMatchedCount : resolved.nationwideLocalLifeCount || resolved.entries.length,
+        matchedEntries: insight.matchedEntries,
+        headCount: insight.headCount,
+        midTailCount: insight.midTailCount,
+        headSamples: insight.headSamples,
+        midTailSamples: insight.midTailSamples,
+        sourceLabel: insight.sourceLabel,
+        tierAvgSummary: insight.tierAvgSummary,
       }
     } else {
       talentLibraryBlock =
-        '【灵祺达人库】当前库内暂无达人条目；talentBudget 须按本地生活探店常规档位保守估算，并在 note 标明「达人库暂空」。'
+        '【灵祺星选达人库】当前库内暂无达人条目；talentBudget 须按本地生活探店常规档位保守估算，并在 note 标明「达人库暂空」。'
     }
   } catch (e) {
     console.warn(
@@ -460,7 +478,7 @@ export async function runAiOpsPlanCore(
       e instanceof Error ? e.message.slice(0, 160) : e,
     )
     talentLibraryBlock =
-      '【灵祺达人库】读取失败；talentBudget 须保守估算并在 note 标明「达人库暂不可用」。'
+      '【灵祺星选达人库】读取失败；talentBudget 须保守估算并在 note 标明「达人库暂不可用」。'
   }
 
   const userPrompt = [
@@ -530,6 +548,27 @@ export async function runAiOpsPlanCore(
         '[meoo-ai-ops-plan] enrichAiOpsPlanPostProcess failed',
         postErr instanceof Error ? postErr.message : postErr,
       )
+    }
+
+    if (talentLibraryMeta) {
+      plan = {
+        ...plan,
+        talentBudget: {
+          ...plan.talentBudget,
+          libraryInsight: {
+            sourceLabel: talentLibraryMeta.sourceLabel,
+            citySource: talentLibraryMeta.citySource,
+            filterCity: talentLibraryMeta.city,
+            platform: talentPlatform,
+            headCount: talentLibraryMeta.headCount,
+            midTailCount: talentLibraryMeta.midTailCount,
+            headSamples: talentLibraryMeta.headSamples,
+            midTailSamples: talentLibraryMeta.midTailSamples,
+            tierAvgSummary: talentLibraryMeta.tierAvgSummary,
+            matchedEntries: talentLibraryMeta.matchedEntries,
+          },
+        },
+      }
     }
 
     // 组品不足时再补；失败忽略。有菜单草稿时优先跳过二次 LLM，降低超时概率
