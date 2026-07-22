@@ -491,8 +491,8 @@ export default function CourseRecordWorkshopPage() {
         signal: ac.signal,
       })
       const safeTitle = (courseTitle || '录播').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 40)
-      downloadBlob(blob, `${safeTitle}-图文录播.webm`)
-      setHint(`已下载视频（${slides.length} 页，约 ${(blob.size / (1024 * 1024)).toFixed(1)} MB）`)
+      downloadBlob(blob, `${safeTitle}-图文录播.mp4`)
+      setHint(`已下载 MP4（${slides.length} 页，约 ${(blob.size / (1024 * 1024)).toFixed(1)} MB）`)
       setVideoProgress(null)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
@@ -956,7 +956,7 @@ export default function CourseRecordWorkshopPage() {
 
       <aside className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
         <b className="text-slate-800">用法：</b>
-        生成全部页音频后，上传与页码对应的课件图 →「生成录播视频并下载」（WebM，Chrome/Edge 最佳）。也可继续用 OBS
+        生成全部页音频后，上传与页码对应的课件图 →「生成录播视频并下载」（导出 MP4，离线合成更快）。也可继续用 OBS
         导播录屏。
       </aside>
     </div>
