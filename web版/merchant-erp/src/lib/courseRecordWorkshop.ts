@@ -375,7 +375,10 @@ async function rasterizeSlideJpeg(
   return blobToU8(jpeg)
 }
 
-async function ffmpegDeleteQuiet(ffmpeg: { deleteFile: (n: string) => Promise<void> }, name: string) {
+async function ffmpegDeleteQuiet(
+  ffmpeg: { deleteFile: (n: string) => Promise<boolean | void> },
+  name: string,
+) {
   try {
     await ffmpeg.deleteFile(name)
   } catch {
