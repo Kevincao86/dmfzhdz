@@ -8,7 +8,6 @@ const registry = require('../../utils/aiModelRegistryMp.js')
 const composerMp = require('../../utils/agentComposerMp.js')
 const habitsMp = require('../../utils/agentUserHabitsMp.js')
 const supabaseRest = require('../../utils/supabaseRest.js')
-const mpEdition = require('../../utils/mpAppEdition.js')
 
 const FILTER_TABS = [
   { id: 'all', short: '全部' },
@@ -17,7 +16,7 @@ const FILTER_TABS = [
 ]
 
 const AGENT_WELCOME =
-  '你好！我是灵祺小助理，我可以帮你快速创建各类产品文案和招聘需求文案（Brief）。请告诉我你的需求吧~'
+  '你好！我是灵祺 AI 智能体，我可以帮你快速创建各类产品文案和招聘需求文案（Brief）。请告诉我你的需求吧~'
 
 function hasUserChat(messages) {
   return (messages || []).some((m) => m.role === 'user')
@@ -86,13 +85,11 @@ Page({
     shortcutsOpen: false,
     hasChat: false,
     confirmingPreviewId: '',
-    agentTitle: '灵祺小助理',
   },
 
   onLoad() {
     this._executionState = execMp.createAgentExecutionState()
     this.recalcLayout()
-    this.setData({ agentTitle: mpEdition.agentTopTitle(mpEdition.getEdition()) })
     const allModelOptions = registry.listAiModelPickerOptions()
     this._allModelOptions = allModelOptions
     this._recorder = wx.getRecorderManager()
@@ -190,7 +187,6 @@ Page({
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 0 })
     }
-    this.setData({ agentTitle: mpEdition.agentTopTitle(mpEdition.getEdition()) })
     this.recalcLayout()
   },
 
@@ -519,7 +515,7 @@ Page({
     if (!api.isRealAuthed()) {
       wx.showModal({
         title: '请先登录',
-        content: '灵祺小助理需登录后使用。请完成登录后再发送消息（免登录游览不支持 AI 对话）。',
+        content: '灵祺 AI 智能体需登录后使用。请完成登录后再发送消息（免登录游览不支持 AI 对话）。',
         confirmText: '去登录',
         cancelText: '取消',
         success: (r) => {

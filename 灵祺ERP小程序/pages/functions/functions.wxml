@@ -1,8 +1,8 @@
 <scroll-view scroll-y class="page-func-v2" enhanced show-scrollbar="{{false}}" style="padding-bottom:var(--tab-bar-pad)">
   <view class="func-top">
     <view>
-      <text class="func-h1">{{hubTitle}}</text>
-      <text class="func-p">{{hubSub}}</text>
+      <text class="func-h1">商家能力中心</text>
+      <text class="func-p">店铺 · 商品 · 运营 · 投流 · 线索 · 财务</text>
     </view>
     <image class="func-illus-img" src="/images/func-hero-illus.svg" mode="aspectFit" />
   </view>

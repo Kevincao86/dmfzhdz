@@ -191,7 +191,7 @@ function isGuestBrowsing() {
   }
 }
 
-/** Tab 页（灵祺助手 / 功能 / 我的）是否可进入：已登录、开发预览或免登录游览 */
+/** Tab 页（灵祺AI / 功能 / 我的）是否可进入：已登录、开发预览或免登录游览 */
 function canAccessTabBar() {
   return canAccessPage()
 }
