@@ -69,7 +69,7 @@
   font-weight: 600;
 }
 
-/* 灵祺助手：对话气泡 + 角标光点 */
+/* 灵祺AI：对话气泡 + 角标光点 */
 .tab-icon-ai .ai-bubble {
   width: 34rpx;
   height: 26rpx;
