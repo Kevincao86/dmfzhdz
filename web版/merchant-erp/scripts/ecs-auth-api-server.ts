@@ -170,6 +170,7 @@ import mpCalendarReminderHandler from '../api/meoo-ops-mp-calendar-reminder.ts'
 import mpOrderCustomLabelHandler from '../api/meoo-ops-mp-order-custom-label.ts'
 import { processDueCalendarReminders } from '../src/lib/mpCalendarReminderCore.ts'
 import wechatPayNotifyHandler from '../api/meoo-wechat-pay-notify.ts'
+import xpayGoodsNotifyHandler from '../api/meoo-xpay-goods-notify.ts'
 import alipayPayNotifyHandler from '../api/meoo-alipay-pay-notify.ts'
 import douyinTradeNotifyHandler from '../api/meoo-douyin-trade-notify.ts'
 import douyinPayNotifyHandler from '../api/meoo-douyin-pay-notify.ts'
@@ -244,6 +245,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-mp-calendar-reminder': mpCalendarReminderHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-order-custom-label': mpOrderCustomLabelHandler as VercelLikeHandler,
   '/api/meoo-wechat-pay-notify': wechatPayNotifyHandler as VercelLikeHandler,
+  '/api/meoo-xpay-goods-notify': xpayGoodsNotifyHandler as VercelLikeHandler,
   '/api/meoo-alipay-pay-notify': alipayPayNotifyHandler as VercelLikeHandler,
   '/api/meoo-douyin-trade-notify': douyinTradeNotifyHandler as VercelLikeHandler,
   '/api/meoo-douyin-pay-notify': douyinPayNotifyHandler as VercelLikeHandler,

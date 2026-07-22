@@ -37,7 +37,10 @@ export async function resolveErpWxOpenIdForPay(input: {
   userId: string
   code?: string
   stableDevOpenId?: string
-}): Promise<{ openid: string; from: 'metadata' | 'code' } | { error: string; message: string }> {
+}): Promise<
+  | { openid: string; session_key?: string; from: 'metadata' | 'code' }
+  | { error: string; message: string }
+> {
   const userId = String(input.userId || '').trim()
   if (!userId) {
     return { error: 'invalid_user', message: '缺少用户身份，请重新登录后支付' }
@@ -53,7 +56,11 @@ export async function resolveErpWxOpenIdForPay(input: {
         return { error: 'invalid_wx_code', message: '微信授权失败，请重新点击支付' }
       }
       void bindErpWxOpenIdToAuthUser(userId, openid)
-      return { openid, from: 'code' }
+      return {
+        openid,
+        session_key: session.session_key ? String(session.session_key) : undefined,
+        from: 'code',
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       if (/code been used|invalid code|40163|40029/i.test(msg)) {

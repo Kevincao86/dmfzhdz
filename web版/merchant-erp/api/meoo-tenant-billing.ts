@@ -187,9 +187,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return
       }
       const payModeRaw = String(body.payMode || 'native').trim()
-      const wechatPayMode = payModeRaw === 'jsapi' ? ('jsapi' as const) : ('native' as const)
+      const wechatPayMode =
+        payModeRaw === 'virtual'
+          ? ('virtual' as const)
+          : payModeRaw === 'jsapi'
+            ? ('jsapi' as const)
+            : ('native' as const)
       let wechatOpenId = String(body.openid || '').trim()
-      if (channel === 'wechat' && wechatPayMode === 'jsapi' && !wechatOpenId) {
+      let wechatSessionKey = String(body.sessionKey || body.session_key || '').trim()
+      if (
+        channel === 'wechat' &&
+        (wechatPayMode === 'jsapi' || wechatPayMode === 'virtual') &&
+        (!wechatOpenId || (wechatPayMode === 'virtual' && !wechatSessionKey))
+      ) {
         const resolved = await resolveErpWxOpenIdForPay({
           userId: auth.userId,
           code: typeof body.code === 'string' ? body.code : undefined,
@@ -205,6 +215,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           return
         }
         wechatOpenId = resolved.openid
+        if (resolved.session_key) wechatSessionKey = resolved.session_key
+      }
+      if (channel === 'wechat' && wechatPayMode === 'virtual' && !wechatSessionKey) {
+        sendJson(res, 400, {
+          ok: false,
+          error: 'missing_session_key',
+          message: '微信会话已失效，请重新点击微信支付',
+        })
+        return
       }
       const result = await createTenantPayPrepay(admin, {
         tenantId: auth.tenantId,
@@ -215,6 +234,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         clientNote: typeof body.clientNote === 'string' ? body.clientNote : null,
         wechatPayMode: channel === 'wechat' ? wechatPayMode : undefined,
         wechatOpenId: wechatOpenId || null,
+        wechatSessionKey: wechatSessionKey || null,
       })
       if (!result.ok) {
         const missing = Array.isArray(result.missing)
@@ -237,6 +257,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         qrCode: result.qrCode ?? result.codeUrl,
         payPageUrl: result.payPageUrl,
         jsapiParams: result.jsapiParams,
+        virtualPayParams: result.virtualPayParams,
       })
       return
     }

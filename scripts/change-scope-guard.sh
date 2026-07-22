@@ -244,6 +244,8 @@ tenantPayFlowMp
 formatDisplayErrorMp
 formatDisplayError
 meoo-tenant-billing
+meoo-xpay-goods-notify
+wechatVirtualPay
 authWxLoginShared
 erpMpWechatAccess
 wechatPayV3
@@ -260,6 +262,7 @@ merchantAiOpsPlanCore
 ecs-setup-erp-mp-wechat-env
 ecs-probe-erp-wechat-native-pay
 ecs-probe-erp-wechat-jsapi-ready
+ecs-auth-api-server
 change-scope-guard
 PAT
       ;;

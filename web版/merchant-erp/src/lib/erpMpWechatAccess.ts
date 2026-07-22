@@ -30,11 +30,14 @@ export async function erpWxCodeToOpenId(
   if (process.env.MP_AUTH_DEV_MODE === 'true') {
     const stable = String(stableDevOpenId || process.env.ERP_MP_DEV_FIXED_OPENID || '').trim()
     if (stable) {
-      return { openid: stable.startsWith('dev_') ? stable : `dev_${stable}` }
+      return {
+        openid: stable.startsWith('dev_') ? stable : `dev_${stable}`,
+        session_key: 'dev_session_key_for_xpay_sign',
+      }
     }
     if (code) {
       const openid = `dev_${createHash('sha256').update(code).digest('hex').slice(0, 28)}`
-      return { openid }
+      return { openid, session_key: 'dev_session_key_for_xpay_sign' }
     }
   }
   const { appId, secret } = erpMpWechatCredentials()
