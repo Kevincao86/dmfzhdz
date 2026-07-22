@@ -1,0 +1,11 @@
+<scroll-view scroll-y class="page-pad-v2" enhanced show-scrollbar="{{false}}">
+  <view class="hero-purple">星选达人招募</view>
+  <text class="hub-sub">与 fws 电脑端星选菜单一致，需在 Web 端完成部分操作时可同步登录。</text>
+  <navigator wx:for="{{items}}" wx:key="path" url="{{item.url}}" class="list-card-v2">
+    <view>
+      <text class="list-strong">{{item.title}}</text>
+      <text class="list-sub">{{item.desc}}</text>
+    </view>
+    <text class="chev">›</text>
+  </navigator>
+</scroll-view>

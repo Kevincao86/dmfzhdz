@@ -54,15 +54,19 @@ module.exports.MODULE_COPY = {
   },
   competitors: {
     navTitle: '竞争对手分析',
-    body: '竞品门店、价格带与差异化建议与电脑端「运营 → 竞争对手分析」同源 API（/api/meoo-competitor-analysis）。完整图表请在电脑端查看；小程序可通过灵祺 AI 智能体咨询竞品策略。',
+    body: '竞品门店、价格带与差异化建议与电脑端「运营 → 竞争对手分析」同源 API。请从「功能 → 运营 → 竞争对手分析」进入原生页生成报告。',
   },
   store_menu: {
     navTitle: '菜单价目表',
-    body: '门店价目与毛利配置经云端 tenant_store_intel 与电脑端同步，并注入灵祺 AI 智能体上下文。完整 Excel/拍照识别请在电脑端「店铺 → 菜单价目表」操作。',
+    body: '门店价目与毛利配置经云端与电脑端同步，并注入灵祺小助理上下文。请从「功能 → 店铺 → 菜单价目表」进入原生页查看与编辑。',
   },
   digital_human: {
     navTitle: '数字人口播',
-    body: '数字人 TTS 与抖音链路合成与电脑端「运营 → 数字人口播」一致。复杂编排请在电脑端完成。',
+    body: '数字人 TTS 试听与电脑端同源。请从「功能 → AI 创作 → 数字人口播」进入原生页；完整成片编排请在电脑端完成。',
+  },
+  ai_ops_plan: {
+    navTitle: 'AI 运营方案',
+    body: '多平台运营方案与电脑端同源。请从「功能 → AI 创作 → AI 运营方案」进入原生页生成。',
   },
   platform_target: {
     navTitle: '平台签框',

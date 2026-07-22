@@ -1,0 +1,5 @@
+<view class="fws-web-page">
+  <view wx:if="{{err}}" class="fws-web-err">{{err}}</view>
+  <web-view wx:elif="{{webUrl}}" src="{{webUrl}}"></web-view>
+  <view wx:else class="fws-web-loading">加载中…</view>
+</view>

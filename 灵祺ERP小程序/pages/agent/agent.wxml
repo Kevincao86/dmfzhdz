@@ -1,6 +1,6 @@
 <view class="page-agent-v2">
   <view class="agent-top-v2" style="padding-top: {{statusBarH}}px;">
-    <text class="agent-top-title">灵祺 AI 智能体</text>
+    <text class="agent-top-title">{{agentTitle}}</text>
     <view class="menu-btn" bindtap="onOpenHeaderMenu">
       <text class="menu-glyph">≡</text>
     </view>

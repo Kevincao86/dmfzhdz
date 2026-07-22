@@ -1,0 +1,35 @@
+<scroll-view scroll-y class="dh-page" enhanced show-scrollbar="{{false}}">
+  <view class="dh-hero">
+    <text class="dh-title">数字人口播</text>
+    <text class="dh-sub">{{tip}}</text>
+  </view>
+
+  <view class="dh-card">
+    <text class="dh-label">音色</text>
+    <view class="dh-chips">
+      <text
+        wx:for="{{voices}}"
+        wx:key="id"
+        class="dh-chip {{voiceId === item.id ? 'on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onPickVoice"
+      >{{item.label}}</text>
+    </view>
+    <text class="dh-label">口播文案</text>
+    <textarea
+      class="dh-area"
+      maxlength="2000"
+      placeholder="输入要合成的口播稿…"
+      value="{{script}}"
+      bindinput="onScript"
+    />
+    <view class="dh-btns">
+      <button class="dh-btn" loading="{{busy}}" disabled="{{busy}}" bindtap="onSynth">
+        {{busy ? '合成中…' : '合成并试听'}}
+      </button>
+      <button wx:if="{{playing}}" class="dh-btn ghost" bindtap="onStop">停止</button>
+    </view>
+  </view>
+
+  <view wx:if="{{err}}" class="dh-err">{{err}}</view>
+</scroll-view>
