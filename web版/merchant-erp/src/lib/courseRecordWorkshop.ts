@@ -215,3 +215,328 @@ export const SAMPLE_OPENING_ORAL_SCRIPT = `### 第 1 页 · 封面
 
 export const VOICE_PREVIEW_FALLBACK =
   '大家好，这是灵祺录播工坊的口播音色试听，请确认音量与语速是否合适。'
+
+/** 从文件名解析页码：page-01 / p12 / 第3页 / 01 / slide_7 等 */
+export function extractPageNoFromImageName(fileName: string): number | null {
+  const base = String(fileName || '')
+    .replace(/^.*[/\\]/, '')
+    .replace(/\.[^.]+$/, '')
+    .trim()
+  if (!base) return null
+  const patterns = [
+    /(?:^|[_\-\s.])page[_-\s.]?0*(\d+)(?:$|[_\-\s.])/i,
+    /(?:^|[_\-\s.])p[_-\s.]?0*(\d+)(?:$|[_\-\s.])/i,
+    /第\s*0*(\d+)\s*页/,
+    /^0*(\d+)$/,
+    /(\d+)/,
+  ]
+  for (const re of patterns) {
+    const m = base.match(re)
+    if (!m?.[1]) continue
+    const n = Number(m[1])
+    if (Number.isFinite(n) && n > 0 && n < 10_000) return Math.floor(n)
+  }
+  return null
+}
+
+export type CourseRecordPageImage = {
+  pageNo: number
+  file: File
+  previewUrl: string
+  fileName: string
+}
+
+/**
+ * 将上传图片按编号匹配到口播页；无法解析编号的按文件名排序后依次填空缺页。
+ */
+export function matchImagesToCoursePages(
+  files: File[],
+  pages: CourseRecordPage[],
+): { matched: CourseRecordPageImage[]; unmatchedNames: string[]; missingPageNos: number[] } {
+  const pageNos = new Set(pages.map((p) => p.pageNo))
+  const byNo = new Map<number, CourseRecordPageImage>()
+  const leftover: File[] = []
+
+  for (const file of files) {
+    if (!file.type.startsWith('image/') && !/\.(png|jpe?g|webp|gif|bmp)$/i.test(file.name)) {
+      continue
+    }
+    const pageNo = extractPageNoFromImageName(file.name)
+    if (pageNo != null && pageNos.has(pageNo) && !byNo.has(pageNo)) {
+      byNo.set(pageNo, {
+        pageNo,
+        file,
+        previewUrl: URL.createObjectURL(file),
+        fileName: file.name,
+      })
+    } else {
+      leftover.push(file)
+    }
+  }
+
+  leftover.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN', { numeric: true }))
+  const missing = pages.map((p) => p.pageNo).filter((n) => !byNo.has(n))
+  for (let i = 0; i < leftover.length && i < missing.length; i++) {
+    const pageNo = missing[i]!
+    const file = leftover[i]!
+    byNo.set(pageNo, {
+      pageNo,
+      file,
+      previewUrl: URL.createObjectURL(file),
+      fileName: file.name,
+    })
+  }
+
+  const matched = pages
+    .map((p) => byNo.get(p.pageNo))
+    .filter((x): x is CourseRecordPageImage => !!x)
+  const unmatchedNames = leftover.slice(missing.length).map((f) => f.name)
+  const missingPageNos = pages.map((p) => p.pageNo).filter((n) => !byNo.has(n))
+  return { matched, unmatchedNames, missingPageNos }
+}
+
+export function revokeCourseRecordPageImages(images: Iterable<CourseRecordPageImage | undefined | null>) {
+  for (const img of images) {
+    if (img?.previewUrl) URL.revokeObjectURL(img.previewUrl)
+  }
+}
+
+/** 探测音频真实时长（秒）；失败返回 null */
+export function probeAudioDurationSec(blob: Blob): Promise<number | null> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(blob)
+    const el = new Audio()
+    el.preload = 'metadata'
+    const finish = (sec: number | null) => {
+      URL.revokeObjectURL(url)
+      resolve(sec)
+    }
+    el.onloadedmetadata = () => {
+      const d = el.duration
+      finish(Number.isFinite(d) && d > 0 ? Math.round(d * 100) / 100 : null)
+    }
+    el.onerror = () => finish(null)
+    el.src = url
+  })
+}
+
+function pickRecorderMime(): string {
+  const candidates = [
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm;codecs=vp9',
+    'video/webm',
+  ]
+  for (const t of candidates) {
+    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(t)) return t
+  }
+  return 'video/webm'
+}
+
+function drawImageContain(
+  ctx: CanvasRenderingContext2D,
+  img: CanvasImageSource,
+  canvasW: number,
+  canvasH: number,
+  naturalW: number,
+  naturalH: number,
+) {
+  ctx.fillStyle = '#0f172a'
+  ctx.fillRect(0, 0, canvasW, canvasH)
+  const scale = Math.min(canvasW / Math.max(1, naturalW), canvasH / Math.max(1, naturalH))
+  const w = naturalW * scale
+  const h = naturalH * scale
+  const x = (canvasW - w) / 2
+  const y = (canvasH - h) / 2
+  ctx.drawImage(img, x, y, w, h)
+}
+
+export type CourseRecordVideoSlide = {
+  pageNo: number
+  title: string
+  imageBlob: Blob
+  audioBlob: Blob
+  /** 展示与成片均用此时长（优先真实音频时长） */
+  durationSec: number
+}
+
+/**
+ * 浏览器端：每页图片展示时长 = 对应页音频时长，合成可下载 WebM。
+ * （Safari 部分版本对 MediaRecorder 支持有限，失败时抛错提示改用 Chrome。）
+ */
+export async function composeCourseRecordVideo(params: {
+  slides: CourseRecordVideoSlide[]
+  width?: number
+  height?: number
+  fps?: number
+  gapSec?: number
+  onProgress?: (message: string, ratio: number) => void
+  signal?: AbortSignal
+}): Promise<Blob> {
+  const slides = params.slides.filter((s) => s.imageBlob && s.audioBlob && s.durationSec > 0)
+  if (!slides.length) throw new Error('没有可合成的页（需同时有图片与音频）')
+  if (typeof MediaRecorder === 'undefined') {
+    throw new Error('当前浏览器不支持 MediaRecorder，请用 Chrome / Edge 生成视频')
+  }
+
+  const width = params.width ?? 1280
+  const height = params.height ?? 720
+  const fps = params.fps ?? 30
+  const gapSec = Math.max(0, params.gapSec ?? 0.25)
+  const signal = params.signal
+
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('无法创建画布')
+
+  const audioCtx = new AudioContext()
+  const dest = audioCtx.createMediaStreamDestination()
+  // 静音扬声器，避免合成时外放；录音仍从 dest 取音轨
+  const silent = audioCtx.createGain()
+  silent.gain.value = 0
+  silent.connect(audioCtx.destination)
+
+  const canvasStream = canvas.captureStream(fps)
+  const combined = new MediaStream([
+    ...canvasStream.getVideoTracks(),
+    ...dest.stream.getAudioTracks(),
+  ])
+  const mimeType = pickRecorderMime()
+  const chunks: BlobPart[] = []
+  const recorder = new MediaRecorder(combined, {
+    mimeType,
+    videoBitsPerSecond: 4_000_000,
+    audioBitsPerSecond: 128_000,
+  })
+  recorder.ondataavailable = (ev) => {
+    if (ev.data.size > 0) chunks.push(ev.data)
+  }
+
+  const stopPromise = new Promise<Blob>((resolve, reject) => {
+    recorder.onerror = () => reject(new Error('录制失败'))
+    recorder.onstop = () => {
+      resolve(new Blob(chunks, { type: mimeType.split(';')[0] || 'video/webm' }))
+    }
+  })
+
+  if (audioCtx.state === 'suspended') await audioCtx.resume()
+  recorder.start(250)
+
+  let drawRaf = 0
+  let currentImg: HTMLImageElement | null = null
+  let currentNatural = { w: width, h: height }
+
+  const paintLoop = () => {
+    if (currentImg) {
+      drawImageContain(ctx, currentImg, width, height, currentNatural.w, currentNatural.h)
+    }
+    drawRaf = requestAnimationFrame(paintLoop)
+  }
+  paintLoop()
+
+  const loadImage = (blob: Blob) =>
+    new Promise<HTMLImageElement>((resolve, reject) => {
+      const url = URL.createObjectURL(blob)
+      const img = new Image()
+      img.onload = () => {
+        URL.revokeObjectURL(url)
+        resolve(img)
+      }
+      img.onerror = () => {
+        URL.revokeObjectURL(url)
+        reject(new Error('图片加载失败'))
+      }
+      img.src = url
+    })
+
+  const waitSec = (sec: number) =>
+    new Promise<void>((resolve, reject) => {
+      if (signal?.aborted) {
+        reject(new Error('已取消'))
+        return
+      }
+      const t = window.setTimeout(() => resolve(), Math.max(0, sec * 1000))
+      signal?.addEventListener(
+        'abort',
+        () => {
+          window.clearTimeout(t)
+          reject(new Error('已取消'))
+        },
+        { once: true },
+      )
+    })
+
+  try {
+    const total = slides.length
+    for (let i = 0; i < total; i++) {
+      if (signal?.aborted) throw new Error('已取消')
+      const slide = slides[i]!
+      params.onProgress?.(
+        `合成第 ${slide.pageNo} 页（${i + 1}/${total}）· ${slide.title}`,
+        i / total,
+      )
+
+      const img = await loadImage(slide.imageBlob)
+      currentImg = img
+      currentNatural = { w: img.naturalWidth || width, h: img.naturalHeight || height }
+      drawImageContain(ctx, img, width, height, currentNatural.w, currentNatural.h)
+
+      const audioBuf = await audioCtx.decodeAudioData(await slide.audioBlob.arrayBuffer())
+      const src = audioCtx.createBufferSource()
+      src.buffer = audioBuf
+      src.connect(dest)
+      src.connect(silent)
+
+      const playSec = Math.max(slide.durationSec, audioBuf.duration || 0)
+      await new Promise<void>((resolve, reject) => {
+        const timer = window.setTimeout(() => resolve(), Math.ceil(playSec * 1000) + 40)
+        src.onended = () => {
+          window.clearTimeout(timer)
+          resolve()
+        }
+        try {
+          src.start(0)
+        } catch (e) {
+          window.clearTimeout(timer)
+          reject(e instanceof Error ? e : new Error('音频播放失败'))
+        }
+        signal?.addEventListener(
+          'abort',
+          () => {
+            window.clearTimeout(timer)
+            try {
+              src.stop()
+            } catch {
+              /* ignore */
+            }
+            reject(new Error('已取消'))
+          },
+          { once: true },
+        )
+      })
+
+      if (i < total - 1 && gapSec > 0) await waitSec(gapSec)
+    }
+
+    params.onProgress?.('收尾封装…', 0.98)
+    await waitSec(0.35)
+    recorder.stop()
+    const blob = await stopPromise
+    params.onProgress?.('完成', 1)
+    return blob
+  } catch (e) {
+    try {
+      if (recorder.state !== 'inactive') recorder.stop()
+    } catch {
+      /* ignore */
+    }
+    throw e
+  } finally {
+    cancelAnimationFrame(drawRaf)
+    canvasStream.getTracks().forEach((t) => t.stop())
+    dest.stream.getTracks().forEach((t) => t.stop())
+    void audioCtx.close()
+  }
+}
