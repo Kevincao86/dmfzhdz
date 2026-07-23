@@ -938,6 +938,16 @@ async function qwenPostVideoTask(
   } else {
     candidates = candidates.filter((id) => isQwenT2vCompatibleModel(id))
   }
+  /** 时长筛空时回退内置文生/图生目录（避免运营台仅配了口型/编辑模型时直接失败） */
+  if (candidates.length === 0) {
+    const rawPool = qwenVideoCandidatesFromEnv(env, mode)
+    const compat =
+      mode === 'i2v'
+        ? sortQwenSingleFrameI2vModels(rawPool.filter((id) => isQwenSingleFrameI2vModel(id)))
+        : rawPool.filter((id) => isQwenT2vCompatibleModel(id))
+    candidates = compat.filter((id) => videoModelSupportsDuration(id, durationSec, mode))
+    if (candidates.length === 0) candidates = compat
+  }
   if (candidates.length === 0) {
     return {
       ok: false,

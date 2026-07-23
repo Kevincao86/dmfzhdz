@@ -46,7 +46,7 @@ Page({
   syncPlatformWarn() {
     const p = PLATFORM_OPTIONS[this.data.platformIdx]
     let w = ''
-    if (p && p.id !== 'douyin') w = 'AI 生成能力当前仅接通「抖音来客」，其它平台占位与电脑端一致。'
+    if (p && p.id !== 'douyin') w = '内容生成能力当前仅接通「抖音来客」，其它平台占位与电脑端一致。'
     else if (!douyin.douyinToken()) w = '未检测到抖音来客绑定，AI 将无法返回正文。'
     this.setData({ platformWarn: w })
   },
@@ -55,7 +55,7 @@ Page({
     const p = PLATFORM_OPTIONS[this.data.platformIdx] || PLATFORM_OPTIONS[0]
     const plat = p.label
     if (p.id !== 'douyin') {
-      return `${plat}（当前仅抖音来客支持 AI 生成）`
+      return `${plat}（当前仅抖音来客支持内容生成）`
     }
     if (this.data.scopeMode === 'brand')
       return `${plat}；品牌：${String(this.data.brandName || '').trim() || '（未填写）'}`

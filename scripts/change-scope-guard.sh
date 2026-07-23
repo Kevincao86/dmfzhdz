@@ -234,6 +234,11 @@ check-dr-affiliate-menu
 ecs-deploy-talent-fulfillment
 灵祺达人履约管理后台/dist
 recruitmentPublishLinkMatchCore
+videoModelDuration
+merchantVideoAiGateway
+videoAiApi
+qwenVisionApi
+qwenVisionCatalog
 change-scope-guard
 PAT
       ;;

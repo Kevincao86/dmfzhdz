@@ -1116,7 +1116,7 @@ Page({
       added += 1
     }
     this.setData({ imageUploading: false })
-    if (added > 0) this.setData({ iceHint: `已上传 ${added} 张图片，可点「AI 生成文案」或填写剪辑指令后一键成片。` })
+    if (added > 0) this.setData({ iceHint: `已上传 ${added} 张图片，可点「生成文案」或填写剪辑指令后一键成片。` })
     this.syncIceDerived()
   },
 

@@ -65,7 +65,9 @@ export function videoModelDurationSpec(modelId: string, mode: VideoGenMode = 't2
   const m = modelId.trim()
   if (!m || m === SEEDANCE_SERVER_AUTO) return { type: 'range', min: 2, max: 15 }
   const norm = normalizeArkVideoModelParam(m)
-  if (isDoubaoSeedanceModelId(norm) || isArkVideoEndpointId(norm) || /^wan2/i.test(norm)) {
+  /** 仅火山/方舟 Wan（wan2-1-14b-*）；勿把通义 wan2.6-t2v / wan2.7-i2v 当成 Seedance */
+  const isArkWan14b = /^wan2-1-14b/i.test(norm) || /^wan2\.1-14b/i.test(norm)
+  if (isDoubaoSeedanceModelId(norm) || isArkVideoEndpointId(norm) || isArkWan14b) {
     return seedanceModelDurationSpec(norm, mode)
   }
   return qwenModelDurationSpec(m)

@@ -1,7 +1,7 @@
 <view class="voice-page">
   <view class="voice-hero meoo-card">
     <text class="voice-hero-title">商品 · 语音录入</text>
-    <text class="voice-hero-desc">对着手机说出品类、套餐、价格与卖点；停止录音后 ASR + AI 生成草稿（未配置服务端 URL 时使用演示数据）。</text>
+    <text class="voice-hero-desc">对着手机说出品类、套餐、价格与卖点；停止录音后 ASR 生成草稿（未配置服务端 URL 时使用演示数据）。</text>
   </view>
 
   <view class="voice-steps meoo-card">
