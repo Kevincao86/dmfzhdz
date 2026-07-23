@@ -5,7 +5,7 @@
       <text class="sv-header-icon">映</text>
       <text class="sv-header-title">短视频AI处理</text>
     </view>
-    <text class="sv-header-desc">短视频 AI 生成与 AI 混剪，积分与商家 Web 版共用同一租户钱包。</text>
+    <text class="sv-header-desc">短视频创作与混剪，积分与商家 Web 版共用同一租户钱包。</text>
   </view>
 
   <view wx:if="{{pointsBalance != null}}" class="sv-points-bar">
@@ -348,7 +348,7 @@
           <text class="sv-pane-sub pad">描述节奏、字幕、氛围与卖点（建议写明总时长、前 3 秒吸睛等）。</text>
         </view>
         <button class="sv-btn-ai" disabled="{{!canAiBrief || briefAiLoading}}" bindtap="runAiEditBrief">
-          {{briefAiLoading ? '生成中…' : 'AI 生成文案'}}
+          {{briefAiLoading ? '生成中…' : '生成文案'}}
         </button>
       </view>
       <textarea
@@ -381,7 +381,7 @@
       </view>
       <block wx:if="{{imageItems.length}}">
         <button class="sv-btn-violet" disabled="{{!canOneClickImages}}" bindtap="runOneClickImages">一键成片（{{imageItems.length}} 张图）</button>
-        <text wx:if="{{!briefOk}}" class="sv-muted warn">请先填写剪辑文案（至少 4 字），或点「AI 生成文案」。</text>
+        <text wx:if="{{!briefOk}}" class="sv-muted warn">请先填写剪辑文案（至少 4 字），或点「生成文案」。</text>
       </block>
     </view>
 

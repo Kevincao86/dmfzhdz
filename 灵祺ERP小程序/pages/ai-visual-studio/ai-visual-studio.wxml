@@ -64,8 +64,8 @@
 
   <view class="vs-card" wx:elif="{{step === 3}}">
     <text class="vs-card__title">海报文案</text>
-    <text class="vs-card__sub">可手填，或用 AI 生成 3 套方案（{{copyPoints}} 积分/次）</text>
-    <button class="vs-btn ghost" loading="{{copyBusy}}" bindtap="onAiCopy">AI 生成文案包</button>
+    <text class="vs-card__sub">可手填，或一键生成 3 套方案（{{copyPoints}} 积分/次）</text>
+    <button class="vs-btn ghost" loading="{{copyBusy}}" bindtap="onAiCopy">生成文案包</button>
     <view class="vs-copy-list" wx:if="{{copyItems.length}}">
       <view
         wx:for="{{copyItems}}"
