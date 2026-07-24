@@ -251,19 +251,8 @@ Page({
   },
 
   onConfirmLogout() {
-    this.setData({
-      showLogoutConfirm: false,
-      loginName: '',
-      storeName: '灵祺商家',
-      storeShort: '灵祺',
-      planLabel: '',
-      cloudPlatformRows: [],
-      webPlatformRows: [],
-      guestMode: true,
-      menu: enrichMenu(buildVisibleMenu(true)),
-    })
-    api.logout()
-    api.enterGuestBrowse()
-    wx.showToast({ title: '已退出', icon: 'none' })
+    this.setData({ showLogoutConfirm: false })
+    // 退出后必须回到登录页（勿仅切游客态留在「我的」）
+    api.logoutAndGoLogin()
   },
 })
