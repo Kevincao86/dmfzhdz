@@ -1,7 +1,10 @@
 # AI 重跑提示词（16:9 · 暗色 BP 版型）
 
+官方 logo 参考：docs/bp-ppt/brand-logo.png（= web版/merchant-erp/public/logo.png）
+圆形紫渐变底 + 三颗白四角星连成 A + 中央金星 + 底部尾焰。禁止斜条/闪电假标。
+
 全局风格前缀（每条都加）：
-Dark pitch deck slide 16:9, near-black #0a0a0f, subtle grid, orange-pink-magenta accents, glass cards, premium Chinese investor BP, no emojis, no cluttered dashboard.
+Dark pitch deck slide 16:9, near-black #0a0a0f, subtle grid, orange-pink-magenta accents, glass cards, premium Chinese investor BP, no emojis, no cluttered dashboard. TOP-LEFT must use EXACT provided circular purple 灵祺 logo from reference image.
 
 01-cover: Center gradient title 灵祺商业计划书; pill 种子轮·保密文件; 4 KPI cards 500万/3家/24个月/杭甬温
 02-milestones: Timeline M3 M6 M12 M24 with glass cards and funding milestones
