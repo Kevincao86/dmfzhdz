@@ -225,12 +225,22 @@
 
 ---
 
+## 品牌 Logo（写死）
+
+正确标：商家 ERP / 小程序同源圆形紫标（三星「A」形 + 金星 + 尾焰），文件：
+
+- `docs/bp-ppt/brand-logo.png`（= `web版/merchant-erp/public/logo.png`）
+- **禁止**使用斜条 / 闪电假标
+
+页角规范：左上放圆形 logo +「灵祺」字标。
+
 ## 文件清单
 
 | 文件 | 说明 |
 |------|------|
 | `PPT规划.md` | 本文件 |
-| `slides-ai/01`–`12-*.png` | AI 生成 16:9 页视觉 |
+| `brand-logo.png` | 官方 logo 源文件 |
+| `slides-ai/01`–`12-*.png` | AI 生成 16:9 页视觉（已嵌入正确 logo） |
 | `prompts.txt` | 若需用即梦/Midjourney 重跑的英文提示词 |
 
 ## 放入 PPT 的建议步骤
