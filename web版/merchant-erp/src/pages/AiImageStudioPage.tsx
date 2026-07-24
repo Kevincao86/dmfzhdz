@@ -864,6 +864,12 @@ export default function AiImageStudioPage() {
           <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-600">
             从左到右：选渠道与玩法 → 编辑文案与参考图 → 右侧实时预览上屏效果
           </p>
+          <p
+            className="mt-2 max-w-2xl rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900"
+            role="note"
+          >
+            生成后请及时保存到本地。刷新页面后，本页生成记录将消失。
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50/80 p-2 ring-1 ring-slate-200/60">
           <label className="pl-1 text-xs text-slate-500">业态</label>
