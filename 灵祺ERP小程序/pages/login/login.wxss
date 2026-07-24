@@ -214,3 +214,119 @@
   font-size: 22rpx;
   color: #64748b;
 }
+
+.login-legal-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 8rpx 0 20rpx;
+  gap: 4rpx;
+}
+
+.login-legal-check {
+  width: 28rpx;
+  height: 28rpx;
+  margin-right: 8rpx;
+  border-radius: 50%;
+  border: 2rpx solid #7dd3fc;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.login-legal-check__mark {
+  font-size: 16rpx;
+  line-height: 1;
+  color: #fff;
+}
+
+.login-legal-check--on {
+  background: #0284c7;
+  border-color: #0284c7;
+}
+
+.login-legal-txt,
+.login-legal-link {
+  font-size: 22rpx;
+  line-height: 1.4;
+  color: #64748b;
+}
+
+.login-legal-link {
+  color: #0284c7;
+}
+
+.login-legal-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48rpx;
+  box-sizing: border-box;
+}
+
+.login-legal-modal {
+  width: 100%;
+  max-width: 620rpx;
+  padding: 36rpx 32rpx 28rpx;
+  border-radius: 24rpx;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.login-legal-modal-title {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #0f172a;
+  text-align: center;
+}
+
+.login-legal-modal-content {
+  display: block;
+  margin-top: 18rpx;
+  font-size: 26rpx;
+  line-height: 1.55;
+  color: #475569;
+  text-align: center;
+}
+
+.login-legal-modal-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 28rpx;
+}
+
+.login-legal-modal-btn {
+  flex: 1;
+  height: 80rpx;
+  line-height: 80rpx;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  padding: 0;
+  margin: 0;
+}
+
+.login-legal-modal-btn::after {
+  border: none;
+}
+
+.login-legal-modal-btn--decline {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.login-legal-modal-btn--agree {
+  background: #0284c7;
+  color: #fff;
+}
