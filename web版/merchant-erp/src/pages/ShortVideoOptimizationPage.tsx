@@ -1438,6 +1438,12 @@ export default function ShortVideoOptimizationPage() {
             </span>
           ) : null}
         </p>
+        <p
+          className="max-w-2xl rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900"
+          role="note"
+        >
+          生成后请及时保存到本地。刷新页面后，本页生成记录将消失。
+        </p>
       </header>
 
       {embedBlocked ? (
