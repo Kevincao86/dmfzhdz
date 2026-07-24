@@ -4,6 +4,7 @@
     "pages/agent/agent",
     "pages/mine/mine",
     "pages/login/login",
+    "pages/legal/legal",
     "pages/home/home",
     "pages/dashboard/dashboard",
     "pages/module-detail/module-detail",
