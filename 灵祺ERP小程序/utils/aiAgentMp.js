@@ -10,13 +10,13 @@ const habitsMp = require('./agentUserHabitsMp.js')
 const stateCloudMp = require('./agentUserStateCloudMp.js')
 const sessionSync = require('./merchantSessionSyncMp.js')
 
-const AI_AGENT_SYSTEM_PROMPT = `你是「灵祺小助理」，嵌入灵祺 AI 智能 ERP，同时也是开放型通用对话助手。
+const AI_AGENT_SYSTEM_PROMPT = `你是「灵祺小助理」，嵌入灵祺商家 ERP，同时也是开放型通用对话助手。
 
 【开放对话】用户可以询问任何类型的问题，均须正常、完整、友好地作答；不要以「只能帮商家经营」等理由拒绝。若缺少实时外部数据，说明限制并给出查法或常识参考，仍应尽力回答。
 
 【ERP 专有能力】仅当用户主动提出经营、商品、达人、报税等相关需求时：涉及创建、修改、发布等写操作须先输出执行预览 JSON（actionType、confirmRequired: true），不得直接执行；用户确认前不要假设写操作已完成。
 
-【九大场景】create_product、recruit_influencer、handle_review、optimize_local_ads、follow_local_lead、sync_platform、analyze_exception、generate_copywriting、file_tax — 与电脑端商家后台智能体一致。`
+【九大场景】create_product、recruit_influencer、handle_review、optimize_local_ads、follow_local_lead、sync_platform、analyze_exception、generate_copywriting、file_tax — 与电脑端商家后台助手一致。`
 
 const AI_AGENT_SHORTCUTS = [
   { type: 'create_product', label: '创建商品', prompt: '我想创建一个新的团购商品，请告诉我需要准备哪些信息' },
@@ -210,9 +210,9 @@ function merchantApiFriendlyError(statusCode, body) {
   const rawMsg = typeof body?.message === 'string' ? body.message : ''
   const code = Number(statusCode) || 0
   if (code === 401 || rawErr === 'unauthorized')
-    return '服务端未放行：未检测到有效登录。请在「我的」登录后再试；免登录游览不支持 AI 对话。'
+    return '服务端未放行：未检测到有效登录。请在「我的」登录后再试；游客浏览不支持对话。'
   if (rawErr === 'tenant_not_found' || (rawDetail && rawDetail.includes('未找到租户')))
-    return rawDetail || '当前账号未关联商户租户，无法使用完整 AI。请使用已在后台绑定门店的账号登录。'
+    return rawDetail || '当前账号未关联商户租户，无法使用完整助手能力。请使用已在后台绑定门店的账号登录。'
   /** 服务端已返回可读说明 */
   if (rawDetail) return rawDetail.length > 800 ? `${rawDetail.slice(0, 800)}…` : rawDetail
   if (rawMsg) return rawMsg.length > 800 ? `${rawMsg.slice(0, 800)}…` : rawMsg

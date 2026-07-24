@@ -3,8 +3,8 @@
     <view class="brand-v2">
       <view class="logo-box">灵</view>
       <text class="tag-v2">— LOCAL LIFE OS —</text>
-      <text class="brand-title">灵祺AI智能ERP</text>
-      <text class="brand-desc">商家端 · 登录后进入工作台</text>
+      <text class="brand-title">灵祺商家ERP</text>
+      <text class="brand-desc">可先浏览功能，登录后使用完整能力</text>
     </view>
     <text class="login-deco">📈</text>
   </view>
@@ -18,7 +18,7 @@
       <view class="ibox ibox-cyan ibox-sm secure-shield">盾</view>
       <view class="secure-body">
         <text class="secure-strong">安全可信</text>
-        <text class="secure-p">灵祺AI智能ERP 采用多重安全防护机制，保障您的数据安全</text>
+        <text class="secure-p">灵祺商家ERP 采用多重安全防护机制，保障您的数据安全</text>
         <view class="secure-icons">
           <text class="secure-icon-item">🔒 数据加密传输</text>
           <text class="secure-icon-item">🛡 账户安全保护</text>
@@ -98,6 +98,8 @@
     </block>
     <text wx:if="{{err}}" class="err-msg">{{err}}</text>
     <button class="btn-v2 primary" loading="{{busy}}" disabled="{{busy}}" bindtap="onSubmit">{{submitLabel}}</button>
+    <button class="btn-v2 guest-browse" bindtap="onGuestBrowse">先逛逛，暂不登录</button>
+    <text class="guest-browse-hint">浏览功能无需授权；使用业务能力时再登录</text>
     <button
       wx:if="{{mode === 'login'}}"
       class="btn-v2 wx-login"

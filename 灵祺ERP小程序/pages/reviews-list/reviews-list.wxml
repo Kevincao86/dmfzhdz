@@ -65,7 +65,7 @@
     <view class="rev-filter-actions">
       <button class="rev-sync-mini" size="mini" loading="{{syncing}}" bindtap="onSync">同步评价</button>
       <switch checked="{{aiAutoReply}}" bindchange="onAiToggle" color="#0ea5e9" />
-      <text class="rev-ai-lab">AI自动回复</text>
+      <text class="rev-ai-lab">自动回复</text>
     </view>
   </view>
 
@@ -118,7 +118,7 @@
           <text wx:for="{{item.keywords}}" wx:for-item="kw" wx:key="*this" class="rev-kw">{{kw}}</text>
         </view>
         <view wx:if="{{item.hasAiSuggest && !item.replied && replyingId !== item.id}}" class="rev-ai-box">
-          <text class="rev-ai-title">AI建议已生成</text>
+          <text class="rev-ai-title">建议已生成</text>
           <text class="rev-ai-preview">{{item.aiSuggestPreview}}</text>
           <button
             class="rev-ai-btn"

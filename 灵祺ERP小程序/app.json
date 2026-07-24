@@ -1,9 +1,9 @@
 {
   "pages": [
-    "pages/login/login",
-    "pages/agent/agent",
     "pages/functions/functions",
+    "pages/agent/agent",
     "pages/mine/mine",
+    "pages/login/login",
     "pages/home/home",
     "pages/dashboard/dashboard",
     "pages/module-detail/module-detail",
@@ -45,7 +45,8 @@
     "pages/shortvideo-ai/shortvideo-ai",
     "pages/notifications/notifications",
     "pages/subscription/subscription",
-    "pages/support-chat/support-chat"
+    "pages/support-chat/support-chat",
+    "pages/profile-edit/profile-edit"
   ],
   "window": {
     "navigationBarTitleText": "灵祺商家",
@@ -61,12 +62,12 @@
     "backgroundColor": "#ffffff",
     "list": [
       {
-        "pagePath": "pages/agent/agent",
-        "text": "灵祺助手"
-      },
-      {
         "pagePath": "pages/functions/functions",
         "text": "功能"
+      },
+      {
+        "pagePath": "pages/agent/agent",
+        "text": "灵祺助手"
       },
       {
         "pagePath": "pages/mine/mine",
@@ -76,7 +77,7 @@
   },
   "permission": {
     "scope.record": {
-      "desc": "用于小助理语音输入、商品与招募语音录入"
+      "desc": "用于语音输入、商品与招募语音录入"
     },
     "scope.camera": {
       "desc": "用于拍摄商品图、评论截图等附件上传"

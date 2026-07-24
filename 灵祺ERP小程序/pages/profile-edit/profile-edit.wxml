@@ -1,0 +1,47 @@
+<view class="pe-page">
+  <view class="pe-card">
+    <text class="pe-title">修改个人资料</text>
+    <text class="pe-desc">可更新头像、昵称与联系手机。浏览功能无需授权；保存资料需登录商家账号。</text>
+  </view>
+
+  <view wx:if="{{guestMode}}" class="pe-card pe-guest">
+    <text class="pe-guest-t">当前为游客</text>
+    <text class="pe-guest-d">请先登录后再完善并保存资料。</text>
+    <button class="btn-v2 primary" bindtap="onGoLogin">去登录</button>
+  </view>
+
+  <view class="pe-card">
+    <text class="field-label">头像</text>
+    <button class="pe-avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+      <image wx:if="{{avatarUrl}}" class="pe-avatar" src="{{avatarUrl}}" mode="aspectFill" />
+      <view wx:else class="pe-avatar pe-avatar-ph">点选</view>
+      <text class="pe-avatar-tip">点击更换头像</text>
+    </button>
+
+    <text class="field-label">昵称 / 商家简称</text>
+    <input
+      class="pe-input"
+      type="nickname"
+      placeholder="点击选用微信昵称或手动输入"
+      value="{{displayName}}"
+      bindinput="onDisplayName"
+      bindblur="onNickBlur"
+      bindnicknamereview="onNickBlur"
+    />
+
+    <text class="field-label">登录账户</text>
+    <input class="pe-input pe-disabled" disabled value="{{loginName || '登录后显示'}}" />
+
+    <text class="field-label">联系手机（选填）</text>
+    <input
+      class="pe-input"
+      type="number"
+      maxlength="11"
+      placeholder="11 位手机号"
+      value="{{phone}}"
+      bindinput="onPhone"
+    />
+
+    <button class="btn-v2 primary pe-save" bindtap="onSave">{{saving ? '保存中…' : '保存资料'}}</button>
+  </view>
+</view>

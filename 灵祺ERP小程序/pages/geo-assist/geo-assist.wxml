@@ -73,7 +73,7 @@
       <text class="geo-card-title">知识包草稿</text>
       <textarea class="geo-area" maxlength="8000" value="{{geoPack}}" bindinput="onPack" placeholder="维护可被检索摘录的事实文本" />
       <view class="geo-actions">
-        <button class="geo-btn-ghost" size="mini" bindtap="genQuestion">AI 随机问法</button>
+        <button class="geo-btn-ghost" size="mini" bindtap="genQuestion">随机问法</button>
         <button class="geo-sync-btn" size="mini" loading="{{scoreBusy}}" bindtap="onSyncAiScore">同步评分</button>
       </view>
     </view>
@@ -98,7 +98,7 @@
   <view wx:if="{{tab === 'overview'}}" class="geo-fab-wrap">
     <button class="geo-fab" bindtap="onOpenConsult">
       <text class="geo-fab-ico">🤖</text>
-      <text>AI咨询优化方案</text>
+      <text>咨询优化方案</text>
     </button>
   </view>
 </view>

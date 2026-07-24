@@ -1,16 +1,26 @@
 <scroll-view scroll-y class="page-mine-v2" enhanced show-scrollbar="{{false}}" style="padding-bottom:var(--tab-bar-pad)">
-  <view class="profile-v2">
+  <view class="profile-v2" bindtap="onEditProfile" hover-class="profile-v2-hover">
     <view class="store-logo-line">
-      <image class="store-logo-img" src="{{storeLogoSrc}}" mode="aspectFit" />
+      <image class="store-logo-img" src="{{avatarUrl || storeLogoSrc}}" mode="aspectFit" />
     </view>
     <view class="profile-main">
       <text class="profile-strong">{{storeName}}</text>
-      <text class="profile-span">账号 {{loginName || '—'}}</text>
-      <text wx:if="{{planLabel}}" class="badge-pro">👑 {{planLabel}}</text>
+      <text class="profile-span">账号 {{loginName || (guestMode ? '游客浏览中' : '—')}}</text>
+      <text wx:if="{{planLabel && showPlanBadge}}" class="badge-pro">👑 {{planLabel}}</text>
+      <view class="profile-edit-pill">
+        <text class="profile-edit-text">修改个人资料</text>
+        <text class="profile-edit-arrow">›</text>
+      </view>
     </view>
     <text class="chev">›</text>
   </view>
-  <view class="sec-card-v2 bind-card-v2">
+
+  <view wx:if="{{guestMode}}" class="guest-login-card" bindtap="onGoLogin">
+    <text class="guest-login-t">游客可先浏览功能</text>
+    <text class="guest-login-a">登录商家账号后使用完整能力 ›</text>
+  </view>
+
+  <view class="sec-card-v2 bind-card-v2" wx:if="{{!guestMode}}">
     <view class="sec-head-v2 bind-head-v2" bindtap="onToggleBind">
       <image class="mine-line-ic" src="{{bindIconSrc}}" mode="aspectFit" />
       <text class="bind-head-title">平台绑定</text>
@@ -39,7 +49,7 @@
       <text class="chev">›</text>
     </view>
   </view>
-  <button class="logout-v2 danger" bindtap="onLogout">退出登录</button>
+  <button wx:if="{{!guestMode}}" class="logout-v2 danger" bindtap="onLogout">退出登录</button>
 </scroll-view>
 <view wx:if="{{showLogoutConfirm}}" class="logout-mask" catchtouchmove="true">
   <view class="sec-card-v2 logout-dialog" catchtap="true">

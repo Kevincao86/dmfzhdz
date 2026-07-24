@@ -14,6 +14,10 @@ App({
       if (!devAuth.isDevSession()) void sessionSync.syncFromCloud({ force: true })
     } else {
       this.globalData.accessToken = null
+      // 审核：冷启动未登录时默认游客浏览，不先进登录页强拦
+      try {
+        require('./utils/api.js').enterGuestBrowse()
+      } catch (_) {}
     }
   },
   globalData: {

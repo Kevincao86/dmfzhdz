@@ -184,7 +184,7 @@ Page({
         subheadline: this.data.subheadline,
         offer: this.data.offer,
       }
-      this.setData({ progress: 'AI 生图中，约需数十秒…' })
+      this.setData({ progress: '生图中，约需数十秒…' })
       const r = await vs.generatePosterImage(this.formSnapshot(), copy, {
         aspectRatio: this.data.aspect,
         referenceImage: this.data.refDataUrl || '',

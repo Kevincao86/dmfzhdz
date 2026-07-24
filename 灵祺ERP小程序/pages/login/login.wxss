@@ -158,6 +158,23 @@
   border: none;
 }
 
+.btn-v2.guest-browse {
+  margin-top: 16rpx;
+  background: #fff;
+  color: #0284c7;
+  border: 2rpx solid #7dd3fc;
+}
+.btn-v2.guest-browse::after {
+  border: none;
+}
+.guest-browse-hint {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 22rpx;
+  color: #64748b;
+  text-align: center;
+}
+
 .btn-v2.wx-login {
   width: 100%;
   margin-top: 16rpx;

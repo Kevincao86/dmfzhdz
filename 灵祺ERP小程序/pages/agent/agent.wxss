@@ -17,10 +17,22 @@
   background: linear-gradient(180deg, #e0f2fe, #f3f6fb);
 }
 
+.agent-top-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4rpx;
+}
+
 .agent-top-title {
   font-size: 30rpx;
   font-weight: 700;
   color: #0f172a;
+}
+
+.agent-guest {
+  font-size: 22rpx;
+  color: #0284c7;
 }
 
 .menu-btn {

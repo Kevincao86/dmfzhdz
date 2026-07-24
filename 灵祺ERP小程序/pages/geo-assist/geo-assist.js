@@ -6,7 +6,7 @@ const geoAi = require('../../utils/geoAiMp.js')
 
 const TABS = [
   { id: 'overview', label: '概览' },
-  { id: 'consult', label: 'AI咨询' },
+  { id: 'consult', label: '运营咨询' },
   { id: 'store', label: '门店' },
   { id: 'content', label: '内容库' },
   { id: 'query', label: '问法' },
@@ -25,7 +25,7 @@ function localTodos(det) {
   if (det.inputs.infoCompletenessPercent < 90) t.push('来客门店必填字段不完整，建议补齐门头与营业时间')
   if (det.inputs.questionCoveragePercent < 60) t.push('问法覆盖偏低，建议在内容库补充 FAQ')
   if (det.inputs.contentFreshnessPercent < 70) t.push('资料新鲜度一般，建议在 7 天内更新来客信息')
-  if (!t.length) t.push('结构良好 · 可到「AI咨询」试答效果')
+  if (!t.length) t.push('结构良好 · 可到「运营咨询」试答效果')
   return t
 }
 

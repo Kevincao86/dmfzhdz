@@ -3,7 +3,7 @@
     <view class="sv-header-bar" />
     <view class="sv-header-row">
       <text class="sv-header-icon">映</text>
-      <text class="sv-header-title">短视频AI处理</text>
+      <text class="sv-header-title">短视频处理</text>
     </view>
     <text class="sv-header-desc">短视频创作与混剪，积分与商家 Web 版共用同一租户钱包。</text>
   </view>
@@ -246,13 +246,13 @@
     </view>
   </view>
 
-  <!-- 灵祺AI云剪 -->
+  <!-- 灵祺云剪 -->
   <view wx:if="{{mainPane === 'cloud_batch'}}" class="sv-ice">
     <view class="sv-ice-head">
       <view>
         <view class="sv-ice-title-row">
           <text class="sv-ice-logo">云</text>
-          <text class="sv-ice-title">灵祺AI云剪</text>
+          <text class="sv-ice-title">灵祺云剪</text>
         </view>
         <text class="sv-ice-desc">批量包装探店/带货短片；普通云剪 {{rateCloudEdit}}，智能一键成片 {{rateCloudEditSmart}}（与 Web 一致）。</text>
       </view>
@@ -280,7 +280,7 @@
       <block wx:if="{{materialTab === 'video'}}">
         <view wx:if="{{!iceLocalUpload}}" class="sv-warn-box">
           <text class="bold">本地上传未开启</text>
-          <text>需在运营管理后台「AI模型 → 短视频 API → 灵祺AI云剪」填写 OSS 成片 URL 前缀并保存。仍可粘贴下方 HTTPS 链接。</text>
+          <text>需在运营管理后台「模型 → 短视频 API → 灵祺云剪」填写 OSS 成片 URL 前缀并保存。仍可粘贴下方 HTTPS 链接。</text>
         </view>
         <view class="sv-upload-zone {{iceLocalUpload ? '' : 'muted'}}" bindtap="pickIceVideo">
           <text wx:if="{{videoUploading}}">视频上传中…</text>
@@ -299,7 +299,7 @@
         />
         <view class="sv-ice-btns">
           <button class="sv-btn-dark sm" disabled="{{iceBusy || videoUploading}}" bindtap="addUrlsFromText">+ 加入任务队列</button>
-          <button wx:if="{{resultUrl}}" class="sv-btn-outline sm" disabled="{{iceBusy}}" bindtap="appendLastResult">使用上一段 AI 成片</button>
+          <button wx:if="{{resultUrl}}" class="sv-btn-outline sm" disabled="{{iceBusy}}" bindtap="appendLastResult">使用上一段成片</button>
         </view>
         <view wx:if="{{jobs.length}}" class="sv-queue">
           <view wx:for="{{jobs}}" wx:key="id" class="sv-queue-row">
@@ -410,7 +410,7 @@
     <view class="sv-submit-sticky">
       <view wx:if="{{iceErr || iceHint}}" class="sv-alert {{iceErr ? 'err' : 'hint'}}">{{iceErr || iceHint}}</view>
       <button class="sv-btn-orange full" disabled="{{!canSubmitIce || downloadBusy}}" loading="{{iceBusy}}" bindtap="runIceBatch">
-        {{iceBusy ? '灵祺AI云剪进行中…' : '提交灵祺AI云剪'}}
+        {{iceBusy ? '灵祺云剪进行中…' : '提交灵祺云剪'}}
       </button>
       <text class="sv-muted center">提交后请在下方「成片输出」查看进度并复制下载链接。</text>
     </view>
@@ -464,6 +464,6 @@
     </view>
   </view>
 
-  <text class="sv-footer">生成内容由 AI 提供，请合规使用并自行备份成片。</text>
+  <text class="sv-footer">生成内容由系统提供，请合规使用并自行备份成片。</text>
   <view class="sv-bottom-sp" />
 </scroll-view>

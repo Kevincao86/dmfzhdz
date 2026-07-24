@@ -38,3 +38,6 @@ web版/merchant-erp/.dh-avatar-staging-raw/
 
 # TypeScript 增量构建缓存
 *.tsbuildinfo
+
+# 商家 ERP 小程序本地配置
+灵祺ERP小程序/utils/config.local.js

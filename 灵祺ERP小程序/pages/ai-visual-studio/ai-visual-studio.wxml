@@ -2,7 +2,7 @@
   <view class="vs-hero">
     <text class="vs-hero__badge">与商家 Web 同源</text>
     <text class="vs-hero__title">灵祺视觉工坊</text>
-    <text class="vs-hero__sub">选渠道 · AI 文案 · 一键出图 · 保存相册（{{copyPoints}} 积分/文案 · {{imagePoints}} 积分/张）</text>
+    <text class="vs-hero__sub">选渠道 · 文案 · 一键出图 · 保存相册（{{copyPoints}} 积分/文案 · {{imagePoints}} 积分/张）</text>
   </view>
 
   <view class="vs-wizard">
