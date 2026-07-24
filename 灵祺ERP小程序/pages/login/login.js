@@ -2,11 +2,31 @@ const api = require('../../utils/api.js')
 const devAuth = require('../../utils/devAuth.js')
 const tenantAuthApi = require('../../utils/tenantAuthApiMp.js')
 const wxAccountMp = require('../../utils/wxAccountMp.js')
+const loginLegalAgree = require('../../utils/loginLegalAgree.js')
 
 const MODE_HINT = {
   login_password: '使用登录名与密码进入商家工作台。',
   login_sms: '使用注册手机号与短信验证码登录。',
   register: '填写商家信息并完成手机验证，注册后为免费版，可订阅升级会员。',
+}
+
+const LEGAL_PROMPT_COPY = {
+  wx: {
+    text: '使用微信一键登录前，请勾选并同意《用户协议》和《隐私政策》。',
+    agree: '同意并登录',
+  },
+  pwd: {
+    text: '使用账号登录前，请勾选并同意《用户协议》和《隐私政策》。',
+    agree: '同意并登录',
+  },
+  sms: {
+    text: '使用验证码登录前，请勾选并同意《用户协议》和《隐私政策》。',
+    agree: '同意并登录',
+  },
+  reg: {
+    text: '注册前，请勾选并同意《用户协议》和《隐私政策》。',
+    agree: '同意并注册',
+  },
 }
 
 Page({
@@ -35,6 +55,11 @@ Page({
     refreshing: false,
     submitLabel: '登录并进入工作台',
     devSkip: false,
+    legalAgreed: false,
+    showLegalPrompt: false,
+    legalPromptAction: 'pwd',
+    legalPromptText: LEGAL_PROMPT_COPY.pwd.text,
+    legalPromptAgreeLabel: LEGAL_PROMPT_COPY.pwd.agree,
   },
 
   onLoad(options) {
@@ -44,7 +69,10 @@ Page({
     } catch (_) {
       this._redirect = raw
     }
-    this.setData({ devSkip: devAuth.isDevSkipLogin() })
+    this.setData({
+      devSkip: devAuth.isDevSkipLogin(),
+      legalAgreed: loginLegalAgree.readAgreed(),
+    })
     this._syncModeHint()
     void api.bootstrapSupabaseConfig()
   },
@@ -73,6 +101,62 @@ Page({
       url: '/pages/functions/functions',
       fail: () => wx.reLaunch({ url: '/pages/functions/functions' }),
     })
+  },
+
+  onToggleLegalAgree() {
+    const next = !this.data.legalAgreed
+    loginLegalAgree.writeAgreed(next)
+    this.setData({ legalAgreed: next, err: '' })
+  },
+
+  onOpenLegal(e) {
+    const doc = e.currentTarget.dataset.doc === 'aup' ? 'aup' : 'privacy'
+    wx.navigateTo({ url: `/pages/legal/legal?doc=${doc}` })
+  },
+
+  _openLegalPrompt(action) {
+    const copy = LEGAL_PROMPT_COPY[action] || LEGAL_PROMPT_COPY.pwd
+    this.setData({
+      showLegalPrompt: true,
+      legalPromptAction: action,
+      legalPromptText: copy.text,
+      legalPromptAgreeLabel: copy.agree,
+    })
+  },
+
+  onLegalDecline() {
+    this.setData({ showLegalPrompt: false, legalPromptAction: 'pwd' })
+  },
+
+  onLegalAgreeContinue() {
+    const action = this.data.legalPromptAction || 'pwd'
+    loginLegalAgree.writeAgreed(true)
+    this.setData({
+      legalAgreed: true,
+      showLegalPrompt: false,
+      err: '',
+    })
+    if (action === 'wx') {
+      void this._doWxLogin()
+      return
+    }
+    if (action === 'pwd') {
+      void this._submitPassword()
+      return
+    }
+    if (action === 'sms') {
+      void this._submitSmsLogin()
+      return
+    }
+    if (action === 'reg') {
+      void this._submitRegister()
+    }
+  },
+
+  _ensureLegalAgreed(action) {
+    if (this.data.legalAgreed) return true
+    this._openLegalPrompt(action)
+    return false
   },
 
   onDevPreview() {
@@ -281,6 +365,12 @@ Page({
 
   async onWxLogin() {
     if (this.data.busy || this.data.wxBusy) return
+    if (!this._ensureLegalAgreed('wx')) return
+    await this._doWxLogin()
+  },
+
+  async _doWxLogin() {
+    if (this.data.busy || this.data.wxBusy) return
     if (!tenantAuthApi.apiRoot()) {
       this.setData({ err: '未配置 MERCHANT_API_BASE_URL，无法使用微信登录' })
       return
@@ -317,13 +407,16 @@ Page({
 
   async onSubmit() {
     if (this.data.mode === 'login' && this.data.loginMethod === 'password') {
+      if (!this._ensureLegalAgreed('pwd')) return
       await this._submitPassword()
       return
     }
     if (this.data.mode === 'login') {
+      if (!this._ensureLegalAgreed('sms')) return
       await this._submitSmsLogin()
       return
     }
+    if (!this._ensureLegalAgreed('reg')) return
     await this._submitRegister()
   },
 

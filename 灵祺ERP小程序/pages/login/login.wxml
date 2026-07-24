@@ -97,6 +97,17 @@
       </view>
     </block>
     <text wx:if="{{err}}" class="err-msg">{{err}}</text>
+
+    <view class="login-legal-row" bindtap="onToggleLegalAgree">
+      <view class="login-legal-check {{legalAgreed ? 'login-legal-check--on' : ''}}">
+        <text wx:if="{{legalAgreed}}" class="login-legal-check__mark">✓</text>
+      </view>
+      <text class="login-legal-txt">我已阅读并同意</text>
+      <text class="login-legal-link" catchtap="onOpenLegal" data-doc="aup">《用户协议》</text>
+      <text class="login-legal-txt">和</text>
+      <text class="login-legal-link" catchtap="onOpenLegal" data-doc="privacy">《隐私政策》</text>
+    </view>
+
     <button class="btn-v2 primary" loading="{{busy}}" disabled="{{busy}}" bindtap="onSubmit">{{submitLabel}}</button>
     <button class="btn-v2 guest-browse" bindtap="onGuestBrowse">先逛逛，暂不登录</button>
     <text class="guest-browse-hint">浏览功能无需授权；使用业务能力时再登录</text>
@@ -116,3 +127,14 @@
     </view>
   </view>
 </scroll-view>
+
+<view wx:if="{{showLegalPrompt}}" class="login-legal-mask" catchtouchmove="true" bindtap="onLegalDecline">
+  <view class="login-legal-modal" catchtap="true">
+    <text class="login-legal-modal-title">请先阅读并同意协议</text>
+    <text class="login-legal-modal-content">{{legalPromptText}}</text>
+    <view class="login-legal-modal-actions">
+      <button class="login-legal-modal-btn login-legal-modal-btn--decline" bindtap="onLegalDecline">不同意</button>
+      <button class="login-legal-modal-btn login-legal-modal-btn--agree" bindtap="onLegalAgreeContinue">{{legalPromptAgreeLabel}}</button>
+    </view>
+  </view>
+</view>
