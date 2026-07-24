@@ -85,6 +85,7 @@ Page({
     shortcutsOpen: false,
     hasChat: false,
     confirmingPreviewId: '',
+    guestMode: false,
   },
 
   onLoad() {
@@ -171,23 +172,28 @@ Page({
   },
 
   onShow() {
-    if (!api.canAccessTabBar()) {
-      api.goLogin()
-      return
+    // 审核：可先浏览助手页，发送消息时再要求真实登录
+    api.enterGuestBrowse()
+    this.setData({ guestMode: !api.isRealAuthed() })
+    if (api.isRealAuthed()) {
+      void (async () => {
+        try {
+          const app = getApp()
+          if (app && typeof app.syncMerchantSession === 'function') {
+            await app.syncMerchantSession({ force: true })
+          }
+          await this.bootstrapAgentUserState()
+        } catch (_) {}
+      })()
     }
-    void (async () => {
-      try {
-        const app = getApp()
-        if (app && typeof app.syncMerchantSession === 'function') {
-          await app.syncMerchantSession({ force: true })
-        }
-        await this.bootstrapAgentUserState()
-      } catch (_) {}
-    })()
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 0 })
+      this.getTabBar().setData({ selected: 1 })
     }
     this.recalcLayout()
+  },
+
+  onGuestLogin() {
+    api.requireRealAuth('/pages/agent/agent')
   },
 
   syncModelPickers() {
@@ -515,11 +521,11 @@ Page({
     if (!api.isRealAuthed()) {
       wx.showModal({
         title: '请先登录',
-        content: '灵祺小助理需登录后使用。请完成登录后再发送消息（免登录游览不支持 AI 对话）。',
+        content: '灵祺助手需登录后使用。请完成登录后再发送消息（游客浏览不支持对话）。',
         confirmText: '去登录',
         cancelText: '取消',
         success: (r) => {
-          if (r.confirm) api.goLogin()
+          if (r.confirm) api.requireRealAuth('/pages/agent/agent')
         },
       })
       return

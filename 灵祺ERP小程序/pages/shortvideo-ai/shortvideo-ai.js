@@ -475,9 +475,9 @@ Page({
     if (!this.data.longformEnabled) return ''
     const lp = this.data.longformPlanner
     if (this.data.plannerModel === 'doubao' && !lp.doubao)
-      return '长片策划需配置豆包 API Key（系统设置 → AI 模型绑定）。'
+      return '长片策划需配置豆包 API Key（系统设置 → 模型绑定）。'
     if (this.data.plannerModel === 'qwen' && !lp.qwen)
-      return '长片策划需配置通义千问 API Key（系统设置 → AI 模型绑定）。'
+      return '长片策划需配置通义千问 API Key（系统设置 → 模型绑定）。'
     return ''
   },
 
@@ -918,7 +918,7 @@ Page({
     wx.setClipboardData({ data: u })
   },
 
-  /* —— 灵祺AI云剪 —— */
+  /* —— 灵祺云剪 —— */
   onMaterialTab(e) {
     const t = e.currentTarget.dataset.tab
     if (t) this.setData({ materialTab: t })
@@ -1006,7 +1006,7 @@ Page({
     const prev = this.data.jobs || []
     this.setData({
       jobs: prev.concat([
-        { id: iceCloud.newJobId(), label: '上一段 AI 成片', mediaUrl: u, phase: 'pending' },
+        { id: iceCloud.newJobId(), label: '上一段成片', mediaUrl: u, phase: 'pending' },
       ]),
       iceHint: '已加入上一段生成结果',
       iceErr: '',
@@ -1018,7 +1018,7 @@ Page({
     if (!this.data.iceLocalUpload) {
       this.setData({
         iceErr:
-          '本地上传尚未开启：请运营在「商家管理后台 → AI模型 → 短视频 API → 灵祺AI云剪」填写 OSS 成片 URL 前缀并保存，然后刷新本页。仍可粘贴下方 HTTPS 链接作为素材。',
+          '本地上传尚未开启：请运营在「商家管理后台 → 模型 → 短视频 API → 灵祺云剪」填写 OSS 成片 URL 前缀并保存，然后刷新本页。仍可粘贴下方 HTTPS 链接作为素材。',
       })
       return
     }
@@ -1176,7 +1176,7 @@ Page({
   async runOneClickImages() {
     const cfg = this.data.iceCfg
     if (!cfg || !cfg.configured) {
-      this.setData({ iceErr: '灵祺AI云剪服务未就绪' })
+      this.setData({ iceErr: '灵祺云剪服务未就绪' })
       return
     }
     if (!this.data.briefOk) {
@@ -1209,7 +1209,7 @@ Page({
     })
     const pipe = await videoAi.postIcePipeline({
       imageUrls,
-      projectName: `灵祺AI云剪-${label}`.slice(0, 120),
+      projectName: `灵祺云剪-${label}`.slice(0, 120),
       editBrief: this.resolveEditBriefForSubmit(),
       width: aspect.width,
       height: aspect.height,
@@ -1246,7 +1246,7 @@ Page({
         // eslint-disable-next-line no-await-in-loop
         const pipe = await videoAi.postIcePipeline({
           mediaUrl: job.mediaUrl,
-          projectName: '灵祺AI云剪',
+          projectName: '灵祺云剪',
           editBrief,
           width: aspect.width,
           height: aspect.height,

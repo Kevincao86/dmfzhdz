@@ -33,15 +33,15 @@ module.exports.MODULE_COPY = {
     body: '小程序提供概览健康分、问法抽样与 AI 咨询测试；完整的门店信息、内容库、问法覆盖、平台同步与效果体检请在电脑端「运营 → GEO 运营优化」操作。',
   },
   ai_content: {
-    navTitle: 'AI 文章与话题',
+    navTitle: '文章与话题',
     body: '文章与话题生成需绑定抖音来客；支持品牌/多店上下文。更多模型自动选型与高级编排请在电脑端完成。',
   },
   ai_visual_studio: {
-    navTitle: 'AI 视觉工坊',
+    navTitle: '视觉工坊',
     body: '与电脑端「灵祺视觉工坊」同源：选渠道与玩法 → AI 文案包 → 参考图对齐 → 一键出图并保存相册；积分规则与 Web 一致（文案 3 积分/次、生图 8 积分/张）。',
   },
   shortvideo_ai: {
-    navTitle: '短视频AI处理',
+    navTitle: '短视频处理',
     body: '参考图生视频、纯文案短片与 ICE 云剪任务经商家后台 BFF 与电脑端一致；混剪支持「智能（按内容自动转场）」；长视频分镜策划等高级能力请在电脑端使用。',
   },
   shortvideo: {
@@ -62,11 +62,11 @@ module.exports.MODULE_COPY = {
   },
   digital_human: {
     navTitle: '数字人口播',
-    body: '数字人 TTS 试听与电脑端同源。请从「功能 → AI 创作 → 数字人口播」进入；完整成片请在电脑端完成。',
+    body: '数字人 TTS 试听与电脑端同源。请从「功能 → 内容创作 → 数字人口播」进入；完整成片请在电脑端完成。',
   },
   ai_ops_plan: {
-    navTitle: 'AI 运营方案',
-    body: '多平台运营方案与电脑端同源。请从「功能 → AI 创作 → AI 运营方案」进入原生页生成。',
+    navTitle: '运营方案',
+    body: '多平台运营方案与电脑端同源。请从「功能 → 内容创作 → 运营方案」进入原生页生成。',
   },
   platform_target: {
     navTitle: '平台签框',

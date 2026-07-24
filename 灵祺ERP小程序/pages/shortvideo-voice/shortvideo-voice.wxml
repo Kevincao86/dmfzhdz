@@ -1,7 +1,7 @@
 <view class="voice-page">
   <view class="voice-hero meoo-card">
     <text class="voice-hero-title">短视频优化 · 语音</text>
-    <text class="voice-hero-desc">口述脚本结构、卖点、时长与结尾 CTA；AI 拆解段落与镜头提示，编辑页做微调。</text>
+    <text class="voice-hero-desc">口述脚本结构、卖点、时长与结尾 CTA；自动拆解段落与镜头提示，编辑页做微调。</text>
   </view>
 
   <view class="voice-steps meoo-card">

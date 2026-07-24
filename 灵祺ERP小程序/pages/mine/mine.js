@@ -5,7 +5,17 @@ const platformBindingsMp = require('../../utils/platformBindingsMp.js')
 const mpUi = require('../../utils/mpUiFlags.js')
 const { iconDataUri } = require('../../utils/funcIconAssetsMp.js')
 
+const PROFILE_KEY = 'meoo_merchant_profile_v1'
+
 const BASE_MENU = [
+  {
+    id: 'profile',
+    title: '修改个人资料',
+    desc: '头像、昵称与联系方式',
+    iconKey: 'user',
+    tone: 'cyan',
+    url: '/pages/profile-edit/profile-edit',
+  },
   {
     id: 'notify',
     title: '消息通知',
@@ -48,8 +58,11 @@ const BASE_MENU = [
   },
 ]
 
-function buildVisibleMenu() {
+function buildVisibleMenu(guestMode) {
   return BASE_MENU.filter((item) => {
+    if (guestMode && (item.id === 'wallet' || item.id === 'subscribe' || item.id === 'switch')) {
+      return false
+    }
     if (item.id === 'wallet' && !mpUi.SHOW_WALLET) return false
     if (item.id === 'subscribe' && !mpUi.SHOW_SUBSCRIPTION) return false
     return true
@@ -61,6 +74,16 @@ function enrichMenu(items) {
     ...item,
     iconSrc: iconDataUri(item.tone || 'cyan', item.iconKey),
   }))
+}
+
+function readAvatar() {
+  try {
+    const raw = wx.getStorageSync(PROFILE_KEY)
+    const p = typeof raw === 'string' ? JSON.parse(raw || '{}') : raw || {}
+    return String(p.avatarUrl || '').trim()
+  } catch (_) {
+    return ''
+  }
 }
 
 Page({
@@ -80,16 +103,36 @@ Page({
     bindExpanded: false,
     bindIconSrc: iconDataUri('cyan', 'bind'),
     storeLogoSrc: iconDataUri('cyan', 'shop'),
-    menu: enrichMenu(buildVisibleMenu()),
+    avatarUrl: '',
+    guestMode: true,
+    menu: enrichMenu(buildVisibleMenu(true)),
   },
 
   onShow() {
-    if (!api.canAccessTabBar()) {
-      api.goLogin()
-      return
-    }
+    api.enterGuestBrowse()
+    const real = api.isRealAuthed()
+    const avatarUrl = readAvatar()
+    this.setData({
+      guestMode: !real,
+      menu: enrichMenu(buildVisibleMenu(!real)),
+      avatarUrl,
+      storeLogoSrc: avatarUrl || iconDataUri('cyan', 'shop'),
+      showPlanBadge: mpUi.SHOW_SUBSCRIPTION && real,
+    })
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 2 })
+    }
+    if (!real) {
+      this.setData({
+        storeName: '灵祺商家',
+        storeShort: '灵祺',
+        loginName: '',
+        planLabel: '',
+        cloudPlatformRows: [],
+        webPlatformRows: [],
+        bindingsHint: '登录后可同步平台绑定',
+      })
+      return
     }
     try {
       const display =
@@ -101,6 +144,14 @@ Page({
     } catch (_) {}
     this.setData({ devMode: devAuth.isDevSkipLogin() })
     void this.refreshAccountData()
+  },
+
+  onEditProfile() {
+    wx.navigateTo({ url: '/pages/profile-edit/profile-edit' })
+  },
+
+  onGoLogin() {
+    api.requireRealAuth('/pages/mine/mine')
   },
 
   onToggleBind() {
@@ -140,7 +191,7 @@ Page({
 
   patchSubscribeMenuDesc(desc) {
     if (!mpUi.SHOW_SUBSCRIPTION) return
-    const menu = enrichMenu(buildVisibleMenu()).map((item) =>
+    const menu = enrichMenu(buildVisibleMenu(false)).map((item) =>
       item.id === 'subscribe' ? Object.assign({}, item, { desc }) : item,
     )
     this.setData({ menu })
@@ -179,7 +230,16 @@ Page({
       api.logoutAndGoLogin()
       return
     }
-    if (url) wx.navigateTo({ url })
+    if (!url) return
+    if (url.indexOf('profile-edit') >= 0) {
+      wx.navigateTo({ url })
+      return
+    }
+    if (!api.isRealAuthed()) {
+      api.requireRealAuth(url)
+      return
+    }
+    wx.navigateTo({ url })
   },
 
   onLogout() {
@@ -195,10 +255,15 @@ Page({
       showLogoutConfirm: false,
       loginName: '',
       storeName: '灵祺商家',
+      storeShort: '灵祺',
       planLabel: '',
       cloudPlatformRows: [],
       webPlatformRows: [],
+      guestMode: true,
+      menu: enrichMenu(buildVisibleMenu(true)),
     })
-    api.logoutAndGoLogin()
+    api.logout()
+    api.enterGuestBrowse()
+    wx.showToast({ title: '已退出', icon: 'none' })
   },
 })

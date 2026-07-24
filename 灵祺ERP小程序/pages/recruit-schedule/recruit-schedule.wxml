@@ -1,6 +1,6 @@
 <scroll-view scroll-y class="page-pad-v2" enhanced show-scrollbar="{{false}}">
   <view class="sec-card-v2">
-    <text class="sec-strong">AI 排期建议</text>
+    <text class="sec-strong">排期建议</text>
     <text class="body">建议分批到店拍摄</text>
   </view>
   <view wx:if="{{err}}" class="hint-v2 err">{{err}}</view>

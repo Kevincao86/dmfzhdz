@@ -7,9 +7,11 @@ Page({
   data: {
     sections: [],
     erpLinked: false,
+    guestMode: false,
   },
 
   onLoad() {
+    api.enterGuestBrowse()
     const sections = FUNCTION_SECTIONS.map((sec) => ({
       ...sec,
       cols: sec.layout === 'grid3' ? 3 : sec.layout === 'grid2' ? 2 : 1,
@@ -23,21 +25,26 @@ Page({
     this.setData({
       sections,
       erpLinked: merchant.hasMerchantApi(),
+      guestMode: !api.isRealAuthed(),
     })
   },
 
   onShow() {
-    if (!api.canAccessTabBar()) {
-      api.goLogin()
-      return
+    // 审核：功能首页可未登录浏览，不强制跳登录
+    api.enterGuestBrowse()
+    this.setData({ guestMode: !api.isRealAuthed() })
+    if (api.isRealAuthed()) {
+      try {
+        const app = getApp()
+        if (app && typeof app.syncMerchantSession === 'function') void app.syncMerchantSession({ force: true })
+      } catch (_) {}
     }
-    try {
-      const app = getApp()
-      if (app && typeof app.syncMerchantSession === 'function') void app.syncMerchantSession({ force: true })
-    } catch (_) {}
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 1 })
+      this.getTabBar().setData({ selected: 0 })
     }
   },
 
+  onGoLogin() {
+    api.requireRealAuth('/pages/functions/functions')
+  },
 })

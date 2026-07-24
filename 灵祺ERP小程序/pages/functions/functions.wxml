@@ -2,9 +2,13 @@
   <view class="func-top">
     <view>
       <text class="func-h1">商家能力中心</text>
-      <text class="func-p">店铺 · 商品 · 运营 · AI创作 · 投流 · 线索 · 财务</text>
+      <text class="func-p">店铺 · 商品 · 运营 · 内容创作 · 投流 · 线索 · 财务</text>
     </view>
     <image class="func-illus-img" src="/images/func-hero-illus.svg" mode="aspectFit" />
+  </view>
+  <view wx:if="{{guestMode}}" class="guest-banner" bindtap="onGoLogin">
+    <text class="guest-banner-t">游客浏览中 · 可先查看功能模块</text>
+    <text class="guest-banner-a">登录后使用完整能力 ›</text>
   </view>
   <block wx:for="{{sections}}" wx:key="id">
     <navigator wx:if="{{item.layout === 'row'}}" url="{{item.items[0].url}}" class="sec-card-v2">

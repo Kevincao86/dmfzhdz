@@ -3,9 +3,9 @@
     <text class="nv-back" bindtap="backPick">返回版本选择</text>
     <view class="nv-title-row">
       <view class="nv-icon">✦</view>
-      <text class="nv-title">新手版 · AI 纯智能处理</text>
+      <text class="nv-title">新手版 · 一键处理</text>
     </view>
-    <text class="nv-sub">已绑定来客门店可多选；档位分配逻辑与 Web 新手版一致（当前为离线估算，与网页端无 AI 时的兜底相同）。</text>
+    <text class="nv-sub">已绑定来客门店可多选；档位分配逻辑与 Web 新手版一致（当前为离线估算，与网页端离线兜底相同）。</text>
   </view>
 
   <view class="nv-card meoo-card">
@@ -77,7 +77,7 @@
     </block>
 
     <button class="nv-ai-btn" bindtap="runAllocation" loading="{{aiLoading}}">
-      {{deliveryPlatformIdx === 1 ? '估算小红书达人数' : 'AI 智能分配达人档位'}}
+      {{deliveryPlatformIdx === 1 ? '估算小红书达人数' : '智能分配达人档位'}}
     </button>
     <text wx:if="{{aiErr}}" class="nv-err">{{aiErr}}</text>
     <text wx:if="{{allocationText}}" class="nv-alloc">{{allocationText}}</text>

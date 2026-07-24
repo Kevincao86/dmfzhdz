@@ -1,10 +1,10 @@
 <view class="ai-page">
   <view class="ai-head-block">
-    <text class="ai-h1">AI 文章与话题</text>
-    <text class="ai-intro">选择平台上下文与品牌或门店口径，对齐电脑端 AI 文案链路。</text>
+    <text class="ai-h1">文章与话题</text>
+    <text class="ai-intro">选择平台上下文与品牌或门店口径，对齐电脑端文案链路。</text>
     <view class="ai-two-tabs">
-      <view class="ai-tab {{mainTab === 'article' ? 'on' : ''}}" data-t="article" bindtap="switchMain">AI 文章生成</view>
-      <view class="ai-tab {{mainTab === 'topic' ? 'on' : ''}}" data-t="topic" bindtap="switchMain">AI 话题推荐</view>
+      <view class="ai-tab {{mainTab === 'article' ? 'on' : ''}}" data-t="article" bindtap="switchMain">文章生成</view>
+      <view class="ai-tab {{mainTab === 'topic' ? 'on' : ''}}" data-t="topic" bindtap="switchMain">话题推荐</view>
     </view>
   </view>
 
@@ -35,7 +35,7 @@
       <text class="ai-hint">来客门店可多选（最多12家）</text>
     </block>
 
-    <text class="ai-label spaced">文案 AI 模型</text>
+    <text class="ai-label spaced">文案模型</text>
     <text class="ai-hint">{{modelUi}}</text>
   </view>
 

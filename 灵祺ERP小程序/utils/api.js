@@ -191,7 +191,46 @@ function isGuestBrowsing() {
   }
 }
 
-/** Tab 页（灵祺助手 / 功能 / 我的）是否可进入：已登录、开发预览或免登录游览 */
+/** 审核：未登录可先浏览 Tab/功能，不强制进登录页 */
+function enterGuestBrowse() {
+  try {
+    wx.setStorageSync('meoo_guest_browse', '1')
+  } catch (_) {}
+}
+
+function clearGuestBrowse() {
+  try {
+    wx.removeStorageSync('meoo_guest_browse')
+  } catch (_) {}
+}
+
+/** 需真实登录时调用；游客可继续逛 */
+function requireRealAuth(redirectUrl) {
+  if (isRealAuthed()) return true
+  enterGuestBrowse()
+  const target = String(redirectUrl || '').trim()
+  wx.showModal({
+    title: '需要登录',
+    content: '浏览无需登录。使用该功能前请先登录商家账号。',
+    confirmText: '去登录',
+    cancelText: '继续逛',
+    success(res) {
+      if (!res.confirm) return
+      const url = target
+        ? `/pages/login/login?redirect=${encodeURIComponent(target)}`
+        : '/pages/login/login'
+      wx.navigateTo({
+        url,
+        fail() {
+          wx.reLaunch({ url })
+        },
+      })
+    },
+  })
+  return false
+}
+
+/** Tab 页（功能 / 灵祺助手 / 我的）是否可进入：已登录、开发预览或免登录游览 */
 function canAccessTabBar() {
   return canAccessPage()
 }
@@ -275,6 +314,9 @@ module.exports = {
   isAuthed,
   isRealAuthed,
   isGuestBrowsing,
+  enterGuestBrowse,
+  clearGuestBrowse,
+  requireRealAuth,
   canAccessTabBar,
   canAccessPage,
   bootstrapSupabaseConfig,

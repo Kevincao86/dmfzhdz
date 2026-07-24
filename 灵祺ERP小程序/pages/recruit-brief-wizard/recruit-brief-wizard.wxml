@@ -5,7 +5,7 @@
     <text class="bw-kicker">对齐 Web Brief 弹窗流程</text>
     <text class="bw-title">AI达人Brief 智能生成</text>
     <text class="bw-lead">
-      Step 选择投放平台 → 选择商品上下文 → AI 产出三版可引用 Brief。（生成接口与电脑端同源，需绑定抖音 Bearer。）
+      Step 选择投放平台 → 选择商品上下文 → 产出三版可引用 Brief。（生成接口与电脑端同源，需绑定抖音 Bearer。）
     </text>
   </view>
 

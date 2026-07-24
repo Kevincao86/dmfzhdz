@@ -37,7 +37,13 @@ Page({
     devSkip: false,
   },
 
-  onLoad() {
+  onLoad(options) {
+    const raw = options && options.redirect ? String(options.redirect) : ''
+    try {
+      this._redirect = raw ? decodeURIComponent(raw) : ''
+    } catch (_) {
+      this._redirect = raw
+    }
     this.setData({ devSkip: devAuth.isDevSkipLogin() })
     this._syncModeHint()
     void api.bootstrapSupabaseConfig()
@@ -55,20 +61,24 @@ Page({
         return
       }
     } catch (_) {}
-    const token = api.getAccessToken()
+    const token = api.getBearerToken()
     if (!token) return
     if (devAuth.isDevSkipLogin() && token === devAuth.DEV_TOKEN) return
-    wx.switchTab({ url: '/pages/agent/agent' })
+    this._goHome()
   },
 
   onGuestBrowse() {
-    // 已取消免登录预览入口；保留方法避免历史绑定报错
+    api.enterGuestBrowse()
+    wx.switchTab({
+      url: '/pages/functions/functions',
+      fail: () => wx.reLaunch({ url: '/pages/functions/functions' }),
+    })
   },
 
   onDevPreview() {
     if (!devAuth.isDevSkipLogin()) return
     devAuth.applyDevSession()
-    wx.switchTab({ url: '/pages/agent/agent' })
+    this._goHome()
   },
 
   async onRefreshPage() {
@@ -243,8 +253,26 @@ Page({
       }
     } catch (_) {}
     this.setData({ busy: false })
+    const redirect = String(this._redirect || '').trim()
+    const tabPaths = ['/pages/functions/functions', '/pages/agent/agent', '/pages/mine/mine']
+    if (redirect) {
+      const path = redirect.split('?')[0]
+      if (tabPaths.some((p) => path === p || path.endsWith(p))) {
+        wx.switchTab({ url: path, fail: () => wx.switchTab({ url: '/pages/functions/functions' }) })
+        return
+      }
+      wx.redirectTo({
+        url: redirect,
+        fail: () =>
+          wx.navigateTo({
+            url: redirect,
+            fail: () => wx.switchTab({ url: '/pages/functions/functions' }),
+          }),
+      })
+      return
+    }
     wx.switchTab({
-      url: '/pages/agent/agent',
+      url: '/pages/functions/functions',
       fail: () => {
         wx.showToast({ title: '进入工作台失败，请重试', icon: 'none' })
       },

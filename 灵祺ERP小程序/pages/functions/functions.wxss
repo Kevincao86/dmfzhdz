@@ -6,6 +6,25 @@
   flex-shrink: 0;
 }
 
+.guest-banner {
+  margin: 0 0 20rpx;
+  padding: 20rpx 24rpx;
+  border-radius: 16rpx;
+  background: linear-gradient(90deg, #e0f2fe, #f0f9ff);
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+.guest-banner-t {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #0f172a;
+}
+.guest-banner-a {
+  font-size: 22rpx;
+  color: #0284c7;
+}
+
 .sec-head-v2 text:nth-child(2) {
   flex: 1;
 }
