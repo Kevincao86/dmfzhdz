@@ -1,0 +1,17 @@
+# AI 重跑提示词（16:9 · 暗色 BP 版型）
+
+全局风格前缀（每条都加）：
+Dark pitch deck slide 16:9, near-black #0a0a0f, subtle grid, orange-pink-magenta accents, glass cards, premium Chinese investor BP, no emojis, no cluttered dashboard.
+
+01-cover: Center gradient title 灵祺商业计划书; pill 种子轮·保密文件; 4 KPI cards 500万/3家/24个月/杭甬温
+02-milestones: Timeline M3 M6 M12 M24 with glass cards and funding milestones
+03-market: Title 市场与机遇; bar chart 2023-2027E; SAM banner
+04-pain-solution: 2x2 pain→solution cards
+05-dual-engine: Two columns Merchant AI Agent × 可验证履约网络
+06-product-matrix: 6 product cards with status badges
+07-business-model: Revenue table + 45/35/20 mix + KPIs
+08-radar: Pentagon radar chart differentiation
+09-region: Hangzhou-Ningbo-Wenzhou triangle map + Q timeline
+10-progress: Checklist + validation metrics
+11-use-of-funds: 44/30/16/10 donut + team size
+12-team-cta: Team cards + risks + CTA 预约路演
