@@ -200,6 +200,48 @@
   box-shadow: 0 12rpx 32rpx rgba(2, 132, 199, 0.28);
 }
 
+/**
+ * 输入框防裁切：微信 input 在 line-height=height 时易裁字
+ * 用固定高度 + 正常行高 + 零垂直 padding
+ */
+input,
+.op-input,
+.cp-input,
+.vs-input,
+.pe-input,
+.plist-search-input,
+.rev-search-input,
+.leads-search-input,
+.composer-input,
+.geo-input,
+.sm-input,
+.bw-input,
+.nv-input,
+.pro-input {
+  min-height: 88rpx !important;
+  height: 88rpx !important;
+  line-height: normal !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  padding-left: 24rpx !important;
+  padding-right: 24rpx !important;
+  font-size: 28rpx !important;
+  box-sizing: border-box !important;
+  vertical-align: middle;
+}
+
+textarea,
+.op-area,
+.cp-area,
+.vs-area,
+.pe-area {
+  min-height: 160rpx !important;
+  line-height: 1.5 !important;
+  padding: 20rpx 24rpx !important;
+  font-size: 28rpx !important;
+  box-sizing: border-box !important;
+}
+
 .kpi-hero,
 .score-v2 {
   background: linear-gradient(135deg, #0ea5e9, #0284c7 55%, #6366f1);

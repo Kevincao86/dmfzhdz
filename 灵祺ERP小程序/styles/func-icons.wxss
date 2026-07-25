@@ -1,12 +1,14 @@
-/* 功能页图标 — image + data-uri SVG，兼容微信小程序 */
+/* 功能页图标 — AI PNG（圆角色块），兼容微信小程序 */
 .func-ic-img {
-  width: 36rpx;
-  height: 36rpx;
+  width: 56rpx;
+  height: 56rpx;
   display: block;
   flex-shrink: 0;
+  border-radius: 16rpx;
 }
 
 .func-ic-sm {
-  width: 28rpx;
-  height: 28rpx;
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 16rpx;
 }

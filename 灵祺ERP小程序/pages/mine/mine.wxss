@@ -51,13 +51,14 @@
   color: #0284c7;
 }
 
-/* 透明底线条图标 */
+/* AI 圆角图标 */
 .mine-line-ic {
-  width: 40rpx;
-  height: 40rpx;
+  width: 48rpx;
+  height: 48rpx;
   display: block;
   flex-shrink: 0;
   background: transparent;
+  border-radius: 14rpx;
 }
 
 .mine-menu-ic {

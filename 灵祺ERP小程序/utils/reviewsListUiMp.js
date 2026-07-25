@@ -1,6 +1,5 @@
-/** 评价管理 — 展示字段与预览数据 */
+/** 评价管理 — 展示字段（禁止虚假预览数据） */
 const { GROUPBUY_OPTIONS } = require('./productCreatePlatformsMp.js')
-const devAuth = require('./devAuth.js')
 
 const PLAT_LOGO = {}
 for (const p of GROUPBUY_OPTIONS) {
@@ -48,9 +47,7 @@ function replyStatusUi(replied) {
 
 function enrichReviewRow(item, platId) {
   const st = replyStatusUi(item.replied)
-  const keywords = Array.isArray(item.keywords)
-    ? item.keywords
-    : extractKeywords(item.content)
+  const keywords = Array.isArray(item.keywords) ? item.keywords : extractKeywords(item.content)
   return {
     ...item,
     platId,
@@ -72,71 +69,19 @@ function extractKeywords(text) {
   return pool.filter((k) => t.includes(k.slice(0, 2))).slice(0, 3)
 }
 
-function previewPlatTabs() {
+/** 空平台 Tab（计数 0），供加载前 / 无数据时使用 */
+function emptyPlatTabs() {
   return [
-    { id: 'all', label: '全部', count: 23, logo: '' },
-    { id: 'douyin', label: '抖音', count: 8, logo: PLAT_LOGO.douyin },
-    { id: 'meituan', label: '美团', count: 10, logo: PLAT_LOGO.meituan },
-    { id: 'xiaohongshu', label: '小红书', count: 3, logo: PLAT_LOGO.xiaohongshu },
-    { id: 'dianping', label: '大众点评', count: 2, logo: PLAT_LOGO.dianping },
+    { id: 'all', label: '全部', count: 0, logo: '' },
+    { id: 'douyin', label: '抖音', count: 0, logo: PLAT_LOGO.douyin },
+    { id: 'meituan', label: '美团', count: 0, logo: PLAT_LOGO.meituan },
+    { id: 'xiaohongshu', label: '小红书', count: 0, logo: PLAT_LOGO.xiaohongshu },
+    { id: 'dianping', label: '大众点评', count: 0, logo: PLAT_LOGO.dianping },
   ]
-}
-
-function previewReviews(platTab) {
-  const all = [
-    {
-      id: 'r1',
-      platId: 'douyin',
-      userName: '用户A',
-      ratingStars: 5,
-      content: '环境很好，老师专业，孩子很喜欢街舞课！',
-      createdAt: new Date(Date.now() - 3600000).toISOString(),
-      replied: false,
-      aiSuggest: '感谢您的认可！我们会继续优化课程体验，欢迎常来～',
-    },
-    {
-      id: 'r2',
-      platId: 'meituan',
-      userName: '用户B',
-      ratingStars: 3,
-      content: '味道不错但排队有点久，建议错峰到店。',
-      createdAt: new Date(Date.now() - 86400000).toISOString(),
-      replied: false,
-      aiSuggest: '抱歉让您久等，我们已增加高峰时段人手，期待您再次光临。',
-    },
-    {
-      id: 'r3',
-      platId: 'xiaohongshu',
-      userName: '用户C',
-      ratingStars: 5,
-      content: '拍照很出片，套餐划算，会推荐给朋友。',
-      createdAt: new Date(Date.now() - 172800000).toISOString(),
-      replied: true,
-      replyText: '谢谢种草！周末有新品上线，欢迎再来打卡～',
-    },
-    {
-      id: 'r4',
-      platId: 'dianping',
-      userName: '用户D',
-      ratingStars: 4,
-      content: '位置好找，停车方便，整体体验不错。',
-      createdAt: new Date(Date.now() - 259200000).toISOString(),
-      replied: true,
-      replyText: '感谢支持，我们会继续保持服务品质。',
-    },
-  ]
-  const rows = platTab === 'all' ? all : all.filter((x) => x.platId === platTab)
-  return rows.map((x) => enrichReviewRow(x, x.platId))
-}
-
-function shouldUsePreview() {
-  return devAuth.isDevSkipLogin()
 }
 
 module.exports = {
   enrichReviewRow,
-  previewPlatTabs,
-  previewReviews,
-  shouldUsePreview,
+  emptyPlatTabs,
   PLAT_LOGO,
 }

@@ -179,9 +179,13 @@
   width: 72rpx;
   height: 72rpx;
   border-radius: 22rpx;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: hidden;
 }
 
 .page-func-v2 .func-ic-sm {
-  width: 36rpx;
-  height: 36rpx;
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 22rpx;
 }
