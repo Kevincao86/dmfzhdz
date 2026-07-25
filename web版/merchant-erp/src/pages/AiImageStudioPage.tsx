@@ -444,6 +444,18 @@ export default function AiImageStudioPage() {
 
   const selectPlatformSeries = (id: 'platform_carousel_five' | 'platform_detail_page') => {
     setForm((f) => {
+      // 已选中再点一次 → 取消，回到下方常规玩法（默认团购上新）
+      if (f.playbook === id) {
+        const fallback =
+          getPlaybooksForIndustry(f.industry).find((p) => !isPlatformSeriesPlaybook(p.id))?.id ??
+          'group_buy_new'
+        const next = applyPlaybookToFormWithVariants(f, fallback, {
+          keepChannels: true,
+          templateIndex: 0,
+        })
+        void loadAiCopy(next)
+        return next
+      }
       const next = applyPlatformSeriesPlaybook(f, id)
       void loadAiCopy(next)
       return next
@@ -959,7 +971,7 @@ export default function AiImageStudioPage() {
 
           <StudioPanel
             title="本地平台长图素材"
-            subtitle="抖音 · 快手 · 美团 · 门店装修与团购详情"
+            subtitle="抖音 · 快手 · 美团 · 再点已选卡片可取消"
           >
             <div className="grid grid-cols-1 gap-2">
               <button
