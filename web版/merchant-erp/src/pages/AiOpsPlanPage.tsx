@@ -10,7 +10,7 @@ import {
   Sparkles,
   Trash2,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import RecruitmentPlatformPicker from '../components/recruitment/RecruitmentPlatformPicker'
 import { usePartnerClients } from '../context/PartnerClientContext'
@@ -61,6 +61,15 @@ import {
   MP_POINTS_OPS_PLAN_PER_USE,
   MP_POINTS_USAGE_KIND_LABELS,
 } from '../lib/mpPointsEconomics'
+import {
+  consumeLatestAiGenerationResultForKind,
+  findRunningAiGenerationJob,
+  finishAiGenerationJob,
+  startAiGenerationJob,
+  storeAiGenerationResult,
+  subscribeAiGenerationJobs,
+  updateAiGenerationJob,
+} from '../lib/aiGenerationJobs'
 import { generateAiOpsPlan } from '../services/aiOpsPlanApi'
 import { fetchMerchantProductList } from '../services/merchantProductListApi'
 import {
@@ -1434,6 +1443,8 @@ export default function AiOpsPlanPage() {
   /** 节日大促：周期内节日 + 店庆/周年庆已选标签 id */
   const [selectedFestivalIds, setSelectedFestivalIds] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
+  const generateLockRef = useRef(false)
+  const mountedRef = useRef(true)
   const [err, setErr] = useState<string | null>(null)
   const [plan, setPlan] = useState<AiOpsPlanResult | null>(null)
   const [tab, setTab] = useState<AiOpsPlanTabId>('ops')
@@ -1491,6 +1502,55 @@ export default function AiOpsPlanPage() {
 
   useEffect(() => {
     setHistory(loadAiOpsPlanHistory(scopeId))
+  }, [scopeId])
+
+  useEffect(() => {
+    mountedRef.current = true
+    const syncRunning = () => {
+      if (findRunningAiGenerationJob('ops_plan')) setLoading(true)
+    }
+    syncRunning()
+
+    type OpsPlanJobResult = {
+      ok: true
+      plan: AiOpsPlanResult
+      itemTitle: string
+      pointsCharged: number
+      pointsBalance?: number
+    } | {
+      ok: false
+      message: string
+    }
+
+    const pending = consumeLatestAiGenerationResultForKind<OpsPlanJobResult>('ops_plan')
+    if (pending?.payload.ok) {
+      setPlan(pending.payload.plan)
+      setTab('ops')
+      setHistory(loadAiOpsPlanHistory(scopeId))
+      setLoading(false)
+      setErr(null)
+      const balTip =
+        typeof pending.payload.pointsBalance === 'number'
+          ? `，余额 ${pending.payload.pointsBalance.toLocaleString('zh-CN')}`
+          : ''
+      const doneMsg = `后台生成完成：${pending.payload.itemTitle}（已扣 ${pending.payload.pointsCharged} 积分${balTip}）`
+      setToast(doneMsg)
+      window.setTimeout(() => setToast(null), 1800)
+    } else if (pending && !pending.payload.ok) {
+      setLoading(false)
+      setErr(pending.payload.message)
+    }
+
+    const unsub = subscribeAiGenerationJobs(() => {
+      if (!mountedRef.current) return
+      const running = findRunningAiGenerationJob('ops_plan')
+      setLoading(!!running)
+    })
+
+    return () => {
+      mountedRef.current = false
+      unsub()
+    }
   }, [scopeId])
 
   /** 拉取连锁门店（抖音来客已认领），供多选 / 全选 */
@@ -1582,13 +1642,16 @@ export default function AiOpsPlanPage() {
   useEffect(() => {
     if (goalTemplateId !== 'jieri') return
     const allow = new Set(jieriSelectableTags.map((t) => t.id))
-    setSelectedFestivalIds((prev) => {
-      const next = prev.filter((id) => allow.has(id))
-      const labels = jieriSelectableTags.filter((t) => next.includes(t.id)).map((t) => t.label)
-      setGoalsNote(buildJieriGoalsNote(labels, periodStart, periodEnd))
-      return next
-    })
+    setSelectedFestivalIds((prev) => prev.filter((id) => allow.has(id)))
   }, [goalTemplateId, jieriSelectableTags, periodStart, periodEnd])
+
+  useEffect(() => {
+    if (goalTemplateId !== 'jieri') return
+    const labels = jieriSelectableTags
+      .filter((t) => selectedFestivalIds.includes(t.id))
+      .map((t) => t.label)
+    setGoalsNote(buildJieriGoalsNote(labels, periodStart, periodEnd))
+  }, [goalTemplateId, jieriSelectableTags, selectedFestivalIds, periodStart, periodEnd])
 
   const toggleFestivalTag = (tag: FestivalTag) => {
     setSelectedFestivalIds((prev) => {
@@ -1862,7 +1925,24 @@ export default function AiOpsPlanPage() {
     storeCatalog.length,
   ])
 
+  const applyGoalTemplate = (t: (typeof GOAL_TEMPLATES)[number]) => {
+    if (loading || generateLockRef.current) return
+    setErr(null)
+    setGoalTemplateId(t.id)
+    setBudgetYuan(t.budget)
+    if (t.id === 'jieri') {
+      setSelectedFestivalIds([])
+      setGoalsNote(buildJieriGoalsNote([], periodStart, periodEnd))
+    } else {
+      setSelectedFestivalIds([])
+      setGoalsNote(t.note)
+    }
+  }
+
   const onGenerate = async () => {
+    if (generateLockRef.current || loading || findRunningAiGenerationJob('ops_plan')) {
+      return
+    }
     if (!platforms.length) {
       setErr('请至少勾选一个平台')
       return
@@ -1880,13 +1960,23 @@ export default function AiOpsPlanPage() {
       setErr('新客户洽谈请先选择商品品类与二级类目（与商品管理同源，用于行业建议毛利与 ROI）')
       return
     }
+    generateLockRef.current = true
     setLoading(true)
     setErr(null)
+    const jobId = startAiGenerationJob({
+      kind: 'ops_plan',
+      label: 'AI 运营方案',
+      route: '/operation/ai-ops-plan',
+    })
     try {
+      updateAiGenerationJob(jobId, { progress: '正在准备参数…' })
       const input = await buildInput()
+      updateAiGenerationJob(jobId, { progress: '正在生成（约 1～2 分钟）…' })
       const r = await generateAiOpsPlan(input)
       if (!r.ok) {
-        setErr(r.message)
+        storeAiGenerationResult(jobId, { ok: false as const, message: r.message })
+        finishAiGenerationJob(jobId, false, r.message)
+        if (mountedRef.current) setErr(r.message)
         return
       }
       const planFixed = enrichAiOpsPlanPostProcess(r.plan, {
@@ -1896,21 +1986,32 @@ export default function AiOpsPlanPage() {
         periodEnd: input.periodEnd,
         platforms: input.platforms,
       })
-      setPlan(planFixed)
-      setTab('ops')
       const item = saveAiOpsPlanHistoryItem(scopeId, input, planFixed)
-      setHistory(loadAiOpsPlanHistory(scopeId))
       const charged =
         typeof r.pointsCharged === 'number' && r.pointsCharged > 0
           ? r.pointsCharged
           : MP_POINTS_OPS_PLAN_PER_USE
-      const balTip =
-        typeof r.pointsBalance === 'number'
-          ? `，余额 ${r.pointsBalance.toLocaleString('zh-CN')}`
-          : ''
-      flash(`已生成并保存：${item.title}（已扣 ${charged} 积分${balTip}）`)
+      storeAiGenerationResult(jobId, {
+        ok: true as const,
+        plan: planFixed,
+        itemTitle: item.title,
+        pointsCharged: charged,
+        pointsBalance: r.pointsBalance,
+      })
+      finishAiGenerationJob(jobId, true)
+      if (mountedRef.current) {
+        setPlan(planFixed)
+        setTab('ops')
+        setHistory(loadAiOpsPlanHistory(scopeId))
+        const balTip =
+          typeof r.pointsBalance === 'number'
+            ? `，余额 ${r.pointsBalance.toLocaleString('zh-CN')}`
+            : ''
+        flash(`已生成并保存：${item.title}（已扣 ${charged} 积分${balTip}）`)
+      }
     } finally {
-      setLoading(false)
+      generateLockRef.current = false
+      if (mountedRef.current) setLoading(false)
     }
   }
 
@@ -2044,23 +2145,16 @@ export default function AiOpsPlanPage() {
                 <button
                   key={t.id}
                   type="button"
-                  onClick={() => {
-                    setGoalTemplateId(t.id)
-                    setBudgetYuan(t.budget)
-                    if (t.id === 'jieri') {
-                      setSelectedFestivalIds([])
-                      setGoalsNote(buildJieriGoalsNote([], periodStart, periodEnd))
-                    } else {
-                      setSelectedFestivalIds([])
-                      setGoalsNote(t.note)
-                    }
-                  }}
+                  disabled={loading}
+                  onClick={() => applyGoalTemplate(t)}
                   className={cn(
                     'rounded-full border px-2.5 py-1 text-xs transition',
+                    loading && 'cursor-not-allowed opacity-50',
                     goalTemplateId === t.id
                       ? 'border-blue-500 bg-blue-50 text-blue-800'
                       : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300',
                   )}
+                  title={loading ? '方案生成中，请稍后再切换模板' : undefined}
                 >
                   {t.label}
                 </button>
@@ -2086,14 +2180,16 @@ export default function AiOpsPlanPage() {
                         <button
                           key={tag.id}
                           type="button"
+                          disabled={loading}
                           onClick={() => toggleFestivalTag(tag)}
                           className={cn(
                             'rounded-full border px-2.5 py-1 text-xs transition',
+                            loading && 'cursor-not-allowed opacity-50',
                             on
                               ? 'border-rose-500 bg-rose-100 text-rose-900'
                               : 'border-gray-200 bg-white text-gray-700 hover:border-rose-300',
                           )}
-                          title={tag.date || tag.label}
+                          title={loading ? '方案生成中，请稍后再切换' : tag.date || tag.label}
                         >
                           {tag.label}
                           {tag.date ? (
@@ -2692,6 +2788,7 @@ export default function AiOpsPlanPage() {
             <div className="flex h-full min-h-[28rem] flex-col items-center justify-center gap-3 px-6">
               <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
               <p className="text-sm text-gray-600">正在结合菜单、毛利与预算分配方案…</p>
+              <p className="text-xs text-gray-400">可切换其他页面，生成会在后台继续</p>
               <div className="mt-2 w-full max-w-md space-y-2">
                 {[1, 2, 3, 4].map((i) => (
                   <div key={i} className="h-3 animate-pulse rounded bg-gray-100" style={{ width: `${90 - i * 8}%` }} />

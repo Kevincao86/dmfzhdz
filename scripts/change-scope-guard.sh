@@ -213,6 +213,9 @@ aiOpsPlanTypes
 aiOpsPlanExport
 aiOpsPlanApi
 AiOpsPlanPage
+aiGenerationJobs
+AiGenerationJobsBanner
+MeooLayout
 merchantAiOpsPlanCore
 merchantAiUpstream
 meoo-ai-ops-plan

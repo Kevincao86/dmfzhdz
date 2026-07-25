@@ -12,6 +12,13 @@ import {
 } from '../services/mpAddonPointsSpendClient'
 import { readMpEmbedAddonAccess } from '../lib/mpEmbedAddonAccess'
 import { cn } from '../cn'
+import {
+  finishAiGenerationJob,
+  findRunningAiGenerationJob,
+  startAiGenerationJob,
+  subscribeAiGenerationJobs,
+  updateAiGenerationJob,
+} from '../lib/aiGenerationJobs'
 import { concatVideoSegmentsToMp4 } from '../lib/concatVideoSegments'
 import {
   finalizeShortVideoOutput,
@@ -529,11 +536,26 @@ export default function ShortVideoOptimizationPage() {
 
   const cancelRef = useRef(false)
   const resultBlobRef = useRef<string | null>(null)
+  const videoJobIdRef = useRef<string | null>(null)
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    if (findRunningAiGenerationJob('short_video')) setBusy(true)
+    const unsub = subscribeAiGenerationJobs(() => {
+      if (!mountedRef.current) return
+      setBusy(!!findRunningAiGenerationJob('short_video'))
+    })
+    return () => {
+      mountedRef.current = false
+      unsub()
+    }
+  }, [])
 
   useEffect(() => {
     cancelRef.current = false
     return () => {
-      cancelRef.current = true
+      // 切页不取消轮询：后台视频任务继续，仅释放本地预览 URL
       if (resultBlobRef.current) {
         URL.revokeObjectURL(resultBlobRef.current)
         resultBlobRef.current = null
@@ -1250,6 +1272,10 @@ export default function ShortVideoOptimizationPage() {
       setErr(generateGateReason)
       return
     }
+    if (findRunningAiGenerationJob('short_video')) {
+      setErr('已有视频任务在后台生成中，请稍候或返回本页查看进度')
+      return
+    }
     setErr(null)
     if (resultBlobRef.current) {
       URL.revokeObjectURL(resultBlobRef.current)
@@ -1274,6 +1300,21 @@ export default function ShortVideoOptimizationPage() {
 
     setHint(null)
 
+    const videoJobId = startAiGenerationJob({
+      kind: 'short_video',
+      label: '短视频 AI 生成',
+      route: '/ai-operation/video-check',
+    })
+    videoJobIdRef.current = videoJobId
+    const trackProgress = (text: string) => {
+      updateAiGenerationJob(videoJobId, { progress: text })
+      if (mountedRef.current) setProgress(text)
+    }
+    const finishVideoJob = (ok: boolean, message?: string) => {
+      finishAiGenerationJob(videoJobId, ok, message)
+      videoJobIdRef.current = null
+    }
+
     const txt = genPrompt.trim()
     const scriptUsable = longformEnabled && isScriptRowsUsable(scriptRows)
     const imgs: string[] = []
@@ -1285,29 +1326,37 @@ export default function ShortVideoOptimizationPage() {
 
     if (longformEnabled) {
       if (!scriptUsable && genMode === 'text') {
+        finishVideoJob(false, '请填写分镜表')
         setErr('请填写分镜表：至少 2 段，且每段填写画面或口播文案。')
         return
       }
       if (!scriptUsable && genMode === 'frames' && imgs.length === 0) {
+        finishVideoJob(false, '请填写分镜表或上传参考')
         setErr('请填写分镜表，或上传至少一个分镜参考（图/视频）。')
         return
       }
       setBusy(true)
-      setProgress('排队中……')
+      trackProgress('排队中……')
+      cancelRef.current = false
       try {
         await runLongformGenerate()
+        finishVideoJob(!!resultBlobRef.current, cancelRef.current ? '已取消等待' : undefined)
       } finally {
-        setBusy(false)
-        setProgress(null)
+        if (mountedRef.current) {
+          setBusy(false)
+          setProgress(null)
+        }
       }
       return
     }
 
     if (genMode === 'text' && !txt) {
+      finishVideoJob(false, '请填写描述')
       setErr('请用文字描述成片内容。')
       return
     }
     if (genMode === 'frames' && imgs.length === 0 && !txt) {
+      finishVideoJob(false, '请填写文案或上传参考')
       setErr('请填写执导文案或上传至少一个分镜参考（图/视频）。')
       return
     }
@@ -1320,7 +1369,7 @@ export default function ShortVideoOptimizationPage() {
           (longformEnabled ? '' : ' 如需更长成片，请勾选「长视频合成」并选择目标总时长。'),
       )
       setBusy(true)
-      setProgress('按分镜分段生成…')
+      trackProgress('按分镜分段生成…')
       cancelRef.current = false
       try {
         await execLongformSegments({
@@ -1340,7 +1389,7 @@ export default function ShortVideoOptimizationPage() {
           }),
           resolveImages: async (i, prevVideoUrl) => {
             if (i > 0 && prevVideoUrl) {
-              const b = await resolveSegmentTailFrameBase64(prevVideoUrl, (msg) => setProgress(msg))
+              const b = await resolveSegmentTailFrameBase64(prevVideoUrl, (msg) => trackProgress(msg))
               return [`data:image/jpeg;base64,${b}`]
             }
             return [imgs[i] ?? imgs[0]!]
@@ -1351,15 +1400,19 @@ export default function ShortVideoOptimizationPage() {
           },
           narrationSource: txt || textBase,
         })
+        finishVideoJob(!!resultBlobRef.current, cancelRef.current ? '已取消等待' : undefined)
       } finally {
-        setBusy(false)
-        setProgress(null)
+        if (mountedRef.current) {
+          setBusy(false)
+          setProgress(null)
+        }
       }
       return
     }
 
     setBusy(true)
-    setProgress('正在提交即梦视频任务…')
+    trackProgress('正在提交即梦视频任务…')
+    cancelRef.current = false
     try {
       const textBlock =
         genMode === 'text'
@@ -1383,19 +1436,23 @@ export default function ShortVideoOptimizationPage() {
         images_base64: imagePayload.length ? imagePayload : undefined,
       })
       if (!r.ok) {
+        finishVideoJob(false, formatVideoAiUserError(r.message))
         setErr(formatVideoAiUserError(r.message))
         return
       }
       if (r.modelUsed) setHint(`已使用视频模型：${r.modelUsed}`)
-      setProgress('合成口播配音与中文字幕…')
+      trackProgress('合成口播配音与中文字幕…')
       const narrationSource = genMode === 'text' ? txt : txt || textBlock
       const narration = await resolveNarrationForFinalVideo(narrationSource, Number(sdDurationSec))
       const dur = Number(sdDurationSec)
       const ok = await commitFinalVideo(r.videoUrl, narration, dur)
+      finishVideoJob(ok, ok ? undefined : '成片合成失败')
       if (!ok) return
     } finally {
-      setBusy(false)
-      setProgress(null)
+      if (mountedRef.current) {
+        setBusy(false)
+        setProgress(null)
+      }
     }
   }
 
@@ -1404,6 +1461,10 @@ export default function ShortVideoOptimizationPage() {
 
   const cancelWait = () => {
     cancelRef.current = true
+    if (videoJobIdRef.current) {
+      finishAiGenerationJob(videoJobIdRef.current, false, '已取消等待')
+      videoJobIdRef.current = null
+    }
     setBusy(false)
     setProgress(null)
     setHint('已停止等待；后台任务可能不会自动取消。')
