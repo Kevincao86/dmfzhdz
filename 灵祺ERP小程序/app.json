@@ -84,8 +84,11 @@
     },
     "scope.camera": {
       "desc": "用于拍摄商品图、评论截图等附件上传"
+    },
+    "scope.userLocation": {
+      "desc": "用于灵祺助手选择门店/探店位置并生成文案"
     }
   },
-  "requiredPrivateInfos": [],
+  "requiredPrivateInfos": ["chooseLocation"],
   "lazyCodeLoading": "requiredComponents"
 }
