@@ -16,7 +16,7 @@ function billingUrl() {
 }
 
 function billingFetchOnce(body) {
-  const token = api.getAccessToken()
+  const token = api.getBearerToken()
   if (!token) return Promise.reject(new Error('请先登录'))
   return new Promise((resolve, reject) => {
     wx.request({

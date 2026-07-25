@@ -1,7 +1,8 @@
 const api = require('../../utils/api.js')
 const feature = require('../../utils/merchantFeatureMp.js')
 const {
-  TODAY_STATS,
+  emptyTodayStats,
+  statsFromAds,
   enrichAdRow,
   previewAds,
   tabCounts,
@@ -15,11 +16,11 @@ Page({
     err: '',
     items: [],
     displayItems: [],
-    todayStats: TODAY_STATS,
+    todayStats: emptyTodayStats(),
     statusTabs: [],
     activeTab: 'all',
     showFilter: false,
-    hasUnread: true,
+    hasUnread: false,
   },
 
   onShow() {
@@ -34,26 +35,33 @@ Page({
     if (shouldUsePreview()) {
       const items = previewAds()
       this.applyTab(items)
-      this.setData({ loading: false, err: '', hasUnread: true })
+      this.setData({ loading: false, err: '', hasUnread: false, todayStats: statsFromAds(items) })
       return
     }
     this.setData({ loading: true, err: '' })
     const r = await feature.fetchLocalPromotions()
     if (!r.ok) {
-      this.setData({ loading: false, err: r.message, items: [], displayItems: [], statusTabs: tabCounts([]) })
+      this.setData({
+        loading: false,
+        err: r.message,
+        items: [],
+        displayItems: [],
+        statusTabs: tabCounts([]),
+        todayStats: emptyTodayStats(),
+      })
       return
     }
     const items = (r.items || []).map((x) =>
       enrichAdRow({
         ...x,
         dailyBudget: x.budget,
-        spend: '—',
-        exposure: '—',
-        duration: '—',
+        spend: x.spend,
+        exposure: x.exposure,
+        duration: x.duration,
       }),
     )
     this.applyTab(items)
-    this.setData({ loading: false, err: '' })
+    this.setData({ loading: false, err: '', todayStats: statsFromAds(items) })
   },
 
   applyTab(items) {

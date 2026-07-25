@@ -495,7 +495,7 @@ async function processAgentTurn(opts, executionState) {
 /** 语音转文字：优先 VOICE_DRAFT_URL，module=agent */
 async function transcribeVoiceTempPath(tempFilePath) {
   const url = (config.VOICE_DRAFT_URL || '').trim()
-  const token = api.getAccessToken()
+  const token = api.getBearerToken()
   if (devAuth.isDevSkipLogin() && (!url || !tempFilePath)) {
     return { ok: true, text: '（演示）帮我看一下今天最该优先处理的三件事' }
   }

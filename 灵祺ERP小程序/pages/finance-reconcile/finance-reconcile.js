@@ -36,7 +36,6 @@ Page({
       return
     }
     const cards = mapApiRows(r.rows)
-    if (!cards.length) cards.push(...previewReconcileCards().slice(0, 1))
     this.setData({ loading: false, err: '', cards })
   },
 

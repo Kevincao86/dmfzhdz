@@ -34,9 +34,9 @@ Page({
     sortLabels: SORT_OPTIONS.map((x) => x.label),
     sortPickerIndex: 0,
     sortBy: 'default',
-    storeLabels: PREVIEW_STORES.map((x) => x.name),
+    storeLabels: ['全部门店'],
     storePickerIndex: 0,
-    storesInternal: PREVIEW_STORES,
+    storesInternal: [{ id: '', name: '全部门店' }],
     storeId: '',
   },
 

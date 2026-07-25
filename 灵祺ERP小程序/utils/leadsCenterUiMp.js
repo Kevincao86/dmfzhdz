@@ -9,12 +9,35 @@ const LEAD_TABS = [
   { id: 'invalid', label: '无效线索' },
 ]
 
-const STAT_CARDS = [
-  { key: 'today', label: '今日新增', value: 23 },
-  { key: 'pending', label: '待分配', value: 18 },
-  { key: 'following', label: '跟进中', value: 45 },
-  { key: 'converted', label: '已转化', value: 32 },
+const EMPTY_STAT_CARDS = [
+  { key: 'today', label: '今日新增', value: 0 },
+  { key: 'pending', label: '待分配', value: 0 },
+  { key: 'following', label: '跟进中', value: 0 },
+  { key: 'converted', label: '已转化', value: 0 },
 ]
+
+/** @deprecated 仅兼容旧引用；真实模式用 statsFromLeads */
+const STAT_CARDS = EMPTY_STAT_CARDS
+
+function emptyStatCards() {
+  return EMPTY_STAT_CARDS.map((x) => ({ ...x }))
+}
+
+function statsFromLeads(items) {
+  const rows = items || []
+  const start = new Date()
+  start.setHours(0, 0, 0, 0)
+  const today = rows.filter((x) => {
+    const t = Date.parse(String(x.createdAt || ''))
+    return Number.isFinite(t) && t >= start.getTime()
+  }).length
+  return [
+    { key: 'today', label: '今日新增', value: today },
+    { key: 'pending', label: '待分配', value: rows.filter((x) => x.stateKey === 'pending').length },
+    { key: 'following', label: '跟进中', value: rows.filter((x) => x.stateKey === 'following').length },
+    { key: 'converted', label: '已转化', value: rows.filter((x) => x.stateKey === 'converted').length },
+  ]
+}
 
 function maskPhone(p) {
   const s = String(p || '').replace(/\s/g, '')
@@ -128,6 +151,8 @@ function shouldUsePreview() {
 module.exports = {
   LEAD_TABS,
   STAT_CARDS,
+  emptyStatCards,
+  statsFromLeads,
   enrichLeadRow,
   previewLeads,
   filterLeads,
