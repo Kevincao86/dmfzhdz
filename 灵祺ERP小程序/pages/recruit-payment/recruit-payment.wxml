@@ -1,6 +1,11 @@
-<scroll-view scroll-y class="page-pad-v2" enhanced show-scrollbar="{{false}}"><view class="sec-card-v2">
+<scroll-view scroll-y class="page-pad-v2" enhanced show-scrollbar="{{false}}">
+  <view class="lq-hero">
+    <text class="lq-hero-title">达人结算</text>
+    <text class="lq-hero-sub">付款与结算状态跟踪</text>
+  </view>
+<view class="sec-card-v2">
   <text class="sec-strong">结款账单</text>
   <text class="body">金额以财务与订单结算为准；确认后将生成打款单。</text>
-  <view class="list-card-v2"><view><text class="list-strong">应付（待汇总）</text><text class="list-span">¥ —</text></view></view>
+  <view class="lq-nav-card list-card-v2"><view><text class="list-strong">应付（待汇总）</text><text class="list-span">¥ —</text></view></view>
   <button class="btn-v2 primary" bindtap="onAck">确认打款</button>
 </view></scroll-view>

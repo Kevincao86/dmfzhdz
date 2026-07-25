@@ -1,1 +1,18 @@
-<scroll-view scroll-y class="page-pad-v2" enhanced show-scrollbar="{{false}}"><view wx:for="{{rows}}" wx:key="id" class="list-card-v2"><view><text class="list-strong">{{item.title}}</text><text class="list-span">{{item.sub}}</text></view><text class="tag">{{item.tag}}</text></view></scroll-view>
+<scroll-view scroll-y class="page-pad-v2" enhanced show-scrollbar="{{false}}">
+  <view class="lq-hero">
+    <text class="lq-hero-title">报税管理</text>
+    <text class="lq-hero-sub">税务申报辅助 · 账单核对入口</text>
+  </view>
+  <view wx:if="{{!rows.length}}" class="lq-empty">
+    <text class="lq-empty-title">暂无报税条目</text>
+    <text class="lq-empty-desc">登录并同步财务数据后显示</text>
+  </view>
+  <view wx:for="{{rows}}" wx:key="id" class="lq-nav-card">
+    <view class="lq-nav-ico amber">税</view>
+    <view class="lq-nav-main">
+      <text class="lq-nav-title">{{item.title}}</text>
+      <text class="lq-nav-desc">{{item.sub}}</text>
+    </view>
+    <text class="tag">{{item.tag}}</text>
+  </view>
+</scroll-view>

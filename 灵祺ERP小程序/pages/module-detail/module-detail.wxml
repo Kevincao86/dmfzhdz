@@ -1,1 +1,10 @@
-<scroll-view scroll-y class="page-pad-v2" enhanced show-scrollbar="{{false}}"><view class="sec-card-v2"><text class="sec-strong">模块说明</text><text class="body">{{body}}</text></view></scroll-view>
+<scroll-view scroll-y class="page-pad-v2" enhanced show-scrollbar="{{false}}">
+  <view class="lq-hero">
+    <text class="lq-hero-title">模块说明</text>
+    <text class="lq-hero-sub">能力介绍与使用指引</text>
+  </view>
+  <view class="sec-card-v2">
+    <text class="sec-strong">详情</text>
+    <text class="body">{{body}}</text>
+  </view>
+</scroll-view>

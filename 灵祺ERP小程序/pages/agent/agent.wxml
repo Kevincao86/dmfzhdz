@@ -2,14 +2,23 @@
   <view class="agent-top-v2" style="padding-top: {{statusBarH}}px;">
     <view class="agent-top-center">
       <text class="agent-top-title">灵祺助手</text>
-      <text wx:if="{{guestMode}}" class="agent-guest" bindtap="onGuestLogin">游客浏览 · 点此登录</text>
+      <text wx:if="{{guestMode}}" class="agent-guest" bindtap="onGuestLogin">未登录 · 点此登录后使用</text>
     </view>
-    <view class="menu-btn" bindtap="onOpenHeaderMenu">
+    <view wx:if="{{!guestMode}}" class="menu-btn" bindtap="onOpenHeaderMenu">
       <text class="menu-glyph">≡</text>
     </view>
   </view>
 
+  <view wx:if="{{guestMode}}" class="agent-lock-gate" style="padding-top: {{headerH}}px;">
+    <image class="agent-lock-logo" src="/images/logo.png" mode="aspectFit" />
+    <text class="agent-lock-title">登录后使用灵祺助手</text>
+    <text class="agent-lock-desc">组品方案、达人招募 Brief、经营对话等能力需商家账号登录后使用。</text>
+    <button class="agent-lock-btn" bindtap="onGuestLogin">去登录</button>
+    <text class="agent-lock-hint">功能 Tab 仍可游客浏览</text>
+  </view>
+
   <scroll-view
+    wx:if="{{!guestMode}}"
     scroll-y
     class="chat-scroll-v2"
     style="padding-top: {{headerH}}px; padding-bottom: {{scrollBottomPad}}px;"
@@ -185,7 +194,7 @@
     </view>
   </scroll-view>
 
-  <view class="composer-dock-v2">
+  <view wx:if="{{!guestMode}}" class="composer-dock-v2">
     <view wx:if="{{!hasChat}}" class="shortcuts-wrap">
       <view class="shortcuts-toggle" bindtap="onToggleShortcuts">
         <text>{{shortcutsOpen ? '收起快捷任务' : '快捷任务（' + shortcuts.length + '）'}}</text>

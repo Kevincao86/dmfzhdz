@@ -1,2 +1,7 @@
-<scroll-view scroll-y class="page-pad-v2" enhanced show-scrollbar="{{false}}"><view class="kpi-hero"><text class="kpi-big">工作台</text><text>已合并至灵祺助手 Tab</text></view>
+<scroll-view scroll-y class="page-pad-v2" enhanced show-scrollbar="{{false}}">
+  <view class="lq-hero">
+    <text class="lq-hero-title">首页</text>
+    <text class="lq-hero-sub">商家经营快捷入口</text>
+  </view>
+<view class="kpi-hero"><text class="kpi-big">工作台</text><text>已合并至灵祺助手 Tab</text></view>
 <navigator url="/pages/agent/agent" class="btn-v2 primary" open-type="switchTab">进入灵祺助手</navigator></scroll-view>
