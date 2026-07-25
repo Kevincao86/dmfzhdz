@@ -1,6 +1,7 @@
 const api = require('../../utils/api.js')
 const { FUNCTION_SECTIONS, itemUrl } = require('../../utils/menuFunctions.js')
 const { iconDataUri } = require('../../utils/funcIconAssetsMp.js')
+const { assetUrl } = require('../../utils/mpStaticAssets.js')
 const merchant = require('../../utils/merchantApi.js')
 
 Page({
@@ -8,6 +9,7 @@ Page({
     sections: [],
     erpLinked: false,
     guestMode: false,
+    logoSrc: assetUrl('logo.png'),
   },
 
   onLoad() {
@@ -26,6 +28,7 @@ Page({
       sections,
       erpLinked: merchant.hasMerchantApi(),
       guestMode: !api.isRealAuthed(),
+      logoSrc: assetUrl('logo.png'),
     })
   },
 

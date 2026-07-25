@@ -1,4 +1,6 @@
-/** 功能页图标 — 优先 AI 生成 PNG，缺省回退 SVG data-uri */
+/** 功能页图标 — AI PNG 走 CDN/OSS，缺省回退 SVG data-uri */
+const { assetUrl } = require('./mpStaticAssets.js')
+
 const TONE_COLORS = {
   cyan: '#0284c7',
   orange: '#ea580c',
@@ -81,7 +83,7 @@ const ICON_BUILDERS = {
 
 function iconDataUri(tone, key) {
   if (AI_ICON_KEYS[key]) {
-    return `/images/func-icons/${key}.png`
+    return assetUrl(`func-icons/${key}.png`)
   }
   const color = TONE_COLORS[tone] || '#334155'
   const build = ICON_BUILDERS[key]

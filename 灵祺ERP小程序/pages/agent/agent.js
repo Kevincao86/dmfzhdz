@@ -8,6 +8,7 @@ const registry = require('../../utils/aiModelRegistryMp.js')
 const composerMp = require('../../utils/agentComposerMp.js')
 const habitsMp = require('../../utils/agentUserHabitsMp.js')
 const supabaseRest = require('../../utils/supabaseRest.js')
+const { assetUrl } = require('../../utils/mpStaticAssets.js')
 
 const FILTER_TABS = [
   { id: 'all', short: '全部' },
@@ -86,6 +87,9 @@ Page({
     hasChat: false,
     confirmingPreviewId: '',
     guestMode: false,
+    logoSrc: assetUrl('logo.png'),
+    iconMicSrc: assetUrl('icon-mic.svg'),
+    iconKeyboardSrc: assetUrl('icon-keyboard.svg'),
   },
 
   onLoad() {
