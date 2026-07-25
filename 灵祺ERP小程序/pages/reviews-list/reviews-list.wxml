@@ -79,7 +79,7 @@
         bindtap="onPlat"
       >
         <image wx:if="{{item.logo}}" class="rev-tab-logo" src="{{item.logo}}" mode="aspectFit" />
-        <text>{{item.label}}({{item.count}})</text>
+        <text class="rev-tab-txt">{{item.label}}{{item.count > 0 ? '(' + item.count + ')' : ''}}</text>
       </view>
     </view>
   </scroll-view>

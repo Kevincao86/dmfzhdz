@@ -126,11 +126,20 @@
   display: inline-flex;
   align-items: center;
   gap: 8rpx;
-  padding: 18rpx 4rpx 16rpx;
+  padding: 18rpx 12rpx 16rpx;
   font-size: 26rpx;
   color: #64748b;
   position: relative;
   flex-shrink: 0;
+  max-width: none;
+}
+
+.rev-tab-txt {
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  font-size: 26rpx;
+  line-height: 1.3;
 }
 
 .rev-tab.on {

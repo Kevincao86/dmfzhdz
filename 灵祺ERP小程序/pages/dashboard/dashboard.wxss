@@ -101,16 +101,18 @@
 .dash-kpi-ibox {
   width: 48rpx;
   height: 48rpx;
-  border-radius: 50%;
-  background: #e0f2fe;
+  border-radius: 14rpx;
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 
 .dash-kpi-ic {
-  width: 26rpx;
-  height: 26rpx;
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 14rpx;
 }
 
 .dash-kpi-value {

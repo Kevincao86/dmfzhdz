@@ -3,12 +3,7 @@ const merchant = require('../../utils/merchantApi.js')
 const reviews = require('../../utils/reviewsMp.js')
 const douyin = require('../../utils/douyinGoodsMp.js')
 const { PLATFORM_TABS } = require('../../utils/platformTokensMp.js')
-const {
-  enrichReviewRow,
-  previewPlatTabs,
-  previewReviews,
-  shouldUsePreview,
-} = require('../../utils/reviewsListUiMp.js')
+const { enrichReviewRow, emptyPlatTabs } = require('../../utils/reviewsListUiMp.js')
 
 const AI_KEY = 'meoo_mp_reviews_ai_auto_v1'
 
@@ -45,7 +40,7 @@ Page({
   data: {
     erpOk: false,
     platUi: PLAT_UI,
-    platTabs: previewPlatTabs(),
+    platTabs: emptyPlatTabs(),
     activePlatTab: 'all',
     reviewKindTabs: [
       { id: 'store', label: '门店评价' },
@@ -99,29 +94,20 @@ Page({
       return
     }
     const erpOk = merchant.hasMerchantApi()
-    this.setData({ erpOk, aiAutoReply: this.readAiToggle() })
-    if (shouldUsePreview()) {
-      this.loadPreview()
+    this.setData({ erpOk, aiAutoReply: this.readAiToggle(), platTabs: emptyPlatTabs() })
+    if (!erpOk) {
+      this.setData({
+        loading: false,
+        items: [],
+        displayItems: [],
+        errMsg: '',
+        syncedAtText: '登录并连接商家后台后可同步评价',
+      })
+      this.patchReplyTabCounts(0, 0, 0)
       return
     }
-    if (erpOk) void this.maybeLoadStores()
-    if (erpOk) void this.load()
-  },
-
-  loadPreview() {
-    const items = previewReviews(this.data.activePlatTab)
-    this.applySearch(items)
-    this.setData({
-      platTabs: previewPlatTabs(),
-      loading: false,
-      errMsg: '',
-      syncedAtText: '预览模式 · 示例评价数据',
-      replyTabs: [
-        { id: 'all', label: '全部', cnt: '23' },
-        { id: 'unreplied', label: '待回复', cnt: '12' },
-        { id: 'replied', label: '已回复', cnt: '11' },
-      ],
-    })
+    void this.maybeLoadStores()
+    void this.load()
   },
 
   toggleFilter() {
@@ -185,10 +171,6 @@ Page({
     const id = e.currentTarget.dataset.id
     if (!id || id === this.data.reviewKind) return
     this.setData({ reviewKind: id })
-    if (shouldUsePreview()) {
-      this.loadPreview()
-      return
-    }
     void this.maybeLoadStores()
     void this.load()
   },
@@ -208,10 +190,6 @@ Page({
       }
     }
     this.setData({ activePlatTab: id, replyingId: '', replyDraft: '' })
-    if (shouldUsePreview()) {
-      this.loadPreview()
-      return
-    }
     void this.maybeLoadStores()
     void this.load()
   },
@@ -219,7 +197,6 @@ Page({
   onStorePick(e) {
     const i = Number(e.detail.value) || 0
     this.setData({ storePickerIndex: i })
-    if (shouldUsePreview()) return
     void this.load()
   },
 
@@ -227,10 +204,6 @@ Page({
     const id = e.currentTarget.dataset.id
     if (!id || id === this.data.sentiment) return
     this.setData({ sentiment: id })
-    if (shouldUsePreview()) {
-      this.loadPreview()
-      return
-    }
     void this.load()
   },
 
@@ -238,10 +211,6 @@ Page({
     const id = e.currentTarget.dataset.id
     if (!id || id === this.data.replyStatus) return
     this.setData({ replyStatus: id })
-    if (shouldUsePreview()) {
-      this.loadPreview()
-      return
-    }
     void this.load()
   },
 
@@ -267,7 +236,14 @@ Page({
 
   async load() {
     if (!merchant.hasMerchantApi()) {
-      this.setData({ loading: false, errMsg: '尚未连接商家后台', items: [], displayItems: [], syncedAtText: '' })
+      this.setData({
+        loading: false,
+        errMsg: '尚未连接商家后台',
+        items: [],
+        displayItems: [],
+        syncedAtText: '',
+        platTabs: emptyPlatTabs(),
+      })
       this.patchReplyTabCounts(0, 0, 0)
       return
     }
@@ -284,7 +260,9 @@ Page({
         items: [],
         displayItems: [],
         syncedAtText: '',
+        platTabs: emptyPlatTabs(),
       })
+      this.patchReplyTabCounts(0, 0, 0)
       return
     }
     const stats = r.stats
@@ -320,7 +298,7 @@ Page({
       const p = x.platId || 'douyin'
       counts[p] = (counts[p] || 0) + 1
     }
-    const tabs = previewPlatTabs().map((t) => ({
+    const tabs = emptyPlatTabs().map((t) => ({
       ...t,
       count: t.id === 'all' ? counts.all || items.length : counts[t.id] || 0,
     }))
@@ -338,11 +316,10 @@ Page({
   },
 
   async onSync() {
-    if (shouldUsePreview()) {
-      wx.showToast({ title: '预览模式已模拟同步', icon: 'success' })
+    if (!merchant.hasMerchantApi()) {
+      wx.showToast({ title: '请先登录商家账号', icon: 'none' })
       return
     }
-    if (!merchant.hasMerchantApi()) return
     const plat = this.activeApiPlatform()
     this.setData({ syncing: true })
     wx.showLoading({ title: '同步中…', mask: true })
@@ -361,11 +338,6 @@ Page({
   },
 
   onPullDownRefresh() {
-    if (shouldUsePreview()) {
-      this.loadPreview()
-      wx.stopPullDownRefresh()
-      return
-    }
     void this.load().finally(() => wx.stopPullDownRefresh())
   },
 
@@ -394,14 +366,6 @@ Page({
   async onAiSuggest(e) {
     const id = e.currentTarget.dataset.id
     if (!id) return
-    if (shouldUsePreview()) {
-      const row = this.data.displayItems.find((x) => x.id === id)
-      this.setData({
-        replyingId: id,
-        replyDraft: row ? row.aiSuggestPreview : '感谢您的光临！',
-      })
-      return
-    }
     this.setData({ suggestBusyId: id })
     const r = await reviews.postReviewAiSuggest(this.activeApiPlatform(), id)
     this.setData({ suggestBusyId: '' })
@@ -420,10 +384,6 @@ Page({
     const text = String(this.data.replyDraft || '').trim()
     if (!id || !text) {
       wx.showToast({ title: '请输入回复内容', icon: 'none' })
-      return
-    }
-    if (shouldUsePreview()) {
-      wx.showToast({ title: '预览模式', icon: 'none' })
       return
     }
     wx.showLoading({ title: '提交…', mask: true })
