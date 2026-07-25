@@ -2,7 +2,7 @@ const api = require('./api.js')
 const { merchantRequestAuth } = require('./merchantApi.js')
 
 function postJson(path, body) {
-  const token = api.getAccessToken()
+  const token = api.getBearerToken()
   return merchantRequestAuth('POST', path, { data: body, bearerToken: token }).then((r) => r || {})
 }
 

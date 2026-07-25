@@ -2,7 +2,8 @@ const api = require('../../utils/api.js')
 const feature = require('../../utils/merchantFeatureMp.js')
 const {
   LEAD_TABS,
-  STAT_CARDS,
+  emptyStatCards,
+  statsFromLeads,
   enrichLeadRow,
   previewLeads,
   filterLeads,
@@ -15,7 +16,7 @@ Page({
     err: '',
     items: [],
     displayItems: [],
-    statCards: STAT_CARDS,
+    statCards: emptyStatCards(),
     leadTabs: LEAD_TABS,
     activeTab: 'all',
     searchKw: '',
@@ -34,13 +35,19 @@ Page({
     if (shouldUsePreview()) {
       const items = previewLeads()
       this.applyFilter(items)
-      this.setData({ loading: false, err: '' })
+      this.setData({ loading: false, err: '', statCards: statsFromLeads(items) })
       return
     }
     this.setData({ loading: true, err: '' })
     const r = await feature.fetchLocalClues(1)
     if (!r.ok) {
-      this.setData({ loading: false, err: r.message, items: [], displayItems: [] })
+      this.setData({
+        loading: false,
+        err: r.message,
+        items: [],
+        displayItems: [],
+        statCards: emptyStatCards(),
+      })
       return
     }
     const items = (r.items || []).map((x) =>
@@ -51,7 +58,7 @@ Page({
       }),
     )
     this.applyFilter(items)
-    this.setData({ loading: false, err: '' })
+    this.setData({ loading: false, err: '', statCards: statsFromLeads(items) })
   },
 
   applyFilter(items) {

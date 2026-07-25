@@ -8,12 +8,40 @@ const STATUS_TABS = [
   { id: 'ended', label: '已结束' },
 ]
 
-const TODAY_STATS = [
-  { key: 'spend', label: '消耗(元)', value: '186.50', trend: '12.5' },
-  { key: 'expose', label: '曝光', value: '12,345', trend: '8.3' },
-  { key: 'click', label: '点击', value: '234', trend: '15.6' },
-  { key: 'deal', label: '成交(元)', value: '1,209.00', trend: '10.2' },
+const EMPTY_TODAY_STATS = [
+  { key: 'spend', label: '消耗(元)', value: '—', trend: '' },
+  { key: 'expose', label: '曝光', value: '—', trend: '' },
+  { key: 'click', label: '点击', value: '—', trend: '' },
+  { key: 'deal', label: '成交(元)', value: '—', trend: '' },
 ]
+
+/** @deprecated 仅预览模式使用；真实模式用 emptyTodayStats / statsFromAds */
+const TODAY_STATS = EMPTY_TODAY_STATS
+
+function emptyTodayStats() {
+  return EMPTY_TODAY_STATS.map((x) => ({ ...x }))
+}
+
+function statsFromAds(items) {
+  if (!items || !items.length) return emptyTodayStats()
+  const num = (v) => {
+    const n = Number(String(v || '').replace(/[^\d.]/g, ''))
+    return Number.isFinite(n) ? n : 0
+  }
+  const spend = items.reduce((s, x) => s + num(x.spend), 0)
+  const expose = items.reduce((s, x) => s + num(x.exposure), 0)
+  const fmt = (n, money) => {
+    if (!n) return '—'
+    if (money) return n.toFixed(2)
+    return String(Math.round(n))
+  }
+  return [
+    { key: 'spend', label: '消耗(元)', value: fmt(spend, true), trend: '' },
+    { key: 'expose', label: '曝光', value: fmt(expose, false), trend: '' },
+    { key: 'click', label: '点击', value: '—', trend: '' },
+    { key: 'deal', label: '成交(元)', value: '—', trend: '' },
+  ]
+}
 
 function normalizeAdStatus(raw) {
   const s = String(raw || '').toLowerCase()
@@ -32,10 +60,10 @@ function enrichAdRow(item) {
     statusLabel: st.label,
     statusClass: st.cls,
     tags: item.tags || ['本地推'],
-    dailyBudget: item.dailyBudget || item.budget || '200.00',
-    spend: item.spend || '86.50',
-    exposure: item.exposure || '4,120',
-    duration: item.duration || '07.01 - 07.31',
+    dailyBudget: item.dailyBudget || item.budget || '—',
+    spend: item.spend != null && item.spend !== '' ? item.spend : '—',
+    exposure: item.exposure != null && item.exposure !== '' ? item.exposure : '—',
+    duration: item.duration || '—',
     actionLabel: st.key === 'paused' ? '继续投放' : '管理',
     thumb: item.thumb || '',
   }
@@ -92,6 +120,8 @@ function shouldUsePreview() {
 module.exports = {
   STATUS_TABS,
   TODAY_STATS,
+  emptyTodayStats,
+  statsFromAds,
   enrichAdRow,
   previewAds,
   tabCounts,

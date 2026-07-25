@@ -31,7 +31,7 @@ Page({
   },
 
   onShow() {
-    if (!api.getAccessToken()) wx.redirectTo({ url: '/pages/login/login' })
+    if (!api.getBearerToken()) wx.redirectTo({ url: '/pages/login/login' })
     void this.loadRows()
   },
 

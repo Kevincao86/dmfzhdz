@@ -8,7 +8,7 @@ const sessionSync = require('./merchantSessionSyncMp.js')
 const supabaseRest = require('./supabaseRest.js')
 
 function postJson(path, body) {
-  const token = api.getAccessToken()
+  const token = api.getBearerToken()
   return merchantRequestAuth('POST', path, { data: body || {}, bearerToken: token }).then((r) => r || {})
 }
 

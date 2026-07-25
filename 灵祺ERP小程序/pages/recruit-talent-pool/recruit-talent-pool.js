@@ -29,17 +29,23 @@ Page({
   },
 
   onShow() {
-    if (!api.getAccessToken()) wx.redirectTo({ url: '/pages/login/login' })
+    if (!api.getBearerToken()) {
+      wx.redirectTo({ url: '/pages/login/login' })
+      return
+    }
     void this.reload()
-    this._timer = setInterval(() => void this.reload(), 8000)
+    // 全量注册表较大，禁止 8s 轮询导致卡顿；仅低频刷新
+    this._timer = setInterval(() => void this.reload(), 60000)
   },
 
   onHide() {
     if (this._timer) clearInterval(this._timer)
+    this._timer = null
   },
 
   onUnload() {
     if (this._timer) clearInterval(this._timer)
+    this._timer = null
   },
 
   goBack() {

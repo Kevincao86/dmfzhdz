@@ -10,6 +10,14 @@ const RANGE_TABS = [
   { id: 'day30', label: '30日', apiRange: 'day30' },
 ]
 
+const EMPTY_KPIS = [
+  { label: '成交额', value: '—', delta: '', deltaUp: true, iconKey: 'shop' },
+  { label: '核销单', value: '—', delta: '', deltaUp: true, iconKey: 'list' },
+  { label: '好评率', value: '—', delta: '', deltaUp: true, iconKey: 'star' },
+  { label: '在途招募', value: '—', delta: '', deltaUp: true, iconKey: 'user' },
+]
+
+/** 仅 DEV_SKIP 预览模式使用 */
 const PREVIEW_BY_RANGE = {
   today: {
     kpis: [
@@ -50,8 +58,8 @@ Page({
     range: 'today',
     rangeTabs: RANGE_TABS,
     heroIconSrc: iconDataUri('cyan', 'shop'),
-    kpis: enrichKpis(PREVIEW_BY_RANGE.today.kpis),
-    usePreview: true,
+    kpis: enrichKpis(EMPTY_KPIS),
+    usePreview: false,
     chartEmpty: true,
   },
 
@@ -74,11 +82,21 @@ Page({
     const tab = RANGE_TABS.find((t) => t.id === this.data.range) || RANGE_TABS[0]
     const previewPack = PREVIEW_BY_RANGE[tab.id] || PREVIEW_BY_RANGE.today
 
-    if (!merchant.hasMerchantApi() || devAuth.isDevSkipLogin()) {
+    if (devAuth.isDevSkipLogin()) {
       this.setData({
         loading: false,
         usePreview: true,
         kpis: enrichKpis(previewPack.kpis),
+        chartEmpty: true,
+      })
+      return
+    }
+
+    if (!merchant.hasMerchantApi()) {
+      this.setData({
+        loading: false,
+        usePreview: false,
+        kpis: enrichKpis(EMPTY_KPIS),
         chartEmpty: true,
       })
       return
@@ -89,8 +107,8 @@ Page({
     if (!d.connected) {
       this.setData({
         loading: false,
-        usePreview: true,
-        kpis: enrichKpis(previewPack.kpis),
+        usePreview: false,
+        kpis: enrichKpis(EMPTY_KPIS),
         chartEmpty: true,
       })
       return

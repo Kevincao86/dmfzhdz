@@ -4,6 +4,7 @@ const ops = require('../../utils/opsRegistryMp.js')
 
 Page({
   data: {
+    loading: false,
     cards: [],
     statItems: [
       { k: 'p', label: '待审核', v: 0 },
@@ -15,17 +16,22 @@ Page({
   },
 
   onShow() {
-    if (!api.getAccessToken()) wx.redirectTo({ url: '/pages/login/login' })
+    if (!api.getBearerToken()) {
+      wx.redirectTo({ url: '/pages/login/login' })
+      return
+    }
     void this.reload()
-    this._timer = setInterval(() => void this.reload(), 8000)
+    this._timer = setInterval(() => void this.reload(), 60000)
   },
 
   onHide() {
     if (this._timer) clearInterval(this._timer)
+    this._timer = null
   },
 
   onUnload() {
     if (this._timer) clearInterval(this._timer)
+    this._timer = null
   },
 
   goBack() {
@@ -47,9 +53,10 @@ Page({
 
   async reload() {
     if (!merchant.hasMerchantApi()) {
-      this.setData({ cards: [], statItems: this.computeStats([]) })
+      this.setData({ loading: false, cards: [], statItems: this.computeStats([]) })
       return
     }
+    this.setData({ loading: true })
     try {
       const reg = await ops.fetchRegistry()
       const raw = Array.isArray(reg.recruitmentVideoSubmissions) ? reg.recruitmentVideoSubmissions : []
@@ -63,9 +70,9 @@ Page({
         thumbUrl: typeof x.thumbUrl === 'string' ? x.thumbUrl : '',
         duration: typeof x.duration === 'string' ? x.duration : '',
       }))
-      this.setData({ cards, statItems: this.computeStats(cards) })
+      this.setData({ loading: false, cards, statItems: this.computeStats(cards) })
     } catch (_) {
-      this.setData({ cards: [], statItems: this.computeStats([]) })
+      this.setData({ loading: false, cards: [], statItems: this.computeStats([]) })
     }
   },
 
