@@ -10,7 +10,7 @@
   </view>
 
   <view wx:if="{{guestMode}}" class="agent-lock-gate" style="padding-top: {{headerH}}px;">
-    <image class="agent-lock-logo" src="/images/logo.png" mode="aspectFit" />
+    <image class="agent-lock-logo" src="{{logoSrc}}" mode="aspectFit" />
     <text class="agent-lock-title">登录后使用灵祺助手</text>
     <text class="agent-lock-desc">组品方案、达人招募 Brief、经营对话等能力需商家账号登录后使用。</text>
     <button class="agent-lock-btn" bindtap="onGuestLogin">去登录</button>
@@ -34,7 +34,7 @@
           id="msg-{{item.id}}"
           class="msg bot"
         >
-          <image class="ava ava-ai-img" src="/images/logo.png" mode="aspectFit" />
+          <image class="ava ava-ai-img" src="{{logoSrc}}" mode="aspectFit" />
           <view class="msg-col">
             <view class="bubble-v2">
               <text class="bubble-text" user-select>{{item.content}}</text>
@@ -121,7 +121,7 @@
           id="msg-{{item.id}}"
           class="msg bot"
         >
-          <image class="ava ava-ai-img" src="/images/logo.png" mode="aspectFit" />
+          <image class="ava ava-ai-img" src="{{logoSrc}}" mode="aspectFit" />
           <view class="msg-col">
             <view class="task-result-v2">
               <text class="task-result-title">✓ 任务结果</text>
@@ -166,7 +166,7 @@
         </view>
 
         <view wx:else id="msg-{{item.id}}" class="msg bot">
-          <image class="ava ava-ai-img" src="/images/logo.png" mode="aspectFit" />
+          <image class="ava ava-ai-img" src="{{logoSrc}}" mode="aspectFit" />
           <view class="bubble-v2">
             <view wx:if="{{item.imageUrls && item.imageUrls.length}}" class="msg-images">
               <image
@@ -186,7 +186,7 @@
       </block>
 
       <view wx:if="{{busy}}" class="msg bot">
-        <image class="ava ava-ai-img" src="/images/logo.png" mode="aspectFit" />
+        <image class="ava ava-ai-img" src="{{logoSrc}}" mode="aspectFit" />
         <view class="bubble-v2 typing">
           <text class="bubble-text">思考中…</text>
         </view>
@@ -269,13 +269,13 @@
         <image
           wx:if="{{inputMode === 'text'}}"
           class="mic-icon"
-          src="/images/icon-mic.svg"
+          src="{{iconMicSrc}}"
           mode="aspectFit"
         />
         <image
           wx:else
           class="mic-icon"
-          src="/images/icon-keyboard.svg"
+          src="{{iconKeyboardSrc}}"
           mode="aspectFit"
         />
       </view>

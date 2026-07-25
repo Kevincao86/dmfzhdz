@@ -1,12 +1,13 @@
 /** 评价管理 — 展示字段（禁止虚假预览数据） */
 const { GROUPBUY_OPTIONS } = require('./productCreatePlatformsMp.js')
+const { assetUrl } = require('./mpStaticAssets.js')
 
 const PLAT_LOGO = {}
 for (const p of GROUPBUY_OPTIONS) {
   if (p.logo) PLAT_LOGO[p.id] = p.logo
 }
-PLAT_LOGO.meituan = PLAT_LOGO.meituan || '/images/platforms/dianping.png'
-PLAT_LOGO.dianping = '/images/platforms/dianping.png'
+PLAT_LOGO.meituan = PLAT_LOGO.meituan || assetUrl('platforms/dianping.png')
+PLAT_LOGO.dianping = assetUrl('platforms/dianping.png')
 
 const PLAT_SHORT = {
   all: '全部',

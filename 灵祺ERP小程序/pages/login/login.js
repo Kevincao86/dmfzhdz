@@ -3,6 +3,7 @@ const devAuth = require('../../utils/devAuth.js')
 const tenantAuthApi = require('../../utils/tenantAuthApiMp.js')
 const wxAccountMp = require('../../utils/wxAccountMp.js')
 const loginLegalAgree = require('../../utils/loginLegalAgree.js')
+const { assetUrl } = require('../../utils/mpStaticAssets.js')
 
 const MODE_HINT = {
   login_password: '使用登录名与密码进入商家工作台。',
@@ -51,6 +52,7 @@ Page({
     err: '',
     infoHint: '',
     busy: false,
+    wechatIconSrc: assetUrl('payment/wechat.png'),
     wxBusy: false,
     refreshing: false,
     submitLabel: '登录并进入工作台',

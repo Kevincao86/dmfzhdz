@@ -33,6 +33,10 @@ const core = {
   VOICE_DRAFT_URL: '',
   /** Web ERP 开发服务根（与 vite .env VITE_MERCHANT_API_BASE_URL 一致）。必须配置：复制 utils/config.local.example.js → config.local.js。 */
   MERCHANT_API_BASE_URL: '',
+  /** 静态图 CDN（真机 downloadFile 合法域名）；OSS 见 erpMpStaticOssBase.js */
+  ERP_MP_STATIC_CDN_BASE: 'https://mofangdianai.com/erp-mp-static',
+  ERP_MP_STATIC_PREFER_CDN: true,
+  MP_ASSET_CACHE_VER: '20260725',
 }
 
 let out = { ...core }

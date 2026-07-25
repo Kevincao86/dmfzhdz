@@ -1,8 +1,9 @@
 /**
  * 与 Web merchantPlatforms.ts + platformBranding 对齐：团购 / 外卖分组 + 同源 Logo。
- * 小程序 Logo 拷贝自 web版/merchant-erp/public/platforms → images/platforms
+ * Logo 走 CDN/OSS（见 mpStaticAssets.js）
  */
 const { readPlatformToken } = require('./platformTokensMp.js')
+const { assetUrl } = require('./mpStaticAssets.js')
 const devAuth = require('./devAuth.js')
 
 const PLATFORM_DESC = {
@@ -28,7 +29,7 @@ const GROUPBUY_OPTIONS = [
     letter: '抖',
     channel: 'groupbuy',
     wizard: 'douyin',
-    logo: '/images/platforms/douyin-laike.png',
+    logo: assetUrl('platforms/douyin-laike.png'),
   },
   {
     id: 'meituan',
@@ -36,7 +37,7 @@ const GROUPBUY_OPTIONS = [
     letter: '美',
     channel: 'groupbuy',
     wizard: 'draft',
-    logo: '/images/platforms/dianping.png',
+    logo: assetUrl('platforms/dianping.png'),
   },
   {
     id: 'xiaohongshu',
@@ -44,7 +45,7 @@ const GROUPBUY_OPTIONS = [
     letter: '红',
     channel: 'groupbuy',
     wizard: 'draft',
-    logo: '/images/platforms/xiaohongshu.png',
+    logo: assetUrl('platforms/xiaohongshu.png'),
   },
   {
     id: 'kuaishou',
@@ -52,7 +53,7 @@ const GROUPBUY_OPTIONS = [
     letter: '快',
     channel: 'groupbuy',
     wizard: 'draft',
-    logo: '/images/platforms/kuaishou-local.png',
+    logo: assetUrl('platforms/kuaishou-local.png'),
   },
   {
     id: 'jd',
@@ -73,7 +74,7 @@ const WAIMAI_OPTIONS = [
     letter: '闪',
     channel: 'waimai',
     wizard: 'draft',
-    logo: '/images/platforms/eleme-shangou.png',
+    logo: assetUrl('platforms/eleme-shangou.png'),
   },
   {
     id: 'meituan_waimai',
@@ -81,7 +82,7 @@ const WAIMAI_OPTIONS = [
     letter: '外',
     channel: 'waimai',
     wizard: 'draft',
-    logo: '/images/platforms/meituan-waimai.png',
+    logo: assetUrl('platforms/meituan-waimai.png'),
   },
   {
     id: 'jd_waimai',
@@ -89,7 +90,7 @@ const WAIMAI_OPTIONS = [
     letter: '京',
     channel: 'waimai',
     wizard: 'draft',
-    logo: '/images/platforms/jd-waimai.png',
+    logo: assetUrl('platforms/jd-waimai.png'),
   },
 ]
 

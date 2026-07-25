@@ -31,7 +31,12 @@
   },
   "simulatorPluginLibVersion": {},
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      {
+        "value": "images/**",
+        "type": "glob"
+      }
+    ],
     "include": []
   },
   "editorSetting": {}

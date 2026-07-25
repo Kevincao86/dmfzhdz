@@ -370,6 +370,9 @@ PAT
     erp_merchant_mp)
       cat <<'PAT'
 灵祺ERP小程序/
+upload-erp-mp-static
+ecs-sync-erp-mp-static
+ecs-meoo-api.nginx
 change-scope-guard
 PAT
       ;;

@@ -1,7 +1,7 @@
 <scroll-view scroll-y class="page-pad-v2" enhanced show-scrollbar="{{false}}">
   <view class="lq-hero">
     <view class="lq-hero-row">
-      <image class="lq-hero-logo" src="/images/logo.png" mode="aspectFit" />
+      <image class="lq-hero-logo" src="{{logoSrc}}" mode="aspectFit" />
       <view>
         <text class="lq-hero-title">达人招募</text>
         <text class="lq-hero-sub">开环探店 · Brief · 订单履约全链路</text>

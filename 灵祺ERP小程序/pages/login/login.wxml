@@ -118,7 +118,7 @@
       disabled="{{busy || wxBusy}}"
       bindtap="onWxLogin"
     >
-      <image class="wx-icon" src="/images/payment/wechat.png" mode="aspectFit" />
+      <image class="wx-icon" src="{{wechatIconSrc}}" mode="aspectFit" />
       <text>微信一键登录</text>
     </button>
     <view wx:if="{{mode === 'login'}}" class="auth-foot">

@@ -18,6 +18,7 @@ Page({
     connecting: false,
     ready: false,
     statusSub: '正在连接云端会话…',
+    logoSrc: require('../../utils/mpStaticAssets.js').assetUrl('logo.png'),
   },
 
   onLoad() {
