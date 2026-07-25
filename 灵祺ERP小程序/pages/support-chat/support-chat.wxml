@@ -1,13 +1,22 @@
-<view class="page-agent-v2">
+<view class="page-agent-v2 support-chat-page">
+  <view class="lq-hero support-hero">
+    <view class="lq-hero-row">
+      <image class="lq-hero-logo" src="/images/logo.png" mode="aspectFit" />
+      <view>
+        <text class="lq-hero-title">在线客服</text>
+        <text class="lq-hero-sub">与商家管理后台坐席互通</text>
+      </view>
+    </view>
+  </view>
   <scroll-view scroll-y class="chat-v2 tall" scroll-into-view="{{scrollTo}}" enhanced show-scrollbar="{{false}}">
     <view wx:for="{{messages}}" wx:key="id" id="msg-{{item.id}}" class="msg {{item.role === 'user' ? 'user' : 'bot'}}">
-      <text wx:if="{{item.role !== 'user'}}" class="ava ava-ai">客</text>
+      <image wx:if="{{item.role !== 'user'}}" class="ava ava-ai-img" src="/images/logo.png" mode="aspectFit" />
       <view class="bubble-v2 {{item.role === 'user' ? 'user' : ''}}"><text user-select>{{item.content}}</text></view>
       <text wx:if="{{item.role === 'user'}}" class="ava ava-me">我</text>
     </view>
   </scroll-view>
-  <view class="composer-v2">
-    <input placeholder="输入消息" value="{{input}}" bindinput="onInput" confirm-type="send" bindconfirm="onSend" />
-    <button class="btn-v2 primary sm" bindtap="onSend">发送</button>
+  <view class="composer-v2 support-composer">
+    <input class="composer-input" placeholder="输入消息…" value="{{input}}" bindinput="onInput" confirm-type="send" bindconfirm="onSend" />
+    <view class="send-v2" bindtap="onSend"><text class="send-glyph">➤</text></view>
   </view>
 </view>

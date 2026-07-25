@@ -1,4 +1,9 @@
-<scroll-view scroll-y class="page-pad-v2" enhanced show-scrollbar="{{false}}"><view wx:for="{{rows}}" wx:key="id" class="list-card-v2">
+<scroll-view scroll-y class="page-pad-v2" enhanced show-scrollbar="{{false}}">
+  <view class="lq-hero">
+    <text class="lq-hero-title">达人池</text>
+    <text class="lq-hero-sub">合作达人与收藏管理</text>
+  </view>
+<view wx:for="{{rows}}" wx:key="id" class="lq-nav-card list-card-v2">
   <view><text class="list-strong">{{item.name}}</text><text class="list-span">{{item.meta}}</text></view>
 </view>
 <button class="btn-v2 primary" bindtap="onConfirm">确认达人名单</button></scroll-view>

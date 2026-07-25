@@ -1,6 +1,6 @@
 .cp-page {
   min-height: 100vh;
-  background: #f3f6fb;
+  background: linear-gradient(180deg, #e8f4fc 0%, #f8fafc 240rpx, #f8fafc 100%);
   padding-bottom: 48rpx;
 }
 
@@ -45,7 +45,7 @@
   width: 100%;
   box-sizing: border-box;
   padding: 16rpx 20rpx;
-  background: #f8fafc;
+  background: linear-gradient(180deg, #e8f4fc 0%, #f8fafc 240rpx, #f8fafc 100%);
   border-radius: 16rpx;
   font-size: 28rpx;
   margin-bottom: 8rpx;

@@ -1,7 +1,14 @@
 <scroll-view scroll-y class="page-pad-v2" enhanced show-scrollbar="{{false}}">
+  <view class="lq-hero">
+    <text class="lq-hero-title">五步流程 · 达人招募</text>
+    <text class="lq-hero-sub">按标准 SOP 完成发布与履约</text>
+  </view>
   <view wx:for="{{steps}}" wx:key="key" class="flow-v2 {{index === 0 ? 'on' : ''}}">
     <text class="flow-num">{{index + 1}}</text>
-    <text>{{item.title}}</text>
+    <view class="lq-nav-main">
+      <text class="lq-nav-title">{{item.title}}</text>
+      <text class="lq-nav-desc" wx:if="{{item.desc}}">{{item.desc}}</text>
+    </view>
   </view>
   <button class="btn-v2 primary" bindtap="goPick">进入 · 选择发布方式</button>
 </scroll-view>

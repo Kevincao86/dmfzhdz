@@ -1,0 +1,250 @@
+/**
+ * 子菜单深度美化壳层（全页生效）
+ * 对齐 docs/mp-erp-ui-mock 浅底 + 青主色 + 卡片质感
+ */
+.page-pad-v2 {
+  min-height: 100vh;
+  padding: 20rpx 24rpx calc(24rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  background: linear-gradient(180deg, #e8f4fc 0%, #f8fafc 220rpx, #f8fafc 100%);
+}
+
+/* 页头 Hero */
+.lq-hero,
+.hero-purple {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28rpx;
+  padding: 32rpx 28rpx;
+  margin-bottom: 20rpx;
+  background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 50%, #ede9fe 100%);
+  border: 1rpx solid rgba(14, 165, 233, 0.12);
+  box-shadow: 0 12rpx 36rpx rgba(14, 165, 233, 0.08);
+}
+
+.lq-hero-title,
+.hero-purple {
+  font-size: 36rpx;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: 0.5rpx;
+}
+
+.lq-hero-sub {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  color: #64748b;
+  line-height: 1.45;
+}
+
+.lq-hero-row {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.lq-hero-logo {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 8rpx 24rpx rgba(91, 33, 182, 0.18);
+  flex-shrink: 0;
+}
+
+/* 导航入口卡 */
+.lq-nav-card,
+.list-card-v2 {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  background: #fff;
+  border-radius: 24rpx;
+  padding: 26rpx 24rpx;
+  margin-bottom: 14rpx;
+  border: 1rpx solid rgba(15, 23, 42, 0.04);
+  box-shadow: 0 8rpx 28rpx rgba(15, 23, 42, 0.05);
+}
+
+.lq-nav-ico {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 22rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  flex-shrink: 0;
+  background: linear-gradient(145deg, #e0f2fe, #bae6fd);
+  color: #0284c7;
+}
+
+.lq-nav-ico.violet {
+  background: linear-gradient(145deg, #ede9fe, #ddd6fe);
+  color: #7c3aed;
+}
+.lq-nav-ico.orange {
+  background: linear-gradient(145deg, #ffedd5, #fed7aa);
+  color: #ea580c;
+}
+.lq-nav-ico.teal {
+  background: linear-gradient(145deg, #ccfbf1, #99f6e4);
+  color: #0d9488;
+}
+.lq-nav-ico.amber {
+  background: linear-gradient(145deg, #fef3c7, #fde68a);
+  color: #d97706;
+}
+
+.lq-nav-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.lq-nav-title,
+.list-strong {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.lq-nav-desc,
+.list-span {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+
+.lq-nav-card .tag,
+.list-card-v2 .tag {
+  font-size: 20rpx;
+  font-weight: 700;
+  color: #0284c7;
+  background: #e0f2fe;
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+}
+
+/* Chip / Tab */
+.chip-row {
+  display: flex;
+  gap: 14rpx;
+  margin-bottom: 20rpx;
+  flex-wrap: wrap;
+}
+
+.chip {
+  padding: 14rpx 28rpx;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  background: #fff;
+  border: 1rpx solid #e2e8f0;
+  color: #64748b;
+  box-shadow: 0 4rpx 12rpx rgba(15, 23, 42, 0.03);
+}
+
+.chip.on {
+  background: linear-gradient(95deg, #0ea5e9, #0284c7);
+  color: #fff;
+  border-color: transparent;
+  font-weight: 700;
+  box-shadow: 0 8rpx 20rpx rgba(2, 132, 199, 0.25);
+}
+
+/* 表单 / KPI / 空态 */
+.form-card-v2 {
+  background: #fff;
+  border-radius: 28rpx;
+  padding: 28rpx;
+  margin-bottom: 20rpx;
+  border: 1rpx solid rgba(15, 23, 42, 0.04);
+  box-shadow: 0 10rpx 32rpx rgba(15, 23, 42, 0.05);
+}
+
+.hint-v2 {
+  font-size: 24rpx;
+  color: #64748b;
+  margin: 24rpx 8rpx;
+  line-height: 1.5;
+}
+
+.lq-empty {
+  margin: 48rpx 8rpx;
+  padding: 48rpx 32rpx;
+  text-align: center;
+  background: #fff;
+  border-radius: 28rpx;
+  border: 1rpx dashed #cbd5e1;
+}
+
+.lq-empty-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 10rpx;
+}
+
+.lq-empty-desc {
+  display: block;
+  font-size: 22rpx;
+  color: #94a3b8;
+}
+
+.btn-v2.primary {
+  background: linear-gradient(95deg, #0ea5e9, #0284c7);
+  box-shadow: 0 12rpx 32rpx rgba(2, 132, 199, 0.28);
+}
+
+.kpi-hero,
+.score-v2 {
+  background: linear-gradient(135deg, #0ea5e9, #0284c7 55%, #6366f1);
+  box-shadow: 0 16rpx 40rpx rgba(2, 132, 199, 0.28);
+}
+
+.pick-v2 {
+  border-radius: 24rpx;
+  box-shadow: 0 6rpx 20rpx rgba(15, 23, 42, 0.04);
+}
+
+.flow-v2 {
+  border: 1rpx solid rgba(15, 23, 42, 0.04);
+  box-shadow: 0 6rpx 18rpx rgba(15, 23, 42, 0.04);
+}
+
+/* 通用子页根容器（覆盖各业务页根 class） */
+.lq-page-bg,
+.plist-page,
+.ads-page,
+.leads-page,
+.wallet-page,
+.geo-page,
+.rev-page,
+.sub-page,
+.vs-page,
+.ai-page,
+.sv-root,
+.store-page-v2,
+.fin-page,
+.dash-page-v2,
+.cp-page,
+.dh-page,
+.op-page,
+.nv-scroll,
+.pro-scroll,
+.bw-scroll,
+.wizard-scroll,
+.edit-scroll,
+.voice-page,
+.notify-page,
+.pe-page,
+.sm-page,
+.legal-page {
+  min-height: 100vh;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, #e8f4fc 0%, #f8fafc 240rpx, #f8fafc 100%) !important;
+}

@@ -1,6 +1,6 @@
 .sm-page {
   min-height: 100vh;
-  background: #f3f6fb;
+  background: linear-gradient(180deg, #e8f4fc 0%, #f8fafc 240rpx, #f8fafc 100%);
   padding-bottom: 48rpx;
   box-sizing: border-box;
 }

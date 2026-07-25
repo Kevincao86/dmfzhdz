@@ -2,7 +2,7 @@
   min-height: 100vh;
   padding: 28rpx;
   box-sizing: border-box;
-  background: #f8fafc;
+  background: linear-gradient(180deg, #e8f4fc 0%, #f8fafc 240rpx, #f8fafc 100%);
 }
 .pe-card {
   background: #fff;

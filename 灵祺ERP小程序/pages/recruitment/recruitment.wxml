@@ -1,9 +1,14 @@
-<scroll-view scroll-y class="page-pad-v2" enhanced show-scrollbar="{{false}}"><text wx:if="{{filterHint}}" class="hint-v2">{{filterHint}}</text>
+<scroll-view scroll-y class="page-pad-v2" enhanced show-scrollbar="{{false}}">
+  <view class="lq-hero">
+    <text class="lq-hero-title">达人订单</text>
+    <text class="lq-hero-sub">报名到结算全状态</text>
+  </view>
+<text wx:if="{{filterHint}}" class="hint-v2">{{filterHint}}</text>
 <view wx:if="{{loading}}" class="hint-v2">加载中…</view>
 <view wx:elif="{{err}}" class="hint-v2 err">{{err}}</view>
 <view wx:elif="{{!rows.length}}" class="hint-v2">暂无数据</view>
 <block wx:else>
-  <view wx:for="{{rows}}" wx:key="id" class="list-card-v2">
+  <view wx:for="{{rows}}" wx:key="id" class="lq-nav-card list-card-v2">
     <view>
       <text class="list-strong">{{item.id}}</text>
       <text class="list-span">{{item.customerName}}</text>

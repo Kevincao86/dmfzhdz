@@ -4,7 +4,7 @@
   margin: 0 !important;
   padding: 0 28rpx 64rpx;
   box-sizing: border-box;
-  background: #f3f6fb;
+  background: linear-gradient(180deg, #e8f4fc 0%, #f8fafc 240rpx, #f8fafc 100%);
 }
 
 .login-hero-v2 {

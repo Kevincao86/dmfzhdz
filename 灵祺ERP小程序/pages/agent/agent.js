@@ -172,28 +172,73 @@ Page({
   },
 
   onShow() {
-    // 审核：可先浏览助手页，发送消息时再要求真实登录
-    api.enterGuestBrowse()
-    this.setData({ guestMode: !api.isRealAuthed() })
-    if (api.isRealAuthed()) {
-      void (async () => {
-        try {
-          const app = getApp()
-          if (app && typeof app.syncMerchantSession === 'function') {
-            await app.syncMerchantSession({ force: true })
-          }
-          await this.bootstrapAgentUserState()
-        } catch (_) {}
-      })()
-    }
+    const real = api.isRealAuthed()
+    this.setData({ guestMode: !real })
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 1 })
     }
+    if (!real) {
+      // 灵祺助手：必须登录后才可使用（不可游客对话）
+      this.setData({
+        messages: [],
+        hasChat: false,
+        busy: false,
+        showPlusPanel: false,
+        shortcutsOpen: false,
+      })
+      this.recalcLayout()
+      if (!this._agentLoginPrompted) {
+        this._agentLoginPrompted = true
+        this.promptAgentLogin()
+      }
+      return
+    }
+    this._agentLoginPrompted = false
+    void (async () => {
+      try {
+        const app = getApp()
+        if (app && typeof app.syncMerchantSession === 'function') {
+          await app.syncMerchantSession({ force: true })
+        }
+        await this.bootstrapAgentUserState()
+      } catch (_) {}
+    })()
     this.recalcLayout()
   },
 
+  promptAgentLogin() {
+    wx.showModal({
+      title: '请先登录',
+      content: '灵祺助手需登录商家账号后才能使用。',
+      showCancel: true,
+      cancelText: '稍后',
+      confirmText: '去登录',
+      success: (r) => {
+        if (r.confirm) this.goAgentLogin()
+      },
+    })
+  },
+
+  goAgentLogin() {
+    const url = `/pages/login/login?redirect=${encodeURIComponent('/pages/agent/agent')}`
+    wx.navigateTo({
+      url,
+      fail() {
+        wx.reLaunch({ url: '/pages/login/login' })
+      },
+    })
+  },
+
   onGuestLogin() {
-    api.requireRealAuth('/pages/agent/agent')
+    this.goAgentLogin()
+  },
+
+  /** @returns {boolean} */
+  ensureAgentAuthed() {
+    if (api.isRealAuthed()) return true
+    this.setData({ guestMode: true })
+    this.promptAgentLogin()
+    return false
   },
 
   syncModelPickers() {
@@ -225,6 +270,7 @@ Page({
   },
 
   onTogglePlus() {
+    if (!this.ensureAgentAuthed()) return
     if (this.data.busy) return
     const next = !this.data.showPlusPanel
     this.setData({ showPlusPanel: next, modelMenuOpen: false })
@@ -232,6 +278,7 @@ Page({
   },
 
   onPlusAction(e) {
+    if (!this.ensureAgentAuthed()) return
     const id = e.currentTarget.dataset.id
     if (!id || this.data.busy || this.data.attachmentFull) return
     this.setData({ showPlusPanel: false })
@@ -346,6 +393,7 @@ Page({
   },
 
   onToggleInputMode() {
+    if (!this.ensureAgentAuthed()) return
     const next = this.data.inputMode === 'text' ? 'voice' : 'text'
     this.setData({ inputMode: next, recording: false })
   },
@@ -383,11 +431,13 @@ Page({
   },
 
   onOpenComposerModelMenu() {
+    if (!this.ensureAgentAuthed()) return
     if (this.data.busy) return
     this.setData({ modelMenuOpen: true, showPlusPanel: false })
   },
 
   onOpenHeaderMenu() {
+    if (!this.ensureAgentAuthed()) return
     wx.showActionSheet({
       itemList: ['新对话', '切换模型'],
       success: (res) => {
@@ -428,6 +478,7 @@ Page({
   },
 
   onApplyShortcut(e) {
+    if (!this.ensureAgentAuthed()) return
     const type = e.currentTarget.dataset.type
     const label = e.currentTarget.dataset.label
     if (!type || !label || this.data.busy) return
@@ -473,6 +524,7 @@ Page({
   },
 
   onVoiceStart() {
+    if (!this.ensureAgentAuthed()) return
     if (this.data.busy || this.data.inputMode !== 'voice') return
     wx.authorize({
       scope: 'scope.record',
@@ -518,18 +570,7 @@ Page({
 
   async sendTurn(text) {
     if (this.data.busy) return
-    if (!api.isRealAuthed()) {
-      wx.showModal({
-        title: '请先登录',
-        content: '灵祺助手需登录后使用。请完成登录后再发送消息（游客浏览不支持对话）。',
-        confirmText: '去登录',
-        cancelText: '取消',
-        success: (r) => {
-          if (r.confirm) api.requireRealAuth('/pages/agent/agent')
-        },
-      })
-      return
-    }
+    if (!this.ensureAgentAuthed()) return
     const attachments = [...this.data.attachments]
     const line = buildAgentUserLine(text, attachments)
     if (!line && !attachments.length) return
