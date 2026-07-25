@@ -25,7 +25,7 @@
           id="msg-{{item.id}}"
           class="msg bot"
         >
-          <text class="ava ava-ai">灵</text>
+          <image class="ava ava-ai-img" src="/images/logo.png" mode="aspectFit" />
           <view class="msg-col">
             <view class="bubble-v2">
               <text class="bubble-text" user-select>{{item.content}}</text>
@@ -112,7 +112,7 @@
           id="msg-{{item.id}}"
           class="msg bot"
         >
-          <text class="ava ava-ai">灵</text>
+          <image class="ava ava-ai-img" src="/images/logo.png" mode="aspectFit" />
           <view class="msg-col">
             <view class="task-result-v2">
               <text class="task-result-title">✓ 任务结果</text>
@@ -157,7 +157,7 @@
         </view>
 
         <view wx:else id="msg-{{item.id}}" class="msg bot">
-          <text class="ava ava-ai">灵</text>
+          <image class="ava ava-ai-img" src="/images/logo.png" mode="aspectFit" />
           <view class="bubble-v2">
             <view wx:if="{{item.imageUrls && item.imageUrls.length}}" class="msg-images">
               <image
@@ -177,7 +177,7 @@
       </block>
 
       <view wx:if="{{busy}}" class="msg bot">
-        <text class="ava ava-ai">灵</text>
+        <image class="ava ava-ai-img" src="/images/logo.png" mode="aspectFit" />
         <view class="bubble-v2 typing">
           <text class="bubble-text">思考中…</text>
         </view>

@@ -1,22 +1,24 @@
 @import '../../styles/func-icons.wxss';
 
 .page-mine-v2 {
-  padding: 0 28rpx;
+  padding: 0 24rpx;
   box-sizing: border-box;
+  background: linear-gradient(180deg, #e8f4fc 0%, #f8fafc 240rpx, #f8fafc 100%);
 }
 
 .profile-v2-hover {
-  opacity: 0.92;
+  opacity: 0.94;
 }
 
 .profile-edit-pill {
-  margin-top: 12rpx;
+  margin-top: 14rpx;
   display: inline-flex;
   align-items: center;
   gap: 6rpx;
-  padding: 6rpx 14rpx;
+  padding: 8rpx 18rpx;
   border-radius: 999rpx;
-  background: #e0f2fe;
+  background: rgba(224, 242, 254, 0.95);
+  border: 1rpx solid rgba(2, 132, 199, 0.16);
 }
 .profile-edit-text {
   font-size: 22rpx;
@@ -31,9 +33,10 @@
 .guest-login-card {
   margin: 0 0 20rpx;
   padding: 22rpx 24rpx;
-  border-radius: 16rpx;
+  border-radius: 24rpx;
   background: #fff;
-  box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.04);
+  border: 1rpx solid rgba(2, 132, 199, 0.12);
+  box-shadow: 0 10rpx 28rpx rgba(2, 132, 199, 0.06);
 }
 .guest-login-t {
   display: block;
@@ -62,18 +65,21 @@
 }
 
 .store-logo-line {
-  width: 104rpx;
-  height: 104rpx;
+  width: 112rpx;
+  height: 112rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  background: transparent;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 10rpx 28rpx rgba(91, 33, 182, 0.18);
 }
 
 .store-logo-img {
-  width: 72rpx;
-  height: 72rpx;
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
   background: transparent;
 }
 
@@ -156,4 +162,28 @@
 
 .logout-actions .btn-v2::after {
   border: none;
+}
+
+.page-mine-v2 .logout-v2 {
+  width: 100%;
+  padding: 26rpx;
+  border: 1rpx solid #fecaca;
+  border-radius: 28rpx;
+  background: #fff;
+  color: #ef4444;
+  font-size: 28rpx;
+  font-weight: 600;
+  box-shadow: 0 8rpx 24rpx rgba(239, 68, 68, 0.06);
+}
+
+.page-mine-v2 .logout-v2::after {
+  border: none;
+}
+
+.page-mine-v2 .menu-item-title {
+  font-weight: 600;
+}
+
+.page-mine-v2 .bind-card-v2 {
+  border-radius: 28rpx;
 }

@@ -1,6 +1,6 @@
 .page-agent-v2 {
   height: 100vh;
-  background: #f3f6fb;
+  background: #f8fafc;
   overflow: hidden;
 }
 
@@ -14,7 +14,9 @@
   align-items: center;
   justify-content: center;
   padding: 10rpx 28rpx 16rpx;
-  background: linear-gradient(180deg, #e0f2fe, #f3f6fb);
+  background: rgba(255, 255, 255, 0.94);
+  border-bottom: 1rpx solid rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(12px);
 }
 
 .agent-top-center {
@@ -103,13 +105,22 @@
 }
 
 .ava-ai {
-  background: linear-gradient(135deg, #0ea5e9, #06b6d4);
+  background: linear-gradient(145deg, #a78bfa, #7c3aed 55%, #5b21b6);
   color: #fff;
 }
 
+.ava-ai-img {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #fff;
+  box-shadow: 0 6rpx 16rpx rgba(91, 33, 182, 0.22);
+}
+
 .ava-me {
-  background: #e2e8f0;
-  color: #475569;
+  background: linear-gradient(145deg, #e0f2fe, #bae6fd);
+  color: #0369a1;
 }
 
 .bubble-v2 {
@@ -121,6 +132,7 @@
   background: #fff;
   border: 1rpx solid #e2e8f0;
   color: #1e293b;
+  box-shadow: 0 4rpx 16rpx rgba(15, 23, 42, 0.04);
 }
 
 .msg.user .bubble-v2 {
@@ -128,9 +140,10 @@
 }
 
 .bubble-v2.user {
-  background: #e0f2fe;
-  border-color: #bae6fd;
-  color: #0c4a6e;
+  background: linear-gradient(135deg, #0ea5e9, #0284c7);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 8rpx 20rpx rgba(2, 132, 199, 0.28);
 }
 
 .bubble-text {
@@ -155,16 +168,17 @@
 .preview-v2 {
   margin-top: 8rpx;
   background: #fff;
-  border: 1rpx solid #c7d2fe;
-  border-radius: 32rpx;
+  border: 1rpx solid #bae6fd;
+  border-radius: 28rpx;
   padding: 24rpx;
+  box-shadow: 0 10rpx 28rpx rgba(2, 132, 199, 0.08);
 }
 
 .preview-title {
   display: block;
-  font-size: 20rpx;
+  font-size: 22rpx;
   font-weight: 700;
-  color: #6366f1;
+  color: #0284c7;
   margin-bottom: 8rpx;
 }
 

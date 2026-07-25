@@ -1,18 +1,19 @@
-/* 内容区 84rpx，须与 app.wxss --tab-bar-pad 一致 */
+/* 内容区须与 app.wxss --tab-bar-pad 一致 */
 .tab-bar {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
-  height: calc(84rpx + env(safe-area-inset-bottom));
+  height: calc(88rpx + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
   box-sizing: border-box;
   display: flex;
   align-items: stretch;
-  background: rgba(255, 255, 255, 0.96);
+  background: rgba(255, 255, 255, 0.97);
   border-top: 1rpx solid rgba(15, 23, 42, 0.06);
-  box-shadow: 0 -8rpx 32rpx rgba(15, 23, 42, 0.04);
+  box-shadow: 0 -10rpx 36rpx rgba(15, 23, 42, 0.06);
   z-index: 9000;
+  backdrop-filter: blur(14px);
 }
 
 .tab-item {
@@ -21,8 +22,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
-  gap: 4rpx;
-  padding-bottom: 8rpx;
+  gap: 6rpx;
+  padding-bottom: 10rpx;
   color: #94a3b8;
   transition: color 0.2s ease;
 }
@@ -32,12 +33,19 @@
 }
 
 .tab-icon-wrap {
-  width: 40rpx;
-  height: 40rpx;
+  width: 48rpx;
+  height: 48rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  border-radius: 16rpx;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.tab-item.active .tab-icon-wrap {
+  background: rgba(14, 165, 233, 0.12);
+  transform: translateY(-2rpx);
 }
 
 .tab-icon {
@@ -66,7 +74,7 @@
 }
 
 .tab-item.active .tab-text {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 /* 灵祺助手：对话气泡 + 角标光点 */
