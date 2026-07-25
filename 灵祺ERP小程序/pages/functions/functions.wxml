@@ -1,10 +1,13 @@
 <scroll-view scroll-y class="page-func-v2" enhanced show-scrollbar="{{false}}" style="padding-bottom:var(--tab-bar-pad)">
-  <view class="func-top">
-    <view>
-      <text class="func-h1">商家能力中心</text>
-      <text class="func-p">店铺 · 商品 · 运营 · 内容创作 · 投流 · 线索 · 财务</text>
+  <view class="func-hero">
+    <view class="func-hero-main">
+      <image class="func-brand-logo" src="/images/logo.png" mode="aspectFit" />
+      <view class="func-hero-text">
+        <text class="func-h1">商家能力中心</text>
+        <text class="func-p">店铺 · 商品 · 运营 · 内容创作 · 投流 · 线索 · 财务</text>
+      </view>
     </view>
-    <image class="func-illus-img" src="/images/func-hero-illus.svg" mode="aspectFit" />
+    <view class="func-hero-glow" aria-hidden="true"></view>
   </view>
   <view wx:if="{{guestMode}}" class="guest-banner" bindtap="onGoLogin">
     <text class="guest-banner-t">游客浏览中 · 可先查看功能模块</text>

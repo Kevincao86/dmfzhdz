@@ -2,20 +2,29 @@
 @import './styles/mp-legacy.wxss';
 
 page {
-  background: #f3f6fb;
+  background: #f8fafc;
   color: #1e293b;
   font-size: 28rpx;
-  --tab-bar-pad: calc(84rpx + env(safe-area-inset-bottom));
+  --lq-primary: #0284c7;
+  --lq-primary-soft: #e0f2fe;
+  --lq-bg: #f8fafc;
+  --lq-card: #ffffff;
+  --lq-text: #0f172a;
+  --lq-muted: #64748b;
+  --lq-radius-card: 28rpx;
+  --lq-shadow-card: 0 10rpx 36rpx rgba(15, 23, 42, 0.05);
+  --tab-bar-pad: calc(88rpx + env(safe-area-inset-bottom));
 }
 
 .page-pad-v2 {
   padding: 0 28rpx 16rpx;
   box-sizing: border-box;
   min-height: 100vh;
+  background: var(--lq-bg);
 }
 
 .page-func-v2 {
-  padding: 0 28rpx 16rpx;
+  padding: 0 24rpx 16rpx;
   box-sizing: border-box;
   min-height: 100vh;
 }
