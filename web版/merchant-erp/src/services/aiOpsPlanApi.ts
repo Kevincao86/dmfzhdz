@@ -20,6 +20,7 @@ export type GenerateAiOpsPlanOk = {
   pointsBalance?: number
 }
 
+/** body.planEdition 透传至 /api/meoo-ai-ops-plan（simple | standard） */
 export async function generateAiOpsPlan(
   body: AiOpsPlanGenerateInput,
 ): Promise<GenerateAiOpsPlanOk | { ok: false; message: string }> {

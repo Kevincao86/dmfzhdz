@@ -169,7 +169,48 @@ export type AiOpsPlanCombo = {
   stockHint: string
 }
 
+/** 标准版=六表；简易版=图文短方案（中小商家/个人） */
+export type AiOpsPlanEdition = 'simple' | 'standard'
+
+export type AiOpsPlanSimpleHero = {
+  headline: string
+  summary: string
+  storeHint: string
+  periodHint: string
+  budgetHint: string
+}
+
+export type AiOpsPlanSimpleStep = {
+  title: string
+  body: string
+  tip: string
+}
+
+export type AiOpsPlanSimplePlatform = {
+  platform: string
+  how: string
+}
+
+export type AiOpsPlanSimpleCombo = {
+  name: string
+  sellingPoint: string
+  priceHint: string
+}
+
+/** 简易版瘦 schema：封面 + 步骤 + 平台 + 货盘 + 清单 */
+export type AiOpsPlanSimplePlan = {
+  hero: AiOpsPlanSimpleHero
+  steps: AiOpsPlanSimpleStep[]
+  platforms: AiOpsPlanSimplePlatform[]
+  combos: AiOpsPlanSimpleCombo[]
+  checklist: string[]
+}
+
 export type AiOpsPlanResult = {
+  /** 缺省视为标准版（兼容旧历史/旧客户端） */
+  planEdition?: AiOpsPlanEdition
+  /** 简易版内容；标准版可为空 */
+  simplePlan?: AiOpsPlanSimplePlan
   opsPlan: {
     background: string
     backgroundDetail: string
@@ -237,6 +278,11 @@ export type AiOpsPlanGenerateInput = {
   margins?: { douyin: number; meituan: number; xhs: number }
   industryPath?: string
   competitorSummary?: string
+  /**
+   * simple=简易图文版；standard=标准六表。
+   * 服务端缺省按 standard（兼容旧客户端）；商家 UI 默认传 simple。
+   */
+  planEdition?: AiOpsPlanEdition
 }
 
 /**
@@ -745,10 +791,153 @@ function clampIsoInPeriod(iso: string, start: string, end: string): string {
   return iso
 }
 
-/** 宽松解析模型 JSON → 六块结构（缺字段补空） */
+function emptyAiOpsPlanStandardBlocks(): AiOpsPlanResult {
+  return {
+    planEdition: 'standard',
+    opsPlan: {
+      background: '',
+      backgroundDetail: '',
+      positioning: '',
+      activities: '',
+      activitiesDetail: '',
+      targetAudience: '',
+      audienceDetail: '',
+      goals: [],
+      goalsDetail: [],
+      contentPillars: [],
+      monthlyThemes: [],
+      platformStrategy: [],
+      risks: [],
+    },
+    executionPlan: { overview: '', phases: [], weeklyActions: [], hourlySchedule: [] },
+    marketingBudget: {
+      totalBudget: 0,
+      channels: [],
+      assumptions: '',
+      contingencyPct: 0,
+      roiSummary: '',
+      roiAnalysis: [],
+    },
+    calendar: { milestones: [] },
+    talentBudget: { talentRows: [], budgetLines: [] },
+    productBoard: { combos: [] },
+  }
+}
+
+export function isAiOpsPlanSimpleEdition(plan: AiOpsPlanResult | null | undefined): boolean {
+  if (!plan) return false
+  return plan.planEdition === 'simple' || !!plan.simplePlan
+}
+
+/** 解析简易版瘦 JSON */
+export function normalizeAiOpsPlanSimplePlan(raw: unknown): AiOpsPlanSimplePlan | null {
+  if (!raw || typeof raw !== 'object') return null
+  const o = raw as Record<string, unknown>
+  const heroRaw = (o.hero ?? o.cover ?? o['封面']) as Record<string, unknown> | undefined
+  const stepsRaw = Array.isArray(o.steps)
+    ? o.steps
+    : Array.isArray(o['本周步骤'])
+      ? o['本周步骤']
+      : []
+  const platformsRaw = Array.isArray(o.platforms)
+    ? o.platforms
+    : Array.isArray(o['平台'])
+      ? o['平台']
+      : []
+  const combosRaw = Array.isArray(o.combos)
+    ? o.combos
+    : Array.isArray(o['套餐'])
+      ? o['套餐']
+      : []
+  const checklistRaw = Array.isArray(o.checklist)
+    ? o.checklist
+    : Array.isArray(o['清单'])
+      ? o['清单']
+      : []
+
+  const hero: AiOpsPlanSimpleHero = {
+    headline: asStr(heroRaw?.headline ?? heroRaw?.title ?? o.headline),
+    summary: asStr(heroRaw?.summary ?? heroRaw?.desc ?? o.summary),
+    storeHint: asStr(heroRaw?.storeHint ?? heroRaw?.store_hint ?? heroRaw?.store),
+    periodHint: asStr(heroRaw?.periodHint ?? heroRaw?.period_hint ?? heroRaw?.period),
+    budgetHint: asStr(heroRaw?.budgetHint ?? heroRaw?.budget_hint ?? heroRaw?.budget),
+  }
+
+  const steps: AiOpsPlanSimpleStep[] = stepsRaw
+    .map((x) => {
+      if (typeof x === 'string') {
+        const t = asStr(x)
+        return t ? { title: t, body: '', tip: '' } : null
+      }
+      if (!x || typeof x !== 'object') return null
+      const r = x as Record<string, unknown>
+      const title = asStr(r.title ?? r.name)
+      const body = asStr(r.body ?? r.desc ?? r.description)
+      if (!title && !body) return null
+      return { title: title || '下一步', body, tip: asStr(r.tip ?? r.hint) }
+    })
+    .filter((x): x is AiOpsPlanSimpleStep => !!x)
+    .slice(0, 5)
+
+  const platforms: AiOpsPlanSimplePlatform[] = platformsRaw
+    .map((x) => {
+      if (!x || typeof x !== 'object') return null
+      const r = x as Record<string, unknown>
+      const platform = asStr(r.platform ?? r.name)
+      const how = asStr(r.how ?? r.body ?? r.desc ?? r.tip)
+      if (!platform && !how) return null
+      return { platform: platform || '平台', how }
+    })
+    .filter((x): x is AiOpsPlanSimplePlatform => !!x)
+    .slice(0, 4)
+
+  const combos: AiOpsPlanSimpleCombo[] = combosRaw
+    .map((x) => {
+      if (!x || typeof x !== 'object') return null
+      const r = x as Record<string, unknown>
+      const name = asStr(r.name ?? r.title)
+      if (!name) return null
+      return {
+        name,
+        sellingPoint: asStr(r.sellingPoint ?? r.selling_point ?? r.point ?? r.desc),
+        priceHint: asStr(r.priceHint ?? r.price_hint ?? r.price ?? r.priceYuan),
+      }
+    })
+    .filter((x): x is AiOpsPlanSimpleCombo => !!x)
+    .slice(0, 4)
+
+  const checklist = checklistRaw
+    .map((x) => (typeof x === 'string' ? asStr(x) : asStr((x as Record<string, unknown>)?.text ?? (x as Record<string, unknown>)?.title)))
+    .filter(Boolean)
+    .slice(0, 8)
+
+  if (!hero.headline && !steps.length && !checklist.length && !combos.length) return null
+  return { hero, steps, platforms, combos, checklist }
+}
+
+/** 宽松解析模型 JSON → 六块结构（缺字段补空）；简易版走瘦 schema */
 export function normalizeAiOpsPlanResult(raw: unknown): AiOpsPlanResult | null {
   if (!raw || typeof raw !== 'object') return null
   const o = raw as Record<string, unknown>
+  const nestedSimple = o.simplePlan ?? o.simple_plan
+  const explicitSimple = o.planEdition === 'simple' || o.plan_edition === 'simple'
+  const hasSix =
+    !!(o.opsPlan ?? o.ops_plan ?? o['运营方案']) ||
+    !!(o.executionPlan ?? o.execution_plan) ||
+    !!(o.marketingBudget ?? o.marketing_budget)
+  const looksSimple =
+    explicitSimple ||
+    !!nestedSimple ||
+    (!hasSix && (!!o.hero || Array.isArray(o.steps) || Array.isArray(o.checklist)))
+
+  if (looksSimple) {
+    const simpleSrc =
+      nestedSimple && typeof nestedSimple === 'object' ? nestedSimple : o
+    const simplePlan = normalizeAiOpsPlanSimplePlan(simpleSrc)
+    if (!simplePlan) return null
+    return { ...emptyAiOpsPlanStandardBlocks(), planEdition: 'simple', simplePlan }
+  }
+
   const ops = (o.opsPlan ?? o.ops_plan ?? o['运营方案']) as Record<string, unknown> | undefined
   const exec = (o.executionPlan ?? o.execution_plan ?? o['具体执行方案']) as
     | Record<string, unknown>
@@ -811,6 +1000,7 @@ export function normalizeAiOpsPlanResult(raw: unknown): AiOpsPlanResult | null {
       : []
 
   return {
+    planEdition: 'standard',
     opsPlan: {
       background: asStr(ops?.background),
       backgroundDetail: asStr(ops?.backgroundDetail ?? ops?.background_detail),
@@ -1054,6 +1244,16 @@ export function normalizeAiOpsPlanResult(raw: unknown): AiOpsPlanResult | null {
 }
 
 export function isAiOpsPlanResultUsable(plan: AiOpsPlanResult): boolean {
+  if (isAiOpsPlanSimpleEdition(plan) && plan.simplePlan) {
+    const s = plan.simplePlan
+    return (
+      !!s.hero.headline ||
+      s.steps.length > 0 ||
+      s.checklist.length > 0 ||
+      s.combos.length > 0 ||
+      s.platforms.length > 0
+    )
+  }
   return (
     plan.opsPlan.goals.length > 0 ||
     plan.opsPlan.platformStrategy.length > 0 ||
@@ -1843,11 +2043,12 @@ export function ensureCalendarMilestones(
   }
 }
 
-/** 服务端/客户端统一后处理：ROI → 目标对齐 → 阶段日粒度 → 日历补全 */
+/** 服务端/客户端统一后处理：ROI → 目标对齐 → 阶段日粒度 → 日历补全（简易版跳过） */
 export function enrichAiOpsPlanPostProcess(
   plan: AiOpsPlanResult,
   opts?: AiOpsPlanEnrichOpts,
 ): AiOpsPlanResult {
+  if (isAiOpsPlanSimpleEdition(plan)) return plan
   let next = ensureMarketingRoiFallback(plan, opts)
   next = alignOpsPlanGoalsToRoi(next, opts)
   next = ensurePhaseDetailDensity(next)
@@ -1855,7 +2056,50 @@ export function enrichAiOpsPlanPostProcess(
   return next
 }
 
+function aiOpsSimplePlanToMarkdown(plan: AiOpsPlanResult, meta?: { title?: string }): string {
+  const s = plan.simplePlan
+  const lines: string[] = []
+  if (meta?.title) lines.push(`# ${meta.title}`, '')
+  else lines.push('# AI 运营方案（简易版）', '')
+  if (!s) return lines.join('\n')
+  if (s.hero.headline) lines.push(`## ${s.hero.headline}`, '')
+  if (s.hero.summary) lines.push(s.hero.summary, '')
+  const hints = [s.hero.storeHint, s.hero.periodHint, s.hero.budgetHint].filter(Boolean)
+  if (hints.length) lines.push(hints.join(' · '), '')
+  if (s.steps.length) {
+    lines.push('## 本周先做什么', '')
+    s.steps.forEach((st, i) => {
+      lines.push(`### ${i + 1}. ${st.title}`)
+      if (st.body) lines.push(st.body)
+      if (st.tip) lines.push(`> 小贴士：${st.tip}`)
+      lines.push('')
+    })
+  }
+  if (s.platforms.length) {
+    lines.push('## 各平台怎么发', '')
+    for (const p of s.platforms) {
+      lines.push(`- **${p.platform}**：${p.how}`)
+    }
+    lines.push('')
+  }
+  if (s.combos.length) {
+    lines.push('## 推荐套餐', '')
+    for (const c of s.combos) {
+      const price = c.priceHint ? `（${c.priceHint}）` : ''
+      lines.push(`- **${c.name}**${price}：${c.sellingPoint}`)
+    }
+    lines.push('')
+  }
+  if (s.checklist.length) {
+    lines.push('## 落地清单', '')
+    for (const item of s.checklist) lines.push(`- [ ] ${item}`)
+    lines.push('')
+  }
+  return lines.join('\n')
+}
+
 export function aiOpsPlanToMarkdown(plan: AiOpsPlanResult, meta?: { title?: string }): string {
+  if (isAiOpsPlanSimpleEdition(plan)) return aiOpsSimplePlanToMarkdown(plan, meta)
   const lines: string[] = []
   if (meta?.title) lines.push(`# ${meta.title}`, '')
   lines.push('## 1. 运营方案', '')

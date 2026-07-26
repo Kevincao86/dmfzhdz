@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx'
 import {
   AI_OPS_MILESTONE_KIND_LABELS,
   aiOpsPlanToMarkdown,
+  isAiOpsPlanSimpleEdition,
   type AiOpsPlanResult,
 } from './aiOpsPlanTypes'
 
@@ -19,6 +20,35 @@ function sheetFromAoA(rows: (string | number)[][]) {
 }
 
 export function exportAiOpsPlanExcel(plan: AiOpsPlanResult, basename: string) {
+  if (isAiOpsPlanSimpleEdition(plan) && plan.simplePlan) {
+    const s = plan.simplePlan
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(
+      wb,
+      sheetFromAoA([
+        ['结论', s.hero.headline],
+        ['摘要', s.hero.summary],
+        ['门店', s.hero.storeHint],
+        ['周期', s.hero.periodHint],
+        ['预算', s.hero.budgetHint],
+        [],
+        ['步骤', '说明', '小贴士'],
+        ...s.steps.map((st) => [st.title, st.body, st.tip]),
+        [],
+        ['平台', '怎么发'],
+        ...s.platforms.map((p) => [p.platform, p.how]),
+        [],
+        ['套餐', '卖点', '价格'],
+        ...s.combos.map((c) => [c.name, c.sellingPoint, c.priceHint]),
+        [],
+        ['落地清单'],
+        ...s.checklist.map((item) => [item]),
+      ]),
+      '简易方案',
+    )
+    XLSX.writeFile(wb, `${basename}.xlsx`)
+    return
+  }
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(
     wb,

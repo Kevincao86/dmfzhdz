@@ -1,5 +1,6 @@
 /**
- * POST /api/meoo-ai-ops-plan — 多平台 AI 运营方案（六块结构化产出）
+ * POST /api/meoo-ai-ops-plan — 多平台 AI 运营方案
+ * body.planEdition: 'simple' | 'standard'（缺省 standard；积分仍按 ops_plan）
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {

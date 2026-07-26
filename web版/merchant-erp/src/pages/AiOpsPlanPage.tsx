@@ -5,9 +5,11 @@ import {
   ClipboardCopy,
   Download,
   History,
+  ListChecks,
   Loader2,
   Search,
   Sparkles,
+  Store,
   Trash2,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -38,7 +40,9 @@ import {
   AI_OPS_PLAN_TABS,
   aiOpsPlanToMarkdown,
   enrichAiOpsPlanPostProcess,
+  isAiOpsPlanSimpleEdition,
   normalizeAiOpsPlanResult,
+  type AiOpsPlanEdition,
   type AiOpsPlanGenerateInput,
   type AiOpsPlanMilestone,
   type AiOpsPlanMilestoneKind,
@@ -859,6 +863,142 @@ function buildPhaseDetailItems(
     .slice(0, 48)
 }
 
+const SIMPLE_STEP_TONES = [
+  'from-sky-500 to-blue-600',
+  'from-emerald-500 to-teal-600',
+  'from-amber-500 to-orange-600',
+  'from-violet-500 to-indigo-600',
+  'from-rose-500 to-pink-600',
+] as const
+
+/** 简易版：封面 → 步骤 → 平台 → 货盘 → 清单 */
+function SimplePlanGallery({ plan }: { plan: AiOpsPlanResult }) {
+  const s = plan.simplePlan
+  if (!s) {
+    return <p className="text-sm text-gray-500">暂无简易方案内容</p>
+  }
+  const hints = [s.hero.storeHint, s.hero.periodHint, s.hero.budgetHint].filter(Boolean)
+  return (
+    <div className="mx-auto flex max-w-2xl flex-col gap-4">
+      <article className="overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-700 to-blue-800 px-5 py-6 text-white shadow-md">
+        <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-medium tracking-wide">
+          <Sparkles className="h-3 w-3" />
+          简易运营方案
+        </div>
+        <h2 className="text-xl font-semibold leading-snug tracking-tight sm:text-2xl">
+          {s.hero.headline || '本周行动方案'}
+        </h2>
+        {s.hero.summary ? (
+          <p className="mt-3 text-sm leading-relaxed text-white/90">{s.hero.summary}</p>
+        ) : null}
+        {hints.length ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {hints.map((h) => (
+              <span
+                key={h}
+                className="inline-flex items-center gap-1 rounded-lg bg-white/12 px-2.5 py-1 text-xs text-white/95"
+              >
+                <Store className="h-3 w-3 opacity-80" />
+                {h}
+              </span>
+            ))}
+          </div>
+        ) : null}
+      </article>
+
+      {s.steps.length ? (
+        <section className="space-y-2.5">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">本周先做什么</h3>
+          {s.steps.map((st, i) => (
+            <article
+              key={`${st.title}-${i}`}
+              className="flex gap-3 rounded-xl border border-gray-100 bg-white p-3.5 shadow-sm"
+            >
+              <div
+                className={cn(
+                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-sm font-bold text-white',
+                  SIMPLE_STEP_TONES[i % SIMPLE_STEP_TONES.length],
+                )}
+              >
+                {i + 1}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h4 className="text-sm font-semibold text-gray-900">{st.title}</h4>
+                {st.body ? <p className="mt-1 text-sm leading-relaxed text-gray-600">{st.body}</p> : null}
+                {st.tip ? (
+                  <p className="mt-2 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900/90">
+                    小贴士：{st.tip}
+                  </p>
+                ) : null}
+              </div>
+            </article>
+          ))}
+        </section>
+      ) : null}
+
+      {s.platforms.length ? (
+        <section className="space-y-2.5">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">各平台怎么发</h3>
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            {s.platforms.map((p, i) => (
+              <article
+                key={`${p.platform}-${i}`}
+                className="rounded-xl border border-sky-100 bg-sky-50/60 p-3.5"
+              >
+                <div className="text-sm font-semibold text-sky-900">{p.platform}</div>
+                <p className="mt-1.5 text-sm leading-relaxed text-sky-950/80">{p.how}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {s.combos.length ? (
+        <section className="space-y-2.5">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">推荐套餐</h3>
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            {s.combos.map((c, i) => (
+              <article
+                key={`${c.name}-${i}`}
+                className="rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50/80 to-white p-3.5"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <h4 className="text-sm font-semibold text-emerald-950">{c.name}</h4>
+                  {c.priceHint ? (
+                    <span className="shrink-0 rounded-md bg-emerald-600/10 px-2 py-0.5 text-xs font-medium text-emerald-800">
+                      {c.priceHint}
+                    </span>
+                  ) : null}
+                </div>
+                {c.sellingPoint ? (
+                  <p className="mt-1.5 text-sm leading-relaxed text-gray-600">{c.sellingPoint}</p>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {s.checklist.length ? (
+        <section className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+          <h3 className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <ListChecks className="h-3.5 w-3.5" />
+            落地清单
+          </h3>
+          <ul className="space-y-2">
+            {s.checklist.map((item, i) => (
+              <li key={`${item}-${i}`} className="flex gap-2.5 text-sm text-gray-700">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+                <span className="leading-relaxed">{item}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+    </div>
+  )
+}
+
 function ResultPanel({
   plan,
   tab,
@@ -1439,6 +1579,8 @@ export default function AiOpsPlanPage() {
   const [periodStart, setPeriodStart] = useState(period0.start)
   const [periodEnd, setPeriodEnd] = useState(period0.end)
   const [goalsNote, setGoalsNote] = useState('')
+  /** 默认简易版（中小商家）；标准版保留六表 */
+  const [planEdition, setPlanEdition] = useState<AiOpsPlanEdition>('simple')
   const [goalTemplateId, setGoalTemplateId] = useState<string | null>(null)
   /** 节日大促：周期内节日 + 店庆/周年庆已选标签 id */
   const [selectedFestivalIds, setSelectedFestivalIds] = useState<string[]>([])
@@ -1524,7 +1666,9 @@ export default function AiOpsPlanPage() {
 
     const pending = consumeLatestAiGenerationResultForKind<OpsPlanJobResult>('ops_plan')
     if (pending?.payload.ok) {
-      setPlan(pending.payload.plan)
+      const donePlan = pending.payload.plan
+      setPlanEdition(isAiOpsPlanSimpleEdition(donePlan) ? 'simple' : 'standard')
+      setPlan(donePlan)
       setTab('ops')
       setHistory(loadAiOpsPlanHistory(scopeId))
       setLoading(false)
@@ -1909,6 +2053,7 @@ export default function AiOpsPlanPage() {
       margins: snap.margins,
       industryPath: snap.industryPath,
       competitorSummary: snap.competitorSummary,
+      planEdition,
     }
   }, [
     partner,
@@ -1919,6 +2064,7 @@ export default function AiOpsPlanPage() {
     periodStart,
     periodEnd,
     goalsNote,
+    planEdition,
     resolveSelectedStoreNames,
     resolveSelectedStoreCity,
     storeScope,
@@ -1971,7 +2117,10 @@ export default function AiOpsPlanPage() {
     try {
       updateAiGenerationJob(jobId, { progress: '正在准备参数…' })
       const input = await buildInput()
-      updateAiGenerationJob(jobId, { progress: '正在生成（约 1～2 分钟）…' })
+      updateAiGenerationJob(jobId, {
+        progress:
+          planEdition === 'simple' ? '正在生成简易方案（约 30～60 秒）…' : '正在生成（约 1～2 分钟）…',
+      })
       const r = await generateAiOpsPlan(input)
       if (!r.ok) {
         storeAiGenerationResult(jobId, { ok: false as const, message: r.message })
@@ -1979,14 +2128,22 @@ export default function AiOpsPlanPage() {
         if (mountedRef.current) setErr(r.message)
         return
       }
-      const planFixed = enrichAiOpsPlanPostProcess(r.plan, {
-        industryPath: input.industryPath,
-        margins: input.margins,
-        periodStart: input.periodStart,
-        periodEnd: input.periodEnd,
-        platforms: input.platforms,
-      })
-      const item = saveAiOpsPlanHistoryItem(scopeId, input, planFixed)
+      const planFixed = isAiOpsPlanSimpleEdition(r.plan)
+        ? { ...r.plan, planEdition: 'simple' as const }
+        : enrichAiOpsPlanPostProcess(r.plan, {
+            industryPath: input.industryPath,
+            margins: input.margins,
+            periodStart: input.periodStart,
+            periodEnd: input.periodEnd,
+            platforms: input.platforms,
+          })
+      const baseTitle = `${input.periodStart || ''}～${input.periodEnd || ''} · ${(input.platforms || []).slice(0, 3).join('/') || '多平台'}`
+      const item = saveAiOpsPlanHistoryItem(
+        scopeId,
+        input,
+        planFixed,
+        isAiOpsPlanSimpleEdition(planFixed) ? `简易 · ${baseTitle}` : undefined,
+      )
       const charged =
         typeof r.pointsCharged === 'number' && r.pointsCharged > 0
           ? r.pointsCharged
@@ -2135,6 +2292,46 @@ export default function AiOpsPlanPage() {
               ))}
             </div>
           ) : null}
+
+          <div className="space-y-2">
+            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
+              方案版本
+            </div>
+            <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5">
+              {(
+                [
+                  { id: 'simple' as const, label: '简易版', tip: '图文短方案，适合中小店' },
+                  { id: 'standard' as const, label: '标准版', tip: '六表完整方案' },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  disabled={loading}
+                  title={opt.tip}
+                  onClick={() => {
+                    setPlanEdition(opt.id)
+                    setPlan(null)
+                    setErr(null)
+                  }}
+                  className={cn(
+                    'flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition',
+                    loading && 'cursor-not-allowed opacity-50',
+                    planEdition === opt.id
+                      ? 'bg-white text-blue-700 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900',
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] leading-relaxed text-gray-400">
+              {planEdition === 'simple'
+                ? '简易版：白话步骤 + 图文卡片，默认推荐中小商家。'
+                : '标准版：运营/执行/预算/日历/达人/货盘六表，适合有运营基础的商家。'}
+            </p>
+          </div>
 
           <div className="space-y-2">
             <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
@@ -2700,8 +2897,10 @@ export default function AiOpsPlanPage() {
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             {loading
-              ? '正在生成（约 1～2 分钟）…'
-              : `生成方案（${MP_POINTS_OPS_PLAN_PER_USE} 积分）`}
+              ? planEdition === 'simple'
+                ? '正在生成简易方案（约 30～60 秒）…'
+                : '正在生成（约 1～2 分钟）…'
+              : `生成${planEdition === 'simple' ? '简易' : '标准'}方案（${MP_POINTS_OPS_PLAN_PER_USE} 积分）`}
           </button>
 
           <div className="border-t border-gray-100 pt-3">
@@ -2721,23 +2920,25 @@ export default function AiOpsPlanPage() {
                       type="button"
                       className="min-w-0 flex-1 text-left"
                       onClick={() => {
-                        {
-                          const n = normalizeAiOpsPlanResult(h.plan) || h.plan
-                          setPlan(
-                            enrichAiOpsPlanPostProcess(n, {
-                              industryPath:
-                                editIntel.industryPath || intel.industryPath || undefined,
-                              margins: {
-                                douyin: Number(editIntel.marginDouyin) || 0,
-                                meituan: Number(editIntel.marginMeituan) || 0,
-                                xhs: Number(editIntel.marginXhs) || 0,
-                              },
-                              periodStart: h.periodStart || periodStart,
-                              periodEnd: h.periodEnd || periodEnd,
-                              platforms: h.platforms?.length ? h.platforms.map(String) : platforms,
-                            }),
-                          )
-                        }
+                        const n = normalizeAiOpsPlanResult(h.plan) || h.plan
+                        const simple = isAiOpsPlanSimpleEdition(n)
+                        setPlanEdition(simple ? 'simple' : 'standard')
+                        setPlan(
+                          simple
+                            ? { ...n, planEdition: 'simple' }
+                            : enrichAiOpsPlanPostProcess(n, {
+                                industryPath:
+                                  editIntel.industryPath || intel.industryPath || undefined,
+                                margins: {
+                                  douyin: Number(editIntel.marginDouyin) || 0,
+                                  meituan: Number(editIntel.marginMeituan) || 0,
+                                  xhs: Number(editIntel.marginXhs) || 0,
+                                },
+                                periodStart: h.periodStart || periodStart,
+                                periodEnd: h.periodEnd || periodEnd,
+                                platforms: h.platforms?.length ? h.platforms.map(String) : platforms,
+                              }),
+                        )
                         setTab('ops')
                         setPlatforms(
                           (h.platforms.filter(Boolean) as RecruitmentPlatform[]).length
@@ -2778,8 +2979,10 @@ export default function AiOpsPlanPage() {
               <Sparkles className="mb-3 h-8 w-8 text-gray-300" />
               <p className="text-sm font-medium text-gray-700">填写左侧参数后生成方案</p>
               <p className="mt-1 max-w-sm text-xs text-gray-400">
-                将输出六块内容：运营方案、执行方案、营销预算、进度日历、达人预算明细、组品货盘。成功生成扣{' '}
-                {MP_POINTS_OPS_PLAN_PER_USE} 积分（套餐优先）。
+                {planEdition === 'simple'
+                  ? '简易版将输出图文卡片：本周步骤、各平台怎么发、推荐套餐与落地清单。'
+                  : '标准版将输出六块内容：运营方案、执行方案、营销预算、进度日历、达人预算明细、组品货盘。'}
+                成功生成扣 {MP_POINTS_OPS_PLAN_PER_USE} 积分（套餐优先）。
               </p>
             </div>
           ) : null}
@@ -2787,7 +2990,11 @@ export default function AiOpsPlanPage() {
           {loading ? (
             <div className="flex h-full min-h-[28rem] flex-col items-center justify-center gap-3 px-6">
               <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-              <p className="text-sm text-gray-600">正在结合菜单、毛利与预算分配方案…</p>
+              <p className="text-sm text-gray-600">
+                {planEdition === 'simple'
+                  ? '正在生成白话步骤与图文方案…'
+                  : '正在结合菜单、毛利与预算分配方案…'}
+              </p>
               <p className="text-xs text-gray-400">可切换其他页面，生成会在后台继续</p>
               <div className="mt-2 w-full max-w-md space-y-2">
                 {[1, 2, 3, 4].map((i) => (
@@ -2800,23 +3007,27 @@ export default function AiOpsPlanPage() {
           {plan && !loading ? (
             <div className="flex h-full flex-col">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-3">
-                <nav className="flex flex-wrap gap-1">
-                  {AI_OPS_PLAN_TABS.map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => setTab(t.id)}
-                      className={cn(
-                        'rounded-md px-2.5 py-1.5 text-xs font-medium transition',
-                        tab === t.id
-                          ? 'bg-blue-600 text-white'
-                          : 'text-gray-600 hover:bg-gray-100',
-                      )}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
-                </nav>
+                {isAiOpsPlanSimpleEdition(plan) ? (
+                  <div className="text-xs font-medium text-gray-600">简易版 · 图文方案</div>
+                ) : (
+                  <nav className="flex flex-wrap gap-1">
+                    {AI_OPS_PLAN_TABS.map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setTab(t.id)}
+                        className={cn(
+                          'rounded-md px-2.5 py-1.5 text-xs font-medium transition',
+                          tab === t.id
+                            ? 'bg-blue-600 text-white'
+                            : 'text-gray-600 hover:bg-gray-100',
+                        )}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </nav>
+                )}
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
@@ -2833,13 +3044,15 @@ export default function AiOpsPlanPage() {
                   >
                     导出 PDF
                   </button>
-                  <button
-                    type="button"
-                    onClick={onExportExcel}
-                    className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
-                  >
-                    Excel
-                  </button>
+                  {!isAiOpsPlanSimpleEdition(plan) ? (
+                    <button
+                      type="button"
+                      onClick={onExportExcel}
+                      className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+                    >
+                      Excel
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     onClick={() => void onCopyMarkdown()}
@@ -2851,12 +3064,16 @@ export default function AiOpsPlanPage() {
                 </div>
               </div>
               <div className="flex-1 overflow-auto p-4">
-                <ResultPanel
-                  plan={plan}
-                  tab={tab}
-                  periodStart={periodStart}
-                  periodEnd={periodEnd}
-                />
+                {isAiOpsPlanSimpleEdition(plan) ? (
+                  <SimplePlanGallery plan={plan} />
+                ) : (
+                  <ResultPanel
+                    plan={plan}
+                    tab={tab}
+                    periodStart={periodStart}
+                    periodEnd={periodEnd}
+                  />
+                )}
               </div>
             </div>
           ) : null}
