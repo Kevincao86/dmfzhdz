@@ -44,6 +44,7 @@ list_scopes() {
   account_pwd_support  改密(短信)+小灵同学双向消息
   regional_partner     区域服务商（城市代理门户 + 运营台开账号）
   mp_pr_orphan_delete  我的发单 orphan 误删（includePrOwned 空列表剪枝）
+  mp_recruit_no_drop   招募单禁止 slice(200) 丢单 + 备份复原
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -451,6 +452,16 @@ PrOrdersScreen
 lingqi-xingxuan-app/src/api/registry
 lingqi-xingxuan-app/src/lib/applicationsStore
 publishedOrders
+change-scope-guard
+PAT
+      ;;
+    mp_recruit_no_drop)
+      cat <<'PAT'
+meoo-ops-mp-recruitment-orders-append
+opsRegistryGatewayShared
+opsRegistrySupabaseDispatch
+registrySnapshotPgAppend
+商家管理后台/src/ops/opsRegistrySupabaseDispatch
 change-scope-guard
 PAT
       ;;

@@ -670,7 +670,7 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
               return
             }
             list.unshift(order)
-            data.mpRecruitmentOrders = list.slice(0, 200)
+            data.mpRecruitmentOrders = list
             writeRegistry(viteRoot, data)
             json(res, 200, { ok: true, id: order.id })
             return
