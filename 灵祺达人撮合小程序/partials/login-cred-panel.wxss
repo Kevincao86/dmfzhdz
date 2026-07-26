@@ -103,3 +103,25 @@
   color: #fff;
   background: var(--lq-gradient);
 }
+
+.cred-sms-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cred-sms-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.cred-sms-btn {
+  flex-shrink: 0;
+  margin: 0;
+  color: #5b21b6;
+  background: #f5f3ff;
+}
+
+.cred-sms-btn::after {
+  border: none;
+}

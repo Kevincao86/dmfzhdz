@@ -11,6 +11,7 @@ import registerHandler from '../api/meoo-auth-register.ts'
 import smsSendHandler from '../api/meoo-auth-sms-send.ts'
 import smsVerifyHandler from '../api/meoo-auth-sms-verify.ts'
 import smsLoginHandler from '../api/meoo-auth-sms-login.ts'
+import smsChangePasswordHandler from '../api/meoo-auth-sms-change-password.ts'
 import wxLoginHandler from '../api/meoo-auth-wx-login.ts'
 import clientConfigHandler from '../api/meoo-erp-client-config.ts'
 import pingHandler from '../api/meoo-auth-ping.ts'
@@ -184,7 +185,7 @@ import apiPingHandler from '../api/ping.ts'
 import merchantSlugHandler from '../api/merchant/[...slug].ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260718-ai-ops-plan-v1'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260726-sms-pwd-support-relay'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -204,6 +205,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-auth-sms-send': smsSendHandler as VercelLikeHandler,
   '/api/meoo-auth-sms-verify': smsVerifyHandler as VercelLikeHandler,
   '/api/meoo-auth-sms-login': smsLoginHandler as VercelLikeHandler,
+  '/api/meoo-auth-sms-change-password': smsChangePasswordHandler as VercelLikeHandler,
   '/api/meoo-auth-wx-login': wxLoginHandler as VercelLikeHandler,
   '/api/meoo-auth-ping': pingHandler as VercelLikeHandler,
   '/api/meoo-erp-client-config': clientConfigHandler as VercelLikeHandler,

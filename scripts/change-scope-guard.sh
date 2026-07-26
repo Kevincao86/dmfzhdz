@@ -41,6 +41,7 @@ list_scopes() {
   ai_points            全端 AI 积分扣减 / 60% 毛利定价
   mp_order_detail_fast 商单详情秒开（hall_registry includeOnly + PG 按 id）
   erp_merchant_mp      商家管理 ERP 小程序（改名/菜单对齐商家Web/缺口页）
+  account_pwd_support  改密(短信)+小灵同学双向消息
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -376,6 +377,31 @@ PAT
 upload-erp-mp-static
 ecs-sync-erp-mp-static
 ecs-meoo-api.nginx
+change-scope-guard
+PAT
+      ;;
+    account_pwd_support)
+      cat <<'PAT'
+SupabaseChangePasswordForm
+MeooLayout
+LoginAuthPanel
+meoo-auth-sms-change-password
+authSmsAuthShared
+tenantRegisterApi
+tenantLocalState
+ecs-auth-api-server
+mpAccountAuth
+meoo-ops-mp-auth
+mpSupportRelayHandler
+support-ops-send
+OpsSupportWorkbenchPage
+supportOpsHttpApi
+loginCredentialsPanel
+login-cred-panel
+pages/login/login
+utils/auth.js
+灵祺达人撮合小程序/
+灵祺星选小程序抖音版/
 change-scope-guard
 PAT
       ;;

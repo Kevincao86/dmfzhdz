@@ -10,6 +10,9 @@ function patchFromAccount(acct) {
     showCredModal: false,
     modalLoginName: loginName,
     modalPassword: '',
+    modalSmsCode: '',
+    credSmsCooldown: 0,
+    credSmsSending: false,
     credModalSaving: false,
     credModalErr: '',
   }
@@ -21,13 +24,16 @@ function sanitizeLoginName(v) {
   return mpPhoneAuth.sanitizePhoneInput(v)
 }
 
-function validateModal(loginName, password, hasPassword) {
+function validateModal(loginName, password, hasPassword, smsCode) {
   const nameErr = mpPhoneAuth.validatePhoneAccount(loginName)
   if (nameErr) return nameErr
   const name = mpPhoneAuth.normalizeMpLoginPhone(loginName)
   if (!hasPassword && String(password || '').length < 6) return '请设置至少 6 位密码'
   const pwd = String(password || '')
   if (pwd.length > 0 && pwd.length < 6) return '密码至少 6 位'
+  if (hasPassword && pwd.length > 0) {
+    if (!/^\d{6}$/.test(String(smsCode || '').trim())) return '修改密码请先获取并填写验证码'
+  }
   return ''
 }
 
@@ -37,6 +43,9 @@ function mapCredError(e) {
   if (/invalid_login_name|invalid_phone/i.test(msg)) return '请输入有效大陆手机号'
   if (/invalid_password/i.test(msg)) return '密码至少 6 位'
   if (/invalid_session/i.test(msg)) return '请先微信登录后再设置账号密码'
+  if (/phone_mismatch/i.test(msg)) return '手机号须与当前账号一致'
+  if (/sms_code_invalid|invalid_sms_code/i.test(msg)) return '验证码错误或已过期'
+  if (/account_phone_missing/i.test(msg)) return '当前账号未绑定手机号'
   return msg || '保存失败'
 }
 
@@ -63,6 +72,7 @@ function createHandlers(auth) {
           showCredModal: true,
           modalLoginName: this.data.loginName || '',
           modalPassword: '',
+          modalSmsCode: '',
           credModalErr: '',
         })
       } else {
@@ -82,6 +92,7 @@ function createHandlers(auth) {
         showCredModal: true,
         modalLoginName: this.data.loginName || '',
         modalPassword: '',
+        modalSmsCode: '',
         credModalErr: '',
       })
     },
@@ -104,6 +115,52 @@ function createHandlers(auth) {
     onModalPasswordInput(e) {
       this.setData({ modalPassword: e.detail.value, credModalErr: '' })
     },
+    onModalSmsCodeInput(e) {
+      this.setData({
+        modalSmsCode: String(e.detail.value || '')
+          .replace(/\D/g, '')
+          .slice(0, 6),
+        credModalErr: '',
+      })
+    },
+    async onSendCredSms() {
+      if (this.data.credSmsSending || (this.data.credSmsCooldown || 0) > 0) return
+      const name = mpPhoneAuth.normalizeMpLoginPhone(this.data.modalLoginName)
+      const nameErr = mpPhoneAuth.validatePhoneAccount(this.data.modalLoginName)
+      if (nameErr) {
+        this.setData({ credModalErr: nameErr })
+        return
+      }
+      const acctPhone = mpPhoneAuth.normalizeMpLoginPhone(this.data.loginName || '')
+      if (this.data.credentialsReady && acctPhone && name !== acctPhone) {
+        this.setData({ credModalErr: '手机号须与当前账号一致' })
+        return
+      }
+      this.setData({ credSmsSending: true, credModalErr: '' })
+      try {
+        const r = await auth.sendRegisterSms(name)
+        if (r && r.devCode) {
+          this.setData({ modalSmsCode: String(r.devCode) })
+        }
+        this.setData({ credSmsCooldown: 60 })
+        if (this._credSmsTimer) clearInterval(this._credSmsTimer)
+        this._credSmsTimer = setInterval(() => {
+          const left = (this.data.credSmsCooldown || 0) - 1
+          if (left <= 0) {
+            clearInterval(this._credSmsTimer)
+            this._credSmsTimer = null
+            this.setData({ credSmsCooldown: 0 })
+          } else {
+            this.setData({ credSmsCooldown: left })
+          }
+        }, 1000)
+        wx.showToast({ title: '验证码已发送', icon: 'none' })
+      } catch (e) {
+        this.setData({ credModalErr: mapCredError(e) })
+      } finally {
+        this.setData({ credSmsSending: false })
+      }
+    },
     async onSaveCredentialsModal() {
       if (!auth.isLoggedIn()) {
         this.setData({ credModalErr: '请先微信登录后再设置账号密码' })
@@ -113,6 +170,7 @@ function createHandlers(auth) {
         this.data.modalLoginName,
         this.data.modalPassword,
         this.data.hasPassword,
+        this.data.modalSmsCode,
       )
       if (err) {
         this.setData({ credModalErr: err })
@@ -120,6 +178,7 @@ function createHandlers(auth) {
       }
       const name = mpPhoneAuth.normalizeMpLoginPhone(this.data.modalLoginName)
       const pwd = String(this.data.modalPassword || '')
+      const sms = String(this.data.modalSmsCode || '').trim()
       const prevAcct = auth.readAccount()
       if (prevAcct && String(prevAcct.loginName || '').trim() === name && !pwd && prevAcct.hasPassword) {
         this.setData({
@@ -132,7 +191,11 @@ function createHandlers(auth) {
       }
       this.setData({ credModalSaving: true, credModalErr: '' })
       try {
-        await auth.setLoginCredentials(name, pwd)
+        if (this.data.hasPassword && pwd) {
+          await auth.changePasswordBySms(name, sms, pwd)
+        } else {
+          await auth.setLoginCredentials(name, pwd)
+        }
         try {
           await auth.refreshSession()
         } catch (_) {}

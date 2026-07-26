@@ -1029,6 +1029,52 @@ export async function mpAuthPasswordLogin(
   return { token, account }
 }
 
+/** 手机号 + 短信验证码登录（忘记密码时切换此方式） */
+export async function mpAuthSmsLogin(
+  supabaseUrl: string,
+  serviceRole: string,
+  phone: string,
+  smsCode: string,
+): Promise<{ token: string; account: MpAccountRow }> {
+  const rest = restClient(supabaseUrl, serviceRole)
+  const phoneNorm = normalizeMpLoginPhone(phone)
+  if (!phoneNorm) throw new Error('invalid_phone')
+  const code = String(smsCode || '').trim()
+  if (!/^\d{6}$/.test(code)) throw new Error('invalid_sms_code')
+  if (!(await verifyAuthSmsCode(phoneNorm, code))) throw new Error('sms_code_invalid')
+  let account = await findAccountByLoginName(rest, phoneNorm)
+  if (!account) throw new Error('phone_not_registered')
+  account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, account)
+  const token = await createSession(rest, account.id)
+  return { token, account }
+}
+
+/** 已登录：手机号须与账号一致 + 验证码 → 更新密码 */
+export async function mpAuthChangePasswordBySms(
+  supabaseUrl: string,
+  serviceRole: string,
+  accountId: string,
+  phone: string,
+  smsCode: string,
+  newPassword: string,
+): Promise<void> {
+  const rest = restClient(supabaseUrl, serviceRole)
+  const phoneNorm = normalizeMpLoginPhone(phone)
+  if (!phoneNorm) throw new Error('invalid_phone')
+  const code = String(smsCode || '').trim()
+  if (!/^\d{6}$/.test(code)) throw new Error('invalid_sms_code')
+  const pwd = String(newPassword || '')
+  if (pwd.length < 6) throw new Error('invalid_password')
+  const cur = await findAccountById(rest, accountId)
+  if (!cur) throw new Error('account_not_found')
+  const accountPhone = normalizeMpLoginPhone(String(cur.login_name || ''))
+  if (!accountPhone) throw new Error('account_phone_missing')
+  if (phoneNorm !== accountPhone) throw new Error('phone_mismatch')
+  if (!(await verifyAuthSmsCode(phoneNorm, code))) throw new Error('sms_code_invalid')
+  const { hash, salt } = hashPassword(pwd)
+  await updateAccount(rest, accountId, { password_hash: hash, password_salt: salt })
+}
+
 export type MpAuthPhoneRegisterInput = {
   phone: string
   smsCode: string
