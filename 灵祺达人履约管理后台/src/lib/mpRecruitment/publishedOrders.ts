@@ -1,4 +1,5 @@
 export {
+  clearPublishedOrderDeleted,
   markPublishedOrderDeleted,
   readPublishedOrders,
   removePublishedOrder,

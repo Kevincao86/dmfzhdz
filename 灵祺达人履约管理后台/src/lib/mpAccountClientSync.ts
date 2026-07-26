@@ -101,7 +101,11 @@ function parsePublishedOrderTime(raw: unknown): number {
 }
 
 function publishedOrderMergeTime(row: Record<string, unknown>): number {
-  return Math.max(parsePublishedOrderTime(row.deletedAt), parsePublishedOrderTime(row.publishedAt))
+  return Math.max(
+    parsePublishedOrderTime(row.deletedAt),
+    parsePublishedOrderTime(row.publishedAt),
+    parsePublishedOrderTime(row.restoredAt),
+  )
 }
 
 function mergePublishedOrderPair(
@@ -110,9 +114,13 @@ function mergePublishedOrderPair(
 ): Record<string, unknown> {
   const newer = publishedOrderMergeTime(prev) >= publishedOrderMergeTime(row) ? prev : row
   const older = newer === prev ? row : prev
-  const deletedAt = String(newer.deletedAt || older.deletedAt || '').trim()
-  if (!deletedAt) return { ...newer }
-  return { ...newer, ...older, deletedAt }
+  const out: Record<string, unknown> = { ...older, ...newer }
+  if (!newer.deletedAt) {
+    delete out.deletedAt
+  } else {
+    out.deletedAt = String(newer.deletedAt).trim()
+  }
+  return out
 }
 
 function mergePublishedOrdersRemote(

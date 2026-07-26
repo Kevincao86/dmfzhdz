@@ -442,9 +442,15 @@ PAT
 prPublishedOrders
 applicationsStore
 mpAccountClientSync
+mpAccountClientStateMerge
 opsRegistryTalentMp
 mine-pr-orders
 mineProfileStats
+PrOrdersPage
+PrOrdersScreen
+lingqi-xingxuan-app/src/api/registry
+lingqi-xingxuan-app/src/lib/applicationsStore
+publishedOrders
 change-scope-guard
 PAT
       ;;
