@@ -9,10 +9,8 @@ import {
   phoneFromUserRecord,
   verifyRegisterSmsCode,
 } from '../vite-plugins/authSmsAuthShared.js'
-import {
-  readMerchantSupabaseAdminEnv,
-  supabaseAdminFetch,
-} from '../vite-plugins/merchantSupabaseAdminEnv.js'
+import { readMerchantSupabaseAdminEnv } from '../vite-plugins/merchantSupabaseAdminEnv.js'
+import { supabaseAdminFetch } from '../src/lib/supabaseAdminFetch.js'
 
 export const config = { maxDuration: 60 }
 
