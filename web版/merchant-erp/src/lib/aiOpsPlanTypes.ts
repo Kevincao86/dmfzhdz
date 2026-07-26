@@ -180,10 +180,13 @@ export type AiOpsPlanSimpleHero = {
   budgetHint: string
 }
 
-/** 点击卡片后展示的细流程（3～6 步） */
+/** 点击卡片后展示的细流程（阶段 + 最后一级动作） */
 export type AiOpsPlanSimpleFlowItem = {
   title: string
+  /** 该阶段说明（必填，白话 1～3 句） */
   body: string
+  /** 最后一级可勾选动作（2～5 条，具体到「打开后台点哪里/写什么」） */
+  actions: string[]
 }
 
 export type AiOpsPlanSimpleStep = {
@@ -849,23 +852,230 @@ export function isAiOpsPlanSimpleEdition(plan: AiOpsPlanResult | null | undefine
   return plan.planEdition === 'simple' || !!plan.simplePlan
 }
 
+function parseSimpleActions(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((x) => {
+      if (typeof x === 'string') return asStr(x)
+      if (!x || typeof x !== 'object') return ''
+      const r = x as Record<string, unknown>
+      return asStr(r.text ?? r.title ?? r.body ?? r.action ?? r.item)
+    })
+    .filter(Boolean)
+    .slice(0, 6)
+}
+
 function parseSimpleFlowItems(raw: unknown): AiOpsPlanSimpleFlowItem[] {
   if (!Array.isArray(raw)) return []
   return raw
     .map((x, i) => {
       if (typeof x === 'string') {
         const t = asStr(x)
-        return t ? { title: `第${i + 1}步`, body: t } : null
+        return t ? { title: `第${i + 1}步`, body: t, actions: [] } : null
       }
       if (!x || typeof x !== 'object') return null
       const r = x as Record<string, unknown>
       const title = asStr(r.title ?? r.name ?? r.step) || `第${i + 1}步`
-      const body = asStr(r.body ?? r.desc ?? r.description ?? r.how)
-      if (!body && !asStr(r.title ?? r.name)) return null
-      return { title, body }
+      const body = asStr(r.body ?? r.desc ?? r.description ?? r.how ?? r.content)
+      const actions = parseSimpleActions(
+        r.actions ?? r.todos ?? r.subSteps ?? r.sub_steps ?? r.items ?? r.checklist,
+      )
+      if (!body && !actions.length && !asStr(r.title ?? r.name)) return null
+      return { title, body, actions }
     })
     .filter((x): x is AiOpsPlanSimpleFlowItem => !!x)
     .slice(0, 8)
+}
+
+function splitToActions(text: string, max = 4): string[] {
+  const chunks = text
+    .split(/[。；;\n→]+/)
+    .map((x) => x.trim().replace(/^[0-9一二三四五六七八九十]+[、.．]\s*/, ''))
+    .filter((x) => x.length >= 4)
+  if (chunks.length >= 2) return chunks.slice(0, max)
+  if (text.trim()) return [text.trim()]
+  return []
+}
+
+/** 按阶段标题 + 上下文补全 body/actions（模型漏写时兜底） */
+function fillSimpleFlowItem(
+  item: AiOpsPlanSimpleFlowItem,
+  ctx: { topic: string; summary: string; tip?: string },
+): AiOpsPlanSimpleFlowItem {
+  const topic = ctx.topic || '本事项'
+  const summary = ctx.summary || ''
+  const tip = ctx.tip || ''
+  const t = item.title
+  let body = item.body
+  let actions = [...(item.actions || [])]
+
+  const defaults: Record<string, { body: string; actions: string[] }> = {
+    准备: {
+      body: `先把「${topic}」要说清的卖点、规则和素材清单列出来，后面执行不返工。`,
+      actions: [
+        `写下主卖点 1～2 句（结合：${summary.slice(0, 36) || topic}）`,
+        '列使用规则：面额/门槛/有效期/不可用说明',
+        '准备封面图或店内实拍 3～5 张（清晰、有优惠感）',
+        tip ? `落实小贴士：${tip}` : '确认素材里没有虚假承诺',
+      ].filter(Boolean),
+    },
+    执行: {
+      body: `按「${topic}」动手落地：改文案、做物料、在后台填好并自查一遍。`,
+      actions: [
+        '按卖点写短文案（标题+正文，突出优惠）',
+        '在商家后台创建/编辑对应团购或券并保存草稿',
+        '预览手机端展示是否清晰、价格与规则一致',
+        '把素材与文案打包给发布人/自己待发',
+      ],
+    },
+    验收: {
+      body: `对照「${topic}」检查能否对外发布：规则清、素材齐、挂链可用。`,
+      actions: [
+        '核对价格、门槛、有效期与宣传文案一致',
+        '用手机预览打开链接/券详情无报错',
+        '店员能说清核销话术与例外情况',
+        '勾选完成，进入下一平台发布或投放',
+      ],
+    },
+    选题: {
+      body: `围绕「${topic}」定一条今天就能拍的内容角度，避免空泛种草。`,
+      actions: [
+        `选题：${summary.slice(0, 40) || `${topic}真实体验+优惠`}`,
+        '定开头 3 秒钩子（价格/痛点/对比）',
+        '列拍摄清单：店面、招牌项目、券面/价格牌',
+        '定发布时间（傍晚高峰更合适）',
+      ],
+    },
+    '拍摄/剪辑': {
+      body: `按选题拍真实画面并剪成 15～30 秒短视频，字幕写清优惠。`,
+      actions: [
+        '实拍 4～6 个镜头（进店→项目→氛围→价格/券）',
+        '口播或字幕写清：谁适合买、省多少、怎么用',
+        '片尾定格「挂团购/领券」引导',
+        '导出竖版，检查无夸大与违禁词',
+      ],
+    },
+    拍摄: {
+      body: `按选题拍真实画面，突出优惠与到店体验。`,
+      actions: [
+        '拍店招/环境/核心项目各 1～2 镜',
+        '拍价格牌或券面特写',
+        '补一句老板/店员真诚推荐口播',
+      ],
+    },
+    剪辑: {
+      body: `剪成短视频：前 3 秒出优惠，字幕可读，片尾引导挂链。`,
+      actions: [
+        '按「钩子→体验→优惠→行动」剪辑',
+        '加大字字幕标出价格与门槛',
+        '片尾加「点击下方团购」',
+      ],
+    },
+    发布挂链: {
+      body: `选高峰时段发布，挂上对应团购/券，并写好标题话题。`,
+      actions: [
+        '标题含城市+品类+优惠数字',
+        '正文写清怎么用券、适用门店',
+        '挂链/组件指向正确商品',
+        '选晚上 18:00～21:00 发布并置顶评论补说明',
+      ],
+    },
+    发布: {
+      body: `按时发布并挂好链接，确保用户一点就能买。`,
+      actions: [
+        '检查挂链商品与宣传一致',
+        '加 3～5 个本地话题标签',
+        '发布后自己点开核验一次',
+      ],
+    },
+    复盘: {
+      body: `看完发布数据，记下哪条素材有效，明天只加码有效打法。`,
+      actions: [
+        '记录播放/完播/点击/核销（能看到的指标）',
+        '标出前 3 秒是否留人、评论常见问题',
+        '把有效钩子复用到下一条',
+        '无效素材停更，改卖点或时段再测',
+      ],
+    },
+    组品: {
+      body: `定清「${topic}」包含什么、卖多少、划不划算，方便上架和话术。`,
+      actions: [
+        `写清包含：${summary.includes('包含') ? summary : topic}`,
+        '定售价与原价对比（突出省多少）',
+        '写使用规则：有效期、是否预约、节假日是否可用',
+        '算毛利是否可接受，不能亏本硬推',
+      ],
+    },
+    上架: {
+      body: `把「${topic}」同步上到勾选平台，主图/标题/库存一次设对。`,
+      actions: [
+        '上传主图（含价格或优惠信息）',
+        '标题写清面额/套餐名+适用场景',
+        '填库存、门店范围、可售时间',
+        '保存后用买家视角预览一遍',
+      ],
+    },
+    核销话术: {
+      body: `店员按统一话术接待核销，避免口径不一引发纠纷。`,
+      actions: [
+        '开场：欢迎光临，请问是否有团购/券码？',
+        '核销：扫码确认项目与差价，口头复述规则',
+        '引导：推荐加购或复购券（不强迫）',
+        '异常：券不可用时礼貌说明原因并给替代方案',
+      ],
+    },
+    做什么: {
+      body: `今天完成「${topic}」的具体动作如下，做完即可打勾。`,
+      actions: splitToActions(summary || topic, 4).length
+        ? splitToActions(summary || `完成：${topic}`, 4)
+        : [
+            `列出「${topic}」所需材料与负责人`,
+            '按清单执行并保存结果（文案/截图/链接）',
+            tip ? `注意：${tip}` : '自检无错后再进入下一项',
+          ],
+    },
+    完成标准: {
+      body: `「${topic}」达到下列标准才算完成，避免只做一半。`,
+      actions: [
+        '相关文案/商品/素材已就绪且可对外展示',
+        '规则与价格前后一致，无虚假宣传',
+        tip ? `满足：${tip}` : '店员或发布人已确认能执行',
+        '在落地清单上勾选本项',
+      ],
+    },
+  }
+
+  // 模糊匹配阶段名
+  const key =
+    (Object.keys(defaults).find((k) => t === k || t.includes(k)) as keyof typeof defaults | undefined) ||
+    undefined
+
+  if (key && defaults[key]) {
+    if (!body || body === '…' || body === '...') body = defaults[key].body
+    if (actions.length < 2) actions = defaults[key].actions
+  } else {
+    if (!body || body === '…' || body === '...') {
+      body = summary
+        ? `围绕「${topic}」落地：${summary}`
+        : `把「${topic}」拆成可执行动作，今天做完并自检。`
+    }
+    if (actions.length < 2) {
+      actions = splitToActions(body, 4)
+      if (actions.length < 2) {
+        actions = [
+          `明确「${t}」要交付的结果`,
+          `按「${topic}」执行并留下记录（截图/链接）`,
+          tip ? `注意：${tip}` : '完成后对照宣传内容自检一遍',
+        ]
+      }
+    }
+  }
+
+  return {
+    title: t || '步骤',
+    body,
+    actions: actions.filter(Boolean).slice(0, 6),
+  }
 }
 
 /** 旧历史无 detailFlow 时，把短文案拆成可读流程 */
@@ -878,8 +1088,97 @@ export function synthesizeSimpleDetailFlow(
     .split(/[。；;\n]+/)
     .map((x) => x.trim())
     .filter((x) => x.length >= 4)
-  if (!chunks.length) return [{ title: '说明', body: text }]
-  return chunks.slice(0, 6).map((body, i) => ({ title: `第${i + 1}步`, body }))
+  if (!chunks.length) {
+    return [fillSimpleFlowItem({ title: '说明', body: text, actions: [] }, { topic: text, summary: text })]
+  }
+  return chunks.slice(0, 6).map((body, i) =>
+    fillSimpleFlowItem(
+      { title: `第${i + 1}步`, body, actions: splitToActions(body, 3) },
+      { topic: body, summary: text },
+    ),
+  )
+}
+
+/** 补全简易版所有 detailFlow 到最后一级 actions（服务端/客户端均可调用） */
+export function ensureSimplePlanDetailDepth(plan: AiOpsPlanResult): AiOpsPlanResult {
+  if (!isAiOpsPlanSimpleEdition(plan) || !plan.simplePlan) return plan
+  const s = plan.simplePlan
+  const steps = s.steps.map((st) => {
+    const baseFlow =
+      st.detailFlow.length > 0
+        ? st.detailFlow
+        : [
+            { title: '准备', body: '', actions: [] as string[] },
+            { title: '执行', body: '', actions: [] as string[] },
+            { title: '验收', body: '', actions: [] as string[] },
+          ]
+    return {
+      ...st,
+      detailFlow: baseFlow.map((f) =>
+        fillSimpleFlowItem(f, { topic: st.title, summary: st.body, tip: st.tip }),
+      ),
+    }
+  })
+  const platforms = s.platforms.map((p) => {
+    const baseFlow =
+      p.detailFlow.length > 0
+        ? p.detailFlow
+        : [
+            { title: '选题', body: '', actions: [] as string[] },
+            { title: '拍摄/剪辑', body: '', actions: [] as string[] },
+            { title: '发布挂链', body: '', actions: [] as string[] },
+            { title: '复盘', body: '', actions: [] as string[] },
+          ]
+    return {
+      ...p,
+      detailFlow: baseFlow.map((f) =>
+        fillSimpleFlowItem(f, { topic: `${p.platform}发布`, summary: p.how, tip: p.detailNote }),
+      ),
+    }
+  })
+  const combos = s.combos.map((c) => {
+    const baseFlow =
+      c.detailFlow.length > 0
+        ? c.detailFlow
+        : [
+            { title: '组品', body: '', actions: [] as string[] },
+            { title: '上架', body: '', actions: [] as string[] },
+            { title: '核销话术', body: '', actions: [] as string[] },
+          ]
+    const summary = [c.sellingPoint, c.items ? `包含：${c.items}` : '', c.priceHint]
+      .filter(Boolean)
+      .join('。')
+    return {
+      ...c,
+      detailFlow: baseFlow.map((f) =>
+        fillSimpleFlowItem(f, { topic: c.name, summary, tip: c.detailNote }),
+      ),
+    }
+  })
+  const checklist = s.checklist.map((item) => {
+    const baseFlow =
+      item.detailFlow.length > 0
+        ? item.detailFlow
+        : [
+            { title: '做什么', body: '', actions: [] as string[] },
+            { title: '完成标准', body: '', actions: [] as string[] },
+          ]
+    return {
+      ...item,
+      detailFlow: baseFlow.map((f) =>
+        fillSimpleFlowItem(f, {
+          topic: item.text,
+          summary: item.detailNote || item.text,
+          tip: item.detailNote,
+        }),
+      ),
+    }
+  })
+  return {
+    ...plan,
+    planEdition: 'simple',
+    simplePlan: { ...s, steps, platforms, combos, checklist },
+  }
 }
 
 /** 解析简易版瘦 JSON */
@@ -2139,8 +2438,18 @@ export function enrichAiOpsPlanPostProcess(
   return next
 }
 
+function formatSimpleFlowMd(flow: AiOpsPlanSimpleFlowItem[]): string[] {
+  const lines: string[] = []
+  flow.forEach((f, i) => {
+    lines.push(`${i + 1}. **${f.title}**：${f.body || ''}`)
+    for (const a of f.actions || []) lines.push(`   - ${a}`)
+  })
+  return lines
+}
+
 function aiOpsSimplePlanToMarkdown(plan: AiOpsPlanResult, meta?: { title?: string }): string {
-  const s = plan.simplePlan
+  const deep = ensureSimplePlanDetailDepth(plan)
+  const s = deep.simplePlan
   const lines: string[] = []
   if (meta?.title) lines.push(`# ${meta.title}`, '')
   else lines.push('# AI 运营方案（简易版）', '')
@@ -2155,23 +2464,32 @@ function aiOpsSimplePlanToMarkdown(plan: AiOpsPlanResult, meta?: { title?: strin
       lines.push(`### ${i + 1}. ${st.title}`)
       if (st.body) lines.push(st.body)
       if (st.tip) lines.push(`> 小贴士：${st.tip}`)
+      if (st.detailFlow.length) {
+        lines.push('', '细流程：')
+        lines.push(...formatSimpleFlowMd(st.detailFlow))
+      }
       lines.push('')
     })
   }
   if (s.platforms.length) {
     lines.push('## 各平台怎么发', '')
     for (const p of s.platforms) {
-      lines.push(`- **${p.platform}**：${p.how}`)
+      lines.push(`### ${p.platform}`)
+      lines.push(p.how)
+      if (p.detailFlow.length) lines.push(...formatSimpleFlowMd(p.detailFlow))
+      lines.push('')
     }
-    lines.push('')
   }
   if (s.combos.length) {
     lines.push('## 推荐套餐', '')
     for (const c of s.combos) {
       const price = c.priceHint ? `（${c.priceHint}）` : ''
-      lines.push(`- **${c.name}**${price}：${c.sellingPoint}`)
+      lines.push(`### ${c.name}${price}`)
+      lines.push(c.sellingPoint)
+      if (c.items) lines.push(`包含：${c.items}`)
+      if (c.detailFlow.length) lines.push(...formatSimpleFlowMd(c.detailFlow))
+      lines.push('')
     }
-    lines.push('')
   }
   if (s.checklist.length) {
     lines.push('## 落地清单', '')
@@ -2179,7 +2497,8 @@ function aiOpsSimplePlanToMarkdown(plan: AiOpsPlanResult, meta?: { title?: strin
       lines.push(`- [ ] ${item.text}`)
       if (item.detailFlow.length) {
         for (const f of item.detailFlow) {
-          lines.push(`  - ${f.title}：${f.body}`)
+          lines.push(`  - **${f.title}**：${f.body}`)
+          for (const a of f.actions || []) lines.push(`    - ${a}`)
         }
       }
     }
