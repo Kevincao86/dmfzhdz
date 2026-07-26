@@ -423,6 +423,8 @@ regionalPartnersBackend
 chinaAdminDivisions
 meoo-ops-regional-partners
 meoo-regional-partner
+tenants_register_city
+register_city
 opsStaffAuth
 opsStaffAccountsBackend
 opsNavConfig
@@ -430,6 +432,7 @@ opsNavConfig
 ecs-auth-api-server
 ecs-apply-regional-partners
 20260726170000_regional_partners
+20260726180000_tenants_register_city
 change-scope-guard
 PAT
       ;;
