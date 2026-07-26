@@ -1,7 +1,12 @@
 import { scopeIdFromAccount } from '../mpAccountLocalScope'
 import { getAccount, type MpAccount } from '../mpSession'
 import { prParticipantKey } from '../mpSync/participant'
-import { markPublishedOrderDeleted, readPublishedOrders, upsertPublishedOrderSnapshot, type PublishedOrderLocal } from '../mpSync/applicationsStore'
+import {
+  clearPublishedOrderDeleted,
+  readPublishedOrders,
+  upsertPublishedOrderSnapshot,
+  type PublishedOrderLocal,
+} from '../mpSync/applicationsStore'
 import { readPrProfile } from '../mpSync/userProfile'
 
 function hallFromMp(mp: Record<string, unknown>): string {
@@ -91,16 +96,19 @@ export function mergePublishedOrdersFromRegistry(
   })
 }
 
-/** 注册表已无该单时，补写本地 deletedAt，避免跨端删除后仍出现在「已发布」 */
+/**
+ * 仅恢复误标删除：注册表仍存在的单清除本地 deletedAt。
+ * 禁止任何自动标删——真实删除只允许发单人确认删除或运营台超管短信删除。
+ */
 export function pruneOrphanPublishedOrders(mpList: Record<string, unknown>[]): void {
   const mpIds = new Set(
     (mpList || []).map((mp) => String(mp?.id || '').trim()).filter(Boolean),
   )
+  if (mpIds.size === 0) return
   for (const item of readPublishedOrders()) {
-    if (!item || item.deletedAt) continue
+    if (!item || !item.deletedAt) continue
     const id = String(item.mpOrderId || '').trim()
-    if (!id || mpIds.has(id)) continue
-    markPublishedOrderDeleted(id)
+    if (id && mpIds.has(id)) clearPublishedOrderDeleted(id)
   }
 }
 

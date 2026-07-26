@@ -214,10 +214,15 @@ export default function PrOrdersPage() {
   async function loadPublished() {
     setErr('')
     try {
-      const [, reg] = await Promise.all([
-        syncClientStateWithServer().catch(() => null),
-        fetchMpRegistry({ includePrOwned: true }),
-      ])
+      await syncClientStateWithServer().catch(() => null)
+      const localIds = readPublishedOrders()
+        .map((item) => String(item?.mpOrderId || '').trim())
+        .filter(Boolean)
+        .slice(0, 120)
+      const reg = await fetchMpRegistry({
+        includePrOwned: true,
+        includeMpOrderIds: localIds,
+      })
       const mpList = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<
         string,
         unknown

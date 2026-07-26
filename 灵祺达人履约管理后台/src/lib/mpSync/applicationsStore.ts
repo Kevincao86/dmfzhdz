@@ -33,6 +33,8 @@ export type PublishedOrderLocal = {
   ownerPrId?: string
   /** 用户主动删除发单时写入，供「我的发单」展示已删除记录 */
   deletedAt?: string
+  /** 误标删除恢复时间，供客户端状态合并优先于旧 deletedAt */
+  restoredAt?: string
   /** 最近一次从注册表同步到的状态（注册表暂未返回时用于展示已完成等） */
   lastStatus?: string
 }
@@ -208,6 +210,21 @@ export function markPublishedOrderDeleted(mpOrderId: string): void {
       ownerPrId: ids.prId,
     })
   }
+  writeListToKey(scopedStorageKey(PUBLISH_BASE), list)
+}
+
+/** 注册表仍存在该单时，清除误标的 deletedAt */
+export function clearPublishedOrderDeleted(mpOrderId: string): void {
+  const id = String(mpOrderId || '').trim()
+  if (!id) return
+  const ids = ownerIdsForFilter()
+  const list = readPublishedOrdersRaw().filter((item) => entryBelongsToCurrentAccount(item, ids))
+  const idx = list.findIndex((item) => item.mpOrderId === id)
+  if (idx < 0 || !list[idx]?.deletedAt) return
+  const next: PublishedOrderLocal = { ...list[idx]!, mpOrderId: id }
+  delete next.deletedAt
+  next.restoredAt = new Date().toLocaleString('zh-CN', { hour12: false })
+  list[idx] = next
   writeListToKey(scopedStorageKey(PUBLISH_BASE), list)
 }
 

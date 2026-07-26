@@ -89,7 +89,7 @@ function mergeListByKey(
 }
 
 function publishedOrderMergeTime(row: Record<string, unknown>): number {
-  return Math.max(parseTime(row.deletedAt), parseTime(row.publishedAt))
+  return Math.max(parseTime(row.deletedAt), parseTime(row.publishedAt), parseTime(row.restoredAt))
 }
 
 function applicationMergeTime(row: Record<string, unknown>): number {
@@ -151,16 +151,20 @@ function mergeApplications(
     .slice(0, limit)
 }
 
-/** 发单历史：deletedAt 一经写入即保留，避免 cache 刷新 publishedAt 冲掉删除标记 */
+/** 发单历史：仅当较新一侧仍带 deletedAt 时保留；较新一侧已恢复（restoredAt）则清除误标 */
 function mergePublishedOrderRow(
   prev: Record<string, unknown>,
   row: Record<string, unknown>,
 ): Record<string, unknown> {
   const newer = publishedOrderMergeTime(prev) >= publishedOrderMergeTime(row) ? prev : row
   const older = newer === prev ? row : prev
-  const deletedAt = String(newer.deletedAt || older.deletedAt || '').trim()
-  if (!deletedAt) return { ...newer }
-  return { ...newer, ...older, deletedAt }
+  const out: Record<string, unknown> = { ...older, ...newer }
+  if (!newer.deletedAt) {
+    delete out.deletedAt
+  } else {
+    out.deletedAt = String(newer.deletedAt).trim()
+  }
+  return out
 }
 
 function mergePublishedOrders(
