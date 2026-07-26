@@ -42,6 +42,7 @@ list_scopes() {
   mp_order_detail_fast 商单详情秒开（hall_registry includeOnly + PG 按 id）
   erp_merchant_mp      商家管理 ERP 小程序（改名/菜单对齐商家Web/缺口页）
   account_pwd_support  改密(短信)+小灵同学双向消息
+  regional_partner     区域服务商（城市代理门户 + 运营台开账号）
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -407,6 +408,27 @@ mp-support-relay-e2e-smoke
 灵祺达人撮合小程序/
 灵祺星选小程序抖音版/
 灵祺达人履约管理后台/src/pages/SupportPage
+change-scope-guard
+PAT
+      ;;
+    regional_partner)
+      cat <<'PAT'
+区域服务商/
+regional_partners
+regionalPartners
+RegionalPartner
+OpsRegionalPartnersPage
+regionalPartnersApi
+regionalPartnersBackend
+meoo-ops-regional-partners
+meoo-regional-partner
+opsStaffAuth
+opsStaffAccountsBackend
+opsNavConfig
+商家管理后台/src/App.tsx
+ecs-auth-api-server
+ecs-apply-regional-partners
+20260726170000_regional_partners
 change-scope-guard
 PAT
       ;;

@@ -23,6 +23,7 @@ import OpsHelpManualPage from './ops/pages/OpsHelpManualPage'
 import OpsTeamIntroPage from './ops/pages/OpsTeamIntroPage'
 import OpsPlatformDecorPage from './ops/pages/OpsPlatformDecorPage'
 import OpsDistributionPage from './ops/pages/OpsDistributionPage'
+import OpsRegionalPartnersPage from './ops/pages/OpsRegionalPartnersPage'
 import OpsLegalDocPage from './pages/OpsLegalDocPage'
 
 export default function App() {
@@ -59,6 +60,7 @@ export default function App() {
           <Route path="payment-orders" element={<OpsPaymentOrdersPage />} />
           <Route path="mp-membership-finance" element={<OpsMpMembershipFinancePage />} />
           <Route path="distribution" element={<OpsDistributionPage />} />
+          <Route path="regional-partners" element={<OpsRegionalPartnersPage />} />
           <Route path="mp-membership-status/:role/:targetId" element={<OpsMpMembershipStatusPage />} />
           <Route path="ai-models" element={<OpsAiModelsPage />} />
           <Route path="support" element={<OpsSupportHubPage />} />

@@ -10,6 +10,7 @@ import {
   Library,
   Megaphone,
   BookOpen,
+  MapPinned,
   PanelTop,
   Share2,
   Shield,
@@ -61,6 +62,13 @@ export const OPS_NAV_GROUPS: OpsNavGroup[] = [
       { kind: 'leaf', to: '/payment-orders', label: '订单管理', icon: CreditCard, permission: 'payment_orders' },
       { kind: 'leaf', to: '/mp-membership-finance', label: '星选会员财务', icon: Wallet, permission: 'mp_membership_finance' },
       { kind: 'leaf', to: '/distribution', label: '渠道分销', icon: Share2, permission: 'distribution' },
+      {
+        kind: 'leaf',
+        to: '/regional-partners',
+        label: '区域服务商',
+        icon: MapPinned,
+        permission: 'regional_partners',
+      },
     ],
   },
   {
