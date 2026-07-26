@@ -6,6 +6,7 @@ import {
   enrichAiOpsPlanPostProcess,
   isAiOpsPlanResultUsable,
   normalizeAiOpsPlanResult,
+  type AiOpsPlanEdition,
   type AiOpsPlanResult,
 } from '../src/lib/aiOpsPlanTypes.js'
 import { verifyBearerJwt } from './aiGateway/authSupabase.js'
@@ -281,6 +282,35 @@ const SYSTEM_PROMPT = `你是资深本地生活/餐饮多平台运营总监。�
 9. 【ROI】禁止「假设转化率」；按平台行业中位核销转化写 note；expectedGmvYuan=周期总GMV=客单×单量，且 ≥ max(投入×投产中位, 投入÷毛利率×1.2)；roi=毛利ROI。
 10. Detail/howTo/rationale 各段≤120字；输出必须是完整可解析 JSON，控制总长，禁止截断。`
 
+/** 简易版：大白话瘦 JSON，供中小商家/个人快速落地 */
+const SIMPLE_SYSTEM_PROMPT = `你是本地生活门店运营教练，服务中小商家与个人店主。用大白话，禁止行话缩写（如 ROI、GMV、BGC、UGC、KPI、POI 等）。只输出一个 JSON 对象（不要 Markdown），结构必须为：
+{
+  "planEdition": "simple",
+  "hero": {
+    "headline": "一句话结论（≤30字）",
+    "summary": "2～3句总述：这周重点做什么、大概花多少、期望什么结果",
+    "storeHint": "店名或门店范围摘要",
+    "periodHint": "活动周期摘要",
+    "budgetHint": "预算用法一句话"
+  },
+  "steps": [
+    { "title": "第1步标题", "body": "白话说明怎么做", "tip": "可选小贴士" }
+  ],
+  "platforms": [
+    { "platform": "抖音", "how": "1～2句：发什么、挂什么、几点发" }
+  ],
+  "combos": [
+    { "name": "套餐名", "sellingPoint": "卖点白话", "priceHint": "大概售价如 ¥99" }
+  ],
+  "checklist": ["落地事项1", "事项2"]
+}
+硬性要求：
+1. steps 3～5 条（≤5），写「本周先做什么」，可执行、可当天动手。
+2. platforms 只覆盖用户勾选平台，每平台 1～2 句，最多 4 条。
+3. combos 2～4 个；有菜单/已上架套餐时优先用真实名称，勿乱编菜名。
+4. checklist 5～8 条短句，像待办清单。
+5. 全文口语化，短句为主；禁止空话与六表结构字段。`
+
 async function enrichCombosFromProductPlan(
   plan: AiOpsPlanResult,
   body: {
@@ -367,6 +397,7 @@ export async function runAiOpsPlanCore(
     margins?: { douyin: number; meituan: number; xhs: number }
     industryPath?: string
     competitorSummary?: string
+    planEdition?: AiOpsPlanEdition | string
   }
   try {
     body = JSON.parse(bodyRaw || '{}') as typeof body
@@ -389,6 +420,8 @@ export async function runAiOpsPlanCore(
   if (!periodStart || !periodEnd) {
     return { status: 400, body: { ok: false, error: 'period_required', message: '请填写活动起止日期' } }
   }
+
+  const planEdition: AiOpsPlanEdition = body.planEdition === 'simple' ? 'simple' : 'standard'
 
   const margins = body.margins
   const marginLine = margins
@@ -413,6 +446,98 @@ export async function runAiOpsPlanCore(
   })()
 
   const storeCity = String(body.city || '').trim()
+
+  if (planEdition === 'simple') {
+    const simpleUserPrompt = [
+      body.prospectPreview ? '场景：服务商洽谈预览（客户尚未签约，输出可对外讲的白话方案）。' : '',
+      `勾选平台：${platforms.join('、')}`,
+      `总预算（元）：${budgetYuan}`,
+      `周期：${periodStart} ～ ${periodEnd}`,
+      storeLine,
+      storeCity ? `城市：${storeCity}` : '',
+      body.industryPath ? `经营类目：${body.industryPath}` : '',
+      marginLine,
+      body.menuSummary
+        ? String(body.menuSummary).includes('已上架套餐')
+          ? `已上架套餐参考：\n${body.menuSummary}`
+          : `菜单价目参考：\n${body.menuSummary}`
+        : '菜单价目：未提供（按类目常规套餐结构写，勿捏造具体菜名）',
+      body.competitorSummary ? `竞品摘要：\n${body.competitorSummary}` : '',
+      body.goalsNote ? `商家补充目标：${body.goalsNote}` : '',
+      '请按简易版 schema 输出完整 JSON；steps≤5、platforms≤4、combos≤4、checklist≤8。',
+    ]
+      .filter(Boolean)
+      .join('\n\n')
+
+    try {
+      let obj = await llmJson(aiEnv, SIMPLE_SYSTEM_PROMPT, simpleUserPrompt, 0)
+      let plan = normalizeAiOpsPlanResult(obj)
+      if (!plan || !isAiOpsPlanResultUsable(plan) || plan.planEdition !== 'simple') {
+        obj = await llmJson(
+          aiEnv,
+          SIMPLE_SYSTEM_PROMPT,
+          `${simpleUserPrompt}\n\n上次输出无效，请严格按简易版 schema 重新输出完整 JSON。`,
+          3,
+        )
+        plan = normalizeAiOpsPlanResult(obj)
+      }
+      if (!plan || !isAiOpsPlanResultUsable(plan)) {
+        return {
+          status: 502,
+          body: {
+            ok: false,
+            error: 'ops_plan_parse_failed',
+            message: '方案解析失败，请稍后重试（模型输出不完整）',
+          },
+        }
+      }
+      plan = { ...plan, planEdition: 'simple' }
+      if (plan.simplePlan) {
+        const h = plan.simplePlan.hero
+        plan = {
+          ...plan,
+          simplePlan: {
+            ...plan.simplePlan,
+            hero: {
+              ...h,
+              storeHint: h.storeHint || storeLine.replace(/^门店[：:]/, '').trim() || body.storeName || '',
+              periodHint: h.periodHint || `${periodStart} ～ ${periodEnd}`,
+              budgetHint: h.budgetHint || `预算约 ¥${budgetYuan.toLocaleString('zh-CN')}`,
+            },
+          },
+        }
+      }
+      return {
+        status: 200,
+        body: {
+          ok: true,
+          plan,
+          meta: {
+            platforms,
+            budgetYuan,
+            periodStart,
+            periodEnd,
+            storeName: body.storeName || '',
+            city: storeCity,
+            planEdition: 'simple',
+          },
+        },
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      console.error('[meoo-ai-ops-plan] simple failed', msg.slice(0, 400))
+      return {
+        status: 502,
+        body: {
+          ok: false,
+          error: 'ops_plan_failed',
+          detail: msg.slice(0, 600),
+          message: msg.slice(0, 200) || '生成失败，请稍后重试',
+        },
+      }
+    }
+  }
+
   const talentPlatform = (() => {
     const joined = platforms.join(' ')
     if (/小红书/.test(joined)) return '小红书' as const
@@ -588,6 +713,7 @@ export async function runAiOpsPlanCore(
       )
     }
 
+    plan = { ...plan, planEdition: 'standard' }
     return {
       status: 200,
       body: {
@@ -600,6 +726,7 @@ export async function runAiOpsPlanCore(
           periodEnd,
           storeName: body.storeName || '',
           city: storeCity,
+          planEdition: 'standard',
           talentLibrary: talentLibraryMeta,
         },
       },
