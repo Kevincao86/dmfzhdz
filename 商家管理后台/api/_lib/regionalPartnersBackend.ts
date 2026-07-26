@@ -7,6 +7,7 @@ import {
   verifyOpsSessionToken,
   type OpsSessionPayload,
 } from './opsStaffAccountsBackend.js'
+import { buildOpsGiftDaysPatch, readEntitlementDays } from './tenantEntitlementCore.js'
 
 export const REGIONAL_PARTNER_MODULE_KEYS = [
   'dashboard',
@@ -437,6 +438,46 @@ export async function requireOpsRegionalPartnersAccess(
   return { ok: true, session }
 }
 
+export function normalizeCityLabel(raw: string): string {
+  return String(raw || '')
+    .trim()
+    .replace(/(特别行政区|自治区|省|市|地区|自治州|盟)$/u, '')
+    .trim()
+}
+
+export function cityLabelVariants(city: string): string[] {
+  const c = String(city || '').trim()
+  if (!c) return []
+  const n = normalizeCityLabel(c)
+  const set = new Set<string>([c])
+  if (n) set.add(n)
+  if (n && !n.endsWith('市')) set.add(`${n}市`)
+  return [...set]
+}
+
+export function partnerCityNameSet(cities: RegionalCity[]): Set<string> {
+  const set = new Set<string>()
+  for (const c of cities) {
+    for (const v of cityLabelVariants(c.city)) set.add(v)
+    set.add(normalizeCityLabel(c.city))
+  }
+  return set
+}
+
+export function tenantCityInPartnerScope(
+  tenant: { attribution_city?: string | null; register_city?: string | null },
+  partnerCities: RegionalCity[],
+): boolean {
+  const scope = partnerCityNameSet(partnerCities)
+  const candidates = [tenant.register_city, tenant.attribution_city]
+    .map((x) => String(x || '').trim())
+    .filter(Boolean)
+  for (const c of candidates) {
+    if (scope.has(c) || scope.has(normalizeCityLabel(c))) return true
+  }
+  return false
+}
+
 export async function assignMerchantToPartner(
   admin: SupabaseClient,
   input: { tenantId: string; partnerId: string; attributionCity?: string },
@@ -444,15 +485,23 @@ export async function assignMerchantToPartner(
   const partner = await fetchById(admin, input.partnerId)
   if (!partner) return { ok: false, error: 'partner_not_found' }
   if (partner.status === 'disabled') return { ok: false, error: 'partner_disabled' }
-  const city =
-    (input.attributionCity ?? '').trim() ||
-    parseCities(partner.cities)[0]?.city ||
-    ''
+  const cities = parseCities(partner.cities)
+  const cityRaw =
+    (input.attributionCity ?? '').trim() || cities[0]?.city || ''
+  if (!cityRaw) return { ok: false, error: 'cities_required' }
+  if (!tenantCityInPartnerScope({ attribution_city: cityRaw, register_city: cityRaw }, cities)) {
+    return { ok: false, error: 'city_out_of_scope' }
+  }
+  const province =
+    cities.find((c) => cityLabelVariants(c.city).includes(cityRaw) || normalizeCityLabel(c.city) === normalizeCityLabel(cityRaw))
+      ?.province || ''
   const { error } = await admin
     .from('tenants')
     .update({
       regional_partner_id: input.partnerId,
-      attribution_city: city || null,
+      attribution_city: cityRaw,
+      register_city: cityRaw,
+      register_province: province || null,
       updated_at: new Date().toISOString(),
     })
     .eq('id', input.tenantId)
@@ -476,17 +525,27 @@ export async function unassignMerchantFromPartner(
   return { ok: true }
 }
 
-type TenantLite = {
+export type TenantAccountRow = {
   id: string
   name: string
+  edition?: string | null
   account_status: string
   service_expire_at: string | null
   regional_partner_id: string | null
   attribution_city: string | null
+  register_province?: string | null
+  register_city?: string | null
+  membership_plan?: string | null
+  ops_gift_days?: number | null
+  official_days?: number | null
+  trial_days?: number | null
+  subscription_days?: number | null
   created_at: string
-  official_days?: number
-  trial_days?: number
+  updated_at?: string
 }
+
+/** @deprecated alias — 结算/看板仍用此名 */
+export type TenantLite = TenantAccountRow
 
 type OrderLite = {
   id: string
@@ -498,19 +557,251 @@ type OrderLite = {
   created_at: string
 }
 
+const ERP_EDITIONS = ['merchant', 'partner', 'partner_agent'] as const
+
+export function editionLabel(edition: string | null | undefined): string {
+  if (edition === 'partner') return 'FWS服务商'
+  if (edition === 'partner_agent') return 'FWS子代'
+  return '商家ERP'
+}
+
+const TENANT_ACCOUNT_SELECT =
+  'id,name,edition,account_status,service_expire_at,regional_partner_id,attribution_city,register_province,register_city,membership_plan,ops_gift_days,official_days,trial_days,subscription_days,created_at,updated_at'
+
+function resolveTenantCity(row: TenantAccountRow): string {
+  return String(row.register_city || row.attribution_city || '').trim()
+}
+
+/** 区域服务商城市范围内的商家 ERP + FWS 账号 */
+export async function loadPartnerCityAccounts(
+  admin: SupabaseClient,
+  partner: RegionalPartnerPublic,
+): Promise<TenantAccountRow[]> {
+  const cities = partner.cities
+  const variants = [...new Set(cities.flatMap((c) => cityLabelVariants(c.city)))]
+  const orParts = [`regional_partner_id.eq.${partner.id}`]
+  if (variants.length) {
+    const listed = variants.map((v) => `"${v.replace(/"/g, '')}"`).join(',')
+    orParts.push(`attribution_city.in.(${listed})`)
+    orParts.push(`register_city.in.(${listed})`)
+  }
+
+  const { data, error } = await admin
+    .from('tenants')
+    .select(TENANT_ACCOUNT_SELECT)
+    .in('edition', [...ERP_EDITIONS])
+    .or(orParts.join(','))
+    .order('created_at', { ascending: false })
+    .limit(2000)
+
+  if (error) {
+    // register_city 列尚未迁移时回退
+    if (/register_city|register_province|schema cache|does not exist/i.test(error.message)) {
+      const { data: legacy, error: e2 } = await admin
+        .from('tenants')
+        .select(
+          'id,name,edition,account_status,service_expire_at,regional_partner_id,attribution_city,membership_plan,ops_gift_days,official_days,trial_days,subscription_days,created_at,updated_at',
+        )
+        .or(
+          [`regional_partner_id.eq.${partner.id}`]
+            .concat(
+              variants.length
+                ? [`attribution_city.in.(${variants.map((v) => `"${v.replace(/"/g, '')}"`).join(',')})`]
+                : [],
+            )
+            .join(','),
+        )
+        .order('created_at', { ascending: false })
+        .limit(2000)
+      if (e2) throw new Error(e2.message)
+      return ((legacy ?? []) as TenantAccountRow[]).filter(
+        (row) =>
+          ERP_EDITIONS.includes((row.edition || 'merchant') as (typeof ERP_EDITIONS)[number]) &&
+          (row.regional_partner_id === partner.id ||
+            tenantCityInPartnerScope(row, cities)),
+      )
+    }
+    throw new Error(error.message)
+  }
+
+  return ((data ?? []) as TenantAccountRow[]).filter(
+    (row) =>
+      row.regional_partner_id === partner.id || tenantCityInPartnerScope(row, cities),
+  )
+}
+
 export async function loadPartnerMerchants(
   admin: SupabaseClient,
   partnerId: string,
 ): Promise<TenantLite[]> {
+  const row = await fetchById(admin, partnerId)
+  if (!row) return []
+  return loadPartnerCityAccounts(admin, rowToPublic(row))
+}
+
+export async function searchTenantsForPartnerClaim(
+  admin: SupabaseClient,
+  partner: RegionalPartnerPublic,
+  keyword: string,
+): Promise<TenantAccountRow[]> {
+  const q = keyword.trim()
+  if (q.length < 2) return []
   const { data, error } = await admin
     .from('tenants')
-    .select(
-      'id,name,account_status,service_expire_at,regional_partner_id,attribution_city,created_at,official_days,trial_days',
-    )
-    .eq('regional_partner_id', partnerId)
+    .select(TENANT_ACCOUNT_SELECT)
+    .in('edition', [...ERP_EDITIONS])
+    .ilike('name', `%${q.replace(/[%_]/g, '')}%`)
     .order('created_at', { ascending: false })
+    .limit(40)
   if (error) throw new Error(error.message)
-  return (data ?? []) as TenantLite[]
+  return (data ?? []) as TenantAccountRow[]
+}
+
+export async function assertTenantInPartnerScope(
+  admin: SupabaseClient,
+  partner: RegionalPartnerPublic,
+  tenantId: string,
+): Promise<{ ok: true; row: TenantAccountRow } | { ok: false; error: string }> {
+  const { data, error } = await admin
+    .from('tenants')
+    .select(TENANT_ACCOUNT_SELECT)
+    .eq('id', tenantId)
+    .maybeSingle()
+  if (error || !data) return { ok: false, error: 'tenant_not_found' }
+  const row = data as TenantAccountRow
+  const edition = row.edition || 'merchant'
+  if (!ERP_EDITIONS.includes(edition as (typeof ERP_EDITIONS)[number])) {
+    return { ok: false, error: 'edition_not_allowed' }
+  }
+  if (
+    row.regional_partner_id === partner.id ||
+    tenantCityInPartnerScope(row, partner.cities)
+  ) {
+    return { ok: true, row }
+  }
+  return { ok: false, error: 'out_of_scope' }
+}
+
+export async function patchPartnerScopedTenant(
+  admin: SupabaseClient,
+  partner: RegionalPartnerPublic,
+  input: {
+    tenantId: string
+    merchantName?: string
+    accountStatus?: 'normal' | 'disabled' | 'frozen'
+    opsGiftDays?: number
+    registerCity?: string
+    registerProvince?: string
+  },
+): Promise<{ ok: true; row: TenantAccountRow } | { ok: false; error: string }> {
+  const gate = await assertTenantInPartnerScope(admin, partner, input.tenantId)
+  // 认领：尚未入范围时，必须带 registerCity 且城市在代理范围内
+  let row = gate.ok ? gate.row : null
+  if (!gate.ok) {
+    if (gate.error !== 'out_of_scope' && gate.error !== 'tenant_not_found') {
+      return { ok: false, error: gate.error }
+    }
+    if (!input.registerCity?.trim()) return { ok: false, error: gate.error }
+    const { data, error } = await admin
+      .from('tenants')
+      .select(TENANT_ACCOUNT_SELECT)
+      .eq('id', input.tenantId)
+      .maybeSingle()
+    if (error || !data) return { ok: false, error: 'tenant_not_found' }
+    row = data as TenantAccountRow
+  }
+  if (!row) return { ok: false, error: 'tenant_not_found' }
+
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  if (input.merchantName?.trim()) patch.name = input.merchantName.trim()
+  if (
+    input.accountStatus === 'normal' ||
+    input.accountStatus === 'disabled' ||
+    input.accountStatus === 'frozen'
+  ) {
+    patch.account_status = input.accountStatus
+  }
+
+  if (input.registerCity?.trim()) {
+    const city = input.registerCity.trim()
+    if (!tenantCityInPartnerScope({ attribution_city: city, register_city: city }, partner.cities)) {
+      return { ok: false, error: 'city_out_of_scope' }
+    }
+    const province =
+      input.registerProvince?.trim() ||
+      partner.cities.find(
+        (c) =>
+          cityLabelVariants(c.city).includes(city) ||
+          normalizeCityLabel(c.city) === normalizeCityLabel(city),
+      )?.province ||
+      ''
+    patch.register_city = city
+    patch.attribution_city = city
+    if (province) patch.register_province = province
+    patch.regional_partner_id = partner.id
+  } else if (gate.ok) {
+    // 编辑已有范围账号时保持归属
+    patch.regional_partner_id = partner.id
+  }
+
+  if (typeof input.opsGiftDays === 'number' && Number.isFinite(input.opsGiftDays)) {
+    const sub = readEntitlementDays(
+      row.subscription_days != null ? row.subscription_days : row.official_days,
+    )
+    const oldGift = readEntitlementDays(row.ops_gift_days)
+    Object.assign(
+      patch,
+      buildOpsGiftDaysPatch({
+        subscriptionDays: sub,
+        oldOpsGiftDays: oldGift,
+        newOpsGiftDays: input.opsGiftDays,
+        serviceExpireAt: row.service_expire_at,
+      }),
+    )
+  }
+
+  const { error: updErr } = await admin.from('tenants').update(patch).eq('id', input.tenantId)
+  if (updErr) return { ok: false, error: updErr.message }
+
+  const refreshed = await assertTenantInPartnerScope(admin, partner, input.tenantId)
+  if (!refreshed.ok) {
+    // 刚认领后应在范围内
+    const { data } = await admin
+      .from('tenants')
+      .select(TENANT_ACCOUNT_SELECT)
+      .eq('id', input.tenantId)
+      .maybeSingle()
+    if (!data) return { ok: false, error: 'tenant_not_found' }
+    return { ok: true, row: data as TenantAccountRow }
+  }
+  return { ok: true, row: refreshed.row }
+}
+
+export function mapTenantAccountPublic(row: TenantAccountRow) {
+  const now = Date.now()
+  const expireMs = row.service_expire_at ? new Date(row.service_expire_at).getTime() : null
+  const active =
+    row.account_status !== 'disabled' &&
+    row.account_status !== 'frozen' &&
+    (expireMs == null || expireMs >= now)
+  const city = resolveTenantCity(row)
+  return {
+    id: row.id,
+    name: row.name,
+    edition: row.edition || 'merchant',
+    editionLabel: editionLabel(row.edition),
+    accountStatus: row.account_status,
+    membershipPlan: row.membership_plan || 'free',
+    opsGiftDays: Number(row.ops_gift_days ?? 0) || 0,
+    serviceExpireAt: row.service_expire_at,
+    registerProvince: row.register_province || null,
+    registerCity: row.register_city || null,
+    attributionCity: row.attribution_city || null,
+    city: city || null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at || null,
+    openStatus: active ? '开通中' : '已到期/停用',
+  }
 }
 
 export async function loadPartnerConfirmedOrders(

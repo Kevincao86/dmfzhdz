@@ -12,21 +12,31 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ECS_HOST="${ECS_HOST:-admin@139.196.42.5}"
-MIGRATION="20260726170000_regional_partners.sql"
+MIGRATIONS=(
+  "20260726170000_regional_partners.sql"
+  "20260726180000_tenants_register_city.sql"
+)
 PG_PORT="${ECS_PG_PORT:-5433}"
 PG_DB="${ECS_PG_DB:-postgres}"
 
+resolve_mig() {
+  local app_root="$1"
+  local name="$2"
+  local p="$app_root/supabase/migrations/$name"
+  if [[ -f "$p" ]]; then
+    echo "$p"
+    return 0
+  fi
+  p="$ROOT/supabase/migrations/$name"
+  if [[ -f "$p" ]]; then
+    echo "$p"
+    return 0
+  fi
+  return 1
+}
+
 run_apply() {
   local app_root="$1"
-  local mig_path="$app_root/supabase/migrations/$MIGRATION"
-
-  if [[ ! -f "$mig_path" ]]; then
-    mig_path="$ROOT/supabase/migrations/$MIGRATION"
-  fi
-  if [[ ! -f "$mig_path" ]]; then
-    echo "FATAL: 找不到 $MIGRATION"
-    exit 1
-  fi
 
   if [[ ! -f "$HOME/stack/db-credentials.txt" ]]; then
     echo "FATAL: 缺少 ~/stack/db-credentials.txt（请在轻量 ECS 上执行）"
@@ -48,20 +58,31 @@ run_apply() {
   echo "=== 0) 备份 Postgres → $dump_file ==="
   pg_dump -h 127.0.0.1 -p "$PG_PORT" -U postgres -d "$PG_DB" -Fc -f "$dump_file"
 
-  echo "=== 1) 应用迁移 $MIGRATION ==="
-  psql -h 127.0.0.1 -p "$PG_PORT" -U postgres -d "$PG_DB" -v ON_ERROR_STOP=1 -f "$mig_path"
+  local i=1
+  for mig in "${MIGRATIONS[@]}"; do
+    local mig_path
+    mig_path="$(resolve_mig "$app_root" "$mig")" || {
+      echo "FATAL: 找不到 $mig"
+      exit 1
+    }
+    echo "=== $i) 应用迁移 $mig ==="
+    psql -h 127.0.0.1 -p "$PG_PORT" -U postgres -d "$PG_DB" -v ON_ERROR_STOP=1 -f "$mig_path"
+    i=$((i + 1))
+  done
 
   local grants="$app_root/supabase/ecs_service_role_grants.sql"
   if [[ -f "$grants" ]]; then
-    echo "=== 2) GRANT service_role ==="
+    echo "=== $i) GRANT service_role ==="
     psql -h 127.0.0.1 -p "$PG_PORT" -U postgres -d "$PG_DB" -v ON_ERROR_STOP=1 -f "$grants"
   fi
 
-  echo "=== 3) 校验 ==="
+  echo "=== 校验 ==="
   psql -h 127.0.0.1 -p "$PG_PORT" -U postgres -d "$PG_DB" -v ON_ERROR_STOP=1 -c \
-    "select to_regclass('public.regional_partners') as regional_partners;"
+    "select to_regclass('public.regional_partners') as regional_partners,
+            (select count(*) from information_schema.columns
+              where table_schema='public' and table_name='tenants' and column_name='register_city') as has_register_city;"
 
-  echo "OK: regional_partners 已就绪。请 sudo systemctl restart meoo-postgrest && 重启 auth-api。"
+  echo "OK: regional_partners + register_city 已就绪。请 sudo systemctl restart meoo-postgrest && 重启 auth-api。"
 }
 
 if [[ "${1:-}" == "--remote" ]]; then

@@ -135,22 +135,49 @@ export async function fetchDashboard() {
   })
 }
 
-export async function fetchMerchants() {
+export type RegionalMerchantRow = {
+  id: string
+  name: string
+  edition: string
+  editionLabel: string
+  accountStatus: string
+  membershipPlan: string
+  opsGiftDays: number
+  serviceExpireAt: string | null
+  registerProvince: string | null
+  registerCity: string | null
+  attributionCity: string | null
+  city: string | null
+  createdAt: string
+  openStatus: string
+  inScope?: boolean
+  canClaim?: boolean
+}
+
+export async function fetchMerchants(keyword?: string) {
+  const q = keyword?.trim()
+  const path = q
+    ? `/api/meoo-regional-partner-merchants?q=${encodeURIComponent(q)}`
+    : '/api/meoo-regional-partner-merchants'
   return request<{
     ok: true
-    merchants: Array<{
-      id: string
-      name: string
-      accountStatus: string
-      serviceExpireAt: string | null
-      attributionCity: string | null
-      createdAt: string
-      openStatus: string
-    }>
-  }>('/api/meoo-regional-partner-merchants', {
+    cities?: RegionalCity[]
+    merchants: RegionalMerchantRow[]
+  }>(path, {
     method: 'GET',
     headers: authHeaders(),
   })
+}
+
+export async function mutateMerchant(body: Record<string, unknown>) {
+  return request<{ ok: true; merchant?: RegionalMerchantRow }>(
+    '/api/meoo-regional-partner-merchants',
+    {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(body),
+    },
+  )
 }
 
 export async function fetchSettlement() {
