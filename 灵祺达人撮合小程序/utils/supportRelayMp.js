@@ -6,8 +6,8 @@ const wxAccount = require('./wxAccount.js')
 
 const SESSION_KEY = 'meoo_talent_mp_support_sid'
 const GUEST_FP_KEY = 'meoo_talent_mp_support_gfp'
-const POLL_MS = 4000
-const POLL_MS_HUMAN = 2000
+const POLL_MS = 3000
+const POLL_MS_HUMAN = 1500
 
 const DEFAULT_BOT = {
   id: 'welcome-bot',

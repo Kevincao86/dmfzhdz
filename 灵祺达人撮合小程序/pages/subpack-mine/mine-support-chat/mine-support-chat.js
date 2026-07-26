@@ -33,6 +33,8 @@ Page({
     this._pollTimer = null
     this._pollFailCount = 0
     this._lastCloudTs = 0
+    this._syncing = false
+    this._pollGen = 0
     this._autoHuman = options && (options.human === '1' || options.human === 'true')
     const welcome = Object.assign({}, relay.DEFAULT_BOT, { at: nowTime() })
     this.setData({ messages: [welcome] })
@@ -50,10 +52,11 @@ Page({
     syncPageIdentity(this)
     if (!relay.canSupport()) return
     this.startPoll()
-    void this.syncFromCloud()
   },
 
   onHide() {
+    // 人工会话保持轮询：切去运营台回消息时若 stop，会表现为「回来看不到、需重进」
+    if (this.data.humanMode) return
     this.stopPoll()
   },
 
@@ -63,16 +66,27 @@ Page({
 
   startPoll() {
     this.stopPoll()
-    const ms = this.data.humanMode ? relay.POLL_MS_HUMAN : relay.POLL_MS
-    this._pollTimer = setInterval(() => {
-      void this.syncFromCloud()
-    }, ms)
-    void this.syncFromCloud()
+    const gen = (this._pollGen || 0) + 1
+    this._pollGen = gen
+    const tick = () => {
+      if (this._pollGen !== gen) return
+      void this.syncFromCloud().finally(() => {
+        if (this._pollGen !== gen) return
+        const ms = this.data.humanMode ? relay.POLL_MS_HUMAN : relay.POLL_MS
+        this._pollTimer = setTimeout(tick, ms)
+      })
+    }
+    void this.syncFromCloud().finally(() => {
+      if (this._pollGen !== gen) return
+      const ms = this.data.humanMode ? relay.POLL_MS_HUMAN : relay.POLL_MS
+      this._pollTimer = setTimeout(tick, ms)
+    })
   },
 
   stopPoll() {
+    this._pollGen = (this._pollGen || 0) + 1
     if (this._pollTimer) {
-      clearInterval(this._pollTimer)
+      clearTimeout(this._pollTimer)
       this._pollTimer = null
     }
   },
@@ -82,11 +96,15 @@ Page({
       const cloud = await relay.fetchSessionMessages(this._sessionId)
       if (cloud.length > 0) {
         this.setMessages(cloud)
+        for (const m of cloud) {
+          if (m && m.ts) this._lastCloudTs = Math.max(this._lastCloudTs || 0, Number(m.ts) || 0)
+        }
       }
       this.setData({
         ready: true,
         statusSub: '已连接商家管理后台 · 小程序在线客服',
       })
+      this.startPoll()
     } catch (e) {
       this.setData({
         ready: false,
@@ -97,17 +115,24 @@ Page({
 
   async syncFromCloud() {
     if (!this._sessionId || !relay.canSupport()) return
+    if (this._syncing) return
+    this._syncing = true
     try {
       const cloud = await relay.fetchSessionMessages(this._sessionId)
       this._pollFailCount = 0
-      if (cloud.length === 0) return
+      if (!cloud || cloud.length === 0) return
       const prevIds = new Set((this.data.messages || []).map((m) => m.id))
       const merged = relay.mergeMessages(this.data.messages, cloud)
-      const newOps = merged.filter((m) => m.role === 'ops' && m.id && !prevIds.has(m.id))
+      let maxTs = this._lastCloudTs || 0
       for (const m of cloud) {
-        if (m && m.ts) this._lastCloudTs = Math.max(this._lastCloudTs || 0, Number(m.ts) || 0)
+        if (m && m.ts) maxTs = Math.max(maxTs, Number(m.ts) || 0)
       }
-      this.setMessages(merged)
+      const newOps = merged.filter((m) => m.role === 'ops' && m.id && !prevIds.has(m.id))
+      const grew = merged.length !== (this.data.messages || []).length || newOps.length > 0
+      if (grew || maxTs > (this._lastCloudTs || 0)) {
+        this._lastCloudTs = maxTs
+        this.setMessages(merged)
+      }
       if (newOps.length > 0) {
         try {
           wx.vibrateShort({ type: 'light' })
@@ -126,13 +151,16 @@ Page({
           statusSub: relay.formatSupportError(e),
         })
       }
+    } finally {
+      this._syncing = false
     }
   },
 
   setMessages(list) {
-    const last = list[list.length - 1]
+    const next = Array.isArray(list) ? list.slice() : []
+    const last = next[next.length - 1]
     this.setData({
-      messages: list,
+      messages: next,
       scrollTo: last && last.id ? `msg-${last.id}` : '',
     })
   },
@@ -140,7 +168,7 @@ Page({
   pushLocal(role, text, id) {
     const mid = id || relay.newMsgId()
     const msg = { id: mid, role, text, at: nowTime(), ts: Date.now() }
-    const next = [...this.data.messages, msg]
+    const next = [...(this.data.messages || []), msg]
     this.setMessages(next)
     return mid
   },
@@ -166,9 +194,13 @@ Page({
     relay
       .sendChatLine('system', sysText, bid, this._sessionId)
       .then(() => {
-        this.setData({ humanMode: true, connecting: false, showHumanBtn: false, input: '' })
-        this.startPoll()
-        void this.syncFromCloud()
+        this.setData(
+          { humanMode: true, connecting: false, showHumanBtn: false, input: '' },
+          () => {
+            this.startPoll()
+            void this.syncFromCloud()
+          },
+        )
       })
       .catch((e) => {
         this.setData({ connecting: false })

@@ -37,6 +37,15 @@ function nowTime(): string {
 }
 
 const SUPPORT_RELAY_POLL_MS = 4000
+const MP_SUPPORT_RELAY_POLL_MS = 2000
+
+/** dr 星选站默认走小程序客服通道；商家 cs/fws 默认 ERP */
+function detectDefaultRelayChannel(): 'erp' | 'mp' {
+  if (typeof window === 'undefined') return 'erp'
+  const host = window.location.hostname.toLowerCase()
+  if (host.startsWith('dr.') || host.includes('xingxuan')) return 'mp'
+  return 'erp'
+}
 
 type FloatingOnlineSupportProps = {
   /** 登录账户编号（如 DMF001），运营台展示为「客户ID」 */
@@ -46,6 +55,7 @@ type FloatingOnlineSupportProps = {
   /**
    * erp：商家 ERP 右下角（运营台「ERP处理中心」）
    * mp：星选 Web 等，走 lq-mp- + meoo-ops-mp-support-relay（运营台「小程序在线客服」）
+   * 不传时：dr.* 自动 mp，其余 erp
    */
   relayChannel?: 'erp' | 'mp'
 }
@@ -53,10 +63,11 @@ type FloatingOnlineSupportProps = {
 export default function FloatingOnlineSupport({
   customerId = '',
   enterpriseName = '',
-  relayChannel = 'erp',
+  relayChannel,
 }: FloatingOnlineSupportProps) {
   const panelId = useId()
-  const isMpChannel = relayChannel === 'mp'
+  const resolvedChannel = relayChannel ?? detectDefaultRelayChannel()
+  const isMpChannel = resolvedChannel === 'mp'
   const sessionIdRef = useRef(
     isMpChannel ? getOrCreateMpSupportSessionId() : getOrCreateSupportRelaySessionId(),
   )
@@ -211,7 +222,7 @@ export default function FloatingOnlineSupport({
     }
 
     relaySyncRef.current = runPoll
-    pollTimer = window.setInterval(runPoll, SUPPORT_RELAY_POLL_MS)
+    pollTimer = window.setInterval(runPoll, MP_SUPPORT_RELAY_POLL_MS)
     runPoll()
     return () => {
       cancelled = true
