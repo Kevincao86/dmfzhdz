@@ -21,6 +21,12 @@ import opsStaffLoginHandler from '../../../商家管理后台/api/_lib/handlers/
 import opsStaffListHandler from '../../../商家管理后台/api/_lib/handlers/meoo-ops-staff-list.ts'
 import opsStaffMutateHandler from '../../../商家管理后台/api/_lib/handlers/meoo-ops-staff-mutate.ts'
 import opsDeleteSmsSendHandler from '../../../商家管理后台/api/_lib/handlers/meoo-ops-delete-sms-send.ts'
+import opsRegionalPartnersHandler from '../../../商家管理后台/api/_lib/handlers/meoo-ops-regional-partners.ts'
+import regionalPartnerLoginHandler from '../../../商家管理后台/api/_lib/handlers/meoo-regional-partner-login.ts'
+import regionalPartnerMeHandler from '../../../商家管理后台/api/_lib/handlers/meoo-regional-partner-me.ts'
+import regionalPartnerDashboardHandler from '../../../商家管理后台/api/_lib/handlers/meoo-regional-partner-dashboard.ts'
+import regionalPartnerMerchantsHandler from '../../../商家管理后台/api/_lib/handlers/meoo-regional-partner-merchants.ts'
+import regionalPartnerSettlementHandler from '../../../商家管理后台/api/_lib/handlers/meoo-regional-partner-settlement.ts'
 import plannerRoomSyncHandler from '../api/meoo-planner-room-sync.ts'
 import plannerGptConfigHandler from '../api/meoo-planner-gpt-config.ts'
 import tenantsListHandler from '../../../商家管理后台/api/_lib/handlers/meoo-supabase-tenants-list.ts'
@@ -185,7 +191,7 @@ import apiPingHandler from '../api/ping.ts'
 import merchantSlugHandler from '../api/merchant/[...slug].ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260726-sms-pwd-support-relay'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260726-regional-partners'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -216,6 +222,12 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-staff-list': opsStaffListHandler as VercelLikeHandler,
   '/api/meoo-ops-staff-mutate': opsStaffMutateHandler as VercelLikeHandler,
   '/api/meoo-ops-delete-sms-send': opsDeleteSmsSendHandler as VercelLikeHandler,
+  '/api/meoo-ops-regional-partners': opsRegionalPartnersHandler as VercelLikeHandler,
+  '/api/meoo-regional-partner-login': regionalPartnerLoginHandler as VercelLikeHandler,
+  '/api/meoo-regional-partner-me': regionalPartnerMeHandler as VercelLikeHandler,
+  '/api/meoo-regional-partner-dashboard': regionalPartnerDashboardHandler as VercelLikeHandler,
+  '/api/meoo-regional-partner-merchants': regionalPartnerMerchantsHandler as VercelLikeHandler,
+  '/api/meoo-regional-partner-settlement': regionalPartnerSettlementHandler as VercelLikeHandler,
   '/api/meoo-planner-room-sync': plannerRoomSyncHandler as VercelLikeHandler,
   '/api/meoo-planner-gpt-config': plannerGptConfigHandler as VercelLikeHandler,
   '/api/meoo-supabase-tenants-list': tenantsListHandler as VercelLikeHandler,

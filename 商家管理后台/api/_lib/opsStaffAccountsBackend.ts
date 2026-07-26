@@ -38,6 +38,7 @@ export const OPS_PERMISSION_MODULE_KEYS = [
   'help_manual',
   'platform_decor',
   'team_intro',
+  'regional_partners',
 ] as const
 
 export type OpsPermissionKey = (typeof OPS_PERMISSION_MODULE_KEYS)[number]
