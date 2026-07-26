@@ -59,7 +59,8 @@ export default function SupportPage() {
       </div>
 
       <div className="support-page__chat-hint surface-card rounded-xl border p-4 text-sm text-[var(--shell-muted)]">
-        点击下方右下角「在线客服」图标，与小灵同学对话；输入「人工服务」可接入运营。
+        点击下方右下角「在线客服」图标，与小灵同学对话；输入「人工服务」可接入运营。消息进入运营台「在线客服 →
+        星选小程序」（会话 ID 以 lq-mp- 开头）。请硬刷新本页后再试。
       </div>
 
       <FloatingOnlineSupport
