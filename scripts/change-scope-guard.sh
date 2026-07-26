@@ -420,6 +420,7 @@ RegionalPartner
 OpsRegionalPartnersPage
 regionalPartnersApi
 regionalPartnersBackend
+chinaAdminDivisions
 meoo-ops-regional-partners
 meoo-regional-partner
 opsStaffAuth
