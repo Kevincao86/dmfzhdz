@@ -180,21 +180,41 @@ export type AiOpsPlanSimpleHero = {
   budgetHint: string
 }
 
+/** 点击卡片后展示的细流程（3～6 步） */
+export type AiOpsPlanSimpleFlowItem = {
+  title: string
+  body: string
+}
+
 export type AiOpsPlanSimpleStep = {
   title: string
   body: string
   tip: string
+  detailFlow: AiOpsPlanSimpleFlowItem[]
+  detailNote: string
 }
 
 export type AiOpsPlanSimplePlatform = {
   platform: string
   how: string
+  detailFlow: AiOpsPlanSimpleFlowItem[]
+  detailNote: string
 }
 
 export type AiOpsPlanSimpleCombo = {
   name: string
   sellingPoint: string
   priceHint: string
+  /** 套餐包含（详情用） */
+  items: string
+  detailFlow: AiOpsPlanSimpleFlowItem[]
+  detailNote: string
+}
+
+export type AiOpsPlanSimpleCheckItem = {
+  text: string
+  detailFlow: AiOpsPlanSimpleFlowItem[]
+  detailNote: string
 }
 
 /** 简易版瘦 schema：封面 + 步骤 + 平台 + 货盘 + 清单 */
@@ -203,7 +223,7 @@ export type AiOpsPlanSimplePlan = {
   steps: AiOpsPlanSimpleStep[]
   platforms: AiOpsPlanSimplePlatform[]
   combos: AiOpsPlanSimpleCombo[]
-  checklist: string[]
+  checklist: AiOpsPlanSimpleCheckItem[]
 }
 
 export type AiOpsPlanResult = {
@@ -829,6 +849,39 @@ export function isAiOpsPlanSimpleEdition(plan: AiOpsPlanResult | null | undefine
   return plan.planEdition === 'simple' || !!plan.simplePlan
 }
 
+function parseSimpleFlowItems(raw: unknown): AiOpsPlanSimpleFlowItem[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((x, i) => {
+      if (typeof x === 'string') {
+        const t = asStr(x)
+        return t ? { title: `第${i + 1}步`, body: t } : null
+      }
+      if (!x || typeof x !== 'object') return null
+      const r = x as Record<string, unknown>
+      const title = asStr(r.title ?? r.name ?? r.step) || `第${i + 1}步`
+      const body = asStr(r.body ?? r.desc ?? r.description ?? r.how)
+      if (!body && !asStr(r.title ?? r.name)) return null
+      return { title, body }
+    })
+    .filter((x): x is AiOpsPlanSimpleFlowItem => !!x)
+    .slice(0, 8)
+}
+
+/** 旧历史无 detailFlow 时，把短文案拆成可读流程 */
+export function synthesizeSimpleDetailFlow(
+  ...parts: Array<string | undefined | null>
+): AiOpsPlanSimpleFlowItem[] {
+  const text = parts.map((p) => asStr(p)).filter(Boolean).join('。')
+  if (!text) return []
+  const chunks = text
+    .split(/[。；;\n]+/)
+    .map((x) => x.trim())
+    .filter((x) => x.length >= 4)
+  if (!chunks.length) return [{ title: '说明', body: text }]
+  return chunks.slice(0, 6).map((body, i) => ({ title: `第${i + 1}步`, body }))
+}
+
 /** 解析简易版瘦 JSON */
 export function normalizeAiOpsPlanSimplePlan(raw: unknown): AiOpsPlanSimplePlan | null {
   if (!raw || typeof raw !== 'object') return null
@@ -867,14 +920,22 @@ export function normalizeAiOpsPlanSimplePlan(raw: unknown): AiOpsPlanSimplePlan 
     .map((x) => {
       if (typeof x === 'string') {
         const t = asStr(x)
-        return t ? { title: t, body: '', tip: '' } : null
+        return t
+          ? { title: t, body: '', tip: '', detailFlow: [], detailNote: '' }
+          : null
       }
       if (!x || typeof x !== 'object') return null
       const r = x as Record<string, unknown>
       const title = asStr(r.title ?? r.name)
       const body = asStr(r.body ?? r.desc ?? r.description)
       if (!title && !body) return null
-      return { title: title || '下一步', body, tip: asStr(r.tip ?? r.hint) }
+      return {
+        title: title || '下一步',
+        body,
+        tip: asStr(r.tip ?? r.hint),
+        detailFlow: parseSimpleFlowItems(r.detailFlow ?? r.detail_flow ?? r.flow ?? r.steps),
+        detailNote: asStr(r.detailNote ?? r.detail_note ?? r.note),
+      }
     })
     .filter((x): x is AiOpsPlanSimpleStep => !!x)
     .slice(0, 5)
@@ -886,7 +947,12 @@ export function normalizeAiOpsPlanSimplePlan(raw: unknown): AiOpsPlanSimplePlan 
       const platform = asStr(r.platform ?? r.name)
       const how = asStr(r.how ?? r.body ?? r.desc ?? r.tip)
       if (!platform && !how) return null
-      return { platform: platform || '平台', how }
+      return {
+        platform: platform || '平台',
+        how,
+        detailFlow: parseSimpleFlowItems(r.detailFlow ?? r.detail_flow ?? r.flow ?? r.steps),
+        detailNote: asStr(r.detailNote ?? r.detail_note ?? r.note),
+      }
     })
     .filter((x): x is AiOpsPlanSimplePlatform => !!x)
     .slice(0, 4)
@@ -901,14 +967,31 @@ export function normalizeAiOpsPlanSimplePlan(raw: unknown): AiOpsPlanSimplePlan 
         name,
         sellingPoint: asStr(r.sellingPoint ?? r.selling_point ?? r.point ?? r.desc),
         priceHint: asStr(r.priceHint ?? r.price_hint ?? r.price ?? r.priceYuan),
+        items: asStr(r.items ?? r.includes ?? r.包含),
+        detailFlow: parseSimpleFlowItems(r.detailFlow ?? r.detail_flow ?? r.flow ?? r.steps),
+        detailNote: asStr(r.detailNote ?? r.detail_note ?? r.note),
       }
     })
     .filter((x): x is AiOpsPlanSimpleCombo => !!x)
     .slice(0, 4)
 
-  const checklist = checklistRaw
-    .map((x) => (typeof x === 'string' ? asStr(x) : asStr((x as Record<string, unknown>)?.text ?? (x as Record<string, unknown>)?.title)))
-    .filter(Boolean)
+  const checklist: AiOpsPlanSimpleCheckItem[] = checklistRaw
+    .map((x) => {
+      if (typeof x === 'string') {
+        const text = asStr(x)
+        return text ? { text, detailFlow: [], detailNote: '' } : null
+      }
+      if (!x || typeof x !== 'object') return null
+      const r = x as Record<string, unknown>
+      const text = asStr(r.text ?? r.title ?? r.item ?? r.name)
+      if (!text) return null
+      return {
+        text,
+        detailFlow: parseSimpleFlowItems(r.detailFlow ?? r.detail_flow ?? r.flow ?? r.steps),
+        detailNote: asStr(r.detailNote ?? r.detail_note ?? r.note ?? r.how),
+      }
+    })
+    .filter((x): x is AiOpsPlanSimpleCheckItem => !!x)
     .slice(0, 8)
 
   if (!hero.headline && !steps.length && !checklist.length && !combos.length) return null
@@ -2092,7 +2175,14 @@ function aiOpsSimplePlanToMarkdown(plan: AiOpsPlanResult, meta?: { title?: strin
   }
   if (s.checklist.length) {
     lines.push('## 落地清单', '')
-    for (const item of s.checklist) lines.push(`- [ ] ${item}`)
+    for (const item of s.checklist) {
+      lines.push(`- [ ] ${item.text}`)
+      if (item.detailFlow.length) {
+        for (const f of item.detailFlow) {
+          lines.push(`  - ${f.title}：${f.body}`)
+        }
+      }
+    }
     lines.push('')
   }
   return lines.join('\n')
