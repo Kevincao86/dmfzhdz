@@ -16,6 +16,12 @@ import {
   relayFromToRole,
   rowToChatMessage,
 } from '../lib/supportRelayChatMerge'
+import {
+  fetchMpSupportMessages,
+  getOrCreateMpSupportSessionId,
+  mergeMpSupportMessages,
+  sendMpSupportLine,
+} from '../lib/mpSupportRelayHttp'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 
 const DEFAULT_BOT: ChatMessage = {
@@ -37,14 +43,23 @@ type FloatingOnlineSupportProps = {
   customerId?: string
   /** 租户企业名称（tenants.name），运营台展示在顶部「企业名称」 */
   enterpriseName?: string
+  /**
+   * erp：商家 ERP 右下角（运营台「ERP处理中心」）
+   * mp：星选 Web 等，走 lq-mp- + meoo-ops-mp-support-relay（运营台「小程序在线客服」）
+   */
+  relayChannel?: 'erp' | 'mp'
 }
 
 export default function FloatingOnlineSupport({
   customerId = '',
   enterpriseName = '',
+  relayChannel = 'erp',
 }: FloatingOnlineSupportProps) {
   const panelId = useId()
-  const sessionIdRef = useRef(getOrCreateSupportRelaySessionId())
+  const isMpChannel = relayChannel === 'mp'
+  const sessionIdRef = useRef(
+    isMpChannel ? getOrCreateMpSupportSessionId() : getOrCreateSupportRelaySessionId(),
+  )
   const relaySyncRef = useRef<(() => void) | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const customerIdRef = useRef(customerId)
@@ -52,7 +67,7 @@ export default function FloatingOnlineSupport({
   const [open, setOpen] = useState(false)
   const [humanMode, setHumanMode] = useState(false)
   const [connecting, setConnecting] = useState(false)
-  const [relayReady, setRelayReady] = useState(false)
+  const [relayReady, setRelayReady] = useState(isMpChannel)
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
     { ...DEFAULT_BOT, at: nowTime(), ts: 0 },
@@ -86,6 +101,22 @@ export default function FloatingOnlineSupport({
       text: string,
       id: string,
     ): Promise<{ ok: boolean; detail?: string }> => {
+      if (isMpChannel) {
+        if (from === 'ops') return { ok: false, detail: 'invalid_from_role' }
+        try {
+          await sendMpSupportLine({
+            sessionId: sessionIdRef.current,
+            fromRole: from,
+            text,
+            clientMsgId: id,
+            customerId: customerIdRef.current.trim(),
+            enterpriseName: enterpriseNameRef.current.trim() || '灵祺星选·Web',
+          })
+          return { ok: true }
+        } catch (e) {
+          return { ok: false, detail: e instanceof Error ? e.message : String(e) }
+        }
+      }
       const wsUrl = getSupportRelayWsUrl()
       if (wsUrl) {
         const ws = wsRef.current
@@ -141,10 +172,56 @@ export default function FloatingOnlineSupport({
       }
       return { ok: true }
     },
-    [],
+    [isMpChannel],
   )
 
+  /** 星选 Web：HTTP 轮询轻量 mp-support-relay（与达人小程序同源表） */
   useEffect(() => {
+    if (!isMpChannel) return
+    let cancelled = false
+    let pollTimer: number | null = null
+
+    const runPoll = () => {
+      if (cancelled) return
+      void (async () => {
+        try {
+          const cloud = await fetchMpSupportMessages(sessionIdRef.current)
+          if (cancelled) return
+          setMessages((prev) => {
+            const merged = mergeMpSupportMessages(
+              prev.map((m) => ({ id: m.id, role: m.role, text: m.text, at: m.at, ts: m.ts })),
+              cloud,
+            )
+            return merged.map((m) => ({
+              id: m.id,
+              role: m.role as ChatRole,
+              text: m.text,
+              at: m.at,
+              ts: m.ts,
+            }))
+          })
+          setRelayReady(true)
+        } catch (e) {
+          if (!cancelled) {
+            console.warn('[mp-support-relay]', e instanceof Error ? e.message : e)
+            setRelayReady(true)
+          }
+        }
+      })()
+    }
+
+    relaySyncRef.current = runPoll
+    pollTimer = window.setInterval(runPoll, SUPPORT_RELAY_POLL_MS)
+    runPoll()
+    return () => {
+      cancelled = true
+      relaySyncRef.current = null
+      if (pollTimer) window.clearInterval(pollTimer)
+    }
+  }, [isMpChannel])
+
+  useEffect(() => {
+    if (isMpChannel) return
     const base = getSupportRelayWsUrl()
     if (!base) return
 
@@ -248,6 +325,7 @@ export default function FloatingOnlineSupport({
 
   /** 生产环境：无 WS 时经 Supabase 表同步（须已执行迁移 support_relay_messages） */
   useEffect(() => {
+    if (isMpChannel) return
     if (getSupportRelayWsUrl()) return
     if (!supabaseConfigured || !supabase) {
       setRelayReady(true)
@@ -438,10 +516,14 @@ export default function FloatingOnlineSupport({
   /** 打开面板或回到前台时立即对齐云端（不依赖 Realtime） */
   useEffect(() => {
     if (!open) return
+    if (isMpChannel) {
+      queueMicrotask(() => relaySyncRef.current?.())
+      return
+    }
     if (getSupportRelayWsUrl()) return
     if (!supabaseConfigured || !supabase) return
     queueMicrotask(() => relaySyncRef.current?.())
-  }, [open])
+  }, [open, isMpChannel])
 
   useEffect(() => {
     const onVis = () => {
@@ -453,6 +535,7 @@ export default function FloatingOnlineSupport({
 
   /** 登录信息变更后补发 identify（WebSocket）；云端模式写入随每条消息携带 customerId */
   useEffect(() => {
+    if (isMpChannel) return
     const ws = wsRef.current
     const base = getSupportRelayWsUrl()
     if (!base || !ws || ws.readyState !== WebSocket.OPEN) return
@@ -479,11 +562,17 @@ export default function FloatingOnlineSupport({
   const requestHuman = () => {
     if (humanMode || connecting) return
     setConnecting(true)
-    const sysText =
-      '已为您接入灵祺人工客服，请在下方直接描述问题，客服同事将在此会话中回复'
+    const sysText = isMpChannel
+      ? '已为您接入灵祺人工客服（星选）。请直接描述问题，运营同事将在商家管理后台「小程序在线客服」中回复。'
+      : '已为您接入灵祺人工客服，请在下方直接描述问题，客服同事将在此会话中回复'
     const bid = pushMessage('system', sysText)
     void emitRelayLine('system', sysText, bid).then((r) => {
       setConnecting(false)
+      if (isMpChannel) {
+        if (r.ok) setHumanMode(true)
+        else pushMessage('system', `消息未能写入客服通道。${r.detail ?? ''}`.trim())
+        return
+      }
       const wsUrl = getSupportRelayWsUrl()
       const cloud = !wsUrl && supabaseConfigured && supabase
       if (!wsUrl && !cloud) {
@@ -504,6 +593,29 @@ export default function FloatingOnlineSupport({
   }
 
   const send = () => {
+    if (isMpChannel) {
+      if (!relayReady) return
+      const t = input.trim()
+      if (!t) return
+      setInput('')
+      const uid = pushMessage('user', t)
+      void emitRelayLine('user', t, uid).then((r) => {
+        if (!r.ok) {
+          pushMessage('system', `消息尚未送达客服通道。${r.detail ?? ''}`.trim())
+        }
+        if (!humanMode) {
+          window.setTimeout(() => {
+            const botText =
+              '已收到您的问题。若需运营人工处理，请点击「转人工服务」。'
+            const bid = pushMessage('bot', botText)
+            void emitRelayLine('bot', botText, bid)
+          }, 500)
+        } else {
+          queueMicrotask(() => relaySyncRef.current?.())
+        }
+      })
+      return
+    }
     const wsUrl = getSupportRelayWsUrl()
     const cloud = !wsUrl && supabaseConfigured && supabase
     if ((wsUrl || cloud) && !relayReady) return
@@ -529,20 +641,27 @@ export default function FloatingOnlineSupport({
     })
   }
 
-  const relayBase = getSupportRelayWsUrl()
-  const relayBlocked = Boolean((relayBase && !relayReady) || (!relayBase && supabaseConfigured && supabase && !relayReady))
+  const relayBase = isMpChannel ? null : getSupportRelayWsUrl()
+  const relayBlocked = isMpChannel
+    ? !relayReady
+    : Boolean((relayBase && !relayReady) || (!relayBase && supabaseConfigured && supabase && !relayReady))
 
-  const statusExtra = relayBase
+  const panelTitle = isMpChannel ? '在线客服（星选处理中心）' : '在线客服（ERP处理中心）'
+  const statusExtra = isMpChannel
     ? relayReady
-      ? ' · 运营台直连已接通'
-      : customSupportWsUrl
-        ? ' · 正在连接自定义 ws…'
-        : ' · 正在连接管理后台…'
-    : supabaseConfigured && supabase
+      ? ' · 已连接运营台小程序客服'
+      : ' · 正在连接客服通道…'
+    : relayBase
       ? relayReady
-        ? ' · 云端会话已同步'
-        : ' · 正在连接云端会话…'
-      : null
+        ? ' · 运营台直连已接通'
+        : customSupportWsUrl
+          ? ' · 正在连接自定义 ws…'
+          : ' · 正在连接管理后台…'
+      : supabaseConfigured && supabase
+        ? relayReady
+          ? ' · 云端会话已同步'
+          : ' · 正在连接云端会话…'
+        : null
 
   return (
     <>
@@ -559,7 +678,7 @@ export default function FloatingOnlineSupport({
                 <Headphones className="h-5 w-5 shrink-0 opacity-95" aria-hidden />
                 <div className="min-w-0">
                   <h2 id={panelId} className="truncate text-sm font-semibold">
-                    在线客服（ERP处理中心）
+                    {panelTitle}
                   </h2>
                   <p className="truncate text-[11px] text-blue-100/90">
                     {humanMode ? '人工客服已接入' : connecting ? '接入中…' : '智能助手 · 可转人工'}
@@ -680,7 +799,7 @@ export default function FloatingOnlineSupport({
             'pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full shadow-lg transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
             open ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-blue-600 text-white hover:bg-blue-700',
           )}
-          aria-label={open ? '关闭在线客服（ERP处理中心）' : '打开在线客服（ERP处理中心）'}
+          aria-label={open ? `关闭${panelTitle}` : `打开${panelTitle}`}
           aria-expanded={open}
           aria-controls={open ? panelId : undefined}
         >

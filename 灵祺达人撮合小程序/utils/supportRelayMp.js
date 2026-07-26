@@ -98,12 +98,19 @@ function relayFromToRole(from) {
 }
 
 function rowToMessage(row) {
+  if (!row || typeof row !== 'object') return null
   const ts = Number(row.ts) || 0
+  // fetchSessionMessages 已规范化为 {id,role}；syncFromCloud 再 merge 时须兼容，否则 client_msg_id/from_role 为空 → id 丢弃、ops 变成 user
+  const id = String(row.client_msg_id || row.id || '').trim()
+  const fromRaw =
+    row.from_role != null && String(row.from_role).trim() !== ''
+      ? String(row.from_role)
+      : String(row.role || 'user')
   return {
-    id: String(row.client_msg_id || ''),
-    role: relayFromToRole(String(row.from_role || '')),
+    id,
+    role: relayFromToRole(fromRaw),
     text: String(row.text || ''),
-    at: formatTime(ts),
+    at: row.at || formatTime(ts),
     ts,
   }
 }
@@ -115,7 +122,7 @@ function mergeMessages(prev, rows) {
   }
   for (const r of rows) {
     const m = rowToMessage(r)
-    if (m.id) map.set(m.id, m)
+    if (m && m.id) map.set(m.id, m)
   }
   return [...map.values()].sort((a, b) => (a.ts !== b.ts ? a.ts - b.ts : a.id.localeCompare(b.id)))
 }

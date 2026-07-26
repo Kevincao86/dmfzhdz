@@ -393,6 +393,8 @@ ecs-auth-api-server
 mpAccountAuth
 meoo-ops-mp-auth
 mpSupportRelayHandler
+mpSupportRelayHttp
+FloatingOnlineSupport
 support-ops-send
 OpsSupportWorkbenchPage
 supportOpsHttpApi
@@ -400,8 +402,11 @@ loginCredentialsPanel
 login-cred-panel
 pages/login/login
 utils/auth.js
+SupportPage
+mp-support-relay-e2e-smoke
 灵祺达人撮合小程序/
 灵祺星选小程序抖音版/
+灵祺达人履约管理后台/src/pages/SupportPage
 change-scope-guard
 PAT
       ;;
