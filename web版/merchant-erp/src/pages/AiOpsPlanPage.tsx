@@ -1032,12 +1032,15 @@ function SimplePlanGallery({ plan }: { plan: AiOpsPlanResult }) {
       }
     }
     if (open.kind === 'checklist') {
-      const flow = s.checklist.map((c, i) => ({
+      const flow: AiOpsPlanSimpleFlowItem[] = s.checklist.map((c, i) => ({
         title: `${i + 1}. ${c.text}`,
         body:
           c.detailFlow.length > 0
             ? c.detailFlow.map((f) => `${f.title}：${f.body}`).join('；')
             : c.detailNote || '按事项标题执行并打勾确认',
+        actions: c.detailFlow.flatMap((f) =>
+          (f.actions || []).map((a) => `${f.title} · ${a}`),
+        ),
       }))
       return {
         title: '落地清单 · 全部事项',
