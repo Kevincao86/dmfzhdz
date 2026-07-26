@@ -80,41 +80,23 @@ function mergePublishedOrdersFromRegistry(local, mpList, account) {
   })
 }
 
-/** 归属过滤失败时常返回空列表；空列表上剪枝会把全部本地发单误标「已删除」 */
-const ORPHAN_PRUNE_GRACE_MS = 30 * 60 * 1000
-
-function parsePublishedLocalMs(raw) {
-  const s = String(raw || '').trim()
-  if (!s) return 0
-  const t = Date.parse(s.replace(/\//g, '-'))
-  return Number.isFinite(t) ? t : 0
-}
-
-/** 注册表已无该单时，补写本地 deletedAt，避免跨端删除后仍出现在「已发布」 */
+/**
+ * 仅恢复误标删除：注册表仍存在的单清除本地 deletedAt。
+ * 禁止任何自动标删——真实删除只允许发单人确认删除或运营台超管短信删除
+ * （跨端删除态靠 mpAccountClientSync 同步 deletedAt，不靠本函数推断）。
+ */
 function pruneOrphanPublishedOrders(mpList) {
   const mpIds = new Set(
     (mpList || []).map((mp) => String(mp && mp.id ? mp.id : '').trim()).filter(Boolean),
   )
-  const local = applicationsStore.readPublishedOrders()
-  // includePrOwned 归属未命中时 mpList 可能为空，禁止据此全量误删
   if (mpIds.size === 0) return
+  if (typeof applicationsStore.clearPublishedOrderDeleted !== 'function') return
 
+  const local = applicationsStore.readPublishedOrders()
   for (const item of local) {
     if (!item || !item.deletedAt) continue
     const id = String(item.mpOrderId || '').trim()
-    if (id && mpIds.has(id) && typeof applicationsStore.clearPublishedOrderDeleted === 'function') {
-      applicationsStore.clearPublishedOrderDeleted(id)
-    }
-  }
-
-  const now = Date.now()
-  for (const item of local) {
-    if (!item || item.deletedAt) continue
-    const id = String(item.mpOrderId || '').trim()
-    if (!id || mpIds.has(id)) continue
-    const publishedMs = parsePublishedLocalMs(item.publishedAt)
-    if (publishedMs && now - publishedMs < ORPHAN_PRUNE_GRACE_MS) continue
-    applicationsStore.markPublishedOrderDeleted(id)
+    if (id && mpIds.has(id)) applicationsStore.clearPublishedOrderDeleted(id)
   }
 }
 

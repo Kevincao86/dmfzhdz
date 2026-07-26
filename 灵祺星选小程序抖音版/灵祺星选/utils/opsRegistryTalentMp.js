@@ -141,10 +141,13 @@ async function fetchRegistryOnce(opts) {
       body.includePrOwned = true
       const acc = auth.readAccount()
       const pr = userProfile.readPrProfile()
+      const participant = require('./participant.js')
       body.lingqiPrId = String((acc && acc.lingqiPrId) || (pr && pr.lingqiPrId) || '').trim()
       body.registryPrId = String(
         (acc && (acc.registryPrId || acc.registryMemberId)) || (pr && pr.id) || '',
       ).trim()
+      // 无手机号时服务端靠此 key 归属；不传会导致 includePrOwned 空列表 → 本地误删
+      body.prParticipantKey = participant.prParticipantKey(pr)
     }
     if (includeRecommendPool) body.includeRecommendPool = true
     if (opts && opts.includeOnly) body.includeOnly = true
