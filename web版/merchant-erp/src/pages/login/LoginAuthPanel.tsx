@@ -495,6 +495,20 @@ export default function LoginAuthPanel({
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
+                  <p className="mt-1.5 text-xs text-slate-500">
+                    忘记密码？
+                    <button
+                      type="button"
+                      className="ml-1 font-medium text-cyan-700 underline-offset-2 hover:underline"
+                      onClick={() => {
+                        setLoginMethod('sms')
+                        onErr(null)
+                        onInfoHint('已切换到手机验证码登录，验证通过即可进入工作台')
+                      }}
+                    >
+                      切换手机验证码登录
+                    </button>
+                  </p>
                 </div>
                 <RememberPasswordRow checked={rememberPassword} onChange={setRememberPassword} />
                 {err ? (

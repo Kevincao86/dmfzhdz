@@ -79,6 +79,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
+  /** 继承会话已有 guest_fingerprint，避免旧 RPC 按行过滤时丢掉 ops 回复 */
+  let guestFingerprint: string | null = null
+  try {
+    const fpQ = new URLSearchParams({
+      session_id: `eq.${sessionId}`,
+      guest_fingerprint: 'not.is.null',
+      select: 'guest_fingerprint',
+      order: 'ts.desc',
+      limit: '1',
+    })
+    const fpRes = await supportRelayAdminFetch(
+      `${supabaseUrl}/rest/v1/support_relay_messages?${fpQ}`,
+      {
+        headers: {
+          apikey: serviceRole,
+          Authorization: `Bearer ${serviceRole}`,
+        },
+      },
+    )
+    if (fpRes.ok) {
+      const fpRows = (await fpRes.json()) as Array<{ guest_fingerprint?: string }>
+      const hit = Array.isArray(fpRows) ? String(fpRows[0]?.guest_fingerprint || '').trim() : ''
+      if (hit) guestFingerprint = hit
+    }
+  } catch {
+    /* ignore */
+  }
+  if (!guestFingerprint && /^lq-mp[-:]/i.test(sessionId)) {
+    guestFingerprint = `lq-mp:${sessionId.replace(/^lq-mp[-:]/i, '').slice(0, 48)}`
+  }
+
   const row = {
     session_id: sessionId,
     customer_id: null,
@@ -88,6 +119,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     ts: Date.now(),
     client_msg_id: id,
     author_user_id: null,
+    guest_fingerprint: guestFingerprint,
   }
 
   let supabaseHost = ''

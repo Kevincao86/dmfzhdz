@@ -27,6 +27,10 @@ const LEGAL_PROMPT_COPY = {
     text: '使用账号登录前，请勾选并同意《用户协议》和《隐私政策》。',
     agree: '同意并登录',
   },
+  sms: {
+    text: '使用手机验证码登录前，请勾选并同意《用户协议》和《隐私政策》。',
+    agree: '同意并登录',
+  },
   reg: {
     text: '注册前，请勾选并同意《用户协议》和《隐私政策》。',
     agree: '同意并注册',
@@ -211,6 +215,8 @@ Page({
     loginIdentityIcon: '',
     loginName: '',
     password: '',
+    smsPhone: '',
+    smsLoginCode: '',
     regPhone: '',
     regSmsCode: '',
     regPassword: '',
@@ -357,8 +363,33 @@ Page({
   onTabPwd() {
     this.setData({ tab: 'pwd', err: '' })
   },
+  onTabSms() {
+    this.setData({
+      tab: 'sms',
+      err: '',
+      smsPhone: this.data.loginName || this.data.smsPhone || '',
+    })
+  },
+  onForgotPassword() {
+    this.setData({
+      tab: 'sms',
+      err: '',
+      smsPhone: this.data.loginName || this.data.smsPhone || '',
+    })
+    wx.showToast({ title: '已切换验证码登录', icon: 'none' })
+  },
   onTabReg() {
     this.setData({ tab: 'reg', err: '' })
+  },
+  onSmsPhone(e) {
+    this.setData({ smsPhone: mpPhoneAuth.sanitizePhoneInput(e.detail.value) })
+  },
+  onSmsLoginCode(e) {
+    this.setData({
+      smsLoginCode: String(e.detail.value || '')
+        .replace(/\D/g, '')
+        .slice(0, 6),
+    })
   },
 
   onGuestMode() {
@@ -610,6 +641,10 @@ Page({
       void this.doPwdLogin(workId)
       return
     }
+    if (action === 'sms') {
+      void this.doSmsLogin(workId)
+      return
+    }
     if (action === 'reg') {
       void this.doRegister(workId)
       return
@@ -737,6 +772,68 @@ Page({
       await navigateAfterLogin(this)
     } catch (e) {
       this.setData({ err: e && e.message ? e.message : '登录失败' })
+    } finally {
+      this.setData({ loading: false })
+    }
+  },
+
+  async onSendSmsLoginCode() {
+    const err = mpPhoneAuth.validatePhoneAccount(this.data.smsPhone)
+    if (err) {
+      this.setData({ err })
+      return
+    }
+    this.setData({ smsSending: true, err: '' })
+    try {
+      await auth.sendRegisterSms(this.data.smsPhone)
+      wx.showToast({ title: '验证码已发送', icon: 'none' })
+      this.setData({ smsCooldown: 60 })
+      const tick = setInterval(() => {
+        const n = this.data.smsCooldown - 1
+        if (n <= 0) {
+          clearInterval(tick)
+          this.setData({ smsCooldown: 0 })
+        } else {
+          this.setData({ smsCooldown: n })
+        }
+      }, 1000)
+    } catch (e) {
+      this.setData({ err: mpApiErrors.formatMpApiErr(e, '验证码发送失败') })
+    } finally {
+      this.setData({ smsSending: false })
+    }
+  },
+
+  async onSmsLogin() {
+    const workId = requireLoginIdentity(this)
+    if (!workId) return
+    if (!this.data.legalAgreed) {
+      openLegalPrompt(this, workId, 'sms')
+      return
+    }
+    await this.doSmsLogin(workId)
+  },
+
+  async doSmsLogin(workId) {
+    const phoneErr = mpPhoneAuth.validatePhoneAccount(this.data.smsPhone)
+    if (phoneErr) {
+      this.setData({ err: phoneErr })
+      return
+    }
+    if (!/^\d{6}$/.test(this.data.smsLoginCode)) {
+      this.setData({ err: '请输入 6 位验证码' })
+      return
+    }
+    this.setData({ loading: true, err: '' })
+    try {
+      const data = await auth.smsLogin(this.data.smsPhone, this.data.smsLoginCode)
+      await applyLoginIdentity(data, workId)
+      await navigateAfterLogin(this)
+    } catch (e) {
+      const msg = e && e.message ? e.message : '登录失败'
+      this.setData({
+        err: /phone_not_registered/i.test(msg) ? '该手机号尚未注册，请先注册' : msg,
+      })
     } finally {
       this.setData({ loading: false })
     }

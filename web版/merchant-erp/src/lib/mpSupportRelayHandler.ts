@@ -60,7 +60,10 @@ function normalizeRelayRows(data: unknown): Record<string, unknown>[] {
     .filter((row) => row.client_msg_id != null && row.from_role != null)
 }
 
-/** 优先 SECURITY DEFINER RPC（含 ops 运营回复）；ECS 未部署 RPC 时回退 service_role 直查 */
+/**
+ * 优先 service_role 按 session_id 直查（必含 from_role=ops 运营回复）。
+ * 旧版 RPC 若按行过滤 guest_fingerprint，会丢掉未带指纹的 ops 行。
+ */
 async function adminFetchMessages(
   supabaseUrl: string,
   serviceRole: string,
@@ -73,6 +76,29 @@ async function adminFetchMessages(
     'Content-Type': 'application/json',
   }
 
+  const q =
+    `session_id=eq.${encodeURIComponent(sessionId)}` +
+    '&select=from_role,text,ts,client_msg_id,guest_fingerprint&order=ts.asc&limit=200'
+  const r = await supportRelayAdminFetch(`${supabaseUrl}/rest/v1/support_relay_messages?${q}`, {
+    headers: {
+      apikey: serviceRole,
+      Authorization: `Bearer ${serviceRole}`,
+    },
+  })
+  if (r.ok) {
+    const rows = (await r.json()) as Record<string, unknown>[]
+    if (Array.isArray(rows) && rows.length > 0) {
+      const fp = String(guestFingerprint || '').trim()
+      const sessionOwned =
+        !fp ||
+        rows.some((row) => String(row.guest_fingerprint || '').trim() === fp) ||
+        rows.some((row) => String(row.from_role || '') === 'ops')
+      if (sessionOwned) return normalizeRelayRows(rows)
+    }
+    if (Array.isArray(rows)) return normalizeRelayRows(rows)
+  }
+
+  const directErr = r.ok ? '' : (await r.text()).slice(0, 400)
   const rpcRes = await supportRelayAdminFetch(`${supabaseUrl}/rest/v1/rpc/support_relay_guest_fetch_session`, {
     method: 'POST',
     headers,
@@ -85,24 +111,7 @@ async function adminFetchMessages(
     return normalizeRelayRows(await rpcRes.json())
   }
   const rpcErr = (await rpcRes.text()).slice(0, 400)
-  const rpcMissing = /PGRST202|42883|does not exist|Could not find/i.test(rpcErr)
-  if (!rpcMissing) {
-    throw new Error(rpcErr || `guest_fetch_failed_${rpcRes.status}`)
-  }
-
-  const q =
-    `session_id=eq.${encodeURIComponent(sessionId)}` +
-    '&select=from_role,text,ts,client_msg_id&order=ts.asc&limit=200'
-  const r = await supportRelayAdminFetch(`${supabaseUrl}/rest/v1/support_relay_messages?${q}`, {
-    headers: {
-      apikey: serviceRole,
-      Authorization: `Bearer ${serviceRole}`,
-    },
-  })
-  if (!r.ok) {
-    throw new Error((await r.text()).slice(0, 400) || `fetch_failed_${r.status}`)
-  }
-  return normalizeRelayRows(await r.json())
+  throw new Error(directErr || rpcErr || `fetch_failed_${r.status}`)
 }
 
 async function adminInsertMessage(

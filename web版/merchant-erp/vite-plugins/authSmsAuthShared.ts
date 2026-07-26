@@ -236,7 +236,7 @@ export async function verifyAuthSmsCode(
   return verifySmsCode(phone, code, viteRoot)
 }
 
-function phoneFromUserRecord(u: Record<string, unknown>): string | null {
+export function phoneFromUserRecord(u: Record<string, unknown>): string | null {
   const meta = u.user_metadata as { phone?: string } | undefined
   const fromMeta = normalizeCnMobile(meta?.phone ?? '')
   if (fromMeta) return fromMeta

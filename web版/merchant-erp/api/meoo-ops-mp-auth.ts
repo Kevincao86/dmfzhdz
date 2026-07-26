@@ -25,6 +25,8 @@ import {
   mpAuthScanCreate,
   mpAuthScanPoll,
   mpAuthSetLoginCredentials,
+  mpAuthSmsLogin,
+  mpAuthChangePasswordBySms,
   mpAuthEnsureIdentity,
   mpAuthSwitchRole,
   mpAuthUpdateWxProfile,
@@ -244,6 +246,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       })
       const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, account)
       sendJson(res, 200, { ok: true, token, isNew, account: payload })
+      return
+    }
+
+    if (action === 'sms_login') {
+      const { token, account } = await mpAuthSmsLogin(
+        supabaseUrl,
+        serviceRole,
+        String(body.phone || body.loginName || ''),
+        String(body.smsCode || ''),
+      )
+      const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, account)
+      sendJson(res, 200, { ok: true, token, account: payload })
+      return
+    }
+
+    if (action === 'change_password_sms') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      await mpAuthChangePasswordBySms(
+        supabaseUrl,
+        serviceRole,
+        sess.account.id,
+        String(body.phone || body.loginName || ''),
+        String(body.smsCode || ''),
+        String(body.password || body.newPassword || ''),
+      )
+      const refreshed = await resolveSession(rest, token)
+      sendJson(res, 200, {
+        ok: true,
+        account: refreshed ? accountToClientPayload(refreshed.account) : accountToClientPayload(sess.account),
+      })
       return
     }
 
@@ -1478,6 +1515,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         'dy_login',
         'bind_phone_login',
         'password_login',
+        'sms_login',
+        'change_password_sms',
         'register',
         'set_password',
         'switch_role',
@@ -1535,6 +1574,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       msg === 'sms_code_invalid' ||
       msg === 'invalid_phone' ||
       msg === 'invalid_sms_code' ||
+      msg === 'phone_not_registered' ||
+      msg === 'phone_mismatch' ||
+      msg === 'account_phone_missing' ||
       msg === 'phone_bind_failed' ||
       msg === 'wx_openid_conflict' ||
       msg === 'dy_openid_conflict' ||
@@ -1558,6 +1600,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       invalid_phone: '请输入有效大陆手机号',
       invalid_password: '密码至少 6 位',
       login_name_taken: '该手机号已被注册',
+      phone_not_registered: '该手机号尚未注册，请先注册',
+      phone_mismatch: '手机号须与当前登录账号一致',
+      account_phone_missing: '当前账号未绑定手机号',
       invalid_credentials: '账号或密码错误',
       account_no_password: '该账号未设置密码，请先用微信登录并在资料页设置密码',
       invalid_session: '登录已过期，请重新登录',

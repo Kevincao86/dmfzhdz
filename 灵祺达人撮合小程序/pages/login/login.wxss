@@ -380,6 +380,15 @@
   color: var(--lq-text-secondary);
 }
 
+.login-forgot {
+  display: block;
+  margin: 12rpx 0 8rpx;
+  font-size: 24rpx;
+  color: var(--lq-primary);
+  font-weight: 500;
+  text-align: right;
+}
+
 .login-guest-link {
   display: block;
   margin-top: 20rpx;

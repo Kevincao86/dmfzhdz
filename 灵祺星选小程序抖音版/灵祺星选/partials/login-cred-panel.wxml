@@ -1,12 +1,12 @@
 <view class="card apply-form cred-panel">
   <view class="section-head">
     <view class="section-head-dot" />
-    <text class="section-title">{{credentialsReady ? '修改账号密码' : '新建账号密码'}}</text>
+    <text class="section-title">{{credentialsReady ? '修改密码' : '新建账号密码'}}</text>
   </view>
 
   <view wx:if="{{credentialsReady}}" class="cred-ready-row">
     <text class="cred-ready-text">账号密码已设置</text>
-    <button class="cred-edit-btn" size="mini" bindtap="onEditCredentials">修改</button>
+    <button class="cred-edit-btn" size="mini" bindtap="onEditCredentials">修改密码</button>
   </view>
 
   <view wx:else class="cred-check-row">
@@ -16,30 +16,50 @@
         <text>用于网页端登录</text>
       </label>
     </checkbox-group>
-    <text class="hint block-hint">与当前抖音账号绑定为同一灵祺 ID，可在登录页使用账号密码登录</text>
+    <text class="hint block-hint">与当前微信绑定为同一灵祺 ID，可在登录页使用账号密码登录</text>
   </view>
 </view>
 
 <view class="cred-modal-mask" wx:if="{{showCredModal}}" bindtap="onCloseCredModal" />
 <view class="cred-modal" wx:if="{{showCredModal}}" catchtap="stopBubble">
-  <text class="cred-modal-title">{{credentialsReady ? '修改账号密码' : '新建账号密码'}}</text>
+  <text class="cred-modal-title">{{credentialsReady ? '修改密码' : '新建账号密码'}}</text>
   <view class="form-row">
     <text class="form-label">手机号</text>
     <input
       class="input"
       type="number"
       maxlength="11"
-      placeholder="11 位大陆手机号，不可重复"
+      placeholder="须与当前账号手机号一致"
       value="{{modalLoginName}}"
       bindinput="onModalLoginNameInput"
     />
   </view>
+  <view class="form-row" wx:if="{{credentialsReady}}">
+    <text class="form-label">验证码</text>
+    <view class="cred-sms-row">
+      <input
+        class="input cred-sms-input"
+        type="number"
+        maxlength="6"
+        placeholder="6 位验证码"
+        value="{{modalSmsCode}}"
+        bindinput="onModalSmsCodeInput"
+      />
+      <button
+        class="cred-sms-btn"
+        size="mini"
+        loading="{{credSmsSending}}"
+        disabled="{{credSmsSending || credSmsCooldown > 0}}"
+        bindtap="onSendCredSms"
+      >{{credSmsCooldown > 0 ? credSmsCooldown + 's' : '获取验证码'}}</button>
+    </view>
+  </view>
   <view class="form-row">
-    <text class="form-label">登录密码</text>
+    <text class="form-label">{{credentialsReady ? '新密码' : '登录密码'}}</text>
     <input
       class="input"
       password
-      placeholder="{{hasPassword ? '留空则不修改原密码' : '至少 6 位'}}"
+      placeholder="{{hasPassword ? '至少 6 位新密码' : '至少 6 位'}}"
       value="{{modalPassword}}"
       bindinput="onModalPasswordInput"
     />

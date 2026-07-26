@@ -449,7 +449,7 @@ export default function MeooLayout() {
                         }}
                       >
                         <Settings className="mr-3 h-4 w-4 text-slate-400" />
-                        个人设置
+                        修改密码
                       </button>
                     </div>
                     <div className="border-t border-slate-100 py-1">
@@ -493,7 +493,7 @@ export default function MeooLayout() {
           >
             <div className="mb-4 flex items-center justify-between gap-3">
               <h2 id="meoo-personal-settings-title" className="text-lg font-semibold text-slate-900">
-                个人设置
+                修改密码
               </h2>
               <button
                 type="button"

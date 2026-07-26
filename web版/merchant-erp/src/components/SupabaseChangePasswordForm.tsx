@@ -1,45 +1,108 @@
 import { KeyRound, Loader2 } from 'lucide-react'
 import SecretInput from './SecretInput'
-import { useEffect, useId, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { sendAuthSms } from '../lib/tenantRegisterApi'
+import { phoneFromAuthUser } from '../lib/tenantLocalState'
+import { merchantErpApiCandidates } from '../lib/merchantErpApiBase'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
+import { toUserFacingError } from '../lib/userFacingError'
 
 /**
- * 商家主账号（Supabase）自助修改登录密码；入口：头像 → 个人设置。
+ * 商家/服务商主账号：手机号 + 短信验证码修改登录密码。
+ * 入口：头像 → 修改密码。
  */
 export default function SupabaseChangePasswordForm() {
   const rid = useId()
   const [accountHint, setAccountHint] = useState('')
-  const [currentPassword, setCurrentPassword] = useState('')
+  const [boundPhone, setBoundPhone] = useState('')
+  const [phone, setPhone] = useState('')
+  const [smsCode, setSmsCode] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [smsSending, setSmsSending] = useState(false)
+  const [smsCooldown, setSmsCooldown] = useState(0)
+  const smsInflightRef = useRef(false)
 
   useEffect(() => {
     if (!supabaseConfigured || !supabase) return
     void supabase.auth.getUser().then(({ data }) => {
       const u = data.user
       if (!u) return
-      const meta = u.user_metadata as { login_name?: string } | undefined
+      const meta = u.user_metadata as { login_name?: string; phone?: string } | undefined
       const name = meta?.login_name?.trim()
+      const mobile = phoneFromAuthUser({ phone: u.phone, user_metadata: meta })
+      setBoundPhone(mobile)
+      setPhone(mobile)
       setAccountHint(name ? `账户名：${name}` : u.email ? `登录邮箱：${u.email}` : '')
     })
   }, [])
 
+  useEffect(() => {
+    if (smsCooldown <= 0) return
+    const t = window.setTimeout(() => setSmsCooldown((c) => Math.max(0, c - 1)), 1000)
+    return () => window.clearTimeout(t)
+  }, [smsCooldown])
+
   if (!supabaseConfigured || !supabase) return null
 
-  const curId = `${rid}-current`
+  const phoneId = `${rid}-phone`
+  const smsId = `${rid}-sms`
   const newId = `${rid}-new`
   const cnfId = `${rid}-confirm`
+
+  const onSendSms = async () => {
+    if (smsInflightRef.current || smsSending || smsCooldown > 0) return
+    setErr(null)
+    setOk(null)
+    const mobile = phone.replace(/\D/g, '').replace(/^86/, '')
+    if (!/^1\d{10}$/.test(mobile)) {
+      setErr('请输入有效大陆手机号')
+      return
+    }
+    if (boundPhone && mobile !== boundPhone) {
+      setErr('手机号须与当前登录账号一致')
+      return
+    }
+    smsInflightRef.current = true
+    setSmsSending(true)
+    try {
+      const r = await sendAuthSms(mobile)
+      if (!r.ok) {
+        setErr(toUserFacingError(r.message ?? r.error, '验证码发送'))
+        return
+      }
+      setSmsCooldown(60)
+      if (r.devCode) {
+        setSmsCode(r.devCode)
+        setOk(`开发环境验证码：${r.devCode}（已自动填入）`)
+      } else {
+        setOk(r.message ?? '验证码已发送')
+      }
+    } finally {
+      setSmsSending(false)
+      smsInflightRef.current = false
+    }
+  }
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setErr(null)
     setOk(null)
 
-    if (currentPassword.length < 6) {
-      setErr('请输入当前密码（至少 6 位）')
+    const mobile = phone.replace(/\D/g, '').replace(/^86/, '')
+    if (!/^1\d{10}$/.test(mobile)) {
+      setErr('请输入有效大陆手机号')
+      return
+    }
+    if (boundPhone && mobile !== boundPhone) {
+      setErr('手机号须与当前登录账号一致')
+      return
+    }
+    if (!/^\d{6}$/.test(smsCode.trim())) {
+      setErr('请输入 6 位验证码')
       return
     }
     if (newPassword.length < 6) {
@@ -50,41 +113,56 @@ export default function SupabaseChangePasswordForm() {
       setErr('两次输入的新密码不一致')
       return
     }
-    if (newPassword === currentPassword) {
-      setErr('新密码不能与当前密码相同')
-      return
-    }
 
     const client = supabase
     if (!client) return
     setBusy(true)
     try {
-      const { data: userData } = await client.auth.getUser()
-      const email = userData.user?.email
-      if (!email) {
-        setErr('无法读取登录邮箱，请重新登录后再试')
+      const { data: sess } = await client.auth.getSession()
+      const token = sess.session?.access_token
+      if (!token) {
+        setErr('登录已失效，请重新登录后再改密')
         return
       }
 
-      const verify = await client.auth.signInWithPassword({
-        email,
-        password: currentPassword,
-      })
-      if (verify.error) {
-        setErr('当前密码不正确')
-        return
+      const targets = merchantErpApiCandidates('/api/meoo-auth-sms-change-password')
+      let lastErr = '改密失败'
+      for (const url of targets) {
+        let res: Response
+        try {
+          res = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              phone: mobile,
+              smsCode: smsCode.trim(),
+              newPassword,
+            }),
+          })
+        } catch (e) {
+          lastErr = e instanceof Error ? e.message : String(e)
+          continue
+        }
+        const json = (await res.json().catch(() => ({}))) as {
+          ok?: boolean
+          message?: string
+          error?: string
+        }
+        if (res.ok && json.ok) {
+          setOk(json.message || '密码已更新，下次登录请使用新密码')
+          setSmsCode('')
+          setNewPassword('')
+          setConfirmPassword('')
+          return
+        }
+        lastErr = json.message || json.error || `HTTP ${res.status}`
+        if (res.status === 404 || res.status >= 502) continue
+        break
       }
-
-      const { error: upd } = await client.auth.updateUser({ password: newPassword })
-      if (upd) {
-        setErr(upd.message)
-        return
-      }
-
-      setOk('密码已更新，下次登录请使用新密码')
-      setCurrentPassword('')
-      setNewPassword('')
-      setConfirmPassword('')
+      setErr(lastErr)
     } finally {
       setBusy(false)
     }
@@ -97,9 +175,9 @@ export default function SupabaseChangePasswordForm() {
           <KeyRound className="h-5 w-5 text-indigo-600" />
         </div>
         <div>
-          <h3 className="text-base font-semibold text-gray-900">主账号登录密码</h3>
+          <h3 className="text-base font-semibold text-gray-900">修改登录密码</h3>
           <p className="mt-1 text-sm text-gray-600">
-            用于登录本 ERP 的主账号密码（云端）。
+            使用绑定手机号收取验证码后设置新密码。
             {accountHint ? (
               <>
                 {' '}
@@ -111,16 +189,46 @@ export default function SupabaseChangePasswordForm() {
       </div>
       <form className="mx-auto max-w-md space-y-3" onSubmit={(e) => void onSubmit(e)}>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor={curId}>
-            当前密码
+          <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor={phoneId}>
+            手机号
           </label>
-          <SecretInput
-            id={curId}
-            autoComplete="current-password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
+          <input
+            id={phoneId}
+            type="tel"
+            inputMode="numeric"
+            autoComplete="tel"
+            maxLength={11}
+            value={phone}
+            onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
             className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none ring-blue-500/25 focus:ring-2"
+            placeholder="须与当前登录账号手机号一致"
           />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor={smsId}>
+            验证码
+          </label>
+          <div className="flex gap-2">
+            <input
+              id={smsId}
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              value={smsCode}
+              onChange={(e) => setSmsCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none ring-blue-500/25 focus:ring-2"
+              placeholder="6 位验证码"
+            />
+            <button
+              type="button"
+              disabled={smsSending || smsCooldown > 0 || busy}
+              onClick={() => void onSendSms()}
+              className="shrink-0 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-60"
+            >
+              {smsSending ? '发送中…' : smsCooldown > 0 ? `${smsCooldown}s` : '获取验证码'}
+            </button>
+          </div>
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor={newId}>

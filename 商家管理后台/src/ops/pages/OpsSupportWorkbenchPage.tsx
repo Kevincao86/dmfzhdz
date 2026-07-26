@@ -575,11 +575,10 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp', embedded = fa
     const sid = selectedId
     if (!t || !sid || sendBusy) return
 
-    const isMpSession = channel === 'mp' || isMpSupportSession(sid)
     const ws = wsRef.current
     const wsOpen = Boolean(relayUrl && ws && ws.readyState === WebSocket.OPEN)
-    /** 小程序会话必须写 Supabase；生产/有 token 时 ERP 会话也走 HTTP */
-    const useHttp = Boolean(httpPollToken) && (isMpSession || !wsOpen)
+    /** 有 HTTP token 时一律写 ECS（含 ERP+WS 已连接），避免 WS-only 导致小程序/星选拉不到回复 */
+    const useHttp = Boolean(httpPollToken)
 
     if (!useHttp && !wsOpen) {
       setSendError('未连接客服通道：请确认云端轮询已启用，或开发环境已启动 WebSocket 服务')

@@ -123,6 +123,14 @@ async function passwordLogin(loginName, password) {
   return accountMemberSync.afterAuthSuccess(data)
 }
 
+async function smsLogin(phone, smsCode) {
+  const data = await authPost('sms_login', {
+    phone: String(phone || '').trim(),
+    smsCode: String(smsCode || '').trim(),
+  })
+  return accountMemberSync.afterAuthSuccess(data)
+}
+
 async function phoneRegister({ phone, smsCode, password, role }) {
   const data = await authPost('register', {
     phone: String(phone || '').trim(),
@@ -141,6 +149,14 @@ async function setLoginCredentials(loginName, password) {
   return authPost('set_login_credentials', {
     loginName: String(loginName || '').trim(),
     password: password == null ? '' : String(password),
+  })
+}
+
+async function changePasswordBySms(phone, smsCode, newPassword) {
+  return authPost('change_password_sms', {
+    phone: String(phone || '').trim(),
+    smsCode: String(smsCode || '').trim(),
+    password: String(newPassword || ''),
   })
 }
 
@@ -218,7 +234,9 @@ module.exports = {
   ensureWxAuthSession,
   wxLogin,
   passwordLogin,
+  smsLogin,
   setLoginCredentials,
+  changePasswordBySms,
   switchRole,
   ensureIdentity,
   refreshSession,
