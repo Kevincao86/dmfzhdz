@@ -4,6 +4,7 @@
 import {
   buildAiOpsRoiLookupForPrompt,
   enrichAiOpsPlanPostProcess,
+  ensureSimplePlanDetailDepth,
   isAiOpsPlanResultUsable,
   normalizeAiOpsPlanResult,
   type AiOpsPlanEdition,
@@ -282,7 +283,7 @@ const SYSTEM_PROMPT = `你是资深本地生活/餐饮多平台运营总监。�
 9. 【ROI】禁止「假设转化率」；按平台行业中位核销转化写 note；expectedGmvYuan=周期总GMV=客单×单量，且 ≥ max(投入×投产中位, 投入÷毛利率×1.2)；roi=毛利ROI。
 10. Detail/howTo/rationale 各段≤120字；输出必须是完整可解析 JSON，控制总长，禁止截断。`
 
-/** 简易版：大白话瘦 JSON，供中小商家/个人快速落地（含点击展开的 detailFlow） */
+/** 简易版：大白话瘦 JSON；detailFlow 每阶段必须有 body + actions（最后一级动作） */
 const SIMPLE_SYSTEM_PROMPT = `你是本地生活门店运营教练，服务中小商家与个人店主。用大白话，禁止行话缩写（如 ROI、GMV、BGC、UGC、KPI、POI 等）。只输出一个 JSON 对象（不要 Markdown），结构必须为：
 {
   "planEdition": "simple",
@@ -296,12 +297,24 @@ const SIMPLE_SYSTEM_PROMPT = `你是本地生活门店运营教练，服务中�
   "steps": [
     {
       "title": "第1步标题",
-      "body": "白话说明怎么做（卡片摘要）",
-      "tip": "可选小贴士",
+      "body": "卡片摘要：白话说明怎么做",
+      "tip": "小贴士",
       "detailFlow": [
-        { "title": "准备", "body": "具体怎么做" },
-        { "title": "执行", "body": "具体怎么做" },
-        { "title": "验收", "body": "怎样算完成" }
+        {
+          "title": "准备",
+          "body": "本阶段要完成什么（1～2句，禁止空）",
+          "actions": ["动作1：具体到打开哪里/写什么", "动作2", "动作3"]
+        },
+        {
+          "title": "执行",
+          "body": "怎么动手（1～2句）",
+          "actions": ["动作1", "动作2", "动作3"]
+        },
+        {
+          "title": "验收",
+          "body": "怎样算做完（1～2句）",
+          "actions": ["检查项1", "检查项2"]
+        }
       ],
       "detailNote": "注意事项一句话"
     }
@@ -311,12 +324,28 @@ const SIMPLE_SYSTEM_PROMPT = `你是本地生活门店运营教练，服务中�
       "platform": "抖音",
       "how": "1～2句：发什么、挂什么、几点发",
       "detailFlow": [
-        { "title": "选题", "body": "…" },
-        { "title": "拍摄/剪辑", "body": "…" },
-        { "title": "发布挂链", "body": "…" },
-        { "title": "复盘", "body": "…" }
+        {
+          "title": "选题",
+          "body": "今天拍什么角度",
+          "actions": ["定钩子文案", "列拍摄清单", "定发布时间"]
+        },
+        {
+          "title": "拍摄/剪辑",
+          "body": "怎么拍怎么剪",
+          "actions": ["拍哪些镜头", "字幕写什么", "片尾引导"]
+        },
+        {
+          "title": "发布挂链",
+          "body": "怎么发怎么挂",
+          "actions": ["标题怎么写", "挂哪个团购", "何时点发布"]
+        },
+        {
+          "title": "复盘",
+          "body": "看什么数据、怎么改",
+          "actions": ["记哪些指标", "有效素材如何复用"]
+        }
       ],
-      "detailNote": "可选补充"
+      "detailNote": "真实拍摄，勿虚假宣传"
     }
   ],
   "combos": [
@@ -326,30 +355,50 @@ const SIMPLE_SYSTEM_PROMPT = `你是本地生活门店运营教练，服务中�
       "priceHint": "大概售价如 ¥99",
       "items": "包含项目（顿号分隔）",
       "detailFlow": [
-        { "title": "组品", "body": "怎么定内容与价" },
-        { "title": "上架", "body": "各平台怎么挂" },
-        { "title": "核销话术", "body": "到店怎么说" }
+        {
+          "title": "组品",
+          "body": "定内容与价格",
+          "actions": ["列包含项目", "定售价与规则", "算是否划算"]
+        },
+        {
+          "title": "上架",
+          "body": "各平台怎么挂",
+          "actions": ["传主图", "写标题", "设门店与库存"]
+        },
+        {
+          "title": "核销话术",
+          "body": "到店怎么说",
+          "actions": ["开场问券", "扫码确认", "异常怎么解释"]
+        }
       ],
-      "detailNote": "可选补充"
+      "detailNote": "规则写清，避免纠纷"
     }
   ],
   "checklist": [
     {
       "text": "落地事项1",
       "detailFlow": [
-        { "title": "做什么", "body": "…" },
-        { "title": "完成标准", "body": "…" }
+        {
+          "title": "做什么",
+          "body": "今天具体做哪些事",
+          "actions": ["动作1", "动作2", "动作3"]
+        },
+        {
+          "title": "完成标准",
+          "body": "怎样算完成",
+          "actions": ["标准1", "标准2"]
+        }
       ],
-      "detailNote": "可选补充"
+      "detailNote": "文案简洁突出优惠"
     }
   ]
 }
-硬性要求：
-1. steps 3～5 条（≤5），写「本周先做什么」；每条必须带 detailFlow（3～5 步细流程），可当天动手。
-2. platforms 只覆盖用户勾选平台，最多 4 条；每条 how 1～2 句，且必须带 detailFlow（3～5 步）。
-3. combos 2～4 个；有菜单/已上架套餐时优先用真实名称；每条必须带 items + detailFlow。
-4. checklist 5～8 条，每条为对象（text + detailFlow），不要只给纯字符串。
-5. 全文口语化；禁止空话与六表结构字段；detailFlow 每步 body≤40字。`
+硬性要求（违反即失败）：
+1. steps 3～5；platforms≤4 且仅用户勾选平台；combos 2～4；checklist 5～8。
+2. 每个 detailFlow 阶段：title、body、actions 三者都必填；body 禁止空、禁止只写省略号「…」；actions 必须 2～5 条，写到「最后一级」可勾选动作（打开后台/拍什么/写什么文案/几点发）。
+3. 禁止只输出阶段标题（如只有「准备」「选题」而 body/actions 为空）。
+4. 有菜单/已上架套餐时优先用真实名称；全文口语化；禁止六表结构字段。
+5. 控制总长，但优先保证 actions 写满，不要为了短而删细节。`
 
 async function enrichCombosFromProductPlan(
   plan: AiOpsPlanResult,
@@ -547,6 +596,8 @@ export async function runAiOpsPlanCore(
           },
         }
       }
+      // 补全 detailFlow.body / 最后一级 actions（模型常只吐标题）
+      plan = ensureSimplePlanDetailDepth(plan)
       return {
         status: 200,
         body: {

@@ -48,6 +48,7 @@ import {
   AI_OPS_PLAN_TABS,
   aiOpsPlanToMarkdown,
   enrichAiOpsPlanPostProcess,
+  ensureSimplePlanDetailDepth,
   isAiOpsPlanSimpleEdition,
   normalizeAiOpsPlanResult,
   synthesizeSimpleDetailFlow,
@@ -904,20 +905,34 @@ function SimpleDetailFlowList({
         </p>
       ) : null}
       {flow.length ? (
-        <ol className="space-y-2.5">
+        <ol className="space-y-3">
           {flow.map((f, i) => (
             <li
               key={`${f.title}-${i}`}
-              className="flex gap-3 rounded-lg border border-gray-100 bg-white px-3 py-2.5"
+              className="rounded-lg border border-gray-100 bg-white px-3 py-2.5"
             >
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
-                {i + 1}
-              </span>
-              <div className="min-w-0">
-                <div className="text-sm font-semibold text-gray-900">{f.title}</div>
-                {f.body ? (
-                  <p className="mt-0.5 text-sm leading-relaxed text-gray-600">{f.body}</p>
-                ) : null}
+              <div className="flex gap-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
+                  {i + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold text-gray-900">{f.title}</div>
+                  {f.body ? (
+                    <p className="mt-0.5 text-sm leading-relaxed text-gray-600">{f.body}</p>
+                  ) : null}
+                  {f.actions?.length ? (
+                    <ul className="mt-2 space-y-1.5 border-l-2 border-blue-100 pl-3">
+                      {f.actions.map((a, j) => (
+                        <li key={`${i}-${j}`} className="flex gap-2 text-sm leading-relaxed text-gray-700">
+                          <span className="mt-0.5 shrink-0 text-xs font-medium text-blue-600">
+                            {i + 1}.{j + 1}
+                          </span>
+                          <span>{a}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
               </div>
             </li>
           ))}
@@ -944,7 +959,8 @@ type SimpleDetailOpen =
 
 /** 简易版：封面 → 步骤 → 平台 → 货盘 → 清单（点击查看细流程） */
 function SimplePlanGallery({ plan }: { plan: AiOpsPlanResult }) {
-  const s = plan.simplePlan
+  const enriched = useMemo(() => ensureSimplePlanDetailDepth(plan), [plan])
+  const s = enriched.simplePlan
   const [open, setOpen] = useState<SimpleDetailOpen>(null)
   if (!s) {
     return <p className="text-sm text-gray-500">暂无简易方案内容</p>
@@ -2354,7 +2370,7 @@ export default function AiOpsPlanPage() {
         return
       }
       const planFixed = isAiOpsPlanSimpleEdition(r.plan)
-        ? { ...r.plan, planEdition: 'simple' as const }
+        ? ensureSimplePlanDetailDepth({ ...r.plan, planEdition: 'simple' as const })
         : enrichAiOpsPlanPostProcess(r.plan, {
             industryPath: input.industryPath,
             margins: input.margins,
@@ -3150,7 +3166,7 @@ export default function AiOpsPlanPage() {
                         setPlanEdition(simple ? 'simple' : 'standard')
                         setPlan(
                           simple
-                            ? { ...n, planEdition: 'simple' }
+                            ? ensureSimplePlanDetailDepth({ ...n, planEdition: 'simple' })
                             : enrichAiOpsPlanPostProcess(n, {
                                 industryPath:
                                   editIntel.industryPath || intel.industryPath || undefined,
