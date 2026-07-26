@@ -41,8 +41,12 @@ export function exportAiOpsPlanExcel(plan: AiOpsPlanResult, basename: string) {
         ['套餐', '卖点', '价格'],
         ...s.combos.map((c) => [c.name, c.sellingPoint, c.priceHint]),
         [],
-        ['落地清单'],
-        ...s.checklist.map((item) => [item]),
+        ['落地清单', '细流程', '备注'],
+        ...s.checklist.map((item) => [
+          item.text,
+          item.detailFlow.map((f) => `${f.title}：${f.body}`).join('；'),
+          item.detailNote,
+        ]),
       ]),
       '简易方案',
     )

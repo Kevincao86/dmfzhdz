@@ -282,7 +282,7 @@ const SYSTEM_PROMPT = `你是资深本地生活/餐饮多平台运营总监。�
 9. 【ROI】禁止「假设转化率」；按平台行业中位核销转化写 note；expectedGmvYuan=周期总GMV=客单×单量，且 ≥ max(投入×投产中位, 投入÷毛利率×1.2)；roi=毛利ROI。
 10. Detail/howTo/rationale 各段≤120字；输出必须是完整可解析 JSON，控制总长，禁止截断。`
 
-/** 简易版：大白话瘦 JSON，供中小商家/个人快速落地 */
+/** 简易版：大白话瘦 JSON，供中小商家/个人快速落地（含点击展开的 detailFlow） */
 const SIMPLE_SYSTEM_PROMPT = `你是本地生活门店运营教练，服务中小商家与个人店主。用大白话，禁止行话缩写（如 ROI、GMV、BGC、UGC、KPI、POI 等）。只输出一个 JSON 对象（不要 Markdown），结构必须为：
 {
   "planEdition": "simple",
@@ -294,22 +294,62 @@ const SIMPLE_SYSTEM_PROMPT = `你是本地生活门店运营教练，服务中�
     "budgetHint": "预算用法一句话"
   },
   "steps": [
-    { "title": "第1步标题", "body": "白话说明怎么做", "tip": "可选小贴士" }
+    {
+      "title": "第1步标题",
+      "body": "白话说明怎么做（卡片摘要）",
+      "tip": "可选小贴士",
+      "detailFlow": [
+        { "title": "准备", "body": "具体怎么做" },
+        { "title": "执行", "body": "具体怎么做" },
+        { "title": "验收", "body": "怎样算完成" }
+      ],
+      "detailNote": "注意事项一句话"
+    }
   ],
   "platforms": [
-    { "platform": "抖音", "how": "1～2句：发什么、挂什么、几点发" }
+    {
+      "platform": "抖音",
+      "how": "1～2句：发什么、挂什么、几点发",
+      "detailFlow": [
+        { "title": "选题", "body": "…" },
+        { "title": "拍摄/剪辑", "body": "…" },
+        { "title": "发布挂链", "body": "…" },
+        { "title": "复盘", "body": "…" }
+      ],
+      "detailNote": "可选补充"
+    }
   ],
   "combos": [
-    { "name": "套餐名", "sellingPoint": "卖点白话", "priceHint": "大概售价如 ¥99" }
+    {
+      "name": "套餐名",
+      "sellingPoint": "卖点白话",
+      "priceHint": "大概售价如 ¥99",
+      "items": "包含项目（顿号分隔）",
+      "detailFlow": [
+        { "title": "组品", "body": "怎么定内容与价" },
+        { "title": "上架", "body": "各平台怎么挂" },
+        { "title": "核销话术", "body": "到店怎么说" }
+      ],
+      "detailNote": "可选补充"
+    }
   ],
-  "checklist": ["落地事项1", "事项2"]
+  "checklist": [
+    {
+      "text": "落地事项1",
+      "detailFlow": [
+        { "title": "做什么", "body": "…" },
+        { "title": "完成标准", "body": "…" }
+      ],
+      "detailNote": "可选补充"
+    }
+  ]
 }
 硬性要求：
-1. steps 3～5 条（≤5），写「本周先做什么」，可执行、可当天动手。
-2. platforms 只覆盖用户勾选平台，每平台 1～2 句，最多 4 条。
-3. combos 2～4 个；有菜单/已上架套餐时优先用真实名称，勿乱编菜名。
-4. checklist 5～8 条短句，像待办清单。
-5. 全文口语化，短句为主；禁止空话与六表结构字段。`
+1. steps 3～5 条（≤5），写「本周先做什么」；每条必须带 detailFlow（3～5 步细流程），可当天动手。
+2. platforms 只覆盖用户勾选平台，最多 4 条；每条 how 1～2 句，且必须带 detailFlow（3～5 步）。
+3. combos 2～4 个；有菜单/已上架套餐时优先用真实名称；每条必须带 items + detailFlow。
+4. checklist 5～8 条，每条为对象（text + detailFlow），不要只给纯字符串。
+5. 全文口语化；禁止空话与六表结构字段；detailFlow 每步 body≤40字。`
 
 async function enrichCombosFromProductPlan(
   plan: AiOpsPlanResult,

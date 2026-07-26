@@ -12,7 +12,15 @@ import {
   Store,
   Trash2,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from 'react'
 import { Link } from 'react-router-dom'
 import RecruitmentPlatformPicker from '../components/recruitment/RecruitmentPlatformPicker'
 import { usePartnerClients } from '../context/PartnerClientContext'
@@ -42,11 +50,13 @@ import {
   enrichAiOpsPlanPostProcess,
   isAiOpsPlanSimpleEdition,
   normalizeAiOpsPlanResult,
+  synthesizeSimpleDetailFlow,
   type AiOpsPlanEdition,
   type AiOpsPlanGenerateInput,
   type AiOpsPlanMilestone,
   type AiOpsPlanMilestoneKind,
   type AiOpsPlanResult,
+  type AiOpsPlanSimpleFlowItem,
   type AiOpsPlanTabId,
 } from '../lib/aiOpsPlanTypes'
 import { loadMerchantIntelSnapshot } from '../lib/agentMerchantContext'
@@ -397,7 +407,13 @@ function DetailModal({
   )
 }
 
-function ViewDetailBtn({ onClick, label = '查看' }: { onClick: () => void; label?: string }) {
+function ViewDetailBtn({
+  onClick,
+  label = '查看',
+}: {
+  onClick: (e: ReactMouseEvent) => void
+  label?: string
+}) {
   return (
     <button
       type="button"
@@ -871,13 +887,151 @@ const SIMPLE_STEP_TONES = [
   'from-rose-500 to-pink-600',
 ] as const
 
-/** 简易版：封面 → 步骤 → 平台 → 货盘 → 清单 */
+function SimpleDetailFlowList({
+  flow,
+  note,
+  summary,
+}: {
+  flow: AiOpsPlanSimpleFlowItem[]
+  note?: string
+  summary?: string
+}) {
+  return (
+    <div className="space-y-3">
+      {summary ? (
+        <p className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2.5 text-sm leading-relaxed text-gray-700">
+          {summary}
+        </p>
+      ) : null}
+      {flow.length ? (
+        <ol className="space-y-2.5">
+          {flow.map((f, i) => (
+            <li
+              key={`${f.title}-${i}`}
+              className="flex gap-3 rounded-lg border border-gray-100 bg-white px-3 py-2.5"
+            >
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
+                {i + 1}
+              </span>
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-gray-900">{f.title}</div>
+                {f.body ? (
+                  <p className="mt-0.5 text-sm leading-relaxed text-gray-600">{f.body}</p>
+                ) : null}
+              </div>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="text-sm text-gray-500">暂无细流程，可按摘要执行。</p>
+      )}
+      {note ? (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900/90">
+          注意：{note}
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
+type SimpleDetailOpen =
+  | { kind: 'step'; index: number }
+  | { kind: 'platform'; index: number }
+  | { kind: 'combo'; index: number }
+  | { kind: 'check'; index: number }
+  | { kind: 'checklist' }
+  | null
+
+/** 简易版：封面 → 步骤 → 平台 → 货盘 → 清单（点击查看细流程） */
 function SimplePlanGallery({ plan }: { plan: AiOpsPlanResult }) {
   const s = plan.simplePlan
+  const [open, setOpen] = useState<SimpleDetailOpen>(null)
   if (!s) {
     return <p className="text-sm text-gray-500">暂无简易方案内容</p>
   }
   const hints = [s.hero.storeHint, s.hero.periodHint, s.hero.budgetHint].filter(Boolean)
+
+  const modal = (() => {
+    if (!open) return null
+    if (open.kind === 'step') {
+      const st = s.steps[open.index]
+      if (!st) return null
+      const flow =
+        st.detailFlow.length > 0
+          ? st.detailFlow
+          : synthesizeSimpleDetailFlow(st.body, st.tip)
+      return {
+        title: `${st.title} · 详细流程`,
+        subtitle: '按下列步骤落地即可',
+        body: (
+          <SimpleDetailFlowList
+            flow={flow}
+            note={st.detailNote || (st.tip ? `小贴士：${st.tip}` : '')}
+            summary={st.body}
+          />
+        ),
+      }
+    }
+    if (open.kind === 'platform') {
+      const p = s.platforms[open.index]
+      if (!p) return null
+      const flow =
+        p.detailFlow.length > 0 ? p.detailFlow : synthesizeSimpleDetailFlow(p.how)
+      return {
+        title: `${p.platform} · 发布流程`,
+        subtitle: '选题 → 制作 → 发布 → 复盘',
+        body: <SimpleDetailFlowList flow={flow} note={p.detailNote} summary={p.how} />,
+      }
+    }
+    if (open.kind === 'combo') {
+      const c = s.combos[open.index]
+      if (!c) return null
+      const flow =
+        c.detailFlow.length > 0
+          ? c.detailFlow
+          : synthesizeSimpleDetailFlow(c.sellingPoint, c.items, c.priceHint)
+      return {
+        title: `${c.name} · 上架与核销`,
+        subtitle: c.priceHint || undefined,
+        body: (
+          <SimpleDetailFlowList
+            flow={flow}
+            note={c.detailNote}
+            summary={[c.sellingPoint, c.items ? `包含：${c.items}` : ''].filter(Boolean).join('\n')}
+          />
+        ),
+      }
+    }
+    if (open.kind === 'check') {
+      const item = s.checklist[open.index]
+      if (!item) return null
+      const flow =
+        item.detailFlow.length > 0
+          ? item.detailFlow
+          : synthesizeSimpleDetailFlow(item.text, item.detailNote)
+      return {
+        title: `${item.text} · 怎么做`,
+        subtitle: '完成标准与操作步骤',
+        body: <SimpleDetailFlowList flow={flow} note={item.detailNote} />,
+      }
+    }
+    if (open.kind === 'checklist') {
+      const flow = s.checklist.map((c, i) => ({
+        title: `${i + 1}. ${c.text}`,
+        body:
+          c.detailFlow.length > 0
+            ? c.detailFlow.map((f) => `${f.title}：${f.body}`).join('；')
+            : c.detailNote || '按事项标题执行并打勾确认',
+      }))
+      return {
+        title: '落地清单 · 全部事项',
+        subtitle: `共 ${s.checklist.length} 条`,
+        body: <SimpleDetailFlowList flow={flow} />,
+      }
+    }
+    return null
+  })()
+
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
       <article className="overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-700 to-blue-800 px-5 py-6 text-white shadow-md">
@@ -904,6 +1058,7 @@ function SimplePlanGallery({ plan }: { plan: AiOpsPlanResult }) {
             ))}
           </div>
         ) : null}
+        <p className="mt-4 text-[11px] text-white/70">点击下方各卡片「查看详情」可看细流程与步骤</p>
       </article>
 
       {s.steps.length ? (
@@ -912,7 +1067,16 @@ function SimplePlanGallery({ plan }: { plan: AiOpsPlanResult }) {
           {s.steps.map((st, i) => (
             <article
               key={`${st.title}-${i}`}
-              className="flex gap-3 rounded-xl border border-gray-100 bg-white p-3.5 shadow-sm"
+              role="button"
+              tabIndex={0}
+              onClick={() => setOpen({ kind: 'step', index: i })}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  setOpen({ kind: 'step', index: i })
+                }
+              }}
+              className="flex w-full cursor-pointer gap-3 rounded-xl border border-gray-100 bg-white p-3.5 text-left shadow-sm transition hover:border-blue-200 hover:shadow-md"
             >
               <div
                 className={cn(
@@ -923,7 +1087,16 @@ function SimplePlanGallery({ plan }: { plan: AiOpsPlanResult }) {
                 {i + 1}
               </div>
               <div className="min-w-0 flex-1">
-                <h4 className="text-sm font-semibold text-gray-900">{st.title}</h4>
+                <div className="flex items-start justify-between gap-2">
+                  <h4 className="text-sm font-semibold text-gray-900">{st.title}</h4>
+                  <ViewDetailBtn
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setOpen({ kind: 'step', index: i })
+                    }}
+                    label="查看详情"
+                  />
+                </div>
                 {st.body ? <p className="mt-1 text-sm leading-relaxed text-gray-600">{st.body}</p> : null}
                 {st.tip ? (
                   <p className="mt-2 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900/90">
@@ -943,9 +1116,27 @@ function SimplePlanGallery({ plan }: { plan: AiOpsPlanResult }) {
             {s.platforms.map((p, i) => (
               <article
                 key={`${p.platform}-${i}`}
-                className="rounded-xl border border-sky-100 bg-sky-50/60 p-3.5"
+                role="button"
+                tabIndex={0}
+                onClick={() => setOpen({ kind: 'platform', index: i })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    setOpen({ kind: 'platform', index: i })
+                  }
+                }}
+                className="cursor-pointer rounded-xl border border-sky-100 bg-sky-50/60 p-3.5 text-left transition hover:border-sky-300 hover:bg-sky-50"
               >
-                <div className="text-sm font-semibold text-sky-900">{p.platform}</div>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="text-sm font-semibold text-sky-900">{p.platform}</div>
+                  <ViewDetailBtn
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setOpen({ kind: 'platform', index: i })
+                    }}
+                    label="查看详情"
+                  />
+                </div>
                 <p className="mt-1.5 text-sm leading-relaxed text-sky-950/80">{p.how}</p>
               </article>
             ))}
@@ -960,15 +1151,33 @@ function SimplePlanGallery({ plan }: { plan: AiOpsPlanResult }) {
             {s.combos.map((c, i) => (
               <article
                 key={`${c.name}-${i}`}
-                className="rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50/80 to-white p-3.5"
+                role="button"
+                tabIndex={0}
+                onClick={() => setOpen({ kind: 'combo', index: i })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    setOpen({ kind: 'combo', index: i })
+                  }
+                }}
+                className="cursor-pointer rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50/80 to-white p-3.5 text-left transition hover:border-emerald-300 hover:shadow-sm"
               >
                 <div className="flex items-start justify-between gap-2">
                   <h4 className="text-sm font-semibold text-emerald-950">{c.name}</h4>
-                  {c.priceHint ? (
-                    <span className="shrink-0 rounded-md bg-emerald-600/10 px-2 py-0.5 text-xs font-medium text-emerald-800">
-                      {c.priceHint}
-                    </span>
-                  ) : null}
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {c.priceHint ? (
+                      <span className="rounded-md bg-emerald-600/10 px-2 py-0.5 text-xs font-medium text-emerald-800">
+                        {c.priceHint}
+                      </span>
+                    ) : null}
+                    <ViewDetailBtn
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setOpen({ kind: 'combo', index: i })
+                      }}
+                      label="查看详情"
+                    />
+                  </div>
                 </div>
                 {c.sellingPoint ? (
                   <p className="mt-1.5 text-sm leading-relaxed text-gray-600">{c.sellingPoint}</p>
@@ -981,19 +1190,35 @@ function SimplePlanGallery({ plan }: { plan: AiOpsPlanResult }) {
 
       {s.checklist.length ? (
         <section className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-          <h3 className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500">
-            <ListChecks className="h-3.5 w-3.5" />
-            落地清单
-          </h3>
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <ListChecks className="h-3.5 w-3.5" />
+              落地清单
+            </h3>
+            <ViewDetailBtn onClick={() => setOpen({ kind: 'checklist' })} label="查看全部" />
+          </div>
           <ul className="space-y-2">
             {s.checklist.map((item, i) => (
-              <li key={`${item}-${i}`} className="flex gap-2.5 text-sm text-gray-700">
-                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
-                <span className="leading-relaxed">{item}</span>
+              <li key={`${item.text}-${i}`}>
+                <button
+                  type="button"
+                  onClick={() => setOpen({ kind: 'check', index: i })}
+                  className="flex w-full items-start gap-2.5 rounded-lg px-1 py-1.5 text-left text-sm text-gray-700 transition hover:bg-blue-50"
+                >
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+                  <span className="min-w-0 flex-1 leading-relaxed">{item.text}</span>
+                  <span className="shrink-0 text-xs font-medium text-blue-600">详情</span>
+                </button>
               </li>
             ))}
           </ul>
         </section>
+      ) : null}
+
+      {modal ? (
+        <DetailModal title={modal.title} subtitle={modal.subtitle} onClose={() => setOpen(null)}>
+          {modal.body}
+        </DetailModal>
       ) : null}
     </div>
   )
