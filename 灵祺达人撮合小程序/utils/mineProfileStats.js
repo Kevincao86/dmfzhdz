@@ -70,7 +70,15 @@ async function loadPrStatsAsync() {
   try {
     const ops = require('./opsRegistryTalentMp.js')
     const account = auth.readAccount()
-    const reg = await ops.fetchRegistry({ includePrOwned: true })
+    const localIds = applicationsStore
+      .readPublishedOrders()
+      .map((item) => String(item && item.mpOrderId ? item.mpOrderId : '').trim())
+      .filter(Boolean)
+      .slice(0, 120)
+    const reg = await ops.fetchRegistry({
+      includePrOwned: true,
+      includeMpOrderIds: localIds,
+    })
     const mpList = reg.mpRecruitmentOrders || []
     prPublishedOrders.pruneOrphanPublishedOrders(mpList)
     const local = prPublishedOrders.listPublishedOrdersForCurrentPr(mpList)

@@ -43,6 +43,7 @@ list_scopes() {
   erp_merchant_mp      商家管理 ERP 小程序（改名/菜单对齐商家Web/缺口页）
   account_pwd_support  改密(短信)+小灵同学双向消息
   regional_partner     区域服务商（城市代理门户 + 运营台开账号）
+  mp_pr_orphan_delete  我的发单 orphan 误删（includePrOwned 空列表剪枝）
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -433,6 +434,17 @@ ecs-auth-api-server
 ecs-apply-regional-partners
 20260726170000_regional_partners
 20260726180000_tenants_register_city
+change-scope-guard
+PAT
+      ;;
+    mp_pr_orphan_delete)
+      cat <<'PAT'
+prPublishedOrders
+applicationsStore
+mpAccountClientSync
+opsRegistryTalentMp
+mine-pr-orders
+mineProfileStats
 change-scope-guard
 PAT
       ;;

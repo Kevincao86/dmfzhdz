@@ -500,7 +500,15 @@ Page({
     this.setData({ loading: true, err: '' })
     try {
       await mpAccountClientSync.ensureClientStatePulled().catch(() => null)
-      const reg = await ops.fetchRegistry({ includePrOwned: true })
+      const localIds = applicationsStore
+        .readPublishedOrders()
+        .map((item) => String(item && item.mpOrderId ? item.mpOrderId : '').trim())
+        .filter(Boolean)
+        .slice(0, 120)
+      const reg = await ops.fetchRegistry({
+        includePrOwned: true,
+        includeMpOrderIds: localIds,
+      })
       const mpList = reg.mpRecruitmentOrders || []
       prPublishedOrders.pruneOrphanPublishedOrders(mpList)
       const local = prPublishedOrders.listPublishedOrdersForCurrentPr(mpList)
@@ -521,7 +529,11 @@ Page({
       const targetedSynced = await this.syncTargetedInvitePhases(rows)
       let mpListFinal = mpList
       if (targetedSynced) {
-        const reg2 = await ops.fetchRegistry({ includePrOwned: true, skipCache: true })
+        const reg2 = await ops.fetchRegistry({
+          includePrOwned: true,
+          includeMpOrderIds: localIds,
+          skipCache: true,
+        })
         mpListFinal = reg2.mpRecruitmentOrders || []
       }
       const rowsFinal = local.map((item) => {
