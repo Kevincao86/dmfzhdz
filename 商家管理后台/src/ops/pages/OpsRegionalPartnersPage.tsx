@@ -3,12 +3,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { cn } from '../../cn'
 import SecretInput from '../../components/SecretInput'
+import { toggleChip } from '../../meooRegistryShared/libraryRegionFilters'
 import {
-  buildCityOpts,
-  buildProvinceOpts,
-  toggleChip,
-} from '../../meooRegistryShared/libraryRegionFilters'
-import { fetchRegistry } from '../opsRegistryApi'
+  CHINA_ADMIN_DIVISIONS,
+  CHINA_PROVINCES,
+  citiesOfProvinces,
+  findProvinceOfCity,
+} from '../../meooRegistryShared/chinaAdminDivisions'
 import {
   canAccessOpsPath,
   hasOpsCloudSession,
@@ -47,8 +48,8 @@ export default function OpsRegionalPartnersPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [formErr, setFormErr] = useState<string | null>(null)
-  const [regionRows, setRegionRows] = useState<Array<{ province?: string; city?: string }>>([])
   const [selectedProvinces, setSelectedProvinces] = useState<string[]>([])
+  const [cityQuery, setCityQuery] = useState('')
   const [assignTenantId, setAssignTenantId] = useState('')
 
   const [form, setForm] = useState({
@@ -76,24 +77,16 @@ export default function OpsRegionalPartnersPage() {
     void reload()
   }, [reload])
 
-  useEffect(() => {
-    void fetchRegistry()
-      .then((r) => {
-        const pr = (r.mpPrUsers ?? []).map((u) => ({ province: u.province, city: u.city }))
-        const tl = (r.talentLibraryEntries ?? []).map((u) => ({
-          province: u.province,
-          city: u.city,
-        }))
-        setRegionRows([...pr, ...tl])
-      })
-      .catch(() => setRegionRows([]))
-  }, [])
-
-  const provinceOpts = useMemo(() => buildProvinceOpts(regionRows), [regionRows])
-  const cityOpts = useMemo(
-    () => buildCityOpts(regionRows, selectedProvinces),
-    [regionRows, selectedProvinces],
-  )
+  const cityOpts = useMemo(() => {
+    const q = cityQuery.trim()
+    let rows = citiesOfProvinces(selectedProvinces)
+    if (q) {
+      rows = rows.filter(
+        (r) => r.city.includes(q) || r.province.includes(q) || r.city.replace(/市$/, '').includes(q),
+      )
+    }
+    return rows
+  }, [selectedProvinces, cityQuery])
 
   if (!session) return <Navigate to="/login" replace />
   if (!allowed) return <Navigate to="/" replace />
@@ -104,6 +97,7 @@ export default function OpsRegionalPartnersPage() {
     setFormErr(null)
     setAssignTenantId('')
     setSelectedProvinces([])
+    setCityQuery('')
     setForm({
       phone: '',
       companyName: '',
@@ -125,6 +119,7 @@ export default function OpsRegionalPartnersPage() {
     setFormOpen(true)
     setEditId(p.id)
     setFormErr(null)
+    setCityQuery('')
     setForm({
       phone: p.phone,
       companyName: p.companyName,
@@ -138,19 +133,32 @@ export default function OpsRegionalPartnersPage() {
     setSelectedProvinces([...new Set(p.cities.map((c) => c.province).filter(Boolean))])
   }
 
-  const toggleCity = (city: string) => {
-    const province =
-      selectedProvinces[0] ||
-      regionRows.find((r) => String(r.city || '').trim() === city)?.province ||
-      ''
-    const next: RegionalCity = { province: String(province).trim(), city }
+  const toggleCity = (row: RegionalCity) => {
+    const next: RegionalCity = {
+      province: row.province || findProvinceOfCity(row.city, selectedProvinces),
+      city: row.city,
+    }
     setForm((f) => {
-      const exists = f.cities.some((c) => cityKey(c) === cityKey(next) || c.city === city)
+      const exists = f.cities.some((c) => cityKey(c) === cityKey(next))
       if (exists) {
-        return { ...f, cities: f.cities.filter((c) => c.city !== city) }
+        return { ...f, cities: f.cities.filter((c) => cityKey(c) !== cityKey(next)) }
       }
       return { ...f, cities: [...f.cities, next] }
     })
+  }
+
+  const selectAllVisibleCities = () => {
+    setForm((f) => {
+      const map = new Map(f.cities.map((c) => [cityKey(c), c]))
+      for (const row of cityOpts) {
+        map.set(cityKey(row), { province: row.province, city: row.city })
+      }
+      return { ...f, cities: [...map.values()] }
+    })
+  }
+
+  const clearSelectedCities = () => {
+    setForm((f) => ({ ...f, cities: [] }))
   }
 
   const togglePerm = (key: RegionalPartnerModuleKey) => {
@@ -165,6 +173,10 @@ export default function OpsRegionalPartnersPage() {
   const handleSave = async () => {
     if (!hasOpsCloudSession()) {
       setFormErr('请先用主账号完成云端登录（会话令牌）后再操作')
+      return
+    }
+    if (!form.cities.length) {
+      setFormErr('请至少选择 1 个代理城市（可跨省多选）')
       return
     }
     setBusy(true)
@@ -244,7 +256,7 @@ export default function OpsRegionalPartnersPage() {
       <div>
         <h1 className="text-xl font-semibold text-white">区域服务商</h1>
         <p className="mt-1 text-sm text-slate-500">
-          开通城市代理账号，配置城市独家范围、门户模块权限与分成比例。门户域名：adqf.mofangdianai.com
+          开通城市代理账号；可跨省勾选多家城市代理，配置门户权限与分成比例。门户：adqf.mofangdianai.com
         </p>
         {!hasOpsCloudSession() ? (
           <p className="mt-2 text-xs text-amber-300/90">
@@ -295,8 +307,10 @@ export default function OpsRegionalPartnersPage() {
                   <tr key={p.id} className="hover:bg-slate-800/30">
                     <td className="px-3 py-2 text-slate-200">{p.companyName}</td>
                     <td className="px-3 py-2 font-mono text-xs text-slate-300">{p.phone}</td>
-                    <td className="max-w-[180px] px-3 py-2 text-xs text-slate-400">
-                      {p.cities.map((c) => c.city).join('、') || '—'}
+                    <td className="max-w-[220px] px-3 py-2 text-xs text-slate-400">
+                      {p.cities.length
+                        ? `${p.cities.length} 城：${p.cities.map((c) => c.city).join('、')}`
+                        : '—'}
                     </td>
                     <td className="px-3 py-2 text-xs text-slate-300">
                       代理 {formatShare(p.partnerShareRate)} / 平台{' '}
@@ -437,12 +451,33 @@ export default function OpsRegionalPartnersPage() {
           </div>
 
           <div className="mt-4 rounded-lg border border-slate-800 bg-slate-950/60 p-3">
-            <div className="mb-2 flex items-center gap-1 text-xs font-medium text-slate-400">
-              <MapPin className="h-3.5 w-3.5" />
-              城市独家范围（同城仅一家启用中的区域服务商）
+            <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1 text-xs font-medium text-slate-400">
+                <MapPin className="h-3.5 w-3.5" />
+                城市代理范围（可多选多城；同城仅一家启用中的区域服务商）
+              </div>
+              <span className="text-[11px] text-slate-500">
+                全国 {CHINA_PROVINCES.length} 省 / {CHINA_ADMIN_DIVISIONS.length} 市 · 已选{' '}
+                {form.cities.length} 城
+              </span>
             </div>
-            <div className="mb-2 flex max-h-32 flex-wrap gap-1.5 overflow-y-auto">
-              {provinceOpts.map((p) => (
+            <p className="mb-2 text-[11px] text-slate-500">
+              先点省份筛选（可多省），再勾选城市；支持跨省拿多家城市代理。
+            </p>
+            <div className="mb-2 flex max-h-36 flex-wrap gap-1.5 overflow-y-auto">
+              <button
+                type="button"
+                onClick={() => setSelectedProvinces([])}
+                className={cn(
+                  'rounded-full border px-2 py-0.5 text-[11px]',
+                  selectedProvinces.length === 0
+                    ? 'border-indigo-500/50 bg-indigo-500/10 text-indigo-200'
+                    : 'border-slate-700 text-slate-500',
+                )}
+              >
+                全部省份
+              </button>
+              {CHINA_PROVINCES.map((p) => (
                 <button
                   key={p}
                   type="button"
@@ -458,31 +493,67 @@ export default function OpsRegionalPartnersPage() {
                 </button>
               ))}
             </div>
-            <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto">
-              {cityOpts.map((c) => {
-                const selected = form.cities.some((x) => x.city === c)
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <input
+                value={cityQuery}
+                onChange={(e) => setCityQuery(e.target.value)}
+                placeholder="搜索城市，如 杭州 / 成都"
+                className="min-w-[200px] flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs text-slate-200"
+              />
+              <button
+                type="button"
+                onClick={selectAllVisibleCities}
+                className="rounded-md border border-slate-600 px-2 py-1 text-[11px] text-slate-300 hover:bg-slate-800"
+              >
+                全选当前列表
+              </button>
+              <button
+                type="button"
+                onClick={clearSelectedCities}
+                className="rounded-md border border-slate-600 px-2 py-1 text-[11px] text-slate-300 hover:bg-slate-800"
+              >
+                清空已选
+              </button>
+            </div>
+            <div className="flex max-h-52 flex-wrap gap-1.5 overflow-y-auto">
+              {cityOpts.map((row) => {
+                const selected = form.cities.some((x) => cityKey(x) === cityKey(row))
                 return (
                   <button
-                    key={c}
+                    key={cityKey(row)}
                     type="button"
-                    onClick={() => toggleCity(c)}
+                    onClick={() => toggleCity(row)}
                     className={cn(
                       'rounded-full border px-2 py-0.5 text-[11px]',
                       selected
                         ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-200'
                         : 'border-slate-700 text-slate-500',
                     )}
+                    title={row.province}
                   >
-                    {c}
+                    {row.city}
                   </button>
                 )
               })}
             </div>
             {form.cities.length ? (
-              <p className="mt-2 text-[11px] text-slate-500">
-                已选：{form.cities.map((c) => c.city).join('、')}
-              </p>
-            ) : null}
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {form.cities.map((c) => (
+                  <button
+                    key={cityKey(c)}
+                    type="button"
+                    onClick={() => toggleCity(c)}
+                    className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-100"
+                    title="点击移除"
+                  >
+                    {c.province ? `${c.province}·` : ''}
+                    {c.city} ×
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-[11px] text-amber-300/80">请至少选择 1 个代理城市</p>
+            )}
           </div>
 
           <div className="mt-4">
