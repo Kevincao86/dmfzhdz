@@ -63,8 +63,9 @@ export default function SupportPage() {
       </div>
 
       <FloatingOnlineSupport
+        relayChannel="mp"
         customerId={acc?.lingqiTalentId || acc?.lingqiPrId || acc?.loginName || ''}
-        enterpriseName={acc?.wxNickName || acc?.loginName || '灵祺星选用户'}
+        enterpriseName={acc?.wxNickName || acc?.loginName || '灵祺星选·Web'}
       />
     </div>
   )
