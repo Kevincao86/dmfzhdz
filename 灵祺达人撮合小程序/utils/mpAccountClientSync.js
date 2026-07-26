@@ -92,15 +92,24 @@ function parsePublishedOrderTime(raw) {
 
 function publishedOrderMergeTime(row) {
   if (!row) return 0
-  return Math.max(parsePublishedOrderTime(row.deletedAt), parsePublishedOrderTime(row.publishedAt))
+  return Math.max(
+    parsePublishedOrderTime(row.deletedAt),
+    parsePublishedOrderTime(row.publishedAt),
+    parsePublishedOrderTime(row.restoredAt),
+  )
 }
 
 function mergePublishedOrderPair(prev, row) {
   const newer = publishedOrderMergeTime(prev) >= publishedOrderMergeTime(row) ? prev : row
   const older = newer === prev ? row : prev
-  const deletedAt = String((newer && newer.deletedAt) || (older && older.deletedAt) || '').trim()
-  if (!deletedAt) return { ...newer }
-  return { ...newer, ...older, deletedAt }
+  const out = { ...older, ...newer }
+  // 较新一侧已清除 deletedAt（含 restoredAt）则视为恢复，避免旧删除态粘住
+  if (!newer.deletedAt) {
+    delete out.deletedAt
+  } else {
+    out.deletedAt = String(newer.deletedAt).trim()
+  }
+  return out
 }
 
 function mergePublishedOrdersRemote(local, remote) {

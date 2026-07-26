@@ -234,6 +234,21 @@ function markPublishedOrderDeleted(mpOrderId) {
   })
 }
 
+/** 注册表仍存在该单时，清除误标的 deletedAt（orphan 剪枝误伤恢复） */
+function clearPublishedOrderDeleted(mpOrderId) {
+  const id = String(mpOrderId || '').trim()
+  if (!id) return
+  const ids = ownerIdsForFilter()
+  const list = readPublishedOrdersRaw().filter((item) => entryBelongsToCurrentAccount(item, ids))
+  const idx = list.findIndex((item) => item && item.mpOrderId === id)
+  if (idx < 0 || !list[idx].deletedAt) return
+  const next = { ...list[idx], mpOrderId: id }
+  delete next.deletedAt
+  next.restoredAt = new Date().toLocaleString('zh-CN', { hour12: false })
+  list[idx] = next
+  writePublishedOrders(list)
+}
+
 function updatePublishedOrderTitle(mpOrderId, title) {
   const id = String(mpOrderId || '').trim()
   if (!id) return
@@ -296,6 +311,7 @@ module.exports = {
   updatePublishedOrderTitle,
   touchPublishedOrderSnapshot,
   markPublishedOrderDeleted,
+  clearPublishedOrderDeleted,
   hasAppliedToOrder,
   markApplicationWithdrawn,
   removeApplication,
