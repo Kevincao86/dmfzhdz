@@ -100,6 +100,7 @@ export async function appendMpRecruitmentOrderViaPg(
 
     await client.query('BEGIN')
 
+    // 只 prepend，禁止再 LIMIT/slice 截断——否则新发单会永久挤掉旧单
     await client.query(
       `UPDATE ops_registry_snapshot
        SET registry = jsonb_set(
@@ -111,29 +112,6 @@ export async function appendMpRecruitmentOrderViaPg(
        updated_at = now()
        WHERE id = 1`,
       [JSON.stringify(prepared.order)],
-    )
-
-    await client.query(
-      `UPDATE ops_registry_snapshot
-       SET registry = jsonb_set(
-         registry,
-         '{mpRecruitmentOrders}',
-         COALESCE(
-           (
-             SELECT jsonb_agg(elem ORDER BY ord DESC)
-             FROM (
-               SELECT elem, ord
-               FROM jsonb_array_elements(registry->'mpRecruitmentOrders') WITH ORDINALITY t(elem, ord)
-               ORDER BY ord
-               LIMIT 200
-             ) sub
-           ),
-           '[]'::jsonb
-         ),
-         true
-       ),
-       updated_at = now()
-       WHERE id = 1`,
     )
 
     for (const [orderId, qr] of Object.entries(prepared.groupQrByOrderId)) {

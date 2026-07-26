@@ -59,7 +59,7 @@ async function appendViaRegistryIo(
     throw err
   }
   list.unshift(stripOrderInlineImagesForPersist(normalizeMpRecruitmentOrderForRegistryPersist(order)))
-  data.mpRecruitmentOrders = list.slice(0, 200)
+  data.mpRecruitmentOrders = list
   await io.save(data)
 }
 
