@@ -122,11 +122,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         merchantName: String(body.merchantName ?? ''),
         edition: body.edition === 'partner' ? 'partner' : 'merchant',
         licenseAddress: String(body.licenseAddress ?? ''),
-        trialDays: body.trialDays != null ? Number(body.trialDays) : 7,
+        trialDays: body.trialDays != null ? Number(body.trialDays) : 0,
+        officialDays: body.officialDays != null ? Number(body.officialDays) : 0,
+        membershipPlan: body.membershipPlan != null ? String(body.membershipPlan) : 'free',
       })
       if (!r.ok) {
         const msgMap: Record<string, string> = {
-          invalid_login_name: '登录名须为 4–32 位字母或数字',
+          invalid_login_name: '账户名至少 2 个字符',
           password_too_short: '密码至少 6 位',
           invalid_merchant_name: '请填写公司/商家名称',
           license_address_required: '请填写营业执照住所地址',
@@ -201,6 +203,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           body.opsGiftDays != null && Number.isFinite(Number(body.opsGiftDays))
             ? Number(body.opsGiftDays)
             : undefined,
+        membershipPlan:
+          body.membershipPlan != null ? String(body.membershipPlan) : undefined,
         registerCity: body.registerCity != null ? String(body.registerCity) : undefined,
         registerProvince:
           body.registerProvince != null ? String(body.registerProvince) : undefined,

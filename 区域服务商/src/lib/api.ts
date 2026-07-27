@@ -135,13 +135,25 @@ export async function fetchDashboard() {
   })
 }
 
+export type MembershipPlan = 'free' | 'member' | 'member_plus'
+
+export const MEMBERSHIP_PLAN_OPTIONS: Array<{ value: MembershipPlan; label: string }> = [
+  { value: 'free', label: '免费版' },
+  { value: 'member', label: '会员版' },
+  { value: 'member_plus', label: '会员 Plus' },
+]
+
 export type RegionalMerchantRow = {
   id: string
   name: string
   edition: string
   editionLabel: string
   accountStatus: string
-  membershipPlan: string
+  membershipPlan: MembershipPlan | string
+  membershipPlanLabel?: string
+  trialDays?: number
+  officialDays?: number
+  subscriptionDays?: number
   opsGiftDays: number
   serviceExpireAt: string | null
   registerProvince: string | null

@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import {
   fetchMerchants,
+  MEMBERSHIP_PLAN_OPTIONS,
   mutateMerchant,
   readSession,
+  type MembershipPlan,
   type RegionalCity,
   type RegionalMerchantRow,
 } from '../lib/api'
@@ -11,6 +13,7 @@ import {
 type EditForm = {
   merchantName: string
   accountStatus: string
+  membershipPlan: MembershipPlan
   opsGiftDays: number
   registerCity: string
   licenseAddress: string
@@ -23,7 +26,8 @@ type CreateForm = {
   merchantName: string
   edition: 'merchant' | 'partner'
   licenseAddress: string
-  trialDays: number
+  officialDays: number
+  membershipPlan: MembershipPlan
 }
 
 const emptyCreate = (): CreateForm => ({
@@ -32,8 +36,17 @@ const emptyCreate = (): CreateForm => ({
   merchantName: '',
   edition: 'merchant',
   licenseAddress: '',
-  trialDays: 7,
+  officialDays: 0,
+  membershipPlan: 'free',
 })
+
+function planLabel(m: RegionalMerchantRow): string {
+  return (
+    m.membershipPlanLabel ||
+    MEMBERSHIP_PLAN_OPTIONS.find((o) => o.value === m.membershipPlan)?.label ||
+    String(m.membershipPlan || '免费版')
+  )
+}
 
 export default function MerchantsPage() {
   const session = readSession()
@@ -49,6 +62,7 @@ export default function MerchantsPage() {
   const [form, setForm] = useState<EditForm>({
     merchantName: '',
     accountStatus: 'normal',
+    membershipPlan: 'free',
     opsGiftDays: 0,
     registerCity: '',
     licenseAddress: '',
@@ -89,9 +103,14 @@ export default function MerchantsPage() {
     setEdit(m)
     setCreateOpen(false)
     setFormErr(null)
+    const plan =
+      m.membershipPlan === 'member' || m.membershipPlan === 'member_plus'
+        ? m.membershipPlan
+        : 'free'
     setForm({
       merchantName: m.name,
       accountStatus: m.accountStatus || 'normal',
+      membershipPlan: plan,
       opsGiftDays: m.opsGiftDays || 0,
       registerCity: m.city || m.registerCity || cities[0]?.city || '',
       licenseAddress: m.businessLicenseAddress || '',
@@ -120,6 +139,7 @@ export default function MerchantsPage() {
         tenantId: edit.id,
         merchantName: form.merchantName,
         accountStatus: form.accountStatus,
+        membershipPlan: form.membershipPlan,
         opsGiftDays: Number(form.opsGiftDays) || 0,
         ...(form.licenseAddress.trim()
           ? { licenseAddress: form.licenseAddress.trim() }
@@ -148,6 +168,10 @@ export default function MerchantsPage() {
   }
 
   const saveCreate = async () => {
+    if (createForm.loginName.trim().length < 2) {
+      setFormErr('账户名至少 2 个字符（与运营台一致）')
+      return
+    }
     setBusy(true)
     setFormErr(null)
     try {
@@ -158,7 +182,9 @@ export default function MerchantsPage() {
         merchantName: createForm.merchantName.trim(),
         edition: createForm.edition,
         licenseAddress: createForm.licenseAddress.trim(),
-        trialDays: Number(createForm.trialDays) || 7,
+        trialDays: 0,
+        officialDays: Number(createForm.officialDays) || 0,
+        membershipPlan: createForm.membershipPlan,
       })
       if (!r.ok) {
         setFormErr(r.error)
@@ -178,7 +204,7 @@ export default function MerchantsPage() {
         <div>
           <h1 className="text-2xl font-semibold text-white">名下商家</h1>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            新增/编辑须以营业执照住所城市命中代理范围。城市：
+            开户与运营台同源；套餐可改。须以营业执照住所城市命中代理范围。城市：
             {cities.map((c) => c.city).join('、') || '未配置'}
           </p>
         </div>
@@ -236,11 +262,12 @@ export default function MerchantsPage() {
       {err ? <p className="text-sm text-rose-400">{err}</p> : null}
 
       <div className="overflow-x-auto rounded-2xl border border-[var(--line)] bg-[var(--panel)]">
-        <table className="w-full min-w-[880px] text-left text-sm">
+        <table className="w-full min-w-[960px] text-left text-sm">
           <thead className="text-[11px] uppercase text-[var(--muted)]">
             <tr>
               <th className="px-4 py-3">账号</th>
               <th className="px-4 py-3">类型</th>
+              <th className="px-4 py-3">套餐</th>
               <th className="px-4 py-3">城市</th>
               <th className="px-4 py-3">状态</th>
               <th className="px-4 py-3">服务到期</th>
@@ -250,7 +277,7 @@ export default function MerchantsPage() {
           <tbody className="divide-y divide-[var(--line)]">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-[var(--muted)]">
+                <td colSpan={7} className="px-4 py-10 text-center text-[var(--muted)]">
                   {searchMode
                     ? '未找到匹配账号'
                     : '本城暂无商家 ERP / FWS 账号，可点「新增客户」或上方搜索认领'}
@@ -261,6 +288,7 @@ export default function MerchantsPage() {
                 <tr key={m.id}>
                   <td className="px-4 py-3 text-white">{m.name}</td>
                   <td className="px-4 py-3 text-[var(--muted)]">{m.editionLabel}</td>
+                  <td className="px-4 py-3 text-[var(--muted)]">{planLabel(m)}</td>
                   <td className="px-4 py-3 text-[var(--muted)]">{m.city || '未归属'}</td>
                   <td className="px-4 py-3 text-[var(--good)]">{m.openStatus}</td>
                   <td className="px-4 py-3 text-[var(--muted)]">
@@ -286,10 +314,10 @@ export default function MerchantsPage() {
 
       {createOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-lg rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-5 shadow-2xl">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-5 shadow-2xl">
             <h2 className="text-lg font-semibold text-white">新增客户</h2>
             <p className="mt-1 text-xs text-[var(--muted)]">
-              系统从营业执照住所地址识别城市，须命中你的代理城市后才可开户
+              与运营台「手动创建账户」同源；另须执照住所城市命中代理范围
             </p>
             {formErr ? <p className="mt-2 text-xs text-rose-400">{formErr}</p> : null}
             <div className="mt-4 grid gap-3">
@@ -328,15 +356,29 @@ export default function MerchantsPage() {
                 </select>
               </label>
               <label className="text-xs text-[var(--muted)]">
-                登录名（4–32 位字母或数字）
-                <input
-                  value={createForm.loginName}
+                套餐方案（与运营台会员档位一致）
+                <select
+                  value={createForm.membershipPlan}
                   onChange={(e) =>
                     setCreateForm((f) => ({
                       ...f,
-                      loginName: e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 32),
+                      membershipPlan: e.target.value as MembershipPlan,
                     }))
                   }
+                  className="mt-1 w-full rounded-xl border border-[var(--line)] bg-[#0b1220] px-3 py-2 text-sm text-white"
+                >
+                  {MEMBERSHIP_PLAN_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-xs text-[var(--muted)]">
+                登录名（至少 2 个字符，与运营台一致）
+                <input
+                  value={createForm.loginName}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, loginName: e.target.value }))}
                   className="mt-1 w-full rounded-xl border border-[var(--line)] bg-[#0b1220] px-3 py-2 text-sm text-white"
                 />
               </label>
@@ -350,14 +392,14 @@ export default function MerchantsPage() {
                 />
               </label>
               <label className="text-xs text-[var(--muted)]">
-                试用天数
+                正式版权益天数（与运营台「正式版权益天数」同源，默认 0）
                 <input
                   type="number"
                   min={0}
-                  max={3650}
-                  value={createForm.trialDays}
+                  max={36500}
+                  value={createForm.officialDays}
                   onChange={(e) =>
-                    setCreateForm((f) => ({ ...f, trialDays: Number(e.target.value) || 0 }))
+                    setCreateForm((f) => ({ ...f, officialDays: Number(e.target.value) || 0 }))
                   }
                   className="mt-1 w-full rounded-xl border border-[var(--line)] bg-[#0b1220] px-3 py-2 text-sm text-white"
                 />
@@ -377,7 +419,7 @@ export default function MerchantsPage() {
                   busy ||
                   !createForm.merchantName.trim() ||
                   !createForm.licenseAddress.trim() ||
-                  !createForm.loginName.trim() ||
+                  createForm.loginName.trim().length < 2 ||
                   createForm.password.length < 6
                 }
                 onClick={() => void saveCreate()}
@@ -392,7 +434,7 @@ export default function MerchantsPage() {
 
       {edit ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-lg rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-5 shadow-2xl">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-5 shadow-2xl">
             <h2 className="text-lg font-semibold text-white">
               {edit.inScope === false ? '认领并编辑' : '编辑账号'} · {edit.editionLabel}
             </h2>
@@ -407,6 +449,28 @@ export default function MerchantsPage() {
                   className="mt-1 w-full rounded-xl border border-[var(--line)] bg-[#0b1220] px-3 py-2 text-sm text-white"
                 />
               </label>
+              <label className="text-xs text-[var(--muted)]">
+                套餐方案
+                <select
+                  value={form.membershipPlan}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      membershipPlan: e.target.value as MembershipPlan,
+                    }))
+                  }
+                  className="mt-1 w-full rounded-xl border border-[var(--line)] bg-[#0b1220] px-3 py-2 text-sm text-white"
+                >
+                  {MEMBERSHIP_PLAN_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="text-[11px] text-[var(--muted)]">
+                订购天数 {edit.subscriptionDays ?? 0} · 赠送天数可改（与运营台编辑同源）
+              </p>
               <label className="text-xs text-[var(--muted)]">
                 营业执照住所/经营场所
                 <textarea

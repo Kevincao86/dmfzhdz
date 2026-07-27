@@ -1,13 +1,22 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+import { ensureErpMonthlyGiftPointsGranted } from '../../../web版/merchant-erp/src/lib/erpPointsCore.js'
+import { normalizeMembershipPlan } from '../../../web版/merchant-erp/src/lib/membershipPlan.js'
 import {
   bearerTokenFromAuthHeader,
   requireSuperAdminSession,
   verifyOpsSessionToken,
   type OpsSessionPayload,
 } from './opsStaffAccountsBackend.js'
-import { buildOpsGiftDaysPatch, readEntitlementDays } from './tenantEntitlementCore.js'
+import { opsTenantPatchAdmin } from './opsTenantsMutationsBackend.js'
+
+export type MembershipPlanKey = 'free' | 'member' | 'member_plus'
+
+function parseMembershipPlan(raw: unknown): MembershipPlanKey | undefined {
+  if (raw === 'free' || raw === 'member' || raw === 'member_plus') return raw
+  return undefined
+}
 
 export const REGIONAL_PARTNER_MODULE_KEYS = [
   'dashboard',
@@ -552,6 +561,10 @@ export async function changeRegionalPartnerPassword(
   return { ok: true }
 }
 
+/**
+ * 与运营台 provision-tenant 同源开户（auth + tenants + tenant_members），
+ * 额外写入区域服务商归属 / 执照地址 / 可选套餐档位。
+ */
 export async function createPartnerScopedTenant(
   admin: SupabaseClient,
   partner: RegionalPartnerPublic,
@@ -561,7 +574,12 @@ export async function createPartnerScopedTenant(
     merchantName: string
     edition?: 'merchant' | 'partner'
     licenseAddress: string
+    /** 与运营台一致：默认 0（无试用） */
     trialDays?: number
+    /** 与运营台一致：正式版权益天数 */
+    officialDays?: number
+    /** 套餐方案：free / member / member_plus */
+    membershipPlan?: string
   },
 ): Promise<
   | { ok: true; tenantId: string; userId: string; city: RegionalCity; matchedToken: string }
@@ -571,15 +589,18 @@ export async function createPartnerScopedTenant(
   const merchantName = input.merchantName.trim()
   const password = input.password
   const licenseAddress = input.licenseAddress.trim()
-  if (!/^[a-zA-Z0-9]{4,32}$/.test(loginName)) return { ok: false, error: 'invalid_login_name' }
+  // 与运营台 provision-tenant 校验对齐
+  if (loginName.length < 2) return { ok: false, error: 'invalid_login_name' }
   if (password.length < 6) return { ok: false, error: 'password_too_short' }
-  if (merchantName.length < 2) return { ok: false, error: 'invalid_merchant_name' }
+  if (merchantName.length < 1) return { ok: false, error: 'invalid_merchant_name' }
 
   const hit = resolveLicenseCityInScope(licenseAddress, partner.cities)
   if (!hit.ok) return { ok: false, error: hit.error }
 
   const edition = input.edition === 'partner' ? 'partner' : 'merchant'
-  const trialDays = Math.max(0, Math.min(3650, Number(input.trialDays) || 7))
+  const trialDays = Math.max(0, Math.min(3650, Number(input.trialDays) || 0))
+  const officialDays = Math.max(0, Math.min(36500, Number(input.officialDays) || 0))
+  const membershipPlan = parseMembershipPlan(input.membershipPlan) ?? 'free'
   const email = loginNameToEmail(loginName)
 
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
@@ -601,12 +622,13 @@ export async function createPartnerScopedTenant(
   }
   const userId = created.user.id
 
+  // 与 provision-tenant 写入字段同源，再叠加区域服务商字段
   const tenantInsert: Record<string, unknown> = {
     name: merchantName,
     trial_days: trialDays,
-    official_days: 0,
+    official_days: officialDays,
     account_status: 'normal',
-    membership_plan: 'free',
+    membership_plan: membershipPlan,
     edition,
     regional_partner_id: partner.id,
     attribution_city: hit.city.city,
@@ -650,6 +672,17 @@ export async function createPartnerScopedTenant(
     await admin.from('tenants').delete().eq('id', tenantId)
     await admin.auth.admin.deleteUser(userId)
     return { ok: false, error: 'member_insert_failed', detail: memErr.message }
+  }
+
+  // 与运营台改档同源：非免费档立即补发当月套餐积分
+  if (membershipPlan !== 'free') {
+    try {
+      await ensureErpMonthlyGiftPointsGranted(admin, tenantId, {
+        plan: normalizeMembershipPlan(membershipPlan),
+      })
+    } catch {
+      /* 积分补发失败不阻断开户 */
+    }
   }
 
   return {
@@ -874,19 +907,22 @@ export async function patchPartnerScopedTenant(
     merchantName?: string
     accountStatus?: 'normal' | 'disabled' | 'frozen'
     opsGiftDays?: number
+    membershipPlan?: string
     registerCity?: string
     registerProvince?: string
     licenseAddress?: string
   },
 ): Promise<{ ok: true; row: TenantAccountRow } | { ok: false; error: string }> {
   const gate = await assertTenantInPartnerScope(admin, partner, input.tenantId)
-  // 认领：尚未入范围时，必须带 registerCity 且城市在代理范围内
+  // 认领：尚未入范围时，须带执照地址或 registerCity，且城市在代理范围内
   let row = gate.ok ? gate.row : null
   if (!gate.ok) {
     if (gate.error !== 'out_of_scope' && gate.error !== 'tenant_not_found') {
       return { ok: false, error: gate.error }
     }
-    if (!input.registerCity?.trim()) return { ok: false, error: gate.error }
+    if (!input.registerCity?.trim() && !input.licenseAddress?.trim()) {
+      return { ok: false, error: gate.error }
+    }
     const { data, error } = await admin
       .from('tenants')
       .select(TENANT_ACCOUNT_SELECT)
@@ -898,14 +934,6 @@ export async function patchPartnerScopedTenant(
   if (!row) return { ok: false, error: 'tenant_not_found' }
 
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
-  if (input.merchantName?.trim()) patch.name = input.merchantName.trim()
-  if (
-    input.accountStatus === 'normal' ||
-    input.accountStatus === 'disabled' ||
-    input.accountStatus === 'frozen'
-  ) {
-    patch.account_status = input.accountStatus
-  }
 
   if (input.licenseAddress?.trim()) {
     const hit = resolveLicenseCityInScope(input.licenseAddress, partner.cities)
@@ -933,32 +961,42 @@ export async function patchPartnerScopedTenant(
     if (province) patch.register_province = province
     patch.regional_partner_id = partner.id
   } else if (gate.ok) {
-    // 编辑已有范围账号时保持归属
     patch.regional_partner_id = partner.id
   }
 
-  if (typeof input.opsGiftDays === 'number' && Number.isFinite(input.opsGiftDays)) {
-    const sub = readEntitlementDays(
-      row.subscription_days != null ? row.subscription_days : row.official_days,
-    )
-    const oldGift = readEntitlementDays(row.ops_gift_days)
-    Object.assign(
-      patch,
-      buildOpsGiftDaysPatch({
-        subscriptionDays: sub,
-        oldOpsGiftDays: oldGift,
-        newOpsGiftDays: input.opsGiftDays,
-        serviceExpireAt: row.service_expire_at,
-      }),
-    )
+  if (Object.keys(patch).length > 1) {
+    const { error: updErr } = await admin.from('tenants').update(patch).eq('id', input.tenantId)
+    if (updErr) return { ok: false, error: updErr.message }
   }
 
-  const { error: updErr } = await admin.from('tenants').update(patch).eq('id', input.tenantId)
-  if (updErr) return { ok: false, error: updErr.message }
+  // 名称 / 状态 / 赠送天数 / 套餐：与运营台 opsTenantPatchAdmin 同源
+  const membershipPlan = parseMembershipPlan(input.membershipPlan)
+  const opsBody: Record<string, unknown> = { id: input.tenantId }
+  if (input.merchantName?.trim()) opsBody.merchantName = input.merchantName.trim()
+  if (
+    input.accountStatus === 'normal' ||
+    input.accountStatus === 'disabled' ||
+    input.accountStatus === 'frozen'
+  ) {
+    opsBody.accountStatus = input.accountStatus
+  }
+  if (typeof input.opsGiftDays === 'number' && Number.isFinite(input.opsGiftDays)) {
+    opsBody.opsGiftDays = input.opsGiftDays
+  }
+  if (membershipPlan) opsBody.membershipPlan = membershipPlan
+
+  if (Object.keys(opsBody).length > 1) {
+    const ops = await opsTenantPatchAdmin(admin, opsBody)
+    if (!ops.ok) {
+      return {
+        ok: false,
+        error: String((ops.body as { error?: string }).error ?? 'ops_patch_failed'),
+      }
+    }
+  }
 
   const refreshed = await assertTenantInPartnerScope(admin, partner, input.tenantId)
   if (!refreshed.ok) {
-    // 刚认领后应在范围内
     const { data } = await admin
       .from('tenants')
       .select(TENANT_ACCOUNT_SELECT)
@@ -978,13 +1016,26 @@ export function mapTenantAccountPublic(row: TenantAccountRow) {
     row.account_status !== 'frozen' &&
     (expireMs == null || expireMs >= now)
   const city = resolveTenantCity(row)
+  const plan = (row.membership_plan || 'free') as MembershipPlanKey
+  const planLabels: Record<MembershipPlanKey, string> = {
+    free: '免费版',
+    member: '会员版',
+    member_plus: '会员 Plus',
+  }
+  const subscriptionDays = Number(
+    row.subscription_days != null ? row.subscription_days : row.official_days ?? 0,
+  ) || 0
   return {
     id: row.id,
     name: row.name,
     edition: row.edition || 'merchant',
     editionLabel: editionLabel(row.edition),
     accountStatus: row.account_status,
-    membershipPlan: row.membership_plan || 'free',
+    membershipPlan: plan,
+    membershipPlanLabel: planLabels[plan] ?? plan,
+    trialDays: Number(row.trial_days ?? 0) || 0,
+    officialDays: Number(row.official_days ?? 0) || 0,
+    subscriptionDays,
     opsGiftDays: Number(row.ops_gift_days ?? 0) || 0,
     serviceExpireAt: row.service_expire_at,
     registerProvince: row.register_province || null,
