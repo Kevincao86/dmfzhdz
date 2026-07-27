@@ -750,7 +750,23 @@ function CreateForm({ onBack }: { onBack: () => void }) {
                 ) : null}
                 {stores.map((s, i) => (
                   <div key={i} className="mb-3 rounded-lg border border-gray-100 bg-gray-50/80 p-3">
-                    <p className="mb-2 text-xs font-medium text-gray-600">门店 {i + 1}</p>
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <p className="text-xs font-medium text-gray-600">门店 {i + 1}</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStores((prev) => {
+                            if (prev.length <= 1) return [{ name: '', address: '' }]
+                            return prev.filter((_, j) => j !== i)
+                          })
+                        }}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-red-600 hover:underline"
+                        aria-label={`删除门店 ${i + 1}`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        删除门店
+                      </button>
+                    </div>
                     <input
                       value={s.name}
                       onChange={(e) => {
