@@ -4,13 +4,18 @@ import {
   CircleAlert,
   ClipboardCopy,
   Download,
+  Gift,
   History,
   ListChecks,
   Loader2,
+  Megaphone,
+  Package,
   Search,
+  Smartphone,
   Sparkles,
   Store,
   Trash2,
+  Wallet,
 } from 'lucide-react'
 import {
   useCallback,
@@ -881,12 +886,63 @@ function buildPhaseDetailItems(
 }
 
 const SIMPLE_STEP_TONES = [
-  'from-sky-500 to-blue-600',
-  'from-emerald-500 to-teal-600',
-  'from-amber-500 to-orange-600',
-  'from-violet-500 to-indigo-600',
-  'from-rose-500 to-pink-600',
+  { bar: 'bg-sky-500', soft: 'bg-sky-50', ring: 'ring-sky-200', text: 'text-sky-800' },
+  { bar: 'bg-emerald-500', soft: 'bg-emerald-50', ring: 'ring-emerald-200', text: 'text-emerald-800' },
+  { bar: 'bg-amber-500', soft: 'bg-amber-50', ring: 'ring-amber-200', text: 'text-amber-900' },
+  { bar: 'bg-violet-500', soft: 'bg-violet-50', ring: 'ring-violet-200', text: 'text-violet-900' },
+  { bar: 'bg-rose-500', soft: 'bg-rose-50', ring: 'ring-rose-200', text: 'text-rose-900' },
 ] as const
+
+const PLATFORM_VISUAL: Record<string, { accent: string; screen: string; label: string }> = {
+  抖音: { accent: 'from-[#111827] to-[#1f2937]', screen: 'bg-[#161823]', label: '短视频' },
+  小红书: { accent: 'from-[#fe2c55] to-[#ff2442]', screen: 'bg-[#fff5f7]', label: '图文笔记' },
+  美团: { accent: 'from-[#ffc300] to-[#ffb000]', screen: 'bg-[#fffbeb]', label: '到店团购' },
+  大众点评: { accent: 'from-[#ffc300] to-[#ffb000]', screen: 'bg-[#fffbeb]', label: '到店团购' },
+  快手: { accent: 'from-[#ff4906] to-[#ff7a45]', screen: 'bg-[#fff7ed]', label: '短视频' },
+  视频号: { accent: 'from-[#07c160] to-[#10b981]', screen: 'bg-[#ecfdf5]', label: '视频号' },
+}
+
+function platformVisual(name: string) {
+  for (const k of Object.keys(PLATFORM_VISUAL)) {
+    if (name.includes(k)) return PLATFORM_VISUAL[k]!
+  }
+  return { accent: 'from-slate-700 to-slate-900', screen: 'bg-slate-50', label: '内容' }
+}
+
+/** 从细流程抽 2～3 条「卡片正面就能看懂」的要点 */
+function pickSimplePreviewLines(
+  flow: AiOpsPlanSimpleFlowItem[],
+  max = 3,
+): Array<{ label: string; detail: string }> {
+  const out: Array<{ label: string; detail: string }> = []
+  for (const f of flow) {
+    for (const a of f.actions || []) {
+      if (!a.detail?.trim()) continue
+      out.push({
+        label: a.label || f.title,
+        detail: a.detail.length > 72 ? `${a.detail.slice(0, 72)}…` : a.detail,
+      })
+      if (out.length >= max) return out
+    }
+  }
+  return out
+}
+
+function pickPlatformPostPreview(flow: AiOpsPlanSimpleFlowItem[]): {
+  title: string
+  body: string
+  when: string
+} {
+  const all = flow.flatMap((f) => f.actions || [])
+  const titleAct = all.find((a) => /标题/.test(a.label))
+  const bodyAct = all.find((a) => /正文|文案|钩子/.test(a.label))
+  const whenAct = all.find((a) => /时间|发布/.test(a.label))
+  return {
+    title: titleAct?.detail?.split('\n')[0]?.slice(0, 48) || '本地优惠｜到店套餐｜限时体验',
+    body: (bodyAct?.detail || titleAct?.detail || '把套餐卖点写进前三秒，挂上团购链接。').slice(0, 90),
+    when: whenAct?.detail?.slice(0, 36) || '建议晚高峰 18:00～21:00 发',
+  }
+}
 
 function SimpleDetailFlowList({
   flow,
@@ -962,7 +1018,10 @@ type SimpleDetailOpen =
   | { kind: 'checklist' }
   | null
 
-/** 简易版：封面 → 步骤 → 平台 → 货盘 → 清单（点击查看细流程） */
+/**
+ * 简易版（中小商家向）：
+ * 一眼结论 → 图文分区（卖什么/怎么发/做什么）→ 卡片正面写清要点，详情作补充
+ */
 function SimplePlanGallery({ plan }: { plan: AiOpsPlanResult }) {
   const enriched = useMemo(() => ensureSimplePlanDetailDepth(plan), [plan])
   const s = enriched.simplePlan
@@ -970,7 +1029,6 @@ function SimplePlanGallery({ plan }: { plan: AiOpsPlanResult }) {
   if (!s) {
     return <p className="text-sm text-gray-500">暂无简易方案内容</p>
   }
-  const hints = [s.hero.storeHint, s.hero.periodHint, s.hero.budgetHint].filter(Boolean)
 
   const modal = (() => {
     if (!open) return null
@@ -982,8 +1040,8 @@ function SimplePlanGallery({ plan }: { plan: AiOpsPlanResult }) {
           ? st.detailFlow
           : synthesizeSimpleDetailFlow(st.body, st.tip)
       return {
-        title: `${st.title} · 详细流程`,
-        subtitle: '按下列步骤落地即可',
+        title: `${st.title} · 完整做法`,
+        subtitle: '照着做就能落地',
         body: (
           <SimpleDetailFlowList
             flow={flow}
@@ -999,8 +1057,8 @@ function SimplePlanGallery({ plan }: { plan: AiOpsPlanResult }) {
       const flow =
         p.detailFlow.length > 0 ? p.detailFlow : synthesizeSimpleDetailFlow(p.how)
       return {
-        title: `${p.platform} · 发布流程`,
-        subtitle: '选题 → 制作 → 发布 → 复盘',
+        title: `${p.platform} · 发帖全流程`,
+        subtitle: '选题 → 制作 → 发布 → 复盘（含可粘贴文案）',
         body: <SimpleDetailFlowList flow={flow} note={p.detailNote} summary={p.how} />,
       }
     }
@@ -1012,7 +1070,7 @@ function SimplePlanGallery({ plan }: { plan: AiOpsPlanResult }) {
           ? c.detailFlow
           : synthesizeSimpleDetailFlow(c.sellingPoint, c.items, c.priceHint)
       return {
-        title: `${c.name} · 上架与核销`,
+        title: `${c.name} · 组品 / 上架 / 话术`,
         subtitle: c.priceHint || undefined,
         body: (
           <SimpleDetailFlowList
@@ -1031,8 +1089,8 @@ function SimplePlanGallery({ plan }: { plan: AiOpsPlanResult }) {
           ? item.detailFlow
           : synthesizeSimpleDetailFlow(item.text, item.detailNote)
       return {
-        title: `${item.text} · 怎么做`,
-        subtitle: '完成标准与操作步骤',
+        title: `${item.text} · 怎么做完`,
+        subtitle: '交付物 + 完成标准',
         body: <SimpleDetailFlowList flow={flow} note={item.detailNote} />,
       }
     }
@@ -1051,193 +1109,357 @@ function SimplePlanGallery({ plan }: { plan: AiOpsPlanResult }) {
         ),
       }))
       return {
-        title: '落地清单 · 全部事项',
-        subtitle: `共 ${s.checklist.length} 条`,
+        title: '本周打勾清单',
+        subtitle: `共 ${s.checklist.length} 条，做完一项勾一项`,
         body: <SimpleDetailFlowList flow={flow} />,
       }
     }
     return null
   })()
 
+  const journey = [
+    { icon: Package, title: '卖什么', desc: '套餐写清' },
+    { icon: Megaphone, title: '怎么发', desc: '照样发布' },
+    { icon: ListChecks, title: '做什么', desc: '打勾落地' },
+  ] as const
+
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4">
-      <article className="overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-700 to-blue-800 px-5 py-6 text-white shadow-md">
-        <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-medium tracking-wide">
-          <Sparkles className="h-3 w-3" />
-          简易运营方案
-        </div>
-        <h2 className="text-xl font-semibold leading-snug tracking-tight sm:text-2xl">
-          {s.hero.headline || '本周行动方案'}
-        </h2>
-        {s.hero.summary ? (
-          <p className="mt-3 text-sm leading-relaxed text-white/90">{s.hero.summary}</p>
-        ) : null}
-        {hints.length ? (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {hints.map((h) => (
-              <span
-                key={h}
-                className="inline-flex items-center gap-1 rounded-lg bg-white/12 px-2.5 py-1 text-xs text-white/95"
+    <div className="mx-auto flex max-w-3xl flex-col gap-5">
+      {/* 一眼结论 */}
+      <article className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0f172a] via-[#1e3a5f] to-[#0ea5e9] px-5 py-6 text-white shadow-lg">
+        <div
+          className="pointer-events-none absolute -right-8 -top-10 h-40 w-40 rounded-full bg-white/10 blur-2xl"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute bottom-0 left-1/3 h-24 w-48 rounded-full bg-cyan-300/20 blur-2xl"
+          aria-hidden
+        />
+        <div className="relative">
+          <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-medium">
+            <Sparkles className="h-3 w-3" />
+            中小店专用 · 本周行动手册
+          </div>
+          <h2 className="text-2xl font-semibold leading-snug tracking-tight sm:text-[1.65rem]">
+            {s.hero.headline || '本周行动方案'}
+          </h2>
+          {s.hero.summary ? (
+            <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-white/90">{s.hero.summary}</p>
+          ) : null}
+          <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {[
+              { icon: Store, label: '门店', value: s.hero.storeHint || '按已选门店执行' },
+              { icon: CalendarRange, label: '档期', value: s.hero.periodHint || '见左侧日期' },
+              { icon: Wallet, label: '预算', value: s.hero.budgetHint || '见左侧预算' },
+            ].map((chip) => (
+              <div
+                key={chip.label}
+                className="flex items-start gap-2.5 rounded-2xl bg-white/12 px-3 py-2.5 backdrop-blur-sm"
               >
-                <Store className="h-3 w-3 opacity-80" />
-                {h}
-              </span>
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/15">
+                  <chip.icon className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <div className="text-[10px] uppercase tracking-wide text-white/65">{chip.label}</div>
+                  <div className="mt-0.5 text-xs font-medium leading-snug text-white">{chip.value}</div>
+                </div>
+              </div>
             ))}
           </div>
-        ) : null}
-        <p className="mt-4 text-[11px] text-white/70">点击下方各卡片「查看详情」可看细流程与步骤</p>
+        </div>
       </article>
 
-      {s.steps.length ? (
-        <section className="space-y-2.5">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">本周先做什么</h3>
-          {s.steps.map((st, i) => (
-            <article
-              key={`${st.title}-${i}`}
-              role="button"
-              tabIndex={0}
-              onClick={() => setOpen({ kind: 'step', index: i })}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  setOpen({ kind: 'step', index: i })
-                }
-              }}
-              className="flex w-full cursor-pointer gap-3 rounded-xl border border-gray-100 bg-white p-3.5 text-left shadow-sm transition hover:border-blue-200 hover:shadow-md"
-            >
-              <div
-                className={cn(
-                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-sm font-bold text-white',
-                  SIMPLE_STEP_TONES[i % SIMPLE_STEP_TONES.length],
-                )}
-              >
-                {i + 1}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-start justify-between gap-2">
-                  <h4 className="text-sm font-semibold text-gray-900">{st.title}</h4>
-                  <ViewDetailBtn
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setOpen({ kind: 'step', index: i })
-                    }}
-                    label="查看详情"
-                  />
-                </div>
-                {st.body ? <p className="mt-1 text-sm leading-relaxed text-gray-600">{st.body}</p> : null}
-                {st.tip ? (
-                  <p className="mt-2 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900/90">
-                    小贴士：{st.tip}
-                  </p>
-                ) : null}
-              </div>
-            </article>
-          ))}
-        </section>
-      ) : null}
-
-      {s.platforms.length ? (
-        <section className="space-y-2.5">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">各平台怎么发</h3>
-          <div className="grid gap-2.5 sm:grid-cols-2">
-            {s.platforms.map((p, i) => (
-              <article
-                key={`${p.platform}-${i}`}
-                role="button"
-                tabIndex={0}
-                onClick={() => setOpen({ kind: 'platform', index: i })}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    setOpen({ kind: 'platform', index: i })
-                  }
-                }}
-                className="cursor-pointer rounded-xl border border-sky-100 bg-sky-50/60 p-3.5 text-left transition hover:border-sky-300 hover:bg-sky-50"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="text-sm font-semibold text-sky-900">{p.platform}</div>
-                  <ViewDetailBtn
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setOpen({ kind: 'platform', index: i })
-                    }}
-                    label="查看详情"
-                  />
-                </div>
-                <p className="mt-1.5 text-sm leading-relaxed text-sky-950/80">{p.how}</p>
-              </article>
-            ))}
+      {/* 阅读路径：降低「不知道从哪看」 */}
+      <div className="grid grid-cols-3 gap-2">
+        {journey.map((j, i) => (
+          <div
+            key={j.title}
+            className="rounded-2xl border border-gray-100 bg-white px-3 py-3 text-center shadow-sm"
+          >
+            <div className="mx-auto mb-1.5 flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-white">
+              <j.icon className="h-4 w-4" />
+            </div>
+            <div className="text-xs font-semibold text-gray-900">
+              {i + 1}. {j.title}
+            </div>
+            <div className="mt-0.5 text-[11px] text-gray-500">{j.desc}</div>
           </div>
-        </section>
-      ) : null}
+        ))}
+      </div>
 
+      {/* ① 卖什么：货盘前置，中小店先搞清商品 */}
       {s.combos.length ? (
-        <section className="space-y-2.5">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">推荐套餐</h3>
-          <div className="grid gap-2.5 sm:grid-cols-2">
-            {s.combos.map((c, i) => (
-              <article
-                key={`${c.name}-${i}`}
-                role="button"
-                tabIndex={0}
-                onClick={() => setOpen({ kind: 'combo', index: i })}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    setOpen({ kind: 'combo', index: i })
-                  }
-                }}
-                className="cursor-pointer rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50/80 to-white p-3.5 text-left transition hover:border-emerald-300 hover:shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <h4 className="text-sm font-semibold text-emerald-950">{c.name}</h4>
-                  <div className="flex shrink-0 items-center gap-1.5">
+        <section className="space-y-3">
+          <div className="flex items-end justify-between gap-2">
+            <div>
+              <h3 className="text-base font-semibold text-gray-900">① 卖什么（先定货）</h3>
+              <p className="mt-0.5 text-xs text-gray-500">价格、包含项目写在卡片上，点开有上架与话术原文</p>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {s.combos.map((c, i) => {
+              const preview = pickSimplePreviewLines(c.detailFlow, 2)
+              const tags = (c.items || '')
+                .split(/[、，,/｜|]+/)
+                .map((x) => x.trim())
+                .filter(Boolean)
+                .slice(0, 5)
+              return (
+                <article
+                  key={`${c.name}-${i}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setOpen({ kind: 'combo', index: i })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      setOpen({ kind: 'combo', index: i })
+                    }
+                  }}
+                  className="cursor-pointer overflow-hidden rounded-2xl border border-emerald-100 bg-white text-left shadow-sm ring-1 ring-emerald-50 transition hover:shadow-md"
+                >
+                  <div className="relative h-24 bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 px-4 py-3 text-white">
+                    <div className="absolute right-3 top-3 opacity-30">
+                      <Gift className="h-16 w-16" />
+                    </div>
+                    <div className="relative text-[11px] font-medium text-white/85">推荐主推</div>
+                    <div className="relative mt-1 text-lg font-bold leading-tight">{c.name}</div>
                     {c.priceHint ? (
-                      <span className="rounded-md bg-emerald-600/10 px-2 py-0.5 text-xs font-medium text-emerald-800">
+                      <div className="relative mt-2 inline-flex rounded-lg bg-white/20 px-2.5 py-1 text-sm font-bold tabular-nums backdrop-blur-sm">
                         {c.priceHint}
-                      </span>
+                      </div>
                     ) : null}
-                    <ViewDetailBtn
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setOpen({ kind: 'combo', index: i })
-                      }}
-                      label="查看详情"
-                    />
                   </div>
-                </div>
-                {c.sellingPoint ? (
-                  <p className="mt-1.5 text-sm leading-relaxed text-gray-600">{c.sellingPoint}</p>
-                ) : null}
-              </article>
-            ))}
+                  <div className="space-y-2.5 p-3.5">
+                    {c.sellingPoint ? (
+                      <p className="text-sm leading-relaxed text-gray-700">{c.sellingPoint}</p>
+                    ) : null}
+                    {tags.length ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {tags.map((t) => (
+                          <span
+                            key={t}
+                            className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800"
+                          >
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    {preview.length ? (
+                      <ul className="space-y-1.5 rounded-xl bg-slate-50 px-3 py-2.5">
+                        {preview.map((line) => (
+                          <li key={line.label} className="text-xs leading-relaxed text-gray-600">
+                            <span className="font-semibold text-gray-800">{line.label}：</span>
+                            {line.detail}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    <div className="flex justify-end">
+                      <ViewDetailBtn
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setOpen({ kind: 'combo', index: i })
+                        }}
+                        label="组品·上架·话术"
+                      />
+                    </div>
+                  </div>
+                </article>
+              )
+            })}
           </div>
         </section>
       ) : null}
 
-      {s.checklist.length ? (
-        <section className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500">
-              <ListChecks className="h-3.5 w-3.5" />
-              落地清单
-            </h3>
-            <ViewDetailBtn onClick={() => setOpen({ kind: 'checklist' })} label="查看全部" />
+      {/* ② 怎么发：手机帖预览 */}
+      {s.platforms.length ? (
+        <section className="space-y-3">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">② 怎么发（照样抄）</h3>
+            <p className="mt-0.5 text-xs text-gray-500">像发帖预览一样：标题/正文要点直接露在卡片上</p>
           </div>
-          <ul className="space-y-2">
-            {s.checklist.map((item, i) => (
-              <li key={`${item.text}-${i}`}>
-                <button
-                  type="button"
-                  onClick={() => setOpen({ kind: 'check', index: i })}
-                  className="flex w-full items-start gap-2.5 rounded-lg px-1 py-1.5 text-left text-sm text-gray-700 transition hover:bg-blue-50"
+          <div className="grid gap-3 sm:grid-cols-2">
+            {s.platforms.map((p, i) => {
+              const vis = platformVisual(p.platform)
+              const post = pickPlatformPostPreview(p.detailFlow)
+              return (
+                <article
+                  key={`${p.platform}-${i}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setOpen({ kind: 'platform', index: i })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      setOpen({ kind: 'platform', index: i })
+                    }
+                  }}
+                  className="cursor-pointer overflow-hidden rounded-2xl border border-gray-100 bg-white text-left shadow-sm transition hover:shadow-md"
                 >
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
-                  <span className="min-w-0 flex-1 leading-relaxed">{item.text}</span>
-                  <span className="shrink-0 text-xs font-medium text-blue-600">详情</span>
-                </button>
-              </li>
-            ))}
+                  <div className={cn('bg-gradient-to-r px-3.5 py-2.5 text-white', vis.accent)}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Smartphone className="h-4 w-4 opacity-90" />
+                        <span className="text-sm font-semibold">{p.platform}</span>
+                      </div>
+                      <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px]">{vis.label}</span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-white/85">{p.how}</p>
+                  </div>
+                  <div className={cn('px-3.5 py-3', vis.screen)}>
+                    <div className="rounded-xl border border-black/5 bg-white p-3 shadow-sm">
+                      <div className="mb-2 flex items-center gap-2">
+                        <span className="h-7 w-7 rounded-full bg-gradient-to-br from-slate-200 to-slate-300" />
+                        <div>
+                          <div className="text-xs font-semibold text-gray-800">本店官方号</div>
+                          <div className="text-[10px] text-gray-400">{post.when}</div>
+                        </div>
+                      </div>
+                      <div className="text-sm font-semibold leading-snug text-gray-900">{post.title}</div>
+                      <p className="mt-1.5 text-xs leading-relaxed text-gray-600">{post.body}</p>
+                      <div className="mt-2.5 flex h-16 items-center justify-center rounded-lg bg-gradient-to-br from-slate-100 to-slate-200 text-[10px] text-slate-500">
+                        成片/封面位 · 点详情看分镜与字幕
+                      </div>
+                    </div>
+                    <div className="mt-2.5 flex justify-end">
+                      <ViewDetailBtn
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setOpen({ kind: 'platform', index: i })
+                        }}
+                        label="完整发布步骤"
+                      />
+                    </div>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      {/* ③ 本周先做什么 */}
+      {s.steps.length ? (
+        <section className="space-y-3">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">③ 本周先做什么</h3>
+            <p className="mt-0.5 text-xs text-gray-500">正面就写清「要点」，点开才是完整做法</p>
+          </div>
+          <div className="space-y-3">
+            {s.steps.map((st, i) => {
+              const tone = SIMPLE_STEP_TONES[i % SIMPLE_STEP_TONES.length]!
+              const preview = pickSimplePreviewLines(st.detailFlow, 3)
+              return (
+                <article
+                  key={`${st.title}-${i}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setOpen({ kind: 'step', index: i })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      setOpen({ kind: 'step', index: i })
+                    }
+                  }}
+                  className={cn(
+                    'cursor-pointer overflow-hidden rounded-2xl border border-gray-100 bg-white text-left shadow-sm ring-1 transition hover:shadow-md',
+                    tone.ring,
+                  )}
+                >
+                  <div className="flex">
+                    <div className={cn('w-1.5 shrink-0', tone.bar)} />
+                    <div className="min-w-0 flex-1 p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-3">
+                          <div
+                            className={cn(
+                              'flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-2xl text-white',
+                              tone.bar,
+                            )}
+                          >
+                            <span className="text-[10px] font-medium opacity-90">事</span>
+                            <span className="text-base font-bold leading-none">{i + 1}</span>
+                          </div>
+                          <div>
+                            <h4 className="text-[15px] font-semibold text-gray-900">{st.title}</h4>
+                            {st.body ? (
+                              <p className="mt-1 text-sm leading-relaxed text-gray-600">{st.body}</p>
+                            ) : null}
+                          </div>
+                        </div>
+                        <ViewDetailBtn
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setOpen({ kind: 'step', index: i })
+                          }}
+                          label="完整做法"
+                        />
+                      </div>
+                      {preview.length ? (
+                        <ul className={cn('mt-3 space-y-1.5 rounded-xl px-3 py-2.5', tone.soft)}>
+                          {preview.map((line) => (
+                            <li key={line.label} className={cn('text-xs leading-relaxed', tone.text)}>
+                              <span className="font-semibold">· {line.label}：</span>
+                              {line.detail}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                      {st.tip ? (
+                        <p className="mt-2 text-xs leading-relaxed text-amber-800/90">提示：{st.tip}</p>
+                      ) : null}
+                    </div>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      {/* ④ 打勾清单 */}
+      {s.checklist.length ? (
+        <section className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+          <div className="flex items-center justify-between gap-2 border-b border-gray-50 bg-slate-50/80 px-4 py-3">
+            <div>
+              <h3 className="text-base font-semibold text-gray-900">④ 打勾做完</h3>
+              <p className="text-xs text-gray-500">像待办一样：做完一项勾一项</p>
+            </div>
+            <ViewDetailBtn onClick={() => setOpen({ kind: 'checklist' })} label="全部明细" />
+          </div>
+          <ul className="divide-y divide-gray-50">
+            {s.checklist.map((item, i) => {
+              const deliver =
+                item.detailFlow
+                  .flatMap((f) => f.actions || [])
+                  .find((a) => /交付|做什么|标准/.test(a.label))?.detail ||
+                item.detailNote ||
+                ''
+              return (
+                <li key={`${item.text}-${i}`}>
+                  <button
+                    type="button"
+                    onClick={() => setOpen({ kind: 'check', index: i })}
+                    className="flex w-full items-start gap-3 px-4 py-3.5 text-left transition hover:bg-blue-50/60"
+                  >
+                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 border-blue-300 bg-white text-blue-600">
+                      <CheckCircle2 className="h-4 w-4 opacity-40" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold text-gray-900">{item.text}</div>
+                      {deliver ? (
+                        <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                          {deliver.length > 90 ? `${deliver.slice(0, 90)}…` : deliver}
+                        </p>
+                      ) : null}
+                    </div>
+                    <span className="shrink-0 text-xs font-medium text-blue-600">怎么做</span>
+                  </button>
+                </li>
+              )
+            })}
           </ul>
         </section>
       ) : null}
