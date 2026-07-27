@@ -8,6 +8,33 @@ import {
   type RegionalMerchantRow,
 } from '../lib/api'
 
+type EditForm = {
+  merchantName: string
+  accountStatus: string
+  opsGiftDays: number
+  registerCity: string
+  licenseAddress: string
+  password: string
+}
+
+type CreateForm = {
+  loginName: string
+  password: string
+  merchantName: string
+  edition: 'merchant' | 'partner'
+  licenseAddress: string
+  trialDays: number
+}
+
+const emptyCreate = (): CreateForm => ({
+  loginName: '',
+  password: '',
+  merchantName: '',
+  edition: 'merchant',
+  licenseAddress: '',
+  trialDays: 7,
+})
+
 export default function MerchantsPage() {
   const session = readSession()
   const [rows, setRows] = useState<RegionalMerchantRow[]>([])
@@ -18,13 +45,16 @@ export default function MerchantsPage() {
   const [searchMode, setSearchMode] = useState(false)
   const [editionFilter, setEditionFilter] = useState<'all' | 'merchant' | 'partner'>('all')
   const [edit, setEdit] = useState<RegionalMerchantRow | null>(null)
-  const [form, setForm] = useState({
+  const [createOpen, setCreateOpen] = useState(false)
+  const [form, setForm] = useState<EditForm>({
     merchantName: '',
     accountStatus: 'normal',
     opsGiftDays: 0,
     registerCity: '',
+    licenseAddress: '',
     password: '',
   })
+  const [createForm, setCreateForm] = useState<CreateForm>(emptyCreate)
   const [formErr, setFormErr] = useState<string | null>(null)
 
   const reload = async (keyword?: string) => {
@@ -57,18 +87,31 @@ export default function MerchantsPage() {
 
   const openEdit = (m: RegionalMerchantRow) => {
     setEdit(m)
+    setCreateOpen(false)
     setFormErr(null)
     setForm({
       merchantName: m.name,
       accountStatus: m.accountStatus || 'normal',
       opsGiftDays: m.opsGiftDays || 0,
       registerCity: m.city || m.registerCity || cities[0]?.city || '',
+      licenseAddress: m.businessLicenseAddress || '',
       password: '',
     })
   }
 
+  const openCreate = () => {
+    setEdit(null)
+    setCreateOpen(true)
+    setFormErr(null)
+    setCreateForm(emptyCreate())
+  }
+
   const saveEdit = async () => {
     if (!edit) return
+    if (edit.inScope === false && form.licenseAddress.trim().length < 4) {
+      setFormErr('认领须填写营业执照住所/经营场所地址，用于校验是否在代理城市内')
+      return
+    }
     setBusy(true)
     setFormErr(null)
     try {
@@ -78,7 +121,9 @@ export default function MerchantsPage() {
         merchantName: form.merchantName,
         accountStatus: form.accountStatus,
         opsGiftDays: Number(form.opsGiftDays) || 0,
-        registerCity: form.registerCity,
+        ...(form.licenseAddress.trim()
+          ? { licenseAddress: form.licenseAddress.trim() }
+          : { registerCity: form.registerCity }),
       })
       if (!r.ok) {
         setFormErr(r.error)
@@ -89,7 +134,6 @@ export default function MerchantsPage() {
           action: 'reset_password',
           tenantId: edit.id,
           password: form.password.trim(),
-          registerCity: form.registerCity,
         })
         if (!pw.ok) {
           setFormErr(`资料已保存，但改密失败：${pw.error}`)
@@ -103,14 +147,48 @@ export default function MerchantsPage() {
     }
   }
 
+  const saveCreate = async () => {
+    setBusy(true)
+    setFormErr(null)
+    try {
+      const r = await mutateMerchant({
+        action: 'create',
+        loginName: createForm.loginName.trim(),
+        password: createForm.password,
+        merchantName: createForm.merchantName.trim(),
+        edition: createForm.edition,
+        licenseAddress: createForm.licenseAddress.trim(),
+        trialDays: Number(createForm.trialDays) || 7,
+      })
+      if (!r.ok) {
+        setFormErr(r.error)
+        return
+      }
+      setCreateOpen(false)
+      setCreateForm(emptyCreate())
+      await reload()
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold text-white">名下商家</h1>
-        <p className="mt-1 text-sm text-[var(--muted)]">
-          查看并编辑代理城市内的商家 ERP / FWS 账号。城市：
-          {cities.map((c) => c.city).join('、') || '未配置'}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold text-white">名下商家</h1>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            新增/编辑须以营业执照住所城市命中代理范围。城市：
+            {cities.map((c) => c.city).join('、') || '未配置'}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={openCreate}
+          className="rounded-xl bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white"
+        >
+          新增客户
+        </button>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -152,7 +230,7 @@ export default function MerchantsPage() {
 
       {searchMode ? (
         <p className="text-xs text-amber-200/90">
-          搜索结果：不在本城的账号可编辑并指定归属城市后认领到名下。
+          搜索结果：不在本城的账号可填写营业执照住所后认领（住所城市须命中代理范围）。
         </p>
       ) : null}
       {err ? <p className="text-sm text-rose-400">{err}</p> : null}
@@ -173,7 +251,9 @@ export default function MerchantsPage() {
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-10 text-center text-[var(--muted)]">
-                  {searchMode ? '未找到匹配账号' : '本城暂无商家 ERP / FWS 账号，可用上方搜索认领'}
+                  {searchMode
+                    ? '未找到匹配账号'
+                    : '本城暂无商家 ERP / FWS 账号，可点「新增客户」或上方搜索认领'}
                 </td>
               </tr>
             ) : (
@@ -204,6 +284,112 @@ export default function MerchantsPage() {
         </table>
       </div>
 
+      {createOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-lg rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-5 shadow-2xl">
+            <h2 className="text-lg font-semibold text-white">新增客户</h2>
+            <p className="mt-1 text-xs text-[var(--muted)]">
+              系统从营业执照住所地址识别城市，须命中你的代理城市后才可开户
+            </p>
+            {formErr ? <p className="mt-2 text-xs text-rose-400">{formErr}</p> : null}
+            <div className="mt-4 grid gap-3">
+              <label className="text-xs text-[var(--muted)]">
+                公司/商家名称
+                <input
+                  value={createForm.merchantName}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, merchantName: e.target.value }))}
+                  className="mt-1 w-full rounded-xl border border-[var(--line)] bg-[#0b1220] px-3 py-2 text-sm text-white"
+                />
+              </label>
+              <label className="text-xs text-[var(--muted)]">
+                营业执照住所/经营场所（整段地址）
+                <textarea
+                  value={createForm.licenseAddress}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, licenseAddress: e.target.value }))}
+                  rows={2}
+                  placeholder="例：浙江省宁波市鄞州区××路××号"
+                  className="mt-1 w-full rounded-xl border border-[var(--line)] bg-[#0b1220] px-3 py-2 text-sm text-white"
+                />
+              </label>
+              <label className="text-xs text-[var(--muted)]">
+                账号类型
+                <select
+                  value={createForm.edition}
+                  onChange={(e) =>
+                    setCreateForm((f) => ({
+                      ...f,
+                      edition: e.target.value === 'partner' ? 'partner' : 'merchant',
+                    }))
+                  }
+                  className="mt-1 w-full rounded-xl border border-[var(--line)] bg-[#0b1220] px-3 py-2 text-sm text-white"
+                >
+                  <option value="merchant">商家 ERP</option>
+                  <option value="partner">FWS 服务商</option>
+                </select>
+              </label>
+              <label className="text-xs text-[var(--muted)]">
+                登录名（4–32 位字母或数字）
+                <input
+                  value={createForm.loginName}
+                  onChange={(e) =>
+                    setCreateForm((f) => ({
+                      ...f,
+                      loginName: e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 32),
+                    }))
+                  }
+                  className="mt-1 w-full rounded-xl border border-[var(--line)] bg-[#0b1220] px-3 py-2 text-sm text-white"
+                />
+              </label>
+              <label className="text-xs text-[var(--muted)]">
+                初始登录密码（至少 6 位）
+                <input
+                  type="password"
+                  value={createForm.password}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, password: e.target.value }))}
+                  className="mt-1 w-full rounded-xl border border-[var(--line)] bg-[#0b1220] px-3 py-2 text-sm text-white"
+                />
+              </label>
+              <label className="text-xs text-[var(--muted)]">
+                试用天数
+                <input
+                  type="number"
+                  min={0}
+                  max={3650}
+                  value={createForm.trialDays}
+                  onChange={(e) =>
+                    setCreateForm((f) => ({ ...f, trialDays: Number(e.target.value) || 0 }))
+                  }
+                  className="mt-1 w-full rounded-xl border border-[var(--line)] bg-[#0b1220] px-3 py-2 text-sm text-white"
+                />
+              </label>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setCreateOpen(false)}
+                className="rounded-xl border border-[var(--line)] px-4 py-2 text-sm text-[var(--muted)]"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                disabled={
+                  busy ||
+                  !createForm.merchantName.trim() ||
+                  !createForm.licenseAddress.trim() ||
+                  !createForm.loginName.trim() ||
+                  createForm.password.length < 6
+                }
+                onClick={() => void saveCreate()}
+                className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
+              >
+                {busy ? '创建中…' : '创建账号'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {edit ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-lg rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-5 shadow-2xl">
@@ -222,19 +408,31 @@ export default function MerchantsPage() {
                 />
               </label>
               <label className="text-xs text-[var(--muted)]">
-                归属城市（须在代理范围内）
-                <select
-                  value={form.registerCity}
-                  onChange={(e) => setForm((f) => ({ ...f, registerCity: e.target.value }))}
+                营业执照住所/经营场所
+                <textarea
+                  value={form.licenseAddress}
+                  onChange={(e) => setForm((f) => ({ ...f, licenseAddress: e.target.value }))}
+                  rows={2}
+                  placeholder="填写后自动校验城市是否命中代理范围"
                   className="mt-1 w-full rounded-xl border border-[var(--line)] bg-[#0b1220] px-3 py-2 text-sm text-white"
-                >
-                  {cities.map((c) => (
-                    <option key={`${c.province}|${c.city}`} value={c.city}>
-                      {c.province} · {c.city}
-                    </option>
-                  ))}
-                </select>
+                />
               </label>
+              {!form.licenseAddress.trim() ? (
+                <label className="text-xs text-[var(--muted)]">
+                  归属城市（未填执照地址时使用；须在代理范围内）
+                  <select
+                    value={form.registerCity}
+                    onChange={(e) => setForm((f) => ({ ...f, registerCity: e.target.value }))}
+                    className="mt-1 w-full rounded-xl border border-[var(--line)] bg-[#0b1220] px-3 py-2 text-sm text-white"
+                  >
+                    {cities.map((c) => (
+                      <option key={`${c.province}|${c.city}`} value={c.city}>
+                        {c.province} · {c.city}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
               <label className="text-xs text-[var(--muted)]">
                 账号状态
                 <select
@@ -260,7 +458,7 @@ export default function MerchantsPage() {
                 />
               </label>
               <label className="text-xs text-[var(--muted)]">
-                重置登录密码（留空不改）
+                重置商家登录密码（留空不改）
                 <input
                   type="password"
                   value={form.password}
@@ -280,7 +478,7 @@ export default function MerchantsPage() {
               </button>
               <button
                 type="button"
-                disabled={busy || !form.registerCity}
+                disabled={busy || (!form.licenseAddress.trim() && !form.registerCity)}
                 onClick={() => void saveEdit()}
                 className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
               >

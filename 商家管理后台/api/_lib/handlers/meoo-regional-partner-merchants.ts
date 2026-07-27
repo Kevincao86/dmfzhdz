@@ -3,10 +3,12 @@ import { createOpsServiceRoleClient } from '../createOpsServiceRoleClient.js'
 import { opsTenantResetPasswordAdmin } from '../opsTenantsMutationsBackend.js'
 import {
   bearerTokenFromAuthHeader,
+  createPartnerScopedTenant,
   loadPartnerCityAccounts,
   mapTenantAccountPublic,
   patchPartnerScopedTenant,
   requireRegionalPartnerSession,
+  resolveLicenseCityInScope,
   searchTenantsForPartnerClaim,
   tenantCityInPartnerScope,
 } from '../regionalPartnersBackend.js'
@@ -89,6 +91,68 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     const action = String(body.action ?? 'update').trim().toLowerCase()
 
+    if (action === 'preview_license_city') {
+      const hit = resolveLicenseCityInScope(
+        String(body.licenseAddress ?? ''),
+        auth.partner.cities,
+      )
+      if (!hit.ok) {
+        sendOpsJson(res, 400, {
+          ok: false,
+          code: hit.error,
+          message:
+            hit.error === 'license_city_not_in_scope'
+              ? '营业执照住所城市未命中你的代理城市范围'
+              : '请填写营业执照住所/经营场所地址',
+        })
+        return
+      }
+      sendOpsJson(res, 200, {
+        ok: true,
+        city: hit.city,
+        matchedToken: hit.matchedToken,
+      })
+      return
+    }
+
+    if (action === 'create') {
+      const r = await createPartnerScopedTenant(client.admin, auth.partner, {
+        loginName: String(body.loginName ?? ''),
+        password: String(body.password ?? ''),
+        merchantName: String(body.merchantName ?? ''),
+        edition: body.edition === 'partner' ? 'partner' : 'merchant',
+        licenseAddress: String(body.licenseAddress ?? ''),
+        trialDays: body.trialDays != null ? Number(body.trialDays) : 7,
+      })
+      if (!r.ok) {
+        const msgMap: Record<string, string> = {
+          invalid_login_name: '登录名须为 4–32 位字母或数字',
+          password_too_short: '密码至少 6 位',
+          invalid_merchant_name: '请填写公司/商家名称',
+          license_address_required: '请填写营业执照住所地址',
+          license_city_not_in_scope: '营业执照住所城市未命中你的代理城市范围，无法开户',
+          login_exists: '该登录名已存在',
+          auth_create_failed: '创建登录账号失败',
+          tenant_insert_failed: '创建租户失败',
+          member_insert_failed: '绑定成员失败',
+        }
+        sendOpsJson(res, 400, {
+          ok: false,
+          code: r.error,
+          message: msgMap[r.error] ?? r.error,
+          detail: r.detail,
+        })
+        return
+      }
+      sendOpsJson(res, 200, {
+        ok: true,
+        tenantId: r.tenantId,
+        city: r.city,
+        matchedToken: r.matchedToken,
+      })
+      return
+    }
+
     if (action === 'reset_password') {
       const tenantId = String(body.tenantId ?? body.id ?? '').trim()
       const gateCities = await loadPartnerCityAccounts(client.admin, auth.partner)
@@ -140,14 +204,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         registerCity: body.registerCity != null ? String(body.registerCity) : undefined,
         registerProvince:
           body.registerProvince != null ? String(body.registerProvince) : undefined,
+        licenseAddress: body.licenseAddress != null ? String(body.licenseAddress) : undefined,
       })
       if (!r.ok) {
         const msg =
-          r.error === 'city_out_of_scope'
-            ? '城市不在你的代理范围内'
+          r.error === 'city_out_of_scope' || r.error === 'license_city_not_in_scope'
+            ? '营业执照住所城市未命中代理范围'
             : r.error === 'out_of_scope'
-              ? '该账号不在代理城市范围内，请先指定归属城市以认领'
-              : r.error
+              ? '该账号不在代理城市范围内，请填写执照住所以认领'
+              : r.error === 'license_address_required'
+                ? '请填写营业执照住所地址'
+                : r.error
         sendOpsJson(res, 400, { ok: false, code: r.error, message: msg })
         return
       }

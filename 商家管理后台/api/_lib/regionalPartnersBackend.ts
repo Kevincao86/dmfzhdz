@@ -478,6 +478,189 @@ export function tenantCityInPartnerScope(
   return false
 }
 
+/**
+ * 从营业执照住所/经营场所地址中识别城市，并校验是否命中代理城市范围。
+ * 规则：地址文本须包含代理城市名（或去「市」后的简称），取最长命中。
+ */
+export function resolveLicenseCityInScope(
+  licenseAddress: string,
+  partnerCities: RegionalCity[],
+): { ok: true; city: RegionalCity; matchedToken: string } | { ok: false; error: string } {
+  const addr = String(licenseAddress || '').trim()
+  if (addr.length < 4) return { ok: false, error: 'license_address_required' }
+  if (!partnerCities.length) return { ok: false, error: 'partner_cities_empty' }
+
+  let best: RegionalCity | null = null
+  let matchedToken = ''
+  let bestLen = 0
+  for (const c of partnerCities) {
+    for (const v of cityLabelVariants(c.city)) {
+      if (v.length < 2) continue
+      if (addr.includes(v) && v.length > bestLen) {
+        best = c
+        matchedToken = v
+        bestLen = v.length
+      }
+    }
+  }
+  if (!best) {
+    return { ok: false, error: 'license_city_not_in_scope' }
+  }
+  return { ok: true, city: best, matchedToken }
+}
+
+function tenantEmailDomain(): string {
+  return (
+    process.env.VITE_SUPABASE_TENANT_EMAIL_DOMAIN ??
+    process.env.TENANT_EMAIL_DOMAIN ??
+    'users.meoo.test'
+  )
+    .trim()
+    .replace(/^@/, '') || 'users.meoo.test'
+}
+
+function loginNameToEmail(loginName: string): string {
+  const slug = loginName
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+  return `${slug || 'user'}@${tenantEmailDomain()}`
+}
+
+export async function changeRegionalPartnerPassword(
+  admin: SupabaseClient,
+  partnerId: string,
+  oldPassword: string,
+  newPassword: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (newPassword.length < 6) return { ok: false, error: 'password_too_short' }
+  const row = await fetchById(admin, partnerId)
+  if (!row) return { ok: false, error: 'not_found' }
+  if (row.status === 'disabled') return { ok: false, error: 'disabled' }
+  if (hashRegionalPasswordSync(oldPassword) !== row.password_hash) {
+    return { ok: false, error: 'bad_old_password' }
+  }
+  const { error } = await admin
+    .from('regional_partners')
+    .update({
+      password_hash: hashRegionalPasswordSync(newPassword),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', partnerId)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
+}
+
+export async function createPartnerScopedTenant(
+  admin: SupabaseClient,
+  partner: RegionalPartnerPublic,
+  input: {
+    loginName: string
+    password: string
+    merchantName: string
+    edition?: 'merchant' | 'partner'
+    licenseAddress: string
+    trialDays?: number
+  },
+): Promise<
+  | { ok: true; tenantId: string; userId: string; city: RegionalCity; matchedToken: string }
+  | { ok: false; error: string; detail?: string }
+> {
+  const loginName = input.loginName.trim()
+  const merchantName = input.merchantName.trim()
+  const password = input.password
+  const licenseAddress = input.licenseAddress.trim()
+  if (!/^[a-zA-Z0-9]{4,32}$/.test(loginName)) return { ok: false, error: 'invalid_login_name' }
+  if (password.length < 6) return { ok: false, error: 'password_too_short' }
+  if (merchantName.length < 2) return { ok: false, error: 'invalid_merchant_name' }
+
+  const hit = resolveLicenseCityInScope(licenseAddress, partner.cities)
+  if (!hit.ok) return { ok: false, error: hit.error }
+
+  const edition = input.edition === 'partner' ? 'partner' : 'merchant'
+  const trialDays = Math.max(0, Math.min(3650, Number(input.trialDays) || 7))
+  const email = loginNameToEmail(loginName)
+
+  const { data: created, error: createErr } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: {
+      login_name: loginName,
+      merchant_name: merchantName,
+      provisioned_by_regional_partner: partner.id,
+    },
+  })
+  if (createErr || !created.user?.id) {
+    const msg = String(createErr?.message || 'auth_create_failed').toLowerCase()
+    if (msg.includes('already') || msg.includes('exists')) {
+      return { ok: false, error: 'login_exists' }
+    }
+    return { ok: false, error: 'auth_create_failed', detail: createErr?.message }
+  }
+  const userId = created.user.id
+
+  const tenantInsert: Record<string, unknown> = {
+    name: merchantName,
+    trial_days: trialDays,
+    official_days: 0,
+    account_status: 'normal',
+    membership_plan: 'free',
+    edition,
+    regional_partner_id: partner.id,
+    attribution_city: hit.city.city,
+    register_city: hit.city.city,
+    register_province: hit.city.province,
+    business_license_address: licenseAddress,
+  }
+
+  let tenantId = ''
+  {
+    let { data: tenantRow, error: tenantErr } = await admin
+      .from('tenants')
+      .insert(tenantInsert)
+      .select('id')
+      .maybeSingle()
+
+    if (
+      tenantErr &&
+      /business_license_address|schema cache|does not exist/i.test(tenantErr.message)
+    ) {
+      const fallback = { ...tenantInsert }
+      delete fallback.business_license_address
+      const retry = await admin.from('tenants').insert(fallback).select('id').maybeSingle()
+      tenantRow = retry.data
+      tenantErr = retry.error
+    }
+
+    if (tenantErr || !tenantRow?.id) {
+      await admin.auth.admin.deleteUser(userId)
+      return { ok: false, error: 'tenant_insert_failed', detail: tenantErr?.message }
+    }
+    tenantId = tenantRow.id as string
+  }
+
+  const { error: memErr } = await admin.from('tenant_members').insert({
+    tenant_id: tenantId,
+    user_id: userId,
+    role: 'owner',
+  })
+  if (memErr) {
+    await admin.from('tenants').delete().eq('id', tenantId)
+    await admin.auth.admin.deleteUser(userId)
+    return { ok: false, error: 'member_insert_failed', detail: memErr.message }
+  }
+
+  return {
+    ok: true,
+    tenantId,
+    userId,
+    city: hit.city,
+    matchedToken: hit.matchedToken,
+  }
+}
+
 export async function assignMerchantToPartner(
   admin: SupabaseClient,
   input: { tenantId: string; partnerId: string; attributionCity?: string },
@@ -535,6 +718,7 @@ export type TenantAccountRow = {
   attribution_city: string | null
   register_province?: string | null
   register_city?: string | null
+  business_license_address?: string | null
   membership_plan?: string | null
   ops_gift_days?: number | null
   official_days?: number | null
@@ -566,7 +750,7 @@ export function editionLabel(edition: string | null | undefined): string {
 }
 
 const TENANT_ACCOUNT_SELECT =
-  'id,name,edition,account_status,service_expire_at,regional_partner_id,attribution_city,register_province,register_city,membership_plan,ops_gift_days,official_days,trial_days,subscription_days,created_at,updated_at'
+  'id,name,edition,account_status,service_expire_at,regional_partner_id,attribution_city,register_province,register_city,business_license_address,membership_plan,ops_gift_days,official_days,trial_days,subscription_days,created_at,updated_at'
 
 function resolveTenantCity(row: TenantAccountRow): string {
   return String(row.register_city || row.attribution_city || '').trim()
@@ -692,6 +876,7 @@ export async function patchPartnerScopedTenant(
     opsGiftDays?: number
     registerCity?: string
     registerProvince?: string
+    licenseAddress?: string
   },
 ): Promise<{ ok: true; row: TenantAccountRow } | { ok: false; error: string }> {
   const gate = await assertTenantInPartnerScope(admin, partner, input.tenantId)
@@ -722,7 +907,15 @@ export async function patchPartnerScopedTenant(
     patch.account_status = input.accountStatus
   }
 
-  if (input.registerCity?.trim()) {
+  if (input.licenseAddress?.trim()) {
+    const hit = resolveLicenseCityInScope(input.licenseAddress, partner.cities)
+    if (!hit.ok) return { ok: false, error: hit.error }
+    patch.business_license_address = input.licenseAddress.trim()
+    patch.register_city = hit.city.city
+    patch.attribution_city = hit.city.city
+    patch.register_province = hit.city.province
+    patch.regional_partner_id = partner.id
+  } else if (input.registerCity?.trim()) {
     const city = input.registerCity.trim()
     if (!tenantCityInPartnerScope({ attribution_city: city, register_city: city }, partner.cities)) {
       return { ok: false, error: 'city_out_of_scope' }
@@ -797,6 +990,7 @@ export function mapTenantAccountPublic(row: TenantAccountRow) {
     registerProvince: row.register_province || null,
     registerCity: row.register_city || null,
     attributionCity: row.attribution_city || null,
+    businessLicenseAddress: row.business_license_address || null,
     city: city || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at || null,

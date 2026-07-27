@@ -435,6 +435,8 @@ ecs-auth-api-server
 ecs-apply-regional-partners
 20260726170000_regional_partners
 20260726180000_tenants_register_city
+20260727100000_tenants_business_license_address
+business_license_address
 change-scope-guard
 PAT
       ;;
