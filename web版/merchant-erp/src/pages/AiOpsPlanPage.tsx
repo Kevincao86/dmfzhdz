@@ -893,20 +893,58 @@ const SIMPLE_STEP_TONES = [
   { bar: 'bg-rose-500', soft: 'bg-rose-50', ring: 'ring-rose-200', text: 'text-rose-900' },
 ] as const
 
-const PLATFORM_VISUAL: Record<string, { accent: string; screen: string; label: string }> = {
-  抖音: { accent: 'from-[#111827] to-[#1f2937]', screen: 'bg-[#161823]', label: '短视频' },
-  小红书: { accent: 'from-[#fe2c55] to-[#ff2442]', screen: 'bg-[#fff5f7]', label: '图文笔记' },
-  美团: { accent: 'from-[#ffc300] to-[#ffb000]', screen: 'bg-[#fffbeb]', label: '到店团购' },
-  大众点评: { accent: 'from-[#ffc300] to-[#ffb000]', screen: 'bg-[#fffbeb]', label: '到店团购' },
-  快手: { accent: 'from-[#ff4906] to-[#ff7a45]', screen: 'bg-[#fff7ed]', label: '短视频' },
-  视频号: { accent: 'from-[#07c160] to-[#10b981]', screen: 'bg-[#ecfdf5]', label: '视频号' },
+const PLATFORM_VISUAL: Record<
+  string,
+  { accent: string; screen: string; label: string; mediaHint: string }
+> = {
+  抖音: {
+    accent: 'from-[#111827] to-[#1f2937]',
+    screen: 'bg-[#161823]',
+    label: '短视频',
+    mediaHint: '竖屏成片位 · 点详情看分镜与字幕',
+  },
+  小红书: {
+    accent: 'from-[#fe2c55] to-[#ff2442]',
+    screen: 'bg-[#fff5f7]',
+    label: '图文笔记',
+    mediaHint: '封面+内页图 · 点详情看排版与文案',
+  },
+  美团: {
+    accent: 'from-[#ffc300] to-[#ffb000]',
+    screen: 'bg-[#fffbeb]',
+    label: '到店团购',
+    mediaHint: '套餐主图位 · 点详情看详情页写法',
+  },
+  大众点评: {
+    accent: 'from-[#ffc300] to-[#ffb000]',
+    screen: 'bg-[#fffbeb]',
+    label: '到店团购',
+    mediaHint: '套餐主图位 · 点详情看详情页写法',
+  },
+  快手: {
+    accent: 'from-[#ff4906] to-[#ff7a45]',
+    screen: 'bg-[#fff7ed]',
+    label: '短视频',
+    mediaHint: '竖屏成片位 · 点详情看口播与黄车',
+  },
+  视频号: {
+    accent: 'from-[#07c160] to-[#10b981]',
+    screen: 'bg-[#ecfdf5]',
+    label: '视频号',
+    mediaHint: '视频封面位 · 点详情看私域转发话术',
+  },
 }
 
 function platformVisual(name: string) {
   for (const k of Object.keys(PLATFORM_VISUAL)) {
     if (name.includes(k)) return PLATFORM_VISUAL[k]!
   }
-  return { accent: 'from-slate-700 to-slate-900', screen: 'bg-slate-50', label: '内容' }
+  return {
+    accent: 'from-slate-700 to-slate-900',
+    screen: 'bg-slate-50',
+    label: '内容',
+    mediaHint: '素材预览位 · 点详情看发布步骤',
+  }
 }
 
 /** 从细流程抽 2～3 条「卡片正面就能看懂」的要点 */
@@ -928,18 +966,39 @@ function pickSimplePreviewLines(
   return out
 }
 
-function pickPlatformPostPreview(flow: AiOpsPlanSimpleFlowItem[]): {
+function pickPlatformPostPreview(
+  flow: AiOpsPlanSimpleFlowItem[],
+  platformName: string,
+): {
   title: string
   body: string
   when: string
 } {
   const all = flow.flatMap((f) => f.actions || [])
-  const titleAct = all.find((a) => /标题/.test(a.label))
-  const bodyAct = all.find((a) => /正文|文案|钩子/.test(a.label))
+  const titleAct =
+    all.find((a) => /标题原文/.test(a.label)) ||
+    all.find((a) => /^标题/.test(a.label) && !/封面/.test(a.label))
+  const bodyAct =
+    all.find((a) => /正文原文|正文/.test(a.label)) ||
+    all.find((a) => /文案|钩子|封面标题/.test(a.label))
   const whenAct = all.find((a) => /时间|发布/.test(a.label))
+  const isXhs = /小红书/.test(platformName)
+  const isMt = /美团|大众点评/.test(platformName)
+  const fallbackTitle = isXhs
+    ? '本地宝藏店｜到店套餐测评｜价格含核心项目'
+    : isMt
+      ? '到店团购｜套餐名｜价格｜含核心项目'
+      : /抖音/.test(platformName)
+        ? '本地探店｜到店套餐｜价格｜点小黄车同款'
+        : '本地优惠｜到店套餐｜限时体验'
+  const fallbackBody = isXhs
+    ? '图文种草：封面价+内页体验，挂笔记商品，引导收藏后下单。'
+    : isMt
+      ? '优化团购主图与详情条文，写清包含、预约与核销。'
+      : '短视频前三秒出钩子，挂上小黄车/团购链接。'
   return {
-    title: titleAct?.detail?.split('\n')[0]?.slice(0, 48) || '本地优惠｜到店套餐｜限时体验',
-    body: (bodyAct?.detail || titleAct?.detail || '把套餐卖点写进前三秒，挂上团购链接。').slice(0, 90),
+    title: titleAct?.detail?.split('\n')[0]?.slice(0, 48) || fallbackTitle,
+    body: (bodyAct?.detail || titleAct?.detail || fallbackBody).slice(0, 90),
     when: whenAct?.detail?.slice(0, 36) || '建议晚高峰 18:00～21:00 发',
   }
 }
@@ -1283,7 +1342,7 @@ function SimplePlanGallery({ plan }: { plan: AiOpsPlanResult }) {
           <div className="grid gap-3 sm:grid-cols-2">
             {s.platforms.map((p, i) => {
               const vis = platformVisual(p.platform)
-              const post = pickPlatformPostPreview(p.detailFlow)
+              const post = pickPlatformPostPreview(p.detailFlow, p.platform)
               return (
                 <article
                   key={`${p.platform}-${i}`}
@@ -1320,7 +1379,7 @@ function SimplePlanGallery({ plan }: { plan: AiOpsPlanResult }) {
                       <div className="text-sm font-semibold leading-snug text-gray-900">{post.title}</div>
                       <p className="mt-1.5 text-xs leading-relaxed text-gray-600">{post.body}</p>
                       <div className="mt-2.5 flex h-16 items-center justify-center rounded-lg bg-gradient-to-br from-slate-100 to-slate-200 text-[10px] text-slate-500">
-                        成片/封面位 · 点详情看分镜与字幕
+                        {vis.mediaHint}
                       </div>
                     </div>
                     <div className="mt-2.5 flex justify-end">
