@@ -937,11 +937,653 @@ function extractIncludedItems(ctx: SimpleFillCtx): string {
   return `${ctx.topic}核心项目（按店内实际可核销项目填写，建议 2～4 项组合）`
 }
 
+type PlatformKind = 'douyin' | 'xiaohongshu' | 'meituan' | 'kuaishou' | 'shipinhao' | 'generic'
+
+function detectPlatformKind(platform?: string): PlatformKind {
+  const p = asStr(platform)
+  if (/小红书|红薯/.test(p)) return 'xiaohongshu'
+  if (/抖音/.test(p)) return 'douyin'
+  if (/美团|大众点评/.test(p)) return 'meituan'
+  if (/快手/.test(p)) return 'kuaishou'
+  if (/视频号|微信视频/.test(p)) return 'shipinhao'
+  return 'generic'
+}
+
+function looksPlatformSpecific(text: string, kind: PlatformKind, platform: string): boolean {
+  const t = asStr(text)
+  if (t.length < 18) return false
+  if (platform && t.includes(platform)) return true
+  switch (kind) {
+    case 'douyin':
+      return /小黄车|完播|口播|竖屏|15\s*[~～\-到至]?\s*30|抖音|黄车|POI|同城/.test(t)
+    case 'xiaohongshu':
+      return /图文|笔记|封面标题|种草|收藏|小红书|九宫格|首图|打卡|测评|标题公式/.test(t)
+    case 'meituan':
+      return /团购|套餐页|评价|美团|点评|到店核销|门店页|套餐详情/.test(t)
+    case 'kuaishou':
+      return /快手|老铁|直播间|黄车|快手小店/.test(t)
+    case 'shipinhao':
+      return /视频号|私域|朋友圈|企微|公众号|转发/.test(t)
+    default:
+      return false
+  }
+}
+
+function normalizePlatformStageTitle(stage: string, kind: PlatformKind): string {
+  if (kind === 'xiaohongshu' && /拍摄|剪辑|成片/.test(stage)) return '图文排版'
+  if (kind === 'meituan' && /拍摄|剪辑|图文/.test(stage)) return '商品页优化'
+  return stage
+}
+
+function defaultPlatformHow(kind: PlatformKind, topic: string, price: string): string {
+  switch (kind) {
+    case 'douyin':
+      return `发 15～30 秒竖屏短视频推「${topic}」（${price}），挂小黄车；建议每天 10:00、20:00 各一条`
+    case 'xiaohongshu':
+      return `发图文种草笔记推「${topic}」（${price}），封面标题公式+商品链接；建议每天 11:00、21:00`
+    case 'meituan':
+      return `优化「${topic}」团购套餐页主图/详情，引导评价晒图；高峰前更新库存与预约说明`
+    case 'kuaishou':
+      return `发短视频推「${topic}」（${price}），挂快手小店/黄车；语气口语，建议晚间 19:00～21:00`
+    case 'shipinhao':
+      return `发视频号短视频推「${topic}」（${price}），引导转发朋友圈/私域；建议午间与晚饭后`
+    default:
+      return `发布「${topic}」内容并挂链，写清价格 ${price} 与到店用法`
+  }
+}
+
+function defaultPlatformFlowStages(kind: PlatformKind): AiOpsPlanSimpleFlowItem[] {
+  const empty = (): AiOpsPlanSimpleAction[] => []
+  if (kind === 'xiaohongshu') {
+    return [
+      { title: '选题', body: '', actions: empty() },
+      { title: '图文排版', body: '', actions: empty() },
+      { title: '发布挂链', body: '', actions: empty() },
+      { title: '复盘', body: '', actions: empty() },
+    ]
+  }
+  if (kind === 'meituan') {
+    return [
+      { title: '选题', body: '', actions: empty() },
+      { title: '商品页优化', body: '', actions: empty() },
+      { title: '发布挂链', body: '', actions: empty() },
+      { title: '复盘', body: '', actions: empty() },
+    ]
+  }
+  return [
+    { title: '选题', body: '', actions: empty() },
+    { title: '拍摄/剪辑', body: '', actions: empty() },
+    { title: '发布挂链', body: '', actions: empty() },
+    { title: '复盘', body: '', actions: empty() },
+  ]
+}
+
+function remapPlatformFlowStages(
+  flow: AiOpsPlanSimpleFlowItem[],
+  kind: PlatformKind,
+): AiOpsPlanSimpleFlowItem[] {
+  return flow.map((f) => ({ ...f, title: normalizePlatformStageTitle(f.title, kind) }))
+}
+
+/** 按平台属性生成选题/制作/发布/复盘的写满明细 */
+function buildPlatformStageDefaults(
+  stage: string,
+  ctx: SimpleFillCtx,
+): { body: string; actions: AiOpsPlanSimpleAction[] } | null {
+  const kind = detectPlatformKind(ctx.platform)
+  if (!ctx.platform && kind === 'generic') return null
+  const topic = ctx.topic || '到店套餐'
+  const price = ctx.priceHint || '按店内测算填写'
+  const sell = ctx.sellingPoint || `${topic}性价比高、适合到店体验`
+  const included = extractIncludedItems(ctx)
+  const itemShort = included.split(/[、，,/]/).filter(Boolean).slice(0, 2).join('＋') || topic
+  const plat = asStr(ctx.platform) || '本平台'
+  const t = normalizePlatformStageTitle(stage, kind)
+
+  if (kind === 'douyin' || (kind === 'generic' && /抖音/.test(plat))) {
+    const table: Record<string, { body: string; actions: AiOpsPlanSimpleAction[] }> = {
+      选题: {
+        body: `抖音今天拍一条 15～30 秒竖屏短视频，只讲「${topic}」一件事，目标完播与小黄车点击。`,
+        actions: [
+          {
+            label: '内容角度（写死）',
+            detail: `到店实拍「${topic}」体验流：痛点开场→核心项目 2 镜→价格牌→引导点小黄车。不要拍成长图文解说。`,
+          },
+          {
+            label: '开头 3 秒口播原句',
+            detail: `「别刷了！本地情侣/到店就冲这个——${topic}，${price}含${itemShort}。」字幕同步出现价格。`,
+          },
+          {
+            label: '分镜清单（竖屏）',
+            detail: `①门头 1 秒 ②进店/接待 2 秒 ③${itemShort}特写各 2～3 秒 ④价格牌停留≥1 秒 ⑤微笑离店+「点下方小黄车」。`,
+          },
+          {
+            label: '发布时间',
+            detail: `抖音优先 18:00～21:00；可补一条 10:00。避开凌晨。发前确认小黄车已挂「${topic}」。`,
+          },
+        ],
+      },
+      '拍摄/剪辑': {
+        body: `实拍并剪成抖音竖屏成片，前 3 秒出钩子，片尾强引导小黄车。`,
+        actions: [
+          {
+            label: '实拍要求',
+            detail: `竖屏 9:16；光线够；突出 ${itemShort}；可加轻微运镜，禁止假消费单据入镜。`,
+          },
+          {
+            label: '字幕文案（可直接贴）',
+            detail: `「${topic}｜${price}｜含 ${included}｜点小黄车下单」。价格出现时字幕加粗停留。`,
+          },
+          {
+            label: '剪辑时间轴',
+            detail: `0–3 秒钩子口播 → 4–20 秒体验特写 → 21–28 秒价格/包含 → 结尾「点击小黄车·同款团购」。BGM 勿盖过人声。`,
+          },
+          {
+            label: '导出前检查',
+            detail: `无夸大功效；挂链商品名与口播一致；封面选价格清晰那一帧。`,
+          },
+        ],
+      },
+      发布挂链: {
+        body: `在抖音发布短视频并挂上「${topic}」小黄车，用户一点能买。`,
+        actions: [
+          {
+            label: '标题原文',
+            detail: `本地探店｜${topic}｜${price}含${itemShort}｜点小黄车同款`,
+          },
+          {
+            label: '正文原文',
+            detail: `${sell}\n包含：${included}\n下单：点下方小黄车→选「${topic}」→到店核销。\n#抖音本地生活 #同城探店 #${topic}`,
+          },
+          {
+            label: '挂链核对',
+            detail: `小黄车必须指向「${topic}」，价格显示 ${price}；发前用另一个号点开测一次能否下单。`,
+          },
+          {
+            label: '发布时间与置顶评',
+            detail: `18:00～21:00 发；置顶评：「团购在小黄车，核销规则看商品页，有问题评论区问」。`,
+          },
+        ],
+      },
+      复盘: {
+        body: `只看抖音这条短视频：完播、小黄车点击、核销，无效脚本立刻停。`,
+        actions: [
+          {
+            label: '记录指标',
+            detail: `记：播放、完播率、点赞、评论、小黄车点击、核销；标注发布时间段。`,
+          },
+          {
+            label: '有效则加码',
+            detail: `完播高且有点击：同一钩子口播再拍 1 条换场景；评论问规则多→先改商品页再投。`,
+          },
+          {
+            label: '无效则止损',
+            detail: `播放差且无小黄车点击：停同脚本，改前 3 秒或换主推套餐，勿连发同一条。`,
+          },
+        ],
+      },
+    }
+    const key = Object.keys(table).find((k) => t === k || t.includes(k) || k.includes(t))
+    return key ? table[key]! : null
+  }
+
+  if (kind === 'xiaohongshu') {
+    const table: Record<string, { body: string; actions: AiOpsPlanSimpleAction[] }> = {
+      选题: {
+        body: `小红书今天发一篇图文种草笔记，封面标题公式清晰，目标收藏与商品点击，不是短视频分镜。`,
+        actions: [
+          {
+            label: '内容角度（写死）',
+            detail: `「真实到店测评/打卡」角度写「${topic}」：谁适合来、体验感受、值不值 ${price}。禁止套用抖音口播分镜。`,
+          },
+          {
+            label: '封面标题公式（原句）',
+            detail: `封面大字 2 行：「本地宝藏｜${topic}」「${price}含${itemShort}」。字体干净，价格必须上封面。`,
+          },
+          {
+            label: '图片清单（建议 6～9 张）',
+            detail: `①门头 ②环境全景 ③${itemShort}细节 ④套餐卡/价格 ⑤互动或成品 ⑥离店/核销小票（可打码）。每张配一句说明。`,
+          },
+          {
+            label: '发布时间',
+            detail: `小红书优先 18:00～21:00；可补 11:00。避开凌晨。发前确认笔记可挂「${topic}」商品。`,
+          },
+        ],
+      },
+      图文排版: {
+        body: `按小红书图文结构排版：首图抓眼→正文种草→结尾行动引导，不要剪成短视频。`,
+        actions: [
+          {
+            label: '首图要求',
+            detail: `竖版；主体清晰；必须出现「${topic}」或 ${price}；避免大段口播字幕墙。`,
+          },
+          {
+            label: '内页说明文案',
+            detail: `每图一句：图2环境「适合情侣/朋友」；图3「含 ${included}」；图4「现价 ${price}」。`,
+          },
+          {
+            label: '笔记结构',
+            detail: `开头痛点 2 句→体验过程→价格与包含→适合谁→「点击下方链接/团购下单」。总字数建议 200～400 字。`,
+          },
+          {
+            label: '发布前检查',
+            detail: `无违规医疗承诺；图片与正文价格一致；标签用本地+品类，勿堆无关热搜。`,
+          },
+        ],
+      },
+      '拍摄/剪辑': {
+        body: `按小红书图文结构排版：首图抓眼→正文种草→结尾行动引导，不要剪成短视频。`,
+        actions: [
+          {
+            label: '首图要求',
+            detail: `竖版；主体清晰；必须出现「${topic}」或 ${price}；避免大段口播字幕墙。`,
+          },
+          {
+            label: '内页说明文案',
+            detail: `每图一句：图2环境；图3「含 ${included}」；图4「现价 ${price}」。`,
+          },
+          {
+            label: '笔记结构',
+            detail: `开头痛点→体验→价格包含→适合谁→引导下单。不要按 15 秒视频时间轴剪辑。`,
+          },
+        ],
+      },
+      发布挂链: {
+        body: `在小红书发图文笔记并挂上「${topic}」，方便收藏后下单到店。`,
+        actions: [
+          {
+            label: '标题原文',
+            detail: `本地宝藏店｜${topic}测评｜${price}含${itemShort}值得冲`,
+          },
+          {
+            label: '正文原文',
+            detail: `姐妹们听劝！这家「${topic}」真的适合约会/犒劳自己。\n亮点：${sell}\n包含：${included}\n价格：${price}\n怎么买：点笔记商品/团购→到店出示核销。\n#小红书探店 #本地生活 #${topic} #种草`,
+          },
+          {
+            label: '挂链核对',
+            detail: `笔记商品组件指向「${topic}」，展示价 ${price}；自己点一次确认能跳转。`,
+          },
+          {
+            label: '发布时间与置顶评',
+            detail: `18:00～21:00 发；置顶：「套餐细则看商品页，预约方式评论区问我」。`,
+          },
+        ],
+      },
+      复盘: {
+        body: `只看小红书这篇笔记：封面点击、收藏、商品点击，按收藏逻辑迭代，不看抖音完播。`,
+        actions: [
+          {
+            label: '记录指标',
+            detail: `记：曝光、封面点击率、点赞、收藏、评论、商品点击、核销；标注发布时间。`,
+          },
+          {
+            label: '有效则加码',
+            detail: `收藏高：同封面公式换内页图再发；评论都在问规则→先改商品页条文。`,
+          },
+          {
+            label: '无效则止损',
+            detail: `曝光有但收藏/点击低：改封面大字与标题公式，勿把抖音口播文案原样再贴。`,
+          },
+        ],
+      },
+    }
+    const key = Object.keys(table).find((k) => t === k || t.includes(k) || k.includes(t))
+    return key ? table[key]! : null
+  }
+
+  if (kind === 'meituan') {
+    const table: Record<string, { body: string; actions: AiOpsPlanSimpleAction[] }> = {
+      选题: {
+        body: `美团/点评今天围绕「${topic}」优化团购套餐页与评价引导，重点是到店转化不是短视频完播。`,
+        actions: [
+          {
+            label: '内容角度（写死）',
+            detail: `主推套餐页卖点：谁适合买、含什么、${price}比门市省多少、怎么预约到店。`,
+          },
+          {
+            label: '主图文案原句',
+            detail: `主图贴字：「${topic}｜${price}｜含${itemShort}」。副图展示环境与项目细节。`,
+          },
+          {
+            label: '评价引导角度',
+            detail: `请到店客人晒「核销后体验+一张环境图」，回复置顶优质评价。`,
+          },
+          {
+            label: '更新节奏',
+            detail: `活动前更新库存与预约说明；节假日单独标注是否通用。`,
+          },
+        ],
+      },
+      商品页优化: {
+        body: `把「${topic}」团购详情写成客人一眼能下单、店员能核销的完整页。`,
+        actions: [
+          {
+            label: '详情条文',
+            detail: `写清：包含 ${included}；售价 ${price}；有效期；是否预约；不适用日期；差价规则。`,
+          },
+          {
+            label: '主图清单',
+            detail: `至少 3 张：门头/环境、核心项目、价格含套餐名；字号够大手机可辨。`,
+          },
+          {
+            label: '下单提示',
+            detail: `详情末尾加：「下单后到店出示团购码核销；建议提前电话/线上预约」。`,
+          },
+        ],
+      },
+      '拍摄/剪辑': {
+        body: `把「${topic}」团购详情写成客人一眼能下单、店员能核销的完整页。`,
+        actions: [
+          {
+            label: '详情条文',
+            detail: `写清包含 ${included}、售价 ${price}、有效期、预约与差价规则。`,
+          },
+          {
+            label: '主图清单',
+            detail: `门头/环境、核心项目、价格含套餐名各至少 1 张。`,
+          },
+        ],
+      },
+      发布挂链: {
+        body: `上架/更新「${topic}」团购并确保可搜可买可核销。`,
+        actions: [
+          {
+            label: '标题原文',
+            detail: `${topic}｜${price}｜含${itemShort}｜到店核销`,
+          },
+          {
+            label: '正文原文',
+            detail: `${sell}\n【包含】${included}\n【价格】${price}\n【使用】到店出示美团/点评团购码核销；建议预约。`,
+          },
+          {
+            label: '挂链核对',
+            detail: `搜索店名能找到该套餐；价格 ${price}；门店勾选正确；自己下单测试（可退）。`,
+          },
+          {
+            label: '发布时间与置顶评',
+            detail: `上架后置顶店铺公告：「${topic}热卖中，预约方式…」；评价区置顶使用说明。`,
+          },
+        ],
+      },
+      复盘: {
+        body: `看团购曝光、购买、核销与差评原因，优先修详情页再谈投放。`,
+        actions: [
+          {
+            label: '记录指标',
+            detail: `记：曝光、购买、核销率、退款原因、差评关键词。`,
+          },
+          {
+            label: '有效则加码',
+            detail: `购买高：保持主图与价格，适当提库存；评价好→引到短视频平台复用卖点。`,
+          },
+          {
+            label: '无效则止损',
+            detail: `有曝光无购买：先改主图价格字与包含条文，勿只加广告预算。`,
+          },
+        ],
+      },
+    }
+    const key = Object.keys(table).find((k) => t === k || t.includes(k) || k.includes(t))
+    return key ? table[key]! : null
+  }
+
+  if (kind === 'kuaishou') {
+    const table: Record<string, { body: string; actions: AiOpsPlanSimpleAction[] }> = {
+      选题: {
+        body: `快手今天拍口语感短视频推「${topic}」，像跟老铁唠嗑，挂黄车/小店。`,
+        actions: [
+          {
+            label: '内容角度（写死）',
+            detail: `老板/店员出镜口语介绍「${topic}」：多少钱、含啥、怎么来。比精致分镜更重要的是真实。`,
+          },
+          {
+            label: '开头口播原句',
+            detail: `「老铁们，我们店「${topic}」${price}，含${itemShort}，想体验的点黄车。」`,
+          },
+          {
+            label: '分镜清单',
+            detail: `出镜打招呼→带看 ${itemShort}→出示价格→引导黄车。总长 20～45 秒可稍长。`,
+          },
+          {
+            label: '发布时间',
+            detail: `快手优先 19:00～21:00；发前确认黄车挂「${topic}」。`,
+          },
+        ],
+      },
+      '拍摄/剪辑': {
+        body: `快手成片：真人出镜+口语，字幕大字标价格，结尾挂黄车。`,
+        actions: [
+          {
+            label: '实拍要求',
+            detail: `竖屏；可手持；突出 ${itemShort}；语气自然勿念稿感太重。`,
+          },
+          {
+            label: '字幕文案',
+            detail: `「${topic} ${price} 含${included} 点黄车」。`,
+          },
+          {
+            label: '成片结构',
+            detail: `打招呼→体验→价格→「黄车同款」；BGM 轻快。`,
+          },
+        ],
+      },
+      发布挂链: {
+        body: `快手发布并挂「${topic}」黄车/小店商品。`,
+        actions: [
+          {
+            label: '标题原文',
+            detail: `老铁看过来｜${topic}｜${price}｜含${itemShort}`,
+          },
+          {
+            label: '正文原文',
+            detail: `${sell}\n包含：${included}\n下单点黄车，到店核销。\n#快手本地 #同城好店`,
+          },
+          {
+            label: '挂链核对',
+            detail: `黄车商品=「${topic}」，价 ${price}；点开自测。`,
+          },
+          {
+            label: '发布时间与置顶评',
+            detail: `19:00～21:00 发；置顶评说明核销与预约。`,
+          },
+        ],
+      },
+      复盘: {
+        body: `看快手播放、互动与黄车转化，口语脚本可复用。`,
+        actions: [
+          {
+            label: '记录指标',
+            detail: `播放、点赞、评论、黄车点击、核销。`,
+          },
+          {
+            label: '有效则加码',
+            detail: `转化好：同一口语钩子换场景再拍。`,
+          },
+          {
+            label: '无效则止损',
+            detail: `无点击：改开头一句和价格出镜时机。`,
+          },
+        ],
+      },
+    }
+    const key = Object.keys(table).find((k) => t === k || t.includes(k) || k.includes(t))
+    return key ? table[key]! : null
+  }
+
+  if (kind === 'shipinhao') {
+    const table: Record<string, { body: string; actions: AiOpsPlanSimpleAction[] }> = {
+      选题: {
+        body: `视频号今天发一条便于转发私域的短视频，推「${topic}」，强调朋友圈可信感。`,
+        actions: [
+          {
+            label: '内容角度（写死）',
+            detail: `「给朋友推荐」口吻介绍「${topic}」：适合谁、${price}含啥、怎么预约。`,
+          },
+          {
+            label: '开头原句',
+            detail: `「想找个地方放松/约会的朋友看过来——我们「${topic}」${price}，含${itemShort}。」`,
+          },
+          {
+            label: '分镜清单',
+            detail: `环境→项目→价格→引导「点左下角/关联商品」或「私信预约」。`,
+          },
+          {
+            label: '发布时间',
+            detail: `视频号优先午饭后与 18:30～20:30；方便转发朋友圈。`,
+          },
+        ],
+      },
+      '拍摄/剪辑': {
+        body: `视频号成片干净可信，字幕清晰，结尾引导转发或私信。`,
+        actions: [
+          {
+            label: '实拍要求',
+            detail: `竖屏；画面稳；突出 ${itemShort}；少用夸张特效。`,
+          },
+          {
+            label: '字幕文案',
+            detail: `「${topic}｜${price}｜含 ${included}｜可转发朋友圈」。`,
+          },
+          {
+            label: '成片结构',
+            detail: `推荐语→体验→价格→行动（商品/私信）；15～40 秒。`,
+          },
+        ],
+      },
+      发布挂链: {
+        body: `视频号发布并关联「${topic}」商品或清晰预约路径。`,
+        actions: [
+          {
+            label: '标题原文',
+            detail: `推荐给身边人｜${topic}｜${price}含${itemShort}`,
+          },
+          {
+            label: '正文原文',
+            detail: `${sell}\n包含：${included}\n价格：${price}\n到店核销/预约方式见商品或私信。\n欢迎转发给需要的朋友。`,
+          },
+          {
+            label: '挂链核对',
+            detail: `关联商品为「${topic}」；或正文写清预约电话/企微；信息与店内一致。`,
+          },
+          {
+            label: '发布时间与置顶评',
+            detail: `晚饭后发；置顶评：「需要预约的朋友评论区留时间」。`,
+          },
+        ],
+      },
+      复盘: {
+        body: `看视频号完播、转发、私信询单，重视私域转化而非纯刷量。`,
+        actions: [
+          {
+            label: '记录指标',
+            detail: `播放、完播、转发、赞、私信询单、核销。`,
+          },
+          {
+            label: '有效则加码',
+            detail: `转发多：做成「可转发版」短文案给店员发朋友圈。`,
+          },
+          {
+            label: '无效则止损',
+            detail: `有播无询单：加强价格出镜与预约方式说明。`,
+          },
+        ],
+      },
+    }
+    const key = Object.keys(table).find((k) => t === k || t.includes(k) || k.includes(t))
+    return key ? table[key]! : null
+  }
+
+  // generic + 已点名平台：带平台名的轻量差异
+  if (asStr(ctx.platform)) {
+    if (/选题/.test(t)) {
+      return {
+        body: `为${plat}定一条今天就能发的「${topic}」内容，角度符合该平台玩法。`,
+        actions: [
+          {
+            label: '内容角度（写死）',
+            detail: `在${plat}主推「${topic}」（${price}，含${itemShort}）：只讲一件事，写清场景与行动引导。`,
+          },
+          {
+            label: '开头钩子原句',
+            detail: `「${topic}｜${price}｜含${itemShort}，详情看${plat}挂链」。`,
+          },
+          {
+            label: '素材要点',
+            detail: `按${plat}常见体裁准备：短视频则竖屏分镜；图文则封面+内页；团购则主图+详情。`,
+          },
+          {
+            label: '发布时间',
+            detail: `${plat}建议 18:00～21:00；发前确认挂链是「${topic}」。`,
+          },
+        ],
+      }
+    }
+    if (/拍摄|剪辑|图文|商品页/.test(t)) {
+      return {
+        body: `按${plat}体裁完成「${topic}」可发布素材（勿混用其他平台模板）。`,
+        actions: [
+          {
+            label: '制作要求',
+            detail: `突出 ${included}；价格 ${price} 必须可见；体裁跟${plat}一致。`,
+          },
+          {
+            label: '文案要点',
+            detail: `「${topic}｜${price}｜含 ${included}」+ ${plat}行动引导（挂链/下单/到店）。`,
+          },
+        ],
+      }
+    }
+    if (/发布/.test(t)) {
+      return {
+        body: `在${plat}发布并挂上「${topic}」。`,
+        actions: [
+          {
+            label: '标题原文',
+            detail: `${plat}专属｜${topic}｜${price}｜${itemShort}`,
+          },
+          {
+            label: '正文原文',
+            detail: `${sell}\n包含：${included}\n怎么用：到店核销。\n#${plat} #本地生活`,
+          },
+          {
+            label: '挂链核对',
+            detail: `${plat}挂链指向「${topic}」，价 ${price}；发前自测。`,
+          },
+          {
+            label: '发布时间与置顶评',
+            detail: `18:00～21:00；置顶说明核销规则。`,
+          },
+        ],
+      }
+    }
+    if (/复盘/.test(t)) {
+      return {
+        body: `按${plat}后台能看到的数据复盘「${topic}」这条内容。`,
+        actions: [
+          {
+            label: '记录指标',
+            detail: `记下${plat}关键的曝光/互动/挂链点击/核销，并标注时段。`,
+          },
+          {
+            label: '怎么改下一条',
+            detail: `有效复用钩子；无效先改${plat}体裁里的开头/封面，再换套餐。`,
+          },
+        ],
+      }
+    }
+  }
+  return null
+}
+
 /** 生成写满具体内容的默认明细（非工作流空壳） */
 function buildConcreteDefaults(stage: string, ctx: SimpleFillCtx): {
   body: string
   actions: AiOpsPlanSimpleAction[]
 } | null {
+  if (ctx.platform) {
+    const platDef = buildPlatformStageDefaults(stage, ctx)
+    if (platDef) return platDef
+  }
   const topic = ctx.topic || '本事项'
   const summary = ctx.summary || ''
   const tip = ctx.tip || ''
@@ -1277,17 +1919,70 @@ function mergeActionsWithDefaults(
   return out.slice(0, 8)
 }
 
+function mergePlatformActions(
+  incoming: AiOpsPlanSimpleAction[],
+  defaults: AiOpsPlanSimpleAction[],
+  kind: PlatformKind,
+  platform: string,
+  forcePlatform: boolean,
+): AiOpsPlanSimpleAction[] {
+  if (!defaults.length) return mergeActionsWithDefaults(incoming, defaults)
+  const out: AiOpsPlanSimpleAction[] = []
+  const n = Math.max(defaults.length, incoming.length)
+  for (let i = 0; i < n && out.length < 8; i++) {
+    const d = defaults[i]
+    const a = incoming[i]
+    const keepAi =
+      !!a &&
+      !isThinAction(a) &&
+      looksPlatformSpecific(a.detail, kind, platform) &&
+      (!forcePlatform || looksPlatformSpecific(a.detail, kind, platform))
+    if (keepAi && a) out.push(a)
+    else if (d) out.push(d)
+    else if (a && !isThinAction(a)) out.push(a)
+  }
+  return out.slice(0, 8)
+}
+
+function extractFlowPublishTitle(flow: AiOpsPlanSimpleFlowItem[]): string {
+  const all = flow.flatMap((f) => f.actions || [])
+  const preferred =
+    all.find((a) => /标题原文/.test(a.label) && asStr(a.detail)) ||
+    all.find((a) => /^标题/.test(a.label) && asStr(a.detail) && !/封面/.test(a.label))
+  if (preferred) return asStr(preferred.detail).split('\n')[0]!.trim()
+  return ''
+}
+
 /** 按阶段标题 + 上下文补全 body/actions 到「写满的明细」 */
 function fillSimpleFlowItem(
   item: AiOpsPlanSimpleFlowItem,
   ctx: SimpleFillCtx,
+  opts?: { forcePlatform?: boolean },
 ): AiOpsPlanSimpleFlowItem {
   const topic = ctx.topic || '本事项'
   const summary = ctx.summary || ''
   const tip = ctx.tip || ''
-  const t = item.title || '步骤'
+  const kind = detectPlatformKind(ctx.platform)
+  const t0 = item.title || '步骤'
+  const t = ctx.platform ? normalizePlatformStageTitle(t0, kind) : t0
   let body = item.body
   const concrete = buildConcreteDefaults(t, ctx)
+  const isPlatStage =
+    !!ctx.platform && /选题|拍摄|剪辑|图文|商品页|发布|复盘/.test(t)
+
+  if (isPlatStage && concrete && opts?.forcePlatform) {
+    const plat = asStr(ctx.platform)
+    const bodyOk =
+      !!body &&
+      body !== '…' &&
+      body !== '...' &&
+      looksPlatformSpecific(body, kind, plat)
+    return {
+      title: t,
+      body: bodyOk ? body : concrete.body,
+      actions: mergePlatformActions(item.actions || [], concrete.actions, kind, plat, true),
+    }
+  }
 
   if ((!body || body === '…' || body === '...') && concrete) body = concrete.body
   if (!body || body === '…' || body === '...') {
@@ -1313,7 +2008,18 @@ function fillSimpleFlowItem(
       },
     ] satisfies AiOpsPlanSimpleAction[])
 
-  const actions = mergeActionsWithDefaults(item.actions || [], defaultActions)
+  let actions: AiOpsPlanSimpleAction[]
+  if (isPlatStage && concrete && ctx.platform) {
+    actions = mergePlatformActions(
+      item.actions || [],
+      concrete.actions,
+      kind,
+      asStr(ctx.platform),
+      false,
+    )
+  } else {
+    actions = mergeActionsWithDefaults(item.actions || [], defaultActions)
+  }
 
   return { title: t, body, actions }
 }
@@ -1364,29 +2070,80 @@ export function ensureSimplePlanDetailDepth(plan: AiOpsPlanResult): AiOpsPlanRes
       ),
     }
   })
-  const platforms = s.platforms.map((p) => {
+  const primaryCombo = s.combos[0]
+  const comboTopic = asStr(primaryCombo?.name) || ''
+  const comboPrice = asStr(primaryCombo?.priceHint) || ''
+  const comboItems = asStr(primaryCombo?.items) || ''
+  const comboSell = asStr(primaryCombo?.sellingPoint) || ''
+
+  const platformsRaw = s.platforms.map((p) => {
+    const kind = detectPlatformKind(p.platform)
+    const topic = comboTopic || asStr(p.how) || `${p.platform}发布`
+    const price = comboPrice || '按店内测算填写'
+    const specializedHow =
+      !asStr(p.how) ||
+      s.platforms.filter((x) => asStr(x.how) === asStr(p.how)).length > 1
+        ? defaultPlatformHow(kind, topic, price)
+        : asStr(p.how)
     const baseFlow =
       p.detailFlow.length > 0
-        ? p.detailFlow
-        : [
-            { title: '选题', body: '', actions: emptyActs() },
-            { title: '拍摄/剪辑', body: '', actions: emptyActs() },
-            { title: '发布挂链', body: '', actions: emptyActs() },
-            { title: '复盘', body: '', actions: emptyActs() },
-          ]
+        ? remapPlatformFlowStages(p.detailFlow, kind)
+        : defaultPlatformFlowStages(kind)
+    const ctx: SimpleFillCtx = {
+      topic,
+      summary: specializedHow,
+      tip: p.detailNote,
+      platform: p.platform,
+      sellingPoint: comboSell || specializedHow,
+      items: comboItems || undefined,
+      priceHint: comboPrice || undefined,
+    }
     return {
       ...p,
-      detailFlow: baseFlow.map((f) =>
-        fillSimpleFlowItem(f, {
-          topic: p.how || `${p.platform}发布`,
-          summary: p.how,
-          tip: p.detailNote,
-          platform: p.platform,
-          sellingPoint: p.how,
-        }),
+      how: specializedHow,
+      detailFlow: baseFlow.map((f) => fillSimpleFlowItem(f, ctx, { forcePlatform: true })),
+    }
+  })
+
+  // 若多平台标题/正文仍撞车，强制用该平台模板重填发布阶段
+  const titleCount = new Map<string, number>()
+  for (const p of platformsRaw) {
+    const title = extractFlowPublishTitle(p.detailFlow)
+    if (!title) continue
+    titleCount.set(title, (titleCount.get(title) || 0) + 1)
+  }
+  const platforms = platformsRaw.map((p) => {
+    const title = extractFlowPublishTitle(p.detailFlow)
+    const collided = !!title && (titleCount.get(title) || 0) > 1
+    if (!collided) return p
+    const kind = detectPlatformKind(p.platform)
+    const topic = comboTopic || asStr(p.how) || `${p.platform}发布`
+    const ctx: SimpleFillCtx = {
+      topic,
+      summary: p.how,
+      tip: p.detailNote,
+      platform: p.platform,
+      sellingPoint: comboSell || p.how,
+      items: comboItems || undefined,
+      priceHint: comboPrice || undefined,
+    }
+    return {
+      ...p,
+      how: defaultPlatformHow(kind, topic, comboPrice || '按店内测算填写'),
+      detailFlow: (p.detailFlow.length ? p.detailFlow : defaultPlatformFlowStages(kind)).map(
+        (f) => {
+          const stage = normalizePlatformStageTitle(f.title, kind)
+          if (!/选题|拍摄|剪辑|图文|商品页|发布|复盘/.test(stage)) {
+            return fillSimpleFlowItem(f, ctx, { forcePlatform: true })
+          }
+          const concrete = buildPlatformStageDefaults(stage, ctx)
+          if (!concrete) return fillSimpleFlowItem(f, ctx, { forcePlatform: true })
+          return { title: stage, body: concrete.body, actions: concrete.actions }
+        },
       ),
     }
   })
+
   const combos = s.combos.map((c) => {
     const baseFlow =
       c.detailFlow.length > 0
