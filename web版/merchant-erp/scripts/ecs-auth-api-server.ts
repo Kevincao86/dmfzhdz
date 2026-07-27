@@ -27,6 +27,7 @@ import regionalPartnerMeHandler from '../../../商家管理后台/api/_lib/handl
 import regionalPartnerDashboardHandler from '../../../商家管理后台/api/_lib/handlers/meoo-regional-partner-dashboard.ts'
 import regionalPartnerMerchantsHandler from '../../../商家管理后台/api/_lib/handlers/meoo-regional-partner-merchants.ts'
 import regionalPartnerSettlementHandler from '../../../商家管理后台/api/_lib/handlers/meoo-regional-partner-settlement.ts'
+import regionalPartnerChangePasswordHandler from '../../../商家管理后台/api/_lib/handlers/meoo-regional-partner-change-password.ts'
 import plannerRoomSyncHandler from '../api/meoo-planner-room-sync.ts'
 import plannerGptConfigHandler from '../api/meoo-planner-gpt-config.ts'
 import tenantsListHandler from '../../../商家管理后台/api/_lib/handlers/meoo-supabase-tenants-list.ts'
@@ -191,7 +192,7 @@ import apiPingHandler from '../api/ping.ts'
 import merchantSlugHandler from '../api/merchant/[...slug].ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260726-regional-partner-city-accounts'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260727-regional-partner-create-pwd'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -228,6 +229,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-regional-partner-dashboard': regionalPartnerDashboardHandler as VercelLikeHandler,
   '/api/meoo-regional-partner-merchants': regionalPartnerMerchantsHandler as VercelLikeHandler,
   '/api/meoo-regional-partner-settlement': regionalPartnerSettlementHandler as VercelLikeHandler,
+  '/api/meoo-regional-partner-change-password': regionalPartnerChangePasswordHandler as VercelLikeHandler,
   '/api/meoo-planner-room-sync': plannerRoomSyncHandler as VercelLikeHandler,
   '/api/meoo-planner-gpt-config': plannerGptConfigHandler as VercelLikeHandler,
   '/api/meoo-supabase-tenants-list': tenantsListHandler as VercelLikeHandler,

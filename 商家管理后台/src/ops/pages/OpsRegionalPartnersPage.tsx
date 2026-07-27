@@ -251,6 +251,32 @@ export default function OpsRegionalPartnersPage() {
     await reload()
   }
 
+  /** 最小方案：运营台直接设新密码，供区域服务商忘记密码时重置 */
+  const handleResetPassword = async (p: RegionalPartner) => {
+    if (!hasOpsCloudSession()) {
+      window.alert('请先用主账号完成云端登录后再操作')
+      return
+    }
+    const pwd = window.prompt(`重置「${p.companyName}」登录密码（至少 6 位）`)
+    if (pwd == null) return
+    const password = pwd.trim()
+    if (password.length < 6) {
+      window.alert('密码至少 6 位')
+      return
+    }
+    setBusy(true)
+    try {
+      const r = await apiMutateRegionalPartner({ action: 'update', id: p.id, password })
+      if (!r.ok) {
+        window.alert(r.error)
+        return
+      }
+      window.alert(`已重置密码，请通知对方用新密码登录：${p.phone}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="mx-auto max-w-5xl space-y-8">
       <div>
@@ -338,6 +364,14 @@ export default function OpsRegionalPartnersPage() {
                         className="mr-2 text-indigo-400 hover:underline"
                       >
                         编辑
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void handleResetPassword(p)}
+                        className="mr-2 text-amber-300/90 hover:underline disabled:opacity-40"
+                      >
+                        重置密码
                       </button>
                       <button
                         type="button"

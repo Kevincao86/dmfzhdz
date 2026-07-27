@@ -148,6 +148,7 @@ export type RegionalMerchantRow = {
   registerCity: string | null
   attributionCity: string | null
   city: string | null
+  businessLicenseAddress?: string | null
   createdAt: string
   openStatus: string
   inScope?: boolean
@@ -170,14 +171,25 @@ export async function fetchMerchants(keyword?: string) {
 }
 
 export async function mutateMerchant(body: Record<string, unknown>) {
-  return request<{ ok: true; merchant?: RegionalMerchantRow }>(
-    '/api/meoo-regional-partner-merchants',
-    {
-      method: 'POST',
-      headers: authHeaders(),
-      body: JSON.stringify(body),
-    },
-  )
+  return request<{
+    ok: true
+    merchant?: RegionalMerchantRow
+    tenantId?: string
+    city?: RegionalCity
+    matchedToken?: string
+  }>('/api/meoo-regional-partner-merchants', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(body),
+  })
+}
+
+export async function changeOwnPassword(oldPassword: string, newPassword: string) {
+  return request<{ ok: true }>('/api/meoo-regional-partner-change-password', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ oldPassword, newPassword }),
+  })
 }
 
 export async function fetchSettlement() {
