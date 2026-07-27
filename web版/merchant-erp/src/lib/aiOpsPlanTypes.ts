@@ -180,13 +180,19 @@ export type AiOpsPlanSimpleHero = {
   budgetHint: string
 }
 
-/** 点击卡片后展示的细流程（阶段 + 最后一级动作） */
+/** 最后一级明细：标签 + 写满的具体内容（禁止只有「列项目」这类空壳标题） */
+export type AiOpsPlanSimpleAction = {
+  label: string
+  detail: string
+}
+
+/** 点击卡片后展示的细流程（阶段 + 最后一级明细） */
 export type AiOpsPlanSimpleFlowItem = {
   title: string
   /** 该阶段说明（必填，白话 1～3 句） */
   body: string
-  /** 最后一级可勾选动作（2～5 条，具体到「打开后台点哪里/写什么」） */
-  actions: string[]
+  /** 最后一级明细 3～6 条：每条必须有可落地的具体内容 */
+  actions: AiOpsPlanSimpleAction[]
 }
 
 export type AiOpsPlanSimpleStep = {
@@ -852,17 +858,28 @@ export function isAiOpsPlanSimpleEdition(plan: AiOpsPlanResult | null | undefine
   return plan.planEdition === 'simple' || !!plan.simplePlan
 }
 
-function parseSimpleActions(raw: unknown): string[] {
+function parseSimpleActions(raw: unknown): AiOpsPlanSimpleAction[] {
   if (!Array.isArray(raw)) return []
   return raw
-    .map((x) => {
-      if (typeof x === 'string') return asStr(x)
-      if (!x || typeof x !== 'object') return ''
+    .map((x, i) => {
+      if (typeof x === 'string') {
+        const s = asStr(x)
+        if (!s) return null
+        const m = s.match(/^(.{1,24}?)[：:]\s*(.+)$/)
+        if (m) return { label: m[1]!.trim(), detail: m[2]!.trim() }
+        // 纯短标题（如「列包含项目」）→ detail 留空，后续强制补全
+        if (s.length <= 14 && !/[，。；]/.test(s)) return { label: s, detail: '' }
+        return { label: `明细${i + 1}`, detail: s }
+      }
+      if (!x || typeof x !== 'object') return null
       const r = x as Record<string, unknown>
-      return asStr(r.text ?? r.title ?? r.body ?? r.action ?? r.item)
+      const label = asStr(r.label ?? r.title ?? r.name ?? r.item) || `明细${i + 1}`
+      const detail = asStr(r.detail ?? r.body ?? r.text ?? r.content ?? r.desc ?? r.description)
+      if (!label && !detail) return null
+      return { label, detail }
     })
-    .filter(Boolean)
-    .slice(0, 6)
+    .filter((x): x is AiOpsPlanSimpleAction => !!x)
+    .slice(0, 8)
 }
 
 function parseSimpleFlowItems(raw: unknown): AiOpsPlanSimpleFlowItem[] {
@@ -878,7 +895,7 @@ function parseSimpleFlowItems(raw: unknown): AiOpsPlanSimpleFlowItem[] {
       const title = asStr(r.title ?? r.name ?? r.step) || `第${i + 1}步`
       const body = asStr(r.body ?? r.desc ?? r.description ?? r.how ?? r.content)
       const actions = parseSimpleActions(
-        r.actions ?? r.todos ?? r.subSteps ?? r.sub_steps ?? r.items ?? r.checklist,
+        r.actions ?? r.todos ?? r.subSteps ?? r.sub_steps ?? r.details ?? r.checklist,
       )
       if (!body && !actions.length && !asStr(r.title ?? r.name)) return null
       return { title, body, actions }
@@ -887,195 +904,418 @@ function parseSimpleFlowItems(raw: unknown): AiOpsPlanSimpleFlowItem[] {
     .slice(0, 8)
 }
 
-function splitToActions(text: string, max = 4): string[] {
-  const chunks = text
-    .split(/[。；;\n→]+/)
-    .map((x) => x.trim().replace(/^[0-9一二三四五六七八九十]+[、.．]\s*/, ''))
-    .filter((x) => x.length >= 4)
-  if (chunks.length >= 2) return chunks.slice(0, max)
-  if (text.trim()) return [text.trim()]
-  return []
+type SimpleFillCtx = {
+  topic: string
+  summary: string
+  tip?: string
+  items?: string
+  priceHint?: string
+  sellingPoint?: string
+  platform?: string
 }
 
-/** 按阶段标题 + 上下文补全 body/actions（模型漏写时兜底） */
+function isThinAction(a: AiOpsPlanSimpleAction): boolean {
+  const d = asStr(a.detail)
+  const l = asStr(a.label)
+  if (!d) return true
+  if (d === '…' || d === '...') return true
+  if (d.length < 18) return true
+  if (d === l) return true
+  // 仍是动词工作流：列xxx / 定xxx / 写xxx，后面没有实质内容
+  if (/^(列|定|写|算|传|设|拍|剪|挂|记|核|问|扫|处理)/.test(d) && d.length < 22) return true
+  return false
+}
+
+function extractIncludedItems(ctx: SimpleFillCtx): string {
+  const fromItems = asStr(ctx.items)
+  if (fromItems) return fromItems
+  const m = asStr(ctx.summary).match(/包含[：:]\s*([^。；\n]+)/)
+  if (m?.[1]) return m[1].trim()
+  if (/代金券/.test(ctx.topic + ctx.summary)) {
+    return `${ctx.topic.replace(/·.*$/, '') || '门店代金券'}（面额以售价为准，到店抵扣）`
+  }
+  return `${ctx.topic}核心项目（按店内实际可核销项目填写，建议 2～4 项组合）`
+}
+
+/** 生成写满具体内容的默认明细（非工作流空壳） */
+function buildConcreteDefaults(stage: string, ctx: SimpleFillCtx): {
+  body: string
+  actions: AiOpsPlanSimpleAction[]
+} | null {
+  const topic = ctx.topic || '本事项'
+  const summary = ctx.summary || ''
+  const tip = ctx.tip || ''
+  const price = ctx.priceHint || '按店内测算填写'
+  const sell = ctx.sellingPoint || summary.slice(0, 48) || `${topic}性价比高、适合到店体验`
+  const included = extractIncludedItems(ctx)
+  const plat = ctx.platform || '平台'
+
+  const table: Record<string, { body: string; actions: AiOpsPlanSimpleAction[] }> = {
+    组品: {
+      body: `把「${topic}」定成可上架的完整商品：项目清单、售价规则、卖点文案都要写死，店员按此核销。`,
+      actions: [
+        {
+          label: '包含项目明细',
+          detail: `套餐「${topic}」建议包含：${included}。上架时逐项录入后台；核销时按清单勾选，未包含项目需另付费并口头说清。`,
+        },
+        {
+          label: '售价与使用规则',
+          detail: `建议售价 ${price}；可另标「门市价」作对比（高出约 20%～40%）。规则建议：活动期内有效；是否预约（建议提前 1 天）；周末/节假日是否通用；是否可转赠/拆分；差价怎么补。以上条文案必须与商品详情页一字不差。`,
+        },
+        {
+          label: '卖点文案（可直接贴）',
+          detail: `主卖点：${sell}。副句示例：「适合约会/节日到店，一次体验多个项目，比单点更划算」。禁止夸大「全市最低」等无法证实的表述。`,
+        },
+        {
+          label: '成本与毛利自检',
+          detail: `按项目估算成本（人工时长+耗材+赠品），售价减去成本后毛利是否可接受；赠品成本建议控制在售价 5%～10% 内。若算下来亏本，先砍赠品或减项目时长，再上架。`,
+        },
+      ],
+    },
+    上架: {
+      body: `把「${topic}」上到各勾选平台：主图、标题、详情、门店与库存一次设对，买家视角能买到。`,
+      actions: [
+        {
+          label: '主图与详情图',
+          detail: `主图：竖版，含套餐名「${topic}」+ 价格「${price}」+ 1 张双人/到店氛围图。详情图建议 3～5 张：项目实拍、包含清单、使用规则、到店路线或门头。`,
+        },
+        {
+          label: '标题与商品描述',
+          detail: `标题示例：「${topic}｜${price}｜${included.split(/[、，,/]/)[0] || '到店套餐'}」。描述必须写清：包含 ${included}；卖点 ${sell}；规则（有效期/预约/节假日）。`,
+        },
+        {
+          label: '门店·库存·可售时间',
+          detail: `勾选实际可核销门店；库存先给可消化量（如 30～100，按店量调整）；可售时间对齐活动周期；售罄勿超卖。保存后用手机买家号预览下单页。`,
+        },
+        {
+          label: '上架后自检清单',
+          detail: `核对：价格=${price}；包含项目与宣传一致；规则无歧义；挂链商品就是本套餐。有一项不对就先下架改完再开卖。`,
+        },
+      ],
+    },
+    核销话术: {
+      body: `店员按统一口径接待「${topic}」核销，避免每人说法不一样引发纠纷。`,
+      actions: [
+        {
+          label: '开场话术（原句）',
+          detail: `「欢迎光临～请问有团购/套餐码吗？我们这期主推「${topic}」，包含 ${included}。」`,
+        },
+        {
+          label: '核销确认话术（原句）',
+          detail: `扫码后说：「帮您核销「${topic}」，包含 ${included}，售价 ${price}。请问还需要加项吗？加项按门市价。」确认客人点头后再点核销。`,
+        },
+        {
+          label: '异常处理话术（原句）',
+          detail: `券过期/门店不对/项目不符时：「不好意思，这张券适用于××条件，您这张是××情况。我可以帮您看看改约/补差价/换同等价位项目，您看哪种方便？」禁止指责客人。`,
+        },
+        {
+          label: '离店加微/复购',
+          detail: `体验结束可以说：「方便的话加个店员微信，下次节日套餐/会员价第一时间告诉您。」不强迫；禁止虚假「关注必送礼」。`,
+        },
+      ],
+    },
+    准备: {
+      body: `为「${topic}」备齐：卖点句、规则条文、素材清单，后面写文案和上架不返工。`,
+      actions: [
+        {
+          label: '主卖点（可直接用）',
+          detail: summary
+            ? `对外主句：${summary.slice(0, 80)}。再补一句行动号召：「今天拍/今天上架/今天就能挂链卖」。`
+            : `对外主句：围绕「${topic}」突出优惠与到店体验，一句话说清「谁适合买、买了得什么」。`,
+        },
+        {
+          label: '使用规则条文',
+          detail: `写进商品页与海报的条文建议：①适用门店 ②有效期（对齐活动周期）③是否预约 ④节假日是否可用 ⑤可否转赠/拆分 ⑥差价规则。${tip ? `额外注意：${tip}` : ''}`,
+        },
+        {
+          label: '素材拍摄清单',
+          detail: `至少准备：门头 1 张、核心项目实拍 2～3 张、价格/券面特写 1 张、成品封面（可后期加字：套餐名+${price !== '按店内测算填写' ? price : '优惠价'}）。勿用与店无关的网图冒充。`,
+        },
+        {
+          label: '违禁与口径',
+          detail: `禁止：虚假「全市第一/医院级/百分百有效」；对比价格需真实；医疗功效类承诺一律不写。`,
+        },
+      ],
+    },
+    执行: {
+      body: `动手落地「${topic}」：文案、后台商品、素材打包一次做完。`,
+      actions: [
+        {
+          label: '标题+正文（可直接改）',
+          detail: `标题：本地+「${topic}」+优惠点。正文结构：痛点 1 句 → 包含什么 → 怎么用 → 何时到店。可嵌入：${sell}`,
+        },
+        {
+          label: '后台操作路径',
+          detail: `打开商家后台 → 创建/编辑团购或套餐 → 填名称「${topic}」→ 录入包含项目与规则 → 上传主图 → 保存草稿 → 手机预览。`,
+        },
+        {
+          label: '预览核对表',
+          detail: `手机预览检查：价格、包含项目、有效期、门店是否与文案一致；链接能否打开；图是否糊。`,
+        },
+        {
+          label: '交付给发布',
+          detail: `把「成稿文案 + 封面图 + 商品链接/ID」发到发布群或自己待发文件夹，标注建议发布时间（晚高峰）。`,
+        },
+      ],
+    },
+    验收: {
+      body: `「${topic}」对外前最后验收：规则、素材、挂链、话术四项过关才算完成。`,
+      actions: [
+        {
+          label: '价格与规则一致性',
+          detail: `商品页、海报、短视频字幕三处价格与规则必须一致；发现不一致立刻改。`,
+        },
+        {
+          label: '链接可用性',
+          detail: `用买家账号点开挂链，能看到「${topic}」且可下单/领券；失败则先别发内容。`,
+        },
+        {
+          label: '店员抽问',
+          detail: `随机问一名店员：包含什么、怎么核销、过期怎么办；答不上来就先培训再放量。`,
+        },
+        {
+          label: '完成打勾',
+          detail: `以上三项都过 → 在落地清单勾选「${topic}」→ 进入平台发布或投放。`,
+        },
+      ],
+    },
+    选题: {
+      body: `为 ${plat} 定一条今天就能拍的「${topic}」内容，角度具体到镜头与文案。`,
+      actions: [
+        {
+          label: '内容角度（写死）',
+          detail: summary
+            ? `今天拍：${summary}。核心信息只讲一件事，不要又讲套餐又讲品牌故事。`
+            : `今天拍：到店体验「${topic}」+ 价格/包含亮点，真实画面为主。`,
+        },
+        {
+          label: '开头 3 秒钩子（原句）',
+          detail: `口播/字幕任选：「情侣/节日到店就选这个」「${price !== '按店内测算填写' ? price + '搞定' : '一套价格'}：${included.split(/[、，,/]/).slice(0, 2).join('＋') || topic}」。`,
+        },
+        {
+          label: '分镜清单',
+          detail: `①门头 ②进店/更衣或接待 ③核心项目特写 2 镜 ④价格牌/套餐卡 ⑤开心离店或核销微笑。每镜 2～4 秒。`,
+        },
+        {
+          label: '发布时间',
+          detail: `${plat} 建议 18:00～21:00 发；避开凌晨。发前确认挂链商品已是「${topic}」。`,
+        },
+      ],
+    },
+    '拍摄/剪辑': {
+      body: `按选题实拍并剪成 15～30 秒，字幕写清「${topic}」优惠与包含。`,
+      actions: [
+        {
+          label: '实拍要求',
+          detail: `竖屏；光线够；突出 ${included.split(/[、，,/]/).slice(0, 2).join('、') || '核心项目'}；禁止摆拍假消费单据。`,
+        },
+        {
+          label: '字幕文案（可直接贴）',
+          detail: `「${topic}｜${price}｜含 ${included}」。片中出现价格时停留 ≥1 秒。`,
+        },
+        {
+          label: '剪辑结构',
+          detail: `0–3 秒钩子 → 4–20 秒体验 → 21–28 秒价格/包含 → 结尾「点击下方团购/小黄车」。BGM 轻快勿盖过人声。`,
+        },
+        {
+          label: '导出前检查',
+          detail: `无夸大医疗功效；无人脸未授权特写纠纷；片尾引导与真实挂链一致。`,
+        },
+      ],
+    },
+    拍摄: {
+      body: `实拍「${topic}」真实到店画面，给剪辑留够素材。`,
+      actions: [
+        {
+          label: '必拍镜头',
+          detail: `门头、核心项目、${included}相关画面、价格/套餐展示各至少 1 镜。`,
+        },
+        {
+          label: '口播一句（原句）',
+          detail: `「我们这期「${topic}」，${sell}，欢迎来体验。」`,
+        },
+      ],
+    },
+    剪辑: {
+      body: `剪出可发布成片，前 3 秒出优惠，片尾引导挂链。`,
+      actions: [
+        {
+          label: '成片结构',
+          detail: `钩子→体验→「${topic} ${price}」→行动引导；总长 15～30 秒。`,
+        },
+        {
+          label: '大字字幕',
+          detail: `至少出现一次：套餐名、价格、包含摘要。`,
+        },
+      ],
+    },
+    发布挂链: {
+      body: `在 ${plat} 发布并挂上「${topic}」，用户一点就能买。`,
+      actions: [
+        {
+          label: '标题（可直接用）',
+          detail: `「本地｜${topic}｜${price}｜${included.split(/[、，,/]/)[0] || '到店套餐'}」`,
+        },
+        {
+          label: '正文（可直接改）',
+          detail: `${sell}\n包含：${included}\n怎么用：到店出示团购/套餐码核销。\n#本地生活 #${plat}`,
+        },
+        {
+          label: '挂链核对',
+          detail: `小黄车/组件必须指向「${topic}」本商品，价格显示为 ${price}；发前自己点开测一次。`,
+        },
+        {
+          label: '发布时间与置顶评',
+          detail: `18:00～21:00 发布；置顶评论：「有问题评论区问，核销规则见商品页」。`,
+        },
+      ],
+    },
+    发布: {
+      body: `按时发布「${topic}」内容并完成挂链核验。`,
+      actions: [
+        {
+          label: '发布前 30 秒检查',
+          detail: `标题、封面、挂链、价格四处一致后再点发布。`,
+        },
+        {
+          label: '话题标签',
+          detail: `加 3～5 个本地/品类话题，勿堆砌无关热搜。`,
+        },
+      ],
+    },
+    复盘: {
+      body: `看「${topic}」这条内容数据，只加码有效打法。`,
+      actions: [
+        {
+          label: '记录指标',
+          detail: `记下：播放、完播、点赞、评论、挂链点击、核销（能看到的都记）。标注发布时段。`,
+        },
+        {
+          label: '有效钩子沉淀',
+          detail: `若前 3 秒留人好，把钩子原句复用到下一条；若评论都在问规则，说明商品页规则写不清，先改详情再投。`,
+        },
+        {
+          label: '无效则止损',
+          detail: `播放差且无转化：停更同脚本，改卖点角度或换套餐主推，勿同一条连发。`,
+        },
+      ],
+    },
+    做什么: {
+      body: `今天把「${topic}」做完，并留下可检查的结果（文案/截图/链接）。`,
+      actions: [
+        {
+          label: '今日交付物',
+          detail: summary
+            ? `完成：${summary}。输出物建议：成稿文案 1 份 + 素材/截图 +（如有）商品链接。`
+            : `完成与「${topic}」直接相关的文案/上架/素材其中至少一项，并保存结果。`,
+        },
+        {
+          label: '操作顺序',
+          detail: `①确认规则与包含 ②写出可对外文案 ③在后台或文件夹落地 ④自检后打勾。${tip ? `注意：${tip}` : ''}`,
+        },
+        {
+          label: '负责人与时限',
+          detail: `今天内完成；若连锁多店，先做 1 家样板店再复制。`,
+        },
+      ],
+    },
+    完成标准: {
+      body: `「${topic}」达到下列标准才算完成，避免只做了流程标题。`,
+      actions: [
+        {
+          label: '内容标准',
+          detail: `对外可见的文案/商品页已写清：叫什么、含什么、多少钱、怎么用；无「待定/稍后补充」。`,
+        },
+        {
+          label: '一致性标准',
+          detail: `海报、短视频、商品页三处关键信息一致；${tip ? `并满足：${tip}` : '无虚假宣传。'}`,
+        },
+        {
+          label: '可执行标准',
+          detail: `店员或发布人拿着材料能直接干活（能上架/能拍/能核销），不需要再问「到底包含啥」。`,
+        },
+      ],
+    },
+  }
+
+  const key = Object.keys(table).find((k) => stage === k || stage.includes(k))
+  return key ? table[key]! : null
+}
+
+function mergeActionsWithDefaults(
+  incoming: AiOpsPlanSimpleAction[],
+  defaults: AiOpsPlanSimpleAction[],
+): AiOpsPlanSimpleAction[] {
+  if (!defaults.length) {
+    return incoming
+      .map((a) => ({
+        label: a.label || '明细',
+        detail: isThinAction(a)
+          ? `${a.label || a.detail}：请按方案上下文写清具体项目、价格、文案原文，勿只留步骤名。`
+          : a.detail,
+      }))
+      .slice(0, 8)
+  }
+  // 默认明细优先保证「写满」；若模型某条 detail 已够厚则保留模型版
+  const richIncoming = incoming.filter((a) => !isThinAction(a))
+  if (richIncoming.length >= defaults.length) return richIncoming.slice(0, 8)
+  if (!incoming.length) return defaults
+  // 按顺序：薄的用默认同序替换，厚的保留
+  const out: AiOpsPlanSimpleAction[] = []
+  const n = Math.max(defaults.length, incoming.length)
+  for (let i = 0; i < n && out.length < 8; i++) {
+    const d = defaults[i]
+    const a = incoming[i]
+    if (a && !isThinAction(a)) out.push(a)
+    else if (d) out.push(d)
+    else if (a)
+      out.push({
+        label: a.label,
+        detail: `${a.label}：结合当前套餐/事项写清具体内容（项目、价格、原文话术），不要只写步骤名。`,
+      })
+  }
+  return out.slice(0, 8)
+}
+
+/** 按阶段标题 + 上下文补全 body/actions 到「写满的明细」 */
 function fillSimpleFlowItem(
   item: AiOpsPlanSimpleFlowItem,
-  ctx: { topic: string; summary: string; tip?: string },
+  ctx: SimpleFillCtx,
 ): AiOpsPlanSimpleFlowItem {
   const topic = ctx.topic || '本事项'
   const summary = ctx.summary || ''
   const tip = ctx.tip || ''
-  const t = item.title
+  const t = item.title || '步骤'
   let body = item.body
-  let actions = [...(item.actions || [])]
+  const concrete = buildConcreteDefaults(t, ctx)
 
-  const defaults: Record<string, { body: string; actions: string[] }> = {
-    准备: {
-      body: `先把「${topic}」要说清的卖点、规则和素材清单列出来，后面执行不返工。`,
-      actions: [
-        `写下主卖点 1～2 句（结合：${summary.slice(0, 36) || topic}）`,
-        '列使用规则：面额/门槛/有效期/不可用说明',
-        '准备封面图或店内实拍 3～5 张（清晰、有优惠感）',
-        tip ? `落实小贴士：${tip}` : '确认素材里没有虚假承诺',
-      ].filter(Boolean),
-    },
-    执行: {
-      body: `按「${topic}」动手落地：改文案、做物料、在后台填好并自查一遍。`,
-      actions: [
-        '按卖点写短文案（标题+正文，突出优惠）',
-        '在商家后台创建/编辑对应团购或券并保存草稿',
-        '预览手机端展示是否清晰、价格与规则一致',
-        '把素材与文案打包给发布人/自己待发',
-      ],
-    },
-    验收: {
-      body: `对照「${topic}」检查能否对外发布：规则清、素材齐、挂链可用。`,
-      actions: [
-        '核对价格、门槛、有效期与宣传文案一致',
-        '用手机预览打开链接/券详情无报错',
-        '店员能说清核销话术与例外情况',
-        '勾选完成，进入下一平台发布或投放',
-      ],
-    },
-    选题: {
-      body: `围绕「${topic}」定一条今天就能拍的内容角度，避免空泛种草。`,
-      actions: [
-        `选题：${summary.slice(0, 40) || `${topic}真实体验+优惠`}`,
-        '定开头 3 秒钩子（价格/痛点/对比）',
-        '列拍摄清单：店面、招牌项目、券面/价格牌',
-        '定发布时间（傍晚高峰更合适）',
-      ],
-    },
-    '拍摄/剪辑': {
-      body: `按选题拍真实画面并剪成 15～30 秒短视频，字幕写清优惠。`,
-      actions: [
-        '实拍 4～6 个镜头（进店→项目→氛围→价格/券）',
-        '口播或字幕写清：谁适合买、省多少、怎么用',
-        '片尾定格「挂团购/领券」引导',
-        '导出竖版，检查无夸大与违禁词',
-      ],
-    },
-    拍摄: {
-      body: `按选题拍真实画面，突出优惠与到店体验。`,
-      actions: [
-        '拍店招/环境/核心项目各 1～2 镜',
-        '拍价格牌或券面特写',
-        '补一句老板/店员真诚推荐口播',
-      ],
-    },
-    剪辑: {
-      body: `剪成短视频：前 3 秒出优惠，字幕可读，片尾引导挂链。`,
-      actions: [
-        '按「钩子→体验→优惠→行动」剪辑',
-        '加大字字幕标出价格与门槛',
-        '片尾加「点击下方团购」',
-      ],
-    },
-    发布挂链: {
-      body: `选高峰时段发布，挂上对应团购/券，并写好标题话题。`,
-      actions: [
-        '标题含城市+品类+优惠数字',
-        '正文写清怎么用券、适用门店',
-        '挂链/组件指向正确商品',
-        '选晚上 18:00～21:00 发布并置顶评论补说明',
-      ],
-    },
-    发布: {
-      body: `按时发布并挂好链接，确保用户一点就能买。`,
-      actions: [
-        '检查挂链商品与宣传一致',
-        '加 3～5 个本地话题标签',
-        '发布后自己点开核验一次',
-      ],
-    },
-    复盘: {
-      body: `看完发布数据，记下哪条素材有效，明天只加码有效打法。`,
-      actions: [
-        '记录播放/完播/点击/核销（能看到的指标）',
-        '标出前 3 秒是否留人、评论常见问题',
-        '把有效钩子复用到下一条',
-        '无效素材停更，改卖点或时段再测',
-      ],
-    },
-    组品: {
-      body: `定清「${topic}」包含什么、卖多少、划不划算，方便上架和话术。`,
-      actions: [
-        `写清包含：${summary.includes('包含') ? summary : topic}`,
-        '定售价与原价对比（突出省多少）',
-        '写使用规则：有效期、是否预约、节假日是否可用',
-        '算毛利是否可接受，不能亏本硬推',
-      ],
-    },
-    上架: {
-      body: `把「${topic}」同步上到勾选平台，主图/标题/库存一次设对。`,
-      actions: [
-        '上传主图（含价格或优惠信息）',
-        '标题写清面额/套餐名+适用场景',
-        '填库存、门店范围、可售时间',
-        '保存后用买家视角预览一遍',
-      ],
-    },
-    核销话术: {
-      body: `店员按统一话术接待核销，避免口径不一引发纠纷。`,
-      actions: [
-        '开场：欢迎光临，请问是否有团购/券码？',
-        '核销：扫码确认项目与差价，口头复述规则',
-        '引导：推荐加购或复购券（不强迫）',
-        '异常：券不可用时礼貌说明原因并给替代方案',
-      ],
-    },
-    做什么: {
-      body: `今天完成「${topic}」的具体动作如下，做完即可打勾。`,
-      actions: splitToActions(summary || topic, 4).length
-        ? splitToActions(summary || `完成：${topic}`, 4)
-        : [
-            `列出「${topic}」所需材料与负责人`,
-            '按清单执行并保存结果（文案/截图/链接）',
-            tip ? `注意：${tip}` : '自检无错后再进入下一项',
-          ],
-    },
-    完成标准: {
-      body: `「${topic}」达到下列标准才算完成，避免只做一半。`,
-      actions: [
-        '相关文案/商品/素材已就绪且可对外展示',
-        '规则与价格前后一致，无虚假宣传',
-        tip ? `满足：${tip}` : '店员或发布人已确认能执行',
-        '在落地清单上勾选本项',
-      ],
-    },
+  if ((!body || body === '…' || body === '...') && concrete) body = concrete.body
+  if (!body || body === '…' || body === '...') {
+    body = summary
+      ? `围绕「${topic}」把下面明细逐条写清并执行：${summary}`
+      : `把「${topic}」拆成可执行明细，每条都要有具体内容（项目/价格/原文），不要只写步骤名。`
   }
 
-  // 模糊匹配阶段名
-  const key =
-    (Object.keys(defaults).find((k) => t === k || t.includes(k)) as keyof typeof defaults | undefined) ||
-    undefined
+  const defaultActions =
+    concrete?.actions ||
+    ([
+      {
+        label: '交付内容',
+        detail: `针对「${topic}」输出可直接使用的结果：${summary || '文案原文 + 规则条文 + 素材说明'}。`,
+      },
+      {
+        label: '操作说明',
+        detail: `在商家后台或本地文件夹落地「${topic}」，保存截图/链接；${tip ? `注意 ${tip}。` : '完成后自检信息一致。'}`,
+      },
+      {
+        label: '验收标准',
+        detail: `他人不追问也能执行：名称、包含、价格、规则四要素齐全。`,
+      },
+    ] satisfies AiOpsPlanSimpleAction[])
 
-  if (key && defaults[key]) {
-    if (!body || body === '…' || body === '...') body = defaults[key].body
-    if (actions.length < 2) actions = defaults[key].actions
-  } else {
-    if (!body || body === '…' || body === '...') {
-      body = summary
-        ? `围绕「${topic}」落地：${summary}`
-        : `把「${topic}」拆成可执行动作，今天做完并自检。`
-    }
-    if (actions.length < 2) {
-      actions = splitToActions(body, 4)
-      if (actions.length < 2) {
-        actions = [
-          `明确「${t}」要交付的结果`,
-          `按「${topic}」执行并留下记录（截图/链接）`,
-          tip ? `注意：${tip}` : '完成后对照宣传内容自检一遍',
-        ]
-      }
-    }
-  }
+  const actions = mergeActionsWithDefaults(item.actions || [], defaultActions)
 
-  return {
-    title: t || '步骤',
-    body,
-    actions: actions.filter(Boolean).slice(0, 6),
-  }
+  return { title: t, body, actions }
 }
 
 /** 旧历史无 detailFlow 时，把短文案拆成可读流程 */
@@ -1093,24 +1333,29 @@ export function synthesizeSimpleDetailFlow(
   }
   return chunks.slice(0, 6).map((body, i) =>
     fillSimpleFlowItem(
-      { title: `第${i + 1}步`, body, actions: splitToActions(body, 3) },
+      {
+        title: `第${i + 1}步`,
+        body,
+        actions: [{ label: '具体内容', detail: body }],
+      },
       { topic: body, summary: text },
     ),
   )
 }
 
-/** 补全简易版所有 detailFlow 到最后一级 actions（服务端/客户端均可调用） */
+/** 补全简易版所有 detailFlow 到最后一级「写满的明细」 */
 export function ensureSimplePlanDetailDepth(plan: AiOpsPlanResult): AiOpsPlanResult {
   if (!isAiOpsPlanSimpleEdition(plan) || !plan.simplePlan) return plan
   const s = plan.simplePlan
+  const emptyActs = (): AiOpsPlanSimpleAction[] => []
   const steps = s.steps.map((st) => {
     const baseFlow =
       st.detailFlow.length > 0
         ? st.detailFlow
         : [
-            { title: '准备', body: '', actions: [] as string[] },
-            { title: '执行', body: '', actions: [] as string[] },
-            { title: '验收', body: '', actions: [] as string[] },
+            { title: '准备', body: '', actions: emptyActs() },
+            { title: '执行', body: '', actions: emptyActs() },
+            { title: '验收', body: '', actions: emptyActs() },
           ]
     return {
       ...st,
@@ -1124,15 +1369,21 @@ export function ensureSimplePlanDetailDepth(plan: AiOpsPlanResult): AiOpsPlanRes
       p.detailFlow.length > 0
         ? p.detailFlow
         : [
-            { title: '选题', body: '', actions: [] as string[] },
-            { title: '拍摄/剪辑', body: '', actions: [] as string[] },
-            { title: '发布挂链', body: '', actions: [] as string[] },
-            { title: '复盘', body: '', actions: [] as string[] },
+            { title: '选题', body: '', actions: emptyActs() },
+            { title: '拍摄/剪辑', body: '', actions: emptyActs() },
+            { title: '发布挂链', body: '', actions: emptyActs() },
+            { title: '复盘', body: '', actions: emptyActs() },
           ]
     return {
       ...p,
       detailFlow: baseFlow.map((f) =>
-        fillSimpleFlowItem(f, { topic: `${p.platform}发布`, summary: p.how, tip: p.detailNote }),
+        fillSimpleFlowItem(f, {
+          topic: p.how || `${p.platform}发布`,
+          summary: p.how,
+          tip: p.detailNote,
+          platform: p.platform,
+          sellingPoint: p.how,
+        }),
       ),
     }
   })
@@ -1141,9 +1392,9 @@ export function ensureSimplePlanDetailDepth(plan: AiOpsPlanResult): AiOpsPlanRes
       c.detailFlow.length > 0
         ? c.detailFlow
         : [
-            { title: '组品', body: '', actions: [] as string[] },
-            { title: '上架', body: '', actions: [] as string[] },
-            { title: '核销话术', body: '', actions: [] as string[] },
+            { title: '组品', body: '', actions: emptyActs() },
+            { title: '上架', body: '', actions: emptyActs() },
+            { title: '核销话术', body: '', actions: emptyActs() },
           ]
     const summary = [c.sellingPoint, c.items ? `包含：${c.items}` : '', c.priceHint]
       .filter(Boolean)
@@ -1151,7 +1402,14 @@ export function ensureSimplePlanDetailDepth(plan: AiOpsPlanResult): AiOpsPlanRes
     return {
       ...c,
       detailFlow: baseFlow.map((f) =>
-        fillSimpleFlowItem(f, { topic: c.name, summary, tip: c.detailNote }),
+        fillSimpleFlowItem(f, {
+          topic: c.name,
+          summary,
+          tip: c.detailNote,
+          items: c.items,
+          priceHint: c.priceHint,
+          sellingPoint: c.sellingPoint,
+        }),
       ),
     }
   })
@@ -1160,8 +1418,8 @@ export function ensureSimplePlanDetailDepth(plan: AiOpsPlanResult): AiOpsPlanRes
       item.detailFlow.length > 0
         ? item.detailFlow
         : [
-            { title: '做什么', body: '', actions: [] as string[] },
-            { title: '完成标准', body: '', actions: [] as string[] },
+            { title: '做什么', body: '', actions: emptyActs() },
+            { title: '完成标准', body: '', actions: emptyActs() },
           ]
     return {
       ...item,
@@ -2442,7 +2700,9 @@ function formatSimpleFlowMd(flow: AiOpsPlanSimpleFlowItem[]): string[] {
   const lines: string[] = []
   flow.forEach((f, i) => {
     lines.push(`${i + 1}. **${f.title}**：${f.body || ''}`)
-    for (const a of f.actions || []) lines.push(`   - ${a}`)
+    for (const a of f.actions || []) {
+      lines.push(`   - **${a.label}**：${a.detail}`)
+    }
   })
   return lines
 }
@@ -2498,7 +2758,7 @@ function aiOpsSimplePlanToMarkdown(plan: AiOpsPlanResult, meta?: { title?: strin
       if (item.detailFlow.length) {
         for (const f of item.detailFlow) {
           lines.push(`  - **${f.title}**：${f.body}`)
-          for (const a of f.actions || []) lines.push(`    - ${a}`)
+          for (const a of f.actions || []) lines.push(`    - **${a.label}**：${a.detail}`)
         }
       }
     }

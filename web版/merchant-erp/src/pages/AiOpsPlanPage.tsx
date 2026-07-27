@@ -921,13 +921,18 @@ function SimpleDetailFlowList({
                     <p className="mt-0.5 text-sm leading-relaxed text-gray-600">{f.body}</p>
                   ) : null}
                   {f.actions?.length ? (
-                    <ul className="mt-2 space-y-1.5 border-l-2 border-blue-100 pl-3">
+                    <ul className="mt-2 space-y-2.5 border-l-2 border-blue-100 pl-3">
                       {f.actions.map((a, j) => (
-                        <li key={`${i}-${j}`} className="flex gap-2 text-sm leading-relaxed text-gray-700">
-                          <span className="mt-0.5 shrink-0 text-xs font-medium text-blue-600">
-                            {i + 1}.{j + 1}
-                          </span>
-                          <span>{a}</span>
+                        <li key={`${i}-${j}`} className="text-sm leading-relaxed text-gray-700">
+                          <div className="flex gap-2">
+                            <span className="mt-0.5 shrink-0 text-xs font-semibold text-blue-600">
+                              {i + 1}.{j + 1}
+                            </span>
+                            <div className="min-w-0">
+                              <div className="font-medium text-gray-900">{a.label}</div>
+                              <p className="mt-0.5 whitespace-pre-wrap text-gray-600">{a.detail}</p>
+                            </div>
+                          </div>
                         </li>
                       ))}
                     </ul>
@@ -1039,7 +1044,10 @@ function SimplePlanGallery({ plan }: { plan: AiOpsPlanResult }) {
             ? c.detailFlow.map((f) => `${f.title}：${f.body}`).join('；')
             : c.detailNote || '按事项标题执行并打勾确认',
         actions: c.detailFlow.flatMap((f) =>
-          (f.actions || []).map((a) => `${f.title} · ${a}`),
+          (f.actions || []).map((a) => ({
+            label: `${f.title} · ${a.label}`,
+            detail: a.detail,
+          })),
         ),
       }))
       return {

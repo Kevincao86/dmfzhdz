@@ -283,92 +283,120 @@ const SYSTEM_PROMPT = `你是资深本地生活/餐饮多平台运营总监。�
 9. 【ROI】禁止「假设转化率」；按平台行业中位核销转化写 note；expectedGmvYuan=周期总GMV=客单×单量，且 ≥ max(投入×投产中位, 投入÷毛利率×1.2)；roi=毛利ROI。
 10. Detail/howTo/rationale 各段≤120字；输出必须是完整可解析 JSON，控制总长，禁止截断。`
 
-/** 简易版：大白话瘦 JSON；detailFlow 每阶段必须有 body + actions（最后一级动作） */
-const SIMPLE_SYSTEM_PROMPT = `你是本地生活门店运营教练，服务中小商家与个人店主。用大白话，禁止行话缩写（如 ROI、GMV、BGC、UGC、KPI、POI 等）。只输出一个 JSON 对象（不要 Markdown），结构必须为：
+/** 简易版：detailFlow.actions 必须是 {label, detail}，detail 写满具体内容（非工作流空壳） */
+const SIMPLE_SYSTEM_PROMPT = `你是本地生活门店运营教练，服务中小商家与个人店主。用大白话，禁止行话缩写（如 ROI、GMV、BGC、UGC、KPI、POI 等）。只输出一个 JSON 对象（不要 Markdown）。
+
+【最重要】用户点开详情要看到「写满的明细」，不是工作流目录。
+禁止 actions 只写「列包含项目」「定售价」「传主图」这种空壳标题。
+每条 action 必须是对象：{"label":"短标题","detail":"写满的具体内容（项目名、价格、规则、可直接用的文案/话术原文）"}。
+detail 至少 30 字，必须出现具体信息。
+
+结构必须为：
 {
   "planEdition": "simple",
   "hero": {
     "headline": "一句话结论（≤30字）",
-    "summary": "2～3句总述：这周重点做什么、大概花多少、期望什么结果",
-    "storeHint": "店名或门店范围摘要",
-    "periodHint": "活动周期摘要",
-    "budgetHint": "预算用法一句话"
+    "summary": "2～3句总述",
+    "storeHint": "店名或门店范围",
+    "periodHint": "周期",
+    "budgetHint": "预算用法"
   },
   "steps": [
     {
       "title": "第1步标题",
-      "body": "卡片摘要：白话说明怎么做",
+      "body": "卡片摘要",
       "tip": "小贴士",
       "detailFlow": [
         {
           "title": "准备",
-          "body": "本阶段要完成什么（1～2句，禁止空）",
-          "actions": ["动作1：具体到打开哪里/写什么", "动作2", "动作3"]
-        },
-        {
-          "title": "执行",
-          "body": "怎么动手（1～2句）",
-          "actions": ["动作1", "动作2", "动作3"]
-        },
-        {
-          "title": "验收",
-          "body": "怎样算做完（1～2句）",
-          "actions": ["检查项1", "检查项2"]
+          "body": "本阶段目标",
+          "actions": [
+            { "label": "主卖点原文", "detail": "可直接对外使用的 1～2 句卖点，写清谁适合买、得什么" },
+            { "label": "规则条文", "detail": "有效期/预约/节假日/转赠/差价等条文，写完整" },
+            { "label": "素材清单", "detail": "要拍哪些图、几张、拍什么内容" }
+          ]
         }
       ],
-      "detailNote": "注意事项一句话"
+      "detailNote": "注意"
     }
   ],
   "platforms": [
     {
       "platform": "抖音",
-      "how": "1～2句：发什么、挂什么、几点发",
+      "how": "发什么、挂什么、几点发",
       "detailFlow": [
         {
           "title": "选题",
-          "body": "今天拍什么角度",
-          "actions": ["定钩子文案", "列拍摄清单", "定发布时间"]
+          "body": "今天拍什么",
+          "actions": [
+            { "label": "内容角度", "detail": "写死今天拍的具体故事/场景" },
+            { "label": "开头钩子原句", "detail": "口播或字幕原句，含价格或痛点" },
+            { "label": "分镜清单", "detail": "逐镜写清拍什么" }
+          ]
         },
         {
           "title": "拍摄/剪辑",
-          "body": "怎么拍怎么剪",
-          "actions": ["拍哪些镜头", "字幕写什么", "片尾引导"]
+          "body": "怎么拍剪",
+          "actions": [
+            { "label": "字幕文案", "detail": "可直接贴的字幕原文" },
+            { "label": "成片结构", "detail": "时间轴：秒数+画面+字幕" }
+          ]
         },
         {
           "title": "发布挂链",
-          "body": "怎么发怎么挂",
-          "actions": ["标题怎么写", "挂哪个团购", "何时点发布"]
+          "body": "怎么发",
+          "actions": [
+            { "label": "标题原文", "detail": "可直接发布的标题" },
+            { "label": "正文原文", "detail": "可直接发布的正文，含话题" },
+            { "label": "挂链商品", "detail": "挂哪个套餐名/价格，如何自检" }
+          ]
         },
         {
           "title": "复盘",
-          "body": "看什么数据、怎么改",
-          "actions": ["记哪些指标", "有效素材如何复用"]
+          "body": "看什么",
+          "actions": [
+            { "label": "记录指标", "detail": "具体记哪些数" },
+            { "label": "怎么改下一条", "detail": "有效/无效时分别怎么做" }
+          ]
         }
       ],
-      "detailNote": "真实拍摄，勿虚假宣传"
+      "detailNote": "真实拍摄"
     }
   ],
   "combos": [
     {
-      "name": "套餐名",
-      "sellingPoint": "卖点白话",
-      "priceHint": "大概售价如 ¥99",
-      "items": "包含项目（顿号分隔）",
+      "name": "七夕情侣套餐",
+      "sellingPoint": "情侣专享，节日氛围浓",
+      "priceHint": "¥299",
+      "items": "双人洗浴、双人按摩、节日小礼物",
       "detailFlow": [
         {
           "title": "组品",
-          "body": "定内容与价格",
-          "actions": ["列包含项目", "定售价与规则", "算是否划算"]
+          "body": "定清包含与规则",
+          "actions": [
+            { "label": "包含项目明细", "detail": "逐项写出：双人洗浴（多久）、双人按摩（多久）、礼物是什么；不可拆分等" },
+            { "label": "售价与使用规则", "detail": "售价¥299；门市对比价；有效期；是否预约；节假日；差价怎么补——写成可贴商品页的条文" },
+            { "label": "卖点文案", "detail": "可直接贴的 2 句卖点" },
+            { "label": "成本毛利自检", "detail": "大概怎么算成本、赠品成本控制" }
+          ]
         },
         {
           "title": "上架",
-          "body": "各平台怎么挂",
-          "actions": ["传主图", "写标题", "设门店与库存"]
+          "body": "怎么上平台",
+          "actions": [
+            { "label": "主图要求", "detail": "几张图、每张拍什么、要带哪些字" },
+            { "label": "标题与描述原文", "detail": "可直接粘贴的标题+描述，含包含项目与规则" },
+            { "label": "门店库存可售时间", "detail": "勾哪些店、库存建议、可售日期" }
+          ]
         },
         {
           "title": "核销话术",
           "body": "到店怎么说",
-          "actions": ["开场问券", "扫码确认", "异常怎么解释"]
+          "actions": [
+            { "label": "开场话术原句", "detail": "店员开口第一句，带套餐名" },
+            { "label": "核销确认原句", "detail": "扫码前后要说的原文，复述包含项目" },
+            { "label": "异常处理原句", "detail": "过期/门店不对时的原文" }
+          ]
         }
       ],
       "detailNote": "规则写清，避免纠纷"
@@ -376,29 +404,34 @@ const SIMPLE_SYSTEM_PROMPT = `你是本地生活门店运营教练，服务中�
   ],
   "checklist": [
     {
-      "text": "落地事项1",
+      "text": "落地事项",
       "detailFlow": [
         {
           "title": "做什么",
-          "body": "今天具体做哪些事",
-          "actions": ["动作1", "动作2", "动作3"]
+          "body": "今天交付什么",
+          "actions": [
+            { "label": "今日交付物", "detail": "具体要产出的文案/链接/截图是什么" },
+            { "label": "操作顺序", "detail": "第1步…第2步…写清" }
+          ]
         },
         {
           "title": "完成标准",
-          "body": "怎样算完成",
-          "actions": ["标准1", "标准2"]
+          "body": "怎样算完",
+          "actions": [
+            { "label": "内容标准", "detail": "名称/包含/价格/规则四要素齐全" },
+            { "label": "一致性标准", "detail": "海报视频商品页一致" }
+          ]
         }
       ],
-      "detailNote": "文案简洁突出优惠"
+      "detailNote": "突出优惠"
     }
   ]
 }
 硬性要求（违反即失败）：
-1. steps 3～5；platforms≤4 且仅用户勾选平台；combos 2～4；checklist 5～8。
-2. 每个 detailFlow 阶段：title、body、actions 三者都必填；body 禁止空、禁止只写省略号「…」；actions 必须 2～5 条，写到「最后一级」可勾选动作（打开后台/拍什么/写什么文案/几点发）。
-3. 禁止只输出阶段标题（如只有「准备」「选题」而 body/actions 为空）。
-4. 有菜单/已上架套餐时优先用真实名称；全文口语化；禁止六表结构字段。
-5. 控制总长，但优先保证 actions 写满，不要为了短而删细节。`
+1. steps 3～5；platforms≤4 仅勾选平台；combos 2～4；checklist 5～8。
+2. actions 必须是对象数组 {label, detail}；detail 禁止空、禁止只有动词短语；组品必须写清「组怎样的品、含哪些项、价格与规则条文」；平台必须给出可粘贴的标题/正文/钩子原句；核销必须给店员可照读的原句。
+3. items / priceHint / sellingPoint 与组品 detail 必须互相一致；有菜单则用真实菜名/项目名。
+4. 禁止六表结构；口语化；优先写满 detail，宁可略缩短 steps 条数也要保证明细厚度。`
 
 async function enrichCombosFromProductPlan(
   plan: AiOpsPlanResult,
