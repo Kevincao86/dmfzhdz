@@ -44,7 +44,15 @@ export function exportAiOpsPlanExcel(plan: AiOpsPlanResult, basename: string) {
         ['落地清单', '细流程', '备注'],
         ...s.checklist.map((item) => [
           item.text,
-          item.detailFlow.map((f) => `${f.title}：${f.body}`).join('；'),
+          item.detailFlow
+            .map(
+              (f) =>
+                `${f.title}：${f.body}` +
+                (f.actions?.length
+                  ? ' / ' + f.actions.map((a) => `${a.label}→${a.detail}`).join('；')
+                  : ''),
+            )
+            .join(' | '),
           item.detailNote,
         ]),
       ]),
