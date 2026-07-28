@@ -171,6 +171,41 @@ export async function tenantPayPoll(
   })
 }
 
+export type EffectiveSubscriptionTier = {
+  label: string
+  yuan: number
+  cents: number
+  plan?: 'member' | 'member_plus'
+  key?: string
+  periodDays?: number
+  regionalMarkup?: boolean
+  floorCents?: number
+}
+
+export async function fetchEffectiveSubscriptionTiers(): Promise<{
+  tiers: EffectiveSubscriptionTier[]
+  source: 'platform' | 'regional'
+  pricingCity: string | null
+}> {
+  if (!supabase) throw new Error('未配置 Supabase')
+  const { data: sessionData } = await supabase.auth.getSession()
+  const token = sessionData.session?.access_token
+  if (!token) throw new Error('请先登录')
+  const res = await fetch('/erp-api/meoo-tenant-subscription-tiers', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  const json = (await res.json().catch(() => ({}))) as Record<string, unknown>
+  if (!res.ok || json.ok === false) {
+    throw new Error(billingApiErrorMessage(json, res.statusText, res.status))
+  }
+  return {
+    tiers: (json.tiers as EffectiveSubscriptionTier[]) ?? [],
+    source: json.source === 'regional' ? 'regional' : 'platform',
+    pricingCity: (json.pricingCity as string) || null,
+  }
+}
+
 export type ErpPointsSpendKind =
   | 'video'
   | 'article'

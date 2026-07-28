@@ -28,6 +28,8 @@ import regionalPartnerDashboardHandler from '../../../商家管理后台/api/_li
 import regionalPartnerMerchantsHandler from '../../../商家管理后台/api/_lib/handlers/meoo-regional-partner-merchants.ts'
 import regionalPartnerSettlementHandler from '../../../商家管理后台/api/_lib/handlers/meoo-regional-partner-settlement.ts'
 import regionalPartnerChangePasswordHandler from '../../../商家管理后台/api/_lib/handlers/meoo-regional-partner-change-password.ts'
+import regionalPartnerPricingHandler from '../../../商家管理后台/api/_lib/handlers/meoo-regional-partner-pricing.ts'
+import tenantSubscriptionTiersHandler from '../../../商家管理后台/api/_lib/handlers/meoo-tenant-subscription-tiers.ts'
 import plannerRoomSyncHandler from '../api/meoo-planner-room-sync.ts'
 import plannerGptConfigHandler from '../api/meoo-planner-gpt-config.ts'
 import tenantsListHandler from '../../../商家管理后台/api/_lib/handlers/meoo-supabase-tenants-list.ts'
@@ -193,7 +195,7 @@ import apiPingHandler from '../api/ping.ts'
 import merchantSlugHandler from '../api/merchant/[...slug].ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260727-regional-partner-package'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260728-regional-partner-pricing'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -231,6 +233,8 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-regional-partner-merchants': regionalPartnerMerchantsHandler as VercelLikeHandler,
   '/api/meoo-regional-partner-settlement': regionalPartnerSettlementHandler as VercelLikeHandler,
   '/api/meoo-regional-partner-change-password': regionalPartnerChangePasswordHandler as VercelLikeHandler,
+  '/api/meoo-regional-partner-pricing': regionalPartnerPricingHandler as VercelLikeHandler,
+  '/api/meoo-tenant-subscription-tiers': tenantSubscriptionTiersHandler as VercelLikeHandler,
   '/api/meoo-planner-room-sync': plannerRoomSyncHandler as VercelLikeHandler,
   '/api/meoo-planner-gpt-config': plannerGptConfigHandler as VercelLikeHandler,
   '/api/meoo-supabase-tenants-list': tenantsListHandler as VercelLikeHandler,

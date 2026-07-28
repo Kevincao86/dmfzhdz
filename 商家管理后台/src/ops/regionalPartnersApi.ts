@@ -3,7 +3,12 @@ import { readOpsSession } from './opsStaffAuth'
 
 export type RegionalCity = { province: string; city: string }
 
-export type RegionalPartnerModuleKey = 'dashboard' | 'merchants' | 'settlement' | 'materials'
+export type RegionalPartnerModuleKey =
+  | 'dashboard'
+  | 'merchants'
+  | 'settlement'
+  | 'pricing'
+  | 'materials'
 
 export type RegionalPartner = {
   id: string
@@ -22,6 +27,7 @@ export type RegionalPartner = {
 export const REGIONAL_PARTNER_MODULES: Array<{ key: RegionalPartnerModuleKey; label: string }> = [
   { key: 'dashboard', label: '业绩看板' },
   { key: 'merchants', label: '名下商家' },
+  { key: 'pricing', label: '区域定价' },
   { key: 'settlement', label: '结算明细' },
   { key: 'materials', label: '授权物料（占位）' },
 ]

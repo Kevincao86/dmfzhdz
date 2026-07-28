@@ -22,6 +22,7 @@ export const REGIONAL_PARTNER_MODULE_KEYS = [
   'dashboard',
   'merchants',
   'settlement',
+  'pricing',
   'materials',
 ] as const
 
@@ -159,7 +160,7 @@ export function parseCities(raw: unknown): RegionalCity[] {
 
 export function parsePartnerPermissions(raw: unknown): RegionalPartnerModuleKey[] {
   const keys = new Set<string>(REGIONAL_PARTNER_MODULE_KEYS)
-  if (!Array.isArray(raw)) return ['dashboard', 'merchants', 'settlement']
+  if (!Array.isArray(raw)) return ['dashboard', 'merchants', 'settlement', 'pricing']
   const out: RegionalPartnerModuleKey[] = []
   for (const p of raw) {
     const k = String(p)
@@ -167,7 +168,10 @@ export function parsePartnerPermissions(raw: unknown): RegionalPartnerModuleKey[
       out.push(k as RegionalPartnerModuleKey)
     }
   }
-  return out.length ? out : ['dashboard']
+  if (!out.length) return ['dashboard']
+  // 存量代理：已有名下商家权限则默认开放区域定价
+  if (out.includes('merchants') && !out.includes('pricing')) out.push('pricing')
+  return out
 }
 
 function rateNum(v: number | string | undefined, fallback: number): number {

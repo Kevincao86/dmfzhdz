@@ -1,6 +1,11 @@
 export type RegionalCity = { province: string; city: string }
 
-export type RegionalPartnerModuleKey = 'dashboard' | 'merchants' | 'settlement' | 'materials'
+export type RegionalPartnerModuleKey =
+  | 'dashboard'
+  | 'merchants'
+  | 'settlement'
+  | 'pricing'
+  | 'materials'
 
 export type RegionalPartner = {
   id: string
@@ -201,6 +206,45 @@ export async function changeOwnPassword(oldPassword: string, newPassword: string
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ oldPassword, newPassword }),
+  })
+}
+
+export type SubscriptionTierKey =
+  | 'member_monthly'
+  | 'member_plus_monthly'
+  | 'member_quarterly'
+  | 'member_plus_quarterly'
+
+export const SUBSCRIPTION_TIER_META: Array<{
+  key: SubscriptionTierKey
+  label: string
+  floorYuan: number
+}> = [
+  { key: 'member_monthly', label: '会员版 · 月度', floorYuan: 168 },
+  { key: 'member_plus_monthly', label: '会员 Plus · 月度', floorYuan: 598 },
+  { key: 'member_quarterly', label: '会员版 · 季度', floorYuan: 468 },
+  { key: 'member_plus_quarterly', label: '会员 Plus · 季度', floorYuan: 1688 },
+]
+
+export async function fetchPricing() {
+  return request<{
+    ok: true
+    cities: RegionalCity[]
+    pricing: Record<string, Partial<Record<SubscriptionTierKey, number>>>
+    floors: Record<string, { floorCents: number; label: string }>
+  }>('/api/meoo-regional-partner-pricing', {
+    method: 'GET',
+    headers: authHeaders(),
+  })
+}
+
+export async function savePricing(
+  pricing: Record<string, Partial<Record<SubscriptionTierKey, number>>>,
+) {
+  return request<{ ok: true; pricing: typeof pricing }>('/api/meoo-regional-partner-pricing', {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify({ pricing }),
   })
 }
 

@@ -17,6 +17,10 @@ import {
 } from '../src/lib/tenantPaymentChannels.js'
 import type { TenantOrderKind, TenantPayChannel } from '../src/lib/tenantPaymentShared.js'
 import {
+  matchResolvedTierByCents,
+  resolveSubscriptionTiersForTenant,
+} from '../../../商家管理后台/api/_lib/regionalPartnerPricing.js'
+import {
   assertErpAiPointsAffordable,
   parseErpAiPointsUsageKind,
   spendErpAiPoints,
@@ -186,6 +190,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         sendJson(res, 400, { ok: false, error: 'invalid_payload' })
         return
       }
+      if (orderKind === 'subscription') {
+        const resolved = await resolveSubscriptionTiersForTenant(admin, auth.tenantId)
+        if (!matchResolvedTierByCents(resolved.tiers, amountCents)) {
+          sendJson(res, 400, {
+            ok: false,
+            error: 'invalid_subscription_tier',
+            message: '订阅金额须为当前有效档位（区域加价后以页面展示为准）',
+          })
+          return
+        }
+      }
       const payModeRaw = String(body.payMode || 'native').trim()
       const wechatPayMode =
         payModeRaw === 'virtual'
@@ -268,6 +283,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       if (!orderKind || amountCents <= 0) {
         sendJson(res, 400, { ok: false, error: 'invalid_payload' })
         return
+      }
+      if (orderKind === 'subscription') {
+        const resolved = await resolveSubscriptionTiersForTenant(admin, auth.tenantId)
+        if (!matchResolvedTierByCents(resolved.tiers, amountCents)) {
+          sendJson(res, 400, {
+            ok: false,
+            error: 'invalid_subscription_tier',
+            message: '订阅金额须为当前有效档位（区域加价后以页面展示为准）',
+          })
+          return
+        }
       }
       const result = await purchaseTenantWithWallet(admin, {
         tenantId: auth.tenantId,

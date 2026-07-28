@@ -1,4 +1,4 @@
-import { Building2, LayoutDashboard, LogOut, Settings, Wallet } from 'lucide-react'
+import { Building2, LayoutDashboard, LogOut, Settings, Tags, Wallet } from 'lucide-react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { cn } from '../lib/cn'
 import { readSession, writeSession, type RegionalPartnerModuleKey } from '../lib/api'
@@ -11,6 +11,7 @@ const NAV: Array<{
 }> = [
   { to: '/', label: '业绩看板', icon: LayoutDashboard, perm: 'dashboard' },
   { to: '/merchants', label: '名下商家', icon: Building2, perm: 'merchants' },
+  { to: '/pricing', label: '区域定价', icon: Tags, perm: 'pricing' },
   { to: '/settlement', label: '结算明细', icon: Wallet, perm: 'settlement' },
   { to: '/settings', label: '账号资料', icon: Settings },
 ]
