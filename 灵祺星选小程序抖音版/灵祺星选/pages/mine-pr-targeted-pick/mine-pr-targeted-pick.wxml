@@ -19,6 +19,7 @@
         value="{{regionMultiValue}}"
         bindcolumnchange="onRegionFilterColumnChange"
         bindchange="onRegionFilterChange"
+        bindcancel="onRegionFilterCancel"
       >
         <view class="tgt-pick-filters__picker">{{filterProvince === '全部' && filterCity === '全部' ? '城市 · 全部' : regionFilterLabel}}</view>
       </picker>

@@ -398,20 +398,23 @@ Page({
     this.refreshFiltered(this.data.rows)
   },
   onRegionFilterColumnChange(e) {
+    this._regionPickerBusy = true
     const detail = e.detail || {}
     const next = regionFilterPicker.onRegionFilterColumnChange(
       {
-        filterProvince: this.data.filterProvince,
-        filterCity: this.data.filterCity,
         regionMultiRange: this.data.regionMultiRange,
         regionMultiValue: this.data.regionMultiValue,
       },
       detail.column,
       detail.value,
     )
-    this.setData(next)
+    if (next) this.setData(next)
+  },
+  onRegionFilterCancel() {
+    this._regionPickerBusy = false
   },
   onRegionFilterChange(e) {
+    this._regionPickerBusy = false
     const values = (e.detail && e.detail.value) || [0, 0]
     const next = regionFilterPicker.onRegionFilterChange(
       {

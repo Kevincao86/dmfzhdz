@@ -684,14 +684,14 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
         this.setData({ showMpPrivacyGate: true })
       }
       // 本会话用户已手动选城：勿用异步 GPS/IP 回写覆盖
-      if (this._hallRegionUserPicked) return
+      if (this._hallRegionUserPicked || this._regionPickerBusy) return
       let hit = await hallRegionLocate.resolveHallRegionFilter()
       // 定位等待期间用户可能已写入本地偏好，二次读取避免竞态覆盖
       const stored = hallRegionLocate.readStoredFilter()
       if (stored && (stored.province !== '全部' || (stored.city && stored.city !== '全部'))) {
         hit = stored
       }
-      if (this._hallRegionUserPicked) return
+      if (this._hallRegionUserPicked || this._regionPickerBusy) return
       if (!hit || !hit.province) return
       const regionState = regionFilterPicker.initRegionFilterState(hit.province, hit.city || '全部')
       if (regionState.filterProvince === '全部' && regionState.filterCity === '全部') {
@@ -1353,20 +1353,23 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     else this.applyOrderFilters()
   },
   onRegionFilterColumnChange(e) {
+    this._regionPickerBusy = true
     const detail = e.detail || {}
     const next = regionFilterPicker.onRegionFilterColumnChange(
       {
-        filterProvince: this.data.filterProvince,
-        filterCity: this.data.filterCity,
         regionMultiRange: this.data.regionMultiRange,
         regionMultiValue: this.data.regionMultiValue,
       },
       detail.column,
       detail.value,
     )
-    this.setData(next)
+    if (next) this.setData(next)
+  },
+  onRegionFilterCancel() {
+    this._regionPickerBusy = false
   },
   onRegionFilterChange(e) {
+    this._regionPickerBusy = false
     const values = (e.detail && e.detail.value) || [0, 0]
     const next = regionFilterPicker.onRegionFilterChange(
       {
