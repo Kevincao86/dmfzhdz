@@ -45,6 +45,7 @@ import PartnerSalespersonPortalPage from './pages/PartnerSalespersonPortalPage'
 import LoginPage from './pages/LoginPage'
 import ErpDyOAuthCallbackPage from './pages/login/ErpDyOAuthCallbackPage'
 import HelpManualPage from './pages/HelpManualPage'
+import KnowledgeBasePage from './pages/KnowledgeBasePage'
 import TeamIntroPage from './pages/TeamIntroPage'
 import LegalDocPage from './pages/legal/LegalDocPage'
 import { isPartnerEdition } from './lib/appEdition'
@@ -108,6 +109,7 @@ export default function App() {
         >
           <Route path="/home" element={<HomeDashboard />} />
           <Route path="ai-agent" element={<AiAgentPage />} />
+          <Route path="knowledge-base" element={<KnowledgeBasePage />} />
           <Route path="store" element={<Navigate to="/store/info" replace />} />
           <Route path="store/info" element={<StoreInfoPage />} />
           <Route path="store/menu" element={<StoreMenuPage />} />

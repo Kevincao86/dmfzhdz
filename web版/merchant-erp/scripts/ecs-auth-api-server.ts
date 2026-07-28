@@ -163,6 +163,7 @@ import mpTalentProfileLinkRefreshHandler from '../api/meoo-ops-mp-talent-profile
 import mpGroupQrUploadInitHandler from '../api/meoo-ops-mp-group-qr-upload-init.ts'
 import mpGroupQrUploadBodyHandler from '../api/meoo-ops-mp-group-qr-upload-body.ts'
 import opsContentImageUploadHandler from '../api/meoo-ops-content-image-upload.ts'
+import meooKbHandler from '../api/meoo-kb.ts'
 import mpRecruitmentAiHandler from '../api/meoo-mp-recruitment-ai.ts'
 import mpRecruitmentVideoComplianceHandler from '../api/meoo-mp-recruitment-video-compliance.ts'
 import mpRecruitmentScriptComplianceHandler from '../api/meoo-mp-recruitment-script-compliance.ts'
@@ -257,6 +258,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-mp-group-qr-upload-init': mpGroupQrUploadInitHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-group-qr-upload-body': mpGroupQrUploadBodyHandler as VercelLikeHandler,
   '/api/meoo-ops-content-image-upload': opsContentImageUploadHandler as VercelLikeHandler,
+  '/api/meoo-kb': meooKbHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-auth': mpAuthHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-calendar-reminder': mpCalendarReminderHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-order-custom-label': mpOrderCustomLabelHandler as VercelLikeHandler,

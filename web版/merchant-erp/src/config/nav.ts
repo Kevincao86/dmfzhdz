@@ -4,6 +4,7 @@ import { PARTNER_STORE_NAV_LABEL } from '../lib/partnerEditionConfig'
 import {
   Bot,
   Briefcase,
+  BookOpen,
   Home,
   Megaphone,
   Package,
@@ -27,6 +28,7 @@ export type NavItem = {
 export const NAV_ITEMS: NavItem[] = [
   { path: '/home', label: '首页', icon: Home },
   { path: '/ai-agent', label: 'AI 智能体', icon: Bot },
+  { path: '/knowledge-base', label: '我的知识库', icon: BookOpen },
   {
     path: '/store',
     label: '店铺',

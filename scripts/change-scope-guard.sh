@@ -45,6 +45,7 @@ list_scopes() {
   regional_partner     区域服务商（城市代理门户 + 运营台开账号）
   mp_pr_orphan_delete  我的发单 orphan 误删（includePrOwned 空列表剪枝）
   mp_recruit_no_drop   招募单禁止 slice(200) 丢单 + 备份复原
+  knowledge_base       知识库（运营全局 + 商家/FWS 租户 + AI 投喂）
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -464,6 +465,29 @@ opsRegistryGatewayShared
 opsRegistrySupabaseDispatch
 registrySnapshotPgAppend
 商家管理后台/src/ops/opsRegistrySupabaseDispatch
+change-scope-guard
+PAT
+      ;;
+    knowledge_base)
+      cat <<'PAT'
+knowledge_base
+knowledgeBase
+KnowledgeBase
+OpsKnowledgeBase
+meoo-kb
+meooAiChatPrepare
+opsNavConfig
+opsStaffAuth
+opsKnowledgeBaseApi
+knowledgeBaseTypes
+knowledgeBaseApi
+KnowledgeBasePage
+20260728100000_knowledge_base
+ecs-apply-knowledge-base
+ecs-auth-api-server
+商家管理后台/src/App.tsx
+web版/merchant-erp/src/App.tsx
+web版/merchant-erp/src/config/nav.ts
 change-scope-guard
 PAT
       ;;

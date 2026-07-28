@@ -20,6 +20,7 @@ import OpsMpMembershipFinancePage from './ops/pages/OpsMpMembershipFinancePage'
 import OpsMpMembershipStatusPage from './ops/pages/OpsMpMembershipStatusPage'
 import OpsSupportHubPage from './ops/pages/OpsSupportHubPage'
 import OpsHelpManualPage from './ops/pages/OpsHelpManualPage'
+import OpsKnowledgeBasePage from './ops/pages/OpsKnowledgeBasePage'
 import OpsTeamIntroPage from './ops/pages/OpsTeamIntroPage'
 import OpsPlatformDecorPage from './ops/pages/OpsPlatformDecorPage'
 import OpsDistributionPage from './ops/pages/OpsDistributionPage'
@@ -66,6 +67,7 @@ export default function App() {
           <Route path="support" element={<OpsSupportHubPage />} />
           <Route path="support-mp" element={<Navigate to="/support?channel=mp" replace />} />
           <Route path="help-manual" element={<OpsHelpManualPage />} />
+          <Route path="knowledge-base" element={<OpsKnowledgeBasePage />} />
           <Route path="help-manual/partner" element={<Navigate to="/help-manual?edition=partner" replace />} />
           <Route path="help-manual/fulfillment" element={<Navigate to="/help-manual?edition=fulfillment" replace />} />
           <Route path="help-manual/mp" element={<Navigate to="/help-manual?edition=mp" replace />} />
