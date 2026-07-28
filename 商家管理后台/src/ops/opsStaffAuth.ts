@@ -55,6 +55,7 @@ export const OPS_PERMISSION_MODULES = [
     pathPrefix: '/support-mp',
   },
   { key: 'help_manual', label: '帮助手册管理', pathPrefix: '/help-manual' },
+  { key: 'knowledge_base', label: '知识库', pathPrefix: '/knowledge-base' },
   { key: 'platform_decor', label: '平台装修（海报/广告位）', pathPrefix: '/platform-decor' },
   { key: 'team_intro', label: '团队介绍', pathPrefix: '/team-intro' },
 ] as const

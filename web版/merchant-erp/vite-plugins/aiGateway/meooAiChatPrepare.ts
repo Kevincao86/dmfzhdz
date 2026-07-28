@@ -9,6 +9,10 @@ import { verifyBearerJwt } from './authSupabase.js'
 import { verifyMpSessionToken } from './authMpSession.js'
 import { assertAiChatAccess } from '../tenantMembershipCore.js'
 import { buildServerMerchantIntelContext } from '../merchantIntelServerCore.js'
+import {
+  formatKbHitsForPrompt,
+  searchKbChunks,
+} from '../knowledgeBaseCore.js'
 
 const ALLOWED = new Set<string>(['tokenmix', 'deepseek', 'kimi', 'minimax', 'qwen', 'doubao'])
 
@@ -144,6 +148,32 @@ export async function prepareMeooAiChat(
       }
     } catch {
       /* 情报注入失败不阻断对话 */
+    }
+  }
+
+  // 知识库片段投喂（关键词检索 topK；失败不阻断）
+  const clientHasKb = messagesWithIntel.some(
+    (m) => m.role === 'system' && /【知识库片段】/.test(m.content),
+  )
+  const tenantIdForKb = usageCtx?.tenantId?.trim() || ''
+  if (!clientHasKb && tenantIdForKb) {
+    try {
+      const lastUser = [...parsed.messages].reverse().find((m) => m.role === 'user')
+      const q = typeof lastUser?.content === 'string' ? lastUser.content.trim() : ''
+      if (q.length >= 2) {
+        const hits = await searchKbChunks({
+          query: q,
+          mode: 'tenant',
+          tenantId: tenantIdForKb,
+          topK: 5,
+        })
+        const kbBlock = formatKbHitsForPrompt(hits)
+        if (kbBlock) {
+          messagesWithIntel = [{ role: 'system', content: kbBlock }, ...messagesWithIntel]
+        }
+      }
+    } catch {
+      /* 知识库注入失败不阻断对话 */
     }
   }
 

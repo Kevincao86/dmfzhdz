@@ -19,6 +19,7 @@ import {
   UserSearch,
   Users,
   Wallet,
+  Brain,
 } from 'lucide-react'
 import type { OpsPermissionKey } from './opsStaffAuth'
 
@@ -108,6 +109,13 @@ export const OPS_NAV_GROUPS: OpsNavGroup[] = [
           { kind: 'leaf', to: '/help-manual?edition=fulfillment', label: '履约版', icon: BookOpen, permission: 'help_manual' },
           { kind: 'leaf', to: '/help-manual?edition=mp', label: '小程序', icon: Smartphone, permission: 'help_manual' },
         ],
+      },
+      {
+        kind: 'leaf',
+        to: '/knowledge-base',
+        label: '知识库',
+        icon: Brain,
+        permission: 'knowledge_base',
       },
     ],
   },
