@@ -1,7 +1,7 @@
 /** 运营台知识库 API */
 import { opsErpApiUrl } from '../lib/opsErpApiBase'
 import { readOpsSession } from './opsStaffAuth'
-import type { KbDocument, KbVisibility } from '../../meooRegistryShared/knowledgeBaseTypes'
+import type { KbDocument, KbVisibility } from '../meooRegistryShared/knowledgeBaseTypes'
 
 export type { KbDocument, KbVisibility }
 
