@@ -469,10 +469,17 @@ function rebuildColumnsForSettings(columns, visitDates, shareTable, mealCount) {
   if (shareTable) {
     next = trimTablesToGlobalMax(next, Math.max(1, mealCount))
   } else {
-    next = next.map((col) => ({
-      ...col,
-      tables: col.tables.length > 1 ? [col.tables[0]] : col.tables,
-    }))
+    // 非拼桌：每个时段必须有且仅有 1 个「单独探店」位，否则无法安排
+    next = next.map((col) => {
+      const tables = col.tables || []
+      if (!tables.length) {
+        return {
+          ...col,
+          tables: [{ id: `t1-${col.dateId}-${col.slotId}`, talentIds: [] }],
+        }
+      }
+      return { ...col, tables: [tables[0]] }
+    })
   }
   return next
 }
@@ -604,11 +611,19 @@ function normalizeScheduleRowsToPlan(rows, visitDates, visitSlots) {
 function applyScheduleRowsToBoard(columns, visitDates, rows, opts) {
   const shareTable = opts.shareTable !== false
   const cap = capTableSize(shareTable, opts.tableSize)
-  const maxTotal = shareTable ? Math.max(1, Number(opts.mealCount) || 1) : 1
+  const maxTotal = shareTable ? Math.max(1, Number(opts.mealCount) || 1) : Number.MAX_SAFE_INTEGER
   let next = (columns || []).map((col) => ({
     ...col,
     tables: (col.tables || []).map((t) => ({ ...t, talentIds: [] })),
   }))
+  // 非拼桌：保证每时段有单独探店位，避免 AI/落盘后无桌可排
+  if (!shareTable) {
+    next = next.map((col) =>
+      (col.tables || []).length
+        ? { ...col, tables: [col.tables[0]] }
+        : { ...col, tables: [{ id: `t1-${col.dateId}-${col.slotId}`, talentIds: [] }] },
+    )
+  }
   for (let i = 0; i < (rows || []).length; i++) {
     const row = rows[i]
     const applicantId = String(row.applicantId || '').trim()
@@ -639,6 +654,10 @@ function applyScheduleRowsToBoard(columns, visitDates, rows, opts) {
       col.tables = [...(col.tables || []), { id: `t-${Date.now()}-${applicantId}`, talentIds: [applicantId] }]
       continue
     }
+    if (!shareTable && !(col.tables || []).length) {
+      col.tables = [{ id: `t-${Date.now()}-${applicantId}`, talentIds: [applicantId] }]
+      continue
+    }
     for (let ti = 0; ti < (col.tables || []).length; ti++) {
       const table = col.tables[ti]
       if ((table.talentIds || []).length < cap) {
@@ -647,7 +666,7 @@ function applyScheduleRowsToBoard(columns, visitDates, rows, opts) {
       }
     }
   }
-  return trimTablesToGlobalMax(next, maxTotal)
+  return shareTable ? trimTablesToGlobalMax(next, maxTotal) : next
 }
 
 module.exports = {

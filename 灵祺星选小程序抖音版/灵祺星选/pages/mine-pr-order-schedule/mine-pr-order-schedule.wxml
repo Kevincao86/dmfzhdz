@@ -31,6 +31,21 @@
         </view>
         <view class="sch-toolbar">
           <button wx:if="{{phase === 'board'}}" class="sch-tool-btn" size="mini" plain bindtap="onExportSchedule">下载排期明细</button>
+          <button
+            wx:if="{{phase === 'board' && !orderGroupChatActive}}"
+            class="sch-tool-btn"
+            size="mini"
+            plain
+            loading="{{orderGroupChatCreating}}"
+            bindtap="onConfirmCreateOrderGroupChat"
+          >一键拉群</button>
+          <button
+            wx:if="{{phase === 'board' && orderGroupChatActive}}"
+            class="sch-tool-btn"
+            size="mini"
+            plain
+            bindtap="onEnterOrderGroupChat"
+          >{{orderGroupChatClosed ? '查看商单群' : '进入商单群'}}</button>
           <block wx:if="{{!isReview && phase === 'board'}}">
             <button class="sch-tool-btn {{mode === 'manual' ? 'sch-tool-btn--on' : ''}}" size="mini" plain bindtap="onModeManual">手动排期</button>
             <button class="sch-tool-btn {{mode === 'ai' ? 'sch-tool-btn--on' : ''}}" size="mini" plain bindtap="onModeAi">AI 智能排期</button>

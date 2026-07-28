@@ -15,7 +15,7 @@
     <button wx:if="{{invitePhaseFinalized}}" class="tgt-man-btn tgt-man-btn--primary" bindtap="onGoSchedule">进入排期</button>
   </view>
 
-  <view class="tgt-man-section" wx:if="{{stats.accepted > 0 && !invitePhaseFinalized}}">
+  <view class="tgt-man-section" wx:if="{{stats.accepted > 0}}">
     <text class="tgt-man-section__title">入群协作</text>
     <view class="tgt-man-mode__opts">
       <view
@@ -53,11 +53,12 @@
       </view>
     </view>
     <button
+      wx:if="{{!invitePhaseFinalized}}"
       class="tgt-man-btn tgt-man-btn--confirm"
       loading="{{confirmingPhase}}"
       bindtap="onConfirmInvitePhase"
     >确认完成邀约并进入待排期</button>
-    <text class="tgt-man-hint">确认后未响应邀约将过期，后续流程与普通招募一致</text>
+    <text class="tgt-man-hint" wx:if="{{!invitePhaseFinalized}}">确认后未响应邀约将过期，后续流程与普通招募一致</text>
   </view>
 
   <view class="tgt-man-section" wx:if="{{acceptedRows.length}}">
