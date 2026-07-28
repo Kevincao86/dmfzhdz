@@ -146,15 +146,34 @@ function isOpsBroadcastPopupDismissed(row) {
   return !!getHandledAction(row)
 }
 
+function noticeTimeMs(row) {
+  if (!row || typeof row !== 'object') return 0
+  const rawTs = row.ts != null ? Number(row.ts) : NaN
+  if (Number.isFinite(rawTs) && rawTs > 0) return rawTs
+  const raw = String(row.createdAt || row.time || row.at || '').trim()
+  if (!raw) return 0
+  if (/^\d{10,13}$/.test(raw)) {
+    const n = Number(raw)
+    return n < 1e12 ? n * 1000 : n
+  }
+  const t = Date.parse(raw.replace(/-/g, '/').replace(/\./g, '/'))
+  return Number.isFinite(t) ? t : 0
+}
+
 function sortRows(rows) {
   const list = (rows || []).slice()
   list.sort((a, b) => {
     const pa = isPinned(a) ? 1 : 0
     const pb = isPinned(b) ? 1 : 0
     if (pa !== pb) return pb - pa
-    const ta = String(a.createdAt || '')
-    const tb = String(b.createdAt || '')
-    return tb.localeCompare(ta)
+    // 未读优先，其次时间最近
+    const ua = a && a.read ? 0 : 1
+    const ub = b && b.read ? 0 : 1
+    if (ua !== ub) return ub - ua
+    const ta = noticeTimeMs(a)
+    const tb = noticeTimeMs(b)
+    if (ta !== tb) return tb - ta
+    return String((b && b.id) || '').localeCompare(String((a && a.id) || ''))
   })
   return list
 }

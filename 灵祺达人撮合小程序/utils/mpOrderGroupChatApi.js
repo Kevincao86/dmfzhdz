@@ -136,21 +136,29 @@ function lastMessagePreview(group) {
 
 function mapGroupSessions(groups) {
   const myKey = myParticipantKey()
-  return (groups || []).map((g) => {
-    const list = g && Array.isArray(g.messages) ? g.messages : []
-    const last = list.length ? list[list.length - 1] : null
-    const ts = (last && last.ts) || Date.parse(String(g.lastMessageAt || g.createdAt || '').replace(/-/g, '/')) || 0
-    return {
-      id: g.id || g.mpOrderId,
-      mpOrderId: g.mpOrderId,
-      title: g.title || '商单群',
-      memberCount: (g.memberParticipantKeys || []).length,
-      lastText: lastMessagePreview(g),
-      timeText: formatTime(ts),
-      closed: g.status === 'closed',
-      unread: groupReadState.unreadInGroup(g, myKey),
-    }
-  })
+  return (groups || [])
+    .map((g) => {
+      const list = g && Array.isArray(g.messages) ? g.messages : []
+      const last = list.length ? list[list.length - 1] : null
+      const ts = (last && last.ts) || Date.parse(String(g.lastMessageAt || g.createdAt || '').replace(/-/g, '/')) || 0
+      return {
+        id: g.id || g.mpOrderId,
+        mpOrderId: g.mpOrderId,
+        title: g.title || '商单群',
+        memberCount: (g.memberParticipantKeys || []).length,
+        lastText: lastMessagePreview(g),
+        lastTs: Number(ts) || 0,
+        timeText: formatTime(ts),
+        closed: g.status === 'closed',
+        unread: groupReadState.unreadInGroup(g, myKey),
+      }
+    })
+    .sort((a, b) => {
+      const ua = Number(a.unread || 0) > 0 ? 1 : 0
+      const ub = Number(b.unread || 0) > 0 ? 1 : 0
+      if (ua !== ub) return ub - ua
+      return Number(b.lastTs || 0) - Number(a.lastTs || 0)
+    })
 }
 
 module.exports = {

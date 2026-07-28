@@ -29,25 +29,24 @@ function enrichAll(rows) {
 }
 
 function buildSections(rows, activeTab) {
-  const filtered = inboxCatalog.filterByTab(rows, activeTab)
+  const filtered = inboxNoticeState.sortRows(inboxCatalog.filterByTab(rows, activeTab))
   if (activeTab !== 'all') {
     if (!filtered.length) return []
     const title = (TABS.find((t) => t.id === activeTab) || {}).label || '通知'
     return [{ id: activeTab, title, rows: filtered }]
   }
   const pinned = filtered.filter((r) => r.pinned)
-  const rest = filtered.filter((r) => !r.pinned)
+  const unread = filtered.filter((r) => !r.pinned && !r.read)
+  const read = filtered.filter((r) => !r.pinned && r.read)
   const sections = []
   if (pinned.length) {
     sections.push({ id: 'pinned', title: SECTION_META.pinned.title, rows: pinned })
   }
-  const kinds = ['selection', 'order', 'business', 'system']
-  for (let i = 0; i < kinds.length; i++) {
-    const kind = kinds[i]
-    const slice = rest.filter((r) => r.noticeKind === kind)
-    if (slice.length) {
-      sections.push({ id: kind, title: SECTION_META[kind].title, rows: slice })
-    }
+  if (unread.length) {
+    sections.push({ id: 'unread', title: '未读', rows: unread })
+  }
+  if (read.length) {
+    sections.push({ id: 'read', title: '已读', rows: read })
   }
   return sections
 }
@@ -74,12 +73,10 @@ async function fetchNotificationRows() {
         rows = enrichAll(messagesStore.mergeRegistryInboxForTalent(reg, member))
       }
     } catch (_) {
-      rows = enrichAll(inboxNoticeState.sortRows(rows))
+      /* keep local rows */
     }
-  } else {
-    rows = enrichAll(inboxNoticeState.sortRows(rows))
   }
-  return rows
+  return enrichAll(inboxNoticeState.sortRows(rows))
 }
 
 function patchFromRows(rows, activeTab) {
