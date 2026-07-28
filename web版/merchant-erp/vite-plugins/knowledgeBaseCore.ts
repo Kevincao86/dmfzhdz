@@ -467,7 +467,7 @@ export async function searchKbChunks(params: {
   return withClient(async (c) => {
     const likeClauses: string[] = []
     const values: unknown[] = []
-    likeTerms.forEach((term, idx) => {
+    likeTerms.forEach((term) => {
       values.push(`%${term}%`)
       likeClauses.push(`c.content ilike $${values.length}`)
     })
