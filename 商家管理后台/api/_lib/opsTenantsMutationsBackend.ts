@@ -82,7 +82,7 @@ export async function opsTenantPatchAdmin(
   // 运营改档后立即按新档补发/补差当月套餐桶积分（避免「已是 Plus 但积分仍是免费档余额」）
   if (planChanged) {
     try {
-      await ensureErpMonthlyGiftPointsGranted(admin, id, {
+      await ensureErpMonthlyGiftPointsGranted(admin as never, id, {
         plan: normalizeMembershipPlan(String(body.membershipPlan)),
       })
     } catch {

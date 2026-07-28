@@ -89,13 +89,6 @@ function normalizePhone(phone: string): string {
   return phone.replace(/\D/g, '').slice(0, 11)
 }
 
-function parsePermissions(raw: unknown, role: OpsStaffRole): OpsPermissionKey[] {
-  const parsed = parsePermissionsPayload(raw, role, allPermissionKeys())
-  return parsed.legacyKeys.filter((p): p is OpsPermissionKey =>
-    OPS_PERMISSION_MODULE_KEYS.includes(p as OpsPermissionKey),
-  )
-}
-
 function parsePermissionsFull(raw: unknown, role: OpsStaffRole) {
   const all = allPermissionKeys()
   const parsed = parsePermissionsPayload(raw, role, all)

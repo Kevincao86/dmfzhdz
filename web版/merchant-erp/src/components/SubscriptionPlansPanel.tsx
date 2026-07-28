@@ -127,16 +127,21 @@ function buildCardsFromTiers(tiers: EffectiveSubscriptionTier[]): SubscriptionPl
   ]
 }
 
-/** 兼容旧导出：平台默认静态卡片（未拉到动态价前的占位） */
-export const SUBSCRIPTION_PLAN_CARDS = buildCardsFromTiers(
-  SUBSCRIPTION_TIERS.map((t) => ({
+function platformTiersAsEffective(): EffectiveSubscriptionTier[] {
+  return SUBSCRIPTION_TIERS.filter(
+    (t): t is (typeof SUBSCRIPTION_TIERS)[number] & { plan: 'member' | 'member_plus' } =>
+      t.plan === 'member' || t.plan === 'member_plus',
+  ).map((t) => ({
     label: t.label,
     yuan: t.yuan,
     cents: t.cents,
     plan: t.plan,
     periodDays: t.cents === 46800 || t.cents === 168800 ? 90 : 30,
-  })),
-)
+  }))
+}
+
+/** 兼容旧导出：平台默认静态卡片（未拉到动态价前的占位） */
+export const SUBSCRIPTION_PLAN_CARDS = buildCardsFromTiers(platformTiersAsEffective())
 
 export type SubscriptionPlansPanelProps = {
   currentPlan: MembershipPlan
@@ -161,30 +166,11 @@ export default function SubscriptionPlansPanel({
         setPricingCity(r.pricingCity)
       })
       .catch(() => {
-        setTiers(
-          SUBSCRIPTION_TIERS.map((t) => ({
-            label: t.label,
-            yuan: t.yuan,
-            cents: t.cents,
-            plan: t.plan,
-            periodDays: t.cents === 46800 || t.cents === 168800 ? 90 : 30,
-          })),
-        )
+        setTiers(platformTiersAsEffective())
       })
   }, [])
 
-  const cards = useMemo(() => {
-    const list =
-      tiers ??
-      SUBSCRIPTION_TIERS.map((t) => ({
-        label: t.label,
-        yuan: t.yuan,
-        cents: t.cents,
-        plan: t.plan,
-        periodDays: (t.cents === 46800 || t.cents === 168800 ? 90 : 30) as 30 | 90,
-      }))
-    return buildCardsFromTiers(list)
-  }, [tiers])
+  const cards = useMemo(() => buildCardsFromTiers(tiers ?? platformTiersAsEffective()), [tiers])
 
   const paidCards = useMemo(() => cards.filter((c) => c.plan !== 'free'), [cards])
 

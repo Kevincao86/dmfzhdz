@@ -681,7 +681,7 @@ export async function createPartnerScopedTenant(
   // 与运营台改档同源：非免费档立即补发当月套餐积分
   if (membershipPlan !== 'free') {
     try {
-      await ensureErpMonthlyGiftPointsGranted(admin, tenantId, {
+      await ensureErpMonthlyGiftPointsGranted(admin as never, tenantId, {
         plan: normalizeMembershipPlan(membershipPlan),
       })
     } catch {
@@ -862,7 +862,7 @@ export async function loadPartnerMerchants(
 
 export async function searchTenantsForPartnerClaim(
   admin: SupabaseClient,
-  partner: RegionalPartnerPublic,
+  _partner: RegionalPartnerPublic,
   keyword: string,
 ): Promise<TenantAccountRow[]> {
   const q = keyword.trim()
