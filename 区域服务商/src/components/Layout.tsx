@@ -29,7 +29,13 @@ export default function Layout() {
           <p className="mt-1 text-xs text-[var(--muted)]">{session?.companyName || session?.phone}</p>
         </div>
         <nav className="flex flex-1 flex-col gap-1">
-          {NAV.filter((n) => !n.perm || perms.has(n.perm)).map((n) => (
+          {NAV.filter((n) => {
+            if (!n.perm) return true
+            if (perms.has(n.perm)) return true
+            // 存量会话可能无 pricing 字段：有「名下商家」即可进区域定价
+            if (n.perm === 'pricing' && perms.has('merchants')) return true
+            return false
+          }).map((n) => (
             <NavLink
               key={n.to}
               to={n.to}
@@ -63,7 +69,12 @@ export default function Layout() {
 
       <main className="min-w-0 flex-1">
         <div className="mb-4 flex gap-2 overflow-x-auto md:hidden">
-          {NAV.filter((n) => !n.perm || perms.has(n.perm)).map((n) => (
+          {NAV.filter((n) => {
+            if (!n.perm) return true
+            if (perms.has(n.perm)) return true
+            if (n.perm === 'pricing' && perms.has('merchants')) return true
+            return false
+          }).map((n) => (
             <NavLink
               key={n.to}
               to={n.to}
