@@ -18,6 +18,13 @@ function findIndex(list, val, fallback) {
   return i >= 0 ? i : fallback != null ? fallback : 0
 }
 
+function toIndex(raw, maxExclusive) {
+  const n = Number(raw)
+  const idx = Number.isFinite(n) ? Math.floor(n) : 0
+  if (!(maxExclusive > 0)) return 0
+  return Math.max(0, Math.min(idx, maxExclusive - 1))
+}
+
 function regionFilterLabel(province, city) {
   const p = String(province || ALL_PROV).trim() || ALL_PROV
   const c = String(city || ALL_CITY).trim() || ALL_CITY
@@ -44,34 +51,57 @@ function initRegionFilterState(province, city) {
   }
 }
 
+/**
+ * multiSelector 受控组件：每一列滚动都必须同步 value，
+ * 否则 setData 旧索引会把滚轮强制拉回（表现为「回滚至初始值」）。
+ * 城市列只改 value，禁止重建 range，避免 iOS 整列刷新回弹。
+ */
 function onRegionFilterColumnChange(state, column, value) {
-  if (Number(column) !== 0) return state
-  const idx = Number(value) || 0
-  const provinces = state.regionMultiRange[0] || []
-  const nextProvince = provinces[idx] || ALL_PROV
-  const regionMultiRange = buildMultiRange(nextProvince)
-  return {
-    ...state,
-    regionMultiRange,
-    regionMultiValue: [idx, 0],
+  const col = Number(column)
+  const range = state && state.regionMultiRange
+  const prevVal = Array.isArray(state && state.regionMultiValue)
+    ? state.regionMultiValue
+    : [0, 0]
+  const provCol = (range && range[0]) || []
+  const cityCol = (range && range[1]) || []
+
+  if (col === 0) {
+    const idx = toIndex(value, provCol.length || 1)
+    const nextProvince = provCol[idx] || ALL_PROV
+    const regionMultiRange = buildMultiRange(nextProvince)
+    return {
+      regionMultiRange,
+      regionMultiValue: [idx, 0],
+    }
   }
+
+  if (col === 1) {
+    const idx = toIndex(value, cityCol.length || 1)
+    const pi = toIndex(prevVal[0], provCol.length || 1)
+    return {
+      regionMultiValue: [pi, idx],
+    }
+  }
+
+  return null
 }
 
 function onRegionFilterChange(state, values) {
-  const pi = Number(values[0]) || 0
-  const ci = Number(values[1]) || 0
-  const provinces = state.regionMultiRange[0] || []
+  const raw = Array.isArray(values) ? values : [0, 0]
+  const provinces = (state && state.regionMultiRange && state.regionMultiRange[0]) || []
+  const pi = toIndex(raw[0], provinces.length || 1)
   const nextProvince = provinces[pi] || ALL_PROV
   const regionMultiRange = buildMultiRange(nextProvince)
   const cities = regionMultiRange[1] || []
+  const ci = toIndex(raw[1], cities.length || 1)
   const filterProvince = nextProvince
-  const filterCity = cities[Math.min(ci, cities.length - 1)] || ALL_CITY
+  const filterCity = cities[ci] || ALL_CITY
   return {
     filterProvince,
     filterCity,
     regionFilterLabel: regionFilterLabel(filterProvince, filterCity),
     regionMultiRange,
-    regionMultiValue: [pi, Math.min(ci, cities.length - 1)],
+    regionMultiValue: [pi, ci],
   }
 }
 

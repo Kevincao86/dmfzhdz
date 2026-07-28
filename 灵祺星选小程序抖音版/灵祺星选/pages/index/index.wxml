@@ -102,6 +102,7 @@
             value="{{regionMultiValue}}"
             bindcolumnchange="onRegionFilterColumnChange"
             bindchange="onRegionFilterChange"
+            bindcancel="onRegionFilterCancel"
           >
             <view class="home-filter-v1__chip {{filterProvince !== '全部' || filterCity !== '全部' ? 'home-filter-v1__chip--on' : ''}}">
               {{regionFilterLabel}} ▾

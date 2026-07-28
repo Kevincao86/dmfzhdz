@@ -243,6 +243,7 @@
           value="{{regionMultiValue}}"
           bindcolumnchange="onRegionFilterColumnChange"
           bindchange="onRegionFilterChange"
+          bindcancel="onRegionFilterCancel"
         >
           <view class="rec-filter-v2__picker">
             <text class="rec-filter-v2__label {{filterProvince !== '全部' || filterCity !== '全部' ? 'rec-filter-v2__label--on' : ''}}">{{regionFilterLabel}}</text>
