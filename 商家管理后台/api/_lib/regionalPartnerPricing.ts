@@ -1,7 +1,6 @@
 /**
  * 区域服务商订阅定价：平台底价 + 城市加价覆盖 + 租户有效价解析
  */
-import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   cityLabelVariants,
   normalizeCityLabel,
@@ -10,6 +9,10 @@ import {
   type RegionalCity,
   type RegionalPartnerPublic,
 } from './regionalPartnersBackend.js'
+
+/** 避免跨包 SupabaseClient 泛型不兼容 */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Db = any
 
 export type SubscriptionTierKey =
   | 'member_monthly'
@@ -188,7 +191,7 @@ export function readPricingFromRow(raw: unknown): PartnerSubscriptionPricingMap 
 }
 
 export async function loadPartnerSubscriptionPricing(
-  admin: SupabaseClient,
+  admin: Db,
   partnerId: string,
 ): Promise<PartnerSubscriptionPricingMap> {
   const { data } = await admin
@@ -200,7 +203,7 @@ export async function loadPartnerSubscriptionPricing(
 }
 
 export async function savePartnerSubscriptionPricing(
-  admin: SupabaseClient,
+  admin: Db,
   partner: RegionalPartnerPublic,
   rawPricing: unknown,
 ): Promise<
@@ -233,7 +236,7 @@ type PartnerLite = {
 }
 
 async function findActivePartnerForCity(
-  admin: SupabaseClient,
+  admin: Db,
   city: string,
   preferredPartnerId?: string | null,
 ): Promise<PartnerLite | null> {
@@ -265,7 +268,7 @@ async function findActivePartnerForCity(
 }
 
 export async function resolveSubscriptionTiersForTenant(
-  admin: SupabaseClient,
+  admin: Db,
   tenantId: string,
 ): Promise<{
   tiers: ResolvedSubscriptionTier[]

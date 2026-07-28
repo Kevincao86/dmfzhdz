@@ -430,6 +430,7 @@ tenants_register_city
 register_city
 opsStaffAuth
 opsStaffAccountsBackend
+opsTenantsMutationsBackend
 opsNavConfig
 商家管理后台/src/App.tsx
 ecs-auth-api-server
