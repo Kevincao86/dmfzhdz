@@ -206,8 +206,50 @@ export async function lookupSessionByFeishuMsgId(msgId: string): Promise<string 
   if (missingParts.length > 0) return null
 
   const q = new URLSearchParams({
-    or: `(feishu_root_msg_id.eq.${id})`,
+    feishu_root_msg_id: `eq.${id}`,
     select: 'session_id',
+    limit: '1',
+  })
+  const res = await supportRelayAdminFetch(`${supabaseUrl}/rest/v1/support_feishu_thread_map?${q}`, {
+    headers: serviceHeaders(serviceRole),
+  })
+  if (!res.ok) return null
+  const rows = (await res.json()) as Array<{ session_id?: string }>
+  const sid = Array.isArray(rows) ? String(rows[0]?.session_id || '').trim() : ''
+  return sid || null
+}
+
+/** 按群/会话 chat_id 取最近一条映射（未引用回复时兜底） */
+export async function lookupLatestSessionByFeishuChatId(chatId: string): Promise<string | null> {
+  const id = chatId.trim()
+  if (!id) return null
+  const { supabaseUrl, serviceRole, missingParts } = readSupportRelaySupabaseAdminEnv()
+  if (missingParts.length > 0) return null
+
+  const q = new URLSearchParams({
+    feishu_chat_id: `eq.${id}`,
+    select: 'session_id,updated_at',
+    order: 'updated_at.desc',
+    limit: '1',
+  })
+  const res = await supportRelayAdminFetch(`${supabaseUrl}/rest/v1/support_feishu_thread_map?${q}`, {
+    headers: serviceHeaders(serviceRole),
+  })
+  if (!res.ok) return null
+  const rows = (await res.json()) as Array<{ session_id?: string }>
+  const sid = Array.isArray(rows) ? String(rows[0]?.session_id || '').trim() : ''
+  return sid || null
+}
+
+/** 最近 24h 内最新一条映射（单聊误回 / 未引用时最后兜底） */
+export async function lookupLatestFeishuMappedSession(): Promise<string | null> {
+  const { supabaseUrl, serviceRole, missingParts } = readSupportRelaySupabaseAdminEnv()
+  if (missingParts.length > 0) return null
+  const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString()
+  const q = new URLSearchParams({
+    updated_at: `gte.${since}`,
+    select: 'session_id,updated_at',
+    order: 'updated_at.desc',
     limit: '1',
   })
   const res = await supportRelayAdminFetch(`${supabaseUrl}/rest/v1/support_feishu_thread_map?${q}`, {
