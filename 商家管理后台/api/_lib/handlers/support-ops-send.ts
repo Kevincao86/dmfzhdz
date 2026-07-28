@@ -2,11 +2,7 @@
  * 运营台通过 HTTP 发送客服回复，写入 ECS Postgres support_relay_messages（service_role）。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import {
-  readSupportRelaySupabaseAdminEnv,
-  supportRelayAdminFetch,
-  supportRelaySupabaseEnvConfigureHint,
-} from '../../../../web版/merchant-erp/vite-plugins/merchantSupabaseAdminEnv.js'
+import { insertSupportOpsReply } from '../supportOpsSendCore.js'
 
 export const config = { maxDuration: 30 }
 
@@ -48,17 +44,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  const { supabaseUrl, serviceRole, missingParts } = readSupportRelaySupabaseAdminEnv()
-  if (missingParts.length > 0) {
-    sendJson(res, 503, {
-      ok: false,
-      error: 'supabase_service_not_configured',
-      missing: missingParts,
-      hint: supportRelaySupabaseEnvConfigureHint(missingParts),
-    })
-    return
-  }
-
   let body: { sessionId?: string; text?: string; id?: string }
   try {
     body = (typeof req.body === 'object' && req.body !== null ? req.body : JSON.parse(String(req.body ?? '{}'))) as {
@@ -71,114 +56,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  const sessionId = typeof body.sessionId === 'string' ? body.sessionId.trim() : ''
-  const text = typeof body.text === 'string' ? body.text.trim() : ''
-  const id = typeof body.id === 'string' ? body.id.trim() : ''
-  if (!sessionId || !text || !id) {
-    sendJson(res, 400, { ok: false, error: 'missing_fields' })
+  const result = await insertSupportOpsReply({
+    sessionId: typeof body.sessionId === 'string' ? body.sessionId : '',
+    text: typeof body.text === 'string' ? body.text : '',
+    id: typeof body.id === 'string' ? body.id : '',
+  })
+
+  if (!result.ok) {
+    sendJson(res, result.status, {
+      ok: false,
+      error: result.error,
+      detail: result.detail,
+      missing: result.missing,
+      hint: result.hint,
+      supabaseHost: result.supabaseHost,
+    })
     return
   }
 
-  /** 继承会话已有 guest_fingerprint，避免旧 RPC 按行过滤时丢掉 ops 回复 */
-  let guestFingerprint: string | null = null
-  try {
-    const fpQ = new URLSearchParams({
-      session_id: `eq.${sessionId}`,
-      guest_fingerprint: 'not.is.null',
-      select: 'guest_fingerprint',
-      order: 'ts.desc',
-      limit: '1',
-    })
-    const fpRes = await supportRelayAdminFetch(
-      `${supabaseUrl}/rest/v1/support_relay_messages?${fpQ}`,
-      {
-        headers: {
-          apikey: serviceRole,
-          Authorization: `Bearer ${serviceRole}`,
-        },
-      },
-    )
-    if (fpRes.ok) {
-      const fpRows = (await fpRes.json()) as Array<{ guest_fingerprint?: string }>
-      const hit = Array.isArray(fpRows) ? String(fpRows[0]?.guest_fingerprint || '').trim() : ''
-      if (hit) guestFingerprint = hit
-    }
-  } catch {
-    /* ignore */
-  }
-  if (!guestFingerprint && /^lq-mp[-:]/i.test(sessionId)) {
-    guestFingerprint = `lq-mp:${sessionId.replace(/^lq-mp[-:]/i, '').slice(0, 48)}`
-  }
-
-  const row = {
-    session_id: sessionId,
-    customer_id: null,
-    enterprise_name: null,
-    from_role: 'ops',
-    text,
-    ts: Date.now(),
-    client_msg_id: id,
-    author_user_id: null,
-    guest_fingerprint: guestFingerprint,
-  }
-
-  let supabaseHost = ''
-  try {
-    supabaseHost = new URL(supabaseUrl).host
-  } catch {
-    supabaseHost = supabaseUrl
-  }
-
-  try {
-    const r = await supportRelayAdminFetch(`${supabaseUrl}/rest/v1/support_relay_messages`, {
-      method: 'POST',
-      headers: {
-        apikey: serviceRole,
-        Authorization: `Bearer ${serviceRole}`,
-        'Content-Type': 'application/json',
-        Prefer: 'return=minimal',
-      },
-      body: JSON.stringify(row),
-    })
-
-    if (!r.ok) {
-      const t = await r.text()
-      sendJson(res, 502, {
-        ok: false,
-        error: 'supabase_insert_failed',
-        detail: t.slice(0, 500),
-        supabaseHost,
-      })
-      return
-    }
-
-    const verifyQ = new URLSearchParams({
-      session_id: `eq.${sessionId}`,
-      client_msg_id: `eq.${id}`,
-      select: 'from_role,text,ts,client_msg_id',
-    })
-    const verifyRes = await supportRelayAdminFetch(
-      `${supabaseUrl}/rest/v1/support_relay_messages?${verifyQ}`,
-      {
-        headers: {
-          apikey: serviceRole,
-          Authorization: `Bearer ${serviceRole}`,
-        },
-      },
-    )
-    let verified = false
-    if (verifyRes.ok) {
-      const rows = (await verifyRes.json()) as unknown
-      verified = Array.isArray(rows) && rows.length > 0
-    }
-
-    sendJson(res, 200, { ok: true, supabaseHost, verified })
-  } catch (e) {
-    sendJson(res, 502, {
-      ok: false,
-      error: 'support_send_failed',
-      detail: e instanceof Error ? e.message : String(e),
-      supabaseHost,
-    })
-  }
+  sendJson(res, 200, { ok: true, supabaseHost: result.supabaseHost, verified: result.verified })
 }
