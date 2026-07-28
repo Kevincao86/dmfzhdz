@@ -68,7 +68,7 @@ export default function PricingPage() {
     return forms[activeCity] ?? emptyYuanForm()
   }, [activeCity, forms])
 
-  if (!session?.permissions.includes('pricing')) {
+  if (!session?.permissions.includes('pricing') && !session?.permissions.includes('merchants')) {
     return <Navigate to="/" replace />
   }
 
