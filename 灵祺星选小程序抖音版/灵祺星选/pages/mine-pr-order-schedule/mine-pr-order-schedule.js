@@ -453,7 +453,9 @@ Page({
     const table = target && (target.tables || []).find((t) => t.id === tableId)
     if (!table) return
     if (!(table.talentIds || []).includes(talentId) && (table.talentIds || []).length >= cap) {
-      this.setData({ dropHint: shareTable ? `该桌已满，最多 ${cap} 人` : '单独探店每格仅可 1 人' })
+      this.setData({
+        dropHint: shareTable ? `该桌已满，最多 ${cap} 人` : '此时段安排人数已达上限',
+      })
       return
     }
     this.setData({ dropHint: '' })

@@ -21,6 +21,16 @@ const MSG_TABS = [
   { id: 'group', label: '群聊' },
 ]
 
+function compareSessionsUnreadRecent(a, b) {
+  const ua = Number((a && a.unread) || 0) > 0 ? 1 : 0
+  const ub = Number((b && b.unread) || 0) > 0 ? 1 : 0
+  if (ua !== ub) return ub - ua
+  const ta = Number((a && a.lastTs) || 0)
+  const tb = Number((b && b.lastTs) || 0)
+  if (ta !== tb) return tb - ta
+  return String((b && b.id) || '').localeCompare(String((a && a.id) || ''))
+}
+
 Page({
   behaviors: [require('../../behaviors/identityTheme')],
   data: {
@@ -166,10 +176,12 @@ Page({
     this._registryForChat = reg
     const rows = await chat.listSessionsForMe()
     const me = participant.getCurrentParticipant()
-    const sessions = rows.map((s) => {
-      const authKey = chat.sessionAuthKeyForMe(s, me)
-      return this.mapSession(s, authKey, reg)
-    })
+    const sessions = rows
+      .map((s) => {
+        const authKey = chat.sessionAuthKeyForMe(s, me)
+        return this.mapSession(s, authKey, reg)
+      })
+      .sort(compareSessionsUnreadRecent)
     let unread = 0
     for (let i = 0; i < rows.length; i++) {
       unread += participant.unreadForMe(rows[i], chat.sessionAuthKeyForMe(rows[i], me))
@@ -180,7 +192,9 @@ Page({
   async loadGroupSessions() {
     try {
       const body = await mpOrderGroupChatApi.listMine()
-      const sessions = mpOrderGroupChatApi.mapGroupSessions(body && body.groups)
+      const sessions = (mpOrderGroupChatApi.mapGroupSessions(body && body.groups) || []).sort(
+        compareSessionsUnreadRecent,
+      )
       this.setData({ allGroupSessions: sessions })
     } catch (e) {
       console.warn('[messages] loadGroupSessions', e)
@@ -199,6 +213,7 @@ Page({
       peerId: peer.peerId || '',
       peerAvatar: wxProfileDisplay.sanitizeDisplayAvatar(peer.avatar),
       lastText: s.last_text || '',
+      lastTs: Number(s.last_ts || 0),
       timeText: chat.sessionPreviewTime(s.last_ts),
       unread: participant.unreadForMe(s, myKey),
       talent_key: s.talent_key,
@@ -230,22 +245,24 @@ Page({
     const kw = String(this.data.searchKeyword || '').trim().toLowerCase()
     if (tab === 'group') {
       const pool = this.data.allGroupSessions || []
-      const groupSessions = kw
+      const groupSessions = (kw
         ? pool.filter((s) => {
             const blob = [s.title, s.lastText, s.mpOrderId].join(' ').toLowerCase()
             return blob.includes(kw)
           })
-        : pool
+        : pool.slice()
+      ).sort(compareSessionsUnreadRecent)
       this.setData({ groupSessions })
       return
     }
     const pool = this.data.allSessions || []
-    const sessions = kw
+    const sessions = (kw
       ? pool.filter((s) => {
           const blob = [s.peerName, s.peerId, s.lastText].join(' ').toLowerCase()
           return blob.includes(kw)
         })
-      : pool
+      : pool.slice()
+    ).sort(compareSessionsUnreadRecent)
     this.setData({ sessions })
   },
   onSearchInput(e) {

@@ -485,7 +485,9 @@ function rebuildColumnsForSettings(columns, visitDates, shareTable, mealCount) {
 }
 
 function capTableSize(shareTable, tableSize) {
-  return shareTable ? Math.max(1, tableSize) : 1
+  if (shareTable) return Math.max(1, Number(tableSize) || 4)
+  // 非拼桌：同时间段不限制达人人数（软上限仅防异常膨胀）
+  return 99
 }
 
 function buildBoardView(visitDates, columns, pool, shareTable, tableSize, mealCount) {
@@ -516,6 +518,7 @@ function buildBoardView(visitDates, columns, pool, shareTable, tableSize, mealCo
           tableId: t.id,
           tableLabel: shareTable ? `第${ti + 1}桌` : '单独探店',
           cap,
+          uncapped: !shareTable,
           count: (t.talentIds || []).length,
           talents: (t.talentIds || []).map((tid) => {
             const p = (pool || []).find((x) => x.id === tid)

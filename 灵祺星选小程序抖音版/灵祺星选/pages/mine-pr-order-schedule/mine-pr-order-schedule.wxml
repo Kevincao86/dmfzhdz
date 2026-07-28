@@ -127,7 +127,8 @@
             </view>
             <view wx:for="{{slot.tables}}" wx:for-item="table" wx:key="tableId" class="sch-table" wx:if="{{phase === 'board'}}">
               <view class="sch-table__head">
-                <text>{{slot.label}} · {{table.tableLabel}}（{{table.count}}/{{table.cap}} 人）</text>
+                <text wx:if="{{shareTable}}">{{slot.label}} · {{table.tableLabel}}（{{table.count}}/{{table.cap}} 人）</text>
+                <text wx:else>{{slot.label}} · {{table.tableLabel}}（{{table.count}} 人）</text>
                 <text wx:if="{{shareTable && !table.count}}" class="sch-remove" data-day-id="{{day.dayId}}" data-slot-id="{{slot.slotId}}" data-table-id="{{table.tableId}}" catchtap="onRemoveTable">移除此桌</text>
               </view>
               <view class="sch-talents">
