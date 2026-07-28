@@ -173,7 +173,14 @@ Page({
         pool,
         checkInRows,
       })
-      this.refreshBoardView()
+      // 确保非拼桌时每个时段有单独探店位（取消勾选拼桌后可安排）
+      this.applyBoardState({
+        visitDates: init.visitDates,
+        columns: init.columns,
+        shareTable: init.shareTable,
+        mealCount: init.mealCount,
+        tableSize: init.tableSize,
+      })
       void this.syncOrderGroupChatState()
     } catch (e) {
       this.setData({ loading: false, err: String(e && e.message ? e.message : e).slice(0, 80) })
@@ -525,6 +532,19 @@ Page({
             ? { ...c, tables: [...(c.tables || []), { id: `t-${Date.now()}`, talentIds: [] }] }
             : c,
         )
+        this.applyBoardState({ columns })
+        slots = collectSlots(columns)
+      }
+    }
+    // 非拼桌：取消勾选后时段可能仍是空桌列表，补齐「单独探店」位
+    if (!slots.length && !shareTable) {
+      let changed = false
+      columns = columns.map((c) => {
+        if ((c.tables || []).length) return c
+        changed = true
+        return { ...c, tables: [{ id: `t1-${c.dateId}-${c.slotId}`, talentIds: [] }] }
+      })
+      if (changed) {
         this.applyBoardState({ columns })
         slots = collectSlots(columns)
       }

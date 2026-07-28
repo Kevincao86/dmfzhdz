@@ -93,24 +93,46 @@ function findMatchingLevelTier(meta, applicant) {
   return null
 }
 
+function parseFansCountToken(raw) {
+  const s = String(raw || '').trim()
+  if (!s) return 0
+  const wan = s.match(/(\d+(?:\.\d+)?)\s*万/)
+  if (wan) return Math.floor(Number(wan[1]) * 10000)
+  const n = Number(String(s).replace(/[^\d.]/g, ''))
+  return Number.isFinite(n) ? n : 0
+}
+
 function fansInRange(fans, range) {
   const r = String(range || '').trim()
   if (!r) return false
   if (r.includes('以下')) {
-    const m = r.match(/(\d+)/)
-    if (m && fans < Number(m[1])) return true
+    const token = r.replace(/以下.*$/, '').trim()
+    const limit =
+      /万/.test(token) || /万/.test(r)
+        ? parseFansCountToken(token.includes('万') ? token : `${token}万`)
+        : parseFansCountToken(token)
+    return fans < limit
   }
-  const m = r.match(/(\d+)\s*[-~～]\s*(\d+)/)
-  if (m) {
-    const lo = Number(m[1])
-    const hi = Number(m[2])
+  // 「1-5万」「10-50万」：区间两端共用「万」
+  const rangeWan = r.match(/^([\d.]+)\s*[-~～]\s*([\d.]+)\s*万/)
+  if (rangeWan) {
+    const lo = Math.floor(Number(rangeWan[1]) * 10000)
+    const hi = Math.floor(Number(rangeWan[2]) * 10000)
     return fans >= lo && fans <= hi
   }
-  const ge = r.match(/(?:≥|以上)\s*(\d+)/)
-  if (ge && fans >= Number(ge[1])) return true
-  if (r.includes('以上')) {
-    const m2 = r.match(/(\d+)/)
-    if (m2 && fans >= Number(m2[1])) return true
+  const m = r.match(/(\d+(?:\.\d+)?\s*万|\d+)\s*[-~～]\s*(\d+(?:\.\d+)?\s*万|\d+)/)
+  if (m) {
+    const lo = parseFansCountToken(m[1])
+    const hi = parseFansCountToken(m[2])
+    return fans >= lo && fans <= hi
+  }
+  if (r.includes('以上') || r.includes('≥')) {
+    const token = r.replace(/(?:以上|≥).*$/, '').trim()
+    const limit =
+      /万/.test(token) || /万/.test(r)
+        ? parseFansCountToken(token.includes('万') ? token : `${token}万`)
+        : parseFansCountToken(token)
+    return fans >= limit
   }
   return false
 }
