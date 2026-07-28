@@ -41,13 +41,17 @@ run_on_light() {
     echo "缺少迁移文件: $mig"
     exit 1
   fi
-  sudo -u postgres psql -h 127.0.0.1 -p 5433 -d postgres -v ON_ERROR_STOP=1 -f "$mig"
+  psql -h 127.0.0.1 -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 -f "$mig"
   echo "=== 校验表 ==="
-  sudo -u postgres psql -h 127.0.0.1 -p 5433 -d postgres -c "
+  psql -h 127.0.0.1 -p 5433 -U postgres -d postgres -c "
 SELECT to_regclass('public.kb_spaces') AS kb_spaces,
        to_regclass('public.kb_documents') AS kb_documents,
        to_regclass('public.kb_chunks') AS kb_chunks;
 "
+  if systemctl is-active --quiet meoo-postgrest 2>/dev/null; then
+    echo "=== 重启 PostgREST ==="
+    sudo systemctl restart meoo-postgrest
+  fi
   echo "OK: knowledge_base migration applied"
 }
 
