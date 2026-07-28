@@ -683,7 +683,15 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
       if (needPrivacy && !this.data.showMpPrivacyGate) {
         this.setData({ showMpPrivacyGate: true })
       }
-      const hit = await hallRegionLocate.resolveHallRegionFilter()
+      // 本会话用户已手动选城：勿用异步 GPS/IP 回写覆盖
+      if (this._hallRegionUserPicked) return
+      let hit = await hallRegionLocate.resolveHallRegionFilter()
+      // 定位等待期间用户可能已写入本地偏好，二次读取避免竞态覆盖
+      const stored = hallRegionLocate.readStoredFilter()
+      if (stored && (stored.province !== '全部' || (stored.city && stored.city !== '全部'))) {
+        hit = stored
+      }
+      if (this._hallRegionUserPicked) return
       if (!hit || !hit.province) return
       const regionState = regionFilterPicker.initRegionFilterState(hit.province, hit.city || '全部')
       if (regionState.filterProvince === '全部' && regionState.filterCity === '全部') {
@@ -1372,8 +1380,10 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     if (next.filterProvince === '全部' && next.filterCity === '全部') {
       next.regionFilterLabel = '地区'
       hallRegionLocate.clearStoredFilter()
+      this._hallRegionUserPicked = false
     } else {
       hallRegionLocate.writeStoredFilter(next.filterProvince, next.filterCity)
+      this._hallRegionUserPicked = true
     }
     this.setData(next)
     if (this.data.isPrMode) this.applyTalentFilters()
@@ -1384,8 +1394,10 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     this.setData({ filterCity })
     if (filterCity === '全部' && this.data.filterProvince === '全部') {
       hallRegionLocate.clearStoredFilter()
+      this._hallRegionUserPicked = false
     } else {
       hallRegionLocate.writeStoredFilter(this.data.filterProvince, filterCity)
+      this._hallRegionUserPicked = true
     }
     if (this.data.isPrMode) this.applyTalentFilters()
     else this.applyOrderFilters()
@@ -1446,6 +1458,8 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
   onResetAllFilters() {
     const regionState = regionFilterPicker.initRegionFilterState('全部', '全部')
     regionState.regionFilterLabel = '地区'
+    hallRegionLocate.clearStoredFilter()
+    this._hallRegionUserPicked = false
     this.setData({
       ...regionState,
       filterPlatform: '全部',
