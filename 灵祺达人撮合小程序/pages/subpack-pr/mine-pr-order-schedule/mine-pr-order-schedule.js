@@ -9,6 +9,7 @@ const prWorkflow = require('../../../utils/prOrderWorkflowStage.js')
 const chat = require('../../../utils/talentChat.js')
 const userProfile = require('../../../utils/userProfile.js')
 const { exportApplicantsExcel } = require('../../../utils/mpApplicantsExport.js')
+const mpOrderGroupChatApi = require('../../../utils/mpOrderGroupChatApi.js')
 
 function normMealCount(v) {
   return Math.max(1, parseInt(String(v), 10) || 1)
@@ -57,6 +58,10 @@ Page({
     assignPickerSlots: [],
     assignPickerTalentId: '',
     chatLoadingId: '',
+    orderGroupChatActive: false,
+    orderGroupChatClosed: false,
+    orderGroupChatTitle: '',
+    orderGroupChatCreating: false,
     lqThemeClass: 'lq-theme-pr',
   },
   _baseline: {},
@@ -169,8 +174,74 @@ Page({
         checkInRows,
       })
       this.refreshBoardView()
+      void this.syncOrderGroupChatState()
     } catch (e) {
       this.setData({ loading: false, err: String(e && e.message ? e.message : e).slice(0, 80) })
+    }
+  },
+  async syncOrderGroupChatState() {
+    const mpOrderId = String(this.data.mpOrderId || '').trim()
+    if (!mpOrderId) return
+    try {
+      const body = await mpOrderGroupChatApi.getGroup(mpOrderId)
+      const group = body && body.group
+      if (!group) {
+        this.setData({ orderGroupChatActive: false, orderGroupChatClosed: false, orderGroupChatTitle: '' })
+        return
+      }
+      this.setData({
+        orderGroupChatActive: true,
+        orderGroupChatClosed: group.status === 'closed',
+        orderGroupChatTitle: group.title || '',
+      })
+    } catch (_) {
+      this.setData({ orderGroupChatActive: false, orderGroupChatClosed: false, orderGroupChatTitle: '' })
+    }
+  },
+  onEnterOrderGroupChat() {
+    const mpOrderId = String(this.data.mpOrderId || '').trim()
+    if (!mpOrderId) return
+    wx.navigateTo({
+      url: `/pages/subpack-pr/order-group-chat/order-group-chat?mpOrderId=${encodeURIComponent(mpOrderId)}`,
+    })
+  },
+  async onConfirmCreateOrderGroupChat() {
+    if (this.data.orderGroupChatCreating) return
+    const selectedCount = (this.data.pool || []).length
+    if (selectedCount <= 0) {
+      wx.showToast({ title: '暂无待排期达人', icon: 'none' })
+      return
+    }
+    if (this.data.orderGroupChatActive) {
+      this.onEnterOrderGroupChat()
+      return
+    }
+    const confirmed = await new Promise((resolve) => {
+      wx.showModal({
+        title: '确认拉群',
+        content: `将为已选 ${selectedCount} 位达人创建小程序商单群。是否确认？`,
+        confirmText: '确认拉群',
+        success: (r) => resolve(!!r.confirm),
+      })
+    })
+    if (!confirmed) return
+    this.setData({ orderGroupChatCreating: true })
+    wx.showLoading({ title: '拉群中…', mask: true })
+    try {
+      const body = await mpOrderGroupChatApi.createGroup(this.data.mpOrderId)
+      const group = body && body.group
+      this.setData({
+        orderGroupChatActive: true,
+        orderGroupChatClosed: false,
+        orderGroupChatTitle: (group && group.title) || '',
+      })
+      wx.showToast({ title: body.existed ? '群已存在' : '商单群已创建', icon: 'success' })
+      setTimeout(() => this.onEnterOrderGroupChat(), 400)
+    } catch (e) {
+      wx.showToast({ title: String(e.message || '创建失败').slice(0, 28), icon: 'none' })
+    } finally {
+      wx.hideLoading()
+      this.setData({ orderGroupChatCreating: false })
     }
   },
   onBackList() {
@@ -417,23 +488,52 @@ Page({
   },
   onAssignTalentTap(e) {
     const talentId = e.currentTarget.dataset.talentId
-    const slots = []
-    for (const day of this.data.boardView.days || []) {
-      for (const slot of day.slots || []) {
-        for (const table of slot.tables || []) {
-          if ((table.talents || []).length < table.cap) {
-            slots.push({
-              label: `第${day.dayIndex}天 ${day.date} ${slot.label} · ${table.tableLabel}`,
-              dayId: day.dayId,
-              slotId: slot.slotId,
-              tableId: table.tableId,
-            })
+    const shareTable = !!this.data.shareTable
+    const mealCount = normMealCount(this.data.mealCount)
+    const tableSize = normTableSize(this.data.tableSize)
+    const visitDates = this.data.visitDates || []
+    const pool = this.data.pool || []
+    let columns = this.data.columns || []
+
+    const collectSlots = (cols) => {
+      const boardView = visitBoard.buildBoardView(visitDates, cols, pool, shareTable, tableSize, mealCount)
+      const slots = []
+      for (const day of boardView.days || []) {
+        for (const slot of day.slots || []) {
+          for (const table of slot.tables || []) {
+            if ((table.talents || []).length < table.cap) {
+              slots.push({
+                label: `第${day.dayIndex}天 ${day.date} ${slot.label} · ${table.tableLabel}`,
+                dayId: day.dayId,
+                slotId: slot.slotId,
+                tableId: table.tableId,
+              })
+            }
           }
         }
       }
+      return slots
+    }
+
+    let slots = collectSlots(columns)
+    // 拼桌默认不预开桌：无桌时误报「时段已满」。安排前自动开一桌（未超餐食份数上限）
+    if (!slots.length && shareTable && visitBoard.countTotalTables(columns) < mealCount) {
+      const targetCol = columns.find((c) => !(c.tables || []).length) || columns[0]
+      if (targetCol) {
+        columns = columns.map((c) =>
+          c.dateId === targetCol.dateId && c.slotId === targetCol.slotId
+            ? { ...c, tables: [...(c.tables || []), { id: `t-${Date.now()}`, talentIds: [] }] }
+            : c,
+        )
+        this.applyBoardState({ columns })
+        slots = collectSlots(columns)
+      }
     }
     if (!slots.length) {
-      wx.showToast({ title: '时段已满', icon: 'none' })
+      wx.showToast({
+        title: shareTable ? '请先在某时段点「+ 加一桌」' : '时段已满',
+        icon: 'none',
+      })
       return
     }
     wx.showActionSheet({
