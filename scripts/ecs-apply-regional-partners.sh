@@ -16,6 +16,7 @@ MIGRATIONS=(
   "20260726170000_regional_partners.sql"
   "20260726180000_tenants_register_city.sql"
   "20260727100000_tenants_business_license_address.sql"
+  "20260728120000_regional_partners_subscription_pricing.sql"
 )
 PG_PORT="${ECS_PG_PORT:-5433}"
 PG_DB="${ECS_PG_DB:-postgres}"

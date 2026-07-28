@@ -12,6 +12,10 @@ import {
   rechargeCreditFromVerifiedCents,
   subscriptionDaysFromVerifiedCents,
 } from '../../../../商家管理后台/src/ops/paymentTierLogic.js'
+import {
+  matchResolvedTierByCents,
+  resolveSubscriptionTiersForTenant,
+} from '../../../../商家管理后台/api/_lib/regionalPartnerPricing.js'
 import { creditErpRechargePoints, ensureErpMonthlyGiftPointsGranted } from './erpPointsCore.js'
 import {
   computeErpRechargePointsFromCents,
@@ -147,7 +151,9 @@ export async function confirmTenantOnlinePaymentOrder(
   const tx = opts?.transactionId ? String(opts.transactionId).trim() : null
 
   if (order.order_kind === 'subscription') {
-    const days = subscriptionDaysFromVerifiedCents(vc)
+    const resolved = await resolveSubscriptionTiersForTenant(admin, tenantId)
+    const hit = matchResolvedTierByCents(resolved.tiers, vc)
+    const days = hit?.periodDays ?? subscriptionDaysFromVerifiedCents(vc)
     if (days <= 0) return { ok: false, error: 'cannot_derive_days' }
 
     const { data: tenant, error: te } = await admin
@@ -167,7 +173,7 @@ export async function confirmTenantOnlinePaymentOrder(
       serviceExpireAt: typeof tenant.service_expire_at === 'string' ? tenant.service_expire_at : null,
       purchasedDays: days,
     })
-    const nextPlan = membershipPlanFromVerifiedCents(vc) as MembershipPlan | null
+    const nextPlan = (hit?.plan ?? membershipPlanFromVerifiedCents(vc)) as MembershipPlan | null
     const tenantPatch: Record<string, unknown> = { ...ent, updated_at: nowIso }
     if (nextPlan) tenantPatch.membership_plan = nextPlan
 

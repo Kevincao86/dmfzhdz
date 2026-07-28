@@ -1,5 +1,5 @@
 import { Check, Crown, Sparkles, Star, Zap } from 'lucide-react'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { cn } from '../cn'
 import {
   ERP_MONTHLY_GIFT_POINTS,
@@ -12,6 +12,10 @@ import {
   type MembershipPlan,
 } from '../lib/membershipPlan'
 import { SUBSCRIPTION_TIERS } from '../lib/meooPaymentTiers'
+import {
+  fetchEffectiveSubscriptionTiers,
+  type EffectiveSubscriptionTier,
+} from '../services/tenantBillingClient'
 
 export type SubscriptionPlanCard = {
   plan: MembershipPlan
@@ -23,6 +27,7 @@ export type SubscriptionPlanCard = {
   highlight?: boolean
   features: string[]
   giftPoints: number
+  regionalMarkup?: boolean
 }
 
 function monthlyGiftFeature(plan: MembershipPlan): string {
@@ -53,11 +58,18 @@ const PLAN_FEATURES: Record<MembershipPlan, string[]> = {
   ],
 }
 
-function buildCards(): SubscriptionPlanCard[] {
-  const memberMonthly = SUBSCRIPTION_TIERS.find((t) => t.plan === 'member' && t.cents === 16800)
-  const memberQuarter = SUBSCRIPTION_TIERS.find((t) => t.plan === 'member' && t.cents === 46800)
-  const plusMonthly = SUBSCRIPTION_TIERS.find((t) => t.plan === 'member_plus' && t.cents === 59800)
-  const plusQuarter = SUBSCRIPTION_TIERS.find((t) => t.plan === 'member_plus' && t.cents === 168800)
+function buildCardsFromTiers(tiers: EffectiveSubscriptionTier[]): SubscriptionPlanCard[] {
+  const find = (plan: MembershipPlan, periodDays: number) =>
+    tiers.find((t) => t.plan === plan && t.periodDays === periodDays) ??
+    tiers.find((t) => t.plan === plan && (periodDays === 30 ? t.cents < 40000 : t.cents >= 40000))
+
+  const memberMonthly = find('member', 30)
+  const memberQuarter = find('member', 90)
+  const plusMonthly = find('member_plus', 30)
+  const plusQuarter = find('member_plus', 90)
+
+  const idx = (t: EffectiveSubscriptionTier | undefined) =>
+    t ? Math.max(0, tiers.findIndex((x) => x.cents === t.cents && x.plan === t.plan)) : -1
 
   return [
     {
@@ -71,26 +83,28 @@ function buildCards(): SubscriptionPlanCard[] {
     },
     {
       plan: 'member',
-      tierIndex: SUBSCRIPTION_TIERS.indexOf(memberMonthly!),
+      tierIndex: idx(memberMonthly),
       label: '会员版',
       priceYuan: memberMonthly?.yuan ?? 168,
       period: '月付',
       badge: '热销',
       features: PLAN_FEATURES.member,
       giftPoints: ERP_MONTHLY_GIFT_POINTS.member,
+      regionalMarkup: memberMonthly?.regionalMarkup,
     },
     {
       plan: 'member',
-      tierIndex: SUBSCRIPTION_TIERS.indexOf(memberQuarter!),
+      tierIndex: idx(memberQuarter),
       label: '会员版 · 季付',
       priceYuan: memberQuarter?.yuan ?? 468,
       period: '90 天',
       features: [...PLAN_FEATURES.member, '季付约 93 折'],
       giftPoints: ERP_MONTHLY_GIFT_POINTS.member,
+      regionalMarkup: memberQuarter?.regionalMarkup,
     },
     {
       plan: 'member_plus',
-      tierIndex: SUBSCRIPTION_TIERS.indexOf(plusMonthly!),
+      tierIndex: idx(plusMonthly),
       label: '会员 Plus',
       priceYuan: plusMonthly?.yuan ?? 598,
       period: '月付',
@@ -98,20 +112,31 @@ function buildCards(): SubscriptionPlanCard[] {
       highlight: true,
       features: PLAN_FEATURES.member_plus,
       giftPoints: ERP_MONTHLY_GIFT_POINTS.member_plus,
+      regionalMarkup: plusMonthly?.regionalMarkup,
     },
     {
       plan: 'member_plus',
-      tierIndex: SUBSCRIPTION_TIERS.indexOf(plusQuarter!),
+      tierIndex: idx(plusQuarter),
       label: '会员 Plus · 季付',
       priceYuan: plusQuarter?.yuan ?? 1688,
       period: '90 天',
       features: [...PLAN_FEATURES.member_plus, '季付约 94 折'],
       giftPoints: ERP_MONTHLY_GIFT_POINTS.member_plus,
+      regionalMarkup: plusQuarter?.regionalMarkup,
     },
   ]
 }
 
-export const SUBSCRIPTION_PLAN_CARDS = buildCards()
+/** 兼容旧导出：平台默认静态卡片（未拉到动态价前的占位） */
+export const SUBSCRIPTION_PLAN_CARDS = buildCardsFromTiers(
+  SUBSCRIPTION_TIERS.map((t) => ({
+    label: t.label,
+    yuan: t.yuan,
+    cents: t.cents,
+    plan: t.plan,
+    periodDays: t.cents === 46800 || t.cents === 168800 ? 90 : 30,
+  })),
+)
 
 export type SubscriptionPlansPanelProps = {
   currentPlan: MembershipPlan
@@ -124,10 +149,44 @@ export default function SubscriptionPlansPanel({
   onSelectPlan,
   compact = false,
 }: SubscriptionPlansPanelProps) {
-  const paidCards = useMemo(
-    () => SUBSCRIPTION_PLAN_CARDS.filter((c) => c.plan !== 'free'),
-    [],
-  )
+  const [tiers, setTiers] = useState<EffectiveSubscriptionTier[] | null>(null)
+  const [source, setSource] = useState<'platform' | 'regional'>('platform')
+  const [pricingCity, setPricingCity] = useState<string | null>(null)
+
+  useEffect(() => {
+    void fetchEffectiveSubscriptionTiers()
+      .then((r) => {
+        setTiers(r.tiers)
+        setSource(r.source)
+        setPricingCity(r.pricingCity)
+      })
+      .catch(() => {
+        setTiers(
+          SUBSCRIPTION_TIERS.map((t) => ({
+            label: t.label,
+            yuan: t.yuan,
+            cents: t.cents,
+            plan: t.plan,
+            periodDays: t.cents === 46800 || t.cents === 168800 ? 90 : 30,
+          })),
+        )
+      })
+  }, [])
+
+  const cards = useMemo(() => {
+    const list =
+      tiers ??
+      SUBSCRIPTION_TIERS.map((t) => ({
+        label: t.label,
+        yuan: t.yuan,
+        cents: t.cents,
+        plan: t.plan,
+        periodDays: (t.cents === 46800 || t.cents === 168800 ? 90 : 30) as 30 | 90,
+      }))
+    return buildCardsFromTiers(list)
+  }, [tiers])
+
+  const paidCards = useMemo(() => cards.filter((c) => c.plan !== 'free'), [cards])
 
   return (
     <div className="space-y-6">
@@ -151,6 +210,11 @@ export default function SubscriptionPlansPanel({
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-300">
               订阅含 ERP 全功能权益；付费档位每月赠送 AI 积分（套餐桶，自然月刷新）。
               积分可用于视频检核、Brief、云剪等 AI 能力。
+              {source === 'regional' && pricingCity ? (
+                <span className="mt-1 block text-amber-200/90">
+                  当前按区域价展示（{pricingCity}）
+                </span>
+              ) : null}
             </p>
           </div>
           <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-sm">
@@ -177,7 +241,7 @@ export default function SubscriptionPlansPanel({
           const isActiveTier = currentPlan === card.plan
           return (
             <article
-              key={`${card.plan}-${card.period}`}
+              key={`${card.plan}-${card.period}-${card.priceYuan}`}
               className={cn(
                 'relative flex flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition hover:shadow-md',
                 card.highlight
@@ -197,7 +261,12 @@ export default function SubscriptionPlansPanel({
               ) : null}
               <div className="border-b border-slate-100 p-5">
                 <h3 className="text-lg font-bold text-slate-900">{card.label}</h3>
-                <p className="mt-1 text-xs text-slate-500">{card.period}</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {card.period}
+                  {card.regionalMarkup ? (
+                    <span className="ml-2 text-amber-600">区域价</span>
+                  ) : null}
+                </p>
                 <div className="mt-4 flex items-end gap-1">
                   <span className="text-3xl font-bold tabular-nums text-slate-900">¥{card.priceYuan}</span>
                   {card.period === '月付' ? (
@@ -225,7 +294,7 @@ export default function SubscriptionPlansPanel({
               <div className="p-5 pt-0">
                 <button
                   type="button"
-                  disabled={isCurrent && isActiveTier}
+                  disabled={isCurrent && isActiveTier || card.tierIndex < 0}
                   onClick={() => onSelectPlan(card.tierIndex)}
                   className={cn(
                     'w-full rounded-xl py-2.5 text-sm font-semibold transition',

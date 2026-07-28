@@ -4,6 +4,7 @@ import RequireAuth from './components/RequireAuth'
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import MerchantsPage from './pages/MerchantsPage'
+import PricingPage from './pages/PricingPage'
 import SettingsPage from './pages/SettingsPage'
 import SettlementPage from './pages/SettlementPage'
 
@@ -21,6 +22,7 @@ export default function App() {
       >
         <Route index element={<HomePage />} />
         <Route path="merchants" element={<MerchantsPage />} />
+        <Route path="pricing" element={<PricingPage />} />
         <Route path="settlement" element={<SettlementPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>

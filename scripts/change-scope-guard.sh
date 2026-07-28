@@ -438,6 +438,16 @@ ecs-apply-regional-partners
 20260726180000_tenants_register_city
 20260727100000_tenants_business_license_address
 business_license_address
+20260728120000_regional_partners_subscription_pricing
+subscription_pricing
+regionalPartnerPricing
+meoo-tenant-subscription-tiers
+TenantPayModal
+SubscriptionPlansPanel
+meoo-tenant-billing
+tenantPaymentShared
+tenantBillingClient
+meooPaymentTiers
 change-scope-guard
 PAT
       ;;

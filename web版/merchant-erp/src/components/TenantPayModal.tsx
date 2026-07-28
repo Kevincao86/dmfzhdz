@@ -16,6 +16,7 @@ import {
 import { insertMerchantPaymentOrder } from '../lib/tenantBilling'
 import { supabase } from '../lib/supabaseClient'
 import {
+  fetchEffectiveSubscriptionTiers,
   tenantPayPoll,
   tenantPayPrepay,
   tenantWalletPay,
@@ -65,11 +66,36 @@ export default function TenantPayModal({
   rechargeContextHint = null,
   walletBalanceCents,
 }: TenantPayModalProps) {
+  const [dynamicSubTiers, setDynamicSubTiers] = useState<PaymentTier[] | null>(null)
+  const [regionalHint, setRegionalHint] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!open || mode !== 'subscription') return
+    void fetchEffectiveSubscriptionTiers()
+      .then((r) => {
+        setDynamicSubTiers(
+          r.tiers.map((t) => ({
+            label: t.label,
+            yuan: t.yuan,
+            cents: t.cents,
+            plan: t.plan,
+          })),
+        )
+        setRegionalHint(
+          r.source === 'regional' && r.pricingCity ? `区域价 · ${r.pricingCity}` : null,
+        )
+      })
+      .catch(() => {
+        setDynamicSubTiers(null)
+        setRegionalHint(null)
+      })
+  }, [open, mode])
+
   const tiers: PaymentTier[] = useMemo(() => {
-    if (mode === 'subscription') return SUBSCRIPTION_TIERS
+    if (mode === 'subscription') return dynamicSubTiers ?? SUBSCRIPTION_TIERS
     if (mode === 'points_recharge') return POINTS_RECHARGE_TIERS
     return RECHARGE_TIERS
-  }, [mode])
+  }, [mode, dynamicSubTiers])
 
   const orderKind: TenantPayOrderKind = useMemo(() => {
     if (mode === 'subscription') return 'subscription'
@@ -326,6 +352,11 @@ export default function TenantPayModal({
             {rechargeContextHint ? (
               <p className="mb-3 rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-100 ring-1 ring-amber-400/20">
                 {rechargeContextHint}
+              </p>
+            ) : null}
+            {regionalHint ? (
+              <p className="mb-3 rounded-lg bg-violet-500/10 px-3 py-2 text-sm text-violet-100 ring-1 ring-violet-400/20">
+                {regionalHint}（平台底价以上加价）
               </p>
             ) : null}
             <p className="text-sm text-slate-400">
