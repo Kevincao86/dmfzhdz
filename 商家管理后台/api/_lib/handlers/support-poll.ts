@@ -172,7 +172,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       rows = (await r.json()) as DbRow[]
     }
 
-    if (incremental && rows.length > 0) {
+    // 全量/增量都尝试推送：claim(feishu_notified_at) 保证只发一次。
+    // 仅增量时，首屏 sinceTs=0 拉到的新消息会永远跳过飞书通知。
+    if (rows.length > 0) {
       await notifyNewMerchantSupportMessages(supabaseUrl, serviceRole, rows)
     }
 
