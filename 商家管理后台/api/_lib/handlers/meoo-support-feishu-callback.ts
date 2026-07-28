@@ -8,6 +8,8 @@ import {
   decryptFeishuEncrypt,
   extractPlainTextFromFeishuMessage,
   extractSessionIdFromReplyText,
+  lookupLatestFeishuMappedSession,
+  lookupLatestSessionByFeishuChatId,
   lookupSessionByFeishuMsgId,
   verifyFeishuEventSignature,
 } from '../supportFeishuAppBridge.js'
@@ -38,6 +40,7 @@ type FeishuEventBody = {
       root_id?: string
       parent_id?: string
       chat_id?: string
+      chat_type?: string
       message_type?: string
       content?: string
     }
@@ -69,11 +72,52 @@ async function parseFeishuBody(req: VercelRequest): Promise<{
       const plain = decryptFeishuEncrypt(parsed.encrypt, encryptKey)
       const inner = JSON.parse(plain) as FeishuEventBody
       return { body: inner, raw, decrypted: true }
-    } catch {
+    } catch (e) {
+      console.warn('[feishu-callback] decrypt_failed', e instanceof Error ? e.message : e)
       return { body: parsed, raw }
     }
   }
   return { body: parsed, raw }
+}
+
+async function resolveSessionId(msg: NonNullable<FeishuEventBody['event']>['message'], text: string): Promise<{
+  sessionId: string | null
+  via: string
+}> {
+  if (!msg) return { sessionId: null, via: 'no_msg' }
+  const parentId = String(msg.parent_id || '').trim()
+  const rootId = String(msg.root_id || '').trim()
+  const chatId = String(msg.chat_id || '').trim()
+
+  if (parentId) {
+    const sid = await lookupSessionByFeishuMsgId(parentId)
+    if (sid) return { sessionId: sid, via: 'parent_id' }
+  }
+  if (rootId) {
+    const sid = await lookupSessionByFeishuMsgId(rootId)
+    if (sid) return { sessionId: sid, via: 'root_id' }
+  }
+
+  const fromText = extractSessionIdFromReplyText(text)
+  if (fromText) return { sessionId: fromText, via: 'text' }
+
+  if (chatId) {
+    const sid = await lookupLatestSessionByFeishuChatId(chatId)
+    if (sid) return { sessionId: sid, via: 'chat_id' }
+  }
+
+  // 配置的客服接收群：未引用回复时落到该群最近会话
+  const configuredChat = (process.env.FEISHU_SUPPORT_RECEIVE_ID ?? '').trim()
+  if (configuredChat && chatId && chatId === configuredChat) {
+    const sid = await lookupLatestSessionByFeishuChatId(configuredChat)
+    if (sid) return { sessionId: sid, via: 'configured_chat' }
+  }
+
+  // 最后兜底：24h 内最近一次出站卡片对应的会话（方便坐席在机器人单聊里误回）
+  const latest = await lookupLatestFeishuMappedSession()
+  if (latest) return { sessionId: latest, via: 'latest_map_24h' }
+
+  return { sessionId: null, via: 'none' }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
@@ -118,6 +162,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       signature,
     })
     if (!ok) {
+      console.warn('[feishu-callback] invalid_signature')
       sendJson(res, 401, { ok: false, error: 'invalid_signature' })
       return
     }
@@ -153,19 +198,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  const parentId = String(msg.parent_id || '').trim()
-  const rootId = String(msg.root_id || '').trim()
-  let sessionId: string | null = null
-  if (parentId) sessionId = await lookupSessionByFeishuMsgId(parentId)
-  if (!sessionId && rootId) sessionId = await lookupSessionByFeishuMsgId(rootId)
-  if (!sessionId) sessionId = extractSessionIdFromReplyText(text)
-
+  const { sessionId, via } = await resolveSessionId(msg, text)
   if (!sessionId) {
+    console.warn('[feishu-callback] session_not_mapped', {
+      messageId: msg.message_id,
+      parentId: msg.parent_id,
+      rootId: msg.root_id,
+      chatId: msg.chat_id,
+      chatType: msg.chat_type,
+      textPreview: text.slice(0, 80),
+    })
     sendJson(res, 200, {
       ok: true,
       skipped: true,
       reason: 'session_not_mapped',
-      hint: '请回复机器人发出的客服卡片消息',
+      hint: '请在客服群内回复机器人卡片，或引用该卡片再回',
     })
     return
   }
@@ -178,6 +225,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   })
 
   if (!result.ok) {
+    console.warn('[feishu-callback] insert_failed', result.error, result.detail)
     sendJson(res, result.status, {
       ok: false,
       error: result.error,
@@ -187,9 +235,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
+  console.info('[feishu-callback] ops_reply_ok', { sessionId, via, clientMsgId })
   sendJson(res, 200, {
     ok: true,
     sessionId,
+    via,
     verified: result.verified,
     clientMsgId,
   })
