@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
-import { BookOpen, Loader2, Trash2, Upload } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { BookOpen, FolderOpen, Loader2, Trash2, Upload, X } from 'lucide-react'
 import {
+  collectFilesFromDataTransfer,
   deleteOpsKbDocument,
   fileToBase64,
   listOpsKbDocuments,
+  mergeUniqueFiles,
   updateOpsKbDocument,
   uploadOpsKbDocument,
   type KbDocument,
@@ -26,17 +28,25 @@ function fmtSize(n: number) {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function displayPath(f: File) {
+  return f.webkitRelativePath || f.name
+}
+
 export default function OpsKnowledgeBasePage() {
   const { canEdit } = useOpsModuleEdit('knowledge_base')
   const [docs, setDocs] = useState<KbDocument[]>([])
   const [loading, setLoading] = useState(true)
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState('')
   const [title, setTitle] = useState('')
   const [plainText, setPlainText] = useState('')
   const [summary, setSummary] = useState('')
   const [visibility, setVisibility] = useState<KbVisibility>('ops_only')
-  const [file, setFile] = useState<File | null>(null)
+  const [files, setFiles] = useState<File[]>([])
+  const [dragOver, setDragOver] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const folderInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -55,29 +65,68 @@ export default function OpsKnowledgeBasePage() {
     void load()
   }, [load])
 
+  useEffect(() => {
+    const el = folderInputRef.current
+    if (!el) return
+    el.setAttribute('webkitdirectory', '')
+    el.setAttribute('directory', '')
+  }, [])
+
+  const addFiles = useCallback((incoming: File[]) => {
+    if (!incoming.length) return
+    setFiles((prev) => mergeUniqueFiles(prev, incoming))
+    setMsg(`已加入 ${incoming.length} 个文件，点击「一键上传」即可全部上传`)
+  }, [])
+
+  async function onDrop(e: React.DragEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(false)
+    if (!canEdit || busy) return
+    try {
+      const collected = await collectFilesFromDataTransfer(e.dataTransfer)
+      addFiles(collected)
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : '读取拖入文件失败')
+    }
+  }
+
   async function onUpload() {
     const denied = requireOpsModuleEdit('knowledge_base')
     if (denied) {
       setMsg(denied)
       return
     }
-    if (!file && !plainText.trim()) {
-      setMsg('请选择文件或粘贴文本')
+    if (!files.length && !plainText.trim()) {
+      setMsg('请拖入/选择文件或粘贴文本')
       return
     }
     setBusy(true)
     setMsg('')
+    setUploadProgress('')
     try {
-      if (file) {
-        const contentBase64 = await fileToBase64(file)
-        await uploadOpsKbDocument({
-          title: title.trim() || file.name,
-          fileName: file.name,
-          contentType: file.type || 'application/octet-stream',
-          contentBase64,
-          summary: summary.trim(),
-          visibility,
-        })
+      let ok = 0
+      let fail = 0
+      if (files.length) {
+        const singleTitle = files.length === 1 ? title.trim() : ''
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i]
+          setUploadProgress(`上传中 ${i + 1}/${files.length}：${displayPath(file)}`)
+          try {
+            const contentBase64 = await fileToBase64(file)
+            await uploadOpsKbDocument({
+              title: singleTitle || displayPath(file),
+              fileName: file.name,
+              contentType: file.type || 'application/octet-stream',
+              contentBase64,
+              summary: summary.trim(),
+              visibility,
+            })
+            ok += 1
+          } catch {
+            fail += 1
+          }
+        }
       } else {
         await uploadOpsKbDocument({
           title: title.trim() || '文本资料',
@@ -87,17 +136,21 @@ export default function OpsKnowledgeBasePage() {
           summary: summary.trim(),
           visibility,
         })
+        ok = 1
       }
       setTitle('')
       setPlainText('')
       setSummary('')
-      setFile(null)
-      setMsg('上传成功')
+      setFiles([])
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      if (folderInputRef.current) folderInputRef.current.value = ''
+      setMsg(fail ? `完成：成功 ${ok}，失败 ${fail}` : `上传成功 ${ok} 项`)
       await load()
     } catch (e) {
       setMsg(e instanceof Error ? e.message : '上传失败')
     } finally {
       setBusy(false)
+      setUploadProgress('')
     }
   }
 
@@ -170,11 +223,12 @@ export default function OpsKnowledgeBasePage() {
           知识库
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          运营全局知识库：上传 PDF/Word/PPT/图片/视频/Markdown 或粘贴文本。默认仅运营智能体可用，可勾选下发给商家/服务商智能体。
+          运营全局知识库：拖入或选择 PDF/Word/PPT/图片/视频/Markdown 等任意格式，支持多文件与文件夹一键上传；也可粘贴文本。默认仅运营智能体可用，可勾选下发给商家/服务商智能体。
         </p>
       </div>
 
       {msg ? <p className="text-sm text-amber-300">{msg}</p> : null}
+      {uploadProgress ? <p className="text-sm text-cyan-300">{uploadProgress}</p> : null}
 
       <OpsEditableSection
         permissionKey="knowledge_base"
@@ -183,37 +237,158 @@ export default function OpsKnowledgeBasePage() {
         <h2 className="text-sm font-medium text-slate-200">上传资料</h2>
         <input
           className="w-full rounded-lg border border-slate-600 bg-slate-900/60 px-3 py-2 text-sm text-white outline-none focus:border-violet-400"
-          placeholder="标题（可选）"
+          placeholder="标题（可选；多文件时每项用文件名）"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          disabled={!canEdit}
+          disabled={!canEdit || busy}
+        />
+
+        <div
+          role="button"
+          tabIndex={canEdit ? 0 : -1}
+          onKeyDown={(e) => {
+            if (!canEdit || busy) return
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              fileInputRef.current?.click()
+            }
+          }}
+          onDragEnter={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            if (canEdit && !busy) setDragOver(true)
+          }}
+          onDragOver={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            if (canEdit && !busy) setDragOver(true)
+          }}
+          onDragLeave={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            if (e.currentTarget === e.target) setDragOver(false)
+          }}
+          onDrop={(e) => void onDrop(e)}
+          onClick={() => canEdit && !busy && fileInputRef.current?.click()}
+          className={`rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors ${
+            canEdit ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'
+          } ${
+            dragOver
+              ? 'border-violet-400 bg-violet-500/10'
+              : 'border-slate-600 bg-slate-900/40 hover:border-violet-500/60'
+          } ${busy ? 'pointer-events-none opacity-60' : ''}`}
+        >
+          <Upload className={`mx-auto h-8 w-8 ${dragOver ? 'text-violet-300' : 'text-slate-500'}`} />
+          <p className="mt-2 text-sm font-medium text-slate-200">
+            拖入文件或文件夹到此处（支持全部格式）
+          </p>
+          <p className="mt-1 text-xs text-slate-500">也可点击选择多文件；支持 PDF / Word / PPT / 图片 / 视频 / Markdown 等</p>
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              disabled={!canEdit || busy}
+              onClick={(e) => {
+                e.stopPropagation()
+                fileInputRef.current?.click()
+              }}
+              className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800 disabled:opacity-50"
+            >
+              选择文件
+            </button>
+            <button
+              type="button"
+              disabled={!canEdit || busy}
+              onClick={(e) => {
+                e.stopPropagation()
+                folderInputRef.current?.click()
+              }}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-600 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800 disabled:opacity-50"
+            >
+              <FolderOpen className="h-3.5 w-3.5" />
+              选择文件夹
+            </button>
+          </div>
+        </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          disabled={!canEdit || busy}
+          onChange={(e) => {
+            addFiles(Array.from(e.target.files || []))
+            e.target.value = ''
+          }}
         />
         <input
+          ref={folderInputRef}
           type="file"
-          className="block w-full text-sm text-slate-300"
+          multiple
+          className="hidden"
           disabled={!canEdit || busy}
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          onChange={(e) => {
+            addFiles(Array.from(e.target.files || []))
+            e.target.value = ''
+          }}
         />
+
+        {files.length > 0 ? (
+          <div className="rounded-lg border border-slate-700 bg-slate-900/50 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-xs font-medium text-slate-400">
+                待上传 {files.length} 个文件（共 {fmtSize(files.reduce((s, f) => s + f.size, 0))}）
+              </span>
+              <button
+                type="button"
+                disabled={!canEdit || busy}
+                className="text-xs text-rose-400 hover:underline disabled:opacity-50"
+                onClick={() => setFiles([])}
+              >
+                清空
+              </button>
+            </div>
+            <ul className="max-h-40 space-y-1 overflow-y-auto text-xs text-slate-400">
+              {files.map((f, idx) => (
+                <li key={`${displayPath(f)}-${f.size}-${idx}`} className="flex items-center justify-between gap-2">
+                  <span className="truncate" title={displayPath(f)}>
+                    {displayPath(f)} · {fmtSize(f.size)}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={!canEdit || busy}
+                    className="shrink-0 text-slate-500 hover:text-rose-400 disabled:opacity-50"
+                    aria-label="移除"
+                    onClick={() => setFiles((prev) => prev.filter((_, i) => i !== idx))}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
         <textarea
           className="min-h-[100px] w-full rounded-lg border border-slate-600 bg-slate-900/60 px-3 py-2 text-sm text-white outline-none focus:border-violet-400"
           placeholder="或直接粘贴文本资料"
           value={plainText}
           onChange={(e) => setPlainText(e.target.value)}
-          disabled={!canEdit}
+          disabled={!canEdit || busy}
         />
         <textarea
           className="min-h-[72px] w-full rounded-lg border border-slate-600 bg-slate-900/60 px-3 py-2 text-sm text-white outline-none focus:border-violet-400"
-          placeholder="说明/字幕摘要（图片/视频建议填写，参与智能体投喂）"
+          placeholder="说明/字幕摘要（图片/视频建议填写，参与智能体投喂；批量上传时共用）"
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
-          disabled={!canEdit}
+          disabled={!canEdit || busy}
         />
         <label className="flex items-center gap-2 text-sm text-slate-300">
           <span>可见性</span>
           <select
             className="rounded border border-slate-600 bg-slate-900 px-2 py-1"
             value={visibility}
-            disabled={!canEdit}
+            disabled={!canEdit || busy}
             onChange={(e) => setVisibility(e.target.value as KbVisibility)}
           >
             <option value="ops_only">仅运营智能体</option>
@@ -228,7 +403,7 @@ export default function OpsKnowledgeBasePage() {
           className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-50"
         >
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-          上传
+          {files.length > 1 ? `一键上传（${files.length}）` : '一键上传'}
         </button>
       </OpsEditableSection>
 
