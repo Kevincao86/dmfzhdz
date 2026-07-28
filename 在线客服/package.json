@@ -1,0 +1,29 @@
+{
+  "name": "lingqi-online-support",
+  "private": true,
+  "version": "0.1.0",
+  "description": "灵祺独立在线客服台 · 与飞书双通道写入 support_relay",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5182",
+    "build": "tsc -p tsconfig.app.json && vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 5182"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.468.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "react-router-dom": "^7.14.2",
+    "tailwind-merge": "^3.5.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.4",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "tailwindcss": "^4.2.4",
+    "typescript": "^5.8.3",
+    "vite": "^8.0.10"
+  }
+}

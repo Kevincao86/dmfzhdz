@@ -42,6 +42,7 @@ list_scopes() {
   mp_order_detail_fast 商单详情秒开（hall_registry includeOnly + PG 按 id）
   erp_merchant_mp      商家管理 ERP 小程序（改名/菜单对齐商家Web/缺口页）
   account_pwd_support  改密(短信)+小灵同学双向消息
+  support_feishu       飞书双向客服（应用回调+映射表+独立客服台）
   regional_partner     区域服务商（城市代理门户 + 运营台开账号）
   mp_pr_orphan_delete  我的发单 orphan 误删（includePrOwned 空列表剪枝）
   mp_recruit_no_drop   招募单禁止 slice(200) 丢单 + 备份复原
@@ -411,6 +412,26 @@ mp-support-relay-e2e-smoke
 灵祺达人撮合小程序/
 灵祺星选小程序抖音版/
 灵祺达人履约管理后台/src/pages/SupportPage
+change-scope-guard
+PAT
+      ;;
+    support_feishu)
+      cat <<'PAT'
+support_feishu
+supportFeishu
+support-feishu
+meoo-support-feishu
+supportFeishuAppBridge
+supportFeishuNotify
+supportOpsSendCore
+support-ops-send
+support-poll
+OpsSupportWorkbenchPage
+supportOpsHttpApi
+在线客服/
+ecs-auth-api-server
+ecs-run-auth-api
+20260728220000_support_feishu_thread_map
 change-scope-guard
 PAT
       ;;

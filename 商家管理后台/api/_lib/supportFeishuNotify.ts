@@ -1,11 +1,15 @@
 /**
- * Edge 兼容的客服飞书通知（供 support-poll 等 Edge API 使用，勿引入 node:crypto）。
+ * Edge 兼容的客服飞书通知（供 support-poll 等使用）。
+ * 优先飞书自建应用卡片（双向）；无凭证时降级群 Webhook 仅通知。
  */
+
+import { pushSupportFeishuAppCard } from './supportFeishuAppBridge.js'
 
 export type SupportFeishuNotifyResult = {
   ok: boolean
   skipped?: boolean
   error?: string
+  via?: 'app' | 'webhook'
 }
 
 function notifyEnabled(): boolean {
@@ -43,16 +47,15 @@ async function buildFeishuBody(text: string): Promise<Record<string, unknown>> {
   return { timestamp: String(timestamp), sign, msg_type: 'text', content }
 }
 
-export async function sendSupportMerchantMessageFeishu(payload: {
+async function sendWebhook(payload: {
   sessionId: string
   enterpriseName?: string
   customerId?: string
   text: string
   ts?: number
 }): Promise<SupportFeishuNotifyResult> {
-  if (!notifyEnabled()) return { ok: true, skipped: true }
   const url = webhookUrl()
-  if (!url) return { ok: true, skipped: true, error: 'webhook_not_configured' }
+  if (!url) return { ok: true, skipped: true, error: 'webhook_not_configured', via: 'webhook' }
 
   const preview = payload.text.trim().slice(0, 400)
   const when = payload.ts
@@ -65,6 +68,7 @@ export async function sendSupportMerchantMessageFeishu(payload: {
     `会话：${payload.sessionId}`,
     `内容：${preview}${payload.text.length > 400 ? '…' : ''}`,
     `时间：${when}`,
+    '（提示：配置飞书自建应用后可在飞书直接回复）',
   ].join('\n')
 
   try {
@@ -76,7 +80,7 @@ export async function sendSupportMerchantMessageFeishu(payload: {
     })
     const raw = await res.text()
     if (!res.ok) {
-      return { ok: false, error: raw.slice(0, 300) || `HTTP ${res.status}` }
+      return { ok: false, error: raw.slice(0, 300) || `HTTP ${res.status}`, via: 'webhook' }
     }
     let parsed: { code?: number; msg?: string } = {}
     try {
@@ -85,10 +89,37 @@ export async function sendSupportMerchantMessageFeishu(payload: {
       /* ignore */
     }
     if (parsed.code != null && parsed.code !== 0) {
-      return { ok: false, error: parsed.msg ?? raw.slice(0, 200) }
+      return { ok: false, error: parsed.msg ?? raw.slice(0, 200), via: 'webhook' }
     }
-    return { ok: true }
+    return { ok: true, via: 'webhook' }
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+    return { ok: false, error: e instanceof Error ? e.message : String(e), via: 'webhook' }
+  }
+}
+
+export async function sendSupportMerchantMessageFeishu(payload: {
+  sessionId: string
+  enterpriseName?: string
+  customerId?: string
+  text: string
+  ts?: number
+}): Promise<SupportFeishuNotifyResult> {
+  if (!notifyEnabled()) return { ok: true, skipped: true }
+
+  try {
+    const appResult = await pushSupportFeishuAppCard(payload)
+    if (appResult.ok && !appResult.skipped) {
+      return { ok: true, via: 'app' }
+    }
+    if (appResult.ok && appResult.skipped) {
+      // 无应用凭证 → Webhook 降级
+      return sendWebhook(payload)
+    }
+    // 应用推送失败时仍尝试 Webhook，避免坐席完全收不到
+    const wh = await sendWebhook(payload)
+    if (wh.ok && !wh.skipped) return wh
+    return { ok: false, error: appResult.error ?? wh.error, via: 'app' }
+  } catch {
+    return sendWebhook(payload)
   }
 }

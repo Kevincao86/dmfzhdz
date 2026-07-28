@@ -17,6 +17,7 @@ import clientConfigHandler from '../api/meoo-erp-client-config.ts'
 import pingHandler from '../api/meoo-auth-ping.ts'
 import supportPollHandler from '../../../商家管理后台/api/_lib/handlers/support-poll.ts'
 import supportOpsSendHandler from '../../../商家管理后台/api/_lib/handlers/support-ops-send.ts'
+import supportFeishuCallbackHandler from '../../../商家管理后台/api/_lib/handlers/meoo-support-feishu-callback.ts'
 import opsStaffLoginHandler from '../../../商家管理后台/api/_lib/handlers/meoo-ops-staff-login.ts'
 import opsStaffListHandler from '../../../商家管理后台/api/_lib/handlers/meoo-ops-staff-list.ts'
 import opsStaffMutateHandler from '../../../商家管理后台/api/_lib/handlers/meoo-ops-staff-mutate.ts'
@@ -195,7 +196,7 @@ import apiPingHandler from '../api/ping.ts'
 import merchantSlugHandler from '../api/merchant/[...slug].ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260728-regional-partner-pricing'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260728-support-feishu-bidirectional'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -221,6 +222,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-erp-client-config': clientConfigHandler as VercelLikeHandler,
   '/api/support-poll': supportPollHandler as VercelLikeHandler,
   '/api/support-ops-send': supportOpsSendHandler as VercelLikeHandler,
+  '/api/meoo-support-feishu-callback': supportFeishuCallbackHandler as VercelLikeHandler,
   /** 运营管控台子账号：须写入 ECS Postgres ops_staff_accounts */
   '/api/meoo-ops-staff-login': opsStaffLoginHandler as VercelLikeHandler,
   '/api/meoo-ops-staff-list': opsStaffListHandler as VercelLikeHandler,

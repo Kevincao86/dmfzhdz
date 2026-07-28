@@ -646,8 +646,8 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp', embedded = fa
           </h1>
           <p className="mt-1 text-sm text-slate-500">
             {channel === 'mp'
-              ? '承接达人招募小程序「小灵同学」等入口的会话（会话 ID 以 lq-mp- 或 mp- 开头）。'
-              : '承接商家 ERP 右下角在线客服的商户会话。'}
+              ? '承接达人招募小程序「小灵同学」等入口的会话（会话 ID 以 lq-mp- 或 mp- 开头）。坐席也可在飞书回复机器人卡片；与独立客服台共用消息库。'
+              : '承接商家 ERP 右下角在线客服的商户会话。坐席也可在飞书回复机器人卡片；与独立客服台共用消息库。'}
             开发环境可走 WebSocket（/__meoo_support_online）；生产可在 Supabase 表 support_relay_messages 上启用云端同步，并在本项目中配置{' '}
             <code className="rounded bg-black/30 px-1">VITE_MEEO_SUPPORT_OPS_HTTP_TOKEN</code> 与 Vercel 服务端同名密钥及{' '}
             <code className="rounded bg-black/30 px-1">SUPABASE_SERVICE_ROLE_KEY</code>。
