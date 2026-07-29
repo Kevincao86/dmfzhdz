@@ -2,13 +2,8 @@ import { Copy, Loader2, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import AiModelAutoPicker from '../components/AiModelAutoPicker'
 import BriefGenRecordsSidebar from '../components/BriefGenRecordsSidebar'
-import { loadAddonRecruitOrderPickerRows } from '../lib/addonRecruitOrderPicker'
 import { cn } from '../cn'
 import { MEOO_REGISTRY_SYNC_EVENT } from '../lib/opsRegistryConstants'
-import {
-  filterRecruitOrderRows,
-  type RecruitOrderPickerRow,
-} from '../lib/aiRecruitOrderContext'
 import { MEOO_AI_VENDOR_CATALOG_EVENT } from '../services/merchantAiVendorCatalogClient'
 import { listAiUiModelOptions } from '../services/douyinAiAssistApi'
 import {
@@ -18,7 +13,6 @@ import {
   isCopyManuscriptPlatform,
   PLATFORM_OPTIONS,
   resolveBriefTextAiModelForRequest,
-  resolveViralBriefPlatform,
   searchViralBriefReferences,
   stripAiMarkdown,
   STYLE_OPTIONS,
@@ -51,17 +45,14 @@ async function copyTextToClipboard(text: string): Promise<boolean> {
   }
 }
 
-
 export default function AiOperationContentPage() {
-  const [orderRows, setOrderRows] = useState<RecruitOrderPickerRow[]>([])
-  const [orderKeyword, setOrderKeyword] = useState('')
-  const [selectedOrderId, setSelectedOrderId] = useState('')
-  const [ordersLoading, setOrdersLoading] = useState(false)
-  const [ordersLoadError, setOrdersLoadError] = useState<string | null>(null)
+  const [title, setTitle] = useState('')
+  const [category, setCategory] = useState('')
+  const [region, setRegion] = useState('')
+  const [content, setContent] = useState('')
   const [extraHint, setExtraHint] = useState('')
   const [platform, setPlatform] = useState<ViralBriefPlatform>('douyin')
   const [style, setStyle] = useState<ViralBriefStyle>('review')
-  const [platformTouched, setPlatformTouched] = useState(false)
 
   const [aiModelUiTick, setAiModelUiTick] = useState(0)
   const [aiOptsReload, setAiOptsReload] = useState(0)
@@ -81,6 +72,7 @@ export default function AiOperationContentPage() {
   const [recordsRefresh, setRecordsRefresh] = useState(0)
 
   const copyManuscriptMode = isCopyManuscriptPlatform(platform)
+  const formReady = title.trim().length >= 2 && content.trim().length >= 8
 
   useEffect(() => {
     const b = () => setAiOptsReload((n) => n + 1)
@@ -98,45 +90,6 @@ export default function AiOperationContentPage() {
     [aiModelUiTick, aiOptsReload],
   )
   const briefFallbackHint = useMemo(() => briefVendorFallbackHint(), [aiModelUiTick, aiOptsReload])
-
-  const selectedOrder = useMemo(
-    () => orderRows.find((r) => r.id === selectedOrderId) ?? null,
-    [orderRows, selectedOrderId],
-  )
-
-  const filteredOrders = useMemo(
-    () => filterRecruitOrderRows(orderRows, orderKeyword),
-    [orderRows, orderKeyword],
-  )
-
-  useEffect(() => {
-    if (!selectedOrder || platformTouched) return
-    setPlatform(resolveViralBriefPlatform(selectedOrder))
-  }, [selectedOrder, platformTouched])
-
-  const reloadOrders = useCallback(async () => {
-    setOrdersLoading(true)
-    setOrdersLoadError(null)
-    try {
-      const rows = await loadAddonRecruitOrderPickerRows()
-      setOrderRows(rows)
-      if (rows.length === 0) {
-        setOrdersLoadError('暂无在招招募订单，请先在「我的发单 → 已发布」确认是否有进行中订单。')
-      }
-    } catch (e) {
-      setOrderRows([])
-      setOrdersLoadError(e instanceof Error ? e.message : '加载招募订单失败')
-    } finally {
-      setOrdersLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void reloadOrders()
-    const onSync = () => void reloadOrders()
-    window.addEventListener(MEOO_REGISTRY_SYNC_EVENT, onSync)
-    return () => window.removeEventListener(MEOO_REGISTRY_SYNC_EVENT, onSync)
-  }, [reloadOrders])
 
   const refreshAffordState = useCallback(async () => {
     setAffordChecking(true)
@@ -167,8 +120,10 @@ export default function AiOperationContentPage() {
   }, [refreshAffordState])
 
   const onGenerateBrief = async () => {
-    if (!selectedOrder) {
-      setBriefErr('请先选择招募订单。')
+    const sourceTitle = title.trim()
+    const sourceContent = content.trim()
+    if (sourceTitle.length < 2 || sourceContent.length < 8) {
+      setBriefErr('请填写门店/标题，以及至少 8 字的需求描述。')
       return
     }
     const afford = await checkBriefPointsAffordable()
@@ -186,10 +141,16 @@ export default function AiOperationContentPage() {
     setBriefBusy(true)
     setReferenceSearching(false)
     setProgressMsg('准备生成…')
-    const genKey = `brief-${selectedOrder.id}-${platform}-${Date.now()}`
+    const source = {
+      title: sourceTitle,
+      category: category.trim(),
+      region: region.trim(),
+      content: sourceContent,
+    }
+    const genKey = `brief-direct-${platform}-${Date.now()}`
     try {
       const textResult = await generateViralBriefText({
-        order: selectedOrder,
+        source,
         platform,
         style,
         extraHint,
@@ -200,7 +161,7 @@ export default function AiOperationContentPage() {
       try {
         const spend = await spendBriefPoints({
           idempotencyKey: genKey,
-          note: `brief:${selectedOrder.id}:${platform}`,
+          note: `brief:direct:${platform}`,
         })
         if (spend && spend.pointsCharged > 0) {
           setPointsTip(`已扣 ${spend.pointsCharged} 积分，当前余额 ${spend.balance.toLocaleString('zh-CN')}`)
@@ -214,8 +175,8 @@ export default function AiOperationContentPage() {
       }
       try {
         await saveMpBriefGenRecord({
-          orderId: selectedOrder.id,
-          orderTitle: selectedOrder.title,
+          orderId: genKey,
+          orderTitle: sourceTitle,
           platform,
           style,
           outputMode: textResult.outputMode,
@@ -233,7 +194,6 @@ export default function AiOperationContentPage() {
         setProgressMsg('文字已就绪，正在补充相似案例…')
         try {
           const { result, searchNote: note } = await searchViralBriefReferences({
-            order: selectedOrder,
             platform,
             style,
             brief: textResult,
@@ -273,49 +233,51 @@ export default function AiOperationContentPage() {
         <h1 className="erp-page-title">爆款 Brief 生成</h1>
         <p className="mt-1 text-sm embed-text-muted">
           {copyManuscriptMode
-            ? '小红书 / 大众点评为图文平台：选择订单后生成可直接发布的种草笔记或评价文稿。'
-            : '选择招募订单后，先生成爆款 Brief 文字（钩子、分镜、话题与执行清单），再自动补充相似视频与场景参考。'}
+            ? '小红书 / 大众点评为图文平台：填写门店与卖点后，直接生成可发布的种草笔记或评价文稿。'
+            : '填写门店与卖点后直接生成爆款 Brief（钩子、分镜、话题与执行清单），并自动补充相似视频与场景参考。'}
         </p>
       </div>
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_min(320px,32%)]">
         <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <div>
-          <span className="block text-sm font-medium embed-text-primary">招募订单</span>
+          <label className="block text-sm font-medium embed-text-primary">门店 / 标题</label>
           <input
-            value={orderKeyword}
-            onChange={(e) => setOrderKeyword(e.target.value)}
-            placeholder="搜索订单标题、区域、品类…"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="如：望京·某某火锅 · 周末探店"
             className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
           />
-          <label className="mt-3 block text-xs embed-text-muted">当前订单</label>
-          <select
-            value={selectedOrderId}
-            disabled={ordersLoading || filteredOrders.length === 0}
-            onChange={(e) => {
-              setSelectedOrderId(e.target.value)
-              setPlatformTouched(false)
-              setBriefResult(null)
-            }}
-            className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm embed-text-primary disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <option value="">
-              {ordersLoading
-                ? '正在加载招募订单…'
-                : filteredOrders.length === 0
-                  ? '暂无可选招募订单'
-                  : '请选择招募订单'}
-            </option>
-            {filteredOrders.map((row) => (
-              <option key={row.id} value={row.id}>
-                {row.title} · {row.platform} · {row.region || '—'}
-              </option>
-            ))}
-          </select>
-          {ordersLoadError ? <p className="mt-2 text-xs text-amber-700">{ordersLoadError}</p> : null}
-          {!ordersLoading && orderRows.length > 0 ? (
-            <p className="mt-1 text-xs embed-text-muted">共 {orderRows.length} 条招募订单</p>
-          ) : null}
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-xs embed-text-muted">品类（可选）</label>
+              <input
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                placeholder="如：火锅、美甲、本地生活"
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs embed-text-muted">区域（可选）</label>
+              <input
+                value={region}
+                onChange={(e) => setRegion(e.target.value)}
+                placeholder="如：北京朝阳 · 望京"
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+
+          <label className="mt-4 block text-xs embed-text-muted">需求描述</label>
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            rows={5}
+            placeholder="写清门店亮点、套餐/价格、目标人群、必拍点位、禁忌等，信息越具体 Brief 越可用"
+            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          />
 
           <div className="mt-4 space-y-4">
             <div>
@@ -325,10 +287,7 @@ export default function AiOperationContentPage() {
                   <button
                     key={p.id}
                     type="button"
-                    onClick={() => {
-                      setPlatform(p.id)
-                      setPlatformTouched(true)
-                    }}
+                    onClick={() => setPlatform(p.id)}
                     className={cn(
                       'rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
                       platform === p.id
@@ -398,7 +357,7 @@ export default function AiOperationContentPage() {
           </h2>
           <p className="mt-1 text-sm embed-text-muted">
             {copyManuscriptMode
-              ? `根据订单生成标题、开篇、正文与完整可发布文稿（${MP_POINTS_BRIEF_PER_USE} 积分/篇，生成成功后扣减）。`
+              ? `根据填写内容生成标题、开篇、正文与完整可发布文稿（${MP_POINTS_BRIEF_PER_USE} 积分/篇，生成成功后扣减）。`
               : `先生成 Brief 文字版，再补充相似探店视频与场景参考（${MP_POINTS_BRIEF_PER_USE} 积分/篇，文字生成成功后扣减）。`}
           </p>
           {affordHint && !briefBusy ? (
@@ -423,7 +382,7 @@ export default function AiOperationContentPage() {
           ) : null}
           <button
             type="button"
-            disabled={briefBusy || affordChecking || !canGenerateBrief || !selectedOrder}
+            disabled={briefBusy || affordChecking || !canGenerateBrief || !formReady}
             onClick={() => void onGenerateBrief()}
             className="mt-4 inline-flex items-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
           >

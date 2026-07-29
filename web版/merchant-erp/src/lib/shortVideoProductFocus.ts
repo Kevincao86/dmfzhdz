@@ -19,7 +19,7 @@ export function shortVideoProductPlannerHint(): string {
 export function productSegmentI2vPromptSuffix(): string {
   return (
     `${SHORT_VIDEO_PRODUCT_SEGMENT_MARKER}参考图1为已抠图产品主体，须与场景自然融合：` +
-    '产品居中或略偏下，占画面 35%～55%，轮廓与包装细节清晰，柔光突出质感，缓慢推近或环绕，禁止模糊遮挡与文字乱码。'
+    '产品居中或略偏下，占画面 35%～55%，轮廓与包装细节清晰锐利，柔光与轻微侧光突出材质质感与高光，缓慢推近或环绕，景深干净，禁止模糊遮挡、灰雾与文字乱码。'
   )
 }
 

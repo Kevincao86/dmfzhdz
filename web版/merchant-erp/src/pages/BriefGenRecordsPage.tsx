@@ -39,6 +39,15 @@ function formatRecordTime(iso: string): string {
   })
 }
 
+function briefRecordTitle(row: { orderTitle?: string; orderId?: string }): string {
+  const title = String(row.orderTitle || '').trim()
+  if (title) return title
+  const id = String(row.orderId || '').trim()
+  if (id.startsWith('brief-direct-') || id.startsWith('direct-')) return '直接生成'
+  if (id) return id
+  return '直接生成'
+}
+
 function platformLabel(id: string): string {
   return (PLATFORM_OPTIONS.find((p) => p.id === id)?.label ?? id) || '—'
 }
@@ -160,7 +169,7 @@ export default function BriefGenRecordsPage() {
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold embed-text-primary">
-                      {row.orderTitle || row.orderId || '未命名订单'}
+                      {briefRecordTitle(row)}
                     </p>
                     <p className="mt-1 text-xs embed-text-muted">
                       {platformLabel(row.platform)} · {styleLabel(row.style)} ·{' '}
