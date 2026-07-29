@@ -71,14 +71,15 @@ function trimField(v: unknown, max: number): string {
     .slice(0, max)
 }
 
-/** HMAC 与 feishuNotify.ts buildFeishuTextBody 一致 */
+/** 飞书自定义机器人签名：key = `${timestamp}\\n${secret}`，对空串做 HmacSHA256 再 Base64 */
 function buildWebhookBody(text: string, secret: string): Record<string, unknown> {
   const content = { text: text.trim().slice(0, 4000) || '（空消息）' }
   if (!secret) {
     return { msg_type: 'text', content }
   }
   const timestamp = Math.floor(Date.now() / 1000)
-  const sign = createHmac('sha256', secret).update(`${timestamp}\n`).digest('base64')
+  const stringToSign = `${timestamp}\n${secret}`
+  const sign = createHmac('sha256', stringToSign).update('').digest('base64')
   return {
     timestamp: String(timestamp),
     sign,
