@@ -1,0 +1,10 @@
+{
+  "name": "modian-official",
+  "private": true,
+  "version": "1.0.0",
+  "description": "宁波墨典网络科技有限公司官方网站",
+  "scripts": {
+    "dev": "python3 -m http.server 5177",
+    "start": "python3 -m http.server 5177"
+  }
+}
