@@ -176,17 +176,17 @@ export default function MeooLayout() {
     <div className="flex min-h-screen bg-slate-100">
       <aside
         className={cn(
-          'fixed left-0 top-0 z-40 flex h-screen flex-shrink-0 flex-col border-r border-slate-800/90 bg-slate-950 shadow-[6px_0_32px_-12px_rgba(15,23,42,0.65)] transition-all duration-300',
+          'fixed left-0 top-0 z-40 flex h-screen flex-shrink-0 flex-col border-r border-slate-800/80 bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 shadow-[8px_0_36px_-14px_rgba(15,23,42,0.7)] transition-all duration-300',
           sidebarWidth,
         )}
       >
-        <div className="flex h-16 items-center border-b border-slate-800/90 px-4">
+        <div className="flex h-16 items-center border-b border-slate-800/80 bg-slate-950/80 px-4 backdrop-blur-sm">
           {!collapsed && (
             <>
               <img
                 src={BRAND_LOGO_URL}
                 alt={BRAND_NAME}
-                className="mr-2 h-10 w-10 shrink-0 rounded-lg object-contain"
+                className="mr-2 h-10 w-10 shrink-0 rounded-xl object-contain ring-1 ring-white/10"
               />
               <span className="text-lg font-semibold tracking-tight text-white">{BRAND_NAME}</span>
             </>
@@ -195,7 +195,7 @@ export default function MeooLayout() {
             <img
               src={BRAND_LOGO_URL}
               alt={BRAND_NAME}
-              className="mx-auto h-9 w-9 rounded-lg object-contain"
+              className="mx-auto h-9 w-9 rounded-xl object-contain ring-1 ring-white/10"
             />
           )}
         </div>
@@ -326,12 +326,12 @@ export default function MeooLayout() {
       </aside>
 
       <div className={cn('flex min-w-0 flex-1 flex-col transition-all duration-300', mainMargin)}>
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200/90 bg-white/85 px-6 shadow-sm shadow-slate-900/[0.04] backdrop-blur-xl">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200/80 bg-white/80 px-6 shadow-sm shadow-slate-900/[0.03] backdrop-blur-xl">
           <div className="flex flex-1 items-center">
             <button
               type="button"
               onClick={() => setCollapsed((v) => !v)}
-              className="mr-4 flex items-center justify-center rounded-xl p-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+              className="mr-4 flex items-center justify-center rounded-xl p-2 text-slate-600 transition-colors hover:bg-cyan-50 hover:text-cyan-800"
               aria-label="折叠侧栏"
             >
               {collapsed ? (

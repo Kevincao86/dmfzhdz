@@ -48,6 +48,7 @@ list_scopes() {
   mp_recruit_no_drop   招募单禁止 slice(200) 丢单 + 备份复原
   knowledge_base       知识库（运营全局 + 商家/FWS 租户 + AI 投喂）
   merchant_brief_direct 商家 ERP：Brief 去订单直接生成 + 短视频观感打磨
+  merchant_jimeng_studio 商家 ERP：即梦式短视频台（Skill/画布/短片/案例）+ 全站 UI token
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -534,6 +535,26 @@ mpBriefGenRecords
 shortVideoGuidanceAi
 ShortVideoOptimizationPage
 shortVideoProductFocus
+change-scope-guard
+PAT
+      ;;
+    merchant_jimeng_studio)
+      cat <<'PAT'
+ShortVideoOptimizationPage
+ShortVideoIceBatchPanel
+ShortVideoScriptTableEditor
+ShortVideoAgentCabin
+ShortVideoCaseGallery
+ShortVideoInfiniteCanvas
+shortVideoSkills
+shortVideoCaseGallery
+shortVideoUiLabels
+shortVideoGuidanceAi
+shortVideoProductFocus
+shortVideoScriptTable
+MeooLayout
+index.css
+merchantEmbedChrome.css
 change-scope-guard
 PAT
       ;;
