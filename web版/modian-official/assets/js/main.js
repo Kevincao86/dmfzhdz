@@ -14,37 +14,136 @@
   onScroll();
   window.addEventListener("scroll", onScroll, { passive: true });
 
-  /* Cursor ring */
-  const ring = document.getElementById("cursor-ring");
-  if (ring && !reduceMotion && window.matchMedia("(pointer: fine)").matches) {
-    let x = 0;
-    let y = 0;
-    let tx = 0;
-    let ty = 0;
-    ring.classList.add("on");
+  /* Magical cursor: core + dual orbit + particle trail */
+  const cursorFx = document.getElementById("cursor-fx");
+  const trailCanvas = document.getElementById("cursor-trail");
+  const finePointer = window.matchMedia("(pointer: fine)").matches;
+
+  if (cursorFx && trailCanvas instanceof HTMLCanvasElement && !reduceMotion && finePointer) {
+    document.body.classList.add("has-magic-cursor");
+    cursorFx.classList.add("on");
+    trailCanvas.classList.add("on");
+
+    const tctx = trailCanvas.getContext("2d");
+    let cx = window.innerWidth / 2;
+    let cy = window.innerHeight / 2;
+    let tx = cx;
+    let ty = cy;
+    let vx = 0;
+    let vy = 0;
+    let particles = [];
+    let lastEmit = 0;
+    let dpr = 1;
+
+    const resizeTrail = () => {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      trailCanvas.width = Math.floor(window.innerWidth * dpr);
+      trailCanvas.height = Math.floor(window.innerHeight * dpr);
+      trailCanvas.style.width = `${window.innerWidth}px`;
+      trailCanvas.style.height = `${window.innerHeight}px`;
+      if (tctx) tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    resizeTrail();
+    window.addEventListener("resize", resizeTrail);
+
+    const spawn = (x, y, burst = false) => {
+      const n = burst ? 10 : 1;
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const sp = burst ? 1.2 + Math.random() * 2.4 : 0.2 + Math.random() * 0.7;
+        particles.push({
+          x,
+          y,
+          vx: Math.cos(a) * sp,
+          vy: Math.sin(a) * sp - (burst ? 0.4 : 0),
+          life: 1,
+          decay: burst ? 0.018 + Math.random() * 0.02 : 0.012 + Math.random() * 0.016,
+          size: burst ? 1.6 + Math.random() * 2.4 : 1 + Math.random() * 1.8,
+          hue: Math.random() > 0.45 ? "teal" : "ice",
+        });
+      }
+      if (particles.length > 160) particles = particles.slice(-160);
+    };
 
     window.addEventListener(
       "pointermove",
       (e) => {
         tx = e.clientX;
         ty = e.clientY;
+        const now = performance.now();
+        const speed = Math.hypot(e.movementX || 0, e.movementY || 0);
+        if (now - lastEmit > (speed > 8 ? 12 : 28)) {
+          spawn(tx, ty, false);
+          lastEmit = now;
+        }
       },
       { passive: true }
     );
 
-    const tickRing = () => {
-      x += (tx - x) * 0.18;
-      y += (ty - y) * 0.18;
-      ring.style.left = `${x}px`;
-      ring.style.top = `${y}px`;
-      requestAnimationFrame(tickRing);
-    };
-    requestAnimationFrame(tickRing);
-
-    document.querySelectorAll("a, button, .cap, input, select, textarea").forEach((el) => {
-      el.addEventListener("pointerenter", () => ring.classList.add("hot"));
-      el.addEventListener("pointerleave", () => ring.classList.remove("hot"));
+    window.addEventListener("pointerdown", (e) => {
+      if (e.pointerType === "touch") return;
+      cursorFx.classList.add("clicking");
+      spawn(e.clientX, e.clientY, true);
+      const ripple = document.createElement("div");
+      ripple.className = "cursor-ripple";
+      ripple.style.left = `${e.clientX}px`;
+      ripple.style.top = `${e.clientY}px`;
+      document.body.appendChild(ripple);
+      ripple.addEventListener("animationend", () => ripple.remove());
     });
+
+    window.addEventListener("pointerup", () => cursorFx.classList.remove("clicking"));
+    document.addEventListener("mouseleave", () => cursorFx.classList.remove("on"));
+    document.addEventListener("mouseenter", () => cursorFx.classList.add("on"));
+
+    document.querySelectorAll("a, button, .cap, input, select, textarea, .header-cta, .btn").forEach((el) => {
+      el.addEventListener("pointerenter", () => cursorFx.classList.add("hot"));
+      el.addEventListener("pointerleave", () => cursorFx.classList.remove("hot"));
+    });
+
+    const tickCursor = () => {
+      const dx = tx - cx;
+      const dy = ty - cy;
+      vx += dx * 0.22;
+      vy += dy * 0.22;
+      vx *= 0.72;
+      vy *= 0.72;
+      cx += vx;
+      cy += vy;
+
+      cursorFx.style.left = `${cx}px`;
+      cursorFx.style.top = `${cy}px`;
+
+      if (tctx) {
+        tctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vx *= 0.96;
+          p.vy *= 0.96;
+          p.life -= p.decay;
+          if (p.life <= 0) {
+            particles.splice(i, 1);
+            continue;
+          }
+          const alpha = Math.max(0, p.life);
+          tctx.beginPath();
+          tctx.fillStyle =
+            p.hue === "ice"
+              ? `rgba(154, 212, 255, ${alpha * 0.85})`
+              : `rgba(61, 255, 213, ${alpha})`;
+          tctx.shadowColor = p.hue === "ice" ? "rgba(154, 212, 255, 0.8)" : "rgba(61, 255, 213, 0.9)";
+          tctx.shadowBlur = 8;
+          tctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
+          tctx.fill();
+        }
+        tctx.shadowBlur = 0;
+      }
+
+      requestAnimationFrame(tickCursor);
+    };
+    requestAnimationFrame(tickCursor);
   }
 
   /* Reveal on scroll */
