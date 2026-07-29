@@ -1,8 +1,8 @@
 /** 商户短视频页 · 对外展示名（与运营后台厂商配置解耦） */
-/** 即梦同源：火山方舟 Seedance 1.5 Pro */
+/** 火山方舟 Seedance 1.5 Pro */
 
 export const VIDEO_ENGINE_LABEL_KLING = '灵祺视频模型1'
-export const VIDEO_ENGINE_LABEL_SEEDANCE = '即梦视频'
+export const VIDEO_ENGINE_LABEL_SEEDANCE = '灵祺视频'
 export const VIDEO_ENGINE_HINT_SEEDANCE = 'Seedance 1.5 Pro · 火山方舟'
 export const VIDEO_ENGINE_HINT_QWEN = '通义万相视频'
 export const SEEDANCE_QUALITY_OPTIONS = [

@@ -224,7 +224,7 @@ export default function ShortVideoAgentCabin({
             </span>
 
             {modeOpen ? (
-              <div className="absolute bottom-[calc(100%+0.5rem)] left-0 z-50 w-[min(100vw-2rem,20rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10">
+              <div className="absolute left-0 top-full z-50 mt-2 w-[min(100vw-2rem,20rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10">
                 {SHORT_VIDEO_STUDIO_MODES.map((m) => {
                   const Ico = MODE_ICON[m.id]
                   const selected = m.id === activeMode.id

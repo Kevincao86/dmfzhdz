@@ -1,6 +1,6 @@
 /**
- * 短视频案例墙（对齐即梦「发现 / 技能 / 短片」作品呈现）
- * 封面/短片由 AI 出图 + Ken Burns 合成，静态托管于 /short-video-cases/
+ * 短视频案例墙（发现 / 技能 / 短片）
+ * 成片由 Seedance 生成，静态托管于 /short-video-cases/
  */
 
 import type { ShortVideoSkillId } from './shortVideoSkills'
@@ -28,7 +28,7 @@ export type ShortVideoCaseItem = {
   videoUrl?: string
 }
 
-const asset = (id: string, ext: 'png' | 'mp4') => `/short-video-cases/${id}.${ext}`
+const asset = (id: string, ext: 'png' | 'mp4') => `/short-video-cases/${id}.${ext}?v=seedance2`
 
 export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
   {
