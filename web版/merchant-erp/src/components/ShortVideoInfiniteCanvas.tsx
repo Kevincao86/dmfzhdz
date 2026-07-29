@@ -100,7 +100,7 @@ export default function ShortVideoInfiniteCanvas({
           changed = true
         }
       })
-      scriptNodes.forEach((row, i) => {
+      scriptNodes.forEach((_row, i) => {
         const id = `script:${i}`
         if (!next[id]) {
           next[id] = defaultScriptPos(i, mediaNodes.length)
