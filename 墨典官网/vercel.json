@@ -1,1 +1,8 @@
-{ "cleanUrls": true }
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "echo '墨典官网静态站，跳过 npm install'",
+  "buildCommand": "echo '墨典官网静态站，跳过 build'",
+  "outputDirectory": ".",
+  "cleanUrls": true
+}
