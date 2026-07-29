@@ -2,14 +2,19 @@
  * 商家 ERP 嵌入履约后台时复用的组件层与动效（勿含 @import 'tailwindcss'，由履约 index.css 统一扫描）。
  */
 :root {
-  --embed-text-primary: #1f2937;
-  --embed-text-secondary: #374151;
-  --embed-text-muted: #6b7280;
+  --embed-text-primary: #0f172a;
+  --embed-text-secondary: #334155;
+  --embed-text-muted: #64748b;
+  --erp-accent: #0891b2;
+  --erp-accent-soft: rgba(8, 145, 178, 0.12);
+  --erp-surface: rgba(255, 255, 255, 0.92);
+  --erp-shadow-soft: 0 10px 40px -18px rgba(15, 23, 42, 0.18);
 }
 
 @layer components {
   .erp-panel {
-    @apply rounded-2xl border border-slate-200/90 bg-white/95 shadow-sm shadow-slate-900/[0.04] backdrop-blur-sm;
+    @apply rounded-2xl border border-slate-200/80 bg-white/95 shadow-sm shadow-slate-900/[0.04] backdrop-blur-sm;
+    box-shadow: var(--erp-shadow-soft);
   }
 
   .erp-page-title {
@@ -19,9 +24,18 @@
 
   .erp-main-surface {
     background:
-      radial-gradient(1200px 600px at 10% -10%, rgba(34, 211, 238, 0.08), transparent 55%),
-      radial-gradient(900px 500px at 100% 0%, rgba(251, 146, 60, 0.06), transparent 50%),
-      linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+      radial-gradient(1200px 600px at 8% -8%, rgba(34, 211, 238, 0.11), transparent 55%),
+      radial-gradient(900px 520px at 100% 0%, rgba(251, 146, 60, 0.07), transparent 52%),
+      radial-gradient(700px 400px at 50% 100%, rgba(14, 165, 233, 0.05), transparent 60%),
+      linear-gradient(180deg, #f8fafc 0%, #f1f5f9 55%, #eef2f7 100%);
+  }
+
+  .erp-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-700 to-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-cyan-900/15 transition hover:from-cyan-600 hover:to-sky-500 disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .erp-chip {
+    @apply inline-flex items-center gap-1 rounded-full bg-cyan-50 px-2.5 py-1 text-xs font-medium text-cyan-800 ring-1 ring-cyan-200/80;
   }
 }
 

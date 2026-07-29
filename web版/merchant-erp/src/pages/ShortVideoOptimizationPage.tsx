@@ -1,6 +1,27 @@
-import { Cloud, Download, FileText, Film, ImagePlus, Loader2, PauseCircle, Sparkles, Upload, Wand2, X } from 'lucide-react'
+import {
+  Clapperboard,
+  Cloud,
+  Download,
+  FileText,
+  Film,
+  Focus,
+  ImagePlus,
+  LayoutGrid,
+  Loader2,
+  PauseCircle,
+  Sparkles,
+  Upload,
+  Wand2,
+  Wrench,
+  X,
+} from 'lucide-react'
 import { ShortVideoIceBatchPanel } from '../components/ShortVideoIceBatchPanel'
 import ShortVideoScriptTableEditor from '../components/ShortVideoScriptTableEditor'
+import ShortVideoAgentCabin from '../components/ShortVideoAgentCabin'
+import ShortVideoCaseGallery from '../components/ShortVideoCaseGallery'
+import ShortVideoInfiniteCanvas from '../components/ShortVideoInfiniteCanvas'
+import type { ShortVideoCaseItem } from '../lib/shortVideoCaseGallery'
+import { findShortVideoSkill, type ShortVideoSkillId } from '../lib/shortVideoSkills'
 import { MpAddonPointsRateBadge } from '../components/MpAddonPointsRateBadge'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { readMpSessionToken } from '../lib/merchantApiAuth'
@@ -80,7 +101,7 @@ import {
   type ShortVideoScriptRow,
 } from '../lib/shortVideoScriptTable'
 
-type MainPane = 'generate' | 'cloud_batch'
+type MainPane = 'generate' | 'canvas' | 'cloud_batch' | 'cases'
 
 type StoryFrameItem = {
   id: string
@@ -352,16 +373,20 @@ export default function ShortVideoOptimizationPage() {
   const embedAddonAccess = useMemo(() => readMpEmbedAddonAccess(), [])
   const paneTabs = useMemo(() => {
     const all = [
-      { id: 'generate' as const, label: '短视频生成', icon: Sparkles },
+      { id: 'generate' as const, label: '短片生成', icon: Clapperboard },
+      { id: 'canvas' as const, label: '无限画布', icon: Focus },
+      { id: 'cases' as const, label: '案例', icon: LayoutGrid },
       { id: 'cloud_batch' as const, label: 'AI混剪', icon: Cloud },
     ]
     if (!embedAddonAccess.embedMode) return all
     return all.filter((t) => {
       if (t.id === 'cloud_batch') return embedAddonAccess.cloudEdit
+      if (t.id === 'cases' || t.id === 'canvas') return embedAddonAccess.shortvideo
       return embedAddonAccess.shortvideo
     })
   }, [embedAddonAccess])
   const [mainPane, setMainPane] = useState<MainPane>('generate')
+  const [activeSkillId, setActiveSkillId] = useState<ShortVideoSkillId | null>(null)
   const [cfg, setCfg] = useState<VideoAiBackendConfig | null>(null)
   const [cfgLoaded, setCfgLoaded] = useState(false)
 
@@ -1464,7 +1489,7 @@ export default function ShortVideoOptimizationPage() {
   }
 
   const fieldSelectCls =
-    'rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-500/25 disabled:opacity-60'
+    'rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/25 disabled:opacity-60'
 
   const cancelWait = () => {
     cancelRef.current = true
@@ -1477,6 +1502,73 @@ export default function ShortVideoOptimizationPage() {
     setHint('已停止等待；后台任务可能不会自动取消。')
   }
 
+  const applyStudioCase = useCallback(
+    (item: ShortVideoCaseItem) => {
+      setErr(null)
+      setGenPrompt(item.prompt)
+      setActiveSkillId(item.skillId ?? null)
+      setSdAspect(item.aspect)
+      setLongformEnabled(item.longform)
+      if (item.longform) {
+        const opts = [...LONGFORM_TARGET_TOTAL_OPTIONS]
+        const best = opts.find((s) => s >= item.durationSec) ?? opts[0]!
+        onLongformTargetTotalSecChange(best)
+      } else {
+        const d = (item.durationSec <= 5 ? '5' : item.durationSec <= 10 ? '10' : '15') as '5' | '10' | '15'
+        setSdDurationSec(d)
+      }
+      setMainPane('generate')
+      setHint(`已套用案例「${item.title}」，可继续编辑参数后生成`)
+    },
+    // onLongformTargetTotalSecChange is stable enough via closure; deps kept minimal
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  )
+
+  const onAgentCabinSubmit = () => {
+    const skill = findShortVideoSkill(activeSkillId)
+    if (skill) {
+      if (skill.preferLongform) setLongformEnabled(true)
+      setSdAspect(skill.preferAspect)
+    }
+    setMainPane('generate')
+    setHint('已进入短片生成工作区，可点「AI 规划分镜」或「开始生成短片」')
+    if (genPrompt.trim() && longformEnabled) {
+      void onOptimizeGuidancePrompt()
+    }
+  }
+
+  const studioQuickEntries = [
+    {
+      id: 'canvas' as const,
+      title: '无限画布',
+      sub: '自由创作',
+      icon: Focus,
+      tone: 'from-sky-500 to-cyan-600',
+    },
+    {
+      id: 'generate' as const,
+      title: '短片生成',
+      sub: 'Seedance 出片',
+      icon: Clapperboard,
+      tone: 'from-orange-500 to-rose-500',
+    },
+    {
+      id: 'cases' as const,
+      title: '技能案例',
+      sub: '做同款灵感',
+      icon: Wrench,
+      tone: 'from-slate-700 to-slate-900',
+    },
+    {
+      id: 'cloud_batch' as const,
+      title: 'AI混剪',
+      sub: '包装精修',
+      icon: Cloud,
+      tone: 'from-violet-500 to-indigo-600',
+    },
+  ].filter((e) => paneTabs.some((t) => t.id === e.id))
+
   useEffect(() => {
     return () => {
       storyFramesRef.current.forEach(revokeStoryFrame)
@@ -1487,27 +1579,28 @@ export default function ShortVideoOptimizationPage() {
   return (
     <div
       className={cn(
-        'short-video-page mx-auto px-4 py-8 lg:py-12',
-        mainPane === 'cloud_batch' ? 'max-w-6xl' : 'max-w-4xl',
+        'short-video-page sv-jimeng-studio mx-auto px-4 py-8 lg:py-10',
+        mainPane === 'cloud_batch' || mainPane === 'canvas' || mainPane === 'cases'
+          ? 'max-w-6xl'
+          : 'max-w-5xl',
       )}
     >
-      <header className="relative mb-10 space-y-2 pl-4">
-        <span className="absolute left-0 top-2 h-10 w-1 rounded-full bg-gradient-to-b from-orange-500 to-cyan-500" aria-hidden />
-        <div className="flex items-center gap-3">
-          <Film className="h-8 w-8 shrink-0 text-orange-500" aria-hidden />
-          <h1 className="erp-page-title text-[1.35rem] leading-tight sm:text-2xl">短视频AI处理</h1>
+      <header className="relative mb-8 space-y-2 text-center sm:mb-10">
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <Film className="h-8 w-8 shrink-0 text-cyan-600" aria-hidden />
+          <h1 className="erp-page-title text-[1.35rem] leading-tight sm:text-2xl">短视频 AI 创作台</h1>
           <MpAddonPointsRateBadge kind="shortvideo" />
         </div>
-        <p className="max-w-2xl text-sm leading-relaxed text-slate-600">
-          即梦视频生成：写文案 → AI 规划分镜 → 一键出片。包装精修请切上方「AI混剪」Tab。
+        <p className="mx-auto max-w-2xl text-sm leading-relaxed text-slate-600">
+          Skill 技能 · 无限画布 · 短片生成 · 案例做同款。底层仍为即梦 Seedance；包装精修请切「AI混剪」。
           {readMpSessionToken() ? (
-            <span className="mt-1 block text-xs text-violet-700">
+            <span className="mt-1 block text-xs text-cyan-800">
               星选账号：成片成功后按秒扣积分；套餐 ai_video_quota 次数优先，用尽后扣积分余额。
             </span>
           ) : null}
         </p>
         <p
-          className="max-w-2xl rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900"
+          className="mx-auto max-w-2xl rounded-xl border border-amber-200/90 bg-amber-50/90 px-3 py-2 text-xs leading-relaxed text-amber-900"
           role="note"
         >
           生成后请及时保存到本地。刷新页面后，本页生成记录将消失。
@@ -1523,6 +1616,63 @@ export default function ShortVideoOptimizationPage() {
         </div>
       ) : (
         <>
+      {!embedBlocked && mainPane !== 'cloud_batch' ? (
+        <div className="mb-6">
+          <input
+            ref={genDocInputRef}
+            type="file"
+            accept=".txt,.md,.doc,.docx,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            className="hidden"
+            onChange={(e) => void onPickGuidanceDoc(e.target.files)}
+          />
+          <ShortVideoAgentCabin
+            value={genPrompt}
+            skillId={activeSkillId}
+            onSkillChange={setActiveSkillId}
+            onChange={setGenPrompt}
+            onSubmit={onAgentCabinSubmit}
+            onPickDoc={() => genDocInputRef.current?.click()}
+            disabled={busy}
+            busy={auxBusy}
+            submitLabel={longformEnabled ? '规划并进入生成' : '进入短片生成'}
+          />
+        </div>
+      ) : null}
+
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {studioQuickEntries.map((e) => {
+          const Ico = e.icon
+          const active = mainPane === e.id
+          return (
+            <button
+              key={e.id}
+              type="button"
+              onClick={() => {
+                resetOutputs()
+                setMainPane(e.id)
+              }}
+              className={cn(
+                'group flex items-center gap-3 rounded-2xl border bg-white/95 p-3.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md',
+                active ? 'border-cyan-300 ring-2 ring-cyan-500/20' : 'border-slate-200/90',
+              )}
+            >
+              <span
+                className={cn(
+                  'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-sm',
+                  e.tone,
+                )}
+              >
+                <Ico className="h-5 w-5" aria-hidden />
+              </span>
+              <span>
+                <span className="block text-sm font-semibold text-slate-900">{e.title}</span>
+                <span className="block text-xs text-slate-500">{e.sub}</span>
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
       <div className="mb-8 flex overflow-hidden rounded-2xl border border-zinc-200 bg-white p-1.5 shadow-sm">
         {paneTabs.map((t) => {
           const Ico = t.icon
@@ -1538,7 +1688,7 @@ export default function ShortVideoOptimizationPage() {
               className={cn(
                 'flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-semibold transition',
                 active
-                  ? 'bg-gradient-to-r from-orange-500 to-rose-500 text-white shadow-md shadow-orange-500/25'
+                  ? 'bg-gradient-to-r from-cyan-600 to-sky-500 text-white shadow-md shadow-cyan-600/25'
                   : 'text-zinc-600 hover:bg-zinc-50',
               )}
             >
@@ -1549,11 +1699,53 @@ export default function ShortVideoOptimizationPage() {
         })}
       </div>
 
-      {mainPane !== 'cloud_batch' ? (
-      <section className="mb-8 overflow-hidden rounded-2xl border border-orange-100 bg-gradient-to-br from-orange-50/70 via-white to-cyan-50/30 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-orange-100/80 px-5 py-4">
+      {mainPane === 'cases' ? (
+        <ShortVideoCaseGallery onApplyCase={applyStudioCase} className="mb-8" />
+      ) : null}
+
+      {mainPane === 'canvas' ? (
+        <div className="mb-8 space-y-4">
+          <ShortVideoInfiniteCanvas
+            scriptRows={scriptRows}
+            media={storyFrames.map((f) => ({
+              id: f.id,
+              previewUrl: f.previewUrl,
+              kind: f.kind,
+              label: f.file.name,
+            }))}
+            disabled={busy || auxBusy}
+            onAddMediaClick={() => {
+              setGenMode('frames')
+              setMainPane('generate')
+              setHint('已切到短片生成 · 分镜参考，请上传素材；也可再回「无限画布」查看节点')
+              queueMicrotask(() => storyFrameInputRef.current?.click())
+            }}
+            onSelectRow={() => setMainPane('generate')}
+          />
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setMainPane('generate')}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+            >
+              去短片生成工作区
+            </button>
+            <button
+              type="button"
+              onClick={() => setMainPane('cases')}
+              className="rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-2 text-sm font-medium text-cyan-900 hover:bg-cyan-100"
+            >
+              浏览案例做同款
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {mainPane !== 'cloud_batch' && mainPane !== 'cases' && mainPane !== 'canvas' ? (
+      <section className="mb-8 overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50/70 via-white to-orange-50/30 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-cyan-100/80 px-5 py-4">
           <div className="flex items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-rose-500 text-white shadow-md">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-600 to-sky-500 text-white shadow-md">
               <Sparkles className="h-5 w-5" />
             </span>
             <div>
@@ -1567,7 +1759,7 @@ export default function ShortVideoOptimizationPage() {
               </p>
             </div>
           </div>
-          <span className="rounded-full border border-orange-200 bg-white/80 px-3 py-1 text-[11px] font-medium text-orange-800">
+          <span className="rounded-full border border-cyan-200 bg-white/80 px-3 py-1 text-[11px] font-medium text-cyan-800">
             单段最长 15 秒
           </span>
         </div>
@@ -1576,13 +1768,13 @@ export default function ShortVideoOptimizationPage() {
           <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/80 bg-white/70 px-4 py-3 text-sm text-zinc-800 shadow-sm">
             <input
               type="checkbox"
-              className="mt-1 accent-orange-600"
+              className="mt-1 accent-cyan-600"
               checked={longformEnabled}
               onChange={(e) => setLongformEnabled(e.target.checked)}
               disabled={busy}
             />
             <span>
-              <span className="font-medium">长视频合成（最长 {LONGFORM_MAX_TARGET_TOTAL_SEC} 秒）</span>
+              <span className="font-medium">长视频 / 短片合成（最长 {LONGFORM_MAX_TARGET_TOTAL_SEC} 秒）</span>
               <span className="mt-0.5 block text-xs leading-relaxed text-zinc-500">
                 按 15 秒为单位自动分段（如 60 秒 = 4 段 × 15 秒），写文案后点「AI 规划分镜」再生成。
               </span>
@@ -1702,20 +1894,20 @@ export default function ShortVideoOptimizationPage() {
         <section className="space-y-8 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8">
           <ol className="grid gap-3 sm:grid-cols-3">
             {[
-              { n: 1, title: '写指导文案', sub: '卖点、场景、运镜（可上传 doc）' },
+              { n: 1, title: '写指导文案 / 选 Skill', sub: '卖点、场景、运镜（可上传 doc）' },
               { n: 2, title: 'AI 规划分镜', sub: '自动拆时间段 + 画面 + 口播' },
-              { n: 3, title: '开始生成', sub: '即梦 Seedance 1.5 Pro · 最长 60 秒' },
+              { n: 3, title: '开始生成短片', sub: '即梦 Seedance · 最长 60 秒' },
             ].map((s) => (
               <li
                 key={s.n}
-                className="flex gap-3 rounded-xl border border-orange-100 bg-gradient-to-br from-orange-50/80 to-white px-4 py-3"
+                className="flex gap-3 rounded-xl border border-cyan-100 bg-gradient-to-br from-cyan-50/80 to-white px-4 py-3"
               >
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-600 text-xs font-bold text-white">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cyan-600 text-xs font-bold text-white">
                   {s.n}
                 </span>
                 <div>
-                  <p className="text-sm font-semibold text-orange-950">{s.title}</p>
-                  <p className="text-xs leading-relaxed text-orange-900/70">{s.sub}</p>
+                  <p className="text-sm font-semibold text-cyan-950">{s.title}</p>
+                  <p className="text-xs leading-relaxed text-cyan-900/70">{s.sub}</p>
                 </div>
               </li>
             ))}
@@ -1730,7 +1922,7 @@ export default function ShortVideoOptimizationPage() {
               className={cn(
                 'inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm transition',
                 genMode === 'text'
-                  ? 'border-orange-600 bg-orange-50 text-orange-950'
+                  ? 'border-cyan-600 bg-cyan-50 text-cyan-950'
                   : 'border-transparent bg-zinc-100 text-zinc-700 hover:bg-zinc-200',
               )}
             >
@@ -1746,12 +1938,20 @@ export default function ShortVideoOptimizationPage() {
               className={cn(
                 'inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm transition',
                 genMode === 'frames'
-                  ? 'border-orange-600 bg-orange-50 text-orange-950'
+                  ? 'border-cyan-600 bg-cyan-50 text-cyan-950'
                   : 'border-transparent bg-zinc-100 text-zinc-700 hover:bg-zinc-200',
               )}
             >
               <ImagePlus className="h-4 w-4" />
               分镜 / 多张参考图
+            </button>
+            <button
+              type="button"
+              onClick={() => setMainPane('canvas')}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            >
+              <Focus className="h-4 w-4" />
+              在画布中查看
             </button>
           </div>
 
@@ -1759,15 +1959,13 @@ export default function ShortVideoOptimizationPage() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-medium text-zinc-800">
                 {longformEnabled ? '指导文案' : '执导文案'}
+                {activeSkillId ? (
+                  <span className="ml-2 rounded-full bg-cyan-50 px-2 py-0.5 text-[11px] font-medium text-cyan-800">
+                    Skill · {findShortVideoSkill(activeSkillId)?.name}
+                  </span>
+                ) : null}
               </span>
               <div className="flex flex-wrap items-center gap-2">
-                <input
-                  ref={genDocInputRef}
-                  type="file"
-                  accept=".txt,.md,.doc,.docx,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                  className="hidden"
-                  onChange={(e) => void onPickGuidanceDoc(e.target.files)}
-                />
                 <button
                   type="button"
                   disabled={busy || auxBusy}
@@ -1781,7 +1979,7 @@ export default function ShortVideoOptimizationPage() {
                   type="button"
                   disabled={busy || auxBusy || !genPrompt.trim()}
                   onClick={() => void onOptimizeGuidancePrompt()}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-medium text-orange-900 hover:bg-orange-100 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-medium text-cyan-900 hover:bg-cyan-100 disabled:opacity-50"
                   title={longformEnabled ? 'AI 将先通读输入框全文，再规划分镜' : undefined}
                 >
                   {auxBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
@@ -1797,7 +1995,7 @@ export default function ShortVideoOptimizationPage() {
                   value={genPrompt}
                   disabled={busy || auxBusy}
                   onChange={(e) => setGenPrompt(e.target.value)}
-                  className="min-h-[112px] w-full resize-y rounded-lg border border-zinc-300 px-4 py-3 text-sm outline-none ring-orange-600/35 focus-visible:ring-2"
+                  className="min-h-[112px] w-full resize-y rounded-lg border border-zinc-300 px-4 py-3 text-sm outline-none ring-cyan-600/35 focus-visible:ring-2"
                 />
                 <p className="text-xs text-zinc-500">
                   粘贴或上传执行文案后，点击「AI 规划分镜」；AI 会先完整阅读输入框内容再填入下方分镜表。
@@ -1832,7 +2030,7 @@ export default function ShortVideoOptimizationPage() {
                   value={genPrompt}
                   disabled={busy || auxBusy}
                   onChange={(e) => setGenPrompt(e.target.value)}
-                  className="min-h-[128px] w-full resize-y rounded-lg border border-zinc-300 px-4 py-3 text-sm outline-none ring-orange-600/35 focus-visible:ring-2"
+                  className="min-h-[128px] w-full resize-y rounded-lg border border-zinc-300 px-4 py-3 text-sm outline-none ring-cyan-600/35 focus-visible:ring-2"
                 />
                 <p className="text-xs text-zinc-500">
                   支持 .txt / .doc / .docx 指导文案自动填入；复杂旧版 .doc 建议另存为 .docx。
@@ -1901,7 +2099,7 @@ export default function ShortVideoOptimizationPage() {
                 className={cn(
                   'cursor-pointer rounded-lg border border-dashed px-4 py-6 text-center transition',
                   storyDropActive
-                    ? 'border-orange-400 bg-orange-50/80'
+                    ? 'border-cyan-400 bg-cyan-50/80'
                     : 'border-zinc-300 bg-white hover:border-zinc-400',
                 )}
               >
@@ -1979,7 +2177,7 @@ export default function ShortVideoOptimizationPage() {
               disabled={!!generateGateReason}
               onClick={() => void submitGenerate()}
               title={generateGateReason ?? undefined}
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-zinc-900 to-zinc-800 px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-zinc-900/20 hover:from-zinc-800 hover:to-zinc-700 disabled:pointer-events-none disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-700 to-sky-600 px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-cyan-900/20 hover:from-cyan-600 hover:to-sky-500 disabled:pointer-events-none disabled:opacity-50"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {busy ? (progress ?? '处理中……') : '开始生成短片'}
@@ -2000,6 +2198,13 @@ export default function ShortVideoOptimizationPage() {
           </div>
         </section>
       )}
+
+      {mainPane === 'generate' ? (
+        <div className="mt-10">
+          <h2 className="mb-4 text-center text-lg font-semibold text-slate-900">灵感与案例</h2>
+          <ShortVideoCaseGallery onApplyCase={applyStudioCase} />
+        </div>
+      ) : null}
 
       {resultUrl && (
         <section className="mt-12 rounded-xl border border-zinc-200 bg-zinc-900 p-8 text-white shadow-inner">
