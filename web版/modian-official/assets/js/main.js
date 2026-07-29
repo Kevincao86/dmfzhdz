@@ -412,4 +412,117 @@
       raf = requestAnimationFrame(draw);
     }
   });
+
+  /* Ambient floating particles across page */
+  const ambient = document.getElementById("ambient-fx");
+  if (ambient instanceof HTMLCanvasElement && !reduceMotion) {
+    const actx = ambient.getContext("2d");
+    let aw = 0;
+    let ah = 0;
+    let adpr = 1;
+    let sparks = [];
+
+    const resizeAmbient = () => {
+      adpr = Math.min(window.devicePixelRatio || 1, 2);
+      aw = window.innerWidth;
+      ah = window.innerHeight;
+      ambient.width = Math.floor(aw * adpr);
+      ambient.height = Math.floor(ah * adpr);
+      ambient.style.width = `${aw}px`;
+      ambient.style.height = `${ah}px`;
+      if (actx) actx.setTransform(adpr, 0, 0, adpr, 0, 0);
+      const count = Math.min(48, Math.floor((aw * ah) / 38000));
+      sparks = Array.from({ length: count }, () => ({
+        x: Math.random() * aw,
+        y: Math.random() * ah,
+        r: 0.6 + Math.random() * 1.8,
+        vy: -0.15 - Math.random() * 0.35,
+        vx: (Math.random() - 0.5) * 0.2,
+        a: 0.15 + Math.random() * 0.45,
+        pulse: Math.random() * Math.PI * 2,
+      }));
+    };
+    resizeAmbient();
+    window.addEventListener("resize", resizeAmbient);
+
+    const tickAmbient = (now) => {
+      if (!actx) return;
+      actx.clearRect(0, 0, aw, ah);
+      for (const s of sparks) {
+        s.pulse += 0.02;
+        s.x += s.vx;
+        s.y += s.vy;
+        if (s.y < -10) s.y = ah + 10;
+        if (s.x < -10) s.x = aw + 10;
+        if (s.x > aw + 10) s.x = -10;
+        const alpha = s.a * (0.55 + 0.45 * Math.sin(s.pulse + now * 0.001));
+        actx.beginPath();
+        actx.fillStyle = `rgba(61, 255, 213, ${alpha})`;
+        actx.shadowColor = "rgba(61, 255, 213, 0.6)";
+        actx.shadowBlur = 8;
+        actx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        actx.fill();
+      }
+      actx.shadowBlur = 0;
+      requestAnimationFrame(tickAmbient);
+    };
+    requestAnimationFrame(tickAmbient);
+  }
+
+  /* Spotlight follow on interactive panels */
+  document.querySelectorAll(".cap, .pedigree-grid li, .partner-grid li, .contact-form, .signal-board").forEach((el) => {
+    el.addEventListener(
+      "pointermove",
+      (e) => {
+        const rect = el.getBoundingClientRect();
+        el.style.setProperty("--mx", `${e.clientX - rect.left}px`);
+        el.style.setProperty("--my", `${e.clientY - rect.top}px`);
+      },
+      { passive: true }
+    );
+  });
+
+  /* Scan lines on major sections */
+  if (!reduceMotion) {
+    document.querySelectorAll(".capabilities, .team, .contact, .edge").forEach((sec, i) => {
+      sec.classList.add("magic-panel");
+      const line = document.createElement("div");
+      line.className = "scan-line";
+      line.style.animationDelay = `${i * 1.1}s`;
+      sec.appendChild(line);
+    });
+  }
+
+  /* Soft parallax on section heads */
+  if (!reduceMotion) {
+    const heads = Array.from(document.querySelectorAll(".section-head, .hero-inner"));
+    window.addEventListener(
+      "scroll",
+      () => {
+        const vh = window.innerHeight || 1;
+        heads.forEach((el) => {
+          const rect = el.getBoundingClientRect();
+          const mid = rect.top + rect.height * 0.5;
+          const p = (mid - vh * 0.5) / vh;
+          el.style.transform = `translate3d(0, ${p * -12}px, 0)`;
+        });
+      },
+      { passive: true }
+    );
+  }
+
+  /* Magnetic buttons */
+  if (!reduceMotion && finePointer) {
+    document.querySelectorAll(".btn, .header-cta").forEach((btn) => {
+      btn.addEventListener("pointermove", (e) => {
+        const rect = btn.getBoundingClientRect();
+        const x = e.clientX - rect.left - rect.width / 2;
+        const y = e.clientY - rect.top - rect.height / 2;
+        btn.style.transform = `translate(${x * 0.12}px, ${y * 0.18}px)`;
+      });
+      btn.addEventListener("pointerleave", () => {
+        btn.style.transform = "";
+      });
+    });
+  }
 })();
