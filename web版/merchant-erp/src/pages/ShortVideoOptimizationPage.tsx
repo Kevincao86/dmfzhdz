@@ -145,7 +145,7 @@ async function storyFrameFileToImageDataUrl(f: File): Promise<string> {
   const b64 = await readImageFilePureBase64(f)
   return `data:image/${f.type.toLowerCase() === 'image/png' ? 'png' : 'jpeg'};base64,${b64}`
 }
-/** 短视频生成固定即梦 / Seedance */
+/** 短视频生成固定 Seedance */
 const VIDEO_ENGINE = 'seedance' as const
 const POLL_MS_SD = 5000
 const LONGFORM_DEFAULT_SEGMENT_SEC = LONGFORM_SEGMENT_UNIT_SEC
@@ -201,7 +201,7 @@ async function formatLongformMergedHint(
   const sec = measured > 0 ? Math.round(measured) : approx
   const target = targetTotalSec ?? approx
   const targetNote =
-    Math.abs(sec - target) <= 3 ? '' : `（目标约 ${target} 秒，若偏短请检查即梦 15 秒额度）`
+    Math.abs(sec - target) <= 3 ? '' : `（目标约 ${target} 秒，若偏短请检查单段 15 秒额度）`
   return `已合成约 ${sec} 秒长片（${segmentCount} 段 × ${segmentSec} 秒）${targetNote}，可预览下载。`
 }
 
@@ -1450,7 +1450,7 @@ export default function ShortVideoOptimizationPage() {
     }
 
     setBusy(true)
-    trackProgress('正在提交即梦视频任务…')
+    trackProgress('正在提交视频生成任务…')
     cancelRef.current = false
     try {
       const textBlock =
@@ -1656,7 +1656,7 @@ export default function ShortVideoOptimizationPage() {
           <MpAddonPointsRateBadge kind="shortvideo" />
         </div>
         <p className="mx-auto max-w-2xl text-sm leading-relaxed text-slate-600">
-          Skill 技能 · 无限画布 · 短片生成 · 案例做同款。底层仍为即梦 Seedance；包装精修请切「AI混剪」。
+          Skill 技能 · 无限画布 · 短片生成 · 案例做同款。引擎为 Seedance；包装精修请切「AI混剪」。
           {readMpSessionToken() ? (
             <span className="mt-1 block text-xs text-cyan-800">
               星选账号：成片成功后按秒扣积分；套餐 ai_video_quota 次数优先，用尽后扣积分余额。
@@ -1963,7 +1963,7 @@ export default function ShortVideoOptimizationPage() {
             {[
               { n: 1, title: '写指导文案 / 选 Skill', sub: '卖点、场景、运镜（可上传 doc）' },
               { n: 2, title: 'AI 规划分镜', sub: '自动拆时间段 + 画面 + 口播' },
-              { n: 3, title: '开始生成短片', sub: '即梦 Seedance · 最长 60 秒' },
+              { n: 3, title: '开始生成短片', sub: 'Seedance · 最长 60 秒' },
             ].map((s) => (
               <li
                 key={s.n}

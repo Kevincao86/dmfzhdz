@@ -554,6 +554,7 @@ shortVideoGuidanceAi
 shortVideoProductFocus
 shortVideoScriptTable
 short-video-cases
+gen-case-seedance
 MeooLayout
 index.css
 merchantEmbedChrome.css
