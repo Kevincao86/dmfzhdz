@@ -467,9 +467,23 @@ export default function ShortVideoOptimizationPage() {
   const [sdWatermark, setSdWatermark] = useState<'off' | 'on'>('off')
   const [sdResolution, setSdResolution] = useState<SeedanceQualityId>('1080p')
 
-  const [longformEnabled, setLongformEnabled] = useState(true)
-  const [longformTargetTotalSec, setLongformTargetTotalSec] = useState(LONGFORM_DEFAULT_TARGET_TOTAL_SEC)
+  const [longformEnabled, setLongformEnabled] = useState(false)
+  const [longformTargetTotalSec, setLongformTargetTotalSec] = useState(15)
   const [longformSegmentSec, setLongformSegmentSec] = useState(LONGFORM_DEFAULT_SEGMENT_SEC)
+
+  /** 从短片模式打开长视频时，沿用用户已选的单段秒数，禁止静默抬到 60 */
+  const enableLongformKeepingUserDuration = useCallback(
+    (alreadyEnabled: boolean) => {
+      if (!alreadyEnabled) {
+        const sec = Number(sdDurationSec)
+        const target = ([15, 30, 45, 60] as number[]).includes(sec) ? sec : 15
+        setLongformTargetTotalSec(target)
+        setLongformSegmentSec(Math.min(LONGFORM_DEFAULT_SEGMENT_SEC, Math.max(5, target)))
+      }
+      setLongformEnabled(true)
+    },
+    [sdDurationSec],
+  )
 
   const longformDurationPlan = useMemo(
     () =>
@@ -1515,19 +1529,12 @@ export default function ShortVideoOptimizationPage() {
       setGenPrompt(item.prompt)
       setActiveSkillId(item.skillId ?? null)
       setSdAspect(item.aspect)
-      setLongformEnabled(item.longform)
-      if (item.longform) {
-        const opts = [...LONGFORM_TARGET_TOTAL_OPTIONS]
-        const best = opts.find((s) => s >= item.durationSec) ?? opts[0]!
-        onLongformTargetTotalSecChange(best)
-      } else {
-        const d = (item.durationSec <= 5 ? '5' : item.durationSec <= 10 ? '10' : '15') as '5' | '10' | '15'
-        setSdDurationSec(d)
-      }
+      // 案例墙预览片约 5s；套用时默认短片 15s，避免被抬成 60s 长视频
+      setLongformEnabled(false)
+      setSdDurationSec('15')
       setMainPane('generate')
       setHint(`已套用案例「${item.title}」，可继续编辑参数后生成`)
     },
-    // onLongformTargetTotalSecChange is stable enough via closure; deps kept minimal
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   )
@@ -1573,12 +1580,12 @@ export default function ShortVideoOptimizationPage() {
     const skill = findShortVideoSkill(activeSkillId)
     const preferLong = Boolean(skill?.preferLongform)
     if (skill) {
-      if (preferLong) setLongformEnabled(true)
+      if (preferLong) enableLongformKeepingUserDuration(longformEnabled)
       setSdAspect(skill.preferAspect)
     }
     setMainPane('generate')
     setHint('已进入短片生成工作区，可点「AI 规划分镜」或「开始生成短片」')
-    // 用 skill 偏好判断，避免 setState 尚未生效时读到旧的 longformEnabled
+    // 仅当用户本就开着长视频、或技能明确偏好长片时，才自动规划；时长用当前选择，不改成 60
     if (genPrompt.trim() && (preferLong || longformEnabled)) {
       void onOptimizeGuidancePrompt()
     }
@@ -1695,7 +1702,7 @@ export default function ShortVideoOptimizationPage() {
               setActiveSkillId(id)
               const skill = findShortVideoSkill(id)
               if (skill) {
-                if (skill.preferLongform) setLongformEnabled(true)
+                if (skill.preferLongform) enableLongformKeepingUserDuration(longformEnabled)
                 setSdAspect(skill.preferAspect)
               }
             }}
@@ -1762,7 +1769,7 @@ export default function ShortVideoOptimizationPage() {
               queueMicrotask(() => storyFrameInputRef.current?.click())
             }}
             onEditRow={(index) => {
-              setLongformEnabled(true)
+              // 不强制改时长；仅进入生成区编辑分镜表
               setGenMode('text')
               setMainPane('generate')
               setHint(`正在编辑分镜 ${index + 1}，请在下方「执导分镜脚本」完善画面与口播`)
@@ -1771,6 +1778,18 @@ export default function ShortVideoOptimizationPage() {
                   .getElementById('sv-script-table-anchor')
                   ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
               })
+            }}
+            onApplyFlowOrder={(orderedIndices) => {
+              if (orderedIndices.length < 2) return
+              setScriptRows((prev) => {
+                const next = orderedIndices.map((i) => prev[i]).filter(Boolean) as typeof prev
+                if (next.length < 2) return prev
+                // 按新顺序重排后，交给 resize 对齐时间轴
+                return resizeScriptRows(next, next.length, longformSegmentSec)
+              })
+              setLongformEnabled(true)
+              setHint(`已按画布连线重排分镜顺序（${orderedIndices.map((i) => i + 1).join('→')}）`)
+              setMainPane('generate')
             }}
             onRemoveScriptRow={(index) => {
               setScriptRows((prev) => removeScriptRowAt(prev, index))
@@ -1829,7 +1848,10 @@ export default function ShortVideoOptimizationPage() {
               type="checkbox"
               className="mt-1 accent-cyan-600"
               checked={longformEnabled}
-              onChange={(e) => setLongformEnabled(e.target.checked)}
+              onChange={(e) => {
+                if (e.target.checked) enableLongformKeepingUserDuration(longformEnabled)
+                else setLongformEnabled(false)
+              }}
               disabled={busy}
             />
             <span>
