@@ -265,8 +265,8 @@ export default function PrTargetedManagePage() {
             </FormSection>
           ) : null}
 
-          {stats.accepted > 0 && !invitePhaseFinalized ? (
-            <FormSection title="建群方式">
+          {stats.accepted > 0 ? (
+            <FormSection title="入群协作">
               <div className="grid gap-3 sm:grid-cols-2">
                 <button
                   type="button"

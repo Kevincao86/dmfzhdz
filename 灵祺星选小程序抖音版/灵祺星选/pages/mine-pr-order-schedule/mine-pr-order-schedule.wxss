@@ -1,5 +1,5 @@
-@import '../../styles/theme.wxss';
-@import '../../styles/identity-themes.wxss';
+@import '../../../styles/theme.wxss';
+@import '../../../styles/identity-themes.wxss';
 
 .sch-page {
   min-height: 100vh;

@@ -3,9 +3,11 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { clearMpRegistryCache, fetchMpRegistry } from '../lib/mpApi'
 import { isIceMpOrder } from '../lib/mpRecruitment/orderCard'
 import { buildMpOrderHeroMeta } from '../lib/mpSync/mpOrderHeroMeta'
+import { createGroup, getGroup } from '../lib/mpSync/orderGroupChat'
 import { isVisitPlanDatesConfirmed } from '../lib/mpSync/visitScheduleRuntime'
 import VisitSchedulePrPanel from '../components/mp/VisitSchedulePrPanel'
 import PageHero from '../components/ui/PageHero'
+import { BtnOutline, BtnPrimary } from '../components/ui/MockupLayouts'
 
 export default function PrOrderSchedulePage() {
   const { id: mpOrderId = '' } = useParams()
@@ -19,6 +21,31 @@ export default function PrOrderSchedulePage() {
   const [category, setCategory] = useState('')
   const [mpOrder, setMpOrder] = useState<Record<string, unknown> | null>(null)
   const [selectedApplicants, setSelectedApplicants] = useState<Record<string, unknown>[]>([])
+  const [orderGroupChatActive, setOrderGroupChatActive] = useState(false)
+  const [orderGroupChatClosed, setOrderGroupChatClosed] = useState(false)
+  const [orderGroupChatTitle, setOrderGroupChatTitle] = useState('')
+  const [orderGroupChatCreating, setOrderGroupChatCreating] = useState(false)
+
+  const syncOrderGroupChatState = useCallback(async () => {
+    if (!mpOrderId) return
+    try {
+      const body = await getGroup(mpOrderId)
+      const group = body.group as Record<string, unknown> | undefined
+      if (!group) {
+        setOrderGroupChatActive(false)
+        setOrderGroupChatClosed(false)
+        setOrderGroupChatTitle('')
+        return
+      }
+      setOrderGroupChatActive(true)
+      setOrderGroupChatClosed(group.status === 'closed')
+      setOrderGroupChatTitle(String(group.title || ''))
+    } catch {
+      setOrderGroupChatActive(false)
+      setOrderGroupChatClosed(false)
+      setOrderGroupChatTitle('')
+    }
+  }, [mpOrderId])
 
   const loadOrder = useCallback(async () => {
     if (!mpOrderId) return
@@ -54,6 +81,7 @@ export default function PrOrderSchedulePage() {
           a.taskStatus !== 'rejected',
       ) as Record<string, unknown>[]
       setSelectedApplicants(pool)
+      await syncOrderGroupChatState()
       if (!pool.length) setErr('请先在报名管理中确认选择并通知达人')
       else if (!isReview && !isVisitPlanDatesConfirmed(mp)) {
         navigate(`/orders/${encodeURIComponent(mpOrderId)}/schedule/dates`, { replace: true })
@@ -63,11 +91,39 @@ export default function PrOrderSchedulePage() {
     } finally {
       setLoading(false)
     }
-  }, [mpOrderId, isReview, navigate])
+  }, [mpOrderId, isReview, navigate, syncOrderGroupChatState])
 
   useEffect(() => {
     void loadOrder()
   }, [loadOrder])
+
+  async function onConfirmCreateOrderGroupChat() {
+    if (orderGroupChatCreating) return
+    const selectedCount = selectedApplicants.length
+    if (selectedCount <= 0) {
+      window.alert('暂无待排期达人')
+      return
+    }
+    if (orderGroupChatActive) {
+      navigate(`/orders/${encodeURIComponent(mpOrderId)}/group-chat`)
+      return
+    }
+    if (!window.confirm(`将为已选 ${selectedCount} 位达人创建小程序商单群。是否确认？`)) return
+    setOrderGroupChatCreating(true)
+    try {
+      const body = await createGroup(mpOrderId)
+      const group = body.group as Record<string, unknown> | undefined
+      setOrderGroupChatActive(true)
+      setOrderGroupChatClosed(false)
+      setOrderGroupChatTitle(String(group?.title || ''))
+      window.alert(body.existed ? '群已存在' : '商单群已创建')
+      navigate(`/orders/${encodeURIComponent(mpOrderId)}/group-chat`)
+    } catch (e) {
+      window.alert(String(e instanceof Error ? e.message : e || '创建失败'))
+    } finally {
+      setOrderGroupChatCreating(false)
+    }
+  }
 
   function onEffectiveSaved(talentCount?: number) {
     if (isReview) {
@@ -94,7 +150,7 @@ export default function PrOrderSchedulePage() {
   return (
     <div className="page-content-shell page-content-shell--wide">
       <PageHero title={pageTitle} subtitle={title || mpOrderId}>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 items-center">
           <Link
             to={
               isReview
@@ -105,6 +161,18 @@ export default function PrOrderSchedulePage() {
           >
             {isVisitPlanDatesConfirmed(mpOrder) ? '修改可探店日期' : '设置可探店日期'}
           </Link>
+          {!loading && !err && selectedApplicants.length > 0 ? (
+            orderGroupChatActive ? (
+              <BtnOutline onClick={() => navigate(`/orders/${encodeURIComponent(mpOrderId)}/group-chat`)}>
+                {orderGroupChatClosed ? '查看商单群' : '进入商单群'}
+                {orderGroupChatTitle ? ` · ${orderGroupChatTitle}` : ''}
+              </BtnOutline>
+            ) : (
+              <BtnPrimary disabled={orderGroupChatCreating} onClick={() => void onConfirmCreateOrderGroupChat()}>
+                {orderGroupChatCreating ? '拉群中…' : '一键拉群'}
+              </BtnPrimary>
+            )
+          ) : null}
           <Link
             to={`/orders?tab=${backTab}`}
             className="inline-flex items-center px-4 py-2 rounded-xl border border-[var(--shell-border)] text-sm"

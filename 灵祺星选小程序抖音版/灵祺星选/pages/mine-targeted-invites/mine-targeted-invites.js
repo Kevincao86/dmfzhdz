@@ -2,6 +2,7 @@ const mpTargetedRecruitApi = require('../../utils/mpTargetedRecruitApi.js')
 const mpTargetedRecruit = require('../../utils/mpTargetedRecruit.js')
 const participant = require('../../utils/participant.js')
 const auth = require('../../utils/auth.js')
+const oaBind = require('../../utils/mpWechatOaBindApi.js')
 const { prepareMineSubPage } = require('../../utils/pageIdentityChrome.js')
 
 Page({
@@ -9,15 +10,37 @@ Page({
   data: {
     rows: [],
     loading: true,
+    oaBound: true,
+    oaDisplayName: '灵祺星选',
   },
   onShow() {
     prepareMineSubPage('talent')
     this.load()
+    void this.refreshOaStatus()
   },
   resolveMemberId() {
     const acct = auth.readAccount()
     const mid = String((acct && acct.registryMemberId) || participant.resolveTalentMemberId() || '').trim()
     return mid
+  },
+  async refreshOaStatus() {
+    const talentMemberId = this.resolveMemberId()
+    if (!talentMemberId) {
+      this.setData({ oaBound: true })
+      return
+    }
+    try {
+      const res = await oaBind.getStatus(talentMemberId)
+      this.setData({
+        oaBound: !!res.bound,
+        oaDisplayName: res.oaDisplayName || '灵祺星选',
+      })
+    } catch (_) {
+      this.setData({ oaBound: true })
+    }
+  },
+  onOpenOaBind() {
+    wx.navigateTo({ url: '/pages/mine-wechat-oa-bind/mine-wechat-oa-bind' })
   },
   async load() {
     const talentMemberId = this.resolveMemberId()

@@ -1,4 +1,6 @@
 const groupChat = require('../../utils/mpOrderGroupChatApi.js')
+const groupReadState = require('../../utils/mpOrderGroupChatReadState.js')
+const chatBadgeWatcher = require('../../utils/chatBadgeWatcher.js')
 const composer = require('../../utils/mpChatComposer.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 
@@ -77,6 +79,11 @@ Page({
     const last = ui[ui.length - 1]
     if (ui.length) {
       this._sinceTs = Math.max(this._sinceTs, ...ui.map((m) => m.ts || 0))
+    }
+    if (this._mpOrderId && ui.length) {
+      const maxTs = Math.max(...ui.map((m) => m.ts || 0))
+      groupReadState.markRead(this._mpOrderId, maxTs)
+      void chatBadgeWatcher.refreshNow()
     }
     const closed = group.status === 'closed' || body.canSend === false
     this.setData({
