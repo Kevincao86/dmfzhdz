@@ -1,4 +1,4 @@
-import { ChevronDown, Clapperboard, Copy, Play, Search, X } from 'lucide-react'
+import { ChevronDown, Clapperboard, Copy, Loader2, Play, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../cn'
 import {
@@ -16,6 +16,24 @@ const TABS: { id: TabId; label: string; kind: ShortVideoCaseKind }[] = [
   { id: 'skill', label: '技能', kind: 'skill' },
   { id: 'film', label: '短片', kind: 'film' },
 ]
+
+/** 预取缓存，避免重复下载 */
+const prefetchCache = new Map<string, Promise<void>>()
+
+function prefetchCaseVideo(url: string | undefined) {
+  const u = String(url || '').trim()
+  if (!u || typeof window === 'undefined') return
+  if (prefetchCache.has(u)) return
+  const p = fetch(u, { credentials: 'same-origin', mode: 'cors', cache: 'force-cache' })
+    .then(async (res) => {
+      if (!res.ok) throw new Error(String(res.status))
+      await res.blob()
+    })
+    .catch(() => {
+      prefetchCache.delete(u)
+    })
+  prefetchCache.set(u, p)
+}
 
 export type ShortVideoCaseGalleryProps = {
   onApplyCase: (item: ShortVideoCaseItem) => void
@@ -50,6 +68,12 @@ export default function ShortVideoCaseGallery({ onApplyCase, className }: ShortV
       document.body.style.overflow = prev
     }
   }, [preview])
+
+  // 首屏可见案例做轻量预取（最多 3 个），降低第一次点开等待
+  useEffect(() => {
+    const first = casesByTab('film').slice(0, 3)
+    for (const c of first) prefetchCaseVideo(c.videoUrl)
+  }, [])
 
   const activeTab = TABS.find((t) => t.id === tab)!
 
@@ -121,6 +145,7 @@ export default function ShortVideoCaseGallery({ onApplyCase, className }: ShortV
             item={item}
             onPreview={() => setPreview(item)}
             onApply={() => onApplyCase(item)}
+            onHover={() => prefetchCaseVideo(item.videoUrl)}
           />
         ))}
       </div>
@@ -130,13 +155,19 @@ export default function ShortVideoCaseGallery({ onApplyCase, className }: ShortV
       ) : null}
 
       <p className="mt-4 text-center text-[11px] text-slate-400">
-        共 {SHORT_VIDEO_CASES.length} 个案例 · 点击卡片或「预览」播放（单路加载更流畅）·「做同款」回填参数
+        共 {SHORT_VIDEO_CASES.length} 个案例 · 悬停预载 · 轻量预览片 ·「做同款」回填参数
       </p>
 
-      {preview ? <CasePreviewModal item={preview} onClose={() => setPreview(null)} onApply={() => {
-        onApplyCase(preview)
-        setPreview(null)
-      }} /> : null}
+      {preview ? (
+        <CasePreviewModal
+          item={preview}
+          onClose={() => setPreview(null)}
+          onApply={() => {
+            onApplyCase(preview)
+            setPreview(null)
+          }}
+        />
+      ) : null}
     </section>
   )
 }
@@ -145,19 +176,26 @@ function CaseCard({
   item,
   onPreview,
   onApply,
+  onHover,
 }: {
   item: ShortVideoCaseItem
   onPreview: () => void
   onApply: () => void
+  onHover: () => void
 }) {
   const skill = findShortVideoSkill(item.skillId)
   const tall = item.aspect === '9:16'
 
   return (
-    <article className="flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+    <article
+      className="flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+      onMouseEnter={onHover}
+      onFocus={onHover}
+    >
       <button
         type="button"
         onClick={onPreview}
+        onPointerDown={onHover}
         className={cn(
           'relative block w-full overflow-hidden bg-slate-900 text-left',
           tall ? 'aspect-[9/16]' : 'aspect-video',
@@ -179,7 +217,7 @@ function CaseCard({
           />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
-        <span className="absolute left-1/2 top-1/2 z-[1] flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-lg transition group-hover:scale-105">
+        <span className="absolute left-1/2 top-1/2 z-[1] flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-lg">
           <Play className="h-5 w-5 fill-current" aria-hidden />
         </span>
         <div className="absolute bottom-0 left-0 right-0 z-[1] space-y-1 p-4 text-white">
@@ -191,7 +229,7 @@ function CaseCard({
           <h3 className="text-base font-semibold leading-snug">{item.title}</h3>
           <p className="text-xs text-white/85">{item.subtitle}</p>
           <p className="text-[11px] text-white/70">
-            {item.aspect} · {item.durationSec}s{item.longform ? ' · 长视频' : ''}
+            {item.aspect} · 预览约 {item.durationSec}s
             {skill ? ` · ${skill.name}` : ''}
           </p>
         </div>
@@ -200,6 +238,7 @@ function CaseCard({
         <button
           type="button"
           onClick={onPreview}
+          onPointerDown={onHover}
           disabled={!item.videoUrl}
           className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-200 disabled:opacity-40"
         >
@@ -230,13 +269,56 @@ function CasePreviewModal({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const skill = findShortVideoSkill(item.skillId)
+  const [loading, setLoading] = useState(true)
+  const [progress, setProgress] = useState(0)
+  const [err, setErr] = useState('')
 
   useEffect(() => {
+    prefetchCaseVideo(item.videoUrl)
+    setLoading(true)
+    setProgress(0)
+    setErr('')
     const v = videoRef.current
     if (!v) return
-    v.currentTime = 0
-    void v.play().catch(() => undefined)
-  }, [item.id])
+
+    const onProgress = () => {
+      try {
+        if (!v.duration || !Number.isFinite(v.duration)) return
+        const end = v.buffered.length ? v.buffered.end(v.buffered.length - 1) : 0
+        setProgress(Math.min(99, Math.round((end / v.duration) * 100)))
+      } catch {
+        /* ignore */
+      }
+    }
+    const onCanPlay = () => {
+      setLoading(false)
+      setProgress(100)
+      void v.play().catch(() => undefined)
+    }
+    const onWaiting = () => setLoading(true)
+    const onPlaying = () => setLoading(false)
+    const onError = () => {
+      setLoading(false)
+      setErr('视频加载失败，请稍后重试')
+    }
+
+    v.addEventListener('progress', onProgress)
+    v.addEventListener('loadeddata', onProgress)
+    v.addEventListener('canplay', onCanPlay)
+    v.addEventListener('waiting', onWaiting)
+    v.addEventListener('playing', onPlaying)
+    v.addEventListener('error', onError)
+    v.load()
+
+    return () => {
+      v.removeEventListener('progress', onProgress)
+      v.removeEventListener('loadeddata', onProgress)
+      v.removeEventListener('canplay', onCanPlay)
+      v.removeEventListener('waiting', onWaiting)
+      v.removeEventListener('playing', onPlaying)
+      v.removeEventListener('error', onError)
+    }
+  }, [item.id, item.videoUrl])
 
   return (
     <div
@@ -262,19 +344,34 @@ function CasePreviewModal({
           <X className="h-4 w-4" />
         </button>
         {item.videoUrl ? (
-          <video
-            ref={videoRef}
-            key={item.videoUrl}
-            src={item.videoUrl}
-            poster={item.coverUrl}
-            controls
-            playsInline
-            preload="metadata"
-            className={cn(
-              'max-h-[70vh] w-full bg-black object-contain',
-              item.aspect === '16:9' ? 'aspect-video' : 'aspect-[9/16]',
-            )}
-          />
+          <div className="relative bg-black">
+            <video
+              ref={videoRef}
+              key={item.videoUrl}
+              src={item.videoUrl}
+              poster={item.coverUrl}
+              controls
+              playsInline
+              muted
+              autoPlay
+              preload="auto"
+              className={cn(
+                'max-h-[70vh] w-full bg-black object-contain',
+                item.aspect === '16:9' ? 'aspect-video' : 'aspect-[9/16]',
+              )}
+            />
+            {loading && !err ? (
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/35 text-white">
+                <Loader2 className="h-8 w-8 animate-spin opacity-90" />
+                <p className="text-xs font-medium tabular-nums">加载中 {progress}%</p>
+              </div>
+            ) : null}
+            {err ? (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/60 px-4 text-center text-sm text-white/90">
+                {err}
+              </div>
+            ) : null}
+          </div>
         ) : (
           <div
             className={cn(
@@ -290,7 +387,7 @@ function CasePreviewModal({
             <h3 className="text-lg font-semibold">{item.title}</h3>
             <p className="mt-1 text-sm text-white/70">{item.subtitle}</p>
             <p className="mt-1 text-xs text-white/50">
-              {item.aspect} · {item.durationSec}s
+              {item.aspect} · 预览约 {item.durationSec}s
               {skill ? ` · ${skill.name}` : ''}
             </p>
           </div>
