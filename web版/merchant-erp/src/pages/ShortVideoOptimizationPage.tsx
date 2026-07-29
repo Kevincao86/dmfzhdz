@@ -1761,9 +1761,24 @@ export default function ShortVideoOptimizationPage() {
               setHint('已切到短片生成 · 分镜参考，请上传素材；也可再回「无限画布」查看节点')
               queueMicrotask(() => storyFrameInputRef.current?.click())
             }}
-            onEditRow={() => {
+            onEditRow={(index) => {
+              setLongformEnabled(true)
+              setGenMode('text')
               setMainPane('generate')
-              setHint('已进入短片生成 · 可继续完善分镜与口播')
+              setHint(`正在编辑分镜 ${index + 1}，请在下方「执导分镜脚本」完善画面与口播`)
+              queueMicrotask(() => {
+                document
+                  .getElementById('sv-script-table-anchor')
+                  ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+              })
+            }}
+            onRemoveScriptRow={(index) => {
+              setScriptRows((prev) => removeScriptRowAt(prev, index))
+              setHint(`已删除分镜 ${index + 1}`)
+            }}
+            onRemoveMedia={(id) => {
+              removeStoryFrame(id)
+              setHint('已删除画布参考素材')
             }}
           />
           <div className="flex flex-wrap gap-2">
@@ -2044,7 +2059,7 @@ export default function ShortVideoOptimizationPage() {
                 <p className="text-xs text-zinc-500">
                   粘贴或上传执行文案后，点击「AI 规划分镜」；AI 会先完整阅读输入框内容再填入下方分镜表。
                 </p>
-                <div className="mt-1 flex flex-col gap-2">
+                <div id="sv-script-table-anchor" className="mt-1 flex flex-col gap-2">
                   <span className="text-sm font-medium text-zinc-800">执导分镜脚本</span>
                   <ShortVideoScriptTableEditor
                     rows={scriptRows}
