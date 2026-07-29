@@ -145,7 +145,9 @@ async function main() {
     bucket: cfg.bucket,
   })
 
-  const publicBase = `https://${cfg.bucket}.${cfg.region}.aliyuncs.com/${cfg.prefix}`
+  const publicBase = `https://mofangdianai.com/erp-mp-static/short-video-cases`
+  // OSS 仍上传作备份；播放走轻量 CDN（OSS 桶强制 attachment 无法 <video> 内联）
+  const ossBase = `https://${cfg.bucket}.${cfg.region}.aliyuncs.com/${cfg.prefix}`
   let ok = 0
   let bytes = 0
   for (const name of files) {
@@ -156,9 +158,9 @@ async function main() {
     await client.put(key, local, {
       headers: {
         'Content-Type': contentType(name),
+        'Content-Disposition': 'inline',
         'Cache-Control': 'public, max-age=31536000, immutable',
         'x-oss-object-acl': 'public-read',
-        'Access-Control-Allow-Origin': '*',
       },
     })
     ok += 1
@@ -166,7 +168,10 @@ async function main() {
   }
 
   writeCdnTs(publicBase)
-  console.log(`DONE ${ok} files ${(bytes / 1024 / 1024).toFixed(2)}MB → ${publicBase}/`)
+  console.log(`DONE ${ok} files ${(bytes / 1024 / 1024).toFixed(2)}MB`)
+  console.log(`播放 CDN: ${publicBase}/`)
+  console.log(`OSS 备份: ${ossBase}/`)
+  console.log('请再执行: bash scripts/ecs-sync-short-video-cases.sh')
 }
 
 main().catch((e) => {
