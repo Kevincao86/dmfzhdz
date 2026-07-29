@@ -30,7 +30,6 @@ function prefetchCaseVideo(url: string | undefined) {
     link.rel = 'preload'
     link.as = 'video'
     link.href = u
-    link.crossOrigin = 'anonymous'
     document.head.appendChild(link)
   } catch {
     /* ignore */
@@ -163,7 +162,7 @@ export default function ShortVideoCaseGallery({ onApplyCase, className }: ShortV
       ) : null}
 
       <p className="mt-4 text-center text-[11px] text-slate-400">
-        共 {SHORT_VIDEO_CASES.length} 个案例 · OSS 秒开预览 · 悬停预载 ·「做同款」回填参数
+        共 {SHORT_VIDEO_CASES.length} 个案例 · CDN 秒开预览 · 悬停预载 ·「做同款」回填参数
       </p>
 
       {preview ? (
@@ -280,15 +279,25 @@ function CasePreviewModal({
   const [loading, setLoading] = useState(true)
   const [progress, setProgress] = useState(0)
   const [err, setErr] = useState('')
+  const primaryUrl = String(item.videoUrl || '').trim()
+  const localFallback = primaryUrl.includes('aliyuncs.com')
+    ? `/short-video-cases/${item.id}.mp4?v=local1`
+    : ''
+  const [playUrl, setPlayUrl] = useState(primaryUrl)
 
   useEffect(() => {
-    prefetchCaseVideo(item.videoUrl)
+    setPlayUrl(primaryUrl)
     setLoading(true)
     setProgress(0)
     setErr('')
-    const v = videoRef.current
-    if (!v) return
+    prefetchCaseVideo(primaryUrl)
+  }, [item.id, primaryUrl])
 
+  useEffect(() => {
+    const v = videoRef.current
+    if (!v || !playUrl) return
+
+    let usedFallback = false
     const onProgress = () => {
       try {
         if (!v.duration || !Number.isFinite(v.duration)) return
@@ -301,11 +310,22 @@ function CasePreviewModal({
     const onCanPlay = () => {
       setLoading(false)
       setProgress(100)
+      setErr('')
       void v.play().catch(() => undefined)
     }
     const onWaiting = () => setLoading(true)
-    const onPlaying = () => setLoading(false)
+    const onPlaying = () => {
+      setLoading(false)
+      setErr('')
+    }
     const onError = () => {
+      if (!usedFallback && localFallback && playUrl !== localFallback) {
+        usedFallback = true
+        setPlayUrl(localFallback)
+        setLoading(true)
+        setErr('')
+        return
+      }
       setLoading(false)
       setErr('视频加载失败，请稍后重试')
     }
@@ -326,7 +346,7 @@ function CasePreviewModal({
       v.removeEventListener('playing', onPlaying)
       v.removeEventListener('error', onError)
     }
-  }, [item.id, item.videoUrl])
+  }, [playUrl, localFallback])
 
   return (
     <div
@@ -351,19 +371,18 @@ function CasePreviewModal({
         >
           <X className="h-4 w-4" />
         </button>
-        {item.videoUrl ? (
+        {playUrl ? (
           <div className="relative bg-black">
             <video
               ref={videoRef}
-              key={item.videoUrl}
-              src={item.videoUrl}
+              key={playUrl}
+              src={playUrl}
               poster={item.coverUrl}
               controls
               playsInline
               muted
               autoPlay
               preload="auto"
-              crossOrigin="anonymous"
               className={cn(
                 'max-h-[70vh] w-full bg-black object-contain',
                 item.aspect === '16:9' ? 'aspect-video' : 'aspect-[9/16]',

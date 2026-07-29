@@ -1,5 +1,7 @@
 /**
- * 短视频案例墙 CDN/OSS 公网前缀（由 upload-short-video-cases-oss.js 自动生成）
- * 直链 OSS，避免新ECS 静态带宽瓶颈。
+ * 短视频案例墙 CDN 公网前缀
+ * 走轻量 mofangdianai.com/erp-mp-static（可内联播放）。
+ * 注：modianningbo OSS 桶开启了强制下载（Content-Disposition: attachment），浏览器无法 <video> 直播。
  */
-export const SHORT_VIDEO_CASE_CDN_BASE = 'https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/web-static/merchant/short-video-cases'
+export const SHORT_VIDEO_CASE_CDN_BASE =
+  'https://mofangdianai.com/erp-mp-static/short-video-cases'
