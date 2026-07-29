@@ -202,11 +202,14 @@
     counters.forEach(animateCount);
   }
 
-  /* Contact form → mailto draft */
+  /* Contact form → 轻量飞书咨询 API */
   const form = document.getElementById("contact-form");
   const note = document.getElementById("form-note");
+  const CONTACT_API =
+    (window.MODIAN_CONTACT_API || "https://mofangdianai.com/erp-api/meoo-official-contact").replace(/\/+$/, "");
+
   if (form) {
-    form.addEventListener("submit", (e) => {
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const data = new FormData(form);
       const name = String(data.get("name") || "").trim();
@@ -223,27 +226,41 @@
         return;
       }
 
-      const subject = encodeURIComponent(`【墨典官网咨询】${need} · ${company}`);
-      const body = encodeURIComponent(
-        [
-          `姓名：${name}`,
-          `公司：${company}`,
-          `联系方式：${phone}`,
-          `需求方向：${need}`,
-          "",
-          "简要描述：",
-          message || "（未填写）",
-          "",
-          "—— 来自墨典官网咨询表单",
-        ].join("\n")
-      );
-
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn instanceof HTMLButtonElement) submitBtn.disabled = true;
       if (note) {
         note.classList.remove("error");
-        note.textContent = "已打开邮件草稿，发送后我们会尽快与您联系。";
+        note.textContent = "正在提交…";
       }
 
-      window.location.href = `mailto:hello@modian.ai?subject=${subject}&body=${body}`;
+      try {
+        const res = await fetch(CONTACT_API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, company, phone, need, message }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.ok) {
+          const err = String(json.error || `HTTP ${res.status}`);
+          if (err === "feishu_not_configured") {
+            throw new Error("咨询通道尚未配置完成，请稍后重试或发邮件至 modian@mofangdianai.com");
+          }
+          throw new Error(err);
+        }
+        if (note) {
+          note.classList.remove("error");
+          note.textContent = "已提交，我们会尽快与您联系。";
+        }
+        form.reset();
+      } catch (err) {
+        if (note) {
+          note.classList.add("error");
+          note.textContent =
+            err instanceof Error ? err.message : "提交失败，请稍后重试或发邮件至 modian@mofangdianai.com";
+        }
+      } finally {
+        if (submitBtn instanceof HTMLButtonElement) submitBtn.disabled = false;
+      }
     });
   }
 
