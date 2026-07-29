@@ -132,6 +132,7 @@ import teamIntroPublicHandler from '../api/meoo-team-intro-public.ts'
 import teamIntroSetHandler from '../api/meoo-ops-team-intro-set.ts'
 import platformDecorPublicHandler from '../api/meoo-platform-decor-public.ts'
 import platformDecorSetHandler from '../api/meoo-ops-platform-decor-set.ts'
+import officialContactHandler from '../api/meoo-official-contact.ts'
 import mpTalentMemberRegisterHandler from '../api/meoo-ops-mp-talent-member-register.ts'
 import mpTalentPrQuotesHandler from '../api/meoo-ops-mp-talent-pr-quotes.ts'
 import mpTalentCooperationStatsHandler from '../api/meoo-ops-mp-talent-cooperation-stats.ts'
@@ -196,7 +197,7 @@ import apiPingHandler from '../api/ping.ts'
 import merchantSlugHandler from '../api/merchant/[...slug].ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260728-support-feishu-bidirectional'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260729-official-contact'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -380,6 +381,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-team-intro-set': teamIntroSetHandler as VercelLikeHandler,
   '/api/meoo-platform-decor-public': platformDecorPublicHandler as VercelLikeHandler,
   '/api/meoo-ops-platform-decor-set': platformDecorSetHandler as VercelLikeHandler,
+  '/api/meoo-official-contact': officialContactHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-talent-member-register': mpTalentMemberRegisterHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-talent-pr-quotes': mpTalentPrQuotesHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-talent-cooperation-stats': mpTalentCooperationStatsHandler as VercelLikeHandler,
