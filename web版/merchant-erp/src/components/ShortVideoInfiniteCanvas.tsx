@@ -1,7 +1,9 @@
 import {
   Film,
   Focus,
+  GitBranch,
   ImagePlus,
+  Link2,
   Minus,
   Pencil,
   Plus,
@@ -22,14 +24,17 @@ export type CanvasMediaItem = {
   label: string
 }
 
+export type CanvasFlowEdge = { id: string; from: number; to: number }
+
 export type ShortVideoInfiniteCanvasProps = {
   scriptRows: ShortVideoScriptRow[]
   media: CanvasMediaItem[]
   disabled?: boolean
-  /** 双击 / 点「编辑」进入短片生成 */
   onEditRow?: (index: number) => void
   onRemoveScriptRow?: (index: number) => void
   onRemoveMedia?: (id: string) => void
+  /** 按连线拓扑序重排分镜并写回流程 */
+  onApplyFlowOrder?: (orderedIndices: number[]) => void
   onAddMediaClick?: () => void
   className?: string
 }
@@ -50,7 +55,6 @@ function defaultMediaPos(index: number): Pt {
   }
 }
 
-/** 分镜默认横向顺序排列，便于连线表达时间轴 */
 function defaultScriptPos(index: number, mediaCount: number): Pt {
   const col0 = mediaCount > 0 ? 48 + 2 * (NODE_W + GAP_X) : 64
   const perRow = 4
@@ -58,6 +62,36 @@ function defaultScriptPos(index: number, mediaCount: number): Pt {
     x: col0 + (index % perRow) * (SCRIPT_W + GAP_X),
     y: 56 + Math.floor(index / perRow) * (SCRIPT_H + GAP_Y),
   }
+}
+
+function sequentialEdges(n: number): CanvasFlowEdge[] {
+  const out: CanvasFlowEdge[] = []
+  for (let i = 0; i < n - 1; i++) out.push({ id: `e-${i}-${i + 1}`, from: i, to: i + 1 })
+  return out
+}
+
+/** Kahn 拓扑；有环时回退为现有下标顺序 */
+function topoOrder(n: number, edges: CanvasFlowEdge[]): number[] {
+  const indeg = Array.from({ length: n }, () => 0)
+  const adj: number[][] = Array.from({ length: n }, () => [])
+  for (const e of edges) {
+    if (e.from < 0 || e.to < 0 || e.from >= n || e.to >= n || e.from === e.to) continue
+    adj[e.from]!.push(e.to)
+    indeg[e.to]! += 1
+  }
+  const q: number[] = []
+  for (let i = 0; i < n; i++) if (indeg[i] === 0) q.push(i)
+  const order: number[] = []
+  while (q.length) {
+    const u = q.shift()!
+    order.push(u)
+    for (const v of adj[u] || []) {
+      indeg[v]! -= 1
+      if (indeg[v] === 0) q.push(v)
+    }
+  }
+  if (order.length !== n) return Array.from({ length: n }, (_, i) => i)
+  return order
 }
 
 type DragKind = 'pan' | 'node'
@@ -69,6 +103,7 @@ export default function ShortVideoInfiniteCanvas({
   onEditRow,
   onRemoveScriptRow,
   onRemoveMedia,
+  onApplyFlowOrder,
   onAddMediaClick,
   className,
 }: ShortVideoInfiniteCanvasProps) {
@@ -77,7 +112,9 @@ export default function ShortVideoInfiniteCanvas({
   const [panning, setPanning] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [nodePosMap, setNodePosMap] = useState<Record<string, Pt>>({})
-  const [showFlow, setShowFlow] = useState(true)
+  const [linkMode, setLinkMode] = useState(true)
+  const [edges, setEdges] = useState<CanvasFlowEdge[]>([])
+  const [linkFrom, setLinkFrom] = useState<number | null>(null)
 
   const dragRef = useRef<{
     kind: DragKind
@@ -88,9 +125,11 @@ export default function ShortVideoInfiniteCanvas({
   } | null>(null)
   const lastTapRef = useRef<{ id: string; at: number } | null>(null)
   const viewportRef = useRef<HTMLDivElement>(null)
+  const edgesInitRef = useRef(false)
 
   const scriptNodes = scriptRows.slice(0, 12)
   const mediaNodes = media.slice(0, 12)
+  const n = scriptNodes.length
 
   const mediaIds = useMemo(() => mediaNodes.map((m) => m.id).join('|'), [mediaNodes])
   const scriptKey = useMemo(
@@ -130,6 +169,21 @@ export default function ShortVideoInfiniteCanvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mediaIds, scriptKey, mediaNodes.length])
 
+  // 分镜数量变化时：首次给顺序边；之后裁剪非法边
+  useEffect(() => {
+    setEdges((prev) => {
+      if (n < 2) return []
+      if (!edgesInitRef.current) {
+        edgesInitRef.current = true
+        return sequentialEdges(n)
+      }
+      const clipped = prev.filter((e) => e.from < n && e.to < n && e.from !== e.to)
+      // 若节点变多且无出边覆盖，不自动乱连，保持用户边
+      return clipped
+    })
+    setLinkFrom(null)
+  }, [n, scriptKey])
+
   const onWheel = useCallback((e: React.WheelEvent) => {
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault()
@@ -153,6 +207,32 @@ export default function ShortVideoInfiniteCanvas({
     const m = /^script:(\d+)$/.exec(nodeId)
     if (!m) return
     onEditRow?.(Number(m[1]))
+  }
+
+  const addEdge = (from: number, to: number) => {
+    if (from === to) return
+    setEdges((prev) => {
+      if (prev.some((e) => e.from === from && e.to === to)) return prev
+      return [...prev, { id: `e-${from}-${to}-${Date.now()}`, from, to }]
+    })
+    setLinkFrom(null)
+  }
+
+  const onPortOut = (index: number, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (disabled || !linkMode) return
+    setLinkFrom(index)
+    setSelectedId(`script:${index}`)
+  }
+
+  const onPortIn = (index: number, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (disabled || !linkMode) return
+    if (linkFrom == null) {
+      setLinkFrom(index)
+      return
+    }
+    addEdge(linkFrom, index)
   }
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -188,6 +268,7 @@ export default function ShortVideoInfiniteCanvas({
     }
     setPanning(true)
     setSelectedId(null)
+    setLinkFrom(null)
   }
 
   const onPointerMove = (e: React.PointerEvent) => {
@@ -239,28 +320,30 @@ export default function ShortVideoInfiniteCanvas({
     setOffset({ x: 20, y: 12 })
     setNodePosMap({})
     setSelectedId(null)
+    setLinkFrom(null)
   }
 
   const flowPaths = useMemo(() => {
-    if (!showFlow || scriptNodes.length < 2) return [] as { d: string; label: string; mid: Pt }[]
-    const out: { d: string; label: string; mid: Pt }[] = []
-    for (let i = 0; i < scriptNodes.length - 1; i++) {
-      const a = nodePosMap[`script:${i}`] || defaultScriptPos(i, mediaNodes.length)
-      const b = nodePosMap[`script:${i + 1}`] || defaultScriptPos(i + 1, mediaNodes.length)
+    if (edges.length === 0) return [] as { id: string; d: string; label: string; mid: Pt }[]
+    return edges.map((e) => {
+      const a = nodePosMap[`script:${e.from}`] || defaultScriptPos(e.from, mediaNodes.length)
+      const b = nodePosMap[`script:${e.to}`] || defaultScriptPos(e.to, mediaNodes.length)
       const x1 = a.x + SCRIPT_W
       const y1 = a.y + SCRIPT_H / 2
       const x2 = b.x
       const y2 = b.y + SCRIPT_H / 2
       const dx = Math.max(40, Math.abs(x2 - x1) * 0.45)
       const d = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`
-      out.push({
+      return {
+        id: e.id,
         d,
-        label: `${i + 1}→${i + 2}`,
+        label: `${e.from + 1}→${e.to + 1}`,
         mid: { x: (x1 + x2) / 2, y: (y1 + y2) / 2 - 10 },
-      })
-    }
-    return out
-  }, [showFlow, scriptNodes, nodePosMap, mediaNodes.length])
+      }
+    })
+  }, [edges, nodePosMap, mediaNodes.length])
+
+  const orderPreview = useMemo(() => topoOrder(n, edges).map((i) => i + 1).join(' → '), [n, edges])
 
   return (
     <div
@@ -277,7 +360,7 @@ export default function ShortVideoInfiniteCanvas({
           <div>
             <p className="text-sm font-semibold text-slate-900">无限画布</p>
             <p className="text-[11px] text-slate-500">
-              拖拽排版 · 顺序连线 · 双击/编辑进分镜 · 删除节点 · ⌘/Ctrl+滚轮缩放
+              右侧圆点拖出连线 / 点入口完成 · 自由编排流程 · 双击编辑
             </p>
           </div>
         </div>
@@ -285,16 +368,50 @@ export default function ShortVideoInfiniteCanvas({
           <button
             type="button"
             disabled={disabled}
-            onClick={() => setShowFlow((v) => !v)}
+            onClick={() => setLinkMode((v) => !v)}
             className={cn(
-              'rounded-lg border px-2.5 py-1.5 text-xs font-medium',
-              showFlow
+              'inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium',
+              linkMode
                 ? 'border-cyan-200 bg-cyan-50 text-cyan-800'
                 : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
             )}
           >
-            {showFlow ? '顺序连线 · 开' : '顺序连线 · 关'}
+            <Link2 className="h-3.5 w-3.5" />
+            {linkMode ? '自由连线 · 开' : '自由连线 · 关'}
           </button>
+          <button
+            type="button"
+            disabled={disabled || n < 2}
+            onClick={() => {
+              setEdges(sequentialEdges(n))
+              setLinkFrom(null)
+            }}
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+          >
+            <GitBranch className="h-3.5 w-3.5" />
+            一键顺序
+          </button>
+          <button
+            type="button"
+            disabled={disabled || edges.length === 0}
+            onClick={() => {
+              setEdges([])
+              setLinkFrom(null)
+            }}
+            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+          >
+            清空连线
+          </button>
+          {onApplyFlowOrder ? (
+            <button
+              type="button"
+              disabled={disabled || n < 2 || edges.length === 0}
+              onClick={() => onApplyFlowOrder(topoOrder(n, edges))}
+              className="rounded-lg border border-cyan-200 bg-cyan-50 px-2.5 py-1.5 text-xs font-semibold text-cyan-900 hover:bg-cyan-100 disabled:opacity-40"
+            >
+              应用流程
+            </button>
+          ) : null}
           <ToolbarBtn label="缩小" onClick={() => setScale((s) => Math.max(0.35, s - 0.1))} icon={ZoomOut} disabled={disabled} />
           <span className="min-w-[3rem] text-center text-xs tabular-nums text-slate-600">{Math.round(scale * 100)}%</span>
           <ToolbarBtn label="放大" onClick={() => setScale((s) => Math.min(2.2, s + 0.1))} icon={ZoomIn} disabled={disabled} />
@@ -312,6 +429,12 @@ export default function ShortVideoInfiniteCanvas({
           ) : null}
         </div>
       </div>
+
+      {linkFrom != null ? (
+        <div className="border-b border-amber-100 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-900">
+          已选择镜 {linkFrom + 1} 的出口，请点击另一分镜左侧入口完成连线；点空白处取消。
+        </div>
+      ) : null}
 
       <div
         ref={viewportRef}
@@ -337,54 +460,18 @@ export default function ShortVideoInfiniteCanvas({
             transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
           }}
         >
-          {showFlow && flowPaths.length > 0 ? (
-            <svg
-              className="pointer-events-none absolute left-0 top-0 overflow-visible"
-              width={2400}
-              height={1600}
-              aria-hidden
-            >
+          {flowPaths.length > 0 ? (
+            <svg className="pointer-events-none absolute left-0 top-0 overflow-visible" width={2800} height={1800} aria-hidden>
               <defs>
-                <marker
-                  id="sv-flow-arrow"
-                  markerWidth="8"
-                  markerHeight="8"
-                  refX="6"
-                  refY="3"
-                  orient="auto"
-                  markerUnits="strokeWidth"
-                >
+                <marker id="sv-flow-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
                   <path d="M0,0 L6,3 L0,6 Z" fill="#22d3ee" />
                 </marker>
               </defs>
               {flowPaths.map((p) => (
-                <g key={p.label}>
-                  <path
-                    d={p.d}
-                    fill="none"
-                    stroke="#67e8f9"
-                    strokeWidth="2.5"
-                    strokeDasharray="6 4"
-                    markerEnd="url(#sv-flow-arrow)"
-                    opacity="0.9"
-                  />
-                  <rect
-                    x={p.mid.x - 16}
-                    y={p.mid.y - 8}
-                    width="32"
-                    height="16"
-                    rx="8"
-                    fill="#ecfeff"
-                    stroke="#a5f3fc"
-                  />
-                  <text
-                    x={p.mid.x}
-                    y={p.mid.y + 4}
-                    textAnchor="middle"
-                    fontSize="9"
-                    fill="#0e7490"
-                    fontWeight="600"
-                  >
+                <g key={p.id}>
+                  <path d={p.d} fill="none" stroke="#67e8f9" strokeWidth="2.5" strokeDasharray="6 4" markerEnd="url(#sv-flow-arrow)" opacity="0.95" />
+                  <rect x={p.mid.x - 18} y={p.mid.y - 8} width="36" height="16" rx="8" fill="#ecfeff" stroke="#a5f3fc" />
+                  <text x={p.mid.x} y={p.mid.y + 4} textAnchor="middle" fontSize="9" fill="#0e7490" fontWeight="600">
                     {p.label}
                   </text>
                 </g>
@@ -413,9 +500,9 @@ export default function ShortVideoInfiniteCanvas({
                     data-node-action
                     disabled={disabled}
                     aria-label="删除参考"
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => {
-                      e.stopPropagation()
+                    onPointerDown={(ev) => ev.stopPropagation()}
+                    onClick={(ev) => {
+                      ev.stopPropagation()
                       onRemoveMedia(m.id)
                     }}
                     className="absolute right-1.5 top-1.5 z-[2] rounded-full bg-black/55 p-1 text-white hover:bg-rose-600"
@@ -439,7 +526,7 @@ export default function ShortVideoInfiniteCanvas({
           {scriptNodes.map((row, i) => {
             const id = `script:${i}`
             const p = nodePosMap[id] || defaultScriptPos(i, mediaNodes.length)
-            const selected = selectedId === id
+            const selected = selectedId === id || linkFrom === i
             return (
               <div
                 key={id}
@@ -452,60 +539,82 @@ export default function ShortVideoInfiniteCanvas({
                   if (e.key === 'Backspace' || e.key === 'Delete') onRemoveScriptRow?.(i)
                 }}
                 className={cn(
-                  'absolute cursor-grab overflow-hidden rounded-xl border bg-gradient-to-br from-white to-cyan-50/80 text-left shadow-lg shadow-cyan-900/5 active:cursor-grabbing',
+                  'absolute cursor-grab overflow-visible rounded-xl border bg-gradient-to-br from-white to-cyan-50/80 text-left shadow-lg shadow-cyan-900/5 active:cursor-grabbing',
                   selected ? 'border-cyan-400 ring-2 ring-cyan-400/40' : 'border-cyan-200/80 ring-1 ring-cyan-100',
                 )}
                 style={{ left: p.x, top: p.y, width: SCRIPT_W, height: SCRIPT_H }}
               >
-                <div className="flex items-center justify-between gap-1 border-b border-cyan-100/80 bg-cyan-500/10 px-2 py-1.5">
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-cyan-900">
-                    <Film className="h-3 w-3" />
-                    镜 {i + 1}
-                  </span>
-                  <span className="flex items-center gap-0.5">
-                    <span className="mr-1 text-[10px] tabular-nums text-cyan-800/80">{row.timeRange || '—'}</span>
+                {/* 入口 / 出口连线桩 */}
+                {linkMode ? (
+                  <>
                     <button
                       type="button"
                       data-node-action
-                      disabled={disabled}
-                      aria-label="编辑分镜"
-                      title="编辑"
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        tryOpenEdit(id)
-                      }}
-                      className="rounded-md p-1 text-cyan-800 hover:bg-cyan-100"
-                    >
-                      <Pencil className="h-3 w-3" />
-                    </button>
-                    {onRemoveScriptRow ? (
+                      title="连线入口"
+                      onPointerDown={(ev) => ev.stopPropagation()}
+                      onClick={(ev) => onPortIn(i, ev)}
+                      className="absolute -left-2 top-1/2 z-[3] h-4 w-4 -translate-y-1/2 rounded-full border-2 border-cyan-500 bg-white shadow hover:scale-110"
+                    />
+                    <button
+                      type="button"
+                      data-node-action
+                      title="连线出口"
+                      onPointerDown={(ev) => ev.stopPropagation()}
+                      onClick={(ev) => onPortOut(i, ev)}
+                      className="absolute -right-2 top-1/2 z-[3] h-4 w-4 -translate-y-1/2 rounded-full border-2 border-sky-500 bg-sky-400 shadow hover:scale-110"
+                    />
+                  </>
+                ) : null}
+
+                <div className="overflow-hidden rounded-xl">
+                  <div className="flex items-center justify-between gap-1 border-b border-cyan-100/80 bg-cyan-500/10 px-2 py-1.5">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-cyan-900">
+                      <Film className="h-3 w-3" />
+                      镜 {i + 1}
+                    </span>
+                    <span className="flex items-center gap-0.5">
+                      <span className="mr-1 text-[10px] tabular-nums text-cyan-800/80">{row.timeRange || '—'}</span>
                       <button
                         type="button"
                         data-node-action
-                        disabled={disabled || scriptNodes.length <= 2}
-                        aria-label="删除分镜"
-                        title={scriptNodes.length <= 2 ? '至少保留 2 段分镜' : '删除'}
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onRemoveScriptRow(i)
+                        disabled={disabled}
+                        aria-label="编辑分镜"
+                        onPointerDown={(ev) => ev.stopPropagation()}
+                        onClick={(ev) => {
+                          ev.stopPropagation()
+                          tryOpenEdit(id)
                         }}
-                        className="rounded-md p-1 text-slate-500 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30"
+                        className="rounded-md p-1 text-cyan-800 hover:bg-cyan-100"
                       >
-                        <Trash2 className="h-3 w-3" />
+                        <Pencil className="h-3 w-3" />
                       </button>
-                    ) : null}
-                  </span>
-                </div>
-                <div className="space-y-1 px-2.5 py-2">
-                  <p className="line-clamp-2 text-[11px] leading-snug text-slate-700">
-                    <Type className="mr-1 inline h-3 w-3 text-slate-400" />
-                    {row.visual || '（画面待填）'}
-                  </p>
-                  <p className="line-clamp-2 text-[10px] leading-snug text-slate-500">
-                    口播：{row.dialogue || '—'}
-                  </p>
+                      {onRemoveScriptRow ? (
+                        <button
+                          type="button"
+                          data-node-action
+                          disabled={disabled || scriptNodes.length <= 2}
+                          aria-label="删除分镜"
+                          onPointerDown={(ev) => ev.stopPropagation()}
+                          onClick={(ev) => {
+                            ev.stopPropagation()
+                            onRemoveScriptRow(i)
+                          }}
+                          className="rounded-md p-1 text-slate-500 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      ) : null}
+                    </span>
+                  </div>
+                  <div className="space-y-1 px-2.5 py-2">
+                    <p className="line-clamp-2 text-[11px] leading-snug text-slate-700">
+                      <Type className="mr-1 inline h-3 w-3 text-slate-400" />
+                      {row.visual || '（画面待填）'}
+                    </p>
+                    <p className="line-clamp-2 text-[10px] leading-snug text-slate-500">
+                      口播：{row.dialogue || '—'}
+                    </p>
+                  </div>
                 </div>
               </div>
             )
@@ -521,19 +630,8 @@ export default function ShortVideoInfiniteCanvas({
               <Plus className="h-8 w-8 text-slate-300" />
               <p className="mt-3 text-sm font-medium text-slate-700">画布为空</p>
               <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                在「短片生成」填写分镜或上传参考后，节点会出现在此。支持拖拽、顺序连线、编辑与删除。
+                填写分镜后可自由连线编排流程，再点「应用流程」同步到生成工作区。
               </p>
-              {onAddMediaClick ? (
-                <button
-                  type="button"
-                  data-node-action
-                  onClick={onAddMediaClick}
-                  className="mt-4 inline-flex items-center gap-1 rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white"
-                >
-                  <ImagePlus className="h-3.5 w-3.5" />
-                  添加参考素材
-                </button>
-              ) : null}
             </div>
           ) : null}
         </div>
@@ -541,13 +639,13 @@ export default function ShortVideoInfiniteCanvas({
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-white/80 px-3 py-2 text-[11px] text-slate-500">
         <span>
-          分镜 {scriptNodes.length} · 参考 {mediaNodes.length}
-          {scriptRows.length > 12 ? `（仅展示前 12 段）` : ''}
-          {selectedId?.startsWith('script:') ? ' · 已选中（双击或点铅笔编辑）' : ''}
+          分镜 {n} · 连线 {edges.length}
+          {n > 1 && edges.length > 0 ? ` · 流程预览 ${orderPreview}` : ''}
+          {selectedId?.startsWith('script:') ? ' · 已选中' : ''}
         </span>
         <span className="inline-flex items-center gap-2">
           <Minus className="h-3 w-3" /> 拖空白平移
-          <Plus className="h-3 w-3" /> 拖节点排版
+          <Plus className="h-3 w-3" /> 左右圆点连线
         </span>
       </div>
     </div>
