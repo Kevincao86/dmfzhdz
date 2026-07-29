@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""用 Seedance 为案例墙生成真实短片（覆盖 Ken Burns 静帧）。"""
+"""用 Seedance 为案例墙生成真实短片；默认只生成尚无 mp4 的案例。"""
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import time
@@ -15,6 +16,7 @@ API = "https://mofangdianai.com/erp-api"
 MODEL = "doubao-seedance-1-5-pro-251215"
 OUT = Path(__file__).resolve().parents[1] / "public" / "short-video-cases"
 
+# 全部案例；脚本会跳过已有 mp4（除非 FORCE=1）
 CASES = [
     (
         "case-visit-night",
@@ -55,6 +57,66 @@ CASES = [
         "case-seed-gadget",
         "9:16",
         "Modern desk organizer with gadgets, cool blue ambient light, camera slowly orbiting product, tech product demo video, continuous motion, photorealistic, no text",
+    ),
+    (
+        "case-hotpot",
+        "9:16",
+        "Cozy Chinese restaurant table at night, large metal soup pot steaming, vegetables and tofu cooking, warm orange lights, slow camera orbit, food commercial video, photorealistic, no text",
+    ),
+    (
+        "case-bbq",
+        "9:16",
+        "Night barbecue grill with charcoal flames, skewers sizzling, warm street lights, handheld food vlog motion, photorealistic, no text",
+    ),
+    (
+        "case-milktea",
+        "9:16",
+        "Colorful bubble tea cup spinning slowly, fresh fruit toppings, bright shop background, product commercial camera orbit, photorealistic, no text",
+    ),
+    (
+        "case-hair",
+        "9:16",
+        "Modern hair salon, stylist cutting hair, mirror reflection, before-after transformation vibe, continuous camera motion, photorealistic, no text",
+    ),
+    (
+        "case-nail",
+        "9:16",
+        "Close-up of elegant manicure nails under soft salon light, slow orbit macro shot, beauty commercial video, photorealistic, no text",
+    ),
+    (
+        "case-gym",
+        "9:16",
+        "Modern gym workout, person lifting weights, energetic camera follow, sweat and motion, fitness commercial video, photorealistic, no text",
+    ),
+    (
+        "case-hotel",
+        "9:16",
+        "Boutique hotel room door opening to bright window view, slow dolly across bed and decor, luxury stay atmosphere, photorealistic, no text",
+    ),
+    (
+        "case-kids",
+        "9:16",
+        "Colorful indoor kids playground, children playing happily, bright safe atmosphere, gentle camera motion, photorealistic, no text",
+    ),
+    (
+        "case-pet",
+        "9:16",
+        "Cute cat cafe interior, fluffy cats lounging, soft warm light, gentle camera follow, adorable lifestyle video, photorealistic, no text",
+    ),
+    (
+        "case-takeaway",
+        "9:16",
+        "Unboxing takeaway food bags on a dining table, opening containers, appetizing steam, top-down then close-up motion, photorealistic, no text",
+    ),
+    (
+        "case-bakery",
+        "9:16",
+        "Fresh bakery bread coming out of oven with steam, knife slicing soft crumb, warm bakery light, continuous food video motion, photorealistic, no text",
+    ),
+    (
+        "case-queue",
+        "9:16",
+        "People queueing outside a popular restaurant on a sunny street, camera moving along the line then into entrance, lifestyle city vlog, photorealistic, no text",
     ),
 ]
 
@@ -102,6 +164,42 @@ def extract_poster(mp4: Path, png: Path) -> None:
     )
 
 
+def compress_web(mp4: Path) -> None:
+    """H.264 + faststart，便于浏览器边下边播、减轻卡顿。"""
+    tmp = mp4.with_suffix(".web.tmp.mp4")
+    r = subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(mp4),
+            "-c:v",
+            "libx264",
+            "-preset",
+            "fast",
+            "-crf",
+            "28",
+            "-vf",
+            "scale='min(720,iw)':-2",
+            "-an",
+            "-movflags",
+            "+faststart",
+            "-pix_fmt",
+            "yuv420p",
+            str(tmp),
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if r.returncode == 0 and tmp.exists() and tmp.stat().st_size > 10_000:
+        tmp.replace(mp4)
+        print(f"COMPRESSED {mp4.name} size={mp4.stat().st_size}", flush=True)
+    else:
+        if tmp.exists():
+            tmp.unlink(missing_ok=True)
+        print(f"COMPRESS_SKIP {mp4.name}", flush=True)
+
+
 def start(prompt: str, aspect: str) -> str:
     body = {
         "prompt": prompt,
@@ -136,9 +234,28 @@ def poll(task_id: str, label: str) -> str:
 
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
-    # 先全部发起，再轮询下载
-    tasks: list[tuple[str, str]] = []
+    force = os.environ.get("FORCE", "") == "1"
+    compress_only = os.environ.get("COMPRESS_ONLY", "") == "1"
+
+    if compress_only:
+        for mp4 in sorted(OUT.glob("*.mp4")):
+            compress_web(mp4)
+            png = mp4.with_suffix(".png")
+            if not png.exists() or png.stat().st_size < 1000:
+                extract_poster(mp4, png)
+        return 0
+
+    pending = []
     for cid, aspect, prompt in CASES:
+        mp4 = OUT / f"{cid}.mp4"
+        if mp4.exists() and mp4.stat().st_size > 100_000 and not force:
+            print(f"SKIP_EXISTS {cid}", flush=True)
+            continue
+        pending.append((cid, aspect, prompt))
+
+    print(f"PENDING {len(pending)}", flush=True)
+    tasks: list[tuple[str, str]] = []
+    for cid, aspect, prompt in pending:
         try:
             tid = start(prompt, aspect)
             print(f"STARTED {cid} task={tid}", flush=True)
@@ -154,14 +271,23 @@ def main() -> int:
             mp4 = OUT / f"{cid}.mp4"
             png = OUT / f"{cid}.png"
             download(url, mp4)
+            compress_web(mp4)
             extract_poster(mp4, png)
             print(f"SAVED {cid} size={mp4.stat().st_size}", flush=True)
             ok += 1
         except Exception as e:
             print(f"POLL_FAIL {cid}: {e}", flush=True)
 
-    print(f"DONE ok={ok}/{len(tasks)}", flush=True)
-    return 0 if ok >= 4 else 1
+    # 顺带压缩已有大文件（>2.5MB）
+    for mp4 in sorted(OUT.glob("*.mp4")):
+        if mp4.stat().st_size > 2_500_000:
+            compress_web(mp4)
+
+    print(f"DONE ok={ok}/{len(tasks)} pending_started={len(tasks)}", flush=True)
+    # 有待生成时至少成功一半；无待生成则成功
+    if not tasks:
+        return 0
+    return 0 if ok >= max(1, len(tasks) // 2) else 1
 
 
 if __name__ == "__main__":

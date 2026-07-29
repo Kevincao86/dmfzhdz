@@ -1,4 +1,4 @@
-import { ChevronDown, Clapperboard, Copy, Play, Search, Volume2, Wrench } from 'lucide-react'
+import { ChevronDown, Clapperboard, Copy, Play, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../cn'
 import {
@@ -26,6 +26,7 @@ export default function ShortVideoCaseGallery({ onApplyCase, className }: ShortV
   const [tab, setTab] = useState<TabId>('film')
   const [filterOpen, setFilterOpen] = useState(false)
   const [q, setQ] = useState('')
+  const [preview, setPreview] = useState<ShortVideoCaseItem | null>(null)
   const filterRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -35,6 +36,20 @@ export default function ShortVideoCaseGallery({ onApplyCase, className }: ShortV
     document.addEventListener('mousedown', onDoc)
     return () => document.removeEventListener('mousedown', onDoc)
   }, [])
+
+  useEffect(() => {
+    if (!preview) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPreview(null)
+    }
+    document.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prev
+    }
+  }, [preview])
 
   const activeTab = TABS.find((t) => t.id === tab)!
 
@@ -99,9 +114,14 @@ export default function ShortVideoCaseGallery({ onApplyCase, className }: ShortV
         </div>
       </div>
 
-      <div className="columns-1 gap-4 sm:columns-2 lg:columns-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((item) => (
-          <CaseCard key={item.id} item={item} onApply={() => onApplyCase(item)} />
+          <CaseCard
+            key={item.id}
+            item={item}
+            onPreview={() => setPreview(item)}
+            onApply={() => onApplyCase(item)}
+          />
         ))}
       </div>
 
@@ -110,60 +130,61 @@ export default function ShortVideoCaseGallery({ onApplyCase, className }: ShortV
       ) : null}
 
       <p className="mt-4 text-center text-[11px] text-slate-400">
-        共 {SHORT_VIDEO_CASES.length} 个案例 · Seedance 生成短片自动循环播放 ·「做同款」回填文案与参数
+        共 {SHORT_VIDEO_CASES.length} 个案例 · 点击卡片或「预览」播放（单路加载更流畅）·「做同款」回填参数
       </p>
+
+      {preview ? <CasePreviewModal item={preview} onClose={() => setPreview(null)} onApply={() => {
+        onApplyCase(preview)
+        setPreview(null)
+      }} /> : null}
     </section>
   )
 }
 
-function CaseCard({ item, onApply }: { item: ShortVideoCaseItem; onApply: () => void }) {
+function CaseCard({
+  item,
+  onPreview,
+  onApply,
+}: {
+  item: ShortVideoCaseItem
+  onPreview: () => void
+  onApply: () => void
+}) {
   const skill = findShortVideoSkill(item.skillId)
   const tall = item.aspect === '9:16'
-  const videoRef = useRef<HTMLVideoElement>(null)
-
-  useEffect(() => {
-    const v = videoRef.current
-    if (!v || !item.videoUrl) return
-    v.muted = true
-    void v.play().catch(() => {
-      /* autoplay may be blocked until interaction */
-    })
-  }, [item.videoUrl])
 
   return (
-    <article
-      className={cn(
-        'group mb-4 break-inside-avoid overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md',
-      )}
-    >
-      <div
-        className={cn('relative overflow-hidden bg-slate-900', tall ? 'aspect-[9/16] min-h-[220px]' : 'aspect-video min-h-[140px]')}
+    <article className="flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      <button
+        type="button"
+        onClick={onPreview}
+        className={cn(
+          'relative block w-full overflow-hidden bg-slate-900 text-left',
+          tall ? 'aspect-[9/16]' : 'aspect-video',
+        )}
+        aria-label={`预览 ${item.title}`}
       >
-        {item.videoUrl ? (
-          <video
-            ref={videoRef}
-            src={item.videoUrl}
-            poster={item.coverUrl}
-            muted
-            loop
-            playsInline
-            autoPlay
-            preload="auto"
+        {item.coverUrl ? (
+          <img
+            src={item.coverUrl}
+            alt=""
+            loading="lazy"
+            decoding="async"
             className="absolute inset-0 h-full w-full object-cover"
           />
-        ) : item.coverUrl ? (
-          <img src={item.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
         ) : (
           <div
             className="absolute inset-0"
             style={{ background: `linear-gradient(145deg, ${item.coverFrom}, ${item.coverTo})` }}
           />
         )}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
+        <span className="absolute left-1/2 top-1/2 z-[1] flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-lg transition group-hover:scale-105">
+          <Play className="h-5 w-5 fill-current" aria-hidden />
+        </span>
         <div className="absolute bottom-0 left-0 right-0 z-[1] space-y-1 p-4 text-white">
           {item.badge ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-medium backdrop-blur-sm">
-              {item.videoUrl ? <Play className="h-2.5 w-2.5" /> : null}
+            <span className="inline-flex rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-medium backdrop-blur-sm">
               {item.badge}
             </span>
           ) : null}
@@ -174,18 +195,17 @@ function CaseCard({ item, onApply }: { item: ShortVideoCaseItem; onApply: () => 
             {skill ? ` · ${skill.name}` : ''}
           </p>
         </div>
-      </div>
+      </button>
       <div className="flex items-center justify-between gap-2 px-3 py-2.5">
-        <span className="inline-flex items-center gap-1 text-[11px] text-slate-500">
-          {item.kind === 'skill' ? (
-            <Wrench className="h-3 w-3" />
-          ) : item.videoUrl ? (
-            <Volume2 className="h-3 w-3" />
-          ) : (
-            <Clapperboard className="h-3 w-3" />
-          )}
-          {item.videoUrl ? 'AI 视频预览' : item.kind === 'skill' ? '技能案例' : '灵感发现'}
-        </span>
+        <button
+          type="button"
+          onClick={onPreview}
+          disabled={!item.videoUrl}
+          className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-200 disabled:opacity-40"
+        >
+          {item.videoUrl ? <Play className="h-3 w-3" /> : <Clapperboard className="h-3 w-3" />}
+          {item.videoUrl ? '预览视频' : '暂无成片'}
+        </button>
         <button
           type="button"
           onClick={onApply}
@@ -196,5 +216,103 @@ function CaseCard({ item, onApply }: { item: ShortVideoCaseItem; onApply: () => 
         </button>
       </div>
     </article>
+  )
+}
+
+function CasePreviewModal({
+  item,
+  onClose,
+  onApply,
+}: {
+  item: ShortVideoCaseItem
+  onClose: () => void
+  onApply: () => void
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const skill = findShortVideoSkill(item.skillId)
+
+  useEffect(() => {
+    const v = videoRef.current
+    if (!v) return
+    v.currentTime = 0
+    void v.play().catch(() => undefined)
+  }, [item.id])
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label={item.title}
+      onClick={onClose}
+    >
+      <div
+        className={cn(
+          'relative w-full overflow-hidden rounded-2xl border border-white/10 bg-slate-950 shadow-2xl',
+          item.aspect === '16:9' ? 'max-w-3xl' : 'max-w-md',
+        )}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-3 top-3 z-10 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70"
+          aria-label="关闭预览"
+        >
+          <X className="h-4 w-4" />
+        </button>
+        {item.videoUrl ? (
+          <video
+            ref={videoRef}
+            key={item.videoUrl}
+            src={item.videoUrl}
+            poster={item.coverUrl}
+            controls
+            playsInline
+            preload="metadata"
+            className={cn(
+              'max-h-[70vh] w-full bg-black object-contain',
+              item.aspect === '16:9' ? 'aspect-video' : 'aspect-[9/16]',
+            )}
+          />
+        ) : (
+          <div
+            className={cn(
+              'flex items-center justify-center bg-slate-900 text-sm text-slate-400',
+              item.aspect === '16:9' ? 'aspect-video' : 'aspect-[9/16]',
+            )}
+          >
+            暂无视频
+          </div>
+        )}
+        <div className="space-y-3 p-4 text-white">
+          <div>
+            <h3 className="text-lg font-semibold">{item.title}</h3>
+            <p className="mt-1 text-sm text-white/70">{item.subtitle}</p>
+            <p className="mt-1 text-xs text-white/50">
+              {item.aspect} · {item.durationSec}s
+              {skill ? ` · ${skill.name}` : ''}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={onApply}
+              className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl bg-cyan-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-cyan-400"
+            >
+              <Copy className="h-4 w-4" />
+              做同款
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-white/20 px-4 py-2.5 text-sm text-white/90 hover:bg-white/10"
+            >
+              关闭
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
