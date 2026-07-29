@@ -1740,29 +1740,6 @@ export default function ShortVideoOptimizationPage() {
         })}
       </div>
 
-      <div className="mb-8 flex overflow-hidden rounded-2xl border border-zinc-200 bg-white p-1.5 shadow-sm">
-        {paneTabs.map((t) => {
-          const Ico = t.icon
-          const active = mainPane === t.id
-          return (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => goPane(t.id)}
-              className={cn(
-                'flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-semibold transition',
-                active
-                  ? 'bg-gradient-to-r from-cyan-600 to-sky-500 text-white shadow-md shadow-cyan-600/25'
-                  : 'text-zinc-600 hover:bg-zinc-50',
-              )}
-            >
-              <Ico className="h-4 w-4 shrink-0" aria-hidden />
-              {t.label}
-            </button>
-          )
-        })}
-      </div>
-
       {mainPane === 'cases' ? (
         <ShortVideoCaseGallery onApplyCase={applyStudioCase} className="mb-8" />
       ) : null}

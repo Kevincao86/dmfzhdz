@@ -165,37 +165,55 @@ def extract_poster(mp4: Path, png: Path) -> None:
 
 
 def compress_web(mp4: Path) -> None:
-    """H.264 + faststart，便于浏览器边下边播、减轻卡顿。"""
+    """H.264 + AAC + faststart；保留音轨（案例预览需有声音）。"""
     tmp = mp4.with_suffix(".web.tmp.mp4")
-    r = subprocess.run(
+    # 若已有音轨则转码保留；无音轨则仅视频
+    probe = subprocess.run(
         [
-            "ffmpeg",
-            "-y",
-            "-i",
+            "ffprobe",
+            "-v",
+            "error",
+            "-select_streams",
+            "a",
+            "-show_entries",
+            "stream=codec_type",
+            "-of",
+            "csv=p=0",
             str(mp4),
-            "-c:v",
-            "libx264",
-            "-preset",
-            "fast",
-            "-crf",
-            "34",
-            "-vf",
-            "scale='min(480,iw)':-2",
-            "-r",
-            "20",
-            "-an",
-            "-movflags",
-            "+faststart",
-            "-pix_fmt",
-            "yuv420p",
-            str(tmp),
         ],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
     )
+    has_audio = "audio" in (probe.stdout or "")
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(mp4),
+        "-c:v",
+        "libx264",
+        "-preset",
+        "fast",
+        "-crf",
+        "34",
+        "-vf",
+        "scale='min(480,iw)':-2",
+        "-r",
+        "20",
+        "-pix_fmt",
+        "yuv420p",
+        "-movflags",
+        "+faststart",
+    ]
+    if has_audio:
+        cmd += ["-c:a", "aac", "-b:a", "96k", "-ac", "2"]
+    else:
+        cmd += ["-an"]
+    cmd.append(str(tmp))
+    r = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if r.returncode == 0 and tmp.exists() and tmp.stat().st_size > 10_000:
         tmp.replace(mp4)
-        print(f"COMPRESSED {mp4.name} size={mp4.stat().st_size}", flush=True)
+        print(f"COMPRESSED {mp4.name} size={mp4.stat().st_size} audio={has_audio}", flush=True)
     else:
         if tmp.exists():
             tmp.unlink(missing_ok=True)
