@@ -1,4 +1,9 @@
 <view class="tgt-inv-page {{lqThemeClass}}">
+  <view wx:if="{{!oaBound}}" class="addon-card tgt-inv-oa-tip" bindtap="onOpenOaBind">
+    <text class="addon-card__title">关注服务号收邀约</text>
+    <text class="addon-card__sub">绑定「{{oaDisplayName}}」后，定向邀约将推送到微信服务号消息</text>
+    <text class="tgt-inv-oa-tip__link">去绑定 ›</text>
+  </view>
   <view wx:if="{{loading}}" class="addon-hint" style="margin:24rpx;">加载中…</view>
   <view wx:elif="{{!rows.length}}" class="addon-card" style="margin-top:20rpx;">
     <text class="addon-card__title">暂无定向邀约</text>

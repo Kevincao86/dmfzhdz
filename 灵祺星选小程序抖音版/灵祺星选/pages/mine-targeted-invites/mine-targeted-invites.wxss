@@ -6,6 +6,18 @@
   background: var(--lq-bg, #f0eff6);
 }
 
+.tgt-inv-oa-tip {
+  margin: 20rpx 24rpx 0;
+}
+
+.tgt-inv-oa-tip__link {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: var(--lq-primary, #6366f1);
+}
+
 .tgt-inv-card {
   margin: 20rpx 24rpx 0;
   padding: 24rpx;

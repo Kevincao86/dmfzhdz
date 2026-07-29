@@ -173,6 +173,7 @@
           </view>
           <view class="msg-entry-bottom">
             <text class="msg-entry-preview">{{item.lastText || '暂无消息'}}</text>
+            <view class="msg-badge" wx:if="{{item.unread > 0}}">{{item.unread > 99 ? '99+' : item.unread}}</view>
           </view>
         </view>
       </view>
@@ -187,17 +188,17 @@
   </block>
 
   <block wx:elif="{{msgTab === 'chat'}}">
-    <view wx:if="{{!chatConfigured && msgTab === 'chat'}}" class="msg-fixed-tip card">
-      <text class="hint">请在 config.release.js 配置 MERCHANT_API_BASE_URL（体验版 https://mofangdianai.com/erp-api）</text>
-    </view>
-
-    <view wx:elif="{{loading}}" class="msg-fixed-tip card state-loading">
+    <view wx:if="{{loading}}" class="msg-fixed-tip card state-loading">
       <view class="loading-dot-wrap">
         <view class="loading-dot" />
         <view class="loading-dot" />
         <view class="loading-dot" />
       </view>
-      <text class="hint list-hint">加载会话…</text>
+      <text class="hint list-hint">加载中</text>
+    </view>
+
+    <view wx:elif="{{!chatConfigured}}" class="msg-fixed-tip card">
+      <text class="hint">加载中</text>
     </view>
 
     <view wx:elif="{{err}}" class="msg-fixed-tip card state-error">

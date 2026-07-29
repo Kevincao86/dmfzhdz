@@ -525,6 +525,7 @@ Page({
     }
 
     let slots = collectSlots(columns)
+    // 拼桌默认不预开桌：无桌时误报「时段已满」。安排前自动开一桌（未超餐食份数上限）
     if (!slots.length && shareTable && visitBoard.countTotalTables(columns) < mealCount) {
       const targetCol = columns.find((c) => !(c.tables || []).length) || columns[0]
       if (targetCol) {
@@ -537,6 +538,7 @@ Page({
         slots = collectSlots(columns)
       }
     }
+    // 非拼桌：取消勾选后时段可能仍是空桌列表，补齐「单独探店」位
     if (!slots.length && !shareTable) {
       let changed = false
       columns = columns.map((c) => {
