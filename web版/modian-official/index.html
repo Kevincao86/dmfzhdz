@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="宁波墨典网络科技有限公司 — 软件开发、小程序定制、AI 私有化部署、智能体定制。以工程化能力把 AI 落进企业生产。" />
+  <meta name="theme-color" content="#07090d" />
+  <title>墨典 · 宁波墨典网络科技有限公司</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@300;400;500;700;900&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/main.css" />
+</head>
+<body>
+  <div class="noise" aria-hidden="true"></div>
+  <div class="cursor-ring" id="cursor-ring" aria-hidden="true"></div>
+
+  <header class="site-header" id="site-header">
+    <a class="brand" href="#top" aria-label="墨典首页">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-text">
+        <strong>墨典</strong>
+        <small>MODIAN</small>
+      </span>
+    </a>
+    <nav class="nav" aria-label="主导航">
+      <a href="#capabilities">能力</a>
+      <a href="#edge">优势</a>
+      <a href="#process">流程</a>
+      <a href="#contact">合作</a>
+    </nav>
+    <a class="header-cta" href="#contact">预约咨询</a>
+  </header>
+
+  <main id="top">
+    <!-- HERO：品牌主导 + 全幅数字视觉 -->
+    <section class="hero" id="hero">
+      <canvas class="hero-canvas" id="hero-canvas" aria-hidden="true"></canvas>
+      <div class="hero-veil" aria-hidden="true"></div>
+      <div class="hero-inner">
+        <p class="hero-brand">宁波墨典网络科技有限公司</p>
+        <h1 class="hero-title">
+          <span class="hero-title-main">墨典</span>
+        </h1>
+        <p class="hero-line">以工程化能力，把 AI 装进企业的生产力</p>
+        <p class="hero-sub">软件开发 · 小程序定制 · AI 私有化部署 · 智能体定制</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#contact">
+            <span>立即咨询合作</span>
+            <span class="btn-arrow" aria-hidden="true">→</span>
+          </a>
+          <a class="btn btn-ghost" href="#capabilities">查看核心能力</a>
+        </div>
+      </div>
+      <div class="hero-meta" aria-hidden="true">
+        <span>NINGBO · CHINA</span>
+        <span class="meta-sep"></span>
+        <span>EST. DIGITAL STUDIO</span>
+      </div>
+      <a class="scroll-cue" href="#capabilities" aria-label="向下浏览">
+        <span>SCROLL</span>
+        <i></i>
+      </a>
+    </section>
+
+    <!-- 能力 -->
+    <section class="section capabilities" id="capabilities">
+      <div class="section-head">
+        <p class="kicker"><span class="mono">01</span> 核心能力</p>
+        <h2>四条产品线，覆盖从应用到智能体的完整交付</h2>
+      </div>
+      <div class="cap-grid">
+        <article class="cap" data-index="01" tabindex="0">
+          <div class="cap-index mono">01</div>
+          <h3>软件开发</h3>
+          <p>企业级 Web / 后台 / 中台系统，从需求拆解到上线运维，交付可演进的数字化底座。</p>
+          <ul>
+            <li>业务系统与运营后台</li>
+            <li>数据看板与工作流引擎</li>
+            <li>高可用架构与安全加固</li>
+          </ul>
+          <div class="cap-rail" aria-hidden="true"></div>
+        </article>
+        <article class="cap" data-index="02" tabindex="0">
+          <div class="cap-index mono">02</div>
+          <h3>小程序定制开发</h3>
+          <p>微信 / 抖音等端到端定制，围绕获客、履约、会员与交易链路做完整产品闭环。</p>
+          <ul>
+            <li>C 端体验与转化路径</li>
+            <li>商家 / 服务商双端协同</li>
+            <li>支付、消息与内容能力</li>
+          </ul>
+          <div class="cap-rail" aria-hidden="true"></div>
+        </article>
+        <article class="cap" data-index="03" tabindex="0">
+          <div class="cap-index mono">03</div>
+          <h3>AI 私有化部署</h3>
+          <p>模型与推理服务落在您的内网或专属云，数据不出域，能力可审计、可扩容、可运维。</p>
+          <ul>
+            <li>本地 / 专有云模型部署</li>
+            <li>知识库与 RAG 检索链路</li>
+            <li>权限、审计与成本可控</li>
+          </ul>
+          <div class="cap-rail" aria-hidden="true"></div>
+        </article>
+        <article class="cap" data-index="04" tabindex="0">
+          <div class="cap-index mono">04</div>
+          <h3>智能体定制</h3>
+          <p>面向真实岗位的 Agent：懂业务规则、会调用工具、能嵌入现有系统，而不是演示型聊天框。</p>
+          <ul>
+            <li>业务 Agent 与工具编排</li>
+            <li>多模态理解与内容生成</li>
+            <li>与 ERP / CRM / 小程序打通</li>
+          </ul>
+          <div class="cap-rail" aria-hidden="true"></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- 优势 -->
+    <section class="section edge" id="edge">
+      <div class="edge-layout">
+        <div class="section-head">
+          <p class="kicker"><span class="mono">02</span> 为什么是墨典</p>
+          <h2>不是堆模型，是把智能做成可上线的系统</h2>
+          <p class="lead">
+            我们同时懂产品、工程与 AI 落地。从界面交互到模型私有化，再到智能体接入业务流，
+            一条链路交给同一支团队，减少「能 demo、不能交付」的断层。
+          </p>
+        </div>
+        <div class="edge-list">
+          <div class="edge-item reveal">
+            <span class="edge-num mono">01</span>
+            <div>
+              <h3>工程优先的 AI</h3>
+              <p>可观测、可回滚、可权限控制。智能能力像普通服务一样接入，而不是黑盒挂件。</p>
+            </div>
+          </div>
+          <div class="edge-item reveal">
+            <span class="edge-num mono">02</span>
+            <div>
+              <h3>数据边界清晰</h3>
+              <p>私有化部署与租户隔离按企业合规设计，敏感业务数据默认不出您的可控环境。</p>
+            </div>
+          </div>
+          <div class="edge-item reveal">
+            <span class="edge-num mono">03</span>
+            <div>
+              <h3>从 0 到 1 到规模化</h3>
+              <p>先做最小可验证闭环，再按业务增长扩模型、扩节点、扩端侧能力，避免一次性重投入。</p>
+            </div>
+          </div>
+          <div class="edge-item reveal">
+            <span class="edge-num mono">04</span>
+            <div>
+              <h3>宁波本地，服务全国</h3>
+              <p>面对面沟通、远程高效交付。适合需要长期共建的数字化与 AI 项目。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="signal-board reveal" aria-hidden="true">
+        <div class="signal-row">
+          <span class="mono">SYS</span>
+          <span class="signal-bar"><i style="--w:86%"></i></span>
+          <span class="mono">ENGINEERING</span>
+        </div>
+        <div class="signal-row">
+          <span class="mono">AI</span>
+          <span class="signal-bar"><i style="--w:92%"></i></span>
+          <span class="mono">PRIVATE · AGENT</span>
+        </div>
+        <div class="signal-row">
+          <span class="mono">MP</span>
+          <span class="signal-bar"><i style="--w:78%"></i></span>
+          <span class="mono">MINI PROGRAM</span>
+        </div>
+        <div class="signal-row">
+          <span class="mono">OPS</span>
+          <span class="signal-bar"><i style="--w:81%"></i></span>
+          <span class="mono">SECURE · AUDIT</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 流程 -->
+    <section class="section process" id="process">
+      <div class="section-head">
+        <p class="kicker"><span class="mono">03</span> 合作流程</p>
+        <h2>四步进入共建，每一步都有明确交付物</h2>
+      </div>
+      <ol class="process-track">
+        <li class="reveal">
+          <span class="step-num mono">01</span>
+          <h3>需求对齐</h3>
+          <p>业务目标、数据边界、上线节奏一次谈清，输出范围与里程碑。</p>
+        </li>
+        <li class="reveal">
+          <span class="step-num mono">02</span>
+          <h3>方案与原型</h3>
+          <p>架构、交互与智能体能力边界可视化确认，再进入开发。</p>
+        </li>
+        <li class="reveal">
+          <span class="step-num mono">03</span>
+          <h3>开发与联调</h3>
+          <p>迭代交付、周报可见；私有化环境与权限体系同步落地。</p>
+        </li>
+        <li class="reveal">
+          <span class="step-num mono">04</span>
+          <h3>上线与陪跑</h3>
+          <p>灰度发布、运维手册、效果复盘，必要时持续迭代智能体。</p>
+        </li>
+      </ol>
+    </section>
+
+    <!-- 信任数字 -->
+    <section class="section trust" id="trust" aria-label="交付能力概览">
+      <div class="trust-strip">
+        <div class="trust-item reveal">
+          <strong class="trust-val" data-count="4">0</strong>
+          <span>核心产品线</span>
+        </div>
+        <div class="trust-item reveal">
+          <strong class="trust-val" data-count="360" data-suffix="+">0</strong>
+          <span>天级稳定交付经验</span>
+        </div>
+        <div class="trust-item reveal">
+          <strong class="trust-val mono">7×12</strong>
+          <span>响应窗口（工作日）</span>
+        </div>
+        <div class="trust-item reveal">
+          <strong class="trust-val">私有化</strong>
+          <span>数据默认不出域</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 咨询 -->
+    <section class="section contact" id="contact">
+      <div class="contact-panel">
+        <div class="contact-copy">
+          <p class="kicker"><span class="mono">04</span> 开始合作</p>
+          <h2>告诉我们你的业务场景，48 小时内给出可行路径</h2>
+          <p class="lead">
+            无论是从零搭建业务系统，还是把大模型私有化进现有架构，
+            我们都会先给出清晰边界与投入区间——不浪费一次沟通。
+          </p>
+          <dl class="contact-facts">
+            <div>
+              <dt>公司</dt>
+              <dd>宁波墨典网络科技有限公司</dd>
+            </div>
+            <div>
+              <dt>所在地</dt>
+              <dd>浙江省宁波市</dd>
+            </div>
+            <div>
+              <dt>业务邮件</dt>
+              <dd><a href="mailto:hello@modian.ai">hello@modian.ai</a></dd>
+            </div>
+            <div>
+              <dt>商务对接</dt>
+              <dd>提交表单后 48 小时内回电</dd>
+            </div>
+          </dl>
+        </div>
+        <form class="contact-form" id="contact-form" novalidate>
+          <label>
+            <span>姓名</span>
+            <input name="name" type="text" autocomplete="name" required placeholder="怎么称呼您" />
+          </label>
+          <label>
+            <span>公司 / 团队</span>
+            <input name="company" type="text" autocomplete="organization" required placeholder="贵司名称" />
+          </label>
+          <label>
+            <span>手机 / 微信</span>
+            <input name="phone" type="tel" autocomplete="tel" required placeholder="方便联系的方式" />
+          </label>
+          <label>
+            <span>需求方向</span>
+            <select name="need" required>
+              <option value="" disabled selected>请选择</option>
+              <option>软件开发</option>
+              <option>小程序定制</option>
+              <option>AI 私有化部署</option>
+              <option>智能体定制</option>
+              <option>综合方案咨询</option>
+            </select>
+          </label>
+          <label class="full">
+            <span>简要描述</span>
+            <textarea name="message" rows="4" placeholder="当前痛点、期望上线时间、是否有现成系统…"></textarea>
+          </label>
+          <button class="btn btn-primary full-btn" type="submit">
+            <span>提交咨询意向</span>
+            <span class="btn-arrow" aria-hidden="true">→</span>
+          </button>
+          <p class="form-note" id="form-note" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div>
+        <strong>墨典</strong>
+        <p>宁波墨典网络科技有限公司</p>
+      </div>
+    </div>
+    <p class="footer-copy">© <span id="year"></span> Modian Network · All rights reserved.</p>
+  </footer>
+
+  <script src="assets/js/main.js" defer></script>
+</body>
+</html>
