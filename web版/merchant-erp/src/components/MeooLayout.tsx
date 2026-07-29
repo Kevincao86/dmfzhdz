@@ -469,12 +469,14 @@ export default function MeooLayout() {
           </div>
         </header>
 
-        <main className="erp-main erp-main-surface flex-1 overflow-auto p-6 lg:p-8">
-          <PlatformDecorHomeHost />
-          <Outlet />
+        <main className="erp-main erp-main-surface flex-1 overflow-auto p-5 lg:p-8">
+          <div className="mx-auto w-full max-w-[1400px]">
+            <PlatformDecorHomeHost />
+            <Outlet />
+          </div>
         </main>
 
-        <footer className="shrink-0 border-t border-slate-200/80 bg-white/80 px-6 py-3 backdrop-blur-sm">
+        <footer className="shrink-0 border-t border-slate-200/80 bg-white/70 px-6 py-3 backdrop-blur-md">
           <SiteIcpFooter />
         </footer>
       </div>

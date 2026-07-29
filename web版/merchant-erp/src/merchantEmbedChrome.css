@@ -37,6 +37,18 @@
   .erp-chip {
     @apply inline-flex items-center gap-1 rounded-full bg-cyan-50 px-2.5 py-1 text-xs font-medium text-cyan-800 ring-1 ring-cyan-200/80;
   }
+
+  .erp-main .rounded-xl.border.bg-white,
+  .erp-main .rounded-2xl.border.bg-white,
+  .erp-main .rounded-lg.border.bg-white {
+    @apply border-slate-200/80 shadow-sm shadow-slate-900/[0.03];
+  }
+
+  .erp-main input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='range']):focus,
+  .erp-main select:focus,
+  .erp-main textarea:focus {
+    @apply border-cyan-400 outline-none ring-2 ring-cyan-500/20;
+  }
 }
 
 .erp-main
