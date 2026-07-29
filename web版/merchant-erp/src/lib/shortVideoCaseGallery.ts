@@ -28,7 +28,7 @@ export type ShortVideoCaseItem = {
 }
 
 const asset = (id: string, ext: 'png' | 'mp4') =>
-  `${SHORT_VIDEO_CASE_CDN_BASE.replace(/\/$/, '')}/${id}.${ext}?v=cdn6`
+  `${SHORT_VIDEO_CASE_CDN_BASE.replace(/\/$/, '')}/${id}.${ext}?v=cdn7`
 
 function c(partial: ShortVideoCaseItem): ShortVideoCaseItem {
   return {

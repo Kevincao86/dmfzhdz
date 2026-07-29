@@ -286,7 +286,7 @@ function CasePreviewModal({
   const [err, setErr] = useState('')
   const primaryUrl = String(item.videoUrl || '').trim()
   const localFallback = primaryUrl.includes('aliyuncs.com')
-    ? `/short-video-cases/${item.id}.mp4?v=local1`
+    ? `/short-video-cases/${item.id}.mp4?v=local2`
     : ''
   const [playUrl, setPlayUrl] = useState(primaryUrl)
 

@@ -30,6 +30,8 @@ export type ShortVideoInfiniteCanvasProps = {
   scriptRows: ShortVideoScriptRow[]
   media: CanvasMediaItem[]
   disabled?: boolean
+  /** 父级应用流程后递增，画布重置为新顺序的顺序连线 */
+  flowEpoch?: number
   onEditRow?: (index: number) => void
   onRemoveScriptRow?: (index: number) => void
   onRemoveMedia?: (id: string) => void
@@ -100,6 +102,7 @@ export default function ShortVideoInfiniteCanvas({
   scriptRows,
   media,
   disabled,
+  flowEpoch = 0,
   onEditRow,
   onRemoveScriptRow,
   onRemoveMedia,
@@ -115,6 +118,8 @@ export default function ShortVideoInfiniteCanvas({
   const [linkMode, setLinkMode] = useState(true)
   const [edges, setEdges] = useState<CanvasFlowEdge[]>([])
   const [linkFrom, setLinkFrom] = useState<number | null>(null)
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null)
+  const lastFlowEpochRef = useRef(flowEpoch)
 
   const dragRef = useRef<{
     kind: DragKind
@@ -182,7 +187,18 @@ export default function ShortVideoInfiniteCanvas({
       return clipped
     })
     setLinkFrom(null)
+    setSelectedEdgeId(null)
   }, [n, scriptKey])
+
+  // 父级应用流程后：分镜已按拓扑重排，连线恢复为新顺序 1→2→…
+  useEffect(() => {
+    if (flowEpoch === lastFlowEpochRef.current) return
+    lastFlowEpochRef.current = flowEpoch
+    if (n >= 2) setEdges(sequentialEdges(n))
+    else setEdges([])
+    setLinkFrom(null)
+    setSelectedEdgeId(null)
+  }, [flowEpoch, n])
 
   const onWheel = useCallback((e: React.WheelEvent) => {
     if (e.ctrlKey || e.metaKey) {
@@ -269,6 +285,7 @@ export default function ShortVideoInfiniteCanvas({
     setPanning(true)
     setSelectedId(null)
     setLinkFrom(null)
+    setSelectedEdgeId(null)
   }
 
   const onPointerMove = (e: React.PointerEvent) => {
@@ -360,7 +377,7 @@ export default function ShortVideoInfiniteCanvas({
           <div>
             <p className="text-sm font-semibold text-slate-900">无限画布</p>
             <p className="text-[11px] text-slate-500">
-              右侧圆点拖出连线 / 点入口完成 · 自由编排流程 · 双击编辑
+              点右侧圆点再点左侧入口自由连线 · 点线可选中/双击删除 ·「应用流程」同步生成顺序
             </p>
           </div>
         </div>
@@ -385,6 +402,7 @@ export default function ShortVideoInfiniteCanvas({
             onClick={() => {
               setEdges(sequentialEdges(n))
               setLinkFrom(null)
+              setSelectedEdgeId(null)
             }}
             className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
           >
@@ -397,10 +415,23 @@ export default function ShortVideoInfiniteCanvas({
             onClick={() => {
               setEdges([])
               setLinkFrom(null)
+              setSelectedEdgeId(null)
             }}
             className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
           >
             清空连线
+          </button>
+          <button
+            type="button"
+            disabled={disabled || !selectedEdgeId}
+            onClick={() => {
+              if (!selectedEdgeId) return
+              setEdges((prev) => prev.filter((e) => e.id !== selectedEdgeId))
+              setSelectedEdgeId(null)
+            }}
+            className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-medium text-rose-800 hover:bg-rose-100 disabled:opacity-40"
+          >
+            删除选中线
           </button>
           {onApplyFlowOrder ? (
             <button
@@ -461,21 +492,58 @@ export default function ShortVideoInfiniteCanvas({
           }}
         >
           {flowPaths.length > 0 ? (
-            <svg className="pointer-events-none absolute left-0 top-0 overflow-visible" width={2800} height={1800} aria-hidden>
+            <svg className="absolute left-0 top-0 overflow-visible" width={2800} height={1800}>
               <defs>
                 <marker id="sv-flow-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
                   <path d="M0,0 L6,3 L0,6 Z" fill="#22d3ee" />
                 </marker>
               </defs>
-              {flowPaths.map((p) => (
-                <g key={p.id}>
-                  <path d={p.d} fill="none" stroke="#67e8f9" strokeWidth="2.5" strokeDasharray="6 4" markerEnd="url(#sv-flow-arrow)" opacity="0.95" />
-                  <rect x={p.mid.x - 18} y={p.mid.y - 8} width="36" height="16" rx="8" fill="#ecfeff" stroke="#a5f3fc" />
-                  <text x={p.mid.x} y={p.mid.y + 4} textAnchor="middle" fontSize="9" fill="#0e7490" fontWeight="600">
-                    {p.label}
-                  </text>
-                </g>
-              ))}
+              {flowPaths.map((p) => {
+                const active = selectedEdgeId === p.id
+                return (
+                  <g
+                    key={p.id}
+                    className="cursor-pointer"
+                    onPointerDown={(ev) => {
+                      ev.stopPropagation()
+                      if (disabled || !linkMode) return
+                      setSelectedEdgeId(p.id)
+                      setSelectedId(null)
+                      setLinkFrom(null)
+                    }}
+                    onDoubleClick={(ev) => {
+                      ev.stopPropagation()
+                      if (disabled) return
+                      setEdges((prev) => prev.filter((e) => e.id !== p.id))
+                      setSelectedEdgeId(null)
+                    }}
+                  >
+                    {/* 宽命中区 */}
+                    <path d={p.d} fill="none" stroke="transparent" strokeWidth="14" />
+                    <path
+                      d={p.d}
+                      fill="none"
+                      stroke={active ? '#f97316' : '#67e8f9'}
+                      strokeWidth={active ? 3.2 : 2.5}
+                      strokeDasharray="6 4"
+                      markerEnd="url(#sv-flow-arrow)"
+                      opacity="0.95"
+                    />
+                    <rect
+                      x={p.mid.x - 18}
+                      y={p.mid.y - 8}
+                      width="36"
+                      height="16"
+                      rx="8"
+                      fill={active ? '#fff7ed' : '#ecfeff'}
+                      stroke={active ? '#fdba74' : '#a5f3fc'}
+                    />
+                    <text x={p.mid.x} y={p.mid.y + 4} textAnchor="middle" fontSize="9" fill={active ? '#c2410c' : '#0e7490'} fontWeight="600">
+                      {p.label}
+                    </text>
+                  </g>
+                )
+              })}
             </svg>
           ) : null}
 
