@@ -9,9 +9,10 @@ import {
 } from '../lib/shortVideoCaseGallery'
 import { findShortVideoSkill } from '../lib/shortVideoSkills'
 
-type TabId = 'discover' | 'skill' | 'film'
+type TabId = 'all' | 'discover' | 'skill' | 'film'
 
-const TABS: { id: TabId; label: string; kind: ShortVideoCaseKind }[] = [
+const TABS: { id: TabId; label: string; kind: ShortVideoCaseKind | 'all' }[] = [
+  { id: 'all', label: '全部', kind: 'all' },
   { id: 'discover', label: '发现', kind: 'discover' },
   { id: 'skill', label: '技能', kind: 'skill' },
   { id: 'film', label: '短片', kind: 'film' },
@@ -48,7 +49,7 @@ export type ShortVideoCaseGalleryProps = {
 }
 
 export default function ShortVideoCaseGallery({ onApplyCase, className }: ShortVideoCaseGalleryProps) {
-  const [tab, setTab] = useState<TabId>('film')
+  const [tab, setTab] = useState<TabId>('all')
   const [filterOpen, setFilterOpen] = useState(false)
   const [q, setQ] = useState('')
   const [preview, setPreview] = useState<ShortVideoCaseItem | null>(null)
@@ -78,7 +79,7 @@ export default function ShortVideoCaseGallery({ onApplyCase, className }: ShortV
 
   // 首屏可见案例做轻量预取（最多 3 个），降低第一次点开等待
   useEffect(() => {
-    const first = casesByTab('film').slice(0, 3)
+    const first = casesByTab('all').slice(0, 3)
     for (const c of first) prefetchCaseVideo(c.videoUrl)
   }, [])
 
@@ -97,6 +98,8 @@ export default function ShortVideoCaseGallery({ onApplyCase, className }: ShortV
     )
   }, [activeTab.kind, q])
 
+  const tabCount = (id: TabId) => casesByTab(TABS.find((t) => t.id === id)!.kind).length
+
   return (
     <section className={cn('sv-case-gallery', className)}>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -109,6 +112,9 @@ export default function ShortVideoCaseGallery({ onApplyCase, className }: ShortV
           >
             {tab === 'skill' ? '🛠️ ' : ''}
             {activeTab.label}
+            <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-slate-500">
+              {tabCount(tab)}
+            </span>
             <ChevronDown className={cn('h-4 w-4 text-slate-500 transition', filterOpen && 'rotate-180')} />
           </button>
           {filterOpen ? (
@@ -122,12 +128,15 @@ export default function ShortVideoCaseGallery({ onApplyCase, className }: ShortV
                     setFilterOpen(false)
                   }}
                   className={cn(
-                    'flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm font-medium transition hover:bg-cyan-50',
+                    'flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition hover:bg-cyan-50',
                     tab === t.id && 'bg-cyan-50 text-cyan-900 ring-1 ring-cyan-200',
                   )}
                 >
-                  {t.id === 'skill' ? '🛠️ ' : ''}
-                  {t.label}
+                  <span>
+                    {t.id === 'skill' ? '🛠️ ' : ''}
+                    {t.label}
+                  </span>
+                  <span className="text-[11px] tabular-nums text-slate-400">{tabCount(t.id)}</span>
                 </button>
               ))}
             </div>
@@ -145,7 +154,7 @@ export default function ShortVideoCaseGallery({ onApplyCase, className }: ShortV
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((item) => (
           <CaseCard
             key={item.id}
@@ -191,11 +200,10 @@ function CaseCard({
   onHover: () => void
 }) {
   const skill = findShortVideoSkill(item.skillId)
-  const tall = item.aspect === '9:16'
 
   return (
     <article
-      className="flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+      className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
       onMouseEnter={onHover}
       onFocus={onHover}
     >
@@ -203,10 +211,7 @@ function CaseCard({
         type="button"
         onClick={onPreview}
         onPointerDown={onHover}
-        className={cn(
-          'relative block w-full overflow-hidden bg-slate-900 text-left',
-          tall ? 'aspect-[9/16]' : 'aspect-video',
-        )}
+        className="relative block aspect-[3/4] w-full overflow-hidden bg-slate-900 text-left"
         aria-label={`预览 ${item.title}`}
       >
         {item.coverUrl ? (
@@ -241,7 +246,7 @@ function CaseCard({
           </p>
         </div>
       </button>
-      <div className="flex items-center justify-between gap-2 px-3 py-2.5">
+      <div className="mt-auto flex items-center justify-between gap-2 px-3 py-2.5">
         <button
           type="button"
           onClick={onPreview}

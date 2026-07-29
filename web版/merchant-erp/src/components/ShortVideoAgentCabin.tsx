@@ -18,6 +18,7 @@ import {
   composeSkillPrompt,
   findShortVideoSkill,
   matchSkillsByQuery,
+  SHORT_VIDEO_SKILLS,
   type ShortVideoSkill,
   type ShortVideoSkillId,
 } from '../lib/shortVideoSkills'
@@ -205,6 +206,7 @@ export default function ShortVideoAgentCabin({
             >
               <Wrench className="h-3.5 w-3.5" aria-hidden />
               使用技能
+              <span className="tabular-nums opacity-80">· {SHORT_VIDEO_SKILLS.length}</span>
               <ChevronDown className={cn('h-3 w-3 transition', skillOpen && 'rotate-180')} />
             </button>
             {onPickDoc ? (
@@ -268,12 +270,12 @@ export default function ShortVideoAgentCabin({
       </div>
 
       {skillOpen ? (
-        <div className="absolute left-0 right-0 top-[calc(100%-0.5rem)] z-40 mt-2 max-h-72 overflow-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-900/10">
+        <div className="absolute left-0 right-0 top-[calc(100%-0.5rem)] z-40 mt-2 max-h-96 overflow-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-900/10">
           <input
             type="search"
             value={skillQuery}
             onChange={(e) => setSkillQuery(e.target.value)}
-            placeholder="搜索技能…"
+            placeholder={`搜索技能（共 ${SHORT_VIDEO_SKILLS.length} 个）…`}
             className="mb-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20"
             autoFocus
           />

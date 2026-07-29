@@ -1643,10 +1643,7 @@ export default function ShortVideoOptimizationPage() {
   return (
     <div
       className={cn(
-        'short-video-page sv-jimeng-studio mx-auto px-4 py-8 lg:py-10',
-        mainPane === 'cloud_batch' || mainPane === 'canvas' || mainPane === 'cases'
-          ? 'max-w-6xl'
-          : 'max-w-5xl',
+        'short-video-page sv-jimeng-studio mx-auto max-w-6xl px-4 py-8 lg:py-10',
       )}
     >
       <header className="relative mb-8 space-y-2 text-center sm:mb-10">
@@ -1771,7 +1768,7 @@ export default function ShortVideoOptimizationPage() {
       ) : null}
 
       {mainPane === 'canvas' ? (
-        <div className="mb-8 space-y-4">
+        <div className="mb-8 w-full space-y-4">
           <ShortVideoInfiniteCanvas
             scriptRows={scriptRows}
             media={storyFrames.map((f) => ({
@@ -1787,7 +1784,10 @@ export default function ShortVideoOptimizationPage() {
               setHint('已切到短片生成 · 分镜参考，请上传素材；也可再回「无限画布」查看节点')
               queueMicrotask(() => storyFrameInputRef.current?.click())
             }}
-            onSelectRow={() => setMainPane('generate')}
+            onEditRow={() => {
+              setMainPane('generate')
+              setHint('已进入短片生成 · 可继续完善分镜与口播')
+            }}
           />
           <div className="flex flex-wrap gap-2">
             <button
