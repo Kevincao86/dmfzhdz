@@ -1,8 +1,9 @@
 /**
  * 短视频案例墙（发现 / 技能 / 短片）
- * 成片由 Seedance 生成，静态托管于 /short-video-cases/
+ * 成片由 Seedance 生成；预览走 OSS 公网直链（秒开），本地 public 仅作源文件。
  */
 
+import { SHORT_VIDEO_CASE_CDN_BASE } from './shortVideoCaseCdn'
 import type { ShortVideoSkillId } from './shortVideoSkills'
 
 export type ShortVideoCaseKind = 'discover' | 'skill' | 'film'
@@ -26,7 +27,8 @@ export type ShortVideoCaseItem = {
   genPrompt?: string
 }
 
-const asset = (id: string, ext: 'png' | 'mp4') => `/short-video-cases/${id}.${ext}?v=preview4`
+const asset = (id: string, ext: 'png' | 'mp4') =>
+  `${SHORT_VIDEO_CASE_CDN_BASE.replace(/\/$/, '')}/${id}.${ext}?v=cdn1`
 
 function c(partial: ShortVideoCaseItem): ShortVideoCaseItem {
   return {

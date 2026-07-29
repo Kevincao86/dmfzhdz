@@ -548,6 +548,7 @@ ShortVideoCaseGallery
 ShortVideoInfiniteCanvas
 shortVideoSkills
 shortVideoCaseGallery
+shortVideoCaseCdn
 shortVideoStudioModes
 shortVideoUiLabels
 shortVideoGuidanceAi

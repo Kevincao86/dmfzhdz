@@ -17,22 +17,30 @@ const TABS: { id: TabId; label: string; kind: ShortVideoCaseKind }[] = [
   { id: 'film', label: '短片', kind: 'film' },
 ]
 
-/** 预取缓存，避免重复下载 */
-const prefetchCache = new Map<string, Promise<void>>()
+/** 用隐藏 video 预取（跨域 OSS 无需 CORS fetch） */
+const prefetchWarm = new Set<string>()
 
 function prefetchCaseVideo(url: string | undefined) {
   const u = String(url || '').trim()
   if (!u || typeof window === 'undefined') return
-  if (prefetchCache.has(u)) return
-  const p = fetch(u, { credentials: 'same-origin', mode: 'cors', cache: 'force-cache' })
-    .then(async (res) => {
-      if (!res.ok) throw new Error(String(res.status))
-      await res.blob()
-    })
-    .catch(() => {
-      prefetchCache.delete(u)
-    })
-  prefetchCache.set(u, p)
+  if (prefetchWarm.has(u)) return
+  prefetchWarm.add(u)
+  try {
+    const link = document.createElement('link')
+    link.rel = 'preload'
+    link.as = 'video'
+    link.href = u
+    link.crossOrigin = 'anonymous'
+    document.head.appendChild(link)
+  } catch {
+    /* ignore */
+  }
+  const v = document.createElement('video')
+  v.preload = 'auto'
+  v.muted = true
+  v.playsInline = true
+  v.src = u
+  v.load()
 }
 
 export type ShortVideoCaseGalleryProps = {
@@ -155,7 +163,7 @@ export default function ShortVideoCaseGallery({ onApplyCase, className }: ShortV
       ) : null}
 
       <p className="mt-4 text-center text-[11px] text-slate-400">
-        共 {SHORT_VIDEO_CASES.length} 个案例 · 悬停预载 · 轻量预览片 ·「做同款」回填参数
+        共 {SHORT_VIDEO_CASES.length} 个案例 · OSS 秒开预览 · 悬停预载 ·「做同款」回填参数
       </p>
 
       {preview ? (
@@ -355,6 +363,7 @@ function CasePreviewModal({
               muted
               autoPlay
               preload="auto"
+              crossOrigin="anonymous"
               className={cn(
                 'max-h-[70vh] w-full bg-black object-contain',
                 item.aspect === '16:9' ? 'aspect-video' : 'aspect-[9/16]',
