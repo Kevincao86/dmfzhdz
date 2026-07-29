@@ -548,10 +548,12 @@ ShortVideoCaseGallery
 ShortVideoInfiniteCanvas
 shortVideoSkills
 shortVideoCaseGallery
+shortVideoStudioModes
 shortVideoUiLabels
 shortVideoGuidanceAi
 shortVideoProductFocus
 shortVideoScriptTable
+short-video-cases
 MeooLayout
 index.css
 merchantEmbedChrome.css

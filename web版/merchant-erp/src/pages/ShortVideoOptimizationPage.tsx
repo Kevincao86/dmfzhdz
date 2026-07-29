@@ -22,8 +22,13 @@ import ShortVideoCaseGallery from '../components/ShortVideoCaseGallery'
 import ShortVideoInfiniteCanvas from '../components/ShortVideoInfiniteCanvas'
 import type { ShortVideoCaseItem } from '../lib/shortVideoCaseGallery'
 import { findShortVideoSkill, type ShortVideoSkillId } from '../lib/shortVideoSkills'
+import {
+  findStudioMode,
+  type ShortVideoStudioModeId,
+} from '../lib/shortVideoStudioModes'
 import { MpAddonPointsRateBadge } from '../components/MpAddonPointsRateBadge'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { readMpSessionToken } from '../lib/merchantApiAuth'
 import { probeVideoDurationSec } from '../lib/digitalHumanSubtitle'
 import {
@@ -370,6 +375,7 @@ async function resolveSegmentTailFrameBase64(
 }
 
 export default function ShortVideoOptimizationPage() {
+  const navigate = useNavigate()
   const embedAddonAccess = useMemo(() => readMpEmbedAddonAccess(), [])
   const paneTabs = useMemo(() => {
     const all = [
@@ -387,6 +393,7 @@ export default function ShortVideoOptimizationPage() {
   }, [embedAddonAccess])
   const [mainPane, setMainPane] = useState<MainPane>('generate')
   const [activeSkillId, setActiveSkillId] = useState<ShortVideoSkillId | null>(null)
+  const [studioMode, setStudioMode] = useState<ShortVideoStudioModeId>('agent')
   const [cfg, setCfg] = useState<VideoAiBackendConfig | null>(null)
   const [cfgLoaded, setCfgLoaded] = useState(false)
 
@@ -1525,17 +1532,74 @@ export default function ShortVideoOptimizationPage() {
     [],
   )
 
+  const onStudioModeChange = (id: ShortVideoStudioModeId) => {
+    setStudioMode(id)
+    const mode = findStudioMode(id)
+    if (mode.href) {
+      setHint(`即将打开「${mode.label}」…`)
+      navigate(mode.href)
+      return
+    }
+    if (mode.pane) {
+      resetOutputs()
+      setMainPane(mode.pane)
+      if (mode.pane === 'cloud_batch') {
+        setHint('已切换到 AI混剪：可在此选择 BGM / 配乐并做包装精修')
+      } else if (mode.pane === 'canvas') {
+        setHint('已进入无限画布：可查看分镜与参考节点')
+      } else {
+        setHint(`已切换到${mode.label}`)
+      }
+    }
+  }
+
   const onAgentCabinSubmit = () => {
+    const mode = findStudioMode(studioMode)
+    if (mode.href) {
+      navigate(mode.href)
+      return
+    }
+    if (mode.pane === 'cloud_batch') {
+      resetOutputs()
+      setMainPane('cloud_batch')
+      setHint('已进入 AI混剪（音乐/配乐与包装精修）')
+      return
+    }
+    if (mode.pane === 'canvas') {
+      setMainPane('canvas')
+      return
+    }
+
     const skill = findShortVideoSkill(activeSkillId)
+    const preferLong = Boolean(skill?.preferLongform)
     if (skill) {
-      if (skill.preferLongform) setLongformEnabled(true)
+      if (preferLong) setLongformEnabled(true)
       setSdAspect(skill.preferAspect)
     }
     setMainPane('generate')
     setHint('已进入短片生成工作区，可点「AI 规划分镜」或「开始生成短片」')
-    if (genPrompt.trim() && longformEnabled) {
+    // 用 skill 偏好判断，避免 setState 尚未生效时读到旧的 longformEnabled
+    if (genPrompt.trim() && (preferLong || longformEnabled)) {
       void onOptimizeGuidancePrompt()
     }
+  }
+
+  const cabinSubmitLabel = useMemo(() => {
+    if (studioMode === 'image') return '打开视觉工坊'
+    if (studioMode === 'digital_human') return '打开数字人'
+    if (studioMode === 'music') return '进入混剪配乐'
+    if (studioMode === 'canvas') return '打开无限画布'
+    if (longformEnabled) return '规划并进入生成'
+    return '进入短片生成'
+  }, [studioMode, longformEnabled])
+
+  const goPane = (id: MainPane) => {
+    resetOutputs()
+    setMainPane(id)
+    if (id === 'generate') setStudioMode((m) => (m === 'agent' ? 'agent' : 'video'))
+    if (id === 'canvas') setStudioMode('canvas')
+    if (id === 'cloud_batch') setStudioMode('music')
+    if (id === 'cases') setStudioMode('agent')
   }
 
   const studioQuickEntries = [
@@ -1616,7 +1680,7 @@ export default function ShortVideoOptimizationPage() {
         </div>
       ) : (
         <>
-      {!embedBlocked && mainPane !== 'cloud_batch' ? (
+      {!embedBlocked ? (
         <div className="mb-6">
           <input
             ref={genDocInputRef}
@@ -1628,13 +1692,22 @@ export default function ShortVideoOptimizationPage() {
           <ShortVideoAgentCabin
             value={genPrompt}
             skillId={activeSkillId}
-            onSkillChange={setActiveSkillId}
+            studioMode={studioMode}
+            onStudioModeChange={onStudioModeChange}
+            onSkillChange={(id) => {
+              setActiveSkillId(id)
+              const skill = findShortVideoSkill(id)
+              if (skill) {
+                if (skill.preferLongform) setLongformEnabled(true)
+                setSdAspect(skill.preferAspect)
+              }
+            }}
             onChange={setGenPrompt}
             onSubmit={onAgentCabinSubmit}
             onPickDoc={() => genDocInputRef.current?.click()}
             disabled={busy}
             busy={auxBusy}
-            submitLabel={longformEnabled ? '规划并进入生成' : '进入短片生成'}
+            submitLabel={cabinSubmitLabel}
           />
         </div>
       ) : null}
@@ -1647,10 +1720,7 @@ export default function ShortVideoOptimizationPage() {
             <button
               key={e.id}
               type="button"
-              onClick={() => {
-                resetOutputs()
-                setMainPane(e.id)
-              }}
+              onClick={() => goPane(e.id)}
               className={cn(
                 'group flex items-center gap-3 rounded-2xl border bg-white/95 p-3.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md',
                 active ? 'border-cyan-300 ring-2 ring-cyan-500/20' : 'border-slate-200/90',
@@ -1681,10 +1751,7 @@ export default function ShortVideoOptimizationPage() {
             <button
               key={t.id}
               type="button"
-              onClick={() => {
-                resetOutputs()
-                setMainPane(t.id)
-              }}
+              onClick={() => goPane(t.id)}
               className={cn(
                 'flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-semibold transition',
                 active

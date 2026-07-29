@@ -1,5 +1,6 @@
 /**
  * 短视频案例墙（对齐即梦「发现 / 技能 / 短片」作品呈现）
+ * 封面/短片由 AI 出图 + Ken Burns 合成，静态托管于 /short-video-cases/
  */
 
 import type { ShortVideoSkillId } from './shortVideoSkills'
@@ -17,11 +18,17 @@ export type ShortVideoCaseItem = {
   aspect: '9:16' | '16:9' | '1:1'
   longform: boolean
   durationSec: number
-  /** 封面渐变（无真实成片时用） */
+  /** 封面渐变（无素材时回退） */
   coverFrom: string
   coverTo: string
   badge?: string
+  /** AI 生成封面图（public） */
+  coverUrl?: string
+  /** AI 封面运镜短片（public mp4） */
+  videoUrl?: string
 }
+
+const asset = (id: string, ext: 'png' | 'mp4') => `/short-video-cases/${id}.${ext}`
 
 export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
   {
@@ -36,6 +43,8 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
     coverFrom: '#0f172a',
     coverTo: '#f97316',
     badge: '短片',
+    coverUrl: asset('case-visit-night', 'png'),
+    videoUrl: asset('case-visit-night', 'mp4'),
     prompt:
       '【Skill·探店成片】\n主题：夜市小吃街探店，暖黄灯光与烟火气。\n结构：街景推镜钩子 → 摊位特写 → 招牌菜出锅蒸汽 → 试吃反应 → 店名与人均收尾。\n运镜跟拍流畅，禁止静止幻灯。',
   },
@@ -51,6 +60,8 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
     coverFrom: '#ec4899',
     coverTo: '#fdf2f8',
     badge: '技能',
+    coverUrl: asset('case-seed-skincare', 'png'),
+    videoUrl: asset('case-seed-skincare', 'mp4'),
     prompt:
       '【Skill·产品种草】\n主题：保湿精华种草。\n结构：干燥起皮痛点 → 瓶身亮相 → 质地拉丝特写 → 上脸吸收 → 限时福利 CTA。\n浅景深、主光柔和。',
   },
@@ -66,6 +77,8 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
     coverFrom: '#dc2626',
     coverTo: '#fbbf24',
     badge: '发现',
+    coverUrl: asset('case-promo-event', 'png'),
+    videoUrl: asset('case-promo-event', 'mp4'),
     prompt:
       '【Skill·活动预告】\n主题：周末满减大促。\n结构：大字「满 100 减 30」冲击 → 活动时间 → 爆品闪切 → 到店 CTA。\n节奏快、信息清晰。',
   },
@@ -81,6 +94,8 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
     coverFrom: '#44403c',
     coverTo: '#d6d3d1',
     badge: '短片',
+    coverUrl: asset('case-ambiance-cafe', 'png'),
+    videoUrl: asset('case-ambiance-cafe', 'mp4'),
     prompt:
       '【Skill·门店氛围】\n主题：独立咖啡馆空间氛围。\n结构：外立面黄昏 → 木纹与杯具细节 → 拉花特写 → 客流柔焦 → Logo 收尾。\n缓慢推轨，色调偏暖灰。',
   },
@@ -96,6 +111,8 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
     coverFrom: '#1e3a8a',
     coverTo: '#67e8f9',
     badge: '技能',
+    coverUrl: asset('case-drama-hook', 'png'),
+    videoUrl: asset('case-drama-hook', 'mp4'),
     prompt:
       '【Skill·短剧钩子】\n主题：外卖迟到引发的反转误会。\n结构：门铃急促 → 错开门瞬间 → 表情特写冲突 → 悬念定格「下一秒……」。\n前 3 秒必须有冲突。',
   },
@@ -111,6 +128,8 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
     coverFrom: '#7c2d12',
     coverTo: '#fdba74',
     badge: '发现',
+    coverUrl: asset('case-food-ramen', 'png'),
+    videoUrl: asset('case-food-ramen', 'mp4'),
     prompt:
       '【Skill·美食特写】\n主题：日式豚骨拉面。\n结构：整碗全景 → 蒸汽升腾 → 筷子拉面 → 叉烧特写 → 店名收尾。\n暖色微距，环绕运镜。',
   },
@@ -126,6 +145,8 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
     coverFrom: '#fef3c7',
     coverTo: '#34d399',
     badge: '短片',
+    coverUrl: asset('case-visit-brunch', 'png'),
+    videoUrl: asset('case-visit-brunch', 'mp4'),
     prompt:
       '【Skill·探店成片】\n主题：周末早午餐探店，自然光、清新色调。\n结构：门头 → 座位环境 → 甜品与咖啡特写 → 试吃口播 → 预约 CTA。',
   },
@@ -141,6 +162,8 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
     coverFrom: '#0ea5e9',
     coverTo: '#e0f2fe',
     badge: '发现',
+    coverUrl: asset('case-seed-gadget', 'png'),
+    videoUrl: asset('case-seed-gadget', 'mp4'),
     prompt:
       '【Skill·产品种草】\n主题：桌面收纳小物。\n结构：桌面凌乱痛点 → 产品展开演示 → 三个功能特写 → 收纳前后对比 → CTA。',
   },
