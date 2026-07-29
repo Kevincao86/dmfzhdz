@@ -3,8 +3,10 @@ import {
   Focus,
   ImagePlus,
   Minus,
+  Pencil,
   Plus,
   RotateCcw,
+  Trash2,
   Type,
   ZoomIn,
   ZoomOut,
@@ -24,8 +26,10 @@ export type ShortVideoInfiniteCanvasProps = {
   scriptRows: ShortVideoScriptRow[]
   media: CanvasMediaItem[]
   disabled?: boolean
-  /** 双击分镜时回调（单击/拖拽不触发） */
+  /** 双击 / 点「编辑」进入短片生成 */
   onEditRow?: (index: number) => void
+  onRemoveScriptRow?: (index: number) => void
+  onRemoveMedia?: (id: string) => void
   onAddMediaClick?: () => void
   className?: string
 }
@@ -34,23 +38,25 @@ type Pt = { x: number; y: number }
 
 const NODE_W = 200
 const NODE_H = 120
-const GAP_X = 48
-const GAP_Y = 36
-const SCRIPT_W = NODE_W + 24
-const SCRIPT_H = NODE_H + 28
+const GAP_X = 56
+const GAP_Y = 48
+const SCRIPT_W = NODE_W + 28
+const SCRIPT_H = NODE_H + 36
 
 function defaultMediaPos(index: number): Pt {
   return {
-    x: 64 + (index % 3) * (NODE_W + GAP_X),
-    y: 64 + Math.floor(index / 3) * (NODE_H + GAP_Y),
+    x: 48 + (index % 2) * (NODE_W + GAP_X),
+    y: 56 + Math.floor(index / 2) * (NODE_H + GAP_Y),
   }
 }
 
+/** 分镜默认横向顺序排列，便于连线表达时间轴 */
 function defaultScriptPos(index: number, mediaCount: number): Pt {
-  const col0 = mediaCount > 0 ? NODE_W + GAP_X + 64 : 64
+  const col0 = mediaCount > 0 ? 48 + 2 * (NODE_W + GAP_X) : 64
+  const perRow = 4
   return {
-    x: col0 + (index % 3) * (SCRIPT_W + GAP_X),
-    y: 64 + Math.floor(index / 3) * (SCRIPT_H + GAP_Y),
+    x: col0 + (index % perRow) * (SCRIPT_W + GAP_X),
+    y: 56 + Math.floor(index / perRow) * (SCRIPT_H + GAP_Y),
   }
 }
 
@@ -61,14 +67,17 @@ export default function ShortVideoInfiniteCanvas({
   media,
   disabled,
   onEditRow,
+  onRemoveScriptRow,
+  onRemoveMedia,
   onAddMediaClick,
   className,
 }: ShortVideoInfiniteCanvasProps) {
   const [scale, setScale] = useState(0.85)
-  const [offset, setOffset] = useState<Pt>({ x: 24, y: 16 })
+  const [offset, setOffset] = useState<Pt>({ x: 20, y: 12 })
   const [panning, setPanning] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [nodePosMap, setNodePosMap] = useState<Record<string, Pt>>({})
+  const [showFlow, setShowFlow] = useState(true)
 
   const dragRef = useRef<{
     kind: DragKind
@@ -77,6 +86,7 @@ export default function ShortVideoInfiniteCanvas({
     nodeId?: string
     moved: boolean
   } | null>(null)
+  const lastTapRef = useRef<{ id: string; at: number } | null>(null)
   const viewportRef = useRef<HTMLDivElement>(null)
 
   const scriptNodes = scriptRows.slice(0, 12)
@@ -88,13 +98,14 @@ export default function ShortVideoInfiniteCanvas({
     [scriptNodes],
   )
 
-  // 节点增删时补默认坐标，不覆盖已拖位置
   useEffect(() => {
     setNodePosMap((prev) => {
       const next = { ...prev }
       let changed = false
+      const alive = new Set<string>()
       mediaNodes.forEach((m, i) => {
         const id = `media:${m.id}`
+        alive.add(id)
         if (!next[id]) {
           next[id] = defaultMediaPos(i)
           changed = true
@@ -102,11 +113,18 @@ export default function ShortVideoInfiniteCanvas({
       })
       scriptNodes.forEach((_row, i) => {
         const id = `script:${i}`
+        alive.add(id)
         if (!next[id]) {
           next[id] = defaultScriptPos(i, mediaNodes.length)
           changed = true
         }
       })
+      for (const k of Object.keys(next)) {
+        if (!alive.has(k)) {
+          delete next[k]
+          changed = true
+        }
+      }
       return changed ? next : prev
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -131,14 +149,22 @@ export default function ShortVideoInfiniteCanvas({
     }
   }
 
+  const tryOpenEdit = (nodeId: string) => {
+    const m = /^script:(\d+)$/.exec(nodeId)
+    if (!m) return
+    onEditRow?.(Number(m[1]))
+  }
+
   const onPointerDown = (e: React.PointerEvent) => {
     if (disabled) return
     if (e.button !== 0 && e.button !== 1) return
     const target = e.target as HTMLElement
+    if (target.closest('[data-node-action]')) return
+
     const nodeEl = target.closest('[data-canvas-node]') as HTMLElement | null
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
 
-    if (nodeEl?.dataset.nodeId) {
+    if (nodeEl?.dataset.nodeId && nodeEl.dataset.nodeId !== 'empty') {
       const nodeId = nodeEl.dataset.nodeId
       const pos = nodePosMap[nodeId] || { x: 0, y: 0 }
       const world = clientToWorld(e.clientX, e.clientY)
@@ -195,18 +221,46 @@ export default function ShortVideoInfiniteCanvas({
     } catch {
       /* ignore */
     }
-    // 单击分镜：仅选中，不跳转；双击才编辑
     if (d?.kind === 'node' && d.nodeId && !d.moved) {
       setSelectedId(d.nodeId)
+      const now = Date.now()
+      const prev = lastTapRef.current
+      if (prev && prev.id === d.nodeId && now - prev.at < 380) {
+        lastTapRef.current = null
+        tryOpenEdit(d.nodeId)
+      } else {
+        lastTapRef.current = { id: d.nodeId, at: now }
+      }
     }
   }
 
   const resetView = () => {
     setScale(0.85)
-    setOffset({ x: 24, y: 16 })
+    setOffset({ x: 20, y: 12 })
     setNodePosMap({})
     setSelectedId(null)
   }
+
+  const flowPaths = useMemo(() => {
+    if (!showFlow || scriptNodes.length < 2) return [] as { d: string; label: string; mid: Pt }[]
+    const out: { d: string; label: string; mid: Pt }[] = []
+    for (let i = 0; i < scriptNodes.length - 1; i++) {
+      const a = nodePosMap[`script:${i}`] || defaultScriptPos(i, mediaNodes.length)
+      const b = nodePosMap[`script:${i + 1}`] || defaultScriptPos(i + 1, mediaNodes.length)
+      const x1 = a.x + SCRIPT_W
+      const y1 = a.y + SCRIPT_H / 2
+      const x2 = b.x
+      const y2 = b.y + SCRIPT_H / 2
+      const dx = Math.max(40, Math.abs(x2 - x1) * 0.45)
+      const d = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`
+      out.push({
+        d,
+        label: `${i + 1}→${i + 2}`,
+        mid: { x: (x1 + x2) / 2, y: (y1 + y2) / 2 - 10 },
+      })
+    }
+    return out
+  }, [showFlow, scriptNodes, nodePosMap, mediaNodes.length])
 
   return (
     <div
@@ -222,10 +276,25 @@ export default function ShortVideoInfiniteCanvas({
           </span>
           <div>
             <p className="text-sm font-semibold text-slate-900">无限画布</p>
-            <p className="text-[11px] text-slate-500">拖拽节点排版 · 空白处平移 · 双击分镜去编辑 · ⌘/Ctrl+滚轮缩放</p>
+            <p className="text-[11px] text-slate-500">
+              拖拽排版 · 顺序连线 · 双击/编辑进分镜 · 删除节点 · ⌘/Ctrl+滚轮缩放
+            </p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-1">
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => setShowFlow((v) => !v)}
+            className={cn(
+              'rounded-lg border px-2.5 py-1.5 text-xs font-medium',
+              showFlow
+                ? 'border-cyan-200 bg-cyan-50 text-cyan-800'
+                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+            )}
+          >
+            {showFlow ? '顺序连线 · 开' : '顺序连线 · 关'}
+          </button>
           <ToolbarBtn label="缩小" onClick={() => setScale((s) => Math.max(0.35, s - 0.1))} icon={ZoomOut} disabled={disabled} />
           <span className="min-w-[3rem] text-center text-xs tabular-nums text-slate-600">{Math.round(scale * 100)}%</span>
           <ToolbarBtn label="放大" onClick={() => setScale((s) => Math.min(2.2, s + 0.1))} icon={ZoomIn} disabled={disabled} />
@@ -268,6 +337,61 @@ export default function ShortVideoInfiniteCanvas({
             transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
           }}
         >
+          {showFlow && flowPaths.length > 0 ? (
+            <svg
+              className="pointer-events-none absolute left-0 top-0 overflow-visible"
+              width={2400}
+              height={1600}
+              aria-hidden
+            >
+              <defs>
+                <marker
+                  id="sv-flow-arrow"
+                  markerWidth="8"
+                  markerHeight="8"
+                  refX="6"
+                  refY="3"
+                  orient="auto"
+                  markerUnits="strokeWidth"
+                >
+                  <path d="M0,0 L6,3 L0,6 Z" fill="#22d3ee" />
+                </marker>
+              </defs>
+              {flowPaths.map((p) => (
+                <g key={p.label}>
+                  <path
+                    d={p.d}
+                    fill="none"
+                    stroke="#67e8f9"
+                    strokeWidth="2.5"
+                    strokeDasharray="6 4"
+                    markerEnd="url(#sv-flow-arrow)"
+                    opacity="0.9"
+                  />
+                  <rect
+                    x={p.mid.x - 16}
+                    y={p.mid.y - 8}
+                    width="32"
+                    height="16"
+                    rx="8"
+                    fill="#ecfeff"
+                    stroke="#a5f3fc"
+                  />
+                  <text
+                    x={p.mid.x}
+                    y={p.mid.y + 4}
+                    textAnchor="middle"
+                    fontSize="9"
+                    fill="#0e7490"
+                    fontWeight="600"
+                  >
+                    {p.label}
+                  </text>
+                </g>
+              ))}
+            </svg>
+          ) : null}
+
           {mediaNodes.map((m, i) => {
             const id = `media:${m.id}`
             const p = nodePosMap[id] || defaultMediaPos(i)
@@ -283,6 +407,22 @@ export default function ShortVideoInfiniteCanvas({
                 )}
                 style={{ left: p.x, top: p.y, width: NODE_W, height: NODE_H }}
               >
+                {onRemoveMedia ? (
+                  <button
+                    type="button"
+                    data-node-action
+                    disabled={disabled}
+                    aria-label="删除参考"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onRemoveMedia(m.id)
+                    }}
+                    className="absolute right-1.5 top-1.5 z-[2] rounded-full bg-black/55 p-1 text-white hover:bg-rose-600"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                ) : null}
                 {m.kind === 'video' ? (
                   <video src={m.previewUrl} muted playsInline className="pointer-events-none h-[78%] w-full object-cover" />
                 ) : (
@@ -307,12 +447,9 @@ export default function ShortVideoInfiniteCanvas({
                 data-node-id={id}
                 role="button"
                 tabIndex={0}
-                onDoubleClick={(e) => {
-                  e.stopPropagation()
-                  onEditRow?.(i)
-                }}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') onEditRow?.(i)
+                  if (e.key === 'Enter') tryOpenEdit(id)
+                  if (e.key === 'Backspace' || e.key === 'Delete') onRemoveScriptRow?.(i)
                 }}
                 className={cn(
                   'absolute cursor-grab overflow-hidden rounded-xl border bg-gradient-to-br from-white to-cyan-50/80 text-left shadow-lg shadow-cyan-900/5 active:cursor-grabbing',
@@ -320,12 +457,46 @@ export default function ShortVideoInfiniteCanvas({
                 )}
                 style={{ left: p.x, top: p.y, width: SCRIPT_W, height: SCRIPT_H }}
               >
-                <div className="flex items-center justify-between gap-1 border-b border-cyan-100/80 bg-cyan-500/10 px-2.5 py-1.5">
+                <div className="flex items-center justify-between gap-1 border-b border-cyan-100/80 bg-cyan-500/10 px-2 py-1.5">
                   <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-cyan-900">
                     <Film className="h-3 w-3" />
                     镜 {i + 1}
                   </span>
-                  <span className="text-[10px] tabular-nums text-cyan-800/80">{row.timeRange || '—'}</span>
+                  <span className="flex items-center gap-0.5">
+                    <span className="mr-1 text-[10px] tabular-nums text-cyan-800/80">{row.timeRange || '—'}</span>
+                    <button
+                      type="button"
+                      data-node-action
+                      disabled={disabled}
+                      aria-label="编辑分镜"
+                      title="编辑"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        tryOpenEdit(id)
+                      }}
+                      className="rounded-md p-1 text-cyan-800 hover:bg-cyan-100"
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </button>
+                    {onRemoveScriptRow ? (
+                      <button
+                        type="button"
+                        data-node-action
+                        disabled={disabled || scriptNodes.length <= 2}
+                        aria-label="删除分镜"
+                        title={scriptNodes.length <= 2 ? '至少保留 2 段分镜' : '删除'}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onRemoveScriptRow(i)
+                        }}
+                        className="rounded-md p-1 text-slate-500 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    ) : null}
+                  </span>
                 </div>
                 <div className="space-y-1 px-2.5 py-2">
                   <p className="line-clamp-2 text-[11px] leading-snug text-slate-700">
@@ -350,11 +521,12 @@ export default function ShortVideoInfiniteCanvas({
               <Plus className="h-8 w-8 text-slate-300" />
               <p className="mt-3 text-sm font-medium text-slate-700">画布为空</p>
               <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                在「短片生成」中填写分镜或上传参考图后，节点会自动出现在此。可拖拽排版，双击分镜进入编辑。
+                在「短片生成」填写分镜或上传参考后，节点会出现在此。支持拖拽、顺序连线、编辑与删除。
               </p>
               {onAddMediaClick ? (
                 <button
                   type="button"
+                  data-node-action
                   onClick={onAddMediaClick}
                   className="mt-4 inline-flex items-center gap-1 rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white"
                 >
@@ -371,7 +543,7 @@ export default function ShortVideoInfiniteCanvas({
         <span>
           分镜 {scriptNodes.length} · 参考 {mediaNodes.length}
           {scriptRows.length > 12 ? `（仅展示前 12 段）` : ''}
-          {selectedId?.startsWith('script:') ? ' · 已选中（双击编辑）' : ''}
+          {selectedId?.startsWith('script:') ? ' · 已选中（双击或点铅笔编辑）' : ''}
         </span>
         <span className="inline-flex items-center gap-2">
           <Minus className="h-3 w-3" /> 拖空白平移
