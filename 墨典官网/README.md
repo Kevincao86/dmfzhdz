@@ -2,10 +2,12 @@
 
 宁波墨典网络科技有限公司官方网站（静态单页）。
 
+路径：仓库根目录 `墨典官网`。Vercel 部署时 Root Directory 请选 `墨典官网`。
+
 ## 本地预览
 
 ```bash
-cd web版/modian-official
+cd 墨典官网
 npm run dev
 # 浏览器打开 http://127.0.0.1:5177
 ```
