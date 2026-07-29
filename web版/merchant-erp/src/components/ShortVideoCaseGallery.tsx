@@ -316,7 +316,11 @@ function CasePreviewModal({
       setLoading(false)
       setProgress(100)
       setErr('')
-      void v.play().catch(() => undefined)
+      // 用户点击打开预览视为手势，优先带声播放；若被拦截则静音重试并可手动开声
+      void v.play().catch(() => {
+        v.muted = true
+        void v.play().catch(() => undefined)
+      })
     }
     const onWaiting = () => setLoading(true)
     const onPlaying = () => {
@@ -385,7 +389,6 @@ function CasePreviewModal({
               poster={item.coverUrl}
               controls
               playsInline
-              muted
               autoPlay
               preload="auto"
               className={cn(
