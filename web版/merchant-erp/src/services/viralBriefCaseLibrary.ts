@@ -1,4 +1,3 @@
-import type { RecruitOrderPickerRow } from '../lib/aiRecruitOrderContext'
 import type { BriefContentForSearch } from '../lib/viralBriefReferenceKeywordCore'
 import type { ViralBriefPlatform, ViralBriefResult, ViralBriefStyle } from './viralBriefAi'
 import { STYLE_LABELS } from './viralBriefAi'
@@ -65,9 +64,8 @@ function toDisplayCase(hit: Awaited<ReturnType<typeof fetchBriefWebReferenceHits
   }
 }
 
-/** 仅从外网检索：服务端 AI 根据已生成 Brief 提炼关键词后搜索（不用招募单名） */
+/** 仅从外网检索：服务端 AI 根据已生成 Brief 提炼关键词后搜索（不依赖订单） */
 export async function pickViralBriefReferenceCases(args: {
-  order: RecruitOrderPickerRow
   platform: ViralBriefPlatform
   style: ViralBriefStyle
   brief: ViralBriefResult

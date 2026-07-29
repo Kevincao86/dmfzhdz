@@ -317,8 +317,15 @@ async function readImageFilePureBase64(f: File): Promise<string> {
 
 function withVideoMotionPrompt(prompt: string): string {
   const p = prompt.trim()
-  if (!p) return SHORT_VIDEO_MOTION_PROMPT_SUFFIX
-  return p.includes('【动作运镜】') ? p : `${p}\n${SHORT_VIDEO_MOTION_PROMPT_SUFFIX}`
+  /** 仅短视频页使用的观感约束，不改全局 SHORT_VIDEO_MOTION_PROMPT_SUFFIX（避免误伤数字人） */
+  const lookSuffix =
+    '【动作运镜】镜头持续平滑运动，主体有自然微动与景深变化，禁止静止硬切或单帧停留。' +
+    '【观感】主光明确、主体清晰、色调统一；避免灰雾过曝死黑；前 2 秒须有动作或推镜钩子，禁止空镜与幻灯片感。'
+  if (!p) return lookSuffix
+  if (p.includes('【观感】')) {
+    return p.includes('【动作运镜】') ? p : `${p}\n${SHORT_VIDEO_MOTION_PROMPT_SUFFIX}`
+  }
+  return p.includes('【动作运镜】') ? `${p}\n【观感】主光明确、主体清晰、色调统一；避免灰雾过曝死黑；前 2 秒须有动作或推镜钩子，禁止空镜与幻灯片感。` : `${p}\n${lookSuffix}`
 }
 
 async function resolveSegmentTailFrameBase64(
@@ -426,7 +433,7 @@ export default function ShortVideoOptimizationPage() {
   const [sdFps, setSdFps] = useState<'24' | '30'>('24')
   const [sdAspect, setSdAspect] = useState<'16:9' | '9:16' | '1:1'>('9:16')
   const [sdWatermark, setSdWatermark] = useState<'off' | 'on'>('off')
-  const [sdResolution, setSdResolution] = useState<SeedanceQualityId>('720p')
+  const [sdResolution, setSdResolution] = useState<SeedanceQualityId>('1080p')
 
   const [longformEnabled, setLongformEnabled] = useState(true)
   const [longformTargetTotalSec, setLongformTargetTotalSec] = useState(LONGFORM_DEFAULT_TARGET_TOTAL_SEC)

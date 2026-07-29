@@ -1,4 +1,3 @@
-import type { RecruitOrderPickerRow } from '../lib/aiRecruitOrderContext'
 import { postDouyinGoodsAiAssist, type AiModelId } from './douyinAiAssistApi'
 import { readTextAiAuto, resolveTextAiModelForRequest } from './merchantAiModelStorage'
 import { pickViralBriefReferenceCases, type ViralBriefReferenceCase } from './viralBriefCaseLibrary'
@@ -216,13 +215,29 @@ function asStringList(raw: unknown): string[] {
   return sanitizeStringList(raw)
 }
 
-export function resolveViralBriefPlatform(order: RecruitOrderPickerRow | null): ViralBriefPlatform {
-  const p = String(order?.platform || '').trim()
+/** 商家直接填写的 Brief 素材（无需招募订单） */
+export type BriefSourceContext = {
+  title: string
+  region?: string
+  category?: string
+  content: string
+}
+
+export function resolveViralBriefPlatformFromLabel(platformLabelRaw?: string | null): ViralBriefPlatform {
+  const p = String(platformLabelRaw || '').trim()
   if (/大众|点评|dianping/i.test(p)) return 'dianping'
   if (/快手|kuaishou/i.test(p)) return 'kuaishou'
   if (/视频号|channels|weixin.*视频/i.test(p)) return 'channels'
   if (/红|xhs|xiaohongshu/i.test(p)) return 'xiaohongshu'
+  if (/douyin|抖音/i.test(p)) return 'douyin'
   return 'douyin'
+}
+
+/** @deprecated 使用 resolveViralBriefPlatformFromLabel；保留旧名兼容 */
+export function resolveViralBriefPlatform(
+  order: { platform?: string } | null,
+): ViralBriefPlatform {
+  return resolveViralBriefPlatformFromLabel(order?.platform)
 }
 
 /** 小红书、大众点评为图文文稿平台（非视频分镜 Brief） */
@@ -230,17 +245,16 @@ export function isCopyManuscriptPlatform(platform: ViralBriefPlatform): boolean 
   return platform === 'xiaohongshu' || platform === 'dianping'
 }
 
-function buildOrderContext(order: RecruitOrderPickerRow, extraHint?: string): string {
+function buildSourceContext(source: BriefSourceContext, extraHint?: string): string {
   const hint = String(extraHint || '').trim()
-  const base = String(order.recruitContent || '').trim()
+  const base = String(source.content || '').trim()
   return [
-    `招募标题：${order.title || '—'}`,
-    `平台：${order.platform || '—'}`,
-    `区域：${order.region || '—'}`,
-    `品类：${order.category || '—'}`,
-    hint ? `PR 补充要点：${hint}` : '',
+    `门店/标题：${source.title || '—'}`,
+    `区域：${source.region || '—'}`,
+    `品类：${source.category || '—'}`,
+    hint ? `补充要点：${hint}` : '',
     '',
-    base || '（订单详情为空，请结合标题与品类发挥）',
+    base || '（需求描述为空，请结合标题与品类发挥）',
   ]
     .filter(Boolean)
     .join('\n')
@@ -512,35 +526,35 @@ async function chat(titleDraft: string, productName: string): Promise<string> {
   throw new Error(formatBriefUserError(lastMsg))
 }
 
-function buildLocalRequirementSummary(order: RecruitOrderPickerRow, extraHint?: string): string {
+function buildLocalRequirementSummary(source: BriefSourceContext, extraHint?: string): string {
   const parts = [
-    order.title,
-    order.category,
-    order.region,
-    order.platform,
-    order.recruitContent,
+    source.title,
+    source.category,
+    source.region,
+    source.content,
     extraHint,
   ]
     .map((x) => stripAiMarkdown(String(x || '')).trim())
     .filter((x) => x.length >= 2)
-  return parts.join('\n') || order.title || '招募订单'
+  return parts.join('\n') || source.title || '商家需求'
 }
 
 /** 仅生成 Brief 文字版（单次 AI 请求，不再单独跑归纳步骤） */
 export async function generateViralBriefText(args: {
-  order: RecruitOrderPickerRow
+  source: BriefSourceContext
   platform?: ViralBriefPlatform
   style?: ViralBriefStyle
   extraHint?: string
   onProgress?: (msg: string) => void
 }): Promise<ViralBriefResult> {
-  const platform = args.platform || resolveViralBriefPlatform(args.order)
+  const platform = args.platform || 'douyin'
   const style = args.style || 'review'
-  const ctx = buildOrderContext(args.order, args.extraHint)
+  const ctx = buildSourceContext(args.source, args.extraHint)
   const plat = platformLabel(platform)
   const styleLabel = STYLE_LABELS[style]
+  const sourceTitle = String(args.source.title || '').trim() || '商家需求'
 
-  const requirementSummary = buildLocalRequirementSummary(args.order, args.extraHint)
+  const requirementSummary = buildLocalRequirementSummary(args.source, args.extraHint)
   const unifiedSolutions: ViralBriefSolution[] = []
 
   args.onProgress?.('正在生成 Brief 文字版…')
@@ -550,7 +564,7 @@ export async function generateViralBriefText(args: {
     ? [
         JSON_ONLY_PREFIX,
         `你是${plat}图文种草爆款文案总监。风格：${styleLabel}。`,
-        `基于下列需求汇总，输出${plat}达人可直接发布的图文种草文稿 JSON（禁止视频分镜/口播/镜头字段）：`,
+        `基于下列商家需求汇总，输出${plat}达人可直接发布的图文种草文稿 JSON（禁止视频分镜/口播/镜头字段）：`,
         `{`,
         `  "requirementSummary": "可沿用或精炼",`,
         `  "unifiedSolutions": [...],`,
@@ -574,14 +588,14 @@ export async function generateViralBriefText(args: {
           ? `【解决方案】\n${unifiedSolutions.map((s, i) => `${i + 1}. ${s.title}：${s.desc}`).join('\n')}`
           : '',
         '',
-        `【订单原文】\n${ctx}`,
+        `【商家需求】\n${ctx}`,
       ]
         .filter(Boolean)
         .join('\n')
     : [
         JSON_ONLY_PREFIX,
         `你是${plat}爆款内容总监。风格：${styleLabel}。`,
-        `基于下列需求汇总，输出${plat}达人可执行的爆款 Brief JSON（字段齐全，数组至少 3 项）：`,
+        `基于下列商家需求汇总，输出${plat}达人可执行的爆款 Brief JSON（字段齐全，数组至少 3 项）：`,
         `{`,
         `  "requirementSummary": "可沿用或精炼",`,
         `  "unifiedSolutions": [...],`,
@@ -602,14 +616,14 @@ export async function generateViralBriefText(args: {
           ? `【解决方案】\n${unifiedSolutions.map((s, i) => `${i + 1}. ${s.title}：${s.desc}`).join('\n')}`
           : '',
         '',
-        `【订单原文】\n${ctx}`,
+        `【商家需求】\n${ctx}`,
       ]
         .filter(Boolean)
         .join('\n')
 
   let briefText = await chat(
     briefPrompt,
-    copyMode ? `爆款文稿｜${plat}｜${args.order.title}` : `爆款Brief｜${plat}｜${args.order.title}`,
+    copyMode ? `爆款文稿｜${plat}｜${sourceTitle}` : `爆款Brief｜${plat}｜${sourceTitle}`,
   )
   let parsed = extractJsonLenient(briefText)
 
@@ -665,7 +679,6 @@ export async function generateViralBriefText(args: {
 
 /** 在已有文字 Brief 上补充相似案例检索（失败不抛错，返回原结果） */
 export async function searchViralBriefReferences(args: {
-  order: RecruitOrderPickerRow
   platform?: ViralBriefPlatform
   style?: ViralBriefStyle
   brief: ViralBriefResult
@@ -679,7 +692,6 @@ export async function searchViralBriefReferences(args: {
   args.onProgress?.('正在根据 Brief 正文提炼关键词并检索外网相似视频…')
   try {
     const referenceCases = await pickViralBriefReferenceCases({
-      order: args.order,
       platform,
       style,
       brief: args.brief,
@@ -697,7 +709,7 @@ export async function searchViralBriefReferences(args: {
 
 /** 兼容旧调用：先文字后检索，检索失败仍返回文字 */
 export async function generateViralBrief(args: {
-  order: RecruitOrderPickerRow
+  source: BriefSourceContext
   platform?: ViralBriefPlatform
   style?: ViralBriefStyle
   extraHint?: string
@@ -705,7 +717,6 @@ export async function generateViralBrief(args: {
 }): Promise<ViralBriefResult> {
   const text = await generateViralBriefText(args)
   const { result } = await searchViralBriefReferences({
-    order: args.order,
     platform: args.platform,
     style: args.style,
     brief: text,
