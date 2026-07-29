@@ -470,6 +470,8 @@ export default function ShortVideoOptimizationPage() {
   const [longformEnabled, setLongformEnabled] = useState(false)
   const [longformTargetTotalSec, setLongformTargetTotalSec] = useState(15)
   const [longformSegmentSec, setLongformSegmentSec] = useState(LONGFORM_DEFAULT_SEGMENT_SEC)
+  /** 画布「应用流程」后递增，通知画布把连线重置为新顺序 */
+  const [canvasFlowEpoch, setCanvasFlowEpoch] = useState(0)
 
   /** 从短片模式打开长视频时，沿用用户已选的单段秒数，禁止静默抬到 60 */
   const enableLongformKeepingUserDuration = useCallback(
@@ -1578,15 +1580,18 @@ export default function ShortVideoOptimizationPage() {
     }
 
     const skill = findShortVideoSkill(activeSkillId)
-    const preferLong = Boolean(skill?.preferLongform)
     if (skill) {
-      if (preferLong) enableLongformKeepingUserDuration(longformEnabled)
+      // 只继承技能的画幅偏好；绝不因 preferLongform 强开长视频或抬高到 60 秒
       setSdAspect(skill.preferAspect)
     }
     setMainPane('generate')
-    setHint('已进入短片生成工作区，可点「AI 规划分镜」或「开始生成短片」')
-    // 仅当用户本就开着长视频、或技能明确偏好长片时，才自动规划；时长用当前选择，不改成 60
-    if (genPrompt.trim() && (preferLong || longformEnabled)) {
+    setHint(
+      longformEnabled
+        ? `已进入短片生成工作区（长视频 ${longformTargetTotalSec} 秒），可点「AI 规划分镜」或「开始生成短片」`
+        : `已进入短片生成工作区（单段 ${sdDurationSec} 秒），可点「AI 优化文案」或「开始生成短片」`,
+    )
+    // 仅用户已勾选长视频时才自动规划，保持下方已选时长不动
+    if (genPrompt.trim() && longformEnabled) {
       void onOptimizeGuidancePrompt()
     }
   }
@@ -1701,10 +1706,8 @@ export default function ShortVideoOptimizationPage() {
             onSkillChange={(id) => {
               setActiveSkillId(id)
               const skill = findShortVideoSkill(id)
-              if (skill) {
-                if (skill.preferLongform) enableLongformKeepingUserDuration(longformEnabled)
-                setSdAspect(skill.preferAspect)
-              }
+              // 切换技能只改画幅，不改动用户已选的时长 / 长视频开关
+              if (skill) setSdAspect(skill.preferAspect)
             }}
             onChange={setGenPrompt}
             onSubmit={onAgentCabinSubmit}
@@ -1761,6 +1764,7 @@ export default function ShortVideoOptimizationPage() {
               kind: f.kind,
               label: f.file.name,
             }))}
+            flowEpoch={canvasFlowEpoch}
             disabled={busy || auxBusy}
             onAddMediaClick={() => {
               setGenMode('frames')
@@ -1781,14 +1785,16 @@ export default function ShortVideoOptimizationPage() {
             }}
             onApplyFlowOrder={(orderedIndices) => {
               if (orderedIndices.length < 2) return
+              const orderLabel = orderedIndices.map((i) => i + 1).join('→')
               setScriptRows((prev) => {
                 const next = orderedIndices.map((i) => prev[i]).filter(Boolean) as typeof prev
                 if (next.length < 2) return prev
-                // 按新顺序重排后，交给 resize 对齐时间轴
-                return resizeScriptRows(next, next.length, longformSegmentSec)
+                // 按连线拓扑重排分镜，并重算时间轴；不强制改成长视频 60 秒
+                const seg = longformEnabled ? longformSegmentSec : Number(sdDurationSec) || 15
+                return resizeScriptRows(next, next.length, seg)
               })
-              setLongformEnabled(true)
-              setHint(`已按画布连线重排分镜顺序（${orderedIndices.map((i) => i + 1).join('→')}）`)
+              setCanvasFlowEpoch((v) => v + 1)
+              setHint(`已按画布自由连线应用流程（${orderLabel}），分镜顺序与时间轴已同步`)
               setMainPane('generate')
             }}
             onRemoveScriptRow={(index) => {
