@@ -301,6 +301,8 @@ PAT
       cat <<'PAT'
 config/nav.ts
 MeooLayout.tsx
+App.tsx
+partnerEditionConfig.ts
 change-scope-guard
 PAT
       ;;

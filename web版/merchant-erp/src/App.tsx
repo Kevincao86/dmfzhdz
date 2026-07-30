@@ -1,5 +1,4 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import type { ReactNode } from 'react'
 import { AiAgentProvider } from './context/AiAgentContext'
 import { PartnerClientProvider } from './context/PartnerClientContext'
 import { PartnerTenantProvider, usePartnerTenant } from './context/PartnerTenantContext'
@@ -52,11 +51,6 @@ import { isPartnerEdition } from './lib/appEdition'
 
 function portalEdition() {
   return isPartnerEdition() ? ('partner' as const) : ('merchant' as const)
-}
-
-function MerchantOnlyAiOperationRoute({ children }: { children: ReactNode }) {
-  if (isPartnerEdition()) return <Navigate to="/recruitment/xingxuan/hall" replace />
-  return <>{children}</>
 }
 
 /** 录播工坊：服务商版已隐藏，直链也跳转走 */
@@ -140,49 +134,14 @@ export default function App() {
           <Route path="operation/ai-ops-plan" element={<AiOpsPlanPage />} />
           <Route path="ai-create/record-workshop" element={<PartnerRecordWorkshopRoute />} />
           <Route path="ai-image" element={<AiImageStudioPage />} />
-          <Route
-            path="ai-operation/article"
-            element={
-              <MerchantOnlyAiOperationRoute>
-                <Navigate to="/ai-operation/content" replace />
-              </MerchantOnlyAiOperationRoute>
-            }
-          />
-          <Route
-            path="ai-operation/topic"
-            element={
-              <MerchantOnlyAiOperationRoute>
-                <Navigate to="/ai-operation/content" replace />
-              </MerchantOnlyAiOperationRoute>
-            }
-          />
-          <Route
-            path="ai-operation/content"
-            element={
-              <MerchantOnlyAiOperationRoute>
-                <BriefContentShell />
-              </MerchantOnlyAiOperationRoute>
-            }
-          >
+          <Route path="ai-operation/article" element={<Navigate to="/ai-operation/content" replace />} />
+          <Route path="ai-operation/topic" element={<Navigate to="/ai-operation/content" replace />} />
+          <Route path="ai-operation/content" element={<BriefContentShell />}>
             <Route index element={<AiOperationContentPage />} />
             <Route path="records" element={<BriefGenRecordsPage />} />
           </Route>
-          <Route
-            path="ai-operation/video-check"
-            element={
-              <MerchantOnlyAiOperationRoute>
-                <ShortVideoOptimizationPage />
-              </MerchantOnlyAiOperationRoute>
-            }
-          />
-          <Route
-            path="ai-operation/digital-human"
-            element={
-              <MerchantOnlyAiOperationRoute>
-                <DigitalHumanBroadcastPage />
-              </MerchantOnlyAiOperationRoute>
-            }
-          />
+          <Route path="ai-operation/video-check" element={<ShortVideoOptimizationPage />} />
+          <Route path="ai-operation/digital-human" element={<DigitalHumanBroadcastPage />} />
           <Route path="advertising" element={<LocalPromotionAdvertisingPage />} />
           <Route path="leads" element={<LocalPromotionLeadsPage />} />
           <Route path="finance" element={<FinanceReconcilePage />} />

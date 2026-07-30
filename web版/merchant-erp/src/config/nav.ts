@@ -79,12 +79,8 @@ export const NAV_ITEMS: NavItem[] = [
   { path: '/settings', label: '系统', icon: Settings },
 ]
 
-/** 服务商版（fws）：爆款 Brief / 短视频 AI / 数字人已在星选增值服务中提供 */
-export const PARTNER_EXCLUDED_OPERATION_PATHS = [
-  '/ai-operation/content',
-  '/ai-operation/video-check',
-  '/ai-operation/digital-human',
-] as const
+/** 服务商版（fws）侧栏仍排除的路径（录播工坊暂隐藏；Brief/短视频/数字人已与商家版对齐） */
+export const PARTNER_EXCLUDED_OPERATION_PATHS = [] as const
 
 export function isPartnerExcludedOperationPath(path: string): boolean {
   const p = path.split('?')[0] ?? path
@@ -106,7 +102,7 @@ function partnerOperationChildren(baseChildren: NavChild[]): NavChild[] {
   return [...xingxuan, ...kept]
 }
 
-/** 服务商：AI 创作仅保留仍可用的入口（排除星选已覆盖的三项；录播工坊暂隐藏） */
+/** 服务商：AI 创作与商家版对齐（录播工坊暂隐藏） */
 function partnerAiCreateChildren(baseChildren: NavChild[]): NavChild[] {
   return baseChildren.filter(
     (c) => !isPartnerExcludedOperationPath(c.path) && c.path !== '/ai-create/record-workshop',
