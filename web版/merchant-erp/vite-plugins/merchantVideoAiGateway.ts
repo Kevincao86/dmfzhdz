@@ -62,6 +62,7 @@ import {
 } from '../src/lib/arkVideoModelDiscovery.js'
 import {
   buildSeedanceImageContentItems,
+  clampSeedanceImagesForModel,
   ensureSeedanceContentImageRoles,
   seedanceContentRequiresImageRole,
 } from '../src/lib/arkVideoContentPayload.js'
@@ -1477,9 +1478,9 @@ function buildArkVideoTaskPayload(
     )
     contentArr = [{ type: 'text', text: textCombined }]
     if (seedanceContentRequiresImageRole(modelId)) {
-      contentArr.push(...buildSeedanceImageContentItems(imageRows))
+      contentArr.push(...buildSeedanceImageContentItems(imageRows, modelId))
     } else {
-      for (const row of imageRows) {
+      for (const row of clampSeedanceImagesForModel(modelId, imageRows)) {
         let url = row
         if (!url.startsWith('data:image') && /^[a-z0-9+/=\s]+$/i.test(url.replace(/\s/g, ''))) {
           url = `data:image/jpeg;base64,${url.replace(/\s/g, '')}`
@@ -1659,7 +1660,7 @@ async function arkCreateVideoTask(
         continue
       }
       const soft =
-        /请填写|无效|invalid|not valid|placeholder|对话模型|payload|参数|content\.text|role must be specified|cannot be mixed|first\/last frame|reference media|parameter 'content'/i.test(
+        /请填写|无效|invalid|not valid|placeholder|对话模型|payload|参数|content\.text|role must be specified|cannot be mixed|first\/last frame|reference media|parameter 'content'|task_type|r2v does not support/i.test(
           `${posted.msg ?? ''} ${rawErr}`,
         )
       if (soft) continue

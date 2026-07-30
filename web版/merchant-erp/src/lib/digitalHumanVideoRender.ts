@@ -141,10 +141,6 @@ function draftNeedsDualRefPersonScene(draft: DigitalHumanDraft): boolean {
   )
 }
 
-async function backgroundDataUrlToPureB64(dataUrl: string): Promise<string> {
-  return imageUrlToPureBase64(dataUrl)
-}
-
 export function estimateDhS2vSegmentCount(script: string): number {
   const chunks = chunkScriptForS2vVideo(script.trim())
   return Math.min(MAX_S2V_SEGMENTS, Math.max(1, chunks.length))
@@ -611,9 +607,17 @@ async function renderWithSeedance(
       }
     } else if (useDualRefPersonScene && segmentCustomBg) {
       try {
-        const bgPure = await backgroundDataUrlToPureB64(segmentCustomBg)
-        /** 即梦式：参考图1完整人物 + 参考图2场景，由豆包说明并融合 */
-        seedanceImages = [segmentImageB64, bgPure]
+        /**
+         * Seedance 1.x 不支持 task_type=r2v（多张 reference_image）。
+         * 先把人物轻叠到场景成单张首帧 i2v（不硬抠，保留五官），由提示词约束融合观感。
+         */
+        const fused = await compositePortraitWithBackground(
+          segmentImageB64,
+          segmentDraft.background,
+          baseFrameMode,
+          segmentCustomBg,
+        )
+        seedanceImages = [fused]
       } catch (e) {
         return {
           ok: false,
