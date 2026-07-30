@@ -114,8 +114,11 @@ export function buildDhSeedanceSegmentPrompt(
     gesturePreset?: string
     continuation?: boolean
     hasProductFusion?: boolean
-    /** 门店/自定义背景：参考图已抠图 */
-    mattedOnScene?: boolean
+    /**
+     * 即梦式双参考：参考图1=完整人物（禁抠图），参考图2=场景；
+     * 由豆包 Seedance 按说明做人物换景融合。
+     */
+    dualRefPersonScene?: boolean
     /** 意图保真：mustInclude / mustAvoid 注入 */
     fidelityBrief?: ShortVideoGenBrief | null
   },
@@ -128,17 +131,28 @@ export function buildDhSeedanceSegmentPrompt(
   const motion = clip(motionBlock(draft, opts?.motionText, opts?.gesturePreset), 72)
   const outfit = clip(draft.outfit || '同参考', 16)
   const fidelity = opts?.fidelityBrief ? clip(briefPromptSuffix(opts.fidelityBrief).trim(), 80) : ''
-  const matteHint = opts?.mattedOnScene
-    ? '参考图人物已去背并融入场景，边缘自然，禁止灰底矩形残影。'
-    : ''
 
   let body: string
   if (opts?.continuation) {
     body = [
-      '竖屏9:16口播续镜，同一人物同服装同场景，动作连续。',
-      matteHint,
+      '竖屏9:16口播续镜，同一人物同服装同场景，动作连续，五官发型不变。',
+      opts?.dualRefPersonScene ? '继续沿用参考图1人物与参考图2场景的融合结果。' : '',
       `动作：${motion}。`,
       opts?.hasProductFusion ? '双参考图自然手持产品。' : '',
+      fidelity,
+      SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
+      SHORT_VIDEO_MOTION_PROMPT_SUFFIX,
+    ]
+      .filter(Boolean)
+      .join('')
+  } else if (opts?.dualRefPersonScene) {
+    body = [
+      `竖屏9:16数字人口播，对齐即梦数字人换景：参考图1为完整人物主体（${frame}，五官发型皮肤完整清晰，禁止裁脸抠穿），`,
+      `参考图2为场景背景（${bg}）。`,
+      `将参考图1人物自然融入参考图2场景，光影透视一致，服装${outfit}，禁止灰底矩形贴片，禁止残缺五官。`,
+      total > 1 ? `分镜${idx}/${total}约${DH_SEEDANCE_SEGMENT_SEC}秒。` : '',
+      opts?.hasProductFusion ? '人物与产品自然融合，禁止贴片悬浮。' : '',
+      `动作：${motion}。`,
       fidelity,
       SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
       SHORT_VIDEO_MOTION_PROMPT_SUFFIX,
@@ -148,8 +162,7 @@ export function buildDhSeedanceSegmentPrompt(
   } else {
     body = [
       `竖屏9:16数字人口播，参考图人物为主播，${frame}，保持五官发型一致。`,
-      matteHint || `背景为${bg}，服装${outfit}。`,
-      matteHint ? `服装${outfit}。` : '',
+      `背景为${bg}，服装${outfit}。`,
       total > 1 ? `分镜${idx}/${total}约${DH_SEEDANCE_SEGMENT_SEC}秒。` : '',
       opts?.hasProductFusion ? '人物与抠图产品自然融合，禁止贴片悬浮。' : '',
       `动作：${motion}。`,

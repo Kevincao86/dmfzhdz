@@ -132,12 +132,15 @@ function sortDhSeedancePoolPreferLongClip(ids: readonly string[]): string[] {
   })
 }
 
-function draftNeedsMattedScene(draft: DigitalHumanDraft): boolean {
+function draftNeedsDualRefPersonScene(draft: DigitalHumanDraft): boolean {
   return (
-    draft.background === 'store' ||
-    draft.background === 'custom' ||
-    draft.background === 'green'
+    (draft.background === 'store' && Boolean(draft.storeScene)) ||
+    draft.background === 'custom'
   )
+}
+
+async function backgroundDataUrlToPureB64(dataUrl: string): Promise<string> {
+  return imageUrlToPureBase64(dataUrl)
 }
 
 export function estimateDhS2vSegmentCount(script: string): number {
@@ -176,7 +179,7 @@ function canUseSeedance(cfg: Awaited<ReturnType<typeof fetchVideoAiConfig>> | nu
 async function resolvePortraitOnlyBase64(
   draft: DigitalHumanDraft,
   frameMode: FrameMode,
-  customBackgroundDataUrl?: string | null,
+  _customBackgroundDataUrl?: string | null,
 ): Promise<string | null> {
   let raw: string | null = null
   if (draft.customAvatarDataUrl?.trim()) {
@@ -208,24 +211,8 @@ async function resolvePortraitOnlyBase64(
   }
   if (!raw) return null
   try {
-    const normalized = await normalizePortraitBase64ForS2v(raw, frameMode)
-    const useCompositeBg =
-      (draft.background === 'custom' || (draft.background === 'store' && draft.storeScene)) &&
-      customBackgroundDataUrl?.trim()
-    if (useCompositeBg) {
-      try {
-        return await compositePortraitWithBackground(
-          normalized,
-          draft.background,
-          frameMode,
-          customBackgroundDataUrl!,
-        )
-      } catch {
-        // 背景合成失败时仍提交人像，避免误报「请选择形象」
-        return normalized
-      }
-    }
-    return normalized
+    // 门店/自定义背景：只提交完整人像，场景作第二张参考图由 Seedance 融合（禁止本地抠图叠图）
+    return await normalizePortraitBase64ForS2v(raw, frameMode)
   } catch {
     return null
   }
@@ -584,9 +571,12 @@ async function renderWithSeedance(
     }
 
     let seedanceImages = [segmentImageB64]
+    const useDualRefPersonScene =
+      draftNeedsDualRefPersonScene(segmentDraft) && Boolean(segmentCustomBg?.trim())
     const useProductFusion =
       Boolean(productPureB64) &&
       isDhProductFusionSegment(i, segmentTotal)
+
     if (useProductFusion && productPureB64) {
       onProgress?.({
         phase: 'generating',
@@ -595,7 +585,17 @@ async function renderWithSeedance(
         progress: 14 + Math.round((i / segmentTotal) * 6),
       })
       try {
-        const fusion = await prepareDhProductFusionAssets(segmentImageB64, productPureB64)
+        /** 产品段：先将完整人像轻叠到场景（不抠图），再双参考融合产品 */
+        let sceneForProduct = segmentImageB64
+        if (useDualRefPersonScene && segmentCustomBg) {
+          sceneForProduct = await compositePortraitWithBackground(
+            segmentImageB64,
+            segmentDraft.background,
+            baseFrameMode,
+            segmentCustomBg,
+          )
+        }
+        const fusion = await prepareDhProductFusionAssets(sceneForProduct, productPureB64)
         seedanceImages = buildDhSeedanceFusionImages(
           fusion.sceneWithProductB64,
           fusion.mattedProductB64,
@@ -605,6 +605,17 @@ async function renderWithSeedance(
         return {
           ok: false,
           message: `第 ${i + 1}/${segmentTotal} 段产品/人物/背景融合参考图失败：${e instanceof Error ? e.message : String(e)}`,
+        }
+      }
+    } else if (useDualRefPersonScene && segmentCustomBg) {
+      try {
+        const bgPure = await backgroundDataUrlToPureB64(segmentCustomBg)
+        /** 即梦式：参考图1完整人物 + 参考图2场景，由豆包说明并融合 */
+        seedanceImages = [segmentImageB64, bgPure]
+      } catch (e) {
+        return {
+          ok: false,
+          message: `第 ${i + 1}/${segmentTotal} 段场景参考图准备失败：${e instanceof Error ? e.message : String(e)}`,
         }
       }
     }
@@ -624,7 +635,7 @@ async function renderWithSeedance(
       gesturePreset: segmentGesture,
       continuation: isContinuation && !sceneShot,
       hasProductFusion: useProductFusion,
-      mattedOnScene: draftNeedsMattedScene(segmentDraft),
+      dualRefPersonScene: useDualRefPersonScene && !useProductFusion,
       fidelityBrief,
     })
 
