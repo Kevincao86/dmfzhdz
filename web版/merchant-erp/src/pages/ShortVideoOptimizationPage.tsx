@@ -94,7 +94,6 @@ import {
   maxScriptTimeRangeEndSec,
   scriptRowsHaveExplicitTimeRanges,
   scriptRowsToOverallPrompt,
-  segmentCountFromTargetTotalSec,
   planLongformSegmentDurations,
   LONGFORM_SEGMENT_UNIT_SEC,
   planLongformAllFiveSecondDurations,
