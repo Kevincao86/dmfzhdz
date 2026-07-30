@@ -129,7 +129,7 @@ export default function ShortVideoAgentCabin({
               : '视频生成 · Seedance 出片'
 
   return (
-    <div ref={wrapRef} className="sv-agent-cabin relative z-30 overflow-visible">
+    <div ref={wrapRef} className="sv-agent-cabin relative z-10 w-full min-w-0 max-w-full">
       <div className="mb-3 text-center">
         <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">{heading}</h2>
         <p className="mt-1 text-sm text-slate-500">
@@ -139,7 +139,7 @@ export default function ShortVideoAgentCabin({
 
       <div
         className={cn(
-          'relative z-40 overflow-visible rounded-[1.75rem] border border-slate-200/90 bg-white/95 p-3 shadow-[0_12px_40px_-16px_rgba(15,23,42,0.18)] ring-1 ring-slate-900/[0.03] backdrop-blur-sm sm:p-4',
+          'relative z-10 w-full max-w-full overflow-hidden rounded-[1.75rem] border border-slate-200/90 bg-white/95 p-3 shadow-[0_12px_40px_-16px_rgba(15,23,42,0.18)] ring-1 ring-slate-900/[0.03] backdrop-blur-sm sm:p-4',
           disabled && 'opacity-70',
         )}
       >
@@ -228,9 +228,19 @@ export default function ShortVideoAgentCabin({
 
           <button
             type="button"
-            disabled={disabled || busy || (!value.trim() && !activeMode.href && activeMode.id !== 'canvas' && activeMode.id !== 'music')}
-            onClick={onSubmit}
-            className="inline-flex h-10 items-center gap-2 rounded-full bg-gradient-to-r from-cyan-600 to-sky-500 px-5 text-sm font-semibold text-white shadow-md shadow-cyan-600/25 hover:from-cyan-500 hover:to-sky-400 disabled:pointer-events-none disabled:opacity-45"
+            disabled={
+              disabled ||
+              busy ||
+              (!value.trim() &&
+                !activeMode.href &&
+                activeMode.id !== 'canvas' &&
+                activeMode.id !== 'music')
+            }
+            onClick={() => {
+              if (disabled || busy) return
+              onSubmit()
+            }}
+            className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full bg-gradient-to-r from-cyan-600 to-sky-500 px-5 text-sm font-semibold text-white shadow-md shadow-cyan-600/25 hover:from-cyan-500 hover:to-sky-400 disabled:cursor-not-allowed disabled:opacity-45"
           >
             <Send className="h-4 w-4" aria-hidden />
             {busy ? '处理中…' : submitLabel}
@@ -238,9 +248,9 @@ export default function ShortVideoAgentCabin({
         </div>
       </div>
 
-      {/* 下拉挂在舱体外层，避免被下方导航卡片遮挡 */}
+      {/* 下拉：限制在舱体宽度内，避免撑破主内容区 */}
       {modeOpen ? (
-        <div className="absolute left-0 right-0 top-full z-[80] mt-2 w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl shadow-slate-900/15">
+        <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-[min(70vh,28rem)] w-full max-w-full overflow-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl shadow-slate-900/15 sm:max-w-md">
           {SHORT_VIDEO_STUDIO_MODES.map((m) => {
             const Ico = MODE_ICON[m.id]
             const selected = m.id === activeMode.id
@@ -260,7 +270,7 @@ export default function ShortVideoAgentCabin({
                 <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
                   <Ico className="h-3.5 w-3.5" />
                 </span>
-                <span>
+                <span className="min-w-0">
                   <span className="block text-sm font-semibold text-slate-900">{m.label}</span>
                   <span className="block text-[11px] leading-relaxed text-slate-500">{m.description}</span>
                 </span>
@@ -271,7 +281,7 @@ export default function ShortVideoAgentCabin({
       ) : null}
 
       {skillOpen ? (
-        <div className="absolute left-0 right-0 top-full z-[80] mt-2 max-h-96 overflow-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl shadow-slate-900/15">
+        <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-[min(70vh,24rem)] w-full max-w-full overflow-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl shadow-slate-900/15">
           <input
             type="search"
             value={skillQuery}

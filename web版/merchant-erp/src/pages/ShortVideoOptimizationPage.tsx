@@ -1596,12 +1596,34 @@ export default function ShortVideoOptimizationPage() {
       // 只继承技能的画幅偏好；绝不因 preferLongform 强开长视频或抬高到 60 秒
       setSdAspect(skill.preferAspect)
     }
+
+    // 已在短片生成区且有文案：主按钮直接触发生成（避免「点了没反应」）
+    if (mainPane === 'generate' && genPrompt.trim()) {
+      if (generateGateReason) {
+        setErr(generateGateReason)
+        setHint(null)
+        queueMicrotask(() => {
+          document
+            .getElementById('sv-generate-workspace')
+            ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        })
+        return
+      }
+      void submitGenerate()
+      return
+    }
+
     setMainPane('generate')
     setHint(
       longformEnabled
         ? `已进入短片生成工作区（长视频 ${longformTargetTotalSec} 秒），可点「AI 规划分镜」或「开始生成短片」`
-        : `已进入短片生成工作区（单段 ${sdDurationSec} 秒），可点「AI 优化文案」或「开始生成短片」`,
+        : `已进入短片生成工作区（单段 ${sdDurationSec} 秒），确认参数后点「开始生成短片」`,
     )
+    queueMicrotask(() => {
+      document
+        .getElementById('sv-generate-workspace')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
     // 仅用户已勾选长视频时才自动规划，保持下方已选时长不动
     if (genPrompt.trim() && longformEnabled) {
       void onOptimizeGuidancePrompt()
@@ -1614,8 +1636,9 @@ export default function ShortVideoOptimizationPage() {
     if (studioMode === 'music') return '打开配乐工作区'
     if (studioMode === 'canvas') return '打开无限画布'
     if (longformEnabled) return '规划并进入生成'
+    if (mainPane === 'generate' && genPrompt.trim()) return '开始生成短片'
     return '进入短片生成'
-  }, [studioMode, longformEnabled])
+  }, [studioMode, longformEnabled, mainPane, genPrompt])
 
   const goPane = (id: MainPane) => {
     resetOutputs()
@@ -1673,7 +1696,7 @@ export default function ShortVideoOptimizationPage() {
   return (
     <div
       className={cn(
-        'short-video-page sv-jimeng-studio mx-auto max-w-6xl px-4 py-8 lg:py-10',
+        'short-video-page sv-jimeng-studio mx-auto w-full min-w-0 max-w-6xl space-y-6 overflow-x-hidden py-2 sm:py-4',
       )}
     >
       <header className="relative mb-8 space-y-2 text-center sm:mb-10">
@@ -1708,7 +1731,7 @@ export default function ShortVideoOptimizationPage() {
       ) : (
         <>
       {!embedBlocked ? (
-        <div className="mb-6">
+        <div className="mb-6 w-full min-w-0 max-w-full">
           <input
             ref={genDocInputRef}
             type="file"
@@ -1854,7 +1877,10 @@ export default function ShortVideoOptimizationPage() {
       ) : null}
 
       {mainPane !== 'cloud_batch' && mainPane !== 'cases' && mainPane !== 'canvas' && mainPane !== 'music' ? (
-      <section className="mb-8 overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50/70 via-white to-orange-50/30 shadow-sm">
+      <section
+        id="sv-generate-workspace"
+        className="mb-8 overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50/70 via-white to-orange-50/30 shadow-sm"
+      >
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-cyan-100/80 px-5 py-4">
           <div className="flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-600 to-sky-500 text-white shadow-md">
