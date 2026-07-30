@@ -4,6 +4,7 @@
  */
 
 import { SHORT_VIDEO_CASE_CDN_BASE } from './shortVideoCaseCdn'
+import type { ShortVideoScriptRow } from './shortVideoScriptTable'
 import type { ShortVideoSkillId } from './shortVideoSkills'
 
 export type ShortVideoCaseKind = 'discover' | 'skill' | 'film'
@@ -29,6 +30,11 @@ export type ShortVideoCaseItem = {
   hasNarration?: boolean
   /** 口播文案（生成脚本 / 展示用） */
   narrationScript?: string
+  /**
+   * 无限画布「做同款」路径：分镜节点 + 口播；
+   * 有值时点击做同款会写入画布并生成顺序连线。
+   */
+  canvasScriptRows?: ShortVideoScriptRow[]
 }
 
 const asset = (id: string, ext: 'png' | 'mp4') =>
@@ -61,6 +67,23 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
       'Night street food market in China, warm lantern glow, steam rising, handheld follow shot, continuous camera motion, cinematic food vlog, photorealistic, no text',
     hasNarration: true,
     narrationScript: '夜市烟火气太足了，这家摊位必吃，人均只要三十块。',
+    canvasScriptRows: [
+      {
+        timeRange: '0-10秒',
+        visual: '夜市街景推镜钩子，暖黄灯笼与人流烟火气',
+        dialogue: '夜市烟火气太足了',
+      },
+      {
+        timeRange: '10-20秒',
+        visual: '摊位招牌与出锅蒸汽特写，跟拍连贯',
+        dialogue: '这家摊位必吃',
+      },
+      {
+        timeRange: '20-30秒',
+        visual: '试吃反应收尾，出店名与人均信息',
+        dialogue: '人均只要三十块',
+      },
+    ],
   }),
   c({
     id: 'case-seed-skincare',
@@ -173,6 +196,23 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
       'Sunny brunch cafe table, avocado toast and latte, natural window light, gentle push-in camera, lifestyle food video, photorealistic',
     hasNarration: true,
     narrationScript: '周末早午餐探店，这口牛油果吐司真的绝了，赶紧预约。',
+    canvasScriptRows: [
+      {
+        timeRange: '0-10秒',
+        visual: '周末早午餐店门头与自然光座位环境',
+        dialogue: '周末早午餐探店',
+      },
+      {
+        timeRange: '10-20秒',
+        visual: '牛油果吐司与咖啡特写，推镜食欲感',
+        dialogue: '这口牛油果吐司真的绝了',
+      },
+      {
+        timeRange: '20-30秒',
+        visual: '试吃反应与预约 CTA 收尾',
+        dialogue: '赶紧预约',
+      },
+    ],
   }),
   c({
     id: 'case-seed-gadget',
@@ -212,6 +252,23 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
       'Cozy Chinese restaurant table at night, large metal soup pot steaming, vegetables and tofu cooking, warm orange lights, slow camera orbit, food commercial video, photorealistic, no text',
     hasNarration: true,
     narrationScript: '红油翻滚，朋友局开起来，人均八十，必点毛肚鸭血。',
+    canvasScriptRows: [
+      {
+        timeRange: '0-10秒',
+        visual: '火锅店门口钩子切入，红油锅底翻滚特写',
+        dialogue: '红油翻滚，朋友局开起来',
+      },
+      {
+        timeRange: '10-20秒',
+        visual: '涮毛肚鸭血，热闹举筷跟拍',
+        dialogue: '人均八十，必点毛肚鸭血',
+      },
+      {
+        timeRange: '20-30秒',
+        visual: '举杯收尾，店招与氛围定格',
+        dialogue: '今晚就约这一家',
+      },
+    ],
   }),
   c({
     id: 'case-bbq',
@@ -231,6 +288,23 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
       'Night barbecue grill with charcoal flames, skewers sizzling, warm street lights, handheld food vlog motion, photorealistic, no text',
     hasNarration: true,
     narrationScript: '炭火滋滋响，夜宵撸串走起，就在巷口第二家。',
+    canvasScriptRows: [
+      {
+        timeRange: '0-10秒',
+        visual: '夜色街景到炭火烧烤摊，暖光跟拍',
+        dialogue: '炭火滋滋响，夜宵撸串走起',
+      },
+      {
+        timeRange: '10-20秒',
+        visual: '刷酱滋滋与串肉特写，手持近景',
+        dialogue: '酱香一口入魂',
+      },
+      {
+        timeRange: '20-30秒',
+        visual: '咬一口反应，巷口位置 CTA',
+        dialogue: '就在巷口第二家',
+      },
+    ],
   }),
   c({
     id: 'case-milktea',
@@ -250,6 +324,23 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
       'Colorful bubble tea cup spinning slowly, fresh fruit toppings, bright shop background, product commercial camera orbit, photorealistic, no text',
     hasNarration: true,
     narrationScript: '季节限定上新，第一口敲甜，活动价只要十五。',
+    canvasScriptRows: [
+      {
+        timeRange: '0-10秒',
+        visual: '新茶饮杯身旋转亮相，店内明亮背景',
+        dialogue: '季节限定上新',
+      },
+      {
+        timeRange: '10-20秒',
+        visual: '原料闪切与第一口特写',
+        dialogue: '第一口敲甜',
+      },
+      {
+        timeRange: '20-30秒',
+        visual: '活动价字幕感收尾与下单 CTA（画面勿烧字）',
+        dialogue: '活动价只要十五',
+      },
+    ],
   }),
   c({
     id: 'case-hair',
@@ -419,6 +510,16 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
 export function casesByTab(tab: ShortVideoCaseKind | 'all'): ShortVideoCaseItem[] {
   if (tab === 'all') return SHORT_VIDEO_CASES
   return SHORT_VIDEO_CASES.filter((c) => c.kind === tab)
+}
+
+/** 无限画布下方：本地生活 + 含口播 + 已配置画布路径 */
+export function canvasLocalLifeCases(): ShortVideoCaseItem[] {
+  return SHORT_VIDEO_CASES.filter(
+    (c) =>
+      c.hasNarration &&
+      Array.isArray(c.canvasScriptRows) &&
+      (c.canvasScriptRows?.length ?? 0) >= 2,
+  ).slice(0, 5)
 }
 
 /** 需要 Seedance 补生成的案例 id（无大体积 mp4 时） */
