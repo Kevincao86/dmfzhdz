@@ -2233,7 +2233,7 @@ export default function DigitalHumanBroadcastPage() {
                 <section className="space-y-4">
                   <h2 className="text-lg font-semibold text-slate-900">低清预览</h2>
                   <p className="text-sm text-slate-600">
-                    静态参考示意：人物照片叠在背景上（与提交 Seedance 的参考图一致，不做浏览器抠图）。
+                    静态示意：人物完整叠在背景上（预览不抠图，避免五官损失）。成片由豆包 Seedance 双参考（人物图+场景图）按说明换景融合，对齐即梦数字人。
                     {draft.productOverlayEnabled ? ' 产品不在此预览出现，成片中段由 Seedance 一体化融合。' : ''}
                     可试听 TTS；动态口播与光影以 Seedance 成片为准。
                   </p>
