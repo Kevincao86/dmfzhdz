@@ -85,6 +85,7 @@ import {
   inferScriptSegmentCountFromText,
   parseScriptRowsFromPlainText,
   resizeScriptRows,
+  retimeScriptRowsBySegmentSec,
   appendEmptyScriptRow,
   removeScriptRowAt,
   maxScriptTimeRangeEndSec,
@@ -385,7 +386,7 @@ async function resolveSegmentTailFrameBase64(
   return extractVideoLastFramePureBase64(blob)
 }
 
-export default function ShortVideoOptimizationPage() {
+export default function ShortVideoOptimizationPage({ embed = false }: { embed?: boolean }) {
   const navigate = useNavigate()
   const embedAddonAccess = useMemo(() => readMpEmbedAddonAccess(), [])
   const paneTabs = useMemo(() => {
@@ -688,6 +689,13 @@ export default function ShortVideoOptimizationPage() {
     if (!longformEnabled) return
     setScriptRows((prev) => resizeScriptRowsForDurationPlan(prev, longformDurationPlan))
   }, [longformEnabled, longformTargetTotalSec, longformDurationPlan])
+
+  /** 未勾选长视频时：单段时长变更 → 分镜时间轴同步为 N×该秒数 */
+  useEffect(() => {
+    if (longformEnabled) return
+    const seg = Math.min(15, Math.max(5, Number(sdDurationSec) || 15))
+    setScriptRows((prev) => retimeScriptRowsBySegmentSec(prev, seg))
+  }, [sdDurationSec, longformEnabled])
 
   const onLongformTargetTotalSecChange = (nextSec: number) => {
     setLongformTargetTotalSec(nextSec)
@@ -1765,9 +1773,11 @@ export default function ShortVideoOptimizationPage() {
   return (
     <div
       className={cn(
-        'short-video-page sv-jimeng-studio mx-auto w-full min-w-0 max-w-6xl space-y-6 overflow-x-hidden py-2 sm:py-4',
+        'short-video-page sv-jimeng-studio mx-auto w-full min-w-0 max-w-6xl space-y-6 overflow-x-hidden',
+        embed ? 'py-0' : 'py-2 sm:py-4',
       )}
     >
+      {!embed ? (
       <header className="relative mb-8 space-y-2 text-center sm:mb-10">
         <div className="flex flex-wrap items-center justify-center gap-3">
           <Film className="h-8 w-8 shrink-0 text-cyan-600" aria-hidden />
@@ -1789,6 +1799,12 @@ export default function ShortVideoOptimizationPage() {
           生成后请及时保存到本地。刷新页面后，本页生成记录将消失。
         </p>
       </header>
+      ) : (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-slate-800">短视频出片 · Agent 同屏</p>
+          <MpAddonPointsRateBadge kind="shortvideo" />
+        </div>
+      )}
 
       {embedBlocked ? (
         <div className="surface-card rounded-xl border border-amber-200 bg-amber-50/80 p-6 text-sm text-amber-950">
@@ -1934,6 +1950,9 @@ export default function ShortVideoOptimizationPage() {
                         <option value="10">10 秒</option>
                         <option value="15">15 秒</option>
                       </select>
+                      <span className="text-[11px] font-normal text-slate-500">
+                        下方分镜每段上限 = {sdDurationSec} 秒
+                      </span>
                     </label>
                   )}
                   <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
@@ -2235,7 +2254,7 @@ export default function ShortVideoOptimizationPage() {
               setScriptRows((prev) => {
                 const next = orderedIndices.map((i) => prev[i]).filter(Boolean) as typeof prev
                 if (next.length < 2) return prev
-                const resized = resizeScriptRows(next, next.length, seg)
+                const resized = retimeScriptRowsBySegmentSec(next, seg)
                 syncGenerateWorkspaceFromCanvas(resized, { fillPrompt: true })
                 return resized
               })
@@ -2340,9 +2359,11 @@ export default function ShortVideoOptimizationPage() {
         </div>
       ) : null}
 
+      {!embed ? (
       <footer className="mt-12 border-t border-dashed border-zinc-200 pt-8 text-[13px] text-zinc-500">
         生成内容由 AI 提供，请合规使用并自行备份成片。
       </footer>
+      ) : null}
         </>
       )}
     </div>
