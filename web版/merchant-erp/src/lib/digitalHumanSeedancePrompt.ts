@@ -14,6 +14,8 @@ import {
 
 export const DH_SEEDANCE_SEGMENT_SEC = 5
 export const DH_SEEDANCE_MAX_SEGMENTS = 12
+/** 中文口播约 4 字/秒 → 5 秒画面约 18～20 字，避免一段 TTS 远长于画面 */
+export const DH_SEEDANCE_CHARS_PER_SEGMENT = 20
 
 const DH_PROMPT_MAX = SEEDANCE_I2V_MAX_CONTENT_TEXT
 
@@ -24,7 +26,10 @@ function clip(s: string, max: number): string {
 }
 
 /** 口播稿按约 5 秒一段切分（图生视频 i2v 常用 3/4/5 秒） */
-export function chunkScriptForSeedanceVideo(script: string, maxLen = 42): string[] {
+export function chunkScriptForSeedanceVideo(
+  script: string,
+  maxLen = DH_SEEDANCE_CHARS_PER_SEGMENT,
+): string[] {
   const text = script.trim()
   if (!text) return []
   if (text.length <= maxLen) return [text]
@@ -45,10 +50,23 @@ export function chunkScriptForSeedanceVideo(script: string, maxLen = 42): string
   return chunks.filter((c) => c.length >= 2)
 }
 
+/** 目标成片时长：跟口播字数走，上限 = 最大段数 × 段长 */
 export function estimateDhTargetDurationSec(script: string): number {
   const len = script.trim().length
   if (len <= 0) return DH_SEEDANCE_SEGMENT_SEC
-  return Math.min(15, Math.max(8, Math.ceil(len * 0.38)))
+  const maxSec = DH_SEEDANCE_MAX_SEGMENTS * DH_SEEDANCE_SEGMENT_SEC
+  /** ~4 字/秒口播 */
+  const byChars = Math.ceil(len / 4)
+  return Math.min(maxSec, Math.max(DH_SEEDANCE_SEGMENT_SEC, byChars))
+}
+
+/** 按口播音频秒数估算 Seedance 需要几段 */
+export function estimateDhSegmentCountFromAudioSec(audioSec: number): number {
+  if (!Number.isFinite(audioSec) || audioSec <= 0) return 1
+  return Math.min(
+    DH_SEEDANCE_MAX_SEGMENTS,
+    Math.max(1, Math.ceil(audioSec / DH_SEEDANCE_SEGMENT_SEC)),
+  )
 }
 
 function frameDesc(draft: DigitalHumanDraft): string {
@@ -96,6 +114,8 @@ export function buildDhSeedanceSegmentPrompt(
     gesturePreset?: string
     continuation?: boolean
     hasProductFusion?: boolean
+    /** 门店/自定义背景：参考图已抠图 */
+    mattedOnScene?: boolean
     /** 意图保真：mustInclude / mustAvoid 注入 */
     fidelityBrief?: ShortVideoGenBrief | null
   },
@@ -108,11 +128,15 @@ export function buildDhSeedanceSegmentPrompt(
   const motion = clip(motionBlock(draft, opts?.motionText, opts?.gesturePreset), 72)
   const outfit = clip(draft.outfit || '同参考', 16)
   const fidelity = opts?.fidelityBrief ? clip(briefPromptSuffix(opts.fidelityBrief).trim(), 80) : ''
+  const matteHint = opts?.mattedOnScene
+    ? '参考图人物已去背并融入场景，边缘自然，禁止灰底矩形残影。'
+    : ''
 
   let body: string
   if (opts?.continuation) {
     body = [
       '竖屏9:16口播续镜，同一人物同服装同场景，动作连续。',
+      matteHint,
       `动作：${motion}。`,
       opts?.hasProductFusion ? '双参考图自然手持产品。' : '',
       fidelity,
@@ -124,7 +148,8 @@ export function buildDhSeedanceSegmentPrompt(
   } else {
     body = [
       `竖屏9:16数字人口播，参考图人物为主播，${frame}，保持五官发型一致。`,
-      `背景替换为${bg}，服装${outfit}。`,
+      matteHint || `背景为${bg}，服装${outfit}。`,
+      matteHint ? `服装${outfit}。` : '',
       total > 1 ? `分镜${idx}/${total}约${DH_SEEDANCE_SEGMENT_SEC}秒。` : '',
       opts?.hasProductFusion ? '人物与抠图产品自然融合，禁止贴片悬浮。' : '',
       `动作：${motion}。`,

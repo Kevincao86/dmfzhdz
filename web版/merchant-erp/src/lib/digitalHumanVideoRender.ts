@@ -42,10 +42,13 @@ import {
   chunkScriptForSeedanceVideo,
   DH_SEEDANCE_MAX_SEGMENTS,
   DH_SEEDANCE_SEGMENT_SEC,
+  estimateDhSegmentCountFromAudioSec,
   estimateDhTargetDurationSec,
 } from './digitalHumanSeedancePrompt'
 import { buildBriefFromInput, validateBriefFidelity } from './shortVideoGenBrief'
 import { buildSeedanceFlagsLine } from './shortVideoRenderFlags'
+import { getAudioDurationSec } from './digitalHumanAudioChunks'
+import { normalizeArkVideoModelParam } from './arkVideoEndpointsConfig'
 import {
   buildMotionTimeline,
   buildWholeVideoMotionTimeline,
@@ -108,6 +111,33 @@ export type DhRenderResult =
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => window.setTimeout(r, ms))
+}
+
+/** 数字人口播：优先 Seedance 1.5/2.0（单段更长），再 1.0/pro，lite 兜底 */
+function sortDhSeedancePoolPreferLongClip(ids: readonly string[]): string[] {
+  const tier = (modelId: string): number => {
+    const norm = normalizeArkVideoModelParam(modelId).toLowerCase()
+    if (/seedance-2-0|seedance-2\.0/.test(norm) && !/mini|fast/.test(norm)) return 1
+    if (/seedance-2-0-fast|seedance-2\.0-fast/.test(norm)) return 2
+    if (/seedance-1-5|seedance-1\.5/.test(norm)) return 3
+    if (/seedance-1-0-pro|seedance-1\.0-pro/.test(norm)) return 4
+    if (/seaweed/.test(norm)) return 5
+    if (/lite/.test(norm)) return 8
+    return 6
+  }
+  return [...ids].sort((a, b) => {
+    const d = tier(a) - tier(b)
+    if (d !== 0) return d
+    return normalizeArkVideoModelParam(a).localeCompare(normalizeArkVideoModelParam(b))
+  })
+}
+
+function draftNeedsMattedScene(draft: DigitalHumanDraft): boolean {
+  return (
+    draft.background === 'store' ||
+    draft.background === 'custom' ||
+    draft.background === 'green'
+  )
 }
 
 export function estimateDhS2vSegmentCount(script: string): number {
@@ -440,34 +470,71 @@ async function renderWithSeedance(
     draft.voiceId === 'v-clone' ? await loadWorkVoiceCloneSampleBlob(work) : null
 
   let scriptChunks: string[] = []
-  let audioSegments: Blob[] = []
+  let segmentAudioBlobs: Blob[] = []
 
   if (isAudioDrive) {
     const uploaded = await resolveUploadedNarrationSegments(work)
     if (!uploaded.ok) return { ok: false, message: uploaded.message }
-    audioSegments = uploaded.audioBlobs
-    scriptChunks = audioSegments.map((_, i) => script.split(/\n+/)[i]?.trim() || `[口播段 ${i + 1}]`)
+    segmentAudioBlobs = uploaded.audioBlobs
+    scriptChunks = segmentAudioBlobs.map((_, i) => script.split(/\n+/)[i]?.trim() || `[口播段 ${i + 1}]`)
   } else {
     scriptChunks = chunkScriptForSeedanceVideo(script).slice(0, DH_SEEDANCE_MAX_SEGMENTS)
+    for (let i = 0; i < scriptChunks.length; i++) {
+      const chunkText = scriptChunks[i] ?? script
+      onProgress?.({
+        phase: 'audio',
+        segmentIndex: i + 1,
+        segmentTotal: scriptChunks.length,
+        progress: 6 + Math.round((i / Math.max(1, scriptChunks.length)) * 10),
+      })
+      const narration = await synthesizeDigitalHumanNarration(draft, chunkText, { voiceCloneBlob })
+      if (!narration.ok) {
+        return {
+          ok: false,
+          message: `口播配音第 ${i + 1}/${scriptChunks.length} 段失败：${narration.message}`,
+        }
+      }
+      segmentAudioBlobs.push(narration.audioBlob)
+    }
   }
 
-  let segmentTotal = Math.max(1, isAudioDrive ? audioSegments.length : scriptChunks.length)
+  let totalAudioSec = 0
+  for (const b of segmentAudioBlobs) {
+    try {
+      totalAudioSec += await getAudioDurationSec(b)
+    } catch {
+      /* ignore probe miss */
+    }
+  }
+  if (!(totalAudioSec > 0.3)) {
+    totalAudioSec = estimateDhTargetDurationSec(script)
+  }
+
+  let segmentTotal = Math.max(
+    isAudioDrive ? segmentAudioBlobs.length : scriptChunks.length,
+    estimateDhSegmentCountFromAudioSec(totalAudioSec),
+  )
   if (activeSceneShots && !isAudioDrive) {
     segmentTotal = Math.max(segmentTotal, activeSceneShots.length)
-    const padText = scriptChunks[scriptChunks.length - 1] ?? script
-    while (scriptChunks.length < segmentTotal) scriptChunks.push(padText)
   }
-  const targetDurationSec = estimateDhTargetDurationSec(script)
+  segmentTotal = Math.min(DH_SEEDANCE_MAX_SEGMENTS, Math.max(1, segmentTotal))
+
+  const padText = scriptChunks[scriptChunks.length - 1] ?? script
+  while (scriptChunks.length < segmentTotal) scriptChunks.push(padText)
+
+  const targetDurationSec = Math.max(
+    estimateDhTargetDurationSec(script),
+    Math.ceil(totalAudioSec),
+  )
   const flags = buildSeedanceFlagsLine({
     durationSec: DH_SEEDANCE_SEGMENT_SEC,
     fps: 24,
     aspect: '9:16',
     watermark: 'off',
   })
-  const poolModels = cfg.arkVideoModels.map((m) => m.endpointId)
+  const poolModels = sortDhSeedancePoolPreferLongClip(cfg.arkVideoModels.map((m) => m.endpointId))
 
   const videoBlobs: Blob[] = []
-  const segmentAudioBlobs: Blob[] = []
   const sourceUrls: string[] = []
   let prevVideoUrl: string | null = null
   let usedProductFusion = false
@@ -479,28 +546,6 @@ async function renderWithSeedance(
       segmentTotal,
       progress: 12 + Math.round((i / segmentTotal) * 48),
     })
-
-    let segmentAudioBlob: Blob
-    if (isAudioDrive) {
-      segmentAudioBlob = audioSegments[i]!
-    } else {
-      const chunkText = scriptChunks[i] ?? script
-      onProgress?.({
-        phase: 'audio',
-        segmentIndex: i + 1,
-        segmentTotal,
-        progress: 8 + Math.round((i / segmentTotal) * 12),
-      })
-      const narration = await synthesizeDigitalHumanNarration(draft, chunkText, { voiceCloneBlob })
-      if (!narration.ok) {
-        return {
-          ok: false,
-          message: `口播配音第 ${i + 1}/${segmentTotal} 段失败：${narration.message}`,
-        }
-      }
-      segmentAudioBlob = narration.audioBlob
-    }
-    segmentAudioBlobs.push(segmentAudioBlob)
 
     const sceneShot = activeSceneShots?.[i % activeSceneShots.length] ?? null
     const segmentDraft = sceneShot ? draftForSceneShot(draft, sceneShot) : draft
@@ -571,13 +616,15 @@ async function renderWithSeedance(
         : motionLine?.text
           ? inferGestureFromMotionText(motionLine.text, 'explain')
           : undefined
+    const isContinuation = i > 0 && (i >= segmentAudioBlobs.length || draft.avatarKind === 'video_clone')
     const prompt = buildDhSeedanceSegmentPrompt(segmentDraft, scriptChunks[i] ?? script, {
       segmentIndex: i,
       segmentTotal,
       motionText: motionLine?.text,
       gesturePreset: segmentGesture,
-      continuation: i > 0 && draft.avatarKind === 'video_clone' && !sceneShot,
+      continuation: isContinuation && !sceneShot,
       hasProductFusion: useProductFusion,
+      mattedOnScene: draftNeedsMattedScene(segmentDraft),
       fidelityBrief,
     })
 
