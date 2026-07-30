@@ -23,7 +23,7 @@ import ShortVideoInfiniteCanvas, {
 } from '../components/ShortVideoInfiniteCanvas'
 import ShortVideoMusicStudio from '../components/ShortVideoMusicStudio'
 import type { ShortVideoCaseItem } from '../lib/shortVideoCaseGallery'
-import { SHORT_VIDEO_CASES, canvasLocalLifeCases } from '../lib/shortVideoCaseGallery'
+import { SHORT_VIDEO_CASES, alignCanvasRowsToCaseDuration, canvasLocalLifeCases } from '../lib/shortVideoCaseGallery'
 import type { ShortVideoMusicTrack } from '../lib/shortVideoMusicLibrary'
 import { findShortVideoSkill, type ShortVideoSkillId } from '../lib/shortVideoSkills'
 import {
@@ -1712,6 +1712,10 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
 
   /** 无限画布「做同款」：写入分镜节点 + 顺序连线路径，停留在画布 */
   const applyCanvasCase = useCallback((item: ShortVideoCaseItem) => {
+    const caseDurRaw = Math.max(1, Math.round(Number(item.durationSec)) || 5)
+    const caseDurOpt: '5' | '10' | '15' =
+      caseDurRaw <= 5 ? '5' : caseDurRaw <= 10 ? '10' : '15'
+    const caseDur = Number(caseDurOpt)
     const rows = item.canvasScriptRows
     if (!rows || rows.length < 2) {
       setErr(null)
@@ -1719,25 +1723,26 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       setActiveSkillId(item.skillId ?? null)
       setSdAspect(item.aspect)
       setLongformEnabled(false)
-      setSdDurationSec('15')
+      setSdDurationSec(caseDurOpt)
       setMainPane('generate')
       setHint(`已套用案例「${item.title}」，可继续编辑参数后生成`)
       return
     }
+    const timedRows = alignCanvasRowsToCaseDuration(rows, caseDur)
     setErr(null)
     setGenPrompt(item.prompt)
     setActiveSkillId(item.skillId ?? null)
     setSdAspect(item.aspect)
     setLongformEnabled(false)
-    setSdDurationSec('15')
-    setScriptRows(rows.map((r) => ({ ...r })))
-    setShotMediaIds(rows.map(() => [] as string[]))
+    setSdDurationSec(caseDurOpt)
+    setScriptRows(timedRows.map((r) => ({ ...r })))
+    setShotMediaIds(timedRows.map(() => [] as string[]))
     setCanvasFlowEpoch((v) => v + 1)
     setStudioMode('canvas')
     setMainPane('canvas')
-    const pathLabel = rows.map((_, i) => i + 1).join('→')
+    const pathLabel = timedRows.map((_, i) => i + 1).join('→')
     setHint(
-      `已套用「${item.title}」画布路径（${pathLabel}）${
+      `已套用「${item.title}」画布路径（${pathLabel} · 共 ${caseDur} 秒）${
         item.hasNarration ? ' · 含配音案例' : ''
       }，可改连线后点「应用流程」或去短片生成`,
     )
@@ -1755,12 +1760,15 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
         applyCanvasCase(item)
         return
       }
+      const caseDurRaw = Math.max(1, Math.round(Number(item.durationSec)) || 5)
+      const caseDurOpt: '5' | '10' | '15' =
+        caseDurRaw <= 5 ? '5' : caseDurRaw <= 10 ? '10' : '15'
       setErr(null)
       setGenPrompt(item.prompt)
       setActiveSkillId(item.skillId ?? null)
       setSdAspect(item.aspect)
       setLongformEnabled(false)
-      setSdDurationSec('15')
+      setSdDurationSec(caseDurOpt)
       setMainPane('generate')
       setHint(`已套用案例「${item.title}」，可继续编辑参数后生成`)
     },
@@ -1788,8 +1796,13 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
             (c.prompt.trim() === prompt || prompt.includes(c.prompt.trim().slice(0, 40))),
         ) || null
     }
-    const rows = item?.canvasScriptRows
-    if (!item || !rows || rows.length < 2) return false
+    const rawRows = item?.canvasScriptRows
+    if (!item || !rawRows || rawRows.length < 2) return false
+    const caseDurRaw = Math.max(1, Math.round(Number(item.durationSec)) || 5)
+    const caseDurOpt: '5' | '10' | '15' =
+      caseDurRaw <= 5 ? '5' : caseDurRaw <= 10 ? '10' : '15'
+    const caseDur = Number(caseDurOpt)
+    const rows = alignCanvasRowsToCaseDuration(rawRows, caseDur)
 
     const filled = isScriptRowsUsable(scriptRows)
     const samePath =
@@ -1797,16 +1810,29 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       scriptRows.every(
         (r, i) =>
           r.visual.trim() === (rows[i]?.visual ?? '').trim() &&
-          r.dialogue.trim() === (rows[i]?.dialogue ?? '').trim(),
+          r.dialogue.trim() === (rows[i]?.dialogue ?? '').trim() &&
+          r.timeRange.trim() === (rows[i]?.timeRange ?? '').trim(),
       )
     if (filled && samePath) return true
-    // 分镜未实质填写（空壳默认行）时，用案例路径覆盖
-    if (!filled || scriptRows.every((r) => !r.visual.trim() && !r.dialogue.trim())) {
+    // 分镜未实质填写（空壳默认行）时，用案例路径覆盖；或画面口播已对齐但时长仍是旧 10s 段
+    const sameContent =
+      scriptRows.length === rows.length &&
+      scriptRows.every(
+        (r, i) =>
+          r.visual.trim() === (rows[i]?.visual ?? '').trim() &&
+          r.dialogue.trim() === (rows[i]?.dialogue ?? '').trim(),
+      )
+    if (
+      !filled ||
+      scriptRows.every((r) => !r.visual.trim() && !r.dialogue.trim()) ||
+      sameContent
+    ) {
       setScriptRows(rows.map((r) => ({ ...r })))
       setShotMediaIds(rows.map(() => [] as string[]))
+      setSdDurationSec(caseDurOpt)
       setCanvasFlowEpoch((v) => v + 1)
       setHint(
-        `已根据「${item.title}」自动生成画布路径（${rows.map((_, i) => i + 1).join('→')}）`,
+        `已根据「${item.title}」自动生成画布路径（${rows.map((_, i) => i + 1).join('→')} · 共 ${caseDur} 秒）`,
       )
       return true
     }
