@@ -83,6 +83,7 @@ import { parseGuidanceDocumentFile } from '../lib/shortVideoGuidanceDoc'
 import {
   planShortVideoScriptFromGuidance,
 } from '../services/shortVideoGuidanceAi'
+import { preparePreciseVideoGeneration } from '../services/preparePreciseVideoGeneration'
 import { extractVideoLastFramePureBase64 } from '../lib/videoFrameUtils'
 import {
   defaultScriptRows,
@@ -1399,9 +1400,14 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
   const runLongformGenerate = async (opts?: {
     targetTotalSecOverride?: number
     segmentSecOverride?: number
+    rowsOverride?: typeof scriptRows
+    promptOverride?: string
   }) => {
-    const scriptUsable = isScriptRowsUsable(scriptRows)
-    const txt = scriptUsable ? scriptRowsToOverallPrompt(scriptRows) : genPrompt.trim()
+    const rows = opts?.rowsOverride ?? scriptRows
+    const scriptUsable = isScriptRowsUsable(rows)
+    const txt =
+      opts?.promptOverride?.trim() ||
+      (scriptUsable ? scriptRowsToOverallPrompt(rows) : genPrompt.trim())
     const imgs: string[] = []
     if (genMode === 'frames') {
       for (const item of storyFrames) {
@@ -1431,7 +1437,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
           segmentSec,
           mode: planMode,
           forceAiPlanner: scriptUsable ? false : undefined,
-          scriptSegments: scriptUsable ? scriptRows : undefined,
+          scriptSegments: scriptUsable ? rows : undefined,
         }),
       resolveImages: async (i, prevVideoUrl) => {
         if (i > 0 && prevVideoUrl) {
@@ -1450,7 +1456,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       },
       narrationSource:
         scriptUsable
-          ? scriptRows
+          ? rows
               .map((r) => r.dialogue.trim())
               .filter((d) => d.length >= 2 && !/待填|^[-—–.]+$/.test(d))
               .join('。') || txt
@@ -1542,14 +1548,14 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       videoJobIdRef.current = null
     }
 
-    const txt = genPrompt.trim()
+    let txt = genPrompt.trim()
     // 画布已填可用分镜时，即使未勾选长片也走分段合成，避免闭环断裂
-    const canvasScriptReady = isScriptRowsUsable(scriptRows) && scriptRows.length >= 2
+    let workingScriptRows = scriptRows
+    const canvasScriptReady = isScriptRowsUsable(workingScriptRows) && workingScriptRows.length >= 2
     if (canvasScriptReady && !longformEnabled) {
-      syncGenerateWorkspaceFromCanvas(scriptRows, { fillPrompt: true })
+      syncGenerateWorkspaceFromCanvas(workingScriptRows, { fillPrompt: true })
     }
     const useLongformPipeline = longformEnabled || canvasScriptReady
-    const scriptUsable = useLongformPipeline && isScriptRowsUsable(scriptRows)
     const imgs: string[] = []
     if (genMode === 'frames') {
       for (const item of storyFrames) {
@@ -1557,28 +1563,87 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       }
     }
 
+    setBusy(true)
+    cancelRef.current = false
+    trackProgress('正在校验执导意图与分镜…')
+    try {
+      const prep = await preparePreciseVideoGeneration({
+        rawPrompt:
+          txt ||
+          (canvasScriptReady
+            ? scriptRowsToOverallPrompt(workingScriptRows)
+            : imgs.length
+              ? `按 ${imgs.length} 个分镜参考生成连贯营销短片`
+              : ''),
+        skillId: activeSkillId,
+        targetTotalSec: estSec,
+        segmentSec: longformEnabled ? longformSegmentSec : Number(sdDurationSec) || 5,
+        longform: useLongformPipeline,
+        hasProductImage: genMode === 'frames' && storyFrames.length > 0,
+        frameMode: genMode === 'frames',
+        existingRows: canvasScriptReady ? workingScriptRows : null,
+        optimizeGuidance: !canvasScriptReady,
+        mode: genMode === 'frames' ? 'generate_frames' : 'generate_text',
+        onProgress: trackProgress,
+      })
+      if (!prep.ok) {
+        finishVideoJob(false, prep.message)
+        setErr(prep.message)
+        if (mountedRef.current) {
+          setBusy(false)
+          setProgress(null)
+        }
+        return
+      }
+      txt = prep.guidance.trim() || txt
+      if (mountedRef.current && txt && txt !== genPrompt.trim()) setGenPrompt(txt)
+      if (prep.rows && prep.rows.length >= 2) {
+        workingScriptRows = prep.rows
+        if (mountedRef.current) setScriptRows(prep.rows)
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '意图校验失败'
+      finishVideoJob(false, msg)
+      setErr(msg)
+      if (mountedRef.current) {
+        setBusy(false)
+        setProgress(null)
+      }
+      return
+    }
+
+    const scriptUsable = useLongformPipeline && isScriptRowsUsable(workingScriptRows)
+
     if (useLongformPipeline) {
       if (!scriptUsable && genMode === 'text') {
         finishVideoJob(false, '请填写分镜表')
         setErr('请填写分镜表：至少 2 段，且每段填写画面或口播文案。')
+        if (mountedRef.current) {
+          setBusy(false)
+          setProgress(null)
+        }
         return
       }
       if (!scriptUsable && genMode === 'frames' && imgs.length === 0) {
         finishVideoJob(false, '请填写分镜表或上传参考')
         setErr('请填写分镜表，或上传至少一个分镜参考（图/视频）。')
+        if (mountedRef.current) {
+          setBusy(false)
+          setProgress(null)
+        }
         return
       }
-      setBusy(true)
       trackProgress('排队中……')
-      cancelRef.current = false
       try {
-        const end = maxScriptTimeRangeEndSec(scriptRows)
-        const targetOverride = snapLongformTargetTotalSec(end, scriptRows.length)
+        const end = maxScriptTimeRangeEndSec(workingScriptRows)
+        const targetOverride = snapLongformTargetTotalSec(end, workingScriptRows.length)
         await runLongformGenerate({
           targetTotalSecOverride: longformEnabled ? undefined : targetOverride,
           segmentSecOverride: longformEnabled
             ? undefined
             : Math.min(15, Math.max(5, Number(sdDurationSec) || 15)),
+          rowsOverride: workingScriptRows,
+          promptOverride: txt,
         })
         finishVideoJob(!!resultBlobRef.current, cancelRef.current ? '已取消等待' : undefined)
       } finally {
@@ -1593,11 +1658,19 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     if (genMode === 'text' && !txt) {
       finishVideoJob(false, '请填写描述')
       setErr('请用文字描述成片内容。')
+      if (mountedRef.current) {
+        setBusy(false)
+        setProgress(null)
+      }
       return
     }
     if (genMode === 'frames' && imgs.length === 0 && !txt) {
       finishVideoJob(false, '请填写文案或上传参考')
       setErr('请填写执导文案或上传至少一个分镜参考（图/视频）。')
+      if (mountedRef.current) {
+        setBusy(false)
+        setProgress(null)
+      }
       return
     }
 

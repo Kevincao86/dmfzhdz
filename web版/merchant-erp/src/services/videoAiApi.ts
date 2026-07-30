@@ -32,6 +32,11 @@ export type ShortVideoGenRequestBody = {
   prefer_quota_stable?: boolean
   /** 数字人口播：仅用火山/Seedance，额度不足时在豆包模型池内切换，禁止回退千问 */
   skip_qwen?: boolean
+  /**
+   * 阶段 D：Wan/垂类 LoRA 挂载点（DiffSynth/musubi）。
+   * 本轮仅类型预留，网关忽略；勿依赖此字段改变生成结果。
+   */
+  styleAdapter?: { id: string; strength?: number }
 }
 
 export function formatVideoAiUserError(msg: string): string {

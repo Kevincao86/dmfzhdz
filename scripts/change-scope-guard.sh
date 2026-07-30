@@ -51,6 +51,7 @@ list_scopes() {
   merchant_jimeng_studio 商家 ERP：即梦式短视频台（Skill/画布/短片/案例）+ 全站 UI token
   aimodelserver_upstream AiModelServer（api.aimodelserver.com）OpenAI 兼容上游接入
   digital_human_bg     商家 ERP：数字人口播·门店实景背景选中
+  video_gen_precision  视频生成更准：Brief/Skill槽位/保真校验/全入口门禁（不含 ICE）
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -596,6 +597,29 @@ PAT
 digitalHumanStoreScenes
 DhStep3Extras
 DigitalHumanBroadcastPage
+change-scope-guard
+PAT
+      ;;
+    video_gen_precision)
+      cat <<'PAT'
+shortVideoGenBrief
+preparePreciseVideoGeneration
+shortVideoSkills
+shortVideoGuidanceAi
+shortVideoScriptTable
+ShortVideoOptimizationPage
+ShortVideoAgentCabin
+videoAiApi
+DigitalHumanBroadcastPage
+digitalHumanVideoRender
+digitalHumanSeedancePrompt
+AiOperationContentPage
+viralBriefAi
+shortvideo-ai
+videoAiMp
+videoGenBrief
+mine-pr-addon-shortvideo
+mpAddonMerchantApi
 change-scope-guard
 PAT
       ;;

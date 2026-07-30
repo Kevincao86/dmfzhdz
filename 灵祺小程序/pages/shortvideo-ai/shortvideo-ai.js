@@ -3,6 +3,7 @@ const merchant = require('../../utils/merchantApi.js')
 const videoAi = require('../../utils/videoAiMp.js')
 const iceCloud = require('../../utils/iceCloudMp.js')
 const labels = require('../../utils/shortVideoLabelsMp.js')
+const videoGenBrief = require('../../utils/videoGenBrief.js')
 
 const {
   MAIN_TABS,
@@ -670,7 +671,7 @@ Page({
       this.setData({ err: vErr })
       return
     }
-    const txt = String(this.data.genPrompt || '').trim()
+    let txt = String(this.data.genPrompt || '').trim()
     const imgs = (this._storyB64List || [])
       .filter(Boolean)
       .map((b) => `data:image/jpeg;base64,${b}`)
@@ -682,6 +683,13 @@ Page({
       this.setData({ err: '请填写执导文案或上传至少一张分镜画面。' })
       return
     }
+    const gate = videoGenBrief.prepareBriefGate(txt || `按 ${imgs.length} 张分镜参考生成短片`, null)
+    if (!gate.ok) {
+      this.setData({ err: gate.message })
+      return
+    }
+    txt = gate.guidance
+    this.setData({ genPrompt: txt })
     this._cancelPoll = false
     this.setData({ busy: true, progress: '排队中……' })
     try {

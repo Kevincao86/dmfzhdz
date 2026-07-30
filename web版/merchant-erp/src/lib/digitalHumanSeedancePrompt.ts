@@ -3,6 +3,7 @@
  */
 import type { DigitalHumanDraft } from './digitalHumanBroadcast'
 import { backgroundPromptForDraft } from './digitalHumanBroadcast'
+import { briefPromptSuffix, type ShortVideoGenBrief } from './shortVideoGenBrief'
 import {
   SHORT_VIDEO_MOTION_PROMPT_SUFFIX,
   SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
@@ -95,6 +96,8 @@ export function buildDhSeedanceSegmentPrompt(
     gesturePreset?: string
     continuation?: boolean
     hasProductFusion?: boolean
+    /** 意图保真：mustInclude / mustAvoid 注入 */
+    fidelityBrief?: ShortVideoGenBrief | null
   },
 ): string {
   void scriptChunk
@@ -104,6 +107,7 @@ export function buildDhSeedanceSegmentPrompt(
   const total = opts?.segmentTotal ?? 1
   const motion = clip(motionBlock(draft, opts?.motionText, opts?.gesturePreset), 72)
   const outfit = clip(draft.outfit || '同参考', 16)
+  const fidelity = opts?.fidelityBrief ? clip(briefPromptSuffix(opts.fidelityBrief).trim(), 80) : ''
 
   let body: string
   if (opts?.continuation) {
@@ -111,6 +115,7 @@ export function buildDhSeedanceSegmentPrompt(
       '竖屏9:16口播续镜，同一人物同服装同场景，动作连续。',
       `动作：${motion}。`,
       opts?.hasProductFusion ? '双参考图自然手持产品。' : '',
+      fidelity,
       SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
       SHORT_VIDEO_MOTION_PROMPT_SUFFIX,
     ]
@@ -123,6 +128,7 @@ export function buildDhSeedanceSegmentPrompt(
       total > 1 ? `分镜${idx}/${total}约${DH_SEEDANCE_SEGMENT_SEC}秒。` : '',
       opts?.hasProductFusion ? '人物与抠图产品自然融合，禁止贴片悬浮。' : '',
       `动作：${motion}。`,
+      fidelity,
       SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
       SHORT_VIDEO_MOTION_PROMPT_SUFFIX,
     ]
