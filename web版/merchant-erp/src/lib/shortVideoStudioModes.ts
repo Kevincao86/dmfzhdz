@@ -16,7 +16,7 @@ export type ShortVideoStudioMode = {
   description: string
   /** 站内路由；空表示留在本页并切换 pane */
   href?: string
-  pane?: 'generate' | 'canvas' | 'cloud_batch' | 'cases'
+  pane?: 'generate' | 'canvas' | 'cloud_batch' | 'cases' | 'music'
 }
 
 export const SHORT_VIDEO_STUDIO_MODES: ShortVideoStudioMode[] = [
@@ -41,8 +41,8 @@ export const SHORT_VIDEO_STUDIO_MODES: ShortVideoStudioMode[] = [
   {
     id: 'music',
     label: '音乐 / 配乐',
-    description: '混剪页选择 BGM 与包装精修',
-    pane: 'cloud_batch',
+    description: '内容匹配曲库试听选用（独立工作区）',
+    pane: 'music',
   },
   {
     id: 'digital_human',

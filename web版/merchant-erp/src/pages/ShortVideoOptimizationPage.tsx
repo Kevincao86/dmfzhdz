@@ -20,7 +20,9 @@ import ShortVideoScriptTableEditor from '../components/ShortVideoScriptTableEdit
 import ShortVideoAgentCabin from '../components/ShortVideoAgentCabin'
 import ShortVideoCaseGallery from '../components/ShortVideoCaseGallery'
 import ShortVideoInfiniteCanvas from '../components/ShortVideoInfiniteCanvas'
+import ShortVideoMusicStudio from '../components/ShortVideoMusicStudio'
 import type { ShortVideoCaseItem } from '../lib/shortVideoCaseGallery'
+import type { ShortVideoMusicTrack } from '../lib/shortVideoMusicLibrary'
 import { findShortVideoSkill, type ShortVideoSkillId } from '../lib/shortVideoSkills'
 import {
   findStudioMode,
@@ -106,7 +108,7 @@ import {
   type ShortVideoScriptRow,
 } from '../lib/shortVideoScriptTable'
 
-type MainPane = 'generate' | 'canvas' | 'cloud_batch' | 'cases'
+type MainPane = 'generate' | 'canvas' | 'cloud_batch' | 'cases' | 'music'
 
 type StoryFrameItem = {
   id: string
@@ -394,11 +396,14 @@ export default function ShortVideoOptimizationPage() {
   const [mainPane, setMainPane] = useState<MainPane>('generate')
   const [activeSkillId, setActiveSkillId] = useState<ShortVideoSkillId | null>(null)
   const [studioMode, setStudioMode] = useState<ShortVideoStudioModeId>('agent')
+  const [selectedMusicTrackId, setSelectedMusicTrackId] = useState<string | null>(null)
   const [cfg, setCfg] = useState<VideoAiBackendConfig | null>(null)
   const [cfgLoaded, setCfgLoaded] = useState(false)
 
   useEffect(() => {
     if (!paneTabs.length) return
+    // 音乐/配乐是独立 pane，不在快捷卡片里，勿被踢回 generate
+    if (mainPane === 'music') return
     if (!paneTabs.some((t) => t.id === mainPane)) {
       setMainPane(paneTabs[0]!.id)
     }
@@ -1552,10 +1557,12 @@ export default function ShortVideoOptimizationPage() {
     if (mode.pane) {
       resetOutputs()
       setMainPane(mode.pane)
-      if (mode.pane === 'cloud_batch') {
-        setHint('已切换到 AI混剪：可在此选择 BGM / 配乐并做包装精修')
+      if (mode.pane === 'music') {
+        setHint('已进入音乐/配乐工作区：按内容匹配试听并选用独立曲目')
+      } else if (mode.pane === 'cloud_batch') {
+        setHint('已切换到 AI混剪：多素材拼接与包装精修')
       } else if (mode.pane === 'canvas') {
-        setHint('已进入无限画布：可查看分镜与参考节点')
+        setHint('已进入无限画布：可拖拽路径连线编排分镜')
       } else {
         setHint(`已切换到${mode.label}`)
       }
@@ -1568,10 +1575,15 @@ export default function ShortVideoOptimizationPage() {
       navigate(mode.href)
       return
     }
+    if (mode.pane === 'music') {
+      setMainPane('music')
+      setHint('已进入音乐/配乐工作区')
+      return
+    }
     if (mode.pane === 'cloud_batch') {
       resetOutputs()
       setMainPane('cloud_batch')
-      setHint('已进入 AI混剪（音乐/配乐与包装精修）')
+      setHint('已进入 AI混剪（多素材拼接包装）')
       return
     }
     if (mode.pane === 'canvas') {
@@ -1599,7 +1611,7 @@ export default function ShortVideoOptimizationPage() {
   const cabinSubmitLabel = useMemo(() => {
     if (studioMode === 'image') return '打开视觉工坊'
     if (studioMode === 'digital_human') return '打开数字人'
-    if (studioMode === 'music') return '进入混剪配乐'
+    if (studioMode === 'music') return '打开配乐工作区'
     if (studioMode === 'canvas') return '打开无限画布'
     if (longformEnabled) return '规划并进入生成'
     return '进入短片生成'
@@ -1610,8 +1622,14 @@ export default function ShortVideoOptimizationPage() {
     setMainPane(id)
     if (id === 'generate') setStudioMode((m) => (m === 'agent' ? 'agent' : 'video'))
     if (id === 'canvas') setStudioMode('canvas')
-    if (id === 'cloud_batch') setStudioMode('music')
+    if (id === 'music') setStudioMode('music')
+    if (id === 'cloud_batch') setStudioMode('agent')
     if (id === 'cases') setStudioMode('agent')
+  }
+
+  const onSelectMusicTrack = (track: ShortVideoMusicTrack) => {
+    setSelectedMusicTrackId(track.id)
+    setHint(`已选用配乐「${track.title}」（${track.moods.join('·')}），可继续生成短片或去 AI混剪包装`)
   }
 
   const studioQuickEntries = [
@@ -1665,7 +1683,7 @@ export default function ShortVideoOptimizationPage() {
           <MpAddonPointsRateBadge kind="shortvideo" />
         </div>
         <p className="mx-auto max-w-2xl text-sm leading-relaxed text-slate-600">
-          Skill 技能 · 无限画布 · 短片生成 · 案例做同款。引擎为 Seedance；包装精修请切「AI混剪」。
+          Skill 技能 · 无限画布 · 短片生成 · 音乐配乐 · 案例做同款。引擎为 Seedance；多素材拼接请切「AI混剪」。
           {readMpSessionToken() ? (
             <span className="mt-1 block text-xs text-cyan-800">
               星选账号：成片成功后按秒扣积分；套餐 ai_video_quota 次数优先，用尽后扣积分余额。
@@ -1754,6 +1772,16 @@ export default function ShortVideoOptimizationPage() {
         <ShortVideoCaseGallery onApplyCase={applyStudioCase} className="mb-8" />
       ) : null}
 
+      {mainPane === 'music' ? (
+        <ShortVideoMusicStudio
+          className="mb-8"
+          promptHint={genPrompt}
+          disabled={busy || auxBusy}
+          selectedTrackId={selectedMusicTrackId}
+          onSelectTrack={onSelectMusicTrack}
+        />
+      ) : null}
+
       {mainPane === 'canvas' ? (
         <div className="mb-8 w-full space-y-4">
           <ShortVideoInfiniteCanvas
@@ -1825,7 +1853,7 @@ export default function ShortVideoOptimizationPage() {
         </div>
       ) : null}
 
-      {mainPane !== 'cloud_batch' && mainPane !== 'cases' && mainPane !== 'canvas' ? (
+      {mainPane !== 'cloud_batch' && mainPane !== 'cases' && mainPane !== 'canvas' && mainPane !== 'music' ? (
       <section className="mb-8 overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50/70 via-white to-orange-50/30 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-cyan-100/80 px-5 py-4">
           <div className="flex items-center gap-3">
