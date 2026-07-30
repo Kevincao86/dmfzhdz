@@ -1,0 +1,21 @@
+# case_id | track | start | mood
+case-visit-night | SoundHelix-8 | 12.0 | 夜市烟火 · 轻快节拍
+case-seed-skincare | SoundHelix-3 | 8.0 | 护肤清透 · 柔和铺底
+case-promo-event | SoundHelix-7 | 5.0 | 大促冲击 · 活力鼓点
+case-ambiance-cafe | SoundHelix-2 | 20.0 | 咖啡馆 · 慵懒爵士感
+case-drama-hook | SoundHelix-11 | 15.0 | 短剧悬念 · 紧张推进
+case-food-ramen | SoundHelix-4 | 10.0 | 拉面食欲 · 温暖律动
+case-visit-brunch | SoundHelix-5 | 6.0 | 早午餐 · 明亮轻盈
+case-seed-gadget | SoundHelix-12 | 9.0 | 数码种草 · 科技节奏
+case-hotpot | SoundHelix-1 | 18.0 | 火锅局 · 热闹升温
+case-bbq | SoundHelix-9 | 14.0 | 烧烤夜宵 · 街头律动
+case-milktea | SoundHelix-6 | 7.0 | 新茶饮 · 甜感轻快
+case-hair | SoundHelix-13 | 11.0 | 美发变装 · 时尚氛围
+case-nail | SoundHelix-14 | 8.0 | 美甲美睫 · 精致柔音
+case-gym | SoundHelix-10 | 4.0 | 健身打卡 · 能量驱动
+case-hotel | SoundHelix-15 | 22.0 | 酒店漫游 · 质感慢铺
+case-kids | SoundHelix-16 | 5.0 | 亲子乐园 · 欢快跳跃
+case-pet | SoundHelix-17 | 10.0 | 猫咖萌宠 · 温暖轻柔
+case-takeaway | SoundHelix-1 | 42.0 | 外卖开箱 · 家常节奏
+case-bakery | SoundHelix-2 | 48.0 | 烘焙出炉 · 黄油暖调
+case-queue | SoundHelix-3 | 40.0 | 网红排队 · 城市游走

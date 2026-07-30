@@ -96,7 +96,7 @@ function topoOrder(n: number, edges: CanvasFlowEdge[]): number[] {
   return order
 }
 
-type DragKind = 'pan' | 'node'
+type DragKind = 'pan' | 'node' | 'link'
 
 export default function ShortVideoInfiniteCanvas({
   scriptRows,
@@ -118,6 +118,8 @@ export default function ShortVideoInfiniteCanvas({
   const [linkMode, setLinkMode] = useState(true)
   const [edges, setEdges] = useState<CanvasFlowEdge[]>([])
   const [linkFrom, setLinkFrom] = useState<number | null>(null)
+  const [linkWireEnd, setLinkWireEnd] = useState<Pt | null>(null)
+  const [hoverInPort, setHoverInPort] = useState<number | null>(null)
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null)
   const lastFlowEpochRef = useRef(flowEpoch)
 
@@ -126,6 +128,7 @@ export default function ShortVideoInfiniteCanvas({
     start: Pt
     origin: Pt
     nodeId?: string
+    fromIndex?: number
     moved: boolean
   } | null>(null)
   const lastTapRef = useRef<{ id: string; at: number } | null>(null)
@@ -232,29 +235,67 @@ export default function ShortVideoInfiniteCanvas({
       return [...prev, { id: `e-${from}-${to}-${Date.now()}`, from, to }]
     })
     setLinkFrom(null)
+    setLinkWireEnd(null)
+    setHoverInPort(null)
   }
 
-  const onPortOut = (index: number, e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (disabled || !linkMode) return
-    setLinkFrom(index)
-    setSelectedId(`script:${index}`)
+  const portOutWorld = (index: number): Pt => {
+    const id = `script:${index}`
+    const p = nodePosMap[id] || defaultScriptPos(index, mediaNodes.length)
+    return { x: p.x + SCRIPT_W, y: p.y + SCRIPT_H / 2 }
   }
 
-  const onPortIn = (index: number, e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (disabled || !linkMode) return
-    if (linkFrom == null) {
-      setLinkFrom(index)
-      return
+  const portInWorld = (index: number): Pt => {
+    const id = `script:${index}`
+    const p = nodePosMap[id] || defaultScriptPos(index, mediaNodes.length)
+    return { x: p.x, y: p.y + SCRIPT_H / 2 }
+  }
+
+  const hitTestInPort = (world: Pt): number | null => {
+    const hitR = 22
+    let best: number | null = null
+    let bestD = hitR * hitR
+    for (let i = 0; i < n; i++) {
+      const p = portInWorld(i)
+      const dx = world.x - p.x
+      const dy = world.y - p.y
+      const d2 = dx * dx + dy * dy
+      if (d2 <= bestD) {
+        bestD = d2
+        best = i
+      }
     }
-    addEdge(linkFrom, index)
+    return best
+  }
+
+  /** 从出口按下开始拖拽连线（鼠标路径） */
+  const onPortOutPointerDown = (index: number, e: React.PointerEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    if (disabled || !linkMode) return
+    const viewport = viewportRef.current
+    if (!viewport) return
+    viewport.setPointerCapture(e.pointerId)
+    const world = clientToWorld(e.clientX, e.clientY)
+    dragRef.current = {
+      kind: 'link',
+      start: world,
+      origin: portOutWorld(index),
+      fromIndex: index,
+      moved: false,
+    }
+    setLinkFrom(index)
+    setLinkWireEnd(world)
+    setSelectedId(`script:${index}`)
+    setSelectedEdgeId(null)
+    setPanning(false)
   }
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (disabled) return
     if (e.button !== 0 && e.button !== 1) return
     const target = e.target as HTMLElement
+    if (target.closest('[data-port-out]') || target.closest('[data-port-in]')) return
     if (target.closest('[data-node-action]')) return
 
     const nodeEl = target.closest('[data-canvas-node]') as HTMLElement | null
@@ -285,6 +326,8 @@ export default function ShortVideoInfiniteCanvas({
     setPanning(true)
     setSelectedId(null)
     setLinkFrom(null)
+    setLinkWireEnd(null)
+    setHoverInPort(null)
     setSelectedEdgeId(null)
   }
 
@@ -296,6 +339,14 @@ export default function ShortVideoInfiniteCanvas({
       const dy = e.clientY - d.start.y
       if (Math.abs(dx) + Math.abs(dy) > 3) d.moved = true
       setOffset({ x: d.origin.x + dx, y: d.origin.y + dy })
+      return
+    }
+    if (d.kind === 'link') {
+      const world = clientToWorld(e.clientX, e.clientY)
+      if (Math.abs(world.x - d.start.x) + Math.abs(world.y - d.start.y) > 2) d.moved = true
+      setLinkWireEnd(world)
+      const hit = hitTestInPort(world)
+      setHoverInPort(hit != null && hit !== d.fromIndex ? hit : null)
       return
     }
     if (d.kind === 'node' && d.nodeId) {
@@ -319,6 +370,17 @@ export default function ShortVideoInfiniteCanvas({
     } catch {
       /* ignore */
     }
+    if (d?.kind === 'link' && d.fromIndex != null) {
+      const world = clientToWorld(e.clientX, e.clientY)
+      const hit = hitTestInPort(world)
+      if (hit != null && hit !== d.fromIndex) addEdge(d.fromIndex, hit)
+      else {
+        setLinkFrom(null)
+        setLinkWireEnd(null)
+        setHoverInPort(null)
+      }
+      return
+    }
     if (d?.kind === 'node' && d.nodeId && !d.moved) {
       setSelectedId(d.nodeId)
       const now = Date.now()
@@ -338,6 +400,8 @@ export default function ShortVideoInfiniteCanvas({
     setNodePosMap({})
     setSelectedId(null)
     setLinkFrom(null)
+    setLinkWireEnd(null)
+    setHoverInPort(null)
   }
 
   const flowPaths = useMemo(() => {
@@ -360,6 +424,18 @@ export default function ShortVideoInfiniteCanvas({
     })
   }, [edges, nodePosMap, mediaNodes.length])
 
+  const liveWirePath = useMemo(() => {
+    if (linkFrom == null || !linkWireEnd) return null
+    const a = portOutWorld(linkFrom)
+    const x1 = a.x
+    const y1 = a.y
+    const x2 = linkWireEnd.x
+    const y2 = linkWireEnd.y
+    const dx = Math.max(40, Math.abs(x2 - x1) * 0.45)
+    return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkFrom, linkWireEnd, nodePosMap, mediaNodes.length, n])
+
   const orderPreview = useMemo(() => topoOrder(n, edges).map((i) => i + 1).join(' → '), [n, edges])
 
   return (
@@ -377,7 +453,7 @@ export default function ShortVideoInfiniteCanvas({
           <div>
             <p className="text-sm font-semibold text-slate-900">无限画布</p>
             <p className="text-[11px] text-slate-500">
-              点右侧圆点再点左侧入口自由连线 · 点线可选中/双击删除 ·「应用流程」同步生成顺序
+              按住右侧圆点拖到左侧入口完成连线 · 点线可选中/双击删除 ·「应用流程」同步顺序
             </p>
           </div>
         </div>
@@ -463,7 +539,7 @@ export default function ShortVideoInfiniteCanvas({
 
       {linkFrom != null ? (
         <div className="border-b border-amber-100 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-900">
-          已选择镜 {linkFrom + 1} 的出口，请点击另一分镜左侧入口完成连线；点空白处取消。
+          正在从镜 {linkFrom + 1} 拖出连线，松手到目标分镜左侧入口即可完成；松在空白处取消。
         </div>
       ) : null}
 
@@ -491,11 +567,14 @@ export default function ShortVideoInfiniteCanvas({
             transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
           }}
         >
-          {flowPaths.length > 0 ? (
-            <svg className="absolute left-0 top-0 overflow-visible" width={2800} height={1800}>
+          {flowPaths.length > 0 || liveWirePath ? (
+            <svg className="pointer-events-none absolute left-0 top-0 overflow-visible" width={2800} height={1800}>
               <defs>
                 <marker id="sv-flow-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
                   <path d="M0,0 L6,3 L0,6 Z" fill="#22d3ee" />
+                </marker>
+                <marker id="sv-live-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
+                  <path d="M0,0 L6,3 L0,6 Z" fill="#f59e0b" />
                 </marker>
               </defs>
               {flowPaths.map((p) => {
@@ -503,13 +582,14 @@ export default function ShortVideoInfiniteCanvas({
                 return (
                   <g
                     key={p.id}
-                    className="cursor-pointer"
+                    className="pointer-events-auto cursor-pointer"
                     onPointerDown={(ev) => {
                       ev.stopPropagation()
                       if (disabled || !linkMode) return
                       setSelectedEdgeId(p.id)
                       setSelectedId(null)
                       setLinkFrom(null)
+                      setLinkWireEnd(null)
                     }}
                     onDoubleClick={(ev) => {
                       ev.stopPropagation()
@@ -518,7 +598,6 @@ export default function ShortVideoInfiniteCanvas({
                       setSelectedEdgeId(null)
                     }}
                   >
-                    {/* 宽命中区 */}
                     <path d={p.d} fill="none" stroke="transparent" strokeWidth="14" />
                     <path
                       d={p.d}
@@ -544,6 +623,17 @@ export default function ShortVideoInfiniteCanvas({
                   </g>
                 )
               })}
+              {liveWirePath ? (
+                <path
+                  d={liveWirePath}
+                  fill="none"
+                  stroke="#f59e0b"
+                  strokeWidth="2.8"
+                  strokeDasharray="5 4"
+                  markerEnd="url(#sv-live-arrow)"
+                  opacity="0.95"
+                />
+              ) : null}
             </svg>
           ) : null}
 
@@ -617,19 +707,27 @@ export default function ShortVideoInfiniteCanvas({
                   <>
                     <button
                       type="button"
+                      data-port-in
                       data-node-action
-                      title="连线入口"
+                      title="连线入口（拖到此处松手）"
                       onPointerDown={(ev) => ev.stopPropagation()}
-                      onClick={(ev) => onPortIn(i, ev)}
-                      className="absolute -left-2 top-1/2 z-[3] h-4 w-4 -translate-y-1/2 rounded-full border-2 border-cyan-500 bg-white shadow hover:scale-110"
+                      className={cn(
+                        'absolute -left-2.5 top-1/2 z-[3] h-5 w-5 -translate-y-1/2 rounded-full border-2 bg-white shadow transition',
+                        hoverInPort === i
+                          ? 'scale-125 border-amber-500 bg-amber-100 ring-2 ring-amber-300'
+                          : 'border-cyan-500 hover:scale-110',
+                      )}
                     />
                     <button
                       type="button"
+                      data-port-out
                       data-node-action
-                      title="连线出口"
-                      onPointerDown={(ev) => ev.stopPropagation()}
-                      onClick={(ev) => onPortOut(i, ev)}
-                      className="absolute -right-2 top-1/2 z-[3] h-4 w-4 -translate-y-1/2 rounded-full border-2 border-sky-500 bg-sky-400 shadow hover:scale-110"
+                      title="按住拖出连线"
+                      onPointerDown={(ev) => onPortOutPointerDown(i, ev)}
+                      className={cn(
+                        'absolute -right-2.5 top-1/2 z-[3] h-5 w-5 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-sky-500 bg-sky-400 shadow hover:scale-110',
+                        linkFrom === i && 'ring-2 ring-amber-400',
+                      )}
                     />
                   </>
                 ) : null}
@@ -698,7 +796,7 @@ export default function ShortVideoInfiniteCanvas({
               <Plus className="h-8 w-8 text-slate-300" />
               <p className="mt-3 text-sm font-medium text-slate-700">画布为空</p>
               <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                填写分镜后可自由连线编排流程，再点「应用流程」同步到生成工作区。
+                按住右侧圆点拖到左侧入口自由连线，再点「应用流程」同步到生成工作区。
               </p>
             </div>
           ) : null}

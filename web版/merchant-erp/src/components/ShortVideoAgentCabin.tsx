@@ -119,7 +119,7 @@ export default function ShortVideoAgentCabin({
     activeMode.id === 'agent'
       ? '开启 Agent 模式，即刻出片'
       : activeMode.id === 'music'
-        ? '音乐 / 配乐：混剪包装精修'
+        ? '音乐 / 配乐：内容匹配曲库'
         : activeMode.id === 'image'
           ? '图片生成：跳转视觉工坊'
           : activeMode.id === 'digital_human'
@@ -129,7 +129,7 @@ export default function ShortVideoAgentCabin({
               : '视频生成 · Seedance 出片'
 
   return (
-    <div ref={wrapRef} className="sv-agent-cabin relative">
+    <div ref={wrapRef} className="sv-agent-cabin relative z-30 overflow-visible">
       <div className="mb-3 text-center">
         <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">{heading}</h2>
         <p className="mt-1 text-sm text-slate-500">
@@ -139,7 +139,7 @@ export default function ShortVideoAgentCabin({
 
       <div
         className={cn(
-          'rounded-[1.75rem] border border-slate-200/90 bg-white/95 p-3 shadow-[0_12px_40px_-16px_rgba(15,23,42,0.18)] ring-1 ring-slate-900/[0.03] backdrop-blur-sm sm:p-4',
+          'relative z-40 overflow-visible rounded-[1.75rem] border border-slate-200/90 bg-white/95 p-3 shadow-[0_12px_40px_-16px_rgba(15,23,42,0.18)] ring-1 ring-slate-900/[0.03] backdrop-blur-sm sm:p-4',
           disabled && 'opacity-70',
         )}
       >
@@ -173,8 +173,8 @@ export default function ShortVideoAgentCabin({
           className="min-h-[108px] w-full resize-y rounded-2xl border-0 bg-transparent px-3 py-2 text-sm leading-relaxed text-slate-800 outline-none placeholder:text-slate-400 disabled:cursor-not-allowed"
         />
 
-        <div className="mt-1 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
-          <div className="relative flex flex-wrap items-center gap-1.5">
+        <div className="relative mt-1 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
               type="button"
               disabled={disabled || busy}
@@ -224,37 +224,6 @@ export default function ShortVideoAgentCabin({
               <Mic className="h-3 w-3" aria-hidden />
               ⌘/Ctrl + Enter 提交
             </span>
-
-            {modeOpen ? (
-              <div className="absolute left-0 top-full z-50 mt-2 w-[min(100vw-2rem,20rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10">
-                {SHORT_VIDEO_STUDIO_MODES.map((m) => {
-                  const Ico = MODE_ICON[m.id]
-                  const selected = m.id === activeMode.id
-                  return (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => {
-                        onStudioModeChange(m.id)
-                        setModeOpen(false)
-                      }}
-                      className={cn(
-                        'flex w-full items-start gap-2.5 rounded-xl px-3 py-2.5 text-left transition hover:bg-cyan-50',
-                        selected && 'bg-cyan-50 ring-1 ring-cyan-200',
-                      )}
-                    >
-                      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
-                        <Ico className="h-3.5 w-3.5" />
-                      </span>
-                      <span>
-                        <span className="block text-sm font-semibold text-slate-900">{m.label}</span>
-                        <span className="block text-[11px] leading-relaxed text-slate-500">{m.description}</span>
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            ) : null}
           </div>
 
           <button
@@ -269,8 +238,40 @@ export default function ShortVideoAgentCabin({
         </div>
       </div>
 
+      {/* 下拉挂在舱体外层，避免被下方导航卡片遮挡 */}
+      {modeOpen ? (
+        <div className="absolute left-0 right-0 top-full z-[80] mt-2 w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl shadow-slate-900/15">
+          {SHORT_VIDEO_STUDIO_MODES.map((m) => {
+            const Ico = MODE_ICON[m.id]
+            const selected = m.id === activeMode.id
+            return (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => {
+                  onStudioModeChange(m.id)
+                  setModeOpen(false)
+                }}
+                className={cn(
+                  'flex w-full items-start gap-2.5 rounded-xl px-3 py-2.5 text-left transition hover:bg-cyan-50',
+                  selected && 'bg-cyan-50 ring-1 ring-cyan-200',
+                )}
+              >
+                <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+                  <Ico className="h-3.5 w-3.5" />
+                </span>
+                <span>
+                  <span className="block text-sm font-semibold text-slate-900">{m.label}</span>
+                  <span className="block text-[11px] leading-relaxed text-slate-500">{m.description}</span>
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      ) : null}
+
       {skillOpen ? (
-        <div className="absolute left-0 right-0 top-[calc(100%-0.5rem)] z-40 mt-2 max-h-96 overflow-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-900/10">
+        <div className="absolute left-0 right-0 top-full z-[80] mt-2 max-h-96 overflow-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl shadow-slate-900/15">
           <input
             type="search"
             value={skillQuery}
