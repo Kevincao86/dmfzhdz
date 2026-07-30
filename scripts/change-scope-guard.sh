@@ -609,6 +609,7 @@ arkVideoContentPayload
 arkVideoModelDiscovery
 arkVideoModelRouter
 merchantVideoAiGateway
+videoAiApi
 change-scope-guard
 PAT
       ;;

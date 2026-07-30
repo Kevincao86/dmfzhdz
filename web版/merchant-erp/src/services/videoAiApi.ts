@@ -330,6 +330,11 @@ async function enrichVideoPostBody(body: Record<string, unknown>): Promise<Recor
 }
 
 const VIDEO_FETCH_TIMEOUT_MS = 45_000
+/**
+ * Seedance 发起：服务端会依次试多个模型（额度/参数失败换模），双参考图更大。
+ * 浏览器 45s 会误报「接口不可达」；须对齐 cs/轻量 Nginx proxy_read_timeout（约 300s）。
+ */
+const VIDEO_SEEDANCE_START_TIMEOUT_MS = 240_000
 /** 分镜策划：服务端单次请求含多轮 AI 重试，须 ≥ 轻量 Nginx proxy_read_timeout（180s） */
 const VIDEO_LONGFORM_PLAN_TIMEOUT_MS = 180_000
 /** 经服务端代理拉取火山/千问 CDN 成片；须 ≥ 轻量 Nginx proxy_read_timeout（180s） */
@@ -341,7 +346,7 @@ const VIDEO_CONFIG_TIMEOUT_MS = 25_000
 function formatVideoFetchNetworkErr(e: unknown): string {
   const raw = e instanceof Error ? e.message : String(e)
   if (/abort|timeout|timed out/i.test(raw)) {
-    return `下载超时（CDN 较慢时可能需要 1–2 分钟，请稍后重试）`
+    return `请求超时（多模型换模/大图上传可能需 1–3 分钟，请稍后重试）`
   }
   return raw.trim() || '网络请求失败'
 }
@@ -1046,8 +1051,9 @@ async function postSeedanceVideoStartOnce(
     '/api/meoo-merchant-ai-video-seedance-start',
     '/api/merchant/ai/video/seedance/start',
   ] as const
+  const netOut: { lastNetworkErr?: string } = {}
   for (const p of paths) {
-    const res = await fetchVideoPost(p, body)
+    const res = await fetchVideoPost(p, body, VIDEO_SEEDANCE_START_TIMEOUT_MS, netOut)
     if (!res) continue
     const j = (await parseJsonSafe<Record<string, unknown>>(res)) ?? {}
     if (!res.ok || !j.ok) {
@@ -1061,10 +1067,11 @@ async function postSeedanceVideoStartOnce(
     const provider = typeof j.provider === 'string' ? j.provider : undefined
     return { ok: true, taskId: tid, modelUsed, provider }
   }
+  const netHint = netOut.lastNetworkErr ? ` 网络细节：${netOut.lastNetworkErr}` : ''
   return {
     ok: false,
     unreachable: true,
-    message: `${prefix} 接口不可达（已尝试 erp-api 与 /api 路径）。若上传了产品图/分镜参考，请缩小图片或刷新后重试；仍失败请联系管理员确认 cs /erp-api 已部署。`,
+    message: `${prefix} 接口不可达（已尝试 erp-api 与 /api 路径）。${netHint}若上传了产品图/分镜参考，请缩小图片或刷新后重试；仍失败请联系管理员确认 cs /erp-api 已部署。`,
   }
 }
 
