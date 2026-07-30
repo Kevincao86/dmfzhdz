@@ -15,6 +15,7 @@ import {
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { cn } from '../cn'
 import {
+  BRIEF_SLOT_LABELS,
   composeSkillPrompt,
   findShortVideoSkill,
   matchSkillsByQuery,
@@ -22,6 +23,7 @@ import {
   type ShortVideoSkill,
   type ShortVideoSkillId,
 } from '../lib/shortVideoSkills'
+import { buildBriefFromInput } from '../lib/shortVideoGenBrief'
 import {
   SHORT_VIDEO_STUDIO_MODES,
   findStudioMode,
@@ -78,6 +80,15 @@ export default function ShortVideoAgentCabin({
   const menuOpen = modeOpen || skillOpen
 
   const skills = useMemo(() => matchSkillsByQuery(skillQuery), [skillQuery])
+  const briefSlotHints = useMemo(() => {
+    if (!activeSkill) return null
+    const brief = buildBriefFromInput(value, activeSkill)
+    return activeSkill.briefSlots.map((slot) => ({
+      slot,
+      label: BRIEF_SLOT_LABELS[slot],
+      filled: !brief.missingSlots.includes(slot),
+    }))
+  }, [activeSkill, value])
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
@@ -188,6 +199,20 @@ export default function ShortVideoAgentCabin({
                 </button>
               </span>
               <span className="text-[11px] text-slate-400">{activeSkill.category}</span>
+              {briefSlotHints?.map((h) => (
+                <span
+                  key={h.slot}
+                  className={cn(
+                    'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1',
+                    h.filled
+                      ? 'bg-emerald-50 text-emerald-800 ring-emerald-200/80'
+                      : 'bg-amber-50 text-amber-900 ring-amber-200/90',
+                  )}
+                  title={h.filled ? `已识别：${h.label}` : `生成前须补充：${h.label}`}
+                >
+                  {h.filled ? '✓' : '!'} {h.label}
+                </span>
+              ))}
             </div>
           ) : null}
 

@@ -44,6 +44,7 @@ import {
   DH_SEEDANCE_SEGMENT_SEC,
   estimateDhTargetDurationSec,
 } from './digitalHumanSeedancePrompt'
+import { buildBriefFromInput, validateBriefFidelity } from './shortVideoGenBrief'
 import { buildSeedanceFlagsLine } from './shortVideoRenderFlags'
 import {
   buildMotionTimeline,
@@ -350,6 +351,18 @@ async function renderWithSeedance(
     }
   }
 
+  // 意图保真：口播须含可识别卖点/场景关键词（无 Skill 时宽松：文案够长即过）
+  const fidelityBrief = buildBriefFromInput(script, null)
+  if (!isAudioDrive) {
+    const fidelity = validateBriefFidelity(fidelityBrief, { prompt: script, skill: null })
+    const hard = fidelity.issues.filter(
+      (x) => x.includes('过短') || x.includes('补全') || x.includes('意图保真'),
+    )
+    if (hard.length > 0 && script.length < 24) {
+      return { ok: false, message: hard.join('；') }
+    }
+  }
+
   const activeSceneShots =
     draft.multiScene && Array.isArray(draft.sceneShots) && draft.sceneShots.length >= 2
       ? draft.sceneShots
@@ -544,6 +557,7 @@ async function renderWithSeedance(
       gesturePreset: segmentGesture,
       continuation: i > 0 && draft.avatarKind === 'video_clone' && !sceneShot,
       hasProductFusion: useProductFusion,
+      fidelityBrief,
     })
 
     const job = await runShortVideoJobWithFailover({

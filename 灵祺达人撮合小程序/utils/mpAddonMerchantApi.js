@@ -277,6 +277,31 @@ async function pollVideoTask(fetchStatus, taskId, onProgress, maxTries) {
   return { ok: false, message: '生成超时，请稍后在星选平台查看' }
 }
 
+/** 长片分镜策划（与 ERP 小程序 videoAiMp 同源路径） */
+async function postLongformVideoPlan(body) {
+  const tries = [
+    '/api/meoo-merchant-ai-video-longform-plan',
+    '/api/merchant/ai/video/longform/plan',
+  ]
+  let lastErr = ''
+  for (const p of tries) {
+    const r = await postPaths([p], body, mpAuthHeaders())
+    if (!r.ok) {
+      lastErr = r.message || '长片策划失败'
+      if (/404|not found/i.test(lastErr)) continue
+      continue
+    }
+    const d = r.data || {}
+    if (d && d.ok && Array.isArray(d.prompts)) {
+      const prompts = d.prompts.map((x) => String(x).trim()).filter(Boolean)
+      if (prompts.length) return { ok: true, prompts, scriptSegments: d.scriptSegments }
+      return { ok: false, message: '分段提示词为空' }
+    }
+    lastErr = d.message || '长片策划失败'
+  }
+  return { ok: false, message: lastErr || '长片策划接口未部署' }
+}
+
 module.exports = {
   TEXT_MODELS,
   hasDouyinLinkeToken,
@@ -291,4 +316,5 @@ module.exports = {
   postDigitalHumanTts,
   postDhS2vStart,
   fetchDhS2vStatus,
+  postLongformVideoPlan,
 }

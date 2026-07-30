@@ -3,6 +3,7 @@ const media = require('../../utils/mpAddonMedia.js')
 const iceApi = require('../../utils/mpAddonIceApi.js')
 const addonApi = require('../../utils/mpAddonMerchantApi.js')
 const mpPointsSpend = require('../../utils/mpPointsSpendApi.js')
+const videoGenBrief = require('../../utils/videoGenBrief.js')
 
 function newJobId() {
   return `ice-${Date.now()}-${Math.floor(Math.random() * 10000)}`
@@ -133,7 +134,7 @@ Page({
   },
   async onGenerate() {
     const pane = this.data.mainPane
-    const prompt = String(pane === 'optimize' ? this.data.optPrompt : this.data.genPrompt).trim()
+    let prompt = String(pane === 'optimize' ? this.data.optPrompt : this.data.genPrompt).trim()
     if (!prompt) {
       wx.showToast({ title: '请填写提示词', icon: 'none' })
       return
@@ -142,7 +143,17 @@ Page({
       wx.showToast({ title: '请先上传参考画面', icon: 'none' })
       return
     }
+    const gate = videoGenBrief.prepareBriefGate(prompt, null)
+    if (!gate.ok) {
+      this.setData({ err: gate.message })
+      wx.showToast({ title: String(gate.message || '请补充卖点').slice(0, 28), icon: 'none' })
+      return
+    }
+    prompt = gate.guidance
+    if (pane === 'optimize') this.setData({ optPrompt: prompt })
+    else this.setData({ genPrompt: prompt })
     const durationSec = Math.max(1, Math.ceil(Number(this.data.durationSec) || 5))
+    const wantLongform = pane === 'generate' && (Boolean(this.data.longformEnabled) || durationSec >= 15)
     try {
       await mpPointsSpend.assertAddonAffordable('shortvideo', durationSec)
     } catch (e) {
@@ -152,8 +163,32 @@ Page({
     this._cancelled = false
     this.setData({ busy: true, err: '', progress: '提交任务…', resultUrl: '' })
     try {
+      let finalPrompt = prompt
+      if (wantLongform) {
+        this.setData({ progress: '规划分镜…' })
+        const plan = await addonApi.postLongformVideoPlan({
+          overallPrompt: prompt,
+          targetTotalSec: Math.min(60, Math.max(15, durationSec)),
+          segmentSec: 5,
+          mode: this.data.framePureB64 ? 'generate_frames' : 'generate_text',
+          forceAiPlanner: true,
+        })
+        if (!plan.ok) {
+          this.setData({ err: plan.message || '分镜规划失败' })
+          return
+        }
+        finalPrompt = (plan.prompts && plan.prompts[0]) || prompt
+        const fidelity = videoGenBrief.validateBriefFidelity(gate.brief, (plan.prompts || []).join('\n'))
+        const hard = (fidelity.issues || []).filter(function (x) {
+          return /意图保真|过短|补全/.test(x)
+        })
+        if (hard.length) {
+          this.setData({ err: hard.join('；') })
+          return
+        }
+      }
       const body = {
-        prompt,
+        prompt: finalPrompt,
         flags: this.flagsLine(),
         images_base64: pane === 'optimize' || this.data.framePureB64 ? [this.data.framePureB64] : undefined,
       }
