@@ -19,7 +19,23 @@ import {
 import { filterRegistryForTenant } from './tenantRegistryScope'
 import { fetchPrimaryTenantId } from './tenantBilling'
 
-const REGISTRY_FETCH_TIMEOUT_MS = 18_000
+const REGISTRY_FETCH_TIMEOUT_MS = 45_000
+
+function isAbortLikeError(e: unknown): boolean {
+  if (typeof DOMException !== 'undefined' && e instanceof DOMException && e.name === 'AbortError') {
+    return true
+  }
+  if (e instanceof Error) {
+    if (e.name === 'AbortError' || e.name === 'TimeoutError') return true
+    return /aborted|abort|timed?\s*out|timeout/i.test(e.message)
+  }
+  return /aborted|abort|timed?\s*out|timeout/i.test(String(e))
+}
+
+function registryFetchErrorMessage(e: unknown): string {
+  if (isAbortLikeError(e)) return '注册表加载超时，请稍后重试'
+  return e instanceof Error ? e.message : String(e)
+}
 
 function registryFetchSignal(): AbortSignal {
   const AS = AbortSignal as typeof AbortSignal & { timeout?: (n: number) => AbortSignal }
@@ -79,7 +95,7 @@ async function fetchRegistryAt(path: string): Promise<RegistryFile> {
         lastErr = 'registry_non_json'
       }
     } catch (e) {
-      lastErr = e instanceof Error ? e.message : String(e)
+      lastErr = registryFetchErrorMessage(e)
     }
   }
   throw new Error(lastErr)
