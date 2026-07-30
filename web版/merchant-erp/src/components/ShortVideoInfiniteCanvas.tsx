@@ -298,6 +298,7 @@ export default function ShortVideoInfiniteCanvas({
     e.stopPropagation()
     e.preventDefault()
     if (disabled || !linkMode) return
+    window.getSelection()?.removeAllRanges()
     const viewport = viewportRef.current
     if (!viewport) return
     viewport.setPointerCapture(e.pointerId)
@@ -323,6 +324,10 @@ export default function ShortVideoInfiniteCanvas({
     if (target.closest('[data-port-out]') || target.closest('[data-port-in]')) return
     if (target.closest('[data-node-action]')) return
     if (target.closest('input, textarea, select, button, a, [contenteditable="true"]')) return
+
+    // 拖节点/平移时禁止原生文字选中（否则多镜文字会一起变蓝）
+    window.getSelection()?.removeAllRanges()
+    e.preventDefault()
 
     const nodeEl = target.closest('[data-canvas-node]') as HTMLElement | null
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
@@ -588,7 +593,7 @@ export default function ShortVideoInfiniteCanvas({
       <div
         ref={viewportRef}
         className={cn(
-          'relative h-[min(62vh,560px)] w-full touch-none overflow-hidden',
+          'relative h-[min(62vh,560px)] w-full touch-none select-none overflow-hidden',
           panning ? 'cursor-grabbing' : 'cursor-grab',
         )}
         onWheel={onWheel}
@@ -689,8 +694,9 @@ export default function ShortVideoInfiniteCanvas({
                 data-canvas-node
                 data-node-id={id}
                 className={cn(
-                  'absolute cursor-grab overflow-hidden rounded-xl border bg-white shadow-lg shadow-slate-900/10 active:cursor-grabbing',
+                  'absolute overflow-hidden rounded-xl border bg-white shadow-lg shadow-slate-900/10 active:cursor-grabbing select-none',
                   selected ? 'border-cyan-400 ring-2 ring-cyan-400/40' : 'border-white ring-1 ring-slate-200',
+                  'cursor-grab',
                 )}
                 style={{ left: p.x, top: p.y, width: NODE_W, height: NODE_H }}
               >
@@ -743,7 +749,7 @@ export default function ShortVideoInfiniteCanvas({
                 }}
                 className={cn(
                   'absolute overflow-visible rounded-xl border bg-gradient-to-br from-white to-cyan-50/80 text-left shadow-lg shadow-cyan-900/5',
-                  editing ? 'cursor-default z-[5]' : 'cursor-grab active:cursor-grabbing',
+                  editing ? 'cursor-default z-[5] select-text' : 'cursor-grab active:cursor-grabbing select-none',
                   selected || editing
                     ? 'border-cyan-400 ring-2 ring-cyan-400/40'
                     : 'border-cyan-200/80 ring-1 ring-cyan-100',
