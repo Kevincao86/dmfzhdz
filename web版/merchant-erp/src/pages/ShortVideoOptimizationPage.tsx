@@ -23,6 +23,7 @@ import ShortVideoInfiniteCanvas, {
 } from '../components/ShortVideoInfiniteCanvas'
 import ShortVideoMusicStudio from '../components/ShortVideoMusicStudio'
 import type { ShortVideoCaseItem } from '../lib/shortVideoCaseGallery'
+import { SHORT_VIDEO_CASES, canvasLocalLifeCases } from '../lib/shortVideoCaseGallery'
 import type { ShortVideoMusicTrack } from '../lib/shortVideoMusicLibrary'
 import { findShortVideoSkill, type ShortVideoSkillId } from '../lib/shortVideoSkills'
 import {
@@ -1709,28 +1710,49 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     setHint('已停止等待；后台任务可能不会自动取消。')
   }
 
-  const applyStudioCase = useCallback(
-    (item: ShortVideoCaseItem) => {
+  /** 无限画布「做同款」：写入分镜节点 + 顺序连线路径，停留在画布 */
+  const applyCanvasCase = useCallback((item: ShortVideoCaseItem) => {
+    const rows = item.canvasScriptRows
+    if (!rows || rows.length < 2) {
       setErr(null)
       setGenPrompt(item.prompt)
       setActiveSkillId(item.skillId ?? null)
       setSdAspect(item.aspect)
-      // 案例墙预览片约 5s；套用时默认短片 15s，避免被抬成 60s 长视频
       setLongformEnabled(false)
       setSdDurationSec('15')
       setMainPane('generate')
       setHint(`已套用案例「${item.title}」，可继续编辑参数后生成`)
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  )
+      return
+    }
+    setErr(null)
+    setGenPrompt(item.prompt)
+    setActiveSkillId(item.skillId ?? null)
+    setSdAspect(item.aspect)
+    setLongformEnabled(false)
+    setSdDurationSec('15')
+    setScriptRows(rows.map((r) => ({ ...r })))
+    setShotMediaIds(rows.map(() => [] as string[]))
+    setCanvasFlowEpoch((v) => v + 1)
+    setStudioMode('canvas')
+    setMainPane('canvas')
+    const pathLabel = rows.map((_, i) => i + 1).join('→')
+    setHint(
+      `已套用「${item.title}」画布路径（${pathLabel}）${
+        item.hasNarration ? ' · 含配音案例' : ''
+      }，可改连线后点「应用流程」或去短片生成`,
+    )
+    queueMicrotask(() => {
+      document
+        .querySelector('.sv-infinite-canvas')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+  }, [])
 
-  /** 无限画布「做同款」：写入分镜节点 + 顺序连线路径，停留在画布 */
-  const applyCanvasCase = useCallback(
+  const applyStudioCase = useCallback(
     (item: ShortVideoCaseItem) => {
-      const rows = item.canvasScriptRows
-      if (!rows || rows.length < 2) {
-        applyStudioCase(item)
+      // 有画布路径的案例：直接铺镜头节点 + 连线，避免再点「打开无限画布」仍是空的
+      if ((item.canvasScriptRows?.length ?? 0) >= 2) {
+        applyCanvasCase(item)
         return
       }
       setErr(null)
@@ -1739,24 +1761,71 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       setSdAspect(item.aspect)
       setLongformEnabled(false)
       setSdDurationSec('15')
+      setMainPane('generate')
+      setHint(`已套用案例「${item.title}」，可继续编辑参数后生成`)
+    },
+    [applyCanvasCase],
+  )
+
+  /** 打开画布时：若已套用技能/文案对应案例有路径，而当前分镜仍是空壳，则自动铺路径 */
+  const ensureCanvasPathFromContext = useCallback(() => {
+    const local = canvasLocalLifeCases()
+    let item =
+      local.find((c) => c.skillId && c.skillId === activeSkillId) ||
+      SHORT_VIDEO_CASES.find(
+        (c) =>
+          (c.canvasScriptRows?.length ?? 0) >= 2 &&
+          c.skillId &&
+          c.skillId === activeSkillId,
+      ) ||
+      null
+    const prompt = genPrompt.trim()
+    if (!item && prompt) {
+      item =
+        SHORT_VIDEO_CASES.find(
+          (c) =>
+            (c.canvasScriptRows?.length ?? 0) >= 2 &&
+            (c.prompt.trim() === prompt || prompt.includes(c.prompt.trim().slice(0, 40))),
+        ) || null
+    }
+    const rows = item?.canvasScriptRows
+    if (!item || !rows || rows.length < 2) return false
+
+    const filled = isScriptRowsUsable(scriptRows)
+    const samePath =
+      scriptRows.length === rows.length &&
+      scriptRows.every(
+        (r, i) =>
+          r.visual.trim() === (rows[i]?.visual ?? '').trim() &&
+          r.dialogue.trim() === (rows[i]?.dialogue ?? '').trim(),
+      )
+    if (filled && samePath) return true
+    // 分镜未实质填写（空壳默认行）时，用案例路径覆盖
+    if (!filled || scriptRows.every((r) => !r.visual.trim() && !r.dialogue.trim())) {
       setScriptRows(rows.map((r) => ({ ...r })))
       setShotMediaIds(rows.map(() => [] as string[]))
       setCanvasFlowEpoch((v) => v + 1)
-      setMainPane('canvas')
-      const pathLabel = rows.map((_, i) => i + 1).join('→')
       setHint(
-        `已套用「${item.title}」画布路径（${pathLabel}）${
-          item.hasNarration ? ' · 含配音案例' : ''
-        }，可改连线后点「应用流程」或去短片生成`,
+        `已根据「${item.title}」自动生成画布路径（${rows.map((_, i) => i + 1).join('→')}）`,
       )
-      queueMicrotask(() => {
-        document
-          .querySelector('.sv-infinite-canvas')
-          ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      })
-    },
-    [applyStudioCase],
-  )
+      return true
+    }
+    return false
+  }, [activeSkillId, genPrompt, scriptRows])
+
+  const openInfiniteCanvas = useCallback(() => {
+    const applied = ensureCanvasPathFromContext()
+    setStudioMode('canvas')
+    setMainPane('canvas')
+    if (!applied) {
+      setHint('已进入无限画布：可拖拽连线编排分镜，应用流程后回写短片生成区')
+    }
+    queueMicrotask(() => {
+      document
+        .querySelector('.sv-infinite-canvas')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+  }, [ensureCanvasPathFromContext])
 
   const onStudioModeChange = (id: ShortVideoStudioModeId) => {
     setStudioMode(id)
@@ -1774,10 +1843,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       } else if (mode.pane === 'cloud_batch') {
         setHint('已切换到 AI混剪：多素材拼接与包装精修')
       } else if (mode.pane === 'canvas') {
-        if (longformEnabled || isScriptRowsUsable(scriptRows)) {
-          syncGenerateWorkspaceFromCanvas(scriptRows)
-        }
-        setHint('已进入无限画布：可拖拽路径连线编排分镜，应用流程后回写短片生成区')
+        openInfiniteCanvas()
       } else {
         setHint(`已切换到${mode.label}`)
       }
@@ -1802,7 +1868,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       return
     }
     if (mode.pane === 'canvas') {
-      setMainPane('canvas')
+      openInfiniteCanvas()
       return
     }
 
@@ -2039,9 +2105,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
                     <button
                       type="button"
                       onClick={() => {
-                        syncGenerateWorkspaceFromCanvas(scriptRows)
-                        setMainPane('canvas')
-                        setHint('已在无限画布中查看分镜；连线后点「应用流程」可回写')
+                        openInfiniteCanvas()
                       }}
                       className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
                     >
