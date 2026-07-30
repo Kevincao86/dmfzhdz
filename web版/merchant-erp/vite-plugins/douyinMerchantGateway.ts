@@ -31,6 +31,9 @@
  * 门店基础信息更新（异步）：POST goodlife/v1/poi/poi/update/ — 生产后端按需代理。
  * @see https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/life.capacity.shop/poi.update
  *
+ * 门店装修（头图/五连图等，异步）：POST goodlife/v1/poi/poi/decorate/ — scope life.capacity.poi.decorate
+ * @see https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/life.capacity.shop/poi.decorate
+ *
  * 能力授权与门店绑定：见抖音「auth_with_bind」文档（生产网关实现）。
  *
  * 出口 IP 需固定时：在部署环境设置 `DOUYIN_OPENAPI_BASE_URL` 为自建反代根（如 `http://<EIP>/douyin`），路径仍与官方一致。
@@ -2316,6 +2319,169 @@ export async function handleDouyinPoiClaimPost(
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     json(res, 502, { message: `抖音认领/亮照提交失败：${msg}` })
+  }
+}
+
+function normalizeDecorateHeadImages(raw: unknown): { url: string; sort_value: number }[] {
+  if (!Array.isArray(raw)) return []
+  const out: { url: string; sort_value: number }[] = []
+  for (let i = 0; i < raw.length; i++) {
+    const item = raw[i]
+    if (typeof item === 'string') {
+      const url = item.trim()
+      if (/^https:\/\//i.test(url)) out.push({ url, sort_value: i + 1 })
+      continue
+    }
+    if (item && typeof item === 'object') {
+      const o = item as Record<string, unknown>
+      const url = String(o.url ?? o.image_url ?? o.imageUrl ?? '').trim()
+      if (!/^https:\/\//i.test(url)) continue
+      const sv = Number(o.sort_value ?? o.sortValue ?? i + 1)
+      out.push({ url, sort_value: Number.isFinite(sv) && sv > 0 ? Math.floor(sv) : i + 1 })
+    }
+  }
+  return out
+}
+
+/**
+ * 提交门店装修任务（五连图头图等）。
+ * 官方：POST /goodlife/v1/poi/poi/decorate/（异步，可用 task/query 查结果）。
+ *
+ * ERP 简化体：
+ * `{ poiId, thirdId?, headImages: string[] | {url,sort_value?}[], waitTask?: boolean }`
+ * 或透传官方 `{ datas: [...] }`。
+ */
+export async function handleDouyinPoiDecoratePost(
+  req: IncomingMessage,
+  res: ServerResponse,
+  bodyRaw: string,
+): Promise<void> {
+  const auth = req.headers.authorization?.match(/^Bearer\s+(\S+)/i)?.[1]
+  if (!auth) {
+    json(res, 401, { message: '缺少 Authorization: Bearer <绑定返回的 accessToken>' })
+    return
+  }
+  const session = resolveSession(auth)
+  if (!session) {
+    json(res, 401, { message: '会话无效或已失效，请重新绑定' })
+    return
+  }
+  let body: unknown
+  try {
+    body = JSON.parse(bodyRaw || '{}') as unknown
+  } catch {
+    json(res, 400, { message: '请求体须为 JSON' })
+    return
+  }
+  if (!body || typeof body !== 'object') {
+    json(res, 400, { message: '请求体格式错误' })
+    return
+  }
+  const b = body as Record<string, unknown>
+  let payload: Record<string, unknown>
+  let waitTask = b.waitTask === true || b.wait_task === true
+
+  if (Array.isArray(b.datas) && b.datas.length > 0) {
+    payload = { datas: b.datas }
+  } else {
+    const poiId = String(b.poiId ?? b.poi_id ?? '').trim()
+    if (!poiId) {
+      json(res, 400, {
+        message:
+          '请提供 poiId（或官方 datas）。字段对应抖音「提交门店装修任务」OpenAPI（life.capacity.poi.decorate）。',
+      })
+      return
+    }
+    const thirdId = String(b.thirdId ?? b.third_id ?? poiId).trim() || poiId
+    const headImages = normalizeDecorateHeadImages(b.headImages ?? b.head_images)
+    if (headImages.length === 0) {
+      json(res, 400, {
+        message: 'headImages 须为 1～10 个 https 图片 URL（五连图建议恰好 5 张，按 sort_value 排序）。',
+      })
+      return
+    }
+    if (headImages.length > 10) {
+      json(res, 400, { message: 'headImages 最多 10 张' })
+      return
+    }
+    const decoration: Record<string, unknown> = { head_images: headImages }
+    const coverImages = normalizeDecorateHeadImages(b.coverImages ?? b.cover_images)
+    if (coverImages.length) decoration.cover_images = coverImages
+    payload = {
+      datas: [
+        {
+          third_id: thirdId,
+          poi_id: poiId,
+          decoration,
+        },
+      ],
+    }
+  }
+
+  try {
+    const token = await ensureDouyinToken(session)
+    const dr = await douyinServerFetch(douyinOpenApiUrl('/goodlife/v1/poi/poi/decorate/'), {
+      method: 'POST',
+      headers: {
+        'access-token': token,
+        'content-type': 'application/json',
+        'Rpc-Transit-Life-Account': session.merchantId,
+      },
+      body: JSON.stringify(payload),
+    })
+    const raw = await dr.text()
+    const j = parseDouyinJson(raw) as Record<string, unknown>
+    if (!dr.ok) {
+      json(res, dr.status >= 400 && dr.status < 600 ? dr.status : 502, {
+        ok: false,
+        message: `抖音门店装修 HTTP ${dr.status}：${raw.slice(0, 400)}`,
+        upstream: j,
+      })
+      return
+    }
+    const err = getDataError(j)
+    if (!err.ok) {
+      json(res, 502, {
+        ok: false,
+        message: err.msg ?? '抖音门店装修业务错误（请确认应用已开通 life.capacity.poi.decorate 且商家已授权）',
+        upstream: j,
+      })
+      return
+    }
+
+    const data = j.data && typeof j.data === 'object' ? (j.data as Record<string, unknown>) : {}
+    const tasks = Array.isArray(data.tasks) ? data.tasks : []
+    const taskIds: string[] = []
+    for (const t of tasks) {
+      if (!t || typeof t !== 'object') continue
+      const tid = (t as Record<string, unknown>).task_id
+      if (tid != null && String(tid).trim()) taskIds.push(String(tid).trim())
+    }
+
+    let taskQuery: Record<string, unknown> | undefined
+    if (waitTask && taskIds.length > 0) {
+      await new Promise((r) => setTimeout(r, 1200))
+      const tq = await poiTaskQueryGet(taskIds, token, session.merchantId)
+      if (tq.ok) taskQuery = tq.body
+      else taskQuery = { ok: false, message: tq.message }
+    }
+
+    clearSessionPoiCache(auth)
+    json(res, 200, {
+      ok: true,
+      message: '已提交抖音门店装修任务（头图/五连图），结果以 task/query 与来客后台为准。',
+      taskIds,
+      poiIds: tasks
+        .map((t) =>
+          t && typeof t === 'object' ? String((t as Record<string, unknown>).poi_id ?? '').trim() : '',
+        )
+        .filter(Boolean),
+      ...(taskQuery ? { taskQuery } : {}),
+      upstream: j,
+    })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    json(res, 502, { ok: false, message: `抖音门店装修提交失败：${msg}` })
   }
 }
 

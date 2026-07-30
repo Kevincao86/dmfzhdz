@@ -190,6 +190,10 @@
       "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 60
     },
+    "api/meoo-douyin-poi-decorate.ts": {
+      "includeFiles": "{vite-plugins,src/lib}/**",
+      "maxDuration": 60
+    },
     "api/meoo-kuaishou-goods-product-save.ts": {
       "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 120

@@ -18,6 +18,7 @@ import {
   handleDouyinGoodsProductTypesGet,
   handleDouyinGoodsTemplateGetGet,
   handleDouyinPoiClaimPost,
+  handleDouyinPoiDecoratePost,
   handleDouyinStoreDecorationGet,
   handleDouyinStoreDetailGet,
   handleDouyinStoresGet,
@@ -583,6 +584,12 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
 
       if (method === 'GET' && pathname === '/api/merchant/douyin/store-decoration') {
         await handleDouyinStoreDecorationGet(req, res, url)
+        return true
+      }
+
+      if (method === 'POST' && pathname === '/api/merchant/douyin/store-decoration/decorate') {
+        const bodyRaw = await bodyReader()
+        await handleDouyinPoiDecoratePost(req, res, bodyRaw)
         return true
       }
 
