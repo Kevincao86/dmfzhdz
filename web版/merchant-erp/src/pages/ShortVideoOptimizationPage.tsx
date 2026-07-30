@@ -5,11 +5,9 @@ import {
   Eye,
   Film,
   Focus,
-  ImagePlus,
   LayoutGrid,
   Loader2,
   PauseCircle,
-  Sparkles,
   Wand2,
   Wrench,
   X,
@@ -95,7 +93,6 @@ import {
   planLongformSegmentDurations,
   LONGFORM_SEGMENT_UNIT_SEC,
   planLongformAllFiveSecondDurations,
-  formatLongformDurationPlanLabel,
   pickLongformSegmentDurationSec,
   resizeScriptRowsForDurationPlan,
   resolveGuidanceScriptRowCount,
@@ -435,7 +432,6 @@ export default function ShortVideoOptimizationPage() {
     defaultScriptRows(2, 15),
   )
   const [storyFrames, setStoryFrames] = useState<StoryFrameItem[]>([])
-  const [storyDropActive, setStoryDropActive] = useState(false)
   const generationBillIdRef = useRef('')
 
   const ensureShortVideoPointsAffordable = async (durationSec: number): Promise<boolean> => {
