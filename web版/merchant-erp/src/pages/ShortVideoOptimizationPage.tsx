@@ -2267,6 +2267,17 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
                   ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
               })
             }}
+            onAddScriptRow={() => {
+              setScriptRows((prev) => {
+                const next = appendEmptyScriptRow(prev, activeScriptSegmentSec)
+                if (next === prev) {
+                  setHint('分镜已达上限 12 段，请先删除再新增')
+                  return prev
+                }
+                setHint(`已新增镜头 ${next.length}（可自由拖动、连线后点「应用流程」）`)
+                return next
+              })
+            }}
             onRemoveScriptRow={(index) => {
               setScriptRows((prev) => {
                 const next = removeScriptRowAt(prev, index, 1)
