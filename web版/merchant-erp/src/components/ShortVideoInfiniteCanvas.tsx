@@ -1,4 +1,5 @@
 import {
+  Check,
   Film,
   Focus,
   GitBranch,
@@ -32,7 +33,10 @@ export type ShortVideoInfiniteCanvasProps = {
   disabled?: boolean
   /** 父级应用流程后递增，画布重置为新顺序的顺序连线 */
   flowEpoch?: number
+  /** @deprecated 优先用 onChangeScriptRow 在画布内编辑 */
   onEditRow?: (index: number) => void
+  /** 画布内就地改分镜字段，不跳转短片生成页 */
+  onChangeScriptRow?: (index: number, patch: Partial<ShortVideoScriptRow>) => void
   onRemoveScriptRow?: (index: number) => void
   onRemoveMedia?: (id: string) => void
   /** 按连线拓扑序重排分镜并写回流程 */
@@ -49,6 +53,8 @@ const GAP_X = 56
 const GAP_Y = 48
 const SCRIPT_W = NODE_W + 28
 const SCRIPT_H = NODE_H + 36
+/** 就地编辑时节点加高，容纳画面/口播输入 */
+const SCRIPT_H_EDIT = 248
 
 function defaultMediaPos(index: number): Pt {
   return {
@@ -104,6 +110,7 @@ export default function ShortVideoInfiniteCanvas({
   disabled,
   flowEpoch = 0,
   onEditRow,
+  onChangeScriptRow,
   onRemoveScriptRow,
   onRemoveMedia,
   onApplyFlowOrder,
@@ -121,6 +128,8 @@ export default function ShortVideoInfiniteCanvas({
   const [linkWireEnd, setLinkWireEnd] = useState<Pt | null>(null)
   const [hoverInPort, setHoverInPort] = useState<number | null>(null)
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null)
+  /** 画布内正在编辑的分镜下标 */
+  const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const lastFlowEpochRef = useRef(flowEpoch)
 
   const dragRef = useRef<{
@@ -191,6 +200,7 @@ export default function ShortVideoInfiniteCanvas({
     })
     setLinkFrom(null)
     setSelectedEdgeId(null)
+    setEditingIndex((cur) => (cur != null && cur >= n ? null : cur))
   }, [n, scriptKey])
 
   // 父级应用流程后：分镜已按拓扑重排，连线恢复为新顺序 1→2→…
@@ -223,10 +233,20 @@ export default function ShortVideoInfiniteCanvas({
   }
 
   const tryOpenEdit = (nodeId: string) => {
+    if (disabled) return
     const m = /^script:(\d+)$/.exec(nodeId)
     if (!m) return
-    onEditRow?.(Number(m[1]))
+    const idx = Number(m[1])
+    if (onChangeScriptRow) {
+      setEditingIndex((cur) => (cur === idx ? null : idx))
+      setSelectedId(nodeId)
+      return
+    }
+    onEditRow?.(idx)
   }
+
+  const scriptNodeHeight = (index: number) =>
+    editingIndex === index ? SCRIPT_H_EDIT : SCRIPT_H
 
   const addEdge = (from: number, to: number) => {
     if (from === to) return
@@ -242,13 +262,15 @@ export default function ShortVideoInfiniteCanvas({
   const portOutWorld = (index: number): Pt => {
     const id = `script:${index}`
     const p = nodePosMap[id] || defaultScriptPos(index, mediaNodes.length)
-    return { x: p.x + SCRIPT_W, y: p.y + SCRIPT_H / 2 }
+    const h = scriptNodeHeight(index)
+    return { x: p.x + SCRIPT_W, y: p.y + h / 2 }
   }
 
   const portInWorld = (index: number): Pt => {
     const id = `script:${index}`
     const p = nodePosMap[id] || defaultScriptPos(index, mediaNodes.length)
-    return { x: p.x, y: p.y + SCRIPT_H / 2 }
+    const h = scriptNodeHeight(index)
+    return { x: p.x, y: p.y + h / 2 }
   }
 
   const hitTestInPort = (world: Pt): number | null => {
@@ -297,12 +319,16 @@ export default function ShortVideoInfiniteCanvas({
     const target = e.target as HTMLElement
     if (target.closest('[data-port-out]') || target.closest('[data-port-in]')) return
     if (target.closest('[data-node-action]')) return
+    if (target.closest('input, textarea, select, button, a, [contenteditable="true"]')) return
 
     const nodeEl = target.closest('[data-canvas-node]') as HTMLElement | null
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
 
     if (nodeEl?.dataset.nodeId && nodeEl.dataset.nodeId !== 'empty') {
       const nodeId = nodeEl.dataset.nodeId
+      // 编辑中的节点禁止拖拽，避免误移
+      const editMatch = /^script:(\d+)$/.exec(nodeId)
+      if (editMatch && editingIndex === Number(editMatch[1])) return
       const pos = nodePosMap[nodeId] || { x: 0, y: 0 }
       const world = clientToWorld(e.clientX, e.clientY)
       dragRef.current = {
@@ -325,6 +351,7 @@ export default function ShortVideoInfiniteCanvas({
     }
     setPanning(true)
     setSelectedId(null)
+    setEditingIndex(null)
     setLinkFrom(null)
     setLinkWireEnd(null)
     setHoverInPort(null)
@@ -685,6 +712,8 @@ export default function ShortVideoInfiniteCanvas({
             const id = `script:${i}`
             const p = nodePosMap[id] || defaultScriptPos(i, mediaNodes.length)
             const selected = selectedId === id || linkFrom === i
+            const editing = editingIndex === i
+            const nodeH = scriptNodeHeight(i)
             return (
               <div
                 key={id}
@@ -693,14 +722,18 @@ export default function ShortVideoInfiniteCanvas({
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
+                  if (editing) return
                   if (e.key === 'Enter') tryOpenEdit(id)
                   if (e.key === 'Backspace' || e.key === 'Delete') onRemoveScriptRow?.(i)
                 }}
                 className={cn(
-                  'absolute cursor-grab overflow-visible rounded-xl border bg-gradient-to-br from-white to-cyan-50/80 text-left shadow-lg shadow-cyan-900/5 active:cursor-grabbing',
-                  selected ? 'border-cyan-400 ring-2 ring-cyan-400/40' : 'border-cyan-200/80 ring-1 ring-cyan-100',
+                  'absolute overflow-visible rounded-xl border bg-gradient-to-br from-white to-cyan-50/80 text-left shadow-lg shadow-cyan-900/5',
+                  editing ? 'cursor-default z-[5]' : 'cursor-grab active:cursor-grabbing',
+                  selected || editing
+                    ? 'border-cyan-400 ring-2 ring-cyan-400/40'
+                    : 'border-cyan-200/80 ring-1 ring-cyan-100',
                 )}
-                style={{ left: p.x, top: p.y, width: SCRIPT_W, height: SCRIPT_H }}
+                style={{ left: p.x, top: p.y, width: SCRIPT_W, height: nodeH }}
               >
                 {/* 入口 / 出口连线桩 */}
                 {linkMode ? (
@@ -732,37 +765,59 @@ export default function ShortVideoInfiniteCanvas({
                   </>
                 ) : null}
 
-                <div className="overflow-hidden rounded-xl">
-                  <div className="flex items-center justify-between gap-1 border-b border-cyan-100/80 bg-cyan-500/10 px-2 py-1.5">
+                <div className="flex h-full flex-col overflow-hidden rounded-xl">
+                  <div className="flex shrink-0 items-center justify-between gap-1 border-b border-cyan-100/80 bg-cyan-500/10 px-2 py-1.5">
                     <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-cyan-900">
                       <Film className="h-3 w-3" />
                       镜 {i + 1}
                     </span>
                     <span className="flex items-center gap-0.5">
-                      <span className="mr-1 text-[10px] tabular-nums text-cyan-800/80">{row.timeRange || '—'}</span>
+                      {editing ? (
+                        <input
+                          type="text"
+                          data-node-action
+                          disabled={disabled}
+                          value={row.timeRange}
+                          aria-label="时间段"
+                          placeholder="0-15秒"
+                          onPointerDown={(ev) => ev.stopPropagation()}
+                          onChange={(ev) => onChangeScriptRow?.(i, { timeRange: ev.target.value })}
+                          className="mr-1 w-[4.5rem] rounded border border-cyan-200 bg-white px-1 py-0.5 text-[10px] tabular-nums text-cyan-900 outline-none ring-cyan-400/40 focus:ring-1"
+                        />
+                      ) : (
+                        <span className="mr-1 text-[10px] tabular-nums text-cyan-800/80">
+                          {row.timeRange || '—'}
+                        </span>
+                      )}
                       <button
                         type="button"
                         data-node-action
                         disabled={disabled}
-                        aria-label="编辑分镜"
+                        aria-label={editing ? '完成编辑' : '编辑分镜'}
+                        title={editing ? '完成' : '在画布内编辑'}
                         onPointerDown={(ev) => ev.stopPropagation()}
                         onClick={(ev) => {
                           ev.stopPropagation()
-                          tryOpenEdit(id)
+                          if (editing) setEditingIndex(null)
+                          else tryOpenEdit(id)
                         }}
-                        className="rounded-md p-1 text-cyan-800 hover:bg-cyan-100"
+                        className={cn(
+                          'rounded-md p-1 text-cyan-800 hover:bg-cyan-100',
+                          editing && 'bg-cyan-200/80',
+                        )}
                       >
-                        <Pencil className="h-3 w-3" />
+                        {editing ? <Check className="h-3 w-3" /> : <Pencil className="h-3 w-3" />}
                       </button>
                       {onRemoveScriptRow ? (
                         <button
                           type="button"
                           data-node-action
-                          disabled={disabled || scriptNodes.length <= 2}
+                          disabled={disabled || scriptNodes.length <= 1}
                           aria-label="删除分镜"
                           onPointerDown={(ev) => ev.stopPropagation()}
                           onClick={(ev) => {
                             ev.stopPropagation()
+                            if (editingIndex === i) setEditingIndex(null)
                             onRemoveScriptRow(i)
                           }}
                           className="rounded-md p-1 text-slate-500 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30"
@@ -772,15 +827,53 @@ export default function ShortVideoInfiniteCanvas({
                       ) : null}
                     </span>
                   </div>
-                  <div className="space-y-1 px-2.5 py-2">
-                    <p className="line-clamp-2 text-[11px] leading-snug text-slate-700">
-                      <Type className="mr-1 inline h-3 w-3 text-slate-400" />
-                      {row.visual || '（画面待填）'}
-                    </p>
-                    <p className="line-clamp-2 text-[10px] leading-snug text-slate-500">
-                      口播：{row.dialogue || '—'}
-                    </p>
-                  </div>
+                  {editing && onChangeScriptRow ? (
+                    <div
+                      data-node-action
+                      className="flex min-h-0 flex-1 flex-col gap-1.5 px-2 py-2"
+                      onPointerDown={(ev) => ev.stopPropagation()}
+                    >
+                      <label className="flex min-h-0 flex-1 flex-col gap-0.5">
+                        <span className="text-[9px] font-medium text-slate-500">画面 / 指令</span>
+                        <textarea
+                          disabled={disabled}
+                          value={row.visual}
+                          placeholder="镜头、人物动作、产品特写…"
+                          rows={3}
+                          autoFocus
+                          onChange={(ev) => onChangeScriptRow(i, { visual: ev.target.value })}
+                          className="min-h-0 flex-1 resize-none rounded-md border border-cyan-200 bg-white px-1.5 py-1 text-[11px] leading-snug text-slate-800 outline-none ring-cyan-400/30 focus:ring-1"
+                        />
+                      </label>
+                      <label className="flex shrink-0 flex-col gap-0.5">
+                        <span className="text-[9px] font-medium text-slate-500">口播 / 文案</span>
+                        <textarea
+                          disabled={disabled}
+                          value={row.dialogue}
+                          placeholder="该时段口播…"
+                          rows={2}
+                          onChange={(ev) => onChangeScriptRow(i, { dialogue: ev.target.value })}
+                          className="resize-none rounded-md border border-cyan-200 bg-white px-1.5 py-1 text-[10px] leading-snug text-slate-700 outline-none ring-cyan-400/30 focus:ring-1"
+                        />
+                      </label>
+                    </div>
+                  ) : (
+                    <div
+                      className="space-y-1 px-2.5 py-2"
+                      onDoubleClick={(ev) => {
+                        ev.stopPropagation()
+                        tryOpenEdit(id)
+                      }}
+                    >
+                      <p className="line-clamp-2 text-[11px] leading-snug text-slate-700">
+                        <Type className="mr-1 inline h-3 w-3 text-slate-400" />
+                        {row.visual || '（画面待填）'}
+                      </p>
+                      <p className="line-clamp-2 text-[10px] leading-snug text-slate-500">
+                        口播：{row.dialogue || '—'}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             )
@@ -812,6 +905,7 @@ export default function ShortVideoInfiniteCanvas({
         <span className="inline-flex items-center gap-2">
           <Minus className="h-3 w-3" /> 拖空白平移
           <Plus className="h-3 w-3" /> 左右圆点连线
+          <Pencil className="h-3 w-3" /> 铅笔/双击就地编辑
         </span>
       </div>
     </div>
