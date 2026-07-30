@@ -363,6 +363,20 @@ function assertSegmentBlob(blob: Blob, index: number): void {
   }
 }
 
+/** 成片 ffmpeg 原始日志转用户可读说明（避免 Lavc/frame=0 堆在作品状态里） */
+function sanitizeDhRenderPipelineError(raw: string, fallback: string): string {
+  const t = String(raw || '').trim()
+  if (!t) return fallback
+  if (/frame=\s*0|Lsize=\s*0kB|video:0kB|size=\s*0kB/i.test(t)) {
+    return `${fallback}：编码结果为空（0 帧）。常见原因是混音失败、字幕/运镜后处理失败或某段视频损坏，请重试；仍失败可先关闭字幕后再生成。`
+  }
+  if (/libx264|Lavc\d|muxing overhead|Side data:|encoder\s*:/i.test(t)) {
+    const clipped = t.replace(/\s+/g, ' ').slice(0, 160)
+    return `${fallback}（${clipped}）`
+  }
+  return t.length > 280 ? `${t.slice(0, 280)}…` : t
+}
+
 /** Seedance 无声成片混入 TTS 口播（浏览器优先 + 音轨验收） */
 async function muxNarrationIntoVideo(videoBlob: Blob, audioBlob: Blob): Promise<Blob> {
   return muxVideoWithNarrationPreferBrowser(videoBlob, audioBlob, muxVideoAudioOnServer)
@@ -713,7 +727,10 @@ async function renderWithSeedance(
   } catch (e) {
     return {
       ok: false,
-      message: e instanceof Error ? e.message : '多段视频合并失败',
+      message: sanitizeDhRenderPipelineError(
+        e instanceof Error ? e.message : String(e),
+        '多段视频合并失败',
+      ),
     }
   }
 
@@ -727,7 +744,10 @@ async function renderWithSeedance(
   } catch (e) {
     return {
       ok: false,
-      message: e instanceof Error ? e.message : '口播音频拼接失败',
+      message: sanitizeDhRenderPipelineError(
+        e instanceof Error ? e.message : String(e),
+        '口播音频拼接失败',
+      ),
     }
   }
 
@@ -737,7 +757,10 @@ async function renderWithSeedance(
   } catch (e) {
     return {
       ok: false,
-      message: e instanceof Error ? e.message : '成片口播混音失败，请重试',
+      message: sanitizeDhRenderPipelineError(
+        e instanceof Error ? e.message : String(e),
+        '成片口播混音失败',
+      ),
     }
   }
 
@@ -753,7 +776,13 @@ async function renderWithSeedance(
       { preserveNarrationAudio: true },
     )
   } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : '成片后处理失败（字幕/运镜）' }
+    return {
+      ok: false,
+      message: sanitizeDhRenderPipelineError(
+        e instanceof Error ? e.message : String(e),
+        '成片后处理失败（字幕/运镜）',
+      ),
+    }
   }
 
   const finalHasAudio = await probeVideoHasAudioStream(finalBlob)
