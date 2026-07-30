@@ -173,8 +173,6 @@ export default function DigitalHumanBroadcastPage() {
   const [pendingPhotoSaveBusy, setPendingPhotoSaveBusy] = useState(false)
   const [avatarLibrarySaveOpen, setAvatarLibrarySaveOpen] = useState(false)
   const [pendingPhotoName, setPendingPhotoName] = useState('')
-  const [storeSceneSelecting, setStoreSceneSelecting] = useState<StoreSceneId | null>(null)
-  const [shotStoreSceneSelecting, setShotStoreSceneSelecting] = useState<string | null>(null)
   const [voiceInferBusy, setVoiceInferBusy] = useState(false)
   const [compositedFramePreview, setCompositedFramePreview] = useState<string | null>(null)
   const [compositedFramePreviewBusy, setCompositedFramePreviewBusy] = useState(false)
@@ -516,7 +514,9 @@ export default function DigitalHumanBroadcastPage() {
   }
 
   const selectStoreScene = (sceneId: StoreSceneId) => {
-    // 先写入选中态，避免等大图转 dataURL 失败/卡住时看起来「点了没反应」
+    // 只写选中态，不在点击时 fetch 大图（线上 OSS/跨域易 Failed to fetch）
+    // dataURL 在提交/预览时由 resolveStoreSceneBackgroundDataUrl 同源优先加载
+    customBackgroundDataUrlRef.current = null
     setCustomBackgroundPreview(storeScenePreviewUrl(sceneId))
     patchDraft({
       background: 'store',
@@ -524,18 +524,6 @@ export default function DigitalHumanBroadcastPage() {
       customBackgroundFileName: `store-${sceneId}.jpg`,
     })
     setToast(`已选择门店实景：${STORE_SCENE_OPTIONS.find((s) => s.id === sceneId)?.label ?? sceneId}`)
-    void (async () => {
-      setStoreSceneSelecting(sceneId)
-      try {
-        const dataUrl = await resolveStoreSceneBackgroundDataUrl(sceneId)
-        customBackgroundDataUrlRef.current = dataUrl
-      } catch (e) {
-        // 选中态已保留；合成时 loadWorkCustomBackgroundDataUrl 会再 resolve
-        console.warn('[digital-human] store scene preload failed', e)
-      } finally {
-        setStoreSceneSelecting(null)
-      }
-    })()
   }
 
   const selectShotStoreScene = (shotId: string, sceneId: StoreSceneId) => {
@@ -545,16 +533,6 @@ export default function DigitalHumanBroadcastPage() {
         s.id === shotId ? { ...s, background: 'store', storeScene: sceneId } : s,
       ),
     })
-    void (async () => {
-      setShotStoreSceneSelecting(`${shotId}:${sceneId}`)
-      try {
-        await resolveStoreSceneBackgroundDataUrl(sceneId)
-      } catch (e) {
-        console.warn('[digital-human] shot store scene preload failed', e)
-      } finally {
-        setShotStoreSceneSelecting(null)
-      }
-    })()
   }
 
   const handleBackgroundFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2062,7 +2040,7 @@ export default function DigitalHumanBroadcastPage() {
                       <DhBackgroundSubContent
                         draft={draft}
                         patchDraft={patchDraft}
-                        storeSceneSelecting={storeSceneSelecting}
+                        storeSceneSelecting={null}
                         onSelectStoreScene={selectStoreScene}
                         customBackgroundPreview={customBackgroundPreview}
                         backgroundInputRef={backgroundInputRef}
@@ -2125,7 +2103,7 @@ export default function DigitalHumanBroadcastPage() {
                       draft={draft}
                       patchDraft={patchDraft}
                       onSelectShotStoreScene={selectShotStoreScene}
-                      shotStoreSceneSelecting={shotStoreSceneSelecting}
+                      shotStoreSceneSelecting={null}
                     />
                   </div>
                   <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
