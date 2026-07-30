@@ -20,7 +20,7 @@ import {
   loadWorkVoiceCloneSample,
   deleteWorkReferenceVideo,
 } from './digitalHumanWorkBlobStore.js'
-import { merchantStaticUrl } from './webStaticOssAssets.js'
+import { merchantStaticUrl, webStaticCandidates } from './webStaticOssAssets.js'
 
 export type AvatarKind = 'preset' | 'photo' | 'video_clone'
 export type AvatarStyle = 'realistic' | 'cartoon'
@@ -178,8 +178,19 @@ export type DigitalHumanWork = {
 /** 预置 JPG 换图后递增，破 cs 上 /digital-human/avatars 7 天缓存 */
 export const PRESET_AVATAR_ASSET_VERSION = 'dh20260619b'
 
+/** 同源优先，避免 OSS Content-Disposition:attachment 导致 fetch Failed to fetch */
+export function presetAvatarPreviewCandidates(file: string): string[] {
+  const path = `/digital-human/avatars/${file}`
+  const candidates = webStaticCandidates('merchant', path)
+  return [...candidates].sort((a, b) => {
+    const aLocal = a.startsWith('/') ? 0 : 1
+    const bLocal = b.startsWith('/') ? 0 : 1
+    return aLocal - bLocal
+  })
+}
+
 export function presetAvatarPreviewUrl(file: string): string {
-  return merchantStaticUrl(`/digital-human/avatars/${file}`)
+  return presetAvatarPreviewCandidates(file)[0] || merchantStaticUrl(`/digital-human/avatars/${file}`)
 }
 
 export const PRESET_AVATARS: PresetAvatar[] = [

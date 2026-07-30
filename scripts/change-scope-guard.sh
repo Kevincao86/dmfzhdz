@@ -597,6 +597,9 @@ PAT
 digitalHumanStoreScenes
 DhStep3Extras
 DigitalHumanBroadcastPage
+digitalHumanBroadcast
+digitalHumanVideoRender
+videoFrameUtils
 change-scope-guard
 PAT
       ;;

@@ -153,31 +153,52 @@ async function resolvePortraitOnlyBase64(
     try {
       raw = await imageUrlToPureBase64(draft.customAvatarDataUrl)
     } catch {
-      return null
+      raw = null
     }
   } else {
     const avatar = findPresetAvatarForDraft(draft)
     if (!avatar?.previewUrl) return null
-    try {
-      raw = await imageUrlToPureBase64(avatar.previewUrl)
-    } catch {
-      return null
+    const urls: string[] = [avatar.previewUrl]
+    // 预置形象再试同源路径（previewUrl 若仍指向 OSS）
+    const localMatch = avatar.previewUrl.match(/(\/digital-human\/avatars\/[^?/#]+)/)
+    if (localMatch?.[1] && localMatch[1] !== avatar.previewUrl) {
+      urls.unshift(localMatch[1])
+    } else if (avatar.id.startsWith('av-real-')) {
+      const n = avatar.id.replace(/^av-real-/, '')
+      urls.unshift(`/digital-human/avatars/av-real-${n}.jpg`)
+    }
+    for (const u of urls) {
+      try {
+        raw = await imageUrlToPureBase64(u)
+        if (raw) break
+      } catch {
+        /* try next */
+      }
     }
   }
   if (!raw) return null
-  const normalized = await normalizePortraitBase64ForS2v(raw, frameMode)
-  const useCompositeBg =
-    (draft.background === 'custom' || (draft.background === 'store' && draft.storeScene)) &&
-    customBackgroundDataUrl?.trim()
-  if (useCompositeBg) {
-    return compositePortraitWithBackground(
-      normalized,
-      draft.background,
-      frameMode,
-      customBackgroundDataUrl!,
-    )
+  try {
+    const normalized = await normalizePortraitBase64ForS2v(raw, frameMode)
+    const useCompositeBg =
+      (draft.background === 'custom' || (draft.background === 'store' && draft.storeScene)) &&
+      customBackgroundDataUrl?.trim()
+    if (useCompositeBg) {
+      try {
+        return await compositePortraitWithBackground(
+          normalized,
+          draft.background,
+          frameMode,
+          customBackgroundDataUrl!,
+        )
+      } catch {
+        // 背景合成失败时仍提交人像，避免误报「请选择形象」
+        return normalized
+      }
+    }
+    return normalized
+  } catch {
+    return null
   }
-  return normalized
 }
 
 async function resolveSeedanceSegmentImageB64(
