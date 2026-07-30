@@ -41,3 +41,6 @@ web版/merchant-erp/.dh-avatar-staging-raw/
 
 # 商家 ERP 小程序本地配置
 灵祺ERP小程序/utils/config.local.js
+
+# OpenMontage（AGPL）本机克隆，仅 Cursor 本地制片，勿提交
+tools/OpenMontage/

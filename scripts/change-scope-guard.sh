@@ -645,6 +645,8 @@ PAT
 openmontage-setup
 openmontage
 tools/OpenMontage
+tools/.gitkeep
+tools/README
 change-scope-guard
 .gitignore
 PAT
