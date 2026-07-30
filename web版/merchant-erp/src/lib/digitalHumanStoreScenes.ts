@@ -1,6 +1,6 @@
 /** 门店实景：预置 AI 生成竖版背景（public/digital-human/store-scenes） */
 
-import { merchantStaticUrl } from './webStaticOssAssets'
+import { merchantStaticUrl, webStaticCandidates } from './webStaticOssAssets'
 
 export type StoreSceneId = 'restaurant' | 'ktv' | 'hotel' | 'scenery'
 
@@ -45,17 +45,40 @@ export const STORE_SCENE_OPTIONS: StoreSceneOption[] = [
   },
 ]
 
-/** 列表/预览用静态 URL（已内置 AI 生成图，无需再请求生图 API） */
-export function storeScenePreviewUrl(sceneId: StoreSceneId): string {
+function storeSceneLocalPath(sceneId: StoreSceneId): string {
   const scene = STORE_SCENE_OPTIONS.find((s) => s.id === sceneId)
   const file = scene?.assetFile ?? `store-scene-${sceneId}.jpg`
-  return merchantStaticUrl(`/digital-human/store-scenes/${file}`)
+  return `/digital-human/store-scenes/${file}`
+}
+
+/** 列表/预览用静态 URL（已内置 AI 生成图，无需再请求生图 API） */
+export function storeScenePreviewUrl(sceneId: StoreSceneId): string {
+  return merchantStaticUrl(storeSceneLocalPath(sceneId))
+}
+
+/** 预览候选：同源 local 优先，再 OSS（避免 OSS Content-Disposition:attachment 影响加载） */
+export function storeScenePreviewCandidates(sceneId: StoreSceneId): string[] {
+  const candidates = webStaticCandidates('merchant', storeSceneLocalPath(sceneId))
+  return [...candidates].sort((a, b) => {
+    const aLocal = a.startsWith('/') ? 0 : 1
+    const bLocal = b.startsWith('/') ? 0 : 1
+    return aLocal - bLocal
+  })
 }
 
 async function blobToDataUrl(blob: Blob): Promise<string> {
+  if (typeof FileReader !== 'undefined') {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader()
+      r.onload = () =>
+        typeof r.result === 'string' ? resolve(r.result) : reject(new Error('背景图读取失败'))
+      r.onerror = () => reject(new Error('背景图读取失败'))
+      r.readAsDataURL(blob)
+    })
+  }
   const bytes = new Uint8Array(await blob.arrayBuffer())
   let binary = ''
-  const chunk = 0x8000
+  const chunk = 0x2000
   for (let i = 0; i < bytes.length; i += chunk) {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
   }
@@ -69,11 +92,20 @@ async function urlToDataUrl(url: string): Promise<string> {
   return blobToDataUrl(await res.blob())
 }
 
-/** 合成用：拉取预置背景并转为 data URL */
+/** 合成用：拉取预置背景并转为 data URL（同源优先，失败再试 OSS） */
 export async function resolveStoreSceneBackgroundDataUrl(sceneId: StoreSceneId): Promise<string> {
   const scene = STORE_SCENE_OPTIONS.find((s) => s.id === sceneId)
   if (!scene) throw new Error('未知门店实景类型')
-  return urlToDataUrl(storeScenePreviewUrl(sceneId))
+  const ordered = storeScenePreviewCandidates(sceneId)
+  let lastErr: Error | null = null
+  for (const url of ordered) {
+    try {
+      return await urlToDataUrl(url)
+    } catch (e) {
+      lastErr = e instanceof Error ? e : new Error(String(e))
+    }
+  }
+  throw lastErr ?? new Error('门店实景加载失败')
 }
 
 export function storeScenePrompt(sceneId: StoreSceneId | null | undefined): string {

@@ -516,20 +516,22 @@ export default function DigitalHumanBroadcastPage() {
   }
 
   const selectStoreScene = (sceneId: StoreSceneId) => {
+    // 先写入选中态，避免等大图转 dataURL 失败/卡住时看起来「点了没反应」
+    setCustomBackgroundPreview(storeScenePreviewUrl(sceneId))
+    patchDraft({
+      background: 'store',
+      storeScene: sceneId,
+      customBackgroundFileName: `store-${sceneId}.jpg`,
+    })
+    setToast(`已选择门店实景：${STORE_SCENE_OPTIONS.find((s) => s.id === sceneId)?.label ?? sceneId}`)
     void (async () => {
       setStoreSceneSelecting(sceneId)
       try {
         const dataUrl = await resolveStoreSceneBackgroundDataUrl(sceneId)
         customBackgroundDataUrlRef.current = dataUrl
-        setCustomBackgroundPreview(storeScenePreviewUrl(sceneId))
-        patchDraft({
-          background: 'store',
-          storeScene: sceneId,
-          customBackgroundFileName: `store-${sceneId}.jpg`,
-        })
-        setToast(`已选择门店实景：${STORE_SCENE_OPTIONS.find((s) => s.id === sceneId)?.label ?? sceneId}`)
       } catch (e) {
-        setToast(e instanceof Error ? e.message : '门店实景加载失败')
+        // 选中态已保留；合成时 loadWorkCustomBackgroundDataUrl 会再 resolve
+        console.warn('[digital-human] store scene preload failed', e)
       } finally {
         setStoreSceneSelecting(null)
       }
@@ -537,18 +539,18 @@ export default function DigitalHumanBroadcastPage() {
   }
 
   const selectShotStoreScene = (shotId: string, sceneId: StoreSceneId) => {
+    const shots = draft.sceneShots ?? []
+    patchDraft({
+      sceneShots: shots.map((s) =>
+        s.id === shotId ? { ...s, background: 'store', storeScene: sceneId } : s,
+      ),
+    })
     void (async () => {
       setShotStoreSceneSelecting(`${shotId}:${sceneId}`)
       try {
         await resolveStoreSceneBackgroundDataUrl(sceneId)
-        const shots = draft.sceneShots ?? []
-        patchDraft({
-          sceneShots: shots.map((s) =>
-            s.id === shotId ? { ...s, background: 'store', storeScene: sceneId } : s,
-          ),
-        })
       } catch (e) {
-        setToast(e instanceof Error ? e.message : '门店实景加载失败')
+        console.warn('[digital-human] shot store scene preload failed', e)
       } finally {
         setShotStoreSceneSelecting(null)
       }
@@ -2025,32 +2027,38 @@ export default function DigitalHumanBroadcastPage() {
                 <section className="space-y-4">
                   <h2 className="text-lg font-semibold text-slate-900">合成参数</h2>
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <label className="text-sm sm:col-span-2">
-                      背景
-                      <select
-                        value={draft.background}
-                        onChange={(e) => {
-                          const v = e.target.value
-                          patchDraft({
-                            background: v,
-                            greenScreen: v === 'green',
-                            storeScene: v === 'store' ? draft.storeScene ?? null : null,
-                            customBackgroundFileName:
-                              v === 'custom' ? draft.customBackgroundFileName : v === 'store' ? draft.customBackgroundFileName : null,
-                          })
-                          if (v !== 'custom' && v !== 'store') {
-                            customBackgroundDataUrlRef.current = null
-                            setCustomBackgroundPreview(null)
-                          }
-                        }}
-                        className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
-                      >
-                        {BACKGROUND_OPTIONS.map((b) => (
-                          <option key={b.id} value={b.id}>
-                            {b.label}
-                          </option>
-                        ))}
-                      </select>
+                    <div className="text-sm sm:col-span-2">
+                      <label className="block">
+                        背景
+                        <select
+                          value={draft.background}
+                          onChange={(e) => {
+                            const v = e.target.value
+                            patchDraft({
+                              background: v,
+                              greenScreen: v === 'green',
+                              storeScene: v === 'store' ? draft.storeScene ?? null : null,
+                              customBackgroundFileName:
+                                v === 'custom'
+                                  ? draft.customBackgroundFileName
+                                  : v === 'store'
+                                    ? draft.customBackgroundFileName
+                                    : null,
+                            })
+                            if (v !== 'custom' && v !== 'store') {
+                              customBackgroundDataUrlRef.current = null
+                              setCustomBackgroundPreview(null)
+                            }
+                          }}
+                          className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+                        >
+                          {BACKGROUND_OPTIONS.map((b) => (
+                            <option key={b.id} value={b.id}>
+                              {b.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
                       <DhBackgroundSubContent
                         draft={draft}
                         patchDraft={patchDraft}
@@ -2062,7 +2070,7 @@ export default function DigitalHumanBroadcastPage() {
                         onBackgroundFileChange={handleBackgroundFileChange}
                         onPickBackgroundFile={() => backgroundInputRef.current?.click()}
                       />
-                    </label>
+                    </div>
                     <label className="text-sm">
                       手势动作
                       <select
