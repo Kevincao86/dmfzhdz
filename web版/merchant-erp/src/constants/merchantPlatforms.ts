@@ -76,9 +76,8 @@ const GROUPBUY: MerchantPlatformDef[] = [
     tokenSessionKey: 'meoo_meituan_merchant_token',
     appIdSessionKey: 'meoo_meituan_app_id',
     docsUrl: 'https://developer.meituan.com/docs/api',
-    settingsBindable: false,
+    settingsBindable: true,
     dedicatedProductWizard: false,
-    comingSoon: true,
   },
   {
     id: 'xiaohongshu',

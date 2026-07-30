@@ -79,7 +79,7 @@ export type MerchantBackendPlatformBrand = {
 export const MERCHANT_BACKEND_PLATFORMS: MerchantBackendPlatformBrand[] = [
   { id: 'douyin', tabName: '抖音来客', logo: 'douyin_laike' },
   { id: 'kuaishou', tabName: '快手团购', logo: 'kuaishou_local' },
-  { id: 'meituan', tabName: '大众点评商家版', logo: 'dianping', comingSoon: true },
+  { id: 'meituan', tabName: '大众点评商家版', logo: 'dianping' },
   { id: 'xhs', tabName: '小红书商家版', logo: 'xiaohongshu' },
 ]
 
