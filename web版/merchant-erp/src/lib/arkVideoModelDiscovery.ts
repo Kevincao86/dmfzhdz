@@ -131,14 +131,14 @@ export function isArkVideoModelQuotaExhausted(apiKey: string, modelId: string): 
   return true
 }
 
-/** 额度稳定场景排序：有免费额度的 1.5-pro / pro-fast 优先，未开通的 2.0 靠后 */
+/** 额度稳定场景排序：有免费额度的 1.0-pro-fast / lite-i2v 优先，1.5 次之，未开通的 2.0 靠后 */
 export function sortArkVideoModelsByQuotaHint(ids: readonly string[]): string[] {
   const norm = (id: string) => normalizeArkVideoModelParam(id).toLowerCase()
   const tier = (id: string): number => {
     const m = norm(id)
-    if (/seedance-1-5|seedance-1\.5/.test(m)) return 1
-    if (/seedance-1-0-pro-fast|seedance-1\.0-pro-fast/.test(m)) return 2
-    if (/lite-i2v/.test(m)) return 3
+    if (/seedance-1-0-pro-fast|seedance-1\.0-pro-fast/.test(m)) return 1
+    if (/lite-i2v/.test(m)) return 2
+    if (/seedance-1-5|seedance-1\.5/.test(m)) return 3
     if (/seaweed|doubao-seaweed/.test(m)) return 4
     if (/wan2-1-14b|wan2\.1-14b/.test(m)) return 5
     if (/seedance-2-0-mini|seedance-2\.0-mini/.test(m)) return 10

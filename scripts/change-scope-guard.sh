@@ -52,6 +52,7 @@ list_scopes() {
   aimodelserver_upstream AiModelServer（api.aimodelserver.com）OpenAI 兼容上游接入
   digital_human_bg     商家 ERP：数字人口播·实景/时长/人像融合
   video_gen_precision  视频生成更准：Brief/Skill槽位/保真校验/全入口门禁（不含 ICE）
+  openmontage_local    Cursor 本地 OpenMontage skill + 安装脚本（不含 ERP 成片链路）
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -604,6 +605,10 @@ digitalHumanSeedancePrompt
 digitalHumanPortraitMatting
 concatVideoSegments
 videoFrameUtils
+arkVideoContentPayload
+arkVideoModelDiscovery
+arkVideoModelRouter
+merchantVideoAiGateway
 change-scope-guard
 PAT
       ;;
@@ -628,6 +633,16 @@ videoGenBrief
 mine-pr-addon-shortvideo
 mpAddonMerchantApi
 change-scope-guard
+PAT
+      ;;
+    openmontage_local)
+      cat <<'PAT'
+.cursor/skills/openmontage
+openmontage-setup
+openmontage
+tools/OpenMontage
+change-scope-guard
+.gitignore
 PAT
       ;;
     *)

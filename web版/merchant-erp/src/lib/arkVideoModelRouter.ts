@@ -154,6 +154,13 @@ export function isArkVideoFailoverError(msg: string): boolean {
     return true
   if (/duration customization is not supported|duration must be in/i.test(raw)) return true
   if (/invalid content\.text|invalid content text|content\.text/i.test(lower)) return true
+  /** 双参考 role 互斥等参数错误：切下一模型或由调用方改单图重试 */
+  if (
+    /first\/last frame|cannot be mixed with reference|reference media content|parameter ['"]content['"]|content.*not valid/i.test(
+      raw,
+    )
+  )
+    return true
   if (/\b502\b/.test(raw) || /\b503\b/.test(raw) || /\b504\b/.test(raw)) return true
   return false
 }

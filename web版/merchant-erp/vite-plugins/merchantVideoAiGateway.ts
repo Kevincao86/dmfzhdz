@@ -1659,7 +1659,7 @@ async function arkCreateVideoTask(
         continue
       }
       const soft =
-        /请填写|无效|invalid|placeholder|对话模型|payload|参数|content\.text|role must be specified/i.test(
+        /请填写|无效|invalid|not valid|placeholder|对话模型|payload|参数|content\.text|role must be specified|cannot be mixed|first\/last frame|reference media|parameter 'content'/i.test(
           `${posted.msg ?? ''} ${rawErr}`,
         )
       if (soft) continue

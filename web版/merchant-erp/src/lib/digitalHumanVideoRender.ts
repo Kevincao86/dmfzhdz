@@ -113,17 +113,19 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => window.setTimeout(r, ms))
 }
 
-/** 数字人口播：优先 Seedance 1.5/2.0（单段更长），再 1.0/pro，lite 兜底 */
+/** 数字人口播：优先有免费额度的 1.0-pro-fast / lite-i2v，再 1.5/2.0 */
 function sortDhSeedancePoolPreferLongClip(ids: readonly string[]): string[] {
   const tier = (modelId: string): number => {
     const norm = normalizeArkVideoModelParam(modelId).toLowerCase()
-    if (/seedance-2-0|seedance-2\.0/.test(norm) && !/mini|fast/.test(norm)) return 1
-    if (/seedance-2-0-fast|seedance-2\.0-fast/.test(norm)) return 2
+    if (/seedance-1-0-pro-fast|seedance-1\.0-pro-fast/.test(norm)) return 1
+    if (/lite-i2v/.test(norm)) return 2
     if (/seedance-1-5|seedance-1\.5/.test(norm)) return 3
-    if (/seedance-1-0-pro|seedance-1\.0-pro/.test(norm)) return 4
-    if (/seaweed/.test(norm)) return 5
+    if (/seedance-2-0|seedance-2\.0/.test(norm) && !/mini|fast/.test(norm)) return 4
+    if (/seedance-2-0-fast|seedance-2\.0-fast/.test(norm)) return 5
+    if (/seaweed/.test(norm)) return 6
+    if (/seedance-1-0-pro|seedance-1\.0-pro/.test(norm)) return 7
     if (/lite/.test(norm)) return 8
-    return 6
+    return 9
   }
   return [...ids].sort((a, b) => {
     const d = tier(a) - tier(b)
