@@ -71,7 +71,14 @@ export async function synthesizeDigitalHumanSpeech(input: {
   }
 
   let lastMsg = '语音合成失败，请稍后重试'
-  for (const target of merchantDigitalHumanTtsApiFetchUrls(API_PATH)) {
+  /** erp-api 优先，避免部分环境 /api 反代异常导致长时间卡在「合成中」 */
+  const targets = (() => {
+    const all = merchantDigitalHumanTtsApiFetchUrls(API_PATH)
+    const erp = all.filter((u) => /\/erp-api\//i.test(u))
+    const rest = all.filter((u) => !erp.includes(u))
+    return erp.length ? [...erp, ...rest] : all
+  })()
+  for (const target of targets) {
     try {
       const res = await fetch(target, {
         method: 'POST',

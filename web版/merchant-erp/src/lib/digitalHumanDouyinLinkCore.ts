@@ -735,7 +735,7 @@ function douyinLinkKindErrorMessage(
     return `${prefix}该链接跳转到达人主页（非视频页），无法提取口播。请在抖音打开目标视频后再点「分享」复制口令；或改用手动输入/文本驱动。`
   }
   if (kind === 'homepage' || shortLinkUnresolved) {
-    return `${prefix}短链未能解析到具体视频（已跳转到抖音首页或无效页）。请换一条视频分享口令重试，或改用手动输入/文本驱动。`
+    return `${prefix}短链未能解析到具体视频（已跳转到抖音首页，常见于口令过期/失效）。请重新打开目标视频 → 点「分享」复制新口令；或从浏览器地址栏复制完整链接（含 /video/数字ID）；也可切换「手动输入 / 文本驱动」直接粘贴口播文案。`
   }
   return null
 }

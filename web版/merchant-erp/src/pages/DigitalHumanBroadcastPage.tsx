@@ -1819,7 +1819,9 @@ export default function DigitalHumanBroadcastPage() {
                           直接粘贴抖音「分享」复制的<strong>整段口令</strong>即可，系统会自动识别其中的链接；再从视频音频识别口播（通义 ASR），不会使用发布标题，并推断动作指令。请核对后再点「下一步」。
                         </p>
                         <p className="mt-1 text-xs text-violet-600">
-                          注意：须在<strong>视频播放页</strong>点分享（勿用搜索页「查看TA的更多作品」类口令，该类链接指向达人主页，无法提取口播）。
+                          注意：须在<strong>视频播放页</strong>点分享（勿用搜索页「查看TA的更多作品」类口令）。若提示跳转首页，说明短链已过期，请重新分享或改用地址栏完整
+                          <code className="mx-0.5">/video/</code>
+                          链接。
                         </p>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <input
