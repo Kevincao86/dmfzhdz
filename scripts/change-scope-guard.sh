@@ -610,6 +610,7 @@ arkVideoModelDiscovery
 arkVideoModelRouter
 merchantVideoAiGateway
 videoAiApi
+dh-seedance-r2v-local-smoke
 change-scope-guard
 PAT
       ;;

@@ -154,9 +154,9 @@ export function isArkVideoFailoverError(msg: string): boolean {
     return true
   if (/duration customization is not supported|duration must be in/i.test(raw)) return true
   if (/invalid content\.text|invalid content text|content\.text/i.test(lower)) return true
-  /** 双参考 role 互斥等参数错误：切下一模型或由调用方改单图重试 */
+  /** 双参考 / r2v 与模型不匹配：切下一模型或由调用方改单图 i2v */
   if (
-    /first\/last frame|cannot be mixed with reference|reference media content|parameter ['"]content['"]|content.*not valid/i.test(
+    /first\/last frame|cannot be mixed with reference|reference media content|parameter ['"]content['"]|content.*not valid|task_type.*r2v|r2v does not support|does not support model/i.test(
       raw,
     )
   )

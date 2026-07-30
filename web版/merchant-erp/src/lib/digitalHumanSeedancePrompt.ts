@@ -136,7 +136,7 @@ export function buildDhSeedanceSegmentPrompt(
   if (opts?.continuation) {
     body = [
       '竖屏9:16口播续镜，同一人物同服装同场景，动作连续，五官发型不变。',
-      opts?.dualRefPersonScene ? '继续沿用参考图1人物与参考图2场景的融合结果。' : '',
+      opts?.dualRefPersonScene ? '继续沿用首帧人物与场景的融合结果。' : '',
       `动作：${motion}。`,
       opts?.hasProductFusion ? '双参考图自然手持产品。' : '',
       fidelity,
@@ -147,9 +147,8 @@ export function buildDhSeedanceSegmentPrompt(
       .join('')
   } else if (opts?.dualRefPersonScene) {
     body = [
-      `竖屏9:16数字人口播，对齐即梦数字人换景：参考图1为完整人物主体（${frame}，五官发型皮肤完整清晰，禁止裁脸抠穿），`,
-      `参考图2为场景背景（${bg}）。`,
-      `将参考图1人物自然融入参考图2场景，光影透视一致，服装${outfit}，禁止灰底矩形贴片，禁止残缺五官。`,
+      `竖屏9:16数字人口播，首帧已将完整人物融入场景（${bg}），${frame}，五官发型皮肤完整清晰，禁止裁脸抠穿，禁止灰底矩形贴片。`,
+      `保持人物自然站在场景中，光影透视一致，服装${outfit}。`,
       total > 1 ? `分镜${idx}/${total}约${DH_SEEDANCE_SEGMENT_SEC}秒。` : '',
       opts?.hasProductFusion ? '人物与产品自然融合，禁止贴片悬浮。' : '',
       `动作：${motion}。`,
