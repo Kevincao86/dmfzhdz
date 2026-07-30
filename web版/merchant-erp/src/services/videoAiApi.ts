@@ -1344,7 +1344,11 @@ export async function runShortVideoJobWithFailover(opts: {
   | ShortVideoJobFail
 > {
   const durationSec = parseVideoDurationFromFlags(opts.body.flags)
-  const first = await runShortVideoJobWithDurationInternal(opts, durationSec)
+  const body =
+    opts.engine === 'seedance'
+      ? { ...opts.body, skip_qwen: true }
+      : opts.body
+  const first = await runShortVideoJobWithDurationInternal({ ...opts, body }, durationSec)
   if (first.ok) return { ...first, durationSecUsed: durationSec }
 
   const allowHalve = opts.allowAutoHalveDuration !== false
@@ -1355,10 +1359,10 @@ export async function runShortVideoJobWithFailover(opts: {
       triedCount: first.triedCount,
     })
   ) {
-    const flags5 = replaceVideoDurationInFlags(opts.body.flags ?? '', 5)
+    const flags5 = replaceVideoDurationInFlags(body.flags ?? '', 5)
     opts.onProgress?.('10秒模型额度已满，自动切换为5秒视频模型…')
     const second = await runShortVideoJobWithDurationInternal(
-      { ...opts, body: { ...opts.body, flags: flags5 } },
+      { ...opts, body: { ...body, flags: flags5 } },
       5,
     )
     if (second.ok) return { ...second, durationSecUsed: 5 }
@@ -1399,7 +1403,7 @@ async function runShortVideoJobWithDurationInternal(
     poolModels: opts.poolModels ?? [],
     preferred: SEEDANCE_SERVER_AUTO,
     preferQuotaStable: opts.body.prefer_quota_stable === true,
-    skipQwen: opts.body.skip_qwen === true,
+    skipQwen: opts.body.skip_qwen === true || opts.engine === 'seedance',
   })
   if (opts.engine === 'qwen' && !opts.body.skip_qwen) {
     const qwenFirst = [
@@ -1407,6 +1411,9 @@ async function runShortVideoJobWithDurationInternal(
       ...tryPlan.filter((s) => s.preferProvider !== 'qwen'),
     ]
     tryPlan.splice(0, tryPlan.length, ...qwenFirst)
+  } else if (opts.engine === 'seedance' || opts.body.skip_qwen === true) {
+    const arkOnly = tryPlan.filter((s) => s.preferProvider !== 'qwen')
+    tryPlan.splice(0, tryPlan.length, ...arkOnly)
   } else {
     const arkFirst = [
       ...tryPlan.filter((s) => s.preferProvider !== 'qwen'),
@@ -1467,6 +1474,17 @@ async function runShortVideoJobWithDurationInternal(
     if (poll.ok) {
       const engineUsed: 'qwen' | 'seedance' =
         step.preferProvider === 'qwen' || start.provider === 'qwen' ? 'qwen' : 'seedance'
+      const modelId = String(start.modelUsed || step.model || '')
+      const looksQwenWan =
+        engineUsed === 'qwen' ||
+        step.preferProvider === 'qwen' ||
+        /^wan[\d._-]/i.test(modelId) ||
+        /wan2\.\d/i.test(modelId)
+      if ((opts.engine === 'seedance' || opts.body.skip_qwen === true) && looksQwenWan) {
+        lastMsg = 'Seedance 通道不可用，未回退到千问 wan 模型。请稍后重试或检查运营台方舟视频端点。'
+        tried.push(step.label)
+        continue
+      }
       return {
         ok: true,
         videoUrl: poll.videoUrl,
