@@ -53,10 +53,11 @@ function storeSceneLocalPath(sceneId: StoreSceneId): string {
 
 /** 列表/预览用静态 URL（已内置 AI 生成图，无需再请求生图 API） */
 export function storeScenePreviewUrl(sceneId: StoreSceneId): string {
-  return merchantStaticUrl(storeSceneLocalPath(sceneId))
+  // 预览优先同源，避免依赖 OSS（部分环境 fetch/显示异常）
+  return storeScenePreviewCandidates(sceneId)[0] || merchantStaticUrl(storeSceneLocalPath(sceneId))
 }
 
-/** 预览候选：同源 local 优先，再 OSS（避免 OSS Content-Disposition:attachment 影响加载） */
+/** 预览候选：同源 local 优先，再 OSS */
 export function storeScenePreviewCandidates(sceneId: StoreSceneId): string[] {
   const candidates = webStaticCandidates('merchant', storeSceneLocalPath(sceneId))
   return [...candidates].sort((a, b) => {
@@ -86,13 +87,44 @@ async function blobToDataUrl(blob: Blob): Promise<string> {
   return `data:${mime};base64,${btoa(binary)}`
 }
 
-async function urlToDataUrl(url: string): Promise<string> {
+async function fetchUrlToDataUrl(url: string): Promise<string> {
   const res = await fetch(url)
   if (!res.ok) throw new Error(`背景图加载失败 HTTP ${res.status}`)
   return blobToDataUrl(await res.blob())
 }
 
-/** 合成用：拉取预置背景并转为 data URL（同源优先，失败再试 OSS） */
+/** fetch 失败时：用 Image + canvas（同源无需 CORS；跨域需 OSS 允许） */
+async function imageElementToDataUrl(url: string): Promise<string> {
+  if (typeof document === 'undefined') throw new Error('非浏览器环境无法解码背景图')
+  const img = new Image()
+  if (!url.startsWith('/') && !url.startsWith('data:')) {
+    img.crossOrigin = 'anonymous'
+  }
+  img.decoding = 'async'
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve()
+    img.onerror = () => reject(new Error('背景图解码失败'))
+    img.src = url
+  })
+  const canvas = document.createElement('canvas')
+  canvas.width = img.naturalWidth || img.width
+  canvas.height = img.naturalHeight || img.height
+  if (!canvas.width || !canvas.height) throw new Error('背景图尺寸无效')
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('无法创建画布')
+  ctx.drawImage(img, 0, 0)
+  return canvas.toDataURL('image/jpeg', 0.92)
+}
+
+async function urlToDataUrl(url: string): Promise<string> {
+  try {
+    return await fetchUrlToDataUrl(url)
+  } catch {
+    return await imageElementToDataUrl(url)
+  }
+}
+
+/** 合成用：拉取预置背景并转为 data URL（同源优先，失败再试 OSS / Image） */
 export async function resolveStoreSceneBackgroundDataUrl(sceneId: StoreSceneId): Promise<string> {
   const scene = STORE_SCENE_OPTIONS.find((s) => s.id === sceneId)
   if (!scene) throw new Error('未知门店实景类型')
