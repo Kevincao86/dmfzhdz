@@ -1,5 +1,6 @@
 /**
  * 美团技术服务合作中心 OpenAPI 通用：会话编解码、签名、HTTP 代理。
+ * 当前 ERP 绑定按「商家自研」：商户自建应用密钥 + 可选 appAuthToken，非三方服务商代授权。
  * @see https://developer.meituan.com/docs/api
  */
 import { createHash } from 'node:crypto'

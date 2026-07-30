@@ -196,29 +196,55 @@ export async function handleMeituanBindPost(
   let appId = ''
   let appSecret = ''
   let extraId = ''
+  let appAuthToken = ''
   try {
     const j = JSON.parse(bodyRaw || '{}') as {
       appId?: string
       appSecret?: string
       extraId?: string
+      appAuthToken?: string
     }
     appId = (j.appId ?? '').trim()
     appSecret = (j.appSecret ?? '').trim()
     extraId = (j.extraId ?? '').trim()
+    appAuthToken = (j.appAuthToken ?? '').trim()
   } catch {
-    json(res, 400, { message: '请求体须为 JSON：{ appId, appSecret, extraId? }' })
+    json(res, 400, {
+      message: '请求体须为 JSON：{ appId, appSecret, appAuthToken?, extraId? }',
+    })
     return
   }
   if (!appId || !appSecret) {
-    json(res, 400, { message: '请填写 AppID 与 App Secret' })
+    json(res, 400, {
+      message: '请填写商家自研应用的 AppID / developerId 与 App Secret / SignKey',
+    })
     return
   }
 
   const merchantId = extraId || `mt-${appId.slice(0, 8)}`
-  let accessToken = `mt-at-${randomUUID().replace(/-/g, '')}`
-  let demo = !meituanConfiguredForLiveApi()
+  const live = meituanConfiguredForLiveApi()
 
-  if (meituanConfiguredForLiveApi()) {
+  if (!live) {
+    const session: MeituanMerchantSession = {
+      v: 1,
+      appKey: appId,
+      appSecret,
+      accessToken: appAuthToken || `mt-at-${randomUUID().replace(/-/g, '')}`,
+      merchantId,
+      demo: true,
+    }
+    json(res, 200, {
+      accessToken: encodeMeituanSessionToken(session),
+      message:
+        '已绑定（演示模式 · 商家自研）：配置 MEITUAN_OPENAPI_BASE_URL 与各业务 PATH 后将直连美团 OpenAPI。',
+      demo: true,
+      mode: 'merchant_self',
+    })
+    return
+  }
+
+  let accessToken = appAuthToken
+  if (!accessToken) {
     const tokenPath = meituanPathFromEnv('MEITUAN_OAUTH_TOKEN_PATH', '/oauth/token')
     const r = await meituanSignedRequest(
       {
@@ -240,21 +266,24 @@ export async function handleMeituanBindPost(
     )
     if (r.ok) {
       const data = r.json.data
-      const tok =
+      accessToken =
         (typeof r.json.access_token === 'string' && r.json.access_token) ||
-        (data && typeof data === 'object' && typeof (data as Record<string, unknown>).access_token === 'string'
+        (data &&
+        typeof data === 'object' &&
+        typeof (data as Record<string, unknown>).access_token === 'string'
           ? String((data as Record<string, unknown>).access_token)
           : '') ||
         (typeof r.json.session === 'string' && r.json.session) ||
         ''
-      if (tok) {
-        accessToken = tok
-        demo = false
-      }
     }
-    if (demo) {
-      accessToken = `mt-live-${randomUUID().replace(/-/g, '')}`
-    }
+  }
+
+  if (!accessToken) {
+    json(res, 400, {
+      message:
+        '未能获取访问令牌。请填写门店授权后的 appAuthToken，或确认商家自研应用 OAuth（client_credentials）可用。',
+    })
+    return
   }
 
   const session: MeituanMerchantSession = {
@@ -263,16 +292,26 @@ export async function handleMeituanBindPost(
     appSecret,
     accessToken,
     merchantId,
-    demo,
+    demo: false,
   }
 
-  const token = encodeMeituanSessionToken(session)
+  const storePath = meituanPathFromEnv('MEITUAN_STORE_LIST_PATH', '/poi/list')
+  const probe = await meituanSignedRequest(session, storePath, {
+    method: 'POST',
+    body: { merchant_id: merchantId },
+  })
+  if (!probe.ok) {
+    json(res, 400, {
+      message: `美团连通性探测失败：${probe.message}。请核对商家自研应用密钥、门店授权 Token、接口权限与 MEITUAN_STORE_LIST_PATH。`,
+    })
+    return
+  }
+
   json(res, 200, {
-    accessToken: token,
-    message: demo
-      ? '已绑定（演示模式）：配置 MEITUAN_OPENAPI_BASE_URL 与各业务 PATH 后将直连美团 OpenAPI。'
-      : '美团绑定成功，请使用返回的 accessToken 作为 Bearer 调用网关。',
-    demo,
+    accessToken: encodeMeituanSessionToken(session),
+    message: '美团绑定成功（商家自研 · 已通过门店列表连通性探测）。',
+    demo: false,
+    mode: 'merchant_self',
   })
 }
 

@@ -14,6 +14,7 @@ import { MerchantSyncControls } from './MerchantSyncControls'
 const TOKEN_KEY = 'meoo_meituan_merchant_token'
 const AUTO_KEY = 'meoo_meituan_auto_refresh'
 const META_APP_ID = 'meoo_meituan_app_id'
+const DEMO_KEY = 'meoo_meituan_bind_demo'
 
 function readSession(key: string) {
   try {
@@ -41,12 +42,15 @@ export default function MeituanMerchantSection() {
   const [guideOpen, setGuideOpen] = useState(false)
   const [appId, setAppId] = useState(() => readSession(META_APP_ID) ?? '')
   const [appSecret, setAppSecret] = useState('')
+  const [appAuthToken, setAppAuthToken] = useState('')
   const [extraId, setExtraId] = useState('')
   const [bindSubmitting, setBindSubmitting] = useState(false)
   const [bindError, setBindError] = useState<string | null>(null)
+  const [bindHint, setBindHint] = useState<string | null>(null)
   const [syncError, setSyncError] = useState<string | null>(null)
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
+  const [demoBound, setDemoBound] = useState(() => readSession(DEMO_KEY) === '1')
 
   const persistAuto = (v: boolean) => {
     writeSession(AUTO_KEY, v ? '1' : '0')
@@ -69,14 +73,16 @@ export default function MeituanMerchantSection() {
 
   const handleBind = async () => {
     setBindError(null)
+    setBindHint(null)
     if (!appId.trim() || !appSecret.trim()) {
-      setBindError('请填写 AppID 与 App Secret')
+      setBindError('请填写商家自研应用的 AppID / developerId 与 App Secret / SignKey')
       return
     }
     setBindSubmitting(true)
     const r = await postMeituanBind({
       appId: appId.trim(),
       appSecret: appSecret.trim(),
+      appAuthToken: appAuthToken.trim() || undefined,
       extraId: extraId.trim() || undefined,
     })
     setBindSubmitting(false)
@@ -86,17 +92,24 @@ export default function MeituanMerchantSection() {
     }
     writeSession(TOKEN_KEY, r.accessToken)
     writeSession(META_APP_ID, appId.trim())
+    writeSession(DEMO_KEY, r.demo ? '1' : '0')
+    setDemoBound(Boolean(r.demo))
     setAccessToken(r.accessToken)
     setAppSecret('')
+    setAppAuthToken('')
     setBindOpen(false)
+    if (r.message) setBindHint(r.message)
     void runSync()
   }
 
   const disconnect = () => {
     writeSession(TOKEN_KEY, null)
+    writeSession(DEMO_KEY, null)
     setAccessToken(null)
+    setDemoBound(false)
     setLastSyncAt(null)
     setSyncError(null)
+    setBindHint(null)
   }
 
   return (
@@ -107,8 +120,9 @@ export default function MeituanMerchantSection() {
           <div>
             <h3 className="text-lg font-semibold text-gray-900">大众点评商家版</h3>
             <p className="text-sm text-gray-500">
-              绑定大众点评商家授权后，可同步门店、团购商品、评价与财务等经营数据；支持手动或定时刷新。
+              商家自研接入：绑定后可同步门店、团购商品、评价与财务等经营数据；支持手动或定时刷新。
             </p>
+            <p className="mt-1 text-xs text-gray-400">接入模式：商家自研（非三方服务商）</p>
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -154,8 +168,12 @@ export default function MeituanMerchantSection() {
                 <div>
                   <h4 className="font-medium text-gray-900">大众点评已绑定</h4>
                   <p className="text-sm text-gray-500">
-                    应用编号：{readSession(META_APP_ID) ?? '—'}
+                    应用编号：{readSession(META_APP_ID) ?? '—'} · 接入模式：商家自研
+                    {demoBound ? ' · 演示模式' : ''}
                   </p>
+                  {bindHint ? (
+                    <p className="mt-1 text-xs text-amber-700">{bindHint}</p>
+                  ) : null}
                   <div className="mt-2">
                     <button
                       type="button"
@@ -182,7 +200,6 @@ export default function MeituanMerchantSection() {
               onAutoRefreshEnabledChange={persistAuto}
             />
           </div>
-
         </div>
       ) : (
         <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50/80 p-8 text-center text-sm text-gray-600">
@@ -194,13 +211,13 @@ export default function MeituanMerchantSection() {
           >
             绑定说明书
           </button>
-          ，再点击「绑定大众点评」完成授权。
+          （商家自研流程），再点击「绑定大众点评」完成授权。
         </div>
       )}
 
       <BindGuideModal
         open={guideOpen}
-        title="大众点评商家版绑定说明书"
+        title="大众点评商家版绑定说明书（商家自研）"
         onClose={() => setGuideOpen(false)}
         primaryAction={
           !accessToken
@@ -230,7 +247,10 @@ export default function MeituanMerchantSection() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">绑定大众点评</h3>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">绑定大众点评</h3>
+                <p className="mt-0.5 text-xs text-gray-500">接入模式：商家自研</p>
+              </div>
               <button
                 type="button"
                 disabled={bindSubmitting}
@@ -244,7 +264,7 @@ export default function MeituanMerchantSection() {
             <div className="space-y-4">
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
-                  应用编号
+                  应用编号（AppID / developerId）
                 </label>
                 <input
                   type="text"
@@ -256,12 +276,24 @@ export default function MeituanMerchantSection() {
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
-                  应用密钥
+                  应用密钥（App Secret / SignKey）
                 </label>
                 <SecretInput
                   autoComplete="new-password"
                   value={appSecret}
                   onChange={(e) => setAppSecret(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  商户授权 Token（appAuthToken，选填）
+                </label>
+                <SecretInput
+                  autoComplete="new-password"
+                  value={appAuthToken}
+                  onChange={(e) => setAppAuthToken(e.target.value)}
+                  placeholder="门店授权成功后填写；演示模式可留空"
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>

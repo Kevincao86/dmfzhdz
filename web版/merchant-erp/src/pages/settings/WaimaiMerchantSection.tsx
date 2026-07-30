@@ -45,12 +45,17 @@ export default function WaimaiMerchantSection({ platformId, guideSteps }: Props)
   const [guideOpen, setGuideOpen] = useState(false)
   const [appId, setAppId] = useState(() => readSession(meta.appIdSessionKey) ?? '')
   const [appSecret, setAppSecret] = useState('')
+  const [appAuthToken, setAppAuthToken] = useState('')
   const [extraId, setExtraId] = useState('')
   const [bindSubmitting, setBindSubmitting] = useState(false)
   const [bindError, setBindError] = useState<string | null>(null)
+  const [bindHint, setBindHint] = useState<string | null>(null)
   const [syncError, setSyncError] = useState<string | null>(null)
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
+  const [demoBound, setDemoBound] = useState(
+    () => readSession(`${meta.tokenSessionKey}_demo`) === '1',
+  )
 
   const persistAuto = (v: boolean) => {
     writeSession(`${meta.tokenSessionKey}_auto`, v ? '1' : '0')
@@ -73,6 +78,7 @@ export default function WaimaiMerchantSection({ platformId, guideSteps }: Props)
 
   const handleBind = async () => {
     setBindError(null)
+    setBindHint(null)
     if (!appId.trim() || !appSecret.trim()) {
       setBindError('请填写商家自研应用的 AppID 与 App Secret')
       return
@@ -81,6 +87,7 @@ export default function WaimaiMerchantSection({ platformId, guideSteps }: Props)
     const r = await postWaimaiBind(platformId, {
       appId: appId.trim(),
       appSecret: appSecret.trim(),
+      appAuthToken: appAuthToken.trim() || undefined,
       extraId: extraId.trim() || undefined,
     })
     setBindSubmitting(false)
@@ -90,17 +97,24 @@ export default function WaimaiMerchantSection({ platformId, guideSteps }: Props)
     }
     writeSession(meta.tokenSessionKey, r.accessToken)
     writeSession(meta.appIdSessionKey, appId.trim())
+    writeSession(`${meta.tokenSessionKey}_demo`, r.demo ? '1' : '0')
+    setDemoBound(Boolean(r.demo))
     setAccessToken(r.accessToken)
     setAppSecret('')
+    setAppAuthToken('')
     setBindOpen(false)
+    if (r.message) setBindHint(r.message)
     void runSync()
   }
 
   const disconnect = () => {
     writeSession(meta.tokenSessionKey, null)
+    writeSession(`${meta.tokenSessionKey}_demo`, null)
     setAccessToken(null)
+    setDemoBound(false)
     setLastSyncAt(null)
     setSyncError(null)
+    setBindHint(null)
   }
 
   return (
@@ -115,6 +129,11 @@ export default function WaimaiMerchantSection({ platformId, guideSteps }: Props)
             <p className="text-sm text-gray-500">
               商家自研系统接入：绑定后可在商品、门店、评价、活动与财务对账中按
               {meta.name}模板创建与同步数据。
+            </p>
+            <p className="mt-1 text-xs text-gray-400">
+              接入模式：商家自研
+              {accessToken && demoBound ? ' · 演示模式' : ''}
+              {bindHint ? ` · ${bindHint}` : ''}
             </p>
             <a
               href={meta.docsUrl}
@@ -182,7 +201,8 @@ export default function WaimaiMerchantSection({ platformId, guideSteps }: Props)
 
       {bindOpen ? (
         <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-5">
-          <h4 className="mb-3 font-medium text-gray-900">绑定凭据（仅存于当前浏览器会话）</h4>
+          <h4 className="mb-1 font-medium text-gray-900">绑定凭据（仅存于当前浏览器会话）</h4>
+          <p className="mb-3 text-xs text-gray-500">接入模式：商家自研</p>
           {bindError ? (
             <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">{bindError}</p>
           ) : null}
@@ -204,6 +224,18 @@ export default function WaimaiMerchantSection({ platformId, guideSteps }: Props)
                   onChange={(e) => setAppSecret(e.target.value)}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2"
                   autoComplete="new-password"
+                />
+              </div>
+            </label>
+            <label className="block text-sm sm:col-span-2">
+              <span className="text-gray-600">商户授权 Token（appAuthToken，选填）</span>
+              <div className="relative mt-1">
+                <SecretInput
+                  value={appAuthToken}
+                  onChange={(e) => setAppAuthToken(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                  autoComplete="new-password"
+                  placeholder="门店授权成功后填写；演示模式可留空"
                 />
               </div>
             </label>
