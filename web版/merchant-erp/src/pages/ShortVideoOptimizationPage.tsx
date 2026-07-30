@@ -2240,16 +2240,10 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
               setHint('已切到短片生成 · 分镜参考，请上传素材；也可再回「无限画布」查看节点')
               queueMicrotask(() => storyFrameInputRef.current?.click())
             }}
-            onEditRow={(index) => {
-              syncGenerateWorkspaceFromCanvas(scriptRows)
-              setGenMode('text')
-              setMainPane('generate')
-              setHint(`正在编辑分镜 ${index + 1}：已同步到短片生成区的执导分镜脚本，请完善画面与口播`)
-              queueMicrotask(() => {
-                document
-                  .getElementById('sv-script-table-anchor')
-                  ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-              })
+            onChangeScriptRow={(index, patch) => {
+              setScriptRows((prev) =>
+                prev.map((r, i) => (i === index ? { ...r, ...patch } : r)),
+              )
             }}
             onApplyFlowOrder={(orderedIndices) => {
               if (orderedIndices.length < 2) return
