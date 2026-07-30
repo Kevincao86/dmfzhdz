@@ -15,7 +15,9 @@ import {
 import { ShortVideoIceBatchPanel } from '../components/ShortVideoIceBatchPanel'
 import ShortVideoScriptTableEditor from '../components/ShortVideoScriptTableEditor'
 import ShortVideoAgentCabin from '../components/ShortVideoAgentCabin'
-import ShortVideoCaseGallery from '../components/ShortVideoCaseGallery'
+import ShortVideoCaseGallery, {
+  ShortVideoCanvasLocalLifeStrip,
+} from '../components/ShortVideoCaseGallery'
 import ShortVideoInfiniteCanvas, {
   SCRIPT_SHOT_MEDIA_MAX,
 } from '../components/ShortVideoInfiniteCanvas'
@@ -1723,6 +1725,39 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     [],
   )
 
+  /** 无限画布「做同款」：写入分镜节点 + 顺序连线路径，停留在画布 */
+  const applyCanvasCase = useCallback(
+    (item: ShortVideoCaseItem) => {
+      const rows = item.canvasScriptRows
+      if (!rows || rows.length < 2) {
+        applyStudioCase(item)
+        return
+      }
+      setErr(null)
+      setGenPrompt(item.prompt)
+      setActiveSkillId(item.skillId ?? null)
+      setSdAspect(item.aspect)
+      setLongformEnabled(false)
+      setSdDurationSec('15')
+      setScriptRows(rows.map((r) => ({ ...r })))
+      setShotMediaIds(rows.map(() => [] as string[]))
+      setCanvasFlowEpoch((v) => v + 1)
+      setMainPane('canvas')
+      const pathLabel = rows.map((_, i) => i + 1).join('→')
+      setHint(
+        `已套用「${item.title}」画布路径（${pathLabel}）${
+          item.hasNarration ? ' · 含配音案例' : ''
+        }，可改连线后点「应用流程」或去短片生成`,
+      )
+      queueMicrotask(() => {
+        document
+          .querySelector('.sv-infinite-canvas')
+          ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      })
+    },
+    [applyStudioCase],
+  )
+
   const onStudioModeChange = (id: ShortVideoStudioModeId) => {
     setStudioMode(id)
     const mode = findStudioMode(id)
@@ -2485,6 +2520,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
               浏览案例做同款
             </button>
           </div>
+          <ShortVideoCanvasLocalLifeStrip onApplyCase={applyCanvasCase} className="pt-2" />
         </div>
       ) : null}
 

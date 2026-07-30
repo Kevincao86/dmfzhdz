@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../cn'
 import {
   SHORT_VIDEO_CASES,
+  canvasLocalLifeCases,
   casesByTab,
   type ShortVideoCaseItem,
   type ShortVideoCaseKind,
@@ -546,5 +547,182 @@ function CasePreviewModal({
         </div>
       </div>
     </div>
+  )
+}
+
+/** 无限画布下方：本地生活含口播案例条，「做同款」铺画布路径 */
+export function ShortVideoCanvasLocalLifeStrip({
+  onApplyCase,
+  className,
+}: {
+  onApplyCase: (item: ShortVideoCaseItem) => void
+  className?: string
+}) {
+  const items = useMemo(() => canvasLocalLifeCases(), [])
+  const [preview, setPreview] = useState<ShortVideoCaseItem | null>(null)
+
+  if (!items.length) return null
+
+  return (
+    <section className={cn('w-full space-y-3', className)}>
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-900">本地生活 · 画布案例</h3>
+          <p className="mt-0.5 text-xs text-slate-500">
+            含配音预览 · 点「做同款」自动生成镜头节点与连线路径
+          </p>
+        </div>
+        <span className="text-[11px] text-slate-400">{items.length} 款</span>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        {items.map((item) => (
+          <CanvasCaseCard
+            key={item.id}
+            item={item}
+            onPreview={() => {
+              prefetchCaseVideo(item.videoUrl)
+              setPreview(item)
+            }}
+            onApply={() => onApplyCase(item)}
+            onHover={() => prefetchCaseVideo(item.videoUrl)}
+          />
+        ))}
+      </div>
+      {preview ? (
+        <CasePreviewModal
+          item={preview}
+          onClose={() => setPreview(null)}
+          onApply={() => {
+            onApplyCase(preview)
+            setPreview(null)
+          }}
+        />
+      ) : null}
+    </section>
+  )
+}
+
+function CanvasCaseCard({
+  item,
+  onPreview,
+  onApply,
+  onHover,
+}: {
+  item: ShortVideoCaseItem
+  onPreview: () => void
+  onApply: () => void
+  onHover: () => void
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [hoverPlaying, setHoverPlaying] = useState(false)
+  const timerRef = useRef<number | null>(null)
+  const pathLen = item.canvasScriptRows?.length ?? 0
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) window.clearTimeout(timerRef.current)
+    }
+  }, [])
+
+  const startHoverPlay = () => {
+    onHover()
+    if (timerRef.current) window.clearTimeout(timerRef.current)
+    timerRef.current = window.setTimeout(() => {
+      const v = videoRef.current
+      if (!v || !item.videoUrl) return
+      v.muted = false
+      void v.play().then(() => setHoverPlaying(true)).catch(() => {
+        v.muted = true
+        void v.play().then(() => setHoverPlaying(true)).catch(() => undefined)
+      })
+    }, 600)
+  }
+
+  const stopHoverPlay = () => {
+    if (timerRef.current) window.clearTimeout(timerRef.current)
+    timerRef.current = null
+    const v = videoRef.current
+    if (v) {
+      v.pause()
+      v.currentTime = 0
+    }
+    setHoverPlaying(false)
+  }
+
+  return (
+    <article className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <button
+        type="button"
+        className="relative aspect-[9/14] w-full overflow-hidden bg-slate-100"
+        onMouseEnter={startHoverPlay}
+        onMouseLeave={stopHoverPlay}
+        onFocus={startHoverPlay}
+        onBlur={stopHoverPlay}
+        onClick={onPreview}
+        aria-label={`预览 ${item.title}`}
+      >
+        {item.coverUrl ? (
+          <img
+            src={item.coverUrl}
+            alt=""
+            className={cn(
+              'absolute inset-0 h-full w-full object-cover transition-opacity',
+              hoverPlaying ? 'opacity-0' : 'opacity-100',
+            )}
+          />
+        ) : (
+          <div
+            className="absolute inset-0"
+            style={{
+              background: `linear-gradient(145deg, ${item.coverFrom}, ${item.coverTo})`,
+            }}
+          />
+        )}
+        {item.videoUrl ? (
+          // eslint-disable-next-line jsx-a11y/media-has-caption
+          <video
+            ref={videoRef}
+            src={item.videoUrl}
+            className={cn(
+              'absolute inset-0 h-full w-full object-cover transition-opacity',
+              hoverPlaying ? 'opacity-100' : 'opacity-0',
+            )}
+            playsInline
+            loop
+            preload="metadata"
+            poster={item.coverUrl}
+          />
+        ) : null}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent p-3 pt-10 text-left text-white">
+          <div className="mb-1 flex flex-wrap gap-1">
+            <span className="rounded-full bg-cyan-600/90 px-1.5 py-0.5 text-[9px] font-medium">含配音</span>
+            <span className="rounded-full bg-black/50 px-1.5 py-0.5 text-[9px] font-medium">
+              {pathLen} 镜路径
+            </span>
+          </div>
+          <p className="text-sm font-semibold leading-snug">{item.title}</p>
+          <p className="mt-0.5 line-clamp-1 text-[11px] text-white/85">{item.subtitle}</p>
+        </div>
+      </button>
+      <div className="flex items-center gap-2 p-2.5">
+        <button
+          type="button"
+          onClick={onPreview}
+          disabled={!item.videoUrl}
+          className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-slate-100 px-2 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-40"
+        >
+          <Play className="h-3 w-3" />
+          预览
+        </button>
+        <button
+          type="button"
+          onClick={onApply}
+          className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-emerald-50 px-2 py-1.5 text-[11px] font-semibold text-emerald-900 ring-1 ring-emerald-200 hover:bg-emerald-100"
+        >
+          <Copy className="h-3 w-3" />
+          做同款
+        </button>
+      </div>
+    </article>
   )
 }
