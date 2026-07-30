@@ -24,7 +24,7 @@ function normalizeImageUrl(row: string): string {
 }
 
 /** 为 i2v 参考图分配 role（首帧 / 首尾帧 / 参考图三种场景互斥，禁止混用） */
-export function seedanceImageRoleForIndex(index: number, total: number): SeedanceImageRole {
+export function seedanceImageRoleForIndex(_index: number, total: number): SeedanceImageRole {
   // 单图：首帧图生视频
   if (total <= 1) return 'first_frame'
   // 多图：一律走「参考图」模式（即梦式人物+场景双参考）。
