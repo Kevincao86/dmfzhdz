@@ -2,12 +2,14 @@
 
 画幅 16:9 · 单片约 30 秒。
 
-## 已产出演示成片（商家 ERP 同源 Seedance）
+## 已产出演示成片
 
-| 成片 | 时长 | 说明 |
-|------|------|------|
-| `out/demo-canvas-30s.mp4` | ≈30.3s | 无限画布玩法 |
-| `out/demo-shortfilm-30s.mp4` | ≈30.3s | 短片生成玩法 |
+| 成片 | 时长 | 方式 | 说明 |
+|------|------|------|------|
+| `out/demo-canvas-30s-keyframes.mp4` | 30s | **关键帧分镜**（推荐） | 每镜 5s 轻推拉，文字清晰 |
+| `out/demo-shortfilm-30s-keyframes.mp4` | 30s | **关键帧分镜**（推荐） | 同上 |
+| `out/demo-canvas-30s.mp4` | ≈30.3s | Seedance i2v | 易糊字，仅作对比 |
+| `out/demo-shortfilm-30s.mp4` | ≈30.3s | Seedance i2v | 易糊字，仅作对比 |
 
 复现：
 
