@@ -271,12 +271,62 @@ export async function compressVisionDataUrl(
 
 export async function imageUrlToPureBase64(url: string): Promise<string> {
   const trimmed = url.trim()
+  if (!trimmed) throw new Error('无法加载形象参考图')
   if (trimmed.startsWith('data:')) {
     const ix = trimmed.indexOf('base64,')
     return ix >= 0 ? trimmed.slice(ix + 'base64,'.length).replace(/\s/g, '') : trimmed
   }
-  const res = await fetch(trimmed)
-  if (!res.ok) throw new Error('无法加载形象参考图')
-  const blob = await res.blob()
-  return blobToPureBase64(blob)
+
+  const candidates: string[] = []
+  const add = (u: string) => {
+    const s = String(u || '').trim()
+    if (!s || candidates.includes(s)) return
+    candidates.push(s)
+  }
+  // OSS 绝对地址时补同源相对路径（数字人预置图 / 门店实景）
+  const localMatch = trimmed.match(/(\/digital-human\/(?:avatars|store-scenes)\/[^?/#]+)/)
+  if (localMatch?.[1]) add(localMatch[1])
+  add(trimmed)
+
+  const viaFetch = async (u: string) => {
+    const res = await fetch(u)
+    if (!res.ok) throw new Error('无法加载形象参考图')
+    return blobToPureBase64(await res.blob())
+  }
+
+  const viaImage = async (u: string) => {
+    if (typeof document === 'undefined') throw new Error('非浏览器环境无法解码形象图')
+    const img = new Image()
+    if (!u.startsWith('/') && !u.startsWith('data:')) img.crossOrigin = 'anonymous'
+    img.decoding = 'async'
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve()
+      img.onerror = () => reject(new Error('无法加载形象参考图'))
+      img.src = u
+    })
+    const canvas = document.createElement('canvas')
+    canvas.width = img.naturalWidth || img.width
+    canvas.height = img.naturalHeight || img.height
+    if (!canvas.width || !canvas.height) throw new Error('形象图尺寸无效')
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('无法创建画布')
+    ctx.drawImage(img, 0, 0)
+    const jpegBlob = await canvasToBlobJpeg(canvas, 0.92)
+    return blobToPureBase64(jpegBlob)
+  }
+
+  let lastErr: Error | null = null
+  for (const u of candidates) {
+    try {
+      return await viaFetch(u)
+    } catch (e) {
+      lastErr = e instanceof Error ? e : new Error(String(e))
+    }
+    try {
+      return await viaImage(u)
+    } catch (e) {
+      lastErr = e instanceof Error ? e : new Error(String(e))
+    }
+  }
+  throw lastErr ?? new Error('无法加载形象参考图')
 }
