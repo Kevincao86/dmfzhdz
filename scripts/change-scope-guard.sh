@@ -50,6 +50,7 @@ list_scopes() {
   merchant_brief_direct 商家 ERP：Brief 去订单直接生成 + 短视频观感打磨
   merchant_jimeng_studio 商家 ERP：即梦式短视频台（Skill/画布/短片/案例）+ 全站 UI token
   aimodelserver_upstream AiModelServer（api.aimodelserver.com）OpenAI 兼容上游接入
+  digital_human_bg     商家 ERP：数字人口播·门店实景背景选中
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -587,6 +588,14 @@ chatStreamRouter
 modelRegistry
 agentModelRoute
 services/ai/types
+change-scope-guard
+PAT
+      ;;
+    digital_human_bg)
+      cat <<'PAT'
+digitalHumanStoreScenes
+DhStep3Extras
+DigitalHumanBroadcastPage
 change-scope-guard
 PAT
       ;;

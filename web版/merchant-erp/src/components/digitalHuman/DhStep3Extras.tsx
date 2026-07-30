@@ -1,5 +1,5 @@
 import { Plus, Trash2, Upload } from 'lucide-react'
-import type { RefObject } from 'react'
+import { useState, type RefObject } from 'react'
 import { cn } from '../../cn'
 import {
   BACKGROUND_OPTIONS,
@@ -9,9 +9,32 @@ import {
 } from '../../lib/digitalHumanBroadcast'
 import {
   STORE_SCENE_OPTIONS,
-  storeScenePreviewUrl,
+  storeScenePreviewCandidates,
   type StoreSceneId,
 } from '../../lib/digitalHumanStoreScenes'
+
+function StoreSceneThumb({
+  sceneId,
+  label,
+  className,
+}: {
+  sceneId: StoreSceneId
+  label: string
+  className?: string
+}) {
+  const candidates = storeScenePreviewCandidates(sceneId)
+  const [idx, setIdx] = useState(0)
+  const src = candidates[Math.min(idx, Math.max(candidates.length - 1, 0))] || ''
+  return (
+    <img
+      src={src}
+      alt={label}
+      className={className}
+      loading="lazy"
+      onError={() => setIdx((i) => (i + 1 < candidates.length ? i + 1 : i))}
+    />
+  )
+}
 
 export const BACKGROUND_PREVIEW_HINTS: Record<
   string,
@@ -75,15 +98,17 @@ export function DhBackgroundSubContent({
           <p className="text-xs text-slate-500">选择门店实景背景（AI 预生成，点击即可选用）</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {STORE_SCENE_OPTIONS.map((scene) => {
-              const preview = storeScenePreviewUrl(scene.id)
               const active = draft.storeScene === scene.id
               const loading = storeSceneSelecting === scene.id
               return (
                 <button
                   key={scene.id}
                   type="button"
-                  disabled={storeSceneSelecting !== null}
-                  onClick={() => onSelectStoreScene(scene.id)}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    onSelectStoreScene(scene.id)
+                  }}
                   className={cn(
                     'overflow-hidden rounded-xl border text-left transition',
                     active
@@ -92,15 +117,19 @@ export function DhBackgroundSubContent({
                   )}
                 >
                   <div className="relative aspect-[9/16] bg-slate-100">
-                    <img
-                      src={preview}
-                      alt={scene.label}
+                    <StoreSceneThumb
+                      sceneId={scene.id}
+                      label={scene.label}
                       className="h-full w-full object-cover"
-                      loading="lazy"
                     />
                     {loading ? (
                       <div className="absolute inset-0 flex items-center justify-center bg-black/30 text-xs text-white">
                         选用中…
+                      </div>
+                    ) : null}
+                    {active && !loading ? (
+                      <div className="absolute right-1.5 top-1.5 rounded bg-violet-600 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                        已选
                       </div>
                     ) : null}
                   </div>
@@ -271,19 +300,21 @@ export function DhMultiScenePanel({
                         <button
                           key={scene.id}
                           type="button"
-                          disabled={shotStoreSceneSelecting !== null}
-                          onClick={() => onSelectShotStoreScene(shot.id, scene.id)}
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            onSelectShotStoreScene(shot.id, scene.id)
+                          }}
                           className={cn(
                             'overflow-hidden rounded-lg border text-left',
                             active ? 'border-violet-400 ring-1 ring-violet-200' : 'border-slate-200',
                           )}
                         >
                           <div className="relative aspect-[9/16]">
-                            <img
-                              src={storeScenePreviewUrl(scene.id)}
-                              alt={scene.label}
+                            <StoreSceneThumb
+                              sceneId={scene.id}
+                              label={scene.label}
                               className="h-full w-full object-cover"
-                              loading="lazy"
                             />
                             {loading ? (
                               <div className="absolute inset-0 bg-black/25 text-[10px] text-white flex items-center justify-center">
