@@ -80,12 +80,14 @@ export function appendEmptyScriptRow(
   ]
 }
 
-/** 删除指定分镜行；至少保留 2 段 */
+/** 删除指定分镜行；默认至少保留 1 段（短片单段）；混剪可传 minRows=2 */
 export function removeScriptRowAt(
   rows: ShortVideoScriptRow[],
   index: number,
+  minRows = 1,
 ): ShortVideoScriptRow[] {
-  if (rows.length <= 2) return rows
+  const floor = Math.max(1, Math.min(SCRIPT_ROW_MAX_COUNT, Math.floor(minRows) || 1))
+  if (rows.length <= floor) return rows
   if (!Number.isFinite(index) || index < 0 || index >= rows.length) return rows
   return rows.filter((_, i) => i !== index)
 }

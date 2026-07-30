@@ -2754,12 +2754,13 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                     rows={scriptRows}
                     disabled={anyBusy || guidanceBusy}
                     compact={scriptRows.length > 8}
+                    minRows={2}
                     onChange={applyScriptRows}
                     onAddRow={() =>
                       applyScriptRows(appendEmptyScriptRow(scriptRows, MIX_DEFAULT_SEGMENT_SEC))
                     }
                     onRemoveRow={(index) => {
-                      const nextRows = removeScriptRowAt(scriptRows, index)
+                      const nextRows = removeScriptRowAt(scriptRows, index, 2)
                       applyScriptRows(nextRows)
                       setMaterialSlots((prev) =>
                         normalizeMixMaterialSlots(
