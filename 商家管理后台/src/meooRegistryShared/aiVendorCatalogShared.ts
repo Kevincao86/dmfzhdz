@@ -22,6 +22,7 @@ export const BUILTIN_AI_VENDOR_IDS = [
   'grok',
   'deepseek',
   'kimi',
+  'aimodelserver',
 ] as const
 export type BuiltinAiVendorId = (typeof BUILTIN_AI_VENDOR_IDS)[number]
 
@@ -109,6 +110,12 @@ export const BUILTIN_AI_VENDOR_ENTRIES: AiVendorCatalogEntry[] = [
     label: 'Kimi',
     hint: 'Moonshot · OpenAI 兼容（智能体网关）',
     logoUrl: '/ai-vendors/kimi.png',
+  },
+  {
+    id: 'aimodelserver',
+    label: 'AiModelServer',
+    hint: 'api.aimodelserver.com · OpenAI 兼容统一网关；填控制台 sk- 密钥（智能体 /api/meoo-ai-chat）',
+    logoUrl: '/ai-vendors/openai.png',
   },
 ]
 

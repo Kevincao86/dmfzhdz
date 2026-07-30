@@ -59,6 +59,14 @@ export const DIRECT_MODEL_REGISTRY: readonly DirectModelRegistryEntry[] = [
     defaultModel: 'MiniMax-M2.7',
     fallbackModel: 'MiniMax-M2.1',
   },
+  {
+    provider: 'aimodelserver',
+    label: 'AiModelServer',
+    defaultBaseUrl: 'https://api.aimodelserver.com/v1',
+    primaryEndpoint: 'POST /chat/completions（OpenAI 兼容）',
+    defaultModel: 'gpt-5.4',
+    fallbackModel: 'claude-sonnet-4-6',
+  },
 ] as const
 
 export function registryEntry(provider: Exclude<AIProvider, 'tokenmix'>): DirectModelRegistryEntry | undefined {
@@ -185,6 +193,17 @@ export function listAiModelPickerOptions(): AiModelPickerOption[] {
         capability: 'image',
       })
     }
+    if (r.provider === 'aimodelserver') {
+      for (const m of ['gemini-3.5-flash', 'deepseek-v4-flash', 'glm-5.2'] as const) {
+        out.push({
+          key: `${r.provider}::${m}`,
+          provider: r.provider,
+          model: m,
+          label: `${r.label} · ${m}`,
+          capability: 'chat',
+        })
+      }
+    }
   }
 
   /** 千问 / 豆包：下拉仅展示三档主封装（子模型在 vendorModelPool 内随机 + 额度切换） */
@@ -231,6 +250,7 @@ export function listAiModelPickerOptionsForPlan(plan: MembershipPlan): AiModelPi
   return all.filter((o) => {
     if (o.provider === 'tokenmix') return false
     if (o.provider === 'kimi') return false
+    if (o.provider === 'aimodelserver') return false
     return (
       o.provider === 'qwen' ||
       o.provider === 'doubao' ||
@@ -250,7 +270,10 @@ export function defaultAiModelPickerKeyForPlan(plan: MembershipPlan): string {
 
 export type ParsedModelPicker =
   | { provider: 'tokenmix'; modelFamily: AIModelFamily; model: string }
-  | { provider: 'deepseek' | 'kimi' | 'minimax' | 'qwen' | 'doubao'; model: string }
+  | {
+      provider: 'deepseek' | 'kimi' | 'minimax' | 'qwen' | 'doubao' | 'aimodelserver'
+      model: string
+    }
 
 export function parseAiModelPickerKey(key: string): ParsedModelPicker | null {
   const tierAuto = parseVendorTierAutoFromKey(key)
@@ -266,7 +289,16 @@ export function parseAiModelPickerKey(key: string): ParsedModelPicker | null {
   }
   if (parts.length >= 2) {
     const p = parts[0] as AIProvider
-    if (p !== 'deepseek' && p !== 'kimi' && p !== 'minimax' && p !== 'qwen' && p !== 'doubao') return null
+    if (
+      p !== 'deepseek' &&
+      p !== 'kimi' &&
+      p !== 'minimax' &&
+      p !== 'qwen' &&
+      p !== 'doubao' &&
+      p !== 'aimodelserver'
+    ) {
+      return null
+    }
     const rest = parts.slice(1).join('::')
     const model = rest === '__default__' ? '' : rest
     return { provider: p, model }

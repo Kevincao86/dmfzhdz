@@ -5,13 +5,21 @@ export const MAX_AI_CHAT_IMAGE_ATTACHMENTS = 8
 
 /**
  * AI 网关 — OpenAI/Claude/Gemini/Grok 经 [TokenMix](https://tokenmix.ai/docs)；
- * DeepSeek / Kimi / MiniMax 仍直连各厂商 API。密钥仅服务端。
+ * DeepSeek / Kimi / MiniMax 仍直连各厂商 API；
+ * AiModelServer 走 api.aimodelserver.com OpenAI 兼容网关。密钥仅服务端。
  */
 
 /** TokenMix 侧「模型家族」分组 */
 export type AIModelFamily = 'openai' | 'claude' | 'gemini' | 'grok'
 
-export type AIProvider = 'tokenmix' | 'deepseek' | 'kimi' | 'minimax' | 'qwen' | 'doubao'
+export type AIProvider =
+  | 'tokenmix'
+  | 'deepseek'
+  | 'kimi'
+  | 'minimax'
+  | 'qwen'
+  | 'doubao'
+  | 'aimodelserver'
 
 export type AIMessageRole = 'system' | 'user' | 'assistant' | 'tool'
 

@@ -236,6 +236,13 @@ export function applyRegistryVendorKeysToMerchantEnv(
     setFromRegistry(out, 'MOONSHOT_API_KEY', kimi, 'kimi')
     setFromRegistry(out, 'MERCHANT_AI_KIMI_KEY', kimi, 'kimi')
   }
+
+  // AiModelServer：正式 id；兼容运营台自定义「鑫义」vendor_1785402863785
+  const aimodelserver =
+    expanded.aimodelserver ||
+    expanded['vendor_1785402863785'] ||
+    expanded.xinyi
+  if (aimodelserver) setFromRegistry(out, 'AIMODELSERVER_API_KEY', aimodelserver)
 }
 
 function mergeVendorKeysFromLocalRegistry(viteRoot: string | undefined, out: MerchantAiEnv): void {

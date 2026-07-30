@@ -49,6 +49,7 @@ list_scopes() {
   knowledge_base       知识库（运营全局 + 商家/FWS 租户 + AI 投喂）
   merchant_brief_direct 商家 ERP：Brief 去订单直接生成 + 短视频观感打磨
   merchant_jimeng_studio 商家 ERP：即梦式短视频台（Skill/画布/短片/案例）+ 全站 UI token
+  aimodelserver_upstream AiModelServer（api.aimodelserver.com）OpenAI 兼容上游接入
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -570,6 +571,20 @@ AiAgentPage
 MeooLayout
 index.css
 merchantEmbedChrome.css
+change-scope-guard
+PAT
+      ;;
+    aimodelserver_upstream)
+      cat <<'PAT'
+aimodelserver
+aiVendorCatalogShared
+merchantRegistryVendorEnv
+meooAiChatPrepare
+chatRouter
+chatStreamRouter
+modelRegistry
+agentModelRoute
+services/ai/types
 change-scope-guard
 PAT
       ;;

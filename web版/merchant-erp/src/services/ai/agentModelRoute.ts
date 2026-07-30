@@ -68,5 +68,8 @@ export function dialogueStyleAddonForPickerKey(pickerKey: string): string {
   if (parsed.provider === 'deepseek') return '使用 DeepSeek：简洁、逻辑清楚，少废话。'
   if (parsed.provider === 'kimi') return '使用 Kimi：长文也能收束，先结论后展开。'
   if (parsed.provider === 'minimax') return '使用 MiniMax：短句、好念，适合口播与活动话术。'
+  if (parsed.provider === 'aimodelserver') {
+    return '使用 AiModelServer 统一网关：按所选模型作答，结构清晰、可执行。'
+  }
   return ''
 }
