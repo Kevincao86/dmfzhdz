@@ -23,11 +23,13 @@ function normalizeImageUrl(row: string): string {
   return url
 }
 
-/** 为 i2v 参考图分配 role：首图 first_frame，其余 reference_image */
+/** 为 i2v 参考图分配 role（首帧 / 首尾帧 / 参考图三种场景互斥，禁止混用） */
 export function seedanceImageRoleForIndex(index: number, total: number): SeedanceImageRole {
+  // 单图：首帧图生视频
   if (total <= 1) return 'first_frame'
-  if (index === 0) return 'first_frame'
-  if (index === total - 1 && total >= 2) return 'reference_image'
+  // 多图：一律走「参考图」模式（即梦式人物+场景双参考）。
+  // 若首张标 first_frame、其余 reference_image，方舟会报：
+  // first/last frame content cannot be mixed with reference media content
   return 'reference_image'
 }
 
