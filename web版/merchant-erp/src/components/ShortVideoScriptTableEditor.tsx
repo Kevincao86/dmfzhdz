@@ -9,8 +9,10 @@ type Props = {
   onChange: (rows: ShortVideoScriptRow[]) => void
   /** 展示「添加时间段」按钮（手动编写分镜） */
   onAddRow?: () => void
-  /** 删除指定行（至少保留 2 段） */
+  /** 删除指定行 */
   onRemoveRow?: (index: number) => void
+  /** 最少保留段数（短片默认 1；混剪建议 2） */
+  minRows?: number
 }
 
 export default function ShortVideoScriptTableEditor({
@@ -20,13 +22,15 @@ export default function ShortVideoScriptTableEditor({
   onChange,
   onAddRow,
   onRemoveRow,
+  minRows = 1,
 }: Props) {
   const updateRow = (index: number, patch: Partial<ShortVideoScriptRow>) => {
     onChange(rows.map((r, i) => (i === index ? { ...r, ...patch } : r)))
   }
 
   const textRows = compact ? 1 : 3
-  const canRemove = Boolean(onRemoveRow) && rows.length > 2
+  const floor = Math.max(1, minRows)
+  const canRemove = Boolean(onRemoveRow) && rows.length > floor
 
   return (
     <div className="overflow-x-auto rounded-lg border border-zinc-200">
@@ -78,7 +82,7 @@ export default function ShortVideoScriptTableEditor({
                     type="button"
                     disabled={disabled || !canRemove}
                     onClick={() => onRemoveRow(i)}
-                    title={canRemove ? '删除该时间段' : '至少保留 2 段分镜'}
+                    title={canRemove ? '删除该时间段' : `至少保留 ${floor} 段分镜`}
                     className="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <Trash2 className="h-3.5 w-3.5" />

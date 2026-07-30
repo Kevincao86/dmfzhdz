@@ -2033,7 +2033,11 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
                       setScriptRows((prev) => appendEmptyScriptRow(prev, activeScriptSegmentSec))
                     }
                     onRemoveRow={(index) =>
-                      setScriptRows((prev) => removeScriptRowAt(prev, index))
+                      setScriptRows((prev) => {
+                        const next = removeScriptRowAt(prev, index, 1)
+                        if (next === prev) return prev
+                        return retimeScriptRowsBySegmentSec(next, activeScriptSegmentSec)
+                      })
                     }
                   />
                 </div>
@@ -2270,7 +2274,11 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
               })
             }}
             onRemoveScriptRow={(index) => {
-              setScriptRows((prev) => removeScriptRowAt(prev, index))
+              setScriptRows((prev) => {
+                const next = removeScriptRowAt(prev, index, 1)
+                if (next === prev) return prev
+                return retimeScriptRowsBySegmentSec(next, activeScriptSegmentSec)
+              })
               setHint(`已删除分镜 ${index + 1}`)
             }}
             onRemoveMedia={(id) => {
