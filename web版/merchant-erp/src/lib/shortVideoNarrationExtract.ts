@@ -248,3 +248,23 @@ export function finalizeNarrationScript(source: string, durationSec: number): st
   const base = looksLikeReadyNarration(raw) ? raw : extractShortVideoNarrationScript(raw)
   return capNarrationForDuration(base, durationSec)
 }
+
+const INVALID_SUBTITLE_RE =
+  /待填|画面待填|口播\s*[:：]?\s*[-—–]|（待填|占位|TODO|placeholder|暂无口播|无口播|暂不配音/i
+
+/**
+ * 是否适合烧录上屏字幕。
+ * 过滤占位/执导元数据/空口播，避免「无效字幕」盖住画面。
+ */
+export function isValidShortVideoSubtitleScript(script: string): boolean {
+  const t = String(script || '').trim()
+  if (t.length < 4) return false
+  if (INVALID_SUBTITLE_RE.test(t)) return false
+  if (/^【[^】]*】\s*画面\s*[:：]/.test(t) && /待填|口播\s*[:：]\s*（/.test(t)) return false
+  // 纯技术/执导说明不当字幕
+  if (looksLikeGuidanceDoc(t) && !looksLikeReadyNarration(t)) return false
+  // 过短且无中文标点的碎片，多为噪声
+  const han = (t.match(/[\u4e00-\u9fff]/g) || []).length
+  if (han < 4 && t.length < 10) return false
+  return true
+}

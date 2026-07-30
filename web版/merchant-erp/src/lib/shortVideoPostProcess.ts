@@ -16,6 +16,7 @@ import {
   SHORT_VIDEO_MOTION_PROMPT_SUFFIX,
   extractShortVideoNarrationScript,
   sanitizePromptForVideoModel,
+  isValidShortVideoSubtitleScript,
 } from './shortVideoNarrationExtract'
 
 export {
@@ -24,6 +25,7 @@ export {
   extractShortVideoNarrationScript,
   sanitizePromptForVideoModel,
   finalizeNarrationScript,
+  isValidShortVideoSubtitleScript,
 }
 
 function base64ToBlob(b64: string, mime: string): Blob {
@@ -94,8 +96,14 @@ export async function finalizeShortVideoOutput(
     return { ok: true, objectUrl, blob: videoBlob }
   }
 
+  // 口播 TTS：有可读稿即可；上屏字幕另做有效性校验
+  const allowTts = isValidShortVideoSubtitleScript(script) || looksLikeSpokenNarrationLoose(script)
+  const burnSubtitles = isValidShortVideoSubtitleScript(script)
+
   onProgress?.('合成口播配音…')
-  const tts = await synthesizeShortVideoNarration(script)
+  const tts = allowTts
+    ? await synthesizeShortVideoNarration(script)
+    : ({ ok: false as const, message: '口播稿无效，跳过配音与字幕' })
   let merged = videoBlob
   if (tts.ok) {
     onProgress?.('混入口播音轨（口播优先，画面不足时延长末帧）…')
@@ -106,7 +114,7 @@ export async function finalizeShortVideoOutput(
       return { ok: false, message: msg }
     }
   } else {
-    onProgress?.(`配音跳过：${tts.message}，仅烧录字幕…`)
+    onProgress?.(`配音跳过：${tts.message}`)
   }
 
   const mergedDur = await probeVideoDurationSec(merged)
@@ -116,14 +124,25 @@ export async function finalizeShortVideoOutput(
       : opts?.preferFullNarration && plannedDur > 0
         ? plannedDur
         : capDur
-  const srt = subtitleDur > 0 ? buildSrtContent(splitSubtitleLines(script), subtitleDur) : ''
+  // 产品特写叠加时不烧字幕，避免遮挡重点画面；无效口播亦不烧录
   const productB64 = opts?.productImageBase64?.replace(/\s/g, '')
   const hasProductOverlay = Boolean(productB64 && productB64.length > 256)
+  const srt =
+    burnSubtitles && !hasProductOverlay && subtitleDur > 0
+      ? buildSrtContent(splitSubtitleLines(script), subtitleDur)
+      : ''
   if (srt.trim() || hasProductOverlay) {
-    onProgress?.(hasProductOverlay && srt.trim() ? '烧录字幕并叠加产品特写…' : hasProductOverlay ? '叠加产品特写…' : '烧录中文字幕…')
+    onProgress?.(
+      hasProductOverlay && srt.trim()
+        ? '烧录字幕并叠加产品特写…'
+        : hasProductOverlay
+          ? '叠加产品特写（跳过字幕以免遮挡）…'
+          : '烧录中文字幕（底部安全区）…',
+    )
     try {
       merged = await postProcessVideoOnServer(merged, {
         srtContent: srt.trim() || undefined,
+        // 底部高边距安全区，远离画面中心主体
         subtitleStyle: 'bottom-safe',
         productImageBase64: hasProductOverlay ? productB64 : undefined,
         productStartSec: hasProductOverlay ? opts?.productStartSec : undefined,
@@ -133,19 +152,18 @@ export async function finalizeShortVideoOutput(
     } catch {
       /* 后处理失败仍返回带配音版本 */
     }
-  } else if (srt.trim()) {
-    onProgress?.('烧录中文字幕…')
-    try {
-      merged = await postProcessVideoOnServer(merged, {
-        srtContent: srt,
-        subtitleStyle: 'bottom-safe',
-        minDurationSec: plannedDur > 0 ? plannedDur : opts?.targetDurationSec,
-      })
-    } catch {
-      /* 字幕失败仍返回带配音版本 */
-    }
+  } else if (!burnSubtitles) {
+    onProgress?.('已取消无效字幕烧录，保留画面清晰度')
   }
 
   const objectUrl = URL.createObjectURL(merged)
   return { ok: true, objectUrl, blob: merged }
+}
+
+/** 宽松：能念但未必适合上屏（仍可 TTS） */
+function looksLikeSpokenNarrationLoose(script: string): boolean {
+  const t = script.trim()
+  if (t.length < 4) return false
+  if (/待填|placeholder|TODO/i.test(t)) return false
+  return (t.match(/[\u4e00-\u9fff]/g) || []).length >= 4
 }

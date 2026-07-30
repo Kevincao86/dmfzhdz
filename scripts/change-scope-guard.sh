@@ -556,6 +556,9 @@ shortVideoUiLabels
 shortVideoGuidanceAi
 shortVideoProductFocus
 shortVideoScriptTable
+shortVideoPostProcess
+shortVideoNarrationExtract
+digitalHumanPostProcessStyles
 videoAiApi
 videoModelDuration
 short-video-cases
