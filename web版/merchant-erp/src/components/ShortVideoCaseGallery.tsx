@@ -154,7 +154,7 @@ export default function ShortVideoCaseGallery({ onApplyCase, className }: ShortV
         </div>
       </div>
 
-      <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid items-start gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((item) => (
           <CaseCard
             key={item.id}
@@ -265,7 +265,14 @@ function CaseCard({
         type="button"
         onClick={onPreview}
         onPointerDown={onHover}
-        className="relative block aspect-[3/4] w-full overflow-hidden bg-slate-900 text-left"
+        className={cn(
+          'relative block w-full overflow-hidden bg-slate-950 text-left',
+          item.aspect === '16:9'
+            ? 'aspect-video'
+            : item.aspect === '1:1'
+              ? 'aspect-square'
+              : 'aspect-[9/16]',
+        )}
         aria-label={`预览 ${item.title}`}
       >
         {item.coverUrl ? (
@@ -275,7 +282,7 @@ function CaseCard({
             loading="lazy"
             decoding="async"
             className={cn(
-              'absolute inset-0 h-full w-full object-cover transition-opacity',
+              'absolute inset-0 h-full w-full object-contain transition-opacity',
               hoverPlaying ? 'opacity-0' : 'opacity-100',
             )}
           />
@@ -290,7 +297,7 @@ function CaseCard({
             ref={videoRef}
             src={item.videoUrl}
             className={cn(
-              'absolute inset-0 h-full w-full object-cover transition-opacity',
+              'absolute inset-0 h-full w-full object-contain transition-opacity',
               hoverPlaying ? 'opacity-100' : 'opacity-0',
             )}
             playsInline
@@ -299,33 +306,33 @@ function CaseCard({
             poster={item.coverUrl}
           />
         ) : null}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
         {!hoverPlaying ? (
-          <span className="absolute left-1/2 top-1/2 z-[1] flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-lg">
+          <span className="absolute left-1/2 top-1/2 z-[1] flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-slate-900 shadow-lg">
             <Play className="h-5 w-5 fill-current" aria-hidden />
           </span>
         ) : null}
         {hoverPlaying && hoverMuted ? (
-          <span className="absolute right-3 top-3 z-[2] rounded-full bg-black/55 px-2 py-1 text-[10px] text-white">
+          <span className="absolute right-3 top-3 z-[2] rounded-full bg-black/70 px-2 py-1 text-[10px] text-white">
             已静音 · 点击听口播
           </span>
         ) : null}
         <div className="absolute bottom-0 left-0 right-0 z-[1] space-y-1 p-4 text-white">
           <div className="flex flex-wrap gap-1">
             {item.badge ? (
-              <span className="inline-flex rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-medium backdrop-blur-sm">
+              <span className="inline-flex rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-medium">
                 {item.badge}
               </span>
             ) : null}
             {item.hasNarration ? (
-              <span className="inline-flex rounded-full bg-cyan-500/80 px-2 py-0.5 text-[10px] font-medium backdrop-blur-sm">
+              <span className="inline-flex rounded-full bg-cyan-600/90 px-2 py-0.5 text-[10px] font-medium">
                 含口播
               </span>
             ) : null}
           </div>
-          <h3 className="text-base font-semibold leading-snug">{item.title}</h3>
-          <p className="text-xs text-white/85">{item.subtitle}</p>
-          <p className="text-[11px] text-white/70">
+          <h3 className="text-base font-semibold leading-snug drop-shadow-sm">{item.title}</h3>
+          <p className="text-xs text-white/90">{item.subtitle}</p>
+          <p className="text-[11px] text-white/75">
             {item.aspect} · 预览约 {item.durationSec}s
             {skill ? ` · ${skill.name}` : ''}
             {hoverPlaying ? ' · 悬停播放中' : ' · 悬停 1 秒自动播'}
@@ -454,7 +461,7 @@ function CasePreviewModal({
       <div
         className={cn(
           'relative w-full overflow-hidden rounded-2xl border border-white/10 bg-slate-950 shadow-2xl',
-          item.aspect === '16:9' ? 'max-w-3xl' : 'max-w-md',
+          item.aspect === '16:9' ? 'max-w-4xl' : item.aspect === '1:1' ? 'max-w-lg' : 'max-w-lg',
         )}
         onClick={(e) => e.stopPropagation()}
       >
@@ -478,8 +485,8 @@ function CasePreviewModal({
               autoPlay
               preload="auto"
               className={cn(
-                'max-h-[70vh] w-full bg-black object-contain',
-                item.aspect === '16:9' ? 'aspect-video' : 'aspect-[9/16]',
+                'mx-auto max-h-[82vh] w-full bg-black object-contain',
+                item.aspect === '16:9' ? 'aspect-video' : item.aspect === '1:1' ? 'aspect-square' : 'aspect-[9/16]',
               )}
             />
             {loading && !err ? (

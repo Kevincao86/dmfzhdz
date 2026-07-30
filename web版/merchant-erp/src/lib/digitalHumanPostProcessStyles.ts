@@ -21,8 +21,8 @@ export function assForceStyleForSubtitle(subtitleStyle: string): string {
     case 'cinematic':
       return `FontSize=18,PrimaryColour=&H00E0E0E0,OutlineColour=&H40000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=2,MarginV=88,${SUBTITLE_SIDE_MARGIN}`
     case 'bottom-safe':
-      /** 竖屏 9:16 安全区：小字、高边距，避免出屏 */
-      return `FontSize=16,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=2,MarginV=150,${SUBTITLE_SIDE_MARGIN}`
+      /** 竖屏 9:16 底部安全区：更小字号 + 更高边距，避开中下部主体/产品 */
+      return `FontSize=15,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=2,MarginV=210,${SUBTITLE_SIDE_MARGIN}`
     case 'bottom-white':
     default:
       return `FontSize=22,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=100,${SUBTITLE_SIDE_MARGIN}`

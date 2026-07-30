@@ -157,6 +157,21 @@ const LONGFORM_MAX_TARGET_TOTAL_SEC = 60
 
 const LONGFORM_TARGET_TOTAL_OPTIONS = [60, 45, 30, 15] as const
 
+/** 画布分镜总时长对齐到可选长片目标（15/30/45/60） */
+function snapLongformTargetTotalSec(
+  endSec: number,
+  rowCount: number,
+): (typeof LONGFORM_TARGET_TOTAL_OPTIONS)[number] {
+  const approx =
+    endSec > 0
+      ? endSec
+      : Math.max(LONGFORM_DEFAULT_SEGMENT_SEC, rowCount * LONGFORM_DEFAULT_SEGMENT_SEC)
+  for (const opt of [...LONGFORM_TARGET_TOTAL_OPTIONS].reverse()) {
+    if (approx <= opt) return opt
+  }
+  return LONGFORM_MAX_TARGET_TOTAL_SEC
+}
+
 const PLANNER_VENDOR_DISPLAY: Record<string, string> = {
   deepseek: 'DeepSeek',
   minimax: 'MiniMax',
@@ -493,6 +508,21 @@ export default function ShortVideoOptimizationPage() {
     [sdDurationSec],
   )
 
+  /** 画布分镜 → 短片生成：打开长片合成并按分镜时间轴对齐目标总时长（闭环） */
+  const syncGenerateWorkspaceFromCanvas = useCallback(
+    (rows: ShortVideoScriptRow[], opts?: { fillPrompt?: boolean }) => {
+      const end = maxScriptTimeRangeEndSec(rows)
+      const target = snapLongformTargetTotalSec(end, rows.length)
+      setLongformEnabled(true)
+      setLongformTargetTotalSec(target)
+      setLongformSegmentSec(LONGFORM_DEFAULT_SEGMENT_SEC)
+      if (opts?.fillPrompt && isScriptRowsUsable(rows)) {
+        setGenPrompt((prev) => (prev.trim() ? prev : scriptRowsToOverallPrompt(rows)))
+      }
+    },
+    [],
+  )
+
   const longformDurationPlan = useMemo(
     () =>
       longformSegmentSec <= 5 && longformEnabled
@@ -542,7 +572,7 @@ export default function ShortVideoOptimizationPage() {
     if (!(cfg?.arkVideoModels?.length ?? 0)) {
       return '火山方舟已配置但未设置视频模型端点，请在运营台 · AI 模型中配置 Seedance 端点。'
     }
-    if (longformEnabled) {
+    if (longformEnabled || (isScriptRowsUsable(scriptRows) && scriptRows.length >= 2)) {
       if (genMode === 'text' && !isScriptRowsUsable(scriptRows)) {
         return '请先填写分镜表：至少 2 段，且每段填写画面或口播文案。'
       }
@@ -1254,7 +1284,10 @@ export default function ShortVideoOptimizationPage() {
     }
   }
 
-  const runLongformGenerate = async () => {
+  const runLongformGenerate = async (opts?: {
+    targetTotalSecOverride?: number
+    segmentSecOverride?: number
+  }) => {
     const scriptUsable = isScriptRowsUsable(scriptRows)
     const txt = scriptUsable ? scriptRowsToOverallPrompt(scriptRows) : genPrompt.trim()
     const imgs: string[] = []
@@ -1275,6 +1308,8 @@ export default function ShortVideoOptimizationPage() {
     setProgress('正在生成分镜脚本…')
     cancelRef.current = false
     await execLongformSegments({
+      targetTotalSecOverride: opts?.targetTotalSecOverride,
+      segmentSecOverride: opts?.segmentSecOverride,
       fetchPlan: (targetTotalSec, segmentSec, segmentCountHint) =>
         postLongformVideoPlan({
           plannerModel: 'auto',
@@ -1305,7 +1340,7 @@ export default function ShortVideoOptimizationPage() {
         scriptUsable
           ? scriptRows
               .map((r) => r.dialogue.trim())
-              .filter(Boolean)
+              .filter((d) => d.length >= 2 && !/待填|^[-—–.]+$/.test(d))
               .join('。') || txt
           : txt || planPromptBase,
     })
@@ -1368,11 +1403,14 @@ export default function ShortVideoOptimizationPage() {
       typeof crypto !== 'undefined' && 'randomUUID' in crypto
         ? crypto.randomUUID()
         : `sv-${Date.now()}`
-    const estSec = longformEnabled
-      ? longformTargetTotalSec
-      : genMode === 'frames' && storyFrames.length > 1
-        ? Math.min(LONGFORM_MAX_TARGET_TOTAL_SEC, Math.max(15, storyFrames.length * Number(sdDurationSec)))
-        : Number(sdDurationSec)
+    const estSec =
+      longformEnabled || (isScriptRowsUsable(scriptRows) && scriptRows.length >= 2)
+        ? longformEnabled
+          ? longformTargetTotalSec
+          : snapLongformTargetTotalSec(maxScriptTimeRangeEndSec(scriptRows), scriptRows.length)
+        : genMode === 'frames' && storyFrames.length > 1
+          ? Math.min(LONGFORM_MAX_TARGET_TOTAL_SEC, Math.max(15, storyFrames.length * Number(sdDurationSec)))
+          : Number(sdDurationSec)
     if (!(await ensureShortVideoPointsAffordable(estSec))) return
 
     setHint(null)
@@ -1393,7 +1431,13 @@ export default function ShortVideoOptimizationPage() {
     }
 
     const txt = genPrompt.trim()
-    const scriptUsable = longformEnabled && isScriptRowsUsable(scriptRows)
+    // 画布已填可用分镜时，即使未勾选长片也走分段合成，避免闭环断裂
+    const canvasScriptReady = isScriptRowsUsable(scriptRows) && scriptRows.length >= 2
+    if (canvasScriptReady && !longformEnabled) {
+      syncGenerateWorkspaceFromCanvas(scriptRows, { fillPrompt: true })
+    }
+    const useLongformPipeline = longformEnabled || canvasScriptReady
+    const scriptUsable = useLongformPipeline && isScriptRowsUsable(scriptRows)
     const imgs: string[] = []
     if (genMode === 'frames') {
       for (const item of storyFrames) {
@@ -1401,7 +1445,7 @@ export default function ShortVideoOptimizationPage() {
       }
     }
 
-    if (longformEnabled) {
+    if (useLongformPipeline) {
       if (!scriptUsable && genMode === 'text') {
         finishVideoJob(false, '请填写分镜表')
         setErr('请填写分镜表：至少 2 段，且每段填写画面或口播文案。')
@@ -1416,7 +1460,12 @@ export default function ShortVideoOptimizationPage() {
       trackProgress('排队中……')
       cancelRef.current = false
       try {
-        await runLongformGenerate()
+        const end = maxScriptTimeRangeEndSec(scriptRows)
+        const targetOverride = snapLongformTargetTotalSec(end, scriptRows.length)
+        await runLongformGenerate({
+          targetTotalSecOverride: longformEnabled ? undefined : targetOverride,
+          segmentSecOverride: longformEnabled ? undefined : LONGFORM_DEFAULT_SEGMENT_SEC,
+        })
         finishVideoJob(!!resultBlobRef.current, cancelRef.current ? '已取消等待' : undefined)
       } finally {
         if (mountedRef.current) {
@@ -1579,7 +1628,10 @@ export default function ShortVideoOptimizationPage() {
       } else if (mode.pane === 'cloud_batch') {
         setHint('已切换到 AI混剪：多素材拼接与包装精修')
       } else if (mode.pane === 'canvas') {
-        setHint('已进入无限画布：可拖拽路径连线编排分镜')
+        if (longformEnabled || isScriptRowsUsable(scriptRows)) {
+          syncGenerateWorkspaceFromCanvas(scriptRows)
+        }
+        setHint('已进入无限画布：可拖拽路径连线编排分镜，应用流程后回写短片生成区')
       } else {
         setHint(`已切换到${mode.label}`)
       }
@@ -1660,8 +1712,19 @@ export default function ShortVideoOptimizationPage() {
   const goPane = (id: MainPane) => {
     resetOutputs()
     setMainPane(id)
-    if (id === 'generate') setStudioMode((m) => (m === 'agent' ? 'agent' : 'video'))
-    if (id === 'canvas') setStudioMode('canvas')
+    if (id === 'generate') {
+      setStudioMode((m) => (m === 'agent' ? 'agent' : 'video'))
+      // 仅当分镜已填写可用内容时对齐长片，避免空默认行误开 60 秒
+      if (isScriptRowsUsable(scriptRows)) {
+        syncGenerateWorkspaceFromCanvas(scriptRows)
+      }
+    }
+    if (id === 'canvas') {
+      setStudioMode('canvas')
+      if (longformEnabled || isScriptRowsUsable(scriptRows)) {
+        syncGenerateWorkspaceFromCanvas(scriptRows)
+      }
+    }
     if (id === 'music') setStudioMode('music')
     if (id === 'cloud_batch') setStudioMode('agent')
     if (id === 'cases') setStudioMode('agent')
@@ -1835,16 +1898,17 @@ export default function ShortVideoOptimizationPage() {
             flowEpoch={canvasFlowEpoch}
             disabled={busy || auxBusy}
             onAddMediaClick={() => {
+              syncGenerateWorkspaceFromCanvas(scriptRows)
               setGenMode('frames')
               setMainPane('generate')
               setHint('已切到短片生成 · 分镜参考，请上传素材；也可再回「无限画布」查看节点')
               queueMicrotask(() => storyFrameInputRef.current?.click())
             }}
             onEditRow={(index) => {
-              // 不强制改时长；仅进入生成区编辑分镜表
+              syncGenerateWorkspaceFromCanvas(scriptRows)
               setGenMode('text')
               setMainPane('generate')
-              setHint(`正在编辑分镜 ${index + 1}，请在下方「执导分镜脚本」完善画面与口播`)
+              setHint(`正在编辑分镜 ${index + 1}：已同步到短片生成区的执导分镜脚本，请完善画面与口播`)
               queueMicrotask(() => {
                 document
                   .getElementById('sv-script-table-anchor')
@@ -1857,13 +1921,20 @@ export default function ShortVideoOptimizationPage() {
               setScriptRows((prev) => {
                 const next = orderedIndices.map((i) => prev[i]).filter(Boolean) as typeof prev
                 if (next.length < 2) return prev
-                // 按连线拓扑重排分镜，并重算时间轴；不强制改成长视频 60 秒
-                const seg = longformEnabled ? longformSegmentSec : Number(sdDurationSec) || 15
-                return resizeScriptRows(next, next.length, seg)
+                const resized = resizeScriptRows(next, next.length, LONGFORM_DEFAULT_SEGMENT_SEC)
+                syncGenerateWorkspaceFromCanvas(resized, { fillPrompt: true })
+                return resized
               })
               setCanvasFlowEpoch((v) => v + 1)
-              setHint(`已按画布自由连线应用流程（${orderLabel}），分镜顺序与时间轴已同步`)
+              setHint(
+                `已按画布自由连线应用流程（${orderLabel}），已打开长片合成并同步分镜表与时间轴；可直接「开始生成短片」`,
+              )
               setMainPane('generate')
+              queueMicrotask(() => {
+                document
+                  .getElementById('sv-script-table-anchor')
+                  ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+              })
             }}
             onRemoveScriptRow={(index) => {
               setScriptRows((prev) => removeScriptRowAt(prev, index))
@@ -1877,15 +1948,24 @@ export default function ShortVideoOptimizationPage() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => setMainPane('generate')}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+              onClick={() => {
+                syncGenerateWorkspaceFromCanvas(scriptRows, { fillPrompt: true })
+                setMainPane('generate')
+                setHint('已进入短片生成工作区：分镜表与画布节点已对齐，勾选长片合成已开启')
+                queueMicrotask(() => {
+                  document
+                    .getElementById('sv-generate-workspace')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                })
+              }}
+              className="rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-2 text-sm font-medium text-cyan-900 hover:bg-cyan-100"
             >
               去短片生成工作区
             </button>
             <button
               type="button"
               onClick={() => setMainPane('cases')}
-              className="rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-2 text-sm font-medium text-cyan-900 hover:bg-cyan-100"
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
             >
               浏览案例做同款
             </button>
@@ -2105,13 +2185,23 @@ export default function ShortVideoOptimizationPage() {
             </button>
             <button
               type="button"
-              onClick={() => setMainPane('canvas')}
+              onClick={() => {
+                syncGenerateWorkspaceFromCanvas(scriptRows)
+                setMainPane('canvas')
+                setHint('已在无限画布中查看分镜节点；连线后点「应用流程」可回写短片生成区')
+              }}
               className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
             >
               <Focus className="h-4 w-4" />
               在画布中查看
             </button>
           </div>
+
+          {longformEnabled ? (
+            <p className="rounded-lg border border-cyan-100 bg-cyan-50/80 px-3 py-2 text-xs leading-relaxed text-cyan-900">
+              分镜表与「无限画布」共用同一套节点。画布连线后点「应用流程」，或此处改表后再回画布查看，即可闭环出片。
+            </p>
+          ) : null}
 
           <label className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
