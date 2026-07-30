@@ -12,7 +12,7 @@ import {
   Wrench,
   X,
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { cn } from '../cn'
 import {
   composeSkillPrompt,
@@ -40,6 +40,8 @@ export type ShortVideoAgentCabinProps = {
   onPickDoc?: () => void
   submitLabel?: string
   busy?: boolean
+  /** 融合短片生成工作区（参数 / 分镜表 / 操作），减少页面切换 */
+  children?: ReactNode
 }
 
 const MODE_ICON: Record<ShortVideoStudioModeId, typeof Sparkles> = {
@@ -63,6 +65,7 @@ export default function ShortVideoAgentCabin({
   onPickDoc,
   submitLabel = '开始创作',
   busy,
+  children,
 }: ShortVideoAgentCabinProps) {
   const [skillOpen, setSkillOpen] = useState(false)
   const [modeOpen, setModeOpen] = useState(false)
@@ -117,7 +120,9 @@ export default function ShortVideoAgentCabin({
 
   const heading =
     activeMode.id === 'agent'
-      ? '开启 Agent 模式，即刻出片'
+      ? children
+        ? 'Agent 一站出片 · 文案到分镜'
+        : '开启 Agent 模式，即刻出片'
       : activeMode.id === 'music'
         ? '音乐 / 配乐：内容匹配曲库'
         : activeMode.id === 'image'
@@ -126,7 +131,9 @@ export default function ShortVideoAgentCabin({
             ? '数字人口播一体化出片'
             : activeMode.id === 'canvas'
               ? '无限画布 · 分镜同屏'
-              : '视频生成 · Seedance 出片'
+              : children
+                ? '视频生成 · 文案 · 分镜 · 出片同屏'
+                : '视频生成 · Seedance 出片'
 
   return (
     <div ref={wrapRef} className="sv-agent-cabin relative z-10 w-full min-w-0 max-w-full">
@@ -139,10 +146,11 @@ export default function ShortVideoAgentCabin({
 
       <div
         className={cn(
-          'relative z-10 w-full max-w-full overflow-hidden rounded-[1.75rem] border border-slate-200/90 bg-white/95 p-3 shadow-[0_12px_40px_-16px_rgba(15,23,42,0.18)] ring-1 ring-slate-900/[0.03] backdrop-blur-sm sm:p-4',
+          'relative z-10 w-full max-w-full overflow-hidden rounded-[1.75rem] border border-slate-200/90 bg-white/95 shadow-[0_12px_40px_-16px_rgba(15,23,42,0.18)] ring-1 ring-slate-900/[0.03] backdrop-blur-sm',
           disabled && 'opacity-70',
         )}
       >
+        <div className="p-3 sm:p-4">
         {activeSkill ? (
           <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-cyan-50 px-2.5 py-1 text-xs font-medium text-cyan-800 ring-1 ring-cyan-200/80">
@@ -246,6 +254,16 @@ export default function ShortVideoAgentCabin({
             {busy ? '处理中…' : submitLabel}
           </button>
         </div>
+        </div>
+
+        {children ? (
+          <div
+            id="sv-generate-workspace"
+            className="border-t border-slate-100 bg-gradient-to-b from-slate-50/90 to-white px-3 py-4 sm:px-4"
+          >
+            {children}
+          </div>
+        ) : null}
       </div>
 
       {/* 下拉：限制在舱体宽度内，避免撑破主内容区 */}

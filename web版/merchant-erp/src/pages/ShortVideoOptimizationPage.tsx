@@ -3,7 +3,6 @@ import {
   Cloud,
   Download,
   Eye,
-  FileText,
   Film,
   Focus,
   ImagePlus,
@@ -11,7 +10,6 @@ import {
   Loader2,
   PauseCircle,
   Sparkles,
-  Upload,
   Wand2,
   Wrench,
   X,
@@ -1831,7 +1829,331 @@ export default function ShortVideoOptimizationPage() {
             disabled={busy}
             busy={auxBusy}
             submitLabel={cabinSubmitLabel}
-          />
+          >
+            {mainPane === 'generate' ? (
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{VIDEO_ENGINE_LABEL_SEEDANCE}</p>
+                    <p className="text-xs text-slate-500">
+                      {cfgLoaded
+                        ? cfg?.arkKeyConfigured
+                          ? VIDEO_ENGINE_HINT_SEEDANCE
+                          : '未开通火山方舟'
+                        : '加载配置…'}
+                      · 单段最长 15 秒 · 分镜表常驻，无需勾选长视频
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        resetOutputs()
+                        setGenMode('text')
+                      }}
+                      className={cn(
+                        'rounded-full px-3 py-1.5 text-xs font-medium transition',
+                        genMode === 'text'
+                          ? 'bg-cyan-600 text-white'
+                          : 'bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50',
+                      )}
+                    >
+                      纯文案
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        resetOutputs()
+                        setGenMode('frames')
+                      }}
+                      className={cn(
+                        'rounded-full px-3 py-1.5 text-xs font-medium transition',
+                        genMode === 'frames'
+                          ? 'bg-cyan-600 text-white'
+                          : 'bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50',
+                      )}
+                    >
+                      分镜参考图
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        syncGenerateWorkspaceFromCanvas(scriptRows)
+                        setMainPane('canvas')
+                        setHint('已在无限画布中查看分镜；连线后点「应用流程」可回写')
+                      }}
+                      className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+                    >
+                      画布
+                    </button>
+                  </div>
+                </div>
+
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200/80 bg-white px-3 py-2.5 text-sm text-slate-800">
+                  <input
+                    type="checkbox"
+                    className="mt-1 accent-cyan-600"
+                    checked={longformEnabled}
+                    onChange={(e) => {
+                      if (e.target.checked) enableLongformKeepingUserDuration(longformEnabled)
+                      else setLongformEnabled(false)
+                    }}
+                    disabled={busy}
+                  />
+                  <span>
+                    <span className="font-medium">长视频合成（最长 {LONGFORM_MAX_TARGET_TOTAL_SEC} 秒）</span>
+                    <span className="mt-0.5 block text-xs text-slate-500">
+                      可选：仅用于更长总时长。下方分镜表不勾选也可新增与编辑。
+                    </span>
+                  </span>
+                </label>
+
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                  {longformEnabled ? (
+                    <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+                      <span>目标总时长</span>
+                      <select
+                        value={longformTargetTotalSec}
+                        onChange={(e) => onLongformTargetTotalSecChange(Number(e.target.value))}
+                        disabled={busy}
+                        className={fieldSelectCls}
+                      >
+                        {LONGFORM_TARGET_TOTAL_OPTIONS.map((sec) => (
+                          <option key={sec} value={sec}>
+                            {sec} 秒
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : (
+                    <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+                      <span>单段时长</span>
+                      <select
+                        value={sdDurationSec}
+                        onChange={(e) => setSdDurationSec(e.target.value as '5' | '10' | '15')}
+                        disabled={busy}
+                        className={fieldSelectCls}
+                      >
+                        <option value="5">5 秒</option>
+                        <option value="10">10 秒</option>
+                        <option value="15">15 秒</option>
+                      </select>
+                    </label>
+                  )}
+                  <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+                    <span>画面质量</span>
+                    <select
+                      value={sdResolution}
+                      onChange={(e) => setSdResolution(e.target.value as SeedanceQualityId)}
+                      disabled={busy}
+                      className={fieldSelectCls}
+                    >
+                      {SEEDANCE_QUALITY_OPTIONS.map((q) => (
+                        <option key={q.id} value={q.id}>
+                          {q.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+                    <span>画面比例</span>
+                    <select
+                      value={sdAspect}
+                      onChange={(e) => setSdAspect(e.target.value as typeof sdAspect)}
+                      disabled={busy}
+                      className={fieldSelectCls}
+                    >
+                      <option value="9:16">竖屏 9:16</option>
+                      <option value="16:9">横屏 16:9</option>
+                      <option value="1:1">方屏 1:1</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+                    <span>帧率</span>
+                    <select
+                      value={sdFps}
+                      onChange={(e) => setSdFps(e.target.value as '24' | '30')}
+                      disabled={busy}
+                      className={fieldSelectCls}
+                    >
+                      <option value="24">24 fps</option>
+                      <option value="30">30 fps</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+                    <span>水印</span>
+                    <select
+                      value={sdWatermark}
+                      onChange={(e) => setSdWatermark(e.target.value as 'off' | 'on')}
+                      disabled={busy}
+                      className={fieldSelectCls}
+                    >
+                      <option value="off">无</option>
+                      <option value="on">有</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div id="sv-script-table-anchor" className="flex flex-col gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-sm font-semibold text-slate-900">执导分镜脚本</span>
+                    <button
+                      type="button"
+                      disabled={busy || auxBusy || !genPrompt.trim()}
+                      onClick={() => void onOptimizeGuidancePrompt()}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-medium text-cyan-900 hover:bg-cyan-100 disabled:opacity-50"
+                    >
+                      {auxBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
+                      AI 规划分镜
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    与上方 Agent 文案同屏：不勾选长视频也可「添加时间段」；填好画面/口播后直接出片。
+                  </p>
+                  <ShortVideoScriptTableEditor
+                    rows={scriptRows}
+                    disabled={busy || auxBusy}
+                    onChange={setScriptRows}
+                    onAddRow={() =>
+                      setScriptRows((prev) => appendEmptyScriptRow(prev, activeScriptSegmentSec))
+                    }
+                    onRemoveRow={(index) =>
+                      setScriptRows((prev) => removeScriptRowAt(prev, index))
+                    }
+                  />
+                </div>
+
+                {genMode === 'frames' ? (
+                  <div className="space-y-2 rounded-xl border border-dashed border-slate-300 bg-white p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-medium text-slate-800">
+                        分镜参考（图/视频）· 已选 {storyFrames.length}/{STORY_FRAME_MAX}
+                      </p>
+                      <div className="flex gap-2">
+                        <input
+                          ref={storyFrameInputRef}
+                          type="file"
+                          multiple
+                          accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime,.mp4,.mov,.webm,.m4v,.avi"
+                          className="hidden"
+                          disabled={busy || auxBusy}
+                          onChange={(e) => onStoryFrameInputChange(e.target.files)}
+                        />
+                        <button
+                          type="button"
+                          disabled={busy || auxBusy || storyFrames.length >= STORY_FRAME_MAX}
+                          onClick={() => storyFrameInputRef.current?.click()}
+                          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          添加参考
+                        </button>
+                        {storyFrames.length > 0 ? (
+                          <button
+                            type="button"
+                            disabled={busy || auxBusy}
+                            onClick={clearStoryFrames}
+                            className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                          >
+                            清空
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                    {storyFrames.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        {storyFrames.map((item, idx) => (
+                          <div
+                            key={item.id}
+                            className="group relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50"
+                          >
+                            <span className="absolute left-1 top-1 z-10 rounded bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
+                              {idx + 1}
+                            </span>
+                            <button
+                              type="button"
+                              disabled={busy || auxBusy}
+                              onClick={() => removeStoryFrame(item.id)}
+                              className="absolute right-1 top-1 z-10 rounded-full bg-black/55 p-0.5 text-white opacity-0 group-hover:opacity-100 disabled:opacity-40"
+                              aria-label={`移除第 ${idx + 1} 个参考`}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                            {item.kind === 'video' ? (
+                              <video
+                                src={item.previewUrl}
+                                muted
+                                playsInline
+                                preload="metadata"
+                                className="aspect-video w-full object-cover"
+                              />
+                            ) : (
+                              <img
+                                src={item.previewUrl}
+                                alt={`参考 ${idx + 1}`}
+                                className="aspect-video w-full object-cover"
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-500">可上传多张图/视频作镜头参考。</p>
+                    )}
+                  </div>
+                ) : null}
+
+                {(hint || err) && (
+                  <div
+                    className={cn(
+                      'rounded-lg px-3 py-2.5 text-sm',
+                      err
+                        ? 'border border-red-200 bg-red-50 text-red-900'
+                        : 'border border-amber-200 bg-amber-50 text-amber-950',
+                    )}
+                    role={err ? 'alert' : undefined}
+                  >
+                    {err ?? hint}
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={!!generateGateReason}
+                      onClick={() => void submitGenerate()}
+                      title={generateGateReason ?? undefined}
+                      className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-700 to-sky-600 px-6 py-2.5 text-sm font-semibold text-white shadow-md shadow-cyan-900/15 hover:from-cyan-600 hover:to-sky-500 disabled:pointer-events-none disabled:opacity-50"
+                    >
+                      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                      {busy ? (progress ?? '处理中……') : '开始生成短片'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!resultUrl || busy}
+                      onClick={() => setResultPreviewOpen(true)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-cyan-200 bg-white px-4 py-2.5 text-sm font-semibold text-cyan-800 hover:bg-cyan-50 disabled:pointer-events-none disabled:opacity-45"
+                    >
+                      <Eye className="h-4 w-4" aria-hidden />
+                      预览结果
+                    </button>
+                    {busy ? (
+                      <button
+                        type="button"
+                        onClick={cancelWait}
+                        className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
+                      >
+                        <PauseCircle className="h-4 w-4" /> 停止等待
+                      </button>
+                    ) : null}
+                  </div>
+                  {generateGateReason && !err ? (
+                    <p className="text-xs leading-relaxed text-amber-900">{generateGateReason}</p>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+          </ShortVideoAgentCabin>
         </div>
       ) : null}
 
@@ -1969,469 +2291,9 @@ export default function ShortVideoOptimizationPage() {
         </div>
       ) : null}
 
-      {mainPane !== 'cloud_batch' && mainPane !== 'cases' && mainPane !== 'canvas' && mainPane !== 'music' ? (
-      <section
-        id="sv-generate-workspace"
-        className="mb-8 overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50/70 via-white to-orange-50/30 shadow-sm"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-cyan-100/80 px-5 py-4">
-          <div className="flex items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-600 to-sky-500 text-white shadow-md">
-              <Sparkles className="h-5 w-5" />
-            </span>
-            <div>
-              <p className="text-sm font-semibold text-zinc-900">{VIDEO_ENGINE_LABEL_SEEDANCE}</p>
-              <p className="text-xs text-zinc-500">
-                {cfgLoaded
-                  ? cfg?.arkKeyConfigured
-                    ? VIDEO_ENGINE_HINT_SEEDANCE
-                    : '未开通火山方舟'
-                  : '加载配置…'}
-              </p>
-            </div>
-          </div>
-          <span className="rounded-full border border-cyan-200 bg-white/80 px-3 py-1 text-[11px] font-medium text-cyan-800">
-            单段最长 15 秒
-          </span>
-        </div>
-
-        <div className="space-y-4 px-5 py-4">
-          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/80 bg-white/70 px-4 py-3 text-sm text-zinc-800 shadow-sm">
-            <input
-              type="checkbox"
-              className="mt-1 accent-cyan-600"
-              checked={longformEnabled}
-              onChange={(e) => {
-                if (e.target.checked) enableLongformKeepingUserDuration(longformEnabled)
-                else setLongformEnabled(false)
-              }}
-              disabled={busy}
-            />
-            <span>
-              <span className="font-medium">长视频 / 短片合成（最长 {LONGFORM_MAX_TARGET_TOTAL_SEC} 秒）</span>
-              <span className="mt-0.5 block text-xs leading-relaxed text-zinc-500">
-                可选：勾选后可设更长目标总时长。分镜表本身在任意时长下都可编辑与新增，不勾选也能写分镜、出片。
-              </span>
-            </span>
-          </label>
-
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            {longformEnabled ? (
-              <label className="flex flex-col gap-1.5 text-xs font-medium text-zinc-600">
-                <span>目标总时长</span>
-                <select
-                  value={longformTargetTotalSec}
-                  onChange={(e) => onLongformTargetTotalSecChange(Number(e.target.value))}
-                  disabled={busy}
-                  className={fieldSelectCls}
-                >
-                  {LONGFORM_TARGET_TOTAL_OPTIONS.map((sec) => (
-                    <option key={sec} value={sec}>
-                      {sec} 秒
-                    </option>
-                  ))}
-                </select>
-                <span className="text-[11px] font-normal leading-snug text-zinc-500">
-                  {formatLongformDurationPlanLabel(longformDurationPlan)}
-                </span>
-              </label>
-            ) : (
-              <label className="flex flex-col gap-1.5 text-xs font-medium text-zinc-600">
-                <span>单段时长</span>
-                <select
-                  value={sdDurationSec}
-                  onChange={(e) => setSdDurationSec(e.target.value as '5' | '10' | '15')}
-                  disabled={busy}
-                  className={fieldSelectCls}
-                >
-                  <option value="5">5 秒</option>
-                  <option value="10">10 秒</option>
-                  <option value="15">15 秒</option>
-                </select>
-              </label>
-            )}
-
-            {longformEnabled ? (
-              <label className="flex flex-col gap-1.5 text-xs font-medium text-zinc-600">
-                <span>分段方案</span>
-                <div className={cn(fieldSelectCls, 'bg-zinc-50 text-zinc-800')}>
-                  {formatLongformDurationPlanLabel(longformDurationPlan)}
-                </div>
-              </label>
-            ) : null}
-
-            <label className="flex flex-col gap-1.5 text-xs font-medium text-zinc-600">
-              <span>画面质量</span>
-              <select
-                value={sdResolution}
-                onChange={(e) => setSdResolution(e.target.value as SeedanceQualityId)}
-                disabled={busy}
-                className={fieldSelectCls}
-              >
-                {SEEDANCE_QUALITY_OPTIONS.map((q) => (
-                  <option key={q.id} value={q.id}>
-                    {q.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="flex flex-col gap-1.5 text-xs font-medium text-zinc-600">
-              <span>画面比例</span>
-              <select
-                value={sdAspect}
-                onChange={(e) => setSdAspect(e.target.value as typeof sdAspect)}
-                disabled={busy}
-                className={fieldSelectCls}
-              >
-                <option value="9:16">竖屏 9:16</option>
-                <option value="16:9">横屏 16:9</option>
-                <option value="1:1">方屏 1:1</option>
-              </select>
-            </label>
-
-            <label className="flex flex-col gap-1.5 text-xs font-medium text-zinc-600">
-              <span>帧率</span>
-              <select
-                value={sdFps}
-                onChange={(e) => setSdFps(e.target.value as '24' | '30')}
-                disabled={busy}
-                className={fieldSelectCls}
-              >
-                <option value="24">24 fps</option>
-                <option value="30">30 fps</option>
-              </select>
-            </label>
-
-            <label className="flex flex-col gap-1.5 text-xs font-medium text-zinc-600">
-              <span>水印</span>
-              <select
-                value={sdWatermark}
-                onChange={(e) => setSdWatermark(e.target.value as 'off' | 'on')}
-                disabled={busy}
-                className={fieldSelectCls}
-              >
-                <option value="off">无</option>
-                <option value="on">有</option>
-              </select>
-            </label>
-          </div>
-        </div>
-      </section>
-      ) : null}
-
       <div className={mainPane === 'cloud_batch' ? undefined : 'hidden'} aria-hidden={mainPane !== 'cloud_batch'}>
         <ShortVideoIceBatchPanel lastResultUrl={resultUrl} />
       </div>
-
-      {mainPane === 'generate' && (
-        <section className="space-y-8 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8">
-          <ol className="grid gap-3 sm:grid-cols-3">
-            {[
-              { n: 1, title: '写指导文案 / 选 Skill', sub: '卖点、场景、运镜（可上传 doc）' },
-              { n: 2, title: '编写或 AI 规划分镜', sub: '任意时长可新增时间段；不必勾选长视频' },
-              { n: 3, title: '开始生成短片', sub: 'Seedance · 最长 60 秒' },
-            ].map((s) => (
-              <li
-                key={s.n}
-                className="flex gap-3 rounded-xl border border-cyan-100 bg-gradient-to-br from-cyan-50/80 to-white px-4 py-3"
-              >
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cyan-600 text-xs font-bold text-white">
-                  {s.n}
-                </span>
-                <div>
-                  <p className="text-sm font-semibold text-cyan-950">{s.title}</p>
-                  <p className="text-xs leading-relaxed text-cyan-900/70">{s.sub}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                resetOutputs()
-                setGenMode('text')
-              }}
-              className={cn(
-                'inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm transition',
-                genMode === 'text'
-                  ? 'border-cyan-600 bg-cyan-50 text-cyan-950'
-                  : 'border-transparent bg-zinc-100 text-zinc-700 hover:bg-zinc-200',
-              )}
-            >
-              <Sparkles className="h-4 w-4" />
-              纯文案生成
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                resetOutputs()
-                setGenMode('frames')
-              }}
-              className={cn(
-                'inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm transition',
-                genMode === 'frames'
-                  ? 'border-cyan-600 bg-cyan-50 text-cyan-950'
-                  : 'border-transparent bg-zinc-100 text-zinc-700 hover:bg-zinc-200',
-              )}
-            >
-              <ImagePlus className="h-4 w-4" />
-              分镜 / 多张参考图
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                syncGenerateWorkspaceFromCanvas(scriptRows)
-                setMainPane('canvas')
-                setHint('已在无限画布中查看分镜节点；连线后点「应用流程」可回写短片生成区')
-              }}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-            >
-              <Focus className="h-4 w-4" />
-              在画布中查看
-            </button>
-          </div>
-
-            <p className="rounded-lg border border-cyan-100 bg-cyan-50/80 px-3 py-2 text-xs leading-relaxed text-cyan-900">
-              任意时长均可编写分镜（无需勾选长视频）。分镜表与「无限画布」共用节点；可点「添加时间段」或「AI 规划分镜」。
-            </p>
-
-          <label className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-sm font-medium text-zinc-800">
-                {longformEnabled ? '指导文案' : '执导文案'}
-                {activeSkillId ? (
-                  <span className="ml-2 rounded-full bg-cyan-50 px-2 py-0.5 text-[11px] font-medium text-cyan-800">
-                    Skill · {findShortVideoSkill(activeSkillId)?.name}
-                  </span>
-                ) : null}
-              </span>
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  disabled={busy || auxBusy}
-                  onClick={() => genDocInputRef.current?.click()}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
-                >
-                  <FileText className="h-3.5 w-3.5" />
-                  上传 doc/txt
-                </button>
-                <button
-                  type="button"
-                  disabled={busy || auxBusy || !genPrompt.trim()}
-                  onClick={() => void onOptimizeGuidancePrompt()}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-medium text-cyan-900 hover:bg-cyan-100 disabled:opacity-50"
-                  title="AI 通读文案后写入下方分镜表（不要求勾选长视频）"
-                >
-                  {auxBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
-                  AI 规划分镜
-                </button>
-              </div>
-            </div>
-            <textarea
-              spellCheck={false}
-              placeholder={
-                genMode === 'frames'
-                  ? '用文字说明各镜头顺序与动作；可上传 Word/txt。点击「AI 规划分镜」填入下方表格，或手动添加时间段。'
-                  : '输入卖点、场景与叙事意图；可上传 Word/txt。点击「AI 规划分镜」自动拆成时间段、画面与口播，无需勾选长视频。'
-              }
-              value={genPrompt}
-              disabled={busy || auxBusy}
-              onChange={(e) => setGenPrompt(e.target.value)}
-              className="min-h-[112px] w-full resize-y rounded-lg border border-zinc-300 px-4 py-3 text-sm outline-none ring-cyan-600/35 focus-visible:ring-2"
-            />
-            <p className="text-xs text-zinc-500">
-              支持 .txt / .doc / .docx；填写分镜表后即可生成。勾选「长视频合成」仅用于选择更长目标总时长（最长 60 秒）。
-            </p>
-            <div id="sv-script-table-anchor" className="mt-1 flex flex-col gap-2">
-              <span className="text-sm font-medium text-zinc-800">执导分镜脚本</span>
-              <ShortVideoScriptTableEditor
-                rows={scriptRows}
-                disabled={busy || auxBusy}
-                onChange={setScriptRows}
-                onAddRow={() =>
-                  setScriptRows((prev) => appendEmptyScriptRow(prev, activeScriptSegmentSec))
-                }
-                onRemoveRow={(index) =>
-                  setScriptRows((prev) => removeScriptRowAt(prev, index))
-                }
-              />
-              <p className="text-xs text-zinc-500">
-                不勾选长视频也可点「添加时间段」；各段画面与口播填好后即可生成。至少保留 2 段，多余段可点右侧删除。
-              </p>
-            </div>
-          </label>
-
-          {genMode === 'frames' && (
-            <div className="space-y-3 rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="text-sm font-medium text-zinc-800">分镜参考（图/视频，按顺序串联镜头）</p>
-                  <p className="mt-0.5 text-xs text-zinc-500">
-                    可一次多选，也可多次添加；最多 {STORY_FRAME_MAX} 个，已选 {storyFrames.length} 个
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <input
-                    ref={storyFrameInputRef}
-                    type="file"
-                    multiple
-                    accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime,.mp4,.mov,.webm,.m4v,.avi"
-                    className="hidden"
-                    disabled={busy || auxBusy}
-                    onChange={(e) => onStoryFrameInputChange(e.target.files)}
-                  />
-                  <button
-                    type="button"
-                    disabled={busy || auxBusy || storyFrames.length >= STORY_FRAME_MAX}
-                    onClick={() => storyFrameInputRef.current?.click()}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-50"
-                  >
-                    <ImagePlus className="h-3.5 w-3.5" />
-                    添加参考
-                  </button>
-                  {storyFrames.length > 0 ? (
-                    <button
-                      type="button"
-                      disabled={busy || auxBusy}
-                      onClick={clearStoryFrames}
-                      className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs text-zinc-600 hover:bg-zinc-100 disabled:opacity-50"
-                    >
-                      清空
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-
-              <div
-                role="presentation"
-                onDragOver={(e) => {
-                  e.preventDefault()
-                  if (!busy && !auxBusy) setStoryDropActive(true)
-                }}
-                onDragLeave={() => setStoryDropActive(false)}
-                onDrop={(e) => {
-                  e.preventDefault()
-                  setStoryDropActive(false)
-                  if (busy || auxBusy) return
-                  if (e.dataTransfer.files?.length) appendStoryFrames(e.dataTransfer.files)
-                }}
-                onClick={() => {
-                  if (!busy && !auxBusy) storyFrameInputRef.current?.click()
-                }}
-                className={cn(
-                  'cursor-pointer rounded-lg border border-dashed px-4 py-6 text-center transition',
-                  storyDropActive
-                    ? 'border-cyan-400 bg-cyan-50/80'
-                    : 'border-zinc-300 bg-white hover:border-zinc-400',
-                )}
-              >
-                <Upload className="mx-auto h-6 w-6 text-zinc-400" />
-                <p className="mt-2 text-sm text-zinc-700">拖拽图片或视频到此处，或点击选择（可多选）</p>
-                <p className="mt-1 text-xs text-zinc-500">支持 jpg / png / webp / mp4 / mov / webm；视频将自动截取首帧作为参考</p>
-              </div>
-
-              {storyFrames.length > 0 ? (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                  {storyFrames.map((item, idx) => (
-                    <div
-                      key={item.id}
-                      className="group relative overflow-hidden rounded-lg border border-zinc-200 bg-white"
-                    >
-                      <span className="absolute left-1.5 top-1.5 z-10 rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-medium text-white">
-                        {idx + 1}
-                      </span>
-                      <button
-                        type="button"
-                        disabled={busy || auxBusy}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          removeStoryFrame(item.id)
-                        }}
-                        className="absolute right-1.5 top-1.5 z-10 rounded-full bg-black/55 p-0.5 text-white opacity-0 transition group-hover:opacity-100 disabled:opacity-40"
-                        aria-label={`移除第 ${idx + 1} 个分镜参考`}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                      {item.kind === 'video' ? (
-                        <video
-                          src={item.previewUrl}
-                          muted
-                          playsInline
-                          preload="metadata"
-                          className="aspect-video w-full object-cover"
-                        />
-                      ) : (
-                        <img
-                          src={item.previewUrl}
-                          alt={`分镜 ${idx + 1}`}
-                          className="aspect-video w-full object-cover"
-                        />
-                      )}
-                      <p className="truncate px-2 py-1 text-[10px] text-zinc-500" title={item.file.name}>
-                        {item.kind === 'video' ? '视频 · ' : ''}
-                        {item.file.name}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-zinc-500">尚未添加分镜参考，上传后将按序号作为镜头参考。</p>
-              )}
-            </div>
-          )}
-
-          {(hint || err) && (
-            <div
-              className={cn(
-                'rounded-lg px-4 py-3 text-sm',
-                err ? 'border border-red-200 bg-red-50 text-red-900' : 'border border-amber-200 bg-amber-50 text-amber-950',
-              )}
-              role={err ? 'alert' : undefined}
-            >
-              {err ?? hint}
-            </div>
-          )}
-
-          <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              disabled={!!generateGateReason}
-              onClick={() => void submitGenerate()}
-              title={generateGateReason ?? undefined}
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-700 to-sky-600 px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-cyan-900/20 hover:from-cyan-600 hover:to-sky-500 disabled:pointer-events-none disabled:opacity-50"
-            >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {busy ? (progress ?? '处理中……') : '开始生成短片'}
-            </button>
-            <button
-              type="button"
-              disabled={!resultUrl || busy}
-              onClick={() => setResultPreviewOpen(true)}
-              title={resultUrl ? '查看本次生成的成片' : '生成完成后可在此预览'}
-              className="inline-flex items-center gap-2 rounded-xl border border-cyan-200 bg-white px-6 py-3 text-sm font-semibold text-cyan-800 shadow-sm hover:bg-cyan-50 disabled:pointer-events-none disabled:opacity-45"
-            >
-              <Eye className="h-4 w-4" aria-hidden />
-              预览生成结果
-            </button>
-            {busy ? (
-              <button
-                type="button"
-                onClick={cancelWait}
-                className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-zinc-800 hover:bg-zinc-50"
-              >
-                <PauseCircle className="h-4 w-4" /> 停止等待
-              </button>
-            ) : null}
-          </div>
-            {generateGateReason && !err ? (
-              <p className="text-xs leading-relaxed text-amber-900">{generateGateReason}</p>
-            ) : null}
-          </div>
-        </section>
-      )}
 
       {mainPane === 'generate' ? (
         <div className="mt-10">
