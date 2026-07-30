@@ -6,6 +6,7 @@ import {
   Printer,
   RefreshCw,
   Sparkles,
+  Upload,
   Wand2,
   X,
   Zap,
@@ -71,6 +72,9 @@ import {
 } from '../services/mpAiPointsSpendClient'
 import { readMpSessionToken } from '../lib/merchantApiAuth'
 import { fetchStoresForPlatform } from '../services/merchantStoresApi'
+import { postDouyinPoiDecorate } from '../services/merchantStoreDecorationApi'
+import { uploadDouyinProductImage } from '../services/douyinProductApi'
+import type { DouyinStoreRow } from '../services/douyinMerchantApi'
 
 type VariantResult = {
   id: string
@@ -257,6 +261,10 @@ export default function AiImageStudioPage() {
   const [error, setError] = useState<string | null>(null)
   const [refineNote, setRefineNote] = useState('')
   const [storeLoadHint, setStoreLoadHint] = useState<string | null>(null)
+  const [decorStores, setDecorStores] = useState<DouyinStoreRow[]>([])
+  const [decorPoiId, setDecorPoiId] = useState('')
+  const [decorBusy, setDecorBusy] = useState(false)
+  const [decorMsg, setDecorMsg] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const copyAbortRef = useRef<AbortController | null>(null)
   const keywordsAbortRef = useRef<AbortController | null>(null)
@@ -389,6 +397,10 @@ export default function AiImageStudioPage() {
     void (async () => {
       const r = await fetchStoresForPlatform('douyin', { page: 1, pageSize: 5 })
       const storeName = r.ok && r.items?.[0]?.name?.trim() ? r.items[0].name.trim() : ''
+      if (r.ok && r.items?.length) {
+        setDecorStores(r.items)
+        setDecorPoiId((prev) => prev || r.items[0]?.id || '')
+      }
       setForm((f) => {
         if (initRef.current) {
           return storeName && !f.storeName ? { ...f, storeName } : f
@@ -405,6 +417,22 @@ export default function AiImageStudioPage() {
       })
     })()
   }, [loadAiCopy])
+
+  useEffect(() => {
+    if (form.playbook !== 'platform_carousel_five') return
+    if (decorStores.length >= 10) return
+    void (async () => {
+      const r = await fetchStoresForPlatform('douyin', {
+        page: 1,
+        pageSize: 50,
+        claimScope: 'claimed',
+      })
+      if (r.ok && r.items?.length) {
+        setDecorStores(r.items)
+        setDecorPoiId((prev) => prev || r.items[0]?.id || '')
+      }
+    })()
+  }, [form.playbook, decorStores.length])
 
   const toggleChannel = (id: PublishChannelId) => {
     setForm((f) => {
@@ -842,7 +870,68 @@ export default function AiImageStudioPage() {
     }
   }
 
+  const publishDouyinCarouselFive = async () => {
+    setDecorMsg(null)
+    if (form.playbook !== 'platform_carousel_five') {
+      setDecorMsg('请先选择「五连图」玩法并生成方案')
+      return
+    }
+    const poiId = decorPoiId.trim()
+    if (!poiId || poiId === '-') {
+      setDecorMsg('请选择要装修的抖音门店')
+      return
+    }
+    const strips = variants
+      .filter((v) => v.channelId === 'douyin' && v.status === 'done' && (v.previewUrl || v.imageUrl))
+      .sort((a, b) => a.variantIndex - b.variantIndex)
+    if (strips.length < 5) {
+      setDecorMsg(`抖音五连图需 5 张已生成图（当前 ${strips.length} 张），请先「一键出图」`)
+      return
+    }
+    setDecorBusy(true)
+    try {
+      const headImages: string[] = []
+      for (let i = 0; i < 5; i++) {
+        const v = strips[i]!
+        setDecorMsg(`上传第 ${i + 1}/5 张到图床…`)
+        const src = v.imageUrl || v.previewUrl!
+        const rawBlob = await fetchImageBlob(src)
+        const jpeg = await compressImageBlobToJpeg(rawBlob)
+        const file = new File([jpeg], `carousel-${poiId}-${i + 1}.jpg`, { type: 'image/jpeg' })
+        const up = await uploadDouyinProductImage(file)
+        if (!up.ok) {
+          setDecorMsg(`第 ${i + 1} 张图床上传失败：${up.message}`)
+          return
+        }
+        if (!/^https:\/\//i.test(up.url)) {
+          setDecorMsg(`第 ${i + 1} 张未得到 https 公网地址（演示占位图不可用于装修）`)
+          return
+        }
+        headImages.push(up.url)
+      }
+      setDecorMsg('提交抖音门店装修（五连图头图）…')
+      const r = await postDouyinPoiDecorate({
+        poiId,
+        headImages,
+        waitTask: true,
+      })
+      if (!r.ok) {
+        setDecorMsg(r.message)
+        return
+      }
+      const taskHint = r.taskIds.length ? `任务号 ${r.taskIds.join(',')}` : '已受理'
+      setDecorMsg(`已提交：${r.message}（${taskHint}）。请在来客后台核对审核结果。`)
+    } catch (e) {
+      setDecorMsg(e instanceof Error ? e.message : '上传失败')
+    } finally {
+      setDecorBusy(false)
+    }
+  }
+
   const doneCount = variants.filter((v) => v.status === 'done').length
+  const douyinCarouselReady =
+    form.playbook === 'platform_carousel_five' &&
+    variants.filter((v) => v.channelId === 'douyin' && v.status === 'done').length >= 5
 
   const selectedChannelSpecs = useMemo(
     () =>
@@ -1375,6 +1464,66 @@ export default function AiImageStudioPage() {
               </div>
             </StudioPanel>
           ) : null}
+
+          {form.playbook === 'platform_carousel_five' ? (
+            <StudioPanel
+              title="一键上传抖音五连图"
+              subtitle="写入来客门店头图轮播（poi/decorate），不改商品。需应用已开通 life.capacity.poi.decorate"
+            >
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <label className="min-w-0 flex-1 text-xs text-slate-600">
+                  目标门店
+                  <select
+                    value={decorPoiId}
+                    disabled={decorBusy || busy}
+                    onChange={(e) => setDecorPoiId(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm"
+                  >
+                    {decorStores.length === 0 ? (
+                      <option value="">暂无门店（请先绑定抖音来客）</option>
+                    ) : (
+                      decorStores.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                          {s.city ? ` · ${s.city}` : ''}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  disabled={decorBusy || busy || !douyinCarouselReady || !decorPoiId}
+                  onClick={() => void publishDouyinCarouselFive()}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-500 disabled:opacity-50"
+                >
+                  {decorBusy ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Upload className="h-4 w-4" />
+                  )}
+                  一键上传五连图
+                </button>
+              </div>
+              {!douyinCarouselReady ? (
+                <p className="mt-2 text-xs text-slate-400">
+                  请先生成抖音渠道 5 张五连图后再上传
+                </p>
+              ) : null}
+              {decorMsg ? (
+                <p
+                  className={cn(
+                    'mt-2 rounded-lg px-3 py-2 text-xs leading-relaxed ring-1',
+                    decorMsg.startsWith('已提交')
+                      ? 'bg-emerald-50 text-emerald-800 ring-emerald-100'
+                      : 'bg-amber-50 text-amber-900 ring-amber-100',
+                  )}
+                >
+                  {decorMsg}
+                </p>
+              ) : null}
+            </StudioPanel>
+          ) : null}
             </div>
           </div>
 
@@ -1516,7 +1665,7 @@ export default function AiImageStudioPage() {
 
             {variants.length === 0 && (
               <p className="mt-3 text-xs leading-relaxed text-slate-400">
-                生成后方案将出现在上方方案墙，可对比选优并单独下载
+                生成后方案将出现在上方方案墙，可对比选优、单独下载；五连图可一键上传抖音门店头图
               </p>
             )}
           </StudioPanel>

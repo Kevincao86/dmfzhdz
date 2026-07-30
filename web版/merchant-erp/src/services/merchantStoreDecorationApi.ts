@@ -163,3 +163,112 @@ export async function fetchStoreDecorationsForPlatform(
     return { ok: false, message: msg }
   }
 }
+
+export type DouyinPoiDecorateResult =
+  | {
+      ok: true
+      message: string
+      taskIds: string[]
+      poiIds: string[]
+    }
+  | { ok: false; message: string }
+
+/**
+ * 提交抖音门店装修（五连图头图）。
+ * 优先 POST `/api/meoo-douyin-poi-decorate`，回退 `/api/merchant/douyin/store-decoration/decorate`。
+ * 图片须为 https 公网 URL（可先走现有商品图上传拿到 URL，不改商品 save）。
+ */
+export async function postDouyinPoiDecorate(params: {
+  poiId: string
+  thirdId?: string
+  headImages: string[]
+  waitTask?: boolean
+}): Promise<DouyinPoiDecorateResult> {
+  const token = storeTabToken('douyin')
+  if (!token) {
+    return { ok: false, message: '请先在「系统 → 商家版后台」完成抖音来客绑定。' }
+  }
+  const poiId = params.poiId.trim()
+  if (!poiId) return { ok: false, message: '请选择要装修的门店（poiId）' }
+  const headImages = params.headImages.map((u) => u.trim()).filter((u) => /^https:\/\//i.test(u))
+  if (headImages.length === 0) {
+    return { ok: false, message: '五连图须先上传为 https 公网地址后再提交装修' }
+  }
+
+  const body = JSON.stringify({
+    poiId,
+    thirdId: (params.thirdId ?? poiId).trim() || poiId,
+    headImages,
+    waitTask: params.waitTask !== false,
+  })
+
+  const paths = [
+    '/api/meoo-douyin-poi-decorate',
+    '/api/merchant/douyin/store-decoration/decorate',
+  ] as const
+
+  let lastStatus = 0
+  let lastMsg = ''
+  for (const path of paths) {
+    try {
+      const res = await fetch(url(path), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body,
+      })
+      lastStatus = res.status
+      const text = await res.text()
+      const ct = res.headers.get('content-type') ?? ''
+      if (res.ok && responseLooksLikeHtml(text, ct)) continue
+      if (res.status === 404 && responseLooksLikeHtml(text, ct)) continue
+      let data: Record<string, unknown> = {}
+      try {
+        data = (JSON.parse(text || '{}') as Record<string, unknown>) ?? {}
+      } catch {
+        data = {}
+      }
+      if (!res.ok) {
+        lastMsg =
+          (typeof data.message === 'string' && data.message) ||
+          (typeof data.error === 'string' && data.error) ||
+          `HTTP ${res.status}`
+        if (res.status === 404) continue
+        return { ok: false, message: lastMsg }
+      }
+      if (data.ok === false) {
+        return {
+          ok: false,
+          message: (typeof data.message === 'string' && data.message) || '装修提交失败',
+        }
+      }
+      const taskIds = Array.isArray(data.taskIds)
+        ? data.taskIds.map((x) => String(x).trim()).filter(Boolean)
+        : []
+      const poiIds = Array.isArray(data.poiIds)
+        ? data.poiIds.map((x) => String(x).trim()).filter(Boolean)
+        : [poiId]
+      return {
+        ok: true,
+        message:
+          (typeof data.message === 'string' && data.message) ||
+          '已提交抖音门店装修任务',
+        taskIds,
+        poiIds,
+      }
+    } catch (e) {
+      lastMsg = e instanceof Error ? e.message : '网络错误'
+    }
+  }
+  return {
+    ok: false,
+    message:
+      lastMsg ||
+      (lastStatus === 404
+        ? '装修接口 404：请部署含 meoo-douyin-poi-decorate 的版本'
+        : '装修提交失败'),
+  }
+}
