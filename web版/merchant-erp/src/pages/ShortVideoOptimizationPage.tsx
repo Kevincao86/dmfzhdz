@@ -16,7 +16,9 @@ import { ShortVideoIceBatchPanel } from '../components/ShortVideoIceBatchPanel'
 import ShortVideoScriptTableEditor from '../components/ShortVideoScriptTableEditor'
 import ShortVideoAgentCabin from '../components/ShortVideoAgentCabin'
 import ShortVideoCaseGallery from '../components/ShortVideoCaseGallery'
-import ShortVideoInfiniteCanvas from '../components/ShortVideoInfiniteCanvas'
+import ShortVideoInfiniteCanvas, {
+  SCRIPT_SHOT_MEDIA_MAX,
+} from '../components/ShortVideoInfiniteCanvas'
 import ShortVideoMusicStudio from '../components/ShortVideoMusicStudio'
 import type { ShortVideoCaseItem } from '../lib/shortVideoCaseGallery'
 import type { ShortVideoMusicTrack } from '../lib/shortVideoMusicLibrary'
@@ -433,6 +435,10 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     defaultScriptRows(2, 15),
   )
   const [storyFrames, setStoryFrames] = useState<StoryFrameItem[]>([])
+  /** 每个分镜绑定的素材 id（对应 storyFrames），支持图/视频多张 */
+  const [shotMediaIds, setShotMediaIds] = useState<string[][]>(() => [[], []])
+  const pendingShotMediaIndexRef = useRef<number | null>(null)
+  const shotMediaInputRef = useRef<HTMLInputElement>(null)
   const generationBillIdRef = useRef('')
 
   const ensureShortVideoPointsAffordable = async (durationSec: number): Promise<boolean> => {
@@ -741,6 +747,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       if (item) revokeStoryFrame(item)
       return prev.filter((x) => x.id !== id)
     })
+    setShotMediaIds((prev) => prev.map((ids) => ids.filter((x) => x !== id)))
   }
 
   const clearStoryFrames = () => {
@@ -748,11 +755,118 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       prev.forEach(revokeStoryFrame)
       return []
     })
+    setShotMediaIds((prev) => prev.map(() => []))
+  }
+
+  /** 分镜段数变化时对齐镜头素材槽位（增补空槽 / 裁掉多余） */
+  useEffect(() => {
+    setShotMediaIds((prev) => {
+      const n = scriptRows.length
+      if (prev.length === n) return prev
+      if (prev.length < n) {
+        return [...prev, ...Array.from({ length: n - prev.length }, () => [] as string[])]
+      }
+      const kept = prev.slice(0, n)
+      const dropped = prev.slice(n).flat()
+      const orphanIds = dropped.filter((id) => !kept.some((ids) => ids.includes(id)))
+      if (orphanIds.length) {
+        queueMicrotask(() => {
+          setStoryFrames((frames) => {
+            const drop = new Set(orphanIds)
+            frames.forEach((f) => {
+              if (drop.has(f.id)) revokeStoryFrame(f)
+            })
+            return frames.filter((f) => !drop.has(f.id))
+          })
+        })
+      }
+      return kept
+    })
+  }, [scriptRows.length])
+
+  const appendStoryFramesToShot = (shotIndex: number, files: FileList | File[]) => {
+    const incoming = [...files].filter(isStoryFrameMediaFile)
+    if (!incoming.length) {
+      setErr('请选择图片（jpg / png / webp）或视频（mp4 / mov / webm）')
+      return
+    }
+    if (shotIndex < 0) return
+
+    const prevFrames = storyFramesRef.current
+    const keys = new Set(prevFrames.map((x) => storyFrameFileKey(x.file)))
+    const nextFrames = [...prevFrames]
+    const addedIds: string[] = []
+    for (const f of incoming) {
+      const k = storyFrameFileKey(f)
+      const existing = nextFrames.find((x) => storyFrameFileKey(x.file) === k)
+      if (existing) {
+        addedIds.push(existing.id)
+        continue
+      }
+      if (nextFrames.length >= STORY_FRAME_MAX) break
+      keys.add(k)
+      const kind: StoryFrameItem['kind'] = isStoryFrameVideoFile(f) ? 'video' : 'image'
+      const id = `${k}-${nextFrames.length}-${Date.now()}`
+      nextFrames.push({
+        id,
+        file: f,
+        previewUrl: URL.createObjectURL(f),
+        kind,
+      })
+      addedIds.push(id)
+    }
+    if (addedIds.length === 0) {
+      setErr('素材已达上限或文件无效')
+      return
+    }
+    setStoryFrames(nextFrames)
+    setShotMediaIds((prev) => {
+      const n = Math.max(scriptRows.length, shotIndex + 1, prev.length)
+      const copy = Array.from({ length: n }, (_, i) => [...(prev[i] || [])])
+      const cur = copy[shotIndex] || []
+      const seen = new Set(cur)
+      for (const id of addedIds) {
+        if (cur.length >= SCRIPT_SHOT_MEDIA_MAX) break
+        if (seen.has(id)) continue
+        seen.add(id)
+        cur.push(id)
+      }
+      copy[shotIndex] = cur
+      return copy
+    })
+    setGenMode('frames')
+    setErr(null)
+    setHint(`已为镜头 ${shotIndex + 1} 添加素材（可继续多选图/视频）`)
+  }
+
+  const removeShotMedia = (shotIndex: number, mediaId: string) => {
+    setShotMediaIds((prev) => {
+      const copy = prev.map((ids, i) => (i === shotIndex ? ids.filter((id) => id !== mediaId) : [...ids]))
+      const stillUsed = copy.some((ids) => ids.includes(mediaId))
+      if (!stillUsed) {
+        queueMicrotask(() => {
+          setStoryFrames((frames) => {
+            const item = frames.find((x) => x.id === mediaId)
+            if (item) revokeStoryFrame(item)
+            return frames.filter((x) => x.id !== mediaId)
+          })
+        })
+      }
+      return copy
+    })
+    setHint('已移除该镜头素材')
   }
 
   const onStoryFrameInputChange = (files: FileList | null) => {
     if (files?.length) appendStoryFrames(files)
     if (storyFrameInputRef.current) storyFrameInputRef.current.value = ''
+  }
+
+  const onShotMediaInputChange = (files: FileList | null) => {
+    const idx = pendingShotMediaIndexRef.current
+    pendingShotMediaIndexRef.current = null
+    if (files?.length && idx != null) appendStoryFramesToShot(idx, files)
+    if (shotMediaInputRef.current) shotMediaInputRef.current.value = ''
   }
 
   const onPickGuidanceDoc = async (files: FileList | null) => {
@@ -2223,6 +2337,15 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
 
       {mainPane === 'canvas' ? (
         <div className="mb-8 w-full space-y-4">
+          <input
+            ref={shotMediaInputRef}
+            type="file"
+            multiple
+            accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime,.mp4,.mov,.webm,.m4v,.avi"
+            className="hidden"
+            disabled={busy || auxBusy}
+            onChange={(e) => onShotMediaInputChange(e.target.files)}
+          />
           <ShortVideoInfiniteCanvas
             scriptRows={scriptRows}
             media={storyFrames.map((f) => ({
@@ -2231,6 +2354,25 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
               kind: f.kind,
               label: f.file.name,
             }))}
+            scriptMedia={scriptRows.map((_, i) =>
+              (shotMediaIds[i] || [])
+                .map((id) => {
+                  const f = storyFrames.find((x) => x.id === id)
+                  if (!f) return null
+                  return {
+                    id: f.id,
+                    previewUrl: f.previewUrl,
+                    kind: f.kind,
+                    label: f.file.name,
+                  }
+                })
+                .filter(Boolean) as {
+                id: string
+                previewUrl: string
+                kind: 'image' | 'video'
+                label: string
+              }[],
+            )}
             flowEpoch={canvasFlowEpoch}
             disabled={busy || auxBusy}
             onAddMediaClick={() => {
@@ -2239,6 +2381,13 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
               setMainPane('generate')
               setHint('已切到短片生成 · 分镜参考，请上传素材；也可再回「无限画布」查看节点')
               queueMicrotask(() => storyFrameInputRef.current?.click())
+            }}
+            onAddScriptMedia={(index) => {
+              pendingShotMediaIndexRef.current = index
+              shotMediaInputRef.current?.click()
+            }}
+            onRemoveScriptMedia={(index, mediaId) => {
+              removeShotMedia(index, mediaId)
             }}
             onChangeScriptRow={(index, patch) => {
               setScriptRows((prev) =>
@@ -2249,6 +2398,10 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
               if (orderedIndices.length < 2) return
               const orderLabel = orderedIndices.map((i) => i + 1).join('→')
               const seg = activeScriptSegmentSec
+              setShotMediaIds((prev) => {
+                const next = orderedIndices.map((i) => [...(prev[i] || [])])
+                return next.length === orderedIndices.length ? next : prev
+              })
               setScriptRows((prev) => {
                 const next = orderedIndices.map((i) => prev[i]).filter(Boolean) as typeof prev
                 if (next.length < 2) return prev
@@ -2279,11 +2432,27 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
               })
             }}
             onRemoveScriptRow={(index) => {
-              setScriptRows((prev) => {
-                const next = removeScriptRowAt(prev, index, 1)
-                if (next === prev) return prev
-                return retimeScriptRowsBySegmentSec(next, activeScriptSegmentSec)
+              const nextRows = removeScriptRowAt(scriptRows, index, 1)
+              if (nextRows === scriptRows) return
+              setShotMediaIds((prev) => {
+                if (index < 0 || index >= prev.length) return prev
+                const removedIds = prev[index] || []
+                const next = prev.filter((_, i) => i !== index)
+                const orphanIds = removedIds.filter((id) => !next.some((ids) => ids.includes(id)))
+                if (orphanIds.length) {
+                  queueMicrotask(() => {
+                    setStoryFrames((frames) => {
+                      const drop = new Set(orphanIds)
+                      frames.forEach((f) => {
+                        if (drop.has(f.id)) revokeStoryFrame(f)
+                      })
+                      return frames.filter((f) => !drop.has(f.id))
+                    })
+                  })
+                }
+                return next
               })
+              setScriptRows(retimeScriptRowsBySegmentSec(nextRows, activeScriptSegmentSec))
               setHint(`已删除分镜 ${index + 1}`)
             }}
             onRemoveMedia={(id) => {

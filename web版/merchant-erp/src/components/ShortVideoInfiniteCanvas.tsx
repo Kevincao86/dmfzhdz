@@ -30,6 +30,8 @@ export type CanvasFlowEdge = { id: string; from: number; to: number }
 export type ShortVideoInfiniteCanvasProps = {
   scriptRows: ShortVideoScriptRow[]
   media: CanvasMediaItem[]
+  /** 每个分镜下标对应的镜头素材（图/视频，多张） */
+  scriptMedia?: CanvasMediaItem[][]
   disabled?: boolean
   /** 父级应用流程后递增，画布重置为新顺序的顺序连线 */
   flowEpoch?: number
@@ -44,6 +46,10 @@ export type ShortVideoInfiniteCanvasProps = {
   /** 画布内自由新增一段空分镜 */
   onAddScriptRow?: () => void
   onAddMediaClick?: () => void
+  /** 为指定镜头添加素材（图/视频，可多选） */
+  onAddScriptMedia?: (scriptIndex: number) => void
+  /** 从指定镜头移除一条素材 */
+  onRemoveScriptMedia?: (scriptIndex: number, mediaId: string) => void
   className?: string
 }
 
@@ -54,9 +60,13 @@ const NODE_H = 120
 const GAP_X = 56
 const GAP_Y = 48
 const SCRIPT_W = NODE_W + 28
-const SCRIPT_H = NODE_H + 36
+/** 镜头底部素材条高度 */
+const SCRIPT_MEDIA_STRIP_H = 52
+const SCRIPT_H = NODE_H + 36 + SCRIPT_MEDIA_STRIP_H
 /** 就地编辑时节点加高，容纳画面/口播输入 */
-const SCRIPT_H_EDIT = 248
+const SCRIPT_H_EDIT = 248 + SCRIPT_MEDIA_STRIP_H
+/** 单镜最多素材数（与父级上限对齐展示） */
+export const SCRIPT_SHOT_MEDIA_MAX = 6
 
 function defaultMediaPos(index: number): Pt {
   return {
@@ -109,6 +119,7 @@ type DragKind = 'pan' | 'node' | 'link'
 export default function ShortVideoInfiniteCanvas({
   scriptRows,
   media,
+  scriptMedia = [],
   disabled,
   flowEpoch = 0,
   onEditRow,
@@ -118,6 +129,8 @@ export default function ShortVideoInfiniteCanvas({
   onApplyFlowOrder,
   onAddScriptRow,
   onAddMediaClick,
+  onAddScriptMedia,
+  onRemoveScriptMedia,
   className,
 }: ShortVideoInfiniteCanvasProps) {
   const [scale, setScale] = useState(0.85)
@@ -880,7 +893,7 @@ export default function ShortVideoInfiniteCanvas({
                     </div>
                   ) : (
                     <div
-                      className="space-y-1 px-2.5 py-2"
+                      className="min-h-0 flex-1 space-y-1 px-2.5 py-2"
                       onDoubleClick={(ev) => {
                         ev.stopPropagation()
                         tryOpenEdit(id)
@@ -895,6 +908,78 @@ export default function ShortVideoInfiniteCanvas({
                       </p>
                     </div>
                   )}
+
+                  {/* 镜头素材：图/视频，多张 */}
+                  <div
+                    data-node-action
+                    className="shrink-0 border-t border-cyan-100/80 bg-white/90 px-1.5 py-1.5"
+                    onPointerDown={(ev) => ev.stopPropagation()}
+                  >
+                    <div className="flex items-center gap-1 overflow-x-auto">
+                      {(scriptMedia[i] || []).slice(0, SCRIPT_SHOT_MEDIA_MAX).map((m) => (
+                        <div
+                          key={m.id}
+                          className="group relative h-9 w-9 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-100"
+                          title={m.label}
+                        >
+                          {m.kind === 'video' ? (
+                            <video
+                              src={m.previewUrl}
+                              muted
+                              playsInline
+                              className="pointer-events-none h-full w-full object-cover"
+                            />
+                          ) : (
+                            <img
+                              src={m.previewUrl}
+                              alt=""
+                              className="pointer-events-none h-full w-full object-cover"
+                            />
+                          )}
+                          {m.kind === 'video' ? (
+                            <span className="absolute bottom-0 left-0 right-0 bg-black/55 text-center text-[8px] leading-3 text-white">
+                              视频
+                            </span>
+                          ) : null}
+                          {onRemoveScriptMedia ? (
+                            <button
+                              type="button"
+                              disabled={disabled}
+                              aria-label="移除素材"
+                              onClick={(ev) => {
+                                ev.stopPropagation()
+                                onRemoveScriptMedia(i, m.id)
+                              }}
+                              className="absolute right-0 top-0 rounded-bl bg-black/55 p-0.5 text-white opacity-0 hover:bg-rose-600 group-hover:opacity-100"
+                            >
+                              <Trash2 className="h-2.5 w-2.5" />
+                            </button>
+                          ) : null}
+                        </div>
+                      ))}
+                      {onAddScriptMedia ? (
+                        <button
+                          type="button"
+                          disabled={
+                            disabled || (scriptMedia[i]?.length ?? 0) >= SCRIPT_SHOT_MEDIA_MAX
+                          }
+                          title={
+                            (scriptMedia[i]?.length ?? 0) >= SCRIPT_SHOT_MEDIA_MAX
+                              ? `单镜最多 ${SCRIPT_SHOT_MEDIA_MAX} 个素材`
+                              : '添加图片 / 视频（可多选）'
+                          }
+                          onClick={(ev) => {
+                            ev.stopPropagation()
+                            onAddScriptMedia(i)
+                          }}
+                          className="inline-flex h-9 min-w-[2.25rem] shrink-0 items-center justify-center gap-0.5 rounded-md border border-dashed border-cyan-300 bg-cyan-50/80 px-1.5 text-[9px] font-medium text-cyan-800 hover:bg-cyan-100 disabled:opacity-40"
+                        >
+                          <ImagePlus className="h-3 w-3" />
+                          {(scriptMedia[i]?.length ?? 0) === 0 ? '素材' : ''}
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
                 </div>
               </div>
             )
@@ -940,6 +1025,7 @@ export default function ShortVideoInfiniteCanvas({
         <span className="inline-flex items-center gap-2">
           <Minus className="h-3 w-3" /> 拖空白平移
           <Plus className="h-3 w-3" /> 新增镜头 / 连线
+          <ImagePlus className="h-3 w-3" /> 镜头底栏加素材
           <Pencil className="h-3 w-3" /> 铅笔/双击就地编辑
         </span>
       </div>
