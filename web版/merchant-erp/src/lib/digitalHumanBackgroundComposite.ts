@@ -1,28 +1,36 @@
 /** 口型驱动前：将人像合成到所选背景（门店实景 / 纯色 / 绿幕等） */
 
+import { mattePortraitWithFallback } from './digitalHumanPortraitMatting'
+
 const OUT_W = 1080
 const OUT_H = 1920
 
-function pureBase64ToBlob(b64: string): Blob {
+function pureBase64ToBlob(b64: string, mime = 'image/jpeg'): Blob {
   const binary = atob(b64.replace(/\s/g, ''))
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-  return new Blob([bytes])
+  return new Blob([bytes], { type: mime })
 }
 
 async function loadImageFromPureBase64(b64: string): Promise<HTMLImageElement> {
-  const url = URL.createObjectURL(pureBase64ToBlob(b64))
-  try {
-    const img = new Image()
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve()
-      img.onerror = () => reject(new Error('无法解码人像图片'))
-      img.src = url
-    })
-    return img
-  } finally {
-    URL.revokeObjectURL(url)
+  let lastErr: Error | null = null
+  for (const mime of ['image/png', 'image/jpeg', 'image/webp'] as const) {
+    const url = URL.createObjectURL(pureBase64ToBlob(b64, mime))
+    try {
+      const img = new Image()
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve()
+        img.onerror = () => reject(new Error('无法解码人像图片'))
+        img.src = url
+      })
+      return img
+    } catch (e) {
+      lastErr = e instanceof Error ? e : new Error(String(e))
+    } finally {
+      URL.revokeObjectURL(url)
+    }
   }
+  throw lastErr ?? new Error('无法解码人像图片')
 }
 
 async function canvasToBlobJpeg(c: HTMLCanvasElement, q = 0.92): Promise<Blob> {
@@ -134,7 +142,7 @@ function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, bac
   }
 }
 
-/** 非默认演播室灰底时，将裁切后人像叠到场景背景上，作为 Seedance 图生视频参考图（不抠图） */
+/** 将裁切后人像叠到场景背景上，作为 Seedance 图生视频参考图；门店/自定义背景先抠图再融合 */
 export async function compositePortraitWithBackground(
   portraitPureB64: string,
   backgroundId: string,
@@ -159,8 +167,13 @@ export async function compositePortraitWithBackground(
     drawBackground(ctx, OUT_W, OUT_H, bg)
   }
 
-  /** Seedance 一体化：参考图不做浏览器抠图，整图叠在背景上交给模型融合 */
-  const img = await loadImageFromPureBase64(portraitPureB64)
+  /** 门店实景 / 自定义图 / 绿幕：先抠图再叠，避免灰底矩形贴片 */
+  const needsMatte = bg === 'store' || bg === 'custom' || bg === 'green' || hasCustomBgImage
+  const portraitForDraw = needsMatte
+    ? await mattePortraitWithFallback(portraitPureB64, { chromaGreen: bg === 'green' })
+    : portraitPureB64
+
+  const img = await loadImageFromPureBase64(portraitForDraw)
   const portraitMaxH = frameMode === 'full' ? OUT_H * 0.9 : OUT_H * 0.74
   const scale = Math.min(OUT_W * 0.92 / img.width, portraitMaxH / img.height)
   const pw = img.width * scale

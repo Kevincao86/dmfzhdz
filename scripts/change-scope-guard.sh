@@ -50,7 +50,7 @@ list_scopes() {
   merchant_brief_direct 商家 ERP：Brief 去订单直接生成 + 短视频观感打磨
   merchant_jimeng_studio 商家 ERP：即梦式短视频台（Skill/画布/短片/案例）+ 全站 UI token
   aimodelserver_upstream AiModelServer（api.aimodelserver.com）OpenAI 兼容上游接入
-  digital_human_bg     商家 ERP：数字人口播·门店实景背景选中
+  digital_human_bg     商家 ERP：数字人口播·实景/时长/人像融合
   video_gen_precision  视频生成更准：Brief/Skill槽位/保真校验/全入口门禁（不含 ICE）
 
 示例:
@@ -599,6 +599,10 @@ DhStep3Extras
 DigitalHumanBroadcastPage
 digitalHumanBroadcast
 digitalHumanVideoRender
+digitalHumanBackgroundComposite
+digitalHumanSeedancePrompt
+digitalHumanPortraitMatting
+concatVideoSegments
 videoFrameUtils
 change-scope-guard
 PAT

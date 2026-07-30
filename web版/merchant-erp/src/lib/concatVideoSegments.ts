@@ -335,10 +335,14 @@ export async function muxAudioWithVideoBlob(videoBlob: Blob, audioBlob: Blob): P
   const audioHead = new Uint8Array(await audioBlob.slice(0, 16).arrayBuffer())
   const audioName = audioWorkspaceName(audioBlob.type || 'audio/mpeg', audioHead)
 
-  const videoDur = await probeVideoDurationSec(videoBlob)
+  let videoDur = await probeVideoDurationSec(videoBlob)
   const audioDur = await probeAudioDurationSec(audioBlob)
+  /** 画面时长探测失败时，保守按短片处理，仍按口播 tpad，避免 -shortest 裁成 3 秒 */
+  if (!(videoDur > 0.2) && audioDur > 1) {
+    videoDur = 0.5
+  }
   const padSec =
-    videoDur > 0.2 && audioDur > videoDur + 0.12 ? Math.min(audioDur - videoDur, 120) : 0
+    audioDur > videoDur + 0.12 ? Math.min(Math.max(0, audioDur - videoDur), 120) : 0
 
   const ffmpeg = await loadFfmpeg()
   await cleanupWorkspace(ffmpeg, ['v.mp4', 'a.mp3', 'a.wav', 'a.m4a', 'out.mp4'])
@@ -366,7 +370,11 @@ export async function muxAudioWithVideoBlob(videoBlob: Blob, audioBlob: Blob): P
             '-map',
             '1:a:0',
             '-c:v',
-            'copy',
+            'libx264',
+            '-preset',
+            'veryfast',
+            '-crf',
+            '23',
             ...tailCommon,
           ],
           [
@@ -377,11 +385,7 @@ export async function muxAudioWithVideoBlob(videoBlob: Blob, audioBlob: Blob): P
             '-map',
             '1:a:0',
             '-c:v',
-            'libx264',
-            '-preset',
-            'veryfast',
-            '-crf',
-            '23',
+            'copy',
             ...tailCommon,
           ],
         ]
