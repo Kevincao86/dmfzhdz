@@ -29,6 +29,10 @@ export async function routeAiChat(req: AIChatRequest, env: Record<string, string
       const { chatDoubaoAgent } = await import('./providers/merchantLlmChat.js')
       return chatDoubaoAgent(req, env)
     }
+    case 'aimodelserver': {
+      const { chatAimodelserver } = await import('./providers/aimodelserver.js')
+      return chatAimodelserver(req, env)
+    }
     default:
       throw new Error(`unknown provider: ${String((req as AIChatRequest).provider)}`)
   }

@@ -11,6 +11,10 @@ import {
   minimaxChatModelCandidates,
   resolveMinimaxApiKey,
 } from './providers/directLlmEnv.js'
+import {
+  resolveAimodelserverApiKey,
+  resolveAimodelserverBaseUrl,
+} from './providers/aimodelserver.js'
 import { type OpenAiCompatMessage } from './providers/openAiCompatibleFetch.js'
 import { openAiCompatChatStream, type OpenAiStreamDelta } from './openAiCompatStream.js'
 import { toOpenAiChatCompletionMessages } from './openAiChatMessages.js'
@@ -139,6 +143,36 @@ async function streamKimi(
   }
 }
 
+async function streamAimodelserver(
+  req: AIChatRequest,
+  env: Record<string, string>,
+  onDelta: AiStreamDeltaHandler,
+  signal?: AbortSignal,
+): Promise<{ model: string }> {
+  const apiKey = resolveAimodelserverApiKey(env)
+  if (!apiKey) throw new Error('AIMODELSERVER_API_KEY 未配置')
+  const reg = registryEntry('aimodelserver')
+  const model = (
+    req.model ??
+    env.AIMODELSERVER_MODEL ??
+    reg?.defaultModel ??
+    'gpt-5.4'
+  ).trim()
+  const base = resolveAimodelserverBaseUrl(env)
+  await consumeGenerator(
+    openAiCompatChatStream({
+      url: `${base}/chat/completions`,
+      apiKey,
+      model,
+      messages: toOpenAiMessages(req.messages),
+      temperature: req.temperature ?? 0.6,
+      signal,
+    }),
+    onDelta,
+  )
+  return { model }
+}
+
 async function streamMinimax(
   req: AIChatRequest,
   env: Record<string, string>,
@@ -215,6 +249,11 @@ export async function routeAiChatStream(
     }
     case 'minimax': {
       const r = await streamMinimax(req, env, wrap, signal)
+      modelUsed = r.model
+      break
+    }
+    case 'aimodelserver': {
+      const r = await streamAimodelserver(req, env, wrap, signal)
       modelUsed = r.model
       break
     }

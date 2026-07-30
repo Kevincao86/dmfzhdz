@@ -14,7 +14,15 @@ import {
   searchKbChunks,
 } from '../knowledgeBaseCore.js'
 
-const ALLOWED = new Set<string>(['tokenmix', 'deepseek', 'kimi', 'minimax', 'qwen', 'doubao'])
+const ALLOWED = new Set<string>([
+  'tokenmix',
+  'deepseek',
+  'kimi',
+  'minimax',
+  'qwen',
+  'doubao',
+  'aimodelserver',
+])
 
 function bearerJwt(authHeader: string | undefined): string | undefined {
   return typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
