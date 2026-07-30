@@ -80,7 +80,6 @@ import {
 } from '../services/videoAiApi'
 import { parseGuidanceDocumentFile } from '../lib/shortVideoGuidanceDoc'
 import {
-  optimizeShortVideoGuidancePrompt,
   planShortVideoScriptFromGuidance,
 } from '../services/shortVideoGuidanceAi'
 import { extractVideoLastFramePureBase64 } from '../lib/videoFrameUtils'
@@ -435,10 +434,8 @@ export default function ShortVideoOptimizationPage() {
   const [genMode, setGenMode] = useState<'text' | 'frames'>('text')
   const [genPrompt, setGenPrompt] = useState('')
   const [scriptRows, setScriptRows] = useState<ShortVideoScriptRow[]>(() =>
-    defaultScriptRows(
-      segmentCountFromTargetTotalSec(LONGFORM_DEFAULT_TARGET_TOTAL_SEC, LONGFORM_DEFAULT_SEGMENT_SEC),
-      LONGFORM_DEFAULT_SEGMENT_SEC,
-    ),
+    // 默认 2 段，不依赖「长视频」勾选；可随时「添加时间段」
+    defaultScriptRows(2, 15),
   )
   const [storyFrames, setStoryFrames] = useState<StoryFrameItem[]>([])
   const [storyDropActive, setStoryDropActive] = useState(false)
@@ -508,20 +505,33 @@ export default function ShortVideoOptimizationPage() {
     [sdDurationSec],
   )
 
-  /** 画布分镜 → 短片生成：打开长片合成并按分镜时间轴对齐目标总时长（闭环） */
+  /** 画布分镜 → 短片生成：对齐文案；仅在已开长片或显式要求时才勾选长片（不强制） */
   const syncGenerateWorkspaceFromCanvas = useCallback(
-    (rows: ShortVideoScriptRow[], opts?: { fillPrompt?: boolean }) => {
+    (rows: ShortVideoScriptRow[], opts?: { fillPrompt?: boolean; enableLongform?: boolean }) => {
       const end = maxScriptTimeRangeEndSec(rows)
       const target = snapLongformTargetTotalSec(end, rows.length)
-      setLongformEnabled(true)
-      setLongformTargetTotalSec(target)
-      setLongformSegmentSec(LONGFORM_DEFAULT_SEGMENT_SEC)
+      if (opts?.enableLongform) {
+        setLongformEnabled(true)
+        setLongformTargetTotalSec(target)
+        setLongformSegmentSec(LONGFORM_DEFAULT_SEGMENT_SEC)
+      } else if (longformEnabled) {
+        setLongformTargetTotalSec(target)
+        setLongformSegmentSec(LONGFORM_DEFAULT_SEGMENT_SEC)
+      }
       if (opts?.fillPrompt && isScriptRowsUsable(rows)) {
         setGenPrompt((prev) => (prev.trim() ? prev : scriptRowsToOverallPrompt(rows)))
       }
     },
-    [],
+    [longformEnabled],
   )
+
+  /** 当前新增分镜的默认段长：长片用分段方案，否则用所选单段时长 */
+  const activeScriptSegmentSec = useMemo(() => {
+    if (longformEnabled) {
+      return Math.min(15, Math.max(5, longformSegmentSec || LONGFORM_DEFAULT_SEGMENT_SEC))
+    }
+    return Math.min(15, Math.max(5, Number(sdDurationSec) || 15))
+  }, [longformEnabled, longformSegmentSec, sdDurationSec])
 
   const longformDurationPlan = useMemo(
     () =>
@@ -753,21 +763,18 @@ export default function ShortVideoOptimizationPage() {
       const text = await parseGuidanceDocumentFile(f)
       const parsedRows = parseScriptRowsFromPlainText(text)
       const inferredCount = inferScriptSegmentCountFromText(text)
-      if (longformEnabled && parsedRows.length >= 2) {
+      if (parsedRows.length >= 2) {
         setGenPrompt(text)
         const count = Math.max(parsedRows.length, inferredCount >= 2 ? inferredCount : parsedRows.length)
-        setScriptRows(resizeScriptRows(parsedRows, count, longformSegmentSec))
+        setScriptRows(resizeScriptRows(parsedRows, count, activeScriptSegmentSec))
         setHint(
           scriptRowsHaveExplicitTimeRanges(parsedRows)
             ? `已从「${f.name}」解析分镜表（${count} 段，含自定义时间段），请核对或继续 AI 规划。`
             : `已从「${f.name}」解析分镜表（${count} 行），请核对或继续 AI 规划。`,
         )
-      } else if (longformEnabled) {
-        setGenPrompt(text)
-        setHint(`已从「${f.name}」载入指导文案，点击「AI 规划分镜」自动填入下方表格。`)
       } else {
         setGenPrompt(text)
-        setHint(`已从「${f.name}」解析执导文案，可继续 AI 优化或直接生成。`)
+        setHint(`已从「${f.name}」载入指导文案，可点「AI 规划分镜」填入下方表格，或直接生成。`)
       }
     } catch (e) {
       setErr(e instanceof Error ? e.message : '文档解析失败')
@@ -778,79 +785,66 @@ export default function ShortVideoOptimizationPage() {
   }
 
   const onOptimizeGuidancePrompt = async () => {
-    if (longformEnabled) {
-      const draft = genPrompt.trim()
-      if (draft.length < 4) {
-        setErr('请先输入或上传指导文案，再点击 AI 规划分镜。')
-        return
-      }
-      setAuxBusy(true)
-      setErr(null)
-      setHint(null)
-      const preCount = resolveGuidanceSegmentCount(draft, longformTargetTotalSec, longformSegmentSec)
-      setProgress('AI 模型 1 正在通读输入框指导文案并规划分镜…')
-      try {
-        const r = await planShortVideoScriptFromGuidance(draft, {
-          targetTotalSec: longformTargetTotalSec,
-          segmentSec: longformSegmentSec,
-          plannerModel: 'auto',
-          mode: genMode === 'text' ? 'generate_text' : 'generate_frames',
-          hasProductImage: false,
-          frameMode: genMode === 'frames',
-          onProgress: (msg) => setProgress(msg),
-        })
-        if (!r.ok) {
-          setErr(r.message)
-          return
-        }
-        setScriptRows(r.rows)
-        const covered = maxScriptTimeRangeEndSec(r.rows)
-        const targetNote =
-          longformTargetTotalSec >= 10 && covered >= longformTargetTotalSec - 2
-            ? `，时间轴已覆盖约 0–${covered} 秒`
-            : longformTargetTotalSec >= 10 && covered > 0
-              ? `（当前约 0–${covered} 秒，目标 ${longformTargetTotalSec} 秒，请核对末段）`
-              : ''
-        const modelNote =
-          r.reviewVendors?.length === 3
-            ? `（三模型复核：${r.reviewVendors.join(' → ')}）`
-            : r.usedAiPlanner
-              ? `（模型：${formatPlannerUsedLabel(r.plannerVendor, r.plannerModelId)}）`
-              : r.usedRuleBasedFallback
-                ? '（AI 不可用，已降级为本地规则拆段，请更换模型后重试）'
-                : ''
-        setHint(
-          scriptRowsHaveExplicitTimeRanges(r.rows) && preCount >= 2
-            ? `三模型复核通过，已填满 ${r.rows.length} 段分镜${targetNote}${modelNote}，请核对后点击「开始生成短片」。`
-            : `三模型复核通过，AI 已规划 ${r.rows.length} 段分镜${targetNote}${modelNote}，请核对表格后点击「开始生成短片」。`,
+    const draft = genPrompt.trim()
+    if (draft.length < 4) {
+      setErr('请先输入或上传指导文案，再点击 AI 规划分镜。')
+      return
+    }
+    // 任意时长均可规划分镜，不要求勾选「长视频」
+    const segmentSec = activeScriptSegmentSec
+    const coveredNow = maxScriptTimeRangeEndSec(scriptRows)
+    const targetTotalSec = longformEnabled
+      ? longformTargetTotalSec
+      : Math.min(
+          LONGFORM_MAX_TARGET_TOTAL_SEC,
+          Math.max(
+            segmentSec * 2,
+            coveredNow > 0 ? coveredNow : segmentSec * Math.max(2, scriptRows.length),
+          ),
         )
-      } finally {
-        setAuxBusy(false)
-        setProgress(null)
-      }
-      return
-    }
-
-    const sourceText = genPrompt
-    if (!sourceText.trim()) {
-      setErr('请先输入执导文案。')
-      return
-    }
     setAuxBusy(true)
     setErr(null)
+    setHint(null)
+    const preCount = resolveGuidanceSegmentCount(draft, targetTotalSec, segmentSec)
+    setProgress('AI 模型 1 正在通读输入框指导文案并规划分镜…')
     try {
-      const r = await optimizeShortVideoGuidancePrompt(sourceText, {
+      const r = await planShortVideoScriptFromGuidance(draft, {
+        targetTotalSec,
+        segmentSec,
+        plannerModel: 'auto',
+        mode: genMode === 'text' ? 'generate_text' : 'generate_frames',
         hasProductImage: false,
         frameMode: genMode === 'frames',
+        onProgress: (msg) => setProgress(msg),
       })
       if (!r.ok) {
         setErr(r.message)
         return
       }
-      setGenPrompt(r.text)
-      setHint('AI 已优化执导文案，请核对后点击「开始生成短片」。')
+      setScriptRows(r.rows)
+      const covered = maxScriptTimeRangeEndSec(r.rows)
+      const targetNote =
+        targetTotalSec >= 10 && covered >= targetTotalSec - 2
+          ? `，时间轴已覆盖约 0–${covered} 秒`
+          : targetTotalSec >= 10 && covered > 0
+            ? `（当前约 0–${covered} 秒，目标 ${targetTotalSec} 秒，请核对末段）`
+            : ''
+      const modelNote =
+        r.reviewVendors?.length === 3
+          ? `（三模型复核：${r.reviewVendors.join(' → ')}）`
+          : r.usedAiPlanner
+            ? `（模型：${formatPlannerUsedLabel(r.plannerVendor, r.plannerModelId)}）`
+            : r.usedRuleBasedFallback
+              ? '（AI 不可用，已降级为本地规则拆段，请更换模型后重试）'
+              : ''
+      setHint(
+        scriptRowsHaveExplicitTimeRanges(r.rows) && preCount >= 2
+          ? `三模型复核通过，已填满 ${r.rows.length} 段分镜${targetNote}${modelNote}，请核对后点击「开始生成短片」。`
+          : `三模型复核通过，AI 已规划 ${r.rows.length} 段分镜${targetNote}${modelNote}，请核对表格后点击「开始生成短片」。`,
+      )
     } finally {
       setAuxBusy(false)
+      setProgress(null)
     }
   }
 
@@ -1464,7 +1458,9 @@ export default function ShortVideoOptimizationPage() {
         const targetOverride = snapLongformTargetTotalSec(end, scriptRows.length)
         await runLongformGenerate({
           targetTotalSecOverride: longformEnabled ? undefined : targetOverride,
-          segmentSecOverride: longformEnabled ? undefined : LONGFORM_DEFAULT_SEGMENT_SEC,
+          segmentSecOverride: longformEnabled
+            ? undefined
+            : Math.min(15, Math.max(5, Number(sdDurationSec) || 15)),
         })
         finishVideoJob(!!resultBlobRef.current, cancelRef.current ? '已取消等待' : undefined)
       } finally {
@@ -1686,15 +1682,15 @@ export default function ShortVideoOptimizationPage() {
     setHint(
       longformEnabled
         ? `已进入短片生成工作区（长视频 ${longformTargetTotalSec} 秒），可点「AI 规划分镜」或「开始生成短片」`
-        : `已进入短片生成工作区（单段 ${sdDurationSec} 秒），确认参数后点「开始生成短片」`,
+        : `已进入短片生成工作区（单段 ${sdDurationSec} 秒），可直接编写/新增分镜，或点「AI 规划分镜」`,
     )
     queueMicrotask(() => {
       document
         .getElementById('sv-generate-workspace')
         ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     })
-    // 仅用户已勾选长视频时才自动规划，保持下方已选时长不动
-    if (genPrompt.trim() && longformEnabled) {
+    // 有文案且分镜表尚未填满时自动规划（不要求勾选长视频）
+    if (genPrompt.trim() && !isScriptRowsUsable(scriptRows)) {
       void onOptimizeGuidancePrompt()
     }
   }
@@ -1704,10 +1700,10 @@ export default function ShortVideoOptimizationPage() {
     if (studioMode === 'digital_human') return '打开数字人'
     if (studioMode === 'music') return '打开配乐工作区'
     if (studioMode === 'canvas') return '打开无限画布'
-    if (longformEnabled) return '规划并进入生成'
     if (mainPane === 'generate' && genPrompt.trim()) return '开始生成短片'
+    if (genPrompt.trim()) return '规划并进入生成'
     return '进入短片生成'
-  }, [studioMode, longformEnabled, mainPane, genPrompt])
+  }, [studioMode, mainPane, genPrompt])
 
   const goPane = (id: MainPane) => {
     resetOutputs()
@@ -1918,16 +1914,17 @@ export default function ShortVideoOptimizationPage() {
             onApplyFlowOrder={(orderedIndices) => {
               if (orderedIndices.length < 2) return
               const orderLabel = orderedIndices.map((i) => i + 1).join('→')
+              const seg = activeScriptSegmentSec
               setScriptRows((prev) => {
                 const next = orderedIndices.map((i) => prev[i]).filter(Boolean) as typeof prev
                 if (next.length < 2) return prev
-                const resized = resizeScriptRows(next, next.length, LONGFORM_DEFAULT_SEGMENT_SEC)
+                const resized = resizeScriptRows(next, next.length, seg)
                 syncGenerateWorkspaceFromCanvas(resized, { fillPrompt: true })
                 return resized
               })
               setCanvasFlowEpoch((v) => v + 1)
               setHint(
-                `已按画布自由连线应用流程（${orderLabel}），已打开长片合成并同步分镜表与时间轴；可直接「开始生成短片」`,
+                `已按画布自由连线应用流程（${orderLabel}），分镜顺序已同步到短片生成区；可直接完善口播后生成`,
               )
               setMainPane('generate')
               queueMicrotask(() => {
@@ -1951,7 +1948,7 @@ export default function ShortVideoOptimizationPage() {
               onClick={() => {
                 syncGenerateWorkspaceFromCanvas(scriptRows, { fillPrompt: true })
                 setMainPane('generate')
-                setHint('已进入短片生成工作区：分镜表与画布节点已对齐，勾选长片合成已开启')
+                setHint('已进入短片生成工作区：分镜表与画布节点已对齐（无需勾选长视频也可编辑分镜）')
                 queueMicrotask(() => {
                   document
                     .getElementById('sv-generate-workspace')
@@ -2014,7 +2011,7 @@ export default function ShortVideoOptimizationPage() {
             <span>
               <span className="font-medium">长视频 / 短片合成（最长 {LONGFORM_MAX_TARGET_TOTAL_SEC} 秒）</span>
               <span className="mt-0.5 block text-xs leading-relaxed text-zinc-500">
-                按 15 秒为单位自动分段（如 60 秒 = 4 段 × 15 秒），写文案后点「AI 规划分镜」再生成。
+                可选：勾选后可设更长目标总时长。分镜表本身在任意时长下都可编辑与新增，不勾选也能写分镜、出片。
               </span>
             </span>
           </label>
@@ -2133,7 +2130,7 @@ export default function ShortVideoOptimizationPage() {
           <ol className="grid gap-3 sm:grid-cols-3">
             {[
               { n: 1, title: '写指导文案 / 选 Skill', sub: '卖点、场景、运镜（可上传 doc）' },
-              { n: 2, title: 'AI 规划分镜', sub: '自动拆时间段 + 画面 + 口播' },
+              { n: 2, title: '编写或 AI 规划分镜', sub: '任意时长可新增时间段；不必勾选长视频' },
               { n: 3, title: '开始生成短片', sub: 'Seedance · 最长 60 秒' },
             ].map((s) => (
               <li
@@ -2197,11 +2194,9 @@ export default function ShortVideoOptimizationPage() {
             </button>
           </div>
 
-          {longformEnabled ? (
             <p className="rounded-lg border border-cyan-100 bg-cyan-50/80 px-3 py-2 text-xs leading-relaxed text-cyan-900">
-              分镜表与「无限画布」共用同一套节点。画布连线后点「应用流程」，或此处改表后再回画布查看，即可闭环出片。
+              任意时长均可编写分镜（无需勾选长视频）。分镜表与「无限画布」共用节点；可点「添加时间段」或「AI 规划分镜」。
             </p>
-          ) : null}
 
           <label className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2228,63 +2223,45 @@ export default function ShortVideoOptimizationPage() {
                   disabled={busy || auxBusy || !genPrompt.trim()}
                   onClick={() => void onOptimizeGuidancePrompt()}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-medium text-cyan-900 hover:bg-cyan-100 disabled:opacity-50"
-                  title={longformEnabled ? 'AI 将先通读输入框全文，再规划分镜' : undefined}
+                  title="AI 通读文案后写入下方分镜表（不要求勾选长视频）"
                 >
                   {auxBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
-                  {longformEnabled ? 'AI 规划分镜' : 'AI 优化文案'}
+                  AI 规划分镜
                 </button>
               </div>
             </div>
-            {longformEnabled ? (
-              <>
-                <textarea
-                  spellCheck={false}
-                  placeholder="输入商业创意、卖点、场景与叙事意图；可上传 Word/txt。点击下方「AI 规划分镜」自动拆成时间段、画面指令与口播文案。"
-                  value={genPrompt}
-                  disabled={busy || auxBusy}
-                  onChange={(e) => setGenPrompt(e.target.value)}
-                  className="min-h-[112px] w-full resize-y rounded-lg border border-zinc-300 px-4 py-3 text-sm outline-none ring-cyan-600/35 focus-visible:ring-2"
-                />
-                <p className="text-xs text-zinc-500">
-                  粘贴或上传执行文案后，点击「AI 规划分镜」；AI 会先完整阅读输入框内容再填入下方分镜表。
-                </p>
-                <div id="sv-script-table-anchor" className="mt-1 flex flex-col gap-2">
-                  <span className="text-sm font-medium text-zinc-800">执导分镜脚本</span>
-                  <ShortVideoScriptTableEditor
-                    rows={scriptRows}
-                    disabled={busy || auxBusy}
-                    onChange={setScriptRows}
-                    onAddRow={() =>
-                      setScriptRows((prev) => appendEmptyScriptRow(prev, longformSegmentSec))
-                    }
-                    onRemoveRow={(index) =>
-                      setScriptRows((prev) => removeScriptRowAt(prev, index))
-                    }
-                  />
-                  <p className="text-xs text-zinc-500">
-                    支持 AI 自动规划，也可点击「添加时间段」手动编写分镜；各段画面与口播填好后即可生成；至少保留 2 段，多余段可点右侧删除。
-                  </p>
-                </div>
-              </>
-            ) : (
-              <>
-                <textarea
-                  spellCheck={false}
-                  placeholder={
-                    genMode === 'text'
-                      ? '描述画面节奏、光线、人物与氛围等；可上传 Word/txt 或点「AI 优化文案」。'
-                      : '用文字说明各镜头顺序与动作；首张图会作为重要参考。'
-                  }
-                  value={genPrompt}
-                  disabled={busy || auxBusy}
-                  onChange={(e) => setGenPrompt(e.target.value)}
-                  className="min-h-[128px] w-full resize-y rounded-lg border border-zinc-300 px-4 py-3 text-sm outline-none ring-cyan-600/35 focus-visible:ring-2"
-                />
-                <p className="text-xs text-zinc-500">
-                  支持 .txt / .doc / .docx 指导文案自动填入；复杂旧版 .doc 建议另存为 .docx。
-                </p>
-              </>
-            )}
+            <textarea
+              spellCheck={false}
+              placeholder={
+                genMode === 'frames'
+                  ? '用文字说明各镜头顺序与动作；可上传 Word/txt。点击「AI 规划分镜」填入下方表格，或手动添加时间段。'
+                  : '输入卖点、场景与叙事意图；可上传 Word/txt。点击「AI 规划分镜」自动拆成时间段、画面与口播，无需勾选长视频。'
+              }
+              value={genPrompt}
+              disabled={busy || auxBusy}
+              onChange={(e) => setGenPrompt(e.target.value)}
+              className="min-h-[112px] w-full resize-y rounded-lg border border-zinc-300 px-4 py-3 text-sm outline-none ring-cyan-600/35 focus-visible:ring-2"
+            />
+            <p className="text-xs text-zinc-500">
+              支持 .txt / .doc / .docx；填写分镜表后即可生成。勾选「长视频合成」仅用于选择更长目标总时长（最长 60 秒）。
+            </p>
+            <div id="sv-script-table-anchor" className="mt-1 flex flex-col gap-2">
+              <span className="text-sm font-medium text-zinc-800">执导分镜脚本</span>
+              <ShortVideoScriptTableEditor
+                rows={scriptRows}
+                disabled={busy || auxBusy}
+                onChange={setScriptRows}
+                onAddRow={() =>
+                  setScriptRows((prev) => appendEmptyScriptRow(prev, activeScriptSegmentSec))
+                }
+                onRemoveRow={(index) =>
+                  setScriptRows((prev) => removeScriptRowAt(prev, index))
+                }
+              />
+              <p className="text-xs text-zinc-500">
+                不勾选长视频也可点「添加时间段」；各段画面与口播填好后即可生成。至少保留 2 段，多余段可点右侧删除。
+              </p>
+            </div>
           </label>
 
           {genMode === 'frames' && (
