@@ -566,6 +566,7 @@ short-video-bgm
 gen-case-seedance
 gen-case-content-bgm
 gen-case-narration-vo
+AiAgentPage
 MeooLayout
 index.css
 merchantEmbedChrome.css

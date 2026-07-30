@@ -1,5 +1,15 @@
-import { Bot, CalendarDays, ChevronDown, ChevronRight, FileText, MessageSquarePlus, Sparkles } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Bot,
+  CalendarDays,
+  ChevronDown,
+  ChevronRight,
+  Clapperboard,
+  FileText,
+  MessageSquarePlus,
+  MessagesSquare,
+  Sparkles,
+} from 'lucide-react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { AiAgentComposerBar } from '../components/AiAgentComposerBar'
 import { AiAgentMessageBubble } from '../components/AiAgentMessageBubble'
 import { AiAgentPreviewActions } from '../components/AiAgentPreviewActions'
@@ -7,14 +17,18 @@ import { AiAgentThinkingIndicator } from '../components/AiAgentThinkingIndicator
 import { useAiAgent } from '../context/AiAgentContext'
 import { cn } from '../cn'
 
+const ShortVideoOptimizationPage = lazy(() => import('./ShortVideoOptimizationPage'))
+
 const INFO_COPY = {
   title: '灵祺 AI 助手',
   body: '我会协助您处理门店经营里的咨询和任务草稿。涉及改价、上架、发消息等操作时，会先给您看执行说明，由您确认后再提交，避免误操作。',
   bullet: '您也可以从顶部搜索框发起指令，在右侧抽屉里继续同一段对话。',
 }
 
+type AgentWorkspace = 'chat' | 'shortvideo'
+
 /**
- * 智能体主页：未对话时居中输入（Codex 空态）；有用户发言后左侧历史 + 上方对话区 + 底部固定输入条。
+ * 智能体主页：对话助手 + 短视频出片同页切换，减少去「短视频 AI 处理」单独开页。
  */
 export default function AiAgentPage() {
   const {
@@ -35,17 +49,70 @@ export default function AiAgentPage() {
   const hasChat = useMemo(() => messages.some((m) => m.role === 'user'), [messages])
   const scrollRef = useRef<HTMLDivElement>(null)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const [workspace, setWorkspace] = useState<AgentWorkspace>('chat')
 
   const confirmDisabledFor = (previewMessageId: string) =>
     isPreviewLoading(previewMessageId) || isPreviewConfirming(previewMessageId) || aiSending
 
   useEffect(() => {
-    if (!hasChat) return
+    if (!hasChat || workspace !== 'chat') return
     requestAnimationFrame(() => {
       const el = scrollRef.current
       if (el) el.scrollTop = el.scrollHeight
     })
-  }, [messages, hasChat, aiSending, streamingReply])
+  }, [messages, hasChat, aiSending, streamingReply, workspace])
+
+  const workspaceTabs = (
+    <div className="mb-5 flex flex-wrap items-center justify-center gap-2">
+      <button
+        type="button"
+        onClick={() => setWorkspace('chat')}
+        className={cn(
+          'inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition',
+          workspace === 'chat'
+            ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25'
+            : 'bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50',
+        )}
+      >
+        <MessagesSquare className="h-4 w-4" aria-hidden />
+        对话助手
+      </button>
+      <button
+        type="button"
+        onClick={() => setWorkspace('shortvideo')}
+        className={cn(
+          'inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition',
+          workspace === 'shortvideo'
+            ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/25'
+            : 'bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50',
+        )}
+      >
+        <Clapperboard className="h-4 w-4" aria-hidden />
+        短视频出片
+      </button>
+    </div>
+  )
+
+  if (workspace === 'shortvideo') {
+    return (
+      <div className="mx-auto w-full min-w-0 max-w-6xl px-1 py-4 sm:px-2 sm:py-6">
+        <div className="mb-2 text-center">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">我们该做什么？</h1>
+          <p className="mt-2 text-sm text-slate-500">对话与短视频出片同页切换，无需再进侧栏「短视频 AI 处理」</p>
+        </div>
+        {workspaceTabs}
+        <Suspense
+          fallback={
+            <div className="rounded-2xl border border-slate-200 bg-white px-6 py-16 text-center text-sm text-slate-500">
+              正在加载短视频创作台…
+            </div>
+          }
+        >
+          <ShortVideoOptimizationPage embed />
+        </Suspense>
+      </div>
+    )
+  }
 
   return (
     <div
@@ -57,7 +124,7 @@ export default function AiAgentPage() {
     >
       {!hasChat ? (
         <>
-          <div className="mb-8 text-center">
+          <div className="mb-6 text-center">
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">我们该做什么？</h1>
             <p className="mt-2 text-sm text-slate-500">
               <span className="mr-2 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-800">
@@ -79,6 +146,8 @@ export default function AiAgentPage() {
               在右侧抽屉中继续会话
             </button>
           </div>
+
+          {workspaceTabs}
 
           <AiAgentComposerBar layout="centered" />
 
@@ -132,6 +201,10 @@ export default function AiAgentPage() {
                     <Sparkles className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
                     {INFO_COPY.bullet}
                   </li>
+                  <li className="flex items-center gap-1.5">
+                    <Clapperboard className="h-3.5 w-3.5 shrink-0 text-cyan-600" />
+                    点上方「短视频出片」可同页打开 Seedance 创作台，无需切换侧栏菜单。
+                  </li>
                 </ul>
               </div>
             </div>
@@ -140,7 +213,7 @@ export default function AiAgentPage() {
       ) : (
         <>
           <aside className="flex shrink-0 flex-col border-b border-slate-200/90 bg-gradient-to-b from-slate-50 to-white lg:w-[12rem] lg:border-b-0 lg:border-r lg:border-slate-200/90">
-            <div className="p-2 lg:p-3">
+            <div className="space-y-2 p-2 lg:p-3">
               <button
                 type="button"
                 disabled={aiSending}
@@ -149,6 +222,14 @@ export default function AiAgentPage() {
               >
                 <MessageSquarePlus className="h-4 w-4 shrink-0 text-indigo-600" aria-hidden />
                 <span className="truncate">返回新建对话</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setWorkspace('shortvideo')}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-cyan-200/90 bg-cyan-50 px-2 py-2 text-xs font-medium text-cyan-900 shadow-sm transition hover:bg-cyan-100 lg:justify-start lg:px-3"
+              >
+                <Clapperboard className="h-4 w-4 shrink-0" aria-hidden />
+                <span className="truncate">短视频出片</span>
               </button>
             </div>
 

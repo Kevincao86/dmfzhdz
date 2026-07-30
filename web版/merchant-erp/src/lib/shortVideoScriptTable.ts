@@ -96,11 +96,12 @@ export function resizeScriptRows(
   segmentSec: number,
 ): ShortVideoScriptRow[] {
   const effectiveCount = Math.min(12, Math.max(2, count))
+  const seg = Math.min(15, Math.max(2, Math.round(segmentSec) || 5))
   const base = rows.slice(0, effectiveCount)
   while (base.length < effectiveCount) {
     const i = base.length
     base.push({
-      timeRange: `${i * segmentSec}-${(i + 1) * segmentSec}秒`,
+      timeRange: `${i * seg}-${(i + 1) * seg}秒`,
       visual: '',
       dialogue: '',
     })
@@ -109,7 +110,20 @@ export function resizeScriptRows(
     ...r,
     timeRange: r.timeRange.trim()
       ? normalizeScriptTimeRange(r.timeRange)
-      : `${i * segmentSec}-${(i + 1) * segmentSec}秒`,
+      : `${i * seg}-${(i + 1) * seg}秒`,
+  }))
+}
+
+/** 按单段秒数重写时间轴（与「单段时长」对齐；保留画面/口播） */
+export function retimeScriptRowsBySegmentSec(
+  rows: ShortVideoScriptRow[],
+  segmentSec: number,
+): ShortVideoScriptRow[] {
+  const seg = Math.min(15, Math.max(2, Math.round(segmentSec) || 5))
+  if (rows.length === 0) return defaultScriptRows(2, seg)
+  return rows.map((r, i) => ({
+    ...r,
+    timeRange: `${i * seg}-${(i + 1) * seg}秒`,
   }))
 }
 
