@@ -152,13 +152,22 @@ export async function handleWaimaiBindPost(
   let appId = ''
   let appSecret = ''
   let extraId = ''
+  let appAuthToken = ''
   try {
-    const j = JSON.parse(bodyRaw || '{}') as { appId?: string; appSecret?: string; extraId?: string }
+    const j = JSON.parse(bodyRaw || '{}') as {
+      appId?: string
+      appSecret?: string
+      extraId?: string
+      appAuthToken?: string
+    }
     appId = (j.appId ?? '').trim()
     appSecret = (j.appSecret ?? '').trim()
     extraId = (j.extraId ?? '').trim()
+    appAuthToken = (j.appAuthToken ?? '').trim()
   } catch {
-    json(res, 400, { message: '请求体须为 JSON：{ appId, appSecret, extraId? }' })
+    json(res, 400, {
+      message: '请求体须为 JSON：{ appId, appSecret, appAuthToken?, extraId? }',
+    })
     return
   }
   if (!appId || !appSecret) {
@@ -168,11 +177,31 @@ export async function handleWaimaiBindPost(
 
   const label = PLATFORM_META[platform].label
   const merchantId = extraId || `${platform}-${appId.slice(0, 8)}`
-  let accessToken = `${platform}-at-${randomUUID().replace(/-/g, '')}`
-  let demo = !waimaiConfiguredForLiveApi(platform)
+  const live = waimaiConfiguredForLiveApi(platform)
+  const envPrefix = platform.toUpperCase()
 
-  if (waimaiConfiguredForLiveApi(platform)) {
-    const tokenPath = waimaiPathFromEnv(platform, `${platform.toUpperCase()}_OAUTH_TOKEN_PATH`, '/oauth/token')
+  if (!live) {
+    const session: WaimaiMerchantSession = {
+      v: 1,
+      platform,
+      appKey: appId,
+      appSecret,
+      accessToken: appAuthToken || `${platform}-at-${randomUUID().replace(/-/g, '')}`,
+      merchantId,
+      demo: true,
+    }
+    json(res, 200, {
+      accessToken: encodeWaimaiSessionToken(session),
+      message: `已绑定 ${label}（演示模式 · 商家自研）：配置 ${envPrefix}_OPENAPI_BASE_URL 与各业务 PATH 后将直连开放平台。`,
+      demo: true,
+      mode: 'merchant_self',
+    })
+    return
+  }
+
+  let accessToken = appAuthToken
+  if (!accessToken) {
+    const tokenPath = waimaiPathFromEnv(platform, `${envPrefix}_OAUTH_TOKEN_PATH`, '/oauth/token')
     const r = await waimaiSignedRequest(
       {
         v: 1,
@@ -183,21 +212,30 @@ export async function handleWaimaiBindPost(
         merchantId,
       },
       tokenPath,
-      { method: 'POST', body: { grant_type: 'client_credentials' }, extraSignParams: { grant_type: 'client_credentials' } },
+      {
+        method: 'POST',
+        body: { grant_type: 'client_credentials' },
+        extraSignParams: { grant_type: 'client_credentials' },
+      },
     )
     if (r.ok) {
       const data = r.json.data
-      const tok =
+      accessToken =
         (typeof r.json.access_token === 'string' && r.json.access_token) ||
-        (data && typeof data === 'object' && typeof (data as Record<string, unknown>).access_token === 'string'
+        (data &&
+        typeof data === 'object' &&
+        typeof (data as Record<string, unknown>).access_token === 'string'
           ? String((data as Record<string, unknown>).access_token)
           : '') ||
         ''
-      if (tok) {
-        accessToken = tok
-        demo = false
-      }
     }
+  }
+
+  if (!accessToken) {
+    json(res, 400, {
+      message: `未能获取 ${label} 访问令牌。请填写门店授权后的 appAuthToken，或确认商家自研应用 OAuth 可用。`,
+    })
+    return
   }
 
   const session: WaimaiMerchantSession = {
@@ -207,15 +245,30 @@ export async function handleWaimaiBindPost(
     appSecret,
     accessToken,
     merchantId,
-    demo,
+    demo: false,
   }
-  const token = encodeWaimaiSessionToken(session)
+
+  const storePath = waimaiPathFromEnv(
+    platform,
+    PLATFORM_META[platform].storeListPathEnv,
+    '/shop/list',
+  )
+  const probe = await waimaiSignedRequest(session, storePath, {
+    method: 'POST',
+    body: { merchant_id: merchantId },
+  })
+  if (!probe.ok) {
+    json(res, 400, {
+      message: `${label}连通性探测失败：${probe.message}。请核对商家自研应用密钥、门店授权 Token 与接口权限。`,
+    })
+    return
+  }
+
   json(res, 200, {
-    accessToken: token,
-    message: demo
-      ? `已绑定 ${label}（演示模式）：配置 ${platform.toUpperCase().replace(/_/g, '_')}_OPENAPI_BASE_URL 与各业务 PATH 后将直连开放平台。`
-      : `${label}绑定成功`,
-    demo,
+    accessToken: encodeWaimaiSessionToken(session),
+    message: `${label}绑定成功（商家自研 · 已通过门店列表连通性探测）。`,
+    demo: false,
+    mode: 'merchant_self',
   })
 }
 

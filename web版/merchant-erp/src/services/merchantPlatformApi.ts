@@ -15,10 +15,12 @@ export type GenericBindPayload = {
   appSecret: string
   /** 美团可传商户/开发者扩展字段；小红书可传 sellerId 等，由后端解析 */
   extraId?: string
+  /** 商家自研：门店授权后的 appAuthToken（正式联调常用） */
+  appAuthToken?: string
 }
 
 export type GenericBindResult =
-  | { ok: true; accessToken: string; message?: string }
+  | { ok: true; accessToken: string; message?: string; demo?: boolean }
   | { ok: false; message: string }
 
 async function parseJson(res: Response): Promise<Record<string, unknown>> {
@@ -55,7 +57,12 @@ export async function postMeituanBind(
         '绑定接口未返回 accessToken（或 token），请后端返回 JSON：{ "accessToken": "..." }',
     }
   }
-  return { ok: true, accessToken: token }
+  return {
+    ok: true,
+    accessToken: token,
+    message: typeof data.message === 'string' ? data.message : undefined,
+    demo: data.demo === true,
+  }
 }
 
 export async function postXhsBind(
@@ -117,7 +124,12 @@ export async function postWaimaiBind(
   if (typeof token !== 'string' || !token) {
     return { ok: false, message: '绑定接口未返回 accessToken' }
   }
-  return { ok: true, accessToken: token }
+  return {
+    ok: true,
+    accessToken: token,
+    message: typeof data.message === 'string' ? data.message : undefined,
+    demo: data.demo === true,
+  }
 }
 
 export async function postWaimaiSync(
