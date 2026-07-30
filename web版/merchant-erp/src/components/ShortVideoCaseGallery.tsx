@@ -171,7 +171,7 @@ export default function ShortVideoCaseGallery({ onApplyCase, className }: ShortV
       ) : null}
 
       <p className="mt-4 text-center text-[11px] text-slate-400">
-        共 {SHORT_VIDEO_CASES.length} 个案例 · CDN 秒开预览 · 悬停预载 ·「做同款」回填参数
+        共 {SHORT_VIDEO_CASES.length} 个案例 · 悬停 1 秒自动播放 · 含口播案例已 AI 配音 ·「做同款」回填参数
       </p>
 
       {preview ? (
@@ -200,11 +200,65 @@ function CaseCard({
   onHover: () => void
 }) {
   const skill = findShortVideoSkill(item.skillId)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const hoverTimerRef = useRef<number | null>(null)
+  const [hoverPlaying, setHoverPlaying] = useState(false)
+  const [hoverMuted, setHoverMuted] = useState(false)
+
+  const clearHoverTimer = () => {
+    if (hoverTimerRef.current != null) {
+      window.clearTimeout(hoverTimerRef.current)
+      hoverTimerRef.current = null
+    }
+  }
+
+  const stopHoverPlay = () => {
+    clearHoverTimer()
+    setHoverPlaying(false)
+    const v = videoRef.current
+    if (v) {
+      v.pause()
+      try {
+        v.currentTime = 0
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  const startHoverPlay = async () => {
+    if (!item.videoUrl) return
+    setHoverPlaying(true)
+    const v = videoRef.current
+    if (!v) return
+    v.muted = false
+    setHoverMuted(false)
+    try {
+      await v.play()
+    } catch {
+      v.muted = true
+      setHoverMuted(true)
+      try {
+        await v.play()
+      } catch {
+        setHoverPlaying(false)
+      }
+    }
+  }
+
+  useEffect(() => () => clearHoverTimer(), [])
 
   return (
     <article
       className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-      onMouseEnter={onHover}
+      onMouseEnter={() => {
+        onHover()
+        clearHoverTimer()
+        hoverTimerRef.current = window.setTimeout(() => {
+          void startHoverPlay()
+        }, 1000)
+      }}
+      onMouseLeave={stopHoverPlay}
       onFocus={onHover}
     >
       <button
@@ -220,29 +274,61 @@ function CaseCard({
             alt=""
             loading="lazy"
             decoding="async"
-            className="absolute inset-0 h-full w-full object-cover"
+            className={cn(
+              'absolute inset-0 h-full w-full object-cover transition-opacity',
+              hoverPlaying ? 'opacity-0' : 'opacity-100',
+            )}
           />
         ) : (
           <div
-            className="absolute inset-0"
+            className={cn('absolute inset-0 transition-opacity', hoverPlaying ? 'opacity-0' : 'opacity-100')}
             style={{ background: `linear-gradient(145deg, ${item.coverFrom}, ${item.coverTo})` }}
           />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
-        <span className="absolute left-1/2 top-1/2 z-[1] flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-lg">
-          <Play className="h-5 w-5 fill-current" aria-hidden />
-        </span>
+        {item.videoUrl ? (
+          <video
+            ref={videoRef}
+            src={item.videoUrl}
+            className={cn(
+              'absolute inset-0 h-full w-full object-cover transition-opacity',
+              hoverPlaying ? 'opacity-100' : 'opacity-0',
+            )}
+            playsInline
+            loop
+            preload="metadata"
+            poster={item.coverUrl}
+          />
+        ) : null}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
+        {!hoverPlaying ? (
+          <span className="absolute left-1/2 top-1/2 z-[1] flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-lg">
+            <Play className="h-5 w-5 fill-current" aria-hidden />
+          </span>
+        ) : null}
+        {hoverPlaying && hoverMuted ? (
+          <span className="absolute right-3 top-3 z-[2] rounded-full bg-black/55 px-2 py-1 text-[10px] text-white">
+            已静音 · 点击听口播
+          </span>
+        ) : null}
         <div className="absolute bottom-0 left-0 right-0 z-[1] space-y-1 p-4 text-white">
-          {item.badge ? (
-            <span className="inline-flex rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-medium backdrop-blur-sm">
-              {item.badge}
-            </span>
-          ) : null}
+          <div className="flex flex-wrap gap-1">
+            {item.badge ? (
+              <span className="inline-flex rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-medium backdrop-blur-sm">
+                {item.badge}
+              </span>
+            ) : null}
+            {item.hasNarration ? (
+              <span className="inline-flex rounded-full bg-cyan-500/80 px-2 py-0.5 text-[10px] font-medium backdrop-blur-sm">
+                含口播
+              </span>
+            ) : null}
+          </div>
           <h3 className="text-base font-semibold leading-snug">{item.title}</h3>
           <p className="text-xs text-white/85">{item.subtitle}</p>
           <p className="text-[11px] text-white/70">
             {item.aspect} · 预览约 {item.durationSec}s
             {skill ? ` · ${skill.name}` : ''}
+            {hoverPlaying ? ' · 悬停播放中' : ' · 悬停 1 秒自动播'}
           </p>
         </div>
       </button>
@@ -286,7 +372,7 @@ function CasePreviewModal({
   const [err, setErr] = useState('')
   const primaryUrl = String(item.videoUrl || '').trim()
   const localFallback = primaryUrl.includes('aliyuncs.com')
-    ? `/short-video-cases/${item.id}.mp4?v=local2`
+    ? `/short-video-cases/${item.id}.mp4?v=local3`
     : ''
   const [playUrl, setPlayUrl] = useState(primaryUrl)
 
@@ -425,7 +511,13 @@ function CasePreviewModal({
             <p className="mt-1 text-xs text-white/50">
               {item.aspect} · 预览约 {item.durationSec}s
               {skill ? ` · ${skill.name}` : ''}
+              {item.hasNarration ? ' · 含 AI 口播' : ''}
             </p>
+            {item.narrationScript ? (
+              <p className="mt-2 rounded-lg bg-white/10 px-3 py-2 text-xs leading-relaxed text-white/85">
+                口播：{item.narrationScript}
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
             <button

@@ -25,10 +25,14 @@ export type ShortVideoCaseItem = {
   videoUrl?: string
   /** Seedance 生成用英文运镜提示（脚本侧） */
   genPrompt?: string
+  /** 预览成片是否含 AI 口播（卡片悬停有声播放） */
+  hasNarration?: boolean
+  /** 口播文案（生成脚本 / 展示用） */
+  narrationScript?: string
 }
 
 const asset = (id: string, ext: 'png' | 'mp4') =>
-  `${SHORT_VIDEO_CASE_CDN_BASE.replace(/\/$/, '')}/${id}.${ext}?v=cdn8`
+  `${SHORT_VIDEO_CASE_CDN_BASE.replace(/\/$/, '')}/${id}.${ext}?v=cdn9`
 
 function c(partial: ShortVideoCaseItem): ShortVideoCaseItem {
   return {
@@ -55,6 +59,8 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
       '【Skill·探店成片】\n主题：夜市小吃街探店，暖黄灯光与烟火气。\n结构：街景推镜钩子 → 摊位特写 → 招牌菜出锅蒸汽 → 试吃反应 → 店名与人均收尾。\n运镜跟拍流畅，禁止静止幻灯。',
     genPrompt:
       'Night street food market in China, warm lantern glow, steam rising, handheld follow shot, continuous camera motion, cinematic food vlog, photorealistic, no text',
+    hasNarration: true,
+    narrationScript: '夜市烟火气太足了，这家摊位必吃，人均只要三十块。',
   }),
   c({
     id: 'case-seed-skincare',
@@ -72,6 +78,8 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
       '【Skill·产品种草】\n主题：保湿精华种草。\n结构：干燥起皮痛点 → 瓶身亮相 → 质地拉丝特写 → 上脸吸收 → 限时福利 CTA。\n浅景深、主光柔和。',
     genPrompt:
       'Close-up of a clear glass cosmetic bottle on a vanity, soft morning light, gentle camera orbit, commercial product video, photorealistic',
+    hasNarration: true,
+    narrationScript: '皮肤干起皮？三秒吸收，今晚限时买一送一。',
   }),
   c({
     id: 'case-promo-618',
@@ -91,6 +99,8 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
       '【Skill·活动预告】\n主题：周末满减大促。\n结构：大字「满 100 减 30」冲击 → 活动时间 → 爆品闪切 → 到店 CTA。\n节奏快、信息清晰。',
     genPrompt:
       'Bright clothing boutique interior, soft warm lights, camera slowly dollies down the aisle, commercial atmosphere video, photorealistic',
+    hasNarration: true,
+    narrationScript: '周末满一百减三十，爆品闪购，现在到店就有！',
   }),
   c({
     id: 'case-ambiance-cafe',
@@ -125,6 +135,8 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
       '【Skill·短剧钩子】\n主题：外卖迟到引发的反转误会。\n结构：门铃急促 → 错开门瞬间 → 表情特写冲突 → 悬念定格「下一秒……」。\n前 3 秒必须有冲突。',
     genPrompt:
       'Person opening apartment door at night looking surprised, cool hallway light, suspenseful short drama hook, continuous camera motion, photorealistic',
+    hasNarration: true,
+    narrationScript: '门铃响了，开门的瞬间……下一秒你绝对想不到。',
   }),
   c({
     id: 'case-food-ramen',
@@ -159,6 +171,8 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
       '【Skill·探店成片】\n主题：周末早午餐探店，自然光、清新色调。\n结构：门头 → 座位环境 → 甜品与咖啡特写 → 试吃口播 → 预约 CTA。',
     genPrompt:
       'Sunny brunch cafe table, avocado toast and latte, natural window light, gentle push-in camera, lifestyle food video, photorealistic',
+    hasNarration: true,
+    narrationScript: '周末早午餐探店，这口牛油果吐司真的绝了，赶紧预约。',
   }),
   c({
     id: 'case-seed-gadget',
@@ -176,6 +190,8 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
       '【Skill·产品种草】\n主题：桌面收纳小物。\n结构：桌面凌乱痛点 → 产品展开演示 → 三个功能特写 → 收纳前后对比 → CTA。',
     genPrompt:
       'Modern desk organizer with gadgets, cool blue ambient light, camera slowly orbiting product, tech product demo video, photorealistic',
+    hasNarration: true,
+    narrationScript: '桌面乱到爆？一个收纳盒搞定，桌面瞬间清爽。',
   }),
   // —— 本地生活扩充 ——
   c({
@@ -194,6 +210,8 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
       '【Skill·火锅局】\n主题：朋友火锅局，红油锅底热闹。\n结构：门口钩子 → 红油翻滚 → 涮菜 → 举杯 → 人均与必点。',
     genPrompt:
       'Cozy Chinese restaurant table at night, large metal soup pot steaming, vegetables and tofu cooking, warm orange lights, slow camera orbit, food commercial video, photorealistic, no text',
+    hasNarration: true,
+    narrationScript: '红油翻滚，朋友局开起来，人均八十，必点毛肚鸭血。',
   }),
   c({
     id: 'case-bbq',
@@ -211,6 +229,8 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
       '【Skill·烧烤夜宵】\n主题：夜市烧烤撸串。\n结构：夜色街景 → 炭火 → 刷酱 → 咬一口 → 位置 CTA。',
     genPrompt:
       'Night barbecue grill with charcoal flames, skewers sizzling, warm street lights, handheld food vlog motion, photorealistic, no text',
+    hasNarration: true,
+    narrationScript: '炭火滋滋响，夜宵撸串走起，就在巷口第二家。',
   }),
   c({
     id: 'case-milktea',
@@ -228,6 +248,8 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
       '【Skill·新茶饮上新】\n主题：季节限定奶茶上新。\n结构：杯身亮相 → 原料闪切 → 第一口 → 活动价 → CTA。',
     genPrompt:
       'Colorful bubble tea cup spinning slowly, fresh fruit toppings, bright shop background, product commercial camera orbit, photorealistic, no text',
+    hasNarration: true,
+    narrationScript: '季节限定上新，第一口敲甜，活动价只要十五。',
   }),
   c({
     id: 'case-hair',
@@ -245,6 +267,8 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
       '【Skill·美发变装】\n主题：发型改造前后对比。\n结构：咨询 → 过程闪切 → 前后对比 → 出门 → 预约。',
     genPrompt:
       'Modern hair salon, stylist cutting hair, mirror reflection, before-after transformation vibe, continuous camera motion, photorealistic, no text',
+    hasNarration: true,
+    narrationScript: '发型改造前后对比，出门回头率拉满，现在预约。',
   }),
   c({
     id: 'case-nail',
@@ -279,6 +303,8 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
       '【Skill·健身打卡】\n主题：健身房打卡。\n结构：进场 → 训练动作 → 教练 → 汗水特写 → 体验 CTA。',
     genPrompt:
       'Modern gym workout, person lifting weights, energetic camera follow, sweat and motion, fitness commercial video, photorealistic, no text',
+    hasNarration: true,
+    narrationScript: '训练打卡不停，汗水见证成长，体验课限时开放。',
   }),
   c({
     id: 'case-hotel',
@@ -313,6 +339,8 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
       '【Skill·亲子乐园】\n主题：周末遛娃乐园。\n结构：门口 → 玩耍 → 家长安心 → 门票 → 预约。',
     genPrompt:
       'Colorful indoor kids playground, children playing happily, bright safe atmosphere, gentle camera motion, photorealistic, no text',
+    hasNarration: true,
+    narrationScript: '周末遛娃好去处，安全好玩，套餐更划算。',
   }),
   c({
     id: 'case-pet',
@@ -347,6 +375,8 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
       '【Skill·外卖开箱】\n主题：家常菜外卖开箱。\n结构：拆袋 → 摆盘 → 份量 → 第一口 → 下单 CTA。',
     genPrompt:
       'Unboxing takeaway food bags on a dining table, opening containers, appetizing steam, top-down then close-up motion, photorealistic, no text',
+    hasNarration: true,
+    narrationScript: '外卖开箱看份量，第一口就上头，下单冲。',
   }),
   c({
     id: 'case-bakery',
@@ -381,6 +411,8 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
       '【Skill·探店成片】\n主题：网红店周末排队探店。\n结构：排队长龙钩子 → 进店 → 必点出餐 → 试吃 → 避坑建议。',
     genPrompt:
       'People queueing outside a popular restaurant on a sunny street, camera moving along the line then into entrance, lifestyle city vlog, photorealistic, no text',
+    hasNarration: true,
+    narrationScript: '网红店周末排队，进门必点这道，避坑建议听我说。',
   }),
 ]
 

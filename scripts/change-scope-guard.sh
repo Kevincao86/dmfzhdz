@@ -560,6 +560,7 @@ short-video-cases
 short-video-bgm
 gen-case-seedance
 gen-case-content-bgm
+gen-case-narration-vo
 MeooLayout
 index.css
 merchantEmbedChrome.css
