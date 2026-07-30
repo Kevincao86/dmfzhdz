@@ -2,6 +2,7 @@ import {
   Clapperboard,
   Cloud,
   Download,
+  Eye,
   FileText,
   Film,
   Focus,
@@ -514,10 +515,18 @@ export default function ShortVideoOptimizationPage() {
     [longformEnabled, longformDurationPlan, longformSegmentSec, sdDurationSec, sdFps, sdAspect, sdWatermark, sdResolution],
   )
 
-  const seedancePoolModels = useMemo(
-    () => cfg?.arkVideoModels.map((m) => m.endpointId) ?? [],
-    [cfg?.arkVideoModels],
-  )
+  const seedancePoolModels = useMemo(() => {
+    const raw = cfg?.arkVideoModels.map((m) => m.endpointId) ?? []
+    // 短片台只用火山 Seedance 族；排除误配进方舟池的 wan / 千问模型
+    return raw.filter((id) => {
+      const t = String(id || '').trim()
+      if (!t) return false
+      if (/^wan[\d._-]/i.test(t) || /t2v|i2v/i.test(t) && /^wan/i.test(t)) return false
+      if (/^wan2/i.test(t)) return false
+      if (/^ep-/i.test(t)) return true
+      return /seedance|seaweed|doubao-seed/i.test(t)
+    })
+  }, [cfg?.arkVideoModels])
 
   /** 生成前门禁：按钮禁用原因（避免可点但点击后无反馈或清空提示） */
   const generateGateReason = useMemo((): string | null => {
@@ -580,6 +589,8 @@ export default function ShortVideoOptimizationPage() {
           flags: opts?.flagsOverride ?? seedanceFlagsLine,
           images_base64: body.images_base64,
           model: body.model ?? SEEDANCE_SERVER_AUTO,
+          // 商家短片台写死 Seedance：禁止自动落到千问 wan*
+          skip_qwen: true,
         },
         poolModels: seedancePoolModels,
         shouldCancel: () => cancelRef.current,
@@ -592,6 +603,7 @@ export default function ShortVideoOptimizationPage() {
   )
 
   const [resultUrl, setResultUrl] = useState<string | null>(null)
+  const [resultPreviewOpen, setResultPreviewOpen] = useState(false)
   const [progress, setProgress] = useState<string | null>(null)
 
   const cancelRef = useRef(false)
@@ -816,6 +828,7 @@ export default function ShortVideoOptimizationPage() {
     setErr(null)
     setHint(null)
     setProgress(null)
+    setResultPreviewOpen(false)
     if (resultBlobRef.current) {
       URL.revokeObjectURL(resultBlobRef.current)
       resultBlobRef.current = null
@@ -898,10 +911,13 @@ export default function ShortVideoOptimizationPage() {
     if (resultBlobRef.current) URL.revokeObjectURL(resultBlobRef.current)
     resultBlobRef.current = fin.objectUrl
     setResultUrl(fin.objectUrl)
+    setResultPreviewOpen(true)
     const billId = generationBillIdRef.current || `sv-${Date.now()}`
     const pointsHint = await chargeShortVideoPoints(fin.blob, billId, targetDurationSec)
     if (pointsHint) {
-      setHint((prev) => [prev, pointsHint].filter(Boolean).join(''))
+      setHint((prev) => [prev, pointsHint, '点击「预览生成结果」可再次查看成片。'].filter(Boolean).join(''))
+    } else {
+      setHint((prev) => [prev, '成片已就绪，可点击「预览生成结果」查看。'].filter(Boolean).join(''))
     }
     return true
   }
@@ -1337,6 +1353,7 @@ export default function ShortVideoOptimizationPage() {
       return
     }
     setErr(null)
+    setResultPreviewOpen(false)
     if (resultBlobRef.current) {
       URL.revokeObjectURL(resultBlobRef.current)
       resultBlobRef.current = null
@@ -2323,6 +2340,16 @@ export default function ShortVideoOptimizationPage() {
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {busy ? (progress ?? '处理中……') : '开始生成短片'}
             </button>
+            <button
+              type="button"
+              disabled={!resultUrl || busy}
+              onClick={() => setResultPreviewOpen(true)}
+              title={resultUrl ? '查看本次生成的成片' : '生成完成后可在此预览'}
+              className="inline-flex items-center gap-2 rounded-xl border border-cyan-200 bg-white px-6 py-3 text-sm font-semibold text-cyan-800 shadow-sm hover:bg-cyan-50 disabled:pointer-events-none disabled:opacity-45"
+            >
+              <Eye className="h-4 w-4" aria-hidden />
+              预览生成结果
+            </button>
             {busy ? (
               <button
                 type="button"
@@ -2347,25 +2374,47 @@ export default function ShortVideoOptimizationPage() {
         </div>
       ) : null}
 
-      {resultUrl && (
-        <section className="mt-12 rounded-xl border border-zinc-200 bg-zinc-900 p-8 text-white shadow-inner">
-          <div className="mb-6 flex flex-wrap items-center gap-6">
-            <h2 className="text-lg font-semibold">预览 & 下载</h2>
-            <a href={resultUrl} download className={cn(buttonGhost, '!text-orange-400')}>
-              <Download className="h-5 w-5" aria-hidden /> 浏览器下载链接
-            </a>
-          </div>
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-          <video
-            controls
-            src={resultUrl}
-            className="w-full rounded-lg border border-zinc-800 bg-black"
-          />
-            <div className="mt-6 text-[13px] leading-relaxed text-zinc-300">
-              下载链接可能有时效，请尽快保存到本地。
+      {resultPreviewOpen && resultUrl ? (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/55 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="预览生成结果"
+          onClick={() => setResultPreviewOpen(false)}
+        >
+          <div
+            className="relative w-full max-w-3xl overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-950 text-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 px-5 py-3">
+              <h2 className="text-base font-semibold">预览生成结果</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <a
+                  href={resultUrl}
+                  download
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-orange-800/60 px-3 py-1.5 text-xs text-orange-300 hover:bg-orange-950/50"
+                >
+                  <Download className="h-3.5 w-3.5" aria-hidden />
+                  下载成片
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setResultPreviewOpen(false)}
+                  className="inline-flex items-center justify-center rounded-lg border border-zinc-700 p-1.5 text-zinc-300 hover:bg-zinc-800"
+                  aria-label="关闭预览"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
-        </section>
-      )}
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+            <video controls autoPlay src={resultUrl} className="max-h-[70vh] w-full bg-black" />
+            <p className="px-5 py-3 text-[12px] leading-relaxed text-zinc-400">
+              下载链接可能有时效，请尽快保存到本地。
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       <footer className="mt-12 border-t border-dashed border-zinc-200 pt-8 text-[13px] text-zinc-500">
         生成内容由 AI 提供，请合规使用并自行备份成片。
@@ -2375,6 +2424,3 @@ export default function ShortVideoOptimizationPage() {
     </div>
   )
 }
-
-const buttonGhost =
-  'inline-flex items-center gap-3 rounded-xl border border-orange-900/55 bg-transparent px-4 py-2 text-sm hover:bg-orange-950/70'

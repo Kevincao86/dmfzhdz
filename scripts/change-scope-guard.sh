@@ -556,6 +556,8 @@ shortVideoUiLabels
 shortVideoGuidanceAi
 shortVideoProductFocus
 shortVideoScriptTable
+videoAiApi
+videoModelDuration
 short-video-cases
 short-video-bgm
 gen-case-seedance
