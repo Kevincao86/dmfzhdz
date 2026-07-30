@@ -1142,9 +1142,12 @@ export default function RecruitmentPage() {
   useEffect(() => {
     if (screen !== 'hub') return
     let cancelled = false
-    setHubOrderLoading(true)
-    setHubOrderErr(null)
-    void (async () => {
+    let attempt = 0
+    const maxAttempts = 2
+
+    const load = async () => {
+      setHubOrderLoading(true)
+      if (attempt === 0) setHubOrderErr(null)
       try {
         let lastId = ''
         try {
@@ -1162,6 +1165,7 @@ export default function RecruitmentPage() {
           if (!cancelled) {
             setHubOrder(null)
             setHubOrderLoading(false)
+            setHubOrderErr(null)
           }
           return
         }
@@ -1170,16 +1174,30 @@ export default function RecruitmentPage() {
         const orders = reg.recruitmentOrders ?? []
         const found = lastId ? orders.find((o) => o.id === lastId) ?? null : null
         setHubOrder(found)
+        setHubOrderErr(null)
         setHubOrderLoading(false)
       } catch (e) {
-        if (!cancelled) {
-          const msg = e instanceof Error ? e.message : String(e)
-          setHubOrderErr(msg.length > 220 ? `${msg.slice(0, 220)}…` : msg)
-          setHubOrder(null)
-          setHubOrderLoading(false)
+        if (cancelled) return
+        const raw = e instanceof Error ? e.message : String(e)
+        const abortLike = /aborted|abort|timed?\s*out|timeout|加载超时/i.test(raw)
+        if (abortLike && attempt + 1 < maxAttempts) {
+          attempt += 1
+          await new Promise((r) => setTimeout(r, 600))
+          if (!cancelled) void load()
+          return
         }
+        const msg = abortLike
+          ? '订单进度加载超时，请点击重试'
+          : raw.length > 220
+            ? `${raw.slice(0, 220)}…`
+            : raw
+        setHubOrderErr(msg)
+        setHubOrder(null)
+        setHubOrderLoading(false)
       }
-    })()
+    }
+
+    void load()
     return () => {
       cancelled = true
     }
