@@ -41,6 +41,8 @@ export type ShortVideoInfiniteCanvasProps = {
   onRemoveMedia?: (id: string) => void
   /** 按连线拓扑序重排分镜并写回流程 */
   onApplyFlowOrder?: (orderedIndices: number[]) => void
+  /** 画布内自由新增一段空分镜 */
+  onAddScriptRow?: () => void
   onAddMediaClick?: () => void
   className?: string
 }
@@ -114,6 +116,7 @@ export default function ShortVideoInfiniteCanvas({
   onRemoveScriptRow,
   onRemoveMedia,
   onApplyFlowOrder,
+  onAddScriptRow,
   onAddMediaClick,
   className,
 }: ShortVideoInfiniteCanvasProps) {
@@ -550,6 +553,18 @@ export default function ShortVideoInfiniteCanvas({
           <span className="min-w-[3rem] text-center text-xs tabular-nums text-slate-600">{Math.round(scale * 100)}%</span>
           <ToolbarBtn label="放大" onClick={() => setScale((s) => Math.min(2.2, s + 0.1))} icon={ZoomIn} disabled={disabled} />
           <ToolbarBtn label="复位" onClick={resetView} icon={RotateCcw} disabled={disabled} />
+          {onAddScriptRow ? (
+            <button
+              type="button"
+              disabled={disabled || n >= 12}
+              title={n >= 12 ? '分镜最多 12 段' : '在画布自由新增一段空镜头'}
+              onClick={() => onAddScriptRow()}
+              className="ml-1 inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-100 disabled:opacity-40"
+            >
+              <Film className="h-3.5 w-3.5" />
+              新增镜头
+            </button>
+          ) : null}
           {onAddMediaClick ? (
             <button
               type="button"
@@ -889,8 +904,22 @@ export default function ShortVideoInfiniteCanvas({
               <Plus className="h-8 w-8 text-slate-300" />
               <p className="mt-3 text-sm font-medium text-slate-700">画布为空</p>
               <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                按住右侧圆点拖到左侧入口自由连线，再点「应用流程」同步到生成工作区。
+                点工具栏「新增镜头」自由添加分镜；连线后点「应用流程」同步到生成工作区。
               </p>
+              {onAddScriptRow ? (
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onAddScriptRow()
+                  }}
+                  className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-100 disabled:opacity-40"
+                >
+                  <Film className="h-3.5 w-3.5" />
+                  新增镜头
+                </button>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -904,7 +933,7 @@ export default function ShortVideoInfiniteCanvas({
         </span>
         <span className="inline-flex items-center gap-2">
           <Minus className="h-3 w-3" /> 拖空白平移
-          <Plus className="h-3 w-3" /> 左右圆点连线
+          <Plus className="h-3 w-3" /> 新增镜头 / 连线
           <Pencil className="h-3 w-3" /> 铅笔/双击就地编辑
         </span>
       </div>

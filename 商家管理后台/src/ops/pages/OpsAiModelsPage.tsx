@@ -68,6 +68,8 @@ export default function OpsAiModelsPage() {
 
   const editingVendorKeysRef = useRef(false)
   const editingVideoAiRef = useRef(false)
+  /** 目录有未同步改动时，禁止定时 pull 覆盖本地（否则「新增供应商」会在数秒内消失） */
+  const catalogDirtyRef = useRef(false)
 
   /** Ref 必须与 state 同时更新（不可依赖 useEffect），否则定时 pull 会先读到旧 ref 而覆盖正在编辑的内容。 */
   const setEditingVendorKeys = (next: boolean) => {
@@ -96,7 +98,9 @@ export default function OpsAiModelsPage() {
       const reg = await fetchRegistry()
       const catRaw = Array.isArray(reg.aiVendorCatalog) ? reg.aiVendorCatalog : []
       const cat = mergeBuiltinAiVendorCatalog(catRaw)
-      setCatalogFull(cat)
+      if (!catalogDirtyRef.current) {
+        setCatalogFull(cat)
+      }
       setUpdatedAt(reg.aiModels.updatedAt)
       setControlled(!!reg.aiModels.controlledByOps)
       if (!editingVendorKeysRef.current) {
@@ -114,7 +118,9 @@ export default function OpsAiModelsPage() {
           ? `注册表请求失败：${detail}`
           : '无法读写注册表：请确认 https://mofangdianai.com/erp-api/meoo-ops-sync-registry 在浏览器可打开 JSON；ECS 执行 git pull && pkill -f ecs-auth-api-server; bash scripts/ecs-run-auth-api.sh；Vercel 运营台 Redeploy。',
       )
-      setCatalogFull((prev) => (prev.length > 0 ? prev : mergeBuiltinAiVendorCatalog([])))
+      if (!catalogDirtyRef.current) {
+        setCatalogFull((prev) => (prev.length > 0 ? prev : mergeBuiltinAiVendorCatalog([])))
+      }
     } finally {
       if (!bg) setLoading(false)
     }
@@ -163,6 +169,7 @@ export default function OpsAiModelsPage() {
         lastWriter: 'ops',
       })
       await postAiModels({ textModel: 'auto', imageModel: 'auto', lastWriter: 'ops' })
+      catalogDirtyRef.current = false
       await pull()
       setEditingVendorKeys(false)
     } catch {
@@ -182,6 +189,7 @@ export default function OpsAiModelsPage() {
         lastWriter: 'ops',
       })
       await postAiModels({ textModel: 'auto', imageModel: 'auto', lastWriter: 'ops' })
+      catalogDirtyRef.current = false
       await pull()
       setEditingVendorKeys(false)
     } catch (e) {
@@ -287,7 +295,7 @@ export default function OpsAiModelsPage() {
     setAddOpen(true)
   }
 
-  const submitAddVendor = () => {
+  const submitAddVendor = async () => {
     setAddErr(null)
     const label = addLabel.trim()
     if (!label) {
@@ -309,11 +317,37 @@ export default function OpsAiModelsPage() {
     }
     const hintRow = addHint.trim() ? addHint.trim().slice(0, 280) : undefined
     const logoUrl = normalizeCatalogLogoUrl(addLogoUrl)
-    setCatalogFull((prev) => [
-      ...prev,
-      { id: slug, label: label.slice(0, 64), hint: hintRow, ...(logoUrl ? { logoUrl } : {}) },
-    ])
+    const nextEntry: AiVendorCatalogEntry = {
+      id: slug,
+      label: label.slice(0, 64),
+      hint: hintRow,
+      ...(logoUrl ? { logoUrl } : {}),
+    }
+    const nextCatalog = [...catalogFull, nextEntry]
+    catalogDirtyRef.current = true
+    setCatalogFull(nextCatalog)
     setAddOpen(false)
+    setSaving(true)
+    setHint(null)
+    try {
+      await postVendorKeys({
+        keys: buildVendorKeysPayload(),
+        aiVendorCatalog: catalogCustomEntriesOnly(nextCatalog),
+        lastWriter: 'ops',
+      })
+      catalogDirtyRef.current = false
+      await pull()
+      setHint(`已新增并保存供应商「${label}」（${slug}）。可在下方点「编辑」填写 API Key。`)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message.trim() : ''
+      setHint(
+        msg
+          ? `供应商已加入本地目录，但写入注册表失败：${msg}。请点顶部「保存模型与 Key」重试。`
+          : '供应商已加入本地目录，但写入注册表失败。请点顶部「保存模型与 Key」重试。',
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
   const removeVendor = (id: string) => {
@@ -324,6 +358,7 @@ export default function OpsAiModelsPage() {
     if (isBuiltinAiVendorId(id)) return
     const ok = window.confirm(`确定从目录移除「${id}」及其 Key？ERP 将不再显示该项。`)
     if (!ok) return
+    catalogDirtyRef.current = true
     setCatalogFull((prev) => prev.filter((x) => x.id !== id))
     setKeys((prev) => {
       const n = { ...prev }
@@ -455,10 +490,11 @@ export default function OpsAiModelsPage() {
               {addErr ? <p className="text-xs text-red-400">{addErr}</p> : null}
               <button
                 type="button"
-                onClick={() => submitAddVendor()}
-                className="w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-medium text-white hover:bg-indigo-500"
+                disabled={saving}
+                onClick={() => void submitAddVendor()}
+                className="w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
               >
-                加入目录（随后在「各厂商 API Key」中点「编辑」，填写 Key 后再点区块内「保存」或顶部「保存模型与 Key」）
+                {saving ? '保存中…' : '加入目录并保存（随后可在「各厂商 API Key」中点「编辑」填写 Key）'}
               </button>
             </div>
           </div>
@@ -600,6 +636,7 @@ export default function OpsAiModelsPage() {
                     value={k.logoUrl ?? ''}
                     onChange={(e) => {
                       const v = e.target.value
+                      catalogDirtyRef.current = true
                       setCatalogFull((prev) => prev.map((x) => (x.id === k.id ? { ...x, logoUrl: v } : x)))
                     }}
                     placeholder="https://… 或 /path/logo.svg"
