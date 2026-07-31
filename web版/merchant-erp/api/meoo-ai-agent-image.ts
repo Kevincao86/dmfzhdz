@@ -140,11 +140,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   /** 商家/服务商 JWT：生图前校验积分；星选 mp: 会话由前端视觉工坊单独扣费 */
   const isMpSession = user.id.startsWith('mp:')
   let erpTenantId: string | undefined
+  const wantsProImage =
+    imageRoute === 'tokenmix' && /^gpt-image-2/i.test(tokenmixImageModel || '')
+  const erpPointsKind = wantsProImage ? 'visual_studio_image_pro' : 'agent_image'
   if (!isMpSession) {
     const { requireErpAiPointsAffordable, sendErpAiPointsGateError } = await import(
       './_lib/erpAiApiPointsGate.js'
     )
-    const gate = await requireErpAiPointsAffordable(auth, 'agent_image', env0, {
+    const gate = await requireErpAiPointsAffordable(auth, erpPointsKind, env0, {
       tenantIdHint: typeof body.tenantId === 'string' ? body.tenantId.trim() : undefined,
     })
     if (!gate.ok) {
@@ -186,10 +189,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       let pointsBalance: number | undefined
       if (!isMpSession && erpTenantId) {
         const { chargeErpAiPointsAfterSuccess } = await import('./_lib/erpAiApiPointsGate.js')
-        const charge = await chargeErpAiPointsAfterSuccess(auth, 'agent_image', env0, {
+        // 高级档仅在真正走出 TokenMix GPT Image 时按 pro 扣；回退内置引擎则按常规 agent_image
+        const chargeKind =
+          wantsProImage && out.channel === 'tokenmix' ? 'visual_studio_image_pro' : 'agent_image'
+        const charge = await chargeErpAiPointsAfterSuccess(auth, chargeKind, env0, {
           tenantId: erpTenantId,
-          idempotencyKey: `agent_image:${erpTenantId}:${Date.now().toString(36)}`,
-          note: 'AI 智能体生图',
+          idempotencyKey: `${chargeKind}:${erpTenantId}:${Date.now().toString(36)}`,
+          note: chargeKind === 'visual_studio_image_pro' ? 'AI 视觉工坊高级生图' : 'AI 智能体生图',
         })
         if (charge) {
           pointsCharged = charge.pointsCharged

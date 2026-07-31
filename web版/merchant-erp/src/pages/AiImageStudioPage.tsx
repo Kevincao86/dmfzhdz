@@ -60,6 +60,8 @@ import {
 import {
   MP_POINTS_VISUAL_STUDIO_COPY_PER_USE,
   MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE,
+  MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE,
+  VISUAL_STUDIO_PRO_IMAGE_MODEL,
   mpPointsCostForVisualStudioImages,
 } from '../lib/mpPointsEconomics'
 import { postAiAgentNativeImage } from '../services/ai/aiClient'
@@ -259,6 +261,8 @@ export default function AiImageStudioPage() {
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState('')
   const [error, setError] = useState<string | null>(null)
+  /** 常规=万相；高级=TokenMix GPT Image 2 */
+  const [imageTier, setImageTier] = useState<'standard' | 'pro'>('standard')
   const [refineNote, setRefineNote] = useState('')
   const [storeLoadHint, setStoreLoadHint] = useState<string | null>(null)
   const [decorStores, setDecorStores] = useState<DouyinStoreRow[]>([])
@@ -302,8 +306,13 @@ export default function AiImageStudioPage() {
     const channelCount = activeGenerateChannels.length
     const variantCount = perPlatformCount
     const total = channelCount * variantCount
-    const pointsCost = mpPointsCostForVisualStudioImages(total)
-    const pointsDetail = `${MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE} 积分/张 × ${total} 张 = ${pointsCost} 积分`
+    const perImage =
+      imageTier === 'pro'
+        ? MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE
+        : MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE
+    const pointsCost = mpPointsCostForVisualStudioImages(total, imageTier)
+    const tierLabel = imageTier === 'pro' ? '高级·GPT Image 2' : '常规·万相'
+    const pointsDetail = `${tierLabel} · ${perImage} 积分/张 × ${total} 张 = ${pointsCost} 积分`
     const primary = resolveChannel(activeGenerateChannels[0] ?? 'douyin')
     const unitLabel = isPlatformSeries
       ? form.playbook === 'platform_carousel_five'
@@ -341,7 +350,14 @@ export default function AiImageStudioPage() {
       pointsCost,
       pointsDetail,
     }
-  }, [activeGenerateChannels, form.multiChannelPack, form.playbook, isPlatformSeries, perPlatformCount])
+  }, [
+    activeGenerateChannels,
+    form.multiChannelPack,
+    form.playbook,
+    imageTier,
+    isPlatformSeries,
+    perPlatformCount,
+  ])
   const previewAspect = useMemo((): 'vertical' | 'horizontal' | 'square' | undefined => {
     if (form.playbook === 'platform_carousel_five') return 'horizontal'
     if (form.playbook === 'platform_detail_page') return 'vertical'
@@ -622,7 +638,7 @@ export default function AiImageStudioPage() {
       return
     }
     const jobList = buildJobs()
-    const afford = await checkVisualStudioImageBatchAffordable(jobList.length)
+    const afford = await checkVisualStudioImageBatchAffordable(jobList.length, imageTier)
     if (!afford.ok) {
       setError(afford.message)
       return
@@ -635,14 +651,27 @@ export default function AiImageStudioPage() {
     const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     setVariants(jobList)
 
-    const refImage = pickReferenceImage()
+    const usePro = imageTier === 'pro'
+    // 高级 GPT Image 2 暂不支持参考图；有参考图时仍走高级纯文生图（不传参考图）
+    const refImage = usePro ? undefined : pickReferenceImage()
     const preferPoster = preferWanxPosterForIntent(playbook.intent)
     const isCarouselFive = form.playbook === 'platform_carousel_five'
+
+    const spendAfterImage = (job: VariantResult, ch: ReturnType<typeof resolveChannel>, usedPro: boolean) => {
+      // ERP JWT 生图已由 /api/meoo-ai-agent-image 扣费；仅星选 mp 会话在此扣
+      if (!readMpSessionToken()) return
+      void spendVisualStudioImagePoints({
+        idempotencyKey: `vs-img-${runId}-${job.id}`,
+        note: `${ch.short} ${resolveSeriesSlotLabel(form.playbook, job.variantIndex)}${usedPro ? '·高级' : ''}`,
+        tier: usedPro ? 'pro' : 'standard',
+      })
+    }
 
     const finishVariantFromBlob = async (
       job: VariantResult,
       blob: Blob,
       ch: ReturnType<typeof resolveChannel>,
+      usedPro: boolean,
     ) => {
       job.status = 'done'
       try {
@@ -658,13 +687,7 @@ export default function AiImageStudioPage() {
         job.previewUrl = URL.createObjectURL(blob)
         job.fileExt = form.delivery === 'platform' ? 'jpg' : 'png'
       }
-      // ERP JWT 生图已由 /api/meoo-ai-agent-image 扣 agent_image；仅星选 mp 会话在此扣 visual_studio_image
-      if (readMpSessionToken()) {
-        void spendVisualStudioImagePoints({
-          idempotencyKey: `vs-img-${runId}-${job.id}`,
-          note: `${ch.short} ${resolveSeriesSlotLabel(form.playbook, job.variantIndex)}`,
-        })
-      }
+      spendAfterImage(job, ch, usedPro)
     }
 
     if (isCarouselFive) {
@@ -700,7 +723,9 @@ export default function AiImageStudioPage() {
         if (ac.signal.aborted) break
         const prompt = promptPack.ok ? promptPack.prompt : promptPack.fallback
 
-        setProgress(`${ch.short} · 五连图横幅 · 生图中（${masterGen.wanxSize}）`)
+        setProgress(
+          `${ch.short} · 五连图横幅 · ${usePro ? '高级生图' : '常规生图'}中（${masterGen.wanxSize}）`,
+        )
         const out = await postAiAgentNativeImage(prompt, {
           exactPrompt: true,
           preferredVendor: 'qwen',
@@ -708,6 +733,9 @@ export default function AiImageStudioPage() {
           wanxSize: masterGen.wanxSize,
           aspectRatio: '16:9',
           preferWanxPosterModel: preferPoster,
+          ...(usePro
+            ? { imageRoute: 'tokenmix' as const, tokenmixImageModel: VISUAL_STUDIO_PRO_IMAGE_MODEL }
+            : {}),
           signal: ac.signal,
         })
 
@@ -720,6 +748,7 @@ export default function AiImageStudioPage() {
           continue
         }
 
+        const usedPro = usePro && out.ok && out.channel === 'tokenmix'
         setProgress(
           `${ch.short} · 裁切为 5 张 ${masterGen.slideSpec.slideWidth}×${masterGen.slideSpec.slideHeight}`,
         )
@@ -735,7 +764,7 @@ export default function AiImageStudioPage() {
               continue
             }
             job.imageUrl = out.imageUrl
-            await finishVariantFromBlob(job, strip, ch)
+            await finishVariantFromBlob(job, strip, ch, usedPro)
             setSelectedPreviewVariantId(job.id)
           }
         } catch (e) {
@@ -788,6 +817,9 @@ export default function AiImageStudioPage() {
         aspectRatio: size.aspectRatio,
         doubaoSize: size.doubaoSize,
         preferWanxPosterModel: preferPoster,
+        ...(usePro
+          ? { imageRoute: 'tokenmix' as const, tokenmixImageModel: VISUAL_STUDIO_PRO_IMAGE_MODEL }
+          : {}),
         signal: ac.signal,
       })
 
@@ -800,12 +832,8 @@ export default function AiImageStudioPage() {
 
       job.imageUrl = out.imageUrl
       job.status = 'done'
-      if (readMpSessionToken()) {
-        void spendVisualStudioImagePoints({
-          idempotencyKey: `vs-img-${runId}-${job.id}`,
-          note: `${ch.short} 方案${job.variantIndex + 1}`,
-        })
-      }
+      const usedPro = usePro && out.channel === 'tokenmix'
+      spendAfterImage(job, ch, usedPro)
       try {
         if (form.delivery === 'platform') {
           const blob = await fetchImageBlob(out.imageUrl)
@@ -1583,6 +1611,39 @@ export default function AiImageStudioPage() {
             title="生成与方案"
             subtitle={generatePlan.detail}
           >
+            <div className="mb-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setImageTier('standard')}
+                className={cn(
+                  'rounded-xl px-3 py-2 text-xs font-semibold ring-1 transition',
+                  imageTier === 'standard'
+                    ? 'bg-slate-900 text-white ring-slate-900'
+                    : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50',
+                )}
+              >
+                常规生图 · {MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE} 积分/张
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setImageTier('pro')}
+                className={cn(
+                  'rounded-xl px-3 py-2 text-xs font-semibold ring-1 transition',
+                  imageTier === 'pro'
+                    ? 'bg-violet-700 text-white ring-violet-700'
+                    : 'bg-white text-slate-600 ring-slate-200 hover:bg-violet-50',
+                )}
+              >
+                高级生图 · GPT Image 2 · {MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE} 积分/张
+              </button>
+            </div>
+            {imageTier === 'pro' && productRefs.length > 0 && (
+              <p className="mb-3 text-[11px] leading-relaxed text-amber-800">
+                高级生图走 GPT Image 2 纯文生图，本次将不使用已上传的参考图。
+              </p>
+            )}
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"

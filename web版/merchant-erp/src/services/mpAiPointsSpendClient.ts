@@ -4,6 +4,7 @@ import {
   MP_POINTS_BRIEF_PER_USE,
   MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE,
   MP_POINTS_VISUAL_STUDIO_COPY_PER_USE,
+  visualStudioImageUsageKind,
   mpPointsCostForVisualStudioImages,
 } from '../lib/mpPointsEconomics'
 import { merchantApiFetchUrls } from '../lib/merchantErpApiBase'
@@ -355,11 +356,13 @@ export async function spendVisualStudioCopyPoints(opts?: {
   }
 }
 
-/** AI 视觉工坊生图：批量校验积分（8 积分/张） */
+/** AI 视觉工坊生图：批量校验积分（常规 8 / 高级 150 积分/张） */
 export async function checkVisualStudioImageBatchAffordable(
   imageCount: number,
+  tier: 'standard' | 'pro' = 'standard',
 ): Promise<MpBriefAffordResult> {
-  const required = mpPointsCostForVisualStudioImages(imageCount)
+  const required = mpPointsCostForVisualStudioImages(imageCount, tier)
+  const kind = visualStudioImageUsageKind(tier)
   if (required <= 0) {
     return { ok: false, message: '无效出图数量', error: 'invalid_amount' }
   }
@@ -367,7 +370,7 @@ export async function checkVisualStudioImageBatchAffordable(
     const billingRole = readMpBillingRoleHint()
     const res = await postMpAuthActionRaw({
       action: 'mp_ai_points_afford',
-      kind: 'visual_studio_image',
+      kind,
       ...(billingRole ? { billingRole } : {}),
     })
     if (res.ok) {
@@ -392,7 +395,7 @@ export async function checkVisualStudioImageBatchAffordable(
     }
   }
   try {
-    const r = await checkErpPointsAffordable({ kind: 'visual_studio_image' })
+    const r = await checkErpPointsAffordable({ kind })
     const balance = Math.max(
       0,
       Math.floor(Number(r.balance) || Number(r.packageBalance) + Number(r.rechargeBalance) || 0),
@@ -416,18 +419,20 @@ export async function checkVisualStudioImageBatchAffordable(
   }
 }
 
-/** AI 视觉工坊单张生图成功后扣减（8 积分/张） */
+/** AI 视觉工坊单张生图成功后扣减（常规 8 / 高级 150 积分/张） */
 export async function spendVisualStudioImagePoints(opts?: {
   idempotencyKey?: string
   note?: string
+  tier?: 'standard' | 'pro'
 }): Promise<MpBriefPointsSpendResult | null> {
+  const kind = visualStudioImageUsageKind(opts?.tier ?? 'standard')
   if (readMpSessionToken()) {
     const token = readMpSessionToken()
     if (!token) return null
     const billingRole = readMpBillingRoleHint()
     const data = await postMpAuthAction({
       action: 'mp_ai_points_spend',
-      kind: 'visual_studio_image',
+      kind,
       idempotencyKey: opts?.idempotencyKey?.trim() || undefined,
       note: opts?.note?.trim() || undefined,
       ...(billingRole ? { billingRole } : {}),
@@ -439,7 +444,7 @@ export async function spendVisualStudioImagePoints(opts?: {
     }
   }
   const r = await spendErpPointsForUsage({
-    kind: 'visual_studio_image',
+    kind,
     idempotencyKey: opts?.idempotencyKey?.trim() || undefined,
     note: opts?.note?.trim() || undefined,
   })

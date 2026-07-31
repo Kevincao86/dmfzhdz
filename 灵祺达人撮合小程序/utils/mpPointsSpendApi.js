@@ -8,6 +8,9 @@ const BRIEF_POINTS_PER_USE = 8
 const VIDEO_POINTS_PER_SEC = 2
 const VISUAL_STUDIO_COPY_POINTS = 3
 const VISUAL_STUDIO_IMAGE_POINTS = 8
+/** 高级生图 GPT Image 2：与 Web mpPointsEconomics 对齐 */
+const VISUAL_STUDIO_IMAGE_PRO_POINTS = 150
+const VISUAL_STUDIO_PRO_IMAGE_MODEL = 'gpt-image-2'
 
 function authHeaders() {
   const token = auth.readSessionToken()
@@ -59,6 +62,7 @@ function estimatePointsForKind(kind, durationSec) {
   }
   if (kind === 'visual_studio_copy') return VISUAL_STUDIO_COPY_POINTS
   if (kind === 'visual_studio_image') return VISUAL_STUDIO_IMAGE_POINTS
+  if (kind === 'visual_studio_image_pro') return VISUAL_STUDIO_IMAGE_PRO_POINTS
   return 0
 }
 
@@ -246,12 +250,22 @@ async function assertVisualStudioCopyAffordable() {
   return result
 }
 
-async function assertVisualStudioImageAffordable(count) {
+async function assertVisualStudioImageAffordable(count, tier) {
   const n = Math.max(1, Number(count) || 1)
-  const result = await checkPointsAffordable('visual_studio_image', { count: n })
+  const kind = tier === 'pro' ? 'visual_studio_image_pro' : 'visual_studio_image'
+  const unit = estimatePointsForKind(kind)
+  if (unit > 0 && n > 1) {
+    try {
+      assertLocalPointsEnough(unit * n)
+    } catch (e) {
+      const err = new Error(e.message || '积分不足')
+      err.code = e.code || 'insufficient_points'
+      throw err
+    }
+  }
+  const result = await checkPointsAffordable(kind, { count: n })
   if (!result.ok) {
-    // 后端若未认 count，至少按单张校验；前端按张循环 spend
-    const once = await checkPointsAffordable('visual_studio_image')
+    const once = await checkPointsAffordable(kind)
     if (!once.ok) {
       const err = new Error(once.message || result.message || '积分不足')
       err.code = once.error || result.error
@@ -267,7 +281,8 @@ async function spendVisualStudioCopyPoints(opts) {
 }
 
 async function spendVisualStudioImagePoints(opts) {
-  return spendPointsKind('visual_studio_image', opts)
+  const kind = opts && opts.tier === 'pro' ? 'visual_studio_image_pro' : 'visual_studio_image'
+  return spendPointsKind(kind, opts)
 }
 
 async function assertAddonAffordable(kind, durationSec) {
@@ -307,6 +322,8 @@ module.exports = {
   VIDEO_POINTS_PER_SEC,
   VISUAL_STUDIO_COPY_POINTS,
   VISUAL_STUDIO_IMAGE_POINTS,
+  VISUAL_STUDIO_IMAGE_PRO_POINTS,
+  VISUAL_STUDIO_PRO_IMAGE_MODEL,
   estimateVideoPoints,
   assertLocalPointsEnough,
   checkPointsAffordable,

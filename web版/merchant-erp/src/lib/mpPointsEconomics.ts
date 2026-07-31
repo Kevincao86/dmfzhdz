@@ -60,10 +60,19 @@ export const MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE = 15
 export const MP_POINTS_VISUAL_STUDIO_COPY_PER_USE = 3
 
 /**
- * AI 视觉工坊 · 海报生图 / 智能体生图：8 积分/张
+ * AI 视觉工坊 · 常规生图 / 智能体生图：8 积分/张
  * 成本：万相/豆包≈¥0.08；60% 毛利 → 用户付 8÷40=¥0.20，AI 预算 ¥0.08。
  */
 export const MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE = 8
+
+/**
+ * AI 视觉工坊 · 高级生图（GPT Image 2 high @1024）：150 积分/张
+ * 成本：OpenAI≈$0.211≈¥1.52；60% 毛利 → 用户付 150÷40=¥3.75，AI 预算 ¥1.50。
+ */
+export const MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE = 150
+
+/** TokenMix / OpenAI 高级文生图模型 id（视觉工坊高级档） */
+export const VISUAL_STUDIO_PRO_IMAGE_MODEL = 'gpt-image-2'
 
 /** 商品上架方案：15 积分/次；长结构化 LLM≈¥0.15 */
 export const MP_POINTS_PRODUCT_PLAN_PER_USE = 15
@@ -116,6 +125,7 @@ export type MpPointsUsageKind =
   | 'digital_human'
   | 'visual_studio_copy'
   | 'visual_studio_image'
+  | 'visual_studio_image_pro'
   | 'product_plan'
   | 'ops_plan'
   | 'agent_image'
@@ -134,7 +144,8 @@ export const MP_POINTS_USAGE_KIND_LABELS: Record<MpPointsUsageKind, string> = {
   cloud_edit_smart: '智能一键成片',
   digital_human: '数字人口播',
   visual_studio_copy: 'AI 视觉工坊文案',
-  visual_studio_image: 'AI 视觉工坊生图',
+  visual_studio_image: 'AI 视觉工坊常规生图',
+  visual_studio_image_pro: 'AI 视觉工坊高级生图',
   product_plan: 'AI 商品上架方案',
   ops_plan: 'AI 运营方案',
   agent_image: 'AI 智能体生图',
@@ -190,6 +201,7 @@ export function parseMpPointsUsageKind(raw: unknown): MpPointsUsageKind | null {
     k === 'digital_human' ||
     k === 'visual_studio_copy' ||
     k === 'visual_studio_image' ||
+    k === 'visual_studio_image_pro' ||
     k === 'product_plan' ||
     k === 'ops_plan' ||
     k === 'agent_image' ||
@@ -208,6 +220,9 @@ export function formatMpPointsRateLabel(kind: MpPointsUsageKind): string {
   if (kind === 'brief') return `${MP_POINTS_BRIEF_PER_USE} 积分/篇`
   if (kind === 'mix_material_analyze') return `${MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE} 积分/次`
   if (kind === 'visual_studio_copy') return `${MP_POINTS_VISUAL_STUDIO_COPY_PER_USE} 积分/次`
+  if (kind === 'visual_studio_image_pro') {
+    return `${MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE} 积分/张`
+  }
   if (kind === 'visual_studio_image' || kind === 'agent_image') {
     return `${MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE} 积分/张`
   }
@@ -258,6 +273,7 @@ export function mpPointsCostForUsage(kind: MpPointsUsageKind, opts?: { durationS
   if (kind === 'brief') return MP_POINTS_BRIEF_PER_USE
   if (kind === 'mix_material_analyze') return MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE
   if (kind === 'visual_studio_copy') return MP_POINTS_VISUAL_STUDIO_COPY_PER_USE
+  if (kind === 'visual_studio_image_pro') return MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE
   if (kind === 'visual_studio_image' || kind === 'agent_image') {
     return MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE
   }
@@ -270,10 +286,23 @@ export function mpPointsCostForUsage(kind: MpPointsUsageKind, opts?: { durationS
   return MP_POINTS_ARTICLE_PER_USE
 }
 
-/** 视觉工坊批量生图积分（按张数） */
-export function mpPointsCostForVisualStudioImages(imageCount: number): number {
+/** 视觉工坊批量生图积分（按张数；pro=高级 GPT Image 2） */
+export function mpPointsCostForVisualStudioImages(
+  imageCount: number,
+  tier: 'standard' | 'pro' = 'standard',
+): number {
   const n = Math.max(0, Math.floor(Number(imageCount) || 0))
-  return n * MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE
+  const unit =
+    tier === 'pro'
+      ? MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE
+      : MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE
+  return n * unit
+}
+
+export function visualStudioImageUsageKind(
+  tier: 'standard' | 'pro' = 'standard',
+): 'visual_studio_image' | 'visual_studio_image_pro' {
+  return tier === 'pro' ? 'visual_studio_image_pro' : 'visual_studio_image'
 }
 
 /** 按视频时长（秒）结算积分 */

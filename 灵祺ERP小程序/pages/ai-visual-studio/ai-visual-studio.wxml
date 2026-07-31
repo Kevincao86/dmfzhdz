@@ -2,7 +2,7 @@
   <view class="vs-hero">
     <text class="vs-hero__badge">与商家 Web 同源</text>
     <text class="vs-hero__title">灵祺视觉工坊</text>
-    <text class="vs-hero__sub">选渠道 · 文案 · 一键出图 · 保存相册（{{copyPoints}} 积分/文案 · {{imagePoints}} 积分/张）</text>
+    <text class="vs-hero__sub">选渠道 · 文案 · 一键出图 · 保存相册（文案 {{copyPoints}} · 常规 {{imageStdPoints}} / 高级 {{imageProPoints}} 积分/张）</text>
     <text class="vs-persist-tip">生成后请及时保存。刷新页面后，本页生成记录将消失。</text>
   </view>
 
@@ -95,17 +95,22 @@
 
   <view class="vs-card" wx:elif="{{step === 4}}">
     <text class="vs-card__title">生成海报</text>
-    <text class="vs-card__sub">可选上传参考图对齐色调；出图 {{imagePoints}} 积分/张</text>
+    <text class="vs-card__sub">常规 {{imageStdPoints}} 积分/张 · 高级 GPT Image 2 {{imageProPoints}} 积分/张</text>
+    <view class="vs-chips">
+      <view class="vs-chip {{imageTier === 'standard' ? 'on' : ''}}" data-tier="standard" bindtap="onImageTier">常规生图 · 万相</view>
+      <view class="vs-chip {{imageTier === 'pro' ? 'on' : ''}}" data-tier="pro" bindtap="onImageTier">高级生图 · GPT Image 2</view>
+    </view>
+    <text class="vs-card__sub" wx:if="{{imageTier === 'pro' && refPath}}">高级生图暂不使用参考图，将按文案纯文生图。</text>
     <view class="vs-ref" bindtap="onPickRef">
       <image wx:if="{{refPath}}" class="vs-ref__img" src="{{refPath}}" mode="aspectFill" />
-      <view wx:else class="vs-ref__empty"><text>+ 参考图（可选）</text></view>
+      <view wx:else class="vs-ref__empty"><text>+ 参考图（可选，常规档）</text></view>
     </view>
     <view class="vs-chips">
       <view class="vs-chip {{aspect === '3:4' ? 'on' : ''}}" data-val="3:4" bindtap="onAspect">竖版 3:4</view>
       <view class="vs-chip {{aspect === '1:1' ? 'on' : ''}}" data-val="1:1" bindtap="onAspect">方形 1:1</view>
       <view class="vs-chip {{aspect === '9:16' ? 'on' : ''}}" data-val="9:16" bindtap="onAspect">竖屏 9:16</view>
     </view>
-    <button class="vs-btn" loading="{{genBusy}}" bindtap="onGenerate">一键出图</button>
+    <button class="vs-btn" loading="{{genBusy}}" bindtap="onGenerate">一键出图（{{imagePoints}} 积分）</button>
     <text class="vs-progress" wx:if="{{progress}}">{{progress}}</text>
     <text class="vs-err" wx:if="{{err}}">{{err}}</text>
     <view class="vs-result" wx:if="{{resultUrl}}">

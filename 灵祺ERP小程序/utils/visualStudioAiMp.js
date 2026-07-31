@@ -106,11 +106,21 @@ async function postAiAgentImage(prompt, opts) {
   if (o.exactPrompt) body.exact_prompt = true
   if (o.preferWanxPoster) body.prefer_wanx_poster = true
   if (o.referenceImage) body.reference_image = o.referenceImage
+  if (o.imageRoute === 'tokenmix') {
+    body.image_route = 'tokenmix'
+    if (o.tokenmixImageModel) body.tokenmix_image_model = o.tokenmixImageModel
+  }
   try {
     const data = await requestJson('/api/meoo-ai-agent-image', body)
     const imageUrl = String(data.imageUrl || '').trim()
     if (!imageUrl) return { ok: false, message: '生图未返回图片地址' }
-    return { ok: true, imageUrl }
+    return {
+      ok: true,
+      imageUrl,
+      channel: data.channel === 'tokenmix' ? 'tokenmix' : 'builtin',
+      pointsCharged:
+        data.pointsCharged != null ? Math.max(0, Math.floor(Number(data.pointsCharged) || 0)) : undefined,
+    }
   } catch (e) {
     return { ok: false, message: String((e && e.message) || e) }
   }
@@ -281,15 +291,31 @@ async function fetchImagePrompt(form, copy) {
 async function generatePosterImage(form, copy, opts) {
   const o = opts || {}
   const packed = await fetchImagePrompt(form, copy)
+  const usePro = o.tier === 'pro'
+  const economics = require('./mpPointsEconomicsMp.js')
   const gen = await postAiAgentImage(packed.prompt, {
     preferredVendor: 'qwen',
     aspectRatio: o.aspectRatio || '3:4',
     exactPrompt: true,
     preferWanxPoster: true,
-    referenceImage: o.referenceImage || '',
+    // 高级 GPT Image 2 暂不支持参考图
+    referenceImage: usePro ? '' : o.referenceImage || '',
+    ...(usePro
+      ? {
+          imageRoute: 'tokenmix',
+          tokenmixImageModel: economics.VISUAL_STUDIO_PRO_IMAGE_MODEL || 'gpt-image-2',
+        }
+      : {}),
   })
   if (!gen.ok) return gen
-  return { ok: true, imageUrl: gen.imageUrl, promptSource: packed.source }
+  return {
+    ok: true,
+    imageUrl: gen.imageUrl,
+    promptSource: packed.source,
+    channel: gen.channel,
+    usedPro: usePro && gen.channel === 'tokenmix',
+    pointsCharged: gen.pointsCharged,
+  }
 }
 
 module.exports = {
