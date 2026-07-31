@@ -38,6 +38,7 @@ import {
   LOCAL_LIFE_INDUSTRIES,
   PLATFORM_SERIES_CHANNELS,
   platformCarouselMasterGenSize,
+  platformCarouselMasterGptSize,
   preferWanxPosterForIntent,
   publishChannelLogoSrc,
   PUBLISH_CHANNELS,
@@ -305,17 +306,22 @@ export default function AiImageStudioPage() {
   const generatePlan = useMemo(() => {
     const channelCount = activeGenerateChannels.length
     const variantCount = perPlatformCount
+    const isCarousel = form.playbook === 'platform_carousel_five'
+    // 五连图：每平台 1 张整幅主图（再裁 5 条），按主图计费
+    const billable = isCarousel ? channelCount : channelCount * variantCount
     const total = channelCount * variantCount
     const perImage =
       imageTier === 'pro'
         ? MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE
         : MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE
-    const pointsCost = mpPointsCostForVisualStudioImages(total, imageTier)
+    const pointsCost = mpPointsCostForVisualStudioImages(billable, imageTier)
     const tierLabel = imageTier === 'pro' ? '高级·GPT Image 2' : '常规·万相'
-    const pointsDetail = `${tierLabel} · ${perImage} 积分/张 × ${total} 张 = ${pointsCost} 积分`
+    const pointsDetail = isCarousel
+      ? `${tierLabel} · ${perImage} 积分/整幅 × ${billable} 平台 = ${pointsCost} 积分（裁 5 条不另扣）`
+      : `${tierLabel} · ${perImage} 积分/张 × ${billable} 张 = ${pointsCost} 积分`
     const primary = resolveChannel(activeGenerateChannels[0] ?? 'douyin')
     const unitLabel = isPlatformSeries
-      ? form.playbook === 'platform_carousel_five'
+      ? isCarousel
         ? '张五连图'
         : '张详情图'
       : '种构图'
@@ -638,10 +644,13 @@ export default function AiImageStudioPage() {
       return
     }
     const jobList = buildJobs()
-    // 五连图必须万相超宽整图，按常规档计费（高级 GPT Image 不支持超宽主图）
-    const billingTier: 'standard' | 'pro' =
-      form.playbook === 'platform_carousel_five' ? 'standard' : imageTier
-    const afford = await checkVisualStudioImageBatchAffordable(jobList.length, billingTier)
+    const isCarouselFive = form.playbook === 'platform_carousel_five'
+    const billingTier: 'standard' | 'pro' = imageTier
+    // 五连图：每平台只生成 1 张整幅主图再裁 5 张，按主图张数预检积分
+    const billingUnits = isCarouselFive
+      ? new Set(jobList.map((j) => j.channelId)).size
+      : jobList.length
+    const afford = await checkVisualStudioImageBatchAffordable(billingUnits, billingTier)
     if (!afford.ok) {
       setError(afford.message)
       return
@@ -658,7 +667,6 @@ export default function AiImageStudioPage() {
     // 高级 GPT Image 2 暂不支持参考图；有参考图时仍走高级纯文生图（不传参考图）
     const refImage = usePro ? undefined : pickReferenceImage()
     const preferPoster = preferWanxPosterForIntent(playbook.intent)
-    const isCarouselFive = form.playbook === 'platform_carousel_five'
 
     const spendAfterImage = (job: VariantResult, ch: ReturnType<typeof resolveChannel>, usedPro: boolean) => {
       // ERP JWT 生图已由 /api/meoo-ai-agent-image 扣费；仅星选 mp 会话在此扣
@@ -675,6 +683,7 @@ export default function AiImageStudioPage() {
       blob: Blob,
       ch: ReturnType<typeof resolveChannel>,
       usedPro: boolean,
+      opts?: { skipSpend?: boolean },
     ) => {
       job.status = 'done'
       try {
@@ -690,7 +699,7 @@ export default function AiImageStudioPage() {
         job.previewUrl = URL.createObjectURL(blob)
         job.fileExt = form.delivery === 'platform' ? 'jpg' : 'png'
       }
-      spendAfterImage(job, ch, usedPro)
+      if (!opts?.skipSpend) spendAfterImage(job, ch, usedPro)
     }
 
     if (isCarouselFive) {
@@ -709,7 +718,10 @@ export default function AiImageStudioPage() {
         setSelectedPreviewChannel(channelId)
         setSelectedPreviewVariantId(channelJobs[0]?.id ?? null)
 
-        const masterGen = platformCarouselMasterGenSize(channelId)
+        const masterGen = usePro
+          ? platformCarouselMasterGptSize(channelId)
+          : platformCarouselMasterGenSize(channelId)
+        const engineLabel = usePro ? 'GPT Image 2' : '万相'
         setProgress(
           `${ch.short} · 五连图横幅 · AI 整理需求（${ci + 1}/${channelIds.length} 平台）`,
         )
@@ -726,9 +738,8 @@ export default function AiImageStudioPage() {
         if (ac.signal.aborted) break
         const prompt = promptPack.ok ? promptPack.prompt : promptPack.fallback
 
-        // 五连图必须整幅超宽横图（单张宽×5），再用 wanxSize；不可强制 16:9 / GPT Image（非超宽）
         setProgress(
-          `${ch.short} · 整幅海报生成中（目标 ${masterGen.slideSpec.masterWidth}×${masterGen.slideSpec.masterHeight} · API ${masterGen.wanxSize}）`,
+          `${ch.short} · ${engineLabel} 整幅海报生成中（目标 ${masterGen.slideSpec.masterWidth}×${masterGen.slideSpec.masterHeight} · API ${masterGen.wanxSize}）`,
         )
         const out = await postAiAgentNativeImage(prompt, {
           exactPrompt: true,
@@ -736,6 +747,9 @@ export default function AiImageStudioPage() {
           referenceImageDataUrl: refImage,
           wanxSize: masterGen.wanxSize,
           preferWanxPosterModel: preferPoster,
+          ...(usePro
+            ? { imageRoute: 'tokenmix' as const, tokenmixImageModel: VISUAL_STUDIO_PRO_IMAGE_MODEL }
+            : {}),
           signal: ac.signal,
         })
 
@@ -746,6 +760,16 @@ export default function AiImageStudioPage() {
           })
           setVariants([...jobList])
           continue
+        }
+
+        const usedPro = usePro && out.channel === 'tokenmix'
+        // 五连图：每平台 1 次主图计费（ERP JWT 已在 API 扣；星选 mp 在此扣一次）
+        if (readMpSessionToken()) {
+          void spendVisualStudioImagePoints({
+            idempotencyKey: `vs-img-${runId}-carousel-${channelId}`,
+            note: `${ch.short} 五连图整幅${usedPro ? '·高级' : ''}`,
+            tier: usedPro ? 'pro' : 'standard',
+          })
         }
 
         setProgress(
@@ -763,8 +787,7 @@ export default function AiImageStudioPage() {
               continue
             }
             job.imageUrl = out.imageUrl
-            // 五连图走万相超宽整图，按常规档扣积分
-            await finishVariantFromBlob(job, strip, ch, false)
+            await finishVariantFromBlob(job, strip, ch, usedPro, { skipSpend: true })
             setSelectedPreviewVariantId(job.id)
           }
         } catch (e) {
@@ -1082,7 +1105,8 @@ export default function AiImageStudioPage() {
             {isPlatformSeries && (
               <p className="mt-2 text-[10px] leading-relaxed text-orange-700/90">
                 五连图：先按整幅尺寸生成完整海报再等分裁 5 张（美团 5000×750 / 抖音
-                5625×633 / 快手 3750×422）；详情图：三端各出 5 段竖图。
+                5625×633 / 快手 3750×422）。常规万相可直出超宽；高级 GPT Image 2
+                受模型 3:1 限制会先取最大横图再中心裁切等分。详情图：三端各出 5 段竖图。
               </p>
             )}
           </StudioPanel>
