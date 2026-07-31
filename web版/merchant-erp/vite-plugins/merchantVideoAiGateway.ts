@@ -94,8 +94,9 @@ import { concatLocalMp4Buffers, concatRemoteMp4Urls, extractLastFrameJpegFromUrl
 import {
   clampSeedanceContentText,
   extractShortVideoNarrationScript,
-  sanitizePromptForVideoModel,
+  sanitizePromptForSeedanceNativeAv,
   SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
+  SHORT_VIDEO_SEEDANCE_NATIVE_AV_SUFFIX,
   SEEDANCE_I2V_MAX_CONTENT_TEXT,
   SEEDANCE_EMERGENCY_I2V_PROMPT,
 } from '../src/lib/shortVideoNarrationExtract.js'
@@ -310,8 +311,8 @@ const NARRATION_EXTRACT_SYSTEM = `你是短视频文案编辑。把用户的「�
 若原文有「口播文案」「旁白」「字幕文案」等段落，只提取该段；若无明确口播，根据卖点写 2–4 句口语（约 40–120 字），勿照读分镜表。
 只输出口播正文，不要 JSON、不要 markdown。`
 
-const VIDEO_PROMPT_SUFFIX =
-  '【画面约束】禁止在视频画面内渲染任何文字、字幕、标题、Logo 字样或乱码字符；口播与字幕由后期合成。'
+/** 短片长视频策划段 prompt 后缀（Seedance 1.5 Pro 原生有声+字幕；数字人不用此常量） */
+const VIDEO_PROMPT_SUFFIX = SHORT_VIDEO_SEEDANCE_NATIVE_AV_SUFFIX
 
 function stripJsonFences(text: string): string {
   let t = text.trim()
@@ -373,7 +374,7 @@ function extractLongformSegmentPrompt(row: unknown): string {
 function buildVideoPromptFromSegmentRow(row: unknown): string {
   if (typeof row === 'string') {
     const t = row.trim()
-    return t.includes('【画面约束】') ? t : `${t}\n${VIDEO_PROMPT_SUFFIX}`
+    return t.includes('【有声成片】') || t.includes('【画面约束】') ? t : `${t}\n${VIDEO_PROMPT_SUFFIX}`
   }
   if (!row || typeof row !== 'object') return ''
   const o = row as Record<string, unknown>
@@ -385,25 +386,35 @@ function buildVideoPromptFromSegmentRow(row: unknown): string {
     ''
   const action = typeof o.action === 'string' ? o.action.trim() : ''
   const camera = typeof o.camera === 'string' ? o.camera.trim() : ''
+  const dialogueRaw =
+    (typeof o.dialogue === 'string' && o.dialogue.trim()) ||
+    (typeof o.narration === 'string' && o.narration.trim()) ||
+    ''
+  const spoken =
+    dialogueRaw.length >= 2 && !/^[(（]?\s*无口播\s*[)）]?$/.test(dialogueRaw)
+      ? `"${dialogueRaw.replace(/^["「『“]+|["」』”]+$/g, '')}"`
+      : ''
   const parts: string[] = []
   if (timeRange) parts.push(`【时段】${timeRange}`)
   if (visual) parts.push(`【画面】${visual}`)
   if (action) parts.push(`【动作运镜】${action}`)
   if (camera) parts.push(`【镜头】${camera}`)
+  if (spoken) {
+    parts.push(`【口播对白】角色说：${spoken}`)
+    parts.push(`【字幕】底部显示：${spoken}`)
+  }
   if (!parts.length) {
     if (action) {
       return `【动作运镜】${action}\n${VIDEO_PROMPT_SUFFIX}`
     }
-    const dialogue =
-      (typeof o.dialogue === 'string' && o.dialogue.trim()) ||
-      (typeof o.narration === 'string' && o.narration.trim()) ||
-      ''
-    if (dialogue.length >= 4) {
-      return `【画面】${dialogue.slice(0, 100)}\n${VIDEO_PROMPT_SUFFIX}`
+    if (dialogueRaw.length >= 4) {
+      return `【画面】${dialogueRaw.slice(0, 100)}\n${VIDEO_PROMPT_SUFFIX}`
     }
     const fallback = extractLongformSegmentPrompt(row)
     if (!fallback) return ''
-    return fallback.includes('【画面约束】') ? fallback : `${fallback}\n${VIDEO_PROMPT_SUFFIX}`
+    return fallback.includes('【有声成片】') || fallback.includes('【画面约束】')
+      ? fallback
+      : `${fallback}\n${VIDEO_PROMPT_SUFFIX}`
   }
   return `${parts.join('\n')}\n${VIDEO_PROMPT_SUFFIX}`
 }
@@ -485,7 +496,7 @@ function longformPlanFromSegments(
   }
   const fallbackPrompts = usable.map((s) => {
     const body = s.visual.trim() || s.dialogue.trim()
-    return body.includes('【画面约束】') ? body : `${body}\n${VIDEO_PROMPT_SUFFIX}`
+    return body.includes('【有声成片】') || body.includes('【画面约束】') ? body : `${body}\n${VIDEO_PROMPT_SUFFIX}`
   })
   if (fallbackPrompts.length < 2) return null
   return {
@@ -598,12 +609,12 @@ function segmentsToPlanResponse(
   const expandedDirect = buildPlanFromScriptRows(finalized, finalized.length)
   const prompts =
     expandedDirect?.prompts.map((p) =>
-      p.includes('【画面约束】') ? p : `${p}\n${VIDEO_PROMPT_SUFFIX}`,
+      p.includes('【有声成片】') || p.includes('【画面约束】') ? p : `${p}\n${VIDEO_PROMPT_SUFFIX}`,
     ) ??
     finalized
       .map((r) => buildVideoPromptFromScriptRow(r))
       .filter((p) => p.length > 0)
-      .map((p) => (p.includes('【画面约束】') ? p : `${p}\n${VIDEO_PROMPT_SUFFIX}`))
+      .map((p) => (p.includes('【有声成片】') || p.includes('【画面约束】') ? p : `${p}\n${VIDEO_PROMPT_SUFFIX}`))
   return {
     ok: true,
     prompts,
@@ -622,10 +633,11 @@ function segmentsToPlanResponse(
 
 /** AI 分镜 JSON 失败时：生成通用画面指令，禁止把执导全文拆段喂给视频模型 */
 function fallbackSplitLongformPrompt(overallPrompt: string, n: number): string[] {
-  const sanitized = sanitizePromptForVideoModel(overallPrompt)
+  const sanitized = sanitizePromptForSeedanceNativeAv(overallPrompt)
   const hint =
     sanitized
       .replace(SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX, '')
+      .replace(SHORT_VIDEO_SEEDANCE_NATIVE_AV_SUFFIX, '')
       .split(/\r?\n/)
       .map((l) => l.trim())
       .filter((l) => l.length >= 6 && !/^(基础设定|总时长|BGM|人物|风格|全局)/i.test(l))
@@ -634,7 +646,7 @@ function fallbackSplitLongformPrompt(overallPrompt: string, n: number): string[]
       .slice(0, 180) || '品牌宣传短视频，明亮办公场景，人物自然互动'
   return Array.from({ length: n }, (_, i) => {
     const seg = `【画面】${hint}，第 ${i + 1}/${n} 段，镜头连贯衔接。\n${VIDEO_PROMPT_SUFFIX}`
-    return seg.includes('【画面约束】') ? seg : `${seg}`
+    return seg.includes('【有声成片】') ? seg : `${seg}\n${VIDEO_PROMPT_SUFFIX}`
   })
 }
 
@@ -1573,6 +1585,13 @@ function buildArkVideoTaskPayload(
     else payload.ratio = '9:16'
     payload.watermark = flagParsed.watermark ?? false
     payload.resolution = flagParsed.resolution ?? '720p'
+    /** 商家短片台显式开启；数字人默认不传，保持原行为 */
+    const genAudio = body.generate_audio
+    if (genAudio === true || genAudio === 'true' || genAudio === 1 || genAudio === '1') {
+      payload.generate_audio = true
+    } else if (genAudio === false || genAudio === 'false' || genAudio === 0 || genAudio === '0') {
+      payload.generate_audio = false
+    }
   }
   return { ok: true, payload }
 }
@@ -2044,7 +2063,7 @@ export async function handleMerchantAiVideoRoutes(input: {
         json(res, 200, {
           ok: true,
           prompts: direct.prompts.map((p) =>
-            p.includes('【画面约束】') ? p : `${p}\n${VIDEO_PROMPT_SUFFIX}`,
+            p.includes('【有声成片】') || p.includes('【画面约束】') ? p : `${p}\n${VIDEO_PROMPT_SUFFIX}`,
           ),
           narrationScript: direct.narrationScript,
           scriptSegments: expanded.map((r) => ({
@@ -2186,7 +2205,7 @@ export async function handleMerchantAiVideoRoutes(input: {
         if (direct) {
           planResult = {
             prompts: direct.prompts.map((p) =>
-              p.includes('【画面约束】') ? p : `${p}\n${VIDEO_PROMPT_SUFFIX}`,
+              p.includes('【有声成片】') || p.includes('【画面约束】') ? p : `${p}\n${VIDEO_PROMPT_SUFFIX}`,
             ),
             narrationScript: direct.narrationScript,
             scriptSegments: embeddedFromPrompt.map((r) => ({
@@ -2202,7 +2221,7 @@ export async function handleMerchantAiVideoRoutes(input: {
         const fb = fallbackSplitLongformPrompt(overallPrompt, fbCount)
         if (fb.length >= 2) {
           const prompts = fb.map((p) =>
-            p.includes('【画面约束】') ? p : `${p}\n${VIDEO_PROMPT_SUFFIX}`,
+            p.includes('【有声成片】') || p.includes('【画面约束】') ? p : `${p}\n${VIDEO_PROMPT_SUFFIX}`,
           )
           planResult = {
             prompts,
