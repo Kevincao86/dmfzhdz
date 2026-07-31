@@ -647,6 +647,11 @@ export default function AiImageStudioPage() {
     if (/支付网关|502|504|Bad Gateway|Gateway Timeout/i.test(t)) {
       return '生图服务暂时不可用（502），请稍后重试；若刚完成部署可能是轻量 auth-api 重启中'
     }
+    if (/abort|超时|已中断/i.test(t)) {
+      return imageTier === 'pro'
+        ? '高级生图超时或已中断。请改选「常规生图」（约十几秒～1 分钟）后重试'
+        : '生图超时或已中断，请重试'
+    }
     return t || '生图失败'
   }
 
@@ -685,6 +690,13 @@ export default function AiImageStudioPage() {
     abortRef.current?.abort()
     const ac = new AbortController()
     abortRef.current = ac
+    /** 高级 GPT 异步轮询最长达约 250s；前端再留余量，避免连接半开时永久转圈 */
+    const perImageTimeoutMs = imageTier === 'pro' ? 280_000 : 150_000
+    let perImageTimer: ReturnType<typeof setTimeout> | null = null
+    const armPerImageTimeout = () => {
+      if (perImageTimer) clearTimeout(perImageTimer)
+      perImageTimer = setTimeout(() => ac.abort(), perImageTimeoutMs)
+    }
     const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     const usePro = imageTier === 'pro'
 
@@ -711,14 +723,12 @@ export default function AiImageStudioPage() {
       }
     })
 
+    try {
     if (readMpSessionToken()) {
       setProgress('校验积分…')
       const afford = await checkVisualStudioImageBatchAffordable(billingUnits, billingTier)
       if (!afford.ok) {
-        setBusy(false)
-        setProgress('')
         setVariants([])
-        abortRef.current = null
         const raw = afford.message || '积分不足'
         setError(
           /支付网关|502|504|Bad Gateway|Gateway Timeout/i.test(raw)
@@ -728,8 +738,6 @@ export default function AiImageStudioPage() {
         return
       }
       if (ac.signal.aborted) {
-        setBusy(false)
-        setProgress('')
         return
       }
       setProgress(
@@ -819,17 +827,32 @@ export default function AiImageStudioPage() {
         setProgress(
           `${ch.short} · ${engineLabel} 整幅海报生成中（目标 ${masterGen.slideSpec.masterWidth}×${masterGen.slideSpec.masterHeight} · API ${masterGen.wanxSize}）`,
         )
-        const out = await postAiAgentNativeImage(prompt, {
-          exactPrompt: true,
-          preferredVendor: 'qwen',
-          referenceImageDataUrl: refImage,
-          wanxSize: masterGen.wanxSize,
-          preferWanxPosterModel: preferPoster,
-          ...(usePro
-            ? { imageRoute: 'tokenmix' as const, tokenmixImageModel: VISUAL_STUDIO_PRO_IMAGE_MODEL }
-            : {}),
-          signal: ac.signal,
-        })
+        armPerImageTimeout()
+        let out: Awaited<ReturnType<typeof postAiAgentNativeImage>>
+        try {
+          out = await postAiAgentNativeImage(prompt, {
+            exactPrompt: true,
+            preferredVendor: 'qwen',
+            referenceImageDataUrl: refImage,
+            wanxSize: masterGen.wanxSize,
+            preferWanxPosterModel: preferPoster,
+            ...(usePro
+              ? { imageRoute: 'tokenmix' as const, tokenmixImageModel: VISUAL_STUDIO_PRO_IMAGE_MODEL }
+              : {}),
+            signal: ac.signal,
+          })
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e)
+          const timedOut = ac.signal.aborted || /abort/i.test(msg)
+          out = {
+            ok: false,
+            message: timedOut
+              ? usePro
+                ? '高级生图超时或已中断，请改选「常规生图」更快出图，或稍后重试'
+                : '生图超时或已中断，请重试'
+              : msg,
+          }
+        }
 
         if (!out.ok) {
           channelJobs.forEach((j) => {
@@ -906,19 +929,34 @@ export default function AiImageStudioPage() {
         `${ch.short} · ${slotLabel}/${perPlatformCount}（${i + 1}/${jobList.length}）· 生图中`,
       )
 
-      const out = await postAiAgentNativeImage(prompt, {
-        exactPrompt: true,
-        preferredVendor: 'qwen',
-        referenceImageDataUrl: refImage,
-        wanxSize: size.wanxSize,
-        aspectRatio: size.aspectRatio,
-        doubaoSize: size.doubaoSize,
-        preferWanxPosterModel: preferPoster,
-        ...(usePro
-          ? { imageRoute: 'tokenmix' as const, tokenmixImageModel: VISUAL_STUDIO_PRO_IMAGE_MODEL }
-          : {}),
-        signal: ac.signal,
-      })
+      armPerImageTimeout()
+      let out: Awaited<ReturnType<typeof postAiAgentNativeImage>>
+      try {
+        out = await postAiAgentNativeImage(prompt, {
+          exactPrompt: true,
+          preferredVendor: 'qwen',
+          referenceImageDataUrl: refImage,
+          wanxSize: size.wanxSize,
+          aspectRatio: size.aspectRatio,
+          doubaoSize: size.doubaoSize,
+          preferWanxPosterModel: preferPoster,
+          ...(usePro
+            ? { imageRoute: 'tokenmix' as const, tokenmixImageModel: VISUAL_STUDIO_PRO_IMAGE_MODEL }
+            : {}),
+          signal: ac.signal,
+        })
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        const timedOut = ac.signal.aborted || /abort/i.test(msg)
+        out = {
+          ok: false,
+          message: timedOut
+            ? usePro
+              ? '高级生图超时或已中断，请改选「常规生图」更快出图，或稍后重试'
+              : '生图超时或已中断，请重试'
+            : msg,
+        }
+      }
 
       if (!out.ok) {
         job.status = 'error'
@@ -950,9 +988,6 @@ export default function AiImageStudioPage() {
     }
     }
 
-    setBusy(false)
-    setProgress('')
-    abortRef.current = null
     const failed = jobList.filter((j) => j.status === 'error')
     if (failed.length > 0) {
       const firstMsg = failed.find((j) => j.message?.trim())?.message?.trim()
@@ -961,6 +996,28 @@ export default function AiImageStudioPage() {
           ? `生图失败：${firstMsg}${failed.length > 1 ? `（${failed.length} 张）` : ''}`
           : `生图失败（${failed.length} 张），请稍后重试`,
       )
+    }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      setError(
+        /abort/i.test(msg)
+          ? usePro
+            ? '高级生图已中断。要更快请改选「常规生图」后重试'
+            : '生图已中断，请重试'
+          : mapGenErrorMessage(msg),
+      )
+      jobList.forEach((j) => {
+        if (j.status === 'running' || j.status === 'pending') {
+          j.status = 'error'
+          j.message = mapGenErrorMessage(msg)
+        }
+      })
+      setVariants([...jobList])
+    } finally {
+      if (perImageTimer) clearTimeout(perImageTimer)
+      if (abortRef.current === ac) abortRef.current = null
+      setBusy(false)
+      setProgress('')
     }
   }
 
@@ -1642,8 +1699,9 @@ export default function AiImageStudioPage() {
             )}
             {imageTier === 'pro' && isCarouselFive && (
               <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
-                高级五连图：GPT 出一整幅再裁 5 张，目标 2～3 分钟内完成；若报 502
-                请等数秒重试（部署重启瞬间）。要更快可选「常规生图」。
+                高级五连图：GPT 出一整幅再裁 5 张，正常约 1～3 分钟。超过 5
+                分钟仍无结果请点「停止」，改选「常规生图」更快出图。若报 502
+                请等数秒重试。
               </p>
             )}
             <div className="flex flex-wrap items-center gap-2">
