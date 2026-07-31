@@ -111,8 +111,55 @@ export function filterRegistrySnapshotForMerchant(authTenantId: string, file: Re
     recruitmentScheduleRows: schedule,
     mpRecruitmentOrders,
     tenants,
+    // 商户 ERP 不需要达人库/大厅侧大数组，避免数 MB 响应拖垮 cs/fws/dr
     talentLibraryEntries: [],
     mpTalentMembers: [],
+    mpTalentInbox: [],
+    mpPrUsers: [],
+    shootTeamLibraryEntries: [],
+    editTeamLibraryEntries: [],
+    mpOpsAnnouncements: [],
+    mpOrderGroupChats: [],
+    talentPoolCandidates: [],
+    recruitmentVideoSubmissions: [],
+  }
+}
+
+/**
+ * 商家壳 OpsRegistryBridge 专用瘦身：只保留 AI 模型 / Key / 厂商目录 / 当前租户。
+ * GET ?slice=ai|bootstrap，体积约数 KB，避免每 15s 拉全量 4MB。
+ */
+export function slimRegistrySnapshotForAiBootstrap(
+  file: RegistryFile,
+  authTenantId?: string | null,
+): RegistryFile {
+  const tid = (authTenantId ?? '').trim()
+  const tenants = tid ? (file.tenants ?? []).filter((t) => t.id === tid) : []
+  return {
+    tenants,
+    aiModels: file.aiModels,
+    vendorKeys: file.vendorKeys ?? {},
+    vendorKeysUpdatedAt: file.vendorKeysUpdatedAt ?? '',
+    vendorKeysWriter: file.vendorKeysWriter ?? 'ops',
+    aiVendorCatalog: file.aiVendorCatalog ?? [],
+    videoAi: file.videoAi,
+    videoAiUpdatedAt: file.videoAiUpdatedAt,
+    videoAiWriter: file.videoAiWriter,
+    recruitmentOrders: [],
+    mpRecruitmentOrders: [],
+    talentLibraryEntries: [],
+    mpTalentMembers: [],
+    mpTalentInbox: [],
+    mpPrUsers: [],
+    shootTeamLibraryEntries: [],
+    editTeamLibraryEntries: [],
+    talentPoolCandidates: [],
+    recruitmentScheduleRows: [],
+    recruitmentVideoSubmissions: [],
+    mpOpsAnnouncements: [],
+    mpOrderGroupChats: [],
+    helpManualCategories: [],
+    helpManualArticles: [],
   }
 }
 

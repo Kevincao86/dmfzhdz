@@ -7,7 +7,7 @@ import {
   MEOO_REGISTRY_SYNC_EVENT,
   MEOO_VENDOR_KEYS_APPLIED_AT_KEY,
 } from '../lib/opsRegistryConstants'
-import { pushAiModels, pushErpTenant, fetchOpsRegistry } from '../lib/opsRegistryClient'
+import { pushAiModels, pushErpTenant, fetchOpsRegistryAiBootstrap } from '../lib/opsRegistryClient'
 import { isBuiltinAiVendorId, isValidAiVendorSlug } from '../lib/aiVendorCatalogShared'
 import type { RegistryFile } from '../lib/opsRegistryTypes'
 import { patchVendorKeyMap } from '../services/merchantAiVendorKeysStorage'
@@ -89,7 +89,8 @@ export default function OpsRegistryBridge() {
 
     const pullFromRegistry = async () => {
       try {
-        const reg = await fetchOpsRegistry()
+        // 仅拉 AI/Key/租户瘦身切片，避免每轮 2～4MB 全量注册表卡死 cs/fws/dr
+        const reg = await fetchOpsRegistryAiBootstrap()
         if (cancelled) return
         controlledByOpsRef.current = !!reg.aiModels.controlledByOps
         applyingRemoteAi.current = true
@@ -137,10 +138,16 @@ export default function OpsRegistryBridge() {
 
     void tick()
 
-    const interval = window.setInterval(() => void tick(), 15_000)
+    // 原 15s 全量拉取会打爆主线程；瘦身后仍降为 2 分钟，切回前台再补一次
+    const interval = window.setInterval(() => void tick(), 120_000)
 
+    let lastVisPull = 0
     const onVis = () => {
-      if (document.visibilityState === 'visible') void tick()
+      if (document.visibilityState !== 'visible') return
+      const now = Date.now()
+      if (now - lastVisPull < 45_000) return
+      lastVisPull = now
+      void tick()
     }
     document.addEventListener('visibilitychange', onVis)
     window.addEventListener('meoo-subaccounts-changed', tick)

@@ -54,6 +54,7 @@ list_scopes() {
   video_gen_precision  视频生成更准：Brief/Skill槽位/保真校验/全入口门禁（不含 ICE）
   openmontage_local    Cursor 本地 OpenMontage skill + 安装脚本（不含 ERP 成片链路）
   jianying_local       Cursor 本地剪映 skill + 安装脚本（不含 ERP / CapCut 国际版）
+  merchant_registry_bootstrap 商家壳注册表瘦身（OpsRegistryBridge slice=ai，缓解 cs/fws/dr 卡顿）
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -676,6 +677,16 @@ tools/jianying-jobs
 tools/README
 change-scope-guard
 .gitignore
+PAT
+      ;;
+    merchant_registry_bootstrap)
+      cat <<'PAT'
+OpsRegistryBridge
+opsRegistryClient
+registryTenantIsolation
+meoo-ops-sync-registry
+opsRegistryGatewayShared
+change-scope-guard
 PAT
       ;;
     *)

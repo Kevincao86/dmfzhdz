@@ -141,6 +141,17 @@ export async function fetchOpsRegistry(): Promise<RegistryFile> {
   return stripRegistryRecruitmentForAnonymous(raw)
 }
 
+/**
+ * 商家壳 AI/Key 同步专用（OpsRegistryBridge）：?slice=ai，约数 KB，勿用于招募页全量。
+ */
+export async function fetchOpsRegistryAiBootstrap(): Promise<RegistryFile> {
+  try {
+    return await fetchRegistryAt('/api/meoo-ops-sync-registry?slice=ai')
+  } catch {
+    return await fetchRegistryAt('/api/ops-sync/registry?slice=ai')
+  }
+}
+
 /** 商户 ERP：仅返回当前租户的招募/排期/视频/Brief 相关切片 */
 export async function fetchOpsRegistryForTenant(tenantId: string | null): Promise<RegistryFile> {
   if (!tenantId) {
