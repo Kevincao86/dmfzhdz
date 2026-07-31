@@ -526,9 +526,11 @@ export async function fetchVisualStudioImagePromptFromAi(
     '1. 单段连贯描述，300～600 字，不要 JSON、不要 markdown、不要编号列表',
     '2. 必须锁定业态与场景：画面主体/环境/道具与 industry、industrySceneHint 一致，严禁业态错配（足浴/足疗须为足浴沙发/足疗椅场景，禁止浴缸/酒店客房/海边度假；餐饮禁止足疗场景）',
     foodBan ? `2b. ${foodBan}` : '',
-    '3. 必须体现 headline、offer、subheadline 等文案为画面中的中文大字信息',
     opts?.carouselMaster
-      ? '4. carouselMaster=true：描述一张从左到右连续的超宽横幅海报，均分 5 格编号 1→2→3→4→5，背景与色调全幅无缝衔接，生成后按从左到右裁成 5 张'
+      ? '3. 画面中文只能使用 JSON 里非空的 headline/subheadline/offer/storeName/note；offer 为空则禁止任何价格与卖点列表'
+      : '3. 必须体现 headline、offer、subheadline 等已填文案为画面中的中文大字信息',
+    opts?.carouselMaster
+      ? '4. carouselMaster=true：只描述一张同一场景从左到右延展的连续超宽海报（禁止五格拼贴/五张无关图），生成后裁成 1～5'
       : '4. 体现 styleHint、compositionVariant、渠道尺寸与 playbook 玩法',
     '5. 若有 productRefCount>0 或 styleFromReference，强调与参考图品类色调一致（非餐饮参考图不得被理解成菜品）',
     form.referenceKeywords.trim()

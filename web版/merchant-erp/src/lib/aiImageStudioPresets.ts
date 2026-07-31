@@ -334,21 +334,38 @@ export function isCarouselFivePlaybook(playbookId: VisualPlaybookId): boolean {
   return playbookId === 'platform_carousel_five'
 }
 
-/** 五连图整幅横幅 Prompt 片段（从左到右 1→5，供一次生图后裁切） */
+/** 五连图整幅横幅 Prompt 片段（一张连续海报，裁切后编号 1～5） */
 export function buildCarouselFiveMasterPromptExtra(
   channelId: PublishChannelId,
+  form?: Pick<VisualStudioForm, 'offer' | 'subheadline' | 'headline' | 'storeName' | 'note'>,
 ): string[] {
   const spec = resolvePlatformCarouselFiveSpec(channelId)
   const ch = resolveChannel(channelId)
-  const labels = CAROUSEL_FIVE_SLOTS.map((s) => s.label).join(' → ')
+  const hasOffer = Boolean(form?.offer?.trim())
+  const hasSub = Boolean(form?.subheadline?.trim())
+  const allowedText: string[] = []
+  if (form?.storeName?.trim()) allowedText.push(`门店名「${form.storeName.trim()}」`)
+  if (form?.headline?.trim()) allowedText.push(`主标题「${form.headline.trim()}」`)
+  if (hasSub) allowedText.push(`副标题「${form.subheadline!.trim()}」`)
+  if (hasOffer) allowedText.push(`优惠「${form!.offer!.trim()}」`)
+  if (form?.note?.trim()) allowedText.push(`补充「${form.note.trim()}」`)
+
   return [
-    `【五连图整幅海报 · ${ch.label}】只生成 1 张完整横版海报，精确构图尺寸 ${spec.masterWidth}×${spec.masterHeight} 像素，从左到右均分 5 个等宽等高板块，顺序编号 ${labels}。`,
-    '整幅必须是一张连续横图（不是 5 张独立海报拼贴）：背景/光效/字体/配色全幅统一，板块等宽等高、可横滑无缝衔接；禁止每段独立换风格或换背景。',
-    ...CAROUSEL_FIVE_SLOTS.map(
-      (s, i) => `从左数第 ${i + 1} 格（编号 ${s.label}）：${s.prompt}`,
-    ),
-    `后处理将整幅从左到右等分裁成 5 张，编号 1～5，单张 ${spec.slideWidth}×${spec.slideHeight}（${spec.specNote}）。`,
-  ]
+    `【五连图 · ${ch.label}】只画 1 张完整超宽横幅海报，目标约 ${spec.masterWidth}×${spec.masterHeight} 像素。`,
+    '硬性构图：同一空间/同一场景从左到右自然延展的一张连续画面（电影宽银幕/全景海报），光影、透视、色调、人物尺度全幅统一。',
+    '严禁：五宫格拼贴、五张互不相关照片、五块独立海报卡片、每格换背景、漫画分镜、信息条堆砌、毫无逻辑的乱拼。',
+    '文字规则：画面中文文案只能使用下列已填写内容' +
+      (allowedText.length
+        ? `：${allowedText.join('；')}。可少量重复主标题以形成节奏，但禁止另造句子。`
+        : '：若无已填文案则几乎不要大字，以场景画面为主。'),
+    hasOffer
+      ? '表单已填优惠/价格：可将该优惠自然融入画面（勿额外编造其它价格）。'
+      : '【禁价禁卖点】表单未填价格/优惠：禁止出现任何 ¥、价格数字、折扣、满减、卖点列表、UGC征集、打卡有礼、虚构促销口号。',
+    hasSub
+      ? ''
+      : '表单未填副标题：禁止编造卖点条文案、功能列表、多行小字卖点墙。',
+    `后处理会把整幅从左到右等宽裁成 5 张（编号 1→2→3→4→5），单张 ${spec.slideWidth}×${spec.slideHeight}；裁切后每一张都必须是同一海报的连续片段，而不是独立主题。`,
+  ].filter(Boolean)
 }
 
 export type PlatformSeriesSlot = {
@@ -356,28 +373,13 @@ export type PlatformSeriesSlot = {
   prompt: string
 }
 
-/** 五连图：整幅裁切后从左到右仅编号 1～5（不作封面/卖点等角色名） */
+/** 五连图裁切后槽位编号（仅 1～5，供方案墙标签；出图以整幅 Prompt 为准） */
 export const CAROUSEL_FIVE_SLOTS: PlatformSeriesSlot[] = [
-  {
-    label: '1',
-    prompt: '左侧第 1 格：大标题与品牌氛围开场，右缘视觉须自然延展到第 2 格。',
-  },
-  {
-    label: '2',
-    prompt: '第 2 格：承接左格色调与构图，展示核心卖点或服务特色，左右缘可无缝横滑。',
-  },
-  {
-    label: '3',
-    prompt: '第 3 格：环境/产品/团队等信任画面，延续同一套配色与字体。',
-  },
-  {
-    label: '4',
-    prompt: '第 4 格：团购套餐或价格信息，数字醒目，背景层次与前后格一致。',
-  },
-  {
-    label: '5',
-    prompt: '右侧第 5 格：到店/抢购/预约行动号召收尾，左缘与第 4 格衔接。',
-  },
+  { label: '1', prompt: '' },
+  { label: '2', prompt: '' },
+  { label: '3', prompt: '' },
+  { label: '4', prompt: '' },
+  { label: '5', prompt: '' },
 ]
 
 export const DETAIL_PAGE_SLOTS: PlatformSeriesSlot[] = [
@@ -621,14 +623,14 @@ export const VISUAL_PLAYBOOKS: Array<{
   {
     id: 'platform_carousel_five',
     label: '五连图',
-    desc: '门店头图轮播，5 张横滑衔接',
+    desc: '一张连续海报裁成 5 张，从左到右横滑',
     intent: 'carousel',
     emoji: '🎠',
     suggestedChannels: ['douyin', 'kuaishou', 'meituan'],
     styleId: 'premium',
-    titleTemplates: ['{store} · 全新升级', 'NEW STORE OPENING', '{store}品质之选'],
-    subtitleTemplates: ['横滑浏览五连图', '豪华阵容 · 舒适体验', '团购热卖中'],
-    offerTemplates: ['限时¥99', '首单立减', ''],
+    titleTemplates: ['{store}', '{store} · 到店体验', ''],
+    subtitleTemplates: ['', '', ''],
+    offerTemplates: ['', '', ''],
   },
   {
     id: 'platform_detail_page',
@@ -1293,26 +1295,26 @@ export const PLAYBOOK_VARIANT_CONFIGS: Partial<Record<VisualPlaybookId, Playbook
       {
         id: 'opening',
         label: '开业上新',
-        periodLabel: '头图轮播 · 吸睛首屏',
-        headline: 'NEW STORE OPENING',
-        subheadline: '全新团队 · 豪华阵容',
+        periodLabel: '连续场景 · 头图轮播',
+        headline: '全新开业',
+        subheadline: '',
         styleId: 'premium',
       },
       {
         id: 'quality',
         label: '品质服务',
-        periodLabel: '环境+手法+信任感',
-        headline: '提升服务品质',
-        subheadline: '手法娴熟 · 舒适体验',
+        periodLabel: '环境叙事 · 信任感',
+        headline: '品质服务',
+        subheadline: '',
         styleId: 'premium',
       },
       {
         id: 'promo',
         label: '团购促销',
-        periodLabel: '价格+套餐组合',
+        periodLabel: '需自行填写价格',
         headline: '限时团购',
-        subheadline: '超值套餐热卖中',
-        offer: '¥99起',
+        subheadline: '',
+        offer: '',
         styleId: 'ecommerce',
       },
     ],
@@ -2359,7 +2361,7 @@ const INTENT_PROMPT: Record<VisualIntentId, string> = {
   environment: '设计探店氛围图，真实可信的就餐/服务环境，适合小红书种草。',
   menu: '设计菜单价目视觉，分区清晰、价格可读。',
   carousel:
-    '设计本地生活门店「五连图」完整超宽横幅：从左到右均分 5 个板块，背景/光效/色调无缝衔接，生成后将按平台单张宽度裁成 5 张轮播图。',
+    '设计本地生活门店「五连图」：只出一张从左到右连续的超宽全景海报（同一场景延展），禁止五格拼贴或五张无关图；生成后等分裁成 5 张轮播。',
   detail:
     '设计团购「详情长图」单段：3:4 竖图，大图+中英标题排版，适合抖音/快手/美团详情页竖向拼接。',
 }
@@ -2985,7 +2987,7 @@ export function buildVisualStudioPrompt(
     : null
   const lines = [
     carouselMaster
-      ? `${INTENT_PROMPT.carousel}内容侧重：${INTENT_PROMPT[pb.intent]}`
+      ? INTENT_PROMPT.carousel
       : seriesMode === 'platform_detail_page'
         ? `${INTENT_PROMPT.detail}内容侧重：${INTENT_PROMPT[pb.intent]}`
         : INTENT_PROMPT[pb.intent],
@@ -2997,24 +2999,30 @@ export function buildVisualStudioPrompt(
     `视觉风格：${style}。`,
     channel
       ? carouselMaster
-        ? `投放渠道：${channel.label}，${sizeDisplay?.pixelHint ?? ''}，超宽横幅一次出图。`
+        ? `投放渠道：${channel.label}，${sizeDisplay?.pixelHint ?? ''}，超宽横幅一次出图后裁 5 张。`
         : `投放渠道：${channel.label}，${size?.aspectRatio ?? ''} ${size?.pixelHint ?? ''}，请符合该平台常见封面构图。`
       : '',
-    variantConfig?.pickerLabel && playbookVariant
+    !carouselMaster && variantConfig?.pickerLabel && playbookVariant
       ? `${variantConfig.pickerLabel}：${playbookVariant.label}（${playbookVariant.periodLabel}）。`
-      : playbookVariant
+      : !carouselMaster && playbookVariant
         ? `活动细分：${playbookVariant.label}（${playbookVariant.periodLabel}），视觉元素须呼应该主题。`
         : '',
-    `营销玩法：${pb.label}（${pb.desc}）。`,
-    seriesMode === 'platform_carousel_five'
+    carouselMaster
+      ? `主题氛围：${pb.label}（${pb.desc}）；以场景叙事为主，勿堆砌促销模块。`
+      : `营销玩法：${pb.label}（${pb.desc}）。`,
+    seriesMode === 'platform_carousel_five' && !carouselMaster
       ? '输出形态：五连图横幅，画面信息与构图须服务该营销玩法。'
       : seriesMode === 'platform_detail_page'
         ? '输出形态：团购详情长图分段，画面信息与构图须服务该营销玩法。'
         : '',
-    form.storeName.trim() ? `门店/品牌名：${form.storeName.trim()}（可出现在画面角落，勿遮挡主信息）。` : '',
+    form.storeName.trim() ? `门店/品牌名：${form.storeName.trim()}（可出现在画面，勿遮挡主信息）。` : '',
     form.headline.trim() ? `主标题（画面中大而清晰的中文）：「${form.headline.trim()}」。` : '',
     form.subheadline.trim() ? `副标题：${form.subheadline.trim()}。` : '',
-    form.offer.trim() ? `核心优惠/价格：${form.offer.trim()}（数字醒目）。` : '',
+    form.offer.trim()
+      ? `核心优惠/价格：${form.offer.trim()}（数字醒目）。`
+      : carouselMaster
+        ? '未填写价格/优惠：禁止自创任何价格、折扣与卖点条文案。'
+        : '',
     form.timeRange.trim() ? `活动时间：${form.timeRange.trim()}。` : '',
     form.note.trim() ? `补充说明：${form.note.trim()}。` : '',
     form.referenceKeywords.trim()
@@ -3032,9 +3040,10 @@ export function buildVisualStudioPrompt(
 
   const vi = opts?.variantIndex ?? 0
   if (carouselMaster && channel) {
-    lines.push(...buildCarouselFiveMasterPromptExtra(channel.id))
+    lines.push(...buildCarouselFiveMasterPromptExtra(channel.id, form))
   } else if (seriesMode) {
-    lines.push(resolveSeriesSlotPrompt(seriesMode, vi))
+    const slotPrompt = resolveSeriesSlotPrompt(seriesMode, vi)
+    if (slotPrompt.trim()) lines.push(slotPrompt)
     lines.push(
       seriesMode === 'platform_carousel_five'
         ? '整套五连图须统一配色、字体与光影，本张仅为系列中的一屏，勿做成独立无关海报。'
@@ -3104,7 +3113,7 @@ export function buildVisualStudioImageContext(
     carouselSlideWidth: masterGen?.slideSpec.slideWidth ?? 0,
     carouselSlideHeight: masterGen?.slideSpec.slideHeight ?? 0,
     compositionVariant: carouselMaster && channel
-      ? buildCarouselFiveMasterPromptExtra(channel.id).join('\n')
+      ? buildCarouselFiveMasterPromptExtra(channel.id, form).join('\n')
       : seriesMode
         ? resolveSeriesSlotPrompt(seriesMode, vi)
         : (VARIANT_SUFFIX[vi] ?? VARIANT_SUFFIX[0]!),
