@@ -7,6 +7,11 @@ import {
   buildSrtFromScriptRows,
   SHORT_VIDEO_SUBTITLE_MAX_CHARS,
 } from '../src/lib/digitalHumanSubtitle.ts'
+import {
+  pickShortVideoSubtitleStyleFromPrompt,
+  resolveShortVideoSubtitleStyle,
+  SHORT_VIDEO_SUBTITLE_STYLE_AUTO,
+} from '../src/lib/shortVideoPostProcess.ts'
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg)
@@ -60,6 +65,34 @@ const short = buildSrtFromScriptRows(
   3,
 )
 assert(short.includes('少切App，多做生意。'), `短句应整行保留:\n${short}`)
+
+// 按提示词自动板式
+assert(
+  pickShortVideoSubtitleStyleFromPrompt('老板握着手机切 App，界面特写，灵祺商家ERP') === 'bottom-safe',
+  'SaaS/手机应选安全区',
+)
+assert(
+  pickShortVideoSubtitleStyleFromPrompt('夜市探店烟火气，街头门店必吃') === 'bottom-yellow',
+  '探店应选黄字',
+)
+assert(
+  pickShortVideoSubtitleStyleFromPrompt('字幕样式：电影感\n氛围大片叙事') === 'cinematic',
+  '显式电影感应命中',
+)
+assert(
+  pickShortVideoSubtitleStyleFromPrompt('限时秒杀福利满减促销') === 'bottom-green',
+  '促销应选绿字',
+)
+const autoPick = resolveShortVideoSubtitleStyle({
+  preference: SHORT_VIDEO_SUBTITLE_STYLE_AUTO,
+  styleHintText: '种草好物测评安利',
+})
+assert(autoPick.auto && autoPick.styleId === 'bottom-pink', `种草自动粉字，实际 ${JSON.stringify(autoPick)}`)
+const fixed = resolveShortVideoSubtitleStyle({
+  preference: 'cinematic',
+  styleHintText: '限时秒杀',
+})
+assert(!fixed.auto && fixed.styleId === 'cinematic', '手动板式应覆盖自动')
 
 console.log('shortVideoPostProcess-subtitle-smoke: OK')
 console.log('--- SRT sample ---\n' + srt)

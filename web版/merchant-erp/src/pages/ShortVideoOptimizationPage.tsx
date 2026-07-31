@@ -56,7 +56,9 @@ import {
   finalizeNarrationScript,
   sanitizePromptForVideoModel,
   SHORT_VIDEO_MOTION_PROMPT_SUFFIX,
+  SHORT_VIDEO_SUBTITLE_STYLE_AUTO,
 } from '../lib/shortVideoPostProcess'
+import { SUBTITLE_STYLES } from '../lib/digitalHumanBroadcast'
 import {
   VIDEO_ENGINE_LABEL_SEEDANCE,
   VIDEO_ENGINE_HINT_SEEDANCE,
@@ -488,6 +490,8 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
   const [sdAspect, setSdAspect] = useState<'16:9' | '9:16' | '1:1'>('9:16')
   const [sdWatermark, setSdWatermark] = useState<'off' | 'on'>('off')
   const [sdResolution, setSdResolution] = useState<SeedanceQualityId>('1080p')
+  /** 字幕板式：auto = 按执导提示词自动选 */
+  const [sdSubtitleStyle, setSdSubtitleStyle] = useState<string>(SHORT_VIDEO_SUBTITLE_STYLE_AUTO)
 
   const [longformEnabled, setLongformEnabled] = useState(false)
   const [longformTargetTotalSec, setLongformTargetTotalSec] = useState(15)
@@ -1047,6 +1051,13 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
         : isScriptRowsUsable(scriptRows) && scriptRows.length >= 2
           ? scriptRows
           : null
+    const styleHintText = [
+      genPrompt.trim(),
+      rowsForSub ? scriptRowsToOverallPrompt(rowsForSub) : '',
+      narrationSource,
+    ]
+      .filter(Boolean)
+      .join('\n')
     const fin = await finalizeShortVideoOutput(source, narrationSource, (text) => setProgress(text), {
       targetDurationSec,
       preferFullNarration: opts?.preferFullNarration,
@@ -1054,6 +1065,8 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       productStartSec: opts?.productStartSec,
       productEndSec: opts?.productEndSec,
       scriptRows: rowsForSub,
+      subtitleStyle: sdSubtitleStyle,
+      styleHintText,
     })
     if (!fin.ok) {
       setErr(fin.message)
@@ -2240,7 +2253,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
                   </span>
                 </label>
 
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                   {longformEnabled ? (
                     <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
                       <span>目标总时长</span>
@@ -2326,6 +2339,25 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
                       <option value="off">无</option>
                       <option value="on">有</option>
                     </select>
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+                    <span>字幕板式</span>
+                    <select
+                      value={sdSubtitleStyle}
+                      onChange={(e) => setSdSubtitleStyle(e.target.value)}
+                      disabled={busy}
+                      className={fieldSelectCls}
+                    >
+                      <option value={SHORT_VIDEO_SUBTITLE_STYLE_AUTO}>自动（按提示词）</option>
+                      {SUBTITLE_STYLES.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.label}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-[11px] font-normal text-slate-500">
+                      自动时读执导/口播关键词；也可写「字幕样式：电影感」
+                    </span>
                   </label>
                 </div>
 

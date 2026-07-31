@@ -8,7 +8,8 @@ import {
 } from '../services/videoAiApi'
 import { synthesizeDigitalHumanSpeech } from '../services/digitalHumanTtsApi'
 import { muxAudioWithVideoBlob } from './concatVideoSegments'
-import { CUSTOM_UPLOAD_VOICE_PRESETS } from './digitalHumanBroadcast'
+import { CUSTOM_UPLOAD_VOICE_PRESETS, SUBTITLE_STYLES } from './digitalHumanBroadcast'
+import { resolveDhSubtitleStyleForBurn } from './digitalHumanPostProcessStyles'
 import {
   buildSrtContent,
   buildSrtFromScriptRows,
@@ -33,6 +34,73 @@ export {
   sanitizePromptForVideoModel,
   finalizeNarrationScript,
   isValidShortVideoSubtitleScript,
+}
+
+/** 短片字幕板式：auto = 按执导/口播提示词推断 */
+export const SHORT_VIDEO_SUBTITLE_STYLE_AUTO = 'auto' as const
+
+const STYLE_LABEL_HINTS: Array<{ id: string; re: RegExp }> = [
+  { id: 'bottom-safe', re: /底部安全|安全区/ },
+  { id: 'bottom-white-large', re: /底部大白字|大白字/ },
+  { id: 'bottom-white', re: /底部白字|白字黑边/ },
+  { id: 'bottom-yellow', re: /底部黄字|黄字/ },
+  { id: 'bottom-pink', re: /底部粉字|粉字|种草字/ },
+  { id: 'bottom-green', re: /底部绿字|绿字/ },
+  { id: 'center-white', re: /居中白字|居中大字|画面中央/ },
+  { id: 'top-news', re: /顶部新闻|新闻条/ },
+  { id: 'top-minimal', re: /顶部简约|顶栏字幕|顶部字幕/ },
+  { id: 'cinematic', re: /电影感|胶片感|质感小字/ },
+]
+
+/**
+ * 根据执导文案 / 口播 / 分镜文本自动选字幕板式。
+ * 优先识别「字幕样式：xxx」显式指定，再按题材关键词，默认 bottom-safe。
+ */
+export function pickShortVideoSubtitleStyleFromPrompt(text: string): string {
+  const t = String(text || '').trim()
+  if (!t) return 'bottom-safe'
+
+  const explicit = t.match(/字幕(?:样式|板式|风格)\s*[：:]\s*([^\n，,。；;]{2,24})/)
+  if (explicit?.[1]) {
+    const tip = explicit[1].trim()
+    for (const row of STYLE_LABEL_HINTS) {
+      if (row.re.test(tip) || tip.includes(row.id)) return row.id
+    }
+    const byLabel = SUBTITLE_STYLES.find(
+      (s) => s.label.includes(tip) || tip.includes(s.label.replace(/（.*?）/g, '')),
+    )
+    if (byLabel) return byLabel.id
+  }
+
+  for (const row of STYLE_LABEL_HINTS) {
+    if (row.re.test(t)) return row.id
+  }
+
+  if (/新闻|资讯|播报|头条|快讯/.test(t)) return 'top-news'
+  if (/电影感|胶片|氛围感|质感大片|纪录片|叙事感/.test(t)) return 'cinematic'
+  if (/促销|限时|秒杀|福利|打折|满减|特价/.test(t)) return 'bottom-green'
+  if (/种草|好物|测评|安利|必买/.test(t)) return 'bottom-pink'
+  if (/大字报|爆款字|冲击字幕|醒目大字/.test(t)) return 'bottom-white-large'
+  if (/探店|夜市|烟火|街头|门店|市井/.test(t)) return 'bottom-yellow'
+  // 界面/手机/SaaS 演示：必须安全区，避免压主体
+  if (/界面|屏幕|手机|看板|ERP|SaaS|App|软件|对话框|特写手|握着手机|切\s*App/.test(t)) {
+    return 'bottom-safe'
+  }
+  return 'bottom-safe'
+}
+
+export function resolveShortVideoSubtitleStyle(opts: {
+  preference?: string | null
+  styleHintText?: string | null
+}): { styleId: string; label: string; auto: boolean } {
+  const pref = String(opts.preference || SHORT_VIDEO_SUBTITLE_STYLE_AUTO).trim()
+  const auto = !pref || pref === SHORT_VIDEO_SUBTITLE_STYLE_AUTO
+  const raw = auto
+    ? pickShortVideoSubtitleStyleFromPrompt(String(opts.styleHintText || ''))
+    : pref
+  const styleId = resolveDhSubtitleStyleForBurn(raw)
+  const label = SUBTITLE_STYLES.find((s) => s.id === styleId)?.label ?? styleId
+  return { styleId, label, auto }
 }
 
 function base64ToBlob(b64: string, mime: string): Blob {
@@ -81,6 +149,10 @@ export async function finalizeShortVideoOutput(
     productEndSec?: number
     /** 有分镜时按 timeRange+dialogue 对齐字幕时间轴 */
     scriptRows?: ScriptRowForSubtitle[] | null
+    /** 字幕板式：auto 或具体 styleId；默认 auto */
+    subtitleStyle?: string | null
+    /** 用于自动推断板式的执导/分镜全文（可含提示词） */
+    styleHintText?: string | null
   },
 ): Promise<{ ok: true; objectUrl: string; blob: Blob } | { ok: false; message: string }> {
   onProgress?.('下载 AI 视频…')
@@ -153,6 +225,14 @@ export async function finalizeShortVideoOutput(
     (burnSubtitles && !hasProductOverlay && subtitleDur > 0 && isValidShortVideoSubtitleScript(script)
       ? buildSrtContent(splitSubtitleLines(script, SHORT_VIDEO_SUBTITLE_MAX_CHARS), subtitleDur)
       : '')
+  const rowHint = (opts?.scriptRows || [])
+    .map((r) => `${r.dialogue || ''}`)
+    .join('\n')
+  const stylePick = resolveShortVideoSubtitleStyle({
+    preference: opts?.subtitleStyle,
+    styleHintText: [opts?.styleHintText, narrationSource, script, rowHint].filter(Boolean).join('\n'),
+  })
+
   if (srt.trim() || hasProductOverlay) {
     onProgress?.(
       hasProductOverlay && srt.trim()
@@ -160,14 +240,13 @@ export async function finalizeShortVideoOutput(
         : hasProductOverlay
           ? '叠加产品特写（跳过字幕以免遮挡）…'
           : fromRows.trim()
-            ? '烧录中文字幕（按分镜时间轴·底部安全区）…'
-            : '烧录中文字幕（底部安全区）…',
+            ? `烧录中文字幕（按分镜时间轴·${stylePick.label}${stylePick.auto ? '·自动' : ''}）…`
+            : `烧录中文字幕（${stylePick.label}${stylePick.auto ? '·自动' : ''}）…`,
     )
     try {
       merged = await postProcessVideoOnServer(merged, {
         srtContent: srt.trim() || undefined,
-        // 底部高边距安全区，远离画面中心主体
-        subtitleStyle: 'bottom-safe',
+        subtitleStyle: stylePick.styleId,
         productImageBase64: hasProductOverlay ? productB64 : undefined,
         productStartSec: hasProductOverlay ? opts?.productStartSec : undefined,
         productEndSec: hasProductOverlay ? opts?.productEndSec : undefined,
