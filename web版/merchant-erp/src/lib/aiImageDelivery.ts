@@ -203,6 +203,46 @@ export async function sliceCarouselFiveStrips(
   return strips
 }
 
+/**
+ * 五连图预览：将已裁切的 1～5 张从左到右拼回一条横幅（仅预览用）。
+ */
+export async function stitchCarouselFiveStrips(
+  sources: Array<Blob | string>,
+): Promise<Blob> {
+  if (!sources.length) throw new Error('没有可拼接的图片')
+  const bitmaps: ImageBitmap[] = []
+  try {
+    for (const src of sources) {
+      const blob = typeof src === 'string' ? await fetchImageBlob(src) : src
+      bitmaps.push(await createImageBitmap(blob))
+    }
+    const h = Math.max(...bitmaps.map((b) => b.height))
+    if (h < 1) throw new Error('拼接高度无效')
+    const widths = bitmaps.map((b) => Math.max(1, Math.round((b.width * h) / b.height)))
+    const totalW = widths.reduce((a, w) => a + w, 0)
+    const canvas = document.createElement('canvas')
+    canvas.width = totalW
+    canvas.height = h
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Canvas 不可用')
+    let x = 0
+    for (let i = 0; i < bitmaps.length; i++) {
+      const b = bitmaps[i]!
+      const w = widths[i]!
+      ctx.drawImage(b, 0, 0, b.width, b.height, x, 0, w, h)
+      x += w
+    }
+    return await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (out) => (out ? resolve(out) : reject(new Error('拼接编码失败'))),
+        'image/png',
+      )
+    })
+  } finally {
+    bitmaps.forEach((b) => b.close())
+  }
+}
+
 export async function pngBlobFromImageUrl(url: string): Promise<Blob> {
   const src = await fetchImageBlob(url)
   const bitmap = await createImageBitmap(src)

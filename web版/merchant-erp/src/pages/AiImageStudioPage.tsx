@@ -19,6 +19,7 @@ import {
   fetchImageBlob,
   pngBlobFromImageUrl,
   sliceCarouselFiveStrips,
+  stitchCarouselFiveStrips,
   triggerBlobDownload,
 } from '../lib/aiImageDelivery'
 import { compressImageFileToDataUrl } from '../lib/aiImageCompress'
@@ -194,26 +195,30 @@ function DevicePreview({
   headline: string
   empty?: boolean
   /** 覆盖渠道默认比例（五连图横图 / 详情图竖图） */
-  previewAspect?: 'vertical' | 'horizontal' | 'square'
+  previewAspect?: 'vertical' | 'horizontal' | 'square' | 'carouselWide'
 }) {
   const ch = resolveChannel(channelId)
   const logoSrc = publishChannelLogoSrc(channelId)
+  const isCarouselWide = previewAspect === 'carouselWide'
   const isVertical =
     previewAspect === 'vertical' ||
-    (previewAspect !== 'horizontal' &&
+    (!isCarouselWide &&
+      previewAspect !== 'horizontal' &&
       previewAspect !== 'square' &&
       ch.primarySizeId === 'moments_vertical')
   const isSquare = previewAspect === 'square'
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex w-full flex-col items-center">
       <div
         className={cn(
           'relative overflow-hidden rounded-[2rem] border-[5px] border-slate-800 bg-slate-900 shadow-2xl shadow-slate-400/30 ring-1 ring-white/10',
-          isVertical
-            ? 'h-[min(520px,58vh)] w-[240px]'
-            : isSquare
-              ? 'h-[280px] w-[280px]'
-              : 'h-[220px] w-[380px]',
+          isCarouselWide
+            ? 'h-[168px] w-full max-w-[420px]'
+            : isVertical
+              ? 'h-[min(520px,58vh)] w-[240px]'
+              : isSquare
+                ? 'h-[280px] w-[280px]'
+                : 'h-[220px] w-[380px]',
         )}
       >
         <div className="absolute left-1/2 top-2.5 z-10 h-1 w-16 -translate-x-1/2 rounded-full bg-slate-700" />
@@ -227,9 +232,17 @@ function DevicePreview({
             />
           )}
           {ch.short}
+          {isCarouselWide ? <span className="font-normal text-slate-500">·五连拼接</span> : null}
         </div>
         {previewUrl ? (
-          <img src={previewUrl} alt="" className="h-full w-full object-cover" />
+          <img
+            src={previewUrl}
+            alt=""
+            className={cn(
+              'h-full w-full',
+              isCarouselWide ? 'object-contain bg-slate-950' : 'object-cover',
+            )}
+          />
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-gradient-to-br from-slate-100 via-white to-violet-50 p-6 text-center">
             {empty ? (
@@ -268,6 +281,10 @@ export default function AiImageStudioPage() {
   const [selectedPreviewChannel, setSelectedPreviewChannel] = useState<PublishChannelId>('douyin')
   const [selectedPreviewVariantId, setSelectedPreviewVariantId] = useState<string | null>(null)
   const [variants, setVariants] = useState<VariantResult[]>([])
+  /** 五连图：各渠道 1～5 张横向拼回的预览 URL */
+  const [carouselStitchByChannel, setCarouselStitchByChannel] = useState<
+    Partial<Record<PublishChannelId, string>>
+  >({})
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -376,12 +393,57 @@ export default function AiImageStudioPage() {
     isPlatformSeries,
     perPlatformCount,
   ])
-  const previewAspect = useMemo((): 'vertical' | 'horizontal' | 'square' | undefined => {
-    if (platformSeries === 'platform_carousel_five') return 'horizontal'
+  const previewAspect = useMemo((): 'vertical' | 'horizontal' | 'square' | 'carouselWide' | undefined => {
+    if (platformSeries === 'platform_carousel_five') return 'carouselWide'
     if (platformSeries === 'platform_detail_page') return 'vertical'
     return undefined
   }, [platformSeries])
   const activeChannel = resolveChannel(selectedPreviewChannel)
+
+  useEffect(() => {
+    if (!isCarouselFive) {
+      setCarouselStitchByChannel((prev) => {
+        Object.values(prev).forEach((u) => {
+          if (u?.startsWith('blob:')) URL.revokeObjectURL(u)
+        })
+        return {}
+      })
+      return
+    }
+    let cancelled = false
+    const channelIds = [...new Set(variants.map((v) => v.channelId))]
+    void (async () => {
+      const next: Partial<Record<PublishChannelId, string>> = {}
+      for (const cid of channelIds) {
+        const strips = variants
+          .filter((v) => v.channelId === cid && v.status === 'done' && v.previewUrl)
+          .sort((a, b) => a.variantIndex - b.variantIndex)
+        if (strips.length < 5) continue
+        try {
+          const blob = await stitchCarouselFiveStrips(strips.map((s) => s.previewUrl!))
+          if (cancelled) return
+          next[cid] = URL.createObjectURL(blob)
+        } catch {
+          /* 单渠道拼接失败则跳过 */
+        }
+      }
+      if (cancelled) {
+        Object.values(next).forEach((u) => {
+          if (u) URL.revokeObjectURL(u)
+        })
+        return
+      }
+      setCarouselStitchByChannel((prev) => {
+        Object.values(prev).forEach((u) => {
+          if (u?.startsWith('blob:')) URL.revokeObjectURL(u)
+        })
+        return next
+      })
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [variants, isCarouselFive])
   const fieldLabels = industryProfile.fieldLabels
   const copySuggestions = useMemo(
     () => (copyOptions.length ? copyOptions : generateCopySuggestions(form)),
@@ -1048,6 +1110,10 @@ export default function AiImageStudioPage() {
   }
 
   const heroPreview = useMemo(() => {
+    if (isCarouselFive) {
+      const stitch = carouselStitchByChannel[selectedPreviewChannel]
+      if (stitch) return stitch
+    }
     const done = variants.filter((v) => v.status === 'done' && v.previewUrl)
     if (selectedPreviewVariantId) {
       const picked = done.find((v) => v.id === selectedPreviewVariantId)
@@ -1055,7 +1121,13 @@ export default function AiImageStudioPage() {
     }
     const forChannel = done.filter((v) => v.channelId === selectedPreviewChannel)
     return (forChannel[0] ?? done[0])?.previewUrl
-  }, [variants, selectedPreviewChannel, selectedPreviewVariantId])
+  }, [
+    variants,
+    selectedPreviewChannel,
+    selectedPreviewVariantId,
+    isCarouselFive,
+    carouselStitchByChannel,
+  ])
 
   const downloadVariant = async (v: VariantResult) => {
     if (!v.previewUrl && !v.imageUrl) return
@@ -1616,72 +1688,146 @@ export default function AiImageStudioPage() {
           </div>
 
           {variants.length > 0 ? (
-            <StudioPanel title="方案墙" subtitle={`已生成 ${doneCount} 张，点击切换右侧预览`}>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                {variants.map((v) => {
-                  const ch = resolveChannel(v.channelId)
-                  return (
-                    <div
-                      key={v.id}
-                      className={cn(
-                        'overflow-hidden rounded-xl border bg-white shadow-sm transition',
-                        v.previewUrl && selectedPreviewVariantId === v.id && 'ring-2 ring-violet-400',
-                      )}
-                    >
-                      <button
-                        type="button"
-                        className="block w-full"
-                        onClick={() => {
-                          if (!v.previewUrl) return
-                          setSelectedPreviewChannel(v.channelId)
-                          setSelectedPreviewVariantId(v.id)
-                        }}
+            <StudioPanel
+              title="方案墙"
+              subtitle={
+                isCarouselFive
+                  ? `已生成 ${doneCount} 张；预览为 1～5 横向拼接，可单独下载每张`
+                  : `已生成 ${doneCount} 张，点击切换右侧预览`
+              }
+            >
+              {isCarouselFive ? (
+                <div className="space-y-3">
+                  {[...new Set(variants.map((v) => v.channelId))].map((cid) => {
+                    const ch = resolveChannel(cid)
+                    const channelVars = variants
+                      .filter((v) => v.channelId === cid)
+                      .sort((a, b) => a.variantIndex - b.variantIndex)
+                    const stitch = carouselStitchByChannel[cid]
+                    const running = channelVars.some(
+                      (v) => v.status === 'running' || v.status === 'pending',
+                    )
+                    const errMsg = channelVars.find((v) => v.status === 'error')?.message
+                    const active = selectedPreviewChannel === cid
+                    return (
+                      <div
+                        key={cid}
+                        className={cn(
+                          'overflow-hidden rounded-xl border bg-white shadow-sm transition',
+                          active && 'ring-2 ring-violet-400',
+                        )}
                       >
-                        <div
-                          className={cn(
-                            'flex items-center justify-center bg-slate-100',
-                            isCarouselFive
-                              ? 'aspect-[16/9]'
-                              : platformSeries === 'platform_detail_page'
+                        <button
+                          type="button"
+                          className="block w-full"
+                          onClick={() => {
+                            setSelectedPreviewChannel(cid)
+                            setSelectedPreviewVariantId(null)
+                          }}
+                        >
+                          <div className="flex aspect-[5/1] items-center justify-center bg-slate-100">
+                            {running && !stitch ? (
+                              <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                            ) : stitch ? (
+                              <img
+                                src={stitch}
+                                alt={`${ch.short} 五连拼接`}
+                                className="h-full w-full object-contain"
+                              />
+                            ) : errMsg ? (
+                              <span className="px-2 text-center text-[10px] text-red-600" title={errMsg}>
+                                失败
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-slate-400">等待拼接…</span>
+                            )}
+                          </div>
+                        </button>
+                        <div className="flex flex-wrap items-center gap-1.5 px-2 py-1.5">
+                          <span className="text-[10px] font-medium text-slate-600">{ch.short} · 1→5</span>
+                          {channelVars.map((v) => (
+                            <button
+                              key={v.id}
+                              type="button"
+                              disabled={v.status !== 'done'}
+                              onClick={() => void downloadVariant(v)}
+                              className="inline-flex items-center gap-0.5 rounded-md bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-500 ring-1 ring-slate-200 hover:text-violet-600 disabled:opacity-40"
+                              title={`下载第 ${v.variantIndex + 1} 张`}
+                            >
+                              {v.variantIndex + 1}
+                              <Download className="h-3 w-3" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                  {variants.map((v) => {
+                    const ch = resolveChannel(v.channelId)
+                    return (
+                      <div
+                        key={v.id}
+                        className={cn(
+                          'overflow-hidden rounded-xl border bg-white shadow-sm transition',
+                          v.previewUrl && selectedPreviewVariantId === v.id && 'ring-2 ring-violet-400',
+                        )}
+                      >
+                        <button
+                          type="button"
+                          className="block w-full"
+                          onClick={() => {
+                            if (!v.previewUrl) return
+                            setSelectedPreviewChannel(v.channelId)
+                            setSelectedPreviewVariantId(v.id)
+                          }}
+                        >
+                          <div
+                            className={cn(
+                              'flex items-center justify-center bg-slate-100',
+                              platformSeries === 'platform_detail_page'
                                 ? 'aspect-[9/16]'
                                 : 'aspect-[3/4]',
-                          )}
-                        >
-                          {v.status === 'running' || v.status === 'pending' ? (
-                            <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
-                          ) : v.status === 'error' ? (
-                            <span
-                              className="px-1 text-center text-[10px] leading-tight text-red-600"
-                              title={v.message || '生图失败'}
-                            >
-                              失败
-                            </span>
-                          ) : v.previewUrl ? (
-                            <img src={v.previewUrl} alt="" className="h-full w-full object-cover" />
-                          ) : null}
-                        </div>
-                      </button>
-                      <div className="flex items-center justify-between px-2 py-1.5">
-                        <span className="text-[10px] text-slate-500">
-                          {ch.short}{' '}
-                          {platformSeries
-                            ? resolveSeriesSlotLabel(platformSeries, v.variantIndex)
-                            : `#${v.variantIndex + 1}`}
-                        </span>
-                        {v.status === 'done' && (
-                          <button
-                            type="button"
-                            onClick={() => void downloadVariant(v)}
-                            className="text-slate-500 hover:text-violet-600"
+                            )}
                           >
-                            <Download className="h-3.5 w-3.5" />
-                          </button>
-                        )}
+                            {v.status === 'running' || v.status === 'pending' ? (
+                              <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                            ) : v.status === 'error' ? (
+                              <span
+                                className="px-1 text-center text-[10px] leading-tight text-red-600"
+                                title={v.message || '生图失败'}
+                              >
+                                失败
+                              </span>
+                            ) : v.previewUrl ? (
+                              <img src={v.previewUrl} alt="" className="h-full w-full object-cover" />
+                            ) : null}
+                          </div>
+                        </button>
+                        <div className="flex items-center justify-between px-2 py-1.5">
+                          <span className="text-[10px] text-slate-500">
+                            {ch.short}{' '}
+                            {platformSeries
+                              ? resolveSeriesSlotLabel(platformSeries, v.variantIndex)
+                              : `#${v.variantIndex + 1}`}
+                          </span>
+                          {v.status === 'done' && (
+                            <button
+                              type="button"
+                              onClick={() => void downloadVariant(v)}
+                              className="text-slate-500 hover:text-violet-600"
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )
-                })}
-              </div>
+                    )
+                  })}
+                </div>
+              )}
             </StudioPanel>
           ) : null}
 
