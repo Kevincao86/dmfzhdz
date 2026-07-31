@@ -1,5 +1,6 @@
 /**
- * GET /api/meoo-ops-sync-registry — 运营台经 erp-api 拉全量注册表（不做商户租户裁剪）。
+ * GET /api/ops-sync/registry — 运营台经 erp-api 拉全量注册表（默认不做商户租户裁剪）。
+ * 兼容 ?slice=ai|bootstrap：返回 AI/Key 瘦身切片（与商家 Bridge 同源）。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
@@ -7,6 +8,7 @@ import {
   readMerchantSupabaseAdminEnv,
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import { createRegistrySnapshotIoFetch, loadRegistrySnapshotForGet } from '../src/lib/registrySnapshotIoFetch.js'
+import { slimRegistrySnapshotForAiBootstrap } from '../src/lib/registryTenantIsolation.js'
 
 export const config = { maxDuration: 60 }
 
@@ -65,6 +67,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const hint = loadErr instanceof Error ? loadErr.message : String(loadErr)
       console.error('[meoo-ops-registry-ops-get] loadRegistrySnapshotForGet failed, fallback io.load:', hint.slice(0, 400))
       data = await io.load()
+    }
+
+    const sliceRaw = req.query?.slice
+    const slice =
+      typeof sliceRaw === 'string'
+        ? sliceRaw.trim().toLowerCase()
+        : Array.isArray(sliceRaw)
+          ? String(sliceRaw[0] ?? '').trim().toLowerCase()
+          : ''
+    if (slice === 'ai' || slice === 'bootstrap') {
+      data = slimRegistrySnapshotForAiBootstrap(data, null)
     }
 
     let payload: string
