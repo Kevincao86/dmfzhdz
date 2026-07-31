@@ -62,7 +62,7 @@ import { SUBTITLE_STYLES } from '../lib/digitalHumanBroadcast'
 import {
   VIDEO_ENGINE_LABEL_SEEDANCE,
   VIDEO_ENGINE_HINT_SEEDANCE,
-  SEEDANCE_SERVER_AUTO,
+  SEEDANCE_1_5_PRO_MODEL_ID,
   SEEDANCE_QUALITY_OPTIONS,
   type SeedanceQualityId,
 } from '../lib/shortVideoUiLabels'
@@ -594,15 +594,19 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
 
   const seedancePoolModels = useMemo(() => {
     const raw = cfg?.arkVideoModels.map((m) => m.endpointId) ?? []
-    // 短片台只用火山 Seedance 族；排除误配进方舟池的 wan / 千问模型
-    return raw.filter((id) => {
+    // 后期写死：仅 Seedance 1.5 Pro（不再 hop lite/fast/其它 ep）
+    const proOnly = raw.filter((id) => {
       const t = String(id || '').trim()
       if (!t) return false
-      if (/^wan[\d._-]/i.test(t) || /t2v|i2v/i.test(t) && /^wan/i.test(t)) return false
-      if (/^wan2/i.test(t)) return false
-      if (/^ep-/i.test(t)) return true
-      return /seedance|seaweed|doubao-seed/i.test(t)
+      if (/^wan[\d._-]/i.test(t) || (/t2v|i2v/i.test(t) && /^wan/i.test(t))) return false
+      return (
+        t === SEEDANCE_1_5_PRO_MODEL_ID ||
+        /1-5-pro|1\.5-pro/i.test(t) ||
+        /seedance-1-5-pro/i.test(t) ||
+        /251215/.test(t)
+      )
     })
+    return proOnly.length > 0 ? proOnly : [SEEDANCE_1_5_PRO_MODEL_ID]
   }, [cfg?.arkVideoModels])
 
   /** 生成前门禁：按钮禁用原因（避免可点但点击后无反馈或清空提示） */
@@ -665,9 +669,10 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
           prompt: sanitizePromptForVideoModel(body.prompt),
           flags: opts?.flagsOverride ?? seedanceFlagsLine,
           images_base64: body.images_base64,
-          model: body.model ?? SEEDANCE_SERVER_AUTO,
-          // 商家短片台写死 Seedance：禁止自动落到千问 wan*
+          model: body.model?.trim() || SEEDANCE_1_5_PRO_MODEL_ID,
+          // 商家短片台写死 Seedance 1.5 Pro：禁止 hop / 千问
           skip_qwen: true,
+          lock_model: true,
         },
         poolModels: seedancePoolModels,
         shouldCancel: () => cancelRef.current,
@@ -1093,16 +1098,25 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     ]
       .filter(Boolean)
       .join('\n')
-    const fin = await finalizeShortVideoOutput(source, narrationSource, (text) => setProgress(text), {
-      targetDurationSec,
-      preferFullNarration: opts?.preferFullNarration,
-      productImageBase64: opts?.productImageBase64,
-      productStartSec: opts?.productStartSec,
-      productEndSec: opts?.productEndSec,
-      scriptRows: rowsForSub,
-      subtitleStyle: sdSubtitleStyle,
-      styleHintText,
-    })
+    const fin = await finalizeShortVideoOutput(
+      source,
+      narrationSource,
+      (text) => {
+        setProgress(text)
+        const jobId = videoJobIdRef.current
+        if (jobId) updateAiGenerationJob(jobId, { progress: text })
+      },
+      {
+        targetDurationSec,
+        preferFullNarration: opts?.preferFullNarration,
+        productImageBase64: opts?.productImageBase64,
+        productStartSec: opts?.productStartSec,
+        productEndSec: opts?.productEndSec,
+        scriptRows: rowsForSub,
+        subtitleStyle: sdSubtitleStyle,
+        styleHintText,
+      },
+    )
     if (!fin.ok) {
       setErr(fin.message)
       return false

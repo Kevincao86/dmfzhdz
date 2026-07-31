@@ -15,3 +15,5 @@ export const VIDEO_MODEL_DEFAULT_LABEL = '默认'
 export const KLING_DEFAULT_MODEL_ID = 'kling-v1-6'
 export const SEEDANCE_SERVER_AUTO = '__server_auto__'
 export const SEEDANCE_AUTO_LABEL = '自动（额度不足时切换）'
+/** 商家短片台写死：仅 Seedance 1.5 Pro（方舟 endpoint id） */
+export const SEEDANCE_1_5_PRO_MODEL_ID = 'doubao-seedance-1-5-pro-251215'

@@ -128,11 +128,33 @@ async function synthesizeShortVideoNarration(
   return { ok: true, blob: base64ToBlob(r.audioBase64, r.mimeType) }
 }
 
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => {
+      reject(new Error(`${label}超时（${Math.round(ms / 1000)}秒），已跳过以免卡住`))
+    }, ms)
+    p.then(
+      (v) => {
+        clearTimeout(t)
+        resolve(v)
+      },
+      (e) => {
+        clearTimeout(t)
+        reject(e)
+      },
+    )
+  })
+}
+
 async function muxNarrationPreferFullVideo(videoBlob: Blob, audioBlob: Blob): Promise<Blob> {
   try {
-    return await muxAudioWithVideoBlob(videoBlob, audioBlob)
+    return await withTimeout(muxAudioWithVideoBlob(videoBlob, audioBlob), 45_000, '浏览器混音')
   } catch {
-    return muxVideoAudioOnServer(videoBlob, audioBlob)
+    return withTimeout(
+      muxVideoAudioOnServer(videoBlob, audioBlob, { timeoutMs: 75_000 }),
+      80_000,
+      '服务端混音',
+    )
   }
 }
 
@@ -156,8 +178,16 @@ export async function finalizeShortVideoOutput(
   },
 ): Promise<{ ok: true; objectUrl: string; blob: Blob } | { ok: false; message: string }> {
   onProgress?.('下载 AI 视频…')
-  const videoBlob =
-    typeof source === 'string' ? await downloadVideoUrlAsBlob(source) : source
+  let videoBlob: Blob
+  try {
+    videoBlob =
+      typeof source === 'string'
+        ? await withTimeout(downloadVideoUrlAsBlob(source), 90_000, '下载成片')
+        : source
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : '下载成片失败'
+    return { ok: false, message: msg }
+  }
 
   const probedDur = await probeVideoDurationSec(videoBlob)
   const plannedDur =
@@ -188,17 +218,27 @@ export async function finalizeShortVideoOutput(
   const burnSubtitles = isValidShortVideoSubtitleScript(script) || rowsHaveDialogue
 
   onProgress?.('合成口播配音…')
-  const tts = allowTts
-    ? await synthesizeShortVideoNarration(script)
-    : ({ ok: false as const, message: '口播稿无效，跳过配音与字幕' })
+  let tts: { ok: true; blob: Blob } | { ok: false; message: string }
+  if (allowTts) {
+    try {
+      tts = await withTimeout(synthesizeShortVideoNarration(script), 60_000, '口播配音')
+    } catch (e) {
+      tts = { ok: false, message: e instanceof Error ? e.message : '口播配音失败' }
+    }
+  } else {
+    tts = { ok: false, message: '口播稿无效，跳过配音与字幕' }
+  }
   let merged = videoBlob
   if (tts.ok) {
     onProgress?.('混入口播音轨（口播优先，画面不足时延长末帧）…')
     try {
       merged = await muxNarrationPreferFullVideo(videoBlob, tts.blob)
     } catch (e) {
-      const msg = e instanceof Error ? e.message : '音视频合成失败'
-      return { ok: false, message: msg }
+      // 混音失败仍交付无声成片，避免卡在「合成口播」二十分钟
+      onProgress?.(
+        `混音跳过：${e instanceof Error ? e.message : '音视频合成失败'}，先交付画面`,
+      )
+      merged = videoBlob
     }
   } else {
     onProgress?.(`配音跳过：${tts.message}`)
@@ -233,7 +273,11 @@ export async function finalizeShortVideoOutput(
     styleHintText: [opts?.styleHintText, narrationSource, script, rowHint].filter(Boolean).join('\n'),
   })
 
-  if (srt.trim() || hasProductOverlay) {
+  // 超大成片 base64 上传极易卡死；跳过烧录仍可预览带口播版本
+  const tooHeavyForBurn = merged.size > 48 * 1024 * 1024
+  if ((srt.trim() || hasProductOverlay) && tooHeavyForBurn) {
+    onProgress?.('成片体积较大，已跳过字幕烧录以免长时间卡住（可预览带口播版本）')
+  } else if (srt.trim() || hasProductOverlay) {
     onProgress?.(
       hasProductOverlay && srt.trim()
         ? '烧录字幕并叠加产品特写…'
@@ -244,21 +288,29 @@ export async function finalizeShortVideoOutput(
             : `烧录中文字幕（${stylePick.label}${stylePick.auto ? '·自动' : ''}）…`,
     )
     try {
-      merged = await postProcessVideoOnServer(merged, {
-        srtContent: srt.trim() || undefined,
-        subtitleStyle: stylePick.styleId,
-        productImageBase64: hasProductOverlay ? productB64 : undefined,
-        productStartSec: hasProductOverlay ? opts?.productStartSec : undefined,
-        productEndSec: hasProductOverlay ? opts?.productEndSec : undefined,
-        minDurationSec: plannedDur > 0 ? plannedDur : opts?.targetDurationSec,
-      })
-    } catch {
-      /* 后处理失败仍返回带配音版本 */
+      merged = await withTimeout(
+        postProcessVideoOnServer(merged, {
+          srtContent: srt.trim() || undefined,
+          subtitleStyle: stylePick.styleId,
+          productImageBase64: hasProductOverlay ? productB64 : undefined,
+          productStartSec: hasProductOverlay ? opts?.productStartSec : undefined,
+          productEndSec: hasProductOverlay ? opts?.productEndSec : undefined,
+          minDurationSec: plannedDur > 0 ? plannedDur : opts?.targetDurationSec,
+          timeoutMs: 75_000,
+        }),
+        80_000,
+        '字幕烧录',
+      )
+    } catch (e) {
+      onProgress?.(
+        `字幕烧录跳过：${e instanceof Error ? e.message : '后处理失败'}，已保留当前成片`,
+      )
     }
   } else if (!burnSubtitles) {
     onProgress?.('已取消无效字幕烧录，保留画面清晰度')
   }
 
+  onProgress?.('成片已就绪')
   const objectUrl = URL.createObjectURL(merged)
   return { ok: true, objectUrl, blob: merged }
 }

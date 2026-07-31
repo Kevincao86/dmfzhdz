@@ -34,6 +34,8 @@ export type ShortVideoGenRequestBody = {
   prefer_quota_stable?: boolean
   /** 数字人口播：仅用火山/Seedance，额度不足时在豆包模型池内切换，禁止回退千问 */
   skip_qwen?: boolean
+  /** 商家短片：锁定 body.model，禁止多模型 hop */
+  lock_model?: boolean
   /**
    * 阶段 D：Wan/垂类 LoRA 挂载点（DiffSynth/musubi）。
    * 本轮仅类型预留，网关忽略；勿依赖此字段改变生成结果。
@@ -766,17 +768,23 @@ export async function concatVideoBlobsOnServer(
 }
 
 /** 服务端 ffmpeg 将 TTS 口播混入无声视频（浏览器 wasm 失败时兜底） */
-export async function muxVideoAudioOnServer(videoBlob: Blob, audioBlob: Blob): Promise<Blob> {
+export async function muxVideoAudioOnServer(
+  videoBlob: Blob,
+  audioBlob: Blob,
+  opts?: { timeoutMs?: number },
+): Promise<Blob> {
   const paths = [
     '/api/meoo-merchant-ai-video-mux-audio',
     '/api/merchant/ai/video/mux-audio',
   ] as const
+  const timeoutMs =
+    typeof opts?.timeoutMs === 'number' && opts.timeoutMs > 0 ? opts.timeoutMs : 300_000
   const body = {
     videoBase64: await blobToBase64(videoBlob),
     audioBase64: await blobToBase64(audioBlob),
   }
   for (const p of paths) {
-    const res = await fetchVideoPostBinary(p, body, 300_000)
+    const res = await fetchVideoPostBinary(p, body, timeoutMs)
     if (!res) continue
     if (!res.ok) {
       const j = await parseJsonSafe<{ message?: string }>(new Response(await res.text()))
@@ -805,12 +813,16 @@ export async function postProcessVideoOnServer(
     bgmUrl?: string
     bgmVolume?: number
     minDurationSec?: number
+    /** 短片请传短超时（如 75s），避免大文件 base64 上传卡死；数字人默认仍 300s */
+    timeoutMs?: number
   },
 ): Promise<Blob> {
   const paths = [
     '/api/meoo-merchant-ai-video-post-process',
     '/api/merchant/ai/video/post-process',
   ] as const
+  const timeoutMs =
+    typeof opts.timeoutMs === 'number' && opts.timeoutMs > 0 ? opts.timeoutMs : 300_000
   const body: Record<string, unknown> = {
     videoBase64: await blobToBase64(videoBlob),
   }
@@ -835,7 +847,7 @@ export async function postProcessVideoOnServer(
     body.minDurationSec = opts.minDurationSec
   }
   for (const p of paths) {
-    const res = await fetchVideoPostBinary(p, body, 300_000)
+    const res = await fetchVideoPostBinary(p, body, timeoutMs)
     if (!res) continue
     if (!res.ok) {
       const j = await parseJsonSafe<{ message?: string }>(new Response(await res.text()))
@@ -1424,19 +1436,22 @@ async function runShortVideoJobWithDurationInternal(
     Array.isArray(opts.body.images_base64) && opts.body.images_base64.some((x) => String(x).trim())
   const promptWithAspect = appendAspectToVideoPrompt(opts.body.prompt ?? '', opts.body.flags)
   const i2vMaxImages = parseI2vMaxImagesFromBody(opts.body)
+  const preferredModel = opts.body.model?.trim() || SEEDANCE_SERVER_AUTO
+  const lockToPreferred = opts.body.lock_model === true
   const apiBody = {
     ...opts.body,
     prompt: promptWithAspect,
-    model: SEEDANCE_SERVER_AUTO,
+    model: preferredModel,
     images_base64: clampI2vImagesForApi(opts.body.images_base64, i2vMaxImages),
   }
   const tryPlan = buildVideoDurationMatchedTryPlan({
     durationSec,
     hasImages,
     poolModels: opts.poolModels ?? [],
-    preferred: SEEDANCE_SERVER_AUTO,
+    preferred: preferredModel,
     preferQuotaStable: opts.body.prefer_quota_stable === true,
     skipQwen: opts.body.skip_qwen === true || opts.engine === 'seedance',
+    lockToPreferred,
   })
   if (opts.engine === 'qwen' && !opts.body.skip_qwen) {
     const qwenFirst = [

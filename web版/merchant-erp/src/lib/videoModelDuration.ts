@@ -197,6 +197,8 @@ export function buildVideoDurationMatchedTryPlan(input: {
   preferQuotaStable?: boolean
   /** 数字人口播：仅用火山/Seedance，禁止千问步骤与服务端千问回退 */
   skipQwen?: boolean
+  /** 商家短片台：只跑已选模型，禁止多模型 hop 拖成二十分钟 */
+  lockToPreferred?: boolean
 }): VideoTryStep[] {
   const mode: VideoGenMode = input.hasImages ? 'i2v' : 't2v'
   const dur = Math.round(input.durationSec)
@@ -212,6 +214,17 @@ export function buildVideoDurationMatchedTryPlan(input: {
     if (!videoModelSupportsDuration(id, dur, mode)) return
     seen.add(`ark:${id}`)
     steps.push({ model: id, label: label ?? id })
+  }
+
+  if (input.lockToPreferred && preferred && preferred !== SEEDANCE_SERVER_AUTO) {
+    pushArk(preferred, '固定 Seedance 1.5 Pro')
+    if (steps.length === 0) {
+      const id = normalizeArkVideoModelParam(preferred.trim())
+      if (id && id !== SEEDANCE_SERVER_AUTO) {
+        steps.push({ model: id, label: '固定 Seedance 1.5 Pro' })
+      }
+    }
+    return steps
   }
 
   const pushQwen = (raw: string, label?: string) => {
