@@ -728,7 +728,7 @@ export default function AiImageStudioPage() {
 
         // 五连图必须整幅超宽横图（单张宽×5），再用 wanxSize；不可强制 16:9 / GPT Image（非超宽）
         setProgress(
-          `${ch.short} · 五连图整幅横图生成中（${masterGen.wanxSize} · 单张 ${masterGen.slideSpec.slideWidth}×${masterGen.slideSpec.slideHeight}）`,
+          `${ch.short} · 整幅海报生成中（目标 ${masterGen.slideSpec.masterWidth}×${masterGen.slideSpec.masterHeight} · API ${masterGen.wanxSize}）`,
         )
         const out = await postAiAgentNativeImage(prompt, {
           exactPrompt: true,
@@ -1081,8 +1081,8 @@ export default function AiImageStudioPage() {
             </label>
             {isPlatformSeries && (
               <p className="mt-2 text-[10px] leading-relaxed text-orange-700/90">
-                五连图：每平台先生成 1 张完整横版大图，再等宽等高裁成 5 张（抖音
-                1125×480 / 美团 750×400 / 快手 750×422）；详情图：三端各出 5 段竖图。
+                五连图：先按整幅尺寸生成完整海报再等分裁 5 张（美团 5000×750 / 抖音
+                5625×633 / 快手 3750×422）；详情图：三端各出 5 段竖图。
               </p>
             )}
           </StudioPanel>
@@ -1108,7 +1108,7 @@ export default function AiImageStudioPage() {
                   <div>
                     <p className="text-sm font-semibold text-slate-900">五连图</p>
                     <p className="text-[11px] text-slate-500">
-                      先整幅横图 → 等分裁 5 张（抖音/美团单张尺寸不同）
+                      美团 5000×750 / 抖音 5625×633 整幅生成 → 等分裁 5 张
                     </p>
                   </div>
                 </div>
