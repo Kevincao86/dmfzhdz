@@ -152,10 +152,13 @@ async function storyFrameFileToImageDataUrl(f: File): Promise<string> {
 }
 /** 短视频生成固定 Seedance */
 const VIDEO_ENGINE = 'seedance' as const
-const POLL_MS_SD = 5000
+/** 短片轮询 2.5s，配合服务端更快发现完成/排队卡住 */
+const POLL_MS_SD = 2500
 const LONGFORM_DEFAULT_SEGMENT_SEC = LONGFORM_SEGMENT_UNIT_SEC
 const LONGFORM_DEFAULT_TARGET_TOTAL_SEC = 60
 const LONGFORM_MAX_TARGET_TOTAL_SEC = 60
+/** ≤15s 画布分镜优先单次 Seedance，避免 3 段串行 + 尾帧衔接拖到半小时 */
+const SINGLE_SHOT_MAX_TOTAL_SEC = 15
 
 const LONGFORM_TARGET_TOTAL_OPTIONS = [60, 45, 30, 15] as const
 
@@ -172,6 +175,13 @@ function snapLongformTargetTotalSec(
     if (approx <= opt) return opt
   }
   return LONGFORM_MAX_TARGET_TOTAL_SEC
+}
+
+function snapSeedanceDurationSec(sec: number): 5 | 10 | 15 {
+  const n = Math.max(5, Math.round(sec) || 5)
+  if (n <= 5) return 5
+  if (n <= 10) return 10
+  return 15
 }
 
 const PLANNER_VENDOR_DISPLAY: Record<string, string> = {
@@ -381,17 +391,36 @@ async function resolveSegmentTailFrameBase64(
   const url = String(prevVideoUrl || '').trim()
   if (!url) throw new Error('缺少上一段视频地址')
 
-  const serverFrame = await postVideoLastFrameFromUrl(url, { onProgress })
-  if (serverFrame.ok) return serverFrame.pureBase64
-
-  onProgress?.(`服务端截帧失败（${serverFrame.message}），改为下载后本地截取…`)
-  const blob = await downloadVideoUrlAsBlob(url, {
-    maxAttempts: 3,
-    onRetry: (attempt, maxAttempts, message) =>
-      onProgress?.(`下载上一段成片… 重试 ${attempt}/${maxAttempts}（${message}）`),
+  onProgress?.('截取上一段尾帧（服务端/本地竞速）…')
+  const serverPromise = postVideoLastFrameFromUrl(url, {
+    onProgress,
+    timeoutMs: 20_000,
+  }).then((r) => {
+    if (!r.ok) throw new Error(r.message)
+    return r.pureBase64
   })
-  onProgress?.('本地截取尾帧…')
-  return extractVideoLastFramePureBase64(blob)
+
+  const localPromise = (async () => {
+    const blob = await downloadVideoUrlAsBlob(url, {
+      maxAttempts: 2,
+      onRetry: (attempt, maxAttempts, message) =>
+        onProgress?.(`下载上一段成片… 重试 ${attempt}/${maxAttempts}（${message}）`),
+    })
+    onProgress?.('本地截取尾帧…')
+    return extractVideoLastFramePureBase64(blob)
+  })()
+
+  try {
+    return await Promise.any([serverPromise, localPromise])
+  } catch {
+    // Promise.any 在全部失败时抛 AggregateError
+    const serverFrame = await postVideoLastFrameFromUrl(url, { onProgress, timeoutMs: 15_000 }).catch(
+      () => null,
+    )
+    if (serverFrame && serverFrame.ok) return serverFrame.pureBase64
+    const blob = await downloadVideoUrlAsBlob(url, { maxAttempts: 2 })
+    return extractVideoLastFramePureBase64(blob)
+  }
 }
 
 export default function ShortVideoOptimizationPage({ embed = false }: { embed?: boolean }) {
@@ -642,7 +671,13 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
         },
         poolModels: seedancePoolModels,
         shouldCancel: () => cancelRef.current,
-        onProgress: opts?.onProgress ?? ((text) => setProgress(text)),
+        onProgress:
+          opts?.onProgress ??
+          ((text) => {
+            setProgress(text)
+            const jobId = videoJobIdRef.current
+            if (jobId) updateAiGenerationJob(jobId, { progress: text })
+          }),
         pollIntervalMs: POLL_MS_SD,
         allowAutoHalveDuration: opts?.allowAutoHalveDuration,
       })
@@ -1114,6 +1149,11 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     let halvedOnce = false
     let planNarrationScript = ''
     const segmentActualDurations: number[] = []
+    const report = (msg: string) => {
+      setProgress(msg)
+      const jobId = videoJobIdRef.current
+      if (jobId) updateAiGenerationJob(jobId, { progress: msg })
+    }
 
     const loadPlan = async () => {
       const plan = await input.fetchPlan(targetTotalSec, activeSegmentSec, segmentCountHint)
@@ -1168,12 +1208,12 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
           segmentActualDurations.reduce((sum, d) => sum + d, 0),
         ),
       )
-      setProgress(`长视频 ${i + 1}/${planPrompts.length} · ${segDur}秒 · 生成中…`)
+      report(`长视频 ${i + 1}/${planPrompts.length} · ${segDur}秒 · 生成中…`)
 
       let images: string[] | undefined
       try {
         if (i > 0 && prevVideoUrl) {
-          setProgress(`长视频 ${i + 1}/${planPrompts.length} · 截取上一段尾帧…`)
+          report(`长视频 ${i + 1}/${planPrompts.length} · 截取上一段尾帧…`)
         }
         images = await input.resolveImages(i, prevVideoUrl)
       } catch (e) {
@@ -1190,7 +1230,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       })
 
       const segmentProgress = (detail: string) =>
-        setProgress(`长视频 ${i + 1}/${planPrompts.length} · ${segDur}秒 · ${detail}`)
+        report(`长视频 ${i + 1}/${planPrompts.length} · ${segDur}秒 · ${detail}`)
 
       segmentProgress('提交任务…')
 
@@ -1326,7 +1366,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
         targetTotalSec,
         estimatedTotalSec,
       )
-      setProgress(
+      report(
         `实际时长约 ${Math.round(estimatedTotalSec)} 秒，未达目标 ${targetTotalSec} 秒，追加衔接段 ${segIdx + 1}（${tailDur} 秒）…`,
       )
       const flags = buildSeedanceFlagsLine({
@@ -1341,7 +1381,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       )
       let tailImages: string[] | undefined
       try {
-        const b = await resolveSegmentTailFrameBase64(prevVideoUrl, (msg) => setProgress(msg))
+        const b = await resolveSegmentTailFrameBase64(prevVideoUrl, (msg) => report(msg))
         tailImages = [`data:image/jpeg;base64,${b}`]
       } catch (e) {
         setHint(
@@ -1356,7 +1396,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
           flagsOverride: flags,
           allowAutoHalveDuration: false,
           onProgress: (detail) =>
-            setProgress(`衔接段 ${segIdx + 1} · ${activeSegmentSec}秒 · ${detail}`),
+            report(`衔接段 ${segIdx + 1} · ${activeSegmentSec}秒 · ${detail}`),
         },
       )
       if (!extra.ok) {
@@ -1376,22 +1416,22 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     }
 
     if (cancelRef.current || segmentUrls.length === 0) return
-    setProgress(`正在云端拼接 ${segmentUrls.length} 段成片…`)
+    report(`正在云端拼接 ${segmentUrls.length} 段成片…`)
     try {
       let final: Blob
       try {
         final = await concatVideoUrlsOnServer(segmentUrls, { ratio: sdAspect, fps: sdFps })
       } catch (concatErr) {
         const concatMsg = concatErr instanceof Error ? concatErr.message : '云端拼接失败'
-        setProgress(`云端拼接不可用（${concatMsg}），改为下载后本地拼接…`)
+        report(`云端拼接不可用（${concatMsg}），改为下载后本地拼接…`)
         const blobs: Blob[] = []
         for (let si = 0; si < segmentUrls.length; si++) {
           if (cancelRef.current) return
-          setProgress(`下载片段 ${si + 1}/${segmentUrls.length}…`)
+          report(`下载片段 ${si + 1}/${segmentUrls.length}…`)
           blobs.push(
             await downloadVideoUrlAsBlob(segmentUrls[si]!, {
               onRetry: (attempt, maxAttempts) =>
-                setProgress(`下载片段 ${si + 1}/${segmentUrls.length}… 重试 ${attempt}/${maxAttempts}`),
+                report(`下载片段 ${si + 1}/${segmentUrls.length}… 重试 ${attempt}/${maxAttempts}`),
             }),
           )
         }
@@ -1401,7 +1441,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
           final = await concatVideoSegmentsToMp4(blobs, { ratio: sdAspect, fps: sdFps })
         }
       }
-      setProgress('合成口播配音与中文字幕…')
+      report('合成口播配音与中文字幕…')
       const planNarr = planNarrationScript.trim()
       const narration = planNarr
         ? finalizeNarrationScript(planNarr, targetTotalSec)
@@ -1654,10 +1694,69 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
         }
         return
       }
-      trackProgress('排队中……')
       try {
         const end = maxScriptTimeRangeEndSec(workingScriptRows)
         const targetOverride = snapLongformTargetTotalSec(end, workingScriptRows.length)
+        const targetTotal = longformEnabled ? longformTargetTotalSec : targetOverride
+        /**
+         * 快路径：≤15s 且分镜已齐 → 单次 Seedance（约 2～3 分钟），
+         * 避免「5s×3 + 尾帧衔接」串行卡在排队/截帧半小时。
+         * 勾选长视频且目标 >15s 仍走分段。
+         */
+        const preferSingleShot =
+          scriptUsable &&
+          targetTotal <= SINGLE_SHOT_MAX_TOTAL_SEC &&
+          workingScriptRows.length >= 2 &&
+          workingScriptRows.length <= 6 &&
+          !(longformEnabled && longformTargetTotalSec > SINGLE_SHOT_MAX_TOTAL_SEC)
+
+        if (preferSingleShot) {
+          const shotSec = snapSeedanceDurationSec(targetTotal)
+          trackProgress(`单次生成 ${shotSec} 秒短片（快路径）…`)
+          const shotPrompt = withVideoMotionPrompt(
+            [
+              scriptRowsToOverallPrompt(workingScriptRows),
+              `【成片】一条连贯竖屏短片约 ${shotSec} 秒，按时段叙事，镜头连续平滑，禁止幻灯片硬切。`,
+            ].join('\n'),
+          )
+          const shotImages =
+            genMode === 'frames' && imgs.length > 0 ? [imgs[0]!] : undefined
+          const flags = buildSeedanceFlagsLine({
+            durationSec: shotSec,
+            fps: sdFps,
+            aspect: sdAspect,
+            watermark: sdWatermark,
+            resolution: sdResolution,
+          })
+          const r = await runShortVideo(
+            { prompt: shotPrompt, images_base64: shotImages },
+            {
+              resetCancel: false,
+              flagsOverride: flags,
+              allowAutoHalveDuration: true,
+              onProgress: trackProgress,
+            },
+          )
+          if (!r.ok) {
+            finishVideoJob(false, formatVideoAiUserError(r.message))
+            setErr(formatVideoAiUserError(r.message))
+            return
+          }
+          if (r.modelUsed) setHint(`已使用视频模型：${r.modelUsed}（单次快路径）`)
+          trackProgress('合成口播配音与中文字幕…')
+          const narration = await resolveNarrationForFinalVideo(
+            workingScriptRows
+              .map((row) => row.dialogue.trim())
+              .filter((d) => d.length >= 2 && !/待填|^[-—–.]+$/.test(d))
+              .join('。') || txt,
+            shotSec,
+          )
+          const ok = await commitFinalVideo(r.videoUrl, narration, shotSec)
+          finishVideoJob(ok, ok ? undefined : '成片合成失败')
+          return
+        }
+
+        trackProgress('分段生成中…')
         await runLongformGenerate({
           targetTotalSecOverride: longformEnabled ? undefined : targetOverride,
           segmentSecOverride: longformEnabled

@@ -343,7 +343,8 @@ const VIDEO_SEEDANCE_START_TIMEOUT_MS = 240_000
 const VIDEO_LONGFORM_PLAN_TIMEOUT_MS = 180_000
 /** 经服务端代理拉取火山/千问 CDN 成片；须 ≥ 轻量 Nginx proxy_read_timeout（180s） */
 const VIDEO_SEGMENT_DOWNLOAD_TIMEOUT_MS = 180_000
-const VIDEO_LAST_FRAME_TIMEOUT_MS = 180_000
+/** 尾帧截取：过长会拖死多段衔接；失败由调用方改本地截帧 */
+const VIDEO_LAST_FRAME_TIMEOUT_MS = 25_000
 const VIDEO_CONCAT_TIMEOUT_MS = 600_000
 const VIDEO_CONFIG_TIMEOUT_MS = 25_000
 
@@ -921,7 +922,13 @@ export async function downloadVideoUrlAsBlob(
 /** 服务端 ffmpeg 截取远程视频采样帧（opening/last/atSec） */
 export async function postVideoLastFrameFromUrl(
   url: string,
-  opts?: { onProgress?: (msg: string) => void; frame?: 'opening' | 'last'; atSec?: number },
+  opts?: {
+    onProgress?: (msg: string) => void
+    frame?: 'opening' | 'last'
+    atSec?: number
+    /** 覆盖默认尾帧超时（毫秒） */
+    timeoutMs?: number
+  },
 ): Promise<{ ok: true; pureBase64: string } | { ok: false; message: string }> {
   const trimmed = url.trim()
   if (!trimmed) return { ok: false, message: '缺少视频 URL' }
@@ -931,6 +938,10 @@ export async function postVideoLastFrameFromUrl(
   ] as const
   const atSec = opts?.atSec != null && Number.isFinite(Number(opts.atSec)) ? Number(opts.atSec) : undefined
   const frame = atSec != null ? undefined : opts?.frame === 'opening' ? 'opening' : 'last'
+  const timeoutMs =
+    typeof opts?.timeoutMs === 'number' && opts.timeoutMs > 0
+      ? opts.timeoutMs
+      : VIDEO_LAST_FRAME_TIMEOUT_MS
   let lastErr = '尾帧截取接口未部署或不可达'
   for (const p of paths) {
     opts?.onProgress?.(
@@ -943,7 +954,7 @@ export async function postVideoLastFrameFromUrl(
     const body: Record<string, unknown> = { url: trimmed }
     if (atSec != null) body.atSec = atSec
     else body.frame = frame
-    const res = await fetchVideoPost(p, body, VIDEO_LAST_FRAME_TIMEOUT_MS)
+    const res = await fetchVideoPost(p, body, timeoutMs)
     if (!res) continue
     const j = (await parseJsonSafe<Record<string, unknown>>(res)) ?? {}
     if (!res.ok || !j.ok) {
@@ -1219,12 +1230,16 @@ export async function fetchSeedanceVideoStatus(
   return { ok: false, message: 'Seedance/方舟查询失败 HTTP 404' }
 }
 
-const DEFAULT_POLL_MS = 5000
+const DEFAULT_POLL_MS = 2500
 
-/** 按视频时长估算轮询上限（5 秒片约 8 分钟，10 秒片约 15 分钟） */
+/**
+ * 按视频时长估算轮询上限。
+ * 短片（≤15s）目标总等待约 3～4 分钟，超时尽快换模；长片仍放宽。
+ */
 export function pollMaxTriesForVideoDuration(durationSec: number, pollIntervalMs = DEFAULT_POLL_MS): number {
   const sec = Math.max(3, Math.round(durationSec))
-  const maxWaitMs = sec <= 5 ? 8 * 60_000 : 15 * 60_000
+  const maxWaitMs =
+    sec <= 5 ? 3 * 60_000 : sec <= 15 ? 4 * 60_000 : sec <= 30 ? 8 * 60_000 : 12 * 60_000
   return Math.max(24, Math.ceil(maxWaitMs / Math.max(1000, pollIntervalMs)))
 }
 
@@ -1251,9 +1266,10 @@ export async function pollShortVideoTask(
   let queuedSince: number | null = null
   let runningSince: number | null = null
   let finalizeSince: number | null = null
-  const queuedStallMs = 3 * 60_000
-  const runningStallMs = dur <= 5 ? 10 * 60_000 : 18 * 60_000
-  const finalizeStallMs = 2 * 60_000
+  /** 短片排队超过约 45s 即换模，避免卡在「排队中」半小时 */
+  const queuedStallMs = dur <= 15 ? 45_000 : 90_000
+  const runningStallMs = dur <= 5 ? 3 * 60_000 : dur <= 15 ? 4 * 60_000 : 10 * 60_000
+  const finalizeStallMs = 90_000
 
   opts?.onProgress?.('已提交，等待云端生成…')
 
