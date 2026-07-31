@@ -1892,7 +1892,7 @@ export default function AiImageStudioPage() {
             {imageTier === 'pro' && isCarouselFive && (
               <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
                 高级三连图：GPT Image 2 最长边比≤3:1，抖音目标更扁，系统会上下等比例居中裁后再等分
-                3 张；文案要求上下各约 12% 留白、文字落在中部安全带，避免贴边被裁。约数十秒，轮询约
+                3 张；文案要求上下各约 15% 留白、文字落在中部安全带，避免贴边被裁。约数十秒，轮询约
                 1～3 分钟；超过 5 分钟请点「停止」后重试。不会回退万相。
               </p>
             )}
