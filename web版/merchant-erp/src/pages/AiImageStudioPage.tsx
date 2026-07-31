@@ -388,34 +388,40 @@ export default function AiImageStudioPage() {
     copyAbortRef.current?.abort()
     const ac = new AbortController()
     copyAbortRef.current = ac
-    if (opts?.billable) {
-      const afford = await checkVisualStudioCopyAffordable()
-      if (!afford.ok) {
-        setCopyAiHint(afford.message)
-        return
-      }
-    }
     setCopyAiBusy(true)
     setCopyAiHint(null)
-    const r = await fetchVisualStudioCopyFromAi(snapshot, { signal: ac.signal })
-    if (ac.signal.aborted) return
-    setCopyAiBusy(false)
-    copyAbortRef.current = null
-    if (r.ok) {
-      setCopyOptions(r.items)
-      if (r.source === 'ai' && opts?.billable) {
-        const spendKey = `vs-copy-${snapshot.playbook}-${snapshot.industry}-${Date.now()}`
-        void spendVisualStudioCopyPoints({
-          idempotencyKey: spendKey,
-          note: snapshot.storeName.trim() || resolvePlaybook(snapshot.playbook).label,
-        })
+    try {
+      if (opts?.billable) {
+        const afford = await checkVisualStudioCopyAffordable()
+        if (copyAbortRef.current !== ac) return
+        if (!afford.ok) {
+          setCopyAiHint(afford.message)
+          return
+        }
       }
-      setCopyAiHint(r.source === 'ai' ? '已由 AI 模型生成文案' : null)
-      return
-    }
-    if (r.message !== '已取消') {
-      setCopyOptions(r.fallback)
-      setCopyAiHint(r.message)
+      const r = await fetchVisualStudioCopyFromAi(snapshot, { signal: ac.signal })
+      if (copyAbortRef.current !== ac) return
+      if (r.ok) {
+        setCopyOptions(r.items)
+        if (r.source === 'ai' && opts?.billable) {
+          const spendKey = `vs-copy-${snapshot.playbook}-${snapshot.industry}-${Date.now()}`
+          void spendVisualStudioCopyPoints({
+            idempotencyKey: spendKey,
+            note: snapshot.storeName.trim() || resolvePlaybook(snapshot.playbook).label,
+          })
+        }
+        setCopyAiHint(r.source === 'ai' ? '已由 AI 模型生成文案' : null)
+        return
+      }
+      if (r.message !== '已取消') {
+        setCopyOptions(r.fallback)
+        setCopyAiHint(r.message)
+      }
+    } finally {
+      if (copyAbortRef.current === ac) {
+        setCopyAiBusy(false)
+        copyAbortRef.current = null
+      }
     }
   }, [])
 
@@ -540,21 +546,26 @@ export default function AiImageStudioPage() {
     keywordsAbortRef.current = ac
     setKeywordsAiBusy(true)
     setKeywordsAiHint(null)
-    const r = await fetchVisualStudioReferenceKeywordsFromAi(form, {
-      signal: ac.signal,
-      referenceAnalysis,
-    })
-    if (ac.signal.aborted) return
-    setKeywordsAiBusy(false)
-    keywordsAbortRef.current = null
-    if (r.ok) {
-      patchForm({ referenceKeywords: r.keywords })
-      setKeywordsAiHint(r.source === 'ai' ? '已由 AI 生成参考关键词，可继续手改' : '已用本地规则生成，可继续手改')
-      return
-    }
-    if (r.message !== '已取消') {
-      patchForm({ referenceKeywords: r.fallback })
-      setKeywordsAiHint(r.message)
+    try {
+      const r = await fetchVisualStudioReferenceKeywordsFromAi(form, {
+        signal: ac.signal,
+        referenceAnalysis,
+      })
+      if (keywordsAbortRef.current !== ac) return
+      if (r.ok) {
+        patchForm({ referenceKeywords: r.keywords })
+        setKeywordsAiHint(r.source === 'ai' ? '已由 AI 生成参考关键词，可继续手改' : '已用本地规则生成，可继续手改')
+        return
+      }
+      if (r.message !== '已取消') {
+        patchForm({ referenceKeywords: r.fallback })
+        setKeywordsAiHint(r.message)
+      }
+    } finally {
+      if (keywordsAbortRef.current === ac) {
+        setKeywordsAiBusy(false)
+        keywordsAbortRef.current = null
+      }
     }
   }, [form, referenceAnalysis, patchForm])
 
