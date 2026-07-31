@@ -347,7 +347,7 @@ export function platformCarouselMasterGenSize(channelId: PublishChannelId): {
 
 /**
  * 三连图 · GPT Image 2：平台目标偶有 >3:1（如抖音 3375×633），
- * 在模型约束内取最大可用横图，再偏顶裁到目标比例并等分 3 张。
+ * 在模型约束内取最大可用横图，再上下居中裁到目标比例并等分 3 张。
  */
 export function platformCarouselMasterGptSize(channelId: PublishChannelId): {
   wanxSize: string
@@ -383,7 +383,7 @@ export function buildCarouselFiveMasterPromptExtra(
   channelId: PublishChannelId,
   form?: Pick<VisualStudioForm, 'offer' | 'subheadline' | 'headline' | 'storeName' | 'note'>,
   opts?: {
-    /** GPT≤3:1 / 万相≤4:1 时，目标平台更扁，事后会偏顶裁（上少下多） */
+    /** GPT≤3:1 / 万相≤4:1 时，目标平台更扁，事后会上下等比例居中裁 */
     aspectClamped?: boolean
     engine?: 'gpt' | 'wanx'
   },
@@ -408,13 +408,13 @@ export function buildCarouselFiveMasterPromptExtra(
     `左/中/右约各 1/${slots} 应是同一空间的不同景别（不同座位、通道或人物位置），不要三张相同海报并排。`,
     aspectClamped
       ? isGpt
-        ? '【防裁切·必遵】模型最长边比≤3:1，生成后会从下方多裁、上方少裁成更扁横幅。主标题距顶边至少约 8%～12% 画高且须完整可见；副标题/价格/图标放在上半区偏中（约垂直 15%～55%），禁止贴顶贴底放大字；底边只留场景延伸。'
-        : '【防裁切·必遵】生成后会从下方多裁、上方少裁：主标题勿贴顶，留约 8% 顶边空白；价格/图标放上半区，勿贴底。'
-      : '标题等中文文案整幅最多出现一处；上下边缘留出少量安全留白，勿贴边裁切。',
+        ? '【防裁切·必遵】模型最长边比≤3:1，生成后会上下等比例居中裁成更扁横幅。上下边缘各约 12% 画高为危险区（只留场景延伸）；主标题、副标题、价格、图标与说明文字必须完整落在垂直中间约 76% 安全带内，禁止贴顶或贴底放大字。'
+        : '【防裁切·必遵】生成后会上下等比例居中裁：上下各留约 12% 勿放文字；标题/价格/图标全部放在垂直中部安全带。'
+      : '标题等中文文案整幅最多出现一处；上下边缘各留约 12% 安全留白，勿贴边裁切。',
     '标题等中文文案整幅最多出现一处；不要在画面写系统标签或编号。' +
       (allowedText.length ? `可用文案：${allowedText.join('；')}。` : '无已填文案时以场景为主、少放大字。'),
     hasOffer
-      ? '可将已填优惠自然放在画面中部一处（勿贴上下边）。'
+      ? '可将已填优惠自然放在画面中部一处（距上下边各至少约 12% 画高）。'
       : '未填价格时不要自创价格与折扣文案。',
     hasSub ? '' : '未填副标题时不要编造卖点列表。',
     `生成后会等宽裁成 ${slots} 张（${slotNums}），单张 ${spec.slideWidth}×${spec.slideHeight}。`,
