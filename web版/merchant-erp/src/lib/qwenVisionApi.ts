@@ -24,59 +24,135 @@ const WANX_SIZE_MIN_SIDE = 768
 const WANX_SIZE_MAX_SIDE = 4096
 const WANX_SIZE_MAX_ASPECT = 4
 
+/** wan2.2 及更早：单边必须在 512～1440（否则报 Either width or height should be between 512 and 1440） */
+const WANX_LEGACY_MIN_SIDE = 512
+const WANX_LEGACY_MAX_SIDE = 1440
+
+function snapSide(n: number, min: number, max: number): number {
+  const snapped = Math.floor(n / 16) * 16
+  return Math.max(min, Math.min(max, snapped))
+}
+
+function parseWanxWh(raw?: string): { w: number; h: number } | null {
+  const t = String(raw ?? '').trim()
+  if (!t || /^(1k|2k|4k)$/i.test(t)) return null
+  const m = /^(\d{3,5})\s*[*×x]\s*(\d{3,5})$/i.exec(t)
+  if (!m) return null
+  return {
+    w: Math.max(1, Math.round(Number(m[1]) || 1024)),
+    h: Math.max(1, Math.round(Number(m[2]) || 1024)),
+  }
+}
+
+function fitWanxWhToBounds(
+  w0: number,
+  h0: number,
+  minSide: number,
+  maxSide: number,
+  maxAspect: number,
+): { w: number; h: number } {
+  let w = w0
+  let h = h0
+
+  if (h > w && h / w > maxAspect + 0.001) {
+    const tmp = w
+    w = h
+    h = tmp
+  }
+  if (w / h > maxAspect + 0.001) h = Math.max(1, Math.round(w / maxAspect))
+  else if (h / w > maxAspect + 0.001) w = Math.max(1, Math.round(h / maxAspect))
+
+  if (Math.max(w, h) > maxSide) {
+    const s = maxSide / Math.max(w, h)
+    w = Math.max(1, Math.round(w * s))
+    h = Math.max(1, Math.round(h * s))
+  }
+  if (Math.min(w, h) < minSide) {
+    const s = minSide / Math.min(w, h)
+    w = Math.max(1, Math.round(w * s))
+    h = Math.max(1, Math.round(h * s))
+  }
+
+  w = snapSide(w, minSide, maxSide)
+  h = snapSide(h, minSide, maxSide)
+
+  if (w / h > maxAspect + 0.001) h = snapSide(Math.round(w / maxAspect), minSide, maxSide)
+  else if (h / w > maxAspect + 0.001) w = snapSide(Math.round(h / maxAspect), minSide, maxSide)
+
+  // 再保证不越界：抬短边后若长边超限则等比缩小
+  if (Math.max(w, h) > maxSide) {
+    const s = maxSide / Math.max(w, h)
+    w = snapSide(Math.round(w * s), minSide, maxSide)
+    h = snapSide(Math.round(h * s), minSide, maxSide)
+  }
+  return { w, h }
+}
+
 /**
  * 规范化万相 size：
  * - 支持 1K/2K/4K 或 `宽*高`
  * - 纠正「超宽横幅被对调成竖条」的 461×4096 类非法尺寸
  * - 钳制到最长边比 ≤4:1，避免 Aspect ratio must be between 1:4 and 4:1
+ * - 默认按 wan2.7 约束（768～4096）
  */
 export function normalizeWan27ImageSizeParam(raw?: string): string {
   const t = String(raw ?? '').trim()
   if (!t) return '2K'
   if (/^(1k|2k|4k)$/i.test(t)) return t.toUpperCase()
-  const m = /^(\d{3,5})\s*[*×x]\s*(\d{3,5})$/i.exec(t)
-  if (!m) return '2K'
+  const parsed = parseWanxWh(t)
+  if (!parsed) return '2K'
+  const { w, h } = fitWanxWhToBounds(parsed.w, parsed.h, WANX_SIZE_MIN_SIDE, WANX_SIZE_MAX_SIDE, WANX_SIZE_MAX_ASPECT)
+  return `${w}*${h}`
+}
 
-  let w = Math.max(1, Math.round(Number(m[1]) || 1024))
-  let h = Math.max(1, Math.round(Number(m[2]) || 1024))
+/**
+ * 按具体万相/wan2.x 模型约束规范化 size。
+ * - wan2.7 / wan2.6-image：768～4096（或 1K/2K/4K）
+ * - wan2.5：总像素约 1280²～1440²，单边尽量 ≤1440
+ * - wan2.2 及更早 / wanx*：单边必须 512～1440（否则上游 Common/512-1440 拒单）
+ */
+export function normalizeWanImageSizeForModel(raw: string | undefined, modelId: string): string {
+  const m = modelId.trim().toLowerCase()
+  const t = String(raw ?? '').trim()
 
-  // 超高竖条（常见于超宽五连图被对调）：先还原为横图再钳比例
-  if (h > w && h / w > WANX_SIZE_MAX_ASPECT + 0.001) {
-    const tmp = w
-    w = h
-    h = tmp
+  if (isWan27MultimodalImageModel(modelId) || /^wan2\.7/.test(m)) {
+    return normalizeWan27ImageSizeParam(t || '2K')
   }
 
-  if (w / h > WANX_SIZE_MAX_ASPECT + 0.001) {
-    h = Math.max(1, Math.round(w / WANX_SIZE_MAX_ASPECT))
-  } else if (h / w > WANX_SIZE_MAX_ASPECT + 0.001) {
-    w = Math.max(1, Math.round(h / WANX_SIZE_MAX_ASPECT))
+  // wan2.5：总像素夹在 1280²～1440²，比例 ≤4:1
+  if (/^wan2\.5/.test(m)) {
+    if (/^(1k|2k|4k)$/i.test(t)) return '1280*1280'
+    const parsed = parseWanxWh(t) ?? { w: 1280, h: 1280 }
+    let { w, h } = fitWanxWhToBounds(parsed.w, parsed.h, 512, WANX_LEGACY_MAX_SIDE, WANX_SIZE_MAX_ASPECT)
+    const minPx = 1280 * 1280
+    const maxPx = 1440 * 1440
+    if (w * h < minPx) {
+      const s = Math.sqrt(minPx / (w * h))
+      w = Math.round(w * s)
+      h = Math.round(h * s)
+      ;({ w, h } = fitWanxWhToBounds(w, h, 512, WANX_LEGACY_MAX_SIDE, WANX_SIZE_MAX_ASPECT))
+    }
+    if (w * h > maxPx) {
+      const s = Math.sqrt(maxPx / (w * h))
+      w = Math.round(w * s)
+      h = Math.round(h * s)
+      ;({ w, h } = fitWanxWhToBounds(w, h, 512, WANX_LEGACY_MAX_SIDE, WANX_SIZE_MAX_ASPECT))
+    }
+    return `${w}*${h}`
   }
 
-  if (Math.max(w, h) > WANX_SIZE_MAX_SIDE) {
-    const s = WANX_SIZE_MAX_SIDE / Math.max(w, h)
-    w = Math.max(1, Math.round(w * s))
-    h = Math.max(1, Math.round(h * s))
+  // wan2.2 / wan2.1 / wanx* 等：硬限制单边 512～1440
+  if (/^(1k|2k|4k)$/i.test(t)) {
+    return t.toUpperCase() === '1K' ? '1024*1024' : '1440*1440'
   }
-  if (Math.min(w, h) < WANX_SIZE_MIN_SIDE) {
-    const s = WANX_SIZE_MIN_SIDE / Math.min(w, h)
-    w = Math.max(1, Math.round(w * s))
-    h = Math.max(1, Math.round(h * s))
-  }
-
-  w = Math.max(WANX_SIZE_MIN_SIDE, Math.min(WANX_SIZE_MAX_SIDE, w))
-  h = Math.max(WANX_SIZE_MIN_SIDE, Math.min(WANX_SIZE_MAX_SIDE, h))
-
-  // 对齐 16 像素，降低 wan2.x 对非对齐尺寸返回 Common error 的概率
-  w = Math.max(WANX_SIZE_MIN_SIDE, Math.min(WANX_SIZE_MAX_SIDE, Math.floor(w / 16) * 16))
-  h = Math.max(WANX_SIZE_MIN_SIDE, Math.min(WANX_SIZE_MAX_SIDE, Math.floor(h / 16) * 16))
-
-  if (w / h > WANX_SIZE_MAX_ASPECT + 0.001) {
-    h = Math.max(WANX_SIZE_MIN_SIDE, Math.min(WANX_SIZE_MAX_SIDE, Math.floor(Math.round(w / WANX_SIZE_MAX_ASPECT) / 16) * 16))
-  } else if (h / w > WANX_SIZE_MAX_ASPECT + 0.001) {
-    w = Math.max(WANX_SIZE_MIN_SIDE, Math.min(WANX_SIZE_MAX_SIDE, Math.floor(Math.round(h / WANX_SIZE_MAX_ASPECT) / 16) * 16))
-  }
-
+  const parsed = parseWanxWh(t) ?? { w: 1024, h: 1024 }
+  const { w, h } = fitWanxWhToBounds(
+    parsed.w,
+    parsed.h,
+    WANX_LEGACY_MIN_SIDE,
+    WANX_LEGACY_MAX_SIDE,
+    WANX_SIZE_MAX_ASPECT,
+  )
   return `${w}*${h}`
 }
 
@@ -136,7 +212,7 @@ export function buildQwenVisionImageRequest(
     const sizeRaw = safeExtras.size
     const size =
       typeof sizeRaw === 'string' && sizeRaw.trim()
-        ? normalizeWan27ImageSizeParam(sizeRaw)
+        ? normalizeWanImageSizeForModel(sizeRaw, modelId)
         : isWan27MultimodalImageModel(modelId)
           ? '2K'
           : '1024*1024'
@@ -171,7 +247,7 @@ export function buildQwenVisionImageRequest(
   void _legacySizeDrop
   const legacySizeRaw =
     typeof rawExtras.size === 'string' && rawExtras.size.trim()
-      ? normalizeWan27ImageSizeParam(rawExtras.size)
+      ? normalizeWanImageSizeForModel(rawExtras.size, modelId)
       : '1024*1024'
   const parameters = {
     n: 1,

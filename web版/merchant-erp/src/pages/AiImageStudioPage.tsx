@@ -705,6 +705,9 @@ export default function AiImageStudioPage() {
     if (/Aspect ratio must be between|ratio=\d/i.test(t)) {
       return '三连图尺寸超出模型宽高比限制，请硬刷新后重试（已自动钳到合法比例）'
     }
+    if (/between 512 and 1440|512.*1440|1440.*512/i.test(t)) {
+      return '生图尺寸超出当前模型限制，请硬刷新后重试（已自动钳到 1440 以内）'
+    }
     if (/Common error/i.test(t)) {
       return '万相上游瞬时失败（Common error）。请再点生成；若连续失败可改用高级 GPT'
     }
