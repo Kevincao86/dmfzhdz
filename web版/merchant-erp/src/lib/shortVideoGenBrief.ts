@@ -54,9 +54,15 @@ const DEFAULT_MUST_AVOID = [
   '编造未提及的店名或价格',
 ]
 
-const HOOK_HINTS = /钩子|开场|前\s*[123]秒|冲击|门铃|门口|排队|冲突|亮相|街景/
-const PRODUCT_HINTS = /主品|卖点|特写|产品|招牌|必点|菜品|杯身|造型|房型|训练|萌宠|份量/
-const CTA_HINTS = /CTA|行动号召|预约|下单|到店|外卖|办卡|预订|复购|福利|限时|扫码/
+/** 开场钩子：含本地生活 + SaaS/产品演示常见开场语 */
+const HOOK_HINTS =
+  /钩子|开场|前\s*[123]秒|冲击|门铃|门口|排队|冲突|亮相|街景|痛点|一屏|看清|困扰|难题|有没有发现|还在为|第一眼|开篇/
+/** 主品/卖点：含餐饮招牌 + 功能/界面/方案类 */
+const PRODUCT_HINTS =
+  /主品|卖点|特写|产品|招牌|必点|菜品|杯身|造型|房型|训练|萌宠|份量|功能|亮点|核心|看板|助手|方案|组件|界面|数据|系统|平台|能力|工具|组品|对话/
+/** 行动号召：含到店转化 + 试用/开通/了解等 */
+const CTA_HINTS =
+  /CTA|行动号召|预约|下单|到店|外卖|办卡|预订|复购|福利|限时|扫码|试用|开通|马上|立即|点击|关注|收藏|了解|咨询|体验|注册|免费|赶紧|欢迎/
 
 function firstMatch(text: string, patterns: RegExp[]): string {
   for (const re of patterns) {
@@ -202,10 +208,44 @@ function corpusFromRowsOrPrompt(
   return String(prompt || '')
 }
 
-function beatCovered(beat: ShortVideoStructureBeat, text: string): boolean {
-  if (beat === 'hook') return HOOK_HINTS.test(text) || /开场|进门|进店|门铃/.test(text)
-  if (beat === 'product') return PRODUCT_HINTS.test(text)
-  return CTA_HINTS.test(text)
+function rowCorpus(row: ShortVideoScriptRow | undefined): string {
+  if (!row) return ''
+  return `${row.visual || ''}\n${row.dialogue || ''}`.trim()
+}
+
+/**
+ * 节拍是否覆盖：关键词命中，或分镜表按位兜底（首格=钩子位、中段=卖点位、末格=收尾位）。
+ * 避免 SaaS/产品演示分镜因不含「菜品/到店」等餐饮词被误拦。
+ */
+function beatCovered(
+  beat: ShortVideoStructureBeat,
+  text: string,
+  rows?: ShortVideoScriptRow[] | null,
+): boolean {
+  if (beat === 'hook') {
+    if (HOOK_HINTS.test(text) || /开场|进门|进店|门铃/.test(text)) return true
+    if (rows && rows.length >= 2 && rowCorpus(rows[0]).length >= 4) return true
+    return false
+  }
+  if (beat === 'product') {
+    if (PRODUCT_HINTS.test(text)) return true
+    if (rows && rows.length >= 2) {
+      // 非首格任一段有实质画面/口播，视为中段卖点位已占
+      if (rows.slice(1).some((r) => rowCorpus(r).length >= 4)) return true
+    }
+    return false
+  }
+  // cta
+  if (CTA_HINTS.test(text)) return true
+  if (rows && rows.length >= 2) {
+    const last = rowCorpus(rows[rows.length - 1])
+    if (CTA_HINTS.test(last)) return true
+    // 末段祈使/邀请/收束语气
+    if (/来|试试|帮你|就用|记住|解锁|搞定|一站|直达|别再|从今天/.test(last)) return true
+    // 三段及以上且末格已填写：位置即收尾位
+    if (rows.length >= 3 && last.length >= 8) return true
+  }
+  return false
 }
 
 export function validateBriefFidelity(
@@ -239,7 +279,7 @@ export function validateBriefFidelity(
     if (text.trim().length < 12) issues.push('执导文案过短，请补充具体场景与卖点')
   } else {
     for (const beat of beats) {
-      if (!beatCovered(beat, text)) {
+      if (!beatCovered(beat, text, opts.rows)) {
         issues.push(`结构节拍缺失：${STRUCTURE_BEAT_LABELS[beat]}`)
       }
     }
