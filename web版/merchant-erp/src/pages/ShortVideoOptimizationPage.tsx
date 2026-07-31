@@ -1124,12 +1124,16 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       setErr(fin.message)
       return false
     }
-    if (resultBlobRef.current) URL.revokeObjectURL(resultBlobRef.current)
+    if (resultBlobRef.current?.startsWith('blob:')) URL.revokeObjectURL(resultBlobRef.current)
     resultBlobRef.current = fin.objectUrl
     setResultUrl(fin.objectUrl)
     setResultPreviewOpen(true)
     const billId = generationBillIdRef.current || `sv-${Date.now()}`
-    const pointsHint = await chargeShortVideoPoints(fin.blob, billId, targetDurationSec)
+    const pointsHint = await chargeShortVideoPoints(
+      fin.blob.size > 1024 ? fin.blob : new Blob(),
+      billId,
+      targetDurationSec,
+    )
     if (pointsHint) {
       setHint((prev) => [prev, pointsHint, '点击「预览生成结果」可再次查看成片。'].filter(Boolean).join(''))
     } else {

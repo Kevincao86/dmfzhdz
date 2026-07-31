@@ -189,22 +189,54 @@ export async function finalizeShortVideoOutput(
     seedanceNativeAv?: boolean
   },
 ): Promise<{ ok: true; objectUrl: string; blob: Blob } | { ok: false; message: string }> {
+  /**
+   * Seedance 原生有声：模型侧已出片；浏览器再「下载」只是为了本地预览/扣积分。
+   * 1080p 经代理拉取常超过 90s——绝不能再套死超时后报「合成失败」。
+   * 拉取失败时直接用方舟成片 URL 在线预览。
+   */
+  if (opts?.seedanceNativeAv) {
+    if (typeof source !== 'string') {
+      onProgress?.('Seedance 有声成片已就绪（模型内置语音与字幕）')
+      return { ok: true, objectUrl: URL.createObjectURL(source), blob: source }
+    }
+    onProgress?.('成片已生成，正在拉取预览…')
+    try {
+      const videoBlob = await downloadVideoUrlAsBlob(source, {
+        maxAttempts: 3,
+        onRetry: (attempt, maxAttempts) => {
+          onProgress?.(`成片文件较大，重试拉取 ${attempt}/${maxAttempts}…`)
+        },
+      })
+      onProgress?.('Seedance 有声成片已就绪（模型内置语音与字幕）')
+      return { ok: true, objectUrl: URL.createObjectURL(videoBlob), blob: videoBlob }
+    } catch {
+      onProgress?.('成片已就绪（在线预览；本机缓存未拉完可点下载重试）')
+      return {
+        ok: true,
+        objectUrl: source,
+        blob: new Blob([], { type: 'video/mp4' }),
+      }
+    }
+  }
+
   onProgress?.('下载 AI 视频…')
   let videoBlob: Blob
   try {
     videoBlob =
       typeof source === 'string'
-        ? await withTimeout(downloadVideoUrlAsBlob(source), 90_000, '下载成片')
+        ? await downloadVideoUrlAsBlob(source, {
+            maxAttempts: 3,
+            onRetry: (attempt, maxAttempts) => {
+              onProgress?.(`成片文件较大，重试拉取 ${attempt}/${maxAttempts}…`)
+            },
+          })
         : source
   } catch (e) {
-    const msg = e instanceof Error ? e.message : '下载成片失败'
-    return { ok: false, message: msg }
-  }
-
-  if (opts?.seedanceNativeAv) {
-    onProgress?.('Seedance 有声成片已就绪（模型内置语音与字幕）')
-    const objectUrl = URL.createObjectURL(videoBlob)
-    return { ok: true, objectUrl, blob: videoBlob }
+    const raw = e instanceof Error ? e.message : '下载成片失败'
+    return {
+      ok: false,
+      message: `成片已生成，但拉取预览文件失败：${raw}。请点「开始生成」旁预览或稍后重试（非模型失败）。`,
+    }
   }
 
   const probedDur = await probeVideoDurationSec(videoBlob)
