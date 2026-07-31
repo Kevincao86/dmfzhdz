@@ -705,6 +705,9 @@ export default function AiImageStudioPage() {
     if (/Aspect ratio must be between|ratio=\d/i.test(t)) {
       return '三连图尺寸超出模型宽高比限制，请硬刷新后重试（已自动钳到合法比例）'
     }
+    if (/Common error/i.test(t)) {
+      return '万相上游瞬时失败（Common error）。请再点生成；若连续失败可改用高级 GPT'
+    }
     if (/支付网关|502|504|Bad Gateway|Gateway Timeout/i.test(t)) {
       return '生图服务暂时不可用（502），请稍后重试；若刚完成部署可能是轻量 auth-api 重启中'
     }
@@ -907,7 +910,7 @@ export default function AiImageStudioPage() {
               preferredVendor: 'qwen',
               referenceImageDataUrl: refImage,
               wanxSize: masterGen.wanxSize,
-              preferWanxPosterModel: preferPoster,
+              preferWanxPosterModel: false,
               signal: ac.signal,
             })
           }

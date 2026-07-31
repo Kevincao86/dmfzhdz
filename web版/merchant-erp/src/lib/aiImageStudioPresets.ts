@@ -276,8 +276,14 @@ export function resolvePlatformCarouselFiveSpec(channelId: PublishChannelId): Pl
 }
 
 /** 万相边长上限；宽高比须在 1:4～4:1（上游硬限制，超宽三连图会钳到 4:1 再中心裁） */
-const CAROUSEL_MASTER_API_MAX_SIDE = 4096
+const CAROUSEL_MASTER_API_MAX_SIDE = 3072
+const CAROUSEL_MASTER_API_MIN_SIDE = 768
 const WANX_CAROUSEL_MAX_ASPECT = 4
+const WANX_CAROUSEL_MAX_PIXELS = 2048 * 2048
+
+function snapWanxSide(n: number): number {
+  return Math.max(CAROUSEL_MASTER_API_MIN_SIDE, Math.floor(n / 16) * 16)
+}
 
 /** 三连图：先按平台整幅尺寸（适配万相边长+宽高比）生成完整海报，再等分裁成 3 张 */
 export function platformCarouselMasterGenSize(channelId: PublishChannelId): {
@@ -300,25 +306,36 @@ export function platformCarouselMasterGenSize(channelId: PublishChannelId): {
   let wanxAspectClamped = false
 
   // 万相硬限制：长短边比 ≤ 4:1（抖音/快手三连约 5.3:1 仍超限，须先抬高再生成，裁切时取中间带）
-  const long = Math.max(w, h)
-  const short = Math.min(w, h)
-  if (long / short > WANX_CAROUSEL_MAX_ASPECT + 0.001) {
-    wanxAspectClamped = true
-    if (w >= h) h = Math.max(1, Math.round(w / WANX_CAROUSEL_MAX_ASPECT))
-    else w = Math.max(1, Math.round(h / WANX_CAROUSEL_MAX_ASPECT))
-  }
-
-  if (w > CAROUSEL_MASTER_API_MAX_SIDE || h > CAROUSEL_MASTER_API_MAX_SIDE) {
-    const scale = Math.min(CAROUSEL_MASTER_API_MAX_SIDE / w, CAROUSEL_MASTER_API_MAX_SIDE / h)
-    w = Math.max(1, Math.round(w * scale))
-    h = Math.max(1, Math.round(h * scale))
-  }
-
-  // 取整后再钳一次，避免浮点又越界
   if (Math.max(w, h) / Math.min(w, h) > WANX_CAROUSEL_MAX_ASPECT + 0.001) {
     wanxAspectClamped = true
     if (w >= h) h = Math.max(1, Math.round(w / WANX_CAROUSEL_MAX_ASPECT))
     else w = Math.max(1, Math.round(h / WANX_CAROUSEL_MAX_ASPECT))
+  }
+
+  // 边长与总像素钳制：过宽易触发上游 Common error
+  if (w > CAROUSEL_MASTER_API_MAX_SIDE || h > CAROUSEL_MASTER_API_MAX_SIDE || w * h > WANX_CAROUSEL_MAX_PIXELS) {
+    const scale = Math.min(
+      CAROUSEL_MASTER_API_MAX_SIDE / w,
+      CAROUSEL_MASTER_API_MAX_SIDE / h,
+      Math.sqrt(WANX_CAROUSEL_MAX_PIXELS / (w * h)),
+    )
+    w = Math.max(1, Math.round(w * scale))
+    h = Math.max(1, Math.round(h * scale))
+  }
+
+  if (Math.min(w, h) < CAROUSEL_MASTER_API_MIN_SIDE) {
+    const s = CAROUSEL_MASTER_API_MIN_SIDE / Math.min(w, h)
+    w = Math.max(1, Math.round(w * s))
+    h = Math.max(1, Math.round(h * s))
+  }
+
+  w = snapWanxSide(Math.min(CAROUSEL_MASTER_API_MAX_SIDE, w))
+  h = snapWanxSide(Math.min(CAROUSEL_MASTER_API_MAX_SIDE, h))
+
+  if (Math.max(w, h) / Math.min(w, h) > WANX_CAROUSEL_MAX_ASPECT + 0.001) {
+    wanxAspectClamped = true
+    if (w >= h) h = snapWanxSide(Math.round(w / WANX_CAROUSEL_MAX_ASPECT))
+    else w = snapWanxSide(Math.round(h / WANX_CAROUSEL_MAX_ASPECT))
   }
 
   return {
@@ -388,22 +405,15 @@ export function buildCarouselFiveMasterPromptExtra(
   const slotNums = Array.from({ length: slots }, (_, i) => String(i + 1)).join('→')
 
   return [
-    `【超宽全景海报 · ${ch.label}】只画 1 张连续横幅，目标约 ${spec.masterWidth}×${spec.masterHeight} 像素（勿画成 ${slots} 张独立图）。`,
-    '硬性构图：同一室内空间从左到右自然延展的一张电影宽银幕全景；透视、光影、色调、人物尺度全幅统一，像一台相机横移扫过整间店。',
-    `左/中/右各约 1/${slots} 必须是不同空间内容（例如左侧沙发区、中间通道/技师、右侧另一组座位或前台），禁止左中右出现同一构图、同一人物姿态、同一文案排版的复制粘贴。`,
-    '严禁：三宫格/三联画框、三张相同海报并排、三块独立卡片、每格换背景、漫画分镜、把整张海报复制三次。',
-    '画面禁止出现元信息字样：「三连图」「五连图」「轮播」「carousel」「1/3」「图1」等。',
-    '文字规则：主标题等中文文案在整幅上最多出现 1～2 处（可横跨中部），禁止在左/中/右各贴一套完整标题+按钮。仅允许下列已填内容' +
-      (allowedText.length
-        ? `：${allowedText.join('；')}。禁止另造句子。`
-        : '：若无已填文案则几乎不要大字，以场景画面为主。'),
+    `【超宽全景 · ${ch.label}】画 1 张连续横幅（约 ${spec.masterWidth}×${spec.masterHeight}），同一室内从左到右自然延展。`,
+    `左/中/右约各 1/${slots} 应是同一空间的不同景别（不同座位、通道或人物位置），不要三张相同海报并排。`,
+    '标题等中文文案整幅最多出现一处；不要在画面写系统标签或编号。' +
+      (allowedText.length ? `可用文案：${allowedText.join('；')}。` : '无已填文案时以场景为主、少放大字。'),
     hasOffer
-      ? '表单已填优惠/价格：可将该优惠自然融入画面一处（勿额外编造其它价格，勿三处重复贴价）。'
-      : '【禁价禁卖点】表单未填价格/优惠：禁止出现任何 ¥、价格数字、折扣、满减、卖点列表、UGC征集、打卡有礼、虚构促销口号。',
-    hasSub
-      ? ''
-      : '表单未填副标题：禁止编造卖点条文案、功能列表、多行小字卖点墙。',
-    `后处理会把整幅从左到右等宽裁成 ${slots} 张（编号 ${slotNums}），单张 ${spec.slideWidth}×${spec.slideHeight}；裁后每张应是连续全景的不同片段，而不是三张重复海报。`,
+      ? '可将已填优惠自然放在画面一处。'
+      : '未填价格时不要自创价格与折扣文案。',
+    hasSub ? '' : '未填副标题时不要编造卖点列表。',
+    `生成后会等宽裁成 ${slots} 张（${slotNums}），单张 ${spec.slideWidth}×${spec.slideHeight}。`,
   ].filter(Boolean)
 }
 
@@ -2398,7 +2408,7 @@ const INTENT_PROMPT: Record<VisualIntentId, string> = {
   environment: '设计探店氛围图，真实可信的就餐/服务环境，适合小红书种草。',
   menu: '设计菜单价目视觉，分区清晰、价格可读。',
   carousel:
-    '设计一张本地生活门店超宽全景营销海报：同一室内场景从左到右连续延展（电影宽银幕），画面内容在左/中/右必须有空间纵深差异；严禁三宫格、三张相同海报并排、重复同一构图。系统会事后等分裁切，画面上禁止写「三连图」「轮播」等元信息。',
+    '设计一张本地生活门店超宽全景营销海报：同一室内场景从左到右连续延展，左中右景别有差异；不要做成三张相同海报并排。系统会事后等分裁切。',
   detail:
     '设计团购「详情长图」单段：3:4 竖图，大图+中英标题排版，适合抖音/快手/美团详情页竖向拼接。',
 }
