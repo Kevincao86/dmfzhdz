@@ -263,42 +263,63 @@ export function resolvePlatformCarouselFiveSpec(channelId: PublishChannelId): Pl
   return PLATFORM_CAROUSEL_FIVE_SPECS.meituan
 }
 
-/** 万相边长上限；超宽海报等比缩小进 API，裁切后再放大到目标单张像素 */
+/** 万相边长上限；宽高比须在 1:4～4:1（上游硬限制，超宽五连图会钳到 4:1 再中心裁） */
 const CAROUSEL_MASTER_API_MAX_SIDE = 4096
+const WANX_CAROUSEL_MAX_ASPECT = 4
 
-/** 五连图：先按平台整幅尺寸（等比适配 API）生成完整海报，再等分裁成 5 张 */
+/** 五连图：先按平台整幅尺寸（适配万相边长+宽高比）生成完整海报，再等分裁成 5 张 */
 export function platformCarouselMasterGenSize(channelId: PublishChannelId): {
   wanxSize: string
   pixelHint: string
   slideSpec: PlatformCarouselFiveSpec
   /** 主图目标宽高比（用于 Prompt，勿用 16:9） */
   masterAspectLabel: string
+  /** 万相是否因 ≤4:1 限制钳制了宽高比 */
+  wanxAspectClamped?: boolean
   /** GPT Image 2 是否因 3:1 限制钳制了宽高比 */
   gptAspectClamped?: boolean
 } {
   const slideSpec = resolvePlatformCarouselFiveSpec(channelId)
   const idealW = slideSpec.masterWidth
   const idealH = slideSpec.masterHeight
-  const ratio = idealW / idealH
-  // 严格保持整幅比例；仅在超出 API 边长时等比缩小（禁止为凑 768 而改比例）
-  let w = idealW
-  let h = idealH
+  let w = Math.max(1, Math.round(idealW))
+  let h = Math.max(1, Math.round(idealH))
+  let wanxAspectClamped = false
+
+  // 万相硬限制：长短边比 ≤ 4:1（抖音整幅约 8.9:1，必须先抬高再生成，裁切时取中间带）
+  const long = Math.max(w, h)
+  const short = Math.min(w, h)
+  if (long / short > WANX_CAROUSEL_MAX_ASPECT + 0.001) {
+    wanxAspectClamped = true
+    if (w >= h) h = Math.max(1, Math.round(w / WANX_CAROUSEL_MAX_ASPECT))
+    else w = Math.max(1, Math.round(h / WANX_CAROUSEL_MAX_ASPECT))
+  }
+
   if (w > CAROUSEL_MASTER_API_MAX_SIDE || h > CAROUSEL_MASTER_API_MAX_SIDE) {
     const scale = Math.min(CAROUSEL_MASTER_API_MAX_SIDE / w, CAROUSEL_MASTER_API_MAX_SIDE / h)
     w = Math.max(1, Math.round(w * scale))
     h = Math.max(1, Math.round(h * scale))
-    // 浮点取整后微调，保证比例尽量贴近
-    if (Math.abs(w / h - ratio) > 0.002) {
-      h = Math.max(1, Math.round(w / ratio))
-    }
   }
+
+  // 取整后再钳一次，避免浮点又越界
+  if (Math.max(w, h) / Math.min(w, h) > WANX_CAROUSEL_MAX_ASPECT + 0.001) {
+    wanxAspectClamped = true
+    if (w >= h) h = Math.max(1, Math.round(w / WANX_CAROUSEL_MAX_ASPECT))
+    else w = Math.max(1, Math.round(h / WANX_CAROUSEL_MAX_ASPECT))
+  }
+
   return {
     wanxSize: `${w}*${h}`,
     pixelHint: `整幅目标 ${idealW}×${idealH}${
-      w !== idealW || h !== idealH ? `（API ${w}×${h} 等比）` : ''
+      wanxAspectClamped
+        ? `（万相最长边比≤4:1 → API ${w}×${h}，再中心裁等分）`
+        : w !== idealW || h !== idealH
+          ? `（API ${w}×${h} 等比）`
+          : ''
     } → 等分 ${slideSpec.slideWidth}×${slideSpec.slideHeight}×5`,
     slideSpec,
     masterAspectLabel: `${idealW}:${idealH}`,
+    wanxAspectClamped,
   }
 }
 

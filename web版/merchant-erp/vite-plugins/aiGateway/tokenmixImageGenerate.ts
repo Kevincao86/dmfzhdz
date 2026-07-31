@@ -25,12 +25,17 @@ export function isTokenmixBrowserUnsafeImageUrl(url: string): boolean {
   }
 }
 
-/** 服务端拉 TokenMix CDN → data URL（解决浏览器 CORS Failed to fetch） */
-export async function hydrateTokenmixImageUrlForBrowser(imageUrl: string): Promise<string> {
-  const src = imageUrl.trim()
-  if (!src || src.startsWith('data:') || src.startsWith('blob:')) return src
-  if (!isTokenmixBrowserUnsafeImageUrl(src)) return src
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms))
+}
 
+function isTransientHydrateError(msg: string): boolean {
+  return /fetch failed|Failed to fetch|ECONNRESET|ETIMEDOUT|ENOTFOUND|ECONNREFUSED|socket|network|aborted|HTTP 5\d\d/i.test(
+    msg,
+  )
+}
+
+async function hydrateTokenmixImageUrlOnce(src: string): Promise<string> {
   const res = await fetch(src, {
     method: 'GET',
     headers: { Accept: 'image/*,*/*' },
@@ -46,8 +51,23 @@ export async function hydrateTokenmixImageUrlForBrowser(imageUrl: string): Promi
   return `data:${ct};base64,${buf.toString('base64')}`
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms))
+/** 服务端拉 TokenMix CDN → data URL（解决浏览器 CORS Failed to fetch）；短暂网络抖动自动重试 */
+export async function hydrateTokenmixImageUrlForBrowser(imageUrl: string): Promise<string> {
+  const src = imageUrl.trim()
+  if (!src || src.startsWith('data:') || src.startsWith('blob:')) return src
+  if (!isTokenmixBrowserUnsafeImageUrl(src)) return src
+
+  let lastErr = 'TokenMix 成图下载失败'
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    try {
+      return await hydrateTokenmixImageUrlOnce(src)
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+      if (attempt >= 4 || !isTransientHydrateError(lastErr)) break
+      await sleep(Math.min(6000, 700 * attempt))
+    }
+  }
+  throw new Error(lastErr)
 }
 
 function extractImageUrlFromPayload(json: unknown): string {

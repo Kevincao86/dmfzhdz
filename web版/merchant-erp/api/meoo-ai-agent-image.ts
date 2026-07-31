@@ -32,8 +32,17 @@ async function embedTokenmixImageForBrowser<T extends Extract<MeooAgentImageResu
 ): Promise<T> {
   if (!('imageUrl' in out) || typeof out.imageUrl !== 'string') return out
   if (!isTokenmixBrowserUnsafeImageUrl(out.imageUrl)) return out
-  const dataUrl = await hydrateTokenmixImageUrlForBrowser(out.imageUrl)
-  return { ...out, imageUrl: dataUrl }
+  try {
+    const dataUrl = await hydrateTokenmixImageUrlForBrowser(out.imageUrl)
+    // 超大 data URL 塞进 JSON 易被反代掐断；过大则保留 CDN，交给前端 phase=fetch
+    if (dataUrl.length > 3_500_000) return out
+    return { ...out, imageUrl: dataUrl }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.error('[meoo-ai-agent-image] tokenmix hydrate skipped, keep CDN', msg.slice(0, 200))
+    // 成图已成功：禁止因代拉失败整单 502；前端会走 phase=fetch 再代拉
+    return out
+  }
 }
 
 async function sendImageSuccess(
@@ -58,18 +67,7 @@ async function sendImageSuccess(
     return
   }
 
-  try {
-    out = await embedTokenmixImageForBrowser(out)
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    console.error('[meoo-ai-agent-image] tokenmix hydrate failed', msg)
-    sendMerchantJson(res, 502, {
-      ok: false,
-      error: 'image_hydrate_failed',
-      detail: msg.slice(0, 400),
-    })
-    return
-  }
+  out = await embedTokenmixImageForBrowser(out)
 
   const { recordAiTokenUsageFromVercelRequest, estimateLlmTokensFromText } = await import(
     '../vite-plugins/aiTokenUsageCore.js'
@@ -185,7 +183,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendMerchantJson(res, 200, { ok: true, imageUrl: dataUrl, channel: 'tokenmix' })
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      sendMerchantJson(res, 502, { ok: false, error: 'image_fetch_failed', detail: msg.slice(0, 400) })
+      console.error('[meoo-ai-agent-image] phase=fetch failed', msg.slice(0, 300))
+      sendMerchantJson(res, 502, {
+        ok: false,
+        error: 'image_fetch_failed',
+        detail: /fetch failed/i.test(msg)
+          ? '代拉 TokenMix 成图网络失败，请稍后重试'
+          : msg.slice(0, 400),
+      })
     }
     return
   }

@@ -710,10 +710,17 @@ export default function AiImageStudioPage() {
 
   const mapGenErrorMessage = (raw: string) => {
     const t = (raw || '').trim()
-    if (/Failed to fetch|NetworkError|Load failed|network error/i.test(t)) {
+    if (
+      /Failed to fetch|fetch failed|NetworkError|Load failed|network error|image_fetch_failed|image_hydrate_failed|代拉 TokenMix/i.test(
+        t,
+      )
+    ) {
       return imageTier === 'pro'
-        ? '高级生图网络中断。请点「停止」后重试 GPT Image 2（不会回退万相）'
+        ? '高级生图拉图失败（网络抖动）。请重试 GPT Image 2（不会回退万相）'
         : '生图网络中断，请检查网络后重试'
+    }
+    if (/Aspect ratio must be between|ratio=\d/i.test(t)) {
+      return '五连图尺寸超出模型宽高比限制，请硬刷新后重试（已自动钳到合法比例）'
     }
     if (/支付网关|502|504|Bad Gateway|Gateway Timeout/i.test(t)) {
       return '生图服务暂时不可用（502），请稍后重试；若刚完成部署可能是轻量 auth-api 重启中'
