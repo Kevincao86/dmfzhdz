@@ -35,7 +35,6 @@ import {
   runShortVideoJobWithFailover,
 } from '../services/videoAiApi'
 import { buildSrtContent, probeVideoDurationSec, splitSubtitleLines } from './digitalHumanSubtitle'
-import { compositePortraitWithBackground } from './digitalHumanBackgroundComposite'
 import { resolveDhSubtitleStyleForBurn } from './digitalHumanPostProcessStyles'
 import {
   buildDhSeedanceSegmentPrompt,
@@ -50,9 +49,6 @@ import { buildSeedanceFlagsLine } from './shortVideoRenderFlags'
 import { getAudioDurationSec } from './digitalHumanAudioChunks'
 import { normalizeArkVideoModelParam } from './arkVideoEndpointsConfig'
 import {
-  buildMotionTimeline,
-  buildWholeVideoMotionTimeline,
-  hasUsableMotionInstructions,
   inferGestureFromMotionText,
   motionLineForSegmentIndex,
   parseMotionInstructions,
@@ -252,10 +248,12 @@ async function applyDhFinalPostProcess(
 ): Promise<Blob> {
   const draft = work.draft
   const wantsSubtitle = draft.subtitleEnabled && script.length >= 2
-  const motionUsable = hasUsableMotionInstructions(draft.motionInstructions)
-  const wantsMotion =
-    draft.gesturePreset !== 'none' || motionUsable || baseFrameMode === 'full'
-  if (!wantsSubtitle && !wantsMotion && !(targetDurationSec && targetDurationSec > 0)) {
+  /**
+   * Seedance 已含镜头/人物微动；ffmpeg zoompan(d=1,fps=30) 会把口播时长压成数秒。
+   * 成片后处理只烧字幕 + 按口播补齐时长，不再做运镜。
+   */
+  void baseFrameMode
+  if (!wantsSubtitle && !(targetDurationSec && targetDurationSec > 0)) {
     return finalBlob
   }
 
@@ -265,44 +263,12 @@ async function applyDhFinalPostProcess(
     srtContent = buildSrtContent(splitSubtitleLines(script), videoDur)
   }
 
-  let motionTimelinePayload: Array<{ startSec: number; endSec: number; gesturePreset: string }> | undefined
-  if (wantsMotion && videoDur > 0) {
-    const gestureFallback =
-      draft.gesturePreset !== 'none'
-        ? draft.gesturePreset
-        : inferGestureFromMotionText(draft.motionInstructions, 'explain')
-    const timeline = motionUsable
-      ? buildMotionTimeline(draft.motionInstructions, baseFrameMode, gestureFallback, videoDur)
-      : buildWholeVideoMotionTimeline(
-          draft.motionInstructions,
-          baseFrameMode,
-          gestureFallback,
-          videoDur,
-        )
-    const resolvedTimeline =
-      timeline.length || draft.gesturePreset === 'none'
-        ? timeline
-        : buildWholeVideoMotionTimeline('', baseFrameMode, gestureFallback, videoDur)
-    if (resolvedTimeline.length) {
-      motionTimelinePayload = resolvedTimeline.map((row) => ({
-        startSec: row.startSec,
-        endSec: row.endSec,
-        gesturePreset: row.gesturePreset,
-      }))
-    }
-  }
-
-  const useMotionTimeline = Boolean(motionTimelinePayload?.length)
-  const fallbackGesture = motionUsable
-    ? inferGestureFromMotionText(draft.motionInstructions, draft.gesturePreset)
-    : draft.gesturePreset
-
   return postProcessVideoOnServer(finalBlob, {
     srtContent,
     subtitleStyle: resolveDhSubtitleStyleForBurn(draft.subtitleStyle),
-    subtleMotion: wantsMotion && !useMotionTimeline,
-    gesturePreset: fallbackGesture,
-    motionTimeline: useMotionTimeline ? motionTimelinePayload : undefined,
+    subtleMotion: false,
+    gesturePreset: 'none',
+    motionTimeline: undefined,
     minDurationSec: targetDurationSec,
   }).then(async (out) => {
     if (opts?.preserveNarrationAudio) {
@@ -583,6 +549,8 @@ async function renderWithSeedance(
     }
 
     let seedanceImages = [segmentImageB64]
+    /** 即梦首尾帧布局；有场景/产品双图时开启，禁止多张 reference_image（1.x 会报 r2v） */
+    let seedanceImageMode: 'auto' | 'first_last' = 'auto'
     const useDualRefPersonScene =
       draftNeedsDualRefPersonScene(segmentDraft) && Boolean(segmentCustomBg?.trim())
     const useProductFusion =
@@ -597,21 +565,20 @@ async function renderWithSeedance(
         progress: 14 + Math.round((i / segmentTotal) * 6),
       })
       try {
-        /** 产品段：先将完整人像轻叠到场景（不抠图），再双参考融合产品 */
-        let sceneForProduct = segmentImageB64
+        /**
+         * 产品段：首帧=人物，尾帧=场景纯图（不叠图）；
+         * 产品以抠图作为尾帧引导时改用「场景含产品位」作尾帧，仍走首尾帧非 r2v。
+         */
+        let scenePure = segmentImageB64
         if (useDualRefPersonScene && segmentCustomBg) {
-          sceneForProduct = await compositePortraitWithBackground(
-            segmentImageB64,
-            segmentDraft.background,
-            baseFrameMode,
-            segmentCustomBg,
-          )
+          scenePure = await imageUrlToPureBase64(segmentCustomBg)
         }
-        const fusion = await prepareDhProductFusionAssets(sceneForProduct, productPureB64)
+        const fusion = await prepareDhProductFusionAssets(scenePure, productPureB64)
         seedanceImages = buildDhSeedanceFusionImages(
+          segmentImageB64,
           fusion.sceneWithProductB64,
-          fusion.mattedProductB64,
         )
+        seedanceImageMode = 'first_last'
         usedProductFusion = true
       } catch (e) {
         return {
@@ -622,16 +589,12 @@ async function renderWithSeedance(
     } else if (useDualRefPersonScene && segmentCustomBg) {
       try {
         /**
-         * Seedance 1.x 不支持 task_type=r2v（多张 reference_image）。
-         * 先把人物轻叠到场景成单张首帧 i2v（不硬抠，保留五官），由提示词约束融合观感。
+         * 即梦首尾帧（与短视频一致）：first_frame=完整人物，last_frame=场景纯图。
+         * Seedance 深度融合进景；禁止本地灰底叠片，也禁止多张 reference_image（r2v）。
          */
-        const fused = await compositePortraitWithBackground(
-          segmentImageB64,
-          segmentDraft.background,
-          baseFrameMode,
-          segmentCustomBg,
-        )
-        seedanceImages = [fused]
+        const scenePureB64 = await imageUrlToPureBase64(segmentCustomBg)
+        seedanceImages = [segmentImageB64, scenePureB64]
+        seedanceImageMode = 'first_last'
       } catch (e) {
         return {
           ok: false,
@@ -655,7 +618,7 @@ async function renderWithSeedance(
       gesturePreset: segmentGesture,
       continuation: isContinuation && !sceneShot,
       hasProductFusion: useProductFusion,
-      dualRefPersonScene: useDualRefPersonScene && !useProductFusion,
+      dualRefPersonScene: useDualRefPersonScene || useProductFusion,
       fidelityBrief,
     })
 
@@ -666,6 +629,7 @@ async function renderWithSeedance(
         flags,
         images_base64: seedanceImages,
         i2v_max_images: Math.min(2, seedanceImages.length),
+        seedance_image_mode: seedanceImageMode,
         prefer_quota_stable: true,
         skip_qwen: true,
       },

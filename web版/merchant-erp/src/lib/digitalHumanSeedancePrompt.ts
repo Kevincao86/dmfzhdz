@@ -115,8 +115,8 @@ export function buildDhSeedanceSegmentPrompt(
     continuation?: boolean
     hasProductFusion?: boolean
     /**
-     * 即梦式双参考：参考图1=完整人物（禁抠图），参考图2=场景；
-     * 由豆包 Seedance 按说明做人物换景融合。
+     * 即梦式首尾帧：首帧=完整人物，尾帧=场景；
+     * 由豆包 Seedance 深度融合（非本地叠图、非 r2v 多参考）。
      */
     dualRefPersonScene?: boolean
     /** 意图保真：mustInclude / mustAvoid 注入 */
@@ -136,7 +136,7 @@ export function buildDhSeedanceSegmentPrompt(
   if (opts?.continuation) {
     body = [
       '竖屏9:16口播续镜，同一人物同服装同场景，动作连续，五官发型不变。',
-      opts?.dualRefPersonScene ? '继续沿用首帧人物与场景的融合结果。' : '',
+      opts?.dualRefPersonScene ? '继续沿用首尾帧人物与场景的深度融合结果。' : '',
       `动作：${motion}。`,
       opts?.hasProductFusion ? '双参考图自然手持产品。' : '',
       fidelity,
@@ -147,8 +147,8 @@ export function buildDhSeedanceSegmentPrompt(
       .join('')
   } else if (opts?.dualRefPersonScene) {
     body = [
-      `竖屏9:16数字人口播，首帧已将完整人物融入场景（${bg}），${frame}，五官发型皮肤完整清晰，禁止裁脸抠穿，禁止灰底矩形贴片。`,
-      `保持人物自然站在场景中，光影透视一致，服装${outfit}。`,
+      `竖屏9:16数字人口播，即梦首尾帧：首帧为完整人物（五官发型皮肤清晰），尾帧为场景（${bg}）。`,
+      `将首帧人物深度自然融入尾帧场景全程口播，${frame}，光影透视一致，服装${outfit}，禁止灰底矩形贴片、禁止硬抠叠图、禁止裁脸。`,
       total > 1 ? `分镜${idx}/${total}约${DH_SEEDANCE_SEGMENT_SEC}秒。` : '',
       opts?.hasProductFusion ? '人物与产品自然融合，禁止贴片悬浮。' : '',
       `动作：${motion}。`,

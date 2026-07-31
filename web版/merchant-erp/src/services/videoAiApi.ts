@@ -26,6 +26,8 @@ export type ShortVideoGenRequestBody = {
   images_base64?: string[]
   /** 数字人产品融合等：允许保留多张 i2v 参考图（默认 1） */
   i2v_max_images?: number
+  /** 即梦式首尾帧：first_last；勿用多张 reference_image（1.x 会报 r2v） */
+  seedance_image_mode?: 'auto' | 'first_last' | 'reference' | 'first_only'
   /** 数字人口播等：跳过豆包/方舟，直接走千问视频 */
   prefer_provider?: 'qwen'
   /** 数字人口播等：lite-i2v / Seaweed 优先，Pro 排后；千问跳过 wan2.7 */
