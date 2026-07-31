@@ -513,12 +513,11 @@ export default function AiImageStudioPage() {
           f.playbook,
           { keepChannels: true, templateIndex: 0 },
         )
-        void loadAiCopy(base)
         if (storeName) setStoreLoadHint(`已从抖音门店带入：${storeName}`)
         return base
       })
     })()
-  }, [loadAiCopy])
+  }, [])
 
   useEffect(() => {
     if (platformSeries !== 'platform_carousel_five') return
@@ -549,19 +548,11 @@ export default function AiImageStudioPage() {
   }
 
   const changeIndustry = (ind: LocalLifeIndustryId) => {
-    setForm((f) => {
-      const next = applyIndustryChange(f, ind)
-      void loadAiCopy(next)
-      return next
-    })
+    setForm((f) => applyIndustryChange(f, ind))
   }
 
   const changeIndustrySub = (subId: string) => {
-    setForm((f) => {
-      const next = applyIndustrySubChange(f, subId)
-      void loadAiCopy(next)
-      return next
-    })
+    setForm((f) => applyIndustrySubChange(f, subId))
   }
 
   const selectPlaybook = (id: VisualPlaybookId) => {
@@ -574,9 +565,7 @@ export default function AiImageStudioPage() {
         id,
         { keepChannels: true, templateIndex: 0 },
       )
-      const merged = { ...next, playbook: id, platformSeries: series }
-      void loadAiCopy(merged)
-      return merged
+      return { ...next, playbook: id, platformSeries: series }
     })
   }
 
@@ -584,22 +573,14 @@ export default function AiImageStudioPage() {
     setForm((f) => {
       // 已选中再点一次 → 仅取消平台长图，保留下方场景玩法
       if (resolveFormPlatformSeries(f) === id) {
-        const next = clearPlatformSeriesPlaybook(f)
-        void loadAiCopy(next)
-        return next
+        return clearPlatformSeriesPlaybook(f)
       }
-      const next = applyPlatformSeriesPlaybook(f, id)
-      void loadAiCopy(next)
-      return next
+      return applyPlatformSeriesPlaybook(f, id)
     })
   }
 
   const selectPlaybookVariant = (variantId: string) => {
-    setForm((f) => {
-      const next = applyPlaybookVariantToForm(f, variantId)
-      void loadAiCopy(next)
-      return next
-    })
+    setForm((f) => applyPlaybookVariantToForm(f, variantId))
   }
 
   const refreshCopy = () => {
@@ -1538,10 +1519,10 @@ export default function AiImageStudioPage() {
 
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="space-y-4">
-              <StudioPanel title="AI 文案包" subtitle="点选后同步填入上方文案">
+              <StudioPanel title="AI 文案包" subtitle="需手动点「AI 生成」；点选后同步填入上方文案">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <p className="text-[10px] text-slate-400">
-                    手动「AI 换一版」{MP_POINTS_VISUAL_STUDIO_COPY_PER_USE} 积分/次
+                    不自动生成 · 手动「AI 生成」{MP_POINTS_VISUAL_STUDIO_COPY_PER_USE} 积分/次
                   </p>
                   <button
                     type="button"
@@ -1554,7 +1535,7 @@ export default function AiImageStudioPage() {
                     ) : (
                       <RefreshCw className="h-3 w-3" />
                     )}
-                    {copyAiBusy ? '生成中…' : 'AI 换一版'}
+                    {copyAiBusy ? '生成中…' : copyOptions.length ? 'AI 换一版' : 'AI 生成'}
                   </button>
                 </div>
                 {copyAiHint && <p className="mb-2 text-[11px] text-violet-600">{copyAiHint}</p>}
