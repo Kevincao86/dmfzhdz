@@ -606,6 +606,8 @@ digitalHumanVideoRender
 digitalHumanBackgroundComposite
 digitalHumanSeedancePrompt
 digitalHumanPortraitMatting
+digitalHumanPostProcessStyles
+digitalHumanSubtitle
 concatVideoSegments
 videoFrameUtils
 arkVideoContentPayload

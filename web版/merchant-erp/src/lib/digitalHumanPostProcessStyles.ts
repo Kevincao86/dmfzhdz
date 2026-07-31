@@ -1,31 +1,60 @@
 /** 成片后处理样式（无 DOM，可供 Node ffmpeg 与浏览器共用） */
 
 const SUBTITLE_SIDE_MARGIN = 'MarginL=48,MarginR=48'
+/**
+ * 必须声明 PlayRes：ffmpeg subtitles 默认 PlayResY≈288，
+ * MarginV=280 会把「底部安全区」顶到画面上方并裁切半截字。
+ */
+const ASS_PLAY_RES = 'PlayResX=1080,PlayResY=1920'
+
+function withPlayRes(styleBody: string): string {
+  return `${ASS_PLAY_RES},${styleBody}`
+}
 
 export function assForceStyleForSubtitle(subtitleStyle: string): string {
   switch (subtitleStyle) {
     case 'top-minimal':
-      return `FontSize=20,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=8,MarginV=48,${SUBTITLE_SIDE_MARGIN}`
+      return withPlayRes(
+        `FontSize=20,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=8,MarginV=48,${SUBTITLE_SIDE_MARGIN}`,
+      )
     case 'top-news':
-      return `FontSize=22,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,BorderStyle=3,Outline=2,Shadow=0,Alignment=8,MarginV=40,BackColour=&H80000000,${SUBTITLE_SIDE_MARGIN}`
+      return withPlayRes(
+        `FontSize=22,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,BorderStyle=3,Outline=2,Shadow=0,Alignment=8,MarginV=40,BackColour=&H80000000,${SUBTITLE_SIDE_MARGIN}`,
+      )
     case 'bottom-yellow':
-      return `FontSize=22,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=100,${SUBTITLE_SIDE_MARGIN}`
+      return withPlayRes(
+        `FontSize=22,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=100,${SUBTITLE_SIDE_MARGIN}`,
+      )
     case 'bottom-white-large':
-      return `FontSize=26,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=120,${SUBTITLE_SIDE_MARGIN}`
+      return withPlayRes(
+        `FontSize=26,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=120,${SUBTITLE_SIDE_MARGIN}`,
+      )
     case 'bottom-pink':
-      return `FontSize=22,PrimaryColour=&H00FF99FF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=100,${SUBTITLE_SIDE_MARGIN}`
+      return withPlayRes(
+        `FontSize=22,PrimaryColour=&H00FF99FF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=100,${SUBTITLE_SIDE_MARGIN}`,
+      )
     case 'bottom-green':
-      return `FontSize=22,PrimaryColour=&H0000FF88,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=100,${SUBTITLE_SIDE_MARGIN}`
+      return withPlayRes(
+        `FontSize=22,PrimaryColour=&H0000FF88,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=100,${SUBTITLE_SIDE_MARGIN}`,
+      )
     case 'center-white':
-      return `FontSize=24,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=5,MarginV=0,${SUBTITLE_SIDE_MARGIN}`
+      return withPlayRes(
+        `FontSize=24,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=5,MarginV=0,${SUBTITLE_SIDE_MARGIN}`,
+      )
     case 'cinematic':
-      return `FontSize=18,PrimaryColour=&H00E0E0E0,OutlineColour=&H40000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=2,MarginV=88,${SUBTITLE_SIDE_MARGIN}`
+      return withPlayRes(
+        `FontSize=18,PrimaryColour=&H00E0E0E0,OutlineColour=&H40000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=2,MarginV=88,${SUBTITLE_SIDE_MARGIN}`,
+      )
     case 'bottom-safe':
       /** 竖屏 9:16 底部安全区：更小字号 + 更高边距，避开中下部主体/手机/手部 */
-      return `FontSize=14,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=2,MarginV=280,${SUBTITLE_SIDE_MARGIN}`
+      return withPlayRes(
+        `FontSize=14,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=2,MarginV=280,${SUBTITLE_SIDE_MARGIN}`,
+      )
     case 'bottom-white':
     default:
-      return `FontSize=22,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=100,${SUBTITLE_SIDE_MARGIN}`
+      return withPlayRes(
+        `FontSize=22,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=100,${SUBTITLE_SIDE_MARGIN}`,
+      )
   }
 }
 

@@ -29,7 +29,14 @@ import {
   fetchVideoAiConfig,
   postProcessVideoOnServer,
 } from '../services/videoAiApi'
-import { buildSrtContent, probeVideoDurationSec, splitSubtitleLines } from './digitalHumanSubtitle'
+import {
+  buildSrtContent,
+  buildSrtFromTimedChunks,
+  DH_SUBTITLE_MAX_CHARS,
+  probeVideoDurationSec,
+  splitSubtitleLines,
+  type TimedSubtitleChunk,
+} from './digitalHumanSubtitle'
 import { resolveDhSubtitleStyleForBurn } from './digitalHumanPostProcessStyles'
 import { compositePortraitWithBackground } from './digitalHumanBackgroundComposite'
 import {
@@ -199,7 +206,10 @@ async function applyDhFinalPostProcess(
   script: string,
   baseFrameMode: FrameMode,
   targetDurationSec?: number,
-  opts?: { preserveNarrationAudio?: boolean },
+  opts?: {
+    preserveNarrationAudio?: boolean
+    timedSubtitleChunks?: TimedSubtitleChunk[] | null
+  },
 ): Promise<Blob> {
   const draft = work.draft
   const wantsSubtitle = draft.subtitleEnabled && script.length >= 2
@@ -215,7 +225,13 @@ async function applyDhFinalPostProcess(
   let srtContent: string | undefined
   const videoDur = await probeVideoDurationSec(finalBlob)
   if (wantsSubtitle && videoDur > 0) {
-    srtContent = buildSrtContent(splitSubtitleLines(script), videoDur)
+    const fromChunks = buildSrtFromTimedChunks(opts?.timedSubtitleChunks, {
+      maxCharsPerLine: DH_SUBTITLE_MAX_CHARS,
+      totalDurationSec: videoDur,
+    })
+    srtContent =
+      fromChunks.trim() ||
+      buildSrtContent(splitSubtitleLines(script, DH_SUBTITLE_MAX_CHARS), videoDur)
   }
 
   return postProcessVideoOnServer(finalBlob, {
@@ -469,6 +485,8 @@ async function renderWithOmniHuman(
     }
 
     let sceneImageB64 = portraitB64
+    const useProductFusion =
+      Boolean(productPureB64) && isDhProductFusionSegment(i, segmentTotal)
     try {
       if (draftNeedsSceneComposite(segmentDraft) || segmentCustomBg) {
         sceneImageB64 = await compositePortraitWithBackground(
@@ -478,8 +496,6 @@ async function renderWithOmniHuman(
           segmentCustomBg,
         )
       }
-      const useProductFusion =
-        Boolean(productPureB64) && isDhProductFusionSegment(i, segmentTotal)
       if (useProductFusion && productPureB64) {
         const fusion = await prepareDhProductFusionAssets(sceneImageB64, productPureB64)
         sceneImageB64 = fusion.sceneWithProductB64
@@ -502,6 +518,8 @@ async function renderWithOmniHuman(
     const prompt = buildDhOmniHumanPrompt(segmentDraft, {
       motionText: motionLine?.text,
       gesturePreset: segmentGesture,
+      scriptHint: scriptChunks[i] ?? script,
+      hasProductFusion: useProductFusion,
     })
 
     let audioB64: string
@@ -580,6 +598,21 @@ async function renderWithOmniHuman(
   }
 
   onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 94 })
+
+  const timedSubtitleChunks: TimedSubtitleChunk[] = []
+  for (let i = 0; i < segmentTotal; i++) {
+    let dur = 0
+    try {
+      dur = await getAudioDurationSec(segmentAudioBlobs[i]!)
+    } catch {
+      dur = 0
+    }
+    if (!(dur > 0.3)) {
+      dur = Math.max(2, (scriptChunks[i] ?? '').length / 4)
+    }
+    timedSubtitleChunks.push({ text: scriptChunks[i] ?? '', durationSec: dur })
+  }
+
   let finalBlob: Blob
   try {
     finalBlob = await applyDhFinalPostProcess(
@@ -588,7 +621,7 @@ async function renderWithOmniHuman(
       script,
       baseFrameMode,
       targetDurationSec,
-      { preserveNarrationAudio: true },
+      { preserveNarrationAudio: true, timedSubtitleChunks },
     )
   } catch (e) {
     return {
