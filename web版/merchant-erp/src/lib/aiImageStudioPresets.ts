@@ -5,6 +5,7 @@
  */
 import type { PlatformLogoKey } from './platformBranding'
 import { PLATFORM_LOGO_SRC } from './platformBranding'
+import { fitGptImage2Size } from './aiImageStudioGptSize'
 
 export type LocalLifeIndustryId =
   | 'catering'
@@ -272,6 +273,8 @@ export function platformCarouselMasterGenSize(channelId: PublishChannelId): {
   slideSpec: PlatformCarouselFiveSpec
   /** 主图目标宽高比（用于 Prompt，勿用 16:9） */
   masterAspectLabel: string
+  /** GPT Image 2 是否因 3:1 限制钳制了宽高比 */
+  gptAspectClamped?: boolean
 } {
   const slideSpec = resolvePlatformCarouselFiveSpec(channelId)
   const idealW = slideSpec.masterWidth
@@ -296,6 +299,34 @@ export function platformCarouselMasterGenSize(channelId: PublishChannelId): {
     } → 等分 ${slideSpec.slideWidth}×${slideSpec.slideHeight}×5`,
     slideSpec,
     masterAspectLabel: `${idealW}:${idealH}`,
+  }
+}
+
+/**
+ * 五连图 · GPT Image 2：平台目标往往 >3:1（如美团 5000×750），
+ * 在模型约束内取最大可用横图，再中心裁到目标比例并等分 5 张。
+ */
+export function platformCarouselMasterGptSize(channelId: PublishChannelId): {
+  wanxSize: string
+  gptSize: string
+  pixelHint: string
+  slideSpec: PlatformCarouselFiveSpec
+  masterAspectLabel: string
+  gptAspectClamped: boolean
+} {
+  const slideSpec = resolvePlatformCarouselFiveSpec(channelId)
+  const idealW = slideSpec.masterWidth
+  const idealH = slideSpec.masterHeight
+  const fit = fitGptImage2Size(idealW, idealH)
+  return {
+    wanxSize: `${fit.width}*${fit.height}`,
+    gptSize: fit.size,
+    pixelHint: `整幅目标 ${idealW}×${idealH}${
+      fit.clampedAspect ? `（GPT 最长边比≤3:1 → API ${fit.width}×${fit.height}）` : `（API ${fit.width}×${fit.height}）`
+    } → 等分 ${slideSpec.slideWidth}×${slideSpec.slideHeight}×5`,
+    slideSpec,
+    masterAspectLabel: `${idealW}:${idealH}`,
+    gptAspectClamped: fit.clampedAspect,
   }
 }
 

@@ -1,3 +1,4 @@
+import { wanxSizeToGptImage2Size } from '../src/lib/aiImageStudioGptSize.js'
 import { tokenmixImagesGenerate } from './aiGateway/tokenmixImageGenerate.js'
 import { runAgentFreeformTextToImage, type AgentFreeformImageOpts } from './merchantAiUpstream.js'
 
@@ -129,9 +130,14 @@ export async function runMeooAgentImageRequest(
 
   if (imageRoute === 'tokenmix' && tm && !refHttps) {
     try {
-      const gptQuality = /^gpt-image/i.test(tm) ? ('high' as const) : undefined
+      const isGptImage = /^gpt-image/i.test(tm)
+      const gptQuality = isGptImage ? ('high' as const) : undefined
+      const size = isGptImage
+        ? wanxSizeToGptImage2Size(wanxSize)
+        : wanxSize?.trim().replace(/\*/g, 'x').replace(/×/g, 'x') || undefined
       const { imageUrl, modelUsed } = await tokenmixImagesGenerate(env, tm, prompt, {
         quality: gptQuality,
+        ...(size ? { size } : {}),
       })
       return { ok: true, imageUrl, channel: 'tokenmix', displayModel: modelUsed }
     } catch (e) {
