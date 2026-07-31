@@ -170,7 +170,13 @@ export type DigitalHumanWork = {
   hasLocalVoiceCloneSample?: boolean
   /** 用户上传实拍参考视频在 IndexedDB */
   hasLocalReferenceVideo?: boolean
-  videoEngine?: 'qwen_s2v' | 'seedance' | 'seedance_lipsync' | 'seedance_product_fusion' | 'kling'
+  videoEngine?:
+    | 'omnihuman'
+    | 'qwen_s2v'
+    | 'seedance'
+    | 'seedance_lipsync'
+    | 'seedance_product_fusion'
+    | 'kling'
   plannerModel?: 'doubao' | 'qwen'
   segmentCount?: number
 }
