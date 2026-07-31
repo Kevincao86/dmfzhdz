@@ -19,18 +19,61 @@ export function isWan27MultimodalImageModel(modelId: string): boolean {
   return /^wan2\.7-image/.test(m) || m === 'wan2.6-image'
 }
 
-/** wan2.7 支持 1K/2K/4K 缩写或 宽*高 自定义（768–4096） */
+/** 万相/wan2.x 自定义像素：边长 768–4096，宽高比须在 1:4～4:1（上游硬限制） */
+const WANX_SIZE_MIN_SIDE = 768
+const WANX_SIZE_MAX_SIDE = 4096
+const WANX_SIZE_MAX_ASPECT = 4
+
+/**
+ * 规范化万相 size：
+ * - 支持 1K/2K/4K 或 `宽*高`
+ * - 纠正「超宽横幅被对调成竖条」的 461×4096 类非法尺寸
+ * - 钳制到最长边比 ≤4:1，避免 Aspect ratio must be between 1:4 and 4:1
+ */
 export function normalizeWan27ImageSizeParam(raw?: string): string {
   const t = String(raw ?? '').trim()
   if (!t) return '2K'
   if (/^(1k|2k|4k)$/i.test(t)) return t.toUpperCase()
-  const m = /^(\d{3,4})\s*[*×x]\s*(\d{3,4})$/i.exec(t)
-  if (m) {
-    const w = Math.max(768, Math.min(4096, Number(m[1]) || 1024))
-    const h = Math.max(768, Math.min(4096, Number(m[2]) || 1024))
-    return `${w}*${h}`
+  const m = /^(\d{3,5})\s*[*×x]\s*(\d{3,5})$/i.exec(t)
+  if (!m) return '2K'
+
+  let w = Math.max(1, Math.round(Number(m[1]) || 1024))
+  let h = Math.max(1, Math.round(Number(m[2]) || 1024))
+
+  // 超高竖条（常见于超宽五连图被对调）：先还原为横图再钳比例
+  if (h > w && h / w > WANX_SIZE_MAX_ASPECT + 0.001) {
+    const tmp = w
+    w = h
+    h = tmp
   }
-  return '2K'
+
+  if (w / h > WANX_SIZE_MAX_ASPECT + 0.001) {
+    h = Math.max(1, Math.round(w / WANX_SIZE_MAX_ASPECT))
+  } else if (h / w > WANX_SIZE_MAX_ASPECT + 0.001) {
+    w = Math.max(1, Math.round(h / WANX_SIZE_MAX_ASPECT))
+  }
+
+  if (Math.max(w, h) > WANX_SIZE_MAX_SIDE) {
+    const s = WANX_SIZE_MAX_SIDE / Math.max(w, h)
+    w = Math.max(1, Math.round(w * s))
+    h = Math.max(1, Math.round(h * s))
+  }
+  if (Math.min(w, h) < WANX_SIZE_MIN_SIDE) {
+    const s = WANX_SIZE_MIN_SIDE / Math.min(w, h)
+    w = Math.max(1, Math.round(w * s))
+    h = Math.max(1, Math.round(h * s))
+  }
+
+  w = Math.max(WANX_SIZE_MIN_SIDE, Math.min(WANX_SIZE_MAX_SIDE, w))
+  h = Math.max(WANX_SIZE_MIN_SIDE, Math.min(WANX_SIZE_MAX_SIDE, h))
+
+  if (w / h > WANX_SIZE_MAX_ASPECT + 0.001) {
+    h = Math.max(WANX_SIZE_MIN_SIDE, Math.min(WANX_SIZE_MAX_SIDE, Math.round(w / WANX_SIZE_MAX_ASPECT)))
+  } else if (h / w > WANX_SIZE_MAX_ASPECT + 0.001) {
+    w = Math.max(WANX_SIZE_MIN_SIDE, Math.min(WANX_SIZE_MAX_SIDE, Math.round(h / WANX_SIZE_MAX_ASPECT)))
+  }
+
+  return `${w}*${h}`
 }
 
 function isQwenImageEditModel(modelId: string): boolean {
@@ -89,9 +132,7 @@ export function buildQwenVisionImageRequest(
     const sizeRaw = safeExtras.size
     const size =
       typeof sizeRaw === 'string' && sizeRaw.trim()
-        ? isWan27MultimodalImageModel(modelId)
-          ? normalizeWan27ImageSizeParam(sizeRaw)
-          : sizeRaw.trim()
+        ? normalizeWan27ImageSizeParam(sizeRaw)
         : isWan27MultimodalImageModel(modelId)
           ? '2K'
           : '1024*1024'
@@ -120,10 +161,18 @@ export function buildQwenVisionImageRequest(
     }
   }
 
+  const { size: _legacySizeDrop, ...legacyExtras } = rawExtras as Record<string, unknown> & {
+    size?: unknown
+  }
+  void _legacySizeDrop
+  const legacySizeRaw =
+    typeof rawExtras.size === 'string' && rawExtras.size.trim()
+      ? normalizeWan27ImageSizeParam(rawExtras.size)
+      : '1024*1024'
   const parameters = {
-    size: '1024*1024',
     n: 1,
-    ...rawExtras,
+    ...legacyExtras,
+    size: legacySizeRaw,
   }
   const input: Record<string, unknown> = { prompt }
   if (ref) {

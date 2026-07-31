@@ -30,6 +30,7 @@ import {
   extractQwenVisionImageUrls,
   extractQwenVisionImageUrlsFromPayload,
   isWan27MultimodalImageModel,
+  normalizeWan27ImageSizeParam,
   qwenVisionImageUsesAsyncHeader,
 } from '../src/lib/qwenVisionApi.js'
 import { parseArkVideoEndpointsRaw } from '../src/lib/arkVideoEndpointsConfig.js'
@@ -1983,7 +1984,9 @@ async function qwenWanxOneImage(
   let parameterExtras: Record<string, unknown> | undefined
   const useRef = Boolean(refImageUrl && !opts?.forceT2i)
   const voucherNeg = voucherImageNegativePrompt()
-  const wanxSize = opts?.wanxSize?.trim()
+  const wanxSizeRaw = opts?.wanxSize?.trim()
+  // 服务端再钳一次：避免浏览器旧包仍传 4096*461 / 对调后的 461*4096 被万相拒单
+  const wanxSize = wanxSizeRaw ? normalizeWan27ImageSizeParam(wanxSizeRaw) : undefined
   const preferred = qwenWanxModelId(env)
   /**
    * 视觉工坊默认 wan2.7-image-pro（image_t2i）。有参考图时若切纯 i2i 目录会丢掉 wan2.7，
