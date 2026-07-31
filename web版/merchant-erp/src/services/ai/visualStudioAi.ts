@@ -596,7 +596,7 @@ function sleepMs(ms: number): Promise<void> {
 }
 
 function isFetchNetworkError(msg: string): boolean {
-  return /Failed to fetch|NetworkError|Load failed|network error|ECONNRESET|aborted|AbortError/i.test(
+  return /Failed to fetch|fetch failed|NetworkError|Load failed|network error|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|socket|aborted|AbortError|image_hydrate_failed|image_fetch_failed|代拉 TokenMix/i.test(
     msg,
   )
 }

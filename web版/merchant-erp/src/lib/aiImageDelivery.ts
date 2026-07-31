@@ -22,6 +22,16 @@ function isTokenmixCdnUrl(url: string): boolean {
   }
 }
 
+function sleepMs(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms))
+}
+
+function isProxyTransientError(msg: string): boolean {
+  return /Failed to fetch|fetch failed|NetworkError|Load failed|network error|ECONNRESET|502|503|504|image_fetch_failed|代拉 TokenMix/i.test(
+    msg,
+  )
+}
+
 async function fetchImageBlobViaErpProxy(url: string): Promise<Blob> {
   const auth = await resolveMerchantApiBearer()
   const headers: Record<string, string> = {
@@ -31,38 +41,42 @@ async function fetchImageBlobViaErpProxy(url: string): Promise<Blob> {
   }
   const urls = merchantErpApiCandidates('/api/meoo-ai-agent-image')
   let lastErr = 'image_proxy_unavailable'
-  for (const endpoint of urls) {
-    try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ phase: 'fetch', image_url: url }),
-      })
-      const text = await res.text()
-      let json: Record<string, unknown> = {}
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    for (const endpoint of urls) {
       try {
-        json = text ? (JSON.parse(text) as Record<string, unknown>) : {}
-      } catch {
-        json = {}
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ phase: 'fetch', image_url: url }),
+        })
+        const text = await res.text()
+        let json: Record<string, unknown> = {}
+        try {
+          json = text ? (JSON.parse(text) as Record<string, unknown>) : {}
+        } catch {
+          json = {}
+        }
+        if (!res.ok || json.ok !== true) {
+          lastErr =
+            (typeof json.detail === 'string' && json.detail) ||
+            (typeof json.message === 'string' && json.message) ||
+            `HTTP ${res.status}`
+          if (res.status === 404) continue
+          throw new Error(lastErr)
+        }
+        const dataUrl = typeof json.imageUrl === 'string' ? json.imageUrl.trim() : ''
+        if (!dataUrl.startsWith('data:')) throw new Error('代拉成图未返回 data URL')
+        const bin = await fetch(dataUrl)
+        if (!bin.ok) throw new Error('代拉成图解码失败')
+        return bin.blob()
+      } catch (e) {
+        lastErr = e instanceof Error ? e.message : String(e)
+        if (!isProxyTransientError(lastErr) && !/HTTP 404/i.test(lastErr)) {
+          throw e instanceof Error ? e : new Error(lastErr)
+        }
       }
-      if (!res.ok || json.ok !== true) {
-        lastErr =
-          (typeof json.detail === 'string' && json.detail) ||
-          (typeof json.message === 'string' && json.message) ||
-          `HTTP ${res.status}`
-        if (res.status === 404) continue
-        throw new Error(lastErr)
-      }
-      const dataUrl = typeof json.imageUrl === 'string' ? json.imageUrl.trim() : ''
-      if (!dataUrl.startsWith('data:')) throw new Error('代拉成图未返回 data URL')
-      const bin = await fetch(dataUrl)
-      if (!bin.ok) throw new Error('代拉成图解码失败')
-      return bin.blob()
-    } catch (e) {
-      lastErr = e instanceof Error ? e.message : String(e)
-      if (/Failed to fetch|NetworkError|Load failed/i.test(lastErr)) continue
-      throw e instanceof Error ? e : new Error(lastErr)
     }
+    if (attempt < 4) await sleepMs(Math.min(5000, 800 * attempt))
   }
   throw new Error(lastErr)
 }
