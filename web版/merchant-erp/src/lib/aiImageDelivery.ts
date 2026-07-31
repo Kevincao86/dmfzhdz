@@ -218,6 +218,49 @@ export async function sliceCarouselFiveStrips(
 }
 
 /**
+ * 检测裁切条带是否几乎相同（万相常把整幅画成「三张相同海报并排」）。
+ * 采样缩略图 RGB，平均绝对差过低则判为重复。
+ */
+export async function carouselStripsLookNearlyIdentical(
+  strips: Blob[],
+  opts?: { maxMeanAbsDiff?: number },
+): Promise<boolean> {
+  if (strips.length < 2) return false
+  const maxMean = opts?.maxMeanAbsDiff ?? 12
+  const sampleSize = 48
+  const samples: Uint8ClampedArray[] = []
+  for (const blob of strips) {
+    const bitmap = await createImageBitmap(blob)
+    const canvas = document.createElement('canvas')
+    canvas.width = sampleSize
+    canvas.height = sampleSize
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
+    if (!ctx) {
+      bitmap.close()
+      return false
+    }
+    ctx.drawImage(bitmap, 0, 0, sampleSize, sampleSize)
+    bitmap.close()
+    samples.push(ctx.getImageData(0, 0, sampleSize, sampleSize).data)
+  }
+  const base = samples[0]!
+  for (let s = 1; s < samples.length; s++) {
+    const other = samples[s]!
+    let sum = 0
+    let n = 0
+    for (let i = 0; i < base.length; i += 4) {
+      sum +=
+        Math.abs(base[i]! - other[i]!) +
+        Math.abs(base[i + 1]! - other[i + 1]!) +
+        Math.abs(base[i + 2]! - other[i + 2]!)
+      n += 3
+    }
+    if (n > 0 && sum / n > maxMean) return false
+  }
+  return true
+}
+
+/**
  * 三连图预览：将已裁切的条带从左到右拼回一条横幅（仅预览用）。
  */
 export async function stitchCarouselFiveStrips(

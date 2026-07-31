@@ -16,6 +16,7 @@ import { flushSync } from 'react-dom'
 import { cn } from '../cn'
 import {
   compressImageBlobToJpeg,
+  carouselStripsLookNearlyIdentical,
   fetchImageBlob,
   pngBlobFromImageUrl,
   sliceCarouselFiveStrips,
@@ -948,6 +949,15 @@ export default function AiImageStudioPage() {
         try {
           const masterBlob = await fetchImageBlob(out.imageUrl)
           const strips = await sliceCarouselFiveStrips(masterBlob, masterGen.slideSpec)
+          if (await carouselStripsLookNearlyIdentical(strips)) {
+            channelJobs.forEach((j) => {
+              j.status = 'error'
+              j.message =
+                '整幅被画成三张相同海报并排，裁切后重复。请再点生成；也可改高级 GPT，或在微调写「连续全景、左中右不同场景」'
+            })
+            setVariants([...jobList])
+            continue
+          }
           for (let si = 0; si < channelJobs.length; si++) {
             const job = channelJobs[si]!
             const strip = strips[si]
