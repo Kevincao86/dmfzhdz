@@ -1,0 +1,22 @@
+{
+  "name": "tata-wecom-tools",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "塔塔的小工具：企微智能表格 + 群机器人提醒/报表",
+  "scripts": {
+    "demo": "node src/cli.js demo",
+    "job:reminder": "node src/cli.js reminder",
+    "job:rank:week": "node src/cli.js rank-week",
+    "job:rank:month": "node src/cli.js rank-month",
+    "job:files": "node src/cli.js files",
+    "schedule": "node src/schedule.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "node-cron": "^3.0.3"
+  }
+}
