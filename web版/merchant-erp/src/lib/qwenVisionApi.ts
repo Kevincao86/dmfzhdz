@@ -67,10 +67,14 @@ export function normalizeWan27ImageSizeParam(raw?: string): string {
   w = Math.max(WANX_SIZE_MIN_SIDE, Math.min(WANX_SIZE_MAX_SIDE, w))
   h = Math.max(WANX_SIZE_MIN_SIDE, Math.min(WANX_SIZE_MAX_SIDE, h))
 
+  // 对齐 16 像素，降低 wan2.x 对非对齐尺寸返回 Common error 的概率
+  w = Math.max(WANX_SIZE_MIN_SIDE, Math.min(WANX_SIZE_MAX_SIDE, Math.floor(w / 16) * 16))
+  h = Math.max(WANX_SIZE_MIN_SIDE, Math.min(WANX_SIZE_MAX_SIDE, Math.floor(h / 16) * 16))
+
   if (w / h > WANX_SIZE_MAX_ASPECT + 0.001) {
-    h = Math.max(WANX_SIZE_MIN_SIDE, Math.min(WANX_SIZE_MAX_SIDE, Math.round(w / WANX_SIZE_MAX_ASPECT)))
+    h = Math.max(WANX_SIZE_MIN_SIDE, Math.min(WANX_SIZE_MAX_SIDE, Math.floor(Math.round(w / WANX_SIZE_MAX_ASPECT) / 16) * 16))
   } else if (h / w > WANX_SIZE_MAX_ASPECT + 0.001) {
-    w = Math.max(WANX_SIZE_MIN_SIDE, Math.min(WANX_SIZE_MAX_SIDE, Math.round(h / WANX_SIZE_MAX_ASPECT)))
+    w = Math.max(WANX_SIZE_MIN_SIDE, Math.min(WANX_SIZE_MAX_SIDE, Math.floor(Math.round(h / WANX_SIZE_MAX_ASPECT) / 16) * 16))
   }
 
   return `${w}*${h}`

@@ -126,6 +126,9 @@ function humanizeUpstreamModelErrorMessage(raw: string, model: string): string {
   if (lower.includes('403') || lower.includes('forbidden')) {
     return `模型访问被拒绝（403）：请核对 API Key 权限与模型开通状态。${raw}`
   }
+  if (/common error/i.test(raw)) {
+    return '万相上游瞬时失败（Common error），请稍后重试；系统会尽量切换备用模型。'
+  }
   if (lower.includes('429') || lower.includes('rate limit') || lower.includes('throttl')) {
     return `请求过于频繁或触发限流，请稍后重试。${raw}`
   }
@@ -177,6 +180,7 @@ function isVendorHopableError(e: unknown): boolean {
     return true
   if (lower.includes('不支持') && (lower.includes('图') || lower.includes('image'))) return true
   if (lower.includes('not support') && lower.includes('image')) return true
+  if (/common error/i.test(raw)) return true
   return false
 }
 
