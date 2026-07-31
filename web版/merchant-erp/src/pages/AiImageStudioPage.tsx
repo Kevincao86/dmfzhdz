@@ -669,31 +669,54 @@ export default function AiImageStudioPage() {
     const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     const usePro = imageTier === 'pro'
 
-    // 先立刻刷新按钮/方案墙，再做积分校验，避免点击后「卡住几秒」无反馈
+    // 先立刻刷新按钮/方案墙；商家 JWT 由 API 门禁扣费，跳过前端预检以缩短等待
+    jobList.forEach((j) => {
+      j.status = 'running'
+    })
     flushSync(() => {
       setBusy(true)
       setError(null)
-      setProgress(usePro ? '高级生图准备中…' : '常规生图准备中…')
-      setVariants(jobList)
+      setProgress(
+        usePro
+          ? carouselFive
+            ? '高级整幅生图中（GPT Image 2，约 15–45 秒）…'
+            : '高级生图中（GPT Image 2，约 10–40 秒）…'
+          : carouselFive
+            ? '常规整幅生图中…'
+            : '常规生图中…',
+      )
+      setVariants([...jobList])
       if (jobList[0]) {
         setSelectedPreviewChannel(jobList[0].channelId)
         setSelectedPreviewVariantId(jobList[0].id)
       }
     })
 
-    const afford = await checkVisualStudioImageBatchAffordable(billingUnits, billingTier)
-    if (!afford.ok) {
-      setBusy(false)
-      setProgress('')
-      setVariants([])
-      abortRef.current = null
-      setError(afford.message)
-      return
-    }
-    if (ac.signal.aborted) {
-      setBusy(false)
-      setProgress('')
-      return
+    if (readMpSessionToken()) {
+      setProgress('校验积分…')
+      const afford = await checkVisualStudioImageBatchAffordable(billingUnits, billingTier)
+      if (!afford.ok) {
+        setBusy(false)
+        setProgress('')
+        setVariants([])
+        abortRef.current = null
+        setError(afford.message)
+        return
+      }
+      if (ac.signal.aborted) {
+        setBusy(false)
+        setProgress('')
+        return
+      }
+      setProgress(
+        usePro
+          ? carouselFive
+            ? '高级整幅生图中（GPT Image 2，约 15–45 秒）…'
+            : '高级生图中（GPT Image 2，约 10–40 秒）…'
+          : carouselFive
+            ? '常规整幅生图中…'
+            : '常规生图中…',
+      )
     }
 
     // 高级 GPT Image 2 暂不支持参考图；有参考图时仍走高级纯文生图（不传参考图）
@@ -1555,119 +1578,6 @@ export default function AiImageStudioPage() {
             </StudioPanel>
           ) : null}
 
-          {isCarouselFive ? (
-            <StudioPanel
-              title="一键上传抖音五连图"
-              subtitle="写入来客门店头图轮播（poi/decorate），不改商品。需应用已开通 life.capacity.poi.decorate"
-            >
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                <label className="min-w-0 flex-1 text-xs text-slate-600">
-                  目标门店
-                  <select
-                    value={decorPoiId}
-                    disabled={decorBusy || busy}
-                    onChange={(e) => setDecorPoiId(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm"
-                  >
-                    {decorStores.length === 0 ? (
-                      <option value="">暂无门店（请先绑定抖音来客）</option>
-                    ) : (
-                      decorStores.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                          {s.city ? ` · ${s.city}` : ''}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                </label>
-                <button
-                  type="button"
-                  disabled={decorBusy || busy || !douyinCarouselReady || !decorPoiId}
-                  onClick={() => void publishDouyinCarouselFive()}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-500 disabled:opacity-50"
-                >
-                  {decorBusy ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Upload className="h-4 w-4" />
-                  )}
-                  一键上传五连图
-                </button>
-              </div>
-              {!douyinCarouselReady ? (
-                <p className="mt-2 text-xs text-slate-400">
-                  请先生成抖音渠道 5 张五连图后再上传
-                </p>
-              ) : null}
-              {decorMsg ? (
-                <p
-                  className={cn(
-                    'mt-2 rounded-lg px-3 py-2 text-xs leading-relaxed ring-1',
-                    decorMsg.startsWith('已提交')
-                      ? 'bg-emerald-50 text-emerald-800 ring-emerald-100'
-                      : 'bg-amber-50 text-amber-900 ring-amber-100',
-                  )}
-                >
-                  {decorMsg}
-                </p>
-              ) : null}
-            </StudioPanel>
-          ) : null}
-            </div>
-          </div>
-
-          {/* 下排：规格速查 + 生成（与上排同列宽，紧凑衔接） */}
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)] lg:items-stretch">
-            <StudioPanel title="发布规格速查" subtitle="当前玩法与已选渠道出图尺寸">
-              <div className="mb-3 rounded-xl bg-violet-50/80 px-3 py-2.5 ring-1 ring-violet-100">
-                <p className="flex items-center gap-1.5 text-sm font-medium text-violet-950">
-                  <span>{playbook.emoji}</span>
-                  {playbook.label}
-                  {activePlaybookVariant ? (
-                    <span className="text-xs font-normal text-violet-600">
-                      · {activePlaybookVariant.label}
-                    </span>
-                  ) : null}
-                </p>
-                <p className="mt-1 text-xs leading-relaxed text-violet-800/80">{playbook.desc}</p>
-                {activePlaybookVariant ? (
-                  <p className="mt-1.5 text-[11px] font-medium text-violet-600">
-                    {activePlaybookVariant.periodLabel}
-                  </p>
-                ) : null}
-              </div>
-              <ul className="space-y-2">
-                {selectedChannelSpecs.map(({ id, ch, display }) => (
-                  <li
-                    key={id}
-                    className="rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="h-2 w-2 shrink-0 rounded-full"
-                        style={{ backgroundColor: ch.color }}
-                      />
-                      <span className="text-xs font-semibold text-slate-800">{ch.label}</span>
-                    </div>
-                    <p className="mt-1 text-[11px] text-slate-600">
-                      {display.label} · {display.pixelHint} · {display.aspectRatio}
-                    </p>
-                    <p className="mt-0.5 text-[10px] leading-relaxed text-slate-400">
-                      {ch.publishTips[0]}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-2 text-[10px] text-slate-400">
-                {isPlatformSeries
-                  ? `五连图/详情图：${form.channels.filter((c) => PLATFORM_SERIES_CHANNELS.includes(c)).length || PLATFORM_SERIES_CHANNELS.length} 个平台 × ${perPlatformCount} 张`
-                  : form.multiChannelPack && form.channels.length > 1
-                    ? `已开启多端套装，${form.channels.length} 个平台各出 ${form.variantCount} 种构图`
-                    : `当前仅 ${resolveChannel(form.channels[0] ?? 'douyin').short} 出图`}
-              </p>
-            </StudioPanel>
-
           <StudioPanel
             step="4"
             title="生成与方案"
@@ -1704,6 +1614,11 @@ export default function AiImageStudioPage() {
             {imageTier === 'pro' && productRefs.length > 0 && (
               <p className="mb-3 text-[11px] leading-relaxed text-amber-800">
                 高级生图走 GPT Image 2 纯文生图，本次将不使用已上传的参考图。
+              </p>
+            )}
+            {imageTier === 'pro' && isCarouselFive && (
+              <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
+                高级五连图需等 GPT 出一整幅再裁 5 张，通常约 15–45 秒；要更快可选「常规生图」。
               </p>
             )}
             <div className="flex flex-wrap items-center gap-2">
@@ -1788,10 +1703,130 @@ export default function AiImageStudioPage() {
 
             {variants.length === 0 && (
               <p className="mt-3 text-xs leading-relaxed text-slate-400">
-                生成后方案将出现在上方方案墙，可对比选优、单独下载；五连图可一键上传抖音门店头图
+                生成后方案将出现在上方方案墙，可对比选优、单独下载；五连图可在下方一键上传抖音门店头图
               </p>
             )}
           </StudioPanel>
+            </div>
+          </div>
+
+          {/* 下排：规格速查 + 一键上传（生成区已上移到方案墙下方） */}
+          <div
+            className={cn(
+              'grid gap-4 lg:items-stretch',
+              isCarouselFive
+                ? 'lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)]'
+                : 'lg:grid-cols-[minmax(0,280px)]',
+            )}
+          >
+            <StudioPanel title="发布规格速查" subtitle="当前玩法与已选渠道出图尺寸">
+              <div className="mb-3 rounded-xl bg-violet-50/80 px-3 py-2.5 ring-1 ring-violet-100">
+                <p className="flex items-center gap-1.5 text-sm font-medium text-violet-950">
+                  <span>{playbook.emoji}</span>
+                  {playbook.label}
+                  {activePlaybookVariant ? (
+                    <span className="text-xs font-normal text-violet-600">
+                      · {activePlaybookVariant.label}
+                    </span>
+                  ) : null}
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-violet-800/80">{playbook.desc}</p>
+                {activePlaybookVariant ? (
+                  <p className="mt-1.5 text-[11px] font-medium text-violet-600">
+                    {activePlaybookVariant.periodLabel}
+                  </p>
+                ) : null}
+              </div>
+              <ul className="space-y-2">
+                {selectedChannelSpecs.map(({ id, ch, display }) => (
+                  <li
+                    key={id}
+                    className="rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="h-2 w-2 shrink-0 rounded-full"
+                        style={{ backgroundColor: ch.color }}
+                      />
+                      <span className="text-xs font-semibold text-slate-800">{ch.label}</span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-slate-600">
+                      {display.label} · {display.pixelHint} · {display.aspectRatio}
+                    </p>
+                    <p className="mt-0.5 text-[10px] leading-relaxed text-slate-400">
+                      {ch.publishTips[0]}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-[10px] text-slate-400">
+                {isPlatformSeries
+                  ? `五连图/详情图：${form.channels.filter((c) => PLATFORM_SERIES_CHANNELS.includes(c)).length || PLATFORM_SERIES_CHANNELS.length} 个平台 × ${perPlatformCount} 张`
+                  : form.multiChannelPack && form.channels.length > 1
+                    ? `已开启多端套装，${form.channels.length} 个平台各出 ${form.variantCount} 种构图`
+                    : `当前仅 ${resolveChannel(form.channels[0] ?? 'douyin').short} 出图`}
+              </p>
+            </StudioPanel>
+
+            {isCarouselFive ? (
+              <StudioPanel
+                title="一键上传抖音五连图"
+                subtitle="写入来客门店头图轮播（poi/decorate），不改商品。需应用已开通 life.capacity.poi.decorate"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <label className="min-w-0 flex-1 text-xs text-slate-600">
+                    目标门店
+                    <select
+                      value={decorPoiId}
+                      disabled={decorBusy || busy}
+                      onChange={(e) => setDecorPoiId(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm"
+                    >
+                      {decorStores.length === 0 ? (
+                        <option value="">暂无门店（请先绑定抖音来客）</option>
+                      ) : (
+                        decorStores.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                            {s.city ? ` · ${s.city}` : ''}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    disabled={decorBusy || busy || !douyinCarouselReady || !decorPoiId}
+                    onClick={() => void publishDouyinCarouselFive()}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-500 disabled:opacity-50"
+                  >
+                    {decorBusy ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Upload className="h-4 w-4" />
+                    )}
+                    一键上传五连图
+                  </button>
+                </div>
+                {!douyinCarouselReady ? (
+                  <p className="mt-2 text-xs text-slate-400">
+                    请先在上方生成抖音渠道 5 张五连图后再上传
+                  </p>
+                ) : null}
+                {decorMsg ? (
+                  <p
+                    className={cn(
+                      'mt-2 rounded-lg px-3 py-2 text-xs leading-relaxed ring-1',
+                      decorMsg.startsWith('已提交')
+                        ? 'bg-emerald-50 text-emerald-800 ring-emerald-100'
+                        : 'bg-amber-50 text-amber-900 ring-amber-100',
+                    )}
+                  >
+                    {decorMsg}
+                  </p>
+                ) : null}
+              </StudioPanel>
+            ) : null}
           </div>
         </div>
 

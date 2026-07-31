@@ -131,10 +131,18 @@ export async function runMeooAgentImageRequest(
   if (imageRoute === 'tokenmix' && tm && !refHttps) {
     try {
       const isGptImage = /^gpt-image/i.test(tm)
-      const gptQuality = isGptImage ? ('high' as const) : undefined
       const size = isGptImage
         ? wanxSizeToGptImage2Size(wanxSize)
         : wanxSize?.trim().replace(/\*/g, 'x').replace(/×/g, 'x') || undefined
+      // 超宽主图（五连图）用 medium：TokenMix high 常需数十秒且易超时；单张竖图仍用 high
+      let gptQuality: 'low' | 'medium' | 'high' | undefined
+      if (isGptImage) {
+        const m = size?.match(/^(\d+)x(\d+)$/i)
+        const w = m ? Number(m[1]) : 0
+        const h = m ? Number(m[2]) : 0
+        const ratio = w > 0 && h > 0 ? Math.max(w, h) / Math.min(w, h) : 1
+        gptQuality = ratio >= 2.2 ? 'medium' : 'high'
+      }
       const { imageUrl, modelUsed } = await tokenmixImagesGenerate(env, tm, prompt, {
         quality: gptQuality,
         ...(size ? { size } : {}),
