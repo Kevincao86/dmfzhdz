@@ -29,6 +29,7 @@ import {
   applyPlaybookToFormWithVariants,
   applyPlaybookVariantToForm,
   buildVisualStudioPrompt,
+  clearPlatformSeriesPlaybook,
   DEFAULT_VISUAL_STUDIO_FORM,
   effectiveVariantCountForForm,
   generateCopySuggestions,
@@ -42,6 +43,8 @@ import {
   platformCarouselMasterGenSize,
   platformCarouselMasterGptSize,
   preferWanxPosterForIntent,
+  resolveFormOutputPlaybookId,
+  resolveFormPlatformSeries,
   publishChannelLogoSrc,
   PUBLISH_CHANNELS,
   resolveAiImageSizePreset,
@@ -299,7 +302,10 @@ export default function AiImageStudioPage() {
     () => getPlaybooksForIndustry(form.industry).filter((p) => !isPlatformSeriesPlaybook(p.id)),
     [form.industry],
   )
-  const isPlatformSeries = isPlatformSeriesPlaybook(form.playbook)
+  const platformSeries = resolveFormPlatformSeries(form)
+  const outputPlaybookId = resolveFormOutputPlaybookId(form)
+  const isPlatformSeries = platformSeries != null
+  const isCarouselFive = platformSeries === 'platform_carousel_five'
   const perPlatformCount = effectiveVariantCountForForm(form)
   const activeGenerateChannels = useMemo(
     () => (form.multiChannelPack ? form.channels : [form.channels[0] ?? 'douyin']),
@@ -308,7 +314,7 @@ export default function AiImageStudioPage() {
   const generatePlan = useMemo(() => {
     const channelCount = activeGenerateChannels.length
     const variantCount = perPlatformCount
-    const isCarousel = form.playbook === 'platform_carousel_five'
+    const isCarousel = isCarouselFive
     // 五连图：每平台 1 张整幅主图（再裁 5 条），按主图计费
     const billable = isCarousel ? channelCount : channelCount * variantCount
     const total = channelCount * variantCount
@@ -361,16 +367,16 @@ export default function AiImageStudioPage() {
   }, [
     activeGenerateChannels,
     form.multiChannelPack,
-    form.playbook,
     imageTier,
+    isCarouselFive,
     isPlatformSeries,
     perPlatformCount,
   ])
   const previewAspect = useMemo((): 'vertical' | 'horizontal' | 'square' | undefined => {
-    if (form.playbook === 'platform_carousel_five') return 'horizontal'
-    if (form.playbook === 'platform_detail_page') return 'vertical'
+    if (platformSeries === 'platform_carousel_five') return 'horizontal'
+    if (platformSeries === 'platform_detail_page') return 'vertical'
     return undefined
-  }, [form.playbook])
+  }, [platformSeries])
   const activeChannel = resolveChannel(selectedPreviewChannel)
   const fieldLabels = industryProfile.fieldLabels
   const copySuggestions = useMemo(
@@ -443,7 +449,7 @@ export default function AiImageStudioPage() {
   }, [loadAiCopy])
 
   useEffect(() => {
-    if (form.playbook !== 'platform_carousel_five') return
+    if (platformSeries !== 'platform_carousel_five') return
     if (decorStores.length >= 10) return
     void (async () => {
       const r = await fetchStoresForPlatform('douyin', {
@@ -456,7 +462,7 @@ export default function AiImageStudioPage() {
         setDecorPoiId((prev) => prev || r.items[0]?.id || '')
       }
     })()
-  }, [form.playbook, decorStores.length])
+  }, [platformSeries, decorStores.length])
 
   const toggleChannel = (id: PublishChannelId) => {
     setForm((f) => {
@@ -487,24 +493,26 @@ export default function AiImageStudioPage() {
   }
 
   const selectPlaybook = (id: VisualPlaybookId) => {
+    if (isPlatformSeriesPlaybook(id)) return
     setForm((f) => {
-      const next = applyPlaybookToFormWithVariants(f, id, { keepChannels: true, templateIndex: 0 })
-      void loadAiCopy(next)
-      return next
+      // 保留五连图/详情图叠加；兼容旧数据（playbook 曾直接等于五连图）
+      const series = resolveFormPlatformSeries(f)
+      const next = applyPlaybookToFormWithVariants(
+        { ...f, platformSeries: series },
+        id,
+        { keepChannels: true, templateIndex: 0 },
+      )
+      const merged = { ...next, playbook: id, platformSeries: series }
+      void loadAiCopy(merged)
+      return merged
     })
   }
 
   const selectPlatformSeries = (id: 'platform_carousel_five' | 'platform_detail_page') => {
     setForm((f) => {
-      // 已选中再点一次 → 取消，回到下方常规玩法（默认团购上新）
-      if (f.playbook === id) {
-        const fallback =
-          getPlaybooksForIndustry(f.industry).find((p) => !isPlatformSeriesPlaybook(p.id))?.id ??
-          'group_buy_new'
-        const next = applyPlaybookToFormWithVariants(f, fallback, {
-          keepChannels: true,
-          templateIndex: 0,
-        })
+      // 已选中再点一次 → 仅取消平台长图，保留下方场景玩法
+      if (resolveFormPlatformSeries(f) === id) {
+        const next = clearPlatformSeriesPlaybook(f)
         void loadAiCopy(next)
         return next
       }
@@ -647,10 +655,11 @@ export default function AiImageStudioPage() {
     }
     if (busy) return
     const jobList = buildJobs()
-    const isCarouselFive = form.playbook === 'platform_carousel_five'
+    const seriesMode = resolveFormPlatformSeries(form)
+    const carouselFive = seriesMode === 'platform_carousel_five'
     const billingTier: 'standard' | 'pro' = imageTier
     // 五连图：每平台只生成 1 张整幅主图再裁 5 张，按主图张数预检积分
-    const billingUnits = isCarouselFive
+    const billingUnits = carouselFive
       ? new Set(jobList.map((j) => j.channelId)).size
       : jobList.length
 
@@ -697,7 +706,11 @@ export default function AiImageStudioPage() {
       if (!readMpSessionToken()) return
       void spendVisualStudioImagePoints({
         idempotencyKey: `vs-img-${runId}-${job.id}`,
-        note: `${ch.short} ${resolveSeriesSlotLabel(form.playbook, job.variantIndex)}${usedPro ? '·高级' : ''}`,
+        note: `${ch.short} ${
+          seriesMode
+            ? resolveSeriesSlotLabel(seriesMode, job.variantIndex)
+            : `方案${job.variantIndex + 1}`
+        }${usedPro ? '·高级' : ''}`,
         tier: usedPro ? 'pro' : 'standard',
       })
     }
@@ -726,7 +739,7 @@ export default function AiImageStudioPage() {
       if (!opts?.skipSpend) spendAfterImage(job, ch, usedPro)
     }
 
-    if (isCarouselFive) {
+    if (carouselFive) {
       const channelIds = [...new Set(jobList.map((j) => j.channelId))]
       for (let ci = 0; ci < channelIds.length; ci++) {
         if (ac.signal.aborted) break
@@ -822,11 +835,13 @@ export default function AiImageStudioPage() {
       if (ac.signal.aborted) break
       const job = jobList[i]!
       const ch = resolveChannel(job.channelId)
-      const size = resolveAiImageSizePreset(resolvePlaybookSizePresetId(job.channelId, form.playbook))
+      const size = resolveAiImageSizePreset(
+        resolvePlaybookSizePresetId(job.channelId, resolveFormOutputPlaybookId(form)),
+      )
       job.status = 'running'
       setVariants([...jobList])
-      const slotLabel = isPlatformSeries
-        ? resolveSeriesSlotLabel(form.playbook, job.variantIndex)
+      const slotLabel = seriesMode
+        ? resolveSeriesSlotLabel(seriesMode, job.variantIndex)
         : `方案 ${job.variantIndex + 1}`
       setSelectedPreviewChannel(job.channelId)
       setSelectedPreviewVariantId(job.id)
@@ -916,8 +931,8 @@ export default function AiImageStudioPage() {
     if (!v.previewUrl && !v.imageUrl) return
     const ch = resolveChannel(v.channelId)
     const ext = v.fileExt ?? 'jpg'
-    const slotPart = isPlatformSeries
-      ? resolveSeriesSlotLabel(form.playbook, v.variantIndex)
+    const slotPart = platformSeries
+      ? resolveSeriesSlotLabel(platformSeries, v.variantIndex)
       : `方案${v.variantIndex + 1}`
     const name = `${form.storeName || '门店'}-${ch.short}-${slotPart}.${ext}`.replace(/\s+/g, '-')
     if (v.previewUrl?.startsWith('blob:')) {
@@ -935,8 +950,8 @@ export default function AiImageStudioPage() {
 
   const publishDouyinCarouselFive = async () => {
     setDecorMsg(null)
-    if (form.playbook !== 'platform_carousel_five') {
-      setDecorMsg('请先选择「五连图」玩法并生成方案')
+    if (platformSeries !== 'platform_carousel_five') {
+      setDecorMsg('请先选择「五连图」并生成方案')
       return
     }
     const poiId = decorPoiId.trim()
@@ -993,17 +1008,17 @@ export default function AiImageStudioPage() {
 
   const doneCount = variants.filter((v) => v.status === 'done').length
   const douyinCarouselReady =
-    form.playbook === 'platform_carousel_five' &&
+    isCarouselFive &&
     variants.filter((v) => v.channelId === 'douyin' && v.status === 'done').length >= 5
 
   const selectedChannelSpecs = useMemo(
     () =>
       form.channels.map((id) => {
         const ch = resolveChannel(id)
-        const display = resolvePlaybookSizeDisplay(id, form.playbook)
+        const display = resolvePlaybookSizeDisplay(id, outputPlaybookId)
         return { id, ch, display }
       }),
-    [form.channels, form.playbook],
+    [form.channels, outputPlaybookId],
   )
 
   return (
@@ -1125,7 +1140,7 @@ export default function AiImageStudioPage() {
 
           <StudioPanel
             title="本地平台长图素材"
-            subtitle="抖音 · 快手 · 美团 · 再点已选卡片可取消"
+            subtitle="可与下方场景玩法叠加 · 再点已选卡片可取消"
           >
             <div className="grid grid-cols-1 gap-2">
               <button
@@ -1134,7 +1149,7 @@ export default function AiImageStudioPage() {
                 onClick={() => selectPlatformSeries('platform_carousel_five')}
                 className={cn(
                   'rounded-xl border px-3 py-3 text-left transition-all',
-                  form.playbook === 'platform_carousel_five'
+                  isCarouselFive
                     ? 'border-orange-400 bg-gradient-to-r from-orange-50 to-amber-50 shadow-sm ring-1 ring-orange-200'
                     : 'border-slate-100 bg-white hover:border-orange-200 hover:bg-orange-50/40',
                 )}
@@ -1155,7 +1170,7 @@ export default function AiImageStudioPage() {
                 onClick={() => selectPlatformSeries('platform_detail_page')}
                 className={cn(
                   'rounded-xl border px-3 py-3 text-left transition-all',
-                  form.playbook === 'platform_detail_page'
+                  platformSeries === 'platform_detail_page'
                     ? 'border-violet-400 bg-gradient-to-r from-violet-50 to-indigo-50 shadow-sm ring-1 ring-violet-200'
                     : 'border-slate-100 bg-white hover:border-violet-200 hover:bg-violet-50/40',
                 )}
@@ -1182,7 +1197,15 @@ export default function AiImageStudioPage() {
             </div>
           </StudioPanel>
 
-          <StudioPanel step="2" title="这次想做什么" subtitle="选玩法后下方可细分场景">
+          <StudioPanel
+            step="2"
+            title="这次想做什么"
+            subtitle={
+              isPlatformSeries
+                ? `已叠加${isCarouselFive ? '五连图' : '详情图'} · 仍可选场景玩法`
+                : '选玩法后下方可细分场景'
+            }
+          >
             <div className="grid grid-cols-2 gap-1.5">
               {visiblePlaybooks.map((pb) => (
                 <button
@@ -1487,9 +1510,9 @@ export default function AiImageStudioPage() {
                         <div
                           className={cn(
                             'flex items-center justify-center bg-slate-100',
-                            form.playbook === 'platform_carousel_five'
+                            isCarouselFive
                               ? 'aspect-[16/9]'
-                              : form.playbook === 'platform_detail_page'
+                              : platformSeries === 'platform_detail_page'
                                 ? 'aspect-[9/16]'
                                 : 'aspect-[3/4]',
                           )}
@@ -1511,8 +1534,8 @@ export default function AiImageStudioPage() {
                       <div className="flex items-center justify-between px-2 py-1.5">
                         <span className="text-[10px] text-slate-500">
                           {ch.short}{' '}
-                          {isPlatformSeries
-                            ? resolveSeriesSlotLabel(form.playbook, v.variantIndex)
+                          {platformSeries
+                            ? resolveSeriesSlotLabel(platformSeries, v.variantIndex)
                             : `#${v.variantIndex + 1}`}
                         </span>
                         {v.status === 'done' && (
@@ -1532,7 +1555,7 @@ export default function AiImageStudioPage() {
             </StudioPanel>
           ) : null}
 
-          {form.playbook === 'platform_carousel_five' ? (
+          {isCarouselFive ? (
             <StudioPanel
               title="一键上传抖音五连图"
               subtitle="写入来客门店头图轮播（poi/decorate），不改商品。需应用已开通 life.capacity.poi.decorate"
