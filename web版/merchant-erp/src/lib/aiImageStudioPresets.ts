@@ -346,8 +346,8 @@ export function buildCarouselFiveMasterPromptExtra(
   const allowedText: string[] = []
   if (form?.storeName?.trim()) allowedText.push(`门店名「${form.storeName.trim()}」`)
   if (form?.headline?.trim()) allowedText.push(`主标题「${form.headline.trim()}」`)
-  if (hasSub) allowedText.push(`副标题「${form.subheadline!.trim()}」`)
-  if (hasOffer) allowedText.push(`优惠「${form!.offer!.trim()}」`)
+  if (hasSub) allowedText.push(`副标题「${form?.subheadline?.trim()}」`)
+  if (hasOffer) allowedText.push(`优惠「${form?.offer?.trim()}」`)
   if (form?.note?.trim()) allowedText.push(`补充「${form.note.trim()}」`)
 
   return [
