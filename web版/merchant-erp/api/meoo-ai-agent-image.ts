@@ -237,6 +237,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     process.cwd(),
     process.env as Record<string, string>,
   )
+  const wantsProImage =
+    imageRoute === 'tokenmix' && /^gpt-image/i.test(tokenmixImageModel || 'gpt-image-2')
   const accessProvider =
     imageRoute === 'tokenmix'
       ? 'tokenmix'
@@ -245,13 +247,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     (typeof auth === 'string' && auth.startsWith('Bearer ')
       ? auth.slice('Bearer '.length).trim()
       : '') || mpSession || undefined
-  const access = await assertAiChatAccess(
+  let access = await assertAiChatAccess(
     user.id,
     accessProvider,
     env0,
     userJwt,
     typeof body.tenantId === 'string' ? body.tenantId.trim() : undefined,
   )
+  // 视觉工坊高级生图按积分计费（150/张），不要求会员 Plus 才开 TokenMix 对话模型
+  if (
+    !access.ok &&
+    wantsProImage &&
+    (access.error === 'plan_model_restricted' || access.error === 'tokenmix_requires_plus')
+  ) {
+    const tmKey = (env0.TOKENMIX_API_KEY ?? '').trim()
+    if (tmKey) {
+      access = { ok: true, envForChat: { ...env0, TOKENMIX_API_KEY: tmKey } }
+    }
+  }
   if (!access.ok) {
     sendMerchantJson(res, access.status, {
       ok: false,
@@ -263,8 +276,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   const isMpSession = user.id.startsWith('mp:')
   let erpTenantId: string | undefined
-  const wantsProImage =
-    imageRoute === 'tokenmix' && /^gpt-image/i.test(tokenmixImageModel || 'gpt-image-2')
   const erpPointsKind = wantsProImage ? 'visual_studio_image_pro' : 'agent_image'
 
   // poll：只查任务，积分在完成时扣；start/sync：先校验余额
