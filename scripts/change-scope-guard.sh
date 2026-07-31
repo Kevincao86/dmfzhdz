@@ -53,6 +53,7 @@ list_scopes() {
   digital_human_bg     商家 ERP：数字人口播·实景/时长/人像融合
   video_gen_precision  视频生成更准：Brief/Skill槽位/保真校验/全入口门禁（不含 ICE）
   openmontage_local    Cursor 本地 OpenMontage skill + 安装脚本（不含 ERP 成片链路）
+  jianying_local       Cursor 本地剪映 skill + 安装脚本（不含 ERP / CapCut 国际版）
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -650,6 +651,19 @@ openmontage-setup
 openmontage
 tools/OpenMontage
 tools/.gitkeep
+tools/README
+change-scope-guard
+.gitignore
+PAT
+      ;;
+    jianying_local)
+      cat <<'PAT'
+.cursor/skills/jianying-editor
+jianying-editor-setup
+jianying-editor
+jianying-jobs
+tools/jianying-editor-skill
+tools/jianying-jobs
 tools/README
 change-scope-guard
 .gitignore

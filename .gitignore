@@ -44,3 +44,6 @@ web版/merchant-erp/.dh-avatar-staging-raw/
 
 # OpenMontage（AGPL）本机克隆，仅 Cursor 本地制片，勿提交
 tools/OpenMontage/
+
+# 剪映 editor skill 上游本机克隆，仅 Cursor 本地剪辑，勿提交
+tools/jianying-editor-skill/
