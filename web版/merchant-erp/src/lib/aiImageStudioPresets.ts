@@ -382,6 +382,11 @@ export function isCarouselFivePlaybook(playbookId: VisualPlaybookId): boolean {
 export function buildCarouselFiveMasterPromptExtra(
   channelId: PublishChannelId,
   form?: Pick<VisualStudioForm, 'offer' | 'subheadline' | 'headline' | 'storeName' | 'note'>,
+  opts?: {
+    /** GPT≤3:1 / 万相≤4:1 时，目标平台更扁，事后会上下居中裁 */
+    aspectClamped?: boolean
+    engine?: 'gpt' | 'wanx'
+  },
 ): string[] {
   const spec = resolvePlatformCarouselFiveSpec(channelId)
   const slots = spec.slotCount || PLATFORM_CAROUSEL_SLOT_COUNT
@@ -395,14 +400,21 @@ export function buildCarouselFiveMasterPromptExtra(
   if (hasOffer) allowedText.push(`优惠「${form?.offer?.trim()}」`)
   if (form?.note?.trim()) allowedText.push(`补充「${form.note.trim()}」`)
   const slotNums = Array.from({ length: slots }, (_, i) => String(i + 1)).join('→')
+  const aspectClamped = opts?.aspectClamped === true
+  const isGpt = opts?.engine === 'gpt'
 
   return [
     `【超宽全景 · ${ch.label}】画 1 张连续横幅（约 ${spec.masterWidth}×${spec.masterHeight}），同一室内从左到右自然延展。`,
     `左/中/右约各 1/${slots} 应是同一空间的不同景别（不同座位、通道或人物位置），不要三张相同海报并排。`,
+    aspectClamped
+      ? isGpt
+        ? '【防裁切·必遵】模型最长边比≤3:1，生成后会上下居中裁成更扁的平台横幅：上下各约 20% 为危险区。所有标题、副标题、价格、按钮、图标与说明文字必须完整落在垂直方向中间 55%～60% 带内；上下边缘只留场景延伸，禁止贴顶贴底放大字。'
+        : '【防裁切·必遵】生成后会上下居中裁成更扁横幅：标题/价格/图标勿贴顶贴底，全部放在画面垂直中部安全带。'
+      : '标题等中文文案整幅最多出现一处；上下边缘留出少量安全留白，勿贴边裁切。',
     '标题等中文文案整幅最多出现一处；不要在画面写系统标签或编号。' +
       (allowedText.length ? `可用文案：${allowedText.join('；')}。` : '无已填文案时以场景为主、少放大字。'),
     hasOffer
-      ? '可将已填优惠自然放在画面一处。'
+      ? '可将已填优惠自然放在画面中部一处（勿贴上下边）。'
       : '未填价格时不要自创价格与折扣文案。',
     hasSub ? '' : '未填副标题时不要编造卖点列表。',
     `生成后会等宽裁成 ${slots} 张（${slotNums}），单张 ${spec.slideWidth}×${spec.slideHeight}。`,
@@ -3001,6 +3013,9 @@ export function buildVisualStudioPrompt(
     refineNote?: string
     /** 三连图：一次生成整幅横幅（非单张 slot） */
     carouselMaster?: boolean
+    /** 三连图引擎比例被钳制（GPT≤3:1 / 万相≤4:1），需防上下裁切 */
+    carouselAspectClamped?: boolean
+    carouselEngine?: 'gpt' | 'wanx'
   },
 ): string {
   const pb = resolvePlaybook(form.playbook)
@@ -3082,7 +3097,12 @@ export function buildVisualStudioPrompt(
 
   const vi = opts?.variantIndex ?? 0
   if (carouselMaster && channel) {
-    lines.push(...buildCarouselFiveMasterPromptExtra(channel.id, form))
+    lines.push(
+      ...buildCarouselFiveMasterPromptExtra(channel.id, form, {
+        aspectClamped: opts?.carouselAspectClamped === true,
+        engine: opts?.carouselEngine,
+      }),
+    )
   } else if (seriesMode) {
     const slotPrompt = resolveSeriesSlotPrompt(seriesMode, vi)
     if (slotPrompt.trim()) lines.push(slotPrompt)
@@ -3155,7 +3175,10 @@ export function buildVisualStudioImageContext(
     carouselSlideWidth: masterGen?.slideSpec.slideWidth ?? 0,
     carouselSlideHeight: masterGen?.slideSpec.slideHeight ?? 0,
     compositionVariant: carouselMaster && channel
-      ? buildCarouselFiveMasterPromptExtra(channel.id, form).join('\n')
+      ? buildCarouselFiveMasterPromptExtra(channel.id, form, {
+          aspectClamped: true,
+          engine: 'gpt',
+        }).join('\n')
       : seriesMode
         ? resolveSeriesSlotPrompt(seriesMode, vi)
         : (VARIANT_SUFFIX[vi] ?? VARIANT_SUFFIX[0]!),

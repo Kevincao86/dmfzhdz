@@ -530,7 +530,7 @@ export async function fetchVisualStudioImagePromptFromAi(
       ? '3. 画面中文只能使用 JSON 里非空的 headline/subheadline/offer/storeName/note；offer 为空则禁止任何价格与卖点列表'
       : '3. 必须体现 headline、offer、subheadline 等已填文案为画面中的中文大字信息',
     opts?.carouselMaster
-      ? '4. carouselMaster=true：描述一张同一室内从左到右连续延展的超宽全景，左中右景别不同；不要三张相同海报并排；生成后裁成 1～3'
+      ? '4. carouselMaster=true：描述一张同一室内从左到右连续延展的超宽全景，左中右景别不同；不要三张相同海报并排；标题价格图标须放在垂直中部安全带（上下勿贴边，防事后上下裁切）；生成后裁成 1～3'
       : '4. 体现 styleHint、compositionVariant、渠道尺寸与 playbook 玩法',
     '5. 若有 productRefCount>0 或 styleFromReference，强调与参考图品类色调一致（非餐饮参考图不得被理解成菜品）',
     form.referenceKeywords.trim()
