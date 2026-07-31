@@ -67,11 +67,15 @@ import {
   MP_POINTS_VISUAL_STUDIO_COPY_PER_USE,
   MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE,
   MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE,
-  VISUAL_STUDIO_PRO_IMAGE_MODEL,
   mpPointsCostForVisualStudioImages,
 } from '../lib/mpPointsEconomics'
 import { postAiAgentNativeImage } from '../services/ai/aiClient'
-import { fetchVisualStudioCopyFromAi, analyzeVisualStudioReferenceImage, fetchVisualStudioReferenceKeywordsFromAi } from '../services/ai/visualStudioAi'
+import {
+  fetchVisualStudioCopyFromAi,
+  analyzeVisualStudioReferenceImage,
+  fetchVisualStudioReferenceKeywordsFromAi,
+  generateVisualStudioGptImage,
+} from '../services/ai/visualStudioAi'
 import {
   checkVisualStudioCopyAffordable,
   checkVisualStudioImageBatchAffordable,
@@ -644,12 +648,17 @@ export default function AiImageStudioPage() {
 
   const mapGenErrorMessage = (raw: string) => {
     const t = (raw || '').trim()
+    if (/Failed to fetch|NetworkError|Load failed|network error/i.test(t)) {
+      return imageTier === 'pro'
+        ? '高级生图网络中断。请点「停止」后重试 GPT Image 2（不会回退万相）'
+        : '生图网络中断，请检查网络后重试'
+    }
     if (/支付网关|502|504|Bad Gateway|Gateway Timeout/i.test(t)) {
       return '生图服务暂时不可用（502），请稍后重试；若刚完成部署可能是轻量 auth-api 重启中'
     }
     if (/abort|超时|已中断/i.test(t)) {
       return imageTier === 'pro'
-        ? '高级生图超时或已中断。请改选「常规生图」（约十几秒～1 分钟）后重试'
+        ? '高级生图超时或已中断。请重试 GPT Image 2（约 1～3 分钟出图）'
         : '生图超时或已中断，请重试'
     }
     return t || '生图失败'
@@ -690,8 +699,8 @@ export default function AiImageStudioPage() {
     abortRef.current?.abort()
     const ac = new AbortController()
     abortRef.current = ac
-    /** 高级 GPT 异步轮询最长达约 250s；前端再留余量，避免连接半开时永久转圈 */
-    const perImageTimeoutMs = imageTier === 'pro' ? 280_000 : 150_000
+    /** 高级 GPT：浏览器短轮询最长约 5 分钟；勿用超长单次 HTTP */
+    const perImageTimeoutMs = imageTier === 'pro' ? 320_000 : 150_000
     let perImageTimer: ReturnType<typeof setTimeout> | null = null
     const armPerImageTimeout = () => {
       if (perImageTimer) clearTimeout(perImageTimer)
@@ -828,19 +837,28 @@ export default function AiImageStudioPage() {
           `${ch.short} · ${engineLabel} 整幅海报生成中（目标 ${masterGen.slideSpec.masterWidth}×${masterGen.slideSpec.masterHeight} · API ${masterGen.wanxSize}）`,
         )
         armPerImageTimeout()
-        let out: Awaited<ReturnType<typeof postAiAgentNativeImage>>
+        let out:
+          | { ok: true; imageUrl: string; channel?: string }
+          | { ok: false; message: string }
         try {
-          out = await postAiAgentNativeImage(prompt, {
-            exactPrompt: true,
-            preferredVendor: 'qwen',
-            referenceImageDataUrl: refImage,
-            wanxSize: masterGen.wanxSize,
-            preferWanxPosterModel: preferPoster,
-            ...(usePro
-              ? { imageRoute: 'tokenmix' as const, tokenmixImageModel: VISUAL_STUDIO_PRO_IMAGE_MODEL }
-              : {}),
-            signal: ac.signal,
-          })
+          if (usePro) {
+            // 高级：start+短轮询，禁止回退万相
+            out = await generateVisualStudioGptImage({
+              prompt,
+              wanxSize: masterGen.wanxSize,
+              signal: ac.signal,
+              onProgress: (msg) => setProgress(`${ch.short} · ${msg}`),
+            })
+          } else {
+            out = await postAiAgentNativeImage(prompt, {
+              exactPrompt: true,
+              preferredVendor: 'qwen',
+              referenceImageDataUrl: refImage,
+              wanxSize: masterGen.wanxSize,
+              preferWanxPosterModel: preferPoster,
+              signal: ac.signal,
+            })
+          }
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e)
           const timedOut = ac.signal.aborted || /abort/i.test(msg)
@@ -848,11 +866,13 @@ export default function AiImageStudioPage() {
             ok: false,
             message: timedOut
               ? usePro
-                ? '高级生图超时或已中断，请改选「常规生图」更快出图，或稍后重试'
+                ? '高级生图超时或已中断，请重试 GPT Image 2'
                 : '生图超时或已中断，请重试'
               : msg,
           }
         }
+
+        const usedPro = usePro && out.ok
 
         if (!out.ok) {
           channelJobs.forEach((j) => {
@@ -862,8 +882,6 @@ export default function AiImageStudioPage() {
           setVariants([...jobList])
           continue
         }
-
-        const usedPro = usePro && out.channel === 'tokenmix'
         // 五连图：每平台 1 次主图计费（ERP JWT 已在 API 扣；星选 mp 在此扣一次）
         if (readMpSessionToken()) {
           void spendVisualStudioImagePoints({
@@ -930,21 +948,29 @@ export default function AiImageStudioPage() {
       )
 
       armPerImageTimeout()
-      let out: Awaited<ReturnType<typeof postAiAgentNativeImage>>
+      let out:
+        | { ok: true; imageUrl: string; channel?: string }
+        | { ok: false; message: string }
       try {
-        out = await postAiAgentNativeImage(prompt, {
-          exactPrompt: true,
-          preferredVendor: 'qwen',
-          referenceImageDataUrl: refImage,
-          wanxSize: size.wanxSize,
-          aspectRatio: size.aspectRatio,
-          doubaoSize: size.doubaoSize,
-          preferWanxPosterModel: preferPoster,
-          ...(usePro
-            ? { imageRoute: 'tokenmix' as const, tokenmixImageModel: VISUAL_STUDIO_PRO_IMAGE_MODEL }
-            : {}),
-          signal: ac.signal,
-        })
+        if (usePro) {
+          out = await generateVisualStudioGptImage({
+            prompt,
+            wanxSize: size.wanxSize,
+            signal: ac.signal,
+            onProgress: (msg) => setProgress(`${ch.short} · ${slotLabel} · ${msg}`),
+          })
+        } else {
+          out = await postAiAgentNativeImage(prompt, {
+            exactPrompt: true,
+            preferredVendor: 'qwen',
+            referenceImageDataUrl: refImage,
+            wanxSize: size.wanxSize,
+            aspectRatio: size.aspectRatio,
+            doubaoSize: size.doubaoSize,
+            preferWanxPosterModel: preferPoster,
+            signal: ac.signal,
+          })
+        }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         const timedOut = ac.signal.aborted || /abort/i.test(msg)
@@ -952,7 +978,7 @@ export default function AiImageStudioPage() {
           ok: false,
           message: timedOut
             ? usePro
-              ? '高级生图超时或已中断，请改选「常规生图」更快出图，或稍后重试'
+              ? '高级生图超时或已中断，请重试 GPT Image 2'
               : '生图超时或已中断，请重试'
             : msg,
         }
@@ -967,7 +993,7 @@ export default function AiImageStudioPage() {
 
       job.imageUrl = out.imageUrl
       job.status = 'done'
-      const usedPro = usePro && out.channel === 'tokenmix'
+      const usedPro = usePro
       spendAfterImage(job, ch, usedPro)
       try {
         if (form.delivery === 'platform') {
@@ -1002,7 +1028,7 @@ export default function AiImageStudioPage() {
       setError(
         /abort/i.test(msg)
           ? usePro
-            ? '高级生图已中断。要更快请改选「常规生图」后重试'
+            ? '高级生图已中断。请重试 GPT Image 2'
             : '生图已中断，请重试'
           : mapGenErrorMessage(msg),
       )
@@ -1699,9 +1725,8 @@ export default function AiImageStudioPage() {
             )}
             {imageTier === 'pro' && isCarouselFive && (
               <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
-                高级五连图：GPT 出一整幅再裁 5 张，正常约 1～3 分钟。超过 5
-                分钟仍无结果请点「停止」，改选「常规生图」更快出图。若报 502
-                请等数秒重试。
+                高级五连图：GPT Image 2 整幅再裁 5 张，正常约 1～3 分钟；浏览器短轮询，不会回退万相。超过 5
+                分钟仍无结果请点「停止」后重试。若报 502 请等数秒再试。
               </p>
             )}
             <div className="flex flex-wrap items-center gap-2">

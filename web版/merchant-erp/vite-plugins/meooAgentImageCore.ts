@@ -1,5 +1,9 @@
 import { wanxSizeToGptImage2Size } from '../src/lib/aiImageStudioGptSize.js'
-import { tokenmixImagesGenerate } from './aiGateway/tokenmixImageGenerate.js'
+import {
+  tokenmixImagesCreate,
+  tokenmixImagesGenerate,
+  tokenmixImagesPollOnce,
+} from './aiGateway/tokenmixImageGenerate.js'
 import { runAgentFreeformTextToImage, type AgentFreeformImageOpts } from './merchantAiUpstream.js'
 
 /**
@@ -94,8 +98,92 @@ export type MeooAgentImageOkJson =
       vendorUsed: 'qwen' | 'doubao' | 'minimax'
       fallbackNote?: string
     }
+  | {
+      ok: true
+      pending: true
+      channel: 'tokenmix'
+      taskId: string
+      displayModel: string
+      retryAfterSec?: number
+    }
 
 export type MeooAgentImageResult = MeooAgentImageOkJson | { ok: false; message: string }
+
+function resolveGptQualityAndSize(
+  modelId: string,
+  wanxSize?: string,
+): { size?: string; quality?: 'low' | 'medium' | 'high' } {
+  const isGptImage = /^gpt-image/i.test(modelId)
+  if (!isGptImage) {
+    const size = wanxSize?.trim().replace(/\*/g, 'x').replace(/×/g, 'x') || undefined
+    return { size }
+  }
+  const size = wanxSizeToGptImage2Size(wanxSize)
+  const m = size?.match(/^(\d+)x(\d+)$/i)
+  const w = m ? Number(m[1]) : 0
+  const h = m ? Number(m[2]) : 0
+  const ratio = w > 0 && h > 0 ? Math.max(w, h) / Math.min(w, h) : 1
+  // 超宽五连图用 low，缩短 TokenMix 排队；禁止回退万相
+  return { size, quality: ratio >= 2.2 ? 'low' : 'high' }
+}
+
+/** 仅创建 TokenMix 任务（秒级返回），供视觉工坊浏览器短轮询 */
+export async function runMeooAgentImageStartTokenmix(
+  env: Record<string, string>,
+  input: Pick<MeooAgentImageRequestInput, 'prompt' | 'tokenmixImageModel' | 'wanxSize'>,
+): Promise<MeooAgentImageResult> {
+  const tm = (input.tokenmixImageModel ?? '').trim()
+  if (!tm) return { ok: false, message: 'tokenmix_image_model 为空' }
+  try {
+    const { size, quality } = resolveGptQualityAndSize(tm, input.wanxSize)
+    const created = await tokenmixImagesCreate(env, tm, input.prompt, {
+      quality,
+      ...(size ? { size } : {}),
+    })
+    if (created.kind === 'ready') {
+      return { ok: true, imageUrl: created.imageUrl, channel: 'tokenmix', displayModel: created.modelUsed }
+    }
+    return {
+      ok: true,
+      pending: true,
+      channel: 'tokenmix',
+      taskId: created.taskId,
+      displayModel: created.modelUsed,
+      retryAfterSec: created.retryAfterSec,
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, message: msg.slice(0, 600) }
+  }
+}
+
+/** 单次轮询 TokenMix 任务 */
+export async function runMeooAgentImagePollTokenmix(
+  env: Record<string, string>,
+  input: { taskId: string; tokenmixImageModel?: string },
+): Promise<MeooAgentImageResult> {
+  const taskId = input.taskId.trim()
+  if (!taskId) return { ok: false, message: 'task_id 为空' }
+  const fallbackModel = (input.tokenmixImageModel ?? 'gpt-image-2').trim() || 'gpt-image-2'
+  try {
+    const once = await tokenmixImagesPollOnce(env, taskId, fallbackModel)
+    if (once.kind === 'ready') {
+      return { ok: true, imageUrl: once.imageUrl, channel: 'tokenmix', displayModel: once.modelUsed }
+    }
+    if (once.kind === 'failed') return { ok: false, message: once.message }
+    return {
+      ok: true,
+      pending: true,
+      channel: 'tokenmix',
+      taskId,
+      displayModel: fallbackModel,
+      retryAfterSec: once.retryAfterSec,
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, message: msg.slice(0, 600) }
+  }
+}
 
 export async function runMeooAgentImageRequest(
   env: Record<string, string>,
@@ -131,23 +219,12 @@ export async function runMeooAgentImageRequest(
   if (imageRoute === 'tokenmix' && tm && !refHttps) {
     try {
       const isGptImage = /^gpt-image/i.test(tm)
-      const size = isGptImage
-        ? wanxSizeToGptImage2Size(wanxSize)
-        : wanxSize?.trim().replace(/\*/g, 'x').replace(/×/g, 'x') || undefined
-      // 超宽主图（五连图）用 low：目标 2～3 分钟内出图；单张仍用 high
-      let gptQuality: 'low' | 'medium' | 'high' | undefined
-      if (isGptImage) {
-        const m = size?.match(/^(\d+)x(\d+)$/i)
-        const w = m ? Number(m[1]) : 0
-        const h = m ? Number(m[2]) : 0
-        const ratio = w > 0 && h > 0 ? Math.max(w, h) / Math.min(w, h) : 1
-        gptQuality = ratio >= 2.2 ? 'low' : 'high'
-      }
+      const { size, quality } = resolveGptQualityAndSize(tm, wanxSize)
       const genPromise = tokenmixImagesGenerate(env, tm, prompt, {
-        quality: gptQuality,
+        quality,
         ...(size ? { size } : {}),
       })
-      // gpt-image-2 在 TokenMix 为异步轮询，high/超宽可能 2～3 分钟；失败不切换其它模型
+      // gpt-image-2 在 TokenMix 为异步轮询，high/超宽可能 2～3 分钟；失败不切换其它模型（禁止回退万相）
       const timeoutMs = isGptImage ? 250_000 : 120_000
       const { imageUrl, modelUsed } = await Promise.race([
         genPromise,
