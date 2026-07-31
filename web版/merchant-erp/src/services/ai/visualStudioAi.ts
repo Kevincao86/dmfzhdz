@@ -267,6 +267,35 @@ export type VisualStudioAiCopyResult =
   | { ok: true; items: CopySuggestion[]; source: 'ai' | 'local' }
   | { ok: false; message: string; fallback: CopySuggestion[] }
 
+/** 文案包应秒级返回；超时立刻回退本地模板，避免 UI 永久「生成中」 */
+const VISUAL_STUDIO_COPY_AI_TIMEOUT_MS = 12_000
+
+function combineAbortWithTimeout(
+  external: AbortSignal | undefined,
+  timeoutMs: number,
+): { signal: AbortSignal; didTimeout: () => boolean; dispose: () => void } {
+  const ac = new AbortController()
+  let timedOut = false
+  const onExternal = () => ac.abort()
+  if (external?.aborted) {
+    ac.abort()
+  } else {
+    external?.addEventListener('abort', onExternal, { once: true })
+  }
+  const timer = setTimeout(() => {
+    timedOut = true
+    ac.abort()
+  }, timeoutMs)
+  return {
+    signal: ac.signal,
+    didTimeout: () => timedOut,
+    dispose: () => {
+      clearTimeout(timer)
+      external?.removeEventListener('abort', onExternal)
+    },
+  }
+}
+
 /** 调用智能体 LLM 生成 3 套海报文案，失败则回退本地模板 */
 export async function fetchVisualStudioCopyFromAi(
   form: VisualStudioForm,
@@ -306,6 +335,7 @@ export async function fetchVisualStudioCopyFromAi(
     .filter(Boolean)
     .join('\n')
 
+  const gate = combineAbortWithTimeout(opts?.signal, VISUAL_STUDIO_COPY_AI_TIMEOUT_MS)
   try {
     const res = await postAiChat(
       {
@@ -322,7 +352,7 @@ export async function fetchVisualStudioCopyFromAi(
         taskType: 'generate_copywriting',
         temperature: 0.4,
       },
-      { signal: opts?.signal },
+      { signal: gate.signal },
     )
     const parsed = parseCopySuggestionsFromAi(res.content)
     if (parsed?.length) {
@@ -335,11 +365,17 @@ export async function fetchVisualStudioCopyFromAi(
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
+    const aborted = /abort/i.test(msg) || e instanceof DOMException
+    if (aborted && gate.didTimeout()) {
+      return { ok: false, message: 'AI 文案超时，已使用本地文案包', fallback }
+    }
     return {
       ok: false,
-      message: msg.includes('abort') ? '已取消' : `AI 文案暂不可用：${msg.slice(0, 120)}`,
+      message: aborted ? '已取消' : `AI 文案暂不可用：${msg.slice(0, 120)}`,
       fallback,
     }
+  } finally {
+    gate.dispose()
   }
 }
 
