@@ -5,7 +5,7 @@ const RATES = {
   shortvideo: { perSec: 80, label: '短视频 AI 处理', unit: '积分/秒' },
   cloud_edit: { flat: 80, maxSec: 60, label: 'AI 混剪', unit: '积分/条' },
   cloud_edit_smart: { perSec: 5, label: '智能混剪', unit: '积分/秒' },
-  digital_human: { perSec: 28, label: '数字人口播', unit: '积分/秒' },
+  digital_human: { perSec: 80, label: '数字人口播', unit: '积分/秒' },
 }
 
 function rateLine(kind) {
