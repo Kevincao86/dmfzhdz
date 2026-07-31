@@ -1433,6 +1433,24 @@ function qwenChatModelCandidates(env: MerchantAiEnv): string[] {
 }
 
 /** 千问：优先百炼 API 拉取的全量语言模型，失败回退内置目录 */
+/** 百炼免费额度耗尽后，通用 qwen-plus/turbo/flash 常 403；优先付费可用的 qwen3.7-flash */
+function isQwen37FlashModelId(modelId: string): boolean {
+  return /qwen3\.7-flash|qwen3-7-flash/i.test(modelId)
+}
+
+/** qwen3.7-flash 默认开思考链会多耗数秒；文案/对话关闭思考以秒级返回 */
+function qwenChatBodyOverridesForModel(modelId: string): Record<string, unknown> | undefined {
+  if (isQwen37FlashModelId(modelId)) return { enable_thinking: false }
+  return undefined
+}
+
+function prioritizeQwenChatModels(ids: readonly string[]): string[] {
+  const sorted = sortQwenChatModelsForText(ids)
+  const flash = sorted.filter((id) => isQwen37FlashModelId(id))
+  const rest = sorted.filter((id) => !isQwen37FlashModelId(id))
+  return flash.length ? [...flash, ...rest] : sorted
+}
+
 async function resolveQwenLiveChatCandidates(
   apiKey: string,
   env: MerchantAiEnv,
@@ -1444,9 +1462,9 @@ async function resolveQwenLiveChatCandidates(
       apiKey,
       chatCompletionsUrl: url,
     })
-    if (discovered.length) return sortQwenChatModelsForText(discovered)
+    if (discovered.length) return prioritizeQwenChatModels(discovered)
   }
-  return qwenChatModelCandidates(env)
+  return prioritizeQwenChatModels(qwenChatModelCandidates(env))
 }
 
 /** 豆包：优先火山 API 拉取的全量语言模型 */
@@ -1617,12 +1635,49 @@ async function callQwenChat(
 ): Promise<{ text: string; modelUsed: string }> {
   /** 公共 DashScope 优先，避免误配业务空间域名导致 403 Workspace endpoint access denied */
   const endpoints = qwenChatEndpointCandidates(env, { preferDefaultFirst: true })
+  const preferred = (env.MERCHANT_AI_QWEN_CHAT_MODEL ?? '').trim()
   let lastErr: Error | undefined
   for (const url of endpoints) {
+    /** 显式模型直调：跳过全量 models 分页，避免冷启动多等数百毫秒～数秒 */
+    if (preferred) {
+      try {
+        const text = await openAiStyleChat(
+          url,
+          apiKey,
+          preferred,
+          system,
+          user,
+          { ...chatOverrides, ...qwenChatBodyOverridesForModel(preferred) },
+          fetchSignal,
+        )
+        return { text, modelUsed: preferred }
+      } catch (e) {
+        lastErr = e instanceof Error ? e : new Error(String(e))
+        if (
+          isQuotaHopableError(lastErr.message) ||
+          isQwenWorkspaceEndpointDenied(lastErr.message) ||
+          isVendorHopableError(e)
+        ) {
+          /* fall through to live pool */
+        } else if (url !== endpoints[endpoints.length - 1]) {
+          continue
+        } else {
+          throw lastErr
+        }
+      }
+    }
     const candidates = await resolveQwenLiveChatCandidates(apiKey, env, url)
     try {
       const { result, modelUsed } = await invokeWithQuotaFailover(candidates, (mid) =>
-        openAiStyleChat(url, apiKey, mid, system, user, chatOverrides, fetchSignal),
+        openAiStyleChat(
+          url,
+          apiKey,
+          mid,
+          system,
+          user,
+          { ...chatOverrides, ...qwenChatBodyOverridesForModel(mid) },
+          fetchSignal,
+        ),
       )
       return { text: result, modelUsed }
     } catch (e) {
