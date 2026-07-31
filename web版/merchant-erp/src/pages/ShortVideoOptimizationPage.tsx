@@ -1578,13 +1578,28 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     return r
   }
 
+  const scrollGenerateFeedbackIntoView = () => {
+    queueMicrotask(() => {
+      document
+        .getElementById('sv-generate-workspace')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    })
+  }
+
+  const failGenerateEarly = (message: string) => {
+    setErr(message)
+    setHint(null)
+    setProgress(null)
+    scrollGenerateFeedbackIntoView()
+  }
+
   const submitGenerate = async () => {
     if (generateGateReason) {
-      setErr(generateGateReason)
+      failGenerateEarly(generateGateReason)
       return
     }
     if (findRunningAiGenerationJob('short_video')) {
-      setErr('已有视频任务在后台生成中，请稍候或返回本页查看进度')
+      failGenerateEarly('已有视频任务在后台生成中，请稍候或返回本页查看进度')
       return
     }
     setErr(null)
@@ -1596,7 +1611,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     setResultUrl(null)
     const vErr = validateEngine() ?? validateLongform()
     if (vErr) {
-      setErr(vErr)
+      failGenerateEarly(vErr)
       return
     }
     generationBillIdRef.current =
@@ -1611,9 +1626,18 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
         : genMode === 'frames' && storyFrames.length > 1
           ? Math.min(LONGFORM_MAX_TARGET_TOTAL_SEC, Math.max(15, storyFrames.length * Number(sdDurationSec)))
           : Number(sdDurationSec)
-    if (!(await ensureShortVideoPointsAffordable(estSec))) return
-
+    // 积分校验前先给主按钮反馈，避免「点了没反应」
+    setBusy(true)
+    setProgress('正在检查积分与引擎…')
     setHint(null)
+    if (!(await ensureShortVideoPointsAffordable(estSec))) {
+      if (mountedRef.current) {
+        setBusy(false)
+        setProgress(null)
+      }
+      scrollGenerateFeedbackIntoView()
+      return
+    }
 
     const videoJobId = startAiGenerationJob({
       kind: 'short_video',
@@ -1645,7 +1669,6 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       }
     }
 
-    setBusy(true)
     cancelRef.current = false
     trackProgress('正在校验执导意图与分镜…')
     try {
@@ -1675,6 +1698,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
           setBusy(false)
           setProgress(null)
         }
+        scrollGenerateFeedbackIntoView()
         return
       }
       txt = prep.guidance.trim() || txt
@@ -1691,6 +1715,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
         setBusy(false)
         setProgress(null)
       }
+      scrollGenerateFeedbackIntoView()
       return
     }
 
@@ -2121,13 +2146,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     // 已在短片生成区且有文案：主按钮直接触发生成（避免「点了没反应」）
     if (mainPane === 'generate' && genPrompt.trim()) {
       if (generateGateReason) {
-        setErr(generateGateReason)
-        setHint(null)
-        queueMicrotask(() => {
-          document
-            .getElementById('sv-generate-workspace')
-            ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        })
+        failGenerateEarly(generateGateReason)
         return
       }
       void submitGenerate()
@@ -2294,7 +2313,8 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
             onSubmit={onAgentCabinSubmit}
             onPickDoc={() => genDocInputRef.current?.click()}
             disabled={busy}
-            busy={auxBusy}
+            busy={busy || auxBusy}
+            progressLabel={busy ? progress : null}
             submitLabel={cabinSubmitLabel}
           >
             {mainPane === 'generate' ? (

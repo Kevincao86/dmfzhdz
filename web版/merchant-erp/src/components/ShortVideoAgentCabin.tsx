@@ -42,6 +42,8 @@ export type ShortVideoAgentCabinProps = {
   onPickDoc?: () => void
   submitLabel?: string
   busy?: boolean
+  /** 生成中进度文案；有值时主按钮显示该文案而非泛化「处理中」 */
+  progressLabel?: string | null
   /** 融合短片生成工作区（参数 / 分镜表 / 操作），减少页面切换 */
   children?: ReactNode
 }
@@ -67,6 +69,7 @@ export default function ShortVideoAgentCabin({
   onPickDoc,
   submitLabel = '开始创作',
   busy,
+  progressLabel,
   children,
 }: ShortVideoAgentCabinProps) {
   const [skillOpen, setSkillOpen] = useState(false)
@@ -387,7 +390,7 @@ export default function ShortVideoAgentCabin({
                 className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full bg-gradient-to-r from-cyan-600 to-sky-500 px-5 text-sm font-semibold text-white shadow-md shadow-cyan-600/25 hover:from-cyan-500 hover:to-sky-400 disabled:cursor-not-allowed disabled:opacity-45"
               >
                 <Send className="h-4 w-4" aria-hidden />
-                {busy ? '处理中…' : submitLabel}
+                {busy ? (progressLabel?.trim() || '处理中…') : submitLabel}
               </button>
             </div>
           </div>
