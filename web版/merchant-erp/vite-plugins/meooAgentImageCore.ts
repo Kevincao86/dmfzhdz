@@ -134,19 +134,26 @@ export async function runMeooAgentImageRequest(
       const size = isGptImage
         ? wanxSizeToGptImage2Size(wanxSize)
         : wanxSize?.trim().replace(/\*/g, 'x').replace(/×/g, 'x') || undefined
-      // 超宽主图（五连图）用 medium：TokenMix high 常需数十秒且易超时；单张竖图仍用 high
+      // 超宽主图（五连图）用 low：目标 2～3 分钟内出图；单张仍用 high
       let gptQuality: 'low' | 'medium' | 'high' | undefined
       if (isGptImage) {
         const m = size?.match(/^(\d+)x(\d+)$/i)
         const w = m ? Number(m[1]) : 0
         const h = m ? Number(m[2]) : 0
         const ratio = w > 0 && h > 0 ? Math.max(w, h) / Math.min(w, h) : 1
-        gptQuality = ratio >= 2.2 ? 'medium' : 'high'
+        gptQuality = ratio >= 2.2 ? 'low' : 'high'
       }
-      const { imageUrl, modelUsed } = await tokenmixImagesGenerate(env, tm, prompt, {
+      const genPromise = tokenmixImagesGenerate(env, tm, prompt, {
         quality: gptQuality,
         ...(size ? { size } : {}),
       })
+      // 避免 TokenMix 挂死导致 Nginx/前端一直等到 502
+      const { imageUrl, modelUsed } = await Promise.race([
+        genPromise,
+        new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('高级生图超时（120秒），请改用常规生图或稍后重试')), 120_000)
+        }),
+      ])
       return { ok: true, imageUrl, channel: 'tokenmix', displayModel: modelUsed }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)

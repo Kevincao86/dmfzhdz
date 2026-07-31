@@ -631,6 +631,14 @@ export default function AiImageStudioPage() {
 
   const pickReferenceImage = () => productRefs[0]?.dataUrl
 
+  const mapGenErrorMessage = (raw: string) => {
+    const t = (raw || '').trim()
+    if (/支付网关|502|504|Bad Gateway|Gateway Timeout/i.test(t)) {
+      return '生图服务暂时不可用（502），请稍后重试；若刚完成部署可能是轻量 auth-api 重启中'
+    }
+    return t || '生图失败'
+  }
+
   const buildJobs = (): VariantResult[] => {
     const jobs: VariantResult[] = []
     const channels = form.multiChannelPack ? form.channels : [form.channels[0] ?? 'douyin']
@@ -679,8 +687,8 @@ export default function AiImageStudioPage() {
       setProgress(
         usePro
           ? carouselFive
-            ? '高级整幅生图中（GPT Image 2，约 15–45 秒）…'
-            : '高级生图中（GPT Image 2，约 10–40 秒）…'
+            ? '高级整幅生图中（目标 2～3 分钟内完成）…'
+            : '高级生图中（GPT Image 2）…'
           : carouselFive
             ? '常规整幅生图中…'
             : '常规生图中…',
@@ -700,7 +708,12 @@ export default function AiImageStudioPage() {
         setProgress('')
         setVariants([])
         abortRef.current = null
-        setError(afford.message)
+        const raw = afford.message || '积分不足'
+        setError(
+          /支付网关|502|504|Bad Gateway|Gateway Timeout/i.test(raw)
+            ? '生图服务暂时不可用（502），请稍后重试；若刚完成部署可能是轻量 auth-api 重启中'
+            : raw,
+        )
         return
       }
       if (ac.signal.aborted) {
@@ -711,8 +724,8 @@ export default function AiImageStudioPage() {
       setProgress(
         usePro
           ? carouselFive
-            ? '高级整幅生图中（GPT Image 2，约 15–45 秒）…'
-            : '高级生图中（GPT Image 2，约 10–40 秒）…'
+            ? '高级整幅生图中（目标 2～3 分钟内完成）…'
+            : '高级生图中（GPT Image 2）…'
           : carouselFive
             ? '常规整幅生图中…'
             : '常规生图中…',
@@ -810,7 +823,7 @@ export default function AiImageStudioPage() {
         if (!out.ok) {
           channelJobs.forEach((j) => {
             j.status = 'error'
-            j.message = out.message
+            j.message = mapGenErrorMessage(out.message)
           })
           setVariants([...jobList])
           continue
@@ -898,7 +911,7 @@ export default function AiImageStudioPage() {
 
       if (!out.ok) {
         job.status = 'error'
-        job.message = out.message
+        job.message = mapGenErrorMessage(out.message)
         setVariants([...jobList])
         continue
       }
@@ -1618,7 +1631,8 @@ export default function AiImageStudioPage() {
             )}
             {imageTier === 'pro' && isCarouselFive && (
               <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
-                高级五连图需等 GPT 出一整幅再裁 5 张，通常约 15–45 秒；要更快可选「常规生图」。
+                高级五连图：GPT 出一整幅再裁 5 张，目标 2～3 分钟内完成；若报 502
+                请等数秒重试（部署重启瞬间）。要更快可选「常规生图」。
               </p>
             )}
             <div className="flex flex-wrap items-center gap-2">

@@ -1,11 +1,11 @@
 /**
  * TokenMix / gpt-image-* 自定义尺寸约束（以中继实际上限为准）：
  * - 两边均为 16 的倍数
- * - 最长边 ≤ 2048（上游报错：out of range [16*16, 2048*2048]）
+ * - 最长边 ≤ 1536（兼顾 TokenMix≤2048 与 2～3 分钟内出图；过大极易超时/502）
  * - 长短边比 ≤ 3:1
- * - 总像素 ∈ [655360, 2048*2048]
+ * - 总像素 ∈ [655360, 1536*1536]
  */
-const GPT_IMAGE2_MAX_EDGE = 2048
+const GPT_IMAGE2_MAX_EDGE = 1536
 const GPT_IMAGE2_MAX_RATIO = 3
 const GPT_IMAGE2_MAX_PIXELS = GPT_IMAGE2_MAX_EDGE * GPT_IMAGE2_MAX_EDGE
 const GPT_IMAGE2_MIN_PIXELS = 655_360
