@@ -275,11 +275,11 @@ export function resolvePlatformCarouselFiveSpec(channelId: PublishChannelId): Pl
   return PLATFORM_CAROUSEL_FIVE_SPECS.meituan
 }
 
-/** 万相边长上限；宽高比须在 1:4～4:1（上游硬限制，超宽三连图会钳到 4:1 再中心裁） */
-const CAROUSEL_MASTER_API_MAX_SIDE = 3072
+/** 万相边长：三连图优先兼容 wan2.2 及更早（单边 ≤1440），避免 failover 后 512-1440 拒单 */
+const CAROUSEL_MASTER_API_MAX_SIDE = 1440
 const CAROUSEL_MASTER_API_MIN_SIDE = 768
 const WANX_CAROUSEL_MAX_ASPECT = 4
-const WANX_CAROUSEL_MAX_PIXELS = 2048 * 2048
+const WANX_CAROUSEL_MAX_PIXELS = 1440 * 1440
 
 function snapWanxSide(n: number): number {
   return Math.max(CAROUSEL_MASTER_API_MIN_SIDE, Math.floor(n / 16) * 16)
@@ -305,51 +305,43 @@ export function platformCarouselMasterGenSize(channelId: PublishChannelId): {
   let h = Math.max(1, Math.round(idealH))
   let wanxAspectClamped = false
 
-  // 万相硬限制：长短边比 ≤ 4:1（抖音/快手三连约 5.3:1 仍超限，须先抬高再生成，裁切时取中间带）
-  if (Math.max(w, h) / Math.min(w, h) > WANX_CAROUSEL_MAX_ASPECT + 0.001) {
+  // 先按目标比例；再钳到「单边 768～1440」以兼容 wan2.7 与 wan2.2 failover
+  const targetAspect = idealW / Math.max(1, idealH)
+  if (targetAspect > WANX_CAROUSEL_MAX_ASPECT + 0.001) {
     wanxAspectClamped = true
-    if (w >= h) h = Math.max(1, Math.round(w / WANX_CAROUSEL_MAX_ASPECT))
-    else w = Math.max(1, Math.round(h / WANX_CAROUSEL_MAX_ASPECT))
   }
-
-  // 边长与总像素钳制：过宽易触发上游 Common error
-  if (w > CAROUSEL_MASTER_API_MAX_SIDE || h > CAROUSEL_MASTER_API_MAX_SIDE || w * h > WANX_CAROUSEL_MAX_PIXELS) {
-    const scale = Math.min(
-      CAROUSEL_MASTER_API_MAX_SIDE / w,
-      CAROUSEL_MASTER_API_MAX_SIDE / h,
-      Math.sqrt(WANX_CAROUSEL_MAX_PIXELS / (w * h)),
-    )
-    w = Math.max(1, Math.round(w * scale))
-    h = Math.max(1, Math.round(h * scale))
+  // 在兼容区内取最大横图：优先拉满长边 1440，短边 ≥768 → 最大约 1440×768（≈1.875:1）
+  const maxAspectInBox = CAROUSEL_MASTER_API_MAX_SIDE / CAROUSEL_MASTER_API_MIN_SIDE
+  const wantAspect = Math.min(Math.max(targetAspect, 1), Math.min(WANX_CAROUSEL_MAX_ASPECT, maxAspectInBox))
+  w = CAROUSEL_MASTER_API_MAX_SIDE
+  h = Math.max(CAROUSEL_MASTER_API_MIN_SIDE, Math.round(w / wantAspect))
+  if (h > CAROUSEL_MASTER_API_MAX_SIDE) {
+    h = CAROUSEL_MASTER_API_MAX_SIDE
+    w = Math.max(CAROUSEL_MASTER_API_MIN_SIDE, Math.round(h * wantAspect))
   }
-
-  if (Math.min(w, h) < CAROUSEL_MASTER_API_MIN_SIDE) {
-    const s = CAROUSEL_MASTER_API_MIN_SIDE / Math.min(w, h)
+  if (w * h > WANX_CAROUSEL_MAX_PIXELS) {
+    const s = Math.sqrt(WANX_CAROUSEL_MAX_PIXELS / (w * h))
     w = Math.max(1, Math.round(w * s))
     h = Math.max(1, Math.round(h * s))
   }
 
   w = snapWanxSide(Math.min(CAROUSEL_MASTER_API_MAX_SIDE, w))
-  h = snapWanxSide(Math.min(CAROUSEL_MASTER_API_MAX_SIDE, h))
-
-  if (Math.max(w, h) / Math.min(w, h) > WANX_CAROUSEL_MAX_ASPECT + 0.001) {
+  h = snapWanxSide(Math.min(CAROUSEL_MASTER_API_MAX_SIDE, Math.max(CAROUSEL_MASTER_API_MIN_SIDE, h)))
+  if (w / h > WANX_CAROUSEL_MAX_ASPECT + 0.001) {
     wanxAspectClamped = true
-    if (w >= h) h = snapWanxSide(Math.round(w / WANX_CAROUSEL_MAX_ASPECT))
-    else w = snapWanxSide(Math.round(h / WANX_CAROUSEL_MAX_ASPECT))
+    h = snapWanxSide(Math.round(w / WANX_CAROUSEL_MAX_ASPECT))
   }
 
   return {
     wanxSize: `${w}*${h}`,
     pixelHint: `整幅目标 ${idealW}×${idealH}${
-      wanxAspectClamped
-        ? `（万相最长边比≤4:1 → API ${w}×${h}，再中心裁等分）`
-        : w !== idealW || h !== idealH
-          ? `（API ${w}×${h} 等比）`
-          : ''
+      wanxAspectClamped || w !== idealW || h !== idealH
+        ? `（API 兼容尺寸 ${w}×${h}，再中心裁等分）`
+        : ''
     } → 等分 ${slideSpec.slideWidth}×${slideSpec.slideHeight}×${slots}`,
     slideSpec,
     masterAspectLabel: `${idealW}:${idealH}`,
-    wanxAspectClamped,
+    wanxAspectClamped: wanxAspectClamped || Math.abs(w / h - targetAspect) > 0.05,
   }
 }
 
