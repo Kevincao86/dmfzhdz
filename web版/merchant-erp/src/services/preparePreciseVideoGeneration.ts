@@ -57,7 +57,27 @@ export type PreparePreciseVideoGenerationResult =
     }
   | { ok: false; message: string; brief: ShortVideoGenBrief; issues: string[] }
 
+/** 超过单段 Seedance 上限才走长片分镜规划；=15 仍是单次出片 */
 const LONGFORM_SEC_THRESHOLD = 15
+
+function singleShotResult(
+  guidance: string,
+  brief: ShortVideoGenBrief,
+): Extract<PreparePreciseVideoGenerationResult, { ok: true }> {
+  return {
+    ok: true,
+    guidance,
+    rows: null,
+    segmentPrompts: [guidance],
+    brief,
+    adapterHint: brief.adapterHint,
+    usedLongformPlan: false,
+  }
+}
+
+function allowSingleShotFallback(input: PreparePreciseVideoGenerationInput): boolean {
+  return !input.longform && input.targetTotalSec <= LONGFORM_SEC_THRESHOLD
+}
 
 export async function preparePreciseVideoGeneration(
   input: PreparePreciseVideoGenerationInput,
@@ -77,8 +97,12 @@ export async function preparePreciseVideoGeneration(
   }
 
   let guidance = enrichGuidanceFromBrief(brief)
+  const existingUsable =
+    input.existingRows != null &&
+    input.existingRows.length >= 2 &&
+    isScriptRowsUsable(input.existingRows)
   const wantOptimize = input.optimizeGuidance !== false
-  if (wantOptimize && !(input.existingRows && input.existingRows.length >= 2)) {
+  if (wantOptimize && !existingUsable) {
     input.onProgress?.('正在优化执导文案…')
     const opt = await optimizeShortVideoGuidancePrompt(guidance, {
       hasProductImage: input.hasProductImage,
@@ -90,13 +114,14 @@ export async function preparePreciseVideoGeneration(
     }
   }
 
+  // 仅「明确长片 / 超过 15s / 已有可用分镜」走分段规划。
+  // 旧逻辑用 >=15，导致默认 15 秒单段也先调规划模型，失败时主按钮像点了没反应。
   const useLongform =
     Boolean(input.longform) ||
-    input.targetTotalSec >= LONGFORM_SEC_THRESHOLD ||
-    (input.existingRows != null && input.existingRows.length >= 2)
+    input.targetTotalSec > LONGFORM_SEC_THRESHOLD ||
+    existingUsable
 
-  let rows: ShortVideoScriptRow[] | null =
-    input.existingRows && input.existingRows.length >= 2 ? [...input.existingRows] : null
+  let rows: ShortVideoScriptRow[] | null = existingUsable ? [...input.existingRows!] : null
   let usedLongformPlan = false
 
   if (useLongform) {
@@ -112,6 +137,10 @@ export async function preparePreciseVideoGeneration(
         onProgress: input.onProgress,
       })
       if (!plan.ok) {
+        if (allowSingleShotFallback(input)) {
+          input.onProgress?.('分镜规划暂不可用，改为单段直接出片…')
+          return singleShotResult(guidance, brief)
+        }
         return {
           ok: false,
           message: plan.message,
@@ -125,6 +154,10 @@ export async function preparePreciseVideoGeneration(
 
     const fill = validateStoryboardRows(rows, input.targetTotalSec)
     if (!fill.ok) {
+      if (allowSingleShotFallback(input)) {
+        input.onProgress?.('分镜未填满，改为单段直接出片…')
+        return singleShotResult(guidance, brief)
+      }
       return {
         ok: false,
         message: `分镜未通过：${fill.issues.join('；')}`,
@@ -146,6 +179,10 @@ export async function preparePreciseVideoGeneration(
         (x) => !x.startsWith('结构节拍缺失') || (!storyboardReady && corpusLen < 80),
       )
       if (hard.length > 0) {
+        if (allowSingleShotFallback(input)) {
+          input.onProgress?.('分镜保真未过，改为单段直接出片…')
+          return singleShotResult(guidance, brief)
+        }
         return {
           ok: false,
           message: hard.join('；'),
@@ -187,15 +224,7 @@ export async function preparePreciseVideoGeneration(
     }
   }
 
-  return {
-    ok: true,
-    guidance,
-    rows: null,
-    segmentPrompts: [guidance],
-    brief,
-    adapterHint: brief.adapterHint,
-    usedLongformPlan: false,
-  }
+  return singleShotResult(guidance, brief)
 }
 
 /** 将规划 prompts 与已有分镜对齐（无 rows 时用） */
