@@ -155,7 +155,7 @@ export function triggerBlobDownload(blob: Blob, filename: string) {
  * 三连图裁切：整幅横图先按「N×单张」比例裁准，再等宽等高切成 N 张，
  * 最后缩放到平台单张像素（抖音/美团单张宽高不同）。默认 N=3。
  *
- * 垂直对齐：默认 center（上下等比例裁），与 Prompt「上下各约 12% 安全留白」一致。
+ * 垂直对齐：默认 center（上下等比例裁），与 Prompt「上下各约 15% 安全留白」一致。
  */
 export async function sliceCarouselFiveStrips(
   blob: Blob,
