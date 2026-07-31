@@ -1,5 +1,6 @@
 /**
- * 短视频 AI 成片后处理：口播 TTS、混入音轨、烧录中文字幕（避免模型画面内乱码字）。
+ * 短视频 AI 成片后处理。
+ * 短片台默认走 Seedance 1.5 Pro 原生有声+字幕（skipNativeAvPost）；旧路径仍可 TTS + ffmpeg 烧录。
  */
 import {
   downloadVideoUrlAsBlob,
@@ -21,17 +22,23 @@ import {
 import {
   finalizeNarrationScript,
   SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
+  SHORT_VIDEO_SEEDANCE_NATIVE_AV_SUFFIX,
   SHORT_VIDEO_MOTION_PROMPT_SUFFIX,
   extractShortVideoNarrationScript,
   sanitizePromptForVideoModel,
+  sanitizePromptForSeedanceNativeAv,
+  formatDialogueForSeedanceSpeech,
   isValidShortVideoSubtitleScript,
 } from './shortVideoNarrationExtract'
 
 export {
   SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
+  SHORT_VIDEO_SEEDANCE_NATIVE_AV_SUFFIX,
   SHORT_VIDEO_MOTION_PROMPT_SUFFIX,
   extractShortVideoNarrationScript,
   sanitizePromptForVideoModel,
+  sanitizePromptForSeedanceNativeAv,
+  formatDialogueForSeedanceSpeech,
   finalizeNarrationScript,
   isValidShortVideoSubtitleScript,
 }
@@ -175,6 +182,11 @@ export async function finalizeShortVideoOutput(
     subtitleStyle?: string | null
     /** 用于自动推断板式的执导/分镜全文（可含提示词） */
     styleHintText?: string | null
+    /**
+     * Seedance 1.5 Pro 直出有声+字幕：只下载交付，跳过 TTS / 混音 / 烧录。
+     * 数字人口播勿传此开关。
+     */
+    seedanceNativeAv?: boolean
   },
 ): Promise<{ ok: true; objectUrl: string; blob: Blob } | { ok: false; message: string }> {
   onProgress?.('下载 AI 视频…')
@@ -187,6 +199,12 @@ export async function finalizeShortVideoOutput(
   } catch (e) {
     const msg = e instanceof Error ? e.message : '下载成片失败'
     return { ok: false, message: msg }
+  }
+
+  if (opts?.seedanceNativeAv) {
+    onProgress?.('Seedance 有声成片已就绪（模型内置语音与字幕）')
+    const objectUrl = URL.createObjectURL(videoBlob)
+    return { ok: true, objectUrl, blob: videoBlob }
   }
 
   const probedDur = await probeVideoDurationSec(videoBlob)

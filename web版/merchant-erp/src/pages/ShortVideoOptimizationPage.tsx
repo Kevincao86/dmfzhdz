@@ -54,7 +54,7 @@ import {
   finalizeShortVideoOutput,
   extractShortVideoNarrationScript,
   finalizeNarrationScript,
-  sanitizePromptForVideoModel,
+  sanitizePromptForSeedanceNativeAv,
   SHORT_VIDEO_MOTION_PROMPT_SUFFIX,
   SHORT_VIDEO_SUBTITLE_STYLE_AUTO,
 } from '../lib/shortVideoPostProcess'
@@ -666,13 +666,14 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       return runShortVideoJobWithFailover({
         engine: VIDEO_ENGINE,
         body: {
-          prompt: sanitizePromptForVideoModel(body.prompt),
+          prompt: sanitizePromptForSeedanceNativeAv(body.prompt),
           flags: opts?.flagsOverride ?? seedanceFlagsLine,
           images_base64: body.images_base64,
           model: body.model?.trim() || SEEDANCE_1_5_PRO_MODEL_ID,
-          // 商家短片台写死 Seedance 1.5 Pro：禁止 hop / 千问
+          // 商家短片台写死 Seedance 1.5 Pro：禁止 hop / 千问；原生有声
           skip_qwen: true,
           lock_model: true,
+          generate_audio: true,
         },
         poolModels: seedancePoolModels,
         shouldCancel: () => cancelRef.current,
@@ -1115,6 +1116,8 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
         scriptRows: rowsForSub,
         subtitleStyle: sdSubtitleStyle,
         styleHintText,
+        /** 短片台：Seedance 直出有声+字幕，跳过 TTS/烧录（数字人未走此页） */
+        seedanceNativeAv: true,
       },
     )
     if (!fin.ok) {
@@ -1455,7 +1458,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
           final = await concatVideoSegmentsToMp4(blobs, { ratio: sdAspect, fps: sdFps })
         }
       }
-      report('合成口播配音与中文字幕…')
+      report('交付 Seedance 有声成片…')
       const planNarr = planNarrationScript.trim()
       const narration = planNarr
         ? finalizeNarrationScript(planNarr, targetTotalSec)
@@ -1757,7 +1760,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
             return
           }
           if (r.modelUsed) setHint(`已使用视频模型：${r.modelUsed}（单次快路径）`)
-          trackProgress('合成口播配音与中文字幕…')
+          trackProgress('交付 Seedance 有声成片…')
           const narration = await resolveNarrationForFinalVideo(
             workingScriptRows
               .map((row) => row.dialogue.trim())
@@ -1888,7 +1891,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
         return
       }
       if (r.modelUsed) setHint(`已使用视频模型：${r.modelUsed}`)
-      trackProgress('合成口播配音与中文字幕…')
+      trackProgress('交付 Seedance 有声成片…')
       const narrationSource = genMode === 'text' ? txt : txt || textBlock
       const narration = await resolveNarrationForFinalVideo(narrationSource, Number(sdDurationSec))
       const dur = Number(sdDurationSec)

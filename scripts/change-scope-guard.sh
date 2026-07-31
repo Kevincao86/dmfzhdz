@@ -571,6 +571,7 @@ digitalHumanPostProcessStyles
 digitalHumanSubtitle
 videoAiApi
 videoModelDuration
+merchantVideoAiGateway
 short-video-cases
 short-video-bgm
 gen-case-seedance

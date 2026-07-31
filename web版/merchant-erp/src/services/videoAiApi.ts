@@ -36,6 +36,8 @@ export type ShortVideoGenRequestBody = {
   skip_qwen?: boolean
   /** 商家短片：锁定 body.model，禁止多模型 hop */
   lock_model?: boolean
+  /** 商家短片：Seedance 1.5 Pro 原生有声（方舟 generate_audio）；数字人勿开 */
+  generate_audio?: boolean
   /**
    * 阶段 D：Wan/垂类 LoRA 挂载点（DiffSynth/musubi）。
    * 本轮仅类型预留，网关忽略；勿依赖此字段改变生成结果。

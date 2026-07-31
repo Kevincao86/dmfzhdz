@@ -1,11 +1,13 @@
 import {
+  formatDialogueForSeedanceSpeech,
   SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
-  sanitizePromptForVideoModel,
+  SHORT_VIDEO_SEEDANCE_NATIVE_AV_SUFFIX,
+  sanitizePromptForSeedanceNativeAv,
 } from './shortVideoNarrationExtract.js'
 
-/** 提交视频模型：只执行【画面】，口播/大字由后期合成 */
+/** 提交 Seedance 1.5 Pro：画面 + 有声口播 + 底部中文字幕（短片台） */
 export const SHORT_VIDEO_STRICT_VISUAL_SUFFIX =
-  '【执行要求】严格按【画面】描述生成镜头与运镜，不得偏离场景/主体；禁止在画面内渲染任何文字、字幕、标题、Logo 字样；口播与大字由后期合成。'
+  '【执行要求】严格按【画面】描述生成镜头与运镜，不得偏离场景/主体；同步生成中文口播语音；底部安全区中文字幕与口播一致，禁止乱码。'
 
 export type ShortVideoScriptRow = {
   timeRange: string
@@ -24,12 +26,17 @@ export type ShortVideoScriptSegmentPayload = {
 export function buildVideoPromptFromScriptRow(row: ShortVideoScriptRow): string {
   const time = row.timeRange.trim()
   const visual = stripOnScreenTextFromVisual(row.visual.trim())
-  if (!visual && !time) return ''
+  const spoken = formatDialogueForSeedanceSpeech(row.dialogue)
+  if (!visual && !time && !spoken) return ''
   const parts: string[] = []
   if (time) parts.push(`【时段】${time}`)
   if (visual) parts.push(`【画面】${visual}`)
-  const body = `${parts.join('\n')}\n${SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX}\n${SHORT_VIDEO_STRICT_VISUAL_SUFFIX}`
-  return sanitizePromptForVideoModel(body)
+  if (spoken) {
+    parts.push(`【口播对白】角色说：${spoken}`)
+    parts.push(`【字幕】底部显示：${spoken}`)
+  }
+  const body = `${parts.join('\n')}\n${SHORT_VIDEO_SEEDANCE_NATIVE_AV_SUFFIX}\n${SHORT_VIDEO_STRICT_VISUAL_SUFFIX}`
+  return sanitizePromptForSeedanceNativeAv(body)
 }
 
 export function buildPlanFromScriptRows(
@@ -133,9 +140,13 @@ export function scriptRowsToOverallPrompt(rows: ShortVideoScriptRow[]): string {
   return rows
     .map((r, i) => {
       const time = r.timeRange.trim() || `第${i + 1}段`
-      const vis = r.visual.trim() || '（待填画面）'
-      const dia = r.dialogue.trim() || '（待填口播）'
-      return `【${time}】画面：${vis}；口播：${dia}`
+      const vis = stripOnScreenTextFromVisual(r.visual.trim()) || '（待填画面）'
+      const spoken = formatDialogueForSeedanceSpeech(r.dialogue)
+      if (spoken) {
+        return `【${time}】画面：${vis}；口播对白：${spoken}；底部字幕：${spoken}`
+      }
+      const dia = r.dialogue.trim()
+      return dia ? `【${time}】画面：${vis}；口播：${dia}` : `【${time}】画面：${vis}`
     })
     .join('\n')
 }
@@ -773,12 +784,18 @@ export function scriptRowsFromVideoPrompts(
     const timeRange = `${i * segmentSec}-${(i + 1) * segmentSec}秒`
     let body = String(p || '')
       .replace(SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX, '')
+      .replace(SHORT_VIDEO_SEEDANCE_NATIVE_AV_SUFFIX, '')
       .replace(/【画面约束】[^\n]*/g, '')
+      .replace(/【有声成片】[^\n]*/g, '')
+      .replace(/【字幕】[^\n]*/g, '')
       .trim()
     const timeM = body.match(/【时段】([^\n]+)/)
     const visM = body.match(/【画面】([^\n]+)/)
     const actM = body.match(/【动作运镜】([^\n]+)/)
-    const diaM = body.match(/【口播】([^\n]+)/)
+    const diaM =
+      body.match(/【口播对白】[^\n]*?[「"“]([^」"”]+)[」"”]/) ||
+      body.match(/【口播对白】([^\n]+)/) ||
+      body.match(/【口播】([^\n]+)/)
     if (timeM) body = body.replace(/【时段】[^\n]+\n?/, '').trim()
     body = body
       .replace(/【画面】[^\n]+\n?/, '')

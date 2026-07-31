@@ -3,9 +3,26 @@
 export const SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX =
   '【画面约束】禁止在视频画面内渲染任何文字、字幕、标题、Logo 字样或乱码字符；口播与字幕由后期合成。'
 
+/**
+ * 商家短片台（Seedance 1.5 Pro）：模型直出有声 + 底部中文字幕，禁止再走 TTS/ffmpeg 烧录。
+ * 勿用于数字人口播（数字人仍用 SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX）。
+ */
+export const SHORT_VIDEO_SEEDANCE_NATIVE_AV_SUFFIX =
+  '【有声成片】同步生成清晰中文口播语音与环境声；对白用双引号标出并朗读。【字幕】画面底部安全区显示与口播一致的清晰中文字幕（白字细黑边），禁止乱码、禁止大面积遮挡主体；勿生成英文乱码标题。'
+
 /** 图生视频时强调连续动态，避免模型输出近乎静止的「幻灯片」 */
 export const SHORT_VIDEO_MOTION_PROMPT_SUFFIX =
   '【动作运镜】镜头持续平滑运动，主体有自然微动与景深变化，禁止静止硬切或单帧停留。'
+
+/** 口播写入 Seedance prompt：双引号可提升 1.5 Pro 语音对齐 */
+export function formatDialogueForSeedanceSpeech(dialogue: string): string {
+  const d = String(dialogue || '')
+    .trim()
+    .replace(/^["「『“]+|["」』”]+$/g, '')
+  if (d.length < 2) return ''
+  if (/^[(（]?\s*无口播\s*[)）]?$/.test(d) || /待填|^[-—–.]+$/.test(d)) return ''
+  return `"${d}"`
+}
 
 const METADATA_LINE =
   /^(总时长|时长|适配比例|画幅|比例|帧率|fps|BGM|背景音乐|配乐|字幕样式|字体|分辨率|水印)/i
@@ -92,8 +109,7 @@ export function clampSeedanceContentText(
   return out.length >= 8 ? out : SEEDANCE_EMERGENCY_I2V_PROMPT.slice(0, maxLen)
 }
 
-/** 提交给视频模型前：去掉技术参数行，避免模型把元数据画进画面 */
-export function sanitizePromptForVideoModel(prompt: string): string {
+function scrubPromptMetadataLines(prompt: string): string {
   const lines = prompt
     .split(/\r?\n/)
     .map((l) => l.trim())
@@ -107,8 +123,26 @@ export function sanitizePromptForVideoModel(prompt: string): string {
     .join('\n')
     .trim()
   if (!body) body = prompt.trim()
-  if (!body.includes('【画面约束】')) {
+  return body
+}
+
+/** 提交给视频模型前：去掉技术参数行，避免模型把元数据画进画面（数字人 / 旧静音路径） */
+export function sanitizePromptForVideoModel(prompt: string): string {
+  let body = scrubPromptMetadataLines(prompt)
+  if (!body.includes('【画面约束】') && !body.includes('【有声成片】')) {
     body = `${body}\n${SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX}`
+  }
+  return body
+}
+
+/** 商家短片台：Seedance 1.5 Pro 直出有声+字幕（替换「禁字幕/后期合成」约束） */
+export function sanitizePromptForSeedanceNativeAv(prompt: string): string {
+  let body = scrubPromptMetadataLines(prompt)
+    .replace(SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  if (!body.includes('【有声成片】')) {
+    body = `${body}\n${SHORT_VIDEO_SEEDANCE_NATIVE_AV_SUFFIX}`
   }
   return body
 }
