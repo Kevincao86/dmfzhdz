@@ -638,7 +638,10 @@ export default function AiImageStudioPage() {
       return
     }
     const jobList = buildJobs()
-    const afford = await checkVisualStudioImageBatchAffordable(jobList.length, imageTier)
+    // 五连图必须万相超宽整图，按常规档计费（高级 GPT Image 不支持超宽主图）
+    const billingTier: 'standard' | 'pro' =
+      form.playbook === 'platform_carousel_five' ? 'standard' : imageTier
+    const afford = await checkVisualStudioImageBatchAffordable(jobList.length, billingTier)
     if (!afford.ok) {
       setError(afford.message)
       return
@@ -723,19 +726,16 @@ export default function AiImageStudioPage() {
         if (ac.signal.aborted) break
         const prompt = promptPack.ok ? promptPack.prompt : promptPack.fallback
 
+        // 五连图必须整幅超宽横图（单张宽×5），再用 wanxSize；不可强制 16:9 / GPT Image（非超宽）
         setProgress(
-          `${ch.short} · 五连图横幅 · ${usePro ? '高级生图' : '常规生图'}中（${masterGen.wanxSize}）`,
+          `${ch.short} · 五连图整幅横图生成中（${masterGen.wanxSize} · 单张 ${masterGen.slideSpec.slideWidth}×${masterGen.slideSpec.slideHeight}）`,
         )
         const out = await postAiAgentNativeImage(prompt, {
           exactPrompt: true,
           preferredVendor: 'qwen',
           referenceImageDataUrl: refImage,
           wanxSize: masterGen.wanxSize,
-          aspectRatio: '16:9',
           preferWanxPosterModel: preferPoster,
-          ...(usePro
-            ? { imageRoute: 'tokenmix' as const, tokenmixImageModel: VISUAL_STUDIO_PRO_IMAGE_MODEL }
-            : {}),
           signal: ac.signal,
         })
 
@@ -748,9 +748,8 @@ export default function AiImageStudioPage() {
           continue
         }
 
-        const usedPro = usePro && out.ok && out.channel === 'tokenmix'
         setProgress(
-          `${ch.short} · 裁切为 5 张 ${masterGen.slideSpec.slideWidth}×${masterGen.slideSpec.slideHeight}`,
+          `${ch.short} · 整幅等分裁切为 5 张 ${masterGen.slideSpec.slideWidth}×${masterGen.slideSpec.slideHeight}`,
         )
         try {
           const masterBlob = await fetchImageBlob(out.imageUrl)
@@ -764,7 +763,8 @@ export default function AiImageStudioPage() {
               continue
             }
             job.imageUrl = out.imageUrl
-            await finishVariantFromBlob(job, strip, ch, usedPro)
+            // 五连图走万相超宽整图，按常规档扣积分
+            await finishVariantFromBlob(job, strip, ch, false)
             setSelectedPreviewVariantId(job.id)
           }
         } catch (e) {
@@ -1081,7 +1081,8 @@ export default function AiImageStudioPage() {
             </label>
             {isPlatformSeries && (
               <p className="mt-2 text-[10px] leading-relaxed text-orange-700/90">
-                五连图：每平台先生成 1 张横幅再裁 5 张；详情图：三端各出 5 段竖图。
+                五连图：每平台先生成 1 张完整横版大图，再等宽等高裁成 5 张（抖音
+                1125×480 / 美团 750×400 / 快手 750×422）；详情图：三端各出 5 段竖图。
               </p>
             )}
           </StudioPanel>
@@ -1106,7 +1107,9 @@ export default function AiImageStudioPage() {
                   <span className="text-lg">🎠</span>
                   <div>
                     <p className="text-sm font-semibold text-slate-900">五连图</p>
-                    <p className="text-[11px] text-slate-500">先生成超宽横幅，再按平台单张宽度裁 5 张轮播</p>
+                    <p className="text-[11px] text-slate-500">
+                      先整幅横图 → 等分裁 5 张（抖音/美团单张尺寸不同）
+                    </p>
                   </div>
                 </div>
               </button>
