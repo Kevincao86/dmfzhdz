@@ -1859,8 +1859,8 @@ export default function AiImageStudioPage() {
             )}
             {imageTier === 'pro' && isCarouselFive && (
               <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
-                高级五连图：GPT Image 2 整幅再裁 5 张，正常约 1～3 分钟；浏览器短轮询，不会回退万相。超过 5
-                分钟仍无结果请点「停止」后重试。若报 502 请等数秒再试。
+                高级五连图：GPT Image 2 整幅再裁 5 张。创建任务约数十秒，生成轮询约 1～3
+                分钟；若长时间停在「创建任务中」会自动重试。超过 5 分钟请点「停止」后重试。不会回退万相。
               </p>
             )}
             <div className="flex flex-wrap items-center gap-2">
