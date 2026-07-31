@@ -685,7 +685,9 @@ OpsRegistryBridge
 opsRegistryClient
 registryTenantIsolation
 meoo-ops-sync-registry
+meoo-ops-registry-ops-get
 opsRegistryGatewayShared
+ecs-auth-api-server
 change-scope-guard
 PAT
       ;;
