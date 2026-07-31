@@ -40,6 +40,7 @@ import {
   getSubCategoriesForIndustry,
   isPlatformSeriesPlaybook,
   LOCAL_LIFE_INDUSTRIES,
+  PLATFORM_CAROUSEL_SLOT_COUNT,
   PLATFORM_SERIES_CHANNELS,
   platformCarouselMasterGenSize,
   platformCarouselMasterGptSize,
@@ -194,7 +195,7 @@ function DevicePreview({
   previewUrl?: string
   headline: string
   empty?: boolean
-  /** 覆盖渠道默认比例（五连图横图 / 详情图竖图） */
+  /** 覆盖渠道默认比例（三连图横图 / 详情图竖图） */
   previewAspect?: 'vertical' | 'horizontal' | 'square' | 'carouselWide'
 }) {
   const ch = resolveChannel(channelId)
@@ -232,7 +233,7 @@ function DevicePreview({
             />
           )}
           {ch.short}
-          {isCarouselWide ? <span className="font-normal text-slate-500">·五连拼接</span> : null}
+          {isCarouselWide ? <span className="font-normal text-slate-500">·三连拼接</span> : null}
         </div>
         {previewUrl ? (
           <img
@@ -281,7 +282,7 @@ export default function AiImageStudioPage() {
   const [selectedPreviewChannel, setSelectedPreviewChannel] = useState<PublishChannelId>('douyin')
   const [selectedPreviewVariantId, setSelectedPreviewVariantId] = useState<string | null>(null)
   const [variants, setVariants] = useState<VariantResult[]>([])
-  /** 五连图：各渠道 1～5 张横向拼回的预览 URL */
+  /** 三连图：各渠道条带横向拼回的预览 URL */
   const [carouselStitchByChannel, setCarouselStitchByChannel] = useState<
     Partial<Record<PublishChannelId, string>>
   >({})
@@ -336,7 +337,7 @@ export default function AiImageStudioPage() {
     const channelCount = activeGenerateChannels.length
     const variantCount = perPlatformCount
     const isCarousel = isCarouselFive
-    // 五连图：每平台 1 张整幅主图（再裁 5 条），按主图计费
+    // 三连图：每平台 1 张整幅主图（再裁 3 条），按主图计费
     const billable = isCarousel ? channelCount : channelCount * variantCount
     const total = channelCount * variantCount
     const perImage =
@@ -346,12 +347,12 @@ export default function AiImageStudioPage() {
     const pointsCost = mpPointsCostForVisualStudioImages(billable, imageTier)
     const tierLabel = imageTier === 'pro' ? '高级·GPT Image 2' : '常规·万相'
     const pointsDetail = isCarousel
-      ? `${tierLabel} · ${perImage} 积分/整幅 × ${billable} 平台 = ${pointsCost} 积分（裁 5 条不另扣）`
+      ? `${tierLabel} · ${perImage} 积分/整幅 × ${billable} 平台 = ${pointsCost} 积分（裁 ${PLATFORM_CAROUSEL_SLOT_COUNT} 条不另扣）`
       : `${tierLabel} · ${perImage} 积分/张 × ${billable} 张 = ${pointsCost} 积分`
     const primary = resolveChannel(activeGenerateChannels[0] ?? 'douyin')
     const unitLabel = isPlatformSeries
       ? isCarousel
-        ? '张五连图'
+        ? '张三连图'
         : '张详情图'
       : '种构图'
     if (channelCount === 1) {
@@ -418,8 +419,8 @@ export default function AiImageStudioPage() {
         const strips = variants
           .filter((v) => v.channelId === cid && v.status === 'done' && v.previewUrl)
           .sort((a, b) => a.variantIndex - b.variantIndex)
-        if (strips.length < 5) continue
-        try {
+        if (strips.length < PLATFORM_CAROUSEL_SLOT_COUNT) continue
+          try {
           const blob = await stitchCarouselFiveStrips(strips.map((s) => s.previewUrl!))
           if (cancelled) return
           next[cid] = URL.createObjectURL(blob)
@@ -558,7 +559,7 @@ export default function AiImageStudioPage() {
   const selectPlaybook = (id: VisualPlaybookId) => {
     if (isPlatformSeriesPlaybook(id)) return
     setForm((f) => {
-      // 保留五连图/详情图叠加；兼容旧数据（playbook 曾直接等于五连图）
+      // 保留三连图/详情图叠加；兼容旧数据（playbook 曾直接等于三连图）
       const series = resolveFormPlatformSeries(f)
       const next = applyPlaybookToFormWithVariants(
         { ...f, platformSeries: series },
@@ -701,7 +702,7 @@ export default function AiImageStudioPage() {
         : '生图网络中断，请检查网络后重试'
     }
     if (/Aspect ratio must be between|ratio=\d/i.test(t)) {
-      return '五连图尺寸超出模型宽高比限制，请硬刷新后重试（已自动钳到合法比例）'
+      return '三连图尺寸超出模型宽高比限制，请硬刷新后重试（已自动钳到合法比例）'
     }
     if (/支付网关|502|504|Bad Gateway|Gateway Timeout/i.test(t)) {
       return '生图服务暂时不可用（502），请稍后重试；若刚完成部署可能是轻量 auth-api 重启中'
@@ -741,7 +742,7 @@ export default function AiImageStudioPage() {
     const seriesMode = resolveFormPlatformSeries(form)
     const carouselFive = seriesMode === 'platform_carousel_five'
     const billingTier: 'standard' | 'pro' = imageTier
-    // 五连图：每平台只生成 1 张整幅主图再裁 5 张，按主图张数预检积分
+    // 三连图：每平台只生成 1 张整幅主图再裁 3 张，按主图张数预检积分
     const billingUnits = carouselFive
       ? new Set(jobList.map((j) => j.channelId)).size
       : jobList.length
@@ -932,17 +933,17 @@ export default function AiImageStudioPage() {
           setVariants([...jobList])
           continue
         }
-        // 五连图：每平台 1 次主图计费（ERP JWT 已在 API 扣；星选 mp 在此扣一次）
+        // 三连图：每平台 1 次主图计费（ERP JWT 已在 API 扣；星选 mp 在此扣一次）
         if (readMpSessionToken()) {
           void spendVisualStudioImagePoints({
             idempotencyKey: `vs-img-${runId}-carousel-${channelId}`,
-            note: `${ch.short} 五连图整幅${usedPro ? '·高级' : ''}`,
+            note: `${ch.short} 三连图整幅${usedPro ? '·高级' : ''}`,
             tier: usedPro ? 'pro' : 'standard',
           })
         }
 
         setProgress(
-          `${ch.short} · 整幅等分裁切为 5 张 ${masterGen.slideSpec.slideWidth}×${masterGen.slideSpec.slideHeight}`,
+          `${ch.short} · 整幅等分裁切为 ${PLATFORM_CAROUSEL_SLOT_COUNT} 张 ${masterGen.slideSpec.slideWidth}×${masterGen.slideSpec.slideHeight}`,
         )
         try {
           const masterBlob = await fetchImageBlob(out.imageUrl)
@@ -1141,7 +1142,7 @@ export default function AiImageStudioPage() {
   const publishDouyinCarouselFive = async () => {
     setDecorMsg(null)
     if (platformSeries !== 'platform_carousel_five') {
-      setDecorMsg('请先选择「五连图」并生成方案')
+      setDecorMsg('请先选择「三连图」并生成方案')
       return
     }
     const poiId = decorPoiId.trim()
@@ -1152,16 +1153,18 @@ export default function AiImageStudioPage() {
     const strips = variants
       .filter((v) => v.channelId === 'douyin' && v.status === 'done' && (v.previewUrl || v.imageUrl))
       .sort((a, b) => a.variantIndex - b.variantIndex)
-    if (strips.length < 5) {
-      setDecorMsg(`抖音五连图需 5 张已生成图（当前 ${strips.length} 张），请先「一键出图」`)
+    if (strips.length < PLATFORM_CAROUSEL_SLOT_COUNT) {
+      setDecorMsg(
+        `抖音三连图需 ${PLATFORM_CAROUSEL_SLOT_COUNT} 张已生成图（当前 ${strips.length} 张），请先「一键出图」`,
+      )
       return
     }
     setDecorBusy(true)
     try {
       const headImages: string[] = []
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < PLATFORM_CAROUSEL_SLOT_COUNT; i++) {
         const v = strips[i]!
-        setDecorMsg(`上传第 ${i + 1}/5 张到图床…`)
+        setDecorMsg(`上传第 ${i + 1}/${PLATFORM_CAROUSEL_SLOT_COUNT} 张到图床…`)
         const src = v.imageUrl || v.previewUrl!
         const rawBlob = await fetchImageBlob(src)
         const jpeg = await compressImageBlobToJpeg(rawBlob)
@@ -1177,7 +1180,7 @@ export default function AiImageStudioPage() {
         }
         headImages.push(up.url)
       }
-      setDecorMsg('提交抖音门店装修（五连图头图）…')
+      setDecorMsg('提交抖音门店装修（三连图头图）…')
       const r = await postDouyinPoiDecorate({
         poiId,
         headImages,
@@ -1199,7 +1202,8 @@ export default function AiImageStudioPage() {
   const doneCount = variants.filter((v) => v.status === 'done').length
   const douyinCarouselReady =
     isCarouselFive &&
-    variants.filter((v) => v.channelId === 'douyin' && v.status === 'done').length >= 5
+    variants.filter((v) => v.channelId === 'douyin' && v.status === 'done').length >=
+      PLATFORM_CAROUSEL_SLOT_COUNT
 
   const selectedChannelSpecs = useMemo(
     () =>
@@ -1321,8 +1325,8 @@ export default function AiImageStudioPage() {
             </label>
             {isPlatformSeries && (
               <p className="mt-2 text-[10px] leading-relaxed text-orange-700/90">
-                五连图：先按整幅尺寸生成完整海报再等分裁 5 张（美团 5000×750 / 抖音
-                5625×633 / 快手 3750×422）。常规万相可直出超宽；高级 GPT Image 2
+                三连图：先按整幅尺寸生成完整海报再等分裁 3 张（美团 3000×750 / 抖音
+                3375×633 / 快手 2250×422）。单张像素不变。常规万相可直出超宽；高级 GPT Image 2
                 受模型 3:1 限制会先取最大横图再中心裁切等分。详情图：三端各出 5 段竖图。
               </p>
             )}
@@ -1347,9 +1351,9 @@ export default function AiImageStudioPage() {
                 <div className="flex items-center gap-2">
                   <span className="text-lg">🎠</span>
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">五连图</p>
+                    <p className="text-sm font-semibold text-slate-900">三连图</p>
                     <p className="text-[11px] text-slate-500">
-                      美团 5000×750 / 抖音 5625×633 整幅生成 → 等分裁 5 张
+                      美团 3000×750 / 抖音 3375×633 整幅生成 → 等分裁 3 张
                     </p>
                   </div>
                 </div>
@@ -1392,7 +1396,7 @@ export default function AiImageStudioPage() {
             title="这次想做什么"
             subtitle={
               isPlatformSeries
-                ? `已叠加${isCarouselFive ? '五连图' : '详情图'} · 仍可选场景玩法`
+                ? `已叠加${isCarouselFive ? '三连图' : '详情图'} · 仍可选场景玩法`
                 : '选玩法后下方可细分场景'
             }
           >
@@ -1680,7 +1684,7 @@ export default function AiImageStudioPage() {
               title="方案墙"
               subtitle={
                 isCarouselFive
-                  ? `已生成 ${doneCount} 张；预览为 1～5 横向拼接，可单独下载每张`
+                  ? `已生成 ${doneCount} 张；预览为 1～${PLATFORM_CAROUSEL_SLOT_COUNT} 横向拼接，可单独下载每张`
                   : `已生成 ${doneCount} 张，点击切换右侧预览`
               }
             >
@@ -1713,13 +1717,13 @@ export default function AiImageStudioPage() {
                             setSelectedPreviewVariantId(null)
                           }}
                         >
-                          <div className="flex aspect-[5/1] items-center justify-center bg-slate-100">
+                          <div className="flex aspect-[3/1] items-center justify-center bg-slate-100">
                             {running && !stitch ? (
                               <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
                             ) : stitch ? (
                               <img
                                 src={stitch}
-                                alt={`${ch.short} 五连拼接`}
+                                alt={`${ch.short} 三连拼接`}
                                 className="h-full w-full object-contain"
                               />
                             ) : errMsg ? (
@@ -1732,7 +1736,9 @@ export default function AiImageStudioPage() {
                           </div>
                         </button>
                         <div className="flex flex-wrap items-center gap-1.5 px-2 py-1.5">
-                          <span className="text-[10px] font-medium text-slate-600">{ch.short} · 1→5</span>
+                          <span className="text-[10px] font-medium text-slate-600">
+                            {ch.short} · 1→{PLATFORM_CAROUSEL_SLOT_COUNT}
+                          </span>
                           {channelVars.map((v) => (
                             <button
                               key={v.id}
@@ -1859,7 +1865,7 @@ export default function AiImageStudioPage() {
             )}
             {imageTier === 'pro' && isCarouselFive && (
               <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
-                高级五连图：GPT Image 2 整幅再裁 5 张。创建任务约数十秒，生成轮询约 1～3
+                高级三连图：GPT Image 2 整幅再裁 3 张。创建任务约数十秒，生成轮询约 1～3
                 分钟；若长时间停在「创建任务中」会自动重试。超过 5 分钟请点「停止」后重试。不会回退万相。
               </p>
             )}
@@ -1885,7 +1891,7 @@ export default function AiImageStudioPage() {
               </select>
               {isPlatformSeries && (
                 <span className="rounded-lg bg-orange-50 px-2.5 py-2 text-xs text-orange-800 ring-1 ring-orange-100">
-                  固定 5 张系列图
+                  固定 {perPlatformCount} 张系列图
                 </span>
               )}
               <p className="w-full text-[11px] text-slate-500">{generatePlan.pointsDetail}</p>
@@ -1945,7 +1951,7 @@ export default function AiImageStudioPage() {
 
             {variants.length === 0 && (
               <p className="mt-3 text-xs leading-relaxed text-slate-400">
-                生成后方案将出现在上方方案墙，可对比选优、单独下载；五连图可在下方一键上传抖音门店头图
+                生成后方案将出现在上方方案墙，可对比选优、单独下载；三连图可在下方一键上传抖音门店头图
               </p>
             )}
           </StudioPanel>
@@ -2003,7 +2009,7 @@ export default function AiImageStudioPage() {
               </ul>
               <p className="mt-2 text-[10px] text-slate-400">
                 {isPlatformSeries
-                  ? `五连图/详情图：${form.channels.filter((c) => PLATFORM_SERIES_CHANNELS.includes(c)).length || PLATFORM_SERIES_CHANNELS.length} 个平台 × ${perPlatformCount} 张`
+                  ? `三连图/详情图：${form.channels.filter((c) => PLATFORM_SERIES_CHANNELS.includes(c)).length || PLATFORM_SERIES_CHANNELS.length} 个平台 × ${perPlatformCount} 张`
                   : form.multiChannelPack && form.channels.length > 1
                     ? `已开启多端套装，${form.channels.length} 个平台各出 ${form.variantCount} 种构图`
                     : `当前仅 ${resolveChannel(form.channels[0] ?? 'douyin').short} 出图`}
@@ -2012,7 +2018,7 @@ export default function AiImageStudioPage() {
 
             {isCarouselFive ? (
               <StudioPanel
-                title="一键上传抖音五连图"
+                title="一键上传抖音三连图"
                 subtitle="写入来客门店头图轮播（poi/decorate），不改商品。需应用已开通 life.capacity.poi.decorate"
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -2047,12 +2053,13 @@ export default function AiImageStudioPage() {
                     ) : (
                       <Upload className="h-4 w-4" />
                     )}
-                    一键上传五连图
+                    一键上传三连图
                   </button>
                 </div>
                 {!douyinCarouselReady ? (
                   <p className="mt-2 text-xs text-slate-400">
-                    请先在上方生成抖音渠道 5 张五连图后再上传
+                    请先在上方生成抖音渠道 {PLATFORM_CAROUSEL_SLOT_COUNT}{' '}
+                    张三连图后再上传
                   </p>
                 ) : null}
                 {decorMsg ? (

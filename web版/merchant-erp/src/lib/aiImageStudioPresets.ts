@@ -201,16 +201,23 @@ export function resolveIndustrySceneContext(form: {
   }
 }
 
-/** 五连图 / 详情图专用渠道（抖音、快手、美团） */
+/** 三连图 / 详情图专用渠道（抖音、快手、美团） */
 export const PLATFORM_SERIES_CHANNELS: PublishChannelId[] = ['douyin', 'kuaishou', 'meituan']
 
-export const PLATFORM_SERIES_SLOT_COUNT = 5
+/** 三连图裁切张数（单张像素不变，整幅 = 单张宽 × 3） */
+export const PLATFORM_CAROUSEL_SLOT_COUNT = 3
+
+/** 详情图竖向段数（勿与三连图槽位数混用） */
+export const PLATFORM_DETAIL_SLOT_COUNT = 5
+
+/** @deprecated 请用 PLATFORM_CAROUSEL_SLOT_COUNT / PLATFORM_DETAIL_SLOT_COUNT */
+export const PLATFORM_SERIES_SLOT_COUNT = PLATFORM_DETAIL_SLOT_COUNT
 
 /**
- * 五连图规格：先按「整幅海报」尺寸生成，再等宽等高裁成 5 张。
- * - 美团整幅 5000×750 → 单张 1000×750
- * - 抖音整幅 5625×633 → 单张 1125×633
- * - 快手：业界常用 16:9 轮播，整幅 3750×422 → 单张 750×422
+ * 三连图规格：先按「整幅海报」尺寸生成，再等宽等高裁成 3 张。
+ * - 美团整幅 3000×750 → 单张 1000×750
+ * - 抖音整幅 3375×633 → 单张 1125×633
+ * - 快手：业界常用 16:9 轮播，整幅 2250×422 → 单张 750×422
  */
 export type PlatformCarouselFiveSpec = {
   channelId: PublishChannelId
@@ -218,10 +225,12 @@ export type PlatformCarouselFiveSpec = {
   masterWidth: number
   /** 完整海报高（裁前） */
   masterHeight: number
-  /** 裁切后单张宽 = masterWidth / 5 */
+  /** 裁切后单张宽 = masterWidth / slotCount */
   slideWidth: number
   /** 裁切后单张高 = masterHeight */
   slideHeight: number
+  /** 等分张数（三连 = 3） */
+  slotCount: number
   /** 平台侧说明（展示用） */
   specNote: string
 }
@@ -232,27 +241,30 @@ export const PLATFORM_CAROUSEL_FIVE_SPECS: Record<
 > = {
   meituan: {
     channelId: 'meituan',
-    masterWidth: 5000,
+    masterWidth: 3000,
     masterHeight: 750,
     slideWidth: 1000,
     slideHeight: 750,
-    specNote: '美团五连图整幅 5000×750 → 单张 1000×750',
+    slotCount: PLATFORM_CAROUSEL_SLOT_COUNT,
+    specNote: '美团三连图整幅 3000×750 → 单张 1000×750',
   },
   douyin: {
     channelId: 'douyin',
-    masterWidth: 5625,
+    masterWidth: 3375,
     masterHeight: 633,
     slideWidth: 1125,
     slideHeight: 633,
-    specNote: '抖音五连图整幅 5625×633 → 单张 1125×633',
+    slotCount: PLATFORM_CAROUSEL_SLOT_COUNT,
+    specNote: '抖音三连图整幅 3375×633 → 单张 1125×633',
   },
   kuaishou: {
     channelId: 'kuaishou',
-    masterWidth: 3750,
+    masterWidth: 2250,
     masterHeight: 422,
     slideWidth: 750,
     slideHeight: 422,
-    specNote: '快手五连图整幅 3750×422 → 单张 750×422',
+    slotCount: PLATFORM_CAROUSEL_SLOT_COUNT,
+    specNote: '快手三连图整幅 2250×422 → 单张 750×422',
   },
 }
 
@@ -263,11 +275,11 @@ export function resolvePlatformCarouselFiveSpec(channelId: PublishChannelId): Pl
   return PLATFORM_CAROUSEL_FIVE_SPECS.meituan
 }
 
-/** 万相边长上限；宽高比须在 1:4～4:1（上游硬限制，超宽五连图会钳到 4:1 再中心裁） */
+/** 万相边长上限；宽高比须在 1:4～4:1（上游硬限制，超宽三连图会钳到 4:1 再中心裁） */
 const CAROUSEL_MASTER_API_MAX_SIDE = 4096
 const WANX_CAROUSEL_MAX_ASPECT = 4
 
-/** 五连图：先按平台整幅尺寸（适配万相边长+宽高比）生成完整海报，再等分裁成 5 张 */
+/** 三连图：先按平台整幅尺寸（适配万相边长+宽高比）生成完整海报，再等分裁成 3 张 */
 export function platformCarouselMasterGenSize(channelId: PublishChannelId): {
   wanxSize: string
   pixelHint: string
@@ -280,13 +292,14 @@ export function platformCarouselMasterGenSize(channelId: PublishChannelId): {
   gptAspectClamped?: boolean
 } {
   const slideSpec = resolvePlatformCarouselFiveSpec(channelId)
+  const slots = slideSpec.slotCount || PLATFORM_CAROUSEL_SLOT_COUNT
   const idealW = slideSpec.masterWidth
   const idealH = slideSpec.masterHeight
   let w = Math.max(1, Math.round(idealW))
   let h = Math.max(1, Math.round(idealH))
   let wanxAspectClamped = false
 
-  // 万相硬限制：长短边比 ≤ 4:1（抖音整幅约 8.9:1，必须先抬高再生成，裁切时取中间带）
+  // 万相硬限制：长短边比 ≤ 4:1（抖音/快手三连约 5.3:1 仍超限，须先抬高再生成，裁切时取中间带）
   const long = Math.max(w, h)
   const short = Math.min(w, h)
   if (long / short > WANX_CAROUSEL_MAX_ASPECT + 0.001) {
@@ -316,7 +329,7 @@ export function platformCarouselMasterGenSize(channelId: PublishChannelId): {
         : w !== idealW || h !== idealH
           ? `（API ${w}×${h} 等比）`
           : ''
-    } → 等分 ${slideSpec.slideWidth}×${slideSpec.slideHeight}×5`,
+    } → 等分 ${slideSpec.slideWidth}×${slideSpec.slideHeight}×${slots}`,
     slideSpec,
     masterAspectLabel: `${idealW}:${idealH}`,
     wanxAspectClamped,
@@ -324,8 +337,8 @@ export function platformCarouselMasterGenSize(channelId: PublishChannelId): {
 }
 
 /**
- * 五连图 · GPT Image 2：平台目标往往 >3:1（如美团 5000×750），
- * 在模型约束内取最大可用横图，再中心裁到目标比例并等分 5 张。
+ * 三连图 · GPT Image 2：平台目标偶有 >3:1（如抖音 3375×633），
+ * 在模型约束内取最大可用横图，再中心裁到目标比例并等分 3 张。
  */
 export function platformCarouselMasterGptSize(channelId: PublishChannelId): {
   wanxSize: string
@@ -336,6 +349,7 @@ export function platformCarouselMasterGptSize(channelId: PublishChannelId): {
   gptAspectClamped: boolean
 } {
   const slideSpec = resolvePlatformCarouselFiveSpec(channelId)
+  const slots = slideSpec.slotCount || PLATFORM_CAROUSEL_SLOT_COUNT
   const idealW = slideSpec.masterWidth
   const idealH = slideSpec.masterHeight
   const fit = fitGptImage2Size(idealW, idealH)
@@ -344,7 +358,7 @@ export function platformCarouselMasterGptSize(channelId: PublishChannelId): {
     gptSize: fit.size,
     pixelHint: `整幅目标 ${idealW}×${idealH}${
       fit.clampedAspect ? `（GPT 最长边比≤3:1 → API ${fit.width}×${fit.height}）` : `（API ${fit.width}×${fit.height}）`
-    } → 等分 ${slideSpec.slideWidth}×${slideSpec.slideHeight}×5`,
+    } → 等分 ${slideSpec.slideWidth}×${slideSpec.slideHeight}×${slots}`,
     slideSpec,
     masterAspectLabel: `${idealW}:${idealH}`,
     gptAspectClamped: fit.clampedAspect,
@@ -355,12 +369,13 @@ export function isCarouselFivePlaybook(playbookId: VisualPlaybookId): boolean {
   return playbookId === 'platform_carousel_five'
 }
 
-/** 五连图整幅横幅 Prompt 片段（一张连续海报，裁切后编号 1～5） */
+/** 三连图整幅横幅 Prompt 片段（一张连续海报，裁切后编号 1～3） */
 export function buildCarouselFiveMasterPromptExtra(
   channelId: PublishChannelId,
   form?: Pick<VisualStudioForm, 'offer' | 'subheadline' | 'headline' | 'storeName' | 'note'>,
 ): string[] {
   const spec = resolvePlatformCarouselFiveSpec(channelId)
+  const slots = spec.slotCount || PLATFORM_CAROUSEL_SLOT_COUNT
   const ch = resolveChannel(channelId)
   const hasOffer = Boolean(form?.offer?.trim())
   const hasSub = Boolean(form?.subheadline?.trim())
@@ -370,11 +385,12 @@ export function buildCarouselFiveMasterPromptExtra(
   if (hasSub) allowedText.push(`副标题「${form?.subheadline?.trim()}」`)
   if (hasOffer) allowedText.push(`优惠「${form?.offer?.trim()}」`)
   if (form?.note?.trim()) allowedText.push(`补充「${form.note.trim()}」`)
+  const slotNums = Array.from({ length: slots }, (_, i) => String(i + 1)).join('→')
 
   return [
-    `【五连图 · ${ch.label}】只画 1 张完整超宽横幅海报，目标约 ${spec.masterWidth}×${spec.masterHeight} 像素。`,
+    `【三连图 · ${ch.label}】只画 1 张完整超宽横幅海报，目标约 ${spec.masterWidth}×${spec.masterHeight} 像素。`,
     '硬性构图：同一空间/同一场景从左到右自然延展的一张连续画面（电影宽银幕/全景海报），光影、透视、色调、人物尺度全幅统一。',
-    '严禁：五宫格拼贴、五张互不相关照片、五块独立海报卡片、每格换背景、漫画分镜、信息条堆砌、毫无逻辑的乱拼。',
+    '严禁：三宫格拼贴、三张互不相关照片、三块独立海报卡片、每格换背景、漫画分镜、信息条堆砌、毫无逻辑的乱拼。',
     '文字规则：画面中文文案只能使用下列已填写内容' +
       (allowedText.length
         ? `：${allowedText.join('；')}。可少量重复主标题以形成节奏，但禁止另造句子。`
@@ -385,7 +401,7 @@ export function buildCarouselFiveMasterPromptExtra(
     hasSub
       ? ''
       : '表单未填副标题：禁止编造卖点条文案、功能列表、多行小字卖点墙。',
-    `后处理会把整幅从左到右等宽裁成 5 张（编号 1→2→3→4→5），单张 ${spec.slideWidth}×${spec.slideHeight}；裁切后每一张都必须是同一海报的连续片段，而不是独立主题。`,
+    `后处理会把整幅从左到右等宽裁成 ${slots} 张（编号 ${slotNums}），单张 ${spec.slideWidth}×${spec.slideHeight}；裁切后每一张都必须是同一海报的连续片段，而不是独立主题。`,
   ].filter(Boolean)
 }
 
@@ -394,13 +410,11 @@ export type PlatformSeriesSlot = {
   prompt: string
 }
 
-/** 五连图裁切后槽位编号（仅 1～5，供方案墙标签；出图以整幅 Prompt 为准） */
+/** 三连图裁切后槽位编号（仅 1～3，供方案墙标签；出图以整幅 Prompt 为准） */
 export const CAROUSEL_FIVE_SLOTS: PlatformSeriesSlot[] = [
   { label: '1', prompt: '' },
   { label: '2', prompt: '' },
   { label: '3', prompt: '' },
-  { label: '4', prompt: '' },
-  { label: '5', prompt: '' },
 ]
 
 export const DETAIL_PAGE_SLOTS: PlatformSeriesSlot[] = [
@@ -445,7 +459,7 @@ export const PUBLISH_CHANNELS: Array<{
     primarySizeId: 'moments_vertical',
     carouselSizeId: 'landscape',
     detailSizeId: 'a4_portrait',
-    publishTips: ['竖屏 9:16', '主标题 6 字内更易读', '留底部安全区放团购入口', '五连图整幅 5625×633'],
+    publishTips: ['竖屏 9:16', '主标题 6 字内更易读', '留底部安全区放团购入口', '三连图整幅 3375×633'],
   },
   {
     id: 'xiaohongshu',
@@ -472,7 +486,7 @@ export const PUBLISH_CHANNELS: Array<{
     primarySizeId: 'square',
     carouselSizeId: 'landscape',
     detailSizeId: 'a4_portrait',
-    publishTips: ['团购主图偏 1:1', '突出套餐组合与到手价', '避免过多小字', '五连图整幅 5000×750'],
+    publishTips: ['团购主图偏 1:1', '突出套餐组合与到手价', '避免过多小字', '三连图整幅 3000×750'],
   },
   {
     id: 'kuaishou',
@@ -482,7 +496,7 @@ export const PUBLISH_CHANNELS: Array<{
     primarySizeId: 'moments_vertical',
     carouselSizeId: 'landscape',
     detailSizeId: 'a4_portrait',
-    publishTips: ['竖屏短视频封面同尺寸', '大字报风格转化更好', '五连图单张 750×422'],
+    publishTips: ['竖屏短视频封面同尺寸', '大字报风格转化更好', '三连图单张 750×422'],
   },
   {
     id: 'offline_print',
@@ -643,8 +657,8 @@ export const VISUAL_PLAYBOOKS: Array<{
   },
   {
     id: 'platform_carousel_five',
-    label: '五连图',
-    desc: '一张连续海报裁成 5 张，从左到右横滑',
+    label: '三连图',
+    desc: '一张连续海报裁成 3 张，从左到右横滑',
     intent: 'carousel',
     emoji: '🎠',
     suggestedChannels: ['douyin', 'kuaishou', 'meituan'],
@@ -817,7 +831,7 @@ export type VisualStudioForm = {
   channels: PublishChannelId[]
   playbook: VisualPlaybookId
   /**
-   * 五连图 / 详情图输出形态。与 playbook（场景玩法）独立：
+   * 三连图 / 详情图输出形态。与 playbook（场景玩法）独立：
    * 选中后仍可切换招牌单品、团购上新等玩法。
    */
   platformSeries: PlatformSeriesMode | null
@@ -1311,7 +1325,7 @@ export const PLAYBOOK_VARIANT_CONFIGS: Partial<Record<VisualPlaybookId, Playbook
     ],
   },
   platform_carousel_five: {
-    pickerLabel: '五连图主题',
+    pickerLabel: '三连图主题',
     options: [
       {
         id: 'opening',
@@ -2382,7 +2396,7 @@ const INTENT_PROMPT: Record<VisualIntentId, string> = {
   environment: '设计探店氛围图，真实可信的就餐/服务环境，适合小红书种草。',
   menu: '设计菜单价目视觉，分区清晰、价格可读。',
   carousel:
-    '设计本地生活门店「五连图」：只出一张从左到右连续的超宽全景海报（同一场景延展），禁止五格拼贴或五张无关图；生成后等分裁成 5 张轮播。',
+    '设计本地生活门店「三连图」：只出一张从左到右连续的超宽全景海报（同一场景延展），禁止三格拼贴或三张无关图；生成后等分裁成 3 张轮播。',
   detail:
     '设计团购「详情长图」单段：3:4 竖图，大图+中英标题排版，适合抖音/快手/美团详情页竖向拼接。',
 }
@@ -2402,7 +2416,7 @@ export function isPlatformSeriesPlaybook(id: VisualPlaybookId): boolean {
   return id === 'platform_carousel_five' || id === 'platform_detail_page'
 }
 
-/** 当前表单的平台长图形态（兼容旧数据：playbook 直接等于五连图/详情图） */
+/** 当前表单的平台长图形态（兼容旧数据：playbook 直接等于三连图/详情图） */
 export function resolveFormPlatformSeries(form: VisualStudioForm): PlatformSeriesMode | null {
   if (form.platformSeries === 'platform_carousel_five' || form.platformSeries === 'platform_detail_page') {
     return form.platformSeries
@@ -2425,7 +2439,9 @@ export function platformSeriesSlots(playbookId: VisualPlaybookId): PlatformSerie
 }
 
 export function platformSeriesSlotCount(playbookId: VisualPlaybookId): number {
-  return isPlatformSeriesPlaybook(playbookId) ? PLATFORM_SERIES_SLOT_COUNT : 0
+  if (playbookId === 'platform_carousel_five') return PLATFORM_CAROUSEL_SLOT_COUNT
+  if (playbookId === 'platform_detail_page') return PLATFORM_DETAIL_SLOT_COUNT
+  return 0
 }
 
 export function resolveSeriesSlotLabel(playbookId: VisualPlaybookId, index: number): string {
@@ -2438,7 +2454,7 @@ export function resolveSeriesSlotPrompt(playbookId: VisualPlaybookId, index: num
   return slots[index]?.prompt ?? `构图方案${index + 1}。`
 }
 
-/** 按玩法解析出图尺寸（五连图=超宽主图 / 详情图竖图 / 默认渠道主尺寸） */
+/** 按玩法解析出图尺寸（三连图=超宽主图 / 详情图竖图 / 默认渠道主尺寸） */
 export function resolvePlaybookSizePresetId(
   channelId: PublishChannelId,
   playbookId: VisualPlaybookId,
@@ -2459,9 +2475,10 @@ export function resolvePlaybookSizeDisplay(
   if (playbookId === 'platform_carousel_five') {
     const master = platformCarouselMasterGenSize(channelId)
     const s = master.slideSpec
+    const slots = s.slotCount || PLATFORM_CAROUSEL_SLOT_COUNT
     return {
-      label: '五连图',
-      pixelHint: `整幅 ${s.masterWidth}×${s.masterHeight} → 单张 ${s.slideWidth}×${s.slideHeight}×5`,
+      label: '三连图',
+      pixelHint: `整幅 ${s.masterWidth}×${s.masterHeight} → 单张 ${s.slideWidth}×${s.slideHeight}×${slots}`,
       aspectRatio: master.masterAspectLabel,
     }
   }
@@ -2475,14 +2492,14 @@ export function effectiveVariantCountForForm(form: VisualStudioForm): number {
   return series > 0 ? series : form.variantCount
 }
 
-/** 开启/切换五连图或详情图：只改输出形态，保留当前场景玩法 */
+/** 开启/切换三连图或详情图：只改输出形态，保留当前场景玩法 */
 export function applyPlatformSeriesPlaybook(
   form: VisualStudioForm,
   seriesId: PlatformSeriesMode,
 ): VisualStudioForm {
   const channels = PLATFORM_SERIES_CHANNELS.filter((id) => form.channels.includes(id))
   const nextChannels = channels.length > 0 ? channels : [...PLATFORM_SERIES_CHANNELS]
-  // 若旧数据把 playbook 写成了五连图/详情图，恢复为业态推荐场景玩法
+  // 若旧数据把 playbook 写成了三连图/详情图，恢复为业态推荐场景玩法
   const scenePlaybook = isPlatformSeriesPlaybook(form.playbook)
     ? (resolveIndustryProfile(form.industry).recommendedPlaybooks.find((id) => !isPlatformSeriesPlaybook(id)) ??
       'group_buy_new')
@@ -2978,7 +2995,7 @@ export function buildVisualStudioPrompt(
     styleFromReference?: boolean
     referenceAnalysis?: VisualStudioReferenceAnalysis | null
     refineNote?: string
-    /** 五连图：一次生成整幅横幅（非单张 slot） */
+    /** 三连图：一次生成整幅横幅（非单张 slot） */
     carouselMaster?: boolean
   },
 ): string {
@@ -3020,7 +3037,7 @@ export function buildVisualStudioPrompt(
     `视觉风格：${style}。`,
     channel
       ? carouselMaster
-        ? `投放渠道：${channel.label}，${sizeDisplay?.pixelHint ?? ''}，超宽横幅一次出图后裁 5 张。`
+        ? `投放渠道：${channel.label}，${sizeDisplay?.pixelHint ?? ''}，超宽横幅一次出图后裁 3 张。`
         : `投放渠道：${channel.label}，${size?.aspectRatio ?? ''} ${size?.pixelHint ?? ''}，请符合该平台常见封面构图。`
       : '',
     !carouselMaster && variantConfig?.pickerLabel && playbookVariant
@@ -3032,7 +3049,7 @@ export function buildVisualStudioPrompt(
       ? `主题氛围：${pb.label}（${pb.desc}）；以场景叙事为主，勿堆砌促销模块。`
       : `营销玩法：${pb.label}（${pb.desc}）。`,
     seriesMode === 'platform_carousel_five' && !carouselMaster
-      ? '输出形态：五连图横幅，画面信息与构图须服务该营销玩法。'
+      ? '输出形态：三连图横幅，画面信息与构图须服务该营销玩法。'
       : seriesMode === 'platform_detail_page'
         ? '输出形态：团购详情长图分段，画面信息与构图须服务该营销玩法。'
         : '',
@@ -3067,7 +3084,7 @@ export function buildVisualStudioPrompt(
     if (slotPrompt.trim()) lines.push(slotPrompt)
     lines.push(
       seriesMode === 'platform_carousel_five'
-        ? '整套五连图须统一配色、字体与光影，本张仅为系列中的一屏，勿做成独立无关海报。'
+        ? '整套三连图须统一配色、字体与光影，本张仅为系列中的一屏，勿做成独立无关海报。'
         : '整套详情长图须统一视觉体系，本张仅为竖向拼接的一段，与上下段风格一致。',
     )
   } else if (vi >= 0 && vi < VARIANT_SUFFIX.length) {

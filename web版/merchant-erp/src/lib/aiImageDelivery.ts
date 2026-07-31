@@ -89,7 +89,7 @@ export async function fetchImageBlob(url: string): Promise<Blob> {
     if (!res.ok) throw new Error(`读取图片失败 HTTP ${res.status}`)
     return res.blob()
   }
-  // TokenMix CDN 无 CORS：直接同源代拉，避免五连图裁切 Failed to fetch
+  // TokenMix CDN 无 CORS：直接同源代拉，避免三连图裁切 Failed to fetch
   if (isTokenmixCdnUrl(src)) {
     return fetchImageBlobViaErpProxy(src)
   }
@@ -150,14 +150,14 @@ export function triggerBlobDownload(blob: Blob, filename: string) {
 }
 
 /**
- * 五连图裁切：整幅横图先按「5×单张」比例居中裁准，再等宽等高切成 N 张，
- * 最后缩放到平台单张像素（抖音/美团单张宽高不同）。
+ * 三连图裁切：整幅横图先按「N×单张」比例居中裁准，再等宽等高切成 N 张，
+ * 最后缩放到平台单张像素（抖音/美团单张宽高不同）。默认 N=3。
  */
 export async function sliceCarouselFiveStrips(
   blob: Blob,
   spec: { slideWidth: number; slideHeight: number; slotCount?: number },
 ): Promise<Blob[]> {
-  const slotCount = Math.max(1, Math.floor(spec.slotCount ?? 5))
+  const slotCount = Math.max(1, Math.floor(spec.slotCount ?? 3))
   const slideW = Math.max(1, Math.floor(spec.slideWidth))
   const slideH = Math.max(1, Math.floor(spec.slideHeight))
   const bitmap = await createImageBitmap(blob)
@@ -218,7 +218,7 @@ export async function sliceCarouselFiveStrips(
 }
 
 /**
- * 五连图预览：将已裁切的 1～5 张从左到右拼回一条横幅（仅预览用）。
+ * 三连图预览：将已裁切的条带从左到右拼回一条横幅（仅预览用）。
  */
 export async function stitchCarouselFiveStrips(
   sources: Array<Blob | string>,
