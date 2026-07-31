@@ -9,7 +9,14 @@ import {
 import { synthesizeDigitalHumanSpeech } from '../services/digitalHumanTtsApi'
 import { muxAudioWithVideoBlob } from './concatVideoSegments'
 import { CUSTOM_UPLOAD_VOICE_PRESETS } from './digitalHumanBroadcast'
-import { buildSrtContent, probeVideoDurationSec, splitSubtitleLines } from './digitalHumanSubtitle'
+import {
+  buildSrtContent,
+  buildSrtFromScriptRows,
+  probeVideoDurationSec,
+  SHORT_VIDEO_SUBTITLE_MAX_CHARS,
+  splitSubtitleLines,
+  type ScriptRowForSubtitle,
+} from './digitalHumanSubtitle'
 import {
   finalizeNarrationScript,
   SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
@@ -72,6 +79,8 @@ export async function finalizeShortVideoOutput(
     productImageBase64?: string
     productStartSec?: number
     productEndSec?: number
+    /** 有分镜时按 timeRange+dialogue 对齐字幕时间轴 */
+    scriptRows?: ScriptRowForSubtitle[] | null
   },
 ): Promise<{ ok: true; objectUrl: string; blob: Blob } | { ok: false; message: string }> {
   onProgress?.('下载 AI 视频…')
@@ -96,9 +105,15 @@ export async function finalizeShortVideoOutput(
     return { ok: true, objectUrl, blob: videoBlob }
   }
 
-  // 口播 TTS：有可读稿即可；上屏字幕另做有效性校验
+  // 口播 TTS：有可读稿即可；上屏字幕另做有效性校验（分镜有口播也可烧）
   const allowTts = isValidShortVideoSubtitleScript(script) || looksLikeSpokenNarrationLoose(script)
-  const burnSubtitles = isValidShortVideoSubtitleScript(script)
+  const rowsHaveDialogue = Boolean(
+    opts?.scriptRows?.some((r) => {
+      const d = String(r.dialogue || '').trim()
+      return d.length >= 2 && !/^[(（]?\s*无口播\s*[)）]?$/.test(d)
+    }),
+  )
+  const burnSubtitles = isValidShortVideoSubtitleScript(script) || rowsHaveDialogue
 
   onProgress?.('合成口播配音…')
   const tts = allowTts
@@ -127,17 +142,26 @@ export async function finalizeShortVideoOutput(
   // 产品特写叠加时不烧字幕，避免遮挡重点画面；无效口播亦不烧录
   const productB64 = opts?.productImageBase64?.replace(/\s/g, '')
   const hasProductOverlay = Boolean(productB64 && productB64.length > 256)
-  const srt =
+  const fromRows =
     burnSubtitles && !hasProductOverlay && subtitleDur > 0
-      ? buildSrtContent(splitSubtitleLines(script), subtitleDur)
+      ? buildSrtFromScriptRows(opts?.scriptRows, subtitleDur, {
+          maxCharsPerLine: SHORT_VIDEO_SUBTITLE_MAX_CHARS,
+        })
       : ''
+  const srt =
+    fromRows.trim() ||
+    (burnSubtitles && !hasProductOverlay && subtitleDur > 0 && isValidShortVideoSubtitleScript(script)
+      ? buildSrtContent(splitSubtitleLines(script, SHORT_VIDEO_SUBTITLE_MAX_CHARS), subtitleDur)
+      : '')
   if (srt.trim() || hasProductOverlay) {
     onProgress?.(
       hasProductOverlay && srt.trim()
         ? '烧录字幕并叠加产品特写…'
         : hasProductOverlay
           ? '叠加产品特写（跳过字幕以免遮挡）…'
-          : '烧录中文字幕（底部安全区）…',
+          : fromRows.trim()
+            ? '烧录中文字幕（按分镜时间轴·底部安全区）…'
+            : '烧录中文字幕（底部安全区）…',
     )
     try {
       merged = await postProcessVideoOnServer(merged, {
