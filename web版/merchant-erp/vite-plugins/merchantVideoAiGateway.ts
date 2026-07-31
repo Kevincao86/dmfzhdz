@@ -62,6 +62,7 @@ import {
 } from '../src/lib/arkVideoModelDiscovery.js'
 import {
   buildSeedanceImageContentItems,
+  parseSeedanceImageLayoutMode,
   clampSeedanceImagesForModel,
   ensureSeedanceContentImageRoles,
   seedanceContentRequiresImageRole,
@@ -1446,9 +1447,14 @@ function buildArkVideoTaskPayload(
     }
   }
 
+  const imageLayoutMode = parseSeedanceImageLayoutMode(body.seedance_image_mode)
   let contentArr: Record<string, unknown>[]
   if (Array.isArray(body.content)) {
-    contentArr = ensureSeedanceContentImageRoles(body.content as Record<string, unknown>[], modelId)
+    contentArr = ensureSeedanceContentImageRoles(
+      body.content as Record<string, unknown>[],
+      modelId,
+      imageLayoutMode,
+    )
   } else {
     const imageRows: string[] = []
     if (Array.isArray(imagesUnknown)) {
@@ -1478,9 +1484,9 @@ function buildArkVideoTaskPayload(
     )
     contentArr = [{ type: 'text', text: textCombined }]
     if (seedanceContentRequiresImageRole(modelId)) {
-      contentArr.push(...buildSeedanceImageContentItems(imageRows, modelId))
+      contentArr.push(...buildSeedanceImageContentItems(imageRows, modelId, imageLayoutMode))
     } else {
-      for (const row of clampSeedanceImagesForModel(modelId, imageRows)) {
+      for (const row of clampSeedanceImagesForModel(modelId, imageRows, imageLayoutMode)) {
         let url = row
         if (!url.startsWith('data:image') && /^[a-z0-9+/=\s]+$/i.test(url.replace(/\s/g, ''))) {
           url = `data:image/jpeg;base64,${url.replace(/\s/g, '')}`

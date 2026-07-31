@@ -1,13 +1,17 @@
 /**
  * 火山方舟 Seedance / 视频生成 content 数组构造（图生须带 role）。
  *
- * 注意：多张 `reference_image` 会被方舟推断为 task_type=r2v；
- * Seedance 1.0 / 1.5 不支持 r2v，仅 Seedance 2.0 支持。对 1.x 必须压成单图 first_frame（i2v）。
+ * - 多张 `reference_image` → 方舟 task_type=r2v（仅 Seedance 2.0 支持）
+ * - 即梦式首尾帧：`first_frame` + `last_frame`（1.0/1.5/2.0 均支持，非 r2v）
+ * - 默认 1.x 多图若未声明首尾帧，压成单图 first_frame，避免误触 r2v
  */
 import { isArkVideoEndpointId, isDoubaoSeedanceModelId, normalizeArkVideoModelParam } from './arkVideoEndpointsConfig.js'
 import { isArkGenerativeVideoModelId } from './arkModelCatalog.js'
 
 export type SeedanceImageRole = 'first_frame' | 'last_frame' | 'reference_image'
+
+/** 图生布局：first_last=即梦首尾帧；reference=r2v；first_only=单首帧；auto=按模型推断 */
+export type SeedanceImageLayoutMode = 'auto' | 'first_last' | 'reference' | 'first_only'
 
 /** 该 model 走 v2 content API，图片项必须带 role */
 export function seedanceContentRequiresImageRole(modelId: string): boolean {
@@ -18,10 +22,21 @@ export function seedanceContentRequiresImageRole(modelId: string): boolean {
   return isArkGenerativeVideoModelId(norm)
 }
 
-/** Seedance 2.0 才支持多参考图 r2v；1.0/1.5 仅 i2v 首帧 */
+/** Seedance 2.0 才支持多参考图 r2v；1.0/1.5 仅 i2v / 首尾帧 */
 export function seedanceModelSupportsReferenceR2v(modelId: string): boolean {
   const m = normalizeArkVideoModelParam(modelId).toLowerCase()
   return /seedance-2-0|seedance-2\.0/.test(m)
+}
+
+export function parseSeedanceImageLayoutMode(raw: unknown): SeedanceImageLayoutMode {
+  const t = String(raw ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, '_')
+  if (t === 'first_last' || t === 'firstlast') return 'first_last'
+  if (t === 'reference' || t === 'r2v') return 'reference'
+  if (t === 'first_only' || t === 'first' || t === 'i2v') return 'first_only'
+  return 'auto'
 }
 
 function normalizeImageUrl(row: string): string {
@@ -32,47 +47,72 @@ function normalizeImageUrl(row: string): string {
   return url
 }
 
+function resolveLayoutMode(
+  modelId: string,
+  imageCount: number,
+  mode: SeedanceImageLayoutMode,
+): SeedanceImageLayoutMode {
+  if (mode !== 'auto') return mode
+  if (imageCount <= 1) return 'first_only'
+  if (seedanceModelSupportsReferenceR2v(modelId)) return 'reference'
+  // 1.x 默认不猜首尾帧，压成单首帧，避免误发 r2v
+  return 'first_only'
+}
+
 /**
- * 按模型能力压图：非 r2v 模型多图会触发方舟 task_type=r2v 报错，只保留首张走 i2v。
+ * 按模型能力与布局模式压图。
+ * first_last：最多保留 2 张；reference：2.0 可多图，1.x 仍压成 1；first_only：只留首张。
  */
-export function clampSeedanceImagesForModel(modelId: string, imageRows: string[]): string[] {
+export function clampSeedanceImagesForModel(
+  modelId: string,
+  imageRows: string[],
+  layoutMode: SeedanceImageLayoutMode = 'auto',
+): string[] {
   const rows = imageRows.map((r) => r.trim()).filter(Boolean)
   if (rows.length <= 1) return rows
-  if (seedanceModelSupportsReferenceR2v(modelId)) return rows
+  const mode = resolveLayoutMode(modelId, rows.length, layoutMode)
+  if (mode === 'first_last') return rows.slice(0, 2)
+  if (mode === 'reference' && seedanceModelSupportsReferenceR2v(modelId)) return rows
   return rows.slice(0, 1)
 }
 
-/** 为 i2v / r2v 参考图分配 role（首帧与参考图互斥，禁止混用） */
+/** 为 i2v / 首尾帧 / r2v 分配 role（首尾帧与 reference_image 互斥） */
 export function seedanceImageRoleForIndex(
-  _index: number,
+  index: number,
   total: number,
   modelId?: string,
+  layoutMode: SeedanceImageLayoutMode = 'auto',
 ): SeedanceImageRole {
-  if (total <= 1) return 'first_frame'
-  if (modelId && seedanceModelSupportsReferenceR2v(modelId)) return 'reference_image'
-  // 非 2.0：调用方应先 clamp；兜底仍标 first_frame，避免误发 r2v
+  const mode = resolveLayoutMode(modelId ?? '', total, layoutMode)
+  if (mode === 'first_last') {
+    if (total <= 1) return 'first_frame'
+    return index === 0 ? 'first_frame' : 'last_frame'
+  }
+  if (mode === 'reference') return 'reference_image'
   return 'first_frame'
 }
 
 export function buildSeedanceImageContentItems(
   imageRows: string[],
   modelId = '',
+  layoutMode: SeedanceImageLayoutMode = 'auto',
 ): Record<string, unknown>[] {
-  const rows = clampSeedanceImagesForModel(modelId, imageRows)
+  const rows = clampSeedanceImagesForModel(modelId, imageRows, layoutMode)
   return rows.map((row, i) => {
     const item: Record<string, unknown> = {
       type: 'image_url',
       image_url: { url: normalizeImageUrl(row) },
-      role: seedanceImageRoleForIndex(i, rows.length, modelId),
+      role: seedanceImageRoleForIndex(i, rows.length, modelId, layoutMode),
     }
     return item
   })
 }
 
-/** 若 content 已有 image_url 但缺 role，补齐；非 r2v 模型多图压成首帧单图 */
+/** 若 content 已有 image_url 但缺 role，补齐；按布局模式压图 */
 export function ensureSeedanceContentImageRoles(
   content: Record<string, unknown>[],
   modelId: string,
+  layoutMode: SeedanceImageLayoutMode = 'auto',
 ): Record<string, unknown>[] {
   if (!seedanceContentRequiresImageRole(modelId)) return content
   const imageIdx: number[] = []
@@ -81,9 +121,11 @@ export function ensureSeedanceContentImageRoles(
   }
   if (!imageIdx.length) return content
 
-  const keepOnlyFirst = imageIdx.length > 1 && !seedanceModelSupportsReferenceR2v(modelId)
-  const keepSet = keepOnlyFirst ? new Set([imageIdx[0]!]) : new Set(imageIdx)
-  const effectiveTotal = keepOnlyFirst ? 1 : imageIdx.length
+  const mode = resolveLayoutMode(modelId, imageIdx.length, layoutMode)
+  const maxKeep = mode === 'first_last' ? 2 : mode === 'reference' && seedanceModelSupportsReferenceR2v(modelId) ? imageIdx.length : 1
+  const keepIdx = imageIdx.slice(0, maxKeep)
+  const keepSet = new Set(keepIdx)
+  const effectiveTotal = keepIdx.length
 
   const out: Record<string, unknown>[] = []
   for (let i = 0; i < content.length; i++) {
@@ -93,11 +135,12 @@ export function ensureSeedanceContentImageRoles(
       continue
     }
     if (!keepSet.has(i)) continue
-    const pos = keepOnlyFirst ? 0 : imageIdx.indexOf(i)
+    const pos = keepIdx.indexOf(i)
+    const existingRole = row.role && String(row.role).trim()
     const role =
-      row.role && String(row.role).trim() && !keepOnlyFirst
-        ? String(row.role)
-        : seedanceImageRoleForIndex(pos >= 0 ? pos : 0, effectiveTotal, modelId)
+      existingRole && mode === 'first_last' && (existingRole === 'first_frame' || existingRole === 'last_frame')
+        ? existingRole
+        : seedanceImageRoleForIndex(pos >= 0 ? pos : 0, effectiveTotal, modelId, mode)
     out.push({ ...row, role })
   }
   return out
