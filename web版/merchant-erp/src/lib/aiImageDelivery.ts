@@ -1,5 +1,8 @@
 /** 文生图交付：JPEG 压缩与下载 */
 
+import { merchantApiAuthHeaders, resolveMerchantApiBearer } from './merchantApiAuth'
+import { merchantErpApiCandidates } from './merchantErpApiBase'
+
 export function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const r = new FileReader()
@@ -9,8 +12,74 @@ export function readFileAsDataUrl(file: File): Promise<string> {
   })
 }
 
+function isTokenmixCdnUrl(url: string): boolean {
+  try {
+    const u = new URL(url)
+    const h = u.hostname.toLowerCase()
+    return h === 'cdn.tokenmix.ai' || h === 'tokenmix.ai' || h.endsWith('.tokenmix.ai')
+  } catch {
+    return false
+  }
+}
+
+async function fetchImageBlobViaErpProxy(url: string): Promise<Blob> {
+  const auth = await resolveMerchantApiBearer()
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+    ...merchantApiAuthHeaders(auth.token, auth.source),
+  }
+  const urls = merchantErpApiCandidates('/api/meoo-ai-agent-image')
+  let lastErr = 'image_proxy_unavailable'
+  for (const endpoint of urls) {
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ phase: 'fetch', image_url: url }),
+      })
+      const text = await res.text()
+      let json: Record<string, unknown> = {}
+      try {
+        json = text ? (JSON.parse(text) as Record<string, unknown>) : {}
+      } catch {
+        json = {}
+      }
+      if (!res.ok || json.ok !== true) {
+        lastErr =
+          (typeof json.detail === 'string' && json.detail) ||
+          (typeof json.message === 'string' && json.message) ||
+          `HTTP ${res.status}`
+        if (res.status === 404) continue
+        throw new Error(lastErr)
+      }
+      const dataUrl = typeof json.imageUrl === 'string' ? json.imageUrl.trim() : ''
+      if (!dataUrl.startsWith('data:')) throw new Error('代拉成图未返回 data URL')
+      const bin = await fetch(dataUrl)
+      if (!bin.ok) throw new Error('代拉成图解码失败')
+      return bin.blob()
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+      if (/Failed to fetch|NetworkError|Load failed/i.test(lastErr)) continue
+      throw e instanceof Error ? e : new Error(lastErr)
+    }
+  }
+  throw new Error(lastErr)
+}
+
 export async function fetchImageBlob(url: string): Promise<Blob> {
-  const res = await fetch(url, { mode: 'cors' })
+  const src = (url || '').trim()
+  if (!src) throw new Error('图片地址为空')
+  if (src.startsWith('data:') || src.startsWith('blob:')) {
+    const res = await fetch(src)
+    if (!res.ok) throw new Error(`读取图片失败 HTTP ${res.status}`)
+    return res.blob()
+  }
+  // TokenMix CDN 无 CORS：直接同源代拉，避免五连图裁切 Failed to fetch
+  if (isTokenmixCdnUrl(src)) {
+    return fetchImageBlobViaErpProxy(src)
+  }
+  const res = await fetch(src, { mode: 'cors' })
   if (!res.ok) throw new Error(`下载图片失败 HTTP ${res.status}`)
   return res.blob()
 }

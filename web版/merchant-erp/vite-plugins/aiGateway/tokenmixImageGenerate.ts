@@ -3,7 +3,48 @@
  * gpt-image-2 在 TokenMix 上为异步任务（HTTP 202 → GET /images/generations/{id}），须轮询 output.data。
  *
  * 视觉工坊高级生图：拆成 create + pollOnce，避免浏览器长连接被反代掐断（Failed to fetch）。
+ * TokenMix CDN 无 CORS：成图后服务端 hydrate 为 data URL，供浏览器裁切。
  */
+
+const TOKENMIX_HYDRATE_MAX_BYTES = 8 * 1024 * 1024
+
+function isTokenmixImageHost(hostname: string): boolean {
+  const h = hostname.toLowerCase()
+  return h === 'cdn.tokenmix.ai' || h === 'tokenmix.ai' || h.endsWith('.tokenmix.ai')
+}
+
+export function isTokenmixBrowserUnsafeImageUrl(url: string): boolean {
+  const u = url.trim()
+  if (!u || u.startsWith('data:') || u.startsWith('blob:')) return false
+  try {
+    const parsed = new URL(u)
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false
+    return isTokenmixImageHost(parsed.hostname)
+  } catch {
+    return false
+  }
+}
+
+/** 服务端拉 TokenMix CDN → data URL（解决浏览器 CORS Failed to fetch） */
+export async function hydrateTokenmixImageUrlForBrowser(imageUrl: string): Promise<string> {
+  const src = imageUrl.trim()
+  if (!src || src.startsWith('data:') || src.startsWith('blob:')) return src
+  if (!isTokenmixBrowserUnsafeImageUrl(src)) return src
+
+  const res = await fetch(src, {
+    method: 'GET',
+    headers: { Accept: 'image/*,*/*' },
+  })
+  if (!res.ok) throw new Error(`TokenMix 成图下载失败 HTTP ${res.status}`)
+  const buf = Buffer.from(await res.arrayBuffer())
+  if (!buf.length) throw new Error('TokenMix 成图为空')
+  if (buf.length > TOKENMIX_HYDRATE_MAX_BYTES) {
+    throw new Error(`TokenMix 成图过大（${buf.length} bytes）`)
+  }
+  const ctRaw = (res.headers.get('content-type') || 'image/png').split(';')[0]?.trim() || 'image/png'
+  const ct = /^image\//i.test(ctRaw) ? ctRaw : 'image/png'
+  return `data:${ct};base64,${buf.toString('base64')}`
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms))

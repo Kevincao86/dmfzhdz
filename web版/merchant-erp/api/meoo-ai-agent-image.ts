@@ -3,6 +3,7 @@
  * - builtin：万相 / 豆包 / MiniMax（MERCHANT_AI_*）。
  * - tokenmix：TokenMix OpenAI 兼容 images/generations（须 TOKENMIX_API_KEY）；有参考图时走内置图生图。
  * - phase=start|poll：GPT Image 异步短请求（避免浏览器长连接 Failed to fetch）；禁止回退万相。
+ * - phase=fetch：同源代拉 TokenMix CDN（浏览器无 CORS，否则裁切 Failed to fetch）。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
@@ -14,6 +15,10 @@ import { verifyBearerJwt } from '../vite-plugins/aiGateway/authSupabase.js'
 import { verifyMpSessionToken } from '../vite-plugins/aiGateway/authMpSession.js'
 import { assertAiChatAccess } from '../vite-plugins/tenantMembershipCore.js'
 import {
+  hydrateTokenmixImageUrlForBrowser,
+  isTokenmixBrowserUnsafeImageUrl,
+} from '../vite-plugins/aiGateway/tokenmixImageGenerate.js'
+import {
   runMeooAgentImagePollTokenmix,
   runMeooAgentImageRequest,
   runMeooAgentImageStartTokenmix,
@@ -21,6 +26,15 @@ import {
 } from '../vite-plugins/meooAgentImageCore.js'
 
 export const config = { maxDuration: 300 }
+
+async function embedTokenmixImageForBrowser<T extends Extract<MeooAgentImageResult, { ok: true }>>(
+  out: T,
+): Promise<T> {
+  if (!('imageUrl' in out) || typeof out.imageUrl !== 'string') return out
+  if (!isTokenmixBrowserUnsafeImageUrl(out.imageUrl)) return out
+  const dataUrl = await hydrateTokenmixImageUrlForBrowser(out.imageUrl)
+  return { ...out, imageUrl: dataUrl }
+}
 
 async function sendImageSuccess(
   req: VercelRequest,
@@ -38,9 +52,22 @@ async function sendImageSuccess(
     chargeIdempotencyKey?: string
   },
 ): Promise<void> {
-  const { out } = opts
+  let { out } = opts
   if ('pending' in out && out.pending) {
     sendMerchantJson(res, 200, out)
+    return
+  }
+
+  try {
+    out = await embedTokenmixImageForBrowser(out)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.error('[meoo-ai-agent-image] tokenmix hydrate failed', msg)
+    sendMerchantJson(res, 502, {
+      ok: false,
+      error: 'image_hydrate_failed',
+      detail: msg.slice(0, 400),
+    })
     return
   }
 
@@ -128,6 +155,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     prefer_wanx_poster?: unknown
     phase?: unknown
     task_id?: unknown
+    image_url?: unknown
   }
   try {
     body = JSON.parse(rawBody(req) || '{}') as typeof body
@@ -137,9 +165,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   const phaseRaw = typeof body.phase === 'string' ? body.phase.trim().toLowerCase() : ''
-  const phase = phaseRaw === 'start' || phaseRaw === 'poll' ? phaseRaw : 'sync'
+  const phase =
+    phaseRaw === 'start' || phaseRaw === 'poll' || phaseRaw === 'fetch' ? phaseRaw : 'sync'
   const taskId = typeof body.task_id === 'string' ? body.task_id.trim() : ''
   const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
+  const fetchImageUrl = typeof body.image_url === 'string' ? body.image_url.trim() : ''
+
+  if (phase === 'fetch') {
+    if (!fetchImageUrl || !isTokenmixBrowserUnsafeImageUrl(fetchImageUrl)) {
+      sendMerchantJson(res, 400, {
+        ok: false,
+        error: 'image_url_not_allowed',
+        message: '仅允许代拉 TokenMix 成图地址',
+      })
+      return
+    }
+    try {
+      const dataUrl = await hydrateTokenmixImageUrlForBrowser(fetchImageUrl)
+      sendMerchantJson(res, 200, { ok: true, imageUrl: dataUrl, channel: 'tokenmix' })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      sendMerchantJson(res, 502, { ok: false, error: 'image_fetch_failed', detail: msg.slice(0, 400) })
+    }
+    return
+  }
+
   if (phase !== 'poll' && !prompt) {
     sendMerchantJson(res, 400, { ok: false, error: 'prompt_required' })
     return
