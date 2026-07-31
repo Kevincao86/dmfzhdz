@@ -12,8 +12,8 @@ export const MP_POINTS_VIDEO_PER_MIN = MP_POINTS_VIDEO_PER_SEC * 60
 /** 短视频 AI 处理（即梦成片）：80 积分/秒 */
 export const MP_POINTS_SHORTVIDEO_PER_SEC = 80
 
-/** 数字人口播（Seedance 分段 i2v）：28 积分/秒 */
-export const MP_POINTS_DIGITAL_HUMAN_PER_SEC = 28
+/** 数字人口播（Seedance 分段 i2v）：80 积分/秒 */
+export const MP_POINTS_DIGITAL_HUMAN_PER_SEC = 80
 
 /** 灵祺 AI 云剪（ICE 普通合成）：一口价 80 积分/条（≤60 秒） */
 export const MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP = 80
@@ -28,8 +28,8 @@ export const MP_POINTS_CLOUD_EDIT_SMART_PER_SEC = 5
 /** 短视频 AI 成片最低扣费（约 5 秒，80 积分/秒） */
 export const MP_POINTS_SHORTVIDEO_MIN_CHARGE = 400
 
-/** 数字人成片最低扣费（约 5 秒） */
-export const MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE = 110
+/** 数字人成片最低扣费（约 4 秒，80 积分/秒） */
+export const MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE = 320
 
 /** @deprecated 请用 MP_POINTS_SHORTVIDEO_MIN_CHARGE / MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE */
 export const MP_POINTS_ADDON_VIDEO_MIN_CHARGE = MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE
