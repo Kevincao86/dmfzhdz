@@ -134,11 +134,21 @@ export async function preparePreciseVideoGeneration(
 
     const fidelity = validateBriefFidelity(brief, { rows, skill })
     if (!fidelity.ok) {
-      return {
-        ok: false,
-        message: fidelity.issues.join('；'),
-        brief,
-        issues: fidelity.issues,
+      // 与单段一致：分镜已填且文案够长时，结构节拍关键词不再硬拦（SaaS/产品演示常无「到店/菜品」词）
+      const corpusLen = rows.reduce(
+        (n, r) => n + String(r.visual || '').length + String(r.dialogue || '').length,
+        0,
+      )
+      const hard = fidelity.issues.filter(
+        (x) => !x.startsWith('结构节拍缺失') || corpusLen < 80,
+      )
+      if (hard.length > 0) {
+        return {
+          ok: false,
+          message: hard.join('；'),
+          brief,
+          issues: hard,
+        }
       }
     }
 
