@@ -12,6 +12,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { flushSync } from 'react-dom'
 import { cn } from '../cn'
 import {
   compressImageBlobToJpeg,
@@ -27,6 +28,7 @@ import {
   applyPlatformSeriesPlaybook,
   applyPlaybookToFormWithVariants,
   applyPlaybookVariantToForm,
+  buildVisualStudioPrompt,
   DEFAULT_VISUAL_STUDIO_FORM,
   effectiveVariantCountForForm,
   generateCopySuggestions,
@@ -66,7 +68,7 @@ import {
   mpPointsCostForVisualStudioImages,
 } from '../lib/mpPointsEconomics'
 import { postAiAgentNativeImage } from '../services/ai/aiClient'
-import { fetchVisualStudioCopyFromAi, analyzeVisualStudioReferenceImage, fetchVisualStudioImagePromptFromAi, fetchVisualStudioReferenceKeywordsFromAi } from '../services/ai/visualStudioAi'
+import { fetchVisualStudioCopyFromAi, analyzeVisualStudioReferenceImage, fetchVisualStudioReferenceKeywordsFromAi } from '../services/ai/visualStudioAi'
 import {
   checkVisualStudioCopyAffordable,
   checkVisualStudioImageBatchAffordable,
@@ -643,6 +645,7 @@ export default function AiImageStudioPage() {
       setError('请先填写主标题，或点「换一版文案」自动生成')
       return
     }
+    if (busy) return
     const jobList = buildJobs()
     const isCarouselFive = form.playbook === 'platform_carousel_five'
     const billingTier: 'standard' | 'pro' = imageTier
@@ -650,23 +653,44 @@ export default function AiImageStudioPage() {
     const billingUnits = isCarouselFive
       ? new Set(jobList.map((j) => j.channelId)).size
       : jobList.length
-    const afford = await checkVisualStudioImageBatchAffordable(billingUnits, billingTier)
-    if (!afford.ok) {
-      setError(afford.message)
-      return
-    }
+
     abortRef.current?.abort()
     const ac = new AbortController()
     abortRef.current = ac
-    setBusy(true)
-    setError(null)
     const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    setVariants(jobList)
-
     const usePro = imageTier === 'pro'
+
+    // 先立刻刷新按钮/方案墙，再做积分校验，避免点击后「卡住几秒」无反馈
+    flushSync(() => {
+      setBusy(true)
+      setError(null)
+      setProgress(usePro ? '高级生图准备中…' : '常规生图准备中…')
+      setVariants(jobList)
+      if (jobList[0]) {
+        setSelectedPreviewChannel(jobList[0].channelId)
+        setSelectedPreviewVariantId(jobList[0].id)
+      }
+    })
+
+    const afford = await checkVisualStudioImageBatchAffordable(billingUnits, billingTier)
+    if (!afford.ok) {
+      setBusy(false)
+      setProgress('')
+      setVariants([])
+      abortRef.current = null
+      setError(afford.message)
+      return
+    }
+    if (ac.signal.aborted) {
+      setBusy(false)
+      setProgress('')
+      return
+    }
+
     // 高级 GPT Image 2 暂不支持参考图；有参考图时仍走高级纯文生图（不传参考图）
     const refImage = usePro ? undefined : pickReferenceImage()
     const preferPoster = preferWanxPosterForIntent(playbook.intent)
+    const refine = opts?.refine ?? refineNote
 
     const spendAfterImage = (job: VariantResult, ch: ReturnType<typeof resolveChannel>, usedPro: boolean) => {
       // ERP JWT 生图已由 /api/meoo-ai-agent-image 扣费；仅星选 mp 会话在此扣
@@ -722,21 +746,15 @@ export default function AiImageStudioPage() {
           ? platformCarouselMasterGptSize(channelId)
           : platformCarouselMasterGenSize(channelId)
         const engineLabel = usePro ? 'GPT Image 2' : '万相'
-        setProgress(
-          `${ch.short} · 五连图横幅 · AI 整理需求（${ci + 1}/${channelIds.length} 平台）`,
-        )
-
-        const promptPack = await fetchVisualStudioImagePromptFromAi(form, {
+        // 本地模板即时拼 Prompt，跳过 LLM 打包等待，点击后立刻进入生图
+        const prompt = buildVisualStudioPrompt(form, {
           channel: channelId,
           carouselMaster: true,
           productRefCount: productRefs.length,
           styleFromReference: productRefs.length > 0,
           referenceAnalysis,
-          refineNote: opts?.refine ?? refineNote,
-          signal: ac.signal,
+          refineNote: refine,
         })
-        if (ac.signal.aborted) break
-        const prompt = promptPack.ok ? promptPack.prompt : promptPack.fallback
 
         setProgress(
           `${ch.short} · ${engineLabel} 整幅海报生成中（目标 ${masterGen.slideSpec.masterWidth}×${masterGen.slideSpec.masterHeight} · API ${masterGen.wanxSize}）`,
@@ -810,23 +828,17 @@ export default function AiImageStudioPage() {
       const slotLabel = isPlatformSeries
         ? resolveSeriesSlotLabel(form.playbook, job.variantIndex)
         : `方案 ${job.variantIndex + 1}`
-      setProgress(
-        `${ch.short} · ${slotLabel}/${perPlatformCount}（${i + 1}/${jobList.length}）· AI 整理出图需求`,
-      )
       setSelectedPreviewChannel(job.channelId)
       setSelectedPreviewVariantId(job.id)
-
-      const promptPack = await fetchVisualStudioImagePromptFromAi(form, {
+      // 本地模板即时拼 Prompt，跳过 LLM 打包等待，点击后立刻进入生图
+      const prompt = buildVisualStudioPrompt(form, {
         channel: job.channelId,
         variantIndex: job.variantIndex,
         productRefCount: productRefs.length,
         styleFromReference: productRefs.length > 0,
         referenceAnalysis,
-        refineNote: opts?.refine ?? refineNote,
-        signal: ac.signal,
+        refineNote: refine,
       })
-      if (ac.signal.aborted) break
-      const prompt = promptPack.ok ? promptPack.prompt : promptPack.fallback
 
       setProgress(
         `${ch.short} · ${slotLabel}/${perPlatformCount}（${i + 1}/${jobList.length}）· 生图中`,
