@@ -309,6 +309,9 @@ config/nav.ts
 MeooLayout.tsx
 App.tsx
 partnerEditionConfig.ts
+index.html
+index.css
+ecs-nginx-merchant-cs.conf
 change-scope-guard
 PAT
       ;;
@@ -703,7 +706,7 @@ $CHANGED_RAW
 EOF
 
 if [[ ${#CHANGED[@]} -eq 0 ]]; then
-  echo "OK: scope=$SCOPE，无待检改动"
+  echo "OK: scope=${SCOPE}, no pending changes"
   exit 0
 fi
 
