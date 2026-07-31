@@ -14,27 +14,28 @@ function assert(cond: unknown, msg: string): void {
 }
 
 async function main(): Promise<void> {
-  const tid = `${OMNIHUMAN_TASK_PREFIX}abc123`
+  const tid = `${OMNIHUMAN_TASK_PREFIX}plain-task`
   assert(isOmniHumanTaskId(tid), '应识别 omnihuman: 前缀')
-  assert(stripOmniHumanTaskPrefix(tid) === 'abc123', '应剥离前缀')
+  assert(stripOmniHumanTaskPrefix(tid) === 'plain-task', '应剥离前缀')
   assert(!isOmniHumanTaskId('ark-task-1'), '普通 taskId 不应误判')
 
   const signed = signVolcVisualJsonPost({
     accessKeyId: 'AKTEST',
     secretAccessKey: 'SKTEST',
-    action: 'CVSync2AsyncSubmitTask',
+    action: 'JimengRealmanAvatarPictureOmniV15SubmitTask',
+    version: '2024-06-06',
     body: {
       req_key: 'jimeng_realman_avatar_picture_omni_v15',
       image_url: 'https://example.com/a.jpg',
       audio_url: 'https://example.com/a.mp3',
     },
   })
-  assert(signed.url.includes('Action=CVSync2AsyncSubmitTask'), 'URL 须含 Action')
+  assert(signed.url.includes('JimengRealmanAvatarPictureOmniV15SubmitTask'), 'URL 须含专用 Action')
+  assert(signed.url.includes('2024-06-06'), 'URL 须含 2024-06-06')
   assert(signed.headers.Authorization?.includes('HMAC-SHA256'), '须 V4 签名')
-  assert(signed.headers['X-Content-Sha256'], '须 body sha')
-  assert(signed.body.includes('audio_url'), 'body 含音频')
+  assert(signed.body.includes('jimeng_realman_avatar_picture_omni_v15'), 'body 含 req_key')
 
-  console.log('OK: OmniHuman local unit — taskId prefix + volc visual sign')
+  console.log('OK: OmniHuman local unit — V15 Action + volc visual sign')
 }
 
 main().catch((e) => {

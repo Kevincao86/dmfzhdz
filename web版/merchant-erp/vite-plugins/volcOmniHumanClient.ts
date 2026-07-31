@@ -1,18 +1,41 @@
 /**
  * 火山即梦 OmniHuman 1.5：单图 + 音频驱动数字人口播
- * API: visual.volcengineapi.com CVSync2AsyncSubmitTask / CVSync2AsyncGetResult
+ *
+ * 须走专用 Action（不是 CVSync2AsyncSubmitTask）：
+ * - 提交：JimengRealmanAvatarPictureOmniV15SubmitTask
+ * - 查询：JimengRealmanAvatarPictureOmniV15GetResult
+ * Version: 2024-06-06，req_key: jimeng_realman_avatar_picture_omni_v15
  */
 import type { MerchantAiEnv } from './merchantAiUpstream.js'
 import { signVolcVisualJsonPost } from './volcVisualSign.js'
 
 export const OMNIHUMAN_TASK_PREFIX = 'omnihuman:'
 
-/** 官方/聚合侧常见 req_key；可用环境变量覆盖 */
-const DEFAULT_VIDEO_REQ_KEYS = [
-  'jimeng_realman_avatar_picture_omni_v15',
-  'volces_realman_avatar_picture_omni_v15',
-  'jimeng_realman_avatar_picture_omni',
-] as const
+const OMNI_V15_REQ_KEY = 'jimeng_realman_avatar_picture_omni_v15'
+const OMNI_V15_VERSION = '2024-06-06'
+const OMNI_V15_SUBMIT_ACTION = 'JimengRealmanAvatarPictureOmniV15SubmitTask'
+const OMNI_V15_GET_ACTION = 'JimengRealmanAvatarPictureOmniV15GetResult'
+
+/** 备用：旧版 Omni v2 / 同步异步通用接口（账号开通时才可用） */
+const FALLBACK_ATTEMPTS: Array<{
+  action: string
+  version: string
+  reqKey: string
+  getAction: string
+}> = [
+  {
+    action: OMNI_V15_SUBMIT_ACTION,
+    version: OMNI_V15_VERSION,
+    reqKey: OMNI_V15_REQ_KEY,
+    getAction: OMNI_V15_GET_ACTION,
+  },
+  {
+    action: 'RealmanAvatarPictureOmniV2SubmitTask',
+    version: OMNI_V15_VERSION,
+    reqKey: 'jimeng_realman_avatar_picture_omni_v2',
+    getAction: 'RealmanAvatarPictureOmniV2GetResult',
+  },
+]
 
 export function resolveVolcVisualCredentials(env: MerchantAiEnv): {
   accessKeyId: string
@@ -55,15 +78,87 @@ export function stripOmniHumanTaskPrefix(taskId: string): string {
   return t
 }
 
-function videoReqKeys(env: MerchantAiEnv): string[] {
-  const custom = (env.MERCHANT_AI_OMNIHUMAN_REQ_KEY ?? '').trim()
-  if (custom) return [custom, ...DEFAULT_VIDEO_REQ_KEYS.filter((k) => k !== custom)]
-  return [...DEFAULT_VIDEO_REQ_KEYS]
+/** taskId 内嵌 req_key / getAction，便于轮询：omnihuman:v15:<taskId> */
+function encodeTaskToken(reqKey: string, getAction: string, rawTaskId: string): string {
+  const pack = Buffer.from(
+    JSON.stringify({ k: reqKey, g: getAction, t: rawTaskId }),
+    'utf8',
+  ).toString('base64url')
+  return `${OMNIHUMAN_TASK_PREFIX}${pack}`
+}
+
+function decodeTaskToken(taskIdRaw: string): {
+  reqKey: string
+  getAction: string
+  taskId: string
+} | null {
+  const raw = stripOmniHumanTaskPrefix(taskIdRaw)
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) as {
+      k?: string
+      g?: string
+      t?: string
+    }
+    if (parsed.t && parsed.k && parsed.g) {
+      return { reqKey: parsed.k, getAction: parsed.g, taskId: parsed.t }
+    }
+  } catch {
+    /* plain task id fallback */
+  }
+  return {
+    reqKey: OMNI_V15_REQ_KEY,
+    getAction: OMNI_V15_GET_ACTION,
+    taskId: raw,
+  }
+}
+
+function attemptsForEnv(env: MerchantAiEnv): typeof FALLBACK_ATTEMPTS {
+  const customKey = (env.MERCHANT_AI_OMNIHUMAN_REQ_KEY ?? '').trim()
+  const customAction = (env.MERCHANT_AI_OMNIHUMAN_SUBMIT_ACTION ?? '').trim()
+  const customGet = (env.MERCHANT_AI_OMNIHUMAN_GET_ACTION ?? '').trim()
+  if (customKey || customAction) {
+    return [
+      {
+        action: customAction || OMNI_V15_SUBMIT_ACTION,
+        version: OMNI_V15_VERSION,
+        reqKey: customKey || OMNI_V15_REQ_KEY,
+        getAction: customGet || OMNI_V15_GET_ACTION,
+      },
+      ...FALLBACK_ATTEMPTS,
+    ]
+  }
+  return FALLBACK_ATTEMPTS
+}
+
+function unwrapVolcResult(j: Record<string, unknown>): {
+  code: number | string | undefined
+  message: string
+  data: Record<string, unknown>
+  httpOkHint: boolean
+} {
+  const metaErr = (j.ResponseMetadata as { Error?: { Message?: string; Code?: string } } | undefined)
+    ?.Error
+  const result = (j.Result ?? j.result ?? j.data ?? j) as Record<string, unknown>
+  const data =
+    result && typeof result === 'object' && result.data && typeof result.data === 'object'
+      ? (result.data as Record<string, unknown>)
+      : result && typeof result === 'object'
+        ? result
+        : {}
+  const code = result?.code ?? result?.status ?? j.code
+  const message =
+    (typeof result?.message === 'string' && result.message) ||
+    (typeof j.message === 'string' && j.message) ||
+    (typeof metaErr?.Message === 'string' && metaErr.Message) ||
+    ''
+  return { code, message, data, httpOkHint: !metaErr }
 }
 
 async function postVolcVisual(
   creds: { accessKeyId: string; secretAccessKey: string; region: string },
   action: string,
+  version: string,
   body: Record<string, unknown>,
 ): Promise<{ ok: true; json: Record<string, unknown> } | { ok: false; message: string; status?: number }> {
   const signed = signVolcVisualJsonPost({
@@ -71,6 +166,7 @@ async function postVolcVisual(
     secretAccessKey: creds.secretAccessKey,
     region: creds.region,
     action,
+    version,
     body,
   })
   let res: Response
@@ -87,37 +183,46 @@ async function postVolcVisual(
   try {
     j = (await res.json()) as Record<string, unknown>
   } catch {
-    /* empty */
+    return { ok: false, message: `火山视觉 HTTP ${res.status}`, status: res.status }
   }
-  const code = j.code ?? j.Code ?? (j.ResponseMetadata as { Error?: { Code?: string } } | undefined)?.Error?.Code
-  const msg =
-    (typeof j.message === 'string' && j.message) ||
-    (typeof j.Message === 'string' && j.Message) ||
-    (j.ResponseMetadata as { Error?: { Message?: string } } | undefined)?.Error?.Message ||
-    `火山视觉 HTTP ${res.status}`
-  if (!res.ok) {
-    return { ok: false, message: String(msg), status: res.status }
-  }
-  if (code !== undefined && code !== 0 && code !== '0' && code !== 10000 && String(code) !== 'Success') {
-    const nested = j.data as Record<string, unknown> | undefined
-    const nestedMsg = typeof nested?.message === 'string' ? nested.message : ''
-    return { ok: false, message: nestedMsg || String(msg), status: res.status }
+  const unwrapped = unwrapVolcResult(j)
+  const codeNum = Number(unwrapped.code)
+  const businessFail =
+    unwrapped.code !== undefined &&
+    unwrapped.code !== null &&
+    unwrapped.code !== '' &&
+    codeNum !== 0 &&
+    codeNum !== 10000 &&
+    String(unwrapped.code).toLowerCase() !== 'success'
+  if (!res.ok || businessFail) {
+    const msg = unwrapped.message || `火山视觉 HTTP ${res.status}`
+    return { ok: false, message: msg, status: res.status }
   }
   return { ok: true, json: j }
 }
 
 function extractTaskId(j: Record<string, unknown>): string {
-  const data = (j.data ?? j.Data ?? j.result ?? {}) as Record<string, unknown>
-  const candidates = [data.task_id, data.taskId, data.JobId, j.task_id, j.taskId]
+  const { data } = unwrapVolcResult(j)
+  const candidates = [data.task_id, data.taskId, data.JobId, data.job_id]
   for (const c of candidates) {
     if (typeof c === 'string' && c.trim()) return c.trim()
+  }
+  const respData = data.resp_data
+  if (typeof respData === 'string' && respData.trim()) {
+    try {
+      const parsed = JSON.parse(respData) as Record<string, unknown>
+      const u = parsed.task_id ?? parsed.taskId
+      if (typeof u === 'string' && u.trim()) return u.trim()
+    } catch {
+      /* ignore */
+    }
   }
   return ''
 }
 
 function extractVideoUrl(j: Record<string, unknown>): string | undefined {
-  const data = (j.data ?? j.Data ?? {}) as Record<string, unknown>
-  const direct = [data.video_url, data.videoUrl, data.url, j.video_url]
+  const { data } = unwrapVolcResult(j)
+  const direct = [data.video_url, data.videoUrl, data.url]
   for (const c of direct) {
     if (typeof c === 'string' && /^https?:\/\//i.test(c.trim())) return c.trim()
   }
@@ -145,8 +250,8 @@ function extractVideoUrl(j: Record<string, unknown>): string | undefined {
 }
 
 function extractStatus(j: Record<string, unknown>): string {
-  const data = (j.data ?? j.Data ?? {}) as Record<string, unknown>
-  const s = data.status ?? data.task_status ?? data.Status ?? j.status
+  const { data } = unwrapVolcResult(j)
+  const s = data.status ?? data.task_status ?? data.Status
   return String(s ?? '').trim().toLowerCase()
 }
 
@@ -171,7 +276,7 @@ export async function volcSubmitOmniHumanTask(
     return {
       ok: false,
       message:
-        '未配置火山智能视觉 AK/SK，无法使用 OmniHuman。请在轻量 auth-api.env 配置 MERCHANT_AI_VOLC_ACCESS_KEY 与 MERCHANT_AI_VOLC_SECRET_KEY（即梦/视觉内容生成控制台）。',
+        '未配置火山智能视觉 AK/SK，无法使用 OmniHuman。请在轻量 auth-api.env 配置 MERCHANT_AI_VOLC_ACCESS_KEY 与 MERCHANT_AI_VOLC_SECRET_KEY。',
     }
   }
   const imageUrl = opts.imageUrl.trim()
@@ -183,51 +288,71 @@ export async function volcSubmitOmniHumanTask(
     return { ok: false, message: 'OmniHuman 需要公网可访问的口播音频 URL' }
   }
 
-  let lastMsg = 'OmniHuman 提交失败'
-  for (const reqKey of videoReqKeys(env)) {
+  const errors: string[] = []
+  for (const attempt of attemptsForEnv(env)) {
     const body: Record<string, unknown> = {
-      req_key: reqKey,
+      req_key: attempt.reqKey,
       image_url: imageUrl,
       audio_url: audioUrl,
     }
     if (opts.prompt?.trim()) body.prompt = opts.prompt.trim().slice(0, 500)
     if (opts.peFastMode) body.pe_fast_mode = true
 
-    const r = await postVolcVisual(creds, 'CVSync2AsyncSubmitTask', body)
+    const r = await postVolcVisual(creds, attempt.action, attempt.version, body)
     if (!r.ok) {
-      lastMsg = `${reqKey}: ${r.message}`
-      if (/not.?found|unknown.?req|req_key|不支持|未开通|invalid/i.test(r.message)) continue
-      return { ok: false, message: r.message }
+      errors.push(`${attempt.action}/${attempt.reqKey}: ${r.message}`)
+      if (/concurrent|50430|try later|限流|频率/i.test(r.message)) {
+        return { ok: false, message: `OmniHuman 限流，请稍后重试（${r.message}）` }
+      }
+      continue
     }
     const tid = extractTaskId(r.json)
     if (!tid) {
-      lastMsg = `${reqKey}: 未返回 task_id`
+      errors.push(`${attempt.action}: 未返回 task_id`)
       continue
     }
-    return { ok: true, taskId: `${OMNIHUMAN_TASK_PREFIX}${tid}`, reqKey }
+    return {
+      ok: true,
+      taskId: encodeTaskToken(attempt.reqKey, attempt.getAction, tid),
+      reqKey: attempt.reqKey,
+    }
   }
-  return { ok: false, message: lastMsg }
+  return {
+    ok: false,
+    message:
+      errors[0] ||
+      'OmniHuman 提交失败：账号可能未开通即梦 OmniHuman 1.5，请到火山控制台开通后重试',
+  }
 }
 
 export async function volcGetOmniHumanTaskOnce(
   env: MerchantAiEnv,
   taskIdRaw: string,
-  reqKeyHint?: string,
 ): Promise<OmniHumanPollState> {
   const creds = resolveVolcVisualCredentials(env)
   if (!creds) {
     return { phase: 'failed', statusLabel: 'FAILED', failReason: '未配置火山视觉 AK/SK' }
   }
-  const taskId = stripOmniHumanTaskPrefix(taskIdRaw)
-  const keys = reqKeyHint?.trim()
-    ? [reqKeyHint.trim(), ...videoReqKeys(env)]
-    : videoReqKeys(env)
+  const decoded = decodeTaskToken(taskIdRaw)
+  if (!decoded?.taskId) {
+    return { phase: 'failed', statusLabel: 'FAILED', failReason: '无效的 OmniHuman taskId' }
+  }
+
+  const getAttempts = [
+    { action: decoded.getAction, version: OMNI_V15_VERSION, reqKey: decoded.reqKey },
+    { action: OMNI_V15_GET_ACTION, version: OMNI_V15_VERSION, reqKey: OMNI_V15_REQ_KEY },
+    {
+      action: 'CVSync2AsyncGetResult',
+      version: '2022-08-31',
+      reqKey: decoded.reqKey,
+    },
+  ]
 
   let lastFail = '查询失败'
-  for (const reqKey of keys) {
-    const r = await postVolcVisual(creds, 'CVSync2AsyncGetResult', {
-      req_key: reqKey,
-      task_id: taskId,
+  for (const g of getAttempts) {
+    const r = await postVolcVisual(creds, g.action, g.version, {
+      req_key: g.reqKey,
+      task_id: decoded.taskId,
     })
     if (!r.ok) {
       lastFail = r.message
@@ -235,18 +360,14 @@ export async function volcGetOmniHumanTaskOnce(
     }
     const status = extractStatus(r.json)
     const videoUrl = extractVideoUrl(r.json)
-    if (videoUrl && (/succ|done|finish|complete|success/i.test(status) || !status)) {
+    if (videoUrl && (/succ|done|finish|complete|success/i.test(status) || !status || status === '0')) {
       return { phase: 'succeeded', statusLabel: status || 'SUCCEEDED', videoUrl }
     }
     if (/fail|error|cancel/i.test(status)) {
-      const data = (r.json.data ?? {}) as Record<string, unknown>
-      const reason =
-        (typeof data.message === 'string' && data.message) ||
-        (typeof r.json.message === 'string' && r.json.message) ||
-        status
-      return { phase: 'failed', statusLabel: status || 'FAILED', failReason: String(reason) }
+      const { message } = unwrapVolcResult(r.json)
+      return { phase: 'failed', statusLabel: status || 'FAILED', failReason: message || status }
     }
-    if (/queue|pending|waiting|submit/i.test(status)) {
+    if (/queue|pending|waiting|submit|in_queue/i.test(status)) {
       return { phase: 'queued', statusLabel: status || 'QUEUED' }
     }
     if (videoUrl) {
