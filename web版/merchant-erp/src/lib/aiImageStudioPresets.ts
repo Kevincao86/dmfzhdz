@@ -5,7 +5,7 @@
  */
 import type { PlatformLogoKey } from './platformBranding'
 import { PLATFORM_LOGO_SRC } from './platformBranding'
-import { fitGptImage2CarouselSize, fitGptImage2Size } from './aiImageStudioGptSize'
+import { fitGptImage2CarouselSize } from './aiImageStudioGptSize'
 
 export type LocalLifeIndustryId =
   | 'catering'
