@@ -24,7 +24,7 @@ npm run demo
 
 ## 配置真实企微
 
-1. 复制环境变量：`cp .env.example .env`
+1. 复制环境变量：`cp env.example .env`
 2. **自建应用**：企微管理后台 → 应用管理 → 自建 → 拿到 `CorpID` / `Secret`，并在「协作 → 文档 → API」把该应用加入可调用列表。
 3. **三张智能表格**：在企微里按下方列名建表（标题须一致），把每张表的 `docid`、`sheet_id` 填进 `.env`。
 4. **群机器人**：目标群 → 添加群机器人 → 复制 Webhook，填 `WECOM_WEBHOOK_URL`（或只填 `WECOM_WEBHOOK_KEY`）。
