@@ -191,31 +191,34 @@ export async function finalizeShortVideoOutput(
 ): Promise<{ ok: true; objectUrl: string; blob: Blob } | { ok: false; message: string }> {
   /**
    * Seedance 原生有声：模型侧已出片；浏览器再「下载」只是为了本地预览/扣积分。
-   * 1080p 经代理拉取常超过 90s——绝不能再套死超时后报「合成失败」。
-   * 拉取失败时直接用方舟成片 URL 在线预览。
+   * 代理拉 1080p 单次超时可达 180s×多路径×多轮重试，会卡十几分钟仍显示「正在拉取预览」。
+   * 预览拉取硬限约 30s：超时/失败立刻用方舟成片 URL 在线播放，绝不长时间挂死。
    */
   if (opts?.seedanceNativeAv) {
     if (typeof source !== 'string') {
       onProgress?.('Seedance 有声成片已就绪（模型内置语音与字幕）')
       return { ok: true, objectUrl: URL.createObjectURL(source), blob: source }
     }
-    onProgress?.('成片已生成，正在拉取预览…')
+    const PREVIEW_PULL_MS = 28_000
+    onProgress?.('成片已生成，正在拉取预览（约 30 秒内未完成将直接在线播放）…')
     try {
-      const videoBlob = await downloadVideoUrlAsBlob(source, {
-        maxAttempts: 3,
-        onRetry: (attempt, maxAttempts) => {
-          onProgress?.(`成片文件较大，重试拉取 ${attempt}/${maxAttempts}…`)
-        },
-      })
-      onProgress?.('Seedance 有声成片已就绪（模型内置语音与字幕）')
-      return { ok: true, objectUrl: URL.createObjectURL(videoBlob), blob: videoBlob }
-    } catch {
-      onProgress?.('成片已就绪（在线预览；本机缓存未拉完可点下载重试）')
-      return {
-        ok: true,
-        objectUrl: source,
-        blob: new Blob([], { type: 'video/mp4' }),
+      const videoBlob = await withTimeout(
+        downloadVideoUrlAsBlob(source, { maxAttempts: 1 }),
+        PREVIEW_PULL_MS,
+        '拉取预览',
+      )
+      if (videoBlob.size >= 1024) {
+        onProgress?.('Seedance 有声成片已就绪（模型内置语音与字幕）')
+        return { ok: true, objectUrl: URL.createObjectURL(videoBlob), blob: videoBlob }
       }
+    } catch {
+      /* fall through → 在线预览 */
+    }
+    onProgress?.('成片已就绪（在线预览；本机缓存未拉完不影响播放）')
+    return {
+      ok: true,
+      objectUrl: source,
+      blob: new Blob([], { type: 'video/mp4' }),
     }
   }
 
