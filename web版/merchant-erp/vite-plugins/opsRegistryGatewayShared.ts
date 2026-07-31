@@ -75,6 +75,7 @@ import {
   filterRegistrySnapshotForMerchant,
   setRecruitmentScheduleRowsForTenant,
   setTalentPoolCandidatesForTenant,
+  slimRegistrySnapshotForAiBootstrap,
   stripRegistryRecruitmentForAnonymous,
 } from '../src/lib/registryTenantIsolation.js'
 import { recruitmentOrderBelongsToTenant } from '../src/lib/tenantRegistryScope.js'
@@ -352,8 +353,12 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
               data.recruitmentOrders = cleaned
               writeRegistry(viteRoot, data)
             }
+            const slice = new URL(req.url || '/', 'http://local').searchParams.get('slice')?.trim().toLowerCase() || ''
+            const wantAiBootstrap = slice === 'ai' || slice === 'bootstrap'
             const auth = await requireMerchantRegistryAuthFromHeaders(authHeader)
-            if (auth.ok) {
+            if (wantAiBootstrap) {
+              data = slimRegistrySnapshotForAiBootstrap(data, auth.ok ? auth.tenantId : null)
+            } else if (auth.ok) {
               data = filterRegistrySnapshotForMerchant(auth.tenantId, data)
             } else {
               data = stripRegistryRecruitmentForAnonymous(data)

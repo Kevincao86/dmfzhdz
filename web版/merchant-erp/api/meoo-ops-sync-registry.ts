@@ -13,6 +13,7 @@ import {
 import { requireMerchantRegistryAuth } from '../src/lib/merchantRegistryAuth.js'
 import {
   filterRegistrySnapshotForMerchant,
+  slimRegistrySnapshotForAiBootstrap,
   stripRegistryRecruitmentForAnonymous,
 } from '../src/lib/registryTenantIsolation.js'
 import { createRegistrySnapshotIoFetch, loadRegistrySnapshotForGet } from '../src/lib/registrySnapshotIoFetch.js'
@@ -77,8 +78,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       data = await io.load()
     }
 
+    const sliceRaw = req.query?.slice
+    const slice =
+      typeof sliceRaw === 'string' ? sliceRaw.trim().toLowerCase() : Array.isArray(sliceRaw) ? String(sliceRaw[0] ?? '').trim().toLowerCase() : ''
+    const wantAiBootstrap = slice === 'ai' || slice === 'bootstrap'
+
     const auth = await requireMerchantRegistryAuth(req)
-    if (auth.ok) {
+    if (wantAiBootstrap) {
+      data = slimRegistrySnapshotForAiBootstrap(data, auth.ok ? auth.tenantId : null)
+    } else if (auth.ok) {
       data = filterRegistrySnapshotForMerchant(auth.tenantId, data)
     } else {
       data = stripRegistryRecruitmentForAnonymous(data)
