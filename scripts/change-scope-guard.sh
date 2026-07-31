@@ -177,6 +177,7 @@ addon_visual_studio
 mpVisualStudioAi
 meooAgentImageCore
 meoo-ai-agent-image
+tokenmixImageGenerate
 merchantAiUpstream
 qwenVisionApi
 qwenVisionCatalog

@@ -147,11 +147,15 @@ export async function runMeooAgentImageRequest(
         quality: gptQuality,
         ...(size ? { size } : {}),
       })
-      // 避免 TokenMix 挂死导致 Nginx/前端一直等到 502；失败不切换其它模型
+      // gpt-image-2 在 TokenMix 为异步轮询，high/超宽可能 2～3 分钟；失败不切换其它模型
+      const timeoutMs = isGptImage ? 250_000 : 120_000
       const { imageUrl, modelUsed } = await Promise.race([
         genPromise,
         new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('高级生图超时（120秒），请稍后重试')), 120_000)
+          setTimeout(
+            () => reject(new Error(`高级生图超时（${Math.round(timeoutMs / 1000)}秒），请稍后重试`)),
+            timeoutMs,
+          )
         }),
       ])
       return { ok: true, imageUrl, channel: 'tokenmix', displayModel: modelUsed }
