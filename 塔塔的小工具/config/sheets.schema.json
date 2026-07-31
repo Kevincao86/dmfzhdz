@@ -1,0 +1,53 @@
+{
+  "followup": {
+    "title": "新签客户跟进表",
+    "columns": {
+      "customer": "客户名称",
+      "signedAt": "签约日期",
+      "bizOwner": "商务",
+      "opsOwner": "运营",
+      "taskAccount": "开通账号",
+      "taskMaterials": "资料收集",
+      "taskPlan": "方案确认",
+      "taskFirstOrder": "首单启动",
+      "taskTraining": "培训完成",
+      "note": "备注"
+    },
+    "checklistKeys": [
+      "taskAccount",
+      "taskMaterials",
+      "taskPlan",
+      "taskFirstOrder",
+      "taskTraining"
+    ]
+  },
+  "rank": {
+    "title": "客户业绩表",
+    "columns": {
+      "customer": "客户名称",
+      "type": "类型",
+      "period": "周期",
+      "periodRange": "周期起止",
+      "metricName": "指标名",
+      "metricValue": "指标值",
+      "owner": "负责人"
+    },
+    "typeTop": "TOP",
+    "typeNewOps": "新运营",
+    "periodWeek": "周",
+    "periodMonth": "月",
+    "topN": 10
+  },
+  "files": {
+    "title": "共享文件表",
+    "columns": {
+      "fileName": "文件名",
+      "category": "分类",
+      "link": "企微链接",
+      "uploader": "上传人",
+      "updatedAt": "更新日期",
+      "note": "备注"
+    },
+    "recentDays": 7
+  }
+}
