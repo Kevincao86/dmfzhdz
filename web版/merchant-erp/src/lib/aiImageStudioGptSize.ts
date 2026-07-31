@@ -1,13 +1,13 @@
 /**
- * GPT Image 2（及 gpt-image-*）自定义尺寸约束：
+ * TokenMix / gpt-image-* 自定义尺寸约束（以中继实际上限为准）：
  * - 两边均为 16 的倍数
- * - 最长边 ≤ 3840
+ * - 最长边 ≤ 2048（上游报错：out of range [16*16, 2048*2048]）
  * - 长短边比 ≤ 3:1
- * - 总像素 ∈ [655360, 8294400]
+ * - 总像素 ∈ [655360, 2048*2048]
  */
-const GPT_IMAGE2_MAX_EDGE = 3840
+const GPT_IMAGE2_MAX_EDGE = 2048
 const GPT_IMAGE2_MAX_RATIO = 3
-const GPT_IMAGE2_MAX_PIXELS = 8_294_400
+const GPT_IMAGE2_MAX_PIXELS = GPT_IMAGE2_MAX_EDGE * GPT_IMAGE2_MAX_EDGE
 const GPT_IMAGE2_MIN_PIXELS = 655_360
 
 function snap16(n: number): number {
@@ -37,33 +37,39 @@ export function fitGptImage2Size(
     h = Math.round(h * s)
   }
 
-  w = snap16(w)
-  h = snap16(h)
+  w = snap16(Math.min(w, GPT_IMAGE2_MAX_EDGE))
+  h = snap16(Math.min(h, GPT_IMAGE2_MAX_EDGE))
 
   if (Math.max(w, h) / Math.min(w, h) > GPT_IMAGE2_MAX_RATIO + 0.001) {
     if (w >= h) h = snap16(Math.ceil(w / GPT_IMAGE2_MAX_RATIO))
     else w = snap16(Math.ceil(h / GPT_IMAGE2_MAX_RATIO))
   }
 
-  while (w * h > GPT_IMAGE2_MAX_PIXELS && Math.min(w, h) > 16) {
+  while (
+    (w * h > GPT_IMAGE2_MAX_PIXELS || w > GPT_IMAGE2_MAX_EDGE || h > GPT_IMAGE2_MAX_EDGE) &&
+    Math.min(w, h) > 16
+  ) {
     if (w >= h) {
-      w = snap16(w - 16)
-      h = snap16(Math.round(w / Math.min(ratio, GPT_IMAGE2_MAX_RATIO)))
+      w = snap16(Math.min(w - 16, GPT_IMAGE2_MAX_EDGE))
+      h = snap16(Math.min(Math.round(w / Math.min(ratio, GPT_IMAGE2_MAX_RATIO)), GPT_IMAGE2_MAX_EDGE))
     } else {
-      h = snap16(h - 16)
-      w = snap16(Math.round(h / Math.min(ratio, GPT_IMAGE2_MAX_RATIO)))
+      h = snap16(Math.min(h - 16, GPT_IMAGE2_MAX_EDGE))
+      w = snap16(Math.min(Math.round(h / Math.min(ratio, GPT_IMAGE2_MAX_RATIO)), GPT_IMAGE2_MAX_EDGE))
     }
   }
 
   while (w * h < GPT_IMAGE2_MIN_PIXELS && Math.max(w, h) < GPT_IMAGE2_MAX_EDGE) {
     if (w >= h) {
-      w = snap16(w + 16)
+      w = snap16(Math.min(w + 16, GPT_IMAGE2_MAX_EDGE))
       h = snap16(Math.max(16, Math.round(w / Math.min(ratio, GPT_IMAGE2_MAX_RATIO))))
     } else {
-      h = snap16(h + 16)
+      h = snap16(Math.min(h + 16, GPT_IMAGE2_MAX_EDGE))
       w = snap16(Math.max(16, Math.round(h / Math.min(ratio, GPT_IMAGE2_MAX_RATIO))))
     }
   }
+
+  w = snap16(Math.min(w, GPT_IMAGE2_MAX_EDGE))
+  h = snap16(Math.min(h, GPT_IMAGE2_MAX_EDGE))
 
   return { width: w, height: h, size: `${w}x${h}`, clampedAspect }
 }
