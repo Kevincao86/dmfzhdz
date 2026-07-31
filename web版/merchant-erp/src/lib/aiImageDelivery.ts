@@ -106,13 +106,15 @@ export async function compressImageBlobToJpeg(blob: Blob, maxBytes = 3 * 1024 * 
   canvas.height = bitmap.height
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Canvas 不可用')
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
   ctx.drawImage(bitmap, 0, 0)
   bitmap.close()
 
-  let quality = 0.92
+  let quality = 0.95
   let out = await canvasToJpegBlob(canvas, quality)
-  while (out.size > maxBytes && quality > 0.35) {
-    quality -= 0.08
+  while (out.size > maxBytes && quality > 0.42) {
+    quality -= 0.06
     out = await canvasToJpegBlob(canvas, quality)
   }
   if (out.size > maxBytes) {
@@ -150,16 +152,20 @@ export function triggerBlobDownload(blob: Blob, filename: string) {
 }
 
 /**
- * 三连图裁切：整幅横图先按「N×单张」比例居中裁准，再等宽等高切成 N 张，
+ * 三连图裁切：整幅横图先按「N×单张」比例裁准，再等宽等高切成 N 张，
  * 最后缩放到平台单张像素（抖音/美团单张宽高不同）。默认 N=3。
+ *
+ * 垂直方向：默认 preferTop（上方少裁、下方多裁），避免 GPT≤3:1 事后压扁时切掉贴顶主标题。
  */
 export async function sliceCarouselFiveStrips(
   blob: Blob,
   spec: { slideWidth: number; slideHeight: number; slotCount?: number },
+  opts?: { verticalAlign?: 'center' | 'preferTop' },
 ): Promise<Blob[]> {
   const slotCount = Math.max(1, Math.floor(spec.slotCount ?? 3))
   const slideW = Math.max(1, Math.floor(spec.slideWidth))
   const slideH = Math.max(1, Math.floor(spec.slideHeight))
+  const verticalAlign = opts?.verticalAlign ?? 'preferTop'
   const bitmap = await createImageBitmap(blob)
   const srcW = bitmap.width
   const srcH = bitmap.height
@@ -183,7 +189,12 @@ export async function sliceCarouselFiveStrips(
     cropW = srcW
     cropH = Math.max(1, Math.round(srcW / targetAspect))
     cropX = 0
-    cropY = Math.floor((srcH - cropH) / 2)
+    const surplus = Math.max(0, srcH - cropH)
+    // preferTop：约 12% surplus 留在顶，其余从底裁，保住主标题
+    cropY =
+      verticalAlign === 'preferTop'
+        ? Math.floor(surplus * 0.12)
+        : Math.floor(surplus / 2)
   }
 
   const strips: Blob[] = []
@@ -201,6 +212,9 @@ export async function sliceCarouselFiveStrips(
       bitmap.close()
       throw new Error('Canvas 不可用')
     }
+    // 放大到平台单张时用高质量插值，减轻发糊
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high'
     ctx.drawImage(bitmap, sx, cropY, sw, sh, 0, 0, slideW, slideH)
 
     strips.push(
