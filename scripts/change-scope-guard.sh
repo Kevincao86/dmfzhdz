@@ -566,6 +566,7 @@ shortVideoScriptTable
 shortVideoPostProcess
 shortVideoNarrationExtract
 digitalHumanPostProcessStyles
+digitalHumanSubtitle
 videoAiApi
 videoModelDuration
 short-video-cases

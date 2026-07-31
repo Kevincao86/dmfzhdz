@@ -1,7 +1,11 @@
 /** 数字人口播成片 — SRT 字幕生成（按口播时长均分） */
 import { assForceStyleForSubtitle } from './digitalHumanPostProcessStyles.js'
+import { parseScriptTimeRangeSeconds } from './shortVideoScriptTable'
 
 export { assForceStyleForSubtitle }
+
+/** 短片竖屏折行：约 12 字/行，优先标点处断开，减少半截句上屏 */
+export const SHORT_VIDEO_SUBTITLE_MAX_CHARS = 14
 
 export function wrapSubtitleLineForVertical(text: string, maxChars = 8): string[] {
   const t = text.trim()
@@ -17,28 +21,45 @@ export function wrapSubtitleLineForVertical(text: string, maxChars = 8): string[
       continue
     }
     buf = next
-    if (/[，。！？；、]/.test(ch) && buf.length >= 6) {
+    if (/[，。！？；、]/.test(ch) && buf.length >= Math.min(6, maxChars - 2)) {
       out.push(buf)
       buf = ''
     }
   }
   if (buf.trim()) out.push(buf.trim())
+  // 避免「清。」这类 1～2 字残句单独上屏：并回上一行（略超 max 可接受）
+  while (out.length >= 2) {
+    const last = out[out.length - 1]!
+    const bare = last.replace(/[，。！？；、…\s]/g, '')
+    if (bare.length >= 3) break
+    const prev = out[out.length - 2]!
+    out[out.length - 2] = `${prev}${last}`
+    out.pop()
+  }
   return out.length ? out : [t.slice(0, maxChars)]
 }
 
-export function splitSubtitleLines(text: string): string[] {
+export function splitSubtitleLines(text: string, maxChars = 8): string[] {
   const paras = text.replace(/\r/g, '').split(/\n+/).map((s) => s.trim()).filter(Boolean)
   const sentences: string[] = []
   for (const para of paras) {
     const parts = para.split(/(?<=[。！？])/).map((s) => s.trim()).filter(Boolean)
     sentences.push(...(parts.length ? parts : [para]))
   }
-  const lines = sentences.flatMap((s) => wrapSubtitleLineForVertical(s)).filter(Boolean)
+  const lines = sentences.flatMap((s) => wrapSubtitleLineForVertical(s, maxChars)).filter(Boolean)
   const deduped: string[] = []
   for (const line of lines) {
     if (deduped[deduped.length - 1] !== line) deduped.push(line)
   }
   return deduped
+}
+
+function isBlankDialogue(dialogue: string): boolean {
+  const t = String(dialogue || '').trim()
+  if (!t) return true
+  if (/^[(（]\s*无口播\s*[)）]$/.test(t)) return true
+  if (/^无口播$/.test(t)) return true
+  return false
 }
 
 function pad2(n: number): string {
@@ -76,6 +97,62 @@ export function buildSrtContent(lines: string[], totalDurationSec: number): stri
     blocks.push(
       `${i + 1}\n${formatSrtTimestamp(start)} --> ${formatSrtTimestamp(end)}\n${line}\n`,
     )
+  }
+  return blocks.join('\n')
+}
+
+export type ScriptRowForSubtitle = {
+  timeRange: string
+  dialogue: string
+}
+
+/**
+ * 按分镜 timeRange + dialogue 生成 SRT（对齐镜头时间轴）。
+ * 无口播段跳过；段内多行按字数均分该段时长。
+ */
+export function buildSrtFromScriptRows(
+  rows: ScriptRowForSubtitle[] | null | undefined,
+  totalDurationSec: number,
+  opts?: { maxCharsPerLine?: number },
+): string {
+  if (!rows?.length || totalDurationSec <= 0) return ''
+  const maxChars = opts?.maxCharsPerLine ?? SHORT_VIDEO_SUBTITLE_MAX_CHARS
+  const timed = rows
+    .map((r) => {
+      const range = parseScriptTimeRangeSeconds(r.timeRange)
+      const dialogue = String(r.dialogue || '').trim()
+      if (!range || isBlankDialogue(dialogue)) return null
+      const start = Math.max(0, Math.min(totalDurationSec, range.start))
+      const end = Math.max(start + 0.35, Math.min(totalDurationSec, range.end))
+      if (end <= start) return null
+      const lines = splitSubtitleLines(dialogue, maxChars)
+      if (!lines.length) return null
+      return { start, end, lines }
+    })
+    .filter((x): x is { start: number; end: number; lines: string[] } => Boolean(x))
+    .sort((a, b) => a.start - b.start)
+
+  if (!timed.length) return ''
+
+  const blocks: string[] = []
+  let idx = 1
+  for (const seg of timed) {
+    const segDur = seg.end - seg.start
+    const totalChars = seg.lines.reduce((n, l) => n + l.length, 0) || 1
+    let cursor = seg.start
+    for (let i = 0; i < seg.lines.length; i++) {
+      const line = seg.lines[i]!
+      const share = line.length / totalChars
+      const slice = Math.max(0.6, segDur * share)
+      const start = cursor
+      const end = i === seg.lines.length - 1 ? seg.end : Math.min(seg.end, cursor + slice)
+      cursor = end
+      if (end <= start) continue
+      blocks.push(
+        `${idx}\n${formatSrtTimestamp(start)} --> ${formatSrtTimestamp(end)}\n${line}\n`,
+      )
+      idx += 1
+    }
   }
   return blocks.join('\n')
 }

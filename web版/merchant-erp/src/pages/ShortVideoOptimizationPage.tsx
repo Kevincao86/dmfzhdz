@@ -1038,14 +1038,22 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       productImageBase64?: string
       productStartSec?: number
       productEndSec?: number
+      scriptRows?: ShortVideoScriptRow[] | null
     },
   ): Promise<boolean> => {
+    const rowsForSub =
+      opts?.scriptRows && opts.scriptRows.length >= 2
+        ? opts.scriptRows
+        : isScriptRowsUsable(scriptRows) && scriptRows.length >= 2
+          ? scriptRows
+          : null
     const fin = await finalizeShortVideoOutput(source, narrationSource, (text) => setProgress(text), {
       targetDurationSec,
       preferFullNarration: opts?.preferFullNarration,
       productImageBase64: opts?.productImageBase64,
       productStartSec: opts?.productStartSec,
       productEndSec: opts?.productEndSec,
+      scriptRows: rowsForSub,
     })
     if (!fin.ok) {
       setErr(fin.message)
