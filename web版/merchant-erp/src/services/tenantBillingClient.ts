@@ -217,6 +217,7 @@ export type ErpPointsSpendKind =
   | 'digital_human'
   | 'visual_studio_copy'
   | 'visual_studio_image'
+  | 'visual_studio_image_pro'
 
 export type ErpPointsSpendResult = {
   pointsCharged: number

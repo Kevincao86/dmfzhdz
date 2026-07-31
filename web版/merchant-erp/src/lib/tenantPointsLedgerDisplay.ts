@@ -39,7 +39,13 @@ function formatNoteDetail(kind: string, noteBody: string): string | undefined {
   ) {
     return formatDurationDetail(tail)
   }
-  if (kind === 'brief' || kind === 'article' || kind === 'visual_studio_copy' || kind === 'visual_studio_image') {
+  if (
+    kind === 'brief' ||
+    kind === 'article' ||
+    kind === 'visual_studio_copy' ||
+    kind === 'visual_studio_image' ||
+    kind === 'visual_studio_image_pro'
+  ) {
     if (/^订单\s/.test(tail) || tail.includes('订单')) return tail
     if (tail && !/^[a-f0-9-]{8,}$/i.test(tail)) return `订单 ${tail}`
     return undefined

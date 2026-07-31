@@ -36,7 +36,18 @@ Page({
     err: '',
     resultUrl: '',
     copyPoints: points.VISUAL_STUDIO_COPY_POINTS,
+    imageStdPoints: points.VISUAL_STUDIO_IMAGE_POINTS,
+    imageProPoints: points.VISUAL_STUDIO_IMAGE_PRO_POINTS,
+    imageTier: 'standard',
     imagePoints: points.VISUAL_STUDIO_IMAGE_POINTS,
+  },
+  onImageTier(e) {
+    const tier = e.currentTarget.dataset.tier === 'pro' ? 'pro' : 'standard'
+    this.setData({
+      imageTier: tier,
+      imagePoints:
+        tier === 'pro' ? points.VISUAL_STUDIO_IMAGE_PRO_POINTS : points.VISUAL_STUDIO_IMAGE_POINTS,
+    })
   },
   formSnapshot() {
     return {
@@ -175,25 +186,33 @@ Page({
       wx.showToast({ title: '请先填写主标题', icon: 'none' })
       return
     }
+    const tier = this.data.imageTier === 'pro' ? 'pro' : 'standard'
     this.setData({ genBusy: true, err: '', progress: '校验积分…', resultUrl: '' })
     try {
-      await points.assertVisualStudioImageAffordable(1)
+      await points.assertVisualStudioImageAffordable(1, tier)
       this.setData({ progress: '整理出图需求…' })
       const copy = {
         headline,
         subheadline: this.data.subheadline,
         offer: this.data.offer,
       }
-      this.setData({ progress: '生图中，约需数十秒…' })
+      this.setData({
+        progress: tier === 'pro' ? '高级生图中（GPT Image 2）…' : '生图中，约需数十秒…',
+      })
       const r = await vs.generatePosterImage(this.formSnapshot(), copy, {
         aspectRatio: this.data.aspect,
         referenceImage: this.data.refDataUrl || '',
+        tier,
       })
       if (!r.ok) throw new Error(r.message || '出图失败')
-      await points.spendVisualStudioImagePoints({
-        idempotencyKey: `erp-vs-img-${Date.now()}`,
-        note: '视觉工坊生图',
-      })
+      // JWT 路径已由 /api/meoo-ai-agent-image 扣费；仅当接口未扣时再补扣
+      if (!(r.pointsCharged > 0)) {
+        await points.spendVisualStudioImagePoints({
+          idempotencyKey: `erp-vs-img-${Date.now()}`,
+          note: tier === 'pro' ? '视觉工坊高级生图' : '视觉工坊生图',
+          tier: r.usedPro ? 'pro' : 'standard',
+        })
+      }
       this.setData({ resultUrl: r.imageUrl, progress: '生成完成' })
     } catch (e) {
       const msg = String((e && e.message) || e)

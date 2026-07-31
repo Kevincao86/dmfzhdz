@@ -195,15 +195,29 @@ async function fetchImagePrompt(form, copy) {
 async function generatePosterImage(form, copy, opts) {
   const o = opts || {}
   const packed = await fetchImagePrompt(form, copy)
+  const usePro = o.tier === 'pro'
+  const points = require('./mpPointsSpendApi.js')
   const gen = await api.postAiAgentImage(packed.prompt, {
     preferredVendor: 'qwen',
     aspectRatio: o.aspectRatio || '3:4',
     exactPrompt: true,
     preferWanxPoster: true,
-    referenceImage: o.referenceImage || '',
+    referenceImage: usePro ? '' : o.referenceImage || '',
+    ...(usePro
+      ? {
+          imageRoute: 'tokenmix',
+          tokenmixImageModel: points.VISUAL_STUDIO_PRO_IMAGE_MODEL || 'gpt-image-2',
+        }
+      : {}),
   })
   if (!gen.ok) return gen
-  return { ok: true, imageUrl: gen.imageUrl, promptSource: packed.source }
+  return {
+    ok: true,
+    imageUrl: gen.imageUrl,
+    promptSource: packed.source,
+    channel: gen.channel,
+    usedPro: usePro && gen.channel === 'tokenmix',
+  }
 }
 
 module.exports = {

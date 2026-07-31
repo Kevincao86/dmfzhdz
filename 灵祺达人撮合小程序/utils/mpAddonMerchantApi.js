@@ -127,6 +127,10 @@ async function postAiAgentImage(prompt, opts) {
   if (o.aspectRatio) body.aspect_ratio = o.aspectRatio
   if (o.exactPrompt) body.exact_prompt = true
   if (o.preferWanxPoster) body.prefer_wanx_poster = true
+  if (o.imageRoute === 'tokenmix') {
+    body.image_route = 'tokenmix'
+    if (o.tokenmixImageModel) body.tokenmix_image_model = o.tokenmixImageModel
+  }
   let r
   try {
     r = await postPaths(['/api/meoo-ai-agent-image'], body, mpAuthHeaders())
@@ -137,7 +141,12 @@ async function postAiAgentImage(prompt, opts) {
   const d = r.data || {}
   const imageUrl = String(d.imageUrl || d.url || d.image_url || '').trim()
   if (!imageUrl) return { ok: false, message: '未返回图片地址' }
-  return { ok: true, imageUrl, vendorUsed: d.vendorUsed || d.channel || '' }
+  return {
+    ok: true,
+    imageUrl,
+    vendorUsed: d.vendorUsed || d.channel || '',
+    channel: d.channel === 'tokenmix' ? 'tokenmix' : 'builtin',
+  }
 }
 
 async function postDouyinLinkForDh(url) {

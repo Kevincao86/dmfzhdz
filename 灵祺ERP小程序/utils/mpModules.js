@@ -38,7 +38,7 @@ module.exports.MODULE_COPY = {
   },
   ai_visual_studio: {
     navTitle: '视觉工坊',
-    body: '与电脑端「灵祺视觉工坊」同源：选渠道与玩法 → AI 文案包 → 参考图对齐 → 一键出图并保存相册；积分规则与 Web 一致（文案 3 积分/次、生图 8 积分/张）。',
+    body: '与电脑端「灵祺视觉工坊」同源：选渠道与玩法 → AI 文案包 → 参考图对齐 → 一键出图并保存相册；积分规则与 Web 一致（文案 3 积分/次、常规生图 8 积分/张、高级 GPT Image 2 为 150 积分/张）。',
   },
   shortvideo_ai: {
     navTitle: '短视频处理',

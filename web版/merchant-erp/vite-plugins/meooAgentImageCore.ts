@@ -129,7 +129,10 @@ export async function runMeooAgentImageRequest(
 
   if (imageRoute === 'tokenmix' && tm && !refHttps) {
     try {
-      const { imageUrl, modelUsed } = await tokenmixImagesGenerate(env, tm, prompt)
+      const gptQuality = /^gpt-image/i.test(tm) ? ('high' as const) : undefined
+      const { imageUrl, modelUsed } = await tokenmixImagesGenerate(env, tm, prompt, {
+        quality: gptQuality,
+      })
       return { ok: true, imageUrl, channel: 'tokenmix', displayModel: modelUsed }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)

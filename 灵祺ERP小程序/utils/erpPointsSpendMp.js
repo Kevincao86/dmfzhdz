@@ -14,7 +14,12 @@ function readBalance(summaryOrResult) {
 }
 
 function checkAddonPointsAffordable(kind, durationSec, extra) {
-  const flatKinds = new Set(['visual_studio_copy', 'visual_studio_image', 'mix_material_analyze'])
+  const flatKinds = new Set([
+    'visual_studio_copy',
+    'visual_studio_image',
+    'visual_studio_image_pro',
+    'mix_material_analyze',
+  ])
   const sec = flatKinds.has(kind) ? undefined : Math.max(1, Math.ceil(Number(durationSec) || 1))
   const count = extra && extra.count != null ? Number(extra.count) : 1
   const required = economics.mpPointsCostForUsage(kind, {
@@ -44,7 +49,12 @@ function checkAddonPointsAffordable(kind, durationSec, extra) {
 }
 
 function spendAddonPoints(opts) {
-  const flatKinds = new Set(['visual_studio_copy', 'visual_studio_image', 'mix_material_analyze'])
+  const flatKinds = new Set([
+    'visual_studio_copy',
+    'visual_studio_image',
+    'visual_studio_image_pro',
+    'mix_material_analyze',
+  ])
   const kind = opts.kind
   const sec = flatKinds.has(kind)
     ? undefined
@@ -80,8 +90,9 @@ async function spendVisualStudioCopyPoints(opts) {
   })
 }
 
-async function assertVisualStudioImageAffordable(count) {
-  const r = await checkAddonPointsAffordable('visual_studio_image', 1, { count: count || 1 })
+async function assertVisualStudioImageAffordable(count, tier) {
+  const kind = tier === 'pro' ? 'visual_studio_image_pro' : 'visual_studio_image'
+  const r = await checkAddonPointsAffordable(kind, 1, { count: count || 1 })
   if (!r.ok) {
     const err = new Error(r.message || '积分不足')
     err.code = 'points_insufficient'
@@ -91,10 +102,12 @@ async function assertVisualStudioImageAffordable(count) {
 }
 
 async function spendVisualStudioImagePoints(opts) {
+  const tier = opts && opts.tier === 'pro' ? 'pro' : 'standard'
+  const kind = tier === 'pro' ? 'visual_studio_image_pro' : 'visual_studio_image'
   return spendAddonPoints({
-    kind: 'visual_studio_image',
+    kind,
     idempotencyKey: opts && opts.idempotencyKey,
-    note: (opts && opts.note) || '视觉工坊生图',
+    note: (opts && opts.note) || (tier === 'pro' ? '视觉工坊高级生图' : '视觉工坊生图'),
   })
 }
 
@@ -121,4 +134,5 @@ module.exports = {
   affordActionFromError,
   VISUAL_STUDIO_COPY_POINTS: economics.MP_POINTS_VISUAL_STUDIO_COPY_PER_USE,
   VISUAL_STUDIO_IMAGE_POINTS: economics.MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE,
+  VISUAL_STUDIO_IMAGE_PRO_POINTS: economics.MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE,
 }

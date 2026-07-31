@@ -14,6 +14,9 @@ const MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE = 15
 
 const MP_POINTS_VISUAL_STUDIO_COPY_PER_USE = 3
 const MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE = 8
+/** 高级生图 GPT Image 2 high：150 积分/张（与 Web mpPointsEconomics 一致） */
+const MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE = 150
+const VISUAL_STUDIO_PRO_IMAGE_MODEL = 'gpt-image-2'
 
 const MP_POINTS_PER_SEC_BY_KIND = {
   shortvideo: MP_POINTS_SHORTVIDEO_PER_SEC,
@@ -26,7 +29,8 @@ const MP_POINTS_USAGE_KIND_LABELS = {
   cloud_edit_smart: '智能一键成片',
   mix_material_analyze: 'AI 混剪素材分析',
   visual_studio_copy: 'AI 视觉工坊文案',
-  visual_studio_image: 'AI 视觉工坊生图',
+  visual_studio_image: 'AI 视觉工坊常规生图',
+  visual_studio_image_pro: 'AI 视觉工坊高级生图',
 }
 
 function mpPointsPerSecForKind(kind) {
@@ -61,6 +65,10 @@ function mpPointsCostForUsage(kind, opts) {
     const n = Math.max(1, Math.ceil(Number((opts && opts.count) || 1) || 1))
     return n * MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE
   }
+  if (kind === 'visual_studio_image_pro') {
+    const n = Math.max(1, Math.ceil(Number((opts && opts.count) || 1) || 1))
+    return n * MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE
+  }
   return 0
 }
 
@@ -76,6 +84,9 @@ function formatMpPointsRateLabel(kind) {
   }
   if (kind === 'visual_studio_image') {
     return `${MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE} 积分/张`
+  }
+  if (kind === 'visual_studio_image_pro') {
+    return `${MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE} 积分/张`
   }
   const rate = mpPointsPerSecForKind(kind)
   if (rate != null) return `${rate} 积分/秒`
@@ -102,6 +113,8 @@ module.exports = {
   MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE,
   MP_POINTS_VISUAL_STUDIO_COPY_PER_USE,
   MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE,
+  MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE,
+  VISUAL_STUDIO_PRO_IMAGE_MODEL,
   mpPointsCostForUsage,
   formatMpPointsRateLabel,
   formatAddonSpendHint,

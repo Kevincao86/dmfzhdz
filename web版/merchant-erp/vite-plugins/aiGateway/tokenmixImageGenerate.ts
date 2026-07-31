@@ -5,6 +5,7 @@ export async function tokenmixImagesGenerate(
   env: Record<string, string>,
   modelId: string,
   prompt: string,
+  opts?: { quality?: 'low' | 'medium' | 'high'; size?: string },
 ): Promise<{ imageUrl: string; modelUsed: string }> {
   const apiKey = (env.TOKENMIX_API_KEY ?? '').trim()
   if (!apiKey) throw new Error('TOKENMIX_API_KEY 未配置')
@@ -19,16 +20,20 @@ export async function tokenmixImagesGenerate(
 
   const isDalle3 = mid.includes('dall-e-3') || mid === 'dall-e-3'
   const isDalle2 = mid.includes('dall-e-2') || mid === 'dall-e-2'
+  const isGptImage = /^gpt-image/i.test(mid)
 
   const payload: Record<string, unknown> = { model: mid, prompt: p, n: 1 }
   if (isDalle3) {
-    payload.size = '1024x1024'
+    payload.size = opts?.size?.trim() || '1024x1024'
     payload.response_format = 'url'
   } else if (isDalle2) {
-    payload.size = '512x512'
+    payload.size = opts?.size?.trim() || '512x512'
     payload.response_format = 'url'
+  } else if (isGptImage) {
+    payload.size = opts?.size?.trim() || '1024x1024'
+    payload.quality = opts?.quality || 'high'
   } else {
-    payload.size = '1024x1024'
+    payload.size = opts?.size?.trim() || '1024x1024'
     payload.response_format = 'url'
   }
 

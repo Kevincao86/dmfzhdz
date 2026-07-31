@@ -94,6 +94,7 @@ export type AiModelPickerOption = {
 /** TokenMix 各家族下展示的「文生图」模型名（与 chat id 独立；出图仍由灵祺服务端引擎执行） */
 const AGENT_TOKENMIX_T2I_BY_FAMILY: Partial<Record<AIModelFamily, readonly { id: string; label: string }[]>> = {
   openai: [
+    { id: 'gpt-image-2', label: '绘境 Max（GPT Image 2）' },
     { id: 'gpt-image-1', label: '绘境 Pro' },
     { id: 'dall-e-3', label: '绘境 Classic' },
   ],

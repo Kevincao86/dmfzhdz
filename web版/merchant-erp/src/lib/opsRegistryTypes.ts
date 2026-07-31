@@ -857,6 +857,7 @@ export type RegistryMpAiPointsSpendEntry = {
     | 'digital_human'
     | 'visual_studio_copy'
     | 'visual_studio_image'
+    | 'visual_studio_image_pro'
     | 'product_plan'
     | 'ops_plan'
     | 'agent_image'
