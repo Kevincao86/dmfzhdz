@@ -5,7 +5,7 @@
  */
 import type { PlatformLogoKey } from './platformBranding'
 import { PLATFORM_LOGO_SRC } from './platformBranding'
-import { fitGptImage2Size } from './aiImageStudioGptSize'
+import { fitGptImage2CarouselSize, fitGptImage2Size } from './aiImageStudioGptSize'
 
 export type LocalLifeIndustryId =
   | 'catering'
@@ -347,7 +347,7 @@ export function platformCarouselMasterGenSize(channelId: PublishChannelId): {
 
 /**
  * 三连图 · GPT Image 2：平台目标偶有 >3:1（如抖音 3375×633），
- * 在模型约束内取最大可用横图，再中心裁到目标比例并等分 3 张。
+ * 在模型约束内取最大可用横图，再偏顶裁到目标比例并等分 3 张。
  */
 export function platformCarouselMasterGptSize(channelId: PublishChannelId): {
   wanxSize: string
@@ -361,7 +361,7 @@ export function platformCarouselMasterGptSize(channelId: PublishChannelId): {
   const slots = slideSpec.slotCount || PLATFORM_CAROUSEL_SLOT_COUNT
   const idealW = slideSpec.masterWidth
   const idealH = slideSpec.masterHeight
-  const fit = fitGptImage2Size(idealW, idealH)
+  const fit = fitGptImage2CarouselSize(idealW, idealH)
   return {
     wanxSize: `${fit.width}*${fit.height}`,
     gptSize: fit.size,
@@ -383,7 +383,7 @@ export function buildCarouselFiveMasterPromptExtra(
   channelId: PublishChannelId,
   form?: Pick<VisualStudioForm, 'offer' | 'subheadline' | 'headline' | 'storeName' | 'note'>,
   opts?: {
-    /** GPT≤3:1 / 万相≤4:1 时，目标平台更扁，事后会上下居中裁 */
+    /** GPT≤3:1 / 万相≤4:1 时，目标平台更扁，事后会偏顶裁（上少下多） */
     aspectClamped?: boolean
     engine?: 'gpt' | 'wanx'
   },
@@ -408,8 +408,8 @@ export function buildCarouselFiveMasterPromptExtra(
     `左/中/右约各 1/${slots} 应是同一空间的不同景别（不同座位、通道或人物位置），不要三张相同海报并排。`,
     aspectClamped
       ? isGpt
-        ? '【防裁切·必遵】模型最长边比≤3:1，生成后会上下居中裁成更扁的平台横幅：上下各约 20% 为危险区。所有标题、副标题、价格、按钮、图标与说明文字必须完整落在垂直方向中间 55%～60% 带内；上下边缘只留场景延伸，禁止贴顶贴底放大字。'
-        : '【防裁切·必遵】生成后会上下居中裁成更扁横幅：标题/价格/图标勿贴顶贴底，全部放在画面垂直中部安全带。'
+        ? '【防裁切·必遵】模型最长边比≤3:1，生成后会从下方多裁、上方少裁成更扁横幅。主标题距顶边至少约 8%～12% 画高且须完整可见；副标题/价格/图标放在上半区偏中（约垂直 15%～55%），禁止贴顶贴底放大字；底边只留场景延伸。'
+        : '【防裁切·必遵】生成后会从下方多裁、上方少裁：主标题勿贴顶，留约 8% 顶边空白；价格/图标放上半区，勿贴底。'
       : '标题等中文文案整幅最多出现一处；上下边缘留出少量安全留白，勿贴边裁切。',
     '标题等中文文案整幅最多出现一处；不要在画面写系统标签或编号。' +
       (allowedText.length ? `可用文案：${allowedText.join('；')}。` : '无已填文案时以场景为主、少放大字。'),

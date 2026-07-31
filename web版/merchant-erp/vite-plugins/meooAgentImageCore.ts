@@ -123,8 +123,8 @@ function resolveGptQualityAndSize(
   const w = m ? Number(m[1]) : 0
   const h = m ? Number(m[2]) : 0
   const ratio = w > 0 && h > 0 ? Math.max(w, h) / Math.min(w, h) : 1
-  // 超宽五连图用 low，缩短 TokenMix 排队；禁止回退万相
-  return { size, quality: ratio >= 2.2 ? 'low' : 'high' }
+  // 超宽三连图：medium 兼顾清晰度（low 放大后发糊）；禁止回退万相
+  return { size, quality: ratio >= 2.2 ? 'medium' : 'high' }
 }
 
 /** 仅创建 TokenMix 任务（秒级返回），供视觉工坊浏览器短轮询 */
