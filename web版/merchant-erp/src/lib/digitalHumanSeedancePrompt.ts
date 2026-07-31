@@ -41,17 +41,35 @@ export function chunkScriptForOmniHumanVideo(script: string): string[] {
 /** OmniHuman 单段驱动提示（可选，控制表情/动作） */
 export function buildDhOmniHumanPrompt(
   draft: DigitalHumanDraft,
-  opts?: { motionText?: string; gesturePreset?: string },
+  opts?: {
+    motionText?: string
+    gesturePreset?: string
+    /** 本段口播摘要，用于手势/主题一致 */
+    scriptHint?: string
+    /** 已上传产品图并做手持融合时为 true */
+    hasProductFusion?: boolean
+  },
 ): string {
   const bg = clip(backgroundPromptForDraft(draft), 36)
   const frame = frameDesc(draft)
-  const motion = clip(motionBlock(draft, opts?.motionText, opts?.gesturePreset), 64)
+  const motion = clip(motionBlock(draft, opts?.motionText, opts?.gesturePreset), 56)
+  const theme = opts?.scriptHint?.trim()
+    ? `口播主题：${clip(opts.scriptHint, 40)}，手势含义须与主题一致。`
+    : ''
+  // 未开启手持产品时：禁止模型凭空捏造瓶罐/化妆品等实物（常见误伤）
+  const hands = opts?.hasProductFusion
+    ? '人物自然手持参考图中的产品，禁止换成其它品类。'
+    : '双手自然空闲或仅做空手比划，禁止凭空手持瓶罐、化妆品、面霜、包装盒、餐盒等任何实物道具；口播提到食品时用手势比划外形即可，画面不得出现未提供的实物。'
   const body = [
     `竖屏9:16数字人口播，人物已站在场景（${bg}）中，${frame}。`,
     '口型与驱动音频严格同步，表情自然，禁止灰底矩形贴片。',
+    theme,
+    hands,
     `动作：${motion}。`,
     SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
-  ].join('')
+  ]
+    .filter(Boolean)
+    .join('')
   return clampSeedanceContentText(sanitizePromptForVideoModel(body), DH_PROMPT_MAX)
 }
 
@@ -168,7 +186,9 @@ export function buildDhSeedanceSegmentPrompt(
       '竖屏9:16口播续镜，同一人物同服装同场景，动作连续，五官发型不变。',
       opts?.dualRefPersonScene ? '继续沿用首尾帧人物与场景的深度融合结果。' : '',
       `动作：${motion}。`,
-      opts?.hasProductFusion ? '双参考图自然手持产品。' : '',
+      opts?.hasProductFusion
+        ? '双参考图自然手持产品。'
+        : '双手空手比划，禁止凭空手持瓶罐化妆品等实物。',
       fidelity,
       SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
       SHORT_VIDEO_MOTION_PROMPT_SUFFIX,
@@ -180,7 +200,9 @@ export function buildDhSeedanceSegmentPrompt(
       `竖屏9:16数字人口播，即梦首尾帧：首帧为完整人物（五官发型皮肤清晰），尾帧为场景（${bg}）。`,
       `将首帧人物深度自然融入尾帧场景全程口播，${frame}，光影透视一致，服装${outfit}，禁止灰底矩形贴片、禁止硬抠叠图、禁止裁脸。`,
       total > 1 ? `分镜${idx}/${total}约${DH_SEEDANCE_SEGMENT_SEC}秒。` : '',
-      opts?.hasProductFusion ? '人物与产品自然融合，禁止贴片悬浮。' : '',
+      opts?.hasProductFusion
+        ? '人物与产品自然融合，禁止贴片悬浮。'
+        : '双手空手比划，禁止凭空手持瓶罐化妆品等实物。',
       `动作：${motion}。`,
       fidelity,
       SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
@@ -193,7 +215,9 @@ export function buildDhSeedanceSegmentPrompt(
       `竖屏9:16数字人口播，参考图人物为主播，${frame}，保持五官发型一致。`,
       `背景为${bg}，服装${outfit}。`,
       total > 1 ? `分镜${idx}/${total}约${DH_SEEDANCE_SEGMENT_SEC}秒。` : '',
-      opts?.hasProductFusion ? '人物与抠图产品自然融合，禁止贴片悬浮。' : '',
+      opts?.hasProductFusion
+        ? '人物与抠图产品自然融合，禁止贴片悬浮。'
+        : '双手空手比划，禁止凭空手持瓶罐化妆品等实物。',
       `动作：${motion}。`,
       fidelity,
       SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,

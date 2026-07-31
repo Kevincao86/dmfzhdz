@@ -4,8 +4,10 @@ import { parseScriptTimeRangeSeconds } from './shortVideoScriptTable'
 
 export { assForceStyleForSubtitle }
 
-/** 短片竖屏折行：约 12 字/行，优先标点处断开，减少半截句上屏 */
+/** 短片竖屏折行：约 14 字/行，优先标点处断开，减少半截句上屏 */
 export const SHORT_VIDEO_SUBTITLE_MAX_CHARS = 14
+/** 数字人口播竖屏折行 */
+export const DH_SUBTITLE_MAX_CHARS = 14
 
 export function wrapSubtitleLineForVertical(text: string, maxChars = 8): string[] {
   const t = text.trim()
@@ -98,6 +100,82 @@ export function buildSrtContent(lines: string[], totalDurationSec: number): stri
       `${i + 1}\n${formatSrtTimestamp(start)} --> ${formatSrtTimestamp(end)}\n${line}\n`,
     )
   }
+  return blocks.join('\n')
+}
+
+export type TimedSubtitleChunk = {
+  text: string
+  durationSec: number
+}
+
+/**
+ * 按口播分段（TTS/OmniHuman 段）生成 SRT：段边界对齐音频时长，段内再按标点折行。
+ */
+export function buildSrtFromTimedChunks(
+  chunks: TimedSubtitleChunk[] | null | undefined,
+  opts?: { maxCharsPerLine?: number; totalDurationSec?: number },
+): string {
+  if (!chunks?.length) return ''
+  const maxChars = opts?.maxCharsPerLine ?? DH_SUBTITLE_MAX_CHARS
+  const totalCap =
+    typeof opts?.totalDurationSec === 'number' && opts.totalDurationSec > 0
+      ? opts.totalDurationSec
+      : Number.POSITIVE_INFINITY
+
+  const blocks: string[] = []
+  let idx = 1
+  let cursor = 0
+  for (const chunk of chunks) {
+    const text = String(chunk.text || '')
+      .trim()
+      .replace(/^\[口播段\s*\d+\]$/, '')
+    if (!text || isBlankDialogue(text)) {
+      cursor += Math.max(0, Number(chunk.durationSec) || 0)
+      continue
+    }
+    const lines = splitSubtitleLines(text, maxChars)
+    if (!lines.length) {
+      cursor += Math.max(0, Number(chunk.durationSec) || 0)
+      continue
+    }
+    const segDur = Math.max(0.8, Number(chunk.durationSec) || lines.length * 1.2)
+    const segStart = Math.min(cursor, totalCap)
+    let segEnd = Math.min(cursor + segDur, totalCap)
+    if (segEnd <= segStart) {
+      cursor = segEnd
+      continue
+    }
+    const totalChars = lines.reduce((n, l) => n + l.length, 0) || 1
+    let lineCursor = segStart
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]!
+      const share = line.length / totalChars
+      const slice = Math.max(0.7, (segEnd - segStart) * share)
+      const start = lineCursor
+      const end = i === lines.length - 1 ? segEnd : Math.min(segEnd, lineCursor + slice)
+      lineCursor = end
+      if (end <= start) continue
+      blocks.push(
+        `${idx}\n${formatSrtTimestamp(start)} --> ${formatSrtTimestamp(end)}\n${line}\n`,
+      )
+      idx += 1
+    }
+    cursor = segEnd
+  }
+
+  // 末段拉伸到成片总时长（避免口播结束字幕过早消失）
+  if (
+    Number.isFinite(totalCap) &&
+    blocks.length > 0 &&
+    cursor + 0.35 < totalCap
+  ) {
+    const last = blocks[blocks.length - 1]!
+    blocks[blocks.length - 1] = last.replace(
+      /(--> )(\d{2}:\d{2}:\d{2},\d{3})/,
+      `$1${formatSrtTimestamp(totalCap)}`,
+    )
+  }
+
   return blocks.join('\n')
 }
 
