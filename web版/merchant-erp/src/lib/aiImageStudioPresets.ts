@@ -334,7 +334,7 @@ export function isCarouselFivePlaybook(playbookId: VisualPlaybookId): boolean {
   return playbookId === 'platform_carousel_five'
 }
 
-/** 五连图整幅横幅 Prompt 片段（从左到右 5 段，供一次生图） */
+/** 五连图整幅横幅 Prompt 片段（从左到右 1→5，供一次生图后裁切） */
 export function buildCarouselFiveMasterPromptExtra(
   channelId: PublishChannelId,
 ): string[] {
@@ -342,10 +342,12 @@ export function buildCarouselFiveMasterPromptExtra(
   const ch = resolveChannel(channelId)
   const labels = CAROUSEL_FIVE_SLOTS.map((s) => s.label).join(' → ')
   return [
-    `【五连图整幅海报 · ${ch.label}】先生成 1 张完整横版海报，精确构图尺寸 ${spec.masterWidth}×${spec.masterHeight} 像素，从左到右均分 5 个等宽等高板块：${labels}。`,
-    '整幅必须是一张连续横图（不是 5 张拼贴）：背景/光效/字体/配色全幅统一，板块等宽等高、可横滑无缝衔接；禁止每段独立换风格或换背景。',
-    ...CAROUSEL_FIVE_SLOTS.map((s, i) => `第 ${i + 1} 段（${s.label}）：${s.prompt.replace(/^五连图第\d+张[^：:]*[：:]/, '')}`),
-    `后处理将整幅等比例裁成 5 张 ${spec.slideWidth}×${spec.slideHeight}（${spec.specNote}）。`,
+    `【五连图整幅海报 · ${ch.label}】只生成 1 张完整横版海报，精确构图尺寸 ${spec.masterWidth}×${spec.masterHeight} 像素，从左到右均分 5 个等宽等高板块，顺序编号 ${labels}。`,
+    '整幅必须是一张连续横图（不是 5 张独立海报拼贴）：背景/光效/字体/配色全幅统一，板块等宽等高、可横滑无缝衔接；禁止每段独立换风格或换背景。',
+    ...CAROUSEL_FIVE_SLOTS.map(
+      (s, i) => `从左数第 ${i + 1} 格（编号 ${s.label}）：${s.prompt}`,
+    ),
+    `后处理将整幅从左到右等分裁成 5 张，编号 1～5，单张 ${spec.slideWidth}×${spec.slideHeight}（${spec.specNote}）。`,
   ]
 }
 
@@ -354,28 +356,27 @@ export type PlatformSeriesSlot = {
   prompt: string
 }
 
+/** 五连图：整幅裁切后从左到右仅编号 1～5（不作封面/卖点等角色名） */
 export const CAROUSEL_FIVE_SLOTS: PlatformSeriesSlot[] = [
   {
-    label: '封面',
-    prompt:
-      '五连图第1张（封面）：门店头图轮播首屏，大标题+品牌氛围，右侧/边缘预留与第2张衔接的延展元素（色调、光效、装饰线连续）。',
+    label: '1',
+    prompt: '左侧第 1 格：大标题与品牌氛围开场，右缘视觉须自然延展到第 2 格。',
   },
   {
-    label: '卖点1',
-    prompt:
-      '五连图第2张：承接封面视觉语言，突出核心卖点或服务特色，左右边缘色彩/背景须与相邻图可横滑拼接。',
+    label: '2',
+    prompt: '第 2 格：承接左格色调与构图，展示核心卖点或服务特色，左右缘可无缝横滑。',
   },
   {
-    label: '卖点2',
-    prompt: '五连图第3张：展示环境/产品/技师团队等信任要素，延续同一套配色与字体风格，适合横向滑动浏览。',
+    label: '3',
+    prompt: '第 3 格：环境/产品/团队等信任画面，延续同一套配色与字体。',
   },
   {
-    label: '套餐',
-    prompt: '五连图第4张：团购套餐或价格组合，数字醒目，与前后图背景层次一致，避免突兀换色。',
+    label: '4',
+    prompt: '第 4 格：团购套餐或价格信息，数字醒目，背景层次与前后格一致。',
   },
   {
-    label: '行动',
-    prompt: '五连图第5张（收尾）：到店/抢购/预约行动号召，品牌定帧，左侧可与第4张视觉衔接。',
+    label: '5',
+    prompt: '右侧第 5 格：到店/抢购/预约行动号召收尾，左缘与第 4 格衔接。',
   },
 ]
 
