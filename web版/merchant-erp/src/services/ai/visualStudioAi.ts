@@ -596,9 +596,33 @@ function sleepMs(ms: number): Promise<void> {
 }
 
 function isFetchNetworkError(msg: string): boolean {
-  return /Failed to fetch|fetch failed|NetworkError|Load failed|network error|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|socket|aborted|AbortError|image_hydrate_failed|image_fetch_failed|代拉 TokenMix/i.test(
+  return /Failed to fetch|fetch failed|NetworkError|Load failed|network error|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|socket|aborted|AbortError|image_hydrate_failed|image_fetch_failed|代拉 TokenMix|创建任务超时|任务查询超时|TokenMix 创建任务超时|TokenMix 任务查询超时/i.test(
     msg,
   )
+}
+
+/** start 单次请求限时，避免卡在「创建任务中」直到 nginx 300s */
+async function withRequestTimeout<T>(
+  work: (signal: AbortSignal) => Promise<T>,
+  parent: AbortSignal | undefined,
+  timeoutMs: number,
+  label: string,
+): Promise<T> {
+  const ac = new AbortController()
+  const onParent = () => ac.abort()
+  parent?.addEventListener('abort', onParent)
+  const timer = setTimeout(() => ac.abort(), timeoutMs)
+  try {
+    return await work(ac.signal)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    if (parent?.aborted) throw e
+    if (/abort/i.test(msg)) throw new Error(`${label}超时（${Math.round(timeoutMs / 1000)}秒），请重试`)
+    throw e instanceof Error ? e : new Error(msg)
+  } finally {
+    clearTimeout(timer)
+    parent?.removeEventListener('abort', onParent)
+  }
 }
 
 async function postAgentImageJson(
@@ -683,16 +707,22 @@ export async function generateVisualStudioGptImage(opts: {
         : `GPT Image 2 创建任务重试（第 ${startAttempts} 次）…`,
     )
     try {
-      const started = await postAgentImageJson(
-        {
-          phase: 'start',
-          prompt: opts.prompt,
-          image_route: 'tokenmix',
-          tokenmix_image_model: model,
-          exact_prompt: true,
-          ...(opts.wanxSize ? { wanx_size: opts.wanxSize } : {}),
-        },
+      const started = await withRequestTimeout(
+        (signal) =>
+          postAgentImageJson(
+            {
+              phase: 'start',
+              prompt: opts.prompt,
+              image_route: 'tokenmix',
+              tokenmix_image_model: model,
+              exact_prompt: true,
+              ...(opts.wanxSize ? { wanx_size: opts.wanxSize } : {}),
+            },
+            signal,
+          ),
         opts.signal,
+        55_000,
+        'GPT Image 创建任务',
       )
       if (typeof started.imageUrl === 'string' && started.imageUrl.trim()) {
         return {
@@ -713,11 +743,11 @@ export async function generateVisualStudioGptImage(opts: {
       throw new Error('高级生图未返回 taskId')
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      if (opts.signal?.aborted || /已取消|AbortError/i.test(msg)) {
+      if (opts.signal?.aborted || /已取消/i.test(msg)) {
         return { ok: false, message: '已取消' }
       }
       if (isFetchNetworkError(msg) && startAttempts < 8 && Date.now() < deadline) {
-        await sleepMs(Math.min(8000, 1000 * startAttempts))
+        await sleepMs(Math.min(4000, 800 * startAttempts))
         continue
       }
       return { ok: false, message: msg.slice(0, 240) }

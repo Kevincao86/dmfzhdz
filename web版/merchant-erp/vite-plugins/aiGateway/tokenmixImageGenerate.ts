@@ -29,6 +29,26 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms))
 }
 
+/** 避免 TokenMix 上游挂起导致 phase=start 卡满 nginx 300s */
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+  label: string,
+): Promise<Response> {
+  const ac = new AbortController()
+  const timer = setTimeout(() => ac.abort(), timeoutMs)
+  try {
+    return await fetch(url, { ...init, signal: ac.signal })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    if (/abort/i.test(msg)) throw new Error(`${label}超时（${Math.round(timeoutMs / 1000)}秒），请重试`)
+    throw e instanceof Error ? e : new Error(msg)
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 function isTransientHydrateError(msg: string): boolean {
   return /fetch failed|Failed to fetch|ECONNRESET|ETIMEDOUT|ENOTFOUND|ECONNREFUSED|socket|network|aborted|HTTP 5\d\d/i.test(
     msg,
@@ -156,14 +176,19 @@ export async function tokenmixImagesCreate(
     payload.response_format = 'url'
   }
 
-  const res = await fetch(`${base}/images/generations`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
+  const res = await fetchWithTimeout(
+    `${base}/images/generations`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
     },
-    body: JSON.stringify(payload),
-  })
+    45_000,
+    'TokenMix 创建任务',
+  )
   const text = await res.text()
   let json: unknown = null
   try {
@@ -210,10 +235,15 @@ export async function tokenmixImagesPollOnce(
   const id = taskId.trim()
   if (!id) throw new Error('task_id 为空')
 
-  const res = await fetch(`${base}/images/generations/${encodeURIComponent(id)}`, {
-    method: 'GET',
-    headers: { Authorization: `Bearer ${apiKey}` },
-  })
+  const res = await fetchWithTimeout(
+    `${base}/images/generations/${encodeURIComponent(id)}`,
+    {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${apiKey}` },
+    },
+    20_000,
+    'TokenMix 任务查询',
+  )
   const text = await res.text()
   let json: unknown = null
   try {
