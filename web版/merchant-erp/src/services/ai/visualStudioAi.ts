@@ -267,8 +267,13 @@ export type VisualStudioAiCopyResult =
   | { ok: true; items: CopySuggestion[]; source: 'ai' | 'local' }
   | { ok: false; message: string; fallback: CopySuggestion[] }
 
-/** 文案包应秒级返回；超时立刻回退本地模板，避免 UI 永久「生成中」 */
-const VISUAL_STUDIO_COPY_AI_TIMEOUT_MS = 12_000
+/**
+ * 文案包应秒级返回。上游现用 qwen3.7-flash（关思考）约 2～3s；
+ * 预留鉴权/网络余量，超时再回退本地模板。
+ */
+const VISUAL_STUDIO_COPY_AI_TIMEOUT_MS = 20_000
+/** 付费可用的快模型；通用 qwen-plus/turbo 免费额度耗尽会 403 */
+const VISUAL_STUDIO_COPY_AI_MODEL = 'qwen3.7-flash'
 
 function combineAbortWithTimeout(
   external: AbortSignal | undefined,
@@ -340,6 +345,7 @@ export async function fetchVisualStudioCopyFromAi(
     const res = await postAiChat(
       {
         provider: 'qwen',
+        model: VISUAL_STUDIO_COPY_AI_MODEL,
         messages: [
           {
             role: 'system',
@@ -441,6 +447,7 @@ export async function fetchVisualStudioReferenceKeywordsFromAi(
     const res = await postAiChat(
       {
         provider: 'qwen',
+        model: VISUAL_STUDIO_COPY_AI_MODEL,
         messages: [
           {
             role: 'system',
