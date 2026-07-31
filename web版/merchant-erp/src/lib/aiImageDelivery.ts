@@ -155,7 +155,7 @@ export function triggerBlobDownload(blob: Blob, filename: string) {
  * 三连图裁切：整幅横图先按「N×单张」比例裁准，再等宽等高切成 N 张，
  * 最后缩放到平台单张像素（抖音/美团单张宽高不同）。默认 N=3。
  *
- * 垂直方向：默认 preferTop（上方少裁、下方多裁），避免 GPT≤3:1 事后压扁时切掉贴顶主标题。
+ * 垂直对齐：默认 center（上下等比例裁），与 Prompt「上下各约 12% 安全留白」一致。
  */
 export async function sliceCarouselFiveStrips(
   blob: Blob,
@@ -165,7 +165,7 @@ export async function sliceCarouselFiveStrips(
   const slotCount = Math.max(1, Math.floor(spec.slotCount ?? 3))
   const slideW = Math.max(1, Math.floor(spec.slideWidth))
   const slideH = Math.max(1, Math.floor(spec.slideHeight))
-  const verticalAlign = opts?.verticalAlign ?? 'preferTop'
+  const verticalAlign = opts?.verticalAlign ?? 'center'
   const bitmap = await createImageBitmap(blob)
   const srcW = bitmap.width
   const srcH = bitmap.height
@@ -190,7 +190,7 @@ export async function sliceCarouselFiveStrips(
     cropH = Math.max(1, Math.round(srcW / targetAspect))
     cropX = 0
     const surplus = Math.max(0, srcH - cropH)
-    // preferTop：约 12% surplus 留在顶，其余从底裁，保住主标题
+    // center：上下等分；preferTop 仅兼容旧调用
     cropY =
       verticalAlign === 'preferTop'
         ? Math.floor(surplus * 0.12)
