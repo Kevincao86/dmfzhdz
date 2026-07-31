@@ -783,12 +783,20 @@ export function normalizeStyleIdForSub(
   return ids.includes(styleId) ? styleId : (ids[0] ?? styleId)
 }
 
+/** 平台长图输出形态（与下方场景玩法独立，可叠加） */
+export type PlatformSeriesMode = 'platform_carousel_five' | 'platform_detail_page'
+
 export type VisualStudioForm = {
   industry: LocalLifeIndustryId
   /** 二级业态 id，如 leisure_foot_spa */
   industrySubId: string
   channels: PublishChannelId[]
   playbook: VisualPlaybookId
+  /**
+   * 五连图 / 详情图输出形态。与 playbook（场景玩法）独立：
+   * 选中后仍可切换招牌单品、团购上新等玩法。
+   */
+  platformSeries: PlatformSeriesMode | null
   /** 玩法细分选项 id（节日名称、套餐规格等） */
   playbookVariantId: string
   storeName: string
@@ -810,6 +818,7 @@ export const DEFAULT_VISUAL_STUDIO_FORM: VisualStudioForm = {
   industrySubId: 'catering_chinese',
   channels: ['douyin', 'wechat_moments'],
   playbook: 'group_buy_new',
+  platformSeries: null,
   playbookVariantId: '',
   storeName: '',
   headline: '',
@@ -2369,6 +2378,22 @@ export function isPlatformSeriesPlaybook(id: VisualPlaybookId): boolean {
   return id === 'platform_carousel_five' || id === 'platform_detail_page'
 }
 
+/** 当前表单的平台长图形态（兼容旧数据：playbook 直接等于五连图/详情图） */
+export function resolveFormPlatformSeries(form: VisualStudioForm): PlatformSeriesMode | null {
+  if (form.platformSeries === 'platform_carousel_five' || form.platformSeries === 'platform_detail_page') {
+    return form.platformSeries
+  }
+  if (form.playbook === 'platform_carousel_five' || form.playbook === 'platform_detail_page') {
+    return form.playbook
+  }
+  return null
+}
+
+/** 尺寸/槽位用的输出玩法 id；文案场景仍读 form.playbook */
+export function resolveFormOutputPlaybookId(form: VisualStudioForm): VisualPlaybookId {
+  return resolveFormPlatformSeries(form) ?? form.playbook
+}
+
 export function platformSeriesSlots(playbookId: VisualPlaybookId): PlatformSeriesSlot[] {
   if (playbookId === 'platform_carousel_five') return CAROUSEL_FIVE_SLOTS
   if (playbookId === 'platform_detail_page') return DETAIL_PAGE_SLOTS
@@ -2422,21 +2447,52 @@ export function resolvePlaybookSizeDisplay(
 }
 
 export function effectiveVariantCountForForm(form: VisualStudioForm): number {
-  const series = platformSeriesSlotCount(form.playbook)
+  const series = platformSeriesSlotCount(resolveFormOutputPlaybookId(form))
   return series > 0 ? series : form.variantCount
 }
 
+/** 开启/切换五连图或详情图：只改输出形态，保留当前场景玩法 */
 export function applyPlatformSeriesPlaybook(
   form: VisualStudioForm,
-  playbookId: 'platform_carousel_five' | 'platform_detail_page',
+  seriesId: PlatformSeriesMode,
 ): VisualStudioForm {
   const channels = PLATFORM_SERIES_CHANNELS.filter((id) => form.channels.includes(id))
   const nextChannels = channels.length > 0 ? channels : [...PLATFORM_SERIES_CHANNELS]
-  return applyPlaybookToFormWithVariants(
-    { ...form, channels: nextChannels, multiChannelPack: true },
-    playbookId,
-    { keepChannels: true, templateIndex: 0 },
-  )
+  // 若旧数据把 playbook 写成了五连图/详情图，恢复为业态推荐场景玩法
+  const scenePlaybook = isPlatformSeriesPlaybook(form.playbook)
+    ? (resolveIndustryProfile(form.industry).recommendedPlaybooks.find((id) => !isPlatformSeriesPlaybook(id)) ??
+      'group_buy_new')
+    : form.playbook
+  const base =
+    scenePlaybook !== form.playbook
+      ? applyPlaybookToFormWithVariants(
+          { ...form, channels: nextChannels, multiChannelPack: true, platformSeries: seriesId },
+          scenePlaybook,
+          { keepChannels: true, templateIndex: 0 },
+        )
+      : {
+          ...form,
+          channels: nextChannels,
+          multiChannelPack: true,
+          platformSeries: seriesId,
+        }
+  return { ...base, platformSeries: seriesId, playbook: scenePlaybook }
+}
+
+/** 取消平台长图，仅保留场景玩法 */
+export function clearPlatformSeriesPlaybook(form: VisualStudioForm): VisualStudioForm {
+  const scenePlaybook = isPlatformSeriesPlaybook(form.playbook)
+    ? (resolveIndustryProfile(form.industry).recommendedPlaybooks.find((id) => !isPlatformSeriesPlaybook(id)) ??
+      'group_buy_new')
+    : form.playbook
+  if (scenePlaybook !== form.playbook) {
+    return applyPlaybookToFormWithVariants(
+      { ...form, platformSeries: null },
+      scenePlaybook,
+      { keepChannels: true, templateIndex: 0 },
+    )
+  }
+  return { ...form, platformSeries: null }
 }
 
 export function resolveChannel(id: PublishChannelId) {
@@ -2917,15 +2973,21 @@ export function buildVisualStudioPrompt(
       : AI_IMAGE_STYLE_PRESETS.find((s) => s.id === form.styleId)?.promptHint ?? '商业设计'
 
   const channel = opts?.channel ? resolveChannel(opts.channel) : null
-  const carouselMaster = opts?.carouselMaster === true && form.playbook === 'platform_carousel_five'
+  const seriesMode = resolveFormPlatformSeries(form)
+  const outputPlaybookId = resolveFormOutputPlaybookId(form)
+  const carouselMaster = opts?.carouselMaster === true && seriesMode === 'platform_carousel_five'
   const sizeDisplay = channel
-    ? resolvePlaybookSizeDisplay(channel.id, form.playbook)
+    ? resolvePlaybookSizeDisplay(channel.id, outputPlaybookId)
     : null
   const size = channel && !carouselMaster
-    ? resolveAiImageSizePreset(resolvePlaybookSizePresetId(channel.id, form.playbook))
+    ? resolveAiImageSizePreset(resolvePlaybookSizePresetId(channel.id, outputPlaybookId))
     : null
   const lines = [
-    carouselMaster ? INTENT_PROMPT.carousel : INTENT_PROMPT[pb.intent],
+    carouselMaster
+      ? `${INTENT_PROMPT.carousel}内容侧重：${INTENT_PROMPT[pb.intent]}`
+      : seriesMode === 'platform_detail_page'
+        ? `${INTENT_PROMPT.detail}内容侧重：${INTENT_PROMPT[pb.intent]}`
+        : INTENT_PROMPT[pb.intent],
     `【业态锁定】${sceneCtx.label}。${sceneCtx.sceneHint}。画面主体、道具、环境必须严格符合该业态，禁止出现与业态无关的场景（如餐饮禁止酒吧夜场、足浴禁止咖啡厅）。`,
     nonCateringFoodBanLine(form.industry, form.industrySubId),
     form.industrySubId === 'leisure_foot_spa'
@@ -2943,6 +3005,11 @@ export function buildVisualStudioPrompt(
         ? `活动细分：${playbookVariant.label}（${playbookVariant.periodLabel}），视觉元素须呼应该主题。`
         : '',
     `营销玩法：${pb.label}（${pb.desc}）。`,
+    seriesMode === 'platform_carousel_five'
+      ? '输出形态：五连图横幅，画面信息与构图须服务该营销玩法。'
+      : seriesMode === 'platform_detail_page'
+        ? '输出形态：团购详情长图分段，画面信息与构图须服务该营销玩法。'
+        : '',
     form.storeName.trim() ? `门店/品牌名：${form.storeName.trim()}（可出现在画面角落，勿遮挡主信息）。` : '',
     form.headline.trim() ? `主标题（画面中大而清晰的中文）：「${form.headline.trim()}」。` : '',
     form.subheadline.trim() ? `副标题：${form.subheadline.trim()}。` : '',
@@ -2965,10 +3032,10 @@ export function buildVisualStudioPrompt(
   const vi = opts?.variantIndex ?? 0
   if (carouselMaster && channel) {
     lines.push(...buildCarouselFiveMasterPromptExtra(channel.id))
-  } else if (isPlatformSeriesPlaybook(form.playbook)) {
-    lines.push(resolveSeriesSlotPrompt(form.playbook, vi))
+  } else if (seriesMode) {
+    lines.push(resolveSeriesSlotPrompt(seriesMode, vi))
     lines.push(
-      form.playbook === 'platform_carousel_five'
+      seriesMode === 'platform_carousel_five'
         ? '整套五连图须统一配色、字体与光影，本张仅为系列中的一屏，勿做成独立无关海报。'
         : '整套详情长图须统一视觉体系，本张仅为竖向拼接的一段，与上下段风格一致。',
     )
@@ -3005,10 +3072,12 @@ export function buildVisualStudioImageContext(
   const variantConfig = getPlaybookVariantConfig(form.playbook, form.industry, form.industrySubId)
   const stylePreset = AI_IMAGE_STYLE_PRESETS.find((s) => s.id === form.styleId)
   const channel = opts?.channel ? resolveChannel(opts.channel) : null
-  const carouselMaster = opts?.carouselMaster === true && form.playbook === 'platform_carousel_five'
-  const sizeDisplay = channel ? resolvePlaybookSizeDisplay(channel.id, form.playbook) : null
+  const seriesMode = resolveFormPlatformSeries(form)
+  const outputPlaybookId = resolveFormOutputPlaybookId(form)
+  const carouselMaster = opts?.carouselMaster === true && seriesMode === 'platform_carousel_five'
+  const sizeDisplay = channel ? resolvePlaybookSizeDisplay(channel.id, outputPlaybookId) : null
   const size = channel && !carouselMaster
-    ? resolveAiImageSizePreset(resolvePlaybookSizePresetId(channel.id, form.playbook))
+    ? resolveAiImageSizePreset(resolvePlaybookSizePresetId(channel.id, outputPlaybookId))
     : null
   const vi = opts?.variantIndex ?? 0
   const masterGen = carouselMaster && channel ? platformCarouselMasterGenSize(channel.id) : null
@@ -3019,6 +3088,7 @@ export function buildVisualStudioImageContext(
     playbook: pb.label,
     playbookDesc: pb.desc,
     playbookIntent: pb.intent,
+    platformSeries: seriesMode ?? '',
     playbookVariantPicker: variantConfig?.pickerLabel ?? '',
     playbookVariantLabel: playbookVariant?.label ?? '',
     playbookVariantPeriod: playbookVariant?.periodLabel ?? '',
@@ -3034,14 +3104,12 @@ export function buildVisualStudioImageContext(
     carouselSlideHeight: masterGen?.slideSpec.slideHeight ?? 0,
     compositionVariant: carouselMaster && channel
       ? buildCarouselFiveMasterPromptExtra(channel.id).join('\n')
-      : isPlatformSeriesPlaybook(form.playbook)
-        ? resolveSeriesSlotPrompt(form.playbook, vi)
+      : seriesMode
+        ? resolveSeriesSlotPrompt(seriesMode, vi)
         : (VARIANT_SUFFIX[vi] ?? VARIANT_SUFFIX[0]!),
-    seriesSlotLabel: isPlatformSeriesPlaybook(form.playbook)
-      ? resolveSeriesSlotLabel(form.playbook, vi)
-      : '',
-    seriesSlotIndex: isPlatformSeriesPlaybook(form.playbook) ? vi + 1 : 0,
-    seriesSlotTotal: platformSeriesSlotCount(form.playbook),
+    seriesSlotLabel: seriesMode ? resolveSeriesSlotLabel(seriesMode, vi) : '',
+    seriesSlotIndex: seriesMode ? vi + 1 : 0,
+    seriesSlotTotal: seriesMode ? platformSeriesSlotCount(seriesMode) : 0,
     storeName: form.storeName.trim(),
     headline: form.headline.trim(),
     subheadline: form.subheadline.trim(),
