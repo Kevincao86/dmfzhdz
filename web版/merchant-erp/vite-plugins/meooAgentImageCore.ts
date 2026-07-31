@@ -147,36 +147,29 @@ export async function runMeooAgentImageRequest(
         quality: gptQuality,
         ...(size ? { size } : {}),
       })
-      // 避免 TokenMix 挂死导致 Nginx/前端一直等到 502
+      // 避免 TokenMix 挂死导致 Nginx/前端一直等到 502；失败不切换其它模型
       const { imageUrl, modelUsed } = await Promise.race([
         genPromise,
         new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('高级生图超时（120秒），请改用常规生图或稍后重试')), 120_000)
+          setTimeout(() => reject(new Error('高级生图超时（120秒），请稍后重试')), 120_000)
         }),
       ])
       return { ok: true, imageUrl, channel: 'tokenmix', displayModel: modelUsed }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      const out = await runAgentFreeformTextToImage(env, prompt, preferredVendor, imageOpts)
-      if (out.ok) {
-        return {
-          ok: true,
-          imageUrl: out.imageUrl,
-          channel: 'builtin',
-          vendorUsed: out.vendorUsed,
-          fallbackNote: `高级模型生图不可用（${msg.slice(0, 200)}），已改用灵祺内置引擎。`,
-        }
-      }
-      return { ok: false, message: `${msg}；回退内置：${out.message}` }
+      return { ok: false, message: msg.slice(0, 600) }
+    }
+  }
+
+  // 用户选了高级模型但带了参考图：高级接口不支持，禁止静默切到内置引擎
+  if (imageRoute === 'tokenmix' && tm && refHttps) {
+    return {
+      ok: false,
+      message: '高级生图暂不支持参考图，请去掉参考图后重试（不会改用其它模型）',
     }
   }
 
   const out = await runAgentFreeformTextToImage(env, prompt, preferredVendor, imageOpts)
   if (!out.ok) return { ok: false, message: out.message }
-  const extra: { fallbackNote?: string } = {}
-  if (imageRoute === 'tokenmix' && tm && refHttps) {
-    extra.fallbackNote =
-      '已上传参考图时使用灵祺内置图生图；高级图像接口暂不支持参考图，可在纯文生图时选用 OpenAI 图像模型。'
-  }
-  return { ok: true, imageUrl: out.imageUrl, channel: 'builtin', vendorUsed: out.vendorUsed, ...extra }
+  return { ok: true, imageUrl: out.imageUrl, channel: 'builtin', vendorUsed: out.vendorUsed }
 }
