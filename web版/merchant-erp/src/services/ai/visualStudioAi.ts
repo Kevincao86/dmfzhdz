@@ -1,5 +1,6 @@
 /**
  * 视觉工坊 AI 接入：文案（LLM）+ 生图 Prompt 打包（LLM）+ 生图（postAiAgentNativeImage）
+ * 高级 GPT Image：phase=start/poll 短轮询，禁止回退万相。
  */
 import { postAiChat } from './aiClient'
 import type { CopySuggestion, PublishChannelId, VisualStudioForm, VisualStudioReferenceAnalysis } from '../../lib/aiImageStudioPresets'
@@ -14,6 +15,11 @@ import {
   resolvePlaybook,
   resolvePlaybookVariant,
 } from '../../lib/aiImageStudioPresets'
+import { merchantApiAuthHeaders, resolveMerchantApiBearer } from '../../lib/merchantApiAuth'
+import { merchantErpApiCandidates } from '../../lib/merchantErpApiBase'
+import { fetchPrimaryTenantId } from '../../lib/tenantBilling'
+import { supabase, supabaseConfigured } from '../../lib/supabaseClient'
+import { VISUAL_STUDIO_PRO_IMAGE_MODEL } from '../../lib/mpPointsEconomics'
 
 function stripJsonFence(raw: string): string {
   const t = raw.trim()
@@ -577,4 +583,195 @@ export async function fetchVisualStudioImagePromptFromAi(
       fallback,
     }
   }
+}
+
+export type VisualStudioGptImageResult =
+  | { ok: true; imageUrl: string; channel: 'tokenmix'; displayModel?: string }
+  | { ok: false; message: string }
+
+function sleepMs(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms))
+}
+
+function isFetchNetworkError(msg: string): boolean {
+  return /Failed to fetch|NetworkError|Load failed|network error|ECONNRESET|aborted|AbortError/i.test(
+    msg,
+  )
+}
+
+async function postAgentImageJson(
+  body: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<Record<string, unknown>> {
+  const [auth, tenantId] = await Promise.all([
+    resolveMerchantApiBearer(),
+    (async () => {
+      if (!supabaseConfigured || !supabase) return undefined
+      return (await fetchPrimaryTenantId(supabase)) ?? undefined
+    })(),
+  ])
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+    ...merchantApiAuthHeaders(auth.token, auth.source),
+  }
+  const payload = { ...body, ...(tenantId ? { tenantId } : {}) }
+  const urls = merchantErpApiCandidates('/api/meoo-ai-agent-image')
+  let lastErr = 'no_response'
+  for (const url of urls) {
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+        signal,
+      })
+      const text = await res.text()
+      let json: Record<string, unknown> = {}
+      try {
+        json = text ? (JSON.parse(text) as Record<string, unknown>) : {}
+      } catch {
+        json = {}
+      }
+      if (res.ok && json.ok === true) return json
+      const detail =
+        typeof json.detail === 'string'
+          ? json.detail
+          : typeof json.message === 'string'
+            ? json.message
+            : typeof json.error === 'string'
+              ? json.error
+              : text.slice(0, 200)
+      lastErr = detail || `HTTP ${res.status}`
+      if (res.status === 404) continue
+      throw new Error(lastErr)
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+      if (signal?.aborted || /AbortError/i.test(lastErr)) throw e
+      if (isFetchNetworkError(lastErr)) continue
+      throw e instanceof Error ? e : new Error(lastErr)
+    }
+  }
+  throw new Error(lastErr || 'ai_agent_image_unavailable')
+}
+
+/**
+ * 高级 GPT Image：start 创建任务 + 短轮询直到出图。
+ * 网络抖动自动重试 start/poll，绝不回退万相。
+ */
+export async function generateVisualStudioGptImage(opts: {
+  prompt: string
+  wanxSize?: string
+  signal?: AbortSignal
+  onProgress?: (msg: string) => void
+}): Promise<VisualStudioGptImageResult> {
+  const model = VISUAL_STUDIO_PRO_IMAGE_MODEL
+  const deadline = Date.now() + 300_000
+  let taskId = ''
+  let displayModel = model
+  let startAttempts = 0
+
+  while (!taskId && Date.now() < deadline) {
+    if (opts.signal?.aborted) return { ok: false, message: '已取消' }
+    startAttempts += 1
+    opts.onProgress?.(
+      startAttempts === 1
+        ? 'GPT Image 2 创建任务中…'
+        : `GPT Image 2 创建任务重试（第 ${startAttempts} 次）…`,
+    )
+    try {
+      const started = await postAgentImageJson(
+        {
+          phase: 'start',
+          prompt: opts.prompt,
+          image_route: 'tokenmix',
+          tokenmix_image_model: model,
+          exact_prompt: true,
+          ...(opts.wanxSize ? { wanx_size: opts.wanxSize } : {}),
+        },
+        opts.signal,
+      )
+      if (typeof started.imageUrl === 'string' && started.imageUrl.trim()) {
+        return {
+          ok: true,
+          imageUrl: started.imageUrl.trim(),
+          channel: 'tokenmix',
+          displayModel:
+            typeof started.displayModel === 'string' ? started.displayModel : model,
+        }
+      }
+      if (started.pending === true && typeof started.taskId === 'string' && started.taskId.trim()) {
+        taskId = started.taskId.trim()
+        if (typeof started.displayModel === 'string' && started.displayModel.trim()) {
+          displayModel = started.displayModel.trim()
+        }
+        break
+      }
+      throw new Error('高级生图未返回 taskId')
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      if (opts.signal?.aborted || /已取消|AbortError/i.test(msg)) {
+        return { ok: false, message: '已取消' }
+      }
+      if (isFetchNetworkError(msg) && startAttempts < 8 && Date.now() < deadline) {
+        await sleepMs(Math.min(8000, 1000 * startAttempts))
+        continue
+      }
+      return { ok: false, message: msg.slice(0, 240) }
+    }
+  }
+
+  if (!taskId) return { ok: false, message: 'GPT Image 创建任务失败，请重试' }
+
+  let pollRound = 0
+  let waitSec = 3
+  while (Date.now() < deadline) {
+    if (opts.signal?.aborted) return { ok: false, message: '已取消' }
+    await sleepMs(Math.max(1000, Math.min(10_000, waitSec * 1000)))
+    pollRound += 1
+    opts.onProgress?.(`GPT Image 2 生成中…（轮询 ${pollRound}）`)
+    try {
+      const polled = await postAgentImageJson(
+        {
+          phase: 'poll',
+          task_id: taskId,
+          image_route: 'tokenmix',
+          tokenmix_image_model: model,
+        },
+        opts.signal,
+      )
+      if (typeof polled.imageUrl === 'string' && polled.imageUrl.trim()) {
+        return {
+          ok: true,
+          imageUrl: polled.imageUrl.trim(),
+          channel: 'tokenmix',
+          displayModel:
+            typeof polled.displayModel === 'string' ? polled.displayModel : displayModel,
+        }
+      }
+      if (polled.pending === true) {
+        const ra = Number(polled.retryAfterSec)
+        if (Number.isFinite(ra) && ra > 0) waitSec = Math.max(1, Math.min(10, Math.round(ra)))
+        continue
+      }
+      throw new Error(
+        typeof polled.detail === 'string'
+          ? polled.detail
+          : '高级生图轮询无结果',
+      )
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      if (opts.signal?.aborted || /已取消|AbortError/i.test(msg)) {
+        return { ok: false, message: '已取消' }
+      }
+      // 轮询网络失败：继续同一 taskId，不换万相
+      if (isFetchNetworkError(msg) && Date.now() < deadline) {
+        waitSec = Math.min(8, waitSec + 1)
+        continue
+      }
+      return { ok: false, message: msg.slice(0, 240) }
+    }
+  }
+  return { ok: false, message: 'GPT Image 生成超时（5 分钟），请重试高级生图' }
 }

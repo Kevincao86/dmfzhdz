@@ -2,6 +2,7 @@
  * POST /api/meoo-ai-agent-image — 智能体文生图 / 图生图。
  * - builtin：万相 / 豆包 / MiniMax（MERCHANT_AI_*）。
  * - tokenmix：TokenMix OpenAI 兼容 images/generations（须 TOKENMIX_API_KEY）；有参考图时走内置图生图。
+ * - phase=start|poll：GPT Image 异步短请求（避免浏览器长连接 Failed to fetch）；禁止回退万相。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
@@ -12,9 +13,72 @@ import {
 import { verifyBearerJwt } from '../vite-plugins/aiGateway/authSupabase.js'
 import { verifyMpSessionToken } from '../vite-plugins/aiGateway/authMpSession.js'
 import { assertAiChatAccess } from '../vite-plugins/tenantMembershipCore.js'
-import { runMeooAgentImageRequest } from '../vite-plugins/meooAgentImageCore.js'
+import {
+  runMeooAgentImagePollTokenmix,
+  runMeooAgentImageRequest,
+  runMeooAgentImageStartTokenmix,
+  type MeooAgentImageResult,
+} from '../vite-plugins/meooAgentImageCore.js'
 
 export const config = { maxDuration: 300 }
+
+async function sendImageSuccess(
+  req: VercelRequest,
+  res: VercelResponse,
+  opts: {
+    out: Extract<MeooAgentImageResult, { ok: true }>
+    env0: Record<string, string>
+    auth: string | undefined
+    accessProvider: string
+    preferredModelId?: string
+    prompt: string
+    isMpSession: boolean
+    erpTenantId?: string
+    wantsProImage: boolean
+    chargeIdempotencyKey?: string
+  },
+): Promise<void> {
+  const { out } = opts
+  if ('pending' in out && out.pending) {
+    sendMerchantJson(res, 200, out)
+    return
+  }
+
+  const { recordAiTokenUsageFromVercelRequest, estimateLlmTokensFromText } = await import(
+    '../vite-plugins/aiTokenUsageCore.js'
+  )
+  const usageProvider = out.channel === 'tokenmix' ? 'tokenmix' : out.vendorUsed
+  const usageModel = out.channel === 'tokenmix' ? out.displayModel : opts.preferredModelId || null
+  void recordAiTokenUsageFromVercelRequest(req, opts.env0, {
+    provider: usageProvider || opts.accessProvider,
+    model: usageModel ?? undefined,
+    inputText: opts.prompt,
+    outputText: 'image_generated',
+    usage: estimateLlmTokensFromText(opts.prompt, 'image'),
+  })
+  let pointsCharged: number | undefined
+  let pointsBalance: number | undefined
+  if (!opts.isMpSession && opts.erpTenantId && 'imageUrl' in out) {
+    const { chargeErpAiPointsAfterSuccess } = await import('./_lib/erpAiApiPointsGate.js')
+    const chargeKind =
+      opts.wantsProImage && out.channel === 'tokenmix' ? 'visual_studio_image_pro' : 'agent_image'
+    const charge = await chargeErpAiPointsAfterSuccess(opts.auth, chargeKind, opts.env0, {
+      tenantId: opts.erpTenantId,
+      idempotencyKey:
+        opts.chargeIdempotencyKey?.trim() ||
+        `${chargeKind}:${opts.erpTenantId}:${Date.now().toString(36)}`,
+      note: chargeKind === 'visual_studio_image_pro' ? 'AI 视觉工坊高级生图' : 'AI 智能体生图',
+    })
+    if (charge) {
+      pointsCharged = charge.pointsCharged
+      pointsBalance = charge.balance
+    }
+  }
+  sendMerchantJson(res, 200, {
+    ...out,
+    ...(pointsCharged != null ? { pointsCharged, pointsBalance } : {}),
+  })
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (handleMerchantApiOptions(req, res)) return
@@ -35,7 +99,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     sendMerchantJson(res, 503, { ok: false, error: 'auth_lookup_failed', detail: msg.slice(0, 400) })
     return
   }
-  // 小程序只带 X-Mp-Session（无 Bearer JWT）时须单独校验，与 meoo-ai-chat 一致
   if (!user && mpSession) {
     try {
       user = await verifyMpSessionToken(mpSession, process.env as Record<string, string>)
@@ -63,6 +126,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     aspect_ratio?: unknown
     doubao_size?: unknown
     prefer_wanx_poster?: unknown
+    phase?: unknown
+    task_id?: unknown
   }
   try {
     body = JSON.parse(rawBody(req) || '{}') as typeof body
@@ -70,11 +135,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     sendMerchantJson(res, 400, { ok: false, error: 'invalid_json' })
     return
   }
+
+  const phaseRaw = typeof body.phase === 'string' ? body.phase.trim().toLowerCase() : ''
+  const phase = phaseRaw === 'start' || phaseRaw === 'poll' ? phaseRaw : 'sync'
+  const taskId = typeof body.task_id === 'string' ? body.task_id.trim() : ''
   const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
-  if (!prompt) {
+  if (phase !== 'poll' && !prompt) {
     sendMerchantJson(res, 400, { ok: false, error: 'prompt_required' })
     return
   }
+  if (phase === 'poll' && !taskId) {
+    sendMerchantJson(res, 400, { ok: false, error: 'task_id_required' })
+    return
+  }
+
   const refRaw = typeof body.reference_image === 'string' ? body.reference_image.trim() : ''
   if (refRaw.length > 2_800_000) {
     sendMerchantJson(res, 400, {
@@ -90,7 +164,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     pvRaw === 'qwen' || pvRaw === 'doubao' || pvRaw === 'minimax' ? (pvRaw as 'qwen' | 'doubao' | 'minimax') : undefined
 
   const routeRaw = typeof body.image_route === 'string' ? body.image_route.trim().toLowerCase() : ''
-  const imageRoute = routeRaw === 'tokenmix' ? 'tokenmix' : 'builtin'
+  const imageRoute = routeRaw === 'tokenmix' || phase === 'start' || phase === 'poll' ? 'tokenmix' : 'builtin'
   const tokenmixImageModel =
     typeof body.tokenmix_image_model === 'string' ? body.tokenmix_image_model.trim() : undefined
   const preferredModelId =
@@ -137,13 +211,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  /** 商家/服务商 JWT：生图前校验积分；星选 mp: 会话由前端视觉工坊单独扣费 */
   const isMpSession = user.id.startsWith('mp:')
   let erpTenantId: string | undefined
   const wantsProImage =
-    imageRoute === 'tokenmix' && /^gpt-image-2/i.test(tokenmixImageModel || '')
+    imageRoute === 'tokenmix' && /^gpt-image/i.test(tokenmixImageModel || 'gpt-image-2')
   const erpPointsKind = wantsProImage ? 'visual_studio_image_pro' : 'agent_image'
-  if (!isMpSession) {
+
+  // poll：只查任务，积分在完成时扣；start/sync：先校验余额
+  if (!isMpSession && phase !== 'poll') {
     const { requireErpAiPointsAffordable, sendErpAiPointsGateError } = await import(
       './_lib/erpAiApiPointsGate.js'
     )
@@ -155,60 +230,67 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
     erpTenantId = gate.tenantId
+  } else if (!isMpSession && phase === 'poll') {
+    // 完成扣费时需要 tenantId；poll 再轻量解析一次
+    const { requireErpAiPointsAffordable } = await import('./_lib/erpAiApiPointsGate.js')
+    const gate = await requireErpAiPointsAffordable(auth, erpPointsKind, env0, {
+      tenantIdHint: typeof body.tenantId === 'string' ? body.tenantId.trim() : undefined,
+    })
+    if (gate.ok) erpTenantId = gate.tenantId
   }
 
   try {
-    const out = await runMeooAgentImageRequest(access.envForChat, {
-      prompt,
-      referenceImage,
-      preferredVendor,
-      preferredModelId,
-      imageRoute,
-      tokenmixImageModel,
-      exactPrompt,
-      wanxSize,
-      aspectRatio,
-      doubaoSize,
-      preferWanxPoster,
-    })
-    if (out.ok) {
-      const { recordAiTokenUsageFromVercelRequest, estimateLlmTokensFromText } = await import(
-        '../vite-plugins/aiTokenUsageCore.js'
-      )
-      const usageProvider = out.channel === 'tokenmix' ? 'tokenmix' : out.vendorUsed
-      const usageModel = out.channel === 'tokenmix' ? out.displayModel : preferredModelId || null
-      void recordAiTokenUsageFromVercelRequest(req, env0, {
-        provider: usageProvider || accessProvider,
-        model: usageModel ?? undefined,
-        tenantIdHint: typeof body.tenantId === 'string' ? body.tenantId.trim() : undefined,
-        inputText: prompt,
-        outputText: 'image_generated',
-        usage: estimateLlmTokensFromText(prompt, 'image'),
+    let out: MeooAgentImageResult
+    if (phase === 'start') {
+      out = await runMeooAgentImageStartTokenmix(access.envForChat, {
+        prompt,
+        tokenmixImageModel: tokenmixImageModel || 'gpt-image-2',
+        wanxSize,
       })
-      let pointsCharged: number | undefined
-      let pointsBalance: number | undefined
-      if (!isMpSession && erpTenantId) {
-        const { chargeErpAiPointsAfterSuccess } = await import('./_lib/erpAiApiPointsGate.js')
-        // 高级档仅在真正走出 TokenMix GPT Image 时按 pro 扣；回退内置引擎则按常规 agent_image
-        const chargeKind =
-          wantsProImage && out.channel === 'tokenmix' ? 'visual_studio_image_pro' : 'agent_image'
-        const charge = await chargeErpAiPointsAfterSuccess(auth, chargeKind, env0, {
-          tenantId: erpTenantId,
-          idempotencyKey: `${chargeKind}:${erpTenantId}:${Date.now().toString(36)}`,
-          note: chargeKind === 'visual_studio_image_pro' ? 'AI 视觉工坊高级生图' : 'AI 智能体生图',
-        })
-        if (charge) {
-          pointsCharged = charge.pointsCharged
-          pointsBalance = charge.balance
-        }
-      }
-      sendMerchantJson(res, 200, {
-        ...out,
-        ...(pointsCharged != null ? { pointsCharged, pointsBalance } : {}),
+    } else if (phase === 'poll') {
+      out = await runMeooAgentImagePollTokenmix(access.envForChat, {
+        taskId,
+        tokenmixImageModel: tokenmixImageModel || 'gpt-image-2',
       })
     } else {
-      sendMerchantJson(res, 502, { ok: false, error: 'image_generation_failed', detail: out.message })
+      out = await runMeooAgentImageRequest(access.envForChat, {
+        prompt,
+        referenceImage,
+        preferredVendor,
+        preferredModelId,
+        imageRoute,
+        tokenmixImageModel,
+        exactPrompt,
+        wanxSize,
+        aspectRatio,
+        doubaoSize,
+        preferWanxPoster,
+      })
     }
+
+    if (!out.ok) {
+      sendMerchantJson(res, 502, { ok: false, error: 'image_generation_failed', detail: out.message })
+      return
+    }
+
+    const resolvedTaskId =
+      taskId ||
+      ('taskId' in out && typeof out.taskId === 'string' ? out.taskId.trim() : '')
+    await sendImageSuccess(req, res, {
+      out,
+      env0,
+      auth,
+      accessProvider,
+      preferredModelId,
+      prompt: prompt || `tokenmix-task:${resolvedTaskId || 'sync'}`,
+      isMpSession,
+      erpTenantId,
+      wantsProImage,
+      chargeIdempotencyKey:
+        wantsProImage && resolvedTaskId
+          ? `visual_studio_image_pro:${erpTenantId || user.id}:${resolvedTaskId}`
+          : undefined,
+    })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     console.error('[meoo-ai-agent-image] fatal', msg)
