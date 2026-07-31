@@ -877,13 +877,18 @@ export default function AiImageStudioPage() {
         setSelectedPreviewChannel(channelId)
         setSelectedPreviewVariantId(channelJobs[0]?.id ?? null)
 
-        const masterGen = usePro
-          ? platformCarouselMasterGptSize(channelId)
-          : platformCarouselMasterGenSize(channelId)
+        let masterGen: ReturnType<typeof platformCarouselMasterGenSize> | ReturnType<typeof platformCarouselMasterGptSize>
+        let aspectClamped: boolean
+        if (usePro) {
+          const gptGen = platformCarouselMasterGptSize(channelId)
+          masterGen = gptGen
+          aspectClamped = gptGen.gptAspectClamped
+        } else {
+          const wanxGen = platformCarouselMasterGenSize(channelId)
+          masterGen = wanxGen
+          aspectClamped = Boolean(wanxGen.wanxAspectClamped)
+        }
         const engineLabel = usePro ? 'GPT Image 2' : '万相'
-        const aspectClamped = usePro
-          ? masterGen.gptAspectClamped
-          : Boolean(masterGen.wanxAspectClamped)
         // 本地模板即时拼 Prompt，跳过 LLM 打包等待，点击后立刻进入生图
         const prompt = buildVisualStudioPrompt(form, {
           channel: channelId,
