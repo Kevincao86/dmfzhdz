@@ -17,12 +17,42 @@ export const DH_SEEDANCE_MAX_SEGMENTS = 12
 /** 中文口播约 4 字/秒 → 5 秒画面约 18～20 字，避免一段 TTS 远长于画面 */
 export const DH_SEEDANCE_CHARS_PER_SEGMENT = 20
 
+/** OmniHuman 单段音频建议 ≤30s（API 约 35s 上限）；中文约 4 字/秒 → ~110 字 */
+export const DH_OMNIHUMAN_CHARS_PER_SEGMENT = 110
+export const DH_OMNIHUMAN_MAX_AUDIO_SEC = 30
+export const DH_OMNIHUMAN_MAX_SEGMENTS = 8
+
 const DH_PROMPT_MAX = SEEDANCE_I2V_MAX_CONTENT_TEXT
 
 function clip(s: string, max: number): string {
   const t = String(s ?? '').trim()
   if (t.length <= max) return t
   return t.slice(0, max).trim()
+}
+
+/** OmniHuman：按口播秒数切分文案（单段约 30s） */
+export function chunkScriptForOmniHumanVideo(script: string): string[] {
+  return chunkScriptForSeedanceVideo(script, DH_OMNIHUMAN_CHARS_PER_SEGMENT).slice(
+    0,
+    DH_OMNIHUMAN_MAX_SEGMENTS,
+  )
+}
+
+/** OmniHuman 单段驱动提示（可选，控制表情/动作） */
+export function buildDhOmniHumanPrompt(
+  draft: DigitalHumanDraft,
+  opts?: { motionText?: string; gesturePreset?: string },
+): string {
+  const bg = clip(backgroundPromptForDraft(draft), 36)
+  const frame = frameDesc(draft)
+  const motion = clip(motionBlock(draft, opts?.motionText, opts?.gesturePreset), 64)
+  const body = [
+    `竖屏9:16数字人口播，人物已站在场景（${bg}）中，${frame}。`,
+    '口型与驱动音频严格同步，表情自然，禁止灰底矩形贴片。',
+    `动作：${motion}。`,
+    SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
+  ].join('')
+  return clampSeedanceContentText(sanitizePromptForVideoModel(body), DH_PROMPT_MAX)
 }
 
 /** 口播稿按约 5 秒一段切分（图生视频 i2v 常用 3/4/5 秒） */

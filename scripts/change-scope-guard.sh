@@ -613,6 +613,10 @@ videoAiApi
 digitalHumanDouyinLinkCore
 digitalHumanTtsApi
 dh-seedance-r2v-local-smoke
+dh-omnihuman-local-smoke
+dhOmniHumanVideoApi
+volcVisualSign
+volcOmniHumanClient
 change-scope-guard
 PAT
       ;;

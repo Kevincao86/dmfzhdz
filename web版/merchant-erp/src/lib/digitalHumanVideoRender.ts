@@ -1,6 +1,6 @@
 /**
- * 数字人口播高清 MP4：豆包 Seedance 一体化图生视频（人物+背景+产品融合）+ TTS 配音混流。
- * 禁止千问口型单引擎与 ffmpeg 产品贴片；与短视频模块同源 Seedance。
+ * 数字人口播高清 MP4：火山 OmniHuman（单图+TTS 音频驱动口型）为主路径。
+ * 先抠人融景成首帧，再音频驱动；成片自带口型音轨，无需后期静音混音。
  */
 import type { DigitalHumanDraft, DigitalHumanWork, FrameMode } from './digitalHumanBroadcast'
 import {
@@ -13,9 +13,7 @@ import {
 import { resolveStoreSceneBackgroundDataUrl } from './digitalHumanStoreScenes'
 import {
   assertBlobLooksLikeVideo,
-  concatAudioMp3Blobs,
   concatVideoSegmentsToMp4,
-  muxVideoWithNarrationPreferBrowser,
   probeVideoHasAudioStream,
 } from './concatVideoSegments'
 import {
@@ -23,41 +21,32 @@ import {
   resolveUploadedNarrationSegments,
   synthesizeDigitalHumanNarration,
 } from './digitalHumanRenderAudio'
-import { imageUrlToPureBase64, normalizePortraitBase64ForS2v, extractVideoLastFramePureBase64 } from './videoFrameUtils'
+import { imageUrlToPureBase64, normalizePortraitBase64ForS2v } from './videoFrameUtils'
 import {
   concatVideoBlobsOnServer,
   concatVideoUrlsOnServer,
   downloadVideoUrlAsBlob,
   fetchVideoAiConfig,
-  muxVideoAudioOnServer,
   postProcessVideoOnServer,
-  postVideoLastFrameFromUrl,
-  runShortVideoJobWithFailover,
 } from '../services/videoAiApi'
 import { buildSrtContent, probeVideoDurationSec, splitSubtitleLines } from './digitalHumanSubtitle'
 import { resolveDhSubtitleStyleForBurn } from './digitalHumanPostProcessStyles'
+import { compositePortraitWithBackground } from './digitalHumanBackgroundComposite'
 import {
-  buildDhSeedanceSegmentPrompt,
-  chunkScriptForSeedanceVideo,
-  DH_SEEDANCE_MAX_SEGMENTS,
-  DH_SEEDANCE_SEGMENT_SEC,
-  estimateDhSegmentCountFromAudioSec,
+  buildDhOmniHumanPrompt,
+  chunkScriptForOmniHumanVideo,
+  DH_OMNIHUMAN_MAX_SEGMENTS,
   estimateDhTargetDurationSec,
 } from './digitalHumanSeedancePrompt'
 import { buildBriefFromInput, validateBriefFidelity } from './shortVideoGenBrief'
-import { buildSeedanceFlagsLine } from './shortVideoRenderFlags'
 import { getAudioDurationSec } from './digitalHumanAudioChunks'
-import { normalizeArkVideoModelParam } from './arkVideoEndpointsConfig'
 import {
   inferGestureFromMotionText,
   motionLineForSegmentIndex,
   parseMotionInstructions,
 } from './digitalHumanMotionPlan'
-import {
-  buildDhSeedanceFusionImages,
-  isDhProductFusionSegment,
-  prepareDhProductFusionAssets,
-} from './digitalHumanProductFusion'
+import { isDhProductFusionSegment, prepareDhProductFusionAssets } from './digitalHumanProductFusion'
+import { runDhOmniHumanJob } from './dhOmniHumanVideoApi'
 import {
   blobUrlIsReadable,
   loadWorkMp4Blob,
@@ -70,20 +59,22 @@ const MAX_DH_SEGMENTS = 20
 const MAX_S2V_SEGMENTS = 12
 
 export type DhVideoEngine =
+  | 'omnihuman'
   | 'seedance_lipsync'
   | 'seedance_product_fusion'
   | 'seedance'
   | 'qwen_s2v'
-export type DhVideoProvider = 'doubao' | 'qwen'
+export type DhVideoProvider = 'volc' | 'doubao' | 'qwen'
 
 export function dhVideoEngineLabel(engine: DhVideoEngine | undefined): string {
+  if (engine === 'omnihuman') return '火山 OmniHuman 音频驱动口播'
   if (engine === 'seedance_product_fusion') {
     return '豆包 Seedance 一体化融合（人物+背景+产品）'
   }
   if (engine === 'seedance_lipsync' || engine === 'seedance') {
     return '豆包 Seedance 一体化图生视频'
   }
-  return '豆包 Seedance 图生视频'
+  return '火山 OmniHuman 数字人口播'
 }
 
 export type DhRenderProgress = {
@@ -109,32 +100,23 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => window.setTimeout(r, ms))
 }
 
-/** 数字人口播：优先有免费额度的 1.0-pro-fast / lite-i2v，再 1.5/2.0 */
-function sortDhSeedancePoolPreferLongClip(ids: readonly string[]): string[] {
-  const tier = (modelId: string): number => {
-    const norm = normalizeArkVideoModelParam(modelId).toLowerCase()
-    if (/seedance-1-0-pro-fast|seedance-1\.0-pro-fast/.test(norm)) return 1
-    if (/lite-i2v/.test(norm)) return 2
-    if (/seedance-1-5|seedance-1\.5/.test(norm)) return 3
-    if (/seedance-2-0|seedance-2\.0/.test(norm) && !/mini|fast/.test(norm)) return 4
-    if (/seedance-2-0-fast|seedance-2\.0-fast/.test(norm)) return 5
-    if (/seaweed/.test(norm)) return 6
-    if (/seedance-1-0-pro|seedance-1\.0-pro/.test(norm)) return 7
-    if (/lite/.test(norm)) return 8
-    return 9
-  }
-  return [...ids].sort((a, b) => {
-    const d = tier(a) - tier(b)
-    if (d !== 0) return d
-    return normalizeArkVideoModelParam(a).localeCompare(normalizeArkVideoModelParam(b))
-  })
+/** OmniHuman 单图驱动：一律先合成进所选背景，避免灰底证件照直接驱动 */
+function draftNeedsSceneComposite(_draft: DigitalHumanDraft): boolean {
+  void _draft
+  return true
 }
 
-function draftNeedsDualRefPersonScene(draft: DigitalHumanDraft): boolean {
-  return (
-    (draft.background === 'store' && Boolean(draft.storeScene)) ||
-    draft.background === 'custom'
-  )
+async function blobToPureBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader()
+    fr.onload = () => {
+      const s = typeof fr.result === 'string' ? fr.result : ''
+      const ix = s.indexOf('base64,')
+      resolve(ix >= 0 ? s.slice(ix + 'base64,'.length) : s.replace(/\s/g, ''))
+    }
+    fr.onerror = () => reject(new Error('读取文件失败'))
+    fr.readAsDataURL(blob)
+  })
 }
 
 export function estimateDhS2vSegmentCount(script: string): number {
@@ -166,8 +148,8 @@ async function resolveSegmentBackgroundDataUrl(
   return null
 }
 
-function canUseSeedance(cfg: Awaited<ReturnType<typeof fetchVideoAiConfig>> | null): boolean {
-  return Boolean(cfg?.arkKeyConfigured && (cfg?.arkVideoModels?.length ?? 0) > 0)
+function canUseOmniHuman(cfg: Awaited<ReturnType<typeof fetchVideoAiConfig>> | null): boolean {
+  return Boolean(cfg?.omnihumanConfigured)
 }
 
 async function resolvePortraitOnlyBase64(
@@ -205,37 +187,10 @@ async function resolvePortraitOnlyBase64(
   }
   if (!raw) return null
   try {
-    // 门店/自定义背景：只提交完整人像，场景作第二张参考图由 Seedance 融合（禁止本地抠图叠图）
     return await normalizePortraitBase64ForS2v(raw, frameMode)
   } catch {
     return null
   }
-}
-
-async function resolveSeedanceSegmentImageB64(
-  draft: DigitalHumanDraft,
-  frameMode: FrameMode,
-  segmentIndex: number,
-  prevVideoUrl: string | null,
-  portraitB64: string,
-  customBackgroundDataUrl?: string | null,
-): Promise<string> {
-  const portraitRef =
-    (await resolvePortraitOnlyBase64(draft, frameMode, customBackgroundDataUrl)) ?? portraitB64
-
-  /** 照片/预置形象：每段固定原参考图，避免续帧换脸 */
-  if (draft.avatarKind !== 'video_clone') {
-    return portraitRef
-  }
-
-  if (segmentIndex === 0) return portraitRef
-
-  const url = String(prevVideoUrl ?? '').trim()
-  if (!url) throw new Error(`第 ${segmentIndex + 1} 段缺少上一段视频衔接`)
-  const serverFrame = await postVideoLastFrameFromUrl(url)
-  if (serverFrame.ok) return serverFrame.pureBase64
-  const blob = await downloadVideoUrlAsBlob(url)
-  return extractVideoLastFramePureBase64(blob)
 }
 
 async function applyDhFinalPostProcess(
@@ -343,16 +298,12 @@ function sanitizeDhRenderPipelineError(raw: string, fallback: string): string {
   return t.length > 280 ? `${t.slice(0, 280)}…` : t
 }
 
-/** Seedance 无声成片混入 TTS 口播（浏览器优先 + 音轨验收） */
-async function muxNarrationIntoVideo(videoBlob: Blob, audioBlob: Blob): Promise<Blob> {
-  return muxVideoWithNarrationPreferBrowser(videoBlob, audioBlob, muxVideoAudioOnServer)
-}
-
-async function renderWithSeedance(
+async function renderWithOmniHuman(
   work: DigitalHumanWork,
-  cfg: NonNullable<Awaited<ReturnType<typeof fetchVideoAiConfig>>>,
+  _cfg: NonNullable<Awaited<ReturnType<typeof fetchVideoAiConfig>>>,
   onProgress?: (p: DhRenderProgress) => void,
 ): Promise<DhRenderResult> {
+  void _cfg
   const draft = work.draft
   const script = draft.script.trim()
   const isAudioDrive = draft.driveMode === 'audio'
@@ -367,7 +318,6 @@ async function renderWithSeedance(
     }
   }
 
-  // 意图保真：口播须含可识别卖点/场景关键词（无 Skill 时宽松：文案够长即过）
   const fidelityBrief = buildBriefFromInput(script, null)
   if (!isAudioDrive) {
     const fidelity = validateBriefFidelity(fidelityBrief, { prompt: script, skill: null })
@@ -410,21 +360,17 @@ async function renderWithSeedance(
     return { ok: false, message: '请上传清晰正面人像/实拍视频或选择预置形象后重试' }
   }
 
-  if (draft.productOverlayEnabled) {
-    const productDataUrl = await loadWorkProductImageDataUrl(work)
-    if (!productDataUrl) {
-      return {
-        ok: false,
-        message: '已开启手持产品展示，请返回步骤 3 上传产品图（JPG/PNG）后重试',
-      }
-    }
-  }
-
   let productPureB64: string | null = null
   if (draft.productOverlayEnabled) {
     try {
       const productDataUrl = await loadWorkProductImageDataUrl(work)
-      if (productDataUrl) productPureB64 = await imageUrlToPureBase64(productDataUrl)
+      if (!productDataUrl) {
+        return {
+          ok: false,
+          message: '已开启手持产品展示，请返回步骤 3 上传产品图（JPG/PNG）后重试',
+        }
+      }
+      productPureB64 = await imageUrlToPureBase64(productDataUrl)
     } catch {
       return { ok: false, message: '产品图无法读取，请重新上传后重试' }
     }
@@ -443,7 +389,7 @@ async function renderWithSeedance(
     segmentAudioBlobs = uploaded.audioBlobs
     scriptChunks = segmentAudioBlobs.map((_, i) => script.split(/\n+/)[i]?.trim() || `[口播段 ${i + 1}]`)
   } else {
-    scriptChunks = chunkScriptForSeedanceVideo(script).slice(0, DH_SEEDANCE_MAX_SEGMENTS)
+    scriptChunks = chunkScriptForOmniHumanVideo(script)
     for (let i = 0; i < scriptChunks.length; i++) {
       const chunkText = scriptChunks[i] ?? script
       onProgress?.({
@@ -468,7 +414,7 @@ async function renderWithSeedance(
     try {
       totalAudioSec += await getAudioDurationSec(b)
     } catch {
-      /* ignore probe miss */
+      /* ignore */
     }
   }
   if (!(totalAudioSec > 0.3)) {
@@ -477,31 +423,22 @@ async function renderWithSeedance(
 
   let segmentTotal = Math.max(
     isAudioDrive ? segmentAudioBlobs.length : scriptChunks.length,
-    estimateDhSegmentCountFromAudioSec(totalAudioSec),
+    activeSceneShots && !isAudioDrive ? activeSceneShots.length : 1,
   )
-  if (activeSceneShots && !isAudioDrive) {
-    segmentTotal = Math.max(segmentTotal, activeSceneShots.length)
-  }
-  segmentTotal = Math.min(DH_SEEDANCE_MAX_SEGMENTS, Math.max(1, segmentTotal))
-
+  segmentTotal = Math.min(DH_OMNIHUMAN_MAX_SEGMENTS, Math.max(1, segmentTotal))
   const padText = scriptChunks[scriptChunks.length - 1] ?? script
   while (scriptChunks.length < segmentTotal) scriptChunks.push(padText)
+  while (segmentAudioBlobs.length < segmentTotal) {
+    segmentAudioBlobs.push(segmentAudioBlobs[segmentAudioBlobs.length - 1]!)
+  }
 
   const targetDurationSec = Math.max(
     estimateDhTargetDurationSec(script),
     Math.ceil(totalAudioSec),
   )
-  const flags = buildSeedanceFlagsLine({
-    durationSec: DH_SEEDANCE_SEGMENT_SEC,
-    fps: 24,
-    aspect: '9:16',
-    watermark: 'off',
-  })
-  const poolModels = sortDhSeedancePoolPreferLongClip(cfg.arkVideoModels.map((m) => m.endpointId))
 
   const videoBlobs: Blob[] = []
   const sourceUrls: string[] = []
-  let prevVideoUrl: string | null = null
   let usedProductFusion = false
 
   for (let i = 0; i < segmentTotal; i++) {
@@ -509,7 +446,7 @@ async function renderWithSeedance(
       phase: 'generating',
       segmentIndex: i + 1,
       segmentTotal,
-      progress: 12 + Math.round((i / segmentTotal) * 48),
+      progress: 14 + Math.round((i / segmentTotal) * 60),
     })
 
     const sceneShot = activeSceneShots?.[i % activeSceneShots.length] ?? null
@@ -531,75 +468,27 @@ async function renderWithSeedance(
       }
     }
 
-    let segmentImageB64: string
+    let sceneImageB64 = portraitB64
     try {
-      segmentImageB64 = await resolveSeedanceSegmentImageB64(
-        segmentDraft,
-        baseFrameMode,
-        i,
-        prevVideoUrl,
-        portraitB64,
-        segmentCustomBg,
-      )
+      if (draftNeedsSceneComposite(segmentDraft) || segmentCustomBg) {
+        sceneImageB64 = await compositePortraitWithBackground(
+          portraitB64,
+          segmentDraft.background,
+          baseFrameMode,
+          segmentCustomBg,
+        )
+      }
+      const useProductFusion =
+        Boolean(productPureB64) && isDhProductFusionSegment(i, segmentTotal)
+      if (useProductFusion && productPureB64) {
+        const fusion = await prepareDhProductFusionAssets(sceneImageB64, productPureB64)
+        sceneImageB64 = fusion.sceneWithProductB64
+        usedProductFusion = true
+      }
     } catch (e) {
       return {
         ok: false,
-        message: `第 ${i + 1}/${segmentTotal} 段参考图准备失败：${e instanceof Error ? e.message : String(e)}`,
-      }
-    }
-
-    let seedanceImages = [segmentImageB64]
-    /** 即梦首尾帧布局；有场景/产品双图时开启，禁止多张 reference_image（1.x 会报 r2v） */
-    let seedanceImageMode: 'auto' | 'first_last' = 'auto'
-    const useDualRefPersonScene =
-      draftNeedsDualRefPersonScene(segmentDraft) && Boolean(segmentCustomBg?.trim())
-    const useProductFusion =
-      Boolean(productPureB64) &&
-      isDhProductFusionSegment(i, segmentTotal)
-
-    if (useProductFusion && productPureB64) {
-      onProgress?.({
-        phase: 'generating',
-        segmentIndex: i + 1,
-        segmentTotal,
-        progress: 14 + Math.round((i / segmentTotal) * 6),
-      })
-      try {
-        /**
-         * 产品段：首帧=人物，尾帧=场景纯图（不叠图）；
-         * 产品以抠图作为尾帧引导时改用「场景含产品位」作尾帧，仍走首尾帧非 r2v。
-         */
-        let scenePure = segmentImageB64
-        if (useDualRefPersonScene && segmentCustomBg) {
-          scenePure = await imageUrlToPureBase64(segmentCustomBg)
-        }
-        const fusion = await prepareDhProductFusionAssets(scenePure, productPureB64)
-        seedanceImages = buildDhSeedanceFusionImages(
-          segmentImageB64,
-          fusion.sceneWithProductB64,
-        )
-        seedanceImageMode = 'first_last'
-        usedProductFusion = true
-      } catch (e) {
-        return {
-          ok: false,
-          message: `第 ${i + 1}/${segmentTotal} 段产品/人物/背景融合参考图失败：${e instanceof Error ? e.message : String(e)}`,
-        }
-      }
-    } else if (useDualRefPersonScene && segmentCustomBg) {
-      try {
-        /**
-         * 即梦首尾帧（与短视频一致）：first_frame=完整人物，last_frame=场景纯图。
-         * Seedance 深度融合进景；禁止本地灰底叠片，也禁止多张 reference_image（r2v）。
-         */
-        const scenePureB64 = await imageUrlToPureBase64(segmentCustomBg)
-        seedanceImages = [segmentImageB64, scenePureB64]
-        seedanceImageMode = 'first_last'
-      } catch (e) {
-        return {
-          ok: false,
-          message: `第 ${i + 1}/${segmentTotal} 段场景参考图准备失败：${e instanceof Error ? e.message : String(e)}`,
-        }
+        message: `第 ${i + 1}/${segmentTotal} 段场景合成失败：${e instanceof Error ? e.message : String(e)}`,
       }
     }
 
@@ -610,46 +499,39 @@ async function renderWithSeedance(
         : motionLine?.text
           ? inferGestureFromMotionText(motionLine.text, 'explain')
           : undefined
-    const isContinuation = i > 0 && (i >= segmentAudioBlobs.length || draft.avatarKind === 'video_clone')
-    const prompt = buildDhSeedanceSegmentPrompt(segmentDraft, scriptChunks[i] ?? script, {
-      segmentIndex: i,
-      segmentTotal,
+    const prompt = buildDhOmniHumanPrompt(segmentDraft, {
       motionText: motionLine?.text,
       gesturePreset: segmentGesture,
-      continuation: isContinuation && !sceneShot,
-      hasProductFusion: useProductFusion,
-      dualRefPersonScene: useDualRefPersonScene || useProductFusion,
-      fidelityBrief,
     })
 
-    const job = await runShortVideoJobWithFailover({
-      engine: 'seedance',
-      body: {
-        prompt,
-        flags,
-        images_base64: seedanceImages,
-        i2v_max_images: Math.min(2, seedanceImages.length),
-        seedance_image_mode: seedanceImageMode,
-        prefer_quota_stable: true,
-        skip_qwen: true,
-      },
-      poolModels,
-      allowAutoHalveDuration: false,
-      onProgress: (msg) => {
+    let audioB64: string
+    try {
+      audioB64 = await blobToPureBase64(segmentAudioBlobs[i]!)
+    } catch (e) {
+      return {
+        ok: false,
+        message: `第 ${i + 1}/${segmentTotal} 段音频读取失败：${e instanceof Error ? e.message : String(e)}`,
+      }
+    }
+
+    const job = await runDhOmniHumanJob({
+      image_base64: sceneImageB64,
+      audio_base64: audioB64,
+      prompt,
+      onProgress: (label) => {
         onProgress?.({
           phase: 'generating',
           segmentIndex: i + 1,
           segmentTotal,
           progress: 20 + Math.round((i / segmentTotal) * 55),
         })
-        void msg
+        void label
       },
     })
-
     if (!job.ok) {
       return {
         ok: false,
-        message: `第 ${i + 1}/${segmentTotal} 段豆包 Seedance 视觉生成失败：${job.message}`,
+        message: `第 ${i + 1}/${segmentTotal} 段 OmniHuman 生成失败：${job.message}`,
       }
     }
 
@@ -658,32 +540,31 @@ async function renderWithSeedance(
       return { ok: false, message: `第 ${i + 1}/${segmentTotal} 段未返回视频地址` }
     }
 
-    let seedanceBlob: Blob | null = null
+    let ohBlob: Blob | null = null
     for (let d = 0; d < 4; d++) {
       if (d > 0) await sleep(2000 * d)
       try {
         const candidate = await assertBlobLooksLikeVideo(
           await downloadVideoUrlAsBlob(url),
-          `Seedance 第 ${i + 1} 段`,
+          `OmniHuman 第 ${i + 1} 段`,
         )
         if (candidate.size >= 1024) {
-          seedanceBlob = candidate
+          ohBlob = candidate
           break
         }
       } catch {
         /* retry */
       }
     }
-    if (!seedanceBlob) {
-      return { ok: false, message: `第 ${i + 1}/${segmentTotal} 段豆包视频下载失败` }
+    if (!ohBlob) {
+      return { ok: false, message: `第 ${i + 1}/${segmentTotal} 段 OmniHuman 视频下载失败` }
     }
 
-    videoBlobs.push(seedanceBlob)
+    videoBlobs.push(ohBlob)
     sourceUrls.push(url)
-    prevVideoUrl = url
   }
 
-  onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 82 })
+  onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 86 })
 
   let mergedVideo: Blob
   try {
@@ -698,42 +579,12 @@ async function renderWithSeedance(
     }
   }
 
-  onProgress?.({ phase: 'audio', segmentIndex: segmentTotal, segmentTotal, progress: 88 })
-  let fullNarration: Blob
-  try {
-    fullNarration =
-      segmentAudioBlobs.length === 1
-        ? segmentAudioBlobs[0]!
-        : await concatAudioMp3Blobs(segmentAudioBlobs)
-  } catch (e) {
-    return {
-      ok: false,
-      message: sanitizeDhRenderPipelineError(
-        e instanceof Error ? e.message : String(e),
-        '口播音频拼接失败',
-      ),
-    }
-  }
-
-  let videoWithNarration: Blob
-  try {
-    videoWithNarration = await muxNarrationIntoVideo(mergedVideo, fullNarration)
-  } catch (e) {
-    return {
-      ok: false,
-      message: sanitizeDhRenderPipelineError(
-        e instanceof Error ? e.message : String(e),
-        '成片口播混音失败',
-      ),
-    }
-  }
-
   onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 94 })
   let finalBlob: Blob
   try {
     finalBlob = await applyDhFinalPostProcess(
       work,
-      videoWithNarration,
+      mergedVideo,
       script,
       baseFrameMode,
       targetDurationSec,
@@ -744,7 +595,7 @@ async function renderWithSeedance(
       ok: false,
       message: sanitizeDhRenderPipelineError(
         e instanceof Error ? e.message : String(e),
-        '成片后处理失败（字幕/运镜）',
+        '成片后处理失败（字幕）',
       ),
     }
   }
@@ -753,7 +604,7 @@ async function renderWithSeedance(
   if (!finalHasAudio) {
     return {
       ok: false,
-      message: '成片验收失败：MP4 无口播音轨。请确认运营台已配置 MiniMax/千问 TTS 后重新渲染。',
+      message: '成片验收失败：MP4 无口播音轨。OmniHuman 应自带音轨，请重试或检查火山视觉任务结果。',
     }
   }
 
@@ -762,19 +613,10 @@ async function renderWithSeedance(
     outputMp4Url: URL.createObjectURL(finalBlob),
     outputBlob: finalBlob,
     segmentCount: segmentTotal,
-    engine: usedProductFusion ? 'seedance_product_fusion' : 'seedance',
-    videoProvider: 'doubao',
+    engine: usedProductFusion ? 'seedance_product_fusion' : 'omnihuman',
+    videoProvider: 'volc',
     plannerModel: 'doubao',
   }
-}
-
-/** 实拍视频：统一走 Seedance 一体化生成（与照片驱动相同） */
-async function renderWithVideoCloneLipsync(
-  work: DigitalHumanWork,
-  cfg: NonNullable<Awaited<ReturnType<typeof fetchVideoAiConfig>>>,
-  onProgress?: (p: DhRenderProgress) => void,
-): Promise<DhRenderResult> {
-  return renderWithSeedance(work, cfg, onProgress)
 }
 
 export async function renderDigitalHumanMp4(
@@ -800,26 +642,15 @@ export async function renderDigitalHumanMp4(
     }
   }
 
-  if (draft.avatarKind === 'video_clone') {
-    if (!canUseSeedance(cfg)) {
-      return {
-        ok: false,
-        message:
-          '数字人口播须配置豆包 Seedance 视频模型，请在运营台配置 MERCHANT_AI_DOUBAO_KEY。',
-      }
-    }
-    return renderWithVideoCloneLipsync(work, cfg!, onProgress)
-  }
-
-  if (!canUseSeedance(cfg)) {
+  if (!canUseOmniHuman(cfg)) {
     return {
       ok: false,
       message:
-        '数字人口播须配置豆包 Seedance 视频模型（与短视频同源）。请在运营台配置 MERCHANT_AI_DOUBAO_KEY 与视频模型。',
+        '数字人口播已切换为火山 OmniHuman。请在轻量 auth-api.env 配置 MERCHANT_AI_VOLC_ACCESS_KEY 与 MERCHANT_AI_VOLC_SECRET_KEY（即梦/智能视觉控制台 AK/SK），重启 meoo-auth-api 后重试。',
     }
   }
 
-  return renderWithSeedance(work, cfg!, onProgress)
+  return renderWithOmniHuman(work, cfg!, onProgress)
 }
 
 /** 解析作品成片 Blob：IndexedDB → 有效 blob: URL → 远端 HTTPS */

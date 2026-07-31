@@ -1,4 +1,5 @@
 /** 口型驱动前：将人像合成到所选背景（门店实景 / 纯色 / 绿幕等） */
+import { mattePortraitWithFallback } from './digitalHumanPortraitMatting'
 
 const OUT_W = 1080
 const OUT_H = 1920
@@ -140,7 +141,9 @@ function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, bac
   }
 }
 
-/** 将裁切后人像叠到场景背景上，仅作低清预览示意；成片由豆包 Seedance 双参考融合（不在此抠图） */
+/**
+ * 将人像叠入场景：门店/自定义背景先去灰底再合成，供 OmniHuman 单图驱动（避免灰底矩形贴片）。
+ */
 export async function compositePortraitWithBackground(
   portraitPureB64: string,
   backgroundId: string,
@@ -165,8 +168,11 @@ export async function compositePortraitWithBackground(
     drawBackground(ctx, OUT_W, OUT_H, bg)
   }
 
-  /** 预览示意：整图轻叠，保留五官；禁止浏览器抠图（易误伤脸部） */
-  const img = await loadImageFromPureBase64(portraitPureB64)
+  const needsMatte = hasCustomBgImage || bg === 'store' || bg === 'custom' || bg === 'green'
+  const portraitSrc = needsMatte
+    ? await mattePortraitWithFallback(portraitPureB64, { chromaGreen: bg === 'green' })
+    : portraitPureB64
+  const img = await loadImageFromPureBase64(portraitSrc)
   const portraitMaxH = frameMode === 'full' ? OUT_H * 0.9 : OUT_H * 0.74
   const scale = Math.min(OUT_W * 0.92 / img.width, portraitMaxH / img.height)
   const pw = img.width * scale

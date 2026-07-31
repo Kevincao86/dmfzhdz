@@ -244,6 +244,8 @@ export async function postShortVideoStartWithCrossFailover(opts: {
 
 export type VideoAiBackendConfig = {
   klingConfigured: boolean
+  /** 火山 OmniHuman（智能视觉 AK/SK）已配置 */
+  omnihumanConfigured?: boolean
   arkKeyConfigured: boolean
   arkVideoModels: { label: string; endpointId: string }[]
   iceConfigured?: boolean
@@ -529,6 +531,7 @@ export async function fetchVideoAiConfig(): Promise<VideoAiBackendConfig | null>
   if (lastNetworkErr) {
     return {
       klingConfigured: false,
+      omnihumanConfigured: false,
       arkKeyConfigured: false,
       arkVideoModels: [],
       configLoadError: lastNetworkErr,
