@@ -15,6 +15,7 @@ import {
   type ShortVideoSkillId,
 } from '../lib/shortVideoSkills'
 import {
+  isScriptRowsUsable,
   scriptRowsFromVideoPrompts,
   validateStoryboardRows,
   type ShortVideoScriptRow,
@@ -134,13 +135,15 @@ export async function preparePreciseVideoGeneration(
 
     const fidelity = validateBriefFidelity(brief, { rows, skill })
     if (!fidelity.ok) {
-      // 与单段一致：分镜已填且文案够长时，结构节拍关键词不再硬拦（SaaS/产品演示常无「到店/菜品」词）
+      // 分镜表可用（或文案够长）时：结构节拍不再硬拦。
+      // SaaS/产品演示常用「焦虑切 App + 反问」开场，不含餐饮「门铃/排队」词。
       const corpusLen = rows.reduce(
         (n, r) => n + String(r.visual || '').length + String(r.dialogue || '').length,
         0,
       )
+      const storyboardReady = isScriptRowsUsable(rows)
       const hard = fidelity.issues.filter(
-        (x) => !x.startsWith('结构节拍缺失') || corpusLen < 80,
+        (x) => !x.startsWith('结构节拍缺失') || (!storyboardReady && corpusLen < 80),
       )
       if (hard.length > 0) {
         return {

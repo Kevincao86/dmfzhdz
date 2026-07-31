@@ -54,15 +54,15 @@ const DEFAULT_MUST_AVOID = [
   '编造未提及的店名或价格',
 ]
 
-/** 开场钩子：含本地生活 + SaaS/产品演示常见开场语 */
+/** 开场钩子：本地生活 + SaaS/产品演示常见开场语与痛点词 */
 const HOOK_HINTS =
-  /钩子|开场|前\s*[123]秒|冲击|门铃|门口|排队|冲突|亮相|街景|痛点|一屏|看清|困扰|难题|有没有发现|还在为|第一眼|开篇/
+  /钩子|开场|前\s*[123]秒|冲击|门铃|门口|排队|冲突|亮相|街景|痛点|一屏|看清|困扰|难题|有没有发现|还在为|第一眼|开篇|焦虑|困惑|焦躁|手忙脚乱|急推|还在|一个个翻|切来切去|来回切|忙不过来|看不过来|少切/
 /** 主品/卖点：含餐饮招牌 + 功能/界面/方案类 */
 const PRODUCT_HINTS =
   /主品|卖点|特写|产品|招牌|必点|菜品|杯身|造型|房型|训练|萌宠|份量|功能|亮点|核心|看板|助手|方案|组件|界面|数据|系统|平台|能力|工具|组品|对话/
 /** 行动号召：含到店转化 + 试用/开通/了解等 */
 const CTA_HINTS =
-  /CTA|行动号召|预约|下单|到店|外卖|办卡|预订|复购|福利|限时|扫码|试用|开通|马上|立即|点击|关注|收藏|了解|咨询|体验|注册|免费|赶紧|欢迎/
+  /CTA|行动号召|预约|下单|到店|外卖|办卡|预订|复购|福利|限时|扫码|试用|开通|马上|立即|点击|关注|收藏|了解|咨询|体验|注册|免费|赶紧|欢迎|今天就|就用|多做生意/
 
 function firstMatch(text: string, patterns: RegExp[]): string {
   for (const re of patterns) {
@@ -213,6 +213,38 @@ function rowCorpus(row: ShortVideoScriptRow | undefined): string {
   return `${row.visual || ''}\n${row.dialogue || ''}`.trim()
 }
 
+/** 开场窗口：优先首格分镜，否则取全文前段（反问/痛点常落在这里） */
+function openingWindow(text: string, rows?: ShortVideoScriptRow[] | null): string {
+  if (rows && rows.length > 0) {
+    const head = rowCorpus(rows[0])
+    if (head.length >= 2) return head
+  }
+  const t = String(text || '').trim()
+  if (!t) return ''
+  const firstPara = t.split(/\n+/)[0] || t
+  return (firstPara.length >= 8 ? firstPara : t).slice(0, 160)
+}
+
+/**
+ * 是否具备开场钩子信号：关键词、反问、痛点情绪、或多段分镜首格已填。
+ * SaaS 演示常见「焦虑切 App + 反问」不含餐饮「门铃/排队」词，必须放行。
+ */
+function hasHookSignal(text: string, rows?: ShortVideoScriptRow[] | null): boolean {
+  const open = openingWindow(text, rows)
+  const all = String(text || '')
+  if (HOOK_HINTS.test(all) || HOOK_HINTS.test(open)) return true
+  if (/开场|进门|进店|门铃/.test(all)) return true
+  // 反问钩子：首段或全文前 80 字含问号
+  if (/[？?]/.test(open) || /[？?]/.test(all.slice(0, 80))) return true
+  // 多 App / 多平台切换类痛点画面
+  if (/(外卖|短视频|抖音|美团|小红书).{0,12}(App|APP|软件|平台)|切多个|切换多个/.test(open)) {
+    return true
+  }
+  // 分镜表：首格有实质内容即占「钩子位」
+  if (rows && rows.length >= 2 && rowCorpus(rows[0]).length >= 4) return true
+  return false
+}
+
 /**
  * 节拍是否覆盖：关键词命中，或分镜表按位兜底（首格=钩子位、中段=卖点位、末格=收尾位）。
  * 避免 SaaS/产品演示分镜因不含「菜品/到店」等餐饮词被误拦。
@@ -222,11 +254,7 @@ function beatCovered(
   text: string,
   rows?: ShortVideoScriptRow[] | null,
 ): boolean {
-  if (beat === 'hook') {
-    if (HOOK_HINTS.test(text) || /开场|进门|进店|门铃/.test(text)) return true
-    if (rows && rows.length >= 2 && rowCorpus(rows[0]).length >= 4) return true
-    return false
-  }
+  if (beat === 'hook') return hasHookSignal(text, rows)
   if (beat === 'product') {
     if (PRODUCT_HINTS.test(text)) return true
     if (rows && rows.length >= 2) {
@@ -241,7 +269,9 @@ function beatCovered(
     const last = rowCorpus(rows[rows.length - 1])
     if (CTA_HINTS.test(last)) return true
     // 末段祈使/邀请/收束语气
-    if (/来|试试|帮你|就用|记住|解锁|搞定|一站|直达|别再|从今天/.test(last)) return true
+    if (/来|试试|帮你|就用|记住|解锁|搞定|一站|直达|别再|从今天|少切|多做/.test(last)) {
+      return true
+    }
     // 三段及以上且末格已填写：位置即收尾位
     if (rows.length >= 3 && last.length >= 8) return true
   }
