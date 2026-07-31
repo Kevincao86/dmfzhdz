@@ -910,7 +910,7 @@ export default function AiImageStudioPage() {
             setSelectedPreviewVariantId(job.id)
           }
         } catch (e) {
-          const msg = e instanceof Error ? e.message : '裁切失败'
+          const msg = mapGenErrorMessage(e instanceof Error ? e.message : '裁切失败')
           channelJobs.forEach((j) => {
             j.status = 'error'
             j.message = msg
