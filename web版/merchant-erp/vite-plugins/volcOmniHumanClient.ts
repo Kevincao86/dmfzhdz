@@ -146,7 +146,9 @@ function unwrapVolcResult(j: Record<string, unknown>): {
       : result && typeof result === 'object'
         ? result
         : {}
-  const code = result?.code ?? result?.status ?? j.code
+  const codeRaw = result?.code ?? result?.status ?? j.code
+  const code =
+    typeof codeRaw === 'string' || typeof codeRaw === 'number' ? codeRaw : undefined
   const message =
     (typeof result?.message === 'string' && result.message) ||
     (typeof j.message === 'string' && j.message) ||
