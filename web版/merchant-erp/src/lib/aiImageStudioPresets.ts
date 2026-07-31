@@ -205,7 +205,12 @@ export const PLATFORM_SERIES_CHANNELS: PublishChannelId[] = ['douyin', 'kuaishou
 
 export const PLATFORM_SERIES_SLOT_COUNT = 5
 
-/** 各平台门店头图轮播「单张」像素（装修规范汇总，用于五连图裁切） */
+/**
+ * 各平台门店头图轮播「单张」像素（公网装修规范汇总，用于五连图裁切）。
+ * - 美团大图轮播：须 >750×400 且长宽比 15:8（设计导航/商家装修常见标准）
+ * - 抖音来客门店投图：培训材料建议 1125×480（与美团宽度不同）
+ * - 快手本地：业界常用 16:9 海报轮播 750×422
+ */
 export type PlatformCarouselFiveSpec = {
   channelId: PublishChannelId
   slideWidth: number
@@ -221,14 +226,14 @@ export const PLATFORM_CAROUSEL_FIVE_SPECS: Record<
   meituan: {
     channelId: 'meituan',
     slideWidth: 750,
-    slideHeight: 420,
-    specNote: '美团/点评轮播单张 750×420（≈16:9），≤3MB',
+    slideHeight: 400,
+    specNote: '美团大图轮播单张 750×400（15:8）',
   },
   douyin: {
     channelId: 'douyin',
-    slideWidth: 750,
-    slideHeight: 422,
-    specNote: '抖音来客店铺入口/海报轮播 750×422',
+    slideWidth: 1125,
+    slideHeight: 480,
+    specNote: '抖音来客门店投图/头图轮播单张 1125×480',
   },
   kuaishou: {
     channelId: 'kuaishou',
@@ -245,26 +250,35 @@ export function resolvePlatformCarouselFiveSpec(channelId: PublishChannelId): Pl
   return PLATFORM_CAROUSEL_FIVE_SPECS.meituan
 }
 
-/** 五连图：先出一张超宽主图（API 宽 768–4096），再按单张宽度裁 5 份并缩放到平台尺寸 */
+/** 五连图：先出一张「单张宽×5」超宽主图（API 边长 768–4096），再等宽等高裁成 5 张并缩放到平台尺寸 */
 export function platformCarouselMasterGenSize(channelId: PublishChannelId): {
   wanxSize: string
   pixelHint: string
   slideSpec: PlatformCarouselFiveSpec
+  /** 主图目标宽高比（用于 Prompt，勿用 16:9） */
+  masterAspectLabel: string
 } {
   const slideSpec = resolvePlatformCarouselFiveSpec(channelId)
   const idealW = slideSpec.slideWidth * PLATFORM_SERIES_SLOT_COUNT
   const idealH = slideSpec.slideHeight
   const ratio = idealW / idealH
-  let h = Math.max(768, Math.min(4096, idealH))
-  let w = Math.round(h * ratio)
-  if (w > 4096) {
-    w = 4096
+  // 优先贴齐「宽=5×单张宽」的比例；受万相边长上限约束时等比缩小
+  let w = Math.min(4096, Math.max(768, idealW))
+  let h = Math.round(w / ratio)
+  if (h < 768) {
+    h = 768
+    w = Math.min(4096, Math.round(h * ratio))
     h = Math.max(768, Math.round(w / ratio))
+  }
+  if (h > 4096) {
+    h = 4096
+    w = Math.min(4096, Math.round(h * ratio))
   }
   return {
     wanxSize: `${w}*${h}`,
-    pixelHint: `${idealW}×${idealH}（裁切后 ${slideSpec.slideWidth}×${slideSpec.slideHeight}×5）`,
+    pixelHint: `${w}×${h} → 等分裁 ${slideSpec.slideWidth}×${slideSpec.slideHeight}×5`,
     slideSpec,
+    masterAspectLabel: `${PLATFORM_SERIES_SLOT_COUNT}×(${slideSpec.slideWidth}:${slideSpec.slideHeight})`,
   }
 }
 
@@ -279,11 +293,12 @@ export function buildCarouselFiveMasterPromptExtra(
   const spec = resolvePlatformCarouselFiveSpec(channelId)
   const ch = resolveChannel(channelId)
   const labels = CAROUSEL_FIVE_SLOTS.map((s) => s.label).join(' → ')
+  const masterW = spec.slideWidth * PLATFORM_SERIES_SLOT_COUNT
   return [
-    `【五连图整幅超宽横幅】投放 ${ch.label}，从左到右均分 5 个板块：${labels}。`,
-    '整幅为一张连续横图：背景渐变、光效、装饰线、字体与配色须全幅统一，板块之间可横滑无缝衔接，禁止每段独立换风格或换背景。',
+    `【五连图整幅超宽横幅 · ${ch.label}】先生成 1 张完整横版大图（目标约 ${masterW}×${spec.slideHeight}），从左到右均分 5 个等宽等高板块：${labels}。`,
+    '整幅必须是一张连续横图（不是 5 张拼贴的拼接痕迹）：背景渐变、光效、装饰线、字体与配色全幅统一，板块等宽等高、可横滑无缝衔接；禁止每段独立换风格或换背景。',
     ...CAROUSEL_FIVE_SLOTS.map((s, i) => `第 ${i + 1} 段（${s.label}）：${s.prompt.replace(/^五连图第\d+张[^：:]*[：:]/, '')}`),
-    `生成后将按单张宽度 ${spec.slideWidth}px 裁成 5 张 ${spec.slideWidth}×${spec.slideHeight} 上传门店头图轮播。`,
+    `后处理将把整幅图等宽裁成 5 张，再缩放到平台单张 ${spec.slideWidth}×${spec.slideHeight}（${spec.specNote}）上传门店头图轮播。`,
   ]
 }
 
@@ -359,7 +374,7 @@ export const PUBLISH_CHANNELS: Array<{
     primarySizeId: 'moments_vertical',
     carouselSizeId: 'landscape',
     detailSizeId: 'a4_portrait',
-    publishTips: ['竖屏 9:16', '主标题 6 字内更易读', '留底部安全区放团购入口', '五连图单张 750×422'],
+    publishTips: ['竖屏 9:16', '主标题 6 字内更易读', '留底部安全区放团购入口', '五连图单张 1125×480'],
   },
   {
     id: 'xiaohongshu',
@@ -386,7 +401,7 @@ export const PUBLISH_CHANNELS: Array<{
     primarySizeId: 'square',
     carouselSizeId: 'landscape',
     detailSizeId: 'a4_portrait',
-    publishTips: ['团购主图偏 1:1', '突出套餐组合与到手价', '避免过多小字', '五连图单张 750×420'],
+    publishTips: ['团购主图偏 1:1', '突出套餐组合与到手价', '避免过多小字', '五连图单张 750×400（15:8）'],
   },
   {
     id: 'kuaishou',
@@ -2350,8 +2365,8 @@ export function resolvePlaybookSizeDisplay(
     const s = master.slideSpec
     return {
       label: '五连图',
-      pixelHint: `主图 ${master.pixelHint} → 单张 ${s.slideWidth}×${s.slideHeight}`,
-      aspectRatio: `${PLATFORM_SERIES_SLOT_COUNT}×16:9`,
+      pixelHint: `整幅横图再等分 · ${master.pixelHint}`,
+      aspectRatio: master.masterAspectLabel,
     }
   }
   const sizeId = resolvePlaybookSizePresetId(channelId, playbookId)

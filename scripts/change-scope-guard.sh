@@ -170,6 +170,7 @@ PAT
       cat <<'PAT'
 AiImageStudioPage
 aiImageStudio
+aiImageDelivery
 visualStudio
 visual_studio
 addon_visual_studio

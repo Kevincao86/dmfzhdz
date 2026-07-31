@@ -66,27 +66,59 @@ export function triggerBlobDownload(blob: Blob, filename: string) {
   URL.revokeObjectURL(url)
 }
 
+/**
+ * 五连图裁切：整幅横图先按「5×单张」比例居中裁准，再等宽等高切成 N 张，
+ * 最后缩放到平台单张像素（抖音/美团单张宽高不同）。
+ */
 export async function sliceCarouselFiveStrips(
   blob: Blob,
   spec: { slideWidth: number; slideHeight: number; slotCount?: number },
 ): Promise<Blob[]> {
-  const slotCount = spec.slotCount ?? 5
+  const slotCount = Math.max(1, Math.floor(spec.slotCount ?? 5))
+  const slideW = Math.max(1, Math.floor(spec.slideWidth))
+  const slideH = Math.max(1, Math.floor(spec.slideHeight))
   const bitmap = await createImageBitmap(blob)
   const srcW = bitmap.width
   const srcH = bitmap.height
-  const strips: Blob[] = []
+  if (srcW < slotCount || srcH < 1) {
+    bitmap.close()
+    throw new Error('主图尺寸过小，无法等分裁切')
+  }
 
+  const targetAspect = (slideW * slotCount) / slideH
+  const srcAspect = srcW / srcH
+  let cropW: number
+  let cropH: number
+  let cropX: number
+  let cropY: number
+  if (srcAspect > targetAspect) {
+    cropH = srcH
+    cropW = Math.max(slotCount, Math.round(srcH * targetAspect))
+    cropX = Math.floor((srcW - cropW) / 2)
+    cropY = 0
+  } else {
+    cropW = srcW
+    cropH = Math.max(1, Math.round(srcW / targetAspect))
+    cropX = 0
+    cropY = Math.floor((srcH - cropH) / 2)
+  }
+
+  const strips: Blob[] = []
   for (let i = 0; i < slotCount; i++) {
-    const sx = Math.floor((i * srcW) / slotCount)
-    const ex = Math.floor(((i + 1) * srcW) / slotCount)
+    const sx = cropX + Math.floor((i * cropW) / slotCount)
+    const ex = cropX + Math.floor(((i + 1) * cropW) / slotCount)
     const sw = Math.max(1, ex - sx)
+    const sh = cropH
 
     const canvas = document.createElement('canvas')
-    canvas.width = spec.slideWidth
-    canvas.height = spec.slideHeight
+    canvas.width = slideW
+    canvas.height = slideH
     const ctx = canvas.getContext('2d')
-    if (!ctx) throw new Error('Canvas 不可用')
-    ctx.drawImage(bitmap, sx, 0, sw, srcH, 0, 0, spec.slideWidth, spec.slideHeight)
+    if (!ctx) {
+      bitmap.close()
+      throw new Error('Canvas 不可用')
+    }
+    ctx.drawImage(bitmap, sx, cropY, sw, sh, 0, 0, slideW, slideH)
 
     strips.push(
       await new Promise<Blob>((resolve, reject) => {
