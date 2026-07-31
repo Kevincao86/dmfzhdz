@@ -528,7 +528,7 @@ export async function fetchVisualStudioImagePromptFromAi(
     foodBan ? `2b. ${foodBan}` : '',
     '3. 必须体现 headline、offer、subheadline 等文案为画面中的中文大字信息',
     opts?.carouselMaster
-      ? '4. carouselMaster=true：描述一张从左到右连续的超宽横幅，均分 5 段（封面→卖点1→卖点2→套餐→行动），背景与色调全幅无缝衔接，生成后将裁成单张轮播图'
+      ? '4. carouselMaster=true：描述一张从左到右连续的超宽横幅海报，均分 5 格编号 1→2→3→4→5，背景与色调全幅无缝衔接，生成后按从左到右裁成 5 张'
       : '4. 体现 styleHint、compositionVariant、渠道尺寸与 playbook 玩法',
     '5. 若有 productRefCount>0 或 styleFromReference，强调与参考图品类色调一致（非餐饮参考图不得被理解成菜品）',
     form.referenceKeywords.trim()
