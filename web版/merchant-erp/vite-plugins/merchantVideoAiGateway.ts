@@ -69,6 +69,12 @@ import {
 } from '../src/lib/arkVideoContentPayload.js'
 import { applyRegistryVideoAiToMerchantEnv } from './registryVideoAiEnvMerge.js'
 import {
+  isOmniHumanConfigured,
+  isOmniHumanTaskId,
+  volcGetOmniHumanTaskOnce,
+  volcSubmitOmniHumanTask,
+} from './volcOmniHumanClient.js'
+import {
   anyLongformPlannerConfigured,
   longformPlannerModelIds,
   longformPlannerVendorAvailability,
@@ -1084,6 +1090,63 @@ async function ensurePublicHttpsMediaUrl(
   }
 }
 
+/** 数字人口播：火山 OmniHuman（图+音频，原生口型） */
+async function volcPostOmniHumanVideoTask(
+  env: MerchantAiEnv,
+  body: Record<string, unknown>,
+  viteRoot?: string,
+): Promise<{ ok: false; msg: string } | { ok: true; taskId: string; modelUsed: string }> {
+  if (!isOmniHumanConfigured(env)) {
+    return {
+      ok: false,
+      msg:
+        '未配置火山智能视觉 AK/SK（OmniHuman）。请在轻量 ~/stack/auth-api.env 写入 MERCHANT_AI_VOLC_ACCESS_KEY 与 MERCHANT_AI_VOLC_SECRET_KEY 后重启 meoo-auth-api。',
+    }
+  }
+  const imageRaw =
+    (typeof body.image_base64 === 'string' && body.image_base64.trim()) ||
+    (Array.isArray(body.images_base64) &&
+      typeof body.images_base64[0] === 'string' &&
+      body.images_base64[0].trim()) ||
+    (typeof body.image_url === 'string' && body.image_url.trim()) ||
+    ''
+  const audioRaw =
+    (typeof body.audio_base64 === 'string' && body.audio_base64.trim()) ||
+    (typeof body.audio_url === 'string' && body.audio_url.trim()) ||
+    ''
+  if (!imageRaw) {
+    return { ok: false, msg: 'OmniHuman 缺少人像/场景参考图' }
+  }
+  if (!audioRaw) {
+    return { ok: false, msg: 'OmniHuman 缺少口播音频' }
+  }
+  const imageUrl = await ensurePublicHttpsMediaUrl(viteRoot, env, imageRaw, 'image')
+  if (!imageUrl) {
+    return {
+      ok: false,
+      msg: '人像/场景图无法上传为公网 URL（需 OSS/ICE 源站）。请检查阿里云 OSS 配置后重试。',
+    }
+  }
+  const audioUrl = await ensurePublicHttpsMediaUrl(viteRoot, env, audioRaw, 'audio')
+  if (!audioUrl) {
+    return {
+      ok: false,
+      msg: '口播音频无法上传为公网 URL（需 OSS/ICE 源站）。请检查阿里云 OSS 配置后重试。',
+    }
+  }
+  const prompt = typeof body.prompt === 'string' ? body.prompt : undefined
+  const peFast =
+    body.pe_fast_mode === true || String(body.pe_fast_mode ?? '').trim() === 'true'
+  const submitted = await volcSubmitOmniHumanTask(env, {
+    imageUrl,
+    audioUrl,
+    prompt,
+    peFastMode: peFast,
+  })
+  if (!submitted.ok) return { ok: false, msg: submitted.message }
+  return { ok: true, taskId: submitted.taskId, modelUsed: submitted.reqKey }
+}
+
 async function qwenPostS2vVideoTask(
   env: MerchantAiEnv,
   body: Record<string, unknown>,
@@ -1878,6 +1941,7 @@ export async function handleMerchantAiVideoRoutes(input: {
     const plannerVendors = longformPlannerVendorAvailability(env)
     json(res, 200, {
       klingConfigured: kCfg.ok,
+      omnihumanConfigured: isOmniHumanConfigured(env),
       arkVideoModels: arkOpts,
       arkDiscoveredVideoModels,
       arkKeyConfigured: arkKeyOk,
@@ -2747,6 +2811,32 @@ export async function handleMerchantAiVideoRoutes(input: {
       json(res, 400, { ok: false, message: '请求体必须为 JSON。' })
       return true
     }
+    if (String(parsed.pipeline ?? '').trim() === 'omnihuman') {
+      const oh = await volcPostOmniHumanVideoTask(env, parsed, input.viteRoot)
+      if (oh.ok === true) {
+        voidRecordVideoAiUsage(
+          input.req,
+          rawEnv,
+          parsed,
+          'volc_omnihuman',
+          oh.modelUsed,
+          estimateVideoGenerationTokens({
+            durationSec: 15,
+            promptChars: String(parsed.prompt ?? '').length,
+          }),
+        )
+        json(res, 200, {
+          ok: true,
+          taskId: oh.taskId,
+          provider: 'volc_omnihuman',
+          modelUsed: oh.modelUsed,
+          pipeline: 'omnihuman',
+        })
+        return true
+      }
+      json(res, 400, { ok: false, message: oh.msg })
+      return true
+    }
     if (String(parsed.pipeline ?? '').trim() === 'wan_s2v') {
       const s2v = await qwenPostS2vVideoTask(env, parsed, input.viteRoot)
       if (s2v.ok === true) {
@@ -2809,6 +2899,17 @@ export async function handleMerchantAiVideoRoutes(input: {
     if (!taskIdSd) {
       json(res, 400, { ok: false, message: '缺少 query taskId。' })
       return true
+    }
+    if (isOmniHumanTaskId(taskIdSd)) {
+      try {
+        const state = await volcGetOmniHumanTaskOnce(env, taskIdSd)
+        json(res, 200, { ok: true, provider: 'volc_omnihuman', ...state })
+        return true
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        json(res, 502, { ok: false, message: msg })
+        return true
+      }
     }
     if (isQwenVideoTaskId(taskIdSd)) {
       const qk = qwenBearerKey(env)
