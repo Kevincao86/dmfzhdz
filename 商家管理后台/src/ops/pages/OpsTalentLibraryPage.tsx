@@ -4,9 +4,11 @@ import { Eye } from 'lucide-react'
 import { cn } from '../../cn'
 import { listMembershipPlanVersions, resolvePlanVersionLabel } from '../../meooRegistryShared/mpMembershipCatalog'
 import type { MpMembershipPlanVersion } from '../../meooRegistryShared/mpMembershipCatalog'
+import { fetchOpsErpApi } from '../../lib/opsErpApiBase'
 import {
   deleteMpLibraryEntries,
   fetchRegistry,
+  type RegistryFile,
   type RegistryTalentLibraryEntry,
 } from '../opsRegistryApi'
 import OpsPageHero from '../OpsPageHero'
@@ -53,6 +55,32 @@ function stableTalentSortKey(e: RegistryTalentLibraryEntry): string {
   return e.lingqiTalentId || e.platformAccount || e.id
 }
 
+/**
+ * 达人库必须读全量注册表。
+ * `/api/meoo-ops-sync-registry` 已挂商家裁剪 handler，匿名会清空 talentLibraryEntries（HTTP 200），
+ * 旧 fetchRegistry 优先打该路径时运营台会「假成功、列表空」。
+ */
+async function fetchTalentLibraryRegistry(): Promise<RegistryFile> {
+  const res = await fetchOpsErpApi('/api/ops-sync/registry', { method: 'GET' })
+  const text = await res.text()
+  if (res.ok) {
+    try {
+      const file = JSON.parse(text) as RegistryFile
+      if (Array.isArray(file.talentLibraryEntries)) return file
+    } catch {
+      /* fall through */
+    }
+  }
+  const fallback = await fetchRegistry()
+  const n = fallback.talentLibraryEntries?.length ?? 0
+  if (n > 0) return fallback
+  throw new Error(
+    res.ok
+      ? '达人库快照为空：请确认已走 /api/ops-sync/registry（勿用商家裁剪版 meoo-ops-sync-registry）'
+      : `达人库注册表 HTTP ${res.status}`,
+  )
+}
+
 export default function OpsTalentLibraryPage() {
   const session = readOpsSession()
   const staffScope = sessionDataScope(session)
@@ -62,6 +90,7 @@ export default function OpsTalentLibraryPage() {
   const [members, setMembers] = useState<RegistryMpTalentMember[]>([])
   const [mpOrders, setMpOrders] = useState<RegistryMpRecruitmentOrder[]>([])
   const [planVersions, setPlanVersions] = useState<MpMembershipPlanVersion[]>([])
+  const [loadError, setLoadError] = useState('')
   const [q, setQ] = useState('')
   const [genderFilter, setGenderFilter] = useState('全部')
   const [followerFilters, setFollowerFilters] = useState<string[]>([])
@@ -77,15 +106,17 @@ export default function OpsTalentLibraryPage() {
 
   const load = useCallback(async () => {
     try {
-      const r = await fetchRegistry()
+      const r = await fetchTalentLibraryRegistry()
       const membersList = r.mpTalentMembers ?? []
       const enriched = (r.talentLibraryEntries ?? []).map((e) => enrichTalentLibraryEntry(e, membersList))
       setMembers(membersList)
       setMpOrders(r.mpRecruitmentOrders ?? [])
       setEntries(enriched)
       setPlanVersions(listMembershipPlanVersions(r, 'talent'))
-    } catch {
+      setLoadError('')
+    } catch (e) {
       setEntries([])
+      setLoadError(e instanceof Error ? e.message : '达人库加载失败')
     }
   }, [])
 
@@ -187,6 +218,12 @@ export default function OpsTalentLibraryPage() {
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
       <OpsPageHero heroKey="talent-library" />
+
+      {loadError ? (
+        <div className="rounded-lg border border-rose-500/40 bg-rose-950/30 px-3 py-2 text-xs text-rose-200">
+          {loadError}
+        </div>
+      ) : null}
 
       {staffScope.mode !== 'national' ? (
         <div className="rounded-lg border border-amber-500/30 bg-amber-950/20 px-3 py-2 text-xs text-amber-200">
