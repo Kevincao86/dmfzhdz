@@ -1,4 +1,7 @@
 (() => {
+  const reducePageMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const finePointer = window.matchMedia("(pointer: fine)").matches;
+
   const yearEl = document.getElementById("year");
   if (yearEl) yearEl.textContent = String(new Date().getFullYear());
 
@@ -9,6 +12,121 @@
   };
   onScroll();
   window.addEventListener("scroll", onScroll, { passive: true });
+
+  /* —— Page ambient FX（不动 Live Mesh 底栏） —— */
+  const pageFx = document.getElementById("page-fx");
+  const cursorOrb = document.getElementById("cursor-orb");
+
+  if (pageFx instanceof HTMLCanvasElement && !reducePageMotion) {
+    const ctx = pageFx.getContext("2d");
+    let w = 0;
+    let h = 0;
+    let sparks = [];
+
+    const resize = () => {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      w = window.innerWidth;
+      h = window.innerHeight;
+      pageFx.width = Math.floor(w * dpr);
+      pageFx.height = Math.floor(h * dpr);
+      pageFx.style.width = `${w}px`;
+      pageFx.style.height = `${h}px`;
+      if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const count = Math.min(56, Math.floor((w * h) / 32000));
+      sparks = Array.from({ length: count }, () => ({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        r: 0.5 + Math.random() * 1.6,
+        vx: (Math.random() - 0.5) * 0.25,
+        vy: -0.1 - Math.random() * 0.28,
+        a: 0.12 + Math.random() * 0.4,
+        hue: Math.random() > 0.5 ? "violet" : "cyan",
+      }));
+    };
+    resize();
+    window.addEventListener("resize", resize);
+
+    const tick = (now) => {
+      if (!ctx) return;
+      ctx.clearRect(0, 0, w, h);
+      for (const s of sparks) {
+        s.x += s.vx;
+        s.y += s.vy;
+        if (s.y < -10) s.y = h + 10;
+        if (s.x < -10) s.x = w + 10;
+        if (s.x > w + 10) s.x = -10;
+        const alpha = s.a * (0.5 + 0.5 * Math.sin(now * 0.002 + s.x * 0.01));
+        ctx.beginPath();
+        ctx.fillStyle =
+          s.hue === "cyan" ? `rgba(103,232,249,${alpha})` : `rgba(167,139,250,${alpha})`;
+        ctx.shadowColor = s.hue === "cyan" ? "rgba(103,232,249,0.7)" : "rgba(167,139,250,0.7)";
+        ctx.shadowBlur = 7;
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.shadowBlur = 0;
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
+  if (cursorOrb && finePointer && !reducePageMotion) {
+    document.body.classList.add("has-cursor-orb");
+    window.addEventListener(
+      "pointermove",
+      (e) => {
+        cursorOrb.style.left = `${e.clientX}px`;
+        cursorOrb.style.top = `${e.clientY}px`;
+      },
+      { passive: true }
+    );
+  }
+
+  document
+    .querySelectorAll(".block-intro, .bento-cell, .engine-card, .service-strips > li, .steps > li, .banner, .talk-quote, .talk-form")
+    .forEach((el) => el.classList.add("reveal"));
+
+  const reveals = document.querySelectorAll(".reveal");
+  if ("IntersectionObserver" in window) {
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("in-view");
+            io.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.14, rootMargin: "0px 0px -6% 0px" }
+    );
+    reveals.forEach((el) => io.observe(el));
+  } else {
+    reveals.forEach((el) => el.classList.add("in-view"));
+  }
+
+  if (!reducePageMotion && finePointer) {
+    document.querySelectorAll(".btn, .pill-cta, .bento-cell").forEach((el) => {
+      el.addEventListener(
+        "pointermove",
+        (e) => {
+          const rect = el.getBoundingClientRect();
+          el.style.setProperty("--mx", `${e.clientX - rect.left}px`);
+          el.style.setProperty("--my", `${e.clientY - rect.top}px`);
+          if (el.classList.contains("btn") || el.classList.contains("pill-cta")) {
+            const x = e.clientX - rect.left - rect.width / 2;
+            const y = e.clientY - rect.top - rect.height / 2;
+            el.style.transform = `translate(${x * 0.1}px, ${y * 0.14}px)`;
+          }
+        },
+        { passive: true }
+      );
+      el.addEventListener("pointerleave", () => {
+        if (el.classList.contains("btn") || el.classList.contains("pill-cta")) {
+          el.style.transform = "";
+        }
+      });
+    });
+  }
 
   /* —— Contact form —— */
   const form = document.getElementById("contact-form");
