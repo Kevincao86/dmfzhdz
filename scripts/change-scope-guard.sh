@@ -704,6 +704,8 @@ meoo-merchant-orders
 douyinMerchantGateway
 merchant_platform_orders_poi
 ecs-auth-api-server
+erpAiPointsSpendCore
+erpAiApiPointsGate
 change-scope-guard
 PAT
       ;;
