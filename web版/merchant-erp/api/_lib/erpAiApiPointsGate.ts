@@ -41,7 +41,7 @@ export async function requireErpAiPointsAffordable(
   authHeader: string | undefined,
   kind: ErpAiUsageKind,
   env: Record<string, string>,
-  opts?: { durationSec?: number; tenantIdHint?: string },
+  opts?: { durationSec?: number; pointsOverride?: number; tenantIdHint?: string },
 ): Promise<ErpAiApiPointsGateOk | ErpAiApiPointsGateFail> {
   const user = await verifyBearerJwt(authHeader, env)
   if (!user) {
@@ -70,6 +70,7 @@ export async function requireErpAiPointsAffordable(
   const admin = createClient(base, serviceRole, nodeSupabaseClientOptions())
   const result = await assertErpAiPointsAffordable(admin, ctx.tenantId, kind, {
     durationSec: opts?.durationSec,
+    pointsOverride: opts?.pointsOverride,
   })
   if (!result.ok) {
     return {
@@ -91,6 +92,7 @@ export async function chargeErpAiPointsAfterSuccess(
   env: Record<string, string>,
   opts?: {
     durationSec?: number
+    pointsOverride?: number
     tenantIdHint?: string
     idempotencyKey?: string
     note?: string
@@ -115,6 +117,7 @@ export async function chargeErpAiPointsAfterSuccess(
   const result = await spendErpAiPoints(admin, tenantId, {
     kind,
     durationSec: opts?.durationSec,
+    pointsOverride: opts?.pointsOverride,
     idempotencyKey: opts?.idempotencyKey,
     note: opts?.note,
   })
@@ -163,13 +166,15 @@ export async function runErpAiWithPointsBilling<T extends { ok: boolean }>(
   authHeader: string | undefined,
   kind: ErpAiUsageKind,
   env: Record<string, string>,
-  opts: { note: string; idempotencyKey?: string },
+  opts: { note: string; idempotencyKey?: string; pointsOverride?: number },
   run: () => Promise<T>,
 ): Promise<
   | { blocked: true; status: number; error: string; message: string; required?: number; balance?: number }
   | { blocked: false; result: T & { pointsCharged?: number; pointsBalance?: number } }
 > {
-  const gate = await requireErpAiPointsAffordable(authHeader, kind, env)
+  const gate = await requireErpAiPointsAffordable(authHeader, kind, env, {
+    pointsOverride: opts.pointsOverride,
+  })
   if (!gate.ok) {
     return {
       blocked: true,
@@ -186,6 +191,7 @@ export async function runErpAiWithPointsBilling<T extends { ok: boolean }>(
   }
   const charge = await chargeErpAiPointsAfterSuccess(authHeader, kind, env, {
     tenantId: gate.tenantId,
+    pointsOverride: opts.pointsOverride,
     idempotencyKey:
       opts.idempotencyKey ||
       `${kind}:${gate.userId}:${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,

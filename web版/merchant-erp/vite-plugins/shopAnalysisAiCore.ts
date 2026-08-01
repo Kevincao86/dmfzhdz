@@ -10,6 +10,18 @@ import {
   merchantChatTextWithVendorFailover,
   type MerchantAiEnv,
 } from './merchantAiUpstream.js'
+import { MP_RECHARGE_POINTS_PER_YUAN } from '../src/lib/mpPointsEconomics.js'
+
+/**
+ * 按区间「估算毛利」计费（再套 60% 毛利积分模型：¥1 实付 ≈ 40 积分）。
+ * 服务费(元) = 毛利 × 万分之 0.2，夹在 ¥0.375～¥3 → 15～120 积分；毛利为 0 时按 GPT 文本档 25 积分。
+ */
+export function shopAnalysisAiPointsFromGross(estimatedGrossYuan: number): number {
+  const gross = Math.max(0, Number(estimatedGrossYuan) || 0)
+  if (gross <= 0) return 25
+  const feeYuan = Math.min(3, Math.max(0.375, gross * 0.00002))
+  return Math.max(15, Math.min(120, Math.ceil(feeYuan * MP_RECHARGE_POINTS_PER_YUAN)))
+}
 
 /** GPT 优先，国内文案模型兜底 */
 export const SHOP_ANALYSIS_AI_VENDOR_ORDER = ['openai', 'qwen', 'doubao'] as const
@@ -186,22 +198,41 @@ export function formatReviewDigestForPrompt(d: ShopReviewDigest): string {
     .join('\n')
 }
 
+/** 仅按「一、…八、」一级标题切分；避免把节内 1.xxx / ### 小标题拆成空卡片 */
 export function parseShopAiReportSections(text: string): ShopAiReportSection[] {
   const raw = (text || '').trim()
   if (!raw) return []
-  const parts = raw.split(/\n(?=(?:#{1,3}\s+|[一二三四五六七八]、|[1-5]\.\s))/)
-  const sections = parts
-    .map((block) => {
-      const lines = block.trim().split('\n')
-      let title = (lines[0] || '').replace(/^#{1,3}\s+/, '').replace(/^\d+\.\s+/, '').trim()
-      const bodyLines = lines
-        .slice(1)
-        .map((l) => l.replace(/^[-*·•]\s*/, '').replace(/^\d+[\.、]\s*/, '').trim())
+  const parts = raw.split(/\n(?=(?:#{1,3}\s*)?[一二三四五六七八]、)/)
+  const sections: ShopAiReportSection[] = []
+  for (const block of parts) {
+    const lines = block.trim().split('\n')
+    if (!lines.length) continue
+    const title = (lines[0] || '')
+      .replace(/^#{1,3}\s*/, '')
+      .replace(/^【|】$/g, '')
+      .trim()
+    if (!/^[一二三四五六七八]、/.test(title)) {
+      // 游离小标题（如「优先动作」）：并入上一节，避免空卡
+      if (!sections.length) continue
+      const extra = lines
+        .map((l) => l.replace(/^#{1,3}\s*/, '').replace(/^[-*·•]\s*/, '').trim())
         .filter(Boolean)
-      return { title, body: bodyLines.join('\n'), bullets: bodyLines }
-    })
-    .filter((x) => x.title)
-  if (sections.length) return sections
+      if (!extra.length) continue
+      const prev = sections[sections.length - 1]
+      prev.bullets.push(...extra)
+      prev.body = [...prev.bullets].join('\n')
+      continue
+    }
+    const bodyLines = lines
+      .slice(1)
+      .map((l) => l.replace(/^[-*·•]\s*/, '').trim())
+      .filter((l) => Boolean(l) && !/^#{1,3}\s/.test(l))
+      .map((l) => l.replace(/^#{1,3}\s*/, '').trim())
+      .filter(Boolean)
+    sections.push({ title, body: bodyLines.join('\n'), bullets: bodyLines })
+  }
+  const nonEmpty = sections.filter((x) => x.bullets.length > 0 || x.body.trim())
+  if (nonEmpty.length) return nonEmpty
   return [{ title: '经营分析报告', body: raw, bullets: raw.split('\n').map((l) => l.trim()).filter(Boolean) }]
 }
 
@@ -210,13 +241,13 @@ function buildSystemPrompt(): string {
     '你是资深本地生活（抖音来客）店铺经营顾问，擅长团购成交、退款履约、客群运营与评价口碑诊断。',
     '请基于用户提供的【数据事实】撰写完整中文经营分析报告，要求专业、具体、可执行，禁止编造未给出的数字。',
     '客群新老客为灵祺根据订单 open_id 推算，并非抖音官方用户标签；文中须点明这一点。',
-    '输出必须使用以下五个一级标题（可带序号），每节 3～6 条要点，用「· 」开头：',
+    '输出必须且只能使用以下五个一级标题（格式严格为「一、标题」），禁止再增加「优先动作」「小结」等其它标题或 Markdown ### 小标题：',
     '一、经营总览',
     '二、客群洞察',
     '三、商品与退款',
     '四、评价口碑',
     '五、行动建议',
-    '第五节须给出未来 7～14 天可落地的优先动作（含负责人视角：运营/门店/客服）。',
+    '每节 3～6 条要点，用「· 」开头。第五节内直接写清未来 7～14 天优先动作及负责人（运营/门店/客服），不要单独开第六节。',
   ].join('\n')
 }
 

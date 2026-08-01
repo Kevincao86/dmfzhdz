@@ -14,6 +14,7 @@ import {
   buildShopReviewDigest,
   generateShopAnalysisAiReport,
   parseShopAiReportSections,
+  shopAnalysisAiPointsFromGross,
 } from '../vite-plugins/shopAnalysisAiCore.js'
 import { mergeMerchantAiEnvWithRegistrySnapshot } from '../vite-plugins/merchantRegistryVendorEnv.js'
 import type { MerchantAiEnv } from '../vite-plugins/merchantAiUpstream.js'
@@ -147,9 +148,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       ? summary.stores.find((s) => s.poiId === poiId)?.poiName || poiId
       : '全部门店'
     const warnings: string[] = []
-    if (!reviewDigest.ok) warnings.push(reviewDigest.message || '评价拉取失败')
-    else if (reviewDigest.warning) warnings.push(reviewDigest.warning)
-    warnings.push('客群新老客为灵祺根据订单 open_id 推算，抖音订单接口不提供官方用户标签。')
+    const pointsOverride = shopAnalysisAiPointsFromGross(summary.estimatedGrossYuan)
 
     const aiEnv = await mergeMerchantAiEnvWithRegistrySnapshot(viteRoot, env as MerchantAiEnv)
     const authHeader = req.headers.authorization
@@ -157,7 +156,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       typeof authHeader === 'string' ? authHeader : undefined,
       'ops_plan',
       env,
-      { note: '店铺分析 GPT 报告' },
+      {
+        note: `店铺分析 GPT（按估算毛利 ¥${summary.estimatedGrossYuan}）`,
+        pointsOverride,
+      },
       async () => {
         const ai = await generateShopAnalysisAiReport({
           env: aiEnv,

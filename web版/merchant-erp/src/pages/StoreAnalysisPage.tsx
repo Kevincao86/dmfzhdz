@@ -8,7 +8,6 @@ import {
   Store,
   TrendingUp,
   Users,
-  AlertTriangle,
   Copy,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -131,7 +130,6 @@ export default function StoreAnalysisPage() {
   const [syncing, setSyncing] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
   const [err, setErr] = useState('')
-  const [warnings, setWarnings] = useState<string[]>([])
   const [summary, setSummary] = useState<ShopAnalysisSummary | null>(null)
   const [advice, setAdvice] = useState('')
   const [aiSections, setAiSections] = useState<ShopAiReportSection[]>([])
@@ -197,11 +195,10 @@ export default function StoreAnalysisPage() {
     setSyncing(true)
     setErr('')
     try {
-      const s = await syncMerchantOrders({ startDate, endDate })
-      setWarnings(s.warnings || [])
+      await syncMerchantOrders({ startDate, endDate })
       await loadCharts()
     } catch (e) {
-      setWarnings([e instanceof Error ? e.message : '同步失败（仍展示已落库数据）'])
+      setErr(e instanceof Error ? e.message : '同步失败（仍展示已落库数据）')
       await loadCharts()
     } finally {
       setSyncing(false)
@@ -221,7 +218,6 @@ export default function StoreAnalysisPage() {
       setSummary(r.summary)
       setReviewDigest(r.reviewDigest)
       setModelUsed(r.modelUsed)
-      if (r.warnings?.length) setWarnings(r.warnings)
       if (r.summary.stores?.length) {
         const named = await mergeStoreNames(r.summary.stores)
         setStoreOptions(named)
@@ -233,7 +229,7 @@ export default function StoreAnalysisPage() {
       } else {
         setAdvice(r.adviceFacts)
         setAiSections([])
-        if (r.message) setWarnings((w) => [...w, r.message!].slice(0, 6))
+        if (r.message) setErr(r.message)
       }
       setShowAdvice(true)
       requestAnimationFrame(() => {
@@ -285,8 +281,8 @@ export default function StoreAnalysisPage() {
   }, [summary])
 
   const sections = useMemo(() => {
-    if (aiSections.length) return aiSections
-    return adviceSections(advice)
+    const raw = aiSections.length ? aiSections : adviceSections(advice)
+    return raw.filter((s) => (s.bullets?.length ?? 0) > 0 || (s.body || '').trim())
   }, [aiSections, advice])
 
   return (
@@ -369,13 +365,6 @@ export default function StoreAnalysisPage() {
       {err ? (
         <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{err}</div>
       ) : null}
-      {warnings.length ? (
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-          {warnings.slice(0, 4).map((w) => (
-            <p key={w}>{w}</p>
-          ))}
-        </div>
-      ) : null}
 
       {!summary && loading ? (
         <div className="flex items-center gap-2 text-sm text-slate-500">
@@ -385,16 +374,6 @@ export default function StoreAnalysisPage() {
 
       {summary ? (
         <div className="space-y-6">
-          {summary.guestBasis === 'repurchase' ? (
-            <div className="flex items-start gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <p>
-                库内暂无更早订单对照，新老客按「区间内是否复购」识别：仅买 1 次为新客，买 ≥2 次为老客（与复购率一致）。向前多同步
-                30～60 天后可改为按历史首购判断。
-              </p>
-            </div>
-          ) : null}
-
           <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {[
               { k: '成交额', v: yuan(summary.salesAmountYuan), hint: `${summary.orderCount} 笔订单` },
@@ -560,7 +539,7 @@ export default function StoreAnalysisPage() {
               <Sparkles className="mx-auto h-8 w-8 text-indigo-500" />
               <p className="mt-3 text-sm font-medium text-slate-800">图表已就绪</p>
               <p className="mt-1 text-xs text-slate-500">
-                点击「店铺分析」，用 GPT 结合订单与评价生成完整图文报告（将消耗 AI 积分）
+                点击「店铺分析」，用 GPT 结合订单与评价生成完整图文报告
               </p>
               <button
                 type="button"
@@ -695,10 +674,6 @@ export default function StoreAnalysisPage() {
                     </pre>
                   )}
                 </div>
-                <p className="mt-4 text-xs text-slate-400">
-                  说明：客群新老客由灵祺按订单 open_id 推算（抖音订单接口不提供官方用户标签）；毛利为商家自填比例估算；竞对成交无法从平台
-                  API 获取。
-                </p>
               </div>
             </section>
           )}
