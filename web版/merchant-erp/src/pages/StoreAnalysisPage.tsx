@@ -25,6 +25,7 @@ import {
   YAxis,
 } from 'recharts'
 import { cn } from '../cn'
+import { readMerchantSession } from '../lib/merchantSession'
 import { getDouyinStores } from '../services/douyinMerchantApi'
 import {
   fetchShopAnalysis,
@@ -126,8 +127,10 @@ export default function StoreAnalysisPage() {
 
   const mergeStoreNames = useCallback(async (stores: ShopStoreOption[]): Promise<ShopStoreOption[]> => {
     if (!stores.length || platform !== 'douyin') return stores
+    const accessToken = readMerchantSession('meoo_douyin_merchant_token')
+    if (!accessToken) return stores
     try {
-      const res = await getDouyinStores({ page: 1, pageSize: 100 })
+      const res = await getDouyinStores({ accessToken, page: 1, pageSize: 100 })
       if (!res.ok || !res.items?.length) return stores
       const nameById = new Map(
         res.items.map((row) => [String(row.id || '').trim(), String(row.name || '').trim()]),
