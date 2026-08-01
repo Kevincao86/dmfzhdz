@@ -72,24 +72,69 @@ img {
   inset: 0;
   z-index: 0;
   background:
-    radial-gradient(circle at 70% 20%, rgba(196, 181, 253, 0.35), transparent 35%),
-    radial-gradient(circle at 20% 80%, rgba(124, 58, 237, 0.08), transparent 40%);
+    radial-gradient(circle at 70% 20%, rgba(196, 181, 253, 0.42), transparent 35%),
+    radial-gradient(circle at 20% 80%, rgba(124, 58, 237, 0.14), transparent 40%),
+    radial-gradient(circle at 55% 55%, rgba(103, 232, 249, 0.1), transparent 45%);
+  animation: page-glow-shift 12s ease-in-out infinite alternate;
+}
+
+@keyframes page-glow-shift {
+  to {
+    filter: hue-rotate(12deg) saturate(1.15);
+    transform: scale(1.04);
+  }
 }
 
 .grid-floor {
   pointer-events: none;
   position: fixed;
-  inset: 40% 0 0;
+  inset: 35% 0 0;
   z-index: 0;
-  opacity: 0.35;
+  opacity: 0.42;
   background-image:
-    linear-gradient(rgba(124, 58, 237, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(124, 58, 237, 0.06) 1px, transparent 1px);
+    linear-gradient(rgba(124, 58, 237, 0.09) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124, 58, 237, 0.09) 1px, transparent 1px);
   background-size: 56px 56px;
   mask-image: linear-gradient(180deg, transparent, #000 35%, transparent 95%);
   perspective: 400px;
   transform: rotateX(55deg) scale(1.4);
   transform-origin: center top;
+  animation: floor-scroll 20s linear infinite;
+}
+
+@keyframes floor-scroll {
+  to {
+    background-position: 56px 56px;
+  }
+}
+
+.page-fx {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.85;
+}
+
+.cursor-orb {
+  pointer-events: none;
+  position: fixed;
+  z-index: 40;
+  width: 220px;
+  height: 220px;
+  margin: -110px 0 0 -110px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(167, 139, 250, 0.22), rgba(103, 232, 249, 0.08) 42%, transparent 70%);
+  mix-blend-mode: multiply;
+  opacity: 0;
+  transition: opacity 0.35s;
+  will-change: left, top;
+}
+
+body.has-cursor-orb .cursor-orb {
+  opacity: 1;
 }
 
 main,
@@ -97,6 +142,17 @@ main,
 .foot {
   position: relative;
   z-index: 1;
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.75s var(--ease), transform 0.75s var(--ease);
+}
+
+.reveal.in-view {
+  opacity: 1;
+  transform: none;
 }
 
 /* —— 居中胶囊导航 —— */
@@ -120,16 +176,20 @@ main,
   padding: 0.45rem 0.55rem 0.45rem 0.85rem;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(196, 181, 253, 0.55);
   box-shadow:
-    0 10px 40px rgba(88, 60, 160, 0.1),
+    0 10px 40px rgba(88, 60, 160, 0.12),
+    0 0 24px rgba(167, 139, 250, 0.18),
     0 1px 0 rgba(255, 255, 255, 0.8) inset;
   backdrop-filter: blur(16px);
-  transition: box-shadow 0.3s var(--ease), transform 0.3s var(--ease);
+  transition: box-shadow 0.3s var(--ease), transform 0.3s var(--ease), border-color 0.3s;
 }
 
 .topbar.is-scrolled .pill-nav {
-  box-shadow: 0 14px 48px rgba(88, 60, 160, 0.16);
+  box-shadow:
+    0 16px 52px rgba(88, 60, 160, 0.2),
+    0 0 36px rgba(124, 58, 237, 0.22);
+  border-color: rgba(124, 58, 237, 0.35);
 }
 
 .brand {
@@ -171,6 +231,13 @@ main,
   background: linear-gradient(120deg, var(--violet), #6d28d9);
   color: #fff;
   box-shadow: 0 8px 20px rgba(124, 58, 237, 0.35);
+  animation: cta-glow 2.8s ease-in-out infinite;
+}
+
+@keyframes cta-glow {
+  50% {
+    box-shadow: 0 8px 28px rgba(124, 58, 237, 0.55), 0 0 24px rgba(167, 139, 250, 0.45);
+  }
 }
 
 @media (min-width: 900px) {
@@ -208,13 +275,36 @@ main,
 }
 
 .btn-solid {
+  position: relative;
+  overflow: hidden;
   background: linear-gradient(120deg, #8b5cf6, var(--violet));
   color: #fff;
   box-shadow: 0 12px 28px rgba(124, 58, 237, 0.28);
 }
 
+.btn-solid::after {
+  content: "";
+  position: absolute;
+  inset: -40% auto -40% -40%;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  transform: skewX(-20deg) translateX(-120%);
+  animation: btn-sheen 3.2s ease-in-out infinite;
+}
+
+@keyframes btn-sheen {
+  0%,
+  55% {
+    transform: skewX(-20deg) translateX(-180%);
+  }
+  80%,
+  100% {
+    transform: skewX(-20deg) translateX(420%);
+  }
+}
+
 .btn-solid:hover {
-  box-shadow: 0 16px 36px rgba(124, 58, 237, 0.38);
+  box-shadow: 0 16px 36px rgba(124, 58, 237, 0.45), 0 0 28px rgba(167, 139, 250, 0.35);
 }
 
 .btn-line {
@@ -265,16 +355,29 @@ main,
 
 .brand-word {
   display: block;
+  position: relative;
   font-family: var(--display);
   font-size: clamp(3.4rem, 9vw, 5.8rem);
   font-weight: 700;
   line-height: 0.95;
   letter-spacing: 0.14em;
-  background: linear-gradient(120deg, #2e1065 10%, var(--violet) 45%, #818cf8 85%);
+  background: linear-gradient(120deg, #2e1065 8%, var(--violet) 40%, #67e8f9 62%, #818cf8 88%);
+  background-size: 180% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 10px 30px rgba(124, 58, 237, 0.2));
+  filter: drop-shadow(0 10px 30px rgba(124, 58, 237, 0.28));
+  animation: brand-sheen 5s ease-in-out infinite;
+}
+
+@keyframes brand-sheen {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
 }
 
 .hero h1 {
@@ -882,10 +985,32 @@ main,
 
 /* —— Marquee —— */
 .marquee {
-  border-block: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.45);
+  position: relative;
+  border-block: 1px solid rgba(124, 58, 237, 0.12);
+  background: rgba(255, 255, 255, 0.5);
   overflow: hidden;
-  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  box-shadow: 0 0 40px rgba(167, 139, 250, 0.08) inset;
+}
+
+.marquee::before,
+.marquee::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 80px;
+  z-index: 1;
+}
+
+.marquee::before {
+  left: 0;
+  background: linear-gradient(90deg, rgba(247, 244, 255, 0.95), transparent);
+}
+
+.marquee::after {
+  right: 0;
+  background: linear-gradient(270deg, rgba(247, 244, 255, 0.95), transparent);
 }
 
 .marquee-track {
@@ -893,12 +1018,13 @@ main,
   gap: 2.5rem;
   width: max-content;
   padding: 0.95rem 0;
-  animation: marquee 32s linear infinite;
+  animation: marquee 24s linear infinite;
   font-family: var(--mono);
   font-size: 0.78rem;
   letter-spacing: 0.14em;
-  color: var(--muted);
+  color: var(--violet);
   text-transform: uppercase;
+  text-shadow: 0 0 18px rgba(167, 139, 250, 0.25);
 }
 
 .marquee-track span::after {
@@ -985,18 +1111,35 @@ main,
 }
 
 .bento-cell {
+  position: relative;
+  overflow: hidden;
   padding: 1.6rem 1.5rem;
   border-radius: var(--radius);
   background: var(--surface);
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(196, 181, 253, 0.35);
   box-shadow: 0 18px 50px rgba(88, 60, 160, 0.08);
   backdrop-filter: blur(10px);
-  transition: transform 0.35s var(--ease), box-shadow 0.35s;
+  transition: transform 0.35s var(--ease), box-shadow 0.35s, border-color 0.35s;
+}
+
+.bento-cell::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at var(--mx, 80%) var(--my, 0%), rgba(167, 139, 250, 0.18), transparent 45%);
+  opacity: 0;
+  transition: opacity 0.3s;
 }
 
 .bento-cell:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 24px 60px rgba(88, 60, 160, 0.14);
+  transform: translateY(-5px);
+  border-color: rgba(124, 58, 237, 0.4);
+  box-shadow: 0 24px 60px rgba(88, 60, 160, 0.16), 0 0 36px rgba(167, 139, 250, 0.2);
+}
+
+.bento-cell:hover::after {
+  opacity: 1;
 }
 
 .bento-hero {
@@ -1100,16 +1243,18 @@ main,
 }
 
 .engine-card {
+  position: relative;
   padding: 1.4rem 1.35rem;
   border-radius: 16px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.7);
-  transition: border-color 0.25s, transform 0.3s var(--ease);
+  transition: border-color 0.25s, transform 0.3s var(--ease), box-shadow 0.3s;
 }
 
 .engine-card:hover {
-  border-color: rgba(124, 58, 237, 0.35);
-  transform: translateX(6px);
+  border-color: rgba(124, 58, 237, 0.45);
+  transform: translateX(8px);
+  box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.2), 0 16px 40px rgba(124, 58, 237, 0.12);
 }
 
 .engine-card .mono {
@@ -1145,12 +1290,14 @@ main,
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.75);
   border: 1px solid var(--line);
-  transition: background 0.25s, box-shadow 0.3s;
+  transition: background 0.25s, box-shadow 0.3s, border-color 0.25s, transform 0.3s var(--ease);
 }
 
 .service-strips li:hover {
   background: #fff;
-  box-shadow: 0 16px 40px rgba(88, 60, 160, 0.1);
+  border-color: rgba(124, 58, 237, 0.35);
+  transform: translateY(-3px);
+  box-shadow: 0 16px 40px rgba(88, 60, 160, 0.12), 0 0 28px rgba(167, 139, 250, 0.16);
 }
 
 @media (min-width: 860px) {
@@ -1251,6 +1398,8 @@ main,
 
 /* —— Banner —— */
 .banner {
+  position: relative;
+  overflow: hidden;
   max-width: var(--max);
   margin: 0 auto 2rem;
   padding: clamp(2rem, 5vw, 2.75rem) 1.75rem;
@@ -1263,8 +1412,37 @@ main,
   background:
     radial-gradient(circle at 0% 50%, rgba(103, 232, 249, 0.25), transparent 40%),
     linear-gradient(120deg, #6d28d9, #7c3aed 45%, #8b5cf6);
+  background-size: 100% 100%, 180% 100%;
   color: #fff;
-  box-shadow: 0 24px 60px rgba(109, 40, 217, 0.35);
+  box-shadow: 0 24px 60px rgba(109, 40, 217, 0.35), 0 0 48px rgba(124, 58, 237, 0.25);
+  animation: banner-flow 8s ease-in-out infinite alternate;
+}
+
+@keyframes banner-flow {
+  to {
+    background-position: 0 0, 100% 0;
+    box-shadow: 0 28px 70px rgba(109, 40, 217, 0.45), 0 0 64px rgba(103, 232, 249, 0.25);
+  }
+}
+
+.banner::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.18) 50%, transparent 60%);
+  transform: translateX(-120%);
+  animation: banner-sheen 4.5s ease-in-out infinite;
+}
+
+@keyframes banner-sheen {
+  0%,
+  60% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(120%);
+  }
 }
 
 .banner p {
@@ -1479,7 +1657,23 @@ main,
 
 @media (prefers-reduced-motion: reduce) {
   .marquee-track,
-  .hud-dot {
+  .hud-dot,
+  .page-glow,
+  .grid-floor,
+  .brand-word,
+  .pill-cta,
+  .btn-solid::after,
+  .banner,
+  .banner::before {
     animation: none !important;
+  }
+
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+
+  .cursor-orb {
+    display: none !important;
   }
 }
