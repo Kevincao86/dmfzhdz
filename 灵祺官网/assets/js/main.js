@@ -142,12 +142,10 @@
       const name = String(data.get("name") || "").trim();
       const company = String(data.get("company") || "").trim();
       const phone = String(data.get("phone") || "").trim();
-      const needRaw = String(data.get("need") || "").trim();
-      const messageRaw = String(data.get("message") || "").trim();
-      const need = needRaw ? `【灵祺官网】${needRaw}` : "";
-      const message = messageRaw ? `[来源：灵祺官网]\n${messageRaw}` : "[来源：灵祺官网]";
+      const need = String(data.get("need") || "").trim();
+      const message = String(data.get("message") || "").trim();
 
-      if (!name || !company || !phone || !needRaw) {
+      if (!name || !company || !phone || !need) {
         if (note) {
           note.classList.add("error");
           note.textContent = "请完整填写姓名、公司、联系方式与需求方向。";
@@ -166,13 +164,13 @@
         const res = await fetch(CONTACT_API, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, company, phone, need, message }),
+          body: JSON.stringify({ name, company, phone, need, message, source: "lingqi" }),
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok || !json.ok) {
           const err = String(json.error || `HTTP ${res.status}`);
           if (err === "feishu_not_configured") {
-            throw new Error("咨询通道尚未配置完成，请稍后重试或发邮件至 hello@mofangdianai.com");
+            throw new Error("咨询通道尚未配置完成，请稍后重试或发邮件至 lingqi@mofangdianai.com");
           }
           throw new Error(err);
         }
@@ -187,7 +185,7 @@
           note.textContent =
             err instanceof Error
               ? err.message
-              : "提交失败，请稍后重试或发邮件至 hello@mofangdianai.com";
+              : "提交失败，请稍后重试或发邮件至 lingqi@mofangdianai.com";
         }
       } finally {
         if (submitBtn instanceof HTMLButtonElement) submitBtn.disabled = false;
