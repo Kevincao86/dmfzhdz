@@ -447,8 +447,21 @@ async function postRegistrySync(
   return { res: lastRes!, j: lastJ }
 }
 
+/** 商家裁剪路径会清空达人库/会员；运营台不可当作成功全量快照 */
+function isMerchantStrippedOpsRegistry(file: RegistryFile): boolean {
+  const talents = file.talentLibraryEntries
+  const members = file.mpTalentMembers
+  if (!Array.isArray(talents) || !Array.isArray(members)) return false
+  if (talents.length > 0 || members.length > 0) return false
+  // 仍有租户/招募等主体，说明不是「整库空」，而是匿名/商家裁剪
+  const tenants = file.tenants
+  const mpOrders = file.mpRecruitmentOrders
+  return (Array.isArray(tenants) && tenants.length > 0) || (Array.isArray(mpOrders) && mpOrders.length > 0)
+}
+
 export async function fetchRegistry(): Promise<RegistryFile> {
-  const paths = ['/api/meoo-ops-sync-registry', '/api/ops-sync/registry']
+  // 运营台优先全量；meoo-ops-sync-registry 已挂商家裁剪 handler（匿名 talentLibraryEntries=[]）
+  const paths = ['/api/ops-sync/registry', '/api/meoo-ops-sync-registry']
   let lastErr: Error | undefined
   for (const path of paths) {
     try {
@@ -475,15 +488,20 @@ export async function fetchRegistry(): Promise<RegistryFile> {
         const snippet = text.trim().slice(0, 280)
         if (snippet.startsWith('<')) {
           throw new Error(
-            `注册表 HTTP ${res.status}（网关 HTML 错误页）。请在 ECS 执行 ecs-fix-erp-api-502.sh 并确认 https://mofangdianai.com/erp-api/meoo-ops-sync-registry 可访问。`,
+            `注册表 HTTP ${res.status}（网关 HTML 错误页）。请在 ECS 执行 ecs-fix-erp-api-502.sh 并确认 https://mofangdianai.com/erp-api/ops-sync/registry 可访问。`,
           )
         }
         throw new Error(snippet || mapHttpError(res.status))
       }
       try {
-        return JSON.parse(text) as RegistryFile
-      } catch {
-        throw new Error('注册表接口返回非 JSON，请检查 Vercel 是否已部署 /api/meoo-ops-sync-registry')
+        const file = JSON.parse(text) as RegistryFile
+        if (path === '/api/meoo-ops-sync-registry' && isMerchantStrippedOpsRegistry(file)) {
+          throw new Error('merchant_stripped_registry')
+        }
+        return file
+      } catch (e) {
+        if (e instanceof Error && e.message === 'merchant_stripped_registry') throw e
+        throw new Error('注册表接口返回非 JSON，请检查 Vercel / erp-api 注册表路由')
       }
     } catch (e) {
       lastErr = e instanceof Error ? e : new Error(String(e))
