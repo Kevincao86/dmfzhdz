@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="温州灵祺智能科技有限公司 — 灵祺AI智能ERP、灵祺星选达人撮合平台；亦提供软件开发、小程序定制、AI 私有化部署与智能体定制。" />
+  <meta name="theme-color" content="#0c0814" />
+  <meta property="og:title" content="灵祺 · 温州灵祺智能科技有限公司" />
+  <meta property="og:description" content="好经营成就好增长 · 好撮合成就好履约。本地生活 AI 经营与可验证履约基础设施。" />
+  <meta property="og:type" content="website" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <title>灵祺 · 温州灵祺智能科技有限公司</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@300;400;500;700;900&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/main.css" />
+</head>
+<body>
+  <div class="noise" aria-hidden="true"></div>
+  <canvas class="ambient-fx" id="ambient-fx" aria-hidden="true"></canvas>
+  <div class="aurora" aria-hidden="true">
+    <span></span><span></span><span></span>
+  </div>
+  <div class="cursor-fx" id="cursor-fx" aria-hidden="true">
+    <div class="cursor-aura"></div>
+    <div class="cursor-orbit"></div>
+    <div class="cursor-orbit cursor-orbit--rev"></div>
+    <div class="cursor-core"></div>
+    <div class="cursor-spark"></div>
+  </div>
+  <canvas class="cursor-trail" id="cursor-trail" aria-hidden="true"></canvas>
+
+  <header class="site-header" id="site-header">
+    <a class="brand" href="#top" aria-label="灵祺首页">
+      <img class="brand-logo" src="assets/img/brand/lingqi-mark.png" alt="" width="40" height="40" />
+      <span class="brand-text">
+        <strong>灵祺</strong>
+        <small>LINGQI</small>
+      </span>
+    </a>
+    <nav class="nav" aria-label="主导航">
+      <a href="#products">产品</a>
+      <a href="#capabilities">能力</a>
+      <a href="#edge">优势</a>
+      <a href="#process">流程</a>
+      <a href="#contact">合作</a>
+    </nav>
+    <a class="header-cta" href="#contact">预约咨询</a>
+  </header>
+
+  <main id="top">
+    <section class="hero" id="hero">
+      <canvas class="hero-canvas" id="hero-canvas" aria-hidden="true"></canvas>
+      <div class="hero-veil" aria-hidden="true"></div>
+      <div class="hero-inner">
+        <p class="hero-brand">温州灵祺智能科技有限公司</p>
+        <h1 class="hero-title">
+          <span class="hero-title-main">灵祺</span>
+        </h1>
+        <p class="hero-line">好经营成就好增长 · 好撮合成就好履约</p>
+        <p class="hero-sub">AI 智能 ERP · 达人星选平台 · 软件与智能体定制</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#contact">
+            <span>立即咨询合作</span>
+            <span class="btn-arrow" aria-hidden="true">→</span>
+          </a>
+          <a class="btn btn-ghost" href="#products">查看产品矩阵</a>
+        </div>
+      </div>
+      <div class="hero-meta" aria-hidden="true">
+        <span>WENZHOU · CHINA</span>
+        <span class="meta-sep"></span>
+        <span>LOCAL LIFE · AI OS</span>
+      </div>
+      <a class="scroll-cue" href="#products" aria-label="向下浏览">
+        <span>SCROLL</span>
+        <i></i>
+      </a>
+    </section>
+
+    <!-- 产品矩阵 -->
+    <section class="section products" id="products">
+      <div class="section-head">
+        <p class="kicker"><span class="mono">01</span> 产品矩阵</p>
+        <h2>三条产品线，覆盖商家经营、服务商协同与达人履约</h2>
+        <p class="lead">
+          以注册表中枢打通商家 ERP、服务商后台与星选履约网络，让招募、创作、交付到结算成为可验证闭环。
+        </p>
+      </div>
+      <div class="product-grid">
+        <article class="product reveal" data-tone="merchant">
+          <div class="product-top">
+            <span class="product-tag mono">SaaS</span>
+            <span class="product-index mono">01</span>
+          </div>
+          <h3>灵祺 AI 智能 ERP · 商家版</h3>
+          <p>面向餐饮、零售、丽人与休闲娱乐的 AI 经营中枢：组品、招募、内容与财务一体协同。</p>
+          <ul>
+            <li>AI 智能体：组品 / Brief / 评价回复</li>
+            <li>多平台门店与商品同步</li>
+            <li>达人招募一键推送星选</li>
+            <li>云剪混剪 · 数字人 · GEO 分析</li>
+          </ul>
+          <a class="product-link" href="https://cs.mofangdianai.com" target="_blank" rel="noopener noreferrer">
+            进入商家版 <span aria-hidden="true">↗</span>
+          </a>
+        </article>
+        <article class="product reveal" data-tone="partner">
+          <div class="product-top">
+            <span class="product-tag mono">PARTNER</span>
+            <span class="product-index mono">02</span>
+          </div>
+          <h3>灵祺 AI 智能 ERP · 服务商版</h3>
+          <p>面向代运营、区域运营与 MCN 的多客户协同后台，一个租户管好多家商家。</p>
+          <ul>
+            <li>独立服务商租户与客户绑定</li>
+            <li>客户视图切换与汇总看板</li>
+            <li>跨客户商品 / 招募 / 投流</li>
+            <li>平台服务商凭证统一管理</li>
+          </ul>
+          <a class="product-link" href="https://fws.mofangdianai.com" target="_blank" rel="noopener noreferrer">
+            进入服务商版 <span aria-hidden="true">↗</span>
+          </a>
+        </article>
+        <article class="product reveal" data-tone="xingxuan">
+          <div class="product-top">
+            <span class="product-tag mono">NETWORK</span>
+            <span class="product-index mono">03</span>
+          </div>
+          <h3>灵祺星选 · 达人撮合平台</h3>
+          <p>达人 / PR / 拍摄 / 剪辑四身份工作台，从报名到回链核查与结算全链路可追踪。</p>
+          <ul>
+            <li>招募大厅 · 急单 · AI 智能匹配</li>
+            <li>探店履约与云剪任务闭环</li>
+            <li>Web · 微信 · 抖音 · App 多端</li>
+            <li>回链核查 · AI 合规 · 结算</li>
+          </ul>
+          <a class="product-link" href="https://dr.mofangdianai.com" target="_blank" rel="noopener noreferrer">
+            进入星选平台 <span aria-hidden="true">↗</span>
+          </a>
+        </article>
+      </div>
+    </section>
+
+    <!-- 能力：定制服务 -->
+    <section class="section capabilities" id="capabilities">
+      <div class="section-head">
+        <p class="kicker"><span class="mono">02</span> 核心能力</p>
+        <h2>不止 SaaS：软件开发、智能体与 AI 部署一站交付</h2>
+        <p class="lead">
+          在自研产品之外，灵祺团队亦为企业提供工程化定制——把 AI 装进真实业务流，而不是停留在演示。
+        </p>
+      </div>
+      <div class="cap-grid">
+        <article class="cap" data-index="01" tabindex="0">
+          <div class="cap-index mono">01</div>
+          <h3>软件开发</h3>
+          <p>企业级 Web / 后台 / 中台系统，从需求拆解到上线运维，交付可演进的数字化底座。</p>
+          <ul>
+            <li>业务系统与运营后台</li>
+            <li>数据看板与工作流引擎</li>
+            <li>高可用架构与安全加固</li>
+          </ul>
+          <div class="cap-rail" aria-hidden="true"></div>
+        </article>
+        <article class="cap" data-index="02" tabindex="0">
+          <div class="cap-index mono">02</div>
+          <h3>小程序定制开发</h3>
+          <p>微信 / 抖音等端到端定制，围绕获客、履约、会员与交易链路做完整产品闭环。</p>
+          <ul>
+            <li>C 端体验与转化路径</li>
+            <li>商家 / 服务商双端协同</li>
+            <li>支付、消息与内容能力</li>
+          </ul>
+          <div class="cap-rail" aria-hidden="true"></div>
+        </article>
+        <article class="cap" data-index="03" tabindex="0">
+          <div class="cap-index mono">03</div>
+          <h3>AI 私有化部署</h3>
+          <p>模型与推理服务落在您的内网或专属云，数据不出域，能力可审计、可扩容、可运维。</p>
+          <ul>
+            <li>本地 / 专有云模型部署</li>
+            <li>知识库与 RAG 检索链路</li>
+            <li>权限、审计与成本可控</li>
+          </ul>
+          <div class="cap-rail" aria-hidden="true"></div>
+        </article>
+        <article class="cap" data-index="04" tabindex="0">
+          <div class="cap-index mono">04</div>
+          <h3>智能体定制</h3>
+          <p>面向真实岗位的 Agent：懂业务规则、会调用工具、能嵌入现有系统，而不是演示型聊天框。</p>
+          <ul>
+            <li>业务 Agent 与工具编排</li>
+            <li>多模态理解与内容生成</li>
+            <li>与 ERP / CRM / 小程序打通</li>
+          </ul>
+          <div class="cap-rail" aria-hidden="true"></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- 优势 -->
+    <section class="section edge" id="edge">
+      <div class="edge-layout">
+        <div class="section-head">
+          <p class="kicker"><span class="mono">03</span> 为什么是灵祺</p>
+          <h2>双引擎：AI 经营 + 可验证履约</h2>
+          <p class="lead">
+            简单生意，需要简单工具。我们把智能体嵌进真实经营动作，把达人协作做成可追踪、可结算的基础设施——
+            同一条数据中枢，服务商家、服务商与达人生态。
+          </p>
+        </div>
+        <div class="edge-list">
+          <div class="edge-item reveal">
+            <span class="edge-num mono">01</span>
+            <div>
+              <h3>场景化 AI，而非空对话</h3>
+              <p>组品、Brief、审片、合规检核嵌入流程；预览 → 确认 → 写入，人做最终判断。</p>
+            </div>
+          </div>
+          <div class="edge-item reveal">
+            <span class="edge-num mono">02</span>
+            <div>
+              <h3>四端数据同源</h3>
+              <p>商家 Web、服务商 Web、星选多端与运营台经注册表中枢实时协同，减少信息断层。</p>
+            </div>
+          </div>
+          <div class="edge-item reveal">
+            <span class="edge-num mono">03</span>
+            <div>
+              <h3>可验证履约闭环</h3>
+              <p>招募 → 反选 → 交付 → 回链 → AI 核查 → 结算，状态流转清晰可审计。</p>
+            </div>
+          </div>
+          <div class="edge-item reveal">
+            <span class="edge-num mono">04</span>
+            <div>
+              <h3>产品力 + 定制交付</h3>
+              <p>自研 SaaS 验证过的工程能力，可延伸到私有化部署与企业智能体共建。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="signal-board reveal" aria-hidden="true">
+        <div class="signal-row">
+          <span class="mono">ERP</span>
+          <span class="signal-bar"><i style="--w:88%"></i></span>
+          <span class="mono">MERCHANT · PARTNER</span>
+        </div>
+        <div class="signal-row">
+          <span class="mono">XX</span>
+          <span class="signal-bar"><i style="--w:90%"></i></span>
+          <span class="mono">XINGXUAN · MATCH</span>
+        </div>
+        <div class="signal-row">
+          <span class="mono">AI</span>
+          <span class="signal-bar"><i style="--w:86%"></i></span>
+          <span class="mono">AGENT · PRIVATE</span>
+        </div>
+        <div class="signal-row">
+          <span class="mono">OPS</span>
+          <span class="signal-bar"><i style="--w:82%"></i></span>
+          <span class="mono">REGISTRY · AUDIT</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 闭环示意 -->
+    <section class="section loop" id="loop" aria-label="履约闭环">
+      <div class="section-head">
+        <p class="kicker"><span class="mono">04</span> 履约闭环</p>
+        <h2>从发招募到结算，一条链路跑通</h2>
+      </div>
+      <ol class="loop-track">
+        <li class="reveal"><span class="mono">01</span><strong>商家发招募</strong><em>ERP 一键推送</em></li>
+        <li class="reveal"><span class="mono">02</span><strong>星选大厅</strong><em>达人 / 团队报名</em></li>
+        <li class="reveal"><span class="mono">03</span><strong>PR 反选</strong><em>探店 · 拍摄 · 剪辑</em></li>
+        <li class="reveal"><span class="mono">04</span><strong>回链核查</strong><em>AI 检核 · 结算</em></li>
+      </ol>
+    </section>
+
+    <!-- 流程 -->
+    <section class="section process" id="process">
+      <div class="section-head">
+        <p class="kicker"><span class="mono">05</span> 合作流程</p>
+        <h2>四步进入共建，每一步都有明确交付物</h2>
+      </div>
+      <ol class="process-track">
+        <li class="reveal">
+          <span class="step-num mono">01</span>
+          <h3>需求对齐</h3>
+          <p>业务目标、数据边界、上线节奏一次谈清，输出范围与里程碑。</p>
+        </li>
+        <li class="reveal">
+          <span class="step-num mono">02</span>
+          <h3>方案与原型</h3>
+          <p>架构、交互与智能体能力边界可视化确认，再进入开发。</p>
+        </li>
+        <li class="reveal">
+          <span class="step-num mono">03</span>
+          <h3>开发与联调</h3>
+          <p>迭代交付、周报可见；私有化环境与权限体系同步落地。</p>
+        </li>
+        <li class="reveal">
+          <span class="step-num mono">04</span>
+          <h3>上线与陪跑</h3>
+          <p>灰度发布、运维手册、效果复盘，必要时持续迭代智能体。</p>
+        </li>
+      </ol>
+    </section>
+
+    <!-- 信任数字 -->
+    <section class="section trust" id="trust" aria-label="能力概览">
+      <div class="trust-strip">
+        <div class="trust-item reveal">
+          <strong class="trust-val" data-count="3">0</strong>
+          <span>核心 SaaS 产品线</span>
+        </div>
+        <div class="trust-item reveal">
+          <strong class="trust-val" data-count="4">0</strong>
+          <span>定制交付能力</span>
+        </div>
+        <div class="trust-item reveal">
+          <strong class="trust-val mono">7×12</strong>
+          <span>响应窗口（工作日）</span>
+        </div>
+        <div class="trust-item reveal">
+          <strong class="trust-val">闭环</strong>
+          <span>经营到履约可验证</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 咨询 -->
+    <section class="section contact" id="contact">
+      <div class="contact-panel">
+        <div class="contact-copy">
+          <p class="kicker"><span class="mono">06</span> 开始合作</p>
+          <h2>告诉我们你的业务场景，48 小时内给出可行路径</h2>
+          <p class="lead">
+            无论是开通灵祺 ERP / 星选，还是定制业务系统与智能体，我们都会先给出清晰边界与投入区间。
+          </p>
+          <dl class="contact-facts">
+            <div>
+              <dt>公司</dt>
+              <dd>温州灵祺智能科技有限公司</dd>
+            </div>
+            <div>
+              <dt>产品入口</dt>
+              <dd>
+                <a href="https://cs.mofangdianai.com" target="_blank" rel="noopener noreferrer">商家 ERP</a>
+                ·
+                <a href="https://fws.mofangdianai.com" target="_blank" rel="noopener noreferrer">服务商</a>
+                ·
+                <a href="https://dr.mofangdianai.com" target="_blank" rel="noopener noreferrer">星选</a>
+              </dd>
+            </div>
+            <div>
+              <dt>业务邮件</dt>
+              <dd><a href="mailto:hello@mofangdianai.com">hello@mofangdianai.com</a></dd>
+            </div>
+            <div>
+              <dt>商务对接</dt>
+              <dd>提交表单后 48 小时内回电</dd>
+            </div>
+          </dl>
+        </div>
+        <form class="contact-form" id="contact-form" novalidate>
+          <label>
+            <span>姓名</span>
+            <input name="name" type="text" autocomplete="name" required placeholder="怎么称呼您" />
+          </label>
+          <label>
+            <span>公司 / 团队</span>
+            <input name="company" type="text" autocomplete="organization" required placeholder="贵司名称" />
+          </label>
+          <label>
+            <span>手机 / 微信</span>
+            <input name="phone" type="tel" autocomplete="tel" required placeholder="方便联系的方式" />
+          </label>
+          <label>
+            <span>需求方向</span>
+            <select name="need" required>
+              <option value="" disabled selected>请选择</option>
+              <option>灵祺 ERP · 商家版</option>
+              <option>灵祺 ERP · 服务商版</option>
+              <option>灵祺星选平台</option>
+              <option>软件开发</option>
+              <option>小程序定制</option>
+              <option>AI 私有化部署</option>
+              <option>智能体定制</option>
+              <option>综合方案咨询</option>
+            </select>
+          </label>
+          <label class="full">
+            <span>简要描述</span>
+            <textarea name="message" rows="4" placeholder="当前痛点、期望上线时间、是否有现成系统…"></textarea>
+          </label>
+          <button class="btn btn-primary full-btn" type="submit">
+            <span>提交咨询意向</span>
+            <span class="btn-arrow" aria-hidden="true">→</span>
+          </button>
+          <p class="form-note" id="form-note" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-brand">
+      <img class="brand-logo brand-logo--footer" src="assets/img/brand/lingqi-mark.png" alt="" width="36" height="36" />
+      <div>
+        <strong>灵祺</strong>
+        <p>温州灵祺智能科技有限公司</p>
+      </div>
+    </div>
+    <nav class="footer-links" aria-label="产品链接">
+      <a href="https://cs.mofangdianai.com" target="_blank" rel="noopener noreferrer">商家 ERP</a>
+      <a href="https://fws.mofangdianai.com" target="_blank" rel="noopener noreferrer">服务商版</a>
+      <a href="https://dr.mofangdianai.com" target="_blank" rel="noopener noreferrer">灵祺星选</a>
+    </nav>
+    <p class="footer-copy">© <span id="year"></span> LingQi Intelligent Tech · All rights reserved.</p>
+  </footer>
+
+  <script src="assets/js/main.js" defer></script>
+</body>
+</html>

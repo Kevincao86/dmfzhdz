@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "echo '灵祺官网静态站，跳过 npm install'",
+  "buildCommand": "echo '灵祺官网静态站，跳过 build'",
+  "outputDirectory": ".",
+  "cleanUrls": true
+}

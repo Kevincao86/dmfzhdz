@@ -1,0 +1,10 @@
+{
+  "name": "lingqi-official",
+  "private": true,
+  "version": "1.0.0",
+  "description": "温州灵祺智能科技有限公司官方网站",
+  "scripts": {
+    "dev": "python3 -m http.server 5178",
+    "start": "python3 -m http.server 5178"
+  }
+}
