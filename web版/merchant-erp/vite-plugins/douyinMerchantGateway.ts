@@ -6303,6 +6303,8 @@ export type DouyinTradeOrderDetail = {
   categoryL1: string
   categoryL2: string
   categoryL3: string
+  poiId: string
+  poiName: string
   payAmountFen: number
   refundAmountFen: number
   couponCount: number
@@ -6311,6 +6313,24 @@ export type DouyinTradeOrderDetail = {
   verifyTimeIso: string | null
   openId: string
   raw: Record<string, unknown>
+}
+
+function orderPoiInfo(order: Record<string, unknown>): { poiId: string; poiName: string } {
+  let poiId = String(order.poi_id ?? order.poiId ?? order.shop_id ?? order.store_id ?? '').trim()
+  let poiName = String(
+    order.poi_name ?? order.poiName ?? order.shop_name ?? order.store_name ?? '',
+  ).trim()
+  const certs = order.certificate
+  if (Array.isArray(certs)) {
+    for (const c of certs) {
+      if (!c || typeof c !== 'object') continue
+      const cert = c as Record<string, unknown>
+      if (!poiId) poiId = String(cert.poi_id ?? cert.poiId ?? '').trim()
+      if (!poiName) poiName = String(cert.poi_name ?? cert.shop_name ?? '').trim()
+      if (poiId && poiName) break
+    }
+  }
+  return { poiId, poiName }
 }
 
 function orderRefundAmountFen(order: Record<string, unknown>): number {
@@ -6363,6 +6383,7 @@ function normalizeDouyinTradeOrderDetail(order: Record<string, unknown>): Douyin
   const paySec = orderCreateUnixSec(order)
   const verifySec = orderFirstVerifyUnixSec(order)
   const st = Number(order.order_status)
+  const poi = orderPoiInfo(order)
   return {
     platform: 'douyin',
     orderId,
@@ -6372,6 +6393,8 @@ function normalizeDouyinTradeOrderDetail(order: Record<string, unknown>): Douyin
     categoryL1,
     categoryL2,
     categoryL3,
+    poiId: poi.poiId,
+    poiName: poi.poiName,
     payAmountFen: Math.round(payYuan * 100),
     refundAmountFen: orderRefundAmountFen(order),
     couponCount: orderSalesCouponCount(order),

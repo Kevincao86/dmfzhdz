@@ -82,6 +82,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const summary = await computeShopAnalysisSummary({
       tenantId: ctx.tenantId,
       platform: get('platform') || 'douyin',
+      poiId: get('poiId') || undefined,
       startYmd: startDate,
       endYmd: endDate,
       marginPercent: Number(get('marginPercent') || '0') || 0,

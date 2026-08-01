@@ -24,6 +24,8 @@ export type MerchantOrderRow = {
   syncedAt: string
 }
 
+export type ShopStoreOption = { poiId: string; poiName: string; orderCount: number }
+
 export type ShopAnalysisSummary = {
   orderCount: number
   couponCount: number
@@ -33,11 +35,16 @@ export type ShopAnalysisSummary = {
   buyerCount: number
   openIdCoverage: number
   newBuyerCount: number
+  oldBuyerCount: number
   newBuyerSalesYuan: number
+  oldBuyerSalesYuan: number
   newBuyerShare: number
+  oneTimeBuyerCount: number
+  repeatBuyerCount: number
   repurchaseRate: number
   estimatedGrossYuan: number
-  categories: { name: string; level: 1 | 2 | 3; orderCount: number; salesYuan: number; share: number }[]
+  hasPreWindowHistory: boolean
+  stores: ShopStoreOption[]
   topBySales: { name: string; productId: string; salesYuan: number; couponCount: number; share: number }[]
   topByRefund: { name: string; productId: string; refundYuan: number; refundRate: number }[]
 }
@@ -123,6 +130,7 @@ export async function fetchShopAnalysis(params: {
   startDate: string
   endDate: string
   platform?: string
+  poiId?: string
 }): Promise<{ summary: ShopAnalysisSummary; adviceFacts: string; startDate: string; endDate: string }> {
   const margins = readStorePlatformMargins()
   const q = new URLSearchParams({
@@ -131,6 +139,7 @@ export async function fetchShopAnalysis(params: {
     platform: params.platform || 'douyin',
     marginPercent: String(margins.douyin || 0),
   })
+  if (params.poiId?.trim()) q.set('poiId', params.poiId.trim())
   const headers = await authHeaders()
   const j = await fetchJson(`/api/meoo-shop-analysis-summary?${q}`, { method: 'GET', headers })
   return {
