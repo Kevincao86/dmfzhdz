@@ -157,18 +157,35 @@
     ["partner", "fulfill"],
   ];
 
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const wrap = document.querySelector(".play-canvas-wrap");
   const nodesRoot = document.getElementById("play-nodes");
   const svg = document.getElementById("play-links");
+  const panel = document.getElementById("live-panel");
   const panelTitle = document.getElementById("panel-title");
   const panelDesc = document.getElementById("panel-desc");
   const panelStats = document.getElementById("panel-stats");
   const panelLink = document.getElementById("panel-link");
   const tip = document.getElementById("canvas-tip");
+  const fxCanvas = document.getElementById("play-fx");
+  const spotlight = document.getElementById("play-spotlight");
+  const hudSync = document.getElementById("hud-sync");
+  const hudLat = document.getElementById("hud-lat");
+  const hudPkt = document.getElementById("hud-pkt");
 
   if (!wrap || !nodesRoot || !svg) return;
 
   const nodes = Array.from(nodesRoot.querySelectorAll(".node"));
+  let linkGeometry = [];
+
+  const centerOf = (el) => {
+    const rect = wrap.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    return {
+      x: r.left - rect.left + r.width / 2,
+      y: r.top - rect.top + r.height / 2,
+    };
+  };
 
   const setPanel = (id) => {
     const meta = NODE_META[id];
@@ -194,45 +211,72 @@
         panelLink.removeAttribute("rel");
       }
     }
+    if (panel) {
+      panel.classList.remove("is-flash");
+      void panel.offsetWidth;
+      panel.classList.add("is-flash");
+      window.setTimeout(() => panel.classList.remove("is-flash"), 480);
+    }
+  };
+
+  const spawnRipple = (node) => {
+    const ripple = document.createElement("span");
+    ripple.className = "node-ripple";
+    node.appendChild(ripple);
+    ripple.addEventListener("animationend", () => ripple.remove());
   };
 
   const drawLinks = () => {
     const rect = wrap.getBoundingClientRect();
     svg.setAttribute("viewBox", `0 0 ${rect.width} ${rect.height}`);
     svg.innerHTML = "";
-
-    const centerOf = (el) => {
-      const r = el.getBoundingClientRect();
-      return {
-        x: r.left - rect.left + r.width / 2,
-        y: r.top - rect.top + r.height / 2,
-      };
-    };
+    linkGeometry = [];
 
     const byId = Object.fromEntries(nodes.map((n) => [n.dataset.id, n]));
+    const activeId = nodes.find((n) => n.classList.contains("is-active"))?.dataset.id;
 
     for (const [aId, bId] of LINKS) {
       const a = byId[aId];
       const b = byId[bId];
       if (!a || !b) continue;
       const dim = a.classList.contains("is-dim") || b.classList.contains("is-dim");
+      const hot = aId === activeId || bId === activeId;
       const pa = centerOf(a);
       const pb = centerOf(b);
-      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-      line.setAttribute("x1", String(pa.x));
-      line.setAttribute("y1", String(pa.y));
-      line.setAttribute("x2", String(pb.x));
-      line.setAttribute("y2", String(pb.y));
-      line.setAttribute("stroke", dim ? "rgba(124,58,237,0.12)" : "rgba(124,58,237,0.45)");
-      line.setAttribute("stroke-width", dim ? "1" : "1.6");
-      line.setAttribute("stroke-linecap", "round");
-      svg.appendChild(line);
+      linkGeometry.push({ pa, pb, dim, hot });
+
+      const base = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      base.setAttribute("class", "link-base");
+      base.setAttribute("x1", String(pa.x));
+      base.setAttribute("y1", String(pa.y));
+      base.setAttribute("x2", String(pb.x));
+      base.setAttribute("y2", String(pb.y));
+      base.setAttribute(
+        "stroke",
+        dim ? "rgba(124,58,237,0.1)" : hot ? "rgba(124,58,237,0.55)" : "rgba(124,58,237,0.28)"
+      );
+      base.setAttribute("stroke-width", dim ? "1" : hot ? "2.2" : "1.5");
+      svg.appendChild(base);
+
+      if (!dim && !reduceMotion) {
+        const flow = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        flow.setAttribute("class", "link-flow");
+        flow.setAttribute("x1", String(pa.x));
+        flow.setAttribute("y1", String(pa.y));
+        flow.setAttribute("x2", String(pb.x));
+        flow.setAttribute("y2", String(pb.y));
+        flow.setAttribute("stroke", hot ? "rgba(103,232,249,0.95)" : "rgba(167,139,250,0.85)");
+        flow.setAttribute("stroke-width", hot ? "2.4" : "1.8");
+        flow.style.animationDuration = `${0.85 + Math.random() * 0.5}s`;
+        svg.appendChild(flow);
+      }
     }
   };
 
   const selectNode = (node) => {
     nodes.forEach((n) => n.classList.toggle("is-active", n === node));
     setPanel(node.dataset.id || "agent");
+    spawnRipple(node);
     drawLinks();
   };
 
@@ -246,7 +290,6 @@
     });
   });
 
-  /* Layer filter chips */
   document.querySelectorAll(".dock-chip").forEach((chip) => {
     chip.addEventListener("click", () => {
       document.querySelectorAll(".dock-chip").forEach((c) => c.classList.remove("is-active"));
@@ -263,14 +306,12 @@
     });
   });
 
-  /* Drag nodes */
   let drag = null;
 
   const onPointerDown = (e) => {
     const node = e.target.closest(".node");
     if (!node || !nodesRoot.contains(node)) return;
     e.preventDefault();
-    const rect = wrap.getBoundingClientRect();
     drag = {
       node,
       startX: e.clientX,
@@ -281,26 +322,28 @@
     node.setPointerCapture?.(e.pointerId);
     if (tip) {
       tip.hidden = false;
-      tip.textContent = "拖拽中…松开完成排布";
+      tip.textContent = "能量重排中…松开锁定坐标";
     }
   };
 
   const onPointerMove = (e) => {
+    const rect = wrap.getBoundingClientRect();
+    if (spotlight) {
+      spotlight.style.left = `${e.clientX - rect.left}px`;
+      spotlight.style.top = `${e.clientY - rect.top}px`;
+    }
     if (!drag) return;
     const dx = e.clientX - drag.startX;
     const dy = e.clientY - drag.startY;
     if (Math.hypot(dx, dy) > 4) drag.moved = true;
-    const rect = wrap.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
-    const cx = Math.min(90, Math.max(10, x));
-    const cy = Math.min(88, Math.max(12, y));
-    drag.node.style.setProperty("--x", `${cx}%`);
-    drag.node.style.setProperty("--y", `${cy}%`);
+    drag.node.style.setProperty("--x", `${Math.min(90, Math.max(10, x))}%`);
+    drag.node.style.setProperty("--y", `${Math.min(88, Math.max(12, y))}%`);
     drawLinks();
   };
 
-  const onPointerUp = (e) => {
+  const onPointerUp = () => {
     if (!drag) return;
     drag.node.classList.remove("is-dragging");
     if (drag.moved) drag.node.dataset.didDrag = "1";
@@ -310,12 +353,112 @@
   };
 
   wrap.addEventListener("pointerdown", onPointerDown);
-  window.addEventListener("pointermove", onPointerMove);
+  wrap.addEventListener("pointermove", onPointerMove);
   window.addEventListener("pointerup", onPointerUp);
-  window.addEventListener("resize", drawLinks);
+  window.addEventListener("resize", () => {
+    resizeFx();
+    drawLinks();
+  });
 
-  /* init */
+  /* Particle field + energy packets */
+  let fxCtx = null;
+  let fxW = 0;
+  let fxH = 0;
+  let sparks = [];
+  let packets = [];
+
+  const resizeFx = () => {
+    if (!(fxCanvas instanceof HTMLCanvasElement)) return;
+    fxCtx = fxCanvas.getContext("2d");
+    if (!fxCtx) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    fxW = wrap.clientWidth;
+    fxH = wrap.clientHeight;
+    fxCanvas.width = Math.floor(fxW * dpr);
+    fxCanvas.height = Math.floor(fxH * dpr);
+    fxCanvas.style.width = `${fxW}px`;
+    fxCanvas.style.height = `${fxH}px`;
+    fxCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const count = Math.min(70, Math.floor((fxW * fxH) / 14000));
+    sparks = Array.from({ length: count }, () => ({
+      x: Math.random() * fxW,
+      y: Math.random() * fxH,
+      r: 0.6 + Math.random() * 1.8,
+      vx: (Math.random() - 0.5) * 0.35,
+      vy: -0.12 - Math.random() * 0.35,
+      a: 0.2 + Math.random() * 0.5,
+      hue: Math.random() > 0.55 ? "violet" : "cyan",
+    }));
+  };
+
+  const tickFx = (now) => {
+    if (!fxCtx || reduceMotion) return;
+    fxCtx.clearRect(0, 0, fxW, fxH);
+
+    for (const s of sparks) {
+      s.x += s.vx;
+      s.y += s.vy;
+      if (s.y < -8) s.y = fxH + 8;
+      if (s.x < -8) s.x = fxW + 8;
+      if (s.x > fxW + 8) s.x = -8;
+      const alpha = s.a * (0.55 + 0.45 * Math.sin(now * 0.003 + s.x));
+      fxCtx.beginPath();
+      fxCtx.fillStyle =
+        s.hue === "cyan" ? `rgba(103,232,249,${alpha})` : `rgba(167,139,250,${alpha})`;
+      fxCtx.shadowColor = s.hue === "cyan" ? "rgba(103,232,249,0.8)" : "rgba(167,139,250,0.8)";
+      fxCtx.shadowBlur = 8;
+      fxCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      fxCtx.fill();
+    }
+    fxCtx.shadowBlur = 0;
+
+    if (packets.length < linkGeometry.filter((g) => !g.dim).length) {
+      for (const g of linkGeometry) {
+        if (g.dim) continue;
+        if (Math.random() > 0.04) continue;
+        packets.push({
+          g,
+          t: 0,
+          speed: 0.008 + Math.random() * 0.012,
+          r: 2 + Math.random() * 2,
+          hot: g.hot,
+        });
+      }
+    }
+
+    for (let i = packets.length - 1; i >= 0; i--) {
+      const p = packets[i];
+      p.t += p.speed;
+      if (p.t >= 1) {
+        packets.splice(i, 1);
+        continue;
+      }
+      const x = p.g.pa.x + (p.g.pb.x - p.g.pa.x) * p.t;
+      const y = p.g.pa.y + (p.g.pb.y - p.g.pa.y) * p.t;
+      fxCtx.beginPath();
+      fxCtx.fillStyle = p.hot ? "rgba(103,232,249,0.95)" : "rgba(196,181,253,0.95)";
+      fxCtx.shadowColor = p.hot ? "rgba(103,232,249,1)" : "rgba(167,139,250,1)";
+      fxCtx.shadowBlur = 12;
+      fxCtx.arc(x, y, p.r, 0, Math.PI * 2);
+      fxCtx.fill();
+    }
+    fxCtx.shadowBlur = 0;
+
+    requestAnimationFrame(tickFx);
+  };
+
+  /* HUD live metrics */
+  if (!reduceMotion) {
+    window.setInterval(() => {
+      if (hudSync) hudSync.textContent = `${(97.8 + Math.random() * 1.8).toFixed(1)}%`;
+      if (hudLat) hudLat.textContent = `${8 + Math.floor(Math.random() * 16)}ms`;
+      if (hudPkt) hudPkt.textContent = `${(0.9 + Math.random() * 1.4).toFixed(1)}k`;
+    }, 1200);
+  }
+
   const active = nodes.find((n) => n.classList.contains("is-active")) || nodes[0];
   if (active) selectNode(active);
+  resizeFx();
   requestAnimationFrame(drawLinks);
+  if (!reduceMotion && fxCanvas) requestAnimationFrame(tickFx);
 })();

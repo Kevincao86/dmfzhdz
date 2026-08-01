@@ -56,6 +56,7 @@
       </div>
 
       <div class="play-deck" id="play-stage">
+        <div class="play-deck-glow" aria-hidden="true"></div>
         <div class="play-toolbar">
           <div class="play-toolbar-left">
             <div class="hud">
@@ -70,33 +71,47 @@
               <button type="button" class="dock-chip" data-focus="private">私有化</button>
             </div>
           </div>
-          <p class="play-hint mono">点击节点查看 · 按住拖拽排布</p>
+          <div class="hud-metrics mono" aria-hidden="true">
+            <span>SYNC <b id="hud-sync">98.6%</b></span>
+            <span>LAT <b id="hud-lat">12ms</b></span>
+            <span>PKT <b id="hud-pkt">1.2k</b></span>
+          </div>
         </div>
 
-        <div class="play-canvas-wrap">
+        <div class="play-canvas-wrap" id="play-canvas-wrap">
+          <canvas class="play-fx" id="play-fx" aria-hidden="true"></canvas>
+          <div class="play-grid" aria-hidden="true"></div>
+          <div class="play-scan" aria-hidden="true"></div>
+          <div class="play-spotlight" id="play-spotlight" aria-hidden="true"></div>
           <svg class="play-links" id="play-links" aria-hidden="true"></svg>
           <div class="play-nodes" id="play-nodes">
             <button type="button" class="node" data-id="merchant" data-layer="erp" style="--x:18%; --y:32%;">
+              <i class="node-ring" aria-hidden="true"></i>
               <strong>商家</strong>
               <span>ERP</span>
             </button>
             <button type="button" class="node" data-id="partner" data-layer="erp" style="--x:82%; --y:28%;">
+              <i class="node-ring" aria-hidden="true"></i>
               <strong>服务商</strong>
               <span>Partner</span>
             </button>
             <button type="button" class="node" data-id="xingxuan" data-layer="xingxuan" style="--x:62%; --y:58%;">
+              <i class="node-ring" aria-hidden="true"></i>
               <strong>星选</strong>
               <span>Match</span>
             </button>
             <button type="button" class="node node--core is-active" data-id="agent" data-layer="agent" style="--x:48%; --y:36%;">
+              <i class="node-ring" aria-hidden="true"></i>
               <strong>Agent</strong>
               <span>AI Core</span>
             </button>
             <button type="button" class="node" data-id="fulfill" data-layer="xingxuan" style="--x:28%; --y:68%;">
+              <i class="node-ring" aria-hidden="true"></i>
               <strong>履约</strong>
               <span>Loop</span>
             </button>
             <button type="button" class="node" data-id="private" data-layer="private" style="--x:78%; --y:72%;">
+              <i class="node-ring" aria-hidden="true"></i>
               <strong>私有化</strong>
               <span>Deploy</span>
             </button>
@@ -106,7 +121,7 @@
 
         <div class="live-bar" id="live-panel" aria-live="polite">
           <div class="live-bar-main">
-            <p class="dock-label mono">SELECTED</p>
+            <p class="dock-label mono">SELECTED · SIGNAL LOCKED</p>
             <h3 id="panel-title">Agent · AI Core</h3>
             <p id="panel-desc">场景化智能体嵌入经营动作：组品、Brief、审片与合规检核。</p>
           </div>
