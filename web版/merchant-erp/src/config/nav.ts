@@ -35,6 +35,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Store,
     children: [
       { path: '/store/info', label: '店铺信息' },
+      { path: '/store/analysis', label: '店铺分析' },
       { path: '/store/menu', label: '菜单价目表' },
       { path: '/store/decoration', label: '店铺装修' },
     ],

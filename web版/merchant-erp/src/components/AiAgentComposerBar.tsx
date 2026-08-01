@@ -1,4 +1,4 @@
-import { ChevronDown, Film, ImagePlus, Loader2, Mic, Paperclip, Send, Square } from 'lucide-react'
+import { ChevronDown, FileText, Film, ImagePlus, Loader2, Mic, Paperclip, Send, Square } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAiAgent } from '../context/AiAgentContext'
 import { MAX_AI_CHAT_IMAGE_ATTACHMENTS } from '../services/ai/types'
@@ -18,6 +18,7 @@ const FILTER_TABS: { id: ModelFilterTab; label: string; short: string }[] = [
 
 const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif'
 const VIDEO_ACCEPT = 'video/mp4,video/quicktime,video/webm,video/x-m4v,video/*,.mp4,.mov,.m4v,.webm,.avi,.mkv'
+const FILE_ACCEPT = '*/*'
 
 function readMediaFilesFromClipboard(ev: React.ClipboardEvent<HTMLTextAreaElement>): File[] {
   const out: File[] = []
@@ -72,7 +73,7 @@ function AttachmentPreview({
     <div className="group relative">
       {att.kind === 'image' ? (
         <img src={att.url} alt="" className="h-14 w-14 rounded-lg border border-slate-200 object-cover" />
-      ) : (
+      ) : att.kind === 'video' ? (
         <div className="relative h-14 w-14 overflow-hidden rounded-lg border border-slate-200 bg-zinc-900">
           <video
             src={att.previewUrl}
@@ -85,6 +86,14 @@ function AttachmentPreview({
             <Film className="h-3 w-3" />
             视频
           </span>
+        </div>
+      ) : (
+        <div
+          className="flex h-14 w-14 flex-col items-center justify-center gap-0.5 rounded-lg border border-slate-200 bg-slate-50 px-1"
+          title={att.name}
+        >
+          <FileText className="h-5 w-5 text-indigo-600" />
+          <span className="w-full truncate text-center text-[9px] text-slate-600">{att.name}</span>
         </div>
       )}
       <button
@@ -107,11 +116,13 @@ function reportAttachResult(r: {
 }) {
   const parts: string[] = []
   if (r.added > 0) parts.push(`已添加 ${r.added} 个附件`)
-  if (r.skippedOversize > 0) parts.push(`${r.skippedOversize} 个视频超过 100MB 已跳过`)
-  if (r.skippedUnsupported > 0) parts.push(`${r.skippedUnsupported} 个文件格式不支持`)
+  if (r.skippedOversize > 0) parts.push(`${r.skippedOversize} 个文件超出大小限制已跳过`)
+  if (r.skippedUnsupported > 0) parts.push(`${r.skippedUnsupported} 个文件无法添加（含可执行类或读取失败）`)
   if (r.skippedFull > 0) parts.push(`已达上限 ${MAX_AI_CHAT_IMAGE_ATTACHMENTS} 个，余下未加入`)
   if (!parts.length) {
-    window.alert('未添加任何附件。请选择图片，或 MP4/MOV/WebM 等视频（可多选，单文件 ≤100MB）。')
+    window.alert(
+      '未添加任何附件。可上传图片、视频（≤100MB）或文档等文件（≤40MB；可执行类除外）。',
+    )
     return
   }
   if (r.skippedOversize || r.skippedUnsupported || r.skippedFull) {
@@ -138,6 +149,7 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
 
   const imageFileRef = useRef<HTMLInputElement>(null)
   const videoFileRef = useRef<HTMLInputElement>(null)
+  const anyFileRef = useRef<HTMLInputElement>(null)
   const recRef = useRef<SpeechRecognition | null>(null)
   const imeComposingRef = useRef(false)
   const filterWrapRef = useRef<HTMLDivElement>(null)
@@ -162,6 +174,7 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
   const filterShort = FILTER_TABS.find((t) => t.id === modelFilter)?.short ?? '全部'
   const videoCount = pendingComposerAttachments.filter((a) => a.kind === 'video').length
   const imageCount = pendingComposerAttachments.filter((a) => a.kind === 'image').length
+  const fileCount = pendingComposerAttachments.filter((a) => a.kind === 'file').length
 
   useEffect(() => {
     if (filteredModelOptions.some((o) => o.key === modelPickerKey)) return
@@ -262,6 +275,18 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
         onChange={(e) => {
           void onPickFiles(e.target.files).finally(() => {
             if (videoFileRef.current) videoFileRef.current.value = ''
+          })
+        }}
+      />
+      <input
+        ref={anyFileRef}
+        type="file"
+        accept={FILE_ACCEPT}
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          void onPickFiles(e.target.files).finally(() => {
+            if (anyFileRef.current) anyFileRef.current.value = ''
           })
         }}
       />
@@ -397,9 +422,24 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
                 <Film className="h-4 w-4 text-violet-600" />
                 批量上传视频
               </button>
+              <button
+                type="button"
+                role="menuitem"
+                disabled={attachmentFull}
+                onClick={() => {
+                  setAttachOpen(false)
+                  anyFileRef.current?.click()
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+              >
+                <FileText className="h-4 w-4 text-indigo-600" />
+                上传文件（文档等）
+              </button>
               <p className="border-t border-slate-100 px-3 py-2 text-[10px] leading-relaxed text-slate-400">
-                支持 MP4 / MOV / WebM，单文件 ≤100MB，合计最多 {MAX_AI_CHAT_IMAGE_ATTACHMENTS}{' '}
-                个附件
+                图片 / 视频（≤100MB）/ 其它文件（≤40MB，可执行类除外）；合计最多{' '}
+                {MAX_AI_CHAT_IMAGE_ATTACHMENTS} 个
+                {fileCount ? ` · 已选文件 ${fileCount}` : ''}
+                {imageCount || videoCount ? ` · 图${imageCount}/视${videoCount}` : ''}
               </p>
             </div>
           ) : null}

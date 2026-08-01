@@ -34,6 +34,11 @@ import {
   type FinancePlatformId,
   type FinanceReconcileRow,
 } from '../services/financeReconcileApi'
+import {
+  listMerchantOrders,
+  syncMerchantOrders,
+  type MerchantOrderRow,
+} from '../services/merchantOrdersApi'
 import ModulePage from './ModulePage'
 
 const PIE_COLORS = ['#2563eb', '#ea580c', '#16a34a']
@@ -87,6 +92,65 @@ export function FinanceReconcilePage() {
   const [apiWarnings, setApiWarnings] = useState<string[]>([])
   const [resolvedRange, setResolvedRange] = useState<{ start?: string; end?: string }>({})
   const [platformFilter, setPlatformFilter] = useState<PlatformView>('all')
+  const [viewTab, setViewTab] = useState<'daily' | 'orders'>('daily')
+  const [orderRows, setOrderRows] = useState<MerchantOrderRow[]>([])
+  const [orderTotal, setOrderTotal] = useState(0)
+  const [orderPage, setOrderPage] = useState(1)
+  const [orderQ, setOrderQ] = useState('')
+  const [orderLoading, setOrderLoading] = useState(false)
+  const [orderErr, setOrderErr] = useState('')
+  const [orderSyncing, setOrderSyncing] = useState(false)
+
+  const orderRange = useMemo(() => {
+    if (rangeMode === 'custom') return { start: customStart, end: customEnd }
+    const end = shanghaiTodayYmd()
+    return { start: addCalendarDaysShanghai(end, -(dayRange - 1)), end }
+  }, [rangeMode, customStart, customEnd, dayRange])
+
+  const loadOrders = useCallback(async () => {
+    setOrderLoading(true)
+    setOrderErr('')
+    try {
+      const plat =
+        platformFilter === 'douyin' || platformFilter === 'all' || platformFilter === 'groupbuy'
+          ? platformFilter === 'all' || platformFilter === 'groupbuy'
+            ? 'douyin'
+            : platformFilter
+          : 'douyin'
+      const r = await listMerchantOrders({
+        platform: plat,
+        startDate: orderRange.start,
+        endDate: orderRange.end,
+        q: orderQ.trim() || undefined,
+        page: orderPage,
+        pageSize: 30,
+      })
+      setOrderRows(r.rows)
+      setOrderTotal(r.total)
+    } catch (e) {
+      setOrderErr(e instanceof Error ? e.message : '订单明细加载失败')
+      setOrderRows([])
+      setOrderTotal(0)
+    } finally {
+      setOrderLoading(false)
+    }
+  }, [platformFilter, orderRange.start, orderRange.end, orderQ, orderPage])
+
+  const syncAndLoadOrders = useCallback(async () => {
+    setOrderSyncing(true)
+    try {
+      await syncMerchantOrders({ startDate: orderRange.start, endDate: orderRange.end })
+    } catch {
+      /* 仍尝试读库 */
+    } finally {
+      setOrderSyncing(false)
+    }
+    await loadOrders()
+  }, [orderRange.start, orderRange.end, loadOrders])
+
+  useEffect(() => {
+    if (viewTab === 'orders') void loadOrders()
+  }, [viewTab, loadOrders])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -278,6 +342,132 @@ export function FinanceReconcilePage() {
         </div>
       }
     >
+      <div className="mb-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => setViewTab('daily')}
+          className={cn(
+            'rounded-lg px-3 py-1.5 text-sm font-medium',
+            viewTab === 'daily' ? 'bg-indigo-600 text-white' : 'border border-slate-200 bg-white text-slate-700',
+          )}
+        >
+          按日汇总
+        </button>
+        <button
+          type="button"
+          onClick={() => setViewTab('orders')}
+          className={cn(
+            'rounded-lg px-3 py-1.5 text-sm font-medium',
+            viewTab === 'orders' ? 'bg-indigo-600 text-white' : 'border border-slate-200 bg-white text-slate-700',
+          )}
+        >
+          订单明细
+        </button>
+      </div>
+
+      {viewTab === 'orders' ? (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="text-sm text-slate-600">
+              搜索
+              <input
+                value={orderQ}
+                onChange={(e) => {
+                  setOrderPage(1)
+                  setOrderQ(e.target.value)
+                }}
+                placeholder="订单号 / 商品名"
+                className="mt-1 block min-w-[200px] rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              />
+            </label>
+            <button
+              type="button"
+              disabled={orderLoading || orderSyncing}
+              onClick={() => void syncAndLoadOrders()}
+              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm text-white disabled:opacity-50"
+            >
+              {orderSyncing || orderLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              同步抖音订单并刷新
+            </button>
+            <p className="text-xs text-slate-500">
+              区间 {orderRange.start} ~ {orderRange.end} · 共 {orderTotal} 笔（一期支持抖音来客）
+            </p>
+          </div>
+          {orderErr ? (
+            <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+              {orderErr}
+            </div>
+          ) : null}
+          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+            <table className="min-w-full text-left text-sm">
+              <thead className="bg-slate-50 text-xs text-slate-500">
+                <tr>
+                  <th className="px-3 py-2">支付时间</th>
+                  <th className="px-3 py-2">平台</th>
+                  <th className="px-3 py-2">订单号</th>
+                  <th className="px-3 py-2">商品</th>
+                  <th className="px-3 py-2">金额</th>
+                  <th className="px-3 py-2">退款</th>
+                  <th className="px-3 py-2">状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orderRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-3 py-8 text-center text-slate-400">
+                      {orderLoading ? '加载中…' : '暂无逐单，请先同步抖音订单'}
+                    </td>
+                  </tr>
+                ) : (
+                  orderRows.map((o) => (
+                    <tr key={o.id} className="border-t border-slate-100">
+                      <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-600">
+                        {o.payTime ? new Date(o.payTime).toLocaleString('zh-CN') : '—'}
+                      </td>
+                      <td className="px-3 py-2">{o.platform}</td>
+                      <td className="px-3 py-2 font-mono text-xs">{o.orderId}</td>
+                      <td className="max-w-[240px] truncate px-3 py-2" title={o.skuName}>
+                        {o.skuName}
+                      </td>
+                      <td className="px-3 py-2">{formatYuan(o.payAmountFen / 100)}</td>
+                      <td className="px-3 py-2">{formatYuan(o.refundAmountFen / 100)}</td>
+                      <td className="px-3 py-2">{o.orderStatus ?? '—'}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex items-center gap-3 text-sm">
+            <button
+              type="button"
+              disabled={orderPage <= 1}
+              onClick={() => setOrderPage((p) => Math.max(1, p - 1))}
+              className="rounded border px-2 py-1 disabled:opacity-40"
+            >
+              上一页
+            </button>
+            <span>
+              第 {orderPage} 页 / 共 {Math.max(1, Math.ceil(orderTotal / 30))} 页
+            </span>
+            <button
+              type="button"
+              disabled={orderPage * 30 >= orderTotal}
+              onClick={() => setOrderPage((p) => p + 1)}
+              className="rounded border px-2 py-1 disabled:opacity-40"
+            >
+              下一页
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {viewTab === 'daily' ? (
+      <>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-4 rounded-lg border border-amber-100 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
         <div className="min-w-0 flex-1">
           <span className="font-medium">毛利率来源：</span>
@@ -549,6 +739,8 @@ export function FinanceReconcilePage() {
       <p className="mt-4 text-xs leading-relaxed text-gray-500">
         说明：预估毛利按「核销金额 × 商品页该渠道综合毛利率」粗算，未扣平台佣金、退款与税费；正式结算以各平台对账单与财务规则为准。美团、小红书等渠道的对账展示将随后续版本接入。
       </p>
+      </>
+      ) : null}
     </ModulePage>
   )
 }

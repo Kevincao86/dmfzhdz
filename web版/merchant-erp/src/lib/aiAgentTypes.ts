@@ -175,6 +175,7 @@ export type AiTaxFilingPreview = {
 export type AiComposerAttachment =
   | { kind: 'image'; url: string }
   | { kind: 'video'; previewUrl: string; posterUrl: string; name: string }
+  | { kind: 'file'; name: string; extractedText: string; mime: string }
 
 /** 输入框中待发送的「引用某条对话」片段（发送后写入用户消息正文前缀） */
 export type AiAgentPendingQuote = {

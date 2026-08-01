@@ -239,13 +239,22 @@ function agentMessagesToChatMessages(msgs: AiAgentMessage[], taskType?: AiTaskTy
 const MAX_ARCHIVED_SESSIONS = 10
 const MAX_COMPOSER_ATTACHMENTS = MAX_AI_CHAT_IMAGE_ATTACHMENTS
 const MAX_COMPOSER_VIDEO_BYTES = 100 * 1024 * 1024
+const MAX_COMPOSER_FILE_BYTES = 40 * 1024 * 1024
+const COMPOSER_FILE_BLOCK_EXT =
+  /\.(exe|dll|bat|cmd|msi|scr|ps1|sh|bash|zsh|com|jar|apk|dmg|pkg|deb|rpm)$/i
 
 function revokeComposerAttachment(att: AiComposerAttachment) {
   if (att.kind === 'video') URL.revokeObjectURL(att.previewUrl)
 }
 
 function attachmentVisionUrls(attachments: AiComposerAttachment[]): string[] {
-  return attachments.map((a) => (a.kind === 'image' ? a.url : a.posterUrl))
+  return attachments
+    .map((a) => (a.kind === 'image' ? a.url : a.kind === 'video' ? a.posterUrl : ''))
+    .filter(Boolean)
+}
+
+function isComposerBlockedFile(file: File): boolean {
+  return COMPOSER_FILE_BLOCK_EXT.test(file.name || '')
 }
 
 function userReferenceImagesFromMessages(msgs: AiAgentMessage[]): string[] {
@@ -532,8 +541,47 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
             posterUrl,
             name: file.name || 'video.mp4',
           })
-        } else {
+        } else if (isComposerBlockedFile(file)) {
           skippedUnsupported += 1
+        } else {
+          if (file.size > MAX_COMPOSER_FILE_BYTES) {
+            skippedOversize += 1
+            continue
+          }
+          const name = file.name || '附件'
+          const mime = file.type || 'application/octet-stream'
+          let extractedText = ''
+          const isPlain =
+            /^text\//i.test(mime) ||
+            /\.(txt|md|markdown|csv|json|html?|xml|log|tsv)$/i.test(name)
+          if (isPlain) {
+            extractedText = (await file.text()).replace(/\u0000/g, '').trim().slice(0, 80_000)
+          } else {
+            const { fileToBase64, uploadTenantKbDocument } = await import('../lib/knowledgeBaseApi')
+            const b64 = await fileToBase64(file)
+            const doc = await uploadTenantKbDocument({
+              fileName: name,
+              contentType: mime,
+              contentBase64: b64,
+              title: `AI附件 · ${name}`,
+              tags: ['ai-agent-attachment'],
+              feedEnabled: true,
+            })
+            extractedText = [
+              `【附件已入库知识库】${name}`,
+              doc.summary?.trim() || '',
+              doc.parse_status === 'failed'
+                ? `（解析状态：${doc.parse_status}${doc.parse_error ? ` / ${doc.parse_error}` : ''}；请在消息里补充要点）`
+                : `（解析状态：${doc.parse_status}）`,
+            ]
+              .filter(Boolean)
+              .join('\n')
+              .slice(0, 80_000)
+          }
+          if (!extractedText.trim()) {
+            extractedText = `【附件】${name}（未能提取正文，请在对话中说明要点）`
+          }
+          staged.push({ kind: 'file', name, extractedText, mime })
         }
       } catch {
         skippedUnsupported += 1
@@ -1609,17 +1657,29 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       if ((!trimmed && attachments.length === 0 && !pq) || aiSending) return
       const videoCount = attachments.filter((a) => a.kind === 'video').length
       const imageCount = attachments.filter((a) => a.kind === 'image').length
+      const fileAtts = attachments.filter(
+        (a): a is Extract<AiComposerAttachment, { kind: 'file' }> => a.kind === 'file',
+      )
       let line =
         trimmed ||
-        (videoCount
-          ? `请结合我附带的 ${videoCount} 个视频（下方为关键帧截图，供你理解画面）说明需求。`
-          : attachments.length
-            ? '请结合附图说明你的需求。'
-            : '')
+        (fileAtts.length
+          ? `请结合我附带的 ${fileAtts.length} 个文件说明需求。`
+          : videoCount
+            ? `请结合我附带的 ${videoCount} 个视频（下方为关键帧截图，供你理解画面）说明需求。`
+            : attachments.length
+              ? '请结合附图说明你的需求。'
+              : '')
       if (videoCount > 0 && trimmed) {
         line = `${trimmed}\n\n【附件说明】已上传 ${videoCount} 个视频` +
           (imageCount ? `、${imageCount} 张图片` : '') +
           '；下列图片为视频关键帧/原图，请据此理解画面与指令（勿当成「要我生图」）。'
+      }
+      if (fileAtts.length) {
+        const blocks = fileAtts
+          .map((f) => `----- 文件：${f.name} -----\n${f.extractedText}`)
+          .join('\n\n')
+          .slice(0, 60_000)
+        line = `${line}\n\n【文件正文摘录】\n${blocks}`
       }
       if (pq) {
         const who = pq.role === 'user' ? '我' : '助手'
@@ -1634,7 +1694,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       const bubbleImageUrls: string[] = []
       for (const a of attachments) {
         if (a.kind === 'image') bubbleImageUrls.push(a.url)
-        else bubbleImageUrls.push(a.posterUrl)
+        else if (a.kind === 'video') bubbleImageUrls.push(a.posterUrl)
       }
       const userMsg = createAgentMessage('user', line, {
         imageUrls: bubbleImageUrls.length ? bubbleImageUrls : undefined,

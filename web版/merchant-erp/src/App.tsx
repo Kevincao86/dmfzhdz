@@ -36,6 +36,7 @@ const StoreDecorationPage = lazy(() => import('./pages/StoreDecorationPage'))
 const StoreDetailPage = lazy(() => import('./pages/StoreDetailPage'))
 const StoreInfoPage = lazy(() => import('./pages/StoreInfoPage'))
 const StoreMenuPage = lazy(() => import('./pages/StoreMenuPage'))
+const StoreAnalysisPage = lazy(() => import('./pages/StoreAnalysisPage'))
 const CompetitorAnalysisPage = lazy(() => import('./pages/CompetitorAnalysisPage'))
 const AiOpsPlanPage = lazy(() => import('./pages/AiOpsPlanPage'))
 const ProductCreateFlowPage = lazy(() => import('./pages/ProductCreateFlowPage'))
@@ -136,6 +137,7 @@ export default function App() {
                     <Route path="knowledge-base" element={<KnowledgeBasePage />} />
                     <Route path="store" element={<Navigate to="/store/info" replace />} />
                     <Route path="store/info" element={<StoreInfoPage />} />
+                    <Route path="store/analysis" element={<StoreAnalysisPage />} />
                     <Route path="store/menu" element={<StoreMenuPage />} />
                     <Route path="store/detail/:platform/:poiId" element={<StoreDetailPage />} />
                     <Route path="store/decoration" element={<StoreDecorationPage />} />
