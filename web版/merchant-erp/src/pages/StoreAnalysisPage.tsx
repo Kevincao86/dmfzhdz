@@ -1,8 +1,10 @@
 import {
   BarChart3,
   Loader2,
+  MessageSquare,
   RefreshCw,
   Sparkles,
+  Star,
   Store,
   TrendingUp,
   Users,
@@ -29,8 +31,11 @@ import { readMerchantSession } from '../lib/merchantSession'
 import { getDouyinStores } from '../services/douyinMerchantApi'
 import {
   fetchShopAnalysis,
+  fetchShopAnalysisAi,
   syncMerchantOrders,
   type ShopAnalysisSummary,
+  type ShopAiReportSection,
+  type ShopReviewDigest,
   type ShopStoreOption,
 } from '../services/merchantOrdersApi'
 import ModulePage from './ModulePage'
@@ -62,7 +67,13 @@ const ADVICE_VISUALS: {
     accent: 'text-violet-700 bg-violet-100',
   },
   {
-    match: /优化|建议/,
+    match: /评价|口碑|评分/,
+    icon: MessageSquare,
+    tone: 'from-rose-50 to-white border-rose-100',
+    accent: 'text-rose-700 bg-rose-100',
+  },
+  {
+    match: /优化|建议|行动/,
     icon: Sparkles,
     tone: 'from-amber-50 to-white border-amber-100',
     accent: 'text-amber-700 bg-amber-100',
@@ -123,6 +134,9 @@ export default function StoreAnalysisPage() {
   const [warnings, setWarnings] = useState<string[]>([])
   const [summary, setSummary] = useState<ShopAnalysisSummary | null>(null)
   const [advice, setAdvice] = useState('')
+  const [aiSections, setAiSections] = useState<ShopAiReportSection[]>([])
+  const [reviewDigest, setReviewDigest] = useState<ShopReviewDigest | null>(null)
+  const [modelUsed, setModelUsed] = useState('')
   const [showAdvice, setShowAdvice] = useState(false)
 
   const mergeStoreNames = useCallback(async (stores: ShopStoreOption[]): Promise<ShopStoreOption[]> => {
@@ -148,6 +162,9 @@ export default function StoreAnalysisPage() {
     setLoading(true)
     setErr('')
     setShowAdvice(false)
+    setAiSections([])
+    setReviewDigest(null)
+    setModelUsed('')
     try {
       const r = await fetchShopAnalysis({
         startDate,
@@ -195,15 +212,29 @@ export default function StoreAnalysisPage() {
     setAnalyzing(true)
     setErr('')
     try {
-      const r = await fetchShopAnalysis({
+      const r = await fetchShopAnalysisAi({
         startDate,
         endDate,
         platform,
         poiId: poiId || undefined,
       })
       setSummary(r.summary)
-      setAdvice(r.adviceFacts)
-      if (r.summary.stores?.length) setStoreOptions(r.summary.stores)
+      setReviewDigest(r.reviewDigest)
+      setModelUsed(r.modelUsed)
+      if (r.warnings?.length) setWarnings(r.warnings)
+      if (r.summary.stores?.length) {
+        const named = await mergeStoreNames(r.summary.stores)
+        setStoreOptions(named)
+        setSummary({ ...r.summary, stores: named })
+      }
+      if (r.aiReport && !r.aiFailed) {
+        setAdvice(r.aiReport)
+        setAiSections(r.aiSections?.length ? r.aiSections : adviceSections(r.aiReport))
+      } else {
+        setAdvice(r.adviceFacts)
+        setAiSections([])
+        if (r.message) setWarnings((w) => [...w, r.message!].slice(0, 6))
+      }
       setShowAdvice(true)
       requestAnimationFrame(() => {
         document.getElementById('shop-advice-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -253,12 +284,15 @@ export default function StoreAnalysisPage() {
     }))
   }, [summary])
 
-  const sections = useMemo(() => adviceSections(advice), [advice])
+  const sections = useMemo(() => {
+    if (aiSections.length) return aiSections
+    return adviceSections(advice)
+  }, [aiSections, advice])
 
   return (
     <ModulePage
       title="店铺分析"
-      subtitle="先看成交与客群图表；点击「店铺分析」生成图文经营建议"
+      subtitle="先看成交与客群图表；点击「店铺分析」由 GPT 结合评价生成完整图文报告"
     >
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <label className="text-sm text-slate-600">
@@ -525,7 +559,9 @@ export default function StoreAnalysisPage() {
             <div className="rounded-xl border border-dashed border-indigo-200 bg-indigo-50/40 px-5 py-8 text-center">
               <Sparkles className="mx-auto h-8 w-8 text-indigo-500" />
               <p className="mt-3 text-sm font-medium text-slate-800">图表已就绪</p>
-              <p className="mt-1 text-xs text-slate-500">点击上方「店铺分析」，生成图文经营建议</p>
+              <p className="mt-1 text-xs text-slate-500">
+                点击「店铺分析」，用 GPT 结合订单与评价生成完整图文报告（将消耗 AI 积分）
+              </p>
               <button
                 type="button"
                 disabled={analyzing}
@@ -537,82 +573,133 @@ export default function StoreAnalysisPage() {
               </button>
             </div>
           ) : (
-            <section id="shop-advice-panel" className="rounded-xl border border-slate-200 bg-white p-5">
-              <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-base font-semibold text-slate-900">经营建议</h3>
-                  <p className="text-xs text-slate-400">按成交、退款与客群自动生成 · 图文卡片</p>
-                </div>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:underline"
-                  onClick={() => {
-                    void navigator.clipboard.writeText(advice)
-                  }}
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                  复制报告
-                </button>
-              </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                {sections.length ? (
-                  sections.map((sec) => {
-                    const vis = visualFor(sec.title)
-                    const Icon = vis.icon
-                    return (
-                      <article
-                        key={sec.title}
-                        className={cn(
-                          'relative overflow-hidden rounded-xl border bg-gradient-to-br p-4 shadow-sm',
-                          vis.tone,
-                        )}
-                      >
-                        <div
-                          className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-30"
-                          style={{
-                            background:
-                              'radial-gradient(circle, rgba(79,70,229,0.35) 0%, transparent 70%)',
-                          }}
-                        />
-                        <div className="relative flex items-start gap-3">
-                          <span
+            <section id="shop-advice-panel" className="space-y-4">
+              {reviewDigest ? (
+                <div className="rounded-xl border border-slate-200 bg-white p-4">
+                  <div className="mb-3 flex items-center gap-2">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-rose-100 text-rose-700">
+                      <Star className="h-4 w-4" />
+                    </span>
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-900">评价概况</h3>
+                      <p className="text-xs text-slate-400">来自抖音来客近区间评价（需餐饮评价权限）</p>
+                    </div>
+                  </div>
+                  {!reviewDigest.ok ? (
+                    <p className="text-sm text-amber-800">{reviewDigest.message || '评价暂不可用'}</p>
+                  ) : reviewDigest.total <= 0 ? (
+                    <p className="text-sm text-slate-500">区间内暂无评价</p>
+                  ) : (
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      {[
+                        { k: '均分', v: `${reviewDigest.avgStars}` },
+                        { k: '评价数', v: String(reviewDigest.total) },
+                        {
+                          k: '差评占比',
+                          v: `${reviewDigest.badShare}%`,
+                          danger: reviewDigest.badShare >= 15,
+                        },
+                        { k: '未回复', v: String(reviewDigest.unrepliedCount) },
+                      ].map((x) => (
+                        <div key={x.k} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                          <p className="text-xs text-slate-500">{x.k}</p>
+                          <p
                             className={cn(
-                              'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
-                              vis.accent,
+                              'mt-0.5 text-lg font-semibold',
+                              x.danger ? 'text-rose-600' : 'text-slate-900',
                             )}
                           >
-                            <Icon className="h-5 w-5" />
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <h4 className="text-sm font-semibold text-slate-900">{sec.title}</h4>
-                            <ul className="mt-2 space-y-2">
-                              {(sec.bullets.length ? sec.bullets : [sec.body || '（本节暂无要点）']).map(
-                                (line, idx) => (
-                                  <li
-                                    key={`${sec.title}-${idx}`}
-                                    className="flex gap-2 text-sm leading-relaxed text-slate-700"
-                                  >
-                                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400" />
-                                    <span>{line}</span>
-                                  </li>
-                                ),
-                              )}
-                            </ul>
-                          </div>
+                            {x.v}
+                          </p>
                         </div>
-                      </article>
-                    )
-                  })
-                ) : (
-                  <pre className="col-span-full whitespace-pre-wrap font-sans text-sm leading-relaxed text-slate-700">
-                    {advice}
-                  </pre>
-                )}
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : null}
+
+              <div className="rounded-xl border border-slate-200 bg-white p-5">
+                <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-900">经营建议</h3>
+                    <p className="text-xs text-slate-400">
+                      {modelUsed
+                        ? `GPT/文案模型完整分析 · ${modelUsed}`
+                        : '规则建议（AI 未生成时回退）'}
+                      · 图文卡片
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:underline"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(advice)
+                    }}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    复制报告
+                  </button>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {sections.length ? (
+                    sections.map((sec) => {
+                      const vis = visualFor(sec.title)
+                      const Icon = vis.icon
+                      return (
+                        <article
+                          key={sec.title}
+                          className={cn(
+                            'relative overflow-hidden rounded-xl border bg-gradient-to-br p-4 shadow-sm',
+                            vis.tone,
+                          )}
+                        >
+                          <div
+                            className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-30"
+                            style={{
+                              background:
+                                'radial-gradient(circle, rgba(79,70,229,0.35) 0%, transparent 70%)',
+                            }}
+                          />
+                          <div className="relative flex items-start gap-3">
+                            <span
+                              className={cn(
+                                'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
+                                vis.accent,
+                              )}
+                            >
+                              <Icon className="h-5 w-5" />
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <h4 className="text-sm font-semibold text-slate-900">{sec.title}</h4>
+                              <ul className="mt-2 space-y-2">
+                                {(sec.bullets.length ? sec.bullets : [sec.body || '（本节暂无要点）']).map(
+                                  (line, idx) => (
+                                    <li
+                                      key={`${sec.title}-${idx}`}
+                                      className="flex gap-2 text-sm leading-relaxed text-slate-700"
+                                    >
+                                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400" />
+                                      <span>{line}</span>
+                                    </li>
+                                  ),
+                                )}
+                              </ul>
+                            </div>
+                          </div>
+                        </article>
+                      )
+                    })
+                  ) : (
+                    <pre className="col-span-full whitespace-pre-wrap font-sans text-sm leading-relaxed text-slate-700">
+                      {advice}
+                    </pre>
+                  )}
+                </div>
+                <p className="mt-4 text-xs text-slate-400">
+                  说明：客群新老客由灵祺按订单 open_id 推算（抖音订单接口不提供官方用户标签）；毛利为商家自填比例估算；竞对成交无法从平台
+                  API 获取。
+                </p>
               </div>
-              <p className="mt-4 text-xs text-slate-400">
-                说明：新客/老客按「区间开始前是否有成交」判定；毛利为商家自填比例估算；竞对成交无法从平台 API
-                获取。
-              </p>
             </section>
           )}
         </div>

@@ -172,6 +172,7 @@ import meooKbHandler from '../api/meoo-kb.ts'
 import merchantOrdersSyncHandler from '../api/meoo-merchant-orders-sync.ts'
 import merchantOrdersHandler from '../api/meoo-merchant-orders.ts'
 import shopAnalysisSummaryHandler from '../api/meoo-shop-analysis-summary.ts'
+import shopAnalysisAiHandler from '../api/meoo-shop-analysis-ai.ts'
 import mpRecruitmentAiHandler from '../api/meoo-mp-recruitment-ai.ts'
 import mpRecruitmentVideoComplianceHandler from '../api/meoo-mp-recruitment-video-compliance.ts'
 import mpRecruitmentScriptComplianceHandler from '../api/meoo-mp-recruitment-script-compliance.ts'
@@ -201,7 +202,7 @@ import apiPingHandler from '../api/ping.ts'
 import merchantSlugHandler from '../api/merchant/[...slug].ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260802-shop-analysis-charts-v2'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260802-shop-analysis-ai-v1'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -274,6 +275,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-merchant-orders-sync': merchantOrdersSyncHandler as VercelLikeHandler,
   '/api/meoo-merchant-orders': merchantOrdersHandler as VercelLikeHandler,
   '/api/meoo-shop-analysis-summary': shopAnalysisSummaryHandler as VercelLikeHandler,
+  '/api/meoo-shop-analysis-ai': shopAnalysisAiHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-auth': mpAuthHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-calendar-reminder': mpCalendarReminderHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-order-custom-label': mpOrderCustomLabelHandler as VercelLikeHandler,
