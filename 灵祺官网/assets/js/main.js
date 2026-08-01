@@ -4,206 +4,19 @@
   const yearEl = document.getElementById("year");
   if (yearEl) yearEl.textContent = String(new Date().getFullYear());
 
-  const header = document.getElementById("site-header");
+  const topbar = document.getElementById("topbar");
   const onScroll = () => {
-    if (!header) return;
-    header.classList.toggle("scrolled", window.scrollY > 24);
+    if (!topbar) return;
+    topbar.classList.toggle("is-scrolled", window.scrollY > 20);
   };
   onScroll();
   window.addEventListener("scroll", onScroll, { passive: true });
 
-  const cursorFx = document.getElementById("cursor-fx");
-  const trailCanvas = document.getElementById("cursor-trail");
-  const finePointer = window.matchMedia("(pointer: fine)").matches;
-
-  if (cursorFx && trailCanvas instanceof HTMLCanvasElement && !reduceMotion && finePointer) {
-    document.body.classList.add("has-magic-cursor");
-    cursorFx.classList.add("on");
-    trailCanvas.classList.add("on");
-
-    const tctx = trailCanvas.getContext("2d");
-    let cx = window.innerWidth / 2;
-    let cy = window.innerHeight / 2;
-    let tx = cx;
-    let ty = cy;
-    let vx = 0;
-    let vy = 0;
-    let particles = [];
-    let lastEmit = 0;
-    let dpr = 1;
-
-    const resizeTrail = () => {
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
-      trailCanvas.width = Math.floor(window.innerWidth * dpr);
-      trailCanvas.height = Math.floor(window.innerHeight * dpr);
-      trailCanvas.style.width = `${window.innerWidth}px`;
-      trailCanvas.style.height = `${window.innerHeight}px`;
-      if (tctx) tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    };
-    resizeTrail();
-    window.addEventListener("resize", resizeTrail);
-
-    const spawn = (x, y, burst = false) => {
-      const n = burst ? 10 : 1;
-      for (let i = 0; i < n; i++) {
-        const a = Math.random() * Math.PI * 2;
-        const sp = burst ? 1.2 + Math.random() * 2.4 : 0.2 + Math.random() * 0.7;
-        particles.push({
-          x,
-          y,
-          vx: Math.cos(a) * sp,
-          vy: Math.sin(a) * sp - (burst ? 0.4 : 0),
-          life: 1,
-          decay: burst ? 0.018 + Math.random() * 0.02 : 0.012 + Math.random() * 0.016,
-          size: burst ? 1.6 + Math.random() * 2.4 : 1 + Math.random() * 1.8,
-          hue: Math.random() > 0.45 ? "lilac" : "mist",
-        });
-      }
-      if (particles.length > 160) particles = particles.slice(-160);
-    };
-
-    window.addEventListener(
-      "pointermove",
-      (e) => {
-        tx = e.clientX;
-        ty = e.clientY;
-        const now = performance.now();
-        const speed = Math.hypot(e.movementX || 0, e.movementY || 0);
-        if (now - lastEmit > (speed > 8 ? 12 : 28)) {
-          spawn(tx, ty, false);
-          lastEmit = now;
-        }
-      },
-      { passive: true }
-    );
-
-    window.addEventListener("pointerdown", (e) => {
-      if (e.pointerType === "touch") return;
-      cursorFx.classList.add("clicking");
-      spawn(e.clientX, e.clientY, true);
-      const ripple = document.createElement("div");
-      ripple.className = "cursor-ripple";
-      ripple.style.left = `${e.clientX}px`;
-      ripple.style.top = `${e.clientY}px`;
-      document.body.appendChild(ripple);
-      ripple.addEventListener("animationend", () => ripple.remove());
-    });
-
-    window.addEventListener("pointerup", () => cursorFx.classList.remove("clicking"));
-    document.addEventListener("mouseleave", () => cursorFx.classList.remove("on"));
-    document.addEventListener("mouseenter", () => cursorFx.classList.add("on"));
-
-    document.querySelectorAll("a, button, .cap, .product, input, select, textarea, .header-cta, .btn").forEach((el) => {
-      el.addEventListener("pointerenter", () => cursorFx.classList.add("hot"));
-      el.addEventListener("pointerleave", () => cursorFx.classList.remove("hot"));
-    });
-
-    const tickCursor = () => {
-      const dx = tx - cx;
-      const dy = ty - cy;
-      vx += dx * 0.22;
-      vy += dy * 0.22;
-      vx *= 0.72;
-      vy *= 0.72;
-      cx += vx;
-      cy += vy;
-
-      cursorFx.style.left = `${cx}px`;
-      cursorFx.style.top = `${cy}px`;
-
-      if (tctx) {
-        tctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-        for (let i = particles.length - 1; i >= 0; i--) {
-          const p = particles[i];
-          p.x += p.vx;
-          p.y += p.vy;
-          p.vx *= 0.96;
-          p.vy *= 0.96;
-          p.life -= p.decay;
-          if (p.life <= 0) {
-            particles.splice(i, 1);
-            continue;
-          }
-          const alpha = Math.max(0, p.life);
-          tctx.beginPath();
-          tctx.fillStyle =
-            p.hue === "mist"
-              ? `rgba(233, 213, 255, ${alpha * 0.85})`
-              : `rgba(196, 181, 253, ${alpha})`;
-          tctx.shadowColor =
-            p.hue === "mist" ? "rgba(233, 213, 255, 0.8)" : "rgba(167, 139, 250, 0.9)";
-          tctx.shadowBlur = 8;
-          tctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
-          tctx.fill();
-        }
-        tctx.shadowBlur = 0;
-      }
-
-      requestAnimationFrame(tickCursor);
-    };
-    requestAnimationFrame(tickCursor);
-  }
-
-  const revealEls = document.querySelectorAll(".reveal, .signal-board");
-  if ("IntersectionObserver" in window) {
-    const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("in-view");
-            io.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.18, rootMargin: "0px 0px -8% 0px" }
-    );
-    revealEls.forEach((el) => io.observe(el));
-  } else {
-    revealEls.forEach((el) => el.classList.add("in-view"));
-  }
-
-  const counters = document.querySelectorAll("[data-count]");
-  const animateCount = (el) => {
-    const target = Number(el.getAttribute("data-count") || 0);
-    const suffix = el.getAttribute("data-suffix") || "";
-    if (reduceMotion) {
-      el.textContent = `${target}${suffix}`;
-      return;
-    }
-    const duration = 1100;
-    const start = performance.now();
-    const step = (now) => {
-      const t = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - t, 3);
-      el.textContent = `${Math.round(target * eased)}${suffix}`;
-      if (t < 1) requestAnimationFrame(step);
-    };
-    requestAnimationFrame(step);
-  };
-
-  if ("IntersectionObserver" in window) {
-    const cio = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            animateCount(entry.target);
-            cio.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.5 }
-    );
-    counters.forEach((el) => cio.observe(el));
-  } else {
-    counters.forEach(animateCount);
-  }
-
+  /* Contact → shared official API, tagged as 灵祺官网 */
   const form = document.getElementById("contact-form");
   const note = document.getElementById("form-note");
   const CONTACT_API = (
-    window.LINGQI_CONTACT_API ||
-    window.MODIAN_CONTACT_API ||
-    "https://mofangdianai.com/erp-api/meoo-official-contact"
+    window.LINGQI_CONTACT_API || "https://mofangdianai.com/erp-api/meoo-official-contact"
   ).replace(/\/+$/, "");
 
   if (form) {
@@ -266,17 +79,18 @@
     });
   }
 
-  const canvas = document.getElementById("hero-canvas");
-  if (!canvas || !(canvas instanceof HTMLCanvasElement)) return;
+  /* Hero orb: constellation + rings (light tech) */
+  const canvas = document.getElementById("orb-canvas");
+  if (!(canvas instanceof HTMLCanvasElement)) return;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
   let w = 0;
   let h = 0;
   let nodes = [];
-  let mouse = { x: 0.62, y: 0.38 };
   let raf = 0;
   let t0 = performance.now();
+  let mouse = { x: 0.55, y: 0.45 };
 
   const resize = () => {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -285,14 +99,13 @@
     canvas.width = Math.floor(w * dpr);
     canvas.height = Math.floor(h * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    const count = Math.floor((w * h) / 14000);
-    nodes = Array.from({ length: Math.max(42, Math.min(count, 110)) }, () => ({
+    const count = Math.floor((w * h) / 9000);
+    nodes = Array.from({ length: Math.max(28, Math.min(count, 70)) }, () => ({
       x: Math.random() * w,
       y: Math.random() * h,
-      vx: (Math.random() - 0.5) * 0.28,
-      vy: (Math.random() - 0.5) * 0.28,
-      r: 1.1 + Math.random() * 1.6,
+      vx: (Math.random() - 0.5) * 0.35,
+      vy: (Math.random() - 0.5) * 0.35,
+      r: 1.2 + Math.random() * 1.8,
     }));
   };
 
@@ -313,59 +126,59 @@
     const t = (now - t0) / 1000;
     ctx.clearRect(0, 0, w, h);
 
+    const cx = w * 0.52;
+    const cy = h * 0.48;
+    const R = Math.min(w, h) * 0.28;
+
+    const glow = ctx.createRadialGradient(cx, cy, R * 0.1, cx, cy, R * 1.6);
+    glow.addColorStop(0, "rgba(167, 139, 250, 0.35)");
+    glow.addColorStop(0.45, "rgba(103, 232, 249, 0.12)");
+    glow.addColorStop(1, "transparent");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * 1.6, 0, Math.PI * 2);
+    ctx.fill();
+
     ctx.save();
-    ctx.strokeStyle = "rgba(196, 181, 253, 0.05)";
-    ctx.lineWidth = 1;
-    const gap = 56;
-    const ox = (t * 8) % gap;
-    const oy = (t * 5) % gap;
-    for (let x = -gap + ox; x < w + gap; x += gap) {
+    ctx.translate(cx, cy);
+    for (let i = 0; i < 3; i++) {
+      ctx.rotate(t * (0.12 + i * 0.04) * (i % 2 ? -1 : 1));
+      ctx.strokeStyle = `rgba(124, 58, 237, ${0.18 - i * 0.04})`;
+      ctx.lineWidth = 1.2;
       ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, h);
-      ctx.stroke();
-    }
-    for (let y = -gap + oy; y < h + gap; y += gap) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(w, y);
+      ctx.ellipse(0, 0, R * (1.05 + i * 0.22), R * (0.55 + i * 0.12), i * 0.5, 0, Math.PI * 2);
       ctx.stroke();
     }
     ctx.restore();
 
-    const cx = w * 0.68;
-    const cy = h * 0.42;
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(t * 0.15);
-    ctx.strokeStyle = "rgba(196, 181, 253, 0.22)";
-    ctx.lineWidth = 1;
+    const core = ctx.createRadialGradient(cx - R * 0.15, cy - R * 0.2, 0, cx, cy, R);
+    core.addColorStop(0, "rgba(255, 255, 255, 0.95)");
+    core.addColorStop(0.35, "rgba(196, 181, 253, 0.75)");
+    core.addColorStop(1, "rgba(124, 58, 237, 0.35)");
+    ctx.fillStyle = core;
     ctx.beginPath();
-    ctx.ellipse(0, 0, Math.min(w, h) * 0.22, Math.min(w, h) * 0.14, 0, 0, Math.PI * 2);
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
+    ctx.lineWidth = 1.5;
     ctx.stroke();
-    ctx.rotate(-t * 0.35);
-    ctx.strokeStyle = "rgba(240, 198, 116, 0.14)";
-    ctx.beginPath();
-    ctx.ellipse(0, 0, Math.min(w, h) * 0.16, Math.min(w, h) * 0.28, 0.4, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
 
     const mx = mouse.x * w;
     const my = mouse.y * h;
 
-    for (const n of nodes) {
-      if (!reduceMotion) {
+    if (!reduceMotion) {
+      for (const n of nodes) {
         n.x += n.vx;
         n.y += n.vy;
         const dx = mx - n.x;
         const dy = my - n.y;
         const dist = Math.hypot(dx, dy) || 1;
-        if (dist < 180) {
-          n.vx += (dx / dist) * 0.012;
-          n.vy += (dy / dist) * 0.012;
+        if (dist < 140) {
+          n.vx += (dx / dist) * 0.01;
+          n.vy += (dy / dist) * 0.01;
         }
-        n.vx *= 0.992;
-        n.vy *= 0.992;
+        n.vx *= 0.99;
+        n.vy *= 0.99;
         if (n.x < 0 || n.x > w) n.vx *= -1;
         if (n.y < 0 || n.y > h) n.vy *= -1;
         n.x = Math.max(0, Math.min(w, n.x));
@@ -373,17 +186,15 @@
       }
     }
 
-    const linkDist = Math.min(150, w * 0.14);
+    const linkDist = Math.min(120, w * 0.16);
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
         const a = nodes[i];
         const b = nodes[j];
-        const dx = a.x - b.x;
-        const dy = a.y - b.y;
-        const d = Math.hypot(dx, dy);
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
         if (d < linkDist) {
-          const alpha = (1 - d / linkDist) * 0.38;
-          ctx.strokeStyle = `rgba(196, 181, 253, ${alpha})`;
+          const alpha = (1 - d / linkDist) * 0.45;
+          ctx.strokeStyle = `rgba(124, 58, 237, ${alpha})`;
           ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(a.x, a.y);
@@ -394,20 +205,12 @@
     }
 
     for (const n of nodes) {
-      const glow = Math.hypot(n.x - mx, n.y - my) < 120;
-      ctx.fillStyle = glow ? "rgba(233, 213, 255, 0.95)" : "rgba(196, 181, 253, 0.55)";
+      const hot = Math.hypot(n.x - mx, n.y - my) < 100;
+      ctx.fillStyle = hot ? "rgba(103, 232, 249, 0.95)" : "rgba(124, 58, 237, 0.65)";
       ctx.beginPath();
       ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
       ctx.fill();
     }
-
-    const g = ctx.createRadialGradient(mx, my, 0, mx, my, 160);
-    g.addColorStop(0, "rgba(167, 139, 250, 0.14)");
-    g.addColorStop(1, "transparent");
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(mx, my, 160, 0, Math.PI * 2);
-    ctx.fill();
 
     raf = requestAnimationFrame(draw);
   };
@@ -419,118 +222,10 @@
   }
 
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) {
-      cancelAnimationFrame(raf);
-    } else if (!reduceMotion) {
+    if (document.hidden) cancelAnimationFrame(raf);
+    else if (!reduceMotion) {
       t0 = performance.now();
       raf = requestAnimationFrame(draw);
     }
   });
-
-  const ambient = document.getElementById("ambient-fx");
-  if (ambient instanceof HTMLCanvasElement && !reduceMotion) {
-    const actx = ambient.getContext("2d");
-    let aw = 0;
-    let ah = 0;
-    let sparks = [];
-
-    const resizeAmbient = () => {
-      const adpr = Math.min(window.devicePixelRatio || 1, 2);
-      aw = window.innerWidth;
-      ah = window.innerHeight;
-      ambient.width = Math.floor(aw * adpr);
-      ambient.height = Math.floor(ah * adpr);
-      ambient.style.width = `${aw}px`;
-      ambient.style.height = `${ah}px`;
-      if (actx) actx.setTransform(adpr, 0, 0, adpr, 0, 0);
-      const count = Math.min(48, Math.floor((aw * ah) / 38000));
-      sparks = Array.from({ length: count }, () => ({
-        x: Math.random() * aw,
-        y: Math.random() * ah,
-        r: 0.6 + Math.random() * 1.8,
-        vy: -0.15 - Math.random() * 0.35,
-        vx: (Math.random() - 0.5) * 0.2,
-        a: 0.15 + Math.random() * 0.45,
-        pulse: Math.random() * Math.PI * 2,
-      }));
-    };
-    resizeAmbient();
-    window.addEventListener("resize", resizeAmbient);
-
-    const tickAmbient = (now) => {
-      if (!actx) return;
-      actx.clearRect(0, 0, aw, ah);
-      for (const s of sparks) {
-        s.pulse += 0.02;
-        s.x += s.vx;
-        s.y += s.vy;
-        if (s.y < -10) s.y = ah + 10;
-        if (s.x < -10) s.x = aw + 10;
-        if (s.x > aw + 10) s.x = -10;
-        const alpha = s.a * (0.55 + 0.45 * Math.sin(s.pulse + now * 0.001));
-        actx.beginPath();
-        actx.fillStyle = `rgba(196, 181, 253, ${alpha})`;
-        actx.shadowColor = "rgba(167, 139, 250, 0.6)";
-        actx.shadowBlur = 8;
-        actx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-        actx.fill();
-      }
-      actx.shadowBlur = 0;
-      requestAnimationFrame(tickAmbient);
-    };
-    requestAnimationFrame(tickAmbient);
-  }
-
-  document.querySelectorAll(".cap, .product, .contact-form, .signal-board").forEach((el) => {
-    el.addEventListener(
-      "pointermove",
-      (e) => {
-        const rect = el.getBoundingClientRect();
-        el.style.setProperty("--mx", `${e.clientX - rect.left}px`);
-        el.style.setProperty("--my", `${e.clientY - rect.top}px`);
-      },
-      { passive: true }
-    );
-  });
-
-  if (!reduceMotion) {
-    document.querySelectorAll(".capabilities, .products, .contact, .edge").forEach((sec, i) => {
-      sec.classList.add("magic-panel");
-      const line = document.createElement("div");
-      line.className = "scan-line";
-      line.style.animationDelay = `${i * 1.1}s`;
-      sec.appendChild(line);
-    });
-  }
-
-  if (!reduceMotion) {
-    const heads = Array.from(document.querySelectorAll(".section-head, .hero-inner"));
-    window.addEventListener(
-      "scroll",
-      () => {
-        const vh = window.innerHeight || 1;
-        heads.forEach((el) => {
-          const rect = el.getBoundingClientRect();
-          const mid = rect.top + rect.height * 0.5;
-          const p = (mid - vh * 0.5) / vh;
-          el.style.transform = `translate3d(0, ${p * -12}px, 0)`;
-        });
-      },
-      { passive: true }
-    );
-  }
-
-  if (!reduceMotion && finePointer) {
-    document.querySelectorAll(".btn, .header-cta").forEach((btn) => {
-      btn.addEventListener("pointermove", (e) => {
-        const rect = btn.getBoundingClientRect();
-        const x = e.clientX - rect.left - rect.width / 2;
-        const y = e.clientY - rect.top - rect.height / 2;
-        btn.style.transform = `translate(${x * 0.12}px, ${y * 0.18}px)`;
-      });
-      btn.addEventListener("pointerleave", () => {
-        btn.style.transform = "";
-      });
-    });
-  }
 })();
