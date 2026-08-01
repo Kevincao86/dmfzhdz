@@ -25,6 +25,7 @@ import {
   YAxis,
 } from 'recharts'
 import { cn } from '../cn'
+import { getDouyinStores } from '../services/douyinMerchantApi'
 import {
   fetchShopAnalysis,
   syncMerchantOrders,
@@ -123,6 +124,23 @@ export default function StoreAnalysisPage() {
   const [advice, setAdvice] = useState('')
   const [showAdvice, setShowAdvice] = useState(false)
 
+  const mergeStoreNames = useCallback(async (stores: ShopStoreOption[]): Promise<ShopStoreOption[]> => {
+    if (!stores.length || platform !== 'douyin') return stores
+    try {
+      const res = await getDouyinStores({ page: 1, pageSize: 100 })
+      if (!res.ok || !res.items?.length) return stores
+      const nameById = new Map(
+        res.items.map((row) => [String(row.id || '').trim(), String(row.name || '').trim()]),
+      )
+      return stores.map((s) => {
+        const nm = nameById.get(s.poiId)
+        return nm ? { ...s, poiName: nm } : s
+      })
+    } catch {
+      return stores
+    }
+  }, [platform])
+
   const loadCharts = useCallback(async () => {
     setLoading(true)
     setErr('')
@@ -136,7 +154,11 @@ export default function StoreAnalysisPage() {
       })
       setSummary(r.summary)
       setAdvice(r.adviceFacts)
-      if (r.summary.stores?.length) setStoreOptions(r.summary.stores)
+      if (r.summary.stores?.length) {
+        const named = await mergeStoreNames(r.summary.stores)
+        setStoreOptions(named)
+        setSummary({ ...r.summary, stores: named })
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : '加载失败')
       setSummary(null)
@@ -144,7 +166,7 @@ export default function StoreAnalysisPage() {
     } finally {
       setLoading(false)
     }
-  }, [startDate, endDate, platform, poiId])
+  }, [startDate, endDate, platform, poiId, mergeStoreNames])
 
   /** 首屏只拉已落库数据出图，不阻塞同步 */
   useEffect(() => {
@@ -326,11 +348,12 @@ export default function StoreAnalysisPage() {
 
       {summary ? (
         <div className="space-y-6">
-          {!summary.hasPreWindowHistory ? (
-            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          {summary.guestBasis === 'repurchase' ? (
+            <div className="flex items-start gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <p>
-                当前筛选下几乎没有「开始日之前」的订单，新客可能被高估。建议把同步区间再往前拉 30～60 天后再分析。
+                库内暂无更早订单对照，新老客按「区间内是否复购」识别：仅买 1 次为新客，买 ≥2 次为老客（与复购率一致）。向前多同步
+                30～60 天后可改为按历史首购判断。
               </p>
             </div>
           ) : null}
@@ -408,7 +431,9 @@ export default function StoreAnalysisPage() {
             <div className="rounded-xl border border-slate-200 bg-white p-4">
               <h3 className="mb-1 text-sm font-semibold text-slate-900">新客 / 老客结构</h3>
               <p className="mb-3 text-xs text-slate-400">
-                新客 = 区间内有成交且开始日前无成交；老客 = 开始日前已有成交
+                {summary.guestBasis === 'history'
+                  ? '新客 = 开始日前无成交；老客 = 开始日前已有成交'
+                  : '新客 = 区间内仅买 1 次；老客 = 区间内买 ≥2 次'}
               </p>
               {guestPie.length ? (
                 <div className="h-64">

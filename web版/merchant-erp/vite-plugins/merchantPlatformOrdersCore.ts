@@ -67,6 +67,31 @@ function mapRow(r: Record<string, unknown>): MerchantOrderRow {
   }
 }
 
+/** 历史同步未写列时，从 raw_json.poi_id 回填门店字段 */
+export async function backfillOrderPoiFromRaw(tenantId?: string): Promise<number> {
+  return withClient(async (c) => {
+    const args: unknown[] = []
+    let where = `coalesce(poi_id, '') = '' and coalesce(raw_json->>'poi_id', '') <> ''`
+    if (tenantId?.trim()) {
+      where = `tenant_id = $1::uuid and ${where}`
+      args.push(tenantId.trim())
+    }
+    const r = await c.query(
+      `update public.merchant_platform_orders
+          set poi_id = left(raw_json->>'poi_id', 120),
+              poi_name = case
+                when coalesce(poi_name, '') <> '' then poi_name
+                when coalesce(raw_json->'poi'->>'poi_name', '') <> '' then left(raw_json->'poi'->>'poi_name', 200)
+                when coalesce(raw_json->>'poi_name', '') <> '' then left(raw_json->>'poi_name', 200)
+                else poi_name
+              end
+        where ${where}`,
+      args,
+    )
+    return Number(r.rowCount) || 0
+  })
+}
+
 export async function upsertDouyinOrders(
   tenantId: string,
   orders: DouyinTradeOrderDetail[],
@@ -205,8 +230,13 @@ export type ShopAnalysisSummary = {
   repeatBuyerCount: number
   repurchaseRate: number
   estimatedGrossYuan: number
-  /** 区间前是否有可对照历史（否则新老客不可靠） */
+  /** 区间前是否有可对照历史 */
   hasPreWindowHistory: boolean
+  /**
+   * history = 按区间前是否有成交
+   * repurchase = 无区间前历史时，按区间内是否复购识别老客
+   */
+  guestBasis: 'history' | 'repurchase'
   stores: ShopStoreOption[]
   topBySales: { name: string; productId: string; salesYuan: number; couponCount: number; share: number }[]
   topByRefund: { name: string; productId: string; refundYuan: number; refundRate: number }[]
@@ -220,6 +250,8 @@ export async function computeShopAnalysisSummary(params: {
   endYmd: string
   marginPercent?: number
 }): Promise<ShopAnalysisSummary> {
+  // 旧数据列为空时先从 raw_json 回填，保证门店筛选项可用
+  await backfillOrderPoiFromRaw(params.tenantId).catch(() => 0)
   return withClient(async (c) => {
     const where: string[] = [
       'tenant_id = $1::uuid',
@@ -298,15 +330,19 @@ export async function computeShopAnalysisSummary(params: {
     const refundRate = salesYuan > 0 ? Math.round((refundYuan / salesYuan) * 10000) / 100 : 0
 
     /**
-     * 新客 = 区间内有成交，且区间开始前无任何成交
-     * 老客 = 区间内有成交，且区间开始前已有成交
-     * （修复：仅同步当前窗时，旧逻辑会把所有人算成新客）
+     * 优先：老客 = 区间前已有成交；新客 = 区间前无成交
+     * 无区间前历史时：老客 = 区间内买 ≥2 次；新客 = 区间内仅买 1 次
+     * （复购率已说明大量回头客，不能再显示 0 老客）
      */
     let newBuyerCount = 0
     let oldBuyerCount = 0
     let newBuyerSalesFen = 0
     let oldBuyerSalesFen = 0
     let hasPreWindowHistory = false
+    let guestBasis: 'history' | 'repurchase' = 'repurchase'
+    const buyerCount = buyers.size
+    const oneTimeBuyerCount = [...buyers.values()].filter((n) => n === 1).length
+    const repeatBuyerCount = [...buyers.values()].filter((n) => n >= 2).length
     if (withOpenId.length) {
       const unique = [...new Set(withOpenId)]
       const preWhere = [
@@ -336,7 +372,6 @@ export async function computeShopAnalysisSummary(params: {
       )
       const oldSet = new Set(preHist.rows.map((h) => String(h.open_id)))
       hasPreWindowHistory = oldSet.size > 0
-      // 若当前筛选条件下没有区间前订单，再扫同租户同筛选是否有任何区间前成交
       if (!hasPreWindowHistory) {
         const anyWhere = ['tenant_id = $1::uuid', `pay_time < ($2::date)::timestamptz`]
         const anyArgs: unknown[] = [params.tenantId, params.startYmd]
@@ -361,21 +396,35 @@ export async function computeShopAnalysisSummary(params: {
         )
         hasPreWindowHistory = Boolean(anyPre.rows[0])
       }
-      for (const oid of unique) {
-        const fen = buyerSales.get(oid) || 0
-        if (oldSet.has(oid)) {
-          oldBuyerCount += 1
-          oldBuyerSalesFen += fen
-        } else {
-          newBuyerCount += 1
-          newBuyerSalesFen += fen
+
+      if (hasPreWindowHistory && oldSet.size > 0) {
+        guestBasis = 'history'
+        for (const oid of unique) {
+          const fen = buyerSales.get(oid) || 0
+          if (oldSet.has(oid)) {
+            oldBuyerCount += 1
+            oldBuyerSalesFen += fen
+          } else {
+            newBuyerCount += 1
+            newBuyerSalesFen += fen
+          }
+        }
+      } else {
+        guestBasis = 'repurchase'
+        for (const oid of unique) {
+          const fen = buyerSales.get(oid) || 0
+          const n = buyers.get(oid) || 0
+          if (n >= 2) {
+            oldBuyerCount += 1
+            oldBuyerSalesFen += fen
+          } else {
+            newBuyerCount += 1
+            newBuyerSalesFen += fen
+          }
         }
       }
     }
 
-    const buyerCount = buyers.size
-    const oneTimeBuyerCount = [...buyers.values()].filter((n) => n === 1).length
-    const repeatBuyerCount = [...buyers.values()].filter((n) => n >= 2).length
     const repurchaseRate = buyerCount > 0 ? Math.round((repeatBuyerCount / buyerCount) * 10000) / 100 : 0
     const openIdCoverage = orderCount > 0 ? Math.round((withOpenId.length / orderCount) * 10000) / 100 : 0
     const newBuyerSalesYuan = Math.round(newBuyerSalesFen) / 100
@@ -384,7 +433,17 @@ export async function computeShopAnalysisSummary(params: {
     const margin = Math.min(95, Math.max(0, Number(params.marginPercent) || 0))
     const estimatedGrossYuan = Math.round(salesYuan * (margin / 100) * 100) / 100
 
-    const stores = [...byStore.values()].sort((a, b) => b.orderCount - a.orderCount)
+    const stores = [...byStore.values()]
+      .map((s) => ({
+        ...s,
+        poiName:
+          s.poiName && s.poiName !== s.poiId
+            ? s.poiName
+            : s.poiId === '_unknown'
+              ? '未标记门店'
+              : `门店 …${s.poiId.slice(-4)}`,
+      }))
+      .sort((a, b) => b.orderCount - a.orderCount)
 
     const topBySales = [...byProduct.values()]
       .map((p) => ({
@@ -426,6 +485,7 @@ export async function computeShopAnalysisSummary(params: {
       repurchaseRate,
       estimatedGrossYuan,
       hasPreWindowHistory,
+      guestBasis,
       stores,
       topBySales,
       topByRefund,
@@ -465,9 +525,9 @@ function buildOptimizationSuggestions(summary: ShopAnalysisSummary): string[] {
     tips.push(`TOP3 商品合计占比约 ${Math.round(top3Share)}%，结构偏集中：中腰部商品可做限时加码提升曝光。`)
   }
 
-  if (!summary.hasPreWindowHistory) {
+  if (summary.guestBasis === 'repurchase') {
     tips.push(
-      `库内几乎没有「分析开始日之前」的订单，新老客可能被高估为新客：建议把同步起始日再往前拉 30～60 天后重算。`,
+      `当前按「区间内是否复购」识别新老客（老客 ${summary.oldBuyerCount} / 新客 ${summary.newBuyerCount}）。若向前多同步 30～60 天，可改为按历史首购更精细判断。`,
     )
   }
 
@@ -511,9 +571,9 @@ export function buildShopAdviceFacts(summary: ShopAnalysisSummary, rangeLabel: s
     `· 共 ${summary.orderCount} 笔订单、成交券 ${summary.couponCount} 张，成交额 ¥${summary.salesAmountYuan.toLocaleString('zh-CN')}。`,
     `· 退款额 ¥${summary.refundAmountYuan.toLocaleString('zh-CN')}，退款率 ${summary.refundRate}%${summary.refundRate >= 20 ? '（偏高，核心风险）' : ''}。`,
     `· 可识别买家 ${summary.buyerCount} 人（覆盖率 ${summary.openIdCoverage}%）；新客 ${summary.newBuyerCount} / 老客 ${summary.oldBuyerCount}；新客成交占比 ${summary.newBuyerShare}%；区间复购率 ${summary.repurchaseRate}%。`,
-    summary.hasPreWindowHistory
+    summary.guestBasis === 'history'
       ? `· 新老客按「区间开始前是否有成交」判定。`
-      : `· 注意：暂无区间前历史订单，新客可能被高估，建议向前多同步一段时间。`,
+      : `· 新老客按「区间内是否复购」判定（库内暂无更早订单作对照）。`,
     `· 按商家配置毛利率估算毛利约 ¥${summary.estimatedGrossYuan.toLocaleString('zh-CN')}（非平台真实成本）。`,
     ``,
     `二、客群与复购`,
