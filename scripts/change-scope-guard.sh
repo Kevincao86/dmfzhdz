@@ -55,6 +55,7 @@ list_scopes() {
   openmontage_local    Cursor 本地 OpenMontage skill + 安装脚本（不含 ERP 成片链路）
   jianying_local       Cursor 本地剪映 skill + 安装脚本（不含 ERP / CapCut 国际版）
   merchant_registry_bootstrap 商家壳注册表瘦身（OpsRegistryBridge slice=ai，缓解 cs/fws/dr 卡顿）
+  shop_analysis          商家 ERP：店铺分析（图表/门店筛选/经营建议/逐单 POI）
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -688,6 +689,18 @@ meoo-ops-sync-registry
 meoo-ops-registry-ops-get
 opsRegistryGatewayShared
 ecs-auth-api-server
+change-scope-guard
+PAT
+      ;;
+    shop_analysis)
+      cat <<'PAT'
+StoreAnalysisPage
+merchantOrdersApi
+merchantPlatformOrdersCore
+meoo-shop-analysis-summary
+meoo-merchant-orders
+douyinMerchantGateway
+merchant_platform_orders_poi
 change-scope-guard
 PAT
       ;;
