@@ -698,6 +698,7 @@ StoreAnalysisPage
 merchantOrdersApi
 merchantPlatformOrdersCore
 shopAnalysisAiCore
+shopAnalysisAiPoints
 meoo-shop-analysis-summary
 meoo-shop-analysis-ai
 meoo-merchant-orders

@@ -27,6 +27,7 @@ import {
 } from 'recharts'
 import { cn } from '../cn'
 import { readMerchantSession } from '../lib/merchantSession'
+import { shopAnalysisAiPointsFromGross } from '../lib/shopAnalysisAiPoints'
 import { getDouyinStores } from '../services/douyinMerchantApi'
 import {
   fetchShopAnalysis,
@@ -136,6 +137,12 @@ export default function StoreAnalysisPage() {
   const [reviewDigest, setReviewDigest] = useState<ShopReviewDigest | null>(null)
   const [modelUsed, setModelUsed] = useState('')
   const [showAdvice, setShowAdvice] = useState(false)
+  const [pointsCharged, setPointsCharged] = useState(0)
+
+  const estimatedAiPoints = useMemo(
+    () => (summary ? shopAnalysisAiPointsFromGross(summary.estimatedGrossYuan) : 0),
+    [summary],
+  )
 
   const mergeStoreNames = useCallback(async (stores: ShopStoreOption[]): Promise<ShopStoreOption[]> => {
     if (!stores.length || platform !== 'douyin') return stores
@@ -163,6 +170,7 @@ export default function StoreAnalysisPage() {
     setAiSections([])
     setReviewDigest(null)
     setModelUsed('')
+    setPointsCharged(0)
     try {
       const r = await fetchShopAnalysis({
         startDate,
@@ -218,6 +226,7 @@ export default function StoreAnalysisPage() {
       setSummary(r.summary)
       setReviewDigest(r.reviewDigest)
       setModelUsed(r.modelUsed)
+      setPointsCharged(Number(r.pointsCharged) || 0)
       if (r.summary.stores?.length) {
         const named = await mergeStoreNames(r.summary.stores)
         setStoreOptions(named)
@@ -352,10 +361,11 @@ export default function StoreAnalysisPage() {
           type="button"
           disabled={loading || syncing || analyzing || !summary}
           onClick={() => void onAnalyze()}
+          title={estimatedAiPoints > 0 ? `按区间估算毛利计费，预计消耗 ${estimatedAiPoints} 积分` : undefined}
           className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
         >
           {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-          店铺分析
+          {estimatedAiPoints > 0 ? `店铺分析 · ${estimatedAiPoints} 积分` : '店铺分析'}
         </button>
         <Link to="/finance" className="text-sm text-indigo-600 hover:underline">
           财务订单明细 →
@@ -540,15 +550,17 @@ export default function StoreAnalysisPage() {
               <p className="mt-3 text-sm font-medium text-slate-800">图表已就绪</p>
               <p className="mt-1 text-xs text-slate-500">
                 点击「店铺分析」，用 GPT 结合订单与评价生成完整图文报告
+                {estimatedAiPoints > 0 ? `（预计消耗 ${estimatedAiPoints} 积分）` : ''}
               </p>
               <button
                 type="button"
                 disabled={analyzing}
                 onClick={() => void onAnalyze()}
+                title={estimatedAiPoints > 0 ? `按区间估算毛利计费，预计消耗 ${estimatedAiPoints} 积分` : undefined}
                 className="mt-4 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
               >
                 {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                店铺分析
+                {estimatedAiPoints > 0 ? `店铺分析 · ${estimatedAiPoints} 积分` : '店铺分析'}
               </button>
             </div>
           ) : (
@@ -605,6 +617,7 @@ export default function StoreAnalysisPage() {
                       {modelUsed
                         ? `GPT/文案模型完整分析 · ${modelUsed}`
                         : '规则建议（AI 未生成时回退）'}
+                      {pointsCharged > 0 ? ` · 本次消耗 ${pointsCharged} 积分` : ''}
                       · 图文卡片
                     </p>
                   </div>
