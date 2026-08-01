@@ -19,7 +19,7 @@
   <div class="page-glow" aria-hidden="true"></div>
   <div class="grid-floor" aria-hidden="true"></div>
 
-  <!-- 差异化：居中悬浮胶囊导航（非墨典左右铺满顶栏） -->
+  <!-- A：居中悬浮胶囊导航 -->
   <header class="topbar" id="topbar">
     <div class="pill-nav">
       <a class="brand" href="#top" aria-label="灵祺首页">
@@ -27,10 +27,10 @@
         <span>灵祺</span>
       </a>
       <nav aria-label="主导航">
+        <a href="#playground">探索</a>
         <a href="#ecosystem">生态</a>
         <a href="#engines">双引擎</a>
         <a href="#services">定制</a>
-        <a href="#loop">闭环</a>
         <a href="#talk">咨询</a>
       </nav>
       <a class="pill-cta" href="#talk">预约咨询</a>
@@ -38,39 +38,80 @@
   </header>
 
   <main id="top">
-    <!-- 差异化：左右分栏 Hero + 右侧全息视觉 -->
-    <section class="hero" id="hero">
+    <!-- A 左文案 + E 交互节点台 -->
+    <section class="hero" id="playground">
       <div class="hero-copy">
         <p class="eyebrow">温州灵祺智能科技有限公司 · Local Life AI OS</p>
-        <h1>
-          <span class="brand-word">灵祺</span>
-        </h1>
+        <h1><span class="brand-word">灵祺</span></h1>
         <p class="slogan">好经营成就好增长<br />好撮合成就好履约</p>
-        <p class="lede">把 AI 经营与可验证履约做成基础设施——服务商家、服务商与达人生态。</p>
+        <p class="lede">拖拽节点、切换能力，亲手摸清商家 · 服务商 · 星选 · Agent 如何连成一张履约网。</p>
         <div class="hero-cta">
           <a class="btn btn-solid" href="#talk">立即咨询合作 <i>→</i></a>
           <a class="btn btn-line" href="#ecosystem">浏览产品生态</a>
         </div>
-        <ul class="hero-chips" aria-label="核心能力标签">
-          <li>AI 智能 ERP</li>
-          <li>达人星选</li>
-          <li>智能体定制</li>
-          <li>AI 私有化</li>
-        </ul>
+        <p class="play-hint mono">拖拽探索 · Drag nodes · 点击切换</p>
       </div>
-      <div class="hero-stage" aria-hidden="true">
-        <canvas id="orb-canvas" class="orb-canvas"></canvas>
-        <div class="hud">
-          <span class="hud-dot"></span>
-          <span>LINGQI · LIVE MESH</span>
+
+      <div class="play-stage" id="play-stage">
+        <aside class="play-dock" aria-label="能力切换">
+          <p class="dock-label mono">LAYER</p>
+          <button type="button" class="dock-chip is-active" data-focus="all">全部</button>
+          <button type="button" class="dock-chip" data-focus="erp">ERP</button>
+          <button type="button" class="dock-chip" data-focus="xingxuan">星选</button>
+          <button type="button" class="dock-chip" data-focus="agent">Agent</button>
+          <button type="button" class="dock-chip" data-focus="private">私有化</button>
+        </aside>
+
+        <div class="play-canvas-wrap">
+          <div class="hud">
+            <span class="hud-dot"></span>
+            <span>LINGQI · LIVE MESH</span>
+          </div>
+          <svg class="play-links" id="play-links" aria-hidden="true"></svg>
+          <div class="play-nodes" id="play-nodes">
+            <button type="button" class="node" data-id="merchant" data-layer="erp" style="--x:22%; --y:28%;">
+              <strong>商家</strong>
+              <span>ERP</span>
+            </button>
+            <button type="button" class="node" data-id="partner" data-layer="erp" style="--x:72%; --y:22%;">
+              <strong>服务商</strong>
+              <span>Partner</span>
+            </button>
+            <button type="button" class="node" data-id="xingxuan" data-layer="xingxuan" style="--x:50%; --y:52%;">
+              <strong>星选</strong>
+              <span>Match</span>
+            </button>
+            <button type="button" class="node node--core is-active" data-id="agent" data-layer="agent" style="--x:50%; --y:30%;">
+              <strong>Agent</strong>
+              <span>AI Core</span>
+            </button>
+            <button type="button" class="node" data-id="fulfill" data-layer="xingxuan" style="--x:28%; --y:72%;">
+              <strong>履约</strong>
+              <span>Loop</span>
+            </button>
+            <button type="button" class="node" data-id="private" data-layer="private" style="--x:74%; --y:68%;">
+              <strong>私有化</strong>
+              <span>Deploy</span>
+            </button>
+          </div>
+          <p class="canvas-tip mono" id="canvas-tip">点击节点查看详情 · 按住拖拽排布</p>
         </div>
-        <div class="float-chip float-chip-a">Merchant Agent</div>
-        <div class="float-chip float-chip-b">Registry Sync</div>
-        <div class="float-chip float-chip-c">Fulfillment</div>
+
+        <aside class="live-panel" id="live-panel" aria-live="polite">
+          <p class="dock-label mono">LIVE PANEL</p>
+          <h3 id="panel-title">Agent · AI Core</h3>
+          <p id="panel-desc">场景化智能体嵌入经营动作：组品、Brief、审片与合规检核。</p>
+          <dl id="panel-stats">
+            <div><dt>链路</dt><dd>预览 → 确认 → 写入</dd></div>
+            <div><dt>协同</dt><dd>ERP ↔ 星选</dd></div>
+            <div><dt>状态</dt><dd class="ok">Online</dd></div>
+          </dl>
+          <a class="panel-link" id="panel-link" href="#services">了解定制能力 →</a>
+        </aside>
       </div>
     </section>
 
-    <!-- 差异化：横向跑马灯（墨典无此模块） -->
+    <!-- A：跑马灯 -->
     <div class="marquee" aria-hidden="true">
       <div class="marquee-track">
         <span>灵祺 ERP 商家版</span><span>服务商多客户协同</span><span>灵祺星选撮合</span>
@@ -82,7 +123,7 @@
       </div>
     </div>
 
-    <!-- 差异化：Bento 不对称产品矩阵（非均等三列 / 非 2×2） -->
+    <!-- A：Bento 产品矩阵 -->
     <section class="block ecosystem" id="ecosystem">
       <div class="block-intro">
         <p class="kicker">Product Ecosystem</p>
@@ -122,7 +163,6 @@
       </div>
     </section>
 
-    <!-- 差异化：粘性双栏「双引擎」（非列表+信号条） -->
     <section class="engines" id="engines">
       <aside class="engines-sticky">
         <p class="kicker">Dual Engine</p>
@@ -154,7 +194,6 @@
       </div>
     </section>
 
-    <!-- 差异化：能力横条列表（非 2×2 能力格） -->
     <section class="block services" id="services">
       <div class="block-intro block-intro--row">
         <div>
@@ -215,39 +254,24 @@
       </ol>
     </section>
 
-    <!-- 差异化：阶梯式闭环（非四列等宽 process） -->
     <section class="block loop" id="loop">
       <div class="block-intro">
         <p class="kicker">Fulfillment Loop</p>
         <h2>从发招募到结算，一步级推进</h2>
       </div>
       <ol class="steps">
-        <li style="--i:0">
-          <strong>商家发招募</strong>
-          <span>ERP 一键推送星选</span>
-        </li>
-        <li style="--i:1">
-          <strong>大厅报名</strong>
-          <span>达人 / 团队接单</span>
-        </li>
-        <li style="--i:2">
-          <strong>PR 反选交付</strong>
-          <span>探店 · 拍摄 · 剪辑</span>
-        </li>
-        <li style="--i:3">
-          <strong>回链核查结算</strong>
-          <span>AI 检核 · 结款</span>
-        </li>
+        <li style="--i:0"><strong>商家发招募</strong><span>ERP 一键推送星选</span></li>
+        <li style="--i:1"><strong>大厅报名</strong><span>达人 / 团队接单</span></li>
+        <li style="--i:2"><strong>PR 反选交付</strong><span>探店 · 拍摄 · 剪辑</span></li>
+        <li style="--i:3"><strong>回链核查结算</strong><span>AI 检核 · 结款</span></li>
       </ol>
     </section>
 
-    <!-- 差异化：全宽宣言条（墨典无独立 CTA band） -->
     <section class="banner" aria-label="合作号召">
       <p>告诉我们业务场景，<em>48 小时内</em>给出可行路径。</p>
       <a class="btn btn-solid" href="#talk">开始合作 <i>→</i></a>
     </section>
 
-    <!-- 差异化：咨询区「左宣言右表单」浅色玻璃卡 -->
     <section class="talk" id="talk">
       <div class="talk-quote">
         <p class="kicker">Start</p>

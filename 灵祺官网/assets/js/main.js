@@ -1,6 +1,4 @@
 (() => {
-  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
   const yearEl = document.getElementById("year");
   if (yearEl) yearEl.textContent = String(new Date().getFullYear());
 
@@ -12,7 +10,7 @@
   onScroll();
   window.addEventListener("scroll", onScroll, { passive: true });
 
-  /* Contact → shared official API, tagged as 灵祺官网 */
+  /* —— Contact form —— */
   const form = document.getElementById("contact-form");
   const note = document.getElementById("form-note");
   const CONTACT_API = (
@@ -79,153 +77,242 @@
     });
   }
 
-  /* Hero orb: constellation + rings (light tech) */
-  const canvas = document.getElementById("orb-canvas");
-  if (!(canvas instanceof HTMLCanvasElement)) return;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-
-  let w = 0;
-  let h = 0;
-  let nodes = [];
-  let raf = 0;
-  let t0 = performance.now();
-  let mouse = { x: 0.55, y: 0.45 };
-
-  const resize = () => {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    w = canvas.clientWidth;
-    h = canvas.clientHeight;
-    canvas.width = Math.floor(w * dpr);
-    canvas.height = Math.floor(h * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const count = Math.floor((w * h) / 9000);
-    nodes = Array.from({ length: Math.max(28, Math.min(count, 70)) }, () => ({
-      x: Math.random() * w,
-      y: Math.random() * h,
-      vx: (Math.random() - 0.5) * 0.35,
-      vy: (Math.random() - 0.5) * 0.35,
-      r: 1.2 + Math.random() * 1.8,
-    }));
-  };
-
-  resize();
-  window.addEventListener("resize", resize);
-
-  canvas.addEventListener(
-    "pointermove",
-    (e) => {
-      const rect = canvas.getBoundingClientRect();
-      mouse.x = (e.clientX - rect.left) / Math.max(rect.width, 1);
-      mouse.y = (e.clientY - rect.top) / Math.max(rect.height, 1);
+  /* —— E：Live Mesh playground —— */
+  const NODE_META = {
+    merchant: {
+      title: "商家 · ERP",
+      desc: "AI 经营中枢：组品、招募、内容与财务一体协同，一键推送星选履约。",
+      stats: [
+        ["入口", "cs.mofangdianai.com"],
+        ["能力", "Agent · 多平台门店"],
+        ["状态", "Online"],
+      ],
+      href: "https://cs.mofangdianai.com",
+      linkText: "进入商家版 →",
     },
-    { passive: true }
-  );
-
-  const draw = (now) => {
-    const t = (now - t0) / 1000;
-    ctx.clearRect(0, 0, w, h);
-
-    const cx = w * 0.52;
-    const cy = h * 0.48;
-    const R = Math.min(w, h) * 0.28;
-
-    const glow = ctx.createRadialGradient(cx, cy, R * 0.1, cx, cy, R * 1.6);
-    glow.addColorStop(0, "rgba(167, 139, 250, 0.35)");
-    glow.addColorStop(0.45, "rgba(103, 232, 249, 0.12)");
-    glow.addColorStop(1, "transparent");
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(cx, cy, R * 1.6, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.save();
-    ctx.translate(cx, cy);
-    for (let i = 0; i < 3; i++) {
-      ctx.rotate(t * (0.12 + i * 0.04) * (i % 2 ? -1 : 1));
-      ctx.strokeStyle = `rgba(124, 58, 237, ${0.18 - i * 0.04})`;
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.ellipse(0, 0, R * (1.05 + i * 0.22), R * (0.55 + i * 0.12), i * 0.5, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-    ctx.restore();
-
-    const core = ctx.createRadialGradient(cx - R * 0.15, cy - R * 0.2, 0, cx, cy, R);
-    core.addColorStop(0, "rgba(255, 255, 255, 0.95)");
-    core.addColorStop(0.35, "rgba(196, 181, 253, 0.75)");
-    core.addColorStop(1, "rgba(124, 58, 237, 0.35)");
-    ctx.fillStyle = core;
-    ctx.beginPath();
-    ctx.arc(cx, cy, R, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    const mx = mouse.x * w;
-    const my = mouse.y * h;
-
-    if (!reduceMotion) {
-      for (const n of nodes) {
-        n.x += n.vx;
-        n.y += n.vy;
-        const dx = mx - n.x;
-        const dy = my - n.y;
-        const dist = Math.hypot(dx, dy) || 1;
-        if (dist < 140) {
-          n.vx += (dx / dist) * 0.01;
-          n.vy += (dy / dist) * 0.01;
-        }
-        n.vx *= 0.99;
-        n.vy *= 0.99;
-        if (n.x < 0 || n.x > w) n.vx *= -1;
-        if (n.y < 0 || n.y > h) n.vy *= -1;
-        n.x = Math.max(0, Math.min(w, n.x));
-        n.y = Math.max(0, Math.min(h, n.y));
-      }
-    }
-
-    const linkDist = Math.min(120, w * 0.16);
-    for (let i = 0; i < nodes.length; i++) {
-      for (let j = i + 1; j < nodes.length; j++) {
-        const a = nodes[i];
-        const b = nodes[j];
-        const d = Math.hypot(a.x - b.x, a.y - b.y);
-        if (d < linkDist) {
-          const alpha = (1 - d / linkDist) * 0.45;
-          ctx.strokeStyle = `rgba(124, 58, 237, ${alpha})`;
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(a.x, a.y);
-          ctx.lineTo(b.x, b.y);
-          ctx.stroke();
-        }
-      }
-    }
-
-    for (const n of nodes) {
-      const hot = Math.hypot(n.x - mx, n.y - my) < 100;
-      ctx.fillStyle = hot ? "rgba(103, 232, 249, 0.95)" : "rgba(124, 58, 237, 0.65)";
-      ctx.beginPath();
-      ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    raf = requestAnimationFrame(draw);
+    partner: {
+      title: "服务商 · Partner",
+      desc: "多客户协同后台：独立租户、客户切换、跨客户商品与投流管理。",
+      stats: [
+        ["入口", "fws.mofangdianai.com"],
+        ["协同", "多商家汇总看板"],
+        ["状态", "Online"],
+      ],
+      href: "https://fws.mofangdianai.com",
+      linkText: "进入服务商版 →",
+    },
+    xingxuan: {
+      title: "星选 · Match",
+      desc: "达人 / PR / 拍摄 / 剪辑四身份工作台，AI 匹配与招募大厅。",
+      stats: [
+        ["入口", "dr.mofangdianai.com"],
+        ["网络", "报名 · 反选 · 交付"],
+        ["状态", "Online"],
+      ],
+      href: "https://dr.mofangdianai.com",
+      linkText: "进入星选平台 →",
+    },
+    agent: {
+      title: "Agent · AI Core",
+      desc: "场景化智能体嵌入经营动作：组品、Brief、审片与合规检核。",
+      stats: [
+        ["链路", "预览 → 确认 → 写入"],
+        ["协同", "ERP ↔ 星选"],
+        ["状态", "Online"],
+      ],
+      href: "#services",
+      linkText: "了解定制能力 →",
+    },
+    fulfill: {
+      title: "履约 · Loop",
+      desc: "招募 → 反选 → 交付 → 回链 → AI 核查 → 结算，全程可追踪。",
+      stats: [
+        ["闭环", "可验证交付"],
+        ["检核", "回链 · AI 合规"],
+        ["状态", "Online"],
+      ],
+      href: "#loop",
+      linkText: "查看履约闭环 →",
+    },
+    private: {
+      title: "私有化 · Deploy",
+      desc: "模型与推理落在内网或专属云，数据不出域，可审计可扩容。",
+      stats: [
+        ["形态", "专有云 / 本地"],
+        ["能力", "RAG · Agent"],
+        ["状态", "Ready"],
+      ],
+      href: "#services",
+      linkText: "咨询私有化 →",
+    },
   };
 
-  if (!reduceMotion) {
-    raf = requestAnimationFrame(draw);
-  } else {
-    draw(performance.now());
-  }
+  const LINKS = [
+    ["merchant", "agent"],
+    ["partner", "agent"],
+    ["agent", "xingxuan"],
+    ["xingxuan", "fulfill"],
+    ["merchant", "xingxuan"],
+    ["agent", "private"],
+    ["partner", "fulfill"],
+  ];
 
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) cancelAnimationFrame(raf);
-    else if (!reduceMotion) {
-      t0 = performance.now();
-      raf = requestAnimationFrame(draw);
+  const wrap = document.querySelector(".play-canvas-wrap");
+  const nodesRoot = document.getElementById("play-nodes");
+  const svg = document.getElementById("play-links");
+  const panelTitle = document.getElementById("panel-title");
+  const panelDesc = document.getElementById("panel-desc");
+  const panelStats = document.getElementById("panel-stats");
+  const panelLink = document.getElementById("panel-link");
+  const tip = document.getElementById("canvas-tip");
+
+  if (!wrap || !nodesRoot || !svg) return;
+
+  const nodes = Array.from(nodesRoot.querySelectorAll(".node"));
+
+  const setPanel = (id) => {
+    const meta = NODE_META[id];
+    if (!meta) return;
+    if (panelTitle) panelTitle.textContent = meta.title;
+    if (panelDesc) panelDesc.textContent = meta.desc;
+    if (panelStats) {
+      panelStats.innerHTML = meta.stats
+        .map(
+          ([k, v]) =>
+            `<div><dt>${k}</dt><dd${v === "Online" || v === "Ready" ? ' class="ok"' : ""}>${v}</dd></div>`
+        )
+        .join("");
     }
+    if (panelLink) {
+      panelLink.href = meta.href;
+      panelLink.textContent = meta.linkText;
+      if (meta.href.startsWith("http")) {
+        panelLink.target = "_blank";
+        panelLink.rel = "noopener noreferrer";
+      } else {
+        panelLink.removeAttribute("target");
+        panelLink.removeAttribute("rel");
+      }
+    }
+  };
+
+  const drawLinks = () => {
+    const rect = wrap.getBoundingClientRect();
+    svg.setAttribute("viewBox", `0 0 ${rect.width} ${rect.height}`);
+    svg.innerHTML = "";
+
+    const centerOf = (el) => {
+      const r = el.getBoundingClientRect();
+      return {
+        x: r.left - rect.left + r.width / 2,
+        y: r.top - rect.top + r.height / 2,
+      };
+    };
+
+    const byId = Object.fromEntries(nodes.map((n) => [n.dataset.id, n]));
+
+    for (const [aId, bId] of LINKS) {
+      const a = byId[aId];
+      const b = byId[bId];
+      if (!a || !b) continue;
+      const dim = a.classList.contains("is-dim") || b.classList.contains("is-dim");
+      const pa = centerOf(a);
+      const pb = centerOf(b);
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", String(pa.x));
+      line.setAttribute("y1", String(pa.y));
+      line.setAttribute("x2", String(pb.x));
+      line.setAttribute("y2", String(pb.y));
+      line.setAttribute("stroke", dim ? "rgba(124,58,237,0.12)" : "rgba(124,58,237,0.45)");
+      line.setAttribute("stroke-width", dim ? "1" : "1.6");
+      line.setAttribute("stroke-linecap", "round");
+      svg.appendChild(line);
+    }
+  };
+
+  const selectNode = (node) => {
+    nodes.forEach((n) => n.classList.toggle("is-active", n === node));
+    setPanel(node.dataset.id || "agent");
+    drawLinks();
+  };
+
+  nodes.forEach((node) => {
+    node.addEventListener("click", () => {
+      if (node.dataset.didDrag === "1") {
+        node.dataset.didDrag = "0";
+        return;
+      }
+      selectNode(node);
+    });
   });
+
+  /* Layer filter chips */
+  document.querySelectorAll(".dock-chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      document.querySelectorAll(".dock-chip").forEach((c) => c.classList.remove("is-active"));
+      chip.classList.add("is-active");
+      const focus = chip.getAttribute("data-focus") || "all";
+      nodes.forEach((n) => {
+        const layer = n.getAttribute("data-layer") || "";
+        const show = focus === "all" || layer === focus;
+        n.classList.toggle("is-dim", !show);
+      });
+      const first = nodes.find((n) => !n.classList.contains("is-dim"));
+      if (first) selectNode(first);
+      else drawLinks();
+    });
+  });
+
+  /* Drag nodes */
+  let drag = null;
+
+  const onPointerDown = (e) => {
+    const node = e.target.closest(".node");
+    if (!node || !nodesRoot.contains(node)) return;
+    e.preventDefault();
+    const rect = wrap.getBoundingClientRect();
+    drag = {
+      node,
+      startX: e.clientX,
+      startY: e.clientY,
+      moved: false,
+    };
+    node.classList.add("is-dragging");
+    node.setPointerCapture?.(e.pointerId);
+    tip && (tip.textContent = "拖拽中…松开完成排布");
+  };
+
+  const onPointerMove = (e) => {
+    if (!drag) return;
+    const dx = e.clientX - drag.startX;
+    const dy = e.clientY - drag.startY;
+    if (Math.hypot(dx, dy) > 4) drag.moved = true;
+    const rect = wrap.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    const cx = Math.min(90, Math.max(10, x));
+    const cy = Math.min(88, Math.max(12, y));
+    drag.node.style.setProperty("--x", `${cx}%`);
+    drag.node.style.setProperty("--y", `${cy}%`);
+    drawLinks();
+  };
+
+  const onPointerUp = (e) => {
+    if (!drag) return;
+    drag.node.classList.remove("is-dragging");
+    if (drag.moved) drag.node.dataset.didDrag = "1";
+    tip && (tip.textContent = "点击节点查看详情 · 按住拖拽排布");
+    drag = null;
+    drawLinks();
+  };
+
+  wrap.addEventListener("pointerdown", onPointerDown);
+  window.addEventListener("pointermove", onPointerMove);
+  window.addEventListener("pointerup", onPointerUp);
+  window.addEventListener("resize", drawLinks);
+
+  /* init */
+  const active = nodes.find((n) => n.classList.contains("is-active")) || nodes[0];
+  if (active) selectNode(active);
+  requestAnimationFrame(drawLinks);
 })();
