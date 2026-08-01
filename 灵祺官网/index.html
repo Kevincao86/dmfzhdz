@@ -38,76 +38,85 @@
   </header>
 
   <main id="top">
-    <!-- A 左文案 + E 交互节点台 -->
+    <!-- 全宽品牌条 + 合一交互台 -->
     <section class="hero" id="playground">
-      <div class="hero-copy">
-        <p class="eyebrow">温州灵祺智能科技有限公司 · Local Life AI OS</p>
-        <h1><span class="brand-word">灵祺</span></h1>
-        <p class="slogan">好经营成就好增长<br />好撮合成就好履约</p>
-        <p class="lede">拖拽节点、切换能力，亲手摸清商家 · 服务商 · 星选 · Agent 如何连成一张履约网。</p>
-        <div class="hero-cta">
-          <a class="btn btn-solid" href="#talk">立即咨询合作 <i>→</i></a>
-          <a class="btn btn-line" href="#ecosystem">浏览产品生态</a>
+      <div class="hero-banner">
+        <div class="hero-banner-text">
+          <p class="eyebrow">温州灵祺智能科技有限公司 · Local Life AI OS</p>
+          <h1><span class="brand-word">灵祺</span></h1>
+          <p class="slogan">好经营成就好增长 · 好撮合成就好履约</p>
         </div>
-        <p class="play-hint mono">拖拽探索 · Drag nodes · 点击切换</p>
+        <div class="hero-banner-actions">
+          <p class="lede">在下方一张台上拖拽节点、切换 Layer，摸清商家 · 服务商 · 星选 · Agent 如何连网。</p>
+          <div class="hero-cta">
+            <a class="btn btn-solid" href="#talk">立即咨询合作 <i>→</i></a>
+            <a class="btn btn-line" href="#ecosystem">浏览产品生态</a>
+          </div>
+        </div>
       </div>
 
-      <div class="play-stage" id="play-stage">
-        <aside class="play-dock" aria-label="能力切换">
-          <p class="dock-label mono">LAYER</p>
-          <button type="button" class="dock-chip is-active" data-focus="all">全部</button>
-          <button type="button" class="dock-chip" data-focus="erp">ERP</button>
-          <button type="button" class="dock-chip" data-focus="xingxuan">星选</button>
-          <button type="button" class="dock-chip" data-focus="agent">Agent</button>
-          <button type="button" class="dock-chip" data-focus="private">私有化</button>
-        </aside>
+      <div class="play-deck" id="play-stage">
+        <div class="play-toolbar">
+          <div class="play-toolbar-left">
+            <div class="hud">
+              <span class="hud-dot"></span>
+              <span>LINGQI · LIVE MESH</span>
+            </div>
+            <div class="play-dock" aria-label="能力切换">
+              <button type="button" class="dock-chip is-active" data-focus="all">全部</button>
+              <button type="button" class="dock-chip" data-focus="erp">ERP</button>
+              <button type="button" class="dock-chip" data-focus="xingxuan">星选</button>
+              <button type="button" class="dock-chip" data-focus="agent">Agent</button>
+              <button type="button" class="dock-chip" data-focus="private">私有化</button>
+            </div>
+          </div>
+          <p class="play-hint mono">点击节点查看 · 按住拖拽排布</p>
+        </div>
 
         <div class="play-canvas-wrap">
-          <div class="hud">
-            <span class="hud-dot"></span>
-            <span>LINGQI · LIVE MESH</span>
-          </div>
           <svg class="play-links" id="play-links" aria-hidden="true"></svg>
           <div class="play-nodes" id="play-nodes">
-            <button type="button" class="node" data-id="merchant" data-layer="erp" style="--x:22%; --y:28%;">
+            <button type="button" class="node" data-id="merchant" data-layer="erp" style="--x:18%; --y:32%;">
               <strong>商家</strong>
               <span>ERP</span>
             </button>
-            <button type="button" class="node" data-id="partner" data-layer="erp" style="--x:72%; --y:22%;">
+            <button type="button" class="node" data-id="partner" data-layer="erp" style="--x:82%; --y:28%;">
               <strong>服务商</strong>
               <span>Partner</span>
             </button>
-            <button type="button" class="node" data-id="xingxuan" data-layer="xingxuan" style="--x:50%; --y:52%;">
+            <button type="button" class="node" data-id="xingxuan" data-layer="xingxuan" style="--x:62%; --y:58%;">
               <strong>星选</strong>
               <span>Match</span>
             </button>
-            <button type="button" class="node node--core is-active" data-id="agent" data-layer="agent" style="--x:50%; --y:30%;">
+            <button type="button" class="node node--core is-active" data-id="agent" data-layer="agent" style="--x:48%; --y:36%;">
               <strong>Agent</strong>
               <span>AI Core</span>
             </button>
-            <button type="button" class="node" data-id="fulfill" data-layer="xingxuan" style="--x:28%; --y:72%;">
+            <button type="button" class="node" data-id="fulfill" data-layer="xingxuan" style="--x:28%; --y:68%;">
               <strong>履约</strong>
               <span>Loop</span>
             </button>
-            <button type="button" class="node" data-id="private" data-layer="private" style="--x:74%; --y:68%;">
+            <button type="button" class="node" data-id="private" data-layer="private" style="--x:78%; --y:72%;">
               <strong>私有化</strong>
               <span>Deploy</span>
             </button>
           </div>
-          <p class="canvas-tip mono" id="canvas-tip">点击节点查看详情 · 按住拖拽排布</p>
+          <p class="canvas-tip mono" id="canvas-tip" hidden>拖拽中…</p>
         </div>
 
-        <aside class="live-panel" id="live-panel" aria-live="polite">
-          <p class="dock-label mono">LIVE PANEL</p>
-          <h3 id="panel-title">Agent · AI Core</h3>
-          <p id="panel-desc">场景化智能体嵌入经营动作：组品、Brief、审片与合规检核。</p>
-          <dl id="panel-stats">
+        <div class="live-bar" id="live-panel" aria-live="polite">
+          <div class="live-bar-main">
+            <p class="dock-label mono">SELECTED</p>
+            <h3 id="panel-title">Agent · AI Core</h3>
+            <p id="panel-desc">场景化智能体嵌入经营动作：组品、Brief、审片与合规检核。</p>
+          </div>
+          <dl id="panel-stats" class="live-bar-stats">
             <div><dt>链路</dt><dd>预览 → 确认 → 写入</dd></div>
             <div><dt>协同</dt><dd>ERP ↔ 星选</dd></div>
             <div><dt>状态</dt><dd class="ok">Online</dd></div>
           </dl>
           <a class="panel-link" id="panel-link" href="#services">了解定制能力 →</a>
-        </aside>
+        </div>
       </div>
     </section>
 

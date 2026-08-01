@@ -279,7 +279,10 @@
     };
     node.classList.add("is-dragging");
     node.setPointerCapture?.(e.pointerId);
-    tip && (tip.textContent = "拖拽中…松开完成排布");
+    if (tip) {
+      tip.hidden = false;
+      tip.textContent = "拖拽中…松开完成排布";
+    }
   };
 
   const onPointerMove = (e) => {
@@ -301,7 +304,7 @@
     if (!drag) return;
     drag.node.classList.remove("is-dragging");
     if (drag.moved) drag.node.dataset.didDrag = "1";
-    tip && (tip.textContent = "点击节点查看详情 · 按住拖拽排布");
+    if (tip) tip.hidden = true;
     drag = null;
     drawLinks();
   };
