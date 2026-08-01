@@ -6216,6 +6216,8 @@ function douyinFinanceFetchLimits(startYmd: string, endYmd: string): DouyinFinan
 type PaginateDouyinOrdersOpts = {
   maxPages?: number
   pageSize?: number
+  /** 创单拉取时回调原始订单（用于逐单落库） */
+  onOrder?: (order: Record<string, unknown>) => void
 }
 
 async function paginateDouyinTradeOrders(
@@ -6279,6 +6281,7 @@ async function paginateDouyinTradeOrders(
       if (!rawOrder || typeof rawOrder !== 'object') continue
       const order = rawOrder as Record<string, unknown>
       if (timeRange === 'create') {
+        opts?.onOrder?.(order)
         mergeDouyinOrderSales(bucket, order, startYmd, endYmd, seenSalesOrderIds, hourlyPay)
         mergeDouyinOrderVerify(bucket, order, startYmd, endYmd, seenVerifyCerts, isHermes)
       } else {
@@ -6289,6 +6292,149 @@ async function paginateDouyinTradeOrders(
     page += 1
   }
   if (page > maxPages) warnings.push('抖音订单分页达到上限，汇总可能不完整')
+}
+
+export type DouyinTradeOrderDetail = {
+  platform: 'douyin'
+  orderId: string
+  skuId: string
+  skuName: string
+  productId: string
+  categoryL1: string
+  categoryL2: string
+  categoryL3: string
+  payAmountFen: number
+  refundAmountFen: number
+  couponCount: number
+  orderStatus: number | null
+  payTimeIso: string | null
+  verifyTimeIso: string | null
+  openId: string
+  raw: Record<string, unknown>
+}
+
+function orderRefundAmountFen(order: Record<string, unknown>): number {
+  let fen = 0
+  const certs = order.certificate
+  if (Array.isArray(certs)) {
+    for (const c of certs) {
+      if (!c || typeof c !== 'object') continue
+      const cert = c as Record<string, unknown>
+      const r = Number(cert.refund_amount ?? cert.refund_fee)
+      if (Number.isFinite(r) && r > 0) fen += r
+    }
+  }
+  if (fen <= 0) {
+    const st = Number(order.order_status)
+    if (st === 300 || st === 301) {
+      fen = Math.round(orderPayAmountYuan(order) * 100)
+    }
+  }
+  return Math.max(0, Math.floor(fen))
+}
+
+function orderFirstVerifyUnixSec(order: Record<string, unknown>): number {
+  const certs = order.certificate
+  if (!Array.isArray(certs)) return 0
+  let best = 0
+  for (const c of certs) {
+    if (!c || typeof c !== 'object') continue
+    const cert = c as Record<string, unknown>
+    if (!certIsFulfilled(Number(cert.item_status ?? cert.status))) continue
+    const sec = unixSecFromApiTime(cert.item_update_time)
+    if (sec > 0 && (best === 0 || sec < best)) best = sec
+  }
+  return best
+}
+
+function normalizeDouyinTradeOrderDetail(order: Record<string, unknown>): DouyinTradeOrderDetail | null {
+  const orderId = orderUniqueId(order)
+  if (!orderId) return null
+  const skuName = String(order.sku_name ?? order.product_name ?? order.title ?? '').trim()
+  const skuId = String(order.sku_id ?? '').trim()
+  const productId = String(order.product_id ?? order.productId ?? skuId).trim()
+  const cat = (order.category ?? order.product_category ?? {}) as Record<string, unknown>
+  const categoryL1 = String(
+    order.category_full_name ?? cat.first_cname ?? cat.first_name ?? order.first_cname ?? '',
+  ).trim()
+  const categoryL2 = String(cat.second_cname ?? cat.second_name ?? order.second_cname ?? '').trim()
+  const categoryL3 = String(cat.third_cname ?? cat.third_name ?? order.third_cname ?? '').trim()
+  const payYuan = orderPayAmountYuan(order)
+  const paySec = orderCreateUnixSec(order)
+  const verifySec = orderFirstVerifyUnixSec(order)
+  const st = Number(order.order_status)
+  return {
+    platform: 'douyin',
+    orderId,
+    skuId,
+    skuName: skuName || '未命名商品',
+    productId,
+    categoryL1,
+    categoryL2,
+    categoryL3,
+    payAmountFen: Math.round(payYuan * 100),
+    refundAmountFen: orderRefundAmountFen(order),
+    couponCount: orderSalesCouponCount(order),
+    orderStatus: Number.isFinite(st) ? st : null,
+    payTimeIso: paySec > 0 ? new Date(paySec * 1000).toISOString() : null,
+    verifyTimeIso: verifySec > 0 ? new Date(verifySec * 1000).toISOString() : null,
+    openId: String(order.open_id ?? order.openid ?? order.buyer_open_id ?? '').trim(),
+    raw: order,
+  }
+}
+
+/** 拉取抖音来客团购逐单（创单时间窗），供落库与店铺分析 */
+export async function fetchDouyinTradeOrderDetails(
+  bearerToken: string,
+  startYmd: string,
+  endYmd: string,
+): Promise<{ orders: DouyinTradeOrderDetail[]; warnings: string[] }> {
+  const warnings: string[] = []
+  const session = bearerToken ? resolveSession(bearerToken) : undefined
+  if (!session) {
+    warnings.push('当前 Bearer 非抖音来客绑定会话，无法拉取抖音订单。')
+    return { orders: [], warnings }
+  }
+  const rng = unixRangeInclusiveShanghai(startYmd, endYmd)
+  if (!rng) {
+    warnings.push('日期范围无效')
+    return { orders: [], warnings }
+  }
+
+  const bucket = new Map<string, DouyinFinanceDayBucket>()
+  const seenSalesOrderIds = new Set<string>()
+  const seenVerifyCerts = new Set<string>()
+  const byId = new Map<string, DouyinTradeOrderDetail>()
+
+  try {
+    const token = await ensureDouyinToken(session)
+    const accountId = session.merchantId
+    const limits = douyinFinanceFetchLimits(startYmd, endYmd)
+    const onOrder = (order: Record<string, unknown>) => {
+      const d = normalizeDouyinTradeOrderDetail(order)
+      if (!d) return
+      byId.set(d.orderId, d)
+    }
+    await paginateDouyinTradeOrders(
+      token,
+      accountId,
+      '/goodlife/v1/trade/order/query/',
+      rng.startSec,
+      rng.endSec,
+      startYmd,
+      endYmd,
+      bucket,
+      seenSalesOrderIds,
+      seenVerifyCerts,
+      'create',
+      warnings,
+      { pageSize: limits.pageSize, maxPages: limits.createMaxPages, onOrder },
+    )
+  } catch (e) {
+    warnings.push(`抖音逐单拉取异常：${e instanceof Error ? e.message : String(e)}`)
+  }
+
+  return { orders: Array.from(byId.values()), warnings }
 }
 
 /**
