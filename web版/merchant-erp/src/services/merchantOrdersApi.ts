@@ -44,6 +44,7 @@ export type ShopAnalysisSummary = {
   repurchaseRate: number
   estimatedGrossYuan: number
   hasPreWindowHistory: boolean
+  guestBasis: 'history' | 'repurchase'
   stores: ShopStoreOption[]
   topBySales: { name: string; productId: string; salesYuan: number; couponCount: number; share: number }[]
   topByRefund: { name: string; productId: string; refundYuan: number; refundRate: number }[]

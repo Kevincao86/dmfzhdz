@@ -7,7 +7,10 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { verifyBearerJwt } from '../vite-plugins/aiGateway/authSupabase.js'
 import { loadTenantAiContextForUser } from '../vite-plugins/tenantMembershipCore.js'
 import { fetchDouyinTradeOrderDetails } from '../vite-plugins/douyinMerchantGateway.js'
-import { upsertDouyinOrders } from '../vite-plugins/merchantPlatformOrdersCore.js'
+import {
+  backfillOrderPoiFromRaw,
+  upsertDouyinOrders,
+} from '../vite-plugins/merchantPlatformOrdersCore.js'
 
 export const config = { maxDuration: 120 }
 
@@ -109,11 +112,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     const pulled = await fetchDouyinTradeOrderDetails(douyinToken, startDate, endDate)
     const { upserted } = await upsertDouyinOrders(tenantId, pulled.orders)
+    const poiBackfilled = await backfillOrderPoiFromRaw(tenantId).catch(() => 0)
     sendJson(res, 200, {
       ok: true,
       platform: 'douyin',
       pulled: pulled.orders.length,
       upserted,
+      poiBackfilled,
       warnings: pulled.warnings,
       startDate,
       endDate,
