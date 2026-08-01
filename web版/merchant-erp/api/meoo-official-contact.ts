@@ -1,10 +1,12 @@
 /**
- * POST /api/meoo-official-contact — 墨典官网咨询表单（公开）
+ * POST /api/meoo-official-contact — 官网咨询表单（公开）
  *
- * 飞书投递（二选一，优先 Webhook）：
- * - MEOO_FEISHU_WEBHOOK_OFFICIAL（可选签名 MEOO_FEISHU_WEBHOOK_OFFICIAL_SECRET，HMAC 同 feishuNotify）
- * - 或 FEISHU_OFFICIAL_APP_ID + FEISHU_OFFICIAL_APP_SECRET + FEISHU_OFFICIAL_RECEIVE_ID
- *   （可选 FEISHU_OFFICIAL_RECEIVE_ID_TYPE=chat_id|open_id，默认 chat_id）
+ * body.source:
+ * - modian（默认）→ MEOO_FEISHU_WEBHOOK_OFFICIAL (+ SECRET)
+ * - lingqi → MEOO_FEISHU_WEBHOOK_LINGQI (+ SECRET)
+ *
+ * 亦支持自建应用投递（仅 modian 回落）：
+ * FEISHU_OFFICIAL_APP_ID + FEISHU_OFFICIAL_APP_SECRET + FEISHU_OFFICIAL_RECEIVE_ID
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createHmac } from 'node:crypto'
@@ -17,7 +19,10 @@ const MAX = {
   phone: 40,
   need: 120,
   message: 2000,
+  source: 32,
 } as const
+
+type ContactChannel = 'modian' | 'lingqi'
 
 function corsOrigin(req: VercelRequest): string {
   const origin = String(req.headers.origin || '').trim()
@@ -71,6 +76,30 @@ function trimField(v: unknown, max: number): string {
     .slice(0, max)
 }
 
+function resolveChannel(raw: string, need: string, message: string): ContactChannel {
+  const s = raw.toLowerCase()
+  if (s === 'lingqi' || s === '灵祺' || s.includes('lingqi')) return 'lingqi'
+  if (need.includes('灵祺官网') || message.includes('灵祺官网') || message.includes('来源：灵祺')) {
+    return 'lingqi'
+  }
+  return 'modian'
+}
+
+function channelWebhook(channel: ContactChannel): { url: string; secret: string; title: string } {
+  if (channel === 'lingqi') {
+    return {
+      url: (process.env.MEOO_FEISHU_WEBHOOK_LINGQI ?? '').trim(),
+      secret: (process.env.MEOO_FEISHU_WEBHOOK_LINGQI_SECRET ?? '').trim(),
+      title: '【灵祺官网咨询】',
+    }
+  }
+  return {
+    url: (process.env.MEOO_FEISHU_WEBHOOK_OFFICIAL ?? '').trim(),
+    secret: (process.env.MEOO_FEISHU_WEBHOOK_OFFICIAL_SECRET ?? '').trim(),
+    title: '【墨典官网咨询】',
+  }
+}
+
 /** 飞书自定义机器人签名：key = `${timestamp}\\n${secret}`，对空串做 HmacSHA256 再 Base64 */
 function buildWebhookBody(text: string, secret: string): Record<string, unknown> {
   const content = { text: text.trim().slice(0, 4000) || '（空消息）' }
@@ -88,10 +117,12 @@ function buildWebhookBody(text: string, secret: string): Record<string, unknown>
   }
 }
 
-async function sendViaWebhook(text: string): Promise<{ ok: boolean; error?: string }> {
-  const url = (process.env.MEOO_FEISHU_WEBHOOK_OFFICIAL ?? '').trim()
+async function sendViaWebhook(
+  url: string,
+  secret: string,
+  text: string,
+): Promise<{ ok: boolean; error?: string }> {
   if (!url) return { ok: false, error: 'webhook_not_configured' }
-  const secret = (process.env.MEOO_FEISHU_WEBHOOK_OFFICIAL_SECRET ?? '').trim()
   try {
     const res = await fetch(url, {
       method: 'POST',
@@ -177,13 +208,17 @@ async function sendViaAppIm(text: string): Promise<{ ok: boolean; error?: string
   }
 }
 
-function feishuConfigured(): boolean {
-  if ((process.env.MEOO_FEISHU_WEBHOOK_OFFICIAL ?? '').trim()) return true
-  return Boolean(
-    (process.env.FEISHU_OFFICIAL_APP_ID ?? '').trim() &&
-      (process.env.FEISHU_OFFICIAL_APP_SECRET ?? '').trim() &&
-      (process.env.FEISHU_OFFICIAL_RECEIVE_ID ?? '').trim(),
-  )
+function channelConfigured(channel: ContactChannel): boolean {
+  const { url } = channelWebhook(channel)
+  if (url) return true
+  if (channel === 'modian') {
+    return Boolean(
+      (process.env.FEISHU_OFFICIAL_APP_ID ?? '').trim() &&
+        (process.env.FEISHU_OFFICIAL_APP_SECRET ?? '').trim() &&
+        (process.env.FEISHU_OFFICIAL_RECEIVE_ID ?? '').trim(),
+    )
+  }
+  return false
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
@@ -195,16 +230,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
     if (req.method !== 'POST') {
       sendJson(req, res, 405, { ok: false, error: 'method_not_allowed' })
-      return
-    }
-
-    if (!feishuConfigured()) {
-      sendJson(req, res, 503, {
-        ok: false,
-        error: 'feishu_not_configured',
-        message:
-          '官网咨询飞书未配置：请在轻量 meoo-auth-api 环境设置 MEOO_FEISHU_WEBHOOK_OFFICIAL（可选 MEOO_FEISHU_WEBHOOK_OFFICIAL_SECRET），或 FEISHU_OFFICIAL_APP_ID + FEISHU_OFFICIAL_APP_SECRET + FEISHU_OFFICIAL_RECEIVE_ID',
-      })
       return
     }
 
@@ -221,6 +246,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const phone = trimField(body.phone, MAX.phone)
     const need = trimField(body.need, MAX.need)
     const message = trimField(body.message, MAX.message)
+    const sourceRaw = trimField(body.source, MAX.source)
+    const channel = resolveChannel(sourceRaw, need, message)
+
+    if (!channelConfigured(channel)) {
+      sendJson(req, res, 503, {
+        ok: false,
+        error: 'feishu_not_configured',
+        channel,
+        message:
+          channel === 'lingqi'
+            ? '灵祺官网咨询飞书未配置：请在轻量 meoo-auth-api 环境设置 MEOO_FEISHU_WEBHOOK_LINGQI（可选 MEOO_FEISHU_WEBHOOK_LINGQI_SECRET）'
+            : '墨典官网咨询飞书未配置：请在轻量 meoo-auth-api 环境设置 MEOO_FEISHU_WEBHOOK_OFFICIAL（可选 MEOO_FEISHU_WEBHOOK_OFFICIAL_SECRET），或 FEISHU_OFFICIAL_APP_ID + FEISHU_OFFICIAL_APP_SECRET + FEISHU_OFFICIAL_RECEIVE_ID',
+      })
+      return
+    }
 
     const missing: string[] = []
     if (!name) missing.push('name')
@@ -232,9 +272,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    const { url, secret, title } = channelWebhook(channel)
     const when = new Date().toLocaleString('zh-CN', { hour12: false, timeZone: 'Asia/Shanghai' })
     const text = [
-      '【墨典官网咨询】',
+      title,
       `姓名：${name}`,
       `公司：${company}`,
       `手机/微信：${phone}`,
@@ -244,8 +285,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     ].join('\n')
 
     let result: { ok: boolean; error?: string }
-    if ((process.env.MEOO_FEISHU_WEBHOOK_OFFICIAL ?? '').trim()) {
-      result = await sendViaWebhook(text)
+    if (url) {
+      result = await sendViaWebhook(url, secret, text)
     } else {
       result = await sendViaAppIm(text)
     }
@@ -259,7 +300,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    sendJson(req, res, 200, { ok: true })
+    sendJson(req, res, 200, { ok: true, channel })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     sendJson(req, res, 500, { ok: false, error: 'official_contact_failed', detail: msg.slice(0, 400) })
