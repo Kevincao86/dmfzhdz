@@ -6383,6 +6383,21 @@ function normalizeDouyinTradeOrderDetail(order: Record<string, unknown>): Douyin
   }
 }
 
+/** 逐单落库：按周切片拉取，避免长区间单窗分页打满 */
+function eachShanghaiWeekChunks(startYmd: string, endYmd: string): { start: string; end: string }[] {
+  const out: { start: string; end: string }[] = []
+  let cur = startYmd
+  let guard = 0
+  while (cur <= endYmd && guard++ < 80) {
+    const chunkEnd = addCalendarDaysShanghai(cur, 6)
+    const end = chunkEnd > endYmd ? endYmd : chunkEnd
+    out.push({ start: cur, end })
+    if (end >= endYmd) break
+    cur = addCalendarDaysShanghai(end, 1)
+  }
+  return out
+}
+
 /** 拉取抖音来客团购逐单（创单时间窗），供落库与店铺分析 */
 export async function fetchDouyinTradeOrderDetails(
   bearerToken: string,
@@ -6395,41 +6410,58 @@ export async function fetchDouyinTradeOrderDetails(
     warnings.push('当前 Bearer 非抖音来客绑定会话，无法拉取抖音订单。')
     return { orders: [], warnings }
   }
-  const rng = unixRangeInclusiveShanghai(startYmd, endYmd)
-  if (!rng) {
+  if (!unixRangeInclusiveShanghai(startYmd, endYmd)) {
     warnings.push('日期范围无效')
     return { orders: [], warnings }
   }
 
-  const bucket = new Map<string, DouyinFinanceDayBucket>()
-  const seenSalesOrderIds = new Set<string>()
-  const seenVerifyCerts = new Set<string>()
   const byId = new Map<string, DouyinTradeOrderDetail>()
+  let hitPageCap = false
 
   try {
     const token = await ensureDouyinToken(session)
     const accountId = session.merchantId
-    const limits = douyinFinanceFetchLimits(startYmd, endYmd)
-    const onOrder = (order: Record<string, unknown>) => {
-      const d = normalizeDouyinTradeOrderDetail(order)
-      if (!d) return
-      byId.set(d.orderId, d)
+    const chunks = eachShanghaiWeekChunks(startYmd, endYmd)
+    for (const chunk of chunks) {
+      const rng = unixRangeInclusiveShanghai(chunk.start, chunk.end)
+      if (!rng) continue
+      const bucket = new Map<string, DouyinFinanceDayBucket>()
+      const seenSalesOrderIds = new Set<string>()
+      const seenVerifyCerts = new Set<string>()
+      const chunkWarnings: string[] = []
+      const onOrder = (order: Record<string, unknown>) => {
+        const d = normalizeDouyinTradeOrderDetail(order)
+        if (!d) return
+        byId.set(d.orderId, d)
+      }
+      // 每周最多 80 页 × 100 ≈ 8000 单，覆盖旺季门店
+      await paginateDouyinTradeOrders(
+        token,
+        accountId,
+        '/goodlife/v1/trade/order/query/',
+        rng.startSec,
+        rng.endSec,
+        chunk.start,
+        chunk.end,
+        bucket,
+        seenSalesOrderIds,
+        seenVerifyCerts,
+        'create',
+        chunkWarnings,
+        { pageSize: 100, maxPages: 80, onOrder },
+      )
+      if (chunkWarnings.some((w) => w.includes('分页达到上限'))) {
+        hitPageCap = true
+        warnings.push(`区间 ${chunk.start}~${chunk.end} 订单较多，该周可能未拉全，建议缩短同步天数后重试。`)
+      } else {
+        for (const w of chunkWarnings) {
+          if (!warnings.includes(w)) warnings.push(w)
+        }
+      }
     }
-    await paginateDouyinTradeOrders(
-      token,
-      accountId,
-      '/goodlife/v1/trade/order/query/',
-      rng.startSec,
-      rng.endSec,
-      startYmd,
-      endYmd,
-      bucket,
-      seenSalesOrderIds,
-      seenVerifyCerts,
-      'create',
-      warnings,
-      { pageSize: limits.pageSize, maxPages: limits.createMaxPages, onOrder },
-    )
+    if (hitPageCap) {
+      warnings.push('部分周次触及分页上限；已按周切片尽量拉全。可改用更短日期再同步补齐。')
+    }
   } catch (e) {
     warnings.push(`抖音逐单拉取异常：${e instanceof Error ? e.message : String(e)}`)
   }
