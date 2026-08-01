@@ -697,10 +697,13 @@ PAT
 StoreAnalysisPage
 merchantOrdersApi
 merchantPlatformOrdersCore
+shopAnalysisAiCore
 meoo-shop-analysis-summary
+meoo-shop-analysis-ai
 meoo-merchant-orders
 douyinMerchantGateway
 merchant_platform_orders_poi
+ecs-auth-api-server
 change-scope-guard
 PAT
       ;;

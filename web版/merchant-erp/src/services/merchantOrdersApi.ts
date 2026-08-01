@@ -150,3 +150,75 @@ export async function fetchShopAnalysis(params: {
     endDate: String(j.endDate || params.endDate),
   }
 }
+
+export type ShopReviewDigest = {
+  ok: boolean
+  message?: string
+  warning?: string
+  total: number
+  avgStars: number
+  goodCount: number
+  neutralCount: number
+  badCount: number
+  unrepliedCount: number
+  goodShare: number
+  badShare: number
+  badSamples: { stars: number; text: string; poiName?: string }[]
+}
+
+export type ShopAiReportSection = { title: string; body: string; bullets: string[] }
+
+export async function fetchShopAnalysisAi(params: {
+  startDate: string
+  endDate: string
+  platform?: string
+  poiId?: string
+}): Promise<{
+  summary: ShopAnalysisSummary
+  adviceFacts: string
+  reviewDigest: ShopReviewDigest
+  aiReport: string
+  aiSections: ShopAiReportSection[]
+  modelUsed: string
+  warnings: string[]
+  aiFailed?: boolean
+  message?: string
+  pointsCharged?: number
+}> {
+  const margins = readStorePlatformMargins()
+  const headers = await authHeaders({ 'Content-Type': 'application/json' })
+  const j = await fetchJson('/api/meoo-shop-analysis-ai', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      startDate: params.startDate,
+      endDate: params.endDate,
+      platform: params.platform || 'douyin',
+      poiId: params.poiId || undefined,
+      marginPercent: margins.douyin || 0,
+    }),
+  })
+  return {
+    summary: j.summary as ShopAnalysisSummary,
+    adviceFacts: String(j.adviceFacts || ''),
+    reviewDigest: (j.reviewDigest || {
+      ok: false,
+      total: 0,
+      avgStars: 0,
+      goodCount: 0,
+      neutralCount: 0,
+      badCount: 0,
+      unrepliedCount: 0,
+      goodShare: 0,
+      badShare: 0,
+      badSamples: [],
+    }) as ShopReviewDigest,
+    aiReport: String(j.aiReport || ''),
+    aiSections: Array.isArray(j.aiSections) ? (j.aiSections as ShopAiReportSection[]) : [],
+    modelUsed: String(j.modelUsed || ''),
+    warnings: Array.isArray(j.warnings) ? (j.warnings as string[]) : [],
+    aiFailed: Boolean(j.aiFailed),
+    message: j.message ? String(j.message) : undefined,
+    pointsCharged: Number(j.pointsCharged) || 0,
+  }
+}
