@@ -162,8 +162,9 @@ Page({
         (sys.safeArea && sys.screenHeight
           ? Math.max(0, sys.screenHeight - sys.safeArea.bottom)
           : 0)
-      const tabBarPx = Math.round((84 * sys.windowWidth) / 750) + safeBottom
-      const dockPx = Math.round((108 * sys.windowWidth) / 750)
+      // 底栏：tab(88rpx) + 安全区；输入条约 112rpx（与 composer-dock 实际高度对齐）
+      const tabBarPx = Math.round((88 * sys.windowWidth) / 750) + safeBottom
+      const dockPx = Math.round((112 * sys.windowWidth) / 750)
       const plusPx = this.data.showPlusPanel ? Math.round((200 * sys.windowWidth) / 750) : 0
       const shortcutPx = !this.data.hasChat
         ? this.data.shortcutsOpen
@@ -176,7 +177,8 @@ Page({
       this.setData({
         statusBarH,
         headerH,
-        scrollBottomPad: headerH + dockPx + attachPx + plusPx + shortcutPx + tabBarPx + 16,
+        // 仅预留底部输入条+Tab；顶栏已用 padding-top，切勿再把 headerH 加进底部（会出大块空白遮挡）
+        scrollBottomPad: dockPx + attachPx + plusPx + shortcutPx + tabBarPx + 12,
       })
     } catch (_) {}
   },
