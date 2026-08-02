@@ -28,7 +28,13 @@ bash scripts/ecs-deploy-fws-web-local-build.sh
 bash scripts/ecs-deploy-new-ecs-web-local-build.sh
 ```
 
-流程写死：本机 `npm run build`（或 `build:partner`）→ `rsync` dist → 新ECS 上 `SKIP_BUILD=1` 只写 Nginx/配置。
+**履约 dr（嵌入 @merchant=CS 同源页）：**
+
+```bash
+bash scripts/ecs-deploy-dr-web-local-build.sh
+```
+
+流程写死：本机 `npm run build`（或 `build:partner` / 履约后台 build）→ `rsync` dist → 新ECS 上 `SKIP_BUILD=1` 只写 Nginx/配置。
 
 ## 禁止
 

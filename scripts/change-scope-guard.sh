@@ -56,6 +56,7 @@ list_scopes() {
   jianying_local       Cursor 本地剪映 skill + 安装脚本（不含 ERP / CapCut 国际版）
   merchant_registry_bootstrap 商家壳注册表瘦身（OpsRegistryBridge slice=ai，缓解 cs/fws/dr 卡顿）
   shop_analysis          商家 ERP：店铺分析（图表/门店筛选/经营建议/逐单 POI）
+  edition_cs_sync        各端前端对齐 CS（DR/FWS/Admin 同源功能与积分经济）
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -707,6 +708,18 @@ merchant_platform_orders_poi
 ecs-auth-api-server
 erpAiPointsSpendCore
 erpAiApiPointsGate
+change-scope-guard
+PAT
+      ;;
+    edition_cs_sync)
+      cat <<'PAT'
+XingxuanPointsRechargePage
+mpPointsEconomics
+OpsMpLibraryPermissionPage
+ecs-deploy-dr-web-local-build
+ecs-deploy-talent-fulfillment
+ecs-new-ecs-local-build-only
+deploy-targets
 change-scope-guard
 PAT
       ;;

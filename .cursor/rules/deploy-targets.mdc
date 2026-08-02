@@ -48,6 +48,7 @@ cd ~/app && bash scripts/ecs-git-pull-gitee.sh && bash scripts/ecs-deploy-auth-a
 ```bash
 bash scripts/ecs-deploy-cs-web-local-build.sh          # cs
 bash scripts/ecs-deploy-fws-web-local-build.sh         # fws
+bash scripts/ecs-deploy-dr-web-local-build.sh          # dr（@merchant=CS）
 bash scripts/ecs-deploy-new-ecs-web-local-build.sh     # cs+fws
 ```
 
