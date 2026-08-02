@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>灵祺商家 ERP · 图文入门课</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #0c1b24;
+      --ink-soft: #16303c;
+      --paper: #f3efe6;
+      --paper-2: #ebe4d6;
+      --amber: #d97706;
+      --amber-deep: #b45309;
+      --teal: #0f766e;
+      --teal-soft: #99f6e4;
+      --muted: #5c6b73;
+      --line: rgba(12, 27, 36, 0.12);
+      --shadow: 0 24px 60px rgba(12, 27, 36, 0.18);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: "DM Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(15, 118, 110, 0.16), transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, rgba(217, 119, 6, 0.14), transparent 50%),
+        linear-gradient(180deg, #e8f0f2 0%, var(--paper) 28%, var(--paper-2) 100%);
+      line-height: 1.65;
+    }
+
+    .shell {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 28px 20px 80px;
+    }
+
+    .topbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .brand strong {
+      font-family: "Noto Serif SC", serif;
+      font-size: 1.15rem;
+      letter-spacing: 0.02em;
+    }
+    .brand span {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .nav-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .nav-pills a {
+      text-decoration: none;
+      color: var(--ink-soft);
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      transition: background 0.2s, transform 0.2s;
+    }
+    .nav-pills a:hover {
+      background: #fff;
+      transform: translateY(-1px);
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      border-radius: 28px;
+      min-height: min(72vh, 640px);
+      color: #f8fafc;
+      box-shadow: var(--shadow);
+      margin-bottom: 36px;
+      isolation: isolate;
+    }
+    .hero img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: -2;
+      transform: scale(1.02);
+      animation: heroDrift 18s ease-in-out infinite alternate;
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      background: linear-gradient(115deg, rgba(12, 27, 36, 0.82) 8%, rgba(12, 27, 36, 0.45) 55%, rgba(12, 27, 36, 0.2) 100%);
+    }
+    .hero-inner {
+      max-width: 620px;
+      padding: clamp(36px, 7vw, 72px);
+    }
+    .eyebrow {
+      display: inline-block;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--teal-soft);
+      margin-bottom: 14px;
+    }
+    .hero h1 {
+      font-family: "Noto Serif SC", serif;
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      line-height: 1.18;
+      margin: 0 0 16px;
+      font-weight: 700;
+    }
+    .hero p {
+      margin: 0 0 24px;
+      font-size: 1.05rem;
+      color: rgba(248, 250, 252, 0.9);
+      max-width: 36em;
+    }
+    .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .btn {
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--amber), var(--amber-deep));
+      color: #fff7ed;
+      box-shadow: 0 10px 24px rgba(180, 83, 9, 0.35);
+    }
+    .btn-ghost {
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      backdrop-filter: blur(8px);
+    }
+
+    .toc {
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 22px 22px 10px;
+      margin-bottom: 40px;
+      backdrop-filter: blur(10px);
+    }
+    .toc h2 {
+      font-family: "Noto Serif SC", serif;
+      margin: 0 0 12px;
+      font-size: 1.25rem;
+    }
+    .toc ol {
+      margin: 0;
+      padding: 0 0 8px 1.2em;
+    }
+    .toc li { margin: 0.45em 0; }
+    .toc a {
+      color: var(--teal);
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .toc a:hover { text-decoration: underline; }
+
+    .lesson {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 28px;
+      align-items: stretch;
+      margin-bottom: 42px;
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid var(--line);
+      border-radius: 26px;
+      overflow: hidden;
+      box-shadow: 0 12px 36px rgba(12, 27, 36, 0.08);
+      animation: riseIn 0.7s ease both;
+    }
+    .lesson:nth-child(even) .lesson-media { order: 2; }
+    .lesson-media {
+      min-height: 280px;
+      position: relative;
+      overflow: hidden;
+      background: var(--ink);
+    }
+    .lesson-media img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: transform 0.8s ease;
+    }
+    .lesson:hover .lesson-media img { transform: scale(1.04); }
+    .lesson-body {
+      padding: clamp(22px, 3vw, 36px);
+    }
+    .lesson-kicker {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--teal);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .lesson h2 {
+      font-family: "Noto Serif SC", serif;
+      font-size: clamp(1.45rem, 2.6vw, 1.9rem);
+      margin: 0 0 12px;
+      line-height: 1.25;
+    }
+    .lesson p { margin: 0 0 12px; color: #243842; }
+    .lesson ul {
+      margin: 10px 0 0;
+      padding-left: 1.15em;
+      color: #243842;
+    }
+    .lesson li { margin: 0.35em 0; }
+    .callout {
+      margin-top: 16px;
+      padding: 12px 14px;
+      border-left: 4px solid var(--amber);
+      background: rgba(217, 119, 6, 0.08);
+      border-radius: 0 12px 12px 0;
+      font-size: 0.95rem;
+    }
+    .demo {
+      margin-top: 14px;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+    .demo strong { color: var(--ink-soft); }
+
+    .closing {
+      position: relative;
+      overflow: hidden;
+      border-radius: 28px;
+      min-height: 420px;
+      color: #f8fafc;
+      box-shadow: var(--shadow);
+    }
+    .closing img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: -2;
+    }
+    .closing::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      background: linear-gradient(120deg, rgba(12, 27, 36, 0.88), rgba(12, 27, 36, 0.35));
+    }
+    .closing-inner { padding: clamp(32px, 6vw, 64px); max-width: 640px; }
+    .closing h2 {
+      font-family: "Noto Serif SC", serif;
+      font-size: clamp(1.8rem, 4vw, 2.5rem);
+      margin: 0 0 14px;
+    }
+
+    footer {
+      margin-top: 36px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    @keyframes heroDrift {
+      from { transform: scale(1.02) translateY(0); }
+      to { transform: scale(1.06) translateY(-1.5%); }
+    }
+    @keyframes riseIn {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: none; }
+    }
+
+    @media (max-width: 860px) {
+      .lesson,
+      .lesson:nth-child(even) {
+        grid-template-columns: 1fr;
+      }
+      .lesson:nth-child(even) .lesson-media { order: 0; }
+      .lesson-media { min-height: 220px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .hero img, .lesson-media img { animation: none; transition: none; }
+      .lesson { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <strong>灵祺商家 ERP</strong>
+        <span>本地生活 AI 经营实操 · 图文入门课</span>
+      </div>
+      <nav class="nav-pills" aria-label="课程目录">
+        <a href="#l1">痛点</a>
+        <a href="#l2">价值</a>
+        <a href="#l3">上手</a>
+        <a href="#l4">智能体</a>
+        <a href="#l5">招募</a>
+        <a href="#l6">内容</a>
+        <a href="#l7">获客</a>
+        <a href="#l8">复盘</a>
+      </nav>
+    </header>
+
+    <section class="hero" id="top">
+      <img src="assets/01-cover.png" alt="商家 AI 经营中枢封面插画" />
+      <div class="hero-inner">
+        <div class="eyebrow">Illustrated Course · AI Art</div>
+        <h1>会说话，就会经营：从 0 学会灵祺商家 ERP</h1>
+        <p>
+          不是教你「怎么开抖音」，而是教你用 AI 把开团、招达人、做内容、跟线索、对账
+          串成一条流水线——少雇人、少外包、少踩坑。
+        </p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="#toc">开始学习</a>
+          <a class="btn btn-ghost" href="https://cs.mofangdianai.com" target="_blank" rel="noopener">打开商家后台</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="toc" id="toc">
+      <h2>课程目录（约 45–60 分钟读完）</h2>
+      <ol>
+        <li><a href="#l1">第 1 讲 · 本地生活商家为什么越做越累</a></li>
+        <li><a href="#l2">第 2 讲 · 一张图看懂 ERP 能帮你省什么</a></li>
+        <li><a href="#l3">第 3 讲 · 注册登录与门店绑定</a></li>
+        <li><a href="#l4">第 4 讲 · AI 智能体：九大场景与预览确认</a></li>
+        <li><a href="#l5">第 5 讲 · 达人招募闭环：从 Brief 到结款</a></li>
+        <li><a href="#l6">第 6 讲 · 短视频出片与数字人口播</a></li>
+        <li><a href="#l7">第 7 讲 · GEO、竞对与本地推线索</a></li>
+        <li><a href="#l8">第 8 讲 · 店铺分析、对账与月度复盘</a></li>
+      </ol>
+      <p style="color:var(--muted);font-size:0.9rem;">配图由 AI 生成，仅作氛围与教学示意；操作以 <code>cs.mofangdianai.com</code> 实机为准。</p>
+    </section>
+
+    <article class="lesson" id="l1">
+      <div class="lesson-media">
+        <img src="assets/02-pain.png" alt="多平台经营让老板越做越累" loading="lazy" />
+      </div>
+      <div class="lesson-body">
+        <div class="lesson-kicker">Lesson 01</div>
+        <h2>本地生活商家为什么越做越累</h2>
+        <p>很多老板有同一种感觉：平台越开越多，人越招越多，生意却没有更轻松。</p>
+        <ul>
+          <li><strong>多平台山</strong>：美团、抖音、小红书……商品与活动要重复维护。</li>
+          <li><strong>内容山</strong>：短视频/直播成了标配，产能靠外包或店员加班。</li>
+          <li><strong>达人山</strong>：钱从微信转出去，跟单靠表格和群消息，常踩坑。</li>
+        </ul>
+        <div class="callout">累不在「不够勤奋」，而在链路断裂——同一件事被拆成五份工。</div>
+      </div>
+    </article>
+
+    <article class="lesson" id="l2">
+      <div class="lesson-media">
+        <img src="assets/03-value.png" alt="AI 经营中枢价值图" loading="lazy" />
+      </div>
+      <div class="lesson-body">
+        <div class="lesson-kicker">Lesson 02</div>
+        <h2>一张图看懂 ERP 能帮你省什么</h2>
+        <p>把经营拆成六个结果词，比背功能列表更有用：</p>
+        <ul>
+          <li><strong>省人力</strong>：AI 组品、写 Brief、差评回复。</li>
+          <li><strong>省外包</strong>：短视频出片、云剪混剪、数字人口播。</li>
+          <li><strong>省试错</strong>：招募可追踪到回链，少付冤枉钱。</li>
+          <li><strong>提速度</strong>：说话出方案，确认后再写入。</li>
+          <li><strong>提闭环</strong>：招募 → 履约 → 审片 → 结款看得见卡点。</li>
+          <li><strong>提清晰度</strong>：线索与对账进同一中枢。</li>
+        </ul>
+        <div class="callout">一句话：灵祺商家 ERP = 本地生活的 AI 经营中枢。</div>
+      </div>
+    </article>
+
+    <article class="lesson" id="l3">
+      <div class="lesson-media">
+        <img src="assets/04-onboard.png" alt="登录与门店绑定上手" loading="lazy" />
+      </div>
+      <div class="lesson-body">
+        <div class="lesson-kicker">Lesson 03</div>
+        <h2>注册登录与门店绑定</h2>
+        <p>先把「能登录、能认店」跑通，后面所有 AI 能力才有数据可用。</p>
+        <ul>
+          <li>打开 <strong>cs.mofangdianai.com</strong> 完成注册/登录。</li>
+          <li>在设置中绑定抖音来客等平台账号。</li>
+          <li>核对门店列表与经营类目、毛利率配置。</li>
+          <li>确认会员权益与 AI 积分额度。</li>
+        </ul>
+        <p class="demo"><strong>【演示路径】</strong> 登录 → 设置 / 系统设置 → 平台绑定 → 商品 / 门店毛利配置</p>
+        <div class="callout">作业：本周完成首次登录，并截图「已绑定平台」状态。</div>
+      </div>
+    </article>
+
+    <article class="lesson" id="l4">
+      <div class="lesson-media">
+        <img src="assets/05-agent.png" alt="AI 智能体预览确认" loading="lazy" />
+      </div>
+      <div class="lesson-body">
+        <div class="lesson-kicker">Lesson 04</div>
+        <h2>AI 智能体：九大场景与预览确认</h2>
+        <p>智能体可以闲聊，也可以处理经营任务。涉及写操作时，必须先出「执行预览」，你确认后才真正写入。</p>
+        <ul>
+          <li>创建商品 · 招募达人 · 处理评价 · 优化本地推</li>
+          <li>跟进线索 · 同步平台 · 分析异常 · 推广文案 · 一键报税</li>
+        </ul>
+        <p>同页还可切换「短视频出片 / 推广文案」。分析异常时，只针对<strong>已绑定平台</strong>诊断，并覆盖组品、价格、毛利、评价、销量、客群、竞对、Geo 等维度。</p>
+        <p class="demo"><strong>【演示路径】</strong> 侧栏「AI 智能体」→ 快捷任务 → 核对预览卡片 → 确认执行</p>
+        <div class="callout">铁律：气泡里只看中文方案；不要被机器代码吓到——真正执行看下方确认卡。</div>
+      </div>
+    </article>
+
+    <article class="lesson" id="l5">
+      <div class="lesson-media">
+        <img src="assets/06-recruit.png" alt="达人招募闭环" loading="lazy" />
+      </div>
+      <div class="lesson-body">
+        <div class="lesson-kicker">Lesson 05</div>
+        <h2>达人招募闭环：从 Brief 到结款</h2>
+        <p>找达人最容易钱打水漂的原因，往往不是「达人不好」，而是流程不在系统里。</p>
+        <ul>
+          <li>AI 写三版探店 Brief，选一版下达招募。</li>
+          <li>AI 按预算做档位分配，匹配达人库城市数据。</li>
+          <li>报名 → 反选 → 探店 → 审片 → 回链 → 结款，状态可追踪。</li>
+        </ul>
+        <p class="demo"><strong>【演示路径】</strong> 智能体「招募达人」或「达人招募」页 → 确认 Brief → 发单到大厅</p>
+        <div class="callout">作业：发一单测试招募（或草稿），截图订单状态。</div>
+      </div>
+    </article>
+
+    <article class="lesson" id="l6">
+      <div class="lesson-media">
+        <img src="assets/07-video.png" alt="短视频出片与混剪" loading="lazy" />
+      </div>
+      <div class="lesson-body">
+        <div class="lesson-kicker">Lesson 06</div>
+        <h2>短视频出片与数字人口播</h2>
+        <p>周更产能要握在自己手里：可以外包精镜头，但脚本与混剪节奏应在 ERP 内完成。</p>
+        <ul>
+          <li><strong>短视频出片</strong>：Agent / 视频生成 / AI 混剪；电脑端还有画布、案例、配乐。</li>
+          <li><strong>数字人口播</strong>：电脑端完整成片；手机端可先 TTS 试听口播稿。</li>
+          <li>积分与商家 Web / 小程序共用同一租户钱包。</li>
+        </ul>
+        <p class="demo"><strong>【演示路径】</strong> AI 智能体 → 短视频出片，或侧栏「短视频 AI 处理」</p>
+        <div class="callout">作业：产出 1 条脚本或成片预览（保存到本地）。</div>
+      </div>
+    </article>
+
+    <article class="lesson" id="l7">
+      <div class="lesson-media">
+        <img src="assets/08-geo.png" alt="GEO 本地搜索与获客" loading="lazy" />
+      </div>
+      <div class="lesson-body">
+        <div class="lesson-kicker">Lesson 07</div>
+        <h2>GEO、竞对与本地推线索</h2>
+        <p>曝光不只靠投流：本地搜索可见度、竞对差距、线索跟进，决定「钱有没有花在刀刃上」。</p>
+        <ul>
+          <li><strong>GEO</strong>：门店信息完整度、问法覆盖、内容新鲜度。</li>
+          <li><strong>竞对分析</strong>：看差距再组品，而不是盲目抄作业。</li>
+          <li><strong>本地推线索</strong>：线索进 ERP，用智能体生成跟进话术。</li>
+        </ul>
+        <p class="demo"><strong>【演示路径】</strong> GEO 运营 / 竞对分析 / 线索中心</p>
+      </div>
+    </article>
+
+    <article class="lesson" id="l8">
+      <div class="lesson-media">
+        <img src="assets/09-finance.png" alt="店铺分析与财务复盘" loading="lazy" />
+      </div>
+      <div class="lesson-body">
+        <div class="lesson-kicker">Lesson 08</div>
+        <h2>店铺分析、对账与月度复盘</h2>
+        <p>经营要「看得见」：成交、退款、复购、新老客结构，配合 GPT 图文报告；财务侧可对账与导出报税资料（会员能力）。</p>
+        <ul>
+          <li>店铺分析：图表先看，再按毛利率估算积分跑 AI 报告。</li>
+          <li>对账：平台账单与核销对齐。</li>
+          <li>月度复盘：用模板收口本月动作与下月重点。</li>
+        </ul>
+        <p class="demo"><strong>【演示路径】</strong> 店铺 → 店铺分析；财务对账 / 报税管理</p>
+        <div class="callout">作业：填一张本月经营复盘表（成交亮点 + 问题 + 下周动作）。</div>
+      </div>
+    </article>
+
+    <section class="closing" id="end">
+      <img src="assets/10-close.png" alt="学完后开始用 AI 经营中枢" />
+      <div class="closing-inner">
+        <div class="eyebrow">Next Step</div>
+        <h2>学完就做：本周最小闭环</h2>
+        <p>
+          1）绑定门店 → 2）用智能体出一版商品草稿 → 3）写一份招募 Brief 或一条短视频脚本。
+          三步跑通，你就不再只是「看过课」，而是「用上了中枢」。
+        </p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="https://cs.mofangdianai.com" target="_blank" rel="noopener">进入商家 ERP</a>
+          <a class="btn btn-ghost" href="#toc">返回目录</a>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <p>灵祺 AI 智能 ERP · 商家版图文入门课 · 配图 AI 生成 · 产品地址 cs.mofangdianai.com</p>
+      <p>完整月订阅课库见：商家ERP月订阅课程包-课件材料 / html-讲义</p>
+    </footer>
+  </div>
+</body>
+</html>
