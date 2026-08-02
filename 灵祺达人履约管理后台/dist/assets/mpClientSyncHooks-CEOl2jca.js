@@ -1,1 +1,0 @@
-import{i as e}from"./jsx-runtime-n5LQ9ujS.js";var t=e({notifyLocalClientStateChanged:()=>i,registerClientSyncOnChange:()=>r}),n=null;function r(e){n=e}function i(){n?.()}export{i as n,r,t};

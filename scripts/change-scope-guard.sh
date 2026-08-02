@@ -720,6 +720,8 @@ ecs-deploy-dr-web-local-build
 ecs-deploy-talent-fulfillment
 ecs-new-ecs-local-build-only
 deploy-targets
+灵祺达人履约管理后台/.gitignore
+灵祺达人履约管理后台/dist
 change-scope-guard
 PAT
       ;;
