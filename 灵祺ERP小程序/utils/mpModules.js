@@ -60,9 +60,13 @@ module.exports.MODULE_COPY = {
     navTitle: '菜单价目表',
     body: '门店价目与电脑端云端同步（tenant_store_intel）。请从「功能 → 店铺 → 菜单价目表」进入原生页查看与编辑。',
   },
+  store_analysis: {
+    navTitle: '店铺分析',
+    body: '成交、客群、退款榜与 AI 经营建议与电脑端同源。请从「功能 → 店铺 → 店铺分析」进入；复杂图表可在电脑端查看。',
+  },
   digital_human: {
     navTitle: '数字人口播',
-    body: '数字人 TTS 试听与电脑端同源。请从「功能 → 内容创作 → 数字人口播」进入；完整成片请在电脑端完成。',
+    body: '数字人 TTS 试听与电脑端同源（试听不扣积分）。完整成片在电脑端按 80 积分/秒（最低 320）计费，与 CS 一致。',
   },
   ai_ops_plan: {
     navTitle: '运营方案',

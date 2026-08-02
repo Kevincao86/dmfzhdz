@@ -17,6 +17,13 @@ const FUNCTION_SECTIONS = [
       },
       {
         kind: 'link',
+        url: '/pages/store-analysis/store-analysis',
+        title: '店铺分析',
+        desc: '成交客群与 AI 经营建议',
+        iconKey: 'chart',
+      },
+      {
+        kind: 'link',
         url: '/pages/store-menu/store-menu',
         title: '菜单价目表',
         desc: '价目与电脑端云端同步',

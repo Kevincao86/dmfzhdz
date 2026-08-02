@@ -4,6 +4,10 @@
 const MP_POINTS_SHORTVIDEO_PER_SEC = 80
 const MP_POINTS_SHORTVIDEO_MIN_CHARGE = 400
 
+/** 数字人口播成片：80 积分/秒（与 CS Web 一致）；小程序当前为 TTS 试听，成片在电脑端扣费 */
+const MP_POINTS_DIGITAL_HUMAN_PER_SEC = 80
+const MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE = 320
+
 const MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP = 80
 const MP_POINTS_CLOUD_EDIT_MAX_SEC = 60
 
@@ -21,12 +25,14 @@ const VISUAL_STUDIO_PRO_IMAGE_MODEL = 'gpt-image-2'
 const MP_POINTS_PER_SEC_BY_KIND = {
   shortvideo: MP_POINTS_SHORTVIDEO_PER_SEC,
   cloud_edit_smart: MP_POINTS_CLOUD_EDIT_SMART_PER_SEC,
+  digital_human: MP_POINTS_DIGITAL_HUMAN_PER_SEC,
 }
 
 const MP_POINTS_USAGE_KIND_LABELS = {
   shortvideo: '短视频 AI 处理',
   cloud_edit: '灵祺 AI 云剪',
   cloud_edit_smart: '智能一键成片',
+  digital_human: '数字人口播',
   mix_material_analyze: 'AI 混剪素材分析',
   visual_studio_copy: 'AI 视觉工坊文案',
   visual_studio_image: 'AI 视觉工坊常规生图',
@@ -47,7 +53,9 @@ function mpPointsCostForAddonDuration(kind, durationSec) {
       ? MP_POINTS_CLOUD_EDIT_SMART_MIN_CHARGE
       : kind === 'shortvideo'
         ? MP_POINTS_SHORTVIDEO_MIN_CHARGE
-        : 0
+        : kind === 'digital_human'
+          ? MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE
+          : 0
   return Math.max(min, raw)
 }
 
@@ -55,7 +63,8 @@ function mpPointsCostForUsage(kind, opts) {
   if (
     kind === 'shortvideo' ||
     kind === 'cloud_edit' ||
-    kind === 'cloud_edit_smart'
+    kind === 'cloud_edit_smart' ||
+    kind === 'digital_human'
   ) {
     return mpPointsCostForAddonDuration(kind, (opts && opts.durationSec) || 1)
   }
@@ -107,6 +116,9 @@ function insufficientMessage(kind, required, balance) {
 }
 
 module.exports = {
+  MP_POINTS_SHORTVIDEO_PER_SEC,
+  MP_POINTS_DIGITAL_HUMAN_PER_SEC,
+  MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE,
   MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP,
   MP_POINTS_CLOUD_EDIT_MAX_SEC,
   MP_POINTS_CLOUD_EDIT_SMART_PER_SEC,

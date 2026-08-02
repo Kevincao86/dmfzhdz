@@ -1,0 +1,100 @@
+<scroll-view scroll-y class="sa-page" enhanced show-scrollbar="{{false}}">
+  <view class="sa-hero">
+    <text class="sa-title">店铺分析</text>
+    <text class="sa-sub">与电脑端同源：成交 / 客群 / 退款榜；完整图表可在电脑端查看</text>
+  </view>
+
+  <view class="sa-card sa-filters">
+    <view class="sa-row">
+      <text class="sa-label">开始</text>
+      <picker mode="date" value="{{startDate}}" bindchange="onStartDate">
+        <view class="sa-picker">{{startDate}}</view>
+      </picker>
+    </view>
+    <view class="sa-row">
+      <text class="sa-label">结束</text>
+      <picker mode="date" value="{{endDate}}" bindchange="onEndDate">
+        <view class="sa-picker">{{endDate}}</view>
+      </picker>
+    </view>
+    <view class="sa-row">
+      <text class="sa-label">门店</text>
+      <picker mode="selector" range="{{storeOptions}}" range-key="poiName" value="{{storeIndex}}" bindchange="onStorePick">
+        <view class="sa-picker">{{storeOptions[storeIndex].poiName}}</view>
+      </picker>
+    </view>
+    <view class="sa-actions">
+      <button class="sa-btn ghost" size="mini" loading="{{loading}}" disabled="{{loading || analyzing}}" bindtap="onReload">
+        刷新数据
+      </button>
+      <button
+        class="sa-btn primary"
+        size="mini"
+        loading="{{analyzing}}"
+        disabled="{{loading || analyzing || !summary}}"
+        bindtap="onAnalyze"
+      >
+        {{estimatedPoints > 0 ? '店铺分析 · ' + estimatedPoints + ' 积分' : '店铺分析'}}
+      </button>
+    </view>
+  </view>
+
+  <view wx:if="{{err}}" class="sa-err">{{err}}</view>
+  <view wx:if="{{loading && !summary}}" class="sa-muted">加载中…</view>
+
+  <block wx:if="{{summary}}">
+    <view class="sa-kpi-grid">
+      <view wx:for="{{kpis}}" wx:key="label" class="sa-kpi">
+        <text class="sa-kpi-label">{{item.label}}</text>
+        <text class="sa-kpi-value">{{item.value}}</text>
+        <text class="sa-kpi-sub">{{item.sub}}</text>
+      </view>
+    </view>
+
+    <view class="sa-card">
+      <text class="sa-card-title">成交 TOP</text>
+      <view wx:if="{{!topSales.length}}" class="sa-muted">暂无成交榜</view>
+      <view wx:for="{{topSales}}" wx:key="id" class="sa-bar-row">
+        <text class="sa-bar-name">{{item.name}}</text>
+        <view class="sa-bar-track">
+          <view class="sa-bar-fill sales" style="width: {{item.pct}}%;"></view>
+        </view>
+        <text class="sa-bar-meta">{{item.meta}}</text>
+      </view>
+    </view>
+
+    <view class="sa-card">
+      <text class="sa-card-title">退款压力 TOP</text>
+      <view wx:if="{{!topRefund.length}}" class="sa-muted">暂无明显退款</view>
+      <view wx:for="{{topRefund}}" wx:key="id" class="sa-bar-row">
+        <text class="sa-bar-name">{{item.name}}</text>
+        <view class="sa-bar-track">
+          <view class="sa-bar-fill refund" style="width: {{item.pct}}%;"></view>
+        </view>
+        <text class="sa-bar-meta">{{item.meta}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{!showAdvice}}" class="sa-card sa-cta">
+      <text class="sa-card-title">AI 经营建议</text>
+      <text class="sa-muted">结合订单与评价生成图文报告
+        <text wx:if="{{estimatedPoints > 0}}">（预计消耗 {{estimatedPoints}} 积分）</text>
+      </text>
+      <button class="sa-btn primary block" loading="{{analyzing}}" disabled="{{analyzing}}" bindtap="onAnalyze">
+        {{estimatedPoints > 0 ? '店铺分析 · ' + estimatedPoints + ' 积分' : '店铺分析'}}
+      </button>
+    </view>
+
+    <view wx:if="{{showAdvice}}" class="sa-card">
+      <text class="sa-card-title">经营建议</text>
+      <text class="sa-muted">
+        {{modelUsed ? '模型 · ' + modelUsed : '规则建议'}}
+        <text wx:if="{{pointsCharged > 0}}"> · 本次消耗 {{pointsCharged}} 积分</text>
+      </text>
+      <view wx:for="{{aiSections}}" wx:key="id" class="sa-section">
+        <text class="sa-sec-title">{{item.title}}</text>
+        <text class="sa-sec-body" user-select>{{item.body}}</text>
+      </view>
+    </view>
+  </block>
+</scroll-view>

@@ -153,10 +153,16 @@ Page({
 
   recalcLayout() {
     try {
-      const sys = wx.getSystemInfoSync()
+      const win = typeof wx.getWindowInfo === 'function' ? wx.getWindowInfo() : null
+      const sys = win || wx.getSystemInfoSync()
       const statusBarH = sys.statusBarHeight || 44
       const headerH = statusBarH + 44
-      const tabBarPx = Math.round((84 * sys.windowWidth) / 750) + (sys.safeAreaInsets?.bottom || 0)
+      const safeBottom =
+        (sys.safeAreaInsets && sys.safeAreaInsets.bottom) ||
+        (sys.safeArea && sys.screenHeight
+          ? Math.max(0, sys.screenHeight - sys.safeArea.bottom)
+          : 0)
+      const tabBarPx = Math.round((84 * sys.windowWidth) / 750) + safeBottom
       const dockPx = Math.round((108 * sys.windowWidth) / 750)
       const plusPx = this.data.showPlusPanel ? Math.round((200 * sys.windowWidth) / 750) : 0
       const shortcutPx = !this.data.hasChat

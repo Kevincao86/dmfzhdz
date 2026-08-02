@@ -15,6 +15,8 @@ const GRID_VISUAL = {
   经营概览: { glyph: '览', tone: 'blue' },
   我的钱包: { glyph: '钱', tone: 'amber' },
   店铺信息: { glyph: '店', tone: 'cyan' },
+  店铺分析: { glyph: '析', tone: 'indigo' },
+
   店铺装修: { glyph: '装', tone: 'purple' },
   商品列表: { glyph: '列', tone: 'orange' },
   新建商品: { glyph: '建', tone: 'green' },

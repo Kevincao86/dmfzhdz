@@ -1,4 +1,5 @@
 const feat = require('../../utils/merchantFeatureApisMp.js')
+const econ = require('../../utils/mpPointsEconomicsMp.js')
 const fs = wx.getFileSystemManager()
 
 const VOICES = [
@@ -14,7 +15,7 @@ Page({
     busy: false,
     err: '',
     playing: false,
-    tip: '合成试听口播音频（与电脑端 TTS 同源）。形象成片与抖音发布请在电脑端完成。',
+    tip: `合成试听口播音频（与电脑端 TTS 同源，试听不扣积分）。电脑端形象成片按 ${econ.MP_POINTS_DIGITAL_HUMAN_PER_SEC} 积分/秒计费（最低 ${econ.MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE} 积分），与 CS 一致。`,
   },
 
   onUnload() {

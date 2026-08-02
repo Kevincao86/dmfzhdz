@@ -18,6 +18,7 @@ const MODULE_PAGES = {
   store_info: '/pages/store-list/store-list?mode=info',
   store_decoration: '/pages/store-list/store-list?mode=decoration',
   store_menu: '/pages/store-menu/store-menu',
+  store_analysis: '/pages/store-analysis/store-analysis',
   competitors: '/pages/competitors/competitors',
   digital_human: '/pages/digital-human/digital-human',
   ai_ops_plan: '/pages/ai-ops-plan/ai-ops-plan',
