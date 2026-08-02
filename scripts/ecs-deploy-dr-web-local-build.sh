@@ -55,23 +55,44 @@ if [[ ! -f "$FUL/dist/index.html" ]]; then
 fi
 echo "OK: 本机 dist $(du -sh "$FUL/dist" | awk '{print $1}')"
 
-echo "== 1) 上传 dist 到新 ECS（rsync）=="
-ssh -o ConnectTimeout=25 -o StrictHostKeyChecking=accept-new "$CS_HOST" "mkdir -p ~/app/灵祺达人履约管理后台/dist"
+echo "== 1) 远程先 git pull（必须在 rsync 之前，避免 reset 冲掉本机 dist）=="
+ssh -o ConnectTimeout=25 -o StrictHostKeyChecking=accept-new "$CS_HOST" bash -s <<'REMOTE'
+set -euo pipefail
+cd ~/app
+if [[ -f scripts/ecs-git-pull-gitee.sh ]]; then
+  bash scripts/ecs-git-pull-gitee.sh
+fi
+echo "HEAD: $(git log -1 --oneline)"
+mkdir -p ~/app/灵祺达人履约管理后台/dist
+REMOTE
+
+echo "== 2) 上传本机 dist 到新 ECS（rsync，覆盖仓库内陈旧 dist）=="
 rsync -az --delete \
   -e "ssh -o ConnectTimeout=25 -o StrictHostKeyChecking=accept-new" \
   "$FUL/dist/" \
   "$CS_HOST:~/app/灵祺达人履约管理后台/dist/"
 echo "OK: dist 已同步到 $CS_HOST"
 
-echo "== 2) 远程 SKIP_BUILD 部署（仅写配置 + reload nginx）=="
-ssh -o ConnectTimeout=25 -o StrictHostKeyChecking=accept-new "$CS_HOST" bash -s <<REMOTE
+LOCAL_IDX="$(grep -oE 'assets/index-[^"]+\.js' "$FUL/dist/index.html" | head -1 | sed 's|^assets/||')"
+echo "本机 dist index=${LOCAL_IDX:-unknown}"
+
+echo "== 3) 远程 SKIP_BUILD 部署（禁止再 git pull）=="
+ssh -o ConnectTimeout=25 -o StrictHostKeyChecking=accept-new "$CS_HOST" \
+  env LOCAL_IDX="$LOCAL_IDX" MEOO_API_UPSTREAM="$MEOO_API_UPSTREAM" \
+  bash -s <<'REMOTE'
 set -euo pipefail
 cd ~/app
-if [[ -f scripts/ecs-git-pull-gitee.sh ]]; then
-  bash scripts/ecs-git-pull-gitee.sh
+idx="$(grep -oE 'assets/index-[^"]+\.js' 灵祺达人履约管理后台/dist/index.html | head -1 | sed 's|^assets/||')"
+if [[ -z "$idx" || ! -f "灵祺达人履约管理后台/dist/assets/$idx" ]]; then
+  echo "FATAL: 上传后 dist 不完整，拒绝 SKIP_BUILD"
+  exit 1
 fi
-echo "HEAD: \$(git log -1 --oneline)"
-SKIP_BUILD=1 SKIP_GIT_PULL=1 MEOO_API_UPSTREAM=${MEOO_API_UPSTREAM} \
+if [[ -n "${LOCAL_IDX:-}" && "$idx" != "$LOCAL_IDX" ]]; then
+  echo "FATAL: 远程 dist index=$idx 与本机 $LOCAL_IDX 不一致（疑似被 git reset 冲掉）"
+  exit 1
+fi
+echo "OK: 远程 dist index=$idx 与本机一致"
+SKIP_BUILD=1 SKIP_GIT_PULL=1 MEOO_API_UPSTREAM="${MEOO_API_UPSTREAM}" \
   bash scripts/ecs-deploy-talent-fulfillment-web.sh
 REMOTE
 
