@@ -131,6 +131,9 @@
 
 .msg.user {
   justify-content: flex-end;
+  /* 左侧留出 AI 头像列，气泡不越过红线 */
+  padding-left: 68rpx;
+  box-sizing: border-box;
 }
 
 .msg.welcome-only {
@@ -200,7 +203,7 @@
 }
 
 .msg.user .bubble-v2 {
-  max-width: none;
+  max-width: 100%;
 }
 
 .bubble-v2.user {
