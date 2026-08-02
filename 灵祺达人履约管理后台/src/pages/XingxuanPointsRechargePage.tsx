@@ -3,7 +3,13 @@ import { Link, useNavigate } from 'react-router-dom'
 import {
   MP_POINTS_ARTICLE_PER_USE,
   MP_POINTS_BRIEF_PER_USE,
+  MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE,
+  MP_POINTS_DIGITAL_HUMAN_PER_SEC,
+  MP_POINTS_SHORTVIDEO_PER_SEC,
   MP_POINTS_VIDEO_PER_MIN,
+  MP_POINTS_VISUAL_STUDIO_COPY_PER_USE,
+  MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE,
+  MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE,
   MP_RECHARGE_POINTS_PER_YUAN,
   MP_RECHARGE_TIER_PRESETS,
   computeRechargePoints,
@@ -358,8 +364,12 @@ export default function XingxuanPointsRechargePage() {
           </Link>
           <h1 className="xx-membership-page__title">积分充值</h1>
           <p className="xx-membership-page__subtitle">
-            ¥1 = {MP_RECHARGE_POINTS_PER_YUAN} 积分 · 视频 {MP_POINTS_VIDEO_PER_MIN} 积分/分钟 · 文稿{' '}
-            {MP_POINTS_ARTICLE_PER_USE} 积分/次 · Brief {MP_POINTS_BRIEF_PER_USE} 积分/篇
+            ¥1 = {MP_RECHARGE_POINTS_PER_YUAN} 积分 · 视频检核 {MP_POINTS_VIDEO_PER_MIN} 积分/分钟 · 文稿{' '}
+            {MP_POINTS_ARTICLE_PER_USE} 积分/次 · Brief {MP_POINTS_BRIEF_PER_USE} 积分/篇 · 短视频/数字人{' '}
+            {MP_POINTS_SHORTVIDEO_PER_SEC}/{MP_POINTS_DIGITAL_HUMAN_PER_SEC} 积分/秒（数字人最低{' '}
+            {MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE}）· 视觉工坊文案 {MP_POINTS_VISUAL_STUDIO_COPY_PER_USE}{' '}
+            积分/次 · 常规图 {MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE} 积分/张 · 高级图{' '}
+            {MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE} 积分/张
           </p>
           <p className="text-sm text-[var(--shell-muted)] mt-2">
             当前余额：

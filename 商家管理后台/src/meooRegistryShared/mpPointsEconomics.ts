@@ -1,28 +1,32 @@
 /**
- * 星选 AI 积分经济：消耗规则、60% 毛利下的赠送额度与充值换算。
- * 1 积分内部成本 = MP_POINT_INTERNAL_COST_YUAN；用户支付价中 40% 用于覆盖 AI 成本。
- * 权威源以 web版/merchant-erp/src/lib/mpPointsEconomics.ts 为准。
+ * 星选 / ERP 共用 AI 积分经济：消耗规则、60% 毛利下的赠送额度与充值换算。
+ *
+ * 计价模型（写死）：
+ * - 1 积分 = ¥0.01 内部 API 成本容量
+ * - 目标毛利率 60% → 用户支付价中 40% 覆盖 AI 成本（`MP_POINT_AI_COST_SHARE`）
+ * - 充值：¥1 → 40 积分；单次消耗积分 ≈ API 成本(元) × 100
+ * - 用户实付(元) = 消耗积分 / 40；毛利 = (实付 − API成本) / 实付 ≈ 60%
  */
 import type { MpLibraryRole, MpMembershipTier } from './mpMembershipCatalog.js'
 
-/** AI 视频检核：2 积分/秒（= 120 积分/分钟） */
+/** AI 视频检核：2 积分/秒（= 120 积分/分钟）；API≈¥0.02/秒 */
 export const MP_POINTS_VIDEO_PER_SEC = 2
 export const MP_POINTS_VIDEO_PER_MIN = MP_POINTS_VIDEO_PER_SEC * 60
 
-/** 短视频 AI 处理（即梦成片）：80 积分/秒 */
+/** 短视频 AI 处理（即梦成片）：80 积分/秒；API≈¥0.80/秒 */
 export const MP_POINTS_SHORTVIDEO_PER_SEC = 80
 
-/** 数字人口播（Seedance 分段 i2v）：80 积分/秒 */
+/** 数字人口播（Seedance 分段 i2v）：80 积分/秒；API≈¥0.80/秒 */
 export const MP_POINTS_DIGITAL_HUMAN_PER_SEC = 80
 
-/** 灵祺 AI 云剪（ICE 普通合成）：一口价 80 积分/条（≤60 秒） */
+/** 灵祺 AI 云剪（ICE 普通合成）：一口价 80 积分/条（≤60 秒）；API≈¥0.80/条 */
 export const MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP = 80
 export const MP_POINTS_CLOUD_EDIT_MAX_SEC = 60
 
-/** @deprecated 普通云剪已改一口价 */
+/** @deprecated 普通云剪已改一口价，仅保留兼容引用 */
 export const MP_POINTS_CLOUD_EDIT_PER_SEC = 0
 
-/** 阿里云 IMS 智能一键成片：5 积分/秒 */
+/** 阿里云 IMS 智能一键成片：5 积分/秒；API≈¥0.05/秒 */
 export const MP_POINTS_CLOUD_EDIT_SMART_PER_SEC = 5
 
 /** 短视频 AI 成片最低扣费（约 5 秒，80 积分/秒） */
@@ -37,29 +41,78 @@ export const MP_POINTS_ADDON_VIDEO_MIN_CHARGE = MP_POINTS_DIGITAL_HUMAN_MIN_CHAR
 /** @deprecated 普通云剪已改一口价 */
 export const MP_POINTS_CLOUD_EDIT_MIN_CHARGE = MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP
 
-/** AI 文章/文稿检核：2 积分/次 */
+/** 智能一键成片最低扣费（1 秒档） */
+export const MP_POINTS_CLOUD_EDIT_SMART_MIN_CHARGE = 5
+
+/** AI 文章/文稿检核：2 积分/次；API≈¥0.02 */
 export const MP_POINTS_ARTICLE_PER_USE = 2
 
-/** AI 爆款 Brief 生成：8 积分/篇（含正文生成 + 外网案例检索） */
+/** AI 爆款 Brief 生成：8 积分/篇（正文 + 检索）；API≈¥0.08 */
 export const MP_POINTS_BRIEF_PER_USE = 8
 
-/** AI 混剪素材分析：15 积分/次（多模态采样 + 指导文案生成） */
+/** AI 混剪素材分析：15 积分/次；API≈¥0.15 */
 export const MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE = 15
+
+/**
+ * AI 视觉工坊 · 文案包：3 积分/次
+ * 成本：qwen≈¥0.03；60% 毛利 → 用户付 3÷40=¥0.075，AI 预算 ¥0.03。
+ */
+export const MP_POINTS_VISUAL_STUDIO_COPY_PER_USE = 3
+
+/**
+ * AI 视觉工坊 · 常规生图 / 智能体生图：8 积分/张
+ * 成本：万相/豆包≈¥0.08；60% 毛利 → 用户付 8÷40=¥0.20，AI 预算 ¥0.08。
+ */
+export const MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE = 8
+
+/**
+ * AI 视觉工坊 · 高级生图（GPT Image 2 high @1024）：150 积分/张
+ * 成本：OpenAI≈$0.211≈¥1.52；60% 毛利 → 用户付 150÷40=¥3.75，AI 预算 ¥1.50。
+ */
+export const MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE = 150
+
+/** TokenMix / OpenAI 高级文生图模型 id（视觉工坊高级档） */
+export const VISUAL_STUDIO_PRO_IMAGE_MODEL = 'gpt-image-2'
+
+/** 商品上架方案：15 积分/次；长结构化 LLM≈¥0.15 */
+export const MP_POINTS_PRODUCT_PLAN_PER_USE = 15
+
+/** 多平台运营方案（六块）：30 积分/次；多轮结构化≈¥0.30 */
+export const MP_POINTS_OPS_PLAN_PER_USE = 30
+
+/** 招募大厅 AI（标签/匹配/排期）：5 积分/次；短 prompt≈¥0.05 */
+export const MP_POINTS_RECRUITMENT_AI_PER_USE = 5
+
+/** 商品向导 AI（标题/卖点/质检等文本）：5 积分/次；≈¥0.05 */
+export const MP_POINTS_GOODS_AI_PER_USE = 5
+
+/** 投流/线索 AI（广告洞察、跟进话术）：5 积分/次；≈¥0.05 */
+export const MP_POINTS_AD_AI_PER_USE = 5
+
+/** 评价回复 AI：3 积分/次；≈¥0.03 */
+export const MP_POINTS_REVIEW_AI_PER_USE = 3
 
 /** 单积分内部 API 成本（元） */
 export const MP_POINT_INTERNAL_COST_YUAN = 0.01
 
-/** 目标毛利率 60% → AI 成本占比 40%（历史字段名 PROFIT_MARGIN 实为成本占比） */
+/** 目标毛利率（用户支付价中归平台利润的比例） */
 export const MP_POINT_GROSS_MARGIN = 0.6
+
+/**
+ * 用户支付价中用于覆盖 AI 成本的比例（= 1 − 毛利率）。
+ * 历史字段名 `MP_POINT_PROFIT_MARGIN` 易误解，保留为别名。
+ */
 export const MP_POINT_AI_COST_SHARE = 1 - MP_POINT_GROSS_MARGIN
-/** @deprecated 请用 MP_POINT_AI_COST_SHARE */
+/** @deprecated 请用 MP_POINT_AI_COST_SHARE；值为 AI 成本占比而非毛利率 */
 export const MP_POINT_PROFIT_MARGIN = MP_POINT_AI_COST_SHARE
 
 /** 基础版（免费）注册赠送 */
 export const MP_BASIC_GIFT_POINTS = 100
 
-/** 积分充值：60% 毛利 → ¥1 可购 40 积分 */
-export const MP_RECHARGE_POINTS_PER_YUAN = Math.floor(MP_POINT_AI_COST_SHARE / MP_POINT_INTERNAL_COST_YUAN)
+/** 积分充值：60% 毛利 → ¥1 可购 40 积分（成本预算 ¥0.4） */
+export const MP_RECHARGE_POINTS_PER_YUAN = Math.floor(
+  MP_POINT_AI_COST_SHARE / MP_POINT_INTERNAL_COST_YUAN,
+)
 
 export type MpPointsUsageKind =
   | 'video'
@@ -68,7 +121,18 @@ export type MpPointsUsageKind =
   | 'mix_material_analyze'
   | 'shortvideo'
   | 'cloud_edit'
+  | 'cloud_edit_smart'
   | 'digital_human'
+  | 'visual_studio_copy'
+  | 'visual_studio_image'
+  | 'visual_studio_image_pro'
+  | 'product_plan'
+  | 'ops_plan'
+  | 'agent_image'
+  | 'recruitment_ai'
+  | 'goods_ai'
+  | 'ad_ai'
+  | 'review_ai'
 
 export const MP_POINTS_USAGE_KIND_LABELS: Record<MpPointsUsageKind, string> = {
   video: '短视频 AI 检核',
@@ -77,24 +141,47 @@ export const MP_POINTS_USAGE_KIND_LABELS: Record<MpPointsUsageKind, string> = {
   mix_material_analyze: 'AI 混剪素材分析',
   shortvideo: '短视频 AI 处理',
   cloud_edit: '灵祺 AI 云剪',
+  cloud_edit_smart: '智能一键成片',
   digital_human: '数字人口播',
+  visual_studio_copy: 'AI 视觉工坊文案',
+  visual_studio_image: 'AI 视觉工坊常规生图',
+  visual_studio_image_pro: 'AI 视觉工坊高级生图',
+  product_plan: 'AI 商品上架方案',
+  ops_plan: 'AI 运营方案',
+  agent_image: 'AI 智能体生图',
+  recruitment_ai: '招募大厅 AI',
+  goods_ai: '商品向导 AI',
+  ad_ai: '投流/线索 AI',
+  review_ai: '评价回复 AI',
 }
 
 const MP_POINTS_PER_SEC_BY_KIND: Partial<Record<MpPointsUsageKind, number>> = {
   video: MP_POINTS_VIDEO_PER_SEC,
   shortvideo: MP_POINTS_SHORTVIDEO_PER_SEC,
   cloud_edit: MP_POINTS_CLOUD_EDIT_PER_SEC,
+  cloud_edit_smart: MP_POINTS_CLOUD_EDIT_SMART_PER_SEC,
   digital_human: MP_POINTS_DIGITAL_HUMAN_PER_SEC,
 }
 
 export function isMpPointsDurationKind(kind: MpPointsUsageKind): boolean {
-  return kind === 'video' || kind === 'shortvideo' || kind === 'cloud_edit' || kind === 'digital_human'
+  return (
+    kind === 'video' ||
+    kind === 'shortvideo' ||
+    kind === 'cloud_edit' ||
+    kind === 'cloud_edit_smart' ||
+    kind === 'digital_human'
+  )
 }
 
 export function isMpPointsAddonGenerationKind(
   kind: MpPointsUsageKind,
-): kind is 'shortvideo' | 'cloud_edit' | 'digital_human' {
-  return kind === 'shortvideo' || kind === 'cloud_edit' || kind === 'digital_human'
+): kind is 'shortvideo' | 'cloud_edit' | 'cloud_edit_smart' | 'digital_human' {
+  return (
+    kind === 'shortvideo' ||
+    kind === 'cloud_edit' ||
+    kind === 'cloud_edit_smart' ||
+    kind === 'digital_human'
+  )
 }
 
 export function mpPointsPerSecForKind(kind: MpPointsUsageKind): number | null {
@@ -110,7 +197,18 @@ export function parseMpPointsUsageKind(raw: unknown): MpPointsUsageKind | null {
     k === 'mix_material_analyze' ||
     k === 'shortvideo' ||
     k === 'cloud_edit' ||
-    k === 'digital_human'
+    k === 'cloud_edit_smart' ||
+    k === 'digital_human' ||
+    k === 'visual_studio_copy' ||
+    k === 'visual_studio_image' ||
+    k === 'visual_studio_image_pro' ||
+    k === 'product_plan' ||
+    k === 'ops_plan' ||
+    k === 'agent_image' ||
+    k === 'recruitment_ai' ||
+    k === 'goods_ai' ||
+    k === 'ad_ai' ||
+    k === 'review_ai'
   ) {
     return k
   }
@@ -121,6 +219,19 @@ export function formatMpPointsRateLabel(kind: MpPointsUsageKind): string {
   if (kind === 'article') return `${MP_POINTS_ARTICLE_PER_USE} 积分/次`
   if (kind === 'brief') return `${MP_POINTS_BRIEF_PER_USE} 积分/篇`
   if (kind === 'mix_material_analyze') return `${MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE} 积分/次`
+  if (kind === 'visual_studio_copy') return `${MP_POINTS_VISUAL_STUDIO_COPY_PER_USE} 积分/次`
+  if (kind === 'visual_studio_image_pro') {
+    return `${MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE} 积分/张`
+  }
+  if (kind === 'visual_studio_image' || kind === 'agent_image') {
+    return `${MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE} 积分/张`
+  }
+  if (kind === 'product_plan') return `${MP_POINTS_PRODUCT_PLAN_PER_USE} 积分/次`
+  if (kind === 'ops_plan') return `${MP_POINTS_OPS_PLAN_PER_USE} 积分/次`
+  if (kind === 'recruitment_ai') return `${MP_POINTS_RECRUITMENT_AI_PER_USE} 积分/次`
+  if (kind === 'goods_ai') return `${MP_POINTS_GOODS_AI_PER_USE} 积分/次`
+  if (kind === 'ad_ai') return `${MP_POINTS_AD_AI_PER_USE} 积分/次`
+  if (kind === 'review_ai') return `${MP_POINTS_REVIEW_AI_PER_USE} 积分/次`
   if (kind === 'cloud_edit') {
     return `${MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP} 积分/条（≤${MP_POINTS_CLOUD_EDIT_MAX_SEC} 秒）`
   }
@@ -129,20 +240,30 @@ export function formatMpPointsRateLabel(kind: MpPointsUsageKind): string {
   return '按积分扣费'
 }
 
-function mpPointsCostForAddonDuration(kind: 'shortvideo' | 'cloud_edit' | 'digital_human', durationSec: number): number {
+function mpPointsCostForAddonDuration(
+  kind: 'shortvideo' | 'cloud_edit' | 'cloud_edit_smart' | 'digital_human',
+  durationSec: number,
+): number {
   if (kind === 'cloud_edit') return MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP
   const sec = Math.max(1, Math.ceil(Number(durationSec) || 1))
   const rate = mpPointsPerSecForKind(kind) ?? 0
   const raw = sec * rate
   const min =
-    kind === 'shortvideo'
-      ? MP_POINTS_SHORTVIDEO_MIN_CHARGE
-      : MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE
+    kind === 'cloud_edit_smart'
+      ? MP_POINTS_CLOUD_EDIT_SMART_MIN_CHARGE
+      : kind === 'shortvideo'
+        ? MP_POINTS_SHORTVIDEO_MIN_CHARGE
+        : MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE
   return Math.max(min, raw)
 }
 
 export function mpPointsCostForUsage(kind: MpPointsUsageKind, opts?: { durationSec?: number }): number {
-  if (kind === 'shortvideo' || kind === 'cloud_edit' || kind === 'digital_human') {
+  if (
+    kind === 'shortvideo' ||
+    kind === 'cloud_edit' ||
+    kind === 'cloud_edit_smart' ||
+    kind === 'digital_human'
+  ) {
     return mpPointsCostForAddonDuration(kind, Number(opts?.durationSec) || 1)
   }
   if (kind === 'video') {
@@ -151,7 +272,37 @@ export function mpPointsCostForUsage(kind: MpPointsUsageKind, opts?: { durationS
   }
   if (kind === 'brief') return MP_POINTS_BRIEF_PER_USE
   if (kind === 'mix_material_analyze') return MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE
+  if (kind === 'visual_studio_copy') return MP_POINTS_VISUAL_STUDIO_COPY_PER_USE
+  if (kind === 'visual_studio_image_pro') return MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE
+  if (kind === 'visual_studio_image' || kind === 'agent_image') {
+    return MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE
+  }
+  if (kind === 'product_plan') return MP_POINTS_PRODUCT_PLAN_PER_USE
+  if (kind === 'ops_plan') return MP_POINTS_OPS_PLAN_PER_USE
+  if (kind === 'recruitment_ai') return MP_POINTS_RECRUITMENT_AI_PER_USE
+  if (kind === 'goods_ai') return MP_POINTS_GOODS_AI_PER_USE
+  if (kind === 'ad_ai') return MP_POINTS_AD_AI_PER_USE
+  if (kind === 'review_ai') return MP_POINTS_REVIEW_AI_PER_USE
   return MP_POINTS_ARTICLE_PER_USE
+}
+
+/** 视觉工坊批量生图积分（按张数；pro=高级 GPT Image 2） */
+export function mpPointsCostForVisualStudioImages(
+  imageCount: number,
+  tier: 'standard' | 'pro' = 'standard',
+): number {
+  const n = Math.max(0, Math.floor(Number(imageCount) || 0))
+  const unit =
+    tier === 'pro'
+      ? MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE
+      : MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE
+  return n * unit
+}
+
+export function visualStudioImageUsageKind(
+  tier: 'standard' | 'pro' = 'standard',
+): 'visual_studio_image' | 'visual_studio_image_pro' {
+  return tier === 'pro' ? 'visual_studio_image_pro' : 'visual_studio_image'
 }
 
 /** 按视频时长（秒）结算积分 */
@@ -180,7 +331,7 @@ export function mpPointsEquivalents(points: number): MpPointsEquivalents {
   }
 }
 
-/** 月付折后价（元）→ 赠送积分（60% 毛利，未取整） */
+/** 月付折后价（元）→ 赠送积分（60% 毛利：按 AI 成本占比 40% 折算，未取整） */
 export function computeGiftPointsForMonthlyPrice(priceYuan: number | null | undefined): number {
   const price = Number(priceYuan)
   if (!Number.isFinite(price) || price <= 0) return MP_BASIC_GIFT_POINTS
@@ -297,6 +448,7 @@ export function formatComplianceBillingSuffix(res: {
   if (
     res.billingKind === 'shortvideo' ||
     res.billingKind === 'cloud_edit' ||
+    res.billingKind === 'cloud_edit_smart' ||
     res.billingKind === 'digital_human' ||
     res.billingKind === 'video'
   ) {
