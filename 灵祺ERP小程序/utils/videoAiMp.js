@@ -406,6 +406,180 @@ async function fetchIceJobStatus(jobId) {
   }
 }
 
+async function postLastFrame(body) {
+  const tries = ['/api/meoo-merchant-ai-video-last-frame', '/api/merchant/ai/video/last-frame']
+  let lastErr = ''
+  for (const p of tries) {
+    try {
+      const data = await merchantVideoPost(p, body)
+      if (data && data.ok && (data.imageUrl || data.frameUrl || data.dataUrl)) {
+        return {
+          ok: true,
+          imageUrl: String(data.imageUrl || data.frameUrl || data.dataUrl),
+        }
+      }
+      lastErr = (data && data.message) || '抽帧失败'
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+      if (/404|not found/i.test(lastErr)) continue
+    }
+  }
+  return { ok: false, message: lastErr || '尾帧接口未部署' }
+}
+
+async function postConcatUrls(body) {
+  const tries = ['/api/meoo-merchant-ai-video-concat-urls', '/api/merchant/ai/video/concat-urls']
+  let lastErr = ''
+  for (const p of tries) {
+    try {
+      const data = await merchantVideoPost(p, body)
+      if (data && data.ok && (data.videoUrl || data.downloadUrl || data.url)) {
+        return {
+          ok: true,
+          videoUrl: String(data.videoUrl || data.downloadUrl || data.url),
+        }
+      }
+      lastErr = (data && data.message) || '拼接失败'
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+      if (/404|not found/i.test(lastErr)) continue
+    }
+  }
+  return { ok: false, message: lastErr || '拼接接口未部署' }
+}
+
+async function postMuxAudio(body) {
+  const tries = ['/api/meoo-merchant-ai-video-mux-audio', '/api/merchant/ai/video/mux-audio']
+  let lastErr = ''
+  for (const p of tries) {
+    try {
+      const data = await merchantVideoPost(p, body)
+      if (data && data.ok && (data.videoUrl || data.downloadUrl || data.url)) {
+        return {
+          ok: true,
+          videoUrl: String(data.videoUrl || data.downloadUrl || data.url),
+        }
+      }
+      lastErr = (data && data.message) || '混音失败'
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+      if (/404|not found/i.test(lastErr)) continue
+    }
+  }
+  return { ok: false, message: lastErr || '混音接口未部署' }
+}
+
+async function postVideoPostProcess(body) {
+  const tries = [
+    '/api/meoo-merchant-ai-video-post-process',
+    '/api/merchant/ai/video/post-process',
+  ]
+  let lastErr = ''
+  for (const p of tries) {
+    try {
+      const data = await merchantVideoPost(p, body)
+      if (data && data.ok && (data.videoUrl || data.downloadUrl || data.url)) {
+        return {
+          ok: true,
+          videoUrl: String(data.videoUrl || data.downloadUrl || data.url),
+        }
+      }
+      lastErr = (data && data.message) || '后处理失败'
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+      if (/404|not found/i.test(lastErr)) continue
+    }
+  }
+  return { ok: false, message: lastErr || '后处理接口未部署' }
+}
+
+async function postIceSmartBatch(body) {
+  const tries = [
+    '/api/meoo-merchant-ai-video-ice-smart-batch',
+    '/api/merchant/ai/video/ice/smart-batch',
+  ]
+  let lastErr = ''
+  for (const p of tries) {
+    try {
+      const data = await merchantVideoPost(p, body)
+      if (data && data.ok && (data.batchJobId || data.jobId)) {
+        return {
+          ok: true,
+          batchJobId: String(data.batchJobId || data.jobId),
+          raw: data,
+        }
+      }
+      lastErr = (data && data.message) || '智能混剪提交失败'
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+      if (/404|not found/i.test(lastErr)) continue
+    }
+  }
+  return { ok: false, message: lastErr || '智能混剪接口未部署' }
+}
+
+async function fetchIceSmartBatchJob(batchJobId) {
+  const q = `?id=${encodeURIComponent(batchJobId)}`
+  const tries = [
+    `/api/meoo-merchant-ai-video-ice-smart-batch-job${q}`,
+    `/api/merchant/ai/video/ice/smart-batch-job${q}`,
+  ]
+  let lastErr = ''
+  for (const p of tries) {
+    try {
+      const data = await merchantVideoGet(p)
+      if (data && data.ok) return { ok: true, raw: data }
+      lastErr = (data && data.message) || '查询失败'
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+      if (/404|not found/i.test(lastErr)) continue
+    }
+  }
+  return { ok: false, message: lastErr }
+}
+
+async function pollIceSmartBatch(batchJobId, onTick, maxTries = 100, intervalMs = 5000) {
+  let n = 0
+  while (n++ < maxTries) {
+    // eslint-disable-next-line no-await-in-loop
+    const r = await fetchIceSmartBatchJob(batchJobId)
+    if (!r.ok) return r
+    const st = r.raw || {}
+    if (typeof onTick === 'function') onTick(`${st.status || '处理中'} · ${n}/${maxTries}`)
+    if (st.failed) return { ok: false, message: st.message || '智能混剪失败' }
+    const url = st.downloadUrl || st.previewUrl || st.videoUrl
+    if (st.done && url) return { ok: true, downloadUrl: String(url), previewUrl: String(url), raw: st }
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((res) => setTimeout(res, intervalMs))
+  }
+  return { ok: false, message: '智能混剪等待超时' }
+}
+
+function saveVideoToAlbum(url) {
+  return new Promise((resolve) => {
+    if (!url) {
+      resolve({ ok: false, message: '无视频地址' })
+      return
+    }
+    wx.downloadFile({
+      url,
+      success(res) {
+        if (res.statusCode !== 200 || !res.tempFilePath) {
+          resolve({ ok: false, message: `下载失败 ${res.statusCode || ''}` })
+          return
+        }
+        wx.saveVideoToPhotosAlbum({
+          filePath: res.tempFilePath,
+          success: () => resolve({ ok: true }),
+          fail: (err) =>
+            resolve({ ok: false, message: (err && err.errMsg) || '保存到相册失败，请检查权限' }),
+        })
+      },
+      fail: (err) => resolve({ ok: false, message: (err && err.errMsg) || '下载失败' }),
+    })
+  })
+}
+
 module.exports = {
   fetchVideoAiConfig,
   postKlingStart,
@@ -416,7 +590,14 @@ module.exports = {
   fetchSeedanceStatus,
   pollSeedanceUntilDone,
   postLongformVideoPlan,
+  postLastFrame,
+  postConcatUrls,
+  postMuxAudio,
+  postVideoPostProcess,
   postIcePipeline,
+  postIceSmartBatch,
+  fetchIceSmartBatchJob,
+  pollIceSmartBatch,
   fetchIceJob,
   fetchIceJobStatus,
   pollIceJob,
@@ -424,5 +605,6 @@ module.exports = {
   uploadLocalMediaToIceOss,
   fetchAliyunIceCloudConfig,
   iceJobDownloadUrl,
+  saveVideoToAlbum,
   merchantBase,
 }

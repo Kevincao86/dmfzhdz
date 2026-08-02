@@ -1,9 +1,37 @@
-/** 与 web `shortVideoUiLabels.ts` / `shortVideoStudioModes.ts` 对齐的标签与入口 */
+/** 与 web shortVideoUiLabels / shortVideoStudioModes 对齐 */
 module.exports = {
   VIDEO_ENGINE_LABEL_KLING: '灵祺视频模型1',
-  VIDEO_ENGINE_LABEL_SEEDANCE: '灵祺视频模型2',
+  VIDEO_ENGINE_LABEL_SEEDANCE: '灵祺视频',
+  VIDEO_ENGINE_HINT_SEEDANCE: 'Seedance 1.5 Pro · 火山方舟',
   VIDEO_MODEL_DEFAULT_LABEL: '默认',
   KLING_DEFAULT_MODEL_ID: 'kling-v1-6',
+  SEEDANCE_1_5_PRO_MODEL_ID: 'doubao-seedance-1-5-pro-251215',
+  SEEDANCE_QUALITY_OPTIONS: [
+    { id: '720p', label: '标准 720p' },
+    { id: '1080p', label: '高清 1080p' },
+  ],
+  DURATION_OPTIONS: [
+    { sec: 5, label: '标准 5 秒' },
+    { sec: 10, label: '标准 10 秒' },
+    { sec: 15, label: '标准 15 秒' },
+  ],
+  ASPECT_OPTIONS: [
+    { id: '9:16', label: '竖屏 9:16' },
+    { id: '16:9', label: '横屏 16:9' },
+    { id: '1:1', label: '方屏 1:1' },
+  ],
+  SUBTITLE_STYLE_AUTO: 'auto',
+  SUBTITLE_STYLES: [
+    { id: 'bottom-safe', label: '底部安全区白字（推荐）' },
+    { id: 'bottom-white', label: '底部白字黑边' },
+    { id: 'bottom-white-large', label: '底部大白字' },
+    { id: 'bottom-yellow', label: '底部黄字' },
+    { id: 'bottom-pink', label: '底部粉字（种草）' },
+    { id: 'bottom-green', label: '底部绿字（促销）' },
+    { id: 'center-white', label: '居中白字' },
+    { id: 'top-minimal', label: '顶部简约' },
+    { id: 'cinematic', label: '电影感小字' },
+  ],
   KLING_MODEL_OPTIONS: [
     { id: 'kling-v1', label: 'Kling V1' },
     { id: 'kling-v1-6', label: 'Kling V1.6（默认）' },
@@ -15,32 +43,36 @@ module.exports = {
     { id: '1:1', label: '方屏 1:1', width: 1080, height: 1080 },
   ],
   ICE_BATCH_GENERATE_COUNTS: [10, 20, 50, 100],
-  /** 与 CS ShortVideoOptimizationPage 顶栏一致；小程序可原生执行 generate / cloud_batch */
   MAIN_TABS: [
     { id: 'generate', label: '短视频生成', native: true },
     { id: 'cloud_batch', label: 'AI混剪', native: true },
-    { id: 'canvas', label: '无限画布', native: false },
-    { id: 'cases', label: '案例', native: false },
-    { id: 'music', label: '配乐', native: false },
+    { id: 'canvas', label: '无限画布', native: true },
+    { id: 'cases', label: '案例', native: true },
+    { id: 'music', label: '配乐', native: true },
   ],
-  /** 与 CS SHORT_VIDEO_STUDIO_MODES 对齐的创作模式入口 */
   STUDIO_MODES: [
     {
       id: 'agent',
       label: 'Agent 模式',
-      description: '自然语言规划分镜出片',
+      description: '自然语言 + Skill，自动规划分镜出片',
       pane: 'generate',
     },
     {
       id: 'video',
       label: '视频生成',
-      description: '文生/图生短片',
+      description: '文生/图生短片（Seedance）',
       pane: 'generate',
+    },
+    {
+      id: 'image',
+      label: '图片生成',
+      description: '跳转 AI 视觉工坊',
+      href: '/pages/ai-visual-studio/ai-visual-studio',
     },
     {
       id: 'music',
       label: '音乐 / 配乐',
-      description: '曲库试听（完整版在电脑端）',
+      description: '内容匹配曲库试听选用',
       pane: 'music',
     },
     {
@@ -52,14 +84,14 @@ module.exports = {
     {
       id: 'canvas',
       label: '无限画布',
-      description: '分镜编排（完整版在电脑端）',
+      description: '分镜流程编排（手机端流程板）',
       pane: 'canvas',
     },
-    {
-      id: 'copywriting',
-      label: '推广文案',
-      description: '跳转文案工作台',
-      href: '/pages/ai-content/ai-content',
-    },
+  ],
+  QUICK_CARDS: [
+    { id: 'canvas', label: '无限画布', desc: '分镜流程编排', pane: 'canvas' },
+    { id: 'generate', label: '视频生成', desc: '文生/图生短片', pane: 'generate' },
+    { id: 'cases', label: '案例灵感', desc: '做同款', pane: 'cases' },
+    { id: 'cloud_batch', label: 'AI 混剪', desc: '素材一键成片', pane: 'cloud_batch' },
   ],
 }
