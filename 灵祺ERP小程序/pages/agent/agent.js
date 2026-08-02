@@ -86,6 +86,7 @@ Page({
     shortcuts: aiAgent.shortcutsForPlan('free'),
     shortcutsOpen: false,
     membershipPlan: 'free',
+    workspace: 'chat',
     hasChat: false,
     confirmingPreviewId: '',
     guestMode: false,
@@ -188,7 +189,7 @@ Page({
 
   onShow() {
     const real = api.isRealAuthed()
-    this.setData({ guestMode: !real })
+    this.setData({ guestMode: !real, workspace: 'chat' })
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 1 })
     }
@@ -491,6 +492,25 @@ Page({
     if (this.data.busy) return
     this.setData({ shortcutsOpen: !this.data.shortcutsOpen, showPlusPanel: false, modelMenuOpen: false })
     this.recalcLayout()
+  },
+
+  /** 与 CS 智能体页「对话助手 / 短视频出片」切换对齐；另提供推广文案入口 */
+  onSwitchWorkspace(e) {
+    if (!this.ensureAgentAuthed()) return
+    const ws = e.currentTarget.dataset.ws
+    if (!ws || ws === 'chat') {
+      this.setData({ workspace: 'chat' })
+      return
+    }
+    if (ws === 'shortvideo') {
+      this.setData({ workspace: 'shortvideo' })
+      wx.navigateTo({ url: '/pages/shortvideo-ai/shortvideo-ai' })
+      return
+    }
+    if (ws === 'copywriting') {
+      this.setData({ workspace: 'copywriting' })
+      wx.navigateTo({ url: '/pages/ai-content/ai-content' })
+    }
   },
 
   async refreshMembershipShortcuts() {

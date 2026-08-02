@@ -89,7 +89,7 @@ const SECTIONS = [
       {
         kind: 'link',
         url: '/pages/shortvideo-ai/shortvideo-ai',
-        title: '短视频AI处理',
+        title: '短视频出片',
         desc: '可灵成片 · ICE 云剪 · 对齐电脑端',
       },
       {

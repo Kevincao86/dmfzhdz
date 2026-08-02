@@ -3,9 +3,9 @@
     <view class="sv-header-bar" />
     <view class="sv-header-row">
       <text class="sv-header-icon">映</text>
-      <text class="sv-header-title">短视频处理</text>
+      <text class="sv-header-title">短视频出片</text>
     </view>
-    <text class="sv-header-desc">短视频生成与 AI 混剪（积分与商家 Web 同租户钱包）。完整画布 / 案例库 / 配乐工作室请在电脑端商家 ERP 使用。</text>
+    <text class="sv-header-desc">与电脑端商家 ERP「短视频出片」同源：生成 / AI混剪可在手机完成；无限画布、案例库、配乐工作室请用电脑端。</text>
     <text class="sv-persist-tip">生成后请及时保存。刷新页面后，本页生成记录将消失。</text>
   </view>
 
@@ -17,16 +17,33 @@
   <view wx:if="{{mainPane === 'generate' && pointsHintGenerate}}" class="sv-points-tip">{{pointsHintGenerate}}</view>
   <view wx:if="{{mainPane === 'cloud_batch' && pointsHintMix}}" class="sv-points-tip">{{pointsHintMix}}</view>
 
-  <!-- 顶栏三 Tab（与 Web erp-panel 一致） -->
+  <!-- 与 CS SHORT_VIDEO_STUDIO_MODES 对齐的创作模式 -->
+  <scroll-view scroll-x class="sv-studio-scroll" enhanced show-scrollbar="{{false}}">
+    <view class="sv-studio-row">
+      <view
+        wx:for="{{studioModes}}"
+        wx:key="id"
+        class="sv-studio-chip {{studioModeId === item.id ? 'on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onStudioMode"
+      >
+        <text class="sv-studio-lab">{{item.label}}</text>
+        <text class="sv-studio-desc">{{item.description}}</text>
+      </view>
+    </view>
+  </scroll-view>
+
+  <!-- 顶栏 Tab（与 Web 一致；画布/案例/配乐引导电脑端） -->
   <view class="sv-main-tabs">
     <view
       wx:for="{{mainTabs}}"
       wx:key="id"
-      class="sv-main-tab {{mainPane === item.id ? 'active' : ''}}"
+      class="sv-main-tab {{mainPane === item.id ? 'active' : ''}} {{item.native === false ? 'desk' : ''}}"
       data-id="{{item.id}}"
       bindtap="onMainTab"
     >{{item.label}}</view>
   </view>
+  <view wx:if="{{desktopPaneTip}}" class="sv-desktop-tip">{{desktopPaneTip}}</view>
 
   <!-- 模型配置区：云剪 Tab 不显示 -->
   <view wx:if="{{mainPane !== 'cloud_batch'}}" class="sv-engine-panel">

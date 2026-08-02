@@ -1,4 +1,4 @@
-/** 与 web `shortVideoUiLabels.ts` 一致 */
+/** 与 web `shortVideoUiLabels.ts` / `shortVideoStudioModes.ts` 对齐的标签与入口 */
 module.exports = {
   VIDEO_ENGINE_LABEL_KLING: '灵祺视频模型1',
   VIDEO_ENGINE_LABEL_SEEDANCE: '灵祺视频模型2',
@@ -15,8 +15,51 @@ module.exports = {
     { id: '1:1', label: '方屏 1:1', width: 1080, height: 1080 },
   ],
   ICE_BATCH_GENERATE_COUNTS: [10, 20, 50, 100],
+  /** 与 CS ShortVideoOptimizationPage 顶栏一致；小程序可原生执行 generate / cloud_batch */
   MAIN_TABS: [
-    { id: 'generate', label: '短视频生成' },
-    { id: 'cloud_batch', label: 'AI混剪' },
+    { id: 'generate', label: '短视频生成', native: true },
+    { id: 'cloud_batch', label: 'AI混剪', native: true },
+    { id: 'canvas', label: '无限画布', native: false },
+    { id: 'cases', label: '案例', native: false },
+    { id: 'music', label: '配乐', native: false },
+  ],
+  /** 与 CS SHORT_VIDEO_STUDIO_MODES 对齐的创作模式入口 */
+  STUDIO_MODES: [
+    {
+      id: 'agent',
+      label: 'Agent 模式',
+      description: '自然语言规划分镜出片',
+      pane: 'generate',
+    },
+    {
+      id: 'video',
+      label: '视频生成',
+      description: '文生/图生短片',
+      pane: 'generate',
+    },
+    {
+      id: 'music',
+      label: '音乐 / 配乐',
+      description: '曲库试听（完整版在电脑端）',
+      pane: 'music',
+    },
+    {
+      id: 'digital_human',
+      label: '数字人口播',
+      description: '跳转数字人试听/电脑端成片',
+      href: '/pages/digital-human/digital-human',
+    },
+    {
+      id: 'canvas',
+      label: '无限画布',
+      description: '分镜编排（完整版在电脑端）',
+      pane: 'canvas',
+    },
+    {
+      id: 'copywriting',
+      label: '推广文案',
+      description: '跳转文案工作台',
+      href: '/pages/ai-content/ai-content',
+    },
   ],
 }

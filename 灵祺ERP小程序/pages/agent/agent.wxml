@@ -9,6 +9,25 @@
     </view>
   </view>
 
+  <!-- 与 CS AiAgentPage 一致：对话 / 短视频出片 / 推广文案 -->
+  <view wx:if="{{!guestMode}}" class="agent-workspace-tabs" style="top: {{headerH}}px;">
+    <view
+      class="ws-tab {{workspace === 'chat' ? 'on' : ''}}"
+      data-ws="chat"
+      bindtap="onSwitchWorkspace"
+    >对话助手</view>
+    <view
+      class="ws-tab {{workspace === 'shortvideo' ? 'on' : ''}}"
+      data-ws="shortvideo"
+      bindtap="onSwitchWorkspace"
+    >短视频出片</view>
+    <view
+      class="ws-tab {{workspace === 'copywriting' ? 'on' : ''}}"
+      data-ws="copywriting"
+      bindtap="onSwitchWorkspace"
+    >推广文案</view>
+  </view>
+
   <view wx:if="{{guestMode}}" class="agent-lock-gate" style="padding-top: {{headerH}}px;">
     <image class="agent-lock-logo" src="{{logoSrc}}" mode="aspectFit" />
     <text class="agent-lock-title">登录后使用灵祺助手</text>
@@ -21,7 +40,7 @@
     wx:if="{{!guestMode}}"
     scroll-y
     class="chat-scroll-v2"
-    style="padding-top: {{headerH}}px; padding-bottom: {{scrollBottomPad}}px;"
+    style="padding-top: {{headerH + 44}}px; padding-bottom: {{scrollBottomPad}}px;"
     scroll-into-view="{{scrollTo}}"
     scroll-with-animation
     enhanced

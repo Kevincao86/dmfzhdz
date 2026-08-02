@@ -145,7 +145,9 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
   const imgs = m.imageUrls?.filter(Boolean) ?? []
   const videos = m.videoUrls?.filter(Boolean) ?? []
   const timeStr = formatBubbleTime(m.createdAt)
-  const displayText = m.content?.trim() ?? ''
+  const rawContent = m.content?.trim() ?? ''
+  const displayText =
+    !isUser && !isSystem && rawContent ? formatAssistantDisplayText(rawContent) || rawContent : rawContent
   const thinkingText = m.thinkingText?.trim() ?? ''
   const showThinking = !isUser && !isSystem && !displayText && Boolean(thinkingText)
   const showBody = Boolean(displayText) || showThinking || imgs.length > 0
