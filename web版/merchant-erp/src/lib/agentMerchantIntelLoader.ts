@@ -123,8 +123,16 @@ async function fetchOnlineProductsSummary(): Promise<{ text?: string; note?: str
   const blocks: string[] = []
   const notes: string[] = []
 
-  for (const platform of ['douyin', 'kuaishou'] as const) {
-    const label = platform === 'douyin' ? '抖音来客' : '快手团购'
+  const platformTokens: { platform: 'douyin' | 'kuaishou'; label: string; tokenKey: string }[] = [
+    { platform: 'douyin', label: '抖音来客', tokenKey: 'meoo_douyin_merchant_token' },
+    { platform: 'kuaishou', label: '快手团购', tokenKey: 'meoo_kuaishou_merchant_token' },
+  ]
+
+  for (const { platform, label, tokenKey } of platformTokens) {
+    if (!String(readMerchantSession(tokenKey) || '').trim()) {
+      notes.push(`${label}：未绑定，跳过商品拉取`)
+      continue
+    }
     const r = await fetchMerchantProductList(platform, { page: 1, pageSize: 30, full: true })
     if (!r.ok) {
       notes.push(`${label}：${r.message}`)
@@ -133,7 +141,7 @@ async function fetchOnlineProductsSummary(): Promise<{ text?: string; note?: str
     if (!r.items.length) {
       const hint = r.message?.trim()
       if (hint) notes.push(`${label}：${hint}`)
-      else notes.push(`${label}：线上无商品或未绑定`)
+      else notes.push(`${label}：线上无商品`)
       continue
     }
     const lines = r.items.slice(0, 12).map((p) => {

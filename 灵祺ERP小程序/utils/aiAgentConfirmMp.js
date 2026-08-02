@@ -169,6 +169,23 @@ async function confirmPreviewMessage(previewMsg, context) {
   if (taskType === 'file_tax') {
     return { ok: true, message: '请前往报税管理导出申报资料。', navUrl: erpNav.navForTaskType('file_tax') }
   }
+  if (taskType === 'analyze_exception') {
+    return {
+      ok: true,
+      message: '诊断已确认。可按 Todo 前往看板与对应模块继续处理；写操作仍须在各场景再次确认。',
+      navUrl: erpNav.navForTaskType('analyze_exception'),
+    }
+  }
+  if (taskType === 'sync_platform') {
+    return { ok: true, message: '请前往商品/同步相关模块处理。', navUrl: erpNav.navForTaskType('sync_platform') }
+  }
+  if (taskType === 'generate_copywriting') {
+    return {
+      ok: true,
+      message: '请前往推广文案相关模块继续。',
+      navUrl: erpNav.navForTaskType('generate_copywriting'),
+    }
+  }
   return { ok: true, message: '任务已记录，可在功能中心查看对应模块。', navUrl: erpNav.navForTaskType('general') }
 }
 

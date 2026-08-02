@@ -15,7 +15,7 @@ Page({
     busy: false,
     err: '',
     playing: false,
-    tip: `合成试听口播音频（与电脑端 TTS 同源，试听不扣积分）。电脑端形象成片按 ${econ.MP_POINTS_DIGITAL_HUMAN_PER_SEC} 积分/秒计费（最低 ${econ.MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE} 积分），与 CS 一致。`,
+    tip: `小程序提供口播 TTS 试听（不扣积分）。完整数字人口播成片（选形象/参数/Seedance 合成）请在电脑端商家 ERP「数字人口播」完成，成片按 ${econ.MP_POINTS_DIGITAL_HUMAN_PER_SEC} 积分/秒计费（最低 ${econ.MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE} 积分，与 CS 一致）。`,
   },
 
   onUnload() {

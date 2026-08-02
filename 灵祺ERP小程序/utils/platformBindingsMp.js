@@ -63,13 +63,31 @@ function loadPlatformBindingRows() {
 
 function formatAgentBindingContext() {
   const snap = sessionSync.readBindingSnapshotFromStorage()
-  const parts = []
-  if (snap.douyin.bound) parts.push(`抖音来客：${snap.douyin.accountName}`)
-  if (snap.kuaishou.bound) parts.push(`快手团购：${snap.kuaishou.accountName}`)
-  if (snap.localPromotion.bound) parts.push(`巨量本地推：${snap.localPromotion.accountName}`)
-  if (snap.xhsCommercial.bound) parts.push(`小红书聚光：${snap.xhsCommercial.accountName}`)
-  if (!parts.length) return '当前账号尚未同步到任何平台绑定（请在电脑端设置页完成授权）。'
-  return `已绑定平台：${parts.join('；')}`
+  const all = [
+    { key: 'douyin', label: '抖音来客' },
+    { key: 'kuaishou', label: '快手团购' },
+    { key: 'localPromotion', label: '巨量本地推' },
+    { key: 'xhsCommercial', label: '小红书聚光' },
+  ]
+  const bound = []
+  const unbound = []
+  for (const p of all) {
+    const item = snap[p.key]
+    if (item && item.bound) {
+      bound.push(item.accountName ? `${p.label}：${item.accountName}` : p.label)
+    } else {
+      unbound.push(p.label)
+    }
+  }
+  if (!bound.length) {
+    return (
+      '已绑定平台：无。未绑定（跳过分析）：' +
+      unbound.join('、') +
+      '。分析异常时不得对未绑定平台下结论；请在电脑端「设置 → 系统设置」完成授权后下拉刷新。'
+    )
+  }
+  const skip = unbound.length ? `未绑定（跳过分析）：${unbound.join('、')}。` : ''
+  return `已绑定平台（可分析）：${bound.join('；')}。${skip}`
 }
 
 module.exports = {

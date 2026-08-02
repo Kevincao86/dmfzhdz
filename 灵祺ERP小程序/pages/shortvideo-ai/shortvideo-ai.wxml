@@ -5,7 +5,7 @@
       <text class="sv-header-icon">映</text>
       <text class="sv-header-title">短视频处理</text>
     </view>
-    <text class="sv-header-desc">短视频创作与混剪，积分与商家 Web 版共用同一租户钱包。</text>
+    <text class="sv-header-desc">短视频生成与 AI 混剪（积分与商家 Web 同租户钱包）。完整画布 / 案例库 / 配乐工作室请在电脑端商家 ERP 使用。</text>
     <text class="sv-persist-tip">生成后请及时保存。刷新页面后，本页生成记录将消失。</text>
   </view>
 

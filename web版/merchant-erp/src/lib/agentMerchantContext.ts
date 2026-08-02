@@ -12,6 +12,8 @@ import { loadStoreMenuRecord, menuItemsSummary } from './storeMenuStorage'
 import { readStoreMarginConfig } from './storeMarginsRead'
 import { loadProductEditLibraryDraftBriefPicks } from './productEditLibrary'
 import { formatIndustryAlignmentConstraint, summarizeDraftProductPicks } from './merchantIndustryAlign'
+import { MERCHANT_PLATFORMS } from '../constants/merchantPlatforms'
+import { readMerchantSession } from './merchantSession'
 
 export type MerchantIntelSnapshot = {
   storeName?: string
@@ -29,7 +31,30 @@ export type MerchantIntelSnapshot = {
   onlineProductsSummary?: string
   /** 菜单为空时从 ERP 草稿箱补充 */
   draftProductsSummary?: string
+  /** 已绑定 / 未绑定平台说明（分析异常须遵守） */
+  boundPlatformsSummary?: string
   intelLoadNotes?: string[]
+}
+
+/** 与小程序 platformBindingsMp.formatAgentBindingContext 对齐：供分析异常过滤未绑定平台 */
+export function formatAgentBoundPlatformsContext(): string {
+  const bindable = MERCHANT_PLATFORMS.filter((p) => p.settingsBindable && !p.comingSoon)
+  const bound: string[] = []
+  const unbound: string[] = []
+  for (const p of bindable) {
+    const tok = String(readMerchantSession(p.tokenSessionKey) || '').trim()
+    if (tok) bound.push(p.name)
+    else unbound.push(p.name)
+  }
+  if (!bound.length) {
+    return (
+      '已绑定平台：无。未绑定：' +
+      unbound.join('、') +
+      '。分析异常时不得对未绑定平台下结论或编造数据；请引导用户至「设置 → 系统设置」完成授权。'
+    )
+  }
+  const skip = unbound.length ? `未绑定（跳过分析）：${unbound.join('、')}。` : ''
+  return `已绑定平台（可分析）：${bound.join('、')}。${skip}`
 }
 
 export function loadMerchantIntelSnapshot(): MerchantIntelSnapshot {
@@ -54,6 +79,7 @@ export function loadMerchantIntelSnapshot(): MerchantIntelSnapshot {
     margins: marginCfg.margins,
     industryPath: marginCfg.industry.path || marginCfg.industry.name || undefined,
     competitorSummary: cmp ? competitorReportSummary(cmp) : fallbackCmp,
+    boundPlatformsSummary: formatAgentBoundPlatformsContext(),
   }
 }
 
@@ -66,6 +92,11 @@ export function buildAgentMerchantIntelContextFromSnapshot(s: MerchantIntelSnaps
   ]
 
   if (s.storeName) lines.push(`当前门店：${s.storeName}`)
+
+  lines.push(s.boundPlatformsSummary || formatAgentBoundPlatformsContext())
+  lines.push(
+    '分析异常时：仅针对已绑定平台取数与下结论；未绑定平台必须写「跳过」，禁止编造。',
+  )
 
   lines.push(
     `综合毛利率（%）：抖音 ${s.margins.douyin}，美团 ${s.margins.meituan}，小红书 ${s.margins.xhs}（商品板块已保存，定价与套餐须据此倒推）。`,

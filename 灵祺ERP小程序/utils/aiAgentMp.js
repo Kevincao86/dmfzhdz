@@ -10,13 +10,19 @@ const habitsMp = require('./agentUserHabitsMp.js')
 const stateCloudMp = require('./agentUserStateCloudMp.js')
 const sessionSync = require('./merchantSessionSyncMp.js')
 
-const AI_AGENT_SYSTEM_PROMPT = `你是「灵祺小助理」，嵌入灵祺商家 ERP，同时也是开放型通用对话助手。
+const AI_AGENT_SYSTEM_PROMPT = `你是「灵祺小助理」，嵌入灵祺商家 ERP，同时也是开放型通用对话助手（与电脑端商家后台助手同源规则）。
 
 【开放对话】用户可以询问任何类型的问题，均须正常、完整、友好地作答；不要以「只能帮商家经营」等理由拒绝。若缺少实时外部数据，说明限制并给出查法或常识参考，仍应尽力回答。
 
 【ERP 专有能力】仅当用户主动提出经营、商品、达人、报税等相关需求时：涉及创建、修改、发布等写操作须先输出执行预览 JSON（actionType、confirmRequired: true），不得直接执行；用户确认前不要假设写操作已完成。
 
-【九大场景】create_product、recruit_influencer、handle_review、optimize_local_ads、follow_local_lead、sync_platform、analyze_exception、generate_copywriting、file_tax — 与电脑端商家后台助手一致。`
+【九大场景工作流】create_product、recruit_influencer、handle_review、optimize_local_ads、follow_local_lead、sync_platform、analyze_exception、generate_copywriting、file_tax。用户通过快捷任务进入时须按场景推进；分析异常可作为路由中枢，按根因衔接到对应场景。
+
+【分析异常 · analyze_exception】
+1) 先根据上下文「已绑定平台」清单：只分析已绑定平台；未绑定平台必须写「跳过」，禁止编造。
+2) 按维度诊断（有数据给结论，无数据标明缺口）：组品、价格、毛利、评价、销量、客群分析、竞争对手分析、Geo 优化分析；可附带同步/审核等技术异常。
+3) 输出修复 Todo 并映射下游场景；需要写操作时再给预览 JSON（confirmRequired: true）。
+4) 禁止只列笼统「六大故障」而不做绑定过滤与维度诊断。`
 
 const AI_AGENT_SHORTCUTS = [
   { type: 'create_product', label: '创建商品', prompt: '我想创建一个新的团购商品，请告诉我需要准备哪些信息' },
@@ -25,10 +31,32 @@ const AI_AGENT_SHORTCUTS = [
   { type: 'optimize_local_ads', label: '优化本地推', prompt: '本地推投放预算怎么拆比较合理' },
   { type: 'follow_local_lead', label: '跟进线索', prompt: '帮我整理本地推线索跟进的要点' },
   { type: 'sync_platform', label: '同步平台', prompt: '商品同步失败可能有哪些原因' },
-  { type: 'analyze_exception', label: '分析异常', prompt: '帮我分析最近经营数据异常的可能原因' },
+  {
+    type: 'analyze_exception',
+    label: '分析异常',
+    prompt:
+      '进入【分析异常】：请先根据我账号已绑定平台做诊断（未绑定平台跳过）；按组品、价格、毛利、评价、销量、客群分析、竞争对手分析、Geo 优化分析等维度给出结论与修复 Todo。',
+  },
   { type: 'generate_copywriting', label: '推广文案', prompt: '帮我写一段探店推广文案' },
   { type: 'file_tax', label: '一键报税', prompt: '本月报税需要准备哪些数据和步骤' },
 ]
+
+/** 与 CS aiAgentPlan.shortcutsForPlan 对齐 */
+function shortcutsForPlan(plan) {
+  const blocked = new Set()
+  if (plan === 'free') {
+    blocked.add('file_tax')
+    blocked.add('optimize_local_ads')
+    blocked.add('follow_local_lead')
+  }
+  return AI_AGENT_SHORTCUTS.filter((s) => !blocked.has(s.type))
+}
+
+function membershipAllowsAiTask(plan, task) {
+  if (plan === 'free' && task === 'file_tax') return false
+  if (plan === 'free' && (task === 'optimize_local_ads' || task === 'follow_local_lead')) return false
+  return true
+}
 
 const STORAGE_KEY_BASE = 'meoo_agent_thread_v2'
 const THREAD_UID_KEY = '_meoo_agent_thread_uid'
@@ -553,6 +581,8 @@ module.exports = {
   AI_AGENT_SYSTEM_PROMPT,
   AI_AGENT_SHORTCUTS,
   MAX_ATTACH,
+  shortcutsForPlan,
+  membershipAllowsAiTask,
   setCurrentUserId,
   getCurrentUserId,
   syncAgentStateFromCloud,

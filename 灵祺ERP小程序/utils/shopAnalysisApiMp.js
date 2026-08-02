@@ -4,6 +4,7 @@
 const api = require('./api.js')
 const merchantApi = require('./merchantApi.js')
 const { readPlatformToken } = require('./platformTokensMp.js')
+const feat = require('./merchantFeatureApisMp.js')
 
 const MP_RECHARGE_POINTS_PER_YUAN = 40
 
@@ -13,6 +14,15 @@ function shopAnalysisAiPointsFromGross(estimatedGrossYuan) {
   if (gross <= 0) return 25
   const feeYuan = Math.min(3, Math.max(0.375, gross * 0.00002))
   return Math.max(15, Math.min(120, Math.ceil(feeYuan * MP_RECHARGE_POINTS_PER_YUAN)))
+}
+
+/** 与 CS marginPercentForFinancePlatform 对齐：按分析平台取毛利率 */
+function marginPercentForPlatform(platform) {
+  const m = feat.readMargins() || {}
+  const p = String(platform || 'douyin').trim()
+  if (p === 'meituan') return Number(m.meituan) || 0
+  if (p === 'xhs' || p === 'xiaohongshu') return Number(m.xhs) || 0
+  return Number(m.douyin) || 0
 }
 
 function shanghaiTodayYmd() {
@@ -83,10 +93,15 @@ async function fetchShopAnalysisSummary(opts) {
   const startDate = opts.startDate || range.startDate
   const endDate = opts.endDate || range.endDate
   const platform = opts.platform || 'douyin'
+  const marginPercent =
+    typeof opts.marginPercent === 'number' && Number.isFinite(opts.marginPercent)
+      ? opts.marginPercent
+      : marginPercentForPlatform(platform)
   const q = [
     `startDate=${encodeURIComponent(startDate)}`,
     `endDate=${encodeURIComponent(endDate)}`,
     `platform=${encodeURIComponent(platform)}`,
+    `marginPercent=${encodeURIComponent(String(marginPercent || 0))}`,
   ]
   if (opts.poiId) q.push(`poiId=${encodeURIComponent(opts.poiId)}`)
   const data = await requestShop('GET', `/api/meoo-shop-analysis-summary?${q.join('&')}`)
@@ -101,10 +116,16 @@ async function fetchShopAnalysisSummary(opts) {
 
 async function fetchShopAnalysisAi(opts) {
   const range = defaultRange()
+  const platform = opts.platform || 'douyin'
+  const marginPercent =
+    typeof opts.marginPercent === 'number' && Number.isFinite(opts.marginPercent)
+      ? opts.marginPercent
+      : marginPercentForPlatform(platform)
   const body = {
     startDate: opts.startDate || range.startDate,
     endDate: opts.endDate || range.endDate,
-    platform: opts.platform || 'douyin',
+    platform,
+    marginPercent: marginPercent || 0,
   }
   if (opts.poiId) body.poiId = opts.poiId
   const data = await requestShop('POST', '/api/meoo-shop-analysis-ai', body, 180000)
