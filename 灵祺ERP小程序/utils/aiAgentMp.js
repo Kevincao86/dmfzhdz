@@ -220,15 +220,34 @@ function merchantApiFriendlyError(statusCode, body) {
   return `请求失败（HTTP ${code || '?'}）`
 }
 
-function requestJson(path, data) {
+/** AI 对话/生图默认 120s（微信默认约 60s 易 request:fail timeout） */
+const AI_REQUEST_TIMEOUT_MS = 120000
+
+function friendlyNetworkError(errMsg) {
+  const em = String(errMsg || '网络异常')
+  if (/timeout|超时|TIMED_OUT|timed\s*out/i.test(em)) {
+    return '请求超时：模型响应较慢或网络不稳定，请缩短问题后重试；若刚登录可先退出再登录。'
+  }
+  const hb = apiBase()
+  let hint = ''
+  if (/fail|ECONNRESET|域名|ssl|certificate/i.test(em) && hb && /5173|:443/.test(hb)) {
+    hint =
+      ' 若调试本机 ERP：请先在本机启动 web版/merchant-erp（npm run dev）；真机请把 MERCHANT_API_BASE_URL 改为电脑局域网 IP，并在开发者工具勾选「不校验合法域名」。'
+  }
+  return em + hint
+}
+
+function requestJson(path, data, opts) {
   const base = apiBase()
   if (!base) return Promise.reject(new Error('未配置商家后台 API'))
+  const timeout = Math.max(10000, Number(opts && opts.timeoutMs) || AI_REQUEST_TIMEOUT_MS)
   return new Promise((resolve, reject) => {
     wx.request({
       url: `${base}${path}`,
       method: 'POST',
       header: authHeaders(),
       data,
+      timeout,
       success(res) {
         const body = res.data
         if (res.statusCode >= 200 && res.statusCode < 300 && body && body.ok !== false) {
@@ -238,14 +257,7 @@ function requestJson(path, data) {
         reject(new Error(merchantApiFriendlyError(res.statusCode, body || {})))
       },
       fail(err) {
-        const em = err && typeof err.errMsg === 'string' ? err.errMsg : '网络异常'
-        const hb = apiBase()
-        let hint = ''
-        if (/fail|超时|超时|timed out|ECONNRESET|域名|ssl|certificate/i.test(em) && hb && /5173|:443/.test(hb)) {
-          hint =
-            ' 若调试本机 ERP：请先在本机启动 web版/merchant-erp（npm run dev）；真机请把 MERCHANT_API_BASE_URL 改为电脑局域网 IP，并在开发者工具勾选「不校验合法域名」。'
-        }
-        reject(new Error(em + hint))
+        reject(new Error(friendlyNetworkError(err && err.errMsg)))
       },
     })
   })

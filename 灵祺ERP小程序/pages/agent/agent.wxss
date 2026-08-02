@@ -125,7 +125,7 @@
 
 .msg {
   display: flex;
-  gap: 16rpx;
+  gap: 12rpx;
   align-items: flex-start;
 }
 
@@ -159,6 +159,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  margin-top: 0;
 }
 
 .ava-ai {
@@ -180,16 +181,22 @@
   color: #0369a1;
 }
 
+/* 短气泡高度对齐头像（56rpx）；长文案向下延伸，顶边与头像齐平 */
 .bubble-v2 {
   max-width: 78%;
-  padding: 20rpx 24rpx;
-  border-radius: 28rpx;
+  min-height: 56rpx;
+  padding: 10rpx 18rpx;
+  border-radius: 20rpx;
   font-size: 26rpx;
-  line-height: 1.55;
+  line-height: 1.45;
   background: #fff;
   border: 1rpx solid #e2e8f0;
   color: #1e293b;
   box-shadow: 0 4rpx 16rpx rgba(15, 23, 42, 0.04);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .msg.user .bubble-v2 {
