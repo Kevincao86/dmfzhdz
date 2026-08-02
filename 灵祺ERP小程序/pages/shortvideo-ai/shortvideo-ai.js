@@ -6,15 +6,25 @@ const labels = require('../../utils/shortVideoLabelsMp.js')
 const erpPoints = require('../../utils/erpPointsSpendMp.js')
 const economics = require('../../utils/mpPointsEconomicsMp.js')
 const videoGenBrief = require('../../utils/videoGenBrief.js')
+const skillsLib = require('../../utils/shortVideoSkillsMp.js')
+const casesLib = require('../../utils/shortVideoCasesMp.js')
+const musicLib = require('../../utils/shortVideoMusicMp.js')
+const scriptTable = require('../../utils/shortVideoScriptTableMp.js')
 
 const {
   MAIN_TABS,
   STUDIO_MODES,
+  QUICK_CARDS,
   KLING_MODEL_OPTIONS,
   KLING_DEFAULT_MODEL_ID,
   VIDEO_ENGINE_LABEL_KLING,
   VIDEO_ENGINE_LABEL_SEEDANCE,
+  VIDEO_ENGINE_HINT_SEEDANCE,
   VIDEO_MODEL_DEFAULT_LABEL,
+  SEEDANCE_QUALITY_OPTIONS,
+  DURATION_OPTIONS,
+  ASPECT_OPTIONS,
+  SUBTITLE_STYLES,
   ICE_ASPECT_PRESETS,
   ICE_BATCH_GENERATE_COUNTS,
 } = labels
@@ -56,12 +66,16 @@ Page({
     mainTabs: MAIN_TABS,
     mainPane: 'generate',
     studioModes: STUDIO_MODES,
-    studioModeId: 'video',
+    studioModeId: 'agent',
+    studioModeLabel: 'Agent 模式',
+    quickCards: QUICK_CARDS,
     desktopPaneTip: '',
 
     engineLabelKling: VIDEO_ENGINE_LABEL_KLING,
     engineLabelSeedance: VIDEO_ENGINE_LABEL_SEEDANCE,
-    engine: 'kling',
+    engineHintSeedance: VIDEO_ENGINE_HINT_SEEDANCE,
+    engine: 'seedance',
+    showAdvancedEngine: false,
     cfgLoaded: false,
     klingConfigured: false,
     arkKeyConfigured: false,
@@ -72,20 +86,20 @@ Page({
     longformEnabled: false,
     plannerModel: 'doubao',
     longformSegmentOptions: [2, 3, 4, 5, 6],
-    longformSegmentLabels: ['2 段（约 20 秒）', '3 段（约 30 秒）', '4 段（约 40 秒）', '5 段（约 50 秒）', '6 段（约 60 秒）'],
-    longformSegmentCount: 6,
-    longformSegmentIdx: 4,
+    longformSegmentLabels: ['2 段', '3 段', '4 段', '5 段', '6 段'],
+    longformSegmentCount: 4,
+    longformSegmentIdx: 2,
 
     klingModelOptions: KLING_MODEL_OPTIONS.map((m) =>
       m.id === KLING_DEFAULT_MODEL_ID ? VIDEO_MODEL_DEFAULT_LABEL : m.label,
     ),
     klingModelIds: KLING_MODEL_OPTIONS.map((m) => m.id),
     klingModelIdx: 1,
-    aspectOptions: ['横屏 16:9', '竖屏 9:16', '方屏 1:1'],
-    aspectValues: ['16:9', '9:16', '1:1'],
+    aspectOptions: ASPECT_OPTIONS.map((a) => a.label),
+    aspectValues: ASPECT_OPTIONS.map((a) => a.id),
     aspectIdx: 0,
-    durationOptions: ['5 秒', '10 秒'],
-    durationValues: ['5', '10'],
+    durationOptions: DURATION_OPTIONS.map((d) => d.label),
+    durationValues: DURATION_OPTIONS.map((d) => String(d.sec)),
     durationIdx: 0,
     kModeOptions: ['标准', '高品质'],
     kModeValues: ['std', 'pro'],
@@ -94,18 +108,32 @@ Page({
     sdModelLabels: [],
     sdModelIds: [],
     sdModelIdx: 0,
-    sdDurationOptions: ['5 秒', '10 秒'],
-    sdDurationValues: ['5', '10'],
+    sdDurationOptions: DURATION_OPTIONS.map((d) => d.label),
+    sdDurationValues: DURATION_OPTIONS.map((d) => String(d.sec)),
     sdDurationIdx: 0,
+    sdQualityOptions: SEEDANCE_QUALITY_OPTIONS.map((q) => q.label),
+    sdQualityValues: SEEDANCE_QUALITY_OPTIONS.map((q) => q.id),
+    sdQualityIdx: 0,
     sdFpsOptions: ['24 fps', '30 fps'],
     sdFpsValues: ['24', '30'],
     sdFpsIdx: 0,
-    sdAspectOptions: ['横屏 16:9', '竖屏 9:16', '方屏 1:1'],
-    sdAspectValues: ['16:9', '9:16', '1:1'],
-    sdAspectIdx: 1,
+    sdAspectOptions: ASPECT_OPTIONS.map((a) => a.label),
+    sdAspectValues: ASPECT_OPTIONS.map((a) => a.id),
+    sdAspectIdx: 0,
     sdWatermarkOptions: ['无', '有'],
     sdWatermarkValues: ['off', 'on'],
     sdWatermarkIdx: 0,
+    subtitleStyles: SUBTITLE_STYLES,
+    subtitleStyleIdx: 0,
+    subtitleStyleId: 'bottom-safe',
+
+    skillList: skillsLib.SHORT_VIDEO_SKILLS,
+    skillId: null,
+    skillName: '',
+    skillOpen: false,
+    modeOpen: false,
+    briefSlotHints: [],
+    cabinPrompt: '',
 
     optPrompt: '',
     optNegative: '',
@@ -116,12 +144,28 @@ Page({
     genPrompt: '',
     storyFiles: [],
 
+    scriptRows: scriptTable.defaultScriptRows(3, 5),
+    scriptEditorOpen: true,
+    showScriptPanel: true,
+
     busy: false,
     progress: '',
     hint: '',
     err: '',
     resultUrl: '',
     resultSegments: [],
+
+    caseList: casesLib.listCases ? casesLib.listCases() : casesLib.SHORT_VIDEO_CASES,
+    caseFilter: '全部',
+    casePreviewUrl: '',
+    caseLocalLife: [],
+
+    musicMoods: musicLib.MUSIC_MOODS,
+    musicMood: '全部',
+    musicList: musicLib.listMusicByMood('全部'),
+    selectedMusicId: '',
+    selectedMusicTitle: '',
+    playingMusicId: '',
 
     iceCfg: null,
     iceServiceReady: false,
@@ -144,6 +188,8 @@ Page({
     iceErr: '',
     iceHint: '',
     iceBusy: false,
+    smartBatchEnabled: false,
+    smartBatchBusy: false,
 
     aspectPresets: ICE_ASPECT_PRESETS,
     aspectId: '9:16',
@@ -170,11 +216,26 @@ Page({
   _frameB64: '',
   _storyB64List: [],
   _cancelPoll: false,
+  _audioCtx: null,
 
   onLoad() {
     this._frameB64 = ''
     this._storyB64List = []
     this._cancelPoll = false
+    const localLife = (casesLib.SHORT_VIDEO_CASES || [])
+      .filter((c) => (c.skillId === 'store_visit' || /探店|本地/.test(c.title + (c.subtitle || ''))))
+      .slice(0, 8)
+    this.setData({
+      caseLocalLife: localLife,
+      caseList: casesLib.SHORT_VIDEO_CASES || [],
+      skillList: skillsLib.SHORT_VIDEO_SKILLS || [],
+      musicList: musicLib.listMusicByMood('全部'),
+      scriptRows: scriptTable.defaultScriptRows(3, 5),
+    })
+  },
+
+  onUnload() {
+    this._stopMusic()
   },
 
   async onShow() {
@@ -187,6 +248,7 @@ Page({
     await this.loadPointsBalance()
     this.syncIceDerived()
     this.refreshPointsHints()
+    this.refreshBriefHints()
   },
 
   async loadPointsBalance() {
@@ -194,13 +256,22 @@ Page({
       const bal = await erpPoints.fetchPointsBalance()
       this.setData({ pointsBalance: bal })
     } catch {
-      /* 余额展示可选 */
+      /* optional */
     }
   },
 
   estimateShortvideoDurationSec() {
-    if (this.data.longformEnabled) return Number(this.data.longformSegmentCount) * 10
-    return this.data.durationValues[this.data.durationIdx] === '10' ? 10 : 5
+    if (this.data.longformEnabled) {
+      const rows = this.data.scriptRows || []
+      if (scriptTable.isScriptRowsUsable(rows)) {
+        return Math.max(10, rows.length * (Number(this.data.sdDurationValues[this.data.sdDurationIdx]) || 5))
+      }
+      return Number(this.data.longformSegmentCount) * (Number(this.data.sdDurationValues[this.data.sdDurationIdx]) || 10)
+    }
+    if (this.data.engine === 'seedance') {
+      return Number(this.data.sdDurationValues[this.data.sdDurationIdx]) || 5
+    }
+    return Number(this.data.durationValues[this.data.durationIdx]) || 5
   },
 
   async ensureShortvideoAffordable() {
@@ -298,8 +369,10 @@ Page({
       longformPlanner: { doubao: Boolean(lp.doubao), qwen: Boolean(lp.qwen) },
       sdModelLabels: sdLabels,
       sdModelIds: sdIds,
-      sdModelIdx: sdIds.length ? 0 : 0,
+      sdModelIdx: 0,
       plannerModel,
+      smartBatchEnabled: Boolean(conf.smartBatchEnabled || (this.data.iceCfg && this.data.iceCfg.smartBatchEnabled)),
+      engine: 'seedance',
     })
   },
 
@@ -317,6 +390,7 @@ Page({
       iceLocalUpload: Boolean(cfg && cfg.localUploadEnabled),
       presetOptions: presets,
       presetIdx: 0,
+      smartBatchEnabled: Boolean(cfg && cfg.smartBatchEnabled),
     })
     this.syncIceDerived()
     this.refreshPointsHints()
@@ -337,6 +411,14 @@ Page({
     if (this.isSmartPreset()) {
       brief = `${brief}\n【智能特效】请根据素材画面与节奏自动选择合适的转场与特效，避免生硬硬切。`.trim()
     }
+    const music = musicLib.findMusicTrack(this.data.selectedMusicId)
+    if (music && music.previewUrl) {
+      brief = `${brief}\n【BGM】建议使用：${music.title}（${music.previewUrl}）`.trim()
+    }
+    const style = this.data.subtitleStyles[this.data.subtitleStyleIdx]
+    if (style) {
+      brief = `${brief}\n【字幕板式】${style.label}`.trim()
+    }
     return brief
   },
 
@@ -347,7 +429,7 @@ Page({
     const genCost = economics.mpPointsCostForUsage('shortvideo', { durationSec: genSec })
     const mixCost = economics.mpPointsCostForUsage(mixKind, { durationSec: mixSec })
     this.setData({
-      pointsHintGenerate: `消耗提醒：短视频生成 ${economics.formatMpPointsRateLabel('shortvideo')}；当前约 ${genSec} 秒预计 ${genCost} 积分（与 Web 同一租户钱包）。`,
+      pointsHintGenerate: `消耗提醒：短视频生成 ${economics.formatMpPointsRateLabel('shortvideo')}；当前约 ${genSec} 秒预计 ${genCost} 积分。`,
       pointsHintMix: this.isSmartPreset()
         ? `消耗提醒：智能混剪 ${economics.formatMpPointsRateLabel('cloud_edit_smart')}；当前约 ${mixSec} 秒预计 ${mixCost} 积分。`
         : `消耗提醒：AI 混剪 ${economics.formatMpPointsRateLabel('cloud_edit')}；预计 ${mixCost} 积分/条。`,
@@ -394,41 +476,95 @@ Page({
 
   onMainTab(e) {
     const id = e.currentTarget.dataset.id
-    if (!id) return
-    const tab = (MAIN_TABS || []).find((t) => t.id === id)
-    if (tab && tab.native === false) {
-      this.setData({
-        desktopPaneTip: `「${tab.label}」完整能力在电脑端商家 ERP「短视频出片」中可用；小程序请用「短视频生成 / AI混剪」。`,
-        mainPane: this.data.mainPane === 'cloud_batch' ? 'cloud_batch' : 'generate',
-      })
-      wx.showToast({ title: '完整版请用电脑端', icon: 'none' })
-      return
-    }
-    if (id === this.data.mainPane) return
+    if (!id || id === this.data.mainPane) return
     this.resetOutputs()
     this.setData({ mainPane: id, desktopPaneTip: '' })
+    if (id === 'music') this.refreshMusicList()
+  },
+
+  onQuickCard(e) {
+    const pane = e.currentTarget.dataset.pane
+    if (!pane) return
+    this.resetOutputs()
+    this.setData({ mainPane: pane, desktopPaneTip: '' })
   },
 
   onStudioMode(e) {
     const id = e.currentTarget.dataset.id
     const mode = (STUDIO_MODES || []).find((m) => m.id === id)
     if (!mode) return
-    this.setData({ studioModeId: id })
+    this.setData({ studioModeId: id, studioModeLabel: mode.label, modeOpen: false })
     if (mode.href) {
       wx.navigateTo({ url: mode.href })
-      return
-    }
-    if (mode.pane === 'music' || mode.pane === 'canvas' || mode.pane === 'cases') {
-      this.setData({
-        desktopPaneTip: `「${mode.label}」完整能力在电脑端商家 ERP 短视频出片台；小程序可先用视频生成 / AI混剪。`,
-      })
-      wx.showToast({ title: '完整版请用电脑端', icon: 'none' })
       return
     }
     if (mode.pane) {
       this.resetOutputs()
       this.setData({ mainPane: mode.pane, desktopPaneTip: '' })
     }
+  },
+
+  toggleModeOpen() {
+    this.setData({ modeOpen: !this.data.modeOpen, skillOpen: false })
+  },
+
+  toggleSkillOpen() {
+    this.setData({ skillOpen: !this.data.skillOpen, modeOpen: false })
+  },
+
+  onPickSkill(e) {
+    const id = e.currentTarget.dataset.id
+    const skill = skillsLib.findShortVideoSkill(id)
+    if (!skill) return
+    const note = String(this.data.cabinPrompt || this.data.genPrompt || '').trim()
+    const composed = skillsLib.composeSkillPrompt(skill, note)
+    const patch = {
+      skillId: skill.id,
+      skillName: skill.name,
+      skillOpen: false,
+      cabinPrompt: composed,
+      genPrompt: composed,
+      studioModeId: 'agent',
+    }
+    if (skill.preferLongform) {
+      patch.longformEnabled = true
+      if (skill.preferAspect) {
+        const aix = this.data.sdAspectValues.indexOf(skill.preferAspect)
+        if (aix >= 0) patch.sdAspectIdx = aix
+      }
+    }
+    this.setData(patch, () => {
+      this.refreshBriefHints()
+      this.refreshPointsHints()
+    })
+  },
+
+  clearSkill() {
+    this.setData({ skillId: null, skillName: '', skillOpen: false }, () => this.refreshBriefHints())
+  },
+
+  onCabinPrompt(e) {
+    const v = e.detail.value
+    this.setData({ cabinPrompt: v, genPrompt: v }, () => this.refreshBriefHints())
+  },
+
+  refreshBriefHints() {
+    const skill = skillsLib.findShortVideoSkill(this.data.skillId)
+    if (!skill) {
+      this.setData({ briefSlotHints: [] })
+      return
+    }
+    const brief = videoGenBrief.buildBriefFromInput(this.data.cabinPrompt || this.data.genPrompt, skill)
+    const hints = (skill.briefSlots || []).map((slot) => ({
+      slot,
+      label: skillsLib.BRIEF_SLOT_LABELS[slot] || slot,
+      filled: !(brief.missingSlots || []).includes(slot),
+    }))
+    this.setData({ briefSlotHints: hints })
+  },
+
+  toggleAdvancedEngine() {
+    this.setData({ showAdvancedEngine: !this.data.showAdvancedEngine })
   },
 
   onEngine(e) {
@@ -442,8 +578,11 @@ Page({
     const on = Boolean(e.detail.value)
     const patch = { longformEnabled: on }
     if (on) {
-      patch.durationIdx = 1
-      patch.sdDurationIdx = 1
+      const dix = this.data.sdDurationValues.indexOf('10')
+      if (dix >= 0) patch.sdDurationIdx = dix
+      if (!scriptTable.isScriptRowsUsable(this.data.scriptRows)) {
+        patch.scriptRows = scriptTable.defaultScriptRows(this.data.longformSegmentCount, 5)
+      }
     }
     this.setData(patch, () => this.refreshPointsHints())
   },
@@ -456,8 +595,14 @@ Page({
   onSegmentCountChange(e) {
     const opts = this.data.longformSegmentOptions
     const ix = Number(e.detail.value) || 0
-    this.setData({ longformSegmentIdx: ix, longformSegmentCount: opts[ix] || 6 }, () =>
-      this.refreshPointsHints(),
+    const n = opts[ix] || 4
+    this.setData(
+      {
+        longformSegmentIdx: ix,
+        longformSegmentCount: n,
+        scriptRows: scriptTable.resizeScriptRows(this.data.scriptRows, n, Number(this.data.sdDurationValues[this.data.sdDurationIdx]) || 5),
+      },
+      () => this.refreshPointsHints(),
     )
   },
 
@@ -479,6 +624,9 @@ Page({
   sdDurChange(e) {
     this.setData({ sdDurationIdx: Number(e.detail.value) || 0 }, () => this.refreshPointsHints())
   },
+  sdQualityChange(e) {
+    this.setData({ sdQualityIdx: Number(e.detail.value) || 0 })
+  },
   sdFpsChange(e) {
     this.setData({ sdFpsIdx: Number(e.detail.value) || 0 })
   },
@@ -488,13 +636,28 @@ Page({
   sdWmChange(e) {
     this.setData({ sdWatermarkIdx: Number(e.detail.value) || 0 })
   },
+  subtitleChange(e) {
+    const ix = Number(e.detail.value) || 0
+    const row = SUBTITLE_STYLES[ix] || SUBTITLE_STYLES[0]
+    this.setData({ subtitleStyleIdx: ix, subtitleStyleId: row.id })
+  },
 
-  seedanceFlagsLine() {
-    const dur = this.data.longformEnabled ? '10' : this.data.sdDurationValues[this.data.sdDurationIdx] || '5'
+  seedanceFlagsLine(durOverride) {
+    const dur =
+      durOverride != null
+        ? String(durOverride)
+        : this.data.longformEnabled
+          ? this.data.sdDurationValues[this.data.sdDurationIdx] || '10'
+          : this.data.sdDurationValues[this.data.sdDurationIdx] || '5'
     const fps = this.data.sdFpsValues[this.data.sdFpsIdx] || '24'
     const ratio = this.data.sdAspectValues[this.data.sdAspectIdx] || '9:16'
     const wm = this.data.sdWatermarkValues[this.data.sdWatermarkIdx] === 'on' ? 'true' : 'false'
-    return `--dur ${dur} --fps ${fps} --ratio ${ratio} --wm ${wm}`
+    const q = this.data.sdQualityValues[this.data.sdQualityIdx] || '720p'
+    return `--dur ${dur} --fps ${fps} --ratio ${ratio} --wm ${wm} --rsn ${q}`
+  },
+
+  appendNativeAv(prompt) {
+    return scriptTable.sanitizePromptForSeedanceNativeAv(prompt)
   },
 
   validateEngine() {
@@ -510,58 +673,13 @@ Page({
 
   validateLongform() {
     if (!this.data.longformEnabled) return ''
+    if (scriptTable.isScriptRowsUsable(this.data.scriptRows)) return ''
     const lp = this.data.longformPlanner
     if (this.data.plannerModel === 'doubao' && !lp.doubao)
-      return '长片策划需配置豆包 API Key（系统设置 → 模型绑定）。'
+      return '长片策划需配置豆包 API Key，或先完善分镜表画面描述。'
     if (this.data.plannerModel === 'qwen' && !lp.qwen)
-      return '长片策划需配置通义千问 API Key（系统设置 → 模型绑定）。'
+      return '长片策划需配置通义千问 API Key，或先完善分镜表画面描述。'
     return ''
-  },
-
-  pickOptimizeMedia() {
-    wx.chooseMedia({
-      count: 1,
-      mediaType: ['image', 'video'],
-      sourceType: ['album', 'camera'],
-      maxDuration: 120,
-      success: async (res) => {
-        this.resetOutputs()
-        const f = res.tempFiles && res.tempFiles[0]
-        if (!f) return
-        const path = f.tempFilePath || ''
-        const thumb = f.thumbTempFilePath || path
-        try {
-          let b64 = ''
-          const isVideo = (f.fileType === 'video') || /\.(mp4|mov|m4v|webm)/i.test(path)
-          if (isVideo && f.thumbTempFilePath) {
-            b64 = await readFsBase64(f.thumbTempFilePath)
-            this.setData({
-              thumbUrl: thumb,
-              hasFrame: true,
-              hint: '已从视频中截取一帧；也可直接上传图片作为参考。',
-            })
-          } else {
-            b64 = await readFsBase64(path)
-            this.setData({
-              thumbUrl: path,
-              hasFrame: true,
-              hint: '已载入参考图像。',
-            })
-          }
-          this._frameB64 = b64
-        } catch (_) {
-          this.setData({ err: '文件解析失败', hasFrame: false, thumbUrl: '' })
-          this._frameB64 = ''
-        }
-      },
-    })
-  },
-
-  onOptPrompt(e) {
-    this.setData({ optPrompt: e.detail.value })
-  },
-  onOptNeg(e) {
-    this.setData({ optNegative: e.detail.value })
   },
 
   setGenMode(e) {
@@ -572,7 +690,8 @@ Page({
   },
 
   onGenPrompt(e) {
-    this.setData({ genPrompt: e.detail.value })
+    const v = e.detail.value
+    this.setData({ genPrompt: v, cabinPrompt: v }, () => this.refreshBriefHints())
   },
 
   pickStoryFrames() {
@@ -596,6 +715,35 @@ Page({
         }
         this._storyB64List = b64list
         this.setData({ storyFiles })
+      },
+    })
+  },
+
+  pickRefFrame() {
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image', 'video'],
+      sourceType: ['album', 'camera'],
+      maxDuration: 120,
+      success: async (res) => {
+        const f = res.tempFiles && res.tempFiles[0]
+        if (!f) return
+        const path = f.tempFilePath || ''
+        const thumb = f.thumbTempFilePath || path
+        try {
+          let b64 = ''
+          const isVideo = f.fileType === 'video' || /\.(mp4|mov|m4v|webm)/i.test(path)
+          if (isVideo && f.thumbTempFilePath) {
+            b64 = await readFsBase64(f.thumbTempFilePath)
+          } else {
+            b64 = await readFsBase64(path)
+          }
+          this._frameB64 = b64
+          this.setData({ thumbUrl: thumb, hasFrame: true, hint: '已载入参考画面。' })
+        } catch (_) {
+          this._frameB64 = ''
+          this.setData({ err: '文件解析失败', hasFrame: false, thumbUrl: '' })
+        }
       },
     })
   },
@@ -625,300 +773,420 @@ Page({
     return videoAi.pollSeedanceUntilDone(taskId, onProgress, () => this.shouldCancel())
   },
 
-  async runLongformOptimize() {
-    const p = String(this.data.optPrompt || '').trim()
-    const plan = await videoAi.postLongformVideoPlan({
-      plannerModel: this.data.plannerModel,
-      overallPrompt: p,
-      segmentCount: this.data.longformSegmentCount,
-      mode: 'optimize',
-      negativeHint: this.data.engine === 'kling' ? String(this.data.optNegative || '').trim() : undefined,
-    })
-    if (!plan.ok) {
-      this.setData({ err: plan.message })
-      return
-    }
-    const segmentUrls = []
-    let lastUrl = ''
-    const durNum = 10
-    for (let i = 0; i < plan.prompts.length; i++) {
-      if (this.shouldCancel()) {
-        this.setData({ hint: '已取消长视频生成。' })
-        return
-      }
-      this.setData({ progress: `长视频 ${i + 1}/${plan.prompts.length} · 生成中…` })
-      const segPrompt = plan.prompts[i]
-      const frameB64 = this._frameB64
-      let urlOut = ''
-      if (this.data.engine === 'kling') {
-        const r = await videoAi.postKlingStart({
-          kind: 'image2video',
-          prompt: segPrompt,
-          negative_prompt: String(this.data.optNegative || '').trim(),
-          duration: durNum,
-          mode: this.data.kModeValues[this.data.kModeIdx],
-          aspect_ratio: this.data.aspectValues[this.data.aspectIdx],
-          image_base64: frameB64,
-          model_name: this.data.klingModelIds[this.data.klingModelIdx],
-        })
-        if (!r.ok) {
-          this.setData({ err: r.message })
-          return
-        }
-        const done = await this.pollVideo('kling', r.pollKind, r.taskId, (t) => this.setData({ progress: t }))
-        if (!done.ok || !done.videoUrl) return
-        urlOut = done.videoUrl
-      } else {
-        const r = await videoAi.postSeedanceStart({
-          model: this.data.sdModelIds[this.data.sdModelIdx],
-          prompt: segPrompt,
-          flags: this.seedanceFlagsLine(),
-          images_base64: [`data:image/jpeg;base64,${frameB64}`],
-        })
-        if (!r.ok) {
-          this.setData({ err: r.message })
-          return
-        }
-        const done = await this.pollVideo('seedance', null, r.taskId, (t) => this.setData({ progress: t }))
-        if (!done.ok || !done.videoUrl) return
-        urlOut = done.videoUrl
-      }
-      segmentUrls.push(urlOut)
-      lastUrl = urlOut
-    }
-    this.setData({
-      resultUrl: lastUrl,
-      resultSegments: segmentUrls,
-      hint: `已生成 ${segmentUrls.length} 段（每段约 10 秒）。网页端会自动拼接为一条成片；下方可逐段预览。`,
-    })
-    await this.chargeShortvideo(`longform-opt-${Date.now()}`, plan.prompts.length * 10)
+  /* —— 分镜表 —— */
+  onScriptField(e) {
+    const idx = Number(e.currentTarget.dataset.idx)
+    const field = e.currentTarget.dataset.field
+    const rows = (this.data.scriptRows || []).slice()
+    if (!rows[idx] || !field) return
+    rows[idx] = Object.assign({}, rows[idx], { [field]: e.detail.value })
+    this.setData({ scriptRows: rows })
   },
 
-  async runLongformGenerate() {
-    const txt = String(this.data.genPrompt || '').trim()
-    const imgs = (this._storyB64List || [])
-      .filter(Boolean)
-      .map((b) => `data:image/jpeg;base64,${b}`)
-    const planMode = this.data.genMode === 'text' ? 'generate_text' : 'generate_frames'
-    const plan = await videoAi.postLongformVideoPlan({
-      plannerModel: this.data.plannerModel,
-      overallPrompt: txt || (imgs.length ? `按 ${imgs.length} 张分镜参考图生成连贯营销短片` : '生成连贯短片'),
-      segmentCount: this.data.longformSegmentCount,
-      mode: planMode,
-    })
-    if (!plan.ok) {
-      this.setData({ err: plan.message })
-      return
-    }
-    const segmentUrls = []
-    let lastUrl = ''
-    const durNum = 10
-    for (let i = 0; i < plan.prompts.length; i++) {
-      if (this.shouldCancel()) {
-        this.setData({ hint: '已取消长视频生成。' })
-        return
-      }
-      this.setData({ progress: `长视频 ${i + 1}/${plan.prompts.length} · 生成中…` })
-      const segPrompt = plan.prompts[i]
-      let urlOut = ''
-      if (this.data.engine === 'kling') {
-        if (i === 0 && this.data.genMode === 'text') {
-          const r = await videoAi.postKlingStart({
-            kind: 'text2video',
-            prompt: segPrompt,
-            duration: durNum,
-            mode: this.data.kModeValues[this.data.kModeIdx],
-            aspect_ratio: this.data.aspectValues[this.data.aspectIdx],
-            model_name: this.data.klingModelIds[this.data.klingModelIdx],
-          })
-          if (!r.ok) {
-            this.setData({ err: r.message })
-            return
-          }
-          const done = await this.pollVideo('kling', r.pollKind, r.taskId, (t) => this.setData({ progress: t }))
-          if (!done.ok || !done.videoUrl) return
-          urlOut = done.videoUrl
-        } else {
-          let frameB64 = ''
-          if (i === 0 && this.data.genMode === 'frames') {
-            if (!imgs.length) {
-              this.setData({ err: '分镜模式下至少需要一张示意画面。' })
-              return
-            }
-            frameB64 = imgs[0].replace(/^data:image\/[^;]+;base64,/, '')
-          } else {
-            this.setData({
-              err: '长视频分镜衔接需在网页端完成（需下载上一段尾帧）；请关闭「长视频合成」或改用电脑端。',
-            })
-            return
-          }
-          const r = await videoAi.postKlingStart({
-            kind: 'image2video',
-            prompt: segPrompt,
-            duration: durNum,
-            mode: this.data.kModeValues[this.data.kModeIdx],
-            aspect_ratio: this.data.aspectValues[this.data.aspectIdx],
-            image_base64: frameB64,
-            model_name: this.data.klingModelIds[this.data.klingModelIdx],
-          })
-          if (!r.ok) {
-            this.setData({ err: r.message })
-            return
-          }
-          const done = await this.pollVideo('kling', r.pollKind, r.taskId, (t) => this.setData({ progress: t }))
-          if (!done.ok || !done.videoUrl) return
-          urlOut = done.videoUrl
-        }
-      } else {
-        this.setData({ err: '长视频合成当前在小程序端仅完整支持灵祺视频模型1；请切换模型或使用电脑端。' })
-        return
-      }
-      segmentUrls.push(urlOut)
-      lastUrl = urlOut
-    }
-    this.setData({
-      resultUrl: lastUrl,
-      resultSegments: segmentUrls,
-      hint: `已生成 ${segmentUrls.length} 段。网页端可自动拼接；下方可逐段预览。`,
-    })
-    await this.chargeShortvideo(`longform-gen-${Date.now()}`, plan.prompts.length * 10)
+  addScriptRow() {
+    const seg = Number(this.data.sdDurationValues[this.data.sdDurationIdx]) || 5
+    this.setData({ scriptRows: scriptTable.appendEmptyScriptRow(this.data.scriptRows, seg) })
   },
 
-  async submitOptimize() {
-    this.resetOutputs()
-    const vErr = this.validateEngine() || this.validateLongform()
-    if (vErr) {
-      this.setData({ err: vErr })
+  removeScriptRow(e) {
+    const idx = Number(e.currentTarget.dataset.idx)
+    this.setData({ scriptRows: scriptTable.removeScriptRowAt(this.data.scriptRows, idx, 2) })
+  },
+
+  moveScriptRow(e) {
+    const idx = Number(e.currentTarget.dataset.idx)
+    const dir = e.currentTarget.dataset.dir
+    const to = dir === 'up' ? idx - 1 : idx + 1
+    this.setData({ scriptRows: scriptTable.moveScriptRow(this.data.scriptRows, idx, to) })
+  },
+
+  async planScriptRows() {
+    const txt = String(this.data.cabinPrompt || this.data.genPrompt || '').trim()
+    if (txt.length < 8) {
+      this.setData({ err: '请先在 Agent 舱输入创作主题（至少 8 字），再 AI 规划分镜。' })
       return
     }
-    const p = String(this.data.optPrompt || '').trim()
-    if (!p) {
-      this.setData({ err: '请输入「希望如何改短视频」的描述。' })
-      return
-    }
-    if (!this._frameB64) {
-      this.setData({ err: '请上传源视频（自动截帧）或一张参考图像。' })
-      return
-    }
-    this._cancelPoll = false
-    if (!(await this.ensureShortvideoAffordable())) return
-    this.setData({ busy: true, progress: '排队中……' })
+    this.setData({ busy: true, progress: 'AI 规划分镜中…', err: '' })
     try {
-      if (this.data.longformEnabled) {
-        await this.runLongformOptimize()
+      const plan = await videoAi.postLongformVideoPlan({
+        plannerModel: this.data.plannerModel,
+        overallPrompt: txt,
+        segmentCount: this.data.longformSegmentCount || 4,
+        mode: 'generate_text',
+      })
+      if (!plan.ok) {
+        this.setData({ err: plan.message })
         return
       }
-      const durNum = this.data.durationValues[this.data.durationIdx] === '10' ? 10 : 5
-      if (this.data.engine === 'kling') {
-        const r = await videoAi.postKlingStart({
-          kind: 'image2video',
-          prompt: p,
-          negative_prompt: String(this.data.optNegative || '').trim(),
-          duration: durNum,
-          mode: this.data.kModeValues[this.data.kModeIdx],
-          aspect_ratio: this.data.aspectValues[this.data.aspectIdx],
-          image_base64: this._frameB64,
-          model_name: this.data.klingModelIds[this.data.klingModelIdx],
-        })
-        if (!r.ok) {
-          this.setData({ err: r.message })
-          return
-        }
-        const done = await this.pollVideo('kling', r.pollKind, r.taskId, (t) => this.setData({ progress: t }))
-        if (done.ok && done.videoUrl) {
-          this.setData({ resultUrl: done.videoUrl })
-          await this.chargeShortvideo(r.taskId, durNum)
-        } else if (!this.shouldCancel()) this.setData({ err: done.message || '生成未完成' })
-      } else {
-        const r = await videoAi.postSeedanceStart({
-          model: this.data.sdModelIds[this.data.sdModelIdx],
-          prompt: p,
-          flags: this.seedanceFlagsLine(),
-          images_base64: [`data:image/jpeg;base64,${this._frameB64}`],
-        })
-        if (!r.ok) {
-          this.setData({ err: r.message })
-          return
-        }
-        const done = await this.pollVideo('seedance', null, r.taskId, (t) => this.setData({ progress: t }))
-        if (done.ok && done.videoUrl) {
-          this.setData({ resultUrl: done.videoUrl })
-          await this.chargeShortvideo(r.taskId, durNum)
-        } else if (!this.shouldCancel()) this.setData({ err: done.message || '生成未完成' })
-      }
+      const rows = scriptTable.promptsFromLongformPlan(plan.prompts)
+      this.setData({
+        scriptRows: rows,
+        longformEnabled: true,
+        hint: `已规划 ${rows.length} 个分镜，可编辑后点「开始创作」。`,
+      })
     } finally {
       this.setData({ busy: false, progress: '' })
     }
   },
 
+  applyFlowboard() {
+    const rows = this.data.scriptRows || []
+    if (!rows.length) {
+      wx.showToast({ title: '流程板为空', icon: 'none' })
+      return
+    }
+    this.setData({
+      mainPane: 'generate',
+      longformEnabled: true,
+      hint: '已应用流程板分镜，可在生成台出片。',
+    })
+    wx.showToast({ title: '已写回分镜表', icon: 'success' })
+  },
+
+  async runFlowboardGenerate() {
+    this.applyFlowboard()
+    this.setData({ longformEnabled: true })
+    await this.submitGenerate()
+  },
+
+  /* —— 案例 / 配乐 —— */
+  previewCase(e) {
+    const id = e.currentTarget.dataset.id
+    const c = casesLib.findCase(id)
+    if (!c || !c.videoUrl) {
+      wx.showToast({ title: '暂无预览', icon: 'none' })
+      return
+    }
+    this.setData({ casePreviewUrl: c.videoUrl })
+  },
+
+  closeCasePreview() {
+    this.setData({ casePreviewUrl: '' })
+  },
+
+  applyCase(e) {
+    const id = e.currentTarget.dataset.id
+    const c = casesLib.findCase(id)
+    if (!c) return
+    const rows =
+      c.canvasScriptRows && c.canvasScriptRows.length
+        ? c.canvasScriptRows.map((r, i) =>
+            Object.assign({}, r, { _id: `case-${id}-${i}` }),
+          )
+        : null
+    const patch = {
+      cabinPrompt: c.prompt || c.genPrompt || '',
+      genPrompt: c.prompt || c.genPrompt || '',
+      skillId: c.skillId || null,
+      skillName: (skillsLib.findShortVideoSkill(c.skillId) || {}).name || '',
+      longformEnabled: Boolean(c.longform),
+      mainPane: 'generate',
+      studioModeId: 'agent',
+      hint: `已套用案例「${c.title}」`,
+    }
+    if (c.aspect) {
+      const aix = this.data.sdAspectValues.indexOf(c.aspect)
+      if (aix >= 0) patch.sdAspectIdx = aix
+    }
+    if (rows) {
+      patch.scriptRows = rows
+    } else if (c.longform || c.hasNarration) {
+      const shots = [
+        { visual: (c.prompt || c.genPrompt || '').slice(0, 80), dialogue: c.narrationScript || '' },
+        { visual: c.subtitle || '中段主体特写与运镜', dialogue: '' },
+        { visual: '收尾口播与行动号召', dialogue: c.narrationScript || '' },
+      ]
+      patch.scriptRows = casesLib.withCaseCanvasTimeRanges(c.durationSec || 15, shots).map((r, i) =>
+        Object.assign({}, r, { _id: `case-${id}-${i}` }),
+      )
+    }
+    this.setData(patch, () => this.refreshBriefHints())
+    wx.showToast({ title: '已做同款', icon: 'success' })
+  },
+
+  refreshMusicList() {
+    this.setData({ musicList: musicLib.listMusicByMood(this.data.musicMood) })
+  },
+
+  onMusicMood(e) {
+    const mood = e.currentTarget.dataset.mood
+    this.setData({ musicMood: mood, musicList: musicLib.listMusicByMood(mood) })
+  },
+
+  _stopMusic() {
+    if (this._audioCtx) {
+      try {
+        this._audioCtx.stop()
+        this._audioCtx.destroy()
+      } catch (_) {}
+      this._audioCtx = null
+    }
+    this.setData({ playingMusicId: '' })
+  },
+
+  toggleMusicPreview(e) {
+    const id = e.currentTarget.dataset.id
+    const track = musicLib.findMusicTrack(id)
+    if (!track || !track.previewUrl) {
+      wx.showToast({ title: '暂无试听', icon: 'none' })
+      return
+    }
+    if (this.data.playingMusicId === id) {
+      this._stopMusic()
+      return
+    }
+    this._stopMusic()
+    const ctx = wx.createInnerAudioContext()
+    ctx.src = track.previewUrl
+    ctx.onEnded(() => this.setData({ playingMusicId: '' }))
+    ctx.onError(() => {
+      wx.showToast({ title: '试听失败', icon: 'none' })
+      this.setData({ playingMusicId: '' })
+    })
+    ctx.play()
+    this._audioCtx = ctx
+    this.setData({ playingMusicId: id })
+  },
+
+  selectMusic(e) {
+    const id = e.currentTarget.dataset.id
+    const track = musicLib.findMusicTrack(id)
+    if (!track) return
+    this.setData({
+      selectedMusicId: id,
+      selectedMusicTitle: track.title,
+      hint: `已选用配乐「${track.title}」，生成后可自动混音。`,
+    })
+    wx.showToast({ title: '已选用', icon: 'success' })
+  },
+
+  clearMusic() {
+    this.setData({ selectedMusicId: '', selectedMusicTitle: '' })
+  },
+
+  async maybeMuxMusic(videoUrl) {
+    const track = musicLib.findMusicTrack(this.data.selectedMusicId)
+    if (!track || !track.previewUrl || !videoUrl) return videoUrl
+    this.setData({ progress: '混入配乐中…' })
+    const r = await videoAi.postMuxAudio({
+      videoUrl,
+      audioUrl: track.previewUrl,
+      bgmUrl: track.previewUrl,
+      bgmVolume: 0.35,
+    })
+    if (r.ok && r.videoUrl) {
+      this.setData({ hint: (this.data.hint || '') + ` · 已混入「${track.title}」` })
+      return r.videoUrl
+    }
+    this.setData({ hint: (this.data.hint || '') + ` · 配乐混音跳过：${r.message || ''}` })
+    return videoUrl
+  },
+
+  async maybePostProcess(videoUrl) {
+    if (!videoUrl) return videoUrl
+    const style = this.data.subtitleStyleId
+    if (!style || style === 'bottom-safe') return videoUrl
+    this.setData({ progress: '字幕板式后处理…' })
+    const r = await videoAi.postVideoPostProcess({
+      videoUrl,
+      subtitleStyle: style,
+    })
+    if (r.ok && r.videoUrl) return r.videoUrl
+    return videoUrl
+  },
+
+  async saveResultAlbum() {
+    const url = this.data.resultUrl
+    if (!url) return
+    this.setData({ downloadBusy: true })
+    const r = await videoAi.saveVideoToAlbum(url)
+    this.setData({ downloadBusy: false })
+    if (r.ok) wx.showToast({ title: '已保存到相册', icon: 'success' })
+    else wx.showToast({ title: r.message || '保存失败', icon: 'none' })
+  },
+
+  async runLongformFromScriptOrPlan() {
+    const txt = String(this.data.cabinPrompt || this.data.genPrompt || '').trim()
+    let prompts = []
+    const fromScript = scriptTable.buildPlanFromScriptRows(
+      this.data.scriptRows,
+      this.data.longformSegmentCount,
+    )
+    if (fromScript && fromScript.prompts.length >= 2) {
+      prompts = fromScript.prompts
+    } else {
+      const plan = await videoAi.postLongformVideoPlan({
+        plannerModel: this.data.plannerModel,
+        overallPrompt: txt || '生成连贯营销短片',
+        segmentCount: this.data.longformSegmentCount,
+        mode: this.data.genMode === 'frames' ? 'generate_frames' : 'generate_text',
+      })
+      if (!plan.ok) {
+        this.setData({ err: plan.message })
+        return
+      }
+      prompts = plan.prompts
+      this.setData({ scriptRows: scriptTable.promptsFromLongformPlan(prompts) })
+    }
+
+    const segmentUrls = []
+    let lastFrameB64 = ''
+    const durNum = Number(this.data.sdDurationValues[this.data.sdDurationIdx]) || 10
+    const model = this.data.sdModelIds[this.data.sdModelIdx]
+
+    const downloadImageAsDataUrl = (url) =>
+      new Promise((resolve) => {
+        if (!url) {
+          resolve('')
+          return
+        }
+        if (/^data:image\//i.test(url)) {
+          resolve(url)
+          return
+        }
+        wx.downloadFile({
+          url,
+          success: async (res) => {
+            if (res.statusCode !== 200 || !res.tempFilePath) {
+              resolve('')
+              return
+            }
+            try {
+              const b64 = await readFsBase64(res.tempFilePath)
+              resolve(b64 ? `data:image/jpeg;base64,${b64}` : '')
+            } catch (_) {
+              resolve('')
+            }
+          },
+          fail: () => resolve(''),
+        })
+      })
+
+    for (let i = 0; i < prompts.length; i++) {
+      if (this.shouldCancel()) {
+        this.setData({ hint: '已取消长视频生成。' })
+        return
+      }
+      this.setData({ progress: `长片 ${i + 1}/${prompts.length} · Seedance 生成中…` })
+      const segPrompt = this.appendNativeAv(prompts[i])
+      const images = []
+      if (i > 0 && lastFrameB64) {
+        images.push(lastFrameB64)
+      } else if (i === 0 && this._frameB64) {
+        images.push(`data:image/jpeg;base64,${this._frameB64}`)
+      } else if (i === 0 && (this._storyB64List || [])[0]) {
+        images.push(`data:image/jpeg;base64,${this._storyB64List[0]}`)
+      }
+      const body = {
+        model,
+        prompt: segPrompt,
+        flags: this.seedanceFlagsLine(durNum),
+      }
+      if (images.length) body.images_base64 = images
+      // eslint-disable-next-line no-await-in-loop
+      const r = await videoAi.postSeedanceStart(body)
+      if (!r.ok) {
+        this.setData({ err: r.message })
+        return
+      }
+      // eslint-disable-next-line no-await-in-loop
+      const done = await this.pollVideo('seedance', null, r.taskId, (t) => this.setData({ progress: t }))
+      if (!done.ok || !done.videoUrl) {
+        if (!this.shouldCancel()) this.setData({ err: (done && done.message) || '分段生成失败' })
+        return
+      }
+      segmentUrls.push(done.videoUrl)
+      this.setData({ progress: `长片 ${i + 1}/${prompts.length} · 抽取尾帧…` })
+      // eslint-disable-next-line no-await-in-loop
+      const lf = await videoAi.postLastFrame({ videoUrl: done.videoUrl })
+      if (lf.ok && lf.imageUrl) {
+        // eslint-disable-next-line no-await-in-loop
+        lastFrameB64 = await downloadImageAsDataUrl(lf.imageUrl)
+      } else {
+        lastFrameB64 = ''
+      }
+    }
+
+    let finalUrl = segmentUrls[segmentUrls.length - 1]
+    if (segmentUrls.length >= 2) {
+      this.setData({ progress: '拼接成片中…' })
+      const cat = await videoAi.postConcatUrls({ urls: segmentUrls, videoUrls: segmentUrls })
+      if (cat.ok && cat.videoUrl) finalUrl = cat.videoUrl
+      else {
+        this.setData({
+          resultUrl: finalUrl,
+          resultSegments: segmentUrls,
+          hint: `已生成 ${segmentUrls.length} 段，拼接失败：${cat.message || ''}。可逐段预览。`,
+        })
+        await this.chargeShortvideo(`longform-${Date.now()}`, prompts.length * durNum)
+        return
+      }
+    }
+    finalUrl = await this.maybeMuxMusic(finalUrl)
+    finalUrl = await this.maybePostProcess(finalUrl)
+    this.setData({
+      resultUrl: finalUrl,
+      resultSegments: segmentUrls,
+      hint: `长片已拼接完成（${segmentUrls.length} 段）。`,
+    })
+    await this.chargeShortvideo(`longform-${Date.now()}`, prompts.length * durNum)
+  },
+
+  async submitCabin() {
+    await this.submitGenerate()
+  },
+
   async submitGenerate() {
     this.resetOutputs()
+    // 默认 Seedance；Kling 仅高级折叠
+    if (this.data.engine !== 'kling') this.setData({ engine: 'seedance' })
     const vErr = this.validateEngine() || this.validateLongform()
     if (vErr) {
       this.setData({ err: vErr })
       return
     }
-    let txt = String(this.data.genPrompt || '').trim()
+    let txt = String(this.data.cabinPrompt || this.data.genPrompt || '').trim()
+    const skill = skillsLib.findShortVideoSkill(this.data.skillId)
+    if (skill && txt && !txt.includes('【Skill·')) {
+      txt = skillsLib.composeSkillPrompt(skill, txt)
+    }
     const imgs = (this._storyB64List || [])
       .filter(Boolean)
       .map((b) => `data:image/jpeg;base64,${b}`)
-    if (this.data.genMode === 'text' && !txt) {
-      this.setData({ err: '请用文字描述成片内容。' })
+    if (!txt && !imgs.length && !scriptTable.isScriptRowsUsable(this.data.scriptRows)) {
+      this.setData({ err: '请用文字描述成片内容，或完善分镜表。' })
       return
     }
-    if (this.data.genMode === 'frames' && !imgs.length && !txt) {
-      this.setData({ err: '请填写执导文案或上传至少一张分镜画面。' })
-      return
+    if (txt) {
+      const gate = videoGenBrief.prepareBriefGate(txt, skill)
+      if (!gate.ok) {
+        this.setData({ err: gate.message })
+        return
+      }
+      txt = gate.guidance
+      this.setData({ genPrompt: txt, cabinPrompt: txt })
     }
-    const gate = videoGenBrief.prepareBriefGate(txt || `按 ${imgs.length} 张分镜参考生成短片`, null)
-    if (!gate.ok) {
-      this.setData({ err: gate.message })
-      return
-    }
-    txt = gate.guidance
-    this.setData({ genPrompt: txt })
     this._cancelPoll = false
     if (!(await this.ensureShortvideoAffordable())) return
     this.setData({ busy: true, progress: '排队中……' })
     try {
-      if (this.data.longformEnabled) {
-        await this.runLongformGenerate()
+      if (this.data.longformEnabled || scriptTable.isScriptRowsUsable(this.data.scriptRows)) {
+        if (this.data.engine === 'kling') {
+          this.setData({ err: '长片闭环请使用灵祺视频（Seedance）；可在高级选项切回后关闭长片。' })
+          return
+        }
+        await this.runLongformFromScriptOrPlan()
         return
       }
-      const durNum = this.data.durationValues[this.data.durationIdx] === '10' ? 10 : 5
+      const durNum = Number(this.data.sdDurationValues[this.data.sdDurationIdx]) || 5
       if (this.data.engine === 'kling') {
-        if (this.data.genMode === 'text') {
-          const r = await videoAi.postKlingStart({
-            kind: 'text2video',
-            prompt: txt,
-            duration: durNum,
-            mode: this.data.kModeValues[this.data.kModeIdx],
-            aspect_ratio: this.data.aspectValues[this.data.aspectIdx],
-            model_name: this.data.klingModelIds[this.data.klingModelIdx],
-          })
-          if (!r.ok) {
-            this.setData({ err: r.message })
-            return
-          }
-          const done = await this.pollVideo('kling', r.pollKind, r.taskId, (t) => this.setData({ progress: t }))
-          if (done.ok && done.videoUrl) {
-            this.setData({ resultUrl: done.videoUrl })
-            await this.chargeShortvideo(r.taskId, durNum)
-          } else if (!this.shouldCancel()) this.setData({ err: done.message || '生成未完成' })
-          return
-        }
-        if (!imgs.length) {
-          this.setData({ err: '分镜模式下至少需要一张示意画面。' })
-          return
-        }
-        const shotsNote = imgs.length > 1 ? `（共 ${imgs.length} 张参考图，按顺序串联镜头）。` : ''
         const r = await videoAi.postKlingStart({
-          kind: 'image2video',
-          prompt: txt ? `${txt}\n${shotsNote}` : `按图示画面延展动态${shotsNote}`.trim(),
-          duration: durNum,
+          kind: imgs.length ? 'image2video' : 'text2video',
+          prompt: txt,
+          duration: Math.min(10, durNum),
           mode: this.data.kModeValues[this.data.kModeIdx],
           aspect_ratio: this.data.aspectValues[this.data.aspectIdx],
-          image_base64: imgs[0].replace(/^data:image\/[^;]+;base64,/, ''),
+          image_base64: imgs.length ? imgs[0].replace(/^data:image\/[^;]+;base64,/, '') : undefined,
           model_name: this.data.klingModelIds[this.data.klingModelIdx],
         })
         if (!r.ok) {
@@ -927,30 +1195,34 @@ Page({
         }
         const done = await this.pollVideo('kling', r.pollKind, r.taskId, (t) => this.setData({ progress: t }))
         if (done.ok && done.videoUrl) {
-          this.setData({ resultUrl: done.videoUrl })
+          let url = done.videoUrl
+          url = await this.maybeMuxMusic(url)
+          this.setData({ resultUrl: url })
           await this.chargeShortvideo(r.taskId, durNum)
         } else if (!this.shouldCancel()) this.setData({ err: done.message || '生成未完成' })
-      } else {
-        const textBlock =
-          this.data.genMode === 'text'
-            ? txt
-            : txt || `连贯演绎 ${imgs.length || 1} 张示意画面构成的短片。`
-        const r = await videoAi.postSeedanceStart({
-          model: this.data.sdModelIds[this.data.sdModelIdx],
-          prompt: textBlock,
-          flags: this.seedanceFlagsLine(),
-          images_base64: imgs.length ? imgs : undefined,
-        })
-        if (!r.ok) {
-          this.setData({ err: r.message })
-          return
-        }
-        const done = await this.pollVideo('seedance', null, r.taskId, (t) => this.setData({ progress: t }))
-        if (done.ok && done.videoUrl) {
-          this.setData({ resultUrl: done.videoUrl })
-          await this.chargeShortvideo(r.taskId, durNum)
-        } else if (!this.shouldCancel()) this.setData({ err: done.message || '生成未完成' })
+        return
       }
+      const prompt = this.appendNativeAv(txt || `连贯演绎 ${imgs.length || 1} 张示意画面构成的短片。`)
+      const body = {
+        model: this.data.sdModelIds[this.data.sdModelIdx],
+        prompt,
+        flags: this.seedanceFlagsLine(),
+      }
+      if (imgs.length) body.images_base64 = imgs
+      else if (this._frameB64) body.images_base64 = [`data:image/jpeg;base64,${this._frameB64}`]
+      const r = await videoAi.postSeedanceStart(body)
+      if (!r.ok) {
+        this.setData({ err: r.message })
+        return
+      }
+      const done = await this.pollVideo('seedance', null, r.taskId, (t) => this.setData({ progress: t }))
+      if (done.ok && done.videoUrl) {
+        let url = done.videoUrl
+        url = await this.maybeMuxMusic(url)
+        url = await this.maybePostProcess(url)
+        this.setData({ resultUrl: url })
+        await this.chargeShortvideo(r.taskId, durNum)
+      } else if (!this.shouldCancel()) this.setData({ err: done.message || '生成未完成' })
     } finally {
       this.setData({ busy: false, progress: '' })
     }
@@ -960,6 +1232,73 @@ Page({
     const u = this.data.resultUrl
     if (!u) return
     wx.setClipboardData({ data: u })
+  },
+
+  async runSmartBatch() {
+    if (!this.data.smartBatchEnabled) {
+      this.setData({ iceErr: '运营台未开启智能混剪（smart-batch）' })
+      return
+    }
+    if (!this.data.briefOk) {
+      this.setData({ iceErr: '请先填写剪辑指令（≥4 字）' })
+      return
+    }
+    const mediaUrls = (this.data.jobs || [])
+      .filter((j) => j.mediaUrl)
+      .map((j) => j.mediaUrl)
+    const imageUrls = (this.data.imageItems || []).map((x) => x.mediaUrl)
+    if (mediaUrls.length + imageUrls.length < 2) {
+      this.setData({ iceErr: '智能混剪至少需要 2 个素材（视频或图片）' })
+      return
+    }
+    if (!(await this.ensureCloudEditAffordable())) return
+    const aspect = this.getIceAspect()
+    this.setData({ smartBatchBusy: true, iceBusy: true, iceErr: '', iceHint: '智能混剪提交中…' })
+    try {
+      const body = {
+        mediaUrls,
+        imageUrls,
+        editBrief: this.resolveEditBriefForSubmit(),
+        width: aspect.width,
+        height: aspect.height,
+        clipEndSec: Number(this.data.clipEndSec) || 10,
+        subtitleStyle: this.data.subtitleStyleId,
+        scriptRows: this.data.scriptRows,
+      }
+      const music = musicLib.findMusicTrack(this.data.selectedMusicId)
+      if (music) body.bgmUrl = music.previewUrl
+      const r = await videoAi.postIceSmartBatch(body)
+      if (!r.ok) {
+        this.setData({ iceErr: r.message })
+        return
+      }
+      const done = await videoAi.pollIceSmartBatch(r.batchJobId, (t) => this.setData({ iceHint: t }))
+      if (!done.ok) {
+        this.setData({ iceErr: done.message })
+        return
+      }
+      const localId = iceCloud.newJobId()
+      const prev = this.data.jobs || []
+      this.setData({
+        jobs: prev.concat([
+          {
+            id: localId,
+            label: '智能混剪成片',
+            mediaUrl: done.downloadUrl,
+            previewUrl: done.downloadUrl || done.previewUrl,
+            phase: 'done',
+            exportId: r.batchJobId,
+            message: '智能混剪完成',
+          },
+        ]),
+        iceHint: '智能混剪完成',
+        latestDonePreview: done.downloadUrl || done.previewUrl,
+      })
+      await this.chargeCloudEdit(r.batchJobId)
+      this.syncIceDerived()
+    } finally {
+      this.setData({ smartBatchBusy: false, iceBusy: false })
+    }
   },
 
   /* —— 灵祺云剪 —— */
