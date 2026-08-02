@@ -19,6 +19,37 @@
   backdrop-filter: blur(12px);
 }
 
+.agent-workspace-tabs {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 99;
+  display: flex;
+  gap: 12rpx;
+  padding: 12rpx 20rpx 14rpx;
+  background: rgba(248, 250, 252, 0.96);
+  border-bottom: 1rpx solid rgba(15, 23, 42, 0.06);
+}
+
+.ws-tab {
+  flex: 1;
+  text-align: center;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #475569;
+  background: #fff;
+  border: 1rpx solid #e2e8f0;
+  border-radius: 999rpx;
+  padding: 14rpx 8rpx;
+}
+
+.ws-tab.on {
+  color: #fff;
+  background: #4f46e5;
+  border-color: #4f46e5;
+  box-shadow: 0 6rpx 16rpx rgba(79, 70, 229, 0.28);
+}
+
 .agent-top-center {
   display: flex;
   flex-direction: column;

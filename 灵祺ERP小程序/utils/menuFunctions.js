@@ -146,7 +146,7 @@ const FUNCTION_SECTIONS = [
       {
         kind: 'link',
         url: '/pages/shortvideo-ai/shortvideo-ai',
-        title: '短视频处理',
+        title: '短视频出片',
         desc: '剪辑与创作',
         iconKey: 'play',
       },

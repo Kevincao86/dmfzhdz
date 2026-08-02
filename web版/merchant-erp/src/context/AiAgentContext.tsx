@@ -1503,7 +1503,11 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
                       setMessages((prev) =>
                         prev.map((m) =>
                           m.id === placeholder.id
-                            ? { ...m, content: displayPartial || ev.text.trim() }
+                            ? {
+                                ...m,
+                                // 流式阶段也不回退到原始 JSON，避免英文键闪现
+                                content: displayPartial || '正在生成方案…',
+                              }
                             : m,
                         ),
                       )
@@ -1563,13 +1567,16 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           visibleRaw,
           taskType ?? inferTaskTypeFromText(trimmed),
         )
+        // 始终走 formatAssistantDisplayText：剥离预览 JSON / 英文键，避免气泡出现机器码
         const rawSummary = summarizeAssistantContent(visibleRaw)
-        let display =
-          deferPreview || isPlanDesignQuery(trimmed)
-            ? formatAssistantDisplayText(visibleRaw)
-            : formatAssistantDisplayText(rawSummary ?? visibleRaw)
+        let display = formatAssistantDisplayText(
+          deferPreview || isPlanDesignQuery(trimmed) ? visibleRaw : rawSummary ?? visibleRaw,
+        )
         if (!display.trim()) {
-          display = formatAssistantDisplayText(thinking.trim() || res.content.trim())
+          display =
+            formatAssistantDisplayText(thinking.trim() || res.content.trim()) ||
+            rawSummary ||
+            '已生成方案说明，请继续对话或确认下方预览。'
         }
 
         if (deferPreview && !isInformationalOnlyQuery(trimmed)) {

@@ -41,7 +41,7 @@ module.exports.MODULE_COPY = {
     body: '与电脑端「灵祺视觉工坊」同源：选渠道与玩法 → AI 文案包 → 参考图对齐 → 一键出图并保存相册；积分规则与 Web 一致（文案 3 积分/次、常规生图 8 积分/张、高级 GPT Image 2 为 150 积分/张）。',
   },
   shortvideo_ai: {
-    navTitle: '短视频处理',
+    navTitle: '短视频出片',
     body: '参考图生视频、纯文案短片与 ICE 云剪任务经商家后台 BFF 与电脑端一致；混剪支持「智能（按内容自动转场）」；长视频分镜策划等高级能力请在电脑端使用。',
   },
   shortvideo: {

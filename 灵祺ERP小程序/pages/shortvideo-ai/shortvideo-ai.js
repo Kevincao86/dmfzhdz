@@ -9,6 +9,7 @@ const videoGenBrief = require('../../utils/videoGenBrief.js')
 
 const {
   MAIN_TABS,
+  STUDIO_MODES,
   KLING_MODEL_OPTIONS,
   KLING_DEFAULT_MODEL_ID,
   VIDEO_ENGINE_LABEL_KLING,
@@ -54,6 +55,9 @@ Page({
   data: {
     mainTabs: MAIN_TABS,
     mainPane: 'generate',
+    studioModes: STUDIO_MODES,
+    studioModeId: 'video',
+    desktopPaneTip: '',
 
     engineLabelKling: VIDEO_ENGINE_LABEL_KLING,
     engineLabelSeedance: VIDEO_ENGINE_LABEL_SEEDANCE,
@@ -390,9 +394,41 @@ Page({
 
   onMainTab(e) {
     const id = e.currentTarget.dataset.id
-    if (!id || id === this.data.mainPane) return
+    if (!id) return
+    const tab = (MAIN_TABS || []).find((t) => t.id === id)
+    if (tab && tab.native === false) {
+      this.setData({
+        desktopPaneTip: `「${tab.label}」完整能力在电脑端商家 ERP「短视频出片」中可用；小程序请用「短视频生成 / AI混剪」。`,
+        mainPane: this.data.mainPane === 'cloud_batch' ? 'cloud_batch' : 'generate',
+      })
+      wx.showToast({ title: '完整版请用电脑端', icon: 'none' })
+      return
+    }
+    if (id === this.data.mainPane) return
     this.resetOutputs()
-    this.setData({ mainPane: id })
+    this.setData({ mainPane: id, desktopPaneTip: '' })
+  },
+
+  onStudioMode(e) {
+    const id = e.currentTarget.dataset.id
+    const mode = (STUDIO_MODES || []).find((m) => m.id === id)
+    if (!mode) return
+    this.setData({ studioModeId: id })
+    if (mode.href) {
+      wx.navigateTo({ url: mode.href })
+      return
+    }
+    if (mode.pane === 'music' || mode.pane === 'canvas' || mode.pane === 'cases') {
+      this.setData({
+        desktopPaneTip: `「${mode.label}」完整能力在电脑端商家 ERP 短视频出片台；小程序可先用视频生成 / AI混剪。`,
+      })
+      wx.showToast({ title: '完整版请用电脑端', icon: 'none' })
+      return
+    }
+    if (mode.pane) {
+      this.resetOutputs()
+      this.setData({ mainPane: mode.pane, desktopPaneTip: '' })
+    }
   },
 
   onEngine(e) {

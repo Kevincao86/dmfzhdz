@@ -156,9 +156,79 @@ export function summarizeAssistantContent(content: string): string | null {
       return title || '已理解您的达人招募需求，请在下方查看图文 Brief 并确认。'
     case 'file_tax':
       return title || '已理解您的报税需求，请在下方核对各平台汇总后确认一键报税。'
+    case 'generate_copywriting':
+      return title || '已准备推广文案方案，请在下方预览中确认后继续。'
+    case 'analyze_exception':
+      return title || '已完成异常诊断，请查看下方结论与待办，确认后再执行写操作。'
+    case 'sync_platform':
+      return title || '已整理平台同步方案，请在下方确认后继续。'
+    case 'handle_review':
+      return title || '已准备评价处理方案，请在下方确认后继续。'
+    case 'optimize_local_ads':
+      return title || '已准备本地推优化方案，请在下方确认后继续。'
+    case 'follow_local_lead':
+      return title || '已准备线索跟进方案，请在下方确认后继续。'
     default:
       return title || '请在下方确认执行预览后继续。'
   }
+}
+
+const AGENT_MACHINE_JSON_HINT =
+  /"(?:confirmRequired|confirm_required|actionType|action_type|originalId|stepId|requiredPermissions|riskLevel|previewSteps)"/
+
+function looksLikeAgentMachineJson(slice: string): boolean {
+  return AGENT_MACHINE_JSON_HINT.test(slice)
+}
+
+/** 去掉助手回复中供系统解析的预览 JSON（含英文键），避免气泡出现乱码/英文字段 */
+export function stripAgentMachineJsonFromDisplay(content: string): string {
+  let s = String(content || '')
+  s = s.replace(/```(?:json)?\s*[\s\S]*?```/gi, '\n')
+
+  let out = ''
+  let i = 0
+  while (i < s.length) {
+    if (s[i] !== '{') {
+      out += s[i]
+      i += 1
+      continue
+    }
+    let depth = 0
+    let j = i
+    let inStr = false
+    let esc = false
+    for (; j < s.length; j += 1) {
+      const ch = s[j]!
+      if (inStr) {
+        if (esc) esc = false
+        else if (ch === '\\') esc = true
+        else if (ch === '"') inStr = false
+        continue
+      }
+      if (ch === '"') {
+        inStr = true
+        continue
+      }
+      if (ch === '{') depth += 1
+      else if (ch === '}') {
+        depth -= 1
+        if (depth === 0) {
+          j += 1
+          break
+        }
+      }
+    }
+    const slice = s.slice(i, j)
+    if (looksLikeAgentMachineJson(slice)) {
+      i = j
+      if (out && !/\s$/.test(out)) out += '\n'
+      continue
+    }
+    out += slice
+    i = j
+  }
+
+  return out.replace(/\n{3,}/g, '\n\n').trim()
 }
 
 /** 从用户描述提取商品名/标题草稿 */
@@ -358,17 +428,24 @@ export function parsePriceYuanFromApi(raw: unknown): number | undefined {
   return undefined
 }
 
-/** 去除助手回复中的 Markdown 装饰符（#、* 等），便于对话区整洁展示 */
+/** 去除助手回复中的 Markdown 装饰符与机器 JSON，便于对话区整洁展示（不向用户展示英文键） */
 export function formatAssistantDisplayText(content: string): string {
   if (!content?.trim()) return content
+  const summary = summarizeAssistantContent(content)
   let s = resolveAssistantVisibleText(content)
   s = s.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+  s = stripAgentMachineJsonFromDisplay(s)
   s = s.replace(/^#{1,6}\s+/gm, '')
   s = s.replace(/\*\*([^*]+)\*\*/g, '$1')
   s = s.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '$1')
   s = s.replace(/^-{3,}\s*$/gm, '')
-  s = s.replace(/\n{3,}/g, '\n\n')
-  return s.trim()
+  s = s.replace(/\n{3,}/g, '\n\n').trim()
+  if (!s && summary) return summary
+  // 若剥离后仍残留大量英文键，整段改用中文摘要
+  if (AGENT_MACHINE_JSON_HINT.test(s) || /"originalId"\s*:/.test(s)) {
+    return summary || '方案已就绪，请在下方预览卡片中确认后继续（详情不再以代码形式展示）。'
+  }
+  return s
 }
 
 export {

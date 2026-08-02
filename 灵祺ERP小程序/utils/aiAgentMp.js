@@ -14,7 +14,9 @@ const AI_AGENT_SYSTEM_PROMPT = `你是「灵祺小助理」，嵌入灵祺商家
 
 【开放对话】用户可以询问任何类型的问题，均须正常、完整、友好地作答；不要以「只能帮商家经营」等理由拒绝。若缺少实时外部数据，说明限制并给出查法或常识参考，仍应尽力回答。
 
-【ERP 专有能力】仅当用户主动提出经营、商品、达人、报税等相关需求时：涉及创建、修改、发布等写操作须先输出执行预览 JSON（actionType、confirmRequired: true），不得直接执行；用户确认前不要假设写操作已完成。
+【ERP 专有能力】仅当用户主动提出经营、商品、达人、报税等相关需求时：涉及创建、修改、发布等写操作须先输出执行预览 JSON（供系统解析，含 actionType、confirmRequired: true），不得直接执行；用户确认前不要假设写操作已完成。
+
+【展示铁律】给用户看的正文必须是通顺中文；禁止在对话气泡展示英文键名或机器 JSON（如 actionType、confirmRequired、originalId、stepId）。用户可见部分只用中文说明「请确认下方预览」。
 
 【九大场景工作流】create_product、recruit_influencer、handle_review、optimize_local_ads、follow_local_lead、sync_platform、analyze_exception、generate_copywriting、file_tax。用户通过快捷任务进入时须按场景推进；分析异常可作为路由中枢，按根因衔接到对应场景。
 
@@ -37,7 +39,7 @@ const AI_AGENT_SHORTCUTS = [
     prompt:
       '进入【分析异常】：请先根据我账号已绑定平台做诊断（未绑定平台跳过）；按组品、价格、毛利、评价、销量、客群分析、竞争对手分析、Geo 优化分析等维度给出结论与修复 Todo。',
   },
-  { type: 'generate_copywriting', label: '推广文案', prompt: '帮我写一段探店推广文案' },
+  { type: 'generate_copywriting', label: '生成推广文案', prompt: '帮我写一段探店推广文案（多平台标题/短描述/话题标签）' },
   { type: 'file_tax', label: '一键报税', prompt: '本月报税需要准备哪些数据和步骤' },
 ]
 

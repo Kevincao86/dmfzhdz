@@ -32,6 +32,7 @@ const GRID_VISUAL = {
   AI视觉工坊: { glyph: '视', tone: 'indigo' },
   'AI 视觉工坊': { glyph: '视', tone: 'indigo' },
   短视频AI处理: { glyph: '剪', tone: 'orange' },
+  短视频出片: { glyph: '剪', tone: 'orange' },
   '短视频优化 · 看板': { glyph: '视', tone: 'orange' },
   直播间分析: { glyph: '播', tone: 'pink' },
   平台签框: { glyph: '签', tone: 'slate' },

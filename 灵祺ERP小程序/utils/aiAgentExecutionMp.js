@@ -111,6 +111,17 @@ function parseAgentActionType(content) {
     at === 'create_recruitment'
   )
     return 'recruit_influencer'
+  if (
+    at === 'generate_copywriting' ||
+    at === 'analyze_exception' ||
+    at === 'sync_platform' ||
+    at === 'handle_review' ||
+    at === 'optimize_local_ads' ||
+    at === 'follow_local_lead' ||
+    at === 'file_tax'
+  ) {
+    return at
+  }
   return undefined
 }
 
@@ -196,15 +207,93 @@ function buildPlanExecutionConsultation(taskTypes) {
   return `\n\n——\n\n若需要我按上述方案执行，请回复「确认执行」。\n将为 ${filtered.length} 项场景（${labels.join('、')}）分别生成独立预览卡片，您可在各卡片内单独确认。`
 }
 
+const AGENT_MACHINE_JSON_HINT =
+  /"(?:confirmRequired|confirm_required|actionType|action_type|originalId|stepId|requiredPermissions|riskLevel|previewSteps)"/
+
+function looksLikeAgentMachineJson(slice) {
+  return AGENT_MACHINE_JSON_HINT.test(slice)
+}
+
+/** 去掉供系统解析的预览 JSON（英文键），避免气泡出现乱码 */
+function stripAgentMachineJsonFromDisplay(content) {
+  let s = String(content || '')
+  s = s.replace(/```(?:json)?\s*[\s\S]*?```/gi, '\n')
+  let out = ''
+  let i = 0
+  while (i < s.length) {
+    if (s[i] !== '{') {
+      out += s[i]
+      i += 1
+      continue
+    }
+    let depth = 0
+    let j = i
+    let inStr = false
+    let esc = false
+    for (; j < s.length; j += 1) {
+      const ch = s[j]
+      if (inStr) {
+        if (esc) esc = false
+        else if (ch === '\\') esc = true
+        else if (ch === '"') inStr = false
+        continue
+      }
+      if (ch === '"') {
+        inStr = true
+        continue
+      }
+      if (ch === '{') depth += 1
+      else if (ch === '}') {
+        depth -= 1
+        if (depth === 0) {
+          j += 1
+          break
+        }
+      }
+    }
+    const slice = s.slice(i, j)
+    if (looksLikeAgentMachineJson(slice)) {
+      i = j
+      if (out && !/\s$/.test(out)) out += '\n'
+      continue
+    }
+    out += slice
+    i = j
+  }
+  return out.replace(/\n{3,}/g, '\n\n').trim()
+}
+
+function summarizeAssistantContent(content) {
+  const taskType = parseAgentActionType(content)
+  if (!taskType) return null
+  const labels = {
+    create_product: '已理解您的上架需求，请在下方核对预览并确认。',
+    recruit_influencer: '已理解您的达人招募需求，请在下方查看 Brief 并确认。',
+    file_tax: '已理解您的报税需求，请在下方核对后确认。',
+    generate_copywriting: '已准备推广文案方案，请在下方确认后继续。',
+    analyze_exception: '已完成异常诊断，请查看下方结论与待办。',
+    sync_platform: '已整理平台同步方案，请在下方确认后继续。',
+    handle_review: '已准备评价处理方案，请在下方确认后继续。',
+    optimize_local_ads: '已准备本地推优化方案，请在下方确认后继续。',
+    follow_local_lead: '已准备线索跟进方案，请在下方确认后继续。',
+  }
+  return labels[taskType] || '请在下方确认执行预览后继续。'
+}
+
 function formatAssistantDisplayText(content) {
+  const summary = summarizeAssistantContent(content)
   let s = String(content || '')
   s = s.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
-  s = s.replace(/```(?:json)?\s*[\s\S]*?```/gi, '')
+  s = stripAgentMachineJsonFromDisplay(s)
   s = s.replace(/^#{1,6}\s+/gm, '')
   s = s.replace(/\*\*([^*]+)\*\*/g, '$1')
   s = s.replace(/\*([^*\n]+)\*/g, '$1')
-  s = s.replace(/\n{3,}/g, '\n\n')
-  return s.trim()
+  s = s.replace(/\n{3,}/g, '\n\n').trim()
+  if (!s && summary) return summary
+  if (AGENT_MACHINE_JSON_HINT.test(s) || /"originalId"\s*:/.test(s)) {
+    return summary || '方案已就绪，请在下方预览卡片中确认后继续（详情不再以代码形式展示）。'
+  }
+  return s
 }
 
 function parsePlanIntentLabels(assistantContent) {
