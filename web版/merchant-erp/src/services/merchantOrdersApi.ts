@@ -1,7 +1,21 @@
 import { merchantErpApiCandidates } from '../lib/merchantErpApiBase'
 import { readMerchantSession } from '../lib/merchantSession'
 import { supabase } from '../lib/supabaseClient'
-import { readStorePlatformMargins } from '../lib/storeMarginsRead'
+import {
+  marginPercentForFinancePlatform,
+  readStorePlatformMargins,
+  type StorePlatformMargins,
+} from '../lib/storeMarginsRead'
+
+function shopAnalysisMarginPercent(
+  margins: StorePlatformMargins,
+  platform?: string,
+): number {
+  const p = String(platform || 'douyin').trim()
+  if (p === 'meituan') return marginPercentForFinancePlatform(margins, 'meituan')
+  if (p === 'xhs' || p === 'xiaohongshu') return marginPercentForFinancePlatform(margins, 'xhs')
+  return marginPercentForFinancePlatform(margins, 'douyin')
+}
 
 export type MerchantOrderRow = {
   id: string
@@ -134,11 +148,12 @@ export async function fetchShopAnalysis(params: {
   poiId?: string
 }): Promise<{ summary: ShopAnalysisSummary; adviceFacts: string; startDate: string; endDate: string }> {
   const margins = readStorePlatformMargins()
+  const platform = params.platform || 'douyin'
   const q = new URLSearchParams({
     startDate: params.startDate,
     endDate: params.endDate,
-    platform: params.platform || 'douyin',
-    marginPercent: String(margins.douyin || 0),
+    platform,
+    marginPercent: String(shopAnalysisMarginPercent(margins, platform) || 0),
   })
   if (params.poiId?.trim()) q.set('poiId', params.poiId.trim())
   const headers = await authHeaders()
@@ -186,6 +201,7 @@ export async function fetchShopAnalysisAi(params: {
   pointsCharged?: number
 }> {
   const margins = readStorePlatformMargins()
+  const platform = params.platform || 'douyin'
   const headers = await authHeaders({ 'Content-Type': 'application/json' })
   const j = await fetchJson('/api/meoo-shop-analysis-ai', {
     method: 'POST',
@@ -193,9 +209,9 @@ export async function fetchShopAnalysisAi(params: {
     body: JSON.stringify({
       startDate: params.startDate,
       endDate: params.endDate,
-      platform: params.platform || 'douyin',
+      platform,
       poiId: params.poiId || undefined,
-      marginPercent: margins.douyin || 0,
+      marginPercent: shopAnalysisMarginPercent(margins, platform) || 0,
     }),
   })
   return {

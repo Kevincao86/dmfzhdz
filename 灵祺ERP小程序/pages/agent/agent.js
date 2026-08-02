@@ -8,6 +8,7 @@ const registry = require('../../utils/aiModelRegistryMp.js')
 const composerMp = require('../../utils/agentComposerMp.js')
 const habitsMp = require('../../utils/agentUserHabitsMp.js')
 const supabaseRest = require('../../utils/supabaseRest.js')
+const membershipMp = require('../../utils/membershipMp.js')
 const { assetUrl } = require('../../utils/mpStaticAssets.js')
 
 const FILTER_TABS = [
@@ -82,8 +83,9 @@ Page({
     inputFocused: false,
     showPlusPanel: false,
     plusActions: composerMp.PLUS_ACTIONS,
-    shortcuts: aiAgent.AI_AGENT_SHORTCUTS,
+    shortcuts: aiAgent.shortcutsForPlan('free'),
     shortcutsOpen: false,
+    membershipPlan: 'free',
     hasChat: false,
     confirmingPreviewId: '',
     guestMode: false,
@@ -95,6 +97,7 @@ Page({
   onLoad() {
     this._executionState = execMp.createAgentExecutionState()
     this.recalcLayout()
+    void this.refreshMembershipShortcuts()
     const allModelOptions = registry.listAiModelPickerOptions()
     this._allModelOptions = allModelOptions
     this._recorder = wx.getRecorderManager()
@@ -206,6 +209,7 @@ Page({
       return
     }
     this._agentLoginPrompted = false
+    void this.refreshMembershipShortcuts()
     void (async () => {
       try {
         const app = getApp()
@@ -489,13 +493,32 @@ Page({
     this.recalcLayout()
   },
 
+  async refreshMembershipShortcuts() {
+    try {
+      const snap = await membershipMp.loadMembershipSnapshot()
+      const plan = (snap && snap.ent && snap.ent.plan) || 'free'
+      this.setData({
+        membershipPlan: plan,
+        shortcuts: aiAgent.shortcutsForPlan(plan),
+      })
+    } catch (_) {
+      this.setData({ membershipPlan: 'free', shortcuts: aiAgent.shortcutsForPlan('free') })
+    }
+  },
+
   onApplyShortcut(e) {
     if (!this.ensureAgentAuthed()) return
     const type = e.currentTarget.dataset.type
     const label = e.currentTarget.dataset.label
     if (!type || !label || this.data.busy) return
+    if (!aiAgent.membershipAllowsAiTask(this.data.membershipPlan || 'free', type)) {
+      wx.showToast({ title: '该快捷任务需升级会员', icon: 'none' })
+      return
+    }
     this.setData({ shortcutsOpen: false })
-    void this.sendTurn(`使用快捷任务：${label}`)
+    const sc = (this.data.shortcuts || []).find((s) => s.type === type)
+    const detail = sc && sc.prompt ? `\n${sc.prompt}` : ''
+    void this.sendTurn(`使用快捷任务：${label}${detail}`)
   },
 
   onOpenTaskResultNav(e) {

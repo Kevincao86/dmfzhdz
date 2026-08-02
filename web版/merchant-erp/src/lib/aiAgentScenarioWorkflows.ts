@@ -192,18 +192,24 @@ export const AI_AGENT_SCENARIO_WORKFLOWS: Record<AiTaskType, ScenarioWorkflowDef
     phaseLabel: PHASE_LABEL.P5,
     previewTitle: '异常分析任务',
     previewSteps: [
-      '聚合同步失败、审核驳回、接口报错与经营指标异常',
-      '归纳根因类别并给出修复建议',
+      '仅针对账号已绑定平台诊断；未绑定平台明确跳过',
+      '按组品/价格/毛利/评价/销量/客群/竞对/GEO 等维度输出结论',
       '高风险修复须二次确认后再执行',
     ],
     workflowSteps: [
-      '明确异常现象、时间范围与涉及平台',
-      '归类根因：权限/字段/图片/类目/投流/口碑/货盘',
-      '输出修复 Todo 并映射到对应场景（create_product / sync_platform 等）',
+      '先列出本账号已绑定平台与未绑定平台；未绑定平台一律不分析、不编造数据',
+      '明确异常现象、时间范围；仅在已绑定平台上取数',
+      '按维度诊断（有数据给结论，无数据标明缺口与补数入口）：组品、价格、毛利、评价、销量、客群分析、竞争对手分析、Geo 优化分析；可附带同步/审核等技术异常',
+      '输出修复 Todo 并映射到对应场景（create_product / sync_platform / handle_review / optimize_local_ads 等）',
       '生成预览 JSON（actionType: analyze_exception，confirmRequired: true）',
       '仅分析+建议；改库/同步须用户在各场景卡片再次确认',
     ],
-    deliverables: ['诊断报告', '根因分类', '修复 Todo'],
+    deliverables: [
+      '绑定平台清单（含跳过项）',
+      '八维度诊断报告',
+      '根因分类',
+      '修复 Todo',
+    ],
     downstream: [
       'create_product',
       'generate_copywriting',
@@ -277,7 +283,7 @@ export function buildScenarioWorkflowSystemAddon(taskType: AiTaskType): string {
   if (!def) return ''
   const downstream = def.downstream.map((t) => AI_TASK_TYPE_LABELS[t]).join('、')
   const steps = def.workflowSteps.map((s, i) => `${i + 1}. ${s}`).join('\n')
-  return [
+  const lines = [
     `【当前场景：${def.label}｜${def.phase} ${def.phaseLabel}】`,
     '须严格按下列工作流推进；写操作仅能通过执行预览 JSON（confirmRequired: true）发起，不得跳过确认。',
     '工作流步骤：',
@@ -286,8 +292,17 @@ export function buildScenarioWorkflowSystemAddon(taskType: AiTaskType): string {
     downstream ? `完成后可衔接：${downstream}` : '',
     `所需权限：${def.requiredPermissions.join('、')}`,
   ]
-    .filter(Boolean)
-    .join('\n')
+  if (taskType === 'analyze_exception') {
+    lines.push(
+      '【分析异常强制输出结构】',
+      '1) 已绑定平台（分析）/ 未绑定平台（跳过，勿编造）',
+      '2) 八维度分节：组品、价格、毛利、评价、销量、客群分析、竞争对手分析、Geo 优化分析（缺数据写「缺口：…」）',
+      '3) 可选：同步失败/审核驳回等技术异常（仅当有情报或用户描述）',
+      '4) 修复 Todo（映射下游场景）',
+      '5) 需要写操作时再给预览 JSON；禁止只列笼统「六大故障」而不做绑定过滤与维度诊断',
+    )
+  }
+  return lines.filter(Boolean).join('\n')
 }
 
 /** 多场景方案时注入闭环说明 */

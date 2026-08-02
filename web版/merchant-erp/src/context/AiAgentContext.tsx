@@ -1938,7 +1938,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       return []
     })
       const label = AI_TASK_TYPE_LABELS[taskType]
-      const line = `使用快捷任务：${label}`
+      const line =
+        taskType === 'analyze_exception'
+          ? `使用快捷任务：${label}\n进入【分析异常】：请先根据我账号已绑定平台做诊断（未绑定平台跳过）；按组品、价格、毛利、评价、销量、客群分析、竞争对手分析、Geo 优化分析等维度给出结论与修复 Todo。`
+          : `使用快捷任务：${label}`
       const userMsg = createAgentMessage('user', line)
       setMessages((prev) => {
         const next = [...prev, userMsg]
