@@ -85,8 +85,8 @@ export function loadMerchantIntelSnapshot(): MerchantIntelSnapshot {
 
 export function buildAgentMerchantIntelContextFromSnapshot(s: MerchantIntelSnapshot): string {
   const lines: string[] = [
-    '【门店经营情报 · ERP 自动注入，回复前须先阅读本段】',
-    '优先使用菜单价目；若无菜单则使用经营类目与绑定平台商品/草稿箱；所有组品须与类目一致。',
+    '【门店经营情报 · ERP 自动注入，经营类问题可参考本段】',
+    '组品/创建商品时优先使用菜单价目；若无菜单则参考经营类目与绑定平台商品/草稿箱。用户改图、改字、闲聊或其它明确指令：按用户要求执行，禁止以品类不符拒绝。',
     '本地：菜单价目表、商品页门店毛利配置、竞品分析报告、达人 Brief/招募草稿。',
     '接口（已尝试调用）：抖音来客门店列表→GEO 评分、/api/meoo-marketing-activities 平台活动、/api/meoo-competitor-analysis（无缓存时按需）、商品/菜单相关方案 API。',
   ]
@@ -110,7 +110,7 @@ export function buildAgentMerchantIntelContextFromSnapshot(s: MerchantIntelSnaps
       `菜单价目：已上传 ${s.menuImageCount} 张图，条目未识别；可结合用户附图，或提示至「店铺 → 菜单价目表」识别。`,
     )
   } else {
-    lines.push('菜单价目：暂无本地条目；须改读经营类目与下方商品/草稿箱，禁止默认按餐饮举例。')
+    lines.push('菜单价目：暂无本地条目；组品时可改读经营类目与下方商品/草稿箱。')
   }
 
   if (s.draftProductsSummary) {
@@ -149,7 +149,7 @@ export function buildAgentMerchantIntelContextFromSnapshot(s: MerchantIntelSnaps
   lines.push(formatIndustryAlignmentConstraint(s.industryPath, s.storeName))
 
   lines.push(
-    '补充说明：涉及商品组品、套餐、推广、招募等经营话题时，必须先依据本段类目/菜单/商品作答；与当前问题无关时不要主动展开。涉及 ERP 写操作（create_product 等）时须优先使用上述情报，执行预览 JSON 须 confirmRequired: true；禁止让用户重复报毛利率、完整菜单或竞品名单（除非快照与接口均为空且用户未附图）。',
+    '补充说明：涉及商品组品、套餐、推广、招募等经营话题时，优先依据本段类目/菜单/商品作答；与当前问题无关时不要主动展开，更不得以品类拦截用户请求。用户附图表述改字/换文案/改图时，直接按指令处理画面内容。涉及 ERP 写操作（create_product 等）时须优先使用上述情报，执行预览 JSON 须 confirmRequired: true；禁止让用户重复报毛利率、完整菜单或竞品名单（除非快照与接口均为空且用户未附图）。',
   )
 
   return lines.join('\n')

@@ -736,6 +736,9 @@ agentImageModelKeys
 agentModelRoute
 AiAgentContext
 mpPointsEconomics
+merchantIndustryAlign
+agentMerchantContext
+services/ai/types
 change-scope-guard
 PAT
       ;;
