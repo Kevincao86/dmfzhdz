@@ -108,6 +108,7 @@ import {
   resizeScriptRowsForDurationPlan,
   resolveGuidanceScriptRowCount,
   ensureVideoPromptsForTargetDuration,
+  mergeVideoPromptsToSegmentCount,
   videoPromptDurationSec,
   minSegmentCountForTargetDuration,
   inferTargetTotalSecFromText,
@@ -657,6 +658,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
         prompt: string
         images_base64?: string[]
         model?: string
+        seedance_image_mode?: 'auto' | 'first_last' | 'reference' | 'first_only'
       },
       opts?: {
         resetCancel?: boolean
@@ -666,6 +668,9 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       },
     ) => {
       if (opts?.resetCancel !== false) cancelRef.current = false
+      const imageCount = Array.isArray(body.images_base64)
+        ? body.images_base64.filter((x) => String(x || '').trim()).length
+        : 0
       return runShortVideoJobWithFailover({
         engine: VIDEO_ENGINE,
         body: {
@@ -677,6 +682,11 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
           skip_qwen: true,
           lock_model: true,
           generate_audio: true,
+          // 1.5 多图默认只能当首帧；显式 first_last 才能用上第 2 张参考
+          seedance_image_mode:
+            body.seedance_image_mode ??
+            (imageCount >= 2 ? 'first_last' : 'auto'),
+          i2v_max_images: imageCount >= 2 ? 2 : undefined,
         },
         poolModels: seedancePoolModels,
         shouldCancel: () => cancelRef.current,
@@ -790,6 +800,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       }
       return next
     })
+    setGenMode('frames')
     setErr(null)
   }
 
@@ -1198,7 +1209,14 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
         targetTotalSec,
         activeSegmentSec,
       )
-      if (promptsOut.length > plan.prompts.length) {
+      // 节拍过多（如 5×3s）合并到 Seedance 段计划（如 5+5+5），避免 3 秒非法时长或总时长超标
+      const planCap = Math.max(minSegments, segmentDurationPlan.length)
+      if (promptsOut.length > planCap) {
+        promptsOut = mergeVideoPromptsToSegmentCount(promptsOut, planCap)
+        setHint(
+          `分镜 ${plan.prompts.length} 段已合并为 ${promptsOut.length} 段生成（目标 ${targetTotalSec} 秒，保留各段画面与口播）。`,
+        )
+      } else if (promptsOut.length > plan.prompts.length) {
         setHint(
           `分镜策划返回 ${plan.prompts.length} 段，已自动补至 ${promptsOut.length} 段以覆盖目标 ${targetTotalSec} 秒。`,
         )
@@ -1222,15 +1240,16 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
         return
       }
       const planPrompts = prompts
-      const segDur = videoPromptDurationSec(
-        planPrompts[i]!,
-        pickLongformSegmentDurationSec(
-          segmentDurationPlan,
-          i,
-          targetTotalSec,
-          segmentActualDurations.reduce((sum, d) => sum + d, 0),
-        ),
+      const plannedDur = pickLongformSegmentDurationSec(
+        segmentDurationPlan,
+        i,
+        targetTotalSec,
+        segmentActualDurations.reduce((sum, d) => sum + d, 0),
       )
+      const fromPrompt = videoPromptDurationSec(planPrompts[i]!, plannedDur)
+      // Seedance 仅稳妥支持 5/10/15；节拍表里的 3 秒等须回落到段计划秒数
+      const segDur =
+        fromPrompt === 5 || fromPrompt === 10 || fromPrompt === 15 ? fromPrompt : plannedDur
       report(`长视频 ${i + 1}/${planPrompts.length} · ${segDur}秒 · 生成中…`)
 
       let images: string[] | undefined
@@ -1493,14 +1512,15 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       opts?.promptOverride?.trim() ||
       (scriptUsable ? scriptRowsToOverallPrompt(rows) : genPrompt.trim())
     const imgs: string[] = []
-    if (genMode === 'frames') {
+    // 只要上传了参考素材就编入图生，避免仍停在「文案」模式时完全忽略参考图
+    if (genMode === 'frames' || storyFrames.length > 0) {
       for (const item of storyFrames) {
         imgs.push(await storyFrameFileToImageDataUrl(item.file))
       }
     }
 
     const planMode: LongformPlanMode =
-      genMode === 'text' ? 'generate_text' : 'generate_frames'
+      genMode === 'text' && imgs.length === 0 ? 'generate_text' : 'generate_frames'
 
     const planPromptBase =
       txt ||
@@ -1524,19 +1544,28 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
           scriptSegments: scriptUsable ? rows : undefined,
         }),
       resolveImages: async (i, prevVideoUrl) => {
+        if (!imgs.length) {
+          if (i > 0 && prevVideoUrl) {
+            const b = await resolveSegmentTailFrameBase64(prevVideoUrl, (msg) => setProgress(msg))
+            return [`data:image/jpeg;base64,${b}`]
+          }
+          return undefined
+        }
+        // 多段：按段取参考图；续段用上一段尾帧作首帧 + 本段参考作尾帧（Seedance 1.5 first_last）
+        const refIdx = Math.min(i, imgs.length - 1)
+        const ref = imgs[refIdx]!
+        const nextRef = imgs[Math.min(refIdx + 1, imgs.length - 1)]!
         if (i > 0 && prevVideoUrl) {
           const b = await resolveSegmentTailFrameBase64(prevVideoUrl, (msg) => setProgress(msg))
-          return [`data:image/jpeg;base64,${b}`]
+          return [`data:image/jpeg;base64,${b}`, ref]
         }
-        if (i === 0 && genMode === 'frames') {
-          if (!imgs.length) return undefined
-          return [imgs[0]!]
-        }
-        return undefined
+        if (imgs.length >= 2) return [ref, nextRef === ref ? imgs[imgs.length - 1]! : nextRef]
+        return [ref]
       },
       storyboardHintForSegment: (i) => {
-        if (genMode !== 'frames' || i <= 0 || i >= imgs.length) return null
-        return `【分镜意向】构图可参考分镜参考 ${i + 1}，须从上一段尾帧自然运镜过渡，禁止静态切镜。`
+        if (!imgs.length) return null
+        const n = Math.min(i + 1, imgs.length)
+        return `【分镜意向】构图必须贴近分镜参考 ${n}（已上传参考图），画面主体/界面/场景与参考一致；须从上一段尾帧自然运镜过渡，禁止静态切镜、禁止另起无关场景。`
       },
       narrationSource:
         scriptUsable
@@ -1552,32 +1581,10 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     prompt: string
     images_base64?: string[]
     model?: string
+    seedance_image_mode?: 'auto' | 'first_last' | 'reference' | 'first_only'
   }) => {
-    const requestedDur = longformEnabled ? longformSegmentSec : Number(sdDurationSec)
-    let r = await runShortVideo(body)
-    if (
-      !r.ok &&
-      requestedDur >= LONGFORM_SEGMENT_UNIT_SEC &&
-      shouldFallbackVideoDurationToFiveSec(r.message, requestedDur, {
-        exhaustedAtDuration: r.exhaustedAtDuration,
-        triedCount: r.triedCount,
-      })
-    ) {
-      setHint('15秒额度已满，自动切换为5秒重新提交…')
-      setProgress('正在以 5 秒时长重新提交…')
-      const flags5 = buildSeedanceFlagsLine({
-        durationSec: 5,
-        fps: sdFps,
-        aspect: sdAspect,
-        watermark: sdWatermark,
-        resolution: sdResolution,
-      })
-      r = await runShortVideo(body, {
-        flagsOverride: flags5,
-        allowAutoHalveDuration: false,
-      })
-    }
-    return r
+    // 禁止静默降成 5 秒：用户选的单段时长必须兑现，否则口播/分镜全对不上
+    return runShortVideo(body, { allowAutoHalveDuration: false })
   }
 
   const scrollGenerateFeedbackIntoView = () => {
@@ -1665,7 +1672,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     }
     const useLongformPipeline = longformEnabled || canvasScriptReady
     const imgs: string[] = []
-    if (genMode === 'frames') {
+    if (genMode === 'frames' || storyFrames.length > 0) {
       for (const item of storyFrames) {
         imgs.push(await storyFrameFileToImageDataUrl(item.file))
       }
@@ -1744,31 +1751,39 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       }
       try {
         const end = maxScriptTimeRangeEndSec(workingScriptRows)
-        const targetOverride = snapLongformTargetTotalSec(end, workingScriptRows.length)
+        const userDurationSec = Math.min(15, Math.max(5, Number(sdDurationSec) || 15))
+        // 未勾长视频：以用户所选单段时长为准（勿被 snap 抬到 30）
+        const targetOverride = longformEnabled
+          ? snapLongformTargetTotalSec(end, workingScriptRows.length)
+          : snapSeedanceDurationSec(end > 0 ? Math.min(end, userDurationSec) : userDurationSec)
         const targetTotal = longformEnabled ? longformTargetTotalSec : targetOverride
         /**
-         * 快路径：≤15s 且分镜已齐 → 单次 Seedance（约 2～3 分钟），
-         * 避免「5s×3 + 尾帧衔接」串行卡在排队/截帧半小时。
-         * 勾选长视频且目标 >15s 仍走分段。
+         * 快路径仅用于「简单 2 段 + 无多参考图」：单次 Seedance。
+         * 多段执导 / 多张参考图必须走分段，才能把口播与参考图逐段吃进去；
+         * 且禁止静默降到 5 秒（用户选 15 秒时）。
          */
         const preferSingleShot =
           scriptUsable &&
           targetTotal <= SINGLE_SHOT_MAX_TOTAL_SEC &&
-          workingScriptRows.length >= 2 &&
-          workingScriptRows.length <= 6 &&
+          workingScriptRows.length === 2 &&
+          imgs.length <= 1 &&
           !(longformEnabled && longformTargetTotalSec > SINGLE_SHOT_MAX_TOTAL_SEC)
 
         if (preferSingleShot) {
           const shotSec = snapSeedanceDurationSec(targetTotal)
-          trackProgress(`单次生成 ${shotSec} 秒短片（快路径）…`)
+          trackProgress(`单次生成 ${shotSec} 秒短片…`)
           const shotPrompt = withVideoMotionPrompt(
             [
               scriptRowsToOverallPrompt(workingScriptRows),
-              `【成片】一条连贯竖屏短片约 ${shotSec} 秒，按时段叙事，镜头连续平滑，禁止幻灯片硬切。`,
+              `【成片】一条连贯竖屏短片必须满 ${shotSec} 秒，严格按上表时段叙事与口播，镜头连续平滑，禁止幻灯片硬切。`,
             ].join('\n'),
           )
           const shotImages =
-            genMode === 'frames' && imgs.length > 0 ? [imgs[0]!] : undefined
+            imgs.length >= 2
+              ? [imgs[0]!, imgs[imgs.length - 1]!]
+              : imgs.length === 1
+                ? [imgs[0]!]
+                : undefined
           const flags = buildSeedanceFlagsLine({
             durationSec: shotSec,
             fps: sdFps,
@@ -1777,11 +1792,16 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
             resolution: sdResolution,
           })
           const r = await runShortVideo(
-            { prompt: shotPrompt, images_base64: shotImages },
+            {
+              prompt: shotPrompt,
+              images_base64: shotImages,
+              seedance_image_mode: shotImages && shotImages.length >= 2 ? 'first_last' : 'auto',
+            },
             {
               resetCancel: false,
               flagsOverride: flags,
-              allowAutoHalveDuration: true,
+              // 用户选 10/15 秒时禁止静默降成 5 秒
+              allowAutoHalveDuration: shotSec < 10,
               onProgress: trackProgress,
             },
           )
@@ -1790,7 +1810,14 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
             setErr(formatVideoAiUserError(r.message))
             return
           }
-          if (r.modelUsed) setHint(`已使用视频模型：${r.modelUsed}（单次快路径）`)
+          const usedSec = r.durationSecUsed ?? shotSec
+          if (usedSec < shotSec - 2) {
+            const msg = `成片时长约 ${usedSec} 秒，未达到所选 ${shotSec} 秒，请检查 Seedance 额度后重试（已禁止自动降为 5 秒）。`
+            finishVideoJob(false, msg)
+            setErr(msg)
+            return
+          }
+          if (r.modelUsed) setHint(`已使用视频模型：${r.modelUsed}`)
           trackProgress('交付 Seedance 有声成片…')
           const narration = await resolveNarrationForFinalVideo(
             workingScriptRows
@@ -1804,12 +1831,19 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
           return
         }
 
-        trackProgress('分段生成中…')
+        trackProgress(
+          imgs.length > 0
+            ? `分段生成中（目标 ${targetTotal} 秒，将逐段引用参考图与口播）…`
+            : `分段生成中（目标 ${targetTotal} 秒，按执导分镜逐段出片）…`,
+        )
         await runLongformGenerate({
-          targetTotalSecOverride: longformEnabled ? undefined : targetOverride,
+          targetTotalSecOverride: longformEnabled ? undefined : targetTotal,
+          // 多段执导：用 5 秒段拼满目标（如 15=5+5+5），才能把各段画面/口播/参考吃进去
           segmentSecOverride: longformEnabled
             ? undefined
-            : Math.min(15, Math.max(5, Number(sdDurationSec) || 15)),
+            : workingScriptRows.length >= 3 || imgs.length >= 2
+              ? 5
+              : Math.min(15, Math.max(5, userDurationSec)),
           rowsOverride: workingScriptRows,
           promptOverride: txt,
         })
@@ -1896,25 +1930,28 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     cancelRef.current = false
     try {
       const textBlock =
-        genMode === 'text'
+        genMode === 'text' && imgs.length === 0
           ? txt
           : txt || `连贯演绎 ${imgs.length || 1} 个分镜参考（图/视频）构成的短片。`
       const shotsNote =
-        genMode === 'frames' && imgs.length > 1
-          ? `（共 ${imgs.length} 个参考，图/视频按顺序串联镜头）。`
+        imgs.length > 1
+          ? `（共 ${imgs.length} 个参考，须贴近参考画面主体与界面，按顺序串联镜头）。`
           : ''
       const prompt = withVideoMotionPrompt(
-        genMode === 'frames' && shotsNote && textBlock
-          ? `${textBlock}\n${shotsNote}`
-          : textBlock,
+        shotsNote && textBlock ? `${textBlock}\n${shotsNote}` : textBlock,
       )
 
       const imagePayload: string[] = []
-      if (genMode === 'frames' && imgs.length) imagePayload.push(imgs[0]!)
+      if (imgs.length >= 2) {
+        imagePayload.push(imgs[0]!, imgs[imgs.length - 1]!)
+      } else if (imgs.length === 1) {
+        imagePayload.push(imgs[0]!)
+      }
 
       const r = await runSingleShortVideoWithDurationFallback({
         prompt,
         images_base64: imagePayload.length ? imagePayload : undefined,
+        seedance_image_mode: imagePayload.length >= 2 ? 'first_last' : 'auto',
       })
       if (!r.ok) {
         finishVideoJob(false, formatVideoAiUserError(r.message))
