@@ -47,3 +47,9 @@ tools/OpenMontage/
 
 # 剪映 editor skill 上游本机克隆，仅 Cursor 本地剪辑，勿提交
 tools/jianying-editor-skill/
+
+# 宣传视频 / 做图 Skills 上游本机克隆（勿提交）
+tools/Seedance-Product-Video/
+tools/seedance2-prompt-skill/
+tools/Seedance2-skill/
+tools/ai-image-prompts-skill/
