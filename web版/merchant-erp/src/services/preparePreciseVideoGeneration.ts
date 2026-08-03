@@ -1,5 +1,6 @@
 /**
- * 生成前统一门禁：Brief → 增强 →（可选）长片规划 → 填满+意图保真。
+ * 生成前统一门禁：Brief → 增强 →（可选）长片规划 → 填满分镜。
+ * 意图保真（mustInclude 字面命中）只作约束注入，不硬拦出片。
  */
 
 import {
@@ -168,16 +169,17 @@ export async function preparePreciseVideoGeneration(
 
     const fidelity = validateBriefFidelity(brief, { rows, skill })
     if (!fidelity.ok) {
-      // 分镜表可用（或文案够长）时：结构节拍不再硬拦。
-      // SaaS/产品演示常用「焦虑切 App + 反问」开场，不含餐饮「门铃/排队」词。
+      // 结构节拍 / 意图保真（mustInclude 字面命中）均不硬拦：约束已写入 guidance，可继续出片。
       const corpusLen = rows.reduce(
         (n, r) => n + String(r.visual || '').length + String(r.dialogue || '').length,
         0,
       )
       const storyboardReady = isScriptRowsUsable(rows)
-      const hard = fidelity.issues.filter(
-        (x) => !x.startsWith('结构节拍缺失') || (!storyboardReady && corpusLen < 80),
-      )
+      const hard = fidelity.issues.filter((x) => {
+        if (x.includes('意图保真')) return false
+        if (x.startsWith('结构节拍缺失')) return !storyboardReady && corpusLen < 80
+        return true
+      })
       if (hard.length > 0) {
         if (allowSingleShotFallback(input)) {
           input.onProgress?.('分镜保真未过，改为单段直接出片…')
@@ -209,18 +211,23 @@ export async function preparePreciseVideoGeneration(
     }
   }
 
-  // 单段短片
+  // 单段短片：意图保真不硬拦；仅拦文案过短 / 缺槽补全
   const fidelity = validateBriefFidelity(brief, { prompt: guidance, skill })
   if (!fidelity.ok) {
-    // 单段对「结构节拍」过严时：若 mustInclude 已写入 guidance 且文案够长，仅保留 mustInclude/缺槽类问题
-    const soft = fidelity.issues.filter(
-      (x) => !x.startsWith('结构节拍缺失') || guidance.length < 80,
+    const blocking = fidelity.issues.filter(
+      (x) =>
+        !x.includes('意图保真') &&
+        !x.startsWith('结构节拍缺失') &&
+        (x.includes('补全') || x.includes('过短')),
     )
-    if (soft.length > 0 && soft.some((x) => x.includes('意图保真') || x.includes('补全') || x.includes('过短'))) {
-      return { ok: false, message: soft.join('；'), brief, issues: soft }
+    if (blocking.length > 0) {
+      return { ok: false, message: blocking.join('；'), brief, issues: blocking }
     }
-    if (soft.length > 0 && guidance.length < 40) {
-      return { ok: false, message: soft.join('；'), brief, issues: soft }
+    if (guidance.length < 40) {
+      const shortIssues = fidelity.issues.filter((x) => !x.includes('意图保真') && !x.startsWith('结构节拍缺失'))
+      if (shortIssues.length > 0) {
+        return { ok: false, message: shortIssues.join('；'), brief, issues: shortIssues }
+      }
     }
   }
 
