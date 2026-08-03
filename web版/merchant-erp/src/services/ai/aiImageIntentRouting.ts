@@ -26,8 +26,15 @@ function detectImageEditIntent(text: string, hasImages: boolean): boolean {
     return true
   }
   if (!hasImages) return false
-  // 附图 +「把文字换成… / 改成…」等（图3：帮我把文字换成超猛炒鸡）
+  // 附图 +「把文字换成… / 改成…」等
   if (/(?:换|改|替换).{0,16}(?:字|文字|文案|标题|logo|Logo|内容)|(?:字|文字|文案|标题).{0,10}(?:换|改)成/i.test(t)) {
+    return true
+  }
+  // 附图 +「把徽派家宴换成超猛炒鸡」——图上替换文案/主体，不要求出现「文字」二字
+  if (/(?:把|将).{1,40}(?:换成|改成|替换为|替换成)/i.test(t)) {
+    return true
+  }
+  if (/(?:换成|改成|替换为|替换成).{1,40}$/i.test(t) && t.length <= 80) {
     return true
   }
   if (/(?:把|将).{0,12}(?:这张|该|原)?图.{0,16}(?:改|换|修|替换)|基于这张图|根据这张图|按这张图|修改图片|改图片/i.test(t)) {
