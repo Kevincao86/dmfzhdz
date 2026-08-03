@@ -108,6 +108,7 @@ import {
   ensureVideoPromptsForTargetDuration,
   videoPromptDurationSec,
   minSegmentCountForTargetDuration,
+  inferTargetTotalSecFromText,
   type ShortVideoScriptRow,
 } from '../lib/shortVideoScriptTable'
 
@@ -956,16 +957,12 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     }
     // 任意时长均可规划分镜，不要求勾选「长视频」
     const segmentSec = activeScriptSegmentSec
-    const coveredNow = maxScriptTimeRangeEndSec(scriptRows)
+    // 未勾选长视频：总时长以「单段时长」为准；指导文案若已写明更长总时长（如 0–15s / 总时长30秒）则取更大值。
+    // 旧逻辑强制 segmentSec×2，会在单段=15s 时把 15s 文案误规划成 30s。
+    const fromGuidance = inferTargetTotalSecFromText(draft)
     const targetTotalSec = longformEnabled
       ? longformTargetTotalSec
-      : Math.min(
-          LONGFORM_MAX_TARGET_TOTAL_SEC,
-          Math.max(
-            segmentSec * 2,
-            coveredNow > 0 ? coveredNow : segmentSec * Math.max(2, scriptRows.length),
-          ),
-        )
+      : Math.min(LONGFORM_MAX_TARGET_TOTAL_SEC, Math.max(segmentSec, fromGuidance || 0))
     setAuxBusy(true)
     setErr(null)
     setHint(null)
