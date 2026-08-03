@@ -126,14 +126,28 @@ export function imagePickerKeyForChatSelection(
   return options.find((o) => o.key === 'img::v::auto')?.key ?? 'img::v::auto'
 }
 
-/** 明确生图意图时：若当前为对话模型，自动解析为文生图 picker（附图≠生图，混剪/识图仍走对话） */
+function isForeignTokenmixImagePicker(key: string): boolean {
+  const p = parseAgentImagePickerKey(key)
+  return p?.kind === 'style'
+}
+
+/** 明确生图意图时：若当前为对话模型，自动解析为国内文生图 picker（禁止自动切国外 TokenMix） */
 export function resolveImagePickerKeyForUserLine(
   chatPickerKey: string,
   options: readonly { key: string; capability?: string }[],
   userLine: string,
-  _hasComposerImages: boolean,
+  hasComposerImages: boolean,
 ): string {
-  if (isAgentImagePickerKey(chatPickerKey)) return chatPickerKey
-  if (!detectImageGenerationIntent(userLine)) return chatPickerKey
+  const wantsImage = detectImageGenerationIntent(userLine, hasComposerImages)
+  if (isAgentImagePickerKey(chatPickerKey)) {
+    // 有参考图时高级（TokenMix）不支持图生图 → 强制国内
+    if (wantsImage && hasComposerImages && isForeignTokenmixImagePicker(chatPickerKey)) {
+      const auto = options.find((o) => o.key === 'img::v::auto')?.key
+      return auto ?? vendorTierAutoPickerKey('qwen', 'image_text')
+    }
+    return chatPickerKey
+  }
+  if (!wantsImage) return chatPickerKey
+  // 同品牌国内图文档（千问/豆包）或 img::v::auto，绝不落到 img::m::…
   return imagePickerKeyForChatSelection(chatPickerKey, options)
 }

@@ -57,6 +57,7 @@ list_scopes() {
   merchant_registry_bootstrap 商家壳注册表瘦身（OpsRegistryBridge slice=ai，缓解 cs/fws/dr 卡顿）
   shop_analysis          商家 ERP：店铺分析（图表/门店筛选/经营建议/逐单 POI）
   edition_cs_sync        各端前端对齐 CS（DR/FWS/Admin 同源功能与积分经济）
+  ai_agent_quick_image   商家 ERP：AI 智能体快捷任务平铺 + 生图意图自动切模型
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -722,6 +723,19 @@ ecs-new-ecs-local-build-only
 deploy-targets
 灵祺达人履约管理后台/.gitignore
 灵祺达人履约管理后台/dist
+change-scope-guard
+PAT
+      ;;
+    ai_agent_quick_image)
+      cat <<'PAT'
+AiAgentPage
+AiAgentDrawer
+AiAgentComposerBar
+aiImageIntentRouting
+agentImageModelKeys
+agentModelRoute
+AiAgentContext
+mpPointsEconomics
 change-scope-guard
 PAT
       ;;
