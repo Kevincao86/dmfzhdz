@@ -19,6 +19,7 @@ import {
   fillBlankScriptRowsFromGuidance,
   validateStoryboardRows,
   scriptRowsFullyFilled,
+  clampScriptRowsToTargetTotal,
   type ShortVideoScriptRow,
 } from '../lib/shortVideoScriptTable'
 
@@ -186,10 +187,16 @@ function applyPlanResponseRows(
   scriptSegments: PlanApiRow[] | undefined,
   prompts: string[],
   segmentSec: number,
+  targetTotalSec?: number,
 ): ShortVideoScriptRow[] {
   let rows = rowsFromPlanSegments(scriptSegments)
   if (prompts.length >= 2) {
-    rows = mergePlanRowsWithPrompts(rows, prompts, segmentSec)
+    // 有目标总时长时按「总时长/段数」铺时间轴，避免 2 段×单段15s 变成 0–30s
+    const perSec =
+      targetTotalSec && targetTotalSec >= 10 && prompts.length >= 2
+        ? Math.max(2, Math.round(targetTotalSec / prompts.length))
+        : segmentSec
+    rows = mergePlanRowsWithPrompts(rows, prompts, perSec)
   }
   return rows
 }
@@ -283,7 +290,10 @@ export async function planShortVideoScriptFromGuidance(
       if (fallbackRows.length >= 2) {
         return {
           ok: true,
-          rows: finalizePlannedScriptRows(fallbackRows, draft, planner.effectiveTargetSec),
+          rows: clampScriptRowsToTargetTotal(
+            finalizePlannedScriptRows(fallbackRows, draft, planner.effectiveTargetSec),
+            planner.effectiveTargetSec,
+          ),
           segmentCount: fallbackRows.length,
           usedAiPlanner: false,
           usedRuleBasedFallback: true,
@@ -293,7 +303,12 @@ export async function planShortVideoScriptFromGuidance(
     return plan
   }
 
-  let rows = applyPlanResponseRows(plan.scriptSegments, plan.prompts, opts.segmentSec)
+  let rows = applyPlanResponseRows(
+    plan.scriptSegments,
+    plan.prompts,
+    opts.segmentSec,
+    planner.effectiveTargetSec,
+  )
   if (plan.plannerVendor) reviewVendors.push(plan.plannerVendor)
 
   if (
@@ -310,7 +325,12 @@ export async function planShortVideoScriptFromGuidance(
       planStage: 'draft',
     })
     if (!plan.ok) return plan
-    rows = applyPlanResponseRows(plan.scriptSegments, plan.prompts, opts.segmentSec)
+    rows = applyPlanResponseRows(
+      plan.scriptSegments,
+      plan.prompts,
+      opts.segmentSec,
+      planner.effectiveTargetSec,
+    )
   }
 
   if (rows.length < 2) {
@@ -342,7 +362,12 @@ export async function planShortVideoScriptFromGuidance(
       validationIssues,
     })
     if (!review1.ok) return review1
-    rows = applyPlanResponseRows(review1.scriptSegments, review1.prompts, opts.segmentSec)
+    rows = applyPlanResponseRows(
+      review1.scriptSegments,
+      review1.prompts,
+      opts.segmentSec,
+      planner.effectiveTargetSec,
+    )
     if (review1.plannerVendor) reviewVendors.push(review1.plannerVendor)
     review1UsedAi = review1.usedAiPlanner === true
     review1Vendor = review1.plannerVendor
@@ -360,7 +385,12 @@ export async function planShortVideoScriptFromGuidance(
       validationIssues,
     })
     if (!review2.ok) return review2
-    rows = applyPlanResponseRows(review2.scriptSegments, review2.prompts, opts.segmentSec)
+    rows = applyPlanResponseRows(
+      review2.scriptSegments,
+      review2.prompts,
+      opts.segmentSec,
+      planner.effectiveTargetSec,
+    )
     if (review2.plannerVendor) reviewVendors.push(review2.plannerVendor)
     review2UsedAi = review2.usedAiPlanner === true
     review2Vendor = review2.plannerVendor
@@ -385,6 +415,7 @@ export async function planShortVideoScriptFromGuidance(
   }
 
   rows = finalizePlannedScriptRows(rows, draft, planner.effectiveTargetSec)
+  rows = clampScriptRowsToTargetTotal(rows, planner.effectiveTargetSec)
 
   if (!opts.mixAutoExpandSegments) {
     const finalValidation = validateStoryboardRows(rows, planner.effectiveTargetSec)
