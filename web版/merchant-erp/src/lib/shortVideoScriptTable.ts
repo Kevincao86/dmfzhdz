@@ -136,6 +136,48 @@ export function retimeScriptRowsBySegmentSec(
   }))
 }
 
+/**
+ * 将分镜时间轴重排到 0～totalSec（未勾选长视频时：多段是节拍，总时长=所选单段时长）。
+ * 避免 2 段 × 15 秒被排成 0–30 秒。
+ */
+export function retimeScriptRowsToTotalSec(
+  rows: ShortVideoScriptRow[],
+  totalSec: number,
+): ShortVideoScriptRow[] {
+  const total = Math.min(60, Math.max(5, Math.round(totalSec) || 15))
+  if (rows.length === 0) {
+    return [{ timeRange: `0-${total}秒`, visual: '', dialogue: '' }]
+  }
+  const n = rows.length
+  const edges: number[] = [0]
+  for (let i = 1; i < n; i++) {
+    edges.push(Math.round((total * i) / n))
+  }
+  edges.push(total)
+  for (let i = 1; i < edges.length; i++) {
+    if (edges[i]! <= edges[i - 1]!) {
+      edges[i] = Math.min(total, edges[i - 1]! + 1)
+    }
+  }
+  edges[edges.length - 1] = total
+  return rows.map((r, i) => ({
+    ...r,
+    timeRange: `${edges[i]}-${edges[i + 1]}秒`,
+  }))
+}
+
+/** 时间轴超出目标总时长时压回 0～targetTotalSec；未超出则原样返回 */
+export function clampScriptRowsToTargetTotal(
+  rows: ShortVideoScriptRow[],
+  targetTotalSec: number,
+): ShortVideoScriptRow[] {
+  if (rows.length === 0) return rows
+  const target = Math.min(60, Math.max(5, Math.round(targetTotalSec) || 15))
+  const end = maxScriptTimeRangeEndSec(rows)
+  if (end <= target + 1) return rows
+  return retimeScriptRowsToTotalSec(rows, target)
+}
+
 export function scriptRowsToOverallPrompt(rows: ShortVideoScriptRow[]): string {
   return rows
     .map((r, i) => {

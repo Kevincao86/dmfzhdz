@@ -94,6 +94,8 @@ import {
   parseScriptRowsFromPlainText,
   resizeScriptRows,
   retimeScriptRowsBySegmentSec,
+  retimeScriptRowsToTotalSec,
+  clampScriptRowsToTargetTotal,
   appendEmptyScriptRow,
   removeScriptRowAt,
   maxScriptTimeRangeEndSec,
@@ -467,8 +469,8 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
   const [genMode, setGenMode] = useState<'text' | 'frames'>('text')
   const [genPrompt, setGenPrompt] = useState('')
   const [scriptRows, setScriptRows] = useState<ShortVideoScriptRow[]>(() =>
-    // 默认 2 段，不依赖「长视频」勾选；可随时「添加时间段」
-    defaultScriptRows(2, 15),
+    // 默认 2 段节拍落在所选单段总时长内（15s → 0–8 / 8–15），避免 2×15=30s
+    retimeScriptRowsToTotalSec(defaultScriptRows(2, 5), 15),
   )
   const [storyFrames, setStoryFrames] = useState<StoryFrameItem[]>([])
   /** 每个分镜绑定的素材 id（对应 storyFrames），支持图/视频多张 */
@@ -746,11 +748,11 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     setScriptRows((prev) => resizeScriptRowsForDurationPlan(prev, longformDurationPlan))
   }, [longformEnabled, longformTargetTotalSec, longformDurationPlan])
 
-  /** 未勾选长视频时：单段时长变更 → 分镜时间轴同步为 N×该秒数 */
+  /** 未勾选长视频时：单段时长 = 成片总时长，分镜多段为节拍，时间轴重排到 0～该秒数 */
   useEffect(() => {
     if (longformEnabled) return
-    const seg = Math.min(15, Math.max(5, Number(sdDurationSec) || 15))
-    setScriptRows((prev) => retimeScriptRowsBySegmentSec(prev, seg))
+    const total = Math.min(15, Math.max(5, Number(sdDurationSec) || 15))
+    setScriptRows((prev) => retimeScriptRowsToTotalSec(prev, total))
   }, [sdDurationSec, longformEnabled])
 
   const onLongformTargetTotalSecChange = (nextSec: number) => {
@@ -982,8 +984,11 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
         setErr(r.message)
         return
       }
-      setScriptRows(r.rows)
-      const covered = maxScriptTimeRangeEndSec(r.rows)
+      const plannedRows = longformEnabled
+        ? r.rows
+        : clampScriptRowsToTargetTotal(r.rows, targetTotalSec)
+      setScriptRows(plannedRows)
+      const covered = maxScriptTimeRangeEndSec(plannedRows)
       const targetNote =
         targetTotalSec >= 10 && covered >= targetTotalSec - 2
           ? `，时间轴已覆盖约 0–${covered} 秒`
@@ -999,9 +1004,9 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
               ? '（AI 不可用，已降级为本地规则拆段，请更换模型后重试）'
               : ''
       setHint(
-        scriptRowsHaveExplicitTimeRanges(r.rows) && preCount >= 2
-          ? `三模型复核通过，已填满 ${r.rows.length} 段分镜${targetNote}${modelNote}，请核对后点击「开始生成短片」。`
-          : `三模型复核通过，AI 已规划 ${r.rows.length} 段分镜${targetNote}${modelNote}，请核对表格后点击「开始生成短片」。`,
+        scriptRowsHaveExplicitTimeRanges(plannedRows) && preCount >= 2
+          ? `三模型复核通过，已填满 ${plannedRows.length} 段分镜${targetNote}${modelNote}，请核对后点击「开始生成短片」。`
+          : `三模型复核通过，AI 已规划 ${plannedRows.length} 段分镜${targetNote}${modelNote}，请核对表格后点击「开始生成短片」。`,
       )
     } finally {
       setAuxBusy(false)
@@ -2421,7 +2426,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
                         <option value="15">15 秒</option>
                       </select>
                       <span className="text-[11px] font-normal text-slate-500">
-                        下方分镜每段上限 = {sdDurationSec} 秒
+                        成片总时长 = {sdDurationSec} 秒（多段分镜为节拍，合计不超出）
                       </span>
                     </label>
                   )}
@@ -2519,13 +2524,27 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
                     disabled={busy || auxBusy}
                     onChange={setScriptRows}
                     onAddRow={() =>
-                      setScriptRows((prev) => appendEmptyScriptRow(prev, activeScriptSegmentSec))
+                      setScriptRows((prev) => {
+                        const next = appendEmptyScriptRow(prev, activeScriptSegmentSec)
+                        if (next === prev) return prev
+                        if (longformEnabled) return next
+                        return retimeScriptRowsToTotalSec(
+                          next,
+                          Math.min(15, Math.max(5, Number(sdDurationSec) || 15)),
+                        )
+                      })
                     }
                     onRemoveRow={(index) =>
                       setScriptRows((prev) => {
                         const next = removeScriptRowAt(prev, index, 1)
                         if (next === prev) return prev
-                        return retimeScriptRowsBySegmentSec(next, activeScriptSegmentSec)
+                        if (longformEnabled) {
+                          return retimeScriptRowsBySegmentSec(next, activeScriptSegmentSec)
+                        }
+                        return retimeScriptRowsToTotalSec(
+                          next,
+                          Math.min(15, Math.max(5, Number(sdDurationSec) || 15)),
+                        )
                       })
                     }
                   />
@@ -2780,7 +2799,12 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
               setScriptRows((prev) => {
                 const next = orderedIndices.map((i) => prev[i]).filter(Boolean) as typeof prev
                 if (next.length < 2) return prev
-                const resized = retimeScriptRowsBySegmentSec(next, seg)
+                const resized = longformEnabled
+                  ? retimeScriptRowsBySegmentSec(next, seg)
+                  : retimeScriptRowsToTotalSec(
+                      next,
+                      Math.min(15, Math.max(5, Number(sdDurationSec) || 15)),
+                    )
                 syncGenerateWorkspaceFromCanvas(resized, { fillPrompt: true })
                 return resized
               })
@@ -2827,7 +2851,14 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
                 }
                 return next
               })
-              setScriptRows(retimeScriptRowsBySegmentSec(nextRows, activeScriptSegmentSec))
+              setScriptRows(
+                longformEnabled
+                  ? retimeScriptRowsBySegmentSec(nextRows, activeScriptSegmentSec)
+                  : retimeScriptRowsToTotalSec(
+                      nextRows,
+                      Math.min(15, Math.max(5, Number(sdDurationSec) || 15)),
+                    ),
+              )
               setHint(`已删除分镜 ${index + 1}`)
             }}
             onRemoveMedia={(id) => {
