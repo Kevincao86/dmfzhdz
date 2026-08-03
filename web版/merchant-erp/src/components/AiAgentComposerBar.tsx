@@ -6,6 +6,11 @@ import { cn } from '../cn'
 import type { AiComposerAttachment } from '../lib/aiAgentTypes'
 import { shouldSubmitComposerOnEnter } from '../lib/composerEnterKey'
 import { isComposerImageFile, isComposerVideoFile } from '../lib/aiVideoPoster'
+import {
+  MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE,
+  MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE,
+} from '../lib/mpPointsEconomics'
+import { parseAgentImagePickerKey } from '../services/ai/agentImageModelKeys'
 
 type Layout = 'centered' | 'dock'
 type ModelFilterTab = 'all' | 'chat' | 'image'
@@ -170,6 +175,15 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
     () => modelPickerOptions.find((o) => o.key === modelPickerKey),
     [modelPickerOptions, modelPickerKey],
   )
+
+  const imagePointsHint = useMemo(() => {
+    if ((currentModel?.capability ?? 'chat') !== 'image') return null
+    const parsed = parseAgentImagePickerKey(modelPickerKey)
+    if (parsed?.kind === 'style') {
+      return `高级生图约 ${MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE} 积分/张`
+    }
+    return `常规生图约 ${MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE} 积分/张`
+  }, [currentModel?.capability, modelPickerKey])
 
   const filterShort = FILTER_TABS.find((t) => t.id === modelFilter)?.short ?? '全部'
   const videoCount = pendingComposerAttachments.filter((a) => a.kind === 'video').length
@@ -508,7 +522,11 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
                 modelOpen && 'border-indigo-300 bg-indigo-50 text-indigo-800',
                 (aiSending || disabled) && 'cursor-not-allowed opacity-50',
               )}
-              title={currentModel?.label}
+              title={
+                imagePointsHint
+                  ? `${currentModel?.label ?? ''} · ${imagePointsHint}`
+                  : currentModel?.label
+              }
               aria-expanded={modelOpen}
               aria-haspopup="listbox"
             >
@@ -520,10 +538,24 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
                 role="listbox"
                 className="absolute bottom-full right-0 z-50 mb-1.5 max-h-52 w-[min(16rem,calc(100vw-3rem))] overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg shadow-slate-900/10"
               >
-                <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">模型</p>
+                <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                  模型
+                  {imagePointsHint ? (
+                    <span className="ml-1 font-normal normal-case tracking-normal text-slate-400">
+                      · {imagePointsHint}
+                    </span>
+                  ) : null}
+                </p>
                 {filteredModelOptions.map((o, idx) => {
                   const prevGroup = filteredModelOptions[idx - 1]?.groupLabel
                   const showGroup = o.groupLabel && o.groupLabel !== prevGroup
+                  const imgParsed = o.capability === 'image' ? parseAgentImagePickerKey(o.key) : null
+                  const pts =
+                    o.capability === 'image'
+                      ? imgParsed?.kind === 'style'
+                        ? `${MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE}积分`
+                        : `${MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE}积分`
+                      : null
                   return (
                     <div key={o.key}>
                       {showGroup ? (
@@ -540,12 +572,13 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
                           setModelOpen(false)
                         }}
                         className={cn(
-                          'flex w-full px-3 py-2 text-left text-xs leading-snug text-slate-700 hover:bg-slate-50',
+                          'flex w-full items-start justify-between gap-2 px-3 py-2 text-left text-xs leading-snug text-slate-700 hover:bg-slate-50',
                           modelPickerKey === o.key && 'bg-indigo-50 font-medium text-indigo-900',
                           o.tierAuto && 'text-indigo-800/90',
                         )}
                       >
-                        {o.label}
+                        <span>{o.label}</span>
+                        {pts ? <span className="shrink-0 text-[10px] font-normal text-slate-400">{pts}</span> : null}
                       </button>
                     </div>
                   )

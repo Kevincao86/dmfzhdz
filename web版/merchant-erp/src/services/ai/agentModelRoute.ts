@@ -18,15 +18,16 @@ export function shouldRouteToAgentNativeImage(
 ): boolean {
   if (!isAgentImagePickerKey(pickerKey)) return false
   if (detectIceMixVideoIntent(userLine)) return false
+  const hasImages = visionUrls.length > 0
   if (
     inferTaskTypeFromText(userLine) === 'create_product' &&
-    !detectImageGenerationIntent(userLine)
+    !detectImageGenerationIntent(userLine, hasImages)
   ) {
     return false
   }
-  if (visionUrls.length > 0 && STRUCTURED_PRODUCT_PREVIEW_HINT.test(userLine)) return false
+  if (hasImages && STRUCTURED_PRODUCT_PREVIEW_HINT.test(userLine)) return false
   // 有参考图也不再默认图生图：须用户明确说生图/改图（避免「混剪/看下素材」误调上游缺参）
-  return detectImageGenerationIntent(userLine)
+  return detectImageGenerationIntent(userLine, hasImages)
 }
 
 function familyFromChatPickerKey(key: string): AIModelFamily | null {

@@ -1,10 +1,6 @@
 import {
   Bot,
-  CalendarDays,
-  ChevronDown,
-  ChevronRight,
   Clapperboard,
-  FileText,
   MessageSquarePlus,
   MessagesSquare,
   Sparkles,
@@ -48,7 +44,6 @@ export default function AiAgentPage() {
 
   const hasChat = useMemo(() => messages.some((m) => m.role === 'user'), [messages])
   const scrollRef = useRef<HTMLDivElement>(null)
-  const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [workspace, setWorkspace] = useState<AgentWorkspace>('chat')
 
   const confirmDisabledFor = (previewMessageId: string) =>
@@ -151,41 +146,27 @@ export default function AiAgentPage() {
 
           <AiAgentComposerBar layout="centered" />
 
-          <div className="mt-4">
-            <button
-              type="button"
-              onClick={() => setShortcutsOpen((v) => !v)}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200/90 bg-white py-2.5 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50"
-            >
-              {shortcutsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              快捷任务（{agentProfile.shortcuts.length}）
-            </button>
-            {shortcutsOpen ? (
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                {agentProfile.shortcuts.map((s) => (
-                  <button
-                    key={s.type}
-                    type="button"
-                    disabled={aiSending}
-                    onClick={() => applyShortcut(s.type)}
-                    className={cn(
-                      'flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-left text-sm font-medium text-slate-800 shadow-sm',
-                      'transition hover:border-indigo-200 hover:bg-indigo-50/50 hover:text-indigo-900',
-                      'disabled:cursor-not-allowed disabled:opacity-50',
-                    )}
-                  >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-indigo-600 ring-1 ring-slate-100">
-                      {s.type === 'create_product' || s.type === 'generate_copywriting' ? (
-                        <FileText className="h-3.5 w-3.5" />
-                      ) : (
-                        <CalendarDays className="h-3.5 w-3.5" />
-                      )}
-                    </span>
-                    <span className="min-w-0">{s.label}</span>
-                  </button>
-                ))}
-              </div>
-            ) : null}
+          <div className="mt-5">
+            <p className="mb-2.5 text-center text-xs font-medium text-slate-500">
+              快捷任务（{agentProfile.shortcuts.length}）· 点击即可开始
+            </p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              {agentProfile.shortcuts.map((s) => (
+                <button
+                  key={s.type}
+                  type="button"
+                  disabled={aiSending}
+                  onClick={() => applyShortcut(s.type)}
+                  className={cn(
+                    'rounded-full border border-slate-200/90 bg-white px-3 py-2.5 text-center text-sm font-medium text-slate-700 shadow-sm',
+                    'transition hover:border-indigo-300 hover:bg-indigo-50/70 hover:text-indigo-900',
+                    'disabled:cursor-not-allowed disabled:opacity-50',
+                  )}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="mt-8 rounded-2xl border border-indigo-100/80 bg-gradient-to-br from-indigo-50/50 to-violet-50/40 p-5">

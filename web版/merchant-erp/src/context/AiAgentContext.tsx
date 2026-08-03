@@ -142,14 +142,20 @@ import {
   isComposerImageFile,
   isComposerVideoFile,
 } from '../lib/aiVideoPoster'
-import { modelPickerKeyForNativeImageVendor } from '../services/ai/aiImageIntentRouting'
+import {
+  AGENT_PREMIUM_IMAGE_PICKER_KEY,
+  agentDomesticImageUpsellTip,
+  detectIceMixVideoIntent,
+  detectPremiumImageRetryIntent,
+  modelPickerKeyForNativeImageVendor,
+} from '../services/ai/aiImageIntentRouting'
 import { shouldRouteToAgentNativeImage } from '../services/ai/agentModelRoute'
-import { detectIceMixVideoIntent } from '../services/ai/aiImageIntentRouting'
 import {
   agentNativeImageRouteFromPickerKey,
   effectiveChatPickerKey,
   resolveImagePickerKeyForUserLine,
 } from '../services/ai/agentImageModelKeys'
+import { membershipAllowsTokenMix } from '../lib/membershipPlan'
 import {
   defaultAiModelPickerKeyForPlan,
   listAiModelPickerOptionsForPlan,
@@ -190,7 +196,7 @@ function buildAgentImagePostOpts(
 
 function captionForAgentImageResult(img: AiAgentNativeImageOk, isI2i: boolean): string {
   if (img.channel === 'tokenmix') {
-    let s = `已使用 **${img.displayModel ?? '图像模型'}** 生成下方结果。`
+    let s = `已使用 **${img.displayModel ?? '高级图像模型'}** 生成下方结果。`
     if (img.fallbackNote) s += `\n\n${img.fallbackNote}`
     return s
   }
@@ -200,6 +206,7 @@ function captionForAgentImageResult(img: AiAgentNativeImageOk, isI2i: boolean): 
     ? `已使用 **${vendorZh}** 图生图（已参考你上传的图片）。下方为生成结果。`
     : `已使用 **${vendorZh}** 文生图生成下方结果（与商品 AI 共用服务端配置）。如需改风格、主体或构图，请直接说明。`
   if (img.fallbackNote) s += `\n\n${img.fallbackNote}`
+  s += `\n\n${agentDomesticImageUpsellTip()}`
   return s
 }
 
@@ -1773,6 +1780,74 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
             if (tryHandleExecutionFlow(strippedLine, visionUrls, pageContext?.pageLabel)) {
               return
             }
+
+            // 高级（国外）重绘：不传参考图，避免 TokenMix 硬拒
+            if (detectPremiumImageRetryIntent(strippedLine)) {
+              if (!membershipAllowsTokenMix(plan)) {
+                const deny = createAgentMessage(
+                  'assistant',
+                  '高级生图（国外 GPT Image）需 **会员 Plus** 解锁。当前可用国内万相/豆包常规生图；升级后即可回复「用高级模型重绘」。',
+                )
+                setMessages((prev) => {
+                  const next = [...prev, deny]
+                  messagesRef.current = next
+                  return next
+                })
+                return
+              }
+              const proKey = modelPickerOptions.some((o) => o.key === AGENT_PREMIUM_IMAGE_PICKER_KEY)
+                ? AGENT_PREMIUM_IMAGE_PICKER_KEY
+                : null
+              if (!proKey) {
+                const deny = createAgentMessage('assistant', '当前账号暂未开放高级生图模型，请稍后重试或联系管理员。')
+                setMessages((prev) => {
+                  const next = [...prev, deny]
+                  messagesRef.current = next
+                  return next
+                })
+                return
+              }
+              setModelPickerKeyState(proKey)
+              savePickerKey(proKey)
+              const imgPlaceholder = createAgentMessage(
+                'assistant',
+                '正在使用高级模型（国外 GPT Image）重绘，请稍候…（不附带原参考图）',
+              )
+              imgPlaceholder.isStreaming = true
+              setMessages((prev) => {
+                const next = [...prev, imgPlaceholder]
+                messagesRef.current = next
+                return next
+              })
+              const imgOpts = buildAgentImagePostOpts(proKey)
+              const imgRes = await postAiAgentNativeImage(line, {
+                ...imgOpts,
+                signal: ac.signal,
+              })
+              if (imgRes.ok) {
+                const assistantMsg = createAgentMessage(
+                  'assistant',
+                  captionForAgentImageResult(imgRes, false),
+                  { imageUrls: [imgRes.imageUrl] },
+                )
+                setMessages((prev) => {
+                  const without = prev.filter((m) => m.id !== imgPlaceholder.id)
+                  const next = [...without, assistantMsg]
+                  messagesRef.current = next
+                  return next
+                })
+                return
+              }
+              const errMsg = imgRes.ok === false ? imgRes.message : '生图失败'
+              setMessages((prev) => {
+                const without = prev.filter((m) => m.id !== imgPlaceholder.id)
+                const next = [...without, createAgentMessage('assistant', `高级生图失败：${errMsg}`)]
+                messagesRef.current = next
+                return next
+              })
+              return
+            }
+
             const refImg = visionUrls[0]?.trim()
             const imagePickerKey = resolveImagePickerKeyForUserLine(
               activePickerKey,
@@ -1781,6 +1856,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
               visionUrls.length > 0,
             )
             if (shouldRouteToAgentNativeImage(imagePickerKey, strippedLine, visionUrls)) {
+              if (imagePickerKey !== activePickerKey) {
+                setModelPickerKeyState(imagePickerKey)
+                savePickerKey(imagePickerKey)
+              }
               const imgPlaceholder = createAgentMessage('assistant', '正在生成图片，请稍候…')
               imgPlaceholder.isStreaming = true
               setMessages((prev) => {
@@ -1788,6 +1867,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
                 messagesRef.current = next
                 return next
               })
+              // 国内优先：自动路由到 builtin；若用户手动选了国外且带参考图，仍按所选（可能被服务端拒）
               const imgOpts = buildAgentImagePostOpts(imagePickerKey, refImg)
               const imgRes = await postAiAgentNativeImage(line, {
                 ...imgOpts,
@@ -1801,7 +1881,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
                     savePickerKey(vk)
                   }
                 }
-                const isI2i = Boolean(refImg)
+                const isI2i = Boolean(refImg) && imgRes.channel === 'builtin'
                 const assistantMsg = createAgentMessage(
                   'assistant',
                   captionForAgentImageResult(imgRes, isI2i),
@@ -1855,6 +1935,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       scheduleTaskPreview,
       modelPickerKey,
       modelPickerOptions,
+      plan,
       beginAiRun,
       endAiRun,
       appendStoppedMessage,
@@ -2344,8 +2425,48 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
             if (tryHandleExecutionFlow(q, [], pl)) {
               return
             }
+            if (detectPremiumImageRetryIntent(q)) {
+              if (!membershipAllowsTokenMix(plan)) {
+                const deny = createAgentMessage(
+                  'assistant',
+                  '高级生图（国外 GPT Image）需 **会员 Plus** 解锁。当前可用国内常规生图；升级后即可回复「用高级模型重绘」。',
+                )
+                setMessages((prev) => {
+                  const next = [...prev, deny]
+                  messagesRef.current = next
+                  return next
+                })
+                return
+              }
+              const proKey = modelPickerOptions.some((o) => o.key === AGENT_PREMIUM_IMAGE_PICKER_KEY)
+                ? AGENT_PREMIUM_IMAGE_PICKER_KEY
+                : null
+              if (proKey) {
+                setModelPickerKeyState(proKey)
+                savePickerKey(proKey)
+                const imgOpts = buildAgentImagePostOpts(proKey)
+                const imgRes = await postAiAgentNativeImage(q, { ...imgOpts, signal: ac.signal })
+                if (imgRes.ok) {
+                  const assistantMsg = createAgentMessage(
+                    'assistant',
+                    captionForAgentImageResult(imgRes, false),
+                    { imageUrls: [imgRes.imageUrl] },
+                  )
+                  setMessages((prev) => {
+                    const next = [...prev, assistantMsg]
+                    messagesRef.current = next
+                    return next
+                  })
+                  return
+                }
+              }
+            }
             const imagePickerKey = resolveImagePickerKeyForUserLine(activePickerKey, modelPickerOptions, q, false)
             if (shouldRouteToAgentNativeImage(imagePickerKey, q, [])) {
+              if (imagePickerKey !== activePickerKey) {
+                setModelPickerKeyState(imagePickerKey)
+                savePickerKey(imagePickerKey)
+              }
               const imgOpts = buildAgentImagePostOpts(imagePickerKey)
               const imgRes = await postAiAgentNativeImage(q, { ...imgOpts, signal: ac.signal })
               if (imgRes.ok) {
@@ -2392,6 +2513,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       runGatewayForSnapshot,
       modelPickerKey,
       modelPickerOptions,
+      plan,
       scheduleTaskPreview,
       tryHandleExecutionFlow,
       beginAiRun,

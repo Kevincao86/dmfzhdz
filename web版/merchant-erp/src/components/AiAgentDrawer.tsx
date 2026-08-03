@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronDown, ChevronRight, Shield, X } from 'lucide-react'
+import { Shield, X } from 'lucide-react'
 import { BRAND_LOGO_URL, BRAND_NAME_SHORT } from '../lib/brand'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { AiAgentComposerBar } from './AiAgentComposerBar'
 import { AiAgentMessageBubble } from './AiAgentMessageBubble'
 import { AiAgentPreviewActions } from './AiAgentPreviewActions'
@@ -48,7 +48,6 @@ export default function AiAgentDrawer() {
   } = useAiAgent()
 
   const listRef = useRef<HTMLDivElement>(null)
-  const [shortcutsOpen, setShortcutsOpen] = useState(false)
 
   useEffect(() => {
     if (!drawerOpen) return
@@ -140,34 +139,27 @@ export default function AiAgentDrawer() {
               </div>
             </div>
 
-            <div className="shrink-0 border-b border-slate-100 px-4 py-2">
-              <button
-                type="button"
-                onClick={() => setShortcutsOpen((v) => !v)}
-                className="flex w-full items-center justify-between rounded-lg px-1 py-1.5 text-left text-[11px] font-medium text-slate-600 hover:bg-slate-100/80"
-              >
-                <span>快捷任务（{agentProfile.shortcuts.length}）</span>
-                {shortcutsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </button>
-              {shortcutsOpen ? (
-                <div className="mt-2 flex flex-wrap gap-2 pb-1">
-                  {agentProfile.shortcuts.map((s) => (
-                    <button
-                      key={s.type}
-                      type="button"
-                      disabled={aiSending}
-                      onClick={() => applyShortcut(s.type)}
-                      className={cn(
-                        'rounded-xl border border-indigo-200/80 bg-white px-3 py-1.5 text-xs font-medium text-indigo-800 shadow-sm transition-colors',
-                        'hover:border-indigo-300 hover:bg-indigo-50/80',
-                        aiSending && 'cursor-not-allowed opacity-50',
-                      )}
-                    >
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
+            <div className="shrink-0 border-b border-slate-100 px-4 py-2.5">
+              <p className="mb-2 text-[11px] font-medium text-slate-600">
+                快捷任务（{agentProfile.shortcuts.length}）· 点击即可开始
+              </p>
+              <div className="grid grid-cols-3 gap-1.5 pb-0.5">
+                {agentProfile.shortcuts.map((s) => (
+                  <button
+                    key={s.type}
+                    type="button"
+                    disabled={aiSending}
+                    onClick={() => applyShortcut(s.type)}
+                    className={cn(
+                      'rounded-full border border-indigo-200/80 bg-white px-2 py-1.5 text-center text-[11px] font-medium text-indigo-800 shadow-sm transition-colors',
+                      'hover:border-indigo-300 hover:bg-indigo-50/80',
+                      aiSending && 'cursor-not-allowed opacity-50',
+                    )}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div ref={listRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
