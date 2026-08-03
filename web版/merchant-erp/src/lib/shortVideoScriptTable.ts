@@ -485,6 +485,23 @@ export function ensureVideoPromptsForTargetDuration(
   return out
 }
 
+/**
+ * 分镜节拍多于 Seedance 可生成段数时合并（如 5×3s → 3×5s），保留各段画面与口播文案。
+ */
+export function mergeVideoPromptsToSegmentCount(
+  prompts: string[],
+  targetCount: number,
+): string[] {
+  const n = Math.max(2, Math.min(12, Math.floor(targetCount) || 2))
+  if (prompts.length <= n) return prompts
+  const groups: string[][] = Array.from({ length: n }, () => [])
+  for (let i = 0; i < prompts.length; i++) {
+    const g = Math.min(n - 1, Math.floor((i * n) / prompts.length))
+    groups[g]!.push(prompts[i]!)
+  }
+  return groups.map((chunk) => chunk.filter(Boolean).join('\n'))
+}
+
 /** 分镜行数不足时扩展至目标时长所需段数 */
 export function ensureScriptRowsForTargetDuration(
   rows: ShortVideoScriptRow[],
