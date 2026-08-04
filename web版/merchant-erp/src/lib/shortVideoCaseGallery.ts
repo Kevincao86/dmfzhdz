@@ -38,7 +38,7 @@ export type ShortVideoCaseItem = {
 }
 
 const asset = (id: string, ext: 'png' | 'mp4') =>
-  `${SHORT_VIDEO_CASE_CDN_BASE.replace(/\/$/, '')}/${id}.${ext}?v=cdn13`
+  `${SHORT_VIDEO_CASE_CDN_BASE.replace(/\/$/, '')}/${id}.${ext}?v=cdn14`
 
 function c(partial: ShortVideoCaseItem): ShortVideoCaseItem {
   return {
@@ -162,19 +162,19 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
   c({
     id: 'case-ambiance-cafe',
     title: '咖啡馆氛围片',
-    subtitle: '横屏品牌空间',
+    subtitle: '竖屏品牌空间',
     kind: 'film',
     skillId: 'ambiance',
-    aspect: '16:9',
+    aspect: '9:16',
     longform: true,
     durationSec: 5,
     coverFrom: '#44403c',
     coverTo: '#d6d3d1',
     badge: '短片',
     prompt:
-      '【Skill·门店氛围】\n主题：独立咖啡馆空间氛围。\n结构：外立面黄昏 → 木纹与杯具细节 → 拉花特写 → 客流柔焦 → Logo 收尾。\n缓慢推轨，色调偏暖灰。',
+      '【Skill·门店氛围】\n主题：独立咖啡馆空间氛围。\n结构：外立面黄昏 → 木纹与杯具细节 → 拉花特写 → 客流柔焦 → Logo 收尾。\n竖屏缓慢推轨，色调偏暖灰。',
     genPrompt:
-      'Cozy cafe interior at dusk, steam from latte art, slow cinematic dolly, continuous camera motion, photorealistic, no text',
+      'Vertical 9:16 cozy cafe interior at dusk, steam from latte art, slow cinematic push-in, continuous camera motion, photorealistic, no text',
   }),
   c({
     id: 'case-drama-hook',
