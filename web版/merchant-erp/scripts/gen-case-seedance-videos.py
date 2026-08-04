@@ -298,6 +298,14 @@ def main() -> int:
         except Exception as e:
             print(f"POLL_FAIL {cid}: {e}", flush=True)
 
+    if ok:
+        print(
+            "NOTE: 成片已落盘。请再跑口播/BGM 混音：\n"
+            "  python3 scripts/gen-case-content-bgm.py\n"
+            "  python3 scripts/gen-case-narration-vo.py",
+            flush=True,
+        )
+
     print(f"DONE ok={ok}/{len(tasks)} pending_started={len(tasks)}", flush=True)
     # 有待生成时至少成功一半；无待生成则成功
     if not tasks:

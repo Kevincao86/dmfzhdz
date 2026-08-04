@@ -47,9 +47,15 @@ def download(idx: int) -> Path:
     out = TMP / f"SoundHelix-Song-{idx}.mp3"
     if out.exists() and out.stat().st_size > 100_000:
         return out
+    # 已有案例 BGM 切片时可跳过远程下载（避免外网卡住）
+    existing_beds = list(BGM_DIR.glob("case-*.m4a"))
+    if existing_beds and not out.exists():
+        # 仍尝试下载；超时则抛错由上层跳过
+        pass
     url = f"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-{idx}.mp3"
-    print("DL", idx)
-    urllib.request.urlretrieve(url, out)
+    print("DL", idx, flush=True)
+    with urllib.request.urlopen(url, timeout=45) as res:
+        out.write_bytes(res.read())
     return out
 
 

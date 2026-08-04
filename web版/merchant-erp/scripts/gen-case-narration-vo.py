@@ -83,9 +83,9 @@ def mux(cid: str, vo: Path) -> bool:
     if bgm.exists():
         # 口播主声 + 背景音乐压低；对齐视频时长
         filt = (
-            f"[1:a]aresample=44100,volume=1.15,afade=t=in:st=0:d=0.08[vo];"
-            f"[2:a]aresample=44100,volume=0.22,afade=t=in:st=0:d=0.2,afade=t=out:st={max(0.4, vdur - 0.6):.2f}:d=0.55[bg];"
-            f"[vo][bg]amix=inputs=2:duration=first:dropout_transition=0,atrim=0:{vdur:.3f},asetpts=PTS-STARTPTS[a]"
+            f"[1:a]aresample=44100,volume=1.35,afade=t=in:st=0:d=0.06[vo];"
+            f"[2:a]aresample=44100,volume=0.35,afade=t=in:st=0:d=0.15,afade=t=out:st={max(0.4, vdur - 0.6):.2f}:d=0.5[bg];"
+            f"[vo][bg]amix=inputs=2:duration=first:dropout_transition=0,atrim=0:{vdur:.3f},asetpts=PTS-STARTPTS,loudnorm=I=-14:TP=-1.5:LRA=11[a]"
         )
         cmd = [
             "ffmpeg",
@@ -107,14 +107,14 @@ def mux(cid: str, vo: Path) -> bool:
             "-c:a",
             "aac",
             "-b:a",
-            "160k",
+            "192k",
             "-shortest",
             "-movflags",
             "+faststart",
             str(tmp),
         ]
     else:
-        filt = f"[1:a]aresample=44100,volume=1.1,atrim=0:{vdur:.3f},asetpts=PTS-STARTPTS,afade=t=in:st=0:d=0.08[a]"
+        filt = f"[1:a]aresample=44100,volume=1.3,atrim=0:{vdur:.3f},asetpts=PTS-STARTPTS,afade=t=in:st=0:d=0.06,loudnorm=I=-14:TP=-1.5:LRA=11[a]"
         cmd = [
             "ffmpeg",
             "-y",
@@ -133,7 +133,7 @@ def mux(cid: str, vo: Path) -> bool:
             "-c:a",
             "aac",
             "-b:a",
-            "160k",
+            "192k",
             "-shortest",
             "-movflags",
             "+faststart",
