@@ -31,7 +31,7 @@ CASES = [
     (
         "case-promo-event",
         "9:16",
-        "Busy bright retail store interior, shoppers moving, festive warm lights, dynamic camera push-in through aisle, energetic commercial promo video, continuous motion, photorealistic, no logos or text",
+        "Bright clothing boutique store interior, shoppers walking through aisle, festive warm lights, dynamic camera push-in, energetic commercial atmosphere video, continuous motion, photorealistic",
     ),
     (
         "case-ambiance-cafe",
@@ -165,9 +165,8 @@ def extract_poster(mp4: Path, png: Path) -> None:
 
 
 def compress_web(mp4: Path) -> None:
-    """H.264 + AAC + faststart；保留音轨（案例预览需有声音）。"""
+    """H.264 + AAC + faststart；保留音轨。目标 1080 短边内、24fps（勿再压成 480p）。"""
     tmp = mp4.with_suffix(".web.tmp.mp4")
-    # 若已有音轨则转码保留；无音轨则仅视频
     probe = subprocess.run(
         [
             "ffprobe",
@@ -185,6 +184,7 @@ def compress_web(mp4: Path) -> None:
         text=True,
     )
     has_audio = "audio" in (probe.stdout or "")
+    # 竖屏宽≤1080、横屏宽≤1920；偶数对齐，保留高清
     cmd = [
         "ffmpeg",
         "-y",
@@ -193,20 +193,20 @@ def compress_web(mp4: Path) -> None:
         "-c:v",
         "libx264",
         "-preset",
-        "fast",
+        "medium",
         "-crf",
-        "34",
+        "23",
         "-vf",
-        "scale='min(480,iw)':-2",
+        "scale=w='if(gt(iw\\,ih)\\,min(1920\\,iw)\\,min(1080\\,iw))':h=-2",
         "-r",
-        "20",
+        "24",
         "-pix_fmt",
         "yuv420p",
         "-movflags",
         "+faststart",
     ]
     if has_audio:
-        cmd += ["-c:a", "aac", "-b:a", "96k", "-ac", "2"]
+        cmd += ["-c:a", "aac", "-b:a", "128k", "-ac", "2"]
     else:
         cmd += ["-an"]
     cmd.append(str(tmp))
@@ -226,7 +226,7 @@ def start(prompt: str, aspect: str) -> str:
         "flags": {
             "duration": 5,
             "aspect_ratio": aspect,
-            "resolution": "720p",
+            "resolution": "1080p",
             "fps": 24,
         },
         "model": MODEL,
@@ -297,11 +297,6 @@ def main() -> int:
             ok += 1
         except Exception as e:
             print(f"POLL_FAIL {cid}: {e}", flush=True)
-
-    # 顺带压缩已有大文件（>2.5MB）
-    for mp4 in sorted(OUT.glob("*.mp4")):
-        if mp4.stat().st_size > 2_500_000:
-            compress_web(mp4)
 
     print(f"DONE ok={ok}/{len(tasks)} pending_started={len(tasks)}", flush=True)
     # 有待生成时至少成功一半；无待生成则成功
