@@ -9,3 +9,5 @@
 | lingqi-douyin-poster-03-local-push-data.png | 本地推数据看板 |
 | lingqi-douyin-poster-04-ai-content.png | AI 出图/云剪 |
 | lingqi-douyin-poster-05-save-time-roi.png | 老板省时提效 |
+
+品牌标识：`web版/merchant-erp/public/logo.png`（已替换顶部假 logo）。
