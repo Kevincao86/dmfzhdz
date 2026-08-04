@@ -10,12 +10,12 @@ mkdir -p "$OUT"
 start_one() {
   local id="$1" aspect="$2" prompt="$3"
   local body
-  body=$(python3 - <<PY
-import json
+  body=$(ASPECT="$aspect" PROMPT="$prompt" MODEL="$MODEL" python3 - <<'PY'
+import json, os
 print(json.dumps({
-  "prompt": """$prompt""",
-  "flags": {"duration": 5, "aspect_ratio": "$aspect", "resolution": "1080p", "fps": 24},
-  "model": "$MODEL",
+  "prompt": os.environ["PROMPT"],
+  "flags": f"--dur 5 --fps 24 --ratio {os.environ['ASPECT']} --wm false --resolution 1080p",
+  "model": os.environ["MODEL"],
   "skip_qwen": True,
 }, ensure_ascii=False))
 PY
@@ -65,7 +65,7 @@ poll_one() {
 start_one case-visit-night "9:16" "Night street food market in China, warm lantern glow, steam rising from stalls, handheld follow shot walking through crowd, continuous smooth camera motion, cinematic food vlog, photorealistic, no text"
 start_one case-seed-skincare "9:16" "Luxury skincare serum bottle rotating slowly on glass, soft pink light, liquid texture dripping, shallow depth of field, product commercial video, continuous camera orbit, photorealistic, no text"
 start_one case-promo-event "9:16" "Bright clothing boutique store interior, shoppers walking through aisle, festive warm lights, dynamic camera push-in, energetic commercial atmosphere video, continuous motion, photorealistic"
-start_one case-ambiance-cafe "16:9" "Cozy cafe interior at dusk, steam from latte art, slow cinematic dolly past wooden tables and window light, brand atmosphere film, continuous camera motion, photorealistic, no text"
+start_one case-ambiance-cafe "16:9" "Wide cinematic landscape 16:9 view of cozy cafe interior at dusk, steam from latte art, slow horizontal dolly past wooden tables and large window light, brand atmosphere film, continuous camera motion, photorealistic, no text overlay"
 start_one case-drama-hook "9:16" "Person opening apartment door at night looking surprised, cool hallway light, emotional close-up then pull back, suspenseful short drama hook, continuous camera motion, photorealistic, no text"
 start_one case-food-ramen "9:16" "Steaming tonkotsu ramen bowl, chopsticks lifting noodles with broth drip, rising steam, slow orbit macro food video, appetite cinematic, continuous motion, photorealistic, no text"
 start_one case-visit-brunch "9:16" "Sunny brunch cafe table, avocado toast and latte, natural window light, gentle push-in camera, lifestyle food video, continuous motion, photorealistic, no text"

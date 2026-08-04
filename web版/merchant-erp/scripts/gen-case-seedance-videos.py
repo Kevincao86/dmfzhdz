@@ -36,7 +36,7 @@ CASES = [
     (
         "case-ambiance-cafe",
         "16:9",
-        "Cozy cafe interior at dusk, steam from latte art, slow cinematic dolly past wooden tables and window light, brand atmosphere film, continuous camera motion, photorealistic, no text",
+        "Wide cinematic landscape 16:9 view of cozy cafe interior at dusk, steam from latte art, slow horizontal dolly past wooden tables and large window light, brand atmosphere film, continuous camera motion, photorealistic, no text overlay",
     ),
     (
         "case-drama-hook",
@@ -221,14 +221,11 @@ def compress_web(mp4: Path) -> None:
 
 
 def start(prompt: str, aspect: str) -> str:
+    # 网关只解析 CLI 字符串 flags（--ratio / --dur…）；JSON 对象会被忽略并默认 9:16
+    flags = f"--dur 5 --fps 24 --ratio {aspect} --wm false --resolution 1080p"
     body = {
         "prompt": prompt,
-        "flags": {
-            "duration": 5,
-            "aspect_ratio": aspect,
-            "resolution": "1080p",
-            "fps": 24,
-        },
+        "flags": flags,
         "model": MODEL,
         "skip_qwen": True,
     }
