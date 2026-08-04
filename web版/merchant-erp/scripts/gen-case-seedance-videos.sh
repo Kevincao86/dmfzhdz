@@ -14,7 +14,7 @@ start_one() {
 import json
 print(json.dumps({
   "prompt": """$prompt""",
-  "flags": {"duration": 5, "aspect_ratio": "$aspect", "resolution": "720p", "fps": 24},
+  "flags": {"duration": 5, "aspect_ratio": "$aspect", "resolution": "1080p", "fps": 24},
   "model": "$MODEL",
   "skip_qwen": True,
 }, ensure_ascii=False))
@@ -64,7 +64,7 @@ poll_one() {
 # 启动全部任务
 start_one case-visit-night "9:16" "Night street food market in China, warm lantern glow, steam rising from stalls, handheld follow shot walking through crowd, continuous smooth camera motion, cinematic food vlog, photorealistic, no text"
 start_one case-seed-skincare "9:16" "Luxury skincare serum bottle rotating slowly on glass, soft pink light, liquid texture dripping, shallow depth of field, product commercial video, continuous camera orbit, photorealistic, no text"
-start_one case-promo-event "9:16" "Busy bright retail store interior, shoppers moving, festive warm lights, dynamic camera push-in through aisle, energetic commercial promo video, continuous motion, photorealistic, no logos or text"
+start_one case-promo-event "9:16" "Bright clothing boutique store interior, shoppers walking through aisle, festive warm lights, dynamic camera push-in, energetic commercial atmosphere video, continuous motion, photorealistic"
 start_one case-ambiance-cafe "16:9" "Cozy cafe interior at dusk, steam from latte art, slow cinematic dolly past wooden tables and window light, brand atmosphere film, continuous camera motion, photorealistic, no text"
 start_one case-drama-hook "9:16" "Person opening apartment door at night looking surprised, cool hallway light, emotional close-up then pull back, suspenseful short drama hook, continuous camera motion, photorealistic, no text"
 start_one case-food-ramen "9:16" "Steaming tonkotsu ramen bowl, chopsticks lifting noodles with broth drip, rising steam, slow orbit macro food video, appetite cinematic, continuous motion, photorealistic, no text"

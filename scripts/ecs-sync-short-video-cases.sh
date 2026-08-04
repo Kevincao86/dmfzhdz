@@ -13,7 +13,7 @@ if [[ ! -d "$SRC" ]]; then
 fi
 
 ssh "$HOST" "mkdir -p '$DEST'"
-rsync -avz --delete "$SRC" "$HOST:$DEST"
+rsync -avz --delete --exclude '_bak*' --exclude '_task_*' --exclude '*.tmp.mp4' "$SRC" "$HOST:$DEST"
 echo "OK → https://mofangdianai.com/erp-mp-static/short-video-cases/"
 curl -sS -o /dev/null -w "probe case-visit-night.mp4 HTTP %{http_code} size=%{size_download}\n" \
   "https://mofangdianai.com/erp-mp-static/short-video-cases/case-visit-night.mp4" || true
