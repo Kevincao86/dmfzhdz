@@ -35,8 +35,8 @@ CASES = [
     ),
     (
         "case-ambiance-cafe",
-        "16:9",
-        "Wide cinematic landscape 16:9 view of cozy cafe interior at dusk, steam from latte art, slow horizontal dolly past wooden tables and large window light, brand atmosphere film, continuous camera motion, photorealistic, no text overlay",
+        "9:16",
+        "Vertical 9:16 cozy cafe interior at dusk, steam from latte art, slow cinematic push-in past wooden tables and window light, brand atmosphere film, continuous camera motion, photorealistic, no text overlay",
     ),
     (
         "case-drama-hook",
