@@ -27,6 +27,8 @@ import { probeMerchantPlatforms } from '../services/platformConnectivityProbe'
 import { fetchHomeDashboardByPlatforms } from '../services/merchantDashboardApi'
 import { fetchFinanceReconcile } from '../services/financeReconcileApi'
 import type { StorePlatformTab } from '../services/merchantStoresApi'
+import { getDouyinStores } from '../services/douyinMerchantApi'
+import { buildStoreGeoBriefs } from './geoScoresFromDouyinRows'
 
 export type SoftScenarioConfirmResult = {
   ok: boolean
@@ -332,6 +334,47 @@ async function confirmAnalyzeException(title: string): Promise<SoftScenarioConfi
     }
   }
 
+  let storeScopeLine = '门店范围：未绑定抖音来客，跳过门店清单'
+  let geoDimNote = '缺口：未拉 Geo 明细；请在经营方案页继续'
+  const dyTok = readMerchantSession('meoo_douyin_merchant_token')
+  if (dyTok) {
+    try {
+      const storesRes = await getDouyinStores({
+        accessToken: dyTok,
+        page: 1,
+        pageSize: 100,
+        claimScope: 'claimed',
+      })
+      if (!storesRes.ok) {
+        storeScopeLine = `门店范围：拉取失败 — ${storesRes.message}`
+      } else if (!storesRes.items.length) {
+        storeScopeLine = '门店范围：暂无已认领门店'
+        geoDimNote = 'GEO：暂无已认领门店'
+      } else {
+        const chain = buildStoreGeoBriefs(storesRes.items)
+        if (chain.isChain) {
+          const weak = [...chain.briefs]
+            .sort((a, b) => a.healthScore - b.healthScore)
+            .slice(0, 5)
+            .map((b) => `${b.name}（${b.healthScore}分）`)
+            .join('；')
+          storeScopeLine = [
+            `门店范围：连锁共 ${chain.storeCount} 家（诊断对象=全部，已汇总）`,
+            `门店清单：${chain.briefs.map((b) => b.name).join('、')}`,
+            `连锁 GEO 聚合健康分 ${chain.aggregateHealth}/100；偏低门店示例：${weak}`,
+          ].join('\n')
+          geoDimNote = `连锁聚合健康分 ${chain.aggregateHealth}/100；信息完整度 ${chain.aggregateInputs.infoCompletenessPercent}%（已覆盖 ${chain.storeCount} 家）`
+        } else {
+          const one = chain.briefs[0]!
+          storeScopeLine = `门店范围：单店 — ${one.name}`
+          geoDimNote = `健康分 ${one.healthScore}/100；信息完整度 ${one.infoCompletenessPercent}%`
+        }
+      }
+    } catch (e) {
+      storeScopeLine = `门店范围：拉取异常 — ${e instanceof Error ? e.message : String(e)}`
+    }
+  }
+
   const margin = readStoreMarginConfig()
   const industryName = margin.industry?.name?.trim() || ''
   const financeNote = finance.ok
@@ -379,7 +422,7 @@ async function confirmAnalyzeException(title: string): Promise<SoftScenarioConfi
     },
     {
       name: 'Geo 优化分析',
-      note: '缺口：本链路未拉 Geo 明细；请在经营方案页继续',
+      note: geoDimNote,
     },
   ]
 
@@ -399,6 +442,7 @@ async function confirmAnalyzeException(title: string): Promise<SoftScenarioConfi
       `「${title}」已确认（只读诊断，未写库）。`,
       boundLine,
       skipLine,
+      storeScopeLine,
       financeNote,
       dashNote,
       '八维度摘要：',
