@@ -122,6 +122,10 @@ import {
   membershipAllowsAiTask,
 } from '../lib/aiAgentPlan'
 import {
+  confirmSoftScenarioTask,
+  isSoftScenarioTask,
+} from '../lib/aiAgentSoftScenarioConfirm'
+import {
   buildRecruitmentOrderFromAgentBrief,
   recruitmentOrderDetailFromRegistry,
 } from '../lib/aiAgentRecruitmentOrder'
@@ -2324,6 +2328,58 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
             })
             setDrawerOpen(false)
             navigate('/finance/tax')
+          } finally {
+            setConfirmingPreviewId(null)
+            setTaskConfirming(false)
+          }
+        })()
+        return
+      }
+
+      if (isSoftScenarioTask(p.taskType)) {
+        const lastUser = [...messagesRef.current].reverse().find((m) => m.role === 'user')
+        const userBrief =
+          lastUser?.content?.replace(/\[引用[\s\S]*?\n\n/, '').trim() ||
+          pending.content?.trim() ||
+          ''
+        void (async () => {
+          setConfirmingPreviewId(previewMessageId)
+          setTaskConfirming(true)
+          try {
+            const result = await confirmSoftScenarioTask({
+              taskType: p.taskType,
+              title,
+              userBrief,
+            })
+            patchPreviewStatus(previewMessageId, 'confirmed')
+            setMessages((prev) => {
+              const next = [
+                ...prev,
+                createAgentMessage('task_result', result.summary, {
+                  resultSummary: result.resultSummary ?? (result.ok ? 'confirmed' : 'partial'),
+                }),
+              ]
+              messagesRef.current = next
+              return next
+            })
+            if (result.navigateTo) {
+              setDrawerOpen(false)
+              navigate(result.navigateTo)
+            }
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e)
+            setMessages((prev) => {
+              const next = [
+                ...prev,
+                createAgentMessage(
+                  'task_result',
+                  `「${title}」执行失败：${msg.slice(0, 200)}。可稍后在对应模块重试。`,
+                  { resultSummary: 'partial' },
+                ),
+              ]
+              messagesRef.current = next
+              return next
+            })
           } finally {
             setConfirmingPreviewId(null)
             setTaskConfirming(false)

@@ -77,6 +77,18 @@ export function aiTaskConfirmLabel(taskType: AiTaskType | null): string {
       return '确认并下达招募订单'
     case 'file_tax':
       return '确认并一键报税'
+    case 'handle_review':
+      return '确认并处理评价'
+    case 'sync_platform':
+      return '确认并同步平台'
+    case 'generate_copywriting':
+      return '确认并生成文案'
+    case 'optimize_local_ads':
+      return '确认并优化本地推'
+    case 'follow_local_lead':
+      return '确认并跟进线索'
+    case 'analyze_exception':
+      return '确认并分析异常'
     default:
       return '确认执行'
   }
