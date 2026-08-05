@@ -737,6 +737,9 @@ agentModelRoute
 AiAgentContext
 aiAgentPlan
 aiAgentSoftScenarioConfirm
+aiAgentScenarioWorkflows
+agentMerchantIntelLoader
+geoScoresFromDouyinRows
 mpPointsEconomics
 merchantIndustryAlign
 agentMerchantContext

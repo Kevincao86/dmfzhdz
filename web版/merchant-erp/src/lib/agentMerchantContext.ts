@@ -24,6 +24,13 @@ export type MerchantIntelSnapshot = {
   industryPath?: string
   competitorSummary?: string
   geoSummary?: string
+  /**
+   * 抖音已认领门店范围（连锁多店时注明须全覆盖分析）。
+   * 由 intel loader 注入；单店也可有简短一行。
+   */
+  chainStoresSummary?: string
+  /** 已认领门店数（≥2 视为连锁） */
+  claimedStoreCount?: number
   activitiesSummary?: string
   kolBriefSummary?: string
   recruitmentDraftSummary?: string
@@ -91,7 +98,21 @@ export function buildAgentMerchantIntelContextFromSnapshot(s: MerchantIntelSnaps
     '接口（已尝试调用）：抖音来客门店列表→GEO 评分、/api/meoo-marketing-activities 平台活动、/api/meoo-competitor-analysis（无缓存时按需）、商品/菜单相关方案 API。',
   ]
 
-  if (s.storeName) lines.push(`当前门店：${s.storeName}`)
+  const claimed = s.claimedStoreCount ?? 0
+  if (claimed > 1 && s.chainStoresSummary) {
+    lines.push(s.chainStoresSummary)
+    lines.push(
+      '【连锁多门店强制】诊断对象=上述全部已认领门店；须先列门店清单，再按店给出要点，最后输出连锁汇总。禁止只分析其中一家或把单店标签当作唯一对象。',
+    )
+    if (s.storeName) {
+      lines.push(`参考标签（非唯一诊断对象）：${s.storeName}`)
+    }
+  } else if (s.chainStoresSummary) {
+    lines.push(s.chainStoresSummary)
+    if (s.storeName) lines.push(`当前门店：${s.storeName}`)
+  } else if (s.storeName) {
+    lines.push(`当前门店：${s.storeName}`)
+  }
 
   lines.push(s.boundPlatformsSummary || formatAgentBoundPlatformsContext())
   lines.push(

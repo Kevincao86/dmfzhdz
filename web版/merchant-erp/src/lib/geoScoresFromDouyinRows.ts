@@ -1,6 +1,49 @@
 import type { DouyinStoreRow } from '../services/douyinMerchantApi'
 import type { GeoHealthInputs } from './geoModuleSpec'
-import { contentFreshnessPercentFromLastUpdate } from './geoModuleSpec'
+import { computeGeoHealthScore, contentFreshnessPercentFromLastUpdate } from './geoModuleSpec'
+
+export type StoreGeoBrief = {
+  id: string
+  name: string
+  healthScore: number
+  infoCompletenessPercent: number
+  missing: string[]
+}
+
+/** 连锁/多门店：逐店 GEO 要点 + 全店聚合 */
+export function buildStoreGeoBriefs(stores: DouyinStoreRow[]): {
+  isChain: boolean
+  storeCount: number
+  aggregateInputs: GeoHealthInputs
+  aggregateHealth: number
+  briefs: StoreGeoBrief[]
+} {
+  const aggregate = computeDeterministicGeoFromStores(stores)
+  const aggregateHealth = computeGeoHealthScore(aggregate.inputs)
+  const briefs: StoreGeoBrief[] = stores.map((s) => {
+    const one = computeDeterministicGeoFromStores([s])
+    const missing: string[] = []
+    if (!s.name?.trim()) missing.push('名称')
+    if (!s.address?.trim()) missing.push('地址')
+    if (!s.businessHours?.trim()) missing.push('营业时间')
+    if (!s.phone?.trim()) missing.push('电话')
+    if (!s.avatarUrl?.trim()) missing.push('门头图')
+    return {
+      id: String(s.id || '').trim(),
+      name: String(s.name || '').trim() || `门店${s.id || '?'}`,
+      healthScore: computeGeoHealthScore(one.inputs),
+      infoCompletenessPercent: one.inputs.infoCompletenessPercent,
+      missing,
+    }
+  })
+  return {
+    isChain: stores.length > 1,
+    storeCount: stores.length,
+    aggregateInputs: aggregate.inputs,
+    aggregateHealth,
+    briefs,
+  }
+}
 
 /** 与概览「问法覆盖」演示表结构一致，供无 AI 时展示 */
 export const DEFAULT_GEO_QUERY_SAMPLES: { q: string; covered: boolean }[] = [

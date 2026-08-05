@@ -15,8 +15,7 @@ import {
   saveCompetitorReport,
   type CompetitorReport,
 } from './competitorStorage'
-import { computeGeoHealthScore } from './geoModuleSpec'
-import { computeDeterministicGeoFromStores } from './geoScoresFromDouyinRows'
+import { buildStoreGeoBriefs, computeDeterministicGeoFromStores } from './geoScoresFromDouyinRows'
 import { readKolBriefRecords, readSelectedBriefForRecruitment } from './kolBriefStorage'
 import { readMerchantSession } from './merchantSession'
 import type { MarketingActivityPlatform } from './marketingActivityTypes'
@@ -32,6 +31,8 @@ const FETCH_TIMEOUT_MS = 45_000
 export type MerchantIntelEnrichment = Pick<
   MerchantIntelSnapshot,
   | 'geoSummary'
+  | 'chainStoresSummary'
+  | 'claimedStoreCount'
   | 'activitiesSummary'
   | 'kolBriefSummary'
   | 'recruitmentDraftSummary'
@@ -156,7 +157,12 @@ async function fetchOnlineProductsSummary(): Promise<{ text?: string; note?: str
   return { note: notes.join('；') || '未拉取到绑定平台商品' }
 }
 
-async function fetchGeoSummary(): Promise<{ text?: string; note?: string }> {
+async function fetchGeoSummary(): Promise<{
+  text?: string
+  note?: string
+  chainStoresSummary?: string
+  claimedStoreCount?: number
+}> {
   const token = readMerchantSession('meoo_douyin_merchant_token')
   if (!token) {
     return { note: 'GEO：未绑定抖音来客（/api 门店列表未调用）' }
@@ -165,26 +171,57 @@ async function fetchGeoSummary(): Promise<{ text?: string; note?: string }> {
     const r = await getDouyinStores({
       accessToken: token,
       page: 1,
-      pageSize: 50,
+      pageSize: 100,
       claimScope: 'claimed',
     })
     if (!r.ok) return { note: `GEO：门店列表接口失败 — ${r.message ?? 'unknown'}` }
-    if (!r.items.length) return { text: 'GEO：暂无已认领门店，健康分按 0 计' }
+    if (!r.items.length) {
+      return {
+        text: 'GEO：暂无已认领门店，健康分按 0 计',
+        claimedStoreCount: 0,
+        chainStoresSummary: '门店范围：暂无已认领门店',
+      }
+    }
+    const chain = buildStoreGeoBriefs(r.items)
     const { inputs, querySamples } = computeDeterministicGeoFromStores(r.items)
-    const health = computeGeoHealthScore(inputs)
     const gaps = querySamples.filter((x) => !x.covered).map((x) => x.q)
-    const storeNames = r.items
-      .slice(0, 5)
-      .map((s) => s.name)
-      .filter(Boolean)
-      .join('、')
+    const totalHint =
+      typeof r.total === 'number' && r.total > r.items.length
+        ? `（接口 total=${r.total}，本批已拉 ${r.items.length} 家，以本批为准全覆盖分析）`
+        : ''
+    const nameList = chain.briefs.map((b) => b.name).join('、')
+    const perStoreLines = chain.briefs
+      .slice(0, 40)
+      .map((b) => {
+        const miss = b.missing.length ? `；缺口：${b.missing.join('、')}` : ''
+        return `- ${b.name}：健康分 ${b.healthScore}/100，信息完整度 ${b.infoCompletenessPercent}%${miss}`
+      })
+      .join('\n')
+    const more =
+      chain.briefs.length > 40 ? `\n…另有 ${chain.briefs.length - 40} 家略（总数 ${chain.storeCount}）` : ''
+
+    const chainStoresSummary = chain.isChain
+      ? [
+          `门店范围：连锁共 ${chain.storeCount} 家已认领门店${totalHint}`,
+          `门店清单：${nameList}`,
+          '须对上述全部门店分析后给出连锁汇总，禁止只挑一家。',
+        ].join('\n')
+      : `门店范围：单店 1 家 — ${chain.briefs[0]?.name || '未命名'}`
+
     return {
+      claimedStoreCount: chain.storeCount,
+      chainStoresSummary,
       text: [
-        `GEO 健康分 ${health}/100（门店 ${r.items.length} 家${storeNames ? `：${storeNames}` : ''}）`,
-        `维度：信息完整度 ${inputs.infoCompletenessPercent}% · 问法覆盖 ${inputs.questionCoveragePercent}% · 内容新鲜度 ${inputs.contentFreshnessPercent}%`,
+        chain.isChain
+          ? `GEO 连锁聚合健康分 ${chain.aggregateHealth}/100（共 ${chain.storeCount} 家）`
+          : `GEO 健康分 ${chain.aggregateHealth}/100（门店 1 家：${chain.briefs[0]?.name || '—'}）`,
+        `聚合维度：信息完整度 ${inputs.infoCompletenessPercent}% · 问法覆盖 ${inputs.questionCoveragePercent}% · 内容新鲜度 ${inputs.contentFreshnessPercent}%`,
         gaps.length ? `未覆盖高频问法：${gaps.join('、')}` : '高频问法均已覆盖',
+        chain.isChain ? `逐店 GEO 要点：\n${perStoreLines}${more}` : '',
         '接口：抖音来客门店列表 + 本地 geoModuleSpec 权重计算（与 GEO 运营页同源）',
-      ].join('\n'),
+      ]
+        .filter(Boolean)
+        .join('\n'),
     }
   } catch (e) {
     return { note: `GEO：拉取异常 — ${e instanceof Error ? e.message : String(e)}` }
@@ -341,6 +378,8 @@ export async function fetchMerchantIntelEnrichment(
       withTimeout(fetchGeoSummary(), FETCH_TIMEOUT_MS, { note: 'GEO：请求超时' }).then((g) => {
         if (g.text) out.geoSummary = g.text
         else if (g.note) notes.push(g.note)
+        if (g.chainStoresSummary) out.chainStoresSummary = g.chainStoresSummary
+        if (typeof g.claimedStoreCount === 'number') out.claimedStoreCount = g.claimedStoreCount
       }),
     )
   }
