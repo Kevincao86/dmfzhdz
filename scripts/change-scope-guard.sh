@@ -735,6 +735,8 @@ aiImageIntentRouting
 agentImageModelKeys
 agentModelRoute
 AiAgentContext
+aiAgentPlan
+aiAgentSoftScenarioConfirm
 mpPointsEconomics
 merchantIndustryAlign
 agentMerchantContext
