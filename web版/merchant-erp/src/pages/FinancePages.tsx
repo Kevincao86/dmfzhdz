@@ -200,17 +200,24 @@ export function FinanceReconcilePage() {
   }, [load])
 
   useEffect(() => {
+    const refresh = () => setMargins(readStorePlatformMargins())
     const onStorage = (e: StorageEvent) => {
       if (
         e.key === 'meoo_store_margin_config_v1' ||
         e.key === 'meoo_store_gross_margins_v1' ||
+        e.key?.startsWith('meoo_store_margin_config_v1@') ||
+        e.key?.startsWith('meoo_store_gross_margins_v1@') ||
         e.key === null
       ) {
-        setMargins(readStorePlatformMargins())
+        refresh()
       }
     }
     window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
+    window.addEventListener('meoo-store-margin-config-changed', refresh)
+    return () => {
+      window.removeEventListener('storage', onStorage)
+      window.removeEventListener('meoo-store-margin-config-changed', refresh)
+    }
   }, [])
 
   const refreshMargins = useCallback(() => {

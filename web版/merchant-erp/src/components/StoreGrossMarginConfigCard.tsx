@@ -195,17 +195,26 @@ export default function StoreGrossMarginConfigCard({
       xhs: clampMarginPct(marginDraft.xhs),
     }
     let nextIndustry: MarginIndustryPersist = { ...marginIndustry }
-    if (tree.length > 0 && categorySelectionOk) {
+    if (tree.length > 0) {
+      if (!categorySelectionOk) {
+        setToast('请先选择经营类目（一级 + 二级），再保存')
+        return
+      }
       const ids = [cat1, cat2]
       const { path, name } = pickerLabelsForPath(tree, ids)
+      if (!path.trim()) {
+        setToast('类目路径无效，请重新选择后再保存')
+        return
+      }
       nextIndustry = {
         code: '',
         leafCategoryId: cat2,
-        name,
+        name: name || path,
         path,
       }
-    } else if (tree.length > 0 && (cat1 || cat2) && !categorySelectionOk) {
-      setToast('请选择可用的二级类目（灰色项为不可用）')
+    } else if (!marginIndustry.path?.trim() && !marginIndustry.name?.trim()) {
+      /** 未加载类目树且本地也无类目时，禁止只存毛利导致竞品分析一直提示未配置 */
+      setToast('请先同步类目并选择经营类目，再保存')
       return
     }
     onSaved({ margins: next, industry: nextIndustry })

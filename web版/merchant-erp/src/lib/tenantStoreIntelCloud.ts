@@ -3,7 +3,12 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchPrimaryTenantId } from './tenantBilling'
-import { readStoreMarginConfig } from './storeMarginsRead'
+import {
+  applyStoreMarginConfigFromUnknown,
+  readStoreMarginConfig,
+  storeMarginIndustryConfigured,
+  type StoreMarginConfig,
+} from './storeMarginsRead'
 import { loadStoreMenuRecord, type StoreMenuItem } from './storeMenuStorage'
 
 export type TenantStoreIntelRow = {
@@ -70,6 +75,26 @@ export async function upsertMarginConfigCloud(
     },
     { onConflict: 'tenant_id' },
   )
+}
+
+/**
+ * 从云端拉取门店毛利/经营类目到 localStorage。
+ * 默认仅在本地尚未配置经营类目时写入，避免空本地把云端冲掉前的读回。
+ */
+export async function pullMarginConfigFromCloud(
+  supabase: SupabaseClient,
+): Promise<StoreMarginConfig | null> {
+  const tenantId = await fetchPrimaryTenantId(supabase)
+  if (!tenantId) return null
+  const { data, error } = await supabase
+    .from('tenant_store_intel')
+    .select('margin_config')
+    .eq('tenant_id', tenantId)
+    .maybeSingle()
+  if (error || !data?.margin_config) return null
+  const local = readStoreMarginConfig()
+  if (storeMarginIndustryConfigured(local.industry)) return local
+  return applyStoreMarginConfigFromUnknown(data.margin_config, { preferIfLocalEmpty: true })
 }
 
 /** 从 Supabase 恢复菜单价目（localStorage 为空或切换设备时使用） */

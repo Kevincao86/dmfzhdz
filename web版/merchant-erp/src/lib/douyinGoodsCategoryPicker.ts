@@ -82,7 +82,8 @@ export function pickerLabelsForPath(
   ids: string[],
 ): { path: string; name: string } {
   const names = ids.map((id) => findNodeById(tree as DouyinCategoryNode[], id)?.name ?? '').filter(Boolean)
-  return { path: names.join(' > '), name: names[0] ?? '' }
+  /** name 取末级（二级）标签；path 为 一级 > 二级 */
+  return { path: names.join(' > '), name: names[names.length - 1] ?? names[0] ?? '' }
 }
 
 /** 与 category/get 一致：末级 + enable + 非封禁；懒加载补树后 uploadableLeafIds 可能滞后，以节点字段为准 */
