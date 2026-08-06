@@ -17,7 +17,16 @@ import {
   X,
 } from 'lucide-react'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
-import { pushLocalStoreIntelToCloud, upsertMarginConfigCloud } from '../lib/tenantStoreIntelCloud'
+import {
+  pullMarginConfigFromCloud,
+  pushLocalStoreIntelToCloud,
+  upsertMarginConfigCloud,
+} from '../lib/tenantStoreIntelCloud'
+import {
+  readStoreMarginConfig,
+  writeStoreMarginConfig,
+  type StoreMarginConfig,
+} from '../lib/storeMarginsRead'
 import { getActiveTenantStorageId } from '../lib/tenantLocalState'
 import { Link, useNavigate } from 'react-router-dom'
 import {
@@ -250,9 +259,6 @@ type SyncedProduct = {
 type PickRow = SyncedProduct & { selected: boolean }
 
 const DEFAULT_MARGINS = { douyin: 38, meituan: 35, xhs: 32 }
-/** 新：毛利率 + 手动行业；旧：仅三平台数字 */
-const MEOO_STORE_MARGIN_CONFIG_KEY = 'meoo_store_margin_config_v1'
-const MEOO_STORE_GROSS_MARGINS_KEY = 'meoo_store_gross_margins_v1'
 
 type StoreMargins = typeof DEFAULT_MARGINS
 
@@ -263,64 +269,14 @@ type MarginIndustry = {
   path: string
 }
 
-type StoredMarginConfig = { margins: StoreMargins; industry: MarginIndustry }
-
-function clampMarginPct(n: number): number {
-  const x = Math.round(Number(n))
-  if (!Number.isFinite(x)) return 0
-  return Math.min(100, Math.max(0, x))
-}
-
-function parseMarginsFromUnknown(o: Record<string, unknown>): StoreMargins {
-  const m = (o.margins && typeof o.margins === 'object' ? o.margins : o) as Record<string, unknown>
-  return {
-    douyin: clampMarginPct(Number(m.douyin ?? DEFAULT_MARGINS.douyin)),
-    meituan: clampMarginPct(Number(m.meituan ?? DEFAULT_MARGINS.meituan)),
-    xhs: clampMarginPct(Number(m.xhs ?? DEFAULT_MARGINS.xhs)),
-  }
-}
+type StoredMarginConfig = StoreMarginConfig
 
 function loadStoredMarginConfig(): StoredMarginConfig {
-  try {
-    const raw = window.localStorage.getItem(MEOO_STORE_MARGIN_CONFIG_KEY)
-    if (raw) {
-      const o = JSON.parse(raw) as Record<string, unknown>
-      const ind =
-        o.industry && typeof o.industry === 'object' ? (o.industry as Record<string, unknown>) : {}
-      return {
-        margins: parseMarginsFromUnknown(o),
-        industry: {
-          code: typeof ind.code === 'string' ? ind.code : '',
-          leafCategoryId: typeof ind.leafCategoryId === 'string' ? ind.leafCategoryId : '',
-          name: typeof ind.name === 'string' ? ind.name : '',
-          path: typeof ind.path === 'string' ? ind.path : '',
-        },
-      }
-    }
-    const legacy = window.localStorage.getItem(MEOO_STORE_GROSS_MARGINS_KEY)
-    if (legacy) {
-      const o = JSON.parse(legacy) as Record<string, unknown>
-      return {
-        margins: parseMarginsFromUnknown(o),
-        industry: { code: '', leafCategoryId: '', name: '', path: '' },
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-  return {
-    margins: { ...DEFAULT_MARGINS },
-    industry: { code: '', leafCategoryId: '', name: '', path: '' },
-  }
+  return readStoreMarginConfig()
 }
 
 function persistMarginConfig(cfg: StoredMarginConfig) {
-  try {
-    window.localStorage.setItem(MEOO_STORE_MARGIN_CONFIG_KEY, JSON.stringify(cfg))
-    window.localStorage.setItem(MEOO_STORE_GROSS_MARGINS_KEY, JSON.stringify(cfg.margins))
-  } catch {
-    /* ignore */
-  }
+  writeStoreMarginConfig(cfg)
   if (supabaseConfigured && supabase) {
     void upsertMarginConfigCloud(supabase, {
       margins: cfg.margins,
@@ -366,21 +322,43 @@ export default function ProductsPage() {
   const [pickItems, setPickItems] = useState<PickRow[]>([])
   const initialMarginCfg = useMemo(() => loadStoredMarginConfig(), [])
 
+  const [margins, setMargins] = useState<StoreMargins>(() => initialMarginCfg.margins)
+  const [marginIndustry, setMarginIndustry] = useState<MarginIndustry>(
+    () => initialMarginCfg.industry,
+  )
+
   useEffect(() => {
     if (!supabaseConfigured || !supabase) return
     const client = supabase
     const sync = () => {
       if (!getActiveTenantStorageId()) return
-      void pushLocalStoreIntelToCloud(client)
+      void (async () => {
+        /** 先拉云端类目，避免空本地把已保存的经营类目冲掉 */
+        const pulled = await pullMarginConfigFromCloud(client)
+        if (pulled?.industry?.path || pulled?.industry?.name) {
+          setMargins(pulled.margins)
+          setMarginIndustry(pulled.industry)
+        }
+        const local = readStoreMarginConfig()
+        if (local.industry.path || local.industry.name || local.industry.leafCategoryId) {
+          await pushLocalStoreIntelToCloud(client)
+        }
+      })()
     }
     sync()
     window.addEventListener('meoo-active-tenant-changed', sync)
     return () => window.removeEventListener('meoo-active-tenant-changed', sync)
   }, [])
-  const [margins, setMargins] = useState<StoreMargins>(() => initialMarginCfg.margins)
-  const [marginIndustry, setMarginIndustry] = useState<MarginIndustry>(
-    () => initialMarginCfg.industry,
-  )
+
+  useEffect(() => {
+    const onLocal = () => {
+      const cfg = readStoreMarginConfig()
+      setMargins(cfg.margins)
+      setMarginIndustry(cfg.industry)
+    }
+    window.addEventListener('meoo-store-margin-config-changed', onLocal)
+    return () => window.removeEventListener('meoo-store-margin-config-changed', onLocal)
+  }, [])
   const [marginAdvisorData, setMarginAdvisorData] = useState<MarginAdvisorOk | null>(null)
   const [marginAdvisorLoading, setMarginAdvisorLoading] = useState(false)
   const [marginAdvisorError, setMarginAdvisorError] = useState<string | null>(null)

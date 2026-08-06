@@ -58,6 +58,7 @@ list_scopes() {
   shop_analysis          商家 ERP：店铺分析（图表/门店筛选/经营建议/逐单 POI）
   edition_cs_sync        各端前端对齐 CS（DR/FWS/Admin 同源功能与积分经济）
   ai_agent_quick_image   商家 ERP：AI 智能体快捷任务平铺 + 生图意图自动切模型
+  competitor_industry    商家 ERP：竞争对手分析经营类目读取/门店毛利配置联动
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -709,6 +710,20 @@ merchant_platform_orders_poi
 ecs-auth-api-server
 erpAiPointsSpendCore
 erpAiApiPointsGate
+change-scope-guard
+PAT
+      ;;
+    competitor_industry)
+      cat <<'PAT'
+CompetitorAnalysisPage
+competitorIndustry
+competitorStorage
+storeMarginsRead
+StoreGrossMarginConfigCard
+ProductsPage
+tenantStoreIntelCloud
+douyinGoodsCategoryPicker
+FinancePages
 change-scope-guard
 PAT
       ;;

@@ -1,7 +1,10 @@
 /**
  * 竞争对手分析所用经营类目：优先商品页「门店毛利配置」，其次从门店名推断。
  */
-import { readStoreMarginConfig } from './storeMarginsRead'
+import {
+  readStoreMarginConfig,
+  storeMarginIndustryConfigured,
+} from './storeMarginsRead'
 
 export type CompetitorIndustryResolved = {
   path: string
@@ -22,6 +25,13 @@ function inferIndustryFromStoreName(storeName: string): CompetitorIndustryResolv
   if (/百货|商场|购物中心|奥特莱斯/.test(sn)) {
     return { path: '购物 > 百货零售', name: '百货零售', source: 'store_name' }
   }
+  /** 足疗 / SPA / 汤泉等休闲业态（截图门店名常见） */
+  if (/足道|足疗|足浴|修脚|采耳|汤泉|温泉|洗浴|汗蒸|SPA|Spa|spa|按摩|推拿|养生会所/.test(sn)) {
+    return { path: '休闲娱乐 > 足疗按摩', name: '足疗按摩', source: 'store_name' }
+  }
+  if (/美容|美发|美甲|美睫|皮肤管理|纹绣/.test(sn)) {
+    return { path: '丽人 > 美发', name: '美发', source: 'store_name' }
+  }
   return null
 }
 
@@ -34,6 +44,18 @@ export function resolveCompetitorAnalysisIndustry(storeName?: string): Competito
     return {
       path: path || name,
       name: name || path,
+      source: 'margin_config',
+    }
+  }
+  /** 仅有类目 id / code 时也视为已配置，避免「已保存但 path 空」卡死分析 */
+  if (storeMarginIndustryConfigured(marginCfg.industry)) {
+    const fallback =
+      marginCfg.industry.name ||
+      marginCfg.industry.code ||
+      `类目 ${marginCfg.industry.leafCategoryId}`
+    return {
+      path: fallback,
+      name: fallback,
       source: 'margin_config',
     }
   }

@@ -1,5 +1,5 @@
 import { Loader2, RefreshCw, Sparkles } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import CompetitorTargetPicker from '../components/store/CompetitorTargetPicker'
 import {
@@ -20,6 +20,8 @@ import {
   resolveCompetitorAnalysisIndustry,
 } from '../lib/competitorIndustry'
 import { analyzeCompetitors } from '../services/storeIntelApi'
+import { supabase, supabaseConfigured } from '../lib/supabaseClient'
+import { pullMarginConfigFromCloud } from '../lib/tenantStoreIntelCloud'
 
 export default function CompetitorAnalysisPage() {
   const [target, setTarget] = useState<CompetitorTarget | null>(null)
@@ -27,9 +29,14 @@ export default function CompetitorAnalysisPage() {
   const [history, setHistory] = useState<CompetitorReport[]>([])
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  /** 触发重新 resolve 经营类目（云端拉取 / 商品页保存后） */
+  const [industryTick, setIndustryTick] = useState(0)
   const industryNameForResolve =
     target?.mode === 'brand' ? target.brandName : target?.storeName
-  const boundIndustry = resolveCompetitorAnalysisIndustry(industryNameForResolve)
+  const boundIndustry = useMemo(
+    () => resolveCompetitorAnalysisIndustry(industryNameForResolve),
+    [industryNameForResolve, industryTick],
+  )
 
   useEffect(() => {
     const t = loadSelectedCompetitorTarget()
@@ -37,6 +44,39 @@ export default function CompetitorAnalysisPage() {
     setHistory(loadCompetitorReports())
     setReport(latestCompetitorReportForTarget(t))
   }, [])
+
+  useEffect(() => {
+    if (!supabaseConfigured || !supabase) return
+    const client = supabase
+    void pullMarginConfigFromCloud(client).then((cfg) => {
+      if (cfg?.industry?.path || cfg?.industry?.name || cfg?.industry?.leafCategoryId) {
+        setIndustryTick((n) => n + 1)
+        setErr((prev) =>
+          prev?.includes('门店毛利配置') ? null : prev,
+        )
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    const refreshIndustry = () => {
+      setIndustryTick((n) => n + 1)
+      const ind = resolveCompetitorAnalysisIndustry(
+        target?.mode === 'brand' ? target.brandName : target?.storeName,
+      )
+      if (ind.path) {
+        setErr((prev) => (prev?.includes('门店毛利配置') ? null : prev))
+      }
+    }
+    window.addEventListener('meoo-store-margin-config-changed', refreshIndustry)
+    window.addEventListener('meoo-active-tenant-changed', refreshIndustry)
+    window.addEventListener('focus', refreshIndustry)
+    return () => {
+      window.removeEventListener('meoo-store-margin-config-changed', refreshIndustry)
+      window.removeEventListener('meoo-active-tenant-changed', refreshIndustry)
+      window.removeEventListener('focus', refreshIndustry)
+    }
+  }, [target])
 
   const onSelectTarget = (next: CompetitorTarget | null) => {
     setTarget(next)
