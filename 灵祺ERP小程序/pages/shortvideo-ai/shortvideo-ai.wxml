@@ -4,11 +4,11 @@
     <view class="sv-header-row">
       <text class="sv-header-icon">映</text>
       <view class="sv-header-titles">
-        <text class="sv-header-title">短视频 AI 创作台</text>
+        <text class="sv-header-title">短视频创作台</text>
         <text class="sv-header-sub">短视频出片 · 与电脑端同源</text>
       </view>
     </view>
-    <text class="sv-header-desc">Agent 舱 + 灵祺视频（Seedance）主路径；无限画布为手机端分镜流程板（能力等价出片）。</text>
+    <text class="sv-header-desc">创作舱 + 灵祺视频（Seedance）主路径；无限画布为手机端分镜流程板（能力等价出片）。</text>
     <text class="sv-persist-tip">生成后请及时保存到相册。刷新页面后，本页生成记录将消失。</text>
   </view>
 
@@ -43,10 +43,10 @@
     >{{item.label}}</view>
   </view>
 
-  <!-- ========== 短视频生成 / Agent 舱 ========== -->
+  <!-- ========== 短视频生成 / 创作舱 ========== -->
   <view wx:if="{{mainPane === 'generate'}}" class="sv-cabin-wrap">
     <view class="sv-cabin-heading">
-      <text class="sv-cabin-h1">{{studioModeId === 'agent' ? 'Agent 一站出片 · 文案到分镜' : '视频生成 · Seedance 出片'}}</text>
+      <text class="sv-cabin-h1">{{studioModeId === 'agent' ? '创作舱一站出片 · 文案到分镜' : '视频生成 · Seedance 出片'}}</text>
       <text class="sv-cabin-h2">主引擎：{{engineLabelSeedance}} · {{engineHintSeedance}}</text>
     </view>
 
@@ -65,7 +65,7 @@
 
       <textarea
         class="sv-cabin-area"
-        placeholder="输入想法、剧本或门店卖点；点「使用技能」套模板，和 Agent 一起创作"
+        placeholder="输入想法、剧本或门店卖点；点「使用技能」套模板，一起创作"
         value="{{cabinPrompt}}"
         disabled="{{busy}}"
         bindinput="onCabinPrompt"
@@ -172,7 +172,7 @@
         <view class="sv-script-head">
           <text class="sv-script-title">分镜表</text>
           <view class="sv-script-acts">
-            <text class="sv-link" bindtap="planScriptRows">AI 规划</text>
+            <text class="sv-link" bindtap="planScriptRows">自动规划</text>
             <text class="sv-link" bindtap="addScriptRow">+ 行</text>
           </view>
         </view>

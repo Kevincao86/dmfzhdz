@@ -53,7 +53,7 @@ async function generateIceEditBrief(ctx) {
   ].join('\n')
 
   const r = await aiOperation.postAiOperationAssist('operation_article', {
-    productContextName: '灵祺AI云剪',
+    productContextName: '灵祺云剪',
     titleDraft,
     model: 'qwen',
   })

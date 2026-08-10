@@ -29,14 +29,14 @@ const MP_POINTS_PER_SEC_BY_KIND = {
 }
 
 const MP_POINTS_USAGE_KIND_LABELS = {
-  shortvideo: '短视频 AI 处理',
-  cloud_edit: '灵祺 AI 云剪',
+  shortvideo: '短视频处理',
+  cloud_edit: '灵祺云剪',
   cloud_edit_smart: '智能一键成片',
   digital_human: '数字人口播',
-  mix_material_analyze: 'AI 混剪素材分析',
-  visual_studio_copy: 'AI 视觉工坊文案',
-  visual_studio_image: 'AI 视觉工坊常规生图',
-  visual_studio_image_pro: 'AI 视觉工坊高级生图',
+  mix_material_analyze: '混剪素材分析',
+  visual_studio_copy: '视觉工坊文案',
+  visual_studio_image: '视觉工坊常规生图',
+  visual_studio_image_pro: '视觉工坊高级生图',
 }
 
 function mpPointsPerSecForKind(kind) {

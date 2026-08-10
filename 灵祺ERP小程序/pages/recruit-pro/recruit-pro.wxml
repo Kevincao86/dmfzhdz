@@ -17,7 +17,7 @@ module.exports.includes = includes
     <text class="pro-sec">1 招募模式</text>
     <view class="pro-mode-row">
       <view class="pro-mode {{recruitMode === 'ai' ? 'on' : ''}}" bindtap="tapModeAi">
-        <text class="pro-mode-title">✦ AI智能匹配</text>
+        <text class="pro-mode-title">✦ 智能匹配</text>
         <text class="pro-mode-sub">根据条件自动从星图匹配达人</text>
       </view>
       <view class="pro-mode {{recruitMode === 'designated' ? 'on' : ''}}" bindtap="tapModeDesignated">
@@ -130,7 +130,7 @@ module.exports.includes = includes
       <text class="pro-modal-title">选择 Brief 版本</text>
       <scroll-view scroll-y class="pro-brief-list">
         <block wx:if="{{!briefRecords.length}}">
-          <text class="pro-muted">暂无本地记录，请先在「AI达人Brief生成」中生成并保存。</text>
+          <text class="pro-muted">暂无本地记录，请先在「达人Brief生成」中生成并保存。</text>
         </block>
         <block wx:for="{{briefRecords}}" wx:key="id">
           <view class="pro-brief-rec">

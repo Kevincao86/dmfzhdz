@@ -76,7 +76,7 @@
     </view>
 
     <view wx:if="{{!showAdvice}}" class="sa-card sa-cta">
-      <text class="sa-card-title">AI 经营建议</text>
+      <text class="sa-card-title">经营建议</text>
       <text class="sa-muted">结合订单与评价生成图文报告
         <text wx:if="{{estimatedPoints > 0}}">（预计消耗 {{estimatedPoints}} 积分）</text>
       </text>

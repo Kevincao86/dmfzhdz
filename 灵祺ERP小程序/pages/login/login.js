@@ -340,7 +340,7 @@ Page({
     } catch (_) {}
     this.setData({ busy: false })
     const redirect = String(this._redirect || '').trim()
-    const tabPaths = ['/pages/functions/functions', '/pages/agent/agent', '/pages/mine/mine']
+    const tabPaths = ['/pages/functions/functions', '/pages/dashboard/dashboard', '/pages/mine/mine']
     if (redirect) {
       const path = redirect.split('?')[0]
       if (tabPaths.some((p) => path === p || path.endsWith(p))) {

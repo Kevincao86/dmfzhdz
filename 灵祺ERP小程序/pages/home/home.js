@@ -75,7 +75,7 @@ Page({
     ],
   },
   onShow() {
-    wx.switchTab({ url: '/pages/agent/agent' })
+    wx.switchTab({ url: '/pages/dashboard/dashboard' })
   },
 
   _legacyOnShow() {

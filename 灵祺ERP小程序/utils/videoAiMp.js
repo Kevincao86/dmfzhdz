@@ -21,7 +21,7 @@ async function fetchVideoAiConfig() {
       if (!/404|not found/i.test(lastErr)) break
     }
   }
-  return { ok: false, message: lastErr || '无法读取视频 AI 配置' }
+  return { ok: false, message: lastErr || '无法读取视频创作配置' }
 }
 
 async function postKlingStart(body) {

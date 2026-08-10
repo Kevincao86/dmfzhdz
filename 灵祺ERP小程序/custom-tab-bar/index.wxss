@@ -119,6 +119,39 @@
   opacity: 0.85;
 }
 
+/* 经营概览：柱状图 */
+.tab-icon-chart {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 5rpx;
+  width: 34rpx;
+  height: 30rpx;
+}
+
+.tab-icon-chart .chart-bar {
+  width: 7rpx;
+  border-radius: 4rpx 4rpx 2rpx 2rpx;
+  background: currentColor;
+  opacity: 0.38;
+}
+
+.tab-icon-chart .chart-bar-1 {
+  height: 14rpx;
+}
+
+.tab-icon-chart .chart-bar-2 {
+  height: 24rpx;
+}
+
+.tab-icon-chart .chart-bar-3 {
+  height: 18rpx;
+}
+
+.tab-item.active .tab-icon-chart .chart-bar {
+  opacity: 0.92;
+}
+
 /* 功能：四宫格 */
 .tab-icon-grid {
   display: grid;

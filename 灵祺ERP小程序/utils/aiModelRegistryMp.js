@@ -5,7 +5,7 @@
 const TOKENMIX_FAMILIES = [
   {
     id: 'openai',
-    label: '灵祺智能AI · 灵犀',
+    label: '灵祺智能 · 灵犀',
     models: [
       { id: 'gpt-4o', label: '旗舰对话' },
       { id: 'gpt-4o-mini', label: '轻量对话' },
@@ -14,7 +14,7 @@ const TOKENMIX_FAMILIES = [
   },
   {
     id: 'claude',
-    label: '灵祺智能AI · 慧思',
+    label: '灵祺智能 · 慧思',
     models: [
       { id: 'claude-sonnet-4.6', label: '均衡旗舰' },
       { id: 'claude-haiku-4.5', label: '迅捷轻量' },
@@ -23,7 +23,7 @@ const TOKENMIX_FAMILIES = [
   },
   {
     id: 'gemini',
-    label: '灵祺智能AI · 星鉴',
+    label: '灵祺智能 · 星鉴',
     models: [
       { id: 'gemini-2.5-flash', label: '闪速对话' },
       { id: 'gemini-2.5-pro', label: '专业对话' },
@@ -31,7 +31,7 @@ const TOKENMIX_FAMILIES = [
   },
   {
     id: 'grok',
-    label: '灵祺智能AI · 破界',
+    label: '灵祺智能 · 破界',
     models: [
       { id: 'grok-4.1-fast-non-reasoning', label: '极速对话' },
       { id: 'grok-4.1-fast-reasoning', label: '极速推理' },
