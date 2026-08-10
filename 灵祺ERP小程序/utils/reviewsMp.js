@@ -103,13 +103,13 @@ async function postReviewAiSuggest(apiPlatform, reviewId) {
   const headers = multiPlatformMerchantHeaders()
   const body = { platform: apiPlatform, reviewId }
   const tries = ['/api/meoo-merchant-reviews-ai-suggest', '/api/merchant/reviews/ai-suggest']
-  let lastErr = 'AI 话术失败'
+  let lastErr = '话术生成失败'
   for (const path of tries) {
     try {
       const data = await merchantApi.merchantRequestWithHeaders('POST', path, { headers, data: body })
       const suggestion = String(data.suggestion || data.text || '').trim()
       if (suggestion) return { ok: true, text: suggestion }
-      lastErr = data.message || 'AI 未返回话术'
+      lastErr = data.message || '未返回话术'
     } catch (e) {
       lastErr = e instanceof Error ? e.message : String(e)
       if (/404|not found/i.test(lastErr)) continue

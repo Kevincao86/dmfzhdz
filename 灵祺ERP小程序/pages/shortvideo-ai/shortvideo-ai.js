@@ -67,7 +67,7 @@ Page({
     mainPane: 'generate',
     studioModes: STUDIO_MODES,
     studioModeId: 'agent',
-    studioModeLabel: 'Agent 模式',
+    studioModeLabel: '创作舱模式',
     quickCards: QUICK_CARDS,
     desktopPaneTip: '',
 
@@ -432,7 +432,7 @@ Page({
       pointsHintGenerate: `消耗提醒：短视频生成 ${economics.formatMpPointsRateLabel('shortvideo')}；当前约 ${genSec} 秒预计 ${genCost} 积分。`,
       pointsHintMix: this.isSmartPreset()
         ? `消耗提醒：智能混剪 ${economics.formatMpPointsRateLabel('cloud_edit_smart')}；当前约 ${mixSec} 秒预计 ${mixCost} 积分。`
-        : `消耗提醒：AI 混剪 ${economics.formatMpPointsRateLabel('cloud_edit')}；预计 ${mixCost} 积分/条。`,
+        : `消耗提醒：智能混剪 ${economics.formatMpPointsRateLabel('cloud_edit')}；预计 ${mixCost} 积分/条。`,
     })
   },
 
@@ -803,10 +803,10 @@ Page({
   async planScriptRows() {
     const txt = String(this.data.cabinPrompt || this.data.genPrompt || '').trim()
     if (txt.length < 8) {
-      this.setData({ err: '请先在 Agent 舱输入创作主题（至少 8 字），再 AI 规划分镜。' })
+      this.setData({ err: '请先在创作舱输入创作主题（至少 8 字），再自动规划分镜。' })
       return
     }
-    this.setData({ busy: true, progress: 'AI 规划分镜中…', err: '' })
+    this.setData({ busy: true, progress: '自动规划分镜中…', err: '' })
     try {
       const plan = await videoAi.postLongformVideoPlan({
         plannerModel: this.data.plannerModel,

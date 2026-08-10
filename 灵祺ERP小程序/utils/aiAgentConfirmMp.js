@@ -133,7 +133,7 @@ async function submitRecruitmentFromPreview(previewMsg, userBrief) {
     netAmount: 0,
     storeAddress: '—',
     category: tags[0] || '达人招募',
-    infoSummary: `AI智能体招募：${mainProductName}（${platform}）；Brief 已生成；需求摘要：${String(userBrief || text).slice(0, 280)}`,
+    infoSummary: `智能招募：${mainProductName}（${platform}）；Brief 已生成；需求摘要：${String(userBrief || text).slice(0, 280)}`,
   }
 
   await ops.appendRecruitmentOrder(order)

@@ -197,7 +197,7 @@ Page({
         offer: this.data.offer,
       }
       this.setData({
-        progress: tier === 'pro' ? '高级生图中（GPT Image 2）…' : '生图中，约需数十秒…',
+        progress: tier === 'pro' ? '高级生图中…' : '生图中，约需数十秒…',
       })
       const r = await vs.generatePosterImage(this.formSnapshot(), copy, {
         aspectRatio: this.data.aspect,

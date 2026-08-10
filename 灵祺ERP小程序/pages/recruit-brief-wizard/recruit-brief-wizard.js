@@ -5,7 +5,7 @@ const briefAi = require('../../utils/recruitmentBriefAiMp.js')
 const briefStore = require('../../utils/kolBriefStorageMp.js')
 
 const PLATFORMS = [
-  { key: 'douyin_laike', label: '抖音来客', sub: '与来客商品联动，AI Brief 链路最完整' },
+  { key: 'douyin_laike', label: '抖音来客', sub: '与来客商品联动，Brief 链路最完整' },
   { key: 'meituan', label: '美团点评', sub: '以手工填写商品信息与标签为准' },
   { key: 'xiaohongshu', label: '小红书', sub: '以手工填写商品信息与标签为准' },
   { key: 'jd_local', label: '京东本地生活', sub: '以手工填写商品信息与标签为准' },
@@ -120,7 +120,7 @@ Page({
 
   async runGenerate() {
     if (!merchant.hasMerchantApi()) {
-      wx.showModal({ title: '未连接后台', content: '请配置 MERCHANT_API_BASE_URL 后再调用 AI Brief。', showCancel: false })
+      wx.showModal({ title: '未连接后台', content: '请配置 MERCHANT_API_BASE_URL 后再调用 Brief 生成。', showCancel: false })
       return
     }
     if (!this.validateStep2()) return

@@ -22,6 +22,11 @@
           <view class="grid-cell"></view>
           <view class="grid-cell"></view>
         </block>
+        <block wx:elif="{{item.icon === 'chart'}}">
+          <view class="chart-bar chart-bar-1"></view>
+          <view class="chart-bar chart-bar-2"></view>
+          <view class="chart-bar chart-bar-3"></view>
+        </block>
         <block wx:else>
           <view class="user-head"></view>
           <view class="user-body"></view>

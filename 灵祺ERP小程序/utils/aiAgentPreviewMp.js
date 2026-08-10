@@ -176,7 +176,7 @@ async function enrichRecruitPreviewMessage(msg) {
     enrichError = e instanceof Error ? e.message : String(e)
   }
   const note = enrichError
-    ? `\n\n（AI Brief 未完全生成，已展示离线模板：${enrichError.slice(0, 80)}）`
+    ? `\n\n（Brief 未完全生成，已展示离线模板：${enrichError.slice(0, 80)}）`
     : ''
   return Object.assign({}, msg, {
     content: `${msg.content}\n\n已生成三版达人 Brief，请核对后点击「确认执行」。${note}`,

@@ -49,7 +49,7 @@ function fallbackNoviceKolAllocation(budgetYuan, strategy, /** @type {string|und
     v4: Math.max(0, v4),
     v5: Math.max(0, v5),
     v5plus: Math.max(0, v5plus),
-    notes: '当前为离线规则估算（与 Web 端 AI 不可用时的兜底一致）。',
+    notes: '当前为离线规则估算（与 Web 端服务不可用时的兜底一致）。',
     costHint: `按总预算约 ¥${b}、合计约 ${v3 + v4 + v5 + v5plus} 人次档位建议（仅供参考）。`,
     source: 'fallback',
   }

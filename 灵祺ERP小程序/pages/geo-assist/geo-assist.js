@@ -31,7 +31,7 @@ function localTodos(det) {
 
 const SUGGESTION_META = [
   { id: 'nap', title: 'NAP一致性', icon: '📍', iconBg: '#dbeafe', desc: '企业名称、地址、电话在各平台保持一致，提升本地检索可信度。' },
-  { id: 'keyword', title: '本地关键词', icon: '🔍', iconBg: '#e0f2fe', desc: '覆盖用户常搜的本地词与长尾问法，提高被 AI 引用概率。' },
+  { id: 'keyword', title: '本地关键词', icon: '🔍', iconBg: '#e0f2fe', desc: '覆盖用户常搜的本地词与长尾问法，提高被搜索引用概率。' },
   { id: 'reputation', title: '口碑证据', icon: '⭐', iconBg: '#fef3c7', desc: '沉淀可引用的评价与到店证据，增强 GEO 内容权重。' },
   { id: 'link', title: '结构化链接', icon: '🔗', iconBg: '#ede9fe', desc: '门店事实、FAQ 与平台资料互链，便于检索引擎理解。' },
 ]
@@ -190,7 +190,7 @@ Page({
             kpiQuery = `${Math.round(Number(qc))}%`
             kpiFresh = `${Math.round(Number(cf))}%`
           }
-          scoreSource = 'AI 综合'
+          scoreSource = '综合评分'
           const rz = typeof payload.rationale_zh === 'string' ? payload.rationale_zh : ''
           if (rz) rationale = rz
 

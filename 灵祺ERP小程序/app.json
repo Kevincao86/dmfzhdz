@@ -1,12 +1,11 @@
 {
   "pages": [
     "pages/functions/functions",
-    "pages/agent/agent",
+    "pages/dashboard/dashboard",
     "pages/mine/mine",
     "pages/login/login",
     "pages/legal/legal",
     "pages/home/home",
-    "pages/dashboard/dashboard",
     "pages/module-detail/module-detail",
     "pages/wallet/wallet",
     "pages/recruitment/recruitment",
@@ -70,8 +69,8 @@
         "text": "功能"
       },
       {
-        "pagePath": "pages/agent/agent",
-        "text": "灵祺助手"
+        "pagePath": "pages/dashboard/dashboard",
+        "text": "经营概览"
       },
       {
         "pagePath": "pages/mine/mine",
@@ -87,7 +86,7 @@
       "desc": "用于拍摄商品图、评论截图等附件上传"
     },
     "scope.userLocation": {
-      "desc": "用于灵祺助手选择门店/探店位置并生成文案"
+      "desc": "用于选择门店/探店位置并生成运营文案"
     }
   },
   "requiredPrivateInfos": ["chooseLocation"],

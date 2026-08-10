@@ -19,7 +19,7 @@ const FUNCTION_SECTIONS = [
         kind: 'link',
         url: '/pages/store-analysis/store-analysis',
         title: '店铺分析',
-        desc: '成交客群与 AI 经营建议',
+        desc: '成交客群与经营建议',
         iconKey: 'chart',
       },
       {
@@ -197,13 +197,6 @@ const FUNCTION_SECTIONS = [
         url: '/pages/finance-tax/finance-tax',
         title: '报税管理',
         desc: '税务申报辅助',
-        iconKey: 'chart',
-      },
-      {
-        kind: 'link',
-        url: '/pages/dashboard/dashboard',
-        title: '经营概览',
-        desc: '数据看板与分析',
         iconKey: 'chart',
       },
     ],

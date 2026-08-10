@@ -68,7 +68,7 @@ Page({
     wx.showModal({
       title: '生成排期',
       content:
-        '小程序端按达人池「已确认」名单与最近一次提交的探店档位做规则排期写入注册表（与电脑端网关同源）。不进行在线 AI 排期推理。',
+        '小程序端按达人池「已确认」名单与最近一次提交的探店档位做规则排期写入注册表（与电脑端网关同源）。不进行在线排期推理。',
       confirmText: '继续',
       success: async (res) => {
         if (!res.confirm) return

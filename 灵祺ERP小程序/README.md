@@ -1,6 +1,6 @@
 # 灵祺ERP小程序
 
-**1:1 复刻** `docs/ui-mockups/merchant-erp-mp/index.html`（42 屏 AI 设计稿）。
+**1:1 复刻** `docs/ui-mockups/merchant-erp-mp/index.html`（42 屏设计稿）。
 
 ## 打开方式
 

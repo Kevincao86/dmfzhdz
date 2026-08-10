@@ -10,7 +10,7 @@ const habitsMp = require('./agentUserHabitsMp.js')
 const stateCloudMp = require('./agentUserStateCloudMp.js')
 const sessionSync = require('./merchantSessionSyncMp.js')
 
-const AI_AGENT_SYSTEM_PROMPT = `你是「灵祺小助理」，嵌入灵祺商家 ERP，同时也是开放型通用对话助手（与电脑端商家后台助手同源规则）。
+const AI_AGENT_SYSTEM_PROMPT = `你是「经营助手」，嵌入灵祺商家 ERP，同时也是开放型通用对话助手（与电脑端商家后台助手同源规则）。
 
 【开放对话】用户可以询问任何类型的问题，均须正常、完整、友好地作答；不要以「只能帮商家经营」等理由拒绝。若缺少实时外部数据，说明限制并给出查法或常识参考，仍应尽力回答。
 
@@ -190,7 +190,7 @@ function devMockReply(userText) {
   if (/投流|广告/.test(t)) return '请打开「功能 → 投流 → 投流管理」。'
   if (/方案|规划|推广|活动|618|抖音/.test(t)) {
     return (
-      '（开发预览）活动方案等内容需走后端 AI。\n\n' +
+      '（开发预览）活动方案等内容需走后端服务。\n\n' +
       '请：\n' +
       '1. utils/config.local.js：MERCHANT_API_BASE_URL=http://127.0.0.1:5173（真机预览改为电脑的局域网 IP:5173）\n' +
       '2. 电脑 cd web版/merchant-erp 并 npm run dev\n' +
@@ -231,7 +231,7 @@ function authHeaders() {
 
 function ensureRealAuthForAi() {
   if (api.isRealAuthed()) return
-  throw new Error('请先登录后再使用灵祺小助理（「我的」页或登录页完成登录）。免登录游览模式不支持 AI 对话。')
+  throw new Error('请先登录后再使用经营助手（「我的」页或登录页完成登录）。免登录游览模式不支持对话。')
 }
 
 function merchantApiFriendlyError(statusCode, body) {

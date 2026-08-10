@@ -14,7 +14,7 @@ async function postDouyinGoodsAiAssist(payload) {
       lastErr = e instanceof Error ? e.message : String(e)
     }
   }
-  throw new Error(lastErr || 'AI 请求失败')
+  throw new Error(lastErr || '请求失败')
 }
 
 function extractDescription(data) {

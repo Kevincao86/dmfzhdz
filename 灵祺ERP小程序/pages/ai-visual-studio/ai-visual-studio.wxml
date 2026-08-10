@@ -95,10 +95,10 @@
 
   <view class="vs-card" wx:elif="{{step === 4}}">
     <text class="vs-card__title">生成海报</text>
-    <text class="vs-card__sub">常规 {{imageStdPoints}} 积分/张 · 高级 GPT Image 2 {{imageProPoints}} 积分/张</text>
+    <text class="vs-card__sub">常规 {{imageStdPoints}} 积分/张 · 高级生图 {{imageProPoints}} 积分/张</text>
     <view class="vs-chips">
       <view class="vs-chip {{imageTier === 'standard' ? 'on' : ''}}" data-tier="standard" bindtap="onImageTier">常规生图 · 万相</view>
-      <view class="vs-chip {{imageTier === 'pro' ? 'on' : ''}}" data-tier="pro" bindtap="onImageTier">高级生图 · GPT Image 2</view>
+      <view class="vs-chip {{imageTier === 'pro' ? 'on' : ''}}" data-tier="pro" bindtap="onImageTier">高级生图</view>
     </view>
     <text class="vs-card__sub" wx:if="{{imageTier === 'pro' && refPath}}">高级生图暂不使用参考图，将按文案纯文生图。</text>
     <view class="vs-ref" bindtap="onPickRef">

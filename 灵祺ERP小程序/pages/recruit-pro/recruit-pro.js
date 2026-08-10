@@ -355,7 +355,7 @@ Page({
         netAmount: Math.round(Math.max(0, budget) * (1 - merchantCommissionPct / 100)),
         storeAddress,
         category: talentTags[0] || '达人招募',
-        infoSummary: `招募：${name}；模式：${this.data.recruitMode === 'designated' ? `指定达人(${String(this.data.designatedInput).trim()})` : 'AI智能匹配'}；Brief：${sel.mainProductName}（${sel.platform}）；预算¥${budget}/${headcount}人；行业${industry}；商家佣金率${merchantCommissionPct}%；桌数${tablePerMeal ?? '—'}；时段${visitSlots.join('、')}；达人标签${talentTags.join('、')}；粉丝量级${followerTiers.join('、') || '—'}；带货等级${commerceLevels.join('、') || '—'}`,
+        infoSummary: `招募：${name}；模式：${this.data.recruitMode === 'designated' ? `指定达人(${String(this.data.designatedInput).trim()})` : '智能匹配'}；Brief：${sel.mainProductName}（${sel.platform}）；预算¥${budget}/${headcount}人；行业${industry}；商家佣金率${merchantCommissionPct}%；桌数${tablePerMeal ?? '—'}；时段${visitSlots.join('、')}；达人标签${talentTags.join('、')}；粉丝量级${followerTiers.join('、') || '—'}；带货等级${commerceLevels.join('、') || '—'}`,
       }
 
       try {

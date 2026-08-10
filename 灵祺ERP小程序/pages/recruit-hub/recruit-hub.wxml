@@ -22,7 +22,7 @@
   <navigator url="/pages/recruit-brief-wizard/recruit-brief-wizard" class="lq-nav-card" hover-class="none">
     <view class="lq-nav-ico">✦</view>
     <view class="lq-nav-main">
-      <text class="lq-nav-title">AI 达人 Brief 生成</text>
+      <text class="lq-nav-title">达人 Brief 生成</text>
       <text class="lq-nav-desc">结构化招募需求一键成稿</text>
     </view>
     <text class="chev">›</text>

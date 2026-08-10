@@ -250,7 +250,7 @@ Page({
     }
     if (!this.data.allocationFresh) {
       wx.showToast({
-        title: plat.id === '小红书' ? '请先点击小红书人数估算' : '请先点击 AI 分配达人档位',
+        title: plat.id === '小红书' ? '请先点击小红书人数估算' : '请先点击智能分配达人档位',
         icon: 'none',
       })
       return
@@ -308,7 +308,7 @@ Page({
         customerName,
         storeName,
         talentId: '—',
-        talentName: '新手版·待 AI / 运营匹配',
+        talentName: '新手版·待系统 / 运营匹配',
         fans: headcount,
         accountType: plat.id,
         recruitmentPlatform: plat.id,
@@ -320,7 +320,7 @@ Page({
         netAmount: Math.round((Math.max(0, budget) * (100 - (isDouyin ? kolPct : 0))) / 100),
         storeAddress,
         category: industry,
-        infoSummary: `【新手版·AI纯智能】投放平台:${plat.id}；城市:${city}；门店:${storeName}；POI:${storeIdsLine}；行业:${industry}；套餐:${packageNote.slice(0, 200)}；预算¥${budget}；${isDouyin ? `达人佣金:${kolPct}%；策略:${novice.kolTierStrategyLabel(strategy)}；` : '达人佣金:不适用(小红书)；'}招募:${recruitStart}~${recruitEnd}；探店:${visitStart}~${visitEnd}；${isDouyin ? `档位:${tierLine}；` : `人数:${tierLine}；`}分配来源:${alloc.source}；${alloc.costHint || ''}${alloc.notes ? `；说明:${alloc.notes}` : ''}`,
+        infoSummary: `【新手版·智能分配】投放平台:${plat.id}；城市:${city}；门店:${storeName}；POI:${storeIdsLine}；行业:${industry}；套餐:${packageNote.slice(0, 200)}；预算¥${budget}；${isDouyin ? `达人佣金:${kolPct}%；策略:${novice.kolTierStrategyLabel(strategy)}；` : '达人佣金:不适用(小红书)；'}招募:${recruitStart}~${recruitEnd}；探店:${visitStart}~${visitEnd}；${isDouyin ? `档位:${tierLine}；` : `人数:${tierLine}；`}分配来源:${alloc.source}；${alloc.costHint || ''}${alloc.notes ? `；说明:${alloc.notes}` : ''}`,
       }
 
       await ops.appendRecruitmentOrder(order)
