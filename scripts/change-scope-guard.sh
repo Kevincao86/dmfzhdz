@@ -61,6 +61,7 @@ list_scopes() {
   competitor_industry    商家 ERP：竞争对手分析经营类目读取/门店毛利配置联动
   competitor_baidu_map   商家 ERP：竞品分析接入百度地图周边 POI（服务端 AK）
   ops_site_selection     商家 ERP：运营「选址参考」+ 竞品近7日人流热度
+  partner_linke_auth     服务商版：林客邀请授权链接拼装/客户商家开通
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -760,6 +761,16 @@ nav.ts
 App.tsx
 membershipPlan
 partnerEditionConfig
+change-scope-guard
+PAT
+      ;;
+    partner_linke_auth)
+      cat <<'PAT'
+partnerLinkeOnboardCore
+partnerLinkeSolutionOptions
+PartnerClientsSection
+douyinPartnerBindGuideConfig
+meoo-partner-linke-onboard
 change-scope-guard
 PAT
       ;;
