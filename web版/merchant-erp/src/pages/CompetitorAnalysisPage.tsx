@@ -19,6 +19,7 @@ import {
   competitorIndustrySourceLabel,
   resolveCompetitorAnalysisIndustry,
 } from '../lib/competitorIndustry'
+import FootTrafficHeatPanel from '../components/store/FootTrafficHeatPanel'
 import { analyzeCompetitors } from '../services/storeIntelApi'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { pullMarginConfigFromCloud } from '../lib/tenantStoreIntelCloud'
@@ -152,6 +153,7 @@ export default function CompetitorAnalysisPage() {
       bundleSuggestions: r.bundleSuggestions,
       ...(r.mapSource ? { mapSource: r.mapSource } : {}),
       ...(typeof r.mapMeta?.poiCount === 'number' ? { mapPoiCount: r.mapMeta.poiCount } : {}),
+      ...(r.footTrafficHeat ? { footTrafficHeat: r.footTrafficHeat } : {}),
     }
     saveCompetitorReport(next)
     setReport(next)
@@ -256,6 +258,11 @@ export default function CompetitorAnalysisPage() {
           {report.industryHint && (
             <p className="text-xs text-gray-500">分析类目：{report.industryHint}</p>
           )}
+          {report.footTrafficHeat ? (
+            <div className="rounded-lg border border-sky-100 bg-sky-50/40 p-3">
+              <FootTrafficHeatPanel heat={report.footTrafficHeat} />
+            </div>
+          ) : null}
           <div>
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
               {report.mapSource === 'baidu'

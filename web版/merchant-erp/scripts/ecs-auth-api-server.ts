@@ -68,6 +68,7 @@ import meooAiOpsPlanHandler from '../api/meoo-ai-ops-plan.ts'
 import meooStoreMenuRecognizeHandler from '../api/meoo-store-menu-recognize.ts'
 import meooStoreMenuExcelRecognizeHandler from '../api/meoo-store-menu-excel-recognize.ts'
 import meooCompetitorAnalysisHandler from '../api/meoo-competitor-analysis.ts'
+import meooSiteSelectionHandler from '../api/meoo-site-selection.ts'
 import agentDailyInfoHandler from '../api/meoo-agent-daily-info.ts'
 import agentUserStateHandler from '../api/meoo-agent-user-state.ts'
 import videoConfigHandler from '../api/meoo-merchant-ai-video-config.ts'
@@ -305,6 +306,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-store-menu-recognize': meooStoreMenuRecognizeHandler as VercelLikeHandler,
   '/api/meoo-store-menu-excel-recognize': meooStoreMenuExcelRecognizeHandler as VercelLikeHandler,
   '/api/meoo-competitor-analysis': meooCompetitorAnalysisHandler as VercelLikeHandler,
+  '/api/meoo-site-selection': meooSiteSelectionHandler as VercelLikeHandler,
   '/api/meoo-agent-daily-info': agentDailyInfoHandler as VercelLikeHandler,
   '/api/meoo-agent-user-state': agentUserStateHandler as VercelLikeHandler,
   /** 数字人口播：MiniMax 神经 TTS 试听、抖音链接文案（须合并运营台 vendorKeys） */

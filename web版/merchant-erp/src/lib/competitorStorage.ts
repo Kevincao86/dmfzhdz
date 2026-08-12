@@ -34,6 +34,27 @@ export type CompetitorEntry = {
   hotProducts?: CompetitorHotProduct[]
 }
 
+export type CompetitorFootTrafficHeat = {
+  source: 'estimated_proxy'
+  disclaimer: string
+  radiusM: number
+  location: { lat: number; lng: number }
+  days: Array<{
+    date: string
+    weekday: string
+    avgIndex: number
+    peakSlot: string
+    peakIndex: number
+    slots: Array<{
+      key: 'morning' | 'noon' | 'evening' | 'night'
+      label: string
+      index: number
+    }>
+  }>
+  insight: string
+  drivers: string[]
+}
+
 export type CompetitorReport = {
   id: string
   /** store: 单店 poiId；brand: `brand:${brandKey}` */
@@ -53,6 +74,7 @@ export type CompetitorReport = {
   /** baidu：周边实查；baidu_error/none：区位推断 */
   mapSource?: 'baidu' | 'baidu_error' | 'none'
   mapPoiCount?: number
+  footTrafficHeat?: CompetitorFootTrafficHeat
 }
 
 export type CompetitorTarget =

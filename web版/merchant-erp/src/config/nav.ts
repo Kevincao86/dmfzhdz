@@ -51,6 +51,7 @@ export const NAV_ITEMS: NavItem[] = [
       { path: '/reviews', label: '评价管理' },
       { path: '/geo', label: 'GEO运营优化' },
       { path: '/operation/competitors', label: '竞争对手分析' },
+      { path: '/operation/site-selection', label: '选址参考' },
     ],
   },
   {

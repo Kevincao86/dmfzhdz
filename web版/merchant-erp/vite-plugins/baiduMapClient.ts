@@ -254,3 +254,96 @@ export async function baiduFetchNearbyCompetitorsForStore(
     linesForPrompt,
   }
 }
+
+export type BaiduAmenityBucket =
+  | 'transit'
+  | 'office'
+  | 'residential'
+  | 'mall'
+  | 'school'
+  | 'competitor'
+
+const AMENITY_QUERIES: Record<Exclude<BaiduAmenityBucket, 'competitor'>, string> = {
+  transit: '地铁站$公交站',
+  office: '写字楼$办公楼',
+  residential: '住宅区$小区',
+  mall: '购物中心$商场$百货',
+  school: '学校$大学$中学',
+}
+
+/** 选址：并行检索竞品 + 交通/写字楼/住宅/商场/学校 */
+export async function baiduFetchSiteAmenityContext(
+  env: BaiduMapEnv,
+  opts: {
+    address: string
+    city?: string
+    industryPathOrName?: string
+    radiusM?: number
+  },
+): Promise<
+  | {
+      ok: true
+      location: BaiduLatLng
+      radiusM: number
+      competitorQuery: string
+      competitorPois: BaiduNearbyPoi[]
+      buckets: Record<Exclude<BaiduAmenityBucket, 'competitor'>, BaiduNearbyPoi[]>
+      counts: {
+        transit: number
+        office: number
+        residential: number
+        mall: number
+        school: number
+        competitor: number
+      }
+    }
+  | { ok: false; message: string }
+> {
+  if (!isBaiduMapConfigured(env)) {
+    return { ok: false, message: '未配置 BAIDU_MAP_AK' }
+  }
+  const geo = await baiduGeocodeAddress(env, opts.address, opts.city)
+  if (!geo.ok) return geo
+  const radiusM = opts.radiusM ?? 1500
+  const competitorQuery = baiduQueryForIndustry(opts.industryPathOrName ?? '')
+  const keys = Object.keys(AMENITY_QUERIES) as Array<keyof typeof AMENITY_QUERIES>
+  const [comp, ...rest] = await Promise.all([
+    baiduPlaceNearby(env, {
+      location: geo.location,
+      query: competitorQuery,
+      radiusM,
+      pageSize: 20,
+    }),
+    ...keys.map((k) =>
+      baiduPlaceNearby(env, {
+        location: geo.location,
+        query: AMENITY_QUERIES[k],
+        radiusM,
+        pageSize: 15,
+      }),
+    ),
+  ])
+  if (!comp.ok) return comp
+  const buckets = {} as Record<Exclude<BaiduAmenityBucket, 'competitor'>, BaiduNearbyPoi[]>
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i]!
+    const hit = rest[i]
+    buckets[k] = hit && hit.ok ? hit.pois : []
+  }
+  return {
+    ok: true,
+    location: geo.location,
+    radiusM,
+    competitorQuery,
+    competitorPois: comp.pois,
+    buckets,
+    counts: {
+      competitor: comp.pois.length,
+      transit: buckets.transit.length,
+      office: buckets.office.length,
+      residential: buckets.residential.length,
+      mall: buckets.mall.length,
+      school: buckets.school.length,
+    },
+  }
+}

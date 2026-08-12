@@ -71,6 +71,7 @@ export function membershipAllowsProvider(plan: MembershipPlan, provider: string)
 export const FREE_BLOCKED_PATHS = [
   '/geo',
   '/operation/competitors',
+  '/operation/site-selection',
   '/finance/tax',
 ] as const
 

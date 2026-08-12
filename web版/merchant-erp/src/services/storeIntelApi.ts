@@ -4,7 +4,7 @@
 import { merchantErpApiCandidates } from '../lib/merchantErpApiBase'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import type { StoreMenuItem } from '../lib/storeMenuStorage'
-import type { CompetitorBundleSuggestion, CompetitorEntry } from '../lib/competitorStorage'
+import type { CompetitorBundleSuggestion, CompetitorEntry, CompetitorFootTrafficHeat } from '../lib/competitorStorage'
 import {
   coerceAgentDisplayError,
   coerceAgentTextField,
@@ -184,6 +184,7 @@ export async function analyzeCompetitors(body: {
         poiCount?: number
         error?: string
       }
+      footTrafficHeat?: CompetitorFootTrafficHeat
     }
   | { ok: false; message: string }
 > {
@@ -203,6 +204,7 @@ export async function analyzeCompetitors(body: {
         poiCount?: number
         error?: string
       }
+      footTrafficHeat?: CompetitorFootTrafficHeat
       error?: string
     }>('/api/meoo-competitor-analysis', body)
     if (r.ok && r.summary) {
@@ -215,9 +217,78 @@ export async function analyzeCompetitors(body: {
         bundleSuggestions: Array.isArray(r.bundleSuggestions) ? r.bundleSuggestions : [],
         ...(r.mapSource ? { mapSource: r.mapSource } : {}),
         ...(r.mapMeta ? { mapMeta: r.mapMeta } : {}),
+        ...(r.footTrafficHeat ? { footTrafficHeat: r.footTrafficHeat } : {}),
       }
     }
     return { ok: false, message: r.error ?? '分析失败' }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+export type FootTrafficHeatReport = CompetitorFootTrafficHeat
+
+export type SiteSelectionResult = {
+  ok: true
+  address: string
+  city?: string
+  storeName?: string
+  industryHint?: string
+  location: { lat: number; lng: number }
+  radiusM: number
+  competitorQuery?: string
+  counts: {
+    transit: number
+    office: number
+    residential: number
+    mall: number
+    school: number
+    competitor: number
+  }
+  competitors: Array<{
+    name: string
+    address?: string
+    distanceM?: number
+    tag?: string
+    overallRating?: string
+  }>
+  amenities: {
+    transit: string[]
+    office: string[]
+    residential: string[]
+    mall: string[]
+    school: string[]
+  }
+  score: {
+    overall: number
+    verdict: string
+    dimensions: Array<{ key: string; label: string; score: number; note: string }>
+  }
+  footTrafficHeat: FootTrafficHeatReport
+  checklist: string[]
+  marketFeatures: Array<{ name: string; desc: string }>
+  aiAdvice?: string
+  summary: string
+}
+
+export async function runSiteSelection(body: {
+  address: string
+  city?: string
+  storeName?: string
+  industryPath?: string
+  industryName?: string
+  industryHint?: string
+  radiusM?: number
+}): Promise<SiteSelectionResult | { ok: false; message: string }> {
+  try {
+    const r = await postJson<SiteSelectionResult & { ok: boolean; error?: string; detail?: string }>(
+      '/api/meoo-site-selection',
+      body,
+    )
+    if (r.ok && r.summary && r.score && r.footTrafficHeat) {
+      return r
+    }
+    return { ok: false, message: r.error ?? r.detail ?? '选址评估失败' }
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : String(e) }
   }

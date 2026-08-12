@@ -38,6 +38,7 @@ const StoreInfoPage = lazy(() => import('./pages/StoreInfoPage'))
 const StoreMenuPage = lazy(() => import('./pages/StoreMenuPage'))
 const StoreAnalysisPage = lazy(() => import('./pages/StoreAnalysisPage'))
 const CompetitorAnalysisPage = lazy(() => import('./pages/CompetitorAnalysisPage'))
+const SiteSelectionPage = lazy(() => import('./pages/SiteSelectionPage'))
 const AiOpsPlanPage = lazy(() => import('./pages/AiOpsPlanPage'))
 const ProductCreateFlowPage = lazy(() => import('./pages/ProductCreateFlowPage'))
 const ProductEditFlowPage = lazy(() => import('./pages/ProductEditFlowPage'))
@@ -172,6 +173,7 @@ export default function App() {
                     />
                     <Route path="geo" element={<GeoPage />} />
                     <Route path="operation/competitors" element={<CompetitorAnalysisPage />} />
+                    <Route path="operation/site-selection" element={<SiteSelectionPage />} />
                     <Route path="operation/ai-ops-plan" element={<AiOpsPlanPage />} />
                     <Route path="ai-create/record-workshop" element={<PartnerRecordWorkshopRoute />} />
                     <Route path="ai-image" element={<AiImageStudioPage />} />

@@ -613,6 +613,7 @@ export async function runCompetitorAnalysisCore(
   )
   let mapBlock = ''
   let mapMeta: Record<string, unknown> | undefined
+  let footTrafficHeat: Record<string, unknown> | undefined
   if (isBaiduMapConfigured(aiEnv)) {
     const mapHit = await baiduFetchNearbyCompetitorsForStore(aiEnv, {
       address,
@@ -635,6 +636,21 @@ export async function runCompetitorAnalysisCore(
           tag: p.tag,
           overallRating: p.overallRating,
         })),
+      }
+      try {
+        const { buildFootTrafficHeatForAddress } = await import('./siteSelectionCore.js')
+        const heatHit = await buildFootTrafficHeatForAddress(aiEnv, {
+          address,
+          city: city || undefined,
+          industryPathOrName: boundIndustry || storeName,
+          radiusM: 1500,
+        })
+        if (heatHit.ok) {
+          footTrafficHeat = heatHit.heat as unknown as Record<string, unknown>
+          mapBlock = `${mapBlock}\n\n【近7日人流热度（区位代理指数）】\n${heatHit.heat.insight}\n驱动因素：${heatHit.heat.drivers.join('；')}`
+        }
+      } catch {
+        /* 热度失败不阻断竞品分析 */
       }
     } else {
       mapBlock = `【百度地图周边实查失败】${mapHit.message}。请在 summary 中简要说明，并退回区位推断（注明非实时抓取）。`
@@ -745,6 +761,7 @@ ${industryRules}
         suggestions,
         bundleSuggestions,
         ...(mapMeta ? { mapMeta } : {}),
+        ...(footTrafficHeat ? { footTrafficHeat } : {}),
         mapSource: hasMapPois ? 'baidu' : mapMeta ? 'baidu_error' : 'none',
       },
     }

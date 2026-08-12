@@ -10,6 +10,7 @@ export const PARTNER_CLIENT_SCOPED_PATH_PREFIXES = [
   '/reviews',
   '/geo',
   '/operation/competitors',
+  '/operation/site-selection',
   '/operation/ai-ops-plan',
   '/knowledge-base',
   '/ai-image',
