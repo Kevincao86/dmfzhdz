@@ -59,6 +59,7 @@ list_scopes() {
   edition_cs_sync        各端前端对齐 CS（DR/FWS/Admin 同源功能与积分经济）
   ai_agent_quick_image   商家 ERP：AI 智能体快捷任务平铺 + 生图意图自动切模型
   competitor_industry    商家 ERP：竞争对手分析经营类目读取/门店毛利配置联动
+  competitor_baidu_map   商家 ERP：竞品分析接入百度地图周边 POI（服务端 AK）
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -724,6 +725,17 @@ ProductsPage
 tenantStoreIntelCloud
 douyinGoodsCategoryPicker
 FinancePages
+change-scope-guard
+PAT
+      ;;
+    competitor_baidu_map)
+      cat <<'PAT'
+baiduMapClient
+merchantStoreIntelCore
+meoo-competitor-analysis
+CompetitorAnalysisPage
+storeIntelApi
+competitorStorage
 change-scope-guard
 PAT
       ;;
