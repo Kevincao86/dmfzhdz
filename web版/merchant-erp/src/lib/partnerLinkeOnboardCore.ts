@@ -109,8 +109,8 @@ export function douyinLifeSignV2(
 
 /**
  * 拼装 auth_with_bind URL。
- * 新方案（如 21）官方单方案表未列全，统一走「多方案」参数：
- * solution_keys + multi_solution_data；extra 不得含 JSON 引号。
+ * 单方案统一走官方「solution_key + permission_keys」格式。
+ * 勿对 21 等新方案误用 multi_solution_data：抖音侧常报「URL校验不通过：获取解决方案信息失败」。
  */
 export function buildDouyinAuthWithBindUrl(input: {
   clientKey: string
@@ -122,13 +122,12 @@ export function buildDouyinAuthWithBindUrl(input: {
 }): string {
   const solutionKey = input.solutionKey.trim()
   const permissionKeys = input.permissionKeys.map((x) => String(x).trim()).filter(Boolean)
-  const multiSolutionData = JSON.stringify({ [solutionKey]: permissionKeys })
   const query: Record<string, string> = {
     client_key: input.clientKey.trim(),
     timestamp: String(Math.floor(Date.now() / 1000)),
     charset: 'UTF-8',
-    solution_keys: solutionKey,
-    multi_solution_data: multiSolutionData,
+    solution_key: solutionKey,
+    permission_keys: permissionKeys.join(','),
     out_shop_id: input.outShopId.trim(),
     extra: input.extra.trim(),
   }
@@ -136,6 +135,8 @@ export function buildDouyinAuthWithBindUrl(input: {
   const u = new URL(DOUYIN_AUTH_WITH_BIND_BASE)
   for (const [k, v] of Object.entries(query)) u.searchParams.set(k, v)
   u.searchParams.set('sign', sign)
+  /** 微信内打开时降低链接被拦截概率（不参与签名） */
+  u.searchParams.set('new_host', '1')
   return u.toString()
 }
 
