@@ -101,6 +101,50 @@ export async function deletePartnerLinkeOnboarding(onboardingId: string): Promis
   })
 }
 
+export type PartnerLinkeCapabilityProbe = {
+  clientKey: string
+  spAccountId: string
+  clientTokenOk: boolean
+  partnerOrderQuery: { ok: boolean; errorCode: number | null; description: string }
+  shopPoiQuery: { ok: boolean; errorCode: number | null; description: string }
+  hint: string
+}
+
+export async function diagnosePartnerLinkeCapabilities(): Promise<{
+  probe: PartnerLinkeCapabilityProbe
+  message?: string
+}> {
+  const j = await partnerLinkeFetch<{
+    probe: PartnerLinkeCapabilityProbe
+    message?: string
+  }>('/api/meoo-partner-linke-onboard', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'diagnose' }),
+  })
+  if (!j.probe) throw new Error('未返回能力探测结果')
+  return j
+}
+
+export async function syncPartnerBoundClientsFromDouyin(): Promise<{
+  upserted: number
+  scanned: number
+  message: string
+}> {
+  const j = await partnerLinkeFetch<{
+    upserted?: number
+    scanned?: number
+    message?: string
+  }>('/api/meoo-partner-linke-onboard', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'sync_bound_clients' }),
+  })
+  return {
+    upserted: Number(j.upserted || 0),
+    scanned: Number(j.scanned || 0),
+    message: String(j.message || '同步完成'),
+  }
+}
+
 export function linkeOnboardStatusLabel(item: PartnerLinkeOnboardItem): string {
   if (item.authStatus === 'pending') return '待商家授权'
   if (item.authStatus === 'failed') return '授权失败'

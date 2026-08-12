@@ -770,6 +770,7 @@ partnerLinkeOnboardCore
 partnerLinkeSolutionOptions
 PartnerClientsSection
 douyinPartnerBindGuideConfig
+partnerLinkeOnboardClient
 meoo-partner-linke-onboard
 change-scope-guard
 PAT
