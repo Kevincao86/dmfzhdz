@@ -750,6 +750,8 @@ merchantStoreIntelCore
 merchantApiMock
 ecs-auth-api-server
 SiteSelectionPage
+SiteSelectionHeatMap
+SiteSelectionScoreCard
 FootTrafficHeatPanel
 CompetitorAnalysisPage
 storeIntelApi

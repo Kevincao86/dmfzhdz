@@ -228,12 +228,29 @@ export async function analyzeCompetitors(body: {
 
 export type FootTrafficHeatReport = CompetitorFootTrafficHeat
 
+export type SiteSelectionRecommendSpot = {
+  rank: number
+  label: string
+  address: string
+  city?: string
+  location: { lat: number; lng: number }
+  distanceM: number
+  direction: string
+  score: number
+  verdict: string
+  reason: string
+  counts: { competitor: number; transit: number; mall: number }
+}
+
 export type SiteSelectionResult = {
   ok: true
   address: string
   city?: string
-  storeName?: string
+  spotLabel?: string
+  brandName?: string
   industryHint?: string
+  brandUnderstanding?: string
+  scoreStory?: string
   location: { lat: number; lng: number }
   radiusM: number
   competitorQuery?: string
@@ -251,6 +268,7 @@ export type SiteSelectionResult = {
     distanceM?: number
     tag?: string
     overallRating?: string
+    location?: { lat: number; lng: number }
   }>
   amenities: {
     transit: string[]
@@ -265,19 +283,23 @@ export type SiteSelectionResult = {
     dimensions: Array<{ key: string; label: string; score: number; note: string }>
   }
   footTrafficHeat: FootTrafficHeatReport
+  heatMapGrid?: Array<{ lat: number; lng: number; weight: number }>
+  recommendations?: SiteSelectionRecommendSpot[]
   checklist: string[]
-  marketFeatures: Array<{ name: string; desc: string }>
-  aiAdvice?: string
   summary: string
 }
 
 export async function runSiteSelection(body: {
   address: string
   city?: string
-  storeName?: string
+  spotLabel?: string
+  brandName?: string
+  brandStoreCount?: number
   industryPath?: string
   industryName?: string
   industryHint?: string
+  margins?: { douyin: number; meituan: number; xhs: number }
+  brandNotes?: string
   radiusM?: number
 }): Promise<SiteSelectionResult | { ok: false; message: string }> {
   try {
