@@ -27,10 +27,12 @@ import {
 } from '../../lib/partnerLinkeSolutionOptions'
 import {
   deletePartnerLinkeOnboarding,
+  diagnosePartnerLinkeCapabilities,
   linkeOnboardStatusLabel,
   listPartnerLinkeOnboarding,
   retryPartnerLinkeCooperation,
   startPartnerLinkeInvite,
+  syncPartnerBoundClientsFromDouyin,
   type PartnerLinkeOnboardItem,
 } from '../../services/partnerLinkeOnboardClient'
 
@@ -59,6 +61,8 @@ export default function PartnerClientsSection() {
   const [inviteBusy, setInviteBusy] = useState(false)
   const [lastAuthUrl, setLastAuthUrl] = useState<string | null>(null)
   const [bindMode, setBindMode] = useState<'linke_invite' | 'manual'>('linke_invite')
+  const [syncBusy, setSyncBusy] = useState(false)
+  const [diagBusy, setDiagBusy] = useState(false)
 
   const provider = plat as MerchantBindingProvider
   const platformLabel = plat === 'douyin' ? '抖音来客' : '快手团购'
@@ -214,6 +218,34 @@ export default function PartnerClientsSection() {
       setErr(toUserFacingError(e, '删除开通任务'))
     } finally {
       setInviteBusy(false)
+    }
+  }
+
+  const onDiagnoseCapabilities = async () => {
+    setDiagBusy(true)
+    setErr(null)
+    try {
+      const out = await diagnosePartnerLinkeCapabilities()
+      setErr(out.message || out.probe.hint)
+    } catch (e) {
+      setErr(toUserFacingError(e, '探测开放平台能力'))
+    } finally {
+      setDiagBusy(false)
+    }
+  }
+
+  const onSyncBoundClients = async () => {
+    setSyncBusy(true)
+    setErr(null)
+    try {
+      const out = await syncPartnerBoundClientsFromDouyin()
+      setErr(out.message)
+      await load()
+      void reloadCtx()
+    } catch (e) {
+      setErr(toUserFacingError(e, '拉取已合作商家'))
+    } finally {
+      setSyncBusy(false)
     }
   }
 
@@ -403,7 +435,8 @@ export default function PartnerClientsSection() {
                   ))}
                 </select>
                 <span className="mt-1 block text-xs text-gray-500">
-                  须与开放平台「生活服务服务商应用」已开通且审核通过的方案一致（餐饮团购用 21，到综用 16；勿用即将下线的 1/4）。方案下须开通「商户授权」「门店管理」。若仍报「获取解决方案信息失败」，请到开放平台核对方案状态后重新生成链接（旧链接无效）。林客后台已绑定的商家不会自动出现在本列表，须走本页邀请授权成功（Webhook）或手工录入。
+                  须与开放平台该应用<strong>已开通且审核通过</strong>的解决方案一致。默认优先试
+                  <strong> 1 / 4</strong>（存量应用常见）；若选 <strong>21 / 16</strong> 但开放平台未开通，会报「URL校验不通过：获取解决方案信息失败」。方案下必须开通「商户授权(16)」与「门店管理(1)」。林客控制台里看到的绑定不会自动进 ERP，需本页授权成功、合作列表拉取或手工录入。
                 </span>
               </label>
               <div className="flex flex-wrap gap-2">
@@ -414,6 +447,22 @@ export default function PartnerClientsSection() {
                   className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
                 >
                   {inviteBusy ? '生成中…' : '生成林客授权链接'}
+                </button>
+                <button
+                  type="button"
+                  disabled={syncBusy || providerBound === false}
+                  onClick={() => void onSyncBoundClients()}
+                  className="rounded-lg border border-indigo-300 bg-white px-4 py-2 text-sm font-medium text-indigo-800 hover:bg-indigo-50 disabled:opacity-60"
+                >
+                  {syncBusy ? '拉取中…' : '从抖音拉取已合作商家'}
+                </button>
+                <button
+                  type="button"
+                  disabled={diagBusy || providerBound === false}
+                  onClick={() => void onDiagnoseCapabilities()}
+                  className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                >
+                  {diagBusy ? '探测中…' : '探测开放平台能力'}
                 </button>
                 <button
                   type="button"

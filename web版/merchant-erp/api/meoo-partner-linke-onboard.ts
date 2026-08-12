@@ -7,9 +7,11 @@ import { requireMerchantRegistryAuth } from '../src/lib/merchantRegistryAuth.js'
 import { fetchPartnerTenantProfile, partnerClientsDataTenantId } from '../src/lib/partnerTenantProfile.js'
 import {
   deletePartnerLinkeOnboarding,
+  diagnosePartnerLinkeCapabilities,
   listPartnerLinkeOnboarding,
   retryPartnerLinkeCooperation,
   startPartnerLinkeOnboardInvite,
+  syncPartnerClientsFromDouyinCooperations,
 } from '../src/lib/partnerLinkeOnboardCore.js'
 import { readMerchantSupabaseAdminEnv } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import { nodeSupabaseClientOptions } from '../src/lib/nodeSupabaseClientOptions.js'
@@ -139,6 +141,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return
       }
       sendJson(res, 200, { ok: true, message: '已删除开通任务' })
+      return
+    }
+
+    if (action === 'diagnose') {
+      const out = await diagnosePartnerLinkeCapabilities({ admin, dataTenantId })
+      if (!out.ok) {
+        sendJson(res, 400, { ok: false, message: out.message })
+        return
+      }
+      sendJson(res, 200, { ok: true, probe: out.probe, message: out.probe.hint })
+      return
+    }
+
+    if (action === 'sync_bound_clients') {
+      const out = await syncPartnerClientsFromDouyinCooperations({ admin, profile })
+      if (!out.ok) {
+        sendJson(res, 400, {
+          ok: false,
+          message: out.message,
+          errorCode: out.errorCode ?? null,
+        })
+        return
+      }
+      sendJson(res, 200, {
+        ok: true,
+        upserted: out.upserted,
+        scanned: out.scanned,
+        merchants: out.merchants,
+        message: out.message,
+      })
       return
     }
 

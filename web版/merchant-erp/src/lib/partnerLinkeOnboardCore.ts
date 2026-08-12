@@ -549,6 +549,235 @@ export async function finalizePartnerLinkeAuthWebhook(input: {
   }
 }
 
+function pickDouyinErrorCode(j: Record<string, unknown>): {
+  code: number
+  description: string
+} {
+  const data =
+    j.data && typeof j.data === 'object' && !Array.isArray(j.data)
+      ? (j.data as Record<string, unknown>)
+      : undefined
+  const extra =
+    j.extra && typeof j.extra === 'object' && !Array.isArray(j.extra)
+      ? (j.extra as Record<string, unknown>)
+      : undefined
+  const code = Number(data?.error_code ?? extra?.error_code ?? j.error_code ?? 0)
+  const description = String(
+    data?.description ?? extra?.description ?? j.description ?? '',
+  ).trim()
+  return { code: Number.isFinite(code) ? code : 0, description }
+}
+
+export type PartnerLinkeCapabilityProbe = {
+  clientKey: string
+  spAccountId: string
+  clientTokenOk: boolean
+  partnerOrderQuery: {
+    ok: boolean
+    errorCode: number | null
+    description: string
+  }
+  shopPoiQuery: {
+    ok: boolean
+    errorCode: number | null
+    description: string
+  }
+  hint: string
+}
+
+/** 只读探测：client_token + 合作列表 + 门店查询能力是否已开通 */
+export async function diagnosePartnerLinkeCapabilities(input: {
+  admin: SupabaseClient
+  dataTenantId: string
+}): Promise<
+  | { ok: true; probe: PartnerLinkeCapabilityProbe }
+  | { ok: false; message: string }
+> {
+  const sp = await loadPartnerDouyinSpCredentials(input.admin, input.dataTenantId)
+  if ('ok' in sp && sp.ok === false) return { ok: false, message: sp.message }
+  const creds = sp as PartnerDouyinSpCredentials
+
+  let token = ''
+  try {
+    token = await fetchDouyinClientToken(creds)
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : 'client_token 获取失败',
+    }
+  }
+
+  async function probeGet(path: string, qs: Record<string, string | number>) {
+    const u = new URL(douyinOpenApiUrl(path))
+    for (const [k, v] of Object.entries(qs)) u.searchParams.set(k, String(v))
+    const res = await douyinServerFetch(u, { headers: { 'access-token': token } })
+    const raw = await res.text()
+    try {
+      const j = parseDouyinOpenApiEnvelope(raw, path)
+      const { code, description } = pickDouyinErrorCode(j)
+      return {
+        ok: res.ok && code === 0,
+        errorCode: Number.isFinite(code) ? code : null,
+        description: description || `HTTP ${res.status}`,
+      }
+    } catch (e) {
+      return {
+        ok: false,
+        errorCode: null,
+        description: e instanceof Error ? e.message : String(e),
+      }
+    }
+  }
+
+  const partnerOrderQuery = await probeGet('/goodlife/v1/partner/order/query/', {
+    page: 1,
+    size: 1,
+    cooperation_contents: 5,
+  })
+  const shopPoiQuery = await probeGet('/goodlife/v1/shop/poi/query/', {
+    account_id: creds.spAccountId || '0',
+    page: 1,
+    size: 1,
+  })
+
+  const missingCaps: string[] = []
+  if (partnerOrderQuery.errorCode === 2190004) missingCaps.push('代运营合作（partner/order）')
+  if (shopPoiQuery.errorCode === 2190004) missingCaps.push('门店管理（shop/poi）')
+  const hint =
+    missingCaps.length > 0
+      ? `当前应用 ${creds.clientKey} 未开通：${missingCaps.join('、')}。请到开放平台控制台 → 应用详情 → 解决方案，申请并通过审核后再「拉取已合作商家」或生成授权链。授权链 solution_key 也必须是已开通方案（未开通 21 时改用 1/4）。`
+      : partnerOrderQuery.ok
+        ? '代运营合作能力可用，可点击「从抖音拉取已合作商家」同步客户。'
+        : `能力探测完成：合作列表=${partnerOrderQuery.description}；门店=${shopPoiQuery.description}`
+
+  return {
+    ok: true,
+    probe: {
+      clientKey: creds.clientKey,
+      spAccountId: creds.spAccountId,
+      clientTokenOk: true,
+      partnerOrderQuery,
+      shopPoiQuery,
+      hint,
+    },
+  }
+}
+
+/**
+ * 从抖音「合作列表」拉取已建立代运营关系的商家，写入 tenant_partner_clients。
+ * @see https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/paterner/orderquery
+ */
+export async function syncPartnerClientsFromDouyinCooperations(input: {
+  admin: SupabaseClient
+  profile: PartnerTenantProfile
+}): Promise<
+  | {
+      ok: true
+      upserted: number
+      scanned: number
+      merchants: Array<{ accountId: string; merchantName: string; orderId: string; status: number | null }>
+      message: string
+    }
+  | { ok: false; message: string; errorCode?: number }
+> {
+  const dataTenantId = partnerClientsDataTenantId(input.profile)
+  const sp = await loadPartnerDouyinSpCredentials(input.admin, dataTenantId)
+  if ('ok' in sp && sp.ok === false) return { ok: false, message: sp.message }
+  const creds = sp as PartnerDouyinSpCredentials
+
+  let token = ''
+  try {
+    token = await fetchDouyinClientToken(creds)
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : 'client_token 获取失败' }
+  }
+
+  type CoopMerchant = {
+    accountId: string
+    merchantName: string
+    orderId: string
+    status: number | null
+  }
+  const byAccount = new Map<string, CoopMerchant>()
+  let page = 1
+  const size = 50
+  for (;;) {
+    const u = new URL(douyinOpenApiUrl('/goodlife/v1/partner/order/query/'))
+    u.searchParams.set('page', String(page))
+    u.searchParams.set('size', String(size))
+    u.searchParams.set('cooperation_contents', '5')
+    const res = await douyinServerFetch(u, { headers: { 'access-token': token } })
+    const raw = await res.text()
+    let j: Record<string, unknown>
+    try {
+      j = parseDouyinOpenApiEnvelope(raw, 'partner/order/query')
+    } catch (e) {
+      return { ok: false, message: e instanceof Error ? e.message : String(e) }
+    }
+    const { code, description } = pickDouyinErrorCode(j)
+    if (!res.ok || code !== 0) {
+      const tip =
+        code === 2190004
+          ? `应用未获得「代运营合作」能力（error_code=2190004）。请到开放平台为 ${creds.clientKey} 申请「代运营合作」后再拉取；林客控制台绑定≠ OpenAPI 授权。也可先用「手工录入」填商家账户 ID。`
+          : description || `合作列表查询失败（HTTP ${res.status}）`
+      return { ok: false, message: tip, errorCode: code || undefined }
+    }
+    const data =
+      j.data && typeof j.data === 'object' && !Array.isArray(j.data)
+        ? (j.data as Record<string, unknown>)
+        : {}
+    const orders = Array.isArray(data.orders) ? data.orders : []
+    for (const row of orders) {
+      if (!row || typeof row !== 'object') continue
+      const o = row as Record<string, unknown>
+      const accountId = String(o.account_id || '').trim()
+      if (!accountId) continue
+      const statusRaw = o.status
+      const status =
+        typeof statusRaw === 'number'
+          ? statusRaw
+          : typeof statusRaw === 'string' && statusRaw.trim()
+            ? Number(statusRaw)
+            : null
+      byAccount.set(accountId, {
+        accountId,
+        merchantName: String(o.merchant_name || accountId).trim() || accountId,
+        orderId: String(o.id || '').trim(),
+        status: Number.isFinite(status as number) ? (status as number) : null,
+      })
+    }
+    if (orders.length < size) break
+    page += 1
+    if (page > 40) break
+  }
+
+  const merchants = [...byAccount.values()]
+  let upserted = 0
+  for (const m of merchants) {
+    const row = await upsertPartnerClientFromAuth({
+      admin: input.admin,
+      dataTenantId,
+      merchantAccountId: m.accountId,
+      creds,
+      clientLabel: m.merchantName,
+      ownerAgentTenantId: input.profile.isAgent ? input.profile.tenantId : null,
+      createdByTenantId: input.profile.tenantId,
+    })
+    if (row) upserted += 1
+  }
+
+  return {
+    ok: true,
+    upserted,
+    scanned: merchants.length,
+    merchants,
+    message:
+      merchants.length === 0
+        ? '抖音合作列表为空：应用能力已通，但尚无代运营合作单。请用「邀请开通」生成授权链（方案须已开通），或「手工录入」商家账户 ID。'
+        : `已从抖音合作列表同步 ${upserted}/${merchants.length} 个商家到客户列表`,
+  }
+}
+
 export async function retryPartnerLinkeCooperation(input: {
   admin: SupabaseClient
   dataTenantId: string
