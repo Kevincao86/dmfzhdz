@@ -150,6 +150,8 @@ export default function CompetitorAnalysisPage() {
       competitors: r.competitors,
       suggestions: r.suggestions,
       bundleSuggestions: r.bundleSuggestions,
+      ...(r.mapSource ? { mapSource: r.mapSource } : {}),
+      ...(typeof r.mapMeta?.poiCount === 'number' ? { mapPoiCount: r.mapMeta.poiCount } : {}),
     }
     saveCompetitorReport(next)
     setReport(next)
@@ -169,7 +171,7 @@ export default function CompetitorAnalysisPage() {
           <Link to="/products" className="mx-1 text-indigo-600 underline">
             商品毛利率
           </Link>
-          ，由 AI 推断周边同业格局（基于区位与行业常识，非实时地图抓取）。
+          ，优先用百度地图检索周边同业 POI，再由 AI 分析定价带与组品建议。
         </p>
       </div>
 
@@ -256,7 +258,11 @@ export default function CompetitorAnalysisPage() {
           )}
           <div>
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-              周边竞品（推断）
+              {report.mapSource === 'baidu'
+                ? `百度地图实查${
+                    typeof report.mapPoiCount === 'number' ? `（${report.mapPoiCount} 家）` : ''
+                  }`
+                : '周边竞品（推断）'}
             </h3>
             <ul className="space-y-2">
               {report.competitors.map((c, i) => (

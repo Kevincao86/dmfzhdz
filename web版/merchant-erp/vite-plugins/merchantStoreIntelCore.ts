@@ -608,6 +608,40 @@ export async function runCompetitorAnalysisCore(
   const storeCount = Number(body.storeCount ?? 0)
   const storeLocations = String(body.storeLocations ?? '').trim()
 
+  const { baiduFetchNearbyCompetitorsForStore, isBaiduMapConfigured } = await import(
+    './baiduMapClient.js'
+  )
+  let mapBlock = ''
+  let mapMeta: Record<string, unknown> | undefined
+  if (isBaiduMapConfigured(aiEnv)) {
+    const mapHit = await baiduFetchNearbyCompetitorsForStore(aiEnv, {
+      address,
+      city: city || undefined,
+      industryPathOrName: boundIndustry || storeName,
+      radiusM: 3000,
+    })
+    if (mapHit.ok) {
+      mapBlock = mapHit.linesForPrompt
+      mapMeta = {
+        provider: 'baidu',
+        query: mapHit.query,
+        radiusM: mapHit.radiusM,
+        location: mapHit.location,
+        poiCount: mapHit.pois.length,
+        pois: mapHit.pois.slice(0, 20).map((p) => ({
+          name: p.name,
+          address: p.address,
+          distanceM: p.distanceM,
+          tag: p.tag,
+          overallRating: p.overallRating,
+        })),
+      }
+    } else {
+      mapBlock = `【百度地图周边实查失败】${mapHit.message}。请在 summary 中简要说明，并退回区位推断（注明非实时抓取）。`
+      mapMeta = { provider: 'baidu', error: mapHit.message }
+    }
+  }
+
   const industryRules = boundIndustry
     ? `【硬性规则 · 商家已绑定经营类目】
 - 绑定类目「${boundIndustry}」是分析的唯一主营行业依据；industryHint 必须原样输出该类目（可含完整路径），禁止改写成餐饮、饮品、奶茶等其他品类。
@@ -616,8 +650,13 @@ export async function runCompetitorAnalysisCore(
 - 门店名称仅作参考，不得因店名或地址商圈常识覆盖绑定类目。`
     : `若未提供绑定类目，可结合门店名与地址推断主营品类；industryHint 输出推断结果。`
 
-  const system = `你是本地生活商业分析师。根据门店地址与经营类目，推断其周边 3–8 公里内可能的同业竞争格局。
-你没有实时地图数据：须基于地址语义、城市商圈常识做合理推断，并在 summary 中注明「基于公开信息与区位推断，非实时抓取」。
+  const hasMapPois = Boolean(mapMeta && typeof mapMeta.poiCount === 'number' && mapMeta.poiCount > 0)
+  const system = `你是本地生活商业分析师。根据门店地址、经营类目${hasMapPois ? '与百度地图周边实查 POI 名单' : ''}，分析周边同业竞争格局。
+${
+  hasMapPois
+    ? '用户消息中含【百度地图周边实查】真实门店列表：competitors 须优先使用该名单中的店名与距离；定价带/热销品可合理推断；禁止用虚构店名替换实查结果。summary 须注明「已结合百度地图周边实查」。'
+    : '若无可用地图实查：须基于地址语义、城市商圈常识做合理推断，并在 summary 中注明「基于公开信息与区位推断，非实时抓取」。'
+}
 ${industryRules}
 只输出 JSON：
 {
@@ -649,6 +688,7 @@ ${industryRules}
     boundIndustry
       ? `【绑定经营类目 · 必须遵守】${boundIndustry}${industryName && industryName !== industryPath ? `（${industryName}）` : ''}`
       : '',
+    mapBlock,
     menuSummary ? `本店/品牌菜单摘要（组品须优先引用其中品名与单价）：\n${menuSummary}` : '',
     marginLine ? `商家毛利率配置：\n${marginLine}` : '',
     boundIndustry
@@ -704,6 +744,8 @@ ${industryRules}
         competitors,
         suggestions,
         bundleSuggestions,
+        ...(mapMeta ? { mapMeta } : {}),
+        mapSource: hasMapPois ? 'baidu' : mapMeta ? 'baidu_error' : 'none',
       },
     }
   } catch (e) {

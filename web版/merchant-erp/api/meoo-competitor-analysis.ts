@@ -1,5 +1,5 @@
 /**
- * POST /api/meoo-competitor-analysis — 基于门店地址的周边竞品分析（AI 推断）
+ * POST /api/meoo-competitor-analysis — 周边竞品分析（百度地图 POI + AI）
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {

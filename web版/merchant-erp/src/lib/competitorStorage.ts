@@ -50,6 +50,9 @@ export type CompetitorReport = {
   suggestions: string[]
   /** AI 组品建议（毛利 + 菜单 + 竞品） */
   bundleSuggestions?: CompetitorBundleSuggestion[]
+  /** baidu：周边实查；baidu_error/none：区位推断 */
+  mapSource?: 'baidu' | 'baidu_error' | 'none'
+  mapPoiCount?: number
 }
 
 export type CompetitorTarget =
