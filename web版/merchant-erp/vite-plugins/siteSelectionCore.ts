@@ -1,13 +1,23 @@
 /**
- * 选址参考：对齐市面选址工具常见能力（点位打分 / 竞品密度 / 交通与聚客配套 / 7 日热度 / 建议）
+ * 选址参考：品牌属性理解 → 预想点位评估 → 地图热力 → 图文综合分 → 附近 2–3 点推荐
  */
 import { verifyBearerJwt } from './aiGateway/authSupabase.js'
 import {
   baiduFetchSiteAmenityContext,
+  baiduOffsetLatLng,
+  baiduPlaceNearby,
+  baiduReverseGeocode,
   isBaiduMapConfigured,
+  baiduQueryForIndustry,
+  type BaiduLatLng,
   type BaiduNearbyPoi,
 } from './baiduMapClient.js'
-import { buildFootTrafficHeat7d, type FootTrafficHeatReport } from './siteSelectionHeat.js'
+import {
+  buildFootTrafficHeat7d,
+  buildHeatMapGrid,
+  type FootTrafficHeatReport,
+  type HeatMapCell,
+} from './siteSelectionHeat.js'
 import { merchantAgentChatFromMessages } from './merchantAiUpstream.js'
 
 async function mergeStoreIntelAiEnv(env: Record<string, string>): Promise<Record<string, string>> {
@@ -34,19 +44,12 @@ function scoreDimensions(input: {
 } {
   const { competitorCount, transit, office, residential, mall, school, industry } = input
 
-  // 竞品：过少缺验证、过多红海；甜区约 3–10
   let competition = 72
-  if (competitorCount <= 1) {
-    competition = 58
-  } else if (competitorCount <= 4) {
-    competition = 82
-  } else if (competitorCount <= 10) {
-    competition = 70
-  } else if (competitorCount <= 16) {
-    competition = 52
-  } else {
-    competition = 38
-  }
+  if (competitorCount <= 1) competition = 58
+  else if (competitorCount <= 4) competition = 82
+  else if (competitorCount <= 10) competition = 70
+  else if (competitorCount <= 16) competition = 52
+  else competition = 38
 
   const traffic = clamp(35 + transit * 9 + mall * 4, 20, 95)
   const catchment = clamp(30 + residential * 5 + office * 4 + school * 3 + mall * 5, 20, 95)
@@ -92,9 +95,9 @@ function scoreDimensions(input: {
     },
     {
       key: 'risk',
-      label: '选址风险（越低越好）',
+      label: '选址风险（展示分越高风险越高）',
       score: Math.round(100 - risk),
-      note: '综合饱和度与可达性的风险代理分（展示分越高风险越高）',
+      note: '综合饱和度与可达性的风险代理分',
     },
   ]
 
@@ -125,23 +128,21 @@ function topNames(pois: BaiduNearbyPoi[], n = 6): string[] {
     })
 }
 
-async function llmSiteAdvice(
+async function llmText(
   env: Record<string, string>,
-  prompt: string,
+  system: string,
+  user: string,
 ): Promise<string | undefined> {
-  const system =
-    '你是本地生活选址顾问。根据给定的点位打分与周边 POI 事实，用中文给出 4–6 条可执行选址建议，简洁分点，不要编造未给出的店名或数据。'
   try {
-    const { text } = await merchantAgentChatFromMessages(env, 'qwen', undefined, system, prompt)
+    const { text } = await merchantAgentChatFromMessages(env, 'qwen', undefined, system, user)
     const t = String(text ?? '').trim()
     if (t) return t
   } catch {
     /* fall through */
   }
   try {
-    const { text } = await merchantAgentChatFromMessages(env, 'doubao', undefined, system, prompt)
-    const t = String(text ?? '').trim()
-    return t || undefined
+    const { text } = await merchantAgentChatFromMessages(env, 'doubao', undefined, system, user)
+    return String(text ?? '').trim() || undefined
   } catch {
     return undefined
   }
@@ -156,7 +157,7 @@ export async function buildFootTrafficHeatForAddress(
     radiusM?: number
   },
 ): Promise<
-  | { ok: true; heat: FootTrafficHeatReport; mapError?: undefined }
+  | { ok: true; heat: FootTrafficHeatReport }
   | { ok: false; message: string }
 > {
   if (!isBaiduMapConfigured(env)) {
@@ -185,6 +186,124 @@ export async function buildFootTrafficHeatForAddress(
   return { ok: true, heat }
 }
 
+async function scoreCandidateAtLocation(
+  env: Record<string, string>,
+  location: BaiduLatLng,
+  industry: string,
+  radiusM: number,
+): Promise<{
+  overall: number
+  counts: { competitor: number; transit: number; mall: number; residential: number; office: number }
+  scored: ReturnType<typeof scoreDimensions>
+}> {
+  const query = baiduQueryForIndustry(industry)
+  const [comp, transit, mall, residential, office] = await Promise.all([
+    baiduPlaceNearby(env, { location, query, radiusM, pageSize: 12 }),
+    baiduPlaceNearby(env, { location, query: '地铁站$公交站', radiusM, pageSize: 10 }),
+    baiduPlaceNearby(env, { location, query: '购物中心$商场', radiusM, pageSize: 8 }),
+    baiduPlaceNearby(env, { location, query: '住宅区$小区', radiusM, pageSize: 10 }),
+    baiduPlaceNearby(env, { location, query: '写字楼$办公楼', radiusM, pageSize: 10 }),
+  ])
+  const counts = {
+    competitor: comp.ok ? comp.pois.length : 0,
+    transit: transit.ok ? transit.pois.length : 0,
+    mall: mall.ok ? mall.pois.length : 0,
+    residential: residential.ok ? residential.pois.length : 0,
+    office: office.ok ? office.pois.length : 0,
+  }
+  const scored = scoreDimensions({
+    competitorCount: counts.competitor,
+    transit: counts.transit,
+    office: counts.office,
+    residential: counts.residential,
+    mall: counts.mall,
+    school: 0,
+    industry,
+  })
+  return { overall: scored.overall, counts, scored }
+}
+
+type RecommendSpot = {
+  rank: number
+  label: string
+  address: string
+  city?: string
+  location: BaiduLatLng
+  distanceM: number
+  direction: string
+  score: number
+  verdict: string
+  reason: string
+  counts: { competitor: number; transit: number; mall: number }
+}
+
+async function findNearbyRecommendations(
+  env: Record<string, string>,
+  center: BaiduLatLng,
+  industry: string,
+  radiusM: number,
+): Promise<RecommendSpot[]> {
+  const dirs: Array<{ name: string; n: number; e: number }> = [
+    { name: '东北', n: 480, e: 480 },
+    { name: '东南', n: -520, e: 560 },
+    { name: '西南', n: -500, e: -520 },
+    { name: '西北', n: 560, e: -480 },
+  ]
+
+  const scored = (
+    await Promise.all(
+      dirs.map(async (d) => {
+        const loc = baiduOffsetLatLng(center, d.n, d.e)
+        const distanceM = Math.round(Math.hypot(d.n, d.e))
+        const rev = await baiduReverseGeocode(env, loc)
+        if (!rev.ok) return null
+        const hit = await scoreCandidateAtLocation(env, loc, industry, radiusM)
+        const reasonBits = [
+          hit.counts.transit >= 2 ? '交通配套更好' : '',
+          hit.counts.competitor <= 6 ? '竞争压力可控' : '同业偏密需差异化',
+          hit.counts.mall >= 1 ? '靠近商场聚客' : '',
+          hit.counts.residential >= 3 ? '社区到店潜力' : '',
+        ].filter(Boolean)
+        const labelBase = [rev.district, rev.street].filter(Boolean).join('') || `${d.name}方向`
+        const spot: RecommendSpot = {
+          rank: 0,
+          label: `${labelBase}候选`,
+          address: rev.address,
+          city: rev.city,
+          location: loc,
+          distanceM,
+          direction: d.name,
+          score: hit.overall,
+          verdict: hit.scored.verdict,
+          reason: reasonBits.join('；') || '综合区位可作备选对比',
+          counts: {
+            competitor: hit.counts.competitor,
+            transit: hit.counts.transit,
+            mall: hit.counts.mall,
+          },
+        }
+        return spot
+      }),
+    )
+  ).filter((x): x is RecommendSpot => Boolean(x))
+
+  scored.sort((a, b) => b.score - a.score)
+  const picked: RecommendSpot[] = []
+  for (const row of scored) {
+    if (picked.length >= 3) break
+    const tooClose = picked.some(
+      (p) =>
+        Math.hypot(
+          (p.location.lat - row.location.lat) * 111_320,
+          (p.location.lng - row.location.lng) * 111_320,
+        ) < 350,
+    )
+    if (tooClose) continue
+    picked.push({ ...row, rank: picked.length + 1 })
+  }
+  return picked
+}
+
 export async function runSiteSelectionCore(
   bodyRaw: string,
   authHeader: string | undefined,
@@ -197,10 +316,15 @@ export async function runSiteSelectionCore(
   let body: {
     address?: string
     city?: string
-    storeName?: string
+    /** 预想点位备注名 */
+    spotLabel?: string
+    brandName?: string
+    brandStoreCount?: number
     industryPath?: string
     industryName?: string
     industryHint?: string
+    margins?: { douyin?: number; meituan?: number; xhs?: number }
+    brandNotes?: string
     radiusM?: number
   }
   try {
@@ -212,9 +336,13 @@ export async function runSiteSelectionCore(
   const address = String(body.address ?? '').trim()
   if (!address) return { status: 400, body: { ok: false, error: 'address_required' } }
   const city = String(body.city ?? '').trim()
-  const storeName = String(body.storeName ?? '').trim()
+  const spotLabel = String(body.spotLabel ?? '').trim()
+  const brandName = String(body.brandName ?? '').trim()
+  const brandStoreCount = Number(body.brandStoreCount ?? 0)
   const industry =
     String(body.industryPath ?? body.industryHint ?? body.industryName ?? '').trim()
+  const brandNotes = String(body.brandNotes ?? '').trim()
+  const margins = body.margins
   const radiusM = Math.min(Math.max(Math.floor(Number(body.radiusM) || 1500), 500), 3000)
 
   if (!isBaiduMapConfigured(aiEnv)) {
@@ -224,10 +352,32 @@ export async function runSiteSelectionCore(
     }
   }
 
+  const brandProfileLines = [
+    brandName ? `品牌：${brandName}${brandStoreCount > 0 ? `（在营约 ${brandStoreCount} 家）` : ''}` : '品牌：未命名（以经营类目为准）',
+    industry ? `经营类目：${industry}` : '',
+    margins &&
+    typeof margins.douyin === 'number' &&
+    typeof margins.meituan === 'number' &&
+    typeof margins.xhs === 'number'
+      ? `毛利目标：抖音 ${margins.douyin}% / 美团 ${margins.meituan}% / 小红书 ${margins.xhs}%`
+      : '',
+    brandNotes ? `补充：${brandNotes.slice(0, 400)}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  const brandUnderstanding =
+    (await llmText(
+      aiEnv,
+      '你是本地生活选址顾问。根据商家已绑定的品牌/类目/毛利信息，用 3–5 句中文概括「该品牌适合什么样的点位」（客群、商圈类型、时段、应避开什么）。不要编造未给出的门店地址。',
+      brandProfileLines || `经营类目：${industry || '未配置'}`,
+    )) ||
+    `该品牌以「${industry || '本地生活服务'}」为主营，选址应优先匹配目标客群可达性与合理同业密度，避开过度饱和红海并兼顾租金回收周期。`
+
   const ctx = await baiduFetchSiteAmenityContext(aiEnv, {
     address,
     city: city || undefined,
-    industryPathOrName: industry || storeName,
+    industryPathOrName: industry || brandName,
     radiusM,
   })
   if (!ctx.ok) {
@@ -241,12 +391,12 @@ export async function runSiteSelectionCore(
     residential: ctx.counts.residential,
     mall: ctx.counts.mall,
     school: ctx.counts.school,
-    industry: industry || storeName,
+    industry: industry || brandName,
   })
 
   const heat = buildFootTrafficHeat7d({
     location: ctx.location,
-    industryPathOrName: industry || storeName,
+    industryPathOrName: industry || brandName,
     competitorPois: ctx.competitorPois,
     amenityCounts: {
       transit: ctx.counts.transit,
@@ -258,35 +408,60 @@ export async function runSiteSelectionCore(
     radiusM: ctx.radiusM,
   })
 
+  const amenityPois = [
+    ...ctx.buckets.transit,
+    ...ctx.buckets.mall,
+    ...ctx.buckets.office,
+    ...ctx.buckets.residential,
+  ]
+  const heatMapGrid: HeatMapCell[] = buildHeatMapGrid({
+    center: ctx.location,
+    pois: ctx.competitorPois,
+    amenityPois,
+    radiusM: Math.min(radiusM, 1200),
+    gridHalf: 5,
+  })
+
+  const recommendations = await findNearbyRecommendations(
+    aiEnv,
+    ctx.location,
+    industry || brandName || '休闲娱乐',
+    radiusM,
+  )
+
+  const scoreStory =
+    (await llmText(
+      aiEnv,
+      '你是选址报告撰稿人。根据品牌理解、点位得分与周边事实，用「图文报告」口吻写 4 段短文（每段 1–2 句）：①总评 ②优势 ③风险 ④落地建议。不要编造未出现的店名。',
+      [
+        `【品牌理解】\n${brandUnderstanding}`,
+        `预想点位：${spotLabel || address}`,
+        `地址：${address}${city ? `（${city}）` : ''}`,
+        `综合分 ${scored.overall}（${scored.verdict}）`,
+        `维度：${scored.dimensions.map((d) => `${d.label}${d.score}`).join('；')}`,
+        `同业 ${ctx.counts.competitor}：${topNames(ctx.competitorPois, 5).join('、') || '无'}`,
+        `交通 ${ctx.counts.transit}、商场 ${ctx.counts.mall}、写字楼 ${ctx.counts.office}、住宅 ${ctx.counts.residential}`,
+        heat.insight,
+        recommendations.length
+          ? `备选推荐：${recommendations.map((r) => `${r.label}${r.score}分`).join('；')}`
+          : '',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    )) ||
+    [
+      `总评：该预想点位综合分 ${scored.overall}/100，结论「${scored.verdict}」。`,
+      `优势：交通站点约 ${ctx.counts.transit}、聚客配套（商场 ${ctx.counts.mall} / 住宅 ${ctx.counts.residential}）可支撑到店。`,
+      `风险：同业约 ${ctx.counts.competitor} 家，需对照品牌定位做差异化与租金测算。`,
+      `建议：结合下方热力图高峰区与备选点位，工作日/周末各蹲点验证门前流。`,
+    ].join('\n')
+
   const checklist = [
-    '核对日租/转让费与预估客单能否覆盖盈亏平衡',
+    '对照品牌客群，确认该点位是否匹配（社区/办公/商圈）',
     '工作日与周末各蹲点 1–2 个高峰时段，校验门前过人流',
-    '对比同商圈 2–3 个备选点的可视性、停车与快递可达',
-    '确认物业用途、消防与招牌政策是否匹配业态',
+    '对比推荐备选点的可视性、停车与招牌政策',
+    '用毛利目标反推盈亏平衡客单与日租上限',
   ]
-
-  const marketFeatures = [
-    { name: '点位综合打分', desc: '竞争/交通/聚客/业态匹配多维评分（对齐经营通/慧眼类选址产品）' },
-    { name: '竞品密度', desc: '百度周边同业 POI 实查与距离分布' },
-    { name: '交通与聚客配套', desc: '地铁公交、写字楼、住宅、商场、学校密度' },
-    { name: '近 7 日热度', desc: '区位代理热度指数（非信令客流）；可后续替换慧眼' },
-    { name: '选址建议', desc: '结合打分与 POI 的可执行建议清单' },
-  ]
-
-  const advicePrompt = [
-    storeName ? `候选店名/品牌：${storeName}` : '',
-    `地址：${address}${city ? `（${city}）` : ''}`,
-    industry ? `经营类目：${industry}` : '',
-    `综合分 ${scored.overall}，结论：${scored.verdict}`,
-    `维度：${scored.dimensions.map((d) => `${d.label}${d.score}`).join('；')}`,
-    `同业 ${ctx.counts.competitor}：${topNames(ctx.competitorPois).join('、') || '无'}`,
-    `交通 ${ctx.counts.transit}、写字楼 ${ctx.counts.office}、住宅 ${ctx.counts.residential}、商场 ${ctx.counts.mall}、学校 ${ctx.counts.school}`,
-    heat.insight,
-  ]
-    .filter(Boolean)
-    .join('\n')
-
-  const aiAdvice = await llmSiteAdvice(aiEnv, advicePrompt)
 
   return {
     status: 200,
@@ -294,8 +469,11 @@ export async function runSiteSelectionCore(
       ok: true,
       address,
       city: city || undefined,
-      storeName: storeName || undefined,
+      spotLabel: spotLabel || undefined,
+      brandName: brandName || undefined,
       industryHint: industry || undefined,
+      brandUnderstanding,
+      scoreStory,
       location: ctx.location,
       radiusM: ctx.radiusM,
       competitorQuery: ctx.competitorQuery,
@@ -306,6 +484,7 @@ export async function runSiteSelectionCore(
         distanceM: p.distanceM,
         tag: p.tag,
         overallRating: p.overallRating,
+        location: p.location,
       })),
       amenities: {
         transit: topNames(ctx.buckets.transit),
@@ -316,10 +495,10 @@ export async function runSiteSelectionCore(
       },
       score: scored,
       footTrafficHeat: heat,
+      heatMapGrid,
+      recommendations,
       checklist,
-      marketFeatures,
-      aiAdvice,
-      summary: `点位综合分 ${scored.overall}/100（${scored.verdict}）。半径 ${Math.round(radiusM / 1000)}km 内同业约 ${ctx.counts.competitor} 家，交通站点 ${ctx.counts.transit}，商场 ${ctx.counts.mall}。${heat.insight}`,
+      summary: `【${brandName || '品牌'}】预想点位综合分 ${scored.overall}/100（${scored.verdict}）。${heat.insight}`,
     },
   }
 }

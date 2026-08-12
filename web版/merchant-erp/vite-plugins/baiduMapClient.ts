@@ -271,6 +271,57 @@ const AMENITY_QUERIES: Record<Exclude<BaiduAmenityBucket, 'competitor'>, string>
   school: '学校$大学$中学',
 }
 
+/** 百度坐标近似平移（米 → bd09ll） */
+export function baiduOffsetLatLng(
+  location: BaiduLatLng,
+  metersNorth: number,
+  metersEast: number,
+): BaiduLatLng {
+  const dLat = metersNorth / 111_320
+  const cos = Math.cos((location.lat * Math.PI) / 180)
+  const dLng = metersEast / (111_320 * Math.max(cos, 0.2))
+  return { lat: location.lat + dLat, lng: location.lng + dLng }
+}
+
+/** 逆地理：坐标 → 结构化地址 */
+export async function baiduReverseGeocode(
+  env: BaiduMapEnv,
+  location: BaiduLatLng,
+): Promise<
+  | { ok: true; address: string; city?: string; district?: string; street?: string }
+  | { ok: false; message: string }
+> {
+  const ak = resolveBaiduMapAk(env)
+  if (!ak) return { ok: false, message: '未配置 BAIDU_MAP_AK' }
+  const qs = new URLSearchParams({
+    ak,
+    output: 'json',
+    coordtype: 'bd09ll',
+    location: `${location.lat},${location.lng}`,
+  })
+  const r = await baiduGetJson(`https://api.map.baidu.com/reverse_geocoding/v3/?${qs.toString()}`)
+  if (!r.ok) return r
+  const result = r.json.result as
+    | {
+        formatted_address?: string
+        addressComponent?: {
+          city?: string
+          district?: string
+          street?: string
+          town?: string
+        }
+      }
+    | undefined
+  const address = String(result?.formatted_address ?? '').trim()
+  if (!address) return { ok: false, message: '逆地理未返回地址' }
+  const city = String(result?.addressComponent?.city ?? '').trim() || undefined
+  const district = String(result?.addressComponent?.district ?? '').trim() || undefined
+  const street =
+    String(result?.addressComponent?.street ?? result?.addressComponent?.town ?? '').trim() ||
+    undefined
+  return { ok: true, address, city, district, street }
+}
+
 /** 选址：并行检索竞品 + 交通/写字楼/住宅/商场/学校 */
 export async function baiduFetchSiteAmenityContext(
   env: BaiduMapEnv,

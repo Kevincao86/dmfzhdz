@@ -233,3 +233,51 @@ export function buildFootTrafficHeat7d(opts: {
     drivers,
   }
 }
+
+export type HeatMapCell = {
+  lat: number
+  lng: number
+  weight: number
+}
+
+/** 地图热力网格：以候选点为中心，用周边 POI 距离衰减生成权重 */
+export function buildHeatMapGrid(opts: {
+  center: BaiduLatLng
+  pois: BaiduNearbyPoi[]
+  amenityPois?: BaiduNearbyPoi[]
+  radiusM?: number
+  gridHalf?: number
+}): HeatMapCell[] {
+  const radiusM = opts.radiusM ?? 1200
+  const half = Math.min(Math.max(opts.gridHalf ?? 5, 3), 7)
+  const stepM = radiusM / half
+  const cells: HeatMapCell[] = []
+  const attractors = [
+    ...opts.pois.map((p) => ({ loc: p.location, w: 1.2 })),
+    ...(opts.amenityPois ?? []).map((p) => ({ loc: p.location, w: 0.7 })),
+  ].filter((a): a is { loc: BaiduLatLng; w: number } => Boolean(a.loc))
+
+  for (let iy = -half; iy <= half; iy++) {
+    for (let ix = -half; ix <= half; ix++) {
+      const metersNorth = -iy * stepM
+      const metersEast = ix * stepM
+      const dLat = metersNorth / 111_320
+      const cos = Math.cos((opts.center.lat * Math.PI) / 180)
+      const dLng = metersEast / (111_320 * Math.max(cos, 0.2))
+      const lat = opts.center.lat + dLat
+      const lng = opts.center.lng + dLng
+      const distFromCenter = Math.hypot(metersNorth, metersEast)
+      let w = Math.max(0, 1 - distFromCenter / (radiusM * 1.15)) * 28
+      for (const a of attractors) {
+        const dy = (a.loc.lat - lat) * 111_320
+        const dx = (a.loc.lng - lng) * 111_320 * Math.max(cos, 0.2)
+        const d = Math.hypot(dx, dy)
+        w += a.w * Math.exp(-d / 280) * 42
+      }
+      // 中心候选点略抬高，便于对照
+      if (ix === 0 && iy === 0) w += 18
+      cells.push({ lat, lng, weight: Math.round(clamp(w, 4, 100)) })
+    }
+  }
+  return cells
+}
