@@ -60,6 +60,7 @@ list_scopes() {
   ai_agent_quick_image   商家 ERP：AI 智能体快捷任务平铺 + 生图意图自动切模型
   competitor_industry    商家 ERP：竞争对手分析经营类目读取/门店毛利配置联动
   competitor_baidu_map   商家 ERP：竞品分析接入百度地图周边 POI（服务端 AK）
+  ops_site_selection     商家 ERP：运营「选址参考」+ 竞品近7日人流热度
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -736,6 +737,27 @@ meoo-competitor-analysis
 CompetitorAnalysisPage
 storeIntelApi
 competitorStorage
+change-scope-guard
+PAT
+      ;;
+    ops_site_selection)
+      cat <<'PAT'
+baiduMapClient
+siteSelectionHeat
+siteSelectionCore
+meoo-site-selection
+merchantStoreIntelCore
+merchantApiMock
+ecs-auth-api-server
+SiteSelectionPage
+FootTrafficHeatPanel
+CompetitorAnalysisPage
+storeIntelApi
+competitorStorage
+nav.ts
+App.tsx
+membershipPlan
+partnerEditionConfig
 change-scope-guard
 PAT
       ;;

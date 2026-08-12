@@ -184,6 +184,7 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
       '/api/meoo-store-menu-recognize',
       '/api/meoo-store-menu-excel-recognize',
       '/api/meoo-competitor-analysis',
+      '/api/meoo-site-selection',
       '/api/meoo-ai-product-plan',
     ] as const
     if (storeIntelPaths.includes(loc.pathname as (typeof storeIntelPaths)[number])) {
@@ -213,7 +214,20 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
           '/api/meoo-competitor-analysis': intel.runCompetitorAnalysisCore,
           '/api/meoo-ai-product-plan': intel.runAiProductPlanCore,
         } as const
-        const run = runners[loc.pathname as keyof typeof runners]
+        const siteRunners = {
+          '/api/meoo-site-selection': async (
+            bodyRaw: string,
+            auth: string | undefined,
+            aiEnv: Record<string, string>,
+          ) => {
+            const site = await import('./siteSelectionCore.js')
+            return site.runSiteSelectionCore(bodyRaw, auth, aiEnv)
+          },
+        } as const
+        const run =
+          loc.pathname in runners
+            ? runners[loc.pathname as keyof typeof runners]
+            : siteRunners[loc.pathname as keyof typeof siteRunners]
         const out = await run(
           bodyRaw,
           typeof auth === 'string' ? auth : undefined,
