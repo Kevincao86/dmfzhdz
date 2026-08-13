@@ -608,14 +608,15 @@ export async function runCompetitorAnalysisCore(
   const storeCount = Number(body.storeCount ?? 0)
   const storeLocations = String(body.storeLocations ?? '').trim()
 
-  const { baiduFetchNearbyCompetitorsForStore, isBaiduMapConfigured } = await import(
-    './baiduMapClient.js'
+  const { mapFetchNearbyCompetitorsForStore, isMapServiceConfigured } = await import(
+    './mapProvidersClient.js'
   )
   let mapBlock = ''
   let mapMeta: Record<string, unknown> | undefined
   let footTrafficHeat: Record<string, unknown> | undefined
-  if (isBaiduMapConfigured(aiEnv)) {
-    const mapHit = await baiduFetchNearbyCompetitorsForStore(aiEnv, {
+  let mapSource: 'amap' | 'baidu' | 'amap_error' | 'baidu_error' | 'none' = 'none'
+  if (isMapServiceConfigured(aiEnv)) {
+    const mapHit = await mapFetchNearbyCompetitorsForStore(aiEnv, {
       address,
       city: city || undefined,
       industryPathOrName: boundIndustry || storeName,
@@ -623,8 +624,9 @@ export async function runCompetitorAnalysisCore(
     })
     if (mapHit.ok) {
       mapBlock = mapHit.linesForPrompt
+      mapSource = mapHit.provider
       mapMeta = {
-        provider: 'baidu',
+        provider: mapHit.provider,
         query: mapHit.query,
         radiusM: mapHit.radiusM,
         location: mapHit.location,
@@ -653,8 +655,10 @@ export async function runCompetitorAnalysisCore(
         /* 热度失败不阻断竞品分析 */
       }
     } else {
-      mapBlock = `【百度地图周边实查失败】${mapHit.message}。请在 summary 中简要说明，并退回区位推断（注明非实时抓取）。`
-      mapMeta = { provider: 'baidu', error: mapHit.message }
+      const last = mapHit.tried?.[mapHit.tried.length - 1]
+      mapSource = last === 'baidu' ? 'baidu_error' : 'amap_error'
+      mapBlock = `【地图周边实查失败】${mapHit.message}。请在 summary 中简要说明，并退回区位推断（注明非实时抓取）。`
+      mapMeta = { provider: last || 'amap', error: mapHit.message, tried: mapHit.tried }
     }
   }
 
@@ -667,10 +671,12 @@ export async function runCompetitorAnalysisCore(
     : `若未提供绑定类目，可结合门店名与地址推断主营品类；industryHint 输出推断结果。`
 
   const hasMapPois = Boolean(mapMeta && typeof mapMeta.poiCount === 'number' && mapMeta.poiCount > 0)
-  const system = `你是本地生活商业分析师。根据门店地址、经营类目${hasMapPois ? '与百度地图周边实查 POI 名单' : ''}，分析周边同业竞争格局。
+  const mapLabelForLlm =
+    mapSource === 'amap' ? '高德地图' : mapSource === 'baidu' ? '百度地图' : '地图'
+  const system = `你是本地生活商业分析师。根据门店地址、经营类目${hasMapPois ? `与${mapLabelForLlm}周边实查 POI 名单` : ''}，分析周边同业竞争格局。
 ${
   hasMapPois
-    ? '用户消息中含【百度地图周边实查】真实门店列表：competitors 须优先使用该名单中的店名与距离；定价带/热销品可合理推断；禁止用虚构店名替换实查结果。summary 须注明「已结合百度地图周边实查」。'
+    ? `用户消息中含【${mapLabelForLlm}周边实查】真实门店列表：competitors 须优先使用该名单中的店名与距离；定价带/热销品可合理推断；禁止用虚构店名替换实查结果。summary 须注明「已结合${mapLabelForLlm}周边实查」。`
     : '若无可用地图实查：须基于地址语义、城市商圈常识做合理推断，并在 summary 中注明「基于公开信息与区位推断，非实时抓取」。'
 }
 ${industryRules}
@@ -762,7 +768,13 @@ ${industryRules}
         bundleSuggestions,
         ...(mapMeta ? { mapMeta } : {}),
         ...(footTrafficHeat ? { footTrafficHeat } : {}),
-        mapSource: hasMapPois ? 'baidu' : mapMeta ? 'baidu_error' : 'none',
+        mapSource: hasMapPois
+          ? mapSource
+          : mapMeta
+            ? mapSource === 'none'
+              ? 'amap_error'
+              : mapSource
+            : 'none',
       },
     }
   } catch (e) {

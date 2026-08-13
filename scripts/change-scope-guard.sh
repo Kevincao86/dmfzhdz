@@ -60,6 +60,7 @@ list_scopes() {
   ai_agent_quick_image   商家 ERP：AI 智能体快捷任务平铺 + 生图意图自动切模型
   competitor_industry    商家 ERP：竞争对手分析经营类目读取/门店毛利配置联动
   competitor_baidu_map   商家 ERP：竞品分析接入百度地图周边 POI（服务端 AK）
+  map_providers          商家 ERP：地图主副（高德优先 / 百度兜底）竞品+选址
   ops_site_selection     商家 ERP：运营「选址参考」+ 竞品近7日人流热度
   partner_linke_auth     服务商版：林客邀请授权链接拼装/客户商家开通
 
@@ -733,8 +734,26 @@ PAT
     competitor_baidu_map)
       cat <<'PAT'
 baiduMapClient
+amapMapClient
+mapProvidersClient
 merchantStoreIntelCore
 meoo-competitor-analysis
+CompetitorAnalysisPage
+storeIntelApi
+competitorStorage
+change-scope-guard
+PAT
+      ;;
+    map_providers)
+      cat <<'PAT'
+amapMapClient
+mapProvidersClient
+baiduMapClient
+merchantStoreIntelCore
+siteSelectionCore
+siteSelectionHeat
+meoo-competitor-analysis
+meoo-site-selection
 CompetitorAnalysisPage
 storeIntelApi
 competitorStorage
@@ -744,6 +763,8 @@ PAT
     ops_site_selection)
       cat <<'PAT'
 baiduMapClient
+amapMapClient
+mapProvidersClient
 siteSelectionHeat
 siteSelectionCore
 meoo-site-selection

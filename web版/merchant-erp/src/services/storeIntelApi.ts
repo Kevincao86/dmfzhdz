@@ -176,7 +176,7 @@ export async function analyzeCompetitors(body: {
       competitors: CompetitorEntry[]
       suggestions: string[]
       bundleSuggestions: CompetitorBundleSuggestion[]
-      mapSource?: 'baidu' | 'baidu_error' | 'none'
+      mapSource?: 'amap' | 'baidu' | 'amap_error' | 'baidu_error' | 'none'
       mapMeta?: {
         provider?: string
         query?: string
@@ -196,7 +196,7 @@ export async function analyzeCompetitors(body: {
       competitors?: CompetitorEntry[]
       suggestions?: string[]
       bundleSuggestions?: CompetitorBundleSuggestion[]
-      mapSource?: 'baidu' | 'baidu_error' | 'none'
+      mapSource?: 'amap' | 'baidu' | 'amap_error' | 'baidu_error' | 'none'
       mapMeta?: {
         provider?: string
         query?: string
