@@ -99,65 +99,71 @@ export default function CompetitorAnalysisPage() {
     }
     setLoading(true)
     setErr(null)
-    const industry = resolveCompetitorAnalysisIndustry(
-      target.mode === 'brand' ? target.brandName : target.storeName,
-    )
-    if (!industry.path) {
+    try {
+      const industry = resolveCompetitorAnalysisIndustry(
+        target.mode === 'brand' ? target.brandName : target.storeName,
+      )
+      if (!industry.path) {
+        setErr(
+          '请先在「商品 → 门店毛利配置」中选择经营类目（如 购物 > 商超便利 或 购物 > 数码家电），再进行分析',
+        )
+        return
+      }
+      const menu = loadStoreMenuRecord()
+      const menuSummary = menu?.items?.length ? menuItemsSummary(menu.items, 30) : ''
+      const { margins } = readStoreMarginConfig()
+      const displayName =
+        target.mode === 'brand' ? target.brandName : target.storeName
+      const r = await analyzeCompetitors({
+        storeName: displayName,
+        address: address.trim(),
+        city: target.mode === 'brand' ? target.anchorCity : target.city,
+        industryPath: industry.path,
+        industryName: industry.name,
+        industryHint: industry.path,
+        menuSummary: menuSummary || undefined,
+        margins,
+        marginSummary: `抖音 ${margins.douyin}%、美团 ${margins.meituan}%、小红书 ${margins.xhs}%`,
+        analysisMode: target.mode,
+        brandName: target.mode === 'brand' ? target.brandName : undefined,
+        storeCount: target.mode === 'brand' ? target.storeCount : undefined,
+        storeLocations:
+          target.mode === 'brand'
+            ? target.stores
+                .map((s) => `${s.storeName}：${s.address}${s.city ? `（${s.city}）` : ''}`)
+                .join('\n')
+            : undefined,
+      })
+      if (!r.ok) {
+        setErr(r.message)
+        return
+      }
+      const reportKey = competitorReportKeyForTarget(target)
+      const next: CompetitorReport = {
+        id: `cmp-${Date.now()}`,
+        poiId: reportKey,
+        storeName: displayName,
+        address: address.trim(),
+        brandName: target.mode === 'brand' ? target.brandName : undefined,
+        storeCount: target.mode === 'brand' ? target.storeCount : undefined,
+        industryHint: industry.path,
+        analyzedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+        summary: r.summary,
+        competitors: r.competitors,
+        suggestions: r.suggestions,
+        bundleSuggestions: r.bundleSuggestions,
+        ...(r.mapSource ? { mapSource: r.mapSource } : {}),
+        ...(typeof r.mapMeta?.poiCount === 'number' ? { mapPoiCount: r.mapMeta.poiCount } : {}),
+        ...(r.footTrafficHeat ? { footTrafficHeat: r.footTrafficHeat } : {}),
+      }
+      saveCompetitorReport(next)
+      setReport(next)
+      setHistory(loadCompetitorReports())
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e))
+    } finally {
       setLoading(false)
-      setErr('请先在「商品 → 门店毛利配置」中选择经营类目（如 购物 > 商超便利 或 购物 > 数码家电），再进行分析')
-      return
     }
-    const menu = loadStoreMenuRecord()
-    const menuSummary = menu?.items?.length ? menuItemsSummary(menu.items, 30) : ''
-    const { margins } = readStoreMarginConfig()
-    const displayName =
-      target.mode === 'brand' ? target.brandName : target.storeName
-    const r = await analyzeCompetitors({
-      storeName: displayName,
-      address: address.trim(),
-      city: target.mode === 'brand' ? target.anchorCity : target.city,
-      industryPath: industry.path,
-      industryName: industry.name,
-      industryHint: industry.path,
-      menuSummary: menuSummary || undefined,
-      margins,
-      marginSummary: `抖音 ${margins.douyin}%、美团 ${margins.meituan}%、小红书 ${margins.xhs}%`,
-      analysisMode: target.mode,
-      brandName: target.mode === 'brand' ? target.brandName : undefined,
-      storeCount: target.mode === 'brand' ? target.storeCount : undefined,
-      storeLocations:
-        target.mode === 'brand'
-          ? target.stores
-              .map((s) => `${s.storeName}：${s.address}${s.city ? `（${s.city}）` : ''}`)
-              .join('\n')
-          : undefined,
-    })
-    setLoading(false)
-    if (!r.ok) {
-      setErr(r.message)
-      return
-    }
-    const reportKey = competitorReportKeyForTarget(target)
-    const next: CompetitorReport = {
-      id: `cmp-${Date.now()}`,
-      poiId: reportKey,
-      storeName: displayName,
-      address: address.trim(),
-      brandName: target.mode === 'brand' ? target.brandName : undefined,
-      storeCount: target.mode === 'brand' ? target.storeCount : undefined,
-      industryHint: industry.path,
-      analyzedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
-      summary: r.summary,
-      competitors: r.competitors,
-      suggestions: r.suggestions,
-      bundleSuggestions: r.bundleSuggestions,
-      ...(r.mapSource ? { mapSource: r.mapSource } : {}),
-      ...(typeof r.mapMeta?.poiCount === 'number' ? { mapPoiCount: r.mapMeta.poiCount } : {}),
-      ...(r.footTrafficHeat ? { footTrafficHeat: r.footTrafficHeat } : {}),
-    }
-    saveCompetitorReport(next)
-    setReport(next)
-    setHistory(loadCompetitorReports())
   }, [target])
 
   return (

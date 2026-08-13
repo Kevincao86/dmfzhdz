@@ -18,7 +18,18 @@ async function bearer(): Promise<string | null> {
   return data.session?.access_token ?? null
 }
 
-async function postJson<T>(path: string, body: unknown): Promise<T> {
+const STORE_INTEL_FETCH_TIMEOUT_MS = 180_000
+
+function fetchTimeoutSignal(ms: number): { signal: AbortSignal; clear: () => void } {
+  const ctrl = new AbortController()
+  const id = setTimeout(() => ctrl.abort(), ms)
+  return {
+    signal: ctrl.signal,
+    clear: () => clearTimeout(id),
+  }
+}
+
+async function postJson<T>(path: string, body: unknown, timeoutMs = STORE_INTEL_FETCH_TIMEOUT_MS): Promise<T> {
   const token = await bearer()
   const headers: Record<string, string> = {
     Accept: 'application/json',
@@ -31,13 +42,20 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
   for (let i = 0; i < targets.length; i++) {
     const target = targets[i]!
     let res: Response
+    const { signal, clear } = fetchTimeoutSignal(timeoutMs)
     try {
-      res = await fetch(target, { method: 'POST', headers, body: JSON.stringify(body) })
+      res = await fetch(target, { method: 'POST', headers, body: JSON.stringify(body), signal })
     } catch (e) {
-      lastErr = e instanceof Error ? e.message : String(e)
+      clear()
+      const msg = e instanceof Error ? e.message : String(e)
+      lastErr =
+        e instanceof Error && e.name === 'AbortError'
+          ? `请求超时（>${Math.round(timeoutMs / 1000)} 秒），请稍后重试`
+          : msg
       if (i < targets.length - 1) continue
       throw new Error(lastErr)
     }
+    clear()
     const text = await res.text()
     let json: unknown = null
     try {
@@ -206,6 +224,7 @@ export async function analyzeCompetitors(body: {
       }
       footTrafficHeat?: CompetitorFootTrafficHeat
       error?: string
+      detail?: string
     }>('/api/meoo-competitor-analysis', body)
     if (r.ok && r.summary) {
       return {
@@ -220,7 +239,12 @@ export async function analyzeCompetitors(body: {
         ...(r.footTrafficHeat ? { footTrafficHeat: r.footTrafficHeat } : {}),
       }
     }
-    return { ok: false, message: r.error ?? '分析失败' }
+    const detail = typeof r.detail === 'string' ? r.detail.trim() : ''
+    const code = typeof r.error === 'string' ? r.error.trim() : ''
+    return {
+      ok: false,
+      message: detail || code || '分析失败',
+    }
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : String(e) }
   }
