@@ -3,8 +3,8 @@
 
 统一口径（全材料必须一致）：
 - 算法名称：灵祺智能生成合成算法
-- 备案主体：宁波墨典网络科技有限公司（与域名 ICP 主体一致）
-- ICP：浙ICP备2026044830号-1（mofangdianai.com）
+- 备案主体：温州灵祺智能科技有限公司
+- ICP：须为「温州灵祺」名下备案号（与备案主体一致；提交前填实）
 """
 from __future__ import annotations
 
@@ -19,16 +19,17 @@ from docx.shared import Cm, Pt
 OUT_DIR = Path(__file__).resolve().parent
 DOWNLOADS = Path.home() / "Downloads"
 
-# 与 ICP / 用户协议主体对齐；信用代码请与营业执照核对后替换
+# 备案主体：温州灵祺；信用代码/ICP 请与营业执照及工信部备案核对后替换
 COMPANY = {
-    "name": "宁波墨典网络科技有限公司",
-    "credit_code": "【请填写统一社会信用代码，须与营业执照一致】",
+    "name": "温州灵祺智能科技有限公司",
+    "credit_code": "【请填写温州灵祺营业执照统一社会信用代码】",
     "legal_rep": "曹鑫淼",
     "algo_officer": "曹鑫淼",
     "phone": "15757468650",
-    "address": "浙江省宁波市",
+    "address": "浙江省温州市",
     "domain": "mofangdianai.com",
-    "icp": "浙ICP备2026044830号-1",
+    # 驳回点：ICP 主体须与备案主体一致。当前公网域名曾挂宁波墨典 ICP，须过户/新增至温州灵祺后再填实号
+    "icp": "【请填写温州灵祺名下ICP备案号，须与工信部查询一致】",
     "products": "灵祺AI智能ERP（网站）、灵祺星选（微信小程序）及相关配套 Web",
     "product_urls": (
         "商家ERP网站：https://cs.mofangdianai.com；"
@@ -194,7 +195,7 @@ def build_publicity() -> Document:
                 f"本公示内容由{COMPANY['name']}依据《互联网信息服务算法推荐管理规定》"
                 f"《互联网信息服务深度合成管理规定》编制，随算法备案材料一并提交。"
                 f"产品与服务入口：{COMPANY['product_urls']}；"
-                f"ICP备案号：{COMPANY['icp']}（主体与备案主体一致：{COMPANY['name']}）。",
+                f"ICP备案号：{COMPANY['icp']}（备案主体与ICP主体均为：{COMPANY['name']}）。",
             ),
         ],
     )
