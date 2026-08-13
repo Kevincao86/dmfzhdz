@@ -59,14 +59,29 @@ export function baiduQueryForIndustry(industryPathOrName: string): string {
   return leaf || s.slice(0, 20)
 }
 
+const BAIDU_FETCH_TIMEOUT_MS = 12_000
+
+function baiduFetchSignal(): AbortSignal {
+  const AS = AbortSignal as typeof AbortSignal & { timeout?: (n: number) => AbortSignal }
+  if (typeof AS.timeout === 'function') return AS.timeout(BAIDU_FETCH_TIMEOUT_MS)
+  const c = new AbortController()
+  const t = setTimeout(() => c.abort(), BAIDU_FETCH_TIMEOUT_MS)
+  ;(t as { unref?: () => void }).unref?.()
+  return c.signal
+}
+
 async function baiduGetJson(
   url: string,
 ): Promise<{ ok: true; json: Record<string, unknown> } | { ok: false; message: string }> {
   let res: Response
   try {
-    res = await fetch(url, { method: 'GET' })
+    res = await fetch(url, { method: 'GET', signal: baiduFetchSignal() })
   } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : String(e) }
+    const msg = e instanceof Error ? e.message : String(e)
+    if (e instanceof Error && e.name === 'AbortError') {
+      return { ok: false, message: `百度地图请求超时（>${BAIDU_FETCH_TIMEOUT_MS / 1000}s）` }
+    }
+    return { ok: false, message: msg }
   }
   let json: Record<string, unknown> = {}
   try {
