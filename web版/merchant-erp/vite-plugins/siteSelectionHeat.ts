@@ -1,6 +1,6 @@
 /**
  * 近 7 日人流热度指数（区位代理模型）
- * 说明：百度慧眼信令客流需独立商业开通；当前用周边 POI + 业态时段曲线生成可复现指数，供 MVP 决策参考。
+ * 说明：真实信令客流需独立商业开通；当前用周边 POI + 业态时段曲线生成可复现指数，供 MVP 决策参考。
  */
 import type { BaiduLatLng, BaiduNearbyPoi } from './baiduMapClient.js'
 
@@ -110,6 +110,8 @@ export function buildFootTrafficHeat7d(opts: {
   }
   radiusM?: number
   now?: Date
+  /** 实际 POI 来源：amap 优先 / baidu 兜底 */
+  mapProvider?: 'amap' | 'baidu'
 }): FootTrafficHeatReport {
   const now = opts.now ?? new Date()
   const radiusM = opts.radiusM ?? 1500
@@ -219,13 +221,13 @@ export function buildFootTrafficHeat7d(opts: {
     `近 7 日综合热度约 ${Math.round(days.reduce((a, d) => a + d.avgIndex, 0) / days.length)}（0–100）。`,
     `相对最旺：${bestDay.date}（${bestDay.weekday}，日均 ${bestDay.avgIndex}）；偏低：${worstDay.date}（${worstDay.weekday}）。`,
     `时段峰值多出现在「${peakSlotOverall.label}」。`,
-    '以上为区位代理指数，非手机信令级真实客流；开通百度慧眼后可替换为实测热力。',
+    '以上为区位代理指数，非手机信令级真实客流；后续可接入实测热力替换。',
   ].join(' ')
 
+  const mapLabel = opts.mapProvider === 'baidu' ? '百度' : opts.mapProvider === 'amap' ? '高德' : '地图'
   return {
     source: 'estimated_proxy',
-    disclaimer:
-      '人流热度基于百度周边 POI、业态时段规律与区位配套估算，非百度慧眼信令客流；仅供选址/运营参考。',
+    disclaimer: `人流热度基于${mapLabel}周边 POI、业态时段规律与区位配套估算，非手机信令客流；仅供选址/运营参考。`,
     radiusM,
     location: opts.location,
     days,

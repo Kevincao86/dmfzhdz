@@ -173,7 +173,7 @@ export default function CompetitorAnalysisPage() {
           <Link to="/products" className="mx-1 text-indigo-600 underline">
             商品毛利率
           </Link>
-          ，优先用百度地图检索周边同业 POI，再由 AI 分析定价带与组品建议。
+          ，优先用高德地图检索周边同业 POI（失败时回退百度），再由 AI 分析定价带与组品建议。
         </p>
       </div>
 
@@ -265,8 +265,8 @@ export default function CompetitorAnalysisPage() {
           ) : null}
           <div>
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-              {report.mapSource === 'baidu'
-                ? `百度地图实查${
+              {report.mapSource === 'amap' || report.mapSource === 'baidu'
+                ? `${report.mapSource === 'amap' ? '高德' : '百度'}地图实查${
                     typeof report.mapPoiCount === 'number' ? `（${report.mapPoiCount} 家）` : ''
                   }`
                 : '周边竞品（推断）'}

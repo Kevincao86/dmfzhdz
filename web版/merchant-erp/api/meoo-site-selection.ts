@@ -1,5 +1,5 @@
 /**
- * POST /api/meoo-site-selection — 选址参考（百度周边配套 + 打分 + 近7日热度）
+ * POST /api/meoo-site-selection — 选址参考（优先高德周边配套，百度兜底 + 打分 + 近7日热度）
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {

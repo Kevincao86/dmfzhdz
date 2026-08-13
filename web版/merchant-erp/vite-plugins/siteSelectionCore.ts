@@ -1,17 +1,20 @@
 /**
  * 选址参考：品牌属性理解 → 预想点位评估 → 地图热力 → 图文综合分 → 附近 2–3 点推荐
+ * 地图：优先高德，失败回退百度（同一请求不混用坐标系）
  */
 import { verifyBearerJwt } from './aiGateway/authSupabase.js'
 import {
-  baiduFetchSiteAmenityContext,
-  baiduOffsetLatLng,
-  baiduPlaceNearby,
-  baiduReverseGeocode,
-  isBaiduMapConfigured,
-  baiduQueryForIndustry,
-  type BaiduLatLng,
-  type BaiduNearbyPoi,
-} from './baiduMapClient.js'
+  isMapServiceConfigured,
+  mapFetchSiteAmenityContext,
+  mapOffsetLatLng,
+  mapPlaceNearby,
+  mapProviderLabel,
+  mapQueryForIndustry,
+  mapReverseGeocode,
+  type MapLatLng,
+  type MapNearbyPoi,
+  type MapProviderId,
+} from './mapProvidersClient.js'
 import {
   buildFootTrafficHeat7d,
   buildHeatMapGrid,
@@ -114,7 +117,7 @@ function scoreDimensions(input: {
   return { overall: clamp(overall, 1, 99), dimensions, verdict }
 }
 
-function topNames(pois: BaiduNearbyPoi[], n = 6): string[] {
+function topNames(pois: MapNearbyPoi[], n = 6): string[] {
   return pois
     .slice(0, n)
     .map((p) => {
@@ -157,13 +160,13 @@ export async function buildFootTrafficHeatForAddress(
     radiusM?: number
   },
 ): Promise<
-  | { ok: true; heat: FootTrafficHeatReport }
+  | { ok: true; heat: FootTrafficHeatReport; provider: MapProviderId }
   | { ok: false; message: string }
 > {
-  if (!isBaiduMapConfigured(env)) {
-    return { ok: false, message: '未配置 BAIDU_MAP_AK' }
+  if (!isMapServiceConfigured(env)) {
+    return { ok: false, message: '未配置 AMAP_WEB_KEY 或 BAIDU_MAP_AK' }
   }
-  const ctx = await baiduFetchSiteAmenityContext(env, {
+  const ctx = await mapFetchSiteAmenityContext(env, {
     address: opts.address,
     city: opts.city,
     industryPathOrName: opts.industryPathOrName,
@@ -182,13 +185,15 @@ export async function buildFootTrafficHeatForAddress(
       school: ctx.counts.school,
     },
     radiusM: ctx.radiusM,
+    mapProvider: ctx.provider,
   })
-  return { ok: true, heat }
+  return { ok: true, heat, provider: ctx.provider }
 }
 
 async function scoreCandidateAtLocation(
   env: Record<string, string>,
-  location: BaiduLatLng,
+  provider: MapProviderId,
+  location: MapLatLng,
   industry: string,
   radiusM: number,
 ): Promise<{
@@ -196,13 +201,17 @@ async function scoreCandidateAtLocation(
   counts: { competitor: number; transit: number; mall: number; residential: number; office: number }
   scored: ReturnType<typeof scoreDimensions>
 }> {
-  const query = baiduQueryForIndustry(industry)
+  const query = mapQueryForIndustry(industry, provider)
+  const amenityTransit = provider === 'amap' ? '地铁站|公交站' : '地铁站$公交站'
+  const amenityMall = provider === 'amap' ? '购物中心|商场' : '购物中心$商场'
+  const amenityRes = provider === 'amap' ? '住宅区|小区' : '住宅区$小区'
+  const amenityOffice = provider === 'amap' ? '写字楼|办公楼' : '写字楼$办公楼'
   const [comp, transit, mall, residential, office] = await Promise.all([
-    baiduPlaceNearby(env, { location, query, radiusM, pageSize: 12 }),
-    baiduPlaceNearby(env, { location, query: '地铁站$公交站', radiusM, pageSize: 10 }),
-    baiduPlaceNearby(env, { location, query: '购物中心$商场', radiusM, pageSize: 8 }),
-    baiduPlaceNearby(env, { location, query: '住宅区$小区', radiusM, pageSize: 10 }),
-    baiduPlaceNearby(env, { location, query: '写字楼$办公楼', radiusM, pageSize: 10 }),
+    mapPlaceNearby(env, provider, { location, query, radiusM, pageSize: 12 }),
+    mapPlaceNearby(env, provider, { location, query: amenityTransit, radiusM, pageSize: 10 }),
+    mapPlaceNearby(env, provider, { location, query: amenityMall, radiusM, pageSize: 8 }),
+    mapPlaceNearby(env, provider, { location, query: amenityRes, radiusM, pageSize: 10 }),
+    mapPlaceNearby(env, provider, { location, query: amenityOffice, radiusM, pageSize: 10 }),
   ])
   const counts = {
     competitor: comp.ok ? comp.pois.length : 0,
@@ -228,7 +237,7 @@ type RecommendSpot = {
   label: string
   address: string
   city?: string
-  location: BaiduLatLng
+  location: MapLatLng
   distanceM: number
   direction: string
   score: number
@@ -239,7 +248,8 @@ type RecommendSpot = {
 
 async function findNearbyRecommendations(
   env: Record<string, string>,
-  center: BaiduLatLng,
+  provider: MapProviderId,
+  center: MapLatLng,
   industry: string,
   radiusM: number,
 ): Promise<RecommendSpot[]> {
@@ -253,11 +263,11 @@ async function findNearbyRecommendations(
   const scored = (
     await Promise.all(
       dirs.map(async (d) => {
-        const loc = baiduOffsetLatLng(center, d.n, d.e)
+        const loc = mapOffsetLatLng(center, d.n, d.e)
         const distanceM = Math.round(Math.hypot(d.n, d.e))
-        const rev = await baiduReverseGeocode(env, loc)
+        const rev = await mapReverseGeocode(env, provider, loc)
         if (!rev.ok) return null
-        const hit = await scoreCandidateAtLocation(env, loc, industry, radiusM)
+        const hit = await scoreCandidateAtLocation(env, provider, loc, industry, radiusM)
         const reasonBits = [
           hit.counts.transit >= 2 ? '交通配套更好' : '',
           hit.counts.competitor <= 6 ? '竞争压力可控' : '同业偏密需差异化',
@@ -345,10 +355,14 @@ export async function runSiteSelectionCore(
   const margins = body.margins
   const radiusM = Math.min(Math.max(Math.floor(Number(body.radiusM) || 1500), 500), 3000)
 
-  if (!isBaiduMapConfigured(aiEnv)) {
+  if (!isMapServiceConfigured(aiEnv)) {
     return {
       status: 503,
-      body: { ok: false, error: 'baidu_map_not_configured', detail: '服务端未配置 BAIDU_MAP_AK' },
+      body: {
+        ok: false,
+        error: 'map_not_configured',
+        detail: '服务端未配置 AMAP_WEB_KEY（优先）或 BAIDU_MAP_AK（兜底）',
+      },
     }
   }
 
@@ -374,14 +388,14 @@ export async function runSiteSelectionCore(
     )) ||
     `该品牌以「${industry || '本地生活服务'}」为主营，选址应优先匹配目标客群可达性与合理同业密度，避开过度饱和红海并兼顾租金回收周期。`
 
-  const ctx = await baiduFetchSiteAmenityContext(aiEnv, {
+  const ctx = await mapFetchSiteAmenityContext(aiEnv, {
     address,
     city: city || undefined,
     industryPathOrName: industry || brandName,
     radiusM,
   })
   if (!ctx.ok) {
-    return { status: 502, body: { ok: false, error: 'baidu_site_fetch_failed', detail: ctx.message } }
+    return { status: 502, body: { ok: false, error: 'map_site_fetch_failed', detail: ctx.message } }
   }
 
   const scored = scoreDimensions({
@@ -406,6 +420,7 @@ export async function runSiteSelectionCore(
       school: ctx.counts.school,
     },
     radiusM: ctx.radiusM,
+    mapProvider: ctx.provider,
   })
 
   const amenityPois = [
@@ -424,6 +439,7 @@ export async function runSiteSelectionCore(
 
   const recommendations = await findNearbyRecommendations(
     aiEnv,
+    ctx.provider,
     ctx.location,
     industry || brandName || '休闲娱乐',
     radiusM,
@@ -437,6 +453,7 @@ export async function runSiteSelectionCore(
         `【品牌理解】\n${brandUnderstanding}`,
         `预想点位：${spotLabel || address}`,
         `地址：${address}${city ? `（${city}）` : ''}`,
+        `地图源：${mapProviderLabel(ctx.provider)}`,
         `综合分 ${scored.overall}（${scored.verdict}）`,
         `维度：${scored.dimensions.map((d) => `${d.label}${d.score}`).join('；')}`,
         `同业 ${ctx.counts.competitor}：${topNames(ctx.competitorPois, 5).join('、') || '无'}`,
@@ -477,6 +494,7 @@ export async function runSiteSelectionCore(
       location: ctx.location,
       radiusM: ctx.radiusM,
       competitorQuery: ctx.competitorQuery,
+      mapProvider: ctx.provider,
       counts: ctx.counts,
       competitors: ctx.competitorPois.slice(0, 15).map((p) => ({
         name: p.name,
