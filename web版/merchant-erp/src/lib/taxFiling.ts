@@ -227,7 +227,8 @@ export function buildTaxExportBlob(
     })),
     totalVerifyYuan: rows.reduce((s, r) => s + r.verifyAmountYuan, 0),
     totalCommissionYuan,
-    note: '本文件为灵祺 ERP 报税辅助导出；平台佣金按门店配置行业参考费率粗算，正式申报请以各平台税务接口或主管税务机关要求为准。',
+    note:
+      '本文件为灵祺 ERP 报税辅助导出；平台佣金按门店经营类目匹配「行业×平台」参考费率粗算（抖音来客对齐美食等公开技术服务费口径，美团/小红书/外卖为行业常见区间）；正式申报请以各平台费率查询或主管税务机关要求为准。',
   }
   return new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' })
 }
