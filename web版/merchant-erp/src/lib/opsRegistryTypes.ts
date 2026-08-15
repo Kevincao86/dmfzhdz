@@ -811,6 +811,20 @@ export type RegistryMpMembershipCheckoutRequest = {
   paidAt?: string
 }
 
+/** 星选会员扫码福利领取记录（海报等活动，一账号每活动一次） */
+export type RegistryMpMembershipPromoClaim = {
+  id: string
+  campaignId: string
+  role: 'pr' | 'talent' | 'shoot' | 'edit'
+  accountId: string
+  registryTargetId: string
+  lingqiId?: string
+  planId: string
+  daysGranted: number
+  claimedAt: string
+  membershipExpiresAt: string
+}
+
 /** 星选平台积分充值订单（微信 / 支付宝 / 抖音 / 手动申报） */
 export type RegistryMpPointsCheckoutRequest = {
   id: string
@@ -973,6 +987,8 @@ export type RegistryFile = {
   editMembershipPlanVersions?: import('./mpMembershipCatalog.js').MpMembershipPlanVersion[]
   /** 星选平台会员开通支付申报（待运营确认） */
   mpMembershipCheckoutRequests?: RegistryMpMembershipCheckoutRequest[]
+  /** 星选会员扫码福利领取记录 */
+  mpMembershipPromoClaims?: RegistryMpMembershipPromoClaim[]
   /** 星选平台积分充值订单 */
   mpPointsCheckoutRequests?: RegistryMpPointsCheckoutRequest[]
   /** 星选 AI 积分消耗流水 */
