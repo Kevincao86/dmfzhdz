@@ -94,6 +94,7 @@ export function buildTaxPlatformRows(
   }
 
   const industryCode = (industry?.code ?? '').trim()
+  const industryPath = (industry?.path ?? industry?.name ?? '').trim()
 
   const platformIds: FinancePlatformId[] = [
     'douyin',
@@ -115,7 +116,7 @@ export function buildTaxPlatformRows(
 
     const channel = financePlatformChannel(platformId)
     const verifyAmountYuan = sums?.verifyAmountYuan ?? 0
-    const commissionRatePct = platformCommissionPctForTax(industryCode, platformId)
+    const commissionRatePct = platformCommissionPctForTax(industryCode, platformId, industryPath)
     return {
       platformId,
       platformLabel:
@@ -157,7 +158,8 @@ export function resolveTaxFilingIndustryContext(
   industry?: Pick<StoreMarginIndustry, 'code' | 'path' | 'name'>,
 ): TaxFilingIndustryContext {
   const code = (industry?.code ?? '').trim()
-  const preset = resolveIndustryCommissionPreset(code)
+  const pathHint = (industry?.path ?? industry?.name ?? '').trim()
+  const preset = resolveIndustryCommissionPreset(code, pathHint)
   const path = (industry?.path ?? '').trim() || preset.industryPath
   const name = (industry?.name ?? '').trim() || preset.industryName
   return { code, path, name, presetPath: preset.industryPath }

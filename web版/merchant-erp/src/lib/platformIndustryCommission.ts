@@ -29,9 +29,9 @@ const DEFAULT_WAIMAI: WaimaiCommissionPct = {
   jd_waimai: 20,
 }
 
-/** 未匹配行业时的默认团购佣金（%） */
+/** 未匹配行业时的默认团购佣金（%）；抖音来客美食类公开口径约 2.5% */
 export const DEFAULT_GROUPBUY_COMMISSION: GroupbuyCommissionPct = {
-  douyin: 6,
+  douyin: 2.5,
   meituan: 8,
   xhs: 5,
 }
@@ -41,26 +41,32 @@ export const INDUSTRY_PLATFORM_COMMISSION_PRESETS: Record<string, IndustryPlatfo
   '': {
     industryName: '餐饮',
     industryPath: '餐饮 > 火锅/汤锅',
-    groupbuy: { douyin: 6, meituan: 8, xhs: 5 },
+    groupbuy: { douyin: 2.5, meituan: 8, xhs: 5 },
     waimai: DEFAULT_WAIMAI,
   },
   life_food_hotpot: {
     industryName: '餐饮',
     industryPath: '餐饮 > 火锅/汤锅',
-    groupbuy: { douyin: 6, meituan: 8, xhs: 5 },
+    groupbuy: { douyin: 2.5, meituan: 8, xhs: 5 },
     waimai: DEFAULT_WAIMAI,
   },
   life_food_bbq: {
     industryName: '餐饮',
     industryPath: '餐饮 > 烧烤',
-    groupbuy: { douyin: 6, meituan: 8, xhs: 5 },
+    groupbuy: { douyin: 2.5, meituan: 8, xhs: 5 },
     waimai: DEFAULT_WAIMAI,
   },
   life_food_fast: {
     industryName: '餐饮',
     industryPath: '餐饮 > 快餐小吃',
-    groupbuy: { douyin: 4, meituan: 6, xhs: 4 },
+    groupbuy: { douyin: 2.5, meituan: 6, xhs: 4 },
     waimai: { eleme: 20, meituan_waimai: 21, jd_waimai: 19 },
+  },
+  life_food_general: {
+    industryName: '餐饮',
+    industryPath: '餐饮 > 美食',
+    groupbuy: { douyin: 2.5, meituan: 8, xhs: 5 },
+    waimai: DEFAULT_WAIMAI,
   },
   life_beauty_hair: {
     industryName: '丽人',
@@ -94,17 +100,32 @@ function clampCommissionPct(n: number): number {
   return Math.min(40, Math.max(0, x))
 }
 
-export function resolveIndustryCommissionPreset(industryCode: string): IndustryPlatformCommissionPreset {
+function looksLikeFoodIndustry(industryCode: string, industryPath?: string): boolean {
+  const blob = `${industryCode} ${industryPath ?? ''}`
+  return /餐饮|美食|火锅|烧烤|小吃|正餐|茶饮|咖啡|烘焙|life_food_/i.test(blob)
+}
+
+export function resolveIndustryCommissionPreset(
+  industryCode: string,
+  industryPath?: string,
+): IndustryPlatformCommissionPreset {
   const code = (industryCode ?? '').trim()
-  return INDUSTRY_PLATFORM_COMMISSION_PRESETS[code] ?? INDUSTRY_PLATFORM_COMMISSION_PRESETS['']
+  if (code && INDUSTRY_PLATFORM_COMMISSION_PRESETS[code]) {
+    return INDUSTRY_PLATFORM_COMMISSION_PRESETS[code]!
+  }
+  if (looksLikeFoodIndustry(code, industryPath)) {
+    return INDUSTRY_PLATFORM_COMMISSION_PRESETS.life_food_general!
+  }
+  return INDUSTRY_PLATFORM_COMMISSION_PRESETS['']!
 }
 
 /** 按门店配置行业与平台返回佣金率（%，核销额口径粗算） */
 export function platformCommissionPctForTax(
   industryCode: string,
   platformId: FinancePlatformId,
+  industryPath?: string,
 ): number {
-  const preset = resolveIndustryCommissionPreset(industryCode)
+  const preset = resolveIndustryCommissionPreset(industryCode, industryPath)
   if (platformId === 'douyin') return clampCommissionPct(preset.groupbuy.douyin)
   if (platformId === 'meituan') return clampCommissionPct(preset.groupbuy.meituan)
   if (platformId === 'xhs') return clampCommissionPct(preset.groupbuy.xhs)

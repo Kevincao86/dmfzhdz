@@ -25,6 +25,7 @@ export function shouldUseFullAgentSystemPrompt(userText: string, taskType?: AiTa
   if (isKnownScenarioTaskType(taskType)) return true
   const x = userText.replace(/\[引用[\s\S]*?\n\n/, '').trim()
   if (!x) return false
+  if (isBusinessMetricsQuery(x)) return true
   if (isPlanOrNineScenarioQuery(x) || isPlanDesignQuery(x)) return true
   if (/备案|ICP|EDI|合规|资质/.test(x)) return true
   if (/融资|商业计划|路演|政策|对比分析|深度分析|研究报告|战略|OPC|AI创业/.test(x)) return true
@@ -35,6 +36,31 @@ export function isAgentShortcutTaskLine(text: string): boolean {
   return /^使用快捷任务：/.test(text.replace(/\[引用[\s\S]*?\n\n/, '').trim())
 }
 
+/**
+ * 经营数据/营收类查询：只回答、不触发九大场景工具与执行预览。
+ * （如「近三个月总营收」「拉取数据明细」勿误走 create_product）
+ */
+export function isBusinessMetricsQuery(text: string): boolean {
+  const x = text.replace(/\[引用[\s\S]*?\n\n/, '').trim()
+  if (!x) return false
+  if (isAgentShortcutTaskLine(x)) return false
+  if (/(?:创建|上架|组品|确认执行|开始创建|立即上架|按方案执行)/.test(x)) return false
+  if (
+    /(?:营收|营业额|成交额|销售额|核销额|订单量|订单数|客单价|毛利率|经营数据|数据明细)/.test(x) &&
+    /(?:查|看|拉|给|帮|分析|汇总|明细|多少|情况|数据|报告|一份|拉取)/.test(x)
+  ) {
+    return true
+  }
+  if (
+    /近\s*(?:一|两|三|1|2|3|[一二三])\s*个?月|最近\s*\d+\s*个?月|本月|上月/.test(x) &&
+    /(?:数据|营收|营业额|成交|订单|明细|报告)/.test(x)
+  ) {
+    return true
+  }
+  if (/\d{4}\s*年.{0,24}(?:到|至|~|—|-|－).{0,24}(?:数据|营收|明细)/.test(x)) return true
+  return false
+}
+
 /** 合规/政策/选型类咨询（含团购等词但非九大场景执行意图） */
 export function isInformationalOnlyQuery(text: string): boolean {
   const x = text.replace(/\[引用[\s\S]*?\n\n/, '').trim()
@@ -43,6 +69,7 @@ export function isInformationalOnlyQuery(text: string): boolean {
   if (/确认执行|按.*方案执行|开始创建|立即上架|需要执行|同意执行|执行方案|确认创建|帮我执行|按上述方案/.test(x)) {
     return false
   }
+  if (isBusinessMetricsQuery(x)) return true
   if (
     /ICP|EDI|备案|资质|许可证|托管协议|域名证书|通信管理局|增值电信|经营性|非经营性|电信业务/.test(
       x,
