@@ -89,7 +89,7 @@ import { fetchAiProductPlan, fetchAiProductPlansBatch } from '../services/storeI
 import { enrichAiProductPlanPreview } from '../services/aiAgentProductPlanEnrich'
 import {
   executeAiAgentToolCalls,
-  listAiAgentTools,
+  listAiAgentToolsForUserIntent,
   toOpenAiTools,
   type AiAgentClientToolResult,
   type AiAgentToolCall,
@@ -1465,7 +1465,9 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         }
 
         const deferredTaskTypes = executionStateRef.current.plan?.taskTypes
-        const openAiTools = toOpenAiTools(listAiAgentTools())
+        const openAiTools = toOpenAiTools(
+          listAiAgentToolsForUserIntent(trimmed, taskType, deferredTaskTypes),
+        )
         const chatReq = {
           provider: parsed.provider,
           model: chatModel || undefined,

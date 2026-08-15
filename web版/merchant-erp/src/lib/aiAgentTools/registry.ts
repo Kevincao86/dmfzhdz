@@ -4,7 +4,7 @@ export const AI_AGENT_TOOLS: AiAgentToolDef[] = [
   {
     name: 'create_product',
     description:
-      '创建团购/本地生活商品方案。可保存草稿或提交到抖音/快手等平台。调用后需用户在预览卡片确认。',
+      '仅当用户明确要求创建/上架/组品团购商品时调用。营收、营业额、订单、经营数据查询禁止调用本工具。调用后需用户在预览卡片确认。',
     requiresConfirm: true,
     parameters: {
       type: 'object',

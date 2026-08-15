@@ -58,6 +58,7 @@ list_scopes() {
   shop_analysis          商家 ERP：店铺分析（图表/门店筛选/经营建议/逐单 POI）
   edition_cs_sync        各端前端对齐 CS（DR/FWS/Admin 同源功能与积分经济）
   ai_agent_quick_image   商家 ERP：AI 智能体快捷任务平铺 + 生图意图自动切模型
+  merchant_ai_agent_tax  商家 ERP：AI智能体意图/工具门禁 + 近三月日期 + 一键报税佣金
   competitor_industry    商家 ERP：竞争对手分析经营类目读取/门店毛利配置联动
   competitor_baidu_map   商家 ERP：竞品分析接入百度地图周边 POI（服务端 AK）
   map_providers          商家 ERP：地图主副（高德优先 / 百度兜底）竞品+选址
@@ -828,6 +829,19 @@ mpPointsEconomics
 merchantIndustryAlign
 agentMerchantContext
 services/ai/types
+change-scope-guard
+PAT
+      ;;
+    merchant_ai_agent_tax)
+      cat <<'PAT'
+AiAgentContext
+aiAgentActionParse
+aiAgentSystemPromptRoute
+aiAgentTools
+aiAgentScenarioWorkflows
+agentMerchantContext
+platformIndustryCommission
+taxFiling
 change-scope-guard
 PAT
       ;;

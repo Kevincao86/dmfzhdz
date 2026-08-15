@@ -91,8 +91,21 @@ export function loadMerchantIntelSnapshot(): MerchantIntelSnapshot {
 }
 
 export function buildAgentMerchantIntelContextFromSnapshot(s: MerchantIntelSnapshot): string {
+  const now = new Date()
+  const shanghaiDate = now.toLocaleDateString('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'long',
+  })
+  const shanghaiYmd = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
+
   const lines: string[] = [
     '【门店经营情报 · ERP 自动注入，经营类问题可参考本段】',
+    `【系统时间 · Asia/Shanghai】今天是 ${shanghaiDate}（${shanghaiYmd}）。用户说「近N个月 / 本月 / 上月 / 近三个月」时，必须相对此日期计算区间；禁止使用与今天相差数年的过期年份（如 2023、2024）冒充「近三个月」。`,
+    '【经营数据铁律】未绑定平台禁止编造营收/订单/客单价/毛利率等数字；当前对话若无真实对账/核销取数结果，须明确说明「暂无绑定平台实数 / 请至财务管理或店铺分析查看」，不得用示例店或虚构金额充数。',
+    '【工具/执行】仅当用户命中九大场景并明确要执行（快捷任务或「确认执行」等）时才输出执行预览 JSON 或调用 tools；纯营收/数据问答只文字回答，禁止 create_product 等写操作。',
     '组品/创建商品时优先使用菜单价目；若无菜单则参考经营类目与绑定平台商品/草稿箱。用户改图、改字、闲聊或其它明确指令：按用户要求执行，禁止以品类不符拒绝。',
     '本地：菜单价目表、商品页门店毛利配置、竞品分析报告、达人 Brief/招募草稿。',
     '接口（已尝试调用）：抖音来客门店列表→GEO 评分、/api/meoo-marketing-activities 平台活动、/api/meoo-competitor-analysis（无缓存时按需）、商品/菜单相关方案 API。',
@@ -116,7 +129,7 @@ export function buildAgentMerchantIntelContextFromSnapshot(s: MerchantIntelSnaps
 
   lines.push(s.boundPlatformsSummary || formatAgentBoundPlatformsContext())
   lines.push(
-    '分析异常时：仅针对已绑定平台取数与下结论；未绑定平台必须写「跳过」，禁止编造。',
+    '分析异常与经营数据问答：仅针对已绑定平台取数与下结论；未绑定平台必须写「跳过/未绑定」，禁止编造任何金额或订单数。',
   )
 
   lines.push(

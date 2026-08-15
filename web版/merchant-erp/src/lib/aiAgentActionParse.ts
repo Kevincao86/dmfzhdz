@@ -1,6 +1,7 @@
 import type { AiTaskType } from './aiAgentTypes'
 import {
   isAgentShortcutTaskLine,
+  isBusinessMetricsQuery,
   isInformationalOnlyQuery,
   isPlanOrNineScenarioQuery,
 } from './aiAgentSystemPromptRoute'
@@ -63,19 +64,26 @@ export function inferTaskTypeFromText(t: string): AiTaskType | undefined {
   const x = t.replace(/\[引用[\s\S]*?\n\n/, '').trim()
   // 文生图/主图/海报等像素出图，勿误判为创建团购商品（否则会拉 GEO/竞品，分钟级卡住）
   if (detectImageGenerationIntent(x)) return undefined
-  if (isInformationalOnlyQuery(x)) return undefined
+  if (isInformationalOnlyQuery(x) || isBusinessMetricsQuery(x)) return undefined
   if (
     /创建|上架|组品|上传.*(商品|套餐|券)|发布.*(?:商品|套餐|团购)|帮我.*(?:上架|创建|组品)|做(?:一|个).*(?:商品|套餐|团购)/.test(
       x,
     ) ||
-    (/团购|套餐|代金券|双人|单人|三人|四人|火锅|代\s*\d+|抵\s*\d+|券面|商品/.test(x) &&
-      /帮我|我要|需要|请|想要|打算|准备|立即|马上/.test(x))
+    (/团购|套餐|代金券|双人|单人|三人|四人|火锅|代\s*\d+|抵\s*\d+|券面/.test(x) &&
+      /帮我|我要|需要|请|想要|打算|准备|立即|马上/.test(x) &&
+      /(?:商品|套餐|团购|券|上架|组品)/.test(x))
   ) {
     return 'create_product'
   }
   if (isRecruitInfluencerUserIntent(x)) return 'recruit_influencer'
   if (/差评|评价|评论|回复.*评/.test(x)) return 'handle_review'
-  if (/分析|原因|异常|掉单|核销.*少|ROI.*下/.test(x)) return 'analyze_exception'
+  // 「分析近三个月营收」属经营数据问答，勿误判分析异常
+  if (
+    /(?:异常|掉单|核销.*少|ROI.*下|故障|审核驳回|同步失败)/.test(x) ||
+    (/分析/.test(x) && /(?:异常|掉单|故障|驳回|失败原因|为什么.*少|六大故障)/.test(x))
+  ) {
+    return 'analyze_exception'
+  }
   if (/同步|多端.*不一致|平台.*差异/.test(x)) return 'sync_platform'
   if (/报税|税务|申报|增值税|一键报税|纳税/.test(x)) return 'file_tax'
   if (/文案|口播|推广语|话题标签|种草文案|写.*标题/.test(x) && !isInformationalOnlyQuery(x)) {
@@ -450,6 +458,7 @@ export function formatAssistantDisplayText(content: string): string {
 
 export {
   isAgentShortcutTaskLine,
+  isBusinessMetricsQuery,
   isInformationalOnlyQuery,
   isPlanDesignQuery,
   isPlanOrNineScenarioQuery,
