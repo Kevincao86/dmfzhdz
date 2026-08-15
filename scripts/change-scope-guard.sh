@@ -840,6 +840,7 @@ aiAgentSystemPromptRoute
 aiAgentTools
 aiAgentScenarioWorkflows
 agentMerchantContext
+agentBusinessMetricsFetch
 platformIndustryCommission
 taxFiling
 opsRegistryTypes

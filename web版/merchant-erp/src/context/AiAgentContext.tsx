@@ -47,6 +47,7 @@ import {
   parseCreateProductIntentsFromPlan,
   planIncludesRecruitInfluencer,
   isInformationalOnlyQuery,
+  isBusinessMetricsQuery,
   shouldDeferTaskPreview,
   shouldUseFullAgentSystemPrompt,
   summarizeAssistantContent,
@@ -78,6 +79,7 @@ import {
   buildAgentMerchantIntelContextAsync,
   loadFullMerchantIntelSnapshot,
 } from '../lib/agentMerchantIntelLoader'
+import { fetchAgentBusinessMetricsContext } from '../lib/agentBusinessMetricsFetch'
 import {
   buildAgentUserHabitsContext,
   hydrateAgentUserHabitsFromCloud,
@@ -395,7 +397,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   const aiRunAbortRef = useRef<AbortController | null>(null)
   const merchantIntelCacheRef = useRef<{
     at: number
-    task?: AiTaskType
+    task?: string
     text: string
   } | null>(null)
   const MERCHANT_INTEL_CACHE_MS = 45_000
@@ -414,16 +416,26 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   archivedRef.current = archivedSessions
   const authUserIdRef = useRef<string | null>(null)
 
-  const resolveMerchantIntelBlock = useCallback(async (taskType?: AiTaskType) => {
+  const resolveMerchantIntelBlock = useCallback(async (taskType?: AiTaskType, userText?: string) => {
     const now = Date.now()
+    const metricsQ = Boolean(userText && isBusinessMetricsQuery(userText))
+    const cacheKey = `${taskType ?? ''}|m${metricsQ ? 1 : 0}|${metricsQ ? String(userText).slice(0, 96) : ''}`
     const hit = merchantIntelCacheRef.current
-    if (hit && now - hit.at < MERCHANT_INTEL_CACHE_MS && hit.task === taskType) {
+    if (hit && now - hit.at < MERCHANT_INTEL_CACHE_MS && hit.task === cacheKey) {
       return hit.text
     }
     const text = await buildAgentMerchantIntelContextAsync(taskType)
     const habits = buildAgentUserHabitsContext(authUserIdRef.current)
-    const combined = habits ? `${text}\n\n${habits}` : text
-    merchantIntelCacheRef.current = { at: now, task: taskType, text: combined }
+    let combined = habits ? `${text}\n\n${habits}` : text
+    if (metricsQ && userText) {
+      try {
+        const metricsBlock = await fetchAgentBusinessMetricsContext(userText)
+        if (metricsBlock.trim()) combined = `${combined}\n\n${metricsBlock}`
+      } catch {
+        combined = `${combined}\n\n【已拉取经营实数】拉取失败，请根据绑定说明如实告知缺口，禁止编造。`
+      }
+    }
+    merchantIntelCacheRef.current = { at: now, task: cacheKey, text: combined }
     return combined
   }, [])
 
@@ -1454,7 +1466,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           return next
         })
 
-        const merchantCtx = await resolveMerchantIntelBlock(taskType)
+        const merchantCtx = await resolveMerchantIntelBlock(taskType, trimmed)
         const history: AIMessage[] = [
           { role: 'system', content: merchantCtx },
           ...agentMessagesToChatMessages(snapshot, taskType),

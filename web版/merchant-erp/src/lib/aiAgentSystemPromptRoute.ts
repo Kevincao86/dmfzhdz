@@ -47,7 +47,7 @@ export function isBusinessMetricsQuery(text: string): boolean {
   if (/(?:创建|上架|组品|确认执行|开始创建|立即上架|按方案执行)/.test(x)) return false
   if (
     /(?:营收|营业额|成交额|销售额|核销额|订单量|订单数|客单价|毛利率|经营数据|数据明细)/.test(x) &&
-    /(?:查|看|拉|给|帮|分析|汇总|明细|多少|情况|数据|报告|一份|拉取)/.test(x)
+    /(?:查|看|拉|给|帮|分析|汇总|总结|明细|多少|情况|数据|报告|一份|拉取)/.test(x)
   ) {
     return true
   }
