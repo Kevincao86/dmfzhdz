@@ -139,11 +139,8 @@ import { resolveRecruitmentOrderTenantMeta } from '../lib/recruitmentOrderMeta'
 import {
   appendTaxFilingRecord,
   buildTaxExportBlob,
-  buildTaxPlatformRows,
-  collectTaxIndustryHintFromBoundAccounts,
-  resolveTaxFilingIndustryContext,
+  loadTaxPlatformRowsForPeriod,
 } from '../lib/taxFiling'
-import { readStoreMarginConfig } from '../lib/storeMarginsRead'
 import { buildAiTaxFilingPreview } from '../services/aiAgentTaxFilingPreview'
 import { compressImageFileToDataUrl } from '../lib/aiImageCompress'
 import {
@@ -172,8 +169,6 @@ import {
 } from '../services/ai/modelRegistry'
 import { useMembership } from './MembershipContext'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
-import { listMerchantBindings } from '../lib/merchantPlatformBindings'
-import { fetchFinanceReconcile } from '../services/financeReconcileApi'
 import { defaultModelIdForFamily } from '../services/ai/tokenmixClient'
 import {
   isAiRequestAborted,
@@ -2421,21 +2416,9 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
               start: tax.startDate,
               end: tax.endDate,
             }
-            let bindings: Awaited<ReturnType<typeof listMerchantBindings>> = []
-            if (supabaseConfigured && supabase) {
-              const [dy, xhs] = await Promise.all([
-                listMerchantBindings(supabase, 'douyin'),
-                listMerchantBindings(supabase, 'xhs_commercial'),
-              ])
-              bindings = [...dy, ...xhs]
-            }
-            const marginConfig = readStoreMarginConfig()
-            const boundHint = await collectTaxIndustryHintFromBoundAccounts(bindings)
-            const industryCtx = resolveTaxFilingIndustryContext(marginConfig.industry, boundHint)
-            const fin = await fetchFinanceReconcile({ startDate: period.start, endDate: period.end })
-            const rows = fin.ok
-              ? buildTaxPlatformRows(bindings, fin.rows, marginConfig.industry, boundHint)
-              : []
+            const packed = await loadTaxPlatformRowsForPeriod(period.start, period.end)
+            const rows = packed.ok ? packed.rows : []
+            const industryCtx = packed.industryCtx
             const blob = buildTaxExportBlob(rows, period, industryCtx)
             const url = URL.createObjectURL(blob)
             const a = document.createElement('a')

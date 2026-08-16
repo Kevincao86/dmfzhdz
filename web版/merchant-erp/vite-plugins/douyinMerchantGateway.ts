@@ -6613,6 +6613,225 @@ export async function fetchDouyinFinanceReconcileRows(
   }
 }
 
+export type DouyinPlatformCommissionRateResult = {
+  ok: boolean
+  bound: boolean
+  ratePct: number
+  feeYuan: number
+  baseYuan: number
+  sampleCount: number
+  source: string
+  apiPath?: string
+  error?: string
+}
+
+const DOUYIN_LEDGER_COMMISSION_APIS: { path: string; label: string }[] = [
+  { path: '/goodlife/v1/settle/bill/composite_query/', label: '综合账单' },
+  { path: '/goodlife/v1/settle/ledger/query/', label: '团购账单' },
+  { path: '/goodlife/v1/settle/ledger/detailed_query/', label: '账单明细' },
+]
+
+function douyinFen(v: unknown): number {
+  const n = Number(v)
+  if (!Number.isFinite(n) || n <= 0) return 0
+  return n
+}
+
+function pickDouyinLedgerRecords(data: Record<string, unknown> | undefined): Record<string, unknown>[] {
+  if (!data) return []
+  const raw = data.ledger_records ?? data.records ?? data.list
+  if (!Array.isArray(raw)) return []
+  return raw.filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === 'object')
+}
+
+function sumDouyinLedgerServiceFee(records: Record<string, unknown>[]): {
+  feeFen: number
+  baseFen: number
+  count: number
+} {
+  let feeFen = 0
+  let baseFen = 0
+  let count = 0
+  for (const rec of records) {
+    const amount =
+      rec.amount && typeof rec.amount === 'object' && !Array.isArray(rec.amount)
+        ? (rec.amount as Record<string, unknown>)
+        : rec
+    const fee = douyinFen(amount.total_merchant_platform_service)
+    const base =
+      douyinFen(amount.ledger_total) ||
+      douyinFen(amount.original) ||
+      douyinFen(amount.pay) ||
+      douyinFen(amount.coupon_pay)
+    if (fee <= 0 && base <= 0) continue
+    feeFen += fee
+    baseFen += base
+    count += 1
+  }
+  return { feeFen, baseFen, count }
+}
+
+function pickDouyinSampleYmds(startYmd: string, endYmd: string, max = 6): string[] {
+  const all = eachShanghaiYmdInclusive(startYmd, endYmd)
+  if (all.length <= max) return all
+  const out = new Set<string>()
+  out.add(all[0]!)
+  out.add(all[all.length - 1]!)
+  for (let i = 1; i < max - 1; i++) {
+    const idx = Math.round((i * (all.length - 1)) / (max - 1))
+    out.add(all[idx]!)
+  }
+  return [...out].sort()
+}
+
+async function fetchDouyinLedgerCommissionPage(input: {
+  token: string
+  accountId: string
+  path: string
+  billDate: string
+  cursor: string
+}): Promise<
+  | { ok: true; records: Record<string, unknown>[]; cursor: string; hasMore: boolean }
+  | { ok: false; msg: string }
+> {
+  const u = new URL(douyinOpenApiUrl(input.path))
+  u.searchParams.set('account_id', input.accountId)
+  u.searchParams.set('bill_date', input.billDate)
+  u.searchParams.set('cursor', input.cursor)
+  u.searchParams.set('size', '50')
+  const dr = await douyinServerFetch(u.toString(), {
+    method: 'GET',
+    headers: {
+      'access-token': input.token,
+      'content-type': 'application/json',
+      'Rpc-Transit-Life-Account': input.accountId,
+    },
+  })
+  const raw = await dr.text()
+  if (!dr.ok) {
+    return { ok: false, msg: `HTTP ${dr.status}：${raw.slice(0, 180)}` }
+  }
+  const j = parseDouyinJson(raw)
+  const envErr = getDataError(j)
+  if (!envErr.ok) return { ok: false, msg: envErr.msg ?? '抖音账单业务错误' }
+  const data = j.data && typeof j.data === 'object' ? (j.data as Record<string, unknown>) : undefined
+  const records = pickDouyinLedgerRecords(data)
+  const nextCursor = String(data?.cursor ?? '0')
+  const hasMore = data?.has_more === true || data?.has_more === 'true'
+  return { ok: true, records, cursor: nextCursor, hasMore }
+}
+
+/**
+ * 用来客账单 OpenAPI 实算软件服务费 / 分账基数 → 行业佣金率。
+ * 不回落到本地餐饮 2.5% 表。
+ */
+export async function fetchDouyinPlatformCommissionRate(
+  bearerToken: string,
+  startYmd: string,
+  endYmd: string,
+): Promise<DouyinPlatformCommissionRateResult> {
+  const session = bearerToken ? resolveSession(bearerToken) : undefined
+  if (!session) {
+    return {
+      ok: false,
+      bound: false,
+      ratePct: 0,
+      feeYuan: 0,
+      baseYuan: 0,
+      sampleCount: 0,
+      source: 'unbound',
+      error: '未绑定抖音来客，无法拉取佣金率',
+    }
+  }
+  try {
+    return await withDouyinClientTokenRetry(session, {}, async (token) => {
+      const accountId = session.merchantId
+      const sampleDays = pickDouyinSampleYmds(startYmd, endYmd, 6)
+      let lastErr = ''
+      for (const api of DOUYIN_LEDGER_COMMISSION_APIS) {
+        const probe = await fetchDouyinLedgerCommissionPage({
+          token,
+          accountId,
+          path: api.path,
+          billDate: sampleDays[0] ?? startYmd,
+          cursor: '0',
+        })
+        if (!probe.ok) {
+          lastErr = `${api.label}：${probe.msg}`
+          continue
+        }
+
+        let feeFen = 0
+        let baseFen = 0
+        let sampleCount = 0
+        for (const day of sampleDays) {
+          let cursor = '0'
+          for (let page = 0; page < 4; page++) {
+            const r =
+              page === 0 && day === sampleDays[0]
+                ? probe
+                : await fetchDouyinLedgerCommissionPage({
+                    token,
+                    accountId,
+                    path: api.path,
+                    billDate: day,
+                    cursor,
+                  })
+            if (!r.ok) {
+              lastErr = `${api.label}：${r.msg}`
+              break
+            }
+            const sum = sumDouyinLedgerServiceFee(r.records)
+            feeFen += sum.feeFen
+            baseFen += sum.baseFen
+            sampleCount += sum.count
+            if (!r.hasMore || r.records.length === 0) break
+            cursor = r.cursor || String(page + 1)
+          }
+        }
+
+        if (sampleCount > 0 && baseFen > 0) {
+          const ratePct = Math.round((feeFen / baseFen) * 1000) / 10
+          return {
+            ok: true,
+            bound: true,
+            ratePct: Math.min(40, Math.max(0, ratePct)),
+            feeYuan: Math.round((feeFen / 100) * 100) / 100,
+            baseYuan: Math.round((baseFen / 100) * 100) / 100,
+            sampleCount,
+            source: `douyin:${api.label}`,
+            apiPath: api.path,
+          }
+        }
+        lastErr = lastErr || `${api.label}在申报期内无分账记录`
+      }
+
+      return {
+        ok: false,
+        bound: true,
+        ratePct: 0,
+        feeYuan: 0,
+        baseYuan: 0,
+        sampleCount: 0,
+        source: 'api_error',
+        error: lastErr || '来客账单接口均不可用（需团购对账 / 商家账单明细权限）',
+      }
+    })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return {
+      ok: false,
+      bound: true,
+      ratePct: 0,
+      feeYuan: 0,
+      baseYuan: 0,
+      sampleCount: 0,
+      source: 'api_error',
+      error: `抖音佣金率拉取异常：${msg}`,
+    }
+  }
+}
+
 /**
  * 餐饮评价 rate_score → 1–5 星。
  * 官方文档未枚举具体取值；线上常见：1–5、10/20/30/40/50、20/40/60/80/100。
