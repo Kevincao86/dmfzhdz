@@ -56,6 +56,7 @@ export default function RecruitCoverField({
   const [aiRefDataUrl, setAiRefDataUrl] = useState('')
   const [aiBusy, setAiBusy] = useState(false)
   const [fromAi, setFromAi] = useState(false)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
 
   const preview = useMemo(
     () => resolvePreview(platform, talentTags, coverImage, coverLibraryId),
@@ -193,7 +194,12 @@ export default function RecruitCoverField({
           )}
         </div>
         {preview ? (
-          <button type="button" className="mt-3 block w-full" onClick={openGallery}>
+          <button
+            type="button"
+            className="mt-3 block w-full cursor-zoom-in"
+            title="点击查看大图"
+            onClick={() => setLightboxOpen(true)}
+          >
             <img src={preview} alt="招募封面预览" className="h-36 w-full rounded-lg object-cover" />
           </button>
         ) : null}
@@ -245,6 +251,30 @@ export default function RecruitCoverField({
           </div>
         ) : null}
       </div>
+
+      {lightboxOpen && preview ? (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/90 p-4"
+          onClick={() => setLightboxOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="封面大图"
+        >
+          <button
+            type="button"
+            className="absolute right-4 top-4 text-sm text-white/80 hover:text-white"
+            onClick={() => setLightboxOpen(false)}
+          >
+            关闭
+          </button>
+          <img
+            src={preview}
+            alt="招募封面大图"
+            className="max-h-[90vh] max-w-[min(90vw,720px)] rounded-lg object-contain shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      ) : null}
 
       {galleryOpen ? (
         <div className="fixed inset-0 z-50 flex flex-col bg-slate-950/95 p-4 text-white">
