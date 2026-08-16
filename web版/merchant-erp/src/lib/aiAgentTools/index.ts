@@ -42,7 +42,8 @@ function collectScenarioToolNames(types: AiTaskType[]): Set<string> {
 
 /**
  * 仅在命中九大场景执行意图（或明确的生图/混剪/数字人）时挂载写 tools。
- * 数据问答可挂只读 fetch_page_data；禁止因此挂上 create_product 等写工具。
+ * 数据问答不挂 fetch_page_data：实数已由 intel 注入，直接文字作答；
+ * 若挂 tool 会打断作答并把内部指令当回复。
  */
 export function listAiAgentToolsForUserIntent(
   userText: string,
@@ -52,10 +53,7 @@ export function listAiAgentToolsForUserIntent(
   const x = userText.replace(/\[引用[\s\S]*?\n\n/, '').trim()
   if (!x) return []
 
-  const dataDomains = detectAgentDataQueryDomains(x)
-  if (dataDomains.length > 0) {
-    return AI_AGENT_TOOLS.filter((t) => t.name === 'fetch_page_data')
-  }
+  if (detectAgentDataQueryDomains(x).length > 0) return []
   if (isInformationalOnlyQuery(x)) return []
 
   const allow = new Set<string>()
