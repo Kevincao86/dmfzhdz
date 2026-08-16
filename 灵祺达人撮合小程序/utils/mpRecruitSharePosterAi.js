@@ -1,5 +1,5 @@
 /**
- * 招募分享页海报 AI 生图：与视觉工坊常规生图同价（8 积分/张）
+ * 招募单封面 AI 生图：与视觉工坊常规生图同价（8 积分/张）
  */
 const ecs = require('./ecs.js')
 const sessionStore = require('./mpSessionStore.js')
@@ -16,8 +16,8 @@ function mpAuthHeaders() {
   return token ? { 'X-Mp-Session': token } : {}
 }
 
-function buildPrompt(order, userText) {
-  const o = order || {}
+function buildPrompt(ctx, userText) {
+  const o = ctx || {}
   const title = String(o.title || '').trim()
   const platform = String(o.platform || '').trim()
   const region = String(o.region || '').trim()
@@ -104,7 +104,7 @@ function pickReferenceImage() {
       const mpPrivacy = require('./mpPrivacyAuthorize.js')
       if (mpPrivacy && typeof mpPrivacy.runChooseMedia === 'function') {
         mpPrivacy
-          .runChooseMedia(chooseOpts, { purpose: '上传海报参考图' })
+          .runChooseMedia(chooseOpts, { purpose: '上传封面参考图' })
           .then(onPicked)
           .catch((e) => {
             const msg = String((e && e.message) || e || '')
@@ -156,7 +156,7 @@ function openRecharge() {
   }
   wx.showModal({
     title: '积分不足',
-    content: `生成分享海报需要 ${POSTER_POINTS} 积分，请充值或升级套餐后再试。`,
+    content: `生成招募封面需要 ${POSTER_POINTS} 积分，请充值或升级套餐后再试。`,
     confirmText: '去充值',
     success: (res) => {
       if (res.confirm) tryNav(0)
@@ -164,20 +164,22 @@ function openRecharge() {
   })
 }
 
-async function generateSharePoster(opts) {
+async function generateCoverImage(opts) {
   const o = opts || {}
   await points.assertVisualStudioImageAffordable(1)
-  const prompt = buildPrompt(o.order, o.userText)
+  const prompt = buildPrompt(
+    { title: o.title, platform: o.platform, region: o.region },
+    o.userText,
+  )
   const imageUrl = await postAgentImage(prompt, o.referenceImage)
   const spend = await points.spendVisualStudioImagePoints({
-    idempotencyKey: `recruit-share-poster-${Date.now()}`,
-    note: '招募分享海报生图',
+    idempotencyKey: `recruit-cover-ai-${Date.now()}`,
+    note: '招募封面生图',
   })
   return {
     ok: true,
     imageUrl,
     pointsCharged: Number((spend && spend.pointsCharged) || POSTER_POINTS),
-    order: applyCoverToOrder(o.order, imageUrl),
   }
 }
 
@@ -186,7 +188,7 @@ module.exports = {
   buildPrompt,
   applyCoverToOrder,
   pickReferenceImage,
-  generateSharePoster,
+  generateCoverImage,
   openRecharge,
   affordActionFromError: points.affordActionFromError,
 }
