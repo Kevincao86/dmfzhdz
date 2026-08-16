@@ -7,7 +7,7 @@
  * - 小红书本地生活：公开披露少，取行业常见团购抽成参考。
  * - 外卖（淘宝闪购/美团外卖/京东外卖）：综合抽成参考（含履约感知区间），餐饮业态为主。
  *
- * 匹配顺序：精确 industryCode → 经营类目路径关键词 → 默认餐饮。
+ * 匹配顺序：绑定账号业态关键词 → 精确 industryCode → 经营类目路径 → 未识别（禁止默默当成餐饮）。
  */
 import type { FinancePlatformId } from '../services/financeReconcileApi'
 
@@ -80,16 +80,26 @@ export const INDUSTRY_L1_COMMISSION_TABLE: Record<string, IndustryPlatformCommis
   wedding: row('结婚', '结婚 > 婚庆摄影', { douyin: 8, meituan: 15, xhs: 10 }, WAIMAI_NON_FOOD),
 }
 
-/** 未匹配时的默认：餐饮美食 */
-export const DEFAULT_GROUPBUY_COMMISSION: GroupbuyCommissionPct =
-  INDUSTRY_L1_COMMISSION_TABLE.food!.groupbuy
+/** 未匹配到业态时禁止当成餐饮，佣金记 0 */
+const WAIMAI_ZERO: WaimaiCommissionPct = {
+  eleme: 0,
+  meituan_waimai: 0,
+  jd_waimai: 0,
+}
+
+export const UNMATCHED_INDUSTRY_COMMISSION: IndustryPlatformCommissionPreset = row(
+  '未识别行业',
+  '未识别（须用绑定账号业态匹配）',
+  { douyin: 0, meituan: 0, xhs: 0 },
+  WAIMAI_ZERO,
+)
 
 /**
  * 精确 industryCode / 历史预设编码 → 费率行。
  * 含 gross-margin-advisor、类目 mock leaf、来客二级习惯编码。
  */
 export const INDUSTRY_PLATFORM_COMMISSION_PRESETS: Record<string, IndustryPlatformCommissionPreset> = {
-  '': INDUSTRY_L1_COMMISSION_TABLE.food!,
+  // 空编码不再映射餐饮，避免未配置时把洗衣等业态算成 2.5%
 
   // —— 餐饮 ——
   life_food_general: INDUSTRY_L1_COMMISSION_TABLE.food!,
@@ -150,7 +160,9 @@ export function resolveIndustryBucketFromPath(industryPath?: string): IndustryBu
   if (/培训|教育|课程|语言|职业技能|学习/.test(blob)) return 'edu'
   if (/商超|购物|百货|便利|零售|数码家电/.test(blob)) return 'shopping'
   if (/爱车|洗车|汽车|汽修|保养/.test(blob)) return 'car'
-  if (/家政|保洁|搬家|维修|开锁|洗衣|月嫂|生活服务|甲醛|装修/.test(blob)) return 'life'
+  if (/家政|保洁|搬家|维修|开锁|洗衣|干洗|洗染|洗涤|洗护|洗爱|洗鞋|熨烫|月嫂|生活服务|甲醛|装修/.test(blob)) {
+    return 'life'
+  }
   if (/亲子|早教|托育|儿童乐园|婴儿游泳|绘本/.test(blob)) return 'kids'
   if (/健身|瑜伽|游泳|球馆|攀岩|运动|私教|团操/.test(blob)) return 'sport'
   if (/KTV|酒吧|影院|剧本杀|密室|棋牌|网吧|桌游|轰趴|温泉|桑拿|休闲娱乐|玩乐/.test(blob)) {
@@ -203,10 +215,23 @@ export function resolveIndustryCommissionPreset(
     return INDUSTRY_L1_COMMISSION_TABLE[bucket]!
   }
 
-  return INDUSTRY_L1_COMMISSION_TABLE.food!
+  return UNMATCHED_INDUSTRY_COMMISSION
 }
 
-/** 按门店配置行业与平台返回佣金率（%，核销额口径粗算） */
+/** 绑定账号业态能识别时优先于毛利配置（避免空配置默认餐饮 2.5%） */
+export function resolveIndustryHintForTax(
+  industryCode: string,
+  industryPath: string,
+  boundAccountHint: string,
+): { code: string; path: string } {
+  const bound = boundAccountHint.trim()
+  if (bound && resolveIndustryBucketFromPath(bound)) {
+    return { code: '', path: bound }
+  }
+  return { code: (industryCode ?? '').trim(), path: (industryPath ?? '').trim() }
+}
+
+/** 按门店/绑定账号业态与平台返回佣金率（%，核销额口径粗算） */
 export function platformCommissionPctForTax(
   industryCode: string,
   platformId: FinancePlatformId,
@@ -219,7 +244,7 @@ export function platformCommissionPctForTax(
   if (platformId === 'eleme') return clampCommissionPct(preset.waimai.eleme)
   if (platformId === 'meituan_waimai') return clampCommissionPct(preset.waimai.meituan_waimai)
   if (platformId === 'jd_waimai') return clampCommissionPct(preset.waimai.jd_waimai)
-  return clampCommissionPct(DEFAULT_GROUPBUY_COMMISSION.douyin)
+  return 0
 }
 
 export function estimatePlatformCommissionYuan(verifyAmountYuan: number, commissionPct: number): number {
