@@ -5,9 +5,11 @@ import {
   estimatePlatformCommissionYuan,
   platformCommissionPctForTax,
   resolveIndustryCommissionPreset,
+  resolveIndustryHintForTax,
 } from './platformIndustryCommission'
 import { readMerchantSession } from './merchantSession'
 import type { StoreMarginIndustry } from './storeMarginsRead'
+import { getDouyinStores } from '../services/douyinMerchantApi'
 
 export type TaxPlatformBindingStatus = 'bound' | 'session_only' | 'unbound'
 
@@ -81,10 +83,48 @@ export function aggregateReconcileForTax(rows: FinanceReconcileRow[]): Map<Finan
   return map
 }
 
+export function collectBoundAccountIndustryHint(bindings: MerchantPlatformBindingRow[]): string {
+  return bindings
+    .map((b) => [b.bindingLabel, b.accountDisplayName].filter(Boolean).join(' '))
+    .filter(Boolean)
+    .join(' ')
+}
+
+/** 绑定账号名 + 来客门店/品牌名，供业态匹配（失败不抛）。 */
+export async function collectTaxIndustryHintFromBoundAccounts(
+  bindings: MerchantPlatformBindingRow[],
+): Promise<string> {
+  const parts = [collectBoundAccountIndustryHint(bindings)]
+  const token = String(readMerchantSession('meoo_douyin_merchant_token') || '').trim()
+  if (token) {
+    try {
+      const r = await getDouyinStores({
+        accessToken: token,
+        page: 1,
+        pageSize: 80,
+        relationType: 'all',
+        clientTimeoutMs: 8000,
+      })
+      if (r.ok) {
+        parts.push(
+          r.items
+            .map((s) => [s.name, s.brandName].filter(Boolean).join(' '))
+            .filter(Boolean)
+            .join(' '),
+        )
+      }
+    } catch {
+      /* 门店列表失败时仍用绑定账号名匹配 */
+    }
+  }
+  return parts.filter((x) => x.trim()).join(' ')
+}
+
 export function buildTaxPlatformRows(
   bindings: MerchantPlatformBindingRow[],
   reconcileRows: FinanceReconcileRow[],
   industry?: Pick<StoreMarginIndustry, 'code' | 'path' | 'name'>,
+  boundAccountHint = '',
 ): TaxPlatformRow[] {
   const agg = aggregateReconcileForTax(reconcileRows)
   const bindingByPlatform = new Map<FinancePlatformId, MerchantPlatformBindingRow>()
@@ -95,6 +135,8 @@ export function buildTaxPlatformRows(
 
   const industryCode = (industry?.code ?? '').trim()
   const industryPath = (industry?.path ?? industry?.name ?? '').trim()
+  const extraHint = [boundAccountHint, collectBoundAccountIndustryHint(bindings)].filter(Boolean).join(' ')
+  const hint = resolveIndustryHintForTax(industryCode, industryPath, extraHint)
 
   const platformIds: FinancePlatformId[] = [
     'douyin',
@@ -116,7 +158,7 @@ export function buildTaxPlatformRows(
 
     const channel = financePlatformChannel(platformId)
     const verifyAmountYuan = sums?.verifyAmountYuan ?? 0
-    const commissionRatePct = platformCommissionPctForTax(industryCode, platformId, industryPath)
+    const commissionRatePct = platformCommissionPctForTax(hint.code, platformId, hint.path)
     return {
       platformId,
       platformLabel:
@@ -156,13 +198,24 @@ export type TaxFilingIndustryContext = {
 
 export function resolveTaxFilingIndustryContext(
   industry?: Pick<StoreMarginIndustry, 'code' | 'path' | 'name'>,
+  boundAccountHint = '',
 ): TaxFilingIndustryContext {
-  const code = (industry?.code ?? '').trim()
-  const pathHint = (industry?.path ?? industry?.name ?? '').trim()
-  const preset = resolveIndustryCommissionPreset(code, pathHint)
+  const codeRaw = (industry?.code ?? '').trim()
+  const pathRaw = (industry?.path ?? industry?.name ?? '').trim()
+  const extra = [boundAccountHint.trim(), pathRaw].filter(Boolean).join(' ')
+  const hint = resolveIndustryHintForTax(codeRaw, pathRaw, extra)
+  const preset = resolveIndustryCommissionPreset(hint.code, hint.path)
+  if (hint.code === '' && boundAccountHint.trim() && hint.path) {
+    return {
+      code: '',
+      path: preset.industryPath,
+      name: preset.industryName,
+      presetPath: preset.industryPath,
+    }
+  }
   const path = (industry?.path ?? '').trim() || preset.industryPath
   const name = (industry?.name ?? '').trim() || preset.industryName
-  return { code, path, name, presetPath: preset.industryPath }
+  return { code: hint.code || codeRaw, path, name, presetPath: preset.industryPath }
 }
 
 export type TaxFilingRecord = {
@@ -228,7 +281,7 @@ export function buildTaxExportBlob(
     totalVerifyYuan: rows.reduce((s, r) => s + r.verifyAmountYuan, 0),
     totalCommissionYuan,
     note:
-      '本文件为灵祺 ERP 报税辅助导出；平台佣金按门店经营类目匹配「行业×平台」参考费率粗算（抖音来客对齐美食等公开技术服务费口径，美团/小红书/外卖为行业常见区间）；正式申报请以各平台费率查询或主管税务机关要求为准。',
+      '本文件为灵祺 ERP 报税辅助导出；平台佣金按绑定账号业态匹配「行业×平台」参考费率（未识别业态记 0，禁止默认餐饮）。正式申报请以各平台费率查询或主管税务机关要求为准。',
   }
   return new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' })
 }

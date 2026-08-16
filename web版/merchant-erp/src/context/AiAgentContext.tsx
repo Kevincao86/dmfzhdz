@@ -140,6 +140,7 @@ import {
   appendTaxFilingRecord,
   buildTaxExportBlob,
   buildTaxPlatformRows,
+  collectTaxIndustryHintFromBoundAccounts,
   resolveTaxFilingIndustryContext,
 } from '../lib/taxFiling'
 import { readStoreMarginConfig } from '../lib/storeMarginsRead'
@@ -2429,9 +2430,12 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
               bindings = [...dy, ...xhs]
             }
             const marginConfig = readStoreMarginConfig()
-            const industryCtx = resolveTaxFilingIndustryContext(marginConfig.industry)
+            const boundHint = await collectTaxIndustryHintFromBoundAccounts(bindings)
+            const industryCtx = resolveTaxFilingIndustryContext(marginConfig.industry, boundHint)
             const fin = await fetchFinanceReconcile({ startDate: period.start, endDate: period.end })
-            const rows = fin.ok ? buildTaxPlatformRows(bindings, fin.rows, marginConfig.industry) : []
+            const rows = fin.ok
+              ? buildTaxPlatformRows(bindings, fin.rows, marginConfig.industry, boundHint)
+              : []
             const blob = buildTaxExportBlob(rows, period, industryCtx)
             const url = URL.createObjectURL(blob)
             const a = document.createElement('a')

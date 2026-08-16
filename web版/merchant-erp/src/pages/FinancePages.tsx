@@ -8,6 +8,7 @@ import {
   appendTaxFilingRecord,
   buildTaxExportBlob,
   buildTaxPlatformRows,
+  collectTaxIndustryHintFromBoundAccounts,
   readTaxFilingHistory,
   resolveTaxFilingIndustryContext,
   shanghaiMonthRangeYmd,
@@ -784,8 +785,6 @@ export function FinanceTaxPage() {
     setErr(null)
     try {
       const marginConfig = readStoreMarginConfig()
-      const industry = resolveTaxFilingIndustryContext(marginConfig.industry)
-      setIndustryCtx(industry)
       let bindings: Awaited<ReturnType<typeof listMerchantBindings>> = []
       if (supabaseConfigured && supabase) {
         const [dy, xhs] = await Promise.all([
@@ -800,7 +799,10 @@ export function FinanceTaxPage() {
         setRows([])
         return
       }
-      setRows(buildTaxPlatformRows(bindings, fin.rows, marginConfig.industry))
+      const boundHint = await collectTaxIndustryHintFromBoundAccounts(bindings)
+      const industry = resolveTaxFilingIndustryContext(marginConfig.industry, boundHint)
+      setIndustryCtx(industry)
+      setRows(buildTaxPlatformRows(bindings, fin.rows, marginConfig.industry, boundHint))
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
       setRows([])
@@ -924,15 +926,15 @@ export function FinanceTaxPage() {
       </div>
 
       <p className="mb-4 text-xs text-gray-500">
-        经营行业（来自商品页门店毛利配置）：{industryCtx.path || industryCtx.presetPath}
-        {!industryCtx.code ? (
+        经营行业（绑定账号业态优先，再匹配该业态×平台佣金）：{industryCtx.path || industryCtx.presetPath}
+        {industryCtx.presetPath?.startsWith('未识别') ? (
           <>
             {' '}
-            · 未配置时将按默认餐饮类目佣金率估算，可在{' '}
+            · 未能从绑定账号识别业态，佣金暂记 0。可在{' '}
             <Link to="/products" className="text-indigo-600 hover:underline">
               商品列表
             </Link>{' '}
-            设置行业与毛利率
+            补充经营类目
           </>
         ) : null}
       </p>

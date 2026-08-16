@@ -854,6 +854,7 @@ agentMerchantContext
 agentBusinessMetricsFetch
 platformIndustryCommission
 taxFiling
+FinancePages
 opsRegistryTypes
 mpMembershipPromoClaimMutations
 change-scope-guard
