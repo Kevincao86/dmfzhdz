@@ -17,6 +17,14 @@ function devRequestTimeoutMs() {
   return mpRuntime.isLocalDevRuntime() ? 12000 : 120000
 }
 
+function requestTimeoutMs(path) {
+  const p = String(path || '')
+  if (/meoo-ai-agent-image/i.test(p)) {
+    return 180000
+  }
+  return devRequestTimeoutMs()
+}
+
 function bases() {
   mpRuntime.applyRuntimeConfig(config)
   const list = []
@@ -87,14 +95,15 @@ function hostHeaderForBase(base) {
   return { Host: ip }
 }
 
-function wxRequestOnce(method, fullUrl, data, headers, tryNo, base) {
+function wxRequestOnce(method, fullUrl, data, headers, tryNo, base, pathHint) {
   const m = String(method || 'GET').toUpperCase()
   const isGet = m === 'GET'
+  const timeout = requestTimeoutMs(pathHint || fullUrl)
   return new Promise((resolve, reject) => {
     wx.request({
       url: fullUrl,
       method: m,
-      timeout: devRequestTimeoutMs(),
+      timeout,
       enableHttp2: false,
       enableQuic: false,
       ...(tryNo > 0 && isPhone() ? { forceCellularNetwork: true } : {}),
@@ -126,7 +135,7 @@ async function directRequest(method, path, data, headers, tryNo = 0, baseIdx = 0
   const base = list[baseIdx] || list[0]
   const fullUrl = url(path, base)
   try {
-    return await wxRequestOnce(method, fullUrl, data, headers, tryNo, base)
+    return await wxRequestOnce(method, fullUrl, data, headers, tryNo, base, path)
   } catch (err) {
     const nextBase = baseIdx + 1
     if (nextBase < list.length && isNetReset(err.message)) {
