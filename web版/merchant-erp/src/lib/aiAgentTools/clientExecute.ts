@@ -1,10 +1,28 @@
 import { postAiAgentNativeImage } from '../../services/ai/aiClient'
+import { isAgentDataDomain } from '../aiAgentSystemPromptRoute'
+import { loadAgentPageDataContext } from '../agentPageDataLoaders'
 import { parseToolCallArguments } from './openaiTools'
 import type { AiAgentClientToolResult, AiAgentToolCall } from './types'
 
 async function executeOne(call: AiAgentToolCall): Promise<AiAgentClientToolResult> {
   const tool = String(call.function?.name || '').trim()
   const args = parseToolCallArguments(call.function?.arguments)
+
+  if (tool === 'fetch_page_data') {
+    const raw = Array.isArray(args.domains) ? args.domains.map((d) => String(d)) : []
+    const domains = raw.filter(isAgentDataDomain)
+    if (!domains.length) {
+      return { call, tool, ok: false, message: '请指定有效 domains（如 reviews、leads、metrics）' }
+    }
+    const text = await loadAgentPageDataContext(domains, '')
+    return {
+      call,
+      tool,
+      ok: true,
+      message: text || '未拉到数据',
+      data: { domains, digest: text },
+    }
+  }
 
   if (tool === 'generate_image') {
     const prompt = String(args.prompt || '').trim()

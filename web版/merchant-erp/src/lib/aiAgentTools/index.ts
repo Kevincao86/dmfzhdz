@@ -1,8 +1,8 @@
 import { AI_AGENT_TOOLS } from './registry'
 import type { AiTaskType } from '../aiAgentTypes'
 import {
+  detectAgentDataQueryDomains,
   isAgentShortcutTaskLine,
-  isBusinessMetricsQuery,
   isInformationalOnlyQuery,
 } from '../aiAgentSystemPromptRoute'
 import { inferTaskTypeFromText, isExplicitExecutionIntent } from '../aiAgentActionParse'
@@ -41,8 +41,8 @@ function collectScenarioToolNames(types: AiTaskType[]): Set<string> {
 }
 
 /**
- * 仅在命中九大场景执行意图（或明确的生图/混剪/数字人）时挂载 tools。
- * 经营数据问答、闲聊、政策咨询等一律不传 tools，避免误调 create_product。
+ * 仅在命中九大场景执行意图（或明确的生图/混剪/数字人）时挂载写 tools。
+ * 数据问答可挂只读 fetch_page_data；禁止因此挂上 create_product 等写工具。
  */
 export function listAiAgentToolsForUserIntent(
   userText: string,
@@ -51,7 +51,12 @@ export function listAiAgentToolsForUserIntent(
 ): AiAgentToolDef[] {
   const x = userText.replace(/\[引用[\s\S]*?\n\n/, '').trim()
   if (!x) return []
-  if (isBusinessMetricsQuery(x) || isInformationalOnlyQuery(x)) return []
+
+  const dataDomains = detectAgentDataQueryDomains(x)
+  if (dataDomains.length > 0) {
+    return AI_AGENT_TOOLS.filter((t) => t.name === 'fetch_page_data')
+  }
+  if (isInformationalOnlyQuery(x)) return []
 
   const allow = new Set<string>()
   const inferred = taskType ?? inferTaskTypeFromText(x)
