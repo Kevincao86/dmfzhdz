@@ -20,6 +20,7 @@ import {
   emptyPublishForm,
   validatePublishForm,
   buildPublishOrder,
+  buildRegionText,
   type PublishForm,
 } from '../../lib/mpSync/publishOrder'
 import { clampNonNegativeInput } from '../../lib/mpSync/publishNumeric'
@@ -1355,6 +1356,8 @@ export default function PublishWizard() {
           talentTags={form.talentTags}
           coverImage={form.coverImage}
           coverLibraryId={form.coverLibraryId}
+          recruitTitle={form.title}
+          region={buildRegionText(form)}
           onChange={(patch) => patchForm(patch)}
         />
 
