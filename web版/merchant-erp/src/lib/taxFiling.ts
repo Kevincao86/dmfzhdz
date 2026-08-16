@@ -1,15 +1,21 @@
 import type { FinancePlatformId, FinanceReconcileRow } from '../services/financeReconcileApi'
+import { fetchFinanceReconcile } from '../services/financeReconcileApi'
+import {
+  fetchFinanceCommissionRates,
+  type FinanceCommissionRateRow,
+} from '../services/financeCommissionRatesApi'
 import { financePlatformChannel } from '../constants/merchantPlatforms'
 import type { MerchantBindingProvider, MerchantPlatformBindingRow } from './merchantPlatformBindings'
+import { listMerchantBindings } from './merchantPlatformBindings'
 import {
   estimatePlatformCommissionYuan,
-  platformCommissionPctForTax,
   resolveIndustryCommissionPreset,
   resolveIndustryHintForTax,
 } from './platformIndustryCommission'
 import { readMerchantSession } from './merchantSession'
-import type { StoreMarginIndustry } from './storeMarginsRead'
+import { readStoreMarginConfig, type StoreMarginIndustry } from './storeMarginsRead'
 import { getDouyinStores } from '../services/douyinMerchantApi'
+import { supabase, supabaseConfigured } from './supabaseClient'
 
 export type TaxPlatformBindingStatus = 'bound' | 'session_only' | 'unbound'
 
@@ -23,10 +29,13 @@ export type TaxPlatformRow = {
   salesAmountYuan: number
   orderCount: number
   verifyOrderCount: number
-  /** 当前门店行业下该平台参考佣金率（%） */
+  /** 平台账单接口实算佣金率（%）；拉不到则为 0 */
   commissionRatePct: number
-  /** 核销额 × 佣金率（粗算，元） */
+  /** 核销额 × 佣金率（元）；未含达人分佣 */
   commissionAmountYuan: number
+  commissionSource: 'api' | 'unbound' | 'api_error'
+  commissionSourceLabel: string
+  commissionError?: string
 }
 
 const SESSION_TOKEN_KEYS: Partial<Record<FinancePlatformId, string>> = {
@@ -125,6 +134,7 @@ export function buildTaxPlatformRows(
   reconcileRows: FinanceReconcileRow[],
   industry?: Pick<StoreMarginIndustry, 'code' | 'path' | 'name'>,
   boundAccountHint = '',
+  apiRates: FinanceCommissionRateRow[] = [],
 ): TaxPlatformRow[] {
   const agg = aggregateReconcileForTax(reconcileRows)
   const bindingByPlatform = new Map<FinancePlatformId, MerchantPlatformBindingRow>()
@@ -132,11 +142,13 @@ export function buildTaxPlatformRows(
     const pid = BINDING_PROVIDER_TO_PLATFORM[b.provider]
     if (pid) bindingByPlatform.set(pid, b)
   }
+  const rateByPlatform = new Map<string, FinanceCommissionRateRow>()
+  for (const r of apiRates) {
+    if (r.platformId) rateByPlatform.set(String(r.platformId), r)
+  }
 
-  const industryCode = (industry?.code ?? '').trim()
-  const industryPath = (industry?.path ?? industry?.name ?? '').trim()
-  const extraHint = [boundAccountHint, collectBoundAccountIndustryHint(bindings)].filter(Boolean).join(' ')
-  const hint = resolveIndustryHintForTax(industryCode, industryPath, extraHint)
+  void industry
+  void boundAccountHint
 
   const platformIds: FinancePlatformId[] = [
     'douyin',
@@ -158,7 +170,23 @@ export function buildTaxPlatformRows(
 
     const channel = financePlatformChannel(platformId)
     const verifyAmountYuan = sums?.verifyAmountYuan ?? 0
-    const commissionRatePct = platformCommissionPctForTax(hint.code, platformId, hint.path)
+    const api = rateByPlatform.get(platformId)
+    let commissionRatePct = 0
+    let commissionSource: TaxPlatformRow['commissionSource'] = 'unbound'
+    let commissionSourceLabel = '未绑定，无法拉取'
+    let commissionError: string | undefined
+    if (bindingStatus === 'unbound') {
+      commissionSource = 'unbound'
+      commissionSourceLabel = '未绑定，无法拉取'
+    } else if (api?.ok && api.ratePct > 0) {
+      commissionRatePct = api.ratePct
+      commissionSource = 'api'
+      commissionSourceLabel = api.source || '平台账单接口'
+    } else {
+      commissionSource = 'api_error'
+      commissionSourceLabel = '接口未返回佣金率'
+      commissionError = api?.error || '平台账单接口未返回佣金率'
+    }
     return {
       platformId,
       platformLabel:
@@ -185,8 +213,53 @@ export function buildTaxPlatformRows(
       verifyOrderCount: sums?.verifyOrderCount ?? 0,
       commissionRatePct,
       commissionAmountYuan: estimatePlatformCommissionYuan(verifyAmountYuan, commissionRatePct),
+      commissionSource,
+      commissionSourceLabel,
+      commissionError,
     }
   })
+}
+
+export async function loadTaxPlatformRowsForPeriod(
+  startDate: string,
+  endDate: string,
+): Promise<{
+  ok: boolean
+  message?: string
+  rows: TaxPlatformRow[]
+  industryCtx: TaxFilingIndustryContext
+  warnings: string[]
+}> {
+  const marginConfig = readStoreMarginConfig()
+  let bindings: MerchantPlatformBindingRow[] = []
+  if (supabaseConfigured && supabase) {
+    const [dy, xhs] = await Promise.all([
+      listMerchantBindings(supabase, 'douyin'),
+      listMerchantBindings(supabase, 'xhs_commercial'),
+    ])
+    bindings = [...dy, ...xhs]
+  }
+  const boundHint = await collectTaxIndustryHintFromBoundAccounts(bindings)
+  const industryCtx = resolveTaxFilingIndustryContext(marginConfig.industry, boundHint)
+  const [fin, rates] = await Promise.all([
+    fetchFinanceReconcile({ startDate, endDate }),
+    fetchFinanceCommissionRates({ startDate, endDate }),
+  ])
+  const warnings: string[] = []
+  if (!fin.ok) {
+    return { ok: false, message: fin.message, rows: [], industryCtx, warnings }
+  }
+  if (fin.warnings) warnings.push(...fin.warnings)
+  if (!rates.ok) warnings.push(rates.message)
+  else if (rates.warnings) warnings.push(...rates.warnings)
+  const rows = buildTaxPlatformRows(
+    bindings,
+    fin.rows,
+    marginConfig.industry,
+    boundHint,
+    rates.ok ? rates.rates : [],
+  )
+  return { ok: true, rows, industryCtx, warnings }
 }
 
 export type TaxFilingIndustryContext = {
@@ -277,11 +350,14 @@ export function buildTaxExportBlob(
       orderCount: r.orderCount,
       commissionRatePct: r.commissionRatePct,
       commissionAmountYuan: r.commissionAmountYuan,
+      commissionSource: r.commissionSource,
+      commissionSourceLabel: r.commissionSourceLabel,
+      commissionError: r.commissionError,
     })),
     totalVerifyYuan: rows.reduce((s, r) => s + r.verifyAmountYuan, 0),
     totalCommissionYuan,
     note:
-      '本文件为灵祺 ERP 报税辅助导出；平台佣金按绑定账号业态匹配「行业×平台」参考费率（未识别业态记 0，禁止默认餐饮）。正式申报请以各平台费率查询或主管税务机关要求为准。',
+      '本文件为灵祺 ERP 报税辅助导出；平台佣金率一律由各平台账单/分账 OpenAPI 实算（软件服务费÷分账基数），未绑定或接口无权限记 0，禁止本地行业表兜底。正式申报请以主管税务机关要求为准。',
   }
   return new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' })
 }

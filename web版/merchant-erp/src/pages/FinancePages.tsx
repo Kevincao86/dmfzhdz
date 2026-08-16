@@ -2,15 +2,11 @@ import { Download, Loader2, PieChart, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMembership } from '../context/MembershipContext'
-import { listMerchantBindings } from '../lib/merchantPlatformBindings'
-import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import {
   appendTaxFilingRecord,
   buildTaxExportBlob,
-  buildTaxPlatformRows,
-  collectTaxIndustryHintFromBoundAccounts,
+  loadTaxPlatformRowsForPeriod,
   readTaxFilingHistory,
-  resolveTaxFilingIndustryContext,
   shanghaiMonthRangeYmd,
   type TaxFilingIndustryContext,
   type TaxPlatformRow,
@@ -757,9 +753,12 @@ export function FinanceTaxPage() {
   const { entitlements } = useMembership()
   const [periodOffset, setPeriodOffset] = useState(-1)
   const [rows, setRows] = useState<TaxPlatformRow[]>([])
-  const [industryCtx, setIndustryCtx] = useState<TaxFilingIndustryContext>(() =>
-    resolveTaxFilingIndustryContext(readStoreMarginConfig().industry),
-  )
+  const [industryCtx, setIndustryCtx] = useState<TaxFilingIndustryContext>({
+    code: '',
+    path: '',
+    name: '',
+    presetPath: '',
+  })
   const [history, setHistory] = useState(() => readTaxFilingHistory())
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
@@ -784,25 +783,14 @@ export function FinanceTaxPage() {
     setLoading(true)
     setErr(null)
     try {
-      const marginConfig = readStoreMarginConfig()
-      let bindings: Awaited<ReturnType<typeof listMerchantBindings>> = []
-      if (supabaseConfigured && supabase) {
-        const [dy, xhs] = await Promise.all([
-          listMerchantBindings(supabase, 'douyin'),
-          listMerchantBindings(supabase, 'xhs_commercial'),
-        ])
-        bindings = [...dy, ...xhs]
-      }
-      const fin = await fetchFinanceReconcile({ startDate: period.start, endDate: period.end })
-      if (!fin.ok) {
-        setErr(fin.message)
+      const packed = await loadTaxPlatformRowsForPeriod(period.start, period.end)
+      setIndustryCtx(packed.industryCtx)
+      if (!packed.ok) {
+        setErr(packed.message || '报税数据加载失败')
         setRows([])
         return
       }
-      const boundHint = await collectTaxIndustryHintFromBoundAccounts(bindings)
-      const industry = resolveTaxFilingIndustryContext(marginConfig.industry, boundHint)
-      setIndustryCtx(industry)
-      setRows(buildTaxPlatformRows(bindings, fin.rows, marginConfig.industry, boundHint))
+      setRows(packed.rows)
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
       setRows([])
@@ -926,17 +914,7 @@ export function FinanceTaxPage() {
       </div>
 
       <p className="mb-4 text-xs text-gray-500">
-        经营行业（绑定账号业态优先，再匹配该业态×平台佣金）：{industryCtx.path || industryCtx.presetPath}
-        {industryCtx.presetPath?.startsWith('未识别') ? (
-          <>
-            {' '}
-            · 未能从绑定账号识别业态，佣金暂记 0。可在{' '}
-            <Link to="/products" className="text-indigo-600 hover:underline">
-              商品列表
-            </Link>{' '}
-            补充经营类目
-          </>
-        ) : null}
+        行业佣金率一律由各平台账单接口实算（抖音来客：软件服务费÷分账基数）。未绑定或接口无权限显示「—」，不再使用本地 2.5% 等参考表。
       </p>
 
       {err ? (
@@ -964,7 +942,7 @@ export function FinanceTaxPage() {
               <tr>
                 <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
                   <Loader2 className="mx-auto h-6 w-6 animate-spin text-indigo-500" />
-                  <p className="mt-2">正在拉取对账与绑定信息…</p>
+                  <p className="mt-2">正在拉取对账与各平台佣金率…</p>
                 </td>
               </tr>
             ) : rows.length === 0 ? (
@@ -999,7 +977,23 @@ export function FinanceTaxPage() {
                   <td className="px-4 py-3 text-right tabular-nums text-gray-700">
                     {formatYuan(r.salesAmountYuan)}
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-gray-700">{r.commissionRatePct}%</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-gray-700">
+                    {r.commissionSource === 'api' && r.commissionRatePct > 0 ? (
+                      <span title={r.commissionSourceLabel}>
+                        {r.commissionRatePct}%
+                        <span className="mt-0.5 block text-[10px] font-normal text-gray-400">
+                          {r.commissionSourceLabel}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-gray-400" title={r.commissionError || r.commissionSourceLabel}>
+                        —
+                        <span className="mt-0.5 block text-[10px] font-normal">
+                          {r.commissionSourceLabel}
+                        </span>
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right tabular-nums font-medium text-amber-800">
                     {formatYuan(r.commissionAmountYuan)}
                   </td>
@@ -1031,7 +1025,7 @@ export function FinanceTaxPage() {
       </div>
 
       <p className="mt-4 text-xs leading-relaxed text-gray-500">
-        说明：核销额来自「财务对账」各平台汇总；平台佣金按当前门店行业（商品页毛利配置）× 各平台参考费率粗算（核销额×佣金率），未含达人分佣、活动补贴与退款。一键报税导出 JSON
+        说明：核销额来自「财务对账」各平台汇总；平台佣金率由各平台开放接口账单实算，未含达人分佣、活动补贴与退款。一键报税导出 JSON
         申报包并记录状态；对接各平台税务开放接口后可替换为真实申报提交。
       </p>
     </ModulePage>

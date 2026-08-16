@@ -8,12 +8,9 @@ import {
 import type { AgentDataDomain } from './aiAgentSystemPromptRoute'
 import { competitorReportSummary, loadCompetitorReports } from './competitorStorage'
 import { buildStoreGeoBriefs } from './geoScoresFromDouyinRows'
-import { listMerchantBindings } from './merchantPlatformBindings'
 import { readMerchantSession } from './merchantSession'
-import { readStoreMarginConfig } from './storeMarginsRead'
-import { buildTaxPlatformRows, shanghaiMonthRangeYmd } from './taxFiling'
+import { loadTaxPlatformRowsForPeriod, shanghaiMonthRangeYmd } from './taxFiling'
 import { getDouyinStores } from '../services/douyinMerchantApi'
-import { fetchFinanceReconcile } from '../services/financeReconcileApi'
 import {
   fetchLocalClues,
   fetchLocalPromotions,
@@ -23,7 +20,6 @@ import { fetchMarketingActivities } from '../services/marketingActivitiesApi'
 import { fetchMerchantProductList } from '../services/merchantProductListApi'
 import { fetchShopAnalysis } from '../services/merchantOrdersApi'
 import { fetchReviewsList, type ReviewsApiPlatform } from '../services/reviewsMerchantApi'
-import { supabase, supabaseConfigured } from './supabaseClient'
 
 const DOMAIN_TIMEOUT_MS = 60_000
 
@@ -309,38 +305,32 @@ async function loadTax(): Promise<string> {
   const period = shanghaiMonthRangeYmd(-1)
   lines.push(`参考周期：${period.label}（${period.start} ~ ${period.end}）`)
   try {
-    let bindings: Awaited<ReturnType<typeof listMerchantBindings>> = []
-    if (supabaseConfigured && supabase) {
-      const [dy, xhs] = await Promise.all([
-        listMerchantBindings(supabase, 'douyin'),
-        listMerchantBindings(supabase, 'xhs_commercial'),
-      ])
-      bindings = [...dy, ...xhs]
-    }
-    const industry = readStoreMarginConfig().industry
-    const fin = await fetchFinanceReconcile({ startDate: period.start, endDate: period.end })
-    if (!fin.ok) {
-      lines.push(`对账失败：${fin.message}`)
+    const packed = await loadTaxPlatformRowsForPeriod(period.start, period.end)
+    if (!packed.ok) {
+      lines.push(`对账失败：${packed.message}`)
       return lines.join('\n')
     }
-    const rows = buildTaxPlatformRows(bindings, fin.rows, industry)
     let totalVerify = 0
     let totalComm = 0
-    for (const r of rows) {
+    for (const r of packed.rows) {
       totalVerify += r.verifyAmountYuan
       totalComm += r.commissionAmountYuan
+      const rateText =
+        r.commissionSource === 'api' && r.commissionRatePct > 0
+          ? `${r.commissionRatePct}%（${r.commissionSourceLabel}）`
+          : `未拉取（${r.commissionSourceLabel}）`
       lines.push(
-        `- ${r.platformLabel}：核销 ${yuan(r.verifyAmountYuan)}，佣金率 ${r.commissionRatePct}% → 佣金约 ${yuan(r.commissionAmountYuan)}（${r.bindingLabel}/${r.bindingStatus}）`,
+        `- ${r.platformLabel}：核销 ${yuan(r.verifyAmountYuan)}，佣金率 ${rateText} → 佣金约 ${yuan(r.commissionAmountYuan)}（${r.bindingLabel}/${r.bindingStatus}）`,
       )
     }
-    lines.push(`合计核销 ${yuan(totalVerify)}，参考佣金 ${yuan(totalComm)}`)
-    if (industry?.path || industry?.name) {
-      lines.push(`行业：${industry.path || industry.name}`)
+    lines.push(`合计核销 ${yuan(totalVerify)}，接口实算佣金 ${yuan(totalComm)}`)
+    if (packed.warnings.length) {
+      lines.push(`接口提示：${packed.warnings.slice(0, 4).join('；')}`)
     }
   } catch (e) {
     lines.push(`拉取失败：${e instanceof Error ? e.message : String(e)}`)
   }
-  lines.push('仅供参考汇总；真正报税须走九大场景「一键报税」预览确认。')
+  lines.push('佣金率来自各平台账单 OpenAPI，禁止本地行业表；真正报税须走九大场景「一键报税」预览确认。')
   return lines.join('\n')
 }
 

@@ -68,6 +68,7 @@ import {
   postMeituanCommentReply,
 } from './meituanMerchantGateway.js'
 import { handleFinanceReconcileGet } from './financeReconcileGateway.js'
+import { handleFinanceCommissionRatesGet } from './platformCommissionRateGateway.js'
 import {
   generateGrossMarginSuggestionByAi,
   generateReviewReplyByAi,
@@ -903,6 +904,12 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
        */
       if (method === 'GET' && pathname === '/api/merchant/finance/reconcile') {
         await handleFinanceReconcileGet(req, res, url)
+        return true
+      }
+
+      /** 报税：各平台账单接口实算佣金率，禁止本地行业表兜底 */
+      if (method === 'GET' && pathname === '/api/merchant/finance/commission-rates') {
+        await handleFinanceCommissionRatesGet(req, res, url)
         return true
       }
 

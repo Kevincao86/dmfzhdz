@@ -1,13 +1,5 @@
 import type { AiTaxFilingPreview } from '../lib/aiAgentTypes'
-import {
-  buildTaxPlatformRows,
-  shanghaiMonthRangeYmd,
-  type TaxPlatformRow,
-} from '../lib/taxFiling'
-import { listMerchantBindings } from '../lib/merchantPlatformBindings'
-import { readStoreMarginConfig } from '../lib/storeMarginsRead'
-import { supabase, supabaseConfigured } from '../lib/supabaseClient'
-import { fetchFinanceReconcile } from './financeReconcileApi'
+import { loadTaxPlatformRowsForPeriod, shanghaiMonthRangeYmd, type TaxPlatformRow } from '../lib/taxFiling'
 
 function toPreview(rows: TaxPlatformRow[], period: { label: string; start: string; end: string }): AiTaxFilingPreview {
   const platforms = rows.map((r) => ({
@@ -34,19 +26,11 @@ function toPreview(rows: TaxPlatformRow[], period: { label: string; start: strin
   }
 }
 
-/** 为智能体报税任务生成预览（上月对账汇总 + 绑定状态） */
+/** 为智能体报税任务生成预览（上月对账汇总 + 平台账单佣金率） */
 export async function buildAiTaxFilingPreview(): Promise<AiTaxFilingPreview> {
   const period = shanghaiMonthRangeYmd(-1)
-  let bindings: Awaited<ReturnType<typeof listMerchantBindings>> = []
-  if (supabaseConfigured && supabase) {
-    const [dy, xhs] = await Promise.all([
-      listMerchantBindings(supabase, 'douyin'),
-      listMerchantBindings(supabase, 'xhs_commercial'),
-    ])
-    bindings = [...dy, ...xhs]
-  }
-  const fin = await fetchFinanceReconcile({ startDate: period.start, endDate: period.end })
-  if (!fin.ok) {
+  const packed = await loadTaxPlatformRowsForPeriod(period.start, period.end)
+  if (!packed.ok) {
     return {
       periodLabel: period.label,
       startDate: period.start,
@@ -54,9 +38,8 @@ export async function buildAiTaxFilingPreview(): Promise<AiTaxFilingPreview> {
       platforms: [],
       totalVerifyYuan: 0,
       enrichStatus: 'error',
-      enrichError: fin.message,
+      enrichError: packed.message,
     }
   }
-  const rows = buildTaxPlatformRows(bindings, fin.rows, readStoreMarginConfig().industry)
-  return toPreview(rows, period)
+  return toPreview(packed.rows, period)
 }

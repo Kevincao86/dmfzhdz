@@ -852,9 +852,16 @@ aiAgentTools
 aiAgentScenarioWorkflows
 agentMerchantContext
 agentBusinessMetricsFetch
+agentPageDataLoaders
+aiAgentTaxFilingPreview
 platformIndustryCommission
 taxFiling
 FinancePages
+financeCommissionRatesApi
+platformCommissionRateGateway
+meoo-finance-commission-rates
+douyinMerchantGateway
+merchantApiGatewayCore
 opsRegistryTypes
 mpMembershipPromoClaimMutations
 change-scope-guard
