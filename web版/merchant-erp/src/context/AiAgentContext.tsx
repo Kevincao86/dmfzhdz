@@ -80,6 +80,8 @@ import {
   loadFullMerchantIntelSnapshot,
 } from '../lib/agentMerchantIntelLoader'
 import { fetchAgentBusinessMetricsContext } from '../lib/agentBusinessMetricsFetch'
+import { loadAgentPageDataContext } from '../lib/agentPageDataLoaders'
+import { detectAgentDataQueryDomains } from '../lib/aiAgentSystemPromptRoute'
 import {
   buildAgentUserHabitsContext,
   hydrateAgentUserHabitsFromCloud,
@@ -418,8 +420,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
 
   const resolveMerchantIntelBlock = useCallback(async (taskType?: AiTaskType, userText?: string) => {
     const now = Date.now()
+    const domains = userText ? detectAgentDataQueryDomains(userText) : []
     const metricsQ = Boolean(userText && isBusinessMetricsQuery(userText))
-    const cacheKey = `${taskType ?? ''}|m${metricsQ ? 1 : 0}|${metricsQ ? String(userText).slice(0, 96) : ''}`
+    const domainKey = domains.slice().sort().join(',')
+    const cacheKey = `${taskType ?? ''}|d${domainKey}|m${metricsQ ? 1 : 0}|${domains.length || metricsQ ? String(userText).slice(0, 96) : ''}`
     const hit = merchantIntelCacheRef.current
     if (hit && now - hit.at < MERCHANT_INTEL_CACHE_MS && hit.task === cacheKey) {
       return hit.text
@@ -427,7 +431,15 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     const text = await buildAgentMerchantIntelContextAsync(taskType)
     const habits = buildAgentUserHabitsContext(authUserIdRef.current)
     let combined = habits ? `${text}\n\n${habits}` : text
-    if (metricsQ && userText) {
+    if (domains.length && userText) {
+      try {
+        const pageBlock = await loadAgentPageDataContext(domains, userText)
+        if (pageBlock.trim()) combined = `${combined}\n\n${pageBlock}`
+      } catch {
+        combined = `${combined}\n\n【已拉取业务页实数】拉取失败，请根据绑定说明如实告知缺口，禁止编造。`
+      }
+    } else if (metricsQ && userText) {
+      // 兼容：仅命中经营问答且域检测为空时仍拉对账
       try {
         const metricsBlock = await fetchAgentBusinessMetricsContext(userText)
         if (metricsBlock.trim()) combined = `${combined}\n\n${metricsBlock}`

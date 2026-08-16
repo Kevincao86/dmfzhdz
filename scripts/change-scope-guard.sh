@@ -59,6 +59,7 @@ list_scopes() {
   edition_cs_sync        各端前端对齐 CS（DR/FWS/Admin 同源功能与积分经济）
   ai_agent_quick_image   商家 ERP：AI 智能体快捷任务平铺 + 生图意图自动切模型
   merchant_ai_agent_tax  商家 ERP：AI智能体意图/工具门禁 + 近三月日期 + 一键报税佣金（含构建类型补齐）
+  merchant_ai_agent_data 商家 ERP：AI智能体跨页只读取数（评价/线索/投流/订单等摘要注入）
   competitor_industry    商家 ERP：竞争对手分析经营类目读取/门店毛利配置联动
   competitor_baidu_map   商家 ERP：竞品分析接入百度地图周边 POI（服务端 AK）
   map_providers          商家 ERP：地图主副（高德优先 / 百度兜底）竞品+选址
@@ -845,6 +846,18 @@ platformIndustryCommission
 taxFiling
 opsRegistryTypes
 mpMembershipPromoClaimMutations
+change-scope-guard
+PAT
+      ;;
+    merchant_ai_agent_data)
+      cat <<'PAT'
+AiAgentContext
+aiAgentTools
+aiAgentSystemPromptRoute
+agentMerchantContext
+agentMerchantIntelLoader
+agentBusinessMetricsFetch
+agentPageDataLoaders
 change-scope-guard
 PAT
       ;;

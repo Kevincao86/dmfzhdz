@@ -25,6 +25,7 @@ import { fetchMarketingActivities } from '../services/marketingActivitiesApi'
 import { getDouyinStores } from '../services/douyinMerchantApi'
 import { fetchMerchantProductList } from '../services/merchantProductListApi'
 import { resolveCompetitorAnalysisIndustry } from './competitorIndustry'
+import { loadAgentPageDataContext, pageDataDomainsForTask } from './agentPageDataLoaders'
 
 const FETCH_TIMEOUT_MS = 45_000
 
@@ -449,5 +450,15 @@ export async function buildAgentMerchantIntelContextAsync(
   taskType?: AiTaskType,
 ): Promise<string> {
   const full = await loadFullMerchantIntelSnapshot(taskType)
-  return buildAgentMerchantIntelContextFromSnapshot(full)
+  let text = buildAgentMerchantIntelContextFromSnapshot(full)
+  const domains = pageDataDomainsForTask(taskType)
+  if (domains.length) {
+    try {
+      const pageBlock = await loadAgentPageDataContext(domains, '')
+      if (pageBlock.trim()) text = `${text}\n\n${pageBlock}`
+    } catch {
+      text = `${text}\n\n【已拉取业务页实数】场景附带拉数失败，请据绑定说明告知缺口，禁止编造。`
+    }
+  }
+  return text
 }

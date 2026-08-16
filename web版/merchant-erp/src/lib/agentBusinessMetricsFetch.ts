@@ -164,8 +164,9 @@ function yuan(n: number): string {
 export async function fetchAgentBusinessMetricsContext(
   userText: string,
   signal?: AbortSignal,
+  opts?: { force?: boolean },
 ): Promise<string> {
-  if (!isBusinessMetricsQuery(userText)) return ''
+  if (!opts?.force && !isBusinessMetricsQuery(userText)) return ''
 
   const range = resolveMetricsDateRangeFromText(userText)
   const lines: string[] = [

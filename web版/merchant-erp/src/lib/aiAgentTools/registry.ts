@@ -96,6 +96,37 @@ export const AI_AGENT_TOOLS: AiAgentToolDef[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'fetch_page_data',
+    description:
+      '只读：按业务域拉取商家 ERP 页面实数摘要（评价/线索/投流/订单/商品/活动/GEO/竞品/报税参考/经营对账）。禁止用于创建商品等写操作。',
+    parameters: {
+      type: 'object',
+      properties: {
+        domains: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: [
+              'metrics',
+              'reviews',
+              'leads',
+              'ads',
+              'orders',
+              'products',
+              'activities',
+              'geo',
+              'competitors',
+              'tax',
+            ],
+          },
+          description: '要拉取的数据域列表',
+        },
+      },
+      required: ['domains'],
+      additionalProperties: false,
+    },
+  },
 ]
 
 export function getAiAgentTool(name: string): AiAgentToolDef | undefined {
