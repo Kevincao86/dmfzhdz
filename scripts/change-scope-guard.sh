@@ -25,6 +25,7 @@ list_scopes() {
 
   group_qr          群二维码上传/展示/清理（不含探店视频/ICE/其它上传）
   recruit_video     探店成片上传
+  recruit_share_poster_ai  招募创建成功分享页 AI 海报生图（星选+撮合）
   video_review_play 链接/视频审核预览（ICE短链误判 + OSS签名过期）
   ops_pr_library    运营台 PR 用户库
   ops_talent_library 运营台达人库
@@ -115,6 +116,14 @@ PAT
 recruitmentVideoUpload
 recruitment-video-upload
 meoo-ops-mp-recruitment-video-upload
+PAT
+      ;;
+    recruit_share_poster_ai)
+      cat <<'PAT'
+mpRecruitSharePosterAi
+灵祺达人撮合小程序/pages/publish/publish
+灵祺星选小程序抖音版/灵祺星选/pages/publish/publish
+change-scope-guard
 PAT
       ;;
     video_review_play)
