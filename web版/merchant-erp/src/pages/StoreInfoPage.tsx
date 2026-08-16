@@ -37,7 +37,8 @@ const REGION_HINTS = [
 
 export default function StoreInfoPage() {
   const [tab, setTab] = useState<StorePlatformTab>('douyin')
-  const [relationType, setRelationType] = useState<'0' | '1' | '2' | 'all'>('0')
+  /** 默认「全部」：抖音 shop.query 的认领(0)/关联(1)/挂靠(2) 常拆分，仅选认领会漏店（如来客 9 家只出 6 家） */
+  const [relationType, setRelationType] = useState<'0' | '1' | '2' | 'all'>('all')
   const [keyword, setKeyword] = useState('')
   const [debouncedKw, setDebouncedKw] = useState('')
   const [provinceCity, setProvinceCity] = useState('')
@@ -186,11 +187,12 @@ export default function StoreInfoPage() {
                 value={relationType}
                 onChange={(e) => setRelationType(e.target.value as typeof relationType)}
                 className="min-w-[140px] rounded-lg border border-gray-200 bg-white py-2 pl-3 pr-8 text-sm outline-none focus:border-blue-500"
+                title="抖音 OpenAPI 将门店拆为认领/关联/挂靠；来客后台门店数通常对应「全部」合并结果"
               >
-                <option value="0">认领</option>
-                <option value="1">关联</option>
-                <option value="2">挂靠</option>
                 <option value="all">全部（合并去重）</option>
+                <option value="0">仅认领</option>
+                <option value="1">仅关联</option>
+                <option value="2">仅挂靠</option>
               </select>
             </div>
           )}
