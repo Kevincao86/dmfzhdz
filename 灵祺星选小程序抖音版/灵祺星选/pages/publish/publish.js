@@ -620,6 +620,24 @@ Page({
       wx.showToast({ title: msg.slice(0, 28) || '上传失败', icon: 'none' })
     }
   },
+  onPreviewCoverImage() {
+    const url = String(this.data.coverPreviewUrl || '').trim()
+    if (!url) return
+    const open = (src) => wx.previewImage({ urls: [src], current: src })
+    const m = url.match(/^data:image\/(\w+);base64,(.+)$/i)
+    if (!m) {
+      open(url)
+      return
+    }
+    const dest = `${wx.env.USER_DATA_PATH}/cover-preview-${Date.now()}.${m[1] === 'png' ? 'png' : 'jpg'}`
+    wx.getFileSystemManager().writeFile({
+      filePath: dest,
+      data: m[2],
+      encoding: 'base64',
+      success: () => open(dest),
+      fail: () => open(url),
+    })
+  },
   openCoverGallery() {
     const f = this.data.form || {}
     const tab = 'recommended'
