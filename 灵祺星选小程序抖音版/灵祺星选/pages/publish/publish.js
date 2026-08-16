@@ -265,7 +265,8 @@ Page({
     posterAiRefDataUrl: '',
     posterAiBusy: false,
     posterAiPoints: posterAi.POSTER_POINTS,
-    posterPreviewUrl: '',
+    coverAiOpen: false,
+    coverAiGenerated: false,
     formHeadStyle: '',
     heroHeadStyle: '',
     scrollIntoView: '',
@@ -597,7 +598,7 @@ Page({
     let hint = '未选择时将使用对应平台默认封面'
     if (String(f.coverImage || '').trim()) {
       preview = f.coverImage
-      hint = '已上传自定义封面'
+      hint = this.data.coverAiGenerated ? '已用 AI 生成封面' : '已上传自定义封面'
     } else if (String(f.coverLibraryId || '').trim()) {
       const hit = recruitCoverLib.findCoverById(f.coverLibraryId)
       preview = hit ? hit.url : ''
@@ -611,7 +612,7 @@ Page({
   async onCoverUpload() {
     try {
       const dataUrl = await recruitCoverImage.chooseCoverImageDataUrl()
-      this.setData({ 'form.coverImage': dataUrl, 'form.coverLibraryId': '' })
+      this.setData({ 'form.coverImage': dataUrl, 'form.coverLibraryId': '', coverAiGenerated: false })
       this.syncCoverPreview()
     } catch (e) {
       const msg = String((e && e.message) || e || '')
@@ -678,7 +679,7 @@ Page({
     const id = e.currentTarget.dataset.id
     if (!id) return
     this.setData(
-      { 'form.coverImage': '', 'form.coverLibraryId': id, pickerView: '', scrollIntoView: 'field-cover' },
+      { 'form.coverImage': '', 'form.coverLibraryId': id, coverAiGenerated: false, pickerView: '', scrollIntoView: 'field-cover' },
       () => {
         this.syncCoverPreview()
         this.syncTabBarOverlay()
@@ -686,7 +687,7 @@ Page({
     )
   },
   onCoverClear() {
-    this.setData({ 'form.coverImage': '', 'form.coverLibraryId': '' })
+    this.setData({ 'form.coverImage': '', 'form.coverLibraryId': '', coverAiGenerated: false })
     this.syncCoverPreview()
   },
   refreshLinkeClients() {
@@ -961,7 +962,8 @@ Page({
       posterAiRefPreview: '',
       posterAiRefDataUrl: '',
       posterAiBusy: false,
-      posterPreviewUrl: '',
+      coverAiOpen: false,
+      coverAiGenerated: false,
     })
     this.syncDisplayFields()
     this.syncTabBarOverlay()
@@ -1889,20 +1891,8 @@ Page({
       const shareTitle = shareCopy.buildShareTitle(order)
       const prProfile = userProfile.readPrProfile()
       const groupCopyText = await shareCopy.buildGroupCopyTextAsync(order, prProfile)
-      const posterPreviewUrl = recruitCoverLib.resolveOrderCoverUrl(order)
-      this.setData({
-        step: 'done',
-        submitting: false,
-        createdOrder: order,
-        shareTitle,
-        groupCopyText,
-        posterAiPrompt: '',
-        posterAiRefPreview: '',
-        posterAiRefDataUrl: '',
-        posterAiBusy: false,
-        posterPreviewUrl,
-      })
-      recruitShareCover.preloadShareImageUrl(posterPreviewUrl)
+      this.setData({ step: 'done', submitting: false, createdOrder: order, shareTitle, groupCopyText })
+      recruitShareCover.preloadShareImageUrl(recruitCoverLib.resolveOrderCoverUrl(order))
     } catch (e) {
       wx.showToast({ title: String(e.message || e).slice(0, 28), icon: 'none' })
       this.setData({ submitting: false })
@@ -1929,6 +1919,9 @@ Page({
   onPosterAiPrompt(e) {
     this.setData({ posterAiPrompt: e.detail.value })
   },
+  onCoverAiToggle() {
+    this.setData({ coverAiOpen: !this.data.coverAiOpen })
+  },
   onPosterAiPickRef() {
     posterAi
       .pickReferenceImage()
@@ -1946,27 +1939,23 @@ Page({
   onPosterAiClearRef() {
     this.setData({ posterAiRefPreview: '', posterAiRefDataUrl: '' })
   },
-  onPosterAiPreview() {
-    const url = this.data.posterPreviewUrl
-    if (!url) return
-    wx.previewImage({ urls: [url], current: url })
-  },
-  async onPosterAiGenerate() {
-    const order = this.data.createdOrder
-    if (!order || this.data.posterAiBusy) return
+  async onCoverAiGenerate() {
+    if (this.data.posterAiBusy) return
+    const f = this.data.form || {}
     this.setData({ posterAiBusy: true })
     wx.showLoading({ title: 'AI 生图中', mask: true })
     try {
-      const r = await posterAi.generateSharePoster({
-        order,
+      const r = await posterAi.generateCoverImage({
+        title: f.title,
+        platform: f.platform,
+        region: this.buildRegionText(f),
         userText: this.data.posterAiPrompt,
         referenceImage: this.data.posterAiRefDataUrl,
       })
-      try {
-        await mpOrderRegistryOps.updateMpRecruitmentOrder(r.order)
-      } catch (_) {}
-      this.setData({ createdOrder: r.order, posterPreviewUrl: r.imageUrl })
-      recruitShareCover.preloadShareImageUrl(r.imageUrl)
+      this.setData(
+        { 'form.coverImage': r.imageUrl, 'form.coverLibraryId': '', coverAiGenerated: true },
+        () => this.syncCoverPreview(),
+      )
       wx.hideLoading()
       wx.showToast({ title: `已生成 · ${r.pointsCharged || posterAi.POSTER_POINTS}积分`, icon: 'success' })
     } catch (e) {
