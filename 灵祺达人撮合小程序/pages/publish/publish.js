@@ -14,6 +14,7 @@ const mpOrderRegistryOps = require('../../utils/mpOrderRegistryOps.js')
 const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
 const recruitShareCover = require('../../utils/recruitShareCover.js')
 const recruitCoverImage = require('../../utils/recruitCoverImage.js')
+const posterAi = require('../../utils/mpRecruitSharePosterAi.js')
 const recruitTarget = require('../../utils/recruitTarget.js')
 const userProfile = require('../../utils/userProfile.js')
 const auth = require('../../utils/auth.js')
@@ -262,6 +263,12 @@ Page({
     createdOrder: null,
     shareTitle: '',
     groupCopyText: '',
+    posterAiPrompt: '',
+    posterAiRefPreview: '',
+    posterAiRefDataUrl: '',
+    posterAiBusy: false,
+    posterAiPoints: posterAi.POSTER_POINTS,
+    posterPreviewUrl: '',
     formHeadStyle: '',
     heroHeadStyle: '',
     scrollIntoView: '',
@@ -957,6 +964,11 @@ Page({
       feeTypeLabel: '请选择',
       feePlaceholder: true,
       createdOrder: null,
+      posterAiPrompt: '',
+      posterAiRefPreview: '',
+      posterAiRefDataUrl: '',
+      posterAiBusy: false,
+      posterPreviewUrl: '',
     })
     this.syncDisplayFields()
     this.syncTabBarOverlay()
@@ -1921,8 +1933,20 @@ Page({
       const shareTitle = shareCopy.buildShareTitle(order)
       const prProfile = userProfile.readPrProfile()
       const groupCopyText = await shareCopy.buildGroupCopyTextAsync(order, prProfile)
-      this.setData({ step: 'done', submitting: false, createdOrder: order, shareTitle, groupCopyText })
-      recruitShareCover.preloadShareImageUrl(recruitCoverLib.resolveOrderCoverUrl(order))
+      const posterPreviewUrl = recruitCoverLib.resolveOrderCoverUrl(order)
+      this.setData({
+        step: 'done',
+        submitting: false,
+        createdOrder: order,
+        shareTitle,
+        groupCopyText,
+        posterAiPrompt: '',
+        posterAiRefPreview: '',
+        posterAiRefDataUrl: '',
+        posterAiBusy: false,
+        posterPreviewUrl,
+      })
+      recruitShareCover.preloadShareImageUrl(posterPreviewUrl)
     } catch (e) {
       wx.showToast({ title: String(e.message || e).slice(0, 28), icon: 'none' })
       this.setData({ submitting: false })
@@ -1944,6 +1968,61 @@ Page({
       await this.submitPublishOrder()
     } catch (_) {
       /* submitPublishOrder 已 toast */
+    }
+  },
+  onPosterAiPrompt(e) {
+    this.setData({ posterAiPrompt: e.detail.value })
+  },
+  onPosterAiPickRef() {
+    posterAi
+      .pickReferenceImage()
+      .then((picked) => {
+        this.setData({
+          posterAiRefPreview: picked.path,
+          posterAiRefDataUrl: picked.dataUrl,
+        })
+      })
+      .catch((e) => {
+        const msg = String((e && e.message) || e || '')
+        if (msg !== 'cancel') wx.showToast({ title: msg.slice(0, 28), icon: 'none' })
+      })
+  },
+  onPosterAiClearRef() {
+    this.setData({ posterAiRefPreview: '', posterAiRefDataUrl: '' })
+  },
+  onPosterAiPreview() {
+    const url = this.data.posterPreviewUrl
+    if (!url) return
+    wx.previewImage({ urls: [url], current: url })
+  },
+  async onPosterAiGenerate() {
+    const order = this.data.createdOrder
+    if (!order || this.data.posterAiBusy) return
+    this.setData({ posterAiBusy: true })
+    wx.showLoading({ title: 'AI 生图中', mask: true })
+    try {
+      const r = await posterAi.generateSharePoster({
+        order,
+        userText: this.data.posterAiPrompt,
+        referenceImage: this.data.posterAiRefDataUrl,
+      })
+      try {
+        await mpOrderRegistryOps.updateMpRecruitmentOrder(r.order)
+      } catch (_) {}
+      this.setData({ createdOrder: r.order, posterPreviewUrl: r.imageUrl })
+      recruitShareCover.preloadShareImageUrl(r.imageUrl)
+      wx.hideLoading()
+      wx.showToast({ title: `已生成 · ${r.pointsCharged || posterAi.POSTER_POINTS}积分`, icon: 'success' })
+    } catch (e) {
+      wx.hideLoading()
+      const action = posterAi.affordActionFromError(e)
+      if (action === 'recharge' || action === 'membership') {
+        posterAi.openRecharge()
+      } else {
+        wx.showToast({ title: String((e && e.message) || e).slice(0, 36), icon: 'none' })
+      }
+    } finally {
+      this.setData({ posterAiBusy: false })
     }
   },
   onShareAppMessage() {

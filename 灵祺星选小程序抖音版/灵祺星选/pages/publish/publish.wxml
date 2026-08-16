@@ -1088,16 +1088,28 @@
   <block wx:elif="{{step === 'done'}}">
     <view class="pub-screen pub-screen--done">
       <template is="pubLifeBg" />
-    <view class="pub-done-wrap">
+    <scroll-view class="pub-done-wrap" scroll-y enhanced show-scrollbar="{{false}}">
       <view class="pub-done">
         <view class="pub-done-icon">✓</view>
         <text class="pub-done-title">招募已创建</text>
         <text class="pub-done-sub">{{createdOrder.title}}</text>
+        <view class="pub-poster-ai">
+          <text class="pub-poster-ai-title">分享页海报</text>
+          <text class="pub-poster-ai-hint">文字、要求和参考图均可选填 · 生成后作为微信分享封面 · {{posterAiPoints}}积分/张</text>
+          <image wx:if="{{posterPreviewUrl}}" class="pub-poster-ai-preview" src="{{posterPreviewUrl}}" mode="aspectFill" bindtap="onPosterAiPreview" />
+          <textarea class="pub-textarea pub-poster-ai-input" value="{{posterAiPrompt}}" maxlength="300" placeholder="选填：海报上的文字、风格或场景要求" bindinput="onPosterAiPrompt" />
+          <view class="pub-cover-actions">
+            <button class="pub-cover-btn" bindtap="onPosterAiPickRef">{{posterAiRefPreview ? '已选参考图' : '选填参考图'}}</button>
+            <button wx:if="{{posterAiRefPreview}}" class="pub-cover-btn pub-cover-btn--ghost" bindtap="onPosterAiClearRef">清除参考图</button>
+          </view>
+          <image wx:if="{{posterAiRefPreview}}" class="pub-poster-ai-ref" src="{{posterAiRefPreview}}" mode="aspectFill" bindtap="onPosterAiPickRef" />
+          <button class="btn-primary pub-poster-ai-btn" loading="{{posterAiBusy}}" disabled="{{posterAiBusy}}" bindtap="onPosterAiGenerate">AI生成海报 · {{posterAiPoints}}积分</button>
+        </view>
         <button class="btn-primary pub-done-btn" open-type="share">分享招募</button>
         <button class="btn-ghost pub-done-btn" bindtap="onCopyGroupShare">分享群聊（复制招募信息）</button>
         <button class="btn-secondary pub-done-btn" bindtap="onFinish">完成创建</button>
       </view>
-    </view>
+    </scroll-view>
     </view>
   </block>
 </view>
