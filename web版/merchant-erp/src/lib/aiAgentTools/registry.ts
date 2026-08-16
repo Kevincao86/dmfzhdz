@@ -99,7 +99,7 @@ export const AI_AGENT_TOOLS: AiAgentToolDef[] = [
   {
     name: 'fetch_page_data',
     description:
-      '只读：按业务域拉取商家 ERP 页面实数摘要（评价/线索/投流/订单/商品/活动/GEO/竞品/报税参考/经营对账）。禁止用于创建商品等写操作。',
+      '只读：按业务域拉取商家 ERP 页面实数摘要。数据问答时系统已注入实数，不要调用本工具。禁止用于创建商品等写操作。禁止把返回原文发给用户。',
     parameters: {
       type: 'object',
       properties: {

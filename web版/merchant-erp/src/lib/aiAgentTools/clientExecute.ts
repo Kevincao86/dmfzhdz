@@ -4,7 +4,10 @@ import { loadAgentPageDataContext } from '../agentPageDataLoaders'
 import { parseToolCallArguments } from './openaiTools'
 import type { AiAgentClientToolResult, AiAgentToolCall } from './types'
 
-async function executeOne(call: AiAgentToolCall): Promise<AiAgentClientToolResult> {
+async function executeOne(
+  call: AiAgentToolCall,
+  opts?: { userText?: string },
+): Promise<AiAgentClientToolResult> {
   const tool = String(call.function?.name || '').trim()
   const args = parseToolCallArguments(call.function?.arguments)
 
@@ -14,12 +17,15 @@ async function executeOne(call: AiAgentToolCall): Promise<AiAgentClientToolResul
     if (!domains.length) {
       return { call, tool, ok: false, message: '请指定有效 domains（如 reviews、leads、metrics）' }
     }
-    const text = await loadAgentPageDataContext(domains, '')
+    const text = await loadAgentPageDataContext(domains, opts?.userText || '')
+    const timedOut = /拉取超时/.test(text)
     return {
       call,
       tool,
-      ok: true,
-      message: text || '未拉到数据',
+      ok: !timedOut,
+      message: timedOut
+        ? '经营数据拉取较慢未完成，正在根据已有情报汇总…'
+        : '经营数据已拉取，正在汇总…',
       data: { domains, digest: text },
     }
   }
@@ -128,13 +134,13 @@ async function executeOne(call: AiAgentToolCall): Promise<AiAgentClientToolResul
 
 export async function executeAiAgentToolCalls(
   calls: AiAgentToolCall[],
-  opts?: { signal?: AbortSignal },
+  opts?: { signal?: AbortSignal; userText?: string },
 ): Promise<AiAgentClientToolResult[]> {
   const out: AiAgentClientToolResult[] = []
   for (const call of calls) {
     if (opts?.signal?.aborted) break
     try {
-      out.push(await executeOne(call))
+      out.push(await executeOne(call, { userText: opts?.userText }))
     } catch (e) {
       out.push({
         call,

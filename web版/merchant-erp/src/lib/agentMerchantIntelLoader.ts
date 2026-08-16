@@ -457,7 +457,7 @@ export async function buildAgentMerchantIntelContextAsync(
       const pageBlock = await loadAgentPageDataContext(domains, '')
       if (pageBlock.trim()) text = `${text}\n\n${pageBlock}`
     } catch {
-      text = `${text}\n\n【已拉取业务页实数】场景附带拉数失败，请据绑定说明告知缺口，禁止编造。`
+      text = `${text}\n\n【已拉取业务页实数】场景附带拉数失败。请用中文说明缺口并尽量作答，禁止拒答。`
     }
   }
   return text
