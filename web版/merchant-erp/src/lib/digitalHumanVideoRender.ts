@@ -304,6 +304,12 @@ function assertSegmentBlob(blob: Blob, index: number): void {
 function sanitizeDhRenderPipelineError(raw: string, fallback: string): string {
   const t = String(raw || '').trim()
   if (!t) return fallback
+  if (/50400|Access\s*Denied/i.test(t)) {
+    return (
+      `${fallback}：火山即梦 OmniHuman Access Denied（账号未开通该能力、AK 无权限或余额不足）。` +
+      '请到火山控制台开通「即梦 AI · OmniHuman 1.5」，确认轻量 MERCHANT_AI_VOLC_* 对应密钥有权，并有可用余额后重试。'
+    )
+  }
   if (/frame=\s*0|Lsize=\s*0kB|video:0kB|size=\s*0kB/i.test(t)) {
     return `${fallback}：编码结果为空（0 帧）。常见原因是混音失败、字幕/运镜后处理失败或某段视频损坏，请重试；仍失败可先关闭字幕后再生成。`
   }
@@ -549,7 +555,10 @@ async function renderWithOmniHuman(
     if (!job.ok) {
       return {
         ok: false,
-        message: `第 ${i + 1}/${segmentTotal} 段 OmniHuman 生成失败：${job.message}`,
+        message: sanitizeDhRenderPipelineError(
+          job.message,
+          `第 ${i + 1}/${segmentTotal} 段 OmniHuman 生成失败`,
+        ),
       }
     }
 
