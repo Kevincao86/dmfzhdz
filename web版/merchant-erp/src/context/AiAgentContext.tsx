@@ -1494,6 +1494,21 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           return next
         })
 
+        const dataDomains = detectAgentDataQueryDomains(trimmed)
+        const pullingMetrics =
+          dataDomains.includes('metrics') || isBusinessMetricsQuery(trimmed)
+        if (pullingMetrics) {
+          setMessages((prev) => {
+            const next = prev.map((m) =>
+              m.id === placeholder.id
+                ? { ...m, content: '正在拉取财务对账数据，随后直接汇总…' }
+                : m,
+            )
+            messagesRef.current = next
+            return next
+          })
+        }
+
         const merchantCtx = await resolveMerchantIntelBlock(taskType, trimmed)
         const history: AIMessage[] = [
           { role: 'system', content: merchantCtx },
