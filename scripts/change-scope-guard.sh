@@ -67,6 +67,7 @@ list_scopes() {
   map_providers          商家 ERP：地图主副（高德优先 / 百度兜底）竞品+选址
   ops_site_selection     商家 ERP：运营「选址参考」+ 竞品近7日人流热度
   partner_linke_auth     服务商版：林客邀请授权链接拼装/客户商家开通
+  douyin_spi_acceptance  抖音到综团购联调：SPI 过审桩 meoo-douyin-spi
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -819,6 +820,13 @@ PartnerClientsSection
 douyinPartnerBindGuideConfig
 partnerLinkeOnboardClient
 meoo-partner-linke-onboard
+change-scope-guard
+PAT
+      ;;
+    douyin_spi_acceptance)
+      cat <<'PAT'
+meoo-douyin-spi
+ecs-auth-api-server
 change-scope-guard
 PAT
       ;;

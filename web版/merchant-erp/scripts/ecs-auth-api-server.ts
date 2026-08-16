@@ -50,6 +50,7 @@ import partnerSalespersonsHandler from '../api/meoo-partner-salespersons.ts'
 import partnerDistributionStatsHandler from '../api/meoo-partner-distribution-stats.ts'
 import partnerSalespersonPortalHandler from '../api/meoo-partner-salesperson-portal.ts'
 import douyinLifeWebhookHandler from '../api/meoo-douyin-life-webhook.ts'
+import douyinSpiHandler from '../api/meoo-douyin-spi.ts'
 import opsSyncRegistryGetHandler from '../api/meoo-ops-registry-ops-get.ts'
 import merchantOpsSyncRegistryGetHandler from '../api/meoo-ops-sync-registry.ts'
 import opsSyncVendorKeysHandler from '../api/meoo-ops-sync-vendor-keys.ts'
@@ -263,6 +264,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-partner-distribution-stats': partnerDistributionStatsHandler as VercelLikeHandler,
   '/api/meoo-partner-salesperson-portal': partnerSalespersonPortalHandler as VercelLikeHandler,
   '/api/meoo-douyin-life-webhook': douyinLifeWebhookHandler as VercelLikeHandler,
+  '/api/meoo-douyin-spi': douyinSpiHandler as VercelLikeHandler,
   /** 运营台注册表：Vercel 无法出站访问 ECS Supabase，由浏览器经 /erp-api 直连本机 */
   // 商家壳 / Bridge：租户裁剪 + ?slice=ai 瘦身（勿挂 ops 全量 get）
   '/api/meoo-ops-sync-registry': merchantOpsSyncRegistryGetHandler as VercelLikeHandler,
