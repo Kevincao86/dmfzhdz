@@ -691,7 +691,9 @@
           <view class="pub-field" id="field-cover">
             <text class="pub-label">招募单封面图（选填）</text>
             <text class="pub-cover-hint">{{coverSourceHint}}</text>
-            <image wx:if="{{coverPreviewUrl}}" class="pub-cover-preview" src="{{coverPreviewUrl}}" mode="aspectFill" bindtap="onPreviewCoverImage" />
+            <view wx:if="{{coverPreviewUrl}}" class="pub-cover-preview-wrap" bindtap="onPreviewCoverImage">
+              <image class="pub-cover-preview" src="{{coverPreviewUrl}}" mode="aspectFill" />
+            </view>
             <view class="pub-cover-actions">
               <button class="pub-cover-btn" bindtap="onCoverUpload">上传图片</button>
               <button class="pub-cover-btn" bindtap="openCoverGallery">从图库选择</button>

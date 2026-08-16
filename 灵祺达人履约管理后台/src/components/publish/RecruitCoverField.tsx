@@ -200,7 +200,7 @@ export default function RecruitCoverField({
             title="点击查看大图"
             onClick={() => setLightboxOpen(true)}
           >
-            <img src={preview} alt="招募封面预览" className="h-36 w-full rounded-lg object-cover" />
+            <img src={preview} alt="招募封面预览" className="aspect-[5/4] w-full rounded-lg object-cover" />
           </button>
         ) : null}
         {aiOpen ? (
@@ -270,7 +270,7 @@ export default function RecruitCoverField({
           <img
             src={preview}
             alt="招募封面大图"
-            className="max-h-[90vh] max-w-[min(90vw,720px)] rounded-lg object-contain shadow-2xl"
+            className="max-h-[90vh] w-full max-w-[min(90vw,640px)] rounded-lg object-contain shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           />
         </div>

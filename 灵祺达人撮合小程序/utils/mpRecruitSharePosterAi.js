@@ -23,8 +23,8 @@ function buildPrompt(ctx, userText) {
   const region = String(o.region || '').trim()
   const user = String(userText || '').trim()
   const lines = [
-    '竖版 3:4 探店招募分享海报，生活服务商业摄影质感，画面干净、光影自然，适合微信分享卡片。',
-    '不要出现二维码、水印、小字堆砌、变形人脸、乱码文字。',
+    '横版 5:4 微信小程序分享封面（宽:高=5:4，约 1280×1024），生活服务商业摄影质感，画面干净、光影自然。',
+    '不要做成竖版海报、9:16 长图或上下留白；构图按横版卡片铺满，主视觉居中。',
     title ? `招募主题：${title}` : '',
     platform ? `投放平台氛围：${platform}` : '',
     region ? `城市场景：${region}` : '',
@@ -128,8 +128,9 @@ async function postAgentImage(prompt, referenceImage) {
   const body = {
     prompt: String(prompt || '').trim(),
     exact_prompt: true,
-    prefer_wanx_poster: true,
-    aspect_ratio: '3:4',
+    prefer_wanx_poster: false,
+    aspect_ratio: '4:3',
+    wanx_size: '1280*1024',
     preferred_vendor: 'qwen',
   }
   const ref = String(referenceImage || '').trim()
