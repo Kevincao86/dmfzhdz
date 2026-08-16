@@ -146,7 +146,7 @@ function unwrapVolcResult(j: Record<string, unknown>): {
       : result && typeof result === 'object'
         ? result
         : {}
-  const codeRaw = result?.code ?? result?.status ?? j.code
+  const codeRaw = result?.code ?? result?.status ?? j.code ?? metaErr?.Code
   const code =
     typeof codeRaw === 'string' || typeof codeRaw === 'number' ? codeRaw : undefined
   const message =
@@ -155,6 +155,30 @@ function unwrapVolcResult(j: Record<string, unknown>): {
     (typeof metaErr?.Message === 'string' && metaErr.Message) ||
     ''
   return { code, message, data, httpOkHint: !metaErr }
+}
+
+/** 将火山 50400 / Access Denied 等转为可执行说明（避免只显示英文拒答） */
+export function humanizeOmniHumanVolcError(raw: string): string {
+  const msg = String(raw || '').trim()
+  if (!msg) return 'OmniHuman 提交失败'
+  if (/50400|Access\s*Denied/i.test(msg)) {
+    return (
+      '火山即梦 OmniHuman 返回 Access Denied（50400）：当前轻量 AK/SK 无权调用「OmniHuman 1.5 视频生成」。' +
+      '请到火山控制台开通/续期「即梦 AI · OmniHuman 1.5」，确认该 Access Key 具备智能视觉(cv)权限且账户有余额；' +
+      '若换了新 AK/SK，写入轻量 auth-api.env 的 MERCHANT_AI_VOLC_ACCESS_KEY / MERCHANT_AI_VOLC_SECRET_KEY 后重启 meoo-auth-api。' +
+      `（原始：${msg.slice(0, 160)}）`
+    )
+  }
+  if (/concurrent|50430|try later|限流|频率/i.test(msg)) {
+    return `OmniHuman 限流，请稍后重试（${msg.slice(0, 120)}）`
+  }
+  if (/not supported|req_key/i.test(msg)) {
+    return (
+      'OmniHuman 接口或 req_key 不被当前账号支持，请确认已开通即梦 OmniHuman 1.5 公测/正式版。' +
+      `（原始：${msg.slice(0, 160)}）`
+    )
+  }
+  return msg
 }
 
 async function postVolcVisual(
@@ -197,7 +221,7 @@ async function postVolcVisual(
     codeNum !== 10000 &&
     String(unwrapped.code).toLowerCase() !== 'success'
   if (!res.ok || businessFail) {
-    const msg = unwrapped.message || `火山视觉 HTTP ${res.status}`
+    const msg = humanizeOmniHumanVolcError(unwrapped.message || `火山视觉 HTTP ${res.status}`)
     return { ok: false, message: msg, status: res.status }
   }
   return { ok: true, json: j }
@@ -304,7 +328,11 @@ export async function volcSubmitOmniHumanTask(
     if (!r.ok) {
       errors.push(`${attempt.action}/${attempt.reqKey}: ${r.message}`)
       if (/concurrent|50430|try later|限流|频率/i.test(r.message)) {
-        return { ok: false, message: `OmniHuman 限流，请稍后重试（${r.message}）` }
+        return { ok: false, message: humanizeOmniHumanVolcError(r.message) }
+      }
+      if (/50400|Access\s*Denied/i.test(r.message)) {
+        // 权限类错误换 Action 也不会通，直接返回可读说明
+        return { ok: false, message: humanizeOmniHumanVolcError(r.message) }
       }
       continue
     }
@@ -321,9 +349,10 @@ export async function volcSubmitOmniHumanTask(
   }
   return {
     ok: false,
-    message:
+    message: humanizeOmniHumanVolcError(
       errors[0] ||
-      'OmniHuman 提交失败：账号可能未开通即梦 OmniHuman 1.5，请到火山控制台开通后重试',
+        'OmniHuman 提交失败：账号可能未开通即梦 OmniHuman 1.5，请到火山控制台开通后重试',
+    ),
   }
 }
 
@@ -357,7 +386,7 @@ export async function volcGetOmniHumanTaskOnce(
       task_id: decoded.taskId,
     })
     if (!r.ok) {
-      lastFail = r.message
+      lastFail = humanizeOmniHumanVolcError(r.message)
       continue
     }
     const status = extractStatus(r.json)
@@ -367,7 +396,11 @@ export async function volcGetOmniHumanTaskOnce(
     }
     if (/fail|error|cancel/i.test(status)) {
       const { message } = unwrapVolcResult(r.json)
-      return { phase: 'failed', statusLabel: status || 'FAILED', failReason: message || status }
+      return {
+        phase: 'failed',
+        statusLabel: status || 'FAILED',
+        failReason: humanizeOmniHumanVolcError(message || status),
+      }
     }
     if (/queue|pending|waiting|submit|in_queue/i.test(status)) {
       return { phase: 'queued', statusLabel: status || 'QUEUED' }
