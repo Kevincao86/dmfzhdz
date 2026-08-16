@@ -25,7 +25,7 @@ import {
   YAxis,
 } from 'recharts'
 import { cn } from '../cn'
-import { readStorePlatformMargins, readStoreMarginConfig, type StorePlatformMargins } from '../lib/storeMarginsRead'
+import { readStorePlatformMargins, type StorePlatformMargins } from '../lib/storeMarginsRead'
 import {
   fetchFinanceReconcile,
   type FinancePlatformId,
