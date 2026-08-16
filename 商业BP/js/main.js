@@ -3,7 +3,7 @@
  */
 (function () {
   const PITCH =
-    '我们是商户的 AI 经营操作系统，并用可验证履约网络锁住达人合作数据与结算依据。'
+    '我们是本地生活商户的 AI 经营操作系统，并用可验证达人履约网络锁住合作数据与结算依据——不是通告墙，也不是高客单代运营人力公司。'
 
   const SECTIONS = [
     'hero', 'market', 'solution', 'product', 'business', 'region', 'fund', 'team',
@@ -11,31 +11,31 @@
   /* milestones 在 goals 与 hero 之间，不单独占 rail */
 
   const TL_TEXT = {
-    q1: 'M1–M3：主链路打通，3→500 店，标杆案例沉淀',
-    q3: 'M4–M6：服务商导入，冲刺 6,000 店落地',
-    q4: 'M7–M12：销售扩招，6,000→20,000 店，MRR ≥1,000 万',
-    y2: 'M13–M24：长三角复制，20,000→100,000 店，MRR ≥5,000 万',
+    q1: 'M1–M3：主链路打通，标杆案例沉淀；付费门店 Base 约 30–80',
+    q3: 'M4–M6：服务商导入 ≥3 家，冲刺 Base 200–500 店',
+    q4: 'M7–M12：杭甬温密度成型，Base 1,500–3,000 店，MRR ≥100 万',
+    y2: 'M13–M24：浙江溢出 + Pre-A 数据包，Base 8,000–15,000 店，MRR ≥500 万',
   }
 
   const MILESTONE_DETAIL = {
     m3: {
       title: 'M3 · 平台与 SaaS 主链路打通',
-      biz: '商家 ERP、达人小程序、服务商版与 /erp-api 一体化；灰测能力产品化上线。',
+      biz: '商家 ERP、达人小程序、服务商版与 /erp-api 一体化；灰测能力产品化；Base 付费约 30–80 家。',
       fund: '资金投向 ¥220 万 — 研发核心系统',
     },
     m6: {
-      title: 'M6 · 运营标准化 + 6,000 家门店落地',
-      biz: '交付 SOP、服务商批量导入、达人供给与履约协同跑通。',
+      title: 'M6 · 运营标准化 + Base 200–500 家门店',
+      biz: '交付 SOP、≥3 家服务商导入、达人供给与履约协同跑通；月留存可披露。',
       fund: '资金投向 ¥150 万 — 交付团队建设与运营支持',
     },
     m12: {
-      title: 'M12 · 2 万付费门店 · MRR 突破 1,000 万',
-      biz: '销售团队扩招、连锁/协会渠道、杭甬温饱和后浙江溢出。',
+      title: 'M12 · Base 1,500–3,000 付费门店 · MRR ≥100 万',
+      biz: '杭甬温密度成型；订阅+履约 ARPU 稳定；渠道超预期时再谈 Stretch。',
       fund: '资金投向 ¥80 万 — 市场渠道拓展与销售团队扩招',
     },
     m24: {
-      title: 'M24 · 10 万付费门店 · MRR 突破 5,000 万',
-      biz: '长三角多城复制、开放平台筹备、规模效应显现。',
+      title: 'M24 · Base 8,000–15,000 付费门店 · MRR ≥500 万',
+      biz: '浙江溢出、开放平台筹备、单位经济可复制后谈下一城。',
       fund: '资金投向 ¥50 万 — 长期运营服务费与风险储备金',
     },
   }
@@ -189,7 +189,7 @@
   /* ── Chart play buttons ── */
   const PLAY_LABEL = '▶ 播放增长动画'
   const PLAYING_LABEL = '⟳ 播放中…'
-  const MARKET_MAX = 4500
+  const MARKET_MAX = 1952
 
   /* ── Market growth curve (SVG) ── */
   function buildMarketCurvePaths() {
@@ -469,7 +469,7 @@
   }
 
   /* ── Finance curve + bars ── */
-  const FIN_MAX = 60000
+  const FIN_MAX = 6000
 
   function buildFinCurvePath() {
     const path = $('#fin-curve-path')
