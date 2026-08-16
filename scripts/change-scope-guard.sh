@@ -56,6 +56,7 @@ list_scopes() {
   jianying_local       Cursor 本地剪映 skill + 安装脚本（不含 ERP / CapCut 国际版）
   merchant_registry_bootstrap 商家壳注册表瘦身（OpsRegistryBridge slice=ai，缓解 cs/fws/dr 卡顿）
   shop_analysis          商家 ERP：店铺分析（图表/门店筛选/经营建议/逐单 POI）
+  merchant_store_info    商家 ERP：店铺信息门店列表（账户门店关系默认全量）
   edition_cs_sync        各端前端对齐 CS（DR/FWS/Admin 同源功能与积分经济）
   ai_agent_quick_image   商家 ERP：AI 智能体快捷任务平铺 + 生图意图自动切模型
   merchant_ai_agent_tax  商家 ERP：AI智能体意图/工具门禁 + 近三月日期 + 一键报税佣金（含构建类型补齐）
@@ -716,6 +717,15 @@ merchant_platform_orders_poi
 ecs-auth-api-server
 erpAiPointsSpendCore
 erpAiApiPointsGate
+change-scope-guard
+PAT
+      ;;
+    merchant_store_info)
+      cat <<'PAT'
+StoreInfoPage
+merchantStoresApi
+douyinMerchantApi
+douyinMerchantGateway
 change-scope-guard
 PAT
       ;;
