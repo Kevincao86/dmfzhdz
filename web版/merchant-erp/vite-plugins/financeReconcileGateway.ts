@@ -260,9 +260,17 @@ export async function handleFinanceReconcileGet(
     rows.push(...pack.rows)
   }
 
+  const inRange = rows.filter((r) => {
+    const d = String((r as { date?: unknown }).date || '')
+      .trim()
+      .slice(0, 10)
+      .replace(/\//g, '-')
+    return d >= startYmd && d <= endYmd
+  })
+
   json(res, 200, {
     ok: true,
-    rows,
+    rows: inRange,
     startDate: startYmd,
     endDate: endYmd,
     fetchedAt: new Date().toISOString(),

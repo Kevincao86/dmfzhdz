@@ -727,6 +727,8 @@ shopAnalysisAiPoints
 meoo-shop-analysis-summary
 meoo-shop-analysis-ai
 meoo-merchant-orders
+FinancePages
+financeReconcile
 douyinMerchantGateway
 merchant_platform_orders_poi
 ecs-auth-api-server
