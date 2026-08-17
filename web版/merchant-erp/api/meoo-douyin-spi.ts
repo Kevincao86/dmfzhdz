@@ -340,7 +340,11 @@ function spiJson(res: VercelResponse, logid: string, out: Record<string, unknown
 }
 
 function issueCode(orderId: string, index1: number): string {
-  return `MEOO${String(orderId).slice(-8)}${index1}`.replace(/\W/g, '').slice(0, 24)
+  const d = String(orderId).replace(/\D/g, '').padStart(11, '0')
+  const core = d.slice(-11)
+  const idx = String(Math.max(0, Math.min(9, index1 - 1)))
+  const code = `${core}${idx}`.replace(/^0+/, '') || '1'
+  return code.padStart(12, '1').slice(0, 15)
 }
 
 function codesFromIssueData(data: Record<string, unknown>, orderId?: string): string[] {
@@ -363,10 +367,12 @@ function codesFromIssueData(data: Record<string, unknown>, orderId?: string): st
 
 function codesForHit(h: SpiHit): string[] {
   if (h.codes && h.codes.length) return h.codes
-  if (h.orderId && isIssueAction(h.action) && /(?:^|;)result=1(?:;|$)/.test(h.responseSummary || '')) {
-    return [issueCode(h.orderId, 1)]
-  }
-  return []
+  const m = String(h.responseSummary || '').match(/codes=([^;]+)/)
+  if (!m) return []
+  return m[1]
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
 }
 
 function isIssueAction(action: string): boolean {
@@ -428,7 +434,7 @@ function panelHtml(state: SpiState, latestIssueLogid: string, latestPrecreateLog
         <span id="copied" class="copyok" hidden>已复制</span>
       </div>
       <div class="muted" style="margin-top:8px">预下单 logid：<span id="latestPre" class="mono">${preLogid || '—'}</span></div>
-      <div class="muted" style="margin-top:10px">三方券码（来客「团购券处理」输入框填这个，不是抖音那串 12***** 码）</div>
+      <div class="muted" style="margin-top:10px">三方券码（12–15 位数字，来客「团购券处理」原样粘贴，不要加空格）</div>
       <div id="latestCodes" class="logid">—</div>
       <div class="row">
         <button type="button" class="pri" id="copyCodes">复制券码</button>
@@ -483,7 +489,7 @@ function panelHtml(state: SpiState, latestIssueLogid: string, latestPrecreateLog
         document.getElementById('latestIssue').textContent = (issueHit && issueHit.logid) || '（还没有发券请求，先切「发券超时」再去支付）';
         document.getElementById('latestPre').textContent = (preHit && preHit.logid) || '—';
         const codeHit = rows.find(h => Array.isArray(h.codes) && h.codes.length);
-        const codesText = codeHit ? codeHit.codes.join(' ') : '（发券同步成功后会出现 MEOO 开头的三方码）';
+        const codesText = codeHit ? codeHit.codes.join(' ') : '（发券同步成功后会出现 12–15 位数字券码）';
         document.getElementById('latestCodes').textContent = codesText;
         const st = j.state || {};
         const fail = Number(st.precreateFailCode || 0);
