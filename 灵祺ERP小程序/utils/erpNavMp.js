@@ -32,7 +32,7 @@ function navForTaskType(taskType) {
 function openTaskPage(taskType) {
   const url = navForTaskType(taskType)
   if (!url) return
-  if (url.includes('/pages/functions/') || url.includes('/pages/dashboard/') || url.includes('/pages/mine/')) {
+  if (url.includes('/pages/functions/') || url.includes('/pages/agent/') || url.includes('/pages/dashboard/') || url.includes('/pages/mine/')) {
     wx.switchTab({ url })
     return
   }

@@ -3,6 +3,7 @@ Component({
     selected: 0,
     list: [
       { pagePath: '/pages/functions/functions', text: '功能', icon: 'grid' },
+      { pagePath: '/pages/agent/agent', text: '灵祺助手', icon: 'ai' },
       { pagePath: '/pages/dashboard/dashboard', text: '经营概览', icon: 'chart' },
       { pagePath: '/pages/mine/mine', text: '我的', icon: 'user' },
     ],
