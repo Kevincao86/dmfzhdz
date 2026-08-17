@@ -304,38 +304,36 @@ function json(res: VercelResponse, status: number, body: unknown): void {
 }
 
 /**
- * 发券 SPI 官方回包（到综：字段必须全在 data 内）。
- * 同步发券超时 = 发码中：error_code=0（int64 数字）+ result=0 + 不回券码；8s 内返回。
- * 禁止把 error_code 写成字符串 "0"：联调按 int64 解析失败会记成 20（其他异常）或 210xxxx（参数不合法）。
+ * 到综 SPI 官方回包：字段必须全在 data 内，不要带 extra/BaseResp。
+ * 同步发券超时 = 发码中：error_code=0（数字）+ result=0 + 不回券码；8s 内返回。
+ * extra.error_code=0 时联调会把 HTTP 200 记成「网关错误码」（200 与限购撞号）。
+ * 禁止把 error_code 写成字符串 "0"：会记成 20 / 210xxxx。
  * 文档：https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/tripartite.code/create
  */
-function wrapSpiResponse(
-  out: Record<string, unknown>,
-  logid: string,
-): Record<string, unknown> {
+function wrapSpiResponse(out: Record<string, unknown>, _logid: string): Record<string, unknown> {
   const raw =
     out.data && typeof out.data === 'object' ? (out.data as Record<string, unknown>) : out
-  const data: Record<string, unknown> = { ...raw }
-  if (data.error_code != null) data.error_code = Number(data.error_code) || 0
-  if (data.result != null) data.result = Number(data.result)
-  const extra = {
-    error_code: 0,
-    description: 'success',
-    sub_error_code: 0,
-    sub_description: '',
-    logid: logid || '',
-    now: Math.floor(Date.now() / 1000),
+  const data: Record<string, unknown> = {
+    error_code: Number(raw.error_code) || 0,
+    description: raw.description == null || raw.description === '' ? 'success' : raw.description,
   }
-  return {
-    data,
-    extra,
+  if (raw.result != null) data.result = Number(raw.result)
+  for (const [k, v] of Object.entries(raw)) {
+    if (k === 'error_code' || k === 'description' || k === 'result') continue
+    data[k] = v
   }
+  return { data }
 }
 
 function spiJson(res: VercelResponse, logid: string, out: Record<string, unknown>): void {
+  const nodeRes = res as VercelResponse & { removeHeader?: (name: string) => void }
+  nodeRes.removeHeader?.('Access-Control-Allow-Origin')
+  nodeRes.removeHeader?.('Access-Control-Allow-Methods')
+  nodeRes.removeHeader?.('Access-Control-Allow-Headers')
   res.setHeader('Content-Type', 'application/json')
   res.setHeader('X-Bytedance-Logid', logid || '')
   res.setHeader('x-tt-logid', logid || '')
+  res.setHeader('X-Tt-Error-Code', '0')
   res.status(200).send(JSON.stringify(wrapSpiResponse(out, logid)))
 }
 
