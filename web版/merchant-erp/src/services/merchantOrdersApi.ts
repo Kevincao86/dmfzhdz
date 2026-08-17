@@ -108,27 +108,87 @@ async function fetchJson(path: string, init?: RequestInit): Promise<Record<strin
       }
       return j
     } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') throw e
+      if (e instanceof Error && e.name === 'AbortError') throw e
       last = e instanceof Error ? e.message : String(e)
     }
   }
   throw new Error(last)
 }
 
+function addCalendarDaysYmd(ymd: string, delta: number): string {
+  const ms = new Date(`${ymd}T12:00:00+08:00`).getTime() + delta * 86_400_000
+  return new Date(ms).toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
+}
+
+/** 浏览器一次只同步 3 天，避免整月/整周请求被网关断开后留下空洞 */
+export function eachShopSyncWeekChunks(startYmd: string, endYmd: string): { start: string; end: string }[] {
+  const out: { start: string; end: string }[] = []
+  let cur = startYmd
+  let guard = 0
+  while (cur <= endYmd && guard++ < 80) {
+    const chunkEnd = addCalendarDaysYmd(cur, 2)
+    const end = chunkEnd > endYmd ? endYmd : chunkEnd
+    out.push({ start: cur, end })
+    if (end >= endYmd) break
+    cur = addCalendarDaysYmd(end, 1)
+  }
+  return out
+}
+
+function abortAfter(ms: number): AbortSignal {
+  const c = new AbortController()
+  window.setTimeout(() => c.abort(), ms)
+  return c.signal
+}
+
 export async function syncMerchantOrders(params: {
   startDate: string
   endDate: string
+  onProgress?: (done: number, total: number) => void
 }): Promise<{ pulled: number; upserted: number; warnings: string[] }> {
   const headers = await authHeaders({ 'Content-Type': 'application/json' })
-  const j = await fetchJson('/api/meoo-merchant-orders-sync', {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(params),
-  })
-  return {
-    pulled: Number(j.pulled) || 0,
-    upserted: Number(j.upserted) || 0,
-    warnings: Array.isArray(j.warnings) ? (j.warnings as string[]) : [],
+  const weeks = eachShopSyncWeekChunks(params.startDate, params.endDate)
+  let pulled = 0
+  let upserted = 0
+  const warnings: string[] = []
+  let lastErr = ''
+  const syncOne = async (week: { start: string; end: string }) => {
+    const j = await fetchJson('/api/meoo-merchant-orders-sync', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ startDate: week.start, endDate: week.end }),
+      signal: abortAfter(180_000),
+    })
+    pulled += Number(j.pulled) || 0
+    upserted += Number(j.upserted) || 0
+    if (Array.isArray(j.warnings)) {
+      for (const w of j.warnings as string[]) {
+        if (w && !warnings.includes(w)) warnings.push(w)
+      }
+    }
   }
+  for (let i = 0; i < weeks.length; i++) {
+    const week = weeks[i]
+    params.onProgress?.(i + 1, weeks.length)
+    try {
+      await syncOne(week)
+    } catch {
+      try {
+        await syncOne(week)
+      } catch (e2) {
+        lastErr =
+          e2 instanceof Error
+            ? e2.name === 'AbortError'
+              ? `同步 ${week.start}~${week.end} 超时`
+              : e2.message
+            : String(e2)
+        if (!warnings.includes(lastErr)) warnings.push(lastErr)
+      }
+    }
+  }
+  if (upserted <= 0 && lastErr) throw new Error(lastErr)
+  return { pulled, upserted, warnings }
 }
 
 export async function listMerchantOrders(params: {

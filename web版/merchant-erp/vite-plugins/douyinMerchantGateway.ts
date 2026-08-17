@@ -6056,26 +6056,39 @@ function amountFenFromUnknown(v: unknown): number {
   return Math.floor(n)
 }
 
+function orderAmountInfo(order: Record<string, unknown>): Record<string, unknown> | null {
+  const info = order.amount_info
+  return info && typeof info === 'object' ? (info as Record<string, unknown>) : null
+}
+
+function amountFenFromAmountRow(row: Record<string, unknown>): number {
+  const receipt = amountFenFromUnknown(row.receipt_amount)
+  if (receipt > 0) return receipt
+  const pay = amountFenFromUnknown(row.pay_amount)
+  const discount =
+    amountFenFromUnknown(row.payment_discount) || amountFenFromUnknown(row.pay_discount_amount)
+  if (pay > 0) return pay + discount
+  return (
+    amountFenFromUnknown(row.original_amount) ||
+    amountFenFromUnknown(row.origin_amount) ||
+    amountFenFromUnknown(row.product_origin_amount)
+  )
+}
+
 /**
- * 对齐来客「成交/实收」：优先 receipt_amount（实收 = 用户实付 + 支付优惠）。
- * pay_amount 已对服务商下线，常为 0；子单只取 [0] 会漏套餐/多 SKU。
+ * 对齐来客「成交金额」：实收 = 用户实付 + 支付优惠（receipt_amount）。
+ * 外卖金额常在 amount_info；pay_amount 对服务商已下线，常为 0。
  */
 function orderPayAmountYuan(order: Record<string, unknown>): number {
-  let fen =
-    amountFenFromUnknown(order.receipt_amount) ||
-    amountFenFromUnknown(order.pay_amount) ||
-    amountFenFromUnknown(order.original_amount) ||
-    amountFenFromUnknown(order.origin_amount)
+  const info = orderAmountInfo(order)
+  let fen = amountFenFromAmountRow(order)
+  if (fen <= 0 && info) fen = amountFenFromAmountRow(info)
   if (fen <= 0) {
     const subs = order.sub_order_amount_infos
     if (Array.isArray(subs)) {
       for (const s of subs) {
         if (!s || typeof s !== 'object') continue
-        const row = s as Record<string, unknown>
-        fen +=
-          amountFenFromUnknown(row.receipt_amount) ||
-          amountFenFromUnknown(row.pay_amount) ||
-          amountFenFromUnknown(row.origin_amount)
+        fen += amountFenFromAmountRow(s as Record<string, unknown>)
       }
     }
   }
@@ -6299,13 +6312,9 @@ async function paginateDouyinTradeOrders(
     for (const rawOrder of orders) {
       if (!rawOrder || typeof rawOrder !== 'object') continue
       const order = rawOrder as Record<string, unknown>
-      if (timeRange === 'create') {
-        opts?.onOrder?.(order)
-        mergeDouyinOrderSales(bucket, order, startYmd, endYmd, seenSalesOrderIds, hourlyPay)
-        mergeDouyinOrderVerify(bucket, order, startYmd, endYmd, seenVerifyCerts, isHermes)
-      } else {
-        mergeDouyinOrderVerify(bucket, order, startYmd, endYmd, seenVerifyCerts, isHermes)
-      }
+      opts?.onOrder?.(order)
+      mergeDouyinOrderSales(bucket, order, startYmd, endYmd, seenSalesOrderIds, hourlyPay)
+      mergeDouyinOrderVerify(bucket, order, startYmd, endYmd, seenVerifyCerts, isHermes)
     }
     if (orders.length < pageSize) break
     page += 1
@@ -6465,20 +6474,24 @@ export async function fetchDouyinTradeOrderDetails(
   try {
     const token = await ensureDouyinToken(session)
     const accountId = session.merchantId
-    const chunks = eachShanghaiWeekChunks(queryStart, endYmd)
-    for (const chunk of chunks) {
-      const rng = unixRangeInclusiveShanghai(chunk.start, chunk.end)
-      if (!rng) continue
+    const onOrder = (order: Record<string, unknown>) => {
+      if (!orderIsPaidForSales(order)) return
+      const d = normalizeDouyinTradeOrderDetail(order)
+      if (!d || d.payAmountFen <= 0) return
+      byId.set(d.orderId, d)
+    }
+    const pullChunk = async (
+      chunkStart: string,
+      chunkEnd: string,
+      timeRange: DouyinOrderQueryTimeRange,
+    ) => {
+      const rng = unixRangeInclusiveShanghai(chunkStart, chunkEnd)
+      if (!rng) return
       const bucket = new Map<string, DouyinFinanceDayBucket>()
       const seenSalesOrderIds = new Set<string>()
       const seenVerifyCerts = new Set<string>()
       const tradeWarnings: string[] = []
       const hermesWarnings: string[] = []
-      const onOrder = (order: Record<string, unknown>) => {
-        const d = normalizeDouyinTradeOrderDetail(order)
-        if (!d) return
-        byId.set(d.orderId, d)
-      }
       const tasks: Promise<void>[] = [
         paginateDouyinTradeOrders(
           token,
@@ -6491,7 +6504,7 @@ export async function fetchDouyinTradeOrderDetails(
           bucket,
           seenSalesOrderIds,
           seenVerifyCerts,
-          'create',
+          timeRange,
           tradeWarnings,
           { pageSize: DOUYIN_WEEK_PAGE_SIZE, maxPages: DOUYIN_WEEK_MAX_PAGES, onOrder },
         ),
@@ -6509,27 +6522,33 @@ export async function fetchDouyinTradeOrderDetails(
             bucket,
             seenSalesOrderIds,
             seenVerifyCerts,
-            'create',
+            timeRange,
             hermesWarnings,
             { pageSize: DOUYIN_WEEK_PAGE_SIZE, maxPages: DOUYIN_HERMES_WEEK_MAX_PAGES, onOrder },
           ),
         )
       }
       await Promise.all(tasks)
-      if (hermesWarnings.some((w) => /HTTP|业务错误|未获得|无权限/.test(w))) {
+      if (hermesWarnings.some((w) => /未获得|无权限|access denied|scope/i.test(w))) {
         skipHermes = true
-        const note = '抖音即配/外卖订单未拉取（无权限或接口不可用）；纯团购商家可忽略。'
+        const note = '抖音即配/外卖订单未拉取（无权限）；纯团购商家可忽略。'
         if (!warnings.includes(note)) warnings.push(note)
       }
       const chunkWarnings = [...tradeWarnings, ...(!skipHermes ? hermesWarnings : [])]
       if (chunkWarnings.some((w) => w.includes('分页达到上限'))) {
         hitPageCap = true
-        warnings.push(`区间 ${chunk.start}~${chunk.end} 订单较多，该周可能未拉全，建议缩短同步天数后重试。`)
+        warnings.push(`区间 ${chunkStart}~${chunkEnd} 订单较多，该周可能未拉全，建议缩短同步天数后重试。`)
       } else {
         for (const w of chunkWarnings) {
           if (!warnings.includes(w)) warnings.push(w)
         }
       }
+    }
+    for (const chunk of eachShanghaiWeekChunks(queryStart, endYmd)) {
+      await pullChunk(chunk.start, chunk.end, 'create')
+    }
+    for (const chunk of eachShanghaiWeekChunks(startYmd, endYmd)) {
+      await pullChunk(chunk.start, chunk.end, 'update')
     }
     if (hitPageCap) {
       warnings.push('部分周次触及分页上限；已按周切片尽量拉全。可改用更短日期再同步补齐。')
@@ -6618,7 +6637,7 @@ export async function fetchDouyinFinanceReconcileRows(
       }
       await Promise.all(tasks)
       const chunkWarnings = [...tradeWarnings, ...hermesWarnings]
-      if (hermesWarnings.some((w) => /HTTP|业务错误|未获得|无权限/.test(w))) {
+      if (hermesWarnings.some((w) => /未获得|无权限|access denied|scope/i.test(w))) {
         skipHermes = true
         const note = '抖音即配订单未拉取（无权限或接口不可用）；纯团购商家可忽略。'
         if (!warnings.includes(note)) warnings.push(note)

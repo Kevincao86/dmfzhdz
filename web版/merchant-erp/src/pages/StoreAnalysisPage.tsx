@@ -11,7 +11,7 @@ import {
   Users,
   Copy,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Bar,
@@ -156,6 +156,8 @@ export default function StoreAnalysisPage() {
 
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
+  const [syncHint, setSyncHint] = useState('')
+  const skipChartsReload = useRef(false)
   const [analyzing, setAnalyzing] = useState(false)
   const [err, setErr] = useState('')
   const [summary, setSummary] = useState<ShopAnalysisSummary | null>(null)
@@ -190,7 +192,9 @@ export default function StoreAnalysisPage() {
     }
   }, [platform])
 
-  const loadCharts = useCallback(async () => {
+  const loadCharts = useCallback(async (range?: { start: string; end: string }) => {
+    const start = range?.start ?? appliedStart
+    const end = range?.end ?? appliedEnd
     setLoading(true)
     setErr('')
     setShowAdvice(false)
@@ -200,8 +204,8 @@ export default function StoreAnalysisPage() {
     setPointsCharged(0)
     try {
       const r = await fetchShopAnalysis({
-        startDate: appliedStart,
-        endDate: appliedEnd,
+        startDate: start,
+        endDate: end,
         platform,
         poiId: poiId || undefined,
       })
@@ -221,23 +225,43 @@ export default function StoreAnalysisPage() {
     }
   }, [appliedStart, appliedEnd, platform, poiId, mergeStoreNames])
 
-  /** 首屏只拉已落库数据出图，不阻塞同步 */
+  /** 首屏只拉已落库数据出图；查询/同步会自己 loadCharts，避免和 applied 日期竞态 */
   useEffect(() => {
+    if (skipChartsReload.current) {
+      skipChartsReload.current = false
+      return
+    }
     void loadCharts()
   }, [loadCharts])
 
-  const onSync = async () => {
-    setSyncing(true)
+  const refreshFromPlatform = async (start: string, end: string) => {
     setErr('')
-    try {
-      await syncMerchantOrders({ startDate: appliedStart, endDate: appliedEnd })
-      await loadCharts()
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : '同步失败（仍展示已落库数据）')
-      await loadCharts()
-    } finally {
-      setSyncing(false)
+    if (platform === 'douyin') {
+      setSyncing(true)
+      setSyncHint('正在从来客按段拉取订单…')
+      try {
+        const r = await syncMerchantOrders({
+          startDate: start,
+          endDate: end,
+          onProgress: (done, total) => setSyncHint(`正在从来客拉取订单 ${done}/${total} 段…`),
+        })
+        if (r.warnings.length) setSyncHint(r.warnings.join('；'))
+        else setSyncHint('')
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : '同步失败（仍展示已落库数据）')
+        setSyncHint('')
+      } finally {
+        setSyncing(false)
+      }
     }
+    skipChartsReload.current = true
+    setAppliedStart(start)
+    setAppliedEnd(end)
+    await loadCharts({ start, end })
+  }
+
+  const onSync = async () => {
+    await refreshFromPlatform(startDate, endDate)
   }
 
   const onAnalyze = async () => {
@@ -379,12 +403,7 @@ export default function StoreAnalysisPage() {
           type="button"
           disabled={loading || syncing || analyzing || !startDate || !endDate || startDate > endDate}
           onClick={() => {
-            if (startDate === appliedStart && endDate === appliedEnd) {
-              void loadCharts()
-              return
-            }
-            setAppliedStart(startDate)
-            setAppliedEnd(endDate)
+            void refreshFromPlatform(startDate, endDate)
           }}
           className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
         >
@@ -418,10 +437,13 @@ export default function StoreAnalysisPage() {
       {err ? (
         <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{err}</div>
       ) : null}
+      {syncHint ? (
+        <div className="mb-4 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800">{syncHint}</div>
+      ) : null}
       {summary?.coverageGapDays && summary.coverageGapDays.length > 0 ? (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          所选区间有 {summary.coverageGapDays.length} 天没有订单记录（例如只同步了近 7
-          天会留下空洞），成交额会明显低于来客后台。请再点「同步数据」，起止日期须与来客一致。
+          所选区间有 {summary.coverageGapDays.length}{' '}
+          天没有订单记录，成交额会低于来客后台。请把起止日期与来客看板设成同一天，再点「查询」等各段拉完。
         </div>
       ) : null}
 
