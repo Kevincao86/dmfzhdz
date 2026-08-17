@@ -1,4 +1,4 @@
-import { Download, Loader2, PieChart, RefreshCw } from 'lucide-react'
+import { Download, Loader2, PieChart, RefreshCw, Search } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMembership } from '../context/MembershipContext'
@@ -61,6 +61,13 @@ function addCalendarDaysShanghai(ymd: string, deltaDays: number): string {
   return new Date(ms).toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
 }
 
+function ymdKey(raw: string): string {
+  const s = String(raw || '').trim()
+  const m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/)
+  if (!m) return s.slice(0, 10)
+  return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`
+}
+
 type DayRangePreset = 7 | 15 | 30
 type PlatformView = 'all' | 'groupbuy' | 'waimai' | FinancePlatformId
 
@@ -86,6 +93,10 @@ export function FinanceReconcilePage() {
   const [rangeMode, setRangeMode] = useState<'preset' | 'custom'>('preset')
   const [customStart, setCustomStart] = useState(() => addCalendarDaysShanghai(shanghaiTodayYmd(), -6))
   const [customEnd, setCustomEnd] = useState(() => shanghaiTodayYmd())
+  const [appliedRange, setAppliedRange] = useState(() => {
+    const end = shanghaiTodayYmd()
+    return { start: addCalendarDaysShanghai(end, -6), end }
+  })
   const [apiWarnings, setApiWarnings] = useState<string[]>([])
   const [resolvedRange, setResolvedRange] = useState<{ start?: string; end?: string }>({})
   const [platformFilter, setPlatformFilter] = useState<PlatformView>('all')
@@ -98,11 +109,7 @@ export function FinanceReconcilePage() {
   const [orderErr, setOrderErr] = useState('')
   const [orderSyncing, setOrderSyncing] = useState(false)
 
-  const orderRange = useMemo(() => {
-    if (rangeMode === 'custom') return { start: customStart, end: customEnd }
-    const end = shanghaiTodayYmd()
-    return { start: addCalendarDaysShanghai(end, -(dayRange - 1)), end }
-  }, [rangeMode, customStart, customEnd, dayRange])
+  const orderRange = appliedRange
 
   const loadOrders = useCallback(async () => {
     setOrderLoading(true)
@@ -122,8 +129,14 @@ export function FinanceReconcilePage() {
         page: orderPage,
         pageSize: 30,
       })
-      setOrderRows(r.rows)
-      setOrderTotal(r.total)
+      const start = ymdKey(orderRange.start)
+      const end = ymdKey(orderRange.end)
+      const clipped = r.rows.filter((o) => {
+        const d = ymdKey(o.payTime || '')
+        return Boolean(d) && d >= start && d <= end
+      })
+      setOrderRows(clipped)
+      setOrderTotal(clipped.length === r.rows.length ? r.total : clipped.length)
     } catch (e) {
       setOrderErr(e instanceof Error ? e.message : '订单明细加载失败')
       setOrderRows([])
@@ -149,20 +162,24 @@ export function FinanceReconcilePage() {
     if (viewTab === 'orders') void loadOrders()
   }, [viewTab, loadOrders])
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { mode: 'preset' | 'custom'; dayRange?: DayRangePreset; start?: string; end?: string }) => {
+    const mode = opts?.mode ?? rangeMode
+    const days = opts?.dayRange ?? dayRange
+    const start = opts?.start ?? (mode === 'custom' ? customStart : appliedRange.start)
+    const end = opts?.end ?? (mode === 'custom' ? customEnd : appliedRange.end)
     setLoading(true)
     setErr(null)
     try {
-      if (rangeMode === 'custom') {
-        if (!customStart || !customEnd || customStart > customEnd) {
+      if (mode === 'custom') {
+        if (!start || !end || start > end) {
           setErr('请选择有效的自定义起止日期')
           setRows([])
           setApiWarnings([])
           setResolvedRange({})
           return
         }
-        const t0 = new Date(`${customStart}T12:00:00+08:00`).getTime()
-        const t1 = new Date(`${customEnd}T12:00:00+08:00`).getTime()
+        const t0 = new Date(`${start}T12:00:00+08:00`).getTime()
+        const t1 = new Date(`${end}T12:00:00+08:00`).getTime()
         const spanDays = Math.floor((t1 - t0) / 86_400_000) + 1
         if (spanDays > 90) {
           setErr('自定义区间最长 90 天')
@@ -172,10 +189,17 @@ export function FinanceReconcilePage() {
           return
         }
       }
+      const nextRange =
+        mode === 'custom'
+          ? { start, end }
+          : (() => {
+              const e = shanghaiTodayYmd()
+              return { start: addCalendarDaysShanghai(e, -(days - 1)), end: e }
+            })()
       const r =
-        rangeMode === 'custom'
-          ? await fetchFinanceReconcile({ startDate: customStart, endDate: customEnd })
-          : await fetchFinanceReconcile({ days: dayRange })
+        mode === 'custom'
+          ? await fetchFinanceReconcile({ startDate: nextRange.start, endDate: nextRange.end })
+          : await fetchFinanceReconcile({ days })
       if (!r.ok) {
         setErr(r.message)
         setRows([])
@@ -183,18 +207,21 @@ export function FinanceReconcilePage() {
         setResolvedRange({})
         return
       }
+      setAppliedRange(nextRange)
       setRows(r.rows)
       setFetchedAt(r.fetchedAt)
       setApiWarnings(r.warnings ?? [])
-      setResolvedRange({ start: r.startDate, end: r.endDate })
+      setResolvedRange({ start: r.startDate || nextRange.start, end: r.endDate || nextRange.end })
     } finally {
       setLoading(false)
     }
-  }, [dayRange, rangeMode, customStart, customEnd])
+  }, [dayRange, rangeMode, customStart, customEnd, appliedRange.start, appliedRange.end])
 
   useEffect(() => {
-    void load()
-  }, [load])
+    void load({ mode: 'preset', dayRange: 7 })
+    // 首屏仅拉近 7 天；自定义日期须点「查询」
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     const refresh = () => setMargins(readStorePlatformMargins())
@@ -230,11 +257,17 @@ export function FinanceReconcilePage() {
   }, [rows, margins])
 
   const filteredEnriched = useMemo(() => {
-    if (platformFilter === 'all') return enriched
-    if (platformFilter === 'groupbuy') return enriched.filter((r) => r.channel === 'groupbuy')
-    if (platformFilter === 'waimai') return enriched.filter((r) => r.channel === 'waimai')
-    return enriched.filter((r) => r.platform === platformFilter)
-  }, [enriched, platformFilter])
+    const start = ymdKey(resolvedRange.start || appliedRange.start)
+    const end = ymdKey(resolvedRange.end || appliedRange.end)
+    const inWindow = enriched.filter((r) => {
+      const d = ymdKey(r.date)
+      return (!start || d >= start) && (!end || d <= end)
+    })
+    if (platformFilter === 'all') return inWindow
+    if (platformFilter === 'groupbuy') return inWindow.filter((r) => r.channel === 'groupbuy')
+    if (platformFilter === 'waimai') return inWindow.filter((r) => r.channel === 'waimai')
+    return inWindow.filter((r) => r.platform === platformFilter)
+  }, [enriched, platformFilter, resolvedRange.start, resolvedRange.end, appliedRange.start, appliedRange.end])
 
   const totals = useMemo(() => {
     let orders = 0
@@ -327,7 +360,13 @@ export function FinanceReconcilePage() {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => void load()}
+            onClick={() =>
+              void load(
+                rangeMode === 'custom'
+                  ? { mode: 'custom', start: appliedRange.start, end: appliedRange.end }
+                  : { mode: 'preset', dayRange },
+              )
+            }
             disabled={loading}
             className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
           >
@@ -512,6 +551,7 @@ export function FinanceReconcilePage() {
                   onClick={() => {
                     setRangeMode('preset')
                     setDayRange(d)
+                    void load({ mode: 'preset', dayRange: d })
                   }}
                   disabled={loading}
                   className={cn(
@@ -560,6 +600,18 @@ export function FinanceReconcilePage() {
                       className="rounded border border-amber-200/90 bg-white px-2 py-1.5 text-xs text-gray-900 shadow-sm"
                     />
                   </label>
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => {
+                      setRangeMode('custom')
+                      void load({ mode: 'custom', start: customStart, end: customEnd })
+                    }}
+                    className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    <Search className="h-3.5 w-3.5" />
+                    查询
+                  </button>
                 </span>
               ) : null}
             </div>

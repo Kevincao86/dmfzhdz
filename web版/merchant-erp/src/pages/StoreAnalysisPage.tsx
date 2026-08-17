@@ -3,6 +3,7 @@ import {
   Loader2,
   MessageSquare,
   RefreshCw,
+  Search,
   Sparkles,
   Star,
   Store,
@@ -89,6 +90,30 @@ function addDays(ymd: string, delta: number): string {
   return new Date(ms).toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
 }
 
+function growthLine(
+  curr: number,
+  prev: number | undefined,
+  opts?: { invert?: boolean; asPoints?: boolean },
+): { text: string; cls: string } {
+  if (prev == null || !Number.isFinite(prev)) return { text: '暂无对照', cls: 'text-slate-400' }
+  if (prev === 0 && curr === 0) return { text: '持平', cls: 'text-slate-400' }
+  if (prev === 0) {
+    const up = curr > 0
+    const good = opts?.invert ? !up : up
+    return { text: up ? '新增' : '—', cls: good ? 'text-emerald-600' : 'text-rose-600' }
+  }
+  const raw = opts?.asPoints ? curr - prev : ((curr - prev) / Math.abs(prev)) * 100
+  const n = Math.round(raw * 10) / 10
+  if (n === 0) return { text: '持平', cls: 'text-slate-400' }
+  const up = n > 0
+  const good = opts?.invert ? !up : up
+  const unit = opts?.asPoints ? 'pp' : '%'
+  return {
+    text: `${up ? '+' : ''}${n}${unit}`,
+    cls: good ? 'text-emerald-600' : 'text-rose-600',
+  }
+}
+
 function yuan(n: number): string {
   return `¥${(Number(n) || 0).toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`
 }
@@ -123,6 +148,8 @@ export default function StoreAnalysisPage() {
   const today = shanghaiTodayYmd()
   const [startDate, setStartDate] = useState(() => addDays(today, -29))
   const [endDate, setEndDate] = useState(today)
+  const [appliedStart, setAppliedStart] = useState(() => addDays(today, -29))
+  const [appliedEnd, setAppliedEnd] = useState(today)
   const [platform, setPlatform] = useState('douyin')
   const [poiId, setPoiId] = useState('')
   const [storeOptions, setStoreOptions] = useState<ShopStoreOption[]>([])
@@ -173,8 +200,8 @@ export default function StoreAnalysisPage() {
     setPointsCharged(0)
     try {
       const r = await fetchShopAnalysis({
-        startDate,
-        endDate,
+        startDate: appliedStart,
+        endDate: appliedEnd,
         platform,
         poiId: poiId || undefined,
       })
@@ -192,7 +219,7 @@ export default function StoreAnalysisPage() {
     } finally {
       setLoading(false)
     }
-  }, [startDate, endDate, platform, poiId, mergeStoreNames])
+  }, [appliedStart, appliedEnd, platform, poiId, mergeStoreNames])
 
   /** 首屏只拉已落库数据出图，不阻塞同步 */
   useEffect(() => {
@@ -203,7 +230,7 @@ export default function StoreAnalysisPage() {
     setSyncing(true)
     setErr('')
     try {
-      await syncMerchantOrders({ startDate, endDate })
+      await syncMerchantOrders({ startDate: appliedStart, endDate: appliedEnd })
       await loadCharts()
     } catch (e) {
       setErr(e instanceof Error ? e.message : '同步失败（仍展示已落库数据）')
@@ -218,8 +245,8 @@ export default function StoreAnalysisPage() {
     setErr('')
     try {
       const r = await fetchShopAnalysisAi({
-        startDate,
-        endDate,
+        startDate: appliedStart,
+        endDate: appliedEnd,
         platform,
         poiId: poiId || undefined,
       })
@@ -350,6 +377,22 @@ export default function StoreAnalysisPage() {
         </label>
         <button
           type="button"
+          disabled={loading || syncing || analyzing || !startDate || !endDate || startDate > endDate}
+          onClick={() => {
+            if (startDate === appliedStart && endDate === appliedEnd) {
+              void loadCharts()
+              return
+            }
+            setAppliedStart(startDate)
+            setAppliedEnd(endDate)
+          }}
+          className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+        >
+          <Search className="h-4 w-4" />
+          查询
+        </button>
+        <button
+          type="button"
           disabled={loading || syncing || analyzing}
           onClick={() => void onSync()}
           className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
@@ -386,32 +429,64 @@ export default function StoreAnalysisPage() {
         <div className="space-y-6">
           <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { k: '成交额', v: yuan(summary.salesAmountYuan), hint: `${summary.orderCount} 笔订单` },
+              {
+                k: '成交额',
+                v: yuan(summary.salesAmountYuan),
+                hint: `${summary.orderCount} 笔订单`,
+                curr: summary.salesAmountYuan,
+                mom: summary.mom?.salesAmountYuan,
+                yoy: summary.yoy?.salesAmountYuan,
+              },
               {
                 k: '退款率',
                 v: `${summary.refundRate}%`,
                 hint: yuan(summary.refundAmountYuan),
                 danger: summary.refundRate >= 20,
+                curr: summary.refundRate,
+                mom: summary.mom?.refundRate,
+                yoy: summary.yoy?.refundRate,
+                invert: true,
+                asPoints: true,
               },
               {
                 k: '复购率',
                 v: `${summary.repurchaseRate}%`,
                 hint: `${summary.buyerCount} 位可识别买家`,
+                curr: summary.repurchaseRate,
+                mom: summary.mom?.repurchaseRate,
+                yoy: summary.yoy?.repurchaseRate,
+                asPoints: true,
               },
               {
                 k: '新客占比',
                 v: `${summary.newBuyerShare}%`,
                 hint: `新客 ${summary.newBuyerCount} / 老客 ${summary.oldBuyerCount}`,
+                curr: summary.newBuyerShare,
+                mom: summary.mom?.newBuyerShare,
+                yoy: summary.yoy?.newBuyerShare,
+                asPoints: true,
               },
-            ].map((x) => (
+            ].map((x) => {
+              const momG = growthLine(x.curr, x.mom, { invert: x.invert, asPoints: x.asPoints })
+              const yoyG = growthLine(x.curr, x.yoy, { invert: x.invert, asPoints: x.asPoints })
+              return (
               <div key={x.k} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <p className="text-xs text-slate-500">{x.k}</p>
                 <p className={cn('mt-1 text-2xl font-semibold', x.danger ? 'text-rose-600' : 'text-slate-900')}>
                   {x.v}
                 </p>
                 <p className="mt-1 text-xs text-slate-400">{x.hint}</p>
+                <p className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]">
+                  <span>
+                    上月同期 <span className={cn('font-medium', momG.cls)}>{momG.text}</span>
+                  </span>
+                  <span>
+                    去年同月 <span className={cn('font-medium', yoyG.cls)}>{yoyG.text}</span>
+                  </span>
+                </p>
               </div>
-            ))}
+              )
+            })}
           </section>
 
           <section className="grid gap-4 lg:grid-cols-2">

@@ -23,6 +23,29 @@ async function withClient<T>(fn: (c: pg.Client) => Promise<T>): Promise<T> {
   }
 }
 
+/** 按 Asia/Shanghai 日历日拦截 pay_time，避免 UTC date 把隔日订单算进/漏出区间 */
+function sqlPayTimeGteShanghai(ph: string): string {
+  return `pay_time >= (${ph}::date::timestamp AT TIME ZONE 'Asia/Shanghai')`
+}
+function sqlPayTimeLtNextShanghai(ph: string): string {
+  return `pay_time < ((${ph}::date + 1)::timestamp AT TIME ZONE 'Asia/Shanghai')`
+}
+function sqlPayTimeLtStartShanghai(ph: string): string {
+  return `pay_time < (${ph}::date::timestamp AT TIME ZONE 'Asia/Shanghai')`
+}
+
+function shiftYmdByMonths(ymd: string, months: number): string {
+  const m = String(ymd || '').match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!m) return ymd
+  const y = Number(m[1])
+  const mo = Number(m[2])
+  const d = Number(m[3])
+  const dt = new Date(Date.UTC(y, mo - 1 + months, 1))
+  const last = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 0)).getUTCDate()
+  const day = Math.min(d, last)
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
 export type MerchantOrderRow = {
   id: string
   tenantId: string
@@ -179,11 +202,11 @@ export async function listMerchantOrders(params: {
       args.push(params.platform)
     }
     if (params.startYmd) {
-      where.push(`pay_time >= ($${i++}::date)::timestamptz`)
+      where.push(sqlPayTimeGteShanghai(`$${i++}`))
       args.push(params.startYmd)
     }
     if (params.endYmd) {
-      where.push(`pay_time < (($${i++}::date) + interval '1 day')::timestamptz`)
+      where.push(sqlPayTimeLtNextShanghai(`$${i++}`))
       args.push(params.endYmd)
     }
     if (params.q?.trim()) {
@@ -240,6 +263,20 @@ export type ShopAnalysisSummary = {
   stores: ShopStoreOption[]
   topBySales: { name: string; productId: string; salesYuan: number; couponCount: number; share: number }[]
   topByRefund: { name: string; productId: string; refundYuan: number; refundRate: number }[]
+  /** 上月同期（按起止各前移 1 个日历月） */
+  mom?: ShopPeriodKpis
+  /** 去年同月（按起止各前移 12 个日历月） */
+  yoy?: ShopPeriodKpis
+}
+
+export type ShopPeriodKpis = {
+  startDate: string
+  endDate: string
+  salesAmountYuan: number
+  orderCount: number
+  refundRate: number
+  repurchaseRate: number
+  newBuyerShare: number
 }
 
 export async function computeShopAnalysisSummary(params: {
@@ -249,14 +286,15 @@ export async function computeShopAnalysisSummary(params: {
   startYmd: string
   endYmd: string
   marginPercent?: number
+  skipCompare?: boolean
 }): Promise<ShopAnalysisSummary> {
   // 旧数据列为空时先从 raw_json 回填，保证门店筛选项可用
   await backfillOrderPoiFromRaw(params.tenantId).catch(() => 0)
-  return withClient(async (c) => {
+  const current = await withClient(async (c) => {
     const where: string[] = [
       'tenant_id = $1::uuid',
-      `pay_time >= ($2::date)::timestamptz`,
-      `pay_time < (($3::date) + interval '1 day')::timestamptz`,
+      sqlPayTimeGteShanghai('$2'),
+      sqlPayTimeLtNextShanghai('$3'),
     ]
     const args: unknown[] = [params.tenantId, params.startYmd, params.endYmd]
     let i = 4
@@ -349,7 +387,7 @@ export async function computeShopAnalysisSummary(params: {
         'tenant_id = $1::uuid',
         'open_id = any($2::text[])',
         `open_id <> ''`,
-        `pay_time < ($3::date)::timestamptz`,
+        sqlPayTimeLtStartShanghai('$3'),
       ]
       const preArgs: unknown[] = [params.tenantId, unique, params.startYmd]
       let pi = 4
@@ -373,7 +411,7 @@ export async function computeShopAnalysisSummary(params: {
       const oldSet = new Set(preHist.rows.map((h) => String(h.open_id)))
       hasPreWindowHistory = oldSet.size > 0
       if (!hasPreWindowHistory) {
-        const anyWhere = ['tenant_id = $1::uuid', `pay_time < ($2::date)::timestamptz`]
+        const anyWhere = ['tenant_id = $1::uuid', sqlPayTimeLtStartShanghai('$2')]
         const anyArgs: unknown[] = [params.tenantId, params.startYmd]
         let ai = 3
         if (params.platform && params.platform !== 'all') {
@@ -491,6 +529,25 @@ export async function computeShopAnalysisSummary(params: {
       topByRefund,
     }
   })
+  if (params.skipCompare) return current
+  const momStart = shiftYmdByMonths(params.startYmd, -1)
+  const momEnd = shiftYmdByMonths(params.endYmd, -1)
+  const yoyStart = shiftYmdByMonths(params.startYmd, -12)
+  const yoyEnd = shiftYmdByMonths(params.endYmd, -12)
+  const pick = (s: ShopAnalysisSummary, startDate: string, endDate: string): ShopPeriodKpis => ({
+    startDate,
+    endDate,
+    salesAmountYuan: s.salesAmountYuan,
+    orderCount: s.orderCount,
+    refundRate: s.refundRate,
+    repurchaseRate: s.repurchaseRate,
+    newBuyerShare: s.newBuyerShare,
+  })
+  const [mom, yoy] = await Promise.all([
+    computeShopAnalysisSummary({ ...params, startYmd: momStart, endYmd: momEnd, skipCompare: true }),
+    computeShopAnalysisSummary({ ...params, startYmd: yoyStart, endYmd: yoyEnd, skipCompare: true }),
+  ])
+  return { ...current, mom: pick(mom, momStart, momEnd), yoy: pick(yoy, yoyStart, yoyEnd) }
 }
 
 function buildOptimizationSuggestions(summary: ShopAnalysisSummary): string[] {

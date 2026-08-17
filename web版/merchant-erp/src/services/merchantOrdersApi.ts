@@ -62,6 +62,18 @@ export type ShopAnalysisSummary = {
   stores: ShopStoreOption[]
   topBySales: { name: string; productId: string; salesYuan: number; couponCount: number; share: number }[]
   topByRefund: { name: string; productId: string; refundYuan: number; refundRate: number }[]
+  mom?: ShopPeriodKpis
+  yoy?: ShopPeriodKpis
+}
+
+export type ShopPeriodKpis = {
+  startDate: string
+  endDate: string
+  salesAmountYuan: number
+  orderCount: number
+  refundRate: number
+  repurchaseRate: number
+  newBuyerShare: number
 }
 
 async function authHeaders(extra?: Record<string, string>): Promise<Record<string, string>> {
