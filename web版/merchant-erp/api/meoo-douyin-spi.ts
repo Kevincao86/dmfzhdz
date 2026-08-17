@@ -7,10 +7,20 @@
  * GET  ?panel=1                联调反馈面板（自动刷新 logid）
  * GET  ?set_precreate_fail=2   预下单固定失败码（1/2/3/4/5/6/7；0=成功）
  * GET  ?set_issue_mode=success|async|fail
+ * GET  ?panel=1&do_verify=1    用已绑定 ERP对接 凭证调验券 OpenAPI（不要走开放平台调试台）
+ * GET  ?panel=1&do_cancel=1    撤销核销 OpenAPI
  */
 import fs from 'node:fs'
 import path from 'node:path'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { openDouyinSessionCredentials } from './douyin-bind.js'
+import {
+  douyinOpenApiUrl,
+  douyinServerFetch,
+  exchangeDouyinClientToken,
+  fetchGoodlifeWithOfficialFallback,
+  parseDouyinOpenApiEnvelope,
+} from './douyinOpenApiBase.js'
 
 export const config = { maxDuration: 12 }
 
@@ -29,11 +39,20 @@ type SpiHit = {
   skuId?: string
   responseSummary: string
   codes?: string[]
+  verifyId?: string
+  certificateId?: string
 }
 
 const MAX_HITS = 40
+const SPI_DEFAULT_APP_ID = 'aw0jtjzp5ptjjpbq'
+const SPI_DEFAULT_POI_ID = '7569859650230781962'
+
+type OpenApiCreds = { clientKey: string; clientSecret: string; merchantId: string }
+
 const g = globalThis as typeof globalThis & {
   __meooDouyinSpiHits?: SpiHit[]
+  __meooDouyinSpiToken?: { token: string; expMs: number; clientKey: string }
+  __meooDouyinSpiFlash?: string
 }
 
 function hitsPath(): string {
@@ -385,7 +404,215 @@ function isPrecreateAction(action: string): boolean {
   return a.includes('pre_create')
 }
 
-function panelHtml(state: SpiState, latestIssueLogid: string, latestPrecreateLogid: string): string {
+function isVerifyAction(action: string): boolean {
+  const a = String(action || '').toLowerCase()
+  return a.includes('certificate.verify')
+}
+
+function escHtml(s: string): string {
+  return String(s || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] || c)
+}
+
+function asRec(v: unknown): Record<string, unknown> | null {
+  return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null
+}
+
+function numericCode(v: unknown): number {
+  const n = Number(v)
+  return Number.isFinite(n) ? n : -1
+}
+
+function extraLogid(j: Record<string, unknown>): string {
+  const extra = asRec(j.extra)
+  const data = asRec(j.data)
+  return String(extra?.logid || extra?.log_id || data?.logid || '').trim()
+}
+
+async function loadOpenApiCreds(): Promise<OpenApiCreds> {
+  const envKey = String(process.env.DOUYIN_SPI_CLIENT_KEY || '').trim()
+  const envSecret = String(process.env.DOUYIN_SPI_CLIENT_SECRET || '').trim()
+  const envAccount = String(process.env.DOUYIN_SPI_ACCOUNT_ID || '').trim()
+  if (envKey && envSecret) {
+    return { clientKey: envKey, clientSecret: envSecret, merchantId: envAccount }
+  }
+  try {
+    const p = path.join(process.env.HOME || '/home/admin', 'stack', 'douyin-spi-openapi.json')
+    const o = JSON.parse(fs.readFileSync(p, 'utf8')) as Partial<OpenApiCreds>
+    if (o.clientKey && o.clientSecret) {
+      return {
+        clientKey: String(o.clientKey),
+        clientSecret: String(o.clientSecret),
+        merchantId: String(o.merchantId || ''),
+      }
+    }
+  } catch {
+    /* 可选文件 */
+  }
+  const appId = envKey || SPI_DEFAULT_APP_ID
+  const base = String(process.env.SUPABASE_URL || process.env.MEOO_SUPABASE_ADMIN_URL || '').replace(/\/+$/, '')
+  const srk = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim()
+  if (!base || !srk) {
+    throw new Error('缺少抖音凭证：请在商家 ERP 绑定「ERP对接」，或配置 DOUYIN_SPI_CLIENT_KEY/SECRET')
+  }
+  const u =
+    `${base}/tenant_merchant_bindings?client_key=eq.${encodeURIComponent(appId)}` +
+    '&select=sealed_credentials,merchant_account_id&order=updated_at.desc&limit=1'
+  const r = await fetch(u, {
+    headers: { apikey: srk, Authorization: `Bearer ${srk}`, Accept: 'application/json' },
+  })
+  const raw = await r.text()
+  if (!r.ok) throw new Error(`读取绑定失败 HTTP ${r.status}`)
+  const rows = JSON.parse(raw || '[]') as Array<{ sealed_credentials?: string; merchant_account_id?: string }>
+  const opened = openDouyinSessionCredentials(String(rows[0]?.sealed_credentials || ''))
+  if (!opened?.clientKey || !opened.clientSecret) {
+    throw new Error('ERP对接绑定凭证无法解密。请到商家 ERP 重新绑定抖音来客。')
+  }
+  return {
+    clientKey: opened.clientKey,
+    clientSecret: opened.clientSecret,
+    merchantId: opened.merchantId || String(rows[0]?.merchant_account_id || ''),
+  }
+}
+
+async function ensureSpiClientToken(creds: OpenApiCreds, force = false): Promise<string> {
+  const cached = g.__meooDouyinSpiToken
+  if (!force && cached && cached.clientKey === creds.clientKey && Date.now() < cached.expMs - 120_000) {
+    return cached.token
+  }
+  const { token, expiresIn } = await exchangeDouyinClientToken(
+    creds.clientKey,
+    creds.clientSecret,
+    douyinServerFetch,
+  )
+  g.__meooDouyinSpiToken = {
+    token,
+    expMs: Date.now() + Math.max(300, expiresIn) * 1000,
+    clientKey: creds.clientKey,
+  }
+  return token
+}
+
+async function postCertificate(
+  apiPath: '/goodlife/v1/fulfilment/certificate/verify/' | '/goodlife/v1/fulfilment/certificate/cancel/',
+  creds: OpenApiCreds,
+  body: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const tryOnce = async (token: string) => {
+    const headers: Record<string, string> = {
+      'access-token': token,
+      'content-type': 'application/json',
+    }
+    if (creds.merchantId) headers['Rpc-Transit-Life-Account'] = creds.merchantId
+    const { status, raw } = await fetchGoodlifeWithOfficialFallback(
+      douyinServerFetch,
+      douyinOpenApiUrl(apiPath),
+      { method: 'POST', headers, body: JSON.stringify(body) },
+    )
+    if (status < 200 || status >= 300) {
+      throw new Error(`OpenAPI HTTP ${status}：${raw.slice(0, 400)}`)
+    }
+    return parseDouyinOpenApiEnvelope(raw, apiPath)
+  }
+  let token = await ensureSpiClientToken(creds, false)
+  let j = await tryOnce(token)
+  const data = asRec(j.data) || {}
+  const extra = asRec(j.extra) || {}
+  const code = numericCode(data.error_code ?? extra.error_code)
+  if (code === 2190002 || code === 2190008) {
+    token = await ensureSpiClientToken(creds, true)
+    j = await tryOnce(token)
+  }
+  return j
+}
+
+type OpenApiActionResult = { ok: boolean; notice: string; logid: string }
+
+async function runPanelOpenApi(kind: 'verify' | 'cancel'): Promise<OpenApiActionResult> {
+  const creds = await loadOpenApiCreds()
+  const recent = hits()
+  if (kind === 'verify') {
+    const codeHit = recent.find((h) => codesForHit(h).length > 0)
+    const codes = codeHit ? codesForHit(codeHit) : []
+    const orderId = String(codeHit?.orderId || recent.find((h) => h.orderId)?.orderId || '').trim()
+    const poiId = String(process.env.DOUYIN_SPI_POI_ID || '').trim() || SPI_DEFAULT_POI_ID
+    if (!codes.length || !orderId) {
+      return { ok: false, notice: '还没有三方券码。请先切「发券同步成功」并完成购买。', logid: '' }
+    }
+    const j = await postCertificate('/goodlife/v1/fulfilment/certificate/verify/', creds, {
+      verify_token: `meoo-verify-${Date.now()}`,
+      poi_id: poiId,
+      codes,
+      order_id: orderId,
+    })
+    const data = asRec(j.data) || {}
+    const extra = asRec(j.extra) || {}
+    const logid = extraLogid(j)
+    const err = numericCode(data.error_code ?? extra.error_code)
+    const results = Array.isArray(data.verify_results) ? data.verify_results : []
+    const first = asRec(results[0]) || {}
+    const result = numericCode(first.result)
+    const verifyId = String(first.verify_id || '').trim()
+    const certificateId = String(first.certificate_id || '').trim()
+    const ok = err === 0 && result === 0
+    pushHit({
+      at: new Date().toISOString(),
+      action: 'openapi.certificate.verify',
+      logid: logid || '(missing)',
+      orderId,
+      codes,
+      responseSummary:
+        `error_code=${err};result=${result};desc=${String(data.description || extra.description || first.msg || '')}` +
+        (verifyId ? `;verify_id=${verifyId}` : ''),
+      verifyId: verifyId || undefined,
+      certificateId: certificateId || undefined,
+    })
+    if (ok) {
+      return { ok: true, notice: `验券成功。把这条 extra.logid 填联调第 4 步：${logid}`, logid }
+    }
+    return {
+      ok: false,
+      notice: `验券未成功：error_code=${err} result=${result} ${String(data.description || extra.description || first.msg || '')} logid=${logid}`,
+      logid,
+    }
+  }
+
+  const vHit = recent.find((h) => h.verifyId && h.certificateId)
+  if (!vHit?.verifyId || !vHit.certificateId) {
+    return { ok: false, notice: '还没有验券成功记录，请先点「验券」。', logid: '' }
+  }
+  const j = await postCertificate('/goodlife/v1/fulfilment/certificate/cancel/', creds, {
+    verify_id: vHit.verifyId,
+    certificate_id: vHit.certificateId,
+  })
+  const data = asRec(j.data) || {}
+  const extra = asRec(j.extra) || {}
+  const logid = extraLogid(j)
+  const err = numericCode(data.error_code ?? extra.error_code)
+  const ok = err === 0
+  pushHit({
+    at: new Date().toISOString(),
+    action: 'openapi.certificate.cancel',
+    logid: logid || '(missing)',
+    orderId: vHit.orderId,
+    codes: vHit.codes,
+    responseSummary: `error_code=${err};desc=${String(data.description || extra.description || '')}`,
+  })
+  if (ok) {
+    return { ok: true, notice: `撤销核销成功。把这条 extra.logid 填联调第 5 步：${logid}`, logid }
+  }
+  return {
+    ok: false,
+    notice: `撤销未成功：error_code=${err} ${String(data.description || extra.description || '')} logid=${logid}`,
+    logid,
+  }
+}
+
+function panelHtml(
+  state: SpiState,
+  latestIssueLogid: string,
+  latestPrecreateLogid: string,
+  openApiNotice = '',
+): string {
   const fail = state.precreateFailCode
   const issue = state.issueMode
   const on = (cond: boolean) => (cond ? ' on' : '')
@@ -424,7 +651,12 @@ function panelHtml(state: SpiState, latestIssueLogid: string, latestPrecreateLog
 <body>
   <div class="wrap">
     <h1>抖音 SPI 联调面板</h1>
-    <p class="sub">三方码不要去来客「团购券处理」输码（那里只核销抖音券，会误报美团券）。核销请用开放平台「验券」OpenAPI。蓝框=当前选中。</p>
+    <p class="sub">验券不要用开放平台调试台（顶部星号不是真 token，会报 2190002）。点下面「验券」由本机用 ERP对接 凭证调 OpenAPI。蓝框=当前选中。</p>
+    ${
+      openApiNotice
+        ? `<div class="card" style="border-color:#38bdf8"><div class="muted">OpenAPI 结果</div><div class="logid">${escHtml(openApiNotice)}</div></div>`
+        : ''
+    }
     <div class="card">
       <div class="muted">发券 logid（同步发券超时用这一条）</div>
       <div id="latestIssue" class="logid">${issueLogid || '（还没有发券请求，先切「发券超时」再去支付）'}</div>
@@ -434,14 +666,21 @@ function panelHtml(state: SpiState, latestIssueLogid: string, latestPrecreateLog
         <span id="copied" class="copyok" hidden>已复制</span>
       </div>
       <div class="muted" style="margin-top:8px">预下单 logid：<span id="latestPre" class="mono">${preLogid || '—'}</span></div>
-      <div class="muted" style="margin-top:10px">验券参数（开放平台「团购核销」→「验券」在线调试，不要用来客「团购券处理」）</div>
+      <div class="muted" style="margin-top:10px">验券 / 撤销（本面板调 OpenAPI，不要用来客团购券处理，也不要用开放平台调试台）</div>
       <div class="muted" style="margin-top:6px">codes</div>
       <div id="latestCodes" class="logid">—</div>
       <div class="muted" style="margin-top:6px">order_id</div>
       <div id="latestOrder" class="logid">—</div>
+      <div class="muted" style="margin-top:6px">验券 extra.logid（联调第 4 步）</div>
+      <div id="latestVerify" class="logid">—</div>
       <div class="row">
         <button type="button" class="pri" id="copyCodes">复制券码</button>
         <button type="button" class="ok" id="copyOrder">复制订单号</button>
+        <button type="button" class="ok" id="copyVerify">复制验券 logid</button>
+      </div>
+      <div class="row">
+        <a class="btn pri" href="?panel=1&amp;do_verify=1">验券</a>
+        <a class="btn warn" href="?panel=1&amp;do_cancel=1">撤销核销</a>
       </div>
       <div class="muted" style="margin-top:8px">当前模式：<span id="mode">…</span></div>
     </div>
@@ -478,6 +717,8 @@ function panelHtml(state: SpiState, latestIssueLogid: string, latestPrecreateLog
     };
     function actionName(a){
       const s = String(a||'').toLowerCase();
+      if (s.includes('certificate.cancel')) return '撤销核销';
+      if (s.includes('certificate.verify')) return '验券';
       if (s.includes('refund')) return '退款';
       if (s.includes('tripartite')) return '发券';
       if (s.includes('pre_create')) return '预下单';
@@ -496,6 +737,8 @@ function panelHtml(state: SpiState, latestIssueLogid: string, latestPrecreateLog
         const codesText = codeHit ? codeHit.codes.join(' ') : '（发券同步成功后会出现 12–15 位数字券码）';
         document.getElementById('latestCodes').textContent = codesText;
         document.getElementById('latestOrder').textContent = (codeHit && codeHit.orderId) || (issueHit && issueHit.orderId) || '（发券成功后会出现抖音订单号）';
+        const verifyHit = rows.find(h => String(h.action||'').toLowerCase().includes('certificate.verify'));
+        document.getElementById('latestVerify').textContent = (verifyHit && verifyHit.logid) || '（点「验券」后出现，填联调第 4 步）';
         const st = j.state || {};
         const fail = Number(st.precreateFailCode || 0);
         document.getElementById('mode').textContent =
@@ -520,6 +763,7 @@ function panelHtml(state: SpiState, latestIssueLogid: string, latestPrecreateLog
     document.getElementById('copyPre').onclick = () => copyText(document.getElementById('latestPre').textContent.trim());
     document.getElementById('copyCodes').onclick = () => copyText(document.getElementById('latestCodes').textContent.trim());
     document.getElementById('copyOrder').onclick = () => copyText(document.getElementById('latestOrder').textContent.trim());
+    document.getElementById('copyVerify').onclick = () => copyText(document.getElementById('latestVerify').textContent.trim());
     load();
     setInterval(load, 2000);
   </script>
@@ -556,6 +800,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
     if (changed) writeState(state)
 
+    let openApiNotice = ''
+    const doVerify = queryOne(req, 'do_verify') === '1'
+    const doCancel = queryOne(req, 'do_cancel') === '1'
+    const wantPanel = queryOne(req, 'panel') === '1' || queryOne(req, 'panel') === 'html'
+    if (doVerify || doCancel) {
+      try {
+        const r = await runPanelOpenApi(doVerify ? 'verify' : 'cancel')
+        openApiNotice = r.notice
+      } catch (e) {
+        openApiNotice = e instanceof Error ? e.message : String(e)
+      }
+      if (wantPanel) {
+        g.__meooDouyinSpiFlash = openApiNotice
+        res.setHeader('Location', '?panel=1')
+        res.setHeader('Cache-Control', 'no-store')
+        res.status(302).end()
+        return
+      }
+    }
+    if (wantPanel && g.__meooDouyinSpiFlash) {
+      openApiNotice = g.__meooDouyinSpiFlash
+      g.__meooDouyinSpiFlash = ''
+    }
+
     const recent = hits().slice(0, 15)
     const latestIssueLogid = recent.find((h) => isIssueAction(h.action))?.logid || ''
     const latestPrecreateLogid = recent.find((h) => isPrecreateAction(h.action))?.logid || ''
@@ -571,11 +839,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         orderId: h.orderId,
         skuId: h.skuId,
         codes: codesForHit(h),
+        verifyId: h.verifyId,
+        certificateId: h.certificateId,
         responseSummary: h.responseSummary,
       })),
       latestLogid: latestIssueLogid || recent[0]?.logid || null,
       latestIssueLogid,
       latestPrecreateLogid,
+      latestVerifyLogid: recent.find((h) => isVerifyAction(h.action))?.logid || '',
       hint: {
         panel: 'GET ?panel=1',
         setOfflineFail: 'GET ?set_precreate_fail=2',
@@ -584,10 +855,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         diag: 'GET ?diag=1',
       },
     }
-    if (queryOne(req, 'panel') === '1' || queryOne(req, 'panel') === 'html') {
+    if (wantPanel) {
       res.setHeader('Content-Type', 'text/html; charset=utf-8')
       res.setHeader('Cache-Control', 'no-store')
-      res.status(200).send(panelHtml(readState(), latestIssueLogid, latestPrecreateLogid))
+      res.status(200).send(panelHtml(readState(), latestIssueLogid, latestPrecreateLogid, openApiNotice))
       return
     }
     res.setHeader('Cache-Control', 'no-store')
