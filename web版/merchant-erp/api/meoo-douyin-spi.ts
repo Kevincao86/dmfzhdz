@@ -281,6 +281,31 @@ function json(res: VercelResponse, status: number, body: unknown): void {
   res.status(status).send(JSON.stringify(body))
 }
 
+/**
+ * 开放平台联调把 extra.error_code 当「网关错误码」。
+ * 只回 data.error_code 时，平台会把 HTTP 200 记成网关码，校验 [网关错误码==0] 失败。
+ */
+function wrapSpiResponse(
+  out: Record<string, unknown>,
+  logid: string,
+): Record<string, unknown> {
+  const data =
+    out.data && typeof out.data === 'object' ? (out.data as Record<string, unknown>) : out
+  return {
+    error_code: 0,
+    description: 'success',
+    extra: {
+      error_code: 0,
+      description: 'success',
+      sub_error_code: 0,
+      sub_description: '',
+      logid: logid || '',
+      now: Math.floor(Date.now() / 1000),
+    },
+    data,
+  }
+}
+
 function panelHtml(): string {
   return `<!doctype html>
 <html lang="zh-CN">
@@ -498,5 +523,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     `[douyin-spi] action=${action} logid=${logid || '-'} order=${String(body.order_id ?? '')} ${summary}`,
   )
 
-  json(res, 200, out)
+  json(res, 200, wrapSpiResponse(out, logid))
 }
