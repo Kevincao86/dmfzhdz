@@ -12,7 +12,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
-export const config = { maxDuration: 10 }
+export const config = { maxDuration: 12 }
 
 type IssueMode = 'success' | 'async' | 'fail'
 type SpiState = {
@@ -234,7 +234,8 @@ function handleIssue(state: SpiState, body: Record<string, unknown>): Record<str
     }
   }
   if (state.issueMode === 'async') {
-    // 官方发码中（同步发券超时）：8s 内 error_code=0、result=0、不回券码
+    // 联调「同步发券超时」要的是 8s 内不要成功回 HTTP 200（见 handler 里 hang）。
+    // 若仍落到这里（未 hang），保持官方发码中包络。
     return {
       data: {
         error_code: 0,
@@ -386,7 +387,7 @@ function panelHtml(state: SpiState, latestIssueLogid: string, latestPrecreateLog
 <body>
   <div class="wrap">
     <h1>抖音 SPI 联调面板</h1>
-    <p class="sub">「同步发券超时」请复制下面<strong>发券</strong> logid，不要复制预下单。切桩用链接整页跳转，蓝框=当前选中。</p>
+    <p class="sub">「同步发券超时」会卡住超过 8 秒、不回 HTTP 200。请复制<strong>发券</strong> logid，不要复制预下单。蓝框=当前选中。</p>
     <div class="card">
       <div class="muted">发券 logid（同步发券超时用这一条）</div>
       <div id="latestIssue" class="logid">${issueLogid || '（还没有发券请求，先切「发券超时」再去支付）'}</div>
@@ -553,9 +554,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const body = parseBody(req)
   const action = resolveAction(req, body)
   const state = readState()
+  const a = action.toLowerCase()
+  const isIssue =
+    a.includes('tripartite') ||
+    a.includes('fulfilment.order') ||
+    (a === 'unknown' && body.open_id != null)
+
+  if (state.issueMode === 'async' && isIssue) {
+    pushHit({
+      at: new Date().toISOString(),
+      action,
+      logid: logid || '(missing)',
+      orderId: String(body.order_id ?? '').trim() || undefined,
+      skuId: String(body.sku_id ?? body.third_sku_id ?? '').trim() || undefined,
+      responseSummary: 'hang>8s no HTTP 200',
+    })
+    console.info(
+      `[douyin-spi] action=${action} logid=${logid || '-'} order=${String(body.order_id ?? '')} hang>8s`,
+    )
+    await new Promise((r) => setTimeout(r, 8500))
+    const raw = res as VercelResponse & {
+      destroy?: () => void
+      writableEnded?: boolean
+      headersSent?: boolean
+    }
+    if (!raw.writableEnded && !raw.headersSent) {
+      try {
+        raw.destroy?.()
+      } catch {
+        /* 抖音侧 8s 已超时 */
+      }
+    }
+    return
+  }
 
   let out: Record<string, unknown>
-  const a = action.toLowerCase()
   if (a.includes('pre_create') || a === 'trade.order.pre_create_order') {
     out = handlePrecreate(state, body)
   } else if (a.includes('tripartite') || a.includes('fulfilment.order')) {
