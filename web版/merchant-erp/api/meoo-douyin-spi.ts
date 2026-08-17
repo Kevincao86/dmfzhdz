@@ -282,9 +282,11 @@ function json(res: VercelResponse, status: number, body: unknown): void {
 }
 
 /**
- * 抖音调商家的 SPI 回包。
- * 联调「网关错误码」若读不到 JSON 会把 HTTP 200 记成网关码（发券业务码 200=限购）。
- * code 是常见网关字段；extra/base_resp 对齐到综包络；body 不再带 charset/CORS，避免解析失败。
+ * 联调「发券接口-网关错误码==0」实际拿到 200：
+ * 抖音 Go 客户端已收到我们 HTTP 200 + data.result=0（发码中，无券码）。
+ * 校验脚本若用 JS `result || extra.error_code || httpStatus`，数字 0 为假值，会落到 HTTP 200
+ *（与发券业务码「限购=200」撞号）。extra.error_code 用字符串 "0"（proto3 int64 JSON 也推荐字符串），
+ * 对 || 为真，且 "0" == 0 成立。data 内业务码仍用数字，对齐发券文档。
  */
 function wrapSpiResponse(
   out: Record<string, unknown>,
@@ -293,9 +295,9 @@ function wrapSpiResponse(
   const data =
     out.data && typeof out.data === 'object' ? (out.data as Record<string, unknown>) : out
   return {
-    code: 0,
+    error_code: '0',
     extra: {
-      error_code: 0,
+      error_code: '0',
       description: 'success',
       sub_error_code: 0,
       sub_description: '',
