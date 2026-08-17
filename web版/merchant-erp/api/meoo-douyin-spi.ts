@@ -213,6 +213,7 @@ function handleIssue(state: SpiState, body: Record<string, unknown>): Record<str
     }
   }
   if (state.issueMode === 'async') {
+    // 官方发码中（同步发券超时）：8s 内 error_code=0、result=0、不回券码
     return {
       data: {
         error_code: 0,
@@ -282,33 +283,31 @@ function json(res: VercelResponse, status: number, body: unknown): void {
 }
 
 /**
- * 联调「发券接口-网关错误码==0」实际拿到 200：
- * 抖音 Go 客户端已收到我们 HTTP 200 + data.result=0（发码中，无券码）。
- * 校验脚本若用 JS `result || extra.error_code || httpStatus`，数字 0 为假值，会落到 HTTP 200
- *（与发券业务码「限购=200」撞号）。extra.error_code 用字符串 "0"（proto3 int64 JSON 也推荐字符串），
- * 对 || 为真，且 "0" == 0 成立。data 内业务码仍用数字，对齐发券文档。
+ * 发券 SPI 官方回包（到综：字段必须全在 data 内）。
+ * 同步发券超时 = 发码中：error_code=0（int64 数字）+ result=0 + 不回券码；8s 内返回。
+ * 禁止把 error_code 写成字符串 "0"：联调按 int64 解析失败会记成 20（其他异常）或 210xxxx（参数不合法）。
+ * 文档：https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/tripartite.code/create
  */
 function wrapSpiResponse(
   out: Record<string, unknown>,
   logid: string,
 ): Record<string, unknown> {
-  const data =
+  const raw =
     out.data && typeof out.data === 'object' ? (out.data as Record<string, unknown>) : out
+  const data: Record<string, unknown> = { ...raw }
+  if (data.error_code != null) data.error_code = Number(data.error_code) || 0
+  if (data.result != null) data.result = Number(data.result)
+  const extra = {
+    error_code: 0,
+    description: 'success',
+    sub_error_code: 0,
+    sub_description: '',
+    logid: logid || '',
+    now: Math.floor(Date.now() / 1000),
+  }
   return {
-    error_code: '0',
-    extra: {
-      error_code: '0',
-      description: 'success',
-      sub_error_code: 0,
-      sub_description: '',
-      logid: logid || '',
-      now: Math.floor(Date.now() / 1000),
-    },
-    base_resp: {
-      status_code: 0,
-      status_message: 'success',
-    },
     data,
+    extra,
   }
 }
 
