@@ -454,8 +454,9 @@ async function loadOpenApiCreds(): Promise<OpenApiCreds> {
   if (!base || !srk) {
     throw new Error('缺少抖音凭证：请在商家 ERP 绑定「ERP对接」，或配置 DOUYIN_SPI_CLIENT_KEY/SECRET')
   }
+  const restRoot = /\/rest\/v1$/i.test(base) ? base : `${base}/rest/v1`
   const u =
-    `${base}/tenant_merchant_bindings?client_key=eq.${encodeURIComponent(appId)}` +
+    `${restRoot}/tenant_merchant_bindings?client_key=eq.${encodeURIComponent(appId)}` +
     '&select=sealed_credentials,merchant_account_id&order=updated_at.desc&limit=1'
   const r = await fetch(u, {
     headers: { apikey: srk, Authorization: `Bearer ${srk}`, Accept: 'application/json' },
@@ -463,6 +464,9 @@ async function loadOpenApiCreds(): Promise<OpenApiCreds> {
   const raw = await r.text()
   if (!r.ok) throw new Error(`读取绑定失败 HTTP ${r.status}`)
   const rows = JSON.parse(raw || '[]') as Array<{ sealed_credentials?: string; merchant_account_id?: string }>
+  if (!rows[0]?.sealed_credentials) {
+    throw new Error(`未找到 ERP对接（${appId}）的来客绑定`)
+  }
   const opened = openDouyinSessionCredentials(String(rows[0]?.sealed_credentials || ''))
   if (!opened?.clientKey || !opened.clientSecret) {
     throw new Error('ERP对接绑定凭证无法解密。请到商家 ERP 重新绑定抖音来客。')
