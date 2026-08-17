@@ -756,12 +756,16 @@ function panelHtml(
       <div class="muted" style="margin-top:8px">当前模式：<span id="mode">…</span></div>
     </div>
     <div class="card">
-      <div class="muted" style="margin-bottom:8px">切桩（点链接整页跳转，蓝框=已选中。本用例点「发券超时」后再去抖音买 2 份）</div>
+      <div class="muted" style="margin-bottom:8px">切桩（点链接整页跳转，蓝框=已选中。下单失败用例只切「下单桩」，发券不用改）</div>
       <div class="muted">下单桩</div>
       <div class="row">
         <a class="btn ok${on(fail === 0)}" href="?panel=1&set_precreate_fail=0">预下单成功</a>
+        <a class="btn warn${on(fail === 1)}" href="?panel=1&set_precreate_fail=1">商品不存在</a>
         <a class="btn warn${on(fail === 2)}" href="?panel=1&set_precreate_fail=2">商品已下线</a>
+        <a class="btn warn${on(fail === 3)}" href="?panel=1&set_precreate_fail=3">未到售卖时间</a>
+        <a class="btn warn${on(fail === 4)}" href="?panel=1&set_precreate_fail=4">已过售卖时间</a>
         <a class="btn bad${on(fail === 5)}" href="?panel=1&set_precreate_fail=5">库存售罄/已抢完</a>
+        <a class="btn bad${on(fail === 6)}" href="?panel=1&set_precreate_fail=6">购买上限</a>
       </div>
       <div class="muted" style="margin-top:10px">发券桩（同步发券超时点这一行）</div>
       <div class="row">
