@@ -321,6 +321,7 @@ export async function computeShopAnalysisSummary(params: {
       'tenant_id = $1::uuid',
       sqlPayTimeGteShanghai('$2'),
       sqlPayTimeLtNextShanghai('$3'),
+      '(order_status is null or order_status not in (0, 100))',
     ]
     const args: unknown[] = [params.tenantId, params.startYmd, params.endYmd]
     let i = 4
@@ -421,6 +422,7 @@ export async function computeShopAnalysisSummary(params: {
         'open_id = any($2::text[])',
         `open_id <> ''`,
         sqlPayTimeLtStartShanghai('$3'),
+        '(order_status is null or order_status not in (0, 100))',
       ]
       const preArgs: unknown[] = [params.tenantId, unique, params.startYmd]
       let pi = 4
@@ -444,7 +446,11 @@ export async function computeShopAnalysisSummary(params: {
       const oldSet = new Set(preHist.rows.map((h) => String(h.open_id)))
       hasPreWindowHistory = oldSet.size > 0
       if (!hasPreWindowHistory) {
-        const anyWhere = ['tenant_id = $1::uuid', sqlPayTimeLtStartShanghai('$2')]
+        const anyWhere = [
+          'tenant_id = $1::uuid',
+          sqlPayTimeLtStartShanghai('$2'),
+          '(order_status is null or order_status not in (0, 100))',
+        ]
         const anyArgs: unknown[] = [params.tenantId, params.startYmd]
         let ai = 3
         if (params.platform && params.platform !== 'all') {
