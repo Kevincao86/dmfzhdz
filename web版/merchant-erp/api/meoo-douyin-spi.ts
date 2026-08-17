@@ -282,8 +282,9 @@ function json(res: VercelResponse, status: number, body: unknown): void {
 }
 
 /**
- * 到综 SPI：data + extra + base_resp。联调「网关错误码」读 BaseResp.StatusCode / extra.error_code。
- * 缺省时平台会把 HTTP 200 记成网关码（发券业务码 200=限购），校验 [网关错误码==0] 失败。
+ * 抖音调商家的 SPI 回包。
+ * 联调「网关错误码」若读不到 JSON 会把 HTTP 200 记成网关码（发券业务码 200=限购）。
+ * code 是常见网关字段；extra/base_resp 对齐到综包络；body 不再带 charset/CORS，避免解析失败。
  */
 function wrapSpiResponse(
   out: Record<string, unknown>,
@@ -291,28 +292,29 @@ function wrapSpiResponse(
 ): Record<string, unknown> {
   const data =
     out.data && typeof out.data === 'object' ? (out.data as Record<string, unknown>) : out
-  const extra = {
-    error_code: 0,
-    description: 'success',
-    sub_error_code: 0,
-    sub_description: '',
-    logid: logid || '',
-    now: Math.floor(Date.now() / 1000),
-  }
-  const baseResp = {
-    StatusCode: 0,
-    StatusMessage: 'success',
-    status_code: 0,
-    status_message: 'success',
-  }
   return {
-    error_code: 0,
-    description: 'success',
-    extra,
-    base_resp: baseResp,
-    BaseResp: baseResp,
+    code: 0,
+    extra: {
+      error_code: 0,
+      description: 'success',
+      sub_error_code: 0,
+      sub_description: '',
+      logid: logid || '',
+      now: Math.floor(Date.now() / 1000),
+    },
+    base_resp: {
+      status_code: 0,
+      status_message: 'success',
+    },
     data,
   }
+}
+
+function spiJson(res: VercelResponse, logid: string, out: Record<string, unknown>): void {
+  res.setHeader('Content-Type', 'application/json')
+  res.setHeader('X-Bytedance-Logid', logid || '')
+  res.setHeader('x-tt-logid', logid || '')
+  res.status(200).send(JSON.stringify(wrapSpiResponse(out, logid)))
 }
 
 function panelHtml(): string {
@@ -532,7 +534,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     `[douyin-spi] action=${action} logid=${logid || '-'} order=${String(body.order_id ?? '')} ${summary}`,
   )
 
-  res.setHeader('x-tt-error-code', '0')
-  res.setHeader('x-life-error-code', '0')
-  json(res, 200, wrapSpiResponse(out, logid))
+  spiJson(res, logid, out)
 }
