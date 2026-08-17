@@ -424,7 +424,7 @@ function panelHtml(state: SpiState, latestIssueLogid: string, latestPrecreateLog
 <body>
   <div class="wrap">
     <h1>抖音 SPI 联调面板</h1>
-    <p class="sub">「同步发券超时」会卡住超过 8 秒、不回 HTTP 200。请复制<strong>发券</strong> logid，不要复制预下单。蓝框=当前选中。</p>
+    <p class="sub">三方码不要去来客「团购券处理」输码（那里只核销抖音券，会误报美团券）。核销请用开放平台「验券」OpenAPI。蓝框=当前选中。</p>
     <div class="card">
       <div class="muted">发券 logid（同步发券超时用这一条）</div>
       <div id="latestIssue" class="logid">${issueLogid || '（还没有发券请求，先切「发券超时」再去支付）'}</div>
@@ -434,10 +434,14 @@ function panelHtml(state: SpiState, latestIssueLogid: string, latestPrecreateLog
         <span id="copied" class="copyok" hidden>已复制</span>
       </div>
       <div class="muted" style="margin-top:8px">预下单 logid：<span id="latestPre" class="mono">${preLogid || '—'}</span></div>
-      <div class="muted" style="margin-top:10px">三方券码（12–15 位数字，来客「团购券处理」原样粘贴，不要加空格）</div>
+      <div class="muted" style="margin-top:10px">验券参数（开放平台「团购核销」→「验券」在线调试，不要用来客「团购券处理」）</div>
+      <div class="muted" style="margin-top:6px">codes</div>
       <div id="latestCodes" class="logid">—</div>
+      <div class="muted" style="margin-top:6px">order_id</div>
+      <div id="latestOrder" class="logid">—</div>
       <div class="row">
         <button type="button" class="pri" id="copyCodes">复制券码</button>
+        <button type="button" class="ok" id="copyOrder">复制订单号</button>
       </div>
       <div class="muted" style="margin-top:8px">当前模式：<span id="mode">…</span></div>
     </div>
@@ -491,6 +495,7 @@ function panelHtml(state: SpiState, latestIssueLogid: string, latestPrecreateLog
         const codeHit = rows.find(h => Array.isArray(h.codes) && h.codes.length);
         const codesText = codeHit ? codeHit.codes.join(' ') : '（发券同步成功后会出现 12–15 位数字券码）';
         document.getElementById('latestCodes').textContent = codesText;
+        document.getElementById('latestOrder').textContent = (codeHit && codeHit.orderId) || (issueHit && issueHit.orderId) || '（发券成功后会出现抖音订单号）';
         const st = j.state || {};
         const fail = Number(st.precreateFailCode || 0);
         document.getElementById('mode').textContent =
@@ -514,6 +519,7 @@ function panelHtml(state: SpiState, latestIssueLogid: string, latestPrecreateLog
     document.getElementById('copyIssue').onclick = () => copyText(document.getElementById('latestIssue').textContent.trim());
     document.getElementById('copyPre').onclick = () => copyText(document.getElementById('latestPre').textContent.trim());
     document.getElementById('copyCodes').onclick = () => copyText(document.getElementById('latestCodes').textContent.trim());
+    document.getElementById('copyOrder').onclick = () => copyText(document.getElementById('latestOrder').textContent.trim());
     load();
     setInterval(load, 2000);
   </script>
