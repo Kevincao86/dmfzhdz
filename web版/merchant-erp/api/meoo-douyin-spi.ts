@@ -81,34 +81,44 @@ function statePath(): string {
   return path.join(home, 'stack', 'douyin-spi-acceptance.json')
 }
 
+let memState: SpiState | null = null
+
 function defaultState(): SpiState {
   return {
     precreateFailCode: 0,
-    issueMode: 'success',
+    issueMode: 'async',
     updatedAt: new Date().toISOString(),
   }
 }
 
 function readState(): SpiState {
+  if (memState) return { ...memState }
   try {
     const raw = fs.readFileSync(statePath(), 'utf8')
     const o = JSON.parse(raw) as Partial<SpiState>
     const fail = Number(o.precreateFailCode)
-    const mode = String(o.issueMode || 'success') as IssueMode
-    return {
+    const mode = String(o.issueMode || 'async') as IssueMode
+    const parsed: SpiState = {
       precreateFailCode: Number.isFinite(fail) ? fail : 0,
-      issueMode: mode === 'async' || mode === 'fail' || mode === 'success' ? mode : 'success',
+      issueMode: mode === 'async' || mode === 'fail' || mode === 'success' ? mode : 'async',
       updatedAt: String(o.updatedAt || new Date().toISOString()),
     }
+    memState = parsed
+    return { ...parsed }
   } catch {
     return defaultState()
   }
 }
 
 function writeState(next: SpiState): void {
-  const p = statePath()
-  fs.mkdirSync(path.dirname(p), { recursive: true })
-  fs.writeFileSync(p, JSON.stringify(next, null, 2), 'utf8')
+  memState = { ...next }
+  try {
+    const p = statePath()
+    fs.mkdirSync(path.dirname(p), { recursive: true })
+    fs.writeFileSync(p, JSON.stringify(next, null, 2), 'utf8')
+  } catch {
+    /* 磁盘写失败时内存桩仍生效，避免切桩按钮看起来无效 */
+  }
 }
 
 function headerOne(req: VercelRequest, name: string): string {
@@ -132,8 +142,19 @@ function parseBody(req: VercelRequest): Record<string, unknown> {
 
 function queryOne(req: VercelRequest, key: string): string {
   const v = req.query?.[key]
-  if (Array.isArray(v)) return String(v[0] || '').trim()
-  return String(v ?? '').trim()
+  if (Array.isArray(v)) {
+    const s = String(v[0] || '').trim()
+    if (s) return s
+  } else if (v != null && String(v).trim()) {
+    return String(v).trim()
+  }
+  try {
+    const raw = String(req.url || '')
+    const q = raw.includes('?') ? raw.slice(raw.indexOf('?')) : ''
+    return new URLSearchParams(q).get(key)?.trim() || ''
+  } catch {
+    return ''
+  }
 }
 
 /** 同一 URL 多场景：优先 query/header，再按 body 形状推断 */
@@ -318,7 +339,22 @@ function spiJson(res: VercelResponse, logid: string, out: Record<string, unknown
   res.status(200).send(JSON.stringify(wrapSpiResponse(out, logid)))
 }
 
-function panelHtml(): string {
+function isIssueAction(action: string): boolean {
+  const a = String(action || '').toLowerCase()
+  return a.includes('tripartite')
+}
+
+function isPrecreateAction(action: string): boolean {
+  const a = String(action || '').toLowerCase()
+  return a.includes('pre_create')
+}
+
+function panelHtml(state: SpiState, latestIssueLogid: string, latestPrecreateLogid: string): string {
+  const fail = state.precreateFailCode
+  const issue = state.issueMode
+  const on = (cond: boolean) => (cond ? ' on' : '')
+  const issueLogid = latestIssueLogid || ''
+  const preLogid = latestPrecreateLogid || ''
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -334,43 +370,49 @@ function panelHtml(): string {
     .card { background:#1e293b; border:1px solid #334155; border-radius:12px; padding:14px 16px; margin-bottom:12px; }
     .logid { font:16px/1.4 ui-monospace,Menlo,monospace; word-break:break-all; color:#38bdf8; }
     .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:10px; }
-    button, a.btn { appearance:none; border:0; border-radius:8px; padding:8px 12px; background:#334155; color:#f8fafc; cursor:pointer; text-decoration:none; font:inherit; }
+    button, a.btn { appearance:none; border:0; border-radius:8px; padding:8px 12px; background:#334155; color:#f8fafc; cursor:pointer; text-decoration:none; font:inherit; display:inline-block; }
     button.pri { background:#2563eb; }
-    button.ok { background:#0f766e; }
-    button.warn { background:#b45309; }
-    button.bad { background:#be123c; }
+    a.ok, button.ok { background:#0f766e; }
+    a.warn, button.warn { background:#b45309; }
+    a.bad, button.bad { background:#be123c; }
+    a.on, button.on { outline:3px solid #38bdf8; box-shadow:0 0 0 1px #38bdf8; }
     table { width:100%; border-collapse:collapse; font-size:12px; }
     th, td { text-align:left; padding:8px 6px; border-bottom:1px solid #334155; vertical-align:top; }
     th { color:#94a3b8; font-weight:600; }
     .mono { font-family:ui-monospace,Menlo,monospace; }
     .muted { color:#94a3b8; }
-    .okt { color:#34d399; } .badt { color:#fb7185; }
+    .okt { color:#34d399; } .badt { color:#fb7185; } .iss { color:#fbbf24; font-weight:700; }
     .copyok { color:#34d399; margin-left:8px; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>抖音 SPI 联调面板</h1>
-    <p class="sub">轻量实时日志 · 每 2 秒刷新 · 点支付后把最新 logid 填进开放平台「立即校验」</p>
+    <p class="sub">「同步发券超时」请复制下面<strong>发券</strong> logid，不要复制预下单。切桩用链接整页跳转，蓝框=当前选中。</p>
     <div class="card">
-      <div class="muted">最新 logid</div>
-      <div id="latest" class="logid">（还没有请求）</div>
+      <div class="muted">发券 logid（同步发券超时用这一条）</div>
+      <div id="latestIssue" class="logid">${issueLogid || '（还没有发券请求，先切「发券超时」再去支付）'}</div>
       <div class="row">
-        <button class="pri" id="copy">复制 logid</button>
+        <button type="button" class="pri" id="copyIssue">复制发券 logid</button>
+        <button type="button" class="ok" id="copyPre">复制预下单 logid</button>
         <span id="copied" class="copyok" hidden>已复制</span>
-        <span id="age" class="muted"></span>
       </div>
+      <div class="muted" style="margin-top:8px">预下单 logid：<span id="latestPre" class="mono">${preLogid || '—'}</span></div>
       <div class="muted" style="margin-top:8px">当前模式：<span id="mode">…</span></div>
     </div>
     <div class="card">
-      <div class="muted" style="margin-bottom:8px">切桩（切完再去抖音下单）</div>
+      <div class="muted" style="margin-bottom:8px">切桩（点链接整页跳转，蓝框=已选中。本用例点「发券超时」后再去抖音买 2 份）</div>
+      <div class="muted">下单桩</div>
       <div class="row">
-        <button class="ok" data-q="set_precreate_fail=0">预下单成功</button>
-        <button class="warn" data-q="set_precreate_fail=2">商品已下线</button>
-        <button class="bad" data-q="set_precreate_fail=5">库存售罄/已抢完</button>
-        <button class="ok" data-q="set_issue_mode=success">发券同步成功</button>
-        <button class="warn" data-q="set_issue_mode=async">发券超时(async)</button>
-        <button class="bad" data-q="set_issue_mode=fail">发券失败</button>
+        <a class="btn ok${on(fail === 0)}" href="?panel=1&set_precreate_fail=0">预下单成功</a>
+        <a class="btn warn${on(fail === 2)}" href="?panel=1&set_precreate_fail=2">商品已下线</a>
+        <a class="btn bad${on(fail === 5)}" href="?panel=1&set_precreate_fail=5">库存售罄/已抢完</a>
+      </div>
+      <div class="muted" style="margin-top:10px">发券桩（同步发券超时点这一行）</div>
+      <div class="row">
+        <a class="btn ok${on(issue === 'success')}" href="?panel=1&set_issue_mode=success">发券同步成功</a>
+        <a class="btn warn${on(issue === 'async')}" href="?panel=1&set_issue_mode=async">发券超时(async)</a>
+        <a class="btn bad${on(issue === 'fail')}" href="?panel=1&set_issue_mode=fail">发券失败</a>
       </div>
     </div>
     <div class="card">
@@ -383,40 +425,49 @@ function panelHtml(): string {
   <script>
     const failLabel = {0:'预下单成功',1:'商品不存在',2:'商品已下线',3:'未开售',4:'已过售卖',5:'库存售罄',6:'购买上限',7:'价格校验失败'};
     const issueLabel = {success:'发券同步成功',async:'发券超时',fail:'发券失败'};
+    const api = location.pathname;
     const fmt = (iso) => {
       if (!iso) return '—';
       try { return new Date(iso).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false }); }
       catch { return iso; }
     };
+    function actionName(a){
+      const s = String(a||'').toLowerCase();
+      if (s.includes('refund')) return '退款';
+      if (s.includes('tripartite')) return '发券';
+      if (s.includes('pre_create')) return '预下单';
+      return a || '—';
+    }
     async function load() {
-      const r = await fetch('?diag=1', { cache: 'no-store' });
-      const j = await r.json();
-      const latest = j.latestLogid || '';
-      document.getElementById('latest').textContent = latest || '（还没有请求）';
-      const first = (j.recentLogids || [])[0];
-      document.getElementById('age').textContent = first ? ('最近一次 ' + fmt(first.at)) : '';
-      const st = j.state || {};
-      const fail = Number(st.precreateFailCode || 0);
-      document.getElementById('mode').textContent =
-        (failLabel[fail] || ('失败码'+fail)) + ' · ' + (issueLabel[st.issueMode] || st.issueMode);
-      const tb = document.getElementById('rows');
-      const rows = j.recentLogids || [];
-      if (!rows.length) { tb.innerHTML = '<tr><td colspan="5" class="muted">暂无。扫码支付后会出现。</td></tr>'; return; }
-      tb.innerHTML = rows.map(h => {
-        const bad = String(h.responseSummary||'').includes('error_code=2') || String(h.responseSummary||'').includes('error_code=5');
-        return '<tr><td>'+fmt(h.at)+'</td><td class="mono">'+esc(h.action)+'</td><td class="mono '+(bad?'badt':'okt')+'">'+esc(h.logid)+'</td><td class="mono">'+esc(h.orderId||'')+'</td><td class="mono">'+esc(h.responseSummary||'')+'</td></tr>';
-      }).join('');
+      try {
+        const r = await fetch(api + '?diag=1&_=' + Date.now(), { cache: 'no-store' });
+        const j = await r.json();
+        const rows = j.recentLogids || [];
+        const issueHit = rows.find(h => String(h.action||'').toLowerCase().includes('tripartite'));
+        const preHit = rows.find(h => String(h.action||'').toLowerCase().includes('pre_create'));
+        document.getElementById('latestIssue').textContent = (issueHit && issueHit.logid) || '（还没有发券请求，先切「发券超时」再去支付）';
+        document.getElementById('latestPre').textContent = (preHit && preHit.logid) || '—';
+        const st = j.state || {};
+        const fail = Number(st.precreateFailCode || 0);
+        document.getElementById('mode').textContent =
+          (failLabel[fail] || ('失败码'+fail)) + ' · ' + (issueLabel[st.issueMode] || st.issueMode);
+        const tb = document.getElementById('rows');
+        if (!rows.length) { tb.innerHTML = '<tr><td colspan="5" class="muted">暂无。扫码支付后会出现。</td></tr>'; return; }
+        tb.innerHTML = rows.map(h => {
+          const name = actionName(h.action);
+          const isIssue = name === '发券';
+          return '<tr><td>'+fmt(h.at)+'</td><td class="mono '+(isIssue?'iss':'')+'">'+esc(name)+'</td><td class="mono '+(isIssue?'iss':'okt')+'">'+esc(h.logid)+'</td><td class="mono">'+esc(h.orderId||'')+'</td><td class="mono">'+esc(h.responseSummary||'')+'</td></tr>';
+        }).join('');
+      } catch (e) { console.warn(e); }
     }
     function esc(s){ return String(s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-    document.getElementById('copy').onclick = async () => {
-      const t = document.getElementById('latest').textContent.trim();
-      if (!t || t.startsWith('（')) return;
+    async function copyText(t) {
+      if (!t || t.startsWith('（') || t === '—') return;
       await navigator.clipboard.writeText(t);
       const el = document.getElementById('copied'); el.hidden = false; setTimeout(() => el.hidden = true, 1200);
-    };
-    document.querySelectorAll('button[data-q]').forEach(btn => {
-      btn.onclick = async () => { await fetch('?' + btn.getAttribute('data-q') + '&diag=1'); load(); };
-    });
+    }
+    document.getElementById('copyIssue').onclick = () => copyText(document.getElementById('latestIssue').textContent.trim());
+    document.getElementById('copyPre').onclick = () => copyText(document.getElementById('latestPre').textContent.trim());
     load();
     setInterval(load, 2000);
   </script>
@@ -454,6 +505,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     if (changed) writeState(state)
 
     const recent = hits().slice(0, 15)
+    const latestIssueLogid = recent.find((h) => isIssueAction(h.action))?.logid || ''
+    const latestPrecreateLogid = recent.find((h) => isPrecreateAction(h.action))?.logid || ''
     const payload = {
       ok: true,
       endpoint: '/api/meoo-douyin-spi',
@@ -467,7 +520,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         skuId: h.skuId,
         responseSummary: h.responseSummary,
       })),
-      latestLogid: recent[0]?.logid || null,
+      latestLogid: latestIssueLogid || recent[0]?.logid || null,
+      latestIssueLogid,
+      latestPrecreateLogid,
       hint: {
         panel: 'GET ?panel=1',
         setOfflineFail: 'GET ?set_precreate_fail=2',
@@ -479,9 +534,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     if (queryOne(req, 'panel') === '1' || queryOne(req, 'panel') === 'html') {
       res.setHeader('Content-Type', 'text/html; charset=utf-8')
       res.setHeader('Cache-Control', 'no-store')
-      res.status(200).send(panelHtml())
+      res.status(200).send(panelHtml(readState(), latestIssueLogid, latestPrecreateLogid))
       return
     }
+    res.setHeader('Cache-Control', 'no-store')
     json(res, 200, payload)
     return
   }
