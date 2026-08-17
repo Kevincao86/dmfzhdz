@@ -15,10 +15,8 @@ import path from 'node:path'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { openDouyinSessionCredentials } from './douyin-bind.js'
 import {
-  douyinOpenApiUrl,
   douyinServerFetch,
   exchangeDouyinClientToken,
-  fetchGoodlifeWithOfficialFallback,
   parseDouyinOpenApiEnvelope,
 } from './douyinOpenApiBase.js'
 
@@ -507,13 +505,15 @@ async function postCertificate(
       'content-type': 'application/json',
     }
     if (creds.merchantId) headers['Rpc-Transit-Life-Account'] = creds.merchantId
-    const { status, raw } = await fetchGoodlifeWithOfficialFallback(
-      douyinServerFetch,
-      douyinOpenApiUrl(apiPath),
-      { method: 'POST', headers, body: JSON.stringify(body) },
-    )
-    if (status < 200 || status >= 300) {
-      throw new Error(`OpenAPI HTTP ${status}：${raw.slice(0, 400)}`)
+    const officialUrl = `https://open.douyin.com${apiPath}`
+    const r = await douyinServerFetch(officialUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    })
+    const raw = await r.text()
+    if (r.status < 200 || r.status >= 300) {
+      throw new Error(`OpenAPI HTTP ${r.status}：${raw.slice(0, 400)}`)
     }
     return parseDouyinOpenApiEnvelope(raw, apiPath)
   }
@@ -655,10 +655,10 @@ function panelHtml(
 <body>
   <div class="wrap">
     <h1>抖音 SPI 联调面板</h1>
-    <p class="sub">验券不要用开放平台调试台（顶部星号不是真 token，会报 2190002）。点下面「验券」由本机用 ERP对接 凭证调 OpenAPI。蓝框=当前选中。</p>
+    <p class="sub">联调第 4/5 步只认开放平台「在线调试」产生的 extra.logid。面板「验券」能核销，但那条 log 联调查不到。请先复制 access-token 填进调试台请求头，再在调试台发验券/撤销。</p>
     ${
       openApiNotice
-        ? `<div class="card" style="border-color:#38bdf8"><div class="muted">OpenAPI 结果</div><div class="logid">${escHtml(openApiNotice)}</div></div>`
+        ? `<div class="card" style="border-color:#38bdf8"><div class="muted">OpenAPI 结果</div><div class="logid" style="white-space:pre-wrap">${escHtml(openApiNotice)}</div></div>`
         : ''
     }
     <div class="card">
@@ -670,21 +670,25 @@ function panelHtml(
         <span id="copied" class="copyok" hidden>已复制</span>
       </div>
       <div class="muted" style="margin-top:8px">预下单 logid：<span id="latestPre" class="mono">${preLogid || '—'}</span></div>
-      <div class="muted" style="margin-top:10px">验券 / 撤销（本面板调 OpenAPI，不要用来客团购券处理，也不要用开放平台调试台）</div>
+      <div class="muted" style="margin-top:10px">调试台参数（联调第 4/5 步用这里，不要填面板验券 logid）</div>
       <div class="muted" style="margin-top:6px">codes</div>
       <div id="latestCodes" class="logid">—</div>
       <div class="muted" style="margin-top:6px">order_id</div>
       <div id="latestOrder" class="logid">—</div>
-      <div class="muted" style="margin-top:6px">验券 extra.logid（联调第 4 步）</div>
+      <div class="muted" style="margin-top:6px">verify_id / certificate_id（撤销核销 body）</div>
+      <div id="latestVerifyIds" class="logid">—</div>
+      <div class="muted" style="margin-top:6px">面板验券 extra.logid（联调查不到，仅作核对）</div>
       <div id="latestVerify" class="logid">—</div>
       <div class="row">
         <button type="button" class="pri" id="copyCodes">复制券码</button>
         <button type="button" class="ok" id="copyOrder">复制订单号</button>
-        <button type="button" class="ok" id="copyVerify">复制验券 logid</button>
+        <button type="button" class="ok" id="copyDebugVerify">复制调试台验券 JSON</button>
+        <button type="button" class="ok" id="copyDebugCancel">复制调试台撤销 JSON</button>
       </div>
       <div class="row">
-        <a class="btn pri" href="?panel=1&amp;do_verify=1">验券</a>
-        <a class="btn warn" href="?panel=1&amp;do_cancel=1">撤销核销</a>
+        <a class="btn pri" href="?panel=1&amp;do_token=1">复制 access-token（填调试台请求头）</a>
+        <a class="btn warn" href="?panel=1&amp;do_cancel=1">面板撤销核销（先把券退回未核）</a>
+        <a class="btn" href="?panel=1&amp;do_verify=1">面板验券（不用于联调 logid）</a>
       </div>
       <div class="muted" style="margin-top:8px">当前模式：<span id="mode">…</span></div>
     </div>
@@ -741,8 +745,19 @@ function panelHtml(
         const codesText = codeHit ? codeHit.codes.join(' ') : '（发券同步成功后会出现 12–15 位数字券码）';
         document.getElementById('latestCodes').textContent = codesText;
         document.getElementById('latestOrder').textContent = (codeHit && codeHit.orderId) || (issueHit && issueHit.orderId) || '（发券成功后会出现抖音订单号）';
-        const verifyHit = rows.find(h => String(h.action||'').toLowerCase().includes('certificate.verify'));
-        document.getElementById('latestVerify').textContent = (verifyHit && verifyHit.logid) || '（点「验券」后出现，填联调第 4 步）';
+        const verifyHit = rows.find(h => String(h.action||'').toLowerCase().includes('certificate.verify') && (h.verifyId || h.certificateId));
+        const verifyAny = rows.find(h => String(h.action||'').toLowerCase().includes('certificate.verify'));
+        document.getElementById('latestVerify').textContent = (verifyAny && verifyAny.logid) || '（面板验券 log，联调查不到）';
+        const vid = (verifyHit && verifyHit.verifyId) || '';
+        const cid = (verifyHit && verifyHit.certificateId) || '';
+        document.getElementById('latestVerifyIds').textContent = (vid && cid) ? (vid + ' / ' + cid) : '（先面板撤销再调试台验券；撤销 JSON 需要这两项）';
+        window.__spiDebug = {
+          codes: codeHit && codeHit.codes ? codeHit.codes : [],
+          orderId: (codeHit && codeHit.orderId) || (issueHit && issueHit.orderId) || '',
+          poiId: '7569859650230781962',
+          verifyId: vid,
+          certificateId: cid,
+        };
         const st = j.state || {};
         const fail = Number(st.precreateFailCode || 0);
         document.getElementById('mode').textContent =
@@ -767,7 +782,21 @@ function panelHtml(
     document.getElementById('copyPre').onclick = () => copyText(document.getElementById('latestPre').textContent.trim());
     document.getElementById('copyCodes').onclick = () => copyText(document.getElementById('latestCodes').textContent.trim());
     document.getElementById('copyOrder').onclick = () => copyText(document.getElementById('latestOrder').textContent.trim());
-    document.getElementById('copyVerify').onclick = () => copyText(document.getElementById('latestVerify').textContent.trim());
+    document.getElementById('copyDebugVerify').onclick = () => {
+      const d = window.__spiDebug || {};
+      if (!d.codes || !d.codes.length || !d.orderId) return;
+      copyText(JSON.stringify({
+        verify_token: 'meoo-debug-' + Date.now(),
+        poi_id: d.poiId,
+        codes: d.codes,
+        order_id: d.orderId,
+      }, null, 2));
+    };
+    document.getElementById('copyDebugCancel').onclick = () => {
+      const d = window.__spiDebug || {};
+      if (!d.verifyId || !d.certificateId) return;
+      copyText(JSON.stringify({ verify_id: d.verifyId, certificate_id: d.certificateId }, null, 2));
+    };
     load();
     setInterval(load, 2000);
   </script>
@@ -807,7 +836,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     let openApiNotice = ''
     const doVerify = queryOne(req, 'do_verify') === '1'
     const doCancel = queryOne(req, 'do_cancel') === '1'
+    const doToken = queryOne(req, 'do_token') === '1'
     const wantPanel = queryOne(req, 'panel') === '1' || queryOne(req, 'panel') === 'html'
+    if (doToken) {
+      try {
+        const creds = await loadOpenApiCreds()
+        const token = await ensureSpiClientToken(creds, false)
+        openApiNotice =
+          `把下面整段贴进调试台「请求头」的 access-token（不要点 client_token 那几个字）：\n${token}`
+      } catch (e) {
+        openApiNotice = e instanceof Error ? e.message : String(e)
+      }
+      if (wantPanel) {
+        g.__meooDouyinSpiFlash = openApiNotice
+        res.setHeader('Location', '?panel=1')
+        res.setHeader('Cache-Control', 'no-store')
+        res.status(302).end()
+        return
+      }
+    }
     if (doVerify || doCancel) {
       try {
         const r = await runPanelOpenApi(doVerify ? 'verify' : 'cancel')
