@@ -64,6 +64,7 @@ export type ShopAnalysisSummary = {
   topByRefund: { name: string; productId: string; refundYuan: number; refundRate: number }[]
   mom?: ShopPeriodKpis
   yoy?: ShopPeriodKpis
+  coverageGapDays?: string[]
 }
 
 export type ShopPeriodKpis = {

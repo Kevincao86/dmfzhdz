@@ -6,7 +6,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { verifyBearerJwt } from '../vite-plugins/aiGateway/authSupabase.js'
 import { loadTenantAiContextForUser } from '../vite-plugins/tenantMembershipCore.js'
-import { fetchDouyinTradeOrderDetails } from '../vite-plugins/douyinMerchantGateway.js'
+import { fetchDouyinTradeOrderDetails, eachShanghaiWeekChunks } from '../vite-plugins/douyinMerchantGateway.js'
 import {
   backfillOrderPoiFromRaw,
   upsertDouyinOrders,
@@ -110,16 +110,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    const pulled = await fetchDouyinTradeOrderDetails(douyinToken, startDate, endDate)
-    const { upserted } = await upsertDouyinOrders(tenantId, pulled.orders)
+    const warnings: string[] = []
+    let pulled = 0
+    let upserted = 0
+    for (const chunk of eachShanghaiWeekChunks(startDate, endDate)) {
+      const r = await fetchDouyinTradeOrderDetails(douyinToken, chunk.start, chunk.end)
+      pulled += r.orders.length
+      const u = await upsertDouyinOrders(tenantId, r.orders)
+      upserted += u.upserted
+      for (const w of r.warnings) {
+        if (!warnings.includes(w)) warnings.push(w)
+      }
+    }
     const poiBackfilled = await backfillOrderPoiFromRaw(tenantId).catch(() => 0)
     sendJson(res, 200, {
       ok: true,
       platform: 'douyin',
-      pulled: pulled.orders.length,
+      pulled,
       upserted,
       poiBackfilled,
-      warnings: pulled.warnings,
+      warnings,
       startDate,
       endDate,
     })

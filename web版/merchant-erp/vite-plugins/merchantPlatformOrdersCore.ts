@@ -34,6 +34,30 @@ function sqlPayTimeLtStartShanghai(ph: string): string {
   return `pay_time < (${ph}::date::timestamp AT TIME ZONE 'Asia/Shanghai')`
 }
 
+function nextYmdUtc(ymd: string): string {
+  const m = String(ymd || '').match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!m) return ymd
+  const dt = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + 1))
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(dt.getUTCDate()).padStart(2, '0')}`
+}
+
+function eachYmdInclusive(startYmd: string, endYmd: string): string[] {
+  const out: string[] = []
+  let cur = startYmd
+  let guard = 0
+  while (cur <= endYmd && guard++ < 400) {
+    out.push(cur)
+    if (cur === endYmd) break
+    cur = nextYmdUtc(cur)
+  }
+  return out
+}
+
+function shanghaiYmdFromPayTime(v: unknown): string {
+  if (!v) return ''
+  return new Date(String(v)).toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
+}
+
 function shiftYmdByMonths(ymd: string, months: number): string {
   const m = String(ymd || '').match(/^(\d{4})-(\d{2})-(\d{2})$/)
   if (!m) return ymd
@@ -267,6 +291,8 @@ export type ShopAnalysisSummary = {
   mom?: ShopPeriodKpis
   /** 去年同月（按起止各前移 12 个日历月） */
   yoy?: ShopPeriodKpis
+  /** 所选区间内无订单的日历日（常见于同步超时/只拉了近 7 天） */
+  coverageGapDays: string[]
 }
 
 export type ShopPeriodKpis = {
@@ -330,6 +356,7 @@ export async function computeShopAnalysisSummary(params: {
       { name: string; productId: string; salesFen: number; refundFen: number; coupons: number }
     >()
     const byStore = new Map<string, { poiId: string; poiName: string; orderCount: number }>()
+    const daysWithOrders = new Set<string>()
 
     for (const raw of rows) {
       const r = raw as Record<string, unknown>
@@ -339,6 +366,8 @@ export async function computeShopAnalysisSummary(params: {
       salesFen += pay
       refundFen += refund
       couponCount += coupons
+      const day = shanghaiYmdFromPayTime(r.pay_time)
+      if (day) daysWithOrders.add(day)
       const oid = String(r.open_id || '').trim()
       if (oid) {
         withOpenId.push(oid)
@@ -362,6 +391,10 @@ export async function computeShopAnalysisSummary(params: {
       byStore.set(poiKey, st)
     }
 
+    const coverageGapDays =
+      daysWithOrders.size > 0
+        ? eachYmdInclusive(params.startYmd, params.endYmd).filter((d) => !daysWithOrders.has(d))
+        : []
     const orderCount = rows.length
     const salesYuan = Math.round(salesFen) / 100
     const refundYuan = Math.round(refundFen) / 100
@@ -527,6 +560,7 @@ export async function computeShopAnalysisSummary(params: {
       stores,
       topBySales,
       topByRefund,
+      coverageGapDays,
     }
   })
   if (params.skipCompare) return current
