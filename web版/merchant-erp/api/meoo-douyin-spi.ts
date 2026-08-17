@@ -9,6 +9,7 @@
  * GET  ?set_issue_mode=success|async|fail
  * GET  ?panel=1&do_verify=1    用已绑定 ERP对接 凭证调验券 OpenAPI（不要走开放平台调试台）
  * GET  ?panel=1&do_cancel=1    撤销核销 OpenAPI
+ * GET  ?panel=1&do_idempotent=1 同一 verify_token 再验一次（联调「幂等核销」要 result=0，不要 1208）
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -393,6 +394,22 @@ function codesForHit(h: SpiHit): string[] {
     .filter(Boolean)
 }
 
+function parseCodesQuery(raw: string): string[] {
+  return String(raw || '')
+    .split(/[,\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
+function hitVerifyResult(h: SpiHit): number {
+  const m = String(h.responseSummary || '').match(/(?:^|;)result=(-?\d+)(?:;|$)/)
+  return m ? Number(m[1]) : -1
+}
+
+function isVerifyResultZero(h: SpiHit): boolean {
+  return isVerifyAction(h.action) && hitVerifyResult(h) === 0
+}
+
 function isIssueAction(action: string): boolean {
   const a = String(action || '').toLowerCase()
   return a.includes('tripartite')
@@ -534,21 +551,38 @@ type OpenApiActionResult = { ok: boolean; notice: string; logid: string }
 
 async function runPanelOpenApi(
   kind: 'verify' | 'cancel',
-  opts?: { verifyToken?: string },
+  opts?: { verifyToken?: string; orderId?: string; codes?: string; idempotent?: boolean },
 ): Promise<OpenApiActionResult> {
   const creds = await loadOpenApiCreds()
   const recent = hits()
   if (kind === 'verify') {
-    const codeHit = recent.find((h) => codesForHit(h).length > 0)
-    const codes = codeHit ? codesForHit(codeHit) : []
-    const orderId = String(codeHit?.orderId || recent.find((h) => h.orderId)?.orderId || '').trim()
+    const qOrder = String(opts?.orderId || '').trim()
+    const qCodes = parseCodesQuery(String(opts?.codes || ''))
+    const codeHit = qOrder
+      ? recent.find((h) => h.orderId === qOrder && codesForHit(h).length > 0) ||
+        recent.find((h) => codesForHit(h).length > 0)
+      : recent.find((h) => codesForHit(h).length > 0)
+    const codes = qCodes.length ? qCodes : codeHit ? codesForHit(codeHit) : []
+    const orderId = qOrder || String(codeHit?.orderId || recent.find((h) => h.orderId)?.orderId || '').trim()
     const poiId = String(process.env.DOUYIN_SPI_POI_ID || '').trim() || SPI_DEFAULT_POI_ID
     if (!codes.length || !orderId) {
       return { ok: false, notice: '还没有三方券码。请先切「发券同步成功」并完成购买。', logid: '' }
     }
-    const lastToken = recent.find((h) => h.verifyToken)?.verifyToken || ''
+    const qToken = String(opts?.verifyToken || '').trim()
+    const successHit = recent.find(
+      (h) => isVerifyResultZero(h) && h.verifyToken && (!orderId || h.orderId === orderId),
+    )
+    const lastSuccessToken = String(successHit?.verifyToken || '').trim()
+    if (opts?.idempotent && !qToken && !lastSuccessToken) {
+      return {
+        ok: false,
+        notice:
+          '没有可回放的核销 token。请先点「验券」拿到 result=0，再点「幂等核销」。换新 token 会得到 1208，联调不认。',
+        logid: '',
+      }
+    }
     const verifyToken =
-      String(opts?.verifyToken || '').trim() || lastToken || `meoo-verify-${Date.now()}`
+      qToken || (opts?.idempotent ? lastSuccessToken : '') || `meoo-verify-${Date.now()}`
     const j = await postCertificate('/goodlife/v1/fulfilment/certificate/verify/', creds, {
       verify_token: verifyToken,
       poi_id: poiId,
@@ -564,7 +598,7 @@ async function runPanelOpenApi(
     const result = numericCode(first.result)
     const verifyId = String(first.verify_id || '').trim()
     const certificateId = String(first.certificate_id || '').trim()
-    const ok = err === 0 && (result === 0 || result === 1208 || result === 2)
+    const ok = err === 0 && result === 0
     pushHit({
       at: new Date().toISOString(),
       action: 'openapi.certificate.verify',
@@ -582,10 +616,17 @@ async function runPanelOpenApi(
     if (ok) {
       return {
         ok: true,
+        notice: opts?.idempotent
+          ? `幂等核销成功（result=0，token 未变）。把这条 extra.logid 填联调第 5 步：${logid}`
+          : `验券成功（result=0）。把这条 extra.logid 填联调「核销成功」：${logid}`,
+        logid,
+      }
+    }
+    if (err === 0 && result === 1208) {
+      return {
+        ok: false,
         notice:
-          result === 0
-            ? `验券成功。logid：${logid}`
-            : `幂等验券成功（result=${result} 已核销）。logid：${logid}`,
+          `验券返回 1208（已核销）。联调「幂等核销」不认 1208，必须用「核销成功」那次同一个 verify_token 再打才会 result=0。不要填这条 logid：${logid}`,
         logid,
       }
     }
@@ -671,7 +712,7 @@ function panelHtml(
 <body>
   <div class="wrap">
     <h1>抖音 SPI 联调面板</h1>
-    <p class="sub">联调第 4/5 步只认开放平台「在线调试」产生的 extra.logid。面板「验券」能核销，但那条 log 联调查不到。请先复制 access-token 填进调试台请求头，再在调试台发验券/撤销。</p>
+    <p class="sub">核销 / 撤销 / 幂等 的 extra.logid 在下面蓝字，复制后填联调。蓝框=当前选中。</p>
     ${
       openApiNotice
         ? `<div class="card" style="border-color:#38bdf8"><div class="muted">OpenAPI 结果</div><div class="logid" style="white-space:pre-wrap">${escHtml(openApiNotice)}</div></div>`
@@ -686,25 +727,31 @@ function panelHtml(
         <span id="copied" class="copyok" hidden>已复制</span>
       </div>
       <div class="muted" style="margin-top:8px">预下单 logid：<span id="latestPre" class="mono">${preLogid || '—'}</span></div>
-      <div class="muted" style="margin-top:10px">调试台参数（联调第 4/5 步用这里，不要填面板验券 logid）</div>
-      <div class="muted" style="margin-top:6px">codes</div>
-      <div id="latestCodes" class="logid">—</div>
-      <div class="muted" style="margin-top:6px">order_id</div>
-      <div id="latestOrder" class="logid">—</div>
-      <div class="muted" style="margin-top:6px">verify_id / certificate_id（撤销核销 body）</div>
-      <div id="latestVerifyIds" class="logid">—</div>
-      <div class="muted" style="margin-top:6px">面板验券 extra.logid（联调查不到，仅作核对）</div>
+      <div class="muted" style="margin-top:10px">联调 extra.logid（点按钮复制后填入对应步骤）</div>
+      <div class="muted" style="margin-top:6px">核销成功</div>
       <div id="latestVerify" class="logid">—</div>
+      <div class="muted" style="margin-top:6px">撤销核销</div>
+      <div id="latestCancel" class="logid">—</div>
+      <div class="muted" style="margin-top:6px">幂等核销</div>
+      <div id="latestIdempotent" class="logid">—</div>
+      <div class="row">
+        <button type="button" class="pri" id="copyVerify">复制核销 logid</button>
+        <button type="button" class="ok" id="copyCancel">复制撤销 logid</button>
+        <button type="button" class="ok" id="copyIdempotent">复制幂等 logid</button>
+      </div>
+      <div class="muted" style="margin-top:10px">codes / order_id</div>
+      <div id="latestCodes" class="logid">—</div>
+      <div id="latestOrder" class="logid">—</div>
+      <div class="muted" style="margin-top:6px">verify_id / certificate_id</div>
+      <div id="latestVerifyIds" class="logid">—</div>
       <div class="row">
         <button type="button" class="pri" id="copyCodes">复制券码</button>
         <button type="button" class="ok" id="copyOrder">复制订单号</button>
-        <button type="button" class="ok" id="copyDebugVerify">复制调试台验券 JSON</button>
-        <button type="button" class="ok" id="copyDebugCancel">复制调试台撤销 JSON</button>
       </div>
       <div class="row">
-        <a class="btn pri" href="?panel=1&amp;do_token=1">复制 access-token（填调试台请求头）</a>
-        <a class="btn warn" href="?panel=1&amp;do_cancel=1">面板撤销核销（先把券退回未核）</a>
-        <a class="btn" href="?panel=1&amp;do_verify=1">面板验券（不用于联调 logid）</a>
+        <a class="btn pri" href="?panel=1&amp;do_verify=1">验券</a>
+        <a class="btn warn" href="?panel=1&amp;do_cancel=1">撤销核销</a>
+        <a class="btn ok" href="?panel=1&amp;do_idempotent=1">幂等核销（同一 token 再验，必须 result=0）</a>
       </div>
       <div class="muted" style="margin-top:8px">当前模式：<span id="mode">…</span></div>
     </div>
@@ -761,12 +808,24 @@ function panelHtml(
         const codesText = codeHit ? codeHit.codes.join(' ') : '（发券同步成功后会出现 12–15 位数字券码）';
         document.getElementById('latestCodes').textContent = codesText;
         document.getElementById('latestOrder').textContent = (codeHit && codeHit.orderId) || (issueHit && issueHit.orderId) || '（发券成功后会出现抖音订单号）';
-        const verifyHit = rows.find(h => String(h.action||'').toLowerCase().includes('certificate.verify') && (h.verifyId || h.certificateId));
-        const verifyAny = rows.find(h => String(h.action||'').toLowerCase().includes('certificate.verify'));
-        document.getElementById('latestVerify').textContent = (verifyAny && verifyAny.logid) || '（面板验券 log，联调查不到）';
-        const vid = (verifyHit && verifyHit.verifyId) || '';
-        const cid = (verifyHit && verifyHit.certificateId) || '';
-        document.getElementById('latestVerifyIds').textContent = (vid && cid) ? (vid + ' / ' + cid) : '（先面板撤销再调试台验券；撤销 JSON 需要这两项）';
+        const isVerify = (h) => String(h.action||'').toLowerCase().includes('certificate.verify');
+        const resultOf = (h) => {
+          const m = String(h.responseSummary||'').match(/(?:^|;)result=(-?\d+)(?:;|$)/);
+          return m ? Number(m[1]) : -1;
+        };
+        const zeros = rows.filter(h => isVerify(h) && resultOf(h) === 0);
+        const idemHit = zeros.find(h => h.verifyToken && zeros.filter(x => x.verifyToken === h.verifyToken).length >= 2);
+        const verifyHit = idemHit
+          ? zeros.filter(x => x.verifyToken === idemHit.verifyToken).slice(-1)[0]
+          : zeros[0];
+        const cancelHit = rows.find(h => String(h.action||'').toLowerCase().includes('certificate.cancel'));
+        document.getElementById('latestVerify').textContent = (verifyHit && verifyHit.logid) || '（先点「验券」，result 必须是 0）';
+        document.getElementById('latestCancel').textContent = (cancelHit && cancelHit.logid) || '—';
+        document.getElementById('latestIdempotent').textContent = (idemHit && idemHit.logid) || '（验券成功后点「幂等核销」，不要换 token）';
+        const idsHit = rows.find(h => isVerify(h) && (h.verifyId || h.certificateId));
+        const vid = (idsHit && idsHit.verifyId) || '';
+        const cid = (idsHit && idsHit.certificateId) || '';
+        document.getElementById('latestVerifyIds').textContent = (vid && cid) ? (vid + ' / ' + cid) : '（验券成功后会出现）';
         window.__spiDebug = {
           codes: codeHit && codeHit.codes ? codeHit.codes : [],
           orderId: (codeHit && codeHit.orderId) || (issueHit && issueHit.orderId) || '',
@@ -798,21 +857,9 @@ function panelHtml(
     document.getElementById('copyPre').onclick = () => copyText(document.getElementById('latestPre').textContent.trim());
     document.getElementById('copyCodes').onclick = () => copyText(document.getElementById('latestCodes').textContent.trim());
     document.getElementById('copyOrder').onclick = () => copyText(document.getElementById('latestOrder').textContent.trim());
-    document.getElementById('copyDebugVerify').onclick = () => {
-      const d = window.__spiDebug || {};
-      if (!d.codes || !d.codes.length || !d.orderId) return;
-      copyText(JSON.stringify({
-        verify_token: 'meoo-debug-' + Date.now(),
-        poi_id: d.poiId,
-        codes: d.codes,
-        order_id: d.orderId,
-      }, null, 2));
-    };
-    document.getElementById('copyDebugCancel').onclick = () => {
-      const d = window.__spiDebug || {};
-      if (!d.verifyId || !d.certificateId) return;
-      copyText(JSON.stringify({ verify_id: d.verifyId, certificate_id: d.certificateId }, null, 2));
-    };
+    document.getElementById('copyVerify').onclick = () => copyText(document.getElementById('latestVerify').textContent.trim());
+    document.getElementById('copyCancel').onclick = () => copyText(document.getElementById('latestCancel').textContent.trim());
+    document.getElementById('copyIdempotent').onclick = () => copyText(document.getElementById('latestIdempotent').textContent.trim());
     load();
     setInterval(load, 2000);
   </script>
@@ -852,6 +899,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     let openApiNotice = ''
     const doVerify = queryOne(req, 'do_verify') === '1'
     const doCancel = queryOne(req, 'do_cancel') === '1'
+    const doIdempotent = queryOne(req, 'do_idempotent') === '1'
     const doToken = queryOne(req, 'do_token') === '1'
     const wantPanel = queryOne(req, 'panel') === '1' || queryOne(req, 'panel') === 'html'
     if (doToken) {
@@ -871,10 +919,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return
       }
     }
-    if (doVerify || doCancel) {
+    if (doVerify || doCancel || doIdempotent) {
       try {
-        const r = await runPanelOpenApi(doVerify ? 'verify' : 'cancel', {
+        const r = await runPanelOpenApi(doCancel ? 'cancel' : 'verify', {
           verifyToken: queryOne(req, 'verify_token'),
+          orderId: queryOne(req, 'order_id'),
+          codes: queryOne(req, 'codes'),
+          idempotent: doIdempotent || queryOne(req, 'idempotent') === '1',
         })
         openApiNotice = r.notice
       } catch (e) {
