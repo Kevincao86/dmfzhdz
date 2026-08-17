@@ -28,6 +28,7 @@ type SpiHit = {
   orderId?: string
   skuId?: string
   responseSummary: string
+  codes?: string[]
 }
 
 const MAX_HITS = 40
@@ -248,7 +249,7 @@ function handleIssue(state: SpiState, body: Record<string, unknown>): Record<str
   const orderId = String(body.order_id ?? '').trim() || String(Date.now())
   const certificates = Array.from({ length: count }, (_, i) => {
     const id = `meoo_cert_${orderId}_${i + 1}`
-    return { certificate_id: id, code: `MEOO${orderId.slice(-8)}${i + 1}`.replace(/\W/g, '').slice(0, 24) }
+    return { certificate_id: id, code: issueCode(orderId, i + 1) }
   })
   return {
     data: {
@@ -338,6 +339,36 @@ function spiJson(res: VercelResponse, logid: string, out: Record<string, unknown
   res.status(200).send(JSON.stringify(wrapSpiResponse(out, logid)))
 }
 
+function issueCode(orderId: string, index1: number): string {
+  return `MEOO${String(orderId).slice(-8)}${index1}`.replace(/\W/g, '').slice(0, 24)
+}
+
+function codesFromIssueData(data: Record<string, unknown>, orderId?: string): string[] {
+  const raw = data.codes
+  if (Array.isArray(raw) && raw.length) {
+    return raw.map((x) => String(x || '').trim()).filter(Boolean)
+  }
+  const certs = data.certificates
+  if (Array.isArray(certs)) {
+    const fromCert = certs
+      .map((c) =>
+        c && typeof c === 'object' && 'code' in c ? String((c as { code?: unknown }).code || '').trim() : '',
+      )
+      .filter(Boolean)
+    if (fromCert.length) return fromCert
+  }
+  if (Number(data.result) === 1 && orderId) return [issueCode(orderId, 1)]
+  return []
+}
+
+function codesForHit(h: SpiHit): string[] {
+  if (h.codes && h.codes.length) return h.codes
+  if (h.orderId && isIssueAction(h.action) && /(?:^|;)result=1(?:;|$)/.test(h.responseSummary || '')) {
+    return [issueCode(h.orderId, 1)]
+  }
+  return []
+}
+
 function isIssueAction(action: string): boolean {
   const a = String(action || '').toLowerCase()
   return a.includes('tripartite')
@@ -397,6 +428,11 @@ function panelHtml(state: SpiState, latestIssueLogid: string, latestPrecreateLog
         <span id="copied" class="copyok" hidden>已复制</span>
       </div>
       <div class="muted" style="margin-top:8px">预下单 logid：<span id="latestPre" class="mono">${preLogid || '—'}</span></div>
+      <div class="muted" style="margin-top:10px">三方券码（来客「团购券处理」输入框填这个，不是抖音那串 12***** 码）</div>
+      <div id="latestCodes" class="logid">—</div>
+      <div class="row">
+        <button type="button" class="pri" id="copyCodes">复制券码</button>
+      </div>
       <div class="muted" style="margin-top:8px">当前模式：<span id="mode">…</span></div>
     </div>
     <div class="card">
@@ -416,8 +452,8 @@ function panelHtml(state: SpiState, latestIssueLogid: string, latestPrecreateLog
     </div>
     <div class="card">
       <table>
-        <thead><tr><th>时间</th><th>动作</th><th>logid</th><th>订单</th><th>返回</th></tr></thead>
-        <tbody id="rows"><tr><td colspan="5" class="muted">暂无</td></tr></tbody>
+        <thead><tr><th>时间</th><th>动作</th><th>logid</th><th>订单</th><th>券码</th><th>返回</th></tr></thead>
+        <tbody id="rows"><tr><td colspan="6" class="muted">暂无</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -446,16 +482,20 @@ function panelHtml(state: SpiState, latestIssueLogid: string, latestPrecreateLog
         const preHit = rows.find(h => String(h.action||'').toLowerCase().includes('pre_create'));
         document.getElementById('latestIssue').textContent = (issueHit && issueHit.logid) || '（还没有发券请求，先切「发券超时」再去支付）';
         document.getElementById('latestPre').textContent = (preHit && preHit.logid) || '—';
+        const codeHit = rows.find(h => Array.isArray(h.codes) && h.codes.length);
+        const codesText = codeHit ? codeHit.codes.join(' ') : '（发券同步成功后会出现 MEOO 开头的三方码）';
+        document.getElementById('latestCodes').textContent = codesText;
         const st = j.state || {};
         const fail = Number(st.precreateFailCode || 0);
         document.getElementById('mode').textContent =
           (failLabel[fail] || ('失败码'+fail)) + ' · ' + (issueLabel[st.issueMode] || st.issueMode);
         const tb = document.getElementById('rows');
-        if (!rows.length) { tb.innerHTML = '<tr><td colspan="5" class="muted">暂无。扫码支付后会出现。</td></tr>'; return; }
+        if (!rows.length) { tb.innerHTML = '<tr><td colspan="6" class="muted">暂无。扫码支付后会出现。</td></tr>'; return; }
         tb.innerHTML = rows.map(h => {
           const name = actionName(h.action);
           const isIssue = name === '发券';
-          return '<tr><td>'+fmt(h.at)+'</td><td class="mono '+(isIssue?'iss':'')+'">'+esc(name)+'</td><td class="mono '+(isIssue?'iss':'okt')+'">'+esc(h.logid)+'</td><td class="mono">'+esc(h.orderId||'')+'</td><td class="mono">'+esc(h.responseSummary||'')+'</td></tr>';
+          const codes = (h.codes && h.codes.length) ? h.codes.join(' ') : '—';
+          return '<tr><td>'+fmt(h.at)+'</td><td class="mono '+(isIssue?'iss':'')+'">'+esc(name)+'</td><td class="mono '+(isIssue?'iss':'okt')+'">'+esc(h.logid)+'</td><td class="mono">'+esc(h.orderId||'')+'</td><td class="mono iss">'+esc(codes)+'</td><td class="mono">'+esc(h.responseSummary||'')+'</td></tr>';
         }).join('');
       } catch (e) { console.warn(e); }
     }
@@ -467,6 +507,7 @@ function panelHtml(state: SpiState, latestIssueLogid: string, latestPrecreateLog
     }
     document.getElementById('copyIssue').onclick = () => copyText(document.getElementById('latestIssue').textContent.trim());
     document.getElementById('copyPre').onclick = () => copyText(document.getElementById('latestPre').textContent.trim());
+    document.getElementById('copyCodes').onclick = () => copyText(document.getElementById('latestCodes').textContent.trim());
     load();
     setInterval(load, 2000);
   </script>
@@ -517,6 +558,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         logid: h.logid,
         orderId: h.orderId,
         skuId: h.skuId,
+        codes: codesForHit(h),
         responseSummary: h.responseSummary,
       })),
       latestLogid: latestIssueLogid || recent[0]?.logid || null,
@@ -608,14 +650,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   const data = (out.data && typeof out.data === 'object' ? out.data : {}) as Record<string, unknown>
-  const summary = `error_code=${data.error_code ?? ''};result=${data.result ?? ''};ext=${data.ext_order_id ?? ''}`
+  const orderId = String(body.order_id ?? '').trim() || undefined
+  const codes = codesFromIssueData(data, orderId)
+  const summary =
+    `error_code=${data.error_code ?? ''};result=${data.result ?? ''};ext=${data.ext_order_id ?? ''}` +
+    (codes.length ? `;codes=${codes.join(',')}` : '')
   pushHit({
     at: new Date().toISOString(),
     action,
     logid: logid || '(missing)',
-    orderId: String(body.order_id ?? '').trim() || undefined,
+    orderId,
     skuId: String(body.sku_id ?? body.third_sku_id ?? '').trim() || undefined,
     responseSummary: summary,
+    codes: codes.length ? codes : undefined,
   })
 
   console.info(
