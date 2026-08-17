@@ -39,6 +39,7 @@ type SpiHit = {
   codes?: string[]
   verifyId?: string
   certificateId?: string
+  verifyToken?: string
 }
 
 const MAX_HITS = 40
@@ -531,7 +532,10 @@ async function postCertificate(
 
 type OpenApiActionResult = { ok: boolean; notice: string; logid: string }
 
-async function runPanelOpenApi(kind: 'verify' | 'cancel'): Promise<OpenApiActionResult> {
+async function runPanelOpenApi(
+  kind: 'verify' | 'cancel',
+  opts?: { verifyToken?: string },
+): Promise<OpenApiActionResult> {
   const creds = await loadOpenApiCreds()
   const recent = hits()
   if (kind === 'verify') {
@@ -542,8 +546,11 @@ async function runPanelOpenApi(kind: 'verify' | 'cancel'): Promise<OpenApiAction
     if (!codes.length || !orderId) {
       return { ok: false, notice: '还没有三方券码。请先切「发券同步成功」并完成购买。', logid: '' }
     }
+    const lastToken = recent.find((h) => h.verifyToken)?.verifyToken || ''
+    const verifyToken =
+      String(opts?.verifyToken || '').trim() || lastToken || `meoo-verify-${Date.now()}`
     const j = await postCertificate('/goodlife/v1/fulfilment/certificate/verify/', creds, {
-      verify_token: `meoo-verify-${Date.now()}`,
+      verify_token: verifyToken,
       poi_id: poiId,
       codes,
       order_id: orderId,
@@ -557,7 +564,7 @@ async function runPanelOpenApi(kind: 'verify' | 'cancel'): Promise<OpenApiAction
     const result = numericCode(first.result)
     const verifyId = String(first.verify_id || '').trim()
     const certificateId = String(first.certificate_id || '').trim()
-    const ok = err === 0 && result === 0
+    const ok = err === 0 && (result === 0 || result === 1208 || result === 2)
     pushHit({
       at: new Date().toISOString(),
       action: 'openapi.certificate.verify',
@@ -566,12 +573,21 @@ async function runPanelOpenApi(kind: 'verify' | 'cancel'): Promise<OpenApiAction
       codes,
       responseSummary:
         `error_code=${err};result=${result};desc=${String(data.description || extra.description || first.msg || '')}` +
-        (verifyId ? `;verify_id=${verifyId}` : ''),
+        (verifyId ? `;verify_id=${verifyId}` : '') +
+        `;verify_token=${verifyToken}`,
       verifyId: verifyId || undefined,
       certificateId: certificateId || undefined,
+      verifyToken,
     })
     if (ok) {
-      return { ok: true, notice: `验券成功。把这条 extra.logid 填联调第 4 步：${logid}`, logid }
+      return {
+        ok: true,
+        notice:
+          result === 0
+            ? `验券成功。logid：${logid}`
+            : `幂等验券成功（result=${result} 已核销）。logid：${logid}`,
+        logid,
+      }
     }
     return {
       ok: false,
@@ -857,7 +873,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
     if (doVerify || doCancel) {
       try {
-        const r = await runPanelOpenApi(doVerify ? 'verify' : 'cancel')
+        const r = await runPanelOpenApi(doVerify ? 'verify' : 'cancel', {
+          verifyToken: queryOne(req, 'verify_token'),
+        })
         openApiNotice = r.notice
       } catch (e) {
         openApiNotice = e instanceof Error ? e.message : String(e)
@@ -892,6 +910,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         codes: codesForHit(h),
         verifyId: h.verifyId,
         certificateId: h.certificateId,
+        verifyToken: h.verifyToken,
         responseSummary: h.responseSummary,
       })),
       latestLogid: latestIssueLogid || recent[0]?.logid || null,
