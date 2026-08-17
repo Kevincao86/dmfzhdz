@@ -282,8 +282,8 @@ function json(res: VercelResponse, status: number, body: unknown): void {
 }
 
 /**
- * 开放平台联调把 extra.error_code 当「网关错误码」。
- * 只回 data.error_code 时，平台会把 HTTP 200 记成网关码，校验 [网关错误码==0] 失败。
+ * 到综 SPI：data + extra + base_resp。联调「网关错误码」读 BaseResp.StatusCode / extra.error_code。
+ * 缺省时平台会把 HTTP 200 记成网关码（发券业务码 200=限购），校验 [网关错误码==0] 失败。
  */
 function wrapSpiResponse(
   out: Record<string, unknown>,
@@ -291,17 +291,26 @@ function wrapSpiResponse(
 ): Record<string, unknown> {
   const data =
     out.data && typeof out.data === 'object' ? (out.data as Record<string, unknown>) : out
+  const extra = {
+    error_code: 0,
+    description: 'success',
+    sub_error_code: 0,
+    sub_description: '',
+    logid: logid || '',
+    now: Math.floor(Date.now() / 1000),
+  }
+  const baseResp = {
+    StatusCode: 0,
+    StatusMessage: 'success',
+    status_code: 0,
+    status_message: 'success',
+  }
   return {
     error_code: 0,
     description: 'success',
-    extra: {
-      error_code: 0,
-      description: 'success',
-      sub_error_code: 0,
-      sub_description: '',
-      logid: logid || '',
-      now: Math.floor(Date.now() / 1000),
-    },
+    extra,
+    base_resp: baseResp,
+    BaseResp: baseResp,
     data,
   }
 }
@@ -523,5 +532,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     `[douyin-spi] action=${action} logid=${logid || '-'} order=${String(body.order_id ?? '')} ${summary}`,
   )
 
+  res.setHeader('x-tt-error-code', '0')
+  res.setHeader('x-life-error-code', '0')
   json(res, 200, wrapSpiResponse(out, logid))
 }
