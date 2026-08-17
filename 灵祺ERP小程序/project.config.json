@@ -35,10 +35,6 @@
       {
         "value": "images/**",
         "type": "glob"
-      },
-      {
-        "value": "pages/agent/**",
-        "type": "glob"
       }
     ],
     "include": []

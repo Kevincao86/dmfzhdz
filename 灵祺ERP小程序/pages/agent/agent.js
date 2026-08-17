@@ -18,7 +18,7 @@ const FILTER_TABS = [
 ]
 
 const AGENT_WELCOME =
-  '你好！我是经营助手，我可以帮你快速创建各类产品文案和招聘需求文案（Brief）。请告诉我你的需求吧~'
+  '你好！我是灵祺助手，我可以帮你快速创建各类产品文案和招聘需求文案（Brief）。请告诉我你的需求吧~'
 
 function hasUserChat(messages) {
   return (messages || []).some((m) => m.role === 'user')
@@ -167,8 +167,7 @@ Page({
           ? Math.max(0, sys.screenHeight - sys.safeArea.bottom)
           : 0)
       // 底栏：tab(88rpx) + 安全区；输入条约 112rpx（与 composer-dock 实际高度对齐）
-      const tabBarPx = 0
-      const bottomSafePx = safeBottom + 12
+      const tabBarPx = Math.round((88 * sys.windowWidth) / 750) + safeBottom
       const dockPx = Math.round((112 * sys.windowWidth) / 750)
       const plusPx = this.data.showPlusPanel ? Math.round((200 * sys.windowWidth) / 750) : 0
       const shortcutPx = !this.data.hasChat
@@ -183,12 +182,15 @@ Page({
         statusBarH,
         headerH,
         // 仅预留底部输入条+Tab；顶栏已用 padding-top，切勿再把 headerH 加进底部（会出大块空白遮挡）
-        scrollBottomPad: dockPx + attachPx + plusPx + shortcutPx + bottomSafePx,
+        scrollBottomPad: dockPx + attachPx + plusPx + shortcutPx + tabBarPx + 12,
       })
     } catch (_) {}
   },
 
   onShow() {
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+      this.getTabBar().setData({ selected: 1 })
+    }
     const real = api.isRealAuthed()
     this.setData({ guestMode: !real, workspace: 'chat' })
     if (!real) {
@@ -224,7 +226,7 @@ Page({
   promptAgentLogin() {
     wx.showModal({
       title: '请先登录',
-      content: '经营助手需登录商家账号后才能使用。',
+      content: '灵祺助手需登录商家账号后才能使用。',
       showCancel: true,
       cancelText: '稍后',
       confirmText: '去登录',
@@ -551,7 +553,7 @@ Page({
   onOpenTaskResultNav(e) {
     const url = e.currentTarget.dataset.url
     if (!url) return
-    if (url.includes('/pages/functions/') || url.includes('/pages/dashboard/') || url.includes('/pages/mine/')) {
+    if (url.includes('/pages/functions/') || url.includes('/pages/agent/') || url.includes('/pages/dashboard/') || url.includes('/pages/mine/')) {
       wx.switchTab({ url })
       return
     }
