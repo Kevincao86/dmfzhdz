@@ -418,6 +418,12 @@ export default function StoreAnalysisPage() {
       {err ? (
         <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{err}</div>
       ) : null}
+      {summary?.coverageGapDays && summary.coverageGapDays.length > 0 ? (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          所选区间有 {summary.coverageGapDays.length} 天没有订单记录（例如只同步了近 7
+          天会留下空洞），成交额会明显低于来客后台。请再点「同步数据」，起止日期须与来客一致。
+        </div>
+      ) : null}
 
       {!summary && loading ? (
         <div className="flex items-center gap-2 text-sm text-slate-500">
