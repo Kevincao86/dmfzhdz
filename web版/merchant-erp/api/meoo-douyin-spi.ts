@@ -5,8 +5,10 @@
  * 说明：业务侧可不启用真实履约；本桩用于开放平台必验用例。
  * GET  ?diag=1                 查看最近 logid / 当前模式
  * GET  ?panel=1                联调反馈面板（自动刷新 logid）
+ * GET  ?set_scenario=order_fail_limit  一键切联调用例（见面板）
  * GET  ?set_precreate_fail=2   预下单固定失败码（1/2/3/4/5/6/7；0=成功）
  * GET  ?set_issue_mode=success|async|fail
+ * GET  ?set_refund_mode=agree|reject
  * GET  ?panel=1&do_verify=1    用已绑定 ERP对接 凭证调验券 OpenAPI（不要走开放平台调试台）
  * GET  ?panel=1&do_cancel=1    撤销核销 OpenAPI
  * GET  ?panel=1&do_idempotent=1 同一 verify_token 再验一次（联调「幂等核销」要 result=0，不要 1208）
@@ -24,10 +26,204 @@ import {
 export const config = { maxDuration: 12 }
 
 type IssueMode = 'success' | 'async' | 'fail'
+type RefundMode = 'agree' | 'reject'
 type SpiState = {
   precreateFailCode: number
   issueMode: IssueMode
+  refundMode: RefundMode
+  scenario: string
   updatedAt: string
+}
+
+type SpiScenario = {
+  id: string
+  group: 'order_fail' | 'fulfil'
+  title: string
+  precreateFailCode: number
+  issueMode: IssueMode
+  refundMode: RefundMode
+  buy: string
+  copy: string
+  how: string
+}
+
+const SPI_SCENARIOS: SpiScenario[] = [
+  {
+    id: 'order_fail_no_sku',
+    group: 'order_fail',
+    title: '下单失败 · 商品ID不存在',
+    precreateFailCode: 1,
+    issueMode: 'success',
+    refundMode: 'agree',
+    buy: '买 1 份（应失败）',
+    copy: '预下单 logid',
+    how: '来客库存必须>0，能看到购买按钮。不要改商品ID。点购买后预下单回 error_code=1。',
+  },
+  {
+    id: 'order_fail_offline',
+    group: 'order_fail',
+    title: '下单失败 · 商品已下线',
+    precreateFailCode: 2,
+    issueMode: 'success',
+    refundMode: 'agree',
+    buy: '买 1 份（应失败）',
+    copy: '预下单 logid',
+    how: '来客库存必须>0。点购买后预下单回 error_code=2。此桩可能让抖音把商品标成不可买，测完请换新测试商品。',
+  },
+  {
+    id: 'order_fail_not_started',
+    group: 'order_fail',
+    title: '下单失败 · 未到售卖开始时间',
+    precreateFailCode: 3,
+    issueMode: 'success',
+    refundMode: 'agree',
+    buy: '买 1 份（应失败）',
+    copy: '预下单 logid',
+    how: '来客库存必须>0，不要改售卖开始时间。点购买后预下单回 error_code=3。',
+  },
+  {
+    id: 'order_fail_ended',
+    group: 'order_fail',
+    title: '下单失败 · 已过售卖结束时间',
+    precreateFailCode: 4,
+    issueMode: 'success',
+    refundMode: 'agree',
+    buy: '买 1 份（应失败）',
+    copy: '预下单 logid',
+    how: '来客库存必须>0，不要改售卖结束时间。点购买后预下单回 error_code=4。',
+  },
+  {
+    id: 'order_fail_sold_out',
+    group: 'order_fail',
+    title: '下单失败 · 商品库存售罄',
+    precreateFailCode: 5,
+    issueMode: 'success',
+    refundMode: 'agree',
+    buy: '买 1 份（应失败）',
+    copy: '预下单 logid',
+    how: '禁止把来客剩余库存改成 0（前端会没有购买按钮）。库存留着，点购买后预下单回 error_code=5。',
+  },
+  {
+    id: 'order_fail_limit',
+    group: 'order_fail',
+    title: '下单失败 · 已达到购买上限',
+    precreateFailCode: 6,
+    issueMode: 'success',
+    refundMode: 'agree',
+    buy: '买 1 份（应失败）',
+    copy: '预下单 logid',
+    how: '禁止用来客每人限购。库存>0，点购买后预下单回 error_code=6。',
+  },
+  {
+    id: 'order_fail_price',
+    group: 'order_fail',
+    title: '下单失败 · 商家价格校验失败',
+    precreateFailCode: 7,
+    issueMode: 'success',
+    refundMode: 'agree',
+    buy: '买 1 份（应失败）',
+    copy: '预下单 logid',
+    how: '来客库存必须>0，不要改售价。点购买后预下单回 error_code=7。',
+  },
+  {
+    id: 'issue_sync_fail',
+    group: 'fulfil',
+    title: '购买 1 份 · 同步发券失败',
+    precreateFailCode: 0,
+    issueMode: 'fail',
+    refundMode: 'agree',
+    buy: '买 1 份并支付',
+    copy: '发券 logid',
+    how: '下单要成功。发券回 error_code≠0。填发券那条 logid，不要填预下单。',
+  },
+  {
+    id: 'buy1_issue_verify',
+    group: 'fulfil',
+    title: '购买 1 份 · 同步发券 · 核销 / 幂等',
+    precreateFailCode: 0,
+    issueMode: 'success',
+    refundMode: 'agree',
+    buy: '买 1 份并支付',
+    copy: '发券 → 核销 extra.logid → 幂等 extra.logid',
+    how: '先复制发券 logid。核销点「验券」，幂等点「幂等核销」（同一 token，result 必须是 0）。',
+  },
+  {
+    id: 'buy1_cs_refund',
+    group: 'fulfil',
+    title: '购买 1 份 · 发券成功 · 客服强退 · 通知商家退款成功',
+    precreateFailCode: 0,
+    issueMode: 'success',
+    refundMode: 'agree',
+    buy: '买 1 份并支付',
+    copy: '发券 logid，退款后来客/SPI 退款 logid',
+    how: '发券成功后去抖音客服强退。本桩同意退款。复制退款 logid 填「通知商家退款成功」。',
+  },
+  {
+    id: 'buy1_verify_cs_refund',
+    group: 'fulfil',
+    title: '购买 1 份 · 发券成功 · 核销 · 客服强退 · 通知商家退款成功',
+    precreateFailCode: 0,
+    issueMode: 'success',
+    refundMode: 'agree',
+    buy: '买 1 份并支付',
+    copy: '发券 / 核销 extra.logid / 退款 logid',
+    how: '支付后点「验券」，再到抖音客服强退。本桩同意退款。',
+  },
+  {
+    id: 'buy2_partial_refund',
+    group: 'fulfil',
+    title: '购买 2 份 · 同步发券 · 部分核销 · 同步退款成功',
+    precreateFailCode: 0,
+    issueMode: 'success',
+    refundMode: 'agree',
+    buy: '买 2 份并支付',
+    copy: '发券 logid、核销 extra.logid、退款 logid',
+    how: '支付后点「验第 1 张」只核一张，再发起退款。本桩同意退款。',
+  },
+  {
+    id: 'buy2_timeout_refund_reject',
+    group: 'fulfil',
+    title: '购买 2 份 · 同步发券超时 · 同步退款拒绝补码',
+    precreateFailCode: 0,
+    issueMode: 'async',
+    refundMode: 'reject',
+    buy: '买 2 份并支付',
+    copy: '发券 logid（超时那条）、退款 logid',
+    how: '发券桩会超过 8s 不回成功。退款时本桩拒绝（不补码）。填发券超时 logid 和退款 logid。',
+  },
+]
+
+function scenarioById(id: string): SpiScenario | undefined {
+  return SPI_SCENARIOS.find((s) => s.id === id)
+}
+
+function applyScenario(state: SpiState, sc: SpiScenario): void {
+  state.precreateFailCode = sc.precreateFailCode
+  state.issueMode = sc.issueMode
+  state.refundMode = sc.refundMode
+  state.scenario = sc.id
+  state.updatedAt = new Date().toISOString()
+}
+
+function currentScenario(state: SpiState): SpiScenario | undefined {
+  const named = scenarioById(state.scenario)
+  if (
+    named &&
+    named.precreateFailCode === state.precreateFailCode &&
+    named.issueMode === state.issueMode &&
+    named.refundMode === state.refundMode
+  ) {
+    return named
+  }
+  const matched = SPI_SCENARIOS.filter(
+    (s) =>
+      s.precreateFailCode === state.precreateFailCode &&
+      s.issueMode === state.issueMode &&
+      s.refundMode === state.refundMode,
+  )
+  if (matched.length === 1) return matched[0]
+  if (named && matched.some((s) => s.id === named.id)) return named
+  return matched[0]
 }
 
 type SpiHit = {
@@ -107,6 +303,8 @@ function defaultState(): SpiState {
   return {
     precreateFailCode: 0,
     issueMode: 'async',
+    refundMode: 'agree',
+    scenario: '',
     updatedAt: new Date().toISOString(),
   }
 }
@@ -118,9 +316,12 @@ function readState(): SpiState {
     const o = JSON.parse(raw) as Partial<SpiState>
     const fail = Number(o.precreateFailCode)
     const mode = String(o.issueMode || 'async') as IssueMode
+    const refund = String(o.refundMode || 'agree') as RefundMode
     const parsed: SpiState = {
       precreateFailCode: Number.isFinite(fail) ? fail : 0,
       issueMode: mode === 'async' || mode === 'fail' || mode === 'success' ? mode : 'async',
+      refundMode: refund === 'reject' ? 'reject' : 'agree',
+      scenario: String(o.scenario || ''),
       updatedAt: String(o.updatedAt || new Date().toISOString()),
     }
     memState = parsed
@@ -245,8 +446,8 @@ function handleIssue(state: SpiState, body: Record<string, unknown>): Record<str
   if (state.issueMode === 'fail') {
     return {
       data: {
-        error_code: 0,
-        description: 'success',
+        error_code: 20,
+        description: '发券失败',
         result: 2,
         fail_reason: 'ACCEPTANCE_FORCE_FAIL',
         fail_reason_desc: '联调过审：强制发券失败',
@@ -282,8 +483,16 @@ function handleIssue(state: SpiState, body: Record<string, unknown>): Record<str
   }
 }
 
-function handleRefund(_body: Record<string, unknown>): Record<string, unknown> {
-  // 默认同意退款，覆盖多数「退款成功」用例；拒绝补码用例可用 set 扩展
+function handleRefund(state: SpiState, _body: Record<string, unknown>): Record<string, unknown> {
+  if (state.refundMode === 'reject') {
+    return {
+      data: {
+        error_code: 0,
+        description: '拒绝退款',
+        result: 2,
+      },
+    }
+  }
   return {
     data: {
       error_code: 0,
@@ -423,6 +632,11 @@ function isPrecreateAction(action: string): boolean {
 function isVerifyAction(action: string): boolean {
   const a = String(action || '').toLowerCase()
   return a.includes('certificate.verify')
+}
+
+function isRefundAction(action: string): boolean {
+  const a = String(action || '').toLowerCase()
+  return a.includes('refund')
 }
 
 function escHtml(s: string): string {
@@ -676,9 +890,26 @@ function panelHtml(
 ): string {
   const fail = state.precreateFailCode
   const issue = state.issueMode
+  const refund = state.refundMode
   const on = (cond: boolean) => (cond ? ' on' : '')
   const issueLogid = latestIssueLogid || ''
   const preLogid = latestPrecreateLogid || ''
+  const sc = currentScenario(state)
+  const sceneBtns = (group: SpiScenario['group']) =>
+    SPI_SCENARIOS.filter((s) => s.group === group)
+      .map(
+        (s) =>
+          `<a class="btn scene${on(sc?.id === s.id)}" href="?panel=1&set_scenario=${encodeURIComponent(s.id)}">${escHtml(s.title)}</a>`,
+      )
+      .join('')
+  const sceneCard = sc
+    ? `<div class="card" style="border-color:#38bdf8">
+      <div class="muted">当前用例</div>
+      <div class="logid">${escHtml(sc.title)}</div>
+      <p class="how">${escHtml(sc.how)}</p>
+      <div class="muted" style="margin-top:8px">去抖音：${escHtml(sc.buy)} · 回来复制：${escHtml(sc.copy)}</div>
+    </div>`
+    : ''
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -688,7 +919,7 @@ function panelHtml(
   <style>
     :root { color-scheme: dark; }
     body { margin:0; font:14px/1.45 ui-sans-serif,system-ui; background:#0f172a; color:#e2e8f0; }
-    .wrap { max-width:960px; margin:0 auto; padding:20px 16px 48px; }
+    .wrap { max-width:1080px; margin:0 auto; padding:20px 16px 48px; }
     h1 { font-size:18px; margin:0 0 4px; }
     .sub { color:#94a3b8; margin-bottom:16px; }
     .card { background:#1e293b; border:1px solid #334155; border-radius:12px; padding:14px 16px; margin-bottom:12px; }
@@ -700,6 +931,8 @@ function panelHtml(
     a.warn, button.warn { background:#b45309; }
     a.bad, button.bad { background:#be123c; }
     a.on, button.on { outline:3px solid #38bdf8; box-shadow:0 0 0 1px #38bdf8; }
+    .how { color:#e2e8f0; margin:6px 0 0; }
+    .scene { background:#0f172a; border:1px solid #334155; }
     table { width:100%; border-collapse:collapse; font-size:12px; }
     th, td { text-align:left; padding:8px 6px; border-bottom:1px solid #334155; vertical-align:top; }
     th { color:#94a3b8; font-weight:600; }
@@ -712,12 +945,19 @@ function panelHtml(
 <body>
   <div class="wrap">
     <h1>抖音 SPI 联调面板</h1>
-    <p class="sub">核销 / 撤销 / 幂等 的 extra.logid 在下面蓝字，复制后填联调。蓝框=当前选中。</p>
+    <p class="sub">点下面用例切桩，再去抖音买。蓝框=当前选中。下单失败用例来客库存必须大于 0，不要用来客限购/库存=0。</p>
     ${
       openApiNotice
         ? `<div class="card" style="border-color:#38bdf8"><div class="muted">OpenAPI 结果</div><div class="logid" style="white-space:pre-wrap">${escHtml(openApiNotice)}</div></div>`
         : ''
     }
+    ${sceneCard}
+    <div class="card">
+      <div class="muted">下单失败（校验预下单 · 库存必须>0）</div>
+      <div class="row">${sceneBtns('order_fail')}</div>
+      <div class="muted" style="margin-top:12px">发券 / 核销 / 退款</div>
+      <div class="row">${sceneBtns('fulfil')}</div>
+    </div>
     <div class="card">
       <div class="muted">发券 logid（同步发券超时用这一条）</div>
       <div id="latestIssue" class="logid">${issueLogid || '（还没有发券请求，先切「发券超时」再去支付）'}</div>
@@ -734,10 +974,13 @@ function panelHtml(
       <div id="latestCancel" class="logid">—</div>
       <div class="muted" style="margin-top:6px">幂等核销</div>
       <div id="latestIdempotent" class="logid">—</div>
+      <div class="muted" style="margin-top:6px">退款</div>
+      <div id="latestRefund" class="logid">—</div>
       <div class="row">
         <button type="button" class="pri" id="copyVerify">复制核销 logid</button>
         <button type="button" class="ok" id="copyCancel">复制撤销 logid</button>
         <button type="button" class="ok" id="copyIdempotent">复制幂等 logid</button>
+        <button type="button" class="ok" id="copyRefund">复制退款 logid</button>
       </div>
       <div class="muted" style="margin-top:10px">codes / order_id</div>
       <div id="latestCodes" class="logid">—</div>
@@ -750,13 +993,15 @@ function panelHtml(
       </div>
       <div class="row">
         <a class="btn pri" href="?panel=1&amp;do_verify=1">验券</a>
+        <a class="btn pri" id="verifyOne" href="?panel=1&amp;do_verify=1">验第 1 张</a>
+        <a class="btn pri" id="verifyTwo" href="?panel=1&amp;do_verify=1">验第 2 张</a>
         <a class="btn warn" href="?panel=1&amp;do_cancel=1">撤销核销</a>
         <a class="btn ok" href="?panel=1&amp;do_idempotent=1">幂等核销（同一 token 再验，必须 result=0）</a>
       </div>
       <div class="muted" style="margin-top:8px">当前模式：<span id="mode">…</span></div>
     </div>
     <div class="card">
-      <div class="muted" style="margin-bottom:8px">切桩（点链接整页跳转，蓝框=已选中。下单失败用例只切「下单桩」，发券不用改）</div>
+      <div class="muted" style="margin-bottom:8px">细调桩（一般点上面用例即可）</div>
       <div class="muted">下单桩</div>
       <div class="row">
         <a class="btn ok${on(fail === 0)}" href="?panel=1&set_precreate_fail=0">预下单成功</a>
@@ -766,12 +1011,18 @@ function panelHtml(
         <a class="btn warn${on(fail === 4)}" href="?panel=1&set_precreate_fail=4">已过售卖时间</a>
         <a class="btn bad${on(fail === 5)}" href="?panel=1&set_precreate_fail=5">库存售罄/已抢完</a>
         <a class="btn bad${on(fail === 6)}" href="?panel=1&set_precreate_fail=6">购买上限</a>
+        <a class="btn bad${on(fail === 7)}" href="?panel=1&set_precreate_fail=7">价格校验失败</a>
       </div>
-      <div class="muted" style="margin-top:10px">发券桩（同步发券超时点这一行）</div>
+      <div class="muted" style="margin-top:10px">发券桩</div>
       <div class="row">
         <a class="btn ok${on(issue === 'success')}" href="?panel=1&set_issue_mode=success">发券同步成功</a>
         <a class="btn warn${on(issue === 'async')}" href="?panel=1&set_issue_mode=async">发券超时(async)</a>
         <a class="btn bad${on(issue === 'fail')}" href="?panel=1&set_issue_mode=fail">发券失败</a>
+      </div>
+      <div class="muted" style="margin-top:10px">退款桩</div>
+      <div class="row">
+        <a class="btn ok${on(refund === 'agree')}" href="?panel=1&set_refund_mode=agree">同意退款</a>
+        <a class="btn bad${on(refund === 'reject')}" href="?panel=1&set_refund_mode=reject">拒绝退款（不补码）</a>
       </div>
     </div>
     <div class="card">
@@ -784,6 +1035,7 @@ function panelHtml(
   <script>
     const failLabel = {0:'预下单成功',1:'商品不存在',2:'商品已下线',3:'未开售',4:'已过售卖',5:'库存售罄',6:'购买上限',7:'价格校验失败'};
     const issueLabel = {success:'发券同步成功',async:'发券超时',fail:'发券失败'};
+    const refundLabel = {agree:'同意退款',reject:'拒绝退款'};
     const api = location.pathname;
     const fmt = (iso) => {
       if (!iso) return '—';
@@ -823,9 +1075,11 @@ function panelHtml(
           ? zeros.filter(x => x.verifyToken === idemHit.verifyToken).slice(-1)[0]
           : zeros[0];
         const cancelHit = rows.find(h => String(h.action||'').toLowerCase().includes('certificate.cancel'));
+        const refundHit = rows.find(h => String(h.action||'').toLowerCase().includes('refund'));
         document.getElementById('latestVerify').textContent = (verifyHit && verifyHit.logid) || '（先点「验券」，result 必须是 0）';
         document.getElementById('latestCancel').textContent = (cancelHit && cancelHit.logid) || '—';
         document.getElementById('latestIdempotent').textContent = (idemHit && idemHit.logid) || '（验券成功后点「幂等核销」，不要换 token）';
+        document.getElementById('latestRefund').textContent = (refundHit && refundHit.logid) || '—';
         const idsHit = rows.find(h => isVerify(h) && (h.verifyId || h.certificateId));
         const vid = (idsHit && idsHit.verifyId) || '';
         const cid = (idsHit && idsHit.certificateId) || '';
@@ -840,7 +1094,12 @@ function panelHtml(
         const st = j.state || {};
         const fail = Number(st.precreateFailCode || 0);
         document.getElementById('mode').textContent =
-          (failLabel[fail] || ('失败码'+fail)) + ' · ' + (issueLabel[st.issueMode] || st.issueMode);
+          (failLabel[fail] || ('失败码'+fail)) + ' · ' + (issueLabel[st.issueMode] || st.issueMode) + ' · ' + (refundLabel[st.refundMode] || st.refundMode || '同意退款');
+        const codesArr = codeHit && Array.isArray(codeHit.codes) ? codeHit.codes : [];
+        const v1 = document.getElementById('verifyOne');
+        const v2 = document.getElementById('verifyTwo');
+        if (v1) v1.setAttribute('href', codesArr[0] ? ('?panel=1&do_verify=1&codes=' + encodeURIComponent(codesArr[0])) : '?panel=1&do_verify=1');
+        if (v2) v2.setAttribute('href', codesArr[1] ? ('?panel=1&do_verify=1&codes=' + encodeURIComponent(codesArr[1])) : '?panel=1&do_verify=1');
         const tb = document.getElementById('rows');
         if (!rows.length) { tb.innerHTML = '<tr><td colspan="6" class="muted">暂无。扫码支付后会出现。</td></tr>'; return; }
         tb.innerHTML = rows.map(h => {
@@ -864,6 +1123,7 @@ function panelHtml(
     document.getElementById('copyVerify').onclick = () => copyText(document.getElementById('latestVerify').textContent.trim());
     document.getElementById('copyCancel').onclick = () => copyText(document.getElementById('latestCancel').textContent.trim());
     document.getElementById('copyIdempotent').onclick = () => copyText(document.getElementById('latestIdempotent').textContent.trim());
+    document.getElementById('copyRefund').onclick = () => copyText(document.getElementById('latestRefund').textContent.trim());
     load();
     setInterval(load, 2000);
   </script>
@@ -883,6 +1143,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   if (req.method === 'GET') {
     const setFail = queryOne(req, 'set_precreate_fail')
     const setIssue = queryOne(req, 'set_issue_mode')
+    const setRefund = queryOne(req, 'set_refund_mode')
+    const setScenario = queryOne(req, 'set_scenario')
     const state = readState()
     let changed = false
     if (setFail !== '') {
@@ -897,6 +1159,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       state.issueMode = setIssue
       state.updatedAt = new Date().toISOString()
       changed = true
+    }
+    if (setRefund === 'agree' || setRefund === 'reject') {
+      state.refundMode = setRefund
+      state.updatedAt = new Date().toISOString()
+      changed = true
+    }
+    if (setScenario) {
+      const sc = scenarioById(setScenario)
+      if (sc) {
+        applyScenario(state, sc)
+        changed = true
+      }
     }
     if (changed) writeState(state)
 
@@ -972,8 +1246,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       latestIssueLogid,
       latestPrecreateLogid,
       latestVerifyLogid: recent.find((h) => isVerifyAction(h.action))?.logid || '',
+      latestRefundLogid: recent.find((h) => isRefundAction(h.action))?.logid || '',
+      scenario: currentScenario(readState())?.id || '',
       hint: {
         panel: 'GET ?panel=1',
+        setScenario: 'GET ?set_scenario=order_fail_price',
         setOfflineFail: 'GET ?set_precreate_fail=2',
         setSuccess: 'GET ?set_precreate_fail=0',
         setIssueAsync: 'GET ?set_issue_mode=async',
@@ -1046,7 +1323,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   } else if (a.includes('refund') && (a.includes('sync') || a.includes('notify') || a.includes('info'))) {
     out = handleRefundNotify(body)
   } else if (a.includes('refund')) {
-    out = handleRefund(body)
+    out = handleRefund(state, body)
   } else if (a.includes('query') || a.includes('order.query')) {
     out = handleOrderQuery(body)
   } else if (a === 'unknown') {
