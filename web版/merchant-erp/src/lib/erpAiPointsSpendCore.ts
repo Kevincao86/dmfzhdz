@@ -51,7 +51,7 @@ const IDEMP_PREFIX = '[idemp:'
 
 export function computeErpAiPointsCharge(
   kind: ErpAiUsageKind,
-  opts?: { durationSec?: number; pointsOverride?: number },
+  opts?: { durationSec?: number; pointsOverride?: number; motionImitate?: boolean },
 ): number {
   const override = Math.floor(Number(opts?.pointsOverride) || 0)
   if (override > 0) return override
@@ -142,7 +142,7 @@ export async function assertErpAiPointsAffordable(
   admin: SupabaseClient,
   tenantId: string,
   kind: ErpAiUsageKind,
-  opts?: { durationSec?: number; pointsOverride?: number },
+  opts?: { durationSec?: number; pointsOverride?: number; motionImitate?: boolean },
 ): Promise<ErpAiPointsSpendResult> {
   const points = computeErpAiPointsCharge(kind, opts)
   if (points <= 0) {
@@ -179,6 +179,7 @@ export async function spendErpAiPoints(
     kind: ErpAiUsageKind
     durationSec?: number
     pointsOverride?: number
+    motionImitate?: boolean
     idempotencyKey?: string
     note?: string
   },
@@ -204,6 +205,7 @@ export async function spendErpAiPoints(
   const points = computeErpAiPointsCharge(kind, {
     durationSec: opts.durationSec,
     pointsOverride: opts.pointsOverride,
+    motionImitate: opts.motionImitate,
   })
   if (points <= 0) {
     return { ok: false, error: 'invalid_amount', message: '无效扣费金额' }

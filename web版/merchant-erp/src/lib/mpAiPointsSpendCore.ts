@@ -216,7 +216,7 @@ function findIdempotentSpend(
 
 export function computeMpAiPointsCharge(
   kind: MpPointsUsageKind,
-  opts?: { durationSec?: number },
+  opts?: { durationSec?: number; motionImitate?: boolean },
 ): number {
   return mpPointsCostForUsage(kind, opts)
 }
@@ -225,7 +225,7 @@ export function computeMpAiPointsCharge(
 export function estimateMpAiPointsAffordability(
   balance: number,
   kind: MpPointsUsageKind,
-  opts?: { durationSec?: number },
+  opts?: { durationSec?: number; motionImitate?: boolean },
 ): { required: number; balance: number; remaining: number; ok: boolean } {
   const required = Math.max(0, Math.floor(Number(computeMpAiPointsCharge(kind, opts)) || 0))
   const bal = Math.max(0, Math.floor(Number(balance) || 0))
@@ -243,6 +243,7 @@ export function spendMpAiPointsWithSnapshot(
   opts: {
     kind: MpPointsUsageKind
     durationSec?: number
+    motionImitate?: boolean
     idempotencyKey?: string
     note?: string
     skipMonthlyGift?: boolean
@@ -287,6 +288,7 @@ export function spendMpAiPointsWithSnapshot(
   const balanceBefore = readAccountMpAiPointsBalance(data, account, roleOpts)
   const estimate = estimateMpAiPointsAffordability(balanceBefore, opts.kind, {
     durationSec: opts.durationSec,
+    motionImitate: opts.motionImitate,
   })
   const points = Math.max(estimate.required, split.pointsRequired)
   if (points <= 0) {
@@ -343,7 +345,7 @@ export function assertMpAiPointsAffordable(
   data: RegistrySnapshot,
   account: MpAccountRow,
   kind: MpPointsUsageKind,
-  opts?: { durationSec?: number; roleHint?: MpLibraryRole | null },
+  opts?: { durationSec?: number; motionImitate?: boolean; roleHint?: MpLibraryRole | null },
 ): MpAiPointsSpendResult {
   const roleOpts = { roleHint: opts?.roleHint }
   ensureMonthlyGiftPointsGranted(data, account, roleOpts)

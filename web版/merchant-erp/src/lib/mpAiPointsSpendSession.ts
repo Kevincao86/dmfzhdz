@@ -22,6 +22,7 @@ export async function spendMpAiPointsForSessionToken(
   opts: {
     kind: MpPointsUsageKind
     durationSec?: number
+    motionImitate?: boolean
     idempotencyKey?: string
     note?: string
     roleHint?: MpLibraryRole | null
@@ -51,7 +52,7 @@ export async function assertMpAiPointsAffordableForSessionToken(
   serviceRole: string,
   token: string,
   kind: MpPointsUsageKind,
-  opts?: { durationSec?: number; roleHint?: MpLibraryRole | null },
+  opts?: { durationSec?: number; motionImitate?: boolean; roleHint?: MpLibraryRole | null },
 ): Promise<MpAiPointsSpendResult> {
   const t = String(token || '').trim()
   if (!t) {

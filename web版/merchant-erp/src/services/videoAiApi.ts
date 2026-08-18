@@ -250,6 +250,7 @@ export type VideoAiBackendConfig = {
   klingConfigured: boolean
   /** 火山 OmniHuman（智能视觉 AK/SK）已配置 */
   omnihumanConfigured?: boolean
+  motionImitateConfigured?: boolean
   arkKeyConfigured: boolean
   arkVideoModels: { label: string; endpointId: string }[]
   iceConfigured?: boolean
@@ -537,6 +538,7 @@ export async function fetchVideoAiConfig(): Promise<VideoAiBackendConfig | null>
     return {
       klingConfigured: false,
       omnihumanConfigured: false,
+      motionImitateConfigured: false,
       arkKeyConfigured: false,
       arkVideoModels: [],
       configLoadError: lastNetworkErr,
@@ -1106,10 +1108,11 @@ async function postSeedanceVideoStartOnce(
 }
 
 export async function postSeedanceVideoStart(body: ShortVideoGenRequestBody & {
-  /** wan2.2-s2v 口型驱动 */
-  pipeline?: 'wan_s2v'
+  /** wan2.2-s2v 口型驱动 / OmniHuman / 动作模仿 */
+  pipeline?: 'wan_s2v' | 'omnihuman' | 'motion_imitate'
   image_base64?: string
   audio_base64?: string
+  video_base64?: string
   resolution?: '480P' | '720P'
 }): Promise<
   { ok: true; taskId: string; modelUsed?: string | null; provider?: string }

@@ -1231,6 +1231,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return
       }
       const durationSec = body.durationSec != null ? Number(body.durationSec) : undefined
+      const motionImitate =
+        body.motionImitate === true ||
+        body.motionImitate === 1 ||
+        String(body.motionImitate ?? '').trim() === '1' ||
+        String(body.motionImitate ?? '').trim().toLowerCase() === 'true'
       const roleRaw = String(body.billingRole || body.libraryRole || '').trim().toLowerCase()
       const roleHint: MpLibraryRole | undefined =
         roleRaw === 'pr' || roleRaw === 'talent' || roleRaw === 'shoot' || roleRaw === 'edit'
@@ -1238,6 +1243,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           : undefined
       const result = await assertMpAiPointsAffordableForSessionToken(supabaseUrl, serviceRole, token, kind, {
         durationSec: Number.isFinite(durationSec) ? durationSec : undefined,
+        motionImitate,
         roleHint,
       })
       if (!result.ok) {
@@ -1276,6 +1282,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return
       }
       const durationSec = body.durationSec != null ? Number(body.durationSec) : undefined
+      const motionImitate =
+        body.motionImitate === true ||
+        body.motionImitate === 1 ||
+        String(body.motionImitate ?? '').trim() === '1' ||
+        String(body.motionImitate ?? '').trim().toLowerCase() === 'true'
       const idempotencyKey = String(body.idempotencyKey || '').trim()
       const spendRoleRaw = String(body.billingRole || body.libraryRole || '').trim().toLowerCase()
       const spendRoleHint: MpLibraryRole | undefined =
@@ -1285,6 +1296,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const result = await spendMpAiPointsForSessionToken(supabaseUrl, serviceRole, token, {
         kind,
         durationSec: Number.isFinite(durationSec) ? durationSec : undefined,
+        motionImitate,
         idempotencyKey: idempotencyKey || undefined,
         note: String(body.note || '').trim() || undefined,
         roleHint: spendRoleHint,

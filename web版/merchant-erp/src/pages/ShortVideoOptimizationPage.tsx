@@ -35,6 +35,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { readMpSessionToken } from '../lib/merchantApiAuth'
 import { probeVideoDurationSec } from '../lib/digitalHumanSubtitle'
+import { runDhMotionImitateJob } from '../lib/dhOmniHumanVideoApi'
 import {
   checkMpAddonPointsAffordable,
   formatMpAddonPointsSpendHint,
@@ -153,6 +154,27 @@ async function storyFrameFileToImageDataUrl(f: File): Promise<string> {
   }
   const b64 = await readImageFilePureBase64(f)
   return `data:image/${f.type.toLowerCase() === 'image/png' ? 'png' : 'jpeg'};base64,${b64}`
+}
+
+const MOTION_VIDEO_MAX_BYTES = 12 * 1024 * 1024
+
+async function storyFrameFileToVideoDataUrl(f: File): Promise<string> {
+  if (f.size > MOTION_VIDEO_MAX_BYTES) {
+    throw new Error('动作参考视频请压缩到 12MB 以内后再生成')
+  }
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader()
+    fr.onload = () => {
+      const s = String(fr.result || '').trim()
+      if (!s.startsWith('data:')) {
+        reject(new Error('读取参考视频失败'))
+        return
+      }
+      resolve(s)
+    }
+    fr.onerror = () => reject(new Error('读取参考视频失败'))
+    fr.readAsDataURL(f)
+  })
 }
 /** 短视频生成固定 Seedance */
 const VIDEO_ENGINE = 'seedance' as const
@@ -479,9 +501,13 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
   const pendingShotMediaIndexRef = useRef<number | null>(null)
   const shotMediaInputRef = useRef<HTMLInputElement>(null)
   const generationBillIdRef = useRef('')
+  const motionImitateBillRef = useRef(false)
 
-  const ensureShortVideoPointsAffordable = async (durationSec: number): Promise<boolean> => {
-    const afford = await checkMpAddonPointsAffordable('shortvideo', durationSec)
+  const ensureShortVideoPointsAffordable = async (
+    durationSec: number,
+    motionImitate = false,
+  ): Promise<boolean> => {
+    const afford = await checkMpAddonPointsAffordable('shortvideo', durationSec, { motionImitate })
     if (afford.ok) return true
     setErr(afford.message)
     return false
@@ -503,6 +529,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       const charge = await spendMpAddonPoints({
         kind: 'shortvideo',
         durationSec: dur,
+        motionImitate: motionImitateBillRef.current,
         idempotencyKey: `shortvideo:${billId}`,
         note: `shortvideo:${billId}`,
       })
@@ -1582,6 +1609,9 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     images_base64?: string[]
     model?: string
     seedance_image_mode?: 'auto' | 'first_last' | 'reference' | 'first_only'
+    pipeline?: 'motion_imitate'
+    video_base64?: string
+    image_base64?: string
   }) => {
     // 禁止静默降成 5 秒：用户选的单段时长必须兑现，否则口播/分镜全对不上
     return runShortVideo(body, { allowAutoHalveDuration: false })
@@ -1627,6 +1657,8 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       typeof crypto !== 'undefined' && 'randomUUID' in crypto
         ? crypto.randomUUID()
         : `sv-${Date.now()}`
+    const hasMotionVideo = storyFrames.some((f) => f.kind === 'video')
+    motionImitateBillRef.current = hasMotionVideo
     const estSec =
       longformEnabled || (isScriptRowsUsable(scriptRows) && scriptRows.length >= 2)
         ? longformEnabled
@@ -1639,7 +1671,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     setBusy(true)
     setProgress('正在检查积分与引擎…')
     setHint(null)
-    if (!(await ensureShortVideoPointsAffordable(estSec))) {
+    if (!(await ensureShortVideoPointsAffordable(estSec, hasMotionVideo))) {
       if (mountedRef.current) {
         setBusy(false)
         setProgress(null)
@@ -1729,6 +1761,47 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     }
 
     const scriptUsable = useLongformPipeline && isScriptRowsUsable(workingScriptRows)
+
+    const motionFrame = storyFrames.find((f) => f.kind === 'video')
+    if (motionFrame) {
+      setBusy(true)
+      trackProgress('动作模仿生成中（图+参考视频）…')
+      cancelRef.current = false
+      try {
+        const imageRaw = imgs[0] || (await storyFrameFileToImageDataUrl(motionFrame.file))
+        const videoDataUrl = await storyFrameFileToVideoDataUrl(motionFrame.file)
+        const promptText =
+          txt ||
+          (scriptUsable ? scriptRowsToOverallPrompt(workingScriptRows) : '') ||
+          '按参考视频动作驱动画面人物，保持参考图身份与构图。'
+        const job = await runDhMotionImitateJob({
+          image_base64: imageRaw,
+          video_base64: videoDataUrl,
+          prompt: promptText,
+          onProgress: (label) => trackProgress(label),
+        })
+        if (!job.ok) {
+          finishVideoJob(false, formatVideoAiUserError(job.message))
+          setErr(formatVideoAiUserError(job.message))
+          return
+        }
+        trackProgress('交付动作模仿成片…')
+        const narration = await resolveNarrationForFinalVideo(promptText, Number(sdDurationSec))
+        const ok = await commitFinalVideo(job.videoUrl, narration, Number(sdDurationSec))
+        finishVideoJob(ok, ok ? undefined : '成片合成失败')
+        if (ok) setHint('已使用即梦动作模仿 2.0（参考视频驱动人物动作）')
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : '动作模仿失败'
+        finishVideoJob(false, formatVideoAiUserError(msg))
+        setErr(formatVideoAiUserError(msg))
+      } finally {
+        if (mountedRef.current) {
+          setBusy(false)
+          setProgress(null)
+        }
+      }
+      return
+    }
 
     if (useLongformPipeline) {
       if (!scriptUsable && genMode === 'text') {
@@ -2295,7 +2368,10 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
         <div className="flex flex-wrap items-center justify-center gap-3">
           <Film className="h-8 w-8 shrink-0 text-cyan-600" aria-hidden />
           <h1 className="erp-page-title text-[1.35rem] leading-tight sm:text-2xl">短视频 AI 创作台</h1>
-          <MpAddonPointsRateBadge kind="shortvideo" />
+          <MpAddonPointsRateBadge
+            kind="shortvideo"
+            motionImitate={storyFrames.some((f) => f.kind === 'video')}
+          />
         </div>
         <p className="mx-auto max-w-2xl text-sm leading-relaxed text-slate-600">
           Skill 技能 · 无限画布 · 短片生成 · 音乐配乐 · 案例做同款。引擎为 Seedance；多素材拼接请切「AI混剪」。
@@ -2315,7 +2391,10 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       ) : (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm font-semibold text-slate-800">短视频出片 · Agent 同屏</p>
-          <MpAddonPointsRateBadge kind="shortvideo" />
+          <MpAddonPointsRateBadge
+            kind="shortvideo"
+            motionImitate={storyFrames.some((f) => f.kind === 'video')}
+          />
         </div>
       )}
 
@@ -2661,7 +2740,9 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
                         ))}
                       </div>
                     ) : (
-                      <p className="text-xs text-slate-500">可上传多张图/视频作镜头参考。</p>
+                      <p className="text-xs text-slate-500">
+                        可上传多张图/视频作镜头参考。含视频时走即梦动作模仿（人物复刻参考视频动作）。
+                      </p>
                     )}
                   </div>
                 ) : null}
