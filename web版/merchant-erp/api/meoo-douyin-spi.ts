@@ -155,8 +155,8 @@ const SPI_SCENARIOS: SpiScenario[] = [
     issueMode: 'success',
     refundMode: 'agree',
     buy: '买 1 份并支付',
-    copy: '发券 logid，退款后来客/SPI 退款 logid',
-    how: '发券成功后去抖音客服强退。本桩同意退款。复制退款 logid 填「通知商家退款成功」。',
+    copy: '发券 logid；信息同步 logid（不要填退款审核）',
+    how: '发券成功后不要点申请退款。只点联调「客服强退」。面板出现「信息同步」logid 再填第 5 步。',
   },
   {
     id: 'buy1_verify_cs_refund',
@@ -166,8 +166,8 @@ const SPI_SCENARIOS: SpiScenario[] = [
     issueMode: 'success',
     refundMode: 'agree',
     buy: '买 1 份并支付',
-    copy: '发券 / 核销 extra.logid / 退款 logid',
-    how: '支付后点「验券」，再到抖音客服强退。本桩同意退款。',
+    copy: '发券 / 核销 extra.logid / 信息同步 logid',
+    how: '支付后点「验券」。不要点申请退款，只点联调「客服强退」。第 5 步填「信息同步」logid。',
   },
   {
     id: 'buy2_partial_refund',
@@ -378,8 +378,9 @@ function queryOne(req: VercelRequest, key: string): string {
   }
 }
 
-/** 同一 URL 多场景：优先 query/header，再按 body 形状推断 */
+/** 同一 URL 多场景：notice_list=信息同步；优先 query/header，再按 body 形状推断 */
 function resolveAction(req: VercelRequest, body: Record<string, unknown>): string {
+  if (Array.isArray(body.notice_list)) return 'refund.notice'
   const fromQ =
     queryOne(req, 'action') ||
     queryOne(req, 'Action') ||
@@ -636,9 +637,14 @@ function isVerifyAction(action: string): boolean {
   return a.includes('certificate.verify')
 }
 
+function isRefundNotifyAction(action: string): boolean {
+  const a = String(action || '').toLowerCase()
+  return a.includes('notice') || ((a.includes('refund') || a.includes('after_sale')) && (a.includes('sync') || a.includes('notify') || a.includes('info')))
+}
+
 function isRefundAction(action: string): boolean {
   const a = String(action || '').toLowerCase()
-  return a.includes('refund')
+  return a.includes('refund') && !isRefundNotifyAction(action)
 }
 
 function escHtml(s: string): string {
@@ -976,13 +982,16 @@ function panelHtml(
       <div id="latestCancel" class="logid">—</div>
       <div class="muted" style="margin-top:6px">幂等核销</div>
       <div id="latestIdempotent" class="logid">—</div>
-      <div class="muted" style="margin-top:6px">退款</div>
+      <div class="muted" style="margin-top:6px">退款审核（不要填进「信息同步」）</div>
       <div id="latestRefund" class="logid">—</div>
+      <div class="muted" style="margin-top:6px">信息同步（客服强退第 5 步填这一条）</div>
+      <div id="latestNotify" class="logid">—</div>
       <div class="row">
         <button type="button" class="pri" id="copyVerify">复制核销 logid</button>
         <button type="button" class="ok" id="copyCancel">复制撤销 logid</button>
         <button type="button" class="ok" id="copyIdempotent">复制幂等 logid</button>
-        <button type="button" class="ok" id="copyRefund">复制退款 logid</button>
+        <button type="button" class="ok" id="copyRefund">复制退款审核 logid</button>
+        <button type="button" class="pri" id="copyNotify">复制信息同步 logid</button>
       </div>
       <div class="muted" style="margin-top:10px">codes / order_id</div>
       <div id="latestCodes" class="logid">—</div>
@@ -1048,7 +1057,8 @@ function panelHtml(
       const s = String(a||'').toLowerCase();
       if (s.includes('certificate.cancel')) return '撤销核销';
       if (s.includes('certificate.verify')) return '验券';
-      if (s.includes('refund')) return '退款';
+      if (s.includes('notice') || ((s.includes('refund')||s.includes('after_sale')) && (s.includes('sync')||s.includes('notify')||s.includes('info')))) return '信息同步';
+      if (s.includes('refund')) return '退款审核';
       if (s.includes('tripartite')) return '发券';
       if (s.includes('pre_create')) return '预下单';
       return a || '—';
@@ -1077,11 +1087,17 @@ function panelHtml(
           ? zeros.filter(x => x.verifyToken === idemHit.verifyToken).slice(-1)[0]
           : zeros[0];
         const cancelHit = rows.find(h => String(h.action||'').toLowerCase().includes('certificate.cancel'));
-        const refundHit = rows.find(h => String(h.action||'').toLowerCase().includes('refund'));
+        const isNotify = (h) => {
+          const s = String(h.action||'').toLowerCase();
+          return s.includes('notice') || ((s.includes('refund')||s.includes('after_sale')) && (s.includes('sync')||s.includes('notify')||s.includes('info')));
+        };
+        const refundHit = rows.find(h => String(h.action||'').toLowerCase().includes('refund') && !isNotify(h));
+        const notifyHit = rows.find(h => isNotify(h));
         document.getElementById('latestVerify').textContent = (verifyHit && verifyHit.logid) || '（先点「验券」，result 必须是 0）';
         document.getElementById('latestCancel').textContent = (cancelHit && cancelHit.logid) || '—';
         document.getElementById('latestIdempotent').textContent = (idemHit && idemHit.logid) || '（验券成功后点「幂等核销」，不要换 token）';
         document.getElementById('latestRefund').textContent = (refundHit && refundHit.logid) || '—';
+        document.getElementById('latestNotify').textContent = (notifyHit && notifyHit.logid) || '（客服强退后才会出现；不要填退款审核 logid）';
         const idsHit = rows.find(h => isVerify(h) && (h.verifyId || h.certificateId));
         const vid = (idsHit && idsHit.verifyId) || '';
         const cid = (idsHit && idsHit.certificateId) || '';
@@ -1126,6 +1142,7 @@ function panelHtml(
     document.getElementById('copyCancel').onclick = () => copyText(document.getElementById('latestCancel').textContent.trim());
     document.getElementById('copyIdempotent').onclick = () => copyText(document.getElementById('latestIdempotent').textContent.trim());
     document.getElementById('copyRefund').onclick = () => copyText(document.getElementById('latestRefund').textContent.trim());
+    document.getElementById('copyNotify').onclick = () => copyText(document.getElementById('latestNotify').textContent.trim());
     load();
     setInterval(load, 2000);
   </script>
@@ -1249,6 +1266,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       latestPrecreateLogid,
       latestVerifyLogid: recent.find((h) => isVerifyAction(h.action))?.logid || '',
       latestRefundLogid: recent.find((h) => isRefundAction(h.action))?.logid || '',
+      latestNotifyLogid: recent.find((h) => isRefundNotifyAction(h.action))?.logid || '',
       scenario: currentScenario(readState())?.id || '',
       hint: {
         panel: 'GET ?panel=1',
@@ -1322,7 +1340,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     out = handlePrecreate(state, body)
   } else if (a.includes('tripartite') || a.includes('fulfilment.order')) {
     out = handleIssue(state, body)
-  } else if (a.includes('refund') && (a.includes('sync') || a.includes('notify') || a.includes('info'))) {
+  } else if (
+    a.includes('notice') ||
+    (a.includes('refund') && (a.includes('sync') || a.includes('notify') || a.includes('info')))
+  ) {
     out = handleRefundNotify(body)
   } else if (a.includes('refund')) {
     out = handleRefund(state, body)
@@ -1353,7 +1374,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   })
 
   console.info(
-    `[douyin-spi] action=${action} logid=${logid || '-'} order=${String(body.order_id ?? '')} ${summary}`,
+    `[douyin-spi] action=${action} logid=${logid || '-'} order=${String(body.order_id ?? '')} keys=${Object.keys(body).join(',')} ${summary}`,
   )
 
   spiJson(res, logid, out)
