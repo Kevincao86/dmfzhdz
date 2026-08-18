@@ -172,6 +172,7 @@ export type DigitalHumanWork = {
   hasLocalReferenceVideo?: boolean
   videoEngine?:
     | 'omnihuman'
+    | 'motion_imitate'
     | 'qwen_s2v'
     | 'seedance'
     | 'seedance_lipsync'
