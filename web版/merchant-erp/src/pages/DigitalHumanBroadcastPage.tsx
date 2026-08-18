@@ -997,8 +997,13 @@ export default function DigitalHumanBroadcastPage() {
       setToast(`视频 AI 配置拉取失败：${cfg.configLoadError}`)
       return
     }
-    if (!cfg?.arkKeyConfigured || !(cfg?.arkVideoModels?.length ?? 0)) {
-      setToast('须配置火山方舟豆包 Seedance 视频模型（与短视频同源），人物/背景/产品一体化生成')
+    if (draft.avatarKind === 'video_clone') {
+      if (!(cfg?.motionImitateConfigured || cfg?.omnihumanConfigured)) {
+        setToast('实拍视频动作模仿需要火山智能视觉 AK/SK。请在轻量配置后重试。')
+        return
+      }
+    } else if (!cfg?.omnihumanConfigured) {
+      setToast('数字人口播需要火山 OmniHuman。请在轻量配置智能视觉 AK/SK 后重试。')
       return
     }
 
@@ -1111,8 +1116,8 @@ export default function DigitalHumanBroadcastPage() {
         : segs > 1
           ? `已提交渲染（口播较长，将分 ${segs} 段生成后合并为 MP4）`
           : draft.avatarKind === 'video_clone'
-            ? '已提交渲染（实拍视频 · Seedance 一体化 + TTS 配音）'
-            : '已提交高清 MP4 渲染（豆包 Seedance 一体化 + TTS 配音）',
+            ? '已提交渲染（实拍视频 · 即梦动作模仿 2.0）'
+            : '已提交高清 MP4 渲染（火山 OmniHuman 口型驱动）',
     )
     } catch (e) {
       const msg =
@@ -1767,8 +1772,8 @@ export default function DigitalHumanBroadcastPage() {
                       </select>
                       <p className="mt-1 text-xs text-slate-500">
                         {isVideoCloneFlow
-                          ? '实拍视频成片输出 720P；Seedance 一体化图生视频 + TTS 配音'
-                          : '成片输出 720P；豆包 Seedance 一体化图生视频 + TTS 配音。自定义照片/视频建议竖版 ≥1080×1920。'}
+                          ? '实拍视频成片输出 720P；即梦动作模仿 2.0 复刻肢体与口型'
+                          : '成片输出 720P；火山 OmniHuman 按口播音频驱动口型。自定义照片建议竖版 ≥1080×1920。'}
                       </p>
                     </label>
                   </div>
@@ -1781,11 +1786,11 @@ export default function DigitalHumanBroadcastPage() {
                   <h2 className="text-lg font-semibold text-slate-900">口播内容</h2>
                   {isVideoCloneFlow ? (
                     <p className="rounded-lg border border-violet-200 bg-violet-50/80 px-3 py-2 text-sm text-violet-900">
-                      实拍视频模式：音色已在步骤 1 配置；填写口播文案或上传音频后可直接「提交渲染」（Seedance 一体化 + TTS，无需配置背景/预览步骤）。
+                      实拍视频模式：音色已在步骤 1 配置；填写口播文案或上传音频后可直接「提交渲染」（即梦动作模仿 2.0，无需配置背景/预览步骤）。
                     </p>
                   ) : isUploadDrive ? (
                     <p className="rounded-lg border border-violet-200 bg-violet-50/80 px-3 py-2 text-sm text-violet-900">
-                      照片驱动模式：音色已在步骤 1 配置，本步只需填写口播文案或上传音频。
+                      照片驱动模式：音色已在步骤 1 配置，本步只需填写口播文案或上传音频；成片由火山 OmniHuman 驱动口型。
                     </p>
                   ) : null}
                   <div className="flex flex-wrap gap-2">
@@ -2076,7 +2081,7 @@ export default function DigitalHumanBroadcastPage() {
                       </select>
                       {draft.gesturePreset !== 'none' ? (
                         <p className="mt-1 text-xs text-slate-500">
-                          将写入 Seedance 动作提示，并在成片后处理中叠加对应运镜效果。
+                          将写入 OmniHuman 动作提示，并在成片后处理中叠加对应运镜效果。
                         </p>
                       ) : null}
                     </label>
@@ -2138,7 +2143,7 @@ export default function DigitalHumanBroadcastPage() {
                       手持产品展示（AI 视频融合）
                     </label>
                     <p className="mt-1 text-xs text-slate-500">
-                      上传产品图后，成片中段将由豆包 Seedance 双参考图自然手持展示（预览不含产品，非浏览器贴片）。
+                      上传产品图后，成片中段将把产品合成进人物画面，再由 OmniHuman 口型驱动（预览不含产品）。
                     </p>
                     {draft.productOverlayEnabled ? (
                       <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -2171,7 +2176,7 @@ export default function DigitalHumanBroadcastPage() {
                                 productImageDataUrlRef.current = dataUrl
                                 setProductImagePreview(dataUrl)
                                 patchDraft({ productImageFileName: f.name })
-                                setToast('产品图已上传，提交后由 Seedance 在中段融合展示')
+                                setToast('产品图已上传，提交后将合成进人物画面再由 OmniHuman 驱动')
                               } catch (err) {
                                 setToast(err instanceof Error ? err.message : '产品图上传失败')
                               } finally {
@@ -2245,9 +2250,9 @@ export default function DigitalHumanBroadcastPage() {
                 <section className="space-y-4">
                   <h2 className="text-lg font-semibold text-slate-900">低清预览</h2>
                   <p className="text-sm text-slate-600">
-                    静态示意：人物完整叠在背景上（预览不抠图，避免五官损失）。成片由豆包 Seedance 双参考（人物图+场景图）按说明换景融合，对齐即梦数字人。
-                    {draft.productOverlayEnabled ? ' 产品不在此预览出现，成片中段由 Seedance 一体化融合。' : ''}
-                    可试听 TTS；动态口播与光影以 Seedance 成片为准。
+                    静态示意：人物完整叠在背景上（预览不抠图，避免五官损失）。成片先合成人景，再由火山 OmniHuman 按口播音频驱动口型。
+                    {draft.productOverlayEnabled ? ' 产品不在此预览出现，成片中段会合成进画面。' : ''}
+                    可试听 TTS；动态口播与光影以 OmniHuman 成片为准。
                   </p>
                   <div className="mx-auto max-w-xs">
                     <div className="relative overflow-hidden rounded-2xl bg-slate-900 p-2">
@@ -2291,12 +2296,14 @@ export default function DigitalHumanBroadcastPage() {
                     <li>
                       · 驱动：
                       {draft.driveMode === 'text'
-                        ? '文本 → TTS → Seedance 一体化'
+                        ? '文本 → TTS → OmniHuman 口型驱动'
                         : draft.driveMode === 'link'
                           ? draft.avatarKind === 'video_clone'
-                            ? '实拍视频 + 抖音链接文案'
-                            : '抖音链接 → 文案 + Seedance 一体化'
-                          : '音频 + Seedance 一体化'}
+                            ? '实拍视频 + 抖音链接文案 → 即梦动作模仿 2.0'
+                            : '抖音链接 → 文案 + OmniHuman 口型驱动'
+                          : draft.avatarKind === 'video_clone'
+                            ? '音频 + 即梦动作模仿 2.0'
+                            : '音频 + OmniHuman 口型驱动'}
                     </li>
                     <li>· 输出：{resolutionLabel(s2vResolutionFromDraft(draft))} · {draft.frameMode === 'full' ? '全身' : '半身'}</li>
                     <li>· 音色：{selectedVoice?.label}</li>
