@@ -76,13 +76,13 @@ export type DhVideoEngine =
 export type DhVideoProvider = 'volc' | 'doubao' | 'qwen'
 
 export function dhVideoEngineLabel(engine: DhVideoEngine | undefined): string {
-  if (engine === 'motion_imitate') return '火山即梦动作模仿（图+参考视频）'
+  if (engine === 'motion_imitate') return '即梦动作模仿 2.0（图+参考视频）'
   if (engine === 'omnihuman') return '火山 OmniHuman 音频驱动口播'
   if (engine === 'seedance_product_fusion') {
-    return '豆包 Seedance 一体化融合（人物+背景+产品）'
+    return '火山 OmniHuman（人景产品合成）'
   }
   if (engine === 'seedance_lipsync' || engine === 'seedance') {
-    return '豆包 Seedance 一体化图生视频'
+    return '火山 OmniHuman 音频驱动口播'
   }
   return '火山 OmniHuman 数字人口播'
 }

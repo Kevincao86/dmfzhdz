@@ -63,7 +63,10 @@ import { SUBTITLE_STYLES } from '../lib/digitalHumanBroadcast'
 import {
   VIDEO_ENGINE_LABEL_SEEDANCE,
   VIDEO_ENGINE_HINT_SEEDANCE,
+  VIDEO_ENGINE_HINT_SEEDANCE_FRAMES,
+  VIDEO_ENGINE_HINT_MOTION_IMITATE,
   SEEDANCE_1_5_PRO_MODEL_ID,
+  SEEDANCE_2_0_MODEL_ID,
   SEEDANCE_QUALITY_OPTIONS,
   type SeedanceQualityId,
 } from '../lib/shortVideoUiLabels'
@@ -208,6 +211,39 @@ function videoClickPct(el: HTMLVideoElement, clientX: number, clientY: number): 
 }
 /** 短视频生成固定 Seedance */
 const VIDEO_ENGINE = 'seedance' as const
+const SEEDANCE_R2V_MAX_IMAGES = 9
+
+function isSeedance15ProModelId(id: string): boolean {
+  const t = String(id || '').trim()
+  return (
+    t === SEEDANCE_1_5_PRO_MODEL_ID ||
+    /1-5-pro|1\.5-pro/i.test(t) ||
+    /seedance-1-5-pro/i.test(t) ||
+    /251215/.test(t)
+  )
+}
+
+function isSeedance20ModelId(id: string): boolean {
+  const t = String(id || '').trim()
+  return /seedance-2-0|seedance-2\.0/i.test(t)
+}
+
+function pickSeedanceImages(genMode: 'text' | 'frames' | 'motion', imgs: string[]): {
+  images_base64?: string[]
+  seedance_image_mode: 'auto' | 'first_last' | 'reference' | 'first_only'
+} {
+  if (!imgs.length) return { seedance_image_mode: 'auto' }
+  if (genMode === 'frames' && imgs.length >= 2) {
+    return {
+      images_base64: imgs.slice(0, SEEDANCE_R2V_MAX_IMAGES),
+      seedance_image_mode: 'reference',
+    }
+  }
+  if (imgs.length >= 2) {
+    return { images_base64: [imgs[0]!, imgs[imgs.length - 1]!], seedance_image_mode: 'first_last' }
+  }
+  return { images_base64: [imgs[0]!], seedance_image_mode: 'auto' }
+}
 /** 短片轮询 2.5s，配合服务端更快发现完成/排队卡住 */
 const POLL_MS_SD = 2500
 const LONGFORM_DEFAULT_SEGMENT_SEC = LONGFORM_SEGMENT_UNIT_SEC
@@ -665,21 +701,23 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
   )
 
   const seedancePoolModels = useMemo(() => {
-    const raw = cfg?.arkVideoModels.map((m) => m.endpointId) ?? []
-    // 后期写死：仅 Seedance 1.5 Pro（不再 hop lite/fast/其它 ep）
-    const proOnly = raw.filter((id) => {
+    const raw = (cfg?.arkVideoModels.map((m) => m.endpointId) ?? []).filter((id) => {
       const t = String(id || '').trim()
       if (!t) return false
       if (/^wan[\d._-]/i.test(t) || (/t2v|i2v/i.test(t) && /^wan/i.test(t))) return false
-      return (
-        t === SEEDANCE_1_5_PRO_MODEL_ID ||
-        /1-5-pro|1\.5-pro/i.test(t) ||
-        /seedance-1-5-pro/i.test(t) ||
-        /251215/.test(t)
-      )
+      return true
     })
-    return proOnly.length > 0 ? proOnly : [SEEDANCE_1_5_PRO_MODEL_ID]
-  }, [cfg?.arkVideoModels])
+    if (genMode === 'frames') {
+      const pro20 = raw.filter((id) => isSeedance20ModelId(id) && !/fast|mini/i.test(id))
+      const fast20 = raw.filter((id) => isSeedance20ModelId(id) && /fast/i.test(id))
+      const ordered = [...pro20, ...fast20]
+      return ordered.length > 0 ? ordered : [SEEDANCE_2_0_MODEL_ID]
+    }
+    const pro15 = raw.filter(isSeedance15ProModelId)
+    const fallback20 = raw.filter((id) => isSeedance20ModelId(id) && !/mini/i.test(id))
+    const ordered = [...pro15, ...fallback20]
+    return ordered.length > 0 ? ordered : [SEEDANCE_1_5_PRO_MODEL_ID]
+  }, [cfg?.arkVideoModels, genMode])
 
   /** 生成前门禁：按钮禁用原因（避免可点但点击后无反馈或清空提示） */
   const generateGateReason = useMemo((): string | null => {
@@ -749,22 +787,28 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       const imageCount = Array.isArray(body.images_base64)
         ? body.images_base64.filter((x) => String(x || '').trim()).length
         : 0
+      const preferredModel =
+        genMode === 'frames' ? SEEDANCE_2_0_MODEL_ID : SEEDANCE_1_5_PRO_MODEL_ID
+      const imageMode =
+        body.seedance_image_mode ??
+        (genMode === 'frames' && imageCount >= 2
+          ? 'reference'
+          : imageCount >= 2
+            ? 'first_last'
+            : 'auto')
       return runShortVideoJobWithFailover({
         engine: VIDEO_ENGINE,
         body: {
           prompt: sanitizePromptForSeedanceNativeAv(body.prompt),
           flags: opts?.flagsOverride ?? seedanceFlagsLine,
           images_base64: body.images_base64,
-          model: body.model?.trim() || SEEDANCE_1_5_PRO_MODEL_ID,
-          // 商家短片台写死 Seedance 1.5 Pro：禁止 hop / 千问；原生有声
+          model: body.model?.trim() || preferredModel,
           skip_qwen: true,
-          lock_model: true,
+          lock_model: seedancePoolModels.length <= 1,
           generate_audio: true,
-          // 1.5 多图默认只能当首帧；显式 first_last 才能用上第 2 张参考
-          seedance_image_mode:
-            body.seedance_image_mode ??
-            (imageCount >= 2 ? 'first_last' : 'auto'),
-          i2v_max_images: imageCount >= 2 ? 2 : undefined,
+          seedance_image_mode: imageMode,
+          i2v_max_images:
+            imageMode === 'reference' ? Math.min(SEEDANCE_R2V_MAX_IMAGES, Math.max(2, imageCount)) : imageCount >= 2 ? 2 : undefined,
         },
         poolModels: seedancePoolModels,
         shouldCancel: () => cancelRef.current,
@@ -779,7 +823,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
         allowAutoHalveDuration: opts?.allowAutoHalveDuration,
       })
     },
-    [seedanceFlagsLine, seedancePoolModels],
+    [seedanceFlagsLine, seedancePoolModels, genMode],
   )
 
   const [resultUrl, setResultUrl] = useState<string | null>(null)
@@ -1977,12 +2021,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
               `【成片】一条连贯竖屏短片必须满 ${shotSec} 秒，严格按上表时段叙事与口播，镜头连续平滑，禁止幻灯片硬切。`,
             ].join('\n'),
           )
-          const shotImages =
-            imgs.length >= 2
-              ? [imgs[0]!, imgs[imgs.length - 1]!]
-              : imgs.length === 1
-                ? [imgs[0]!]
-                : undefined
+          const shotPlan = pickSeedanceImages(genMode, imgs)
           const flags = buildSeedanceFlagsLine({
             durationSec: shotSec,
             fps: sdFps,
@@ -1993,8 +2032,8 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
           const r = await runShortVideo(
             {
               prompt: shotPrompt,
-              images_base64: shotImages,
-              seedance_image_mode: shotImages && shotImages.length >= 2 ? 'first_last' : 'auto',
+              images_base64: shotPlan.images_base64,
+              seedance_image_mode: shotPlan.seedance_image_mode,
             },
             {
               resetCancel: false,
@@ -2140,17 +2179,11 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
         shotsNote && textBlock ? `${textBlock}\n${shotsNote}` : textBlock,
       )
 
-      const imagePayload: string[] = []
-      if (imgs.length >= 2) {
-        imagePayload.push(imgs[0]!, imgs[imgs.length - 1]!)
-      } else if (imgs.length === 1) {
-        imagePayload.push(imgs[0]!)
-      }
-
+      const imagePlan = pickSeedanceImages(genMode, imgs)
       const r = await runSingleShortVideoWithDurationFallback({
         prompt,
-        images_base64: imagePayload.length ? imagePayload : undefined,
-        seedance_image_mode: imagePayload.length >= 2 ? 'first_last' : 'auto',
+        images_base64: imagePlan.images_base64,
+        seedance_image_mode: imagePlan.seedance_image_mode,
       })
       if (!r.ok) {
         finishVideoJob(false, formatVideoAiUserError(r.message))
@@ -2503,7 +2536,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
           />
         </div>
         <p className="mx-auto max-w-2xl text-sm leading-relaxed text-slate-600">
-          Skill 技能 · 无限画布 · 短片生成 · 动作模仿 · 音乐配乐 · 案例做同款。引擎为 Seedance；点名替换角色请切「动作模仿」。多素材拼接请切「AI混剪」。
+          Skill 技能 · 无限画布 · 短片生成 · 动作模仿 · 音乐配乐 · 案例做同款。纯文案用 1.5 Pro 音画一体；分镜参考用 Seedance 2.0；点名换人用即梦动作模仿。多素材拼接请切「AI混剪」。
           {readMpSessionToken() ? (
             <span className="mt-1 block text-xs text-cyan-800">
               星选账号：成片成功后按秒扣积分；套餐 ai_video_quota 次数优先，用尽后扣积分余额。
@@ -2571,9 +2604,15 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
                     <p className="text-sm font-semibold text-slate-900">{VIDEO_ENGINE_LABEL_SEEDANCE}</p>
                     <p className="text-xs text-slate-500">
                       {cfgLoaded
-                        ? cfg?.arkKeyConfigured
-                          ? VIDEO_ENGINE_HINT_SEEDANCE
-                          : '未开通火山方舟'
+                        ? genMode === 'motion'
+                          ? cfg?.motionImitateConfigured || cfg?.omnihumanConfigured
+                            ? VIDEO_ENGINE_HINT_MOTION_IMITATE
+                            : '未开通即梦动作模仿（需火山智能视觉 AK/SK）'
+                          : cfg?.arkKeyConfigured
+                            ? genMode === 'frames'
+                              ? VIDEO_ENGINE_HINT_SEEDANCE_FRAMES
+                              : VIDEO_ENGINE_HINT_SEEDANCE
+                            : '未开通火山方舟'
                         : '加载配置…'}
                       · 单段最长 15 秒 · 分镜表常驻，无需勾选长视频
                     </p>

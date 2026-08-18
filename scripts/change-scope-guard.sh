@@ -675,6 +675,7 @@ PAT
     video_gen_precision)
       cat <<'PAT'
 shortVideoGenBrief
+shortVideoUiLabels
 preparePreciseVideoGeneration
 shortVideoSkills
 shortVideoGuidanceAi

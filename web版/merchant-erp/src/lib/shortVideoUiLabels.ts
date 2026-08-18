@@ -3,7 +3,9 @@
 
 export const VIDEO_ENGINE_LABEL_KLING = '灵祺视频模型1'
 export const VIDEO_ENGINE_LABEL_SEEDANCE = '灵祺视频'
-export const VIDEO_ENGINE_HINT_SEEDANCE = 'Seedance 1.5 Pro · 火山方舟'
+export const VIDEO_ENGINE_HINT_SEEDANCE = 'Seedance 1.5 Pro · 音画一体'
+export const VIDEO_ENGINE_HINT_SEEDANCE_FRAMES = 'Seedance 2.0 · 多图参考'
+export const VIDEO_ENGINE_HINT_MOTION_IMITATE = '即梦动作模仿 2.0 · 点名角色替换'
 export const VIDEO_ENGINE_HINT_QWEN = '通义万相视频'
 export const SEEDANCE_QUALITY_OPTIONS = [
   { id: '720p', label: '标准 720p' },
@@ -15,5 +17,7 @@ export const VIDEO_MODEL_DEFAULT_LABEL = '默认'
 export const KLING_DEFAULT_MODEL_ID = 'kling-v1-6'
 export const SEEDANCE_SERVER_AUTO = '__server_auto__'
 export const SEEDANCE_AUTO_LABEL = '自动（额度不足时切换）'
-/** 商家短片台写死：仅 Seedance 1.5 Pro（方舟 endpoint id） */
+/** 纯文案短片：Seedance 1.5 Pro（原生音画一体） */
 export const SEEDANCE_1_5_PRO_MODEL_ID = 'doubao-seedance-1-5-pro-251215'
+/** 分镜参考图：Seedance 2.0（多图 r2v，官方暂无 2.5 方舟 ID） */
+export const SEEDANCE_2_0_MODEL_ID = 'doubao-seedance-2-0-260128'
