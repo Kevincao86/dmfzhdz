@@ -188,8 +188,8 @@ const SPI_SCENARIOS: SpiScenario[] = [
     issueMode: 'async',
     refundMode: 'reject',
     buy: '买 2 份并支付',
-    copy: '发券 logid（超时那条）、退款 logid',
-    how: '发券桩会超过 8s 不回成功。退款时本桩拒绝（不补码）。填发券超时 logid 和退款 logid。',
+    copy: '发券超时 logid、退款审核 logid',
+    how: '发券会超过 8s 不回成功。10 分钟后抖音自动退款，本桩拒绝并补码。填退款审核 logid。这笔若已显示退款成功，必须重新买 2 份。',
   },
 ]
 
@@ -486,13 +486,41 @@ function handleIssue(state: SpiState, body: Record<string, unknown>): Record<str
   }
 }
 
-function handleRefund(state: SpiState, _body: Record<string, unknown>): Record<string, unknown> {
+function refundCertList(body: Record<string, unknown>): Array<{ certificate_id: string; code: string }> {
+  const orderId = String(body.order_id ?? '').trim() || String(Date.now())
+  const raw = Array.isArray(body.certificates) ? body.certificates : []
+  const fromReq = raw
+    .map((item, i) => {
+      if (!item || typeof item !== 'object') return null
+      const rec = item as Record<string, unknown>
+      const certificateId = String(rec.certificate_id ?? '').trim()
+      const existing = String(rec.code ?? '').trim()
+      return {
+        certificate_id: certificateId,
+        code: existing || issueCode(orderId, i + 1),
+      }
+    })
+    .filter((x): x is { certificate_id: string; code: string } => Boolean(x && x.certificate_id && x.code))
+  if (fromReq.length) return fromReq
+  const count = Math.min(Math.max(Number(body.count) || 2, 1), 20)
+  return Array.from({ length: count }, (_, i) => ({
+    certificate_id: `meoo_cert_${orderId}_${i + 1}`,
+    code: issueCode(orderId, i + 1),
+  }))
+}
+
+function handleRefund(state: SpiState, body: Record<string, unknown>): Record<string, unknown> {
   if (state.refundMode === 'reject') {
+    // 发券超时后 code 为空：拒绝退款必须回传 codes/certificate 补码，否则平台当拒绝失败，超时自动退成「退款成功」。
+    const certificate = refundCertList(body)
     return {
       data: {
         error_code: 0,
-        description: '拒绝退款',
+        description: 'success',
         result: 2,
+        reason: '发码超时后补码，拒绝退款',
+        codes: certificate.map((c) => c.code),
+        certificate,
       },
     }
   }
@@ -583,7 +611,7 @@ function codesFromIssueData(data: Record<string, unknown>, orderId?: string): st
   if (Array.isArray(raw) && raw.length) {
     return raw.map((x) => String(x || '').trim()).filter(Boolean)
   }
-  const certs = data.certificates
+  const certs = data.certificate || data.certificates
   if (Array.isArray(certs)) {
     const fromCert = certs
       .map((c) =>
