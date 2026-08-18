@@ -31,7 +31,7 @@ import {
   type ShortVideoStudioModeId,
 } from '../lib/shortVideoStudioModes'
 import { MpAddonPointsRateBadge } from '../components/MpAddonPointsRateBadge'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { readMpSessionToken } from '../lib/merchantApiAuth'
 import { probeVideoDurationSec } from '../lib/digitalHumanSubtitle'
@@ -175,6 +175,36 @@ async function storyFrameFileToVideoDataUrl(f: File): Promise<string> {
     fr.onerror = () => reject(new Error('读取参考视频失败'))
     fr.readAsDataURL(f)
   })
+}
+
+type MotionCharacterPick = { xPct: number; yPct: number; atSec: number }
+
+function buildMotionReplacePrompt(opts: {
+  characterHint: string
+  pick: MotionCharacterPick | null
+  extra: string
+}): string {
+  const named = opts.characterHint.trim()
+  const loc = opts.pick
+    ? `画面水平约 ${Math.round(opts.pick.xPct)}%、垂直约 ${Math.round(opts.pick.yPct)}% 处（约 ${opts.pick.atSec.toFixed(1)} 秒）的角色`
+    : ''
+  const who = named || loc || '画面中的主要角色'
+  const extra = opts.extra.trim()
+  return [
+    `将参考视频中的「${who}」替换为参考图中的人物。`,
+    '保持参考视频的动作、口型、表情、运镜、场景，以及其他未被点名的角色不变。',
+    extra,
+  ]
+    .filter(Boolean)
+    .join('')
+}
+
+function videoClickPct(el: HTMLVideoElement, clientX: number, clientY: number): { xPct: number; yPct: number } {
+  const rect = el.getBoundingClientRect()
+  return {
+    xPct: Math.max(0, Math.min(100, ((clientX - rect.left) / Math.max(1, rect.width)) * 100)),
+    yPct: Math.max(0, Math.min(100, ((clientY - rect.top) / Math.max(1, rect.height)) * 100)),
+  }
 }
 /** 短视频生成固定 Seedance */
 const VIDEO_ENGINE = 'seedance' as const
@@ -489,7 +519,14 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
   const [hint, setHint] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
 
-  const [genMode, setGenMode] = useState<'text' | 'frames'>('text')
+  const [genMode, setGenMode] = useState<'text' | 'frames' | 'motion'>('text')
+  const [motionVideo, setMotionVideo] = useState<{ file: File; previewUrl: string } | null>(null)
+  const [motionPhoto, setMotionPhoto] = useState<{ file: File; previewUrl: string } | null>(null)
+  const [motionCharacterHint, setMotionCharacterHint] = useState('')
+  const [motionPick, setMotionPick] = useState<MotionCharacterPick | null>(null)
+  const motionVideoRef = useRef<HTMLVideoElement>(null)
+  const motionVideoInputRef = useRef<HTMLInputElement>(null)
+  const motionPhotoInputRef = useRef<HTMLInputElement>(null)
   const [genPrompt, setGenPrompt] = useState('')
   const [scriptRows, setScriptRows] = useState<ShortVideoScriptRow[]>(() =>
     // 默认 2 段节拍落在所选单段总时长内（15s → 0–8 / 8–15），避免 2×15=30s
@@ -544,6 +581,10 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
   const storyFrameInputRef = useRef<HTMLInputElement>(null)
   const storyFramesRef = useRef(storyFrames)
   storyFramesRef.current = storyFrames
+  const motionVideoStateRef = useRef(motionVideo)
+  motionVideoStateRef.current = motionVideo
+  const motionPhotoStateRef = useRef(motionPhoto)
+  motionPhotoStateRef.current = motionPhoto
 
   const [sdDurationSec, setSdDurationSec] = useState<'5' | '10' | '15'>('15')
   const [sdFps, setSdFps] = useState<'24' | '30'>('24')
@@ -648,6 +689,14 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     if (cfg?.configLoadError) {
       return `视频配置加载失败：${cfg.configLoadError.slice(0, 120)}`
     }
+    if (genMode === 'motion') {
+      if (!(cfg?.motionImitateConfigured || cfg?.omnihumanConfigured)) {
+        return '动作模仿需要火山智能视觉 AK/SK。请在轻量配置后重试。'
+      }
+      if (!motionVideo) return '请先上传要替换角色的参考视频。'
+      if (!motionPhoto) return '请上传用于替换的人物照片。'
+      return null
+    }
     if (!cfg?.arkKeyConfigured) {
       return `当前环境未开通${VIDEO_ENGINE_LABEL_SEEDANCE}，请在运营台配置火山方舟 Key 后再生成。`
     }
@@ -677,6 +726,8 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     scriptRows,
     storyFrames.length,
     genPrompt,
+    motionVideo,
+    motionPhoto,
   ])
 
   const runShortVideo = useCallback(
@@ -801,6 +852,58 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
 
   const revokeStoryFrame = (item: StoryFrameItem) => {
     if (item.previewUrl.startsWith('blob:')) URL.revokeObjectURL(item.previewUrl)
+  }
+
+  const revokeMotionPreview = (url: string | undefined) => {
+    if (url?.startsWith('blob:')) URL.revokeObjectURL(url)
+  }
+
+  const onPickMotionVideoFile = (f: File | undefined) => {
+    if (!f) return
+    if (!isStoryFrameVideoFile(f)) {
+      setErr('请上传 MP4 / MOV / WEBM 视频')
+      return
+    }
+    if (f.size > MOTION_VIDEO_MAX_BYTES) {
+      setErr('参考视频请压缩到 12MB 以内')
+      return
+    }
+    setErr(null)
+    setMotionVideo((prev) => {
+      revokeMotionPreview(prev?.previewUrl)
+      return { file: f, previewUrl: URL.createObjectURL(f) }
+    })
+    setMotionPick(null)
+  }
+
+  const onPickMotionPhotoFile = (f: File | undefined) => {
+    if (!f) return
+    if (!isStoryFrameImageFile(f)) {
+      setErr('请上传人物照片（JPG / PNG / WEBP）')
+      return
+    }
+    setErr(null)
+    setMotionPhoto((prev) => {
+      revokeMotionPreview(prev?.previewUrl)
+      return { file: f, previewUrl: URL.createObjectURL(f) }
+    })
+  }
+
+  const onMotionVideoPickClick = (e: MouseEvent<HTMLButtonElement>) => {
+    const el = motionVideoRef.current
+    if (!el) return
+    if (!el.paused) {
+      el.pause()
+      return
+    }
+    const { xPct, yPct } = videoClickPct(el, e.clientX, e.clientY)
+    const atSec = Number.isFinite(el.currentTime) ? el.currentTime : 0
+    setMotionPick({ xPct, yPct, atSec })
+    setMotionCharacterHint((prev) =>
+      prev.trim()
+        ? prev
+        : `画面约 ${Math.round(xPct)}% 水平、${Math.round(yPct)}% 垂直处的角色`,
+    )
   }
 
   const appendStoryFrames = (files: FileList | File[]) => {
@@ -1067,6 +1170,12 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
   const validateEngine = (): string | null => {
     if (!cfgLoaded) return '视频引擎配置加载中，请稍候再试。'
     if (cfg?.configLoadError) return `视频配置不可用：${cfg.configLoadError.slice(0, 160)}`
+    if (genMode === 'motion') {
+      if (!(cfg?.motionImitateConfigured || cfg?.omnihumanConfigured)) {
+        return '动作模仿需要火山智能视觉 AK/SK。请在轻量配置后重试。'
+      }
+      return null
+    }
     if (!cfg?.arkKeyConfigured)
       return `当前环境未开通${VIDEO_ENGINE_LABEL_SEEDANCE}，请在运营台配置火山方舟 Key。`
     if (!(cfg?.arkVideoModels?.length ?? 0)) {
@@ -1609,9 +1718,6 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     images_base64?: string[]
     model?: string
     seedance_image_mode?: 'auto' | 'first_last' | 'reference' | 'first_only'
-    pipeline?: 'motion_imitate'
-    video_base64?: string
-    image_base64?: string
   }) => {
     // 禁止静默降成 5 秒：用户选的单段时长必须兑现，否则口播/分镜全对不上
     return runShortVideo(body, { allowAutoHalveDuration: false })
@@ -1648,7 +1754,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       resultBlobRef.current = null
     }
     setResultUrl(null)
-    const vErr = validateEngine() ?? validateLongform()
+    const vErr = genMode === 'motion' ? validateEngine() : validateEngine() ?? validateLongform()
     if (vErr) {
       failGenerateEarly(vErr)
       return
@@ -1657,21 +1763,28 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       typeof crypto !== 'undefined' && 'randomUUID' in crypto
         ? crypto.randomUUID()
         : `sv-${Date.now()}`
-    const hasMotionVideo = storyFrames.some((f) => f.kind === 'video')
-    motionImitateBillRef.current = hasMotionVideo
-    const estSec =
-      longformEnabled || (isScriptRowsUsable(scriptRows) && scriptRows.length >= 2)
-        ? longformEnabled
-          ? longformTargetTotalSec
-          : snapLongformTargetTotalSec(maxScriptTimeRangeEndSec(scriptRows), scriptRows.length)
-        : genMode === 'frames' && storyFrames.length > 1
-          ? Math.min(LONGFORM_MAX_TARGET_TOTAL_SEC, Math.max(15, storyFrames.length * Number(sdDurationSec)))
-          : Number(sdDurationSec)
+    const isMotionReplace = genMode === 'motion'
+    motionImitateBillRef.current = isMotionReplace
+    let estSec = Number(sdDurationSec)
+    if (isMotionReplace && motionVideo) {
+      try {
+        const probed = await probeVideoDurationSec(motionVideo.file)
+        if (probed > 0.3) estSec = Math.min(15, Math.max(1, Math.ceil(probed)))
+      } catch {
+        estSec = 8
+      }
+    } else if (longformEnabled || (isScriptRowsUsable(scriptRows) && scriptRows.length >= 2)) {
+      estSec = longformEnabled
+        ? longformTargetTotalSec
+        : snapLongformTargetTotalSec(maxScriptTimeRangeEndSec(scriptRows), scriptRows.length)
+    } else if (genMode === 'frames' && storyFrames.length > 1) {
+      estSec = Math.min(LONGFORM_MAX_TARGET_TOTAL_SEC, Math.max(15, storyFrames.length * Number(sdDurationSec)))
+    }
     // 积分校验前先给主按钮反馈，避免「点了没反应」
     setBusy(true)
     setProgress('正在检查积分与引擎…')
     setHint(null)
-    if (!(await ensureShortVideoPointsAffordable(estSec, hasMotionVideo))) {
+    if (!(await ensureShortVideoPointsAffordable(estSec, isMotionReplace))) {
       if (mountedRef.current) {
         setBusy(false)
         setProgress(null)
@@ -1693,6 +1806,60 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     const finishVideoJob = (ok: boolean, message?: string) => {
       finishAiGenerationJob(videoJobId, ok, message)
       videoJobIdRef.current = null
+    }
+
+    if (isMotionReplace) {
+      if (!motionVideo || !motionPhoto) {
+        finishVideoJob(false, '请上传参考视频和替换照片')
+        setErr('请上传参考视频，并指定要用哪张照片替换其中的角色。')
+        if (mountedRef.current) {
+          setBusy(false)
+          setProgress(null)
+        }
+        return
+      }
+      cancelRef.current = false
+      trackProgress('动作模仿：替换点名角色…')
+      try {
+        const promptText = buildMotionReplacePrompt({
+          characterHint: motionCharacterHint,
+          pick: motionPick,
+          extra: genPrompt.trim(),
+        })
+        const [imageRaw, videoDataUrl] = await Promise.all([
+          storyFrameFileToImageDataUrl(motionPhoto.file),
+          storyFrameFileToVideoDataUrl(motionVideo.file),
+        ])
+        const job = await runDhMotionImitateJob({
+          image_base64: imageRaw,
+          video_base64: videoDataUrl,
+          prompt: promptText,
+          onProgress: (label) => trackProgress(label),
+        })
+        if (!job.ok) {
+          finishVideoJob(false, formatVideoAiUserError(job.message))
+          setErr(formatVideoAiUserError(job.message))
+          return
+        }
+        trackProgress('交付角色替换成片…')
+        const ok = await commitFinalVideo(job.videoUrl, promptText, estSec)
+        finishVideoJob(ok, ok ? undefined : '成片合成失败')
+        if (ok) {
+          setHint(
+            `已将参考视频中的「${motionCharacterHint.trim() || '点名角色'}」替换为上传照片中的人物（即梦动作模仿 2.0）。`,
+          )
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : '动作模仿失败'
+        finishVideoJob(false, formatVideoAiUserError(msg))
+        setErr(formatVideoAiUserError(msg))
+      } finally {
+        if (mountedRef.current) {
+          setBusy(false)
+          setProgress(null)
+        }
+      }
+      return
     }
 
     let txt = genPrompt.trim()
@@ -1761,47 +1928,6 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     }
 
     const scriptUsable = useLongformPipeline && isScriptRowsUsable(workingScriptRows)
-
-    const motionFrame = storyFrames.find((f) => f.kind === 'video')
-    if (motionFrame) {
-      setBusy(true)
-      trackProgress('动作模仿生成中（图+参考视频）…')
-      cancelRef.current = false
-      try {
-        const imageRaw = imgs[0] || (await storyFrameFileToImageDataUrl(motionFrame.file))
-        const videoDataUrl = await storyFrameFileToVideoDataUrl(motionFrame.file)
-        const promptText =
-          txt ||
-          (scriptUsable ? scriptRowsToOverallPrompt(workingScriptRows) : '') ||
-          '按参考视频动作驱动画面人物，保持参考图身份与构图。'
-        const job = await runDhMotionImitateJob({
-          image_base64: imageRaw,
-          video_base64: videoDataUrl,
-          prompt: promptText,
-          onProgress: (label) => trackProgress(label),
-        })
-        if (!job.ok) {
-          finishVideoJob(false, formatVideoAiUserError(job.message))
-          setErr(formatVideoAiUserError(job.message))
-          return
-        }
-        trackProgress('交付动作模仿成片…')
-        const narration = await resolveNarrationForFinalVideo(promptText, Number(sdDurationSec))
-        const ok = await commitFinalVideo(job.videoUrl, narration, Number(sdDurationSec))
-        finishVideoJob(ok, ok ? undefined : '成片合成失败')
-        if (ok) setHint('已使用即梦动作模仿 2.0（参考视频驱动人物动作）')
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : '动作模仿失败'
-        finishVideoJob(false, formatVideoAiUserError(msg))
-        setErr(formatVideoAiUserError(msg))
-      } finally {
-        if (mountedRef.current) {
-          setBusy(false)
-          setProgress(null)
-        }
-      }
-      return
-    }
 
     if (useLongformPipeline) {
       if (!scriptUsable && genMode === 'text') {
@@ -2287,10 +2413,11 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     if (studioMode === 'digital_human') return '打开数字人'
     if (studioMode === 'music') return '打开配乐工作区'
     if (studioMode === 'canvas') return '打开无限画布'
+    if (mainPane === 'generate' && genMode === 'motion') return '开始角色替换'
     if (mainPane === 'generate' && genPrompt.trim()) return '开始生成短片'
     if (genPrompt.trim()) return '规划并进入生成'
     return '进入短片生成'
-  }, [studioMode, mainPane, genPrompt])
+  }, [studioMode, mainPane, genPrompt, genMode])
 
   const goPane = (id: MainPane) => {
     resetOutputs()
@@ -2352,6 +2479,8 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
   useEffect(() => {
     return () => {
       storyFramesRef.current.forEach(revokeStoryFrame)
+      revokeMotionPreview(motionVideoStateRef.current?.previewUrl)
+      revokeMotionPreview(motionPhotoStateRef.current?.previewUrl)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -2370,11 +2499,11 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
           <h1 className="erp-page-title text-[1.35rem] leading-tight sm:text-2xl">短视频 AI 创作台</h1>
           <MpAddonPointsRateBadge
             kind="shortvideo"
-            motionImitate={storyFrames.some((f) => f.kind === 'video')}
+            motionImitate={genMode === 'motion'}
           />
         </div>
         <p className="mx-auto max-w-2xl text-sm leading-relaxed text-slate-600">
-          Skill 技能 · 无限画布 · 短片生成 · 音乐配乐 · 案例做同款。引擎为 Seedance；多素材拼接请切「AI混剪」。
+          Skill 技能 · 无限画布 · 短片生成 · 动作模仿 · 音乐配乐 · 案例做同款。引擎为 Seedance；点名替换角色请切「动作模仿」。多素材拼接请切「AI混剪」。
           {readMpSessionToken() ? (
             <span className="mt-1 block text-xs text-cyan-800">
               星选账号：成片成功后按秒扣积分；套餐 ai_video_quota 次数优先，用尽后扣积分余额。
@@ -2393,7 +2522,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
           <p className="text-sm font-semibold text-slate-800">短视频出片 · Agent 同屏</p>
           <MpAddonPointsRateBadge
             kind="shortvideo"
-            motionImitate={storyFrames.some((f) => f.kind === 'video')}
+            motionImitate={genMode === 'motion'}
           />
         </div>
       )}
@@ -2483,6 +2612,21 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
                     <button
                       type="button"
                       onClick={() => {
+                        resetOutputs()
+                        setGenMode('motion')
+                      }}
+                      className={cn(
+                        'rounded-full px-3 py-1.5 text-xs font-medium transition',
+                        genMode === 'motion'
+                          ? 'bg-cyan-600 text-white'
+                          : 'bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50',
+                      )}
+                    >
+                      动作模仿
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
                         openInfiniteCanvas()
                       }}
                       className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
@@ -2492,6 +2636,137 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
                   </div>
                 </div>
 
+                {genMode === 'motion' ? (
+                  <div className="space-y-3 rounded-xl border border-cyan-200/80 bg-cyan-50/40 p-3">
+                    <p className="text-sm font-medium text-slate-800">动作模仿 · 点名角色替换</p>
+                    <p className="text-xs leading-relaxed text-slate-600">
+                      上传一段视频，暂停后点击画面中要替换的人；再上传一张照片，成片会把该角色换成照片里的人，动作/口型跟原视频。
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-slate-700">1. 参考视频</p>
+                        <input
+                          ref={motionVideoInputRef}
+                          type="file"
+                          accept="video/mp4,video/webm,video/quicktime,.mp4,.mov,.webm,.m4v"
+                          className="hidden"
+                          disabled={busy || auxBusy}
+                          onChange={(e) => {
+                            onPickMotionVideoFile(e.target.files?.[0])
+                            e.target.value = ''
+                          }}
+                        />
+                        {motionVideo ? (
+                          <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-black">
+                            <video
+                              ref={motionVideoRef}
+                              src={motionVideo.previewUrl}
+                              controls
+                              playsInline
+                              className="max-h-72 w-full object-contain"
+                            />
+                            <button
+                              type="button"
+                              aria-label="暂停后点击点名要替换的角色"
+                              className="absolute inset-x-0 top-0 bottom-12 cursor-crosshair bg-transparent"
+                              onClick={onMotionVideoPickClick}
+                            />
+                            {motionPick ? (
+                              <span
+                                className="pointer-events-none absolute h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-cyan-500/55 shadow"
+                                style={{ left: `${motionPick.xPct}%`, top: `${motionPick.yPct}%` }}
+                                aria-hidden
+                              />
+                            ) : null}
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={busy || auxBusy}
+                            onClick={() => motionVideoInputRef.current?.click()}
+                            className="flex h-36 w-full items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white text-sm text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                          >
+                            上传视频
+                          </button>
+                        )}
+                        {motionVideo ? (
+                          <button
+                            type="button"
+                            disabled={busy || auxBusy}
+                            onClick={() => motionVideoInputRef.current?.click()}
+                            className="text-xs text-cyan-700 hover:underline disabled:opacity-50"
+                          >
+                            更换视频
+                          </button>
+                        ) : null}
+                        <p className="text-[11px] text-slate-500">建议竖版/横版 MP4，约 3～15 秒、12MB 内。先暂停再点击角色。</p>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-slate-700">2. 替换成这张照片里的人</p>
+                        <input
+                          ref={motionPhotoInputRef}
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          className="hidden"
+                          disabled={busy || auxBusy}
+                          onChange={(e) => {
+                            onPickMotionPhotoFile(e.target.files?.[0])
+                            e.target.value = ''
+                          }}
+                        />
+                        {motionPhoto ? (
+                          <img
+                            src={motionPhoto.previewUrl}
+                            alt="替换角色"
+                            className="max-h-72 w-full rounded-lg border border-slate-200 object-contain bg-white"
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={busy || auxBusy}
+                            onClick={() => motionPhotoInputRef.current?.click()}
+                            className="flex h-36 w-full items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white text-sm text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                          >
+                            上传人物照片
+                          </button>
+                        )}
+                        {motionPhoto ? (
+                          <button
+                            type="button"
+                            disabled={busy || auxBusy}
+                            onClick={() => motionPhotoInputRef.current?.click()}
+                            className="text-xs text-cyan-700 hover:underline disabled:opacity-50"
+                          >
+                            更换照片
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                    <label className="block text-xs font-medium text-slate-700">
+                      点名的角色
+                      <input
+                        type="text"
+                        value={motionCharacterHint}
+                        onChange={(e) => setMotionCharacterHint(e.target.value)}
+                        disabled={busy || auxBusy}
+                        placeholder="例如：画面左侧穿白裙的女生 / 正中间说话的人"
+                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20"
+                      />
+                    </label>
+                    <label className="block text-xs font-medium text-slate-700">
+                      补充说明（可选）
+                      <textarea
+                        value={genPrompt}
+                        onChange={(e) => setGenPrompt(e.target.value)}
+                        disabled={busy || auxBusy}
+                        rows={2}
+                        placeholder="例如：保留原背景和其他路人，不要改运镜"
+                        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20"
+                      />
+                    </label>
+                  </div>
+                ) : (
+                  <>
                 <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200/80 bg-white px-3 py-2.5 text-sm text-slate-800">
                   <input
                     type="checkbox"
@@ -2740,12 +3015,13 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
                         ))}
                       </div>
                     ) : (
-                      <p className="text-xs text-slate-500">
-                        可上传多张图/视频作镜头参考。含视频时走即梦动作模仿（人物复刻参考视频动作）。
-                      </p>
+                      <p className="text-xs text-slate-500">可上传多张图/视频作镜头参考。</p>
                     )}
                   </div>
                 ) : null}
+
+                  </>
+                )}
 
                 {(hint || err) && (
                   <div
@@ -2771,7 +3047,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
                       className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-700 to-sky-600 px-6 py-2.5 text-sm font-semibold text-white shadow-md shadow-cyan-900/15 hover:from-cyan-600 hover:to-sky-500 disabled:pointer-events-none disabled:opacity-50"
                     >
                       {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                      {busy ? (progress ?? '处理中……') : '开始生成短片'}
+                      {busy ? (progress ?? '处理中……') : genMode === 'motion' ? '开始角色替换' : '开始生成短片'}
                     </button>
                     <button
                       type="button"
