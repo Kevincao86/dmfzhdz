@@ -391,6 +391,7 @@ export default function DigitalHumanBroadcastPage() {
         const charge = await spendMpAddonPoints({
           kind: 'digital_human',
           durationSec: billSec,
+          motionImitate: result.engine === 'motion_imitate',
           idempotencyKey: `digital_human:${job.id}`,
           note: `digital_human:${job.id}`,
         })
@@ -1025,7 +1026,12 @@ export default function DigitalHumanBroadcastPage() {
       const segs = estimateDhS2vSegmentCount(draft.script)
       estBillSec = Math.max(5, segs * 5)
     }
-    const afford = await checkMpAddonPointsAffordable('digital_human', estBillSec)
+    const afford = await checkMpAddonPointsAffordable('digital_human', estBillSec, {
+      motionImitate:
+        draft.avatarKind === 'video_clone' ||
+        Boolean(customReferenceVideoBlobRef.current) ||
+        Boolean(prev?.hasLocalReferenceVideo),
+    })
     if (!afford.ok) {
       setToast(afford.message)
       return
@@ -1311,9 +1317,13 @@ export default function DigitalHumanBroadcastPage() {
             aria-hidden
           />
           <h1 className="erp-page-title">数字人口播</h1>
-          <MpAddonPointsRateBadge kind="digital_human" className="mt-2" />
+          <MpAddonPointsRateBadge
+            kind="digital_human"
+            motionImitate={draft.avatarKind === 'video_clone'}
+            className="mt-2"
+          />
           <p className="mt-1 max-w-2xl text-sm text-slate-600">
-            形象管理 · 口播文案 · 高清 MP4（豆包 Seedance 一体化：人物+背景+产品融合 + TTS 配音，与短视频同源）· 支持实拍视频上传 · 作品库。
+            形象管理 · 口播文案 · 高清 MP4（火山 OmniHuman 口型驱动；上传实拍视频时走即梦动作模仿）· 作品库。
             {readMpSessionToken() ? (
               <span className="mt-1 block text-xs text-violet-700">
                 星选账号：渲染成功后按秒扣积分；套餐 ai_video_quota 次数优先，用尽后扣积分余额。
@@ -1659,7 +1669,7 @@ export default function DigitalHumanBroadcastPage() {
                                   customReferenceVideoFileName: f.name,
                                   ...customAvatarVoiceDefaults(),
                                 })
-                                setToast('实拍视频已上传；完成口播文案后可直接提交渲染（TTS + 口型）')
+                                setToast('实拍视频已上传；生成时将走即梦动作模仿（复刻肢体与口型），口播配音请尽量与参考视频口型匹配')
                               } else {
                                 patchDraft({
                                   customAvatarDataUrl: dataUrl,
@@ -1680,12 +1690,12 @@ export default function DigitalHumanBroadcastPage() {
                       />
                       <Upload className="mx-auto h-8 w-8 text-slate-400" />
                       <p className="mt-2 text-sm text-slate-600">
-                        上传 {draft.avatarKind === 'photo' ? '正面照片' : '自己拍的竖版 MP4 视频'}，与照片驱动共用豆包 Seedance 图生视频逻辑
+                        上传 {draft.avatarKind === 'photo' ? '正面照片' : '自己拍的竖版 MP4 视频'}，实拍视频将作为动作模仿参考
                       </p>
                       <p className="mt-1 text-xs text-slate-500">
                         {draft.avatarKind === 'photo'
                           ? '建议竖版 JPG/PNG ≥1080×1920；全身照请在下方选「全身」后生成'
-                          : '建议竖版 MP4 ≥720P；完成步骤 2 口播文案后可直接提交渲染（TTS + 口型）'}
+                          : '建议竖版 MP4 ≥720P、约 3～15 秒、12MB 内；生成时人物会复刻该视频动作与口型'}
                       </p>
                       <button
                         type="button"

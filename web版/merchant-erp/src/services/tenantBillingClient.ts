@@ -232,17 +232,20 @@ export type ErpPointsSpendResult = {
 export async function checkErpPointsAffordable(input: {
   kind: ErpPointsSpendKind
   durationSec?: number
+  motionImitate?: boolean
 }): Promise<{ balance: number; packageBalance: number; rechargeBalance: number }> {
   return billingFetch({
     action: 'points_check',
     kind: input.kind,
     durationSec: input.durationSec,
+    motionImitate: input.motionImitate === true,
   })
 }
 
 export async function spendErpPointsForUsage(input: {
   kind: ErpPointsSpendKind
   durationSec?: number
+  motionImitate?: boolean
   idempotencyKey?: string
   note?: string
 }): Promise<ErpPointsSpendResult> {
@@ -250,6 +253,7 @@ export async function spendErpPointsForUsage(input: {
     action: 'points_spend',
     kind: input.kind,
     durationSec: input.durationSec,
+    motionImitate: input.motionImitate === true,
     idempotencyKey: input.idempotencyKey,
     note: input.note,
   })

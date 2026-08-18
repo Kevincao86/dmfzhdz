@@ -55,6 +55,26 @@ export async function postDhOmniHumanStart(body: {
   { ok: true; taskId: string; modelUsed?: string | null } | { ok: false; message: string }
 > {
   const payload = { ...body, pipeline: 'omnihuman' as const }
+  return postDhVolcVideoStart(payload, 'OmniHuman')
+}
+
+export async function postDhMotionImitateStart(body: {
+  image_base64: string
+  video_base64: string
+  prompt?: string
+}): Promise<
+  { ok: true; taskId: string; modelUsed?: string | null } | { ok: false; message: string }
+> {
+  const payload = { ...body, pipeline: 'motion_imitate' as const }
+  return postDhVolcVideoStart(payload, '动作模仿')
+}
+
+async function postDhVolcVideoStart(
+  payload: Record<string, unknown>,
+  label: string,
+): Promise<
+  { ok: true; taskId: string; modelUsed?: string | null } | { ok: false; message: string }
+> {
   for (const path of START_PATHS) {
     for (const url of erpApiUrls(path)) {
       try {
@@ -67,11 +87,11 @@ export async function postDhOmniHumanStart(body: {
         const j = (await parseJsonSafe<Record<string, unknown>>(res)) ?? {}
         if (!res.ok || !j.ok) {
           const msg =
-            typeof j.message === 'string' ? j.message : `OmniHuman 发起失败 HTTP ${res.status}`
+            typeof j.message === 'string' ? j.message : `${label} 发起失败 HTTP ${res.status}`
           return { ok: false, message: msg }
         }
         const tid = typeof j.taskId === 'string' ? j.taskId.trim() : ''
-        if (!tid) return { ok: false, message: 'OmniHuman 未返回 taskId' }
+        if (!tid) return { ok: false, message: `${label} 未返回 taskId` }
         return {
           ok: true,
           taskId: tid,
@@ -84,7 +104,7 @@ export async function postDhOmniHumanStart(body: {
   }
   return {
     ok: false,
-    message: 'OmniHuman 接口不可达。请确认已部署轻量 auth-api，并配置火山视觉 AK/SK。',
+    message: `${label} 接口不可达。请确认已部署轻量 auth-api，并配置火山视觉 AK/SK。`,
   }
 }
 
@@ -159,4 +179,34 @@ export async function runDhOmniHumanJob(opts: {
     }
   }
   return { ok: false, message: 'OmniHuman 生成超时，请稍后重试' }
+}
+
+/** 提交并轮询至成功：动作模仿（图+参考视频） */
+export async function runDhMotionImitateJob(opts: {
+  image_base64: string
+  video_base64: string
+  prompt?: string
+  onProgress?: (label: string) => void
+}): Promise<{ ok: true; videoUrl: string; modelUsed?: string | null } | { ok: false; message: string }> {
+  const started = await postDhMotionImitateStart({
+    image_base64: opts.image_base64,
+    video_base64: opts.video_base64,
+    prompt: opts.prompt,
+  })
+  if (!started.ok) return started
+  opts.onProgress?.('动作模仿生成中…')
+  const t0 = Date.now()
+  while (Date.now() - t0 < POLL_MAX_MS) {
+    await sleep(POLL_INTERVAL_MS)
+    const st = await fetchDhOmniHumanStatus(started.taskId)
+    if (!st.ok) return st
+    opts.onProgress?.(st.statusLabel)
+    if (st.phase === 'succeeded' && st.videoUrl) {
+      return { ok: true, videoUrl: st.videoUrl, modelUsed: started.modelUsed }
+    }
+    if (st.phase === 'failed') {
+      return { ok: false, message: st.failReason || '动作模仿生成失败' }
+    }
+  }
+  return { ok: false, message: '动作模仿生成超时，请稍后重试' }
 }

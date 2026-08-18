@@ -13,11 +13,14 @@ import type { MpLibraryRole, MpMembershipTier } from './mpMembershipCatalog.js'
 export const MP_POINTS_VIDEO_PER_SEC = 2
 export const MP_POINTS_VIDEO_PER_MIN = MP_POINTS_VIDEO_PER_SEC * 60
 
-/** 短视频 AI 处理（即梦成片）：80 积分/秒；API≈¥0.80/秒 */
-export const MP_POINTS_SHORTVIDEO_PER_SEC = 80
+/** 短视频 AI（Seedance 2.0）：公开价约 ¥0.80/秒，售价上浮 30% → 104 积分/秒 */
+export const MP_POINTS_SHORTVIDEO_PER_SEC = 104
 
-/** 数字人口播（Seedance 分段 i2v）：80 积分/秒；API≈¥0.80/秒 */
-export const MP_POINTS_DIGITAL_HUMAN_PER_SEC = 80
+/** 数字人口播（OmniHuman 1.5）：公开价约 ¥0.80/秒，售价上浮 30% → 104 积分/秒 */
+export const MP_POINTS_DIGITAL_HUMAN_PER_SEC = 104
+
+/** 即梦动作模仿 2.0：公开价约 ¥0.50/秒，售价上浮 30% → 65 积分/秒 */
+export const MP_POINTS_MOTION_IMITATE_PER_SEC = 65
 
 /** 灵祺 AI 云剪（ICE 普通合成）：一口价 80 积分/条（≤60 秒）；API≈¥0.80/条 */
 export const MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP = 80
@@ -29,11 +32,14 @@ export const MP_POINTS_CLOUD_EDIT_PER_SEC = 0
 /** 阿里云 IMS 智能一键成片：5 积分/秒；API≈¥0.05/秒 */
 export const MP_POINTS_CLOUD_EDIT_SMART_PER_SEC = 5
 
-/** 短视频 AI 成片最低扣费（约 5 秒，80 积分/秒） */
-export const MP_POINTS_SHORTVIDEO_MIN_CHARGE = 400
+/** 短视频 AI 成片最低扣费（约 5 秒，104 积分/秒） */
+export const MP_POINTS_SHORTVIDEO_MIN_CHARGE = 520
 
-/** 数字人成片最低扣费（约 4 秒，80 积分/秒） */
-export const MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE = 320
+/** 数字人成片最低扣费（约 4 秒，104 积分/秒） */
+export const MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE = 416
+
+/** 动作模仿成片最低扣费（约 4 秒，65 积分/秒） */
+export const MP_POINTS_MOTION_IMITATE_MIN_CHARGE = 260
 
 /** @deprecated 请用 MP_POINTS_SHORTVIDEO_MIN_CHARGE / MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE */
 export const MP_POINTS_ADDON_VIDEO_MIN_CHARGE = MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE
@@ -94,6 +100,16 @@ export const MP_POINTS_REVIEW_AI_PER_USE = 3
 
 /** 单积分内部 API 成本（元） */
 export const MP_POINT_INTERNAL_COST_YUAN = 0.01
+
+/** 模型公开价上浮比例（售价 = 成本 × 1.30） */
+export const MP_POINTS_MODEL_MARKUP = 1.3
+
+/** 按模型公开价（元）换算积分：ceil(成本 × 1.30 / 0.01) */
+export function mpPointsFromModelCostYuan(costYuan: number): number {
+  const n = Number(costYuan)
+  if (!Number.isFinite(n) || n <= 0) return 0
+  return Math.max(1, Math.ceil((n * MP_POINTS_MODEL_MARKUP) / MP_POINT_INTERNAL_COST_YUAN))
+}
 
 /** 目标毛利率（用户支付价中归平台利润的比例） */
 export const MP_POINT_GROSS_MARGIN = 0.6
@@ -215,7 +231,9 @@ export function parseMpPointsUsageKind(raw: unknown): MpPointsUsageKind | null {
   return null
 }
 
-export function formatMpPointsRateLabel(kind: MpPointsUsageKind): string {
+export type MpPointsCostOpts = { durationSec?: number; motionImitate?: boolean; count?: number }
+
+export function formatMpPointsRateLabel(kind: MpPointsUsageKind, opts?: { motionImitate?: boolean }): string {
   if (kind === 'article') return `${MP_POINTS_ARTICLE_PER_USE} 积分/次`
   if (kind === 'brief') return `${MP_POINTS_BRIEF_PER_USE} 积分/篇`
   if (kind === 'mix_material_analyze') return `${MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE} 积分/次`
@@ -236,16 +254,25 @@ export function formatMpPointsRateLabel(kind: MpPointsUsageKind): string {
     return `${MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP} 积分/条（≤${MP_POINTS_CLOUD_EDIT_MAX_SEC} 秒）`
   }
   const rate = mpPointsPerSecForKind(kind)
-  if (rate != null) return `${rate} 积分/秒（${rate * 60} 积分/分钟）`
+  if (rate != null) {
+    if (opts?.motionImitate) {
+      return `${MP_POINTS_MOTION_IMITATE_PER_SEC} 积分/秒（动作模仿，模型价上浮 30%）`
+    }
+    return `${rate} 积分/秒（${rate * 60} 积分/分钟）`
+  }
   return '按积分扣费'
 }
 
 function mpPointsCostForAddonDuration(
   kind: 'shortvideo' | 'cloud_edit' | 'cloud_edit_smart' | 'digital_human',
   durationSec: number,
+  opts?: { motionImitate?: boolean },
 ): number {
   if (kind === 'cloud_edit') return MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP
   const sec = Math.max(1, Math.ceil(Number(durationSec) || 1))
+  if (opts?.motionImitate && (kind === 'shortvideo' || kind === 'digital_human')) {
+    return Math.max(MP_POINTS_MOTION_IMITATE_MIN_CHARGE, sec * MP_POINTS_MOTION_IMITATE_PER_SEC)
+  }
   const rate = mpPointsPerSecForKind(kind) ?? 0
   const raw = sec * rate
   const min =
@@ -257,14 +284,14 @@ function mpPointsCostForAddonDuration(
   return Math.max(min, raw)
 }
 
-export function mpPointsCostForUsage(kind: MpPointsUsageKind, opts?: { durationSec?: number }): number {
+export function mpPointsCostForUsage(kind: MpPointsUsageKind, opts?: MpPointsCostOpts): number {
   if (
     kind === 'shortvideo' ||
     kind === 'cloud_edit' ||
     kind === 'cloud_edit_smart' ||
     kind === 'digital_human'
   ) {
-    return mpPointsCostForAddonDuration(kind, Number(opts?.durationSec) || 1)
+    return mpPointsCostForAddonDuration(kind, Number(opts?.durationSec) || 1, opts)
   }
   if (kind === 'video') {
     const sec = Math.max(1, Math.ceil(Number(opts?.durationSec) || 1))

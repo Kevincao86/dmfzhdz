@@ -1,12 +1,14 @@
 /**
  * 与 web `mpPointsEconomics.ts` 消耗规则保持一致（ERP 租户积分）
  */
-const MP_POINTS_SHORTVIDEO_PER_SEC = 80
-const MP_POINTS_SHORTVIDEO_MIN_CHARGE = 400
+const MP_POINTS_SHORTVIDEO_PER_SEC = 104
+const MP_POINTS_SHORTVIDEO_MIN_CHARGE = 520
 
-/** 数字人口播成片：80 积分/秒（与 CS Web 一致）；小程序当前为 TTS 试听，成片在电脑端扣费 */
-const MP_POINTS_DIGITAL_HUMAN_PER_SEC = 80
-const MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE = 320
+/** 数字人口播成片：104 积分/秒（模型价上浮 30%）；动作模仿 65 积分/秒 */
+const MP_POINTS_DIGITAL_HUMAN_PER_SEC = 104
+const MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE = 416
+const MP_POINTS_MOTION_IMITATE_PER_SEC = 65
+const MP_POINTS_MOTION_IMITATE_MIN_CHARGE = 260
 
 const MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP = 80
 const MP_POINTS_CLOUD_EDIT_MAX_SEC = 60
@@ -43,9 +45,12 @@ function mpPointsPerSecForKind(kind) {
   return MP_POINTS_PER_SEC_BY_KIND[kind] ?? null
 }
 
-function mpPointsCostForAddonDuration(kind, durationSec) {
+function mpPointsCostForAddonDuration(kind, durationSec, opts) {
   if (kind === 'cloud_edit') return MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP
   const sec = Math.max(1, Math.ceil(Number(durationSec) || 1))
+  if (opts && opts.motionImitate && (kind === 'shortvideo' || kind === 'digital_human')) {
+    return Math.max(MP_POINTS_MOTION_IMITATE_MIN_CHARGE, sec * MP_POINTS_MOTION_IMITATE_PER_SEC)
+  }
   const rate = mpPointsPerSecForKind(kind) || 0
   const raw = sec * rate
   const min =
@@ -66,7 +71,7 @@ function mpPointsCostForUsage(kind, opts) {
     kind === 'cloud_edit_smart' ||
     kind === 'digital_human'
   ) {
-    return mpPointsCostForAddonDuration(kind, (opts && opts.durationSec) || 1)
+    return mpPointsCostForAddonDuration(kind, (opts && opts.durationSec) || 1, opts)
   }
   if (kind === 'mix_material_analyze') return MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE
   if (kind === 'visual_studio_copy') return MP_POINTS_VISUAL_STUDIO_COPY_PER_USE

@@ -59,23 +59,29 @@ async function postMpAuthAction(body: Record<string, unknown>): Promise<Record<s
   throw new Error(String(res.data.message || res.data.error || '积分接口失败'))
 }
 
-export function estimateMpAddonPointsCharge(kind: MpAddonGenerationKind, durationSec: number): number {
-  return mpPointsCostForUsage(kind, { durationSec })
+export function estimateMpAddonPointsCharge(
+  kind: MpAddonGenerationKind,
+  durationSec: number,
+  opts?: { motionImitate?: boolean },
+): number {
+  return mpPointsCostForUsage(kind, { durationSec, motionImitate: opts?.motionImitate })
 }
 
 /** 生成前校验积分：星选 mp 会话优先；否则走 ERP 租户 billing */
 export async function checkMpAddonPointsAffordable(
   kind: MpAddonGenerationKind,
   durationSec: number,
+  opts?: { motionImitate?: boolean },
 ): Promise<MpAddonPointsAffordResult> {
   const sec = Math.max(1, Math.ceil(Number(durationSec) || 1))
-  const required = estimateMpAddonPointsCharge(kind, sec)
+  const required = estimateMpAddonPointsCharge(kind, sec, opts)
   if (readMpSessionToken()) {
     const billingRole = readMpBillingRoleHint()
     const res = await postMpAuthActionRaw({
       action: 'mp_ai_points_afford',
       kind,
       durationSec: sec,
+      motionImitate: opts?.motionImitate === true,
       ...(billingRole ? { billingRole } : {}),
     })
     if (res.ok) {
@@ -98,7 +104,11 @@ export async function checkMpAddonPointsAffordable(
     }
   }
   try {
-    const r = await checkErpPointsAffordable({ kind, durationSec: sec })
+    const r = await checkErpPointsAffordable({
+      kind,
+      durationSec: sec,
+      motionImitate: opts?.motionImitate === true,
+    })
     const balance = Math.max(
       0,
       Math.floor(Number(r.balance) || Number(r.packageBalance) + Number(r.rechargeBalance) || 0),
@@ -135,6 +145,7 @@ export async function checkMpAddonPointsAffordable(
 export async function spendMpAddonPoints(opts: {
   kind: MpAddonGenerationKind
   durationSec: number
+  motionImitate?: boolean
   idempotencyKey?: string
   note?: string
 }): Promise<MpAddonPointsSpendResult | null> {
@@ -145,6 +156,7 @@ export async function spendMpAddonPoints(opts: {
       action: 'mp_ai_points_spend',
       kind: opts.kind,
       durationSec: sec,
+      motionImitate: opts.motionImitate === true,
       idempotencyKey: opts.idempotencyKey?.trim() || undefined,
       note: opts.note?.trim() || undefined,
       ...(billingRole ? { billingRole } : {}),
@@ -158,6 +170,7 @@ export async function spendMpAddonPoints(opts: {
   const r = await spendErpPointsForUsage({
     kind: opts.kind,
     durationSec: sec,
+    motionImitate: opts.motionImitate === true,
     idempotencyKey: opts.idempotencyKey?.trim() || undefined,
     note: opts.note?.trim() || undefined,
   })

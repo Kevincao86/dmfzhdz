@@ -66,7 +66,7 @@ module.exports.MODULE_COPY = {
   },
   digital_human: {
     navTitle: '数字人口播',
-    body: '数字人 TTS 试听与电脑端同源（试听不扣积分）。完整成片在电脑端按 80 积分/秒（最低 320）计费，与 CS 一致。',
+    body: '数字人 TTS 试听与电脑端同源（试听不扣积分）。完整成片在电脑端按 104 积分/秒（最低 416）计费；动作模仿 65 积分/秒（最低 260），与 CS 一致。',
   },
   ai_ops_plan: {
     navTitle: '运营方案',

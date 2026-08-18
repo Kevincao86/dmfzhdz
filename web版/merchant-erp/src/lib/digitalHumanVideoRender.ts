@@ -53,10 +53,11 @@ import {
   parseMotionInstructions,
 } from './digitalHumanMotionPlan'
 import { isDhProductFusionSegment, prepareDhProductFusionAssets } from './digitalHumanProductFusion'
-import { runDhOmniHumanJob } from './dhOmniHumanVideoApi'
+import { runDhOmniHumanJob, runDhMotionImitateJob } from './dhOmniHumanVideoApi'
 import {
   blobUrlIsReadable,
   loadWorkMp4Blob,
+  loadWorkReferenceVideo,
   saveWorkMp4Blob,
 } from './digitalHumanWorkBlobStore'
 
@@ -67,6 +68,7 @@ const MAX_S2V_SEGMENTS = 12
 
 export type DhVideoEngine =
   | 'omnihuman'
+  | 'motion_imitate'
   | 'seedance_lipsync'
   | 'seedance_product_fusion'
   | 'seedance'
@@ -74,6 +76,7 @@ export type DhVideoEngine =
 export type DhVideoProvider = 'volc' | 'doubao' | 'qwen'
 
 export function dhVideoEngineLabel(engine: DhVideoEngine | undefined): string {
+  if (engine === 'motion_imitate') return '火山即梦动作模仿（图+参考视频）'
   if (engine === 'omnihuman') return '火山 OmniHuman 音频驱动口播'
   if (engine === 'seedance_product_fusion') {
     return '豆包 Seedance 一体化融合（人物+背景+产品）'
@@ -382,6 +385,12 @@ async function renderWithOmniHuman(
     return { ok: false, message: '请上传清晰正面人像/实拍视频或选择预置形象后重试' }
   }
 
+  const refVideo = await loadWorkReferenceVideo(work.id)
+  const useMotion = Boolean(refVideo && refVideo.size >= 1024)
+  if (useMotion && refVideo && refVideo.size > 12 * 1024 * 1024) {
+    return { ok: false, message: '动作参考视频请压缩到 12MB 以内后再生成' }
+  }
+
   let productPureB64: string | null = null
   if (draft.productOverlayEnabled) {
     try {
@@ -448,6 +457,7 @@ async function renderWithOmniHuman(
     activeSceneShots && !isAudioDrive ? activeSceneShots.length : 1,
   )
   segmentTotal = Math.min(DH_OMNIHUMAN_MAX_SEGMENTS, Math.max(1, segmentTotal))
+  if (useMotion) segmentTotal = 1
   const padText = scriptChunks[scriptChunks.length - 1] ?? script
   while (scriptChunks.length < segmentTotal) scriptChunks.push(padText)
   while (segmentAudioBlobs.length < segmentTotal) {
@@ -538,26 +548,44 @@ async function renderWithOmniHuman(
       }
     }
 
-    const job = await runDhOmniHumanJob({
-      image_base64: sceneImageB64,
-      audio_base64: audioB64,
-      prompt,
-      onProgress: (label) => {
-        onProgress?.({
-          phase: 'generating',
-          segmentIndex: i + 1,
-          segmentTotal,
-          progress: 20 + Math.round((i / segmentTotal) * 55),
-        })
-        void label
-      },
-    })
+    const job =
+      useMotion && refVideo
+        ? await runDhMotionImitateJob({
+            image_base64: sceneImageB64,
+            video_base64: await blobToPureBase64(refVideo),
+            prompt,
+            onProgress: (label) => {
+              onProgress?.({
+                phase: 'generating',
+                segmentIndex: i + 1,
+                segmentTotal,
+                progress: 20 + Math.round((i / segmentTotal) * 55),
+              })
+              void label
+            },
+          })
+        : await runDhOmniHumanJob({
+            image_base64: sceneImageB64,
+            audio_base64: audioB64,
+            prompt,
+            onProgress: (label) => {
+              onProgress?.({
+                phase: 'generating',
+                segmentIndex: i + 1,
+                segmentTotal,
+                progress: 20 + Math.round((i / segmentTotal) * 55),
+              })
+              void label
+            },
+          })
     if (!job.ok) {
       return {
         ok: false,
         message: sanitizeDhRenderPipelineError(
           job.message,
-          `第 ${i + 1}/${segmentTotal} 段 OmniHuman 生成失败`,
+          useMotion
+            ? `第 ${i + 1}/${segmentTotal} 段动作模仿生成失败`
+            : `第 ${i + 1}/${segmentTotal} 段 OmniHuman 生成失败`,
         ),
       }
     }
@@ -630,7 +658,7 @@ async function renderWithOmniHuman(
       script,
       baseFrameMode,
       targetDurationSec,
-      { preserveNarrationAudio: true, timedSubtitleChunks },
+      { preserveNarrationAudio: !useMotion, timedSubtitleChunks },
     )
   } catch (e) {
     return {
@@ -643,7 +671,7 @@ async function renderWithOmniHuman(
   }
 
   const finalHasAudio = await probeVideoHasAudioStream(finalBlob)
-  if (!finalHasAudio) {
+  if (!finalHasAudio && !useMotion) {
     return {
       ok: false,
       message: '成片验收失败：MP4 无口播音轨。OmniHuman 应自带音轨，请重试或检查火山视觉任务结果。',
@@ -655,7 +683,11 @@ async function renderWithOmniHuman(
     outputMp4Url: URL.createObjectURL(finalBlob),
     outputBlob: finalBlob,
     segmentCount: segmentTotal,
-    engine: usedProductFusion ? 'seedance_product_fusion' : 'omnihuman',
+    engine: useMotion
+      ? 'motion_imitate'
+      : usedProductFusion
+        ? 'seedance_product_fusion'
+        : 'omnihuman',
     videoProvider: 'volc',
     plannerModel: 'doubao',
   }

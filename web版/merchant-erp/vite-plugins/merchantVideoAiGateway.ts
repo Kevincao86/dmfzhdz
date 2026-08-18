@@ -75,6 +75,12 @@ import {
   volcSubmitOmniHumanTask,
 } from './volcOmniHumanClient.js'
 import {
+  isMotionImitateConfigured,
+  isMotionImitateTaskId,
+  volcGetMotionImitateTaskOnce,
+  volcSubmitMotionImitateTask,
+} from './volcMotionImitateClient.js'
+import {
   anyLongformPlannerConfigured,
   longformPlannerModelIds,
   longformPlannerVendorAvailability,
@@ -1048,7 +1054,15 @@ function parseMediaRefToBuffer(
     if (!b64) return null
     const buffer = Buffer.from(b64, 'base64')
     if (!buffer.length) return null
-    const ext = contentType.includes('mpeg') || contentType.includes('mp3') ? 'mp3' : defaultExt
+    const ext = contentType.includes('mpeg') || contentType.includes('mp3')
+      ? 'mp3'
+      : contentType.includes('webm')
+        ? 'webm'
+        : contentType.includes('quicktime')
+          ? 'mov'
+          : contentType.includes('mp4')
+            ? 'mp4'
+            : defaultExt
     return { buffer, contentType, fileName: `dh-s2v-${Date.now()}.${ext}` }
   }
   if (/^https?:\/\//i.test(t)) return null
@@ -1067,7 +1081,7 @@ async function ensurePublicHttpsMediaUrl(
   viteRoot: string | undefined,
   env: MerchantAiEnv,
   raw: string,
-  kind: 'image' | 'audio',
+  kind: 'image' | 'audio' | 'video',
   opts?: { normalizeS2vPortrait?: boolean; frameMode?: 'half' | 'full' },
 ): Promise<string | null> {
   const t = raw.trim()
@@ -1075,7 +1089,9 @@ async function ensurePublicHttpsMediaUrl(
   const parsed =
     kind === 'image'
       ? parseImageRefToBuffer(t)
-      : parseMediaRefToBuffer(t, 'audio/mpeg', 'mp3')
+      : kind === 'video'
+        ? parseMediaRefToBuffer(t, 'video/mp4', 'mp4')
+        : parseMediaRefToBuffer(t, 'audio/mpeg', 'mp3')
   if (!parsed) return null
   let upload = parsed
   if (kind === 'image' && opts?.normalizeS2vPortrait) {
@@ -1100,6 +1116,56 @@ async function ensurePublicHttpsMediaUrl(
   } catch {
     return null
   }
+}
+
+/** 动作模仿 2.0：单图 + 参考视频 */
+async function volcPostMotionImitateVideoTask(
+  env: MerchantAiEnv,
+  body: Record<string, unknown>,
+  viteRoot?: string,
+): Promise<{ ok: false; msg: string } | { ok: true; taskId: string; modelUsed: string }> {
+  if (!isMotionImitateConfigured(env)) {
+    return {
+      ok: false,
+      msg:
+        '未配置火山智能视觉 AK/SK（动作模仿）。请在轻量 ~/stack/auth-api.env 写入 MERCHANT_AI_VOLC_ACCESS_KEY 与 MERCHANT_AI_VOLC_SECRET_KEY 后重启 meoo-auth-api。',
+    }
+  }
+  const imageRaw =
+    (typeof body.image_base64 === 'string' && body.image_base64.trim()) ||
+    (Array.isArray(body.images_base64) &&
+      typeof body.images_base64[0] === 'string' &&
+      body.images_base64[0].trim()) ||
+    (typeof body.image_url === 'string' && body.image_url.trim()) ||
+    ''
+  const videoRaw =
+    (typeof body.video_base64 === 'string' && body.video_base64.trim()) ||
+    (typeof body.video_url === 'string' && body.video_url.trim()) ||
+    ''
+  if (!imageRaw) {
+    return { ok: false, msg: '动作模仿缺少人物/场景参考图' }
+  }
+  if (!videoRaw) {
+    return { ok: false, msg: '动作模仿缺少参考视频' }
+  }
+  const imageUrl = await ensurePublicHttpsMediaUrl(viteRoot, env, imageRaw, 'image')
+  if (!imageUrl) {
+    return {
+      ok: false,
+      msg: '人物/场景图无法上传为公网 URL（需 OSS/ICE 源站）。请检查阿里云 OSS 配置后重试。',
+    }
+  }
+  const videoUrl = await ensurePublicHttpsMediaUrl(viteRoot, env, videoRaw, 'video')
+  if (!videoUrl) {
+    return {
+      ok: false,
+      msg: '参考视频无法上传为公网 URL（需 OSS/ICE 源站）。请压缩到约 12MB 内，或检查阿里云 OSS 配置后重试。',
+    }
+  }
+  const prompt = typeof body.prompt === 'string' ? body.prompt : undefined
+  const submitted = await volcSubmitMotionImitateTask(env, { imageUrl, videoUrl, prompt })
+  if (!submitted.ok) return { ok: false, msg: submitted.message }
+  return { ok: true, taskId: submitted.taskId, modelUsed: submitted.reqKey }
 }
 
 /** 数字人口播：火山 OmniHuman（图+音频，原生口型） */
@@ -1961,6 +2027,7 @@ export async function handleMerchantAiVideoRoutes(input: {
     json(res, 200, {
       klingConfigured: kCfg.ok,
       omnihumanConfigured: isOmniHumanConfigured(env),
+      motionImitateConfigured: isMotionImitateConfigured(env),
       arkVideoModels: arkOpts,
       arkDiscoveredVideoModels,
       arkKeyConfigured: arkKeyOk,
@@ -2830,6 +2897,32 @@ export async function handleMerchantAiVideoRoutes(input: {
       json(res, 400, { ok: false, message: '请求体必须为 JSON。' })
       return true
     }
+    if (String(parsed.pipeline ?? '').trim() === 'motion_imitate') {
+      const mi = await volcPostMotionImitateVideoTask(env, parsed, input.viteRoot)
+      if (mi.ok === true) {
+        voidRecordVideoAiUsage(
+          input.req,
+          rawEnv,
+          parsed,
+          'volc_motion_imitate',
+          mi.modelUsed,
+          estimateVideoGenerationTokens({
+            durationSec: 15,
+            promptChars: String(parsed.prompt ?? '').length,
+          }),
+        )
+        json(res, 200, {
+          ok: true,
+          taskId: mi.taskId,
+          provider: 'volc_motion_imitate',
+          modelUsed: mi.modelUsed,
+          pipeline: 'motion_imitate',
+        })
+        return true
+      }
+      json(res, 400, { ok: false, message: mi.msg })
+      return true
+    }
     if (String(parsed.pipeline ?? '').trim() === 'omnihuman') {
       const oh = await volcPostOmniHumanVideoTask(env, parsed, input.viteRoot)
       if (oh.ok === true) {
@@ -2918,6 +3011,17 @@ export async function handleMerchantAiVideoRoutes(input: {
     if (!taskIdSd) {
       json(res, 400, { ok: false, message: '缺少 query taskId。' })
       return true
+    }
+    if (isMotionImitateTaskId(taskIdSd)) {
+      try {
+        const state = await volcGetMotionImitateTaskOnce(env, taskIdSd)
+        json(res, 200, { ok: true, provider: 'volc_motion_imitate', ...state })
+        return true
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        json(res, 502, { ok: false, message: msg })
+        return true
+      }
     }
     if (isOmniHumanTaskId(taskIdSd)) {
       try {

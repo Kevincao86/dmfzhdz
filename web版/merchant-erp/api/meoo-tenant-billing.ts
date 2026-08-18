@@ -120,7 +120,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         body.durationSec != null && Number.isFinite(Number(body.durationSec))
           ? Math.max(1, Math.ceil(Number(body.durationSec)))
           : undefined
-      const result = await assertErpAiPointsAffordable(admin, auth.tenantId, kind, { durationSec })
+      const motionImitate =
+        body.motionImitate === true ||
+        body.motionImitate === 1 ||
+        String(body.motionImitate ?? '').trim() === '1' ||
+        String(body.motionImitate ?? '').trim().toLowerCase() === 'true'
+      const result = await assertErpAiPointsAffordable(admin, auth.tenantId, kind, {
+        durationSec,
+        motionImitate,
+      })
       if (!result.ok) {
         sendJson(res, 402, {
           ok: false,
@@ -150,12 +158,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         body.durationSec != null && Number.isFinite(Number(body.durationSec))
           ? Math.max(1, Math.ceil(Number(body.durationSec)))
           : undefined
+      const motionImitate =
+        body.motionImitate === true ||
+        body.motionImitate === 1 ||
+        String(body.motionImitate ?? '').trim() === '1' ||
+        String(body.motionImitate ?? '').trim().toLowerCase() === 'true'
       const idempotencyKey =
         typeof body.idempotencyKey === 'string' ? body.idempotencyKey.trim() : undefined
       const note = typeof body.note === 'string' ? body.note.trim() : undefined
       const result = await spendErpAiPoints(admin, auth.tenantId, {
         kind,
         durationSec,
+        motionImitate,
         idempotencyKey,
         note,
       })
