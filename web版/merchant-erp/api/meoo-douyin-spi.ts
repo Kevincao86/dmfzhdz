@@ -134,7 +134,7 @@ const SPI_SCENARIOS: SpiScenario[] = [
     refundMode: 'agree',
     buy: '买 1 份并支付',
     copy: '发券 logid',
-    how: '下单要成功。发券回 error_code≠0。填发券那条 logid，不要填预下单。',
+    how: '下单要成功。发券必须 error_code=0 且 result=2（业务失败），抖音才会自动退款到「退款成功」。不要把 data.error_code 回成非 0，否则订单会停在支付确认中。填发券 logid，等订单变成退款成功再校验。',
   },
   {
     id: 'buy1_issue_verify',
@@ -446,8 +446,8 @@ function handleIssue(state: SpiState, body: Record<string, unknown>): Record<str
   if (state.issueMode === 'fail') {
     return {
       data: {
-        error_code: 20,
-        description: '发券失败',
+        error_code: 0,
+        description: 'success',
         result: 2,
         fail_reason: 'ACCEPTANCE_FORCE_FAIL',
         fail_reason_desc: '联调过审：强制发券失败',
