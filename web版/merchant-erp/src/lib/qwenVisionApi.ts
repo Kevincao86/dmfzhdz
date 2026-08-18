@@ -156,9 +156,21 @@ export function normalizeWanImageSizeForModel(raw: string | undefined, modelId: 
   return `${w}*${h}`
 }
 
-function isQwenImageEditModel(modelId: string): boolean {
-  const m = modelId.toLowerCase()
-  return /qwen-image-edit|imageedit|repaint|out-painting|i2i-preview/.test(m)
+/** qwen-image-edit*：走 multimodal-generation（image + text），不是 wanx image2image */
+function isQwenImageEditMultimodalModel(modelId: string): boolean {
+  return /^qwen-image-edit/i.test(modelId.trim())
+}
+
+/** 万相通用图像编辑 wanx2.1-imageedit：须 input.function + input.base_image_url */
+function isWanx21ImageEditModel(modelId: string): boolean {
+  const m = modelId.trim().toLowerCase()
+  return m === 'wanx2.1-imageedit' || /wanx[\d.]*-imageedit/.test(m)
+}
+
+/** wan2.5 图生图：input.images[] */
+function isWan25I2iPreviewModel(modelId: string): boolean {
+  const m = modelId.trim().toLowerCase()
+  return /wan2\.5-i2i/.test(m) || m.endsWith('-i2i-preview')
 }
 
 function isWanxLegacyModel(modelId: string): boolean {
@@ -186,29 +198,50 @@ export function buildQwenVisionImageRequest(
   void _rs
   void _rm
 
-  if (isQwenImageEditModel(modelId) && ref) {
-    const parameters = {
-      size: '1024*1024',
-      n: 1,
-      ...safeExtras,
+  if (isWanx21ImageEditModel(modelId) && ref) {
+    const { size: _editSize, ...editExtras } = safeExtras
+    void _editSize
+    return {
+      url: `${DASHSCOPE}/api/v1/services/aigc/image2image/image-synthesis`,
+      body: {
+        model: modelId,
+        input: {
+          function: 'description_edit',
+          prompt,
+          base_image_url: ref,
+          ...(opts?.negativePrompt ? { negative_prompt: opts.negativePrompt } : {}),
+        },
+        parameters: {
+          n: 1,
+          ...editExtras,
+        },
+      },
     }
+  }
+
+  if (isWan25I2iPreviewModel(modelId) && ref) {
     return {
       url: `${DASHSCOPE}/api/v1/services/aigc/image2image/image-synthesis`,
       body: {
         model: modelId,
         input: {
           prompt,
-          image_url: ref,
+          images: [ref],
           ...(opts?.negativePrompt ? { negative_prompt: opts.negativePrompt } : {}),
         },
-        parameters,
+        parameters: {
+          n: 1,
+          ...safeExtras,
+        },
       },
     }
   }
 
   if (isQwenImageModel(modelId) || isWan27MultimodalImageModel(modelId)) {
-    const content: Array<Record<string, string>> = [{ text: prompt }]
-    if (ref) content.push({ image: ref })
+    const content: Array<Record<string, string>> =
+      isQwenImageEditMultimodalModel(modelId) && ref
+        ? [{ image: ref }, { text: prompt }]
+        : [{ text: prompt }, ...(ref ? [{ image: ref }] : [])]
     const sizeRaw = safeExtras.size
     const size =
       typeof sizeRaw === 'string' && sizeRaw.trim()
