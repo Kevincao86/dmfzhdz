@@ -13,13 +13,13 @@ import type { MpLibraryRole, MpMembershipTier } from './mpMembershipCatalog.js'
 export const MP_POINTS_VIDEO_PER_SEC = 2
 export const MP_POINTS_VIDEO_PER_MIN = MP_POINTS_VIDEO_PER_SEC * 60
 
-/** 短视频 AI（Seedance 2.0）：公开价约 ¥0.80/秒，售价上浮 30% → 104 积分/秒 */
+/** 短视频 AI（Seedance 1.5 Pro / 2.0）：成本约 ¥0.80/秒，内部上浮 30% → 104 积分/秒 */
 export const MP_POINTS_SHORTVIDEO_PER_SEC = 104
 
-/** 数字人口播（OmniHuman 1.5）：公开价约 ¥0.80/秒，售价上浮 30% → 104 积分/秒 */
+/** 数字人口播（OmniHuman 1.5）：成本约 ¥0.80/秒，内部上浮 30% → 104 积分/秒 */
 export const MP_POINTS_DIGITAL_HUMAN_PER_SEC = 104
 
-/** 即梦动作模仿 2.0：公开价约 ¥0.50/秒，售价上浮 30% → 65 积分/秒 */
+/** 即梦动作模仿 2.0：成本约 ¥0.50/秒，内部上浮 30% → 65 积分/秒（前端不展示加价说明） */
 export const MP_POINTS_MOTION_IMITATE_PER_SEC = 65
 
 /** 灵祺 AI 云剪（ICE 普通合成）：一口价 80 积分/条（≤60 秒）；API≈¥0.80/条 */
@@ -256,7 +256,7 @@ export function formatMpPointsRateLabel(kind: MpPointsUsageKind, opts?: { motion
   const rate = mpPointsPerSecForKind(kind)
   if (rate != null) {
     if (opts?.motionImitate) {
-      return `${MP_POINTS_MOTION_IMITATE_PER_SEC} 积分/秒（动作模仿，模型价上浮 30%）`
+      return `${MP_POINTS_MOTION_IMITATE_PER_SEC} 积分/秒`
     }
     return `${rate} 积分/秒（${rate * 60} 积分/分钟）`
   }
