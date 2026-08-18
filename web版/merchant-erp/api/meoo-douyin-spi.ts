@@ -134,7 +134,7 @@ const SPI_SCENARIOS: SpiScenario[] = [
     refundMode: 'agree',
     buy: '买 1 份并支付',
     copy: '发券 logid',
-    how: '下单要成功。发券必须 error_code=0 且 result=2（业务失败），抖音才会自动退款到「退款成功」。不要把 data.error_code 回成非 0，否则订单会停在支付确认中。填发券 logid，等订单变成退款成功再校验。',
+    how: '下单要成功。发券回 data.error_code≠0（联调查这个，不是 result）。抖音会重试几分钟后自动退款。等订单变成退款成功，再填发券 logid。不要填退款流水号。',
   },
   {
     id: 'buy1_issue_verify',
@@ -444,10 +444,12 @@ function handlePrecreate(state: SpiState, body: Record<string, unknown>): Record
 
 function handleIssue(state: SpiState, body: Record<string, unknown>): Record<string, unknown> {
   if (state.issueMode === 'fail') {
+    // 联调「同步发券失败」jsonpath 是 $.resp.data.error_code != 0。
+    // 官方文档发码失败应是 error_code=0 且 result=2；非 0 时抖音不读 result，会重试随后自动退款。
     return {
       data: {
-        error_code: 0,
-        description: 'success',
+        error_code: 2,
+        description: '发券失败',
         result: 2,
         fail_reason: 'ACCEPTANCE_FORCE_FAIL',
         fail_reason_desc: '联调过审：强制发券失败',
