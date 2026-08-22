@@ -634,6 +634,7 @@ digitalHumanStoreScenes
 DhStep3Extras
 DigitalHumanBroadcastPage
 digitalHumanBroadcast
+public/digital-human
 digitalHumanVideoRender
 ShortVideoOptimizationPage
 digitalHumanBackgroundComposite

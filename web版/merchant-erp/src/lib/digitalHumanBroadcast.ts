@@ -1,4 +1,4 @@
-import { resolveStoreSceneBackgroundDataUrl, storeScenePrompt } from './digitalHumanStoreScenes.js'
+import { resolveStoreSceneBackgroundDataUrl, storeScenePrompt, type StoreSceneId } from './digitalHumanStoreScenes.js'
 import { findUserSavedAvatar, isUserSavedAvatarId } from './digitalHumanUserAvatars.js'
 import {
   deleteWorkCustomAvatar,
@@ -83,8 +83,8 @@ export type DigitalHumanDraft = {
   outfit: string
   hairstyle: string
   background: string
-  /** 门店实景子场景：餐厅 / KTV / 酒店 / 景点 */
-  storeScene?: 'restaurant' | 'ktv' | 'hotel' | 'scenery' | null
+  /** 门店实景子场景 */
+  storeScene?: StoreSceneId | null
   /** 自定义背景图文件名（数据在 IndexedDB） */
   customBackgroundFileName: string | null
   frameMode: FrameMode
@@ -119,7 +119,7 @@ export type DhSceneShot = {
   id: string
   label: string
   background: string
-  storeScene?: 'restaurant' | 'ktv' | 'hotel' | 'scenery' | null
+  storeScene?: StoreSceneId | null
 }
 
 export function newSceneShot(label: string, seed?: Partial<Omit<DhSceneShot, 'id' | 'label'>>): DhSceneShot {
@@ -183,17 +183,19 @@ export type DigitalHumanWork = {
 }
 
 /** 预置 JPG 换图后递增，破 cs 上 /digital-human/avatars 7 天缓存 */
-export const PRESET_AVATAR_ASSET_VERSION = 'dh20260619b'
+export const PRESET_AVATAR_ASSET_VERSION = 'dh20260822'
 
 /** 同源优先，避免 OSS Content-Disposition:attachment 导致 fetch Failed to fetch */
 export function presetAvatarPreviewCandidates(file: string): string[] {
   const path = `/digital-human/avatars/${file}`
   const candidates = webStaticCandidates('merchant', path)
-  return [...candidates].sort((a, b) => {
-    const aLocal = a.startsWith('/') ? 0 : 1
-    const bLocal = b.startsWith('/') ? 0 : 1
-    return aLocal - bLocal
-  })
+  return [...candidates]
+    .map((u) => (u.startsWith('/') ? `${u.split('?')[0]}?v=${PRESET_AVATAR_ASSET_VERSION}` : u))
+    .sort((a, b) => {
+      const aLocal = a.startsWith('/') ? 0 : 1
+      const bLocal = b.startsWith('/') ? 0 : 1
+      return aLocal - bLocal
+    })
 }
 
 export function presetAvatarPreviewUrl(file: string): string {
@@ -205,7 +207,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     id: 'av-real-1',
     name: '晓晨',
     style: 'realistic',
-    tag: '商务男声',
+    tag: '餐饮店长',
     gender: '男',
     gradient: 'from-slate-600 to-slate-800',
     previewUrl: presetAvatarPreviewUrl('av-real-1.jpg'),
@@ -216,7 +218,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     id: 'av-real-2',
     name: '悦然',
     style: 'realistic',
-    tag: '亲和女声',
+    tag: '门店店长',
     gender: '女',
     gradient: 'from-rose-400 to-orange-400',
     previewUrl: presetAvatarPreviewUrl('av-real-2.jpg'),
@@ -227,7 +229,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     id: 'av-real-3',
     name: '明哲',
     style: 'realistic',
-    tag: '新闻播报',
+    tag: '团购讲解',
     gender: '男',
     gradient: 'from-blue-600 to-indigo-700',
     previewUrl: presetAvatarPreviewUrl('av-real-3.jpg'),
@@ -238,7 +240,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     id: 'av-real-4',
     name: '诗涵',
     style: 'realistic',
-    tag: '种草达人',
+    tag: '探店达人',
     gender: '女',
     gradient: 'from-pink-500 to-rose-500',
     previewUrl: presetAvatarPreviewUrl('av-real-4.jpg'),
@@ -249,7 +251,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     id: 'av-real-5',
     name: '俊杰',
     style: 'realistic',
-    tag: '阳光男声',
+    tag: '健身教练',
     gender: '男',
     gradient: 'from-sky-500 to-blue-600',
     previewUrl: presetAvatarPreviewUrl('av-real-5.jpg'),
@@ -260,7 +262,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     id: 'av-real-6',
     name: '婉清',
     style: 'realistic',
-    tag: '门店店长',
+    tag: '美业顾问',
     gender: '女',
     gradient: 'from-teal-500 to-emerald-600',
     previewUrl: presetAvatarPreviewUrl('av-real-6.jpg'),
@@ -271,7 +273,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     id: 'av-real-7',
     name: '浩然',
     style: 'realistic',
-    tag: '沉稳讲解',
+    tag: '酒店接待',
     gender: '男',
     gradient: 'from-zinc-600 to-stone-700',
     previewUrl: presetAvatarPreviewUrl('av-real-7.jpg'),
@@ -282,7 +284,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     id: 'av-real-8',
     name: '思琪',
     style: 'realistic',
-    tag: '活力女声',
+    tag: '茶饮店员',
     gender: '女',
     gradient: 'from-fuchsia-500 to-purple-600',
     previewUrl: presetAvatarPreviewUrl('av-real-8.jpg'),
@@ -293,7 +295,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     id: 'av-real-9',
     name: '子墨',
     style: 'realistic',
-    tag: '探店 Vlog',
+    tag: '烧烤档口',
     gender: '男',
     gradient: 'from-amber-600 to-orange-700',
     previewUrl: presetAvatarPreviewUrl('av-real-9.jpg'),
@@ -304,7 +306,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     id: 'av-real-10',
     name: '静雯',
     style: 'realistic',
-    tag: '温柔客服',
+    tag: '到综前台',
     gender: '女',
     gradient: 'from-indigo-400 to-violet-500',
     previewUrl: presetAvatarPreviewUrl('av-real-10.jpg'),
@@ -315,7 +317,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     id: 'av-real-11',
     name: '嘉伟',
     style: 'realistic',
-    tag: '团购带货',
+    tag: '火锅店长',
     gender: '男',
     gradient: 'from-cyan-600 to-blue-700',
     previewUrl: presetAvatarPreviewUrl('av-real-11.jpg'),
@@ -326,7 +328,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     id: 'av-real-12',
     name: '雨桐',
     style: 'realistic',
-    tag: '美妆护肤',
+    tag: '美甲师',
     gender: '女',
     gradient: 'from-rose-500 to-pink-600',
     previewUrl: presetAvatarPreviewUrl('av-real-12.jpg'),
@@ -337,10 +339,10 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     id: 'cartoon-1',
     name: '小祺',
     style: 'cartoon',
-    tag: '卡通 IP',
+    tag: '门店 IP',
     gender: '女',
     gradient: 'from-cyan-400 to-teal-500',
-    previewUrl: 'https://api.dicebear.com/7.x/adventurer/png?seed=XiaoQi&size=256',
+    previewUrl: presetAvatarPreviewUrl('cartoon-1.jpg'),
     bodyFrame: 'half',
     nationality: 'cn',
   },
@@ -348,10 +350,10 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     id: 'cartoon-2',
     name: '阿灵',
     style: 'cartoon',
-    tag: '种草达人',
+    tag: '探店达人',
     gender: '女',
     gradient: 'from-violet-400 to-fuchsia-500',
-    previewUrl: 'https://api.dicebear.com/7.x/lorelei/png?seed=A-Ling&size=256',
+    previewUrl: presetAvatarPreviewUrl('cartoon-2.jpg'),
     bodyFrame: 'half',
     nationality: 'cn',
   },
@@ -359,10 +361,10 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     id: 'cartoon-3',
     name: '团子',
     style: 'cartoon',
-    tag: '萌系讲解',
+    tag: '茶饮导购',
     gender: '女',
     gradient: 'from-amber-300 to-orange-400',
-    previewUrl: 'https://api.dicebear.com/7.x/fun-emoji/png?seed=TuanZi&size=256',
+    previewUrl: presetAvatarPreviewUrl('cartoon-3.jpg'),
     bodyFrame: 'half',
     nationality: 'cn',
   },
@@ -705,6 +707,31 @@ export const DH_SCRIPT_TEMPLATES: DhScriptTemplate[] = [
       '欢迎到【店名】。先核销，再入座。\n套餐包含【项目名】，时长【时长】，还送【赠品】。\n有过敏或禁忌提前跟老师说一声。\n核销报手机号，我们前台见。',
   },
 ]
+
+export type DhShopFill = {
+  storeName?: string
+  offerName?: string
+  price?: string
+  address?: string
+}
+
+/** 把【店名】【套餐名】等占位换成商家填写的门店信息 */
+export function fillDhScriptPlaceholders(script: string, fill: DhShopFill): string {
+  const pairs: Array<[RegExp, string | undefined]> = [
+    [/【店名】/g, fill.storeName],
+    [/【套餐名】/g, fill.offerName],
+    [/【招牌名】/g, fill.offerName],
+    [/【项目名】/g, fill.offerName],
+    [/【现价】/g, fill.price],
+    [/【地址】/g, fill.address],
+  ]
+  let out = script
+  for (const [re, raw] of pairs) {
+    const v = raw?.trim()
+    if (v) out = out.replace(re, v)
+  }
+  return out
+}
 
 const DH_SETUP_KEY = 'meoo_dh_broadcast_setup_v1'
 
@@ -1126,29 +1153,29 @@ export function workTitleFromDraft(d: DigitalHumanDraft): string {
 export function avatarDemoScript(avatar: PresetAvatar): string {
   const byId: Record<string, string> = {
     'av-real-1':
-      '大家好，我是晓晨。今天给大家推荐一款本地生活团购好物，品质靠谱、性价比很高，欢迎到店体验。',
+      '大家好，我是晓晨。今天带你看我们店的招牌套餐，点链接团购，到店报手机号就能核。',
     'av-real-2':
-      '嗨，我是悦然。这条视频带你看看我们店里的招牌套餐，新客还有专属优惠，记得点赞收藏哦。',
+      '嗨，我是悦然。这条带你看店里环境、出品和本周活动，到店报手机号核销就行。',
     'av-real-3':
-      '各位观众好，我是明哲。接下来为您播报今日门店活动详情，优惠力度大，名额有限，先到先得。',
+      '各位好，我是明哲。今天团购包含主食和饮品，价格以链接为准，到店报手机号核销。',
     'av-real-4':
-      '姐妹们好呀，我是诗涵。这款真的超级种草，我自己也在用，现在下单还有团购价，别错过啦。',
+      '哈喽我是诗涵。这家店环境稳、出品稳，人均看团购价，到店报手机号就能核。',
     'av-real-5':
-      '嘿，我是俊杰。周末不知道吃什么？来我们店，环境好、分量足，线上团购更划算。',
+      '嘿，我是俊杰。私教体验课在团购里，到店报手机号核销，先练再决定办不办卡。',
     'av-real-6':
-      '您好，我是婉清，本店店长。感谢一直支持我们的老顾客，新季菜单已上线，欢迎来店品尝。',
+      '您好，我是婉清。项目先沟通再按你的需求做，预约从团购进，到店报手机号。',
     'av-real-7':
-      '大家好，我是浩然。下面用三分钟讲清楚这款产品的核心卖点和适用场景，帮您快速做决定。',
+      '大家好，我是浩然。房型与早餐以套餐为准，预订后到店报手机号办理入住。',
     'av-real-8':
-      '哈喽，我是思琪。今天探店 vlog 走起，这家宝藏小店必须安利给你们，链接在下方团购里。',
+      '哈喽，我是思琪。新品茶饮在团购里，到店报手机号核销，少排队。',
     'av-real-9':
-      '我是子墨，带你云探店。环境、口味、服务我都替你们看过了，结论就一句话：值得冲。',
+      '我是子墨。摊位必点看团购套餐，到店报手机号就能核，别买错份。',
     'av-real-10':
-      '您好，我是静雯。如有任何订单或预约问题，都可以私信我，我会第一时间为您解答。',
+      '您好，我是静雯。先核销再入座，套餐含项目时长，到店报手机号。',
     'av-real-11':
-      '家人们好，我是嘉伟。今日团购爆款上线，库存不多，手慢无，赶紧点击下方链接下单。',
+      '家人们，我是嘉伟。锅底和小料都在套餐里，团购价点链接，到店报手机号。',
     'av-real-12':
-      'Hi，我是雨桐。换季护肤别踩雷，今天这支好物亲测有效，敏感肌也可以放心尝试。',
+      'Hi，我是雨桐。美甲款式到店选，时长看套餐，预约后报手机号核销。',
   }
   if (byId[avatar.id]) return byId[avatar.id]
   if (avatar.style === 'cartoon') {

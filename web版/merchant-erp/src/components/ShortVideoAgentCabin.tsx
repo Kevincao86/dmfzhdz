@@ -160,7 +160,7 @@ export default function ShortVideoAgentCabin({
               ? '无限画布 · 分镜同屏'
               : children
                 ? '视频生成 · 文案 · 分镜 · 出片同屏'
-                : '视频生成 · Seedance 出片'
+                : '视频生成 · 一键出片'
 
   return (
     <div

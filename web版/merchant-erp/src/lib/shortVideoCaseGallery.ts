@@ -40,10 +40,27 @@ export type ShortVideoCaseItem = {
 const asset = (id: string, ext: 'png' | 'mp4') =>
   `${SHORT_VIDEO_CASE_CDN_BASE.replace(/\/$/, '')}/${id}.${ext}?v=cdn14`
 
+const LL_COVER_VER = 'll20260822'
+const LL_COVER_IDS = new Set([
+  'case-visit-night',
+  'case-hotpot',
+  'case-milktea',
+  'case-hair',
+  'case-nail',
+  'case-gym',
+  'case-takeaway',
+  'case-promo-618',
+])
+
+function localLifeCover(id: string): string {
+  const file = id === 'case-promo-618' ? 'case-promo-event' : id
+  return `/short-video-cases/${file}.jpg?v=${LL_COVER_VER}`
+}
+
 function c(partial: ShortVideoCaseItem): ShortVideoCaseItem {
   return {
     ...partial,
-    coverUrl: partial.coverUrl ?? asset(partial.id, 'png'),
+    coverUrl: partial.coverUrl ?? (LL_COVER_IDS.has(partial.id) ? localLifeCover(partial.id) : asset(partial.id, 'png')),
     videoUrl: partial.videoUrl ?? asset(partial.id, 'mp4'),
   }
 }
@@ -150,7 +167,7 @@ export const SHORT_VIDEO_CASES: ShortVideoCaseItem[] = [
     coverFrom: '#dc2626',
     coverTo: '#fbbf24',
     badge: '发现',
-    coverUrl: asset('case-promo-event', 'png'),
+    coverUrl: localLifeCover('case-promo-618'),
     videoUrl: asset('case-promo-event', 'mp4'),
     prompt:
       '【Skill·活动预告】\n主题：周末满减大促。\n结构：大字「满 100 减 30」冲击 → 活动时间 → 爆品闪切 → 到店 CTA。\n节奏快、信息清晰。',
