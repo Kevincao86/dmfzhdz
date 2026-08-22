@@ -639,6 +639,110 @@ export const GESTURE_PRESETS = [
   { id: 'celebrate', label: '庆祝（活力推拉）' },
 ]
 
+/** 口播模板（对照剪映数字人：选品类模板 → 套动作/景别 → 只改店名） */
+export type DhScriptTemplate = {
+  id: string
+  category: string
+  label: string
+  gesturePreset: string
+  frameMode: FrameMode
+  script: string
+}
+
+export const DH_SCRIPT_TEMPLATES: DhScriptTemplate[] = [
+  {
+    id: 'store-tour',
+    category: '探店',
+    label: '探店讲解',
+    gesturePreset: 'welcome',
+    frameMode: 'half',
+    script:
+      '欢迎来到【店名】。\n今天带你看三样：环境、出品，还有这周的招牌【招牌名】。\n先坐下来喝一口，再慢慢看。\n想了解套餐，点下面链接，到店报手机号就能核。',
+  },
+  {
+    id: 'combo-sell',
+    category: '带货',
+    label: '套餐带货',
+    gesturePreset: 'point',
+    frameMode: 'half',
+    script:
+      '这套【套餐名】，就是为到店准备的。\n包含【主食】、【饮品】，还送一份【赠品】。\n原价【原价】，现在团购只要【现价】。\n点进去就能核，到店报手机号。',
+  },
+  {
+    id: 'campaign',
+    category: '活动',
+    label: '活动预告',
+    gesturePreset: 'celebrate',
+    frameMode: 'half',
+    script:
+      '这周末【店名】有一场到店活动，位置有限。\n到店打卡，核销【套餐名】，还能参与抽奖。\n时间是【日期】【时段】，地址在【地址】。\n先把档期定下来，朋友圈也同步发一波。',
+  },
+  {
+    id: 'closing',
+    category: '复盘',
+    label: '打烊复盘',
+    gesturePreset: 'explain',
+    frameMode: 'half',
+    script:
+      '今晚【店名】打烊，跟大家说一句。\n今天【招牌名】卖得最好，【套餐名】还剩几份。\n明天【时段】继续，想吃的提前团。\n到店报手机号就能核，我们门口见。',
+  },
+  {
+    id: 'beauty',
+    category: '美业',
+    label: '美业种草',
+    gesturePreset: 'welcome',
+    frameMode: 'half',
+    script:
+      '今天这套，适合想改气色、又怕夸张的人。\n到店先沟通需求，再按你的脸型来做【项目名】。\n时长大约【时长】，做完就能出门。\n预约从下面链接进，到店报手机号。',
+  },
+  {
+    id: 'reception',
+    category: '到综',
+    label: '到综接待',
+    gesturePreset: 'nod',
+    frameMode: 'full',
+    script:
+      '欢迎到【店名】。先核销，再入座。\n套餐包含【项目名】，时长【时长】，还送【赠品】。\n有过敏或禁忌提前跟老师说一声。\n核销报手机号，我们前台见。',
+  },
+]
+
+const DH_SETUP_KEY = 'meoo_dh_broadcast_setup_v1'
+
+export type DhBroadcastSetupSnapshot = {
+  background: string
+  gesturePreset: string
+  subtitleEnabled: boolean
+  subtitleStyle: string
+  frameMode: FrameMode
+}
+
+export function loadDhBroadcastSetup(): DhBroadcastSetupSnapshot | null {
+  try {
+    const raw = localStorage.getItem(DH_SETUP_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as DhBroadcastSetupSnapshot
+    if (!parsed || typeof parsed !== 'object') return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+export function saveDhBroadcastSetup(draft: Pick<DigitalHumanDraft, keyof DhBroadcastSetupSnapshot>): void {
+  try {
+    const snap: DhBroadcastSetupSnapshot = {
+      background: draft.background,
+      gesturePreset: draft.gesturePreset,
+      subtitleEnabled: draft.subtitleEnabled,
+      subtitleStyle: draft.subtitleStyle,
+      frameMode: draft.frameMode,
+    }
+    localStorage.setItem(DH_SETUP_KEY, JSON.stringify(snap))
+  } catch {
+    /* 存储满时忽略 */
+  }
+}
+
 export const SUBTITLE_STYLES = [
   { id: 'bottom-safe', label: '底部安全区白字（推荐）' },
   { id: 'bottom-white', label: '底部白字黑边' },
@@ -666,7 +770,7 @@ export function defaultDraft(): DigitalHumanDraft {
     customBackgroundFileName: null,
     frameMode: 'half',
     resolution: '720P',
-    driveMode: 'link',
+    driveMode: 'text',
     script: '',
     douyinLinkUrl: '',
     motionInstructions: '',

@@ -22,12 +22,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../cn'
 import {
   BACKGROUND_OPTIONS,
+  DH_SCRIPT_TEMPLATES,
   defaultDraft,
   deleteDigitalHumanWork,
   findPresetAvatarForDraft,
   GESTURE_PRESETS,
+  loadDhBroadcastSetup,
   loadDigitalHumanWorks,
   PRESET_AVATARS,
+  saveDhBroadcastSetup,
   SUBTITLE_STYLES,
   avatarCatalogTags,
   type AvatarNationality,
@@ -113,11 +116,11 @@ type MainTab = 'create' | 'works'
 type WizardStep = 1 | 2 | 3 | 4 | 5
 
 const STEPS: { n: WizardStep; label: string }[] = [
-  { n: 1, label: '选择形象' },
-  { n: 2, label: '创作内容' },
-  { n: 3, label: '配置参数' },
-  { n: 4, label: '预览确认' },
-  { n: 5, label: '提交合成' },
+  { n: 1, label: '形象' },
+  { n: 2, label: '文案配音' },
+  { n: 3, label: '动作背景' },
+  { n: 4, label: '预览' },
+  { n: 5, label: '生成' },
 ]
 
 function splitScriptSegments(text: string): string[] {
@@ -596,6 +599,35 @@ export default function DigitalHumanBroadcastPage() {
     setWorks(loadDigitalHumanWorks())
   }, [])
 
+  const applyScriptTemplate = (id: string) => {
+    const t = DH_SCRIPT_TEMPLATES.find((x) => x.id === id)
+    if (!t) return
+    patchDraft({
+      driveMode: 'text',
+      script: t.script,
+      gesturePreset: t.gesturePreset,
+      frameMode: t.frameMode,
+    })
+    setAiTopic(t.label)
+    setToast(`已套用「${t.label}」模板，把【店名】【套餐名】改成自己的再下一步`)
+  }
+
+  const applyLastBroadcastSetup = () => {
+    const snap = loadDhBroadcastSetup()
+    if (!snap) {
+      setToast('还没有保存过成片设置。生成成功一次后会自动记住。')
+      return
+    }
+    patchDraft({
+      background: snap.background,
+      gesturePreset: snap.gesturePreset,
+      subtitleEnabled: snap.subtitleEnabled,
+      subtitleStyle: snap.subtitleStyle,
+      frameMode: snap.frameMode,
+    })
+    setToast('已套用上次成片设置（背景、动作、字幕、景别）')
+  }
+
   const generateScriptWithAi = async () => {
     const topic = aiTopic.trim()
     if (!topic) {
@@ -999,11 +1031,11 @@ export default function DigitalHumanBroadcastPage() {
     }
     if (draft.avatarKind === 'video_clone') {
       if (!(cfg?.motionImitateConfigured || cfg?.omnihumanConfigured)) {
-        setToast('实拍视频动作模仿需要火山智能视觉 AK/SK。请在轻量配置后重试。')
+        setToast('实拍视频动作模仿需要智能视觉服务。请在轻量配置 AK/SK 后重试。')
         return
       }
     } else if (!cfg?.omnihumanConfigured) {
-      setToast('数字人口播需要火山 OmniHuman。请在轻量配置智能视觉 AK/SK 后重试。')
+      setToast('数字人口播服务未就绪。请在轻量配置智能视觉 AK/SK 后重试。')
       return
     }
 
@@ -1116,9 +1148,10 @@ export default function DigitalHumanBroadcastPage() {
         : segs > 1
           ? `已提交渲染（口播较长，将分 ${segs} 段生成后合并为 MP4）`
           : draft.avatarKind === 'video_clone'
-            ? '已提交渲染（实拍视频 · 即梦动作模仿 2.0）'
-            : '已提交高清 MP4 渲染（火山 OmniHuman 口型驱动）',
+            ? '已提交渲染（实拍视频 · 动作模仿）'
+            : '已提交高清口播渲染',
     )
+    saveDhBroadcastSetup(draft)
     } catch (e) {
       const msg =
         e instanceof Error
@@ -1328,7 +1361,7 @@ export default function DigitalHumanBroadcastPage() {
             className="mt-2"
           />
           <p className="mt-1 max-w-2xl text-sm text-slate-600">
-            形象管理 · 口播文案 · 高清 MP4（火山 OmniHuman 口型驱动；上传实拍视频时走即梦动作模仿）· 作品库。
+            选形象、写口播、配动作与背景，一键出竖屏口播。照片走口型驱动；实拍视频走动作模仿。成片进作品库。
             {readMpSessionToken() ? (
               <span className="mt-1 block text-xs text-violet-700">
                 星选账号：渲染成功后按秒扣积分；套餐 ai_video_quota 次数优先，用尽后扣积分余额。
@@ -1674,7 +1707,7 @@ export default function DigitalHumanBroadcastPage() {
                                   customReferenceVideoFileName: f.name,
                                   ...customAvatarVoiceDefaults(),
                                 })
-                                setToast('实拍视频已上传；生成时将走即梦动作模仿（复刻肢体与口型），口播配音请尽量与参考视频口型匹配')
+                                setToast('实拍视频已上传；生成时会复刻肢体与口型，口播配音请尽量与参考视频口型匹配')
                               } else {
                                 patchDraft({
                                   customAvatarDataUrl: dataUrl,
@@ -1772,8 +1805,8 @@ export default function DigitalHumanBroadcastPage() {
                       </select>
                       <p className="mt-1 text-xs text-slate-500">
                         {isVideoCloneFlow
-                          ? '实拍视频成片输出 720P；即梦动作模仿 2.0 复刻肢体与口型'
-                          : '成片输出 720P；火山 OmniHuman 按口播音频驱动口型。自定义照片建议竖版 ≥1080×1920。'}
+                          ? '实拍视频成片输出 720P；会复刻参考视频里的肢体与口型。'
+                          : '成片输出 720P；按口播音频驱动口型。自定义照片建议竖版 ≥1080×1920。'}
                       </p>
                     </label>
                   </div>
@@ -1786,24 +1819,37 @@ export default function DigitalHumanBroadcastPage() {
                   <h2 className="text-lg font-semibold text-slate-900">口播内容</h2>
                   {isVideoCloneFlow ? (
                     <p className="rounded-lg border border-violet-200 bg-violet-50/80 px-3 py-2 text-sm text-violet-900">
-                      实拍视频模式：音色已在步骤 1 配置；填写口播文案或上传音频后可直接「提交渲染」（即梦动作模仿 2.0，无需配置背景/预览步骤）。
+                      实拍视频模式：音色已在步骤 1 配置；填写口播文案或上传音频后可直接「生成」（动作模仿，无需背景/预览）。
                     </p>
                   ) : isUploadDrive ? (
                     <p className="rounded-lg border border-violet-200 bg-violet-50/80 px-3 py-2 text-sm text-violet-900">
-                      照片驱动模式：音色已在步骤 1 配置，本步只需填写口播文案或上传音频；成片由火山 OmniHuman 驱动口型。
+                      照片驱动：音色已在步骤 1 配置，本步填口播或上传音频即可。成片按语音驱动口型。
                     </p>
                   ) : null}
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3">
+                    <p className="text-xs font-medium text-slate-700">口播模板（先选片种，再改【店名】）</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {DH_SCRIPT_TEMPLATES.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => applyScriptTemplate(t.id)}
+                          className={cn(
+                            'rounded-full border px-3 py-1 text-xs',
+                            aiTopic === t.label
+                              ? 'border-violet-400 bg-violet-100 text-violet-900'
+                              : 'border-slate-200 bg-white text-slate-700 hover:border-violet-200',
+                          )}
+                        >
+                          {t.category} · {t.label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+                      逗号、句号、换行会形成停顿。不要堆特殊符号。想让 AI 写稿，先点模板或填关键词，再点「AI 写稿」。
+                    </p>
+                  </div>
                   <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => patchDraft({ driveMode: 'link' })}
-                      className={cn(
-                        'rounded-lg px-3 py-1.5 text-sm',
-                        draft.driveMode === 'link' ? 'bg-violet-100 text-violet-800' : 'bg-slate-100',
-                      )}
-                    >
-                      链接驱动
-                    </button>
                     <button
                       type="button"
                       onClick={() => patchDraft({ driveMode: 'text' })}
@@ -1812,7 +1858,7 @@ export default function DigitalHumanBroadcastPage() {
                         draft.driveMode === 'text' ? 'bg-violet-100 text-violet-800' : 'bg-slate-100',
                       )}
                     >
-                      文本驱动
+                      写口播
                     </button>
                     <button
                       type="button"
@@ -1822,7 +1868,17 @@ export default function DigitalHumanBroadcastPage() {
                         draft.driveMode === 'audio' ? 'bg-violet-100 text-violet-800' : 'bg-slate-100',
                       )}
                     >
-                      音频驱动
+                      上传音频
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => patchDraft({ driveMode: 'link' })}
+                      className={cn(
+                        'rounded-lg px-3 py-1.5 text-sm',
+                        draft.driveMode === 'link' ? 'bg-violet-100 text-violet-800' : 'bg-slate-100',
+                      )}
+                    >
+                      抖音提取
                     </button>
                   </div>
 
@@ -1950,6 +2006,9 @@ export default function DigitalHumanBroadcastPage() {
                       <p className="text-xs text-slate-500">
                         已分段 {splitScriptSegments(draft.script).length} 段 · 约 {draft.script.length} 字
                       </p>
+                      {draft.script.includes('【') ? (
+                        <p className="text-xs text-amber-700">文案里还有【占位】，生成前请改成门店真实信息。</p>
+                      ) : null}
                       <div className="flex flex-wrap items-end gap-2 rounded-xl bg-slate-50 p-4">
                         <label className="flex-1 text-sm">
                           <span className="mb-1 block text-slate-600">AI 文案 · 主题/关键词</span>
@@ -1967,7 +2026,7 @@ export default function DigitalHumanBroadcastPage() {
                           className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-cyan-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
                         >
                           {aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                          AI 生成脚本
+                          AI 写稿
                         </button>
                       </div>
                     </>
@@ -2020,8 +2079,53 @@ export default function DigitalHumanBroadcastPage() {
 
               {step === 3 ? (
                 <section className="space-y-4">
-                  <h2 className="text-lg font-semibold text-slate-900">合成参数</h2>
+                  <h2 className="text-lg font-semibold text-slate-900">动作与背景</h2>
+                  <p className="text-sm text-slate-500">选景别、手势、背景，并勾选是否同时生成字幕。生成成功后会记住这套设置。</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={applyLastBroadcastSetup}
+                      className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-800 hover:bg-violet-100"
+                    >
+                      套用上次成片设置
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        saveDhBroadcastSetup(draft)
+                        setToast('已保存当前背景、动作、字幕、景别')
+                      }}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+                    >
+                      保存为模板
+                    </button>
+                  </div>
                   <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="text-sm sm:col-span-2">
+                      <span className="block text-sm text-slate-700">景别</span>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {(
+                          [
+                            ['half', '半身（口播推荐）'],
+                            ['full', '全身'],
+                          ] as const
+                        ).map(([id, label]) => (
+                          <button
+                            key={id}
+                            type="button"
+                            onClick={() => patchDraft({ frameMode: id })}
+                            className={cn(
+                              'rounded-lg border px-3 py-1.5 text-xs',
+                              draft.frameMode === id
+                                ? 'border-violet-400 bg-violet-50 text-violet-900'
+                                : 'border-slate-200 bg-white text-slate-600',
+                            )}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     <div className="text-sm sm:col-span-2">
                       <label className="block">
                         背景
@@ -2066,25 +2170,29 @@ export default function DigitalHumanBroadcastPage() {
                         onPickBackgroundFile={() => backgroundInputRef.current?.click()}
                       />
                     </div>
-                    <label className="text-sm">
-                      手势动作
-                      <select
-                        value={draft.gesturePreset}
-                        onChange={(e) => patchDraft({ gesturePreset: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
-                      >
+                    <div className="text-sm sm:col-span-2">
+                      <span className="block">手势动作</span>
+                      <div className="mt-2 flex flex-wrap gap-2">
                         {GESTURE_PRESETS.map((g) => (
-                          <option key={g.id} value={g.id}>
+                          <button
+                            key={g.id}
+                            type="button"
+                            onClick={() => patchDraft({ gesturePreset: g.id })}
+                            className={cn(
+                              'rounded-lg border px-3 py-1.5 text-xs',
+                              draft.gesturePreset === g.id
+                                ? 'border-violet-400 bg-violet-50 text-violet-900'
+                                : 'border-slate-200 bg-white text-slate-600 hover:border-violet-200',
+                            )}
+                          >
                             {g.label}
-                          </option>
+                          </button>
                         ))}
-                      </select>
+                      </div>
                       {draft.gesturePreset !== 'none' ? (
-                        <p className="mt-1 text-xs text-slate-500">
-                          将写入 OmniHuman 动作提示，并在成片后处理中叠加对应运镜效果。
-                        </p>
+                        <p className="mt-1 text-xs text-slate-500">成片时按口播节奏匹配手势与轻微运镜。</p>
                       ) : null}
-                    </label>
+                    </div>
                     <label className="text-sm">
                       字幕样式
                       <select
@@ -2106,7 +2214,7 @@ export default function DigitalHumanBroadcastPage() {
                         checked={draft.subtitleEnabled}
                         onChange={(e) => patchDraft({ subtitleEnabled: e.target.checked })}
                       />
-                      自动生成 SRT 字幕并烧录
+                      同时生成字幕并烧录
                     </label>
                     <label className="flex items-center gap-2 text-sm sm:col-span-2">
                       <input
@@ -2143,7 +2251,7 @@ export default function DigitalHumanBroadcastPage() {
                       手持产品展示（AI 视频融合）
                     </label>
                     <p className="mt-1 text-xs text-slate-500">
-                      上传产品图后，成片中段将把产品合成进人物画面，再由 OmniHuman 口型驱动（预览不含产品）。
+                      上传产品图后，成片中段把产品合成进人物画面，再按口播驱动口型（预览不含产品）。
                     </p>
                     {draft.productOverlayEnabled ? (
                       <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -2176,7 +2284,7 @@ export default function DigitalHumanBroadcastPage() {
                                 productImageDataUrlRef.current = dataUrl
                                 setProductImagePreview(dataUrl)
                                 patchDraft({ productImageFileName: f.name })
-                                setToast('产品图已上传，提交后将合成进人物画面再由 OmniHuman 驱动')
+                                setToast('产品图已上传，提交后将合成进人物画面再驱动口型')
                               } catch (err) {
                                 setToast(err instanceof Error ? err.message : '产品图上传失败')
                               } finally {
@@ -2250,9 +2358,9 @@ export default function DigitalHumanBroadcastPage() {
                 <section className="space-y-4">
                   <h2 className="text-lg font-semibold text-slate-900">低清预览</h2>
                   <p className="text-sm text-slate-600">
-                    静态示意：人物完整叠在背景上（预览不抠图，避免五官损失）。成片先合成人景，再由火山 OmniHuman 按口播音频驱动口型。
+                    静态示意：人物叠在背景上（预览不抠图，避免五官损失）。成片再按口播驱动口型。
                     {draft.productOverlayEnabled ? ' 产品不在此预览出现，成片中段会合成进画面。' : ''}
-                    可试听 TTS；动态口播与光影以 OmniHuman 成片为准。
+                    可先试听配音；动态口播以成片为准。
                   </p>
                   <div className="mx-auto max-w-xs">
                     <div className="relative overflow-hidden rounded-2xl bg-slate-900 p-2">
@@ -2296,14 +2404,14 @@ export default function DigitalHumanBroadcastPage() {
                     <li>
                       · 驱动：
                       {draft.driveMode === 'text'
-                        ? '文本 → TTS → OmniHuman 口型驱动'
+                        ? '写口播 → 配音 → 口型驱动'
                         : draft.driveMode === 'link'
                           ? draft.avatarKind === 'video_clone'
-                            ? '实拍视频 + 抖音链接文案 → 即梦动作模仿 2.0'
-                            : '抖音链接 → 文案 + OmniHuman 口型驱动'
+                            ? '实拍视频 + 抖音文案 → 动作模仿'
+                            : '抖音提取 → 文案 + 口型驱动'
                           : draft.avatarKind === 'video_clone'
-                            ? '音频 + 即梦动作模仿 2.0'
-                            : '音频 + OmniHuman 口型驱动'}
+                            ? '音频 + 动作模仿'
+                            : '音频 + 口型驱动'}
                     </li>
                     <li>· 输出：{resolutionLabel(s2vResolutionFromDraft(draft))} · {draft.frameMode === 'full' ? '全身' : '半身'}</li>
                     <li>· 音色：{selectedVoice?.label}</li>
@@ -2320,6 +2428,9 @@ export default function DigitalHumanBroadcastPage() {
                     <li>
                       · 产品展示：{draft.productOverlayEnabled ? draft.productImageFileName ?? '已上传' : '未开启'}
                     </li>
+                    {draft.script.includes('【') ? (
+                      <li className="text-amber-700">· 文案里还有【占位】，建议改完再生成</li>
+                    ) : null}
                   </ul>
                   {activeJob &&
                   (activeJob.status === 'queued' || activeJob.status === 'rendering') ? (
@@ -2444,21 +2555,28 @@ export default function DigitalHumanBroadcastPage() {
               <div className="rounded-2xl border border-slate-200/90 bg-white/95 p-4 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">流程</p>
                 <ol className="mt-3 space-y-2 text-xs text-slate-600">
-                  {isUploadDrive ? (
+                  {isVideoCloneFlow ? (
                     <>
-                      <li>1. 选形象 · 音色 · TTS</li>
-                      <li>2. 链接 · 文案 · 录音</li>
-                      <li>3. 背景 · 字幕（实拍视频可跳过）</li>
-                      <li>4. 低清预览</li>
-                      <li>5. 高清合成队列</li>
+                      <li>1. 实拍视频 · 音色</li>
+                      <li>2. 模板 / 文案 / 录音</li>
+                      <li>3. 可跳过动作与背景</li>
+                      <li>4. 直接生成</li>
+                    </>
+                  ) : isUploadDrive ? (
+                    <>
+                      <li>1. 照片分身 · 音色</li>
+                      <li>2. 模板 / 文案 / 录音</li>
+                      <li>3. 景别 · 动作 · 背景 · 字幕</li>
+                      <li>4. 预览</li>
+                      <li>5. 生成</li>
                     </>
                   ) : (
                     <>
-                      <li>1. 选形象 / 定制分身</li>
-                      <li>2. 链接 · 文案 · AI · 录音</li>
-                      <li>3. 音色 · 背景 · 字幕</li>
-                      <li>4. 低清预览</li>
-                      <li>5. 高清合成队列</li>
+                      <li>1. 形象库</li>
+                      <li>2. 模板 · 写口播 · AI 写稿 · 录音</li>
+                      <li>3. 景别 · 动作 · 背景 · 字幕</li>
+                      <li>4. 预览</li>
+                      <li>5. 生成</li>
                     </>
                   )}
                 </ol>
