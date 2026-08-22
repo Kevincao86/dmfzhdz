@@ -25,7 +25,7 @@ import ShortVideoMusicStudio from '../components/ShortVideoMusicStudio'
 import type { ShortVideoCaseItem } from '../lib/shortVideoCaseGallery'
 import { SHORT_VIDEO_CASES, alignCanvasRowsToCaseDuration, canvasLocalLifeCases } from '../lib/shortVideoCaseGallery'
 import type { ShortVideoMusicTrack } from '../lib/shortVideoMusicLibrary'
-import { findShortVideoSkill, type ShortVideoSkillId } from '../lib/shortVideoSkills'
+import { appendLocalLifeShopFill, findShortVideoSkill, type ShortVideoSkillId } from '../lib/shortVideoSkills'
 import {
   findStudioMode,
   type ShortVideoStudioModeId,
@@ -533,7 +533,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     })
   }, [embedAddonAccess])
   const [mainPane, setMainPane] = useState<MainPane>('generate')
-  const [activeSkillId, setActiveSkillId] = useState<ShortVideoSkillId | null>(null)
+  const [activeSkillId, setActiveSkillId] = useState<ShortVideoSkillId | null>('store_visit')
   const [studioMode, setStudioMode] = useState<ShortVideoStudioModeId>('agent')
   const [selectedMusicTrackId, setSelectedMusicTrackId] = useState<string | null>(null)
   const [cfg, setCfg] = useState<VideoAiBackendConfig | null>(null)
@@ -563,7 +563,10 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
   const motionVideoRef = useRef<HTMLVideoElement>(null)
   const motionVideoInputRef = useRef<HTMLInputElement>(null)
   const motionPhotoInputRef = useRef<HTMLInputElement>(null)
-  const [genPrompt, setGenPrompt] = useState('')
+  const [genPrompt, setGenPrompt] = useState(
+    () => findShortVideoSkill('store_visit')?.promptTemplate ?? '',
+  )
+  const [shopFill, setShopFill] = useState({ storeName: '', offerName: '', price: '' })
   const [scriptRows, setScriptRows] = useState<ShortVideoScriptRow[]>(() =>
     // 默认 2 段节拍落在所选单段总时长内（15s → 0–8 / 8–15），避免 2×15=30s
     retimeScriptRowsToTotalSec(defaultScriptRows(2, 5), 15),
@@ -736,10 +739,10 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       return null
     }
     if (!cfg?.arkKeyConfigured) {
-      return `当前环境未开通${VIDEO_ENGINE_LABEL_SEEDANCE}，请在运营台配置火山方舟 Key 后再生成。`
+      return `当前环境未开通${VIDEO_ENGINE_LABEL_SEEDANCE}，请在运营台配置后再生成。`
     }
     if (!(cfg?.arkVideoModels?.length ?? 0)) {
-      return '火山方舟已配置但未设置视频模型端点，请在运营台 · AI 模型中配置 Seedance 端点。'
+      return '视频服务已配置但未设置模型端点，请在运营台 · AI 模型中完成配置。'
     }
     if (longformEnabled || (isScriptRowsUsable(scriptRows) && scriptRows.length >= 2)) {
       if (genMode === 'text' && !isScriptRowsUsable(scriptRows)) {
@@ -1221,9 +1224,9 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       return null
     }
     if (!cfg?.arkKeyConfigured)
-      return `当前环境未开通${VIDEO_ENGINE_LABEL_SEEDANCE}，请在运营台配置火山方舟 Key。`
+      return `当前环境未开通${VIDEO_ENGINE_LABEL_SEEDANCE}，请在运营台配置后再试。`
     if (!(cfg?.arkVideoModels?.length ?? 0)) {
-      return '火山方舟已配置但未设置视频模型端点，请在运营台配置 Seedance 端点。'
+      return '视频服务已配置但未设置模型端点，请在运营台完成配置。'
     }
     return null
   }
@@ -1663,7 +1666,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
           final = await concatVideoSegmentsToMp4(blobs, { ratio: sdAspect, fps: sdFps })
         }
       }
-      report('交付 Seedance 有声成片…')
+      report('交付有声成片…')
       const planNarr = planNarrationScript.trim()
       const narration = planNarr
         ? finalizeNarrationScript(planNarr, targetTotalSec)
@@ -1890,7 +1893,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
         finishVideoJob(ok, ok ? undefined : '成片合成失败')
         if (ok) {
           setHint(
-            `已将参考视频中的「${motionCharacterHint.trim() || '点名角色'}」替换为上传照片中的人物（即梦动作模仿 2.0）。`,
+            `已将参考视频中的「${motionCharacterHint.trim() || '点名角色'}」替换为上传照片中的人物。`,
           )
         }
       } catch (e) {
@@ -1906,7 +1909,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       return
     }
 
-    let txt = genPrompt.trim()
+    let txt = appendLocalLifeShopFill(genPrompt.trim(), shopFill)
     // 画布已填可用分镜时，即使未勾选长片也走分段合成，避免闭环断裂
     let workingScriptRows = scriptRows
     const canvasScriptReady = isScriptRowsUsable(workingScriptRows) && workingScriptRows.length >= 2
@@ -2056,7 +2059,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
             return
           }
           if (r.modelUsed) setHint(`已使用视频模型：${r.modelUsed}`)
-          trackProgress('交付 Seedance 有声成片…')
+          trackProgress('交付有声成片…')
           const narration = await resolveNarrationForFinalVideo(
             workingScriptRows
               .map((row) => row.dialogue.trim())
@@ -2191,7 +2194,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
         return
       }
       if (r.modelUsed) setHint(`已使用视频模型：${r.modelUsed}`)
-      trackProgress('交付 Seedance 有声成片…')
+      trackProgress('交付有声成片…')
       const narrationSource = genMode === 'text' ? txt : txt || textBlock
       const narration = await resolveNarrationForFinalVideo(narrationSource, Number(sdDurationSec))
       const dur = Number(sdDurationSec)
@@ -2489,7 +2492,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     {
       id: 'generate' as const,
       title: '短片生成',
-      sub: 'Seedance 出片',
+      sub: '一键出片',
       icon: Clapperboard,
       tone: 'from-orange-500 to-rose-500',
     },
@@ -2536,7 +2539,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
           />
         </div>
         <p className="mx-auto max-w-2xl text-sm leading-relaxed text-slate-600">
-          Skill 技能 · 无限画布 · 短片生成 · 动作模仿 · 音乐配乐 · 案例做同款。纯文案用 1.5 Pro 音画一体；分镜参考用 Seedance 2.0；点名换人用即梦动作模仿。多素材拼接请切「AI混剪」。
+          Skill 技能 · 无限画布 · 短片生成 · 动作模仿 · 音乐配乐 · 案例做同款。探店、套餐、活动用技能出片；店员口播请走数字人。多素材拼接请切「AI混剪」。
           {readMpSessionToken() ? (
             <span className="mt-1 block text-xs text-cyan-800">
               星选账号：成片成功后按秒扣积分；套餐 ai_video_quota 次数优先，用尽后扣积分余额。
@@ -2599,6 +2602,26 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
           >
             {mainPane === 'generate' ? (
               <div className="space-y-4">
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <input
+                    value={shopFill.storeName}
+                    onChange={(e) => setShopFill((s) => ({ ...s, storeName: e.target.value }))}
+                    placeholder="店名"
+                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs"
+                  />
+                  <input
+                    value={shopFill.offerName}
+                    onChange={(e) => setShopFill((s) => ({ ...s, offerName: e.target.value }))}
+                    placeholder="招牌 / 套餐"
+                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs"
+                  />
+                  <input
+                    value={shopFill.price}
+                    onChange={(e) => setShopFill((s) => ({ ...s, price: e.target.value }))}
+                    placeholder="团购价（勿编）"
+                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs"
+                  />
+                </div>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <p className="text-sm font-semibold text-slate-900">{VIDEO_ENGINE_LABEL_SEEDANCE}</p>
@@ -2607,12 +2630,12 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
                         ? genMode === 'motion'
                           ? cfg?.motionImitateConfigured || cfg?.omnihumanConfigured
                             ? VIDEO_ENGINE_HINT_MOTION_IMITATE
-                            : '未开通即梦动作模仿（需火山智能视觉 AK/SK）'
+                            : '动作模仿未开通'
                           : cfg?.arkKeyConfigured
                             ? genMode === 'frames'
                               ? VIDEO_ENGINE_HINT_SEEDANCE_FRAMES
                               : VIDEO_ENGINE_HINT_SEEDANCE
-                            : '未开通火山方舟'
+                            : '视频生成未开通'
                         : '加载配置…'}
                       · 单段最长 15 秒 · 分镜表常驻，无需勾选长视频
                     </p>

@@ -378,3 +378,23 @@ export function composeSkillPrompt(skillItem: ShortVideoSkill, userNote: string)
   if (note.includes('【Skill·')) return note
   return `${skillItem.promptTemplate}\n\n【商家补充】\n${note}`
 }
+
+export type LocalLifeShopFill = {
+  storeName?: string
+  offerName?: string
+  price?: string
+}
+
+export function appendLocalLifeShopFill(prompt: string, fill: LocalLifeShopFill): string {
+  const store = fill.storeName?.trim()
+  const offer = fill.offerName?.trim()
+  const price = fill.price?.trim()
+  if (!store && !offer && !price) return prompt
+  const lines = ['【门店信息】']
+  if (store) lines.push(`店名：${store}`)
+  if (offer) lines.push(`主品/套餐：${offer}`)
+  if (price) lines.push(`团购价：${price}（禁止编造未填写的价格）`)
+  lines.push('口播须含店名；结尾落到店报手机号核销。')
+  if (prompt.includes('【门店信息】')) return prompt
+  return `${prompt.trim()}\n\n${lines.join('\n')}`
+}

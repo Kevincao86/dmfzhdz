@@ -23,6 +23,7 @@ import { cn } from '../cn'
 import {
   BACKGROUND_OPTIONS,
   DH_SCRIPT_TEMPLATES,
+  fillDhScriptPlaceholders,
   defaultDraft,
   deleteDigitalHumanWork,
   findPresetAvatarForDraft,
@@ -136,6 +137,7 @@ export default function DigitalHumanBroadcastPage() {
   const [draft, setDraft] = useState<DigitalHumanDraft>(() => defaultDraft())
   const [works, setWorks] = useState<DigitalHumanWork[]>(() => loadDigitalHumanWorks())
   const [aiTopic, setAiTopic] = useState('')
+  const [shopFill, setShopFill] = useState({ storeName: '', offerName: '', price: '', address: '' })
   const [aiBusy, setAiBusy] = useState(false)
   const [aiRewriteBusy, setAiRewriteBusy] = useState(false)
   const [aiMotionRewriteBusy, setAiMotionRewriteBusy] = useState(false)
@@ -604,7 +606,7 @@ export default function DigitalHumanBroadcastPage() {
     if (!t) return
     patchDraft({
       driveMode: 'text',
-      script: t.script,
+      script: fillDhScriptPlaceholders(t.script, shopFill),
       gesturePreset: t.gesturePreset,
       frameMode: t.frameMode,
     })
@@ -1848,6 +1850,42 @@ export default function DigitalHumanBroadcastPage() {
                     <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
                       逗号、句号、换行会形成停顿。不要堆特殊符号。想让 AI 写稿，先点模板或填关键词，再点「AI 写稿」。
                     </p>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      <input
+                        value={shopFill.storeName}
+                        onChange={(e) => setShopFill((s) => ({ ...s, storeName: e.target.value }))}
+                        placeholder="店名"
+                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs"
+                      />
+                      <input
+                        value={shopFill.offerName}
+                        onChange={(e) => setShopFill((s) => ({ ...s, offerName: e.target.value }))}
+                        placeholder="套餐 / 招牌 / 项目"
+                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs"
+                      />
+                      <input
+                        value={shopFill.price}
+                        onChange={(e) => setShopFill((s) => ({ ...s, price: e.target.value }))}
+                        placeholder="团购价（不要编）"
+                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs"
+                      />
+                      <input
+                        value={shopFill.address}
+                        onChange={(e) => setShopFill((s) => ({ ...s, address: e.target.value }))}
+                        placeholder="地址 / 商圈"
+                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        patchDraft({ script: fillDhScriptPlaceholders(draft.script, shopFill) })
+                        setToast('已把店名/套餐/价格填进口播占位')
+                      }}
+                      className="mt-2 rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-xs font-medium text-violet-800 hover:bg-violet-50"
+                    >
+                      填进口播占位
+                    </button>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button

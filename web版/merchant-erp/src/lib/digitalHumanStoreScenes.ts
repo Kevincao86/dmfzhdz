@@ -2,7 +2,16 @@
 
 import { merchantStaticUrl, webStaticCandidates } from './webStaticOssAssets'
 
-export type StoreSceneId = 'restaurant' | 'ktv' | 'hotel' | 'scenery'
+export type StoreSceneId =
+  | 'restaurant'
+  | 'hotpot'
+  | 'tea'
+  | 'beauty'
+  | 'spa'
+  | 'gym'
+  | 'ktv'
+  | 'hotel'
+  | 'scenery'
 
 export type StoreSceneOption = {
   id: StoreSceneId
@@ -12,36 +21,62 @@ export type StoreSceneOption = {
   assetFile: string
 }
 
-export const STORE_SCENE_ASSET_VERSION = 'dh20260625'
+export const STORE_SCENE_ASSET_VERSION = 'dh20260822'
 
 export const STORE_SCENE_OPTIONS: StoreSceneOption[] = [
   {
     id: 'restaurant',
-    label: '餐厅',
+    label: '餐饮堂食',
     assetFile: 'store-scene-restaurant.jpg',
-    prompt:
-      '竖版9:16高清实景：现代中式餐厅内景，暖色灯光，整洁餐桌与绿植，无人物，适合口播背景，真实摄影质感',
+    prompt: '竖版9:16：中式casual餐厅内景，暖光餐桌，适合堂食口播背景',
+  },
+  {
+    id: 'hotpot',
+    label: '火锅',
+    assetFile: 'store-scene-hotpot.jpg',
+    prompt: '竖版9:16：火锅店卡座与铜锅，暖灯笼，适合套餐口播背景',
+  },
+  {
+    id: 'tea',
+    label: '茶饮',
+    assetFile: 'store-scene-tea.jpg',
+    prompt: '竖版9:16：茶饮店吧台与杯品，浅色灯光，适合饮品口播背景',
+  },
+  {
+    id: 'beauty',
+    label: '美业',
+    assetFile: 'store-scene-beauty.jpg',
+    prompt: '竖版9:16：美发美甲店内景，镜面与工位，适合美业口播背景',
+  },
+  {
+    id: 'spa',
+    label: '到综',
+    assetFile: 'store-scene-spa.jpg',
+    prompt: '竖版9:16：到综/养生馆接待过道，暖木色，适合接待口播背景',
+  },
+  {
+    id: 'gym',
+    label: '健身',
+    assetFile: 'store-scene-gym.jpg',
+    prompt: '竖版9:16：精品健身房，哑铃与木地板，适合办卡口播背景',
   },
   {
     id: 'ktv',
     label: 'KTV',
     assetFile: 'store-scene-ktv.jpg',
-    prompt:
-      '竖版9:16高清实景：时尚KTV包厢内景，霓虹灯带与沙发，无人物，适合口播背景，真实摄影质感',
+    prompt: '竖版9:16：KTV包厢霓虹与沙发，适合到综娱乐口播背景',
   },
   {
     id: 'hotel',
     label: '酒店',
     assetFile: 'store-scene-hotel.jpg',
-    prompt:
-      '竖版9:16高清实景：精品酒店大堂或客房，明亮高级，无人物，适合口播背景，真实摄影质感',
+    prompt: '竖版9:16：精品酒店大堂，适合接待口播背景',
   },
   {
     id: 'scenery',
-    label: '景点',
+    label: '街景打卡',
     assetFile: 'store-scene-scenery.jpg',
-    prompt:
-      '竖版9:16高清实景：城市网红打卡景点户外，自然光，无人物，适合口播背景，真实摄影质感',
+    prompt: '竖版9:16：夜市滨水街景，适合探店开场背景',
   },
 ]
 
@@ -60,11 +95,13 @@ export function storeScenePreviewUrl(sceneId: StoreSceneId): string {
 /** 预览候选：同源 local 优先，再 OSS */
 export function storeScenePreviewCandidates(sceneId: StoreSceneId): string[] {
   const candidates = webStaticCandidates('merchant', storeSceneLocalPath(sceneId))
-  return [...candidates].sort((a, b) => {
-    const aLocal = a.startsWith('/') ? 0 : 1
-    const bLocal = b.startsWith('/') ? 0 : 1
-    return aLocal - bLocal
-  })
+  return [...candidates]
+    .map((u) => (u.startsWith('/') ? `${u.split('?')[0]}?v=${STORE_SCENE_ASSET_VERSION}` : u))
+    .sort((a, b) => {
+      const aLocal = a.startsWith('/') ? 0 : 1
+      const bLocal = b.startsWith('/') ? 0 : 1
+      return aLocal - bLocal
+    })
 }
 
 async function blobToDataUrl(blob: Blob): Promise<string> {

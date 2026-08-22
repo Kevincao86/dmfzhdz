@@ -3,9 +3,9 @@
 
 export const VIDEO_ENGINE_LABEL_KLING = '灵祺视频模型1'
 export const VIDEO_ENGINE_LABEL_SEEDANCE = '灵祺视频'
-export const VIDEO_ENGINE_HINT_SEEDANCE = 'Seedance 1.5 Pro · 音画一体'
-export const VIDEO_ENGINE_HINT_SEEDANCE_FRAMES = 'Seedance 2.0 · 多图参考'
-export const VIDEO_ENGINE_HINT_MOTION_IMITATE = '即梦动作模仿 2.0 · 点名角色替换'
+export const VIDEO_ENGINE_HINT_SEEDANCE = '文案口播 · 音画一体'
+export const VIDEO_ENGINE_HINT_SEEDANCE_FRAMES = '分镜参考图成片'
+export const VIDEO_ENGINE_HINT_MOTION_IMITATE = '动作模仿 · 点名换人'
 export const VIDEO_ENGINE_HINT_QWEN = '通义万相视频'
 export const SEEDANCE_QUALITY_OPTIONS = [
   { id: '720p', label: '标准 720p' },
