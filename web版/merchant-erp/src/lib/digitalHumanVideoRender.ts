@@ -331,8 +331,18 @@ function sanitizeDhRenderPipelineError(raw: string, fallback: string): string {
   return t.length > 280 ? `${t.slice(0, 280)}…` : t
 }
 
+function isDhOmniUnavailableError(msg: string): boolean {
+  return /50400|Access\s*Denied|未开通|无权|无权限|req_key.*not supported|not supported.*req_key/i.test(
+    String(msg ?? ''),
+  )
+}
+
 function isDhUpstreamLimitError(msg: string): boolean {
-  return isArkVideoRateLimitError(msg) || isArkVideoDailyQuotaError(msg)
+  return (
+    isArkVideoRateLimitError(msg) ||
+    isArkVideoDailyQuotaError(msg) ||
+    isDhOmniUnavailableError(msg)
+  )
 }
 
 function snapDhSeedanceDurationSec(audioSec: number): 5 | 10 | 15 {
@@ -356,7 +366,7 @@ async function runDhSeedanceI2vFallback(opts: {
     audioSec = 5
   }
   const dur = snapDhSeedanceDurationSec(audioSec)
-  opts.onProgress?.('口播模型接口超限，改用 Seedance 图生视频…')
+  opts.onProgress?.('OmniHuman 暂不可用，改用 Seedance 图生视频并混入口播…')
   const job = await runShortVideoJobWithFailover({
     engine: 'seedance',
     body: {
@@ -539,6 +549,7 @@ async function renderWithOmniHuman(
   const videoBlobs: Blob[] = []
   const sourceUrls: string[] = []
   let usedProductFusion = false
+  let skipOmniHuman = false
 
   for (let i = 0; i < segmentTotal; i++) {
     onProgress?.({
@@ -615,53 +626,41 @@ async function renderWithOmniHuman(
       }
     }
 
-    let job =
+    const onSegProgress = (label: string) => {
+      onProgress?.({
+        phase: 'generating',
+        segmentIndex: i + 1,
+        segmentTotal,
+        progress: 20 + Math.round((i / segmentTotal) * 55),
+      })
+      void label
+    }
+    let job: { ok: true; videoUrl: string; modelUsed?: string | null } | { ok: false; message: string } =
       useMotion && refVideo
         ? await runDhMotionImitateJob({
             image_base64: sceneImageB64,
             video_base64: await blobToPureBase64(refVideo),
             prompt,
-            onProgress: (label) => {
-              onProgress?.({
-                phase: 'generating',
-                segmentIndex: i + 1,
-                segmentTotal,
-                progress: 20 + Math.round((i / segmentTotal) * 55),
-              })
-              void label
-            },
+            onProgress: onSegProgress,
           })
-        : await runDhOmniHumanJob({
-            image_base64: sceneImageB64,
-            audio_base64: audioB64,
-            prompt,
-            onProgress: (label) => {
-              onProgress?.({
-                phase: 'generating',
-                segmentIndex: i + 1,
-                segmentTotal,
-                progress: 20 + Math.round((i / segmentTotal) * 55),
-              })
-              void label
-            },
-          })
+        : skipOmniHuman
+          ? { ok: false, message: 'OmniHuman Access Denied' }
+          : await runDhOmniHumanJob({
+              image_base64: sceneImageB64,
+              audio_base64: audioB64,
+              prompt,
+              onProgress: onSegProgress,
+            })
     let ohBlob: Blob | null = null
     let url = job.ok ? String(job.videoUrl || '').trim() : ''
 
     if (!job.ok && !useMotion && isDhUpstreamLimitError(job.message)) {
+      if (isDhOmniUnavailableError(job.message)) skipOmniHuman = true
       const fb = await runDhSeedanceI2vFallback({
         sceneImageB64,
         prompt,
         audioBlob: segmentAudioBlobs[i]!,
-        onProgress: (label) => {
-          onProgress?.({
-            phase: 'generating',
-            segmentIndex: i + 1,
-            segmentTotal,
-            progress: 20 + Math.round((i / segmentTotal) * 55),
-          })
-          void label
-        },
+        onProgress: onSegProgress,
       })
       if (!fb.ok) {
         return {
