@@ -4,6 +4,7 @@ import {
   isArkQuotaHopableError,
   isQwenVideoModelHopableError,
 } from '../lib/arkModelCatalog'
+import { isArkVideoRateLimitError } from '../lib/arkVideoModelRouter'
 import { SEEDANCE_SERVER_AUTO } from '../lib/shortVideoUiLabels'
 import {
   buildVideoDurationMatchedTryPlan,
@@ -103,6 +104,13 @@ export function formatVideoAiUserError(msg: string): string {
       `https://console.volcengine.com/ark/region:ark+cn-beijing/model。原始信息：${raw}`
     )
   }
+  if (isArkVideoRateLimitError(raw)) {
+    return (
+      '模型接口瞬时超限（QPS/并发），系统已自动退避重试并切换其它视频模型。' +
+      '若仍失败请隔 1～2 分钟再生成。' +
+      `原始信息：${raw}`
+    )
+  }
   return raw
 }
 
@@ -121,7 +129,8 @@ function isVideoApiUnreachableError(msg: string): boolean {
 export function isVideoModelHopableError(msg: string): boolean {
   const raw = String(msg ?? '').trim()
   if (!raw) return false
-  if (isArkQuotaHopableError(raw) || isQwenVideoModelHopableError(raw)) return true
+  if (isArkQuotaHopableError(raw) || isQwenVideoModelHopableError(raw) || isArkVideoRateLimitError(raw))
+    return true
   if (isVideoApiUnreachableError(raw)) return true
   if (/duration must be in|duration customization is not supported|不支持.*时长|时长.*不支持/i.test(raw)) {
     return true

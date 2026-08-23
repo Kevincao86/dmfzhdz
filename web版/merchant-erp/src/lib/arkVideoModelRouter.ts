@@ -125,29 +125,53 @@ function videoModelInList(id: string, list: readonly string[]): boolean {
   return list.some((x) => normalizeArkVideoModelParam(x) === norm)
 }
 
+/**
+ * QPS / 并发 /「接口超限」：应退避重试同一模型，不要记成 45 分钟额度用尽。
+ * 不含 50413（内容风控）和单纯 HTTP 504。
+ */
+export function isArkVideoRateLimitError(msg: string): boolean {
+  const raw = String(msg ?? '').trim()
+  if (!raw) return false
+  return /接口超限|请求超限|并发超限|模型接口超限|qps|限流|频率过高|频率限制|稍后重试|try later|too many requests|rate.?limit|throttl|flowlimit|requestlimit|requestburst|serveroverloaded|50429|50430|\b429\b/i.test(
+    raw,
+  )
+}
+
+/** 日额度 / 安全体验模式：换下一模型，并短期跳过该模型 */
+export function isArkVideoDailyQuotaError(msg: string): boolean {
+  const raw = String(msg ?? '').trim()
+  if (!raw) return false
+  return /inference limit|safe experience mode|model service has been paused|推理限额|已达推理限额|安全体验模式|免费额度|额度用完|allocationquota|throttling\.allocation|资源包.*用完|resource exhausted|has been exhausted/i.test(
+    raw,
+  )
+}
+
+export function shouldMarkArkVideoModelExhausted(msg: string): boolean {
+  return isArkVideoDailyQuotaError(msg)
+}
+
 /** 方舟视频 API 报错是否应切换下一模型（额度、未开通、限流等） */
 export function isArkVideoFailoverError(msg: string): boolean {
   const raw = String(msg ?? '').trim()
   if (!raw) return false
   const lower = raw.toLowerCase()
+  if (isArkVideoRateLimitError(raw) || isArkVideoDailyQuotaError(raw)) return true
   if (
-    /inference limit|safe experience mode|model service has been paused|has not activated|not activated|not open|not enabled/i.test(
+    /has not activated|not activated|not open|not enabled/i.test(
       raw,
     )
   )
     return true
   if (
-    /推理限额|安全体验模式|模型服务已暂停|服务暂停|服务异常|暂停服务|尚未开通|未开通|未激活|未启用|服务未开通/i.test(
+    /服务暂停|服务异常|暂停服务|尚未开通|未开通|未激活|未启用|服务未开通/i.test(
       raw,
     )
   )
     return true
-  if (/额度|quota|exceed|resource exhausted|has been exhausted|token.*不足|tokens.*insufficient/i.test(raw))
+  if (/额度|quota|exceed|token.*不足|tokens.*insufficient/i.test(raw))
     return true
-  if (/免费额度|额度用完|allocationquota|throttling\.allocation|资源包.*用完/i.test(raw)) return true
   if (/free tier|free_quota|free quota/i.test(lower)) return true
   if (/\b403\b/.test(raw) && /exhaust|quota|tier|额度|free|forbidden/i.test(lower)) return true
-  if (/\b429\b/.test(raw) || lower.includes('rate limit') || lower.includes('throttl')) return true
   if (/\b402\b/.test(raw) || lower.includes('insufficient balance') || lower.includes('insufficient_quota'))
     return true
   if (/does not exist|do not have access|not have access|model.*not.*found|unknown model|invalid.*model/i.test(raw))

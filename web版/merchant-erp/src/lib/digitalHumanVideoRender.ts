@@ -14,6 +14,7 @@ import { resolveStoreSceneBackgroundDataUrl } from './digitalHumanStoreScenes'
 import {
   assertBlobLooksLikeVideo,
   concatVideoSegmentsToMp4,
+  muxVideoWithNarrationPreferBrowser,
   probeVideoHasAudioStream,
 } from './concatVideoSegments'
 import {
@@ -27,8 +28,12 @@ import {
   concatVideoUrlsOnServer,
   downloadVideoUrlAsBlob,
   fetchVideoAiConfig,
+  muxVideoAudioOnServer,
   postProcessVideoOnServer,
+  runShortVideoJobWithFailover,
 } from '../services/videoAiApi'
+import { SEEDANCE_1_5_PRO_MODEL_ID } from './shortVideoUiLabels'
+import { isArkVideoDailyQuotaError, isArkVideoRateLimitError } from './arkVideoModelRouter'
 import {
   buildSrtContent,
   buildSrtFromTimedChunks,
@@ -313,6 +318,9 @@ function sanitizeDhRenderPipelineError(raw: string, fallback: string): string {
       '请到火山控制台开通「即梦 AI · OmniHuman 1.5」，确认轻量 MERCHANT_AI_VOLC_* 对应密钥有权，并有可用余额后重试。'
     )
   }
+  if (isArkVideoRateLimitError(t) || /接口超限|50429|50430/i.test(t)) {
+    return `${fallback}：模型接口瞬时超限，已自动重试并切换 Seedance。若仍失败请隔 1～2 分钟再生成。`
+  }
   if (/frame=\s*0|Lsize=\s*0kB|video:0kB|size=\s*0kB/i.test(t)) {
     return `${fallback}：编码结果为空（0 帧）。常见原因是混音失败、字幕/运镜后处理失败或某段视频损坏，请重试；仍失败可先关闭字幕后再生成。`
   }
@@ -321,6 +329,65 @@ function sanitizeDhRenderPipelineError(raw: string, fallback: string): string {
     return `${fallback}（${clipped}）`
   }
   return t.length > 280 ? `${t.slice(0, 280)}…` : t
+}
+
+function isDhUpstreamLimitError(msg: string): boolean {
+  return isArkVideoRateLimitError(msg) || isArkVideoDailyQuotaError(msg)
+}
+
+function snapDhSeedanceDurationSec(audioSec: number): 5 | 10 | 15 {
+  const n = Math.max(5, Math.round(audioSec) || 5)
+  if (n <= 5) return 5
+  if (n <= 10) return 10
+  return 15
+}
+
+/** OmniHuman 接口超限后：Seedance 图生视频 + 口播混音 */
+async function runDhSeedanceI2vFallback(opts: {
+  sceneImageB64: string
+  prompt: string
+  audioBlob: Blob
+  onProgress?: (label: string) => void
+}): Promise<{ ok: true; videoUrl: string; blob: Blob } | { ok: false; message: string }> {
+  let audioSec = 5
+  try {
+    audioSec = await getAudioDurationSec(opts.audioBlob)
+  } catch {
+    audioSec = 5
+  }
+  const dur = snapDhSeedanceDurationSec(audioSec)
+  opts.onProgress?.('口播模型接口超限，改用 Seedance 图生视频…')
+  const job = await runShortVideoJobWithFailover({
+    engine: 'seedance',
+    body: {
+      prompt: opts.prompt,
+      flags: `--dur ${dur} --ratio 9:16 --resolution 720p`,
+      images_base64: [opts.sceneImageB64],
+      model: SEEDANCE_1_5_PRO_MODEL_ID,
+      skip_qwen: true,
+      generate_audio: false,
+      seedance_image_mode: 'first_only',
+    },
+    poolModels: [SEEDANCE_1_5_PRO_MODEL_ID, 'doubao-seedance-2-0-260128', 'doubao-seedance-2-0-fast-260128'],
+    allowAutoHalveDuration: false,
+    onProgress: opts.onProgress,
+  })
+  if (!job.ok) return { ok: false, message: job.message }
+  let videoBlob: Blob | null = null
+  try {
+    videoBlob = await assertBlobLooksLikeVideo(await downloadVideoUrlAsBlob(job.videoUrl), 'Seedance 兜底')
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) }
+  }
+  try {
+    const muxed = await muxVideoWithNarrationPreferBrowser(videoBlob, opts.audioBlob, muxVideoAudioOnServer)
+    return { ok: true, videoUrl: job.videoUrl, blob: muxed }
+  } catch (e) {
+    return {
+      ok: false,
+      message: `Seedance 兜底混音失败：${e instanceof Error ? e.message : String(e)}`,
+    }
+  }
 }
 
 async function renderWithOmniHuman(
@@ -548,7 +615,7 @@ async function renderWithOmniHuman(
       }
     }
 
-    const job =
+    let job =
       useMotion && refVideo
         ? await runDhMotionImitateJob({
             image_base64: sceneImageB64,
@@ -578,7 +645,36 @@ async function renderWithOmniHuman(
               void label
             },
           })
-    if (!job.ok) {
+    let ohBlob: Blob | null = null
+    let url = job.ok ? String(job.videoUrl || '').trim() : ''
+
+    if (!job.ok && !useMotion && isDhUpstreamLimitError(job.message)) {
+      const fb = await runDhSeedanceI2vFallback({
+        sceneImageB64,
+        prompt,
+        audioBlob: segmentAudioBlobs[i]!,
+        onProgress: (label) => {
+          onProgress?.({
+            phase: 'generating',
+            segmentIndex: i + 1,
+            segmentTotal,
+            progress: 20 + Math.round((i / segmentTotal) * 55),
+          })
+          void label
+        },
+      })
+      if (!fb.ok) {
+        return {
+          ok: false,
+          message: sanitizeDhRenderPipelineError(
+            `${job.message}；${fb.message}`,
+            `第 ${i + 1}/${segmentTotal} 段 OmniHuman 生成失败`,
+          ),
+        }
+      }
+      ohBlob = fb.blob
+      url = fb.videoUrl
+    } else if (!job.ok) {
       return {
         ok: false,
         message: sanitizeDhRenderPipelineError(
@@ -590,25 +686,24 @@ async function renderWithOmniHuman(
       }
     }
 
-    const url = String(job.videoUrl || '').trim()
-    if (!url) {
-      return { ok: false, message: `第 ${i + 1}/${segmentTotal} 段未返回视频地址` }
-    }
-
-    let ohBlob: Blob | null = null
-    for (let d = 0; d < 4; d++) {
-      if (d > 0) await sleep(2000 * d)
-      try {
-        const candidate = await assertBlobLooksLikeVideo(
-          await downloadVideoUrlAsBlob(url),
-          `OmniHuman 第 ${i + 1} 段`,
-        )
-        if (candidate.size >= 1024) {
-          ohBlob = candidate
-          break
+    if (!ohBlob) {
+      if (!url) {
+        return { ok: false, message: `第 ${i + 1}/${segmentTotal} 段未返回视频地址` }
+      }
+      for (let d = 0; d < 4; d++) {
+        if (d > 0) await sleep(2000 * d)
+        try {
+          const candidate = await assertBlobLooksLikeVideo(
+            await downloadVideoUrlAsBlob(url),
+            `OmniHuman 第 ${i + 1} 段`,
+          )
+          if (candidate.size >= 1024) {
+            ohBlob = candidate
+            break
+          }
+        } catch {
+          /* retry */
         }
-      } catch {
-        /* retry */
       }
     }
     if (!ohBlob) {

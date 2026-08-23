@@ -157,6 +157,16 @@ function unwrapVolcResult(j: Record<string, unknown>): {
   return { code, message, data, httpOkHint: !metaErr }
 }
 
+function isVolcVisualRateLimitError(msg: string): boolean {
+  return /接口超限|请求超限|并发超限|模型接口超限|50429|50430|concurrent|try later|限流|频率|too many|rate.?limit/i.test(
+    msg,
+  )
+}
+
+async function sleepMs(ms: number): Promise<void> {
+  await new Promise((r) => setTimeout(r, ms))
+}
+
 /** 将火山 50400 / Access Denied 等转为可执行说明（避免只显示英文拒答） */
 export function humanizeOmniHumanVolcError(raw: string): string {
   const msg = String(raw || '').trim()
@@ -169,8 +179,8 @@ export function humanizeOmniHumanVolcError(raw: string): string {
       `（原始：${msg.slice(0, 160)}）`
     )
   }
-  if (/concurrent|50430|try later|限流|频率/i.test(msg)) {
-    return `OmniHuman 限流，请稍后重试（${msg.slice(0, 120)}）`
+  if (isVolcVisualRateLimitError(msg)) {
+    return `OmniHuman 接口瞬时超限（QPS/并发），系统会自动退避重试；若仍失败请隔 1～2 分钟再生成。（${msg.slice(0, 120)}）`
   }
   if (/not supported|req_key/i.test(msg)) {
     return (
@@ -221,10 +231,34 @@ async function postVolcVisual(
     codeNum !== 10000 &&
     String(unwrapped.code).toLowerCase() !== 'success'
   if (!res.ok || businessFail) {
-    const msg = humanizeOmniHumanVolcError(unwrapped.message || `火山视觉 HTTP ${res.status}`)
-    return { ok: false, message: msg, status: res.status }
+    const raw = unwrapped.message || `火山视觉 HTTP ${res.status}`
+    return { ok: false, message: raw, status: res.status }
   }
   return { ok: true, json: j }
+}
+
+async function postVolcVisualWithRetry(
+  creds: { accessKeyId: string; secretAccessKey: string; region: string },
+  action: string,
+  version: string,
+  body: Record<string, unknown>,
+): Promise<{ ok: true; json: Record<string, unknown> } | { ok: false; message: string; status?: number }> {
+  let last: { ok: false; message: string; status?: number } | null = null
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const r = await postVolcVisual(creds, action, version, body)
+    if (r.ok) return r
+    last = r
+    if (attempt < 3 && isVolcVisualRateLimitError(r.message)) {
+      await sleepMs(1500 * 2 ** attempt)
+      continue
+    }
+    return { ok: false, message: humanizeOmniHumanVolcError(r.message), status: r.status }
+  }
+  return {
+    ok: false,
+    message: humanizeOmniHumanVolcError(last?.message || 'OmniHuman 提交失败'),
+    status: last?.status,
+  }
 }
 
 function extractTaskId(j: Record<string, unknown>): string {
@@ -324,12 +358,9 @@ export async function volcSubmitOmniHumanTask(
     if (opts.prompt?.trim()) body.prompt = opts.prompt.trim().slice(0, 500)
     if (opts.peFastMode) body.pe_fast_mode = true
 
-    const r = await postVolcVisual(creds, attempt.action, attempt.version, body)
+    const r = await postVolcVisualWithRetry(creds, attempt.action, attempt.version, body)
     if (!r.ok) {
       errors.push(`${attempt.action}/${attempt.reqKey}: ${r.message}`)
-      if (/concurrent|50430|try later|限流|频率/i.test(r.message)) {
-        return { ok: false, message: humanizeOmniHumanVolcError(r.message) }
-      }
       if (/50400|Access\s*Denied/i.test(r.message)) {
         // 权限类错误换 Action 也不会通，直接返回可读说明
         return { ok: false, message: humanizeOmniHumanVolcError(r.message) }

@@ -123,13 +123,23 @@ function unwrapVolcResult(j: Record<string, unknown>): {
   return { code: j.code ?? data.code, message, data }
 }
 
+function isVolcVisualRateLimitError(msg: string): boolean {
+  return /接口超限|请求超限|并发超限|模型接口超限|50429|50430|concurrent|try later|限流|频率|too many|rate.?limit/i.test(
+    msg,
+  )
+}
+
+async function sleepMs(ms: number): Promise<void> {
+  await new Promise((r) => setTimeout(r, ms))
+}
+
 function humanizeMotionVolcError(raw: string): string {
   const t = String(raw || '').trim()
   if (/Access\s*Denied|50400|not\s*authorized|未开通/i.test(t)) {
     return '即梦动作模仿未开通或 AK 无权限。请到火山控制台开通「动作模仿 2.0」后重试。'
   }
-  if (/concurrent|50430|try later|限流|频率/i.test(t)) {
-    return '动作模仿任务繁忙，请稍后再试。'
+  if (isVolcVisualRateLimitError(t)) {
+    return '动作模仿接口瞬时超限（QPS/并发），系统会自动退避重试；若仍失败请隔 1～2 分钟再生成。'
   }
   if (/video|时长|duration|too long|oversize|过大/i.test(t)) {
     return t || '参考视频不符合动作模仿要求（建议竖版 MP4、约 3～15 秒、12MB 内）。'
@@ -177,9 +187,33 @@ async function postVolcVisual(
     codeNum !== 10000 &&
     String(unwrapped.code).toLowerCase() !== 'success'
   if (!res.ok || businessFail) {
-    return { ok: false, message: humanizeMotionVolcError(unwrapped.message || `火山视觉 HTTP ${res.status}`), status: res.status }
+    return { ok: false, message: unwrapped.message || `火山视觉 HTTP ${res.status}`, status: res.status }
   }
   return { ok: true, json: j }
+}
+
+async function postVolcVisualWithRetry(
+  creds: { accessKeyId: string; secretAccessKey: string; region: string },
+  action: string,
+  version: string,
+  body: Record<string, unknown>,
+): Promise<{ ok: true; json: Record<string, unknown> } | { ok: false; message: string; status?: number }> {
+  let last: { ok: false; message: string; status?: number } | null = null
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const r = await postVolcVisual(creds, action, version, body)
+    if (r.ok) return r
+    last = r
+    if (attempt < 3 && isVolcVisualRateLimitError(r.message)) {
+      await sleepMs(1500 * 2 ** attempt)
+      continue
+    }
+    return { ok: false, message: humanizeMotionVolcError(r.message), status: r.status }
+  }
+  return {
+    ok: false,
+    message: humanizeMotionVolcError(last?.message || '动作模仿提交失败'),
+    status: last?.status,
+  }
 }
 
 function extractTaskId(j: Record<string, unknown>): string {
@@ -277,12 +311,9 @@ export async function volcSubmitMotionImitateTask(
   for (const attempt of attemptsForEnv(env)) {
     for (const fields of bodyVariants(imageUrl, videoUrl, opts.prompt)) {
       const body: Record<string, unknown> = { req_key: attempt.reqKey, ...fields }
-      const r = await postVolcVisual(creds, attempt.action, attempt.version, body)
+      const r = await postVolcVisualWithRetry(creds, attempt.action, attempt.version, body)
       if (!r.ok) {
         errors.push(`${attempt.reqKey}: ${r.message}`)
-        if (/concurrent|50430|try later|限流|频率/i.test(r.message)) {
-          return { ok: false, message: humanizeMotionVolcError(r.message) }
-        }
         if (/50400|Access\s*Denied/i.test(r.message)) {
           return { ok: false, message: humanizeMotionVolcError(r.message) }
         }

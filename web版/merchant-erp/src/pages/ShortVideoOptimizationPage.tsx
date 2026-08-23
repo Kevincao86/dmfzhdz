@@ -713,13 +713,18 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     if (genMode === 'frames') {
       const pro20 = raw.filter((id) => isSeedance20ModelId(id) && !/fast|mini/i.test(id))
       const fast20 = raw.filter((id) => isSeedance20ModelId(id) && /fast/i.test(id))
-      const ordered = [...pro20, ...fast20]
-      return ordered.length > 0 ? ordered : [SEEDANCE_2_0_MODEL_ID]
+      const mini20 = raw.filter((id) => isSeedance20ModelId(id) && /mini/i.test(id))
+      const ordered = [...pro20, ...fast20, ...mini20]
+      return ordered.length > 0
+        ? ordered
+        : [SEEDANCE_2_0_MODEL_ID, 'doubao-seedance-2-0-fast-260128']
     }
     const pro15 = raw.filter(isSeedance15ProModelId)
     const fallback20 = raw.filter((id) => isSeedance20ModelId(id) && !/mini/i.test(id))
     const ordered = [...pro15, ...fallback20]
-    return ordered.length > 0 ? ordered : [SEEDANCE_1_5_PRO_MODEL_ID]
+    return ordered.length > 0
+      ? ordered
+      : [SEEDANCE_1_5_PRO_MODEL_ID, SEEDANCE_2_0_MODEL_ID, 'doubao-seedance-2-0-fast-260128']
   }, [cfg?.arkVideoModels, genMode])
 
   /** 生成前门禁：按钮禁用原因（避免可点但点击后无反馈或清空提示） */
@@ -807,7 +812,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
           images_base64: body.images_base64,
           model: body.model?.trim() || preferredModel,
           skip_qwen: true,
-          lock_model: seedancePoolModels.length <= 1,
+          lock_model: false,
           generate_audio: true,
           seedance_image_mode: imageMode,
           i2v_max_images:

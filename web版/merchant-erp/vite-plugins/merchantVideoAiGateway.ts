@@ -48,7 +48,12 @@ import {
   parseI2vMaxImagesFromBody,
   type VideoGenMode,
 } from '../src/lib/videoModelDuration.js'
-import { buildArkVideoModelTryOrder, isArkVideoFailoverError } from '../src/lib/arkVideoModelRouter.js'
+import {
+  buildArkVideoModelTryOrder,
+  isArkVideoFailoverError,
+  isArkVideoRateLimitError,
+  shouldMarkArkVideoModelExhausted,
+} from '../src/lib/arkVideoModelRouter.js'
 import {
   discoverArkAccountModels,
   discoveredModelsToEndpointsCsv,
@@ -272,6 +277,12 @@ function arkCreateTaskUserMessage(msg: string, endpointId: string, upstreamStatu
       `火山方舟账号对 Seedance 模型「${modelId}」已达推理限额（安全体验模式），视频生成已暂停。` +
       `系统已尝试切换同账号其它 Seedance 模型；若仍失败请到火山方舟控制台关闭或调高「安全体验模式」，或开通正式计费。` +
       `控制台：https://console.volcengine.com/ark/region:ark+cn-beijing/model`
+    )
+  }
+  if (isArkVideoRateLimitError(msg)) {
+    return (
+      `模型接口瞬时超限（QPS/并发），已自动退避重试并切换其它 Seedance 模型。` +
+      `若连续失败请稍等 1～2 分钟再生成。原始信息：${msg}`
     )
   }
   if (upstreamStatus === 404 || /does not exist|not have access/i.test(msg)) {
@@ -1672,33 +1683,45 @@ async function arkPostVideoGenerationTask(
   | { ok: true; taskId: string; raw?: unknown }
 > {
   const root = arkApiV3Root(env)
-  const res = await fetch(`${root}/contents/generations/tasks`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  })
-  const j = await readJsonResponse(res)
-  const idRaw = typeof j.id === 'string' ? j.id : null
-  if (!res.ok) {
+  let lastFail: { ok: false; msg: string; status?: number; rawMsg?: string } | null = null
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const res = await fetch(`${root}/contents/generations/tasks`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    })
+    const j = await readJsonResponse(res)
+    const idRaw = typeof j.id === 'string' ? j.id : null
+    if (res.ok && idRaw) {
+      return { ok: true, taskId: idRaw, raw: j }
+    }
     const rawMsg =
       (typeof j.error === 'object' &&
         j.error &&
         typeof (j.error as { message?: unknown }).message === 'string' &&
         (j.error as { message: string }).message) ||
       (typeof j.message === 'string' && j.message) ||
-      `方舟创建视频任务失败（HTTP ${res.status}）。`
-    return {
+      (idRaw ? `方舟创建视频任务失败（HTTP ${res.status}）。` : res.ok ? '方舟未返回任务 id。' : `方舟创建视频任务失败（HTTP ${res.status}）。`)
+    lastFail = {
       ok: false,
       msg: arkCreateTaskUserMessage(rawMsg, modelForError, res.status),
       status: arkCreateTaskHttpStatus(res.status),
       rawMsg,
     }
+    const retrySame =
+      attempt < 3 &&
+      isArkVideoRateLimitError(`${rawMsg} ${res.status}`) &&
+      !shouldMarkArkVideoModelExhausted(rawMsg)
+    if (retrySame) {
+      await new Promise((r) => setTimeout(r, 1500 * 2 ** attempt))
+      continue
+    }
+    return lastFail
   }
-  if (!idRaw) return { ok: false, msg: '方舟未返回任务 id。', status: res.status }
-  return { ok: true, taskId: idRaw, raw: j }
+  return lastFail ?? { ok: false, msg: '方舟创建视频任务失败。' }
 }
 
 async function arkCreateVideoTask(
@@ -1807,7 +1830,7 @@ async function arkCreateVideoTask(
       if (hopable) {
         if (
           key &&
-          (isArkQuotaHopableError(posted.rawMsg ?? '') || isArkQuotaHopableError(posted.msg))
+          shouldMarkArkVideoModelExhausted(`${posted.rawMsg ?? ''} ${posted.msg}`)
         ) {
           markArkVideoModelQuotaExhausted(key, modelId)
         }
