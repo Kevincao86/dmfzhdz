@@ -3,6 +3,7 @@
  * 先抠人融景成首帧，再音频驱动；成片自带口型音轨，无需后期静音混音。
  */
 import type { DigitalHumanDraft, DigitalHumanWork, FrameMode } from './digitalHumanBroadcast'
+import { normalizeDhTargetDurationSec } from './digitalHumanBroadcast'
 import {
   draftForSceneShot,
   findPresetAvatarForDraft,
@@ -357,6 +358,7 @@ async function runDhSeedanceI2vFallback(opts: {
   sceneImageB64: string
   prompt: string
   audioBlob: Blob
+  targetDurationSec?: number
   onProgress?: (label: string) => void
 }): Promise<{ ok: true; videoUrl: string; blob: Blob } | { ok: false; message: string }> {
   let audioSec = 5
@@ -365,7 +367,8 @@ async function runDhSeedanceI2vFallback(opts: {
   } catch {
     audioSec = 5
   }
-  const dur = snapDhSeedanceDurationSec(audioSec)
+  const want = Math.max(audioSec, Number(opts.targetDurationSec) || 0)
+  const dur = snapDhSeedanceDurationSec(want)
   opts.onProgress?.('OmniHuman 暂不可用，改用 Seedance 图生视频并混入口播…')
   const job = await runShortVideoJobWithFailover({
     engine: 'seedance',
@@ -541,7 +544,9 @@ async function renderWithOmniHuman(
     segmentAudioBlobs.push(segmentAudioBlobs[segmentAudioBlobs.length - 1]!)
   }
 
+  const selectedDurationSec = normalizeDhTargetDurationSec(draft.targetDurationSec)
   const targetDurationSec = Math.max(
+    selectedDurationSec,
     estimateDhTargetDurationSec(script),
     Math.ceil(totalAudioSec),
   )
@@ -660,6 +665,7 @@ async function renderWithOmniHuman(
         sceneImageB64,
         prompt,
         audioBlob: segmentAudioBlobs[i]!,
+        targetDurationSec: Math.ceil(selectedDurationSec / Math.max(1, segmentTotal)),
         onProgress: onSegProgress,
       })
       if (!fb.ok) {

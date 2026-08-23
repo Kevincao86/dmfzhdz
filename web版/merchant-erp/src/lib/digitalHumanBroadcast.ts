@@ -28,6 +28,8 @@ export type FrameMode = 'full' | 'half'
 export type AvatarNationality = 'cn' | 'intl'
 export type DriveMode = 'text' | 'audio' | 'link'
 export type Resolution = '720P' | '480P'
+export const DH_TARGET_DURATION_OPTIONS = [15, 30, 45, 60] as const
+export type DhTargetDurationSec = (typeof DH_TARGET_DURATION_OPTIONS)[number]
 export type S2vOutputResolution = '720P' | '480P'
 export type WorkStatus = 'draft' | 'queued' | 'rendering' | 'completed' | 'failed'
 
@@ -89,6 +91,8 @@ export type DigitalHumanDraft = {
   customBackgroundFileName: string | null
   frameMode: FrameMode
   resolution: Resolution
+  /** 成片目标时长（市场常用档） */
+  targetDurationSec: DhTargetDurationSec
   driveMode: DriveMode
   script: string
   /** 链接驱动：抖音分享 URL */
@@ -741,6 +745,7 @@ export type DhBroadcastSetupSnapshot = {
   subtitleEnabled: boolean
   subtitleStyle: string
   frameMode: FrameMode
+  targetDurationSec?: DhTargetDurationSec
 }
 
 export function loadDhBroadcastSetup(): DhBroadcastSetupSnapshot | null {
@@ -763,6 +768,7 @@ export function saveDhBroadcastSetup(draft: Pick<DigitalHumanDraft, keyof DhBroa
       subtitleEnabled: draft.subtitleEnabled,
       subtitleStyle: draft.subtitleStyle,
       frameMode: draft.frameMode,
+      targetDurationSec: normalizeDhTargetDurationSec(draft.targetDurationSec),
     }
     localStorage.setItem(DH_SETUP_KEY, JSON.stringify(snap))
   } catch {
@@ -797,6 +803,7 @@ export function defaultDraft(): DigitalHumanDraft {
     customBackgroundFileName: null,
     frameMode: 'half',
     resolution: '720P',
+    targetDurationSec: 15,
     driveMode: 'text',
     script: '',
     douyinLinkUrl: '',
@@ -836,7 +843,18 @@ if (typeof globalThis !== 'undefined' && 'localStorage' in globalThis) {
   void ensureDigitalHumanStorageReady()
 }
 
-/** 兼容旧草稿 1080p/4k → 千问实际支持的 720P/480P */
+/** 成片时长档：15 / 30 / 45 / 60，缺省或非法值回落到 15 */
+export function normalizeDhTargetDurationSec(raw: unknown): DhTargetDurationSec {
+  const n = Math.round(Number(raw))
+  if (n === 30 || n === 45 || n === 60) return n
+  return 15
+}
+
+/** 中文口播约 4 字/秒，给文案字数提示 */
+export function recommendedDhScriptChars(sec: DhTargetDurationSec): number {
+  return sec * 4
+}
+
 export function normalizeDraftResolution(raw: unknown): S2vOutputResolution {
   const v = String(raw || '')
     .trim()

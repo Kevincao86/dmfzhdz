@@ -23,8 +23,11 @@ import { cn } from '../cn'
 import {
   BACKGROUND_OPTIONS,
   DH_SCRIPT_TEMPLATES,
+  DH_TARGET_DURATION_OPTIONS,
   fillDhScriptPlaceholders,
   defaultDraft,
+  normalizeDhTargetDurationSec,
+  recommendedDhScriptChars,
   deleteDigitalHumanWork,
   findPresetAvatarForDraft,
   GESTURE_PRESETS,
@@ -626,8 +629,9 @@ export default function DigitalHumanBroadcastPage() {
       subtitleEnabled: snap.subtitleEnabled,
       subtitleStyle: snap.subtitleStyle,
       frameMode: snap.frameMode,
+      targetDurationSec: normalizeDhTargetDurationSec(snap.targetDurationSec),
     })
-    setToast('已套用上次成片设置（背景、动作、字幕、景别）')
+    setToast('已套用上次成片设置（背景、动作、字幕、景别、时长）')
   }
 
   const generateScriptWithAi = async () => {
@@ -638,7 +642,12 @@ export default function DigitalHumanBroadcastPage() {
     }
     setAiBusy(true)
     try {
-      const res = await postDigitalHumanAssistText(buildDhScriptGeneratePrompt(topic))
+      const dur = normalizeDhTargetDurationSec(draft.targetDurationSec)
+      const res = await postDigitalHumanAssistText(
+        buildDhScriptGeneratePrompt(
+          `${topic}。口播成片时长 ${dur} 秒，正文约 ${recommendedDhScriptChars(dur)} 字，不要明显超长或过短。`,
+        ),
+      )
       if (!res.ok) {
         setToast(res.message)
         return
@@ -1811,6 +1820,34 @@ export default function DigitalHumanBroadcastPage() {
                           : '成片输出 720P；按口播音频驱动口型。自定义照片建议竖版 ≥1080×1920。'}
                       </p>
                     </label>
+                    <div className="block text-sm sm:col-span-2">
+                      <span className="mb-1 block text-slate-600">成片时长</span>
+                      <div className="flex flex-wrap gap-2">
+                        {DH_TARGET_DURATION_OPTIONS.map((sec) => {
+                          const on = normalizeDhTargetDurationSec(draft.targetDurationSec) === sec
+                          return (
+                            <button
+                              key={sec}
+                              type="button"
+                              onClick={() => patchDraft({ targetDurationSec: sec })}
+                              className={cn(
+                                'rounded-lg border px-3 py-1.5 text-sm font-medium',
+                                on
+                                  ? 'border-violet-400 bg-violet-50 text-violet-800'
+                                  : 'border-slate-200 bg-white text-slate-600 hover:border-violet-200',
+                              )}
+                            >
+                              {sec} 秒
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">
+                        市场常用档。口播文案建议约{' '}
+                        {recommendedDhScriptChars(normalizeDhTargetDurationSec(draft.targetDurationSec))}{' '}
+                        字（约 4 字/秒）；口播更长时成片会跟音频走。
+                      </p>
+                    </div>
                   </div>
                   {isUploadDrive ? renderVoiceSynthesisPanel({ showAiMatch: true }) : null}
                 </section>
@@ -2014,6 +2051,8 @@ export default function DigitalHumanBroadcastPage() {
                       </label>
                       <p className="text-xs text-slate-500">
                         已分段 {splitScriptSegments(draft.script).length} 段 · 约 {draft.script.length} 字
+                        （所选 {normalizeDhTargetDurationSec(draft.targetDurationSec)} 秒建议{' '}
+                        {recommendedDhScriptChars(normalizeDhTargetDurationSec(draft.targetDurationSec))} 字）
                       </p>
                     </div>
                   ) : draft.driveMode === 'text' ? (
@@ -2043,6 +2082,8 @@ export default function DigitalHumanBroadcastPage() {
                       />
                       <p className="text-xs text-slate-500">
                         已分段 {splitScriptSegments(draft.script).length} 段 · 约 {draft.script.length} 字
+                        （所选 {normalizeDhTargetDurationSec(draft.targetDurationSec)} 秒建议{' '}
+                        {recommendedDhScriptChars(normalizeDhTargetDurationSec(draft.targetDurationSec))} 字）
                       </p>
                       {draft.script.includes('【') ? (
                         <p className="text-xs text-amber-700">文案里还有【占位】，生成前请改成门店真实信息。</p>
@@ -2451,7 +2492,7 @@ export default function DigitalHumanBroadcastPage() {
                             ? '音频 + 动作模仿'
                             : '音频 + 口型驱动'}
                     </li>
-                    <li>· 输出：{resolutionLabel(s2vResolutionFromDraft(draft))} · {draft.frameMode === 'full' ? '全身' : '半身'}</li>
+                    <li>· 输出：{resolutionLabel(s2vResolutionFromDraft(draft))} · {draft.frameMode === 'full' ? '全身' : '半身'} · {normalizeDhTargetDurationSec(draft.targetDurationSec)} 秒</li>
                     <li>· 音色：{selectedVoice?.label}</li>
                     <li>
                       · 字幕：{draft.subtitleEnabled ? SUBTITLE_STYLES.find((s) => s.id === draft.subtitleStyle)?.label ?? '已开启' : '未烧录'}
