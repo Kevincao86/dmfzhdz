@@ -28,7 +28,7 @@ import {
   type StoreMarginConfig,
 } from '../lib/storeMarginsRead'
 import { getActiveTenantStorageId } from '../lib/tenantLocalState'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   postDouyinProductQualityAnalysis,
   type ProductQualityItem,
@@ -52,6 +52,8 @@ import {
 import { MerchantPlatformIcon } from '../lib/platformBranding'
 import StoreGrossMarginConfigCard from '../components/StoreGrossMarginConfigCard'
 import { useAiAgent } from '../context/AiAgentContext'
+import { isPartnerEdition } from '../lib/appEdition'
+import ProductMasterPublishPage from './ProductMasterPublishPage'
 
 type Conn = 'connected' | 'error' | 'pending' | 'opening'
 
@@ -307,6 +309,7 @@ function ScoreBar({ label, score, comment }: { label: string; score: number; com
 
 export default function ProductsPage() {
   const analysisAbortRef = useRef<AbortController | null>(null)
+  const [searchParams] = useSearchParams()
   const [showApi, setShowApi] = useState(true)
   const [analyzing, setAnalyzing] = useState(false)
   const [syncing, setSyncing] = useState(false)
@@ -592,6 +595,10 @@ export default function ProductsPage() {
       setVoiceOpen(false)
       setToast('已根据语音生成一条本地草稿，可在下方「已同步商品」中查看')
     }, 2200)
+  }
+
+  if (!isPartnerEdition() && searchParams.get('flow') === 'multi') {
+    return <ProductMasterPublishPage />
   }
 
   return (
@@ -1039,6 +1046,20 @@ export default function ProductsPage() {
             支持 AI 语音录入、商品资料建档与平台草稿生成
           </p>
         </button>
+        {!isPartnerEdition() ? (
+          <Link
+            to="/products?flow=multi"
+            className="group rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-all duration-200 hover:border-transparent hover:bg-gradient-to-r hover:from-indigo-500 hover:to-indigo-600 hover:shadow-lg"
+          >
+            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 transition-colors group-hover:bg-white/20">
+              <Sparkles className="h-5 w-5 text-indigo-600 transition-colors group-hover:text-white" />
+            </div>
+            <p className="font-semibold text-gray-900 transition-colors group-hover:text-white">一份套餐多平台</p>
+            <p className="mt-1 text-xs text-gray-500 transition-colors group-hover:text-white/80">
+              先编一份，AI 补平台文案；抖音来客仍走原上传向导
+            </p>
+          </Link>
+        ) : null}
         <Link
           to="/products/list"
           className="group rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-all duration-200 hover:border-transparent hover:bg-gradient-to-r hover:from-indigo-500 hover:to-indigo-600 hover:shadow-lg"
