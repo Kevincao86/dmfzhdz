@@ -7,6 +7,8 @@ import {
   BookOpen,
   Home,
   Megaphone,
+  MessageSquare,
+  MoreHorizontal,
   Package,
   Settings,
   Sparkles,
@@ -152,8 +154,8 @@ export function filterNavItemsForPartnerEdition(
 
 export function pathActive(pathname: string, itemPath: string) {
   if (itemPath === '/home') return pathname === '/home'
-  /** 分组键非真实路由，勿用前缀匹配 */
-  if (itemPath === '/ai-create') return false
+  /** 分组键，非真实路由；子项 path 保持不变 */
+  if (itemPath === '/ai-create' || itemPath === '/ai-create-video' || itemPath === '/__more') return false
   /**
    * 「运营」父 path 与「AI 创作」子项 `/operation/ai-ops-plan` 共用前缀，
    * 父级高亮/展开只认子项，避免误开运营组。
@@ -182,4 +184,98 @@ export function filterNavItemsForPlan(items: NavItem[], plan: MembershipPlan): N
       return { ...item, children }
     })
     .filter((x): x is NavItem => x != null)
+}
+
+export type MerchantUiDensity = 'simple' | 'detailed'
+
+export type MerchantUiOutletContext = {
+  uiDensity: MerchantUiDensity
+  setUiDensity: (density: MerchantUiDensity) => void
+}
+
+const DENSITY_KEY = 'meoo_merchant_ui_density_v1'
+
+const SIMPLE_PRIMARY_PATHS = new Set([
+  '/home',
+  '/ai-agent',
+  '/store/info',
+  '/products',
+  '/recruitment',
+  '/ai-operation/digital-human',
+  '/ai-operation/video-check',
+  '/reviews',
+])
+
+function densityMap(raw: string | null): Record<string, MerchantUiDensity> {
+  if (!raw) return {}
+  try {
+    const parsed = JSON.parse(raw) as Record<string, MerchantUiDensity>
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+export function readMerchantUiDensity(tenantId?: string | null): MerchantUiDensity {
+  try {
+    const id = tenantId?.trim() || '_default'
+    return densityMap(localStorage.getItem(DENSITY_KEY))[id] === 'simple' ? 'simple' : 'detailed'
+  } catch {
+    return 'detailed'
+  }
+}
+
+export function writeMerchantUiDensity(density: MerchantUiDensity, tenantId?: string | null): void {
+  try {
+    const id = tenantId?.trim() || '_default'
+    const next = densityMap(localStorage.getItem(DENSITY_KEY))
+    next[id] = density
+    localStorage.setItem(DENSITY_KEY, JSON.stringify(next))
+  } catch {
+    /* 存储满时忽略 */
+  }
+}
+
+function leftoverMoreChildren(fullNav: NavItem[]): NavChild[] {
+  const out: NavChild[] = []
+  const seen = new Set<string>()
+  const push = (path: string, label: string) => {
+    if (SIMPLE_PRIMARY_PATHS.has(path) || seen.has(path)) return
+    seen.add(path)
+    out.push({ path, label })
+  }
+  for (const item of fullNav) {
+    if (item.children?.length) {
+      for (const c of item.children) push(c.path, c.label)
+      continue
+    }
+    push(item.path, item.label)
+  }
+  return out
+}
+
+/** 精简侧栏：白话 7 项 + 「更多」收其余入口（不改当前密度） */
+export function buildSimpleNavItems(fullNav: NavItem[]): NavItem[] {
+  const items: NavItem[] = [
+    { path: '/home', label: '今天', icon: Home },
+    { path: '/ai-agent', label: '问灵祺', icon: Bot },
+    { path: '/store/info', label: '我的店', icon: Store },
+    { path: '/products', label: '上架套餐', icon: Package },
+    { path: '/recruitment', label: '找人拍探店', icon: UserPlus },
+    {
+      path: '/ai-create-video',
+      label: '做视频',
+      icon: Sparkles,
+      children: [
+        { path: '/ai-operation/digital-human', label: '出镜口播' },
+        { path: '/ai-operation/video-check', label: '探店短片' },
+      ],
+    },
+    { path: '/reviews', label: '看评价', icon: MessageSquare },
+  ]
+  const more = leftoverMoreChildren(fullNav)
+  if (more.length > 0) {
+    items.push({ path: '/__more', label: '更多', icon: MoreHorizontal, children: more })
+  }
+  return items
 }

@@ -3,6 +3,7 @@ import {
   ArrowRight,
   BarChart3,
   Calendar,
+  ChevronRight,
   Clock,
   MessageSquare,
   Percent,
@@ -15,7 +16,7 @@ import {
 import { MERCHANT_PLATFORMS, type MerchantPlatformId } from '../constants/merchantPlatforms'
 import { MerchantPlatformIcon } from '../lib/platformBranding'
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useOutletContext } from 'react-router-dom'
 import {
   Bar,
   BarChart,
@@ -38,6 +39,7 @@ import { probeMerchantPlatforms, type PlatformConnectivityRow } from '../service
 import AiTokenUsagePanel from '../components/home/AiTokenUsagePanel'
 import { isPartnerEdition } from '../lib/appEdition'
 import PartnerHomeDashboard from './PartnerHomeDashboard'
+import type { MerchantUiOutletContext } from '../config/nav'
 
 type PlatformId = MerchantPlatformId
 
@@ -58,6 +60,13 @@ const QUICK: {
   { title: '投流管理', path: '/advertising', color: 'bg-orange-500', icon: UserPlus },
   { title: '评论管理', path: '/operation', color: 'bg-green-500', icon: MessageSquare },
   { title: '线索管理', path: '/leads', color: 'bg-blue-500', icon: UserPlus },
+]
+
+const SIMPLE_HOME_LINKS: { title: string; hint: string; path: string }[] = [
+  { title: '上架套餐', hint: '把团购套餐上到平台', path: '/products' },
+  { title: '找人拍探店', hint: '发招募，让达人来拍', path: '/recruitment' },
+  { title: '出镜口播', hint: '数字人讲套餐', path: '/ai-operation/digital-human' },
+  { title: '做探店视频', hint: '按门店出短片', path: '/ai-operation/video-check' },
 ]
 
 const TIME_FILTERS = [
@@ -94,6 +103,9 @@ export default function HomeDashboard() {
 }
 
 function MerchantHomeDashboard() {
+  const outlet = useOutletContext<MerchantUiOutletContext | undefined>()
+  const simple = outlet?.uiDensity === 'simple'
+  const setUiDensity = outlet?.setUiDensity ?? (() => {})
   const [loading, setLoading] = useState(true)
   const [statsLoading, setStatsLoading] = useState(false)
   const [timeOpen, setTimeOpen] = useState(false)
@@ -206,8 +218,13 @@ function MerchantHomeDashboard() {
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
           <span className="text-sm font-medium">加载经营数据…</span>
         </div>
-        <div className="grid grid-cols-2 gap-4 opacity-60 xl:grid-cols-6 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
+        <div
+          className={cn(
+            'grid gap-4 opacity-60',
+            simple ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-2 xl:grid-cols-6 lg:grid-cols-3',
+          )}
+        >
+          {Array.from({ length: simple ? 3 : 6 }).map((_, i) => (
             <div key={i} className="h-24 animate-pulse rounded-2xl bg-slate-100" />
           ))}
         </div>
@@ -218,6 +235,66 @@ function MerchantHomeDashboard() {
   const timeLabel = TIME_FILTERS.find((x) => x.value === timeKey)?.label ?? '实时'
 
   const modalPlatform = platformRows.find((p) => p.id === detailId)
+
+  if (simple) {
+    const pendingVerify = platformRows.reduce(
+      (sum, p) => sum + Math.max(0, p.payAmount - p.verifyAmount),
+      0,
+    )
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="relative pl-4">
+            <span className="absolute left-0 top-1 h-[calc(100%-4px)] w-1 rounded-full bg-gradient-to-b from-cyan-500 to-orange-400" aria-hidden />
+            <h1 className="erp-page-title">今天</h1>
+            <p className="mt-1 text-sm text-slate-600">先看这三件事，其它数据可随时切回详细版</p>
+          </div>
+          <span className="text-xs text-slate-500">
+            {statsLoading ? '正在刷新数据…' : `更新于 ${new Date().toLocaleString('zh-CN')}`}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {(
+            [
+              { label: '今天卖了', value: formatMoney(stats.totalRevenue) },
+              { label: '待核销', value: formatMoney(pendingVerify) },
+              { label: '差评', value: formatNum(stats.pendingComments) },
+            ] as const
+          ).map((card) => (
+            <div key={card.label} className="erp-panel px-5 py-4">
+              <div className="text-sm text-slate-500">{card.label}</div>
+              <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900">{card.value}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="erp-panel divide-y divide-slate-100 overflow-hidden">
+          {SIMPLE_HOME_LINKS.map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              className="flex items-center justify-between px-5 py-3.5 text-sm transition-colors hover:bg-slate-50"
+            >
+              <span>
+                <span className="font-medium text-slate-800">{item.title}</span>
+                <span className="ml-2 text-slate-500">{item.hint}</span>
+              </span>
+              <ChevronRight className="h-4 w-4 text-slate-400" />
+            </Link>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setUiDensity('detailed')}
+          className="text-sm text-cyan-700 hover:underline"
+        >
+          看完整数据
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-8">

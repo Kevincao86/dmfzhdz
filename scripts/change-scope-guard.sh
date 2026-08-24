@@ -335,6 +335,7 @@ PAT
 config/nav.ts
 MeooLayout.tsx
 App.tsx
+HomeDashboard.tsx
 partnerEditionConfig.ts
 index.html
 index.css

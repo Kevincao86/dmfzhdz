@@ -14,9 +14,20 @@ import {
   X,
 } from 'lucide-react'
 import type { AuthChangeEvent } from '@supabase/supabase-js'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { childActive, filterNavItemsForPartnerEdition, filterNavItemsForPlan, NAV_ITEMS, pathActive } from '../config/nav'
+import {
+  buildSimpleNavItems,
+  childActive,
+  filterNavItemsForPartnerEdition,
+  filterNavItemsForPlan,
+  NAV_ITEMS,
+  pathActive,
+  readMerchantUiDensity,
+  writeMerchantUiDensity,
+  type MerchantUiDensity,
+  type MerchantUiOutletContext,
+} from '../config/nav'
 import { isPartnerEdition } from '../lib/appEdition'
 import { usePartnerTenant } from '../context/PartnerTenantContext'
 import { ensurePartnerXingxuanBootstrap } from '../lib/partnerXingxuanBootstrapClient'
@@ -39,6 +50,7 @@ import {
   clearTenantScopedBrowserState,
   maskCnPhone,
   phoneFromAuthUser,
+  getActiveTenantStorageId,
   setActiveTenantStorageId,
 } from '../lib/tenantLocalState'
 import SiteIcpFooter from './SiteIcpFooter'
@@ -58,12 +70,32 @@ export default function MeooLayout() {
   const { submitTopSearchQuery } = useAiAgent()
   const { plan } = useMembership()
   const { profile } = usePartnerTenant()
+  const [uiDensity, setUiDensityState] = useState<MerchantUiDensity>(() =>
+    isPartnerEdition() ? 'detailed' : readMerchantUiDensity(getActiveTenantStorageId()),
+  )
+  const setUiDensity = useCallback((density: MerchantUiDensity) => {
+    if (isPartnerEdition()) return
+    writeMerchantUiDensity(density, getActiveTenantStorageId())
+    setUiDensityState(density)
+  }, [])
+  useEffect(() => {
+    if (isPartnerEdition()) return
+    const sync = () => setUiDensityState(readMerchantUiDensity(getActiveTenantStorageId()))
+    window.addEventListener('meoo-active-tenant-changed', sync)
+    return () => window.removeEventListener('meoo-active-tenant-changed', sync)
+  }, [])
   const navItems = useMemo(() => {
     const forPlan = filterNavItemsForPlan(NAV_ITEMS, plan)
-    return isPartnerEdition()
+    const base = isPartnerEdition()
       ? filterNavItemsForPartnerEdition(forPlan, { isParent: profile.isParent })
       : forPlan
-  }, [plan, profile.isParent])
+    if (isPartnerEdition() || uiDensity === 'detailed') return base
+    return buildSimpleNavItems(base)
+  }, [plan, profile.isParent, uiDensity])
+  const outletContext = useMemo<MerchantUiOutletContext>(
+    () => ({ uiDensity: isPartnerEdition() ? 'detailed' : uiDensity, setUiDensity }),
+    [uiDensity, setUiDensity],
+  )
   const [adminName, setAdminName] = useState('管理员')
   const [enterpriseName, setEnterpriseName] = useState('')
   const [accountType] = useState('主账号')
@@ -361,6 +393,40 @@ export default function MeooLayout() {
 
           <div className="flex items-center space-x-4">
             <PartnerClientScopeBar />
+            {!isPartnerEdition() ? (
+              <div
+                className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs font-medium text-slate-600"
+                role="group"
+                aria-label="界面版本"
+              >
+                <button
+                  type="button"
+                  aria-pressed={uiDensity === 'simple'}
+                  onClick={() => setUiDensity('simple')}
+                  className={cn(
+                    'rounded-md px-2 py-1 transition-colors',
+                    uiDensity === 'simple'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'hover:text-slate-800',
+                  )}
+                >
+                  精简
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={uiDensity === 'detailed'}
+                  onClick={() => setUiDensity('detailed')}
+                  className={cn(
+                    'rounded-md px-2 py-1 transition-colors',
+                    uiDensity === 'detailed'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'hover:text-slate-800',
+                  )}
+                >
+                  详细
+                </button>
+              </div>
+            ) : null}
             <TenantAnnouncementBell />
 
             <div className="relative">
@@ -451,6 +517,19 @@ export default function MeooLayout() {
                         <Settings className="mr-3 h-4 w-4 text-slate-400" />
                         修改密码
                       </button>
+                      {!isPartnerEdition() ? (
+                        <button
+                          type="button"
+                          className="flex w-full items-center px-4 py-2.5 text-sm text-slate-700 transition-colors hover:bg-slate-50"
+                          onClick={() => {
+                            setUiDensity(uiDensity === 'simple' ? 'detailed' : 'simple')
+                            setUserOpen(false)
+                          }}
+                        >
+                          <PanelLeft className="mr-3 h-4 w-4 text-slate-400" />
+                          {uiDensity === 'simple' ? '切换为详细版' : '切换为精简版'}
+                        </button>
+                      ) : null}
                     </div>
                     <div className="border-t border-slate-100 py-1">
                       <button
@@ -472,7 +551,7 @@ export default function MeooLayout() {
         <main className="erp-main erp-main-surface flex-1 overflow-auto p-5 lg:p-8">
           <div className="mx-auto w-full max-w-[1400px]">
             <PlatformDecorHomeHost />
-            <Outlet />
+            <Outlet context={outletContext} />
           </div>
         </main>
 
