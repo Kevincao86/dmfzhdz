@@ -157,7 +157,8 @@ export function suggestApplicantsForPlan(
     score >= 70 ? '粉量与报价更贴近本档' : score >= 55 ? '资料较全，可优先考虑' : '备选'
 
   if (!plan || plan.feeType === 'fixed') {
-    const cap = Math.max(1, plan?.totalHeadcount ?? Math.min(3, applicants.length) || 1)
+    const fallback = Math.max(1, Math.min(3, applicants.length))
+    const cap = Math.max(1, plan?.totalHeadcount ?? fallback)
     const unit = plan?.fixedPriceYuan ?? 0
     return applicants
       .map((a) => ({
