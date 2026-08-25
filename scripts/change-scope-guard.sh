@@ -26,6 +26,7 @@ list_scopes() {
   group_qr          群二维码上传/展示/清理（不含探店视频/ICE/其它上传）
   recruit_video     探店成片上传
   recruit_share_poster_ai  招募创建成功分享页 AI 海报生图（星选+撮合）
+  merchant_recruit_loop  商家 ERP 达人招募引导闭环（不改星选小程序/dr）
   video_review_play 链接/视频审核预览（ICE短链误判 + OSS签名过期）
   ops_pr_library    运营台 PR 用户库
   ops_talent_library 运营台达人库
@@ -118,6 +119,23 @@ PAT
 recruitmentVideoUpload
 recruitment-video-upload
 meoo-ops-mp-recruitment-video-upload
+PAT
+      ;;
+    merchant_recruit_loop)
+      cat <<'PAT'
+RecruitmentPage
+MerchantRecruitmentWorkflowViews
+merchantRecruitmentCoach
+merchantRecruitmentSubmit
+aiAgentRecruitmentOrder
+AiAgentContext
+aiAgentScenarioWorkflows
+aiAgentPlan
+aiAgentTools
+recruitmentLoop
+recruitmentOrderProgress
+merchantRecruitmentTierPlan
+change-scope-guard
 PAT
       ;;
     recruit_share_poster_ai)

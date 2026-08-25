@@ -133,7 +133,7 @@ import {
   buildRecruitmentOrderFromAgentBrief,
   recruitmentOrderDetailFromRegistry,
 } from '../lib/aiAgentRecruitmentOrder'
-import { appendRecruitmentOrderToOps } from '../lib/opsRegistryClient'
+import { submitMerchantRecruitmentWithMpPublish } from '../lib/merchantRecruitmentSubmit'
 import { buildAgentRecruitmentAllocation } from '../services/aiAgentRecruitmentAllocation'
 import { resolveRecruitmentOrderTenantMeta } from '../lib/recruitmentOrderMeta'
 import {
@@ -2359,7 +2359,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
               allocation,
               userBrief,
             })
-            await appendRecruitmentOrderToOps(order)
+            const { mpOrderId } = await submitMerchantRecruitmentWithMpPublish(order)
             const orderDetail = recruitmentOrderDetailFromRegistry(order, brief, intent, allocation)
             try {
               window.localStorage.setItem(tenantLocalKey('meoo_last_recruitment_order_id'), order.id)
@@ -2376,13 +2376,14 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
                 ...prev,
                 createAgentMessage(
                   'task_result',
-                  `「${title}」已确认。招募订单已生成并推送运营台（待接单），下方为 AI 智能分配后的订单明细。`,
+                  `「${title}」已确认。招募已发布到星选大厅（${mpOrderId}）。达人报名后我会带你在「达人招募」里按档位反选。`,
                   { resultSummary: 'confirmed', recruitmentOrder: orderDetail },
                 ),
               ]
               messagesRef.current = next
               return next
             })
+            navigate('/recruitment')
           } catch (e) {
             const msg = e instanceof Error ? e.message : String(e)
             setMessages((prev) => {

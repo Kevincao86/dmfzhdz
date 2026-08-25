@@ -6,7 +6,7 @@ import {
 
 export function recruitmentOrderStatusLabel(s: RegistryRecruitmentOrder['status']): string {
   const m: Record<RegistryRecruitmentOrder['status'], string> = {
-    pending: '待接单',
+    pending: '待发布',
     accepted: '进行中',
     done: '已完成',
     cancelled: '已取消',
@@ -20,7 +20,7 @@ export type { RecruitmentProgressStep }
 export function buildRecruitmentProgressSteps(
   order: Pick<
     RegistryRecruitmentOrder,
-    'status' | 'orderKind' | 'fulfillmentLoop' | 'linkedMpOrderId'
+    'status' | 'orderKind' | 'fulfillmentLoop' | 'linkedMpOrderId' | 'workflowStage'
   >,
 ): RecruitmentProgressStep[] {
   return buildRecruitmentProgressStepsForOrder(order)

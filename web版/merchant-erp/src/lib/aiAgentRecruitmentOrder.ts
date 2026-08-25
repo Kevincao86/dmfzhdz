@@ -4,6 +4,7 @@ import { buildErpRegistryTenant } from './buildErpRegistryTenant'
 import type { AiRecruitmentIntent } from './aiAgentRecruitmentParse'
 import type { NoviceAllocation } from '../services/recruitmentNoviceAllocationAi'
 import { kolTierStrategyLabel } from '../services/recruitmentNoviceAllocationAi'
+import { buildRecruitmentTierPlan } from './merchantRecruitmentTierPlan'
 
 export function recruitmentOrderDetailFromRegistry(
   order: RegistryRecruitmentOrder,
@@ -14,7 +15,7 @@ export function recruitmentOrderDetailFromRegistry(
   const total = allocation.v3 + allocation.v4 + allocation.v5 + allocation.v5plus
   return {
     orderId: order.id,
-    opsStatusLabel: '待运营接单',
+    opsStatusLabel: '已发布星选大厅',
     platform: order.recruitmentPlatform ?? intent.platform,
     storeName: order.storeName,
     mainProductName: brief.mainProductName,
@@ -36,7 +37,7 @@ export function recruitmentOrderDetailFromRegistry(
   }
 }
 
-/** 智能体确认后：生成待运营接单的商家达人招募订单（含 AI 分配摘要） */
+/** 智能体确认后：生成商家达人招募订单（含 AI 分配摘要），由提交函数发到星选大厅 */
 export function buildRecruitmentOrderFromAgentBrief(
   brief: AiRecruitmentBriefPreview,
   tenantMeta: { tenantId?: string; ownerUserId?: string },
@@ -54,9 +55,20 @@ export function buildRecruitmentOrderFromAgentBrief(
   const tags = brief.tags?.length ? brief.tags.join('、') : '—'
   const { allocation, intent } = params
   const total = allocation.v3 + allocation.v4 + allocation.v5 + allocation.v5plus
+  const headcount = Math.max(1, total)
   const tierLine = isXhs
-    ? `小红书达人约 ${total} 人`
+    ? `小红书达人约 ${headcount} 人`
     : `V3:${allocation.v3} V4:${allocation.v4} V5:${allocation.v5} V5+:${allocation.v5plus}`
+  const tierPlan = buildRecruitmentTierPlan({
+    budgetYuan: intent.budgetYuan,
+    targetHeadcount: headcount,
+    city: intent.city || '',
+    feeType: isXhs ? 'fixed' : 'tier',
+    source: allocation.source,
+    allocation: isXhs
+      ? undefined
+      : { v3: allocation.v3, v4: allocation.v4, v5: allocation.v5, v5plus: allocation.v5plus },
+  })
 
   return {
     id,
@@ -64,8 +76,8 @@ export function buildRecruitmentOrderFromAgentBrief(
     customerName,
     storeName: brief.mainProductName || '智能体招募',
     talentId: '—',
-    talentName: '智能体·AI 分配待接单',
-    fans: total,
+    talentName: '智能体·待星选报名',
+    fans: headcount,
     accountType: brief.platform || platform,
     recruitmentPlatform: platform,
     coopTimes: 0,
@@ -78,6 +90,9 @@ export function buildRecruitmentOrderFromAgentBrief(
     category: '智能体招募',
     fulfillmentLoop: 'open',
     orderKind: 'recruitment',
+    autoPublishMp: true,
+    workflowStage: 'submitted',
+    tierPlan,
     infoSummary: [
       `【智能体·开环招募】平台:${platform}；城市:${intent.city || '—'}；预算¥${intent.budgetYuan}；`,
       isXhs ? '' : `达人佣金:${intent.kolCommissionPct}%；`,

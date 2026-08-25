@@ -85,14 +85,14 @@ export const AI_AGENT_SCENARIO_WORKFLOWS: Record<AiTaskType, ScenarioWorkflowDef
     previewSteps: [
       '按门店与城市筛选达人池与粉丝量级',
       '生成招募 Brief 与佣金分配（本地生活 1～5%，默认 3%）',
-      '展示邀约批次预览；确认后创建招募单',
+      '展示邀约批次预览；确认后发布到星选招募大厅',
     ],
     workflowSteps: [
       '明确城市、粉丝量级、探店/种草形式与预算',
       '输出 Brief：门店信息、拍摄要求、佣金与交付物',
       '佣金按团购习惯 1～5%，默认 3%；禁止无故写 20%+ CPS',
       '生成预览 JSON（actionType: recruit_influencer，confirmRequired: true）',
-      '确认后创建邀约批次，不宣称已发送达人私信',
+      '确认后发布到星选招募大厅，不宣称已私信达人',
     ],
     deliverables: ['招募 Brief', '达人筛选条件', '佣金与预算表'],
     downstream: ['follow_local_lead', 'handle_review'],

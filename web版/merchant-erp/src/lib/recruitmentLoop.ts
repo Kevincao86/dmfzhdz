@@ -39,11 +39,11 @@ export type RecruitmentProgressStep = {
 }
 
 const OPEN_PROGRESS: Omit<RecruitmentProgressStep, 'done' | 'current'>[] = [
-  { title: '需求已提交', note: '运营接单并发布招募' },
-  { title: '达人报名', note: '小程序报名，运营反选' },
-  { title: '寄样 / 探店', note: '寄样物流与探店排期' },
-  { title: '内容审核', note: '成片上传与发布审核' },
-  { title: '数据与结算', note: '数据抓取与结款' },
+  { title: '已发星选大厅', note: '达人可在星选报名' },
+  { title: '达人反选', note: '商家按档位勾选并通知进群' },
+  { title: '探店排期', note: 'AI 排期并下发达人日历' },
+  { title: '成片审核', note: '达人上传，商家过/驳' },
+  { title: '结算打款', note: '导出明细，运营确认后完结' },
 ]
 
 const CLOSED_PROGRESS: Omit<RecruitmentProgressStep, 'done' | 'current'>[] = [
@@ -67,7 +67,10 @@ function mapProgress(
 }
 
 export function buildRecruitmentProgressStepsForOrder(
-  order: Pick<RegistryRecruitmentOrder, 'status' | 'orderKind' | 'fulfillmentLoop' | 'linkedMpOrderId'>,
+  order: Pick<
+    RegistryRecruitmentOrder,
+    'status' | 'orderKind' | 'fulfillmentLoop' | 'linkedMpOrderId' | 'workflowStage'
+  >,
 ): RecruitmentProgressStep[] {
   const loop = inferFulfillmentLoop(order)
   if (loop === 'closed') {
@@ -84,16 +87,27 @@ export function buildRecruitmentProgressStepsForOrder(
     return mapProgress(CLOSED_PROGRESS, 1, 2)
   }
 
-  const { status } = order
+  const { status, workflowStage } = order
   if (status === 'cancelled' || status === 'refunded') {
     return mapProgress(OPEN_PROGRESS, 0, 0)
   }
-  if (status === 'pending') return mapProgress(OPEN_PROGRESS, 1, 1)
-  if (status === 'accepted') return mapProgress(OPEN_PROGRESS, 2, 3)
-  if (status === 'done') {
+  if (status === 'done' || workflowStage === 'completed') {
     return OPEN_PROGRESS.map((x) => ({ ...x, done: true, current: false }))
   }
-  return mapProgress(OPEN_PROGRESS, 1, 1)
+  if (workflowStage === 'payment_pending' || workflowStage === 'payment_ops') {
+    return mapProgress(OPEN_PROGRESS, 4, 4)
+  }
+  if (workflowStage === 'video_review') return mapProgress(OPEN_PROGRESS, 3, 3)
+  if (workflowStage === 'scheduling') return mapProgress(OPEN_PROGRESS, 2, 2)
+  if (workflowStage === 'group_notify' || workflowStage === 'selecting') {
+    return mapProgress(OPEN_PROGRESS, 1, 1)
+  }
+  if (workflowStage === 'recruiting' || (status === 'accepted' && order.linkedMpOrderId)) {
+    return mapProgress(OPEN_PROGRESS, 1, 1)
+  }
+  if (status === 'pending' || workflowStage === 'submitted') return mapProgress(OPEN_PROGRESS, 0, 0)
+  if (status === 'accepted') return mapProgress(OPEN_PROGRESS, 1, 1)
+  return mapProgress(OPEN_PROGRESS, 0, 0)
 }
 
 export function mpApplicantTaskStatusLabel(

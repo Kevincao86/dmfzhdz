@@ -54,6 +54,11 @@ import RecruitmentXingxuanBridge from '../components/recruitment/RecruitmentXing
 import { isPartnerEdition } from '../lib/appEdition'
 import { openXingxuanRecruitment } from '../lib/xingxuanPlatformUrl'
 import NoviceRecruitmentForm from './recruitment/NoviceRecruitmentForm'
+import {
+  coachFromOrder,
+  isHubScreenUnlocked,
+  type MerchantRecruitHubScreen,
+} from '../lib/merchantRecruitmentCoach'
 
 const FLOW = [
   {
@@ -1238,6 +1243,16 @@ export default function RecruitmentPage() {
     }
   }, [screen, hubOrderFetchNonce])
 
+  const hubCoach = useMemo(() => coachFromOrder(hubOrder), [hubOrder])
+
+  const enterFlowScreen = (view: MerchantRecruitHubScreen) => {
+    if (!isHubScreenUnlocked(view, hubOrder)) {
+      window.alert(`这一步还不能进入。${hubCoach.nextHint}`)
+      return
+    }
+    setScreen(view)
+  }
+
   if (screen === 'createPick')
     return (
       <div className="mx-auto max-w-4xl space-y-8 px-4 py-6">
@@ -1401,7 +1416,7 @@ export default function RecruitmentPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="erp-page-title">达人招募管理</h1>
-          <p className="mt-1 text-sm text-gray-500">AI 定价 → 星选招募 → 商家反选 → 排期 → 视频审核 → 结算打款</p>
+          <p className="mt-1 text-sm text-gray-500">AI 帮你填单发到星选，再按步骤完成反选、排期、审片和结算。</p>
           <MerchantRecruitmentHubStats />
         </div>
         <button
@@ -1414,11 +1429,27 @@ export default function RecruitmentPage() {
         </button>
       </div>
 
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-violet-200 bg-violet-50/80 px-4 py-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-violet-950">下一步：{hubCoach.nextTitle}</p>
+          <p className="mt-0.5 text-xs text-violet-800">{hubCoach.nextHint}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => enterFlowScreen(hubCoach.nextView)}
+          className="shrink-0 rounded-lg bg-violet-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-800"
+        >
+          {hubCoach.cta}
+        </button>
+      </div>
+
       <RecruitmentXingxuanBridge mpOrderId={hubOrder?.linkedMpOrderId} variant="hub" />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {FLOW.map((e, t) => {
           const Icon = e.icon
+          const unlocked = isHubScreenUnlocked(e.view, hubOrder)
+          const current = hubCoach.nextView === e.view
           return (
             <motion.div
               key={e.title}
@@ -1427,22 +1458,37 @@ export default function RecruitmentPage() {
               transition={{ delay: 0.1 * t }}
               role="button"
               tabIndex={0}
-              onClick={() => setScreen(e.view)}
+              onClick={() => enterFlowScreen(e.view)}
               onKeyDown={(ev) => {
-                if (ev.key === 'Enter' || ev.key === ' ') setScreen(e.view)
+                if (ev.key === 'Enter' || ev.key === ' ') enterFlowScreen(e.view)
               }}
-              className="group cursor-pointer rounded-xl border border-gray-200 bg-white p-5 transition-all hover:shadow-md"
+              className={cn(
+                'group rounded-xl border bg-white p-5 transition-all',
+                unlocked ? 'cursor-pointer border-gray-200 hover:shadow-md' : 'cursor-not-allowed border-gray-100 opacity-60',
+                current && unlocked && 'border-violet-300 ring-1 ring-violet-200',
+              )}
             >
               <div className="mb-3 flex items-start justify-between">
                 <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${e.color}`}>
                   <Icon className="h-5 w-5 text-white" />
                 </div>
-                <span className="rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-700">进行中</span>
+                <span
+                  className={cn(
+                    'rounded-full px-2 py-1 text-xs',
+                    current && unlocked
+                      ? 'bg-violet-100 text-violet-800'
+                      : unlocked
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-gray-100 text-gray-500',
+                  )}
+                >
+                  {current && unlocked ? '当前' : unlocked ? '可进入' : '未到'}
+                </span>
               </div>
               <h4 className="mb-2 font-semibold text-gray-900">{e.title}</h4>
               <p className="mb-4 line-clamp-2 text-sm text-gray-500">{e.desc}</p>
               <span className="flex items-center text-sm text-blue-600 transition-transform group-hover:translate-x-1">
-                进入 <ArrowRight className="ml-1 h-4 w-4" />
+                {unlocked ? '进入' : '待完成上一步'} <ArrowRight className="ml-1 h-4 w-4" />
               </span>
             </motion.div>
           )
@@ -1504,7 +1550,7 @@ export default function RecruitmentPage() {
             </div>
           </div>
           <p className="mb-4 text-sm text-gray-500">
-            展示本机最近一次提交的招募订单在运营侧的状态，并与主流程环节对齐（数据来自运营注册表同步，可点刷新更新）。
+            展示本机最近一次提交的招募订单进度（数据来自运营注册表，与星选大厅同一份单）。
           </p>
           {hubOrderLoading ? (
             <p className="text-sm text-gray-500">正在加载订单…</p>

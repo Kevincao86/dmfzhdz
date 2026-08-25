@@ -74,7 +74,7 @@ export function aiTaskConfirmLabel(taskType: AiTaskType | null): string {
     case 'create_product':
       return '确认并保存至草稿箱'
     case 'recruit_influencer':
-      return '确认并下达招募订单'
+      return '确认并发布到星选大厅'
     case 'file_tax':
       return '确认并一键报税'
     case 'handle_review':

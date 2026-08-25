@@ -83,7 +83,7 @@ export const AI_AGENT_TOOLS: AiAgentToolDef[] = [
   },
   {
     name: 'recruit_influencer',
-    description: '生成达人招募 Brief 并进入预览确认流。',
+    description: '生成达人招募 Brief；商家确认后发布到星选招募大厅。',
     requiresConfirm: true,
     parameters: {
       type: 'object',

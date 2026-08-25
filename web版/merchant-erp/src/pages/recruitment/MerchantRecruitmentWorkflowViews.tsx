@@ -28,6 +28,7 @@ import type {
 } from '../../lib/opsRegistryTypes'
 import RecruitmentCpsSyncPanel from '../../components/recruitment/RecruitmentCpsSyncPanel'
 import RecruitmentXingxuanBridge from '../../components/recruitment/RecruitmentXingxuanBridge'
+import { suggestApplicantsForPlan } from '../../lib/merchantRecruitmentCoach'
 import { fetchPrimaryTenantId } from '../../lib/tenantBilling'
 import { tenantLocalKey } from '../../lib/tenantLocalState'
 import { supabase, supabaseConfigured } from '../../lib/supabaseClient'
@@ -124,6 +125,14 @@ export function MerchantApplicantSelectView({ onBack }: { onBack: () => void }) 
 
   const applicants = mp?.applicants ?? []
   const plan = order?.tierPlan
+  const suggestions = useMemo(
+    () => suggestApplicantsForPlan(applicants, plan),
+    [applicants, plan],
+  )
+  const suggestById = useMemo(
+    () => new Map(suggestions.map((s) => [s.id, s])),
+    [suggestions],
+  )
 
   const byTier = useMemo(() => {
     const map: Record<KolTierKey, RegistryMpRecruitmentApplicant[]> = {
@@ -276,6 +285,11 @@ export function MerchantApplicantSelectView({ onBack }: { onBack: () => void }) 
             订单 {order.id} · 星选单 {mp.id} · 已报名 {applicants.length} 人
             {plan?.feeType === 'tier' ? ' · 按 AI 阶梯档位分别反选' : ' · 一口价模式'}
           </p>
+          {suggestions.length ? (
+            <p className="mt-1 text-xs text-violet-800">
+              AI 建议优先入选 {suggestions.length} 人（未自动勾选）。可先对照建议，再自己改名单。
+            </p>
+          ) : null}
         </div>
         <button type="button" onClick={() => void load()} className="rounded-lg border px-3 py-2 text-sm text-gray-600">
           <RefreshCw className="mr-1 inline h-4 w-4" />
@@ -302,8 +316,15 @@ export function MerchantApplicantSelectView({ onBack }: { onBack: () => void }) 
               <p className="text-sm text-gray-500">该档位暂无报名</p>
             ) : (
               <ul className="divide-y divide-gray-100">
-                {list.map((a) => {
+                {[...list]
+                  .sort((a, b) => {
+                    const as = suggestById.get(String(a.id))?.score ?? -1
+                    const bs = suggestById.get(String(b.id))?.score ?? -1
+                    return bs - as
+                  })
+                  .map((a) => {
                   const on = selectedIds.includes(String(a.id))
+                  const hint = suggestById.get(String(a.id))
                   return (
                     <li key={a.id} className="flex flex-wrap items-center gap-3 py-3">
                       <input
@@ -313,13 +334,21 @@ export function MerchantApplicantSelectView({ onBack }: { onBack: () => void }) 
                         className="h-4 w-4"
                       />
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-gray-900">{a.platformNickname || a.name}</p>
+                        <p className="font-medium text-gray-900">
+                          {a.platformNickname || a.name}
+                          {hint ? (
+                            <span className="ml-2 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-medium text-violet-800">
+                              建议 · {hint.score}分
+                            </span>
+                          ) : null}
+                        </p>
                         <p className="text-xs text-gray-500">
                           {a.followers?.toLocaleString('zh-CN')} 粉 · {a.douyinSalesLevel || '—'} · {a.quotePrice || '报价未填'}
                           {a.platformAccount ? (
                             <span className="ml-1 font-mono text-gray-400">· {a.platformAccount}</span>
                           ) : null}
                         </p>
+                        {hint ? <p className="text-xs text-violet-700">{hint.reason}</p> : null}
                         <p className="text-xs text-gray-400">
                           进群：
                           {a.groupJoinStatus === 'joined'
@@ -339,6 +368,16 @@ export function MerchantApplicantSelectView({ onBack }: { onBack: () => void }) 
       })}
 
       <div className="flex flex-wrap gap-3">
+        {suggestions.length ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setSelectedIds(suggestions.map((s) => s.id))}
+            className="rounded-lg border border-violet-300 bg-white px-4 py-2 text-sm font-medium text-violet-800 hover:bg-violet-50 disabled:opacity-50"
+          >
+            按建议勾选（可再改）
+          </button>
+        ) : null}
         <button
           type="button"
           disabled={busy}
