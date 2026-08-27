@@ -1056,7 +1056,7 @@ export default function ProductsPage() {
             </div>
             <p className="font-semibold text-gray-900 transition-colors group-hover:text-white">一份套餐多平台</p>
             <p className="mt-1 text-xs text-gray-500 transition-colors group-hover:text-white/80">
-              先编一份，AI 补平台文案；抖音来客仍走原上传向导
+              先编一份，本地上传或 AI 出头图；抖音来客仍走原保存向导
             </p>
           </Link>
         ) : null}

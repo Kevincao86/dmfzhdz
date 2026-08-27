@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { ArrowLeft, Loader2, Sparkles, Upload, X } from 'lucide-react'
 import { cn } from '../cn'
 import {
   type CreatePlatformId,
@@ -14,6 +14,10 @@ import {
   probeMerchantPlatforms,
   type PlatformConnStatus,
 } from '../services/platformConnectivityProbe'
+import { uploadDouyinProductImage } from '../services/douyinProductApi'
+import { useDouyinProductWizardAi } from '../hooks/useDouyinProductWizardAi'
+
+const EMPTY_IMG_SLOTS = ['']
 
 /** P0 团购三家。抖音/快手仍走现有创建向导，本页不调用来客 save。 */
 const P0_IDS = ['douyin', 'kuaishou', 'meituan'] as const
@@ -82,6 +86,10 @@ export default function ProductMasterPublishPage() {
   const [aiHint, setAiHint] = useState<string | null>(null)
   const [submitBusy, setSubmitBusy] = useState(false)
   const [results, setResults] = useState<{ id: P0Id; text: string; ok: boolean }[]>([])
+  const [uploadingHead, setUploadingHead] = useState(false)
+  const [headHint, setHeadHint] = useState<string | null>(null)
+  const [headPreviewOpen, setHeadPreviewOpen] = useState(false)
+  const headFileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -108,6 +116,38 @@ export default function ProductMasterPublishPage() {
   }
 
   const patchMaster = (p: Partial<Master>) => setMaster((m) => ({ ...m, ...p }))
+  const setHeadUrl = useCallback((v: string) => {
+    setMaster((m) => ({ ...m, headUrl: v }))
+  }, [])
+  const noopUrls = useCallback((_next: string[]) => {}, [])
+  const noopText = useCallback((_v: string) => {}, [])
+
+  const headAi = useDouyinProductWizardAi({
+    productName: master.name,
+    productDesc: master.combo,
+    priceYuan: master.priceYuan,
+    originYuan: master.originYuan,
+    setProductName: noopText,
+    setProductDesc: noopText,
+    setHeadUrl,
+    headUrl: master.headUrl,
+    auxUrls: EMPTY_IMG_SLOTS,
+    setAuxUrls: noopUrls,
+    envUrls: EMPTY_IMG_SLOTS,
+    setEnvUrls: noopUrls,
+  })
+
+  const onPickHeadFile = async (file: File) => {
+    setUploadingHead(true)
+    setHeadHint(null)
+    const r = await uploadDouyinProductImage(file)
+    setUploadingHead(false)
+    if (!r.ok) {
+      setHeadHint(r.message)
+      return
+    }
+    setHeadUrl(r.url)
+  }
 
   const patchDraft = (id: P0Id, p: Partial<PlatformDraft>) => {
     setDrafts((d) => ({
@@ -248,7 +288,7 @@ export default function ProductMasterPublishPage() {
       <div>
         <h1 className="erp-page-title">一份套餐，多平台发布</h1>
         <p className="mt-1 text-sm text-gray-500">
-          先编好套餐再勾平台。抖音来客仍用现有创建向导上传（已验证可成功），本流程只预填，不改其保存/提审。
+          先编好套餐再勾平台。头图可本地上传，也可用 AI 优化或生成。抖音来客仍用现有创建向导保存（已验证可成功），本流程只预填，不改其保存/提审。
         </p>
       </div>
 
@@ -328,15 +368,98 @@ export default function ProductMasterPublishPage() {
               </select>
             </label>
           </div>
-          <label className="block text-sm">
-            <span className="font-medium text-gray-800">头图链接（https）</span>
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-sm font-medium text-gray-800">套餐头图</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={uploadingHead || headAi.aiOn('img-head') || !master.headUrl.trim()}
+                  onClick={() => void headAi.enhanceHeadImage()}
+                  className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-xs font-medium text-violet-800 disabled:opacity-50"
+                >
+                  {headAi.aiOn('img-head') ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5" />
+                  )}
+                  AI 优化
+                </button>
+                <button
+                  type="button"
+                  disabled={uploadingHead || headAi.aiOn('img-head')}
+                  onClick={() => void headAi.generateHeadImage()}
+                  className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-800 disabled:opacity-50"
+                >
+                  {headAi.aiOn('img-head') ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5" />
+                  )}
+                  AI 生成
+                </button>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {master.headUrl.trim() ? (
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    className="rounded-lg border focus:ring-2 focus:ring-indigo-300"
+                    onClick={() => setHeadPreviewOpen(true)}
+                    title="点击放大"
+                  >
+                    <img src={master.headUrl} alt="" className="h-20 w-20 rounded-lg object-cover" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setHeadUrl('')
+                    }}
+                    className="absolute -right-2 -top-2 rounded-full bg-gray-800 p-1 text-white shadow hover:bg-gray-900"
+                    aria-label="删除头图"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ) : null}
+              <button
+                type="button"
+                disabled={uploadingHead || headAi.aiOn('img-head')}
+                onClick={() => headFileRef.current?.click()}
+                className="inline-flex items-center rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+              >
+                {uploadingHead ? (
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="mr-1 h-4 w-4" />
+                )}
+                {uploadingHead ? '上传中…' : '本地上传'}
+              </button>
+              <input
+                ref={headFileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  e.target.value = ''
+                  if (f) void onPickHeadFile(f)
+                }}
+              />
+            </div>
             <input
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-              placeholder="可留空，在抖音来客向导里再上传"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              placeholder="也可粘贴 https 图片链接（可留空）"
               value={master.headUrl}
               onChange={(e) => patchMaster({ headUrl: e.target.value })}
             />
-          </label>
+            {headHint ? <p className="text-xs text-amber-800">{headHint}</p> : null}
+            <p className="text-xs text-gray-500">
+              AI 生成请先填套餐名称。优化基于当前图。进入抖音来客向导时会带上这张头图。
+            </p>
+          </div>
           <label className="block text-sm">
             <span className="font-medium text-gray-800">适用门店（备注）</span>
             <input
@@ -435,6 +558,17 @@ export default function ProductMasterPublishPage() {
               <span className="text-gray-500">你填的 · 名称</span> {master.name}　
               <span className="text-gray-500">售价</span> {master.priceYuan} 元
             </p>
+            {master.headUrl.trim() ? (
+              <button
+                type="button"
+                className="mt-3 overflow-hidden rounded-lg border"
+                onClick={() => setHeadPreviewOpen(true)}
+              >
+                <img src={master.headUrl} alt="" className="h-24 w-24 object-cover" />
+              </button>
+            ) : (
+              <p className="mt-2 text-xs text-gray-500">未配头图，可在向导里再传。</p>
+            )}
           </div>
           {selected.map((id) => {
             const meta = p0Meta(id)
@@ -516,6 +650,24 @@ export default function ProductMasterPublishPage() {
           </div>
         </div>
       )}
+      {headPreviewOpen && master.headUrl.trim() ? (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4"
+          role="dialog"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setHeadPreviewOpen(false)
+          }}
+        >
+          <div className="max-h-[90vh] max-w-3xl overflow-auto rounded-xl bg-white p-3 shadow-xl">
+            <div className="mb-2 flex justify-end">
+              <button type="button" className="text-sm text-gray-600 hover:text-gray-900" onClick={() => setHeadPreviewOpen(false)}>
+                关闭
+              </button>
+            </div>
+            <img src={master.headUrl} alt="" className="max-h-[80vh] w-auto max-w-full object-contain" />
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
