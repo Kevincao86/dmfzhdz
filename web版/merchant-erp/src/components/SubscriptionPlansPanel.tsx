@@ -39,13 +39,15 @@ const PLAN_FEATURES: Record<MembershipPlan, string[]> = {
   free: [
     '商品 / 店铺 / 招募基础',
     '每平台绑定 1 个账号',
-    '直连 AI 50 次/月（四厂商）',
+    '直连 AI 对话 50 次/月（四厂商）',
+    '可预览生图 / 生视频，使用需升级',
     '注册赠 100 积分',
   ],
   member: [
     'GEO 优化 · 竞对分析 · 报税管理',
     '每平台绑定 5 个账号',
     '直连 AI 不限（四厂商）',
+    'AI 生图 · 短视频 · 数字人 · 混剪',
     '本地推优化 + 线索跟进 AI',
     monthlyGiftFeature('member'),
   ],
@@ -304,7 +306,8 @@ export default function SubscriptionPlansPanel({
           免费版说明
         </p>
         <p className="mt-1">
-          新注册默认为免费版；含基础 ERP 与注册赠 100 积分。升级后积分按自然月发放至套餐桶，充值积分单独计入充值桶且不过期。
+          新注册默认为免费版；含基础 ERP、对话与注册赠 100 积分。生图、生视频板块可预览，点击出图/出片需升级会员。
+          升级后积分按自然月发放至套餐桶，充值积分单独计入充值桶且不过期。
           积分充值按 ¥1 = {ERP_RECHARGE_POINTS_PER_YUAN} 积分换算。
         </p>
       </div>

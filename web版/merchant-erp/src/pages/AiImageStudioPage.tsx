@@ -73,6 +73,7 @@ import {
   mpPointsCostForVisualStudioImages,
 } from '../lib/mpPointsEconomics'
 import { postAiAgentNativeImage } from '../services/ai/aiClient'
+import { useMembership, MembershipMediaLockedBanner } from '../context/MembershipContext'
 import {
   fetchVisualStudioCopyFromAi,
   analyzeVisualStudioReferenceImage,
@@ -270,6 +271,7 @@ function DevicePreview({
 }
 
 export default function AiImageStudioPage() {
+  const { plan, requireAiImageGen, openMembershipUpgrade } = useMembership()
   const [form, setForm] = useState<VisualStudioForm>(DEFAULT_VISUAL_STUDIO_FORM)
   const [productRefs, setProductRefs] = useState<Array<{ id: string; dataUrl: string; name: string }>>([])
   const [referenceAnalysis, setReferenceAnalysis] = useState<VisualStudioReferenceAnalysis | null>(null)
@@ -740,6 +742,7 @@ export default function AiImageStudioPage() {
   }
 
   const runGenerate = async (opts?: { refine?: string }) => {
+    if (!requireAiImageGen()) return
     if (!form.headline.trim() && playbook.intent !== 'logo') {
       setError('请先填写主标题，或点「换一版文案」自动生成')
       return
@@ -1269,6 +1272,13 @@ export default function AiImageStudioPage() {
           >
             生成后请及时保存到本地。刷新页面后，本页生成记录将消失。
           </p>
+          <div className="mt-2 max-w-2xl">
+            <MembershipMediaLockedBanner
+              kind="image"
+              plan={plan}
+              onUpgradeClick={() => openMembershipUpgrade('image')}
+            />
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50/80 p-2 ring-1 ring-slate-200/60">
           <label className="pl-1 text-xs text-slate-500">业态</label>

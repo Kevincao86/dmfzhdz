@@ -99,6 +99,7 @@ import {
 } from '../lib/digitalHumanWorkBlobStore'
 import { parseDouyinLinkForDigitalHuman } from '../services/digitalHumanDouyinLinkApi'
 import { MpAddonPointsRateBadge } from '../components/MpAddonPointsRateBadge'
+import { useMembership, MembershipMediaLockedBanner } from '../context/MembershipContext'
 import { readMpSessionToken } from '../lib/merchantApiAuth'
 import { probeVideoDurationSec } from '../lib/digitalHumanSubtitle'
 import {
@@ -135,6 +136,7 @@ function splitScriptSegments(text: string): string[] {
 }
 
 export default function DigitalHumanBroadcastPage() {
+  const { plan, requireAiVideoGen, openMembershipUpgrade } = useMembership()
   const [mainTab, setMainTab] = useState<MainTab>('create')
   const [step, setStep] = useState<WizardStep>(1)
   const [draft, setDraft] = useState<DigitalHumanDraft>(() => defaultDraft())
@@ -1030,6 +1032,7 @@ export default function DigitalHumanBroadcastPage() {
   }
 
   const submitRender = async () => {
+    if (!requireAiVideoGen()) return
     if (submitRenderLockRef.current) return
     submitRenderLockRef.current = true
     setSubmitRenderBusy(true)
@@ -1379,6 +1382,13 @@ export default function DigitalHumanBroadcastPage() {
               </span>
             ) : null}
           </p>
+          <div className="mt-2 max-w-2xl">
+            <MembershipMediaLockedBanner
+              kind="video"
+              plan={plan}
+              onUpgradeClick={() => openMembershipUpgrade('video')}
+            />
+          </div>
         </div>
         <div className="flex rounded-xl border border-slate-200/90 bg-white/80 p-1 shadow-sm">
           <button

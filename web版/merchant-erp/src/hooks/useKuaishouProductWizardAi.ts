@@ -19,6 +19,7 @@ import {
   resolveImageAssistModelId,
   resolveModelForAssistAction,
 } from '../services/merchantAiModelStorage'
+import { useMembership } from '../context/MembershipContext'
 
 export type AiGoodsContext = {
   goods_category_id?: string
@@ -47,6 +48,7 @@ export function useKuaishouProductWizardAi(params: {
   setEnvUrls: (v: string[]) => void
   goodsContext?: AiGoodsContext
 }) {
+  const { requireAiImageGen } = useMembership()
   const [aiBusySlots, setAiBusySlots] = useState<Partial<Record<AiBusySlot, boolean>>>({})
 
   const beginAi = useCallback((k: AiBusySlot) => {
@@ -169,6 +171,7 @@ export function useKuaishouProductWizardAi(params: {
   }, [postAssist, params, beginAi, endAi])
 
   const generateHeadImage = useCallback(async () => {
+    if (!requireAiImageGen()) return
     const n = params.productName.trim()
     if (!n) {
       window.alert('请先填写商品名称，以便 AI 生成头图')
@@ -187,9 +190,10 @@ export function useKuaishouProductWizardAi(params: {
     } finally {
       endAi('img-head')
     }
-  }, [postAssist, params, imageAssistFields, beginAi, endAi])
+  }, [postAssist, params, imageAssistFields, beginAi, endAi, requireAiImageGen])
 
   const enhanceHeadImage = useCallback(async () => {
+    if (!requireAiImageGen()) return
     const h = params.headUrl.trim()
     if (!h) {
       window.alert('请先上传头图后再优化')
@@ -213,7 +217,7 @@ export function useKuaishouProductWizardAi(params: {
     } finally {
       endAi('img-head')
     }
-  }, [postAssist, params, imageAssistFields, beginAi, endAi])
+  }, [postAssist, params, imageAssistFields, beginAi, endAi, requireAiImageGen])
 
   const filledAux = useCallback(
     () => params.auxUrls.map((u) => u.trim()).filter(Boolean),
@@ -226,6 +230,7 @@ export function useKuaishouProductWizardAi(params: {
   )
 
   const generateAuxImage = useCallback(async () => {
+    if (!requireAiImageGen()) return
     if (filledAux().length >= MAX_AUX) return
     const n = params.productName.trim()
     if (!n) {
@@ -248,9 +253,10 @@ export function useKuaishouProductWizardAi(params: {
     } finally {
       endAi('img-aux')
     }
-  }, [postAssist, params, imageAssistFields, beginAi, endAi, filledAux])
+  }, [postAssist, params, imageAssistFields, beginAi, endAi, filledAux, requireAiImageGen])
 
   const enhanceAuxImages = useCallback(async () => {
+    if (!requireAiImageGen()) return
     const urls = filledAux()
     if (urls.length === 0) {
       window.alert('请先上传辅助图后再优化')
@@ -276,9 +282,10 @@ export function useKuaishouProductWizardAi(params: {
     } finally {
       endAi('img-aux')
     }
-  }, [postAssist, params, imageAssistFields, beginAi, endAi, filledAux])
+  }, [postAssist, params, imageAssistFields, beginAi, endAi, filledAux, requireAiImageGen])
 
   const generateEnvImage = useCallback(async () => {
+    if (!requireAiImageGen()) return
     if (filledEnv().length >= MAX_ENV) return
     const n = params.productName.trim()
     if (!n) {
@@ -301,9 +308,10 @@ export function useKuaishouProductWizardAi(params: {
     } finally {
       endAi('img-env')
     }
-  }, [postAssist, params, imageAssistFields, beginAi, endAi, filledEnv])
+  }, [postAssist, params, imageAssistFields, beginAi, endAi, filledEnv, requireAiImageGen])
 
   const enhanceEnvImages = useCallback(async () => {
+    if (!requireAiImageGen()) return
     const urls = filledEnv()
     if (urls.length === 0) {
       window.alert('请先上传环境图后再优化')
@@ -329,7 +337,7 @@ export function useKuaishouProductWizardAi(params: {
     } finally {
       endAi('img-env')
     }
-  }, [postAssist, params, imageAssistFields, beginAi, endAi, filledEnv])
+  }, [postAssist, params, imageAssistFields, beginAi, endAi, filledEnv, requireAiImageGen])
 
   return {
     aiOn,

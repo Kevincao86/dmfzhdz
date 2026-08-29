@@ -67,13 +67,32 @@ export function membershipAllowsProvider(plan: MembershipPlan, provider: string)
   return (BASIC_AI_PROVIDERS as readonly string[]).includes(p)
 }
 
-/** 免费版不可用的 ERP 功能路径 */
+/** 免费版不可用的 ERP 功能路径（侧栏隐藏并整页拦截） */
 export const FREE_BLOCKED_PATHS = [
   '/geo',
   '/operation/competitors',
   '/operation/site-selection',
   '/finance/tax',
 ] as const
+
+/** 订阅页：点击生图/生视频时引导升级 */
+export const MEMBERSHIP_UPGRADE_HREF = '/settings?tab=subscription&upgrade=1'
+
+export const MEMBERSHIP_AI_IMAGE_UPGRADE_MESSAGE =
+  'AI 生图为会员功能。当前为免费版，请升级会员后使用。'
+
+export const MEMBERSHIP_AI_VIDEO_UPGRADE_MESSAGE =
+  'AI 生视频为会员功能。当前为免费版，请升级会员后使用。'
+
+/** 免费版可浏览生图板块，点击出图时拦截 */
+export function membershipAllowsAiImageGen(plan: MembershipPlan): boolean {
+  return plan !== 'free'
+}
+
+/** 免费版可浏览生视频板块，点击出片时拦截 */
+export function membershipAllowsAiVideoGen(plan: MembershipPlan): boolean {
+  return plan !== 'free'
+}
 
 export function isPathBlockedForFree(pathname: string): boolean {
   return FREE_BLOCKED_PATHS.some(
@@ -97,6 +116,10 @@ export type TenantEntitlements = {
     competitorAnalysis: boolean
     financeTax: boolean
     allAiModels: boolean
+    /** 视觉工坊 / 商品头图 / 智能体生图 */
+    aiImageGen: boolean
+    /** 短视频 / 数字人 / AI混剪 */
+    aiVideoGen: boolean
   }
 }
 
@@ -124,6 +147,8 @@ export function buildTenantEntitlements(input: {
       competitorAnalysis: !isFree,
       financeTax: !isFree,
       allAiModels: plan === 'member_plus',
+      aiImageGen: !isFree,
+      aiVideoGen: !isFree,
     },
   }
 }

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../cn'
+import { useMembership } from '../context/MembershipContext'
 import {
   fetchIceExportPreviewUrl,
   iceExportDownloadPaths,
@@ -260,6 +261,7 @@ type Props = {
 }
 
 export function ShortVideoIceBatchPanel(_props: Props) {
+  const { requireAiVideoGen } = useMembership()
   const [cfg, setCfg] = useState<AliyunIceCloudConfig | null>(null)
   const [imageUrlText, setImageUrlText] = useState('')
   const [imageItems, setImageItems] = useState<IceImageItem[]>([])
@@ -1301,6 +1303,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
   }
 
   const runMixOneClick = async () => {
+    if (!requireAiVideoGen()) return
     if (!cfg?.configured) {
       setErr('AI混剪服务未就绪')
       return
@@ -1486,6 +1489,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
   }
 
   const runSmartBatchOneClick = async () => {
+    if (!requireAiVideoGen()) return
     if (!cfg?.configured) {
       setErr('AI混剪服务未就绪')
       return

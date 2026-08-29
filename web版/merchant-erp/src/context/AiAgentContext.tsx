@@ -161,7 +161,7 @@ import {
   effectiveChatPickerKey,
   resolveImagePickerKeyForUserLine,
 } from '../services/ai/agentImageModelKeys'
-import { membershipAllowsTokenMix } from '../lib/membershipPlan'
+import { membershipAllowsAiImageGen, membershipAllowsTokenMix } from '../lib/membershipPlan'
 import {
   defaultAiModelPickerKeyForPlan,
   listAiModelPickerOptionsForPlan,
@@ -367,7 +367,7 @@ function buildPreviewForTask(taskType: AiTaskType, pageLabel?: string): AiTaskPr
 
 export function AiAgentProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
-  const { plan, entitlements } = useMembership()
+  const { plan, entitlements, requireAiImageGen } = useMembership()
   const agentProfile = useMemo(() => buildAiAgentPlanProfile(plan), [plan])
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [pageContext, setPageContext] = useState<AiAgentOpenContext | null>(null)
@@ -402,6 +402,21 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
 
   const messagesRef = useRef(messages)
   messagesRef.current = messages
+
+  const denyFreeImageGen = useCallback(() => {
+    if (membershipAllowsAiImageGen(plan)) return false
+    requireAiImageGen()
+    const deny = createAgentMessage(
+      'assistant',
+      `当前为 **${agentProfile.planLabel}**，AI 生图需升级会员后使用。可在「系统 → 订阅」开通会员版。`,
+    )
+    setMessages((prev) => {
+      const next = [...prev, deny]
+      messagesRef.current = next
+      return next
+    })
+    return true
+  }, [plan, requireAiImageGen, agentProfile.planLabel])
 
   /** 方案 → 商品预览 → 达人招募 分步执行状态（单一数据源） */
   const executionStateRef = useRef(createAgentExecutionState())
@@ -1922,6 +1937,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
 
             // 高级（国外）重绘：不传参考图，避免 TokenMix 硬拒
             if (detectPremiumImageRetryIntent(strippedLine)) {
+              if (denyFreeImageGen()) return
               if (!membershipAllowsTokenMix(plan)) {
                 const deny = createAgentMessage(
                   'assistant',
@@ -1995,6 +2011,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
               visionUrls.length > 0,
             )
             if (shouldRouteToAgentNativeImage(imagePickerKey, strippedLine, visionUrls)) {
+              if (denyFreeImageGen()) return
               if (imagePickerKey !== activePickerKey) {
                 setModelPickerKeyState(imagePickerKey)
                 savePickerKey(imagePickerKey)
@@ -2609,6 +2626,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
               return
             }
             if (detectPremiumImageRetryIntent(q)) {
+              if (denyFreeImageGen()) return
               if (!membershipAllowsTokenMix(plan)) {
                 const deny = createAgentMessage(
                   'assistant',
@@ -2646,6 +2664,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
             }
             const imagePickerKey = resolveImagePickerKeyForUserLine(activePickerKey, modelPickerOptions, q, false)
             if (shouldRouteToAgentNativeImage(imagePickerKey, q, [])) {
+              if (denyFreeImageGen()) return
               if (imagePickerKey !== activePickerKey) {
                 setModelPickerKeyState(imagePickerKey)
                 savePickerKey(imagePickerKey)

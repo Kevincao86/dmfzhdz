@@ -33,6 +33,7 @@ import {
 import { MpAddonPointsRateBadge } from '../components/MpAddonPointsRateBadge'
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useMembership, MembershipMediaLockedBanner } from '../context/MembershipContext'
 import { readMpSessionToken } from '../lib/merchantApiAuth'
 import { probeVideoDurationSec } from '../lib/digitalHumanSubtitle'
 import { runDhMotionImitateJob } from '../lib/dhOmniHumanVideoApi'
@@ -517,6 +518,7 @@ async function resolveSegmentTailFrameBase64(
 
 export default function ShortVideoOptimizationPage({ embed = false }: { embed?: boolean }) {
   const navigate = useNavigate()
+  const { plan, requireAiVideoGen, openMembershipUpgrade } = useMembership()
   const embedAddonAccess = useMemo(() => readMpEmbedAddonAccess(), [])
   const paneTabs = useMemo(() => {
     const all = [
@@ -1791,6 +1793,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
   }
 
   const submitGenerate = async () => {
+    if (!requireAiVideoGen()) return
     if (generateGateReason) {
       failGenerateEarly(generateGateReason)
       return
@@ -2557,6 +2560,13 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
         >
           生成后请及时保存到本地。刷新页面后，本页生成记录将消失。
         </p>
+        <div className="mx-auto max-w-2xl text-left">
+          <MembershipMediaLockedBanner
+            kind="video"
+            plan={plan}
+            onUpgradeClick={() => openMembershipUpgrade('video')}
+          />
+        </div>
       </header>
       ) : (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
