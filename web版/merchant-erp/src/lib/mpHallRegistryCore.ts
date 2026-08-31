@@ -520,9 +520,46 @@ function emptyHallPayload(): Record<string, unknown> {
   return { ok: true, mpRecruitmentOrders: [] }
 }
 
+/** 大厅列表卡片用到的 meta；表单中继/档位/PR 快照等留给详情 includeOnly */
+const HALL_LIST_META_KEEP = new Set([
+  'recruitScope',
+  'recruitTarget',
+  'recruitMode',
+  'iceVerifyMode',
+  'iceAuditMode',
+  'talentTags',
+  'hallAiTag',
+  'signupDeadline',
+  'coverLibraryId',
+  'coverImageSource',
+  'cities',
+  'cityNational',
+  'hallViewStats',
+])
+
+const HALL_LIST_TEXT_MAX = 160
+
+function slimHallListText(value: unknown, max = HALL_LIST_TEXT_MAX): string | undefined {
+  const s = String(value || '').trim()
+  if (!s) return undefined
+  return s.length > max ? s.slice(0, max) : s
+}
+
+function slimMpPublishMetaForHallList(meta: unknown): Record<string, unknown> | undefined {
+  if (!meta || typeof meta !== 'object') return undefined
+  const src = meta as Record<string, unknown>
+  const out: Record<string, unknown> = {}
+  for (const key of HALL_LIST_META_KEEP) {
+    if (src[key] !== undefined) out[key] = src[key]
+  }
+  return Object.keys(out).length ? out : undefined
+}
+
 /**
- * 小程序首页大厅：剥离 applicants 等大字段，避免云函数 callFunction 响应 >1MB（-501000）。
- * 保留 applicantCount、iceVideoSlots 认领字段供列表展示。
+ * 小程序首页大厅：剥离 applicants / 长文案 / 无用 meta，避免：
+ * - 云函数 callFunction 响应 >1MB（-501000）
+ * - 微信 setData / setStorageSync 单次 1MB，列表被静默截到约 125 条
+ * 保留 applicantCount、iceVideoSlots 认领字段供列表展示。详情走 includeOnly，不走此瘦身。
  */
 export function slimMpRecruitmentOrdersForHallList(
   orders: RegistryMpRecruitmentOrder[],
@@ -556,6 +593,21 @@ export function slimMpRecruitmentOrdersForHallList(
     if (groupQr.startsWith('data:') && groupQr.length > 256) {
       delete o.groupQrImage
     }
+    const info = slimHallListText(o.recruitmentInfo)
+    const req = slimHallListText(o.merchantRequirements)
+    const task = slimHallListText(o.taskDetail)
+    if (info) o.recruitmentInfo = info
+    else delete o.recruitmentInfo
+    if (req) o.merchantRequirements = req
+    else delete o.merchantRequirements
+    if (task) o.taskDetail = task
+    else delete o.taskDetail
+    const fans = slimHallListText(o.fansRequirement, 80)
+    if (fans) o.fansRequirement = fans
+    else delete o.fansRequirement
+    const meta = slimMpPublishMetaForHallList(o.mpPublishMeta)
+    if (meta) o.mpPublishMeta = meta
+    else delete o.mpPublishMeta
     return o
   })
 }

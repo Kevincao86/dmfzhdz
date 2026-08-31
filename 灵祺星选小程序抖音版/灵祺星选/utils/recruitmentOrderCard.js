@@ -47,15 +47,8 @@ function mapMpOrderRow(mp, reg) {
   if (iceSlotsFull && effectiveStatus !== 'expired') rowStatusLabel = '已收满'
   const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
   const talentTags = Array.isArray(meta.talentTags) ? meta.talentTags : []
-  const recruitmentInfo = String(mp.recruitmentInfo || '').trim()
-  const merchantRequirements = String(mp.merchantRequirements || view.recruitmentInfo || '').trim()
-  const taskDetail = String(mp.taskDetail || view.taskDetail || '').trim()
-  const recruitContent = orderHighlightTag.buildRecruitContentForAi({
-    title: view.title,
-    merchantRequirements,
-    recruitmentInfo,
-    taskDetail,
-  })
+  /** 列表行不挂长文案：200+ 条时 setData 会超过微信 1MB 上限，只显示约 125 条 */
+  const recruitmentInfo = String(mp.recruitmentInfo || '').trim().slice(0, 80)
   const hallAiTag = orderHighlightTag.readHallAiTagFromMeta(meta)
   return {
     id: mp.id,
@@ -81,9 +74,6 @@ function mapMpOrderRow(mp, reg) {
     summary: view.summaryShort,
     talentTags,
     recruitmentInfo,
-    merchantRequirements,
-    taskDetail,
-    recruitContent,
     aiTag: hallAiTag ? hallAiTag.tag : '',
     aiTagTone: hallAiTag ? hallAiTag.tone : 'default',
     aiTagBg: hallAiTag ? hallAiTag.bg : '',
