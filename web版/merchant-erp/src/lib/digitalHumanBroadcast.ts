@@ -789,6 +789,24 @@ export const SUBTITLE_STYLES = [
   { id: 'cinematic', label: '电影感小字' },
 ]
 
+/** 步骤 4 合成预览上的字幕位置/颜色，与烧录样式对齐 */
+export function dhSubtitlePreviewLayout(styleId: string): {
+  placement: 'top' | 'center' | 'bottom'
+  color: string
+  large: boolean
+} {
+  const id = String(styleId || '').trim()
+  if (id === 'top-minimal') return { placement: 'top', color: '#ffffff', large: false }
+  if (id === 'top-news') return { placement: 'top', color: '#FFE566', large: false }
+  if (id === 'center-white') return { placement: 'center', color: '#ffffff', large: false }
+  if (id === 'bottom-yellow') return { placement: 'bottom', color: '#FFE566', large: false }
+  if (id === 'bottom-pink') return { placement: 'bottom', color: '#FF99FF', large: false }
+  if (id === 'bottom-green') return { placement: 'bottom', color: '#88FF00', large: false }
+  if (id === 'bottom-white-large') return { placement: 'bottom', color: '#ffffff', large: true }
+  if (id === 'cinematic') return { placement: 'bottom', color: '#E0E0E0', large: false }
+  return { placement: 'bottom', color: '#ffffff', large: false }
+}
+
 export function defaultDraft(): DigitalHumanDraft {
   const first = PRESET_AVATARS[0]
   const voice = first ? voiceSettingsForAvatar(first) : voiceSettingsForAvatar(PRESET_AVATARS[0]!)

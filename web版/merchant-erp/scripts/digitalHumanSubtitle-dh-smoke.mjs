@@ -17,6 +17,10 @@ const style = assForceStyleForSubtitle('bottom-safe')
 assert(/PlayResX=1080/.test(style) && /PlayResY=1920/.test(style), `须声明 PlayRes: ${style}`)
 assert(/Alignment=2/.test(style), 'bottom-safe 须底部对齐')
 assert(/MarginV=280/.test(style), 'bottom-safe MarginV')
+assert(/FontSize=42/.test(style), `bottom-safe FontSize 应为 42（1080×1920 可读），实际: ${style}`)
+assert(/Bold=1/.test(style), `bottom-safe 须加粗，实际: ${style}`)
+const defaultStyle = assForceStyleForSubtitle('bottom-white')
+assert(/FontSize=48/.test(defaultStyle), `默认底部白字 FontSize 应为 48，实际: ${defaultStyle}`)
 
 const srt = buildSrtFromTimedChunks(
   [

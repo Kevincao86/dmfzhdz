@@ -1,6 +1,6 @@
 /**
  * 将 AI 商品方案 enrich：优化标题/说明、生成头图（无图时）。
- * 用户附图时优先以参考图做图生图优化；无附图时才按门店情报文生图。
+ * 参考图优先级：用户附图 > 绑定平台在售商品图（有图）> 按门店情报文生图。
  */
 import { sanitizeDouyinProductDescriptionCompliance } from '../lib/douyinDescCompliance'
 import type { AiProductPlanPreview } from '../lib/aiAgentTypes'
@@ -18,6 +18,8 @@ import {
 export type EnrichAiProductPlanOptions = {
   /** 用户消息附带的参考图（data URL），优先用于头图 */
   userReferenceImages?: string[]
+  /** 绑定平台在售商品主图（有图才收录）；无用户附图时作参考 */
+  boundProductImages?: { name: string; imageUrl: string }[]
   /** 多商品预览时的序号，用于在参考图池中轮询取图 */
   planIndex?: number
   /** 门店经营类目路径，锁标题/生图业态 */
@@ -33,8 +35,43 @@ function pickUserReferenceImage(
   return clean[planIndex % clean.length]
 }
 
+const BOUND_IMAGE_MATCH_MIN = 4
+
+/** 按套餐名/套餐项匹配绑定平台在售商品图；无强匹配时退回第一张有图商品作风貌参考 */
+export function pickBoundProductReferenceImage(
+  plan: Pick<AiProductPlanPreview, 'productName' | 'comboLines' | 'slotLabel'>,
+  refs: { name: string; imageUrl: string }[],
+): { url: string; score: number } | undefined {
+  const clean = refs
+    .map((r) => ({ name: r.name.trim(), url: r.imageUrl.trim() }))
+    .filter((r) => r.name && /^https?:\/\//i.test(r.url))
+  if (!clean.length) return undefined
+  const anchor = resolveProductTitleAnchor(plan)
+  const tokens = [
+    ...significantProductTokens(anchor),
+    ...significantProductTokens(plan.productName || ''),
+    ...plan.comboLines.flatMap((line) => significantProductTokens(line)),
+  ]
+  let best: { url: string; score: number } | undefined
+  for (const r of clean) {
+    let score = 0
+    const name = r.name
+    if (anchor && (name.includes(anchor.slice(0, 4)) || anchor.includes(name.slice(0, 4)))) {
+      score += 10
+    }
+    for (const t of tokens) {
+      if (t.length >= 2 && name.includes(t)) score += Math.min(8, t.length)
+    }
+    if (!best || score > best.score) best = { url: r.url, score }
+  }
+  if (best && best.score >= BOUND_IMAGE_MATCH_MIN) return best
+  return { url: clean[0]!.url, score: 0 }
+}
+
 /** 标题/生图锚点：优先套餐项与 slot 标签，避免门店名营销词盖过真实商品 */
-export function resolveProductTitleAnchor(plan: AiProductPlanPreview): string {
+export function resolveProductTitleAnchor(
+  plan: Pick<AiProductPlanPreview, 'productName' | 'comboLines' | 'slotLabel'>,
+): string {
   const combo = plan.comboLines
     .map((line) => line.replace(/[×x]\s*\d+$/i, '').trim())
     .filter(Boolean)
@@ -135,7 +172,12 @@ export async function enrichAiProductPlanPreview(
 
   if (!headUrl?.trim()) {
     const userRefs = opts?.userReferenceImages ?? []
-    const refUrl = pickUserReferenceImage(userRefs, opts?.planIndex ?? 0)
+    const userRefUrl = pickUserReferenceImage(userRefs, opts?.planIndex ?? 0)
+    const boundMatch = userRefUrl
+      ? undefined
+      : pickBoundProductReferenceImage(plan, opts?.boundProductImages ?? [])
+    const refUrl = userRefUrl || boundMatch?.url
+    const strongBoundMatch = Boolean(boundMatch && boundMatch.score >= BOUND_IMAGE_MATCH_MIN)
     const isVoucher = productType === 2
     const imageAnchor = imageFields.main_product_heuristic || titleAnchor
     const categoryHint = mainProductCategoryHints(imageAnchor, {
@@ -146,7 +188,10 @@ export async function enrichAiProductPlanPreview(
     const industryLockLine = opts?.industryPath?.trim()
       ? `经营类目：${opts.industryPath.trim()}。`
       : ''
-    const imageUserLine = `${industryLockLine}帮我生成一张${imageAnchor}主图。${categoryHint}禁止生成与商品无关的动物、吉祥物、门店 mascots 或餐饮菜品（除非标题与类目确为餐饮）。`
+    const boundHint = refUrl && !userRefUrl
+      ? '画面主体、品类、器皿与摆盘须贴近参考图中的真实在售商品，禁止换成其它品类。'
+      : ''
+    const imageUserLine = `${industryLockLine}帮我生成一张${imageAnchor}主图。${boundHint}${categoryHint}禁止生成与商品无关的动物、吉祥物、门店 mascots 或餐饮菜品（除非标题与类目确为餐饮）。`
     const imageModel = resolveImageAssistModelIdFromChatPicker(chatPickerKey)
     const imageBase = {
       model: imageModel,
@@ -170,8 +215,9 @@ export async function enrichAiProductPlanPreview(
           image_urls: [refUrl],
         })
         if (imgR.ok && imgR.image_urls?.[0]) headUrl = imgR.image_urls[0]
-        else headUrl = refUrl
-      } else {
+        else if (userRefUrl || strongBoundMatch) headUrl = refUrl
+      }
+      if (!headUrl?.trim()) {
         const imgR = await postDouyinGoodsAiAssist({
           action: 'image_generate',
           ...imageBase,
@@ -179,7 +225,7 @@ export async function enrichAiProductPlanPreview(
         if (imgR.ok && imgR.image_urls?.[0]) headUrl = imgR.image_urls[0]
       }
     } catch {
-      if (refUrl && !isVoucher) headUrl = refUrl
+      if ((userRefUrl || strongBoundMatch) && refUrl && !isVoucher) headUrl = refUrl
     }
   }
 

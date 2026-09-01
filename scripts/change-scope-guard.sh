@@ -50,11 +50,13 @@ list_scopes() {
   mp_pr_orphan_delete  我的发单 orphan 误删（includePrOwned 空列表剪枝）
   mp_recruit_no_drop   招募单禁止 slice(200) 丢单 + 备份复原
   mp_hall_list_full    星选大厅招募单列表完整展示（瘦身 1MB 截断）
+  merchant_landing_hero 商家落地页首屏图空白补全（平板工作台 / 全息文案）
   knowledge_base       知识库（运营全局 + 商家/FWS 租户 + AI 投喂）
   merchant_brief_direct 商家 ERP：Brief 去订单直接生成 + 短视频观感打磨
   merchant_jimeng_studio 商家 ERP：即梦式短视频台（Skill/画布/短片/案例）+ 全站 UI token
   aimodelserver_upstream AiModelServer（api.aimodelserver.com）OpenAI 兼容上游接入
   digital_human_bg     商家 ERP：数字人口播·实景/时长/人像融合
+  dh_subtitle_agent_product 商家 ERP：数字人口播字幕可读性 + AI智能体商品预览参考绑定商品图
   video_gen_precision  视频生成更准：Brief/Skill槽位/保真校验/全入口门禁（不含 ICE）
   openmontage_local    Cursor 本地 OpenMontage skill + 安装脚本（不含 ERP 成片链路）
   jianying_local       Cursor 本地剪映 skill + 安装脚本（不含 ERP / CapCut 国际版）
@@ -577,6 +579,13 @@ recruitmentOrderCard
 change-scope-guard
 PAT
       ;;
+    merchant_landing_hero)
+      cat <<'PAT'
+landing-merchant
+webStaticOssAssets
+change-scope-guard
+PAT
+      ;;
     knowledge_base)
       cat <<'PAT'
 knowledge_base
@@ -706,6 +715,20 @@ mpPointsEconomicsMp
 mpModules
 mpAddonPointsHints
 ShortVideoOptimizationPage
+change-scope-guard
+PAT
+      ;;
+    dh_subtitle_agent_product)
+      cat <<'PAT'
+digitalHumanPostProcessStyles
+digitalHumanBroadcast
+DigitalHumanBroadcastPage
+digitalHumanSubtitle-dh-smoke
+shortVideoPostProcess-subtitle-smoke
+aiAgentProductPlanEnrich
+AiAgentContext
+agentMerchantIntelLoader
+agentMerchantContext
 change-scope-guard
 PAT
       ;;
@@ -922,6 +945,7 @@ mpPointsEconomics
 merchantIndustryAlign
 agentMerchantContext
 services/ai/types
+aiAgentProductPlanEnrich
 change-scope-guard
 PAT
       ;;

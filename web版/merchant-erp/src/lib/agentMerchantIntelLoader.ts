@@ -23,7 +23,8 @@ import { tenantLocalKey } from './tenantLocalState'
 import { analyzeCompetitors } from '../services/storeIntelApi'
 import { fetchMarketingActivities } from '../services/marketingActivitiesApi'
 import { getDouyinStores } from '../services/douyinMerchantApi'
-import { fetchMerchantProductList } from '../services/merchantProductListApi'
+import { fetchMerchantProductList, type MerchantProductListItem } from '../services/merchantProductListApi'
+import { loadDraftDetailSnapshot } from './productDraftSnapshot'
 import { resolveCompetitorAnalysisIndustry } from './competitorIndustry'
 import { loadAgentPageDataContext, pageDataDomainsForTask } from './agentPageDataLoaders'
 
@@ -39,6 +40,7 @@ export type MerchantIntelEnrichment = Pick<
   | 'recruitmentDraftSummary'
   | 'competitorSummary'
   | 'onlineProductsSummary'
+  | 'onlineProductImageRefs'
 > & {
   intelLoadNotes?: string[]
 }
@@ -121,9 +123,28 @@ function scopesForTask(task?: AiTaskType): {
   }
 }
 
-async function fetchOnlineProductsSummary(): Promise<{ text?: string; note?: string }> {
+function resolveOnlineProductImageUrl(p: MerchantProductListItem): string | undefined {
+  const direct = p.headImageUrl?.trim()
+  if (direct && /^https?:\/\//i.test(direct)) return direct
+  try {
+    const snap = loadDraftDetailSnapshot(p.id)
+    const u = snap?.head_image_urls?.[0]
+    if (typeof u === 'string' && /^https?:\/\//i.test(u.trim())) return u.trim()
+  } catch {
+    /* ignore */
+  }
+  return undefined
+}
+
+async function fetchOnlineProductsSummary(): Promise<{
+  text?: string
+  note?: string
+  imageRefs?: { name: string; imageUrl: string }[]
+}> {
   const blocks: string[] = []
   const notes: string[] = []
+  const imageRefs: { name: string; imageUrl: string }[] = []
+  const seenImg = new Set<string>()
 
   const platformTokens: { platform: 'douyin' | 'kuaishou'; label: string; tokenKey: string }[] = [
     { platform: 'douyin', label: '抖音来客', tokenKey: 'meoo_douyin_merchant_token' },
@@ -152,10 +173,19 @@ async function fetchOnlineProductsSummary(): Promise<{ text?: string; note?: str
       return `- ${p.name}${price}${sale}`
     })
     blocks.push(`【${label}】${r.items.length} 个\n${lines.join('\n')}`)
+    for (const p of r.items) {
+      const img = resolveOnlineProductImageUrl(p)
+      const name = p.name.trim()
+      if (!img || !name) continue
+      const key = `${name}::${img}`
+      if (seenImg.has(key)) continue
+      seenImg.add(key)
+      imageRefs.push({ name, imageUrl: img })
+    }
   }
 
-  if (blocks.length) return { text: blocks.join('\n\n') }
-  return { note: notes.join('；') || '未拉取到绑定平台商品' }
+  if (blocks.length) return { text: blocks.join('\n\n'), imageRefs }
+  return { note: notes.join('；') || '未拉取到绑定平台商品', imageRefs }
 }
 
 async function fetchGeoSummary(): Promise<{
@@ -423,6 +453,7 @@ export async function fetchMerchantIntelEnrichment(
       withTimeout(fetchOnlineProductsSummary(), FETCH_TIMEOUT_MS, { note: '商品：请求超时' }).then((p) => {
         if (p.text) out.onlineProductsSummary = p.text
         else if (p.note) notes.push(p.note)
+        if (p.imageRefs?.length) out.onlineProductImageRefs = p.imageRefs
       }),
     )
   }

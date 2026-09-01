@@ -15,45 +15,45 @@ export function assForceStyleForSubtitle(subtitleStyle: string): string {
   switch (subtitleStyle) {
     case 'top-minimal':
       return withPlayRes(
-        `FontSize=20,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=8,MarginV=48,${SUBTITLE_SIDE_MARGIN}`,
+        `FontSize=40,Bold=1,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=8,MarginV=56,${SUBTITLE_SIDE_MARGIN}`,
       )
     case 'top-news':
       return withPlayRes(
-        `FontSize=22,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,BorderStyle=3,Outline=2,Shadow=0,Alignment=8,MarginV=40,BackColour=&H80000000,${SUBTITLE_SIDE_MARGIN}`,
+        `FontSize=42,Bold=1,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,BorderStyle=3,Outline=3,Shadow=0,Alignment=8,MarginV=48,BackColour=&H80000000,${SUBTITLE_SIDE_MARGIN}`,
       )
     case 'bottom-yellow':
       return withPlayRes(
-        `FontSize=22,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=100,${SUBTITLE_SIDE_MARGIN}`,
+        `FontSize=50,Bold=1,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=3,Shadow=1,Alignment=2,MarginV=120,${SUBTITLE_SIDE_MARGIN}`,
       )
     case 'bottom-white-large':
       return withPlayRes(
-        `FontSize=26,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=120,${SUBTITLE_SIDE_MARGIN}`,
+        `FontSize=64,Bold=1,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=3,Shadow=1,Alignment=2,MarginV=130,${SUBTITLE_SIDE_MARGIN}`,
       )
     case 'bottom-pink':
       return withPlayRes(
-        `FontSize=22,PrimaryColour=&H00FF99FF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=100,${SUBTITLE_SIDE_MARGIN}`,
+        `FontSize=48,Bold=1,PrimaryColour=&H00FF99FF,OutlineColour=&H00000000,BorderStyle=1,Outline=3,Shadow=1,Alignment=2,MarginV=120,${SUBTITLE_SIDE_MARGIN}`,
       )
     case 'bottom-green':
       return withPlayRes(
-        `FontSize=22,PrimaryColour=&H0000FF88,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=100,${SUBTITLE_SIDE_MARGIN}`,
+        `FontSize=48,Bold=1,PrimaryColour=&H0000FF88,OutlineColour=&H00000000,BorderStyle=1,Outline=3,Shadow=1,Alignment=2,MarginV=120,${SUBTITLE_SIDE_MARGIN}`,
       )
     case 'center-white':
       return withPlayRes(
-        `FontSize=24,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=5,MarginV=0,${SUBTITLE_SIDE_MARGIN}`,
+        `FontSize=52,Bold=1,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=3,Shadow=1,Alignment=5,MarginV=0,${SUBTITLE_SIDE_MARGIN}`,
       )
     case 'cinematic':
       return withPlayRes(
-        `FontSize=18,PrimaryColour=&H00E0E0E0,OutlineColour=&H40000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=2,MarginV=88,${SUBTITLE_SIDE_MARGIN}`,
+        `FontSize=32,Bold=0,PrimaryColour=&H00E0E0E0,OutlineColour=&H40000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=100,${SUBTITLE_SIDE_MARGIN}`,
       )
     case 'bottom-safe':
-      /** 竖屏 9:16 底部安全区：更小字号 + 更高边距，避开中下部主体/手机/手部 */
+      /** 竖屏 9:16 底部安全区：可读字号 + 高边距，避开中下部主体/手机/手部 */
       return withPlayRes(
-        `FontSize=14,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=2,MarginV=280,${SUBTITLE_SIDE_MARGIN}`,
+        `FontSize=42,Bold=1,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=280,${SUBTITLE_SIDE_MARGIN}`,
       )
     case 'bottom-white':
     default:
       return withPlayRes(
-        `FontSize=22,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=100,${SUBTITLE_SIDE_MARGIN}`,
+        `FontSize=48,Bold=1,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=3,Shadow=1,Alignment=2,MarginV=120,${SUBTITLE_SIDE_MARGIN}`,
       )
   }
 }

@@ -57,7 +57,7 @@ assert(
 const style = assForceStyleForSubtitle('bottom-safe')
 assert(/Alignment=2/.test(style), 'bottom-safe 须底部对齐')
 assert(/MarginV=280/.test(style), `bottom-safe MarginV 应为 280，实际: ${style}`)
-assert(/FontSize=14/.test(style), `bottom-safe FontSize 应为 14，实际: ${style}`)
+assert(/FontSize=42/.test(style), `bottom-safe FontSize 应为 42（1080×1920 可读），实际: ${style}`)
 
 // 折行：整句优先完整上屏（≤12 字不硬拆半截）
 const short = buildSrtFromScriptRows(

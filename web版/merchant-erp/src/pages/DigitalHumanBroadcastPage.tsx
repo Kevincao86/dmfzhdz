@@ -36,6 +36,7 @@ import {
   PRESET_AVATARS,
   saveDhBroadcastSetup,
   SUBTITLE_STYLES,
+  dhSubtitlePreviewLayout,
   avatarCatalogTags,
   type AvatarNationality,
   type AvatarStyle,
@@ -2468,9 +2469,29 @@ export default function DigitalHumanBroadcastPage() {
                         <div className="relative z-10">{renderAvatarPreview(true)}</div>
                       )}
                       {draft.subtitleEnabled && draft.script ? (
-                        <p className="absolute bottom-6 left-2 right-2 rounded bg-black/55 px-2 py-1 text-center text-xs text-white">
-                          {splitScriptSegments(draft.script)[0]?.slice(0, 40) ?? '字幕预览'}
-                        </p>
+                        (() => {
+                          const sub = dhSubtitlePreviewLayout(draft.subtitleStyle)
+                          return (
+                            <p
+                              className={cn(
+                                'absolute left-2 right-2 px-1.5 py-0.5 text-center font-semibold leading-snug',
+                                sub.large ? 'text-[15px]' : 'text-[13px]',
+                                sub.placement === 'top'
+                                  ? 'top-5'
+                                  : sub.placement === 'center'
+                                    ? 'top-1/2 -translate-y-1/2'
+                                    : 'bottom-8',
+                              )}
+                              style={{
+                                color: sub.color,
+                                textShadow:
+                                  '0 0 3px #000, 0 1px 2px #000, 1px 1px 0 #000, -1px -1px 0 #000',
+                              }}
+                            >
+                              {splitScriptSegments(draft.script)[0]?.slice(0, 28) ?? '字幕预览'}
+                            </p>
+                          )
+                        })()
                       ) : null}
                     </div>
                     <button

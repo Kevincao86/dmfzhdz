@@ -36,6 +36,8 @@ export type MerchantIntelSnapshot = {
   recruitmentDraftSummary?: string
   /** 绑定平台线上/草稿商品摘要（来客 online.query 等） */
   onlineProductsSummary?: string
+  /** 绑定平台在售商品主图（有图才收录，供创建商品预览参考） */
+  onlineProductImageRefs?: { name: string; imageUrl: string }[]
   /** 菜单为空时从 ERP 草稿箱补充 */
   draftProductsSummary?: string
   /** 已绑定 / 未绑定平台说明（分析异常须遵守） */
