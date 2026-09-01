@@ -599,7 +599,7 @@ export function slimMpRecruitmentOrdersForHallList(
     if (info) o.recruitmentInfo = info
     else delete o.recruitmentInfo
     if (req) o.merchantRequirements = req
-    else delete o.merchantRequirements
+    else delete (o as { merchantRequirements?: string }).merchantRequirements
     if (task) o.taskDetail = task
     else delete o.taskDetail
     const fans = slimHallListText(o.fansRequirement, 80)
