@@ -27,6 +27,7 @@ list_scopes() {
   recruit_video     探店成片上传
   recruit_share_poster_ai  招募创建成功分享页 AI 海报生图（星选+撮合）
   merchant_recruit_loop  商家 ERP 达人招募引导闭环（不改星选小程序/dr）
+  merchant_recruit_order_delete  商家 ERP 达人招募订单删除并同步删星选对应单
   video_review_play 链接/视频审核预览（ICE短链误判 + OSS签名过期）
   ops_pr_library    运营台 PR 用户库
   ops_talent_library 运营台达人库
@@ -139,6 +140,14 @@ aiAgentTools
 recruitmentLoop
 recruitmentOrderProgress
 merchantRecruitmentTierPlan
+change-scope-guard
+PAT
+      ;;
+    merchant_recruit_order_delete)
+      cat <<'PAT'
+recruitmentOrderPatchMutations
+meoo-ops-recruitment-orders-patch
+RecruitmentPage
 change-scope-guard
 PAT
       ;;

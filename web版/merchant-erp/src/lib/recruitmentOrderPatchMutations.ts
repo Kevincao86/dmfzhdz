@@ -1,3 +1,4 @@
+import { deleteMpRecruitmentOrdersFromSnapshot } from './mpRecruitmentOrderRegistryMutations.js'
 import type {
   RecruitmentCpsLinkage,
   RegistryRecruitmentOrder,
@@ -18,14 +19,54 @@ export type RecruitmentOrderPatchBody = {
   autoPublishMp?: boolean
   orderKind?: RegistryRecruitmentOrder['orderKind']
   cpsLinkage?: RecruitmentCpsLinkage
+  /** 商家 ERP 删除招募单：同时删除星选大厅对应 mp 单 */
+  delete?: boolean
+}
+
+function collectLinkedXingxuanOrderIds(data: RegistrySnapshot, merchantOrderId: string): string[] {
+  const ids = new Set<string>()
+  const merchant = (data.recruitmentOrders ?? []).find((o) => o && o.id === merchantOrderId)
+  const linked = String(merchant?.linkedMpOrderId || '').trim()
+  if (linked) ids.add(linked)
+  for (const mp of data.mpRecruitmentOrders ?? []) {
+    if (!mp?.id) continue
+    if (String(mp.sourceMerchantOrderId || '').trim() === merchantOrderId) ids.add(mp.id)
+  }
+  return [...ids]
+}
+
+export function deleteRecruitmentOrderInSnapshot(
+  data: RegistrySnapshot,
+  rawId: string,
+): { ok: true; deletedMpIds: string[] } | { ok: false; error: string; status: number } {
+  const id = String(rawId || '').trim()
+  if (!id) return { ok: false, error: 'invalid_delete', status: 400 }
+  const list = data.recruitmentOrders ?? []
+  if (!list.some((o) => o && o.id === id)) {
+    return { ok: false, error: 'not_found', status: 404 }
+  }
+
+  const mpIds = collectLinkedXingxuanOrderIds(data, id)
+  let deletedMpIds: string[] = []
+  if (mpIds.length) {
+    const mpResult = deleteMpRecruitmentOrdersFromSnapshot(data, mpIds)
+    if (mpResult.ok) deletedMpIds = mpResult.deletedIds
+  }
+
+  data.recruitmentOrders = (data.recruitmentOrders ?? []).filter((o) => o && o.id !== id)
+  return { ok: true, deletedMpIds }
 }
 
 export function patchRecruitmentOrderInSnapshot(
   data: RegistrySnapshot,
   body: RecruitmentOrderPatchBody,
-): { ok: true } | { ok: false; error: string; status: number } {
+): { ok: true; deletedMpIds?: string[] } | { ok: false; error: string; status: number } {
   const id = (body.id ?? '').trim()
   if (!id) return { ok: false, error: 'invalid_patch', status: 400 }
+
+  if (body.delete === true) {
+    return deleteRecruitmentOrderInSnapshot(data, id)
+  }
 
   const status = body.status
   const okStatus =

@@ -31,7 +31,7 @@ import { DB_MIGRATION_HINT_ZH, shouldSuggestDbMigration } from '../lib/dbSchemaE
 import { loadRecruitmentIndustryL1Labels } from '../lib/recruitmentIndustryOptions'
 import { buildRecruitmentProgressSteps, recruitmentOrderStatusLabel } from '../lib/recruitmentOrderProgress'
 import { readMerchantSession } from '../lib/merchantSession'
-import { fetchOpsRegistryForTenant } from '../lib/opsRegistryClient'
+import { fetchOpsRegistryForTenant, patchRecruitmentOrderOnOps } from '../lib/opsRegistryClient'
 import { submitProGeneralRecruitmentToXingxuan } from '../lib/merchantRecruitmentSubmit'
 import RecruitmentPlatformPicker from '../components/recruitment/RecruitmentPlatformPicker'
 import { normalizeRecruitmentPlatform, type RecruitmentPlatform } from '../lib/recruitmentPlatformOptions'
@@ -1132,9 +1132,11 @@ export default function RecruitmentPage() {
   const [briefDetail, setBriefDetail] = useState<KolBriefRecord | null>(null)
   const [briefDetailVariant, setBriefDetailVariant] = useState<0 | 1 | 2>(0)
   const [hubOrder, setHubOrder] = useState<RegistryRecruitmentOrder | null>(null)
+  const [hubOrders, setHubOrders] = useState<RegistryRecruitmentOrder[]>([])
   const [hubOrderLoading, setHubOrderLoading] = useState(false)
   const [hubOrderErr, setHubOrderErr] = useState<string | null>(null)
   const [hubOrderFetchNonce, setHubOrderFetchNonce] = useState(0)
+  const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null)
 
   const refreshHubOrder = useCallback(() => setHubOrderFetchNonce((n) => n + 1), [])
 
@@ -1169,6 +1171,7 @@ export default function RecruitmentPage() {
         if (!tenantId) {
           if (!cancelled) {
             setHubOrder(null)
+            setHubOrders([])
             setHubOrderLoading(false)
             setHubOrderErr(null)
           }
@@ -1176,9 +1179,11 @@ export default function RecruitmentPage() {
         }
         const reg = await fetchOpsRegistryForTenant(tenantId)
         if (cancelled) return
-        const orders = reg.recruitmentOrders ?? []
+        const orders = [...(reg.recruitmentOrders ?? [])].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
         const found = lastId ? orders.find((o) => o.id === lastId) ?? null : null
-        setHubOrder(found)
+        const selected = found ?? orders[0] ?? null
+        setHubOrder(selected)
+        setHubOrders(orders)
         setHubOrderErr(null)
         setHubOrderLoading(false)
       } catch (e) {
@@ -1198,6 +1203,7 @@ export default function RecruitmentPage() {
             : raw
         setHubOrderErr(msg)
         setHubOrder(null)
+        setHubOrders([])
         setHubOrderLoading(false)
       }
     }
@@ -1244,6 +1250,44 @@ export default function RecruitmentPage() {
   }, [screen, hubOrderFetchNonce])
 
   const hubCoach = useMemo(() => coachFromOrder(hubOrder), [hubOrder])
+
+  const persistLastRecruitmentOrderId = (orderId: string) => {
+    try {
+      const key = tenantLocalKey(LAST_RECRUITMENT_ORDER_KEY_BASE)
+      if (orderId) window.localStorage.setItem(key, orderId)
+      else window.localStorage.removeItem(key)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const selectHubOrder = (order: RegistryRecruitmentOrder) => {
+    persistLastRecruitmentOrderId(order.id)
+    setHubOrder(order)
+    refreshHubOrder()
+  }
+
+  const deleteHubRecruitmentOrder = async (order: RegistryRecruitmentOrder) => {
+    const mpHint = order.linkedMpOrderId
+      ? `将同步删除星选平台订单 ${order.linkedMpOrderId}，达人将无法在招募大厅看到该单。`
+      : '若该单已发布到星选，对应大厅订单也会一并删除。'
+    if (!window.confirm(`确定删除招募订单 ${order.id}？\n${mpHint}\n删除后不可恢复。`)) return
+    setDeletingOrderId(order.id)
+    try {
+      const r = await patchRecruitmentOrderOnOps({ id: order.id, delete: true })
+      if (!r.ok) {
+        window.alert(r.error ?? '删除失败，请稍后重试')
+        return
+      }
+      const remaining = hubOrders.filter((o) => o.id !== order.id)
+      persistLastRecruitmentOrderId(remaining[0]?.id ?? '')
+      refreshHubOrder()
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : '删除失败，请稍后重试')
+    } finally {
+      setDeletingOrderId(null)
+    }
+  }
 
   const enterFlowScreen = (view: MerchantRecruitHubScreen) => {
     if (!isHubScreenUnlocked(view, hubOrder)) {
@@ -1550,7 +1594,7 @@ export default function RecruitmentPage() {
             </div>
           </div>
           <p className="mb-4 text-sm text-gray-500">
-            展示本机最近一次提交的招募订单进度（数据来自运营注册表，与星选大厅同一份单）。
+            展示本店招募订单进度（数据来自运营注册表，与星选大厅同一份单）。删除后会同步移除星选平台对应订单。
           </p>
           {hubOrderLoading ? (
             <p className="text-sm text-gray-500">正在加载订单…</p>
@@ -1561,9 +1605,11 @@ export default function RecruitmentPage() {
                 重试
               </button>
             </div>
-          ) : !hubStoredOrderId ? (
+          ) : !hubOrder && !hubOrders.length ? (
             <p className="text-sm text-gray-500">
-              提交招募需求后，将在此显示订单号与各环节进度。请先通过「发布招募需求」完成一次新手版或专业版提单。
+              {hubStoredOrderId
+                ? '已记录本机最近订单号，但在运营注册表中未找到对应条目（可能尚未同步或订单已清理）。可稍后点击「刷新」重试。'
+                : '提交招募需求后，将在此显示订单号与各环节进度。请先通过「发布招募需求」完成一次新手版或专业版提单。'}
             </p>
           ) : !hubOrder ? (
             <p className="text-sm text-amber-800">
@@ -1571,14 +1617,61 @@ export default function RecruitmentPage() {
             </p>
           ) : (
             <div className="space-y-4">
+              {hubOrders.length > 1 ? (
+                <ul className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-gray-100 bg-gray-50/70 p-2">
+                  {hubOrders.map((o) => {
+                    const active = o.id === hubOrder.id
+                    return (
+                      <li key={o.id} className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => selectHubOrder(o)}
+                          className={cn(
+                            'min-w-0 flex-1 truncate rounded-md px-2 py-1.5 text-left text-xs',
+                            active ? 'bg-white font-medium text-gray-900 shadow-sm' : 'text-gray-600 hover:bg-white/80',
+                          )}
+                        >
+                          <span className="font-mono">{o.id}</span>
+                          <span className="ml-2 text-gray-400">{recruitmentOrderStatusLabel(o.status)}</span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={deletingOrderId === o.id}
+                          onClick={() => void deleteHubRecruitmentOrder(o)}
+                          className="shrink-0 rounded-md px-1.5 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
+                          title="删除订单"
+                        >
+                          {deletingOrderId === o.id ? '删除中…' : '删除'}
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              ) : null}
               <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-gray-100 pb-3">
                 <div className="min-w-0">
                   <p className="text-xs font-medium uppercase tracking-wide text-gray-500">订单号</p>
                   <p className="mt-0.5 truncate font-mono text-sm font-semibold text-gray-900">{hubOrder.id}</p>
+                  {hubOrder.linkedMpOrderId ? (
+                    <p className="mt-0.5 truncate text-[11px] text-sky-700">星选单 {hubOrder.linkedMpOrderId}</p>
+                  ) : null}
                 </div>
-                <span className="shrink-0 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800">
-                  {recruitmentOrderStatusLabel(hubOrder.status)}
-                </span>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800">
+                    {recruitmentOrderStatusLabel(hubOrder.status)}
+                  </span>
+                  {hubOrders.length <= 1 ? (
+                    <button
+                      type="button"
+                      disabled={deletingOrderId === hubOrder.id}
+                      onClick={() => void deleteHubRecruitmentOrder(hubOrder)}
+                      className="inline-flex items-center rounded-lg border border-red-200 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                    >
+                      <Trash2 className="mr-1 h-3.5 w-3.5" />
+                      {deletingOrderId === hubOrder.id ? '删除中…' : '删除'}
+                    </button>
+                  ) : null}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
                 <div>

@@ -6,11 +6,13 @@ import {
   merchantSupabaseAdminEnvConfigureHint,
   readMerchantSupabaseAdminEnv,
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
+import { requireMerchantRegistryAuth } from '../src/lib/merchantRegistryAuth.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 import {
   patchRecruitmentOrderInSnapshot,
   type RecruitmentOrderPatchBody,
 } from '../src/lib/recruitmentOrderPatchMutations.js'
+import { recruitmentOrderBelongsToTenant } from '../src/lib/tenantRegistryScope.js'
 
 export const config = { maxDuration: 60 }
 
@@ -69,13 +71,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
+
+    if (body.delete === true) {
+      const auth = await requireMerchantRegistryAuth(req)
+      if (!auth.ok) {
+        sendOpsJson(res, auth.status, {
+          ok: false,
+          error: auth.error,
+          message: auth.message,
+        })
+        return
+      }
+      const existing = (data.recruitmentOrders ?? []).find((o) => o && o.id === String(body.id || '').trim())
+      if (existing && !recruitmentOrderBelongsToTenant(existing, auth.tenantId)) {
+        sendOpsJson(res, 403, { ok: false, error: 'forbidden_order', message: '无权删除其他商户的招募订单' })
+        return
+      }
+    }
+
     const result = patchRecruitmentOrderInSnapshot(data, body)
     if (!result.ok) {
       sendOpsJson(res, result.status, { ok: false, error: result.error })
       return
     }
     await io.save(data)
-    sendOpsJson(res, 200, { ok: true })
+    sendOpsJson(res, 200, { ok: true, deletedMpIds: result.deletedMpIds ?? [] })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     sendOpsJson(res, 500, {
