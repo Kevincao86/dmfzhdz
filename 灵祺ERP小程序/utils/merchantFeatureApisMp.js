@@ -199,6 +199,27 @@ async function generateAiOpsPlan(body) {
   }
 }
 
+/** 对齐 Web storeIntelApi.runSiteSelection */
+async function runSiteSelection(body) {
+  try {
+    const r = await postJson('/api/meoo-site-selection', body)
+    if (r.ok && r.summary && r.score) {
+      return {
+        ok: true,
+        summary: String(r.summary || ''),
+        score: r.score,
+        footTrafficHeat: r.footTrafficHeat || null,
+        recommendations: Array.isArray(r.recommendations) ? r.recommendations : [],
+        checklist: Array.isArray(r.checklist) ? r.checklist : [],
+        nearby: r.nearby || null,
+      }
+    }
+    return { ok: false, message: String(r.error || r.message || r.detail || '选址评估失败') }
+  } catch (e) {
+    return { ok: false, message: (e && e.message) || '选址评估失败' }
+  }
+}
+
 module.exports = {
   tenantId,
   readStoreMenu,
@@ -210,4 +231,5 @@ module.exports = {
   runCompetitorAnalysis,
   synthesizeDigitalHumanTts,
   generateAiOpsPlan,
+  runSiteSelection,
 }

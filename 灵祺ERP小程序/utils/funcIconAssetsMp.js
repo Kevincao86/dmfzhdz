@@ -79,6 +79,13 @@ const ICON_BUILDERS = {
       c,
       '<circle cx="12" cy="8" r="3.5"/><path d="M5 19c1.2-3.5 4.5-5 7-5s5.8 1.5 7 5"/><path d="M16 3.5h3.5V7"/><path d="M19.5 3.5A7 7 0 0014 8"/><path d="M8 20.5H4.5V17"/><path d="M4.5 20.5A7 7 0 0010 16"/>',
     ),
+  book: (c) =>
+    svgWrap(c, '<path d="M4 5a2 2 0 012-2h11v16H6a2 2 0 00-2 2V5z"/><path d="M6 19a2 2 0 012-2h11"/>'),
+  settings: (c) =>
+    svgWrap(
+      c,
+      '<circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+    ),
 }
 
 function iconDataUri(tone, key) {

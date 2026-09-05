@@ -2,7 +2,7 @@
   height: 100vh;
   box-sizing: border-box;
   padding: 20rpx 28rpx calc(28rpx + env(safe-area-inset-bottom));
-  background: linear-gradient(180deg, #eef2ff 0%, #f8fafc 42%);
+  background: linear-gradient(180deg, #f0f9ff 0%, #f8fafc 42%);
 }
 
 .pro-back {
@@ -192,7 +192,7 @@
 
 .pro-check-glyph {
   font-size: 34rpx;
-  color: #6366f1;
+  color: #0284c7;
   line-height: 1;
 }
 

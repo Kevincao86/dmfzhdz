@@ -1,0 +1,64 @@
+<scroll-view scroll-y class="erp-page" enhanced show-scrollbar="{{false}}">
+  <view class="erp-hero">
+    <text class="erp-hero-title">选址参考</text>
+    <text class="erp-hero-sub">人流热度、周边配套与综合打分。与电脑端「选址参考」同源 API。</text>
+  </view>
+
+  <view class="erp-card">
+    <text class="erp-label">选址地址（必填）</text>
+    <input class="erp-input" value="{{address}}" placeholder="含城市的详细地址" bindinput="onAddress" />
+    <button class="erp-btn-ghost" bindtap="onChooseLocation">从地图选点</button>
+    <text class="erp-label">城市（可选）</text>
+    <input class="erp-input" value="{{city}}" placeholder="如：宁波" bindinput="onCity" />
+    <text class="erp-label">点位备注</text>
+    <input class="erp-input" value="{{spotLabel}}" placeholder="如：商场 B1 入口旁" bindinput="onSpot" />
+    <text class="erp-label">品牌/门店名</text>
+    <input class="erp-input" value="{{brandName}}" placeholder="可选" bindinput="onBrand" />
+    <button class="erp-btn-primary" loading="{{busy}}" disabled="{{busy}}" bindtap="onAnalyze">
+      {{busy ? '评估中…' : '开始选址评估'}}
+    </button>
+  </view>
+
+  <view wx:if="{{err}}" class="erp-err">{{err}}</view>
+
+  <view wx:if="{{summary}}" class="erp-card">
+    <view class="ss-score-row">
+      <view>
+        <text class="ss-score">{{overall}}</text>
+        <text class="ss-score-unit">分</text>
+      </view>
+      <text class="erp-chip">{{verdict || '综合评分'}}</text>
+    </view>
+    <text class="erp-card-title" style="margin-top:16rpx">综合摘要</text>
+    <text class="erp-body" user-select>{{summary}}</text>
+    <text wx:if="{{heatNote}}" class="erp-hint" style="margin-top:12rpx">人流：{{heatNote}}</text>
+  </view>
+
+  <view wx:if="{{dimensions.length}}" class="erp-card">
+    <text class="erp-card-title">维度得分</text>
+    <view wx:for="{{dimensions}}" wx:key="id" class="ss-dim">
+      <view class="ss-dim-top">
+        <text class="ss-dim-label">{{item.label}}</text>
+        <text class="ss-dim-score">{{item.score}}</text>
+      </view>
+      <text wx:if="{{item.note}}" class="erp-hint">{{item.note}}</text>
+    </view>
+  </view>
+
+  <view wx:if="{{recommendations.length}}" class="erp-card">
+    <text class="erp-card-title">推荐点位</text>
+    <view wx:for="{{recommendations}}" wx:key="id" class="erp-row">
+      <view>
+        <text class="kb-title">{{item.title}}</text>
+        <text wx:if="{{item.note}}" class="erp-hint">{{item.note}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{checklist.length}}" class="erp-card">
+    <text class="erp-card-title">落地清单</text>
+    <view wx:for="{{checklist}}" wx:key="*this" class="ss-check">
+      <text>· {{item}}</text>
+    </view>
+  </view>
+</scroll-view>

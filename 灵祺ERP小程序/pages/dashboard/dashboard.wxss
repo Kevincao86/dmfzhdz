@@ -57,7 +57,7 @@
 }
 
 .dash-range.on {
-  color: #0284c7;
+  color: #0891b2;
   font-weight: 700;
 }
 
@@ -68,7 +68,7 @@
   right: 0;
   bottom: 0;
   height: 4rpx;
-  background: #0284c7;
+  background: #0891b2;
   border-radius: 4rpx;
 }
 
@@ -119,7 +119,7 @@
   display: block;
   font-size: 36rpx;
   font-weight: 800;
-  color: #0284c7;
+  color: #0891b2;
   line-height: 1.2;
 }
 

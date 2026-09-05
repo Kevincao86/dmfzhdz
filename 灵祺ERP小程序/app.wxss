@@ -1,3 +1,4 @@
+@import './styles/erp-tokens.wxss';
 @import './styles/mockup-base.wxss';
 @import './styles/subpage-shell.wxss';
 @import './styles/mp-legacy.wxss';
@@ -6,8 +7,8 @@ page {
   background: #f8fafc;
   color: #1e293b;
   font-size: 28rpx;
-  --lq-primary: #0284c7;
-  --lq-primary-soft: #e0f2fe;
+  --lq-primary: #0891b2;
+  --lq-primary-soft: rgba(8, 145, 178, 0.12);
   --lq-bg: #f8fafc;
   --lq-card: #ffffff;
   --lq-text: #0f172a;

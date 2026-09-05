@@ -8,7 +8,7 @@
   margin: 16rpx 24rpx;
   padding: 28rpx 24rpx;
   border-radius: 28rpx;
-  background: linear-gradient(160deg, #eef2ff 0%, #e0e7ff 45%, #fff 100%);
+  background: linear-gradient(160deg, #f0f9ff 0%, #e0f2fe 45%, #fff 100%);
 }
 
 .op-title {
@@ -56,7 +56,7 @@
 }
 
 .op-chip.on {
-  background: #4f46e5;
+  background: #0891b2;
   color: #fff;
 }
 
@@ -99,7 +99,7 @@
 
 .op-btn {
   margin-top: 20rpx;
-  background: #4f46e5 !important;
+  background: #0891b2 !important;
   color: #fff !important;
   border-radius: 999rpx !important;
   font-size: 28rpx !important;

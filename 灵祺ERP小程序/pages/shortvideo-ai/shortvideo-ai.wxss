@@ -583,7 +583,7 @@
 }
 
 .sv-btn-violet {
-  background: linear-gradient(135deg, #a78bfa, #7c3aed);
+  background: linear-gradient(135deg, #67e8f9, #0891b2);
   color: #fff;
 }
 
@@ -992,7 +992,7 @@
 }
 
 .sv-mat-tab.violet.on {
-  background: #7c3aed;
+  background: #0891b2;
 }
 
 .sv-warn-box {

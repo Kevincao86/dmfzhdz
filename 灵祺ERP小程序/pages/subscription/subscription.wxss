@@ -42,7 +42,7 @@
   width: 80rpx;
   height: 80rpx;
   border-radius: 50%;
-  background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+  background: linear-gradient(135deg, #06b6d4, #67e8f9);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -77,7 +77,7 @@
   height: 72rpx;
   line-height: 72rpx;
   border-radius: 999rpx;
-  background: linear-gradient(95deg, #8b5cf6, #a78bfa) !important;
+  background: linear-gradient(95deg, #06b6d4, #67e8f9) !important;
   color: #fff !important;
   font-size: 24rpx;
   font-weight: 700;
@@ -109,8 +109,8 @@
 }
 
 .sub-tier-tab.on {
-  border-color: #8b5cf6;
-  color: #7c3aed;
+  border-color: #06b6d4;
+  color: #0891b2;
   font-weight: 700;
   background: #faf5ff;
 }
@@ -160,12 +160,12 @@
 .sub-th.highlight,
 .sub-td.highlight {
   background: #faf5ff;
-  color: #7c3aed;
+  color: #0891b2;
   font-weight: 700;
 }
 
 .sub-td.check {
-  color: #7c3aed;
+  color: #0891b2;
   font-weight: 800;
 }
 
@@ -174,7 +174,7 @@
   margin-top: 4rpx;
   padding: 2rpx 8rpx;
   border-radius: 999rpx;
-  background: #8b5cf6;
+  background: #06b6d4;
   color: #fff;
   font-size: 16rpx;
   font-weight: 600;
@@ -201,7 +201,7 @@
   gap: 8rpx;
   margin: 20rpx 0;
   font-size: 22rpx;
-  color: #7c3aed;
+  color: #0891b2;
 }
 
 .sub-footer-ico {
@@ -210,7 +210,7 @@
 
 .sub-footer-info {
   font-size: 20rpx;
-  color: #a78bfa;
+  color: #67e8f9;
 }
 
 .sub-state {
@@ -270,9 +270,9 @@
 }
 
 .sub-pay-tier.on {
-  border-color: #8b5cf6;
+  border-color: #06b6d4;
   background: #faf5ff;
-  color: #7c3aed;
+  color: #0891b2;
   font-weight: 700;
 }
 
@@ -306,9 +306,9 @@
 }
 
 .sub-pay-ch.on {
-  border-color: #8b5cf6;
+  border-color: #06b6d4;
   background: #faf5ff;
-  color: #7c3aed;
+  color: #0891b2;
 }
 
 .sub-pay-ch::after {
@@ -339,7 +339,7 @@
   flex: 1.2;
   margin: 0;
   border-radius: 999rpx;
-  background: linear-gradient(95deg, #8b5cf6, #a78bfa);
+  background: linear-gradient(95deg, #06b6d4, #67e8f9);
   color: #fff;
 }
 

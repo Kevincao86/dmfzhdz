@@ -49,7 +49,7 @@
   height: 72rpx;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 8rpx 24rpx rgba(91, 33, 182, 0.18);
+  box-shadow: 0 8rpx 24rpx rgba(8, 145, 178, 0.18);
   flex-shrink: 0;
 }
 

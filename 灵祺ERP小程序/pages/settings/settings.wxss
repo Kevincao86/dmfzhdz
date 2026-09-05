@@ -1,0 +1,43 @@
+.set-label {
+  flex: 1;
+  font-size: 28rpx;
+  color: var(--erp-text);
+}
+
+.set-ok {
+  font-size: 24rpx;
+  color: var(--erp-ok);
+  font-weight: 600;
+}
+
+.set-warn {
+  font-size: 24rpx;
+  color: var(--erp-warn);
+}
+
+.set-link {
+  padding: 22rpx 0;
+}
+
+.set-ic {
+  width: 44rpx;
+  height: 44rpx;
+  flex-shrink: 0;
+}
+
+.set-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.set-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--erp-text);
+}
+
+.set-chev {
+  color: #94a3b8;
+  font-size: 32rpx;
+}

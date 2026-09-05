@@ -27,7 +27,7 @@
 .bw-kicker {
   font-size: 22rpx;
   font-weight: 700;
-  color: #7c3aed;
+  color: #0891b2;
   letter-spacing: 2rpx;
 }
 
@@ -59,7 +59,7 @@
 }
 
 .bw-step-chip.on {
-  color: #4f46e5;
+  color: #0891b2;
   font-weight: 700;
 }
 
@@ -92,7 +92,7 @@
 }
 
 .bw-plat-tile.on {
-  border-color: #7c3aed;
+  border-color: #0891b2;
   box-shadow: 0 12rpx 28rpx rgba(124, 58, 237, 0.12);
   background: #faf5ff;
 }
@@ -115,7 +115,7 @@
   margin-bottom: 16rpx;
   padding: 18rpx 20rpx;
   border-radius: 14rpx;
-  border: 1rpx solid #ede9fe;
+  border: 1rpx solid #e0f2fe;
   background: #fff;
   font-size: 26rpx;
   color: #475569;
@@ -138,7 +138,7 @@
   margin-top: 12rpx;
   padding: 18rpx 20rpx;
   border-radius: 14rpx;
-  border: 1rpx solid #ede9fe;
+  border: 1rpx solid #e0f2fe;
   background: #ffffff;
   font-size: 26rpx;
 }
@@ -150,7 +150,7 @@
   max-height: 160rpx;
   padding: 16rpx 18rpx;
   border-radius: 14rpx;
-  border: 1rpx solid #ede9fe;
+  border: 1rpx solid #e0f2fe;
   background: #fff;
   font-size: 26rpx;
   width: 100%;
@@ -164,7 +164,7 @@
   font-weight: 800;
   color: #fff;
   border: none;
-  background: linear-gradient(95deg, #6366f1, #9333ea);
+  background: linear-gradient(95deg, #0284c7, #9333ea);
 }
 
 .bw-btn-main::after {
@@ -178,7 +178,7 @@
   font-weight: 600;
   color: #4c1d95;
   background: rgba(237, 233, 254, 0.55);
-  border: 1rpx solid #ddd6fe;
+  border: 1rpx solid #bae6fd;
 }
 
 .bw-btn-soft::after {
@@ -195,7 +195,7 @@
 .bw-result-block {
   margin-top: 26rpx;
   padding-bottom: 20rpx;
-  border-bottom: 1rpx solid #eef2ff;
+  border-bottom: 1rpx solid #f0f9ff;
 }
 
 .bw-result-head {
@@ -208,7 +208,7 @@
 
 .bw-variant {
   font-weight: 800;
-  color: #4338ca;
+  color: #0e7490;
   font-size: 28rpx;
 }
 

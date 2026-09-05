@@ -1,0 +1,45 @@
+.kb-row {
+  align-items: flex-start;
+}
+
+.kb-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.kb-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: var(--erp-text);
+}
+
+.kb-sum {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 24rpx;
+  color: var(--erp-muted);
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kb-meta {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-top: 10rpx;
+}
+
+.kb-time {
+  font-size: 20rpx;
+  color: #94a3b8;
+}
+
+.kb-del {
+  flex-shrink: 0;
+  font-size: 24rpx;
+  color: var(--erp-danger);
+  padding: 8rpx 0 8rpx 16rpx;
+}

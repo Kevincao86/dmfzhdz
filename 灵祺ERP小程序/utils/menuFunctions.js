@@ -1,6 +1,23 @@
 /** 「功能」Tab — 严格对齐商家 Web merchant-erp/src/config/nav.ts NAV_ITEMS */
 const FUNCTION_SECTIONS = [
   {
+    id: 'knowledge',
+    title: '知识库',
+    layout: 'row',
+    tone: 'cyan',
+    rowDesc: '投喂门店资料供 AI 使用',
+    sectionIcon: 'book',
+    items: [
+      {
+        kind: 'link',
+        url: '/pages/knowledge-base/knowledge-base',
+        title: '我的知识库',
+        desc: '文档与文本投喂',
+        iconKey: 'book',
+      },
+    ],
+  },
+  {
     id: 'store',
     title: '店铺',
     layout: 'grid3',
@@ -111,6 +128,13 @@ const FUNCTION_SECTIONS = [
         title: '竞争对手分析',
         desc: '竞品情报与对比',
         iconKey: 'chart',
+      },
+      {
+        kind: 'link',
+        url: '/pages/site-selection/site-selection',
+        title: '选址参考',
+        desc: '人流热度与选址打分',
+        iconKey: 'pin',
       },
     ],
   },

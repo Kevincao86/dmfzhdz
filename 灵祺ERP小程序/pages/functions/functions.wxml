@@ -4,7 +4,7 @@
       <image class="func-brand-logo" src="{{logoSrc}}" mode="aspectFit" />
       <view class="func-hero-text">
         <text class="func-h1">商家能力中心</text>
-        <text class="func-p">店铺 · 商品 · 运营 · 内容创作 · 投流 · 线索 · 财务</text>
+        <text class="func-p">知识库 · 店铺 · 商品 · 运营 · 内容创作 · 投流 · 线索 · 财务</text>
       </view>
     </view>
     <view class="func-hero-glow" aria-hidden="true"></view>

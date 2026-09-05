@@ -1,0 +1,203 @@
+/**
+ * 商家 ERP 小程序设计 token（对齐 Web --erp-accent #0891b2）
+ * 各页可直接使用 .erp-* 类；app.wxss 已全局引入。
+ */
+page {
+  --erp-accent: #0891b2;
+  --erp-accent-strong: #0284c7;
+  --erp-accent-soft: rgba(8, 145, 178, 0.12);
+  --erp-accent-grad: linear-gradient(135deg, #0891b2 0%, #0284c7 100%);
+  --erp-bg: #f8fafc;
+  --erp-bg-grad: linear-gradient(180deg, #e8f4fc 0%, #f8fafc 220rpx, #f8fafc 100%);
+  --erp-surface: #ffffff;
+  --erp-text: #0f172a;
+  --erp-text-secondary: #334155;
+  --erp-muted: #64748b;
+  --erp-border: rgba(15, 23, 42, 0.06);
+  --erp-radius: 24rpx;
+  --erp-radius-lg: 28rpx;
+  --erp-shadow: 0 10rpx 36rpx rgba(15, 23, 42, 0.05);
+  --erp-danger: #dc2626;
+  --erp-ok: #059669;
+  --erp-warn: #d97706;
+}
+
+.erp-page {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 16rpx 24rpx calc(32rpx + env(safe-area-inset-bottom));
+  background: var(--erp-bg-grad);
+}
+
+.erp-hero {
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 20rpx;
+  padding: 28rpx 24rpx;
+  border-radius: var(--erp-radius-lg);
+  background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 55%, #ecfeff 100%);
+  border: 1rpx solid rgba(8, 145, 178, 0.14);
+  box-shadow: 0 12rpx 36rpx rgba(8, 145, 178, 0.08);
+}
+
+.erp-hero-title {
+  display: block;
+  font-size: 36rpx;
+  font-weight: 800;
+  color: var(--erp-text);
+  letter-spacing: 0.4rpx;
+}
+
+.erp-hero-sub {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  color: var(--erp-muted);
+  line-height: 1.45;
+}
+
+.erp-card {
+  margin-bottom: 16rpx;
+  padding: 22rpx;
+  background: var(--erp-surface);
+  border-radius: var(--erp-radius);
+  border: 1rpx solid var(--erp-border);
+  box-shadow: var(--erp-shadow);
+}
+
+.erp-card-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: var(--erp-text);
+  margin-bottom: 12rpx;
+}
+
+.erp-label {
+  display: block;
+  font-size: 22rpx;
+  color: var(--erp-muted);
+  margin: 8rpx 0;
+}
+
+.erp-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 16rpx 20rpx;
+  background: #f1f5f9;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  color: var(--erp-text);
+  margin-bottom: 8rpx;
+}
+
+.erp-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 160rpx;
+  padding: 16rpx 20rpx;
+  background: #f1f5f9;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  color: var(--erp-text);
+}
+
+.erp-btn-primary {
+  margin-top: 16rpx;
+  background: var(--erp-accent-grad) !important;
+  color: #fff !important;
+  border-radius: 999rpx !important;
+  font-size: 28rpx !important;
+  font-weight: 600 !important;
+  border: none !important;
+}
+
+.erp-btn-primary[disabled] {
+  opacity: 0.55;
+}
+
+.erp-btn-ghost {
+  margin-top: 12rpx;
+  background: var(--erp-accent-soft) !important;
+  color: var(--erp-accent-strong) !important;
+  border-radius: 999rpx !important;
+  font-size: 26rpx !important;
+  border: none !important;
+}
+
+.erp-err {
+  margin-bottom: 16rpx;
+  color: var(--erp-danger);
+  font-size: 26rpx;
+  line-height: 1.4;
+}
+
+.erp-hint {
+  display: block;
+  font-size: 22rpx;
+  color: var(--erp-muted);
+  line-height: 1.45;
+}
+
+.erp-empty {
+  padding: 48rpx 24rpx;
+  text-align: center;
+}
+
+.erp-empty-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: var(--erp-text);
+}
+
+.erp-empty-desc {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  color: var(--erp-muted);
+  line-height: 1.5;
+}
+
+.erp-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 20rpx 0;
+  border-top: 1rpx solid #f1f5f9;
+}
+
+.erp-row:first-child {
+  border-top: none;
+}
+
+.erp-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6rpx 16rpx;
+  border-radius: 999rpx;
+  font-size: 20rpx;
+  background: var(--erp-accent-soft);
+  color: var(--erp-accent-strong);
+}
+
+.erp-body {
+  display: block;
+  font-size: 26rpx;
+  color: var(--erp-text-secondary);
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.erp-section-head {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin: 8rpx 0 16rpx;
+}
+
+.erp-section-head-text {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: var(--erp-text);
+}

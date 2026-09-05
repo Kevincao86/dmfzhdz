@@ -45,8 +45,8 @@
 
 .ws-tab.on {
   color: #fff;
-  background: #4f46e5;
-  border-color: #4f46e5;
+  background: #0891b2;
+  border-color: #0891b2;
   box-shadow: 0 6rpx 16rpx rgba(79, 70, 229, 0.28);
 }
 
@@ -197,7 +197,7 @@
 }
 
 .ava-ai {
-  background: linear-gradient(145deg, #a78bfa, #7c3aed 55%, #5b21b6);
+  background: linear-gradient(145deg, #67e8f9, #0891b2 55%, #0e7490);
   color: #fff;
 }
 

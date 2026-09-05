@@ -10,7 +10,7 @@
   </view>
 
   <navigator url="/pages/recruit-flow/recruit-flow" class="lq-nav-card" hover-class="none">
-    <view class="lq-nav-ico violet">①</view>
+    <view class="lq-nav-ico">①</view>
     <view class="lq-nav-main">
       <text class="lq-nav-title">五步流程 · 达人招募</text>
       <text class="lq-nav-desc">从 Brief 到结算的标准 SOP</text>

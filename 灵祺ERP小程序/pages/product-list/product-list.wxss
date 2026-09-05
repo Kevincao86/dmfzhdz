@@ -42,7 +42,7 @@
   right: 0;
   bottom: 0;
   height: 4rpx;
-  background: #0284c7;
+  background: #0891b2;
   border-radius: 4rpx 4rpx 0 0;
 }
 

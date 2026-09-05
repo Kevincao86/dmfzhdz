@@ -1,0 +1,45 @@
+<scroll-view scroll-y class="erp-page" enhanced show-scrollbar="{{false}}">
+  <view class="erp-hero">
+    <text class="erp-hero-title">系统设置</text>
+    <text class="erp-hero-sub">平台连接、账号与订阅。深度绑定请在电脑端商家后台完成。</text>
+  </view>
+
+  <view wx:if="{{guestMode}}" class="erp-card" bindtap="onGoLogin">
+    <text class="erp-empty-title">登录后管理设置</text>
+    <text class="erp-empty-desc">游客可先浏览功能 Tab · 点此登录</text>
+  </view>
+
+  <view class="erp-card" wx:if="{{!guestMode}}">
+    <text class="erp-card-title">平台连接</text>
+    <text wx:if="{{bindingsHint}}" class="erp-hint">{{bindingsHint}}</text>
+    <text wx:if="{{bindingsLoading}}" class="erp-hint">加载中…</text>
+    <view wx:for="{{cloudPlatformRows}}" wx:key="id" class="erp-row">
+      <text class="set-label">{{item.label}}</text>
+      <text class="{{item.bound ? 'set-ok' : 'set-warn'}}">{{item.bound ? '已绑定' : '未绑定'}}</text>
+    </view>
+    <view wx:for="{{webPlatformRows}}" wx:key="id" class="erp-row">
+      <text class="set-label">{{item.label}}</text>
+      <text class="set-warn">{{item.statusText || '需电脑端授权'}}</text>
+    </view>
+    <button class="erp-btn-ghost" bindtap="onCopyWeb">复制电脑端地址 · 深度绑定</button>
+    <text class="erp-hint" style="margin-top:10rpx">打开 cs.mofangdianai.com → 系统 → 商家版后台完成授权</text>
+  </view>
+
+  <view class="erp-card">
+    <text class="erp-card-title">账号与服务</text>
+    <view
+      wx:for="{{links}}"
+      wx:key="id"
+      class="erp-row set-link"
+      data-url="{{item.url}}"
+      bindtap="onOpenLink"
+    >
+      <image class="set-ic" src="{{item.iconSrc}}" mode="aspectFit" />
+      <view class="set-main">
+        <text class="set-title">{{item.title}}</text>
+        <text class="erp-hint">{{item.desc}}</text>
+      </view>
+      <text class="set-chev">›</text>
+    </view>
+  </view>
+</scroll-view>

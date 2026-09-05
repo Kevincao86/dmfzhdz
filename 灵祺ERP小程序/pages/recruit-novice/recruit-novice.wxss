@@ -165,7 +165,7 @@
   padding: 24rpx;
   font-weight: 700;
   color: #fff;
-  background: linear-gradient(95deg, #7c3aed, #6366f1);
+  background: linear-gradient(95deg, #0891b2, #0284c7);
 }
 
 .nv-ai-btn::after {

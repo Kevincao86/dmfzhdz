@@ -9,6 +9,14 @@ const PROFILE_KEY = 'meoo_merchant_profile_v1'
 
 const BASE_MENU = [
   {
+    id: 'settings',
+    title: '系统设置',
+    desc: '平台连接、账号与订阅',
+    iconKey: 'settings',
+    tone: 'cyan',
+    url: '/pages/settings/settings',
+  },
+  {
     id: 'profile',
     title: '修改个人资料',
     desc: '头像、昵称与联系方式',

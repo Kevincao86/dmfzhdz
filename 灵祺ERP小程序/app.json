@@ -43,6 +43,9 @@
     "pages/ai-ops-plan/ai-ops-plan",
     "pages/store-menu/store-menu",
     "pages/competitors/competitors",
+    "pages/site-selection/site-selection",
+    "pages/knowledge-base/knowledge-base",
+    "pages/settings/settings",
     "pages/digital-human/digital-human",
     "pages/shortvideo-ai/shortvideo-ai",
     "pages/notifications/notifications",
@@ -62,7 +65,7 @@
   "tabBar": {
     "custom": true,
     "color": "#94a3b8",
-    "selectedColor": "#0284c7",
+    "selectedColor": "#0891b2",
     "backgroundColor": "#ffffff",
     "list": [
       {
