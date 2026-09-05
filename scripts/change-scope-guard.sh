@@ -148,6 +148,7 @@ PAT
 recruitmentOrderPatchMutations
 meoo-ops-recruitment-orders-patch
 RecruitmentPage
+MerchantRecruitmentWorkflowViews
 change-scope-guard
 PAT
       ;;

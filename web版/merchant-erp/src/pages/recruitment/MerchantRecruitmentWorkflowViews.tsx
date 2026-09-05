@@ -97,8 +97,9 @@ export function MerchantApplicantSelectView({ onBack }: { onBack: () => void }) 
   const [notifying, setNotifying] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true
+    if (!silent) setLoading(true)
     try {
       const ctx = await loadWorkflowContext()
       setReg(ctx.reg)
@@ -110,16 +111,19 @@ export function MerchantApplicantSelectView({ onBack }: { onBack: () => void }) 
           : (ctx.mp?.applicants ?? [])
               .filter((a) => a.merchantSelected || a.prSelected)
               .map((a) => String(a.id))
-      setSelectedIds(ids)
-      setGroupQr(String(ctx.mp?.groupQrImage || ''))
+      if (!silent) setSelectedIds(ids)
+      const qr = String(ctx.mp?.groupQrImage || '')
+      if (qr || !silent) setGroupQr(qr)
+    } catch {
+      /* 静默轮询失败时保留当前画面，避免整页闪成空态 */
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    void load()
-    const t = window.setInterval(() => void load(), 8000)
+    void load({ silent: false })
+    const t = window.setInterval(() => void load({ silent: true }), 8000)
     return () => window.clearInterval(t)
   }, [load])
 
@@ -183,7 +187,7 @@ export function MerchantApplicantSelectView({ onBack }: { onBack: () => void }) 
         workflowStage: 'group_notify',
       })
       window.alert('反选已确认，请上传群二维码并通知达人。')
-      await load()
+      await load({ silent: true })
     } catch (e) {
       window.alert(e instanceof Error ? e.message : '保存失败')
     } finally {
@@ -242,7 +246,7 @@ export function MerchantApplicantSelectView({ onBack }: { onBack: () => void }) 
       if (!r.ok) throw new Error('通知发送失败')
       await patchRecruitmentOrderOnOps({ id: order.id, workflowStage: 'scheduling' })
       window.alert(`已向 ${entries.length} 位达人发送进群通知。`)
-      await load()
+      await load({ silent: true })
     } catch (e) {
       window.alert(e instanceof Error ? e.message : '通知失败')
     } finally {
@@ -291,7 +295,7 @@ export function MerchantApplicantSelectView({ onBack }: { onBack: () => void }) 
             </p>
           ) : null}
         </div>
-        <button type="button" onClick={() => void load()} className="rounded-lg border px-3 py-2 text-sm text-gray-600">
+        <button type="button" onClick={() => void load({ silent: true })} className="rounded-lg border px-3 py-2 text-sm text-gray-600">
           <RefreshCw className="mr-1 inline h-4 w-4" />
           刷新
         </button>
@@ -396,7 +400,7 @@ export function MerchantApplicantSelectView({ onBack }: { onBack: () => void }) 
             order={order}
             mp={mp}
             selectedApplicantIds={selectedIds}
-            onSynced={load}
+            onSynced={() => load({ silent: true })}
           />
         </>
       ) : null}

@@ -1123,7 +1123,15 @@ function CreateForm({ onBack }: { onBack: () => void }) {
 
 export default function RecruitmentPage() {
   const [screen, setScreen] = useState<
-    'hub' | 'createPick' | 'createNovice' | 'createPro' | 'confirm' | 'schedule' | 'review' | 'payment'
+    | 'hub'
+    | 'createPick'
+    | 'createNovice'
+    | 'createPro'
+    | 'confirm'
+    | 'schedule'
+    | 'review'
+    | 'payment'
+    | 'orderDetail'
   >('hub')
   const [briefOpen, setBriefOpen] = useState(false)
   const [briefTick, setBriefTick] = useState(0)
@@ -1261,10 +1269,10 @@ export default function RecruitmentPage() {
     }
   }
 
-  const selectHubOrder = (order: RegistryRecruitmentOrder) => {
+  const openOrderDetail = (order: RegistryRecruitmentOrder) => {
     persistLastRecruitmentOrderId(order.id)
     setHubOrder(order)
-    refreshHubOrder()
+    setScreen('orderDetail')
   }
 
   const deleteHubRecruitmentOrder = async (order: RegistryRecruitmentOrder) => {
@@ -1281,6 +1289,7 @@ export default function RecruitmentPage() {
       }
       const remaining = hubOrders.filter((o) => o.id !== order.id)
       persistLastRecruitmentOrderId(remaining[0]?.id ?? '')
+      if (screen === 'orderDetail') setScreen('hub')
       refreshHubOrder()
     } catch (e) {
       window.alert(e instanceof Error ? e.message : '删除失败，请稍后重试')
@@ -1381,6 +1390,87 @@ export default function RecruitmentPage() {
     return <RecruitmentScheduleView onBack={() => setScreen('hub')} onEnterVideo={() => setScreen('review')} />
   if (screen === 'review') return <RecruitmentVideoReviewView onBack={() => setScreen('hub')} />
   if (screen === 'payment') return <MerchantRecruitmentPaymentView onBack={() => setScreen('hub')} />
+  if (screen === 'orderDetail') {
+    const detail = hubOrder
+    return (
+      <div className="mx-auto max-w-3xl space-y-6">
+        <button
+          type="button"
+          onClick={() => setScreen('hub')}
+          className="flex items-center text-sm text-gray-600 hover:text-gray-900"
+        >
+          <ChevronLeft className="mr-1 h-4 w-4" />
+          返回招募管理
+        </button>
+        {!detail ? (
+          <p className="text-sm text-amber-800">未找到该招募订单，请返回列表后重试。</p>
+        ) : (
+          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h1 className="erp-page-title">招募订单详情</h1>
+                <p className="mt-1 font-mono text-sm font-semibold text-gray-900">{detail.id}</p>
+                {detail.linkedMpOrderId ? (
+                  <p className="mt-0.5 text-xs text-sky-700">星选单 {detail.linkedMpOrderId}</p>
+                ) : (
+                  <p className="mt-0.5 text-xs text-gray-500">尚未关联星选大厅订单</p>
+                )}
+              </div>
+              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800">
+                {recruitmentOrderStatusLabel(detail.status)}
+              </span>
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+              <div>
+                <p className="text-xs text-gray-500">招募预算</p>
+                <p className="font-medium text-gray-900">¥{Number(detail.serviceAmount).toLocaleString('zh-CN')}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">达人佣金</p>
+                <p className="font-medium text-gray-900">{detail.commissionPct}%</p>
+              </div>
+              <div className="col-span-2 sm:col-span-1">
+                <p className="text-xs text-gray-500">预估结算净值</p>
+                <p className="font-medium text-gray-900">¥{Number(detail.netAmount).toLocaleString('zh-CN')}</p>
+              </div>
+            </div>
+            <div className="mt-5">
+              <p className="mb-2 text-xs font-medium text-gray-600">环节进度</p>
+              <div className="flex gap-1.5 overflow-x-auto pb-1">
+                {buildRecruitmentProgressSteps(detail).map((step, idx) => (
+                  <div
+                    key={`${step.title}-${idx}`}
+                    className={cn(
+                      'min-w-[5.5rem] flex-1 rounded-lg border px-2 py-2 text-center',
+                      step.done && 'border-emerald-200 bg-emerald-50/80',
+                      step.current && !step.done && 'border-blue-400 bg-blue-50 ring-1 ring-blue-200',
+                      !step.done && !step.current && 'border-gray-100 bg-gray-50/80',
+                    )}
+                  >
+                    <p className="text-[10px] font-medium text-gray-500">第 {idx + 1} 步</p>
+                    <p className="mt-0.5 text-xs font-semibold leading-tight text-gray-900">{step.title}</p>
+                    <p className="mt-1 line-clamp-2 text-[10px] text-gray-500">{step.note}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="mt-6 flex flex-wrap gap-2 border-t border-gray-100 pt-4">
+              <button
+                type="button"
+                disabled={deletingOrderId === detail.id}
+                onClick={() => void deleteHubRecruitmentOrder(detail)}
+                className="inline-flex items-center rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+              >
+                <Trash2 className="mr-1.5 h-4 w-4" />
+                {deletingOrderId === detail.id ? '删除中…' : '删除订单'}
+              </button>
+              <p className="self-center text-xs text-gray-500">删除后将同步移除星选大厅对应订单。</p>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -1493,7 +1583,7 @@ export default function RecruitmentPage() {
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
             <h4 className="font-semibold text-gray-900">我的招募订单</h4>
-            <p className="mt-0.5 text-xs text-gray-500">删除后会同步移除星选大厅对应订单。</p>
+            <p className="mt-0.5 text-xs text-gray-500">点击订单进入详情，可在详情页删除（同步移除星选对应单）。</p>
           </div>
           <button
             type="button"
@@ -1517,7 +1607,7 @@ export default function RecruitmentPage() {
                 <li key={o.id} className={cn('flex flex-wrap items-center gap-2 px-3 py-2.5', active && 'bg-blue-50/60')}>
                   <button
                     type="button"
-                    onClick={() => selectHubOrder(o)}
+                    onClick={() => openOrderDetail(o)}
                     className="min-w-0 flex-1 text-left"
                   >
                     <p className="truncate font-mono text-sm font-semibold text-gray-900">{o.id}</p>
@@ -1529,12 +1619,11 @@ export default function RecruitmentPage() {
                   </button>
                   <button
                     type="button"
-                    disabled={deletingOrderId === o.id}
-                    onClick={() => void deleteHubRecruitmentOrder(o)}
-                    className="inline-flex shrink-0 items-center rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                    onClick={() => openOrderDetail(o)}
+                    className="inline-flex shrink-0 items-center rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
                   >
-                    <Trash2 className="mr-1 h-3.5 w-3.5" />
-                    {deletingOrderId === o.id ? '删除中…' : '删除'}
+                    进入
+                    <ArrowRight className="ml-1 h-3.5 w-3.5" />
                   </button>
                 </li>
               )
@@ -1648,7 +1737,7 @@ export default function RecruitmentPage() {
             </div>
           </div>
           <p className="mb-4 text-sm text-gray-500">
-            展示本店招募订单进度（数据来自运营注册表，与星选大厅同一份单）。删除后会同步移除星选平台对应订单。
+            点击进入订单详情查看进度；详情页可删除，并同步移除星选大厅对应订单。
           </p>
           {hubOrderLoading ? (
             <p className="text-sm text-gray-500">正在加载订单…</p>
@@ -1670,65 +1759,25 @@ export default function RecruitmentPage() {
               已记录本机最近订单号，但在运营注册表中未找到对应条目（可能尚未同步或订单已清理）。可稍后点击「刷新」重试。
             </p>
           ) : (
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-gray-100 pb-3">
+            <button
+              type="button"
+              onClick={() => openOrderDetail(hubOrder)}
+              className="w-full rounded-lg border border-gray-100 px-3 py-3 text-left hover:border-blue-200 hover:bg-blue-50/40"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">订单号</p>
+                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">当前订单</p>
                   <p className="mt-0.5 truncate font-mono text-sm font-semibold text-gray-900">{hubOrder.id}</p>
                   {hubOrder.linkedMpOrderId ? (
                     <p className="mt-0.5 truncate text-[11px] text-sky-700">星选单 {hubOrder.linkedMpOrderId}</p>
                   ) : null}
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800">
-                    {recruitmentOrderStatusLabel(hubOrder.status)}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={deletingOrderId === hubOrder.id}
-                    onClick={() => void deleteHubRecruitmentOrder(hubOrder)}
-                    className="inline-flex items-center rounded-lg border border-red-200 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
-                  >
-                    <Trash2 className="mr-1 h-3.5 w-3.5" />
-                    {deletingOrderId === hubOrder.id ? '删除中…' : '删除'}
-                  </button>
-                </div>
+                <span className="inline-flex items-center text-sm font-medium text-blue-600">
+                  进入详情
+                  <ArrowRight className="ml-1 h-4 w-4" />
+                </span>
               </div>
-              <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-                <div>
-                  <p className="text-xs text-gray-500">招募预算</p>
-                  <p className="font-medium text-gray-900">¥{Number(hubOrder.serviceAmount).toLocaleString('zh-CN')}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">达人佣金</p>
-                  <p className="font-medium text-gray-900">{hubOrder.commissionPct}%</p>
-                </div>
-                <div className="col-span-2 sm:col-span-1">
-                  <p className="text-xs text-gray-500">预估结算净值</p>
-                  <p className="font-medium text-gray-900">¥{Number(hubOrder.netAmount).toLocaleString('zh-CN')}</p>
-                </div>
-              </div>
-              <div>
-                <p className="mb-2 text-xs font-medium text-gray-600">环节进度</p>
-                <div className="flex gap-1.5 overflow-x-auto pb-1">
-                  {buildRecruitmentProgressSteps(hubOrder).map((step, idx) => (
-                    <div
-                      key={`${step.title}-${idx}`}
-                      className={cn(
-                        'min-w-[5.5rem] flex-1 rounded-lg border px-2 py-2 text-center',
-                        step.done && 'border-emerald-200 bg-emerald-50/80',
-                        step.current && !step.done && 'border-blue-400 bg-blue-50 ring-1 ring-blue-200',
-                        !step.done && !step.current && 'border-gray-100 bg-gray-50/80',
-                      )}
-                    >
-                      <p className="text-[10px] font-medium text-gray-500">第 {idx + 1} 步</p>
-                      <p className="mt-0.5 text-xs font-semibold leading-tight text-gray-900">{step.title}</p>
-                      <p className="mt-1 line-clamp-2 text-[10px] text-gray-500">{step.note}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            </button>
           )}
         </motion.div>
       </div>
