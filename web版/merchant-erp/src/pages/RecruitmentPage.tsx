@@ -1489,6 +1489,60 @@ export default function RecruitmentPage() {
 
       <RecruitmentXingxuanBridge mpOrderId={hubOrder?.linkedMpOrderId} variant="hub" />
 
+      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h4 className="font-semibold text-gray-900">我的招募订单</h4>
+            <p className="mt-0.5 text-xs text-gray-500">删除后会同步移除星选大厅对应订单。</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => refreshHubOrder()}
+            disabled={hubOrderLoading}
+            className="inline-flex items-center rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+          >
+            <RefreshCw className={cn('mr-1 h-3.5 w-3.5', hubOrderLoading && 'animate-spin')} />
+            刷新
+          </button>
+        </div>
+        {hubOrderLoading && !hubOrders.length ? (
+          <p className="text-sm text-gray-500">正在加载订单…</p>
+        ) : !hubOrders.length ? (
+          <p className="text-sm text-gray-500">暂无招募订单。发布后将出现在此，每笔均可删除。</p>
+        ) : (
+          <ul className="divide-y divide-gray-100 rounded-lg border border-gray-100">
+            {hubOrders.map((o) => {
+              const active = hubOrder?.id === o.id
+              return (
+                <li key={o.id} className={cn('flex flex-wrap items-center gap-2 px-3 py-2.5', active && 'bg-blue-50/60')}>
+                  <button
+                    type="button"
+                    onClick={() => selectHubOrder(o)}
+                    className="min-w-0 flex-1 text-left"
+                  >
+                    <p className="truncate font-mono text-sm font-semibold text-gray-900">{o.id}</p>
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      {recruitmentOrderStatusLabel(o.status)}
+                      {o.linkedMpOrderId ? ` · 星选 ${o.linkedMpOrderId}` : ' · 未关联星选单'}
+                      {` · ¥${Number(o.serviceAmount).toLocaleString('zh-CN')}`}
+                    </p>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={deletingOrderId === o.id}
+                    onClick={() => void deleteHubRecruitmentOrder(o)}
+                    className="inline-flex shrink-0 items-center rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    <Trash2 className="mr-1 h-3.5 w-3.5" />
+                    {deletingOrderId === o.id ? '删除中…' : '删除'}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {FLOW.map((e, t) => {
           const Icon = e.icon
@@ -1617,37 +1671,6 @@ export default function RecruitmentPage() {
             </p>
           ) : (
             <div className="space-y-4">
-              {hubOrders.length > 1 ? (
-                <ul className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-gray-100 bg-gray-50/70 p-2">
-                  {hubOrders.map((o) => {
-                    const active = o.id === hubOrder.id
-                    return (
-                      <li key={o.id} className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => selectHubOrder(o)}
-                          className={cn(
-                            'min-w-0 flex-1 truncate rounded-md px-2 py-1.5 text-left text-xs',
-                            active ? 'bg-white font-medium text-gray-900 shadow-sm' : 'text-gray-600 hover:bg-white/80',
-                          )}
-                        >
-                          <span className="font-mono">{o.id}</span>
-                          <span className="ml-2 text-gray-400">{recruitmentOrderStatusLabel(o.status)}</span>
-                        </button>
-                        <button
-                          type="button"
-                          disabled={deletingOrderId === o.id}
-                          onClick={() => void deleteHubRecruitmentOrder(o)}
-                          className="shrink-0 rounded-md px-1.5 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
-                          title="删除订单"
-                        >
-                          {deletingOrderId === o.id ? '删除中…' : '删除'}
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>
-              ) : null}
               <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-gray-100 pb-3">
                 <div className="min-w-0">
                   <p className="text-xs font-medium uppercase tracking-wide text-gray-500">订单号</p>
@@ -1660,17 +1683,15 @@ export default function RecruitmentPage() {
                   <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800">
                     {recruitmentOrderStatusLabel(hubOrder.status)}
                   </span>
-                  {hubOrders.length <= 1 ? (
-                    <button
-                      type="button"
-                      disabled={deletingOrderId === hubOrder.id}
-                      onClick={() => void deleteHubRecruitmentOrder(hubOrder)}
-                      className="inline-flex items-center rounded-lg border border-red-200 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
-                    >
-                      <Trash2 className="mr-1 h-3.5 w-3.5" />
-                      {deletingOrderId === hubOrder.id ? '删除中…' : '删除'}
-                    </button>
-                  ) : null}
+                  <button
+                    type="button"
+                    disabled={deletingOrderId === hubOrder.id}
+                    onClick={() => void deleteHubRecruitmentOrder(hubOrder)}
+                    className="inline-flex items-center rounded-lg border border-red-200 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    <Trash2 className="mr-1 h-3.5 w-3.5" />
+                    {deletingOrderId === hubOrder.id ? '删除中…' : '删除'}
+                  </button>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
