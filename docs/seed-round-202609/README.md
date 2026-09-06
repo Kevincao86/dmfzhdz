@@ -17,4 +17,5 @@
 
 数据来自服务器快照，抽取时间 2026-09-06 15:28–15:35。同步 GMV 不是公司收入。
 
-重做 PPT：`python3 scripts/build_seed_deck.py`
+重做 PPT：`python3 scripts/build_seed_deck.py`  
+按机构邮件文件夹（桌面）：`python3 scripts/pack_investor_mail_folders.py`
