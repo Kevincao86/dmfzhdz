@@ -554,21 +554,22 @@ def slide_12():
         (220, 214, 204),
     )
     inst = [
-        ("P0  本周提交", "宁波天使引导基金  ·  奇绩创坛  ·  天使湾  ·  浙商创投"),
-        ("P1  两周跟进", "梅花  ·  真格 prompt@  ·  阿米巴  ·  线性资本"),
+        ("本轮结构", "目标 400 万 · 首次交割 300 万 · 超募上限 500 万"),
+        ("参与方式", "2–3 家共同参与，无需单一机构覆盖全部额度"),
+        ("希望同行", "浙江落地资本，以及认可 AI 应用落地的早期机构"),
     ]
-    y = 280
+    y = 270
     for t, b in inst:
-        card(d, (80, y, 1200, y + 130), fill=(12, 22, 34), outline=(55, 66, 78))
-        text(d, (110, y + 28), t, f_sans(16), GOLD)
-        text(d, (110, y + 68), b, f_body(22, True), CREAM)
-        y += 150
-    card(d, (80, 590, 1200, 900), fill=(12, 22, 34), outline=(55, 66, 78))
-    text(d, (110, 630), "宁波墨典网络科技有限公司", f_title(28), WHITE)
+        card(d, (80, y, 1200, y + 96), fill=(12, 22, 34), outline=(55, 66, 78))
+        text(d, (110, y + 16), t, f_sans(16), GOLD)
+        text(d, (110, y + 52), b, f_body(22, True), CREAM)
+        y += 108
+    card(d, (80, 610, 1200, 920), fill=(12, 22, 34), outline=(55, 66, 78))
+    text(d, (110, 638), "宁波墨典网络科技有限公司", f_title(28), WHITE)
     text(d, (110, 700), "创始人  曹鑫淼", f_body(24), CREAM)
-    text(d, (110, 750), "手机 / 微信  15757468650", f_body(24), CREAM)
-    text(d, (110, 800), "商家 ERP  cs.mofangdianai.com", f_body(20, True), (200, 196, 188))
-    text(d, (110, 844), "星选  dr.mofangdianai.com  ·  微信搜「灵祺星选」", f_body(20, True), (200, 196, 188))
+    text(d, (110, 748), "手机 / 微信  15757468650", f_body(24), CREAM)
+    text(d, (110, 796), "商家 ERP  cs.mofangdianai.com", f_body(20, True), (200, 196, 188))
+    text(d, (110, 840), "星选  dr.mofangdianai.com  ·  微信搜「灵祺星选」", f_body(20, True), (200, 196, 188))
     footer(d, 12, light=True)
     return img
 
