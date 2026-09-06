@@ -38,6 +38,7 @@ INSTITUTIONS = [
 
 曹鑫淼
 15757468650
+modian@mofangdianai.com
 """,
     },
     {
@@ -63,6 +64,7 @@ INSTITUTIONS = [
 
 曹鑫淼
 15757468650
+modian@mofangdianai.com
 """,
     },
     {
@@ -88,6 +90,7 @@ INSTITUTIONS = [
 
 曹鑫淼
 15757468650
+modian@mofangdianai.com
 """,
     },
     {
@@ -113,6 +116,7 @@ INSTITUTIONS = [
 
 曹鑫淼
 15757468650
+modian@mofangdianai.com
 """,
     },
     {
@@ -139,6 +143,7 @@ INSTITUTIONS = [
 
 曹鑫淼
 15757468650
+modian@mofangdianai.com
 """,
     },
     {
@@ -165,6 +170,7 @@ INSTITUTIONS = [
 
 曹鑫淼
 15757468650
+modian@mofangdianai.com
 """,
     },
     {
@@ -193,6 +199,7 @@ INSTITUTIONS = [
 
 曹鑫淼
 15757468650
+modian@mofangdianai.com
 """,
     },
     {
@@ -220,6 +227,7 @@ INSTITUTIONS = [
 
 曹鑫淼
 15757468650
+modian@mofangdianai.com
 """,
     },
     {
@@ -245,6 +253,7 @@ INSTITUTIONS = [
 
 曹鑫淼
 15757468650
+modian@mofangdianai.com
 """,
     },
     {
@@ -266,6 +275,7 @@ INSTITUTIONS = [
 
 曹鑫淼
 15757468650
+modian@mofangdianai.com
 """,
     },
     {
@@ -290,6 +300,7 @@ INSTITUTIONS = [
 
 曹鑫淼
 15757468650
+modian@mofangdianai.com
 """,
     },
     {
@@ -309,6 +320,7 @@ INSTITUTIONS = [
 
 曹鑫淼
 15757468650
+modian@mofangdianai.com
 """,
     },
 ]

@@ -147,11 +147,18 @@ def slide_01():
         f_body(26, True),
         (220, 214, 204),
     )
-    text(d, (80, 860), "种子轮  人民币 400 万元", f_body(28), WHITE)
+    text(d, (80, 850), "种子轮  人民币 400 万元", f_body(28), WHITE)
     text(
         d,
-        (80, 910),
+        (80, 896),
         "宁波墨典网络科技有限公司  ·  曹鑫淼  15757468650",
+        f_body(20, True),
+        (200, 196, 188),
+    )
+    text(
+        d,
+        (80, 932),
+        "modian@mofangdianai.com",
         f_body(20, True),
         (200, 196, 188),
     )
@@ -566,10 +573,11 @@ def slide_12():
         y += 108
     card(d, (80, 610, 1200, 920), fill=(12, 22, 34), outline=(55, 66, 78))
     text(d, (110, 638), "宁波墨典网络科技有限公司", f_title(28), WHITE)
-    text(d, (110, 700), "创始人  曹鑫淼", f_body(24), CREAM)
-    text(d, (110, 748), "手机 / 微信  15757468650", f_body(24), CREAM)
-    text(d, (110, 796), "商家 ERP  cs.mofangdianai.com", f_body(20, True), (200, 196, 188))
-    text(d, (110, 840), "星选  dr.mofangdianai.com  ·  微信搜「灵祺星选」", f_body(20, True), (200, 196, 188))
+    text(d, (110, 690), "创始人  曹鑫淼", f_body(24), CREAM)
+    text(d, (110, 730), "手机 / 微信  15757468650", f_body(24), CREAM)
+    text(d, (110, 770), "邮箱  modian@mofangdianai.com", f_body(24), CREAM)
+    text(d, (110, 816), "商家 ERP  cs.mofangdianai.com", f_body(20, True), (200, 196, 188))
+    text(d, (110, 858), "星选  dr.mofangdianai.com  ·  微信搜「灵祺星选」", f_body(20, True), (200, 196, 188))
     footer(d, 12, light=True)
     return img
 
