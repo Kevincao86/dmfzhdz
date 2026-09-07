@@ -20,6 +20,7 @@ const AiOperationContentPage = lazy(() => import('./pages/AiOperationContentPage
 const BriefContentShell = lazy(() => import('./pages/BriefContentShell'))
 const BriefGenRecordsPage = lazy(() => import('./pages/BriefGenRecordsPage'))
 const DigitalHumanBroadcastPage = lazy(() => import('./pages/DigitalHumanBroadcastPage'))
+const ShortDramaPage = lazy(() => import('./pages/ShortDramaPage'))
 const ShortVideoOptimizationPage = lazy(() => import('./pages/ShortVideoOptimizationPage'))
 const FinanceReconcilePage = lazy(() =>
   import('./pages/FinancePages').then((m) => ({ default: m.FinanceReconcilePage })),
@@ -194,6 +195,7 @@ export default function App() {
                       path="ai-operation/digital-human"
                       element={<DigitalHumanBroadcastPage />}
                     />
+                    <Route path="ai-operation/short-drama" element={<ShortDramaPage />} />
                     <Route path="advertising" element={<LocalPromotionAdvertisingPage />} />
                     <Route path="leads" element={<LocalPromotionLeadsPage />} />
                     <Route path="finance" element={<FinanceReconcilePage />} />

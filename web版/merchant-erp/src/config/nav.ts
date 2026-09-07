@@ -67,6 +67,7 @@ export const NAV_ITEMS: NavItem[] = [
       { path: '/ai-operation/content', label: '爆款 Brief 生成' },
       { path: '/ai-operation/video-check', label: '短视频AI处理' },
       { path: '/ai-operation/digital-human', label: '数字人口播' },
+      { path: '/ai-operation/short-drama', label: 'AI短剧' },
     ],
   },
   { path: '/advertising', label: '投流', icon: Megaphone },
@@ -202,6 +203,7 @@ const SIMPLE_PRIMARY_PATHS = new Set([
   '/products',
   '/recruitment',
   '/ai-operation/digital-human',
+  '/ai-operation/short-drama',
   '/ai-operation/video-check',
   '/reviews',
 ])
@@ -268,6 +270,7 @@ export function buildSimpleNavItems(fullNav: NavItem[]): NavItem[] {
       icon: Sparkles,
       children: [
         { path: '/ai-operation/digital-human', label: '出镜口播' },
+        { path: '/ai-operation/short-drama', label: 'AI短剧' },
         { path: '/ai-operation/video-check', label: '探店短片' },
       ],
     },
