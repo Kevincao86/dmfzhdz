@@ -461,7 +461,10 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
   const { method, pathname, url, req, res, env, viteRoot, bodyReader } = ctx
   try {
 
-      if (pathname.startsWith('/api/merchant/ai/video/')) {
+      if (
+        pathname.startsWith('/api/merchant/ai/video/') ||
+        pathname === '/api/merchant/ai/ark/discover-models'
+      ) {
         let bodyRawVideo = ''
         if (method === 'POST') bodyRawVideo = await bodyReader()
         const videoDone = await handleMerchantAiVideoRoutes({

@@ -1,6 +1,7 @@
 /**
  * 从火山方舟 GET /api/v3/models 拉取账号已开通的视频模型，供 Seedance 轮询与配置展示。
  */
+import { fetchArkAccountAllModelIds } from './arkAccountModelDiscovery.js'
 import { DOUBAO_VIDEO_CATALOG, isArkGenerativeVideoModelId } from './arkModelCatalog.js'
 import {
   isArkVideoEndpointId,
@@ -41,20 +42,7 @@ export function isArkListableVideoModelId(id: string): boolean {
   return false
 }
 
-function parseModelsListResponse(j: unknown): string[] {
-  const root = j && typeof j === 'object' ? (j as Record<string, unknown>) : {}
-  const data = root.data
-  const rows = Array.isArray(data) ? data : Array.isArray(root) ? root : []
-  const out: string[] = []
-  for (const row of rows) {
-    if (!row || typeof row !== 'object') continue
-    const id = String((row as { id?: unknown }).id ?? '').trim()
-    if (id && isArkListableVideoModelId(id) && !out.includes(id)) out.push(normalizeArkVideoModelParam(id))
-  }
-  return out
-}
-
-/** 拉取账号已开通视频模型（含 ep- 接入点）；失败时返回空数组 */
+/** 拉取账号已开通视频模型（分页，含 ep- 接入点）；失败时返回空数组 */
 export async function fetchArkAccountVideoModels(input: {
   apiKey: string
   apiV3Root?: string
@@ -70,15 +58,7 @@ export async function fetchArkAccountVideoModels(input: {
   }
 
   try {
-    const res = await fetch(`${root}/models`, {
-      headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' },
-    })
-    if (!res.ok) {
-      cache.set(ck, { expiresAt: Date.now() + 60_000, models: [] })
-      return []
-    }
-    const j = await res.json()
-    const ids = parseModelsListResponse(j)
+    const ids = (await fetchArkAccountAllModelIds(input)).filter((id) => isArkListableVideoModelId(id))
     const models = ids.map((id) => ({ id, label: labelForModelId(id), source: 'api' as const }))
     cache.set(ck, { expiresAt: Date.now() + CACHE_TTL_MS, models })
     return models
@@ -141,6 +121,7 @@ export function sortArkVideoModelsByQuotaHint(ids: readonly string[]): string[] 
     if (/seedance-1-5|seedance-1\.5/.test(m)) return 3
     if (/seaweed|doubao-seaweed/.test(m)) return 4
     if (/wan2-1-14b|wan2\.1-14b/.test(m)) return 5
+    if (/seedance-2-5|seedance-2\.5/.test(m)) return 9
     if (/seedance-2-0-mini|seedance-2\.0-mini/.test(m)) return 10
     if (/seedance-2-0-fast|seedance-2\.0-fast/.test(m)) return 11
     if (/seedance-2-0|seedance-2\.0/.test(m)) return 12

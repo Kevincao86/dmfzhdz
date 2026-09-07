@@ -32,6 +32,7 @@ list_scopes() {
   ops_pr_library    运营台 PR 用户库
   ops_talent_library 运营台达人库
   ops_home          运营台首页看板
+  ops_ark_models    运营台火山方舟模型拉取 + Seedance 目录（不含短剧菜单）
   recommend_hall    推荐大厅全部达人池（慎用，见 recommend-all-talents-lock）
   mp_auth           小程序登录/会话
   ai_vision_workshop AI视觉工坊（DR增值嵌入 + 撮合小程序原生页 + 会员权限位）
@@ -208,6 +209,23 @@ OpsHomePage
 opsDashboardCompute
 opsMpUserDashboardCompute
 opsDashboardRange
+PAT
+      ;;
+    ops_ark_models)
+      cat <<'PAT'
+OpsAiModelsPage
+arkModelCatalog
+arkModelCatalogShared
+arkAccountModelDiscovery
+arkVideoModelDiscovery
+arkVideoEndpointsConfig
+arkVideoModelRouter
+arkVideoContentPayload
+videoModelDuration
+merchantVideoAiGateway
+merchantApiGatewayCore
+meoo-merchant-ai-ark-discover-models
+change-scope-guard
 PAT
       ;;
     recommend_hall)

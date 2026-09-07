@@ -14,6 +14,8 @@ export const DEFAULT_SEEDANCE_VIDEO_MODEL_ID = 'doubao-seedance-1-0-pro-250528'
 
 /** 运营/文档中的友好名 → 方舟 model 参数 */
 const SEEDANCE_MODEL_ALIASES: Record<string, string> = {
+  'doubao-seedance-2.5': 'doubao-seedance-2-5-260628',
+  'doubao-seedance-2-5': 'doubao-seedance-2-5-260628',
   'doubao-seedance-2.0': 'doubao-seedance-2-0-260128',
   'doubao-seedance-2-0': 'doubao-seedance-2-0-260128',
   'doubao-seedance-2.0-fast': 'doubao-seedance-2-0-fast-260128',
@@ -122,7 +124,10 @@ export function clampSeedanceVideoDuration(modelId: string, raw: number): number
   const id = modelId.trim().toLowerCase()
   let min = 4
   let max = 12
-  if (/seedance-2-0|seedance-2\.0/i.test(id)) {
+  if (/seedance-2-5|seedance-2\.5/i.test(id)) {
+    min = 4
+    max = 30
+  } else if (/seedance-2-0|seedance-2\.0/i.test(id)) {
     max = 15
   } else if (/seedance-1-5|seedance-1\.5/i.test(id)) {
     min = 4

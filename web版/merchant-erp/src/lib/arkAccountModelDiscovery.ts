@@ -40,7 +40,7 @@ export function classifyArkModelId(id: string): ArkModelCapability {
   if (!t) return 'other'
   if (/embedding|text-embedding|bge-|e5-|vector/.test(t)) return 'vector'
   if (
-    /^doubao-seedance|^doubao-seaweed|^wan2-|^doubao-seed3d|^doubao-seedream|^doubao-seededit|^doubao-seaweed/.test(
+    /^doubao-seedance|^seedance-|^doubao-seaweed|^wan2-|^doubao-seed3d|^doubao-seedream|^doubao-seededit|^doubao-seaweed/.test(
       t,
     )
   )

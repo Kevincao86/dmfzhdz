@@ -29,12 +29,13 @@ function seedanceModelDurationSpec(modelId: string, mode: VideoGenMode = 't2v'):
   const m = normalizeArkVideoModelParam(modelId).toLowerCase()
   if (/wan2-1-14b|wan2\.1-14b|wan2\.1/.test(m)) return { type: 'discrete', values: [3, 4, 5] }
   if (/seedance-1-0-lite|lite-i2v|lite-t2v/.test(m)) return { type: 'discrete', values: [3, 4, 5] }
+  if (/seedance-2-5|seedance-2\.5/.test(m)) return { type: 'range', min: 4, max: 30 }
   if (/seedance-2-0|seedance-2\.0/.test(m)) return { type: 'range', min: 4, max: 15 }
   if (/seedance-1-5|seedance-1\.5/.test(m)) return { type: 'range', min: 4, max: 15 }
   /** 1.0-pro / seaweed 图生视频官方仅 3/4/5 秒；文生可到 12 秒 */
   if (
     mode === 'i2v' &&
-    (/seedance-1-0|seaweed|doubao-seaweed/.test(m) && !/seedance-1-5|seedance-2-0/.test(m))
+    (/seedance-1-0|seaweed|doubao-seaweed/.test(m) && !/seedance-1-5|seedance-2-0|seedance-2-5/.test(m))
   ) {
     return { type: 'discrete', values: [3, 4, 5] }
   }

@@ -2010,9 +2010,11 @@ export async function handleMerchantAiVideoRoutes(input: {
       chat: pack.chat,
       vision: pack.vision,
       vector: pack.vector,
+      video: pack.video,
       chatEndpointsCsv: discoveredModelsToEndpointsCsv(pack.chat),
       visionEndpointsCsv: discoveredModelsToEndpointsCsv(pack.vision),
       vectorEndpointsCsv: discoveredModelsToEndpointsCsv(pack.vector),
+      videoEndpointsCsv: discoveredModelsToEndpointsCsv(pack.video),
     })
     return true
   }

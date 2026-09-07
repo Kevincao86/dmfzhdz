@@ -255,15 +255,23 @@ export default function OpsAiModelsPage() {
       const base =
         (import.meta.env.VITE_MEEO_SUPPORT_OPS_API_BASE as string | undefined)?.trim() ||
         'https://mofangdianai.com/erp-api'
-      const url = `${base.replace(/\/$/, '')}/api/merchant/ai/ark/discover-models?refresh=1`
+      // Nginx：/erp-api/FOO → :3001/api/FOO；须走扁平 meoo-*，勿再拼 /api/merchant/...
+      const url = `${base.replace(/\/$/, '')}/meoo-merchant-ai-ark-discover-models?refresh=1`
       const res = await fetch(url)
-      const j = (await res.json()) as {
+      const text = await res.text()
+      let j: {
         ok?: boolean
         message?: string
-        counts?: { chat?: number; vision?: number; vector?: number }
+        counts?: { chat?: number; vision?: number; vector?: number; video?: number }
         chatEndpointsCsv?: string
         visionEndpointsCsv?: string
         vectorEndpointsCsv?: string
+        videoEndpointsCsv?: string
+      } = {}
+      try {
+        j = JSON.parse(text) as typeof j
+      } catch {
+        throw new Error(res.ok ? '上游返回非 JSON' : `HTTP ${res.status}`)
       }
       if (!res.ok || !j.ok) {
         throw new Error(j.message || `HTTP ${res.status}`)
@@ -273,10 +281,11 @@ export default function OpsAiModelsPage() {
         arkChatEndpoints: j.chatEndpointsCsv || p.arkChatEndpoints,
         arkVisionEndpoints: j.visionEndpointsCsv || p.arkVisionEndpoints,
         arkVectorEndpoints: j.vectorEndpointsCsv || p.arkVectorEndpoints,
+        arkVideoEndpoints: j.videoEndpointsCsv || p.arkVideoEndpoints,
       }))
       setEditingVideoAi(true)
       setHint(
-        `已从火山 API 拉取：语言 ${j.counts?.chat ?? 0} · 视觉 ${j.counts?.vision ?? 0} · 向量 ${j.counts?.vector ?? 0}。请点击「保存」写入注册表。`,
+        `已从火山 API 拉取：语言 ${j.counts?.chat ?? 0} · 视觉 ${j.counts?.vision ?? 0} · 向量 ${j.counts?.vector ?? 0} · 视频 ${j.counts?.video ?? 0}。请点击「保存」写入注册表。未出现的模型需在方舟控制台先开通。`,
       )
     } catch (e) {
       const detail = e instanceof Error ? e.message : String(e)
@@ -807,7 +816,7 @@ export default function OpsAiModelsPage() {
           </div>
           <OpsArkModelEndpointsEditor
             label="Seedance · 视频模型（逗号分隔「显示名|模型ID或ep」；推荐模型 ID，勿填对话模型 ep）"
-            hint="勾选或「一键填入全部」加载系统内置 Seedance / Seaweed / Wan 视频模型；勿填 Doubao-Seed 对话 ep。"
+            hint="点「从火山API拉取全部模型」可导入账号已开通视频模型（含 Seedance 2.5）；也可勾选或「一键填入全部」加载内置目录。勿填 Doubao-Seed 对话 ep。"
             placeholder="Seedance 1.5 Pro|doubao-seedance-1-5-pro-251215, Pro|ep-xxxxxxxx"
             catalog={DOUBAO_VIDEO_CATALOG}
             value={videoAi.arkVideoEndpoints ?? ''}

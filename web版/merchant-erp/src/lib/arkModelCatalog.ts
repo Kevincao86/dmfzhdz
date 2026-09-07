@@ -52,15 +52,16 @@ export const DOUBAO_IMAGE_CATALOG: ArkCatalogEntry[] = [
 
 /** 图2/3/4：豆包视觉 — 视频生成（priority 越小视觉质量优先越高；额度不足时按序降级） */
 export const DOUBAO_VIDEO_CATALOG: ArkCatalogEntry[] = [
-  { label: 'Doubao-Seedance-2.0', modelId: 'doubao-seedance-2-0-260128', kind: 'video_both', priority: 1 },
-  { label: 'Doubao-Seedance-2.0-fast', modelId: 'doubao-seedance-2-0-fast-260128', kind: 'video_both', priority: 2 },
-  { label: 'Doubao-Seedance-2.0-mini', modelId: 'doubao-seedance-2-0-mini-260615', kind: 'video_both', priority: 3 },
-  { label: 'Doubao-Seedance-1.0-pro', modelId: 'doubao-seedance-1-0-pro-250528', kind: 'video_both', priority: 4 },
-  { label: 'Doubao-Seedance-1.0-pro-fast', modelId: 'doubao-seedance-1-0-pro-fast-250528', kind: 'video_both', priority: 5 },
-  { label: 'Doubao-视频生成-Seaweed', modelId: 'doubao-seaweed-241128', kind: 'video_both', priority: 6 },
-  { label: 'Doubao-Seedance-1.0-lite-t2v', modelId: 'doubao-seedance-1-0-lite-t2v-250428', kind: 'video_t2v', priority: 7 },
-  { label: 'Doubao-Seedance-1.0-lite-i2v', modelId: 'doubao-seedance-1-0-lite-i2v-250428', kind: 'video_i2v', priority: 7 },
-  { label: 'Wan2.1-14B', modelId: 'wan2-1-14b-250224', kind: 'video_both', priority: 8 },
+  { label: 'Doubao-Seedance-2.5', modelId: 'doubao-seedance-2-5-260628', kind: 'video_both', priority: 1 },
+  { label: 'Doubao-Seedance-2.0', modelId: 'doubao-seedance-2-0-260128', kind: 'video_both', priority: 2 },
+  { label: 'Doubao-Seedance-2.0-fast', modelId: 'doubao-seedance-2-0-fast-260128', kind: 'video_both', priority: 3 },
+  { label: 'Doubao-Seedance-2.0-mini', modelId: 'doubao-seedance-2-0-mini-260615', kind: 'video_both', priority: 4 },
+  { label: 'Doubao-Seedance-1.0-pro', modelId: 'doubao-seedance-1-0-pro-250528', kind: 'video_both', priority: 5 },
+  { label: 'Doubao-Seedance-1.0-pro-fast', modelId: 'doubao-seedance-1-0-pro-fast-250528', kind: 'video_both', priority: 6 },
+  { label: 'Doubao-视频生成-Seaweed', modelId: 'doubao-seaweed-241128', kind: 'video_both', priority: 7 },
+  { label: 'Doubao-Seedance-1.0-lite-t2v', modelId: 'doubao-seedance-1-0-lite-t2v-250428', kind: 'video_t2v', priority: 8 },
+  { label: 'Doubao-Seedance-1.0-lite-i2v', modelId: 'doubao-seedance-1-0-lite-i2v-250428', kind: 'video_i2v', priority: 8 },
+  { label: 'Wan2.1-14B', modelId: 'wan2-1-14b-250224', kind: 'video_both', priority: 9 },
   /** 1.5-pro 部分账号已暂停服务，置于末位作兜底 */
   { label: 'Doubao-Seedance-1.5-pro', modelId: 'doubao-seedance-1-5-pro-251215', kind: 'video_both', priority: 20 },
 ]
@@ -238,6 +239,7 @@ export function isArkGenerativeVideoModelId(id: string): boolean {
   const t = id.trim().toLowerCase()
   if (!t || /^ep-/.test(t)) return false
   if (/^doubao-seedance/i.test(t)) return true
+  if (/^seedance-/i.test(t)) return true
   if (/^doubao-seaweed/i.test(t)) return true
   if (/^doubao-seedance-2-0/i.test(t)) return true
   if (/^wan2-1-14b/i.test(t) || /^wan2\.1-14b/i.test(t)) return true

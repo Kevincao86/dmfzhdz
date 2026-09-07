@@ -25,7 +25,7 @@ export function seedanceContentRequiresImageRole(modelId: string): boolean {
 /** Seedance 2.0 才支持多参考图 r2v；1.0/1.5 仅 i2v / 首尾帧 */
 export function seedanceModelSupportsReferenceR2v(modelId: string): boolean {
   const m = normalizeArkVideoModelParam(modelId).toLowerCase()
-  return /seedance-2-0|seedance-2\.0/.test(m)
+  return /seedance-2-0|seedance-2\.0|seedance-2-5|seedance-2\.5/.test(m)
 }
 
 export function parseSeedanceImageLayoutMode(raw: unknown): SeedanceImageLayoutMode {

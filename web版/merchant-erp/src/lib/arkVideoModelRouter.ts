@@ -27,6 +27,7 @@ function parseEnvModelList(raw: string): string[] {
 /** 视觉质量 tier：越小越优先（Pro > Seaweed > Lite） */
 export function arkVideoVisualTier(modelId: string): number {
   const norm = normalizeArkVideoModelParam(modelId).toLowerCase()
+  if (/seedance-2-5|seedance-2\.5/.test(norm)) return 0
   if (/seedance-2-0-mini|seedance-2\.0-mini/.test(norm)) return 3
   if (/seedance-2-0-fast|seedance-2\.0-fast/.test(norm)) return 2
   if (/seedance-2-0|seedance-2\.0/.test(norm)) return 1
