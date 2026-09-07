@@ -84,4 +84,12 @@ export function applyRegistryVideoAiToMerchantEnv(
   } else if (envQwenModels) {
     out.MERCHANT_AI_QWEN_VIDEO_MODELS = envQwenModels
   }
+
+  fill('JIMENG_ACCESS_KEY_ID', vx.jimengAccessKeyId)
+  fill('JIMENG_SECRET_ACCESS_KEY', vx.jimengSecretAccessKey)
+  fill('JIMENG_REGION', vx.jimengRegion)
+  fill('VIDU_API_TOKEN', vx.viduApiToken)
+  fill('VIDU_API_BASE', vx.viduApiBase)
+  fill('MINIMAX_VIDEO_API_KEY', vx.minimaxVideoApiKey)
+  fill('MINIMAX_GROUP_ID', vx.minimaxGroupId)
 }

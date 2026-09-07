@@ -9,6 +9,7 @@ import {
   X,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   catalogCustomEntriesOnly,
   isBuiltinAiVendorId,
@@ -40,9 +41,7 @@ import OpsArkModelEndpointsEditor from '../components/OpsArkModelEndpointsEditor
 import {
   catalogEndpointsCsv,
   DOUBAO_CHAT_CATALOG,
-  DOUBAO_VIDEO_CATALOG,
 } from '../../meooRegistryShared/arkModelCatalogShared'
-import { QWEN_VIDEO_CATALOG } from '../../meooRegistryShared/qwenVisionCatalogShared'
 import { useOpsModuleEdit } from '../useOpsModuleEdit'
 
 export default function OpsAiModelsPage() {
@@ -231,11 +230,9 @@ export default function OpsAiModelsPage() {
     videoAiBaseline.current = { ...videoAi }
     setVideoAi((prev) => {
       const chat = (prev.arkChatEndpoints ?? '').trim()
-      const video = (prev.arkVideoEndpoints ?? '').trim()
       return {
         ...prev,
         arkChatEndpoints: chat ? prev.arkChatEndpoints : catalogEndpointsCsv(DOUBAO_CHAT_CATALOG),
-        arkVideoEndpoints: video ? prev.arkVideoEndpoints : catalogEndpointsCsv(DOUBAO_VIDEO_CATALOG),
       }
     })
     setEditingVideoAi(true)
@@ -381,18 +378,18 @@ export default function OpsAiModelsPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold text-white">
-            AI 模型
+            语言模型 / Key
             {!canEdit ? <span className="ml-2 text-sm font-normal text-amber-300/90">· 仅查看</span> : null}
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            在此维护各厂商 <strong className="text-slate-400">API Key</strong>、
-            <strong className="text-slate-400">AI 供应商目录</strong>
-            ，以及 <strong className="text-slate-400">短视频（可灵 / Seedance）网关绑定</strong>
+            在此维护各厂商 <strong className="text-slate-400">API Key</strong> 与
+            <strong className="text-slate-400"> 豆包对话 / 视觉 / 向量</strong>
+            模型列表。短剧 / Seedance / 可灵 / 即梦凭据请到{' '}
+            <Link to="/ai-models/short-drama" className="text-cyan-400 hover:underline">
+              短剧 AI 制作
+            </Link>
             。商户 ERP 文案 / 生图默认<strong className="text-slate-400">自动</strong>
-            选用已配置 Key 的厂商，不再由运营台固定「默认模型」。保存后写入项目根{' '}
-            <span className="font-mono text-slate-400">.meoo-dev-sync</span>，ERP 约 2.5 秒内拉取。
-            商户 ERP「短视频AI处理」页<strong className="text-slate-400">仅选择模型与参数</strong>
-            ，不在商户端暴露密钥。
+            选用已配置 Key 的厂商。
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -662,7 +659,7 @@ export default function OpsAiModelsPage() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-200">
             <Sparkles className="h-4 w-4 text-cyan-400" />
-            短视频 / 视频模型 API（可灵 + Seedance / 方舟 + 千问）
+            豆包对话 / 视觉 / 向量
           </h2>
           <div className="flex flex-wrap gap-2">
             {canEdit ? (
@@ -711,68 +708,16 @@ export default function OpsAiModelsPage() {
           </div>
         </div>
         <p className="mb-4 text-xs text-slate-500">
-          以下凭据由<strong className="text-slate-400">运营侧</strong>维护，供商户 ERP 短视频页经 dev 网关调用。
-          更新时间：{videoAiUpdatedAt ? new Date(videoAiUpdatedAt).toLocaleString('zh-CN') : '—'}
+          拉取会同时写入视频模型列表（在
+          <Link to="/ai-models/short-drama" className="text-cyan-400 hover:underline">
+            短剧 AI 制作
+          </Link>
+          中查看）。更新时间：{videoAiUpdatedAt ? new Date(videoAiUpdatedAt).toLocaleString('zh-CN') : '—'}
         </p>
         <div className="grid gap-4 md:grid-cols-2">
-          <div>
-            <label className="mb-1 block text-xs text-slate-400">可灵 Access Key（JWT iss）</label>
-            <SecretInput
-              autoComplete="off"
-              readOnly={!editingVideoAi}
-              disabled={loading}
-              value={editingVideoAi ? (videoAi.klingAccessKey ?? '') : ''}
-              onChange={(e) => setVideoAi((p) => ({ ...p, klingAccessKey: e.target.value }))}
-              placeholder={
-                (videoAi.klingAccessKey ?? '').trim() && !editingVideoAi
-                  ? '已保存 · 请点击「编辑」修改'
-                  : '留空则清除'
-              }
-              className={cn(
-                'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100 placeholder:text-slate-600',
-                !editingVideoAi && 'cursor-default opacity-80',
-              )}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-slate-400">可灵 Secret Key（JWT 签名）</label>
-            <SecretInput
-              autoComplete="off"
-              readOnly={!editingVideoAi}
-              disabled={loading}
-              value={editingVideoAi ? (videoAi.klingSecretKey ?? '') : ''}
-              onChange={(e) => setVideoAi((p) => ({ ...p, klingSecretKey: e.target.value }))}
-              placeholder={
-                (videoAi.klingSecretKey ?? '').trim() && !editingVideoAi
-                  ? '已保存 · 请点击「编辑」修改'
-                  : '留空则清除'
-              }
-              className={cn(
-                'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100 placeholder:text-slate-600',
-                !editingVideoAi && 'cursor-default opacity-80',
-              )}
-            />
-          </div>
-          <div className="md:col-span-2">
-            <label className="mb-1 block text-xs text-slate-400">
-              可灵 API 根域（可选，如 https://api.klingai.com，留空用默认）
-            </label>
-            <input
-              type="text"
-              autoComplete="off"
-              readOnly={!editingVideoAi}
-              disabled={loading}
-              value={videoAi.klingApiBase ?? ''}
-              onChange={(e) => setVideoAi((p) => ({ ...p, klingApiBase: e.target.value }))}
-              className={cn(
-                'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100',
-                !editingVideoAi && 'cursor-default opacity-80',
-              )}
-            />
-          </div>
           <OpsArkModelEndpointsEditor
             label="豆包 · 对话模型（逗号分隔「显示名|方舟模型ID或 ep-xxxx」；Brief 生文优先用此列表 + 火山 API 实时池）"
-            hint="点「从火山API拉取全部模型」可导入账号已开通语言模型（约 100 条）；Brief 额度不足/报错时按列表自动切换，Character/1.8 服务受限时自动跳过。"
+            hint="点「从火山API拉取全部模型」可导入账号已开通语言模型；Brief 额度不足/报错时按列表自动切换。"
             placeholder="Character|doubao-seed-character-251128, Pro|ep-xxxxxxxx"
             catalog={DOUBAO_CHAT_CATALOG}
             value={videoAi.arkChatEndpoints ?? ''}
@@ -814,182 +759,6 @@ export default function OpsAiModelsPage() {
               )}
             />
           </div>
-          <OpsArkModelEndpointsEditor
-            label="Seedance · 视频模型（逗号分隔「显示名|模型ID或ep」；推荐模型 ID，勿填对话模型 ep）"
-            hint="点「从火山API拉取全部模型」可导入账号已开通视频模型（含 Seedance 2.5）；也可勾选或「一键填入全部」加载内置目录。勿填 Doubao-Seed 对话 ep。"
-            placeholder="Seedance 1.5 Pro|doubao-seedance-1-5-pro-251215, Pro|ep-xxxxxxxx"
-            catalog={DOUBAO_VIDEO_CATALOG}
-            value={videoAi.arkVideoEndpoints ?? ''}
-            onChange={(v) => setVideoAi((p) => ({ ...p, arkVideoEndpoints: v }))}
-            editing={editingVideoAi}
-            disabled={loading}
-          />
-          <OpsArkModelEndpointsEditor
-            label="千问 · 视频模型（逗号分隔「显示名|百炼模型ID」；豆包额度用尽时商户端自动切换）"
-            hint="勾选或「一键填入全部」加载系统内置千问/万相视频模型（文生/图生/参考生/口播/剪辑）；须同时在下方供应商 Key 配置通义千问 Key。"
-            placeholder="wan2.6-i2v|wan2.6-i2v, wan2.7-t2v|wan2.7-t2v"
-            catalog={QWEN_VIDEO_CATALOG}
-            value={videoAi.qwenVideoModels ?? ''}
-            onChange={(v) => setVideoAi((p) => ({ ...p, qwenVideoModels: v }))}
-            editing={editingVideoAi}
-            disabled={loading}
-          />
-          <div className="md:col-span-2">
-            <label className="mb-1 block text-xs text-slate-400">
-              方舟视频专用 API Key（可选；留空则由商户网关使用上方「豆包」Key）
-            </label>
-            <SecretInput
-              autoComplete="off"
-              readOnly={!editingVideoAi}
-              disabled={loading}
-              value={editingVideoAi ? (videoAi.arkVideoApiKey ?? '') : ''}
-              onChange={(e) => setVideoAi((p) => ({ ...p, arkVideoApiKey: e.target.value }))}
-              placeholder={
-                (videoAi.arkVideoApiKey ?? '').trim() && !editingVideoAi
-                  ? '已保存 · 请点击「编辑」修改'
-                  : '与豆包不同时再填'
-              }
-              className={cn(
-                'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100 placeholder:text-slate-600',
-                !editingVideoAi && 'cursor-default opacity-80',
-              )}
-            />
-          </div>
-          <div className="md:col-span-2 border-t border-slate-800 pt-4">
-            <p className="mb-3 text-xs font-medium text-cyan-400/90">灵祺AI云剪 · 服务凭据</p>
-            <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
-              智能媒体服务云剪辑（ICE 2020-11-09）。商户 ERP 批量云剪经 BFF 调用，密钥仅存服务端与注册表。
-            </p>
-            <label className="mb-1 block text-xs text-slate-400">ICE AppId（IMS 控制台应用 ID）</label>
-            <input
-              type="text"
-              autoComplete="off"
-              readOnly={!editingVideoAi}
-              disabled={loading}
-              value={editingVideoAi ? (videoAi.iceAppId ?? '') : ''}
-              onChange={(e) => setVideoAi((p) => ({ ...p, iceAppId: e.target.value }))}
-              placeholder={
-                (videoAi.iceAppId ?? '').trim() && !editingVideoAi
-                  ? '已保存 · 请点击「编辑」修改'
-                  : '应用 AppId'
-              }
-              className={cn(
-                'mb-3 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100',
-                !editingVideoAi && 'cursor-default opacity-80',
-              )}
-            />
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-xs text-slate-400">AccessKey ID</label>
-                <input
-                  type="text"
-                  autoComplete="off"
-                  readOnly={!editingVideoAi}
-                  disabled={loading}
-                  value={editingVideoAi ? (videoAi.iceAccessKeyId ?? '') : ''}
-                  onChange={(e) => setVideoAi((p) => ({ ...p, iceAccessKeyId: e.target.value }))}
-                  placeholder={
-                    (videoAi.iceAccessKeyId ?? '').trim() && !editingVideoAi
-                      ? '已保存 · 请点击「编辑」修改'
-                      : 'RAM AccessKey ID'
-                  }
-                  className={cn(
-                    'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100',
-                    !editingVideoAi && 'cursor-default opacity-80',
-                  )}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs text-slate-400">AccessKey Secret</label>
-                <SecretInput
-                  autoComplete="off"
-                  readOnly={!editingVideoAi}
-                  disabled={loading}
-                  value={editingVideoAi ? (videoAi.iceAccessKeySecret ?? '') : ''}
-                  onChange={(e) => setVideoAi((p) => ({ ...p, iceAccessKeySecret: e.target.value }))}
-                  placeholder={
-                    (videoAi.iceAccessKeySecret ?? '').trim() && !editingVideoAi
-                      ? '已保存 · 请点击「编辑」修改'
-                      : 'RAM AccessKey Secret'
-                  }
-                  className={cn(
-                    'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100',
-                    !editingVideoAi && 'cursor-default opacity-80',
-                  )}
-                />
-              </div>
-            </div>
-            <label className="mb-1 mt-3 block text-xs text-slate-400">地域（默认 cn-shanghai）</label>
-            <input
-              type="text"
-              autoComplete="off"
-              readOnly={!editingVideoAi}
-              disabled={loading}
-              value={videoAi.iceRegion ?? ''}
-              onChange={(e) => setVideoAi((p) => ({ ...p, iceRegion: e.target.value }))}
-              placeholder="cn-shanghai"
-              className={cn(
-                'mb-3 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100',
-                !editingVideoAi && 'cursor-default opacity-80',
-              )}
-            />
-            <label className="mb-1 block text-xs text-slate-400">
-              点播存储地址 StorageLocation（链接拉取素材、成片输出到 VOD 时必填）
-            </label>
-            <input
-              type="text"
-              autoComplete="off"
-              readOnly={!editingVideoAi}
-              disabled={loading}
-              value={videoAi.iceVodStorageLocation ?? ''}
-              onChange={(e) => setVideoAi((p) => ({ ...p, iceVodStorageLocation: e.target.value }))}
-              placeholder="out-xxx.oss-cn-shanghai.aliyuncs.com"
-              className={cn(
-                'mb-3 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100',
-                !editingVideoAi && 'cursor-default opacity-80',
-              )}
-            />
-            <div className="mt-4 rounded-lg border border-cyan-900/60 bg-cyan-950/30 p-4">
-              <p className="mb-2 text-xs font-semibold text-cyan-200">
-                本地上传 · OSS 成片 URL 前缀
-                <span className="ml-2 rounded bg-cyan-900/80 px-1.5 py-0.5 text-[10px] font-medium text-cyan-100">
-                  商户「灵祺AI云剪」必填
-                </span>
-              </p>
-              <p className="mb-3 text-[11px] leading-relaxed text-slate-400">
-                填写后商户 ERP 可将视频直传到该 Bucket 的{' '}
-                <span className="font-mono text-slate-300">source/日期/</span> 目录；须为标准 OSS 域名，例如{' '}
-                <span className="font-mono text-slate-300">
-                  https://bucket.oss-cn-shanghai.aliyuncs.com/meoo-out/
-                </span>
-                。与 ICE AccessKey 须对该 Bucket 有写权限。
-              </p>
-              {(videoAi.iceOutputOssUrlPrefix ?? '').trim() && !editingVideoAi ? (
-                <p className="mb-2 text-[11px] text-emerald-400/95">
-                  已配置：{(videoAi.iceOutputOssUrlPrefix ?? '').trim()}
-                </p>
-              ) : !editingVideoAi ? (
-                <p className="mb-2 text-[11px] text-amber-400/95">
-                  未配置 — 商户端「本地上传视频」不可用（仍可用 HTTPS 链接）
-                </p>
-              ) : null}
-              <label className="mb-1 block text-xs text-slate-400">OSS 成片 URL 前缀</label>
-              <input
-                type="text"
-                autoComplete="off"
-                readOnly={!editingVideoAi}
-                disabled={loading}
-                value={videoAi.iceOutputOssUrlPrefix ?? ''}
-                onChange={(e) => setVideoAi((p) => ({ ...p, iceOutputOssUrlPrefix: e.target.value }))}
-                placeholder="https://bucket.oss-cn-shanghai.aliyuncs.com/meoo-out/"
-                className={cn(
-                  'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600',
-                  !editingVideoAi && 'cursor-default opacity-80',
-                  editingVideoAi && 'border-cyan-800/80',
-                )}
-              />
-            </div>
-          </div>
         </div>
       </section>
 
@@ -999,12 +768,9 @@ export default function OpsAiModelsPage() {
           说明
         </h2>
         <ul className="list-inside list-disc space-y-1 text-xs text-slate-500">
-          <li>「各厂商 API Key」与「短视频 API」需先<strong className="text-slate-400">编辑</strong>再<strong className="text-slate-400">保存</strong>写入注册表；编辑未保存时可点取消放弃修改。</li>
+          <li>「各厂商 API Key」与「豆包对话 / 视觉 / 向量」需先<strong className="text-slate-400">编辑</strong>再<strong className="text-slate-400">保存</strong>；短剧 / Seedance / 即梦凭据在「短剧 AI 制作」。</li>
           <li>顶层「保存模型与 Key」在任一分区仍处于编辑状态时不可用，请先保存或取消该分区。</li>
           <li>磁盘：注册表文件为项目根 <span className="font-mono text-slate-400">.meoo-dev-sync/registry.json</span>；GET 网关合并内置厂商目录再下发 ERP。</li>
-          <li>
-            「短视频 API」与本页 Key 互不覆盖：ERP 服务端优先读部署环境变量，未配置时再回退本注册表中运营填写的绑定。
-          </li>
         </ul>
       </section>
     </div>

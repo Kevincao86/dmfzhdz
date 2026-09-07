@@ -321,6 +321,13 @@ export type RegistryVideoAi = {
   iceVodStorageLocation?: string
   iceOutputOssUrlPrefix?: string
   qwenVideoModels?: string
+  jimengAccessKeyId?: string
+  jimengSecretAccessKey?: string
+  jimengRegion?: string
+  viduApiToken?: string
+  viduApiBase?: string
+  minimaxVideoApiKey?: string
+  minimaxGroupId?: string
 }
 
 export type RegistryMpMembershipCheckoutRequest = {

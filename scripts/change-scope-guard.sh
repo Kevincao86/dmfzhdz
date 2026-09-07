@@ -33,6 +33,7 @@ list_scopes() {
   ops_talent_library 运营台达人库
   ops_home          运营台首页看板
   ops_ark_models    运营台火山方舟模型拉取 + Seedance 目录（不含短剧菜单）
+  ops_short_drama   运营台「短剧AI制作」子菜单 + 即梦/Vidu/MiniMax 凭据（不含成片工坊）
   recommend_hall    推荐大厅全部达人池（慎用，见 recommend-all-talents-lock）
   mp_auth           小程序登录/会话
   ai_vision_workshop AI视觉工坊（DR增值嵌入 + 撮合小程序原生页 + 会员权限位）
@@ -225,6 +226,19 @@ videoModelDuration
 merchantVideoAiGateway
 merchantApiGatewayCore
 meoo-merchant-ai-ark-discover-models
+change-scope-guard
+PAT
+      ;;
+    ops_short_drama)
+      cat <<'PAT'
+OpsShortDramaPage
+opsNavConfig
+商家管理后台/src/App.tsx
+OpsAiModelsPage
+opsRegistryTypes
+registryVideoAiNormalize
+opsRegistryApi
+registryVideoAiEnvMerge
 change-scope-guard
 PAT
       ;;

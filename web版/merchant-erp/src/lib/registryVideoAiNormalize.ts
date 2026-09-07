@@ -18,6 +18,13 @@ const VIDEO_AI_FIELD_KEYS = [
   'iceSmartBatchEnabled',
   'iceSmartBatchTemplateIds',
   'qwenVideoModels',
+  'jimengAccessKeyId',
+  'jimengSecretAccessKey',
+  'jimengRegion',
+  'viduApiToken',
+  'viduApiBase',
+  'minimaxVideoApiKey',
+  'minimaxGroupId',
 ] as const
 
 /**
@@ -73,5 +80,12 @@ export function normalizeRegistryVideoAi(raw: unknown): RegistryVideoAi {
     iceSmartBatchEnabled: slice('iceSmartBatchEnabled', 16),
     iceSmartBatchTemplateIds: slice('iceSmartBatchTemplateIds', 4096),
     qwenVideoModels: slice('qwenVideoModels', 8192),
+    jimengAccessKeyId: slice('jimengAccessKeyId', 260),
+    jimengSecretAccessKey: slice('jimengSecretAccessKey', 520),
+    jimengRegion: slice('jimengRegion', 64),
+    viduApiToken: slice('viduApiToken', 520),
+    viduApiBase: slice('viduApiBase', 260),
+    minimaxVideoApiKey: slice('minimaxVideoApiKey', 520),
+    minimaxGroupId: slice('minimaxGroupId', 120),
   }
 }

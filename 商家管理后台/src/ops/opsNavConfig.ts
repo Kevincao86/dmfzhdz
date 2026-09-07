@@ -5,6 +5,7 @@ import {
   Camera,
   Clapperboard,
   CreditCard,
+  Film,
   Headphones,
   LayoutDashboard,
   Library,
@@ -31,6 +32,8 @@ export type OpsNavLeaf = {
   label: string
   icon: LucideIcon
   permission: OpsNavPermission
+  /** 为 true 时不把子路径算作当前项（避免 /ai-models 亮到 /ai-models/short-drama） */
+  exact?: boolean
 }
 
 export type OpsNavParent = {
@@ -141,7 +144,16 @@ export const OPS_NAV_GROUPS: OpsNavGroup[] = [
     id: 'system',
     label: '系统与内容',
     entries: [
-      { kind: 'leaf', to: '/ai-models', label: 'AI 模型', icon: Bot, permission: 'ai_models' },
+      {
+        kind: 'parent',
+        id: 'ai-models-hub',
+        label: 'AI 模型',
+        icon: Bot,
+        children: [
+          { kind: 'leaf', to: '/ai-models', label: '语言模型 / Key', icon: Bot, permission: 'ai_models', exact: true },
+          { kind: 'leaf', to: '/ai-models/short-drama', label: '短剧 AI 制作', icon: Film, permission: 'ai_models' },
+        ],
+      },
       {
         kind: 'parent',
         id: 'support-hub',
@@ -158,12 +170,14 @@ export const OPS_NAV_GROUPS: OpsNavGroup[] = [
   },
 ]
 
-function leafMatchesPath(pathname: string, search: string, to: string): boolean {
+function leafMatchesPath(pathname: string, search: string, to: string, exact?: boolean): boolean {
   const [path, query = ''] = to.split('?')
   const pathOk =
     path === '/'
       ? pathname === '/' || pathname === ''
-      : pathname === path || pathname.startsWith(`${path}/`)
+      : exact
+        ? pathname === path || pathname === `${path}/`
+        : pathname === path || pathname.startsWith(`${path}/`)
   if (!pathOk) return false
   if (!query) return true
   const want = new URLSearchParams(query)
@@ -175,11 +189,12 @@ function leafMatchesPath(pathname: string, search: string, to: string): boolean 
 }
 
 export function isOpsNavLeafActive(pathname: string, search: string, to: string): boolean {
-  return leafMatchesPath(pathname, search, to)
+  const leaf = OPS_NAV_FLAT.find((item) => item.to === to)
+  return leafMatchesPath(pathname, search, to, leaf?.exact)
 }
 
 export function isOpsNavParentActive(pathname: string, search: string, parent: OpsNavParent): boolean {
-  return parent.children.some((c) => leafMatchesPath(pathname, search, c.to))
+  return parent.children.some((c) => leafMatchesPath(pathname, search, c.to, c.exact))
 }
 
 export const OPS_NAV_FLAT: OpsNavLeaf[] = OPS_NAV_GROUPS.flatMap((g) =>
@@ -190,7 +205,7 @@ export function resolveOpsPageMeta(pathname: string, search = ''): { title: stri
   const path = pathname.split('?')[0] || '/'
   let best: OpsNavLeaf | null = null
   for (const item of OPS_NAV_FLAT) {
-    if (!leafMatchesPath(path, search, item.to)) continue
+    if (!leafMatchesPath(path, search, item.to, item.exact)) continue
     if (!best || item.to.length > best.to.length) best = item
   }
   if (best) {
@@ -244,7 +259,7 @@ export function opsNavGroupStorageKey(groupId: string): string {
 export function isOpsNavGroupActive(pathname: string, search: string, group: OpsNavGroup): boolean {
   for (const entry of group.entries) {
     if (entry.kind === 'leaf') {
-      if (leafMatchesPath(pathname, search, entry.to)) return true
+      if (leafMatchesPath(pathname, search, entry.to, entry.exact)) return true
     } else if (isOpsNavParentActive(pathname, search, entry)) {
       return true
     }

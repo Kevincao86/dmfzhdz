@@ -5,6 +5,7 @@ import OpsAdminLayout from './ops/OpsAdminLayout'
 import OpsAccountsPermissionsPage from './ops/pages/OpsAccountsPermissionsPage'
 import OpsHomePage from './ops/pages/OpsHomePage'
 import OpsAiModelsPage from './ops/pages/OpsAiModelsPage'
+import OpsShortDramaPage from './ops/pages/OpsShortDramaPage'
 import OpsCustomerDetailPage from './ops/pages/OpsCustomerDetailPage'
 import OpsAnnouncementsPage from './ops/pages/OpsAnnouncementsPage'
 import OpsMpAnnouncementsPage from './ops/pages/OpsMpAnnouncementsPage'
@@ -64,6 +65,7 @@ export default function App() {
           <Route path="regional-partners" element={<OpsRegionalPartnersPage />} />
           <Route path="mp-membership-status/:role/:targetId" element={<OpsMpMembershipStatusPage />} />
           <Route path="ai-models" element={<OpsAiModelsPage />} />
+          <Route path="ai-models/short-drama" element={<OpsShortDramaPage />} />
           <Route path="support" element={<OpsSupportHubPage />} />
           <Route path="support-mp" element={<Navigate to="/support?channel=mp" replace />} />
           <Route path="help-manual" element={<OpsHelpManualPage />} />

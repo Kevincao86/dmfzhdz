@@ -27,5 +27,12 @@ export function normalizeRegistryVideoAi(raw: unknown): RegistryVideoAi {
     iceVodStorageLocation: slice('iceVodStorageLocation', 520),
     iceOutputOssUrlPrefix: slice('iceOutputOssUrlPrefix', 520),
     qwenVideoModels: slice('qwenVideoModels', 8192),
+    jimengAccessKeyId: slice('jimengAccessKeyId', 260),
+    jimengSecretAccessKey: slice('jimengSecretAccessKey', 520),
+    jimengRegion: slice('jimengRegion', 64),
+    viduApiToken: slice('viduApiToken', 520),
+    viduApiBase: slice('viduApiBase', 260),
+    minimaxVideoApiKey: slice('minimaxVideoApiKey', 520),
+    minimaxGroupId: slice('minimaxGroupId', 120),
   }
 }
