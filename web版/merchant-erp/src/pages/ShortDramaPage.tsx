@@ -3,6 +3,7 @@ import {
   Baby,
   BookOpen,
   Building2,
+  Camera,
   Car,
   Coffee,
   Cpu,
@@ -14,16 +15,21 @@ import {
   Flower2,
   Gamepad2,
   Ghost,
+  Gift,
   GraduationCap,
   Heart,
+  Home,
   Hotel,
   Loader2,
+  Map,
   Mic2,
   Monitor,
   Mountain,
   PawPrint,
   Plane,
+  Radio,
   Scissors,
+  Shirt,
   ShoppingBag,
   Smartphone,
   Smile,
@@ -66,7 +72,18 @@ import {
   type VideoAiBackendConfig,
 } from '../services/videoAiApi'
 
-type WorldId = 'catering' | 'leisure' | 'tech' | 'drama' | 'comic'
+type WorldId =
+  | 'catering'
+  | 'leisure'
+  | 'travel'
+  | 'vlog'
+  | 'retail'
+  | 'auto'
+  | 'home'
+  | 'edu'
+  | 'tech'
+  | 'drama'
+  | 'comic'
 type StyleId =
   | 'smoke'
   | 'neon'
@@ -74,6 +91,9 @@ type StyleId =
   | 'cinema'
   | 'quiet'
   | 'product'
+  | 'outdoor'
+  | 'handheld'
+  | 'showroom'
   | 'live'
   | 'cel'
   | 'ink'
@@ -125,12 +145,12 @@ const DURATION_OPTIONS: DurationOpt[] = [
   { sec: 8, label: '8 秒', hint: '单段直出' },
   { sec: 12, label: '12 秒', hint: '单段直出' },
   { sec: 15, label: '15 秒', hint: '单段直出' },
-  { sec: 30, label: '30 秒', hint: '2 段拼接' },
-  { sec: 60, label: '1 分钟', hint: '4 段拼接' },
-  { sec: 180, label: '3 分钟', hint: '先试镜再全片' },
-  { sec: 300, label: '5 分钟', hint: '先试镜再全片' },
-  { sec: 600, label: '10 分钟', hint: '先试镜再全片' },
-  { sec: 900, label: '15 分钟', hint: '先试镜再全片' },
+  { sec: 30, label: '30 秒', hint: '先试镜 · 待接小云雀' },
+  { sec: 60, label: '1 分钟', hint: '先试镜 · 待接小云雀' },
+  { sec: 180, label: '3 分钟', hint: '先试镜 · 待接小云雀' },
+  { sec: 300, label: '5 分钟', hint: '先试镜 · 待接小云雀' },
+  { sec: 600, label: '10 分钟', hint: '先试镜 · 待接小云雀' },
+  { sec: 900, label: '15 分钟', hint: '先试镜 · 待接小云雀' },
 ]
 
 const WORLDS: {
@@ -139,13 +159,13 @@ const WORLDS: {
   blurb: string
   refill: string
   defaultStyle: StyleId
-  promptKind: 'shop' | 'product' | 'drama' | 'comic'
+  promptKind: 'shop' | 'product' | 'vlog' | 'drama' | 'comic'
   fields: { key: FieldKey; label: string; placeholder: string }[]
 }[] = [
   {
     id: 'catering',
     label: '餐饮',
-    blurb: '火锅、烧烤、茶饮、面馆到店场景。钩子围着菜单、价格和第一口。超过 15 秒会分段拼接，先出前 5 秒试镜。',
+    blurb: '火锅、烧烤、茶饮到日料西餐。钩子围着菜单、价格和第一口。长片先 5 秒试镜。',
     refill: '用当前店名重填剧本',
     defaultStyle: 'smoke',
     promptKind: 'shop',
@@ -159,7 +179,7 @@ const WORLDS: {
   {
     id: 'leisure',
     label: '休闲娱乐',
-    blurb: '美业、健身、亲子、酒旅、娱乐。钩子围着体验反差和预约。长片同样先试镜再全片。',
+    blurb: '美业、健身、亲子、酒旅、娱乐。钩子围着体验反差和预约。',
     refill: '用当前店名重填剧本',
     defaultStyle: 'fresh',
     promptKind: 'shop',
@@ -168,6 +188,90 @@ const WORLDS: {
       { key: 'offerName', label: '体验项目', placeholder: '例：锁骨发 / 体验课' },
       { key: 'price', label: '价格记忆点', placeholder: '例：体验 99' },
       { key: 'area', label: '位置', placeholder: '例：万达 3 楼' },
+    ],
+  },
+  {
+    id: 'travel',
+    label: '旅游',
+    blurb: '景点打卡、酒店入住、攻略翻车、城市漫步。钩子围着第一眼和「值不值」。',
+    refill: '用当前目的地重填剧本',
+    defaultStyle: 'outdoor',
+    promptKind: 'shop',
+    fields: [
+      { key: 'storeName', label: '目的地 / 线路', placeholder: '例：大理古城三日' },
+      { key: 'offerName', label: '必打卡点', placeholder: '例：苍山索道日出' },
+      { key: 'price', label: '预算记忆点', placeholder: '例：人均 800' },
+      { key: 'area', label: '季节 / 时段', placeholder: '例：清明小长假' },
+    ],
+  },
+  {
+    id: 'vlog',
+    label: 'Vlog',
+    blurb: '一日跟拍、搬家、探店日记、创业日记。手持生活感，前三秒就要人设。',
+    refill: '用当前主题重填剧本',
+    defaultStyle: 'handheld',
+    promptKind: 'vlog',
+    fields: [
+      { key: 'storeName', label: 'Vlog 主题', placeholder: '例：搬进新合租' },
+      { key: 'offerName', label: '主角人设', placeholder: '例：北漂打工人' },
+      { key: 'price', label: '今日目标', placeholder: '例：把衣柜装完' },
+      { key: 'area', label: '城市 / 空间', placeholder: '例：上海合租' },
+    ],
+  },
+  {
+    id: 'retail',
+    label: '零售探店',
+    blurb: '服饰、美妆、潮玩、超市开箱。钩子围着试穿试色和「闭眼入」。',
+    refill: '用当前门店重填剧本',
+    defaultStyle: 'showroom',
+    promptKind: 'shop',
+    fields: [
+      { key: 'storeName', label: '门店 / 品牌', placeholder: '例：某集合店' },
+      { key: 'offerName', label: '主推单品', placeholder: '例：春款风衣' },
+      { key: 'price', label: '价格记忆点', placeholder: '例：299 起' },
+      { key: 'area', label: '商场楼层', placeholder: '例：万象城 B1' },
+    ],
+  },
+  {
+    id: 'auto',
+    label: '汽车',
+    blurb: '试驾、提车、车内场景、对比打脸。钩子围着关门声和第一脚油。',
+    refill: '用当前车型重填剧本',
+    defaultStyle: 'showroom',
+    promptKind: 'product',
+    fields: [
+      { key: 'storeName', label: '车型 / 品牌', placeholder: '例：某新能源 SUV' },
+      { key: 'offerName', label: '核心卖点', placeholder: '例：智驾辅助' },
+      { key: 'price', label: '价格档', placeholder: '例：15 万档' },
+      { key: 'area', label: '试驾路段', placeholder: '例：环城快速路' },
+    ],
+  },
+  {
+    id: 'home',
+    label: '家装房产',
+    blurb: '看房、收房、改造前后、软装开箱。钩子围着推开门那一帧。',
+    refill: '用当前楼盘重填剧本',
+    defaultStyle: 'quiet',
+    promptKind: 'shop',
+    fields: [
+      { key: 'storeName', label: '楼盘 / 项目', placeholder: '例：江景样板间' },
+      { key: 'offerName', label: '空间卖点', placeholder: '例：全景落地窗' },
+      { key: 'price', label: '总价 / 套餐', placeholder: '例：装修套餐 9.9 万' },
+      { key: 'area', label: '区位', placeholder: '例：滨江核心盘' },
+    ],
+  },
+  {
+    id: 'edu',
+    label: '知识教培',
+    blurb: '兴趣课、考证、亲子课、干货口播短剧化。钩子围着「学会那一秒」。',
+    refill: '用当前课程重填剧本',
+    defaultStyle: 'fresh',
+    promptKind: 'shop',
+    fields: [
+      { key: 'storeName', label: '机构 / 课程', placeholder: '例：少儿编程体验课' },
+      { key: 'offerName', label: '学会什么', placeholder: '例：做出第一个小游戏' },
+      { key: 'price', label: '体验价', placeholder: '例：体验 1 元' },
+      { key: 'area', label: '校区位置', placeholder: '例：学区旁校区' },
     ],
   },
   {
@@ -187,7 +291,7 @@ const WORLDS: {
   {
     id: 'drama',
     label: '短剧',
-    blurb: '职场、情感、悬疑、家庭。人物关系驱动；长片按分镜分段续写，尽量尾帧衔接。',
+    blurb: '职场、情感、重生、豪门、刑侦、古装。人物关系驱动；长片宜走小云雀 Agent。',
     refill: '用当前设定重填剧本',
     defaultStyle: 'live',
     promptKind: 'drama',
@@ -226,6 +330,9 @@ const SCENES: DramaScene[] = [
   { id: 'buffet', world: 'catering', name: '自助烤肉', hook: '夹到招牌肉才算开场', mustSee: '烤盘、翻面、滋滋油光', visual: '烤盘特写，跟拍夹肉', icon: Flame },
   { id: 'breakfast', world: 'catering', name: '早点摊', hook: '天亮前那一口最真实', mustSee: '蒸笼、油条或粥、街边', visual: '清晨街边，烟火气克制', icon: Soup },
   { id: 'takeaway', world: 'catering', name: '外卖开箱', hook: '拆袋比吃更有戏', mustSee: '拆袋、摆盘、份量、第一口', visual: '桌面俯拍拆袋，干脆运镜', icon: ShoppingBag },
+  { id: 'japan', world: 'catering', name: '日料寿司', hook: '刀工那一下最安静', mustSee: '切鱼、握寿司、酱油', visual: '干净台面，克制运镜', icon: Soup },
+  { id: 'western', world: 'catering', name: '西餐约会', hook: '烛光比菜单更危险', mustSee: '摆盘、碰杯、第一口', visual: '暖光浅景深，餐具质感', icon: Wine },
+  { id: 'hotpot_base', world: 'catering', name: '粥底夜宵', hook: '凌晨三点才懂这口', mustSee: '砂锅、配菜、夜色', visual: '深夜街边，蒸汽克制', icon: Soup },
   // leisure
   { id: 'hair', world: 'leisure', name: '美发造型', hook: '镜子一转前后不是同一个人', mustSee: '镜子、剪吹、前后对比', visual: '干净镜面，剪发跟拍', icon: Scissors },
   { id: 'nail', world: 'leisure', name: '美甲美睫', hook: '特写比整张脸更有说服力', mustSee: '色板、微距完成面', visual: '微距完成面，缓慢环绕', icon: Sparkles },
@@ -239,8 +346,53 @@ const SCENES: DramaScene[] = [
   { id: 'escape', world: 'leisure', name: '剧本杀密室', hook: '进门就进另一条时间线', mustSee: '机关、线索、惊吓反应', visual: '暗调场景，线索特写，禁止血腥', icon: Ghost },
   { id: 'billiard', world: 'leisure', name: '台球桌游', hook: '一杆清台才说话', mustSee: '击球、球桌、欢呼', visual: '台球厅灯光，击球慢动作', icon: Gamepad2 },
   { id: 'flower', world: 'leisure', name: '鲜花礼品', hook: '拆纸的声音就能留人', mustSee: '花束、包装、递出', visual: '自然光花材特写', icon: Flower2 },
-  { id: 'edu', world: 'leisure', name: '兴趣课堂', hook: '孩子举手最能转化', mustSee: '举手、作品、课堂', visual: '明亮教室，信任感', icon: GraduationCap },
-  { id: 'travel', world: 'leisure', name: '周边游玩', hook: '下车第一眼就要想发圈', mustSee: '景点门头、打卡位、笑脸', visual: '户外自然光，跟拍行走', icon: Plane },
+  // travel
+  { id: 'scenic', world: 'travel', name: '景点打卡', hook: '下车第一眼就要想发圈', mustSee: '门头或地标、打卡位、笑脸', visual: '户外自然光，跟拍行走', icon: Camera },
+  { id: 'citywalk', world: 'travel', name: '城市漫步', hook: '巷子拐角才有故事', mustSee: '街巷、咖啡或小吃、脚步', visual: '手持跟拍，城市纹理', icon: Map },
+  { id: 'hotel_checkin', world: 'travel', name: '酒店入住', hook: '推开门那一帧决定好评', mustSee: '房卡、推门、窗景床品', visual: '缓慢推轨，干净高级', icon: Hotel },
+  { id: 'guide_fail', world: 'travel', name: '攻略翻车', hook: '网红点排队两小时', mustSee: '长队、表情、改道惊喜', visual: '真实跟拍，情绪清晰', icon: Plane },
+  { id: 'roadtrip', world: 'travel', name: '自驾公路', hook: '车窗风一吹人就松了', mustSee: '车内、公路、落日', visual: '车窗光影，跟拍公路', icon: Car },
+  { id: 'food_travel', world: 'travel', name: '美食旅行', hook: '为这一口专程飞来', mustSee: '当地小吃、第一口、街景', visual: '街头烟火气，克制', icon: UtensilsCrossed },
+  { id: 'camp', world: 'travel', name: '露营星空', hook: '帐篷外比滤镜好看', mustSee: '帐篷、篝火或星空、朋友', visual: '户外自然光到夜景过渡', icon: Trees },
+  { id: 'museum', world: 'travel', name: '博物馆一日', hook: '展柜前忽然安静', mustSee: '展品、观众反应、笔记', visual: '展厅柔光，禁止乱闪', icon: Building2 },
+  // vlog
+  { id: 'day_in_life', world: 'vlog', name: '一日跟拍', hook: '闹钟响了人设就出来', mustSee: '起床、通勤、收尾', visual: '手持生活感，自然光', icon: Camera },
+  { id: 'move_house', world: 'vlog', name: '搬家日记', hook: '纸箱一拆情绪就上来', mustSee: '纸箱、空房、第一晚', visual: '手持跟拍，真实凌乱', icon: Home },
+  { id: 'startup', world: 'vlog', name: '创业日记', hook: '成交或翻车都要拍', mustSee: '工位、客户、数据或订单', visual: '办公实拍，屏幕可读', icon: Building2 },
+  { id: 'study', world: 'vlog', name: '学习打卡', hook: '台灯亮着就不准放弃', mustSee: '书桌、笔记、时钟', visual: '夜台灯，安静跟拍', icon: BookOpen },
+  { id: 'couple', world: 'vlog', name: '情侣日常', hook: '小事比告白更狠', mustSee: '并肩、拌嘴、和好', visual: '暖光双人，手持', icon: Heart },
+  { id: 'pet_vlog', world: 'vlog', name: '萌宠日常', hook: '它一抬头你就输了', mustSee: '萌宠脸、互动、家', visual: '浅景深萌宠特写', icon: PawPrint },
+  { id: 'fitness_vlog', world: 'vlog', name: '健身打卡', hook: '最后一组才说话', mustSee: '训练、汗水、称重或镜子', visual: '跟拍发力，慢动作', icon: Dumbbell },
+  { id: 'shop_diary', world: 'vlog', name: '探店日记', hook: '推门前先吐槽预期', mustSee: '推门、点单、第一口', visual: '手持探店，真实反应', icon: ShoppingBag },
+  // retail
+  { id: 'fashion', world: 'retail', name: '服饰试穿', hook: '镜子一转人设换了', mustSee: '试衣间、镜子前后、面料', visual: '商场自然光，跟拍试穿', icon: Shirt },
+  { id: 'beauty', world: 'retail', name: '美妆试色', hook: '试色比参数更能留人', mustSee: '色号、手臂或唇部、镜子', visual: '微距试色，通透光', icon: Sparkles },
+  { id: 'sneaker', world: 'retail', name: '潮鞋开箱', hook: '拆盒比上脚更有戏', mustSee: '拆盒、鞋面特写、上脚', visual: '干净桌面，材质特写', icon: ShoppingBag },
+  { id: 'toy', world: 'retail', name: '潮玩盲盒', hook: '拆到隐藏款才算赢', mustSee: '拆盒、手办、表情', visual: '桌面俯拍，情绪特写', icon: Gift },
+  { id: 'supermarket', world: 'retail', name: '超市开箱', hook: '购物车比清单更诚实', mustSee: '货架、扫码、开箱', visual: '手持跟拍货架', icon: ShoppingBag },
+  { id: 'jewelry', world: 'retail', name: '珠宝首饰', hook: '戴上那一秒眼神变了', mustSee: '首饰微距、佩戴、镜子', visual: '高级克制光，材质清晰', icon: Sparkles },
+  { id: 'home_goods', world: 'retail', name: '家居软装', hook: '摆上桌才算真正开箱', mustSee: '拆箱、摆放、空间前后', visual: '家居自然光，俯拍', icon: Home },
+  // auto
+  { id: 'testdrive', world: 'auto', name: '试驾体验', hook: '第一脚油门决定种草', mustSee: '上车、仪表、起步', visual: '座舱清晰，公路跟拍', icon: Car },
+  { id: 'pickup', world: 'auto', name: '提车仪式', hook: '交钥匙那帧最贵', mustSee: '车头、钥匙、合影', visual: '展厅干净光，仪式感', icon: Car },
+  { id: 'cabin', world: 'auto', name: '座舱科技', hook: '屏幕一点灯全亮', mustSee: '中控屏、语音、氛围灯', visual: '夜色座舱，屏幕可读', icon: Monitor },
+  { id: 'compare_car', world: 'auto', name: '同价对比', hook: '并排一开差距出来', mustSee: '两车并排、同路试、结论', visual: '公路对比，克制字幕', icon: Car },
+  { id: 'family_car', world: 'auto', name: '家用场景', hook: '后排孩子先投票', mustSee: '后排、储物、上下车', visual: '家庭用车真实跟拍', icon: Baby },
+  { id: 'ev_charge', world: 'auto', name: '补能日常', hook: '插枪那一下最安静', mustSee: '充电桩、电量、等待', visual: '夜间充电站，实用光', icon: Cpu },
+  // home
+  { id: 'viewing', world: 'home', name: '看房推门', hook: '推开门那一帧定生死', mustSee: '推门、采光、格局', visual: '缓慢推轨，真实样板间', icon: Home },
+  { id: 'handover', world: 'home', name: '收房验收', hook: '卷尺比销售更诚实', mustSee: '卷尺、空房、问题点', visual: '空房自然光，跟拍验收', icon: Building2 },
+  { id: 'reno_before', world: 'home', name: '改造前后', hook: '同一角度前后打脸', mustSee: '同机位前后、关键改动', visual: '前后对比，干净构图', icon: Home },
+  { id: 'soft_unbox', world: 'home', name: '软装开箱', hook: '摆上才算真正完工', mustSee: '拆箱、摆放、空间氛围', visual: '家居自然光', icon: ShoppingBag },
+  { id: 'kitchen', world: 'home', name: '厨房动线', hook: '开火那一下最香', mustSee: '台面、收纳、开火', visual: '厨房实用光，跟拍', icon: UtensilsCrossed },
+  { id: 'balcony', world: 'home', name: '阳台生活', hook: '一杯咖啡就住进来', mustSee: '阳台、绿植、窗外', visual: '自然光，慢节奏', icon: Flower2 },
+  // edu
+  { id: 'kids_class', world: 'edu', name: '少儿兴趣课', hook: '孩子举手最能转化', mustSee: '举手、作品、课堂', visual: '明亮教室，信任感', icon: GraduationCap },
+  { id: 'exam', world: 'edu', name: '考证冲刺', hook: '倒计时板上写着要命', mustSee: '倒计时、刷题、突破', visual: '夜自习感，克制', icon: BookOpen },
+  { id: 'skill', world: 'edu', name: '技能实操', hook: '第一次做对那一秒', mustSee: '动手、成品、老师点评', visual: '工坊或教室跟拍', icon: Wand2 },
+  { id: 'talk', world: 'edu', name: '干货口播', hook: '第一句就要打脸认知', mustSee: '出镜、要点板书或字幕克制', visual: '干净背景，人物清晰', icon: Mic2 },
+  { id: 'parent', world: 'edu', name: '家长课', hook: '家长先慌，老师先稳', mustSee: '家长提问、示范、释然', visual: '明亮教室，关系清楚', icon: Baby },
+  { id: 'online', world: 'edu', name: '线上直播课', hook: '弹幕比掌声更吵', mustSee: '屏幕、互动、知识点', visual: '过肩拍屏幕，界面可读', icon: Monitor },
   // tech
   { id: 'phone', world: 'tech', name: '数码开箱', hook: '拆封比参数更有戏', mustSee: '拆封、机身、上手', visual: '干净桌面俯拍，材质特写', icon: Smartphone },
   { id: 'smarthome', world: 'tech', name: '智能家居', hook: '一句话灯就亮了', mustSee: '开关灯、音箱、生活场景', visual: '现代客厅，灯光变化', icon: Cpu },
@@ -259,6 +411,12 @@ const SCENES: DramaScene[] = [
   { id: 'teaser', world: 'drama', name: '下集预告', hook: '高潮切黑只留一句', mustSee: '高潮碎片、切黑、旁白', visual: '快切定格，禁止片尾表', icon: Film },
   { id: 'revenge', world: 'drama', name: '逆袭翻盘', hook: '最被看不起的人先赢', mustSee: '被嘲、证据、翻盘', visual: '都市写实，节奏加快', icon: Crown },
   { id: 'campus_live', world: 'drama', name: '校园写实', hook: '放学铃一响事情就变了', mustSee: '校门口、书包、对峙', visual: '校园写实，自然光', icon: BookOpen },
+  { id: 'rebirth', world: 'drama', name: '重生开局', hook: '睁眼回到关键那天', mustSee: '惊醒、日历或旧物、决意', visual: '都市写实，时间感道具', icon: Sparkles },
+  { id: 'tycoon', world: 'drama', name: '豪门恩怨', hook: '宴会一句话掀桌', mustSee: '宴会、对峙、身份反差', visual: '奢华克制，表情清晰', icon: Crown },
+  { id: 'crime', world: 'drama', name: '刑侦钩子', hook: '证据比口供先说话', mustSee: '现场线索、对质、反转', visual: '冷色写实，禁止血腥特写', icon: Film },
+  { id: 'costume', world: 'drama', name: '古装权谋', hook: '一封折子改命运', mustSee: '宫装或衙门、奏折、对视', visual: '古装写实，服饰清楚，禁止低俗', icon: Wand2 },
+  { id: 'period', world: 'drama', name: '年代剧', hook: '旧收音机里有秘密', mustSee: '年代道具、邻里、信件', visual: '怀旧色调，道具准确', icon: Radio },
+  { id: 'flash_marry', world: 'drama', name: '闪婚契约', hook: '先签字再谈感情', mustSee: '合同、对视、犹豫', visual: '都市写实，节奏干脆', icon: Heart },
   // comic
   { id: 'school', world: 'comic', name: '校园日常', hook: '放学铃一响开始不对劲', mustSee: '教室、大特写、分格', visual: '日漫赛璐珞，眼睛高光', icon: BookOpen },
   { id: 'xianxia', world: 'comic', name: '古风仙侠', hook: '剑未出鞘气势先到', mustSee: '古装、兵器、广袖', visual: '国漫厚涂，二维，禁止真人古装剧', icon: Wand2 },
@@ -285,6 +443,31 @@ const FORMULAS: DramaFormula[] = [
   { id: 'l_flash', world: 'leisure', name: '体验限时', hint: '名额有限，错过再等', beats: ['名额提示', '体验片段', '抢到的人反应', '倒计时预约'], story: '{店名}的{卖点}今晚只放{价格}体验名额。', roles: '顾问 / 赶来的客人', conflict: '名额见底，门口还有人在问。', dialogue: '就这些名额了，明天恢复原价。' },
   { id: 'l_boss', world: 'leisure', name: '老师出手', hint: '被看轻后亲自做示范', beats: ['被当众看轻', '老师上手', '效果打脸', '店名收尾'], story: '有人嫌{店名}普通，老师亲自上手做{卖点}。', roles: '挑事客人 / 老师', conflict: '被看轻之后用完成面打脸。', dialogue: '你再看看这版{卖点}。' },
   { id: 'l_family', world: 'leisure', name: '带娃翻车', hint: '家长先慌，孩子先笑', beats: ['家长犹豫', '孩子上手', '笑场', '立刻报名'], story: '家长犹豫要不要给孩子试{店名}的{卖点}，孩子一上手就笑开了。', roles: '家长 / 孩子 / 老师', conflict: '家长怕不适合，现场反馈相反。', dialogue: '行，给我们留个名额。' },
+  { id: 'tr_first', world: 'travel', name: '第一眼打卡', hint: '下车就想发圈', beats: ['抵达误会', '第一眼打脸预期', '打卡位亮相', '下次还来'], story: '到了{店名}以为会踩雷，第一眼{卖点}直接改口。', roles: '旅行两人', conflict: '攻略预期翻车或超预期。', dialogue: '这才是{卖点}，拍了。' },
+  { id: 'tr_queue', world: 'travel', name: '网红排队', hint: '排两小时值不值', beats: ['长队崩溃', '差点放弃', '进去打脸', '预算记忆'], story: '为{卖点}在{位置}排长队，差点放弃，进去后改口。', roles: '游客 / 同伴', conflict: '时间成本 vs 体验回报。', dialogue: '{价格}值不值？我收回那句。' },
+  { id: 'tr_hotel', world: 'travel', name: '推门打脸', hint: '照片和实景差很远', beats: ['对照片怀疑', '推门瞬间', '窗景或床品', '好评定格'], story: '对{店名}照片存疑，推门看见{卖点}当场改口。', roles: '入住客人', conflict: '滤镜预期 vs 实景。', dialogue: '比照片还好看。' },
+  { id: 'tr_road', world: 'travel', name: '公路松绑', hint: '车窗风把人吹松', beats: ['城市压垮', '上车出发', '公路空镜', '人松一口气'], story: '在{位置}快崩了，开上{店名}线路，{卖点}把人救回来。', roles: '自驾的人', conflict: '城市压力 vs 公路自由。', dialogue: '就这一段路，值了。' },
+  { id: 'tr_food', world: 'travel', name: '为吃飞来', hint: '专程为一口', beats: ['专程抵达', '排队或找店', '第一口', '安利定格'], story: '专程为{卖点}飞到{店名}，第一口决定值不值。', roles: '美食旅客', conflict: '旅途成本 vs 一口味道。', dialogue: '就为这口{卖点}。' },
+  { id: 'v_day', world: 'vlog', name: '一日人设', hint: '闹钟响了人设出场', beats: ['起床开场', '白天冲突', '小胜或翻车', '夜灯收尾'], story: '{卖点}的一天从{位置}开始，目标是{价格}。', roles: '{卖点}', conflict: '计划和现实对不上。', dialogue: '今天先把{价格}做完。' },
+  { id: 'v_move', world: 'vlog', name: '空房第一晚', hint: '纸箱比旁白更狠', beats: ['空房沉默', '拆箱忙乱', '摆上关键物', '第一晚定格'], story: '{卖点}搬进{位置}，空房第一晚才像真正开始。', roles: '{卖点}', conflict: '期待新生活 vs 空房孤独。', dialogue: '先把这一箱拆完。' },
+  { id: 'v_fail', world: 'vlog', name: '翻车实录', hint: '失败比成功更留人', beats: ['自信开场', '现场翻车', '补救', '自嘲收尾'], story: '{卖点}本想轻松完成{价格}，结果在{位置}翻车。', roles: '{卖点}', conflict: '人设撑不住现实。', dialogue: '……当我没说过。' },
+  { id: 'v_win', world: 'vlog', name: '小胜一刻', hint: '小事做成也要拍', beats: ['目标亮相', '过程咬牙', '做成那秒', '分享安利'], story: '{卖点}盯着{价格}硬啃，做成那一秒最安静。', roles: '{卖点}', conflict: '坚持 vs 放弃。', dialogue: '成了。' },
+  { id: 'r_try', world: 'retail', name: '试穿打脸', hint: '镜子前后不是同一个人', beats: ['进店犹豫', '试穿过程', '镜子反转', '闭眼入'], story: '在{店名}试{卖点}，镜子一转当场改口。', roles: '客人 / 导购', conflict: '以为不适合，上身相反。', dialogue: '这件{卖点}，我要了。' },
+  { id: 'r_swatch', world: 'retail', name: '试色种草', hint: '色号比广告诚实', beats: ['挑色纠结', '试色特写', '镜子确认', '带走'], story: '在{店名}纠结色号，试到{卖点}立刻决定。', roles: '客人 / 柜员', conflict: '参数太多，眼睛说了算。', dialogue: '就这个{卖点}。' },
+  { id: 'r_unbox', world: 'retail', name: '开箱反转', hint: '拆盒比上身更有戏', beats: ['拆盒预期', '第一眼皱眉或惊喜', '上手', '安利'], story: '开箱{店名}的{卖点}，{价格}档位当场被验证。', roles: '开箱的人', conflict: '包装预期 vs 实物。', dialogue: '{价格}能做成这样？' },
+  { id: 'r_soldout', world: 'retail', name: '断货倒计时', hint: '只剩最后一件', beats: ['库存提示', '冲去门店', '抢到或错过', '号召'], story: '{店名}的{卖点}只剩最后几件，{位置}还有人在问。', roles: '客人 / 店员', conflict: '来晚了。', dialogue: '就这些了。' },
+  { id: 'a_drive', world: 'auto', name: '第一脚油', hint: '起步定种草', beats: ['上车怀疑', '起步', '路感打脸', '定论'], story: '试驾{店名}，第一脚油门验证{卖点}。', roles: '试驾者 / 销售', conflict: '纸面参数 vs 路感。', dialogue: '这脚{卖点}，够了。' },
+  { id: 'a_key', world: 'auto', name: '交钥匙', hint: '仪式感定格', beats: ['展厅等待', '交钥匙', '绕车一圈', '合影'], story: '在{位置}提走{店名}，钥匙交到手里才像真的。', roles: '车主 / 销售', conflict: '漫长等待后的兑现。', dialogue: '钥匙给我。' },
+  { id: 'a_cabin', world: 'auto', name: '座舱亮灯', hint: '一点灯全亮', beats: ['熄灯座舱', '点亮屏幕', '功能演示', '夜色定格'], story: '{店名}座舱一点亮，{卖点}把夜色切开。', roles: '演示者', conflict: '科技感是否花架子。', dialogue: '你听，这就是{卖点}。' },
+  { id: 'a_family', world: 'auto', name: '后排投票', hint: '孩子先举手', beats: ['家长纠结', '后排体验', '孩子表态', '下单'], story: '家用场景里，孩子先给{店名}的{卖点}投票。', roles: '家长 / 孩子', conflict: '参数 vs 家庭体感。', dialogue: '后排说了算。' },
+  { id: 'h_door', world: 'home', name: '推门定生死', hint: '第一帧采光', beats: ['门外犹豫', '推门', '采光打脸', '留下意向'], story: '看{店名}，推门看见{卖点}当场改口。', roles: '看房人 / 顾问', conflict: '户型图 vs 实景。', dialogue: '这采光，我要了。' },
+  { id: 'h_before', world: 'home', name: '前后打脸', hint: '同机位最狠', beats: ['改造前惨状', '关键改动', '同机位后', '安利套餐'], story: '{店名}同一角度前后对比，{卖点}差距一眼可见。', roles: '业主 / 设计师', conflict: '口头说差不多，画面差很多。', dialogue: '还是以前那个家吗？' },
+  { id: 'h_measure', world: 'home', name: '卷尺诚实', hint: '收房比销售狠', beats: ['空房进场', '卷尺发现问题', '对质', '整改或接受'], story: '收{店名}时卷尺比说辞更诚实。', roles: '业主 / 物业', conflict: '承诺 vs 实测。', dialogue: '你自己看尺寸。' },
+  { id: 'h_soft', world: 'home', name: '摆上才算完', hint: '软装定氛围', beats: ['毛坯或空荡', '拆箱摆放', '氛围成型', '生活定格'], story: '{卖点}摆进{位置}，家才像能住。', roles: '业主', conflict: '硬装完成不等于能住。', dialogue: '这下像家了。' },
+  { id: 'e_raise', world: 'edu', name: '举手种草', hint: '孩子举手最能转化', beats: ['家长犹豫', '课堂上手', '举手笑场', '报名'], story: '家长犹豫{店名}的{卖点}，孩子举手就定了。', roles: '家长 / 孩子 / 老师', conflict: '怕不适合 vs 现场反馈。', dialogue: '给我们留个名额。' },
+  { id: 'e_skill', world: 'edu', name: '学会那秒', hint: '第一次做对', beats: ['不会开场', '试错', '做对那秒', '作品亮相'], story: '在{店名}学{卖点}，第一次做对那秒最安静。', roles: '学员 / 老师', conflict: '不会 vs 做成。', dialogue: '成了。' },
+  { id: 'e_talk', world: 'edu', name: '认知打脸', hint: '第一句掀翻常识', beats: ['错误常识', '一句打脸', '三点干货', '行动号召'], story: '关于{卖点}，很多人在{位置}一直搞错。', roles: '讲者', conflict: '常识是错的。', dialogue: '你以为的{卖点}，不是这样。' },
+  { id: 'e_exam', world: 'edu', name: '倒计时冲刺', hint: '板子上写着要命', beats: ['倒计时压迫', '刷题崩溃', '方法救场', '信心回来'], story: '{价格}倒计时前，{店名}把{卖点}救回来。', roles: '考生 / 老师', conflict: '时间不够。', dialogue: '按这个方法，还来得及。' },
   { id: 't_unbox', world: 'tech', name: '开箱翻车', hint: '先嫌弃包装，上手打脸', beats: ['拆开先皱眉', '以为不值这个价', '功能亮相', '改口安利'], story: '开箱{店名}，先嫌弃包装，上手{卖点}之后立刻改口。', roles: '测评的人 / 旁边吐槽的朋友', conflict: '价格档看起来不匹配，体验相反。', dialogue: '{价格}能做成这样？我收回刚才那句。' },
   { id: 't_spec', world: 'tech', name: '参数打脸', hint: '口头参数打不过现场一试', beats: ['口头质疑参数', '现场演示', '结果弹出', '使用场景定格'], story: '有人说{店名}的{卖点}是宣传，当场在{位置}演示打脸。', roles: '质疑者 / 演示者', conflict: '口头不信，屏幕或实物结果说话。', dialogue: '你自己看，这就是{卖点}。' },
   { id: 't_commute', world: 'tech', name: '场景救命', hint: '最吵的时候它才出现', beats: ['场景噪音或混乱', '掏出产品', '一瞬间变静/变顺', '记忆点'], story: '在{位置}快被打断时，{店名}的{卖点}把局面救回来。', roles: '通勤或办公的人', conflict: '环境已经崩了，产品把节奏拉回来。', dialogue: '就靠这个{卖点}撑过这一段。' },
@@ -297,6 +480,11 @@ const FORMULAS: DramaFormula[] = [
   { id: 'd_love', world: 'drama', name: '情感掀翻', hint: '一句对白把关系掀翻', beats: ['亲密或冷战', '关键对白', '情绪决堤', '未说完'], story: '{店名}里两人本来还能装，{卖点}被一句对白掀翻。', roles: '{卖点}', conflict: '{价格}', dialogue: '你刚才说的，再重复一遍。' },
   { id: 'd_teaser', world: 'drama', name: '下集预告', hint: '高潮切黑，只留一句', beats: ['高潮碎片', '最大冲突', '突然切黑', '旁白预告'], story: '{店名}本集不给结局，{价格}留到下一秒。', roles: '{卖点}', conflict: '观众以为要揭晓。', dialogue: '下一秒，你不会想错过。' },
   { id: 'd_family', world: 'drama', name: '饭桌风暴', hint: '最亲的人最狠的话', beats: ['饭桌寒暄', '一句话刺穿', '沉默爆发', '门响或离席'], story: '{店名}的饭桌上，{卖点}被一句家常话刺穿。', roles: '{卖点}', conflict: '{价格}', dialogue: '你再说一遍试试。' },
+  { id: 'd_rebirth', world: 'drama', name: '重生开局', hint: '睁眼回到关键天', beats: ['惊醒', '确认旧物', '改写决意', '第一步行动'], story: '{店名}：{卖点}睁眼回到{位置}，决定改写{价格}。', roles: '{卖点}', conflict: '知道结局还要重来。', dialogue: '这一次，我不会再错。' },
+  { id: 'd_tycoon', world: 'drama', name: '宴会掀桌', hint: '一句身份翻盘', beats: ['宴会寒暄', '当众看轻', '身份亮牌', '全场静音'], story: '{店名}宴会上，{卖点}被当众看轻，{价格}摊到桌上。', roles: '{卖点}', conflict: '{价格}', dialogue: '你认错人了。' },
+  { id: 'd_crime', world: 'drama', name: '证据先到', hint: '口供不如物证', beats: ['对质僵持', '证据亮相', '表情崩掉', '悬念定格'], story: '{位置}里{卖点}还在狡辩，{价格}已经摆上桌。', roles: '{卖点}', conflict: '口头 vs 物证。', dialogue: '你自己看。' },
+  { id: 'd_costume', world: 'drama', name: '折子改命', hint: '一纸定生死', beats: ['递折子', '对视施压', '批红或拒', '命运转向'], story: '{店名}里一封折子，把{卖点}的命运拧向{价格}。', roles: '{卖点}', conflict: '权谋对峙。', dialogue: '陛下，请看这一页。' },
+  { id: 'd_marry', world: 'drama', name: '先签后爱', hint: '合同比告白更早', beats: ['合同推到眼前', '犹豫签字', '对视停顿', '关系未定'], story: '{店名}里{卖点}先面对合同，感情被{价格}压住。', roles: '{卖点}', conflict: '契约 vs 真心。', dialogue: '先签字，别的以后再说。' },
   { id: 'm_panel', world: 'comic', name: '分格钩子', hint: '第三格必须反转', beats: ['第一格铺垫', '第二格加码', '第三格打脸', '第四格定格'], story: '{店名}用{价格}讲{卖点}，第三格必须反转。', roles: '{卖点}', conflict: '读者以为走向日常。', dialogue: '你以为放学就结束了？' },
   { id: 'm_gag', world: 'comic', name: '搞笑打脸', hint: '表情比台词更狠', beats: ['正经开场', '动作走偏', '表情崩掉', '吐槽定格'], story: '{卖点}在{位置}里想装酷，结果当场翻车。', roles: '{卖点}', conflict: '人设撑不住动作。', dialogue: '……当我没说。' },
   { id: 'm_ink', world: 'comic', name: '气势一格', hint: '不出手，气势先到', beats: ['对峙远景', '特写眼睛', '气势铺开', '出招或收势'], story: '{店名}里{卖点}还没出手，气场已经压过去。', roles: '{卖点}', conflict: '对手先慌。', dialogue: '你先走一步。' },
@@ -307,11 +495,14 @@ const FORMULAS: DramaFormula[] = [
 
 const STYLES: { id: StyleId; worlds: WorldId[]; name: string; visual: string }[] = [
   { id: 'smoke', worlds: ['catering'], name: '烟火气', visual: '暖黄实用光，蒸汽油光，真实市井，禁止精修广告片感' },
-  { id: 'neon', worlds: ['catering', 'leisure'], name: '夜色街灯', visual: '夜晚路灯与室内暖光，潮湿地面反光，克制不霓虹爆炸' },
-  { id: 'fresh', worlds: ['catering', 'leisure'], name: '清新打卡', visual: '自然光，浅景深，干净桌面或镜面' },
-  { id: 'quiet', worlds: ['leisure'], name: '高级克制', visual: '低饱和，留白，材质特写，慢推' },
-  { id: 'cinema', worlds: ['catering', 'leisure', 'tech', 'drama'], name: '电影感', visual: '跟拍推轨，轻微运动模糊，情绪特写，连续运镜' },
-  { id: 'product', worlds: ['tech'], name: '产品冷调', visual: '干净桌面，材质微距，手部操作，屏幕内容可读' },
+  { id: 'neon', worlds: ['catering', 'leisure', 'vlog'], name: '夜色街灯', visual: '夜晚路灯与室内暖光，潮湿地面反光，克制不霓虹爆炸' },
+  { id: 'fresh', worlds: ['catering', 'leisure', 'edu', 'retail'], name: '清新打卡', visual: '自然光，浅景深，干净桌面或镜面' },
+  { id: 'quiet', worlds: ['leisure', 'home', 'retail'], name: '高级克制', visual: '低饱和，留白，材质特写，慢推' },
+  { id: 'cinema', worlds: ['catering', 'leisure', 'travel', 'vlog', 'tech', 'drama', 'auto', 'home'], name: '电影感', visual: '跟拍推轨，轻微运动模糊，情绪特写，连续运镜' },
+  { id: 'outdoor', worlds: ['travel', 'vlog'], name: '户外旅行', visual: '户外自然光，地标清晰，跟拍行走，禁止滤镜过重' },
+  { id: 'handheld', worlds: ['vlog', 'travel'], name: '手持生活', visual: '手持轻微晃动，生活纪实，对白口语，禁止精修广告片' },
+  { id: 'showroom', worlds: ['retail', 'auto', 'home'], name: '展陈质感', visual: '展厅或样板间干净光，材质与空间可读，慢推' },
+  { id: 'product', worlds: ['tech', 'auto'], name: '产品冷调', visual: '干净桌面，材质微距，手部操作，屏幕内容可读' },
   { id: 'live', worlds: ['drama'], name: '真人写实', visual: '当代都市真人写实，人物表情清晰，禁止二维漫画，禁止探店空镜堆砌' },
   { id: 'cel', worlds: ['comic'], name: '赛璐珞', visual: '日漫赛璐珞上色，清晰线稿，眼睛高光，二维动画，禁止真人实拍质感' },
   { id: 'ink', worlds: ['comic'], name: '国漫厚涂', visual: '国漫厚涂，服饰纹样清楚，气势与飘带，二维，禁止真人古装剧' },
@@ -386,8 +577,10 @@ function buildBasePromptMeta(input: {
       : input.world.promptKind === 'drama'
         ? '真人写实都市短剧，前 3 秒必须冲突或反转。禁止二维漫画，禁止探店空镜堆砌。'
         : input.world.promptKind === 'product'
-          ? '科技产品短剧，产品特写必须可读。禁止仙侠，禁止纯餐饮烟雾。'
-          : '本地生活真人写实竖屏短剧，前 3 秒必须冲突或反转。禁止办公室网文，禁止仙侠古装。'
+          ? '科技/汽车产品短剧，产品特写必须可读。禁止仙侠，禁止纯餐饮烟雾。'
+          : input.world.promptKind === 'vlog'
+            ? '竖屏生活 Vlog 短剧，手持纪实感，前 3 秒亮人设。禁止电影片头片尾，禁止精修广告片。'
+            : '本地生活真人写实竖屏短剧，前 3 秒必须冲突或反转。禁止办公室网文，禁止仙侠古装。'
   return [
     `【AI短剧·${input.world.label}·${input.scene.name}·${input.formula.name}】`,
     kindLine,
@@ -1013,7 +1206,15 @@ export default function ShortDramaPage() {
             <section className="erp-panel space-y-5 p-5">
               <div>
                 <p className="mb-2 text-sm font-medium text-slate-800">
-                  {worldId === 'comic' ? '分格钩子' : worldId === 'tech' ? '产品钩子' : '戏剧钩子'}
+                  {worldId === 'comic'
+                    ? '分格钩子'
+                    : worldId === 'tech' || worldId === 'auto'
+                      ? '产品钩子'
+                      : worldId === 'vlog'
+                        ? '叙事钩子'
+                        : worldId === 'travel'
+                          ? '旅行钩子'
+                          : '戏剧钩子'}
                 </p>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {visibleFormulas.map((f) => (
@@ -1142,8 +1343,8 @@ export default function ShortDramaPage() {
                     ))}
                   </select>
                   <span className="block text-[11px] text-slate-500">
-                    单段模型最长约 15 秒（Seedance 2.5 可达约 30 秒）。超过则按 15 秒分段 + 尾帧续写拼接，最长支持 15
-                    分钟。小云雀 Agent 也是「多段分镜合成」而不是一次吐出整集。
+                    单段仍走 Seedance（约 15 秒）。超过 15 秒的长片目标是接小云雀智能生视频 Agent（多镜编排，最长约 15
+                    分钟）；当前长片暂用尾帧续写拼接兜底，小云雀网关接入后会切换。
                   </span>
                 </label>
                 <label className="space-y-1.5">
