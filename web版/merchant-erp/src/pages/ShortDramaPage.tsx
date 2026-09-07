@@ -1151,6 +1151,48 @@ function scenesOf(id: WorldId) {
 function formulasOf(sceneId: string) {
   return FORMULAS.filter((f) => f.scene === sceneId)
 }
+
+/** 用户自填戏剧钩子（不在 FORMULAS 表内） */
+const CUSTOM_FORMULA_ID = 'custom'
+
+type CustomHookDraft = {
+  name: string
+  hint: string
+  beats: [string, string, string, string]
+}
+
+const DEFAULT_CUSTOM_HOOK: CustomHookDraft = {
+  name: '',
+  hint: '',
+  beats: ['开场冲突', '矛盾升级', '关键反转', '记忆点收尾'],
+}
+
+function resolveCustomFormula(sceneId: string, draft: CustomHookDraft, fields: Pick<DramaFormula, 'story' | 'roles' | 'conflict' | 'dialogue'>): DramaFormula {
+  return {
+    id: CUSTOM_FORMULA_ID,
+    scene: sceneId,
+    name: draft.name.trim() || '自定义钩子',
+    hint: draft.hint.trim() || '自行填写名称、四拍与下方故事',
+    beats: [
+      draft.beats[0].trim() || DEFAULT_CUSTOM_HOOK.beats[0],
+      draft.beats[1].trim() || DEFAULT_CUSTOM_HOOK.beats[1],
+      draft.beats[2].trim() || DEFAULT_CUSTOM_HOOK.beats[2],
+      draft.beats[3].trim() || DEFAULT_CUSTOM_HOOK.beats[3],
+    ],
+    story: fields.story,
+    roles: fields.roles,
+    conflict: fields.conflict,
+    dialogue: fields.dialogue,
+  }
+}
+
+function draftFromFormula(f: DramaFormula): CustomHookDraft {
+  return {
+    name: f.name,
+    hint: f.hint,
+    beats: [...f.beats],
+  }
+}
 function stylesOf(id: WorldId) {
   return STYLES.filter((s) => s.worlds.includes(id))
 }
@@ -1278,6 +1320,7 @@ export default function ShortDramaPage() {
   const [worldId, setWorldId] = useState<WorldId>('catering')
   const [sceneId, setSceneId] = useState(SCENES[0]!.id)
   const [formulaId, setFormulaId] = useState(FORMULAS[0]!.id)
+  const [customHook, setCustomHook] = useState<CustomHookDraft>(DEFAULT_CUSTOM_HOOK)
   const [styleId, setStyleId] = useState<StyleId>('smoke')
   const [shop, setShop] = useState<ShopFill>({ storeName: '', offerName: '', price: '', area: '' })
   const [story, setStory] = useState('')
@@ -1307,8 +1350,21 @@ export default function ShortDramaPage() {
   const visibleFormulas = formulasOf(sceneId)
   const visibleStyles = stylesOf(worldId)
   const scene = SCENES.find((s) => s.id === sceneId) ?? visibleScenes[0] ?? SCENES[0]!
-  const formula = FORMULAS.find((f) => f.id === formulaId) ?? visibleFormulas[0] ?? FORMULAS[0]!
+  const formula =
+    formulaId === CUSTOM_FORMULA_ID
+      ? resolveCustomFormula(sceneId, customHook, { story, roles, conflict, dialogue })
+      : FORMULAS.find((f) => f.id === formulaId) ?? visibleFormulas[0] ?? FORMULAS[0]!
   const style = STYLES.find((s) => s.id === styleId) ?? visibleStyles[0] ?? STYLES[0]!
+  const hookLabel =
+    worldId === 'comic'
+      ? '分格钩子'
+      : worldId === 'tech' || worldId === 'auto'
+        ? '产品钩子'
+        : worldId === 'vlog'
+          ? '叙事钩子'
+          : worldId === 'travel'
+            ? '旅行钩子'
+            : '戏剧钩子'
   const activeWork = works.find((w) => w.id === activeWorkId) ?? works[0] ?? null
   const longPlan = useMemo(
     () => planLongformSegmentDurations(Math.min(MAX_DRAMA_TOTAL_SEC, Math.max(5, durationSec))),
@@ -1840,17 +1896,7 @@ export default function ShortDramaPage() {
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
             <section className="erp-panel space-y-5 p-5">
               <div>
-                <p className="mb-2 text-sm font-medium text-slate-800">
-                  {worldId === 'comic'
-                    ? '分格钩子'
-                    : worldId === 'tech' || worldId === 'auto'
-                      ? '产品钩子'
-                      : worldId === 'vlog'
-                        ? '叙事钩子'
-                        : worldId === 'travel'
-                          ? '旅行钩子'
-                          : '戏剧钩子'}
-                </p>
+                <p className="mb-2 text-sm font-medium text-slate-800">{hookLabel}</p>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {visibleFormulas.map((f) => (
                     <button
@@ -1873,7 +1919,95 @@ export default function ShortDramaPage() {
                       <span className="mt-0.5 block text-[11px] text-slate-500">{f.hint}</span>
                     </button>
                   ))}
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      const seed =
+                        formulaId === CUSTOM_FORMULA_ID
+                          ? customHook
+                          : draftFromFormula(
+                              FORMULAS.find((f) => f.id === formulaId) ?? visibleFormulas[0] ?? FORMULAS[0]!,
+                            )
+                      setCustomHook({
+                        name: seed.name === '自定义钩子' ? '' : seed.name,
+                        hint: seed.hint,
+                        beats: [...seed.beats],
+                      })
+                      setFormulaId(CUSTOM_FORMULA_ID)
+                      clearTrial()
+                    }}
+                    className={cn(
+                      'rounded-xl border border-dashed px-3 py-2 text-left transition',
+                      formulaId === CUSTOM_FORMULA_ID
+                        ? 'border-cyan-600 bg-cyan-50 text-cyan-950'
+                        : 'border-slate-300 bg-slate-50 text-slate-700 hover:border-cyan-300 hover:bg-white',
+                    )}
+                  >
+                    <span className="block text-sm font-medium">自定义</span>
+                    <span className="mt-0.5 block text-[11px] text-slate-500">自己写钩子名与四拍</span>
+                  </button>
                 </div>
+                {formulaId === CUSTOM_FORMULA_ID ? (
+                  <div className="mt-3 space-y-3 rounded-xl border border-dashed border-cyan-200 bg-cyan-50/40 p-3">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="space-y-1.5">
+                        <span className="text-xs font-medium text-slate-700">钩子名称</span>
+                        <input
+                          className={fieldCls}
+                          disabled={busy}
+                          value={customHook.name}
+                          onChange={(e) => {
+                            clearTrial()
+                            setCustomHook((p) => ({ ...p, name: e.target.value }))
+                          }}
+                          placeholder="例如：锅底先翻车"
+                        />
+                      </label>
+                      <label className="space-y-1.5">
+                        <span className="text-xs font-medium text-slate-700">一句话提示</span>
+                        <input
+                          className={fieldCls}
+                          disabled={busy}
+                          value={customHook.hint}
+                          onChange={(e) => {
+                            clearTrial()
+                            setCustomHook((p) => ({ ...p, hint: e.target.value }))
+                          }}
+                          placeholder="可选，给自己看的备注"
+                        />
+                      </label>
+                    </div>
+                    <div>
+                      <p className="mb-1.5 text-xs font-medium text-slate-700">四拍结构（开场 → 升级 → 反转 → 收尾）</p>
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        {(['开场', '升级', '反转', '收尾'] as const).map((label, i) => (
+                          <label key={label} className="space-y-1">
+                            <span className="text-[10px] font-medium text-cyan-800">{i + 1}. {label}</span>
+                            <input
+                              className={fieldCls}
+                              disabled={busy}
+                              value={customHook.beats[i]}
+                              onChange={(e) => {
+                                clearTrial()
+                                const v = e.target.value
+                                setCustomHook((p) => {
+                                  const beats: [string, string, string, string] = [...p.beats]
+                                  beats[i] = v
+                                  return { ...p, beats }
+                                })
+                              }}
+                              placeholder={DEFAULT_CUSTOM_HOOK.beats[i]}
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-[11px] leading-snug text-slate-500">
+                      下方「一句话故事 / 角色 / 冲突 / 对白」也可自由改，会直接进生成提示词。
+                    </p>
+                  </div>
+                ) : null}
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
