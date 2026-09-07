@@ -516,13 +516,7 @@ async function resolveSegmentTailFrameBase64(
   }
 }
 
-export default function ShortVideoOptimizationPage({
-  embed = false,
-  variant = 'default',
-}: {
-  embed?: boolean
-  variant?: 'default' | 'short_drama'
-}) {
+export default function ShortVideoOptimizationPage({ embed = false }: { embed?: boolean }) {
   const navigate = useNavigate()
   const { plan, requireAiVideoGen, openMembershipUpgrade } = useMembership()
   const embedAddonAccess = useMemo(() => readMpEmbedAddonAccess(), [])
@@ -541,9 +535,7 @@ export default function ShortVideoOptimizationPage({
     })
   }, [embedAddonAccess])
   const [mainPane, setMainPane] = useState<MainPane>('generate')
-  const [activeSkillId, setActiveSkillId] = useState<ShortVideoSkillId | null>(
-    variant === 'short_drama' ? 'short_drama_hook' : 'store_visit',
-  )
+  const [activeSkillId, setActiveSkillId] = useState<ShortVideoSkillId | null>('store_visit')
   const [studioMode, setStudioMode] = useState<ShortVideoStudioModeId>('agent')
   const [selectedMusicTrackId, setSelectedMusicTrackId] = useState<string | null>(null)
   const [cfg, setCfg] = useState<VideoAiBackendConfig | null>(null)
@@ -2549,7 +2541,7 @@ export default function ShortVideoOptimizationPage({
         <div className="flex flex-wrap items-center justify-center gap-3">
           <Film className="h-8 w-8 shrink-0 text-cyan-600" aria-hidden />
           <h1 className="erp-page-title text-[1.35rem] leading-tight sm:text-2xl">
-            {variant === 'short_drama' ? 'AI短剧' : '短视频 AI 创作台'}
+            短视频 AI 创作台
           </h1>
           <MpAddonPointsRateBadge
             kind="shortvideo"
@@ -2557,9 +2549,7 @@ export default function ShortVideoOptimizationPage({
           />
         </div>
         <p className="mx-auto max-w-2xl text-sm leading-relaxed text-slate-600">
-          {variant === 'short_drama'
-            ? '用剧本/钩子出竖屏短剧：默认「短剧钩子」技能，走已配置的 Seedance / 可灵 / 千问。店员口播出镜请用数字人口播。'
-            : 'Skill 技能 · 无限画布 · 短片生成 · 动作模仿 · 音乐配乐 · 案例做同款。探店、套餐、活动用技能出片；店员口播请走数字人。多素材拼接请切「AI混剪」。'}
+          Skill 技能 · 无限画布 · 短片生成 · 动作模仿 · 音乐配乐 · 案例做同款。探店、套餐、活动用技能出片；店员口播请走数字人。多素材拼接请切「AI混剪」。
           {readMpSessionToken() ? (
             <span className="mt-1 block text-xs text-cyan-800">
               星选账号：成片成功后按秒扣积分；套餐 ai_video_quota 次数优先，用尽后扣积分余额。
