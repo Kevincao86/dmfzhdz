@@ -77,7 +77,7 @@
     </block>
 
     <button class="nv-ai-btn" bindtap="runAllocation" loading="{{aiLoading}}">
-      {{deliveryPlatformIdx === 1 ? '估算小红书达人数' : '智能分配达人档位'}}
+      {{deliveryPlatformIdx === 1 ? '估算小红书达人数' : '分配达人档位'}}
     </button>
     <text wx:if="{{aiErr}}" class="nv-err">{{aiErr}}</text>
     <text wx:if="{{allocationText}}" class="nv-alloc">{{allocationText}}</text>

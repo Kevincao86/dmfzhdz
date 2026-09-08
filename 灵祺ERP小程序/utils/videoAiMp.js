@@ -509,13 +509,13 @@ async function postIceSmartBatch(body) {
           raw: data,
         }
       }
-      lastErr = (data && data.message) || '智能混剪提交失败'
+      lastErr = (data && data.message) || '一键混剪提交失败'
     } catch (e) {
       lastErr = e instanceof Error ? e.message : String(e)
       if (/404|not found/i.test(lastErr)) continue
     }
   }
-  return { ok: false, message: lastErr || '智能混剪接口未部署' }
+  return { ok: false, message: lastErr || '一键混剪接口未部署' }
 }
 
 async function fetchIceSmartBatchJob(batchJobId) {
@@ -546,13 +546,13 @@ async function pollIceSmartBatch(batchJobId, onTick, maxTries = 100, intervalMs 
     if (!r.ok) return r
     const st = r.raw || {}
     if (typeof onTick === 'function') onTick(`${st.status || '处理中'} · ${n}/${maxTries}`)
-    if (st.failed) return { ok: false, message: st.message || '智能混剪失败' }
+    if (st.failed) return { ok: false, message: st.message || '一键混剪失败' }
     const url = st.downloadUrl || st.previewUrl || st.videoUrl
     if (st.done && url) return { ok: true, downloadUrl: String(url), previewUrl: String(url), raw: st }
     // eslint-disable-next-line no-await-in-loop
     await new Promise((res) => setTimeout(res, intervalMs))
   }
-  return { ok: false, message: '智能混剪等待超时' }
+  return { ok: false, message: '一键混剪等待超时' }
 }
 
 function saveVideoToAlbum(url) {

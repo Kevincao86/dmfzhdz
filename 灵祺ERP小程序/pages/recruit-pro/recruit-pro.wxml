@@ -17,7 +17,7 @@ module.exports.includes = includes
     <text class="pro-sec">1 招募模式</text>
     <view class="pro-mode-row">
       <view class="pro-mode {{recruitMode === 'ai' ? 'on' : ''}}" bindtap="tapModeAi">
-        <text class="pro-mode-title">✦ 智能匹配</text>
+        <text class="pro-mode-title">✦ 条件匹配</text>
         <text class="pro-mode-sub">根据条件自动从星图匹配达人</text>
       </view>
       <view class="pro-mode {{recruitMode === 'designated' ? 'on' : ''}}" bindtap="tapModeDesignated">

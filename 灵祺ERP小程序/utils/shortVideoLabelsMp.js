@@ -45,7 +45,7 @@ module.exports = {
   ICE_BATCH_GENERATE_COUNTS: [10, 20, 50, 100],
   MAIN_TABS: [
     { id: 'generate', label: '短视频生成', native: true },
-    { id: 'cloud_batch', label: '智能混剪', native: true },
+    { id: 'cloud_batch', label: '一键混剪', native: true },
     { id: 'cases', label: '案例', native: true },
     { id: 'music', label: '配乐', native: true },
   ],
@@ -84,6 +84,6 @@ module.exports = {
   QUICK_CARDS: [
     { id: 'generate', label: '视频生成', desc: '文生/图生短片', pane: 'generate' },
     { id: 'cases', label: '案例灵感', desc: '做同款', pane: 'cases' },
-    { id: 'cloud_batch', label: '智能混剪', desc: '素材一键成片', pane: 'cloud_batch' },
+    { id: 'cloud_batch', label: '一键混剪', desc: '素材一键成片', pane: 'cloud_batch' },
   ],
 }

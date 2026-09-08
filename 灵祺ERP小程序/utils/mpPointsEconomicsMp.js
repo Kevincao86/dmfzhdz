@@ -33,7 +33,7 @@ const MP_POINTS_PER_SEC_BY_KIND = {
 const MP_POINTS_USAGE_KIND_LABELS = {
   shortvideo: '短视频处理',
   cloud_edit: '灵祺云剪',
-  cloud_edit_smart: '智能一键成片',
+  cloud_edit_smart: '一键成片',
   digital_human: '数字人口播',
   mix_material_analyze: '混剪素材分析',
   visual_studio_copy: '视觉工坊文案',

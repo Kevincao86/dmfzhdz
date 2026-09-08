@@ -46,12 +46,22 @@ function klingModelLabel(id) {
   return row.id === KLING_DEFAULT_MODEL_ID ? VIDEO_MODEL_DEFAULT_LABEL : row.label
 }
 
-const SMART_EFFECT_LABEL = '智能（按内容自动转场）'
+const SMART_EFFECT_LABEL = '自动转场（按内容匹配）'
+
+function relabelSmartPreset(label) {
+  const s = String(label || '')
+  if (/智能|自动转场/.test(s)) return SMART_EFFECT_LABEL
+  return s
+}
+
+function isSmartEffectLabel(label) {
+  return /智能|自动转场/.test(String(label || ''))
+}
 
 function ensureSmartInPresets(presets) {
-  const list = Array.isArray(presets) ? presets.map(String).filter(Boolean) : []
+  const list = Array.isArray(presets) ? presets.map(relabelSmartPreset).filter(Boolean) : []
   if (!list.length) return ['无附加特效', SMART_EFFECT_LABEL, '淡入淡出']
-  if (list.some((p) => /智能/.test(p))) return list
+  if (list.some((p) => isSmartEffectLabel(p))) return list
   const noneIdx = list.findIndex((p) => /无附加/.test(p))
   if (noneIdx >= 0) {
     list.splice(noneIdx + 1, 0, SMART_EFFECT_LABEL)
@@ -398,19 +408,19 @@ Page({
   },
 
   isSmartPreset() {
-    return /智能/.test(String(this.data.presetOptions[this.data.presetIdx] || ''))
+    return isSmartEffectLabel(this.data.presetOptions[this.data.presetIdx] || '')
   },
 
   resolvePipelinePreset() {
     const label = this.data.presetOptions[this.data.presetIdx] || '无附加特效'
-    if (/智能/.test(String(label))) return '随机转场'
+    if (isSmartEffectLabel(label)) return '随机转场'
     return label
   },
 
   resolveEditBriefForSubmit() {
     let brief = String(this.data.editBrief || '').trim()
     if (this.isSmartPreset()) {
-      brief = `${brief}\n【智能特效】请根据素材画面与节奏自动选择合适的转场与特效，避免生硬硬切。`.trim()
+      brief = `${brief}\n【自动特效】请根据素材画面与节奏自动选择合适的转场与特效，避免生硬硬切。`.trim()
     }
     const music = musicLib.findMusicTrack(this.data.selectedMusicId)
     if (music && music.previewUrl) {
@@ -432,8 +442,8 @@ Page({
     this.setData({
       pointsHintGenerate: `消耗提醒：短视频生成 ${economics.formatMpPointsRateLabel('shortvideo')}；当前约 ${genSec} 秒预计 ${genCost} 积分。`,
       pointsHintMix: this.isSmartPreset()
-        ? `消耗提醒：智能混剪 ${economics.formatMpPointsRateLabel('cloud_edit_smart')}；当前约 ${mixSec} 秒预计 ${mixCost} 积分。`
-        : `消耗提醒：智能混剪 ${economics.formatMpPointsRateLabel('cloud_edit')}；预计 ${mixCost} 积分/条。`,
+        ? `消耗提醒：一键混剪 ${economics.formatMpPointsRateLabel('cloud_edit_smart')}；当前约 ${mixSec} 秒预计 ${mixCost} 积分。`
+        : `消耗提醒：一键混剪 ${economics.formatMpPointsRateLabel('cloud_edit')}；预计 ${mixCost} 积分/条。`,
     })
   },
 
@@ -1239,7 +1249,7 @@ Page({
 
   async runSmartBatch() {
     if (!this.data.smartBatchEnabled) {
-      this.setData({ iceErr: '运营台未开启智能混剪（smart-batch）' })
+      this.setData({ iceErr: '运营台未开启一键混剪' })
       return
     }
     if (!this.data.briefOk) {
@@ -1251,12 +1261,12 @@ Page({
       .map((j) => j.mediaUrl)
     const imageUrls = (this.data.imageItems || []).map((x) => x.mediaUrl)
     if (mediaUrls.length + imageUrls.length < 2) {
-      this.setData({ iceErr: '智能混剪至少需要 2 个素材（视频或图片）' })
+      this.setData({ iceErr: '一键混剪至少需要 2 个素材（视频或图片）' })
       return
     }
     if (!(await this.ensureCloudEditAffordable())) return
     const aspect = this.getIceAspect()
-    this.setData({ smartBatchBusy: true, iceBusy: true, iceErr: '', iceHint: '智能混剪提交中…' })
+    this.setData({ smartBatchBusy: true, iceBusy: true, iceErr: '', iceHint: '一键混剪提交中…' })
     try {
       const body = {
         mediaUrls,
@@ -1286,15 +1296,15 @@ Page({
         jobs: prev.concat([
           {
             id: localId,
-            label: '智能混剪成片',
+            label: '一键混剪成片',
             mediaUrl: done.downloadUrl,
             previewUrl: done.downloadUrl || done.previewUrl,
             phase: 'done',
             exportId: r.batchJobId,
-            message: '智能混剪完成',
+            message: '一键混剪完成',
           },
         ]),
-        iceHint: '智能混剪完成',
+        iceHint: '一键混剪完成',
         latestDonePreview: done.downloadUrl || done.previewUrl,
       })
       await this.chargeCloudEdit(r.batchJobId)

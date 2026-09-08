@@ -35,7 +35,7 @@ Page({
     topicErr: '',
     topicBusy: false,
 
-    modelUi: '智能 · qwen（与 Web 「自动文案模型」对齐）',
+    modelUi: '文案模型 · qwen（与电脑端自动文案模型对齐）',
   },
 
   onShow() {

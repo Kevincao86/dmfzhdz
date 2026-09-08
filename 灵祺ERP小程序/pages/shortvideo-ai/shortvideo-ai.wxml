@@ -15,7 +15,7 @@
   <view wx:if="{{pointsBalance != null}}" class="sv-points-bar">
     <text class="sv-points-bal">积分余额 {{pointsBalance}}</text>
     <text wx:if="{{mainPane === 'generate'}}" class="sv-points-rate">短视频生成 · {{rateShortvideo}}</text>
-    <text wx:elif="{{mainPane === 'cloud_batch'}}" class="sv-points-rate">云剪 {{rateCloudEdit}} · 智能成片 {{rateCloudEditSmart}}</text>
+    <text wx:elif="{{mainPane === 'cloud_batch'}}" class="sv-points-rate">云剪 {{rateCloudEdit}} · 一键成片 {{rateCloudEditSmart}}</text>
   </view>
   <view wx:if="{{mainPane === 'generate' && pointsHintGenerate}}" class="sv-points-tip">{{pointsHintGenerate}}</view>
   <view wx:if="{{mainPane === 'cloud_batch' && pointsHintMix}}" class="sv-points-tip">{{pointsHintMix}}</view>
@@ -297,7 +297,7 @@
           <text class="sv-ice-logo">云</text>
           <text class="sv-ice-title">灵祺云剪</text>
         </view>
-        <text class="sv-ice-desc">批量包装探店/带货短片；普通云剪 {{rateCloudEdit}}，智能一键成片 {{rateCloudEditSmart}}。</text>
+        <text class="sv-ice-desc">批量包装探店/带货短片；普通云剪 {{rateCloudEdit}}，一键成片 {{rateCloudEditSmart}}。</text>
       </view>
       <text class="sv-badge {{iceServiceReady ? 'ok' : ''}}">{{iceServiceReady ? '服务就绪' : '未就绪'}}</text>
     </view>
@@ -432,7 +432,7 @@
         disabled="{{iceBusy}}"
         loading="{{smartBatchBusy}}"
         bindtap="runSmartBatch"
-      >智能混剪 smart-batch</button>
+      >一键混剪</button>
     </view>
 
     <view class="sv-output">
