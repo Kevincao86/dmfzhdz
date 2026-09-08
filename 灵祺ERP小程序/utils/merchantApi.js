@@ -29,6 +29,7 @@ function merchantRequest(method, path, data) {
 function merchantRequestAuth(method, path, opts) {
   const data = opts && opts.data
   const bearerToken = opts && opts.bearerToken ? String(opts.bearerToken).trim() : ''
+  const timeoutMs = Math.max(0, Number(opts && opts.timeoutMs) || 0)
   const b = baseUrl()
   if (!b) {
     return Promise.reject(new Error('尚未配置商家后台 API 地址，请在 config.local.js 设置 MERCHANT_API_BASE_URL。'))
@@ -40,7 +41,7 @@ function merchantRequestAuth(method, path, opts) {
   }
   if (bearerToken) header.Authorization = `Bearer ${bearerToken}`
   return new Promise((resolve, reject) => {
-    wx.request({
+    const req = {
       url,
       method,
       header,
@@ -59,7 +60,9 @@ function merchantRequestAuth(method, path, opts) {
         const em = err && typeof err.errMsg === 'string' ? err.errMsg : '网络异常'
         reject(new Error(em))
       },
-    })
+    }
+    if (timeoutMs > 0) req.timeout = timeoutMs
+    wx.request(req)
   })
 }
 

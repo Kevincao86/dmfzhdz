@@ -95,8 +95,15 @@ Page({
       return
     }
 
-    const r = await feature.fetchStoresForPlatform(this.data.platform)
-    const items = r.ok ? r.items : []
+    let items = []
+    let err = ''
+    try {
+      const r = await feature.fetchStoresForPlatform(this.data.platform)
+      items = r && r.ok ? r.items || [] : []
+      err = r && r.ok ? '' : (r && r.message) || '门店列表拉取失败'
+    } catch (e) {
+      err = (e && e.message) || '门店列表拉取失败'
+    }
     const platCard = {
       ...activePlatform,
       ...platformCardStatus(activePlatform.id, true, items.length > 0),
@@ -108,7 +115,7 @@ Page({
     }
     this.setData({
       loading: false,
-      err: r.ok ? '' : r.message,
+      err,
       items,
       activePlatform,
       platCard,

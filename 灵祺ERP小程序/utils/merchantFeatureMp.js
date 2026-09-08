@@ -70,31 +70,12 @@ const FLAT_STORE_PATHS = {
   xiaohongshu: '/api/meoo-xhs-stores',
 }
 
-const MERCHANT_ID_KEYS = {
-  douyin: 'meoo_douyin_merchant_id',
-  kuaishou: 'meoo_kuaishou_merchant_id',
-  meituan: 'meoo_meituan_merchant_id',
-  xiaohongshu: 'meoo_xhs_merchant_id',
-}
-
-function readMerchantId(platformId) {
-  const k = MERCHANT_ID_KEYS[platformId]
-  if (!k) return ''
-  try {
-    return String(wx.getStorageSync(k) || '').trim()
-  } catch (_) {
-    return ''
-  }
-}
+const STORE_FETCH_TIMEOUT_MS = 45000
 
 function isLikelyHtmlPayload(data) {
   if (typeof data !== 'string') return false
   const s = data.trim().slice(0, 200).toLowerCase()
   return s.startsWith('<!doctype') || s.startsWith('<html') || s.includes('<head')
-}
-
-function isRouteMiss(msg) {
-  return /404|not found|could not be found|html 而非|非 json/i.test(String(msg || ''))
 }
 
 function pickStr() {
@@ -128,23 +109,8 @@ function normalizeStoreItem(x) {
   if (!x || typeof x !== 'object') return null
   const poi = x.poi && typeof x.poi === 'object' ? x.poi : null
   const src = poi || x
-  const id = pickStr(
-    src.poi_id,
-    src.poiId,
-    src.id,
-    src.store_id,
-    src.shopId,
-    x.poi_id,
-    x.id,
-  )
-  const name = pickStr(
-    src.poi_name,
-    src.poiName,
-    src.name,
-    src.store_name,
-    src.shopName,
-    x.name,
-  )
+  const id = pickStr(src.poi_id, src.poiId, src.id, src.store_id, src.shopId, x.poi_id, x.id)
+  const name = pickStr(src.poi_name, src.poiName, src.name, src.store_name, src.shopName, x.name)
   const addr = pickStr(src.address, src.addr, src.full_address, src.address_all, x.address)
   if (!id && !name) return null
   return { id: id || name, name: name || '未命名门店', address: addr }
@@ -160,50 +126,65 @@ function storePathCandidates(platformId, qs) {
   return out
 }
 
+function storeQueryString(keyword) {
+  const parts = ['page=1', 'pageSize=50', 'relationType=all']
+  const kw = keyword && String(keyword).trim()
+  if (kw) parts.push(`keyword=${encodeURIComponent(kw)}`)
+  return `?${parts.join('&')}`
+}
+
+function errMessage(e) {
+  if (e && typeof e.message === 'string' && e.message.trim()) return e.message
+  return String(e || '拉取失败')
+}
+
+async function tryOneStorePath(path, token) {
+  try {
+    const data = await merchantApi.merchantRequestAuth('GET', path, {
+      bearerToken: token,
+      timeoutMs: STORE_FETCH_TIMEOUT_MS,
+    })
+    if (isLikelyHtmlPayload(data)) {
+      return { ok: false, message: '门店接口返回了网页而非数据' }
+    }
+    if (!data || typeof data !== 'object') {
+      return { ok: false, message: '门店接口返回无法解析' }
+    }
+    const raw = extractStoreRows(data)
+    const items = []
+    for (let i = 0; i < raw.length; i++) {
+      const row = normalizeStoreItem(raw[i])
+      if (row) items.push(row)
+    }
+    const inner = data.data && typeof data.data === 'object' ? data.data : data
+    const total =
+      typeof inner.total === 'number'
+        ? inner.total
+        : typeof data.total === 'number'
+          ? data.total
+          : items.length
+    return { ok: true, items, total }
+  } catch (e) {
+    const message = errMessage(e)
+    return { ok: false, message }
+  }
+}
+
 async function fetchStoresForPlatform(platformId, keyword) {
   const token = readPlatformToken(platformId)
   if (!token) {
     const label = PLATFORM_TABS.find((p) => p.id === platformId)
     return { ok: false, message: `尚未绑定${label ? label.label : platformId}` }
   }
-  const q = new URLSearchParams({ page: '1', pageSize: '50', relationType: 'all' })
-  if (keyword && String(keyword).trim()) q.set('keyword', String(keyword).trim())
-  const mid = readMerchantId(platformId)
-  if (mid) q.set('merchantId', mid)
-  const paths = storePathCandidates(platformId, `?${q}`)
+  const paths = storePathCandidates(platformId, storeQueryString(keyword))
   if (!paths.length) {
     return { ok: false, message: '该平台门店接口尚未接入' }
   }
   let lastMsg = '拉取失败'
-  for (const p of paths) {
-    try {
-      const data = await merchantApi.merchantRequestAuth('GET', p, { bearerToken: token })
-      if (isLikelyHtmlPayload(data)) {
-        lastMsg = '门店接口返回了网页而非数据，已改试备用路径'
-        continue
-      }
-      if (!data || typeof data !== 'object') {
-        lastMsg = '门店接口返回无法解析'
-        continue
-      }
-      const raw = extractStoreRows(data)
-      const items = []
-      for (const x of raw) {
-        const row = normalizeStoreItem(x)
-        if (row) items.push(row)
-      }
-      const inner = data.data && typeof data.data === 'object' ? data.data : data
-      const total =
-        typeof inner.total === 'number'
-          ? inner.total
-          : typeof data.total === 'number'
-            ? data.total
-            : items.length
-      return { ok: true, items, total }
-    } catch (e) {
-      lastMsg = e instanceof Error ? e.message : String(e)
-      if (isRouteMiss(lastMsg)) continue
-    }
+  for (let i = 0; i < paths.length; i++) {
+    const result = await tryOneStorePath(paths[i], token)
+    if (result.ok) return { ok: true, items: result.items, total: result.total }
+    lastMsg = result.message || lastMsg
   }
   return { ok: false, message: lastMsg }
 }
