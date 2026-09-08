@@ -12,7 +12,7 @@ const NO_CATEGORY_BLOCK =
 export function inferIndustryPathFromText(text?: string): string | undefined {
   const t = (text ?? '').trim()
   if (!t) return undefined
-  if (/足浴|足疗|足道|沐足|采耳|修脚|推拿|开背/.test(t)) return '休闲娱乐 > 足疗足浴'
+  if (/足浴|足疗|足道|沐足|采耳|修脚|推拿|开背|足疗椅|养生馆/.test(t)) return '休闲娱乐 > 足疗足浴'
   if (/汗蒸|洗浴|温泉|桑拿/.test(t)) return '休闲娱乐 > 洗浴汗蒸'
   if (/美甲|美睫|纹绣/.test(t)) return '丽人 > 美甲美睫'
   if (/美发|理发|造型/.test(t)) return '丽人 > 美发'

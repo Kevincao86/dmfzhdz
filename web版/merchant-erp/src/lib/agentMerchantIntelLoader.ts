@@ -623,23 +623,35 @@ export async function loadFullMerchantIntelSnapshot(
   const enriched = await fetchMerchantIntelEnrichment(base, taskType)
   const merged: MerchantIntelSnapshot = { ...base, ...enriched }
   const apiPath = enriched.boundStoreCategoryPath?.trim()
+  const fromFacts = inferIndustryPathFromText(
+    [
+      merged.boundStoreName,
+      merged.storeName,
+      merged.chainStoresSummary,
+      merged.onlineProductsSummary,
+      merged.menuSummary,
+    ]
+      .filter(Boolean)
+      .join(' '),
+  )
+  const factsAreNonFood =
+    Boolean(fromFacts) && inferIndustryVisualCategory(fromFacts, fromFacts) !== 'catering'
   if (apiPath) {
-    merged.industryPath = apiPath
-  } else if (!merged.industryPath?.trim()) {
-    const inferred = inferIndustryPathFromText(
-      [merged.boundStoreName, merged.storeName, merged.chainStoresSummary, merged.onlineProductsSummary, merged.menuSummary]
-        .filter(Boolean)
-        .join(' '),
-    )
-    if (inferred) merged.industryPath = inferred
-  } else if (inferIndustryVisualCategory(merged.industryPath, merged.industryPath) === 'catering') {
-    const fromStores = inferIndustryPathFromText(
-      [merged.boundStoreName, merged.chainStoresSummary].filter(Boolean).join(' '),
-    )
-    if (fromStores && inferIndustryVisualCategory(fromStores, fromStores) !== 'catering') {
-      merged.industryPath = fromStores
+    const apiIsFood = inferIndustryVisualCategory(apiPath, apiPath) === 'catering'
+    if (apiIsFood && factsAreNonFood && fromFacts) {
+      merged.industryPath = fromFacts
       merged.boundStoreCategorySource =
-        merged.boundStoreCategorySource || '已认领门店名（覆盖毛利餐饮默认）'
+        `${merged.boundStoreCategorySource || '接口类目'}（门店名/在售商品覆盖餐饮默认）`
+    } else {
+      merged.industryPath = apiPath
+    }
+  } else if (!merged.industryPath?.trim()) {
+    if (fromFacts) merged.industryPath = fromFacts
+  } else if (inferIndustryVisualCategory(merged.industryPath, merged.industryPath) === 'catering') {
+    if (factsAreNonFood && fromFacts) {
+      merged.industryPath = fromFacts
+      merged.boundStoreCategorySource =
+        merged.boundStoreCategorySource || '门店名/在售商品（覆盖毛利餐饮默认）'
     }
   }
   if (enriched.boundStoreName) merged.boundStoreName = enriched.boundStoreName
