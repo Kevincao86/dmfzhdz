@@ -38,6 +38,7 @@ import {
   Swords,
   Trash2,
   Trees,
+  User,
   UtensilsCrossed,
   Wand2,
   Wine,
@@ -46,8 +47,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../cn'
 import { MpAddonPointsRateBadge } from '../components/MpAddonPointsRateBadge'
 import { MembershipMediaLockedBanner, useMembership } from '../context/MembershipContext'
+import { processCustomAvatarFile } from '../lib/digitalHumanCustomMedia'
 import { probeVideoDurationSec } from '../lib/digitalHumanSubtitle'
 import { readMpSessionToken } from '../lib/merchantApiAuth'
+import { extractVideoFirstFramePureBase64 } from '../lib/videoFrameUtils'
 import { planLongformSegmentDurations } from '../lib/shortVideoScriptTable'
 import { sanitizePromptForSeedanceNativeAv } from '../lib/shortVideoPostProcess'
 import {
@@ -1349,6 +1352,37 @@ function parseDramaStoryAi(raw: string): {
   return first ? { story: first.replace(/^["「]|["」]$/g, '') } : null
 }
 
+type DramaRefItem = {
+  id: string
+  kind: 'image' | 'video'
+  name: string
+  previewUrl: string
+  imageDataUrl: string
+}
+
+const DRAMA_REF_MAX = 6
+const DRAMA_REF_VIDEO_MAX_BYTES = 12 * 1024 * 1024
+const DRAMA_R2V_MAX_IMAGES = 9
+
+function isDramaVideoFile(f: File): boolean {
+  const mime = (f.type || '').toLowerCase()
+  const nameLow = (f.name || '').toLowerCase()
+  return mime.startsWith('video/') || /\.(mp4|webm|mov|m4v)$/i.test(nameLow)
+}
+
+function isDramaImageFile(f: File): boolean {
+  const mime = (f.type || '').toLowerCase()
+  const nameLow = (f.name || '').toLowerCase()
+  return mime.startsWith('image/') || /\.(jpe?g|png|webp|gif)$/i.test(nameLow)
+}
+
+function toDramaImageDataUrl(raw: string): string {
+  const s = String(raw || '').trim()
+  if (!s) return ''
+  if (s.startsWith('data:')) return s
+  return `data:image/jpeg;base64,${s}`
+}
+
 function isSeedance15ProModelId(id: string): boolean {
   const t = String(id || '').trim()
   return t === SEEDANCE_1_5_PRO_MODEL_ID || /seedance-1-5-pro/i.test(t) || /seedance-1\.5-pro/i.test(t)
@@ -1377,6 +1411,11 @@ export default function ShortDramaPage() {
   const [cfgLoaded, setCfgLoaded] = useState(false)
   const [busy, setBusy] = useState(false)
   const [storyBusy, setStoryBusy] = useState(false)
+  const [mediaBusy, setMediaBusy] = useState(false)
+  const [refItems, setRefItems] = useState<DramaRefItem[]>([])
+  const [characterPreview, setCharacterPreview] = useState<string | null>(null)
+  const refInputRef = useRef<HTMLInputElement>(null)
+  const characterInputRef = useRef<HTMLInputElement>(null)
   const [progress, setProgress] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [hint, setHint] = useState<string | null>(null)
@@ -1520,6 +1559,108 @@ export default function ShortDramaPage() {
     }
   }
 
+  const revokeDramaRef = useCallback((item: DramaRefItem) => {
+    if (item.kind === 'video' && item.previewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(item.previewUrl)
+      previewUrlsRef.current = previewUrlsRef.current.filter((u) => u !== item.previewUrl)
+    }
+  }, [])
+
+  const collectFusionImages = useCallback(
+    (continueFrame?: string) => {
+      const out: string[] = []
+      const cont = toDramaImageDataUrl(continueFrame ?? '')
+      if (cont) out.push(cont)
+      if (characterPreview) out.push(characterPreview)
+      for (const item of refItems) {
+        const u = toDramaImageDataUrl(item.imageDataUrl)
+        if (u) out.push(u)
+      }
+      return [...new Set(out)].slice(0, DRAMA_R2V_MAX_IMAGES)
+    },
+    [characterPreview, refItems],
+  )
+
+  const fusionPromptNote = useMemo(() => {
+    const bits: string[] = []
+    if (characterPreview) {
+      bits.push(
+        `主角外貌必须与角色形象参考图为同一人（${roles.trim() || '主角'}），发型、五官、服装、体态全程一致，禁止换人。`,
+      )
+    }
+    if (refItems.length > 0) {
+      bits.push(
+        `已上传 ${refItems.length} 份参考画面（含图/视频抽帧），须融合其场景、构图、光影与道具，禁止另起无关空间。`,
+      )
+    }
+    return bits.join('')
+  }, [characterPreview, refItems.length, roles])
+
+  const addDramaRefFiles = async (files: FileList | File[] | null) => {
+    if (!files || files.length === 0) return
+    const room = DRAMA_REF_MAX - refItems.length
+    if (room <= 0) {
+      setErr(`参考画面最多 ${DRAMA_REF_MAX} 份`)
+      return
+    }
+    setMediaBusy(true)
+    setErr(null)
+    try {
+      const next: DramaRefItem[] = []
+      for (const file of Array.from(files).slice(0, room)) {
+        if (isDramaVideoFile(file)) {
+          if (file.size > DRAMA_REF_VIDEO_MAX_BYTES) {
+            throw new Error(`视频「${file.name}」请压缩到 12MB 以内`)
+          }
+          const previewUrl = URL.createObjectURL(file)
+          previewUrlsRef.current.push(previewUrl)
+          const frame = await extractVideoFirstFramePureBase64(file)
+          next.push({
+            id: newWorkId(),
+            kind: 'video',
+            name: file.name,
+            previewUrl,
+            imageDataUrl: `data:image/jpeg;base64,${frame}`,
+          })
+        } else if (isDramaImageFile(file)) {
+          const imageDataUrl = await processCustomAvatarFile(file)
+          next.push({
+            id: newWorkId(),
+            kind: 'image',
+            name: file.name,
+            previewUrl: imageDataUrl,
+            imageDataUrl,
+          })
+        } else {
+          throw new Error(`「${file.name}」不是可用的图片或视频`)
+        }
+      }
+      if (next.length) {
+        setRefItems((prev) => [...prev, ...next].slice(0, DRAMA_REF_MAX))
+        clearTrial()
+      }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '参考画面读取失败')
+    } finally {
+      setMediaBusy(false)
+    }
+  }
+
+  const onPickCharacterFile = async (file: File | undefined) => {
+    if (!file) return
+    setMediaBusy(true)
+    setErr(null)
+    try {
+      const url = await processCustomAvatarFile(file)
+      setCharacterPreview(url)
+      clearTrial()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '角色形象读取失败')
+    } finally {
+      setMediaBusy(false)
+    }
+  }
+
   const switchWorld = (nextWorldId: WorldId) => {
     const nextWorld = worldOf(nextWorldId)
     const nextScene = scenesOf(nextWorldId)[0]!
@@ -1599,8 +1740,9 @@ export default function ShortDramaPage() {
     }
     if (!durationSelected) return '请先选择成片时长'
     if (!story.trim()) return '请先确认一句话故事，或点「AI生成故事」。'
+    if (mediaBusy) return '正在处理参考画面，请稍候'
     return null
-  }, [busy, storyBusy, cfgLoaded, cfg, durationSelected, story])
+  }, [busy, storyBusy, cfgLoaded, cfg, durationSelected, story, mediaBusy])
 
   useEffect(() => {
     mountedRef.current = true
@@ -1644,22 +1786,36 @@ export default function ShortDramaPage() {
     prompt: string
     durationSec: number
     images_base64?: string[]
+    seedance_image_mode?: 'auto' | 'first_last' | 'reference' | 'first_only'
     onProgress?: (t: string) => void
   }) => {
+    const imgs = (opts.images_base64 ?? []).map((s) => String(s).trim()).filter(Boolean)
+    const mode =
+      opts.seedance_image_mode ??
+      (imgs.length >= 2 ? 'reference' : imgs.length === 1 ? 'first_only' : 'auto')
+    const prefer20 = mode === 'reference' || imgs.length >= 2
+    const pool = prefer20
+      ? [
+          ...seedancePoolModels.filter((id) => isSeedance20ModelId(id)),
+          ...seedancePoolModels.filter((id) => !isSeedance20ModelId(id)),
+        ]
+      : seedancePoolModels
     const flags = `--dur ${opts.durationSec} --fps 24 --ratio 9:16 --wm false --resolution ${resolution}`
+    const prompt = [opts.prompt, fusionPromptNote].filter(Boolean).join('\n')
     return runShortVideoJobWithFailover({
       engine: 'seedance',
       body: {
-        prompt: sanitizePromptForSeedanceNativeAv(opts.prompt),
+        prompt: sanitizePromptForSeedanceNativeAv(prompt),
         flags,
-        model: SEEDANCE_1_5_PRO_MODEL_ID,
+        model: prefer20 ? SEEDANCE_2_0_MODEL_ID : SEEDANCE_1_5_PRO_MODEL_ID,
         skip_qwen: true,
         lock_model: false,
         generate_audio: true,
-        images_base64: opts.images_base64,
-        seedance_image_mode: opts.images_base64?.length ? 'first_only' : 'auto',
+        images_base64: imgs.length ? imgs : undefined,
+        seedance_image_mode: mode,
+        i2v_max_images: imgs.length >= 2 ? Math.min(DRAMA_R2V_MAX_IMAGES, imgs.length) : undefined,
       },
-      poolModels: seedancePoolModels,
+      poolModels: pool.length ? pool : seedancePoolModels,
       shouldCancel: () => cancelRef.current,
       onProgress: opts.onProgress,
       allowAutoHalveDuration: false,
@@ -1707,7 +1863,11 @@ export default function ShortDramaPage() {
       '请由小云雀智能生视频 Agent 多镜编排成片，前 3 秒必须冲突或反转，禁止拖沓空镜与电影片头片尾。',
     ].join('\n')
 
-    if (cfg?.xiaoyunqueConfigured) {
+    if (collectFusionImages().length > 0) {
+      setProgress('已上传参考画面或角色形象，全片走图生融合…')
+    }
+
+    if (cfg?.xiaoyunqueConfigured && collectFusionImages().length === 0) {
       setProgress(`小云雀 Agent 生成全片（约 ${total} 秒）…`)
       const xyq = await runXiaoyunqueVideoJob({
         prompt: xyqPrompt,
@@ -1745,8 +1905,11 @@ export default function ShortDramaPage() {
       if (i > 0 && prevUrl) {
         setProgress(`全片 ${i + 1}/${plan.length} · 截取上一段尾帧衔接`)
         const frame = await postVideoLastFrameFromUrl(prevUrl, { frame: 'last', timeoutMs: 20_000 })
-        if (frame.ok) images = [frame.pureBase64]
+        images = collectFusionImages(frame.ok ? frame.pureBase64 : undefined)
+      } else {
+        images = collectFusionImages()
       }
+      if (!images.length) images = undefined
       const prompt = buildSegmentPrompt({
         meta: metaPrompt,
         beat: beats[i]!,
@@ -1807,11 +1970,12 @@ export default function ShortDramaPage() {
 
     try {
       if (!showPreviewGate) {
-        setProgress('正在提交短剧生成')
+        setProgress(collectFusionImages().length ? '正在按参考画面与角色形象融合生成' : '正在提交短剧生成')
         const prompt = `${metaPrompt}\n时长约 ${durationSec} 秒，竖屏 9:16 单段直出。结构：${formula.beats.join(' → ')}。`
         const r = await runOneClip({
           prompt,
           durationSec,
+          images_base64: collectFusionImages(),
           onProgress: (t) => {
             if (mountedRef.current) setProgress(t)
           },
@@ -1849,6 +2013,7 @@ export default function ShortDramaPage() {
       const r = await runOneClip({
         prompt: previewPrompt,
         durationSec: PREVIEW_SEC,
+        images_base64: collectFusionImages(),
         onProgress: (t) => {
           if (mountedRef.current) setProgress(`试镜 · ${t}`)
         },
@@ -1872,11 +2037,17 @@ export default function ShortDramaPage() {
       setHint(
         [
           `试镜 ${PREVIEW_SEC} 秒已出。满意再点「确认生成全片」（${
-            cfg?.xiaoyunqueConfigured ? '小云雀全片' : segmentPlanLabel(durationSec)
+            collectFusionImages().length
+              ? segmentPlanLabel(durationSec)
+              : cfg?.xiaoyunqueConfigured
+                ? '小云雀全片'
+                : segmentPlanLabel(durationSec)
           }）。`,
-          cfg?.xiaoyunqueConfigured
-            ? '全片将优先走小云雀 Agent；失败时自动回退 Seedance 分段拼接。'
-            : '小云雀未配置时全片走 Seedance 尾帧续写拼接，可能有轻微跳切。',
+          collectFusionImages().length
+            ? '已上传参考画面或角色形象，全片走图生融合（不走小云雀）。'
+            : cfg?.xiaoyunqueConfigured
+              ? '全片将优先走小云雀 Agent；失败时自动回退 Seedance 分段拼接。'
+              : '小云雀未配置时全片走 Seedance 尾帧续写拼接，可能有轻微跳切。',
           spendHint,
         ]
           .filter(Boolean)
@@ -2281,6 +2452,141 @@ export default function ShortDramaPage() {
                 />
               </label>
 
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-slate-800">参考画面</p>
+                    <span className="text-[11px] text-slate-500">
+                      {refItems.length}/{DRAMA_REF_MAX} · 图或视频
+                    </span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-slate-500">
+                    上传店内实拍、成片参考或短视频，生成时会抽帧融合构图与场景。
+                  </p>
+                  <input
+                    ref={refInputRef}
+                    type="file"
+                    multiple
+                    accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime,.mp4,.mov,.webm,.m4v"
+                    className="hidden"
+                    disabled={busy || storyBusy || mediaBusy}
+                    onChange={(e) => {
+                      void addDramaRefFiles(e.target.files)
+                      e.target.value = ''
+                    }}
+                  />
+                  {refItems.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-2">
+                      {refItems.map((item, idx) => (
+                        <div key={item.id} className="group relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                          <span className="absolute left-1 top-1 z-10 rounded bg-black/55 px-1 py-0.5 text-[10px] text-white">
+                            {idx + 1}
+                            {item.kind === 'video' ? ' 视频' : ''}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={busy || mediaBusy}
+                            aria-label={`移除参考 ${idx + 1}`}
+                            onClick={() => {
+                              revokeDramaRef(item)
+                              setRefItems((prev) => prev.filter((x) => x.id !== item.id))
+                              clearTrial()
+                            }}
+                            className="absolute right-1 top-1 z-10 rounded-full bg-black/55 p-0.5 text-white opacity-0 group-hover:opacity-100 disabled:opacity-40"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                          {item.kind === 'video' ? (
+                            <video src={item.previewUrl} muted playsInline className="aspect-square w-full object-cover" />
+                          ) : (
+                            <img src={item.previewUrl} alt="" className="aspect-square w-full object-cover" />
+                          )}
+                        </div>
+                      ))}
+                      {refItems.length < DRAMA_REF_MAX ? (
+                        <button
+                          type="button"
+                          disabled={busy || storyBusy || mediaBusy}
+                          onClick={() => refInputRef.current?.click()}
+                          className="flex aspect-square items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white text-xs text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          {mediaBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : '继续添加'}
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={busy || storyBusy || mediaBusy}
+                      onClick={() => refInputRef.current?.click()}
+                      className="flex h-24 w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-slate-300 bg-white text-sm text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      {mediaBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                      上传图片或视频
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-slate-800">角色形象</p>
+                  <p className="text-[11px] leading-relaxed text-slate-500">
+                    上传主角照片（或短视频抽帧），右侧可预览；成片会按此形象融合。
+                  </p>
+                  <input
+                    ref={characterInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime,.mp4,.mov,.webm"
+                    className="hidden"
+                    disabled={busy || storyBusy || mediaBusy}
+                    onChange={(e) => {
+                      void onPickCharacterFile(e.target.files?.[0])
+                      e.target.value = ''
+                    }}
+                  />
+                  {characterPreview ? (
+                    <div className="relative overflow-hidden rounded-xl border border-cyan-200 bg-cyan-50/40">
+                      <img src={characterPreview} alt="角色形象预览" className="aspect-[3/4] w-full object-cover" />
+                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-2">
+                        <p className="truncate text-xs font-medium text-white">{roles.trim() || '主角'}</p>
+                        <p className="text-[10px] text-white/80">角色形象预览</p>
+                      </div>
+                      <div className="absolute right-1 top-1 flex gap-1">
+                        <button
+                          type="button"
+                          disabled={busy || mediaBusy}
+                          onClick={() => characterInputRef.current?.click()}
+                          className="rounded-full bg-black/55 px-2 py-0.5 text-[10px] text-white disabled:opacity-40"
+                        >
+                          更换
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy || mediaBusy}
+                          aria-label="移除角色形象"
+                          onClick={() => {
+                            setCharacterPreview(null)
+                            clearTrial()
+                          }}
+                          className="rounded-full bg-black/55 p-1 text-white disabled:opacity-40"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={busy || storyBusy || mediaBusy}
+                      onClick={() => characterInputRef.current?.click()}
+                      className="flex h-40 w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-cyan-300 bg-cyan-50/30 text-sm text-cyan-900 hover:bg-cyan-50 disabled:opacity-50"
+                    >
+                      {mediaBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <User className="h-5 w-5" />}
+                      上传角色形象
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <div className="flex flex-wrap gap-3">
                 <label className="min-w-[140px] flex-1 space-y-1.5">
                   <span className="text-sm font-medium text-slate-800">成片时长</span>
@@ -2353,6 +2659,15 @@ export default function ShortDramaPage() {
                   <div className="aspect-[9/16] w-full">
                     {phoneSrc ? (
                       <video key={phoneSrc} src={phoneSrc} controls playsInline className="h-full w-full object-contain" />
+                    ) : characterPreview ? (
+                      <div className="relative h-full">
+                        <img src={characterPreview} alt="角色形象预览" className="h-full w-full object-cover" />
+                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 text-slate-100">
+                          <p className="text-[10px] uppercase tracking-wide text-cyan-200">角色形象预览</p>
+                          <p className="mt-1 text-lg font-semibold">{roles.trim() || '主角'}</p>
+                          <p className="mt-0.5 text-xs text-slate-300">{scene.name} · {formula.name}</p>
+                        </div>
+                      </div>
                     ) : (
                       <div className="flex h-full flex-col justify-end bg-slate-800 p-4 text-slate-100">
                         <SceneIcon className="mb-auto mt-8 h-7 w-7 text-slate-400" />
@@ -2382,13 +2697,19 @@ export default function ShortDramaPage() {
               </ol>
 
               <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
-                {durationSelected
-                  ? showPreviewGate
-                    ? `当前 ${DURATION_OPTIONS.find((d) => d.sec === durationSec)?.label ?? durationSec} · ${
-                        cfg?.xiaoyunqueConfigured ? '小云雀全片' : segmentPlanLabel(durationSec)
-                      }。先出前 ${PREVIEW_SEC} 秒试镜，满意再生成全片。`
-                    : '当前为单段直出，无需试镜确认。'
-                  : '请先选择成片时长，再生成故事或短剧。'}
+                    {durationSelected
+                      ? showPreviewGate
+                        ? `当前 ${DURATION_OPTIONS.find((d) => d.sec === durationSec)?.label ?? durationSec} · ${
+                            collectFusionImages().length
+                              ? '图生融合'
+                              : cfg?.xiaoyunqueConfigured
+                                ? '小云雀全片'
+                                : segmentPlanLabel(durationSec)
+                          }。先出前 ${PREVIEW_SEC} 秒试镜，满意再生成全片。`
+                        : collectFusionImages().length
+                          ? '当前为单段直出，将融合参考画面与角色形象。'
+                          : '当前为单段直出，无需试镜确认。'
+                      : '请先选择成片时长，再生成故事或短剧。'}
               </p>
               <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-950">
                 生成后请及时保存到本地。刷新页面后，本页成片将消失。长片按秒扣积分，15 分钟成本很高，请先确认试镜。
