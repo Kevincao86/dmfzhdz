@@ -47,16 +47,41 @@ async function fetchWithTimeout(
 }
 
 function isTransientHydrateError(msg: string): boolean {
-  return /fetch failed|Failed to fetch|ECONNRESET|ETIMEDOUT|ENOTFOUND|ECONNREFUSED|socket|network|aborted|HTTP 5\d\d/i.test(
+  return /fetch failed|Failed to fetch|ECONNRESET|ETIMEDOUT|ENOTFOUND|ECONNREFUSED|socket|network|aborted|超时|CDN 不可达|HTTP 5\d\d/i.test(
     msg,
   )
 }
 
+function fetchFailedDetail(e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e)
+  const cause =
+    e && typeof e === 'object' && 'cause' in e && (e as { cause?: unknown }).cause
+      ? String((e as { cause: unknown }).cause)
+      : ''
+  const extra = cause && !msg.includes(cause) ? `（${cause.slice(0, 160)}）` : ''
+  return `${msg}${extra}`
+}
+
 async function hydrateTokenmixImageUrlOnce(src: string): Promise<string> {
-  const res = await fetch(src, {
-    method: 'GET',
-    headers: { Accept: 'image/*,*/*' },
-  })
+  let res: Response
+  try {
+    res = await fetchWithTimeout(
+      src,
+      {
+        method: 'GET',
+        headers: {
+          Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+          'User-Agent':
+            'Mozilla/5.0 (compatible; MeooErp/1.0; +https://mofangdianai.com) AppleWebKit/537.36',
+        },
+        redirect: 'follow',
+      },
+      12_000,
+      'TokenMix CDN 代拉',
+    )
+  } catch (e) {
+    throw new Error(`TokenMix CDN 不可达：${fetchFailedDetail(e)}`)
+  }
   if (!res.ok) throw new Error(`TokenMix 成图下载失败 HTTP ${res.status}`)
   const buf = Buffer.from(await res.arrayBuffer())
   if (!buf.length) throw new Error('TokenMix 成图为空')
@@ -75,16 +100,23 @@ export async function hydrateTokenmixImageUrlForBrowser(imageUrl: string): Promi
   if (!isTokenmixBrowserUnsafeImageUrl(src)) return src
 
   let lastErr = 'TokenMix 成图下载失败'
-  for (let attempt = 1; attempt <= 4; attempt++) {
+  for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       return await hydrateTokenmixImageUrlOnce(src)
     } catch (e) {
       lastErr = e instanceof Error ? e.message : String(e)
-      if (attempt >= 4 || !isTransientHydrateError(lastErr)) break
-      await sleep(Math.min(6000, 700 * attempt))
+      if (attempt >= 2 || !isTransientHydrateError(lastErr)) break
+      await sleep(800)
     }
   }
   throw new Error(lastErr)
+}
+
+function asDataUrlFromB64(raw: string): string {
+  const t = raw.trim()
+  if (!t) return ''
+  if (t.startsWith('data:image/')) return t
+  return `data:image/png;base64,${t.replace(/^data:image\/\w+;base64,/i, '')}`
 }
 
 function extractImageUrlFromPayload(json: unknown): string {
@@ -92,14 +124,15 @@ function extractImageUrlFromPayload(json: unknown): string {
   const root = json as Record<string, unknown>
   const tryRows = (rows: unknown): string => {
     if (!Array.isArray(rows) || !rows.length) return ''
-    const row = rows[0]
-    if (!row || typeof row !== 'object') return ''
-    const r = row as Record<string, unknown>
-    const url = typeof r.url === 'string' ? r.url.trim() : ''
-    if (url) return url
-    const b64 = typeof r.b64_json === 'string' ? r.b64_json.trim() : ''
-    if (b64) return `data:image/png;base64,${b64}`
-    return ''
+    let url = ''
+    for (const row of rows) {
+      if (!row || typeof row !== 'object') continue
+      const r = row as Record<string, unknown>
+      const b64 = typeof r.b64_json === 'string' ? r.b64_json.trim() : ''
+      if (b64) return asDataUrlFromB64(b64)
+      if (!url && typeof r.url === 'string' && r.url.trim()) url = r.url.trim()
+    }
+    return url
   }
   const direct = tryRows(root.data)
   if (direct) return direct
@@ -158,35 +191,35 @@ export async function tokenmixImagesCreate(
   const isDalle2 = mid.includes('dall-e-2') || mid === 'dall-e-2'
   const isGptImage = /^gpt-image/i.test(mid)
 
-  const payload: Record<string, unknown> = { model: mid, prompt: p, n: 1 }
+  const payload: Record<string, unknown> = { model: mid, prompt: p, n: 1, response_format: 'b64_json' }
   if (isDalle3) {
     payload.size = opts?.size?.trim() || '1024x1024'
-    payload.response_format = 'url'
   } else if (isDalle2) {
     payload.size = opts?.size?.trim() || '512x512'
-    payload.response_format = 'url'
   } else if (isGptImage) {
     payload.size = opts?.size?.trim() || '1024x1024'
     payload.quality = opts?.quality || 'high'
   } else {
     payload.size = opts?.size?.trim() || '1024x1024'
-    payload.response_format = 'url'
   }
 
-  const res = await fetchWithTimeout(
-    `${base}/images/generations`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+  const postCreate = async (body: Record<string, unknown>) =>
+    fetchWithTimeout(
+      `${base}/images/generations`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
       },
-      body: JSON.stringify(payload),
-    },
-    45_000,
-    'TokenMix 创建任务',
-  )
-  const text = await res.text()
+      45_000,
+      'TokenMix 创建任务',
+    )
+
+  let res = await postCreate(payload)
+  let text = await res.text()
   let json: unknown = null
   try {
     json = text ? JSON.parse(text) : null
@@ -195,7 +228,20 @@ export async function tokenmixImagesCreate(
   }
 
   if (!res.ok && res.status !== 202) {
-    throw new Error(errorMessageFromPayload(json, `TokenMix 生图失败 HTTP ${res.status}`))
+    const errMsg = errorMessageFromPayload(json, `TokenMix 生图失败 HTTP ${res.status}`)
+    if (payload.response_format && /response_format|unknown parameter|invalid param/i.test(errMsg)) {
+      delete payload.response_format
+      res = await postCreate(payload)
+      text = await res.text()
+      try {
+        json = text ? JSON.parse(text) : null
+      } catch {
+        json = null
+      }
+    }
+    if (!res.ok && res.status !== 202) {
+      throw new Error(errorMessageFromPayload(json, `TokenMix 生图失败 HTTP ${res.status}`))
+    }
   }
 
   const root = json && typeof json === 'object' ? (json as Record<string, unknown>) : null
@@ -370,6 +416,7 @@ export async function tokenmixImagesEdit(
   form.append('model', mid)
   form.append('prompt', p)
   form.append('n', '1')
+  form.append('response_format', 'b64_json')
   form.append(
     'image',
     new Blob([new Uint8Array(img.buffer)], { type: img.contentType }),

@@ -32,17 +32,8 @@ async function embedTokenmixImageForBrowser<T extends Extract<MeooAgentImageResu
 ): Promise<T> {
   if (!('imageUrl' in out) || typeof out.imageUrl !== 'string') return out
   if (!isTokenmixBrowserUnsafeImageUrl(out.imageUrl)) return out
-  try {
-    const dataUrl = await hydrateTokenmixImageUrlForBrowser(out.imageUrl)
-    // 超大 data URL 塞进 JSON 易被反代掐断；过大则保留 CDN，交给前端 phase=fetch
-    if (dataUrl.length > 3_500_000) return out
-    return { ...out, imageUrl: dataUrl }
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    console.error('[meoo-ai-agent-image] tokenmix hydrate skipped, keep CDN', msg.slice(0, 200))
-    // 成图已成功：禁止因代拉失败整单 502；前端会走 phase=fetch 再代拉
-    return out
-  }
+  const dataUrl = await hydrateTokenmixImageUrlForBrowser(out.imageUrl)
+  return { ...out, imageUrl: dataUrl }
 }
 
 async function sendImageSuccess(
@@ -68,6 +59,9 @@ async function sendImageSuccess(
   }
 
   out = await embedTokenmixImageForBrowser(out)
+  if ('imageUrl' in out && isTokenmixBrowserUnsafeImageUrl(out.imageUrl)) {
+    throw new Error('TokenMix CDN 不可达：成图地址无法在国内打开')
+  }
 
   const { recordAiTokenUsageFromVercelRequest, estimateLlmTokensFromText } = await import(
     '../vite-plugins/aiTokenUsageCore.js'
@@ -187,8 +181,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendMerchantJson(res, 502, {
         ok: false,
         error: 'image_fetch_failed',
-        detail: /fetch failed/i.test(msg)
-          ? '代拉 TokenMix 成图网络失败，请稍后重试'
+        detail: /fetch failed|CDN 不可达|超时/i.test(msg)
+          ? '代拉 TokenMix 成图失败：国内无法访问 TokenMix CDN，请稍后重试'
           : msg.slice(0, 400),
       })
     }
@@ -360,6 +354,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     console.error('[meoo-ai-agent-image] fatal', msg)
+    if (/CDN 不可达|成图下载失败|fetch failed|代拉/i.test(msg)) {
+      sendMerchantJson(res, 502, {
+        ok: false,
+        error: 'image_fetch_failed',
+        message: 'TokenMix 成图完成但国内无法拉取 CDN，请稍后重试',
+        detail: msg.slice(0, 400),
+      })
+      return
+    }
     sendMerchantJson(res, 500, { ok: false, error: 'internal_error', detail: msg.slice(0, 600) })
   }
 }
