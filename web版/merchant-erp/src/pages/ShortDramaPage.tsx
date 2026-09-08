@@ -1437,48 +1437,17 @@ function buildDramaIdentityLock(cast: DramaCastMember[], roles: string): string 
 }
 
 /**
- * 有角色图时只写图生动作词：照片已当首帧提交，禁止把客人故事塞进模型再另造人。
- * Seedance content.text ≤280 字；即梦可放更长动作。
+ * 即梦图生：不写足浴/按摩等敏感词，避免视觉云审核拦掉；仍锁定首帧同一人。
  */
-function buildDramaImageToVideoPrompt(input: {
-  leadName: string
-  story: string
-  dialogue: string
-  beat?: string
-  maxAction?: number
-}): string {
-  const lead = input.leadName.trim() || '主角'
-  const maxAction = Math.max(24, input.maxAction ?? 90)
-  const action = [input.beat, input.story, input.dialogue ? `对白：${input.dialogue}` : '']
-    .filter(Boolean)
-    .join('。')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, maxAction)
+function buildDramaJimengI2vPrompt(leadName: string): string {
+  const lead = leadName.trim() || '主角'
   return [
-    '【图生·禁止新造人物】',
-    '角色照片已作为首帧提交。必须让这张图里的人动起来，以角色图为准。',
-    `唯一出镜主角是${lead}，就是首帧这张脸、这套衣服、这个发型。`,
-    '禁止模型自己生成人物，禁止另造男客、路人或第二张脸，禁止换脸。',
-    '客人只许出手或脚，不得露正脸。镜头始终跟拍首帧里的人。',
-    action ? `动作：${action}` : '自然表情与手势，半身近景。',
-    '【有声成片】中文对白。',
+    '【图生】角色照片已作为首帧提交。',
+    `让图中的${lead}自然转头、微笑、抬手，竖屏半身近景，电影棚拍光。`,
+    '必须是这张图里的同一人、同一张脸、同一发型、同一套衣服。',
+    '禁止生成其他人物，禁止换脸。最多露出一只手或背影作为配角。',
+    '不要字幕、水印、Logo。中文轻声对白。',
   ].join('')
-}
-
-/** Seedance 图生 content.text 只有约 280 字；截断时保住图生锁，丢掉后半段故事 */
-function compactDramaSeedanceI2vPrompt(prompt: string): string {
-  const t = String(prompt || '')
-    .replace(/\s+/g, '')
-    .trim()
-  if (t.length <= 280) return t
-  const idx = t.indexOf('动作：')
-  if (idx > 40) {
-    const lock = t.slice(0, idx)
-    const room = 280 - lock.length
-    return room > 8 ? `${lock}${t.slice(idx, idx + room)}` : t.slice(0, 280)
-  }
-  return t.slice(0, 280)
 }
 
 function parseRoleNames(raw: string): string[] {
@@ -2542,60 +2511,43 @@ export default function ShortDramaPage() {
     }
     const identity = buildDramaIdentityLock(cast, roles)
     const leadName = buildDramaStoryCastBrief(cast, roles).leadName
-    const i2vPrompt = imgs.length
-      ? buildDramaImageToVideoPrompt({
-          leadName,
-          story: story.trim(),
-          dialogue: dialogue.trim(),
-          beat: opts.beat,
-          maxAction: 400,
-        })
-      : ''
     const prompt = imgs.length
-      ? i2vPrompt
+      ? ''
       : [identity, opts.prompt, fusionPromptNote].filter(Boolean).join('\n')
     if (imgs.length > 0) {
       const kb = Math.max(1, Math.round(imgs.reduce((n, s) => n + s.length, 0) / 1370))
-      opts.onProgress?.(`已把角色图作为首帧提交 ${imgs.length} 张（约 ${kb}KB），禁止模型自己生成人物…`)
-    }
-    if (dramaJimengPhotoReady(cfg) && imgs.length > 0) {
+      opts.onProgress?.(`已把角色图作为首帧提交 ${imgs.length} 张（约 ${kb}KB），走即梦图生，不走方舟…`)
+      const jimengPrompt = buildDramaJimengI2vPrompt(leadName)
       const xyq = await runXiaoyunqueVideoJob({
-        prompt,
-        durationSec: opts.durationSec,
+        prompt: jimengPrompt,
+        durationSec: Math.min(12, Math.max(5, opts.durationSec)),
         aspectRatio: '9:16',
         images_base64: imgs,
         shouldCancel: () => cancelRef.current,
         onProgress: opts.onProgress,
       })
-      if (xyq.ok) {
-        if (/jimeng_ti2v|jimeng_i2v|jimeng_vgfm_i2v/i.test(String(xyq.modelUsed || ''))) {
-          return { ok: true as const, videoUrl: xyq.videoUrl, modelUsed: xyq.modelUsed, engineUsed: 'seedance' as const }
-        }
-        opts.onProgress?.('即梦未带上角色图，改用 Seedance 首帧图生（不改文生换脸）…')
-      } else {
-        opts.onProgress?.(`即梦图生未成功，改用 Seedance 首帧图生（不改文生换脸）…（${formatVideoAiUserError(xyq.message).slice(0, 80)}）`)
+      if (xyq.ok && /jimeng_ti2v|jimeng_i2v|jimeng_vgfm_i2v/i.test(String(xyq.modelUsed || ''))) {
+        return { ok: true as const, videoUrl: xyq.videoUrl, modelUsed: xyq.modelUsed, engineUsed: 'seedance' as const }
+      }
+      return {
+        ok: false as const,
+        message:
+          formatVideoAiUserError(xyq.ok ? '即梦未带上角色图' : xyq.message) ||
+          '即梦图生未成功。写实角色照不能走方舟 Seedance（会拦首帧），未改文生换脸。请确认运营台已开通即梦图生后重试。',
       }
     }
-    /** 无角色图，或即梦未开通/失败时，才走方舟 Seedance；有角色图时禁止文生换脸 */
-    const mode = opts.seedance_image_mode ?? (imgs.length ? 'first_only' : 'auto')
+    /** 无角色图才走方舟 Seedance 文生 */
     const model = seedancePaidModel
     const flags = `--dur ${opts.durationSec} --fps 24 --ratio 9:16 --wm false --resolution ${resolution}`
     return runShortVideoJobWithFailover({
       engine: 'seedance',
       body: {
-        prompt: imgs.length
-          ? compactDramaSeedanceI2vPrompt(i2vPrompt)
-          : sanitizePromptForSeedanceNativeAv(prompt),
+        prompt: sanitizePromptForSeedanceNativeAv(prompt),
         flags,
         model,
         skip_qwen: true,
         lock_model: true,
         generate_audio: true,
-        keep_reference_image: imgs.length > 0,
-        i2v_must_use_image: imgs.length > 0,
-        images_base64: imgs.length ? imgs : undefined,
-        seedance_image_mode: mode,
-        i2v_max_images: imgs.length >= 2 ? Math.min(DRAMA_R2V_MAX_IMAGES, imgs.length) : undefined,
       },
       poolModels: [model],
       shouldCancel: () => cancelRef.current,
@@ -2642,13 +2594,7 @@ export default function ShortDramaPage() {
     const fusionImgs = await prepareDramaModelImages()
     const leadName = buildDramaStoryCastBrief(cast, roles).leadName
     const xyqPrompt = fusionImgs.length
-      ? buildDramaImageToVideoPrompt({
-          leadName,
-          story: story.trim(),
-          dialogue: dialogue.trim(),
-          beat: formula.beats.join(' → '),
-          maxAction: 400,
-        })
+      ? buildDramaJimengI2vPrompt(leadName)
       : [
           buildDramaIdentityLock(cast, roles),
           metaPrompt,
@@ -2659,14 +2605,10 @@ export default function ShortDramaPage() {
           .filter(Boolean)
           .join('\n')
     if (fusionImgs.length > 0) {
-      setProgress(
-        dramaJimengPhotoReady(cfg)
-          ? '已上传参考画面或角色形象，全片走即梦图生…'
-          : '已上传参考画面或角色形象，全片走图生融合…',
-      )
+      setProgress('已上传角色形象，全片走即梦图生，不走方舟…')
     }
 
-    if (dramaJimengPhotoReady(cfg) && fusionImgs.length > 0 && total <= 12) {
+    if (fusionImgs.length > 0 && total <= 12) {
       setProgress(`即梦图生全片（${fusionImgs.length} 张参考图，约 ${total} 秒）…`)
       const xyq = await runXiaoyunqueVideoJob({
         prompt: xyqPrompt,
@@ -2688,7 +2630,7 @@ export default function ShortDramaPage() {
         })
         return
       }
-      setProgress(`即梦图生失败，改用 Seedance 分段图生…（${formatVideoAiUserError(xyq.ok ? '角色图未进入即梦' : xyq.message).slice(0, 80)}）`)
+      setProgress(`即梦整段未出，改分段即梦图生…（${formatVideoAiUserError(xyq.ok ? '角色图未进入即梦' : xyq.message).slice(0, 80)}）`)
     }
 
     if (dramaXiaoyunqueReady(cfg) && fusionImgs.length === 0) {

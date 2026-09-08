@@ -25,10 +25,11 @@ const XYQ_REQ_KEY_REF = 'pippit_iv2v_v20_cvtob_with_vinput'
 /** 即梦视频生成 3.0 Pro：上传照片图生，不走方舟 Seedance 真人库拦截 */
 const JIMENG_I2V_REQ_KEY = 'jimeng_ti2v_v30_pro'
 const JIMENG_I2V_REQ_KEY_FALLBACK = 'jimeng_ti2v_v30'
+const JIMENG_I2V_REQ_KEY_VGFM = 'jimeng_vgfm_i2v_l20'
 
 const NOREF_KEYS = [XYQ_REQ_KEY_NOREF]
 const REF_KEYS = [XYQ_REQ_KEY_REF]
-const JIMENG_I2V_KEYS = [JIMENG_I2V_REQ_KEY, JIMENG_I2V_REQ_KEY_FALLBACK]
+const JIMENG_I2V_KEYS = [JIMENG_I2V_REQ_KEY, JIMENG_I2V_REQ_KEY_FALLBACK, JIMENG_I2V_REQ_KEY_VGFM]
 
 export function isXiaoyunqueConfigured(env: MerchantAiEnv): boolean {
   return Boolean(resolveVolcVisualCredentials(env))
@@ -429,6 +430,7 @@ function buildJimengI2vSubmitBody(opts: {
     prompt: clipPromptKeepIdentity(opts.prompt, 800),
     seed: -1,
     frames: opts.durationSec <= 7 ? 121 : 241,
+    aspect_ratio: '9:16',
   }
   if (opts.binaries.length) {
     body.binary_data_base64 = opts.binaries.slice(0, 1)
@@ -493,39 +495,43 @@ export async function volcSubmitXiaoyunqueTask(
 
   const errors: string[] = []
   for (const attempt of reqKeyAttempts(env, hasVideoRef, hasImageRef)) {
-    const body = isJimengI2vReqKey(attempt.reqKey)
-      ? buildJimengI2vSubmitBody({
-          reqKey: attempt.reqKey,
-          prompt,
-          durationSec,
-          imageUrls,
-          binaries,
-        })
-      : buildXiaoyunqueSubmitBody({
-          reqKey: attempt.reqKey,
-          prompt,
-          durationSec,
-          aspectRatio,
-          imageUrls,
-          videoUrls,
-          binaries,
-        })
     if (isJimengI2vReqKey(attempt.reqKey) && !imageUrls.length && !binaries.length) continue
     if (isJimengI2vReqKey(attempt.reqKey) && durationSec > 12) continue
-    const r = await postVolcVisualWithRetry(creds, attempt.action, attempt.version, body)
-    if (!r.ok) {
-      errors.push(`${attempt.reqKey}: ${r.message}`)
-      continue
-    }
-    const rawId = extractTaskId(r.json)
-    if (!rawId) {
-      errors.push(`${attempt.reqKey}: 未返回 task_id`)
-      continue
-    }
-    return {
-      ok: true,
-      taskId: encodeTaskToken(attempt.reqKey, attempt.getAction, rawId),
-      reqKey: attempt.reqKey,
+    const tryDurs =
+      isJimengI2vReqKey(attempt.reqKey) && durationSec > 7 ? [durationSec, 5] : [durationSec]
+    for (const dur of tryDurs) {
+      const body = isJimengI2vReqKey(attempt.reqKey)
+        ? buildJimengI2vSubmitBody({
+            reqKey: attempt.reqKey,
+            prompt,
+            durationSec: dur,
+            imageUrls,
+            binaries,
+          })
+        : buildXiaoyunqueSubmitBody({
+            reqKey: attempt.reqKey,
+            prompt,
+            durationSec: dur,
+            aspectRatio,
+            imageUrls,
+            videoUrls,
+            binaries,
+          })
+      const r = await postVolcVisualWithRetry(creds, attempt.action, attempt.version, body)
+      if (!r.ok) {
+        errors.push(`${attempt.reqKey}${dur !== durationSec ? `@${dur}s` : ''}: ${r.message}`)
+        continue
+      }
+      const rawId = extractTaskId(r.json)
+      if (!rawId) {
+        errors.push(`${attempt.reqKey}: 未返回 task_id`)
+        continue
+      }
+      return {
+        ok: true,
+        taskId: encodeTaskToken(attempt.reqKey, attempt.getAction, rawId),
+        reqKey: attempt.reqKey,
+      }
     }
   }
   if (hasImageRef && !hasVideoRef) {
