@@ -34,7 +34,7 @@ module.exports.MODULE_COPY = {
   },
   ai_content: {
     navTitle: '文章与话题',
-    body: '文章与话题生成需绑定抖音来客；支持品牌/多店上下文。更多模型自动选型与高级编排请在电脑端完成。',
+    body: '文章与话题需绑定抖音来客；支持品牌/多店上下文。高级编排请在电脑端完成。',
   },
   ai_visual_studio: {
     navTitle: '视觉工坊',

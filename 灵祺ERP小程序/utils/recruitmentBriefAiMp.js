@@ -9,7 +9,7 @@ function splitThreeBriefs(description) {
   if (parts.length >= 3) return [parts[0], parts[1], parts[2]]
   const paras = text.split(/\n{2,}/).map((s) => s.trim()).filter(Boolean)
   if (paras.length >= 3) return [paras[0], paras[1], paras[2]]
-  const one = text || '（模型未返回有效 Brief，请重试或检查商家后台服务配置）'
+  const one = text || '（未能返回有效 Brief，请重试或检查商家后台服务配置）'
   const short = one.slice(0, Math.min(one.length, 420))
   return [
     `${short}\n\n【版本 A】侧重卖点与到店理由`,

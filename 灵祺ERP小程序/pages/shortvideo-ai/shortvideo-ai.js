@@ -364,7 +364,7 @@ Page({
     const conf = c.config || {}
     const models = Array.isArray(conf.arkVideoModels) ? conf.arkVideoModels : []
     const sdLabels = models.length
-      ? models.map((row, idx) => (idx === 0 ? VIDEO_MODEL_DEFAULT_LABEL : row.label || row.endpointId))
+      ? models.map((_, idx) => (idx === 0 ? VIDEO_MODEL_DEFAULT_LABEL : `方案 ${idx + 1}`))
       : []
     const sdIds = models.map((row) => row.endpointId || '')
     let plannerModel = this.data.plannerModel
@@ -376,7 +376,10 @@ Page({
       klingConfigured: Boolean(conf.klingConfigured),
       arkKeyConfigured: Boolean(conf.arkKeyConfigured),
       arkVideoModels: models,
-      arkVideoSetupIssue: conf.arkVideoSetupIssue || '',
+      arkVideoSetupIssue: String(conf.arkVideoSetupIssue || '')
+        .replace(/Seedance[^，。]*/gi, '视频出片')
+        .replace(/Kling[^，。]*/gi, '兼容引擎')
+        .replace(/火山方舟|通义千问|豆包|万相|qwen|gpt-?[^\s，。]*/gi, '出片服务'),
       longformPlanner: { doubao: Boolean(lp.doubao), qwen: Boolean(lp.qwen) },
       sdModelLabels: sdLabels,
       sdModelIds: sdIds,
@@ -679,7 +682,7 @@ Page({
     } else if (!this.data.arkKeyConfigured) {
       return `当前环境未开通${VIDEO_ENGINE_LABEL_SEEDANCE}，请联系管理员。`
     } else if (!this.data.sdModelIds.length) {
-      return this.data.arkVideoSetupIssue || '请先选择视频模型（需配置火山方舟接入点）。'
+      return this.data.arkVideoSetupIssue || '请先完成视频出片配置。'
     }
     return ''
   },
@@ -689,9 +692,9 @@ Page({
     if (scriptTable.isScriptRowsUsable(this.data.scriptRows)) return ''
     const lp = this.data.longformPlanner
     if (this.data.plannerModel === 'doubao' && !lp.doubao)
-      return '长片策划需配置豆包 API Key，或先完善分镜表画面描述。'
+      return '长片策划暂不可用，请先完善分镜表画面描述。'
     if (this.data.plannerModel === 'qwen' && !lp.qwen)
-      return '长片策划需配置通义千问 API Key，或先完善分镜表画面描述。'
+      return '长片策划暂不可用，请先完善分镜表画面描述。'
     return ''
   },
 
@@ -1080,7 +1083,7 @@ Page({
         this.setData({ hint: '已取消长视频生成。' })
         return
       }
-      this.setData({ progress: `长片 ${i + 1}/${prompts.length} · Seedance 生成中…` })
+      this.setData({ progress: `长片 ${i + 1}/${prompts.length} · 出片中…` })
       const segPrompt = this.appendNativeAv(prompts[i])
       const images = []
       if (i > 0 && lastFrameB64) {
@@ -1185,7 +1188,7 @@ Page({
     try {
       if (this.data.longformEnabled || scriptTable.isScriptRowsUsable(this.data.scriptRows)) {
         if (this.data.engine === 'kling') {
-          this.setData({ err: '长片闭环请使用灵祺视频（Seedance）；可在高级选项切回后关闭长片。' })
+          this.setData({ err: '长片请使用默认视频出片；可关闭长片后重试。' })
           return
         }
         await this.runLongformFromScriptOrPlan()
@@ -1414,7 +1417,7 @@ Page({
     if (!this.data.iceLocalUpload) {
       this.setData({
         iceErr:
-          '本地上传尚未开启：请运营在「商家管理后台 → 模型 → 短视频 API → 灵祺云剪」填写 OSS 成片 URL 前缀并保存，然后刷新本页。仍可粘贴下方 HTTPS 链接作为素材。',
+          '本地上传尚未开启：请运营在「商家管理后台 → 短视频 API → 灵祺云剪」填写 OSS 成片 URL 前缀并保存，然后刷新本页。仍可粘贴下方 HTTPS 链接作为素材。',
       })
       return
     }

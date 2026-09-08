@@ -1,8 +1,8 @@
 /** 与 web shortVideoUiLabels / shortVideoStudioModes 对齐 */
 module.exports = {
-  VIDEO_ENGINE_LABEL_KLING: '灵祺视频模型1',
+  VIDEO_ENGINE_LABEL_KLING: '兼容引擎',
   VIDEO_ENGINE_LABEL_SEEDANCE: '灵祺视频',
-  VIDEO_ENGINE_HINT_SEEDANCE: 'Seedance 1.5 Pro · 火山方舟',
+  VIDEO_ENGINE_HINT_SEEDANCE: '',
   VIDEO_MODEL_DEFAULT_LABEL: '默认',
   KLING_DEFAULT_MODEL_ID: 'kling-v1-6',
   SEEDANCE_1_5_PRO_MODEL_ID: 'doubao-seedance-1-5-pro-251215',
@@ -33,9 +33,9 @@ module.exports = {
     { id: 'cinematic', label: '电影感小字' },
   ],
   KLING_MODEL_OPTIONS: [
-    { id: 'kling-v1', label: 'Kling V1' },
-    { id: 'kling-v1-6', label: 'Kling V1.6（默认）' },
-    { id: 'kling-v2-master', label: 'Kling V2 Master' },
+    { id: 'kling-v1', label: '兼容方案 A' },
+    { id: 'kling-v1-6', label: '兼容方案 B（默认）' },
+    { id: 'kling-v2-master', label: '兼容方案 C' },
   ],
   ICE_ASPECT_PRESETS: [
     { id: '9:16', label: '竖屏 9:16', width: 1080, height: 1920 },
@@ -44,7 +44,7 @@ module.exports = {
   ],
   ICE_BATCH_GENERATE_COUNTS: [10, 20, 50, 100],
   MAIN_TABS: [
-    { id: 'generate', label: '短视频生成', native: true },
+    { id: 'generate', label: '短视频出片', native: true },
     { id: 'cloud_batch', label: '一键混剪', native: true },
     { id: 'cases', label: '案例', native: true },
     { id: 'music', label: '配乐', native: true },
@@ -58,13 +58,13 @@ module.exports = {
     },
     {
       id: 'video',
-      label: '视频生成',
-      description: '文生/图生短片（Seedance）',
+      label: '视频出片',
+      description: '文生/图生短片',
       pane: 'generate',
     },
     {
       id: 'image',
-      label: '图片生成',
+      label: '图片出图',
       description: '跳转视觉工坊',
       href: '/pages/ai-visual-studio/ai-visual-studio',
     },
@@ -82,7 +82,7 @@ module.exports = {
     },
   ],
   QUICK_CARDS: [
-    { id: 'generate', label: '视频生成', desc: '文生/图生短片', pane: 'generate' },
+    { id: 'generate', label: '视频出片', desc: '文生/图生短片', pane: 'generate' },
     { id: 'cases', label: '案例灵感', desc: '做同款', pane: 'cases' },
     { id: 'cloud_batch', label: '一键混剪', desc: '素材一键成片', pane: 'cloud_batch' },
   ],

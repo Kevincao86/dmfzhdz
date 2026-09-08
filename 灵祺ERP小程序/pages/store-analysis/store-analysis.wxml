@@ -88,7 +88,7 @@
     <view wx:if="{{showAdvice}}" class="sa-card">
       <text class="sa-card-title">经营建议</text>
       <text class="sa-muted">
-        {{modelUsed ? '模型 · ' + modelUsed : '规则建议'}}
+        经营建议已出
         <text wx:if="{{pointsCharged > 0}}"> · 本次消耗 {{pointsCharged}} 积分</text>
       </text>
       <view wx:for="{{aiSections}}" wx:key="id" class="sa-section">

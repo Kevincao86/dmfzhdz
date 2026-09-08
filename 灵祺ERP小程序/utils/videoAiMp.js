@@ -268,7 +268,7 @@ async function postSeedanceStart(body) {
     try {
       const data = await merchantVideoPost(p, body)
       if (data && data.ok && data.taskId) return { ok: true, taskId: String(data.taskId) }
-      lastErr = data.message || '方舟发起失败'
+      lastErr = data.message || '视频发起失败'
     } catch (e) {
       lastErr = e instanceof Error ? e.message : String(e)
       if (/404|not found/i.test(lastErr)) continue

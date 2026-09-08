@@ -14,7 +14,7 @@
 
   <view wx:if="{{pointsBalance != null}}" class="sv-points-bar">
     <text class="sv-points-bal">积分余额 {{pointsBalance}}</text>
-    <text wx:if="{{mainPane === 'generate'}}" class="sv-points-rate">短视频生成 · {{rateShortvideo}}</text>
+    <text wx:if="{{mainPane === 'generate'}}" class="sv-points-rate">短视频出片 · {{rateShortvideo}}</text>
     <text wx:elif="{{mainPane === 'cloud_batch'}}" class="sv-points-rate">云剪 {{rateCloudEdit}} · 一键成片 {{rateCloudEditSmart}}</text>
   </view>
   <view wx:if="{{mainPane === 'generate' && pointsHintGenerate}}" class="sv-points-tip">{{pointsHintGenerate}}</view>
@@ -46,8 +46,8 @@
   <!-- ========== 短视频生成 / 创作舱 ========== -->
   <view wx:if="{{mainPane === 'generate'}}" class="sv-cabin-wrap">
     <view class="sv-cabin-heading">
-      <text class="sv-cabin-h1">{{studioModeId === 'agent' ? '创作舱一站出片 · 文案到分镜' : '视频生成 · Seedance 出片'}}</text>
-      <text class="sv-cabin-h2">主引擎：{{engineLabelSeedance}} · {{engineHintSeedance}}</text>
+      <text class="sv-cabin-h1">{{studioModeId === 'agent' ? '创作舱一站出片 · 文案到分镜' : '视频出片'}}</text>
+      <text class="sv-cabin-h2">主路径：{{engineLabelSeedance}}</text>
     </view>
 
     <view class="sv-cabin">
@@ -149,16 +149,10 @@
           <switch checked="{{longformEnabled}}" disabled="{{busy}}" bindchange="onLongformChange" color="#0891b2" />
           <view class="sv-check-text">
             <text class="sv-check-title">长片合成（分镜串行 + 尾帧衔接 + 拼接）</text>
-            <text class="sv-check-sub">勾选后按分镜表逐段 Seedance，并 concat 为一条成片。</text>
+            <text class="sv-check-sub">勾选后按分镜表逐段出片，并拼接为一条成片。</text>
           </view>
         </label>
         <view wx:if="{{longformEnabled}}" class="sv-longform-extra">
-          <view class="sv-field">
-            <text class="sv-field-lab">策划模型</text>
-            <picker mode="selector" range="{{['豆包', '通义千问']}}" disabled="{{busy}}" bindchange="onPlannerChange">
-              <view class="sv-pick">{{plannerModel === 'qwen' ? '通义千问' : '豆包'}}</view>
-            </picker>
-          </view>
           <view class="sv-field">
             <text class="sv-field-lab">片段数量</text>
             <picker mode="selector" range="{{longformSegmentLabels}}" value="{{longformSegmentIdx}}" disabled="{{busy}}" bindchange="onSegmentCountChange">
@@ -195,28 +189,6 @@
         <text wx:for="{{storyFiles}}" wx:key="name" class="sv-story-item">· {{item.name}}</text>
       </view>
 
-      <view class="sv-adv-toggle" bindtap="toggleAdvancedEngine">{{showAdvancedEngine ? '收起' : '展开'}}高级 / 兼容引擎（Kling）</view>
-      <view wx:if="{{showAdvancedEngine}}" class="sv-adv-box">
-        <view class="sv-radio-row" data-engine="seedance" bindtap="onEngine">
-          <view class="sv-radio-dot {{engine === 'seedance' ? 'on' : ''}}" />
-          <text>{{engineLabelSeedance}}</text>
-        </view>
-        <view class="sv-radio-row" data-engine="kling" bindtap="onEngine">
-          <view class="sv-radio-dot {{engine === 'kling' ? 'on' : ''}}" />
-          <text>{{engineLabelKling}}</text>
-        </view>
-        <block wx:if="{{engine === 'kling'}}">
-          <picker mode="selector" range="{{klingModelOptions}}" value="{{klingModelIdx}}" bindchange="klingModelChange">
-            <view class="sv-pick">{{klingModelOptions[klingModelIdx]}}</view>
-          </picker>
-        </block>
-        <block wx:else>
-          <picker wx:if="{{sdModelLabels.length}}" mode="selector" range="{{sdModelLabels}}" value="{{sdModelIdx}}" bindchange="sdModelChange">
-            <view class="sv-pick">{{sdModelLabels[sdModelIdx]}}</view>
-          </picker>
-        </block>
-      </view>
-
       <view wx:if="{{err || hint}}" class="sv-alert {{err ? 'err' : 'hint'}}">{{err || hint}}</view>
 
       <button class="sv-btn-cyan" loading="{{busy}}" disabled="{{busy}}" bindtap="submitCabin">
@@ -233,7 +205,7 @@
       <view class="sv-pane-icon cyan">案</view>
       <view>
         <text class="sv-pane-title">案例灵感</text>
-        <text class="sv-pane-sub">点播预览，一键「做同款」灌入 prompt / 技能 / 分镜。</text>
+        <text class="sv-pane-sub">点播预览，一键「做同款」灌入文案 / 技能 / 分镜。</text>
       </view>
     </view>
     <view wx:if="{{casePreviewUrl}}" class="sv-case-preview">

@@ -14,9 +14,9 @@ const MEMBERSHIP_MONTHLY_YUAN = {
 const FREE_DIRECT_AI_CALL_LIMIT = 50
 
 const PLAN_FEATURE_LINES = {
-  free: ['对话每月 50 次（豆包/千问/MiniMax/DeepSeek）', '不含 GEO、竞对分析、报税管理'],
-  member: ['全功能开放', '模型：豆包 / 千问 / MiniMax / DeepSeek'],
-  member_plus: ['全功能开放', '全部对话模型（含旗舰系列）'],
+  free: ['对话每月 50 次', '不含 GEO、竞对分析、报税管理'],
+  member: ['全功能开放', '标准对话额度'],
+  member_plus: ['全功能开放', '全部对话能力'],
 }
 
 function normalizePlan(raw) {

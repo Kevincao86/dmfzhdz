@@ -35,7 +35,7 @@ async function postGeoAiConsult(body) {
     geo_knowledge_pack: String(body.geo_knowledge_pack || '').trim(),
   })
   const description = extractDescription(data)
-  if (!description) throw new Error('模型未返回内容')
+  if (!description) throw new Error('未能返回内容')
   return { description, raw: data }
 }
 
@@ -48,7 +48,7 @@ async function postGeoAiConsultQuestion(body) {
     geo_knowledge_pack: String(body.geo_knowledge_pack || '').trim(),
   })
   const description = extractDescription(data)
-  if (!description) throw new Error('模型未生成问法')
+  if (!description) throw new Error('未能生成问法')
   return { description, raw: data }
 }
 
