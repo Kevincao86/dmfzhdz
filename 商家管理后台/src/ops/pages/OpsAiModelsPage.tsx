@@ -41,6 +41,8 @@ import OpsArkModelEndpointsEditor from '../components/OpsArkModelEndpointsEditor
 import {
   catalogEndpointsCsv,
   DOUBAO_CHAT_CATALOG,
+  DOUBAO_VIDEO_CATALOG,
+  mergeCatalogIntoCsv,
 } from '../../meooRegistryShared/arkModelCatalogShared'
 import { useOpsModuleEdit } from '../useOpsModuleEdit'
 
@@ -67,8 +69,10 @@ export default function OpsAiModelsPage() {
 
   const editingVendorKeysRef = useRef(false)
   const editingVideoAiRef = useRef(false)
+  const videoAiRef = useRef<RegistryVideoAi>({})
   /** 目录有未同步改动时，禁止定时 pull 覆盖本地（否则「新增供应商」会在数秒内消失） */
   const catalogDirtyRef = useRef(false)
+  videoAiRef.current = videoAi
 
   /** Ref 必须与 state 同时更新（不可依赖 useEffect），否则定时 pull 会先读到旧 ref 而覆盖正在编辑的内容。 */
   const setEditingVendorKeys = (next: boolean) => {
@@ -214,13 +218,15 @@ export default function OpsAiModelsPage() {
   const saveVideoAiBindings = async () => {
     setVideoAiSaving(true)
     setHint(null)
+    const payload = { ...videoAiRef.current }
     try {
-      await postVideoAiBindings({ videoAi, lastWriter: 'ops' })
-      await pull()
-      videoAiBaseline.current = { ...videoAi }
+      await postVideoAiBindings({ videoAi: payload, lastWriter: 'ops' })
+      videoAiBaseline.current = { ...payload }
       setEditingVideoAi(false)
+      await pull()
+      setHint('已保存豆包对话 / Seedance 模型勾选。刷新后应保持勾选状态。')
     } catch {
-      setHint('短视频 API 保存失败：请确认本后台 dev 可写注册表目录。')
+      setHint('豆包模型列表保存失败：请确认运营台可写注册表。')
     } finally {
       setVideoAiSaving(false)
     }
@@ -230,9 +236,11 @@ export default function OpsAiModelsPage() {
     videoAiBaseline.current = { ...videoAi }
     setVideoAi((prev) => {
       const chat = (prev.arkChatEndpoints ?? '').trim()
+      const video = (prev.arkVideoEndpoints ?? '').trim()
       return {
         ...prev,
         arkChatEndpoints: chat ? prev.arkChatEndpoints : catalogEndpointsCsv(DOUBAO_CHAT_CATALOG),
+        arkVideoEndpoints: video ? prev.arkVideoEndpoints : catalogEndpointsCsv(DOUBAO_VIDEO_CATALOG),
       }
     })
     setEditingVideoAi(true)
@@ -278,11 +286,14 @@ export default function OpsAiModelsPage() {
         arkChatEndpoints: j.chatEndpointsCsv || p.arkChatEndpoints,
         arkVisionEndpoints: j.visionEndpointsCsv || p.arkVisionEndpoints,
         arkVectorEndpoints: j.vectorEndpointsCsv || p.arkVectorEndpoints,
-        arkVideoEndpoints: j.videoEndpointsCsv || p.arkVideoEndpoints,
+        arkVideoEndpoints: mergeCatalogIntoCsv(
+          j.videoEndpointsCsv || p.arkVideoEndpoints || '',
+          DOUBAO_VIDEO_CATALOG,
+        ),
       }))
       setEditingVideoAi(true)
       setHint(
-        `已从火山 API 拉取：语言 ${j.counts?.chat ?? 0} · 视觉 ${j.counts?.vision ?? 0} · 向量 ${j.counts?.vector ?? 0} · 视频 ${j.counts?.video ?? 0}。请点击「保存」写入注册表。未出现的模型需在方舟控制台先开通。`,
+        `已从火山 API 拉取：语言 ${j.counts?.chat ?? 0} · 视觉 ${j.counts?.vision ?? 0} · 向量 ${j.counts?.vector ?? 0} · 视频 ${j.counts?.video ?? 0}。Seedance 2.5 在下方「豆包 · Seedance 视频」列表；请点「保存」写入注册表。`,
       )
     } catch (e) {
       const detail = e instanceof Error ? e.message : String(e)
@@ -383,8 +394,8 @@ export default function OpsAiModelsPage() {
           </h1>
           <p className="mt-1 text-sm text-slate-500">
             在此维护各厂商 <strong className="text-slate-400">API Key</strong> 与
-            <strong className="text-slate-400"> 豆包对话 / 视觉 / 向量</strong>
-            模型列表。短剧 / Seedance / 可灵 / 即梦凭据请到{' '}
+            <strong className="text-slate-400"> 豆包对话 / 视觉 / 向量 / Seedance</strong>
+            模型列表。可灵 / 即梦凭据请到{' '}
             <Link to="/ai-models/short-drama" className="text-cyan-400 hover:underline">
               短剧 AI 制作
             </Link>
@@ -659,7 +670,7 @@ export default function OpsAiModelsPage() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-200">
             <Sparkles className="h-4 w-4 text-cyan-400" />
-            豆包对话 / 视觉 / 向量
+            豆包对话 / 视觉 / 向量 / Seedance
           </h2>
           <div className="flex flex-wrap gap-2">
             {canEdit ? (
@@ -708,11 +719,9 @@ export default function OpsAiModelsPage() {
           </div>
         </div>
         <p className="mb-4 text-xs text-slate-500">
-          拉取会同时写入视频模型列表（在
-          <Link to="/ai-models/short-drama" className="text-cyan-400 hover:underline">
-            短剧 AI 制作
-          </Link>
-          中查看）。更新时间：{videoAiUpdatedAt ? new Date(videoAiUpdatedAt).toLocaleString('zh-CN') : '—'}
+          Seedance 2.5 是<strong className="text-slate-400">视频模型</strong>
+          ，勾选在下方「豆包 · Seedance 视频」。更新时间：
+          {videoAiUpdatedAt ? new Date(videoAiUpdatedAt).toLocaleString('zh-CN') : '—'}
         </p>
         <div className="grid gap-4 md:grid-cols-2">
           <OpsArkModelEndpointsEditor
@@ -722,6 +731,16 @@ export default function OpsAiModelsPage() {
             catalog={DOUBAO_CHAT_CATALOG}
             value={videoAi.arkChatEndpoints ?? ''}
             onChange={(v) => setVideoAi((p) => ({ ...p, arkChatEndpoints: v }))}
+            editing={editingVideoAi}
+            disabled={loading}
+          />
+          <OpsArkModelEndpointsEditor
+            label="豆包 · Seedance 视频（含 2.5；逗号分隔「显示名|方舟模型ID」）"
+            hint="拉取会合并内置目录，因此即使火山列表暂未返回，也可勾选 Doubao-Seedance-2.5（doubao-seedance-2-5-260628）。"
+            placeholder="Doubao-Seedance-2.5|doubao-seedance-2-5-260628"
+            catalog={DOUBAO_VIDEO_CATALOG}
+            value={videoAi.arkVideoEndpoints ?? ''}
+            onChange={(v) => setVideoAi((p) => ({ ...p, arkVideoEndpoints: v }))}
             editing={editingVideoAi}
             disabled={loading}
           />
@@ -768,7 +787,7 @@ export default function OpsAiModelsPage() {
           说明
         </h2>
         <ul className="list-inside list-disc space-y-1 text-xs text-slate-500">
-          <li>「各厂商 API Key」与「豆包对话 / 视觉 / 向量」需先<strong className="text-slate-400">编辑</strong>再<strong className="text-slate-400">保存</strong>；短剧 / Seedance / 即梦凭据在「短剧 AI 制作」。</li>
+          <li>「各厂商 API Key」与「豆包对话 / Seedance」需先<strong className="text-slate-400">编辑</strong>再<strong className="text-slate-400">保存</strong>；可灵 / 即梦凭据在「短剧 AI 制作」。</li>
           <li>顶层「保存模型与 Key」在任一分区仍处于编辑状态时不可用，请先保存或取消该分区。</li>
           <li>磁盘：注册表文件为项目根 <span className="font-mono text-slate-400">.meoo-dev-sync/registry.json</span>；GET 网关合并内置厂商目录再下发 ERP。</li>
         </ul>

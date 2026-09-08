@@ -216,6 +216,7 @@ PAT
     ops_ark_models)
       cat <<'PAT'
 OpsAiModelsPage
+OpsArkModelEndpointsEditor
 arkModelCatalog
 arkModelCatalogShared
 arkAccountModelDiscovery

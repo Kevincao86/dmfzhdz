@@ -1,9 +1,12 @@
 import { useMemo, useState } from 'react'
 import {
+  arkModelIdsMatch,
   catalogEndpointsCsv,
   filterCatalog,
+  formatEndpointsCsv,
   mergeCatalogIntoCsv,
   parseEndpointsCsv,
+  unionCatalogWithParsed,
   type ArkCatalogEntry,
 } from '../../meooRegistryShared/arkModelCatalogShared'
 import { cn } from '../../cn'
@@ -31,7 +34,8 @@ export default function OpsArkModelEndpointsEditor({
 }: Props) {
   const [filter, setFilter] = useState('')
   const parsed = useMemo(() => parseEndpointsCsv(value), [value])
-  const filtered = useMemo(() => filterCatalog(catalog, filter), [catalog, filter])
+  const displayCatalog = useMemo(() => unionCatalogWithParsed(catalog, parsed), [catalog, parsed])
+  const filtered = useMemo(() => filterCatalog(displayCatalog, filter), [displayCatalog, filter])
 
   function fillAll() {
     onChange(catalogEndpointsCsv(catalog))
@@ -42,11 +46,12 @@ export default function OpsArkModelEndpointsEditor({
   }
 
   function toggleModel(entry: ArkCatalogEntry, checked: boolean) {
-    const ids = new Set(parsed.map((p) => p.modelId))
-    if (checked) ids.add(entry.modelId)
-    else ids.delete(entry.modelId)
-    const rows = catalog.filter((e) => ids.has(e.modelId))
-    onChange(catalogEndpointsCsv(rows))
+    if (checked) {
+      if (parsed.some((p) => arkModelIdsMatch(p.modelId, entry.modelId))) return
+      onChange(formatEndpointsCsv([...parsed, { label: entry.label, modelId: entry.modelId }]))
+      return
+    }
+    onChange(formatEndpointsCsv(parsed.filter((p) => !arkModelIdsMatch(p.modelId, entry.modelId))))
   }
 
   return (
@@ -76,8 +81,8 @@ export default function OpsArkModelEndpointsEditor({
       </div>
       <p className="text-[11px] leading-relaxed text-slate-500">{hint}</p>
 
-      {editing ? (
-        <>
+      <>
+        {editing ? (
           <input
             type="search"
             value={filter}
@@ -86,36 +91,41 @@ export default function OpsArkModelEndpointsEditor({
             disabled={disabled}
             className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-200 placeholder:text-slate-600"
           />
-          <div className="max-h-40 overflow-y-auto rounded-lg border border-slate-800 bg-slate-950/80 p-2">
-            {filtered.length === 0 ? (
-              <p className="px-2 py-3 text-center text-xs text-slate-500">无匹配模型</p>
-            ) : (
-              <ul className="space-y-1">
-                {filtered.map((e) => {
-                  const checked = parsed.some((p) => p.modelId === e.modelId)
-                  return (
-                    <li key={e.modelId}>
-                      <label className="flex cursor-pointer items-start gap-2 rounded px-2 py-1.5 hover:bg-slate-900">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          disabled={disabled}
-                          onChange={(ev) => toggleModel(e, ev.target.checked)}
-                          className="mt-0.5 rounded border-slate-600"
-                        />
-                        <span className="min-w-0 flex-1 text-xs">
-                          <span className="font-medium text-slate-200">{e.label}</span>
-                          <span className="mt-0.5 block font-mono text-[10px] text-slate-500">{e.modelId}</span>
-                        </span>
-                      </label>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </div>
-        </>
-      ) : null}
+        ) : null}
+        <div className="max-h-40 overflow-y-auto rounded-lg border border-slate-800 bg-slate-950/80 p-2">
+          {filtered.length === 0 ? (
+            <p className="px-2 py-3 text-center text-xs text-slate-500">无匹配模型</p>
+          ) : (
+            <ul className="space-y-1">
+              {filtered.map((e) => {
+                const checked = parsed.some((p) => arkModelIdsMatch(p.modelId, e.modelId))
+                return (
+                  <li key={e.modelId}>
+                    <label
+                      className={cn(
+                        'flex items-start gap-2 rounded px-2 py-1.5',
+                        editing ? 'cursor-pointer hover:bg-slate-900' : 'cursor-default',
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={disabled || !editing}
+                        onChange={(ev) => toggleModel(e, ev.target.checked)}
+                        className="mt-0.5 rounded border-slate-600"
+                      />
+                      <span className="min-w-0 flex-1 text-xs">
+                        <span className="font-medium text-slate-200">{e.label}</span>
+                        <span className="mt-0.5 block font-mono text-[10px] text-slate-500">{e.modelId}</span>
+                      </span>
+                    </label>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
+      </>
 
       <textarea
         spellCheck={false}

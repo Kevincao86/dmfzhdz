@@ -38,8 +38,56 @@ export const DOUBAO_VIDEO_CATALOG: ArkCatalogEntry[] = [
   { label: 'Doubao-Seedance-1.5-pro', modelId: 'doubao-seedance-1-5-pro-251215', kind: 'video_both', priority: 20 },
 ]
 
+/** 火山常返回带点号版本或短名；勾选/去重按规范化 ID 比较。 */
+const ARK_MODEL_ID_ALIASES: Record<string, string> = {
+  'doubao-seedance-2.5': 'doubao-seedance-2-5-260628',
+  'doubao-seedance-2-5': 'doubao-seedance-2-5-260628',
+  'seedance-2.5': 'doubao-seedance-2-5-260628',
+  'seedance-2-5': 'doubao-seedance-2-5-260628',
+  'doubao-seedance-2.0': 'doubao-seedance-2-0-260128',
+  'doubao-seedance-2-0': 'doubao-seedance-2-0-260128',
+  'doubao-seedance-2.0-fast': 'doubao-seedance-2-0-fast-260128',
+  'doubao-seedance-2-0-fast': 'doubao-seedance-2-0-fast-260128',
+  'doubao-seedance-2.0-mini': 'doubao-seedance-2-0-mini-260615',
+  'doubao-seedance-2-0-mini': 'doubao-seedance-2-0-mini-260615',
+}
+
+export function normalizeArkCatalogModelId(id: string): string {
+  const raw = id.trim()
+  if (!raw) return ''
+  if (/^ep-/i.test(raw)) return raw.toLowerCase()
+  let t = raw.toLowerCase()
+  t = t.replace(/doubao-seedance-(\d+)\.(\d+)/g, 'doubao-seedance-$1-$2')
+  t = t.replace(/doubao-seed-(\d+)\.(\d+)/g, 'doubao-seed-$1-$2')
+  t = t.replace(/wan2\.(\d+)/g, 'wan2-$1')
+  return ARK_MODEL_ID_ALIASES[t] ?? t
+}
+
+export function arkModelIdsMatch(a: string, b: string): boolean {
+  const na = normalizeArkCatalogModelId(a)
+  const nb = normalizeArkCatalogModelId(b)
+  if (!na || !nb) return false
+  if (na === nb) return true
+  const stripDate = (s: string) => s.replace(/-\d{6}$/, '')
+  const sa = stripDate(na)
+  const sb = stripDate(nb)
+  return sa.length >= 12 && sa === sb
+}
+
 export function catalogEndpointsCsv(entries: readonly ArkCatalogEntry[]): string {
   return entries.map((e) => `${e.label}|${e.modelId}`).join(', ')
+}
+
+export function formatEndpointsCsv(rows: readonly { label: string; modelId: string }[]): string {
+  return rows
+    .map((r) => {
+      const id = r.modelId.trim()
+      if (!id) return ''
+      const label = (r.label || id).trim() || id
+      return label !== id ? `${label}|${id}` : id
+    })
+    .filter(Boolean)
+    .join(', ')
 }
 
 export function parseEndpointsCsv(raw: string): { label: string; modelId: string }[] {
@@ -65,13 +113,36 @@ export function mergeCatalogIntoCsv(
   const rows: { label: string; modelId: string }[] = []
   const add = (label: string, modelId: string) => {
     const id = modelId.trim()
-    if (!id || seen.has(id)) return
-    seen.add(id)
+    if (!id) return
+    const key = normalizeArkCatalogModelId(id) || id
+    if (seen.has(key)) return
+    seen.add(key)
     rows.push({ label: label.trim() || id, modelId: id })
   }
   for (const row of parseEndpointsCsv(currentRaw)) add(row.label, row.modelId)
   for (const e of [...catalog].sort((a, b) => a.priority - b.priority)) add(e.label, e.modelId)
-  return rows.map((r) => (r.label !== r.modelId ? `${r.label}|${r.modelId}` : r.modelId)).join(', ')
+  return formatEndpointsCsv(rows)
+}
+
+/** 内置目录 + 已保存/火山拉回的额外 ID，避免勾选列表看不到 Seedance 2.5 等新模型。 */
+export function unionCatalogWithParsed(
+  catalog: readonly ArkCatalogEntry[],
+  parsed: readonly { label: string; modelId: string }[],
+): ArkCatalogEntry[] {
+  const out: ArkCatalogEntry[] = [...catalog]
+  const fallbackKind = catalog[0]?.kind ?? 'chat'
+  for (const p of parsed) {
+    const id = p.modelId.trim()
+    if (!id) continue
+    if (out.some((e) => arkModelIdsMatch(e.modelId, id))) continue
+    out.push({
+      label: (p.label || id).trim() || id,
+      modelId: id,
+      kind: fallbackKind,
+      priority: 100 + out.length,
+    })
+  }
+  return out
 }
 
 export function filterCatalog(

@@ -16,6 +16,9 @@ export const DEFAULT_SEEDANCE_VIDEO_MODEL_ID = 'doubao-seedance-1-0-pro-250528'
 const SEEDANCE_MODEL_ALIASES: Record<string, string> = {
   'doubao-seedance-2.5': 'doubao-seedance-2-5-260628',
   'doubao-seedance-2-5': 'doubao-seedance-2-5-260628',
+  'seedance-2.5': 'doubao-seedance-2-5-260628',
+  'seedance-2-5': 'doubao-seedance-2-5-260628',
+  'doubao-seedance-2.5-260628': 'doubao-seedance-2-5-260628',
   'doubao-seedance-2.0': 'doubao-seedance-2-0-260128',
   'doubao-seedance-2-0': 'doubao-seedance-2-0-260128',
   'doubao-seedance-2.0-fast': 'doubao-seedance-2-0-fast-260128',

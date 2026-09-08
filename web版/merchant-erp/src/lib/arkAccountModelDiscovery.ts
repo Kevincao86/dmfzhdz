@@ -2,7 +2,7 @@
  * 火山方舟 GET /api/v3/models：拉取账号已开通模型并按能力分类（语言 / 视觉 / 向量 / 视频）。
  * Brief 生文优先用 API 已开通语言模型，额度用尽或报错自动切换下一个。
  */
-import { DOUBAO_CHAT_CATALOG } from './arkModelCatalog.js'
+import { DOUBAO_CHAT_CATALOG, DOUBAO_VIDEO_CATALOG } from './arkModelCatalog.js'
 import {
   isArkVideoEndpointId,
   isDoubaoSeedanceModelId,
@@ -28,8 +28,10 @@ function cacheKey(apiKey: string, baseUrl: string): string {
 
 function labelForModelId(id: string): string {
   const norm = normalizeArkVideoModelParam(id)
-  const hit = DOUBAO_CHAT_CATALOG.find((e) => normalizeArkVideoModelParam(e.modelId) === norm)
-  if (hit) return hit.label
+  const chatHit = DOUBAO_CHAT_CATALOG.find((e) => normalizeArkVideoModelParam(e.modelId) === norm)
+  if (chatHit) return chatHit.label
+  const videoHit = DOUBAO_VIDEO_CATALOG.find((e) => normalizeArkVideoModelParam(e.modelId) === norm)
+  if (videoHit) return videoHit.label
   if (/^ep-/i.test(norm)) return `接入点 ${norm}`
   return norm
 }
