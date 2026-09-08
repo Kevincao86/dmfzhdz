@@ -47,7 +47,14 @@ export function isPreviewMessageLoading(m: AiAgentMessage): boolean {
   const p = m.preview
   if (!p) return false
   if (p.taskType === 'create_product') return isProductPreviewLoading(p)
-  if (p.taskType === 'recruit_influencer') return p.recruitmentBrief?.enrichStatus === 'loading'
+  if (p.taskType === 'recruit_influencer') {
+    const b = p.recruitmentBrief
+    return (
+      b?.enrichStatus === 'loading' ||
+      b?.wizardBudgetStatus === 'loading' ||
+      b?.wizardShootStatus === 'loading'
+    )
+  }
   if (p.taskType === 'file_tax') return p.taxFiling?.enrichStatus === 'loading'
   return false
 }

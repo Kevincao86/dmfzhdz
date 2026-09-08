@@ -47,7 +47,7 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
         })() : m.preview.taskType === 'recruit_influencer' &&
           m.preview.recruitmentBrief &&
           !m.preview.productPlans?.length ? (
-          <AiAgentRecruitmentVisualPreview brief={m.preview.recruitmentBrief} />
+          <AiAgentRecruitmentVisualPreview brief={m.preview.recruitmentBrief} previewMessageId={m.id} />
         ) : m.preview.taskType === 'file_tax' && m.preview.taxFiling ? (
           <AiAgentTaxPreview tax={m.preview.taxFiling} />
         ) : (

@@ -161,7 +161,7 @@ export function summarizeAssistantContent(content: string): string | null {
     case 'create_product':
       return title || '已理解您的上架需求，请在下方核对抖音 C 端手机预览并确认。'
     case 'recruit_influencer':
-      return title || '已理解您的达人招募需求，请在下方查看图文 Brief 并确认。'
+      return title || '已理解您的达人招募需求，请在下方一步一步确认。'
     case 'file_tax':
       return title || '已理解您的报税需求，请在下方核对各平台汇总后确认一键报税。'
     case 'generate_copywriting':

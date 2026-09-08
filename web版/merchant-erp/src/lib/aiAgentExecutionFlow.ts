@@ -255,7 +255,7 @@ export function resolveExecutionUserMessage(
         taskTypes.length > 1
           ? `好的，将为 ${taskTypes.length} 项场景并行生成独立预览（${taskTypes.map(taskTypeLabel).join('、')}），请分别在各自卡片确认。`
           : taskTypes[0] === 'recruit_influencer'
-            ? '好的，正在生成达人招募 Brief 预览…'
+            ? '好的，开始一步一步确认招募单…'
             : '好的，正在生成执行预览…',
     }
   }

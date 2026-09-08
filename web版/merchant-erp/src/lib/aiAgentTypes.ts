@@ -125,7 +125,45 @@ export type AiRecruitmentOrderDetail = {
   }
 }
 
-/** 达人招募：图文 Brief 预览（确认后写入招募页） */
+export type RecruitWizardStep = 1 | 2 | 3 | 4
+
+export type RecruitContentForm = 'instore' | 'talk' | 'note'
+
+export type RecruitWizardScope = {
+  platform: '抖音' | '小红书'
+  city: string
+  storeName: string
+  mainProductName: string
+  contentForm: RecruitContentForm
+}
+
+export type RecruitWizardBudget = {
+  budgetYuan: number
+  headcount: number
+  commissionPct: number
+  allocation?: {
+    v3: number
+    v4: number
+    v5: number
+    v5plus: number
+    source: 'library' | 'ai' | 'fallback'
+    notes?: string
+    costHint?: string
+  }
+}
+
+export type RecruitWizardShoot = {
+  sellingPoints: string[]
+  mustShoot: string[]
+  convertAction: string
+  taboo: string
+  applyDeadline: string
+  deliverDeadline: string
+  hooks: [string, string]
+  briefText: string
+}
+
+/** 达人招募：分步确认预览（确认后写入招募页） */
 export type AiRecruitmentBriefPreview = {
   platform: string
   mainProductName: string
@@ -134,6 +172,12 @@ export type AiRecruitmentBriefPreview = {
   previews?: [string, string, string]
   enrichStatus?: 'loading' | 'ready' | 'error'
   enrichError?: string
+  wizardStep?: RecruitWizardStep
+  wizardScope?: RecruitWizardScope
+  wizardBudget?: RecruitWizardBudget
+  wizardBudgetStatus?: 'idle' | 'loading' | 'ready' | 'error'
+  wizardShoot?: RecruitWizardShoot
+  wizardShootStatus?: 'idle' | 'loading' | 'ready' | 'error'
 }
 
 export type AiTaskPreviewPayload = {

@@ -1,6 +1,7 @@
 import { cn } from '../cn'
 import { useAiAgent } from '../context/AiAgentContext'
 import { aiTaskConfirmLabel } from '../lib/aiAgentPlan'
+import { recruitWizardStepOf } from '../lib/aiAgentRecruitmentWizard'
 import { GROUPBUY_PLATFORMS } from '../constants/productCreatePlatforms'
 import type { CreatePlatformId } from '../constants/productCreatePlatforms'
 
@@ -25,6 +26,8 @@ export function AiAgentPreviewActions({
     submitPendingTaskToPlatforms,
     modifyPendingTask,
     cancelPendingTask,
+    advanceRecruitWizard,
+    backRecruitWizard,
     isPreviewLoading,
     isPreviewConfirming,
   } = useAiAgent()
@@ -34,6 +37,14 @@ export function AiAgentPreviewActions({
   const loading = isPreviewLoading(previewMessageId)
   const confirming = isPreviewConfirming(previewMessageId)
   const isProduct = taskType === 'create_product'
+  const isRecruit = taskType === 'recruit_influencer'
+  const recruitStep = recruitWizardStepOf(previewMsg?.preview?.recruitmentBrief)
+  const recruitBusy =
+    previewMsg?.preview?.recruitmentBrief?.wizardBudgetStatus === 'loading' ||
+    previewMsg?.preview?.recruitmentBrief?.wizardShootStatus === 'loading'
+  const recruitNextDisabled =
+    recruitBusy ||
+    (recruitStep === 1 && !previewMsg?.preview?.recruitmentBrief?.wizardScope?.mainProductName?.trim())
 
   const confirmLabel =
     confirmLabelOverride ??
@@ -84,7 +95,48 @@ export function AiAgentPreviewActions({
       ) : null}
 
       <div className="flex flex-wrap gap-2">
-        {isProduct ? (
+        {isRecruit ? (
+          <>
+            {recruitStep > 1 ? (
+              <button
+                type="button"
+                onClick={() => backRecruitWizard(previewMessageId)}
+                disabled={confirmDisabled || recruitBusy}
+                className={cn(
+                  'rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50',
+                  (confirmDisabled || recruitBusy) && 'cursor-not-allowed opacity-50',
+                )}
+              >
+                上一步
+              </button>
+            ) : null}
+            {recruitStep < 4 ? (
+              <button
+                type="button"
+                onClick={() => advanceRecruitWizard(previewMessageId)}
+                disabled={confirmDisabled || recruitNextDisabled}
+                className={cn(
+                  'rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-xs font-medium text-white shadow-sm hover:brightness-110',
+                  (confirmDisabled || recruitNextDisabled) && 'cursor-not-allowed opacity-50',
+                )}
+              >
+                {recruitBusy ? '生成中…' : '下一步'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => confirmPendingTask(previewMessageId)}
+                disabled={confirmDisabled}
+                className={cn(
+                  'rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-xs font-medium text-white shadow-sm hover:brightness-110',
+                  confirmDisabled && 'cursor-not-allowed opacity-50',
+                )}
+              >
+                {confirmLabel}
+              </button>
+            )}
+          </>
+        ) : isProduct ? (
           <>
             <button
               type="button"

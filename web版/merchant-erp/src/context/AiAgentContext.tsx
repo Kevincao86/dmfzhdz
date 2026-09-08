@@ -64,10 +64,6 @@ import {
   patchPreviewStatusInMessages,
 } from '../lib/aiAgentPreviewState'
 import { appendKolBriefRecord, writeSelectedBriefForRecruitment } from '../lib/kolBriefStorage'
-import {
-  loadMerchantBriefProductPicks,
-  pickBriefMainAndSecondary,
-} from '../lib/merchantBriefCatalog'
 import { fetchDailyAssistReply } from '../lib/agentDailyAssist'
 import { tenantLocalKey } from '../lib/tenantLocalState'
 import {
@@ -98,10 +94,14 @@ import {
   type AiAgentClientToolResult,
   type AiAgentToolCall,
 } from '../lib/aiAgentTools'
+import { buildRecruitWizardShootPreview } from '../services/aiAgentRecruitmentBriefEnrich'
 import {
-  buildAiRecruitmentBriefPreview,
-  buildLocalRecruitmentBriefPreview,
-} from '../services/aiAgentRecruitmentBriefEnrich'
+  buildRecruitWizardSeed,
+  composeRecruitWizardBriefText,
+  composeRecruitWizardUserBrief,
+  recruitPlatformLabel,
+  recruitWizardStepOf,
+} from '../lib/aiAgentRecruitmentWizard'
 import {
   formatAiProductSubmitSummary,
   submitAiProductPlansToPlatforms,
@@ -313,6 +313,9 @@ type AiAgentContextValue = {
   submitPendingTaskToPlatforms: (previewMessageId: string) => void
   cancelPendingTask: (previewMessageId: string) => void
   modifyPendingTask: (previewMessageId: string) => void
+  patchRecruitWizard: (previewMessageId: string, patch: Partial<AiRecruitmentBriefPreview>) => void
+  advanceRecruitWizard: (previewMessageId: string) => void
+  backRecruitWizard: (previewMessageId: string) => void
   /** @deprecated 使用 isPreviewConfirming(id) */
   taskConfirming: boolean
   /** @deprecated 使用 isPreviewLoading(id) */
@@ -983,45 +986,64 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     [patchPreviewProductPlans, modelPickerKey],
   )
 
-  const attachRecruitmentBriefToPreview = useCallback(
-    async (previewMsgId: string, userBrief: string, assistantContent?: string) => {
-      const localBrief = buildLocalRecruitmentBriefPreview(userBrief, assistantContent)
-      patchPreviewRecruitmentBrief(
-        previewMsgId,
-        localBrief,
-        'Brief 预览已生成，正在 AI 优化文案…',
-      )
+  const lastPlanBriefs = useCallback((previewMsgId: string) => {
+    const pending = messagesRef.current.find((m) => m.id === previewMsgId)
+    const plan = executionStateRef.current.plan
+    const lastUser = [...messagesRef.current].reverse().find((m) => m.role === 'user')
+    return {
+      userBrief:
+        plan?.userBrief ||
+        lastUser?.content?.replace(/\[引用[\s\S]*?\n\n/, '').trim() ||
+        pending?.preview?.recruitmentBrief?.mainProductName ||
+        '',
+      assistantContent: plan?.assistantContent,
+    }
+  }, [])
 
-      try {
-        const brief = await Promise.race([
-          buildAiRecruitmentBriefPreview(userBrief, assistantContent),
-          new Promise<AiRecruitmentBriefPreview>((_, reject) =>
-            window.setTimeout(
-              () => reject(new Error('Brief 生成超时（90s）')),
-              90_000,
-            ),
-          ),
-        ])
-        patchPreviewRecruitmentBrief(
-          previewMsgId,
-          brief,
-          brief.enrichError
-            ? 'Brief 预览已就绪（部分 AI 优化未完成，可核对后确认）。'
-            : '已根据方案生成达人招募图文 Brief（三版）。请核对主推品与文案，确认后将在本窗口展示招募订单明细（含 AI 档位分配）。',
-        )
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e)
-        patchPreviewRecruitmentBrief(
-          previewMsgId,
-          {
-            ...localBrief,
-            enrichError: `AI 生成未完成：${msg.slice(0, 120)}`,
+  const runRecruitWizardAllocation = useCallback(
+    async (previewMsgId: string, brief: AiRecruitmentBriefPreview) => {
+      const scope = brief.wizardScope
+      const budget = brief.wizardBudget
+      if (!scope || !budget) return
+      const { userBrief } = lastPlanBriefs(previewMsgId)
+      const composed = composeRecruitWizardUserBrief(scope, budget, userBrief)
+      const { intent, allocation, storeCityResolved } = await buildAgentRecruitmentAllocation(
+        composed,
+        { ...brief, platform: recruitPlatformLabel(scope.platform), mainProductName: scope.mainProductName },
+        {
+          storeCity: scope.city || undefined,
+          budgetYuan: budget.budgetYuan,
+          headcount: budget.headcount,
+          platform: scope.platform,
+          commissionPct: budget.commissionPct,
+        },
+      )
+      const total = allocation.v3 + allocation.v4 + allocation.v5 + allocation.v5plus
+      patchPreviewRecruitmentBrief(previewMsgId, {
+        wizardScope: {
+          ...scope,
+          city: storeCityResolved || scope.city || intent.city,
+        },
+        wizardBudget: {
+          budgetYuan: intent.budgetYuan,
+          headcount: Math.max(1, total || budget.headcount),
+          commissionPct: intent.kolCommissionPct,
+          allocation: {
+            v3: allocation.v3,
+            v4: allocation.v4,
+            v5: allocation.v5,
+            v5plus: allocation.v5plus,
+            source: allocation.source,
+            ...(allocation.notes ? { notes: allocation.notes } : {}),
+            ...(allocation.costHint ? { costHint: allocation.costHint } : {}),
           },
-          'Brief 预览已就绪，可核对后确认；如需调整请在输入框说明。',
-        )
-      }
+        },
+        wizardBudgetStatus: 'ready',
+        platform: recruitPlatformLabel(scope.platform),
+        mainProductName: scope.mainProductName,
+      })
     },
-    [patchPreviewRecruitmentBrief],
+    [lastPlanBriefs, patchPreviewRecruitmentBrief],
   )
 
   const pushCreateProductPreview = useCallback(
@@ -1085,24 +1107,13 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   const pushRecruitInfluencerPreview = useCallback(
     (userBrief: string, pageLabel?: string, assistantContent?: string) => {
       const intelLine = merchantIntelStatusLine(loadMerchantIntelSnapshot())
-      const intro =
-        `【达人招募 · 独立预览】${intelLine ? `${intelLine}，` : ''}将结合方案全文、绑定账号类目与菜单/商品生成探店图文 Brief（三版文案）；请在本卡片确认，与其它场景任务互不影响。`
+      const intro = `【达人招募】${intelLine ? `${intelLine}。` : ''}请一步确认：先核对主推和投放范围，确认后再看预算。`
       const preview = buildPreviewForTask('recruit_influencer', pageLabel)
-      const catalog = loadMerchantBriefProductPicks(24)
-      const hint = [userBrief, assistantContent].filter(Boolean).join('\n').slice(0, 3500)
-      const { main } = pickBriefMainAndSecondary(userBrief, catalog, hint)
-      const loadingBrief: AiRecruitmentBriefPreview = {
-        platform: '抖音来客',
-        mainProductName: main.name,
-        tags: [],
-        briefText: '',
-        previews: ['', '', ''],
-        enrichStatus: 'loading',
-      }
+      const seed = buildRecruitWizardSeed(userBrief, assistantContent)
       const msg = createAgentMessage('task_preview', intro, {
         preview: {
           ...preview,
-          recruitmentBrief: loadingBrief,
+          recruitmentBrief: seed,
         },
         previewStatus: 'pending',
       })
@@ -1110,13 +1121,131 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         const next = [...prev, msg]
         messagesRef.current = next
         executionStateRef.current = syncStageAfterPreviewChange(executionStateRef.current, next)
-        queueMicrotask(() => {
-          void attachRecruitmentBriefToPreview(msg.id, userBrief, assistantContent)
-        })
         return next
       })
     },
-    [attachRecruitmentBriefToPreview],
+    [],
+  )
+
+  const patchRecruitWizard = useCallback(
+    (previewMessageId: string, patch: Partial<AiRecruitmentBriefPreview>) => {
+      patchPreviewRecruitmentBrief(previewMessageId, patch)
+    },
+    [patchPreviewRecruitmentBrief],
+  )
+
+  const advanceRecruitWizard = useCallback(
+    (previewMessageId: string) => {
+      const pending = messagesRef.current.find((m) => m.id === previewMessageId)
+      const brief = pending?.preview?.recruitmentBrief
+      if (!brief || pending?.previewStatus !== 'pending') return
+      const step = recruitWizardStepOf(brief)
+      const scope = brief.wizardScope
+      const budget = brief.wizardBudget
+      if (!scope || !budget) return
+
+      if (step === 1) {
+        patchPreviewRecruitmentBrief(
+          previewMessageId,
+          {
+            wizardStep: 2,
+            wizardBudgetStatus: 'loading',
+            platform: recruitPlatformLabel(scope.platform),
+            mainProductName: scope.mainProductName,
+          },
+          '第 2 步：核对预算和人数。',
+        )
+        void runRecruitWizardAllocation(previewMessageId, {
+          ...brief,
+          wizardScope: scope,
+          wizardBudget: budget,
+        }).catch((e) => {
+          const msg = e instanceof Error ? e.message : String(e)
+          patchPreviewRecruitmentBrief(previewMessageId, {
+            wizardBudgetStatus: 'error',
+            enrichError: `档位测算未完成：${msg.slice(0, 80)}，可先按当前预算继续。`,
+          })
+        })
+        return
+      }
+
+      if (step === 2) {
+        patchPreviewRecruitmentBrief(
+          previewMessageId,
+          { wizardStep: 3, wizardShootStatus: 'loading' },
+          '第 3 步：正在按前两步生成拍摄要点…',
+        )
+        void (async () => {
+          try {
+            await runRecruitWizardAllocation(previewMessageId, {
+              ...brief,
+              wizardScope: scope,
+              wizardBudget: budget,
+            })
+            const latest = messagesRef.current.find((m) => m.id === previewMessageId)?.preview
+              ?.recruitmentBrief
+            const nextScope = latest?.wizardScope ?? scope
+            const nextBudget = latest?.wizardBudget ?? budget
+            const { userBrief, assistantContent } = lastPlanBriefs(previewMessageId)
+            const shoot = await buildRecruitWizardShootPreview(
+              nextScope,
+              nextBudget,
+              userBrief,
+              assistantContent,
+            )
+            patchPreviewRecruitmentBrief(
+              previewMessageId,
+              {
+                wizardShoot: shoot,
+                wizardShootStatus: 'ready',
+                briefText: shoot.briefText,
+                previews: [shoot.briefText, shoot.hooks[0], shoot.hooks[1]],
+                tags: [nextScope.mainProductName, nextScope.city].filter(Boolean),
+                enrichStatus: 'ready',
+              },
+              '第 3 步：核对拍摄要点和档期。',
+            )
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e)
+            patchPreviewRecruitmentBrief(previewMessageId, {
+              wizardShootStatus: 'error',
+              enrichError: `拍摄要点生成未完成：${msg.slice(0, 80)}`,
+            })
+          }
+        })()
+        return
+      }
+
+      if (step === 3) {
+        const shoot = brief.wizardShoot
+        const briefText =
+          shoot && scope && budget ? composeRecruitWizardBriefText(scope, budget, shoot) : brief.briefText
+        patchPreviewRecruitmentBrief(
+          previewMessageId,
+          { wizardStep: 4, briefText },
+          '第 4 步：确认后发到星选大厅。',
+        )
+      }
+    },
+    [lastPlanBriefs, patchPreviewRecruitmentBrief, runRecruitWizardAllocation],
+  )
+
+  const backRecruitWizard = useCallback(
+    (previewMessageId: string) => {
+      const pending = messagesRef.current.find((m) => m.id === previewMessageId)
+      const brief = pending?.preview?.recruitmentBrief
+      if (!brief || pending?.previewStatus !== 'pending') return
+      const step = recruitWizardStepOf(brief)
+      if (step <= 1) return
+      const prev = (step - 1) as 1 | 2 | 3
+      const lines: Record<1 | 2 | 3, string> = {
+        1: '第 1 步：核对主推和投放范围。',
+        2: '第 2 步：核对预算和人数。',
+        3: '第 3 步：核对拍摄要点和档期。',
+      }
+      patchPreviewRecruitmentBrief(previewMessageId, { wizardStep: prev }, lines[prev])
+    },
+    [patchPreviewRecruitmentBrief],
   )
 
   const pushTaxFilingPreview = useCallback((pageLabel?: string) => {
@@ -2309,7 +2438,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
               !hasConfirmedPreviewForTask(messagesRef.current, 'recruit_influencer')
             ) {
               appendAssistantLine(
-                '商品方案已确认。接下来是达人招募 Brief 预览，请核对三版文案后在本卡片确认。',
+                '商品方案已确认。接下来一步一步确认招募单，先核对主推和投放范围。',
               )
               pushRecruitInfluencerPreview(
                 buildCombinedBrief(plan),
@@ -2328,12 +2457,40 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       }
 
       if (p.taskType === 'recruit_influencer') {
-        const brief = p.recruitmentBrief
+        const rawBrief = p.recruitmentBrief
+        const scope = rawBrief?.wizardScope
+        const budget = rawBrief?.wizardBudget
+        const shoot = rawBrief?.wizardShoot
+        const composedText =
+          scope && budget && shoot
+            ? composeRecruitWizardBriefText(scope, budget, shoot)
+            : rawBrief?.briefText
+        const brief = rawBrief
+          ? {
+              ...rawBrief,
+              platform: recruitPlatformLabel(scope?.platform ?? rawBrief.platform),
+              mainProductName: scope?.mainProductName || rawBrief.mainProductName,
+              briefText: composedText || rawBrief.briefText,
+              previews: shoot
+                ? ([composedText || rawBrief.briefText, shoot.hooks[0], shoot.hooks[1]] as [
+                    string,
+                    string,
+                    string,
+                  ])
+                : rawBrief.previews,
+            }
+          : rawBrief
         const lastUser = [...messagesRef.current].reverse().find((m) => m.role === 'user')
         const userBrief =
-          lastUser?.content?.replace(/\[引用[\s\S]*?\n\n/, '').trim() ||
-          brief?.briefText?.slice(0, 200) ||
-          ''
+          scope && budget
+            ? composeRecruitWizardUserBrief(
+                scope,
+                budget,
+                lastUser?.content?.replace(/\[引用[\s\S]*?\n\n/, '').trim() || '',
+              )
+            : lastUser?.content?.replace(/\[引用[\s\S]*?\n\n/, '').trim() ||
+              brief?.briefText?.slice(0, 200) ||
+              ''
         void (async () => {
           setConfirmingPreviewId(previewMessageId)
           setTaskConfirming(true)
@@ -2375,7 +2532,13 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
               tags: brief.tags,
             })
 
-            const { intent, allocation } = await buildAgentRecruitmentAllocation(userBrief, brief)
+            const { intent, allocation } = await buildAgentRecruitmentAllocation(userBrief, brief, {
+              storeCity: scope?.city || undefined,
+              budgetYuan: budget?.budgetYuan,
+              headcount: budget?.headcount,
+              platform: scope?.platform,
+              commissionPct: budget?.commissionPct,
+            })
             const tenantMeta = await resolveRecruitmentOrderTenantMeta(
               supabaseConfigured ? supabase : null,
             )
@@ -2787,6 +2950,9 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       submitPendingTaskToPlatforms,
       cancelPendingTask,
       modifyPendingTask,
+      patchRecruitWizard,
+      advanceRecruitWizard,
+      backRecruitWizard,
       previewSubmitPlatforms,
       togglePreviewSubmitPlatform,
       submitTopSearchQuery,
@@ -2829,6 +2995,9 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       submitPendingTaskToPlatforms,
       cancelPendingTask,
       modifyPendingTask,
+      patchRecruitWizard,
+      advanceRecruitWizard,
+      backRecruitWizard,
       previewSubmitPlatforms,
       togglePreviewSubmitPlatform,
       submitTopSearchQuery,

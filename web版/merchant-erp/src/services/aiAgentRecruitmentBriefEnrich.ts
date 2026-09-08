@@ -1,4 +1,8 @@
-import type { AiRecruitmentBriefPreview } from '../lib/aiAgentTypes'
+import type { AiRecruitmentBriefPreview, RecruitWizardBudget, RecruitWizardScope, RecruitWizardShoot } from '../lib/aiAgentTypes'
+import {
+  buildLocalRecruitWizardShoot,
+  composeRecruitWizardBriefText,
+} from '../lib/aiAgentRecruitmentWizard'
 import {
   loadMerchantBriefProductPicks,
   pickBriefMainAndSecondary,
@@ -149,4 +153,64 @@ export async function buildAiRecruitmentBriefPreview(
       enrichError: `AI 文案优化未完成（${msg.slice(0, 80)}），已展示本地生成版本。`,
     }
   }
+}
+
+/** 第 1、2 步确认后再生成拍摄 Brief（先本地结构，再可选 AI 补钩子） */
+export async function buildRecruitWizardShootPreview(
+  scope: RecruitWizardScope,
+  budget: RecruitWizardBudget,
+  userBrief: string,
+  assistantContent?: string,
+): Promise<RecruitWizardShoot> {
+  const local = buildLocalRecruitWizardShoot(scope, budget)
+  const ctx = resolveMerchantBriefContext()
+  const catalog = loadMerchantBriefProductPicks(24)
+  const hint = [userBrief, assistantContent].filter(Boolean).join('\n').slice(0, 3500)
+  const { main, secondary } = pickBriefMainAndSecondary(userBrief, catalog, hint)
+  try {
+    const previews = await withTimeout(
+      generateThreeKolBriefs({
+        platformLabel: scope.platform === '小红书' ? '小红书' : '抖音来客',
+        industry: ctx.industryLabel,
+        main: { ...main, name: scope.mainProductName || main.name },
+        secondary: secondary && secondary.id !== main.id ? secondary : null,
+        tags: [recruitContentFormHint(scope), scope.city, scope.storeName].filter(Boolean).slice(0, 8),
+        ctx: {
+          storeName: scope.storeName || ctx.storeName,
+          industryPath: ctx.industryPath,
+          menuSummary: ctx.menuSummary,
+        },
+        planContext: hint,
+      }),
+      BRIEFS_AI_TIMEOUT_MS,
+      'Brief 文案生成',
+    )
+    const hooks: [string, string] = [
+      firstHookLine(previews[0]) || local.hooks[0],
+      firstHookLine(previews[1]) || local.hooks[1],
+    ]
+    const shoot: RecruitWizardShoot = {
+      ...local,
+      hooks,
+      briefText: '',
+    }
+    shoot.briefText = composeRecruitWizardBriefText(scope, budget, shoot)
+    return shoot
+  } catch {
+    return local
+  }
+}
+
+function recruitContentFormHint(scope: RecruitWizardScope): string {
+  if (scope.contentForm === 'talk') return '口播'
+  if (scope.contentForm === 'note') return '图文笔记'
+  return '到店探店'
+}
+
+function firstHookLine(text: string): string {
+  const line = text
+    .split('\n')
+    .map((s) => s.trim())
+    .find((s) => s.length >= 8 && s.length <= 80)
+  return line ?? ''
 }

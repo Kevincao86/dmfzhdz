@@ -58,9 +58,21 @@ export async function resolveStoreCityFromMerchantStores(): Promise<string> {
 export async function buildAgentRecruitmentAllocation(
   userBrief: string,
   brief: AiRecruitmentBriefPreview,
-  opts?: { storeCity?: string },
+  opts?: {
+    storeCity?: string
+    budgetYuan?: number
+    headcount?: number
+    platform?: '抖音' | '小红书'
+    commissionPct?: number
+  },
 ): Promise<AgentRecruitmentAllocationResult> {
   const intent = parseRecruitmentIntentFromText(userBrief)
+  if (opts?.budgetYuan && opts.budgetYuan > 0) intent.budgetYuan = Math.round(opts.budgetYuan)
+  if (opts?.headcount && opts.headcount > 0) intent.headcountHint = Math.round(opts.headcount)
+  if (opts?.platform) intent.platform = opts.platform
+  if (opts?.commissionPct != null && Number.isFinite(opts.commissionPct)) {
+    intent.kolCommissionPct = opts.commissionPct
+  }
   const packageNote = [brief.mainProductName, brief.briefText.slice(0, 400)].filter(Boolean).join('；')
 
   const storeCity =

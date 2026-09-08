@@ -1,194 +1,333 @@
-import { ChevronRight, Copy, Loader2, Sparkles } from 'lucide-react'
-import { useCallback, useState } from 'react'
-import type { AiRecruitmentBriefPreview } from '../lib/aiAgentTypes'
-import { cn } from '../cn'
-import { AiAgentOverlayModal } from './AiAgentOverlayModal'
+import { Loader2 } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { useAiAgent } from '../context/AiAgentContext'
+import type { AiRecruitmentBriefPreview, RecruitContentForm } from '../lib/aiAgentTypes'
+import {
+  RECRUIT_CONTENT_FORM_OPTIONS,
+  RECRUIT_WIZARD_STEP_META,
+  recruitContentFormLabel,
+  recruitPlatformLabel,
+  recruitWizardStepOf,
+  summarizeRecruitWizardBudget,
+  summarizeRecruitWizardScope,
+} from '../lib/aiAgentRecruitmentWizard'
+import { LOCAL_LIFE_KOL_COMMISSION_MAX_PCT, LOCAL_LIFE_KOL_COMMISSION_MIN_PCT } from '../lib/localLifeKolCommission'
 
-type BriefDetailSelection = {
-  variantLabel: string
-  text: string
-}
-
-export function AiAgentRecruitmentVisualPreview({ brief }: { brief: AiRecruitmentBriefPreview }) {
-  const [detail, setDetail] = useState<BriefDetailSelection | null>(null)
-  const [copyTip, setCopyTip] = useState<string | null>(null)
-
-  const copyBrief = useCallback(async (text: string, label: string) => {
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopyTip(`已复制版本 ${label}`)
-      window.setTimeout(() => setCopyTip(null), 2000)
-    } catch {
-      setCopyTip('复制失败，请手动选择文本')
-      window.setTimeout(() => setCopyTip(null), 2000)
-    }
-  }, [])
-
-  if (brief.enrichStatus === 'loading') {
-    return (
-      <div className="mt-4 flex flex-col items-center justify-center rounded-xl border border-violet-100 bg-white py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-violet-500" />
-        <p className="mt-3 text-sm text-slate-600">正在生成达人探店图文 Brief…</p>
-        <p className="mt-1 text-xs text-slate-400">完成后将展示可复制的图文版预览</p>
-      </div>
-    )
-  }
-
-  const variants: [string, string, string] = brief.previews ?? [
-    brief.briefText,
-    brief.briefText,
-    brief.briefText,
-  ]
+export function AiAgentRecruitmentVisualPreview({
+  brief,
+  previewMessageId,
+}: {
+  brief: AiRecruitmentBriefPreview
+  previewMessageId: string
+}) {
+  const { patchRecruitWizard } = useAiAgent()
+  const step = recruitWizardStepOf(brief)
+  const meta = RECRUIT_WIZARD_STEP_META[step]
+  const scope =
+    brief.wizardScope ??
+    ({
+      platform: brief.platform === '小红书' ? '小红书' : '抖音',
+      city: '',
+      storeName: '',
+      mainProductName: brief.mainProductName,
+      contentForm: 'instore',
+    } as const)
+  const budget = brief.wizardBudget
+  const shoot = brief.wizardShoot
 
   return (
     <div className="mt-4 space-y-3">
-      <p className="text-center text-xs font-medium text-violet-900">达人招募 · 图文 Brief 预览</p>
-      <p className="text-center text-[11px] text-slate-500">点击卡片查看完整 Brief 文案</p>
-      <BriefCard
-        brief={brief}
-        text={variants[0]}
-        variantLabel="A"
-        onOpenDetail={() => setDetail({ variantLabel: 'A', text: variants[0] })}
-      />
-      <div className="grid gap-3 sm:grid-cols-2">
-        <BriefCard
-          brief={brief}
-          text={variants[1]}
-          variantLabel="B"
-          compact
-          onOpenDetail={() => setDetail({ variantLabel: 'B', text: variants[1] })}
-        />
-        <BriefCard
-          brief={brief}
-          text={variants[2]}
-          variantLabel="C"
-          compact
-          onOpenDetail={() => setDetail({ variantLabel: 'C', text: variants[2] })}
-        />
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-medium text-violet-900">
+          第 {step}/4 步 · {meta.title}
+        </p>
+        <div className="flex gap-1" aria-hidden>
+          {([1, 2, 3, 4] as const).map((n) => (
+            <span
+              key={n}
+              className={
+                n <= step ? 'h-1.5 w-6 rounded-full bg-violet-500' : 'h-1.5 w-6 rounded-full bg-violet-200'
+              }
+            />
+          ))}
+        </div>
       </div>
-      {brief.enrichError ? <p className="text-center text-xs text-amber-700">{brief.enrichError}</p> : null}
-      <p className="text-center text-[11px] text-slate-500">
-        确认后将按您的预算与人数需求 AI 分配达人档位，并在本窗口展示招募订单明细（同时推送运营台待接单）。
-      </p>
+      <p className="text-[11px] text-slate-500">{meta.hint}</p>
 
-      <AiAgentOverlayModal
-        open={detail != null}
-        title={`达人招募 Brief · 版本 ${detail?.variantLabel ?? ''}`}
-        subtitle={[brief.platform, brief.mainProductName].filter(Boolean).join(' · ')}
-        onClose={() => setDetail(null)}
-        footer={
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            {copyTip ? <span className="text-xs text-emerald-700">{copyTip}</span> : <span />}
-            <button
-              type="button"
-              onClick={() => detail && void copyBrief(detail.text, detail.variantLabel)}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-2 text-xs font-medium text-white hover:bg-violet-700"
-            >
-              <Copy className="h-3.5 w-3.5" />
-              复制全文
-            </button>
-          </div>
-        }
-      >
-        {detail ? (
-          <div className="space-y-4">
-            <BriefTags tags={brief.tags} />
-            <dl className="grid gap-2 text-sm sm:grid-cols-2">
-              <MetaRow label="投放平台" value={brief.platform} />
-              <MetaRow label="主推品" value={brief.mainProductName} />
-            </dl>
-            <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
-                {detail.text.trim() || '（暂无内容）'}
-              </p>
+      {step > 1 && scope ? (
+        <p className="rounded-lg bg-white/80 px-3 py-2 text-[11px] text-slate-600 ring-1 ring-violet-100">
+          已确认：{summarizeRecruitWizardScope(scope)}
+        </p>
+      ) : null}
+      {step > 2 && budget ? (
+        <p className="rounded-lg bg-white/80 px-3 py-2 text-[11px] text-slate-600 ring-1 ring-violet-100">
+          已确认：{summarizeRecruitWizardBudget(budget)}
+        </p>
+      ) : null}
+
+      {step === 1 && scope ? (
+        <div className="space-y-3 rounded-xl border border-violet-100 bg-white p-3">
+          <Field label="主推套餐">
+            <input
+              className={inputClass}
+              value={scope.mainProductName}
+              onChange={(e) =>
+                patchRecruitWizard(previewMessageId, {
+                  wizardScope: { ...scope, mainProductName: e.target.value },
+                  mainProductName: e.target.value,
+                })
+              }
+            />
+          </Field>
+          <Field label="平台">
+            <div className="flex flex-wrap gap-2">
+              {(['抖音', '小红书'] as const).map((p) => (
+                <ChoiceChip
+                  key={p}
+                  active={scope.platform === p}
+                  onClick={() =>
+                    patchRecruitWizard(previewMessageId, {
+                      wizardScope: { ...scope, platform: p },
+                      platform: recruitPlatformLabel(p),
+                    })
+                  }
+                >
+                  {recruitPlatformLabel(p)}
+                </ChoiceChip>
+              ))}
             </div>
-          </div>
-        ) : null}
-      </AiAgentOverlayModal>
+          </Field>
+          <Field label="城市">
+            <input
+              className={inputClass}
+              placeholder="按门店地址自动识别，也可手改"
+              value={scope.city}
+              onChange={(e) =>
+                patchRecruitWizard(previewMessageId, {
+                  wizardScope: { ...scope, city: e.target.value },
+                })
+              }
+            />
+          </Field>
+          <Field label="门店">
+            <input
+              className={inputClass}
+              placeholder="可留空"
+              value={scope.storeName}
+              onChange={(e) =>
+                patchRecruitWizard(previewMessageId, {
+                  wizardScope: { ...scope, storeName: e.target.value },
+                })
+              }
+            />
+          </Field>
+          <Field label="内容形式">
+            <div className="flex flex-wrap gap-2">
+              {RECRUIT_CONTENT_FORM_OPTIONS.map((opt) => (
+                <ChoiceChip
+                  key={opt.id}
+                  active={scope.contentForm === opt.id}
+                  onClick={() =>
+                    patchRecruitWizard(previewMessageId, {
+                      wizardScope: { ...scope, contentForm: opt.id as RecruitContentForm },
+                    })
+                  }
+                >
+                  {opt.label}
+                </ChoiceChip>
+              ))}
+            </div>
+          </Field>
+        </div>
+      ) : null}
+
+      {step === 2 && budget ? (
+        <div className="space-y-3 rounded-xl border border-violet-100 bg-white p-3">
+          {brief.wizardBudgetStatus === 'loading' ? (
+            <div className="flex items-center gap-2 py-6 text-sm text-slate-600">
+              <Loader2 className="h-4 w-4 animate-spin text-violet-500" />
+              正在按城市测算档位…
+            </div>
+          ) : (
+            <>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Field label="总预算（元）">
+                  <input
+                    type="number"
+                    min={500}
+                    className={inputClass}
+                    value={budget.budgetYuan}
+                    onChange={(e) =>
+                      patchRecruitWizard(previewMessageId, {
+                        wizardBudget: { ...budget, budgetYuan: Number(e.target.value) || 0 },
+                      })
+                    }
+                  />
+                </Field>
+                <Field label="计划人数">
+                  <input
+                    type="number"
+                    min={1}
+                    max={80}
+                    className={inputClass}
+                    value={budget.headcount}
+                    onChange={(e) =>
+                      patchRecruitWizard(previewMessageId, {
+                        wizardBudget: { ...budget, headcount: Number(e.target.value) || 1 },
+                      })
+                    }
+                  />
+                </Field>
+                <Field label={`佣金（${LOCAL_LIFE_KOL_COMMISSION_MIN_PCT}–${LOCAL_LIFE_KOL_COMMISSION_MAX_PCT}%）`}>
+                  <input
+                    type="number"
+                    min={LOCAL_LIFE_KOL_COMMISSION_MIN_PCT}
+                    max={LOCAL_LIFE_KOL_COMMISSION_MAX_PCT}
+                    className={inputClass}
+                    value={budget.commissionPct}
+                    onChange={(e) =>
+                      patchRecruitWizard(previewMessageId, {
+                        wizardBudget: { ...budget, commissionPct: Number(e.target.value) || 3 },
+                      })
+                    }
+                  />
+                </Field>
+              </div>
+              {budget.allocation ? (
+                <div className="grid grid-cols-4 gap-1.5 text-center">
+                  {([
+                    ['V3', budget.allocation.v3],
+                    ['V4', budget.allocation.v4],
+                    ['V5', budget.allocation.v5],
+                    ['V5+', budget.allocation.v5plus],
+                  ] as const).map(([label, n]) => (
+                    <div key={label} className="rounded-md bg-slate-50 px-1 py-1.5 ring-1 ring-slate-100">
+                      <p className="text-[9px] text-slate-500">{label}</p>
+                      <p className="text-sm font-semibold tabular-nums text-slate-900">{n}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              {budget.allocation?.costHint ? (
+                <p className="text-[11px] text-slate-500">{budget.allocation.costHint}</p>
+              ) : null}
+              <p className="text-[10px] text-slate-400">改预算或人数后，点下一步会按新数字重算档位。</p>
+            </>
+          )}
+        </div>
+      ) : null}
+
+      {step === 3 ? (
+        <div className="space-y-3 rounded-xl border border-violet-100 bg-white p-3">
+          {brief.wizardShootStatus === 'loading' || !shoot ? (
+            <div className="flex items-center gap-2 py-6 text-sm text-slate-600">
+              <Loader2 className="h-4 w-4 animate-spin text-violet-500" />
+              正在按前两步写拍摄要点…
+            </div>
+          ) : (
+            <>
+              <Row label="必讲卖点" value={shoot.sellingPoints.join('；')} />
+              <Row label="必拍镜头" value={shoot.mustShoot.join('；')} />
+              <Row label="转化动作" value={shoot.convertAction} />
+              <Row label="禁忌" value={shoot.taboo} />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="报名截止">
+                  <input
+                    type="date"
+                    className={inputClass}
+                    value={shoot.applyDeadline}
+                    onChange={(e) =>
+                      patchRecruitWizard(previewMessageId, {
+                        wizardShoot: { ...shoot, applyDeadline: e.target.value },
+                      })
+                    }
+                  />
+                </Field>
+                <Field label="成片截止">
+                  <input
+                    type="date"
+                    className={inputClass}
+                    value={shoot.deliverDeadline}
+                    onChange={(e) =>
+                      patchRecruitWizard(previewMessageId, {
+                        wizardShoot: { ...shoot, deliverDeadline: e.target.value },
+                      })
+                    }
+                  />
+                </Field>
+              </div>
+              <Row label="口播钩子" value={shoot.hooks[0]} />
+              <Row label="备选钩子" value={shoot.hooks[1]} />
+            </>
+          )}
+        </div>
+      ) : null}
+
+      {step === 4 && scope && budget ? (
+        <div className="space-y-2 rounded-xl border border-violet-100 bg-white p-3 text-sm text-slate-700">
+          <Row label="投放" value={summarizeRecruitWizardScope(scope)} />
+          <Row label="预算" value={summarizeRecruitWizardBudget(budget)} />
+          {shoot ? (
+            <>
+              <Row
+                label="档期"
+                value={`报名至 ${shoot.applyDeadline}，成片至 ${shoot.deliverDeadline}`}
+              />
+              <Row label="形式" value={recruitContentFormLabel(scope.contentForm)} />
+            </>
+          ) : null}
+          <p className="pt-1 text-[11px] text-slate-500">
+            确认后发到星选大厅，由达人报名；不会直接私信达人。
+          </p>
+        </div>
+      ) : null}
+
+      {brief.enrichError ? <p className="text-center text-xs text-amber-700">{brief.enrichError}</p> : null}
     </div>
   )
 }
 
-function BriefCard({
-  brief,
-  text,
-  variantLabel,
-  compact,
-  onOpenDetail,
-}: {
-  brief: AiRecruitmentBriefPreview
-  text: string
-  variantLabel: string
-  compact?: boolean
-  onOpenDetail: () => void
-}) {
-  const trimmed = text.trim()
-  const isTruncated = compact && trimmed.length > 120
+const inputClass =
+  'w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100'
 
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-[10px] text-slate-500">{label}</span>
+      {children}
+    </label>
+  )
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-[10px] text-slate-500">{label}</p>
+      <p className="text-sm text-slate-800">{value}</p>
+    </div>
+  )
+}
+
+function ChoiceChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
   return (
     <button
       type="button"
-      onClick={onOpenDetail}
-      className={cn(
-        'group w-full overflow-hidden rounded-xl border border-slate-200/90 bg-white text-left shadow-sm transition-all',
-        'hover:border-violet-300 hover:shadow-md hover:ring-2 hover:ring-violet-100/80',
-        'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500',
-        !compact && 'mx-auto max-w-sm rounded-2xl shadow-md ring-1 ring-violet-100/60',
-      )}
+      onClick={onClick}
+      className={
+        active
+          ? 'rounded-lg bg-violet-600 px-2.5 py-1.5 text-[11px] font-medium text-white'
+          : 'rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-600 hover:border-violet-300'
+      }
     >
-      <div className="bg-gradient-to-br from-violet-600 via-fuchsia-600 to-orange-500 px-3 py-2.5 text-white">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 text-[10px] font-medium text-white/90">
-              <Sparkles className="h-3 w-3" />
-              {brief.platform}
-            </div>
-            <p className="mt-0.5 truncate text-sm font-semibold">{brief.mainProductName}</p>
-          </div>
-          <span className="shrink-0 rounded-md bg-white/20 px-2 py-0.5 text-[10px] font-semibold">
-            版本 {variantLabel}
-          </span>
-        </div>
-      </div>
-      <div className={compact ? 'space-y-2 p-3' : 'space-y-3 p-4'}>
-        <BriefTags tags={brief.tags} compact={compact} />
-        <p
-          className={cn(
-            'whitespace-pre-wrap leading-relaxed text-slate-700',
-            compact ? 'line-clamp-6 text-[11px]' : 'text-[13px] text-slate-800',
-          )}
-        >
-          {trimmed || '（暂无内容）'}
-        </p>
-        <p className="flex items-center justify-end gap-0.5 text-[10px] font-medium text-violet-600 group-hover:text-violet-700">
-          {isTruncated ? '查看完整文案' : '查看详情'}
-          <ChevronRight className="h-3 w-3" />
-        </p>
-      </div>
+      {children}
     </button>
-  )
-}
-
-function BriefTags({ tags, compact }: { tags: string[]; compact?: boolean }) {
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {tags.slice(0, compact ? 4 : 8).map((tag) => (
-        <span
-          key={tag}
-          className="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-800 ring-1 ring-violet-100"
-        >
-          #{tag}
-        </span>
-      ))}
-    </div>
-  )
-}
-
-function MetaRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-[10px] text-slate-500">{label}</dt>
-      <dd className="font-medium text-slate-800">{value}</dd>
-    </div>
   )
 }
