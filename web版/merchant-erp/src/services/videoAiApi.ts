@@ -1309,12 +1309,26 @@ const DEFAULT_POLL_MS = 2500
 
 /**
  * 按视频时长估算轮询上限。
- * 短片（≤15s）目标总等待约 3～4 分钟，超时尽快换模；长片仍放宽。
+ * 可换模时短片仍较快放弃；锁定单一模型（短剧 Seedance 2.5 + 有声 + 首帧）时必须等到真正成功/失败。
+ * 方舟 8～15 秒图生视频常要 6～12 分钟，4 分钟仍 running 不是无结果。
  */
-export function pollMaxTriesForVideoDuration(durationSec: number, pollIntervalMs = DEFAULT_POLL_MS): number {
+export function pollMaxTriesForVideoDuration(
+  durationSec: number,
+  pollIntervalMs = DEFAULT_POLL_MS,
+  lockModel = false,
+): number {
   const sec = Math.max(3, Math.round(durationSec))
-  const maxWaitMs =
-    sec <= 5
+  const maxWaitMs = lockModel
+    ? sec <= 5
+      ? 10 * 60_000
+      : sec <= 15
+        ? 15 * 60_000
+        : sec <= 30
+          ? 18 * 60_000
+          : sec <= 60
+            ? 20 * 60_000
+            : Math.min(45 * 60_000, sec * 4000 + 10 * 60_000)
+    : sec <= 5
       ? 3 * 60_000
       : sec <= 15
         ? 4 * 60_000
@@ -1335,6 +1349,8 @@ export async function pollShortVideoTask(
     durationSec?: number
     shouldCancel?: () => boolean
     onProgress?: (statusLabel: string) => void
+    /** 锁定模型时：running 继续等，不要 4 分钟误判无结果 */
+    lockModel?: boolean
   },
 ): Promise<
   | { ok: true; videoUrl: string }
@@ -1342,17 +1358,33 @@ export async function pollShortVideoTask(
 > {
   const pollMs = opts?.pollIntervalMs ?? DEFAULT_POLL_MS
   const dur = Math.max(3, Math.round(opts?.durationSec ?? 5))
-  const maxTries = opts?.pollMaxTries ?? pollMaxTriesForVideoDuration(dur, pollMs)
+  const lockModel = opts?.lockModel === true
+  const maxTries = opts?.pollMaxTries ?? pollMaxTriesForVideoDuration(dur, pollMs, lockModel)
   let tries = 0
   let lastFail = '生成失败，请稍后重试。'
   const startedAt = Date.now()
   let queuedSince: number | null = null
   let runningSince: number | null = null
   let finalizeSince: number | null = null
-  /** 短片排队超过约 45s 即换模，避免卡在「排队中」半小时；长片/Agent 放宽 */
-  const queuedStallMs = dur <= 15 ? 45_000 : dur <= 60 ? 3 * 60_000 : 5 * 60_000
-  const runningStallMs =
-    dur <= 5
+  /** 短片排队超过约 45s 即换模；锁定模型时排队也继续等 */
+  const queuedStallMs = lockModel
+    ? dur <= 15
+      ? 10 * 60_000
+      : 15 * 60_000
+    : dur <= 15
+      ? 45_000
+      : dur <= 60
+        ? 3 * 60_000
+        : 5 * 60_000
+  const runningStallMs = lockModel
+    ? dur <= 5
+      ? 10 * 60_000
+      : dur <= 15
+        ? 15 * 60_000
+        : dur <= 60
+          ? 20 * 60_000
+          : Math.min(40 * 60_000, dur * 3000 + 10 * 60_000)
+    : dur <= 5
       ? 3 * 60_000
       : dur <= 15
         ? 4 * 60_000
@@ -1389,8 +1421,10 @@ export async function pollShortVideoTask(
       else if (Date.now() - finalizeSince >= finalizeStallMs) {
         return {
           ok: false,
-          message: '任务已成功但未返回视频地址，将切换其它模型重试…',
-          hopable: true,
+          message: lockModel
+            ? '任务已成功但未返回视频地址，请稍后重试。'
+            : '任务已成功但未返回视频地址，将切换其它模型重试…',
+          hopable: !lockModel,
         }
       }
       opts?.onProgress?.(`收尾中（等待视频地址）（已等待约 ${elapsedMin} 分钟）`)
@@ -1414,8 +1448,10 @@ export async function pollShortVideoTask(
       else if (Date.now() - queuedSince >= queuedStallMs) {
         return {
           ok: false,
-          message: '任务长时间排队未开始，可能当前模型额度已满，将切换其它模型重试…',
-          hopable: true,
+          message: lockModel
+            ? '任务仍在排队，当前模型未开始生成，请稍后重试。'
+            : '任务长时间排队未开始，可能当前模型额度已满，将切换其它模型重试…',
+          hopable: !lockModel,
         }
       }
       runningSince = null
@@ -1425,8 +1461,10 @@ export async function pollShortVideoTask(
       else if (Date.now() - runningSince >= runningStallMs) {
         return {
           ok: false,
-          message: `生成超过 ${Math.round(runningStallMs / 60_000)} 分钟仍无结果，将切换其它模型重试…`,
-          hopable: true,
+          message: lockModel
+            ? `生成已超过 ${Math.round(runningStallMs / 60_000)} 分钟仍未返回成片，任务可能仍在云端处理，请稍后重试。`
+            : `生成超过 ${Math.round(runningStallMs / 60_000)} 分钟仍无结果，将切换其它模型重试…`,
+          hopable: !lockModel,
         }
       }
     } else {
@@ -1437,8 +1475,10 @@ export async function pollShortVideoTask(
 
   return {
     ok: false,
-    message: '等待超时，可能当前模型额度不足或队列拥堵，将切换其它模型重试…',
-    hopable: true,
+    message: lockModel
+      ? '等待超时，当前模型仍未返回成片，请稍后重试。'
+      : '等待超时，可能当前模型额度不足或队列拥堵，将切换其它模型重试…',
+    hopable: !lockModel,
   }
 }
 
@@ -1594,10 +1634,11 @@ async function runShortVideoJobWithDurationInternal(
 
     const poll = await pollShortVideoTask(start.taskId, {
       pollIntervalMs: opts.pollIntervalMs,
-      pollMaxTries: opts.pollMaxTries ?? pollMaxTriesForVideoDuration(durationSec, opts.pollIntervalMs),
+      pollMaxTries: opts.pollMaxTries ?? pollMaxTriesForVideoDuration(durationSec, opts.pollIntervalMs, lockToPreferred),
       durationSec,
       shouldCancel: opts.shouldCancel,
       onProgress: opts.onProgress,
+      lockModel: lockToPreferred,
     })
     if (poll.ok) {
       const engineUsed: 'qwen' | 'seedance' =
