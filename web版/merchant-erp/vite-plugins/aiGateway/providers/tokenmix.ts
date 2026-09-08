@@ -1,5 +1,5 @@
 import type { AIChatRequest, AIChatResponse } from '../../../src/services/ai/types.js'
-import { resolveTokenMixModelId } from '../../../src/services/ai/tokenmixClient.js'
+import { resolveTokenMixModelId, resolveTokenmixBaseUrl } from '../../../src/services/ai/tokenmixClient.js'
 import { toOpenAiChatCompletionMessages } from '../openAiChatMessages.js'
 
 /**
@@ -10,7 +10,7 @@ export async function chatTokenMix(req: AIChatRequest, env: Record<string, strin
   const apiKey = (env.TOKENMIX_API_KEY ?? '').trim()
   if (!apiKey) throw new Error('TOKENMIX_API_KEY 未配置')
 
-  const baseRaw = (env.TOKENMIX_BASE_URL ?? 'https://api.tokenmix.ai/v1').trim().replace(/\/$/, '')
+  const baseRaw = resolveTokenmixBaseUrl(env)
   const model = resolveTokenMixModelId({ modelFamily: req.modelFamily, model: req.model }, env)
 
   const { default: OpenAI } = await import('openai')

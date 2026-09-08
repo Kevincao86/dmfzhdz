@@ -49,7 +49,7 @@ function writeStored(cfg: GptConfig) {
 function normalizeConfig(raw: GptConfig): GptConfig {
   return {
     apiKey: String(raw.apiKey || '').trim(),
-    baseUrl: String(raw.baseUrl || 'https://api.tokenmix.ai/v1').trim(),
+    baseUrl: String(raw.baseUrl || 'https://api.tokenmix.cc/v1').trim(),
     textModel: String(raw.textModel || 'gpt-4o-mini').trim(),
     imageModel: String(raw.imageModel || 'gpt-image-1').trim(),
     updatedAt: raw.updatedAt || new Date().toISOString(),

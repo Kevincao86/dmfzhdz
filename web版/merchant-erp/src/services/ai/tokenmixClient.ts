@@ -2,11 +2,39 @@ import type { AIModelFamily } from './types'
 
 /**
  * TokenMix 统一网关 — 模型目录与解析逻辑（浏览器可安全 import，无 Node / OpenAI SDK）。
- * 中继文档：<https://tokenmix.ai/docs> · Base URL 默认 `https://api.tokenmix.ai/v1`
+ * 中继文档：<https://tokenmix.ai/docs> · Base URL 默认 `https://api.tokenmix.cc/v1`（临时节点）
  *
  * 各 `models[].id` 须与 TokenMix 控制台当前可用 id 一致；若中继更新目录，可通过部署调整本文件
  * 或请求体显传 `model` 覆盖。
  */
+
+/** 临时节点；环境变量 TOKENMIX_BASE_URL 非空时优先。 */
+export const TOKENMIX_DEFAULT_BASE_URL = 'https://api.tokenmix.cc/v1'
+
+export function resolveTokenmixBaseUrl(env?: Record<string, string | undefined> | null): string {
+  const raw = String(env?.TOKENMIX_BASE_URL ?? '').trim().replace(/\/$/, '')
+  if (!raw) return TOKENMIX_DEFAULT_BASE_URL
+  try {
+    const href = raw.includes('://') ? raw : `https://${raw}`
+    const host = new URL(href).hostname.toLowerCase()
+    if (host === 'api.tokenmix.ai' || host === 'tokenmix.ai') return TOKENMIX_DEFAULT_BASE_URL
+  } catch {
+    /* 非 URL 时沿用原值 */
+  }
+  return raw
+}
+
+export function isTokenmixImageHost(hostname: string): boolean {
+  const h = hostname.toLowerCase()
+  return (
+    h === 'cdn.tokenmix.ai' ||
+    h === 'tokenmix.ai' ||
+    h.endsWith('.tokenmix.ai') ||
+    h === 'cdn.tokenmix.cc' ||
+    h === 'tokenmix.cc' ||
+    h.endsWith('.tokenmix.cc')
+  )
+}
 
 export type TokenMixModelOption = { id: string; label: string }
 

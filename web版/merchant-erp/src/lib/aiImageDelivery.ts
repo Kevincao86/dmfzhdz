@@ -2,6 +2,7 @@
 
 import { merchantApiAuthHeaders, resolveMerchantApiBearer } from './merchantApiAuth'
 import { merchantErpApiCandidates } from './merchantErpApiBase'
+import { isTokenmixImageHost } from '../services/ai/tokenmixClient'
 
 export function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -15,8 +16,7 @@ export function readFileAsDataUrl(file: File): Promise<string> {
 function isTokenmixCdnUrl(url: string): boolean {
   try {
     const u = new URL(url)
-    const h = u.hostname.toLowerCase()
-    return h === 'cdn.tokenmix.ai' || h === 'tokenmix.ai' || h.endsWith('.tokenmix.ai')
+    return isTokenmixImageHost(u.hostname)
   } catch {
     return false
   }

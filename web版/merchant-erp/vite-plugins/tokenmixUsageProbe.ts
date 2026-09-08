@@ -1,3 +1,5 @@
+import { resolveTokenmixBaseUrl } from '../src/services/ai/tokenmixClient.js'
+
 /** 探测 TokenMix 控制台/API 用量信息（无公开文档时多路径尝试） */
 
 export type TokenMixUsageSnapshot = {
@@ -14,7 +16,7 @@ export async function probeTokenMixUsage(
   apiKey: string,
   env: Record<string, string>,
 ): Promise<TokenMixUsageSnapshot> {
-  const base = (env.TOKENMIX_BASE_URL ?? 'https://api.tokenmix.ai/v1').trim().replace(/\/$/, '')
+  const base = resolveTokenmixBaseUrl(env)
   const headers = {
     Authorization: `Bearer ${apiKey}`,
     Accept: 'application/json',

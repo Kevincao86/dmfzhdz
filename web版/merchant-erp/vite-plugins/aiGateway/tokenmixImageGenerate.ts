@@ -6,12 +6,9 @@
  * TokenMix CDN 无 CORS：成图后服务端 hydrate 为 data URL，供浏览器裁切。
  */
 
-const TOKENMIX_HYDRATE_MAX_BYTES = 8 * 1024 * 1024
+import { isTokenmixImageHost, resolveTokenmixBaseUrl } from '../../src/services/ai/tokenmixClient.js'
 
-function isTokenmixImageHost(hostname: string): boolean {
-  const h = hostname.toLowerCase()
-  return h === 'cdn.tokenmix.ai' || h === 'tokenmix.ai' || h.endsWith('.tokenmix.ai')
-}
+const TOKENMIX_HYDRATE_MAX_BYTES = 8 * 1024 * 1024
 
 export function isTokenmixBrowserUnsafeImageUrl(url: string): boolean {
   const u = url.trim()
@@ -139,7 +136,7 @@ export type TokenmixImagePollResult =
 function tokenmixBaseAndKey(env: Record<string, string>): { base: string; apiKey: string } {
   const apiKey = (env.TOKENMIX_API_KEY ?? '').trim()
   if (!apiKey) throw new Error('TOKENMIX_API_KEY 未配置')
-  const base = (env.TOKENMIX_BASE_URL ?? 'https://api.tokenmix.ai/v1').trim().replace(/\/$/, '')
+  const base = resolveTokenmixBaseUrl(env)
   return { base, apiKey }
 }
 
