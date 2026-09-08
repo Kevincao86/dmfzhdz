@@ -14,10 +14,12 @@
     <text wx:if="{{bindingsHint}}" class="erp-hint">{{bindingsHint}}</text>
     <text wx:if="{{bindingsLoading}}" class="erp-hint">加载中…</text>
     <view wx:for="{{cloudPlatformRows}}" wx:key="id" class="erp-row">
+      <image wx:if="{{item.iconSrc}}" class="set-plat-ic" src="{{item.iconSrc}}" mode="aspectFit" />
       <text class="set-label">{{item.label}}</text>
       <text class="{{item.bound ? 'set-ok' : 'set-warn'}}">{{item.bound ? '已绑定' : '未绑定'}}</text>
     </view>
     <view wx:for="{{webPlatformRows}}" wx:key="id" class="erp-row">
+      <image wx:if="{{item.iconSrc}}" class="set-plat-ic" src="{{item.iconSrc}}" mode="aspectFit" />
       <text class="set-label">{{item.label}}</text>
       <text class="set-warn">{{item.statusText || '需电脑端授权'}}</text>
     </view>

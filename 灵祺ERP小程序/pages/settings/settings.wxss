@@ -25,6 +25,15 @@
   flex-shrink: 0;
 }
 
+.set-plat-ic {
+  width: 48rpx;
+  height: 48rpx;
+  flex-shrink: 0;
+  background: #fff;
+  border-radius: 10rpx;
+  margin-right: 12rpx;
+}
+
 .set-main {
   flex: 1;
   min-width: 0;
