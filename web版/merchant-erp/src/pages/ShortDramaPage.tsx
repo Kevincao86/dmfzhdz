@@ -5,6 +5,7 @@ import {
   Building2,
   Camera,
   Car,
+  Check,
   Coffee,
   Cpu,
   Crown,
@@ -38,7 +39,6 @@ import {
   Swords,
   Trash2,
   Trees,
-  User,
   UtensilsCrossed,
   Wand2,
   Wine,
@@ -47,6 +47,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../cn'
 import { MpAddonPointsRateBadge } from '../components/MpAddonPointsRateBadge'
 import { MembershipMediaLockedBanner, useMembership } from '../context/MembershipContext'
+import { fetchImageBlob } from '../lib/aiImageDelivery'
 import { processCustomAvatarFile } from '../lib/digitalHumanCustomMedia'
 import { probeVideoDurationSec } from '../lib/digitalHumanSubtitle'
 import { readMpSessionToken } from '../lib/merchantApiAuth'
@@ -60,7 +61,7 @@ import {
   VIDEO_ENGINE_LABEL_SEEDANCE,
   type SeedanceQualityId,
 } from '../lib/shortVideoUiLabels'
-import { postAiChat } from '../services/ai/aiClient'
+import { postAiAgentNativeImage, postAiChat } from '../services/ai/aiClient'
 import {
   checkMpAddonPointsAffordable,
   formatMpAddonPointsSpendHint,
@@ -1383,6 +1384,22 @@ function toDramaImageDataUrl(raw: string): string {
   return `data:image/jpeg;base64,${s}`
 }
 
+function blobToDramaDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader()
+    fr.onload = () => {
+      const s = String(fr.result || '').trim()
+      if (!s.startsWith('data:')) {
+        reject(new Error('读取角色图失败'))
+        return
+      }
+      resolve(s)
+    }
+    fr.onerror = () => reject(new Error('读取角色图失败'))
+    fr.readAsDataURL(blob)
+  })
+}
+
 function isSeedance15ProModelId(id: string): boolean {
   const t = String(id || '').trim()
   return t === SEEDANCE_1_5_PRO_MODEL_ID || /seedance-1-5-pro/i.test(t) || /seedance-1\.5-pro/i.test(t)
@@ -1414,6 +1431,9 @@ export default function ShortDramaPage() {
   const [mediaBusy, setMediaBusy] = useState(false)
   const [refItems, setRefItems] = useState<DramaRefItem[]>([])
   const [characterPreview, setCharacterPreview] = useState<string | null>(null)
+  const [characterDraft, setCharacterDraft] = useState<string | null>(null)
+  const [characterDesc, setCharacterDesc] = useState('')
+  const [characterBusy, setCharacterBusy] = useState(false)
   const refInputRef = useRef<HTMLInputElement>(null)
   const characterInputRef = useRef<HTMLInputElement>(null)
   const [progress, setProgress] = useState<string | null>(null)
@@ -1595,6 +1615,10 @@ export default function ShortDramaPage() {
     }
     return bits.join('')
   }, [characterPreview, refItems.length, roles])
+  const characterShowUrl = characterDraft || characterPreview
+  const characterConfirmed = Boolean(
+    characterPreview && (!characterDraft || characterDraft === characterPreview),
+  )
 
   const addDramaRefFiles = async (files: FileList | File[] | null) => {
     if (!files || files.length === 0) return
@@ -1652,13 +1676,67 @@ export default function ShortDramaPage() {
     setErr(null)
     try {
       const url = await processCustomAvatarFile(file)
+      setCharacterDraft(url)
       setCharacterPreview(url)
       clearTrial()
+      setHint('已用上传照片确认角色形象。')
     } catch (e) {
       setErr(e instanceof Error ? e.message : '角色形象读取失败')
     } finally {
       setMediaBusy(false)
     }
+  }
+
+  const generateCharacterPreview = async () => {
+    const desc = characterDesc.trim() || roles.trim()
+    if (!desc) {
+      setErr('请先填写角色形象描述，再生成预览')
+      setHint(null)
+      return
+    }
+    setCharacterBusy(true)
+    setErr(null)
+    setHint(null)
+    try {
+      const prompt = [
+        '竖屏半身人像照片，单人，正面或微侧，五官清晰，自然光线，写实。',
+        `角色身份：${roles.trim() || '主角'}。`,
+        `外貌与穿搭：${desc}。`,
+        `气质贴近「${scene.name}」${style.visual ? `，${style.visual}` : ''}。`,
+        '禁止字幕、水印、Logo、多人、拼贴和海报排版。',
+      ].join('')
+      const res = await postAiAgentNativeImage(prompt, { aspectRatio: '3:4', exactPrompt: true })
+      if (!res.ok) {
+        setErr(res.message || '角色形象生成失败，请稍后重试')
+        return
+      }
+      let dataUrl = res.imageUrl.trim()
+      if (!dataUrl.startsWith('data:')) {
+        const blob = await fetchImageBlob(dataUrl)
+        dataUrl = await blobToDramaDataUrl(blob)
+      }
+      if (!mountedRef.current) return
+      setCharacterDraft(dataUrl)
+      setCharacterPreview(null)
+      clearTrial()
+      setHint('请点「确认」后，生成短剧才会按此角色形象融合。')
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '角色形象生成失败')
+    } finally {
+      if (mountedRef.current) setCharacterBusy(false)
+    }
+  }
+
+  const confirmCharacterPreview = () => {
+    const src = characterDraft
+    if (!src) {
+      setErr('请先生成或上传角色形象预览')
+      return
+    }
+    setCharacterPreview(src)
+    clearTrial()
+    setErr(null)
+    setHint('已确认角色形象，生成短剧时将按此融合。')
   }
 
   const switchWorld = (nextWorldId: WorldId) => {
@@ -1741,8 +1819,9 @@ export default function ShortDramaPage() {
     if (!durationSelected) return '请先选择成片时长'
     if (!story.trim()) return '请先确认一句话故事，或点「AI生成故事」。'
     if (mediaBusy) return '正在处理参考画面，请稍候'
+    if (characterBusy) return '正在生成角色形象，请稍候'
     return null
-  }, [busy, storyBusy, cfgLoaded, cfg, durationSelected, story, mediaBusy])
+  }, [busy, storyBusy, cfgLoaded, cfg, durationSelected, story, mediaBusy, characterBusy])
 
   useEffect(() => {
     mountedRef.current = true
@@ -2530,41 +2609,85 @@ export default function ShortDramaPage() {
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-slate-800">角色形象</p>
                   <p className="text-[11px] leading-relaxed text-slate-500">
-                    上传主角照片（或短视频抽帧），右侧可预览；成片会按此形象融合。
+                    用文字描述生成预览，确认后才会用于成片融合；也可直接上传照片。
                   </p>
+                  <textarea
+                    className={cn(fieldCls, 'min-h-[64px] resize-y')}
+                    disabled={busy || storyBusy || characterBusy || mediaBusy}
+                    value={characterDesc}
+                    onChange={(e) => setCharacterDesc(e.target.value)}
+                    placeholder="例如：28 岁短发女生，米色针织开衫，自然妆，半身面对镜头"
+                  />
                   <input
                     ref={characterInputRef}
                     type="file"
                     accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime,.mp4,.mov,.webm"
                     className="hidden"
-                    disabled={busy || storyBusy || mediaBusy}
+                    disabled={busy || storyBusy || mediaBusy || characterBusy}
                     onChange={(e) => {
                       void onPickCharacterFile(e.target.files?.[0])
                       e.target.value = ''
                     }}
                   />
-                  {characterPreview ? (
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={busy || storyBusy || characterBusy || mediaBusy}
+                      onClick={() => void generateCharacterPreview()}
+                      className="inline-flex items-center gap-1 rounded-lg border border-cyan-200 bg-cyan-50 px-2.5 py-1.5 text-xs font-medium text-cyan-900 hover:bg-cyan-100 disabled:opacity-50"
+                    >
+                      {characterBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
+                      {characterBusy ? '正在生成预览' : '生成预览'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy || storyBusy || characterBusy || mediaBusy}
+                      onClick={() => characterInputRef.current?.click()}
+                      className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      上传照片
+                    </button>
+                    {characterShowUrl && !characterConfirmed ? (
+                      <button
+                        type="button"
+                        disabled={busy || characterBusy}
+                        onClick={confirmCharacterPreview}
+                        className="inline-flex items-center gap-1 rounded-lg bg-cyan-700 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-cyan-800 disabled:opacity-50"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                        确认
+                      </button>
+                    ) : null}
+                  </div>
+                  {characterShowUrl ? (
                     <div className="relative overflow-hidden rounded-xl border border-cyan-200 bg-cyan-50/40">
-                      <img src={characterPreview} alt="角色形象预览" className="aspect-[3/4] w-full object-cover" />
+                      <img src={characterShowUrl} alt="角色形象预览" className="aspect-[3/4] w-full object-cover" />
                       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-2">
                         <p className="truncate text-xs font-medium text-white">{roles.trim() || '主角'}</p>
-                        <p className="text-[10px] text-white/80">角色形象预览</p>
+                        <p className="text-[10px] text-white/80">
+                          {characterConfirmed ? '已确认，将按此融合' : '预览待确认'}
+                        </p>
                       </div>
                       <div className="absolute right-1 top-1 flex gap-1">
+                        {characterConfirmed ? (
+                          <span className="rounded-full bg-cyan-700 px-2 py-0.5 text-[10px] text-white">已确认</span>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={busy || characterBusy}
+                            onClick={confirmCharacterPreview}
+                            className="rounded-full bg-cyan-700 px-2 py-0.5 text-[10px] text-white disabled:opacity-40"
+                          >
+                            确认
+                          </button>
+                        )}
                         <button
                           type="button"
-                          disabled={busy || mediaBusy}
-                          onClick={() => characterInputRef.current?.click()}
-                          className="rounded-full bg-black/55 px-2 py-0.5 text-[10px] text-white disabled:opacity-40"
-                        >
-                          更换
-                        </button>
-                        <button
-                          type="button"
-                          disabled={busy || mediaBusy}
+                          disabled={busy || mediaBusy || characterBusy}
                           aria-label="移除角色形象"
                           onClick={() => {
                             setCharacterPreview(null)
+                            setCharacterDraft(null)
                             clearTrial()
                           }}
                           className="rounded-full bg-black/55 p-1 text-white disabled:opacity-40"
@@ -2574,15 +2697,9 @@ export default function ShortDramaPage() {
                       </div>
                     </div>
                   ) : (
-                    <button
-                      type="button"
-                      disabled={busy || storyBusy || mediaBusy}
-                      onClick={() => characterInputRef.current?.click()}
-                      className="flex h-40 w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-cyan-300 bg-cyan-50/30 text-sm text-cyan-900 hover:bg-cyan-50 disabled:opacity-50"
-                    >
-                      {mediaBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <User className="h-5 w-5" />}
-                      上传角色形象
-                    </button>
+                    <div className="flex h-28 items-center justify-center rounded-xl border border-dashed border-cyan-300 bg-cyan-50/30 text-xs text-cyan-900">
+                      {characterBusy ? '正在生成角色预览…' : '先写描述再生成预览'}
+                    </div>
                   )}
                 </div>
               </div>
@@ -2659,11 +2776,13 @@ export default function ShortDramaPage() {
                   <div className="aspect-[9/16] w-full">
                     {phoneSrc ? (
                       <video key={phoneSrc} src={phoneSrc} controls playsInline className="h-full w-full object-contain" />
-                    ) : characterPreview ? (
+                    ) : characterShowUrl ? (
                       <div className="relative h-full">
-                        <img src={characterPreview} alt="角色形象预览" className="h-full w-full object-cover" />
+                        <img src={characterShowUrl} alt="角色形象预览" className="h-full w-full object-cover" />
                         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 text-slate-100">
-                          <p className="text-[10px] uppercase tracking-wide text-cyan-200">角色形象预览</p>
+                          <p className="text-[10px] uppercase tracking-wide text-cyan-200">
+                            {characterConfirmed ? '角色形象预览 · 已确认' : '角色形象预览 · 待确认'}
+                          </p>
                           <p className="mt-1 text-lg font-semibold">{roles.trim() || '主角'}</p>
                           <p className="mt-0.5 text-xs text-slate-300">{scene.name} · {formula.name}</p>
                         </div>
