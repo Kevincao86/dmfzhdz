@@ -1687,12 +1687,13 @@ async function runShortVideoJobWithDurationInternal(
   }
 }
 
-/** 小云雀智能生视频 Agent：单次提交目标时长，适合短剧长片（最长约 15 分钟） */
+/** 即梦/小云雀：有角色图时走视觉云图生，不走方舟 Seedance 真人库 */
 export async function runXiaoyunqueVideoJob(opts: {
   prompt: string
   durationSec: number
   aspectRatio?: string
   flags?: string
+  images_base64?: string[]
   shouldCancel?: () => boolean
   onProgress?: (text: string) => void
 }): Promise<
@@ -1704,13 +1705,19 @@ export async function runXiaoyunqueVideoJob(opts: {
   const flags =
     opts.flags?.trim() ||
     `--dur ${durationSec} --fps 24 --ratio ${aspect} --wm false`
-  opts.onProgress?.(`小云雀 Agent 提交中（目标 ${durationSec} 秒）…`)
+  const imgs = (opts.images_base64 ?? []).map((s) => String(s).trim()).filter(Boolean)
+  opts.onProgress?.(
+    imgs.length
+      ? `即梦图生视频提交中（${imgs.length} 张参考图，目标 ${durationSec} 秒）…`
+      : `小云雀 Agent 提交中（目标 ${durationSec} 秒）…`,
+  )
   const start = await postSeedanceVideoStart({
     prompt: opts.prompt,
     flags,
     durationSec,
     pipeline: 'xiaoyunque',
     skip_qwen: true,
+    images_base64: imgs.length ? imgs : undefined,
   })
   if (!start.ok) return { ok: false, message: formatVideoAiUserError(start.message) }
 
@@ -1723,7 +1730,7 @@ export async function runXiaoyunqueVideoJob(opts: {
     pollMaxTries,
     durationSec,
     shouldCancel: opts.shouldCancel,
-    onProgress: (label) => opts.onProgress?.(`小云雀 · ${label}`),
+    onProgress: (label) => opts.onProgress?.(`${imgs.length ? '即梦图生' : '小云雀'} · ${label}`),
   })
   if (!poll.ok) return { ok: false, message: formatVideoAiUserError(poll.message) }
   return { ok: true, videoUrl: poll.videoUrl, modelUsed: start.modelUsed ?? 'xiaoyunque' }

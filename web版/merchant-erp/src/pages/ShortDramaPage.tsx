@@ -1472,11 +1472,17 @@ function dramaXiaoyunqueReady(cfg: VideoAiBackendConfig | null): boolean {
   return true
 }
 
+/** 即梦图生只需要视觉云 AK；小云雀 Agent 未开通时仍可走 jimeng_ti2v */
+function dramaJimengPhotoReady(cfg: VideoAiBackendConfig | null): boolean {
+  return Boolean(cfg?.xiaoyunqueConfigured)
+}
+
 function dramaXiaoyunqueHint(cfg: VideoAiBackendConfig | null, cfgLoaded: boolean): string {
   if (!cfgLoaded) return ''
+  if (dramaJimengPhotoReady(cfg)) return ' 当前：即梦视觉云已绑定，角色照片走即梦图生，不走方舟真人库。'
   if (dramaXiaoyunqueReady(cfg)) return ' 当前：小云雀已开通，长片可直出。'
   if (cfg?.xiaoyunqueConfigured) {
-    return ' 当前：火山视觉云已绑定，但小云雀 Agent 尚未开通，长片走 Seedance。'
+    return ' 当前：火山视觉云已绑定。角色照片走即梦图生；小云雀 Agent 未开通时长片走拼接。'
   }
   return ' 当前：小云雀未配置（请运营台填即梦/小云雀 AK/SK），长片将走拼接兜底。'
 }
@@ -2251,11 +2257,25 @@ export default function ShortDramaPage() {
     onProgress?: (t: string) => void
   }) => {
     const imgs = (opts.images_base64 ?? []).map((s) => String(s).trim()).filter(Boolean)
-    /** 写实角色图走首帧 i2v；多图 r2v 在 2.5 上更容易被当成真人拦截 */
+    const prompt = [opts.prompt, fusionPromptNote].filter(Boolean).join('\n')
+    if (dramaJimengPhotoReady(cfg) && imgs.length > 0) {
+      const xyq = await runXiaoyunqueVideoJob({
+        prompt,
+        durationSec: opts.durationSec,
+        aspectRatio: '9:16',
+        images_base64: imgs,
+        shouldCancel: () => cancelRef.current,
+        onProgress: opts.onProgress,
+      })
+      if (xyq.ok) {
+        return { ok: true as const, videoUrl: xyq.videoUrl, modelUsed: xyq.modelUsed, engineUsed: 'seedance' as const }
+      }
+      opts.onProgress?.(`即梦图生未成功，改用 Seedance…（${formatVideoAiUserError(xyq.message).slice(0, 80)}）`)
+    }
+    /** 无角色图，或即梦未开通/失败时，才走方舟 Seedance */
     const mode = opts.seedance_image_mode ?? (imgs.length ? 'first_only' : 'auto')
     const model = seedancePaidModel
     const flags = `--dur ${opts.durationSec} --fps 24 --ratio 9:16 --wm false --resolution ${resolution}`
-    const prompt = [opts.prompt, fusionPromptNote].filter(Boolean).join('\n')
     return runShortVideoJobWithFailover({
       engine: 'seedance',
       body: {
@@ -2318,11 +2338,41 @@ export default function ShortDramaPage() {
       '请由小云雀智能生视频 Agent 多镜编排成片，前 3 秒必须冲突或反转，禁止拖沓空镜与电影片头片尾。',
     ].join('\n')
 
-    if (collectFusionImages().length > 0) {
-      setProgress('已上传参考画面或角色形象，全片走图生融合…')
+    const fusionImgs = collectFusionImages()
+    if (fusionImgs.length > 0) {
+      setProgress(
+        dramaJimengPhotoReady(cfg)
+          ? '已上传参考画面或角色形象，全片走即梦图生…'
+          : '已上传参考画面或角色形象，全片走图生融合…',
+      )
     }
 
-    if (dramaXiaoyunqueReady(cfg) && collectFusionImages().length === 0) {
+    if (dramaJimengPhotoReady(cfg) && fusionImgs.length > 0) {
+      setProgress(`即梦图生全片（${fusionImgs.length} 张参考图，约 ${total} 秒）…`)
+      const xyq = await runXiaoyunqueVideoJob({
+        prompt: xyqPrompt,
+        durationSec: total,
+        aspectRatio: '9:16',
+        images_base64: fusionImgs,
+        shouldCancel: () => cancelRef.current,
+        onProgress: (t) => {
+          if (mountedRef.current) setProgress(t)
+        },
+      })
+      if (xyq.ok) {
+        await finishAsWork({
+          billId,
+          videoUrlOrBlob: xyq.videoUrl,
+          title: shop.storeName.trim() || story.trim().slice(0, 18) || scene.name,
+          durationSec: total,
+          modelUsed: xyq.modelUsed ?? 'jimeng',
+        })
+        return
+      }
+      setProgress(`即梦图生失败，改用 Seedance 分段拼接兜底…（${formatVideoAiUserError(xyq.message).slice(0, 80)}）`)
+    }
+
+    if (dramaXiaoyunqueReady(cfg) && fusionImgs.length === 0) {
       setProgress(`小云雀 Agent 生成全片（约 ${total} 秒）…`)
       const xyq = await runXiaoyunqueVideoJob({
         prompt: xyqPrompt,
@@ -2493,13 +2543,17 @@ export default function ShortDramaPage() {
         [
           `试镜 ${PREVIEW_SEC} 秒已出。满意再点「确认生成全片」（${
             collectFusionImages().length
-              ? segmentPlanLabel(durationSec)
+              ? dramaJimengPhotoReady(cfg)
+                ? '即梦图生全片'
+                : segmentPlanLabel(durationSec)
               : dramaXiaoyunqueReady(cfg)
                 ? '小云雀全片'
                 : segmentPlanLabel(durationSec)
           }）。`,
-          collectFusionImages().length
-            ? '已上传参考画面或角色形象，全片走图生融合（不走小云雀）。'
+          collectFusionImages().length && dramaJimengPhotoReady(cfg)
+            ? '已上传参考画面或角色形象，全片走即梦图生（上传照片生成短视频）。'
+            : collectFusionImages().length
+              ? '已上传参考画面或角色形象，即梦未开通时走 Seedance 图生融合。'
             : dramaXiaoyunqueReady(cfg)
               ? '全片将优先走小云雀 Agent；失败时自动回退 Seedance 分段拼接。'
               : cfg?.xiaoyunqueConfigured
@@ -3324,13 +3378,17 @@ export default function ShortDramaPage() {
                       ? showPreviewGate
                         ? `当前 ${DURATION_OPTIONS.find((d) => d.sec === durationSec)?.label ?? durationSec} · ${
                             collectFusionImages().length
-                              ? '图生融合'
+                              ? dramaJimengPhotoReady(cfg)
+                                ? '即梦图生'
+                                : '图生融合'
                               : dramaXiaoyunqueReady(cfg)
                                 ? '小云雀全片'
                                 : segmentPlanLabel(durationSec)
                           }。先出前 ${PREVIEW_SEC} 秒试镜，满意再生成全片。`
                         : collectFusionImages().length
-                          ? '当前为单段直出，将融合参考画面与角色形象。'
+                          ? dramaJimengPhotoReady(cfg)
+                            ? '当前为单段直出，角色照片走即梦图生视频。'
+                            : '当前为单段直出，将融合参考画面与角色形象。'
                           : '当前为单段直出，无需试镜确认。'
                       : '请先选择成片时长，再生成故事或短剧。'}
               </p>

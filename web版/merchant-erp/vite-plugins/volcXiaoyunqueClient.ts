@@ -6,6 +6,7 @@
  * Version: 2022-08-31
  * 默认无参考 req_key: pippit_iv2v_v20_cvtob（文档 85621/2359611）
  * 有参考（图+视频）：pippit_iv2v_v20_cvtob_with_vinput（文档 85621/2359610）
+ * 有角色照片时优先即梦图生 jimeng_ti2v_v30_pro（binary_data_base64），不走方舟 Seedance 真人库。
  *
  * 凭据：运营台 videoAi.jimengAccessKeyId/SK → JIMENG_*，或轻量 MERCHANT_AI_VOLC_*。
  * 可用 MERCHANT_AI_XIAOYUNQUE_REQ_KEY / SUBMIT_ACTION / GET_ACTION 覆盖。
@@ -21,9 +22,12 @@ const XYQ_SUBMIT_ACTION = 'CVSync2AsyncSubmitTask'
 const XYQ_GET_ACTION = 'CVSync2AsyncGetResult'
 const XYQ_REQ_KEY_NOREF = 'pippit_iv2v_v20_cvtob'
 const XYQ_REQ_KEY_REF = 'pippit_iv2v_v20_cvtob_with_vinput'
+/** 即梦视频生成 3.0 Pro：上传照片图生，不走方舟 Seedance 真人库拦截 */
+const JIMENG_I2V_REQ_KEY = 'jimeng_ti2v_v30_pro'
 
 const NOREF_KEYS = [XYQ_REQ_KEY_NOREF]
 const REF_KEYS = [XYQ_REQ_KEY_REF]
+const JIMENG_I2V_KEYS = [JIMENG_I2V_REQ_KEY]
 
 export function isXiaoyunqueConfigured(env: MerchantAiEnv): boolean {
   return Boolean(resolveVolcVisualCredentials(env))
@@ -100,7 +104,15 @@ function decodeTaskToken(taskIdRaw: string): {
   }
 }
 
-function reqKeyAttempts(env: MerchantAiEnv, hasVideoRef: boolean): Array<{
+function isJimengI2vReqKey(reqKey: string): boolean {
+  return /jimeng_ti2v|jimeng_i2v|jimeng_vgfm_i2v/i.test(String(reqKey || ''))
+}
+
+function reqKeyAttempts(
+  env: MerchantAiEnv,
+  hasVideoRef: boolean,
+  hasImageRef: boolean,
+): Array<{
   action: string
   version: string
   reqKey: string
@@ -109,7 +121,8 @@ function reqKeyAttempts(env: MerchantAiEnv, hasVideoRef: boolean): Array<{
   const customKey = (env.MERCHANT_AI_XIAOYUNQUE_REQ_KEY ?? '').trim()
   const customAction = (env.MERCHANT_AI_XIAOYUNQUE_SUBMIT_ACTION ?? '').trim()
   const customGet = (env.MERCHANT_AI_XIAOYUNQUE_GET_ACTION ?? '').trim()
-  const keys = hasVideoRef ? [...REF_KEYS, ...NOREF_KEYS] : [...NOREF_KEYS]
+  const pippitKeys = hasVideoRef ? [...REF_KEYS, ...NOREF_KEYS] : [...NOREF_KEYS]
+  const keys = hasImageRef && !hasVideoRef ? [...JIMENG_I2V_KEYS, ...pippitKeys] : pippitKeys
   const base = keys.map((reqKey) => ({
     action: XYQ_SUBMIT_ACTION,
     version: XYQ_VERSION,
@@ -124,7 +137,7 @@ function reqKeyAttempts(env: MerchantAiEnv, hasVideoRef: boolean): Array<{
         reqKey: customKey || (hasVideoRef ? XYQ_REQ_KEY_REF : XYQ_REQ_KEY_NOREF),
         getAction: customGet || XYQ_GET_ACTION,
       },
-      ...base,
+      ...base.filter((row) => row.reqKey !== customKey),
     ]
   }
   return base
@@ -351,6 +364,54 @@ function publicHttpUrls(raw: unknown, cap: number): string[] {
   return out
 }
 
+function toPureImageBase64(raw: string): string | null {
+  const t = String(raw || '').trim()
+  if (!t || /^https?:\/\//i.test(t)) return null
+  const m = /^data:image\/[a-zA-Z0-9.+-]+;base64,([\s\S]+)$/i.exec(t)
+  const b64 = (m ? m[1] : t).replace(/\s/g, '')
+  if (b64.length < 80) return null
+  return b64
+}
+
+function collectImagePayloads(rawList: unknown, cap: number): { urls: string[]; binaries: string[] } {
+  const urls: string[] = []
+  const binaries: string[] = []
+  const rows = Array.isArray(rawList) ? rawList : rawList != null ? [rawList] : []
+  for (const row of rows) {
+    if (typeof row !== 'string') continue
+    const t = row.trim()
+    if (!t) continue
+    if (/^https?:\/\//i.test(t)) {
+      if (urls.length < cap) urls.push(t)
+      continue
+    }
+    const b64 = toPureImageBase64(t)
+    if (b64 && binaries.length < cap) binaries.push(b64)
+  }
+  return { urls, binaries }
+}
+
+function buildJimengI2vSubmitBody(opts: {
+  reqKey: string
+  prompt: string
+  durationSec: number
+  imageUrls: string[]
+  binaries: string[]
+}): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    req_key: opts.reqKey,
+    prompt: opts.prompt.slice(0, 800),
+    seed: -1,
+    frames: opts.durationSec <= 7 ? 121 : 241,
+  }
+  if (opts.binaries.length) {
+    body.binary_data_base64 = opts.binaries.slice(0, 1)
+  } else if (opts.imageUrls.length) {
+    body.image_urls = opts.imageUrls.slice(0, 1)
+  }
+  return body
+}
+
 function buildXiaoyunqueSubmitBody(opts: {
   reqKey: string
   prompt: string
@@ -358,6 +419,7 @@ function buildXiaoyunqueSubmitBody(opts: {
   aspectRatio: string
   imageUrls: string[]
   videoUrls: string[]
+  binaries: string[]
 }): Record<string, unknown> {
   const body: Record<string, unknown> = {
     req_key: opts.reqKey,
@@ -368,6 +430,7 @@ function buildXiaoyunqueSubmitBody(opts: {
     enable_watermark: false,
   }
   if (opts.imageUrls.length) body.img_url_list = opts.imageUrls.slice(0, 50)
+  if (opts.binaries.length) body.binary_data_base64 = opts.binaries.slice(0, 10)
   if (opts.videoUrls.length) body.video_url_list = opts.videoUrls.slice(0, 50)
   return body
 }
@@ -380,6 +443,7 @@ export async function volcSubmitXiaoyunqueTask(
     aspectRatio?: string
     imageUrls?: string[]
     videoUrls?: string[]
+    imageBase64?: string[]
   },
 ): Promise<{ ok: true; taskId: string; reqKey: string } | { ok: false; message: string }> {
   const creds = resolveVolcVisualCredentials(env)
@@ -394,27 +458,37 @@ export async function volcSubmitXiaoyunqueTask(
   if (!prompt) return { ok: false, message: '缺少小云雀生成提示词。' }
   const durationSec = clampDurationSec(opts.durationSec)
   const aspectRatio = (opts.aspectRatio || '9:16').trim() || '9:16'
-  const imageUrls = publicHttpUrls(opts.imageUrls, 50)
+  const mixed = collectImagePayloads([...(opts.imageUrls ?? []), ...(opts.imageBase64 ?? [])], 50)
+  const imageUrls = mixed.urls
+  const binaries = mixed.binaries
   const videoUrls = publicHttpUrls(opts.videoUrls, 50)
   const hasVideoRef = videoUrls.length > 0
+  const hasImageRef = imageUrls.length > 0 || binaries.length > 0
 
   const errors: string[] = []
-  for (const attempt of reqKeyAttempts(env, hasVideoRef)) {
-    const body = buildXiaoyunqueSubmitBody({
-      reqKey: attempt.reqKey,
-      prompt,
-      durationSec,
-      aspectRatio,
-      imageUrls,
-      videoUrls,
-    })
+  for (const attempt of reqKeyAttempts(env, hasVideoRef, hasImageRef)) {
+    const body = isJimengI2vReqKey(attempt.reqKey)
+      ? buildJimengI2vSubmitBody({
+          reqKey: attempt.reqKey,
+          prompt,
+          durationSec,
+          imageUrls,
+          binaries,
+        })
+      : buildXiaoyunqueSubmitBody({
+          reqKey: attempt.reqKey,
+          prompt,
+          durationSec,
+          aspectRatio,
+          imageUrls,
+          videoUrls,
+          binaries,
+        })
+    if (isJimengI2vReqKey(attempt.reqKey) && !imageUrls.length && !binaries.length) continue
+    if (isJimengI2vReqKey(attempt.reqKey) && durationSec > 12) continue
     const r = await postVolcVisualWithRetry(creds, attempt.action, attempt.version, body)
     if (!r.ok) {
       errors.push(`${attempt.reqKey}: ${r.message}`)
-      if (/50400|Access\s*Denied/i.test(r.message)) {
-        return { ok: false, message: humanizeXiaoyunqueError(r.message) }
-      }
-      if (/not supported|不支持/i.test(r.message)) continue
       continue
     }
     const rawId = extractTaskId(r.json)
@@ -496,12 +570,14 @@ export async function volcPostXiaoyunqueVideoTask(
     /--ratio\s+([0-9:.]+)/i.exec(flags)?.[1] ||
     String(parsed.aspect_ratio ?? parsed.aspectRatio ?? '9:16').trim() ||
     '9:16'
-  const imageUrls = publicHttpUrls(
+  const imageFromBody = collectImagePayloads(
     [
       parsed.image_url,
       parsed.img_url,
       ...(Array.isArray(parsed.image_urls) ? parsed.image_urls : []),
       ...(Array.isArray(parsed.img_url_list) ? parsed.img_url_list : []),
+      ...(Array.isArray(parsed.images_base64) ? parsed.images_base64 : []),
+      ...(Array.isArray(parsed.binary_data_base64) ? parsed.binary_data_base64 : []),
     ],
     50,
   )
@@ -517,7 +593,8 @@ export async function volcPostXiaoyunqueVideoTask(
     prompt,
     durationSec,
     aspectRatio: aspect,
-    imageUrls,
+    imageUrls: imageFromBody.urls,
+    imageBase64: imageFromBody.binaries,
     videoUrls,
   })
   if (!r.ok) return { ok: false, msg: r.message }
