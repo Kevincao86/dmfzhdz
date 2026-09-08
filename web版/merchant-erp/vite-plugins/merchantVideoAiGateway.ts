@@ -270,7 +270,7 @@ function stripImagesForArkT2v(body: Record<string, unknown>, extraPrompt: string
 
 function arkCreateTaskUserMessage(msg: string, endpointId: string, upstreamStatus?: number): string {
   if (isArkRealPersonImageBlock(msg)) {
-    return '当前 Seedance 拦截了写实参考图。系统已按同一模型改用角色描述生成；若仍失败请简化文案后重试。'
+    return '当前 Seedance 拦截了写实参考图。角色形象必须用图生才能保持同一张脸，未改文生换脸。'
   }
   if (looksLikeArkPlaceholderEndpointId(endpointId)) {
     return `视频推理接入点「${endpointId}」为占位示例，不可用。请到运营管控台「AI模型 → 短视频 API」或 Vercel 环境变量 MERCHANT_AI_ARK_VIDEO_ENDPOINTS 填写火山方舟控制台真实的 ep- 接入点（形如 ep-2024xxxxxxxx）。`
@@ -1996,46 +1996,54 @@ async function arkCreateVideoTask(
   }
 
   /**
-   * 写实人像：2.5 / 1.5 / 2.0 图生都会拦。不要硬切未开通模型。
-   * 锁定短剧 2.5 时，同一模型去掉参考图改文生，才能真正出片。
+   * 写实人像：有确认角色图时禁止去掉首帧改文生（会换脸）。
+   * 仅当未要求保持参考图时，才允许同模型文生兜底。
    */
+  const keepReferenceImage =
+    body.keep_reference_image === true ||
+    String(body.keep_reference_image ?? '').trim().toLowerCase() === 'true'
   if (key && (blockedRealPerson || isArkRealPersonImageBlock(`${lastMsg}`))) {
-    const t2vModel =
-      lockModel && lockedOne && lockedOne !== SEEDANCE_SERVER_AUTO
-        ? lockedOne
-        : triedModels[0] || lockedOne || ''
-    const hasImages =
-      (Array.isArray(apiBody.images_base64) &&
-        apiBody.images_base64.some((x) => String(x ?? '').trim())) ||
-      (Array.isArray(apiBody.content) &&
-        (apiBody.content as unknown[]).some(
-          (row) =>
-            row &&
-            typeof row === 'object' &&
-            String((row as { type?: unknown }).type) === 'image_url',
-        ))
-    if (t2vModel && hasImages && videoModelSupportsDuration(t2vModel, durationSec, 't2v')) {
-      const t2vBody = stripImagesForArkT2v(
-        apiBody,
-        '参考图因火山写实人像策略未采用。请严格按提示词中的角色外貌、服装与场景生成电影短剧画面，竖屏 9:16。',
-      )
-      const t2vBuilt = await buildArkVideoTaskPayloadForPost(t2vModel, t2vBody, 't2v')
-      if (t2vBuilt.ok === true) {
-        tried += 1
-        triedModels.push(`${t2vModel}:t2v`)
-        const t2vPosted = await arkPostVideoGenerationTask(env, key, t2vBuilt.payload, t2vModel)
-        if (t2vPosted.ok === true) {
-          clearArkVideoModelQuotaExhausted(key, t2vModel)
-          return {
-            ok: true,
-            taskId: t2vPosted.taskId,
-            provider: 'ark',
-            modelUsed: t2vModel,
-            raw: t2vPosted.raw,
+    if (keepReferenceImage) {
+      lastMsg =
+        '角色形象必须用图生才能保持同一张脸。方舟拦截了写实首帧，未改文生换脸。请走即梦图生或更换更偏短剧定妆的角色图。'
+    } else {
+      const t2vModel =
+        lockModel && lockedOne && lockedOne !== SEEDANCE_SERVER_AUTO
+          ? lockedOne
+          : triedModels[0] || lockedOne || ''
+      const hasImages =
+        (Array.isArray(apiBody.images_base64) &&
+          apiBody.images_base64.some((x) => String(x ?? '').trim())) ||
+        (Array.isArray(apiBody.content) &&
+          (apiBody.content as unknown[]).some(
+            (row) =>
+              row &&
+              typeof row === 'object' &&
+              String((row as { type?: unknown }).type) === 'image_url',
+          ))
+      if (t2vModel && hasImages && videoModelSupportsDuration(t2vModel, durationSec, 't2v')) {
+        const t2vBody = stripImagesForArkT2v(
+          apiBody,
+          '参考图因火山写实人像策略未采用。请严格按提示词中的角色外貌、服装与场景生成电影短剧画面，竖屏 9:16。',
+        )
+        const t2vBuilt = await buildArkVideoTaskPayloadForPost(t2vModel, t2vBody, 't2v')
+        if (t2vBuilt.ok === true) {
+          tried += 1
+          triedModels.push(`${t2vModel}:t2v`)
+          const t2vPosted = await arkPostVideoGenerationTask(env, key, t2vBuilt.payload, t2vModel)
+          if (t2vPosted.ok === true) {
+            clearArkVideoModelQuotaExhausted(key, t2vModel)
+            return {
+              ok: true,
+              taskId: t2vPosted.taskId,
+              provider: 'ark',
+              modelUsed: t2vModel,
+              raw: t2vPosted.raw,
+            }
           }
+          lastMsg = t2vPosted.msg
+          lastStatus = t2vPosted.status
         }
-        lastMsg = t2vPosted.msg
-        lastStatus = t2vPosted.status
       }
     }
   }

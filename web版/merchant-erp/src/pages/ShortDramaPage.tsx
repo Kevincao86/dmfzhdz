@@ -1412,6 +1412,39 @@ function newCastMember(index: number): DramaCastMember {
   }
 }
 
+/** 有确认角色图时必须放在提示词最前，否则图生会按故事去拍男客、把首帧脸换掉 */
+function buildDramaIdentityLock(cast: DramaCastMember[], roles: string): string {
+  const confirmed = cast.filter((m) => m.preview)
+  if (confirmed.length === 0) return ''
+  const name = confirmed[0]!.name.trim() || roles.trim() || '主角'
+  const desc = confirmed[0]!.desc.trim().slice(0, 36)
+  if (confirmed.length === 1) {
+    return [
+      '【角色锁定】',
+      `首帧图就是${name}，必须让这张图里的人动起来，同一张脸同一发型同一套衣服。`,
+      desc ? `外貌：${desc}。` : '',
+      '镜头始终跟拍该角色；顾客最多露手或背影，禁止换脸或改拍男性。',
+    ]
+      .filter(Boolean)
+      .join('')
+  }
+  return [
+    '【角色锁定】',
+    `画面人物必须与角色参考图为同一批人：${confirmed.map((m, i) => m.name.trim() || `角色${i + 1}`).join('、')}。`,
+    '同一张脸同一套衣服，禁止换人。',
+  ].join('')
+}
+
+/** Seedance 图生 content.text 只有约 280 字；必须整段≤280，否则会丢掉角色锁定 */
+function compactDramaSeedanceI2vPrompt(identity: string, story: string): string {
+  const lock = identity.replace(/\s+/g, '').trim()
+  const beat = story.replace(/\s+/g, ' ').trim()
+  const audio = '【有声成片】中文对白。'
+  const budget = 268 - lock.length - audio.length
+  const rest = budget > 16 ? beat.slice(0, budget) : ''
+  return [lock, rest, audio].filter(Boolean).join('')
+}
+
 function parseRoleNames(raw: string): string[] {
   return String(raw || '')
     .split(/[/、,，|]+/)
@@ -1929,11 +1962,11 @@ export default function ShortDramaPage() {
   const collectFusionImages = useCallback(
     (continueFrame?: string) => {
       const out: string[] = []
-      const cont = toDramaImageDataUrl(continueFrame ?? '')
-      if (cont) out.push(cont)
       for (const m of cast) {
         if (m.preview) out.push(m.preview)
       }
+      const cont = toDramaImageDataUrl(continueFrame ?? '')
+      if (cont) out.push(cont)
       for (const item of refItems) {
         const u = toDramaImageDataUrl(item.imageDataUrl)
         if (u) out.push(u)
@@ -1948,7 +1981,7 @@ export default function ShortDramaPage() {
     const confirmed = cast.filter((m) => m.preview)
     if (confirmed.length === 1) {
       bits.push(
-        `主角外貌必须与角色形象参考图为同一人（${confirmed[0]!.name.trim() || roles.trim() || '主角'}），发型、五官、服装、体态全程一致，禁止换人。`,
+        `镜头锁定${confirmed[0]!.name.trim() || roles.trim() || '主角'}：必须是角色形象参考图里的同一人，禁止换成故事里的顾客或其他脸。`,
       )
     } else if (confirmed.length > 1) {
       bits.push(
@@ -2257,7 +2290,8 @@ export default function ShortDramaPage() {
     onProgress?: (t: string) => void
   }) => {
     const imgs = (opts.images_base64 ?? []).map((s) => String(s).trim()).filter(Boolean)
-    const prompt = [opts.prompt, fusionPromptNote].filter(Boolean).join('\n')
+    const identity = buildDramaIdentityLock(cast, roles)
+    const prompt = [identity, opts.prompt, fusionPromptNote].filter(Boolean).join('\n')
     if (dramaJimengPhotoReady(cfg) && imgs.length > 0) {
       const xyq = await runXiaoyunqueVideoJob({
         prompt,
@@ -2270,21 +2304,24 @@ export default function ShortDramaPage() {
       if (xyq.ok) {
         return { ok: true as const, videoUrl: xyq.videoUrl, modelUsed: xyq.modelUsed, engineUsed: 'seedance' as const }
       }
-      opts.onProgress?.(`即梦图生未成功，改用 Seedance…（${formatVideoAiUserError(xyq.message).slice(0, 80)}）`)
+      opts.onProgress?.(`即梦图生未成功，改用 Seedance 首帧图生（不改文生换脸）…（${formatVideoAiUserError(xyq.message).slice(0, 80)}）`)
     }
-    /** 无角色图，或即梦未开通/失败时，才走方舟 Seedance */
+    /** 无角色图，或即梦未开通/失败时，才走方舟 Seedance；有角色图时禁止文生换脸 */
     const mode = opts.seedance_image_mode ?? (imgs.length ? 'first_only' : 'auto')
     const model = seedancePaidModel
     const flags = `--dur ${opts.durationSec} --fps 24 --ratio 9:16 --wm false --resolution ${resolution}`
     return runShortVideoJobWithFailover({
       engine: 'seedance',
       body: {
-        prompt: sanitizePromptForSeedanceNativeAv(prompt),
+        prompt: imgs.length
+          ? compactDramaSeedanceI2vPrompt(identity, opts.prompt)
+          : sanitizePromptForSeedanceNativeAv(prompt),
         flags,
         model,
         skip_qwen: true,
         lock_model: true,
         generate_audio: true,
+        keep_reference_image: imgs.length > 0,
         images_base64: imgs.length ? imgs : undefined,
         seedance_image_mode: mode,
         i2v_max_images: imgs.length >= 2 ? Math.min(DRAMA_R2V_MAX_IMAGES, imgs.length) : undefined,
@@ -2332,11 +2369,14 @@ export default function ShortDramaPage() {
   const generateFullLongform = async (billId: string) => {
     const total = Math.min(MAX_DRAMA_TOTAL_SEC, durationSec)
     const xyqPrompt = [
+      buildDramaIdentityLock(cast, roles),
       metaPrompt,
       `目标总时长约 ${total} 秒，竖屏 9:16。`,
       `戏剧四拍：${formula.beats.join(' → ')}。`,
-      '请由小云雀智能生视频 Agent 多镜编排成片，前 3 秒必须冲突或反转，禁止拖沓空镜与电影片头片尾。',
-    ].join('\n')
+      '请由小云雀智能生视频 Agent 多镜编排成片，前 3 秒必须冲突或反转，禁止拖沓空镜与电影片头片尾。镜头必须跟拍角色参考图中的人，禁止改拍顾客或其他脸。',
+    ]
+      .filter(Boolean)
+      .join('\n')
 
     const fusionImgs = collectFusionImages()
     if (fusionImgs.length > 0) {

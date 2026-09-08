@@ -39,6 +39,8 @@ export type ShortVideoGenRequestBody = {
   lock_model?: boolean
   /** 商家短片：Seedance 1.5 Pro 原生有声（方舟 generate_audio）；数字人勿开 */
   generate_audio?: boolean
+  /** 已确认角色图：禁止去掉首帧改文生，否则会换脸 */
+  keep_reference_image?: boolean
   /**
    * 阶段 D：Wan/垂类 LoRA 挂载点（DiffSynth/musubi）。
    * 本轮仅类型预留，网关忽略；勿依赖此字段改变生成结果。
@@ -50,11 +52,11 @@ export function formatVideoAiUserError(msg: string): string {
   const raw = String(msg ?? '').trim()
   if (!raw) return raw
   if (/已改走火山 1\.5|正在改用火山 1\.5|1\.5 Pro 首帧/i.test(raw)) {
-    return '当前 Seedance 拦截了写实参考图。请再点一次生成，系统会用同一模型按角色描述出片。'
+    return '角色形象必须用图生才能保持同一张脸。请再点生成，系统会走即梦/首帧图生，不会改文生换脸。'
   }
-  if (/仍未通过写实人像|按角色描述生成/.test(raw)) return raw
-  if (/may contain real person|contain real person|input image.*real person|写实人像|真人肖像|更换角色参考图/i.test(raw)) {
-    return '当前 Seedance 拦截了写实参考图。系统已按同一模型改用角色描述生成；若仍失败请简化文案后重试。'
+  if (/仍未通过写实人像|必须用图生才能保持/.test(raw)) return raw
+  if (/may contain real person|contain real person|input image.*real person|写实人像|真人肖像|更换角色参考图|写实参考图/i.test(raw)) {
+    return '角色参考图未能用于图生（方舟会拦写实首帧）。请再试即梦图生，系统不会改文生换脸。'
   }
   if (/parameter ratio.*not valid|output ratio follows the first-frame/i.test(raw)) {
     return '角色参考图已用作视频首帧时，不能再指定画幅。系统会按首帧自动出竖屏，请再点一次生成。'

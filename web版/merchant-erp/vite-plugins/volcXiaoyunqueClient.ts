@@ -391,6 +391,19 @@ function collectImagePayloads(rawList: unknown, cap: number): { urls: string[]; 
   return { urls, binaries }
 }
 
+function clipPromptKeepIdentity(prompt: string, max: number): string {
+  const p = String(prompt ?? '').trim()
+  if (p.length <= max) return p
+  if (p.startsWith('【角色锁定')) {
+    const nl = p.indexOf('\n')
+    const lock = nl > 0 && nl < max ? p.slice(0, nl) : p.slice(0, Math.min(160, max))
+    const restStart = nl > 0 ? nl + 1 : lock.length
+    const room = max - lock.length - 1
+    if (room > 24) return `${lock}\n${p.slice(restStart, restStart + room)}`
+  }
+  return p.slice(0, max)
+}
+
 function buildJimengI2vSubmitBody(opts: {
   reqKey: string
   prompt: string
@@ -400,7 +413,7 @@ function buildJimengI2vSubmitBody(opts: {
 }): Record<string, unknown> {
   const body: Record<string, unknown> = {
     req_key: opts.reqKey,
-    prompt: opts.prompt.slice(0, 800),
+    prompt: clipPromptKeepIdentity(opts.prompt, 800),
     seed: -1,
     frames: opts.durationSec <= 7 ? 121 : 241,
   }
@@ -423,7 +436,7 @@ function buildXiaoyunqueSubmitBody(opts: {
 }): Record<string, unknown> {
   const body: Record<string, unknown> = {
     req_key: opts.reqKey,
-    prompt: opts.prompt.slice(0, 2000),
+    prompt: clipPromptKeepIdentity(opts.prompt, 2000),
     ratio: ratioSlot(opts.aspectRatio),
     duration: durationSlot(opts.durationSec),
     language: 'Chinese',
