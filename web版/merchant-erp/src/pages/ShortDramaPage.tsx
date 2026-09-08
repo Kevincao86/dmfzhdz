@@ -61,6 +61,7 @@ import {
   type SeedanceQualityId,
 } from '../lib/shortVideoUiLabels'
 import { postAiAgentNativeImage, postAiChat } from '../services/ai/aiClient'
+import { generateVisualStudioGptImage } from '../services/ai/visualStudioAi'
 import {
   checkMpAddonPointsAffordable,
   formatMpAddonPointsSpendHint,
@@ -1647,7 +1648,13 @@ function humanizeDramaImageError(raw: string): string {
     return '角色图拉取失败：成图地址浏览器跨域读不到。请再点一次生成预览。'
   }
   if (/TokenMix 成图完成但国内无法拉取|代拉 TokenMix/i.test(t)) {
-    return 'GPT 成图国内拉不下来，已改为豆包。请再点一次生成预览。'
+    return 'GPT 成图国内暂时拉不下来，请再点一次生成预览（不会改走豆包）。'
+  }
+  if (/sensitive information|output image may contain|内容安全|敏感信息|safety/i.test(t)) {
+    return '生图未通过内容审核。请换一张更偏定妆的参考图，或把形象词改短后再试 GPT。'
+  }
+  if (/image_generation_failed/i.test(t)) {
+    return t.replace(/^image_generation_failed\s*[—–-]\s*/i, '') || 'GPT 生图失败，请再试一次'
   }
   return t || '角色形象生成失败，请稍后重试'
 }
@@ -2228,35 +2235,70 @@ export default function ShortDramaPage() {
         return
       }
       const shortHint = desc.length > 0 && desc.length <= 48 ? desc : ''
-      const prompt = refData
-        ? [
-            'Image-to-image: build a similar portrait from the attached reference.',
-            'Keep the same person: face, hairstyle, hair color, skin, body shape. Do not invent another face.',
-            'If the reference is a short-video screenshot, crop to the front person only and remove app UI, icons, captions, status bar and bystanders.',
-            'Output a clean vertical half-body short-drama key art, cinematic studio light, commercial film still, not a documentary photograph or ID photo.',
-            roleHint ? `Role: ${roleHint}.` : '',
-            shortHint ? `Optional occupation/age hint only: ${shortHint}.` : '',
-            'Clothing: prefer the outfit in the reference photo. Do not replace it with an unrelated cafe / linen-shirt look.',
-            'No subtitles, watermarks, logos, collage, or extra people.',
-          ]
-            .filter(Boolean)
-            .join(' ')
-        : [
-            '竖屏半身短剧定妆，单人，正面或微侧，五官清晰，电影棚拍光，商业广告质感；不要证件照、不要新闻纪实超写实抓拍。',
-            `角色身份：${roleHint || '主角'}。`,
-            `外貌与穿搭：${desc}。`,
-            `气质贴近「${scene.name}」${style.visual ? `，${style.visual}` : ''}。`,
-            '禁止字幕、水印、Logo、多人、拼贴和海报排版。',
-          ].join('')
-      const gptOpts = {
-        exactPrompt: true as const,
-        aspectRatio: '3:4' as const,
-        preferredVendor: 'doubao' as const,
-        wanxSize: '1024x1536',
-        ...(refData ? { referenceImageDataUrl: refData } : {}),
+      const buildPrompt = (safe: boolean) =>
+        refData
+          ? (safe
+              ? [
+                  'Image-to-image: professional half-body portrait of the same person in the attached photo.',
+                  'Keep the same face, hairstyle, hair color, skin, body shape and clothing. Do not invent another face.',
+                  'Cinematic studio lighting, commercial film still, single person, SFW.',
+                  'No extra people, no text, no watermark, no collage.',
+                ]
+              : [
+                  'Image-to-image: build a similar portrait from the attached reference.',
+                  'Keep the same person: face, hairstyle, hair color, skin, body shape. Do not invent another face.',
+                  'If the reference is a short-video screenshot, crop to the front person only and remove app UI, icons, captions, status bar and bystanders.',
+                  'Output a clean vertical half-body short-drama key art, cinematic studio light, commercial film still, not a documentary photograph or ID photo.',
+                  roleHint ? `Role: ${roleHint}.` : '',
+                  shortHint ? `Optional occupation/age hint only: ${shortHint}.` : '',
+                  'Clothing: prefer the outfit in the reference photo. Do not replace it with an unrelated cafe / linen-shirt look.',
+                  'No subtitles, watermarks, logos, collage, or extra people.',
+                ]
+            )
+              .filter(Boolean)
+              .join(' ')
+          : (safe
+              ? [
+                  '竖屏半身商业定妆写真，单人，正面或微侧，五官清晰，电影棚拍光。',
+                  `角色：${roleHint || '主角'}。`,
+                  desc ? `外观：${desc}。` : '',
+                  '禁止字幕、水印、多人、拼贴。SFW。',
+                ]
+              : [
+                  '竖屏半身短剧定妆，单人，正面或微侧，五官清晰，电影棚拍光，商业广告质感；不要证件照、不要新闻纪实超写实抓拍。',
+                  `角色身份：${roleHint || '主角'}。`,
+                  `外貌与穿搭：${desc}。`,
+                  `气质贴近「${scene.name}」${style.visual ? `，${style.visual}` : ''}。`,
+                  '禁止字幕、水印、Logo、多人、拼贴和海报排版。',
+                ]
+            )
+              .filter(Boolean)
+              .join('')
+      const runGptOnce = async (prompt: string) => {
+        if (refData) {
+          return postAiAgentNativeImage(prompt, {
+            exactPrompt: true,
+            aspectRatio: '3:4',
+            imageRoute: 'tokenmix',
+            tokenmixImageModel: 'gpt-image-2',
+            wanxSize: '1024x1536',
+            referenceImageDataUrl: refData,
+          })
+        }
+        return generateVisualStudioGptImage({
+          prompt,
+          wanxSize: '1024x1536',
+          onProgress: (msg) => {
+            if (mountedRef.current) setHint(msg)
+          },
+        })
       }
-      setHint(refData ? '正在按参考图用豆包生成相似画像…' : '正在按形象词用豆包生成预览…')
-      let res = await postAiAgentNativeImage(prompt, gptOpts)
+      setHint(refData ? '正在按参考图用 GPT Image 生成相似画像…' : '正在按形象词用 GPT Image 生成预览…')
+      let res = await runGptOnce(buildPrompt(false))
+      if (!res.ok) {
+        setHint('GPT 第一次未出图，正在用更稳的提示词再试一次…')
+        res = await runGptOnce(buildPrompt(true))
+      }
       if (!res.ok) {
         setErr(humanizeDramaImageError(res.message) || '角色形象生成失败，请稍后重试')
         setHint(null)
