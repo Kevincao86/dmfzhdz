@@ -1435,14 +1435,49 @@ function buildDramaIdentityLock(cast: DramaCastMember[], roles: string): string 
   ].join('')
 }
 
-/** Seedance 图生 content.text 只有约 280 字；必须整段≤280，否则会丢掉角色锁定 */
-function compactDramaSeedanceI2vPrompt(identity: string, story: string): string {
-  const lock = identity.replace(/\s+/g, '').trim()
-  const beat = story.replace(/\s+/g, ' ').trim()
-  const audio = '【有声成片】中文对白。'
-  const budget = 268 - lock.length - audio.length
-  const rest = budget > 16 ? beat.slice(0, budget) : ''
-  return [lock, rest, audio].filter(Boolean).join('')
+/**
+ * 有角色图时只写图生动作词：照片已当首帧提交，禁止把客人故事塞进模型再另造人。
+ * Seedance content.text ≤280 字；即梦可放更长动作。
+ */
+function buildDramaImageToVideoPrompt(input: {
+  leadName: string
+  story: string
+  dialogue: string
+  beat?: string
+  maxAction?: number
+}): string {
+  const lead = input.leadName.trim() || '主角'
+  const maxAction = Math.max(24, input.maxAction ?? 90)
+  const action = [input.beat, input.story, input.dialogue ? `对白：${input.dialogue}` : '']
+    .filter(Boolean)
+    .join('。')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxAction)
+  return [
+    '【图生·禁止新造人物】',
+    '角色照片已作为首帧提交。必须让这张图里的人动起来，以角色图为准。',
+    `唯一出镜主角是${lead}，就是首帧这张脸、这套衣服、这个发型。`,
+    '禁止模型自己生成人物，禁止另造男客、路人或第二张脸，禁止换脸。',
+    '客人只许出手或脚，不得露正脸。镜头始终跟拍首帧里的人。',
+    action ? `动作：${action}` : '自然表情与手势，半身近景。',
+    '【有声成片】中文对白。',
+  ].join('')
+}
+
+/** Seedance 图生 content.text 只有约 280 字；截断时保住图生锁，丢掉后半段故事 */
+function compactDramaSeedanceI2vPrompt(prompt: string): string {
+  const t = String(prompt || '')
+    .replace(/\s+/g, '')
+    .trim()
+  if (t.length <= 280) return t
+  const idx = t.indexOf('动作：')
+  if (idx > 40) {
+    const lock = t.slice(0, idx)
+    const room = 280 - lock.length
+    return room > 8 ? `${lock}${t.slice(idx, idx + room)}` : t.slice(0, 280)
+  }
+  return t.slice(0, 280)
 }
 
 function parseRoleNames(raw: string): string[] {
@@ -2376,6 +2411,7 @@ export default function ShortDramaPage() {
     prompt: string
     durationSec: number
     images_base64?: string[]
+    beat?: string
     seedance_image_mode?: 'auto' | 'first_last' | 'reference' | 'first_only'
     onProgress?: (t: string) => void
   }) => {
@@ -2387,10 +2423,22 @@ export default function ShortDramaPage() {
       }
     }
     const identity = buildDramaIdentityLock(cast, roles)
-    const prompt = [identity, opts.prompt, fusionPromptNote].filter(Boolean).join('\n')
+    const leadName = buildDramaStoryCastBrief(cast, roles).leadName
+    const i2vPrompt = imgs.length
+      ? buildDramaImageToVideoPrompt({
+          leadName,
+          story: story.trim(),
+          dialogue: dialogue.trim(),
+          beat: opts.beat,
+          maxAction: 400,
+        })
+      : ''
+    const prompt = imgs.length
+      ? i2vPrompt
+      : [identity, opts.prompt, fusionPromptNote].filter(Boolean).join('\n')
     if (imgs.length > 0) {
       const kb = Math.max(1, Math.round(imgs.reduce((n, s) => n + s.length, 0) / 1370))
-      opts.onProgress?.(`已带入角色首帧 ${imgs.length} 张（约 ${kb}KB），提交图生…`)
+      opts.onProgress?.(`已把角色图作为首帧提交 ${imgs.length} 张（约 ${kb}KB），禁止模型自己生成人物…`)
     }
     if (dramaJimengPhotoReady(cfg) && imgs.length > 0) {
       const xyq = await runXiaoyunqueVideoJob({
@@ -2418,7 +2466,7 @@ export default function ShortDramaPage() {
       engine: 'seedance',
       body: {
         prompt: imgs.length
-          ? compactDramaSeedanceI2vPrompt(identity, opts.prompt)
+          ? compactDramaSeedanceI2vPrompt(i2vPrompt)
           : sanitizePromptForSeedanceNativeAv(prompt),
         flags,
         model,
@@ -2426,6 +2474,7 @@ export default function ShortDramaPage() {
         lock_model: true,
         generate_audio: true,
         keep_reference_image: imgs.length > 0,
+        i2v_must_use_image: imgs.length > 0,
         images_base64: imgs.length ? imgs : undefined,
         seedance_image_mode: mode,
         i2v_max_images: imgs.length >= 2 ? Math.min(DRAMA_R2V_MAX_IMAGES, imgs.length) : undefined,
@@ -2472,17 +2521,25 @@ export default function ShortDramaPage() {
 
   const generateFullLongform = async (billId: string) => {
     const total = Math.min(MAX_DRAMA_TOTAL_SEC, durationSec)
-    const xyqPrompt = [
-      buildDramaIdentityLock(cast, roles),
-      metaPrompt,
-      `目标总时长约 ${total} 秒，竖屏 9:16。`,
-      `戏剧四拍：${formula.beats.join(' → ')}。`,
-      '请由小云雀智能生视频 Agent 多镜编排成片，前 3 秒必须冲突或反转，禁止拖沓空镜与电影片头片尾。镜头必须跟拍角色参考图中的人，禁止改拍顾客或其他脸。',
-    ]
-      .filter(Boolean)
-      .join('\n')
-
     const fusionImgs = await prepareDramaModelImages()
+    const leadName = buildDramaStoryCastBrief(cast, roles).leadName
+    const xyqPrompt = fusionImgs.length
+      ? buildDramaImageToVideoPrompt({
+          leadName,
+          story: story.trim(),
+          dialogue: dialogue.trim(),
+          beat: formula.beats.join(' → '),
+          maxAction: 400,
+        })
+      : [
+          buildDramaIdentityLock(cast, roles),
+          metaPrompt,
+          `目标总时长约 ${total} 秒，竖屏 9:16。`,
+          `戏剧四拍：${formula.beats.join(' → ')}。`,
+          '请由小云雀智能生视频 Agent 多镜编排成片，前 3 秒必须冲突或反转，禁止拖沓空镜与电影片头片尾。',
+        ]
+          .filter(Boolean)
+          .join('\n')
     if (fusionImgs.length > 0) {
       setProgress(
         dramaJimengPhotoReady(cfg)
@@ -2569,6 +2626,7 @@ export default function ShortDramaPage() {
       })
       const r = await runOneClip({
         prompt,
+        beat: beats[i]!,
         durationSec: segDur,
         images_base64: images,
         onProgress: (t) => {
@@ -2624,6 +2682,7 @@ export default function ShortDramaPage() {
         const prompt = `${metaPrompt}\n时长约 ${durationSec} 秒，竖屏 9:16 单段直出。结构：${formula.beats.join(' → ')}。`
         const r = await runOneClip({
           prompt,
+          beat: formula.beats.join(' → '),
           durationSec,
           images_base64: fusionImgs,
           onProgress: (t) => {
@@ -2662,6 +2721,7 @@ export default function ShortDramaPage() {
       })
       const r = await runOneClip({
         prompt: previewPrompt,
+        beat: formula.beats[0]!,
         durationSec: PREVIEW_SEC,
         images_base64: await prepareDramaModelImages(),
         onProgress: (t) => {
@@ -3221,7 +3281,7 @@ export default function ShortDramaPage() {
                     </button>
                   </span>
                   <p className="text-[11px] leading-relaxed text-slate-500">
-                    可新建角色1、角色2、角色3。删除角色会同步从上方「角色」栏去掉对应名字。每位角色可写词或上传参考图后确认。
+                    可新建角色1、角色2、角色3。删除角色会同步从上方「角色」栏去掉对应名字。每位角色可写词或上传参考图后确认。已确认角色图时，会先把照片作为模型首帧提交，成片以角色图为准，禁止模型自己生成人物。
                   </p>
                   <input
                     ref={characterInputRef}

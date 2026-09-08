@@ -268,6 +268,30 @@ function stripImagesForArkT2v(body: Record<string, unknown>, extraPrompt: string
   return next
 }
 
+function bodyFlagTrue(body: Record<string, unknown>, key: string): boolean {
+  const v = body[key]
+  return v === true || String(v ?? '').trim().toLowerCase() === 'true'
+}
+
+function arkContentHasImage(content: unknown): boolean {
+  if (!Array.isArray(content)) return false
+  return content.some(
+    (row) => row && typeof row === 'object' && String((row as { type?: unknown }).type) === 'image_url',
+  )
+}
+
+function bodyHasReferenceImages(body: Record<string, unknown>): boolean {
+  if (Array.isArray(body.images_base64) && body.images_base64.some((x) => String(x ?? '').trim())) {
+    return true
+  }
+  if (typeof body.image_url === 'string' && String(body.image_url).trim()) return true
+  return arkContentHasImage(body.content)
+}
+
+/** 有角色图时紧急重试仍须图生，禁止改成数字人口播文生 */
+const DRAMA_KEEP_IMAGE_EMERGENCY_PROMPT =
+  '【图生】竖屏9:16。让首帧图中的人自然动作，禁止生成其他人物或换脸。'
+
 function arkCreateTaskUserMessage(msg: string, endpointId: string, upstreamStatus?: number): string {
   if (isArkRealPersonImageBlock(msg)) {
     return '当前 Seedance 拦截了写实参考图。角色形象必须用图生才能保持同一张脸，未改文生换脸。'
@@ -1888,6 +1912,16 @@ async function arkCreateVideoTask(
       i2vMaxImages,
     ),
   }
+  const keepReferenceImage =
+    bodyFlagTrue(body, 'keep_reference_image') ||
+    bodyFlagTrue(body, 'i2v_must_use_image') ||
+    (lockModel && bodyHasReferenceImages(apiBody))
+  if (
+    (bodyFlagTrue(body, 'keep_reference_image') || bodyFlagTrue(body, 'i2v_must_use_image')) &&
+    !bodyHasReferenceImages(apiBody)
+  ) {
+    return { ok: false, msg: '已要求以角色图为准，但请求里没有图片，禁止改文生自己生成人物。' }
+  }
   const lockedOne = !isServerAuto ? normalizeArkVideoModelParam(rawModel) : ''
   const candidates =
     preferQwenOnly || !key
@@ -1925,6 +1959,10 @@ async function arkCreateVideoTask(
       if (!videoModelSupportsDuration(modelId, durationSec, mode)) continue
       const built = await buildArkVideoTaskPayloadForPost(modelId, apiBody, mode)
       if (built.ok === false) continue
+      if (keepReferenceImage && !arkContentHasImage(built.payload.content)) {
+        lastMsg = '角色图未写入图生首帧，禁止改文生自己生成人物。'
+        continue
+      }
       tried += 1
       triedModels.push(modelId)
       const posted = await arkPostVideoGenerationTask(env, key, built.payload, modelId)
@@ -1938,11 +1976,14 @@ async function arkCreateVideoTask(
           modelId,
           {
             ...apiBody,
-            prompt: clampSeedanceContentText(SEEDANCE_EMERGENCY_I2V_PROMPT, SEEDANCE_I2V_MAX_CONTENT_TEXT),
+            prompt: clampSeedanceContentText(
+              keepReferenceImage ? DRAMA_KEEP_IMAGE_EMERGENCY_PROMPT : SEEDANCE_EMERGENCY_I2V_PROMPT,
+              SEEDANCE_I2V_MAX_CONTENT_TEXT,
+            ),
           },
           mode,
         )
-        if (emergencyBuilt.ok === true) {
+        if (emergencyBuilt.ok === true && (!keepReferenceImage || arkContentHasImage(emergencyBuilt.payload.content))) {
           const retryPosted = await arkPostVideoGenerationTask(
             env,
             key,
@@ -1999,9 +2040,6 @@ async function arkCreateVideoTask(
    * 写实人像：有确认角色图时禁止去掉首帧改文生（会换脸）。
    * 仅当未要求保持参考图时，才允许同模型文生兜底。
    */
-  const keepReferenceImage =
-    body.keep_reference_image === true ||
-    String(body.keep_reference_image ?? '').trim().toLowerCase() === 'true'
   if (key && (blockedRealPerson || isArkRealPersonImageBlock(`${lastMsg}`))) {
     if (keepReferenceImage) {
       lastMsg =
@@ -2045,6 +2083,14 @@ async function arkCreateVideoTask(
           lastStatus = t2vPosted.status
         }
       }
+    }
+  }
+
+  if (keepReferenceImage) {
+    return {
+      ok: false,
+      msg: lastMsg || '角色图必须作为首帧提交图生，禁止模型自己生成人物。',
+      status: lastStatus,
     }
   }
 

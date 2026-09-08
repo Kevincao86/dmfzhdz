@@ -41,6 +41,8 @@ export type ShortVideoGenRequestBody = {
   generate_audio?: boolean
   /** 已确认角色图：禁止去掉首帧改文生，否则会换脸 */
   keep_reference_image?: boolean
+  /** 已提交角色图：payload 必须含 image_url，禁止改文生自己造人 */
+  i2v_must_use_image?: boolean
   /**
    * 阶段 D：Wan/垂类 LoRA 挂载点（DiffSynth/musubi）。
    * 本轮仅类型预留，网关忽略；勿依赖此字段改变生成结果。
@@ -54,7 +56,7 @@ export function formatVideoAiUserError(msg: string): string {
   if (/已改走火山 1\.5|正在改用火山 1\.5|1\.5 Pro 首帧/i.test(raw)) {
     return '角色形象必须用图生才能保持同一张脸。请再点生成，系统会走即梦/首帧图生，不会改文生换脸。'
   }
-  if (/仍未通过写实人像|必须用图生才能保持/.test(raw)) return raw
+  if (/仍未通过写实人像|必须用图生才能保持|禁止改文生|禁止模型自己生成人物|以角色图为准/.test(raw)) return raw
   if (/may contain real person|contain real person|input image.*real person|写实人像|真人肖像|更换角色参考图|写实参考图/i.test(raw)) {
     return '角色参考图未能用于图生（方舟会拦写实首帧）。请再试即梦图生，系统不会改文生换脸。'
   }

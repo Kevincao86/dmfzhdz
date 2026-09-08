@@ -407,7 +407,7 @@ function collectImagePayloads(rawList: unknown, cap: number): { urls: string[]; 
 function clipPromptKeepIdentity(prompt: string, max: number): string {
   const p = String(prompt ?? '').trim()
   if (p.length <= max) return p
-  if (p.startsWith('【角色锁定')) {
+  if (p.startsWith('【角色锁定') || p.startsWith('【图生')) {
     const nl = p.indexOf('\n')
     const lock = nl > 0 && nl < max ? p.slice(0, nl) : p.slice(0, Math.min(160, max))
     const restStart = nl > 0 ? nl + 1 : lock.length
