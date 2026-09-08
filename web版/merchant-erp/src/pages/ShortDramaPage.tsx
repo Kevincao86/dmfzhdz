@@ -1680,16 +1680,20 @@ export default function ShortDramaPage() {
       `四拍结构：${formula.beats.join(' → ')}`,
       `成片时长：${durOpt.label}（${durOpt.hint}，共 ${durOpt.sec} 秒）`,
       `画风：${style.name}`,
+      '商家提示（必须写进故事，不要空套模板）：',
       shopLines,
-      story.trim() ? `商家已有草稿（请按钩子与时长改写，不要空套模板）：${story.trim()}` : '',
-      '写一条适合该时长、能拍进竖屏短剧的故事。口语、有冲突、有记忆点。',
+      roles.trim() ? `已有角色（故事必须贴合，不要改人设）：${roles.trim()}` : '',
+      conflict.trim() ? `已有核心冲突（故事必须围绕它写）：${conflict.trim()}` : '',
+      dialogue.trim() ? `已有对白钩子（可原句出现在故事里）：${dialogue.trim()}` : '',
+      story.trim() ? `商家已有故事草稿（请按提示改写）：${story.trim()}` : '',
+      '根据以上提示写 1–3 句一句话故事。口语、有冲突、有记忆点，适合该时长竖屏短剧。',
       '只输出 JSON：{"story":"...","roles":"...","conflict":"...","dialogue":"..."}',
-      'story 为 1–3 句一句话故事；dialogue 为一句对白钩子；不要 markdown、不要解释。',
+      'story 为一句话故事；roles/conflict/dialogue 仅在商家未提供时补全；不要 markdown、不要解释。',
     ]
       .filter(Boolean)
       .join('\n')
     const system =
-      '你是竖屏商家短剧编剧。必须根据给定的钩子标签和成片时长写故事：短时长更密、冲突更早；长时长可铺垫但前 2 秒仍要有钩子。不要写技术参数，不要出现字幕/Logo/演职员表。'
+      '你是竖屏商家短剧编剧。必须根据商家提示（店名、项目、钩子、时长、已有角色/冲突）写一句话故事：短时长更密、冲突更早；长时长可铺垫但前 2 秒仍要有钩子。不要写技术参数，不要出现字幕/Logo/演职员表。'
     try {
       let lastErr = '生成故事失败，请稍后重试'
       for (const provider of ['doubao'] as const) {
@@ -1710,10 +1714,10 @@ export default function ShortDramaPage() {
           if (!mountedRef.current) return
           clearTrial()
           setStory(parsed.story)
-          if (parsed.roles) setRoles(parsed.roles)
-          if (parsed.conflict) setConflict(parsed.conflict)
-          if (parsed.dialogue) setDialogue(parsed.dialogue)
-          setHint('已根据钩子与时长写好故事，可再微调后生成短剧。')
+          if (!roles.trim() && parsed.roles) setRoles(parsed.roles)
+          if (!conflict.trim() && parsed.conflict) setConflict(parsed.conflict)
+          if (!dialogue.trim() && parsed.dialogue) setDialogue(parsed.dialogue)
+          setHint('已根据上方提示写好一句话故事，可再微调后生成短剧。')
           setErr(null)
           return
         } catch (e) {
@@ -2818,7 +2822,7 @@ export default function ShortDramaPage() {
                       </div>
                     </div>
                     <p className="text-[11px] leading-snug text-slate-500">
-                      下方「一句话故事 / 角色 / 冲突 / 对白」也可自由改，会直接进生成提示词。
+                      下方「角色 / 对白 / 冲突 / 一句话故事」也可自由改，会直接进生成提示词。
                     </p>
                   </div>
                 ) : null}
@@ -2854,37 +2858,6 @@ export default function ShortDramaPage() {
                 {world.refill}
               </button>
 
-              <div className="space-y-1.5">
-                <span className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-sm font-medium text-slate-800">一句话故事</span>
-                  <button
-                    type="button"
-                    disabled={busy || storyBusy}
-                    onClick={() => void generateAiStory()}
-                    className="inline-flex items-center gap-1 rounded-lg border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-xs font-medium text-cyan-900 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {storyBusy ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Wand2 className="h-3.5 w-3.5" />
-                    )}
-                    {storyBusy ? '正在写故事' : 'AI生成故事'}
-                  </button>
-                </span>
-                <textarea
-                  className={cn(fieldCls, 'min-h-[84px] resize-y')}
-                  disabled={busy || storyBusy}
-                  value={story}
-                  onChange={(e) => {
-                    clearTrial()
-                    setStory(e.target.value)
-                  }}
-                  placeholder="先选上方钩子和成片时长，再点「AI生成故事」"
-                />
-                {err && storyWriteGate && err === storyWriteGate ? (
-                  <span className="block text-xs text-rose-600">{err}</span>
-                ) : null}
-              </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-800">
@@ -2925,6 +2898,40 @@ export default function ShortDramaPage() {
                   }}
                 />
               </label>
+              <div className="space-y-1.5">
+                <span className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-slate-800">一句话故事</span>
+                  <button
+                    type="button"
+                    disabled={busy || storyBusy}
+                    onClick={() => void generateAiStory()}
+                    className="inline-flex items-center gap-1 rounded-lg border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-xs font-medium text-cyan-900 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {storyBusy ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Wand2 className="h-3.5 w-3.5" />
+                    )}
+                    {storyBusy ? '正在写故事' : 'AI生成故事'}
+                  </button>
+                </span>
+                <p className="text-[11px] leading-relaxed text-slate-500">
+                  根据上方钩子、店名/项目等提示生成，可再微调。
+                </p>
+                <textarea
+                  className={cn(fieldCls, 'min-h-[84px] resize-y')}
+                  disabled={busy || storyBusy}
+                  value={story}
+                  onChange={(e) => {
+                    clearTrial()
+                    setStory(e.target.value)
+                  }}
+                  placeholder="先填上方提示，再点「AI生成故事」"
+                />
+                {err && storyWriteGate && err === storyWriteGate ? (
+                  <span className="block text-xs text-rose-600">{err}</span>
+                ) : null}
+              </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
