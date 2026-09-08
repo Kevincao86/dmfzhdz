@@ -6,7 +6,8 @@
  * Version: 2022-08-31
  * 默认无参考 req_key: pippit_iv2v_v20_cvtob（文档 85621/2359611）
  * 有参考（图+视频）：pippit_iv2v_v20_cvtob_with_vinput（文档 85621/2359610）
- * 有角色照片时优先即梦图生 jimeng_ti2v_v30_pro（binary_data_base64），不走方舟 Seedance 真人库。
+ * 有角色照片时：先小云雀 Agent（pippit_iv2v_v20_cvtob + 参考图，有声多镜），
+ * 失败再即梦图生 jimeng_ti2v_v30_pro 锁脸；不走方舟 Seedance 真人库。
  *
  * 凭据：运营台 videoAi.jimengAccessKeyId/SK → JIMENG_*，或轻量 MERCHANT_AI_VOLC_*。
  * 可用 MERCHANT_AI_XIAOYUNQUE_REQ_KEY / SUBMIT_ACTION / GET_ACTION 覆盖。
@@ -110,6 +111,10 @@ function isJimengI2vReqKey(reqKey: string): boolean {
   return /jimeng_ti2v|jimeng_i2v|jimeng_vgfm_i2v/i.test(String(reqKey || ''))
 }
 
+function isXiaoyunqueAgentReqKey(reqKey: string): boolean {
+  return /pippit_iv2v/i.test(String(reqKey || ''))
+}
+
 function reqKeyAttempts(
   env: MerchantAiEnv,
   hasVideoRef: boolean,
@@ -123,36 +128,24 @@ function reqKeyAttempts(
   const customKey = (env.MERCHANT_AI_XIAOYUNQUE_REQ_KEY ?? '').trim()
   const customAction = (env.MERCHANT_AI_XIAOYUNQUE_SUBMIT_ACTION ?? '').trim()
   const customGet = (env.MERCHANT_AI_XIAOYUNQUE_GET_ACTION ?? '').trim()
-  /** 有角色图时禁止落到小云雀无参考 Agent：它会丢掉照片、按文案另生成一张脸 */
-  if (hasImageRef && !hasVideoRef) {
-    const jimengKeys = [...JIMENG_I2V_KEYS]
-    if (customKey && isJimengI2vReqKey(customKey) && !jimengKeys.includes(customKey)) {
-      jimengKeys.unshift(customKey)
-    }
-    return jimengKeys.map((reqKey) => ({
-      action: XYQ_SUBMIT_ACTION,
-      version: XYQ_VERSION,
-      reqKey,
-      getAction: XYQ_GET_ACTION,
-    }))
-  }
-  const pippitKeys = hasVideoRef ? [...REF_KEYS, ...NOREF_KEYS] : [...NOREF_KEYS]
-  const base = pippitKeys.map((reqKey) => ({
-    action: XYQ_SUBMIT_ACTION,
+  const xyqRow = (reqKey: string) => ({
+    action: customAction || XYQ_SUBMIT_ACTION,
     version: XYQ_VERSION,
     reqKey,
-    getAction: XYQ_GET_ACTION,
-  }))
+    getAction: customGet || XYQ_GET_ACTION,
+  })
+  /** 有角色图：先小云雀有声短剧（带参考图），再即梦图生锁脸；禁止无图 Agent 另造人 */
+  if (hasImageRef && !hasVideoRef) {
+    const rows = [xyqRow(XYQ_REQ_KEY_NOREF), ...JIMENG_I2V_KEYS.map((reqKey) => xyqRow(reqKey))]
+    if (customKey && !rows.some((r) => r.reqKey === customKey)) {
+      rows.unshift(xyqRow(customKey))
+    }
+    return rows
+  }
+  const pippitKeys = hasVideoRef ? [...REF_KEYS, ...NOREF_KEYS] : [...NOREF_KEYS]
+  const base = pippitKeys.map((reqKey) => xyqRow(reqKey))
   if (customKey || customAction) {
-    return [
-      {
-        action: customAction || XYQ_SUBMIT_ACTION,
-        version: XYQ_VERSION,
-        reqKey: customKey || (hasVideoRef ? XYQ_REQ_KEY_REF : XYQ_REQ_KEY_NOREF),
-        getAction: customGet || XYQ_GET_ACTION,
-      },
-      ...base.filter((row) => row.reqKey !== customKey),
-    ]
+    return [xyqRow(customKey || (hasVideoRef ? XYQ_REQ_KEY_REF : XYQ_REQ_KEY_NOREF)), ...base.filter((row) => row.reqKey !== customKey)]
   }
   return base
 }
@@ -408,7 +401,7 @@ function collectImagePayloads(rawList: unknown, cap: number): { urls: string[]; 
 function clipPromptKeepIdentity(prompt: string, max: number): string {
   const p = String(prompt ?? '').trim()
   if (p.length <= max) return p
-  if (p.startsWith('【角色锁定') || p.startsWith('【图生')) {
+  if (p.startsWith('【角色锁定') || p.startsWith('【图生') || p.startsWith('【参考图')) {
     const nl = p.indexOf('\n')
     const lock = nl > 0 && nl < max ? p.slice(0, nl) : p.slice(0, Math.min(160, max))
     const restStart = nl > 0 ? nl + 1 : lock.length
@@ -416,6 +409,20 @@ function clipPromptKeepIdentity(prompt: string, max: number): string {
     if (room > 24) return `${lock}\n${p.slice(restStart, restStart + room)}`
   }
   return p.slice(0, max)
+}
+
+/** 即梦图生审核严，故事里的足浴等词会拦；兜底时只做锁脸微动，故事交给小云雀 */
+function jimengSafeMotionPrompt(prompt: string): string {
+  const p = String(prompt ?? '').trim()
+  if (/足浴|按摩|技师|桑拿|会所/.test(p)) {
+    return [
+      '【图生】角色照片已作为首帧提交。',
+      '让图中的人自然转头、微笑、抬手，竖屏半身近景，电影棚拍光。',
+      '必须是这张图里的同一人、同一张脸、同一发型、同一套衣服。',
+      '禁止生成其他人物，禁止换脸。不要字幕、水印、Logo。',
+    ].join('')
+  }
+  return clipPromptKeepIdentity(p, 800)
 }
 
 function buildJimengI2vSubmitBody(opts: {
@@ -427,7 +434,7 @@ function buildJimengI2vSubmitBody(opts: {
 }): Record<string, unknown> {
   const body: Record<string, unknown> = {
     req_key: opts.reqKey,
-    prompt: clipPromptKeepIdentity(opts.prompt, 800),
+    prompt: jimengSafeMotionPrompt(opts.prompt),
     seed: -1,
     frames: opts.durationSec <= 7 ? 121 : 241,
     aspect_ratio: '9:16',
@@ -519,7 +526,8 @@ export async function volcSubmitXiaoyunqueTask(
           })
       const r = await postVolcVisualWithRetry(creds, attempt.action, attempt.version, body)
       if (!r.ok) {
-        errors.push(`${attempt.reqKey}${dur !== durationSec ? `@${dur}s` : ''}: ${r.message}`)
+        const tag = isXiaoyunqueAgentReqKey(attempt.reqKey) ? '小云雀' : attempt.reqKey
+        errors.push(`${tag}${dur !== durationSec ? `@${dur}s` : ''}: ${r.message}`)
         continue
       }
       const rawId = extractTaskId(r.json)
@@ -539,7 +547,7 @@ export async function volcSubmitXiaoyunqueTask(
       ok: false,
       message:
         humanizeXiaoyunqueError(errors.slice(0, 3).join('；')) ||
-        '即梦图生未成功，未改用无参考成片（否则会丢掉角色照片）。',
+        '小云雀有声短剧与即梦图生均未成功，未改用无参考成片（否则会丢掉角色照片）。',
     }
   }
   return {

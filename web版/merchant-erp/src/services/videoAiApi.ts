@@ -1691,7 +1691,7 @@ async function runShortVideoJobWithDurationInternal(
   }
 }
 
-/** 即梦/小云雀：有角色图时走视觉云图生，不走方舟 Seedance 真人库 */
+/** 即梦/小云雀：有角色图时走视觉云（先小云雀有声，再即梦锁脸），不走方舟 Seedance 真人库 */
 export async function runXiaoyunqueVideoJob(opts: {
   prompt: string
   durationSec: number
@@ -1712,7 +1712,7 @@ export async function runXiaoyunqueVideoJob(opts: {
   const imgs = (opts.images_base64 ?? []).map((s) => String(s).trim()).filter(Boolean)
   opts.onProgress?.(
     imgs.length
-      ? `即梦图生视频提交中（${imgs.length} 张参考图，目标 ${durationSec} 秒）…`
+      ? `小云雀有声短剧提交中（${imgs.length} 张角色参考图，目标 ${durationSec} 秒）…`
       : `小云雀 Agent 提交中（目标 ${durationSec} 秒）…`,
   )
   const start = await postSeedanceVideoStart({
@@ -1724,10 +1724,13 @@ export async function runXiaoyunqueVideoJob(opts: {
     images_base64: imgs.length ? imgs : undefined,
   })
   if (!start.ok) return { ok: false, message: formatVideoAiUserError(start.message) }
-  if (imgs.length > 0 && !/jimeng_ti2v|jimeng_i2v|jimeng_vgfm_i2v/i.test(String(start.modelUsed || ''))) {
+  const usedModel = String(start.modelUsed || '')
+  const usedJimeng = /jimeng_ti2v|jimeng_i2v|jimeng_vgfm_i2v/i.test(usedModel)
+  const usedXiaoyunque = /pippit_iv2v/i.test(usedModel)
+  if (imgs.length > 0 && !usedJimeng && !usedXiaoyunque) {
     return {
       ok: false,
-      message: `角色照片未进入图生模型（当前 ${start.modelUsed || '未知'}）。未采用无参考成片，以免换脸。`,
+      message: `角色照片未进入小云雀/即梦（当前 ${usedModel || '未知'}）。未采用无参考成片，以免换脸。`,
     }
   }
 
@@ -1735,12 +1738,13 @@ export async function runXiaoyunqueVideoJob(opts: {
   const pollMs = 5000
   const maxWaitMs = Math.min(45 * 60_000, Math.max(10 * 60_000, durationSec * 4000 + 10 * 60_000))
   const pollMaxTries = Math.max(60, Math.ceil(maxWaitMs / pollMs))
+  const engineLabel = usedJimeng ? '即梦图生' : '小云雀有声'
   const poll = await pollShortVideoTask(start.taskId, {
     pollIntervalMs: pollMs,
     pollMaxTries,
     durationSec,
     shouldCancel: opts.shouldCancel,
-    onProgress: (label) => opts.onProgress?.(`${imgs.length ? '即梦图生' : '小云雀'} · ${label}`),
+    onProgress: (label) => opts.onProgress?.(`${engineLabel} · ${label}`),
   })
   if (!poll.ok) return { ok: false, message: formatVideoAiUserError(poll.message) }
   return { ok: true, videoUrl: poll.videoUrl, modelUsed: start.modelUsed ?? 'xiaoyunque' }
