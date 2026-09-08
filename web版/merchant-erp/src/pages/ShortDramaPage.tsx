@@ -1353,6 +1353,32 @@ function parseDramaStoryAi(raw: string): {
   return first ? { story: first.replace(/^["「]|["」]$/g, '') } : null
 }
 
+function parseDramaCharacterPortraitAi(raw: string): string | null {
+  const text = String(raw || '').trim()
+  if (!text) return null
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i)
+  const jsonStr = (fence?.[1] || text).trim()
+  const start = jsonStr.indexOf('{')
+  const end = jsonStr.lastIndexOf('}')
+  if (start >= 0 && end > start) {
+    try {
+      const o = JSON.parse(jsonStr.slice(start, end + 1)) as Record<string, unknown>
+      const portrait = String(
+        o.portrait ?? o.character ?? o.desc ?? o.description ?? o['角色形象'] ?? o['画像'] ?? '',
+      ).trim()
+      if (portrait) return portrait.replace(/^["「]|["」]$/g, '')
+    } catch {
+      /* fall through to plain text */
+    }
+  }
+  const cleaned = text
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim()
+  if (!cleaned || cleaned.startsWith('{')) return null
+  return cleaned.replace(/^["「]|["」]$/g, '').trim() || null
+}
+
 type DramaRefItem = {
   id: string
   kind: 'image' | 'video'
@@ -1434,6 +1460,7 @@ export default function ShortDramaPage() {
   const [characterDraft, setCharacterDraft] = useState<string | null>(null)
   const [characterDesc, setCharacterDesc] = useState('')
   const [characterBusy, setCharacterBusy] = useState(false)
+  const [portraitBusy, setPortraitBusy] = useState(false)
   const refInputRef = useRef<HTMLInputElement>(null)
   const characterInputRef = useRef<HTMLInputElement>(null)
   const [progress, setProgress] = useState<string | null>(null)
@@ -1576,6 +1603,67 @@ export default function ShortDramaPage() {
       if (mountedRef.current) setErr(lastErr)
     } finally {
       if (mountedRef.current) setStoryBusy(false)
+    }
+  }
+
+  const enrichCharacterPortrait = async () => {
+    const hintText = characterDesc.trim() || roles.trim()
+    if (!hintText) {
+      setErr('请先填写简要提示，例如「足浴店女技师，25-28岁」')
+      setHint(null)
+      return
+    }
+    setErr(null)
+    setHint(null)
+    setPortraitBusy(true)
+    const shopLines = world.fields
+      .map((f) => `${f.label}：${String(shop[f.key] ?? '').trim() || '未填'}`)
+      .join('\n')
+    const user = [
+      `场景：${world.label} / ${scene.name}`,
+      `画风：${style.name}${style.visual ? `（${style.visual}）` : ''}`,
+      shopLines,
+      roles.trim() ? `角色身份：${roles.trim()}` : '',
+      story.trim() ? `一句话故事：${story.trim()}` : '',
+      `商家简要提示：${hintText}`,
+      '请把简要提示补成一段可直接用于文生图的角色形象词。',
+      '必须覆盖：性别、年龄段、国籍/族裔外观、发型发色、五官气质、妆容、职业相关衣着与配饰、体态、镜头（半身面对镜头）。',
+      '未给出的项按职业与场景合理补全，不要留空、不要反问。衣着必须符合职业场景（如足浴技师、餐饮服务员）。',
+      '只输出 JSON：{"portrait":"..."}，portrait 为一段中文、80–180 字，不要 markdown、不要解释。',
+    ]
+      .filter(Boolean)
+      .join('\n')
+    const system =
+      '你是商业短视频角色造型指导。根据简要提示补全写实竖屏人像的角色形象词，具体到国籍外观、衣着面料颜色与配饰。不要写技术参数，不要出现字幕、水印、Logo、多人。'
+    try {
+      let lastErr = '补充画像失败，请稍后重试'
+      for (const provider of ['doubao', 'qwen'] as const) {
+        try {
+          const res = await postAiChat({
+            provider,
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: user },
+            ],
+            temperature: 0.6,
+          })
+          const portrait = parseDramaCharacterPortraitAi(res.content ?? '')
+          if (!portrait) {
+            lastErr = '未返回可用画像，请稍后重试'
+            continue
+          }
+          if (!mountedRef.current) return
+          setCharacterDesc(portrait)
+          setHint('已补全角色形象词，可再微调后点「生成预览」。')
+          setErr(null)
+          return
+        } catch (e) {
+          lastErr = e instanceof Error ? e.message : String(e)
+        }
+      }
+      if (mountedRef.current) setErr(lastErr)
+    } finally {
+      if (mountedRef.current) setPortraitBusy(false)
     }
   }
 
@@ -1819,9 +1907,10 @@ export default function ShortDramaPage() {
     if (!durationSelected) return '请先选择成片时长'
     if (!story.trim()) return '请先确认一句话故事，或点「AI生成故事」。'
     if (mediaBusy) return '正在处理参考画面，请稍候'
+    if (portraitBusy) return '正在补充角色画像，请稍候'
     if (characterBusy) return '正在生成角色形象，请稍候'
     return null
-  }, [busy, storyBusy, cfgLoaded, cfg, durationSelected, story, mediaBusy, characterBusy])
+  }, [busy, storyBusy, cfgLoaded, cfg, durationSelected, story, mediaBusy, portraitBusy, characterBusy])
 
   useEffect(() => {
     mountedRef.current = true
@@ -2607,23 +2696,38 @@ export default function ShortDramaPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <p className="text-sm font-medium text-slate-800">角色形象</p>
+                  <span className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-slate-800">角色形象</p>
+                    <button
+                      type="button"
+                      disabled={busy || storyBusy || characterBusy || mediaBusy || portraitBusy}
+                      onClick={() => void enrichCharacterPortrait()}
+                      className="inline-flex items-center gap-1 rounded-lg border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-xs font-medium text-cyan-900 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {portraitBusy ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-3.5 w-3.5" />
+                      )}
+                      {portraitBusy ? '正在补充画像' : 'AI补充画像'}
+                    </button>
+                  </span>
                   <p className="text-[11px] leading-relaxed text-slate-500">
-                    用文字描述生成预览，确认后才会用于成片融合；也可直接上传照片。
+                    可先写简要提示（职业、年龄等），点「AI补充画像」补全国籍、衣着、发型；再生成预览或直接上传照片。
                   </p>
                   <textarea
-                    className={cn(fieldCls, 'min-h-[64px] resize-y')}
-                    disabled={busy || storyBusy || characterBusy || mediaBusy}
+                    className={cn(fieldCls, 'min-h-[88px] resize-y')}
+                    disabled={busy || storyBusy || characterBusy || mediaBusy || portraitBusy}
                     value={characterDesc}
                     onChange={(e) => setCharacterDesc(e.target.value)}
-                    placeholder="例如：28 岁短发女生，米色针织开衫，自然妆，半身面对镜头"
+                    placeholder="例如：足浴店女技师，25-28岁。点「AI补充画像」可补全国籍、衣着、发型等"
                   />
                   <input
                     ref={characterInputRef}
                     type="file"
                     accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime,.mp4,.mov,.webm"
                     className="hidden"
-                    disabled={busy || storyBusy || mediaBusy || characterBusy}
+                    disabled={busy || storyBusy || mediaBusy || characterBusy || portraitBusy}
                     onChange={(e) => {
                       void onPickCharacterFile(e.target.files?.[0])
                       e.target.value = ''
@@ -2632,7 +2736,7 @@ export default function ShortDramaPage() {
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      disabled={busy || storyBusy || characterBusy || mediaBusy}
+                      disabled={busy || storyBusy || characterBusy || mediaBusy || portraitBusy}
                       onClick={() => void generateCharacterPreview()}
                       className="inline-flex items-center gap-1 rounded-lg border border-cyan-200 bg-cyan-50 px-2.5 py-1.5 text-xs font-medium text-cyan-900 hover:bg-cyan-100 disabled:opacity-50"
                     >
@@ -2641,7 +2745,7 @@ export default function ShortDramaPage() {
                     </button>
                     <button
                       type="button"
-                      disabled={busy || storyBusy || characterBusy || mediaBusy}
+                      disabled={busy || storyBusy || characterBusy || mediaBusy || portraitBusy}
                       onClick={() => characterInputRef.current?.click()}
                       className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-50"
                     >
@@ -2698,7 +2802,11 @@ export default function ShortDramaPage() {
                     </div>
                   ) : (
                     <div className="flex h-28 items-center justify-center rounded-xl border border-dashed border-cyan-300 bg-cyan-50/30 text-xs text-cyan-900">
-                      {characterBusy ? '正在生成角色预览…' : '先写描述再生成预览'}
+                      {characterBusy
+                        ? '正在生成角色预览…'
+                        : portraitBusy
+                          ? '正在补充角色画像…'
+                          : '先写简要提示，点「AI补充画像」后再生成预览'}
                     </div>
                   )}
                 </div>
