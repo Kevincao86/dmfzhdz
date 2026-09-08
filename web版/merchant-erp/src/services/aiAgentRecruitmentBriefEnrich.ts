@@ -12,7 +12,7 @@ import {
   resolveMerchantBriefContext,
 } from '../lib/merchantBriefCatalog'
 import { inferIndustryVisualCategory } from '../lib/douyinProductImageAnchor'
-import { fetchIndustryProductTagsAi, generateRecruitWizardRequirementsAi } from './recruitmentBriefAi'
+import { fetchIndustryProductTagsAi, generateRecruitWizardRequirementsAi, generateThreeKolBriefs } from './recruitmentBriefAi'
 
 const TAGS_AI_TIMEOUT_MS = 20_000
 const BRIEFS_AI_TIMEOUT_MS = 60_000
