@@ -1471,6 +1471,8 @@ export default function ShortDramaPage() {
   const [refItems, setRefItems] = useState<DramaRefItem[]>([])
   const [characterPreview, setCharacterPreview] = useState<string | null>(null)
   const [characterDraft, setCharacterDraft] = useState<string | null>(null)
+  /** 用户上传的原图；生成预览必须按此贴脸，避免用上次生成图当参考 */
+  const [characterSourceUrl, setCharacterSourceUrl] = useState<string | null>(null)
   const [characterDesc, setCharacterDesc] = useState('')
   const [characterBusy, setCharacterBusy] = useState(false)
   const [portraitBusy, setPortraitBusy] = useState(false)
@@ -1619,9 +1621,15 @@ export default function ShortDramaPage() {
     }
   }
 
-  const enrichCharacterPortrait = async () => {
+  const enrichCharacterPortrait = async (imageOverride?: string) => {
     const hintText = characterDesc.trim() || roles.trim()
-    const rawPortraitSrc = (characterDraft || characterPreview || '').trim()
+    const rawPortraitSrc = (
+      imageOverride ||
+      characterSourceUrl ||
+      characterDraft ||
+      characterPreview ||
+      ''
+    ).trim()
     if (!hintText && !rawPortraitSrc) {
       setErr('请先填写简要提示，或上传角色照片后再点「AI补充画像」')
       setHint(null)
@@ -1827,10 +1835,12 @@ export default function ShortDramaPage() {
     setErr(null)
     try {
       const url = await processCustomAvatarFile(file)
+      setCharacterSourceUrl(url)
       setCharacterDraft(url)
       setCharacterPreview(url)
       clearTrial()
-      setHint('已用上传照片确认角色形象。')
+      setHint('已用上传照片确认角色。正在按图重写画像，覆盖旧文案…')
+      void enrichCharacterPortrait(url)
     } catch (e) {
       setErr(e instanceof Error ? e.message : '角色形象读取失败')
     } finally {
@@ -1840,9 +1850,10 @@ export default function ShortDramaPage() {
 
   const generateCharacterPreview = async () => {
     const desc = characterDesc.trim() || roles.trim()
-    const rawRef = (characterDraft || characterPreview || '').trim()
+    const sceneRef = refItems.find((x) => String(x.imageDataUrl || '').trim())?.imageDataUrl?.trim() || ''
+    const rawRef = (characterSourceUrl || sceneRef || characterDraft || characterPreview || '').trim()
     if (!desc && !rawRef) {
-      setErr('请先填写角色形象描述，或上传参考照片后再生成预览')
+      setErr('请先上传角色参考照片，或填写形象描述后再生成预览')
       setHint(null)
       return
     }
@@ -1855,17 +1866,20 @@ export default function ShortDramaPage() {
         const resolved = await resolveDramaPortraitDataUrl(rawRef)
         refData = resolved ? await compressPortraitDataUrlForLibrary(resolved) : undefined
       }
+      if (!refData && !desc) {
+        setErr('请先上传角色参考照片，再生成预览')
+        return
+      }
       const prompt = refData
         ? [
-            '图生图：必须与参考图为同一人，五官、脸型、发型发色、肤色、体态全程一致，禁止换脸换人。',
-            '竖屏半身人像，正面或微侧，五官清晰，自然光线，写实照片。',
-            `角色身份：${roles.trim() || '主角'}。`,
-            desc ? `可微调构图与清晰度，衣着与外貌仍须是参考图本人：${desc}。` : '',
-            `气质贴近「${scene.name}」${style.visual ? `，${style.visual}` : ''}。`,
-            '禁止字幕、水印、Logo、多人、拼贴和海报排版。',
-          ]
-            .filter(Boolean)
-            .join('')
+            'Image edit. The attached photo is the ONLY identity and outfit source.',
+            'Keep the exact same person: face, hair, skin, body, and the exact clothes in the photo. Do not change the outfit. Do not invent a new face.',
+            'If this is a short-video app screenshot, crop to the front young woman only. Remove app UI, like/comment icons, captions, status bar, navigation bar, and other people.',
+            'Output a clean vertical half-body photorealistic portrait, natural light, no collage.',
+            `Role label only (not appearance): ${roles.trim() || '主角'}.`,
+            'Ignore any previous clothing text such as linen shirts, wide-leg pants, or cafe scenes. Those must not appear.',
+            'No subtitles, watermarks, logos, or extra people.',
+          ].join('')
         : [
             '竖屏半身人像照片，单人，正面或微侧，五官清晰，自然光线，写实。',
             `角色身份：${roles.trim() || '主角'}。`,
@@ -1881,17 +1895,17 @@ export default function ShortDramaPage() {
         wanxSize: '1024x1536',
         ...(refData ? { referenceImageDataUrl: refData } : {}),
       }
-      setHint(refData ? '正在用 GPT Image 按参考图生成预览…' : '正在用 GPT Image 生成预览…')
+      setHint(refData ? '正在按你上传的原图用 GPT Image 贴脸生成…' : '正在用 GPT Image 按文字生成预览…')
       let res = await postAiAgentNativeImage(prompt, gptOpts)
       if (!res.ok && refData) {
-        setHint('GPT 参考图未成功，改用国内图生图贴脸…')
+        setHint('GPT 贴脸未成功，改用国内图生图，仍按原图…')
         res = await postAiAgentNativeImage(prompt, {
           exactPrompt: true,
           aspectRatio: '3:4',
           preferredVendor: 'qwen',
           referenceImageDataUrl: refData,
         })
-      } else if (!res.ok) {
+      } else if (!res.ok && !refData) {
         res = await postAiAgentNativeImage(prompt, { exactPrompt: true, aspectRatio: '3:4' })
       }
       if (!res.ok) {
@@ -1912,8 +1926,8 @@ export default function ShortDramaPage() {
       setHint(
         viaGpt
           ? refData
-            ? '已用 GPT Image 按参考图生成预览。请点「用此图确认角色」后才会融合进短剧。'
-            : '已用 GPT Image 生成预览。请点「用此图确认角色」后才会融合进短剧。'
+            ? '已按上传原图用 GPT Image 贴脸。请点「用此图确认角色」后才会融合进短剧。'
+            : '已用 GPT Image 按文字生成预览。请点「用此图确认角色」后才会融合进短剧。'
           : '请点「用此图确认角色」后，生成短剧才会按此角色形象融合。',
       )
     } catch (e) {
@@ -2827,7 +2841,7 @@ export default function ShortDramaPage() {
                     </button>
                   </span>
                   <p className="text-[11px] leading-relaxed text-slate-500">
-                    写画像优先 GPT-4o 看图，只写照片里看得见的特征。生成预览优先 GPT Image 按参考图编辑，尽量同一张脸；上传照片会直接确认角色。
+                    请把参考图传到本栏（不要只放左边参考画面）。上传后会按图重写描述并锁定原图；生成预览只贴这张脸，不再用框里旧的衣着文案。
                   </p>
                   <textarea
                     className={cn(fieldCls, 'min-h-[88px] resize-y')}
@@ -2906,6 +2920,7 @@ export default function ShortDramaPage() {
                           onClick={() => {
                             setCharacterPreview(null)
                             setCharacterDraft(null)
+                            setCharacterSourceUrl(null)
                             clearTrial()
                           }}
                           className="rounded-full bg-black/55 p-1 text-white disabled:opacity-40"
