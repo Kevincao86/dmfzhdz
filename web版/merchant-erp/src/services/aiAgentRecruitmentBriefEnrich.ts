@@ -2,6 +2,9 @@ import type { AiRecruitmentBriefPreview, RecruitWizardBudget, RecruitWizardScope
 import {
   buildLocalRecruitWizardShoot,
   composeRecruitWizardBriefText,
+  mergeRecruitWizardShoot,
+  recruitContentFormLabel,
+  recruitPlatformLabel,
 } from '../lib/aiAgentRecruitmentWizard'
 import {
   loadMerchantBriefProductPicks,
@@ -9,7 +12,7 @@ import {
   resolveMerchantBriefContext,
 } from '../lib/merchantBriefCatalog'
 import { inferIndustryVisualCategory } from '../lib/douyinProductImageAnchor'
-import { fetchIndustryProductTagsAi, generateThreeKolBriefs } from './recruitmentBriefAi'
+import { fetchIndustryProductTagsAi, generateRecruitWizardRequirementsAi } from './recruitmentBriefAi'
 
 const TAGS_AI_TIMEOUT_MS = 20_000
 const BRIEFS_AI_TIMEOUT_MS = 60_000
@@ -155,26 +158,31 @@ export async function buildAiRecruitmentBriefPreview(
   }
 }
 
-/** 第 1、2 步确认后再生成拍摄 Brief（先本地结构，再可选 AI 补钩子） */
+/** 第 1、2 步确认后再生成拍摄/合作要求（本地厚模板 + AI 填实） */
 export async function buildRecruitWizardShootPreview(
   scope: RecruitWizardScope,
   budget: RecruitWizardBudget,
   userBrief: string,
   assistantContent?: string,
 ): Promise<RecruitWizardShoot> {
-  const local = buildLocalRecruitWizardShoot(scope, budget)
   const ctx = resolveMerchantBriefContext()
+  const local = buildLocalRecruitWizardShoot(scope, budget, ctx.industryLabel)
   const catalog = loadMerchantBriefProductPicks(24)
   const hint = [userBrief, assistantContent].filter(Boolean).join('\n').slice(0, 3500)
-  const { main, secondary } = pickBriefMainAndSecondary(userBrief, catalog, hint)
+  const { main } = pickBriefMainAndSecondary(userBrief, catalog, hint)
   try {
-    const previews = await withTimeout(
-      generateThreeKolBriefs({
-        platformLabel: scope.platform === '小红书' ? '小红书' : '抖音来客',
+    const draft = await withTimeout(
+      generateRecruitWizardRequirementsAi({
+        platformLabel: recruitPlatformLabel(scope.platform),
         industry: ctx.industryLabel,
-        main: { ...main, name: scope.mainProductName || main.name },
-        secondary: secondary && secondary.id !== main.id ? secondary : null,
-        tags: [recruitContentFormHint(scope), scope.city, scope.storeName].filter(Boolean).slice(0, 8),
+        mainName: scope.mainProductName || main.name,
+        priceYuan: main.priceYuan,
+        contentFormLabel: recruitContentFormLabel(scope.contentForm),
+        city: scope.city,
+        storeName: scope.storeName || ctx.storeName,
+        budgetYuan: budget.budgetYuan,
+        headcount: budget.headcount,
+        commissionPct: budget.commissionPct,
         ctx: {
           storeName: scope.storeName || ctx.storeName,
           industryPath: ctx.industryPath,
@@ -183,34 +191,12 @@ export async function buildRecruitWizardShootPreview(
         planContext: hint,
       }),
       BRIEFS_AI_TIMEOUT_MS,
-      'Brief 文案生成',
+      '拍摄要求生成',
     )
-    const hooks: [string, string] = [
-      firstHookLine(previews[0]) || local.hooks[0],
-      firstHookLine(previews[1]) || local.hooks[1],
-    ]
-    const shoot: RecruitWizardShoot = {
-      ...local,
-      hooks,
-      briefText: '',
-    }
-    shoot.briefText = composeRecruitWizardBriefText(scope, budget, shoot)
-    return shoot
+    const merged = draft ? mergeRecruitWizardShoot(local, draft) : local
+    merged.briefText = composeRecruitWizardBriefText(scope, budget, merged)
+    return merged
   } catch {
     return local
   }
-}
-
-function recruitContentFormHint(scope: RecruitWizardScope): string {
-  if (scope.contentForm === 'talk') return '口播'
-  if (scope.contentForm === 'note') return '图文笔记'
-  return '到店探店'
-}
-
-function firstHookLine(text: string): string {
-  const line = text
-    .split('\n')
-    .map((s) => s.trim())
-    .find((s) => s.length >= 8 && s.length <= 80)
-  return line ?? ''
 }

@@ -150,3 +150,114 @@ ${sec ? `次推商品/服务：${sec.name}（${priceSec}）` : '无固定次推�
   }
   return splitThreeBriefs(r.description)
 }
+
+export type RecruitWizardRequirementDraft = {
+  goal?: string
+  audience?: string
+  sellingPoints?: string[]
+  storyAngle?: string
+  mustShoot?: string[]
+  talkTrack?: string[]
+  hooks?: [string, string]
+  durationHint?: string
+  deliverables?: string
+  convertAction?: string
+  storeCoop?: string
+  tabooItems?: string[]
+  hashtags?: string[]
+}
+
+function parseRequirementDraft(text: string): RecruitWizardRequirementDraft | null {
+  const t = text.trim()
+  const tryParse = (s: string): RecruitWizardRequirementDraft | null => {
+    try {
+      const j = JSON.parse(s) as Record<string, unknown>
+      if (!j || typeof j !== 'object') return null
+      const list = (v: unknown) =>
+        Array.isArray(v) ? v.map((x) => String(x).trim()).filter((x) => x.length >= 4) : []
+      const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
+      const hooksRaw = list(j.hooks)
+      return {
+        goal: str(j.goal),
+        audience: str(j.audience),
+        sellingPoints: list(j.sellingPoints),
+        storyAngle: str(j.storyAngle),
+        mustShoot: list(j.mustShoot),
+        talkTrack: list(j.talkTrack),
+        hooks:
+          hooksRaw.length >= 2
+            ? [hooksRaw[0]!, hooksRaw[1]!]
+            : undefined,
+        durationHint: str(j.durationHint),
+        deliverables: str(j.deliverables),
+        convertAction: str(j.convertAction),
+        storeCoop: str(j.storeCoop),
+        tabooItems: list(j.tabooItems),
+        hashtags: list(j.hashtags),
+      }
+    } catch {
+      return null
+    }
+  }
+  const direct = tryParse(t)
+  if (direct) return direct
+  const m = t.match(/\{[\s\S]*\}/)
+  return m ? tryParse(m[0]) : null
+}
+
+/** 达人招募确认第 3 步：生成可执行的拍摄/合作要求（JSON） */
+export async function generateRecruitWizardRequirementsAi(args: {
+  platformLabel: string
+  industry: string
+  mainName: string
+  priceYuan?: number
+  contentFormLabel: string
+  city?: string
+  storeName?: string
+  budgetYuan: number
+  headcount: number
+  commissionPct: number
+  ctx?: KolBriefGenerationContext
+  planContext?: string
+}): Promise<RecruitWizardRequirementDraft | null> {
+  const model = resolveTextAiModelForRequest() as AiModelId
+  const menuBlock = args.ctx?.menuSummary
+    ? `\n菜单/产品参考（要求须基于真实品项，勿虚构）：\n${args.ctx.menuSummary.slice(0, 1200)}`
+    : ''
+  const planBlock = args.planContext?.trim()
+    ? `\n方案原文（要求须呼应套餐、赠品与达人策略）：\n${args.planContext.trim().slice(0, 3500)}`
+    : ''
+  const titleDraft = `你是本地生活达人商务。请为达人写一份「合作拍摄要求」，给商家确认后发给达人执行。
+平台：${args.platformLabel}
+类目：${args.industry}${args.ctx?.industryPath && args.ctx.industryPath !== args.industry ? `（${args.ctx.industryPath}）` : ''}
+城市：${args.city || '按门店'}
+门店：${args.storeName || args.ctx?.storeName || '未填'}
+主推：${args.mainName}${args.priceYuan && args.priceYuan > 0 ? `（约 ¥${args.priceYuan}）` : ''}
+内容形式：${args.contentFormLabel}
+预算约 ¥${args.budgetYuan}，计划 ${args.headcount} 人，佣金 ${args.commissionPct}%
+${menuBlock}${planBlock}
+
+只输出一个 JSON 对象，不要 Markdown。字段：
+goal（推广目标，1～2句，写清要卖的团购/核销，不要空话「提升曝光」）
+audience（目标人群，1句）
+sellingPoints（数组，4～6条必讲卖点，每条15～40字，含具体体验/价格/场景）
+storyAngle（内容切入，2句）
+mustShoot（数组，6～8条必拍镜头，写清拍什么、为何要拍）
+talkTrack（数组，4～6条口播结构，按开场→体验→卖点→转化）
+hooks（数组，2条可直接念的口播钩子，各不超过40字）
+durationHint（时长与条数建议，1句）
+deliverables（交付物：几条视频、是否封面/图文、是否挂团购，1～2句）
+convertAction（转化动作，写清点哪里、引导什么）
+storeCoop（到店配合：是否必须到指定门店、是否含套餐体验、如何预约，2句）
+tabooItems（数组，4～6条禁忌，结合该类目合规）
+hashtags（数组，4～8个话题词，不要#号）
+禁止写成无关餐饮模板；禁止医疗疗效承诺。`
+  const r = await postDouyinGoodsAiAssist({
+    model,
+    action: 'operation_article',
+    product_name: `达人拍摄要求｜${args.mainName}`,
+    title_draft: titleDraft,
+  })
+  if (!r.ok || !r.description) return null
+  return parseRequirementDraft(r.description)
+}

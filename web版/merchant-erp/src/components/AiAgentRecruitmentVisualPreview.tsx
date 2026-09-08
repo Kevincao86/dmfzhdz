@@ -226,10 +226,34 @@ export function AiAgentRecruitmentVisualPreview({
             </div>
           ) : (
             <>
-              <Row label="必讲卖点" value={shoot.sellingPoints.join('；')} />
-              <Row label="必拍镜头" value={shoot.mustShoot.join('；')} />
-              <Row label="转化动作" value={shoot.convertAction} />
-              <Row label="禁忌" value={shoot.taboo} />
+              <ReqBlock title="推广目标" text={shoot.goal} />
+              <ReqBlock title="目标人群" text={shoot.audience} />
+              <ReqBlock title="内容切入" text={shoot.storyAngle} />
+              <ReqList title="必讲卖点" items={shoot.sellingPoints} />
+              <ReqList title="必拍镜头" items={shoot.mustShoot} />
+              <ReqList title="口播结构" items={shoot.talkTrack} />
+              <ReqBlock title="主钩子" text={shoot.hooks[0]} />
+              <ReqBlock title="备选钩子" text={shoot.hooks[1]} />
+              <ReqBlock title="时长建议" text={shoot.durationHint} />
+              <ReqBlock title="交付物" text={shoot.deliverables} />
+              <ReqBlock title="转化动作" text={shoot.convertAction} />
+              <ReqBlock title="到店配合" text={shoot.storeCoop} />
+              <ReqList
+                title="禁忌"
+                items={shoot.tabooItems?.length ? shoot.tabooItems : shoot.taboo ? [shoot.taboo] : []}
+              />
+              {shoot.hashtags?.length ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {shoot.hashtags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-800 ring-1 ring-violet-100"
+                    >
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="报名截止">
                   <input
@@ -256,8 +280,6 @@ export function AiAgentRecruitmentVisualPreview({
                   />
                 </Field>
               </div>
-              <Row label="口播钩子" value={shoot.hooks[0]} />
-              <Row label="备选钩子" value={shoot.hooks[1]} />
             </>
           )}
         </div>
@@ -274,6 +296,8 @@ export function AiAgentRecruitmentVisualPreview({
                 value={`报名至 ${shoot.applyDeadline}，成片至 ${shoot.deliverDeadline}`}
               />
               <Row label="形式" value={recruitContentFormLabel(scope.contentForm)} />
+              {shoot.deliverables ? <Row label="交付" value={shoot.deliverables} /> : null}
+              {shoot.convertAction ? <Row label="转化" value={shoot.convertAction} /> : null}
             </>
           ) : null}
           <p className="pt-1 text-[11px] text-slate-500">
@@ -296,6 +320,31 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       <span className="mb-1 block text-[10px] text-slate-500">{label}</span>
       {children}
     </label>
+  )
+}
+
+function ReqBlock({ title, text }: { title: string; text?: string }) {
+  if (!text?.trim()) return null
+  return (
+    <div>
+      <p className="text-[10px] font-medium text-slate-500">{title}</p>
+      <p className="mt-0.5 text-sm leading-relaxed text-slate-800">{text}</p>
+    </div>
+  )
+}
+
+function ReqList({ title, items }: { title: string; items?: string[] }) {
+  const list = (items ?? []).filter(Boolean)
+  if (!list.length) return null
+  return (
+    <div>
+      <p className="text-[10px] font-medium text-slate-500">{title}</p>
+      <ol className="mt-1 list-decimal space-y-1 pl-4 text-sm leading-relaxed text-slate-800">
+        {list.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ol>
+    </div>
   )
 }
 

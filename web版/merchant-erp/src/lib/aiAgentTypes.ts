@@ -153,13 +153,22 @@ export type RecruitWizardBudget = {
 }
 
 export type RecruitWizardShoot = {
+  goal: string
+  audience: string
   sellingPoints: string[]
+  storyAngle: string
   mustShoot: string[]
+  talkTrack: string[]
+  hooks: [string, string]
+  durationHint: string
+  deliverables: string
   convertAction: string
+  storeCoop: string
   taboo: string
+  tabooItems: string[]
+  hashtags: string[]
   applyDeadline: string
   deliverDeadline: string
-  hooks: [string, string]
   briefText: string
 }
 
