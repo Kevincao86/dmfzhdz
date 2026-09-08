@@ -48,7 +48,7 @@ import { cn } from '../cn'
 import { MpAddonPointsRateBadge } from '../components/MpAddonPointsRateBadge'
 import { MembershipMediaLockedBanner, useMembership } from '../context/MembershipContext'
 import { fetchImageBlob } from '../lib/aiImageDelivery'
-import { processCustomAvatarFile } from '../lib/digitalHumanCustomMedia'
+import { compressPortraitDataUrlForLibrary, processCustomAvatarFile } from '../lib/digitalHumanCustomMedia'
 import { probeVideoDurationSec } from '../lib/digitalHumanSubtitle'
 import { readMpSessionToken } from '../lib/merchantApiAuth'
 import { extractVideoFirstFramePureBase64 } from '../lib/videoFrameUtils'
@@ -1426,6 +1426,18 @@ function blobToDramaDataUrl(blob: Blob): Promise<string> {
   })
 }
 
+async function resolveDramaPortraitDataUrl(src: string): Promise<string | null> {
+  const t = String(src || '').trim()
+  if (!t) return null
+  if (t.startsWith('data:image/')) return t
+  if (/^https?:\/\//i.test(t)) {
+    const blob = await fetchImageBlob(t)
+    return blobToDramaDataUrl(blob)
+  }
+  const asData = toDramaImageDataUrl(t)
+  return asData.startsWith('data:image/') ? asData : null
+}
+
 function isSeedance15ProModelId(id: string): boolean {
   const t = String(id || '').trim()
   return t === SEEDANCE_1_5_PRO_MODEL_ID || /seedance-1-5-pro/i.test(t) || /seedance-1\.5-pro/i.test(t)
@@ -1608,8 +1620,9 @@ export default function ShortDramaPage() {
 
   const enrichCharacterPortrait = async () => {
     const hintText = characterDesc.trim() || roles.trim()
-    if (!hintText) {
-      setErr('请先填写简要提示，例如「足浴店女技师，25-28岁」')
+    const rawPortraitSrc = (characterDraft || characterPreview || '').trim()
+    if (!hintText && !rawPortraitSrc) {
+      setErr('请先填写简要提示，或上传角色照片后再点「AI补充画像」')
       setHint(null)
       return
     }
@@ -1619,25 +1632,51 @@ export default function ShortDramaPage() {
     const shopLines = world.fields
       .map((f) => `${f.label}：${String(shop[f.key] ?? '').trim() || '未填'}`)
       .join('\n')
-    const user = [
-      `场景：${world.label} / ${scene.name}`,
-      `画风：${style.name}${style.visual ? `（${style.visual}）` : ''}`,
-      shopLines,
-      roles.trim() ? `角色身份：${roles.trim()}` : '',
-      story.trim() ? `一句话故事：${story.trim()}` : '',
-      `商家简要提示：${hintText}`,
-      '请把简要提示补成一段可直接用于文生图的角色形象词。',
-      '必须覆盖：性别、年龄段、国籍/族裔外观、发型发色、五官气质、妆容、职业相关衣着与配饰、体态、镜头（半身面对镜头）。',
-      '未给出的项按职业与场景合理补全，不要留空、不要反问。衣着必须符合职业场景（如足浴技师、餐饮服务员）。',
-      '只输出 JSON：{"portrait":"..."}，portrait 为一段中文、80–180 字，不要 markdown、不要解释。',
-    ]
-      .filter(Boolean)
-      .join('\n')
-    const system =
-      '你是商业短视频角色造型指导。根据简要提示补全写实竖屏人像的角色形象词，具体到国籍外观、衣着面料颜色与配饰。不要写技术参数，不要出现字幕、水印、Logo、多人。'
     try {
+      let imageDataUrl: string | null = null
+      if (rawPortraitSrc) {
+        const resolved = await resolveDramaPortraitDataUrl(rawPortraitSrc)
+        imageDataUrl = resolved ? await compressPortraitDataUrlForLibrary(resolved) : null
+      }
+      const fromImage = Boolean(imageDataUrl)
+      if (!fromImage && !hintText) {
+        setErr('请先填写简要提示，或上传角色照片后再点「AI补充画像」')
+        return
+      }
+      const user = fromImage
+        ? [
+            `场景：${world.label} / ${scene.name}`,
+            `画风：${style.name}${style.visual ? `（${style.visual}）` : ''}`,
+            shopLines,
+            roles.trim() ? `角色身份：${roles.trim()}` : '',
+            story.trim() ? `一句话故事：${story.trim()}` : '',
+            hintText ? `商家文字提示（仅补职业/年龄/身份，外貌以参考图为准）：${hintText}` : '',
+            '请根据参考图重写角色形象词。图中可见的发型、发色、五官、妆容、衣着颜色与款式必须保留，不要另造一张脸。',
+            '必须覆盖：性别、年龄段、国籍/族裔外观、发型发色、五官气质、妆容、衣着与配饰、体态、镜头。',
+            '只输出 JSON：{"portrait":"..."}，portrait 为一段中文、80–180 字，不要 markdown、不要解释。',
+          ]
+            .filter(Boolean)
+            .join('\n')
+        : [
+            `场景：${world.label} / ${scene.name}`,
+            `画风：${style.name}${style.visual ? `（${style.visual}）` : ''}`,
+            shopLines,
+            roles.trim() ? `角色身份：${roles.trim()}` : '',
+            story.trim() ? `一句话故事：${story.trim()}` : '',
+            `商家简要提示：${hintText}`,
+            '请把简要提示补成一段可直接用于文生图的角色形象词。',
+            '必须覆盖：性别、年龄段、国籍/族裔外观、发型发色、五官气质、妆容、职业相关衣着与配饰、体态、镜头（半身面对镜头）。',
+            '未给出的项按职业与场景合理补全，不要留空、不要反问。衣着必须符合职业场景（如足浴技师、餐饮服务员）。',
+            '只输出 JSON：{"portrait":"..."}，portrait 为一段中文、80–180 字，不要 markdown、不要解释。',
+          ]
+            .filter(Boolean)
+            .join('\n')
+      const system = fromImage
+        ? '你是商业短视频角色造型指导。必须根据参考图如实描述图中人物，不要编造图中看不到的五官或换一套衣服。商家文字只用于补职业与年龄。不要写技术参数，不要出现字幕、水印、Logo、多人。'
+        : '你是商业短视频角色造型指导。根据简要提示补全写实竖屏人像的角色形象词，具体到国籍外观、衣着面料颜色与配饰。不要写技术参数，不要出现字幕、水印、Logo、多人。'
+      const providers = fromImage ? (['qwen', 'doubao'] as const) : (['doubao', 'qwen'] as const)
       let lastErr = '补充画像失败，请稍后重试'
-      for (const provider of ['doubao', 'qwen'] as const) {
+      for (const provider of providers) {
         try {
           const res = await postAiChat({
             provider,
@@ -1645,7 +1684,8 @@ export default function ShortDramaPage() {
               { role: 'system', content: system },
               { role: 'user', content: user },
             ],
-            temperature: 0.6,
+            ...(imageDataUrl ? { imageDataUrls: [imageDataUrl] } : {}),
+            temperature: fromImage ? 0.35 : 0.6,
           })
           const portrait = parseDramaCharacterPortraitAi(res.content ?? '')
           if (!portrait) {
@@ -1654,7 +1694,16 @@ export default function ShortDramaPage() {
           }
           if (!mountedRef.current) return
           setCharacterDesc(portrait)
-          setHint('已补全角色形象词，可再微调后点「生成预览」。')
+          const imageAlreadyConfirmed = Boolean(
+            characterPreview && (!characterDraft || characterDraft === characterPreview),
+          )
+          setHint(
+            fromImage
+              ? imageAlreadyConfirmed
+                ? '已按参考图重写角色形象词。当前照片已确认，生成短剧将按此融合。'
+                : '已按参考图重写角色形象词。可点「用此图确认角色」，或再生成预览。'
+              : '已补全角色形象词，可再微调后点「生成预览」。',
+          )
           setErr(null)
           return
         } catch (e) {
@@ -1662,6 +1711,8 @@ export default function ShortDramaPage() {
         }
       }
       if (mountedRef.current) setErr(lastErr)
+    } catch (e) {
+      if (mountedRef.current) setErr(e instanceof Error ? e.message : '补充画像失败')
     } finally {
       if (mountedRef.current) setPortraitBusy(false)
     }
@@ -1807,7 +1858,7 @@ export default function ShortDramaPage() {
       setCharacterDraft(dataUrl)
       setCharacterPreview(null)
       clearTrial()
-      setHint('请点「确认」后，生成短剧才会按此角色形象融合。')
+      setHint('请点「用此图确认角色」后，生成短剧才会按此角色形象融合。')
     } catch (e) {
       setErr(e instanceof Error ? e.message : '角色形象生成失败')
     } finally {
@@ -2709,11 +2760,17 @@ export default function ShortDramaPage() {
                       ) : (
                         <Sparkles className="h-3.5 w-3.5" />
                       )}
-                      {portraitBusy ? '正在补充画像' : 'AI补充画像'}
+                      {portraitBusy
+                        ? characterShowUrl
+                          ? '正在按图重写'
+                          : '正在补充画像'
+                        : characterShowUrl
+                          ? '按图重写画像'
+                          : 'AI补充画像'}
                     </button>
                   </span>
                   <p className="text-[11px] leading-relaxed text-slate-500">
-                    可先写简要提示（职业、年龄等），点「AI补充画像」补全国籍、衣着、发型；再生成预览或直接上传照片。
+                    可先写简要提示再补词；已有照片时点「AI补充画像」会按图重写描述。上传照片会直接确认角色，生成短剧按此融合。
                   </p>
                   <textarea
                     className={cn(fieldCls, 'min-h-[88px] resize-y')}
@@ -2749,17 +2806,17 @@ export default function ShortDramaPage() {
                       onClick={() => characterInputRef.current?.click()}
                       className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-50"
                     >
-                      上传照片
+                      上传照片并确认
                     </button>
                     {characterShowUrl && !characterConfirmed ? (
                       <button
                         type="button"
-                        disabled={busy || characterBusy}
+                        disabled={busy || characterBusy || portraitBusy}
                         onClick={confirmCharacterPreview}
                         className="inline-flex items-center gap-1 rounded-lg bg-cyan-700 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-cyan-800 disabled:opacity-50"
                       >
                         <Check className="h-3.5 w-3.5" />
-                        确认
+                        用此图确认角色
                       </button>
                     ) : null}
                   </div>
@@ -2782,7 +2839,7 @@ export default function ShortDramaPage() {
                             onClick={confirmCharacterPreview}
                             className="rounded-full bg-cyan-700 px-2 py-0.5 text-[10px] text-white disabled:opacity-40"
                           >
-                            确认
+                            用此图确认
                           </button>
                         )}
                         <button
@@ -2806,7 +2863,7 @@ export default function ShortDramaPage() {
                         ? '正在生成角色预览…'
                         : portraitBusy
                           ? '正在补充角色画像…'
-                          : '先写简要提示，点「AI补充画像」后再生成预览'}
+                          : '可写提示补词，或上传照片直接确认角色'}
                     </div>
                   )}
                 </div>
