@@ -1648,15 +1648,32 @@ function humanizeDramaImageError(raw: string): string {
     return '角色图拉取失败：成图地址浏览器跨域读不到。请再点一次生成预览。'
   }
   if (/TokenMix 成图完成但国内无法拉取|代拉 TokenMix/i.test(t)) {
-    return 'GPT 成图国内暂时拉不下来，请再点一次生成预览（不会改走豆包）。'
+    return '成图国内暂时拉不下来，请再点一次生成预览。'
   }
   if (/sensitive information|output image may contain|内容安全|敏感信息|safety/i.test(t)) {
-    return '生图未通过内容审核。请换一张更偏定妆的参考图，或把形象词改短后再试 GPT。'
+    return '该模型未通过内容审核，正在改试其它生图模型。'
   }
   if (/image_generation_failed/i.test(t)) {
-    return t.replace(/^image_generation_failed\s*[—–-]\s*/i, '') || 'GPT 生图失败，请再试一次'
+    return t.replace(/^image_generation_failed\s*[—–-]\s*/i, '') || '生图失败，正在改试其它模型'
   }
   return t || '角色形象生成失败，请稍后重试'
+}
+
+function dramaImageModelLabel(input: {
+  channel?: string
+  vendorUsed?: string
+  displayModel?: string
+  fallback: string
+}): string {
+  const dm = String(input.displayModel || '').trim()
+  if (/gpt-image/i.test(dm)) return 'GPT Image'
+  if (/dall-e/i.test(dm)) return 'DALL·E'
+  if (dm) return dm
+  if (input.vendorUsed === 'qwen') return '通义万相'
+  if (input.vendorUsed === 'doubao') return '豆包 Seedream'
+  if (input.vendorUsed === 'minimax') return 'MiniMax'
+  if (input.channel === 'tokenmix') return 'GPT Image'
+  return input.fallback
 }
 
 function blobToDramaDataUrl(blob: Blob): Promise<string> {
@@ -2234,76 +2251,135 @@ export default function ShortDramaPage() {
         setErr('请先写形象描述或上传参考图')
         return
       }
-      const shortHint = desc.length > 0 && desc.length <= 48 ? desc : ''
-      const buildPrompt = (safe: boolean) =>
-        refData
-          ? (safe
-              ? [
-                  'Image-to-image: professional half-body portrait of the same person in the attached photo.',
-                  'Keep the same face, hairstyle, hair color, skin, body shape and clothing. Do not invent another face.',
-                  'Cinematic studio lighting, commercial film still, single person, SFW.',
-                  'No extra people, no text, no watermark, no collage.',
-                ]
-              : [
-                  'Image-to-image: build a similar portrait from the attached reference.',
-                  'Keep the same person: face, hairstyle, hair color, skin, body shape. Do not invent another face.',
-                  'If the reference is a short-video screenshot, crop to the front person only and remove app UI, icons, captions, status bar and bystanders.',
-                  'Output a clean vertical half-body short-drama key art, cinematic studio light, commercial film still, not a documentary photograph or ID photo.',
-                  roleHint ? `Role: ${roleHint}.` : '',
-                  shortHint ? `Optional occupation/age hint only: ${shortHint}.` : '',
-                  'Clothing: prefer the outfit in the reference photo. Do not replace it with an unrelated cafe / linen-shirt look.',
-                  'No subtitles, watermarks, logos, collage, or extra people.',
-                ]
-            )
-              .filter(Boolean)
-              .join(' ')
-          : (safe
-              ? [
-                  '竖屏半身商业定妆写真，单人，正面或微侧，五官清晰，电影棚拍光。',
-                  `角色：${roleHint || '主角'}。`,
-                  desc ? `外观：${desc}。` : '',
-                  '禁止字幕、水印、多人、拼贴。SFW。',
-                ]
-              : [
-                  '竖屏半身短剧定妆，单人，正面或微侧，五官清晰，电影棚拍光，商业广告质感；不要证件照、不要新闻纪实超写实抓拍。',
-                  `角色身份：${roleHint || '主角'}。`,
-                  `外貌与穿搭：${desc}。`,
-                  `气质贴近「${scene.name}」${style.visual ? `，${style.visual}` : ''}。`,
-                  '禁止字幕、水印、Logo、多人、拼贴和海报排版。',
-                ]
-            )
-              .filter(Boolean)
-              .join('')
-      const runGptOnce = async (prompt: string) => {
-        if (refData) {
-          return postAiAgentNativeImage(prompt, {
-            exactPrompt: true,
-            aspectRatio: '3:4',
-            imageRoute: 'tokenmix',
-            tokenmixImageModel: 'gpt-image-2',
-            wanxSize: '1024x1536',
-            referenceImageDataUrl: refData,
-          })
+      const similarPrompt = [
+        '图生图：必须与参考图为同一人，同一张脸、同一发型发色、同一套衣服和体态，禁止换脸或另造人物。',
+        '去掉短视频界面图标、字幕、水印和路人，只保留画面中的主角。',
+        '输出竖屏半身短剧定妆，电影棚拍光，商业广告质感，单人，禁止文字。',
+      ].join('')
+      const wordPrompt = [
+        '竖屏半身短剧定妆，单人，正面或微侧，五官清晰，电影棚拍光，商业广告质感；不要证件照。',
+        `角色身份：${roleHint || '主角'}。`,
+        desc ? `外貌与穿搭：${desc}。` : '',
+        `气质贴近「${scene.name}」${style.visual ? `，${style.visual}` : ''}。`,
+        '禁止字幕、水印、Logo、多人、拼贴和海报排版。',
+      ]
+        .filter(Boolean)
+        .join('')
+      const prompt = refData ? similarPrompt : wordPrompt
+      const common = {
+        exactPrompt: true as const,
+        aspectRatio: '3:4' as const,
+        wanxSize: '1024x1536',
+        ...(refData ? { referenceImageDataUrl: refData } : {}),
+      }
+      const attempts: Array<{
+        label: string
+        run: () => ReturnType<typeof postAiAgentNativeImage> | ReturnType<typeof generateVisualStudioGptImage>
+      }> = refData
+        ? [
+            {
+              label: 'GPT Image 2',
+              run: () =>
+                postAiAgentNativeImage(prompt, {
+                  ...common,
+                  imageRoute: 'tokenmix',
+                  tokenmixImageModel: 'gpt-image-2',
+                }),
+            },
+            {
+              label: '通义万相',
+              run: () =>
+                postAiAgentNativeImage(prompt, {
+                  ...common,
+                  preferredVendor: 'qwen',
+                  preferredModelId: 'wan2.7-image-pro',
+                }),
+            },
+            {
+              label: '豆包 Seedream',
+              run: () =>
+                postAiAgentNativeImage(prompt, {
+                  ...common,
+                  preferredVendor: 'doubao',
+                  doubaoSize: '2K',
+                }),
+            },
+            {
+              label: 'GPT Image 1',
+              run: () =>
+                postAiAgentNativeImage(prompt, {
+                  ...common,
+                  imageRoute: 'tokenmix',
+                  tokenmixImageModel: 'gpt-image-1',
+                }),
+            },
+          ]
+        : [
+            {
+              label: 'GPT Image 2',
+              run: () =>
+                generateVisualStudioGptImage({
+                  prompt,
+                  wanxSize: '1024x1536',
+                  onProgress: (msg) => {
+                    if (mountedRef.current) setHint(msg)
+                  },
+                }),
+            },
+            {
+              label: '通义万相',
+              run: () => postAiAgentNativeImage(prompt, { ...common, preferredVendor: 'qwen' }),
+            },
+            {
+              label: '豆包 Seedream',
+              run: () =>
+                postAiAgentNativeImage(prompt, { ...common, preferredVendor: 'doubao', doubaoSize: '2K' }),
+            },
+            {
+              label: 'MiniMax',
+              run: () => postAiAgentNativeImage(prompt, { ...common, preferredVendor: 'minimax' }),
+            },
+          ]
+      let res:
+        | Awaited<ReturnType<typeof postAiAgentNativeImage>>
+        | Awaited<ReturnType<typeof generateVisualStudioGptImage>>
+        | null = null
+      const tried: string[] = []
+      let lastErr = ''
+      for (const attempt of attempts) {
+        if (!mountedRef.current) return
+        tried.push(attempt.label)
+        setHint(
+          refData
+            ? `正在用${attempt.label}按参考图生成相似画像（${tried.length}/${attempts.length}）…`
+            : `正在用${attempt.label}按形象词生成预览（${tried.length}/${attempts.length}）…`,
+        )
+        try {
+          const once = await attempt.run()
+          if (once.ok) {
+            res = once
+            break
+          }
+          lastErr = once.message
+          setHint(`${attempt.label}未出图，改试下一个模型…`)
+        } catch (e) {
+          lastErr = e instanceof Error ? e.message : String(e)
+          setHint(`${attempt.label}未出图，改试下一个模型…`)
         }
-        return generateVisualStudioGptImage({
-          prompt,
-          wanxSize: '1024x1536',
-          onProgress: (msg) => {
-            if (mountedRef.current) setHint(msg)
-          },
-        })
       }
-      setHint(refData ? '正在按参考图用 GPT Image 生成相似画像…' : '正在按形象词用 GPT Image 生成预览…')
-      let res = await runGptOnce(buildPrompt(false))
-      if (!res.ok) {
-        setHint('GPT 第一次未出图，正在用更稳的提示词再试一次…')
-        res = await runGptOnce(buildPrompt(true))
-      }
-      if (!res.ok) {
-        setErr(humanizeDramaImageError(res.message) || '角色形象生成失败，请稍后重试')
+      if (!res || !res.ok) {
+        setErr(
+          `已依次尝试 ${tried.join('、')}，均未生成相似图。${humanizeDramaImageError(lastErr)}`,
+        )
         setHint(null)
         return
       }
+      const usedLabel = dramaImageModelLabel({
+        channel: 'channel' in res ? res.channel : undefined,
+        vendorUsed: 'vendorUsed' in res ? res.vendorUsed : undefined,
+        displayModel: 'displayModel' in res ? res.displayModel : undefined,
+        fallback: tried[tried.length - 1] || '生图模型',
+      })
       let dataUrl = res.imageUrl.trim()
       if (!dataUrl.startsWith('data:')) {
         const blob = await fetchImageBlob(dataUrl)
@@ -2315,8 +2391,8 @@ export default function ShortDramaPage() {
       clearTrial()
       setHint(
         refData
-          ? `已为${member.name}按参考图生成相似画像。请点「用此图确认角色」后才会融合进短剧。`
-          : `已为${member.name}按形象词生成预览。请点「用此图确认角色」后才会融合进短剧。`,
+          ? `已用${usedLabel}为${member.name}按参考图生成相似画像。请点「用此图确认角色」后才会融合进短剧。`
+          : `已用${usedLabel}为${member.name}按形象词生成预览。请点「用此图确认角色」后才会融合进短剧。`,
       )
     } catch (e) {
       setErr(humanizeDramaImageError(e instanceof Error ? e.message : '角色形象生成失败'))
