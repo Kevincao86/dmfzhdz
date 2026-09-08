@@ -1976,6 +1976,36 @@ export default function ShortDramaPage() {
     [cast, refItems],
   )
 
+  const prepareDramaModelImages = useCallback(
+    async (continueFrame?: string) => {
+      const out: string[] = []
+      const confirmed = cast.filter((m) => String(m.preview || '').trim())
+      for (const m of confirmed) {
+        const resolved = await resolveDramaPortraitDataUrl(m.preview!)
+        if (!resolved?.startsWith('data:image/')) continue
+        out.push(await compressPortraitDataUrlForLibrary(resolved))
+      }
+      if (confirmed.length > 0 && out.length === 0) {
+        throw new Error('已确认的角色形象未能编码成图片，无法提交给模型。请重新上传角色照片后再生成。')
+      }
+      const contRaw = String(continueFrame ?? '').trim()
+      if (contRaw) {
+        const asData = /^https?:\/\//i.test(contRaw)
+          ? await resolveDramaPortraitDataUrl(contRaw)
+          : toDramaImageDataUrl(contRaw)
+        if (asData?.startsWith('data:image/')) out.push(await compressPortraitDataUrlForLibrary(asData))
+      }
+      for (const item of refItems) {
+        const raw = String(item.imageDataUrl || '').trim()
+        if (!raw) continue
+        const u = /^https?:\/\//i.test(raw) ? await resolveDramaPortraitDataUrl(raw) : toDramaImageDataUrl(raw)
+        if (u?.startsWith('data:image/')) out.push(await compressPortraitDataUrlForLibrary(u))
+      }
+      return [...new Set(out)].slice(0, DRAMA_R2V_MAX_IMAGES)
+    },
+    [cast, refItems],
+  )
+
   const fusionPromptNote = useMemo(() => {
     const bits: string[] = []
     const confirmed = cast.filter((m) => m.preview)
@@ -2062,11 +2092,11 @@ export default function ShortDramaPage() {
     setErr(null)
     try {
       const url = await processCustomAvatarFile(file)
-      patchCast(member.id, { sourceUrl: url, draft: url, preview: null })
+      patchCast(member.id, { sourceUrl: url, draft: url, preview: url })
       setActiveCastId(member.id)
       clearTrial()
       setHint(
-        `已为${member.name}添加参考图。可点「AI补充画像」按图写词，或点「生成预览」生成相似画像；要用原图直接拍短剧，再点「用此图确认角色」。`,
+        `已为${member.name}确认角色照片。生成短剧会把这张图作为首帧交给模型，不再按文案另画一张脸。`,
       )
     } catch (e) {
       setErr(e instanceof Error ? e.message : '角色形象读取失败')
@@ -2290,8 +2320,18 @@ export default function ShortDramaPage() {
     onProgress?: (t: string) => void
   }) => {
     const imgs = (opts.images_base64 ?? []).map((s) => String(s).trim()).filter(Boolean)
+    if (cast.some((m) => m.preview) && imgs.length === 0) {
+      return {
+        ok: false as const,
+        message: '已确认角色形象，但提交时没有带上照片。请重新上传角色图后再生成。',
+      }
+    }
     const identity = buildDramaIdentityLock(cast, roles)
     const prompt = [identity, opts.prompt, fusionPromptNote].filter(Boolean).join('\n')
+    if (imgs.length > 0) {
+      const kb = Math.max(1, Math.round(imgs.reduce((n, s) => n + s.length, 0) / 1370))
+      opts.onProgress?.(`已带入角色首帧 ${imgs.length} 张（约 ${kb}KB），提交图生…`)
+    }
     if (dramaJimengPhotoReady(cfg) && imgs.length > 0) {
       const xyq = await runXiaoyunqueVideoJob({
         prompt,
@@ -2302,9 +2342,13 @@ export default function ShortDramaPage() {
         onProgress: opts.onProgress,
       })
       if (xyq.ok) {
-        return { ok: true as const, videoUrl: xyq.videoUrl, modelUsed: xyq.modelUsed, engineUsed: 'seedance' as const }
+        if (/jimeng_ti2v|jimeng_i2v|jimeng_vgfm_i2v/i.test(String(xyq.modelUsed || ''))) {
+          return { ok: true as const, videoUrl: xyq.videoUrl, modelUsed: xyq.modelUsed, engineUsed: 'seedance' as const }
+        }
+        opts.onProgress?.('即梦未带上角色图，改用 Seedance 首帧图生（不改文生换脸）…')
+      } else {
+        opts.onProgress?.(`即梦图生未成功，改用 Seedance 首帧图生（不改文生换脸）…（${formatVideoAiUserError(xyq.message).slice(0, 80)}）`)
       }
-      opts.onProgress?.(`即梦图生未成功，改用 Seedance 首帧图生（不改文生换脸）…（${formatVideoAiUserError(xyq.message).slice(0, 80)}）`)
     }
     /** 无角色图，或即梦未开通/失败时，才走方舟 Seedance；有角色图时禁止文生换脸 */
     const mode = opts.seedance_image_mode ?? (imgs.length ? 'first_only' : 'auto')
@@ -2378,7 +2422,7 @@ export default function ShortDramaPage() {
       .filter(Boolean)
       .join('\n')
 
-    const fusionImgs = collectFusionImages()
+    const fusionImgs = await prepareDramaModelImages()
     if (fusionImgs.length > 0) {
       setProgress(
         dramaJimengPhotoReady(cfg)
@@ -2387,7 +2431,7 @@ export default function ShortDramaPage() {
       )
     }
 
-    if (dramaJimengPhotoReady(cfg) && fusionImgs.length > 0) {
+    if (dramaJimengPhotoReady(cfg) && fusionImgs.length > 0 && total <= 12) {
       setProgress(`即梦图生全片（${fusionImgs.length} 张参考图，约 ${total} 秒）…`)
       const xyq = await runXiaoyunqueVideoJob({
         prompt: xyqPrompt,
@@ -2399,7 +2443,7 @@ export default function ShortDramaPage() {
           if (mountedRef.current) setProgress(t)
         },
       })
-      if (xyq.ok) {
+      if (xyq.ok && /jimeng_ti2v|jimeng_i2v|jimeng_vgfm_i2v/i.test(String(xyq.modelUsed || ''))) {
         await finishAsWork({
           billId,
           videoUrlOrBlob: xyq.videoUrl,
@@ -2409,7 +2453,7 @@ export default function ShortDramaPage() {
         })
         return
       }
-      setProgress(`即梦图生失败，改用 Seedance 分段拼接兜底…（${formatVideoAiUserError(xyq.message).slice(0, 80)}）`)
+      setProgress(`即梦图生失败，改用 Seedance 分段图生…（${formatVideoAiUserError(xyq.ok ? '角色图未进入即梦' : xyq.message).slice(0, 80)}）`)
     }
 
     if (dramaXiaoyunqueReady(cfg) && fusionImgs.length === 0) {
@@ -2450,9 +2494,9 @@ export default function ShortDramaPage() {
       if (i > 0 && prevUrl) {
         setProgress(`全片 ${i + 1}/${plan.length} · 截取上一段尾帧衔接`)
         const frame = await postVideoLastFrameFromUrl(prevUrl, { frame: 'last', timeoutMs: 20_000 })
-        images = collectFusionImages(frame.ok ? frame.pureBase64 : undefined)
+        images = await prepareDramaModelImages(frame.ok ? frame.pureBase64 : undefined)
       } else {
-        images = collectFusionImages()
+        images = await prepareDramaModelImages()
       }
       if (!images.length) images = undefined
       const prompt = buildSegmentPrompt({
@@ -2515,12 +2559,13 @@ export default function ShortDramaPage() {
 
     try {
       if (!showPreviewGate) {
-        setProgress(collectFusionImages().length ? '正在按参考画面与角色形象融合生成' : '正在提交短剧生成')
+        const fusionImgs = await prepareDramaModelImages()
+        setProgress(fusionImgs.length ? '正在按参考画面与角色形象融合生成' : '正在提交短剧生成')
         const prompt = `${metaPrompt}\n时长约 ${durationSec} 秒，竖屏 9:16 单段直出。结构：${formula.beats.join(' → ')}。`
         const r = await runOneClip({
           prompt,
           durationSec,
-          images_base64: collectFusionImages(),
+          images_base64: fusionImgs,
           onProgress: (t) => {
             if (mountedRef.current) setProgress(t)
           },
@@ -2558,7 +2603,7 @@ export default function ShortDramaPage() {
       const r = await runOneClip({
         prompt: previewPrompt,
         durationSec: PREVIEW_SEC,
-        images_base64: collectFusionImages(),
+        images_base64: await prepareDramaModelImages(),
         onProgress: (t) => {
           if (mountedRef.current) setProgress(`试镜 · ${t}`)
         },

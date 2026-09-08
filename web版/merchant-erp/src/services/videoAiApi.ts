@@ -1722,6 +1722,12 @@ export async function runXiaoyunqueVideoJob(opts: {
     images_base64: imgs.length ? imgs : undefined,
   })
   if (!start.ok) return { ok: false, message: formatVideoAiUserError(start.message) }
+  if (imgs.length > 0 && !/jimeng_ti2v|jimeng_i2v|jimeng_vgfm_i2v/i.test(String(start.modelUsed || ''))) {
+    return {
+      ok: false,
+      message: `角色照片未进入图生模型（当前 ${start.modelUsed || '未知'}）。未采用无参考成片，以免换脸。`,
+    }
+  }
 
   /** Agent 长片可能远超 Seedance 单段，放宽轮询：约 4×时长 + 10 分钟，封顶 45 分钟 */
   const pollMs = 5000

@@ -24,10 +24,11 @@ const XYQ_REQ_KEY_NOREF = 'pippit_iv2v_v20_cvtob'
 const XYQ_REQ_KEY_REF = 'pippit_iv2v_v20_cvtob_with_vinput'
 /** 即梦视频生成 3.0 Pro：上传照片图生，不走方舟 Seedance 真人库拦截 */
 const JIMENG_I2V_REQ_KEY = 'jimeng_ti2v_v30_pro'
+const JIMENG_I2V_REQ_KEY_FALLBACK = 'jimeng_ti2v_v30'
 
 const NOREF_KEYS = [XYQ_REQ_KEY_NOREF]
 const REF_KEYS = [XYQ_REQ_KEY_REF]
-const JIMENG_I2V_KEYS = [JIMENG_I2V_REQ_KEY]
+const JIMENG_I2V_KEYS = [JIMENG_I2V_REQ_KEY, JIMENG_I2V_REQ_KEY_FALLBACK]
 
 export function isXiaoyunqueConfigured(env: MerchantAiEnv): boolean {
   return Boolean(resolveVolcVisualCredentials(env))
@@ -121,9 +122,21 @@ function reqKeyAttempts(
   const customKey = (env.MERCHANT_AI_XIAOYUNQUE_REQ_KEY ?? '').trim()
   const customAction = (env.MERCHANT_AI_XIAOYUNQUE_SUBMIT_ACTION ?? '').trim()
   const customGet = (env.MERCHANT_AI_XIAOYUNQUE_GET_ACTION ?? '').trim()
+  /** 有角色图时禁止落到小云雀无参考 Agent：它会丢掉照片、按文案另生成一张脸 */
+  if (hasImageRef && !hasVideoRef) {
+    const jimengKeys = [...JIMENG_I2V_KEYS]
+    if (customKey && isJimengI2vReqKey(customKey) && !jimengKeys.includes(customKey)) {
+      jimengKeys.unshift(customKey)
+    }
+    return jimengKeys.map((reqKey) => ({
+      action: XYQ_SUBMIT_ACTION,
+      version: XYQ_VERSION,
+      reqKey,
+      getAction: XYQ_GET_ACTION,
+    }))
+  }
   const pippitKeys = hasVideoRef ? [...REF_KEYS, ...NOREF_KEYS] : [...NOREF_KEYS]
-  const keys = hasImageRef && !hasVideoRef ? [...JIMENG_I2V_KEYS, ...pippitKeys] : pippitKeys
-  const base = keys.map((reqKey) => ({
+  const base = pippitKeys.map((reqKey) => ({
     action: XYQ_SUBMIT_ACTION,
     version: XYQ_VERSION,
     reqKey,
@@ -513,6 +526,14 @@ export async function volcSubmitXiaoyunqueTask(
       ok: true,
       taskId: encodeTaskToken(attempt.reqKey, attempt.getAction, rawId),
       reqKey: attempt.reqKey,
+    }
+  }
+  if (hasImageRef && !hasVideoRef) {
+    return {
+      ok: false,
+      message:
+        humanizeXiaoyunqueError(errors.slice(0, 3).join('；')) ||
+        '即梦图生未成功，未改用无参考成片（否则会丢掉角色照片）。',
     }
   }
   return {
