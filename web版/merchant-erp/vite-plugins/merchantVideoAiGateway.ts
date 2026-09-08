@@ -246,7 +246,19 @@ function arkCreateTaskHttpStatus(upstreamStatus?: number): number {
   return 400
 }
 
+function isArkRealPersonImageBlock(msg: string): boolean {
+  return /may contain real person|contain real person|input image.*real person|真实人|真人肖像|人脸.*不允许/i.test(
+    String(msg ?? ''),
+  )
+}
+
 function arkCreateTaskUserMessage(msg: string, endpointId: string, upstreamStatus?: number): string {
+  if (isArkRealPersonImageBlock(msg)) {
+    return (
+      '参考图被火山判定可能含真人，付费 Seedance 无法用这张图生成视频。' +
+      '请换一张偏插画、非写实的角色图，或去掉角色参考后再试。'
+    )
+  }
   if (looksLikeArkPlaceholderEndpointId(endpointId)) {
     return `视频推理接入点「${endpointId}」为占位示例，不可用。请到运营管控台「AI模型 → 短视频 API」或 Vercel 环境变量 MERCHANT_AI_ARK_VIDEO_ENDPOINTS 填写火山方舟控制台真实的 ep- 接入点（形如 ep-2024xxxxxxxx）。`
   }
@@ -1740,6 +1752,8 @@ async function arkCreateVideoTask(
 > {
   const skipQwen =
     body.skip_qwen === true || String(body.skip_qwen ?? '').trim().toLowerCase() === 'true'
+  const lockModel =
+    body.lock_model === true || String(body.lock_model ?? '').trim().toLowerCase() === 'true'
   const preferQwenOnly =
     !skipQwen && String(body.prefer_provider ?? '').trim().toLowerCase() === 'qwen'
   const key = doubaoBearerKey(env)
@@ -1758,25 +1772,30 @@ async function arkCreateVideoTask(
       i2vMaxImages,
     ),
   }
+  const lockedOne = !isServerAuto ? normalizeArkVideoModelParam(rawModel) : ''
   const candidates =
     preferQwenOnly || !key
       ? []
-      : isServerAuto || skipQwen || preferQuotaStable
+      : lockModel && lockedOne && lockedOne !== SEEDANCE_SERVER_AUTO
+        ? [lockedOne]
+        : isServerAuto || skipQwen || preferQuotaStable
         ? await arkVideoModelCandidatesLive(env, apiBody, preferred, durationSec, preferQuotaStable || isServerAuto)
         : (() => {
             const one = normalizeArkVideoModelParam(rawModel)
             return videoModelSupportsDuration(one, durationSec, mode) ? [one] : []
           })()
 
-  /** 指定 model 时仍把该模型置顶，后续走完整目录 failover */
+  /** 指定 model 时仍把该模型置顶，后续走完整目录 failover；lock_model 禁止 failover */
   const tryOrder =
-    !isServerAuto && (skipQwen || preferQuotaStable) && candidates.length > 0
-      ? (() => {
-          const one = normalizeArkVideoModelParam(rawModel)
-          if (!one || one === SEEDANCE_SERVER_AUTO) return candidates
-          return [one, ...candidates.filter((id) => normalizeArkVideoModelParam(id) !== one)]
-        })()
-      : candidates
+    lockModel && lockedOne && lockedOne !== SEEDANCE_SERVER_AUTO
+      ? candidates
+      : !isServerAuto && (skipQwen || preferQuotaStable) && candidates.length > 0
+        ? (() => {
+            const one = normalizeArkVideoModelParam(rawModel)
+            if (!one || one === SEEDANCE_SERVER_AUTO) return candidates
+            return [one, ...candidates.filter((id) => normalizeArkVideoModelParam(id) !== one)]
+          })()
+        : candidates
 
   let lastMsg = preferQwenOnly ? '千问视频生成失败' : '豆包视频生成失败'
   let lastStatus: number | undefined
@@ -1828,6 +1847,10 @@ async function arkCreateVideoTask(
       }
       lastMsg = posted.msg
       lastStatus = posted.status
+      const combinedErr = `${posted.rawMsg ?? ''} ${posted.msg}`
+      if (lockModel || isArkRealPersonImageBlock(combinedErr)) {
+        break
+      }
       const hopable =
         isArkVideoFailoverError(posted.rawMsg ?? '') ||
         isArkVideoFailoverError(posted.msg) ||
@@ -1867,13 +1890,13 @@ async function arkCreateVideoTask(
   return {
     ok: false,
     msg: skipQwen
-      ? tried > 0
+      ? tried > 1 && !lockModel
         ? `${lastMsg}（已依次尝试 ${tried} 个豆包/Seedance 模型：${triedModels.slice(0, 8).join(' → ')}${triedModels.length > 8 ? '…' : ''}；请到火山方舟开通更多 Seedance 模型或关闭安全体验模式。）`
         : lastMsg
       : preferQwenOnly
         ? qwen.msg
         : key
-          ? tried > 1
+          ? tried > 1 && !lockModel
             ? `${lastMsg}（已自动尝试 ${tried} 个豆包/Seedance 模型）；${qwen.msg}`
             : `${lastMsg}；${qwen.msg}`
           : qwen.msg,

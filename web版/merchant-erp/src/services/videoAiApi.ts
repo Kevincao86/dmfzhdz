@@ -49,6 +49,12 @@ export type ShortVideoGenRequestBody = {
 export function formatVideoAiUserError(msg: string): string {
   const raw = String(msg ?? '').trim()
   if (!raw) return raw
+  if (/may contain real person|contain real person|input image.*real person|参考图被火山判定可能含真人/i.test(raw)) {
+    return (
+      '参考图被火山判定可能含真人，付费 Seedance 无法用这张图生成。' +
+      '请换一张偏插画、非写实的角色图，或去掉角色参考后再试。'
+    )
+  }
   if (/duration customization is not supported|duration must be in/i.test(raw)) {
     return (
       '当前模型不支持您选择的视频时长（10 秒图生视频须 Seedance 1.5/2.0 或千问 wan2.6+）。' +
@@ -129,6 +135,9 @@ function isVideoApiUnreachableError(msg: string): boolean {
 export function isVideoModelHopableError(msg: string): boolean {
   const raw = String(msg ?? '').trim()
   if (!raw) return false
+  if (/may contain real person|contain real person|input image.*real person|参考图被火山判定可能含真人/i.test(raw)) {
+    return false
+  }
   if (isArkQuotaHopableError(raw) || isQwenVideoModelHopableError(raw) || isArkVideoRateLimitError(raw))
     return true
   if (isVideoApiUnreachableError(raw)) return true
@@ -1549,7 +1558,9 @@ async function runShortVideoJobWithDurationInternal(
     const step = plan[i]!
     opts.onProgress?.(
       i === 0
-        ? `正在按 ${durationSec} 秒提交视频（共 ${plan.length} 路候选，额度或时长不符将自动切换）…`
+        ? lockToPreferred
+          ? `正在用付费模型 ${preferredModel} 按 ${durationSec} 秒提交视频…`
+          : `正在按 ${durationSec} 秒提交视频（共 ${plan.length} 路候选，额度或时长不符将自动切换）…`
         : `时长/额度受限，切换模型重试 ${i + 1}/${plan.length}：${step.label}…`,
     )
 
