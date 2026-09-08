@@ -96,6 +96,17 @@
   font-size: 26rpx;
 }
 
+.sa-warn {
+  margin: 0 24rpx 16rpx;
+  padding: 16rpx 20rpx;
+  color: #b45309;
+  font-size: 24rpx;
+  line-height: 1.5;
+  background: #fffbeb;
+  border: 1rpx solid #fde68a;
+  border-radius: 16rpx;
+}
+
 .sa-muted {
   display: block;
   font-size: 24rpx;

@@ -878,6 +878,8 @@ merchant_platform_orders_poi
 ecs-auth-api-server
 erpAiPointsSpendCore
 erpAiApiPointsGate
+灵祺ERP小程序/pages/store-analysis
+灵祺ERP小程序/utils/shopAnalysisApiMp
 change-scope-guard
 PAT
       ;;

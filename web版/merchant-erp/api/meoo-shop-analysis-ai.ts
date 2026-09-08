@@ -126,6 +126,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       startYmd: startDate,
       endYmd: endDate,
       marginPercent,
+      skipCompare: true,
     })
     const adviceFacts = buildShopAdviceFacts(summary, `${startDate} ~ ${endDate}`)
 
@@ -141,7 +142,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       startYmd: startDate,
       endYmd: endDate,
       poiId: poiId || undefined,
-      poiIdsHint,
+      poiIdsHint: poiIdsHint.slice(0, 6),
+      timeoutMs: 18_000,
     })
 
     const poiLabel = poiId

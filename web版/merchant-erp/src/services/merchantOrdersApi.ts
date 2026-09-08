@@ -45,6 +45,7 @@ export type ShopAnalysisSummary = {
   couponCount: number
   salesAmountYuan: number
   refundAmountYuan: number
+  refundCount: number
   refundRate: number
   buyerCount: number
   openIdCoverage: number
@@ -53,6 +54,7 @@ export type ShopAnalysisSummary = {
   newBuyerSalesYuan: number
   oldBuyerSalesYuan: number
   newBuyerShare: number
+  newBuyerPeopleShare: number
   oneTimeBuyerCount: number
   repeatBuyerCount: number
   repurchaseRate: number

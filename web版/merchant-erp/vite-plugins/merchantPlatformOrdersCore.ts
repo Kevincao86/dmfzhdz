@@ -263,6 +263,8 @@ export type ShopAnalysisSummary = {
   couponCount: number
   salesAmountYuan: number
   refundAmountYuan: number
+  /** 区间内 refund_amount_fen > 0 的订单笔数（含部分退） */
+  refundCount: number
   refundRate: number
   buyerCount: number
   openIdCoverage: number
@@ -270,7 +272,10 @@ export type ShopAnalysisSummary = {
   oldBuyerCount: number
   newBuyerSalesYuan: number
   oldBuyerSalesYuan: number
+  /** 新客成交额 / 总成交额 */
   newBuyerShare: number
+  /** 新客人数 / 可识别买家人数 */
+  newBuyerPeopleShare: number
   /** 区间内仅成交 1 次的买家数 */
   oneTimeBuyerCount: number
   /** 区间内成交 ≥2 次的买家数 */
@@ -348,6 +353,7 @@ export async function computeShopAnalysisSummary(params: {
 
     let salesFen = 0
     let refundFen = 0
+    let refundCount = 0
     let couponCount = 0
     const buyers = new Map<string, number>()
     const buyerSales = new Map<string, number>()
@@ -366,6 +372,7 @@ export async function computeShopAnalysisSummary(params: {
       const coupons = Number(r.coupon_count) || 1
       salesFen += pay
       refundFen += refund
+      if (refund > 0) refundCount += 1
       couponCount += coupons
       const day = shanghaiYmdFromPayTime(r.pay_time)
       if (day) daysWithOrders.add(day)
@@ -507,6 +514,9 @@ export async function computeShopAnalysisSummary(params: {
     const newBuyerSalesYuan = Math.round(newBuyerSalesFen) / 100
     const oldBuyerSalesYuan = Math.round(oldBuyerSalesFen) / 100
     const newBuyerShare = salesYuan > 0 ? Math.round((newBuyerSalesYuan / salesYuan) * 10000) / 100 : 0
+    const identifiableBuyers = newBuyerCount + oldBuyerCount
+    const newBuyerPeopleShare =
+      identifiableBuyers > 0 ? Math.round((newBuyerCount / identifiableBuyers) * 10000) / 100 : 0
     const margin = Math.min(95, Math.max(0, Number(params.marginPercent) || 0))
     const estimatedGrossYuan = Math.round(salesYuan * (margin / 100) * 100) / 100
 
@@ -549,6 +559,7 @@ export async function computeShopAnalysisSummary(params: {
       couponCount,
       salesAmountYuan: salesYuan,
       refundAmountYuan: refundYuan,
+      refundCount,
       refundRate,
       buyerCount,
       openIdCoverage,
@@ -557,6 +568,7 @@ export async function computeShopAnalysisSummary(params: {
       newBuyerSalesYuan,
       oldBuyerSalesYuan,
       newBuyerShare,
+      newBuyerPeopleShare,
       oneTimeBuyerCount,
       repeatBuyerCount,
       repurchaseRate,
@@ -666,8 +678,8 @@ export function buildShopAdviceFacts(summary: ShopAnalysisSummary, rangeLabel: s
     ``,
     `一、整体运营概况`,
     `· 共 ${summary.orderCount} 笔订单、成交券 ${summary.couponCount} 张，成交额 ¥${summary.salesAmountYuan.toLocaleString('zh-CN')}。`,
-    `· 退款额 ¥${summary.refundAmountYuan.toLocaleString('zh-CN')}，退款率 ${summary.refundRate}%${summary.refundRate >= 20 ? '（偏高，核心风险）' : ''}。`,
-    `· 可识别买家 ${summary.buyerCount} 人（覆盖率 ${summary.openIdCoverage}%）；新客 ${summary.newBuyerCount} / 老客 ${summary.oldBuyerCount}；新客成交占比 ${summary.newBuyerShare}%；区间复购率 ${summary.repurchaseRate}%。`,
+    `· 退款 ${summary.refundCount} 笔、退款额 ¥${summary.refundAmountYuan.toLocaleString('zh-CN')}，退款率 ${summary.refundRate}%${summary.refundRate >= 20 ? '（偏高，核心风险）' : ''}。`,
+    `· 可识别买家 ${summary.buyerCount} 人（覆盖率 ${summary.openIdCoverage}%）；新客 ${summary.newBuyerCount} / 老客 ${summary.oldBuyerCount}；新客成交占比 ${summary.newBuyerShare}%（人数占比 ${summary.newBuyerPeopleShare}%）；区间复购率 ${summary.repurchaseRate}%。`,
     summary.guestBasis === 'history'
       ? `· 新老客按「区间开始前是否有成交」判定。`
       : `· 新老客按「区间内是否复购」判定（库内暂无更早订单作对照）。`,

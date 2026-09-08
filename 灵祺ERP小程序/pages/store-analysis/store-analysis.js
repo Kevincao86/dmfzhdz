@@ -17,6 +17,7 @@ Page({
     loading: true,
     analyzing: false,
     err: '',
+    coverageHint: '',
     summary: null,
     kpis: [],
     topSales: [],
@@ -67,6 +68,7 @@ Page({
         topRefund: [],
         adviceFacts: adviceFacts || '',
         estimatedPoints: 0,
+        coverageHint: '',
       })
       return
     }
@@ -81,6 +83,14 @@ Page({
       const i = stores.findIndex((s) => s.poiId === this.data.poiId)
       if (i >= 0) storeIndex = i
     }
+    const peopleShare =
+      typeof summary.newBuyerPeopleShare === 'number'
+        ? summary.newBuyerPeopleShare
+        : summary.newBuyerCount + summary.oldBuyerCount > 0
+          ? Math.round(
+              (summary.newBuyerCount / (summary.newBuyerCount + summary.oldBuyerCount)) * 10000,
+            ) / 100
+          : 0
     const kpis = [
       {
         label: '成交额',
@@ -90,7 +100,7 @@ Page({
       {
         label: '退款率',
         value: `${summary.refundRate || 0}%`,
-        sub: `退款 ¥${yuan(summary.refundAmountYuan)}`,
+        sub: `${summary.refundCount || 0} 笔 · ¥${yuan(summary.refundAmountYuan)}`,
       },
       {
         label: '复购率',
@@ -98,11 +108,15 @@ Page({
         sub: `${summary.buyerCount || 0} 位买家`,
       },
       {
-        label: '新客占比',
+        label: '新客成交占比',
         value: `${summary.newBuyerShare || 0}%`,
-        sub: `新 ${summary.newBuyerCount || 0} / 老 ${summary.oldBuyerCount || 0}`,
+        sub: `人数 ${peopleShare}% · 新 ${summary.newBuyerCount || 0} / 老 ${summary.oldBuyerCount || 0}`,
       },
     ]
+    const gaps = Array.isArray(summary.coverageGapDays) ? summary.coverageGapDays : []
+    const coverageHint = gaps.length
+      ? `所选区间有 ${gaps.length} 天没有订单${gaps.length <= 5 ? `（${gaps.join('、')}）` : ''}，成交额可能低于来客后台。`
+      : ''
     const maxSales = Math.max(1, ...(summary.topBySales || []).map((x) => Number(x.salesYuan) || 0))
     const topSales = (summary.topBySales || []).slice(0, 8).map((x, i) => ({
       id: `s-${i}`,
@@ -126,6 +140,7 @@ Page({
       topRefund,
       adviceFacts: adviceFacts || '',
       estimatedPoints: shop.shopAnalysisAiPointsFromGross(summary.estimatedGrossYuan),
+      coverageHint,
     })
   },
 

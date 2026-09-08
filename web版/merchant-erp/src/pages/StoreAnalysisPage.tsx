@@ -274,14 +274,23 @@ export default function StoreAnalysisPage() {
         platform,
         poiId: poiId || undefined,
       })
-      setSummary(r.summary)
+      setSummary((prev) => ({
+        ...r.summary,
+        mom: r.summary.mom || prev?.mom,
+        yoy: r.summary.yoy || prev?.yoy,
+      }))
       setReviewDigest(r.reviewDigest)
       setModelUsed(r.modelUsed)
       setPointsCharged(Number(r.pointsCharged) || 0)
       if (r.summary.stores?.length) {
         const named = await mergeStoreNames(r.summary.stores)
         setStoreOptions(named)
-        setSummary({ ...r.summary, stores: named })
+        setSummary((prev) => ({
+          ...r.summary,
+          stores: named,
+          mom: r.summary.mom || prev?.mom,
+          yoy: r.summary.yoy || prev?.yoy,
+        }))
       }
       if (r.aiReport && !r.aiFailed) {
         setAdvice(r.aiReport)
@@ -442,8 +451,9 @@ export default function StoreAnalysisPage() {
       ) : null}
       {summary?.coverageGapDays && summary.coverageGapDays.length > 0 ? (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          所选区间有 {summary.coverageGapDays.length}{' '}
-          天没有订单记录，成交额会低于来客后台。请把起止日期与来客看板设成同一天，再点「查询」等各段拉完。
+          所选区间有 {summary.coverageGapDays.length} 天没有订单记录
+          {summary.coverageGapDays.length <= 5 ? `（${summary.coverageGapDays.join('、')}）` : ''}
+          ，成交额会低于来客后台。请把起止日期与来客看板设成同一天，再点「查询」等各段拉完。
         </div>
       ) : null}
 
@@ -468,7 +478,7 @@ export default function StoreAnalysisPage() {
               {
                 k: '退款率',
                 v: `${summary.refundRate}%`,
-                hint: yuan(summary.refundAmountYuan),
+                hint: `${summary.refundCount || 0} 笔 · ${yuan(summary.refundAmountYuan)}`,
                 danger: summary.refundRate >= 20,
                 curr: summary.refundRate,
                 mom: summary.mom?.refundRate,
@@ -486,9 +496,9 @@ export default function StoreAnalysisPage() {
                 asPoints: true,
               },
               {
-                k: '新客占比',
+                k: '新客成交占比',
                 v: `${summary.newBuyerShare}%`,
-                hint: `新客 ${summary.newBuyerCount} / 老客 ${summary.oldBuyerCount}`,
+                hint: `人数 ${summary.newBuyerPeopleShare ?? 0}% · 新 ${summary.newBuyerCount} / 老 ${summary.oldBuyerCount}`,
                 curr: summary.newBuyerShare,
                 mom: summary.mom?.newBuyerShare,
                 yoy: summary.yoy?.newBuyerShare,

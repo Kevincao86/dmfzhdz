@@ -99,28 +99,56 @@ export function aggregateReviewDigest(
   }
 }
 
+function emptyReviewDigest(message: string): ShopReviewDigest {
+  return {
+    ok: false,
+    message,
+    total: 0,
+    avgStars: 0,
+    goodCount: 0,
+    neutralCount: 0,
+    badCount: 0,
+    unrepliedCount: 0,
+    goodShare: 0,
+    badShare: 0,
+    badSamples: [],
+  }
+}
+
+async function withTimeoutFallback<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const guarded = p.catch(() => fallback)
+  try {
+    return await Promise.race([
+      guarded,
+      new Promise<T>((resolve) => {
+        timer = setTimeout(() => resolve(fallback), ms)
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
 export async function buildShopReviewDigest(params: {
   douyinToken: string
   startYmd: string
   endYmd: string
   poiId?: string
   poiIdsHint?: string[]
+  timeoutMs?: number
 }): Promise<ShopReviewDigest> {
   const token = params.douyinToken.trim()
   if (!token) {
-    return {
-      ok: false,
-      message: '未绑定抖音来客，无法拉取评价',
-      total: 0,
-      avgStars: 0,
-      goodCount: 0,
-      neutralCount: 0,
-      badCount: 0,
-      unrepliedCount: 0,
-      goodShare: 0,
-      badShare: 0,
-      badSamples: [],
-    }
+    return emptyReviewDigest('未绑定抖音来客，无法拉取评价')
+  }
+  const timeoutMs = Number(params.timeoutMs) || 0
+  if (timeoutMs > 0) {
+    return withTimeoutFallback(
+      buildShopReviewDigest({ ...params, timeoutMs: 0 }),
+      timeoutMs,
+      emptyReviewDigest('评价拉取超时，已先按订单数据生成分析'),
+    )
   }
   const poiId = params.poiId?.trim()
   const hint = (params.poiIdsHint || []).map((x) => x.trim()).filter((x) => x && x !== '_unknown')
@@ -130,7 +158,7 @@ export async function buildShopReviewDigest(params: {
       ...(poiId && poiId !== '_unknown'
         ? { poiId }
         : hint.length
-          ? { poiIds: hint.slice(0, 12) }
+          ? { poiIds: hint.slice(0, 6) }
           : {}),
     })
     if (!r.ok) {
