@@ -2939,7 +2939,7 @@ export default function ShortDramaPage() {
                         ? '正在生成角色预览…'
                         : portraitBusy
                           ? '正在补充角色画像…'
-                          : '可写提示补词，或上传照片直接确认角色'}
+                          : '可写词补画像，或上传参考图生成相似画像'}
                     </div>
                   )}
                 </div>
