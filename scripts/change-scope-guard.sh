@@ -78,6 +78,7 @@ list_scopes() {
   ops_site_selection     商家 ERP：运营「选址参考」+ 竞品近7日人流热度
   partner_linke_auth     服务商版：林客邀请授权链接拼装/客户商家开通
   douyin_spi_acceptance  抖音到综团购联调：SPI 过审桩 meoo-douyin-spi
+  modian_official        墨典官网 m.mofangdianai.com（案例库入口）
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -967,6 +968,12 @@ PAT
       cat <<'PAT'
 meoo-douyin-spi
 ecs-auth-api-server
+change-scope-guard
+PAT
+      ;;
+    modian_official)
+      cat <<'PAT'
+墨典官网
 change-scope-guard
 PAT
       ;;

@@ -96,7 +96,7 @@
     document.addEventListener("mouseleave", () => cursorFx.classList.remove("on"));
     document.addEventListener("mouseenter", () => cursorFx.classList.add("on"));
 
-    document.querySelectorAll("a, button, .cap, input, select, textarea, .header-cta, .btn").forEach((el) => {
+    document.querySelectorAll("a, button, .cap, .case-card, input, select, textarea, .header-cta, .btn").forEach((el) => {
       el.addEventListener("pointerenter", () => cursorFx.classList.add("hot"));
       el.addEventListener("pointerleave", () => cursorFx.classList.remove("hot"));
     });
@@ -501,7 +501,7 @@
 
   /* Scan lines on major sections */
   if (!reduceMotion) {
-    document.querySelectorAll(".capabilities, .team, .contact, .edge").forEach((sec, i) => {
+    document.querySelectorAll(".capabilities, .cases, .team, .contact, .edge").forEach((sec, i) => {
       sec.classList.add("magic-panel");
       const line = document.createElement("div");
       line.className = "scan-line";
