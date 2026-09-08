@@ -28,6 +28,7 @@ import {
   Mountain,
   PawPrint,
   Plane,
+  Plus,
   Radio,
   Scissors,
   Shirt,
@@ -56,8 +57,6 @@ import { VISUAL_STUDIO_PRO_IMAGE_MODEL } from '../lib/mpPointsEconomics'
 import { planLongformSegmentDurations } from '../lib/shortVideoScriptTable'
 import { sanitizePromptForSeedanceNativeAv } from '../lib/shortVideoPostProcess'
 import {
-  SEEDANCE_1_5_PRO_MODEL_ID,
-  SEEDANCE_2_0_MODEL_ID,
   SEEDANCE_QUALITY_OPTIONS,
   VIDEO_ENGINE_LABEL_SEEDANCE,
   type SeedanceQualityId,
@@ -1388,9 +1387,100 @@ type DramaRefItem = {
   imageDataUrl: string
 }
 
+type DramaCastMember = {
+  id: string
+  name: string
+  desc: string
+  sourceUrl: string | null
+  draft: string | null
+  preview: string | null
+}
+
 const DRAMA_REF_MAX = 6
 const DRAMA_REF_VIDEO_MAX_BYTES = 12 * 1024 * 1024
 const DRAMA_R2V_MAX_IMAGES = 9
+const DRAMA_CAST_MAX = 6
+const SEEDANCE_RECOMMENDED_PAID_ID = 'doubao-seedance-2-5-260628'
+
+function newCastMember(index: number): DramaCastMember {
+  return {
+    id: newWorkId(),
+    name: `角色${index}`,
+    desc: '',
+    sourceUrl: null,
+    draft: null,
+    preview: null,
+  }
+}
+
+function parseRoleNames(raw: string): string[] {
+  return String(raw || '')
+    .split(/[/、,，|]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
+function joinRoleNames(names: string[]): string {
+  return names.filter(Boolean).join(' / ')
+}
+
+function addRoleName(roles: string, name: string): string {
+  const n = name.trim()
+  if (!n) return roles
+  const existing = parseRoleNames(roles)
+  if (existing.includes(n)) return roles
+  return joinRoleNames([...existing, n])
+}
+
+function removeRoleName(roles: string, name: string): string {
+  const n = name.trim()
+  if (!n) return roles
+  return joinRoleNames(parseRoleNames(roles).filter((x) => x !== n))
+}
+
+function renameRoleName(roles: string, from: string, to: string): string {
+  const f = from.trim()
+  const t = to.trim()
+  if (!f) return t ? addRoleName(roles, t) : roles
+  const names = parseRoleNames(roles)
+  const idx = names.indexOf(f)
+  if (idx < 0) return t ? addRoleName(roles, t) : roles
+  if (!t) return joinRoleNames(names.filter((_, i) => i !== idx))
+  names[idx] = t
+  return joinRoleNames(names)
+}
+
+function nextCastRoleName(existing: DramaCastMember[]): string {
+  const used = new Set(existing.map((m) => m.name.trim()))
+  for (let i = 1; i <= DRAMA_CAST_MAX + 8; i++) {
+    const name = `角色${i}`
+    if (!used.has(name)) return name
+  }
+  return `角色${existing.length + 1}`
+}
+
+function memberShowUrl(m: DramaCastMember): string | null {
+  return m.draft || m.preview
+}
+
+function memberConfirmed(m: DramaCastMember): boolean {
+  return Boolean(m.preview && (!m.draft || m.draft === m.preview))
+}
+
+function pickRecommendedPaidSeedance(cfg: VideoAiBackendConfig | null): string {
+  const ids = (cfg?.arkVideoModels ?? []).map((m) => String(m.endpointId || '').trim()).filter(Boolean)
+  return ids.find((id) => /seedance-2-5|seedance-2\.5/i.test(id)) || SEEDANCE_RECOMMENDED_PAID_ID
+}
+
+function asDramaMp4Blob(blob: Blob): Blob {
+  if (blob.type === 'video/mp4') return blob
+  return new Blob([blob], { type: 'video/mp4' })
+}
+
+function safeDramaDownloadName(title: string): string {
+  const stem = title.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '').replace(/\s+/g, '-').slice(0, 18)
+  return `ai-short-drama-${stem || 'clip'}.mp4`
+}
 
 function isDramaVideoFile(f: File): boolean {
   const mime = (f.type || '').toLowerCase()
@@ -1439,14 +1529,6 @@ async function resolveDramaPortraitDataUrl(src: string): Promise<string | null> 
   return asData.startsWith('data:image/') ? asData : null
 }
 
-function isSeedance15ProModelId(id: string): boolean {
-  const t = String(id || '').trim()
-  return t === SEEDANCE_1_5_PRO_MODEL_ID || /seedance-1-5-pro/i.test(t) || /seedance-1\.5-pro/i.test(t)
-}
-function isSeedance20ModelId(id: string): boolean {
-  return /seedance-2-0|seedance-2\.0|seedance-2-5|seedance-2\.5/i.test(String(id || ''))
-}
-
 /** 商家 CS：AI 创作 · AI短剧 */
 export default function ShortDramaPage() {
   const { plan, requireAiVideoGen, openMembershipUpgrade } = useMembership()
@@ -1469,15 +1551,13 @@ export default function ShortDramaPage() {
   const [storyBusy, setStoryBusy] = useState(false)
   const [mediaBusy, setMediaBusy] = useState(false)
   const [refItems, setRefItems] = useState<DramaRefItem[]>([])
-  const [characterPreview, setCharacterPreview] = useState<string | null>(null)
-  const [characterDraft, setCharacterDraft] = useState<string | null>(null)
-  /** 用户上传的原图；生成预览必须按此贴脸，避免用上次生成图当参考 */
-  const [characterSourceUrl, setCharacterSourceUrl] = useState<string | null>(null)
-  const [characterDesc, setCharacterDesc] = useState('')
+  const [cast, setCast] = useState<DramaCastMember[]>(() => [newCastMember(1)])
+  const [activeCastId, setActiveCastId] = useState<string | null>(null)
   const [characterBusy, setCharacterBusy] = useState(false)
   const [portraitBusy, setPortraitBusy] = useState(false)
   const refInputRef = useRef<HTMLInputElement>(null)
   const characterInputRef = useRef<HTMLInputElement>(null)
+  const pendingCastUploadIdRef = useRef<string | null>(null)
   const [progress, setProgress] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [hint, setHint] = useState<string | null>(null)
@@ -1621,13 +1701,79 @@ export default function ShortDramaPage() {
     }
   }
 
-  const enrichCharacterPortrait = async (imageOverride?: string) => {
-    const hintText = characterDesc.trim() || roles.trim()
+  const patchCast = (id: string, patch: Partial<DramaCastMember>) => {
+    setCast((prev) => prev.map((m) => (m.id === id ? { ...m, ...patch } : m)))
+  }
+
+  const resolveCastMember = (id?: string | null): DramaCastMember | undefined => {
+    if (id) {
+      const hit = cast.find((m) => m.id === id)
+      if (hit) return hit
+    }
+    if (activeCastId) {
+      const hit = cast.find((m) => m.id === activeCastId)
+      if (hit) return hit
+    }
+    return cast[0]
+  }
+
+  const addCastMember = () => {
+    if (cast.length >= DRAMA_CAST_MAX) {
+      setErr(`最多 ${DRAMA_CAST_MAX} 个角色`)
+      return
+    }
+    const name = nextCastRoleName(cast)
+    const member: DramaCastMember = {
+      id: newWorkId(),
+      name,
+      desc: '',
+      sourceUrl: null,
+      draft: null,
+      preview: null,
+    }
+    setCast((prev) => [...prev, member])
+    setRoles((prev) => {
+      let next = prev
+      for (const m of cast) next = addRoleName(next, m.name)
+      return addRoleName(next, name)
+    })
+    setActiveCastId(member.id)
+    clearTrial()
+    setErr(null)
+    setHint(`已新建${name}。可写形象词或上传参考图。`)
+  }
+
+  const removeCastMember = (id: string) => {
+    const member = cast.find((m) => m.id === id)
+    if (!member) return
+    setCast((prev) => prev.filter((m) => m.id !== id))
+    setRoles((prev) => removeRoleName(prev, member.name))
+    setActiveCastId((prev) => (prev === id ? (cast.find((m) => m.id !== id)?.id ?? null) : prev))
+    clearTrial()
+    setHint(`已删除${member.name}`)
+  }
+
+  const renameCastMember = (id: string, name: string) => {
+    const member = cast.find((m) => m.id === id)
+    if (!member) return
+    const trimmed = name.slice(0, 16)
+    setCast((prev) => prev.map((m) => (m.id === id ? { ...m, name: trimmed } : m)))
+    setRoles((prev) => renameRoleName(prev, member.name, trimmed))
+    clearTrial()
+  }
+
+  const enrichCharacterPortrait = async (memberId?: string, imageOverride?: string) => {
+    const member = resolveCastMember(memberId)
+    if (!member) {
+      setErr('请先新建角色')
+      return
+    }
+    const hintText = member.desc.trim() || member.name.trim() || roles.trim()
     const rawPortraitSrc = (
       imageOverride ||
-      characterSourceUrl ||
-      characterDraft ||
-      characterPreview ||
+      member.sourceUrl ||
+      member.draft ||
+      member.preview ||
       ''
     ).trim()
     if (!hintText && !rawPortraitSrc) {
@@ -1657,7 +1803,9 @@ export default function ShortDramaPage() {
             `场景：${world.label} / ${scene.name}`,
             `画风：${style.name}${style.visual ? `（${style.visual}）` : ''}`,
             shopLines,
-            roles.trim() ? `角色身份：${roles.trim()}` : '',
+            member.name.trim() || roles.trim()
+              ? `角色身份：${member.name.trim() || roles.trim()}`
+              : '',
             story.trim() ? `一句话故事：${story.trim()}` : '',
             hintText ? `商家文字提示（仅补职业/年龄/身份，外貌以参考图为准）：${hintText}` : '',
             '请根据参考图如实重写角色形象词。图中可见的发型、发色、五官、妆容、衣着颜色与款式必须原样写下，禁止另造一张脸或换一套衣服。',
@@ -1670,7 +1818,9 @@ export default function ShortDramaPage() {
             `场景：${world.label} / ${scene.name}`,
             `画风：${style.name}${style.visual ? `（${style.visual}）` : ''}`,
             shopLines,
-            roles.trim() ? `角色身份：${roles.trim()}` : '',
+            member.name.trim() || roles.trim()
+              ? `角色身份：${member.name.trim() || roles.trim()}`
+              : '',
             story.trim() ? `一句话故事：${story.trim()}` : '',
             `商家简要提示：${hintText}`,
             '请把简要提示补成一段可直接用于文生图的角色形象词。',
@@ -1713,10 +1863,8 @@ export default function ShortDramaPage() {
             continue
           }
           if (!mountedRef.current) return
-          setCharacterDesc(portrait)
-          const imageAlreadyConfirmed = Boolean(
-            characterPreview && (!characterDraft || characterDraft === characterPreview),
-          )
+          patchCast(member.id, { desc: portrait })
+          const imageAlreadyConfirmed = memberConfirmed(member)
           setHint(
             fromImage
               ? imageAlreadyConfirmed
@@ -1750,21 +1898,30 @@ export default function ShortDramaPage() {
       const out: string[] = []
       const cont = toDramaImageDataUrl(continueFrame ?? '')
       if (cont) out.push(cont)
-      if (characterPreview) out.push(characterPreview)
+      for (const m of cast) {
+        if (m.preview) out.push(m.preview)
+      }
       for (const item of refItems) {
         const u = toDramaImageDataUrl(item.imageDataUrl)
         if (u) out.push(u)
       }
       return [...new Set(out)].slice(0, DRAMA_R2V_MAX_IMAGES)
     },
-    [characterPreview, refItems],
+    [cast, refItems],
   )
 
   const fusionPromptNote = useMemo(() => {
     const bits: string[] = []
-    if (characterPreview) {
+    const confirmed = cast.filter((m) => m.preview)
+    if (confirmed.length === 1) {
       bits.push(
-        `主角外貌必须与角色形象参考图为同一人（${roles.trim() || '主角'}），发型、五官、服装、体态全程一致，禁止换人。`,
+        `主角外貌必须与角色形象参考图为同一人（${confirmed[0]!.name.trim() || roles.trim() || '主角'}），发型、五官、服装、体态全程一致，禁止换人。`,
+      )
+    } else if (confirmed.length > 1) {
+      bits.push(
+        `画面中须同时出现这些角色且外貌与对应参考图为同一人：${confirmed
+          .map((m, i) => `${m.name.trim() || `角色${i + 1}`}`)
+          .join('、')}。发型、五官、服装、体态全程一致，禁止换人、禁止合并成一张脸。`,
       )
     }
     if (refItems.length > 0) {
@@ -1773,11 +1930,10 @@ export default function ShortDramaPage() {
       )
     }
     return bits.join('')
-  }, [characterPreview, refItems.length, roles])
-  const characterShowUrl = characterDraft || characterPreview
-  const characterConfirmed = Boolean(
-    characterPreview && (!characterDraft || characterDraft === characterPreview),
-  )
+  }, [cast, refItems.length, roles])
+  const activeCast = (activeCastId && cast.find((m) => m.id === activeCastId)) || cast[0] || null
+  const characterShowUrl = activeCast ? memberShowUrl(activeCast) : null
+  const characterConfirmed = activeCast ? memberConfirmed(activeCast) : false
 
   const addDramaRefFiles = async (files: FileList | File[] | null) => {
     if (!files || files.length === 0) return
@@ -1829,17 +1985,23 @@ export default function ShortDramaPage() {
     }
   }
 
-  const onPickCharacterFile = async (file: File | undefined) => {
+  const onPickCharacterFile = async (file: File | undefined, memberId?: string) => {
     if (!file) return
+    const member = resolveCastMember(memberId)
+    if (!member) {
+      setErr('请先新建角色')
+      return
+    }
     setMediaBusy(true)
     setErr(null)
     try {
       const url = await processCustomAvatarFile(file)
-      setCharacterSourceUrl(url)
-      setCharacterDraft(url)
-      setCharacterPreview(null)
+      patchCast(member.id, { sourceUrl: url, draft: url, preview: null })
+      setActiveCastId(member.id)
       clearTrial()
-      setHint('已添加参考图。可点「AI补充画像」按图写词，或点「生成预览」生成相似画像；要用原图直接拍短剧，再点「用此图确认角色」。')
+      setHint(
+        `已为${member.name}添加参考图。可点「AI补充画像」按图写词，或点「生成预览」生成相似画像；要用原图直接拍短剧，再点「用此图确认角色」。`,
+      )
     } catch (e) {
       setErr(e instanceof Error ? e.message : '角色形象读取失败')
     } finally {
@@ -1847,10 +2009,15 @@ export default function ShortDramaPage() {
     }
   }
 
-  const generateCharacterPreview = async () => {
-    const desc = characterDesc.trim()
-    const roleHint = roles.trim()
-    const rawRef = (characterSourceUrl || '').trim()
+  const generateCharacterPreview = async (memberId?: string) => {
+    const member = resolveCastMember(memberId)
+    if (!member) {
+      setErr('请先新建角色')
+      return
+    }
+    const desc = member.desc.trim()
+    const roleHint = member.name.trim() || roles.trim()
+    const rawRef = (member.sourceUrl || '').trim()
     if (!desc && !rawRef) {
       setErr('请先写简要形象词并点「AI补充画像」，或上传参考图后再生成预览')
       setHint(null)
@@ -1922,13 +2089,13 @@ export default function ShortDramaPage() {
         dataUrl = await blobToDramaDataUrl(blob)
       }
       if (!mountedRef.current) return
-      setCharacterDraft(dataUrl)
-      setCharacterPreview(null)
+      patchCast(member.id, { draft: dataUrl, preview: null })
+      setActiveCastId(member.id)
       clearTrial()
       setHint(
         refData
-          ? '已按参考图生成相似画像。请点「用此图确认角色」后才会融合进短剧。'
-          : '已按形象词生成预览。请点「用此图确认角色」后才会融合进短剧。',
+          ? `已为${member.name}按参考图生成相似画像。请点「用此图确认角色」后才会融合进短剧。`
+          : `已为${member.name}按形象词生成预览。请点「用此图确认角色」后才会融合进短剧。`,
       )
     } catch (e) {
       setErr(e instanceof Error ? e.message : '角色形象生成失败')
@@ -1937,16 +2104,18 @@ export default function ShortDramaPage() {
     }
   }
 
-  const confirmCharacterPreview = () => {
-    const src = characterDraft
-    if (!src) {
+  const confirmCharacterPreview = (memberId?: string) => {
+    const member = resolveCastMember(memberId)
+    const src = member?.draft
+    if (!member || !src) {
       setErr('请先生成或上传角色形象预览')
       return
     }
-    setCharacterPreview(src)
+    patchCast(member.id, { preview: src })
+    setActiveCastId(member.id)
     clearTrial()
     setErr(null)
-    setHint('已确认角色形象，生成短剧时将按此融合。')
+    setHint(`已确认${member.name}，生成短剧时将按此融合。`)
   }
 
   const switchWorld = (nextWorldId: WorldId) => {
@@ -2000,20 +2169,7 @@ export default function ShortDramaPage() {
       .join('\n')
   }, [metaPrompt, durationSec, formula, longPlan, showPreviewGate])
 
-  const seedancePoolModels = useMemo(() => {
-    const raw = (cfg?.arkVideoModels.map((m) => m.endpointId) ?? []).filter((id) => {
-      const t = String(id || '').trim()
-      if (!t) return false
-      if (/^wan[\d._-]/i.test(t) || (/t2v|i2v/i.test(t) && /^wan/i.test(t))) return false
-      return true
-    })
-    const pro15 = raw.filter(isSeedance15ProModelId)
-    const fallback20 = raw.filter((id) => isSeedance20ModelId(id) && !/mini/i.test(id))
-    const ordered = [...pro15, ...fallback20]
-    return ordered.length > 0
-      ? ordered
-      : [SEEDANCE_1_5_PRO_MODEL_ID, SEEDANCE_2_0_MODEL_ID, 'doubao-seedance-2-0-fast-260128']
-  }, [cfg?.arkVideoModels])
+  const seedancePaidModel = useMemo(() => pickRecommendedPaidSeedance(cfg), [cfg])
 
   const gateReason = useMemo((): string | null => {
     if (busy) return '正在生成短剧，请稍候'
@@ -2083,13 +2239,7 @@ export default function ShortDramaPage() {
     const mode =
       opts.seedance_image_mode ??
       (imgs.length >= 2 ? 'reference' : imgs.length === 1 ? 'first_only' : 'auto')
-    const prefer20 = mode === 'reference' || imgs.length >= 2
-    const pool = prefer20
-      ? [
-          ...seedancePoolModels.filter((id) => isSeedance20ModelId(id)),
-          ...seedancePoolModels.filter((id) => !isSeedance20ModelId(id)),
-        ]
-      : seedancePoolModels
+    const model = seedancePaidModel
     const flags = `--dur ${opts.durationSec} --fps 24 --ratio 9:16 --wm false --resolution ${resolution}`
     const prompt = [opts.prompt, fusionPromptNote].filter(Boolean).join('\n')
     return runShortVideoJobWithFailover({
@@ -2097,15 +2247,15 @@ export default function ShortDramaPage() {
       body: {
         prompt: sanitizePromptForSeedanceNativeAv(prompt),
         flags,
-        model: prefer20 ? SEEDANCE_2_0_MODEL_ID : SEEDANCE_1_5_PRO_MODEL_ID,
+        model,
         skip_qwen: true,
-        lock_model: false,
+        lock_model: true,
         generate_audio: true,
         images_base64: imgs.length ? imgs : undefined,
         seedance_image_mode: mode,
         i2v_max_images: imgs.length >= 2 ? Math.min(DRAMA_R2V_MAX_IMAGES, imgs.length) : undefined,
       },
-      poolModels: pool.length ? pool : seedancePoolModels,
+      poolModels: [model],
       shouldCancel: () => cancelRef.current,
       onProgress: opts.onProgress,
       allowAutoHalveDuration: false,
@@ -2119,10 +2269,11 @@ export default function ShortDramaPage() {
     durationSec: number
     modelUsed?: string | null
   }) => {
-    const blob =
+    const blob = asDramaMp4Blob(
       typeof opts.videoUrlOrBlob === 'string'
         ? await downloadVideoUrlAsBlob(opts.videoUrlOrBlob, { maxAttempts: 3 })
-        : opts.videoUrlOrBlob
+        : opts.videoUrlOrBlob,
+    )
     const previewUrl = URL.createObjectURL(blob)
     previewUrlsRef.current.push(previewUrl)
     const work: DramaWork = {
@@ -2399,11 +2550,32 @@ export default function ShortDramaPage() {
     setHint('已停止等待。后台任务可能不会自动取消。')
   }
 
-  const downloadWork = (work: DramaWork) => {
-    const a = document.createElement('a')
-    a.href = work.previewUrl
-    a.download = `ai短剧-${work.title.slice(0, 18)}.mp4`
-    a.click()
+  const downloadWork = async (work: DramaWork) => {
+    try {
+      const res = await fetch(work.previewUrl)
+      const raw = await res.blob()
+      const buf = await raw.arrayBuffer()
+      const head = new TextDecoder()
+        .decode(new Uint8Array(buf, 0, Math.min(24, buf.byteLength)))
+        .replace(/^\uFEFF/, '')
+        .trimStart()
+      if (head.startsWith('{') || head.startsWith('<') || head.startsWith('[')) {
+        setErr('成片文件不是视频（可能是错误页），请重新生成后再下载')
+        return
+      }
+      const file = new File([buf], safeDramaDownloadName(work.title), { type: 'video/mp4' })
+      const url = URL.createObjectURL(file)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = file.name
+      a.rel = 'noopener'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 2500)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '下载失败')
+    }
   }
 
   const removeWork = (id: string) => {
@@ -2822,34 +2994,17 @@ export default function ShortDramaPage() {
                     <p className="text-sm font-medium text-slate-800">角色形象</p>
                     <button
                       type="button"
-                      disabled={busy || storyBusy || characterBusy || mediaBusy || portraitBusy}
-                      onClick={() => void enrichCharacterPortrait()}
-                      className="inline-flex items-center gap-1 rounded-lg border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-xs font-medium text-cyan-900 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={busy || storyBusy || characterBusy || mediaBusy || portraitBusy || cast.length >= DRAMA_CAST_MAX}
+                      onClick={addCastMember}
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {portraitBusy ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Sparkles className="h-3.5 w-3.5" />
-                      )}
-                      {portraitBusy
-                        ? characterSourceUrl
-                          ? '正在按图写词'
-                          : '正在补充画像'
-                        : characterSourceUrl
-                          ? '按图补充画像'
-                          : 'AI补充画像'}
+                      <Plus className="h-3.5 w-3.5" />
+                      新建角色
                     </button>
                   </span>
                   <p className="text-[11px] leading-relaxed text-slate-500">
-                    两条路都可用：① 先写简要词，点「AI补充画像」补全文案，再生成预览；② 上传参考图，点「按图补充画像」写词，或点「生成预览」按图生成相似画像。原图要直接用，再点确认。
+                    可新建角色1、角色2、角色3。删除角色会同步从上方「角色」栏去掉对应名字。每位角色可写词或上传参考图后确认。
                   </p>
-                  <textarea
-                    className={cn(fieldCls, 'min-h-[88px] resize-y')}
-                    disabled={busy || storyBusy || characterBusy || mediaBusy || portraitBusy}
-                    value={characterDesc}
-                    onChange={(e) => setCharacterDesc(e.target.value)}
-                    placeholder="文案路径：足浴店女技师，25-28岁。参考图路径：先上传照片再点补充或生成"
-                  />
                   <input
                     ref={characterInputRef}
                     type="file"
@@ -2857,89 +3012,182 @@ export default function ShortDramaPage() {
                     className="hidden"
                     disabled={busy || storyBusy || mediaBusy || characterBusy || portraitBusy}
                     onChange={(e) => {
-                      void onPickCharacterFile(e.target.files?.[0])
+                      const id = pendingCastUploadIdRef.current
+                      pendingCastUploadIdRef.current = null
+                      void onPickCharacterFile(e.target.files?.[0], id ?? undefined)
                       e.target.value = ''
                     }}
                   />
-                  <div className="flex flex-wrap gap-2">
+                  {cast.length === 0 ? (
                     <button
                       type="button"
-                      disabled={busy || storyBusy || characterBusy || mediaBusy || portraitBusy}
-                      onClick={() => void generateCharacterPreview()}
-                      className="inline-flex items-center gap-1 rounded-lg border border-cyan-200 bg-cyan-50 px-2.5 py-1.5 text-xs font-medium text-cyan-900 hover:bg-cyan-100 disabled:opacity-50"
+                      disabled={busy || storyBusy}
+                      onClick={addCastMember}
+                      className="flex h-20 w-full items-center justify-center gap-1 rounded-xl border border-dashed border-cyan-300 bg-cyan-50/30 text-sm text-cyan-900 hover:bg-cyan-50 disabled:opacity-50"
                     >
-                      {characterBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
-                      {characterBusy ? '正在生成预览' : characterSourceUrl ? '按参考图生成' : '生成预览'}
+                      <Plus className="h-4 w-4" />
+                      新建角色1
                     </button>
-                    <button
-                      type="button"
-                      disabled={busy || storyBusy || characterBusy || mediaBusy || portraitBusy}
-                      onClick={() => characterInputRef.current?.click()}
-                      className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-                    >
-                      上传参考图
-                    </button>
-                    {characterShowUrl && !characterConfirmed ? (
-                      <button
-                        type="button"
-                        disabled={busy || characterBusy || portraitBusy}
-                        onClick={confirmCharacterPreview}
-                        className="inline-flex items-center gap-1 rounded-lg bg-cyan-700 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-cyan-800 disabled:opacity-50"
-                      >
-                        <Check className="h-3.5 w-3.5" />
-                        用此图确认角色
-                      </button>
-                    ) : null}
-                  </div>
-                  {characterShowUrl ? (
-                    <div className="relative overflow-hidden rounded-xl border border-cyan-200 bg-cyan-50/40">
-                      <img src={characterShowUrl} alt="角色形象预览" className="aspect-[3/4] w-full object-cover" />
-                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-2">
-                        <p className="truncate text-xs font-medium text-white">{roles.trim() || '主角'}</p>
-                        <p className="text-[10px] text-white/80">
-                          {characterConfirmed
-                            ? '已确认，将按此融合'
-                            : characterSourceUrl && characterDraft === characterSourceUrl
-                              ? '参考图 · 可生成相似画像或直接确认'
-                              : '预览待确认'}
-                        </p>
-                      </div>
-                      <div className="absolute right-1 top-1 flex gap-1">
-                        {characterConfirmed ? (
-                          <span className="rounded-full bg-cyan-700 px-2 py-0.5 text-[10px] text-white">已确认</span>
-                        ) : (
-                          <button
-                            type="button"
-                            disabled={busy || characterBusy}
-                            onClick={confirmCharacterPreview}
-                            className="rounded-full bg-cyan-700 px-2 py-0.5 text-[10px] text-white disabled:opacity-40"
-                          >
-                            用此图确认
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          disabled={busy || mediaBusy || characterBusy}
-                          aria-label="移除角色形象"
-                          onClick={() => {
-                            setCharacterPreview(null)
-                            setCharacterDraft(null)
-                            setCharacterSourceUrl(null)
-                            clearTrial()
-                          }}
-                          className="rounded-full bg-black/55 p-1 text-white disabled:opacity-40"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      </div>
-                    </div>
                   ) : (
-                    <div className="flex h-28 items-center justify-center rounded-xl border border-dashed border-cyan-300 bg-cyan-50/30 text-xs text-cyan-900">
-                      {characterBusy
-                        ? '正在生成角色预览…'
-                        : portraitBusy
-                          ? '正在补充角色画像…'
-                          : '可写词补画像，或上传参考图生成相似画像'}
+                    <div className="space-y-3">
+                      {cast.map((member) => {
+                        const showUrl = memberShowUrl(member)
+                        const confirmed = memberConfirmed(member)
+                        const isActive = (activeCast?.id ?? cast[0]?.id) === member.id
+                        return (
+                          <div
+                            key={member.id}
+                            className={cn(
+                              'space-y-2 rounded-xl border p-3',
+                              isActive ? 'border-cyan-300 bg-cyan-50/30' : 'border-slate-200 bg-white',
+                            )}
+                          >
+                            <div className="flex items-center gap-2">
+                              <input
+                                className={cn(fieldCls, 'py-1.5 text-sm font-medium')}
+                                disabled={busy || storyBusy || characterBusy || portraitBusy}
+                                value={member.name}
+                                onFocus={() => setActiveCastId(member.id)}
+                                onChange={(e) => renameCastMember(member.id, e.target.value)}
+                                placeholder="角色名"
+                              />
+                              <button
+                                type="button"
+                                disabled={busy || storyBusy || characterBusy || portraitBusy}
+                                aria-label={`删除${member.name}`}
+                                onClick={() => removeCastMember(member.id)}
+                                className="shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={busy || storyBusy || characterBusy || mediaBusy || portraitBusy}
+                              onClick={() => {
+                                setActiveCastId(member.id)
+                                void enrichCharacterPortrait(member.id)
+                              }}
+                              className="inline-flex items-center gap-1 rounded-lg border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-xs font-medium text-cyan-900 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {portraitBusy && isActive ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Sparkles className="h-3.5 w-3.5" />
+                              )}
+                              {portraitBusy && isActive
+                                ? member.sourceUrl
+                                  ? '正在按图写词'
+                                  : '正在补充画像'
+                                : member.sourceUrl
+                                  ? '按图补充画像'
+                                  : 'AI补充画像'}
+                            </button>
+                            <textarea
+                              className={cn(fieldCls, 'min-h-[72px] resize-y')}
+                              disabled={busy || storyBusy || characterBusy || mediaBusy || portraitBusy}
+                              value={member.desc}
+                              onFocus={() => setActiveCastId(member.id)}
+                              onChange={(e) => patchCast(member.id, { desc: e.target.value })}
+                              placeholder="文案路径：足浴店女技师，25-28岁。参考图路径：先上传照片再点补充或生成"
+                            />
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                disabled={busy || storyBusy || characterBusy || mediaBusy || portraitBusy}
+                                onClick={() => {
+                                  setActiveCastId(member.id)
+                                  void generateCharacterPreview(member.id)
+                                }}
+                                className="inline-flex items-center gap-1 rounded-lg border border-cyan-200 bg-cyan-50 px-2.5 py-1.5 text-xs font-medium text-cyan-900 hover:bg-cyan-100 disabled:opacity-50"
+                              >
+                                {characterBusy && isActive ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <Wand2 className="h-3.5 w-3.5" />
+                                )}
+                                {characterBusy && isActive
+                                  ? '正在生成预览'
+                                  : member.sourceUrl
+                                    ? '按参考图生成'
+                                    : '生成预览'}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busy || storyBusy || characterBusy || mediaBusy || portraitBusy}
+                                onClick={() => {
+                                  setActiveCastId(member.id)
+                                  pendingCastUploadIdRef.current = member.id
+                                  characterInputRef.current?.click()
+                                }}
+                                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                              >
+                                上传参考图
+                              </button>
+                              {showUrl && !confirmed ? (
+                                <button
+                                  type="button"
+                                  disabled={busy || characterBusy || portraitBusy}
+                                  onClick={() => confirmCharacterPreview(member.id)}
+                                  className="inline-flex items-center gap-1 rounded-lg bg-cyan-700 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-cyan-800 disabled:opacity-50"
+                                >
+                                  <Check className="h-3.5 w-3.5" />
+                                  用此图确认角色
+                                </button>
+                              ) : null}
+                            </div>
+                            {showUrl ? (
+                              <div className="relative overflow-hidden rounded-xl border border-cyan-200 bg-cyan-50/40">
+                                <img src={showUrl} alt={`${member.name}预览`} className="aspect-[3/4] w-full object-cover" />
+                                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-2">
+                                  <p className="truncate text-xs font-medium text-white">{member.name.trim() || '角色'}</p>
+                                  <p className="text-[10px] text-white/80">
+                                    {confirmed
+                                      ? '已确认，将按此融合'
+                                      : member.sourceUrl && member.draft === member.sourceUrl
+                                        ? '参考图 · 可生成相似画像或直接确认'
+                                        : '预览待确认'}
+                                  </p>
+                                </div>
+                                <div className="absolute right-1 top-1 flex gap-1">
+                                  {confirmed ? (
+                                    <span className="rounded-full bg-cyan-700 px-2 py-0.5 text-[10px] text-white">已确认</span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      disabled={busy || characterBusy}
+                                      onClick={() => confirmCharacterPreview(member.id)}
+                                      className="rounded-full bg-cyan-700 px-2 py-0.5 text-[10px] text-white disabled:opacity-40"
+                                    >
+                                      用此图确认
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    disabled={busy || mediaBusy || characterBusy}
+                                    aria-label={`清除${member.name}形象`}
+                                    onClick={() => {
+                                      patchCast(member.id, { preview: null, draft: null, sourceUrl: null })
+                                      clearTrial()
+                                    }}
+                                    className="rounded-full bg-black/55 p-1 text-white disabled:opacity-40"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex h-20 items-center justify-center rounded-xl border border-dashed border-cyan-300 bg-cyan-50/30 text-xs text-cyan-900">
+                                {characterBusy && isActive
+                                  ? '正在生成角色预览…'
+                                  : portraitBusy && isActive
+                                    ? '正在补充角色画像…'
+                                    : '可写词补画像，或上传参考图生成相似画像'}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
@@ -3024,7 +3272,7 @@ export default function ShortDramaPage() {
                           <p className="text-[10px] uppercase tracking-wide text-cyan-200">
                             {characterConfirmed ? '角色形象预览 · 已确认' : '角色形象预览 · 待确认'}
                           </p>
-                          <p className="mt-1 text-lg font-semibold">{roles.trim() || '主角'}</p>
+                          <p className="mt-1 text-lg font-semibold">{activeCast?.name.trim() || roles.trim() || '主角'}</p>
                           <p className="mt-0.5 text-xs text-slate-300">{scene.name} · {formula.name}</p>
                         </div>
                       </div>

@@ -738,8 +738,9 @@ export async function concatVideoUrlsOnServer(
       const j = await parseJsonSafe<{ message?: string }>(new Response(await res.text()))
       throw new Error(j?.message || `云端拼接失败 HTTP ${res.status}`)
     }
-    const blob = new Blob([await readFetchBodyWithTimeout(res, VIDEO_CONCAT_TIMEOUT_MS)])
-    if (blob.size < 1024) throw new Error('云端拼接返回空文件')
+    const buf = await readFetchBodyWithTimeout(res, VIDEO_CONCAT_TIMEOUT_MS)
+    const blob = asMp4VideoBlob(buf)
+    if (!blob) throw new Error('云端拼接返回空文件或非视频内容')
     return blob
   }
   throw new Error('云端拼接失败：视频 AI 接口未部署或不可达')
@@ -869,11 +870,31 @@ export async function postProcessVideoOnServer(
       const j = await parseJsonSafe<{ message?: string }>(new Response(await res.text()))
       throw new Error(j?.message || `云端成片后处理失败 HTTP ${res.status}`)
     }
-    const out = await res.blob()
-    if (out.size < 1024) throw new Error('云端成片后处理返回空文件')
-    return out
+    const buf = await readFetchBodyWithTimeout(res, timeoutMs)
+    const blob = asMp4VideoBlob(buf)
+    if (!blob) throw new Error('云端成片后处理返回空文件或非视频内容')
+    return blob
   }
   throw new Error('云端成片后处理失败：视频 AI 接口未部署或不可达')
+}
+
+function payloadLooksLikeNonVideo(buf: ArrayBuffer): boolean {
+  if (buf.byteLength < 32) return true
+  const n = Math.min(24, buf.byteLength)
+  const head = new TextDecoder('utf-8', { fatal: false })
+    .decode(new Uint8Array(buf, 0, n))
+    .replace(/^\uFEFF/, '')
+    .trimStart()
+  if (!head) return true
+  const c0 = head.charCodeAt(0)
+  if (c0 === 0x7b || c0 === 0x5b || c0 === 0x3c) return true
+  return /^(error|fail|ok|success|message|code)\b/i.test(head)
+}
+
+function asMp4VideoBlob(buf: ArrayBuffer): Blob | null {
+  if (buf.byteLength < 1024) return null
+  if (payloadLooksLikeNonVideo(buf)) return null
+  return new Blob([buf], { type: 'video/mp4' })
 }
 
 /** 豆包/可灵 CDN 偶发允许浏览器直拉；代理失败时兜底 */
@@ -889,8 +910,8 @@ async function tryDirectVideoBlob(url: string): Promise<Blob | null> {
       signal: videoFetchSignal(VIDEO_SEGMENT_DOWNLOAD_TIMEOUT_MS),
     })
     if (!res.ok) return null
-    const blob = new Blob([await readFetchBodyWithTimeout(res, VIDEO_SEGMENT_DOWNLOAD_TIMEOUT_MS)])
-    return blob.size >= 1024 ? blob : null
+    const buf = await readFetchBodyWithTimeout(res, VIDEO_SEGMENT_DOWNLOAD_TIMEOUT_MS)
+    return asMp4VideoBlob(buf)
   } catch {
     return null
   }
@@ -918,9 +939,13 @@ async function downloadVideoUrlAsBlobOnce(url: string): Promise<Blob> {
       lastErr = j?.message || `下载视频失败 HTTP ${res.status}`
       continue
     }
-    const blob = new Blob([await readFetchBodyWithTimeout(res, VIDEO_SEGMENT_DOWNLOAD_TIMEOUT_MS)])
-    if (blob.size < 1024) {
-      lastErr = `下载视频为空（${blob.size} 字节），或与后端连接异常，请稍后重试`
+    const buf = await readFetchBodyWithTimeout(res, VIDEO_SEGMENT_DOWNLOAD_TIMEOUT_MS)
+    const blob = asMp4VideoBlob(buf)
+    if (!blob) {
+      lastErr =
+        buf.byteLength < 1024
+          ? `下载视频为空（${buf.byteLength} 字节），或与后端连接异常，请稍后重试`
+          : '下载到的不是视频文件（可能是错误页），请重新生成后再下载'
       continue
     }
     return blob
