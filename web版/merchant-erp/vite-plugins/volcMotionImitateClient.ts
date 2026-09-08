@@ -4,7 +4,8 @@
  * 提交：CVSync2AsyncSubmitTask
  * 查询：CVSync2AsyncGetResult
  * Version: 2022-08-31
- * 默认 req_key: jimeng_dream_actor_m1_gen_video_cv
+ * 默认 req_key: jimeng_dreamactor_m20_gen_video（文档 85621/2201579）
+ * 旧 key 回落：jimeng_dream_actor_m1_gen_video_cv
  * 可用 MERCHANT_AI_MOTION_REQ_KEY / SUBMIT_ACTION / GET_ACTION 覆盖。
  */
 import type { MerchantAiEnv } from './merchantAiUpstream.js'
@@ -13,7 +14,7 @@ import { resolveVolcVisualCredentials, isOmniHumanConfigured } from './volcOmniH
 
 export const MOTION_IMITATE_TASK_PREFIX = 'motion:'
 
-const MOTION_REQ_KEY = 'jimeng_dream_actor_m1_gen_video_cv'
+const MOTION_REQ_KEY = 'jimeng_dreamactor_m20_gen_video'
 const MOTION_VERSION = '2022-08-31'
 const MOTION_SUBMIT_ACTION = 'CVSync2AsyncSubmitTask'
 const MOTION_GET_ACTION = 'CVSync2AsyncGetResult'
@@ -28,6 +29,12 @@ const FALLBACK_ATTEMPTS: Array<{
     action: MOTION_SUBMIT_ACTION,
     version: MOTION_VERSION,
     reqKey: MOTION_REQ_KEY,
+    getAction: MOTION_GET_ACTION,
+  },
+  {
+    action: MOTION_SUBMIT_ACTION,
+    version: MOTION_VERSION,
+    reqKey: 'jimeng_dream_actor_m1_gen_video_cv',
     getAction: MOTION_GET_ACTION,
   },
   {
@@ -280,9 +287,10 @@ export type MotionImitatePollState = {
 function bodyVariants(imageUrl: string, videoUrl: string, prompt?: string): Record<string, unknown>[] {
   const extra = prompt?.trim() ? { prompt: prompt.trim().slice(0, 500) } : {}
   return [
-    { image_urls: [imageUrl], video_urls: [videoUrl], ...extra },
-    { image_url: imageUrl, video_url: videoUrl, ...extra },
+    { image_urls: [imageUrl], video_url: videoUrl },
     { image_urls: [imageUrl], video_url: videoUrl, ...extra },
+    { image_url: imageUrl, video_url: videoUrl, ...extra },
+    { image_urls: [imageUrl], video_urls: [videoUrl], ...extra },
   ]
 }
 
@@ -315,7 +323,7 @@ export async function volcSubmitMotionImitateTask(
       if (!r.ok) {
         errors.push(`${attempt.reqKey}: ${r.message}`)
         if (/50400|Access\s*Denied/i.test(r.message)) {
-          return { ok: false, message: humanizeMotionVolcError(r.message) }
+          break
         }
         continue
       }

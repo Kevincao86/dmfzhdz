@@ -419,6 +419,7 @@ ShortDramaPage
 ShortVideoOptimizationPage
 volcXiaoyunqueClient
 volcOmniHumanClient
+volcMotionImitateClient
 merchantVideoAiGateway
 videoAiApi
 change-scope-guard

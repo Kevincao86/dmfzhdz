@@ -4,8 +4,8 @@
  * 提交：CVSync2AsyncSubmitTask
  * 查询：CVSync2AsyncGetResult
  * Version: 2022-08-31
- * 默认无参考 req_key: jimeng_video_agent_v20
- * 有参考：jimeng_video_agent_v20_ref
+ * 默认无参考 req_key: pippit_iv2v_v20_cvtob（文档 85621/2359611）
+ * 有参考（图+视频）：pippit_iv2v_v20_cvtob_with_vinput（文档 85621/2359610）
  *
  * 凭据：运营台 videoAi.jimengAccessKeyId/SK → JIMENG_*，或轻量 MERCHANT_AI_VOLC_*。
  * 可用 MERCHANT_AI_XIAOYUNQUE_REQ_KEY / SUBMIT_ACTION / GET_ACTION 覆盖。
@@ -19,17 +19,11 @@ export const XIAOYUNQUE_TASK_PREFIX = 'xyq:'
 const XYQ_VERSION = '2022-08-31'
 const XYQ_SUBMIT_ACTION = 'CVSync2AsyncSubmitTask'
 const XYQ_GET_ACTION = 'CVSync2AsyncGetResult'
-const XYQ_REQ_KEY_NOREF = 'jimeng_video_agent_v20'
-const XYQ_REQ_KEY_REF = 'jimeng_video_agent_v20_ref'
+const XYQ_REQ_KEY_NOREF = 'pippit_iv2v_v20_cvtob'
+const XYQ_REQ_KEY_REF = 'pippit_iv2v_v20_cvtob_with_vinput'
 
-const NOREF_KEYS = [
-  XYQ_REQ_KEY_NOREF,
-  'jimeng_video_agent_v20_noref',
-  'jimeng_video_agent_v2',
-  'jimeng_xyq_video_agent_v20',
-]
-
-const REF_KEYS = [XYQ_REQ_KEY_REF, 'jimeng_video_agent_v20_with_ref']
+const NOREF_KEYS = [XYQ_REQ_KEY_NOREF]
+const REF_KEYS = [XYQ_REQ_KEY_REF]
 
 export function isXiaoyunqueConfigured(env: MerchantAiEnv): boolean {
   return Boolean(resolveVolcVisualCredentials(env))
@@ -51,7 +45,7 @@ export async function probeXiaoyunqueAccount(env: MerchantAiEnv): Promise<{
     return {
       configured: true,
       usable: false,
-      detail: '视觉云 AK 有效，但当前账号未开通小云雀智能生视频 Agent',
+      detail: '视觉云 AK 有效，但当前账号未开通小云雀智能生视频 Agent 2.0',
     }
   }
   if (/Access\s*Denied|50400|未开通或 AK 无权限/i.test(reason)) {
@@ -106,7 +100,7 @@ function decodeTaskToken(taskIdRaw: string): {
   }
 }
 
-function reqKeyAttempts(env: MerchantAiEnv, hasRef: boolean): Array<{
+function reqKeyAttempts(env: MerchantAiEnv, hasVideoRef: boolean): Array<{
   action: string
   version: string
   reqKey: string
@@ -115,7 +109,7 @@ function reqKeyAttempts(env: MerchantAiEnv, hasRef: boolean): Array<{
   const customKey = (env.MERCHANT_AI_XIAOYUNQUE_REQ_KEY ?? '').trim()
   const customAction = (env.MERCHANT_AI_XIAOYUNQUE_SUBMIT_ACTION ?? '').trim()
   const customGet = (env.MERCHANT_AI_XIAOYUNQUE_GET_ACTION ?? '').trim()
-  const keys = hasRef ? [...REF_KEYS, ...NOREF_KEYS] : [...NOREF_KEYS]
+  const keys = hasVideoRef ? [...REF_KEYS, ...NOREF_KEYS] : [...NOREF_KEYS]
   const base = keys.map((reqKey) => ({
     action: XYQ_SUBMIT_ACTION,
     version: XYQ_VERSION,
@@ -127,7 +121,7 @@ function reqKeyAttempts(env: MerchantAiEnv, hasRef: boolean): Array<{
       {
         action: customAction || XYQ_SUBMIT_ACTION,
         version: XYQ_VERSION,
-        reqKey: customKey || (hasRef ? XYQ_REQ_KEY_REF : XYQ_REQ_KEY_NOREF),
+        reqKey: customKey || (hasVideoRef ? XYQ_REQ_KEY_REF : XYQ_REQ_KEY_NOREF),
         getAction: customGet || XYQ_GET_ACTION,
       },
       ...base,
@@ -179,7 +173,7 @@ function humanizeXiaoyunqueError(raw: string): string {
   }
   if (/not supported|req_key/i.test(t)) {
     return (
-      '当前账号不支持该小云雀 req_key。请确认已开通智能生视频 Agent 2.0（无参考），或联系管理员配置 MERCHANT_AI_XIAOYUNQUE_REQ_KEY。' +
+      '当前账号不支持该小云雀 req_key。请确认已开通智能生视频 Agent 2.0（pippit_iv2v_v20_cvtob），或配置 MERCHANT_AI_XIAOYUNQUE_REQ_KEY。' +
       `（原始：${t.slice(0, 140)}）`
     )
   }
@@ -325,40 +319,57 @@ function clampDurationSec(raw: unknown): number {
   return Math.min(900, Math.max(5, Math.round(n)))
 }
 
-function bodyVariants(opts: {
+function durationSlot(sec: number): '～15s' | '～30s' | '40～60s' | '1min+' {
+  if (sec <= 22) return '～15s'
+  if (sec <= 40) return '～30s'
+  if (sec <= 70) return '40～60s'
+  return '1min+'
+}
+
+function ratioSlot(raw: string): '16:9' | '9:16' | '4:3' | '3:4' {
+  const t = String(raw || '').replace(/\s/g, '')
+  if (t === '16:9' || t === '9:16' || t === '4:3' || t === '3:4') return t
+  const [w, h] = t.split(':').map(Number)
+  if (Number.isFinite(w) && Number.isFinite(h) && h > 0) {
+    return w >= h ? '16:9' : '9:16'
+  }
+  return '9:16'
+}
+
+function publicHttpUrls(raw: unknown, cap: number): string[] {
+  const out: string[] = []
+  const push = (u: unknown) => {
+    if (typeof u === 'string' && /^https?:\/\//i.test(u.trim()) && out.length < cap) {
+      out.push(u.trim())
+    }
+  }
+  if (Array.isArray(raw)) {
+    for (const u of raw) push(u)
+  } else {
+    push(raw)
+  }
+  return out
+}
+
+function buildXiaoyunqueSubmitBody(opts: {
+  reqKey: string
   prompt: string
   durationSec: number
   aspectRatio: string
-  imageUrls?: string[]
-}): Record<string, unknown>[] {
-  const prompt = opts.prompt.trim().slice(0, 4000)
-  const duration = opts.durationSec
-  const aspect_ratio = opts.aspectRatio
-  const imageUrls = (opts.imageUrls ?? []).filter((u) => /^https?:\/\//i.test(u)).slice(0, 4)
-  const base: Record<string, unknown> = { prompt, aspect_ratio }
-  const withImages =
-    imageUrls.length > 0
-      ? [{ ...base, image_urls: imageUrls }, { ...base, image_url: imageUrls[0] }]
-      : [{ ...base }]
-
-  const out: Record<string, unknown>[] = []
-  for (const b of withImages) {
-    out.push({ ...b, duration })
-    out.push({ ...b, duration: String(duration) })
-    out.push({
-      ...b,
-      req_json: JSON.stringify({ duration, aspect_ratio, target_duration: duration }),
-    })
-    if (duration <= 15) {
-      out.push({ ...b, frames: 24 * duration + 1 })
-    }
+  imageUrls: string[]
+  videoUrls: string[]
+}): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    req_key: opts.reqKey,
+    prompt: opts.prompt.slice(0, 2000),
+    ratio: ratioSlot(opts.aspectRatio),
+    duration: durationSlot(opts.durationSec),
+    language: 'Chinese',
+    enable_watermark: false,
   }
-  // 最后兜底：时长写进 prompt，仅传 prompt + ratio
-  out.push({
-    prompt: `${prompt}\n目标成片时长约 ${duration} 秒，竖屏 ${aspect_ratio}。`,
-    aspect_ratio,
-  })
-  return out
+  if (opts.imageUrls.length) body.img_url_list = opts.imageUrls.slice(0, 50)
+  if (opts.videoUrls.length) body.video_url_list = opts.videoUrls.slice(0, 50)
+  return body
 }
 
 export async function volcSubmitXiaoyunqueTask(
@@ -368,6 +379,7 @@ export async function volcSubmitXiaoyunqueTask(
     durationSec: number
     aspectRatio?: string
     imageUrls?: string[]
+    videoUrls?: string[]
   },
 ): Promise<{ ok: true; taskId: string; reqKey: string } | { ok: false; message: string }> {
   const creds = resolveVolcVisualCredentials(env)
@@ -382,37 +394,38 @@ export async function volcSubmitXiaoyunqueTask(
   if (!prompt) return { ok: false, message: '缺少小云雀生成提示词。' }
   const durationSec = clampDurationSec(opts.durationSec)
   const aspectRatio = (opts.aspectRatio || '9:16').trim() || '9:16'
-  const hasRef = (opts.imageUrls ?? []).some((u) => /^https?:\/\//i.test(String(u || '')))
+  const imageUrls = publicHttpUrls(opts.imageUrls, 50)
+  const videoUrls = publicHttpUrls(opts.videoUrls, 50)
+  const hasVideoRef = videoUrls.length > 0
 
   const errors: string[] = []
-  for (const attempt of reqKeyAttempts(env, hasRef)) {
-    for (const fields of bodyVariants({
+  for (const attempt of reqKeyAttempts(env, hasVideoRef)) {
+    const body = buildXiaoyunqueSubmitBody({
+      reqKey: attempt.reqKey,
       prompt,
       durationSec,
       aspectRatio,
-      imageUrls: opts.imageUrls,
-    })) {
-      const body: Record<string, unknown> = { req_key: attempt.reqKey, ...fields }
-      const r = await postVolcVisualWithRetry(creds, attempt.action, attempt.version, body)
-      if (!r.ok) {
-        errors.push(`${attempt.reqKey}: ${r.message}`)
-        if (/50400|Access\s*Denied/i.test(r.message)) {
-          return { ok: false, message: humanizeXiaoyunqueError(r.message) }
-        }
-        // req_key 不被支持 → 换下一个 key
-        if (/not supported|req_key|不支持|invalid/i.test(r.message)) break
-        continue
+      imageUrls,
+      videoUrls,
+    })
+    const r = await postVolcVisualWithRetry(creds, attempt.action, attempt.version, body)
+    if (!r.ok) {
+      errors.push(`${attempt.reqKey}: ${r.message}`)
+      if (/50400|Access\s*Denied/i.test(r.message)) {
+        return { ok: false, message: humanizeXiaoyunqueError(r.message) }
       }
-      const rawId = extractTaskId(r.json)
-      if (!rawId) {
-        errors.push(`${attempt.reqKey}: 未返回 task_id`)
-        continue
-      }
-      return {
-        ok: true,
-        taskId: encodeTaskToken(attempt.reqKey, attempt.getAction, rawId),
-        reqKey: attempt.reqKey,
-      }
+      if (/not supported|不支持/i.test(r.message)) continue
+      continue
+    }
+    const rawId = extractTaskId(r.json)
+    if (!rawId) {
+      errors.push(`${attempt.reqKey}: 未返回 task_id`)
+      continue
+    }
+    return {
+      ok: true,
+      taskId: encodeTaskToken(attempt.reqKey, attempt.getAction, rawId),
+      reqKey: attempt.reqKey,
     }
   }
   return {
@@ -440,9 +453,15 @@ export async function volcGetXiaoyunqueTaskOnce(
   }
   const status = extractStatus(r.json)
   const videoUrl = extractVideoUrl(r.json)
-  if (videoUrl || /done|success|succeed|completed|finish/i.test(status)) {
-    if (videoUrl) {
-      return { phase: 'succeeded', statusLabel: '已完成', videoUrl }
+  if (videoUrl) {
+    return { phase: 'succeeded', statusLabel: status || '已完成', videoUrl }
+  }
+  if (/done|success|succeed|completed|finish/i.test(status)) {
+    const { message } = unwrapVolcResult(r.json)
+    return {
+      phase: 'failed',
+      statusLabel: status || '失败',
+      failReason: humanizeXiaoyunqueError(message || '小云雀已结束但未返回视频'),
     }
   }
   if (/fail|error|expired|not_found|cancel/i.test(status)) {
@@ -453,8 +472,11 @@ export async function volcGetXiaoyunqueTaskOnce(
       failReason: humanizeXiaoyunqueError(message || status),
     }
   }
-  if (/queue|pending|wait|submit/i.test(status)) {
+  if (/in_queue|processing|queue|pending|wait|submit/i.test(status)) {
     return { phase: 'queued', statusLabel: status || '排队中' }
+  }
+  if (/generating/i.test(status)) {
+    return { phase: 'running', statusLabel: status || '生成中' }
   }
   return { phase: 'running', statusLabel: status || '生成中' }
 }
@@ -474,19 +496,29 @@ export async function volcPostXiaoyunqueVideoTask(
     /--ratio\s+([0-9:.]+)/i.exec(flags)?.[1] ||
     String(parsed.aspect_ratio ?? parsed.aspectRatio ?? '9:16').trim() ||
     '9:16'
-  const imageUrls: string[] = []
-  const single = String(parsed.image_url ?? '').trim()
-  if (/^https?:\/\//i.test(single)) imageUrls.push(single)
-  if (Array.isArray(parsed.image_urls)) {
-    for (const u of parsed.image_urls) {
-      if (typeof u === 'string' && /^https?:\/\//i.test(u.trim())) imageUrls.push(u.trim())
-    }
-  }
+  const imageUrls = publicHttpUrls(
+    [
+      parsed.image_url,
+      parsed.img_url,
+      ...(Array.isArray(parsed.image_urls) ? parsed.image_urls : []),
+      ...(Array.isArray(parsed.img_url_list) ? parsed.img_url_list : []),
+    ],
+    50,
+  )
+  const videoUrls = publicHttpUrls(
+    [
+      parsed.video_url,
+      ...(Array.isArray(parsed.video_urls) ? parsed.video_urls : []),
+      ...(Array.isArray(parsed.video_url_list) ? parsed.video_url_list : []),
+    ],
+    50,
+  )
   const r = await volcSubmitXiaoyunqueTask(env, {
     prompt,
     durationSec,
     aspectRatio: aspect,
     imageUrls,
+    videoUrls,
   })
   if (!r.ok) return { ok: false, msg: r.message }
   return { ok: true, taskId: r.taskId, modelUsed: r.reqKey }
