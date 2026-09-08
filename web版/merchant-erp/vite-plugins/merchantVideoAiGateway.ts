@@ -1592,6 +1592,102 @@ function unwrapKlingTask(obj: Record<string, unknown>): {
   return { taskId, taskStatus, rawMessage: message }
 }
 
+function seedanceContentUsesFirstOrLastFrame(content: Record<string, unknown>[]): boolean {
+  return content.some((item) => {
+    const role = String(item?.role ?? '')
+    return role === 'first_frame' || role === 'last_frame'
+  })
+}
+
+function parseSeedanceRatioPair(ratio: string): { w: number; h: number } | null {
+  const m = /^(\d+)\s*:\s*(\d+)$/.exec(String(ratio || '').trim())
+  if (!m) return null
+  const w = Number(m[1])
+  const h = Number(m[2])
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return null
+  return { w, h }
+}
+
+function decodeDataImageBuffer(url: string): Buffer | null {
+  const m = /^data:image\/[a-zA-Z0-9.+-]+;base64,([\s\S]+)$/i.exec(String(url || '').trim())
+  if (!m) return null
+  try {
+    return Buffer.from(m[1].replace(/\s/g, ''), 'base64')
+  } catch {
+    return null
+  }
+}
+
+function isSeedanceRatioInvalidError(msg: string): boolean {
+  return /parameter ratio.*not valid|output ratio follows the first-frame/i.test(String(msg || ''))
+}
+
+/** 首帧图生不能传 ratio；把首/尾帧垫成目标画幅，成片才能保持竖屏 */
+async function finalizeArkI2vPayload(
+  payload: Record<string, unknown>,
+  targetRatio = '9:16',
+): Promise<void> {
+  const content = payload.content
+  if (!Array.isArray(content)) return
+  const rows = content as Record<string, unknown>[]
+  if (!seedanceContentUsesFirstOrLastFrame(rows)) return
+  delete payload.ratio
+  const pair = parseSeedanceRatioPair(targetRatio) || { w: 9, h: 16 }
+  for (const item of rows) {
+    const role = String(item?.role ?? '')
+    if (role !== 'first_frame' && role !== 'last_frame') continue
+    const imageUrl = item.image_url
+    if (!imageUrl || typeof imageUrl !== 'object') continue
+    const rec = imageUrl as { url?: unknown }
+    const url = String(rec.url ?? '')
+    if (!url.startsWith('data:image')) continue
+    rec.url = await letterboxDataImageToRatio(url, pair.w, pair.h)
+  }
+}
+
+async function letterboxDataImageToRatio(dataUrl: string, rw: number, rh: number): Promise<string> {
+  const buf = decodeDataImageBuffer(dataUrl)
+  if (!buf?.length) return dataUrl
+  try {
+    const sharpMod = await import('sharp')
+    const sharp = sharpMod.default
+    const meta = await sharp(buf, { failOn: 'none' }).metadata()
+    const iw = meta.width ?? 0
+    const ih = meta.height ?? 0
+    if (iw < 8 || ih < 8) return dataUrl
+    const src = iw / ih
+    const dst = rw / rh
+    if (Math.abs(src - dst) / dst < 0.04) return dataUrl
+    const maxEdge = 1280
+    const tw = rw >= rh ? maxEdge : Math.max(8, Math.round((maxEdge * rw) / rh))
+    const th = rw >= rh ? Math.max(8, Math.round((maxEdge * rh) / rw)) : maxEdge
+    const out = await sharp(buf, { failOn: 'none' })
+      .resize(tw, th, {
+        fit: 'contain',
+        background: { r: 8, g: 10, b: 14, alpha: 1 },
+      })
+      .jpeg({ quality: 90, mozjpeg: true })
+      .toBuffer()
+    return `data:image/jpeg;base64,${out.toString('base64')}`
+  } catch (e) {
+    console.warn('[seedance] first-frame letterbox skipped:', e)
+    return dataUrl
+  }
+}
+
+async function buildArkVideoTaskPayloadForPost(
+  modelId: string,
+  body: Record<string, unknown>,
+  mode: VideoGenMode = 't2v',
+): Promise<{ ok: false; msg: string } | { ok: true; payload: Record<string, unknown> }> {
+  const built = buildArkVideoTaskPayload(modelId, body, mode)
+  if (built.ok === false) return built
+  const flags = typeof body.flags === 'string' ? body.flags : ''
+  const ratio = parseSeedanceCliFlags(flags).ratio || '9:16'
+  await finalizeArkI2vPayload(built.payload, ratio)
+  return built
+}
+
 function buildArkVideoTaskPayload(
   modelId: string,
   body: Record<string, unknown>,
@@ -1680,8 +1776,11 @@ function buildArkVideoTaskPayload(
       }
       payload.duration = resolved
     }
-    if (flagParsed.ratio) payload.ratio = flagParsed.ratio
-    else payload.ratio = '9:16'
+    /** 首帧 / 首尾帧：方舟规定输出比例跟随首帧，传 ratio 会 400 */
+    if (!seedanceContentUsesFirstOrLastFrame(contentArr)) {
+      if (flagParsed.ratio) payload.ratio = flagParsed.ratio
+      else payload.ratio = '9:16'
+    }
     payload.watermark = flagParsed.watermark ?? false
     payload.resolution = flagParsed.resolution ?? '720p'
     /** 商家短片台显式开启；数字人默认不传，保持原行为 */
@@ -1732,6 +1831,10 @@ async function arkPostVideoGenerationTask(
       msg: arkCreateTaskUserMessage(rawMsg, modelForError, res.status),
       status: arkCreateTaskHttpStatus(res.status),
       rawMsg,
+    }
+    if (attempt === 0 && isSeedanceRatioInvalidError(rawMsg) && payload.ratio != null) {
+      delete payload.ratio
+      continue
     }
     const retrySame =
       attempt < 3 &&
@@ -1810,7 +1913,7 @@ async function arkCreateVideoTask(
     for (const modelId of tryOrder) {
       if (looksLikeArkPlaceholderEndpointId(modelId) || looksLikeDoubaoChatModelId(modelId)) continue
       if (!videoModelSupportsDuration(modelId, durationSec, mode)) continue
-      const built = buildArkVideoTaskPayload(modelId, apiBody, mode)
+      const built = await buildArkVideoTaskPayloadForPost(modelId, apiBody, mode)
       if (built.ok === false) continue
       tried += 1
       triedModels.push(modelId)
@@ -1821,7 +1924,7 @@ async function arkCreateVideoTask(
       }
       const rawErr = String(posted.rawMsg ?? posted.msg ?? '')
       if (/invalid content\.text/i.test(rawErr)) {
-        const emergencyBuilt = buildArkVideoTaskPayload(
+        const emergencyBuilt = await buildArkVideoTaskPayloadForPost(
           modelId,
           {
             ...apiBody,
@@ -1904,7 +2007,7 @@ async function arkCreateVideoTask(
           : `${faceFlags} --dur ${faceDur}`.trim()
       }
       if (videoModelSupportsDuration(faceModel, faceDur, faceMode)) {
-        const faceBuilt = buildArkVideoTaskPayload(
+        const faceBuilt = await buildArkVideoTaskPayloadForPost(
           faceModel,
           {
             ...apiBody,

@@ -56,6 +56,9 @@ export function formatVideoAiUserError(msg: string): string {
       ( /已改走|正在改用|1\.5 Pro/.test(raw) ? '' : ` ${raw}` )
     )
   }
+  if (/parameter ratio.*not valid|output ratio follows the first-frame/i.test(raw)) {
+    return '角色参考图已用作视频首帧时，不能再指定画幅。系统会按首帧自动出竖屏，请再点一次生成。'
+  }
   if (/duration customization is not supported|duration must be in/i.test(raw)) {
     return (
       '当前模型不支持您选择的视频时长（10 秒图生视频须 Seedance 1.5/2.0 或千问 wan2.6+）。' +
