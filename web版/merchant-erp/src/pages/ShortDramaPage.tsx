@@ -1861,7 +1861,7 @@ export default function ShortDramaPage() {
             .join('\n')
       const system = fromImage
         ? '你是人像核验员。只描述参考图里看得见的特征，禁止虚构。商家文字只用于职业与年龄。不要写技术参数，不要出现字幕、水印、Logo、多人。'
-        : '你是商业短视频角色造型指导。根据简要提示补全写实竖屏人像的角色形象词，具体到国籍外观、衣着面料颜色与配饰。不要写技术参数，不要出现字幕、水印、Logo、多人。'
+        : '你是商业短视频角色造型指导。根据简要提示补全竖屏短剧定妆形象词，具体到国籍外观、衣着面料颜色与配饰。偏电影感，不要写成证件照或新闻摄影。不要写技术参数，不要出现字幕、水印、Logo、多人。'
       const chatTries = fromImage
         ? ([
             { provider: 'tokenmix' as const, modelFamily: 'openai' as const, model: 'gpt-4o' },
@@ -2069,7 +2069,7 @@ export default function ShortDramaPage() {
             'Image-to-image: build a similar portrait from the attached reference.',
             'Keep the same person: face, hairstyle, hair color, skin, body shape. Do not invent another face.',
             'If the reference is a short-video screenshot, crop to the front person only and remove app UI, icons, captions, status bar and bystanders.',
-            'Output a clean vertical half-body photorealistic portrait, natural light.',
+            'Output a clean vertical half-body short-drama key art, cinematic studio light, commercial film still, not a documentary photograph or ID photo.',
             roleHint ? `Role: ${roleHint}.` : '',
             shortHint ? `Optional occupation/age hint only: ${shortHint}.` : '',
             'Clothing: prefer the outfit in the reference photo. Do not replace it with an unrelated cafe / linen-shirt look.',
@@ -2078,7 +2078,7 @@ export default function ShortDramaPage() {
             .filter(Boolean)
             .join(' ')
         : [
-            '竖屏半身人像照片，单人，正面或微侧，五官清晰，自然光线，写实。',
+            '竖屏半身短剧定妆，单人，正面或微侧，五官清晰，电影棚拍光，商业广告质感；不要证件照、不要新闻纪实超写实抓拍。',
             `角色身份：${roleHint || '主角'}。`,
             `外貌与穿搭：${desc}。`,
             `气质贴近「${scene.name}」${style.visual ? `，${style.visual}` : ''}。`,

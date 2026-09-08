@@ -49,9 +49,12 @@ export type ShortVideoGenRequestBody = {
 export function formatVideoAiUserError(msg: string): string {
   const raw = String(msg ?? '').trim()
   if (!raw) return raw
-  if (/仍未通过写实人像|更换角色参考图/.test(raw)) return raw
-  if (/may contain real person|contain real person|input image.*real person|写实人像|真人肖像/i.test(raw)) {
-    return '当前 Seedance 拦截了写实人像。请更换角色参考图后重试。'
+  if (/已改走火山 1\.5|正在改用火山 1\.5|1\.5 Pro 首帧/i.test(raw)) {
+    return '当前 Seedance 拦截了写实参考图。请再点一次生成，系统会用同一模型按角色描述出片。'
+  }
+  if (/仍未通过写实人像|按角色描述生成/.test(raw)) return raw
+  if (/may contain real person|contain real person|input image.*real person|写实人像|真人肖像|更换角色参考图/i.test(raw)) {
+    return '当前 Seedance 拦截了写实参考图。系统已按同一模型改用角色描述生成；若仍失败请简化文案后重试。'
   }
   if (/parameter ratio.*not valid|output ratio follows the first-frame/i.test(raw)) {
     return '角色参考图已用作视频首帧时，不能再指定画幅。系统会按首帧自动出竖屏，请再点一次生成。'
@@ -136,7 +139,7 @@ function isVideoApiUnreachableError(msg: string): boolean {
 export function isVideoModelHopableError(msg: string): boolean {
   const raw = String(msg ?? '').trim()
   if (!raw) return false
-  if (/may contain real person|contain real person|input image.*real person|参考图被火山判定可能含真人|写实人像/i.test(raw)) {
+  if (/may contain real person|contain real person|input image.*real person|参考图被火山判定可能含真人|写实人像|写实参考图/i.test(raw)) {
     return false
   }
   if (isArkQuotaHopableError(raw) || isQwenVideoModelHopableError(raw) || isArkVideoRateLimitError(raw))

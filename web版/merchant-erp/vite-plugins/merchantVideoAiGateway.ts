@@ -248,31 +248,29 @@ function arkCreateTaskHttpStatus(upstreamStatus?: number): number {
 }
 
 function isArkRealPersonImageBlock(msg: string): boolean {
-  return /may contain real person|contain real person|input image.*real person|真实人|写实人像|真人肖像|人脸.*不允许/i.test(
+  return /may contain real person|contain real person|input image.*real person|真实人|写实人像|写实参考图|真人肖像|人脸.*不允许/i.test(
     String(msg ?? ''),
   )
 }
 
-function isArkModelInaccessibleError(msg: string): boolean {
-  return /does not exist|not have access|do not have access|model.*not.*found|unknown model|无权访问|尚未开通|未开通该模型/i.test(
-    String(msg ?? ''),
-  )
-}
-
-function pickOpenedSeedance15FromTriedOrder(tryOrder: string[], triedModels: string[]): string | null {
-  const tried = new Set(triedModels.map((id) => normalizeArkVideoModelParam(id)))
-  for (const raw of tryOrder) {
-    const id = normalizeArkVideoModelParam(raw)
-    if (!/seedance-1-5|seedance-1\.5/i.test(id)) continue
-    if (tried.has(id)) continue
-    return id
+function stripImagesForArkT2v(body: Record<string, unknown>, extraPrompt: string): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...body }
+  delete next.images_base64
+  next.seedance_image_mode = 'auto'
+  const prompt = String(next.prompt ?? '').trim()
+  next.prompt = [prompt, extraPrompt].filter(Boolean).join('\n')
+  if (Array.isArray(next.content)) {
+    next.content = (next.content as unknown[]).filter((row) => {
+      if (!row || typeof row !== 'object') return true
+      return String((row as { type?: unknown }).type) !== 'image_url'
+    })
   }
-  return null
+  return next
 }
 
 function arkCreateTaskUserMessage(msg: string, endpointId: string, upstreamStatus?: number): string {
   if (isArkRealPersonImageBlock(msg)) {
-    return '当前 Seedance 拦截了写实人像。请更换角色参考图后重试。'
+    return '当前 Seedance 拦截了写实参考图。系统已按同一模型改用角色描述生成；若仍失败请简化文案后重试。'
   }
   if (looksLikeArkPlaceholderEndpointId(endpointId)) {
     return `视频推理接入点「${endpointId}」为占位示例，不可用。请到运营管控台「AI模型 → 短视频 API」或 Vercel 环境变量 MERCHANT_AI_ARK_VIDEO_ENDPOINTS 填写火山方舟控制台真实的 ep- 接入点（形如 ep-2024xxxxxxxx）。`
@@ -1918,6 +1916,7 @@ async function arkCreateVideoTask(
   let lastMsg = preferQwenOnly ? '千问视频生成失败' : '豆包视频生成失败'
   let lastStatus: number | undefined
   let tried = 0
+  let blockedRealPerson = false
   const triedModels: string[] = []
 
   if (key && tryOrder.length > 0) {
@@ -1966,7 +1965,8 @@ async function arkCreateVideoTask(
       lastMsg = posted.msg
       lastStatus = posted.status
       const combinedErr = `${posted.rawMsg ?? ''} ${posted.msg}`
-      if (lockModel || isArkRealPersonImageBlock(combinedErr)) {
+      if (isArkRealPersonImageBlock(combinedErr)) blockedRealPerson = true
+      if (lockModel || blockedRealPerson) {
         break
       }
       const hopable =
@@ -1995,57 +1995,47 @@ async function arkCreateVideoTask(
       '未检测到方舟 / 豆包 API Key：请到运营管控台「AI模型 → 短视频 API」配置专用 Key 或「豆包」Key。'
   }
 
-  /** 写实人脸：仅当尝试列表里已有已开通的 1.5 才换模；锁定模型（短剧 2.5）绝不硬切未开通的 1.5 Pro */
-  if (
-    key &&
-    skipQwen &&
-    !lockModel &&
-    isArkRealPersonImageBlock(`${lastMsg}`) &&
-    Array.isArray(apiBody.images_base64) &&
-    apiBody.images_base64.some((x) => String(x ?? '').trim())
-  ) {
-    const faceModel = pickOpenedSeedance15FromTriedOrder(tryOrder, triedModels)
-    if (faceModel) {
-      const faceMode: 't2v' | 'i2v' = 'i2v'
-      let faceFlags = typeof apiBody.flags === 'string' ? apiBody.flags : ''
-      let faceDur = durationSec
-      if (!videoModelSupportsDuration(faceModel, faceDur, faceMode)) {
-        faceDur = 15
-        faceFlags = /--dur\s+\d+/i.test(faceFlags)
-          ? faceFlags.replace(/--dur\s+\d+/i, `--dur ${faceDur}`)
-          : `${faceFlags} --dur ${faceDur}`.trim()
-      }
-      if (videoModelSupportsDuration(faceModel, faceDur, faceMode)) {
-        const prevMsg = lastMsg
-        const faceBuilt = await buildArkVideoTaskPayloadForPost(
-          faceModel,
-          {
-            ...apiBody,
-            flags: faceFlags,
-            seedance_image_mode: 'first_only',
-            generate_audio: false,
-          },
-          faceMode,
-        )
-        if (faceBuilt.ok === true) {
-          tried += 1
-          triedModels.push(faceModel)
-          const facePosted = await arkPostVideoGenerationTask(env, key, faceBuilt.payload, faceModel)
-          if (facePosted.ok === true) {
-            clearArkVideoModelQuotaExhausted(key, faceModel)
-            return {
-              ok: true,
-              taskId: facePosted.taskId,
-              provider: 'ark',
-              modelUsed: faceModel,
-              raw: facePosted.raw,
-            }
+  /**
+   * 写实人像：2.5 / 1.5 / 2.0 图生都会拦。不要硬切未开通模型。
+   * 锁定短剧 2.5 时，同一模型去掉参考图改文生，才能真正出片。
+   */
+  if (key && (blockedRealPerson || isArkRealPersonImageBlock(`${lastMsg}`))) {
+    const t2vModel =
+      lockModel && lockedOne && lockedOne !== SEEDANCE_SERVER_AUTO
+        ? lockedOne
+        : triedModels[0] || lockedOne || ''
+    const hasImages =
+      (Array.isArray(apiBody.images_base64) &&
+        apiBody.images_base64.some((x) => String(x ?? '').trim())) ||
+      (Array.isArray(apiBody.content) &&
+        (apiBody.content as unknown[]).some(
+          (row) =>
+            row &&
+            typeof row === 'object' &&
+            String((row as { type?: unknown }).type) === 'image_url',
+        ))
+    if (t2vModel && hasImages && videoModelSupportsDuration(t2vModel, durationSec, 't2v')) {
+      const t2vBody = stripImagesForArkT2v(
+        apiBody,
+        '参考图因火山写实人像策略未采用。请严格按提示词中的角色外貌、服装与场景生成电影短剧画面，竖屏 9:16。',
+      )
+      const t2vBuilt = await buildArkVideoTaskPayloadForPost(t2vModel, t2vBody, 't2v')
+      if (t2vBuilt.ok === true) {
+        tried += 1
+        triedModels.push(`${t2vModel}:t2v`)
+        const t2vPosted = await arkPostVideoGenerationTask(env, key, t2vBuilt.payload, t2vModel)
+        if (t2vPosted.ok === true) {
+          clearArkVideoModelQuotaExhausted(key, t2vModel)
+          return {
+            ok: true,
+            taskId: t2vPosted.taskId,
+            provider: 'ark',
+            modelUsed: t2vModel,
+            raw: t2vPosted.raw,
           }
-          lastMsg = isArkModelInaccessibleError(`${facePosted.rawMsg ?? ''} ${facePosted.msg}`)
-            ? prevMsg
-            : facePosted.msg
-          lastStatus = facePosted.status
         }
+        lastMsg = t2vPosted.msg
+        lastStatus = t2vPosted.status
       }
     }
   }
