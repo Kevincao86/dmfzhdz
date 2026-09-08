@@ -149,8 +149,20 @@ export function pickBoundProductReferenceImage(
 function wellnessPhraseFromText(text: string): string | undefined {
   const t = text.replace(/\s+/g, ' ').trim()
   if (!t) return undefined
-  const m = t.match(/[^，。；、\n]{0,10}(?:足浴|足疗|足道|沐足|采耳|按摩|开背|推拿|汗蒸|洗浴|SPA)[^，。；、\n]{0,18}/i)
+  const m = t.match(/(?:足浴|足疗|足道|沐足|采耳|按摩|开背|推拿|汗蒸|洗浴|SPA)[^，。；、\n!！]{0,18}/i)
   return m?.[0]?.trim().slice(0, 48) || undefined
+}
+
+/**
+ * 养生/美业主图：强制豆包 Seedream。
+ * 通义万相（wanx / wan2.7）食品摄影先验极强，「套餐/体验/国庆」常被画成面食火锅，负向提示经常被忽略。
+ */
+function resolveProductPlanImageVendor(
+  visualCategory: ReturnType<typeof inferIndustryVisualCategory>,
+  chatPickerKey?: string,
+): string {
+  if (visualCategory === 'wellness' || visualCategory === 'beauty') return 'doubao'
+  return resolveImageAssistModelIdFromChatPicker(chatPickerKey)
 }
 
 /** 标题/生图锚点：足疗套餐优先服务项，避免营销名「畅享套餐」把模型画成餐饮 */
@@ -223,7 +235,10 @@ export async function enrichAiProductPlanPreview(
   })
   const imageAnchor =
     visualCategory === 'wellness'
-      ? titleAnchor
+      ? wellnessPhraseFromText(titleAnchor) ||
+        wellnessPhraseFromText(plan.productName) ||
+        wellnessPhraseFromText(plan.description || '') ||
+        titleAnchor
       : imageFields.main_product_heuristic || titleAnchor
 
   const assistBase = {
@@ -289,15 +304,15 @@ export async function enrichAiProductPlanPreview(
         ? '画面须贴近参考图中的真实到店服务或门店空间，禁止改成餐饮菜品。'
         : ''
     const foodBan = nonCatering
-      ? '【严禁餐饮错配】禁止出现菜品、餐桌摆盘、火锅海鲜、面食特写、饮品特写等美食摄影。'
+      ? '【严禁餐饮错配】禁止出现菜品、餐桌摆盘、火锅海鲜、冒菜、麻辣烫、面食特写、炒面、饮品特写等美食摄影。画面里不能有碗、筷子、汤汁、食物。'
       : ''
     const wellnessLead =
       visualCategory === 'wellness'
-        ? '帮我生成一张到店足疗养生团购主图，主体必须是足浴沙发/足疗椅、足浴桶或技师按摩场景，'
+        ? '帮我生成一张到店足疗养生团购主图，主体必须是足浴沙发/足疗椅、足浴桶或技师按摩足部场景，室内养生馆灯光，绝不是餐馆也不是任何食物，'
         : `帮我生成一张${imageAnchor}主图。`
     const modelLock = goodsImageIndustryLockSuffix(industryPath)
     const imageUserLine = `${wellnessLead}${visualCategory === 'wellness' ? `内容：${imageAnchor}。` : ''}${industryLockLine}${boundHint}${categoryHint}${foodBan}${modelLock}`
-    const imageModel = resolveImageAssistModelIdFromChatPicker(chatPickerKey)
+    const imageModel = resolveProductPlanImageVendor(visualCategory, chatPickerKey)
     const imageBase = {
       model: imageModel,
       product_name: imageAnchor,
