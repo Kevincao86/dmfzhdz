@@ -1577,10 +1577,14 @@ function dramaJimengPhotoReady(cfg: VideoAiBackendConfig | null): boolean {
 function dramaXiaoyunqueHint(cfg: VideoAiBackendConfig | null, cfgLoaded: boolean): string {
   if (!cfgLoaded) return ''
   if (dramaXiaoyunqueReady(cfg)) {
-    return ' 当前：小云雀已开通。有角色照片时走有声短剧（带参考图），失败再即梦图生锁脸；不走方舟真人库。'
+    return ' 当前：小云雀 Agent 已开通。有角色照片时只走有声短剧（仅提交角色形象）；失败会直接报原因，不再偷偷改即梦无声片。'
   }
   if (dramaJimengPhotoReady(cfg)) {
-    return ' 当前：视觉云已绑定。小云雀 Agent 未开通，角色照片走即梦图生（无声锁脸）。'
+    const detail = String(cfg?.xiaoyunqueProbeDetail || '').trim()
+    return (
+      ` 当前：视觉云已绑定，但小云雀探测未通过${detail ? `（${detail}）` : ''}。` +
+      '提交时仍会先打小云雀；若欠费或未开通会明确报错。仅确认未开通时才兜底即梦无声锁脸。'
+    )
   }
   return ' 当前：小云雀未配置（请运营台填即梦/小云雀 AK/SK），无角色照片时长片将走拼接兜底。'
 }
@@ -2091,15 +2095,10 @@ export default function ShortDramaPage() {
           : toDramaImageDataUrl(contRaw)
         if (asData?.startsWith('data:image/')) out.push(await compressPortraitDataUrlForLibrary(asData))
       }
-      for (const item of refItems) {
-        const raw = String(item.imageDataUrl || '').trim()
-        if (!raw) continue
-        const u = /^https?:\/\//i.test(raw) ? await resolveDramaPortraitDataUrl(raw) : toDramaImageDataUrl(raw)
-        if (u?.startsWith('data:image/')) out.push(await compressPortraitDataUrlForLibrary(u))
-      }
-      return [...new Set(out)].slice(0, DRAMA_R2V_MAX_IMAGES)
+      /** 餐厅/场景参考图只写进提示词，不塞给小云雀：多图过大曾被悄悄打回即梦无声片 */
+      return [...new Set(out)].slice(0, 2)
     },
-    [cast, refItems],
+    [cast],
   )
 
   const fusionPromptNote = useMemo(() => {
@@ -2744,6 +2743,12 @@ export default function ShortDramaPage() {
     const chargeSec = showPreviewGate ? PREVIEW_SEC : durationSec
     setBusy(true)
     setProgress('正在检查积分与引擎')
+    try {
+      const fresh = await fetchVideoAiConfig({ probeXiaoyunque: true })
+      if (mountedRef.current && fresh) setCfg(fresh)
+    } catch {
+      /* 沿用页内已有配置 */
+    }
     const afford = await checkMpAddonPointsAffordable('shortvideo', chargeSec)
     if (!afford.ok) {
       if (mountedRef.current) {
@@ -2835,7 +2840,7 @@ export default function ShortDramaPage() {
                 : segmentPlanLabel(durationSec)
           }）。`,
           collectFusionImages().length && dramaJimengPhotoReady(cfg)
-            ? '已上传角色形象，全片先走小云雀有声短剧（带参考图），失败再即梦图生锁脸。'
+            ? '已上传角色形象，全片走小云雀有声短剧。失败会报原因，不再偷偷改即梦无声片。'
             : collectFusionImages().length
               ? '已上传角色形象。视觉云未开通时不能走方舟真人库，请先在运营台绑定即梦/小云雀 AK。'
             : dramaXiaoyunqueReady(cfg)

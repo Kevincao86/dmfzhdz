@@ -6,8 +6,9 @@
  * Version: 2022-08-31
  * 默认无参考 req_key: pippit_iv2v_v20_cvtob（文档 85621/2359611）
  * 有参考（图+视频）：pippit_iv2v_v20_cvtob_with_vinput（文档 85621/2359610）
- * 有角色照片时：先小云雀 Agent（pippit_iv2v_v20_cvtob + 参考图，有声多镜），
- * 失败再即梦图生 jimeng_ti2v_v30_pro 锁脸；不走方舟 Seedance 真人库。
+ * 有角色照片时：只走小云雀 Agent（pippit_iv2v_v20_cvtob + 角色图，有声多镜）。
+ * 仅当 req_key 明确不支持（未开通 Agent）才兜底即梦图生锁脸；欠费/内容审核/请求过大直接报错，不偷偷改无声片。
+ * 不走方舟 Seedance 真人库。
  *
  * 凭据：运营台 videoAi.jimengAccessKeyId/SK → JIMENG_*，或轻量 MERCHANT_AI_VOLC_*。
  * 可用 MERCHANT_AI_XIAOYUNQUE_REQ_KEY / SUBMIT_ACTION / GET_ACTION 覆盖。
@@ -134,7 +135,7 @@ function reqKeyAttempts(
     reqKey,
     getAction: customGet || XYQ_GET_ACTION,
   })
-  /** 有角色图：先小云雀有声短剧（带参考图），再即梦图生锁脸；禁止无图 Agent 另造人 */
+  /** 有角色图：先小云雀有声；仅 Agent 未开通时才尝试即梦锁脸 */
   if (hasImageRef && !hasVideoRef) {
     const rows = [xyqRow(XYQ_REQ_KEY_NOREF), ...JIMENG_I2V_KEYS.map((reqKey) => xyqRow(reqKey))]
     if (customKey && !rows.some((r) => r.reqKey === customKey)) {
@@ -183,15 +184,28 @@ async function sleepMs(ms: number): Promise<void> {
   await new Promise((r) => setTimeout(r, ms))
 }
 
+function isXiaoyunqueBillingError(msg: string): boolean {
+  return /欠费|余额不足|预付费不足|账号逾期|overdue|arrear|insufficient\s*(credit|fund|balance)|quota\s*exceeded|credit\s*not\s*enough/i.test(
+    msg,
+  )
+}
+
+function isXiaoyunqueReqKeyNotOpenedError(msg: string): boolean {
+  return /req_key\s*<[^>]+>\s*not supported|不支持该小云雀 req_key|req_key.*not supported/i.test(msg)
+}
+
 function humanizeXiaoyunqueError(raw: string): string {
   const t = String(raw || '').trim()
-  if (/Access\s*Denied|50400|not\s*authorized|未开通/i.test(t)) {
+  if (isXiaoyunqueBillingError(t)) {
+    return `小云雀账户余额不足或欠费，请到火山控制台充值后再生成。（原始：${t.slice(0, 140)}）`
+  }
+  if (/Access\s*Denied|50400|not\s*authorized|未开通/i.test(t) && !/req_key/i.test(t)) {
     return (
       '小云雀 Agent 未开通或 AK 无权限。请到火山控制台开通「即梦 AI · 小云雀智能生视频 Agent」，' +
       '并在运营台「短剧 AI 制作」填写视觉云 AK/SK。'
     )
   }
-  if (/not supported|req_key/i.test(t)) {
+  if (isXiaoyunqueReqKeyNotOpenedError(t) || /not supported/i.test(t)) {
     return (
       '当前账号不支持该小云雀 req_key。请确认已开通智能生视频 Agent 2.0（pippit_iv2v_v20_cvtob），或配置 MERCHANT_AI_XIAOYUNQUE_REQ_KEY。' +
       `（原始：${t.slice(0, 140)}）`
@@ -464,8 +478,9 @@ function buildXiaoyunqueSubmitBody(opts: {
     language: 'Chinese',
     enable_watermark: false,
   }
-  if (opts.imageUrls.length) body.img_url_list = opts.imageUrls.slice(0, 50)
-  if (opts.binaries.length) body.binary_data_base64 = opts.binaries.slice(0, 10)
+  /** Agent 只要角色图；餐厅参考图一起塞进去容易请求过大，被悄悄打回即梦 */
+  if (opts.imageUrls.length) body.img_url_list = opts.imageUrls.slice(0, 2)
+  if (opts.binaries.length) body.binary_data_base64 = opts.binaries.slice(0, 2)
   if (opts.videoUrls.length) body.video_url_list = opts.videoUrls.slice(0, 50)
   return body
 }
@@ -493,7 +508,7 @@ export async function volcSubmitXiaoyunqueTask(
   if (!prompt) return { ok: false, message: '缺少小云雀生成提示词。' }
   const durationSec = clampDurationSec(opts.durationSec)
   const aspectRatio = (opts.aspectRatio || '9:16').trim() || '9:16'
-  const mixed = collectImagePayloads([...(opts.imageUrls ?? []), ...(opts.imageBase64 ?? [])], 50)
+  const mixed = collectImagePayloads([...(opts.imageUrls ?? []), ...(opts.imageBase64 ?? [])], 2)
   const imageUrls = mixed.urls
   const binaries = mixed.binaries
   const videoUrls = publicHttpUrls(opts.videoUrls, 50)
@@ -501,9 +516,13 @@ export async function volcSubmitXiaoyunqueTask(
   const hasImageRef = imageUrls.length > 0 || binaries.length > 0
 
   const errors: string[] = []
+  let xyqNotOpened = false
+  let xyqOtherFailed = false
   for (const attempt of reqKeyAttempts(env, hasVideoRef, hasImageRef)) {
     if (isJimengI2vReqKey(attempt.reqKey) && !imageUrls.length && !binaries.length) continue
     if (isJimengI2vReqKey(attempt.reqKey) && durationSec > 12) continue
+    /** 小云雀已开通时不要偷偷改走即梦无声片；仅 req_key 不支持才兜底 */
+    if (isJimengI2vReqKey(attempt.reqKey) && hasImageRef && xyqOtherFailed && !xyqNotOpened) continue
     const tryDurs =
       isJimengI2vReqKey(attempt.reqKey) && durationSec > 7 ? [durationSec, 5] : [durationSec]
     for (const dur of tryDurs) {
@@ -527,7 +546,16 @@ export async function volcSubmitXiaoyunqueTask(
       const r = await postVolcVisualWithRetry(creds, attempt.action, attempt.version, body)
       if (!r.ok) {
         const tag = isXiaoyunqueAgentReqKey(attempt.reqKey) ? '小云雀' : attempt.reqKey
-        errors.push(`${tag}${dur !== durationSec ? `@${dur}s` : ''}: ${r.message}`)
+        const row = `${tag}${dur !== durationSec ? `@${dur}s` : ''}: ${r.message}`
+        errors.push(row)
+        console.warn('[xiaoyunque-submit]', row.slice(0, 400))
+        if (isXiaoyunqueAgentReqKey(attempt.reqKey)) {
+          if (isXiaoyunqueBillingError(r.message)) {
+            return { ok: false, message: humanizeXiaoyunqueError(r.message) }
+          }
+          if (isXiaoyunqueReqKeyNotOpenedError(r.message)) xyqNotOpened = true
+          else xyqOtherFailed = true
+        }
         continue
       }
       const rawId = extractTaskId(r.json)
@@ -547,7 +575,9 @@ export async function volcSubmitXiaoyunqueTask(
       ok: false,
       message:
         humanizeXiaoyunqueError(errors.slice(0, 3).join('；')) ||
-        '小云雀有声短剧与即梦图生均未成功，未改用无参考成片（否则会丢掉角色照片）。',
+        (xyqOtherFailed && !xyqNotOpened
+          ? '小云雀有声短剧提交失败。未改走即梦无声片，以免丢掉对白。'
+          : '小云雀有声短剧与即梦图生均未成功，未改用无参考成片（否则会丢掉角色照片）。'),
     }
   }
   return {

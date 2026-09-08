@@ -1691,7 +1691,7 @@ async function runShortVideoJobWithDurationInternal(
   }
 }
 
-/** 即梦/小云雀：有角色图时走视觉云（先小云雀有声，再即梦锁脸），不走方舟 Seedance 真人库 */
+/** 即梦/小云雀：有角色图时走视觉云小云雀有声；仅 Agent 未开通才兜底即梦锁脸。不走方舟 Seedance 真人库 */
 export async function runXiaoyunqueVideoJob(opts: {
   prompt: string
   durationSec: number
