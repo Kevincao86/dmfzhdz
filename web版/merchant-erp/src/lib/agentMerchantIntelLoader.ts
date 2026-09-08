@@ -27,6 +27,7 @@ import { fetchMerchantProductList, type MerchantProductListItem } from '../servi
 import { loadDraftDetailSnapshot } from './productDraftSnapshot'
 import { resolveCompetitorAnalysisIndustry } from './competitorIndustry'
 import { loadAgentPageDataContext, pageDataDomainsForTask } from './agentPageDataLoaders'
+import { inferIndustryPathFromText } from './merchantIndustryAlign'
 
 const FETCH_TIMEOUT_MS = 45_000
 
@@ -473,7 +474,16 @@ export async function loadFullMerchantIntelSnapshot(
 ): Promise<MerchantIntelSnapshot> {
   const base = loadMerchantIntelSnapshot()
   const enriched = await fetchMerchantIntelEnrichment(base, taskType)
-  return { ...base, ...enriched }
+  const merged: MerchantIntelSnapshot = { ...base, ...enriched }
+  if (!merged.industryPath?.trim()) {
+    const inferred = inferIndustryPathFromText(
+      [merged.storeName, merged.chainStoresSummary, merged.onlineProductsSummary, merged.menuSummary]
+        .filter(Boolean)
+        .join(' '),
+    )
+    if (inferred) merged.industryPath = inferred
+  }
+  return merged
 }
 
 

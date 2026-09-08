@@ -971,6 +971,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
               boundProductImages: intel.onlineProductImageRefs,
               planIndex: idx,
               industryPath: intel.industryPath,
+              storeName: intel.storeName,
             }),
           )
         } catch (e) {
@@ -995,7 +996,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         enriched.map((p, i) => ({ ...p, slotKey: intents[i].key, slotLabel: intents[i].label })),
         intents.length > 1
           ? `已为 ${readyCount} 个商品生成 C 端预览。${imageDoneHint}请逐项核对手机效果；全部确认 OK 后才会进入达人招募 Brief（本步仅商品）。`
-          : `已生成 C 端团购预览（含 AI 优化标题与主图${hasUserRefs ? '，主图参考您上传的菜品图' : usedBoundProductImages ? '，主图参考已绑定平台在售商品图' : ''}）。请核对手机预览；确认后将保存至商品列表草稿箱，请在商品编辑页选择类目与门店后提交审核。`,
+          : `已生成 C 端团购预览（含 AI 优化标题与主图${hasUserRefs ? '，主图参考您上传的图片' : usedBoundProductImages ? '，主图参考已绑定平台在售商品图' : ''}）。请核对手机预览；确认后将保存至商品列表草稿箱，请在商品编辑页选择类目与门店后提交审核。`,
       )
     },
     [patchPreviewProductPlans, modelPickerKey],
@@ -2444,11 +2445,15 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
                     !String(pl.headUrl || '').startsWith('https://')
                   if (!need) return pl
                   try {
+                    const snap = loadMerchantIntelSnapshot()
                     return await enrichAiProductPlanPreview(
                       pl,
                       pl.productName || title,
                       modelPickerKey,
-                      {},
+                      {
+                        industryPath: snap.industryPath,
+                        storeName: snap.storeName,
+                      },
                     )
                   } catch {
                     return pl

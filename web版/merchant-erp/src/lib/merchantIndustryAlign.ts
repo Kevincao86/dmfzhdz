@@ -8,6 +8,19 @@ const NO_CATEGORY_BLOCK =
   '必须按用户指令直接执行，禁止以「与门店经营品类不符」「本店不做餐饮/数码」等理由拒绝或改题。' +
   '下列类目说明仅在用户主动做「组品/创建商品/套餐方案」时作为参考，不得用于拦截其它请求。'
 
+/** 绑定类目为空时，从门店名/商品名推断经营路径，避免足浴店被默当成餐饮出图 */
+export function inferIndustryPathFromText(text?: string): string | undefined {
+  const t = (text ?? '').trim()
+  if (!t) return undefined
+  if (/足浴|足疗|足道|沐足|采耳|修脚|推拿|开背/.test(t)) return '休闲娱乐 > 足疗足浴'
+  if (/汗蒸|洗浴|温泉|桑拿/.test(t)) return '休闲娱乐 > 洗浴汗蒸'
+  if (/美甲|美睫|纹绣/.test(t)) return '丽人 > 美甲美睫'
+  if (/美发|理发|造型/.test(t)) return '丽人 > 美发'
+  if (/美容|SPA|美体/.test(t)) return '丽人 > 美容美体'
+  if (/火锅|烧烤|餐饮|美食|餐厅|食堂/.test(t)) return '餐饮 > 美食'
+  return undefined
+}
+
 export function formatIndustryAlignmentConstraint(
   industryPath?: string,
   storeName?: string,

@@ -304,7 +304,9 @@ export function buildImageAssistTextFields(
         ? `【商品类型】数码/3C 团购（须展示标题中的电子设备，禁止餐饮餐桌/火锅/菜品）`
         : visualCategory === 'catering'
           ? `【商品类型】餐饮团购套餐（突出餐品或就餐场景）`
-          : `【商品类型】团购套餐（须与标题及经营类目「${industryPath || '本地生活'}」一致，禁止偷换为无关餐饮）`
+          : visualCategory === 'wellness'
+            ? `【商品类型】到店足浴/养生团购（须展示服务或门店场景，禁止餐饮菜品）`
+            : `【商品类型】团购套餐（须与标题及经营类目「${industryPath || '本地生活'}」一致，禁止偷换为无关餐饮菜品）`
       : typeLabel
         ? `【商品类型】${typeLabel}`
         : productType != null
@@ -331,11 +333,26 @@ export function buildImageAssistTextFields(
 export function inferIndustryVisualCategory(
   industryPath?: string,
   anchor?: string,
-): 'catering' | 'digital' | 'beauty' | 'general' {
-  const combined = `${industryPath ?? ''} ${anchor ?? ''}`.trim()
+): 'catering' | 'digital' | 'beauty' | 'wellness' | 'general' {
+  const path = (industryPath ?? '').trim()
+  const title = (anchor ?? '').trim()
+  const combined = `${path} ${title}`.trim()
   if (/数码|3c|3C|手机|电脑|电子|家电|智能穿戴|耳机|平板|投影|鼠标|眼镜|科技|潮品|配件|开学|影音/.test(combined)) {
     return 'digital'
   }
+
+  const wellnessRe = /足浴|足疗|足道|沐足|采耳|修脚|按摩|开背|推拿|汗蒸|洗浴|养生馆/
+  const nonFoodPathRe =
+    /足浴|足疗|足道|沐足|采耳|按摩|开背|推拿|汗蒸|洗浴|美容|美发|美甲|丽人|休闲娱乐|养生|SPA|spa|护理|美睫|健身|洗车|酒店|民宿|KTV|影院|剧本杀|生活服务/
+  const pathIsNonFood = nonFoodPathRe.test(path)
+  const titleIsWellness = wellnessRe.test(title) || wellnessRe.test(path)
+
+  if (pathIsNonFood || titleIsWellness) {
+    if (titleIsWellness) return 'wellness'
+    if (/美容|美发|美甲|美睫|纹绣|美体|丽人/.test(combined)) return 'beauty'
+    return 'general'
+  }
+
   if (/餐饮|美食|外卖|火锅|烧烤|咖啡|茶饮|蛋糕|烘焙|食堂|菜品|放题|自助/.test(combined)) {
     return 'catering'
   }
@@ -343,6 +360,16 @@ export function inferIndustryVisualCategory(
     return 'beauty'
   }
   return 'general'
+}
+
+/** 绑定在售商品名是否像餐饮菜品（「套餐」本身不算餐饮） */
+export function looksLikeFoodListingName(name: string): boolean {
+  const n = name.trim()
+  if (!n) return false
+  if (/足浴|足疗|足道|沐足|采耳|按摩|开背|推拿|电影|门票|美甲|美发/.test(n)) return false
+  return /火锅|烧烤|美食|炒|煲|海鲜|小龙虾|烤鱼|麻辣烫|奶茶|咖啡|蛋糕|披萨|汉堡|寿司|自助餐|菜品|炒菜|凉菜|热菜|主食|甜品/.test(
+    n,
+  )
 }
 
 export function mainProductCategoryHints(
@@ -363,8 +390,11 @@ export function mainProductCategoryHints(
   if (industry === 'digital') {
     return '主推为数码/3C 零售团购：须展示标题中的真实电子产品（手环、耳机、投影、支架、鼠标、眼镜等），白底或门店数码陈列；严禁餐饮菜品、火锅、餐桌、厨房场景。'
   }
+  if (industry === 'wellness') {
+    return '主推为到店足浴/养生服务：须呈现足浴沙发、足疗椅、足浴桶、技师按摩或门店养生空间；严禁菜品、餐桌摆盘、火锅海鲜、饮品特写、美食摄影。'
+  }
   if (industry === 'beauty') {
-    return '主推为到店服务：突出服务过程或效果氛围，勿生成无关商品陈列或餐饮场景。'
+    return '主推为到店美业服务：突出服务过程、项目效果或门店空间，严禁菜品、餐桌、火锅、饮品特写等美食摄影。'
   }
   if (
     industry === 'catering' &&
@@ -372,5 +402,5 @@ export function mainProductCategoryHints(
   ) {
     return '主推为餐饮团购套餐：突出餐品或就餐场景，勿生成无关零售货架或代金券券面。'
   }
-  return '主推须与商品标题及绑定经营类目一致，禁止偷换为无关餐饮、卖场空镜或与标题不符的品类。'
+  return '主推须与商品标题及绑定经营类目一致。当前不是餐饮业态：严禁菜品、餐桌摆盘、火锅海鲜、饮品特写等美食摄影，禁止偷换成与标题不符的品类。'
 }

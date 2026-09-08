@@ -11,7 +11,7 @@ import {
 import { loadStoreMenuRecord, menuItemsSummary } from './storeMenuStorage'
 import { readStoreMarginConfig } from './storeMarginsRead'
 import { loadProductEditLibraryDraftBriefPicks } from './productEditLibrary'
-import { formatIndustryAlignmentConstraint, summarizeDraftProductPicks } from './merchantIndustryAlign'
+import { formatIndustryAlignmentConstraint, inferIndustryPathFromText, summarizeDraftProductPicks } from './merchantIndustryAlign'
 import { MERCHANT_PLATFORMS } from '../constants/merchantPlatforms'
 import { readMerchantSession } from './merchantSession'
 
@@ -78,15 +78,19 @@ export function loadMerchantIntelSnapshot(): MerchantIntelSnapshot {
   const menuSummary = items.length ? menuItemsSummary(items, 40) : undefined
   const draftPicks = items.length ? [] : loadProductEditLibraryDraftBriefPicks(24)
   const draftProductsSummary = items.length ? undefined : summarizeDraftProductPicks(draftPicks)
+  const storeName = (sel ? competitorDisplayLabel(sel) : undefined) ?? menu?.storeName
+  const configuredPath = marginCfg.industry.path || marginCfg.industry.name || undefined
+  const industryPath =
+    configuredPath || inferIndustryPathFromText([storeName, menuSummary].filter(Boolean).join(' '))
 
   return {
-    storeName: (sel ? competitorDisplayLabel(sel) : undefined) ?? menu?.storeName,
+    storeName,
     menuItemCount: items.length,
     menuImageCount: images.length,
     menuSummary,
     draftProductsSummary,
     margins: marginCfg.margins,
-    industryPath: marginCfg.industry.path || marginCfg.industry.name || undefined,
+    industryPath,
     competitorSummary: cmp ? competitorReportSummary(cmp) : fallbackCmp,
     boundPlatformsSummary: formatAgentBoundPlatformsContext(),
   }

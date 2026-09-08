@@ -2,11 +2,14 @@
  * 将 AI 商品方案 enrich：优化标题/说明、生成头图（无图时）。
  * 参考图优先级：用户附图 > 绑定平台在售商品图（有图）> 按门店情报文生图。
  */
+import { inferIndustryPathFromText } from '../lib/merchantIndustryAlign'
 import { sanitizeDouyinProductDescriptionCompliance } from '../lib/douyinDescCompliance'
 import type { AiProductPlanPreview } from '../lib/aiAgentTypes'
 import { inferDouyinProductTypeFromText } from '../lib/aiAgentProductPreviewDefaults'
 import {
   buildImageAssistTextFields,
+  inferIndustryVisualCategory,
+  looksLikeFoodListingName,
   mainProductCategoryHints,
 } from '../lib/douyinProductImageAnchor'
 import { postDouyinGoodsAiAssist } from './douyinAiAssistApi'
@@ -24,6 +27,8 @@ export type EnrichAiProductPlanOptions = {
   planIndex?: number
   /** 门店经营类目路径，锁标题/生图业态 */
   industryPath?: string
+  /** 门店名，辅助锁定足浴等业态 */
+  storeName?: string
 }
 
 function pickUserReferenceImage(
@@ -37,14 +42,16 @@ function pickUserReferenceImage(
 
 const BOUND_IMAGE_MATCH_MIN = 4
 
-/** 按套餐名/套餐项匹配绑定平台在售商品图；无强匹配时退回第一张有图商品作风貌参考 */
+/** 按套餐名/套餐项匹配绑定平台在售商品图；无强匹配时仅餐饮业态才退回第一张 */
 export function pickBoundProductReferenceImage(
   plan: Pick<AiProductPlanPreview, 'productName' | 'comboLines' | 'slotLabel'>,
   refs: { name: string; imageUrl: string }[],
+  opts?: { rejectFood?: boolean; requireStrongMatch?: boolean },
 ): { url: string; score: number } | undefined {
   const clean = refs
     .map((r) => ({ name: r.name.trim(), url: r.imageUrl.trim() }))
     .filter((r) => r.name && /^https?:\/\//i.test(r.url))
+    .filter((r) => !(opts?.rejectFood && looksLikeFoodListingName(r.name)))
   if (!clean.length) return undefined
   const anchor = resolveProductTitleAnchor(plan)
   const tokens = [
@@ -65,6 +72,7 @@ export function pickBoundProductReferenceImage(
     if (!best || score > best.score) best = { url: r.url, score }
   }
   if (best && best.score >= BOUND_IMAGE_MATCH_MIN) return best
+  if (opts?.requireStrongMatch) return undefined
   return { url: clean[0]!.url, score: 0 }
 }
 
@@ -124,11 +132,21 @@ export async function enrichAiProductPlanPreview(
   let headUrl = plan.headUrl
 
   const typeLabel = productType === 2 ? '代金券' : '团购套餐'
-  const industryLock = buildIndustryLock(opts?.industryPath, typeLabel)
+  const combinedHint = [opts?.industryPath, opts?.storeName, titleAnchor].filter(Boolean).join(' ')
+  const visualCategory = inferIndustryVisualCategory(combinedHint, titleAnchor)
+  const inferredPath = inferIndustryPathFromText(combinedHint)
+  const industryPath =
+    visualCategory === 'wellness'
+      ? inferredPath || opts?.industryPath || '休闲娱乐 > 足疗足浴'
+      : visualCategory === 'catering'
+        ? opts?.industryPath
+        : inferredPath || opts?.industryPath
+  const nonCatering = visualCategory !== 'catering'
+  const industryLock = buildIndustryLock(industryPath, typeLabel)
   const imageFields = buildImageAssistTextFields(titleAnchor, plan.description, {
     productType,
     productTypeLabel: typeLabel,
-    industryPath: opts?.industryPath,
+    industryPath,
   })
 
   const assistBase = {
@@ -175,7 +193,10 @@ export async function enrichAiProductPlanPreview(
     const userRefUrl = pickUserReferenceImage(userRefs, opts?.planIndex ?? 0)
     const boundMatch = userRefUrl
       ? undefined
-      : pickBoundProductReferenceImage(plan, opts?.boundProductImages ?? [])
+      : pickBoundProductReferenceImage(plan, opts?.boundProductImages ?? [], {
+          rejectFood: nonCatering,
+          requireStrongMatch: nonCatering,
+        })
     const refUrl = userRefUrl || boundMatch?.url
     const strongBoundMatch = Boolean(boundMatch && boundMatch.score >= BOUND_IMAGE_MATCH_MIN)
     const isVoucher = productType === 2
@@ -183,15 +204,20 @@ export async function enrichAiProductPlanPreview(
     const categoryHint = mainProductCategoryHints(imageAnchor, {
       isVoucher,
       isGroupBuy: !isVoucher,
-      industryPath: opts?.industryPath,
+      industryPath,
     })
-    const industryLockLine = opts?.industryPath?.trim()
-      ? `经营类目：${opts.industryPath.trim()}。`
+    const industryLockLine = industryPath
+      ? `经营类目：${industryPath}。`
       : ''
     const boundHint = refUrl && !userRefUrl
-      ? '画面主体、品类、器皿与摆盘须贴近参考图中的真实在售商品，禁止换成其它品类。'
+      ? nonCatering
+        ? '画面须贴近参考图中的真实到店服务或门店空间，禁止改成餐饮菜品。'
+        : '画面主体、品类、器皿与摆盘须贴近参考图中的真实在售商品，禁止换成其它品类。'
       : ''
-    const imageUserLine = `${industryLockLine}帮我生成一张${imageAnchor}主图。${boundHint}${categoryHint}禁止生成与商品无关的动物、吉祥物、门店 mascots 或餐饮菜品（除非标题与类目确为餐饮）。`
+    const foodBan = nonCatering
+      ? '【严禁餐饮错配】禁止出现菜品、餐桌摆盘、火锅海鲜、饮品特写等美食摄影。'
+      : ''
+    const imageUserLine = `帮我生成一张${imageAnchor}主图。${industryLockLine}${boundHint}${categoryHint}${foodBan}`
     const imageModel = resolveImageAssistModelIdFromChatPicker(chatPickerKey)
     const imageBase = {
       model: imageModel,
