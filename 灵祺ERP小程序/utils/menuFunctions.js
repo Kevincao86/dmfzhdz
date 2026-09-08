@@ -5,7 +5,7 @@ const FUNCTION_SECTIONS = [
     title: '知识库',
     layout: 'row',
     tone: 'cyan',
-    rowDesc: '投喂门店资料供 AI 使用',
+    rowDesc: '投喂门店资料供运营引用',
     sectionIcon: 'book',
     items: [
       {
@@ -144,7 +144,7 @@ const FUNCTION_SECTIONS = [
     layout: 'grid3',
     tone: 'violet',
     rowDesc: '',
-    sectionIcon: 'ai',
+    sectionIcon: 'play',
     items: [
       {
         kind: 'link',
@@ -165,7 +165,7 @@ const FUNCTION_SECTIONS = [
         url: '/pages/ai-content/ai-content',
         title: '爆款 Brief 生成',
         desc: '一键生成内容',
-        iconKey: 'ai',
+        iconKey: 'list',
       },
       {
         kind: 'link',
@@ -178,8 +178,15 @@ const FUNCTION_SECTIONS = [
         kind: 'link',
         url: '/pages/digital-human/digital-human',
         title: '数字人口播',
-        desc: '口播 TTS 试听',
+        desc: '口播试听与成片',
         iconKey: 'mic',
+      },
+      {
+        kind: 'link',
+        url: '/pages/short-drama/short-drama',
+        title: '短剧制作',
+        desc: '场景钩子 · 竖屏成片',
+        iconKey: 'star',
       },
     ],
   },

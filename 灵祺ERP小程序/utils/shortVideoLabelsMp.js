@@ -46,7 +46,6 @@ module.exports = {
   MAIN_TABS: [
     { id: 'generate', label: '短视频生成', native: true },
     { id: 'cloud_batch', label: '智能混剪', native: true },
-    { id: 'canvas', label: '无限画布', native: true },
     { id: 'cases', label: '案例', native: true },
     { id: 'music', label: '配乐', native: true },
   ],
@@ -81,15 +80,8 @@ module.exports = {
       description: '跳转数字人试听/电脑端成片',
       href: '/pages/digital-human/digital-human',
     },
-    {
-      id: 'canvas',
-      label: '无限画布',
-      description: '分镜流程编排（手机端流程板）',
-      pane: 'canvas',
-    },
   ],
   QUICK_CARDS: [
-    { id: 'canvas', label: '无限画布', desc: '分镜流程编排', pane: 'canvas' },
     { id: 'generate', label: '视频生成', desc: '文生/图生短片', pane: 'generate' },
     { id: 'cases', label: '案例灵感', desc: '做同款', pane: 'cases' },
     { id: 'cloud_batch', label: '智能混剪', desc: '素材一键成片', pane: 'cloud_batch' },

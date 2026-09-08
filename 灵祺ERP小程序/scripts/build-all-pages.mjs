@@ -25,7 +25,6 @@ const SKIP = new Set([
 ]);
 
 const COPY_COMPLEX = [
-  'agent',
   'product-create',
   'product-voice',
   'recruit-voice',
@@ -82,8 +81,8 @@ ${cond}`);
 
 // —— Tab 页（已手写跳过）——
 
-w('home', pad(`<view class="kpi-hero"><text class="kpi-big">工作台</text><text>已合并至灵祺AI Tab</text></view>
-<navigator url="/pages/agent/agent" class="btn-v2 primary" open-type="switchTab">进入灵祺 AI</navigator>`));
+w('home', pad(`<view class="kpi-hero"><text class="kpi-big">工作台</text><text>已合并至经营概览 Tab</text></view>
+<navigator url="/pages/dashboard/dashboard" class="btn-v2 primary" open-type="switchTab">进入经营概览</navigator>`));
 
 w('dashboard', pad(`<view class="chip-row"><text class="chip on">{{rangeLabel}}</text></view>
 <view class="kpi-grid-v2">

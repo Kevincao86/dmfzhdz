@@ -1,7 +1,6 @@
 {
   "pages": [
     "pages/functions/functions",
-    "pages/agent/agent",
     "pages/dashboard/dashboard",
     "pages/mine/mine",
     "pages/login/login",
@@ -48,6 +47,7 @@
     "pages/settings/settings",
     "pages/digital-human/digital-human",
     "pages/shortvideo-ai/shortvideo-ai",
+    "pages/short-drama/short-drama",
     "pages/notifications/notifications",
     "pages/subscription/subscription",
     "pages/support-chat/support-chat",
@@ -71,10 +71,6 @@
       {
         "pagePath": "pages/functions/functions",
         "text": "功能"
-      },
-      {
-        "pagePath": "pages/agent/agent",
-        "text": "灵祺助手"
       },
       {
         "pagePath": "pages/dashboard/dashboard",

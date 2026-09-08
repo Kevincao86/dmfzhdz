@@ -8,7 +8,7 @@ function formatDoc(d) {
     title: String(d.title || d.file_name || '未命名').trim(),
     summary: String(d.summary || '').trim(),
     status: String(d.parse_status || 'ready'),
-    feedLabel: feed ? '已投喂 AI' : '未投喂',
+    feedLabel: feed ? '已投喂知识库' : '未投喂',
     feedOn: feed,
     updatedAt: String(d.updated_at || d.created_at || '').slice(0, 16).replace('T', ' '),
   }
@@ -83,7 +83,7 @@ Page({
     if (!id) return
     wx.showModal({
       title: '删除资料',
-      content: '确定从知识库移除？AI 将不再引用该内容。',
+      content: '确定从知识库移除？后续内容创作将不再引用该条。',
       success: (res) => {
         if (!res.confirm) return
         void (async () => {

@@ -8,15 +8,7 @@
   >
     <view class="tab-icon-wrap">
       <view class="tab-icon tab-icon-{{item.icon}}">
-        <block wx:if="{{item.icon === 'ai'}}">
-          <view class="ai-bubble">
-            <view class="ai-dot"></view>
-            <view class="ai-dot"></view>
-            <view class="ai-dot"></view>
-          </view>
-          <view class="ai-spark"></view>
-        </block>
-        <block wx:elif="{{item.icon === 'grid'}}">
+        <block wx:if="{{item.icon === 'grid'}}">
           <view class="grid-cell"></view>
           <view class="grid-cell"></view>
           <view class="grid-cell"></view>

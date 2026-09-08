@@ -342,7 +342,6 @@ Page({
     const redirect = String(this._redirect || '').trim()
     const tabPaths = [
       '/pages/functions/functions',
-      '/pages/agent/agent',
       '/pages/dashboard/dashboard',
       '/pages/mine/mine',
     ]

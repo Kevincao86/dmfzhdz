@@ -1,0 +1,71 @@
+<scroll-view scroll-y class="op-page" enhanced show-scrollbar="{{false}}">
+  <view class="op-hero">
+    <text class="op-title">短剧制作</text>
+    <text class="op-sub">选场景与钩子，竖屏成片。长片与复杂分镜请到电脑端操作。</text>
+    <text class="op-meta">{{rateLabel}}</text>
+  </view>
+
+  <view class="op-card">
+    <text class="op-label">品类</text>
+    <view class="op-chips">
+      <text
+        wx:for="{{worlds}}"
+        wx:key="id"
+        class="op-chip {{item.on ? 'on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onWorld"
+      >{{item.label}}</text>
+    </view>
+    <text class="op-body muted">{{worldBlurb}}</text>
+  </view>
+
+  <view class="op-card">
+    <text class="op-label">场景</text>
+    <view class="op-chips">
+      <text
+        wx:for="{{scenes}}"
+        wx:key="id"
+        class="op-chip {{item.on ? 'on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onScene"
+      >{{item.name}}</text>
+    </view>
+    <text class="op-body muted">钩子：{{sceneHook}}</text>
+  </view>
+
+  <view class="op-card">
+    <block wx:for="{{fields}}" wx:key="key">
+      <text class="op-label">{{item.label}}</text>
+      <input
+        class="op-input"
+        data-key="{{item.key}}"
+        placeholder="{{item.placeholder}}"
+        value="{{item.value}}"
+        bindinput="onField"
+      />
+    </block>
+    <text class="op-label">故事补充（选填）</text>
+    <textarea class="op-area" maxlength="400" placeholder="可改写故事走向" value="{{story}}" bindinput="onStory" />
+    <text class="op-label">对白钩子（选填）</text>
+    <input class="op-input" placeholder="一句口语对白" value="{{dialogue}}" bindinput="onDialogue" />
+    <text class="op-label">时长</text>
+    <picker mode="selector" range="{{durationOptions}}" range-key="label" value="{{durationIdx}}" bindchange="onDuration">
+      <view class="op-picker">{{durationOptions[durationIdx].label}}</view>
+    </picker>
+    <button class="op-btn" loading="{{busy}}" disabled="{{busy}}" bindtap="onGenerate">
+      {{busy ? (progress || '生成中…') : '开始出片'}}
+    </button>
+    <button wx:if="{{busy}}" class="op-btn-ghost" bindtap="cancelWait">停止等待</button>
+    <text wx:if="{{pointsHint}}" class="op-meta">{{pointsHint}}</text>
+  </view>
+
+  <view wx:if="{{err}}" class="op-err">{{err}}</view>
+  <view wx:if="{{hint}}" class="op-card"><text class="op-body">{{hint}}</text></view>
+
+  <view wx:if="{{resultUrl}}" class="op-card">
+    <text class="op-card-title">成片预览</text>
+    <video src="{{resultUrl}}" controls object-fit="contain" style="width:100%;height:520rpx;background:#0f172a" />
+    <button class="op-btn" bindtap="saveAlbum">保存到相册</button>
+    <button class="op-btn-ghost" bindtap="copyResult">复制链接</button>
+  </view>
+</scroll-view>

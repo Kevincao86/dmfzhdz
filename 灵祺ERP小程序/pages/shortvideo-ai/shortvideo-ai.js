@@ -239,6 +239,7 @@ Page({
   },
 
   async onShow() {
+    if (this.data.mainPane === 'canvas') this.setData({ mainPane: 'generate' })
     if (!api.getAccessToken()) {
       wx.redirectTo({ url: '/pages/login/login' })
       return
@@ -475,7 +476,8 @@ Page({
   },
 
   onMainTab(e) {
-    const id = e.currentTarget.dataset.id
+    let id = e.currentTarget.dataset.id
+    if (id === 'canvas') id = 'generate'
     if (!id || id === this.data.mainPane) return
     this.resetOutputs()
     this.setData({ mainPane: id, desktopPaneTip: '' })
@@ -483,7 +485,8 @@ Page({
   },
 
   onQuickCard(e) {
-    const pane = e.currentTarget.dataset.pane
+    let pane = e.currentTarget.dataset.pane
+    if (pane === 'canvas') pane = 'generate'
     if (!pane) return
     this.resetOutputs()
     this.setData({ mainPane: pane, desktopPaneTip: '' })

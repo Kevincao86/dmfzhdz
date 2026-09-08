@@ -35,6 +35,26 @@
       {
         "value": "images/**",
         "type": "glob"
+      },
+      {
+        "value": "docs/**",
+        "type": "glob"
+      },
+      {
+        "value": "scripts/**",
+        "type": "glob"
+      },
+      {
+        "value": "utils/aiAgent*.js",
+        "type": "glob"
+      },
+      {
+        "value": "utils/agent*.js",
+        "type": "glob"
+      },
+      {
+        "value": "utils/aiModelRegistryMp.js",
+        "type": "glob"
       }
     ],
     "include": []

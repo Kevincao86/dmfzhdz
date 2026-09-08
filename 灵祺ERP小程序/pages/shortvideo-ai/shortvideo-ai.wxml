@@ -8,16 +8,16 @@
         <text class="sv-header-sub">短视频出片 · 与电脑端同源</text>
       </view>
     </view>
-    <text class="sv-header-desc">创作舱 + 灵祺视频（Seedance）主路径；无限画布为手机端分镜流程板（能力等价出片）。</text>
+    <text class="sv-header-desc">创作舱与灵祺视频主路径；分镜请在短片生成区编排。</text>
     <text class="sv-persist-tip">生成后请及时保存到相册。刷新页面后，本页生成记录将消失。</text>
   </view>
 
   <view wx:if="{{pointsBalance != null}}" class="sv-points-bar">
     <text class="sv-points-bal">积分余额 {{pointsBalance}}</text>
-    <text wx:if="{{mainPane === 'generate' || mainPane === 'canvas'}}" class="sv-points-rate">短视频生成 · {{rateShortvideo}}</text>
+    <text wx:if="{{mainPane === 'generate'}}" class="sv-points-rate">短视频生成 · {{rateShortvideo}}</text>
     <text wx:elif="{{mainPane === 'cloud_batch'}}" class="sv-points-rate">云剪 {{rateCloudEdit}} · 智能成片 {{rateCloudEditSmart}}</text>
   </view>
-  <view wx:if="{{(mainPane === 'generate' || mainPane === 'canvas') && pointsHintGenerate}}" class="sv-points-tip">{{pointsHintGenerate}}</view>
+  <view wx:if="{{mainPane === 'generate' && pointsHintGenerate}}" class="sv-points-tip">{{pointsHintGenerate}}</view>
   <view wx:if="{{mainPane === 'cloud_batch' && pointsHintMix}}" class="sv-points-tip">{{pointsHintMix}}</view>
 
   <view class="sv-quick-grid">
@@ -224,49 +224,6 @@
       </button>
       <button wx:if="{{busy}}" class="sv-btn-outline" bindtap="cancelWait">停止等待</button>
       <text class="sv-cabin-tip">提交将按实际时长扣减短视频积分；成片可保存到相册。</text>
-    </view>
-  </view>
-
-  <!-- ========== 无限画布 · 分镜流程板 ========== -->
-  <view wx:if="{{mainPane === 'canvas'}}" class="sv-flow">
-    <view class="sv-pane-head">
-      <view class="sv-pane-icon cyan">画</view>
-      <view>
-        <text class="sv-pane-title">分镜流程板</text>
-        <text class="sv-pane-sub">手机端等价无限画布：排序 / 插入 / 删除分镜，应用后回写生成台出片。</text>
-      </view>
-    </view>
-    <scroll-view scroll-x class="sv-case-strip" enhanced show-scrollbar="{{false}}">
-      <view class="sv-case-strip-row">
-        <view
-          wx:for="{{caseLocalLife}}"
-          wx:key="id"
-          class="sv-case-chip"
-          data-id="{{item.id}}"
-          bindtap="applyCase"
-        >{{item.title}}</view>
-      </view>
-    </scroll-view>
-    <view class="sv-flow-line">
-      <view wx:for="{{scriptRows}}" wx:key="_id" class="sv-flow-node">
-        <view class="sv-flow-dot">{{index + 1}}</view>
-        <view class="sv-flow-card">
-          <text class="sv-flow-time">{{item.timeRange || '时段'}}</text>
-          <text class="sv-flow-vis">{{item.visual || '（未填画面）'}}</text>
-          <text class="sv-flow-dlg">{{item.dialogue || ''}}</text>
-          <view class="sv-flow-acts">
-            <text data-idx="{{index}}" data-dir="up" bindtap="moveScriptRow">↑</text>
-            <text data-idx="{{index}}" data-dir="down" bindtap="moveScriptRow">↓</text>
-            <text data-idx="{{index}}" bindtap="removeScriptRow">删</text>
-          </view>
-        </view>
-        <view wx:if="{{index < scriptRows.length - 1}}" class="sv-flow-connector" />
-      </view>
-    </view>
-    <view class="sv-actions">
-      <button class="sv-btn-outline" bindtap="addScriptRow">插入分镜</button>
-      <button class="sv-btn-cyan" bindtap="applyFlowboard">应用流程</button>
-      <button class="sv-btn-dark" loading="{{busy}}" bindtap="runFlowboardGenerate">应用并出片</button>
     </view>
   </view>
 
