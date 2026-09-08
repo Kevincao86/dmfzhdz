@@ -49,12 +49,9 @@ export type ShortVideoGenRequestBody = {
 export function formatVideoAiUserError(msg: string): string {
   const raw = String(msg ?? '').trim()
   if (!raw) return raw
-  if (/仍未通过写实人像/.test(raw)) return raw
-  if (/may contain real person|contain real person|input image.*real person|写实人像|1\.5 Pro 首帧/i.test(raw)) {
-    return (
-      '火山 Seedance 2.5 会拦截未入库的写实人像。系统已改走火山 1.5 Pro 首帧图生（不走千问）。' +
-      ( /已改走|正在改用|1\.5 Pro/.test(raw) ? '' : ` ${raw}` )
-    )
+  if (/仍未通过写实人像|更换角色参考图/.test(raw)) return raw
+  if (/may contain real person|contain real person|input image.*real person|写实人像|真人肖像/i.test(raw)) {
+    return '当前 Seedance 拦截了写实人像。请更换角色参考图后重试。'
   }
   if (/parameter ratio.*not valid|output ratio follows the first-frame/i.test(raw)) {
     return '角色参考图已用作视频首帧时，不能再指定画幅。系统会按首帧自动出竖屏，请再点一次生成。'

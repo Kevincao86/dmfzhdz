@@ -248,20 +248,31 @@ function arkCreateTaskHttpStatus(upstreamStatus?: number): number {
 }
 
 function isArkRealPersonImageBlock(msg: string): boolean {
-  return /may contain real person|contain real person|input image.*real person|真实人|写实人像|真人肖像|人脸.*不允许|1\.5 Pro 首帧/i.test(
+  return /may contain real person|contain real person|input image.*real person|真实人|写实人像|真人肖像|人脸.*不允许/i.test(
     String(msg ?? ''),
   )
 }
 
-/** Seedance 2.5 拦截未入库写实人脸；1.5 Pro 首帧图生仍走火山、不走千问 */
-const SEEDANCE_FACE_I2V_MODEL_ID = 'doubao-seedance-1-5-pro-251215'
+function isArkModelInaccessibleError(msg: string): boolean {
+  return /does not exist|not have access|do not have access|model.*not.*found|unknown model|无权访问|尚未开通|未开通该模型/i.test(
+    String(msg ?? ''),
+  )
+}
+
+function pickOpenedSeedance15FromTriedOrder(tryOrder: string[], triedModels: string[]): string | null {
+  const tried = new Set(triedModels.map((id) => normalizeArkVideoModelParam(id)))
+  for (const raw of tryOrder) {
+    const id = normalizeArkVideoModelParam(raw)
+    if (!/seedance-1-5|seedance-1\.5/i.test(id)) continue
+    if (tried.has(id)) continue
+    return id
+  }
+  return null
+}
 
 function arkCreateTaskUserMessage(msg: string, endpointId: string, upstreamStatus?: number): string {
   if (isArkRealPersonImageBlock(msg)) {
-    if (/1-5-pro|1\.5-pro/i.test(endpointId)) {
-      return '火山 1.5 Pro 首帧图生仍未通过写实人像审核，请稍后重试（未走千问）。'
-    }
-    return '火山 Seedance 2.5 对未入库的写实人像会拦截。正在改用火山 1.5 Pro 首帧图生（不走千问）。'
+    return '当前 Seedance 拦截了写实人像。请更换角色参考图后重试。'
   }
   if (looksLikeArkPlaceholderEndpointId(endpointId)) {
     return `视频推理接入点「${endpointId}」为占位示例，不可用。请到运营管控台「AI模型 → 短视频 API」或 Vercel 环境变量 MERCHANT_AI_ARK_VIDEO_ENDPOINTS 填写火山方舟控制台真实的 ep- 接入点（形如 ep-2024xxxxxxxx）。`
@@ -1984,19 +1995,17 @@ async function arkCreateVideoTask(
       '未检测到方舟 / 豆包 API Key：请到运营管控台「AI模型 → 短视频 API」配置专用 Key 或「豆包」Key。'
   }
 
-  /** 2.5 拦写实人脸：仍只走火山（1.5 Pro 首帧），禁止千问 */
+  /** 写实人脸：仅当尝试列表里已有已开通的 1.5 才换模；锁定模型（短剧 2.5）绝不硬切未开通的 1.5 Pro */
   if (
     key &&
     skipQwen &&
+    !lockModel &&
     isArkRealPersonImageBlock(`${lastMsg}`) &&
     Array.isArray(apiBody.images_base64) &&
     apiBody.images_base64.some((x) => String(x ?? '').trim())
   ) {
-    const faceModel = normalizeArkVideoModelParam(SEEDANCE_FACE_I2V_MODEL_ID)
-    const alreadyTriedFace = triedModels.some(
-      (id) => normalizeArkVideoModelParam(id) === faceModel,
-    )
-    if (!alreadyTriedFace) {
+    const faceModel = pickOpenedSeedance15FromTriedOrder(tryOrder, triedModels)
+    if (faceModel) {
       const faceMode: 't2v' | 'i2v' = 'i2v'
       let faceFlags = typeof apiBody.flags === 'string' ? apiBody.flags : ''
       let faceDur = durationSec
@@ -2007,6 +2016,7 @@ async function arkCreateVideoTask(
           : `${faceFlags} --dur ${faceDur}`.trim()
       }
       if (videoModelSupportsDuration(faceModel, faceDur, faceMode)) {
+        const prevMsg = lastMsg
         const faceBuilt = await buildArkVideoTaskPayloadForPost(
           faceModel,
           {
@@ -2031,7 +2041,9 @@ async function arkCreateVideoTask(
               raw: facePosted.raw,
             }
           }
-          lastMsg = facePosted.msg
+          lastMsg = isArkModelInaccessibleError(`${facePosted.rawMsg ?? ''} ${facePosted.msg}`)
+            ? prevMsg
+            : facePosted.msg
           lastStatus = facePosted.status
         }
       }
