@@ -9,7 +9,7 @@ const TASK_NAV = {
   follow_local_lead: '/pages/leads-center/leads-center',
   sync_platform: '/pages/product-list/product-list',
   analyze_exception: '/pages/dashboard/dashboard',
-  generate_copywriting: '/pages/ai-content/ai-content',
+  generate_copywriting: '/pages/functions/functions',
   file_tax: '/pages/finance-tax/finance-tax',
   general: '/pages/functions/functions',
 }
@@ -20,8 +20,6 @@ const MODULE_PAGES = {
   store_menu: '/pages/store-menu/store-menu',
   store_analysis: '/pages/store-analysis/store-analysis',
   competitors: '/pages/competitors/competitors',
-  digital_human: '/pages/digital-human/digital-human',
-  ai_ops_plan: '/pages/ai-ops-plan/ai-ops-plan',
   settings: '/pages/mine/mine',
 }
 

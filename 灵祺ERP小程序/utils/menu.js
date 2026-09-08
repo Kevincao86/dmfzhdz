@@ -75,24 +75,6 @@ const SECTIONS = [
         featuredShortDesc: '概览评分 · 搜索优化',
       },
       {
-        kind: 'link',
-        url: '/pages/ai-content/ai-content',
-        title: '文章与话题',
-        desc: '文章与话题草稿 · 来客上下文',
-      },
-      {
-        kind: 'link',
-        url: '/pages/ai-visual-studio/ai-visual-studio',
-        title: '视觉工坊',
-        desc: '多端海报 · 文案 · 一键出图（对齐电脑端）',
-      },
-      {
-        kind: 'link',
-        url: '/pages/shortvideo-ai/shortvideo-ai',
-        title: '短视频出片',
-        desc: '可灵成片 · ICE 云剪 · 对齐电脑端',
-      },
-      {
         kind: 'voice',
         url: '/pages/shortvideo-voice/shortvideo-voice',
         title: '短视频优化 · 语音',

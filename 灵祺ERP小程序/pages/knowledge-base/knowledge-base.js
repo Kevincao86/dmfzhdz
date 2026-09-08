@@ -83,7 +83,7 @@ Page({
     if (!id) return
     wx.showModal({
       title: '删除资料',
-      content: '确定从知识库移除？后续内容创作将不再引用该条。',
+      content: '确定从知识库移除？后续经营分析将不再引用该条。',
       success: (res) => {
         if (!res.confirm) return
         void (async () => {

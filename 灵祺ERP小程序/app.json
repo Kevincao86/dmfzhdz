@@ -35,17 +35,11 @@
     "pages/ads-manage/ads-manage",
     "pages/leads-center/leads-center",
     "pages/geo-assist/geo-assist",
-    "pages/ai-content/ai-content",
-    "pages/ai-visual-studio/ai-visual-studio",
-    "pages/ai-ops-plan/ai-ops-plan",
     "pages/store-menu/store-menu",
     "pages/competitors/competitors",
     "pages/site-selection/site-selection",
     "pages/knowledge-base/knowledge-base",
     "pages/settings/settings",
-    "pages/digital-human/digital-human",
-    "pages/shortvideo-ai/shortvideo-ai",
-    "pages/short-drama/short-drama",
     "pages/notifications/notifications",
     "pages/subscription/subscription",
     "pages/support-chat/support-chat",
@@ -88,7 +82,7 @@
       "desc": "用于拍摄商品图、评论截图等附件上传"
     },
     "scope.userLocation": {
-      "desc": "用于选择门店/探店位置并生成运营文案"
+      "desc": "用于选择门店位置"
     }
   },
   "requiredPrivateInfos": ["chooseLocation"],

@@ -1,7 +1,7 @@
 <scroll-view scroll-y class="erp-page" enhanced show-scrollbar="{{false}}">
   <view class="erp-hero">
     <text class="erp-hero-title">我的知识库</text>
-    <text class="erp-hero-sub">投喂门店资料、FAQ 与话术，供运营方案与内容创作引用。与电脑端同源。</text>
+    <text class="erp-hero-sub">投喂门店资料、FAQ 与话术，供经营分析引用。与电脑端同源。</text>
   </view>
 
   <view class="erp-card">
@@ -23,7 +23,7 @@
 
   <view wx:if="{{!loading && !docs.length}}" class="erp-card erp-empty">
     <text class="erp-empty-title">暂无资料</text>
-    <text class="erp-empty-desc">先投喂一段门店介绍，后续运营方案与文案会更贴合你的店。</text>
+    <text class="erp-empty-desc">先投喂一段门店介绍，后续经营分析会更贴合你的店。</text>
   </view>
 
   <view wx:if="{{docs.length}}" class="erp-card">

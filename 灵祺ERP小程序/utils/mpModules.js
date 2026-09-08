@@ -38,11 +38,11 @@ module.exports.MODULE_COPY = {
   },
   ai_visual_studio: {
     navTitle: '视觉工坊',
-    body: '与电脑端「灵祺视觉工坊」同源：选渠道与玩法 → 文案包 → 参考图对齐 → 一键出图并保存相册；积分规则与 Web 一致（文案 3 积分/次、常规生图 8 积分/张、高级生图为 150 积分/张）。',
+    body: '视觉工坊请在电脑端商家后台使用。',
   },
   shortvideo_ai: {
     navTitle: '短视频出片',
-    body: '参考图生视频、纯文案短片与 ICE 云剪任务经商家后台 BFF 与电脑端一致；混剪支持「自动转场（按内容匹配）」；长视频分镜策划等高级能力请在电脑端使用。',
+    body: '短视频出片请在电脑端商家后台使用。',
   },
   shortvideo: {
     navTitle: '短视频优化',
@@ -66,11 +66,11 @@ module.exports.MODULE_COPY = {
   },
   digital_human: {
     navTitle: '数字人口播',
-    body: '数字人 TTS 试听与电脑端同源（试听不扣积分）。完整成片在电脑端按 104 积分/秒（最低 416）计费；动作模仿 65 积分/秒（最低 260），与 CS 一致。',
+    body: '数字人 TTS 试听与成片请在电脑端商家后台完成。',
   },
   ai_ops_plan: {
     navTitle: '运营方案',
-    body: '多平台运营方案与电脑端同源。请从「功能 → 内容创作 → 运营方案」进入原生页生成。',
+    body: '多平台运营方案请在电脑端商家后台完成。',
   },
   platform_target: {
     navTitle: '平台签框',
