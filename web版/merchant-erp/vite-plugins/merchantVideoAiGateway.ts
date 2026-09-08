@@ -86,6 +86,12 @@ import {
   volcSubmitMotionImitateTask,
 } from './volcMotionImitateClient.js'
 import {
+  isXiaoyunqueConfigured,
+  isXiaoyunqueTaskId,
+  volcGetXiaoyunqueTaskOnce,
+  volcPostXiaoyunqueVideoTask,
+} from './volcXiaoyunqueClient.js'
+import {
   anyLongformPlannerConfigured,
   longformPlannerModelIds,
   longformPlannerVendorAvailability,
@@ -2053,6 +2059,7 @@ export async function handleMerchantAiVideoRoutes(input: {
       klingConfigured: kCfg.ok,
       omnihumanConfigured: isOmniHumanConfigured(env),
       motionImitateConfigured: isMotionImitateConfigured(env),
+      xiaoyunqueConfigured: isXiaoyunqueConfigured(env),
       arkVideoModels: arkOpts,
       arkDiscoveredVideoModels,
       arkKeyConfigured: arkKeyOk,
@@ -2948,6 +2955,37 @@ export async function handleMerchantAiVideoRoutes(input: {
       json(res, 400, { ok: false, message: mi.msg })
       return true
     }
+    if (String(parsed.pipeline ?? '').trim() === 'xiaoyunque') {
+      const xyq = await volcPostXiaoyunqueVideoTask(env, parsed)
+      if (xyq.ok === true) {
+        const dur = parseVideoDurationFromFlags(
+          typeof parsed.flags === 'string'
+            ? parsed.flags
+            : String(parsed.durationSec ?? parsed.duration ?? ''),
+        )
+        voidRecordVideoAiUsage(
+          input.req,
+          rawEnv,
+          parsed,
+          'volc_xiaoyunque',
+          xyq.modelUsed,
+          estimateVideoGenerationTokens({
+            durationSec: dur || Number(parsed.durationSec) || 30,
+            promptChars: String(parsed.prompt ?? '').length,
+          }),
+        )
+        json(res, 200, {
+          ok: true,
+          taskId: xyq.taskId,
+          provider: 'volc_xiaoyunque',
+          modelUsed: xyq.modelUsed,
+          pipeline: 'xiaoyunque',
+        })
+        return true
+      }
+      json(res, 400, { ok: false, message: xyq.msg })
+      return true
+    }
     if (String(parsed.pipeline ?? '').trim() === 'omnihuman') {
       const oh = await volcPostOmniHumanVideoTask(env, parsed, input.viteRoot)
       if (oh.ok === true) {
@@ -3041,6 +3079,17 @@ export async function handleMerchantAiVideoRoutes(input: {
       try {
         const state = await volcGetMotionImitateTaskOnce(env, taskIdSd)
         json(res, 200, { ok: true, provider: 'volc_motion_imitate', ...state })
+        return true
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        json(res, 502, { ok: false, message: msg })
+        return true
+      }
+    }
+    if (isXiaoyunqueTaskId(taskIdSd)) {
+      try {
+        const state = await volcGetXiaoyunqueTaskOnce(env, taskIdSd)
+        json(res, 200, { ok: true, provider: 'volc_xiaoyunque', ...state })
         return true
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)

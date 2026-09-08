@@ -260,6 +260,8 @@ export type VideoAiBackendConfig = {
   /** 火山 OmniHuman（智能视觉 AK/SK）已配置 */
   omnihumanConfigured?: boolean
   motionImitateConfigured?: boolean
+  /** 即梦/小云雀智能生视频 Agent（JIMENG_* 或 VOLC_*）已配置 */
+  xiaoyunqueConfigured?: boolean
   arkKeyConfigured: boolean
   arkVideoModels: { label: string; endpointId: string }[]
   iceConfigured?: boolean
@@ -548,6 +550,7 @@ export async function fetchVideoAiConfig(): Promise<VideoAiBackendConfig | null>
       klingConfigured: false,
       omnihumanConfigured: false,
       motionImitateConfigured: false,
+      xiaoyunqueConfigured: false,
       arkKeyConfigured: false,
       arkVideoModels: [],
       configLoadError: lastNetworkErr,
@@ -1117,12 +1120,13 @@ async function postSeedanceVideoStartOnce(
 }
 
 export async function postSeedanceVideoStart(body: ShortVideoGenRequestBody & {
-  /** wan2.2-s2v 口型驱动 / OmniHuman / 动作模仿 */
-  pipeline?: 'wan_s2v' | 'omnihuman' | 'motion_imitate'
+  /** wan2.2-s2v 口型驱动 / OmniHuman / 动作模仿 / 小云雀长片 Agent */
+  pipeline?: 'wan_s2v' | 'omnihuman' | 'motion_imitate' | 'xiaoyunque'
   image_base64?: string
   audio_base64?: string
   video_base64?: string
   resolution?: '480P' | '720P'
+  durationSec?: number
 }): Promise<
   { ok: true; taskId: string; modelUsed?: string | null; provider?: string }
   | { ok: false; message: string }
@@ -1265,7 +1269,15 @@ const DEFAULT_POLL_MS = 2500
 export function pollMaxTriesForVideoDuration(durationSec: number, pollIntervalMs = DEFAULT_POLL_MS): number {
   const sec = Math.max(3, Math.round(durationSec))
   const maxWaitMs =
-    sec <= 5 ? 3 * 60_000 : sec <= 15 ? 4 * 60_000 : sec <= 30 ? 8 * 60_000 : 12 * 60_000
+    sec <= 5
+      ? 3 * 60_000
+      : sec <= 15
+        ? 4 * 60_000
+        : sec <= 30
+          ? 8 * 60_000
+          : sec <= 60
+            ? 15 * 60_000
+            : Math.min(45 * 60_000, sec * 4000 + 10 * 60_000)
   return Math.max(24, Math.ceil(maxWaitMs / Math.max(1000, pollIntervalMs)))
 }
 
@@ -1292,10 +1304,17 @@ export async function pollShortVideoTask(
   let queuedSince: number | null = null
   let runningSince: number | null = null
   let finalizeSince: number | null = null
-  /** 短片排队超过约 45s 即换模，避免卡在「排队中」半小时 */
-  const queuedStallMs = dur <= 15 ? 45_000 : 90_000
-  const runningStallMs = dur <= 5 ? 3 * 60_000 : dur <= 15 ? 4 * 60_000 : 10 * 60_000
-  const finalizeStallMs = 90_000
+  /** 短片排队超过约 45s 即换模，避免卡在「排队中」半小时；长片/Agent 放宽 */
+  const queuedStallMs = dur <= 15 ? 45_000 : dur <= 60 ? 3 * 60_000 : 5 * 60_000
+  const runningStallMs =
+    dur <= 5
+      ? 3 * 60_000
+      : dur <= 15
+        ? 4 * 60_000
+        : dur <= 60
+          ? 15 * 60_000
+          : Math.min(40 * 60_000, dur * 3000 + 10 * 60_000)
+  const finalizeStallMs = dur <= 15 ? 90_000 : 3 * 60_000
 
   opts?.onProgress?.('已提交，等待云端生成…')
 
@@ -1575,4 +1594,46 @@ async function runShortVideoJobWithDurationInternal(
     exhaustedAtDuration: durationSec,
     triedCount: tried.length,
   }
+}
+
+/** 小云雀智能生视频 Agent：单次提交目标时长，适合短剧长片（最长约 15 分钟） */
+export async function runXiaoyunqueVideoJob(opts: {
+  prompt: string
+  durationSec: number
+  aspectRatio?: string
+  flags?: string
+  shouldCancel?: () => boolean
+  onProgress?: (text: string) => void
+}): Promise<
+  | { ok: true; videoUrl: string; modelUsed?: string | null }
+  | { ok: false; message: string }
+> {
+  const durationSec = Math.min(900, Math.max(5, Math.round(opts.durationSec)))
+  const aspect = (opts.aspectRatio || '9:16').trim() || '9:16'
+  const flags =
+    opts.flags?.trim() ||
+    `--dur ${durationSec} --fps 24 --ratio ${aspect} --wm false`
+  opts.onProgress?.(`小云雀 Agent 提交中（目标 ${durationSec} 秒）…`)
+  const start = await postSeedanceVideoStart({
+    prompt: opts.prompt,
+    flags,
+    durationSec,
+    pipeline: 'xiaoyunque',
+    skip_qwen: true,
+  })
+  if (!start.ok) return { ok: false, message: formatVideoAiUserError(start.message) }
+
+  /** Agent 长片可能远超 Seedance 单段，放宽轮询：约 4×时长 + 10 分钟，封顶 45 分钟 */
+  const pollMs = 5000
+  const maxWaitMs = Math.min(45 * 60_000, Math.max(10 * 60_000, durationSec * 4000 + 10 * 60_000))
+  const pollMaxTries = Math.max(60, Math.ceil(maxWaitMs / pollMs))
+  const poll = await pollShortVideoTask(start.taskId, {
+    pollIntervalMs: pollMs,
+    pollMaxTries,
+    durationSec,
+    shouldCancel: opts.shouldCancel,
+    onProgress: (label) => opts.onProgress?.(`小云雀 · ${label}`),
+  })
+  if (!poll.ok) return { ok: false, message: formatVideoAiUserError(poll.message) }
+  return { ok: true, videoUrl: poll.videoUrl, modelUsed: start.modelUsed ?? 'xiaoyunque' }
 }

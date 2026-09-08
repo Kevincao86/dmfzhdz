@@ -42,7 +42,7 @@ list_scopes() {
   erp_pay_points       ERP小程序支付 + 星选积分余额对齐
   mp_hall_region       小程序招募/推荐大厅城市自动定位
   merchant_nav         商家/服务商 ERP 侧栏导航信息架构
-  cs_short_drama       商家 CS：AI短剧入口（数字人口播下方，不改竞对/GEO）
+  cs_short_drama       商家 CS：AI短剧入口 + 小云雀长片网关（数字人口播下方，不改竞对/GEO）
   merchant_product_publish 商家 ERP：一份套餐多平台（不改抖音来客保存提审）
   partner_record_workshop 服务商 AI 创作 · 录播工坊（半自动）
   ai_points            全端 AI 积分扣减 / 60% 毛利定价
@@ -415,6 +415,10 @@ config/nav.ts
 App.tsx
 ShortDramaPage
 ShortVideoOptimizationPage
+volcXiaoyunqueClient
+volcOmniHumanClient
+merchantVideoAiGateway
+videoAiApi
 change-scope-guard
 PAT
       ;;

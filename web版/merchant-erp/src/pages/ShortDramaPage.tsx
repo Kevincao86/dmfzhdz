@@ -69,6 +69,7 @@ import {
   formatVideoAiUserError,
   postVideoLastFrameFromUrl,
   runShortVideoJobWithFailover,
+  runXiaoyunqueVideoJob,
   type VideoAiBackendConfig,
 } from '../services/videoAiApi'
 
@@ -146,12 +147,12 @@ const DURATION_OPTIONS: DurationOpt[] = [
   { sec: 8, label: '8 秒', hint: '单段直出' },
   { sec: 12, label: '12 秒', hint: '单段直出' },
   { sec: 15, label: '15 秒', hint: '单段直出' },
-  { sec: 30, label: '30 秒', hint: '先试镜 · 待接小云雀' },
-  { sec: 60, label: '1 分钟', hint: '先试镜 · 待接小云雀' },
-  { sec: 180, label: '3 分钟', hint: '先试镜 · 待接小云雀' },
-  { sec: 300, label: '5 分钟', hint: '先试镜 · 待接小云雀' },
-  { sec: 600, label: '10 分钟', hint: '先试镜 · 待接小云雀' },
-  { sec: 900, label: '15 分钟', hint: '先试镜 · 待接小云雀' },
+  { sec: 30, label: '30 秒', hint: '先试镜 · 小云雀全片' },
+  { sec: 60, label: '1 分钟', hint: '先试镜 · 小云雀全片' },
+  { sec: 180, label: '3 分钟', hint: '先试镜 · 小云雀全片' },
+  { sec: 300, label: '5 分钟', hint: '先试镜 · 小云雀全片' },
+  { sec: 600, label: '10 分钟', hint: '先试镜 · 小云雀全片' },
+  { sec: 900, label: '15 分钟', hint: '先试镜 · 小云雀全片' },
 ]
 
 const WORLDS: {
@@ -1566,6 +1567,37 @@ export default function ShortDramaPage() {
 
   const generateFullLongform = async (billId: string) => {
     const total = Math.min(MAX_DRAMA_TOTAL_SEC, durationSec)
+    const xyqPrompt = [
+      metaPrompt,
+      `目标总时长约 ${total} 秒，竖屏 9:16。`,
+      `戏剧四拍：${formula.beats.join(' → ')}。`,
+      '请由小云雀智能生视频 Agent 多镜编排成片，前 3 秒必须冲突或反转，禁止拖沓空镜与电影片头片尾。',
+    ].join('\n')
+
+    if (cfg?.xiaoyunqueConfigured) {
+      setProgress(`小云雀 Agent 生成全片（约 ${total} 秒）…`)
+      const xyq = await runXiaoyunqueVideoJob({
+        prompt: xyqPrompt,
+        durationSec: total,
+        aspectRatio: '9:16',
+        shouldCancel: () => cancelRef.current,
+        onProgress: (t) => {
+          if (mountedRef.current) setProgress(t)
+        },
+      })
+      if (xyq.ok) {
+        await finishAsWork({
+          billId,
+          videoUrlOrBlob: xyq.videoUrl,
+          title: shop.storeName.trim() || story.trim().slice(0, 18) || scene.name,
+          durationSec: total,
+          modelUsed: xyq.modelUsed ?? 'xiaoyunque',
+        })
+        return
+      }
+      setProgress(`小云雀失败，改用 Seedance 分段拼接兜底…（${formatVideoAiUserError(xyq.message).slice(0, 80)}）`)
+    }
+
     const plan = planLongformSegmentDurations(total)
     const beats = expandBeats(formula, plan.length)
     const segmentUrls: string[] = []
@@ -1706,8 +1738,12 @@ export default function ShortDramaPage() {
       setTrialReady(true)
       setHint(
         [
-          `试镜 ${PREVIEW_SEC} 秒已出。满意再点「确认生成全片」（${segmentPlanLabel(durationSec)}）。`,
-          '分段靠尾帧续写衔接，人物/场景一致性会更好，但不能保证电影级零缝。',
+          `试镜 ${PREVIEW_SEC} 秒已出。满意再点「确认生成全片」（${
+            cfg?.xiaoyunqueConfigured ? '小云雀全片' : segmentPlanLabel(durationSec)
+          }）。`,
+          cfg?.xiaoyunqueConfigured
+            ? '全片将优先走小云雀 Agent；失败时自动回退 Seedance 分段拼接。'
+            : '小云雀未配置时全片走 Seedance 尾帧续写拼接，可能有轻微跳切。',
           spendHint,
         ]
           .filter(Boolean)
@@ -2112,8 +2148,13 @@ export default function ShortDramaPage() {
                     ))}
                   </select>
                   <span className="block text-[11px] text-slate-500">
-                    单段仍走 Seedance（约 15 秒）。超过 15 秒的长片目标是接小云雀智能生视频 Agent（多镜编排，最长约 15
-                    分钟）；当前长片暂用尾帧续写拼接兜底，小云雀网关接入后会切换。
+                    单段（≤15 秒）走 Seedance。超过 15 秒：先 5 秒试镜，确认后优先走小云雀智能生视频 Agent（多镜编排，最长约
+                    15 分钟）；若未配置或失败，再回退 Seedance 尾帧续写拼接。
+                    {cfgLoaded
+                      ? cfg?.xiaoyunqueConfigured
+                        ? ' 当前：小云雀已就绪。'
+                        : ' 当前：小云雀未配置（请运营台填即梦/小云雀 AK/SK），长片将走拼接兜底。'
+                      : ''}
                   </span>
                 </label>
                 <label className="space-y-1.5">
@@ -2189,7 +2230,9 @@ export default function ShortDramaPage() {
 
               <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
                 {showPreviewGate
-                  ? `当前 ${DURATION_OPTIONS.find((d) => d.sec === durationSec)?.label ?? durationSec} · ${segmentPlanLabel(durationSec)}。先出前 ${PREVIEW_SEC} 秒试镜，满意再生成全片。尾帧续写可改善衔接，仍可能有轻微跳切。`
+                  ? `当前 ${DURATION_OPTIONS.find((d) => d.sec === durationSec)?.label ?? durationSec} · ${
+                      cfg?.xiaoyunqueConfigured ? '小云雀全片' : segmentPlanLabel(durationSec)
+                    }。先出前 ${PREVIEW_SEC} 秒试镜，满意再生成全片。`
                   : '当前为单段直出，无需试镜确认。'}
               </p>
               <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-950">

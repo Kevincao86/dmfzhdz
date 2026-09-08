@@ -42,7 +42,9 @@ export function resolveVolcVisualCredentials(env: MerchantAiEnv): {
   secretAccessKey: string
   region: string
 } | null {
+  /** 优先运营台「即梦/小云雀」AK/SK（JIMENG_*），再回落轻量 VOLC_* */
   const accessKeyId = (
+    env.JIMENG_ACCESS_KEY_ID ??
     env.MERCHANT_AI_VOLC_ACCESS_KEY ??
     env.VOLC_ACCESSKEY ??
     env.VOLC_ACCESS_KEY_ID ??
@@ -50,6 +52,7 @@ export function resolveVolcVisualCredentials(env: MerchantAiEnv): {
     ''
   ).trim()
   const secretAccessKey = (
+    env.JIMENG_SECRET_ACCESS_KEY ??
     env.MERCHANT_AI_VOLC_SECRET_KEY ??
     env.VOLC_SECRETKEY ??
     env.VOLC_SECRET_ACCESS_KEY ??
@@ -57,7 +60,9 @@ export function resolveVolcVisualCredentials(env: MerchantAiEnv): {
     ''
   ).trim()
   if (!accessKeyId || !secretAccessKey) return null
-  const region = (env.MERCHANT_AI_VOLC_REGION ?? env.VOLC_REGION ?? 'cn-north-1').trim() || 'cn-north-1'
+  const region =
+    (env.JIMENG_REGION ?? env.MERCHANT_AI_VOLC_REGION ?? env.VOLC_REGION ?? 'cn-north-1').trim() ||
+    'cn-north-1'
   return { accessKeyId, secretAccessKey, region }
 }
 
