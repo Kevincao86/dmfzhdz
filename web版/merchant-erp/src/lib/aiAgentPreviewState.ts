@@ -31,16 +31,23 @@ export function hasPendingPreviewForTask(
   )
 }
 
-export function hasConfirmedPreviewForTask(
+export function hasCancelledPreviewForTask(
   messages: AiAgentMessage[],
   taskType: AiTaskType,
 ): boolean {
   return messages.some(
     (m) =>
       m.role === 'task_preview' &&
-      m.previewStatus === 'confirmed' &&
+      m.previewStatus === 'cancelled' &&
       m.preview?.taskType === taskType,
   )
+}
+
+/** 同一时间只露出一张待确认预览，避免一长串卡片 */
+export function visibleAgentMessages(messages: AiAgentMessage[]): AiAgentMessage[] {
+  const firstPendingId = messages.find((m) => isPendingPreviewMessage(m))?.id
+  if (!firstPendingId) return messages
+  return messages.filter((m) => !isPendingPreviewMessage(m) || m.id === firstPendingId)
 }
 
 export function isPreviewMessageLoading(m: AiAgentMessage): boolean {

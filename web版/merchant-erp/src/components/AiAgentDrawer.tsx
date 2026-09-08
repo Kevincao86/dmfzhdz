@@ -1,13 +1,14 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { Shield, X } from 'lucide-react'
 import { BRAND_LOGO_URL, BRAND_NAME_SHORT } from '../lib/brand'
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { AiAgentComposerBar } from './AiAgentComposerBar'
 import { AiAgentMessageBubble } from './AiAgentMessageBubble'
 import { AiAgentPreviewActions } from './AiAgentPreviewActions'
 import { AiAgentThinkingIndicator } from './AiAgentThinkingIndicator'
 import { cn } from '../cn'
 import { useAiAgent } from '../context/AiAgentContext'
+import { visibleAgentMessages } from '../lib/aiAgentPreviewState'
 import type { AiPermissionId } from '../lib/aiAgentTypes'
 
 const PERMISSION_ORDER: AiPermissionId[] = [
@@ -48,6 +49,7 @@ export default function AiAgentDrawer() {
   } = useAiAgent()
 
   const listRef = useRef<HTMLDivElement>(null)
+  const visibleMessages = useMemo(() => visibleAgentMessages(messages), [messages])
 
   useEffect(() => {
     if (!drawerOpen) return
@@ -163,7 +165,7 @@ export default function AiAgentDrawer() {
             </div>
 
             <div ref={listRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
-              {messages.map((m) => (
+              {visibleMessages.map((m) => (
                 <div key={m.id}>
                   <AiAgentMessageBubble m={m} />
                   {m.role === 'task_preview' && (m.previewStatus ?? 'pending') === 'pending' ? (

@@ -11,6 +11,7 @@ import { AiAgentMessageBubble } from '../components/AiAgentMessageBubble'
 import { AiAgentPreviewActions } from '../components/AiAgentPreviewActions'
 import { AiAgentThinkingIndicator } from '../components/AiAgentThinkingIndicator'
 import { useAiAgent } from '../context/AiAgentContext'
+import { visibleAgentMessages } from '../lib/aiAgentPreviewState'
 import { cn } from '../cn'
 
 const ShortVideoOptimizationPage = lazy(() => import('./ShortVideoOptimizationPage'))
@@ -43,6 +44,7 @@ export default function AiAgentPage() {
   } = useAiAgent()
 
   const hasChat = useMemo(() => messages.some((m) => m.role === 'user'), [messages])
+  const visibleMessages = useMemo(() => visibleAgentMessages(messages), [messages])
   const scrollRef = useRef<HTMLDivElement>(null)
   const [workspace, setWorkspace] = useState<AgentWorkspace>('chat')
 
@@ -250,7 +252,7 @@ export default function AiAgentPage() {
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
               <div className="mx-auto w-full max-w-3xl space-y-3 px-4 py-2 sm:space-y-4 sm:py-3">
-                {messages.map((m) => (
+                {visibleMessages.map((m) => (
                   <div key={m.id}>
                     <AiAgentMessageBubble m={m} />
                     {m.role === 'task_preview' && (m.previewStatus ?? 'pending') === 'pending' ? (

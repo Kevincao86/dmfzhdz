@@ -1,13 +1,15 @@
 /**
  * AI 智能体执行流（对齐产品流程图）：
  * 用户输入 → 场景识别 → 给出方案+预览 → 用户确认/修改 → 调用接口 → 返回结果。
- * 多项九大场景任务可并行，每项各自独立预览确认窗口。
+ * 多项九大场景任务须串行确认：一次只出一张预览，确认后再出下一张。
  */
 import type { AiTaskType } from './aiAgentTypes'
 import {
   filterScenarioTaskTypes,
+  hasCancelledPreviewForTask,
   hasConfirmedPreviewForTask,
   hasPendingPreviewForTask,
+  isPendingPreviewMessage,
 } from './aiAgentPreviewState'
 import type { AiAgentMessage } from './aiAgentTypes'
 import {
@@ -26,7 +28,7 @@ export type AgentExecutionStage =
   | 'awaiting_execute_confirm'
   /** 创建商品前等待用户附图或「自动生成」 */
   | 'awaiting_product_images'
-  /** 至少一项场景预览已展示，各自独立确认 */
+  /** 至少一项场景预览已展示，须一张一张确认 */
   | 'previews_active'
 
 export type AgentExecutionPlan = {
@@ -85,6 +87,27 @@ export function storeDeferredPlan(
   }
 }
 
+/** 把尚未出预览的场景并入当前方案，供确认后一张一张续出 */
+export function mergePlanTaskTypes(
+  state: AgentExecutionState,
+  extra: AiTaskType[],
+  userBrief?: string,
+  assistantContent?: string,
+): AgentExecutionState {
+  const extraFiltered = filterScenarioTaskTypes(extra)
+  if (!extraFiltered.length) return state
+  if (!state.plan) {
+    return storeDeferredPlan(state, userBrief ?? '', assistantContent ?? '', extraFiltered)
+  }
+  return {
+    ...state,
+    plan: {
+      ...state.plan,
+      taskTypes: filterScenarioTaskTypes([...state.plan.taskTypes, ...extraFiltered]),
+    },
+  }
+}
+
 export function markAwaitingProductImages(state: AgentExecutionState): AgentExecutionState {
   if (!state.plan) return state
   return { ...state, stage: 'awaiting_product_images' }
@@ -132,20 +155,27 @@ function needsProductImages(plan: AgentExecutionPlan, visionUrls: string[], stri
   )
 }
 
-/** 从计划中筛出尚未有待确认预览的任务类型 */
+/** 计划中尚未出过预览（待确认/已确认/已取消都不算待出）的任务 */
 export function taskTypesNeedingPreview(
   plan: AgentExecutionPlan,
   messages: AiAgentMessage[],
 ): AiTaskType[] {
-  return plan.taskTypes.filter((t) => !hasPendingPreviewForTask(messages, t))
+  return plan.taskTypes.filter(
+    (t) =>
+      !hasPendingPreviewForTask(messages, t) &&
+      !hasConfirmedPreviewForTask(messages, t) &&
+      !hasCancelledPreviewForTask(messages, t),
+  )
 }
 
-/** 组合「商品+达人招募」时并行生成各自独立预览卡片（确认仍分卡片进行） */
+/** 一次只生成下一张预览；已有待确认卡时不再追加 */
 export function taskTypesForNextPreviewBatch(
   plan: AgentExecutionPlan,
   messages: AiAgentMessage[],
 ): AiTaskType[] {
-  return taskTypesNeedingPreview(plan, messages)
+  if (messages.some(isPendingPreviewMessage)) return []
+  const need = taskTypesNeedingPreview(plan, messages)
+  return need.slice(0, 1)
 }
 
 function isRecruitExecutionIntent(strippedLine: string): boolean {
@@ -214,7 +244,7 @@ export function resolveExecutionUserMessage(
       return {
         state: markPreviewsActive(state),
         action: { type: 'start_parallel_previews', plan, taskTypes },
-        assistantLine: '正在根据方案并行生成各场景执行预览，请分别在对应卡片确认…',
+        assistantLine: sequentialPreviewAssistantLine(plan, taskTypes, messages),
       }
     }
     return { state, action: { type: 'none' } }
@@ -226,8 +256,16 @@ export function resolveExecutionUserMessage(
     (isExplicitExecutionIntent(strippedLine) || isRecruitExecutionIntent(strippedLine))
   ) {
     let taskTypes = taskTypesForNextPreviewBatch(plan, messages)
-    if (isRecruitExecutionIntent(strippedLine) && planIncludesRecruitInfluencer(plan)) {
-      if (!hasPendingPreviewForTask(messages, 'recruit_influencer')) {
+    if (
+      isRecruitExecutionIntent(strippedLine) &&
+      planIncludesRecruitInfluencer(plan) &&
+      !messages.some(isPendingPreviewMessage)
+    ) {
+      if (
+        !hasPendingPreviewForTask(messages, 'recruit_influencer') &&
+        !hasConfirmedPreviewForTask(messages, 'recruit_influencer') &&
+        !hasCancelledPreviewForTask(messages, 'recruit_influencer')
+      ) {
         taskTypes = ['recruit_influencer']
       }
     }
@@ -235,7 +273,7 @@ export function resolveExecutionUserMessage(
       return {
         state,
         action: { type: 'none' },
-        assistantLine: '当前方案下的场景预览已在对话中展示，请分别在对应卡片确认或修改。',
+        assistantLine: '当前这一项还在等待确认。确认后再继续下一项。',
       }
     }
 
@@ -251,16 +289,31 @@ export function resolveExecutionUserMessage(
     return {
       state: markPreviewsActive(state),
       action: { type: 'start_parallel_previews', plan, taskTypes },
-      assistantLine:
-        taskTypes.length > 1
-          ? `好的，将为 ${taskTypes.length} 项场景并行生成独立预览（${taskTypes.map(taskTypeLabel).join('、')}），请分别在各自卡片确认。`
-          : taskTypes[0] === 'recruit_influencer'
-            ? '好的，开始一步一步确认招募单…'
-            : '好的，正在生成执行预览…',
+      assistantLine: sequentialPreviewAssistantLine(plan, taskTypes, messages),
     }
   }
 
   return { state, action: { type: 'none' } }
+}
+
+export function sequentialPreviewAssistantLine(
+  plan: AgentExecutionPlan,
+  started: AiTaskType[],
+  messages: AiAgentMessage[],
+): string {
+  const label = started.map(taskTypeLabel).join('、') || '本项'
+  const rest = plan.taskTypes.filter(
+    (t) =>
+      !started.includes(t) &&
+      !hasPendingPreviewForTask(messages, t) &&
+      !hasConfirmedPreviewForTask(messages, t) &&
+      !hasCancelledPreviewForTask(messages, t),
+  )
+  if (started[0] === 'recruit_influencer' && rest.length === 0) {
+    return '好的，开始一步一步确认招募单…'
+  }
+  if (!rest.length) return `好的，请先确认「${label}」。`
+  return `好的，请先确认「${label}」。其余 ${rest.map(taskTypeLabel).join('、')} 确认这项后再继续。`
 }
 
 function taskTypeLabel(t: AiTaskType): string {

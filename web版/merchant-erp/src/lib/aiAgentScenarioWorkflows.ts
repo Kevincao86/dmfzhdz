@@ -317,7 +317,7 @@ export function buildClosedLoopSystemAddon(taskTypes: AiTaskType[]): string {
   const loop = AI_AGENT_CLOSED_LOOP_PATH.map((t) => AI_TASK_TYPE_LABELS[t]).join(' → ')
   return [
     '【多场景闭环】',
-    `本方案涉及：${labels}。须先输出完整方案正文，用户回复「确认执行」后，为每个场景分别生成独立预览 JSON（禁止合并到一张卡片）。`,
+    `本方案涉及：${labels}。须先输出完整方案正文，用户回复「确认执行」后，为每个场景分别生成独立预览 JSON（一次只出一张，确认后再出下一张；禁止合并到一张卡片，也禁止一次性摊开全部场景）。`,
     `完整经营闭环参考顺序：${loop}。`,
     '分析异常（analyze_exception）可作为路由中枢：按根因跳回对应单场景修复。',
   ].join('\n')

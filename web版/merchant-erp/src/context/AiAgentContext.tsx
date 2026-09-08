@@ -57,8 +57,10 @@ import type { CreatePlatformId } from '../constants/productCreatePlatforms'
 import { isCreatePlatformId } from '../constants/productCreatePlatforms'
 import { listProductPlansFromPreview } from '../lib/aiAgentProductPlans'
 import {
+  filterScenarioTaskTypes,
   hasConfirmedPreviewForTask,
   hasPendingPreviewForTask,
+  isPendingPreviewMessage,
   isPreviewMessageLoading,
   listPendingPreviewMessages,
   patchPreviewStatusInMessages,
@@ -113,11 +115,14 @@ import {
   createAgentExecutionState,
   inferDeferredTaskTypes,
   markPreviewsActive,
+  mergePlanTaskTypes,
   resetAgentExecutionState,
   resolveExecutionUserMessage,
+  sequentialPreviewAssistantLine,
   shouldSkipAutoTaskPreview,
   storeDeferredPlan,
   syncStageAfterPreviewChange,
+  taskTypesForNextPreviewBatch,
   type AgentExecutionPlan,
 } from '../lib/aiAgentExecutionFlow'
 import { AI_TASK_TYPE_LABELS, createAgentMessage } from '../lib/aiAgentTypes'
@@ -212,6 +217,19 @@ function captionForAgentImageResult(img: AiAgentNativeImageOk, isI2i: boolean): 
   if (img.fallbackNote) s += `\n\n${img.fallbackNote}`
   s += `\n\n${agentDomesticImageUpsellTip()}`
   return s
+}
+
+function taskTypesFromClientToolResults(results: AiAgentClientToolResult[]): AiTaskType[] {
+  const out: AiTaskType[] = []
+  for (const r of results) {
+    if (!r.needsConfirm) continue
+    if (r.tool === 'create_product') out.push('create_product')
+    else if (r.tool === 'recruit_influencer') out.push('recruit_influencer')
+    else if (r.tool === 'generate_copy' || r.scenarioKey === 'generate_copywriting') {
+      out.push('generate_copywriting')
+    }
+  }
+  return filterScenarioTaskTypes(out)
 }
 
 const PREFS_KEY = 'meoo_ai_model_picker_key'
@@ -1336,11 +1354,14 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
 
   const triggerParallelPreviews = useCallback(
     (plan: AgentExecutionPlan, taskTypes: AiTaskType[], pageLabel?: string) => {
+      if (messagesRef.current.some(isPendingPreviewMessage)) return
+      const one = taskTypes.slice(0, 1)
+      if (!one.length) return
       executionStateRef.current = markPreviewsActive(executionStateRef.current)
       const combinedBrief = buildCombinedBrief(plan)
       const introGeneric = '根据方案生成的执行预览，请在本卡片确认后继续。'
 
-      for (const taskType of taskTypes) {
+      for (const taskType of one) {
         switch (taskType) {
           case 'create_product':
             pushCreateProductPreview(combinedBrief, pageLabel, {
@@ -1368,6 +1389,33 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     },
     [pushCreateProductPreview, pushRecruitInfluencerPreview, pushTaxFilingPreview, pushPreview],
   )
+
+  const continuePlanPreviews = useCallback(
+    (pageLabel?: string) => {
+      const plan = executionStateRef.current.plan
+      if (!plan) return
+      const nextTypes = taskTypesForNextPreviewBatch(plan, messagesRef.current)
+      if (!nextTypes.length) {
+        executionStateRef.current = syncStageAfterPreviewChange(
+          executionStateRef.current,
+          messagesRef.current,
+        )
+        return
+      }
+      appendAssistantLine(sequentialPreviewAssistantLine(plan, nextTypes, messagesRef.current))
+      triggerParallelPreviews(plan, nextTypes, pageLabel)
+    },
+    [appendAssistantLine, triggerParallelPreviews],
+  )
+
+  const continuePlanPreviewsRef = useRef(continuePlanPreviews)
+  continuePlanPreviewsRef.current = continuePlanPreviews
+
+  const scheduleContinuePlanPreviews = useCallback((pageLabel?: string) => {
+    queueMicrotask(() => {
+      continuePlanPreviewsRef.current(pageLabel)
+    })
+  }, [])
 
   const tryHandleExecutionFlow = useCallback(
     (strippedLine: string, visionUrls: string[], pageLabel?: string): boolean => {
@@ -1402,6 +1450,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       if (shouldSkipAutoTaskPreview(executionStateRef.current, trimmed, assistantContent, explicitTaskType))
         return
       if (hasCombinedProductAndRecruitPlan(trimmed, assistantContent, explicitTaskType)) return
+      if (messagesRef.current.some(isPendingPreviewMessage)) return
 
       const taskType = resolveAutoTaskPreviewType(trimmed, assistantContent, explicitTaskType)
       if (!taskType) return
@@ -1470,6 +1519,15 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       ctx: { pageLabel?: string; userBrief: string; assistantContent?: string },
     ) => {
       const pageLabel = ctx.pageLabel
+      const confirmTypes = taskTypesFromClientToolResults(results)
+      if (confirmTypes.length) {
+        executionStateRef.current = mergePlanTaskTypes(
+          executionStateRef.current,
+          confirmTypes,
+          ctx.userBrief,
+          ctx.assistantContent,
+        )
+      }
       for (const r of results) {
         if (r.needsUpload) {
           setMessages((prev) => {
@@ -1508,6 +1566,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         }
 
         if (r.tool === 'create_product' && r.needsConfirm) {
+          if (messagesRef.current.some(isPendingPreviewMessage)) continue
           const brief =
             strFromUnknown(r.planDraft?.brief) ||
             ctx.userBrief ||
@@ -1535,6 +1594,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         }
 
         if (r.tool === 'recruit_influencer' && r.needsConfirm) {
+          if (messagesRef.current.some(isPendingPreviewMessage)) continue
           const brief = strFromUnknown(r.data?.brief) || ctx.userBrief
           setMessages((prev) => {
             const next = [
@@ -1556,6 +1616,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           (r.tool === 'generate_copy' || r.scenarioKey === 'generate_copywriting') &&
           r.needsConfirm
         ) {
+          if (messagesRef.current.some(isPendingPreviewMessage)) continue
           setMessages((prev) => {
             const next = [
               ...prev,
@@ -2429,23 +2490,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
               messagesRef.current = next
               return next
             })
-
-            const plan = executionStateRef.current.plan
-            if (
-              plan &&
-              planIncludesRecruitInfluencer(plan) &&
-              !hasPendingPreviewForTask(messagesRef.current, 'recruit_influencer') &&
-              !hasConfirmedPreviewForTask(messagesRef.current, 'recruit_influencer')
-            ) {
-              appendAssistantLine(
-                '商品方案已确认。接下来一步一步确认招募单，先核对主推和投放范围。',
-              )
-              pushRecruitInfluencerPreview(
-                buildCombinedBrief(plan),
-                pageContext?.pageLabel,
-                plan.assistantContent,
-              )
-            }
+            scheduleContinuePlanPreviews(pageContext?.pageLabel)
           } catch {
             /* ignore */
           } finally {
@@ -2571,6 +2616,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
               messagesRef.current = next
               return next
             })
+            scheduleContinuePlanPreviews(pageContext?.pageLabel)
             navigate('/recruitment')
           } catch (e) {
             const msg = e instanceof Error ? e.message : String(e)
@@ -2641,6 +2687,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
               messagesRef.current = next
               return next
             })
+            scheduleContinuePlanPreviews(pageContext?.pageLabel)
             setDrawerOpen(false)
             navigate('/finance/tax')
           } finally {
@@ -2681,6 +2728,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
               setDrawerOpen(false)
               navigate(result.navigateTo)
             }
+            scheduleContinuePlanPreviews(pageContext?.pageLabel)
           } catch (e) {
             const msg = e instanceof Error ? e.message : String(e)
             setMessages((prev) => {
@@ -2716,13 +2764,13 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         messagesRef.current = next
         return next
       })
+      scheduleContinuePlanPreviews(pageContext?.pageLabel)
     },
     [
       navigate,
       previewSubmitPlatforms,
       patchPreviewStatus,
-      appendAssistantLine,
-      pushRecruitInfluencerPreview,
+      scheduleContinuePlanPreviews,
       pageContext?.pageLabel,
       modelPickerKey,
     ],
@@ -2741,12 +2789,13 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       if (!pending || pending.previewStatus !== 'pending') return
       patchPreviewStatus(previewMessageId, 'cancelled')
       setMessages((prev) => {
-        const next = [...prev, createAgentMessage('system', '已取消本项待执行操作，其它场景预览不受影响。')]
+        const next = [...prev, createAgentMessage('system', '已取消本项。确认完成后将继续下一项。')]
         messagesRef.current = next
         return next
       })
+      scheduleContinuePlanPreviews(pageContext?.pageLabel)
     },
-    [patchPreviewStatus],
+    [patchPreviewStatus, scheduleContinuePlanPreviews, pageContext?.pageLabel],
   )
 
   const modifyPendingTask = useCallback(
