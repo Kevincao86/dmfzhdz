@@ -46,46 +46,77 @@ function authHeadersExtra() {
   return h
 }
 
+function isTransientWxFail(errMsg) {
+  return /interrupted|timeout|超时|TIMED_OUT|timed\s*out|ECONNRESET|fail net/i.test(String(errMsg || ''))
+}
+
+function friendlyShopNetError(errMsg) {
+  const em = String(errMsg || '网络异常')
+  if (/interrupted/i.test(em)) {
+    return '分析请求被中断（网络不稳定或微信长请求限制）。请再点一次「店铺分析」；若仍失败可缩短日期区间。'
+  }
+  if (/timeout|超时|TIMED_OUT|timed\s*out/i.test(em)) {
+    return '分析超时，请稍后重试或缩短日期区间'
+  }
+  return em.replace(/^request:fail\s*/i, '') || '网络异常'
+}
+
 function requestShop(method, path, data, timeoutMs) {
   const token = api.getBearerToken && api.getBearerToken()
   if (!token) return Promise.reject(new Error('请先登录后再使用店铺分析'))
   const b = merchantApi.baseUrl()
   if (!b) return Promise.reject(new Error('请配置商家后台 API 地址'))
   const url = `${b}${path.startsWith('/') ? path : `/${path}`}`
-  return new Promise((resolve, reject) => {
-    wx.request({
-      url,
-      method,
-      header: Object.assign(
-        {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+  const timeout = Math.max(10000, Number(timeoutMs) || 60000)
+  const maxTry = method === 'GET' ? 2 : 1
+
+  const once = () =>
+    new Promise((resolve, reject) => {
+      wx.request({
+        url,
+        method,
+        enableHttp2: false,
+        enableQuic: false,
+        enableCache: false,
+        header: Object.assign(
+          {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          authHeadersExtra(),
+        ),
+        data: method === 'GET' ? undefined : data,
+        timeout,
+        success(res) {
+          const body = res.data || {}
+          if (res.statusCode >= 200 && res.statusCode < 300 && body.ok !== false) {
+            resolve(body)
+            return
+          }
+          const msg =
+            body.message || body.detail || body.error || `请求失败 ${res.statusCode}`
+          reject(new Error(typeof msg === 'string' ? msg : JSON.stringify(msg)))
         },
-        authHeadersExtra(),
-      ),
-      data: method === 'GET' ? undefined : data,
-      timeout: timeoutMs || 60000,
-      success(res) {
-        const body = res.data || {}
-        if (res.statusCode >= 200 && res.statusCode < 300 && body.ok !== false) {
-          resolve(body)
-          return
-        }
-        const msg =
-          body.message || body.detail || body.error || `请求失败 ${res.statusCode}`
-        reject(new Error(typeof msg === 'string' ? msg : JSON.stringify(msg)))
-      },
-      fail(err) {
-        const em = (err && err.errMsg) || '网络异常'
-        if (/timeout|超时|TIMED_OUT/i.test(em)) {
-          reject(new Error('请求超时，请稍后重试或缩短日期区间'))
-          return
-        }
-        reject(new Error(em))
-      },
+        fail(err) {
+          reject(new Error((err && err.errMsg) || '网络异常'))
+        },
+      })
     })
-  })
+
+  const run = (attempt) =>
+    once().catch((e) => {
+      const msg = e instanceof Error ? e.message : String(e)
+      if (attempt < maxTry && isTransientWxFail(msg)) {
+        return new Promise((r) => {
+          setTimeout(() => r(run(attempt + 1)), 600 * attempt)
+        })
+      }
+      if (isTransientWxFail(msg)) return Promise.reject(new Error(friendlyShopNetError(msg)))
+      return Promise.reject(e instanceof Error ? e : new Error(msg))
+    })
+
+  return run(1)
 }
 
 async function fetchShopAnalysisSummary(opts) {

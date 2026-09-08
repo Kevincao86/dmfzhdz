@@ -90,7 +90,7 @@ Page({
       {
         label: '退款率',
         value: `${summary.refundRate || 0}%`,
-        sub: `${summary.refundCount || 0} 笔退款`,
+        sub: `退款 ¥${yuan(summary.refundAmountYuan)}`,
       },
       {
         label: '复购率',
@@ -134,6 +134,9 @@ Page({
       this.setData({ loading: false, err: '请先登录后再查看店铺分析' })
       return
     }
+    if (this.data.analyzing) return
+    const seq = (this._loadSeq || 0) + 1
+    this._loadSeq = seq
     this.setData({ loading: true, err: '', showAdvice: false, aiSections: [], pointsCharged: 0 })
     try {
       const r = await shop.fetchShopAnalysisSummary({
@@ -142,13 +145,14 @@ Page({
         platform: this.data.platform,
         poiId: this.data.poiId || undefined,
       })
+      if (seq !== this._loadSeq) return
       this.applySummary(r.summary, r.adviceFacts)
       this.setData({ loading: false })
     } catch (e) {
+      if (seq !== this._loadSeq) return
       this.setData({
         loading: false,
         err: e instanceof Error ? e.message : '加载失败',
-        summary: null,
       })
     }
   },
