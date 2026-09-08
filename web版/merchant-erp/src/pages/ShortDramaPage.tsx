@@ -52,6 +52,7 @@ import { compressPortraitDataUrlForLibrary, processCustomAvatarFile } from '../l
 import { probeVideoDurationSec } from '../lib/digitalHumanSubtitle'
 import { readMpSessionToken } from '../lib/merchantApiAuth'
 import { extractVideoFirstFramePureBase64 } from '../lib/videoFrameUtils'
+import { VISUAL_STUDIO_PRO_IMAGE_MODEL } from '../lib/mpPointsEconomics'
 import { planLongformSegmentDurations } from '../lib/shortVideoScriptTable'
 import { sanitizePromptForSeedanceNativeAv } from '../lib/shortVideoPostProcess'
 import {
@@ -1651,9 +1652,9 @@ export default function ShortDramaPage() {
             roles.trim() ? `角色身份：${roles.trim()}` : '',
             story.trim() ? `一句话故事：${story.trim()}` : '',
             hintText ? `商家文字提示（仅补职业/年龄/身份，外貌以参考图为准）：${hintText}` : '',
-            '请根据参考图重写角色形象词。图中可见的发型、发色、五官、妆容、衣着颜色与款式必须保留，不要另造一张脸。',
-            '必须覆盖：性别、年龄段、国籍/族裔外观、发型发色、五官气质、妆容、衣着与配饰、体态、镜头。',
-            '只输出 JSON：{"portrait":"..."}，portrait 为一段中文、80–180 字，不要 markdown、不要解释。',
+            '请根据参考图如实重写角色形象词。图中可见的发型、发色、五官、妆容、衣着颜色与款式必须原样写下，禁止另造一张脸或换一套衣服。',
+            '看不清的项写「看不清」，不要脑补国籍、配饰或体态。',
+            '只输出 JSON：{"portrait":"..."}，portrait 为一段中文、60–140 字，不要 markdown、不要解释。',
           ]
             .filter(Boolean)
             .join('\n')
@@ -1672,20 +1673,31 @@ export default function ShortDramaPage() {
             .filter(Boolean)
             .join('\n')
       const system = fromImage
-        ? '你是商业短视频角色造型指导。必须根据参考图如实描述图中人物，不要编造图中看不到的五官或换一套衣服。商家文字只用于补职业与年龄。不要写技术参数，不要出现字幕、水印、Logo、多人。'
+        ? '你是人像核验员。只描述参考图里看得见的特征，禁止虚构。商家文字只用于职业与年龄。不要写技术参数，不要出现字幕、水印、Logo、多人。'
         : '你是商业短视频角色造型指导。根据简要提示补全写实竖屏人像的角色形象词，具体到国籍外观、衣着面料颜色与配饰。不要写技术参数，不要出现字幕、水印、Logo、多人。'
-      const providers = fromImage ? (['qwen', 'doubao'] as const) : (['doubao', 'qwen'] as const)
+      const chatTries = fromImage
+        ? ([
+            { provider: 'tokenmix' as const, modelFamily: 'openai' as const, model: 'gpt-4o' },
+            { provider: 'qwen' as const },
+            { provider: 'doubao' as const },
+          ])
+        : ([
+            { provider: 'tokenmix' as const, modelFamily: 'openai' as const, model: 'gpt-4o' },
+            { provider: 'doubao' as const },
+            { provider: 'qwen' as const },
+          ])
       let lastErr = '补充画像失败，请稍后重试'
-      for (const provider of providers) {
+      for (const tryItem of chatTries) {
         try {
           const res = await postAiChat({
-            provider,
+            provider: tryItem.provider,
+            ...('modelFamily' in tryItem ? { modelFamily: tryItem.modelFamily, model: tryItem.model } : {}),
             messages: [
               { role: 'system', content: system },
               { role: 'user', content: user },
             ],
             ...(imageDataUrl ? { imageDataUrls: [imageDataUrl] } : {}),
-            temperature: fromImage ? 0.35 : 0.6,
+            temperature: fromImage ? 0.2 : 0.6,
           })
           const portrait = parseDramaCharacterPortraitAi(res.content ?? '')
           if (!portrait) {
@@ -1828,8 +1840,9 @@ export default function ShortDramaPage() {
 
   const generateCharacterPreview = async () => {
     const desc = characterDesc.trim() || roles.trim()
-    if (!desc) {
-      setErr('请先填写角色形象描述，再生成预览')
+    const rawRef = (characterDraft || characterPreview || '').trim()
+    if (!desc && !rawRef) {
+      setErr('请先填写角色形象描述，或上传参考照片后再生成预览')
       setHint(null)
       return
     }
@@ -1837,16 +1850,53 @@ export default function ShortDramaPage() {
     setErr(null)
     setHint(null)
     try {
-      const prompt = [
-        '竖屏半身人像照片，单人，正面或微侧，五官清晰，自然光线，写实。',
-        `角色身份：${roles.trim() || '主角'}。`,
-        `外貌与穿搭：${desc}。`,
-        `气质贴近「${scene.name}」${style.visual ? `，${style.visual}` : ''}。`,
-        '禁止字幕、水印、Logo、多人、拼贴和海报排版。',
-      ].join('')
-      const res = await postAiAgentNativeImage(prompt, { aspectRatio: '3:4', exactPrompt: true })
+      let refData: string | undefined
+      if (rawRef) {
+        const resolved = await resolveDramaPortraitDataUrl(rawRef)
+        refData = resolved ? await compressPortraitDataUrlForLibrary(resolved) : undefined
+      }
+      const prompt = refData
+        ? [
+            '图生图：必须与参考图为同一人，五官、脸型、发型发色、肤色、体态全程一致，禁止换脸换人。',
+            '竖屏半身人像，正面或微侧，五官清晰，自然光线，写实照片。',
+            `角色身份：${roles.trim() || '主角'}。`,
+            desc ? `可微调构图与清晰度，衣着与外貌仍须是参考图本人：${desc}。` : '',
+            `气质贴近「${scene.name}」${style.visual ? `，${style.visual}` : ''}。`,
+            '禁止字幕、水印、Logo、多人、拼贴和海报排版。',
+          ]
+            .filter(Boolean)
+            .join('')
+        : [
+            '竖屏半身人像照片，单人，正面或微侧，五官清晰，自然光线，写实。',
+            `角色身份：${roles.trim() || '主角'}。`,
+            `外貌与穿搭：${desc}。`,
+            `气质贴近「${scene.name}」${style.visual ? `，${style.visual}` : ''}。`,
+            '禁止字幕、水印、Logo、多人、拼贴和海报排版。',
+          ].join('')
+      const gptOpts = {
+        exactPrompt: true as const,
+        aspectRatio: '3:4' as const,
+        imageRoute: 'tokenmix' as const,
+        tokenmixImageModel: VISUAL_STUDIO_PRO_IMAGE_MODEL,
+        wanxSize: '1024x1536',
+        ...(refData ? { referenceImageDataUrl: refData } : {}),
+      }
+      setHint(refData ? '正在用 GPT Image 按参考图生成预览…' : '正在用 GPT Image 生成预览…')
+      let res = await postAiAgentNativeImage(prompt, gptOpts)
+      if (!res.ok && refData) {
+        setHint('GPT 参考图未成功，改用国内图生图贴脸…')
+        res = await postAiAgentNativeImage(prompt, {
+          exactPrompt: true,
+          aspectRatio: '3:4',
+          preferredVendor: 'qwen',
+          referenceImageDataUrl: refData,
+        })
+      } else if (!res.ok) {
+        res = await postAiAgentNativeImage(prompt, { exactPrompt: true, aspectRatio: '3:4' })
+      }
       if (!res.ok) {
         setErr(res.message || '角色形象生成失败，请稍后重试')
+        setHint(null)
         return
       }
       let dataUrl = res.imageUrl.trim()
@@ -1858,7 +1908,14 @@ export default function ShortDramaPage() {
       setCharacterDraft(dataUrl)
       setCharacterPreview(null)
       clearTrial()
-      setHint('请点「用此图确认角色」后，生成短剧才会按此角色形象融合。')
+      const viaGpt = res.ok && res.channel === 'tokenmix'
+      setHint(
+        viaGpt
+          ? refData
+            ? '已用 GPT Image 按参考图生成预览。请点「用此图确认角色」后才会融合进短剧。'
+            : '已用 GPT Image 生成预览。请点「用此图确认角色」后才会融合进短剧。'
+          : '请点「用此图确认角色」后，生成短剧才会按此角色形象融合。',
+      )
     } catch (e) {
       setErr(e instanceof Error ? e.message : '角色形象生成失败')
     } finally {
@@ -2770,7 +2827,7 @@ export default function ShortDramaPage() {
                     </button>
                   </span>
                   <p className="text-[11px] leading-relaxed text-slate-500">
-                    可先写简要提示再补词；已有照片时点「AI补充画像」会按图重写描述。上传照片会直接确认角色，生成短剧按此融合。
+                    写画像优先 GPT-4o 看图，只写照片里看得见的特征。生成预览优先 GPT Image 按参考图编辑，尽量同一张脸；上传照片会直接确认角色。
                   </p>
                   <textarea
                     className={cn(fieldCls, 'min-h-[88px] resize-y')}

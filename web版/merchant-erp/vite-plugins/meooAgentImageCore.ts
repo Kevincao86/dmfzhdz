@@ -1,6 +1,7 @@
 import { wanxSizeToGptImage2Size } from '../src/lib/aiImageStudioGptSize.js'
 import {
   tokenmixImagesCreate,
+  tokenmixImagesEdit,
   tokenmixImagesGenerate,
   tokenmixImagesPollOnce,
 } from './aiGateway/tokenmixImageGenerate.js'
@@ -242,11 +243,28 @@ export async function runMeooAgentImageRequest(
     }
   }
 
-  // 用户选了高级模型但带了参考图：高级接口不支持，禁止静默切到内置引擎
   if (imageRoute === 'tokenmix' && tm && refHttps) {
-    return {
-      ok: false,
-      message: '高级生图暂不支持参考图，请去掉参考图后重试（不会改用其它模型）',
+    try {
+      const isGptImage = /^gpt-image/i.test(tm)
+      const { size, quality } = resolveGptQualityAndSize(tm, wanxSize)
+      const editPromise = tokenmixImagesEdit(env, tm, prompt, refHttps, {
+        quality,
+        ...(size ? { size } : {}),
+      })
+      const timeoutMs = isGptImage ? 250_000 : 120_000
+      const { imageUrl, modelUsed } = await Promise.race([
+        editPromise,
+        new Promise<never>((_, reject) => {
+          setTimeout(
+            () => reject(new Error(`GPT 参考图生图超时（${Math.round(timeoutMs / 1000)}秒），请稍后重试`)),
+            timeoutMs,
+          )
+        }),
+      ])
+      return { ok: true, imageUrl, channel: 'tokenmix', displayModel: modelUsed }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      return { ok: false, message: msg.slice(0, 600) }
     }
   }
 

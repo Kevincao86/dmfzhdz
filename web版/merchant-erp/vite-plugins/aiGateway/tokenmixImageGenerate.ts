@@ -300,3 +300,108 @@ export async function tokenmixImagesGenerate(
   }
   return pollTokenmixImageTask(env, created.taskId, created.retryAfterSec, created.modelUsed)
 }
+
+async function loadTokenmixEditImageBytes(
+  src: string,
+): Promise<{ buffer: Buffer; contentType: string; fileName: string }> {
+  const t = src.trim()
+  const dataUrl = /^data:([^;]+);base64,(.+)$/i.exec(t)
+  if (dataUrl) {
+    const contentType = (dataUrl[1] || 'image/jpeg').trim() || 'image/jpeg'
+    const ext = /png/i.test(contentType) ? 'png' : /webp/i.test(contentType) ? 'webp' : 'jpg'
+    const buffer = Buffer.from(dataUrl[2] || '', 'base64')
+    if (!buffer.length) throw new Error('参考图为空')
+    return { buffer, contentType, fileName: `ref.${ext}` }
+  }
+  if (!/^https?:\/\//i.test(t)) throw new Error('参考图格式无效')
+  const res = await fetchWithTimeout(
+    t,
+    { method: 'GET', headers: { Accept: 'image/*,*/*' } },
+    30_000,
+    '下载参考图',
+  )
+  if (!res.ok) throw new Error(`参考图下载失败 HTTP ${res.status}`)
+  const buffer = Buffer.from(await res.arrayBuffer())
+  if (!buffer.length) throw new Error('参考图为空')
+  const ctRaw = (res.headers.get('content-type') || 'image/jpeg').split(';')[0]?.trim() || 'image/jpeg'
+  const contentType = /^image\//i.test(ctRaw) ? ctRaw : 'image/jpeg'
+  const ext = /png/i.test(contentType) ? 'png' : /webp/i.test(contentType) ? 'webp' : 'jpg'
+  return { buffer, contentType, fileName: `ref.${ext}` }
+}
+
+function parseTokenmixImageCreateBody(json: unknown, httpStatus: number, fallbackModel: string): TokenmixImageCreateResult {
+  const root = json && typeof json === 'object' ? (json as Record<string, unknown>) : null
+  const objectType = typeof root?.object === 'string' ? root.object : ''
+  const taskId = typeof root?.id === 'string' ? root.id.trim() : ''
+  const syncUrl = extractImageUrlFromPayload(json)
+  const modelUsed = typeof root?.model === 'string' && root.model.trim() ? root.model.trim() : fallbackModel
+  if (syncUrl) return { kind: 'ready', imageUrl: syncUrl, modelUsed }
+  if (
+    taskId &&
+    (httpStatus === 202 ||
+      objectType === 'image.generation.task' ||
+      objectType === 'image.edit.task' ||
+      /^pending|processing|queued$/i.test(String(root?.status || '')))
+  ) {
+    const retryAfter =
+      typeof root?.retry_after === 'number' && Number.isFinite(root.retry_after) ? root.retry_after : 3
+    return { kind: 'pending', taskId, modelUsed, retryAfterSec: retryAfter }
+  }
+  throw new Error('TokenMix 生图未返回 url / b64_json / task id')
+}
+
+/** GPT Image 按参考图编辑（multipart /images/edits），用于角色贴脸 */
+export async function tokenmixImagesEdit(
+  env: Record<string, string>,
+  modelId: string,
+  prompt: string,
+  imageSrc: string,
+  opts?: { quality?: 'low' | 'medium' | 'high'; size?: string },
+): Promise<{ imageUrl: string; modelUsed: string }> {
+  const { base, apiKey } = tokenmixBaseAndKey(env)
+  const mid = modelId.trim()
+  if (!mid) throw new Error('tokenmix_image_model 为空')
+  const p = prompt.trim().slice(0, 3800)
+  if (!p) throw new Error('prompt 为空')
+  const img = await loadTokenmixEditImageBytes(imageSrc)
+  if (img.buffer.length > 8 * 1024 * 1024) throw new Error('参考图过大，请压缩后再试')
+
+  const form = new FormData()
+  form.append('model', mid)
+  form.append('prompt', p)
+  form.append('n', '1')
+  form.append(
+    'image',
+    new Blob([new Uint8Array(img.buffer)], { type: img.contentType }),
+    img.fileName,
+  )
+  const size = opts?.size?.trim()
+  if (size) form.append('size', size)
+  if (opts?.quality) form.append('quality', opts.quality)
+
+  const res = await fetchWithTimeout(
+    `${base}/images/edits`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
+    },
+    60_000,
+    'TokenMix 参考图编辑',
+  )
+  const text = await res.text()
+  let json: unknown = null
+  try {
+    json = text ? JSON.parse(text) : null
+  } catch {
+    json = null
+  }
+  if (!res.ok && res.status !== 202) {
+    throw new Error(errorMessageFromPayload(json, `TokenMix 参考图编辑失败 HTTP ${res.status}`))
+  }
+  const created = parseTokenmixImageCreateBody(json, res.status, mid)
+  if (created.kind === 'ready') {
+    return { imageUrl: created.imageUrl, modelUsed: created.modelUsed }
+  }
+  return pollTokenmixImageTask(env, created.taskId, created.retryAfterSec, created.modelUsed)
+}
