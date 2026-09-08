@@ -35,6 +35,31 @@ export function isXiaoyunqueConfigured(env: MerchantAiEnv): boolean {
   return Boolean(resolveVolcVisualCredentials(env))
 }
 
+/** 凭据在 ≠ 小云雀 Agent 已开通。用假 task 打一次 GetResult 判断 req_key 是否被账号支持。 */
+export async function probeXiaoyunqueAccount(env: MerchantAiEnv): Promise<{
+  configured: boolean
+  usable: boolean
+  detail: string
+}> {
+  if (!isXiaoyunqueConfigured(env)) {
+    return { configured: false, usable: false, detail: '未配置即梦/视觉云 AK/SK' }
+  }
+  const dummy = encodeTaskToken(XYQ_REQ_KEY_NOREF, XYQ_GET_ACTION, 'probe-not-exist')
+  const state = await volcGetXiaoyunqueTaskOnce(env, dummy)
+  const reason = `${state.failReason ?? ''} ${state.statusLabel ?? ''}`
+  if (/req_key\s*<[^>]+>\s*not supported|不支持该小云雀 req_key/i.test(reason)) {
+    return {
+      configured: true,
+      usable: false,
+      detail: '视觉云 AK 有效，但当前账号未开通小云雀智能生视频 Agent',
+    }
+  }
+  if (/Access\s*Denied|50400|未开通或 AK 无权限/i.test(reason)) {
+    return { configured: true, usable: false, detail: 'AK 无小云雀权限，请到火山控制台开通并授权' }
+  }
+  return { configured: true, usable: true, detail: '小云雀接口可调用' }
+}
+
 export function isXiaoyunqueTaskId(taskId: string): boolean {
   return String(taskId || '')
     .trim()

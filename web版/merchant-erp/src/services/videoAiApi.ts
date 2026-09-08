@@ -272,6 +272,9 @@ export type VideoAiBackendConfig = {
   motionImitateConfigured?: boolean
   /** 即梦/小云雀智能生视频 Agent（JIMENG_* 或 VOLC_*）已配置 */
   xiaoyunqueConfigured?: boolean
+  /** 账号已开通小云雀 req_key（需 xiaoyunque_probe=1） */
+  xiaoyunqueUsable?: boolean
+  xiaoyunqueProbeDetail?: string
   arkKeyConfigured: boolean
   arkVideoModels: { label: string; endpointId: string }[]
   iceConfigured?: boolean
@@ -532,8 +535,14 @@ async function fetchVideoPost(
   return fetchVideoPostOnUrls(fallback, bodyStr, timeoutMs, authHdr, out)
 }
 
-export async function fetchVideoAiConfig(): Promise<VideoAiBackendConfig | null> {
-  const paths = ['/api/meoo-merchant-ai-video-config', '/api/merchant/ai/video/config'] as const
+export async function fetchVideoAiConfig(opts?: {
+  probeXiaoyunque?: boolean
+}): Promise<VideoAiBackendConfig | null> {
+  const q = opts?.probeXiaoyunque ? '?xiaoyunque_probe=1' : ''
+  const paths = [
+    `/api/meoo-merchant-ai-video-config${q}`,
+    `/api/merchant/ai/video/config${q}`,
+  ] as const
   let lastNetworkErr = ''
   for (const p of paths) {
     for (const url of videoApiFetchUrls(p)) {
@@ -561,6 +570,7 @@ export async function fetchVideoAiConfig(): Promise<VideoAiBackendConfig | null>
       omnihumanConfigured: false,
       motionImitateConfigured: false,
       xiaoyunqueConfigured: false,
+      xiaoyunqueUsable: false,
       arkKeyConfigured: false,
       arkVideoModels: [],
       configLoadError: lastNetworkErr,

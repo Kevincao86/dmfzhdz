@@ -1467,6 +1467,21 @@ function memberConfirmed(m: DramaCastMember): boolean {
   return Boolean(m.preview && (!m.draft || m.draft === m.preview))
 }
 
+function dramaXiaoyunqueReady(cfg: VideoAiBackendConfig | null): boolean {
+  if (!cfg?.xiaoyunqueConfigured) return false
+  if (cfg.xiaoyunqueUsable === false) return false
+  return true
+}
+
+function dramaXiaoyunqueHint(cfg: VideoAiBackendConfig | null, cfgLoaded: boolean): string {
+  if (!cfgLoaded) return ''
+  if (dramaXiaoyunqueReady(cfg)) return ' 当前：小云雀已开通，长片可直出。'
+  if (cfg?.xiaoyunqueConfigured) {
+    return ' 当前：火山视觉云已绑定，但小云雀 Agent 尚未开通，长片走 Seedance。'
+  }
+  return ' 当前：小云雀未配置（请运营台填即梦/小云雀 AK/SK），长片将走拼接兜底。'
+}
+
 function pickRecommendedPaidSeedance(cfg: VideoAiBackendConfig | null): string {
   const ids = (cfg?.arkVideoModels ?? []).map((m) => String(m.endpointId || '').trim()).filter(Boolean)
   return ids.find((id) => /seedance-2-5|seedance-2\.5/i.test(id)) || SEEDANCE_RECOMMENDED_PAID_ID
@@ -1667,7 +1682,7 @@ export default function ShortDramaPage() {
       '你是竖屏商家短剧编剧。必须根据给定的钩子标签和成片时长写故事：短时长更密、冲突更早；长时长可铺垫但前 2 秒仍要有钩子。不要写技术参数，不要出现字幕/Logo/演职员表。'
     try {
       let lastErr = '生成故事失败，请稍后重试'
-      for (const provider of ['doubao', 'qwen'] as const) {
+      for (const provider of ['doubao'] as const) {
         try {
           const res = await postAiChat({
             provider,
@@ -1836,13 +1851,11 @@ export default function ShortDramaPage() {
       const chatTries = fromImage
         ? ([
             { provider: 'tokenmix' as const, modelFamily: 'openai' as const, model: 'gpt-4o' },
-            { provider: 'qwen' as const },
             { provider: 'doubao' as const },
           ])
         : ([
             { provider: 'tokenmix' as const, modelFamily: 'openai' as const, model: 'gpt-4o' },
             { provider: 'doubao' as const },
-            { provider: 'qwen' as const },
           ])
       let lastErr = '补充画像失败，请稍后重试'
       for (const tryItem of chatTries) {
@@ -2068,15 +2081,19 @@ export default function ShortDramaPage() {
       setHint(refData ? '正在按参考图生成相似画像…' : '正在按形象词生成预览…')
       let res = await postAiAgentNativeImage(prompt, gptOpts)
       if (!res.ok && refData) {
-        setHint('GPT 参考图未成功，改用国内图生图继续生成相似画像…')
+        setHint('GPT 参考图未成功，改用豆包图生图继续生成相似画像…')
         res = await postAiAgentNativeImage(prompt, {
           exactPrompt: true,
           aspectRatio: '3:4',
-          preferredVendor: 'qwen',
+          preferredVendor: 'doubao',
           referenceImageDataUrl: refData,
         })
       } else if (!res.ok && !refData) {
-        res = await postAiAgentNativeImage(prompt, { exactPrompt: true, aspectRatio: '3:4' })
+        res = await postAiAgentNativeImage(prompt, {
+          exactPrompt: true,
+          aspectRatio: '3:4',
+          preferredVendor: 'doubao',
+        })
       }
       if (!res.ok) {
         setErr(res.message || '角色形象生成失败，请稍后重试')
@@ -2192,7 +2209,7 @@ export default function ShortDramaPage() {
 
   useEffect(() => {
     mountedRef.current = true
-    void fetchVideoAiConfig()
+    void fetchVideoAiConfig({ probeXiaoyunque: true })
       .then((c) => {
         if (mountedRef.current) setCfg(c)
       })
@@ -2307,7 +2324,7 @@ export default function ShortDramaPage() {
       setProgress('已上传参考画面或角色形象，全片走图生融合…')
     }
 
-    if (cfg?.xiaoyunqueConfigured && collectFusionImages().length === 0) {
+    if (dramaXiaoyunqueReady(cfg) && collectFusionImages().length === 0) {
       setProgress(`小云雀 Agent 生成全片（约 ${total} 秒）…`)
       const xyq = await runXiaoyunqueVideoJob({
         prompt: xyqPrompt,
@@ -2479,15 +2496,17 @@ export default function ShortDramaPage() {
           `试镜 ${PREVIEW_SEC} 秒已出。满意再点「确认生成全片」（${
             collectFusionImages().length
               ? segmentPlanLabel(durationSec)
-              : cfg?.xiaoyunqueConfigured
+              : dramaXiaoyunqueReady(cfg)
                 ? '小云雀全片'
                 : segmentPlanLabel(durationSec)
           }）。`,
           collectFusionImages().length
             ? '已上传参考画面或角色形象，全片走图生融合（不走小云雀）。'
-            : cfg?.xiaoyunqueConfigured
+            : dramaXiaoyunqueReady(cfg)
               ? '全片将优先走小云雀 Agent；失败时自动回退 Seedance 分段拼接。'
-              : '小云雀未配置时全片走 Seedance 尾帧续写拼接，可能有轻微跳切。',
+              : cfg?.xiaoyunqueConfigured
+                ? '火山视觉云已绑定，但小云雀 Agent 尚未开通，全片走 Seedance 尾帧续写拼接。'
+                : '小云雀未配置时全片走 Seedance 尾帧续写拼接，可能有轻微跳切。',
           spendHint,
         ]
           .filter(Boolean)
@@ -3214,11 +3233,7 @@ export default function ShortDramaPage() {
                   <span className="block text-[11px] text-slate-500">
                     单段（≤15 秒）走 Seedance。超过 15 秒：先 5 秒试镜，确认后优先走小云雀智能生视频 Agent（多镜编排，最长约
                     15 分钟）；若未配置或失败，再回退 Seedance 尾帧续写拼接。
-                    {cfgLoaded
-                      ? cfg?.xiaoyunqueConfigured
-                        ? ' 当前：小云雀已就绪。'
-                        : ' 当前：小云雀未配置（请运营台填即梦/小云雀 AK/SK），长片将走拼接兜底。'
-                      : ''}
+                    {cfgLoaded ? dramaXiaoyunqueHint(cfg, cfgLoaded) : ''}
                   </span>
                 </label>
                 <label className="space-y-1.5">
@@ -3309,7 +3324,7 @@ export default function ShortDramaPage() {
                         ? `当前 ${DURATION_OPTIONS.find((d) => d.sec === durationSec)?.label ?? durationSec} · ${
                             collectFusionImages().length
                               ? '图生融合'
-                              : cfg?.xiaoyunqueConfigured
+                              : dramaXiaoyunqueReady(cfg)
                                 ? '小云雀全片'
                                 : segmentPlanLabel(durationSec)
                           }。先出前 ${PREVIEW_SEC} 秒试镜，满意再生成全片。`

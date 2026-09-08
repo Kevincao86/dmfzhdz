@@ -88,6 +88,7 @@ import {
 import {
   isXiaoyunqueConfigured,
   isXiaoyunqueTaskId,
+  probeXiaoyunqueAccount,
   volcGetXiaoyunqueTaskOnce,
   volcPostXiaoyunqueVideoTask,
 } from './volcXiaoyunqueClient.js'
@@ -2135,11 +2136,21 @@ export async function handleMerchantAiVideoRoutes(input: {
       '商户端仅可选择模型能力与参数；可灵、方舟视频、阿里云 ICE 云剪辑凭据由运营在「管控台 · AI模型」维护，经 Supabase 注册表快照下发（生产须配置 VITE_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY）；本地 dev 亦可落盘于项目根 .meoo-dev-sync。'
     const plannerModels = longformPlannerModelIds(env)
     const plannerVendors = longformPlannerVendorAvailability(env)
+    const xiaoyunqueConfigured = isXiaoyunqueConfigured(env)
+    let xiaoyunqueUsable: boolean | undefined
+    let xiaoyunqueProbeDetail: string | undefined
+    if (searchParams.get('xiaoyunque_probe') === '1') {
+      const probe = await probeXiaoyunqueAccount(env)
+      xiaoyunqueUsable = probe.usable
+      xiaoyunqueProbeDetail = probe.detail
+    }
     json(res, 200, {
       klingConfigured: kCfg.ok,
       omnihumanConfigured: isOmniHumanConfigured(env),
       motionImitateConfigured: isMotionImitateConfigured(env),
-      xiaoyunqueConfigured: isXiaoyunqueConfigured(env),
+      xiaoyunqueConfigured,
+      xiaoyunqueUsable,
+      xiaoyunqueProbeDetail,
       arkVideoModels: arkOpts,
       arkDiscoveredVideoModels,
       arkKeyConfigured: arkKeyOk,
