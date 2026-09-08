@@ -45,7 +45,6 @@ import {
   parseAgentActionType,
   parseCreateProductIntents,
   parseCreateProductIntentsFromPlan,
-  planIncludesRecruitInfluencer,
   isInformationalOnlyQuery,
   isBusinessMetricsQuery,
   shouldDeferTaskPreview,
@@ -58,8 +57,6 @@ import { isCreatePlatformId } from '../constants/productCreatePlatforms'
 import { listProductPlansFromPreview } from '../lib/aiAgentProductPlans'
 import {
   filterScenarioTaskTypes,
-  hasConfirmedPreviewForTask,
-  hasPendingPreviewForTask,
   isPendingPreviewMessage,
   isPreviewMessageLoading,
   listPendingPreviewMessages,
