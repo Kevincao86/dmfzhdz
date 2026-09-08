@@ -57,6 +57,7 @@ import {
   VIDEO_ENGINE_LABEL_SEEDANCE,
   type SeedanceQualityId,
 } from '../lib/shortVideoUiLabels'
+import { postAiChat } from '../services/ai/aiClient'
 import {
   checkMpAddonPointsAffordable,
   formatMpAddonPointsSpendHint,
@@ -1306,6 +1307,48 @@ function expandBeats(formula: DramaFormula, segmentCount: number): string[] {
   return out
 }
 
+function isDramaDurationSelected(sec: number): boolean {
+  return DURATION_OPTIONS.some((o) => o.sec === sec)
+}
+
+function parseDramaStoryAi(raw: string): {
+  story: string
+  roles?: string
+  conflict?: string
+  dialogue?: string
+} | null {
+  const text = String(raw || '').trim()
+  if (!text) return null
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i)
+  const jsonStr = (fence?.[1] || text).trim()
+  const start = jsonStr.indexOf('{')
+  const end = jsonStr.lastIndexOf('}')
+  if (start >= 0 && end > start) {
+    try {
+      const o = JSON.parse(jsonStr.slice(start, end + 1)) as Record<string, unknown>
+      const story = String(o.story ?? o['一句话故事'] ?? '').trim()
+      if (story) {
+        const roles = String(o.roles ?? o['角色'] ?? o['人设'] ?? '').trim()
+        const conflict = String(o.conflict ?? o['核心冲突'] ?? '').trim()
+        const dialogue = String(o.dialogue ?? o['对白钩子'] ?? o['对白'] ?? '').trim()
+        return {
+          story,
+          ...(roles ? { roles } : {}),
+          ...(conflict ? { conflict } : {}),
+          ...(dialogue ? { dialogue } : {}),
+        }
+      }
+    } catch {
+      /* fall through to plain text */
+    }
+  }
+  const first = text
+    .split('\n')
+    .map((s) => s.trim())
+    .find((s) => s && !s.startsWith('{') && !s.startsWith('```'))
+  return first ? { story: first.replace(/^["「]|["」]$/g, '') } : null
+}
+
 function isSeedance15ProModelId(id: string): boolean {
   const t = String(id || '').trim()
   return t === SEEDANCE_1_5_PRO_MODEL_ID || /seedance-1-5-pro/i.test(t) || /seedance-1\.5-pro/i.test(t)
@@ -1328,11 +1371,12 @@ export default function ShortDramaPage() {
   const [roles, setRoles] = useState('')
   const [conflict, setConflict] = useState('')
   const [dialogue, setDialogue] = useState('')
-  const [durationSec, setDurationSec] = useState(12)
+  const [durationSec, setDurationSec] = useState(0)
   const [resolution, setResolution] = useState<SeedanceQualityId>('720p')
   const [cfg, setCfg] = useState<VideoAiBackendConfig | null>(null)
   const [cfgLoaded, setCfgLoaded] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [storyBusy, setStoryBusy] = useState(false)
   const [progress, setProgress] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [hint, setHint] = useState<string | null>(null)
@@ -1366,6 +1410,23 @@ export default function ShortDramaPage() {
           : worldId === 'travel'
             ? '旅行钩子'
             : '戏剧钩子'
+  const durationSelected = isDramaDurationSelected(durationSec)
+  const hookSelected =
+    formulaId === CUSTOM_FORMULA_ID
+      ? Boolean(customHook.name.trim())
+      : Boolean(formulaId && FORMULAS.some((f) => f.id === formulaId))
+  const storyWriteGate = useMemo(() => {
+    if (!hookSelected && !durationSelected) {
+      return formulaId === CUSTOM_FORMULA_ID
+        ? `请先填写${hookLabel}名称，并选择成片时长`
+        : `请先选择${hookLabel}，并选择成片时长`
+    }
+    if (!hookSelected) {
+      return formulaId === CUSTOM_FORMULA_ID ? `请先填写${hookLabel}名称` : `请先选择${hookLabel}`
+    }
+    if (!durationSelected) return '请先选择成片时长'
+    return null
+  }, [hookSelected, durationSelected, hookLabel, formulaId])
   const activeWork = works.find((w) => w.id === activeWorkId) ?? works[0] ?? null
   const longPlan = useMemo(
     () => planLongformSegmentDurations(Math.min(MAX_DRAMA_TOTAL_SEC, Math.max(5, durationSec))),
@@ -1388,6 +1449,76 @@ export default function ShortDramaPage() {
     setTrialUrl(null)
     setTrialReady(false)
   }, [trialUrl])
+
+  const generateAiStory = async () => {
+    if (storyWriteGate) {
+      setErr(storyWriteGate)
+      setHint(null)
+      return
+    }
+    const durOpt = DURATION_OPTIONS.find((o) => o.sec === durationSec)
+    if (!durOpt) {
+      setErr('请先选择成片时长')
+      return
+    }
+    setErr(null)
+    setHint(null)
+    setStoryBusy(true)
+    const shopLines = world.fields
+      .map((f) => `${f.label}：${String(shop[f.key] ?? '').trim() || '未填'}`)
+      .join('\n')
+    const user = [
+      `场景：${world.label} / ${scene.name}`,
+      `钩子标签：${formula.name}`,
+      formula.hint ? `钩子提示：${formula.hint}` : '',
+      `四拍结构：${formula.beats.join(' → ')}`,
+      `成片时长：${durOpt.label}（${durOpt.hint}，共 ${durOpt.sec} 秒）`,
+      `画风：${style.name}`,
+      shopLines,
+      story.trim() ? `商家已有草稿（请按钩子与时长改写，不要空套模板）：${story.trim()}` : '',
+      '写一条适合该时长、能拍进竖屏短剧的故事。口语、有冲突、有记忆点。',
+      '只输出 JSON：{"story":"...","roles":"...","conflict":"...","dialogue":"..."}',
+      'story 为 1–3 句一句话故事；dialogue 为一句对白钩子；不要 markdown、不要解释。',
+    ]
+      .filter(Boolean)
+      .join('\n')
+    const system =
+      '你是竖屏商家短剧编剧。必须根据给定的钩子标签和成片时长写故事：短时长更密、冲突更早；长时长可铺垫但前 2 秒仍要有钩子。不要写技术参数，不要出现字幕/Logo/演职员表。'
+    try {
+      let lastErr = '生成故事失败，请稍后重试'
+      for (const provider of ['doubao', 'qwen'] as const) {
+        try {
+          const res = await postAiChat({
+            provider,
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: user },
+            ],
+            temperature: 0.7,
+          })
+          const parsed = parseDramaStoryAi(res.content ?? '')
+          if (!parsed?.story) {
+            lastErr = '未返回可用故事，请稍后重试'
+            continue
+          }
+          if (!mountedRef.current) return
+          clearTrial()
+          setStory(parsed.story)
+          if (parsed.roles) setRoles(parsed.roles)
+          if (parsed.conflict) setConflict(parsed.conflict)
+          if (parsed.dialogue) setDialogue(parsed.dialogue)
+          setHint('已根据钩子与时长写好故事，可再微调后生成短剧。')
+          setErr(null)
+          return
+        } catch (e) {
+          lastErr = e instanceof Error ? e.message : String(e)
+        }
+      }
+      if (mountedRef.current) setErr(lastErr)
+    } finally {
+      if (mountedRef.current) setStoryBusy(false)
+    }
+  }
 
   const switchWorld = (nextWorldId: WorldId) => {
     const nextWorld = worldOf(nextWorldId)
@@ -1457,6 +1588,7 @@ export default function ShortDramaPage() {
 
   const gateReason = useMemo((): string | null => {
     if (busy) return '正在生成短剧，请稍候'
+    if (storyBusy) return '正在生成故事，请稍候'
     if (!cfgLoaded) return '正在加载视频引擎配置'
     if (cfg?.configLoadError) return `视频配置加载失败：${cfg.configLoadError.slice(0, 120)}`
     if (!cfg?.arkKeyConfigured) {
@@ -1465,9 +1597,10 @@ export default function ShortDramaPage() {
     if (!(cfg?.arkVideoModels?.length ?? 0)) {
       return '视频服务已配置但未设置模型端点，请在运营台完成短剧模型配置。'
     }
-    if (!story.trim()) return '请先确认一句话故事，或点一个场景模板。'
+    if (!durationSelected) return '请先选择成片时长'
+    if (!story.trim()) return '请先确认一句话故事，或点「AI生成故事」。'
     return null
-  }, [busy, cfgLoaded, cfg, story])
+  }, [busy, storyBusy, cfgLoaded, cfg, durationSelected, story])
 
   useEffect(() => {
     mountedRef.current = true
@@ -2076,18 +2209,37 @@ export default function ShortDramaPage() {
                 {world.refill}
               </button>
 
-              <label className="block space-y-1.5">
-                <span className="text-sm font-medium text-slate-800">一句话故事</span>
+              <div className="space-y-1.5">
+                <span className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-slate-800">一句话故事</span>
+                  <button
+                    type="button"
+                    disabled={busy || storyBusy}
+                    onClick={() => void generateAiStory()}
+                    className="inline-flex items-center gap-1 rounded-lg border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-xs font-medium text-cyan-900 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {storyBusy ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Wand2 className="h-3.5 w-3.5" />
+                    )}
+                    {storyBusy ? '正在写故事' : 'AI生成故事'}
+                  </button>
+                </span>
                 <textarea
                   className={cn(fieldCls, 'min-h-[84px] resize-y')}
-                  disabled={busy}
+                  disabled={busy || storyBusy}
                   value={story}
                   onChange={(e) => {
                     clearTrial()
                     setStory(e.target.value)
                   }}
+                  placeholder="先选上方钩子和成片时长，再点「AI生成故事」"
                 />
-              </label>
+                {err && storyWriteGate && err === storyWriteGate ? (
+                  <span className="block text-xs text-rose-600">{err}</span>
+                ) : null}
+              </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-800">
@@ -2134,13 +2286,14 @@ export default function ShortDramaPage() {
                   <span className="text-sm font-medium text-slate-800">成片时长</span>
                   <select
                     className={fieldCls}
-                    disabled={busy}
-                    value={durationSec}
+                    disabled={busy || storyBusy}
+                    value={durationSelected ? String(durationSec) : ''}
                     onChange={(e) => {
                       clearTrial()
-                      setDurationSec(Number(e.target.value))
+                      setDurationSec(Number(e.target.value) || 0)
                     }}
                   >
+                    <option value="">请选择成片时长</option>
                     {DURATION_OPTIONS.map((o) => (
                       <option key={o.sec} value={o.sec}>
                         {o.label}（{o.hint}）
@@ -2229,11 +2382,13 @@ export default function ShortDramaPage() {
               </ol>
 
               <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
-                {showPreviewGate
-                  ? `当前 ${DURATION_OPTIONS.find((d) => d.sec === durationSec)?.label ?? durationSec} · ${
-                      cfg?.xiaoyunqueConfigured ? '小云雀全片' : segmentPlanLabel(durationSec)
-                    }。先出前 ${PREVIEW_SEC} 秒试镜，满意再生成全片。`
-                  : '当前为单段直出，无需试镜确认。'}
+                {durationSelected
+                  ? showPreviewGate
+                    ? `当前 ${DURATION_OPTIONS.find((d) => d.sec === durationSec)?.label ?? durationSec} · ${
+                        cfg?.xiaoyunqueConfigured ? '小云雀全片' : segmentPlanLabel(durationSec)
+                      }。先出前 ${PREVIEW_SEC} 秒试镜，满意再生成全片。`
+                    : '当前为单段直出，无需试镜确认。'
+                  : '请先选择成片时长，再生成故事或短剧。'}
               </p>
               <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-950">
                 生成后请及时保存到本地。刷新页面后，本页成片将消失。长片按秒扣积分，15 分钟成本很高，请先确认试镜。
