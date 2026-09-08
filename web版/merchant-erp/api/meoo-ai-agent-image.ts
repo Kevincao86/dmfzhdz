@@ -27,13 +27,66 @@ import {
 
 export const config = { maxDuration: 300 }
 
+const AGENT_IMAGE_FETCH_MAX_BYTES = 8 * 1024 * 1024
+
+function isAllowedAgentImageFetchUrl(url: string): boolean {
+  const u = url.trim()
+  if (!u) return false
+  if (isTokenmixBrowserUnsafeImageUrl(u)) return true
+  try {
+    const parsed = new URL(u)
+    if (parsed.protocol !== 'https:') return false
+    const h = parsed.hostname.toLowerCase()
+    return (
+      h.endsWith('.volces.com') ||
+      h.endsWith('.volcengine.com') ||
+      h.endsWith('.byteimg.com') ||
+      h.endsWith('.bytedance.com') ||
+      h.endsWith('.bytedance.net')
+    )
+  } catch {
+    return false
+  }
+}
+
+async function hydrateHttpsImageToDataUrl(src: string): Promise<string> {
+  const ac = new AbortController()
+  const timer = setTimeout(() => ac.abort(), 25_000)
+  let res: Response
+  try {
+    res = await fetch(src, { signal: ac.signal, redirect: 'follow' })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    throw new Error(/abort/i.test(msg) ? '成图下载超时' : msg)
+  } finally {
+    clearTimeout(timer)
+  }
+  if (!res.ok) throw new Error(`成图下载失败 HTTP ${res.status}`)
+  const buf = Buffer.from(await res.arrayBuffer())
+  if (!buf.length) throw new Error('成图为空')
+  if (buf.length > AGENT_IMAGE_FETCH_MAX_BYTES) {
+    throw new Error(`成图过大（${buf.length} bytes）`)
+  }
+  const ctRaw = (res.headers.get('content-type') || 'image/jpeg').split(';')[0]?.trim() || 'image/jpeg'
+  const ct = /^image\//i.test(ctRaw) ? ctRaw : 'image/jpeg'
+  return `data:${ct};base64,${buf.toString('base64')}`
+}
+
 async function embedTokenmixImageForBrowser<T extends Extract<MeooAgentImageResult, { ok: true }>>(
   out: T,
 ): Promise<T> {
   if (!('imageUrl' in out) || typeof out.imageUrl !== 'string') return out
-  if (!isTokenmixBrowserUnsafeImageUrl(out.imageUrl)) return out
-  const dataUrl = await hydrateTokenmixImageUrlForBrowser(out.imageUrl)
-  return { ...out, imageUrl: dataUrl }
+  const src = out.imageUrl.trim()
+  if (!src || src.startsWith('data:') || src.startsWith('blob:')) return out
+  if (isTokenmixBrowserUnsafeImageUrl(src)) {
+    const dataUrl = await hydrateTokenmixImageUrlForBrowser(src)
+    return { ...out, imageUrl: dataUrl }
+  }
+  if (isAllowedAgentImageFetchUrl(src)) {
+    const dataUrl = await hydrateHttpsImageToDataUrl(src)
+    return { ...out, imageUrl: dataUrl }
+  }
+  return out
 }
 
 async function sendImageSuccess(
@@ -164,17 +217,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const fetchImageUrl = typeof body.image_url === 'string' ? body.image_url.trim() : ''
 
   if (phase === 'fetch') {
-    if (!fetchImageUrl || !isTokenmixBrowserUnsafeImageUrl(fetchImageUrl)) {
+    if (!fetchImageUrl || !isAllowedAgentImageFetchUrl(fetchImageUrl)) {
       sendMerchantJson(res, 400, {
         ok: false,
         error: 'image_url_not_allowed',
-        message: '仅允许代拉 TokenMix 成图地址',
+        message: '仅允许代拉 TokenMix / 火山方舟成图地址',
       })
       return
     }
     try {
-      const dataUrl = await hydrateTokenmixImageUrlForBrowser(fetchImageUrl)
-      sendMerchantJson(res, 200, { ok: true, imageUrl: dataUrl, channel: 'tokenmix' })
+      const dataUrl = isTokenmixBrowserUnsafeImageUrl(fetchImageUrl)
+        ? await hydrateTokenmixImageUrlForBrowser(fetchImageUrl)
+        : await hydrateHttpsImageToDataUrl(fetchImageUrl)
+      if (!dataUrl.startsWith('data:')) {
+        throw new Error('代拉成图未返回 data URL')
+      }
+      sendMerchantJson(res, 200, { ok: true, imageUrl: dataUrl, channel: 'builtin' })
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       console.error('[meoo-ai-agent-image] phase=fetch failed', msg.slice(0, 300))
@@ -182,7 +240,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         ok: false,
         error: 'image_fetch_failed',
         detail: /fetch failed|CDN 不可达|超时/i.test(msg)
-          ? '代拉 TokenMix 成图失败：国内无法访问 TokenMix CDN，请稍后重试'
+          ? '成图地址无法从国内拉取，请稍后重试'
           : msg.slice(0, 400),
       })
     }

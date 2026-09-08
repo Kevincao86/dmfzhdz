@@ -53,7 +53,6 @@ import { compressPortraitDataUrlForLibrary, processCustomAvatarFile } from '../l
 import { probeVideoDurationSec } from '../lib/digitalHumanSubtitle'
 import { readMpSessionToken } from '../lib/merchantApiAuth'
 import { extractVideoFirstFramePureBase64 } from '../lib/videoFrameUtils'
-import { VISUAL_STUDIO_PRO_IMAGE_MODEL } from '../lib/mpPointsEconomics'
 import { planLongformSegmentDurations } from '../lib/shortVideoScriptTable'
 import { sanitizePromptForSeedanceNativeAv } from '../lib/shortVideoPostProcess'
 import {
@@ -1516,6 +1515,17 @@ function toDramaImageDataUrl(raw: string): string {
   return `data:image/jpeg;base64,${s}`
 }
 
+function humanizeDramaImageError(raw: string): string {
+  const t = String(raw || '').trim()
+  if (/Failed to fetch|fetch failed|NetworkError|Load failed/i.test(t)) {
+    return '角色图拉取失败：成图地址浏览器跨域读不到。请再点一次生成预览。'
+  }
+  if (/TokenMix 成图完成但国内无法拉取|代拉 TokenMix/i.test(t)) {
+    return 'GPT 成图国内拉不下来，已改为豆包。请再点一次生成预览。'
+  }
+  return t || '角色形象生成失败，请稍后重试'
+}
+
 function blobToDramaDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const fr = new FileReader()
@@ -2073,30 +2083,14 @@ export default function ShortDramaPage() {
       const gptOpts = {
         exactPrompt: true as const,
         aspectRatio: '3:4' as const,
-        imageRoute: 'tokenmix' as const,
-        tokenmixImageModel: VISUAL_STUDIO_PRO_IMAGE_MODEL,
+        preferredVendor: 'doubao' as const,
         wanxSize: '1024x1536',
         ...(refData ? { referenceImageDataUrl: refData } : {}),
       }
-      setHint(refData ? '正在按参考图生成相似画像…' : '正在按形象词生成预览…')
+      setHint(refData ? '正在按参考图用豆包生成相似画像…' : '正在按形象词用豆包生成预览…')
       let res = await postAiAgentNativeImage(prompt, gptOpts)
-      if (!res.ok && refData) {
-        setHint('GPT 参考图未成功，改用豆包图生图继续生成相似画像…')
-        res = await postAiAgentNativeImage(prompt, {
-          exactPrompt: true,
-          aspectRatio: '3:4',
-          preferredVendor: 'doubao',
-          referenceImageDataUrl: refData,
-        })
-      } else if (!res.ok && !refData) {
-        res = await postAiAgentNativeImage(prompt, {
-          exactPrompt: true,
-          aspectRatio: '3:4',
-          preferredVendor: 'doubao',
-        })
-      }
       if (!res.ok) {
-        setErr(res.message || '角色形象生成失败，请稍后重试')
+        setErr(humanizeDramaImageError(res.message) || '角色形象生成失败，请稍后重试')
         setHint(null)
         return
       }
@@ -2115,7 +2109,7 @@ export default function ShortDramaPage() {
           : `已为${member.name}按形象词生成预览。请点「用此图确认角色」后才会融合进短剧。`,
       )
     } catch (e) {
-      setErr(e instanceof Error ? e.message : '角色形象生成失败')
+      setErr(humanizeDramaImageError(e instanceof Error ? e.message : '角色形象生成失败'))
     } finally {
       if (mountedRef.current) setCharacterBusy(false)
     }

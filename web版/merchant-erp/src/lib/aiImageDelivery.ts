@@ -93,9 +93,17 @@ export async function fetchImageBlob(url: string): Promise<Blob> {
   if (isTokenmixCdnUrl(src)) {
     return fetchImageBlobViaErpProxy(src)
   }
-  const res = await fetch(src, { mode: 'cors' })
-  if (!res.ok) throw new Error(`下载图片失败 HTTP ${res.status}`)
-  return res.blob()
+  try {
+    const res = await fetch(src, { mode: 'cors' })
+    if (!res.ok) throw new Error(`下载图片失败 HTTP ${res.status}`)
+    return res.blob()
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    if (/Failed to fetch|fetch failed|NetworkError|Load failed|CORS/i.test(msg)) {
+      return fetchImageBlobViaErpProxy(src)
+    }
+    throw e instanceof Error ? e : new Error(msg)
+  }
 }
 
 /** 将图片压缩为 JPEG，尽量满足 maxBytes（默认 3MB） */

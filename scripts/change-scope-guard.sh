@@ -422,6 +422,8 @@ volcOmniHumanClient
 volcMotionImitateClient
 merchantVideoAiGateway
 videoAiApi
+aiImageDelivery
+meoo-ai-agent-image
 change-scope-guard
 PAT
       ;;
