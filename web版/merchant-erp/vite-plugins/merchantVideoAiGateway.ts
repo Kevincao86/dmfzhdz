@@ -247,17 +247,20 @@ function arkCreateTaskHttpStatus(upstreamStatus?: number): number {
 }
 
 function isArkRealPersonImageBlock(msg: string): boolean {
-  return /may contain real person|contain real person|input image.*real person|真实人|真人肖像|人脸.*不允许/i.test(
+  return /may contain real person|contain real person|input image.*real person|真实人|写实人像|真人肖像|人脸.*不允许|1\.5 Pro 首帧/i.test(
     String(msg ?? ''),
   )
 }
 
+/** Seedance 2.5 拦截未入库写实人脸；1.5 Pro 首帧图生仍走火山、不走千问 */
+const SEEDANCE_FACE_I2V_MODEL_ID = 'doubao-seedance-1-5-pro-251215'
+
 function arkCreateTaskUserMessage(msg: string, endpointId: string, upstreamStatus?: number): string {
   if (isArkRealPersonImageBlock(msg)) {
-    return (
-      '参考图被火山判定可能含真人，付费 Seedance 无法用这张图生成视频。' +
-      '请换一张偏插画、非写实的角色图，或去掉角色参考后再试。'
-    )
+    if (/1-5-pro|1\.5-pro/i.test(endpointId)) {
+      return '火山 1.5 Pro 首帧图生仍未通过写实人像审核，请稍后重试（未走千问）。'
+    }
+    return '火山 Seedance 2.5 对未入库的写实人像会拦截。正在改用火山 1.5 Pro 首帧图生（不走千问）。'
   }
   if (looksLikeArkPlaceholderEndpointId(endpointId)) {
     return `视频推理接入点「${endpointId}」为占位示例，不可用。请到运营管控台「AI模型 → 短视频 API」或 Vercel 环境变量 MERCHANT_AI_ARK_VIDEO_ENDPOINTS 填写火山方舟控制台真实的 ep- 接入点（形如 ep-2024xxxxxxxx）。`
@@ -1875,6 +1878,60 @@ async function arkCreateVideoTask(
   } else if (!key && !preferQwenOnly) {
     lastMsg =
       '未检测到方舟 / 豆包 API Key：请到运营管控台「AI模型 → 短视频 API」配置专用 Key 或「豆包」Key。'
+  }
+
+  /** 2.5 拦写实人脸：仍只走火山（1.5 Pro 首帧），禁止千问 */
+  if (
+    key &&
+    skipQwen &&
+    isArkRealPersonImageBlock(`${lastMsg}`) &&
+    Array.isArray(apiBody.images_base64) &&
+    apiBody.images_base64.some((x) => String(x ?? '').trim())
+  ) {
+    const faceModel = normalizeArkVideoModelParam(SEEDANCE_FACE_I2V_MODEL_ID)
+    const alreadyTriedFace = triedModels.some(
+      (id) => normalizeArkVideoModelParam(id) === faceModel,
+    )
+    if (!alreadyTriedFace) {
+      const faceMode: 't2v' | 'i2v' = 'i2v'
+      let faceFlags = typeof apiBody.flags === 'string' ? apiBody.flags : ''
+      let faceDur = durationSec
+      if (!videoModelSupportsDuration(faceModel, faceDur, faceMode)) {
+        faceDur = 15
+        faceFlags = /--dur\s+\d+/i.test(faceFlags)
+          ? faceFlags.replace(/--dur\s+\d+/i, `--dur ${faceDur}`)
+          : `${faceFlags} --dur ${faceDur}`.trim()
+      }
+      if (videoModelSupportsDuration(faceModel, faceDur, faceMode)) {
+        const faceBuilt = buildArkVideoTaskPayload(
+          faceModel,
+          {
+            ...apiBody,
+            flags: faceFlags,
+            seedance_image_mode: 'first_only',
+            generate_audio: false,
+          },
+          faceMode,
+        )
+        if (faceBuilt.ok === true) {
+          tried += 1
+          triedModels.push(faceModel)
+          const facePosted = await arkPostVideoGenerationTask(env, key, faceBuilt.payload, faceModel)
+          if (facePosted.ok === true) {
+            clearArkVideoModelQuotaExhausted(key, faceModel)
+            return {
+              ok: true,
+              taskId: facePosted.taskId,
+              provider: 'ark',
+              modelUsed: faceModel,
+              raw: facePosted.raw,
+            }
+          }
+          lastMsg = facePosted.msg
+          lastStatus = facePosted.status
+        }
+      }
+    }
   }
 
   const qwen = skipQwen ? ({ ok: false as const, msg: '' }) : await qwenPostVideoTask(env, apiBody, viteRoot)

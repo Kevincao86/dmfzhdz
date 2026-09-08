@@ -49,10 +49,11 @@ export type ShortVideoGenRequestBody = {
 export function formatVideoAiUserError(msg: string): string {
   const raw = String(msg ?? '').trim()
   if (!raw) return raw
-  if (/may contain real person|contain real person|input image.*real person|参考图被火山判定可能含真人/i.test(raw)) {
+  if (/仍未通过写实人像/.test(raw)) return raw
+  if (/may contain real person|contain real person|input image.*real person|写实人像|1\.5 Pro 首帧/i.test(raw)) {
     return (
-      '参考图被火山判定可能含真人，付费 Seedance 无法用这张图生成。' +
-      '请换一张偏插画、非写实的角色图，或去掉角色参考后再试。'
+      '火山 Seedance 2.5 会拦截未入库的写实人像。系统已改走火山 1.5 Pro 首帧图生（不走千问）。' +
+      ( /已改走|正在改用|1\.5 Pro/.test(raw) ? '' : ` ${raw}` )
     )
   }
   if (/duration customization is not supported|duration must be in/i.test(raw)) {
@@ -135,7 +136,7 @@ function isVideoApiUnreachableError(msg: string): boolean {
 export function isVideoModelHopableError(msg: string): boolean {
   const raw = String(msg ?? '').trim()
   if (!raw) return false
-  if (/may contain real person|contain real person|input image.*real person|参考图被火山判定可能含真人/i.test(raw)) {
+  if (/may contain real person|contain real person|input image.*real person|参考图被火山判定可能含真人|写实人像/i.test(raw)) {
     return false
   }
   if (isArkQuotaHopableError(raw) || isQwenVideoModelHopableError(raw) || isArkVideoRateLimitError(raw))

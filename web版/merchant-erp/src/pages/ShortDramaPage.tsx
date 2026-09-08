@@ -2236,9 +2236,8 @@ export default function ShortDramaPage() {
     onProgress?: (t: string) => void
   }) => {
     const imgs = (opts.images_base64 ?? []).map((s) => String(s).trim()).filter(Boolean)
-    const mode =
-      opts.seedance_image_mode ??
-      (imgs.length >= 2 ? 'reference' : imgs.length === 1 ? 'first_only' : 'auto')
+    /** 写实角色图走首帧 i2v；多图 r2v 在 2.5 上更容易被当成真人拦截 */
+    const mode = opts.seedance_image_mode ?? (imgs.length ? 'first_only' : 'auto')
     const model = seedancePaidModel
     const flags = `--dur ${opts.durationSec} --fps 24 --ratio 9:16 --wm false --resolution ${resolution}`
     const prompt = [opts.prompt, fusionPromptNote].filter(Boolean).join('\n')
