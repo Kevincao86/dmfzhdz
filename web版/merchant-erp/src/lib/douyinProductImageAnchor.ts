@@ -337,9 +337,6 @@ export function inferIndustryVisualCategory(
   const path = (industryPath ?? '').trim()
   const title = (anchor ?? '').trim()
   const combined = `${path} ${title}`.trim()
-  if (/数码|3c|3C|手机|电脑|电子|家电|智能穿戴|耳机|平板|投影|鼠标|眼镜|科技|潮品|配件|开学|影音/.test(combined)) {
-    return 'digital'
-  }
 
   const wellnessRe = /足浴|足疗|足道|沐足|采耳|修脚|按摩|开背|推拿|汗蒸|洗浴|养生馆/
   const nonFoodPathRe =
@@ -353,6 +350,10 @@ export function inferIndustryVisualCategory(
     return 'general'
   }
 
+  if (/数码|3c|3C|手机|电脑|电子|家电|智能穿戴|耳机|平板|投影|鼠标|眼镜|科技|潮品|配件|开学|影音/.test(combined)) {
+    return 'digital'
+  }
+
   if (/餐饮|美食|外卖|火锅|烧烤|咖啡|茶饮|蛋糕|烘焙|食堂|菜品|放题|自助/.test(combined)) {
     return 'catering'
   }
@@ -360,6 +361,31 @@ export function inferIndustryVisualCategory(
     return 'beauty'
   }
   return 'general'
+}
+
+/** 所有生图模型共用：绑定类目不是餐饮时追加到 prompt */
+export function goodsImageIndustryLockSuffix(industryPath?: string): string {
+  const path = (industryPath ?? '').trim()
+  if (!path) return ''
+  const vis = inferIndustryVisualCategory(path, path)
+  if (vis === 'catering') return ''
+  const scene =
+    vis === 'wellness'
+      ? '须呈现足浴沙发/足疗椅、足浴桶、技师按摩或门店养生空间'
+      : vis === 'beauty'
+        ? '须呈现美业服务过程或门店空间'
+        : vis === 'digital'
+          ? '须呈现标题中的真实数码商品或门店陈列'
+          : '须呈现与经营类目一致的到店服务或门店空间'
+  return `【门店经营类目锁·全模型】类目「${path}」不是餐饮。${scene}。严禁菜品、餐桌摆盘、火锅海鲜、饮品特写、美食摄影、餐厅宴席；禁止因标题含「套餐/观影/美食」而改画餐饮。`
+}
+
+/** 非餐饮业态：各模型 negative prompt 追加项 */
+export function goodsImageNonCateringNegativeExtra(industryPath?: string): string {
+  const path = (industryPath ?? '').trim()
+  if (!path) return ''
+  if (inferIndustryVisualCategory(path, path) === 'catering') return ''
+  return '菜品,餐桌摆盘,火锅,海鲜,烧烤,饮品特写,美食摄影,餐厅包厢,宴席,自助餐,外卖盒'
 }
 
 /** 绑定在售商品名是否像餐饮菜品（「套餐」本身不算餐饮） */

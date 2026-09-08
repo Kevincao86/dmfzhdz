@@ -22,6 +22,12 @@ export type MerchantIntelSnapshot = {
   menuSummary?: string
   margins: { douyin: number; meituan: number; xhs: number }
   industryPath?: string
+  /** 来客已认领门店 API 解析出的经营类目（优先于毛利配置） */
+  boundStoreCategoryPath?: string
+  /** 类目来源说明，如 shop.poi.query / poi.cert.info */
+  boundStoreCategorySource?: string
+  /** 已认领门店名（API），生图锚点优先于竞品标签 */
+  boundStoreName?: string
   competitorSummary?: string
   geoSummary?: string
   /**
@@ -142,7 +148,12 @@ export function buildAgentMerchantIntelContextFromSnapshot(s: MerchantIntelSnaps
   lines.push(
     `综合毛利率（%）：抖音 ${s.margins.douyin}，美团 ${s.margins.meituan}，小红书 ${s.margins.xhs}（商品板块已保存，定价与套餐须据此倒推）。`,
   )
-  if (s.industryPath) lines.push(`经营类目：${s.industryPath}`)
+  if (s.industryPath) {
+    const src = s.boundStoreCategorySource ? `（来源：${s.boundStoreCategorySource}）` : ''
+    lines.push(`经营类目：${s.industryPath}${src}`)
+  } else {
+    lines.push('经营类目：尚未从绑定门店接口解析到，组品/生图前须先拉来客门店类目，禁止按餐饮默认出图。')
+  }
 
   if (s.menuSummary) {
     lines.push(`菜单价目（${s.menuItemCount} 项）：\n${s.menuSummary}`)

@@ -8,6 +8,7 @@ import type { AiProductPlanPreview } from '../lib/aiAgentTypes'
 import { inferDouyinProductTypeFromText } from '../lib/aiAgentProductPreviewDefaults'
 import {
   buildImageAssistTextFields,
+  goodsImageIndustryLockSuffix,
   inferIndustryVisualCategory,
   looksLikeFoodListingName,
   mainProductCategoryHints,
@@ -132,16 +133,15 @@ export async function enrichAiProductPlanPreview(
   let headUrl = plan.headUrl
 
   const typeLabel = productType === 2 ? '代金券' : '团购套餐'
-  const combinedHint = [opts?.industryPath, opts?.storeName, titleAnchor].filter(Boolean).join(' ')
-  const visualCategory = inferIndustryVisualCategory(combinedHint, titleAnchor)
-  const inferredPath = inferIndustryPathFromText(combinedHint)
+  const apiPath = opts?.industryPath?.trim()
+  const visualCategory = inferIndustryVisualCategory(apiPath, `${opts?.storeName ?? ''} ${titleAnchor}`)
+  const inferredPath = inferIndustryPathFromText([apiPath, opts?.storeName, titleAnchor].filter(Boolean).join(' '))
   const industryPath =
-    visualCategory === 'wellness'
-      ? inferredPath || opts?.industryPath || '休闲娱乐 > 足疗足浴'
-      : visualCategory === 'catering'
-        ? opts?.industryPath
-        : inferredPath || opts?.industryPath
-  const nonCatering = visualCategory !== 'catering'
+    apiPath ||
+    (visualCategory === 'wellness'
+      ? inferredPath || '休闲娱乐 > 足疗足浴'
+      : inferredPath)
+  const nonCatering = inferIndustryVisualCategory(industryPath, titleAnchor) !== 'catering'
   const industryLock = buildIndustryLock(industryPath, typeLabel)
   const imageFields = buildImageAssistTextFields(titleAnchor, plan.description, {
     productType,
@@ -217,7 +217,8 @@ export async function enrichAiProductPlanPreview(
     const foodBan = nonCatering
       ? '【严禁餐饮错配】禁止出现菜品、餐桌摆盘、火锅海鲜、饮品特写等美食摄影。'
       : ''
-    const imageUserLine = `帮我生成一张${imageAnchor}主图。${industryLockLine}${boundHint}${categoryHint}${foodBan}`
+    const modelLock = goodsImageIndustryLockSuffix(industryPath)
+    const imageUserLine = `帮我生成一张${imageAnchor}主图。${industryLockLine}${boundHint}${categoryHint}${foodBan}${modelLock}`
     const imageModel = resolveImageAssistModelIdFromChatPicker(chatPickerKey)
     const imageBase = {
       model: imageModel,
@@ -234,7 +235,7 @@ export async function enrichAiProductPlanPreview(
     }
 
     try {
-      if (refUrl && !isVoucher) {
+      if (refUrl && !isVoucher && (userRefUrl || industryPath)) {
         const imgR = await postDouyinGoodsAiAssist({
           action: 'image_enhance',
           ...imageBase,
@@ -244,11 +245,15 @@ export async function enrichAiProductPlanPreview(
         else if (userRefUrl || strongBoundMatch) headUrl = refUrl
       }
       if (!headUrl?.trim()) {
-        const imgR = await postDouyinGoodsAiAssist({
-          action: 'image_generate',
-          ...imageBase,
-        })
-        if (imgR.ok && imgR.image_urls?.[0]) headUrl = imgR.image_urls[0]
+        if (!industryPath) {
+          /* 类目未从绑定门店接口解析到：禁止盲目文生图 */
+        } else {
+          const imgR = await postDouyinGoodsAiAssist({
+            action: 'image_generate',
+            ...imageBase,
+          })
+          if (imgR.ok && imgR.image_urls?.[0]) headUrl = imgR.image_urls[0]
+        }
       }
     } catch {
       if ((userRefUrl || strongBoundMatch) && refUrl && !isVoucher) headUrl = refUrl

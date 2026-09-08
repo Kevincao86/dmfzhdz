@@ -790,6 +790,8 @@ aiAgentProductPlanEnrich
 AiAgentContext
 agentMerchantIntelLoader
 agentMerchantContext
+douyinProductImageAnchor
+merchantAiUpstream
 change-scope-guard
 PAT
       ;;

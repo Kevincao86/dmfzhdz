@@ -39,6 +39,8 @@ import { isTokenmixLinkedVendor } from '../src/lib/aiVendorKeysShared.js'
 import {
   buildProductImageUserLine,
   extractMainProductFromListingTitle,
+  goodsImageIndustryLockSuffix,
+  goodsImageNonCateringNegativeExtra,
   isVoucherGoodsProduct,
   isWeakMainProductAnchor,
   resolveMainProductForImage,
@@ -1833,13 +1835,13 @@ type ImageGoodsTypeCtx = { productType?: number | null; typeLabel?: string }
 
 type ImagePriceCtx = { priceYuan?: string; originYuan?: string }
 
-/** 商品向导生图：prompt 原样下发，不套额外模板、不按类目/类型改写 */
+/** 商品向导生图：prompt 原样下发，并追加类目锁（所有模型同一段，禁止忽略经营类目） */
 function buildImagePrompt(
   productName: string,
   _titleDraft: string,
   imageRole: string,
   _mode: 't2i' | 'i2i',
-  _lockSuffix = '',
+  lockSuffix = '',
   _mainProductAnchor = '',
   _goodsTypeCtx?: ImageGoodsTypeCtx,
   _priceYuan = '',
@@ -1852,7 +1854,8 @@ function buildImagePrompt(
     imageRole === 'env' ? 'env' : imageRole === 'aux' ? 'aux' : 'head'
   const line =
     imageUserLineOverride.trim() || buildProductImageUserLine(listingTitle, role)
-  return line
+  const lock = lockSuffix.trim()
+  return lock ? `${line}\n${lock}` : line
 }
 
 /** 商品向导固定句式：优化时不沿用错误底图，强制按标题重绘 */
@@ -2003,12 +2006,15 @@ async function qwenWanxOneImage(
    */
   const preferMultimodalRef =
     useRef && (isWan27MultimodalImageModel(preferred) || /^qwen-image(?!-edit)/i.test(preferred.trim()))
+  const industryNeg = /门店经营类目锁/.test(prompt)
+    ? `, ${goodsImageNonCateringNegativeExtra('休闲娱乐 > 足疗足浴')}`
+    : ''
   const negWithRef = opts?.voucherFaceMode
     ? `${voucherNeg}, 模糊, 低质量, 畸形文字`
-    : '模糊, 低质量, 畸形文字, 水印, 与商品无关的展厅, 卖场内景, 样板间, 办公室, 工位, 数码卖场, 奢侈品橱窗, 空镜走廊, 无关餐饮'
+    : `模糊, 低质量, 畸形文字, 水印, 与商品无关的展厅, 卖场内景, 样板间, 办公室, 工位, 数码卖场, 奢侈品橱窗, 空镜走廊, 无关餐饮${industryNeg}`
   const negT2i = opts?.voucherFaceMode
     ? `${voucherNeg}, 手机, 数码, 低分辨率, 水印`
-    : '手机,智能手机,平板电脑,笔记本电脑,显示器,键盘,鼠标,办公桌面,数码产品特写,与商品标题无关的食物,杂乱拼贴,低分辨率,畸形手指,水印,无关展厅,样板间,办公室,工位'
+    : `手机,智能手机,平板电脑,笔记本电脑,显示器,键盘,鼠标,办公桌面,数码产品特写,与商品标题无关的食物,杂乱拼贴,低分辨率,畸形手指,水印,无关展厅,样板间,办公室,工位${industryNeg}`
 
   const tryModels = async (
     models: string[],
@@ -3085,6 +3091,10 @@ export async function handleDouyinGoodsAiAssist(
         priceYuan: String(body.price_yuan ?? '').trim(),
         originYuan: String(body.origin_yuan ?? '').trim(),
       }
+      const pathZh = String(body.goods_category_path_zh ?? '').trim()
+      const lockSuffix = [goodsAiLockSuffixFromBody(body), goodsImageIndustryLockSuffix(pathZh)]
+        .filter((s) => s.trim())
+        .join('\n')
       if (action === 'image_generate') {
         const { urls, modelUsed } = await runImageGenerateWithBuiltinFailover(
           model,
@@ -3093,7 +3103,7 @@ export async function handleDouyinGoodsAiAssist(
           productName,
           titleDraft,
           imageRole,
-          '',
+          lockSuffix,
           mainProductAnchor,
           goodsTypeCtx,
           priceCtx,
@@ -3125,7 +3135,7 @@ export async function handleDouyinGoodsAiAssist(
         titleDraft,
         imageRole,
         imageUrls,
-        '',
+        lockSuffix,
         mainProductAnchor,
         goodsTypeCtx,
         priceCtx,

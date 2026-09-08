@@ -971,7 +971,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
               boundProductImages: intel.onlineProductImageRefs,
               planIndex: idx,
               industryPath: intel.industryPath,
-              storeName: intel.storeName,
+              storeName: intel.boundStoreName || intel.storeName,
             }),
           )
         } catch (e) {
@@ -2445,14 +2445,14 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
                     !String(pl.headUrl || '').startsWith('https://')
                   if (!need) return pl
                   try {
-                    const snap = loadMerchantIntelSnapshot()
+                    const snap = await loadFullMerchantIntelSnapshot('create_product')
                     return await enrichAiProductPlanPreview(
                       pl,
                       pl.productName || title,
                       modelPickerKey,
                       {
                         industryPath: snap.industryPath,
-                        storeName: snap.storeName,
+                        storeName: snap.boundStoreName || snap.storeName,
                       },
                     )
                   } catch {

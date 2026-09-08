@@ -22,12 +22,14 @@ import type { MarketingActivityPlatform } from './marketingActivityTypes'
 import { tenantLocalKey } from './tenantLocalState'
 import { analyzeCompetitors } from '../services/storeIntelApi'
 import { fetchMarketingActivities } from '../services/marketingActivitiesApi'
-import { getDouyinStores } from '../services/douyinMerchantApi'
+import { getDouyinStores, getDouyinStoreDetail, type DouyinStoreRow } from '../services/douyinMerchantApi'
+import { getDouyinGoodsCategoryTree, type DouyinCategoryTreeNode } from '../services/douyinProductApi'
 import { fetchMerchantProductList, type MerchantProductListItem } from '../services/merchantProductListApi'
 import { loadDraftDetailSnapshot } from './productDraftSnapshot'
 import { resolveCompetitorAnalysisIndustry } from './competitorIndustry'
 import { loadAgentPageDataContext, pageDataDomainsForTask } from './agentPageDataLoaders'
 import { inferIndustryPathFromText } from './merchantIndustryAlign'
+import { inferIndustryVisualCategory } from './douyinProductImageAnchor'
 
 const FETCH_TIMEOUT_MS = 45_000
 
@@ -42,6 +44,9 @@ export type MerchantIntelEnrichment = Pick<
   | 'competitorSummary'
   | 'onlineProductsSummary'
   | 'onlineProductImageRefs'
+  | 'boundStoreCategoryPath'
+  | 'boundStoreCategorySource'
+  | 'boundStoreName'
 > & {
   intelLoadNotes?: string[]
 }
@@ -189,11 +194,142 @@ async function fetchOnlineProductsSummary(): Promise<{
   return { note: notes.join('；') || '未拉取到绑定平台商品', imageRefs }
 }
 
+function collectStringValues(v: unknown, into: string[], depth = 0): void {
+  if (depth > 5 || v == null) return
+  if (typeof v === 'string') {
+    const t = v.trim()
+    if (t && t.length < 80) into.push(t)
+    return
+  }
+  if (Array.isArray(v)) {
+    for (const x of v) collectStringValues(x, into, depth + 1)
+    return
+  }
+  if (typeof v === 'object') {
+    const o = v as Record<string, unknown>
+    for (const k of [
+      'name',
+      'category_name',
+      'industry_name',
+      'category_path',
+      'main_category_name',
+      'sub_category_name',
+      'category_full_name',
+    ]) {
+      collectStringValues(o[k], into, depth + 1)
+    }
+  }
+}
+
+/** 从 goodlife/v1/poi/cert/info 解析经营类目文案 */
+export function parseCertIndustryPath(certInfo?: Record<string, unknown>): string | undefined {
+  if (!certInfo || typeof certInfo !== 'object') return undefined
+  const data =
+    certInfo.data && typeof certInfo.data === 'object'
+      ? (certInfo.data as Record<string, unknown>)
+      : certInfo
+  const industry =
+    data.industry && typeof data.industry === 'object'
+      ? (data.industry as Record<string, unknown>)
+      : data
+  const parts: string[] = []
+  for (const k of [
+    'category_path',
+    'industry_name',
+    'main_category_name',
+    'sub_category_name',
+    'category_name',
+    'name',
+  ]) {
+    const v = industry[k] ?? data[k]
+    if (typeof v === 'string' && v.trim()) parts.push(v.trim())
+  }
+  collectStringValues(industry.categories ?? data.categories ?? data.category_infos, parts)
+  const unique = [...new Set(parts.filter((p) => !/^[0-9a-zA-Z_-]{8,}$/.test(p)))]
+  if (unique.length) {
+    const joined = unique.slice(0, 4).join(' > ')
+    return inferIndustryPathFromText(joined) || joined
+  }
+  return inferIndustryPathFromText(JSON.stringify(industry).slice(0, 1200))
+}
+
+function pickDominantEnabledL1Path(tree: DouyinCategoryTreeNode[]): string | undefined {
+  const enabled = tree.filter((n) => n.enable && !n.is_publish_block && n.name?.trim())
+  if (!enabled.length) return undefined
+  const nonFood = enabled.filter((n) => !/餐饮|美食/.test(n.name))
+  if (nonFood.length === 1) return nonFood[0]!.name
+  const preferred = nonFood.find((n) =>
+    /休闲|丽人|养生|到综|生活服务|娱乐/.test(n.name),
+  )
+  if (preferred) return preferred.name
+  if (enabled.length === 1) return enabled[0]!.name
+  return undefined
+}
+
+function pathFromClaimedStoreNames(items: DouyinStoreRow[]): string | undefined {
+  const blob = items
+    .map((s) => [s.name, s.brandName].filter(Boolean).join(' '))
+    .filter(Boolean)
+    .join(' ')
+  return inferIndustryPathFromText(blob)
+}
+
+async function resolveBoundStoreCategory(
+  token: string,
+  items: DouyinStoreRow[],
+): Promise<{ path?: string; source?: string; storeName?: string; note?: string }> {
+  const storeName = items[0]?.name?.trim() || undefined
+  const fromNames = pathFromClaimedStoreNames(items)
+
+  let fromCert: string | undefined
+  const firstId = items[0]?.id?.trim()
+  if (firstId && firstId !== '-') {
+    try {
+      const detail = await getDouyinStoreDetail({ accessToken: token, poiId: firstId })
+      if (detail.ok) {
+        fromCert = parseCertIndustryPath(detail.certInfo)
+      }
+    } catch {
+      /* cert 无权限时仍可用门店名 */
+    }
+  }
+
+  let fromTree: string | undefined
+  if (!fromCert && !fromNames) {
+    try {
+      const tree = await getDouyinGoodsCategoryTree()
+      if (tree.ok) fromTree = pickDominantEnabledL1Path(tree.category_tree_infos)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (fromCert && inferIndustryVisualCategory(fromCert, fromCert) !== 'catering') {
+    return { path: fromCert, source: '抖音来客 poi/cert/info', storeName }
+  }
+  if (fromNames) {
+    return { path: fromNames, source: '抖音来客 shop.poi.query 门店名', storeName }
+  }
+  if (fromCert) {
+    return { path: fromCert, source: '抖音来客 poi/cert/info', storeName }
+  }
+  if (fromTree) {
+    return { path: fromTree, source: '抖音来客 goods/category/get 可发一级类目', storeName }
+  }
+  return {
+    storeName,
+    note: '已拉已认领门店，但接口未返回可识别类目，禁止按餐饮默认出图',
+  }
+}
+
 async function fetchGeoSummary(): Promise<{
   text?: string
   note?: string
   chainStoresSummary?: string
   claimedStoreCount?: number
+  boundStoreCategoryPath?: string
+  boundStoreCategorySource?: string
+  boundStoreName?: string
 }> {
   const token = readMerchantSession('meoo_douyin_merchant_token')
   if (!token) {
@@ -240,9 +376,14 @@ async function fetchGeoSummary(): Promise<{
         ].join('\n')
       : `门店范围：单店 1 家 — ${chain.briefs[0]?.name || '未命名'}`
 
+    const cat = await resolveBoundStoreCategory(token, r.items)
+
     return {
       claimedStoreCount: chain.storeCount,
       chainStoresSummary,
+      boundStoreCategoryPath: cat.path,
+      boundStoreCategorySource: cat.source,
+      boundStoreName: cat.storeName,
       text: [
         chain.isChain
           ? `GEO 连锁聚合健康分 ${chain.aggregateHealth}/100（共 ${chain.storeCount} 家）`
@@ -250,7 +391,10 @@ async function fetchGeoSummary(): Promise<{
         `聚合维度：信息完整度 ${inputs.infoCompletenessPercent}% · 问法覆盖 ${inputs.questionCoveragePercent}% · 内容新鲜度 ${inputs.contentFreshnessPercent}%`,
         gaps.length ? `未覆盖高频问法：${gaps.join('、')}` : '高频问法均已覆盖',
         chain.isChain ? `逐店 GEO 要点：\n${perStoreLines}${more}` : '',
-        '接口：抖音来客门店列表 + 本地 geoModuleSpec 权重计算（与 GEO 运营页同源）',
+        cat.path
+          ? `绑定门店类目：${cat.path}（${cat.source}）`
+          : cat.note || '绑定门店类目：接口未解析到',
+        '接口：抖音来客门店列表 + poi/cert/info 类目 + 本地 geoModuleSpec 权重计算（与 GEO 运营页同源）',
       ]
         .filter(Boolean)
         .join('\n'),
@@ -412,6 +556,9 @@ export async function fetchMerchantIntelEnrichment(
         else if (g.note) notes.push(g.note)
         if (g.chainStoresSummary) out.chainStoresSummary = g.chainStoresSummary
         if (typeof g.claimedStoreCount === 'number') out.claimedStoreCount = g.claimedStoreCount
+        if (g.boundStoreCategoryPath) out.boundStoreCategoryPath = g.boundStoreCategoryPath
+        if (g.boundStoreCategorySource) out.boundStoreCategorySource = g.boundStoreCategorySource
+        if (g.boundStoreName) out.boundStoreName = g.boundStoreName
       }),
     )
   }
@@ -475,14 +622,27 @@ export async function loadFullMerchantIntelSnapshot(
   const base = loadMerchantIntelSnapshot()
   const enriched = await fetchMerchantIntelEnrichment(base, taskType)
   const merged: MerchantIntelSnapshot = { ...base, ...enriched }
-  if (!merged.industryPath?.trim()) {
+  const apiPath = enriched.boundStoreCategoryPath?.trim()
+  if (apiPath) {
+    merged.industryPath = apiPath
+  } else if (!merged.industryPath?.trim()) {
     const inferred = inferIndustryPathFromText(
-      [merged.storeName, merged.chainStoresSummary, merged.onlineProductsSummary, merged.menuSummary]
+      [merged.boundStoreName, merged.storeName, merged.chainStoresSummary, merged.onlineProductsSummary, merged.menuSummary]
         .filter(Boolean)
         .join(' '),
     )
     if (inferred) merged.industryPath = inferred
+  } else if (inferIndustryVisualCategory(merged.industryPath, merged.industryPath) === 'catering') {
+    const fromStores = inferIndustryPathFromText(
+      [merged.boundStoreName, merged.chainStoresSummary].filter(Boolean).join(' '),
+    )
+    if (fromStores && inferIndustryVisualCategory(fromStores, fromStores) !== 'catering') {
+      merged.industryPath = fromStores
+      merged.boundStoreCategorySource =
+        merged.boundStoreCategorySource || '已认领门店名（覆盖毛利餐饮默认）'
+    }
   }
+  if (enriched.boundStoreName) merged.boundStoreName = enriched.boundStoreName
   return merged
 }
 
