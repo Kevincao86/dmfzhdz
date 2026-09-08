@@ -1452,6 +1452,58 @@ function parseRoleNames(raw: string): string[] {
     .filter(Boolean)
 }
 
+function looksLikeSupportingRoleName(name: string): boolean {
+  return /客人|顾客|客户|对方|男客|女客|旁人/.test(String(name || ''))
+}
+
+/** 写故事用：把角色栏 + 角色形象拆成主角/配角，避免钩子文案把客人写成主语 */
+function buildDramaStoryCastBrief(cast: DramaCastMember[], roles: string): {
+  leadName: string
+  brief: string
+} {
+  const confirmed = cast.filter((m) => m.preview)
+  const named = cast.filter((m) => m.name.trim() || m.desc.trim() || m.preview)
+  const roleTokens = parseRoleNames(roles)
+  const photoLead = confirmed[0] || named.find((m) => !looksLikeSupportingRoleName(m.name)) || named[0]
+  const memberName = (photoLead?.name || '').trim()
+  const genericMember = /^角色\d+$/.test(memberName)
+  const fromRoles = roleTokens.find((n) => !looksLikeSupportingRoleName(n))
+  const fromDesc = (photoLead?.desc || '').match(/女技师|男技师|技师|店员|主理人|老板娘|老板/)?.[0]
+  const leadName = (
+    fromRoles ||
+    (!genericMember && memberName && !looksLikeSupportingRoleName(memberName) ? memberName : '') ||
+    fromDesc ||
+    (!looksLikeSupportingRoleName(memberName) ? memberName : '') ||
+    '主角'
+  )
+    .replace(/（主角）|\(主角\)/g, '')
+    .trim()
+  const leadDesc = (photoLead?.desc || '').trim().slice(0, 80)
+  const otherCast = named
+    .filter((m) => m !== photoLead)
+    .map((m) => {
+      const n = m.name.trim() || '配角'
+      return `${n}${m.desc.trim() ? `（${m.desc.trim().slice(0, 36)}）` : ''}${m.preview ? '·已确认形象' : ''}`
+    })
+  const extraFromRoles = roleTokens.filter((n) => n !== leadName && n !== photoLead?.name.trim())
+  const support = [...otherCast]
+  for (const n of extraFromRoles) {
+    if (!support.some((s) => s.includes(n))) support.push(n)
+  }
+  if (photoLead?.preview && !support.some((s) => /客人|顾客/.test(s))) {
+    support.push('客人（配角，最多露手/背影/声音）')
+  }
+  const brief = [
+    `画面主角：${leadName}${photoLead?.preview ? '（已确认角色形象照，视频会用这张脸，故事必须以 TA 为动作主语）' : ''}`,
+    leadDesc ? `主角画像：${leadDesc}` : '',
+    support.length ? `配角：${support.join('、')}` : '配角：文案里的客人/对方只作推动冲突的配角。',
+    '主次铁律：一句话故事的主语、欲望、镜头中心必须是画面主角；客人不得写成「躺着不想起 / 拉住技师」这类主角句。对白可以是客人说的，但要紧接主角的反应、动作或决定。',
+  ]
+    .filter(Boolean)
+    .join('\n')
+  return { leadName, brief }
+}
+
 function joinRoleNames(names: string[]): string {
   return names.filter(Boolean).join(' / ')
 }
@@ -1712,27 +1764,33 @@ export default function ShortDramaPage() {
     const shopLines = world.fields
       .map((f) => `${f.label}：${String(shop[f.key] ?? '').trim() || '未填'}`)
       .join('\n')
+    const castBrief = buildDramaStoryCastBrief(cast, roles)
     const user = [
+      '先深度理解文案，再分清主次角色，最后才写故事。不要空套钩子模板。',
       `场景：${world.label} / ${scene.name}`,
-      `钩子标签：${formula.name}`,
+      `钩子标签：${formula.name}。钩子要落在画面主角身上，而不是配角欲望。`,
       formula.hint ? `钩子提示：${formula.hint}` : '',
-      `四拍结构：${formula.beats.join(' → ')}`,
+      `四拍结构（按主角动作写，不要写成客人四拍）：${formula.beats.join(' → ')}`,
       `成片时长：${durOpt.label}（${durOpt.hint}，共 ${durOpt.sec} 秒）`,
       `画风：${style.name}`,
-      '商家提示（必须写进故事，不要空套模板）：',
+      '商家提示（店名/项目/价格/位置必须写进故事，不要空套）：',
       shopLines,
-      roles.trim() ? `已有角色（故事必须贴合，不要改人设）：${roles.trim()}` : '',
-      conflict.trim() ? `已有核心冲突（故事必须围绕它写）：${conflict.trim()}` : '',
-      dialogue.trim() ? `已有对白钩子（可原句出现在故事里）：${dialogue.trim()}` : '',
-      story.trim() ? `商家已有故事草稿（请按提示改写）：${story.trim()}` : '',
-      '根据以上提示写 1–3 句一句话故事。口语、有冲突、有记忆点，适合该时长竖屏短剧。',
+      '【主次角色·必须遵守】',
+      castBrief.brief,
+      roles.trim() ? `角色栏原文：${roles.trim()}（若与画面主角冲突，以画面主角为准，角色栏里的客人当配角）` : '',
+      conflict.trim() ? `已有核心冲突（围绕主角来写，不要改成客人内心戏）：${conflict.trim()}` : '',
+      dialogue.trim() ? `已有对白钩子（可原句出现；对白后必须接到主角反应）：${dialogue.trim()}` : '',
+      story.trim()
+        ? `已有故事草稿（若把客人写成主语，必须改写成「${castBrief.leadName}」视角，禁止照抄客人躺平）：${story.trim()}`
+        : '',
+      `根据以上文案写 1–3 句一句话故事：口语、有冲突、有记忆点；主语必须是「${castBrief.leadName}」。`,
       '只输出 JSON：{"story":"...","roles":"...","conflict":"...","dialogue":"..."}',
-      'story 为一句话故事；roles/conflict/dialogue 仅在商家未提供时补全；不要 markdown、不要解释。',
+      `story 必须以「${castBrief.leadName}」开头或作第一动作主语。roles 写成「主角 / 配角」，仅当角色栏为空时才用；conflict/dialogue 仅在商家未提供时补全。不要 markdown、不要解释。`,
     ]
       .filter(Boolean)
       .join('\n')
     const system =
-      '你是竖屏商家短剧编剧。必须根据商家提示（店名、项目、钩子、时长、已有角色/冲突）写一句话故事：短时长更密、冲突更早；长时长可铺垫但前 2 秒仍要有钩子。不要写技术参数，不要出现字幕/Logo/演职员表。'
+      '你是竖屏商家短剧编剧。先读懂钩子、四拍、对白、冲突和商家字段，再按主次角色写一句话故事：画面主角是动作主语和镜头中心，客人/顾客只作配角。短时长更密、冲突更早；长时长可铺垫但前 2 秒仍要有钩子。禁止写成客人躺平加时的视角。不要写技术参数，不要出现字幕/Logo/演职员表。'
     try {
       let lastErr = '生成故事失败，请稍后重试'
       for (const provider of ['doubao'] as const) {
@@ -1756,7 +1814,9 @@ export default function ShortDramaPage() {
           if (!roles.trim() && parsed.roles) setRoles(parsed.roles)
           if (!conflict.trim() && parsed.conflict) setConflict(parsed.conflict)
           if (!dialogue.trim() && parsed.dialogue) setDialogue(parsed.dialogue)
-          setHint('已根据上方提示写好一句话故事，可再微调后生成短剧。')
+          setHint(
+            `已按主角「${castBrief.leadName}」和钩子文案写好一句话故事（配角不抢镜头），可再微调后生成短剧。`,
+          )
           setErr(null)
           return
         } catch (e) {
