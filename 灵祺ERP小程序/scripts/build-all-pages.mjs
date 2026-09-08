@@ -20,7 +20,6 @@ const SKIP = new Set([
   'recruit-hub',
   'recruit-flow',
   'recruit-publish-pick',
-  'recruit-brief-records',
   'finance-tax',
 ]);
 
@@ -31,7 +30,6 @@ const COPY_COMPLEX = [
   'shortvideo-voice',
   'recruit-novice',
   'recruit-pro',
-  'recruit-brief-wizard',
   'ai-content',
   'shortvideo-ai',
   'product-edit',

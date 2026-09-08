@@ -4,7 +4,7 @@
       <image class="lq-hero-logo" src="{{logoSrc}}" mode="aspectFit" />
       <view>
         <text class="lq-hero-title">达人招募</text>
-        <text class="lq-hero-sub">开环探店 · Brief · 订单履约全链路</text>
+        <text class="lq-hero-sub">开环探店 · 订单履约全链路</text>
       </view>
     </view>
   </view>
@@ -13,27 +13,9 @@
     <view class="lq-nav-ico">①</view>
     <view class="lq-nav-main">
       <text class="lq-nav-title">五步流程 · 达人招募</text>
-      <text class="lq-nav-desc">从 Brief 到结算的标准 SOP</text>
+      <text class="lq-nav-desc">从发单到结算的标准 SOP</text>
     </view>
     <text class="tag">5 步</text>
-    <text class="chev">›</text>
-  </navigator>
-
-  <navigator url="/pages/recruit-brief-wizard/recruit-brief-wizard" class="lq-nav-card" hover-class="none">
-    <view class="lq-nav-ico">✦</view>
-    <view class="lq-nav-main">
-      <text class="lq-nav-title">达人 Brief 生成</text>
-      <text class="lq-nav-desc">结构化招募需求一键成稿</text>
-    </view>
-    <text class="chev">›</text>
-  </navigator>
-
-  <navigator url="/pages/recruit-brief-records/recruit-brief-records" class="lq-nav-card" hover-class="none">
-    <view class="lq-nav-ico orange">≡</view>
-    <view class="lq-nav-main">
-      <text class="lq-nav-title">Brief 生成记录</text>
-      <text class="lq-nav-desc">历史方案复用与回溯</text>
-    </view>
     <text class="chev">›</text>
   </navigator>
 

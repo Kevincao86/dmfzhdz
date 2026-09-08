@@ -99,11 +99,6 @@ module.exports.includes = includes
       <view wx:for="{{commerceOpts}}" wx:key="*this" data-x="{{item}}" bindtap="tapCommerce" class="pro-chip {{tools.includes(commerceSel, item) ? 'on' : ''}}">{{item}}</view>
     </view>
 
-    <text class="pro-sec">达人 Brief</text>
-    <text class="pro-brief">{{selectedBriefLines}}</text>
-    <button class="pro-btn-ghost" bindtap="openBriefPicker">选择Brief</button>
-    <button class="pro-btn-ghost mt-sm" bindtap="goBriefWizard">去生成 Brief</button>
-
     <text class="pro-sec">预算与合作 <text class="req">*</text></text>
     <input class="pro-input" type="digit" value="{{budget}}" bindinput="bindBudget" placeholder="总预算（元）" />
     <input class="pro-input mt-sm" type="number" value="{{headcount}}" bindinput="bindHeadcount" placeholder="招募人数" />
@@ -121,30 +116,6 @@ module.exports.includes = includes
       <input class="pro-input" value="{{designatedInput}}" bindinput="bindDesignated" placeholder="达人昵称或达人 ID" />
       <button class="pro-modal-ok" bindtap="confirmDesignated">确定</button>
       <button class="pro-modal-cancel" bindtap="closeDesignated">取消</button>
-    </view>
-  </view>
-
-  <view wx:if="{{briefPickerOpen}}" class="pro-modal">
-    <view class="pro-modal-bg" bindtap="closeBriefPicker"></view>
-    <view class="pro-modal-panel meoo-card lg">
-      <text class="pro-modal-title">选择 Brief 版本</text>
-      <scroll-view scroll-y class="pro-brief-list">
-        <block wx:if="{{!briefRecords.length}}">
-          <text class="pro-muted">暂无本地记录，请先在「达人Brief生成」中生成并保存。</text>
-        </block>
-        <block wx:for="{{briefRecords}}" wx:key="id">
-          <view class="pro-brief-rec">
-            <text class="pro-brief-rec-title">{{item.mainProductName}}</text>
-            <text class="pro-muted">{{item.platform}} · {{item.createdAt}}</text>
-            <view class="pro-brief-vars">
-              <button size="mini" data-id="{{item.id}}" data-v="{{0}}" bindtap="pickBriefVariant">版本 A</button>
-              <button size="mini" data-id="{{item.id}}" data-v="{{1}}" bindtap="pickBriefVariant">版本 B</button>
-              <button size="mini" data-id="{{item.id}}" data-v="{{2}}" bindtap="pickBriefVariant">版本 C</button>
-            </view>
-          </view>
-        </block>
-      </scroll-view>
-      <button class="pro-modal-ok" bindtap="closeBriefPicker">关闭</button>
     </view>
   </view>
 

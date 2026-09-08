@@ -40,7 +40,7 @@
       <view class="wallet-info-divider"></view>
       <view class="wallet-info-col">
         <text class="wallet-info-ico">📄</text>
-        <text class="wallet-info-main">Brief {{briefPointsCost}}积分/篇</text>
+        <text class="wallet-info-main">内容功能按次扣积分</text>
         <text class="wallet-info-sub">内容消费</text>
       </view>
     </view>

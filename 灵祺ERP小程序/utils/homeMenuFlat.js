@@ -21,8 +21,6 @@ const GRID_VISUAL = {
   商品列表: { glyph: '列', tone: 'orange' },
   新建商品: { glyph: '建', tone: 'green' },
   达人招募: { glyph: '募', tone: 'indigo' },
-  '达人Brief生成': { glyph: '简', tone: 'violet' },
-  'Brief生成记录': { glyph: '档', tone: 'slate' },
   查看达人订单: { glyph: '单', tone: 'indigo' },
   活动中心: { glyph: '活', tone: 'rose' },
   评论管理: { glyph: '评', tone: 'green' },

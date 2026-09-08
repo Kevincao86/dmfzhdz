@@ -5,7 +5,6 @@ const rest = require('../../utils/supabaseRest.js')
 const douyin = require('../../utils/douyinGoodsMp.js')
 const industryMp = require('../../utils/recruitmentIndustryMp.js')
 const novice = require('../../utils/recruitmentNoviceMp.js')
-const briefStore = require('../../utils/kolBriefStorageMp.js')
 
 const PLATS = ['抖音', '小红书', '美团', '快手']
 const CONTENT = ['短视频', '直播', '图文']
@@ -50,17 +49,12 @@ Page({
     budget: '',
     headcount: '',
     note: '',
-    selectedBriefLines: '',
     submitting: false,
-    briefPickerOpen: false,
-    briefRecords: [],
     designatedModalOpen: false,
   },
 
   onShow() {
     if (!api.getAccessToken()) wx.redirectTo({ url: '/pages/login/login' })
-    const sel = briefStore.readSelectedBrief()
-    this.applySelectedBrief(sel)
   },
 
   async onLoad() {
@@ -71,20 +65,6 @@ Page({
       industryIndex: 0,
       talentTagsSel: [first],
     })
-    const persisted = briefStore.readSelectedBrief()
-    this.applySelectedBrief(persisted)
-  },
-
-  applySelectedBrief(sel) {
-    if (!sel || !sel.text) {
-      this.setData({
-        selectedBriefLines: sel && sel.recordId ? '（已选记录，暂无正文）' : '尚未选择 Brief',
-      })
-      return
-    }
-    const t = String(sel.text || '').trim()
-    const head = `${sel.mainProductName || '主推'} · ${sel.platform || ''} · v${typeof sel.variantIndex === 'number' ? sel.variantIndex + 1 : 1}`
-    this.setData({ selectedBriefLines: `${head}\n${t.slice(0, 620)}${t.length > 620 ? '…' : ''}` })
   },
 
   backManage() {
@@ -232,37 +212,6 @@ Page({
     this.setData({ note: e.detail.value })
   },
 
-  openBriefPicker() {
-    this.setData({ briefPickerOpen: true, briefRecords: briefStore.readRecords() })
-  },
-  closeBriefPicker() {
-    this.setData({ briefPickerOpen: false })
-  },
-
-  pickBriefVariant(e) {
-    const id = String(e.currentTarget.dataset.id || '')
-    const v = Number(e.currentTarget.dataset.v) || 0
-    const rec = this.data.briefRecords.find((r) => r.id === id)
-    if (!rec || !Array.isArray(rec.previews)) return
-    const text = String(rec.previews[v] || '')
-    const payload = {
-      recordId: rec.id,
-      variantIndex: v,
-      text,
-      platform: rec.platform || '',
-      mainProductName: rec.mainProductName || '',
-      tags: rec.tags || [],
-    }
-    briefStore.writeSelectedBrief(payload)
-    this.applySelectedBrief(payload)
-    this.setData({ briefPickerOpen: false })
-    wx.showToast({ title: '已选择 Brief', icon: 'success' })
-  },
-
-  goBriefWizard() {
-    wx.navigateTo({ url: '/pages/recruit-brief-wizard/recruit-brief-wizard' })
-  },
-
   async onSubmit() {
     if (!merchant.hasMerchantApi()) {
       wx.showModal({ title: '未连接后台', content: '请配置 MERCHANT_API_BASE_URL', showCancel: false })
@@ -271,11 +220,6 @@ Page({
     const name = String(this.data.name || '').trim()
     if (!name) {
       wx.showToast({ title: '请填写招募名称', icon: 'none' })
-      return
-    }
-    const sel = briefStore.readSelectedBrief()
-    if (!sel || !String(sel.text || '').trim()) {
-      wx.showToast({ title: '请先「选择Brief」', icon: 'none' })
       return
     }
     if (this.data.recruitMode === 'designated' && !String(this.data.designatedInput || '').trim()) {
@@ -355,7 +299,7 @@ Page({
         netAmount: Math.round(Math.max(0, budget) * (1 - merchantCommissionPct / 100)),
         storeAddress,
         category: talentTags[0] || '达人招募',
-        infoSummary: `招募：${name}；模式：${this.data.recruitMode === 'designated' ? `指定达人(${String(this.data.designatedInput).trim()})` : '条件匹配'}；Brief：${sel.mainProductName}（${sel.platform}）；预算¥${budget}/${headcount}人；行业${industry}；商家佣金率${merchantCommissionPct}%；桌数${tablePerMeal ?? '—'}；时段${visitSlots.join('、')}；达人标签${talentTags.join('、')}；粉丝量级${followerTiers.join('、') || '—'}；带货等级${commerceLevels.join('、') || '—'}`,
+        infoSummary: `招募：${name}；模式：${this.data.recruitMode === 'designated' ? `指定达人(${String(this.data.designatedInput).trim()})` : '条件匹配'}；预算¥${budget}/${headcount}人；行业${industry}；商家佣金率${merchantCommissionPct}%；桌数${tablePerMeal ?? '—'}；时段${visitSlots.join('、')}；达人标签${talentTags.join('、')}；粉丝量级${followerTiers.join('、') || '—'}；带货等级${commerceLevels.join('、') || '—'}`,
       }
 
       try {

@@ -30,7 +30,6 @@ Page({
     packagePointsText: '0',
     rechargePointsText: '0',
     pointsPerYuan: walletUi.POINTS_PER_YUAN,
-    briefPointsCost: walletUi.BRIEF_POINTS_COST,
     balanceCents: 0,
     pointsLedger: [],
     loading: false,
