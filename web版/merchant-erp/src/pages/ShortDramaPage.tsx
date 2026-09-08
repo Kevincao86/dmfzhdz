@@ -1837,10 +1837,9 @@ export default function ShortDramaPage() {
       const url = await processCustomAvatarFile(file)
       setCharacterSourceUrl(url)
       setCharacterDraft(url)
-      setCharacterPreview(url)
+      setCharacterPreview(null)
       clearTrial()
-      setHint('已用上传照片确认角色。正在按图重写画像，覆盖旧文案…')
-      void enrichCharacterPortrait(url)
+      setHint('已添加参考图。可点「AI补充画像」按图写词，或点「生成预览」生成相似画像；要用原图直接拍短剧，再点「用此图确认角色」。')
     } catch (e) {
       setErr(e instanceof Error ? e.message : '角色形象读取失败')
     } finally {
@@ -1849,11 +1848,11 @@ export default function ShortDramaPage() {
   }
 
   const generateCharacterPreview = async () => {
-    const desc = characterDesc.trim() || roles.trim()
-    const sceneRef = refItems.find((x) => String(x.imageDataUrl || '').trim())?.imageDataUrl?.trim() || ''
-    const rawRef = (characterSourceUrl || sceneRef || characterDraft || characterPreview || '').trim()
+    const desc = characterDesc.trim()
+    const roleHint = roles.trim()
+    const rawRef = (characterSourceUrl || '').trim()
     if (!desc && !rawRef) {
-      setErr('请先上传角色参考照片，或填写形象描述后再生成预览')
+      setErr('请先写简要形象词并点「AI补充画像」，或上传参考图后再生成预览')
       setHint(null)
       return
     }
@@ -1867,22 +1866,26 @@ export default function ShortDramaPage() {
         refData = resolved ? await compressPortraitDataUrlForLibrary(resolved) : undefined
       }
       if (!refData && !desc) {
-        setErr('请先上传角色参考照片，再生成预览')
+        setErr('请先写形象描述或上传参考图')
         return
       }
+      const shortHint = desc.length > 0 && desc.length <= 48 ? desc : ''
       const prompt = refData
         ? [
-            'Image edit. The attached photo is the ONLY identity and outfit source.',
-            'Keep the exact same person: face, hair, skin, body, and the exact clothes in the photo. Do not change the outfit. Do not invent a new face.',
-            'If this is a short-video app screenshot, crop to the front young woman only. Remove app UI, like/comment icons, captions, status bar, navigation bar, and other people.',
-            'Output a clean vertical half-body photorealistic portrait, natural light, no collage.',
-            `Role label only (not appearance): ${roles.trim() || '主角'}.`,
-            'Ignore any previous clothing text such as linen shirts, wide-leg pants, or cafe scenes. Those must not appear.',
-            'No subtitles, watermarks, logos, or extra people.',
-          ].join('')
+            'Image-to-image: build a similar portrait from the attached reference.',
+            'Keep the same person: face, hairstyle, hair color, skin, body shape. Do not invent another face.',
+            'If the reference is a short-video screenshot, crop to the front person only and remove app UI, icons, captions, status bar and bystanders.',
+            'Output a clean vertical half-body photorealistic portrait, natural light.',
+            roleHint ? `Role: ${roleHint}.` : '',
+            shortHint ? `Optional occupation/age hint only: ${shortHint}.` : '',
+            'Clothing: prefer the outfit in the reference photo. Do not replace it with an unrelated cafe / linen-shirt look.',
+            'No subtitles, watermarks, logos, collage, or extra people.',
+          ]
+            .filter(Boolean)
+            .join(' ')
         : [
             '竖屏半身人像照片，单人，正面或微侧，五官清晰，自然光线，写实。',
-            `角色身份：${roles.trim() || '主角'}。`,
+            `角色身份：${roleHint || '主角'}。`,
             `外貌与穿搭：${desc}。`,
             `气质贴近「${scene.name}」${style.visual ? `，${style.visual}` : ''}。`,
             '禁止字幕、水印、Logo、多人、拼贴和海报排版。',
@@ -1895,10 +1898,10 @@ export default function ShortDramaPage() {
         wanxSize: '1024x1536',
         ...(refData ? { referenceImageDataUrl: refData } : {}),
       }
-      setHint(refData ? '正在按你上传的原图用 GPT Image 贴脸生成…' : '正在用 GPT Image 按文字生成预览…')
+      setHint(refData ? '正在按参考图生成相似画像…' : '正在按形象词生成预览…')
       let res = await postAiAgentNativeImage(prompt, gptOpts)
       if (!res.ok && refData) {
-        setHint('GPT 贴脸未成功，改用国内图生图，仍按原图…')
+        setHint('GPT 参考图未成功，改用国内图生图继续生成相似画像…')
         res = await postAiAgentNativeImage(prompt, {
           exactPrompt: true,
           aspectRatio: '3:4',
@@ -1922,13 +1925,10 @@ export default function ShortDramaPage() {
       setCharacterDraft(dataUrl)
       setCharacterPreview(null)
       clearTrial()
-      const viaGpt = res.ok && res.channel === 'tokenmix'
       setHint(
-        viaGpt
-          ? refData
-            ? '已按上传原图用 GPT Image 贴脸。请点「用此图确认角色」后才会融合进短剧。'
-            : '已用 GPT Image 按文字生成预览。请点「用此图确认角色」后才会融合进短剧。'
-          : '请点「用此图确认角色」后，生成短剧才会按此角色形象融合。',
+        refData
+          ? '已按参考图生成相似画像。请点「用此图确认角色」后才会融合进短剧。'
+          : '已按形象词生成预览。请点「用此图确认角色」后才会融合进短剧。',
       )
     } catch (e) {
       setErr(e instanceof Error ? e.message : '角色形象生成失败')
@@ -2832,23 +2832,23 @@ export default function ShortDramaPage() {
                         <Sparkles className="h-3.5 w-3.5" />
                       )}
                       {portraitBusy
-                        ? characterShowUrl
-                          ? '正在按图重写'
+                        ? characterSourceUrl
+                          ? '正在按图写词'
                           : '正在补充画像'
-                        : characterShowUrl
-                          ? '按图重写画像'
+                        : characterSourceUrl
+                          ? '按图补充画像'
                           : 'AI补充画像'}
                     </button>
                   </span>
                   <p className="text-[11px] leading-relaxed text-slate-500">
-                    请把参考图传到本栏（不要只放左边参考画面）。上传后会按图重写描述并锁定原图；生成预览只贴这张脸，不再用框里旧的衣着文案。
+                    两条路都可用：① 先写简要词，点「AI补充画像」补全文案，再生成预览；② 上传参考图，点「按图补充画像」写词，或点「生成预览」按图生成相似画像。原图要直接用，再点确认。
                   </p>
                   <textarea
                     className={cn(fieldCls, 'min-h-[88px] resize-y')}
                     disabled={busy || storyBusy || characterBusy || mediaBusy || portraitBusy}
                     value={characterDesc}
                     onChange={(e) => setCharacterDesc(e.target.value)}
-                    placeholder="例如：足浴店女技师，25-28岁。点「AI补充画像」可补全国籍、衣着、发型等"
+                    placeholder="文案路径：足浴店女技师，25-28岁。参考图路径：先上传照片再点补充或生成"
                   />
                   <input
                     ref={characterInputRef}
@@ -2869,7 +2869,7 @@ export default function ShortDramaPage() {
                       className="inline-flex items-center gap-1 rounded-lg border border-cyan-200 bg-cyan-50 px-2.5 py-1.5 text-xs font-medium text-cyan-900 hover:bg-cyan-100 disabled:opacity-50"
                     >
                       {characterBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
-                      {characterBusy ? '正在生成预览' : '生成预览'}
+                      {characterBusy ? '正在生成预览' : characterSourceUrl ? '按参考图生成' : '生成预览'}
                     </button>
                     <button
                       type="button"
@@ -2877,7 +2877,7 @@ export default function ShortDramaPage() {
                       onClick={() => characterInputRef.current?.click()}
                       className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-50"
                     >
-                      上传照片并确认
+                      上传参考图
                     </button>
                     {characterShowUrl && !characterConfirmed ? (
                       <button
@@ -2897,7 +2897,11 @@ export default function ShortDramaPage() {
                       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-2">
                         <p className="truncate text-xs font-medium text-white">{roles.trim() || '主角'}</p>
                         <p className="text-[10px] text-white/80">
-                          {characterConfirmed ? '已确认，将按此融合' : '预览待确认'}
+                          {characterConfirmed
+                            ? '已确认，将按此融合'
+                            : characterSourceUrl && characterDraft === characterSourceUrl
+                              ? '参考图 · 可生成相似画像或直接确认'
+                              : '预览待确认'}
                         </p>
                       </div>
                       <div className="absolute right-1 top-1 flex gap-1">
