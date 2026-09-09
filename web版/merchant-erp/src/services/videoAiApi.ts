@@ -1742,15 +1742,13 @@ export async function runXiaoyunqueVideoJob(opts: {
     }
   }
 
-  /** Agent 长片可能远超 Seedance 单段，放宽轮询：约 4×时长 + 10 分钟，封顶 45 分钟 */
+  /** 即梦/小云雀必须锁模等出片：11 秒图生常要 6～12 分钟，禁止 4 分钟误判并提示换模 */
   const pollMs = 5000
-  const maxWaitMs = Math.min(45 * 60_000, Math.max(10 * 60_000, durationSec * 4000 + 10 * 60_000))
-  const pollMaxTries = Math.max(60, Math.ceil(maxWaitMs / pollMs))
-  const engineLabel = '小云雀有声'
+  const engineLabel = /jimeng/i.test(usedModel) ? '即梦图生' : '小云雀有声'
   const poll = await pollShortVideoTask(start.taskId, {
     pollIntervalMs: pollMs,
-    pollMaxTries,
     durationSec,
+    lockModel: true,
     shouldCancel: opts.shouldCancel,
     onProgress: (label) => opts.onProgress?.(`${engineLabel} · ${label}`),
   })
