@@ -5,6 +5,7 @@ import {
   parseRegionToCityState,
   primaryRecruitmentCity,
 } from '../lib/recruitmentCityPicker'
+import type { RecruitmentPlatform } from '../lib/recruitmentPlatformOptions'
 import { readMerchantSession } from '../lib/merchantSession'
 import { getDouyinStores } from './douyinMerchantApi'
 import {
@@ -67,6 +68,7 @@ export async function buildAgentRecruitmentAllocation(
     budgetYuan?: number
     headcount?: number
     platform?: '抖音' | '小红书'
+    platforms?: RecruitmentPlatform[]
     commissionPct?: number
   },
 ): Promise<AgentRecruitmentAllocationResult> {
@@ -74,6 +76,14 @@ export async function buildAgentRecruitmentAllocation(
   if (opts?.budgetYuan && opts.budgetYuan > 0) intent.budgetYuan = Math.round(opts.budgetYuan)
   if (opts?.headcount && opts.headcount > 0) intent.headcountHint = Math.round(opts.headcount)
   if (opts?.platform) intent.platform = opts.platform
+  if (opts?.platforms?.length) {
+    intent.platforms = opts.platforms
+    intent.platform = opts.platforms.includes('抖音')
+      ? '抖音'
+      : opts.platforms.includes('小红书')
+        ? '小红书'
+        : intent.platform
+  }
   if (opts?.commissionPct != null && Number.isFinite(opts.commissionPct)) {
     intent.kolCommissionPct = opts.commissionPct
   }
@@ -95,7 +105,9 @@ export async function buildAgentRecruitmentAllocation(
   intent.city = city || intent.city || '全国'
   const cityForAlloc = pricingCity || city || '全国'
 
-  if (intent.platform === '小红书') {
+  const useDouyinTiers = (intent.platforms?.length ? intent.platforms : [intent.platform]).includes('抖音')
+
+  if (!useDouyinTiers) {
     const allocation = fallbackXiaohongshuNoviceAllocation(intent.budgetYuan)
     if (intent.headcountHint && intent.headcountHint > 0) {
       const total = intent.headcountHint
@@ -104,7 +116,7 @@ export async function buildAgentRecruitmentAllocation(
         allocation: {
           ...allocation,
           v5plus: total,
-          costHint: `按您的目标约 ${total} 位小红书达人，预算 ¥${intent.budgetYuan.toLocaleString('zh-CN')}（智能体解析）。`,
+          costHint: `按您的目标约 ${total} 位达人，预算 ¥${intent.budgetYuan.toLocaleString('zh-CN')}（智能体解析）。`,
         },
         storeCityResolved: region || storeCityRaw || undefined,
       }
@@ -139,7 +151,7 @@ export async function buildAgentRecruitmentAllocation(
     feeType: 'tier',
     kolCommissionPct: intent.kolCommissionPct,
     cityTierBands,
-    platform: intent.platform,
+    platform: intent.platforms?.[0] || intent.platform,
   })
 
   return { intent, allocation, cityTierSource, storeCityResolved: region || storeCityRaw || undefined }

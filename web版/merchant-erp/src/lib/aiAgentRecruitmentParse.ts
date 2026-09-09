@@ -1,5 +1,6 @@
 import type { KolTierStrategy } from './opsRegistryTypes'
 import { LOCAL_LIFE_KOL_COMMISSION_DEFAULT_PCT } from './localLifeKolCommission'
+import type { RecruitmentPlatform } from './recruitmentPlatformOptions'
 
 /** 从用户自然语言中解析招募意图（预算、人数、城市、平台等） */
 export type AiRecruitmentIntent = {
@@ -7,6 +8,7 @@ export type AiRecruitmentIntent = {
   headcountHint?: number
   city: string
   platform: '抖音' | '小红书'
+  platforms: RecruitmentPlatform[]
   industry: string
   strategy: KolTierStrategy
   kolCommissionPct: number
@@ -48,8 +50,24 @@ function parseCity(text: string): string {
   return ''
 }
 
-function parsePlatform(text: string): '抖音' | '小红书' {
-  if (/小红书|红薯|种草笔记/.test(text)) return '小红书'
+function parsePlatforms(text: string): RecruitmentPlatform[] {
+  const found: RecruitmentPlatform[] = []
+  const rules: [RegExp, RecruitmentPlatform][] = [
+    [/抖音|douyin/i, '抖音'],
+    [/小红书|红薯|种草笔记|xiaohongshu|\bxhs\b/i, '小红书'],
+    [/大众点评|美团点评/, '大众点评'],
+    [/快手|kuaishou/i, '快手'],
+    [/视频号/, '微信视频号'],
+  ]
+  for (const [re, p] of rules) {
+    if (re.test(text) && !found.includes(p)) found.push(p)
+  }
+  return found.length ? found : ['抖音']
+}
+
+function primaryPlatformOf(platforms: RecruitmentPlatform[]): '抖音' | '小红书' {
+  if (platforms.includes('抖音')) return '抖音'
+  if (platforms.includes('小红书')) return '小红书'
   return '抖音'
 }
 
@@ -78,11 +96,13 @@ export function parseRecruitmentIntentFromText(userBrief: string): AiRecruitment
   }
   if (budgetYuan <= 0) budgetYuan = 5000
 
+  const platforms = parsePlatforms(text)
   return {
     budgetYuan,
     headcountHint: parseHeadcount(text),
     city: parseCity(text),
-    platform: parsePlatform(text),
+    platform: primaryPlatformOf(platforms),
+    platforms,
     industry: /餐饮|美食|火锅|烧烤/.test(text) ? '餐饮' : '本地生活',
     strategy: parseStrategy(text),
     kolCommissionPct: parseKolCommission(text),

@@ -140,7 +140,10 @@ merchantMpAutoPublish
 aiAgentRecruitmentOrder
 aiAgentRecruitmentWizard
 aiAgentRecruitmentAllocation
+aiAgentRecruitmentParse
+aiAgentTypes
 AiAgentRecruitmentVisualPreview
+AiAgentMessageBubble
 AiAgentContext
 aiAgentScenarioWorkflows
 aiAgentPlan

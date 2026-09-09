@@ -7,6 +7,7 @@ import type {
   RecruitWizardStep,
 } from './aiAgentTypes'
 import { parseRecruitmentIntentFromText } from './aiAgentRecruitmentParse'
+import type { RecruitmentPlatform } from './recruitmentPlatformOptions'
 import {
   LOCAL_LIFE_KOL_COMMISSION_DEFAULT_PCT,
   LOCAL_LIFE_KOL_COMMISSION_MAX_PCT,
@@ -43,7 +44,30 @@ export function recruitContentFormLabel(form: RecruitContentForm | undefined): s
 }
 
 export function recruitPlatformLabel(platform: '抖音' | '小红书' | string | undefined): string {
-  return platform === '小红书' ? '小红书' : '抖音来客'
+  if (!platform) return '抖音来客'
+  if (platform.includes('、') || platform.includes('/')) return platform
+  if (platform === '小红书') return '小红书'
+  if (platform === '大众点评') return '大众点评'
+  if (platform === '快手') return '快手'
+  if (platform === '微信视频号') return '微信视频号'
+  return platform === '抖音' || platform === '抖音来客' ? '抖音来客' : platform
+}
+
+export function recruitWizardPlatformList(scope: RecruitWizardScope | undefined): RecruitmentPlatform[] {
+  if (scope?.platforms?.length) return scope.platforms
+  if (scope?.platform === '小红书') return ['小红书']
+  return ['抖音']
+}
+
+export function recruitWizardPlatformsLabel(scope: RecruitWizardScope | undefined): string {
+  const list = recruitWizardPlatformList(scope)
+  return list.map((p) => (p === '抖音' ? '抖音来客' : p)).join('、')
+}
+
+export function primaryRecruitWizardPlatform(platforms: RecruitmentPlatform[]): '抖音' | '小红书' {
+  if (platforms.includes('抖音')) return '抖音'
+  if (platforms.includes('小红书')) return '小红书'
+  return '抖音'
 }
 
 export function clampRecruitCommissionPct(n: number): number {
@@ -80,8 +104,10 @@ export function buildRecruitWizardSeed(
     : /口播|不到店/.test(hint)
       ? 'talk'
       : 'instore'
+  const platforms = intent.platforms.length ? intent.platforms : [intent.platform]
   const scope: RecruitWizardScope = {
     platform: intent.platform,
+    platforms,
     city: intent.city,
     storeName: ctx.storeName?.trim() || '',
     mainProductName: main.name,
@@ -97,7 +123,7 @@ export function buildRecruitWizardSeed(
     commissionPct: clampRecruitCommissionPct(intent.kolCommissionPct),
   }
   return {
-    platform: recruitPlatformLabel(scope.platform),
+    platform: recruitWizardPlatformsLabel(scope),
     mainProductName: scope.mainProductName,
     tags: [],
     briefText: '',
@@ -115,7 +141,7 @@ export function summarizeRecruitWizardScope(scope: RecruitWizardScope | undefine
   const city = scope.city.trim() || '城市待选'
   const store = scope.storeName.trim()
   const place = store ? `${city} · ${store}` : city
-  return `${recruitPlatformLabel(scope.platform)} · ${place} · ${scope.mainProductName} · ${recruitContentFormLabel(scope.contentForm)}`
+  return `${recruitWizardPlatformsLabel(scope)} · ${place} · ${scope.mainProductName} · ${recruitContentFormLabel(scope.contentForm)}`
 }
 
 export function summarizeRecruitWizardBudget(budget: RecruitWizardBudget | undefined): string {
@@ -150,7 +176,7 @@ export function composeRecruitWizardBriefText(
   const storeLine = [scope.city, scope.storeName].filter(Boolean).join(' · ') || '按门店地址'
   const raw = [
     `【达人招募 Brief】${scope.mainProductName}`,
-    `平台：${recruitPlatformLabel(scope.platform)}　形式：${recruitContentFormLabel(scope.contentForm)}`,
+    `平台：${recruitWizardPlatformsLabel(scope)}　形式：${recruitContentFormLabel(scope.contentForm)}`,
     `城市/门店：${storeLine}`,
     `主推：${scope.mainProductName}`,
     `招募人数：${budget.headcount} 人`,
@@ -472,9 +498,15 @@ export function composeRecruitWizardUserBrief(
     fallback.replace(/\[引用[\s\S]*?\n\n/, '').trim(),
     `预算:${budget.budgetYuan}元`,
     `招募${budget.headcount}个达人`,
-    scope.city ? `在${scope.city.endsWith('市') ? scope.city : `${scope.city}市`}` : '',
+    scope.city && scope.city !== '全国'
+      ? scope.city.includes('、') || scope.city.endsWith('市')
+        ? `在${scope.city}`
+        : `在${scope.city}市`
+      : scope.city === '全国'
+        ? '全国'
+        : '',
     `佣金:${budget.commissionPct}%`,
-    scope.platform === '小红书' ? '小红书' : '抖音',
+    `${recruitWizardPlatformList(scope).join('/')}推广`,
     scope.mainProductName,
   ]
     .filter(Boolean)

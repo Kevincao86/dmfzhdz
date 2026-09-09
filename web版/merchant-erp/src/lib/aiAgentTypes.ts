@@ -2,6 +2,8 @@
  * 灵祺 AI 智能体 / 运营助理 — 前端状态与后续接入真实 API 的契约（预留）。
  */
 
+import type { RecruitmentPlatform } from './recruitmentPlatformOptions'
+
 /** 系统侧能力授权（后续与租户权限、OAuth 范围对齐） */
 export type AiPermissionId =
   | 'product'
@@ -130,7 +132,10 @@ export type RecruitWizardStep = 1 | 2 | 3 | 4
 export type RecruitContentForm = 'instore' | 'talk' | 'note'
 
 export type RecruitWizardScope = {
+  /** 档位测算主平台：含抖音则走 V 档，仅小红书等则一口价 */
   platform: '抖音' | '小红书'
+  /** 目标投放平台（与星选发招募一致，可多选；由用户话术预勾） */
+  platforms?: RecruitmentPlatform[]
   city: string
   storeName: string
   mainProductName: string

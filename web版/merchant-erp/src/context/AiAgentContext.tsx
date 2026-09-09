@@ -105,7 +105,8 @@ import {
   buildRecruitWizardSeed,
   composeRecruitWizardBriefText,
   composeRecruitWizardUserBrief,
-  recruitPlatformLabel,
+  recruitWizardPlatformList,
+  recruitWizardPlatformsLabel,
   recruitWizardStepOf,
 } from '../lib/aiAgentRecruitmentWizard'
 import {
@@ -1123,12 +1124,13 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       const composed = composeRecruitWizardUserBrief(scope, budget, userBrief)
       const { intent, allocation, storeCityResolved } = await buildAgentRecruitmentAllocation(
         composed,
-        { ...brief, platform: recruitPlatformLabel(scope.platform), mainProductName: scope.mainProductName },
+        { ...brief, platform: recruitWizardPlatformsLabel(scope), mainProductName: scope.mainProductName },
         {
           storeCity: scope.city || undefined,
           budgetYuan: budget.budgetYuan,
           headcount: budget.headcount,
           platform: scope.platform,
+          platforms: recruitWizardPlatformList(scope),
           commissionPct: budget.commissionPct,
         },
       )
@@ -1136,7 +1138,8 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       patchPreviewRecruitmentBrief(previewMsgId, {
         wizardScope: {
           ...scope,
-          city: storeCityResolved || scope.city || intent.city,
+          city: scope.city.trim() || storeCityResolved || intent.city || '',
+          platforms: recruitWizardPlatformList(scope),
         },
         wizardBudget: {
           budgetYuan: intent.budgetYuan,
@@ -1153,7 +1156,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           },
         },
         wizardBudgetStatus: 'ready',
-        platform: recruitPlatformLabel(scope.platform),
+        platform: recruitWizardPlatformsLabel(scope),
         mainProductName: scope.mainProductName,
       })
     },
@@ -1265,7 +1268,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           {
             wizardStep: 2,
             wizardBudgetStatus: 'loading',
-            platform: recruitPlatformLabel(scope.platform),
+            platform: recruitWizardPlatformsLabel(scope),
             mainProductName: scope.mainProductName,
           },
           '第 2 步：核对预算和人数。',
@@ -2614,7 +2617,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         const brief = rawBrief
           ? {
               ...rawBrief,
-              platform: recruitPlatformLabel(scope?.platform ?? rawBrief.platform),
+              platform: scope ? recruitWizardPlatformsLabel(scope) : rawBrief.platform,
               mainProductName: scope?.mainProductName || rawBrief.mainProductName,
               briefText: composedText || rawBrief.briefText,
               previews: shoot

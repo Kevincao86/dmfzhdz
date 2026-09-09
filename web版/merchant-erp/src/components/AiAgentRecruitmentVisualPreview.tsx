@@ -5,6 +5,7 @@ import type { AiRecruitmentBriefPreview, RecruitContentForm } from '../lib/aiAge
 import RecruitmentCityPickerModal, {
   RecruitmentCityField,
 } from './recruitment/RecruitmentCityPickerModal'
+import RecruitmentPlatformPicker from './recruitment/RecruitmentPlatformPicker'
 import {
   buildRegionFromCityState,
   parseRegionToCityState,
@@ -12,8 +13,9 @@ import {
 import {
   RECRUIT_CONTENT_FORM_OPTIONS,
   RECRUIT_WIZARD_STEP_META,
+  primaryRecruitWizardPlatform,
   recruitContentFormLabel,
-  recruitPlatformLabel,
+  recruitWizardPlatformList,
   recruitWizardStepOf,
   summarizeRecruitWizardBudget,
   summarizeRecruitWizardScope,
@@ -90,32 +92,33 @@ export function AiAgentRecruitmentVisualPreview({
               }
             />
           </Field>
-          <Field label="平台">
-            <div className="flex flex-wrap gap-2">
-              {(['抖音', '小红书'] as const).map((p) => (
-                <ChoiceChip
-                  key={p}
-                  active={scope.platform === p}
-                  onClick={() =>
-                    patchRecruitWizard(previewMessageId, {
-                      wizardScope: { ...scope, platform: p },
-                      platform: recruitPlatformLabel(p),
-                    })
-                  }
-                >
-                  {recruitPlatformLabel(p)}
-                </ChoiceChip>
-              ))}
-            </div>
+          <Field label="目标平台">
+            <RecruitmentPlatformPicker
+              mode="multi"
+              label=""
+              value={recruitWizardPlatformList(scope)}
+              onChange={(platforms) =>
+                patchRecruitWizard(previewMessageId, {
+                  wizardScope: {
+                    ...scope,
+                    platforms,
+                    platform: primaryRecruitWizardPlatform(platforms),
+                  },
+                  platform: platforms.map((p) => (p === '抖音' ? '抖音来客' : p)).join('、'),
+                })
+              }
+            />
+            <p className="mt-1 text-[10px] text-slate-400">按您刚才说的推广平台预勾，可再点选增减（与星选发招募一致）</p>
           </Field>
-          <Field label="招募城市">
+          <div>
+            <span className="mb-1 block text-[10px] text-slate-500">招募城市</span>
             <RecruitmentCityField
               cityNational={cityState.cityNational}
               selectedCities={cityState.selectedCities}
               onClick={() => setCityPickerOpen(true)}
             />
             <p className="mt-1 text-[10px] text-slate-400">可多选城市；选「全国」则不限地域（与星选发招募一致）</p>
-          </Field>
+          </div>
           <Field label="门店">
             <input
               className={inputClass}

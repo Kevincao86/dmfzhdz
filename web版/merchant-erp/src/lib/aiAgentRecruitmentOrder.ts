@@ -50,14 +50,17 @@ export function buildRecruitmentOrderFromAgentBrief(
   const tenant = buildErpRegistryTenant()
   const customerName = tenant?.merchantName ?? '灵祺 ERP 商户'
   const id = `RO-AI${Date.now()}`
-  const platform = params.intent.platform
-  const isXhs = platform === '小红书'
+  const platforms = params.intent.platforms?.length
+    ? params.intent.platforms
+    : [params.intent.platform]
+  const platform = platforms.join('、')
+  const isXhs = !platforms.includes('抖音')
   const tags = brief.tags?.length ? brief.tags.join('、') : '—'
   const { allocation, intent } = params
   const total = allocation.v3 + allocation.v4 + allocation.v5 + allocation.v5plus
   const headcount = Math.max(1, total)
   const tierLine = isXhs
-    ? `小红书达人约 ${headcount} 人`
+    ? `达人约 ${headcount} 人`
     : `V3:${allocation.v3} V4:${allocation.v4} V5:${allocation.v5} V5+:${allocation.v5plus}`
   const tierPlan = buildRecruitmentTierPlan({
     budgetYuan: intent.budgetYuan,

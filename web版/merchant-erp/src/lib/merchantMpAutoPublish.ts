@@ -100,6 +100,11 @@ export function buildMpOrderFromMerchantRecruitment(
       signupDeadline: buildDeadline(),
       cityNational: citySt.cityNational,
       cities: citySt.selectedCities,
+      platforms: String(order.recruitmentPlatform || order.accountType || '')
+        .split(/[/、,，]/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((s) => normalizeRecruitmentPlatform(s)),
       ...(order.tenantId ? { tenantId: order.tenantId } : {}),
     },
   }
