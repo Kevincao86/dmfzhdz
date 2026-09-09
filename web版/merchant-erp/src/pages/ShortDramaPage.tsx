@@ -138,6 +138,156 @@ type DramaWork = {
   previewUrl: string
   createdAt: number
   durationSec: number
+  sourceUrl?: string
+  modelUsed?: string
+  storyPreview?: string
+}
+
+const DRAMA_WORKS_META_KEY = 'meoo-short-drama-works-v1'
+const DRAMA_WORKS_DB = 'meoo-short-drama-works'
+const DRAMA_WORKS_STORE = 'mp4'
+const DRAMA_WORKS_KEEP = 30
+
+type DramaWorkMeta = Omit<DramaWork, 'previewUrl'> & { sourceUrl?: string }
+
+function openDramaWorksDb(): Promise<IDBDatabase> {
+  if (typeof indexedDB === 'undefined') {
+    return Promise.reject(new Error('当前环境不支持 IndexedDB'))
+  }
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DRAMA_WORKS_DB, 1)
+    req.onupgradeneeded = () => {
+      if (!req.result.objectStoreNames.contains(DRAMA_WORKS_STORE)) {
+        req.result.createObjectStore(DRAMA_WORKS_STORE)
+      }
+    }
+    req.onsuccess = () => resolve(req.result)
+    req.onerror = () => reject(req.error ?? new Error('打开短剧记录库失败'))
+  })
+}
+
+async function dramaWorkPutBlob(id: string, blob: Blob): Promise<void> {
+  const db = await openDramaWorksDb()
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(DRAMA_WORKS_STORE, 'readwrite')
+    tx.oncomplete = () => {
+      db.close()
+      resolve()
+    }
+    tx.onerror = () => {
+      db.close()
+      reject(tx.error ?? new Error('写入成片记录失败'))
+    }
+    tx.objectStore(DRAMA_WORKS_STORE).put(blob, id)
+  })
+}
+
+async function dramaWorkGetBlob(id: string): Promise<Blob | null> {
+  const db = await openDramaWorksDb()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DRAMA_WORKS_STORE, 'readonly')
+    const req = tx.objectStore(DRAMA_WORKS_STORE).get(id)
+    req.onsuccess = () => {
+      db.close()
+      resolve(req.result instanceof Blob ? req.result : null)
+    }
+    req.onerror = () => {
+      db.close()
+      reject(req.error ?? new Error('读取成片记录失败'))
+    }
+  })
+}
+
+async function dramaWorkDeleteBlob(id: string): Promise<void> {
+  try {
+    const db = await openDramaWorksDb()
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(DRAMA_WORKS_STORE, 'readwrite')
+      tx.oncomplete = () => {
+        db.close()
+        resolve()
+      }
+      tx.onerror = () => {
+        db.close()
+        reject(tx.error ?? new Error('删除成片记录失败'))
+      }
+      tx.objectStore(DRAMA_WORKS_STORE).delete(id)
+    })
+  } catch {
+    /* 库不可用时仍允许删元数据 */
+  }
+}
+
+function loadDramaWorksMeta(): DramaWorkMeta[] {
+  try {
+    const raw = localStorage.getItem(DRAMA_WORKS_META_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as DramaWorkMeta[]
+    return Array.isArray(parsed) ? parsed.filter((w) => w && typeof w.id === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function saveDramaWorksMeta(rows: DramaWork[]): void {
+  const meta: DramaWorkMeta[] = rows.slice(0, DRAMA_WORKS_KEEP).map((w) => ({
+    id: w.id,
+    title: w.title,
+    sceneName: w.sceneName,
+    createdAt: w.createdAt,
+    durationSec: w.durationSec,
+    sourceUrl: w.sourceUrl && /^https?:\/\//i.test(w.sourceUrl) ? w.sourceUrl : undefined,
+    modelUsed: w.modelUsed,
+    storyPreview: w.storyPreview,
+  }))
+  try {
+    localStorage.setItem(DRAMA_WORKS_META_KEY, JSON.stringify(meta))
+  } catch {
+    try {
+      localStorage.removeItem(DRAMA_WORKS_META_KEY)
+      localStorage.setItem(DRAMA_WORKS_META_KEY, JSON.stringify(meta.slice(0, 12)))
+    } catch {
+      /* 配额满时仍保留当前页内存列表 */
+    }
+  }
+}
+
+async function hydrateDramaWorks(): Promise<DramaWork[]> {
+  const meta = loadDramaWorksMeta()
+  const out: DramaWork[] = []
+  for (const row of meta) {
+    let previewUrl = row.sourceUrl && /^https?:\/\//i.test(row.sourceUrl) ? row.sourceUrl : ''
+    try {
+      const blob = await dramaWorkGetBlob(row.id)
+      if (blob && blob.size > 80) previewUrl = URL.createObjectURL(asDramaMp4Blob(blob))
+    } catch {
+      /* 用远程地址兜底 */
+    }
+    out.push({ ...row, previewUrl })
+  }
+  return out
+}
+
+function formatDramaWorkTime(ts: number): string {
+  try {
+    return new Date(ts).toLocaleString('zh-CN', {
+      month: 'numeric',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  } catch {
+    return ''
+  }
+}
+
+function persistDramaWorksList(rows: DramaWork[]): DramaWork[] {
+  const kept = rows.slice(0, DRAMA_WORKS_KEEP)
+  for (const w of rows.slice(DRAMA_WORKS_KEEP)) {
+    void dramaWorkDeleteBlob(w.id)
+  }
+  saveDramaWorksMeta(kept)
+  return kept
 }
 
 type DurationOpt = { sec: number; label: string; hint: string }
@@ -2465,6 +2615,14 @@ export default function ShortDramaPage() {
 
   useEffect(() => {
     mountedRef.current = true
+    void hydrateDramaWorks().then((rows) => {
+      if (!mountedRef.current || rows.length === 0) return
+      for (const w of rows) {
+        if (w.previewUrl.startsWith('blob:')) previewUrlsRef.current.push(w.previewUrl)
+      }
+      setWorks(rows)
+      setActiveWorkId((cur) => cur ?? rows[0]?.id ?? null)
+    })
     void fetchVideoAiConfig({ probeXiaoyunque: true })
       .then((c) => {
         if (mountedRef.current) setCfg(c)
@@ -2574,13 +2732,22 @@ export default function ShortDramaPage() {
     durationSec: number
     modelUsed?: string | null
   }) => {
-    const blob = asDramaMp4Blob(
-      typeof opts.videoUrlOrBlob === 'string'
-        ? await downloadVideoUrlAsBlob(opts.videoUrlOrBlob, { maxAttempts: 3 })
-        : opts.videoUrlOrBlob,
-    )
-    const previewUrl = URL.createObjectURL(blob)
-    previewUrlsRef.current.push(previewUrl)
+    const sourceUrl =
+      typeof opts.videoUrlOrBlob === 'string' && /^https?:\/\//i.test(opts.videoUrlOrBlob.trim())
+        ? opts.videoUrlOrBlob.trim()
+        : undefined
+    let blob: Blob | null = null
+    try {
+      blob = asDramaMp4Blob(
+        typeof opts.videoUrlOrBlob === 'string'
+          ? await downloadVideoUrlAsBlob(opts.videoUrlOrBlob, { maxAttempts: 3 })
+          : opts.videoUrlOrBlob,
+      )
+    } catch (e) {
+      if (!sourceUrl) throw e
+    }
+    const previewUrl = blob ? URL.createObjectURL(blob) : sourceUrl!
+    if (blob) previewUrlsRef.current.push(previewUrl)
     const work: DramaWork = {
       id: opts.billId,
       title: opts.title,
@@ -2588,15 +2755,28 @@ export default function ShortDramaPage() {
       previewUrl,
       createdAt: Date.now(),
       durationSec: opts.durationSec,
+      sourceUrl,
+      modelUsed: opts.modelUsed || undefined,
+      storyPreview: story.trim().slice(0, 80) || undefined,
     }
-    setWorks((prev) => [work, ...prev])
+    if (blob) {
+      void dramaWorkPutBlob(work.id, blob).catch(() => {
+        /* 本机缓存失败仍保留元数据与远程地址 */
+      })
+    }
+    setWorks((prev) => persistDramaWorksList([work, ...prev.filter((w) => w.id !== work.id)]))
     setActiveWorkId(work.id)
     setMainTab('works')
     clearTrial()
-    const spendHint = await chargePoints(blob, opts.billId, opts.durationSec)
+    const spendHint = await chargePoints(blob ?? new Blob(), opts.billId, opts.durationSec)
     setHint(
-      [opts.modelUsed ? `已使用视频模型：${opts.modelUsed}` : '', spendHint].filter(Boolean).join(' ') ||
-        '成片已生成，请及时保存到本地。',
+      [
+        opts.modelUsed ? `已使用视频模型：${opts.modelUsed}` : '',
+        spendHint,
+        '已记入「成片记录」，刷新后仍可查看。',
+      ]
+        .filter(Boolean)
+        .join(' '),
     )
   }
 
@@ -2911,7 +3091,12 @@ export default function ShortDramaPage() {
 
   const downloadWork = async (work: DramaWork) => {
     try {
-      const res = await fetch(work.previewUrl)
+      const src = work.previewUrl || work.sourceUrl || ''
+      if (!src) {
+        setErr('这条记录没有可下载的成片')
+        return
+      }
+      const res = await fetch(src)
       const raw = await res.blob()
       const buf = await raw.arrayBuffer()
       const head = new TextDecoder()
@@ -2938,10 +3123,11 @@ export default function ShortDramaPage() {
   }
 
   const removeWork = (id: string) => {
+    void dramaWorkDeleteBlob(id)
     setWorks((prev) => {
-      const next = prev.filter((w) => w.id !== id)
+      const next = persistDramaWorksList(prev.filter((w) => w.id !== id))
       const removed = prev.find((w) => w.id === id)
-      if (removed) {
+      if (removed?.previewUrl.startsWith('blob:')) {
         URL.revokeObjectURL(removed.previewUrl)
         previewUrlsRef.current = previewUrlsRef.current.filter((u) => u !== removed.previewUrl)
       }
@@ -2997,7 +3183,7 @@ export default function ShortDramaPage() {
               mainTab === 'works' ? 'bg-cyan-700 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50',
             )}
           >
-            成片{works.length ? ` ${works.length}` : ''}
+            成片记录{works.length ? ` ${works.length}` : ''}
           </button>
         </div>
       </div>
@@ -3682,8 +3868,42 @@ export default function ShortDramaPage() {
                       : '请先选择成片时长，再生成故事或短剧。'}
               </p>
               <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-950">
-                生成后请及时保存到本地。刷新页面后，本页成片将消失。长片按秒扣积分，15 分钟成本很高，请先确认试镜。
+                成片会记入上方「成片记录」，刷新后仍可回看。远程地址可能过期，建议再点一次下载备份。长片按秒扣积分，15
+                分钟成本很高，请先确认试镜。
               </p>
+              {works.length ? (
+                <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+                  <div className="mb-1.5 flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium text-slate-700">最近成片记录</p>
+                    <button
+                      type="button"
+                      onClick={() => setMainTab('works')}
+                      className="text-[11px] text-cyan-800 hover:underline"
+                    >
+                      查看全部 {works.length}
+                    </button>
+                  </div>
+                  <ul className="space-y-1.5">
+                    {works.slice(0, 3).map((w) => (
+                      <li key={w.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveWorkId(w.id)
+                            setMainTab('works')
+                          }}
+                          className="flex w-full items-center justify-between gap-2 rounded-lg px-1 py-0.5 text-left hover:bg-slate-50"
+                        >
+                          <span className="min-w-0 truncate text-xs text-slate-700">{w.title}</span>
+                          <span className="shrink-0 text-[10px] text-slate-400">
+                            {formatDramaWorkTime(w.createdAt)}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
               {progress ? <p className="text-sm text-cyan-800">{progress}</p> : null}
               {hint ? <p className="text-sm text-slate-600">{hint}</p> : null}
               {err ? <p className="text-sm text-rose-700">{err}</p> : null}
@@ -3744,7 +3964,7 @@ export default function ShortDramaPage() {
         <section>
           {works.length === 0 ? (
             <div className="erp-panel px-6 py-16 text-center text-sm text-slate-500">
-              还没有成片。先选分类和场景，再生成。
+              还没有成片记录。生成成功后会出现在这里，刷新页面也会保留。
             </div>
           ) : (
             <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -3757,21 +3977,32 @@ export default function ShortDramaPage() {
                   )}
                 >
                   <button type="button" className="block w-full" onClick={() => setActiveWorkId(w.id)}>
-                    <video src={w.previewUrl} className="aspect-[9/16] w-full bg-slate-950 object-contain" muted />
+                    {w.previewUrl ? (
+                      <video src={w.previewUrl} className="aspect-[9/16] w-full bg-slate-950 object-contain" muted />
+                    ) : (
+                      <div className="flex aspect-[9/16] w-full items-center justify-center bg-slate-950 px-4 text-center text-xs text-slate-400">
+                        视频文件已过期，请重新生成
+                      </div>
+                    )}
                   </button>
                   <div className="flex items-center justify-between gap-2 px-3 py-2">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-slate-800">{w.title}</p>
                       <p className="text-[11px] text-slate-500">
                         {w.sceneName} · {w.durationSec >= 60 ? `${Math.round(w.durationSec / 60)} 分钟` : `${w.durationSec} 秒`}
+                        {formatDramaWorkTime(w.createdAt) ? ` · ${formatDramaWorkTime(w.createdAt)}` : ''}
                       </p>
+                      {w.modelUsed ? (
+                        <p className="truncate text-[10px] text-slate-400">{w.modelUsed}</p>
+                      ) : null}
                     </div>
                     <div className="flex shrink-0 gap-1">
                       <button
                         type="button"
                         title="下载"
+                        disabled={!w.previewUrl}
                         onClick={() => downloadWork(w)}
-                        className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-cyan-800"
+                        className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-cyan-800 disabled:opacity-40"
                       >
                         <Download className="h-4 w-4" />
                       </button>
