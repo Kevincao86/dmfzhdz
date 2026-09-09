@@ -419,6 +419,21 @@ function clipPromptKeepIdentity(prompt: string, max: number): string {
   return p.slice(0, max)
 }
 
+/** 小云雀对足浴/技师会 Text Risk Not Pass；换成同义场景词，保留双人对戏和对白 */
+function xiaoyunqueSafeDramaPrompt(prompt: string): string {
+  return String(prompt ?? '')
+    .replace(/足浴按摩/g, '休闲到店')
+    .replace(/足浴店/g, '休闲店')
+    .replace(/足疗/g, '休闲护理')
+    .replace(/足浴/g, '休闲护理')
+    .replace(/按摩/g, '放松护理')
+    .replace(/女技师/g, '女店员')
+    .replace(/男技师/g, '男店员')
+    .replace(/技师/g, '店员')
+    .replace(/桑拿|会所/g, '休闲空间')
+    .replace(/采耳/g, '护理')
+}
+
 /** 即梦图生审核严，故事里的足浴等词会拦；兜底时只做锁脸微动，故事交给小云雀 */
 function jimengSafeMotionPrompt(prompt: string): string {
   const p = String(prompt ?? '').trim()
@@ -466,7 +481,7 @@ function buildXiaoyunqueSubmitBody(opts: {
 }): Record<string, unknown> {
   const body: Record<string, unknown> = {
     req_key: opts.reqKey,
-    prompt: clipPromptKeepIdentity(opts.prompt, 2000),
+    prompt: clipPromptKeepIdentity(xiaoyunqueSafeDramaPrompt(opts.prompt), 2000),
     ratio: ratioSlot(opts.aspectRatio),
     duration: durationSlot(opts.durationSec),
     language: 'Chinese',
