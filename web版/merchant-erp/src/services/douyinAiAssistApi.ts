@@ -186,7 +186,7 @@ function assistFetchTimeoutMs(action: AiAssistAction): number {
     action === 'operation_topic' ||
     action === 'digital_human_text'
   )
-    return 22_000
+    return 75_000
   return 90_000
 }
 

@@ -166,9 +166,9 @@ async function confirmGenerateCopywriting(
       title: '推广文案',
       content: brief,
     },
-    platform: 'xiaohongshu',
+    platform: 'douyin',
     style: 'deal_push',
-    extraHint: '输出可直接发布的图文推广文案',
+    extraHint: '输出可发布的短推广文案：5 条标题、3 条钩子、分镜口播即可，全文控制在 600 字内，不要长文稿。',
   })
   const orderId =
     typeof crypto !== 'undefined' && 'randomUUID' in crypto

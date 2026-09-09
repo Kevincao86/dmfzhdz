@@ -60,6 +60,15 @@ import {
   type MerchantRecruitHubScreen,
 } from '../lib/merchantRecruitmentCoach'
 
+/** 招募详情进度条第 2～5 步对应主流程页（第 1 步即本页订单详情） */
+const ORDER_DETAIL_STEP_VIEWS: Array<MerchantRecruitHubScreen | null> = [
+  null,
+  'confirm',
+  'schedule',
+  'review',
+  'payment',
+]
+
 const FLOW = [
   {
     title: '发布招募需求',
@@ -1434,27 +1443,122 @@ export default function RecruitmentPage() {
                 <p className="font-medium text-gray-900">¥{Number(detail.netAmount).toLocaleString('zh-CN')}</p>
               </div>
             </div>
+            <dl className="mt-5 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+              <div>
+                <dt className="text-xs text-gray-500">投放平台</dt>
+                <dd className="font-medium text-gray-900">{detail.recruitmentPlatform || detail.accountType || '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500">门店 / 主推</dt>
+                <dd className="font-medium text-gray-900">{detail.storeName || '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500">类目</dt>
+                <dd className="font-medium text-gray-900">{detail.category || '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500">达人</dt>
+                <dd className="font-medium text-gray-900">
+                  {detail.talentName && detail.talentName !== '—' ? detail.talentName : '待星选报名'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500">计划人数</dt>
+                <dd className="font-medium text-gray-900">
+                  {detail.tierPlan?.totalHeadcount
+                    ? `${detail.tierPlan.totalHeadcount} 人`
+                    : detail.fans > 0
+                      ? `${detail.fans} 人`
+                      : '—'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500">创建时间</dt>
+                <dd className="font-medium text-gray-900">{detail.createdAt || '—'}</dd>
+              </div>
+            </dl>
+            {detail.tierPlan ? (
+              <div className="mt-5 rounded-lg border border-emerald-100 bg-emerald-50/50 p-3">
+                <p className="text-xs font-semibold text-emerald-900">达人档位</p>
+                <div className="mt-2 grid grid-cols-4 gap-1.5 text-center">
+                  {(['v3', 'v4', 'v5', 'v5plus'] as const).map((key) => {
+                    const row = detail.tierPlan?.tiers[key]
+                    const label = key === 'v5plus' ? 'V5+' : key.toUpperCase()
+                    return (
+                      <div key={key} className="rounded-md bg-white px-1 py-1.5 ring-1 ring-emerald-100">
+                        <p className="text-[10px] text-gray-500">{label}</p>
+                        <p className="text-sm font-semibold tabular-nums text-gray-900">{row?.count ?? 0}</p>
+                      </div>
+                    )
+                  })}
+                </div>
+                {detail.tierPlan.costHint ? (
+                  <p className="mt-2 text-[11px] text-gray-600">{detail.tierPlan.costHint}</p>
+                ) : null}
+              </div>
+            ) : null}
+            {detail.infoSummary ? (
+              <div className="mt-5">
+                <p className="mb-2 text-xs font-medium text-gray-600">订单详情 / Brief</p>
+                <pre className="max-h-56 overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs leading-relaxed text-gray-800">
+                  {detail.infoSummary}
+                </pre>
+              </div>
+            ) : null}
             <div className="mt-5">
-              <p className="mb-2 text-xs font-medium text-gray-600">环节进度</p>
+              <p className="mb-2 text-xs font-medium text-gray-600">环节进度（点击当前/已完成步骤查看详情）</p>
               <div className="flex gap-1.5 overflow-x-auto pb-1">
-                {buildRecruitmentProgressSteps(detail).map((step, idx) => (
-                  <div
-                    key={`${step.title}-${idx}`}
-                    className={cn(
-                      'min-w-[5.5rem] flex-1 rounded-lg border px-2 py-2 text-center',
-                      step.done && 'border-emerald-200 bg-emerald-50/80',
-                      step.current && !step.done && 'border-blue-400 bg-blue-50 ring-1 ring-blue-200',
-                      !step.done && !step.current && 'border-gray-100 bg-gray-50/80',
-                    )}
-                  >
-                    <p className="text-[10px] font-medium text-gray-500">第 {idx + 1} 步</p>
-                    <p className="mt-0.5 text-xs font-semibold leading-tight text-gray-900">{step.title}</p>
-                    <p className="mt-1 line-clamp-2 text-[10px] text-gray-500">{step.note}</p>
-                  </div>
-                ))}
+                {buildRecruitmentProgressSteps(detail).map((step, idx) => {
+                  const view = ORDER_DETAIL_STEP_VIEWS[idx] ?? null
+                  const clickable = Boolean(view) && (step.done || step.current)
+                  return (
+                    <button
+                      key={`${step.title}-${idx}`}
+                      type="button"
+                      disabled={!clickable}
+                      onClick={() => {
+                        if (!view) return
+                        enterFlowScreen(view)
+                      }}
+                      className={cn(
+                        'min-w-[5.5rem] flex-1 rounded-lg border px-2 py-2 text-center',
+                        step.done && 'border-emerald-200 bg-emerald-50/80',
+                        step.current && !step.done && 'border-blue-400 bg-blue-50 ring-1 ring-blue-200',
+                        !step.done && !step.current && 'border-gray-100 bg-gray-50/80',
+                        clickable && 'cursor-pointer hover:ring-2 hover:ring-blue-200',
+                        !clickable && 'cursor-default',
+                      )}
+                    >
+                      <p className="text-[10px] font-medium text-gray-500">第 {idx + 1} 步</p>
+                      <p className="mt-0.5 text-xs font-semibold leading-tight text-gray-900">{step.title}</p>
+                      <p className="mt-1 line-clamp-2 text-[10px] text-gray-500">{step.note}</p>
+                      {clickable ? (
+                        <p className="mt-1 text-[10px] font-medium text-blue-700">查看详情</p>
+                      ) : null}
+                    </button>
+                  )
+                })}
               </div>
             </div>
+            <RecruitmentXingxuanBridge mpOrderId={detail.linkedMpOrderId} variant="hub" />
             <div className="mt-6 flex flex-wrap gap-2 border-t border-gray-100 pt-4">
+              {ORDER_DETAIL_STEP_VIEWS.map((view, idx) => {
+                if (!view) return null
+                const steps = buildRecruitmentProgressSteps(detail)
+                const step = steps[idx]
+                if (!step?.current) return null
+                return (
+                  <button
+                    key={view}
+                    type="button"
+                    onClick={() => enterFlowScreen(view)}
+                    className="inline-flex items-center rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                  >
+                    <Eye className="mr-1.5 h-4 w-4" />
+                    查看{step.title}详情
+                  </button>
+                )
+              })}
               <button
                 type="button"
                 disabled={deletingOrderId === detail.id}
