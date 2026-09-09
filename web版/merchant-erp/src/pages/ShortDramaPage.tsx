@@ -1794,15 +1794,91 @@ function castWorthSaving(members: DramaCastMember[]): boolean {
 }
 
 function defaultCastPackName(members: DramaCastMember[]): string {
-  const named =
-    members.find((m) => m.preview && m.name.trim() && !/^角色\d+$/.test(m.name.trim()))?.name.trim() ||
-    members.find((m) => m.name.trim() && !/^角色\d+$/.test(m.name.trim()))?.name.trim() ||
-    members.find((m) => m.preview)?.name.trim() ||
-    '续集角色'
-  return named
+  const named = members
+    .map((m) => m.name.trim())
+    .filter((n) => n && !/^角色\d+$/.test(n))
+  if (named.length) return named.slice(0, 4).join(' / ')
+  return members.find((m) => m.preview)?.name.trim() || '续集角色'
+}
+
+function castMemberStoreKey(packId: string, memberId: string): string {
+  return `${packId}::${memberId}`
+}
+
+function mergeRolesIntoCast(roles: string, members: DramaCastMember[]): DramaCastMember[] {
+  const names = parseRoleNames(roles).slice(0, DRAMA_CAST_MAX)
+  if (names.length === 0) return members
+  const next = members.map((m) => ({ ...m }))
+  const used = new Set(next.map((m) => m.name.trim()).filter(Boolean))
+  for (const name of names) {
+    if (used.has(name)) continue
+    const slot = next.find(
+      (m) =>
+        /^角色\d+$/.test(m.name.trim()) &&
+        !m.preview &&
+        !m.draft &&
+        !m.desc.trim() &&
+        !m.sourceUrl,
+    )
+    if (slot) {
+      slot.name = name
+      used.add(name)
+      continue
+    }
+    if (next.length >= DRAMA_CAST_MAX) break
+    next.push({
+      id: newWorkId(),
+      name,
+      desc: '',
+      sourceUrl: null,
+      draft: null,
+      preview: null,
+    })
+    used.add(name)
+  }
+  return next
+}
+
+function sameCastFingerprint(a: DramaCastMember[], b: DramaCastMember[]): boolean {
+  if (a.length !== b.length) return false
+  return a.every((m, i) => m.id === b[i]!.id && m.name === b[i]!.name)
+}
+
+async function compressCastMembersForStore(members: DramaCastMember[]): Promise<DramaCastMember[]> {
+  const out: DramaCastMember[] = []
+  for (const m of members) {
+    const preview =
+      m.preview && m.preview.startsWith('data:image/')
+        ? await compressPortraitDataUrlForLibrary(m.preview)
+        : m.preview
+    const draft =
+      m.draft && m.draft.startsWith('data:image/')
+        ? await compressPortraitDataUrlForLibrary(m.draft)
+        : m.draft
+    const sourceUrl =
+      m.sourceUrl && m.sourceUrl.startsWith('data:image/')
+        ? await compressPortraitDataUrlForLibrary(m.sourceUrl)
+        : m.sourceUrl
+    out.push({ ...m, preview, draft, sourceUrl })
+  }
+  return out
+}
+
+function joinUniqueRoleNames(...groups: string[]): string {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of groups) {
+    for (const n of parseRoleNames(raw)) {
+      if (seen.has(n)) continue
+      seen.add(n)
+      out.push(n)
+    }
+  }
+  return joinRoleNames(out)
 }
 
 async function dramaCastPutPayload(id: string, payload: DramaCastPackPayload): Promise<void> {
+  const members = payload.members.slice(0, DRAMA_CAST_MAX)
   const db = await openDramaWorksDb()
   await new Promise<void>((resolve, reject) => {
     if (!db.objectStoreNames.contains(DRAMA_CAST_STORE)) {
@@ -1819,7 +1895,29 @@ async function dramaCastPutPayload(id: string, payload: DramaCastPackPayload): P
       db.close()
       reject(tx.error ?? new Error('保存角色失败'))
     }
-    tx.objectStore(DRAMA_CAST_STORE).put(payload, id)
+    const store = tx.objectStore(DRAMA_CAST_STORE)
+    const oldReq = store.get(id)
+    oldReq.onsuccess = () => {
+      const old = oldReq.result as { memberIds?: unknown; members?: unknown } | undefined
+      const oldIds = Array.isArray(old?.memberIds)
+        ? old.memberIds.map((x) => String(x || '').trim()).filter(Boolean)
+        : normalizeCastMembers(old?.members)?.map((m) => m.id) ?? []
+      const newIds = members.map((m) => m.id)
+      const keep = new Set(newIds)
+      for (const oid of oldIds) {
+        if (!keep.has(oid)) store.delete(castMemberStoreKey(id, oid))
+      }
+      store.put(
+        {
+          roles: payload.roles,
+          memberIds: newIds,
+        },
+        id,
+      )
+      for (const m of members) {
+        store.put(m, castMemberStoreKey(id, m.id))
+      }
+    }
   })
 }
 
@@ -1832,20 +1930,58 @@ async function dramaCastGetPayload(id: string): Promise<DramaCastPackPayload | n
       return
     }
     const tx = db.transaction(DRAMA_CAST_STORE, 'readonly')
-    const req = tx.objectStore(DRAMA_CAST_STORE).get(id)
-    req.onsuccess = () => {
+    const store = tx.objectStore(DRAMA_CAST_STORE)
+    const headerReq = store.get(id)
+    headerReq.onerror = () => {
       db.close()
-      const raw = req.result as DramaCastPackPayload | undefined
-      const members = normalizeCastMembers(raw?.members)
-      if (!members) {
+      reject(headerReq.error ?? new Error('读取角色失败'))
+    }
+    headerReq.onsuccess = () => {
+      const raw = headerReq.result as
+        | { roles?: unknown; members?: unknown; memberIds?: unknown }
+        | undefined
+      if (!raw) {
+        db.close()
         resolve(null)
         return
       }
-      resolve({ roles: String(raw?.roles ?? ''), members })
-    }
-    req.onerror = () => {
-      db.close()
-      reject(req.error ?? new Error('读取角色失败'))
+      const embedded = normalizeCastMembers(raw.members)
+      if (embedded) {
+        db.close()
+        resolve({ roles: String(raw.roles ?? ''), members: embedded })
+        return
+      }
+      const ids = Array.isArray(raw.memberIds)
+        ? raw.memberIds.map((x) => String(x || '').trim()).filter(Boolean)
+        : []
+      if (ids.length === 0) {
+        db.close()
+        resolve(null)
+        return
+      }
+      const found: DramaCastMember[] = []
+      let pending = ids.length
+      const finish = () => {
+        db.close()
+        resolve(
+          found.some(Boolean)
+            ? { roles: String(raw.roles ?? ''), members: found.filter(Boolean) }
+            : null,
+        )
+      }
+      ids.forEach((mid, idx) => {
+        const req = store.get(castMemberStoreKey(id, mid))
+        req.onsuccess = () => {
+          const one = normalizeCastMembers([req.result])?.[0]
+          if (one) found[idx] = one
+          pending -= 1
+          if (pending <= 0) finish()
+        }
+        req.onerror = () => {
+          pending -= 1
+          if (pending <= 0) finish()
+        }
+      })
     }
   })
 }
@@ -1868,7 +2004,16 @@ async function dramaCastDeletePayload(id: string): Promise<void> {
         db.close()
         reject(tx.error ?? new Error('删除角色失败'))
       }
-      tx.objectStore(DRAMA_CAST_STORE).delete(id)
+      const store = tx.objectStore(DRAMA_CAST_STORE)
+      const oldReq = store.get(id)
+      oldReq.onsuccess = () => {
+        const old = oldReq.result as { memberIds?: unknown; members?: unknown } | undefined
+        const oldIds = Array.isArray(old?.memberIds)
+          ? old.memberIds.map((x) => String(x || '').trim()).filter(Boolean)
+          : normalizeCastMembers(old?.members)?.map((m) => m.id) ?? []
+        for (const oid of oldIds) store.delete(castMemberStoreKey(id, oid))
+        store.delete(id)
+      }
     })
   } catch {
     /* 库不可用时仍允许删元数据 */
@@ -2458,27 +2603,39 @@ export default function ShortDramaPage() {
   }
 
   const saveCastPack = async () => {
-    if (!castWorthSaving(cast)) {
+    const members = mergeRolesIntoCast(roles, cast)
+    if (!castWorthSaving(members)) {
       setErr('请先确认或填写至少一位角色，再保存')
       return
     }
-    const name = (castPackName.trim() || defaultCastPackName(cast)).slice(0, 32)
+    const rolesOut = joinUniqueRoleNames(roles, members.map((m) => m.name).join(' / '))
+    const name = (castPackName.trim() || defaultCastPackName(members)).slice(0, 32)
     setCastPackBusy(true)
     setErr(null)
     try {
+      const packed = await compressCastMembersForStore(members)
       const id = newWorkId()
-      const payload: DramaCastPackPayload = { roles, members: cast }
+      const payload: DramaCastPackPayload = { roles: rolesOut, members: packed }
       await dramaCastPutPayload(id, payload)
       await dramaCastPutPayload(DRAMA_CAST_CURRENT_KEY, payload)
+      setCast(packed)
+      setRoles(rolesOut)
       const meta = packMetaFromPayload(id, name, payload)
       setCastPacks((prev) => {
-        const next = [meta, ...prev.filter((p) => p.id !== id)].slice(0, DRAMA_CAST_PACK_KEEP)
+        const sameName = prev.find((p) => p.name === name)
+        const next = [meta, ...prev.filter((p) => p.id !== id && p.id !== sameName?.id)].slice(
+          0,
+          DRAMA_CAST_PACK_KEEP,
+        )
+        if (sameName) void dramaCastDeletePayload(sameName.id)
         saveCastPackMeta(next)
         return next
       })
       setCastPackName('')
       setShowCastSave(false)
-      setHint(`已保存角色组「${name}」。做续集时点「选用已存」即可载入同一批人。`)
+      setHint(
+        `已保存角色组「${name}」（${packed.length} 人）。做续集时点「选用已存」可一次载入全部角色。`,
+      )
     } catch (e) {
       setErr(e instanceof Error ? e.message : '保存角色失败')
     } finally {
@@ -2495,10 +2652,12 @@ export default function ShortDramaPage() {
         setErr('该角色组已失效，请重新保存')
         return
       }
-      setCast(pack.members)
-      setActiveCastId(pack.members[0]?.id ?? null)
-      if (pack.roles.trim()) setRoles(pack.roles)
-      await dramaCastPutPayload(DRAMA_CAST_CURRENT_KEY, pack)
+      const members = mergeRolesIntoCast(pack.roles, pack.members)
+      const rolesOut = joinUniqueRoleNames(pack.roles, members.map((m) => m.name).join(' / '))
+      setCast(members)
+      setActiveCastId(members[0]?.id ?? null)
+      setRoles(rolesOut)
+      await dramaCastPutPayload(DRAMA_CAST_CURRENT_KEY, { roles: rolesOut, members })
       const packName = castPacks.find((p) => p.id === id)?.name
       setHint(`已载入角色组${packName ? `「${packName}」` : ''}，可改故事后直接生成续集。`)
       setShowCastLibrary(false)
@@ -3059,9 +3218,10 @@ export default function ShortDramaPage() {
       .then((pack) => {
         if (!alive) return
         if (pack?.members.length) {
-          setCast(pack.members)
-          setActiveCastId(pack.members[0]?.id ?? null)
-          if (pack.roles.trim()) setRoles(pack.roles)
+          const members = mergeRolesIntoCast(pack.roles, pack.members)
+          setCast(members)
+          setActiveCastId(members[0]?.id ?? null)
+          setRoles(joinUniqueRoleNames(pack.roles, members.map((m) => m.name).join(' / ')))
           setHint('已载入上次角色，可直接做续集。点「保存角色」可存成角色组，下次一键选用。')
         }
         setCastPacks(loadCastPackMeta())
@@ -3080,7 +3240,14 @@ export default function ShortDramaPage() {
   useEffect(() => {
     if (!castHydratedRef.current || !castWorthSaving(cast)) return
     const t = window.setTimeout(() => {
-      void dramaCastPutPayload(DRAMA_CAST_CURRENT_KEY, { roles, members: cast }).catch(() => {
+      void (async () => {
+        const members = mergeRolesIntoCast(roles, cast)
+        const packed = await compressCastMembersForStore(members)
+        await dramaCastPutPayload(DRAMA_CAST_CURRENT_KEY, {
+          roles: joinUniqueRoleNames(roles, members.map((m) => m.name).join(' / ')),
+          members: packed,
+        })
+      })().catch(() => {
         /* 自动缓存失败不打断创作 */
       })
     }, 600)
@@ -3896,6 +4063,12 @@ export default function ShortDramaPage() {
                       clearTrial()
                       setRoles(e.target.value)
                     }}
+                    onBlur={() => {
+                      setCast((prev) => {
+                        const next = mergeRolesIntoCast(roles, prev)
+                        return sameCastFingerprint(prev, next) ? prev : next
+                      })
+                    }}
                   />
                 </label>
                 <label className="space-y-1.5">
@@ -4061,9 +4234,11 @@ export default function ShortDramaPage() {
                           !castWorthSaving(cast)
                         }
                         onClick={() => {
+                          const members = mergeRolesIntoCast(roles, cast)
+                          if (!sameCastFingerprint(cast, members)) setCast(members)
                           setShowCastSave((v) => !v)
                           setShowCastLibrary(false)
-                          if (!castPackName.trim()) setCastPackName(defaultCastPackName(cast))
+                          if (!castPackName.trim()) setCastPackName(defaultCastPackName(members))
                         }}
                         className="inline-flex items-center gap-1 rounded-lg border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-xs font-medium text-cyan-900 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-60"
                       >
@@ -4082,16 +4257,22 @@ export default function ShortDramaPage() {
                     </span>
                   </span>
                   <p className="text-[11px] leading-relaxed text-slate-500">
-                    确认角色后可点「保存角色」，做续集时「选用已存」载入同一批人。刷新页面也会自动带回上次角色。删除角色会同步从上方「角色」栏去掉对应名字。
+                    角色栏写成「小柔 / 男顾客」后失焦或点「保存角色」，会自动带出多张角色卡，形象会一起存进角色组。做续集时「选用已存」一次载入全部人。删除角色会同步从上方「角色」栏去掉对应名字。
                   </p>
                   {showCastSave ? (
                     <div className="flex flex-wrap items-center gap-2 rounded-xl border border-cyan-200 bg-cyan-50/50 p-2.5">
+                      <p className="w-full text-[11px] text-cyan-900">
+                        将保存 {cast.length} 人
+                        {cast.some((m) => m.name.trim())
+                          ? `：${cast.map((m) => m.name.trim() || '未命名').join('、')}`
+                          : ''}
+                      </p>
                       <input
                         className={cn(fieldCls, 'min-w-[160px] flex-1 py-1.5 text-sm')}
                         disabled={castPackBusy}
                         value={castPackName}
                         onChange={(e) => setCastPackName(e.target.value.slice(0, 32))}
-                        placeholder="角色组名称，如技师小美"
+                        placeholder="角色组名称，如小柔 / 男顾客"
                       />
                       <button
                         type="button"
