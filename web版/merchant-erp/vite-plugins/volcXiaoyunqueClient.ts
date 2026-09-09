@@ -7,7 +7,7 @@
  * 默认无参考 req_key: pippit_iv2v_v20_cvtob（文档 85621/2359611）
  * 有参考（图+视频）：pippit_iv2v_v20_cvtob_with_vinput（文档 85621/2359610）
  * 有角色/参考图：只走 pippit_iv2v_v20_cvtob_with_vinput（图必须进片）。
- * 禁止无参考 cvtob 文生。仅有参考接口未开通时才兜底即梦首帧图生。
+ * 禁止无参考 cvtob 文生。有参考时不兜底即梦无声首帧（会丢掉对白和配角）。
  * 不走方舟 Seedance 真人库/纯文案。
  *
  * 凭据：运营台 videoAi.jimengAccessKeyId/SK → JIMENG_*，或轻量 MERCHANT_AI_VOLC_*。
@@ -24,12 +24,8 @@ const XYQ_SUBMIT_ACTION = 'CVSync2AsyncSubmitTask'
 const XYQ_GET_ACTION = 'CVSync2AsyncGetResult'
 const XYQ_REQ_KEY_NOREF = 'pippit_iv2v_v20_cvtob'
 const XYQ_REQ_KEY_REF = 'pippit_iv2v_v20_cvtob_with_vinput'
-const JIMENG_I2V_REQ_KEY = 'jimeng_ti2v_v30_pro'
-const JIMENG_I2V_REQ_KEY_FALLBACK = 'jimeng_ti2v_v30'
-const JIMENG_I2V_REQ_KEY_VGFM = 'jimeng_vgfm_i2v_l20'
 const NOREF_KEYS = [XYQ_REQ_KEY_NOREF]
 const REF_KEYS = [XYQ_REQ_KEY_REF]
-const JIMENG_I2V_KEYS = [JIMENG_I2V_REQ_KEY, JIMENG_I2V_REQ_KEY_FALLBACK, JIMENG_I2V_REQ_KEY_VGFM]
 
 export function isXiaoyunqueConfigured(env: MerchantAiEnv): boolean {
   return Boolean(resolveVolcVisualCredentials(env))
@@ -136,11 +132,8 @@ function reqKeyAttempts(
   /** 有角色/参考图：只走「有参考」图生。禁止无参考文生 cvtob，否则图不进片 */
   if (hasImageRef) {
     const rows = [xyqRow(XYQ_REQ_KEY_REF)]
-    if (customKey && customKey !== XYQ_REQ_KEY_NOREF && !rows.some((r) => r.reqKey === customKey)) {
+    if (customKey && customKey !== XYQ_REQ_KEY_NOREF && !isJimengI2vReqKey(customKey) && !rows.some((r) => r.reqKey === customKey)) {
       rows.unshift(xyqRow(customKey))
-    }
-    for (const reqKey of JIMENG_I2V_KEYS) {
-      if (!rows.some((r) => r.reqKey === reqKey)) rows.push(xyqRow(reqKey))
     }
     return rows
   }

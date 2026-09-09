@@ -1428,7 +1428,7 @@ function buildBasePromptMeta(input: {
     input.roles.trim() ? `角色：${input.roles.trim()}。` : '',
     input.conflict.trim() ? `核心冲突：${input.conflict.trim()}。` : '',
     quoted,
-    '运镜跟拍，禁止拖沓空镜，禁止大面积海报字幕。口播与对白短、口语。禁止电影片头片尾和演职员表。',
+    '运镜跟拍，禁止拖沓空镜，禁止大面积海报字幕。口播与对白必须有人声（开口说话），禁止无声片、禁止只配字幕不发声。禁止电影片头片尾和演职员表。',
   ]
     .filter(Boolean)
     .join('\n')
@@ -1584,10 +1584,11 @@ function buildDramaIdentityLock(cast: DramaCastMember[], roles: string): string 
       .filter(Boolean)
       .join('')
   }
+  const labeled = confirmed.map((m, i) => `${i + 1}.${m.name.trim() || `角色${i + 1}`}`).join('、')
   return [
     '【角色锁定】',
-    `画面人物必须与角色参考图为同一批人：${confirmed.map((m, i) => m.name.trim() || `角色${i + 1}`).join('、')}。`,
-    '同一张脸同一套衣服，禁止换人。',
+    `第1张是角色对照条，从左到右：${labeled}。`,
+    '成片必须同时出现以上全部角色，每人对应对照条里那张脸和衣服，禁止换人、禁止只拍第一个人走路。',
   ].join('')
 }
 
@@ -1597,6 +1598,7 @@ function buildDramaActionPlaybook(opts: {
   story: string
   dialogue: string
   durationSec: number
+  castNames?: string[]
 }): string {
   const dur = Math.max(5, Math.round(opts.durationSec))
   const beats = opts.beats.map((b) => String(b || '').trim()).filter(Boolean).slice(0, 4)
@@ -1608,12 +1610,19 @@ function buildDramaActionPlaybook(opts: {
     return `${a}-${b}秒必须演出「${beat}」：有走位、手势和表情，禁止只做站桩。`
   })
   const dlg = opts.dialogue.trim().replace(/^[「"']+|[」"']+$/g, '')
+  const names = (opts.castNames ?? []).map((n) => n.trim()).filter(Boolean)
+  const multi = names.length >= 2
   return [
     '【分镜必演】必须按时间切开换动作和机位，禁止整段站在走廊发呆。',
     ...lines,
-    opts.story.trim() ? `故事动作依据：${opts.story.trim()}` : '',
-    dlg ? `角色必须开口说中文对白：「${dlg}」，口型对上。` : '必须有中文对白，禁止哑剧。',
-    '镜头要切：近景表情、跟拍走位、环境交代。第1张图只锁定脸和店，禁止把首帧构图播到片尾。',
+    opts.story.trim() ? `故事必须按原文演出：${opts.story.trim()}` : '',
+    dlg
+      ? `必须开口说出中文对白（有人声，不是字幕）：「${dlg}」，口型对上。`
+      : '必须有中文对白人声，禁止哑剧、禁止无声。',
+    multi
+      ? `对手戏：${names.join('、')}必须都入画、有交流，禁止只拍${names[0]}一个人走路。`
+      : '',
+    '镜头要切：近景表情、双人对话、跟拍走位。第1张图只提供身份，禁止把首帧构图播到片尾。',
   ]
     .filter(Boolean)
     .join('\n')
@@ -1622,21 +1631,28 @@ function buildDramaActionPlaybook(opts: {
 /** 小云雀 Agent：带角色图 + 完整故事，出多镜和对白 */
 function buildDramaXiaoyunquePrompt(opts: {
   leadName: string
+  castNames?: string[]
   identity: string
   story: string
   hasSceneRefs?: boolean
   actionPlaybook?: string
 }): string {
-  const lead = opts.leadName.trim() || '主角'
+  const names = (opts.castNames ?? []).map((n) => n.trim()).filter(Boolean)
+  const multi = names.length >= 2
+  const lead = opts.leadName.trim() || names[0] || '主角'
   return [
     opts.identity,
-    `【形象锁定】第1张只提供${lead}的脸、衣服和店内空间（同一张脸、同一套衣服、同一家店）。成片必须按【分镜必演】演戏，禁止整段维持首帧站姿。禁止抠图贴图、禁止白边贴纸、禁止左右分屏、禁止另起文案空间。`,
+    multi
+      ? `【形象锁定】第1张是角色对照条，从左到右：${names.map((n, i) => `${i + 1}.${n}`).join('、')}。成片必须让这些人都入画、有对手戏，禁止只出现其中一人。每人必须是对照条里对应那张脸和衣服。对照条不是成片构图，禁止把它原样当镜头。禁止抠图贴图、禁止白边贴纸、禁止左右分屏、禁止另起文案空间。`
+      : `【形象锁定】第1张只提供${lead}的脸、衣服和店内空间（同一张脸、同一套衣服、同一家店）。成片必须按【分镜必演】演戏，禁止整段维持首帧站姿。禁止抠图贴图、禁止白边贴纸、禁止左右分屏、禁止另起文案空间。`,
     opts.hasSceneRefs
-      ? '【场景锁定】第2张是店内实拍，灯光、家具、走廊必须与实拍一致；人物要走进这些空间里做事，不要只站在一张定妆里。'
+      ? multi
+        ? '【场景锁定】第2张是店内实拍，灯光、家具、走廊必须与实拍一致；所有角色要走进这些空间里对手戏，不要只站在对照条里。'
+        : '【场景锁定】第2张是店内实拍，灯光、家具、走廊必须与实拍一致；人物要走进这些空间里做事，不要只站在一张定妆里。'
       : '',
     opts.actionPlaybook?.trim() || '',
     opts.story.trim(),
-    '请由小云雀智能生视频 Agent 多镜编排成片，必须有中文对白和环境声，竖屏 9:16。前 3 秒必须冲突或反转。不要字幕水印 Logo。',
+    '请由小云雀智能生视频 Agent 多镜编排成片。必须有中文对白人声和环境声，禁止无声片、禁止只配字幕不发声。竖屏 9:16。前 3 秒必须冲突或反转。必须按一句话故事和对白钩子演戏，禁止改成一个人在走廊走路。不要字幕水印 Logo。',
   ]
     .filter(Boolean)
     .join('\n')
@@ -1645,7 +1661,17 @@ function buildDramaXiaoyunquePrompt(opts: {
 function isDramaPhotoAwareVideoModel(modelUsed: string | null | undefined): boolean {
   const m = String(modelUsed || '')
   if (/pippit_iv2v_v20_cvtob(?!_with_vinput)/i.test(m)) return false
-  return /with_vinput|jimeng_ti2v|jimeng_i2v|jimeng_vgfm_i2v/i.test(m)
+  if (/jimeng_ti2v|jimeng_i2v|jimeng_vgfm_i2v/i.test(m)) return false
+  return /with_vinput/i.test(m)
+}
+
+/** 即梦无声 mp4 往往只有视频轨；短剧必须有声 */
+async function dramaBlobHasAudio(blob: Blob): Promise<boolean> {
+  const take = Math.min(blob.size, 2_000_000)
+  if (take < 64) return false
+  const buf = new Uint8Array(await blob.slice(0, take).arrayBuffer())
+  const ascii = new TextDecoder('latin1').decode(buf)
+  return /soun|mp4a|opus|Opus|ac-3|fLaC/.test(ascii)
 }
 
 function parseRoleNames(raw: string): string[] {
@@ -1693,14 +1719,22 @@ function buildDramaStoryCastBrief(cast: DramaCastMember[], roles: string): {
   for (const n of extraFromRoles) {
     if (!support.some((s) => s.includes(n))) support.push(n)
   }
-  if (photoLead?.preview && !support.some((s) => /客人|顾客/.test(s))) {
+  if (
+    photoLead?.preview &&
+    otherCast.length === 0 &&
+    extraFromRoles.length === 0 &&
+    !support.some((s) => /客人|顾客/.test(s))
+  ) {
     support.push('客人（配角，最多露手/背影/声音）')
   }
+  const multiCast = named.filter((m) => m.preview).length >= 2 || named.length >= 2
   const brief = [
     `画面主角：${leadName}${photoLead?.preview ? '（已确认角色形象照，视频会用这张脸，故事必须以 TA 为动作主语）' : ''}`,
     leadDesc ? `主角画像：${leadDesc}` : '',
     support.length ? `配角：${support.join('、')}` : '配角：文案里的客人/对方只作推动冲突的配角。',
-    '主次铁律：一句话故事的主语、欲望、镜头中心必须是画面主角；客人不得写成「躺着不想起 / 拉住技师」这类主角句。对白可以是客人说的，但要紧接主角的反应、动作或决定。',
+    multiCast
+      ? `对手戏铁律：已确认角色必须全部入画、有走位和对白人声；禁止只拍其中一人走路。对白钩子必须原句说出来。`
+      : '主次铁律：一句话故事的主语、欲望、镜头中心必须是画面主角；客人不得写成「躺着不想起 / 拉住技师」这类主角句。对白可以是客人说的，但要紧接主角的反应、动作或决定。',
   ]
     .filter(Boolean)
     .join('\n')
@@ -2156,6 +2190,47 @@ async function composeDramaSceneCollage(dataUrls: string[]): Promise<string | nu
   }
 }
 
+/** 多角色对照条：占小云雀第 1 槽，避免只融角色1导致成片只出一个人 */
+async function composeDramaCastStrip(
+  portraits: Array<{ url: string; name: string }>,
+): Promise<string | null> {
+  const items = portraits.slice(0, DRAMA_CAST_MAX)
+  if (!items.length) return null
+  if (items.length === 1) return items[0]!.url
+  try {
+    const imgs = await Promise.all(items.map((p) => loadDramaCanvasImage(p.url)))
+    const n = imgs.length
+    const cellW = 512
+    const cellH = 720
+    const labelH = 52
+    const canvas = document.createElement('canvas')
+    canvas.width = cellW * n
+    canvas.height = cellH + labelH
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.fillStyle = '#0b0d12'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    imgs.forEach((img, i) => {
+      const x = i * cellW
+      const scale = Math.max(cellW / Math.max(1, img.width), cellH / Math.max(1, img.height))
+      const w = img.width * scale
+      const h = img.height * scale
+      ctx.drawImage(img, x + (cellW - w) / 2, (cellH - h) / 2, w, h)
+      ctx.fillStyle = '#0b0d12'
+      ctx.fillRect(x, cellH, cellW, labelH)
+      ctx.fillStyle = '#f8fafc'
+      ctx.font = 'bold 28px sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      const label = `${i + 1}.${items[i]!.name.trim() || `角色${i + 1}`}`
+      ctx.fillText(label.slice(0, 14), x + cellW / 2, cellH + labelH / 2, cellW - 16)
+    })
+    return canvas.toDataURL('image/jpeg', 0.86)
+  } catch {
+    return null
+  }
+}
+
 /** 左右对照给生图模型看：左角色、右店内。禁止把这张拼贴当视频首帧。 */
 async function composeDramaFusionBriefing(portraitUrl: string, sceneUrl: string): Promise<string | null> {
   try {
@@ -2505,7 +2580,14 @@ export default function ShortDramaPage() {
       story.trim()
         ? `已有故事草稿（若把客人写成主语，必须改写成「${castBrief.leadName}」视角，禁止照抄客人躺平）：${story.trim()}`
         : '',
-      `根据以上文案写 1–3 句一句话故事：口语、有冲突、有记忆点；主语必须是「${castBrief.leadName}」。`,
+      `根据以上文案写 1–3 句一句话故事：口语、有冲突、有记忆点；主语必须是「${castBrief.leadName}」。${
+        cast.filter((m) => m.preview || m.name.trim()).length >= 2
+          ? `必须写到每位已确认角色（${cast
+              .filter((m) => m.preview || m.name.trim())
+              .map((m, i) => m.name.trim() || `角色${i + 1}`)
+              .join('、')}）的对手戏，禁止写成一个人独行。`
+          : ''
+      }`,
       '只输出 JSON：{"story":"...","roles":"...","conflict":"...","dialogue":"..."}',
       `story 必须以「${castBrief.leadName}」开头或作第一动作主语。roles 写成「主角 / 配角」，仅当角色栏为空时才用；conflict/dialogue 仅在商家未提供时补全。不要 markdown、不要解释。`,
     ]
@@ -2846,13 +2928,17 @@ export default function ShortDramaPage() {
 
   const prepareDramaModelImages = useCallback(
     async (continueFrame?: string) => {
-      const portraits: string[] = []
+      const namedPortraits: Array<{ url: string; name: string }> = []
       const confirmed = cast.filter((m) => String(m.preview || '').trim())
       for (const m of confirmed) {
         const resolved = await resolveDramaPortraitDataUrl(m.preview!)
         if (!resolved?.startsWith('data:image/')) continue
-        portraits.push(await compressPortraitDataUrlForLibrary(resolved))
+        namedPortraits.push({
+          url: await compressPortraitDataUrlForLibrary(resolved),
+          name: m.name.trim() || `角色${namedPortraits.length + 1}`,
+        })
       }
+      const portraits = namedPortraits.map((p) => p.url)
       if (portraits.length === 0) {
         throw new Error('请先确认至少一位角色形象（上传照片或生成并确认预览）。不能只凭文案出片。')
       }
@@ -2883,7 +2969,13 @@ export default function ShortDramaPage() {
       }
       const openingAction = String(formula.beats[0] || story || '').trim()
       let firstRaw = cont
-      if (!firstRaw) {
+      if (!firstRaw && namedPortraits.length >= 2) {
+        const strip = await composeDramaCastStrip(namedPortraits)
+        if (!strip?.startsWith('data:image/')) {
+          throw new Error('多角色形象未能拼成对照图。请重新确认每位角色后再生成。')
+        }
+        firstRaw = strip
+      } else if (!firstRaw) {
         const key = dramaFusionCacheKey(portraits[0]!, sceneSlot, openingAction)
         if (fusedSceneFrameCacheRef.current?.key === key) {
           firstRaw = fusedSceneFrameCacheRef.current.dataUrl
@@ -2904,7 +2996,11 @@ export default function ShortDramaPage() {
         ? await compressPortraitDataUrlForLibrary(firstRaw)
         : ''
       if (!firstSlot) {
-        throw new Error('角色未能融合进店内实拍。请重新确认角色并上传店内参考后再生成。')
+        throw new Error(
+          namedPortraits.length >= 2
+            ? '多角色对照图未能编码。请重新确认每位角色后再生成。'
+            : '角色未能融合进店内实拍。请重新确认角色并上传店内参考后再生成。',
+        )
       }
       const packed = [...new Set([firstSlot, sceneSlot])].slice(0, 2)
       if (packed.length < 2) {
@@ -3289,8 +3385,11 @@ export default function ShortDramaPage() {
         story: story.trim() || fillTokens(formula.story, scene, shop),
         dialogue,
         durationSec,
+        castNames: cast
+          .filter((m) => m.preview || m.name.trim())
+          .map((m, i) => m.name.trim() || `角色${i + 1}`),
       }),
-    [formula.beats, story, scene, shop, dialogue, durationSec],
+    [formula.beats, story, scene, shop, dialogue, durationSec, cast],
   )
 
   const promptPreview = useMemo(() => {
@@ -3396,10 +3495,14 @@ export default function ShortDramaPage() {
     }
     const identity = buildDramaIdentityLock(cast, roles)
     const leadName = buildDramaStoryCastBrief(cast, roles).leadName
+    const castNames = cast
+      .filter((m) => m.preview || m.name.trim())
+      .map((m, i) => m.name.trim() || `角色${i + 1}`)
     const kb = Math.max(1, Math.round(imgs.reduce((n, s) => n + s.length, 0) / 1370))
     opts.onProgress?.(`已提交角色+店内参考（${imgs.length} 张，约 ${kb}KB），只走小云雀有声短剧…`)
     const xyqPrompt = buildDramaXiaoyunquePrompt({
       leadName,
+      castNames,
       identity,
       story: [opts.prompt, fusionPromptNote].filter(Boolean).join('\n'),
       hasSceneRefs: true,
@@ -3446,7 +3549,13 @@ export default function ShortDramaPage() {
       if (!sourceUrl) throw e
     }
     const previewUrl = blob ? URL.createObjectURL(blob) : sourceUrl!
-    if (blob) previewUrlsRef.current.push(previewUrl)
+    if (blob) {
+      if (!(await dramaBlobHasAudio(blob))) {
+        URL.revokeObjectURL(previewUrl)
+        throw new Error('成片没有声音（对白/环境声）。已丢弃这次无声结果，请再试小云雀有声短剧。')
+      }
+      previewUrlsRef.current.push(previewUrl)
+    }
     const work: DramaWork = {
       id: opts.billId,
       title: opts.title,
@@ -3484,11 +3593,15 @@ export default function ShortDramaPage() {
     const fusionImgs = await prepareDramaModelImages()
     const leadName = buildDramaStoryCastBrief(cast, roles).leadName
     const identity = buildDramaIdentityLock(cast, roles)
+    const castNames = cast
+      .filter((m) => m.preview || m.name.trim())
+      .map((m, i) => m.name.trim() || `角色${i + 1}`)
     if (fusionImgs.length < 2) {
       throw new Error('必须同时提交角色图和参考画面，已拒绝纯文案生成。')
     }
     const xyqPrompt = buildDramaXiaoyunquePrompt({
       leadName,
+      castNames,
       identity,
       story: [
         metaPrompt,
@@ -3612,7 +3725,11 @@ export default function ShortDramaPage() {
     try {
       if (!showPreviewGate) {
         const fusionImgs = await prepareDramaModelImages()
-        setProgress('角色已融入店内实拍，正在生成短剧…')
+        setProgress(
+          cast.filter((m) => m.preview).length >= 2
+            ? '已提交多角色对照+店内参考，正在生成有声短剧…'
+            : '角色已融入店内实拍，正在生成有声短剧…',
+        )
         const prompt = `${metaPrompt}\n${actionPlaybook}\n时长约 ${durationSec} 秒，竖屏 9:16 单段直出。结构：${formula.beats.join(' → ')}。`
         const r = await runOneClip({
           prompt,
@@ -3672,6 +3789,9 @@ export default function ShortDramaPage() {
       }
       setProgress('正在拉取试镜…')
       const blob = await downloadVideoUrlAsBlob(r.videoUrl, { maxAttempts: 3 })
+      if (!(await dramaBlobHasAudio(blob))) {
+        throw new Error('试镜没有声音（对白/环境声）。已丢弃无声结果，请再试小云雀有声短剧。')
+      }
       // 试镜也扣积分（按时长），避免白嫖长片预览
       const spendHint = await chargePoints(blob, `${billId}:trial`, PREVIEW_SEC)
       const url = URL.createObjectURL(blob)

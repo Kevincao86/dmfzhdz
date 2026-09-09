@@ -1734,7 +1734,13 @@ export async function runXiaoyunqueVideoJob(opts: {
       message: '成片走了无参考文生，已丢弃。角色和店内参考必须进片，请再试。',
     }
   }
-  const usedPhoto = /with_vinput|jimeng_ti2v|jimeng_i2v|jimeng_vgfm_i2v/i.test(usedModel)
+  if (/jimeng_ti2v|jimeng_i2v|jimeng_vgfm_i2v/i.test(usedModel)) {
+    return {
+      ok: false,
+      message: '即梦图生是无声首帧微动，短剧需要有声对白，已丢弃。请确认小云雀有参考接口可用后再试。',
+    }
+  }
+  const usedPhoto = /with_vinput/i.test(usedModel)
   if (!usedPhoto) {
     return {
       ok: false,
