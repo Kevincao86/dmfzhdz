@@ -1577,9 +1577,9 @@ function buildDramaIdentityLock(cast: DramaCastMember[], roles: string): string 
   if (confirmed.length === 1) {
     return [
       '【角色锁定】',
-      `首帧图就是已站在店内的${name}，必须让这张图里的人动起来，同一张脸同一发型同一套衣服，人物必须吃到店内灯光。`,
+      `第1张只锁定${name}的脸、发型、衣服和这家店，禁止换脸。人物必须按分镜走位演戏，禁止整段维持首帧站姿。`,
       desc ? `外貌：${desc}。` : '',
-      '镜头始终跟拍该角色；顾客最多露手或背影，禁止换脸或改拍男性。',
+      '镜头以该角色为主；客人可以入画（背影或侧脸），禁止把主角换成客人。',
     ]
       .filter(Boolean)
       .join('')
@@ -1591,20 +1591,50 @@ function buildDramaIdentityLock(cast: DramaCastMember[], roles: string): string 
   ].join('')
 }
 
+/** 把戏剧四拍写成按时长切开的必演分镜，避免图生只把首帧站姿微动一下 */
+function buildDramaActionPlaybook(opts: {
+  beats: string[]
+  story: string
+  dialogue: string
+  durationSec: number
+}): string {
+  const dur = Math.max(5, Math.round(opts.durationSec))
+  const beats = opts.beats.map((b) => String(b || '').trim()).filter(Boolean).slice(0, 4)
+  const n = Math.max(1, beats.length)
+  const slice = dur / n
+  const lines = beats.map((beat, i) => {
+    const a = Math.round(i * slice)
+    const b = i === n - 1 ? dur : Math.round((i + 1) * slice)
+    return `${a}-${b}秒必须演出「${beat}」：有走位、手势和表情，禁止只做站桩。`
+  })
+  const dlg = opts.dialogue.trim().replace(/^[「"']+|[」"']+$/g, '')
+  return [
+    '【分镜必演】必须按时间切开换动作和机位，禁止整段站在走廊发呆。',
+    ...lines,
+    opts.story.trim() ? `故事动作依据：${opts.story.trim()}` : '',
+    dlg ? `角色必须开口说中文对白：「${dlg}」，口型对上。` : '必须有中文对白，禁止哑剧。',
+    '镜头要切：近景表情、跟拍走位、环境交代。第1张图只锁定脸和店，禁止把首帧构图播到片尾。',
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
 /** 小云雀 Agent：带角色图 + 完整故事，出多镜和对白 */
 function buildDramaXiaoyunquePrompt(opts: {
   leadName: string
   identity: string
   story: string
   hasSceneRefs?: boolean
+  actionPlaybook?: string
 }): string {
   const lead = opts.leadName.trim() || '主角'
   return [
     opts.identity,
-    `【首帧进片】第1张是${lead}已光影融合进店内实拍的电影剧照（同一张脸、同一套衣服、同一家店，灯光打在人身上）。必须让这张图动起来。禁止抠图贴图、禁止白边贴纸、禁止左右分屏、禁止另起文案空间。`,
+    `【形象锁定】第1张只提供${lead}的脸、衣服和店内空间（同一张脸、同一套衣服、同一家店）。成片必须按【分镜必演】演戏，禁止整段维持首帧站姿。禁止抠图贴图、禁止白边贴纸、禁止左右分屏、禁止另起文案空间。`,
     opts.hasSceneRefs
-      ? '【场景锁定】第2张是店内实拍拼贴，灯光、家具、绿植、夜景窗必须与实拍一致。'
+      ? '【场景锁定】第2张是店内实拍，灯光、家具、走廊必须与实拍一致；人物要走进这些空间里做事，不要只站在一张定妆里。'
       : '',
+    opts.actionPlaybook?.trim() || '',
     opts.story.trim(),
     '请由小云雀智能生视频 Agent 多镜编排成片，必须有中文对白和环境声，竖屏 9:16。前 3 秒必须冲突或反转。不要字幕水印 Logo。',
   ]
@@ -2021,14 +2051,16 @@ const DRAMA_FUSION_PROMPT = [
   '禁止左右分屏、禁止拼贴、禁止抠图白边、禁止贴纸悬浮、禁止图层叠加感、禁止文字水印 Logo。',
 ].join('')
 
-function dramaFusionCacheKey(portrait: string, scene: string): string {
-  return `${portrait.length}:${portrait.slice(-48)}:${scene.length}:${scene.slice(-48)}`
+function dramaFusionCacheKey(portrait: string, scene: string, openingAction = ''): string {
+  const act = openingAction.trim().slice(0, 24)
+  return `${portrait.length}:${portrait.slice(-48)}:${scene.length}:${scene.slice(-48)}:${act}`
 }
 
 /** 用生图把角色融入店内实拍，得到 9:16 进片图。失败就报错，禁止 canvas 贴图兜底。 */
 async function fuseDramaCastIntoScene(opts: {
   portraitUrl: string
   sceneUrl: string
+  openingAction?: string
   onProgress?: (msg: string) => void
 }): Promise<string> {
   const briefing = await composeDramaFusionBriefing(opts.portraitUrl, opts.sceneUrl)
@@ -2036,6 +2068,15 @@ async function fuseDramaCastIntoScene(opts: {
     throw new Error('角色图或店内参考无法解码，请重新上传后再生成。')
   }
   const ref = await compressPortraitDataUrlForLibrary(briefing)
+  const opening = opts.openingAction?.trim() || ''
+  const prompt = [
+    DRAMA_FUSION_PROMPT,
+    opening
+      ? `开场必须是动作戏：人物正在「${opening}」，有走位或手势，不要正面站桩证件照。`
+      : '',
+  ]
+    .filter(Boolean)
+    .join('')
   const common = {
     exactPrompt: true as const,
     aspectRatio: '9:16' as const,
@@ -2046,7 +2087,7 @@ async function fuseDramaCastIntoScene(opts: {
     {
       label: 'GPT Image 2',
       run: () =>
-        postAiAgentNativeImage(DRAMA_FUSION_PROMPT, {
+        postAiAgentNativeImage(prompt, {
           ...common,
           imageRoute: 'tokenmix',
           tokenmixImageModel: 'gpt-image-2',
@@ -2055,7 +2096,7 @@ async function fuseDramaCastIntoScene(opts: {
     {
       label: '通义万相',
       run: () =>
-        postAiAgentNativeImage(DRAMA_FUSION_PROMPT, {
+        postAiAgentNativeImage(prompt, {
           ...common,
           preferredVendor: 'qwen',
           preferredModelId: 'wan2.7-image-pro',
@@ -2064,7 +2105,7 @@ async function fuseDramaCastIntoScene(opts: {
     {
       label: '豆包 Seedream',
       run: () =>
-        postAiAgentNativeImage(DRAMA_FUSION_PROMPT, {
+        postAiAgentNativeImage(prompt, {
           ...common,
           preferredVendor: 'doubao',
           doubaoSize: '2K',
@@ -2073,7 +2114,7 @@ async function fuseDramaCastIntoScene(opts: {
     {
       label: 'GPT Image 1',
       run: () =>
-        postAiAgentNativeImage(DRAMA_FUSION_PROMPT, {
+        postAiAgentNativeImage(prompt, {
           ...common,
           imageRoute: 'tokenmix',
           tokenmixImageModel: 'gpt-image-1',
@@ -2215,6 +2256,8 @@ export default function ShortDramaPage() {
   /** 长片：先 5 秒试镜，用户确认后再全片 */
   const [trialUrl, setTrialUrl] = useState<string | null>(null)
   const [trialReady, setTrialReady] = useState(false)
+  /** 本次生成的成片，只占创作台预览；刷新不自动回放历史 */
+  const [resultPreviewUrl, setResultPreviewUrl] = useState<string | null>(null)
   const cancelRef = useRef(false)
   const mountedRef = useRef(true)
   const previewUrlsRef = useRef<string[]>([])
@@ -2667,15 +2710,17 @@ export default function ShortDramaPage() {
       if (!sceneSlot) {
         throw new Error('参考画面未能编码成图片。请重新上传店内实拍后再生成。')
       }
+      const openingAction = String(formula.beats[0] || story || '').trim()
       let firstRaw = cont
       if (!firstRaw) {
-        const key = dramaFusionCacheKey(portraits[0]!, sceneSlot)
+        const key = dramaFusionCacheKey(portraits[0]!, sceneSlot, openingAction)
         if (fusedSceneFrameCacheRef.current?.key === key) {
           firstRaw = fusedSceneFrameCacheRef.current.dataUrl
         } else {
           const fused = await fuseDramaCastIntoScene({
             portraitUrl: portraits[0]!,
             sceneUrl: sceneSlot,
+            openingAction,
             onProgress: (t) => {
               if (mountedRef.current) setProgress(t)
             },
@@ -2696,7 +2741,7 @@ export default function ShortDramaPage() {
       }
       return packed
     },
-    [cast, refItems],
+    [cast, refItems, formula.beats, story],
   )
 
   const fusionPromptNote = useMemo(() => {
@@ -2715,7 +2760,7 @@ export default function ShortDramaPage() {
     }
     if (refItems.length > 0) {
       bits.push(
-        `已上传 ${refItems.length} 份参考画面（含图/视频抽帧），人物必须站进该店内空间并吃到现场灯光（霓虹反射到皮肤与衣服），禁止抠图贴图、白边、图层叠加、悬浮，禁止另起无关空间。`,
+        `已上传 ${refItems.length} 份参考画面（含图/视频抽帧），人物必须站进该店内空间并吃到现场灯光（霓虹反射到皮肤与衣服），禁止抠图贴图、白边、图层叠加、悬浮，禁止另起无关空间。必须按戏剧四拍演戏，禁止整段站桩。`,
       )
     }
     return bits.join('')
@@ -2998,6 +3043,7 @@ export default function ShortDramaPage() {
     setFormulaId(nextFormula.id)
     setStyleId(nextWorld.defaultStyle)
     clearTrial()
+    setResultPreviewUrl(null)
     applyTemplate(nextScene, nextFormula, shop)
   }
 
@@ -3057,13 +3103,25 @@ export default function ShortDramaPage() {
     [world, scene, formula, style, shop, story, roles, conflict, dialogue],
   )
 
+  const actionPlaybook = useMemo(
+    () =>
+      buildDramaActionPlaybook({
+        beats: formula.beats,
+        story: story.trim() || fillTokens(formula.story, scene, shop),
+        dialogue,
+        durationSec,
+      }),
+    [formula.beats, story, scene, shop, dialogue, durationSec],
+  )
+
   const promptPreview = useMemo(() => {
     if (durationSec <= SEGMENT_UNIT_SEC) {
-      return `${metaPrompt}\n时长约 ${durationSec} 秒，竖屏 9:16 单段直出。`
+      return `${metaPrompt}\n${actionPlaybook}\n时长约 ${durationSec} 秒，竖屏 9:16 单段直出。`
     }
     const beats = expandBeats(formula, longPlan.length)
     return [
       metaPrompt,
+      actionPlaybook,
       `目标总时长 ${durationSec} 秒，按 ${segmentPlanLabel(durationSec)}。`,
       '衔接策略：上一段尾帧作为下一段首帧参考，同角色同场景连续运镜。',
       '分段任务：',
@@ -3072,7 +3130,7 @@ export default function ShortDramaPage() {
     ]
       .filter(Boolean)
       .join('\n')
-  }, [metaPrompt, durationSec, formula, longPlan, showPreviewGate])
+  }, [metaPrompt, actionPlaybook, durationSec, formula, longPlan, showPreviewGate])
 
   const gateReason = useMemo((): string | null => {
     if (busy) return '正在生成短剧，请稍候'
@@ -3166,6 +3224,7 @@ export default function ShortDramaPage() {
       identity,
       story: [opts.prompt, fusionPromptNote].filter(Boolean).join('\n'),
       hasSceneRefs: true,
+      actionPlaybook,
     })
     const xyq = await runXiaoyunqueVideoJob({
       prompt: xyqPrompt,
@@ -3227,7 +3286,7 @@ export default function ShortDramaPage() {
     }
     setWorks((prev) => persistDramaWorksList([work, ...prev.filter((w) => w.id !== work.id)]))
     setActiveWorkId(work.id)
-    setMainTab('works')
+    setResultPreviewUrl(previewUrl)
     clearTrial()
     const spendHint = await chargePoints(blob ?? new Blob(), opts.billId, opts.durationSec)
     setHint(
@@ -3258,6 +3317,7 @@ export default function ShortDramaPage() {
         `戏剧四拍：${formula.beats.join(' → ')}。`,
       ].join('\n'),
       hasSceneRefs: true,
+      actionPlaybook,
     })
     setProgress(`小云雀有声短剧全片（角色+店内参考，约 ${total} 秒）…`)
     const xyq = await runXiaoyunqueVideoJob({
@@ -3374,7 +3434,7 @@ export default function ShortDramaPage() {
       if (!showPreviewGate) {
         const fusionImgs = await prepareDramaModelImages()
         setProgress('角色已融入店内实拍，正在生成短剧…')
-        const prompt = `${metaPrompt}\n时长约 ${durationSec} 秒，竖屏 9:16 单段直出。结构：${formula.beats.join(' → ')}。`
+        const prompt = `${metaPrompt}\n${actionPlaybook}\n时长约 ${durationSec} 秒，竖屏 9:16 单段直出。结构：${formula.beats.join(' → ')}。`
         const r = await runOneClip({
           prompt,
           beat: formula.beats.join(' → '),
@@ -3562,7 +3622,10 @@ export default function ShortDramaPage() {
         URL.revokeObjectURL(removed.previewUrl)
         previewUrlsRef.current = previewUrlsRef.current.filter((u) => u !== removed.previewUrl)
       }
-      if (activeWorkId === id) setActiveWorkId(next[0]?.id ?? null)
+      if (activeWorkId === id) {
+        setActiveWorkId(next[0]?.id ?? null)
+        setResultPreviewUrl(null)
+      }
       return next
     })
   }
@@ -3571,8 +3634,8 @@ export default function ShortDramaPage() {
     'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20 disabled:opacity-60'
 
   const SceneIcon = scene.icon
-  /** 创作台只播当前试镜；刷新后历史成片留在记录里，不占右侧预览 */
-  const phoneSrc = trialUrl || null
+  /** 试镜优先；生成本次成片后在右侧回放。刷新不自动灌入历史片 */
+  const phoneSrc = trialUrl || resultPreviewUrl || null
 
   return (
     <div className="short-drama-page space-y-5">
@@ -3655,6 +3718,7 @@ export default function ShortDramaPage() {
                     setSceneId(s.id)
                     setFormulaId(nextFormula.id)
                     clearTrial()
+                    setResultPreviewUrl(null)
                     applyTemplate(s, nextFormula, shop)
                   }}
                   className={cn(
@@ -4361,6 +4425,8 @@ export default function ShortDramaPage() {
                 </div>
                 {trialReady ? (
                   <p className="mt-2 text-center text-xs font-medium text-cyan-800">试镜已就绪 · 请确认后再生成全片</p>
+                ) : resultPreviewUrl ? (
+                  <p className="mt-2 text-center text-xs font-medium text-cyan-800">成片预览</p>
                 ) : null}
               </div>
 
@@ -4418,7 +4484,7 @@ export default function ShortDramaPage() {
                           type="button"
                           onClick={() => {
                             setActiveWorkId(w.id)
-                            setMainTab('works')
+                            setResultPreviewUrl(w.previewUrl || w.sourceUrl || null)
                           }}
                           className="flex w-full items-center justify-between gap-2 rounded-lg px-1 py-0.5 text-left hover:bg-slate-50"
                         >
