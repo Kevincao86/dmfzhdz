@@ -1596,7 +1596,6 @@ function buildDramaXiaoyunquePrompt(opts: {
     opts.hasSceneRefs
       ? '【场景锁定】第2张是店内实拍拼贴，灯光、家具、绿植、夜景窗必须与实拍一致。'
       : '',
-      : '',
     opts.story.trim(),
     '请由小云雀智能生视频 Agent 多镜编排成片，必须有中文对白和环境声，竖屏 9:16。前 3 秒必须冲突或反转。不要字幕水印 Logo。',
   ]
