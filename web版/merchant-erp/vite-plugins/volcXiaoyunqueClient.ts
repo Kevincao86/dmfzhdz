@@ -24,14 +24,8 @@ const XYQ_SUBMIT_ACTION = 'CVSync2AsyncSubmitTask'
 const XYQ_GET_ACTION = 'CVSync2AsyncGetResult'
 const XYQ_REQ_KEY_NOREF = 'pippit_iv2v_v20_cvtob'
 const XYQ_REQ_KEY_REF = 'pippit_iv2v_v20_cvtob_with_vinput'
-/** 即梦视频生成 3.0 Pro：上传照片图生，不走方舟 Seedance 真人库拦截 */
-const JIMENG_I2V_REQ_KEY = 'jimeng_ti2v_v30_pro'
-const JIMENG_I2V_REQ_KEY_FALLBACK = 'jimeng_ti2v_v30'
-const JIMENG_I2V_REQ_KEY_VGFM = 'jimeng_vgfm_i2v_l20'
-
 const NOREF_KEYS = [XYQ_REQ_KEY_NOREF]
 const REF_KEYS = [XYQ_REQ_KEY_REF]
-const JIMENG_I2V_KEYS = [JIMENG_I2V_REQ_KEY, JIMENG_I2V_REQ_KEY_FALLBACK, JIMENG_I2V_REQ_KEY_VGFM]
 
 export function isXiaoyunqueConfigured(env: MerchantAiEnv): boolean {
   return Boolean(resolveVolcVisualCredentials(env))
@@ -135,9 +129,9 @@ function reqKeyAttempts(
     reqKey,
     getAction: customGet || XYQ_GET_ACTION,
   })
-  /** 有角色图：先小云雀有声；仅 Agent 未开通时才尝试即梦锁脸 */
+  /** 有角色/参考图：只走小云雀有声，禁止即梦单图和无参考文生 */
   if (hasImageRef && !hasVideoRef) {
-    const rows = [xyqRow(XYQ_REQ_KEY_NOREF), ...JIMENG_I2V_KEYS.map((reqKey) => xyqRow(reqKey))]
+    const rows = [xyqRow(XYQ_REQ_KEY_NOREF)]
     if (customKey && !rows.some((r) => r.reqKey === customKey)) {
       rows.unshift(xyqRow(customKey))
     }
@@ -513,7 +507,14 @@ export async function volcSubmitXiaoyunqueTask(
   const binaries = mixed.binaries
   const videoUrls = publicHttpUrls(opts.videoUrls, 50)
   const hasVideoRef = videoUrls.length > 0
-  const hasImageRef = imageUrls.length > 0 || binaries.length > 0
+  const imageCount = imageUrls.length + binaries.length
+  const hasImageRef = imageCount > 0
+  if (imageCount < 2) {
+    return {
+      ok: false,
+      message: '必须同时提交角色图和参考画面，已拒绝纯文案生成。',
+    }
+  }
 
   const errors: string[] = []
   let xyqNotOpened = false

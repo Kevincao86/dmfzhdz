@@ -3206,6 +3206,16 @@ export async function handleMerchantAiVideoRoutes(input: {
       return true
     }
     if (String(parsed.pipeline ?? '').trim() === 'xiaoyunque') {
+      const xyqImages = Array.isArray(parsed.images_base64)
+        ? parsed.images_base64.filter((x) => typeof x === 'string' && String(x).trim()).length
+        : 0
+      if (xyqImages < 2) {
+        json(res, 400, {
+          ok: false,
+          message: '必须同时提交角色图和参考画面，已拒绝纯文案生成。',
+        })
+        return true
+      }
       const xyq = await volcPostXiaoyunqueVideoTask(env, parsed)
       if (xyq.ok === true) {
         const dur = parseVideoDurationFromFlags(

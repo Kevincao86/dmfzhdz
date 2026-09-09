@@ -54,10 +54,8 @@ import { probeVideoDurationSec } from '../lib/digitalHumanSubtitle'
 import { readMpSessionToken } from '../lib/merchantApiAuth'
 import { extractVideoFirstFramePureBase64 } from '../lib/videoFrameUtils'
 import { planLongformSegmentDurations } from '../lib/shortVideoScriptTable'
-import { sanitizePromptForSeedanceNativeAv } from '../lib/shortVideoPostProcess'
 import {
   SEEDANCE_QUALITY_OPTIONS,
-  VIDEO_ENGINE_LABEL_SEEDANCE,
   type SeedanceQualityId,
 } from '../lib/shortVideoUiLabels'
 import { postAiAgentNativeImage, postAiChat } from '../services/ai/aiClient'
@@ -73,7 +71,6 @@ import {
   fetchVideoAiConfig,
   formatVideoAiUserError,
   postVideoLastFrameFromUrl,
-  runShortVideoJobWithFailover,
   runXiaoyunqueVideoJob,
   type VideoAiBackendConfig,
 } from '../services/videoAiApi'
@@ -1550,7 +1547,6 @@ const DRAMA_REF_MAX = 6
 const DRAMA_REF_VIDEO_MAX_BYTES = 12 * 1024 * 1024
 const DRAMA_R2V_MAX_IMAGES = 9
 const DRAMA_CAST_MAX = 6
-const SEEDANCE_RECOMMENDED_PAID_ID = 'doubao-seedance-2-5-260628'
 
 function newCastMember(index: number): DramaCastMember {
   return {
@@ -1608,7 +1604,7 @@ function buildDramaXiaoyunquePrompt(opts: {
 }
 
 function isDramaPhotoAwareVideoModel(modelUsed: string | null | undefined): boolean {
-  return /pippit_iv2v|jimeng_ti2v|jimeng_i2v|jimeng_vgfm_i2v/i.test(String(modelUsed || ''))
+  return /pippit_iv2v/i.test(String(modelUsed || ''))
 }
 
 function parseRoleNames(raw: string): string[] {
@@ -1731,21 +1727,16 @@ function dramaJimengPhotoReady(cfg: VideoAiBackendConfig | null): boolean {
 function dramaXiaoyunqueHint(cfg: VideoAiBackendConfig | null, cfgLoaded: boolean): string {
   if (!cfgLoaded) return ''
   if (dramaXiaoyunqueReady(cfg)) {
-    return ' 当前：小云雀 Agent 已开通。有角色照片时只走有声短剧（仅提交角色形象）；失败会直接报原因，不再偷偷改即梦无声片。'
+    return ' 当前：必须同时确认角色形象并上传参考画面，才会交给小云雀有声短剧。不能只凭文案出片，失败会直接报原因。'
   }
   if (dramaJimengPhotoReady(cfg)) {
     const detail = String(cfg?.xiaoyunqueProbeDetail || '').trim()
     return (
       ` 当前：视觉云已绑定，但小云雀探测未通过${detail ? `（${detail}）` : ''}。` +
-      '提交时仍会先打小云雀；若欠费或未开通会明确报错。仅确认未开通时才兜底即梦无声锁脸。'
+      '仍须提交角色图+参考画面；未开通或欠费会明确报错，不会改成纯文案成片。'
     )
   }
-  return ' 当前：小云雀未配置（请运营台填即梦/小云雀 AK/SK），无角色照片时长片将走拼接兜底。'
-}
-
-function pickRecommendedPaidSeedance(cfg: VideoAiBackendConfig | null): string {
-  const ids = (cfg?.arkVideoModels ?? []).map((m) => String(m.endpointId || '').trim()).filter(Boolean)
-  return ids.find((id) => /seedance-2-5|seedance-2\.5/i.test(id)) || SEEDANCE_RECOMMENDED_PAID_ID
+  return ' 当前：小云雀未配置（请运营台填即梦/小云雀 AK/SK）。未配置时不能生成，以免走纯文案片。'
 }
 
 function asDramaMp4Blob(blob: Blob): Blob {
@@ -2286,8 +2277,8 @@ export default function ShortDramaPage() {
         if (!resolved?.startsWith('data:image/')) continue
         portraits.push(await compressPortraitDataUrlForLibrary(resolved))
       }
-      if (confirmed.length > 0 && portraits.length === 0) {
-        throw new Error('已确认的角色形象未能编码成图片，无法提交给模型。请重新上传角色照片后再生成。')
+      if (portraits.length === 0) {
+        throw new Error('请先确认至少一位角色形象（上传照片或生成并确认预览）。不能只凭文案出片。')
       }
       const scenes: string[] = []
       for (const item of refItems) {
@@ -2295,8 +2286,8 @@ export default function ShortDramaPage() {
         if (!raw.startsWith('data:image/')) continue
         scenes.push(await compressPortraitDataUrlForLibrary(raw))
       }
-      if (refItems.length > 0 && scenes.length === 0) {
-        throw new Error('已上传参考画面，但未能编码成图片。请重新上传店内实拍后再生成。')
+      if (scenes.length === 0) {
+        throw new Error('请先上传至少一张参考画面。角色图和店内参考必须同时提交，不能只凭文案出片。')
       }
       let cont = ''
       const contRaw = String(continueFrame ?? '').trim()
@@ -2311,22 +2302,11 @@ export default function ShortDramaPage() {
       const sceneSlot = scenePacked.startsWith('data:image/')
         ? await compressPortraitDataUrlForLibrary(scenePacked)
         : ''
-      const out: string[] = []
-      if (portraits.length && sceneSlot) {
-        out.push(cont || portraits[0]!)
-        out.push(sceneSlot)
-      } else if (portraits.length) {
-        out.push(portraits[0]!)
-        if (cont && cont !== portraits[0]) out.push(cont)
-        else if (portraits[1]) out.push(portraits[1])
-      } else if (sceneSlot) {
-        if (cont) out.push(cont)
-        out.push(sceneSlot)
-      } else if (cont) {
-        out.push(cont)
+      if (!sceneSlot) {
+        throw new Error('参考画面未能编码成图片。请重新上传店内实拍后再生成。')
       }
-      const packed = [...new Set(out)].slice(0, 2)
-      if (portraits.length && scenes.length && packed.length < 2) {
+      const packed = [...new Set([cont || portraits[0]!, sceneSlot])].slice(0, 2)
+      if (packed.length < 2) {
         throw new Error('角色图和参考画面必须同时提交给模型。请重新上传后再生成。')
       }
       return packed
@@ -2675,26 +2655,27 @@ export default function ShortDramaPage() {
       .join('\n')
   }, [metaPrompt, durationSec, formula, longPlan, showPreviewGate])
 
-  const seedancePaidModel = useMemo(() => pickRecommendedPaidSeedance(cfg), [cfg])
-
   const gateReason = useMemo((): string | null => {
     if (busy) return '正在生成短剧，请稍候'
     if (storyBusy) return '正在生成故事，请稍候'
     if (!cfgLoaded) return '正在加载视频引擎配置'
     if (cfg?.configLoadError) return `视频配置加载失败：${cfg.configLoadError.slice(0, 120)}`
-    if (!cfg?.arkKeyConfigured) {
-      return `当前环境未开通${VIDEO_ENGINE_LABEL_SEEDANCE}，请在运营台配置后再生成。`
-    }
-    if (!(cfg?.arkVideoModels?.length ?? 0)) {
-      return '视频服务已配置但未设置模型端点，请在运营台完成短剧模型配置。'
+    if (!cfg?.xiaoyunqueConfigured) {
+      return '请在运营台配置即梦/小云雀后再生成。短剧必须带角色图和参考画面，不再走纯文案模型。'
     }
     if (!durationSelected) return '请先选择成片时长'
     if (!story.trim()) return '请先确认一句话故事，或点「AI生成故事」。'
+    if (!cast.some((m) => String(m.preview || '').trim())) {
+      return '请先确认角色形象（上传照片或生成并确认预览），不能只凭文案生成。'
+    }
+    if (refItems.length === 0) {
+      return '请先上传至少一张参考画面，角色和店内场景必须一起用。'
+    }
     if (mediaBusy) return '正在处理参考画面，请稍候'
     if (portraitBusy) return '正在补充角色画像，请稍候'
     if (characterBusy) return '正在生成角色形象，请稍候'
     return null
-  }, [busy, storyBusy, cfgLoaded, cfg, durationSelected, story, mediaBusy, portraitBusy, characterBusy])
+  }, [busy, storyBusy, cfgLoaded, cfg, durationSelected, story, cast, refItems.length, mediaBusy, portraitBusy, characterBusy])
 
   useEffect(() => {
     mountedRef.current = true
@@ -2751,64 +2732,39 @@ export default function ShortDramaPage() {
     onProgress?: (t: string) => void
   }) => {
     const imgs = (opts.images_base64 ?? []).map((s) => String(s).trim()).filter(Boolean)
-    if (cast.some((m) => m.preview) && imgs.length === 0) {
+    if (imgs.length < 2) {
       return {
         ok: false as const,
-        message: '已确认角色形象，但提交时没有带上照片。请重新上传角色图后再生成。',
+        message: '必须同时提交角色图和参考画面，已拒绝纯文案生成。请确认角色形象并上传店内参考后再试。',
       }
     }
     const identity = buildDramaIdentityLock(cast, roles)
     const leadName = buildDramaStoryCastBrief(cast, roles).leadName
-    const prompt = imgs.length
-      ? ''
-      : [identity, opts.prompt, fusionPromptNote].filter(Boolean).join('\n')
-    if (imgs.length > 0) {
-      const kb = Math.max(1, Math.round(imgs.reduce((n, s) => n + s.length, 0) / 1370))
-      opts.onProgress?.(
-        `已提交 ${imgs.length} 张参考（角色${refItems.length ? '+店内画面' : ''}，约 ${kb}KB），先走小云雀有声短剧…`,
-      )
-      const xyqPrompt = buildDramaXiaoyunquePrompt({
-        leadName,
-        identity,
-        story: [opts.prompt, fusionPromptNote].filter(Boolean).join('\n'),
-        hasSceneRefs: refItems.length > 0,
-      })
-      const xyq = await runXiaoyunqueVideoJob({
-        prompt: xyqPrompt,
-        durationSec: Math.max(5, opts.durationSec),
-        aspectRatio: '9:16',
-        images_base64: imgs,
-        shouldCancel: () => cancelRef.current,
-        onProgress: opts.onProgress,
-      })
-      if (xyq.ok && isDramaPhotoAwareVideoModel(xyq.modelUsed)) {
-        return { ok: true as const, videoUrl: xyq.videoUrl, modelUsed: xyq.modelUsed, engineUsed: 'seedance' as const }
-      }
-      return {
-        ok: false as const,
-        message:
-          formatVideoAiUserError(xyq.ok ? '角色图未进入小云雀/即梦' : xyq.message) ||
-          '小云雀有声短剧未成功。写实角色照不能走方舟 Seedance（会拦首帧），未改文生换脸。',
-      }
-    }
-    /** 无角色图才走方舟 Seedance 文生 */
-    const model = seedancePaidModel
-    const flags = `--dur ${opts.durationSec} --fps 24 --ratio 9:16 --wm false --resolution ${resolution}`
-    return runShortVideoJobWithFailover({
-      engine: 'seedance',
-      body: {
-        prompt: sanitizePromptForSeedanceNativeAv(prompt),
-        flags,
-        model,
-        skip_qwen: true,
-        lock_model: true,
-        generate_audio: true,
-      },
-      poolModels: [model],
+    const kb = Math.max(1, Math.round(imgs.reduce((n, s) => n + s.length, 0) / 1370))
+    opts.onProgress?.(`已提交角色+店内参考（${imgs.length} 张，约 ${kb}KB），只走小云雀有声短剧…`)
+    const xyqPrompt = buildDramaXiaoyunquePrompt({
+      leadName,
+      identity,
+      story: [opts.prompt, fusionPromptNote].filter(Boolean).join('\n'),
+      hasSceneRefs: true,
+    })
+    const xyq = await runXiaoyunqueVideoJob({
+      prompt: xyqPrompt,
+      durationSec: Math.max(5, opts.durationSec),
+      aspectRatio: '9:16',
+      images_base64: imgs,
       shouldCancel: () => cancelRef.current,
       onProgress: opts.onProgress,
-      allowAutoHalveDuration: false,
     })
+    if (xyq.ok && isDramaPhotoAwareVideoModel(xyq.modelUsed)) {
+      return { ok: true as const, videoUrl: xyq.videoUrl, modelUsed: xyq.modelUsed, engineUsed: 'seedance' as const }
+    }
+    return {
+      ok: false as const,
+      message:
+        formatVideoAiUserError(xyq.ok ? '成片未带上角色/参考图，已丢弃以免变成文案片' : xyq.message) ||
+        '小云雀有声短剧未成功。未改走方舟文生，以免丢掉角色和店内场景。',
+    }
   }
 
   const finishAsWork = async (opts: {
@@ -2871,78 +2827,43 @@ export default function ShortDramaPage() {
     const fusionImgs = await prepareDramaModelImages()
     const leadName = buildDramaStoryCastBrief(cast, roles).leadName
     const identity = buildDramaIdentityLock(cast, roles)
-    const xyqPrompt = fusionImgs.length
-      ? buildDramaXiaoyunquePrompt({
-          leadName,
-          identity,
-          story: [
-            metaPrompt,
-            `目标总时长约 ${total} 秒，竖屏 9:16。`,
-            `戏剧四拍：${formula.beats.join(' → ')}。`,
-          ].join('\n'),
-          hasSceneRefs: refItems.length > 0,
-        })
-      : [
-          identity,
-          metaPrompt,
-          `目标总时长约 ${total} 秒，竖屏 9:16。`,
-          `戏剧四拍：${formula.beats.join(' → ')}。`,
-          '请由小云雀智能生视频 Agent 多镜编排成片，前 3 秒必须冲突或反转，禁止拖沓空镜与电影片头片尾。',
-        ]
-          .filter(Boolean)
-          .join('\n')
-    if (fusionImgs.length > 0) {
-      setProgress(
-        `小云雀有声短剧全片（${fusionImgs.length} 张参考${refItems.length ? '：角色+店内画面' : ''}，约 ${total} 秒）…`,
-      )
-      const xyq = await runXiaoyunqueVideoJob({
-        prompt: xyqPrompt,
-        durationSec: total,
-        aspectRatio: '9:16',
-        images_base64: fusionImgs,
-        shouldCancel: () => cancelRef.current,
-        onProgress: (t) => {
-          if (mountedRef.current) setProgress(t)
-        },
-      })
-      if (xyq.ok && isDramaPhotoAwareVideoModel(xyq.modelUsed)) {
-        await finishAsWork({
-          billId,
-          videoUrlOrBlob: xyq.videoUrl,
-          title: shop.storeName.trim() || story.trim().slice(0, 18) || scene.name,
-          durationSec: total,
-          modelUsed: xyq.modelUsed ?? 'xiaoyunque',
-        })
-        return
-      }
-      setProgress(
-        `小云雀全片未出，改分段生成…（${formatVideoAiUserError(xyq.ok ? '角色图未进入小云雀/即梦' : xyq.message).slice(0, 80)}）`,
-      )
+    if (fusionImgs.length < 2) {
+      throw new Error('必须同时提交角色图和参考画面，已拒绝纯文案生成。')
     }
-
-    if (dramaXiaoyunqueReady(cfg) && fusionImgs.length === 0) {
-      setProgress(`小云雀 Agent 生成全片（约 ${total} 秒）…`)
-      const xyq = await runXiaoyunqueVideoJob({
-        prompt: xyqPrompt,
+    const xyqPrompt = buildDramaXiaoyunquePrompt({
+      leadName,
+      identity,
+      story: [
+        metaPrompt,
+        `目标总时长约 ${total} 秒，竖屏 9:16。`,
+        `戏剧四拍：${formula.beats.join(' → ')}。`,
+      ].join('\n'),
+      hasSceneRefs: true,
+    })
+    setProgress(`小云雀有声短剧全片（角色+店内参考，约 ${total} 秒）…`)
+    const xyq = await runXiaoyunqueVideoJob({
+      prompt: xyqPrompt,
+      durationSec: total,
+      aspectRatio: '9:16',
+      images_base64: fusionImgs,
+      shouldCancel: () => cancelRef.current,
+      onProgress: (t) => {
+        if (mountedRef.current) setProgress(t)
+      },
+    })
+    if (xyq.ok && isDramaPhotoAwareVideoModel(xyq.modelUsed)) {
+      await finishAsWork({
+        billId,
+        videoUrlOrBlob: xyq.videoUrl,
+        title: shop.storeName.trim() || story.trim().slice(0, 18) || scene.name,
         durationSec: total,
-        aspectRatio: '9:16',
-        shouldCancel: () => cancelRef.current,
-        onProgress: (t) => {
-          if (mountedRef.current) setProgress(t)
-        },
+        modelUsed: xyq.modelUsed ?? 'xiaoyunque',
       })
-      if (xyq.ok) {
-        await finishAsWork({
-          billId,
-          videoUrlOrBlob: xyq.videoUrl,
-          title: shop.storeName.trim() || story.trim().slice(0, 18) || scene.name,
-          durationSec: total,
-          modelUsed: xyq.modelUsed ?? 'xiaoyunque',
-        })
-        return
-      }
-      setProgress(`小云雀失败，改用 Seedance 分段拼接兜底…（${formatVideoAiUserError(xyq.message).slice(0, 80)}）`)
+      return
     }
+    setProgress(
+      `小云雀全片未出，改分段图生（仍带角色+参考）…（${formatVideoAiUserError(xyq.ok ? '成片未带上参考图' : xyq.message).slice(0, 80)}）`,
+    )
 
     const plan = planLongformSegmentDurations(total)
     const beats = expandBeats(formula, plan.length)
@@ -2962,7 +2883,9 @@ export default function ShortDramaPage() {
       } else {
         images = await prepareDramaModelImages()
       }
-      if (!images.length) images = undefined
+      if (!images || images.length < 2) {
+        throw new Error('分段生成缺少角色图或参考画面，已停止以免变成文案片。')
+      }
       const prompt = buildSegmentPrompt({
         meta: metaPrompt,
         beat: beats[i]!,

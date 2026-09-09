@@ -1710,27 +1710,28 @@ export async function runXiaoyunqueVideoJob(opts: {
     opts.flags?.trim() ||
     `--dur ${durationSec} --fps 24 --ratio ${aspect} --wm false`
   const imgs = (opts.images_base64 ?? []).map((s) => String(s).trim()).filter(Boolean)
-  opts.onProgress?.(
-    imgs.length
-      ? `小云雀有声短剧提交中（${imgs.length} 张角色参考图，目标 ${durationSec} 秒）…`
-      : `小云雀 Agent 提交中（目标 ${durationSec} 秒）…`,
-  )
+  if (imgs.length < 2) {
+    return {
+      ok: false,
+      message: '短剧必须同时提交角色图和参考画面，已拒绝纯文案生成。',
+    }
+  }
+  opts.onProgress?.(`小云雀有声短剧提交中（角色+参考 ${imgs.length} 张，目标 ${durationSec} 秒）…`)
   const start = await postSeedanceVideoStart({
     prompt: opts.prompt,
     flags,
     durationSec,
     pipeline: 'xiaoyunque',
     skip_qwen: true,
-    images_base64: imgs.length ? imgs : undefined,
+    images_base64: imgs,
   })
   if (!start.ok) return { ok: false, message: formatVideoAiUserError(start.message) }
   const usedModel = String(start.modelUsed || '')
-  const usedJimeng = /jimeng_ti2v|jimeng_i2v|jimeng_vgfm_i2v/i.test(usedModel)
   const usedXiaoyunque = /pippit_iv2v/i.test(usedModel)
-  if (imgs.length > 0 && !usedJimeng && !usedXiaoyunque) {
+  if (!usedXiaoyunque) {
     return {
       ok: false,
-      message: `角色照片未进入小云雀/即梦（当前 ${usedModel || '未知'}）。未采用无参考成片，以免换脸。`,
+      message: `参考图未进入小云雀有声短剧（当前 ${usedModel || '未知'}）。未采用纯文案成片，以免换脸换景。`,
     }
   }
 
