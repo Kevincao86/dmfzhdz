@@ -1577,7 +1577,7 @@ function buildDramaIdentityLock(cast: DramaCastMember[], roles: string): string 
   if (confirmed.length === 1) {
     return [
       '【角色锁定】',
-      `首帧图就是${name}，必须让这张图里的人动起来，同一张脸同一发型同一套衣服。`,
+      `首帧图就是已站在店内的${name}，必须让这张图里的人动起来，同一张脸同一发型同一套衣服，人物必须吃到店内灯光。`,
       desc ? `外貌：${desc}。` : '',
       '镜头始终跟拍该角色；顾客最多露手或背影，禁止换脸或改拍男性。',
     ]
@@ -1601,7 +1601,7 @@ function buildDramaXiaoyunquePrompt(opts: {
   const lead = opts.leadName.trim() || '主角'
   return [
     opts.identity,
-    `【首帧进片】第1张图已经是${lead}站在店内实拍空间里的画面，必须让这张图动起来。同一张脸、同一套衣服、同一家店。禁止另起文案空间、禁止换人换景。`,
+    `【首帧进片】第1张是${lead}已光影融合进店内实拍的电影剧照（同一张脸、同一套衣服、同一家店，灯光打在人身上）。必须让这张图动起来。禁止抠图贴图、禁止白边贴纸、禁止左右分屏、禁止另起文案空间。`,
     opts.hasSceneRefs
       ? '【场景锁定】第2张是店内实拍拼贴，灯光、家具、绿植、夜景窗必须与实拍一致。'
       : '',
@@ -1981,40 +1981,133 @@ async function composeDramaSceneCollage(dataUrls: string[]): Promise<string | nu
   }
 }
 
-/** 把角色叠进店内实拍，做成 9:16 首帧，图生才能真正进片而不是文案另画 */
-async function composeDramaCastInScene(portraitUrl: string, sceneUrl: string): Promise<string | null> {
+/** 左右对照给生图模型看：左角色、右店内。禁止把这张拼贴当视频首帧。 */
+async function composeDramaFusionBriefing(portraitUrl: string, sceneUrl: string): Promise<string | null> {
   try {
     const [person, scene] = await Promise.all([
       loadDramaCanvasImage(portraitUrl),
       loadDramaCanvasImage(sceneUrl),
     ])
-    const W = 720
-    const H = 1280
+    const W = 1400
+    const H = 788
     const canvas = document.createElement('canvas')
     canvas.width = W
     canvas.height = H
     const ctx = canvas.getContext('2d')
     if (!ctx) return null
-    const sScale = Math.max(W / Math.max(1, scene.width), H / Math.max(1, scene.height))
-    ctx.drawImage(
-      scene,
-      (W - scene.width * sScale) / 2,
-      (H - scene.height * sScale) / 2,
-      scene.width * sScale,
-      scene.height * sScale,
-    )
-    const boxW = W * 0.78
-    const boxH = H * 0.68
-    const boxX = (W - boxW) / 2
-    const boxY = H - boxH - 28
-    const pScale = Math.min(boxW / Math.max(1, person.width), boxH / Math.max(1, person.height))
+    ctx.fillStyle = '#0b0d12'
+    ctx.fillRect(0, 0, W, H)
+    const mid = W / 2
+    const pScale = Math.min(mid / Math.max(1, person.width), H / Math.max(1, person.height))
     const pw = person.width * pScale
     const ph = person.height * pScale
-    ctx.drawImage(person, boxX + (boxW - pw) / 2, boxY + (boxH - ph), pw, ph)
-    return canvas.toDataURL('image/jpeg', 0.86)
+    ctx.drawImage(person, (mid - pw) / 2, (H - ph) / 2, pw, ph)
+    const sScale = Math.max(mid / Math.max(1, scene.width), H / Math.max(1, scene.height))
+    const sw = scene.width * sScale
+    const sh = scene.height * sScale
+    ctx.drawImage(scene, mid + (mid - sw) / 2, (H - sh) / 2, sw, sh)
+    return canvas.toDataURL('image/jpeg', 0.84)
   } catch {
     return null
   }
+}
+
+const DRAMA_FUSION_PROMPT = [
+  '图生图：参考图是左右对照，不是成片构图。',
+  '左半边人物必须原样保留：同一张脸、同一发型发色、同一套衣服和体态，禁止换脸。',
+  '右半边是店内实拍：走廊、灯光、地面、墙面、霓虹必须用这间店，禁止另造空间。',
+  '输出一张竖屏 9:16 电影剧照：该人物真实站在这间店的空间里，脚踩地面，有透视和景深。',
+  '店内灯光（含霓虹）必须打到皮肤、头发和衣服上，有环境色反射，人物与环境光影一体。',
+  '禁止左右分屏、禁止拼贴、禁止抠图白边、禁止贴纸悬浮、禁止图层叠加感、禁止文字水印 Logo。',
+].join('')
+
+function dramaFusionCacheKey(portrait: string, scene: string): string {
+  return `${portrait.length}:${portrait.slice(-48)}:${scene.length}:${scene.slice(-48)}`
+}
+
+/** 用生图把角色融入店内实拍，得到 9:16 进片图。失败就报错，禁止 canvas 贴图兜底。 */
+async function fuseDramaCastIntoScene(opts: {
+  portraitUrl: string
+  sceneUrl: string
+  onProgress?: (msg: string) => void
+}): Promise<string> {
+  const briefing = await composeDramaFusionBriefing(opts.portraitUrl, opts.sceneUrl)
+  if (!briefing?.startsWith('data:image/')) {
+    throw new Error('角色图或店内参考无法解码，请重新上传后再生成。')
+  }
+  const ref = await compressPortraitDataUrlForLibrary(briefing)
+  const common = {
+    exactPrompt: true as const,
+    aspectRatio: '9:16' as const,
+    wanxSize: '864x1536',
+    referenceImageDataUrl: ref,
+  }
+  const attempts: Array<{ label: string; run: () => ReturnType<typeof postAiAgentNativeImage> }> = [
+    {
+      label: 'GPT Image 2',
+      run: () =>
+        postAiAgentNativeImage(DRAMA_FUSION_PROMPT, {
+          ...common,
+          imageRoute: 'tokenmix',
+          tokenmixImageModel: 'gpt-image-2',
+        }),
+    },
+    {
+      label: '通义万相',
+      run: () =>
+        postAiAgentNativeImage(DRAMA_FUSION_PROMPT, {
+          ...common,
+          preferredVendor: 'qwen',
+          preferredModelId: 'wan2.7-image-pro',
+        }),
+    },
+    {
+      label: '豆包 Seedream',
+      run: () =>
+        postAiAgentNativeImage(DRAMA_FUSION_PROMPT, {
+          ...common,
+          preferredVendor: 'doubao',
+          doubaoSize: '2K',
+        }),
+    },
+    {
+      label: 'GPT Image 1',
+      run: () =>
+        postAiAgentNativeImage(DRAMA_FUSION_PROMPT, {
+          ...common,
+          imageRoute: 'tokenmix',
+          tokenmixImageModel: 'gpt-image-1',
+        }),
+    },
+  ]
+  let lastErr = ''
+  const tried: string[] = []
+  for (const attempt of attempts) {
+    tried.push(attempt.label)
+    opts.onProgress?.(`正在用${attempt.label}把角色融合进店内实拍（${tried.length}/${attempts.length}）…`)
+    try {
+      const once = await attempt.run()
+      if (!once.ok) {
+        lastErr = once.message
+        continue
+      }
+      let dataUrl = once.imageUrl.trim()
+      if (!dataUrl.startsWith('data:')) {
+        const blob = await fetchImageBlob(dataUrl)
+        dataUrl = await blobToDramaDataUrl(blob)
+      }
+      if (!dataUrl.startsWith('data:image/')) {
+        lastErr = '融合图未能转成图片'
+        continue
+      }
+      return await compressPortraitDataUrlForLibrary(dataUrl)
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+    }
+  }
+  throw new Error(
+    `未能把角色融合进店内实拍（已试 ${tried.join('、')}）。${humanizeDramaImageError(lastErr)} 未采用贴图叠加，以免成片像贴纸。`,
+  )
 }
 
 function humanizeDramaImageError(raw: string): string {
@@ -2126,6 +2219,7 @@ export default function ShortDramaPage() {
   const mountedRef = useRef(true)
   const previewUrlsRef = useRef<string[]>([])
   const initedRef = useRef(false)
+  const fusedSceneFrameCacheRef = useRef<{ key: string; dataUrl: string } | null>(null)
 
   const world = worldOf(worldId)
   const visibleScenes = scenesOf(worldId)
@@ -2574,13 +2668,32 @@ export default function ShortDramaPage() {
       if (!sceneSlot) {
         throw new Error('参考画面未能编码成图片。请重新上传店内实拍后再生成。')
       }
-      const firstRaw = cont || (await composeDramaCastInScene(portraits[0]!, sceneSlot)) || portraits[0]!
+      let firstRaw = cont
+      if (!firstRaw) {
+        const key = dramaFusionCacheKey(portraits[0]!, sceneSlot)
+        if (fusedSceneFrameCacheRef.current?.key === key) {
+          firstRaw = fusedSceneFrameCacheRef.current.dataUrl
+        } else {
+          const fused = await fuseDramaCastIntoScene({
+            portraitUrl: portraits[0]!,
+            sceneUrl: sceneSlot,
+            onProgress: (t) => {
+              if (mountedRef.current) setProgress(t)
+            },
+          })
+          fusedSceneFrameCacheRef.current = { key, dataUrl: fused }
+          firstRaw = fused
+        }
+      }
       const firstSlot = firstRaw.startsWith('data:image/')
         ? await compressPortraitDataUrlForLibrary(firstRaw)
-        : portraits[0]!
+        : ''
+      if (!firstSlot) {
+        throw new Error('角色未能融合进店内实拍。请重新确认角色并上传店内参考后再生成。')
+      }
       const packed = [...new Set([firstSlot, sceneSlot])].slice(0, 2)
       if (packed.length < 2) {
-        throw new Error('角色图和参考画面必须同时做成首帧提交。请重新上传后再生成。')
+        throw new Error('角色图和参考画面必须同时提交。请重新上传后再生成。')
       }
       return packed
     },
@@ -2603,7 +2716,7 @@ export default function ShortDramaPage() {
     }
     if (refItems.length > 0) {
       bits.push(
-        `已上传 ${refItems.length} 份参考画面（含图/视频抽帧），须融合其场景、构图、光影与道具，禁止另起无关空间。`,
+        `已上传 ${refItems.length} 份参考画面（含图/视频抽帧），人物必须站进该店内空间并吃到现场灯光（霓虹反射到皮肤与衣服），禁止抠图贴图、白边、图层叠加、悬浮，禁止另起无关空间。`,
       )
     }
     return bits.join('')
@@ -3261,7 +3374,7 @@ export default function ShortDramaPage() {
     try {
       if (!showPreviewGate) {
         const fusionImgs = await prepareDramaModelImages()
-        setProgress(fusionImgs.length ? '正在按参考画面与角色形象融合生成' : '正在提交短剧生成')
+        setProgress('角色已融入店内实拍，正在生成短剧…')
         const prompt = `${metaPrompt}\n时长约 ${durationSec} 秒，竖屏 9:16 单段直出。结构：${formula.beats.join(' → ')}。`
         const r = await runOneClip({
           prompt,
