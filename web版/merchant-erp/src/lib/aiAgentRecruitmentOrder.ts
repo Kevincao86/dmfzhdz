@@ -5,6 +5,7 @@ import type { AiRecruitmentIntent } from './aiAgentRecruitmentParse'
 import type { NoviceAllocation } from '../services/recruitmentNoviceAllocationAi'
 import { kolTierStrategyLabel } from '../services/recruitmentNoviceAllocationAi'
 import { buildRecruitmentTierPlan } from './merchantRecruitmentTierPlan'
+import { normalizeRecruitmentPlatform } from './recruitmentPlatformOptions'
 
 export function recruitmentOrderDetailFromRegistry(
   order: RegistryRecruitmentOrder,
@@ -53,7 +54,8 @@ export function buildRecruitmentOrderFromAgentBrief(
   const platforms = params.intent.platforms?.length
     ? params.intent.platforms
     : [params.intent.platform]
-  const platform = platforms.join('、')
+  const platformLabel = platforms.join('、')
+  const recruitmentPlatform = normalizeRecruitmentPlatform(platforms[0] || '抖音')
   const isXhs = !platforms.includes('抖音')
   const tags = brief.tags?.length ? brief.tags.join('、') : '—'
   const { allocation, intent } = params
@@ -81,8 +83,8 @@ export function buildRecruitmentOrderFromAgentBrief(
     talentId: '—',
     talentName: '智能体·待星选报名',
     fans: headcount,
-    accountType: brief.platform || platform,
-    recruitmentPlatform: platform,
+    accountType: brief.platform || platformLabel,
+    recruitmentPlatform,
     coopTimes: 0,
     createdAt: new Date().toLocaleString('zh-CN', { hour12: false }),
     status: 'pending',
@@ -97,7 +99,7 @@ export function buildRecruitmentOrderFromAgentBrief(
     workflowStage: 'submitted',
     tierPlan,
     infoSummary: [
-      `【智能体·开环招募】平台:${platform}；城市:${intent.city || '—'}；预算¥${intent.budgetYuan}；`,
+      `【智能体·开环招募】平台:${platformLabel}；城市:${intent.city || '—'}；预算¥${intent.budgetYuan}；`,
       isXhs ? '' : `达人佣金:${intent.kolCommissionPct}%；`,
       isXhs ? '' : `策略:${kolTierStrategyLabel(intent.strategy)}；`,
       `档位:${tierLine}；分配:${allocation.source === 'library' ? '达人库测算' : allocation.source === 'ai' ? 'AI模型' : '规则估算'}；`,
