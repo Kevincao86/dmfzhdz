@@ -1591,11 +1591,15 @@ function buildDramaXiaoyunquePrompt(opts: {
   leadName: string
   identity: string
   story: string
+  hasSceneRefs?: boolean
 }): string {
   const lead = opts.leadName.trim() || '主角'
   return [
     opts.identity,
     `【参考图出演】已提交角色照片：必须让参考图里的${lead}出演，同一张脸同一发型同一套衣服。禁止另造人物、禁止换脸。配角最多露手或背影。`,
+    opts.hasSceneRefs
+      ? '【场景锁定】除角色外的参考图是店内实拍（或多图拼贴）。必须在该空间拍戏：同样的灯光、家具、绿植、夜景窗与道具，禁止换成无关室内或室外。'
+      : '',
     opts.story.trim(),
     '请由小云雀智能生视频 Agent 多镜编排成片，必须有中文对白和环境声，竖屏 9:16。前 3 秒必须冲突或反转。不要字幕水印 Logo。',
   ]
@@ -1771,6 +1775,53 @@ function toDramaImageDataUrl(raw: string): string {
   if (!s) return ''
   if (s.startsWith('data:')) return s
   return `data:image/jpeg;base64,${s}`
+}
+
+function loadDramaCanvasImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error('参考画面解码失败'))
+    img.src = src
+  })
+}
+
+/** 多张店内参考压成一张拼贴，占小云雀第 2 槽，避免只交角色图把场景丢掉 */
+async function composeDramaSceneCollage(dataUrls: string[]): Promise<string | null> {
+  const urls = dataUrls
+    .map((u) => {
+      const s = String(u || '').trim()
+      if (s.startsWith('data:image/')) return s
+      return toDramaImageDataUrl(s)
+    })
+    .filter((u) => u.startsWith('data:image/'))
+  if (!urls.length) return null
+  if (urls.length === 1) return urls[0]!
+  try {
+    const imgs = await Promise.all(urls.map((u) => loadDramaCanvasImage(u)))
+    const n = imgs.length
+    const cols = n <= 4 ? 2 : 3
+    const rows = Math.ceil(n / cols)
+    const cell = 480
+    const canvas = document.createElement('canvas')
+    canvas.width = cols * cell
+    canvas.height = rows * cell
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return urls[0]!
+    ctx.fillStyle = '#0f1115'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    imgs.forEach((img, i) => {
+      const x = (i % cols) * cell
+      const y = Math.floor(i / cols) * cell
+      const scale = Math.max(cell / Math.max(1, img.width), cell / Math.max(1, img.height))
+      const w = img.width * scale
+      const h = img.height * scale
+      ctx.drawImage(img, x + (cell - w) / 2, y + (cell - h) / 2, w, h)
+    })
+    return canvas.toDataURL('image/jpeg', 0.84)
+  } catch {
+    return urls[0] ?? null
+  }
 }
 
 function humanizeDramaImageError(raw: string): string {
@@ -2228,27 +2279,59 @@ export default function ShortDramaPage() {
 
   const prepareDramaModelImages = useCallback(
     async (continueFrame?: string) => {
-      const out: string[] = []
+      const portraits: string[] = []
       const confirmed = cast.filter((m) => String(m.preview || '').trim())
       for (const m of confirmed) {
         const resolved = await resolveDramaPortraitDataUrl(m.preview!)
         if (!resolved?.startsWith('data:image/')) continue
-        out.push(await compressPortraitDataUrlForLibrary(resolved))
+        portraits.push(await compressPortraitDataUrlForLibrary(resolved))
       }
-      if (confirmed.length > 0 && out.length === 0) {
+      if (confirmed.length > 0 && portraits.length === 0) {
         throw new Error('已确认的角色形象未能编码成图片，无法提交给模型。请重新上传角色照片后再生成。')
       }
+      const scenes: string[] = []
+      for (const item of refItems) {
+        const raw = toDramaImageDataUrl(item.imageDataUrl)
+        if (!raw.startsWith('data:image/')) continue
+        scenes.push(await compressPortraitDataUrlForLibrary(raw))
+      }
+      if (refItems.length > 0 && scenes.length === 0) {
+        throw new Error('已上传参考画面，但未能编码成图片。请重新上传店内实拍后再生成。')
+      }
+      let cont = ''
       const contRaw = String(continueFrame ?? '').trim()
       if (contRaw) {
         const asData = /^https?:\/\//i.test(contRaw)
           ? await resolveDramaPortraitDataUrl(contRaw)
           : toDramaImageDataUrl(contRaw)
-        if (asData?.startsWith('data:image/')) out.push(await compressPortraitDataUrlForLibrary(asData))
+        if (asData?.startsWith('data:image/')) cont = await compressPortraitDataUrlForLibrary(asData)
       }
-      /** 餐厅/场景参考图只写进提示词，不塞给小云雀：多图过大曾被悄悄打回即梦无声片 */
-      return [...new Set(out)].slice(0, 2)
+      const scenePacked =
+        scenes.length > 1 ? (await composeDramaSceneCollage(scenes)) || scenes[0]! : scenes[0] || ''
+      const sceneSlot = scenePacked.startsWith('data:image/')
+        ? await compressPortraitDataUrlForLibrary(scenePacked)
+        : ''
+      const out: string[] = []
+      if (portraits.length && sceneSlot) {
+        out.push(cont || portraits[0]!)
+        out.push(sceneSlot)
+      } else if (portraits.length) {
+        out.push(portraits[0]!)
+        if (cont && cont !== portraits[0]) out.push(cont)
+        else if (portraits[1]) out.push(portraits[1])
+      } else if (sceneSlot) {
+        if (cont) out.push(cont)
+        out.push(sceneSlot)
+      } else if (cont) {
+        out.push(cont)
+      }
+      const packed = [...new Set(out)].slice(0, 2)
+      if (portraits.length && scenes.length && packed.length < 2) {
+        throw new Error('角色图和参考画面必须同时提交给模型。请重新上传后再生成。')
+      }
+      return packed
     },
-    [cast],
+    [cast, refItems],
   )
 
   const fusionPromptNote = useMemo(() => {
@@ -2341,7 +2424,7 @@ export default function ShortDramaPage() {
       setActiveCastId(member.id)
       clearTrial()
       setHint(
-        `已为${member.name}确认角色照片。生成短剧会把这张图作为角色参考交给小云雀（有声短剧），不再按文案另画一张脸。`,
+        `已为${member.name}确认角色照片。生成时会把角色图${refItems.length ? '和参考画面一起' : ''}交给小云雀有声短剧，不再按文案另画一张脸。`,
       )
     } catch (e) {
       setErr(e instanceof Error ? e.message : '角色形象读取失败')
@@ -2681,11 +2764,14 @@ export default function ShortDramaPage() {
       : [identity, opts.prompt, fusionPromptNote].filter(Boolean).join('\n')
     if (imgs.length > 0) {
       const kb = Math.max(1, Math.round(imgs.reduce((n, s) => n + s.length, 0) / 1370))
-      opts.onProgress?.(`已把角色图提交 ${imgs.length} 张（约 ${kb}KB），先走小云雀有声短剧…`)
+      opts.onProgress?.(
+        `已提交 ${imgs.length} 张参考（角色${refItems.length ? '+店内画面' : ''}，约 ${kb}KB），先走小云雀有声短剧…`,
+      )
       const xyqPrompt = buildDramaXiaoyunquePrompt({
         leadName,
         identity,
         story: [opts.prompt, fusionPromptNote].filter(Boolean).join('\n'),
+        hasSceneRefs: refItems.length > 0,
       })
       const xyq = await runXiaoyunqueVideoJob({
         prompt: xyqPrompt,
@@ -2794,6 +2880,7 @@ export default function ShortDramaPage() {
             `目标总时长约 ${total} 秒，竖屏 9:16。`,
             `戏剧四拍：${formula.beats.join(' → ')}。`,
           ].join('\n'),
+          hasSceneRefs: refItems.length > 0,
         })
       : [
           identity,
@@ -2805,7 +2892,9 @@ export default function ShortDramaPage() {
           .filter(Boolean)
           .join('\n')
     if (fusionImgs.length > 0) {
-      setProgress(`小云雀有声短剧全片（${fusionImgs.length} 张角色参考图，约 ${total} 秒）…`)
+      setProgress(
+        `小云雀有声短剧全片（${fusionImgs.length} 张参考${refItems.length ? '：角色+店内画面' : ''}，约 ${total} 秒）…`,
+      )
       const xyq = await runXiaoyunqueVideoJob({
         prompt: xyqPrompt,
         durationSec: total,
@@ -3471,7 +3560,7 @@ export default function ShortDramaPage() {
                     </span>
                   </div>
                   <p className="text-[11px] leading-relaxed text-slate-500">
-                    上传店内实拍、成片参考或短视频，生成时会抽帧融合构图与场景。
+                    上传店内实拍、成片参考或短视频。有角色图时，角色和这些画面会一起交给模型，必须按店内场景拍，不会只出角色。
                   </p>
                   <input
                     ref={refInputRef}

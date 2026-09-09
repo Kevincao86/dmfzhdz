@@ -478,7 +478,7 @@ function buildXiaoyunqueSubmitBody(opts: {
     language: 'Chinese',
     enable_watermark: false,
   }
-  /** Agent 只要角色图；餐厅参考图一起塞进去容易请求过大，被悄悄打回即梦 */
+  /** 槽位 1=角色（或尾帧），槽位 2=店内参考/拼贴。多图原图会撑爆请求，由短剧页先压成 2 张再提交 */
   if (opts.imageUrls.length) body.img_url_list = opts.imageUrls.slice(0, 2)
   if (opts.binaries.length) body.binary_data_base64 = opts.binaries.slice(0, 2)
   if (opts.videoUrls.length) body.video_url_list = opts.videoUrls.slice(0, 50)
