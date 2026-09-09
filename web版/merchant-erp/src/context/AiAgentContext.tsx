@@ -42,6 +42,8 @@ import {
   parsePriceYuanFromApi,
   inferVoucherPricesFromText,
   isLikelyUserPromptEcho,
+  isAbstractProductIntentLabel,
+  matchPlansToProductIntents,
   parseAgentActionType,
   parseCreateProductIntents,
   parseCreateProductIntentsFromPlan,
@@ -868,7 +870,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
 
   const attachProductPlanToPreview = useCallback(
     async (previewMsgId: string, userBrief: string, assistantContent?: string) => {
-      const intents = parseCreateProductIntentsFromPlan(userBrief, assistantContent)
+      let intents = parseCreateProductIntentsFromPlan(userBrief, assistantContent)
       const userReferenceImages = userReferenceImagesFromMessages(messagesRef.current)
       const hasUserRefs = userReferenceImages.length > 0
       const imagePhaseHint = hasUserRefs
@@ -899,7 +901,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
 
       const intel = await loadFullMerchantIntelSnapshot('create_product')
       const planCtx = merchantIntelForProductPlanApi(userBrief, intel)
-      const errorPlan = (intent: (typeof intents)[number], message: string): AiProductPlanPreview => ({
+      const errorPlan = (
+        intent: (typeof intents)[number],
+        message: string,
+      ): AiProductPlanPreview => ({
         slotKey: intent.key,
         slotLabel: intent.label,
         productName: intent.label,
@@ -911,6 +916,14 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         enrichError: coerceAgentDisplayError(message, '方案生成失败'),
       })
 
+      const fetchOnePlan = async (intent: (typeof intents)[number]): Promise<AiProductPlanPreview> => {
+        const r = await fetchAiProductPlan({
+          ...planCtx,
+          userBrief: intent.brief || userBrief,
+        })
+        return r.ok ? planFromApi(intent, r.plan, userBrief) : errorPlan(intent, r.message)
+      }
+
       let basePlans: AiProductPlanPreview[]
 
       if (intents.length > 1) {
@@ -920,20 +933,54 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           intentLabels: intents.map((i) => i.label),
         })
         if (!batch.ok) {
-          basePlans = intents.map((intent) => errorPlan(intent, batch.message))
+          basePlans = []
+          for (const intent of intents) {
+            basePlans.push(await fetchOnePlan(intent))
+          }
         } else {
-          const byLabel = new Map(batch.plans.map((p) => [p.slotLabel, p]))
-          basePlans = intents.map((intent) => {
-            const plan = byLabel.get(intent.label)
+          const matched = matchPlansToProductIntents(intents, batch.plans)
+          basePlans = intents.map((intent, i) => {
+            const plan = matched[i]
             if (!plan) return errorPlan(intent, '批量方案中缺少该项')
             return planFromApi(intent, plan, userBrief)
           })
+          for (let i = 0; i < intents.length; i++) {
+            if (basePlans[i]?.enrichStatus !== 'error') continue
+            if (isAbstractProductIntentLabel(intents[i]!.label)) continue
+            basePlans[i] = await fetchOnePlan(intents[i]!)
+          }
         }
       } else {
         const r = await fetchAiProductPlan(planCtx)
         basePlans = intents.map((intent) =>
           r.ok ? planFromApi(intent, r.plan, userBrief) : errorPlan(intent, r.message),
         )
+      }
+
+      const keptIntents: typeof intents = []
+      const keptPlans: AiProductPlanPreview[] = []
+      for (let i = 0; i < intents.length; i++) {
+        const intent = intents[i]!
+        const plan = basePlans[i]
+        if (!plan) continue
+        if (plan.enrichStatus === 'error' && isAbstractProductIntentLabel(intent.label)) continue
+        keptIntents.push(intent)
+        keptPlans.push(plan)
+      }
+      if (keptPlans.length === 0) {
+        const fallbackIntent =
+          intents[0] ??
+          ({
+            key: 'main',
+            label: '商品方案',
+            brief: userBrief,
+            productType: 1,
+          } as (typeof intents)[number])
+        intents = [fallbackIntent]
+        basePlans = [await fetchOnePlan(fallbackIntent)]
+      } else {
+        intents = keptIntents
+        basePlans = keptPlans
       }
 
       const okPlans = basePlans.filter((p) => p.enrichStatus === 'loading')
@@ -966,7 +1013,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         }
         try {
           enriched.push(
-            await enrichAiProductPlanPreview(base, intents[idx].brief, modelPickerKey, {
+            await enrichAiProductPlanPreview(base, intents[idx]?.brief ?? userBrief, modelPickerKey, {
               userReferenceImages,
               boundProductImages: intel.onlineProductImageRefs,
               planIndex: idx,
@@ -996,7 +1043,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           : '主图已按套餐服务内容与经营类目生成，未套用餐饮菜品底图。'
       patchPreviewProductPlans(
         previewMsgId,
-        enriched.map((p, i) => ({ ...p, slotKey: intents[i].key, slotLabel: intents[i].label })),
+        enriched.map((p, i) => ({ ...p, slotKey: intents[i]?.key, slotLabel: intents[i]?.label })),
         intents.length > 1
           ? `已为 ${readyCount} 个商品生成 C 端预览。${imageDoneHint}请逐项核对手机效果；全部确认 OK 后才会进入达人招募 Brief（本步仅商品）。`
           : `已生成 C 端团购预览（含 AI 优化标题与主图${hasUserRefs ? '，主图参考您上传的图片' : copiedBoundHead ? '，主图参考已绑定平台在售商品图' : '，主图按服务内容生成'}）。请核对手机预览；确认后将保存至商品列表草稿箱，请在商品编辑页选择类目与门店后提交审核。`,

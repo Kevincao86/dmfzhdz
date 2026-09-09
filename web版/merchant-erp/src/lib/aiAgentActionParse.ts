@@ -701,6 +701,76 @@ function isGenericPlanSectionLabel(label: string): boolean {
   return GENERIC_PLAN_SECTION_LABEL_RE.test(t)
 }
 
+const ABSTRACT_PLAN_HEADING_CORE_RE =
+  /^(提高|提升|增加|降低|优化|改善|打造|实现|做到|强化)/
+
+/** 方案目标/策略标题（如「提高高毛利套餐」），不是可上架 SKU */
+export function isAbstractProductIntentLabel(label: string): boolean {
+  const t = label.replace(/\*\*/g, '').replace(/\s/g, '').replace(/[·•]/g, '').trim()
+  if (!t) return true
+  if (isGenericPlanSectionLabel(t)) return true
+  const core = t.replace(
+    /^(?:主套餐|次套餐|赠品策略|主推爆款|套餐组合|限时折扣|爆款套餐|组合套餐|引流套餐|福利套餐|加购套餐|次推套餐|形象套餐)[：:]/,
+    '',
+  )
+  if (ABSTRACT_PLAN_HEADING_CORE_RE.test(core) && /毛利|客单|复购|转化|引流|获客|利润|营收|高毛利/.test(core)) {
+    return true
+  }
+  if (/^(?:高毛利|提高毛利|提升毛利)套餐$/.test(core)) return true
+  if (/^(具体组品|组品建议|套餐规划|推广策略|经营策略|活动目的|方案目标)/.test(core)) return true
+  if (
+    /目的|目标|策略|思路|原则/.test(core) &&
+    /套餐|方案|组品/.test(core) &&
+    !/\d/.test(core) &&
+    core.length <= 16
+  ) {
+    return true
+  }
+  return false
+}
+
+function normalizeProductSlotKey(s: string): string {
+  return s.replace(/\s/g, '').replace(/[·•、,，:：*\-—_（）()【】\[\]]/g, '').toLowerCase()
+}
+
+function productSlotKeysLooselyMatch(a: string, b: string): boolean {
+  const na = normalizeProductSlotKey(a)
+  const nb = normalizeProductSlotKey(b)
+  if (!na || !nb) return false
+  if (na === nb) return true
+  if (na.length >= 4 && nb.length >= 4 && (na.includes(nb) || nb.includes(na))) return true
+  return false
+}
+
+/** 批量方案按标签 / 品名 / 序号对齐，避免 slotLabel 稍有差异就报「缺少该项」 */
+export function matchPlansToProductIntents<T extends { slotLabel?: string; productName?: string }>(
+  intents: CreateProductIntent[],
+  plans: T[],
+): Array<T | null> {
+  const used = new Set<number>()
+  const take = (idx: number): T => {
+    used.add(idx)
+    return plans[idx]!
+  }
+  const findUnused = (pred: (p: T, i: number) => boolean): number => {
+    for (let i = 0; i < plans.length; i++) {
+      if (used.has(i)) continue
+      if (pred(plans[i]!, i)) return i
+    }
+    return -1
+  }
+
+  return intents.map((intent, i) => {
+    let idx = findUnused((p) => productSlotKeysLooselyMatch(p.slotLabel ?? '', intent.label))
+    if (idx < 0) {
+      idx = findUnused((p) => productSlotKeysLooselyMatch(p.productName ?? '', intent.label))
+    }
+    if (idx < 0 && i < plans.length && !used.has(i)) idx = i
+    if (idx < 0) idx = findUnused(() => true)
+    return idx >= 0 ? take(idx) : null
+  })
+}
+
 /** API 返回的标题若像用户原话，勿当作商品名 */
 export function isLikelyUserPromptEcho(name: string, userBrief: string): boolean {
   const n = name.replace(/\s/g, '').trim()
@@ -757,6 +827,7 @@ function parsePlanNumberedNamedPackages(full: string): CreateProductIntent[] | n
       label.length < 2 ||
       seen.has(label) ||
       isGenericPlanSectionLabel(label) ||
+      isAbstractProductIntentLabel(label) ||
       isNonProductPlanTag(label) ||
       isGiftThresholdLine(label)
     ) {
@@ -834,7 +905,15 @@ function parsePlanNumberedComboSections(
       cleanTag && !/^主推|套餐|限时|爆款|组合|引流|福利|加购|次推|形象/.test(cleanName)
         ? `${cleanTag} · ${cleanName}`.slice(0, 48)
         : cleanName.slice(0, 48)
-    if (label.length < 2 || seen.has(label) || isGiftThresholdLine(label)) return
+    if (
+      label.length < 2 ||
+      seen.has(label) ||
+      isGiftThresholdLine(label) ||
+      isAbstractProductIntentLabel(label) ||
+      isAbstractProductIntentLabel(cleanName)
+    ) {
+      return
+    }
     seen.add(label)
     const body = slicePlanSectionBody(full, matchEnd)
     const priceYuan = parsePriceYuanFromText(body) ?? parsePriceYuanFromText(matchText)
@@ -931,7 +1010,7 @@ function parsePlanMarkdownTableComboRows(
     const name = cells[nameCol]!.replace(/\*\*/g, '').trim()
     if (name.length < 2) continue
     if (/套餐名称|合计|小计|总计|备注|示例/.test(name)) continue
-    if (isNonProductPlanTag(name) || isGiftThresholdLine(name)) continue
+    if (isNonProductPlanTag(name) || isGiftThresholdLine(name) || isAbstractProductIntentLabel(name)) continue
     if (seen.has(name)) continue
     seen.add(name)
 
@@ -972,7 +1051,8 @@ function parsePlanSlotPatternsFromFull(full: string): CreateProductIntent[] | nu
         rawLabel.length < 2 ||
         seen.has(rawLabel) ||
         isNonProductPlanTag(rawLabel) ||
-        isGenericPlanSectionLabel(rawLabel)
+        isGenericPlanSectionLabel(rawLabel) ||
+        isAbstractProductIntentLabel(rawLabel)
       ) {
         continue
       }
@@ -995,20 +1075,42 @@ function parsePlanSlotPatternsFromFull(full: string): CreateProductIntent[] | nu
 }
 
 function filterConcreteProductIntents(intents: CreateProductIntent[]): CreateProductIntent[] {
-  return intents.filter((i) => !isGenericPlanSectionLabel(i.label))
+  return intents.filter(
+    (i) => !isGenericPlanSectionLabel(i.label) && !isAbstractProductIntentLabel(i.label),
+  )
+}
+
+function intentConcretenessScore(intent: CreateProductIntent): number {
+  if (isAbstractProductIntentLabel(intent.label)) return 0
+  if (/[¥￥]\s*\d/.test(intent.brief) || /团购价约/.test(intent.brief)) return 3
+  if (/\d+\s*(?:min|分钟)|足疗|推拿|火锅|烧烤|SPA|按摩/.test(intent.label)) return 2
+  return 1
+}
+
+function trimIntentsToStatedCount(
+  intents: CreateProductIntent[],
+  statedCount: number | undefined,
+): CreateProductIntent[] {
+  const capped = intents.slice(0, 6)
+  if (!statedCount || statedCount < 1 || capped.length <= statedCount) return capped
+  const scored = capped.map((intent, i) => ({ intent, i, score: intentConcretenessScore(intent) }))
+  scored.sort((a, b) => b.score - a.score || a.i - b.i)
+  const keep = new Set(scored.slice(0, statedCount).map((s) => s.i))
+  return capped.filter((_, i) => keep.has(i))
 }
 
 function pickBestCreateProductIntents(
   candidates: { source: string; intents: CreateProductIntent[] }[],
+  statedCount?: number,
 ): CreateProductIntent[] {
   if (!candidates.length) return []
   const priority: Record<string, number> = {
-    table: 6,
+    table: 8,
+    json: 7,
     numbered_pkg: 6,
     numbered: 5,
     markdown: 4,
     slots: 3,
-    json: 2,
     menu: 1,
     user: 0,
   }
@@ -1017,10 +1119,20 @@ function pickBestCreateProductIntents(
     .filter((c) => c.intents.length > 0)
   if (!normalized.length) return []
   const sorted = [...normalized].sort((a, b) => {
-    if (b.intents.length !== a.intents.length) return b.intents.length - a.intents.length
-    return (priority[b.source] ?? 0) - (priority[a.source] ?? 0)
+    if (statedCount && statedCount >= 1) {
+      const da = Math.abs(a.intents.length - statedCount)
+      const db = Math.abs(b.intents.length - statedCount)
+      if (da !== db) return da - db
+    }
+    const pa = priority[a.source] ?? 0
+    const pb = priority[b.source] ?? 0
+    if (pb !== pa) return pb - pa
+    if (!statedCount && b.intents.length !== a.intents.length) {
+      return b.intents.length - a.intents.length
+    }
+    return 0
   })
-  return sorted[0]!.intents.slice(0, 6)
+  return trimIntentsToStatedCount(sorted[0]!.intents, statedCount)
 }
 
 const CN_PLAN_COUNT: Record<string, number> = {
@@ -1034,15 +1146,15 @@ const CN_PLAN_COUNT: Record<string, number> = {
 }
 
 function parsePlanCountFromText(text: string): number | undefined {
-  const digitM = text.match(/(\d+)\s*(?:个|套)?(?:组品|套餐|商品|方案|团购)/)
+  const digitM = text.match(/(?:共|一共|合计)?\s*(\d+)\s*(?:个|套|款)?(?:组品|套餐|商品|方案|团购)(?!项)/)
   if (digitM) {
     const n = Number.parseInt(digitM[1], 10)
-    if (Number.isFinite(n) && n >= 2) return Math.min(6, n)
+    if (Number.isFinite(n) && n >= 1) return Math.min(6, n)
   }
-  const cnM = text.match(/([一二两三四五六])\s*(?:个|套)?(?:组品|套餐|商品|方案|团购)/)
+  const cnM = text.match(/(?:共|一共)?\s*([一二两三四五六])\s*(?:个|套|款)?(?:组品|套餐|商品|方案|团购)/)
   if (cnM) {
     const n = CN_PLAN_COUNT[cnM[1]]
-    if (n && n >= 2) return Math.min(6, n)
+    if (n && n >= 1) return Math.min(6, n)
   }
   return undefined
 }
@@ -1068,7 +1180,12 @@ function createProductIntentsFromStoreMenu(
     else {
       const numbered = parsePlanNumberedComboSections(_userBrief, assistantContent ?? full)
       if (numbered?.length) planCount = numbered.length
-      else if (/组品|套餐|团购|方案|推广|组品方案|商品方案/.test(full)) planCount = 2
+      else if (
+        !assistantContent &&
+        /(?:两|二|2)\s*(?:个|套)?(?:组品|套餐|商品|方案)|多个(?:组品|套餐|方案)/.test(full)
+      ) {
+        planCount = 2
+      }
     }
   }
   if (!planCount) return null
@@ -1121,7 +1238,14 @@ function parseCreateProductIntentsFromAgentJson(
 
   const pushIntent = (label: string, priceYuan?: number, productType?: number) => {
     const clean = label.replace(/\*\*/g, '').trim().slice(0, 48)
-    if (clean.length < 2 || seen.has(clean) || isGiftThresholdLine(clean)) return
+    if (
+      clean.length < 2 ||
+      seen.has(clean) ||
+      isGiftThresholdLine(clean) ||
+      isAbstractProductIntentLabel(clean)
+    ) {
+      return
+    }
     seen.add(clean)
     const pt = productType ?? inferProductTypeFromLabel(clean, priceYuan)
     intents.push({
@@ -1264,6 +1388,7 @@ export function parseCreateProductIntentsFromPlan(
     assistantSlice.length >= 40 || (assistantContent?.trim()?.length ?? 0) >= 40 || full.length >= 200
 
   const candidates: { source: string; intents: CreateProductIntent[] }[] = []
+  const statedCount = parsePlanCountFromText(full)
 
   if (hasPlanCorpus) {
     const planUser = stripQuoteBlock(userBrief)
@@ -1289,7 +1414,7 @@ export function parseCreateProductIntentsFromPlan(
     const fromSlots = parsePlanSlotPatternsFromFull(full)
     if (fromSlots?.length) candidates.push({ source: 'slots', intents: fromSlots })
 
-    const best = pickBestCreateProductIntents(candidates)
+    const best = pickBestCreateProductIntents(candidates, statedCount)
     if (best.length) return best
   }
 
@@ -1309,7 +1434,7 @@ export function parseCreateProductIntentsFromPlan(
     candidates.push({ source: 'user', intents: fromUser })
   }
 
-  const planCount = parsePlanCountFromText(full)
+  const planCount = statedCount ?? parsePlanCountFromText(full)
   if (planCount && planCount > 1) {
     if (!userSpecifiedConcreteProducts(userBrief)) {
       const fromMenu = createProductIntentsFromStoreMenu(userBrief, assistantContent, full)
@@ -1335,7 +1460,7 @@ export function parseCreateProductIntentsFromPlan(
     if (fromMenu?.length) candidates.push({ source: 'menu', intents: fromMenu })
   }
 
-  const best = pickBestCreateProductIntents(candidates)
+  const best = pickBestCreateProductIntents(candidates, planCount)
   if (best.length) return best
 
   return fromUser
