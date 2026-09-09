@@ -1,6 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 import {
   Baby,
+  Bookmark,
   BookOpen,
   Building2,
   Camera,
@@ -30,6 +31,7 @@ import {
   Plane,
   Plus,
   Radio,
+  Save,
   Scissors,
   Shirt,
   ShoppingBag,
@@ -143,7 +145,11 @@ type DramaWork = {
 const DRAMA_WORKS_META_KEY = 'meoo-short-drama-works-v1'
 const DRAMA_WORKS_DB = 'meoo-short-drama-works'
 const DRAMA_WORKS_STORE = 'mp4'
+const DRAMA_CAST_STORE = 'cast'
+const DRAMA_CAST_CURRENT_KEY = '__current__'
+const DRAMA_CAST_PACKS_META_KEY = 'meoo-short-drama-cast-packs-v1'
 const DRAMA_WORKS_KEEP = 30
+const DRAMA_CAST_PACK_KEEP = 12
 
 type DramaWorkMeta = Omit<DramaWork, 'previewUrl'> & { sourceUrl?: string }
 
@@ -152,10 +158,13 @@ function openDramaWorksDb(): Promise<IDBDatabase> {
     return Promise.reject(new Error('当前环境不支持 IndexedDB'))
   }
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DRAMA_WORKS_DB, 1)
+    const req = indexedDB.open(DRAMA_WORKS_DB, 2)
     req.onupgradeneeded = () => {
       if (!req.result.objectStoreNames.contains(DRAMA_WORKS_STORE)) {
         req.result.createObjectStore(DRAMA_WORKS_STORE)
+      }
+      if (!req.result.objectStoreNames.contains(DRAMA_CAST_STORE)) {
+        req.result.createObjectStore(DRAMA_CAST_STORE)
       }
     }
     req.onsuccess = () => resolve(req.result)
@@ -1715,6 +1724,161 @@ function memberConfirmed(m: DramaCastMember): boolean {
   return Boolean(m.preview && (!m.draft || m.draft === m.preview))
 }
 
+type DramaCastPackMeta = {
+  id: string
+  name: string
+  savedAt: number
+  memberCount: number
+  coverName: string
+}
+
+type DramaCastPackPayload = {
+  roles: string
+  members: DramaCastMember[]
+}
+
+function normalizeCastMembers(raw: unknown): DramaCastMember[] | null {
+  if (!Array.isArray(raw) || raw.length === 0) return null
+  const members: DramaCastMember[] = []
+  for (const row of raw) {
+    if (!row || typeof row !== 'object') continue
+    const o = row as Record<string, unknown>
+    members.push({
+      id: String(o.id ?? '').trim() || newWorkId(),
+      name: String(o.name ?? '').trim() || `角色${members.length + 1}`,
+      desc: String(o.desc ?? ''),
+      sourceUrl: typeof o.sourceUrl === 'string' && o.sourceUrl ? o.sourceUrl : null,
+      draft: typeof o.draft === 'string' && o.draft ? o.draft : null,
+      preview: typeof o.preview === 'string' && o.preview ? o.preview : null,
+    })
+  }
+  return members.length ? members.slice(0, DRAMA_CAST_MAX) : null
+}
+
+function castWorthSaving(members: DramaCastMember[]): boolean {
+  return members.some(
+    (m) =>
+      Boolean(m.preview || m.sourceUrl || m.draft || m.desc.trim()) ||
+      (Boolean(m.name.trim()) && !/^角色\d+$/.test(m.name.trim())),
+  )
+}
+
+function defaultCastPackName(members: DramaCastMember[]): string {
+  const named =
+    members.find((m) => m.preview && m.name.trim() && !/^角色\d+$/.test(m.name.trim()))?.name.trim() ||
+    members.find((m) => m.name.trim() && !/^角色\d+$/.test(m.name.trim()))?.name.trim() ||
+    members.find((m) => m.preview)?.name.trim() ||
+    '续集角色'
+  return named
+}
+
+async function dramaCastPutPayload(id: string, payload: DramaCastPackPayload): Promise<void> {
+  const db = await openDramaWorksDb()
+  await new Promise<void>((resolve, reject) => {
+    if (!db.objectStoreNames.contains(DRAMA_CAST_STORE)) {
+      db.close()
+      reject(new Error('角色库未就绪，请刷新后再保存'))
+      return
+    }
+    const tx = db.transaction(DRAMA_CAST_STORE, 'readwrite')
+    tx.oncomplete = () => {
+      db.close()
+      resolve()
+    }
+    tx.onerror = () => {
+      db.close()
+      reject(tx.error ?? new Error('保存角色失败'))
+    }
+    tx.objectStore(DRAMA_CAST_STORE).put(payload, id)
+  })
+}
+
+async function dramaCastGetPayload(id: string): Promise<DramaCastPackPayload | null> {
+  const db = await openDramaWorksDb()
+  return new Promise((resolve, reject) => {
+    if (!db.objectStoreNames.contains(DRAMA_CAST_STORE)) {
+      db.close()
+      resolve(null)
+      return
+    }
+    const tx = db.transaction(DRAMA_CAST_STORE, 'readonly')
+    const req = tx.objectStore(DRAMA_CAST_STORE).get(id)
+    req.onsuccess = () => {
+      db.close()
+      const raw = req.result as DramaCastPackPayload | undefined
+      const members = normalizeCastMembers(raw?.members)
+      if (!members) {
+        resolve(null)
+        return
+      }
+      resolve({ roles: String(raw?.roles ?? ''), members })
+    }
+    req.onerror = () => {
+      db.close()
+      reject(req.error ?? new Error('读取角色失败'))
+    }
+  })
+}
+
+async function dramaCastDeletePayload(id: string): Promise<void> {
+  try {
+    const db = await openDramaWorksDb()
+    await new Promise<void>((resolve, reject) => {
+      if (!db.objectStoreNames.contains(DRAMA_CAST_STORE)) {
+        db.close()
+        resolve()
+        return
+      }
+      const tx = db.transaction(DRAMA_CAST_STORE, 'readwrite')
+      tx.oncomplete = () => {
+        db.close()
+        resolve()
+      }
+      tx.onerror = () => {
+        db.close()
+        reject(tx.error ?? new Error('删除角色失败'))
+      }
+      tx.objectStore(DRAMA_CAST_STORE).delete(id)
+    })
+  } catch {
+    /* 库不可用时仍允许删元数据 */
+  }
+}
+
+function loadCastPackMeta(): DramaCastPackMeta[] {
+  try {
+    const raw = localStorage.getItem(DRAMA_CAST_PACKS_META_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as DramaCastPackMeta[]
+    return Array.isArray(parsed) ? parsed.filter((p) => p && typeof p.id === 'string' && p.id !== DRAMA_CAST_CURRENT_KEY) : []
+  } catch {
+    return []
+  }
+}
+
+function saveCastPackMeta(rows: DramaCastPackMeta[]): void {
+  try {
+    localStorage.setItem(DRAMA_CAST_PACKS_META_KEY, JSON.stringify(rows.slice(0, DRAMA_CAST_PACK_KEEP)))
+  } catch {
+    try {
+      localStorage.removeItem(DRAMA_CAST_PACKS_META_KEY)
+      localStorage.setItem(DRAMA_CAST_PACKS_META_KEY, JSON.stringify(rows.slice(0, 6)))
+    } catch {
+      /* 配额满时仍保留内存列表 */
+    }
+  }
+}
+
+function packMetaFromPayload(id: string, name: string, payload: DramaCastPackPayload): DramaCastPackMeta {
+  return {
+    id,
+    name: name.trim() || defaultCastPackName(payload.members),
+    savedAt: Date.now(),
+    memberCount: payload.members.length,
+    coverName: defaultCastPackName(payload.members),
+  }
+}
+
 function dramaXiaoyunqueReady(cfg: VideoAiBackendConfig | null): boolean {
   if (!cfg?.xiaoyunqueConfigured) return false
   if (cfg.xiaoyunqueUsable === false) return false
@@ -1939,6 +2103,12 @@ export default function ShortDramaPage() {
   const [refItems, setRefItems] = useState<DramaRefItem[]>([])
   const [cast, setCast] = useState<DramaCastMember[]>(() => [newCastMember(1)])
   const [activeCastId, setActiveCastId] = useState<string | null>(null)
+  const [castPacks, setCastPacks] = useState<DramaCastPackMeta[]>(() => loadCastPackMeta())
+  const [castPackName, setCastPackName] = useState('')
+  const [showCastSave, setShowCastSave] = useState(false)
+  const [showCastLibrary, setShowCastLibrary] = useState(false)
+  const [castPackBusy, setCastPackBusy] = useState(false)
+  const castHydratedRef = useRef(false)
   const [characterBusy, setCharacterBusy] = useState(false)
   const [portraitBusy, setPortraitBusy] = useState(false)
   const refInputRef = useRef<HTMLInputElement>(null)
@@ -2149,6 +2319,67 @@ export default function ShortDramaPage() {
     setActiveCastId((prev) => (prev === id ? (cast.find((m) => m.id !== id)?.id ?? null) : prev))
     clearTrial()
     setHint(`已删除${member.name}`)
+  }
+
+  const saveCastPack = async () => {
+    if (!castWorthSaving(cast)) {
+      setErr('请先确认或填写至少一位角色，再保存')
+      return
+    }
+    const name = (castPackName.trim() || defaultCastPackName(cast)).slice(0, 32)
+    setCastPackBusy(true)
+    setErr(null)
+    try {
+      const id = newWorkId()
+      const payload: DramaCastPackPayload = { roles, members: cast }
+      await dramaCastPutPayload(id, payload)
+      await dramaCastPutPayload(DRAMA_CAST_CURRENT_KEY, payload)
+      const meta = packMetaFromPayload(id, name, payload)
+      setCastPacks((prev) => {
+        const next = [meta, ...prev.filter((p) => p.id !== id)].slice(0, DRAMA_CAST_PACK_KEEP)
+        saveCastPackMeta(next)
+        return next
+      })
+      setCastPackName('')
+      setShowCastSave(false)
+      setHint(`已保存角色组「${name}」。做续集时点「选用已存」即可载入同一批人。`)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '保存角色失败')
+    } finally {
+      setCastPackBusy(false)
+    }
+  }
+
+  const loadCastPack = async (id: string) => {
+    setCastPackBusy(true)
+    setErr(null)
+    try {
+      const pack = await dramaCastGetPayload(id)
+      if (!pack?.members.length) {
+        setErr('该角色组已失效，请重新保存')
+        return
+      }
+      setCast(pack.members)
+      setActiveCastId(pack.members[0]?.id ?? null)
+      if (pack.roles.trim()) setRoles(pack.roles)
+      await dramaCastPutPayload(DRAMA_CAST_CURRENT_KEY, pack)
+      const packName = castPacks.find((p) => p.id === id)?.name
+      setHint(`已载入角色组${packName ? `「${packName}」` : ''}，可改故事后直接生成续集。`)
+      setShowCastLibrary(false)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '载入角色失败')
+    } finally {
+      setCastPackBusy(false)
+    }
+  }
+
+  const deleteCastPack = async (id: string) => {
+    await dramaCastDeletePayload(id)
+    setCastPacks((prev) => {
+      const next = prev.filter((p) => p.id !== id)
+      saveCastPackMeta(next)
+      return next
+    })
   }
 
   const renameCastMember = (id: string, name: string) => {
@@ -2663,6 +2894,40 @@ export default function ShortDramaPage() {
     initedRef.current = true
     applyTemplate(SCENES[0]!, FORMULAS[0]!, { storeName: '', offerName: '', price: '', area: '' })
   }, [applyTemplate])
+
+  useEffect(() => {
+    let alive = true
+    void dramaCastGetPayload(DRAMA_CAST_CURRENT_KEY)
+      .then((pack) => {
+        if (!alive) return
+        if (pack?.members.length) {
+          setCast(pack.members)
+          setActiveCastId(pack.members[0]?.id ?? null)
+          if (pack.roles.trim()) setRoles(pack.roles)
+          setHint('已载入上次角色，可直接做续集。点「保存角色」可存成角色组，下次一键选用。')
+        }
+        setCastPacks(loadCastPackMeta())
+      })
+      .catch(() => {
+        /* 首次或库升级失败时仍可现场新建角色 */
+      })
+      .finally(() => {
+        if (alive) castHydratedRef.current = true
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!castHydratedRef.current || !castWorthSaving(cast)) return
+    const t = window.setTimeout(() => {
+      void dramaCastPutPayload(DRAMA_CAST_CURRENT_KEY, { roles, members: cast }).catch(() => {
+        /* 自动缓存失败不打断创作 */
+      })
+    }, 600)
+    return () => window.clearTimeout(t)
+  }, [cast, roles])
 
   const metaPrompt = useMemo(
     () =>
@@ -3594,19 +3859,115 @@ export default function ShortDramaPage() {
                 <div className="space-y-2">
                   <span className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-medium text-slate-800">角色形象</p>
-                    <button
-                      type="button"
-                      disabled={busy || storyBusy || characterBusy || mediaBusy || portraitBusy || cast.length >= DRAMA_CAST_MAX}
-                      onClick={addCastMember}
-                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      新建角色
-                    </button>
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <button
+                        type="button"
+                        disabled={busy || storyBusy || characterBusy || mediaBusy || portraitBusy || castPackBusy}
+                        onClick={() => {
+                          setShowCastLibrary((v) => !v)
+                          setShowCastSave(false)
+                        }}
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <Bookmark className="h-3.5 w-3.5" />
+                        选用已存{castPacks.length ? ` ${castPacks.length}` : ''}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={
+                          busy ||
+                          storyBusy ||
+                          characterBusy ||
+                          mediaBusy ||
+                          portraitBusy ||
+                          castPackBusy ||
+                          !castWorthSaving(cast)
+                        }
+                        onClick={() => {
+                          setShowCastSave((v) => !v)
+                          setShowCastLibrary(false)
+                          if (!castPackName.trim()) setCastPackName(defaultCastPackName(cast))
+                        }}
+                        className="inline-flex items-center gap-1 rounded-lg border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-xs font-medium text-cyan-900 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <Save className="h-3.5 w-3.5" />
+                        保存角色
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy || storyBusy || characterBusy || mediaBusy || portraitBusy || cast.length >= DRAMA_CAST_MAX}
+                        onClick={addCastMember}
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        新建角色
+                      </button>
+                    </span>
                   </span>
                   <p className="text-[11px] leading-relaxed text-slate-500">
-                    可新建角色1、角色2、角色3。删除角色会同步从上方「角色」栏去掉对应名字。每位角色可写词或上传参考图后确认。已确认角色图时，会先把照片作为模型首帧提交，成片以角色图为准，禁止模型自己生成人物。
+                    确认角色后可点「保存角色」，做续集时「选用已存」载入同一批人。刷新页面也会自动带回上次角色。删除角色会同步从上方「角色」栏去掉对应名字。
                   </p>
+                  {showCastSave ? (
+                    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-cyan-200 bg-cyan-50/50 p-2.5">
+                      <input
+                        className={cn(fieldCls, 'min-w-[160px] flex-1 py-1.5 text-sm')}
+                        disabled={castPackBusy}
+                        value={castPackName}
+                        onChange={(e) => setCastPackName(e.target.value.slice(0, 32))}
+                        placeholder="角色组名称，如技师小美"
+                      />
+                      <button
+                        type="button"
+                        disabled={castPackBusy}
+                        onClick={() => void saveCastPack()}
+                        className="inline-flex items-center gap-1 rounded-lg bg-cyan-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-cyan-800 disabled:opacity-50"
+                      >
+                        {castPackBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                        确认保存
+                      </button>
+                    </div>
+                  ) : null}
+                  {showCastLibrary ? (
+                    <div className="space-y-1.5 rounded-xl border border-slate-200 bg-white p-2.5">
+                      {castPacks.length === 0 ? (
+                        <p className="px-1 py-2 text-xs text-slate-500">还没有已存角色组。确认形象后点「保存角色」，下次做续集可直接选用。</p>
+                      ) : (
+                        castPacks.map((pack) => (
+                          <div
+                            key={pack.id}
+                            className="flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50/80 px-2 py-1.5"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-medium text-slate-800">{pack.name}</p>
+                              <p className="text-[10px] text-slate-500">
+                                {pack.memberCount} 人 · {pack.coverName}
+                                {pack.savedAt
+                                  ? ` · ${new Date(pack.savedAt).toLocaleDateString('zh-CN')}`
+                                  : ''}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={busy || storyBusy || characterBusy || portraitBusy || castPackBusy}
+                              onClick={() => void loadCastPack(pack.id)}
+                              className="shrink-0 rounded-lg bg-cyan-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-cyan-800 disabled:opacity-50"
+                            >
+                              载入
+                            </button>
+                            <button
+                              type="button"
+                              disabled={castPackBusy}
+                              aria-label={`删除角色组${pack.name}`}
+                              onClick={() => void deleteCastPack(pack.id)}
+                              className="shrink-0 rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  ) : null}
                   <input
                     ref={characterInputRef}
                     type="file"
