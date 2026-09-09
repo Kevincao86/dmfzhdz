@@ -1739,7 +1739,7 @@ export async function runXiaoyunqueVideoJob(opts: {
   const pollMs = 5000
   const maxWaitMs = Math.min(45 * 60_000, Math.max(10 * 60_000, durationSec * 4000 + 10 * 60_000))
   const pollMaxTries = Math.max(60, Math.ceil(maxWaitMs / pollMs))
-  const engineLabel = usedJimeng ? '即梦图生' : '小云雀有声'
+  const engineLabel = '小云雀有声'
   const poll = await pollShortVideoTask(start.taskId, {
     pollIntervalMs: pollMs,
     pollMaxTries,
