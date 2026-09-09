@@ -18,6 +18,13 @@ import {
   resolveImageAssistModelIdFromChatPicker,
   resolveModelForAssistAction,
 } from './merchantAiModelStorage'
+import { postAiChat } from './ai/aiClient'
+import { effectiveChatPickerKey } from './ai/agentImageModelKeys'
+import { defaultModelIdForFamily, parseAiModelPickerKey } from './ai/modelRegistry'
+import {
+  intentsFromExtractedPackages,
+  type CreateProductIntent,
+} from '../lib/aiAgentActionParse'
 
 export type EnrichAiProductPlanOptions = {
   /** 用户消息附带的参考图（data URL），优先用于头图 */
@@ -362,4 +369,102 @@ export async function enrichAiProductPlanPreview(
     productType,
     enrichStatus: 'ready',
   }
+}
+
+const EXTRACT_COMBO_SYSTEM = `你是抖音来客组品审核员。先完整阅读方案，只提取「组品/套餐/团购商品」板块里、可上架给顾客购买的具体套餐。
+
+必须排除，不得输出：
+- 准备阶段、宣传阶段、执行阶段、落地/预热/复盘
+- 拍摄、装饰、短视频素材、门店布置、达人招募、预算、排期、直播
+- 工作待办（如「制作节日主题装饰，拍摄短视频素材，设计套餐」）
+- 目标口号、策略标题
+
+只输出 JSON：
+{"packages":[{"name":"顾客可见的套餐名","priceYuan":数字或省略,"comboHint":"包含项目一句"}]}
+没有可上架套餐时 packages 为 []。最多 6 项。name 不能是阶段名或待办句。`
+
+function parseExtractedPackagesJson(
+  content: string,
+): { name: string; priceYuan?: number; comboHint?: string }[] | null {
+  const t = content.trim()
+  const fenced = t.match(/```(?:json)?\s*([\s\S]*?)```/)
+  const raw = (fenced?.[1] ?? t).trim()
+  const start = raw.indexOf('{')
+  const end = raw.lastIndexOf('}')
+  if (start < 0 || end <= start) return null
+  try {
+    const obj = JSON.parse(raw.slice(start, end + 1)) as {
+      packages?: unknown
+      items?: unknown
+      combos?: unknown
+    }
+    const arr = obj.packages ?? obj.items ?? obj.combos
+    if (!Array.isArray(arr)) return null
+    const rows: { name: string; priceYuan?: number; comboHint?: string }[] = []
+    for (const item of arr) {
+      if (!item || typeof item !== 'object') continue
+      const r = item as Record<string, unknown>
+      const name = String(r.name ?? r.title ?? r.productName ?? r.label ?? '').trim()
+      if (!name) continue
+      const priceRaw = r.priceYuan ?? r.price ?? r.suggestedPriceYuan
+      const priceYuan =
+        typeof priceRaw === 'number'
+          ? priceRaw
+          : typeof priceRaw === 'string'
+            ? Number.parseFloat(priceRaw)
+            : undefined
+      const comboHint = String(r.comboHint ?? r.items ?? r.comboLines ?? '').trim()
+      rows.push({
+        name,
+        ...(priceYuan != null && Number.isFinite(priceYuan) && priceYuan > 0 ? { priceYuan } : {}),
+        ...(comboHint ? { comboHint } : {}),
+      })
+    }
+    return rows
+  } catch {
+    return null
+  }
+}
+
+/** 让模型先回读方案，只抽出组品板块中的可上架套餐 */
+export async function extractComboIntentsFromPlanByAi(opts: {
+  userBrief: string
+  assistantContent?: string
+  modelPickerKey?: string
+}): Promise<CreateProductIntent[] | null> {
+  const planText = [opts.assistantContent, opts.userBrief]
+    .map((s) => s?.trim() ?? '')
+    .filter(Boolean)
+    .join('\n\n')
+  if (planText.length < 40) return null
+
+  const chatKey = effectiveChatPickerKey(opts.modelPickerKey ?? '')
+  const parsed = parseAiModelPickerKey(chatKey)
+  const provider = parsed?.provider ?? 'qwen'
+  let model = parsed && 'model' in parsed ? parsed.model : ''
+  const modelFamily = parsed && parsed.provider === 'tokenmix' ? parsed.modelFamily : undefined
+  if (provider === 'tokenmix' && !model && modelFamily) {
+    model = defaultModelIdForFamily(modelFamily)
+  }
+
+  const res = await postAiChat({
+    provider,
+    model: model || undefined,
+    ...(provider === 'tokenmix' && modelFamily ? { modelFamily } : {}),
+    stream: false,
+    temperature: 0.1,
+    taskType: 'create_product',
+    agentPickerKey: opts.modelPickerKey,
+    messages: [
+      { role: 'system', content: EXTRACT_COMBO_SYSTEM },
+      {
+        role: 'user',
+        content: `商家诉求：\n${opts.userBrief.slice(0, 1200)}\n\n方案全文（请先通读，只提取组品板块）：\n${planText.slice(0, 8000)}`,
+      },
+    ],
+  })
+  const rows = parseExtractedPackagesJson(res.content ?? '')
+  if (!rows?.length) return null
+  const intents = intentsFromExtractedPackages(planText, rows)
+  return intents.length ? intents : null
 }

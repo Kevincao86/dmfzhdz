@@ -704,11 +704,114 @@ function isGenericPlanSectionLabel(label: string): boolean {
 const ABSTRACT_PLAN_HEADING_CORE_RE =
   /^(提高|提升|增加|降低|优化|改善|打造|实现|做到|强化)/
 
+/** 执行计划/阶段/拍摄物料等，不是可上架 SKU */
+export function isOperationalPlanLabel(label: string): boolean {
+  const t = label.replace(/\*\*/g, '').replace(/\s/g, '').replace(/[·•]/g, '').trim()
+  if (!t) return true
+  if (/阶段$/.test(t) && t.length <= 10) return true
+  if (/^(准备|宣传|执行|落地|预热|复盘|物料|排期)阶段/.test(t)) return true
+  if (/^(执行计划|落地计划|推广节奏|达人招募|预算分配|拍摄计划|物料准备)/.test(t)) return true
+  if (/设计套餐/.test(t) && /制作|拍摄|装饰/.test(t)) return true
+  if (
+    /拍摄|短视频素材|节日主题装饰|门店布置|制作海报/.test(t) &&
+    !/足疗|足浴|按摩|采耳|推拿|SPA|分钟|min/i.test(t)
+  ) {
+    return true
+  }
+  if ((t.match(/[，,、]/g) ?? []).length >= 2 && /制作|拍摄|设计|布置|准备|宣传/.test(t)) {
+    return true
+  }
+  return false
+}
+
+const COMBO_SECTION_TITLE_RE = /组品|套餐组合|团购套餐|团购商品|上架套餐|上架商品|主套餐|次套餐|具体组品/
+const OPERATIONAL_SECTION_TITLE_RE =
+  /准备阶段|宣传阶段|执行阶段|落地阶段|预热阶段|复盘|执行计划|推广节奏|达人招募|预算分配|排期|直播计划|物料准备|拍摄计划|短视频素材|门店布置|节日主题/
+
+function planSectionTitle(chunk: string): string {
+  const line = (chunk.trim().split('\n')[0] ?? '')
+    .replace(/^#+\s*/, '')
+    .replace(/^\d+[.、．]\s*/, '')
+    .replace(/\*/g, '')
+    .trim()
+  return line.slice(0, 48)
+}
+
+function isComboSectionTitle(title: string): boolean {
+  if (!title) return false
+  if (isOperationalPlanLabel(title) || OPERATIONAL_SECTION_TITLE_RE.test(title)) return false
+  return COMBO_SECTION_TITLE_RE.test(title)
+}
+
+function isOperationalSectionTitle(title: string): boolean {
+  if (!title) return false
+  if (isOperationalPlanLabel(title)) return true
+  return OPERATIONAL_SECTION_TITLE_RE.test(title) && !/套餐名称|团购价/.test(title)
+}
+
+/** 只保留方案里的组品/套餐章节，丢掉准备/宣传/执行等非组品板块 */
+export function extractComboCorpusFromPlan(text: string): string {
+  const t = text.replace(/\r\n/g, '\n').trim()
+  if (!t) return t
+  const chunks = t.split(
+    /(?=^(?:#{1,4}\s+|\s*(?:\d+|[一二三四五六])[.、．]\s*(?:\*{0,2})?(?:准备|宣传|执行|组品|套餐|达人|预算|物料|拍摄|落地|预热|复盘)))/m,
+  )
+  if (chunks.length <= 1) {
+    const lines = t.split('\n')
+    const kept = lines.filter((line) => {
+      const title = planSectionTitle(line)
+      return !isOperationalSectionTitle(title)
+    })
+    const out = kept.join('\n').trim()
+    return out.length >= 20 ? out : t
+  }
+  const comboChunks = chunks.filter((c) => isComboSectionTitle(planSectionTitle(c)))
+  if (comboChunks.length) return comboChunks.join('\n').trim()
+  const withoutOps = chunks.filter((c) => !isOperationalSectionTitle(planSectionTitle(c)))
+  const out = withoutOps.join('\n').trim()
+  return out.length >= 20 ? out : t
+}
+
+export function intentsFromExtractedPackages(
+  full: string,
+  packages: { name: string; priceYuan?: number; comboHint?: string }[],
+): CreateProductIntent[] {
+  const seen = new Set<string>()
+  const intents: CreateProductIntent[] = []
+  for (const row of packages) {
+    const name = String(row.name ?? '').replace(/\*\*/g, '').trim().slice(0, 48)
+    if (
+      name.length < 2 ||
+      seen.has(name) ||
+      isGiftThresholdLine(name) ||
+      isGenericPlanSectionLabel(name) ||
+      isAbstractProductIntentLabel(name) ||
+      isOperationalPlanLabel(name)
+    ) {
+      continue
+    }
+    seen.add(name)
+    const priceYuan = row.priceYuan
+    const hint = String(row.comboHint ?? '').trim().slice(0, 160)
+    intents.push({
+      key: `ai-combo-${intents.length}`,
+      label: name,
+      brief: planIntentBrief(
+        full,
+        `团购套餐「${name}」${priceYuan != null && Number.isFinite(priceYuan) ? `，团购价约 ¥${priceYuan}` : ''}${hint ? `。包含：${hint}` : ''}。须按方案组品板块生成完整团购标题、售价、套餐项与说明。`,
+      ),
+      productType: inferProductTypeFromLabel(name, priceYuan),
+    })
+  }
+  return intents.slice(0, 6)
+}
+
 /** 方案目标/策略标题（如「提高高毛利套餐」），不是可上架 SKU */
 export function isAbstractProductIntentLabel(label: string): boolean {
   const t = label.replace(/\*\*/g, '').replace(/\s/g, '').replace(/[·•]/g, '').trim()
   if (!t) return true
   if (isGenericPlanSectionLabel(t)) return true
+  if (isOperationalPlanLabel(t)) return true
   const core = t.replace(
     /^(?:主套餐|次套餐|赠品策略|主推爆款|套餐组合|限时折扣|爆款套餐|组合套餐|引流套餐|福利套餐|加购套餐|次推套餐|形象套餐)[：:]/,
     '',
@@ -819,32 +922,51 @@ function parsePlanNumberedNamedPackages(full: string): CreateProductIntent[] | n
   const matches: { start: number; end: number; label: string }[] = []
   const seen = new Set<string>()
 
+  const pushMatch = (index: number, rawLen: number, label: string) => {
+    const clean = label.replace(/\*\*/g, '').trim().slice(0, 48)
+    if (
+      clean.length < 2 ||
+      seen.has(clean) ||
+      isGenericPlanSectionLabel(clean) ||
+      isAbstractProductIntentLabel(clean) ||
+      isOperationalPlanLabel(clean) ||
+      isNonProductPlanTag(clean) ||
+      isGiftThresholdLine(clean)
+    ) {
+      return
+    }
+    seen.add(clean)
+    matches.push({ start: index, end: index + rawLen, label: clean })
+  }
+
   NUMBERED_NAMED_PACKAGE_RE.lastIndex = 0
   let m: RegExpExecArray | null
   while ((m = NUMBERED_NAMED_PACKAGE_RE.exec(full)) !== null) {
-    const label = m[2].replace(/\*\*/g, '').trim().slice(0, 48)
-    if (
-      label.length < 2 ||
-      seen.has(label) ||
-      isGenericPlanSectionLabel(label) ||
-      isAbstractProductIntentLabel(label) ||
-      isNonProductPlanTag(label) ||
-      isGiftThresholdLine(label)
-    ) {
-      continue
-    }
-    seen.add(label)
-    matches.push({ start: m.index, end: m.index + m[0].length, label })
+    pushMatch(m.index, m[0].length, m[2])
+  }
+
+  const pricedRe =
+    /(?:^|\n)\s*(?:\*{0,2})?(\d+)[.、．]\s*(?:\*{0,2})?([^*\n]{2,48})(?:\*{0,2})?/gm
+  pricedRe.lastIndex = 0
+  while ((m = pricedRe.exec(full)) !== null) {
+    const label = m[2].replace(/\*\*/g, '').trim()
+    const after = full.slice(m.index + m[0].length)
+    const nextBreak = after.search(/(?:^|\n)\s*(?:\d+[.、．]|#{1,4}\s)/m)
+    const body = (nextBreak > 0 ? after.slice(0, nextBreak) : after.slice(0, 400)).trim()
+    const price = parseGroupBuyPriceFromSection(body) ?? parsePriceYuanFromText(body)
+    if (price == null) continue
+    pushMatch(m.index, m[0].length, label)
   }
 
   if (!matches.length) return null
+  matches.sort((a, b) => a.start - b.start)
 
   const intents: CreateProductIntent[] = []
   for (let i = 0; i < matches.length; i++) {
     const cur = matches[i]!
     const nextStart = matches[i + 1]?.start ?? full.length
     const body = full.slice(cur.end, nextStart).trim()
-    const groupPrice = parseGroupBuyPriceFromSection(body)
+    const groupPrice = parseGroupBuyPriceFromSection(body) ?? parsePriceYuanFromText(body)
     intents.push({
       key: `pkg-${i}`,
       label: cur.label,
@@ -868,7 +990,8 @@ const PLAN_SLOT_PATTERNS: RegExp[] = [
   /(?:^|\n)\s*\d+[.、]\s*(?:\*{0,2})([^*\n：:]{2,20})(?:\*{0,2})[：:]\s*(?:\*{0,2})?([^*\n]{2,48})/g,
 ]
 
-const NON_PRODUCT_PLAN_TAG_RE = /优惠券|代金券|达人|招募|探店|直播|费用分配|佣金|分佣|排期|预算分配/
+const NON_PRODUCT_PLAN_TAG_RE =
+  /优惠券|代金券|达人|招募|探店|直播|费用分配|佣金|分佣|排期|预算分配|准备阶段|宣传阶段|执行阶段|拍摄|短视频素材|节日主题|门店布置/
 
 const NUMBERED_COMBO_TAG_RE =
   /(?:^|\n)\s*(?:\d+[.、]|[-•]\s*)?\*{0,2}((?:主推爆款|套餐组合|限时折扣|爆款套餐|组合套餐|引流套餐|福利套餐|加购套餐|次推套餐|形象套餐)[^*\n：:]{0,10})\*{0,2}[：:]\s*\*{0,2}([^*\n*]{2,56})\*{0,2}/gi
@@ -1076,7 +1199,10 @@ function parsePlanSlotPatternsFromFull(full: string): CreateProductIntent[] | nu
 
 function filterConcreteProductIntents(intents: CreateProductIntent[]): CreateProductIntent[] {
   return intents.filter(
-    (i) => !isGenericPlanSectionLabel(i.label) && !isAbstractProductIntentLabel(i.label),
+    (i) =>
+      !isGenericPlanSectionLabel(i.label) &&
+      !isAbstractProductIntentLabel(i.label) &&
+      !isOperationalPlanLabel(i.label),
   )
 }
 
@@ -1393,25 +1519,28 @@ export function parseCreateProductIntentsFromPlan(
   if (hasPlanCorpus) {
     const planUser = stripQuoteBlock(userBrief)
     const planAssistant = assistantSlice || assistantContent?.trim() || full
+    const comboCorpus = extractComboCorpusFromPlan(planAssistant)
+    const parseAssistant = comboCorpus.length >= 20 ? comboCorpus : planAssistant
+    const parseFull = comboCorpus.length >= 20 ? `${planUser}\n${comboCorpus}` : full
 
-    const fromTable = parsePlanMarkdownTableComboRows(planUser, planAssistant)
+    const fromTable = parsePlanMarkdownTableComboRows(planUser, parseAssistant)
     if (fromTable?.length) candidates.push({ source: 'table', intents: fromTable })
 
-    const fromMarkdown = parsePlanMarkdownProductSections(planUser, planAssistant)
+    const fromMarkdown = parsePlanMarkdownProductSections(planUser, parseAssistant)
     if (fromMarkdown?.length) candidates.push({ source: 'markdown', intents: fromMarkdown })
 
-    const fromNumbered = parsePlanNumberedComboSections(planUser, planAssistant)
+    const fromNumbered = parsePlanNumberedComboSections(planUser, parseAssistant)
     if (fromNumbered?.length) candidates.push({ source: 'numbered', intents: fromNumbered })
 
-    const fromNumberedPackages = parsePlanNumberedNamedPackages(full)
+    const fromNumberedPackages = parsePlanNumberedNamedPackages(parseFull)
     if (fromNumberedPackages?.length) {
       candidates.push({ source: 'numbered_pkg', intents: fromNumberedPackages })
     }
 
-    const fromJson = parseCreateProductIntentsFromAgentJson(planAssistant, planUser)
+    const fromJson = parseCreateProductIntentsFromAgentJson(parseAssistant, planUser)
     if (fromJson?.length) candidates.push({ source: 'json', intents: fromJson })
 
-    const fromSlots = parsePlanSlotPatternsFromFull(full)
+    const fromSlots = parsePlanSlotPatternsFromFull(parseFull)
     if (fromSlots?.length) candidates.push({ source: 'slots', intents: fromSlots })
 
     const best = pickBestCreateProductIntents(candidates, statedCount)

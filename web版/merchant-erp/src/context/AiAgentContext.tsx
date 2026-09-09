@@ -43,6 +43,7 @@ import {
   inferVoucherPricesFromText,
   isLikelyUserPromptEcho,
   isAbstractProductIntentLabel,
+  extractComboCorpusFromPlan,
   matchPlansToProductIntents,
   parseAgentActionType,
   parseCreateProductIntents,
@@ -87,7 +88,10 @@ import {
   saveAgentArchivedSessions,
 } from '../lib/agentUserHabits'
 import { fetchAiProductPlan, fetchAiProductPlansBatch } from '../services/storeIntelApi'
-import { enrichAiProductPlanPreview } from '../services/aiAgentProductPlanEnrich'
+import {
+  enrichAiProductPlanPreview,
+  extractComboIntentsFromPlanByAi,
+} from '../services/aiAgentProductPlanEnrich'
 import {
   executeAiAgentToolCalls,
   listAiAgentToolsForUserIntent,
@@ -870,7 +874,46 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
 
   const attachProductPlanToPreview = useCallback(
     async (previewMsgId: string, userBrief: string, assistantContent?: string) => {
-      let intents = parseCreateProductIntentsFromPlan(userBrief, assistantContent)
+      const readingPlan: AiProductPlanPreview = {
+        slotKey: 'reading',
+        slotLabel: '组品',
+        productName: '正在回读方案…',
+        suggestedPriceYuan: 0,
+        description: '正在识别组品板块中的可上架套餐…',
+        comboLines: [],
+        productType: 1,
+        enrichStatus: 'loading',
+      }
+      patchPreviewProductPlans(
+        previewMsgId,
+        [readingPlan],
+        '正在回读方案中的组品板块，只提取可上架套餐，不会把准备/宣传阶段或拍摄物料待办当成商品…',
+      )
+
+      let intents
+      try {
+        const fromAi = await extractComboIntentsFromPlanByAi({
+          userBrief,
+          assistantContent,
+          modelPickerKey,
+        })
+        intents = fromAi?.length ? fromAi : parseCreateProductIntentsFromPlan(userBrief, assistantContent)
+      } catch {
+        intents = parseCreateProductIntentsFromPlan(userBrief, assistantContent)
+      }
+
+      const comboCorpus = extractComboCorpusFromPlan(assistantContent || userBrief)
+      const comboFocusedBrief = [
+        userBrief,
+        comboCorpus && comboCorpus !== userBrief.trim()
+          ? `【组品板块】\n${comboCorpus.slice(0, 4000)}`
+          : '',
+        intents.length
+          ? `【仅组品】只为以下可上架套餐出方案：${intents.map((i) => i.label).join('、')}。不要把准备/宣传/执行阶段或拍摄装饰待办当成商品。`
+          : '',
+      ]
+        .filter(Boolean)
+        .join('\n\n')
       const userReferenceImages = userReferenceImagesFromMessages(messagesRef.current)
       const hasUserRefs = userReferenceImages.length > 0
       const imagePhaseHint = hasUserRefs
@@ -900,7 +943,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       )
 
       const intel = await loadFullMerchantIntelSnapshot('create_product')
-      const planCtx = merchantIntelForProductPlanApi(userBrief, intel)
+      const planCtx = merchantIntelForProductPlanApi(comboFocusedBrief, intel)
       const errorPlan = (
         intent: (typeof intents)[number],
         message: string,
@@ -929,7 +972,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       if (intents.length > 1) {
         const batch = await fetchAiProductPlansBatch({
           ...planCtx,
-          userBrief,
+          userBrief: comboFocusedBrief,
           intentLabels: intents.map((i) => i.label),
         })
         if (!batch.ok) {
@@ -1118,28 +1161,22 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       pageLabel?: string,
       opts?: { assistantContent?: string },
     ) => {
-      const intents = parseCreateProductIntentsFromPlan(userBrief, opts?.assistantContent)
       const intelLine = merchantIntelStatusLine(loadMerchantIntelSnapshot())
-      const intro =
-        intents.length > 1
-          ? `【创建商品 · 独立预览】检测到 ${intents.length} 个商品/套餐方案（${intents.map((i) => i.label).join('、')}）。${intelLine}，将生成全部 C 端预览；请在本卡片确认，与其它场景任务互不影响。`
-          : `【创建商品 · 独立预览】将生成团购 C 端预览供您核对。${intelLine ? ` ${intelLine}` : ''}请在本卡片确认后保存至草稿箱。`
+      const intro = `【创建商品 · 独立预览】将先回读方案中的组品板块，再生成团购 C 端预览（不含准备/宣传阶段或拍摄物料待办）。${intelLine ? ` ${intelLine}` : ''}请在本卡片确认后保存至草稿箱。`
       const voucher = inferVoucherPricesFromText(userBrief)
       const preview = buildPreviewForTask('create_product', pageLabel)
-      const initialPlans: AiProductPlanPreview[] = intents.map((intent) => {
-        const v = intent.productType === 2 ? inferVoucherPricesFromText(userBrief) : {}
-        return {
-          slotKey: intent.key,
-          slotLabel: intent.label,
-          productName: intent.label,
-          suggestedPriceYuan: v.price ?? 0,
-          description: '正在生成方案…',
+      const initialPlans: AiProductPlanPreview[] = [
+        {
+          slotKey: 'reading',
+          slotLabel: '组品',
+          productName: '正在回读方案…',
+          suggestedPriceYuan: 0,
+          description: '正在识别可上架套餐…',
           comboLines: [],
-          productType: intent.productType,
+          productType: 1,
           enrichStatus: 'loading',
-          ...(v.origin != null ? { originYuan: v.origin } : {}),
-        }
-      })
+        },
+      ]
       const msg = createAgentMessage('task_preview', intro, {
         preview: {
           ...preview,
