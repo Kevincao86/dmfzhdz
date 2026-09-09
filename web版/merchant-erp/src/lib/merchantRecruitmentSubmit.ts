@@ -7,6 +7,29 @@ import {
 import type { RecruitmentTierPlan } from './merchantRecruitmentTierPlan'
 import type { RegistryMpRecruitmentOrder, RegistryRecruitmentOrder } from './opsRegistryTypes'
 
+async function linkMerchantRowToMp(
+  enriched: RegistryRecruitmentOrder,
+  mpOrderId: string,
+): Promise<void> {
+  const patched = await patchRecruitmentOrderOnOps({
+    id: enriched.id,
+    linkedMpOrderId: mpOrderId,
+    workflowStage: 'recruiting',
+    status: 'accepted',
+    acceptMode: 'miniprogram',
+    recruitmentPlatform: enriched.recruitmentPlatform,
+  })
+  if (!patched.ok && (patched.error === 'not_found' || /not_found/i.test(patched.error || ''))) {
+    await appendRecruitmentOrderToOps({
+      ...enriched,
+      linkedMpOrderId: mpOrderId,
+      workflowStage: 'recruiting',
+      status: 'accepted',
+      acceptMode: 'miniprogram',
+    })
+  }
+}
+
 async function linkMpOrderAfterAppend(
   enriched: RegistryRecruitmentOrder,
   mpOrder: RegistryMpRecruitmentOrder,
@@ -14,27 +37,13 @@ async function linkMpOrderAfterAppend(
   const append = await appendMpRecruitmentOrderToOps(mpOrder)
   if (!append.ok) {
     if (append.error === 'duplicate_merchant_order' && append.existingId) {
-      await patchRecruitmentOrderOnOps({
-        id: enriched.id,
-        linkedMpOrderId: append.existingId,
-        workflowStage: 'recruiting',
-        status: 'accepted',
-        acceptMode: 'miniprogram',
-      })
+      await linkMerchantRowToMp(enriched, append.existingId)
       return { orderId: enriched.id, mpOrderId: append.existingId }
     }
     throw new Error(append.error ?? '发布星选招募单失败')
   }
 
-  await patchRecruitmentOrderOnOps({
-    id: enriched.id,
-    linkedMpOrderId: mpOrder.id,
-    workflowStage: 'recruiting',
-    status: 'accepted',
-    acceptMode: 'miniprogram',
-    recruitmentPlatform: enriched.recruitmentPlatform,
-  })
-
+  await linkMerchantRowToMp(enriched, mpOrder.id)
   return { orderId: enriched.id, mpOrderId: mpOrder.id }
 }
 

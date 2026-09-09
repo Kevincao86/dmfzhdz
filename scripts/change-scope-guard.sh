@@ -151,6 +151,13 @@ recruitmentBriefAi
 aiAgentSoftScenarioConfirm
 viralBriefAi
 merchantAiUpstream
+registrySnapshotPgAppend
+meoo-ops-recruitment-orders-append
+registryTenantIsolation
+tenantRegistryScope
+meoo-ops-sync-registry
+opsRegistryClient
+opsRegistryGatewayShared
 change-scope-guard
 PAT
       ;;

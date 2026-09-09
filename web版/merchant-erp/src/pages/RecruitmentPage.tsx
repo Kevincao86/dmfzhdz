@@ -1194,7 +1194,7 @@ export default function RecruitmentPage() {
           }
           return
         }
-        const reg = await fetchOpsRegistryForTenant(tenantId)
+        const reg = await fetchOpsRegistryForTenant(tenantId, { hydrateOrderId: lastId || undefined })
         if (cancelled) return
         const orders = [...(reg.recruitmentOrders ?? [])].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
         const found = lastId ? orders.find((o) => o.id === lastId) ?? null : null

@@ -12,6 +12,10 @@ import type { RegistryRecruitmentOrder } from '../src/lib/opsRegistryTypes.js'
 import { appendRecruitmentOrderForTenant } from '../src/lib/registryTenantIsolation.js'
 import { recruitmentOrderBelongsToTenant } from '../src/lib/tenantRegistryScope.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
+import {
+  appendRecruitmentOrderViaPg,
+  readRegistryPgConnectionString,
+} from '../src/lib/registrySnapshotPgAppend.js'
 
 export const config = { maxDuration: 60 }
 
@@ -102,6 +106,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    const stamped: RegistryRecruitmentOrder = {
+      ...order,
+      tenantId: auth.tenantId,
+      ownerUserId: auth.userId ?? order.ownerUserId,
+    }
+
+    if (readRegistryPgConnectionString()) {
+      const pgResult = await appendRecruitmentOrderViaPg(stamped)
+      if (pgResult.ok) {
+        try {
+          const { notifyFeishuRecruitmentOrderCreated } = await import('./opsFeishuNotifications.js')
+          await notifyFeishuRecruitmentOrderCreated(stamped)
+        } catch {
+          /* 飞书通知失败不影响订单写入 */
+        }
+        sendOpsJson(res, 200, { ok: true, via: 'pg' })
+        return
+      }
+      if (pgResult.error === 'forbidden_order') {
+        sendOpsJson(res, 403, { ok: false, error: 'forbidden_order' })
+        return
+      }
+      if (pgResult.error === 'invalid_order') {
+        sendOpsJson(res, 400, { ok: false, error: 'invalid_order' })
+        return
+      }
+      if (pgResult.error !== 'pg_not_configured') {
+        sendOpsJson(res, 500, {
+          ok: false,
+          error: 'meoo_ops_recruitment_orders_append_failed',
+          detail: pgResult.error,
+        })
+        return
+      }
+    }
+
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
     const existing = (data.recruitmentOrders ?? []).find((o) => o.id === order.id)
@@ -110,11 +150,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    const next = appendRecruitmentOrderForTenant(data, order, auth.tenantId, auth.userId)
+    const next = appendRecruitmentOrderForTenant(data, stamped, auth.tenantId, auth.userId)
     await io.save(next)
     try {
       const { notifyFeishuRecruitmentOrderCreated } = await import('./opsFeishuNotifications.js')
-      await notifyFeishuRecruitmentOrderCreated(order)
+      await notifyFeishuRecruitmentOrderCreated(stamped)
     } catch {
       /* 飞书通知失败不影响订单写入 */
     }

@@ -93,6 +93,7 @@ export function buildMpOrderFromMerchantRecruitment(
       tierPlan: tierPlan ?? null,
       merchantWorkflow: true,
       signupDeadline: buildDeadline(),
+      ...(order.tenantId ? { tenantId: order.tenantId } : {}),
     },
   }
 }

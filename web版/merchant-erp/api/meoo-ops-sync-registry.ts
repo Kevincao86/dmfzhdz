@@ -82,12 +82,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const slice =
       typeof sliceRaw === 'string' ? sliceRaw.trim().toLowerCase() : Array.isArray(sliceRaw) ? String(sliceRaw[0] ?? '').trim().toLowerCase() : ''
     const wantAiBootstrap = slice === 'ai' || slice === 'bootstrap'
+    const hydrateHeader = req.headers['x-meoo-hydrate-order-id']
+    const hydrateFromHeader = Array.isArray(hydrateHeader) ? hydrateHeader[0] : hydrateHeader
+    const hydrateQuery = req.query?.hydrateOrderId
+    const hydrateFromQuery =
+      typeof hydrateQuery === 'string'
+        ? hydrateQuery
+        : Array.isArray(hydrateQuery)
+          ? String(hydrateQuery[0] ?? '')
+          : ''
+    const hydrateOrderId = String(hydrateFromHeader || hydrateFromQuery || '').trim()
 
     const auth = await requireMerchantRegistryAuth(req)
     if (wantAiBootstrap) {
       data = slimRegistrySnapshotForAiBootstrap(data, auth.ok ? auth.tenantId : null)
     } else if (auth.ok) {
-      data = filterRegistrySnapshotForMerchant(auth.tenantId, data)
+      data = filterRegistrySnapshotForMerchant(auth.tenantId, data, hydrateOrderId || undefined)
     } else {
       data = stripRegistryRecruitmentForAnonymous(data)
     }

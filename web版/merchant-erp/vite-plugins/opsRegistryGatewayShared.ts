@@ -353,13 +353,15 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
               data.recruitmentOrders = cleaned
               writeRegistry(viteRoot, data)
             }
-            const slice = new URL(req.url || '/', 'http://local').searchParams.get('slice')?.trim().toLowerCase() || ''
+            const search = new URL(req.url || '/', 'http://local').searchParams
+            const slice = search.get('slice')?.trim().toLowerCase() || ''
             const wantAiBootstrap = slice === 'ai' || slice === 'bootstrap'
+            const hydrateOrderId = search.get('hydrateOrderId')?.trim() || ''
             const auth = await requireMerchantRegistryAuthFromHeaders(authHeader)
             if (wantAiBootstrap) {
               data = slimRegistrySnapshotForAiBootstrap(data, auth.ok ? auth.tenantId : null)
             } else if (auth.ok) {
-              data = filterRegistrySnapshotForMerchant(auth.tenantId, data)
+              data = filterRegistrySnapshotForMerchant(auth.tenantId, data, hydrateOrderId || undefined)
             } else {
               data = stripRegistryRecruitmentForAnonymous(data)
             }

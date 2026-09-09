@@ -3,7 +3,11 @@
  * ECS auth-api 使用 127.0.0.1:5433 + POSTGRES_PASSWORD / MEOO_DATABASE_URL。
  */
 import pg from 'pg'
-import type { RegistryMpRecruitmentOrder, RegistrySnapshot } from './opsRegistryTypes.js'
+import type {
+  RegistryMpRecruitmentOrder,
+  RegistryRecruitmentOrder,
+  RegistrySnapshot,
+} from './opsRegistryTypes.js'
 import {
   MAX_GROUP_QR_PERSIST_LEN,
   normalizeMpRecruitmentOrderForRegistryPersist,
@@ -144,6 +148,84 @@ export async function appendMpRecruitmentOrderViaPg(
     }
 
     return { ok: true, groupQrSaved }
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {})
+    throw e
+  } finally {
+    await client.end()
+  }
+}
+
+/**
+ * 商家招募单 append：jsonb prepend，避免整表 PATCH 与并发 GET/其它写互相覆盖，把刚发的 RO-AI* 冲掉。
+ */
+export async function appendRecruitmentOrderViaPg(
+  order: RegistryRecruitmentOrder,
+): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
+  const cs = readRegistryPgConnectionString()
+  if (!cs) return { ok: false, error: 'pg_not_configured', status: 503 }
+
+  const id = String(order.id || '').trim()
+  const tenantId = String(order.tenantId || '').trim()
+  if (!id || !tenantId || !order.customerName) {
+    return { ok: false, error: 'invalid_order', status: 400 }
+  }
+
+  const sanitized = sanitizeValueForPostgresJson({ ...order, id, tenantId }) as RegistryRecruitmentOrder
+  const client = new Client({ connectionString: cs })
+  await client.connect()
+  try {
+    const dup = await client.query<{ existing_tenant: string | null }>(
+      `SELECT o->>'tenantId' AS existing_tenant
+       FROM ops_registry_snapshot s,
+            LATERAL jsonb_array_elements(COALESCE(s.registry->'recruitmentOrders', '[]'::jsonb)) o
+       WHERE s.id = 1 AND o->>'id' = $1
+       LIMIT 1`,
+      [id],
+    )
+    const existingRow = dup.rows[0]
+    const existingTenant = String(existingRow?.existing_tenant || '').trim()
+    if (existingRow && existingTenant && existingTenant !== tenantId) {
+      return { ok: false, error: 'forbidden_order', status: 403 }
+    }
+
+    await client.query('BEGIN')
+    if (existingRow) {
+      await client.query(
+        `UPDATE ops_registry_snapshot
+         SET registry = jsonb_set(
+           COALESCE(registry, '{}'::jsonb),
+           '{recruitmentOrders}',
+           (
+             SELECT COALESCE(jsonb_agg(x.elem ORDER BY x.ord), '[]'::jsonb)
+             FROM (
+               SELECT CASE WHEN e->>'id' = $2 THEN $1::jsonb ELSE e END AS elem, ordinality AS ord
+               FROM jsonb_array_elements(COALESCE(registry->'recruitmentOrders', '[]'::jsonb))
+                 WITH ORDINALITY AS t(e, ordinality)
+             ) x
+           ),
+           true
+         ),
+         updated_at = now()
+         WHERE id = 1`,
+        [JSON.stringify(sanitized), id],
+      )
+    } else {
+      await client.query(
+        `UPDATE ops_registry_snapshot
+         SET registry = jsonb_set(
+           COALESCE(registry, '{}'::jsonb),
+           '{recruitmentOrders}',
+           jsonb_build_array($1::jsonb) || COALESCE(registry->'recruitmentOrders', '[]'::jsonb),
+           true
+         ),
+         updated_at = now()
+         WHERE id = 1`,
+        [JSON.stringify(sanitized)],
+      )
+    }
+    await client.query('COMMIT')
+    return { ok: true }
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {})
     throw e

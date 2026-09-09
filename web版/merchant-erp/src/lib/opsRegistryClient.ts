@@ -78,6 +78,17 @@ async function registryAuthHeaders(): Promise<Record<string, string>> {
   return headers
 }
 
+export type FetchOpsRegistryOptions = {
+  /** 刚发布但商家行可能已被冲掉时，用本机 lastRecruitmentOrderId 从星选单回填 */
+  hydrateOrderId?: string
+}
+
+function registryPathWithHydrate(path: string, hydrateOrderId?: string): string {
+  const id = String(hydrateOrderId || '').trim()
+  if (!id) return path
+  return `${path}${path.includes('?') ? '&' : '?'}hydrateOrderId=${encodeURIComponent(id)}`
+}
+
 async function fetchRegistryAt(path: string): Promise<RegistryFile> {
   const headers = await registryAuthHeaders()
   let lastErr = 'registry_unreachable'
@@ -129,15 +140,17 @@ async function resolveClientTenantId(): Promise<string | null> {
 }
 
 /** 优先扁平路由；服务端按 JWT 过滤招募数据，客户端再按租户兜底。 */
-export async function fetchOpsRegistry(): Promise<RegistryFile> {
+export async function fetchOpsRegistry(opts?: FetchOpsRegistryOptions): Promise<RegistryFile> {
+  const pathMeoo = registryPathWithHydrate('/api/meoo-ops-sync-registry', opts?.hydrateOrderId)
+  const pathLegacy = registryPathWithHydrate('/api/ops-sync/registry', opts?.hydrateOrderId)
   let raw: RegistryFile
   try {
-    raw = await fetchRegistryAt('/api/meoo-ops-sync-registry')
+    raw = await fetchRegistryAt(pathMeoo)
   } catch {
-    raw = await fetchRegistryAt('/api/ops-sync/registry')
+    raw = await fetchRegistryAt(pathLegacy)
   }
   const tenantId = await resolveClientTenantId()
-  if (tenantId) return filterRegistrySnapshotForMerchant(tenantId, raw)
+  if (tenantId) return filterRegistrySnapshotForMerchant(tenantId, raw, opts?.hydrateOrderId)
   return stripRegistryRecruitmentForAnonymous(raw)
 }
 
@@ -153,13 +166,16 @@ export async function fetchOpsRegistryAiBootstrap(): Promise<RegistryFile> {
 }
 
 /** 商户 ERP：仅返回当前租户的招募/排期/视频/Brief 相关切片 */
-export async function fetchOpsRegistryForTenant(tenantId: string | null): Promise<RegistryFile> {
+export async function fetchOpsRegistryForTenant(
+  tenantId: string | null,
+  opts?: FetchOpsRegistryOptions,
+): Promise<RegistryFile> {
   if (!tenantId) {
-    const raw = await fetchOpsRegistry()
-    return filterRegistryForTenant(raw, null)
+    const raw = await fetchOpsRegistry(opts)
+    return filterRegistryForTenant(raw, null, opts?.hydrateOrderId)
   }
-  const raw = await fetchOpsRegistry()
-  return filterRegistryForTenant(raw, tenantId)
+  const raw = await fetchOpsRegistry(opts)
+  return filterRegistryForTenant(raw, tenantId, opts?.hydrateOrderId)
 }
 
 export async function pushErpTenant(tenant: RegistryTenant): Promise<void> {

@@ -96,11 +96,15 @@ export function setRecruitmentScheduleRowsForTenant(
 }
 
 /** 商户 JWT 请求：招募相关切片按租户；AI/厂商 Key 仍全局（运营台下发） */
-export function filterRegistrySnapshotForMerchant(authTenantId: string, file: RegistryFile): RegistryFile {
+export function filterRegistrySnapshotForMerchant(
+  authTenantId: string,
+  file: RegistryFile,
+  hydrateOrderId?: string,
+): RegistryFile {
   const tid = authTenantId.trim()
-  const scoped = filterRegistryForTenant(file, tid)
+  const scoped = filterRegistryForTenant(file, tid, hydrateOrderId)
   const schedule = (file.recruitmentScheduleRows ?? []).filter((r) => scheduleRowBelongsToTenant(r, tid))
-  const orderIds = tenantRecruitmentOrderIds(file, tid)
+  const orderIds = new Set((scoped.recruitmentOrders ?? []).map((o) => o.id))
   const mpRecruitmentOrders = (file.mpRecruitmentOrders ?? []).filter((o) => {
     const sid = String(o.sourceMerchantOrderId || '').trim()
     return sid && orderIds.has(sid)
