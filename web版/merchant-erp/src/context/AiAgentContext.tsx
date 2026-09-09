@@ -48,6 +48,7 @@ import {
   parseAgentActionType,
   parseCreateProductIntents,
   parseCreateProductIntentsFromPlan,
+  type CreateProductIntent,
   isInformationalOnlyQuery,
   isBusinessMetricsQuery,
   shouldDeferTaskPreview,
@@ -890,7 +891,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         '正在回读方案中的组品板块，只提取可上架套餐，不会把准备/宣传阶段或拍摄物料待办当成商品…',
       )
 
-      let intents
+      let intents: CreateProductIntent[]
       try {
         const fromAi = await extractComboIntentsFromPlanByAi({
           userBrief,
