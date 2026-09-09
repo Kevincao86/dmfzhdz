@@ -6,9 +6,9 @@
  * Version: 2022-08-31
  * 默认无参考 req_key: pippit_iv2v_v20_cvtob（文档 85621/2359611）
  * 有参考（图+视频）：pippit_iv2v_v20_cvtob_with_vinput（文档 85621/2359610）
- * 有角色照片时：只走小云雀 Agent（pippit_iv2v_v20_cvtob + 角色图，有声多镜）。
- * 仅当 req_key 明确不支持（未开通 Agent）才兜底即梦图生锁脸；欠费/内容审核/请求过大直接报错，不偷偷改无声片。
- * 不走方舟 Seedance 真人库。
+ * 有角色/参考图：只走 pippit_iv2v_v20_cvtob_with_vinput（图必须进片）。
+ * 禁止无参考 cvtob 文生。仅有参考接口未开通时才兜底即梦首帧图生。
+ * 不走方舟 Seedance 真人库/纯文案。
  *
  * 凭据：运营台 videoAi.jimengAccessKeyId/SK → JIMENG_*，或轻量 MERCHANT_AI_VOLC_*。
  * 可用 MERCHANT_AI_XIAOYUNQUE_REQ_KEY / SUBMIT_ACTION / GET_ACTION 覆盖。
@@ -24,8 +24,12 @@ const XYQ_SUBMIT_ACTION = 'CVSync2AsyncSubmitTask'
 const XYQ_GET_ACTION = 'CVSync2AsyncGetResult'
 const XYQ_REQ_KEY_NOREF = 'pippit_iv2v_v20_cvtob'
 const XYQ_REQ_KEY_REF = 'pippit_iv2v_v20_cvtob_with_vinput'
+const JIMENG_I2V_REQ_KEY = 'jimeng_ti2v_v30_pro'
+const JIMENG_I2V_REQ_KEY_FALLBACK = 'jimeng_ti2v_v30'
+const JIMENG_I2V_REQ_KEY_VGFM = 'jimeng_vgfm_i2v_l20'
 const NOREF_KEYS = [XYQ_REQ_KEY_NOREF]
 const REF_KEYS = [XYQ_REQ_KEY_REF]
+const JIMENG_I2V_KEYS = [JIMENG_I2V_REQ_KEY, JIMENG_I2V_REQ_KEY_FALLBACK, JIMENG_I2V_REQ_KEY_VGFM]
 
 export function isXiaoyunqueConfigured(env: MerchantAiEnv): boolean {
   return Boolean(resolveVolcVisualCredentials(env))
@@ -129,11 +133,14 @@ function reqKeyAttempts(
     reqKey,
     getAction: customGet || XYQ_GET_ACTION,
   })
-  /** 有角色/参考图：只走小云雀有声，禁止即梦单图和无参考文生 */
-  if (hasImageRef && !hasVideoRef) {
-    const rows = [xyqRow(XYQ_REQ_KEY_NOREF)]
-    if (customKey && !rows.some((r) => r.reqKey === customKey)) {
+  /** 有角色/参考图：只走「有参考」图生。禁止无参考文生 cvtob，否则图不进片 */
+  if (hasImageRef) {
+    const rows = [xyqRow(XYQ_REQ_KEY_REF)]
+    if (customKey && customKey !== XYQ_REQ_KEY_NOREF && !rows.some((r) => r.reqKey === customKey)) {
       rows.unshift(xyqRow(customKey))
+    }
+    for (const reqKey of JIMENG_I2V_KEYS) {
+      if (!rows.some((r) => r.reqKey === reqKey)) rows.push(xyqRow(reqKey))
     }
     return rows
   }
@@ -522,8 +529,6 @@ export async function volcSubmitXiaoyunqueTask(
   for (const attempt of reqKeyAttempts(env, hasVideoRef, hasImageRef)) {
     if (isJimengI2vReqKey(attempt.reqKey) && !imageUrls.length && !binaries.length) continue
     if (isJimengI2vReqKey(attempt.reqKey) && durationSec > 12) continue
-    /** 小云雀已开通时不要偷偷改走即梦无声片；仅 req_key 不支持才兜底 */
-    if (isJimengI2vReqKey(attempt.reqKey) && hasImageRef && xyqOtherFailed && !xyqNotOpened) continue
     const tryDurs =
       isJimengI2vReqKey(attempt.reqKey) && durationSec > 7 ? [durationSec, 5] : [durationSec]
     for (const dur of tryDurs) {
@@ -562,6 +567,10 @@ export async function volcSubmitXiaoyunqueTask(
       const rawId = extractTaskId(r.json)
       if (!rawId) {
         errors.push(`${attempt.reqKey}: 未返回 task_id`)
+        continue
+      }
+      if (hasImageRef && attempt.reqKey === XYQ_REQ_KEY_NOREF) {
+        errors.push('已拒绝无参考文生（图必须进片）')
         continue
       }
       return {

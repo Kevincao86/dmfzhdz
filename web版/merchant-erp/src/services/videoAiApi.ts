@@ -1727,11 +1727,18 @@ export async function runXiaoyunqueVideoJob(opts: {
   })
   if (!start.ok) return { ok: false, message: formatVideoAiUserError(start.message) }
   const usedModel = String(start.modelUsed || '')
-  const usedXiaoyunque = /pippit_iv2v/i.test(usedModel)
-  if (!usedXiaoyunque) {
+  const usedNorefText = /pippit_iv2v_v20_cvtob(?!_with_vinput)/i.test(usedModel)
+  if (usedNorefText) {
     return {
       ok: false,
-      message: `参考图未进入小云雀有声短剧（当前 ${usedModel || '未知'}）。未采用纯文案成片，以免换脸换景。`,
+      message: '成片走了无参考文生，已丢弃。角色和店内参考必须进片，请再试。',
+    }
+  }
+  const usedPhoto = /with_vinput|jimeng_ti2v|jimeng_i2v|jimeng_vgfm_i2v/i.test(usedModel)
+  if (!usedPhoto) {
+    return {
+      ok: false,
+      message: `参考图未进入图生（当前 ${usedModel || '未知'}）。未采用纯文案成片。`,
     }
   }
 

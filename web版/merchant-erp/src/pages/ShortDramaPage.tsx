@@ -1592,9 +1592,10 @@ function buildDramaXiaoyunquePrompt(opts: {
   const lead = opts.leadName.trim() || '主角'
   return [
     opts.identity,
-    `【参考图出演】已提交角色照片：必须让参考图里的${lead}出演，同一张脸同一发型同一套衣服。禁止另造人物、禁止换脸。配角最多露手或背影。`,
+    `【首帧进片】第1张图已经是${lead}站在店内实拍空间里的画面，必须让这张图动起来。同一张脸、同一套衣服、同一家店。禁止另起文案空间、禁止换人换景。`,
     opts.hasSceneRefs
-      ? '【场景锁定】除角色外的参考图是店内实拍（或多图拼贴）。必须在该空间拍戏：同样的灯光、家具、绿植、夜景窗与道具，禁止换成无关室内或室外。'
+      ? '【场景锁定】第2张是店内实拍拼贴，灯光、家具、绿植、夜景窗必须与实拍一致。'
+      : '',
       : '',
     opts.story.trim(),
     '请由小云雀智能生视频 Agent 多镜编排成片，必须有中文对白和环境声，竖屏 9:16。前 3 秒必须冲突或反转。不要字幕水印 Logo。',
@@ -1604,7 +1605,9 @@ function buildDramaXiaoyunquePrompt(opts: {
 }
 
 function isDramaPhotoAwareVideoModel(modelUsed: string | null | undefined): boolean {
-  return /pippit_iv2v/i.test(String(modelUsed || ''))
+  const m = String(modelUsed || '')
+  if (/pippit_iv2v_v20_cvtob(?!_with_vinput)/i.test(m)) return false
+  return /with_vinput|jimeng_ti2v|jimeng_i2v|jimeng_vgfm_i2v/i.test(m)
 }
 
 function parseRoleNames(raw: string): string[] {
@@ -1812,6 +1815,42 @@ async function composeDramaSceneCollage(dataUrls: string[]): Promise<string | nu
     return canvas.toDataURL('image/jpeg', 0.84)
   } catch {
     return urls[0] ?? null
+  }
+}
+
+/** 把角色叠进店内实拍，做成 9:16 首帧，图生才能真正进片而不是文案另画 */
+async function composeDramaCastInScene(portraitUrl: string, sceneUrl: string): Promise<string | null> {
+  try {
+    const [person, scene] = await Promise.all([
+      loadDramaCanvasImage(portraitUrl),
+      loadDramaCanvasImage(sceneUrl),
+    ])
+    const W = 720
+    const H = 1280
+    const canvas = document.createElement('canvas')
+    canvas.width = W
+    canvas.height = H
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    const sScale = Math.max(W / Math.max(1, scene.width), H / Math.max(1, scene.height))
+    ctx.drawImage(
+      scene,
+      (W - scene.width * sScale) / 2,
+      (H - scene.height * sScale) / 2,
+      scene.width * sScale,
+      scene.height * sScale,
+    )
+    const boxW = W * 0.78
+    const boxH = H * 0.68
+    const boxX = (W - boxW) / 2
+    const boxY = H - boxH - 28
+    const pScale = Math.min(boxW / Math.max(1, person.width), boxH / Math.max(1, person.height))
+    const pw = person.width * pScale
+    const ph = person.height * pScale
+    ctx.drawImage(person, boxX + (boxW - pw) / 2, boxY + (boxH - ph), pw, ph)
+    return canvas.toDataURL('image/jpeg', 0.86)
+  } catch {
+    return null
   }
 }
 
@@ -2305,9 +2344,13 @@ export default function ShortDramaPage() {
       if (!sceneSlot) {
         throw new Error('参考画面未能编码成图片。请重新上传店内实拍后再生成。')
       }
-      const packed = [...new Set([cont || portraits[0]!, sceneSlot])].slice(0, 2)
+      const firstRaw = cont || (await composeDramaCastInScene(portraits[0]!, sceneSlot)) || portraits[0]!
+      const firstSlot = firstRaw.startsWith('data:image/')
+        ? await compressPortraitDataUrlForLibrary(firstRaw)
+        : portraits[0]!
+      const packed = [...new Set([firstSlot, sceneSlot])].slice(0, 2)
       if (packed.length < 2) {
-        throw new Error('角色图和参考画面必须同时提交给模型。请重新上传后再生成。')
+        throw new Error('角色图和参考画面必须同时做成首帧提交。请重新上传后再生成。')
       }
       return packed
     },
