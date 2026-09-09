@@ -12,7 +12,7 @@ import {
   type ReviewsApiPlatform,
 } from '../services/reviewsMerchantApi'
 import { syncAllMerchantProductsFromPlatforms } from '../services/merchantProductListApi'
-import { generateViralBriefText } from '../services/viralBriefAi'
+import { buildLocalAgentPromoCopy, generateAgentShortPromoCopy } from '../services/viralBriefAi'
 import { saveMpBriefGenRecord } from '../services/mpBriefGenRecordsClient'
 import {
   fetchLocalClues,
@@ -161,15 +161,17 @@ async function confirmGenerateCopywriting(
   userBrief: string,
 ): Promise<SoftScenarioConfirmResult> {
   const brief = userBrief.trim() || '请根据门店主营与近期活动生成可发布的推广种草文案'
-  const result = await generateViralBriefText({
-    source: {
-      title: '推广文案',
-      content: brief,
-    },
-    platform: 'douyin',
-    style: 'deal_push',
-    extraHint: '输出可发布的短推广文案：5 条标题、3 条钩子、分镜口播即可，全文控制在 600 字内，不要长文稿。',
-  })
+  let result
+  let fallbackNote = ''
+  try {
+    result = await generateAgentShortPromoCopy(brief)
+  } catch (e) {
+    result = buildLocalAgentPromoCopy(brief)
+    const msg = e instanceof Error ? e.message : String(e)
+    fallbackNote = /超时|timeout|aborted/i.test(msg)
+      ? '上游生成较慢，已先给出可用短文案。'
+      : `模型暂不可用，已先给出可用短文案。`
+  }
   const orderId =
     typeof crypto !== 'undefined' && 'randomUUID' in crypto
       ? crypto.randomUUID()
@@ -189,7 +191,7 @@ async function confirmGenerateCopywriting(
     result.requirementSummary.slice(0, 280)
   return {
     ok: true,
-    summary: `「${title}」已确认。推广文案已生成并入库。摘要：${preview}${preview.length >= 280 ? '…' : ''}。可在 AI 运营 → 内容记录查看全文。`,
+    summary: `「${title}」已确认。${fallbackNote}推广文案已生成并入库。摘要：${preview}${preview.length >= 280 ? '…' : ''}。可在 AI 运营 → 内容记录查看全文。`,
     navigateTo: '/ai-operation/content/records',
     resultSummary: 'confirmed',
   }

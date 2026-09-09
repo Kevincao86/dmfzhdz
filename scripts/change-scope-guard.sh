@@ -148,6 +148,9 @@ recruitmentOrderProgress
 merchantRecruitmentTierPlan
 recruitmentInfoFilter
 recruitmentBriefAi
+aiAgentSoftScenarioConfirm
+viralBriefAi
+merchantAiUpstream
 change-scope-guard
 PAT
       ;;

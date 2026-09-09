@@ -677,6 +677,121 @@ export async function generateViralBriefText(args: {
   return baseResult
 }
 
+function compactAgentPromoSource(raw: string): string {
+  return String(raw || '')
+    .replace(/\[引用[\s\S]*?\n\n/, '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l && !/预算|佣金|参考单价|AI招募方案|总预算|费用模式|一口价/.test(l))
+    .join('\n')
+    .trim()
+    .slice(0, 800)
+}
+
+function numberedLines(text: string, max: number): string[] {
+  const lines = String(text || '')
+    .split('\n')
+    .map((l) => l.replace(/^\s*(?:\d+[.、．)]\s*|[-*•]\s*)/, '').trim())
+    .filter((l) => l.length >= 4)
+  return Array.from(new Set(lines)).slice(0, max)
+}
+
+function pickSection(text: string, keys: string[]): string {
+  const src = String(text || '')
+  for (const key of keys) {
+    const re = new RegExp(`${key}[:：]?\\s*\\n?([\\s\\S]*?)(?=\\n(?:标题|钩子|口播|话题|卖点)|$)`, 'i')
+    const m = src.match(re)
+    if (m?.[1]?.trim()) return m[1].trim()
+  }
+  return ''
+}
+
+function finishAgentPromoResult(partial: Omit<ViralBriefResult, 'fullMarkdown'>): ViralBriefResult {
+  return { ...partial, fullMarkdown: formatFullMarkdown(partial) }
+}
+
+export function buildLocalAgentPromoCopy(source: string): ViralBriefResult {
+  const compact = compactAgentPromoSource(source) || '门店探店种草'
+  const name = compact.split(/[，。,\n]/)[0]?.replace(/【.*?】/g, '').trim().slice(0, 16) || '探店套餐'
+  const titles = [
+    `${name}值不值得去`,
+    `本地人推荐的${name}`,
+    `${name}探店避坑`,
+    `周末就冲${name}`,
+    `${name}到店体验`,
+  ]
+  const hooks = [
+    `先说结论：${name}适合想放松、又怕踩雷的人。`,
+    `别再只看封面，这几点到店才知道。`,
+    `同城探店，我只记住这三句话。`,
+  ]
+  const voice = `如果你也在找${name}，记住三点：体验要讲清楚、适合谁要讲明白、最后把团购入口指给观众。口播别堆空词，把到店感受说具体。`
+  return finishAgentPromoResult({
+    outputMode: 'video_brief',
+    platform: 'douyin',
+    style: 'deal_push',
+    requirementSummary: compact.slice(0, 200),
+    unifiedSolutions: [],
+    hooks,
+    titles,
+    structure: [{ scene: '口播', visual: '到店实拍或口播特写', voice, subtitle: name }],
+    mustMention: [name, '到店体验', '团购入口'],
+    forbidden: ['医疗功效承诺', '虚假折扣'],
+    topics: ['#探店', '#本地生活', `#${name}`],
+    roles: { talent: '按口播结构拍一条竖屏', shoot: '环境+项目过程（合规）', edit: '前3秒出钩子' },
+    checklist: ['标题可读', '口播自然', '挂团购'],
+    fullCopy: [titles[0], '', voice].join('\n'),
+  })
+}
+
+/** 智能体确认「推广文案」：短稿、禁止 JSON，避免走 爆款Brief 22s 快路径 */
+export async function generateAgentShortPromoCopy(source: string): Promise<ViralBriefResult> {
+  const compact = compactAgentPromoSource(source) || '请根据门店主营写一条可发布的探店种草短文案'
+  const titleDraft = `根据下面商家需求，写抖音探店可发布短文案。
+需求：
+${compact}
+
+请按下面四段输出纯文本（不要代码块）：
+标题
+- 5 条，每条不超过 18 字
+钩子
+- 3 条开场钩子
+口播
+- 一段 120 到 200 字
+话题
+- 3 个话题词
+
+禁止写招募预算、佣金、档位单价。`
+  const r = await postDouyinGoodsAiAssist({
+    model: resolveBriefTextAiModelForRequest(),
+    action: 'operation_article',
+    product_name: '智能体推广短文案',
+    title_draft: titleDraft,
+  })
+  if (!r.ok || !String(r.description || '').trim()) {
+    throw new Error(formatBriefUserError(r.message || '文案生成失败'))
+  }
+  const raw = stripAiMarkdown(String(r.description || '')).trim()
+  const titles = numberedLines(pickSection(raw, ['标题']) || raw, 5)
+  const hooks = numberedLines(pickSection(raw, ['钩子', '开场']), 3)
+  const voice =
+    pickSection(raw, ['口播', '正文']) ||
+    raw.split('\n').filter((l) => l.trim().length > 20).slice(0, 4).join('')
+  const topics = numberedLines(pickSection(raw, ['话题', '标签']), 3).map((t) =>
+    t.startsWith('#') ? t : `#${t.replace(/^#/, '')}`,
+  )
+  const local = buildLocalAgentPromoCopy(compact)
+  return finishAgentPromoResult({
+    ...local,
+    requirementSummary: compact.slice(0, 200),
+    titles: titles.length ? titles : local.titles,
+    hooks: hooks.length ? hooks : local.hooks,
+    structure: [{ scene: '口播', visual: '到店实拍或口播特写', voice: voice.slice(0, 400) || local.structure[0]?.voice || '' }],
+    topics: topics.length ? topics : local.topics,
+    fullCopy: raw.slice(0, 1200),
+  })
+}
+
 /** 在已有文字 Brief 上补充相似案例检索（失败不抛错，返回原结果） */
 export async function searchViralBriefReferences(args: {
   platform?: ViralBriefPlatform

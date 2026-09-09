@@ -261,10 +261,10 @@ function builtinImageFailoverOthers(primary: string, env: MerchantAiEnv): string
   return out
 }
 
-const BRIEF_ARTICLE_TOTAL_MS = 22_000
+const BRIEF_ARTICLE_TOTAL_MS = 75_000
 const BRIEF_DOUBAO_MAX_TRIES = 2
-const BRIEF_DOUBAO_PER_MODEL_MS = 11_000
-const BRIEF_QWEN_FAST_MS = 10_000
+const BRIEF_DOUBAO_PER_MODEL_MS = 22_000
+const BRIEF_QWEN_FAST_MS = 20_000
 
 function isBriefOperationArticleRequest(productName: string, titleDraft: string): boolean {
   return (
@@ -306,7 +306,7 @@ async function callBriefOperationArticleWithFailover(
 ): Promise<{ text: string; modelUsed: string }> {
   const fast = opts?.fast !== false
   const started = Date.now()
-  const remainingMs = () => Math.max(0, (fast ? BRIEF_ARTICLE_TOTAL_MS : 45_000) - (Date.now() - started))
+  const remainingMs = () => Math.max(0, (fast ? BRIEF_ARTICLE_TOTAL_MS : 75_000) - (Date.now() - started))
 
   const req = normalizeAiModelPreserveCustom(requested)
   const order: AssistVendorId[] = []
