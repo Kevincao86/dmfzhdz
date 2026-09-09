@@ -1,7 +1,14 @@
 import { Loader2 } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useAiAgent } from '../context/AiAgentContext'
 import type { AiRecruitmentBriefPreview, RecruitContentForm } from '../lib/aiAgentTypes'
+import RecruitmentCityPickerModal, {
+  RecruitmentCityField,
+} from './recruitment/RecruitmentCityPickerModal'
+import {
+  buildRegionFromCityState,
+  parseRegionToCityState,
+} from '../lib/recruitmentCityPicker'
 import {
   RECRUIT_CONTENT_FORM_OPTIONS,
   RECRUIT_WIZARD_STEP_META,
@@ -34,6 +41,10 @@ export function AiAgentRecruitmentVisualPreview({
     } as const)
   const budget = brief.wizardBudget
   const shoot = brief.wizardShoot
+  const [cityPickerOpen, setCityPickerOpen] = useState(false)
+  const cityState = scope.city.trim()
+    ? parseRegionToCityState(scope.city)
+    : { cityNational: false, selectedCities: [] }
 
   return (
     <div className="mt-4 space-y-3">
@@ -97,17 +108,13 @@ export function AiAgentRecruitmentVisualPreview({
               ))}
             </div>
           </Field>
-          <Field label="城市">
-            <input
-              className={inputClass}
-              placeholder="按门店地址自动识别，也可手改"
-              value={scope.city}
-              onChange={(e) =>
-                patchRecruitWizard(previewMessageId, {
-                  wizardScope: { ...scope, city: e.target.value },
-                })
-              }
+          <Field label="招募城市">
+            <RecruitmentCityField
+              cityNational={cityState.cityNational}
+              selectedCities={cityState.selectedCities}
+              onClick={() => setCityPickerOpen(true)}
             />
+            <p className="mt-1 text-[10px] text-slate-400">可多选城市；选「全国」则不限地域（与星选发招募一致）</p>
           </Field>
           <Field label="门店">
             <input
@@ -307,6 +314,20 @@ export function AiAgentRecruitmentVisualPreview({
       ) : null}
 
       {brief.enrichError ? <p className="text-center text-xs text-amber-700">{brief.enrichError}</p> : null}
+
+      <RecruitmentCityPickerModal
+        open={cityPickerOpen}
+        value={cityState}
+        onClose={() => setCityPickerOpen(false)}
+        onConfirm={(next) => {
+          patchRecruitWizard(previewMessageId, {
+            wizardScope: {
+              ...scope,
+              city: buildRegionFromCityState(next.cityNational, next.selectedCities),
+            },
+          })
+        }}
+      />
     </div>
   )
 }

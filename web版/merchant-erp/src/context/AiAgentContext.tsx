@@ -109,6 +109,10 @@ import {
   recruitWizardStepOf,
 } from '../lib/aiAgentRecruitmentWizard'
 import {
+  hasRecruitmentCitySelection,
+  parseRegionToCityState,
+} from '../lib/recruitmentCityPicker'
+import {
   formatAiProductSubmitSummary,
   submitAiProductPlansToPlatforms,
 } from '../services/aiAgentProductPlatformSubmit'
@@ -1249,6 +1253,13 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       if (!scope || !budget) return
 
       if (step === 1) {
+        const citySt = scope.city.trim()
+          ? parseRegionToCityState(scope.city)
+          : { cityNational: false, selectedCities: [] as string[] }
+        if (!hasRecruitmentCitySelection(citySt.cityNational, citySt.selectedCities)) {
+          window.alert('请选择招募城市（可多选或选全国，与星选发招募一致）')
+          return
+        }
         patchPreviewRecruitmentBrief(
           previewMessageId,
           {

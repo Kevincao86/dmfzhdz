@@ -1,6 +1,10 @@
 import { inferCityFromChineseAddress } from '../lib/douyinStoreCityResolve'
 import { parseRecruitmentIntentFromText } from '../lib/aiAgentRecruitmentParse'
 import type { AiRecruitmentBriefPreview } from '../lib/aiAgentTypes'
+import {
+  parseRegionToCityState,
+  primaryRecruitmentCity,
+} from '../lib/recruitmentCityPicker'
 import { readMerchantSession } from '../lib/merchantSession'
 import { getDouyinStores } from './douyinMerchantApi'
 import {
@@ -75,11 +79,21 @@ export async function buildAgentRecruitmentAllocation(
   }
   const packageNote = [brief.mainProductName, brief.briefText.slice(0, 400)].filter(Boolean).join('；')
 
-  const storeCity =
+  const storeCityRaw =
     String(opts?.storeCity || '').trim() || (await resolveStoreCityFromMerchantStores())
-  // 写死：门店地址城市 > 话术解析城市；都没有则空串，由库侧回退全国本地生活
-  const city = storeCity || intent.city || ''
+  const cityState = storeCityRaw.trim()
+    ? parseRegionToCityState(storeCityRaw)
+    : { cityNational: false, selectedCities: [] as string[] }
+  const region = cityState.cityNational
+    ? '全国'
+    : cityState.selectedCities.length
+      ? cityState.selectedCities.join('、')
+      : storeCityRaw
+  const pricingCity = primaryRecruitmentCity(cityState.cityNational, cityState.selectedCities)
+  // 写死：向导/星选城市（全国或多选）> 话术解析城市；档位测算用首城或全国
+  const city = region || intent.city || ''
   intent.city = city || intent.city || '全国'
+  const cityForAlloc = pricingCity || city || '全国'
 
   if (intent.platform === '小红书') {
     const allocation = fallbackXiaohongshuNoviceAllocation(intent.budgetYuan)
@@ -92,17 +106,17 @@ export async function buildAgentRecruitmentAllocation(
           v5plus: total,
           costHint: `按您的目标约 ${total} 位小红书达人，预算 ¥${intent.budgetYuan.toLocaleString('zh-CN')}（智能体解析）。`,
         },
-        storeCityResolved: storeCity || undefined,
+        storeCityResolved: region || storeCityRaw || undefined,
       }
     }
-    return { intent, allocation, storeCityResolved: storeCity || undefined }
+    return { intent, allocation, storeCityResolved: region || storeCityRaw || undefined }
   }
 
   let cityTierBands
   let cityTierSource: 'ai' | 'static' | undefined
   try {
     const tier = await resolveCityKolTierBandsSmart({
-      city: city || '全国',
+      city: cityForAlloc,
       industry: intent.industry,
     })
     cityTierBands = tier.bands
@@ -117,7 +131,7 @@ export async function buildAgentRecruitmentAllocation(
       : Math.max(3, Math.min(36, Math.round(intent.budgetYuan / 1200)))
 
   const allocation = await generateNoviceKolAllocation({
-    city: city || '全国',
+    city: cityForAlloc,
     industry: intent.industry,
     packageNote,
     budgetYuan: intent.budgetYuan,
@@ -128,5 +142,5 @@ export async function buildAgentRecruitmentAllocation(
     platform: intent.platform,
   })
 
-  return { intent, allocation, cityTierSource, storeCityResolved: storeCity || undefined }
+  return { intent, allocation, cityTierSource, storeCityResolved: region || storeCityRaw || undefined }
 }

@@ -112,8 +112,10 @@ export function buildRecruitWizardSeed(
 
 export function summarizeRecruitWizardScope(scope: RecruitWizardScope | undefined): string {
   if (!scope) return ''
-  const store = scope.storeName.trim() || scope.city.trim() || '门店待识别'
-  return `${recruitPlatformLabel(scope.platform)} · ${store} · ${scope.mainProductName} · ${recruitContentFormLabel(scope.contentForm)}`
+  const city = scope.city.trim() || '城市待选'
+  const store = scope.storeName.trim()
+  const place = store ? `${city} · ${store}` : city
+  return `${recruitPlatformLabel(scope.platform)} · ${place} · ${scope.mainProductName} · ${recruitContentFormLabel(scope.contentForm)}`
 }
 
 export function summarizeRecruitWizardBudget(budget: RecruitWizardBudget | undefined): string {

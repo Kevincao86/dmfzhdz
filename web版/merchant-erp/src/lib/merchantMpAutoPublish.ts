@@ -8,6 +8,7 @@ import {
   pickTalentFacingBriefFromSummary,
   stripTalentFacingRecruitmentCopy,
 } from './recruitmentInfoFilter'
+import { parseRegionToCityState } from './recruitmentCityPicker'
 import { normalizeRecruitmentPlatform } from './recruitmentPlatformOptions'
 
 function pickPlatform(order: RegistryRecruitmentOrder): string {
@@ -55,6 +56,10 @@ export function buildMpOrderFromMerchantRecruitment(
   ).slice(0, 4000)
 
   const region = tierPlan?.city || order.storeName || order.storeAddress || '—'
+  const citySt =
+    !region || region === '—'
+      ? { cityNational: false, selectedCities: [] as string[] }
+      : parseRegionToCityState(region)
   const title = `${order.customerName}·${order.storeName}${order.category || '达人'}招募`
 
   return {
@@ -93,6 +98,8 @@ export function buildMpOrderFromMerchantRecruitment(
       tierPlan: tierPlan ?? null,
       merchantWorkflow: true,
       signupDeadline: buildDeadline(),
+      cityNational: citySt.cityNational,
+      cities: citySt.selectedCities,
       ...(order.tenantId ? { tenantId: order.tenantId } : {}),
     },
   }

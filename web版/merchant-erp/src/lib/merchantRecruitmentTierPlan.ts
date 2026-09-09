@@ -29,6 +29,71 @@ function bandMid(b: KolTierBand): number {
   return Math.round((b.min + b.max) / 2)
 }
 
+type TierCountMap = { v3: number; v4: number; v5: number; v5plus: number }
+
+function readTierCounts(plan: {
+  tiers?: Partial<Record<KolTierKey, { count: number }>>
+} | null | undefined): TierCountMap {
+  return {
+    v3: plan?.tiers?.v3?.count ?? 0,
+    v4: plan?.tiers?.v4?.count ?? 0,
+    v5: plan?.tiers?.v5?.count ?? 0,
+    v5plus: plan?.tiers?.v5plus?.count ?? 0,
+  }
+}
+
+/** 每档都写成总人数（例如一共 12 人却变成 V3/V4/V5/V5+ 各 12） */
+export function allocationCountsLookDuplicated(counts: TierCountMap, total: number): boolean {
+  if (total <= 0) return false
+  return [counts.v3, counts.v4, counts.v5, counts.v5plus].every((c) => c === total)
+}
+
+/** 阶梯反选：各档独立配额且合计为总人数；一口价 / 配额串档则共用总人数 */
+export function usesPerTierCounterSelect(
+  plan:
+    | {
+        feeType?: 'tier' | 'fixed'
+        totalHeadcount?: number
+        tiers?: Partial<Record<KolTierKey, { count: number }>>
+      }
+    | null
+    | undefined,
+): boolean {
+  if (!plan || plan.feeType !== 'tier') return false
+  const counts = readTierCounts(plan)
+  const sum = counts.v3 + counts.v4 + counts.v5 + counts.v5plus
+  const total = plan.totalHeadcount || sum
+  if (allocationCountsLookDuplicated(counts, total)) return false
+  return sum > 0
+}
+
+export function counterSelectTotalQuota(
+  plan: { feeType?: 'tier' | 'fixed'; totalHeadcount?: number; tiers?: Partial<Record<KolTierKey, { count: number }>> } | null | undefined,
+): number {
+  if (!plan) return 99
+  if (usesPerTierCounterSelect(plan)) {
+    const counts = readTierCounts(plan)
+    const sum = counts.v3 + counts.v4 + counts.v5 + counts.v5plus
+    return Math.max(1, plan.totalHeadcount || sum)
+  }
+  return Math.max(1, plan.totalHeadcount ?? 99)
+}
+
+export function counterSelectQuotaForTier(
+  plan:
+    | {
+        feeType?: 'tier' | 'fixed'
+        totalHeadcount?: number
+        tiers?: Partial<Record<KolTierKey, { count: number }>>
+      }
+    | null
+    | undefined,
+  tier: KolTierKey,
+): number {
+  if (!usesPerTierCounterSelect(plan)) return counterSelectTotalQuota(plan)
+  return Math.max(0, plan?.tiers?.[tier]?.count ?? 0)
+}
+
 function allocateCountsForTarget(
   total: number,
   strategy: KolTierStrategy,
@@ -101,7 +166,18 @@ export function buildRecruitmentTierPlan(params: {
     }
   }
 
-  const fromAllocation = params.allocation
+  const leaked =
+    params.allocation &&
+    allocationCountsLookDuplicated(
+      {
+        v3: params.allocation.v3,
+        v4: params.allocation.v4,
+        v5: params.allocation.v5,
+        v5plus: params.allocation.v5plus,
+      },
+      total,
+    )
+  const fromAllocation = leaked ? undefined : params.allocation
   const raw = fromAllocation
     ? {
         v3: { count: fromAllocation.v3, unitPriceYuan: 0 },

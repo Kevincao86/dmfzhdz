@@ -139,6 +139,8 @@ merchantRecruitmentSubmit
 merchantMpAutoPublish
 aiAgentRecruitmentOrder
 aiAgentRecruitmentWizard
+aiAgentRecruitmentAllocation
+AiAgentRecruitmentVisualPreview
 AiAgentContext
 aiAgentScenarioWorkflows
 aiAgentPlan

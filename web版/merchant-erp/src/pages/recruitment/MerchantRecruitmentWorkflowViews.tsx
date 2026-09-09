@@ -10,8 +10,11 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  counterSelectQuotaForTier,
+  counterSelectTotalQuota,
   inferKolTierFromApplicant,
   kolTierLabel,
+  usesPerTierCounterSelect,
   type KolTierKey,
 } from '../../lib/merchantRecruitmentTierPlan'
 import { resolveTalentMemberIdForApplicant } from '../../lib/merchantRecruitmentInbox'
@@ -48,11 +51,6 @@ async function loadWorkflowContext() {
       ? (reg.mpRecruitmentOrders ?? []).find((m) => m.id === order.linkedMpOrderId) ?? null
       : null
   return { reg, order, mp, orderId }
-}
-
-function tierQuota(plan: RegistryRecruitmentOrder['tierPlan'], tier: KolTierKey): number {
-  if (!plan || plan.feeType === 'fixed') return plan?.totalHeadcount ?? 99
-  return plan.tiers?.[tier]?.count ?? 0
 }
 
 function readImageFile(file: File): Promise<string> {
@@ -152,16 +150,27 @@ export function MerchantApplicantSelectView({ onBack }: { onBack: () => void }) 
     return map
   }, [applicants])
 
+  const perTierSelect = usesPerTierCounterSelect(plan)
+  const totalCap = counterSelectTotalQuota(plan)
+
   const toggle = (id: string, tier: KolTierKey) => {
     const set = new Set(selectedIds)
     if (set.has(id)) {
       set.delete(id)
     } else {
-      const tierSelected = applicants.filter((a) => selectedIds.includes(String(a.id)) && inferKolTierFromApplicant(a) === tier)
-      const cap = tierQuota(plan, tier)
-      if (tierSelected.length >= cap) {
-        window.alert(`${kolTierLabel(tier)} 档最多选 ${cap} 人，请先取消已选再添加。`)
+      if (set.size >= totalCap) {
+        window.alert(`本单一共需选 ${totalCap} 人，请先取消已选再添加。`)
         return
+      }
+      if (perTierSelect) {
+        const tierSelected = applicants.filter(
+          (a) => selectedIds.includes(String(a.id)) && inferKolTierFromApplicant(a) === tier,
+        )
+        const cap = counterSelectQuotaForTier(plan, tier)
+        if (tierSelected.length >= cap) {
+          window.alert(`${kolTierLabel(tier)} 档最多选 ${cap} 人，请先取消已选再添加。`)
+          return
+        }
       }
       set.add(id)
     }
@@ -287,7 +296,7 @@ export function MerchantApplicantSelectView({ onBack }: { onBack: () => void }) 
           <h1 className="erp-page-title">达人反选（星选报名）</h1>
           <p className="mt-1 text-sm text-gray-500">
             订单 {order.id} · 星选单 {mp.id} · 已报名 {applicants.length} 人
-            {plan?.feeType === 'tier' ? ' · 按 AI 阶梯档位分别反选' : ' · 一口价模式'}
+            {perTierSelect ? ' · 按档位人数分别反选' : ` · 一共需选 ${totalCap} 人`}
           </p>
           {suggestions.length ? (
             <p className="mt-1 text-xs text-violet-800">
@@ -301,19 +310,32 @@ export function MerchantApplicantSelectView({ onBack }: { onBack: () => void }) 
         </button>
       </div>
 
+      <div className="rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-3 text-sm text-blue-900">
+        合计需选 <span className="font-semibold tabular-nums">{totalCap}</span> 人 · 已选{' '}
+        <span className="font-semibold tabular-nums">
+          {selectedIds.length}/{totalCap}
+        </span>
+        {perTierSelect ? '（各档人数合计为此数，不是每档都要选这么多人）' : '（不按等级拆配额）'}
+      </div>
+
       {(['v3', 'v4', 'v5', 'v5plus'] as KolTierKey[]).map((tier) => {
-        const cap = tierQuota(plan, tier)
-        if (plan?.feeType === 'tier' && cap <= 0) return null
+        const cap = counterSelectQuotaForTier(plan, tier)
+        if (perTierSelect && cap <= 0) return null
         const list = byTier[tier]
+        if (!perTierSelect && list.length === 0) return null
         const picked = list.filter((a) => selectedIds.includes(String(a.id))).length
         return (
           <div key={tier} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="font-semibold text-gray-900">
-                {kolTierLabel(tier)} 档 · 需选 {cap} 人
+                {perTierSelect
+                  ? `${kolTierLabel(tier)} 档 · 需选 ${cap} 人`
+                  : `${kolTierLabel(tier)} 档`}
               </h3>
               <span className="text-sm text-blue-700">
-                已选 {picked}/{cap} · 报名 {list.length} 人
+                {perTierSelect
+                  ? `已选 ${picked}/${cap} · 报名 ${list.length} 人`
+                  : `已选 ${picked} · 报名 ${list.length} 人`}
               </span>
             </div>
             {list.length === 0 ? (
@@ -370,6 +392,13 @@ export function MerchantApplicantSelectView({ onBack }: { onBack: () => void }) 
           </div>
         )
       })}
+
+      {applicants.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-gray-200 bg-white p-5 text-sm text-gray-500">
+          暂无报名。达人在星选报名后，将按一共 {totalCap} 人的名额反选
+          {perTierSelect ? '（各档人数合计不超过此数）' : ''}。
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap gap-3">
         {suggestions.length ? (
