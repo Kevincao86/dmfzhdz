@@ -208,7 +208,7 @@ export async function mapFetchStaticMap(
     tried.push('amap')
     const hit = await amapFetchStaticMap(env, { location: loc, zoom, width, height })
     if (hit.ok) {
-      return { ok: true as const, ...hit, provider: 'amap' as const, zoom, width, height }
+      return { ...hit, provider: 'amap' as const, zoom, width, height }
     }
     return hit
   }
@@ -216,7 +216,7 @@ export async function mapFetchStaticMap(
     tried.push('baidu')
     const hit = await baiduFetchStaticMap(env, { location: loc, zoom, width, height })
     if (hit.ok) {
-      return { ok: true as const, ...hit, provider: 'baidu' as const, zoom, width, height }
+      return { ...hit, provider: 'baidu' as const, zoom, width, height }
     }
     return hit
   }
