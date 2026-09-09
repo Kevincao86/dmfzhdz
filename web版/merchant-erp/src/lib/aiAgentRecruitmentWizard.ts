@@ -17,6 +17,10 @@ import {
   pickBriefMainAndSecondary,
   resolveMerchantBriefContext,
 } from './merchantBriefCatalog'
+import {
+  isTalentFacingRecruitmentPriceLeak,
+  stripTalentFacingRecruitmentCopy,
+} from './recruitmentInfoFilter'
 
 export const RECRUIT_WIZARD_STEP_META: Record<
   RecruitWizardStep,
@@ -142,12 +146,12 @@ export function composeRecruitWizardBriefText(
   shoot: RecruitWizardShoot,
 ): string {
   const storeLine = [scope.city, scope.storeName].filter(Boolean).join(' · ') || '按门店地址'
-  return [
+  const raw = [
     `【达人招募 Brief】${scope.mainProductName}`,
     `平台：${recruitPlatformLabel(scope.platform)}　形式：${recruitContentFormLabel(scope.contentForm)}`,
     `城市/门店：${storeLine}`,
     `主推：${scope.mainProductName}`,
-    `预算：¥${budget.budgetYuan} · ${budget.headcount} 人 · 佣金 ${budget.commissionPct}%`,
+    `招募人数：${budget.headcount} 人`,
     `档期：报名至 ${shoot.applyDeadline}，成片至 ${shoot.deliverDeadline}`,
     '',
     `一、推广目标`,
@@ -160,7 +164,7 @@ export function composeRecruitWizardBriefText(
     shoot.storyAngle,
     '',
     `四、必讲卖点`,
-    numbered(shoot.sellingPoints),
+    numbered(shoot.sellingPoints.filter((p) => !isTalentFacingRecruitmentPriceLeak(p))),
     '',
     `五、必拍镜头`,
     numbered(shoot.mustShoot),
@@ -187,6 +191,7 @@ export function composeRecruitWizardBriefText(
     .filter((line) => line != null)
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
+  return stripTalentFacingRecruitmentCopy(raw)
 }
 
 export function buildLocalRecruitWizardShoot(

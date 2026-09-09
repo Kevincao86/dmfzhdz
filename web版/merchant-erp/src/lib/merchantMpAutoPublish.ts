@@ -3,8 +3,11 @@ import type {
   RegistryRecruitmentOrder,
 } from './opsRegistryTypes'
 import type { RecruitmentTierPlan } from './merchantRecruitmentTierPlan'
-import { tierPlanSummaryLines } from './merchantRecruitmentTierPlan'
 import { buildMpRecruitmentOrderId } from './mpRecruitmentOrderId'
+import {
+  pickTalentFacingBriefFromSummary,
+  stripTalentFacingRecruitmentCopy,
+} from './recruitmentInfoFilter'
 import { normalizeRecruitmentPlatform } from './recruitmentPlatformOptions'
 
 function pickPlatform(order: RegistryRecruitmentOrder): string {
@@ -47,14 +50,9 @@ export function buildMpOrderFromMerchantRecruitment(
   const platform = pickPlatform(order)
   const budget = Math.max(0, order.serviceAmount || 0)
   const recruitCount = tierPlan?.totalHeadcount ?? (order.fans > 0 ? order.fans : 1)
-  const planLines = tierPlan ? tierPlanSummaryLines(tierPlan) : []
-  const recruitmentInfo = [
-    order.infoSummary?.trim() || '',
-    planLines.length ? `\n【AI招募方案】\n${planLines.join('\n')}` : '',
-  ]
-    .filter(Boolean)
-    .join('\n')
-    .slice(0, 4000)
+  const recruitmentInfo = stripTalentFacingRecruitmentCopy(
+    pickTalentFacingBriefFromSummary(order.infoSummary || ''),
+  ).slice(0, 4000)
 
   const region = tierPlan?.city || order.storeName || order.storeAddress || '—'
   const title = `${order.customerName}·${order.storeName}${order.category || '达人'}招募`
@@ -78,7 +76,7 @@ export function buildMpOrderFromMerchantRecruitment(
       '商家通过 ERP 发起招募；达人报名后由商家在 ERP 反选，确认后推送群码与探店排期。',
     platform,
     fansRequirement: '按招募方案档位',
-    budgetText: budget > 0 ? `¥${budget.toLocaleString('zh-CN')}` : '面议',
+    budgetText: '面议',
     recruitCount,
     region,
     category: order.category || '本地生活',
@@ -109,13 +107,14 @@ export function buildMpOrderFromProRecruitment(
   const budget = Math.max(0, order.serviceAmount || 0)
   const recruitCount = Math.max(1, order.fans || 1)
   const modeLabel = extras.recruitMode === 'designated' ? '指定达人' : 'AI智能匹配'
-  const recruitmentInfo = [
-    order.infoSummary?.trim() || '',
-    extras.note?.trim() ? `补充：${extras.note.trim()}` : '',
-  ]
-    .filter(Boolean)
-    .join('\n')
-    .slice(0, 4000)
+  const recruitmentInfo = stripTalentFacingRecruitmentCopy(
+    [
+      pickTalentFacingBriefFromSummary(order.infoSummary || ''),
+      extras.note?.trim() ? extras.note.trim() : '',
+    ]
+      .filter(Boolean)
+      .join('\n'),
+  ).slice(0, 4000)
 
   return {
     ...base,

@@ -136,7 +136,9 @@ RecruitmentPage
 MerchantRecruitmentWorkflowViews
 merchantRecruitmentCoach
 merchantRecruitmentSubmit
+merchantMpAutoPublish
 aiAgentRecruitmentOrder
+aiAgentRecruitmentWizard
 AiAgentContext
 aiAgentScenarioWorkflows
 aiAgentPlan
@@ -144,6 +146,8 @@ aiAgentTools
 recruitmentLoop
 recruitmentOrderProgress
 merchantRecruitmentTierPlan
+recruitmentInfoFilter
+recruitmentBriefAi
 change-scope-guard
 PAT
       ;;
