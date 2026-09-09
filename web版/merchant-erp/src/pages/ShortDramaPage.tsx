@@ -2387,6 +2387,7 @@ export default function ShortDramaPage() {
   const [showCastSave, setShowCastSave] = useState(false)
   const [showCastLibrary, setShowCastLibrary] = useState(false)
   const [castPackBusy, setCastPackBusy] = useState(false)
+  const [saveCastIds, setSaveCastIds] = useState<string[]>([])
   const castHydratedRef = useRef(false)
   const [characterBusy, setCharacterBusy] = useState(false)
   const [portraitBusy, setPortraitBusy] = useState(false)
@@ -2581,6 +2582,7 @@ export default function ShortDramaPage() {
       preview: null,
     }
     setCast((prev) => [...prev, member])
+    setSaveCastIds((prev) => (prev.includes(member.id) ? prev : [...prev, member.id]))
     setRoles((prev) => {
       let next = prev
       for (const m of cast) next = addRoleName(next, m.name)
@@ -2596,6 +2598,7 @@ export default function ShortDramaPage() {
     const member = cast.find((m) => m.id === id)
     if (!member) return
     setCast((prev) => prev.filter((m) => m.id !== id))
+    setSaveCastIds((prev) => prev.filter((x) => x !== id))
     setRoles((prev) => removeRoleName(prev, member.name))
     setActiveCastId((prev) => (prev === id ? (cast.find((m) => m.id !== id)?.id ?? null) : prev))
     clearTrial()
@@ -2603,12 +2606,18 @@ export default function ShortDramaPage() {
   }
 
   const saveCastPack = async () => {
-    const members = mergeRolesIntoCast(roles, cast)
-    if (!castWorthSaving(members)) {
-      setErr('请先确认或填写至少一位角色，再保存')
+    const all = mergeRolesIntoCast(roles, cast)
+    const pickedIds = new Set(saveCastIds)
+    const members = all.filter((m) => pickedIds.has(m.id)).slice(0, DRAMA_CAST_MAX)
+    if (members.length === 0) {
+      setErr('请先勾选要保存的角色')
       return
     }
-    const rolesOut = joinUniqueRoleNames(roles, members.map((m) => m.name).join(' / '))
+    if (!castWorthSaving(members)) {
+      setErr('勾选的角色还没有形象或名字，请先确认后再保存')
+      return
+    }
+    const rolesOut = joinUniqueRoleNames(members.map((m) => m.name).join(' / '))
     const name = (castPackName.trim() || defaultCastPackName(members)).slice(0, 32)
     setCastPackBusy(true)
     setErr(null)
@@ -2617,9 +2626,12 @@ export default function ShortDramaPage() {
       const id = newWorkId()
       const payload: DramaCastPackPayload = { roles: rolesOut, members: packed }
       await dramaCastPutPayload(id, payload)
-      await dramaCastPutPayload(DRAMA_CAST_CURRENT_KEY, payload)
-      setCast(packed)
-      setRoles(rolesOut)
+      const currentPacked = await compressCastMembersForStore(all)
+      await dramaCastPutPayload(DRAMA_CAST_CURRENT_KEY, {
+        roles: joinUniqueRoleNames(roles, all.map((m) => m.name).join(' / ')),
+        members: currentPacked,
+      })
+      if (!sameCastFingerprint(cast, all)) setCast(all)
       const meta = packMetaFromPayload(id, name, payload)
       setCastPacks((prev) => {
         const sameName = prev.find((p) => p.name === name)
@@ -2634,7 +2646,7 @@ export default function ShortDramaPage() {
       setCastPackName('')
       setShowCastSave(false)
       setHint(
-        `已保存角色组「${name}」（${packed.length} 人）。做续集时点「选用已存」可一次载入全部角色。`,
+        `已保存角色组「${name}」（${packed.map((m) => m.name.trim() || '未命名').join('、')}，共 ${packed.length} 人）。页面上未勾选的角色还在，可继续编辑。`,
       )
     } catch (e) {
       setErr(e instanceof Error ? e.message : '保存角色失败')
@@ -4236,9 +4248,15 @@ export default function ShortDramaPage() {
                         onClick={() => {
                           const members = mergeRolesIntoCast(roles, cast)
                           if (!sameCastFingerprint(cast, members)) setCast(members)
-                          setShowCastSave((v) => !v)
+                          setShowCastSave((v) => {
+                            const next = !v
+                            if (next) {
+                              setSaveCastIds(members.map((m) => m.id))
+                              if (!castPackName.trim()) setCastPackName(defaultCastPackName(members))
+                            }
+                            return next
+                          })
                           setShowCastLibrary(false)
-                          if (!castPackName.trim()) setCastPackName(defaultCastPackName(members))
                         }}
                         className="inline-flex items-center gap-1 rounded-lg border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-xs font-medium text-cyan-900 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-60"
                       >
@@ -4257,16 +4275,36 @@ export default function ShortDramaPage() {
                     </span>
                   </span>
                   <p className="text-[11px] leading-relaxed text-slate-500">
-                    角色栏写成「小柔 / 男顾客」后失焦或点「保存角色」，会自动带出多张角色卡，形象会一起存进角色组。做续集时「选用已存」一次载入全部人。删除角色会同步从上方「角色」栏去掉对应名字。
+                    角色栏写成「小柔 / 男顾客」后失焦或点「保存角色」，会自动带出多张角色卡。勾选要存的人（可多选），未勾选的仍留在本页。做续集时「选用已存」一次载入该组全部人。
                   </p>
                   {showCastSave ? (
                     <div className="flex flex-wrap items-center gap-2 rounded-xl border border-cyan-200 bg-cyan-50/50 p-2.5">
                       <p className="w-full text-[11px] text-cyan-900">
-                        将保存 {cast.length} 人
-                        {cast.some((m) => m.name.trim())
-                          ? `：${cast.map((m) => m.name.trim() || '未命名').join('、')}`
-                          : ''}
+                        {saveCastIds.length === 0
+                          ? '请勾选下方角色卡，可多选'
+                          : `将保存 ${saveCastIds.length} 人：${cast
+                              .filter((m) => saveCastIds.includes(m.id))
+                              .map((m) => m.name.trim() || '未命名')
+                              .join('、')}`}
                       </p>
+                      <div className="flex w-full flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={castPackBusy || !cast.length}
+                          onClick={() => setSaveCastIds(cast.map((m) => m.id))}
+                          className="rounded-md border border-cyan-200 bg-white px-2 py-1 text-[11px] font-medium text-cyan-800 hover:bg-cyan-50 disabled:opacity-50"
+                        >
+                          全选
+                        </button>
+                        <button
+                          type="button"
+                          disabled={castPackBusy || saveCastIds.length === 0}
+                          onClick={() => setSaveCastIds([])}
+                          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          取消全选
+                        </button>
+                      </div>
                       <input
                         className={cn(fieldCls, 'min-w-[160px] flex-1 py-1.5 text-sm')}
                         disabled={castPackBusy}
@@ -4276,7 +4314,11 @@ export default function ShortDramaPage() {
                       />
                       <button
                         type="button"
-                        disabled={castPackBusy}
+                        disabled={
+                          castPackBusy ||
+                          saveCastIds.length === 0 ||
+                          !castWorthSaving(cast.filter((m) => saveCastIds.includes(m.id)))
+                        }
                         onClick={() => void saveCastPack()}
                         className="inline-flex items-center gap-1 rounded-lg bg-cyan-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-cyan-800 disabled:opacity-50"
                       >
@@ -4364,6 +4406,30 @@ export default function ShortDramaPage() {
                             )}
                           >
                             <div className="flex items-center gap-2">
+                              <label
+                                className={cn(
+                                  'flex shrink-0 cursor-pointer items-center justify-center rounded-lg border p-1.5',
+                                  saveCastIds.includes(member.id)
+                                    ? 'border-cyan-300 bg-cyan-50 text-cyan-800'
+                                    : 'border-slate-200 bg-white text-slate-400 hover:bg-slate-50',
+                                )}
+                                title="勾选后写入本次保存的角色组，可多选"
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="h-3.5 w-3.5 accent-cyan-700"
+                                  checked={saveCastIds.includes(member.id)}
+                                  aria-label={`选入本次保存：${member.name.trim() || '角色'}`}
+                                  onChange={() => {
+                                    setActiveCastId(member.id)
+                                    setSaveCastIds((prev) =>
+                                      prev.includes(member.id)
+                                        ? prev.filter((id) => id !== member.id)
+                                        : [...prev, member.id],
+                                    )
+                                  }}
+                                />
+                              </label>
                               <input
                                 className={cn(fieldCls, 'py-1.5 text-sm font-medium')}
                                 disabled={busy || storyBusy || characterBusy || portraitBusy}
