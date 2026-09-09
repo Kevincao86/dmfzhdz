@@ -149,6 +149,7 @@ import {
 } from '../lib/aiAgentRecruitmentOrder'
 import { submitMerchantRecruitmentWithMpPublish } from '../lib/merchantRecruitmentSubmit'
 import { buildAgentRecruitmentAllocation } from '../services/aiAgentRecruitmentAllocation'
+import { mergeWizardBudgetFromPlan } from '../lib/aiAgentRecruitmentParse'
 import { resolveRecruitmentOrderTenantMeta } from '../lib/recruitmentOrderMeta'
 import {
   appendTaxFilingRecord,
@@ -1105,13 +1106,16 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     const pending = messagesRef.current.find((m) => m.id === previewMsgId)
     const plan = executionStateRef.current.plan
     const lastUser = [...messagesRef.current].reverse().find((m) => m.role === 'user')
+    const lastAssistant = [...messagesRef.current].reverse().find(
+      (m) => m.role === 'assistant' && (m.content?.trim().length ?? 0) > 40,
+    )
     return {
       userBrief:
         plan?.userBrief ||
         lastUser?.content?.replace(/\[引用[\s\S]*?\n\n/, '').trim() ||
         pending?.preview?.recruitmentBrief?.mainProductName ||
         '',
-      assistantContent: plan?.assistantContent,
+      assistantContent: plan?.assistantContent || lastAssistant?.content,
     }
   }, [])
 
@@ -1120,15 +1124,26 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       const scope = brief.wizardScope
       const budget = brief.wizardBudget
       if (!scope || !budget) return
-      const { userBrief } = lastPlanBriefs(previewMsgId)
-      const composed = composeRecruitWizardUserBrief(scope, budget, userBrief)
+      const { userBrief, assistantContent } = lastPlanBriefs(previewMsgId)
+      const planText = [userBrief, assistantContent].filter(Boolean).join('\n')
+      const firstFill = brief.wizardBudgetStatus !== 'ready'
+      const filled = mergeWizardBudgetFromPlan({
+        current: { budgetYuan: budget.budgetYuan, headcount: budget.headcount },
+        planText,
+        firstFill,
+      })
+      const composed = composeRecruitWizardUserBrief(
+        scope,
+        { ...budget, budgetYuan: filled.budgetYuan, headcount: filled.headcount },
+        userBrief,
+      )
       const { intent, allocation, storeCityResolved } = await buildAgentRecruitmentAllocation(
         composed,
         { ...brief, platform: recruitWizardPlatformsLabel(scope), mainProductName: scope.mainProductName },
         {
           storeCity: scope.city || undefined,
-          budgetYuan: budget.budgetYuan,
-          headcount: budget.headcount,
+          budgetYuan: filled.budgetYuan,
+          headcount: filled.headcount,
           platform: scope.platform,
           platforms: recruitWizardPlatformList(scope),
           commissionPct: budget.commissionPct,
@@ -1142,9 +1157,9 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           platforms: recruitWizardPlatformList(scope),
         },
         wizardBudget: {
-          budgetYuan: intent.budgetYuan,
-          headcount: Math.max(1, total || budget.headcount),
-          commissionPct: intent.kolCommissionPct,
+          budgetYuan: filled.budgetYuan,
+          headcount: Math.max(1, total || filled.headcount),
+          commissionPct: budget.commissionPct || intent.kolCommissionPct,
           allocation: {
             v3: allocation.v3,
             v4: allocation.v4,
