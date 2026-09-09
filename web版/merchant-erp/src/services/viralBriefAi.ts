@@ -769,7 +769,7 @@ ${compact}
     title_draft: titleDraft,
   })
   if (!r.ok || !String(r.description || '').trim()) {
-    throw new Error(formatBriefUserError(r.message || '文案生成失败'))
+    throw new Error(formatBriefUserError(!r.ok ? r.message : '文案生成失败'))
   }
   const raw = stripAiMarkdown(String(r.description || '')).trim()
   const titles = numberedLines(pickSection(raw, ['标题']) || raw, 5)
