@@ -234,16 +234,16 @@ export async function generateRecruitWizardRequirementsAi(args: {
 门店：${args.storeName || args.ctx?.storeName || '未填'}
 主推：${args.mainName}
 内容形式：${args.contentFormLabel}
-计划招募 ${args.headcount} 人（预算与佣金仅供商家内部，禁止写入任何字段）
+计划招募 ${args.headcount} 人（预算、佣金、档位单价仅供商家内部，禁止写入任何字段；车马费由系统另写，模型不要编价格）
 ${menuBlock}${planBlock}
 
 只输出一个 JSON 对象，不要 Markdown。字段：
 goal（推广目标，1～2句，写清要卖的团购/核销，不要空话「提升曝光」）
 audience（目标人群，1句）
-sellingPoints（数组，4～6条必讲卖点，每条15～40字，写体验/场景/团购权益；禁止写招募预算、佣金、档位单价、城市档位参考价、¥报价）
+sellingPoints（数组，4～6条必讲卖点，每条15～40字，写体验/场景/团购权益；禁止写招募预算、佣金、档位单价、城市档位参考价、¥报价、车马费）
 storyAngle（内容切入，2句）
-mustShoot（数组，6～8条必拍镜头，写清拍什么、为何要拍）
-talkTrack（数组，4～6条口播结构，按开场→体验→卖点→转化）
+mustShoot（数组，6～8条必拍镜头，写清拍什么、为何要拍；禁止写价格区间、80–200 元、「均为区间估算」、车马费、档位报价）
+talkTrack（数组，4～6条口播结构，按开场→体验→卖点→转化；禁止写报价）
 hooks（数组，2条可直接念的口播钩子，各不超过40字）
 durationHint（时长与条数建议，1句）
 deliverables（交付物：几条视频、是否封面/图文、是否挂团购，1～2句）
@@ -251,7 +251,7 @@ convertAction（转化动作，写清点哪里、引导什么）
 storeCoop（到店配合：是否必须到指定门店、是否含套餐体验、如何预约，2句）
 tabooItems（数组，4～6条禁忌，结合该类目合规）
 hashtags（数组，4～8个话题词，不要#号）
-禁止写成无关餐饮模板；禁止医疗疗效承诺；禁止出现招募预算、佣金比例、档位单价或【AI招募方案】。`
+禁止写成无关餐饮模板；禁止医疗疗效承诺；禁止出现招募预算、佣金比例、档位单价、价格区间、「均为区间估算，以实际报价为准」或【AI招募方案】。`
   const r = await postDouyinGoodsAiAssist({
     model,
     action: 'operation_article',

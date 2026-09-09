@@ -146,6 +146,7 @@ export function buildRecruitmentTierPlan(params: {
   cityTierBands?: CityKolTierBands
   source?: 'library' | 'ai' | 'fallback'
   allocation?: { v3: number; v4: number; v5: number; v5plus: number }
+  unitPrices?: Partial<Record<KolTierKey, number>>
 }): RecruitmentTierPlan {
   const budget = Math.max(0, Number(params.budgetYuan) || 0)
   const total = clampInt(Number(params.targetHeadcount) || 0, 1, 200)
@@ -186,11 +187,15 @@ export function buildRecruitmentTierPlan(params: {
         v5plus: { count: fromAllocation.v5plus, unitPriceYuan: 0 },
       }
     : allocateCountsForTarget(total, params.strategy ?? 'more_v4')
+  const feeOf = (key: KolTierKey, band: KolTierBand) => {
+    const fromLib = Number(params.unitPrices?.[key]) || 0
+    return fromLib > 0 ? Math.round(fromLib) : bandMid(band)
+  }
   const tiers: RecruitmentTierPlan['tiers'] = {
-    v3: { count: raw.v3!.count, unitPriceYuan: bandMid(bands.v3) },
-    v4: { count: raw.v4!.count, unitPriceYuan: bandMid(bands.v4) },
-    v5: { count: raw.v5!.count, unitPriceYuan: bandMid(bands.v5) },
-    v5plus: { count: raw.v5plus!.count, unitPriceYuan: bandMid(bands.v5plus) },
+    v3: { count: raw.v3!.count, unitPriceYuan: feeOf('v3', bands.v3) },
+    v4: { count: raw.v4!.count, unitPriceYuan: feeOf('v4', bands.v4) },
+    v5: { count: raw.v5!.count, unitPriceYuan: feeOf('v5', bands.v5) },
+    v5plus: { count: raw.v5plus!.count, unitPriceYuan: feeOf('v5plus', bands.v5plus) },
   }
   const estCost =
     (tiers.v3?.count ?? 0) * (tiers.v3?.unitPriceYuan ?? 0) +
@@ -205,7 +210,7 @@ export function buildRecruitmentTierPlan(params: {
     city: params.city.trim(),
     tiers,
     source: params.source ?? 'fallback',
-    costHint: `${tierLine}；预估档位成本约 ¥${estCost.toLocaleString('zh-CN')}（参考同城达人库，非承诺报价）。`,
+    costHint: `固定车马费合计约 ¥${estCost.toLocaleString('zh-CN')}（按同城达人库均价拆档，达人按此价报名）。`,
   }
 }
 
@@ -229,10 +234,57 @@ export function tierPlanSummaryLines(plan: RecruitmentTierPlan): string[] {
     const t = plan.tiers[key]
     if (t && t.count > 0) {
       const label = key === 'v5plus' ? 'V5+' : key.toUpperCase()
-      lines.push(`${label}：${t.count} 人 · 参考单价约 ¥${t.unitPriceYuan}/人`)
+      lines.push(`${label}：${t.count} 人 · 车马费 ¥${t.unitPriceYuan}/人`)
     }
   }
   return lines
+}
+
+/** 达人可见：各档固定车马费（不含商家总预算） */
+export function formatTalentFacingTravelFeeLines(plan: {
+  feeType?: 'tier' | 'fixed'
+  totalHeadcount?: number
+  fixedPriceYuan?: number
+  tiers?: Partial<Record<KolTierKey, { count: number; unitPriceYuan: number }>>
+} | null | undefined): string[] {
+  if (!plan) return []
+  if (plan.feeType === 'fixed') {
+    const n = Math.max(1, plan.totalHeadcount ?? 1)
+    const fee = Math.max(0, Math.round(Number(plan.fixedPriceYuan) || 0))
+    if (!fee) return []
+    return [`【车马费】共需 ${n} 人，每人固定 ¥${fee}，报名即按此价，无需另报`]
+  }
+  const rows: string[] = []
+  for (const key of ['v3', 'v4', 'v5', 'v5plus'] as KolTierKey[]) {
+    const t = plan.tiers?.[key]
+    if (!t || t.count <= 0 || !t.unitPriceYuan) continue
+    const label = key === 'v5plus' ? 'V5+' : key.toUpperCase()
+    rows.push(`${label}：${t.count} 人 · 车马费 ¥${t.unitPriceYuan}/人`)
+  }
+  if (!rows.length) return []
+  return ['【车马费】按档位固定，报名即按此价，无需另报', ...rows]
+}
+
+export function formatMpBudgetTextFromTierPlan(plan: {
+  feeType?: 'tier' | 'fixed'
+  totalHeadcount?: number
+  fixedPriceYuan?: number
+  tiers?: Partial<Record<KolTierKey, { count: number; unitPriceYuan: number }>>
+} | null | undefined): string {
+  if (!plan) return '面议'
+  if (plan.feeType === 'fixed') {
+    const fee = Math.max(0, Math.round(Number(plan.fixedPriceYuan) || 0))
+    const n = Math.max(1, plan.totalHeadcount ?? 1)
+    return fee > 0 ? `共需 ${n} 人 · 车马费 ¥${fee}/人` : '面议'
+  }
+  const parts: string[] = []
+  for (const key of ['v3', 'v4', 'v5', 'v5plus'] as KolTierKey[]) {
+    const t = plan.tiers?.[key]
+    if (!t || t.count <= 0 || !t.unitPriceYuan) continue
+    const label = key === 'v5plus' ? 'V5+' : key.toUpperCase()
+    parts.push(`${label} ${t.count}人 ¥${t.unitPriceYuan}/人`)
+  }
+  return parts.join('；') || '面议'
 }
 
 export function inferKolTierFromApplicant(a: {

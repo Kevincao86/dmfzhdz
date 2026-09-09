@@ -1,6 +1,5 @@
 import { inferKolTierFromApplicant, type KolTierKey } from './merchantRecruitmentTierPlan'
 import {
-  formatCityTierBandsSummary,
   resolveCityKolTierBands,
   type CityKolTierBands,
   type KolTierBand,
@@ -475,6 +474,7 @@ export type NoviceAllocationFromLibrary = {
   v4: number
   v5: number
   v5plus: number
+  unitPrices?: Record<KolTierKey, number>
   notes?: string
   costHint?: string
   source: 'library' | 'fallback'
@@ -502,8 +502,9 @@ export function buildNoviceAllocationFromTalentLibrary(params: {
       v4: 0,
       v5: 0,
       v5plus: headcount,
-      notes: '一口价模式：人数全部计入高档位展示，人均成本由总预算均分。',
-      costHint: `总预算约 ¥${budget.toLocaleString('zh-CN')}，招募 ${headcount} 人，人均约 ¥${per}/人。`,
+      unitPrices: { v3: 0, v4: 0, v5: 0, v5plus: per },
+      notes: '一口价模式：人数全部计入高档位展示，人均车马费由总预算均分。',
+      costHint: `招募 ${headcount} 人，车马费 ¥${per}/人。`,
       source: 'fallback',
     }
   }
@@ -528,8 +529,6 @@ export function buildNoviceAllocationFromTalentLibrary(params: {
   })
 
   const avgLine = formatTierAvgSummary(ctx)
-  const bands = resolveCityKolTierBands(city)
-  const tierLine = formatCityTierBandsSummary(bands)
   const budgetNote = alloc.withinBudget
     ? `预估总成本约 ¥${alloc.estimatedCostYuan.toLocaleString('zh-CN')}（在预算 ¥${budget.toLocaleString('zh-CN')} 内）`
     : `预估总成本约 ¥${alloc.estimatedCostYuan.toLocaleString('zh-CN')}，高于预算 ¥${budget.toLocaleString('zh-CN')}（已尽量降档）`
@@ -545,17 +544,32 @@ export function buildNoviceAllocationFromTalentLibrary(params: {
         ? `达人库暂无「${city}」同城数据，已优先使用全国本地生活达人行情。`
         : '未解析到门店城市，已优先使用全国本地生活达人行情。'
 
+  const unitPrices: Record<KolTierKey, number> = {
+    v3: Math.max(0, Math.round(tierPrices.v3)),
+    v4: Math.max(0, Math.round(tierPrices.v4)),
+    v5: Math.max(0, Math.round(tierPrices.v5)),
+    v5plus: Math.max(0, Math.round(tierPrices.v5plus)),
+  }
+  const feeLine = (['v3', 'v4', 'v5', 'v5plus'] as const)
+    .filter((k) => alloc[k] > 0)
+    .map((k) => {
+      const label = k === 'v5plus' ? 'V5+' : k.toUpperCase()
+      return `${label} ${alloc[k]} 人 × 车马费 ¥${unitPrices[k]}/人`
+    })
+    .join('；')
+
   return {
     v3: alloc.v3,
     v4: alloc.v4,
     v5: alloc.v5,
     v5plus: alloc.v5plus,
+    unitPrices,
     notes:
       (ctx.priceSource === 'library'
         ? `${cityNote}结合总预算、行业与目标人数自动拆分档位。`
         : `${cityNote}库内报价样本不足，已结合城市档位参考价估算。`) +
       (industryNote ? ` ${industryNote}` : ''),
-    costHint: `${avgLine}。目标 ${headcount} 人；${budgetNote}。${tierLine}`,
+    costHint: `${avgLine}。目标 ${headcount} 人；${budgetNote}。固定车马费：${feeLine || '按均价'}。`,
     source: ctx.priceSource === 'library' ? 'library' : 'fallback',
     pricingContext: ctx,
   }

@@ -3,6 +3,7 @@ import type {
   RegistryRecruitmentOrder,
 } from './opsRegistryTypes'
 import type { RecruitmentTierPlan } from './merchantRecruitmentTierPlan'
+import { formatMpBudgetTextFromTierPlan } from './merchantRecruitmentTierPlan'
 import { buildMpRecruitmentOrderId } from './mpRecruitmentOrderId'
 import {
   pickTalentFacingBriefFromSummary,
@@ -81,7 +82,7 @@ export function buildMpOrderFromMerchantRecruitment(
       '商家通过 ERP 发起招募；达人报名后由商家在 ERP 反选，确认后推送群码与探店排期。',
     platform,
     fansRequirement: '按招募方案档位',
-    budgetText: '面议',
+    budgetText: formatMpBudgetTextFromTierPlan(tierPlan),
     recruitCount,
     region,
     category: order.category || '本地生活',

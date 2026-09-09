@@ -5,15 +5,18 @@ const TALENT_FACING_PRICE_LEAK_RE =
 export function isTalentFacingRecruitmentPriceLeak(text: string): boolean {
   const t = String(text || '').trim()
   if (!t) return false
+  if (/车马费/.test(t) && (/V[345]/.test(t) || /每人固定|报名即按此价/.test(t))) return false
+  if (/区间估算|以实际报价为准|成本带|档位参考价|城市档位/.test(t)) return true
+  if (/达人库均价|库内\d+人|城市参考/.test(t)) return true
+  if (/V[345]\+?/.test(t) && /\d+\s*[–\-~至到]\s*\d+/.test(t)) return true
   if (/【AI招募方案】/.test(t)) return true
-  if (/费用模式|参考单价|一口价|城市档位参考价|档位参考价|分配来源/.test(t)) return true
+  if (/费用模式|参考单价|一口价|分配来源/.test(t)) return true
   if (/预算/.test(t) && /[¥￥\d]/.test(t)) return true
   if (/佣金/.test(t) && /\d/.test(t)) return true
   if (/预估总成本|预计总成本|人均约/.test(t)) return true
-  if (/[¥￥]/.test(t) && /人|单价|预算|成本|佣金|档位|V[345]/.test(t)) return true
-  if (/^V[345]\+?\s*[:：].*[¥￥]/.test(t)) return true
-  if (/^档位[:：]/.test(t) && /V[345]/.test(t)) return true
-  if (TALENT_FACING_PRICE_LEAK_RE.test(t) && /[¥￥\d]/.test(t)) return true
+  if (/[¥￥]/.test(t) && /单价|预算|成本|佣金|档位/.test(t) && !/车马费/.test(t)) return true
+  if (/^档位[:：]/.test(t) && /V[345]/.test(t) && !/车马费/.test(t)) return true
+  if (TALENT_FACING_PRICE_LEAK_RE.test(t) && /[¥￥\d]/.test(t) && !/车马费/.test(t)) return true
   return false
 }
 

@@ -153,6 +153,8 @@ recruitmentOrderProgress
 merchantRecruitmentTierPlan
 recruitmentInfoFilter
 recruitmentBriefAi
+recruitmentNoviceAllocationAi
+talentLibraryTierPricing
 aiAgentSoftScenarioConfirm
 viralBriefAi
 merchantAiUpstream

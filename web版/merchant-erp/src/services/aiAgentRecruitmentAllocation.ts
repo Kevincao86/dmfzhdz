@@ -111,12 +111,14 @@ export async function buildAgentRecruitmentAllocation(
     const allocation = fallbackXiaohongshuNoviceAllocation(intent.budgetYuan)
     if (intent.headcountHint && intent.headcountHint > 0) {
       const total = intent.headcountHint
+      const per = total > 0 ? Math.round(intent.budgetYuan / total) : 0
       return {
         intent,
         allocation: {
           ...allocation,
           v5plus: total,
-          costHint: `按您的目标约 ${total} 位达人，预算 ¥${intent.budgetYuan.toLocaleString('zh-CN')}（智能体解析）。`,
+          unitPrices: { v3: 0, v4: 0, v5: 0, v5plus: per },
+          costHint: `招募 ${total} 人，车马费 ¥${per}/人。`,
         },
         storeCityResolved: region || storeCityRaw || undefined,
       }

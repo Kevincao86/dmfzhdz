@@ -206,14 +206,17 @@ export function AiAgentRecruitmentVisualPreview({
               {budget.allocation ? (
                 <div className="grid grid-cols-4 gap-1.5 text-center">
                   {([
-                    ['V3', budget.allocation.v3],
-                    ['V4', budget.allocation.v4],
-                    ['V5', budget.allocation.v5],
-                    ['V5+', budget.allocation.v5plus],
-                  ] as const).map(([label, n]) => (
+                    ['V3', budget.allocation.v3, budget.allocation.unitPrices?.v3],
+                    ['V4', budget.allocation.v4, budget.allocation.unitPrices?.v4],
+                    ['V5', budget.allocation.v5, budget.allocation.unitPrices?.v5],
+                    ['V5+', budget.allocation.v5plus, budget.allocation.unitPrices?.v5plus],
+                  ] as const).map(([label, n, fee]) => (
                     <div key={label} className="rounded-md bg-slate-50 px-1 py-1.5 ring-1 ring-slate-100">
                       <p className="text-[9px] text-slate-500">{label}</p>
-                      <p className="text-sm font-semibold tabular-nums text-slate-900">{n}</p>
+                      <p className="text-sm font-semibold tabular-nums text-slate-900">{n}人</p>
+                      {fee ? (
+                        <p className="text-[10px] tabular-nums text-violet-700">¥{fee}/人</p>
+                      ) : null}
                     </div>
                   ))}
                 </div>
@@ -221,7 +224,9 @@ export function AiAgentRecruitmentVisualPreview({
               {budget.allocation?.costHint ? (
                 <p className="text-[11px] text-slate-500">{budget.allocation.costHint}</p>
               ) : null}
-              <p className="text-[10px] text-slate-400">改预算或人数后，点下一步会按新数字重算档位。</p>
+              <p className="text-[10px] text-slate-400">
+                各档人数与车马费按该城达人库均价拆预算；达人报名即按此价，改预算或人数后点下一步会重算。
+              </p>
             </>
           )}
         </div>

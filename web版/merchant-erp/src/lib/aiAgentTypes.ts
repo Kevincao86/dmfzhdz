@@ -124,6 +124,12 @@ export type AiRecruitmentOrderDetail = {
     source: 'library' | 'ai' | 'fallback'
     notes?: string
     costHint?: string
+    unitPrices?: {
+      v3: number
+      v4: number
+      v5: number
+      v5plus: number
+    }
   }
 }
 
@@ -152,6 +158,12 @@ export type RecruitWizardBudget = {
     v5: number
     v5plus: number
     source: 'library' | 'ai' | 'fallback'
+    unitPrices?: {
+      v3: number
+      v4: number
+      v5: number
+      v5plus: number
+    }
     notes?: string
     costHint?: string
   }

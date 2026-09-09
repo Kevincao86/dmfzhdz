@@ -34,6 +34,7 @@ export function recruitmentOrderDetailFromRegistry(
       source: allocation.source,
       ...(allocation.notes ? { notes: allocation.notes } : {}),
       ...(allocation.costHint ? { costHint: allocation.costHint } : {}),
+      ...(allocation.unitPrices ? { unitPrices: allocation.unitPrices } : {}),
     },
   }
 }
@@ -73,6 +74,7 @@ export function buildRecruitmentOrderFromAgentBrief(
     allocation: isXhs
       ? undefined
       : { v3: allocation.v3, v4: allocation.v4, v5: allocation.v5, v5plus: allocation.v5plus },
+    unitPrices: allocation.unitPrices,
   })
 
   return {
@@ -104,8 +106,8 @@ export function buildRecruitmentOrderFromAgentBrief(
       isXhs ? '' : `策略:${kolTierStrategyLabel(intent.strategy)}；`,
       `档位:${tierLine}；分配:${allocation.source === 'library' ? '达人库测算' : allocation.source === 'ai' ? 'AI模型' : '规则估算'}；`,
       `主推:${brief.mainProductName}；标签:${tags}；`,
+      allocation.costHint ? `${allocation.costHint}；` : '',
       `Brief:${(brief.briefText || '').slice(0, 500)}`,
-      allocation.costHint ? `；${allocation.costHint}` : '',
     ].join(''),
   }
 }

@@ -22,13 +22,14 @@ import {
   isTalentFacingRecruitmentPriceLeak,
   stripTalentFacingRecruitmentCopy,
 } from './recruitmentInfoFilter'
+import { formatTalentFacingTravelFeeLines } from './merchantRecruitmentTierPlan'
 
 export const RECRUIT_WIZARD_STEP_META: Record<
   RecruitWizardStep,
   { title: string; hint: string }
 > = {
   1: { title: '发什么、发给谁', hint: '先核对主推品、平台和城市，确认后再看预算。' },
-  2: { title: '花多少、招几人', hint: '核对预算和人数，确认后再写拍摄要求。' },
+  2: { title: '花多少、招几人', hint: '按同城达人库均价拆档，每人固定车马费，达人按此价报名。' },
   3: { title: '怎么拍、何时交', hint: '核对完整拍摄与合作要求，确认后看汇总。' },
   4: { title: '确认发布', hint: '确认后发到星选大厅，不会直接私信达人。' },
 }
@@ -147,8 +148,17 @@ export function summarizeRecruitWizardScope(scope: RecruitWizardScope | undefine
 export function summarizeRecruitWizardBudget(budget: RecruitWizardBudget | undefined): string {
   if (!budget) return ''
   const a = budget.allocation
-  const tier =
-    a && budget.headcount > 0
+  const feeBits =
+    a?.unitPrices &&
+    (['v3', 'v4', 'v5', 'v5plus'] as const)
+      .filter((k) => (a[k] ?? 0) > 0 && (a.unitPrices?.[k] ?? 0) > 0)
+      .map((k) => {
+        const label = k === 'v5plus' ? 'V5+' : k.toUpperCase()
+        return `${label} ${a[k]}人¥${a.unitPrices![k]}/人`
+      })
+  const tier = feeBits?.length
+    ? ` · ${feeBits.join(' / ')}`
+    : a && budget.headcount > 0
       ? ` · V3 ${a.v3} / V4 ${a.v4} / V5 ${a.v5} / V5+ ${a.v5plus}`
       : ''
   return `预算 ¥${budget.budgetYuan.toLocaleString('zh-CN')} · ${budget.headcount} 人 · 佣金 ${budget.commissionPct}%${tier}`
@@ -180,6 +190,24 @@ export function composeRecruitWizardBriefText(
     `城市/门店：${storeLine}`,
     `主推：${scope.mainProductName}`,
     `招募人数：${budget.headcount} 人`,
+    ...formatTalentFacingTravelFeeLines(
+      budget.allocation
+        ? {
+            feeType: recruitWizardPlatformList(scope).includes('抖音') ? 'tier' : 'fixed',
+            totalHeadcount: budget.headcount,
+            fixedPriceYuan: budget.allocation.unitPrices?.v5plus,
+            tiers: {
+              v3: { count: budget.allocation.v3, unitPriceYuan: budget.allocation.unitPrices?.v3 ?? 0 },
+              v4: { count: budget.allocation.v4, unitPriceYuan: budget.allocation.unitPrices?.v4 ?? 0 },
+              v5: { count: budget.allocation.v5, unitPriceYuan: budget.allocation.unitPrices?.v5 ?? 0 },
+              v5plus: {
+                count: budget.allocation.v5plus,
+                unitPriceYuan: budget.allocation.unitPrices?.v5plus ?? 0,
+              },
+            },
+          }
+        : null,
+    ),
     `档期：报名至 ${shoot.applyDeadline}，成片至 ${shoot.deliverDeadline}`,
     '',
     `一、推广目标`,
@@ -195,10 +223,10 @@ export function composeRecruitWizardBriefText(
     numbered(shoot.sellingPoints.filter((p) => !isTalentFacingRecruitmentPriceLeak(p))),
     '',
     `五、必拍镜头`,
-    numbered(shoot.mustShoot),
+    numbered(shoot.mustShoot.filter((p) => !isTalentFacingRecruitmentPriceLeak(p))),
     '',
     `六、口播结构`,
-    numbered(shoot.talkTrack),
+    numbered(shoot.talkTrack.filter((p) => !isTalentFacingRecruitmentPriceLeak(p))),
     shoot.hooks[0] ? `\n主钩子：${shoot.hooks[0]}` : '',
     shoot.hooks[1] ? `备选钩子：${shoot.hooks[1]}` : '',
     '',

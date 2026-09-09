@@ -1153,6 +1153,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
             source: allocation.source,
             ...(allocation.notes ? { notes: allocation.notes } : {}),
             ...(allocation.costHint ? { costHint: allocation.costHint } : {}),
+            ...(allocation.unitPrices ? { unitPrices: allocation.unitPrices } : {}),
           },
         },
         wizardBudgetStatus: 'ready',

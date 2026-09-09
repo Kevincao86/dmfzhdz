@@ -26,6 +26,7 @@ export type NoviceAllocation = {
   v4: number
   v5: number
   v5plus: number
+  unitPrices?: { v3: number; v4: number; v5: number; v5plus: number }
   notes?: string
   costHint?: string
   source: 'library' | 'ai' | 'fallback'
@@ -57,12 +58,12 @@ export function fallbackNoviceKolAllocation(
       v4: 0,
       v5: 0,
       v5plus: totalPeople,
+      unitPrices: { v3: 0, v4: 0, v5: 0, v5plus: per },
       notes: '当前为离线规则估算（一口价模式）。',
-      costHint: `总预算约 ¥${b.toLocaleString('zh-CN')}，招募 ${totalPeople} 人，人均约 ¥${per}/人（仅供参考）。`,
+      costHint: `招募 ${totalPeople} 人，车马费 ¥${per}/人。`,
       source: 'fallback',
     }
   }
-  const bands = cityForHint ? resolveCityKolTierBands(cityForHint) : resolveCityKolTierBands('')
   const ctx = computeTalentLibraryTierAverages({ entries: [], city: cityForHint ?? '', platform: '抖音' })
   const tierPrices = {
     v3: ctx.tierAvgs.v3.avgYuan,
@@ -75,7 +76,6 @@ export function fallbackNoviceKolAllocation(
     targetHeadcount: totalPeople,
     tierPrices,
   })
-  const tierHint = formatCityTierBandsSummary(bands)
   const avgLine = formatTierAvgSummary(ctx)
   const budgetNote = alloc.withinBudget
     ? `预估总成本约 ¥${alloc.estimatedCostYuan.toLocaleString('zh-CN')}`
@@ -85,8 +85,14 @@ export function fallbackNoviceKolAllocation(
     v4: alloc.v4,
     v5: alloc.v5,
     v5plus: alloc.v5plus,
+    unitPrices: {
+      v3: Math.round(tierPrices.v3),
+      v4: Math.round(tierPrices.v4),
+      v5: Math.round(tierPrices.v5),
+      v5plus: Math.round(tierPrices.v5plus),
+    },
     notes: '达人库接口不可用，已按城市档位参考价离线估算。',
-    costHint: `${avgLine}。目标 ${totalPeople} 人；${budgetNote}。${tierHint}`,
+    costHint: `${avgLine}。目标 ${totalPeople} 人；${budgetNote}。`,
     source: 'fallback',
   }
 }
@@ -290,13 +296,15 @@ ${tierDoc}
 export function fallbackXiaohongshuNoviceAllocation(budgetYuan: number): NoviceAllocation {
   const b = Number.isFinite(budgetYuan) && budgetYuan > 0 ? budgetYuan : 0
   const totalPeople = clampInt(b / 900, 3, 40)
+  const per = totalPeople > 0 ? Math.round(b / totalPeople) : 0
   return {
     v3: 0,
     v4: 0,
     v5: 0,
     v5plus: totalPeople,
+    unitPrices: { v3: 0, v4: 0, v5: 0, v5plus: per },
     notes: '小红书招募按预算与同城笔记达人行情估算人数（无抖音 V 档位）。',
-    costHint: `按总预算约 ¥${b.toLocaleString('zh-CN')}，建议约 ${totalPeople} 位小红书达人（仅供参考）。`,
+    costHint: `招募约 ${totalPeople} 人，车马费 ¥${per}/人。`,
     source: 'fallback',
   }
 }
@@ -336,16 +344,30 @@ export async function requestNoviceKolAllocationFromLibrary(params: {
       const j = (await res.json()) as {
         ok?: boolean
         allocation?: NoviceAllocation
+        pricing?: {
+          tierAvgs?: Record<'v3' | 'v4' | 'v5' | 'v5plus', { avgYuan?: number }>
+        }
       }
       if (!j.ok || !j.allocation) continue
       const a = j.allocation
       const sum = a.v3 + a.v4 + a.v5 + a.v5plus
       if (sum <= 0) continue
+      const fromPricing = j.pricing?.tierAvgs
+      const unitPrices = a.unitPrices ??
+        (fromPricing
+          ? {
+              v3: Math.round(Number(fromPricing.v3?.avgYuan) || 0),
+              v4: Math.round(Number(fromPricing.v4?.avgYuan) || 0),
+              v5: Math.round(Number(fromPricing.v5?.avgYuan) || 0),
+              v5plus: Math.round(Number(fromPricing.v5plus?.avgYuan) || 0),
+            }
+          : undefined)
       return {
         v3: a.v3,
         v4: a.v4,
         v5: a.v5,
         v5plus: a.v5plus,
+        ...(unitPrices ? { unitPrices } : {}),
         notes: a.notes,
         costHint: a.costHint,
         source: a.source === 'library' ? 'library' : 'fallback',
