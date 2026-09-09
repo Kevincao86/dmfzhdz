@@ -180,6 +180,77 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
       return
     }
 
+    if (loc.pathname === '/api/meoo-map-static') {
+      const method = req.method ?? 'GET'
+      if (method === 'OPTIONS') {
+        res.statusCode = 204
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        res.end()
+        return
+      }
+      if (method !== 'GET') {
+        res.statusCode = 405
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.end(JSON.stringify({ ok: false, error: 'method_not_allowed' }))
+        return
+      }
+      try {
+        const auth = req.headers['authorization']
+        const { verifyBearerJwt } = await import('./aiGateway/authSupabase.js')
+        const user = await verifyBearerJwt(typeof auth === 'string' ? auth : undefined, env)
+        if (!user) {
+          res.statusCode = 401
+          res.setHeader('Content-Type', 'application/json; charset=utf-8')
+          res.end(JSON.stringify({ ok: false, error: 'unauthorized' }))
+          return
+        }
+        const lat = Number(loc.searchParams.get('lat'))
+        const lng = Number(loc.searchParams.get('lng'))
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+          res.statusCode = 400
+          res.setHeader('Content-Type', 'application/json; charset=utf-8')
+          res.end(JSON.stringify({ ok: false, error: 'lat_lng_required' }))
+          return
+        }
+        const zoom = Math.min(17, Math.max(11, Math.round(Number(loc.searchParams.get('zoom')) || 15)))
+        const width = Math.min(1024, Math.max(240, Math.round(Number(loc.searchParams.get('w')) || 750)))
+        const height = Math.min(1024, Math.max(180, Math.round(Number(loc.searchParams.get('h')) || 420)))
+        const rawProvider = String(loc.searchParams.get('provider') ?? '').trim().toLowerCase()
+        const provider = rawProvider === 'amap' || rawProvider === 'baidu' ? rawProvider : undefined
+        const aiEnv = await mergeMerchantAiEnvWithRegistrySnapshot(viteRoot, env)
+        const { mapFetchStaticMap } = await import('./mapProvidersClient.js')
+        const out = await mapFetchStaticMap(aiEnv, {
+          location: { lat, lng },
+          zoom,
+          width,
+          height,
+          ...(provider ? { provider } : {}),
+        })
+        if (!out.ok) {
+          res.statusCode = 502
+          res.setHeader('Content-Type', 'application/json; charset=utf-8')
+          res.setHeader('Access-Control-Allow-Origin', '*')
+          res.end(JSON.stringify({ ok: false, error: 'map_static_failed', detail: out.message }))
+          return
+        }
+        res.statusCode = 200
+        res.setHeader('Content-Type', out.contentType)
+        res.setHeader('Cache-Control', 'private, max-age=3600')
+        res.setHeader('X-Map-Provider', out.provider)
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.end(Buffer.from(out.bytes))
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        res.statusCode = 500
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.end(JSON.stringify({ ok: false, error: 'map_static_failed', detail: msg.slice(0, 600) }))
+      }
+      return
+    }
+
     const storeIntelPaths = [
       '/api/meoo-store-menu-recognize',
       '/api/meoo-store-menu-excel-recognize',

@@ -1,7 +1,7 @@
 /**
  * 门店菜单识别、竞品分析、商品方案 API
  */
-import { merchantErpApiCandidates } from '../lib/merchantErpApiBase'
+import { merchantBinaryApiFetchUrls, merchantErpApiCandidates } from '../lib/merchantErpApiBase'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import type { StoreMenuItem } from '../lib/storeMenuStorage'
 import type { CompetitorBundleSuggestion, CompetitorEntry, CompetitorFootTrafficHeat } from '../lib/competitorStorage'
@@ -99,6 +99,64 @@ async function postJson<T>(path: string, body: unknown, timeoutMs = STORE_INTEL_
     throw new Error(lastErr)
   }
   throw new Error(lastErr)
+}
+
+export const SITE_MAP_STATIC_W = 750
+export const SITE_MAP_STATIC_H = 420
+export const SITE_MAP_STATIC_ZOOM = 15
+
+export async function fetchSiteMapStaticImage(opts: {
+  lat: number
+  lng: number
+  zoom?: number
+  width?: number
+  height?: number
+  provider?: 'amap' | 'baidu'
+}): Promise<{ ok: true; blobUrl: string; provider?: string } | { ok: false; message: string }> {
+  const token = await bearer()
+  const headers: Record<string, string> = { Accept: 'image/*,application/json' }
+  if (token) headers.Authorization = `Bearer ${token}`
+  const qs = new URLSearchParams({
+    lat: String(opts.lat),
+    lng: String(opts.lng),
+    zoom: String(opts.zoom ?? SITE_MAP_STATIC_ZOOM),
+    w: String(opts.width ?? SITE_MAP_STATIC_W),
+    h: String(opts.height ?? SITE_MAP_STATIC_H),
+  })
+  if (opts.provider) qs.set('provider', opts.provider)
+  const path = `/api/meoo-map-static?${qs.toString()}`
+  const targets = merchantBinaryApiFetchUrls(path)
+  let lastErr = 'no_response'
+  for (let i = 0; i < targets.length; i++) {
+    const { signal, clear } = fetchTimeoutSignal(18_000)
+    try {
+      const res = await fetch(targets[i]!, { method: 'GET', headers, signal })
+      clear()
+      const ct = (res.headers.get('content-type') || '').toLowerCase()
+      if (!res.ok) {
+        lastErr = `http_${res.status}`
+        if ((res.status === 404 || res.status >= 502) && i < targets.length - 1) continue
+        return { ok: false, message: lastErr }
+      }
+      if (!ct.includes('image')) {
+        lastErr = 'not_image'
+        if (i < targets.length - 1) continue
+        return { ok: false, message: lastErr }
+      }
+      const blob = await res.blob()
+      return {
+        ok: true,
+        blobUrl: URL.createObjectURL(blob),
+        provider: res.headers.get('x-map-provider') || opts.provider,
+      }
+    } catch (e) {
+      clear()
+      lastErr = e instanceof Error ? e.message : String(e)
+      if (i < targets.length - 1) continue
+      return { ok: false, message: lastErr }
+    }
+  }
+  return { ok: false, message: lastErr }
 }
 
 export async function recognizeStoreMenuImage(
@@ -201,8 +259,11 @@ export async function analyzeCompetitors(body: {
         radiusM?: number
         poiCount?: number
         error?: string
+        location?: { lat: number; lng: number }
+        pois?: Array<{ name: string; location?: { lat: number; lng: number } }>
       }
       footTrafficHeat?: CompetitorFootTrafficHeat
+      heatMapGrid?: Array<{ lat: number; lng: number; weight: number }>
     }
   | { ok: false; message: string }
 > {
@@ -221,8 +282,11 @@ export async function analyzeCompetitors(body: {
         radiusM?: number
         poiCount?: number
         error?: string
+        location?: { lat: number; lng: number }
+        pois?: Array<{ name: string; location?: { lat: number; lng: number } }>
       }
       footTrafficHeat?: CompetitorFootTrafficHeat
+      heatMapGrid?: Array<{ lat: number; lng: number; weight: number }>
       error?: string
       detail?: string
     }>('/api/meoo-competitor-analysis', body)
@@ -237,6 +301,7 @@ export async function analyzeCompetitors(body: {
         ...(r.mapSource ? { mapSource: r.mapSource } : {}),
         ...(r.mapMeta ? { mapMeta: r.mapMeta } : {}),
         ...(r.footTrafficHeat ? { footTrafficHeat: r.footTrafficHeat } : {}),
+        ...(r.heatMapGrid?.length ? { heatMapGrid: r.heatMapGrid } : {}),
       }
     }
     const detail = typeof r.detail === 'string' ? r.detail.trim() : ''
@@ -278,6 +343,7 @@ export type SiteSelectionResult = {
   location: { lat: number; lng: number }
   radiusM: number
   competitorQuery?: string
+  mapProvider?: 'amap' | 'baidu'
   counts: {
     transit: number
     office: number

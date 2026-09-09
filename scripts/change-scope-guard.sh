@@ -964,6 +964,7 @@ mapProvidersClient
 siteSelectionHeat
 siteSelectionCore
 meoo-site-selection
+meoo-map-static
 merchantStoreIntelCore
 merchantApiMock
 ecs-auth-api-server

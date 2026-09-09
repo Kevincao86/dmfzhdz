@@ -5,6 +5,7 @@
 import {
   amapFetchNearbyCompetitorsForStore,
   amapFetchSiteAmenityContext,
+  amapFetchStaticMap,
   amapOffsetLatLng,
   amapPlaceNearby,
   amapQueryForIndustry,
@@ -16,6 +17,7 @@ import {
 import {
   baiduFetchNearbyCompetitorsForStore,
   baiduFetchSiteAmenityContext,
+  baiduFetchStaticMap,
   baiduOffsetLatLng,
   baiduPlaceNearby,
   baiduQueryForIndustry,
@@ -169,6 +171,83 @@ export async function mapFetchSiteAmenityContext(
     tried.push('baidu')
     const hit = await baiduFetchSiteAmenityContext(env, opts)
     if (hit.ok) return { ...hit, provider: 'baidu' }
+    return { ok: false, message: hit.message, tried }
+  }
+  return { ok: false, message: '未配置 AMAP_WEB_KEY 或 BAIDU_MAP_AK', tried }
+}
+
+/** 静态底图：指定 provider 时不混坐标系；未指定则高德优先、百度兜底 */
+export async function mapFetchStaticMap(
+  env: MapEnv,
+  opts: {
+    location: MapLatLng
+    zoom?: number
+    width?: number
+    height?: number
+    provider?: MapProviderId
+  },
+): Promise<
+  | {
+      ok: true
+      bytes: Uint8Array
+      contentType: string
+      provider: MapProviderId
+      zoom: number
+      width: number
+      height: number
+    }
+  | { ok: false; message: string; tried?: MapProviderId[] }
+> {
+  const width = Math.min(1024, Math.max(240, Math.round(opts.width ?? 750)))
+  const height = Math.min(1024, Math.max(180, Math.round(opts.height ?? 420)))
+  const zoom = Math.min(17, Math.max(11, Math.round(opts.zoom ?? 15)))
+  const loc = opts.location
+  const tried: MapProviderId[] = []
+
+  const runAmap = async () => {
+    tried.push('amap')
+    const hit = await amapFetchStaticMap(env, { location: loc, zoom, width, height })
+    if (hit.ok) {
+      return { ok: true as const, ...hit, provider: 'amap' as const, zoom, width, height }
+    }
+    return hit
+  }
+  const runBaidu = async () => {
+    tried.push('baidu')
+    const hit = await baiduFetchStaticMap(env, { location: loc, zoom, width, height })
+    if (hit.ok) {
+      return { ok: true as const, ...hit, provider: 'baidu' as const, zoom, width, height }
+    }
+    return hit
+  }
+
+  if (opts.provider === 'amap') {
+    if (!isAmapMapConfigured(env)) {
+      return { ok: false, message: '未配置 AMAP_WEB_KEY', tried }
+    }
+    const hit = await runAmap()
+    if (hit.ok) return hit
+    return { ok: false, message: hit.message, tried }
+  }
+  if (opts.provider === 'baidu') {
+    if (!isBaiduMapConfigured(env)) {
+      return { ok: false, message: '未配置 BAIDU_MAP_AK', tried }
+    }
+    const hit = await runBaidu()
+    if (hit.ok) return hit
+    return { ok: false, message: hit.message, tried }
+  }
+
+  if (isAmapMapConfigured(env)) {
+    const hit = await runAmap()
+    if (hit.ok) return hit
+    if (!isBaiduMapConfigured(env)) {
+      return { ok: false, message: hit.message, tried }
+    }
+  }
+  if (isBaiduMapConfigured(env)) {
+    const hit = await runBaidu()
+    if (hit.ok) return hit
     return { ok: false, message: hit.message, tried }
   }
   return { ok: false, message: '未配置 AMAP_WEB_KEY 或 BAIDU_MAP_AK', tried }

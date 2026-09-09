@@ -614,6 +614,7 @@ export async function runCompetitorAnalysisCore(
   let mapBlock = ''
   let mapMeta: Record<string, unknown> | undefined
   let footTrafficHeat: Record<string, unknown> | undefined
+  let heatMapGrid: Array<{ lat: number; lng: number; weight: number }> | undefined
   let mapSource: 'amap' | 'baidu' | 'amap_error' | 'baidu_error' | 'none' = 'none'
   if (isMapServiceConfigured(aiEnv)) {
     const mapHit = await mapFetchNearbyCompetitorsForStore(aiEnv, {
@@ -637,7 +638,19 @@ export async function runCompetitorAnalysisCore(
           distanceM: p.distanceM,
           tag: p.tag,
           overallRating: p.overallRating,
+          location: p.location,
         })),
+      }
+      try {
+        const { buildHeatMapGrid } = await import('./siteSelectionHeat.js')
+        heatMapGrid = buildHeatMapGrid({
+          center: mapHit.location,
+          pois: mapHit.pois,
+          radiusM: 1200,
+          gridHalf: 5,
+        })
+      } catch {
+        /* 热力网格失败不阻断竞品分析 */
       }
       try {
         const { buildFootTrafficHeatForAddress } = await import('./siteSelectionCore.js')
@@ -768,6 +781,7 @@ ${industryRules}
         bundleSuggestions,
         ...(mapMeta ? { mapMeta } : {}),
         ...(footTrafficHeat ? { footTrafficHeat } : {}),
+        ...(heatMapGrid?.length ? { heatMapGrid } : {}),
         mapSource: hasMapPois
           ? mapSource
           : mapMeta

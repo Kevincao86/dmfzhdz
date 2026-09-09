@@ -20,6 +20,7 @@ import {
   resolveCompetitorAnalysisIndustry,
 } from '../lib/competitorIndustry'
 import FootTrafficHeatPanel from '../components/store/FootTrafficHeatPanel'
+import SiteSelectionHeatMap from '../components/store/SiteSelectionHeatMap'
 import { analyzeCompetitors } from '../services/storeIntelApi'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { pullMarginConfigFromCloud } from '../lib/tenantStoreIntelCloud'
@@ -155,6 +156,16 @@ export default function CompetitorAnalysisPage() {
         ...(r.mapSource ? { mapSource: r.mapSource } : {}),
         ...(typeof r.mapMeta?.poiCount === 'number' ? { mapPoiCount: r.mapMeta.poiCount } : {}),
         ...(r.footTrafficHeat ? { footTrafficHeat: r.footTrafficHeat } : {}),
+        ...(r.heatMapGrid?.length ? { heatMapGrid: r.heatMapGrid } : {}),
+        ...(r.mapSource === 'amap' || r.mapSource === 'baidu' ? { mapProvider: r.mapSource } : {}),
+        ...(r.mapMeta?.location ? { mapLocation: r.mapMeta.location } : {}),
+        ...(r.mapMeta?.pois?.length
+          ? {
+              peerPois: r.mapMeta.pois
+                .filter((p) => p.location)
+                .map((p) => ({ name: p.name, location: p.location })),
+            }
+          : {}),
       }
       saveCompetitorReport(next)
       setReport(next)
@@ -264,6 +275,18 @@ export default function CompetitorAnalysisPage() {
           {report.industryHint && (
             <p className="text-xs text-gray-500">分析类目：{report.industryHint}</p>
           )}
+          {(() => {
+            const mapCenter = report.mapLocation ?? report.footTrafficHeat?.location
+            return mapCenter ? (
+              <SiteSelectionHeatMap
+                center={mapCenter}
+                heatMapGrid={report.heatMapGrid}
+                peerPois={report.peerPois}
+                candidateLabel={report.storeName || '本店'}
+                mapProvider={report.mapProvider}
+              />
+            ) : null
+          })()}
           {report.footTrafficHeat ? (
             <div className="rounded-lg border border-sky-100 bg-sky-50/40 p-3">
               <FootTrafficHeatPanel heat={report.footTrafficHeat} />

@@ -419,3 +419,44 @@ export async function amapFetchSiteAmenityContext(
     },
   }
 }
+
+export async function amapFetchStaticMap(
+  env: AmapMapEnv,
+  opts: { location: AmapLatLng; zoom?: number; width?: number; height?: number },
+): Promise<{ ok: true; bytes: Uint8Array; contentType: string } | { ok: false; message: string }> {
+  const key = resolveAmapWebKey(env)
+  if (!key) return { ok: false, message: '未配置 AMAP_WEB_KEY' }
+  const width = Math.min(1024, Math.max(240, Math.round(opts.width ?? 750)))
+  const height = Math.min(1024, Math.max(180, Math.round(opts.height ?? 420)))
+  const zoom = Math.min(17, Math.max(11, Math.round(opts.zoom ?? 15)))
+  const qs = new URLSearchParams({
+    location: `${opts.location.lng},${opts.location.lat}`,
+    zoom: String(zoom),
+    size: `${width}*${height}`,
+    key,
+  })
+  let res: Response
+  try {
+    res = await fetch(`https://restapi.amap.com/v3/staticmap?${qs.toString()}`, {
+      method: 'GET',
+      signal: amapFetchSignal(),
+    })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, message: /abort/i.test(msg) ? '高德静态图超时' : msg.slice(0, 200) }
+  }
+  if (!res.ok) return { ok: false, message: `高德静态图 HTTP ${res.status}` }
+  const ct = (res.headers.get('content-type') || '').toLowerCase()
+  const buf = new Uint8Array(await res.arrayBuffer())
+  if (ct.includes('json') || ct.includes('text') || buf[0] === 0x7b) {
+    let info = '高德静态图失败'
+    try {
+      const j = JSON.parse(new TextDecoder().decode(buf)) as { info?: string; infocode?: string }
+      if (j.info) info = String(j.info)
+    } catch {
+      /* ignore */
+    }
+    return { ok: false, message: info }
+  }
+  return { ok: true, bytes: buf, contentType: ct.includes('image') ? ct.split(';')[0]! : 'image/png' }
+}

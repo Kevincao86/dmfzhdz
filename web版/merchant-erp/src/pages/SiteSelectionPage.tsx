@@ -237,12 +237,14 @@ export default function SiteSelectionPage() {
             brandUnderstanding={result.brandUnderstanding}
           />
 
-          {result.heatMapGrid?.length ? (
+          {result.location ? (
             <SiteSelectionHeatMap
               center={result.location}
               heatMapGrid={result.heatMapGrid}
               recommendations={result.recommendations}
+              peerPois={result.competitors}
               candidateLabel={result.spotLabel || '预想点位'}
+              mapProvider={result.mapProvider}
             />
           ) : null}
 

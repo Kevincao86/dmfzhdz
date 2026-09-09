@@ -413,3 +413,43 @@ export async function baiduFetchSiteAmenityContext(
     },
   }
 }
+
+export async function baiduFetchStaticMap(
+  env: BaiduMapEnv,
+  opts: { location: BaiduLatLng; zoom?: number; width?: number; height?: number },
+): Promise<{ ok: true; bytes: Uint8Array; contentType: string } | { ok: false; message: string }> {
+  const ak = resolveBaiduMapAk(env)
+  if (!ak) return { ok: false, message: '未配置 BAIDU_MAP_AK' }
+  const width = Math.min(1024, Math.max(240, Math.round(opts.width ?? 750)))
+  const height = Math.min(1024, Math.max(180, Math.round(opts.height ?? 420)))
+  const zoom = Math.min(18, Math.max(11, Math.round(opts.zoom ?? 15)))
+  const qs = new URLSearchParams({
+    ak,
+    center: `${opts.location.lng},${opts.location.lat}`,
+    width: String(width),
+    height: String(height),
+    zoom: String(zoom),
+    copyright: '1',
+  })
+  const ctrl = new AbortController()
+  const t = setTimeout(() => ctrl.abort(), 12_000)
+  let res: Response
+  try {
+    res = await fetch(`https://api.map.baidu.com/staticimage/v2?${qs.toString()}`, {
+      method: 'GET',
+      signal: ctrl.signal,
+    })
+  } catch (e) {
+    clearTimeout(t)
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, message: /abort/i.test(msg) ? '百度静态图超时' : msg.slice(0, 200) }
+  }
+  clearTimeout(t)
+  if (!res.ok) return { ok: false, message: `百度静态图 HTTP ${res.status}` }
+  const ct = (res.headers.get('content-type') || '').toLowerCase()
+  const buf = new Uint8Array(await res.arrayBuffer())
+  if (ct.includes('json') || ct.includes('text') || buf[0] === 0x7b) {
+    return { ok: false, message: '百度静态图失败' }
+  }
+  return { ok: true, bytes: buf, contentType: ct.includes('image') ? ct.split(';')[0]! : 'image/png' }
+}

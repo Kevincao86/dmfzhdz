@@ -75,6 +75,10 @@ export type CompetitorReport = {
   mapSource?: 'amap' | 'baidu' | 'amap_error' | 'baidu_error' | 'none'
   mapPoiCount?: number
   footTrafficHeat?: CompetitorFootTrafficHeat
+  heatMapGrid?: Array<{ lat: number; lng: number; weight: number }>
+  mapProvider?: 'amap' | 'baidu'
+  mapLocation?: { lat: number; lng: number }
+  peerPois?: Array<{ name: string; location?: { lat: number; lng: number } }>
 }
 
 export type CompetitorTarget =
