@@ -2258,7 +2258,6 @@ export default function ShortDramaPage() {
     if (!durationSelected) return '请先选择成片时长'
     return null
   }, [hookSelected, durationSelected, hookLabel, formulaId])
-  const activeWork = works.find((w) => w.id === activeWorkId) ?? works[0] ?? null
   const longPlan = useMemo(
     () => planLongformSegmentDurations(Math.min(MAX_DRAMA_TOTAL_SEC, Math.max(5, durationSec))),
     [durationSec],
@@ -3572,7 +3571,8 @@ export default function ShortDramaPage() {
     'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20 disabled:opacity-60'
 
   const SceneIcon = scene.icon
-  const phoneSrc = trialUrl || activeWork?.previewUrl || null
+  /** 创作台只播当前试镜；刷新后历史成片留在记录里，不占右侧预览 */
+  const phoneSrc = trialUrl || null
 
   return (
     <div className="short-drama-page space-y-5">
