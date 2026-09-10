@@ -188,27 +188,33 @@ function isXiaoyunqueReqKeyNotOpenedError(msg: string): boolean {
   return /req_key\s*<[^>]+>\s*not supported|不支持该小云雀 req_key|req_key.*not supported/i.test(msg)
 }
 
+function isTransientXiaoyunqueQueryError(msg: string): boolean {
+  return (
+    isVolcVisualRateLimitError(msg) ||
+    /瞬时繁忙|请隔|fetch failed|Failed to fetch|network|timeout|ECONNRESET|ETIMEDOUT|HTTP\s*5\d\d|超时|中断|abort/i.test(
+      msg,
+    )
+  )
+}
+
 function humanizeXiaoyunqueError(raw: string): string {
   const t = String(raw || '').trim()
   if (isXiaoyunqueBillingError(t)) {
-    return `小云雀账户余额不足或欠费，请到火山控制台充值后再生成。（原始：${t.slice(0, 140)}）`
+    return `短剧视频账户余额不足或欠费，请联系运营充值后再生成。（原始：${t.slice(0, 140)}）`
   }
   if (/Access\s*Denied|50400|not\s*authorized|未开通/i.test(t) && !/req_key/i.test(t)) {
-    return (
-      '小云雀 Agent 未开通或 AK 无权限。请到火山控制台开通「即梦 AI · 小云雀智能生视频 Agent」，' +
-      '并在运营台「短剧 AI 制作」填写视觉云 AK/SK。'
-    )
+    return '短剧视频能力未开通或权限不足，请联系运营在管控台完成配置。'
   }
   if (isXiaoyunqueReqKeyNotOpenedError(t) || /not supported/i.test(t)) {
     return (
-      '当前账号不支持该小云雀 req_key。请确认已开通智能生视频 Agent 2.0（pippit_iv2v_v20_cvtob），或配置 MERCHANT_AI_XIAOYUNQUE_REQ_KEY。' +
+      '当前账号尚未开通有声短剧能力，请联系运营配置。' +
       `（原始：${t.slice(0, 140)}）`
     )
   }
   if (isVolcVisualRateLimitError(t)) {
-    return '小云雀接口瞬时超限，请隔 1～2 分钟再生成。'
+    return '视频接口瞬时繁忙。若已提交成功，任务会在云端继续，稍后刷新即可拉回成片；否则请隔 1～2 分钟再试。'
   }
-  return t || '小云雀任务提交失败'
+  return t || '短剧任务提交失败'
 }
 
 async function postVolcVisual(
@@ -275,7 +281,7 @@ async function postVolcVisualWithRetry(
   }
   return {
     ok: false,
-    message: humanizeXiaoyunqueError(last?.message || '小云雀提交失败'),
+    message: humanizeXiaoyunqueError(last?.message || '短剧任务提交失败'),
     status: last?.status,
   }
 }
@@ -600,7 +606,7 @@ export async function volcSubmitXiaoyunqueTask(
   }
   return {
     ok: false,
-    message: humanizeXiaoyunqueError(errors.slice(0, 3).join('；') || '小云雀提交失败'),
+    message: humanizeXiaoyunqueError(errors.slice(0, 3).join('；') || '短剧任务提交失败'),
   }
 }
 
@@ -619,7 +625,10 @@ export async function volcGetXiaoyunqueTaskOnce(
   const body = { req_key: decoded.reqKey, task_id: decoded.taskId }
   const r = await postVolcVisualWithRetry(creds, decoded.getAction, XYQ_VERSION, body)
   if (!r.ok) {
-    return { phase: 'failed', statusLabel: '查询失败', failReason: r.message }
+    if (isTransientXiaoyunqueQueryError(r.message)) {
+      return { phase: 'running', statusLabel: '云端生成中' }
+    }
+    return { phase: 'failed', statusLabel: '查询失败', failReason: humanizeXiaoyunqueError(r.message) }
   }
   const status = extractStatus(r.json)
   const videoUrl = extractVideoUrl(r.json)
@@ -631,7 +640,7 @@ export async function volcGetXiaoyunqueTaskOnce(
     return {
       phase: 'failed',
       statusLabel: status || '失败',
-      failReason: humanizeXiaoyunqueError(message || '小云雀已结束但未返回视频'),
+      failReason: humanizeXiaoyunqueError(message || '任务已结束但未返回视频'),
     }
   }
   if (/fail|error|expired|not_found|cancel/i.test(status)) {
