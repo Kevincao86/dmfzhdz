@@ -28,6 +28,7 @@ const ZH: Record<string, string> = {
   alipay_not_configured: '支付宝尚未配置，请联系管理员',
   plan_not_found: '会员方案不存在或已下架',
   plan_is_free: '该档位无需付费',
+  dy_web_not_configured: '抖音网站扫码尚未配置，请联系管理员',
 }
 
 export function formatMpApiErr(e: unknown, fallback = '操作失败，请稍后重试'): string {
@@ -36,6 +37,9 @@ export function formatMpApiErr(e: unknown, fallback = '操作失败，请稍后�
   if (!msg) return fallback
   if (/Unexpected end of JSON input/i.test(msg)) {
     return '接口无有效响应，请检查 VITE_MP_API_BASE 或联系运维'
+  }
+  if (/failed to fetch|fetch failed|networkerror|load failed/i.test(msg)) {
+    return '网络连接失败，请刷新页面后重试'
   }
   const code = msg.split(/[（(]/)[0]?.trim() || msg
   if (ZH[code]) return ZH[code]

@@ -79,6 +79,7 @@ list_scopes() {
   partner_linke_auth     服务商版：林客邀请授权链接拼装/客户商家开通
   douyin_spi_acceptance  抖音到综团购联调：SPI 过审桩 meoo-douyin-spi
   modian_official        墨典官网 m.mofangdianai.com（案例库入口）
+  xingxuan_dy_oauth      星选履约 Web 抖音扫码登录（不含商家 cs / 小程序）
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -1092,6 +1093,14 @@ useDouyinProductWizardAi
 useKuaishouProductWizardAi
 AiAgentContext
 aiAgentPlan
+change-scope-guard
+PAT
+      ;;
+    xingxuan_dy_oauth)
+      cat <<'PAT'
+TalentLoginAuthPanel
+灵祺达人履约管理后台/src/lib/mpApi.ts
+灵祺达人履约管理后台/src/lib/mpApiErrors.ts
 change-scope-guard
 PAT
       ;;

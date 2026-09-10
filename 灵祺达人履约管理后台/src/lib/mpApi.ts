@@ -151,21 +151,93 @@ export async function scanPoll(ticket: string) {
   }
 }
 
+const LIGHT_ERP_API = 'https://mofangdianai.com/erp-api'
+
+function dyOAuthApiUrls(): string[] {
+  const path = '/api/meoo-ops-mp-auth'
+  const urls: string[] = []
+  const add = (u: string) => {
+    if (u && !urls.includes(u)) urls.push(u)
+  }
+  const base = mpErpApiBase()
+  if (base) add(buildMpErpApiUrl(base, path))
+  if (typeof window !== 'undefined') {
+    add(`${window.location.origin}/erp-api/meoo-ops-mp-auth`)
+    add(`${window.location.origin}/api/meoo-ops-mp-auth`)
+  }
+  add(buildMpErpApiUrl(LIGHT_ERP_API, path))
+  return urls
+}
+
+function shouldRetryDyOAuth(err: string): boolean {
+  return /not_found|404|response_not_json|failed to fetch|network|load failed|接口返回非 JSON|接口返回为空/i.test(
+    err,
+  )
+}
+
+/** 与商家 erpDyOAuthBegin 对齐：带 portal/redirectUri，网络失败换下一候选，不带登录态头 */
+async function postDyOAuth(body: Record<string, unknown>) {
+  const urls = dyOAuthApiUrls()
+  if (!urls.length) {
+    throw new Error('未配置星选 API 地址，请刷新后重试')
+  }
+  let lastErr = 'request_failed'
+  for (let i = 0; i < urls.length; i += 1) {
+    try {
+      const res = await fetch(urls[i]!, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await parseJsonRes(res)
+      if (!res.ok || data.ok === false) {
+        const err = String(data.error || data.message || `http_${res.status}`)
+        if ((res.status === 404 || err === 'not_found' || res.status >= 502) && i < urls.length - 1) {
+          lastErr = err
+          continue
+        }
+        throwApiError(data, res.status)
+      }
+      return data
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+      if (i < urls.length - 1 && shouldRetryDyOAuth(lastErr)) continue
+      throw e
+    }
+  }
+  throw new Error(lastErr)
+}
+
 export async function dyOAuthBegin(workIdentity: string) {
-  const data = await mpAuthRequest('dy_oauth_begin', { workIdentity })
+  const redirectUri =
+    typeof window !== 'undefined' ? `${window.location.origin}/login/dy-oauth` : ''
+  const data = await postDyOAuth({
+    action: 'dy_oauth_begin',
+    workIdentity,
+    portal: 'xingxuan',
+    redirectUri,
+  })
+  const authorizeUrl = String(data.authorizeUrl || '')
+  if (!authorizeUrl) throw new Error('未获取到抖音授权链接')
   return {
-    authorizeUrl: String(data.authorizeUrl || ''),
+    authorizeUrl,
     ticket: String(data.ticket || ''),
     expiresAt: String(data.expiresAt || ''),
-    redirectUri: String(data.redirectUri || ''),
+    redirectUri: String(data.redirectUri || redirectUri),
     clientKey: String(data.clientKey || ''),
   }
 }
 
 export async function dyOAuthComplete(code: string, state: string) {
-  const data = await mpAuthRequest('dy_oauth_complete', { code, state })
+  const data = await postDyOAuth({
+    action: 'dy_oauth_complete',
+    code,
+    state,
+  })
+  const token = String(data.token || '')
+  if (!token) throw new Error('抖音授权成功，但未获取到登录会话')
   return {
-    token: String(data.token),
+    token,
     workIdentity: String(data.workIdentity || 'talent'),
     account: data.account as MpAccount,
   }

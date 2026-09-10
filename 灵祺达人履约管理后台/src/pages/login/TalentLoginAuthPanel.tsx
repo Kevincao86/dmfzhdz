@@ -5,6 +5,7 @@ import { cn } from '../../cn'
 import type { MpWorkIdentity } from '../../lib/mpWorkIdentity'
 import { ROLE_LABEL } from '../landing/landingCopy'
 import DyOAuthOfficialPanel from '@merchant/components/login/DyOAuthOfficialPanel'
+import { formatMpApiErr } from '../../lib/mpApiErrors'
 import { dyOAuthBegin, scanCreate, scanPoll } from '../../lib/mpApi'
 import type { MpAccount } from '../../lib/mpSession'
 
@@ -113,11 +114,11 @@ export default function TalentLoginAuthPanel({
         setDyAuthorizeUrl(s.authorizeUrl)
       } catch (e) {
         if (!cancelled) {
-          const msg = e instanceof Error ? e.message : String(e)
+          const raw = e instanceof Error ? e.message : String(e)
           setDyScanHint(
-            /dy_web_not_configured/i.test(msg)
-              ? '抖音网站扫码尚未配置，请按 README 在抖音开放平台创建网站应用并配置轻量环境变量'
-              : msg,
+            /dy_web_not_configured/i.test(raw)
+              ? '抖音网站扫码尚未配置，请联系管理员在轻量配置 MP_DOUYIN_WEB_* 环境变量'
+              : formatMpApiErr(e, '扫码登录失败，请刷新后重试'),
           )
         }
       } finally {
@@ -275,9 +276,14 @@ export default function TalentLoginAuthPanel({
           ) : (
             <div className="space-y-3 py-6 text-center">
               <p className="text-sm leading-relaxed text-slate-600">{dyScanHint || '无法加载抖音扫码登录'}</p>
-              <p className="text-xs leading-relaxed text-slate-400">
-                需在抖音开放平台创建「网站应用」，并在轻量 auth-api 配置 MP_DOUYIN_WEB_CLIENT_KEY / MP_DOUYIN_WEB_CLIENT_SECRET
-              </p>
+              {/尚未配置|MP_DOUYIN_WEB/i.test(dyScanHint) ? (
+                <p className="text-xs leading-relaxed text-slate-400">
+                  需在抖音开放平台创建「网站应用」，并在轻量 auth-api 配置 MP_DOUYIN_WEB_CLIENT_KEY /
+                  MP_DOUYIN_WEB_CLIENT_SECRET
+                </p>
+              ) : (
+                <p className="text-xs leading-relaxed text-slate-400">请刷新页面重试；若持续失败请联系客服</p>
+              )}
             </div>
           )}
         </>
