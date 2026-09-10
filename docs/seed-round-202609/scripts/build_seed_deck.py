@@ -53,6 +53,20 @@ def new_slide(color=CREAM) -> Image.Image:
     return Image.new("RGB", (W, H), color)
 
 
+def s(*vals):
+    """Scale logical 1920×1080 coords to 2× for sharper slides 11–13."""
+    if len(vals) == 1:
+        v = vals[0]
+        if isinstance(v, (tuple, list)):
+            return tuple(int(x * 2) for x in v)
+        return int(v * 2)
+    return tuple(int(v * 2) for v in vals)
+
+
+def new_slide_hi(color=CREAM) -> Image.Image:
+    return Image.new("RGB", (W * 2, H * 2), color)
+
+
 def load_cover(name: str) -> Image.Image:
     src = ASSETS_AI / name
     if not src.exists():
@@ -105,14 +119,21 @@ def wrap_draw(draw, xy, s, fn, fill, max_w, leading=None, anchor="lt"):
     return len(lines) * lh
 
 
-def footer(draw, page: int, total: int = 13, light: bool = False):
+def footer(draw, page: int, total: int = 13, light: bool = False, scale: int = 1):
     c = (210, 210, 210) if light else MUTED
-    text(draw, (80, 1036), "灵祺 · 种子轮  保密", f_body(18, True), c)
-    text(draw, (1840, 1036), f"{page:02d} / {total:02d}", f_body(18, True), c, "rt")
+    text(draw, (80 * scale, 1036 * scale), "灵祺 · 种子轮  保密", f_body(18 * scale, True), c)
+    text(
+        draw,
+        (1840 * scale, 1036 * scale),
+        f"{page:02d} / {total:02d}",
+        f_body(18 * scale, True),
+        c,
+        "rt",
+    )
 
 
-def card(draw, box, fill=WHITE, outline=LINE, r=18):
-    draw.rounded_rectangle(box, radius=r, fill=fill, outline=outline, width=1)
+def card(draw, box, fill=WHITE, outline=LINE, r=18, width=1):
+    draw.rounded_rectangle(box, radius=r, fill=fill, outline=outline, width=width)
 
 
 def kpi(draw, box, value, label, sub=""):
@@ -488,7 +509,7 @@ def slide_10():
     img = new_slide()
     d = ImageDraw.Draw(img)
     text(d, (80, 64), "09  /  模式与资金", f_sans(18), RUST)
-    text(d, (80, 108), "价挂在支付页上了，还几乎没收上来", f_title(36), INK)
+    text(d, (80, 108), "收费口已经开了，进账还很少", f_title(36), INK)
     models = [
         ("商家订阅", "约 ¥168 / 月", "支付页已经有 168 这一档"),
         ("履约 / 撮合", "¥10–50 / 单", "大厅里已经有单的预算"),
@@ -522,10 +543,10 @@ def slide_10():
 
 
 def slide_11():
-    img = new_slide()
+    img = new_slide_hi()
     d = ImageDraw.Draw(img)
-    text(d, (80, 64), "10  /  竞争与里程碑", f_sans(18), RUST)
-    text(d, (80, 108), "我不跟谁抢，接下来一年怎么走", f_title(42), INK)
+    text(d, s(80, 64), "10  /  竞争与里程碑", f_sans(s(18)), RUST)
+    text(d, s(80, 108), "我不跟谁抢，接下来一年怎么走", f_title(s(42)), INK)
     comps = [
         ("再惠", "高客单全栈代运营", "我们做低价自助，先吃透一座城"),
         ("有赞", "经营系统加种草", "我们自己有达人端，交了活能回传"),
@@ -534,12 +555,12 @@ def slide_11():
     ]
     x = 80
     for a, b, c in comps:
-        card(d, (x, 200, x + 420, 430))
-        text(d, (x + 24, 228), a, f_title(26), INK)
-        wrap_draw(d, (x + 24, 286), b, f_body(18, True), MUTED, 360)
-        wrap_draw(d, (x + 24, 350), c, f_body(18), TEAL, 360)
+        card(d, s(x, 200, x + 420, 430), r=s(18), width=2)
+        text(d, s(x + 24, 228), a, f_title(s(26)), INK)
+        wrap_draw(d, s(x + 24, 286), b, f_body(s(18), True), MUTED, s(360))
+        wrap_draw(d, s(x + 24, 350), c, f_body(s(18)), TEAL, s(360))
         x += 450
-    text(d, (80, 480), "我给自己定的数", f_title(26), INK)
+    text(d, s(80, 480), "我给自己定的数", f_title(s(26)), INK)
     miles = [
         ("现在", "具名约 14 · 深用 3", "以服务器上的数为准"),
         ("3 个月", "付费 30–60", "先做出 3 个能对账的店"),
@@ -548,32 +569,39 @@ def slide_11():
     ]
     x = 80
     for t, a, b in miles:
-        card(d, (x, 540, x + 420, 860))
-        text(d, (x + 28, 572), t, f_sans(18), RUST)
-        text(d, (x + 28, 620), a, f_title(26), INK)
-        wrap_draw(d, (x + 28, 700), b, f_body(20, True), MUTED, 350)
+        card(d, s(x, 540, x + 420, 860), r=s(18), width=2)
+        text(d, s(x + 28, 572), t, f_sans(s(18)), RUST)
+        text(d, s(x + 28, 620), a, f_title(s(26)), INK)
+        wrap_draw(d, s(x + 28, 700), b, f_body(s(20), True), MUTED, s(350))
         x += 450
     text(
         d,
-        (80, 910),
+        s(80, 910),
         "这些是我给自己卡的节点。做不到就改，不拿明年故事换今天的钱。",
-        f_body(20, True),
+        f_body(s(20), True),
         MUTED,
     )
-    footer(d, 11)
+    footer(d, 11, scale=2)
     return img
 
 
 def slide_12():
-    img = new_slide()
+    img = new_slide_hi()
     d = ImageDraw.Draw(img)
-    text(d, (80, 64), "11  /  我们是谁", f_sans(18), RUST)
-    text(d, (80, 108), "一个把系统做出来，一个把生意谈进来", f_title(40), INK)
+    text(d, s(80, 40), "11  /  我们是谁", f_sans(s(18)), RUST)
+    text(d, s(80, 76), "一个把系统做出来，一个把生意谈进来", f_title(s(36)), INK)
+    text(
+        d,
+        s(80, 132),
+        "兼职还有三个人。后端、算法、产品都在岗上。",
+        f_body(s(20), True),
+        MUTED,
+    )
     people = [
         {
             "photo": ROOT / "images" / "founder-cao.png",
-            "box": (80, 210, 920, 980),
-            "pic": (110, 250, 500, 800),
+            "box": s(80, 176, 920, 620),
+            "pic": s(104, 200, 400, 596),
             "name": "曹鑫淼",
             "role": "项目带头人  ·  技术和产品",
             "lines": [
@@ -582,71 +610,123 @@ def slide_12():
                 "宁波区域负责人",
                 "2023–2026  字节跳动本地生活",
                 "大客户负责人",
-                "现在扛整个项目的技术和产品",
             ],
         },
         {
             "photo": ROOT / "images" / "founder-xie.png",
-            "box": (1000, 210, 1840, 980),
-            "pic": (1030, 250, 1420, 800),
+            "box": s(1000, 176, 1840, 620),
+            "pic": s(1024, 200, 1320, 596),
             "name": "谢锦超",
             "role": "合伙人  ·  销售和市场",
             "lines": [
                 "西安培华学院",
                 "2019–2025  小米生态",
                 "温州区域负责人",
-                "现在负责销售和市场",
-                "把门店和服务商谈进来",
+                "现在把门店和服务商谈进来",
             ],
         },
     ]
     for p in people:
-        card(d, p["box"])
-        paste_rounded(img, p["photo"], p["pic"], radius=20)
-        tx = p["pic"][2] + 36
-        ty = 270
-        text(d, (tx, ty), p["name"], f_title(36), INK)
-        text(d, (tx, ty + 56), p["role"], f_body(20), RUST)
-        yy = ty + 130
+        card(d, p["box"], r=s(18), width=2)
+        paste_rounded(img, p["photo"], p["pic"], radius=s(16))
+        tx = p["pic"][2] + s(28)
+        ty = s(214)
+        text(d, (tx, ty), p["name"], f_title(s(30)), INK)
+        text(d, (tx, ty + s(48)), p["role"], f_body(s(18)), RUST)
+        yy = ty + s(110)
         for line in p["lines"]:
-            text(d, (tx, yy), line, f_body(22, True), MUTED)
-            yy += 48
-    footer(d, 12)
+            text(d, (tx, yy), line, f_body(s(18), True), MUTED)
+            yy += s(40)
+    text(d, s(80, 648), "兼职一起做", f_title(s(22)), INK)
+    mates = [
+        (
+            "胡可敌",
+            "兼职  ·  后端",
+            ["2019–2022  飞猪网页后端", "2022–2026  阿里巴巴淘宝后端"],
+        ),
+        (
+            "马强",
+            "兼职  ·  算法",
+            ["原商汤  高级算法策略工程师", "现在百度  算法策略工程师"],
+        ),
+        (
+            "朱晓晨",
+            "兼职  ·  产品",
+            ["原字节跳动  南部大区抖音产品负责人", "现在百度  产品开发经理"],
+        ),
+    ]
+    x = 80
+    for name, role, lines in mates:
+        card(d, s(x, 692, x + 560, 1000), r=s(16), width=2)
+        text(d, s(x + 28, 720), name, f_title(s(26)), INK)
+        text(d, s(x + 28, 770), role, f_body(s(18)), RUST)
+        yy = 824
+        for line in lines:
+            text(d, s(x + 28, yy), line, f_body(s(18), True), MUTED)
+            yy += 40
+        x += 580
+    footer(d, 12, scale=2)
     return img
 
 
 def slide_13():
-    img = overlay(darken(load_cover("lingqi-seed-close.png"), 0.40), alpha=100)
+    img = new_slide_hi()
     d = ImageDraw.Draw(img)
-    text(d, (80, 64), "12  /  这轮我想融多少", f_sans(18), GOLD)
-    text(d, (80, 108), "种子轮  人民币 400 万元", f_title(48), WHITE)
+    text(d, s(80, 64), "12  /  300 万怎么花", f_sans(s(18)), RUST)
+    text(d, s(80, 108), "先到账的 300 万，我准备这么花", f_title(s(40)), INK)
     text(
         d,
-        (80, 190),
-        "先到账 300 万就能干。这轮顶到 500 万。",
-        f_body(22, True),
-        (220, 214, 204),
+        s(80, 176),
+        "整轮目标 400 万，顶到 500 万。希望一家领投，一两家跟投。",
+        f_body(s(22), True),
+        MUTED,
     )
-    inst = [
-        ("这轮怎么拆", "目标 400 万 · 先到账 300 万 · 最多到 500 万"),
-        ("领投跟投", "希望一家领投，一两家跟投。先到账 300 万就能开工"),
-        ("我想找谁", "浙江能落地的机构，以及看得懂本地生活系统的早期基金"),
+    uses = [
+        (
+            "120 万",
+            "商务和渠道",
+            RUST,
+            "地推走宁波、温州、杭州；服务商走已经在谈的 5 家，合同改成付费带客；存量走 13 家微信注册店，做成能付钱的门店。",
+        ),
+        (
+            "75 万",
+            "达人和交付",
+            TEAL,
+            "供给走温州：264 个会员做成能接单交货。客成、履约、结算这条链要跑通，不然商家订了也交不出去。",
+        ),
+        (
+            "75 万",
+            "系统和云",
+            GOLD,
+            "钱留给四端和 212 条接口稳住，以及模型、存储、云剪按用量付。这轮不拿去重做产品。",
+        ),
+        (
+            "30 万",
+            "备用",
+            MUTED,
+            "支付通道、内容审核、应急。按 18 个月的盘子留着，不拿去铺新城市。",
+        ),
     ]
-    y = 270
-    for t, b in inst:
-        card(d, (80, y, 1200, y + 96), fill=(12, 22, 34), outline=(55, 66, 78))
-        text(d, (110, y + 16), t, f_sans(16), GOLD)
-        text(d, (110, y + 52), b, f_body(22, True), CREAM)
-        y += 108
-    card(d, (80, 610, 1200, 920), fill=(12, 22, 34), outline=(55, 66, 78))
-    text(d, (110, 638), "宁波墨典网络科技有限公司", f_title(28), WHITE)
-    text(d, (110, 690), "创始人  曹鑫淼  ·  技术和产品", f_body(24), CREAM)
-    text(d, (110, 728), "合伙人  谢锦超  ·  销售和市场", f_body(24), CREAM)
-    text(d, (110, 772), "手机 / 微信  15757468650", f_body(24), CREAM)
-    text(d, (110, 810), "邮箱  modian@mofangdianai.com", f_body(22), CREAM)
-    text(d, (110, 848), "商家 ERP  cs.mofangdianai.com", f_body(20, True), (200, 196, 188))
-    text(d, (110, 880), "星选  dr.mofangdianai.com  ·  微信搜「灵祺星选」", f_body(20, True), (200, 196, 188))
-    footer(d, 13, light=True)
+    y = 240
+    for amt, name, color, channel in uses:
+        card(d, s(80, y, 1840, y + 132), r=s(16), width=2)
+        d.rectangle(s(80, y, 94, y + 132), fill=color)
+        text(d, s(130, y + 28), amt, f_title(s(28)), RUST)
+        text(d, s(130, y + 78), name, f_body(s(20)), INK)
+        wrap_draw(d, s(420, y + 36), channel, f_body(s(22), True), MUTED, s(1360))
+        y += 148
+    card(d, s(80, 832, 1840, 1008), r=s(16), width=2)
+    text(d, s(110, 856), "宁波墨典网络科技有限公司", f_title(s(24)), INK)
+    text(d, s(110, 902), "创始人  曹鑫淼  ·  技术和产品　　合伙人  谢锦超  ·  销售和市场", f_body(s(20)), MUTED)
+    text(d, s(110, 942), "手机 / 微信  15757468650　　邮箱  modian@mofangdianai.com", f_body(s(20), True), MUTED)
+    text(
+        d,
+        s(110, 978),
+        "商家 ERP  cs.mofangdianai.com　　星选  dr.mofangdianai.com  ·  微信搜「灵祺星选」",
+        f_body(s(18), True),
+        MUTED,
+    )
+    footer(d, 13, scale=2)
     return img
 
 
@@ -662,7 +742,12 @@ def build_pptx(pngs: list[Path], dest: Path) -> None:
 
 
 def build_pdf(pngs: list[Path], dest: Path) -> None:
-    pages = [Image.open(p).convert("RGB") for p in pngs]
+    pages = []
+    for p in pngs:
+        im = Image.open(p).convert("RGB")
+        if im.size != (W, H):
+            im = im.resize((W, H), Image.Resampling.LANCZOS)
+        pages.append(im)
     pages[0].save(dest, save_all=True, append_images=pages[1:], resolution=150)
 
 
@@ -694,20 +779,23 @@ def main() -> None:
     build_pptx(pngs, pptx)
     build_pdf(pngs, pdf)
 
-    DESK.mkdir(parents=True, exist_ok=True)
-    for src, name in (
-        (pptx, "灵祺种子轮-路演PPT.pptx"),
-        (pdf, "灵祺种子轮-路演PPT.pdf"),
-    ):
-        dest = DESK / name
-        dest.write_bytes(src.read_bytes())
-    slides_dir = DESK / "单页PNG"
-    slides_dir.mkdir(exist_ok=True)
-    for p in pngs:
-        (slides_dir / p.name).write_bytes(p.read_bytes())
+    try:
+        DESK.mkdir(parents=True, exist_ok=True)
+        for src, name in (
+            (pptx, "灵祺种子轮-路演PPT.pptx"),
+            (pdf, "灵祺种子轮-路演PPT.pdf"),
+        ):
+            dest = DESK / name
+            dest.write_bytes(src.read_bytes())
+        slides_dir = DESK / "单页PNG"
+        slides_dir.mkdir(exist_ok=True)
+        for p in pngs:
+            (slides_dir / p.name).write_bytes(p.read_bytes())
+        print("DESK", DESK)
+    except OSError as e:
+        print("DESK copy skipped:", e)
     print("PPTX", pptx)
     print("PDF", pdf)
-    print("DESK", DESK)
 
 
 if __name__ == "__main__":
