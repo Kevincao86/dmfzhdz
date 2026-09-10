@@ -50,25 +50,7 @@ export type ShortVideoGenRequestBody = {
   styleAdapter?: { id: string; strength?: number }
 }
 
-/** 用户可见文案去掉厂商/模型名（小云雀、Seedance、即梦等） */
-export function stripVideoVendorNamesFromUserText(s: string): string {
-  return String(s ?? '')
-    .replace(/小云雀智能生视频\s*Agent/gi, '智能成片')
-    .replace(/小云雀\s*Agent/gi, '智能成片')
-    .replace(/Seedance(?:\s*\d(?:\.\d)?(?:\s*Pro)?)?/gi, '视频模型')
-    .replace(/doubao-seedance[\w.\-]*/gi, '视频模型')
-    .replace(/即梦\s*AI/g, '视觉云')
-    .replace(/即梦图生/g, '图生')
-    .replace(/即梦\/小云雀/g, '短剧视频')
-    .replace(/即梦/g, '视觉云')
-    .replace(/小云雀/g, '智能成片')
-}
-
 export function formatVideoAiUserError(msg: string): string {
-  return stripVideoVendorNamesFromUserText(explainVideoAiUserErrorInner(msg))
-}
-
-function explainVideoAiUserErrorInner(msg: string): string {
   const raw = String(msg ?? '').trim()
   if (!raw) return raw
   if (/已改走火山 1\.5|正在改用火山 1\.5|1\.5 Pro 首帧/i.test(raw)) {
@@ -138,8 +120,9 @@ function explainVideoAiUserErrorInner(msg: string): string {
   }
   if (isArkVideoRateLimitError(raw)) {
     return (
-      '视频接口瞬时繁忙，系统会自动重试。已提交的任务会在云端继续，稍后刷新即可拉回成片。' +
-      '若尚未提交成功，请隔 1～2 分钟再试。'
+      '模型接口瞬时超限（QPS/并发），系统已自动退避重试并切换其它视频模型。' +
+      '若仍失败请隔 1～2 分钟再生成。' +
+      `原始信息：${raw}`
     )
   }
   return raw
@@ -1330,79 +1313,6 @@ export async function fetchSeedanceVideoStatus(
 }
 
 const DEFAULT_POLL_MS = 2500
-const CLOUD_JOB_TTL_MS = 50 * 60_000
-const PENDING_CLOUD_VIDEO_JOB_KEY = 'meoo-short-drama-cloud-job-v1'
-
-export type PendingCloudVideoJob = {
-  taskId: string
-  durationSec: number
-  startedAt: number
-  modelUsed?: string | null
-  billId?: string
-  title?: string
-  kind?: 'clip' | 'trial' | 'full'
-}
-
-export function loadPendingCloudVideoJob(): PendingCloudVideoJob | null {
-  try {
-    const raw = localStorage.getItem(PENDING_CLOUD_VIDEO_JOB_KEY)
-    if (!raw) return null
-    const j = JSON.parse(raw) as PendingCloudVideoJob
-    const taskId = String(j?.taskId || '').trim()
-    const startedAt = Number(j?.startedAt) || 0
-    if (!taskId || !startedAt) return null
-    if (Date.now() - startedAt > CLOUD_JOB_TTL_MS) {
-      localStorage.removeItem(PENDING_CLOUD_VIDEO_JOB_KEY)
-      return null
-    }
-    return {
-      taskId,
-      durationSec: Math.max(5, Math.round(Number(j.durationSec) || 5)),
-      startedAt,
-      modelUsed: typeof j.modelUsed === 'string' ? j.modelUsed : null,
-      billId: typeof j.billId === 'string' ? j.billId : undefined,
-      title: typeof j.title === 'string' ? j.title : undefined,
-      kind: j.kind === 'trial' || j.kind === 'full' || j.kind === 'clip' ? j.kind : undefined,
-    }
-  } catch {
-    return null
-  }
-}
-
-export function savePendingCloudVideoJob(job: PendingCloudVideoJob): void {
-  try {
-    localStorage.setItem(PENDING_CLOUD_VIDEO_JOB_KEY, JSON.stringify(job))
-  } catch {
-    /* ignore quota */
-  }
-}
-
-export function clearPendingCloudVideoJob(taskId?: string): void {
-  try {
-    if (taskId) {
-      const cur = loadPendingCloudVideoJob()
-      if (cur && cur.taskId !== taskId) return
-    }
-    localStorage.removeItem(PENDING_CLOUD_VIDEO_JOB_KEY)
-  } catch {
-    /* ignore */
-  }
-}
-
-/** 查询失败（断网/502/限流）不等于成片失败：任务已在云端，应继续拉回 */
-function isTransientCloudPollError(msg: string): boolean {
-  const raw = String(msg ?? '').trim()
-  if (!raw) return true
-  if (/taskId 无效|无效任务|缺少 query taskId|未配置凭据|缺少视觉云/i.test(raw)) return false
-  if (/内容安全|内容审核|敏感内容|不当内容|未通过|无参考文生|未进入图生/i.test(raw)) return false
-  return (
-    isVideoApiUnreachableError(raw) ||
-    isArkVideoRateLimitError(raw) ||
-    /接口瞬时超限|接口超限|查询失败|HTTP\s*404|HTTP\s*502|HTTP\s*503|HTTP\s*504|Failed to fetch|network|timeout|超时|中断|abort|请隔|繁忙/i.test(
-      raw,
-    )
-  )
-}
 
 /**
  * 按视频时长估算轮询上限。
@@ -1500,12 +1410,6 @@ export async function pollShortVideoTask(
 
     const st = await fetchSeedanceVideoStatus(taskId)
     if (!st.ok) {
-      if (lockModel && isTransientCloudPollError(st.message)) {
-        opts?.onProgress?.(
-          `云端仍在生成，网络波动不影响出片，正在重试拉回（已等待约 ${Math.max(1, Math.round((Date.now() - startedAt) / 60_000))} 分钟）`,
-        )
-        continue
-      }
       return {
         ok: false,
         message: st.message,
@@ -1540,12 +1444,6 @@ export async function pollShortVideoTask(
     }
     if (st.phase === 'failed') {
       lastFail = st.failReason ?? lastFail
-      if (lockModel && isTransientCloudPollError(lastFail)) {
-        opts?.onProgress?.(
-          `云端仍在生成，查询稍后重试（已等待约 ${elapsedMin} 分钟）`,
-        )
-        continue
-      }
       return {
         ok: false,
         message: lastFail,
@@ -1793,7 +1691,7 @@ async function runShortVideoJobWithDurationInternal(
   }
 }
 
-/** 视觉云有声短剧：提交后任务在云端跑，浏览器只负责拉回；断网不清任务 */
+/** 即梦/小云雀：有角色图时走视觉云小云雀有声；仅 Agent 未开通才兜底即梦锁脸。不走方舟 Seedance 真人库 */
 export async function runXiaoyunqueVideoJob(opts: {
   prompt: string
   durationSec: number
@@ -1802,7 +1700,6 @@ export async function runXiaoyunqueVideoJob(opts: {
   images_base64?: string[]
   shouldCancel?: () => boolean
   onProgress?: (text: string) => void
-  persist?: Pick<PendingCloudVideoJob, 'billId' | 'title' | 'kind'>
 }): Promise<
   | { ok: true; videoUrl: string; modelUsed?: string | null }
   | { ok: false; message: string }
@@ -1819,7 +1716,7 @@ export async function runXiaoyunqueVideoJob(opts: {
       message: '短剧必须同时提交角色图和参考画面，已拒绝纯文案生成。',
     }
   }
-  opts.onProgress?.(`有声短剧提交中（角色+参考 ${imgs.length} 张，目标 ${durationSec} 秒）…`)
+  opts.onProgress?.(`小云雀有声短剧提交中（角色+参考 ${imgs.length} 张，目标 ${durationSec} 秒）…`)
   const start = await postSeedanceVideoStart({
     prompt: opts.prompt,
     flags,
@@ -1840,81 +1737,27 @@ export async function runXiaoyunqueVideoJob(opts: {
   if (/jimeng_ti2v|jimeng_i2v|jimeng_vgfm_i2v/i.test(usedModel)) {
     return {
       ok: false,
-      message: '当前图生是无声首帧微动，短剧需要有声对白，已丢弃。请确认有声短剧接口可用后再试。',
+      message: '即梦图生是无声首帧微动，短剧需要有声对白，已丢弃。请确认小云雀有参考接口可用后再试。',
     }
   }
   const usedPhoto = /with_vinput/i.test(usedModel)
   if (!usedPhoto) {
     return {
       ok: false,
-      message: '参考图未进入图生。未采用纯文案成片。',
+      message: `参考图未进入图生（当前 ${usedModel || '未知'}）。未采用纯文案成片。`,
     }
   }
 
-  savePendingCloudVideoJob({
-    taskId: start.taskId,
-    durationSec,
-    startedAt: Date.now(),
-    modelUsed: start.modelUsed ?? null,
-    billId: opts.persist?.billId,
-    title: opts.persist?.title,
-    kind: opts.persist?.kind,
-  })
-
-  /** 有声短剧必须锁模等出片：11 秒图生常要 6～12 分钟，禁止 4 分钟误判并提示换模 */
+  /** 即梦/小云雀必须锁模等出片：11 秒图生常要 6～12 分钟，禁止 4 分钟误判并提示换模 */
   const pollMs = 5000
+  const engineLabel = /jimeng/i.test(usedModel) ? '即梦图生' : '小云雀有声'
   const poll = await pollShortVideoTask(start.taskId, {
     pollIntervalMs: pollMs,
     durationSec,
     lockModel: true,
     shouldCancel: opts.shouldCancel,
-    onProgress: (label) =>
-      opts.onProgress?.(`云端生成中 · ${stripVideoVendorNamesFromUserText(label)}`),
+    onProgress: (label) => opts.onProgress?.(`${engineLabel} · ${label}`),
   })
-  if (!poll.ok) {
-    if (poll.message === '已取消等待' || isTransientCloudPollError(poll.message) || /仍在云端|请稍后重试/.test(poll.message)) {
-      return {
-        ok: false,
-        message: formatVideoAiUserError(
-          poll.message === '已取消等待'
-            ? '已停止等待。任务仍在云端生成，刷新页面或稍后再进本页会自动拉回成片。'
-            : poll.message,
-        ),
-      }
-    }
-    clearPendingCloudVideoJob(start.taskId)
-    return { ok: false, message: formatVideoAiUserError(poll.message) }
-  }
-  clearPendingCloudVideoJob(start.taskId)
+  if (!poll.ok) return { ok: false, message: formatVideoAiUserError(poll.message) }
   return { ok: true, videoUrl: poll.videoUrl, modelUsed: start.modelUsed ?? 'xiaoyunque' }
-}
-
-export async function pollPendingCloudVideoJob(opts?: {
-  shouldCancel?: () => boolean
-  onProgress?: (text: string) => void
-}): Promise<
-  | { ok: true; videoUrl: string; job: PendingCloudVideoJob }
-  | { ok: false; message: string; job?: PendingCloudVideoJob }
-> {
-  const job = loadPendingCloudVideoJob()
-  if (!job) return { ok: false, message: '没有待拉回的云端任务' }
-  opts?.onProgress?.('云端仍在生成，正在拉回成片（断网不影响）…')
-  const poll = await pollShortVideoTask(job.taskId, {
-    pollIntervalMs: 5000,
-    durationSec: job.durationSec,
-    lockModel: true,
-    shouldCancel: opts?.shouldCancel,
-    onProgress: (label) =>
-      opts?.onProgress?.(`云端生成中 · ${stripVideoVendorNamesFromUserText(label)}`),
-  })
-  if (!poll.ok) {
-    const keep =
-      poll.message === '已取消等待' ||
-      isTransientCloudPollError(poll.message) ||
-      /仍在云端|请稍后重试|排队/.test(poll.message)
-    if (!keep) clearPendingCloudVideoJob(job.taskId)
-    return { ok: false, message: formatVideoAiUserError(poll.message), job }
-  }
-  clearPendingCloudVideoJob(job.taskId)
-  return { ok: true, videoUrl: poll.videoUrl, job }
 }
