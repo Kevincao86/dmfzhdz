@@ -1547,6 +1547,8 @@ type DramaRefItem = {
   imageDataUrl: string
 }
 
+type DramaCastRefMode = 'beautify' | 'describe'
+
 type DramaCastMember = {
   id: string
   name: string
@@ -1554,6 +1556,8 @@ type DramaCastMember = {
   sourceUrl: string | null
   draft: string | null
   preview: string | null
+  /** 有参考图时二选一：美化生成 / 识图填文案 */
+  refMode?: DramaCastRefMode | null
 }
 
 const DRAMA_REF_MAX = 6
@@ -1569,6 +1573,7 @@ function newCastMember(index: number): DramaCastMember {
     sourceUrl: null,
     draft: null,
     preview: null,
+    refMode: null,
   }
 }
 
@@ -1825,6 +1830,7 @@ function normalizeCastMembers(raw: unknown): DramaCastMember[] | null {
       sourceUrl: typeof o.sourceUrl === 'string' && o.sourceUrl ? o.sourceUrl : null,
       draft: typeof o.draft === 'string' && o.draft ? o.draft : null,
       preview: typeof o.preview === 'string' && o.preview ? o.preview : null,
+      refMode: o.refMode === 'beautify' || o.refMode === 'describe' ? o.refMode : null,
     })
   }
   return members.length ? members.slice(0, DRAMA_CAST_MAX) : null
@@ -1878,6 +1884,7 @@ function mergeRolesIntoCast(roles: string, members: DramaCastMember[]): DramaCas
       sourceUrl: null,
       draft: null,
       preview: null,
+      refMode: null,
     })
     used.add(name)
   }
@@ -2676,6 +2683,7 @@ export default function ShortDramaPage() {
       sourceUrl: null,
       draft: null,
       preview: null,
+      refMode: null,
     }
     setCast((prev) => [...prev, member])
     setSaveCastIds((prev) => (prev.includes(member.id) ? prev : [...prev, member.id]))
@@ -2794,7 +2802,11 @@ export default function ShortDramaPage() {
     clearTrial()
   }
 
-  const enrichCharacterPortrait = async (memberId?: string, imageOverride?: string) => {
+  const enrichCharacterPortrait = async (
+    memberId?: string,
+    imageOverride?: string,
+    opts?: { dropPhotoAfter?: boolean },
+  ) => {
     const member = resolveCastMember(memberId)
     if (!member) {
       setErr('请先新建角色')
@@ -2893,15 +2905,26 @@ export default function ShortDramaPage() {
             continue
           }
           if (!mountedRef.current) return
-          patchCast(member.id, { desc: portrait })
-          const imageAlreadyConfirmed = memberConfirmed(member)
-          setHint(
-            fromImage
-              ? imageAlreadyConfirmed
-                ? '已按参考图重写角色形象词。当前照片已确认，生成短剧将按此融合。'
-                : '已按参考图重写角色形象词。可点「用此图确认角色」，或再生成预览。'
-              : '已补全角色形象词，可再微调后点「生成预览」。',
-          )
+          if (opts?.dropPhotoAfter) {
+            patchCast(member.id, {
+              desc: portrait,
+              sourceUrl: null,
+              draft: null,
+              preview: null,
+              refMode: 'describe',
+            })
+            setHint('已把参考图识别成形象词并填入文案。成片按这段文字走，不再用原图锁脸。可再点「生成预览」。')
+          } else {
+            patchCast(member.id, { desc: portrait })
+            const imageAlreadyConfirmed = memberConfirmed(member)
+            setHint(
+              fromImage
+                ? imageAlreadyConfirmed
+                  ? '已按参考图重写角色形象词。当前照片已确认，生成短剧将按此融合。'
+                  : '已按参考图重写角色形象词。可点「用此图确认角色」，或再生成预览。'
+                : '已补全角色形象词，可再微调后点「生成预览」。',
+            )
+          }
           setErr(null)
           return
         } catch (e) {
@@ -3111,12 +3134,10 @@ export default function ShortDramaPage() {
     setErr(null)
     try {
       const url = await processCustomAvatarFile(file)
-      patchCast(member.id, { sourceUrl: url, draft: url, preview: url, desc: '' })
+      patchCast(member.id, { sourceUrl: url, draft: url, preview: null, desc: '', refMode: null })
       setActiveCastId(member.id)
       clearTrial()
-      setHint(
-        `已为${member.name}确认角色照片。形象以这张图为准，文字描述已清空以免另造一张脸。生成时会把角色图${refItems.length ? '和参考画面一起' : ''}交给有声短剧。`,
-      )
+      setHint(`已为${member.name}上传参考图。请二选一：按图美化生成，或识别成文字填入形象词。`)
     } catch (e) {
       setErr(e instanceof Error ? e.message : '角色形象读取失败')
     } finally {
@@ -3287,7 +3308,11 @@ export default function ShortDramaPage() {
         dataUrl = await blobToDramaDataUrl(blob)
       }
       if (!mountedRef.current) return
-      patchCast(member.id, { draft: dataUrl, preview: null })
+      patchCast(member.id, {
+        draft: dataUrl,
+        preview: null,
+        ...(refData ? { desc: '', refMode: 'beautify' as const } : {}),
+      })
       setActiveCastId(member.id)
       clearTrial()
       setHint(
@@ -3302,6 +3327,26 @@ export default function ShortDramaPage() {
     }
   }
 
+  const applyCastRefMode = async (memberId: string) => {
+    const member = resolveCastMember(memberId)
+    if (!member?.sourceUrl) {
+      setErr('请先上传参考图')
+      return
+    }
+    if (member.refMode === 'beautify') {
+      patchCast(member.id, { desc: '', refMode: 'beautify' })
+      setActiveCastId(member.id)
+      await generateCharacterPreview(member.id)
+      return
+    }
+    if (member.refMode === 'describe') {
+      setActiveCastId(member.id)
+      await enrichCharacterPortrait(member.id, undefined, { dropPhotoAfter: true })
+      return
+    }
+    setErr('请先选择参考图用法：按图美化，或识别成文字。')
+  }
+
   const confirmCharacterPreview = (memberId?: string) => {
     const member = resolveCastMember(memberId)
     const src = member?.draft
@@ -3309,7 +3354,11 @@ export default function ShortDramaPage() {
       setErr('请先生成或上传角色形象预览')
       return
     }
-    patchCast(member.id, { preview: src })
+    patchCast(member.id, {
+      preview: src,
+      desc: member.sourceUrl ? '' : member.desc,
+      refMode: member.sourceUrl ? 'beautify' : member.refMode ?? null,
+    })
     setActiveCastId(member.id)
     clearTrial()
     setErr(null)
@@ -4531,7 +4580,7 @@ export default function ShortDramaPage() {
                     </span>
                   </span>
                   <p className="text-[11px] leading-relaxed text-slate-500">
-                    每位角色请二选一：写文字形象，或上传参考图。不能同时用，否则成片会另造一张脸。角色栏写成「小柔 / 男顾客」后失焦或点「保存角色」，会自动带出多张角色卡。
+                    每位角色请二选一：写文字形象，或上传参考图。上传参考图后还要再选一次用法：按图美化生成，或识别成文字填入形象词，不能两路一起用。
                   </p>
                   {showCastSave ? (
                     <div className="flex flex-wrap items-center gap-2 rounded-xl border border-cyan-200 bg-cyan-50/50 p-2.5">
@@ -4656,6 +4705,9 @@ export default function ShortDramaPage() {
                         const look = castLookMode(member)
                         const textLocked = look === 'photo'
                         const photoLocked = look === 'text'
+                        const rawPhotoPending = Boolean(
+                          member.sourceUrl && member.draft === member.sourceUrl && !confirmed,
+                        )
                         return (
                           <div
                             key={member.id}
@@ -4707,6 +4759,7 @@ export default function ShortDramaPage() {
                                 <Trash2 className="h-4 w-4" />
                               </button>
                             </div>
+                            {look !== 'photo' ? (
                             <button
                               type="button"
                               disabled={
@@ -4730,6 +4783,7 @@ export default function ShortDramaPage() {
                               )}
                               {portraitBusy && isActive ? '正在补充画像' : 'AI补充画像'}
                             </button>
+                            ) : null}
                             <textarea
                               className={cn(fieldCls, 'min-h-[72px] resize-y', textLocked && 'bg-slate-50 text-slate-400')}
                               disabled={busy || storyBusy || characterBusy || mediaBusy || portraitBusy || textLocked}
@@ -4748,7 +4802,12 @@ export default function ShortDramaPage() {
                                 type="button"
                                 disabled={busy || mediaBusy || characterBusy}
                                 onClick={() => {
-                                  patchCast(member.id, { preview: null, draft: null, sourceUrl: null })
+                                  patchCast(member.id, {
+                                    preview: null,
+                                    draft: null,
+                                    sourceUrl: null,
+                                    refMode: null,
+                                  })
                                   setActiveCastId(member.id)
                                   setHint('已去掉参考图，可以改文字形象。')
                                 }}
@@ -4771,7 +4830,72 @@ export default function ShortDramaPage() {
                                 改用参考图（清空文字）
                               </button>
                             ) : null}
+                            {look === 'photo' ? (
+                              <div className="space-y-2 rounded-lg border border-cyan-100 bg-white/80 p-2.5">
+                                <p className="text-[11px] font-medium text-slate-700">参考图用法（二选一）</p>
+                                <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-700">
+                                  <input
+                                    type="radio"
+                                    className="mt-0.5 accent-cyan-700"
+                                    name={`cast-ref-mode-${member.id}`}
+                                    checked={member.refMode === 'beautify'}
+                                    onChange={() => {
+                                      setActiveCastId(member.id)
+                                      patchCast(member.id, { refMode: 'beautify', desc: '' })
+                                    }}
+                                  />
+                                  <span>按参考图美化生成（成片锁这张脸，不把图写成文案）</span>
+                                </label>
+                                <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-700">
+                                  <input
+                                    type="radio"
+                                    className="mt-0.5 accent-cyan-700"
+                                    name={`cast-ref-mode-${member.id}`}
+                                    checked={member.refMode === 'describe'}
+                                    onChange={() => {
+                                      setActiveCastId(member.id)
+                                      patchCast(member.id, { refMode: 'describe' })
+                                    }}
+                                  />
+                                  <span>识别成文字填入形象词（填完后不再用原图锁脸）</span>
+                                </label>
+                                <button
+                                  type="button"
+                                  disabled={
+                                    busy ||
+                                    storyBusy ||
+                                    characterBusy ||
+                                    mediaBusy ||
+                                    portraitBusy ||
+                                    !member.refMode
+                                  }
+                                  onClick={() => {
+                                    setActiveCastId(member.id)
+                                    void applyCastRefMode(member.id)
+                                  }}
+                                  className="inline-flex items-center gap-1 rounded-lg bg-cyan-700 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-cyan-800 disabled:opacity-50"
+                                >
+                                  {(characterBusy || portraitBusy) && isActive ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : member.refMode === 'describe' ? (
+                                    <Sparkles className="h-3.5 w-3.5" />
+                                  ) : (
+                                    <Wand2 className="h-3.5 w-3.5" />
+                                  )}
+                                  {(characterBusy || portraitBusy) && isActive
+                                    ? member.refMode === 'describe'
+                                      ? '正在识别…'
+                                      : '正在美化…'
+                                    : member.refMode === 'describe'
+                                      ? '识别并填入文案'
+                                      : member.refMode === 'beautify'
+                                        ? '按图美化生成'
+                                        : '请先选一种用法'}
+                                </button>
+                              </div>
+                            ) : null}
                             <div className="flex flex-wrap gap-2">
+                              {look !== 'photo' ? (
                               <button
                                 type="button"
                                 disabled={
@@ -4780,7 +4904,7 @@ export default function ShortDramaPage() {
                                   characterBusy ||
                                   mediaBusy ||
                                   portraitBusy ||
-                                  (textLocked ? false : look === 'unset' && !member.desc.trim())
+                                  (look === 'unset' && !member.desc.trim())
                                 }
                                 onClick={() => {
                                   setActiveCastId(member.id)
@@ -4793,12 +4917,9 @@ export default function ShortDramaPage() {
                                 ) : (
                                   <Wand2 className="h-3.5 w-3.5" />
                                 )}
-                                {characterBusy && isActive
-                                  ? '正在生成预览'
-                                  : textLocked
-                                    ? '按参考图生成'
-                                    : '生成预览'}
+                                {characterBusy && isActive ? '正在生成预览' : '生成预览'}
                               </button>
+                              ) : null}
                               <button
                                 type="button"
                                 disabled={
@@ -4818,7 +4939,7 @@ export default function ShortDramaPage() {
                               >
                                 上传参考图
                               </button>
-                              {showUrl && !confirmed ? (
+                              {showUrl && !confirmed && !rawPhotoPending ? (
                                 <button
                                   type="button"
                                   disabled={busy || characterBusy || portraitBusy}
@@ -4838,15 +4959,15 @@ export default function ShortDramaPage() {
                                   <p className="text-[10px] text-white/80">
                                     {confirmed
                                       ? '已确认，将按此融合'
-                                      : member.sourceUrl && member.draft === member.sourceUrl
-                                        ? '参考图 · 可生成相似画像或直接确认'
+                                      : rawPhotoPending
+                                        ? '参考图 · 请先二选一：美化生成 / 识别填词'
                                         : '预览待确认'}
                                   </p>
                                 </div>
                                 <div className="absolute right-1 top-1 flex gap-1">
                                   {confirmed ? (
                                     <span className="rounded-full bg-cyan-700 px-2 py-0.5 text-[10px] text-white">已确认</span>
-                                  ) : (
+                                  ) : rawPhotoPending ? null : (
                                     <button
                                       type="button"
                                       disabled={busy || characterBusy}
@@ -4861,7 +4982,12 @@ export default function ShortDramaPage() {
                                     disabled={busy || mediaBusy || characterBusy}
                                     aria-label={`清除${member.name}形象`}
                                     onClick={() => {
-                                      patchCast(member.id, { preview: null, draft: null, sourceUrl: null })
+                                      patchCast(member.id, {
+                                        preview: null,
+                                        draft: null,
+                                        sourceUrl: null,
+                                        refMode: null,
+                                      })
                                       clearTrial()
                                     }}
                                     className="rounded-full bg-black/55 p-1 text-white disabled:opacity-40"
@@ -4876,7 +5002,7 @@ export default function ShortDramaPage() {
                                   ? '正在生成角色预览…'
                                   : portraitBusy && isActive
                                     ? '正在补充角色画像…'
-                                    : '可写词补画像，或上传参考图生成相似画像'}
+                                    : '可写形象词后生成预览，或上传参考图后二选一：美化 / 识图填词'}
                               </div>
                             )}
                           </div>
