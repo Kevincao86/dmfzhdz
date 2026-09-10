@@ -105,7 +105,7 @@ def wrap_draw(draw, xy, s, fn, fill, max_w, leading=None, anchor="lt"):
     return len(lines) * lh
 
 
-def footer(draw, page: int, total: int = 12, light: bool = False):
+def footer(draw, page: int, total: int = 13, light: bool = False):
     c = (210, 210, 210) if light else MUTED
     text(draw, (80, 1036), "灵祺 · 种子轮  保密", f_body(18, True), c)
     text(draw, (1840, 1036), f"{page:02d} / {total:02d}", f_body(18, True), c, "rt")
@@ -129,6 +129,22 @@ def save(img: Image.Image, name: str) -> Path:
     path = OUT / name
     img.save(path, "PNG", optimize=True)
     return path
+
+
+def paste_rounded(base: Image.Image, photo: Path, box, radius: int = 22) -> None:
+    x0, y0, x1, y1 = box
+    tw, th = x1 - x0, y1 - y0
+    im = Image.open(photo).convert("RGB")
+    sw, sh = im.size
+    scale = max(tw / sw, th / sh)
+    nw, nh = max(1, int(sw * scale)), max(1, int(sh * scale))
+    im = im.resize((nw, nh), Image.Resampling.LANCZOS)
+    left = max(0, (nw - tw) // 2)
+    top = max(0, (nh - th) // 6)  # bias toward face
+    im = im.crop((left, top, left + tw, top + th))
+    mask = Image.new("L", (tw, th), 0)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, tw - 1, th - 1), radius=radius, fill=255)
+    base.paste(im, (x0, y0), mask)
 
 
 def slide_01():
@@ -549,9 +565,60 @@ def slide_11():
 
 
 def slide_12():
+    img = new_slide()
+    d = ImageDraw.Draw(img)
+    text(d, (80, 64), "11  /  我们是谁", f_sans(18), RUST)
+    text(d, (80, 108), "一个把系统做出来，一个把生意谈进来", f_title(40), INK)
+    people = [
+        {
+            "photo": ROOT / "images" / "founder-cao.png",
+            "box": (80, 210, 920, 980),
+            "pic": (110, 250, 500, 800),
+            "name": "曹鑫淼",
+            "role": "项目带头人  ·  技术和产品",
+            "lines": [
+                "浙江农林大学 本科",
+                "2019–2023  阿里巴巴本地生活",
+                "宁波区域负责人",
+                "2023–2026  字节跳动本地生活",
+                "大客户负责人",
+                "现在扛整个项目的技术和产品",
+            ],
+        },
+        {
+            "photo": ROOT / "images" / "founder-xie.png",
+            "box": (1000, 210, 1840, 980),
+            "pic": (1030, 250, 1420, 800),
+            "name": "谢锦超",
+            "role": "合伙人  ·  销售和市场",
+            "lines": [
+                "西安培华学院",
+                "2019–2025  小米生态",
+                "温州区域负责人",
+                "现在负责销售和市场",
+                "把门店和服务商谈进来",
+            ],
+        },
+    ]
+    for p in people:
+        card(d, p["box"])
+        paste_rounded(img, p["photo"], p["pic"], radius=20)
+        tx = p["pic"][2] + 36
+        ty = 270
+        text(d, (tx, ty), p["name"], f_title(36), INK)
+        text(d, (tx, ty + 56), p["role"], f_body(20), RUST)
+        yy = ty + 130
+        for line in p["lines"]:
+            text(d, (tx, yy), line, f_body(22, True), MUTED)
+            yy += 48
+    footer(d, 12)
+    return img
+
+
+def slide_13():
     img = overlay(darken(load_cover("lingqi-seed-close.png"), 0.40), alpha=100)
     d = ImageDraw.Draw(img)
-    text(d, (80, 64), "11  /  这轮我想融多少", f_sans(18), GOLD)
+    text(d, (80, 64), "12  /  这轮我想融多少", f_sans(18), GOLD)
     text(d, (80, 108), "种子轮  人民币 400 万元", f_title(48), WHITE)
     text(
         d,
@@ -573,12 +640,13 @@ def slide_12():
         y += 108
     card(d, (80, 610, 1200, 920), fill=(12, 22, 34), outline=(55, 66, 78))
     text(d, (110, 638), "宁波墨典网络科技有限公司", f_title(28), WHITE)
-    text(d, (110, 690), "创始人  曹鑫淼", f_body(24), CREAM)
-    text(d, (110, 730), "手机 / 微信  15757468650", f_body(24), CREAM)
-    text(d, (110, 770), "邮箱  modian@mofangdianai.com", f_body(24), CREAM)
-    text(d, (110, 816), "商家 ERP  cs.mofangdianai.com", f_body(20, True), (200, 196, 188))
-    text(d, (110, 858), "星选  dr.mofangdianai.com  ·  微信搜「灵祺星选」", f_body(20, True), (200, 196, 188))
-    footer(d, 12, light=True)
+    text(d, (110, 690), "创始人  曹鑫淼  ·  技术和产品", f_body(24), CREAM)
+    text(d, (110, 728), "合伙人  谢锦超  ·  销售和市场", f_body(24), CREAM)
+    text(d, (110, 772), "手机 / 微信  15757468650", f_body(24), CREAM)
+    text(d, (110, 810), "邮箱  modian@mofangdianai.com", f_body(22), CREAM)
+    text(d, (110, 848), "商家 ERP  cs.mofangdianai.com", f_body(20, True), (200, 196, 188))
+    text(d, (110, 880), "星选  dr.mofangdianai.com  ·  微信搜「灵祺星选」", f_body(20, True), (200, 196, 188))
+    footer(d, 13, light=True)
     return img
 
 
@@ -613,6 +681,7 @@ def main() -> None:
         slide_10,
         slide_11,
         slide_12,
+        slide_13,
     ]
     pngs = []
     for i, fn in enumerate(builders, 1):
