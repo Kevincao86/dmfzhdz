@@ -146,6 +146,10 @@
       {
         "value": "utils/chinaCountyCenters.js",
         "type": "file"
+      },
+      {
+        "value": "*.map",
+        "type": "suffix"
       }
     ],
     "include": []

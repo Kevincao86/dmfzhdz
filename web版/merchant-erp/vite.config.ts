@@ -65,5 +65,15 @@ export default defineConfig(({ mode }) => {
         '/rest/v1': { target: supabaseUpstream, changeOrigin: true, secure: true },
       },
     },
+    /** 生产包：不发 sourcemap，去掉 console/debugger，降低前端被整页另存抄走的便利度。 */
+    esbuild: {
+      drop: mode === 'development' ? [] : ['console', 'debugger'],
+      legalComments: 'none',
+    },
+    build: {
+      sourcemap: false,
+      minify: 'esbuild',
+      cssMinify: true,
+    },
   }
 })
