@@ -3351,9 +3351,13 @@ export async function handleMerchantAiVideoRoutes(input: {
         const state = await volcGetXiaoyunqueTaskOnce(env, taskIdSd)
         json(res, 200, { ok: true, provider: 'volc_xiaoyunque', ...state })
         return true
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e)
-        json(res, 502, { ok: false, message: msg })
+      } catch {
+        json(res, 200, {
+          ok: true,
+          provider: 'volc_xiaoyunque',
+          phase: 'running',
+          statusLabel: '云端生成中',
+        })
         return true
       }
     }

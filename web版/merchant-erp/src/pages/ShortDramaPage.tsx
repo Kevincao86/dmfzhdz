@@ -72,8 +72,11 @@ import {
   downloadVideoUrlAsBlob,
   fetchVideoAiConfig,
   formatVideoAiUserError,
+  loadPendingCloudVideoJob,
+  pollPendingCloudVideoJob,
   postVideoLastFrameFromUrl,
   runXiaoyunqueVideoJob,
+  stripVideoVendorNamesFromUserText,
   type VideoAiBackendConfig,
 } from '../services/videoAiApi'
 
@@ -308,12 +311,12 @@ const DURATION_OPTIONS: DurationOpt[] = [
   { sec: 8, label: '8 秒', hint: '单段直出' },
   { sec: 12, label: '12 秒', hint: '单段直出' },
   { sec: 15, label: '15 秒', hint: '单段直出' },
-  { sec: 30, label: '30 秒', hint: '先试镜 · 小云雀全片' },
-  { sec: 60, label: '1 分钟', hint: '先试镜 · 小云雀全片' },
-  { sec: 180, label: '3 分钟', hint: '先试镜 · 小云雀全片' },
-  { sec: 300, label: '5 分钟', hint: '先试镜 · 小云雀全片' },
-  { sec: 600, label: '10 分钟', hint: '先试镜 · 小云雀全片' },
-  { sec: 900, label: '15 分钟', hint: '先试镜 · 小云雀全片' },
+  { sec: 30, label: '30 秒', hint: '先试镜 · 智能全片' },
+  { sec: 60, label: '1 分钟', hint: '先试镜 · 智能全片' },
+  { sec: 180, label: '3 分钟', hint: '先试镜 · 智能全片' },
+  { sec: 300, label: '5 分钟', hint: '先试镜 · 智能全片' },
+  { sec: 600, label: '10 分钟', hint: '先试镜 · 智能全片' },
+  { sec: 900, label: '15 分钟', hint: '先试镜 · 智能全片' },
 ]
 
 const WORLDS: {
@@ -454,7 +457,7 @@ const WORLDS: {
   {
     id: 'drama',
     label: '短剧',
-    blurb: '职场、情感、重生、豪门、刑侦、古装。人物关系驱动；长片宜走小云雀 Agent。',
+    blurb: '职场、情感、重生、豪门、刑侦、古装。人物关系驱动；长片走智能全片。',
     refill: '用当前设定重填剧本',
     defaultStyle: 'live',
     promptKind: 'drama',
@@ -1652,7 +1655,7 @@ function buildDramaXiaoyunquePrompt(opts: {
       : '',
     opts.actionPlaybook?.trim() || '',
     opts.story.trim(),
-    '请由小云雀智能生视频 Agent 多镜编排成片。必须有中文对白人声和环境声，禁止无声片、禁止只配字幕不发声。竖屏 9:16。前 3 秒必须冲突或反转。必须按一句话故事和对白钩子演戏，禁止改成一个人在走廊走路。不要字幕水印 Logo。',
+    '请按一句话故事多镜编排成片。必须有中文对白人声和环境声，禁止无声片、禁止只配字幕不发声。竖屏 9:16。前 3 秒必须冲突或反转。必须按对白钩子演戏，禁止改成一个人在走廊走路。不要字幕水印 Logo。',
   ]
     .filter(Boolean)
     .join('\n')
@@ -2102,16 +2105,16 @@ function dramaJimengPhotoReady(cfg: VideoAiBackendConfig | null): boolean {
 function dramaXiaoyunqueHint(cfg: VideoAiBackendConfig | null, cfgLoaded: boolean): string {
   if (!cfgLoaded) return ''
   if (dramaXiaoyunqueReady(cfg)) {
-    return ' 当前：必须同时确认角色形象并上传参考画面，才会交给小云雀有声短剧。不能只凭文案出片，失败会直接报原因。'
+    return ' 当前：必须同时确认角色形象并上传参考画面，才会生成有声短剧。不能只凭文案出片，失败会直接报原因。'
   }
   if (dramaJimengPhotoReady(cfg)) {
     const detail = String(cfg?.xiaoyunqueProbeDetail || '').trim()
     return (
-      ` 当前：视觉云已绑定，但小云雀探测未通过${detail ? `（${detail}）` : ''}。` +
+      ` 当前：视觉云已绑定，但有声短剧探测未通过${detail ? `（${detail}）` : ''}。` +
       '仍须提交角色图+参考画面；未开通或欠费会明确报错，不会改成纯文案成片。'
     )
   }
-  return ' 当前：小云雀未配置（请运营台填即梦/小云雀 AK/SK）。未配置时不能生成，以免走纯文案片。'
+  return ' 当前：短剧视频未配置。未配置时不能生成，以免走纯文案片。'
 }
 
 function asDramaMp4Blob(blob: Blob): Blob {
@@ -2480,6 +2483,7 @@ export default function ShortDramaPage() {
   /** 本次生成的成片，只占创作台预览；刷新不自动回放历史 */
   const [resultPreviewUrl, setResultPreviewUrl] = useState<string | null>(null)
   const cancelRef = useRef(false)
+  const cloudResumeRef = useRef(false)
   const mountedRef = useRef(true)
   const previewUrlsRef = useRef<string[]>([])
   const initedRef = useRef(false)
@@ -3101,7 +3105,7 @@ export default function ShortDramaPage() {
       setActiveCastId(member.id)
       clearTrial()
       setHint(
-        `已为${member.name}确认角色照片。生成时会把角色图${refItems.length ? '和参考画面一起' : ''}交给小云雀有声短剧，不再按文案另画一张脸。`,
+        `已为${member.name}确认角色照片。生成时会把角色图${refItems.length ? '和参考画面一起' : ''}交给有声短剧，不再按文案另画一张脸。`,
       )
     } catch (e) {
       setErr(e instanceof Error ? e.message : '角色形象读取失败')
@@ -3416,7 +3420,7 @@ export default function ShortDramaPage() {
     if (!cfgLoaded) return '正在加载视频引擎配置'
     if (cfg?.configLoadError) return `视频配置加载失败：${cfg.configLoadError.slice(0, 120)}`
     if (!cfg?.xiaoyunqueConfigured) {
-      return '请在运营台配置即梦/小云雀后再生成。短剧必须带角色图和参考画面，不再走纯文案模型。'
+      return '请在运营台完成短剧视频配置后再生成。短剧必须带角色图和参考画面，不再走纯文案模型。'
     }
     if (!durationSelected) return '请先选择成片时长'
     if (!story.trim()) return '请先确认一句话故事，或点「AI生成故事」。'
@@ -3484,6 +3488,7 @@ export default function ShortDramaPage() {
     images_base64?: string[]
     beat?: string
     seedance_image_mode?: 'auto' | 'first_last' | 'reference' | 'first_only'
+    persist?: { billId?: string; title?: string; kind?: 'clip' | 'trial' | 'full' }
     onProgress?: (t: string) => void
   }) => {
     const imgs = (opts.images_base64 ?? []).map((s) => String(s).trim()).filter(Boolean)
@@ -3499,7 +3504,7 @@ export default function ShortDramaPage() {
       .filter((m) => m.preview || m.name.trim())
       .map((m, i) => m.name.trim() || `角色${i + 1}`)
     const kb = Math.max(1, Math.round(imgs.reduce((n, s) => n + s.length, 0) / 1370))
-    opts.onProgress?.(`已提交角色+店内参考（${imgs.length} 张，约 ${kb}KB），只走小云雀有声短剧…`)
+    opts.onProgress?.(`已提交角色+店内参考（${imgs.length} 张，约 ${kb}KB），云端生成有声短剧…`)
     const xyqPrompt = buildDramaXiaoyunquePrompt({
       leadName,
       castNames,
@@ -3515,6 +3520,7 @@ export default function ShortDramaPage() {
       images_base64: imgs,
       shouldCancel: () => cancelRef.current,
       onProgress: opts.onProgress,
+      persist: opts.persist,
     })
     if (xyq.ok && isDramaPhotoAwareVideoModel(xyq.modelUsed)) {
       return { ok: true as const, videoUrl: xyq.videoUrl, modelUsed: xyq.modelUsed, engineUsed: 'seedance' as const }
@@ -3523,7 +3529,7 @@ export default function ShortDramaPage() {
       ok: false as const,
       message:
         formatVideoAiUserError(xyq.ok ? '成片未带上角色/参考图，已丢弃以免变成文案片' : xyq.message) ||
-        '小云雀有声短剧未成功。未改走方舟文生，以免丢掉角色和店内场景。',
+        '有声短剧未成功。未改走纯文案成片，以免丢掉角色和店内场景。',
     }
   }
 
@@ -3552,7 +3558,7 @@ export default function ShortDramaPage() {
     if (blob) {
       if (!(await dramaBlobHasAudio(blob))) {
         URL.revokeObjectURL(previewUrl)
-        throw new Error('成片没有声音（对白/环境声）。已丢弃这次无声结果，请再试小云雀有声短剧。')
+        throw new Error('成片没有声音（对白/环境声）。已丢弃这次无声结果，请再试有声短剧。')
       }
       previewUrlsRef.current.push(previewUrl)
     }
@@ -3579,7 +3585,7 @@ export default function ShortDramaPage() {
     const spendHint = await chargePoints(blob ?? new Blob(), opts.billId, opts.durationSec)
     setHint(
       [
-        opts.modelUsed ? `已使用视频模型：${opts.modelUsed}` : '',
+        opts.modelUsed ? '已生成有声成片。' : '',
         spendHint,
         '已记入「成片记录」，刷新后仍可查看。',
       ]
@@ -3587,6 +3593,55 @@ export default function ShortDramaPage() {
         .join(' '),
     )
   }
+
+  const tryPullPendingCloudJob = async (): Promise<boolean> => {
+    const pending = loadPendingCloudVideoJob()
+    if (!pending) return false
+    setProgress('检测到云端未完成任务，正在拉回成片（无需重新提交）…')
+    const pulled = await pollPendingCloudVideoJob({
+      shouldCancel: () => cancelRef.current,
+      onProgress: (t) => {
+        if (mountedRef.current) setProgress(t)
+      },
+    })
+    if (pulled.ok) {
+      await finishAsWork({
+        billId: pending.billId || newWorkId(),
+        videoUrlOrBlob: pulled.videoUrl,
+        title: pending.title || shop.storeName.trim() || story.trim().slice(0, 18) || scene.name,
+        durationSec: pending.durationSec,
+        modelUsed: pending.modelUsed,
+      })
+      return true
+    }
+    if (loadPendingCloudVideoJob()) {
+      setErr(formatVideoAiUserError(pulled.message))
+      return true
+    }
+    return false
+  }
+
+  useEffect(() => {
+    if (cloudResumeRef.current) return
+    if (!loadPendingCloudVideoJob()) return
+    cloudResumeRef.current = true
+    cancelRef.current = false
+    setBusy(true)
+    void (async () => {
+      try {
+        await tryPullPendingCloudJob()
+      } catch (e) {
+        if (mountedRef.current) setErr(e instanceof Error ? e.message : String(e))
+      } finally {
+        if (mountedRef.current) {
+          setBusy(false)
+          setProgress(null)
+        }
+      }
+    })()
+    // 仅进页时拉回一次未完成的云端任务
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const generateFullLongform = async (billId: string) => {
     const total = Math.min(MAX_DRAMA_TOTAL_SEC, durationSec)
@@ -3611,7 +3666,7 @@ export default function ShortDramaPage() {
       hasSceneRefs: true,
       actionPlaybook,
     })
-    setProgress(`小云雀有声短剧全片（角色+店内参考，约 ${total} 秒）…`)
+    setProgress(`有声短剧全片（角色+店内参考，约 ${total} 秒，提交后在云端生成）…`)
     const xyq = await runXiaoyunqueVideoJob({
       prompt: xyqPrompt,
       durationSec: total,
@@ -3620,6 +3675,11 @@ export default function ShortDramaPage() {
       shouldCancel: () => cancelRef.current,
       onProgress: (t) => {
         if (mountedRef.current) setProgress(t)
+      },
+      persist: {
+        billId,
+        title: shop.storeName.trim() || story.trim().slice(0, 18) || scene.name,
+        kind: 'full',
       },
     })
     if (xyq.ok && isDramaPhotoAwareVideoModel(xyq.modelUsed)) {
@@ -3633,7 +3693,7 @@ export default function ShortDramaPage() {
       return
     }
     setProgress(
-      `小云雀全片未出，改分段图生（仍带角色+参考）…（${formatVideoAiUserError(xyq.ok ? '成片未带上参考图' : xyq.message).slice(0, 80)}）`,
+      `全片未出，改分段图生（仍带角色+参考）…（${formatVideoAiUserError(xyq.ok ? '成片未带上参考图' : xyq.message).slice(0, 80)}）`,
     )
 
     const plan = planLongformSegmentDurations(total)
@@ -3723,6 +3783,7 @@ export default function ShortDramaPage() {
     }
 
     try {
+      if (await tryPullPendingCloudJob()) return
       if (!showPreviewGate) {
         const fusionImgs = await prepareDramaModelImages()
         setProgress(
@@ -3736,6 +3797,11 @@ export default function ShortDramaPage() {
           beat: formula.beats.join(' → '),
           durationSec,
           images_base64: fusionImgs,
+          persist: {
+            billId,
+            title: shop.storeName.trim() || story.trim().slice(0, 18) || scene.name,
+            kind: 'clip',
+          },
           onProgress: (t) => {
             if (mountedRef.current) setProgress(t)
           },
@@ -3745,7 +3811,7 @@ export default function ShortDramaPage() {
           return
         }
         if (cancelRef.current) {
-          setHint('已停止等待。后台任务可能不会自动取消。')
+          setHint('已停止等待。任务仍在云端生成，刷新本页会自动拉回成片。')
           return
         }
         setProgress('正在拉取成片')
@@ -3775,6 +3841,11 @@ export default function ShortDramaPage() {
         beat: formula.beats[0]!,
         durationSec: PREVIEW_SEC,
         images_base64: await prepareDramaModelImages(),
+        persist: {
+          billId: `${billId}:trial`,
+          title: `${shop.storeName.trim() || story.trim().slice(0, 18) || scene.name} · 试镜`,
+          kind: 'trial',
+        },
         onProgress: (t) => {
           if (mountedRef.current) setProgress(`试镜 · ${t}`)
         },
@@ -3784,13 +3855,13 @@ export default function ShortDramaPage() {
         return
       }
       if (cancelRef.current) {
-        setHint('已停止等待。')
+        setHint('已停止等待。任务仍在云端生成，刷新本页会自动拉回成片。')
         return
       }
       setProgress('正在拉取试镜…')
       const blob = await downloadVideoUrlAsBlob(r.videoUrl, { maxAttempts: 3 })
       if (!(await dramaBlobHasAudio(blob))) {
-        throw new Error('试镜没有声音（对白/环境声）。已丢弃无声结果，请再试小云雀有声短剧。')
+        throw new Error('试镜没有声音（对白/环境声）。已丢弃无声结果，请再试有声短剧。')
       }
       // 试镜也扣积分（按时长），避免白嫖长片预览
       const spendHint = await chargePoints(blob, `${billId}:trial`, PREVIEW_SEC)
@@ -3803,21 +3874,21 @@ export default function ShortDramaPage() {
           `试镜 ${PREVIEW_SEC} 秒已出。满意再点「确认生成全片」（${
             collectFusionImages().length
               ? dramaJimengPhotoReady(cfg)
-                ? '小云雀有声全片'
+                ? '有声全片'
                 : segmentPlanLabel(durationSec)
               : dramaXiaoyunqueReady(cfg)
-                ? '小云雀全片'
+                ? '智能全片'
                 : segmentPlanLabel(durationSec)
           }）。`,
           collectFusionImages().length && dramaJimengPhotoReady(cfg)
-            ? '已上传角色形象，全片走小云雀有声短剧。失败会报原因，不再偷偷改即梦无声片。'
+            ? '已上传角色形象，全片走有声短剧。失败会报原因，不会改成无声片。'
             : collectFusionImages().length
-              ? '已上传角色形象。视觉云未开通时不能走方舟真人库，请先在运营台绑定即梦/小云雀 AK。'
+              ? '已上传角色形象。视觉云未开通时请先在运营台完成短剧视频配置。'
             : dramaXiaoyunqueReady(cfg)
-              ? '全片将优先走小云雀 Agent；失败时自动回退 Seedance 分段拼接。'
+              ? '全片优先走智能成片；失败时自动分段衔接。'
               : cfg?.xiaoyunqueConfigured
-                ? '火山视觉云已绑定，但小云雀 Agent 尚未开通，无角色照片时长片走 Seedance 尾帧续写拼接。'
-                : '小云雀未配置时无角色照片的全片走 Seedance 尾帧续写拼接，可能有轻微跳切。',
+                ? '视觉云已绑定，但有声短剧尚未开通，无角色照片时长片走分段衔接。'
+                : '未配置有声短剧时，无角色照片的全片走分段衔接，可能有轻微跳切。',
           spendHint,
         ]
           .filter(Boolean)
@@ -3861,6 +3932,7 @@ export default function ShortDramaPage() {
       return
     }
     try {
+      if (await tryPullPendingCloudJob()) return
       await generateFullLongform(billId)
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
@@ -3876,7 +3948,7 @@ export default function ShortDramaPage() {
     cancelRef.current = true
     setBusy(false)
     setProgress(null)
-    setHint('已停止等待。后台任务可能不会自动取消。')
+    setHint('已停止等待。任务仍在云端生成，刷新本页会自动拉回成片。')
   }
 
   const downloadWork = async (work: DramaWork) => {
@@ -4720,8 +4792,8 @@ export default function ShortDramaPage() {
                     ))}
                   </select>
                   <span className="block text-[11px] text-slate-500">
-                    单段（≤15 秒）走 Seedance。超过 15 秒：先 5 秒试镜，确认后优先走小云雀智能生视频 Agent（多镜编排，最长约
-                    15 分钟）；若未配置或失败，再回退 Seedance 尾帧续写拼接。
+                    单段（≤15 秒）直接出有声成片。超过 15 秒：先 5 秒试镜，确认后再生成全片（多镜编排，最长约 15
+                    分钟）；失败时再分段衔接。任务提交后在云端生成，断网刷新后会自动拉回。
                     {cfgLoaded ? dramaXiaoyunqueHint(cfg, cfgLoaded) : ''}
                   </span>
                 </label>
@@ -4815,21 +4887,21 @@ export default function ShortDramaPage() {
                         ? `当前 ${DURATION_OPTIONS.find((d) => d.sec === durationSec)?.label ?? durationSec} · ${
                             collectFusionImages().length
                               ? dramaJimengPhotoReady(cfg)
-                                ? '小云雀有声'
+                                ? '有声成片'
                                 : '图生融合'
                               : dramaXiaoyunqueReady(cfg)
-                                ? '小云雀全片'
+                                ? '智能全片'
                                 : segmentPlanLabel(durationSec)
                           }。先出前 ${PREVIEW_SEC} 秒试镜，满意再生成全片。`
                         : collectFusionImages().length
                           ? dramaJimengPhotoReady(cfg)
-                            ? '当前为单段直出，角色照片先走小云雀有声短剧，失败再即梦图生。'
+                            ? '当前为单段直出，角色照片走有声短剧；提交后在云端生成，断网也会继续。'
                             : '当前为单段直出，将融合参考画面与角色形象。'
                           : '当前为单段直出，无需试镜确认。'
                       : '请先选择成片时长，再生成故事或短剧。'}
               </p>
               <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-950">
-                成片会记入上方「成片记录」，刷新后仍可回看。远程地址可能过期，建议再点一次下载备份。长片按秒扣积分，15
+                成片会记入上方「成片记录」，刷新后仍可回看。生成提交后在云端继续，中途断网或刷新会自动拉回。远程地址可能过期，建议再点一次下载备份。长片按秒扣积分，15
                 分钟成本很高，请先确认试镜。
               </p>
               {works.length ? (
@@ -4916,7 +4988,9 @@ export default function ShortDramaPage() {
               </div>
               <details className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
                 <summary className="cursor-pointer select-none text-slate-500">将发送的执导提示词</summary>
-                <pre className="mt-2 whitespace-pre-wrap font-sans leading-relaxed">{promptPreview}</pre>
+                <pre className="mt-2 whitespace-pre-wrap font-sans leading-relaxed">
+                  {stripVideoVendorNamesFromUserText(promptPreview)}
+                </pre>
               </details>
             </aside>
           </div>
