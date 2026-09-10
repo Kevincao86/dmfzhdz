@@ -509,21 +509,21 @@ def slide_10():
     img = new_slide()
     d = ImageDraw.Draw(img)
     text(d, (80, 64), "09  /  怎么收钱", f_sans(18), RUST)
-    text(d, (80, 108), "收费口已经开了，五条都能报价", f_title(36), INK)
+    text(d, (80, 108), "收费口已经开了，四条都能报价", f_title(36), INK)
     models = [
         ("商家订阅", "约 ¥168 / 月", "支付页已经有 168 这一档"),
-        ("履约 / 撮合", "¥10–50 / 单", "大厅里已经有单的预算"),
-        ("达人 / PR 会员", "约 ¥9.9 / 月", "积分月赠在跑，充值几乎为 0"),
+        ("达人 / PR 会员", "约 ¥9.9 / 月", "积分月赠在跑"),
         ("服务商席位", "1.98–4.98 万 / 年", "5 家服务商，合同还没转付费"),
         ("模型和云剪", "按用量加价", "7 月 4,286 次调用可以报价"),
     ]
-    y = 200
+    y = 220
     for a, b, c in models:
-        card(d, (80, y, 1840, y + 120))
-        text(d, (110, y + 40), a, f_title(24), INK)
-        text(d, (620, y + 44), b, f_body(22), RUST)
-        text(d, (1060, y + 46), c, f_body(18, True), MUTED)
-        y += 136
+        card(d, (80, y, 1840, y + 140))
+        text(d, (110, y + 50), a, f_title(24), INK)
+        text(d, (620, y + 54), b, f_body(22), RUST)
+        text(d, (1060, y + 56), c, f_body(18, True), MUTED)
+        y += 160
+    text(d, (80, 900), "大厅撮合订单不收费，不抽成。", f_body(20, True), MUTED)
     footer(d, 10)
     return img
 
