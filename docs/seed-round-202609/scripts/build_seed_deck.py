@@ -508,8 +508,8 @@ def slide_09():
 def slide_10():
     img = new_slide()
     d = ImageDraw.Draw(img)
-    text(d, (80, 64), "09  /  模式与资金", f_sans(18), RUST)
-    text(d, (80, 108), "收费口已经开了，进账还很少", f_title(36), INK)
+    text(d, (80, 64), "09  /  怎么收钱", f_sans(18), RUST)
+    text(d, (80, 108), "收费口已经开了，五条都能报价", f_title(36), INK)
     models = [
         ("商家订阅", "约 ¥168 / 月", "支付页已经有 168 这一档"),
         ("履约 / 撮合", "¥10–50 / 单", "大厅里已经有单的预算"),
@@ -519,25 +519,11 @@ def slide_10():
     ]
     y = 200
     for a, b, c in models:
-        card(d, (80, y, 980, y + 120))
+        card(d, (80, y, 1840, y + 120))
         text(d, (110, y + 40), a, f_title(24), INK)
-        text(d, (430, y + 44), b, f_body(22), RUST)
-        text(d, (680, y + 46), c, f_body(18, True), MUTED)
+        text(d, (620, y + 44), b, f_body(22), RUST)
+        text(d, (1060, y + 46), c, f_body(18, True), MUTED)
         y += 136
-    text(d, (1060, 200), "400 万用途", f_title(28), INK)
-    funds = [
-        ("商业化与渠道", "160 万", "40%", RUST),
-        ("交付与达人供给", "100 万", "25%", TEAL),
-        ("研发与云资源", "100 万", "25%", GOLD),
-        ("储备与合规", "40 万", "10%", (90, 88, 82)),
-    ]
-    y = 270
-    for name, amt, pct, color in funds:
-        card(d, (1060, y, 1840, y + 140))
-        d.rectangle((1060, y, 1074, y + 140), fill=color)
-        text(d, (1100, y + 32), name, f_title(24), INK)
-        text(d, (1100, y + 80), f"{amt}   ·   {pct}", f_body(20, True), MUTED)
-        y += 160
     footer(d, 10)
     return img
 
