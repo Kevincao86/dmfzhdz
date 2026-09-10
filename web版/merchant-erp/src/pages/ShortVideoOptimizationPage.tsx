@@ -2061,7 +2061,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
           }
           const usedSec = r.durationSecUsed ?? shotSec
           if (usedSec < shotSec - 2) {
-            const msg = `成片时长约 ${usedSec} 秒，未达到所选 ${shotSec} 秒，请检查 Seedance 额度后重试（已禁止自动降为 5 秒）。`
+            const msg = `成片时长约 ${usedSec} 秒，未达到所选 ${shotSec} 秒，请检查视频额度后重试（已禁止自动降为 5 秒）。`
             finishVideoJob(false, msg)
             setErr(msg)
             return

@@ -72,6 +72,7 @@ import {
   downloadVideoUrlAsBlob,
   fetchVideoAiConfig,
   formatVideoAiUserError,
+  isTransientCloudPollError,
   loadPendingCloudVideoJob,
   pollPendingCloudVideoJob,
   postVideoLastFrameFromUrl,
@@ -1571,12 +1572,19 @@ function newCastMember(index: number): DramaCastMember {
   }
 }
 
+/** 角色形象二选一：参考图与文字描述不能同时生效，否则成片会另造一张脸 */
+function castLookMode(m: DramaCastMember): 'photo' | 'text' | 'unset' {
+  if (m.sourceUrl) return 'photo'
+  if (m.desc.trim()) return 'text'
+  return 'unset'
+}
+
 /** 有确认角色图时必须放在提示词最前，否则图生会按故事去拍男客、把首帧脸换掉 */
 function buildDramaIdentityLock(cast: DramaCastMember[], roles: string): string {
   const confirmed = cast.filter((m) => m.preview)
   if (confirmed.length === 0) return ''
   const name = confirmed[0]!.name.trim() || roles.trim() || '主角'
-  const desc = confirmed[0]!.desc.trim().slice(0, 36)
+  const desc = confirmed[0]!.sourceUrl ? '' : confirmed[0]!.desc.trim().slice(0, 36)
   if (confirmed.length === 1) {
     return [
       '【角色锁定】',
@@ -2108,7 +2116,7 @@ function dramaXiaoyunqueHint(cfg: VideoAiBackendConfig | null, cfgLoaded: boolea
     return ' 当前：必须同时确认角色形象并上传参考画面，才会生成有声短剧。不能只凭文案出片，失败会直接报原因。'
   }
   if (dramaJimengPhotoReady(cfg)) {
-    const detail = String(cfg?.xiaoyunqueProbeDetail || '').trim()
+    const detail = stripVideoVendorNamesFromUserText(String(cfg?.xiaoyunqueProbeDetail || '').trim())
     return (
       ` 当前：视觉云已绑定，但有声短剧探测未通过${detail ? `（${detail}）` : ''}。` +
       '仍须提交角色图+参考画面；未开通或欠费会明确报错，不会改成纯文案成片。'
@@ -2455,6 +2463,8 @@ export default function ShortDramaPage() {
   const [cfg, setCfg] = useState<VideoAiBackendConfig | null>(null)
   const [cfgLoaded, setCfgLoaded] = useState(false)
   const [busy, setBusy] = useState(false)
+  const busyRef = useRef(false)
+  busyRef.current = busy
   const [storyBusy, setStoryBusy] = useState(false)
   const [mediaBusy, setMediaBusy] = useState(false)
   const [refItems, setRefItems] = useState<DramaRefItem[]>([])
@@ -3101,11 +3111,11 @@ export default function ShortDramaPage() {
     setErr(null)
     try {
       const url = await processCustomAvatarFile(file)
-      patchCast(member.id, { sourceUrl: url, draft: url, preview: url })
+      patchCast(member.id, { sourceUrl: url, draft: url, preview: url, desc: '' })
       setActiveCastId(member.id)
       clearTrial()
       setHint(
-        `已为${member.name}确认角色照片。生成时会把角色图${refItems.length ? '和参考画面一起' : ''}交给有声短剧，不再按文案另画一张脸。`,
+        `已为${member.name}确认角色照片。形象以这张图为准，文字描述已清空以免另造一张脸。生成时会把角色图${refItems.length ? '和参考画面一起' : ''}交给有声短剧。`,
       )
     } catch (e) {
       setErr(e instanceof Error ? e.message : '角色形象读取失败')
@@ -3122,9 +3132,10 @@ export default function ShortDramaPage() {
     }
     const desc = member.desc.trim()
     const roleHint = member.name.trim() || roles.trim()
-    const rawRef = (member.sourceUrl || '').trim()
-    if (!desc && !rawRef) {
-      setErr('请先写简要形象词并点「AI补充画像」，或上传参考图后再生成预览')
+    const look = castLookMode(member)
+    const rawRef = look === 'photo' ? (member.sourceUrl || '').trim() : ''
+    if (look === 'unset' || (!desc && !rawRef)) {
+      setErr('请二选一：写形象词并点「生成预览」，或上传参考图。')
       setHint(null)
       return
     }
@@ -3527,6 +3538,7 @@ export default function ShortDramaPage() {
     }
     return {
       ok: false as const,
+      cloudPending: !xyq.ok && xyq.cloudPending === true,
       message:
         formatVideoAiUserError(xyq.ok ? '成片未带上角色/参考图，已丢弃以免变成文案片' : xyq.message) ||
         '有声短剧未成功。未改走纯文案成片，以免丢掉角色和店内场景。',
@@ -3615,7 +3627,13 @@ export default function ShortDramaPage() {
       return true
     }
     if (loadPendingCloudVideoJob()) {
-      setErr(formatVideoAiUserError(pulled.message))
+      const keep = pulled.cloudPending === true || isTransientCloudPollError(pulled.message)
+      if (keep) {
+        setErr(null)
+        setHint(formatVideoAiUserError(pulled.message))
+      } else {
+        setErr(formatVideoAiUserError(pulled.message))
+      }
       return true
     }
     return false
@@ -3631,7 +3649,7 @@ export default function ShortDramaPage() {
       try {
         await tryPullPendingCloudJob()
       } catch (e) {
-        if (mountedRef.current) setErr(e instanceof Error ? e.message : String(e))
+        if (mountedRef.current) setErr(formatVideoAiUserError(e instanceof Error ? e.message : String(e)))
       } finally {
         if (mountedRef.current) {
           setBusy(false)
@@ -3640,6 +3658,30 @@ export default function ShortDramaPage() {
       }
     })()
     // 仅进页时拉回一次未完成的云端任务
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    const onOnline = () => {
+      if (!mountedRef.current || busyRef.current) return
+      if (!loadPendingCloudVideoJob()) return
+      cancelRef.current = false
+      setBusy(true)
+      void (async () => {
+        try {
+          await tryPullPendingCloudJob()
+        } catch (e) {
+          if (mountedRef.current) setErr(formatVideoAiUserError(e instanceof Error ? e.message : String(e)))
+        } finally {
+          if (mountedRef.current) {
+            setBusy(false)
+            setProgress(null)
+          }
+        }
+      })()
+    }
+    window.addEventListener('online', onOnline)
+    return () => window.removeEventListener('online', onOnline)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -3692,6 +3734,11 @@ export default function ShortDramaPage() {
       })
       return
     }
+    if (!xyq.ok && xyq.cloudPending) {
+      setErr(null)
+      setHint(formatVideoAiUserError(xyq.message))
+      return
+    }
     setProgress(
       `全片未出，改分段图生（仍带角色+参考）…（${formatVideoAiUserError(xyq.ok ? '成片未带上参考图' : xyq.message).slice(0, 80)}）`,
     )
@@ -3734,7 +3781,14 @@ export default function ShortDramaPage() {
           if (mountedRef.current) setProgress(`全片 ${i + 1}/${plan.length} · ${t}`)
         },
       })
-      if (!r.ok) throw new Error(formatVideoAiUserError(r.message))
+      if (!r.ok) {
+        if (r.cloudPending) {
+          setErr(null)
+          setHint(r.message)
+          return
+        }
+        throw new Error(formatVideoAiUserError(r.message))
+      }
       segmentUrls.push(r.videoUrl)
       prevUrl = r.videoUrl
       lastModel = r.modelUsed ?? lastModel
@@ -3807,6 +3861,11 @@ export default function ShortDramaPage() {
           },
         })
         if (!r.ok) {
+          if (r.cloudPending) {
+            setErr(null)
+            setHint(r.message)
+            return
+          }
           setErr(formatVideoAiUserError(r.message))
           return
         }
@@ -3851,6 +3910,11 @@ export default function ShortDramaPage() {
         },
       })
       if (!r.ok) {
+        if (r.cloudPending) {
+          setErr(null)
+          setHint(r.message)
+          return
+        }
         setErr(formatVideoAiUserError(r.message))
         return
       }
@@ -3895,7 +3959,7 @@ export default function ShortDramaPage() {
           .join(' '),
       )
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e))
+      setErr(formatVideoAiUserError(e instanceof Error ? e.message : String(e)))
     } finally {
       if (mountedRef.current) {
         setBusy(false)
@@ -4467,7 +4531,7 @@ export default function ShortDramaPage() {
                     </span>
                   </span>
                   <p className="text-[11px] leading-relaxed text-slate-500">
-                    角色栏写成「小柔 / 男顾客」后失焦或点「保存角色」，会自动带出多张角色卡。勾选要存的人（可多选），未勾选的仍留在本页。做续集时「选用已存」一次载入该组全部人。
+                    每位角色请二选一：写文字形象，或上传参考图。不能同时用，否则成片会另造一张脸。角色栏写成「小柔 / 男顾客」后失焦或点「保存角色」，会自动带出多张角色卡。
                   </p>
                   {showCastSave ? (
                     <div className="flex flex-wrap items-center gap-2 rounded-xl border border-cyan-200 bg-cyan-50/50 p-2.5">
@@ -4589,6 +4653,9 @@ export default function ShortDramaPage() {
                         const showUrl = memberShowUrl(member)
                         const confirmed = memberConfirmed(member)
                         const isActive = (activeCast?.id ?? cast[0]?.id) === member.id
+                        const look = castLookMode(member)
+                        const textLocked = look === 'photo'
+                        const photoLocked = look === 'text'
                         return (
                           <div
                             key={member.id}
@@ -4642,7 +4709,14 @@ export default function ShortDramaPage() {
                             </div>
                             <button
                               type="button"
-                              disabled={busy || storyBusy || characterBusy || mediaBusy || portraitBusy}
+                              disabled={
+                                busy ||
+                                storyBusy ||
+                                characterBusy ||
+                                mediaBusy ||
+                                portraitBusy ||
+                                textLocked
+                              }
                               onClick={() => {
                                 setActiveCastId(member.id)
                                 void enrichCharacterPortrait(member.id)
@@ -4654,26 +4728,60 @@ export default function ShortDramaPage() {
                               ) : (
                                 <Sparkles className="h-3.5 w-3.5" />
                               )}
-                              {portraitBusy && isActive
-                                ? member.sourceUrl
-                                  ? '正在按图写词'
-                                  : '正在补充画像'
-                                : member.sourceUrl
-                                  ? '按图补充画像'
-                                  : 'AI补充画像'}
+                              {portraitBusy && isActive ? '正在补充画像' : 'AI补充画像'}
                             </button>
                             <textarea
-                              className={cn(fieldCls, 'min-h-[72px] resize-y')}
-                              disabled={busy || storyBusy || characterBusy || mediaBusy || portraitBusy}
+                              className={cn(fieldCls, 'min-h-[72px] resize-y', textLocked && 'bg-slate-50 text-slate-400')}
+                              disabled={busy || storyBusy || characterBusy || mediaBusy || portraitBusy || textLocked}
+                              readOnly={textLocked}
                               value={member.desc}
                               onFocus={() => setActiveCastId(member.id)}
                               onChange={(e) => patchCast(member.id, { desc: e.target.value })}
-                              placeholder="文案路径：足浴店女技师，25-28岁。参考图路径：先上传照片再点补充或生成"
+                              placeholder={
+                                textLocked
+                                  ? '已选用参考图，文字形象已锁定。若要改文字，请先去掉参考图。'
+                                  : '文字路径：足浴店女技师，25-28岁。写完后点生成预览。选用参考图时请先上传，不要再改这段。'
+                              }
                             />
+                            {textLocked ? (
+                              <button
+                                type="button"
+                                disabled={busy || mediaBusy || characterBusy}
+                                onClick={() => {
+                                  patchCast(member.id, { preview: null, draft: null, sourceUrl: null })
+                                  setActiveCastId(member.id)
+                                  setHint('已去掉参考图，可以改文字形象。')
+                                }}
+                                className="text-[11px] text-cyan-800 hover:underline"
+                              >
+                                改用文字描述（去掉参考图）
+                              </button>
+                            ) : null}
+                            {photoLocked ? (
+                              <button
+                                type="button"
+                                disabled={busy || mediaBusy || characterBusy}
+                                onClick={() => {
+                                  patchCast(member.id, { desc: '' })
+                                  setActiveCastId(member.id)
+                                  setHint('已清空文字形象，可以上传参考图。')
+                                }}
+                                className="text-[11px] text-cyan-800 hover:underline"
+                              >
+                                改用参考图（清空文字）
+                              </button>
+                            ) : null}
                             <div className="flex flex-wrap gap-2">
                               <button
                                 type="button"
-                                disabled={busy || storyBusy || characterBusy || mediaBusy || portraitBusy}
+                                disabled={
+                                  busy ||
+                                  storyBusy ||
+                                  characterBusy ||
+                                  mediaBusy ||
+                                  portraitBusy ||
+                                  (textLocked ? false : look === 'unset' && !member.desc.trim())
+                                }
                                 onClick={() => {
                                   setActiveCastId(member.id)
                                   void generateCharacterPreview(member.id)
@@ -4687,13 +4795,20 @@ export default function ShortDramaPage() {
                                 )}
                                 {characterBusy && isActive
                                   ? '正在生成预览'
-                                  : member.sourceUrl
+                                  : textLocked
                                     ? '按参考图生成'
                                     : '生成预览'}
                               </button>
                               <button
                                 type="button"
-                                disabled={busy || storyBusy || characterBusy || mediaBusy || portraitBusy}
+                                disabled={
+                                  busy ||
+                                  storyBusy ||
+                                  characterBusy ||
+                                  mediaBusy ||
+                                  portraitBusy ||
+                                  photoLocked
+                                }
                                 onClick={() => {
                                   setActiveCastId(member.id)
                                   pendingCastUploadIdRef.current = member.id
@@ -4937,9 +5052,9 @@ export default function ShortDramaPage() {
                   </ul>
                 </div>
               ) : null}
-              {progress ? <p className="text-sm text-cyan-800">{progress}</p> : null}
-              {hint ? <p className="text-sm text-slate-600">{hint}</p> : null}
-              {err ? <p className="text-sm text-rose-700">{err}</p> : null}
+              {progress ? <p className="text-sm text-cyan-800">{stripVideoVendorNamesFromUserText(progress)}</p> : null}
+              {hint ? <p className="text-sm text-slate-600">{stripVideoVendorNamesFromUserText(hint)}</p> : null}
+              {err ? <p className="text-sm text-rose-700">{stripVideoVendorNamesFromUserText(err)}</p> : null}
 
               <div className="flex flex-wrap gap-2">
                 {!trialReady ? (

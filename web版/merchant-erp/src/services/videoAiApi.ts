@@ -57,6 +57,7 @@ export function stripVideoVendorNamesFromUserText(s: string): string {
     .replace(/小云雀\s*Agent/gi, '智能成片')
     .replace(/Seedance(?:\s*\d(?:\.\d)?(?:\s*Pro)?)?/gi, '视频模型')
     .replace(/doubao-seedance[\w.\-]*/gi, '视频模型')
+    .replace(/xiaoyunque/gi, '智能成片')
     .replace(/即梦\s*AI/g, '视觉云')
     .replace(/即梦图生/g, '图生')
     .replace(/即梦\/小云雀/g, '短剧视频')
@@ -72,26 +73,26 @@ function explainVideoAiUserErrorInner(msg: string): string {
   const raw = String(msg ?? '').trim()
   if (!raw) return raw
   if (/已改走火山 1\.5|正在改用火山 1\.5|1\.5 Pro 首帧/i.test(raw)) {
-    return '角色形象必须用图生才能保持同一张脸。请再点生成，系统会走即梦/首帧图生，不会改文生换脸。'
+            return '角色形象必须用图生才能保持同一张脸。请再点生成，系统会走图生锁脸，不会改文生换脸。'
   }
   if (/仍未通过写实人像|必须用图生才能保持|禁止改文生|禁止模型自己生成人物|以角色图为准/.test(raw)) return raw
   if (/may contain real person|contain real person|input image.*real person|写实人像|真人肖像|更换角色参考图|写实参考图/i.test(raw)) {
-    return '角色参考图未能用于图生（方舟会拦写实首帧）。请再试即梦图生，系统不会改文生换脸。'
+    return '角色参考图未能用于图生。请再试图生锁脸，系统不会改文生换脸。'
   }
   if (/parameter ratio.*not valid|output ratio follows the first-frame/i.test(raw)) {
     return '角色参考图已用作视频首帧时，不能再指定画幅。系统会按首帧自动出竖屏，请再点一次生成。'
   }
   if (/duration customization is not supported|duration must be in/i.test(raw)) {
     return (
-      '当前模型不支持您选择的视频时长（10 秒图生视频须 Seedance 1.5/2.0 或千问 wan2.6+）。' +
-      '系统会按所选秒数自动切换兼容模型；若全部失败请到运营台开通 Seedance 1.5 或配置千问视频 Key。' +
+      '当前模型不支持您选择的视频时长。' +
+      '系统会按所选秒数自动切换兼容模型；若仍失败请联系运营检查视频模型配置。' +
       `原始信息：${raw}`
     )
   }
   if (/field required:\s*input[_\.]?media/i.test(raw)) {
     return (
       '千问 wan2.7 图生视频需要公网参考图，已自动切换 wan2.6 等兼容模型。' +
-      '若仍失败请配置云剪 OSS 或改用灵祺视频模型2（Seedance）。' +
+      '若仍失败请配置云剪 OSS 或改用灵祺视频模型2。' +
       `原始信息：${raw}`
     )
   }
@@ -119,7 +120,7 @@ function explainVideoAiUserErrorInner(msg: string): string {
   }
   if (/invalid content\.text|Invalid content\.text/i.test(raw)) {
     return (
-      '视频模型提示词过长或格式不符合 Seedance 要求（content.text 校验失败）。' +
+      '视频模型提示词过长或格式不符合要求。' +
       '系统已自动精简提示词；请点「再编辑」后重新渲染。若仍失败请缩短动作指令或背景描述。' +
       `原始信息：${raw}`
     )
@@ -129,7 +130,7 @@ function explainVideoAiUserErrorInner(msg: string): string {
       raw.match(/\*\*([^*]+)\*\*/)?.[1]?.trim() ||
       raw.match(/for the\s+\*?\*?([^\s*.]+)\*?\*?\s+model/i)?.[1]?.trim() ||
       raw.match(/模型「([^」]+)」/)?.[1]?.trim() ||
-      'Seedance'
+      '当前视频模型'
     return (
       `火山方舟模型「${modelId}」已达推理限额（安全体验模式），正在尝试其它视频模型。` +
       `若全部失败请到火山方舟控制台关闭「安全体验模式」或开通正式计费：` +
@@ -1389,8 +1390,11 @@ export function clearPendingCloudVideoJob(taskId?: string): void {
   }
 }
 
+const CLOUD_PENDING_USER_MSG =
+  '任务已在云端生成。网络中断不影响出片，刷新本页或稍后再进会自动拉回，请勿重复点生成。'
+
 /** 查询失败（断网/502/限流）不等于成片失败：任务已在云端，应继续拉回 */
-function isTransientCloudPollError(msg: string): boolean {
+export function isTransientCloudPollError(msg: string): boolean {
   const raw = String(msg ?? '').trim()
   if (!raw) return true
   if (/taskId 无效|无效任务|缺少 query taskId|未配置凭据|缺少视觉云/i.test(raw)) return false
@@ -1585,7 +1589,7 @@ export async function pollShortVideoTask(
   return {
     ok: false,
     message: lockModel
-      ? '等待超时，当前模型仍未返回成片，请稍后重试。'
+      ? CLOUD_PENDING_USER_MSG
       : '等待超时，可能当前模型额度不足或队列拥堵，将切换其它模型重试…',
     hopable: !lockModel,
   }
@@ -1805,7 +1809,7 @@ export async function runXiaoyunqueVideoJob(opts: {
   persist?: Pick<PendingCloudVideoJob, 'billId' | 'title' | 'kind'>
 }): Promise<
   | { ok: true; videoUrl: string; modelUsed?: string | null }
-  | { ok: false; message: string }
+  | { ok: false; message: string; cloudPending?: boolean }
 > {
   const durationSec = Math.min(900, Math.max(5, Math.round(opts.durationSec)))
   const aspect = (opts.aspectRatio || '9:16').trim() || '9:16'
@@ -1872,13 +1876,12 @@ export async function runXiaoyunqueVideoJob(opts: {
       opts.onProgress?.(`云端生成中 · ${stripVideoVendorNamesFromUserText(label)}`),
   })
   if (!poll.ok) {
-    if (poll.message === '已取消等待' || isTransientCloudPollError(poll.message) || /仍在云端|请稍后重试/.test(poll.message)) {
+    if (poll.message === '已取消等待' || isTransientCloudPollError(poll.message) || /仍在云端|请稍后重试|拉回成片/.test(poll.message)) {
       return {
         ok: false,
+        cloudPending: true,
         message: formatVideoAiUserError(
-          poll.message === '已取消等待'
-            ? '已停止等待。任务仍在云端生成，刷新页面或稍后再进本页会自动拉回成片。'
-            : poll.message,
+          poll.message === '已取消等待' ? CLOUD_PENDING_USER_MSG : poll.message,
         ),
       }
     }
@@ -1894,7 +1897,7 @@ export async function pollPendingCloudVideoJob(opts?: {
   onProgress?: (text: string) => void
 }): Promise<
   | { ok: true; videoUrl: string; job: PendingCloudVideoJob }
-  | { ok: false; message: string; job?: PendingCloudVideoJob }
+  | { ok: false; message: string; job?: PendingCloudVideoJob; cloudPending?: boolean }
 > {
   const job = loadPendingCloudVideoJob()
   if (!job) return { ok: false, message: '没有待拉回的云端任务' }
@@ -1911,9 +1914,14 @@ export async function pollPendingCloudVideoJob(opts?: {
     const keep =
       poll.message === '已取消等待' ||
       isTransientCloudPollError(poll.message) ||
-      /仍在云端|请稍后重试|排队/.test(poll.message)
+      /仍在云端|请稍后重试|排队|拉回成片/.test(poll.message)
     if (!keep) clearPendingCloudVideoJob(job.taskId)
-    return { ok: false, message: formatVideoAiUserError(poll.message), job }
+    return {
+      ok: false,
+      cloudPending: keep,
+      message: formatVideoAiUserError(keep ? CLOUD_PENDING_USER_MSG : poll.message),
+      job,
+    }
   }
   clearPendingCloudVideoJob(job.taskId)
   return { ok: true, videoUrl: poll.videoUrl, job }

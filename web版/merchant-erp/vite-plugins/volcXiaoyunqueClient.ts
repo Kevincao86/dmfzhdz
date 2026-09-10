@@ -38,7 +38,7 @@ export async function probeXiaoyunqueAccount(env: MerchantAiEnv): Promise<{
   detail: string
 }> {
   if (!isXiaoyunqueConfigured(env)) {
-    return { configured: false, usable: false, detail: '未配置即梦/视觉云 AK/SK' }
+    return { configured: false, usable: false, detail: '未配置短剧视频凭据' }
   }
   const dummy = encodeTaskToken(XYQ_REQ_KEY_NOREF, XYQ_GET_ACTION, 'probe-not-exist')
   const state = await volcGetXiaoyunqueTaskOnce(env, dummy)
@@ -47,13 +47,13 @@ export async function probeXiaoyunqueAccount(env: MerchantAiEnv): Promise<{
     return {
       configured: true,
       usable: false,
-      detail: '视觉云 AK 有效，但当前账号未开通小云雀智能生视频 Agent 2.0',
+      detail: '视觉云 AK 有效，但当前账号未开通有声短剧能力',
     }
   }
   if (/Access\s*Denied|50400|未开通或 AK 无权限/i.test(reason)) {
-    return { configured: true, usable: false, detail: 'AK 无小云雀权限，请到火山控制台开通并授权' }
+    return { configured: true, usable: false, detail: 'AK 无有声短剧权限，请到火山控制台开通并授权' }
   }
-  return { configured: true, usable: true, detail: '小云雀接口可调用' }
+  return { configured: true, usable: true, detail: '有声短剧接口可调用' }
 }
 
 export function isXiaoyunqueTaskId(taskId: string): boolean {
@@ -516,11 +516,11 @@ export async function volcSubmitXiaoyunqueTask(
     return {
       ok: false,
       message:
-        '未配置即梦/小云雀视觉云 AK/SK。请到运营台「短剧 AI 制作」填写，或在轻量 auth-api.env 配置 JIMENG_ACCESS_KEY_ID / JIMENG_SECRET_ACCESS_KEY。',
+        '未配置短剧视频凭据。请到运营台「短剧 AI 制作」填写，或在轻量 auth-api.env 配置视觉云 AK/SK。',
     }
   }
   const prompt = opts.prompt.trim()
-  if (!prompt) return { ok: false, message: '缺少小云雀生成提示词。' }
+  if (!prompt) return { ok: false, message: '缺少短剧生成提示词。' }
   const durationSec = clampDurationSec(opts.durationSec)
   const aspectRatio = (opts.aspectRatio || '9:16').trim() || '9:16'
   const mixed = collectImagePayloads([...(opts.imageUrls ?? []), ...(opts.imageBase64 ?? [])], 2)
@@ -565,7 +565,11 @@ export async function volcSubmitXiaoyunqueTask(
           })
       const r = await postVolcVisualWithRetry(creds, attempt.action, attempt.version, body)
       if (!r.ok) {
-        const tag = isXiaoyunqueAgentReqKey(attempt.reqKey) ? '小云雀' : attempt.reqKey
+        const tag = isXiaoyunqueAgentReqKey(attempt.reqKey)
+          ? '有声短剧'
+          : isJimengI2vReqKey(attempt.reqKey)
+            ? '图生'
+            : '短剧视频'
         const row = `${tag}${dur !== durationSec ? `@${dur}s` : ''}: ${r.message}`
         errors.push(row)
         console.warn('[xiaoyunque-submit]', row.slice(0, 400))
@@ -600,8 +604,8 @@ export async function volcSubmitXiaoyunqueTask(
       message:
         humanizeXiaoyunqueError(errors.slice(0, 3).join('；')) ||
         (xyqOtherFailed && !xyqNotOpened
-          ? '小云雀有声短剧提交失败。未改走即梦无声片，以免丢掉对白。'
-          : '小云雀有声短剧与即梦图生均未成功，未改用无参考成片（否则会丢掉角色照片）。'),
+          ? '有声短剧提交失败。未改走无声片，以免丢掉对白。'
+          : '有声短剧与图生均未成功，未改用无参考成片（否则会丢掉角色照片）。'),
     }
   }
   return {
