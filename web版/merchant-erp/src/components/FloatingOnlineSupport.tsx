@@ -807,8 +807,8 @@ export default function FloatingOnlineSupport({
           type="button"
           onClick={() => setOpen((v) => !v)}
           className={cn(
-            'pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full shadow-lg transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
-            open ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-blue-600 text-white hover:bg-blue-700',
+            'pointer-events-auto flex h-14 w-14 items-center justify-center shadow-lg transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#b42318] focus:ring-offset-2',
+            open ? 'bg-[#3f3a35] text-white hover:bg-[#16141a]' : 'bg-[#b42318] text-white hover:bg-[#8e1a12]',
           )}
           aria-label={open ? `关闭${panelTitle}` : `打开${panelTitle}`}
           aria-expanded={open}

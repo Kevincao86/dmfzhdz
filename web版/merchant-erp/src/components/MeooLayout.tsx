@@ -54,7 +54,7 @@ import {
   setActiveTenantStorageId,
 } from '../lib/tenantLocalState'
 import SiteIcpFooter from './SiteIcpFooter'
-import { BRAND_LOGO_URL, BRAND_NAME } from '../lib/brand'
+import { BRAND_LOGO_URL, BRAND_NAME, BRAND_NAME_SHORT } from '../lib/brand'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 
 export default function MeooLayout() {
@@ -205,34 +205,36 @@ export default function MeooLayout() {
 
   return (
     <TenantAnnouncementProvider>
-    <div className="flex min-h-screen bg-slate-100">
+    <div className="flex min-h-screen bg-[#e8eaed]">
       <aside
         className={cn(
-          'fixed left-0 top-0 z-40 flex h-screen flex-shrink-0 flex-col border-r border-slate-800/80 bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 shadow-[8px_0_36px_-14px_rgba(15,23,42,0.7)] transition-all duration-300',
+          'fixed left-0 top-0 z-40 flex h-screen flex-shrink-0 flex-col border-r border-black/20 bg-[#1c1814] transition-all duration-300',
           sidebarWidth,
         )}
       >
-        <div className="flex h-16 items-center border-b border-slate-800/80 bg-slate-950/80 px-4 backdrop-blur-sm">
+        <div className="flex h-16 items-center border-b border-[rgba(201,162,39,0.28)] px-4">
           {!collapsed && (
             <>
               <img
                 src={BRAND_LOGO_URL}
                 alt={BRAND_NAME}
-                className="mr-2 h-10 w-10 shrink-0 rounded-xl object-contain ring-1 ring-white/10"
+                className="mr-2 h-9 w-9 shrink-0 object-contain"
               />
-              <span className="text-lg font-semibold tracking-tight text-white">{BRAND_NAME}</span>
+              <span className="font-[family-name:var(--lq-serif)] text-base tracking-[0.12em] text-[#c9a227]">
+                {BRAND_NAME_SHORT}商家
+              </span>
             </>
           )}
           {collapsed && (
             <img
               src={BRAND_LOGO_URL}
               alt={BRAND_NAME}
-              className="mx-auto h-9 w-9 rounded-xl object-contain ring-1 ring-white/10"
+              className="mx-auto h-9 w-9 object-contain"
             />
           )}
         </div>
 
-        <nav className="h-[calc(100vh-4rem)] space-y-1 overflow-y-auto p-3">
+        <nav className="h-[calc(100vh-4rem)] space-y-0.5 overflow-y-auto p-2">
           {navItems.map((item) => {
             const Icon = item.icon
             const active = item.children
@@ -249,11 +251,11 @@ export default function MeooLayout() {
                     onMouseEnter={() => collapsed && setOpenGroups([item.path])}
                     onMouseLeave={() => collapsed && setOpenGroups([])}
                     className={cn(
-                      'flex w-full items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
+                      'flex w-full items-center border-l-2 px-3 py-2.5 text-sm font-medium',
                       collapsed ? 'justify-center' : 'justify-between',
                       active
-                        ? 'bg-cyan-500/15 text-cyan-100 ring-1 ring-cyan-500/25'
-                        : 'text-slate-300 hover:bg-slate-800/90 hover:text-white',
+                        ? 'border-[#c9a227] bg-white/[0.06] text-[#f4efe6]'
+                        : 'border-transparent text-white/55 hover:bg-white/[0.04] hover:text-[#f4efe6]',
                     )}
                   >
                     <div className="flex items-center">
@@ -261,16 +263,16 @@ export default function MeooLayout() {
                         className={cn(
                           'h-5 w-5',
                           !collapsed && 'mr-3',
-                          active ? 'text-cyan-400' : 'text-slate-500',
+                          active ? 'text-[#c9a227]' : 'text-white/35',
                         )}
                       />
                       {!collapsed && item.label}
                     </div>
                     {!collapsed &&
                       (open ? (
-                        <ChevronDown className="h-4 w-4 text-slate-500" />
+                        <ChevronDown className="h-4 w-4 text-white/35" />
                       ) : (
-                        <ChevronRight className="h-4 w-4 text-slate-500" />
+                        <ChevronRight className="h-4 w-4 text-white/35" />
                       ))}
                   </button>
 
@@ -285,8 +287,8 @@ export default function MeooLayout() {
                             cn(
                               'block rounded-lg px-3 py-2 text-sm transition-colors',
                               isActive
-                                ? 'bg-cyan-500/15 font-medium text-cyan-100'
-                                : 'text-slate-400 hover:bg-slate-800/80 hover:text-white',
+                                ? 'bg-[rgba(180,35,24,0.18)] font-medium text-[#f4efe6]'
+                                : 'text-white/40 hover:bg-white/[0.04] hover:text-[#f4efe6]',
                             )
                           }
                         >
@@ -297,8 +299,8 @@ export default function MeooLayout() {
                   )}
 
                   {collapsed && open && (
-                    <div className="absolute left-full top-0 z-50 ml-2 w-48 rounded-xl border border-slate-700 bg-slate-900 py-2 shadow-xl shadow-black/40">
-                      <div className="border-b border-slate-800 px-3 py-2 text-xs font-medium text-slate-400">
+                    <div className="absolute left-full top-0 z-50 ml-2 w-48 border border-[#c9a227]/30 bg-[#1c1814] py-2">
+                      <div className="border-b border-white/10 px-3 py-2 text-xs font-medium text-[#c9a227]">
                         {item.label}
                       </div>
                       {item.children.map((c) => (
@@ -310,8 +312,8 @@ export default function MeooLayout() {
                             cn(
                               'block px-3 py-2 text-sm transition-colors',
                               isActive
-                                ? 'bg-cyan-500/15 font-medium text-cyan-100'
-                                : 'text-slate-400 hover:bg-slate-800 hover:text-white',
+                                ? 'bg-[rgba(180,35,24,0.18)] font-medium text-[#f4efe6]'
+                                : 'text-white/40 hover:bg-white/[0.06] hover:text-[#f4efe6]',
                             )
                           }
                         >
@@ -331,11 +333,11 @@ export default function MeooLayout() {
                 end={item.path === '/'}
                 className={({ isActive }) =>
                   cn(
-                    'flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
+                    'flex items-center border-l-2 px-3 py-2.5 text-sm font-medium',
                     collapsed ? 'justify-center' : '',
                     isActive
-                      ? 'bg-cyan-500/15 text-cyan-100 ring-1 ring-cyan-500/25'
-                      : 'text-slate-300 hover:bg-slate-800/90 hover:text-white',
+                      ? 'border-[#c9a227] bg-white/[0.06] text-[#f4efe6]'
+                      : 'border-transparent text-white/55 hover:bg-white/[0.04] hover:text-[#f4efe6]',
                   )
                 }
               >
@@ -345,7 +347,7 @@ export default function MeooLayout() {
                       className={cn(
                         'h-5 w-5',
                         !collapsed && 'mr-3',
-                        isActive ? 'text-cyan-400' : 'text-slate-500',
+                        isActive ? 'text-[#c9a227]' : 'text-white/35',
                       )}
                     />
                     {!collapsed && item.label}
@@ -358,12 +360,12 @@ export default function MeooLayout() {
       </aside>
 
       <div className={cn('flex min-w-0 flex-1 flex-col transition-all duration-300', mainMargin)}>
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200/80 bg-white/80 px-6 shadow-sm shadow-slate-900/[0.03] backdrop-blur-xl">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#d4d0c8] bg-[#fffdf9] px-6">
           <div className="flex flex-1 items-center">
             <button
               type="button"
               onClick={() => setCollapsed((v) => !v)}
-              className="mr-4 flex items-center justify-center rounded-xl p-2 text-slate-600 transition-colors hover:bg-cyan-50 hover:text-cyan-800"
+              className="mr-4 flex items-center justify-center p-2 text-[#3f3a35] transition-colors hover:bg-[#f4efe6] hover:text-[#b42318]"
               aria-label="折叠侧栏"
             >
               {collapsed ? (
@@ -386,7 +388,7 @@ export default function MeooLayout() {
                   }
                 }}
                 placeholder="搜索功能、数据，或输入 AI 指令..."
-                className="w-full rounded-xl border border-slate-200/90 bg-slate-50/90 py-2.5 pl-10 pr-4 text-sm text-slate-800 placeholder:text-slate-400 focus:border-cyan-400/60 focus:outline-none focus:ring-4 focus:ring-cyan-500/15"
+                className="w-full rounded-[2px] border border-[#d4d0c8] bg-[#f4efe6] py-2.5 pl-10 pr-4 text-sm text-[#16141a] placeholder:text-[#6b6560] focus:border-[#b42318] focus:outline-none focus:ring-2 focus:ring-[rgba(180,35,24,0.16)]"
               />
             </div>
           </div>
@@ -435,7 +437,7 @@ export default function MeooLayout() {
                 onClick={() => setUserOpen((v) => !v)}
                 className="flex items-center space-x-3 rounded-xl border-l border-slate-200/90 py-2 pl-4 pr-2 transition-colors hover:bg-slate-50"
               >
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-teal-600 shadow-md shadow-cyan-900/20">
+                <div className="flex h-8 w-8 items-center justify-center bg-[#b42318]">
                   <User className="h-4 w-4 text-white" />
                 </div>
                 <div className="flex flex-col items-start">
@@ -463,7 +465,7 @@ export default function MeooLayout() {
                   >
                     <div className="border-b border-slate-100 px-4 py-3">
                       <div className="flex items-center space-x-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-teal-600 shadow-md">
+                        <div className="flex h-10 w-10 items-center justify-center bg-[#b42318]">
                           <User className="h-5 w-5 text-white" />
                         </div>
                         <div>
@@ -555,7 +557,7 @@ export default function MeooLayout() {
           </div>
         </main>
 
-        <footer className="shrink-0 border-t border-slate-200/80 bg-white/70 px-6 py-3 backdrop-blur-md">
+        <footer className="shrink-0 border-t border-[#d4d0c8] bg-[#fffdf9] px-6 py-3">
           <SiteIcpFooter />
         </footer>
       </div>
@@ -569,7 +571,7 @@ export default function MeooLayout() {
           onClick={() => setPersonalSettingsOpen(false)}
         >
           <div
-            className="max-h-[min(90vh,720px)] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200/90 bg-white p-6 shadow-2xl shadow-slate-900/15"
+            className="max-h-[min(90vh,720px)] w-full max-w-lg overflow-y-auto rounded-[2px] border border-[#d4d0c8] bg-[#fffdf9] p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between gap-3">
@@ -600,7 +602,7 @@ export default function MeooLayout() {
                     setPersonalSettingsOpen(false)
                     navigate({ pathname: '/settings', search: 'tab=accounts' })
                   }}
-                  className="mt-4 w-full rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 py-2.5 text-sm font-medium text-white transition hover:brightness-110"
+                  className="mt-4 w-full rounded-[2px] bg-[#16141a] py-2.5 text-sm font-medium text-white transition hover:bg-[#1c1814]"
                 >
                   前往系统设置
                 </button>

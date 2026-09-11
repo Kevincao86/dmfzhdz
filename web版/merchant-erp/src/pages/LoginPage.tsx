@@ -8,11 +8,11 @@ import { BRAND_LOGO_URL, BRAND_NAME, BRAND_NAME_SHORT } from '../lib/brand'
 import { supabase, supabaseConfigured, missingSupabaseClientEnvKeys } from '../lib/supabaseClient'
 import { captureDistributionRefFromSearch } from '../lib/pendingDistributionRef'
 import LoginAuthPanel from './login/LoginAuthPanel'
+import './landing/landingLook.css'
 
 const AUTH_SHELL = cn(
-  'relative w-full max-w-md rounded-[28px] border border-white/80 p-6 sm:p-8',
-  'bg-white/55 shadow-[0_8px_40px_-12px_rgba(15,23,42,0.12),inset_0_1px_0_rgba(255,255,255,0.9)]',
-  'backdrop-blur-2xl backdrop-saturate-150',
+  'relative w-full max-w-md border border-stone-300 bg-white p-6 sm:p-8',
+  'shadow-[0_12px_40px_-20px_rgba(22,20,26,0.28)]',
 )
 
 export default function LoginPage({ initialMode }: { initialMode?: 'login' | 'register' }) {
@@ -69,8 +69,8 @@ export default function LoginPage({ initialMode }: { initialMode?: 'login' | 're
     const missing = missingSupabaseClientEnvKeys()
     const site = isPartnerEdition() ? '服务商版（fws）' : '商家版（cs）'
     return (
-      <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-4 bg-[#f5f7fb] px-6 py-8 text-center">
-        <h1 className="text-lg font-semibold text-slate-800">登录服务未配置</h1>
+      <div className="lq-site flex min-h-[100dvh] flex-col items-center justify-center gap-4 bg-[var(--lq-paper)] px-6 py-8 text-center">
+        <h1 className="lq-serif text-lg text-[var(--lq-ink)]">登录服务未配置</h1>
         <p className="max-w-md text-sm leading-relaxed text-slate-500">
           当前 {site} 前端未拿到 Supabase 登录配置，且无法从 <code>/api/meoo-erp-client-config</code>{' '}
           拉取。请在 <strong>新ECS</strong> 构建前填写{' '}
@@ -92,7 +92,7 @@ export default function LoginPage({ initialMode }: { initialMode?: 'login' | 're
             MEOO_API_UPSTREAM=https://mofangdianai.com bash scripts/ecs-deploy-merchant-cs-web.sh
           </code>
         </p>
-        <Link to="/" className="text-sm text-cyan-700 hover:underline">
+        <Link to="/" className="text-sm text-[#8e1a12] hover:underline">
           返回首页
         </Link>
       </div>
@@ -102,25 +102,22 @@ export default function LoginPage({ initialMode }: { initialMode?: 'login' | 're
   return (
     <div
       className={cn(
-        'relative flex min-h-[100dvh] flex-col items-center justify-center overflow-x-hidden px-4 py-10 text-slate-900',
+        'lq-site relative flex min-h-[100dvh] flex-col items-center justify-center overflow-x-hidden px-4 py-10 text-[var(--lq-ink)]',
         'pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(0.5rem,env(safe-area-inset-top))]',
+        'bg-[var(--lq-paper)]',
       )}
-      style={{
-        background: `
-          radial-gradient(ellipse 75% 55% at 12% 18%, rgba(56, 189, 248, 0.14), transparent 55%),
-          radial-gradient(ellipse 65% 50% at 88% 82%, rgba(139, 92, 246, 0.12), transparent 50%),
-          linear-gradient(165deg, #f8fafc 0%, #eef4ff 42%, #f0fdfa 100%)
-        `,
-      }}
     >
       <header className="absolute left-0 right-0 top-[max(0.75rem,env(safe-area-inset-top))] z-10 px-4 sm:px-8">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
-          <LoginPortalNav />
+          <LoginPortalNav
+            linkClassName="text-stone-600 hover:text-[var(--lq-ink)]"
+            activeClassName="font-semibold text-[var(--lq-lacquer-deep)]"
+          />
           <Link
             to="/login"
-            className="rounded-full bg-gradient-to-r from-cyan-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-95"
+            className="lq-cta rounded-sm px-4 py-2 text-sm"
           >
-            登录
+            进店
           </Link>
         </div>
       </header>
@@ -128,20 +125,15 @@ export default function LoginPage({ initialMode }: { initialMode?: 'login' | 're
       <div className="mb-6 mt-14 flex items-center gap-3">
         <img src={BRAND_LOGO_URL} alt={BRAND_NAME} className="h-11 w-11 object-contain drop-shadow-sm" />
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-            LingQi · Local Life OS
+          <p className="lq-serif text-[10px] tracking-[0.16em] text-[var(--lq-brass-dim)]">
+            {BRAND_NAME_SHORT} · 本地生活
           </p>
-          <h1 className="text-lg font-bold text-slate-900">
-            {BRAND_NAME_SHORT}
-            <span className="bg-gradient-to-r from-cyan-600 to-violet-600 bg-clip-text text-transparent">
-              AI智能ERP
-            </span>
-          </h1>
+          <h1 className="lq-serif text-xl text-[var(--lq-ink)]">{BRAND_NAME}</h1>
         </div>
       </div>
 
       <div className={AUTH_SHELL}>
-        <div className="mb-4 inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-800">
+        <div className="mb-4 inline-flex items-center border border-[var(--lq-lacquer)]/25 bg-[var(--lq-steam)] px-3 py-1 text-xs text-[var(--lq-lacquer-deep)]">
           当前版本 · {editionLabel()}
         </div>
         <LoginAuthPanel

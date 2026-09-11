@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown } from 'lucide-react'
 import { cn } from '../cn'
 import { BRAND_LOGO_URL, BRAND_NAME_SHORT } from '../lib/brand'
 import { getAppEdition, isPartnerEdition, peerEditionRootUrl } from '../lib/appEdition'
@@ -15,6 +14,7 @@ import {
   getLandingConfig,
   type LandingEditionKey,
 } from './landing/landingConfig'
+import './landing/landingLook.css'
 
 const SECTION_COUNT = 4
 
@@ -56,8 +56,11 @@ export default function LandingPage() {
     window.location.href = peerEditionRootUrl()
   }
 
+  const featured = config.section2Cards[0]
+  const restCards = config.section2Cards.slice(1)
+
   return (
-    <div className="h-[100dvh] overflow-hidden bg-[#0a0f18] text-white">
+    <div className="lq-site h-[100dvh] overflow-hidden bg-[var(--lq-ink)] text-[var(--lq-steam)]">
       <div
         ref={scrollerRef}
         onScroll={onScroll}
@@ -65,45 +68,52 @@ export default function LandingPage() {
       >
         <section className="relative h-[100dvh] w-full shrink-0 snap-start snap-always">
           <LandingHeroBackground config={config} />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/78 via-black/30 to-black/45" />
+          <div className="lq-hero-veil absolute inset-0" />
 
           <header className="relative z-20 flex items-center justify-between px-6 py-5 sm:px-10 lg:px-14">
             <div className="flex items-center gap-3">
-              <img src={BRAND_LOGO_URL} alt={BRAND_NAME_SHORT} className="h-10 w-10 rounded-xl object-contain sm:h-11 sm:w-11" />
+              <img
+                src={BRAND_LOGO_URL}
+                alt={BRAND_NAME_SHORT}
+                className="h-10 w-10 rounded-sm object-contain sm:h-11 sm:w-11"
+              />
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/50">
-                  {config.brandTagline}
-                </p>
-                <p className="text-base font-bold sm:text-lg">{config.productTitle}</p>
+                <p className="lq-serif text-sm tracking-[0.12em] text-[var(--lq-brass)]">{BRAND_NAME_SHORT}</p>
+                <p className="hidden text-[13px] text-white/70 sm:block">{config.productTitle}</p>
               </div>
             </div>
-            <div className="flex items-center gap-4 sm:gap-6">
+            <div className="flex items-center gap-3 sm:gap-5">
+              <div className="hidden lg:block">
               <LoginPortalNav
-                linkClassName="text-white/70 hover:text-white"
-                activeClassName="text-white font-semibold"
+                linkClassName="text-white/65 hover:text-white"
+                activeClassName="text-[var(--lq-brass)] font-semibold"
               />
+              </div>
               <button
                 type="button"
                 onClick={() => (onSameEdition ? nav('/login') : goAuth())}
-                className="rounded-full bg-white px-6 py-2 text-sm font-semibold text-slate-900 shadow-lg transition hover:bg-white/95"
+                className="lq-cta rounded-sm px-5 py-2 text-sm"
               >
-                登录
+                进店
               </button>
             </div>
           </header>
 
-          <div className="pointer-events-none absolute bottom-28 left-6 z-10 max-w-xl sm:left-10 lg:left-14 lg:bottom-32">
-            <h1 className="text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
+          <p className="lq-plaque pointer-events-none absolute left-4 top-1/2 z-10 hidden -translate-y-1/2 py-6 text-2xl sm:left-8 sm:block lg:left-12 lg:text-3xl">
+            探店
+          </p>
+
+          <div className="pointer-events-none absolute bottom-36 left-6 z-10 max-w-xl sm:bottom-32 sm:left-24 lg:left-28">
+            <h1 className="lq-serif text-4xl font-semibold leading-[1.15] tracking-tight sm:text-5xl lg:text-[3.4rem]">
               {m.headline}
               <br />
-              <span className="text-white/95">好经营成就好增长</span>
+              好经营成就好增长
             </h1>
-            <p className="mt-4 text-sm text-white/75 sm:text-base">{m.sub}</p>
-            <p className="mt-2 font-serif text-2xl text-cyan-300/90 italic sm:text-3xl">{m.accentEn}</p>
+            <p className="mt-5 max-w-md text-[15px] leading-relaxed text-white/72">{m.sub}</p>
           </div>
 
-          <div className="absolute bottom-8 right-6 z-20 w-[min(100%,340px)] sm:right-10 lg:right-14">
-            <p className="mb-3 text-right text-xs text-white/60">{m.cta}</p>
+          <div className="absolute bottom-8 right-6 z-20 w-[min(100%,320px)] sm:right-10 lg:right-14">
+            <p className="mb-3 text-right text-xs text-white/55">{m.cta}</p>
             <EditionLandingToggle
               siteEdition={siteEdition}
               viewEdition={viewEdition}
@@ -112,17 +122,17 @@ export default function LandingPage() {
             <button
               type="button"
               onClick={goAuth}
-              className="mt-3 w-full rounded-xl bg-gradient-to-r from-cyan-600 via-blue-600 to-violet-600 py-3 text-sm font-semibold text-white shadow-lg transition hover:opacity-95"
+              className="lq-cta mt-3 w-full rounded-sm py-3 text-sm"
             >
               {onSameEdition
-                ? `以${EDITION_LABEL[viewEdition]}进入登录`
+                ? `以${EDITION_LABEL[viewEdition]}进店`
                 : `前往${EDITION_LABEL[viewEdition]}`}
             </button>
             {!isPartnerEdition() ? (
               <button
                 type="button"
                 onClick={() => nav('/affiliate/apply')}
-                className="mt-2 w-full rounded-xl border border-white/30 bg-white/10 py-2.5 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/15"
+                className="mt-2 w-full rounded-sm border border-[var(--lq-brass)]/45 bg-transparent py-2.5 text-sm text-[var(--lq-brass)] hover:bg-white/5"
               >
                 申请成为推广员
               </button>
@@ -131,122 +141,120 @@ export default function LandingPage() {
 
           <button
             type="button"
-            className="absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 flex-col items-center gap-1 text-xs text-white/70 hover:text-white"
+            className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2 text-[11px] tracking-[0.2em] text-white/50 hover:text-white/80"
             onClick={() => scrollToSection(scrollerRef.current, 1)}
           >
-            滑动了解更多
-            <ChevronDown className="h-4 w-4 animate-bounce" aria-hidden />
+            下滑
           </button>
         </section>
 
-        <section
-          className="relative flex h-[100dvh] shrink-0 snap-start snap-always flex-col items-center justify-center px-4 py-16 sm:px-8"
-          style={{
-            background: `
-              radial-gradient(ellipse 80% 60% at 20% 10%, rgba(186, 230, 253, 0.55), transparent),
-              radial-gradient(ellipse 70% 50% at 90% 90%, rgba(199, 210, 254, 0.45), transparent),
-              linear-gradient(180deg, #f8fafc 0%, #eef4ff 50%, #f0fdfa 100%)
-            `,
-          }}
-        >
-          <h2 className="max-w-4xl text-center text-2xl font-extrabold text-slate-900 sm:text-4xl">
-            {config.section2Title}
-            <span className="relative inline-block">
-              {config.section2TitleAccent}
-              <span
-                className="absolute -bottom-1 left-0 right-0 h-2 rounded-full bg-gradient-to-r from-cyan-400 to-violet-400 opacity-80"
-                aria-hidden
-              />
-            </span>
-          </h2>
-          <p className="mt-3 max-w-2xl text-center text-sm text-slate-600 sm:text-base">{config.section2Subtitle}</p>
-          <div className="mt-10 grid w-full max-w-6xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5">
-            {config.section2Cards.map((card) => (
-              <article
-                key={card.title}
-                className="flex flex-col overflow-hidden rounded-2xl border border-white/90 bg-white shadow-[0_12px_40px_-16px_rgba(15,23,42,0.12)] transition hover:-translate-y-0.5 hover:shadow-lg"
-              >
-                <div className="relative h-36 overflow-hidden bg-slate-100 sm:h-40">
-                  <WebStaticOssImage
-                    app="merchant"
-                    localPath={card.img}
-                    alt=""
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                  />
-                  <span className="absolute left-3 top-3 rounded-full bg-slate-900/75 px-2.5 py-0.5 text-[10px] font-semibold text-white">
-                    {card.tag}
-                  </span>
-                </div>
-                <div className="flex flex-1 flex-col p-4">
-                  <h3 className="text-base font-bold text-slate-900">{card.title}</h3>
-                  <p className="mt-2 text-xs leading-relaxed text-slate-600">{card.desc}</p>
-                </div>
-              </article>
-            ))}
+        <section className="relative flex h-[100dvh] shrink-0 snap-start snap-always flex-col justify-center bg-[var(--lq-paper)] px-4 py-12 text-[var(--lq-ink)] sm:px-10 lg:px-14">
+          <div className="mx-auto w-full max-w-6xl">
+            <h2 className="lq-serif text-3xl font-semibold sm:text-4xl">
+              {config.section2Title}
+              <span className="ml-1 decoration-[var(--lq-lacquer)] decoration-2 underline-offset-8 underline">
+                {config.section2TitleAccent}
+              </span>
+            </h2>
+            <p className="mt-3 max-w-xl text-sm leading-relaxed text-stone-600 sm:text-[15px]">
+              {config.section2Subtitle}
+            </p>
+            <div className="mt-8 grid gap-4 lg:grid-cols-[1.15fr_0.85fr] lg:gap-5">
+              {featured ? (
+                <article className="overflow-hidden border border-stone-300 bg-white">
+                  <div className="relative h-48 bg-stone-200 sm:h-56 lg:h-[22rem]">
+                    <WebStaticOssImage
+                      app="merchant"
+                      localPath={featured.img}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                    <span className="absolute left-0 top-0 bg-[var(--lq-lacquer)] px-3 py-1 text-[11px] text-white">
+                      {featured.tag}
+                    </span>
+                  </div>
+                  <div className="p-5">
+                    <h3 className="lq-serif text-xl">{featured.title}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-stone-600">{featured.desc}</p>
+                  </div>
+                </article>
+              ) : null}
+              <div className="flex flex-col gap-4">
+                {restCards.map((card) => (
+                  <article
+                    key={card.title}
+                    className="flex min-h-0 flex-1 overflow-hidden border border-stone-300 bg-white"
+                  >
+                    <div className="relative w-[38%] shrink-0 bg-stone-200">
+                      <WebStaticOssImage
+                        app="merchant"
+                        localPath={card.img}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                    </div>
+                    <div className="flex flex-1 flex-col justify-center p-4">
+                      <p className="text-[11px] text-[var(--lq-lacquer)]">{card.tag}</p>
+                      <h3 className="lq-serif mt-1 text-base">{card.title}</h3>
+                      <p className="mt-1 text-xs leading-relaxed text-stone-600">{card.desc}</p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
 
         <LandingSection3 config={config} />
 
-        <section className="relative flex h-[100dvh] shrink-0 snap-start snap-always items-center overflow-hidden px-4 py-12 sm:px-8 lg:px-12">
-          <div
-            className="pointer-events-none absolute inset-0"
-            aria-hidden
-            style={{
-              background: 'linear-gradient(135deg, #0c1222 0%, #152238 50%, #0f172a 100%)',
-            }}
-          />
-          <div className="relative z-10 mx-auto grid w-full max-w-6xl grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] lg:items-center">
+        <section className="relative flex h-[100dvh] shrink-0 snap-start snap-always items-center overflow-hidden bg-[var(--lq-night)] px-4 py-12 sm:px-10 lg:px-14">
+          <div className="relative z-10 mx-auto grid w-full max-w-6xl grid-cols-1 gap-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-center">
             <div>
-              <h2 className="text-2xl font-extrabold leading-snug sm:text-3xl">
+              <h2 className="lq-serif text-3xl font-semibold leading-snug sm:text-4xl">
                 {config.section4Title}
                 <br />
-                <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-violet-400 bg-clip-text text-transparent">
-                  {config.section4TitleAccent}
-                </span>
+                <span className="text-[var(--lq-brass)]">{config.section4TitleAccent}</span>
               </h2>
-              <ul className="mt-8 space-y-4">
+              <ol className="mt-8 space-y-0 border-l border-[var(--lq-brass)]/40 pl-5">
                 {config.section4Steps.map((s) => (
                   <li
                     key={s.n}
-                    className={cn('flex items-center gap-3 text-sm', s.active ? 'text-white' : 'text-white/40')}
+                    className={cn(
+                      'relative py-3 text-sm',
+                      s.active ? 'text-[var(--lq-steam)]' : 'text-white/35',
+                    )}
                   >
                     <span
                       className={cn(
-                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-bold',
-                        s.active ? 'border-cyan-400 bg-cyan-500/20 text-cyan-200' : 'border-white/20',
+                        'absolute -left-[1.4rem] top-4 h-2 w-2 rounded-full',
+                        s.active ? 'bg-[var(--lq-brass)]' : 'bg-white/25',
                       )}
-                    >
-                      {s.n}
-                    </span>
+                    />
                     {s.title}
                   </li>
                 ))}
-              </ul>
-              <button
-                type="button"
-                onClick={() => nav('/login')}
-                className="mt-8 rounded-full bg-white px-8 py-2.5 text-sm font-semibold text-slate-900 hover:bg-white/90"
-              >
-                立即登录
+              </ol>
+              <button type="button" onClick={() => nav('/login')} className="lq-cta mt-8 rounded-sm px-8 py-2.5 text-sm">
+                进店登录
               </button>
             </div>
-            <div className="overflow-hidden rounded-3xl border border-white/10 bg-black/30 p-4 shadow-2xl backdrop-blur-sm sm:p-6">
-              <h3 className="text-lg font-bold">{config.section4PanelTitle}</h3>
-              <p className="mt-2 text-sm text-white/65">{config.section4PanelDesc}</p>
+            <div className="border border-[var(--lq-brass)]/25 bg-black/25 p-4 sm:p-6">
+              <h3 className="lq-serif text-xl">{config.section4PanelTitle}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-white/60">{config.section4PanelDesc}</p>
               <WebStaticOssImage
                 app="merchant"
                 localPath={config.section4ShowcaseImg}
                 alt=""
-                className="mt-4 w-full rounded-2xl object-cover"
+                className="mt-4 w-full object-cover"
                 loading="lazy"
               />
               <div className="mt-4 flex flex-wrap gap-2">
                 {config.section4Tags.map((tag) => (
                   <span
                     key={tag}
-                    className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/80"
+                    className="border border-[var(--lq-brass)]/35 px-3 py-1 text-xs text-[var(--lq-brass)]"
                   >
                     {tag}
                   </span>
@@ -269,8 +277,8 @@ export default function LandingPage() {
             aria-current={activeSection === i ? 'true' : undefined}
             onClick={() => scrollToSection(scrollerRef.current, i)}
             className={cn(
-              'h-2.5 w-2.5 rounded-full transition-all',
-              activeSection === i ? 'scale-125 bg-cyan-400' : 'bg-white/35 hover:bg-white/60',
+              'h-2 w-2 rounded-full',
+              activeSection === i ? 'bg-[var(--lq-brass)]' : 'bg-white/30 hover:bg-white/55',
             )}
           />
         ))}

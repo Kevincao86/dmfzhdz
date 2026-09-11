@@ -29,7 +29,7 @@ export default function LoginPortalNav({ className, linkClassName, activeClassNa
             to={item.to}
             className={cn(
               'text-sm font-medium transition-colors',
-              active ? activeClassName ?? 'text-cyan-700' : linkClassName ?? 'text-slate-600 hover:text-slate-900',
+              active ? activeClassName ?? 'text-[#8e1a12]' : linkClassName ?? 'text-slate-600 hover:text-slate-900',
             )}
           >
             {item.label}

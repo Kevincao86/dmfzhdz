@@ -16,10 +16,10 @@ export default function EditionLandingToggle({
   onViewEditionChange,
   className = '',
 }: Props) {
-  const track = cn('flex gap-1 rounded-xl border border-white/20 bg-black/35 p-1 backdrop-blur-md', className)
+  const track = cn('flex gap-1 border border-[var(--lq-brass)]/40 bg-black/40 p-1', className)
   const off = 'text-white/55 hover:text-white/90'
-  const merchantOn = 'bg-white text-cyan-800 shadow-sm'
-  const partnerOn = 'bg-white text-violet-800 shadow-sm'
+  const merchantOn = 'bg-[var(--lq-steam)] text-[var(--lq-ink)]'
+  const partnerOn = 'bg-[var(--lq-steam)] text-[var(--lq-ink)]'
 
   return (
     <div className={track}>
@@ -28,7 +28,7 @@ export default function EditionLandingToggle({
           key={e}
           type="button"
           className={cn(
-            'flex-1 rounded-lg py-2 text-sm font-medium transition-colors',
+            'flex-1 rounded-sm py-2 text-sm font-medium transition-colors',
             viewEdition === e ? (e === 'merchant' ? merchantOn : partnerOn) : off,
           )}
           onClick={() => onViewEditionChange(e)}

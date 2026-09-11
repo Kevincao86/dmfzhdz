@@ -1,0 +1,56 @@
+/* 落地页 / 登录页：店招红 + 黄铜，避开紫青渐变 SaaS 脸 */
+.lq-site {
+  --lq-ink: #16141a;
+  --lq-night: #1c1814;
+  --lq-paper: #eef0f2;
+  --lq-lacquer: #b42318;
+  --lq-lacquer-deep: #8e1a12;
+  --lq-brass: #c9a227;
+  --lq-brass-dim: #8a7018;
+  --lq-steam: #f4efe6;
+  --lq-serif: 'Noto Serif SC', 'Songti SC', serif;
+  --lq-sans: 'DM Sans', 'Noto Sans SC', system-ui, sans-serif;
+  font-family: var(--lq-sans);
+}
+
+.lq-serif {
+  font-family: var(--lq-serif);
+}
+
+.lq-cta {
+  background: var(--lq-lacquer);
+  color: #fffaf5;
+  font-weight: 600;
+  transition: background 0.15s ease;
+}
+
+.lq-cta:hover {
+  background: var(--lq-lacquer-deep);
+}
+
+.lq-cta:focus-visible {
+  outline: 2px solid var(--lq-brass);
+  outline-offset: 3px;
+}
+
+.lq-hero-veil {
+  background:
+    linear-gradient(90deg, rgba(22, 20, 26, 0.42) 0%, rgba(22, 20, 26, 0.08) 52%, rgba(22, 20, 26, 0.18) 100%),
+    linear-gradient(180deg, rgba(22, 20, 26, 0.28) 0%, transparent 38%, rgba(22, 20, 26, 0.55) 100%);
+}
+
+.lq-plaque {
+  writing-mode: vertical-rl;
+  font-family: var(--lq-serif);
+  letter-spacing: 0.28em;
+  color: var(--lq-brass);
+  border-left: 1px solid var(--lq-brass);
+  border-right: 1px solid var(--lq-brass);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lq-site * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
