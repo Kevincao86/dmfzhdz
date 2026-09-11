@@ -56,6 +56,7 @@ list_scopes() {
   mp_hall_list_full    星选大厅招募单列表完整展示（瘦身 1MB 截断）
   merchant_landing_hero 商家落地页首屏图空白补全（平板工作台 / 全息文案）
   cs_web_beautify      商家 CS 全站视觉（落地+登录+工作台壳层/内页主题，不部署）
+  merchant_simple_ui   商家 CS 精简版：今天待办 + 侧栏收口（不改详细版 IA）
   knowledge_base       知识库（运营全局 + 商家/FWS 租户 + AI 投喂）
   merchant_brief_direct 商家 ERP：Brief 去订单直接生成 + 短视频观感打磨
   merchant_jimeng_studio 商家 ERP：即梦式短视频台（Skill/画布/短片/案例）+ 全站 UI token
@@ -667,6 +668,13 @@ PAT
       cat <<'PAT'
 landing-merchant
 webStaticOssAssets
+change-scope-guard
+PAT
+      ;;
+    merchant_simple_ui)
+      cat <<'PAT'
+web版/merchant-erp/src/config/nav.ts
+web版/merchant-erp/src/pages/HomeDashboard.tsx
 change-scope-guard
 PAT
       ;;

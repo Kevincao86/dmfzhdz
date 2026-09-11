@@ -62,11 +62,11 @@ const QUICK: {
   { title: '线索管理', path: '/leads', color: 'bg-blue-500', icon: UserPlus },
 ]
 
-const SIMPLE_HOME_LINKS: { title: string; hint: string; path: string }[] = [
+const SIMPLE_HOME_NEXT: { title: string; hint: string; path: string }[] = [
   { title: '上架套餐', hint: '把团购套餐上到平台', path: '/products' },
   { title: '找人拍探店', hint: '发招募，让达人来拍', path: '/recruitment' },
+  { title: '做探店短片', hint: '按门店出短片', path: '/ai-operation/video-check' },
   { title: '出镜口播', hint: '数字人讲套餐', path: '/ai-operation/digital-human' },
-  { title: '做探店视频', hint: '按门店出短片', path: '/ai-operation/video-check' },
 ]
 
 const TIME_FILTERS = [
@@ -215,7 +215,7 @@ function MerchantHomeDashboard() {
     return (
       <div className="space-y-8">
         <div className="flex h-24 flex-col items-center justify-center gap-3 text-slate-500">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#b42318] border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
           <span className="text-sm font-medium">加载经营数据…</span>
         </div>
         <div
@@ -241,13 +241,43 @@ function MerchantHomeDashboard() {
       (sum, p) => sum + Math.max(0, p.payAmount - p.verifyAmount),
       0,
     )
+    const connectedCount = probeRows.filter((p) => p.status === 'connected').length
+    const todos: { title: string; hint: string; path: string }[] = []
+    if (connectedCount === 0) {
+      todos.push({
+        title: '连接平台门店',
+        hint: '先绑来客或美团，才能看今天卖了多少',
+        path: '/settings?tab=platforms',
+      })
+    }
+    if (pendingVerify > 0.005) {
+      todos.push({
+        title: '待核销',
+        hint: formatMoney(pendingVerify),
+        path: '/finance',
+      })
+    }
+    if (stats.pendingComments > 0) {
+      todos.push({
+        title: '差评未回',
+        hint: `${formatNum(stats.pendingComments)} 条`,
+        path: '/reviews',
+      })
+    }
+    if (stats.todayNewLeads > 0) {
+      todos.push({
+        title: '今日新线索',
+        hint: `${formatNum(stats.todayNewLeads)} 条，跟进后不容易丢客`,
+        path: '/leads',
+      })
+    }
     return (
       <div className="space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="relative pl-4">
-            <span className="absolute left-0 top-1 h-[calc(100%-4px)] w-1 bg-[#c9a227]" aria-hidden />
+            <span className="absolute left-0 top-1 h-[calc(100%-4px)] w-1 rounded-full bg-gradient-to-b from-cyan-500 to-orange-400" aria-hidden />
             <h1 className="erp-page-title">今天</h1>
-            <p className="mt-1 text-sm text-slate-600">先看这三件事，其它数据可随时切回详细版</p>
+            <p className="mt-1 text-sm text-slate-600">先清待办，再去做上架、探店和视频</p>
           </div>
           <span className="text-xs text-slate-500">
             {statsLoading ? '正在刷新数据…' : `更新于 ${new Date().toLocaleString('zh-CN')}`}
@@ -269,26 +299,52 @@ function MerchantHomeDashboard() {
           ))}
         </div>
 
-        <div className="erp-panel divide-y divide-slate-100 overflow-hidden">
-          {SIMPLE_HOME_LINKS.map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className="flex items-center justify-between px-5 py-3.5 text-sm transition-colors hover:bg-slate-50"
-            >
-              <span>
-                <span className="font-medium text-slate-800">{item.title}</span>
-                <span className="ml-2 text-slate-500">{item.hint}</span>
-              </span>
-              <ChevronRight className="h-4 w-4 text-slate-400" />
-            </Link>
-          ))}
+        <div>
+          <h2 className="mb-2 text-sm font-semibold text-slate-800">待办</h2>
+          <div className="erp-panel divide-y divide-slate-100 overflow-hidden">
+            {todos.length === 0 ? (
+              <p className="px-5 py-4 text-sm text-slate-500">今天没有待办。下面四件事做一件，店就在转。</p>
+            ) : (
+              todos.map((item) => (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className="flex items-center justify-between px-5 py-3.5 text-sm transition-colors hover:bg-slate-50"
+                >
+                  <span>
+                    <span className="font-medium text-slate-800">{item.title}</span>
+                    <span className="ml-2 text-slate-500">{item.hint}</span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-slate-400" />
+                </Link>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div>
+          <h2 className="mb-2 text-sm font-semibold text-slate-800">去做</h2>
+          <div className="erp-panel divide-y divide-slate-100 overflow-hidden">
+            {SIMPLE_HOME_NEXT.map((item) => (
+              <Link
+                key={item.path}
+                to={item.path}
+                className="flex items-center justify-between px-5 py-3.5 text-sm transition-colors hover:bg-slate-50"
+              >
+                <span>
+                  <span className="font-medium text-slate-800">{item.title}</span>
+                  <span className="ml-2 text-slate-500">{item.hint}</span>
+                </span>
+                <ChevronRight className="h-4 w-4 text-slate-400" />
+              </Link>
+            ))}
+          </div>
         </div>
 
         <button
           type="button"
           onClick={() => setUiDensity('detailed')}
-          className="text-sm text-[#8e1a12] hover:underline"
+          className="text-sm text-cyan-700 hover:underline"
         >
           看完整数据
         </button>
@@ -300,11 +356,11 @@ function MerchantHomeDashboard() {
     <div className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="relative pl-4">
-          <span className="absolute left-0 top-1 h-[calc(100%-4px)] w-1 bg-[#c9a227]" aria-hidden />
+          <span className="absolute left-0 top-1 h-[calc(100%-4px)] w-1 rounded-full bg-gradient-to-b from-cyan-500 to-orange-400" aria-hidden />
           <h1 className="erp-page-title">数据看板</h1>
           <p className="mt-1 text-sm text-slate-600">本地生活全渠道经营概览</p>
         </div>
-        <span className="border border-[#d4d0c8] bg-[#fffdf9] px-4 py-1.5 text-xs font-medium text-[#6b6560]">
+        <span className="rounded-full border border-slate-200/90 bg-white/80 px-4 py-1.5 text-xs font-medium text-slate-600 shadow-sm backdrop-blur-sm">
           {statsLoading ? '正在刷新数据…' : `更新于 ${new Date().toLocaleString('zh-CN')}`}
         </span>
       </div>
@@ -312,12 +368,12 @@ function MerchantHomeDashboard() {
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-6 lg:grid-cols-3">
         {(
           [
-            { label: '总营收', value: formatMoney(stats.totalRevenue), icon: Wallet, tone: 'ink' },
-            { label: '订单数', value: formatNum(stats.totalOrders), icon: ShoppingCart, tone: 'ink' },
-            { label: '转化率', value: `${stats.conversionRate}%`, icon: Percent, tone: 'brass' },
-            { label: '粉丝增长', value: `+${formatNum(stats.fansGrowth)}`, icon: Users, tone: 'brass' },
-            { label: '今日新线索', value: stats.todayNewLeads, icon: UserPlus, tone: 'lacquer' },
-            { label: '待处理评论', value: stats.pendingComments, icon: MessageSquare, tone: 'lacquer' },
+            { label: '总营收', value: formatMoney(stats.totalRevenue), icon: Wallet, color: 'blue' },
+            { label: '订单数', value: formatNum(stats.totalOrders), icon: ShoppingCart, color: 'green' },
+            { label: '转化率', value: `${stats.conversionRate}%`, icon: Percent, color: 'purple' },
+            { label: '粉丝增长', value: `+${formatNum(stats.fansGrowth)}`, icon: Users, color: 'pink' },
+            { label: '今日新线索', value: stats.todayNewLeads, icon: UserPlus, color: 'orange' },
+            { label: '待处理评论', value: stats.pendingComments, icon: MessageSquare, color: 'red' },
           ] as const
         ).map((card, idx) => (
           <motion.div
@@ -331,13 +387,26 @@ function MerchantHomeDashboard() {
               <span className="text-sm text-gray-500">{card.label}</span>
               <div
                 className={cn(
-                  'flex h-8 w-8 items-center justify-center',
-                  card.tone === 'ink' && 'bg-[#16141a]',
-                  card.tone === 'brass' && 'bg-[#c9a227]',
-                  card.tone === 'lacquer' && 'bg-[#b42318]',
+                  'flex h-8 w-8 items-center justify-center rounded-lg',
+                  card.color === 'blue' && 'bg-blue-50',
+                  card.color === 'green' && 'bg-green-50',
+                  card.color === 'purple' && 'bg-purple-50',
+                  card.color === 'pink' && 'bg-pink-50',
+                  card.color === 'orange' && 'bg-orange-50',
+                  card.color === 'red' && 'bg-red-50',
                 )}
               >
-                <card.icon className="h-4 w-4 text-[#fffaf5]" />
+                <card.icon
+                  className={cn(
+                    'h-4 w-4',
+                    card.color === 'blue' && 'text-blue-600',
+                    card.color === 'green' && 'text-green-600',
+                    card.color === 'purple' && 'text-purple-600',
+                    card.color === 'pink' && 'text-pink-600',
+                    card.color === 'orange' && 'text-orange-600',
+                    card.color === 'red' && 'text-red-600',
+                  )}
+                />
               </div>
             </div>
             <div className="text-2xl font-bold tabular-nums text-slate-900">{card.value}</div>
@@ -389,7 +458,7 @@ function MerchantHomeDashboard() {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.1 * idx }}
-                className="group relative cursor-pointer border border-[#d4d0c8] bg-[#fffdf9] p-5"
+                className="group relative cursor-pointer rounded-xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-5 transition-all hover:shadow-lg"
               >
                 <div className="mb-4 flex items-center justify-between">
                   <div className="flex items-center">

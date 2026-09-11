@@ -203,9 +203,15 @@ const SIMPLE_PRIMARY_PATHS = new Set([
   '/products',
   '/recruitment',
   '/ai-operation/digital-human',
-  '/ai-operation/short-drama',
   '/ai-operation/video-check',
   '/reviews',
+])
+
+/** 精简版「更多」不再并列：知识库/方案/Brief 走问灵祺；短剧仍可从更多进入 */
+const SIMPLE_MORE_HIDDEN_PATHS = new Set([
+  '/knowledge-base',
+  '/operation/ai-ops-plan',
+  '/ai-operation/content',
 ])
 
 function densityMap(raw: string | null): Record<string, MerchantUiDensity> {
@@ -242,7 +248,7 @@ function leftoverMoreChildren(fullNav: NavItem[]): NavChild[] {
   const out: NavChild[] = []
   const seen = new Set<string>()
   const push = (path: string, label: string) => {
-    if (SIMPLE_PRIMARY_PATHS.has(path) || seen.has(path)) return
+    if (SIMPLE_PRIMARY_PATHS.has(path) || SIMPLE_MORE_HIDDEN_PATHS.has(path) || seen.has(path)) return
     seen.add(path)
     out.push({ path, label })
   }
@@ -269,9 +275,8 @@ export function buildSimpleNavItems(fullNav: NavItem[]): NavItem[] {
       label: '做视频',
       icon: Sparkles,
       children: [
-        { path: '/ai-operation/digital-human', label: '出镜口播' },
-        { path: '/ai-operation/short-drama', label: 'AI短剧' },
         { path: '/ai-operation/video-check', label: '探店短片' },
+        { path: '/ai-operation/digital-human', label: '出镜口播' },
       ],
     },
     { path: '/reviews', label: '看评价', icon: MessageSquare },
