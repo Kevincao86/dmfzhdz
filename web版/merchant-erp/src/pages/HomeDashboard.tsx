@@ -62,11 +62,11 @@ const QUICK: {
   { title: '线索管理', path: '/leads', color: 'bg-blue-500', icon: UserPlus },
 ]
 
-const SIMPLE_HOME_NEXT: { title: string; hint: string; path: string }[] = [
+const SIMPLE_HOME_LINKS: { title: string; hint: string; path: string }[] = [
   { title: '上架套餐', hint: '把团购套餐上到平台', path: '/products' },
   { title: '找人拍探店', hint: '发招募，让达人来拍', path: '/recruitment' },
-  { title: '做探店短片', hint: '按门店出短片', path: '/ai-operation/video-check' },
   { title: '出镜口播', hint: '数字人讲套餐', path: '/ai-operation/digital-human' },
+  { title: '做探店视频', hint: '按门店出短片', path: '/ai-operation/video-check' },
 ]
 
 const TIME_FILTERS = [
@@ -241,43 +241,13 @@ function MerchantHomeDashboard() {
       (sum, p) => sum + Math.max(0, p.payAmount - p.verifyAmount),
       0,
     )
-    const connectedCount = probeRows.filter((p) => p.status === 'connected').length
-    const todos: { title: string; hint: string; path: string }[] = []
-    if (connectedCount === 0) {
-      todos.push({
-        title: '连接平台门店',
-        hint: '先绑来客或美团，才能看今天卖了多少',
-        path: '/settings?tab=platforms',
-      })
-    }
-    if (pendingVerify > 0.005) {
-      todos.push({
-        title: '待核销',
-        hint: formatMoney(pendingVerify),
-        path: '/finance',
-      })
-    }
-    if (stats.pendingComments > 0) {
-      todos.push({
-        title: '差评未回',
-        hint: `${formatNum(stats.pendingComments)} 条`,
-        path: '/reviews',
-      })
-    }
-    if (stats.todayNewLeads > 0) {
-      todos.push({
-        title: '今日新线索',
-        hint: `${formatNum(stats.todayNewLeads)} 条，跟进后不容易丢客`,
-        path: '/leads',
-      })
-    }
     return (
       <div className="space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="relative pl-4">
             <span className="absolute left-0 top-1 h-[calc(100%-4px)] w-1 rounded-full bg-gradient-to-b from-cyan-500 to-orange-400" aria-hidden />
             <h1 className="erp-page-title">今天</h1>
-            <p className="mt-1 text-sm text-slate-600">先清待办，再去做上架、探店和视频</p>
+            <p className="mt-1 text-sm text-slate-600">先看这三件事，其它数据可随时切回详细版</p>
           </div>
           <span className="text-xs text-slate-500">
             {statsLoading ? '正在刷新数据…' : `更新于 ${new Date().toLocaleString('zh-CN')}`}
@@ -299,46 +269,20 @@ function MerchantHomeDashboard() {
           ))}
         </div>
 
-        <div>
-          <h2 className="mb-2 text-sm font-semibold text-slate-800">待办</h2>
-          <div className="erp-panel divide-y divide-slate-100 overflow-hidden">
-            {todos.length === 0 ? (
-              <p className="px-5 py-4 text-sm text-slate-500">今天没有待办。下面四件事做一件，店就在转。</p>
-            ) : (
-              todos.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className="flex items-center justify-between px-5 py-3.5 text-sm transition-colors hover:bg-slate-50"
-                >
-                  <span>
-                    <span className="font-medium text-slate-800">{item.title}</span>
-                    <span className="ml-2 text-slate-500">{item.hint}</span>
-                  </span>
-                  <ChevronRight className="h-4 w-4 text-slate-400" />
-                </Link>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div>
-          <h2 className="mb-2 text-sm font-semibold text-slate-800">去做</h2>
-          <div className="erp-panel divide-y divide-slate-100 overflow-hidden">
-            {SIMPLE_HOME_NEXT.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                className="flex items-center justify-between px-5 py-3.5 text-sm transition-colors hover:bg-slate-50"
-              >
-                <span>
-                  <span className="font-medium text-slate-800">{item.title}</span>
-                  <span className="ml-2 text-slate-500">{item.hint}</span>
-                </span>
-                <ChevronRight className="h-4 w-4 text-slate-400" />
-              </Link>
-            ))}
-          </div>
+        <div className="erp-panel divide-y divide-slate-100 overflow-hidden">
+          {SIMPLE_HOME_LINKS.map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              className="flex items-center justify-between px-5 py-3.5 text-sm transition-colors hover:bg-slate-50"
+            >
+              <span>
+                <span className="font-medium text-slate-800">{item.title}</span>
+                <span className="ml-2 text-slate-500">{item.hint}</span>
+              </span>
+              <ChevronRight className="h-4 w-4 text-slate-400" />
+            </Link>
+          ))}
         </div>
 
         <button

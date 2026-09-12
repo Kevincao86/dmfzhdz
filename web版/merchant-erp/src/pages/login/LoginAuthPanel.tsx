@@ -29,7 +29,7 @@ type AuthMode = 'login' | 'register'
 type LoginMethod = 'password' | 'sms' | 'scan'
 
 const inputClass =
-  'w-full rounded-sm border border-stone-300 bg-white px-4 py-3 text-base text-slate-900 outline-none placeholder:text-slate-400 focus:border-[#b42318] focus:ring-2 focus:ring-[#b42318]/15 sm:text-sm'
+  'w-full rounded-xl border border-white/60 bg-white/55 px-4 py-3 text-base text-slate-900 outline-none backdrop-blur-sm placeholder:text-slate-400 focus:border-cyan-300/80 focus:bg-white/80 focus:ring-2 focus:ring-cyan-500/20 sm:text-sm'
 
 const labelClass = 'mb-1.5 block text-sm font-medium text-slate-700'
 
@@ -331,10 +331,10 @@ export default function LoginAuthPanel({
   }
 
   const primaryBtn =
-    'w-full rounded-sm bg-[#b42318] py-3.5 text-sm font-semibold text-white transition hover:bg-[#8e1a12] disabled:opacity-60'
+    'w-full rounded-xl bg-gradient-to-r from-[#0ea5e9] to-[#14b8a6] py-3.5 text-sm font-semibold text-white shadow-[0_8px_24px_-6px_rgba(14,165,233,0.45)] transition hover:shadow-[0_12px_28px_-6px_rgba(14,165,233,0.5)] disabled:opacity-60'
 
   const smsBtn =
-    'shrink-0 rounded-sm border border-stone-300 bg-white px-3 py-3 text-xs font-semibold text-[#8e1a12] hover:bg-stone-50 disabled:opacity-50 sm:px-4 sm:text-sm'
+    'shrink-0 rounded-xl border border-white/70 bg-white/60 px-3 py-3 text-xs font-semibold text-cyan-700 backdrop-blur-sm hover:bg-white/80 disabled:opacity-50 sm:px-4 sm:text-sm'
 
   return (
     <div className="relative w-full">
@@ -363,7 +363,7 @@ export default function LoginAuthPanel({
           >
             登录
             {mode === 'login' ? (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#b42318]" />
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-gradient-to-r from-cyan-500 to-teal-500" />
             ) : null}
           </button>
           <button
@@ -376,7 +376,7 @@ export default function LoginAuthPanel({
           >
             注册
             {mode === 'register' ? (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#b42318]" />
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-gradient-to-r from-cyan-500 to-teal-500" />
             ) : null}
           </button>
         </div>
@@ -396,7 +396,7 @@ export default function LoginAuthPanel({
       <div>
         <div className="mb-5 flex items-center gap-3 rounded-2xl border border-white/50 bg-white/40 px-4 py-3 backdrop-blur-sm">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/60 bg-white/70 shadow-sm">
-            <ShieldCheck className="h-5 w-5 text-[#b42318]" />
+            <ShieldCheck className="h-5 w-5 text-cyan-600" />
           </div>
           <div className="min-w-0 text-left">
             <p className="text-sm font-semibold text-slate-800">安全可信</p>
@@ -407,7 +407,7 @@ export default function LoginAuthPanel({
         </div>
 
         {infoHint ? (
-          <p className="mb-4 border border-[#b42318]/20 bg-[#f4efe6] px-3 py-2.5 text-center text-sm text-[#16141a]">
+          <p className="mb-4 rounded-xl border border-cyan-200/80 bg-cyan-50 px-3 py-2.5 text-center text-sm text-cyan-950">
             {infoHint}
           </p>
         ) : null}
@@ -430,7 +430,7 @@ export default function LoginAuthPanel({
               >
                 账号密码
                 {loginMethod === 'password' ? (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#b42318]" />
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-cyan-500" />
                 ) : null}
               </button>
               <button
@@ -463,7 +463,7 @@ export default function LoginAuthPanel({
               >
                 扫码登录
                 {loginMethod === 'scan' ? (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#b42318]" />
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-cyan-500" />
                 ) : null}
               </button>
             </div>
@@ -499,7 +499,7 @@ export default function LoginAuthPanel({
                     忘记密码？
                     <button
                       type="button"
-                      className="ml-1 font-medium text-[#8e1a12] underline-offset-2 hover:underline"
+                      className="ml-1 font-medium text-cyan-700 underline-offset-2 hover:underline"
                       onClick={() => {
                         setLoginMethod('sms')
                         onErr(null)
