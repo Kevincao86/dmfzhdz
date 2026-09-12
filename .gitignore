@@ -53,3 +53,13 @@ tools/Seedance-Product-Video/
 tools/seedance2-prompt-skill/
 tools/Seedance2-skill/
 tools/ai-image-prompts-skill/
+
+# 文档与素材仅本机，不推 GitHub / Gitee（各端 public、小程序 images 仍跟踪）
+docs/
+商业BP/
+公众号首发文章/
+营销素材/
+调研报告/
+页面/
+videos/
+.media/

@@ -27,6 +27,10 @@ if [[ -n "$(git status --porcelain -uno)" ]]; then
   echo "WARN: 工作区有未提交改动（仍将推送已提交的 commit）"
   git status -sb
 fi
+
+if [[ -f "$ROOT/scripts/git-push-code-only-guard.sh" ]]; then
+  bash "$ROOT/scripts/git-push-code-only-guard.sh"
+fi
 AHEAD="$(git rev-list --count @{u}..HEAD 2>/dev/null || echo 0)"
 if [[ "${AHEAD:-0}" -eq 0 ]]; then
   echo "本地 main 与 @{u} 无待推送 commit，跳过 push"

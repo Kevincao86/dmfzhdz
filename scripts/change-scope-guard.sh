@@ -57,6 +57,7 @@ list_scopes() {
   merchant_landing_hero 商家落地页首屏图空白补全（平板工作台 / 全息文案）
   cs_web_beautify      商家 CS 全站视觉（落地+登录+工作台壳层/内页主题，不部署）
   merchant_simple_ui   商家 CS 精简版：今天待办 + 侧栏收口（不改详细版 IA）
+  git_code_only      远程只推代码：文档/素材 gitignore + 推送门禁（不改业务功能）
   knowledge_base       知识库（运营全局 + 商家/FWS 租户 + AI 投喂）
   merchant_brief_direct 商家 ERP：Brief 去订单直接生成 + 短视频观感打磨
   merchant_jimeng_studio 商家 ERP：即梦式短视频台（Skill/画布/短片/案例）+ 全站 UI token
@@ -676,6 +677,22 @@ PAT
 web版/merchant-erp/src/config/nav.ts
 web版/merchant-erp/src/pages/HomeDashboard.tsx
 change-scope-guard
+PAT
+      ;;
+    git_code_only)
+      cat <<'PAT'
+.gitignore
+scripts/git-push-both.sh
+scripts/git-push-code-only-guard.sh
+change-scope-guard
+docs/
+商业BP/
+公众号首发文章/
+营销素材/
+调研报告/
+页面/
+videos/
+.media/
 PAT
       ;;
     cs_web_beautify)
