@@ -62,7 +62,7 @@ import {
 import { readPrProfile } from '../../lib/mpSync/userProfile'
 import { canUseTargetedRecruit } from '../../lib/mpSync/mpTargetedRecruitAccess'
 import { INVITE_HOUR_OPTIONS, RECRUIT_CHANNELS } from '../../lib/mpSync/mpTargetedRecruit'
-import { readImageFileAsDataUrl } from '../../lib/mpSync/mpGroupQr'
+import { readImageFileAsDataUrl, patchGroupQrImage } from '../../lib/mpSync/mpGroupQr'
 import {
   BtnOutline,
   BtnPrimary,
@@ -388,6 +388,9 @@ export default function PublishWizard() {
       } else {
         await appendMpRecruitmentOrder(order)
         clearMpRegistryCache()
+        if (order.fulfillmentLoop === 'open' && String(form.groupQrImage || '').trim()) {
+          await patchGroupQrImage(String(order.id), form.groupQrImage || '')
+        }
         if (isTargetedRecruit) {
           saveApplyFormForMpOrder(String(order.id), {
             templateId: form.applyFormTemplateId,
@@ -606,6 +609,9 @@ export default function PublishWizard() {
                     applyFormFields: defaultLiveApplyFields(),
                     applyFormTemplateName: '直播达人报名默认项',
                   }))
+                }
+                if (m.id === 'ice' || m.id === 'edit_ice') {
+                  setForm((prev) => ({ ...prev, fulfillmentLoop: 'closed' }))
                 }
                 setStep('form')
               }}
@@ -1220,6 +1226,79 @@ export default function PublishWizard() {
             onChange={(e) => patchForm({ recruitDetail: e.target.value })}
           />
         </div>
+
+        {recruitMode !== 'ice' && recruitMode !== 'edit_ice' ? (
+          <div>
+            <PubLabel>履约方式 *</PubLabel>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {(['closed', 'open'] as const).map((loop) => (
+                <button
+                  key={loop}
+                  type="button"
+                  className={`text-sm px-3 py-1.5 rounded-lg border ${
+                    (form.fulfillmentLoop || 'closed') === loop
+                      ? 'border-violet-500 bg-violet-600 text-white'
+                      : 'border-[var(--shell-border)] text-[var(--shell-muted)] hover:bg-white/5'
+                  }`}
+                  onClick={() => patchForm({ fulfillmentLoop: loop })}
+                >
+                  {loop === 'open' ? '开环' : '闭环'}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-[var(--shell-muted)]">
+              {(form.fulfillmentLoop || 'closed') === 'open'
+                ? '开环：与通告单相同，创建时上传群码；达人报名后即可长按识别进群。'
+                : '闭环：保持现有路径（报名 → PR 确认选择 → 进群/排期）。'}
+            </p>
+            {(form.fulfillmentLoop || 'closed') === 'open' ? (
+              <div className="mt-3">
+                <PubLabel hint="达人报名成功后即可长按识别进群">上传群二维码 *</PubLabel>
+                <input
+                  ref={groupQrInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    e.target.value = ''
+                    if (file) void onUploadGroupQr(file)
+                  }}
+                />
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={groupQrUploading}
+                    className={`text-sm px-3 py-1.5 rounded-lg border ${
+                      form.groupQrImage ? 'border-green-500 text-green-700' : ''
+                    }`}
+                    onClick={() => groupQrInputRef.current?.click()}
+                  >
+                    {groupQrUploading ? '上传中…' : form.groupQrImage ? '已上传群码' : '选择群二维码图片'}
+                  </button>
+                  {form.groupQrImage ? (
+                    <button
+                      type="button"
+                      className="text-xs text-[var(--shell-muted)] underline"
+                      onClick={() => patchForm({ groupQrImage: '' })}
+                    >
+                      清除
+                    </button>
+                  ) : null}
+                </div>
+                {form.groupQrImage ? (
+                  <button
+                    type="button"
+                    className="mt-2 block"
+                    onClick={() => window.open(form.groupQrImage, '_blank')}
+                  >
+                    <img src={form.groupQrImage} alt="群二维码" className="h-16 rounded border" />
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         {recruitMode === 'ice' || recruitMode === 'edit_ice' ? (
           <div>

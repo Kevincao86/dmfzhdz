@@ -69,6 +69,9 @@ function formPatchFromMpOrder(mp) {
     signupDeadline: String(meta.signupDeadline || mp?.deadline || '').trim(),
     iceVideoUrl: String(meta.iceVideoUrl || '').trim(),
     iceVerifyMode: String(meta.iceVerifyMode || meta.iceAuditMode || 'ai').trim() === 'pr' ? 'pr' : 'ai',
+    fulfillmentLoop:
+      String(mp.fulfillmentLoop || meta.fulfillmentLoop || '').trim() === 'open' ? 'open' : 'closed',
+    groupQrImage: String(mp.groupQrImage || meta.groupQrImage || '').trim(),
     applyFormTemplateId: meta.applyFormTemplateId || '',
     applyFormTemplateName: meta.applyFormTemplateName || '',
     applyFormFields: Array.isArray(meta.applyFormFields)

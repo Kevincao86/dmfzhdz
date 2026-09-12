@@ -35,6 +35,7 @@ import {
   merchantLocationToMeta,
   type MerchantLocationFormFields,
 } from './merchantLocation'
+import { resolvePublishFulfillmentLoop } from './xingxuanRecruitLoop'
 
 export type PublishForm = {
   deliveryWindow: 'normal' | 'urgent'
@@ -61,7 +62,9 @@ export type PublishForm = {
   inviteResponseHours: number
   iceVideoUrl: string
   iceVerifyMode: 'ai' | 'pr'
-  /** 云剪 AI 核查：达人群结算二维码（data URL） */
+  /** closed=现网反选路径；open=通告式，报名后直接出群码 */
+  fulfillmentLoop?: 'open' | 'closed'
+  /** 云剪 AI 核查 / 开环通告：群二维码 */
   groupQrImage?: string
   /** 剪辑师云剪：剪辑师群二维码（data URL） */
   editGroupQrImage?: string
@@ -119,6 +122,7 @@ export function emptyPublishForm(recruitTarget = 'talent'): PublishForm {
     inviteResponseHours: 72,
     iceVideoUrl: '',
     iceVerifyMode: 'ai',
+    fulfillmentLoop: 'closed',
     applyFormTemplateId: '',
     applyFormTemplateName: isSupplier ? '团队报名默认项' : '',
     applyFormFields: isSupplier
@@ -338,6 +342,14 @@ export function validatePublishForm(
     return '云剪任务请填写参考片链接'
   }
   if (
+    recruitMode !== 'ice' &&
+    recruitMode !== 'edit_ice' &&
+    f.fulfillmentLoop === 'open' &&
+    !String(f.groupQrImage || '').trim()
+  ) {
+    return '开环招募请上传群二维码'
+  }
+  if (
     recruitMode === 'ice' &&
     (f.iceVerifyMode || 'ai') === 'ai' &&
     !String(f.groupQrImage || '').trim()
@@ -468,6 +480,7 @@ export function buildPublishOrder(
   const coverFields = buildCoverFieldsForOrder(form)
   const groupQrImage = String(form.groupQrImage || '').trim()
   const editGroupQrImage = String(form.editGroupQrImage || '').trim()
+  const fulfillmentLoop = resolvePublishFulfillmentLoop(recruitModeId, form.fulfillmentLoop)
   const merchantLocMeta = merchantLocationToMeta(form)
   const order: Record<string, unknown> = {
     id: mpId,
@@ -493,6 +506,7 @@ export function buildPublishOrder(
     deadline,
     budgetText: buildCompactBudgetText(form),
     recruitCount,
+    fulfillmentLoop: fulfillmentLoop || '',
     region: buildRegionText(form),
     category: mode.category,
     publisherIdentity: 'pr',
@@ -565,6 +579,7 @@ export function buildPublishOrder(
       ...(merchantLocMeta ? { merchantLocation: merchantLocMeta } : {}),
       iceVideoUrl: recruitModeId === 'edit_ice' ? '' : resolveIceReferenceVideoUrl(form),
       iceVerifyMode: form.iceVerifyMode === 'pr' ? 'pr' : 'ai',
+      ...(fulfillmentLoop ? { fulfillmentLoop } : {}),
       ...(isTargetedRecruit
         ? {
             recruitScope: 'targeted',
@@ -573,7 +588,9 @@ export function buildPublishOrder(
             targetedInvites: [],
           }
         : { recruitScope: 'open' }),
-      ...(groupQrImage ? { groupQrImage } : {}),
+      ...(groupQrImage && (fulfillmentLoop === 'open' || recruitModeId === 'ice' || recruitModeId === 'edit_ice')
+        ? { groupQrImage }
+        : {}),
       ...(editGroupQrImage ? { editGroupQrImage } : {}),
       ...(form.linkeAttach?.enabled && form.linkeAttach.clientId
         ? {
@@ -589,7 +606,7 @@ export function buildPublishOrder(
         : {}),
     },
   }
-  if (groupQrImage) {
+  if (groupQrImage && (fulfillmentLoop === 'open' || recruitModeId === 'ice' || recruitModeId === 'edit_ice')) {
     order.groupQrImage = groupQrImage
   }
   if (editGroupQrImage) {

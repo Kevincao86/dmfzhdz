@@ -9,6 +9,8 @@ const contactGate = require('../../../utils/talentContactPrGate.js')
 const iceOrderStats = require('../../../utils/iceOrderStats.js')
 const iceOrderDetect = require('../../../utils/iceOrderDetect.js')
 const iceGroupQr = require('../../../utils/iceGroupQr.js')
+const mpGroupQr = require('../../../utils/mpGroupQr.js')
+const xingxuanRecruitLoop = require('../../../utils/xingxuanRecruitLoop.js')
 const editDeliverLinks = require('../../../utils/editDeliverLinks.js')
 const talentAppStatus = require('../../../utils/talentApplicationStatus.js')
 const applicantListExtras = require('../../../utils/applicantListExtras.js')
@@ -200,6 +202,8 @@ Page({
     err: '',
     view: null,
     applied: false,
+    isOpenLoop: false,
+    openLoopGroupQr: '',
     isIce: false,
     iceApplicantId: '',
     assignedVideoUrl: '',
@@ -1012,6 +1016,11 @@ Page({
         iceStatusHint,
         iceStep3Hint,
         applied: hasApplied,
+        isOpenLoop: xingxuanRecruitLoop.isXingxuanOpenLoop(mp),
+        openLoopGroupQr:
+          hasApplied && xingxuanRecruitLoop.isXingxuanOpenLoop(mp)
+            ? mpGroupQr.groupQrFromRegistry(reg, id) || mpGroupQr.groupQrFromMp(mp)
+            : '',
         readOnlyEnded: isEnded && canViewEnded,
         isEditIce,
         isPackIce,
@@ -1149,6 +1158,11 @@ Page({
   },
   previewEditGroupQr() {
     const url = String(this.data.editGroupQrImage || '').trim()
+    if (!url) return
+    wx.previewImage({ urls: [url], current: url })
+  },
+  previewOpenLoopGroupQr() {
+    const url = String(this.data.openLoopGroupQr || '').trim()
     if (!url) return
     wx.previewImage({ urls: [url], current: url })
   },

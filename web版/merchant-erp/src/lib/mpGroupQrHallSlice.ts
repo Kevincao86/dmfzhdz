@@ -169,7 +169,40 @@ export function buildMpGroupQrByOrderIdForIceClaimant(
   return out
 }
 
-/** 合并入选通知群码 + 云剪认领群码 */
+function isXingxuanOpenLoopMp(mp: RegistryMpRecruitmentOrder): boolean {
+  const top = String(mp.fulfillmentLoop || '').trim()
+  if (top === 'open') return true
+  const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : null
+  return String((meta as { fulfillmentLoop?: string } | null)?.fulfillmentLoop || '').trim() === 'open'
+}
+
+/** 开环招募：达人报名后即可看群码（无需 PR 反选） */
+export function buildMpGroupQrByOrderIdForOpenLoopApplicant(
+  data: RegistrySnapshot,
+  member: RegistryMpTalentMember | null,
+  wxOpenId?: string | null,
+): Record<string, string> {
+  const out: Record<string, string> = {}
+  const openId = String(wxOpenId || member?.wxOpenId || '').trim()
+  for (const mp of data.mpRecruitmentOrders ?? []) {
+    if (!mp?.id || !isXingxuanOpenLoopMp(mp)) continue
+    const plat = mp.platform || '抖音'
+    let mine = false
+    for (const a of mp.applicants ?? []) {
+      if (!a || a.taskStatus === 'rejected') continue
+      if (applicantMatchesViewer(a, member, openId, plat)) {
+        mine = true
+        break
+      }
+    }
+    if (!mine) continue
+    const qr = groupQrFromOrderRaw(data, mp.id)
+    if (qr) out[String(mp.id)] = qr
+  }
+  return out
+}
+
+/** 合并入选通知群码 + 云剪认领群码 + 开环报名群码 */
 export function buildMpGroupQrByOrderIdForSession(
   data: RegistrySnapshot,
   member: RegistryMpTalentMember | null,
@@ -178,6 +211,7 @@ export function buildMpGroupQrByOrderIdForSession(
   return {
     ...buildMpGroupQrByOrderIdForTalent(data, member),
     ...buildMpGroupQrByOrderIdForIceClaimant(data, member, wxOpenId),
+    ...buildMpGroupQrByOrderIdForOpenLoopApplicant(data, member, wxOpenId),
   }
 }
 

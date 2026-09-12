@@ -83,6 +83,7 @@ list_scopes() {
   douyin_spi_acceptance  抖音到综团购联调：SPI 过审桩 meoo-douyin-spi
   modian_official        墨典官网 m.mofangdianai.com（案例库入口）
   xingxuan_dy_oauth      星选履约 Web 抖音扫码登录（不含商家 cs / 小程序）
+  xingxuan_open_loop     星选招募开环/闭环（小程序发单+达人报名群码 + 履约 Web 同步；闭环现网路径不改）
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -1147,6 +1148,20 @@ PAT
 TalentLoginAuthPanel
 灵祺达人履约管理后台/src/lib/mpApi.ts
 灵祺达人履约管理后台/src/lib/mpApiErrors.ts
+change-scope-guard
+PAT
+      ;;
+    xingxuan_open_loop)
+      cat <<'PAT'
+xingxuanRecruitLoop
+灵祺达人撮合小程序/pages/publish/publish
+灵祺达人撮合小程序/utils/mpOrderPublishRestore
+灵祺达人撮合小程序/pages/subpack-core/detail/detail
+灵祺达人履约管理后台/src/components/publish
+灵祺达人履约管理后台/src/lib/mpSync/publishOrder.ts
+灵祺达人履约管理后台/src/lib/mpSync/mpOrderPublishRestore.ts
+灵祺达人履约管理后台/src/pages/RecruitmentDetailPage.tsx
+mpGroupQrHallSlice
 change-scope-guard
 PAT
       ;;

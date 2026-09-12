@@ -27,6 +27,7 @@ const prDouyinLinkeStore = require('../../utils/prDouyinLinkeStore.js')
 const prDouyinLinkeApi = require('../../utils/prDouyinLinkeApi.js')
 const mpTargetedRecruit = require('../../utils/mpTargetedRecruit.js')
 const mpTargetedRecruitAccess = require('../../utils/mpTargetedRecruitAccess.js')
+const xingxuanRecruitLoop = require('../../utils/xingxuanRecruitLoop.js')
 const { setTabBarForPage, setTabBarHidden } = require('../../utils/tabBar.js')
 /** 自定义导航：标题区落在胶囊下方 */
 function applyPublishSafeHead(page) {
@@ -147,6 +148,8 @@ function emptyForm(recruitTarget) {
     inviteResponseHours: 72,
     iceVideoUrl: '',
     iceVerifyMode: 'ai',
+    fulfillmentLoop: 'closed',
+    groupQrImage: '',
     editGroupQrImage: '',
     applyFormTemplateId: '',
     applyFormTemplateName: target === 'talent' ? '' : '团队报名默认项',
@@ -259,6 +262,7 @@ Page({
     fansTierPickerRanges: FANS_TIER_RANGES,
     editingFansTierIndex: -1,
     submitting: false,
+    groupQrUploading: false,
     editGroupQrUploading: false,
     createdOrder: null,
     shareTitle: '',
@@ -1123,6 +1127,9 @@ Page({
       patch['form.applyFormFields'] = livePublishForm.defaultLiveApplyFields()
       patch['form.applyFormTemplateName'] = '直播达人报名默认项'
     }
+    if (mode.id === 'ice' || mode.id === 'edit_ice') {
+      patch['form.fulfillmentLoop'] = 'closed'
+    }
     this.setData(patch, () => {
       if (this.data.isSupplierPublish) {
         this.syncSupplierPublishGrids(this.data.form)
@@ -1529,6 +1536,14 @@ Page({
       const sErr = supplierPublishForm.validateSupplierPublish(target, f, this.data.recruitMode)
       if (sErr) return sErr
     }
+    if (
+      this.data.recruitMode !== 'ice' &&
+      this.data.recruitMode !== 'edit_ice' &&
+      f.fulfillmentLoop === 'open' &&
+      !String(f.groupQrImage || '').trim()
+    ) {
+      return '开环招募请上传群二维码'
+    }
     if (this.data.recruitMode === 'ice') {
       if (!resolveIceReferenceVideoUrl(f)) return '云剪任务请填写参考片链接'
     }
@@ -1683,6 +1698,34 @@ Page({
     const iceVerifyMode = val === 'pr' ? 'pr' : 'ai'
     this.setData({ form: { ...this.data.form, iceVerifyMode } })
   },
+  onFulfillmentLoopPick(e) {
+    const val = e.currentTarget.dataset.val === 'open' ? 'open' : 'closed'
+    this.setData({ form: { ...this.data.form, fulfillmentLoop: val } })
+  },
+  async onUploadOpenLoopGroupQr() {
+    if (this.data.groupQrUploading) return
+    this.setData({ groupQrUploading: true })
+    try {
+      const dataUrl = await mpGroupQr.chooseAndReadImageDataUrl()
+      this.setData({ form: { ...this.data.form, groupQrImage: dataUrl } })
+      wx.showToast({ title: '已上传群码', icon: 'success' })
+    } catch (e) {
+      const msg = String((e && e.message) || e || '')
+      if (!/cancel/i.test(msg)) {
+        wx.showToast({ title: msg.slice(0, 24) || '上传失败', icon: 'none' })
+      }
+    } finally {
+      this.setData({ groupQrUploading: false })
+    }
+  },
+  onClearOpenLoopGroupQr() {
+    this.setData({ form: { ...this.data.form, groupQrImage: '' } })
+  },
+  onPreviewOpenLoopGroupQr() {
+    const url = String((this.data.form && this.data.form.groupQrImage) || '').trim()
+    if (!url) return
+    wx.previewImage({ urls: [url], current: url })
+  },
   async onUploadEditGroupQr() {
     if (this.data.editGroupQrUploading) return
     this.setData({ editGroupQrUploading: true })
@@ -1822,6 +1865,14 @@ Page({
           ...(merchantLocMeta ? { merchantLocation: merchantLocMeta } : {}),
           iceVideoUrl: mode.id === 'edit_ice' ? '' : resolveIceReferenceVideoUrl(f),
           iceVerifyMode: f.iceVerifyMode === 'pr' ? 'pr' : 'ai',
+          ...(xingxuanRecruitLoop.resolvePublishFulfillmentLoop(mode.id, f.fulfillmentLoop)
+            ? {
+                fulfillmentLoop: xingxuanRecruitLoop.resolvePublishFulfillmentLoop(
+                  mode.id,
+                  f.fulfillmentLoop,
+                ),
+              }
+            : {}),
           ...(this.data.isTargetedRecruit
             ? {
                 recruitScope: 'targeted',
@@ -1851,6 +1902,16 @@ Page({
     const editGroupQrImage = String(f.editGroupQrImage || '').trim()
     if (editGroupQrImage) {
       order.editGroupQrImage = editGroupQrImage
+    }
+    const groupQrImage = String(f.groupQrImage || '').trim()
+    const loop = xingxuanRecruitLoop.resolvePublishFulfillmentLoop(mode.id, f.fulfillmentLoop)
+    if (loop) {
+      order.fulfillmentLoop = loop
+    } else {
+      order.fulfillmentLoop = ''
+    }
+    if (groupQrImage && (loop === 'open' || mode.hall === 'ice' || mode.id === 'edit_ice')) {
+      order.groupQrImage = groupQrImage
     }
     if (mode.hall === 'ice' || mode.id === 'edit_ice') {
       order.orderKind = 'recruitment_ice'
@@ -1922,6 +1983,9 @@ Page({
         wx.removeStorageSync('meoo_mp_registry_cache_v1')
       } catch (_) {}
       const f = this.data.form
+      if (order.fulfillmentLoop === 'open' && String(f.groupQrImage || '').trim()) {
+        await mpGroupQr.patchGroupQrImage(order.id, f.groupQrImage)
+      }
       applyTemplates.saveApplyFormForMpOrder(order.id, {
         templateId: f.applyFormTemplateId,
         templateName:

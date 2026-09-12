@@ -671,6 +671,30 @@
               show-confirm-bar="{{false}}"
             />
           </view>
+          <view class="pub-field" wx:if="{{recruitMode !== 'ice' && recruitMode !== 'edit_ice'}}">
+            <text class="pub-label">履约方式 *</text>
+            <view class="pub-radio-pair">
+              <view
+                class="pub-radio-opt {{form.fulfillmentLoop !== 'open' ? 'pub-radio-opt--on' : ''}}"
+                data-val="closed"
+                catchtap="onFulfillmentLoopPick"
+              >闭环</view>
+              <view
+                class="pub-radio-opt {{form.fulfillmentLoop === 'open' ? 'pub-radio-opt--on' : ''}}"
+                data-val="open"
+                catchtap="onFulfillmentLoopPick"
+              >开环</view>
+            </view>
+            <text class="pub-cover-hint">{{form.fulfillmentLoop === 'open' ? '开环：与通告单相同，创建时上传群码；达人报名后即可长按识别进群。' : '闭环：保持现有路径（报名 → PR 确认选择 → 进群/排期）。'}}</text>
+            <view class="pub-field" wx:if="{{form.fulfillmentLoop === 'open'}}">
+              <text class="pub-label">上传群二维码 *</text>
+              <view class="pub-cover-actions">
+                <button class="pub-cover-btn" loading="{{groupQrUploading}}" bindtap="onUploadOpenLoopGroupQr">{{form.groupQrImage ? '已上传群码' : '选择图片'}}</button>
+                <button wx:if="{{form.groupQrImage}}" class="pub-cover-btn pub-cover-btn--ghost" bindtap="onClearOpenLoopGroupQr">清除</button>
+              </view>
+              <image wx:if="{{form.groupQrImage}}" class="pub-cover-preview" src="{{form.groupQrImage}}" mode="aspectFit" bindtap="onPreviewOpenLoopGroupQr" />
+            </view>
+          </view>
           <view class="pub-field" wx:if="{{recruitMode === 'ice' || recruitMode === 'edit_ice'}}">
             <text class="pub-label">云剪审核方式 *</text>
             <view class="pub-radio-pair">

@@ -72,6 +72,8 @@ import {
 } from '../lib/mpSync/mpTargetedRecruit'
 import { respond as respondTargetedInvite } from '../lib/mpSync/mpTargetedRecruitApi'
 import { resolveTalentMemberId } from '../lib/mpSync/participant'
+import { groupQrFromRegistry } from '../lib/mpSync/mpGroupQr'
+import { isXingxuanOpenLoop } from '../lib/mpSync/xingxuanRecruitLoop'
 
 function resolveTargetedInviteState(mp: Record<string, unknown> | null | undefined, talentMemberId: string) {
   if (!mp || !isTargetedOrder(mp)) {
@@ -612,13 +614,32 @@ export default function RecruitmentDetailPage() {
               }`}
             >
               <p className="font-medium">报名状态：{statusLabel}</p>
-              {contactGate.reason === 'pending_pr_review' ? (
+              {contactGate.reason === 'pending_pr_review' && !isXingxuanOpenLoop(mpRaw) ? (
                 <p className="mt-1 text-xs opacity-90">{contactGate.message}</p>
               ) : null}
               {contactGate.canContact ? (
                 <p className="mt-1 text-xs opacity-90">PR 已通过您的报名，可联系招募方沟通排期。</p>
               ) : null}
             </div>
+          ) : null}
+
+          {role === 'talent' && applied && isXingxuanOpenLoop(mpRaw) ? (
+            <section className="surface-card rounded-xl border p-4 space-y-2">
+              <h3 className="font-medium">扫码进群</h3>
+              <p className="text-xs text-[var(--shell-muted)]">长按或右键保存二维码，用微信识别后加入项目群</p>
+              {(() => {
+                const qr = groupQrFromRegistry(
+                  mpRegistry as Record<string, unknown> | null,
+                  id || '',
+                  mpRaw,
+                )
+                return qr ? (
+                  <img src={qr} alt="群二维码" className="mx-auto max-h-72 w-full max-w-xs object-contain" />
+                ) : (
+                  <p className="text-xs text-amber-800">群二维码加载中，请刷新本页</p>
+                )
+              })()}
+            </section>
           ) : null}
 
           {role === 'talent' && applied && view.isIce && (isEditIce ? workIdentity === 'edit' : workIdentity === 'talent') ? (
