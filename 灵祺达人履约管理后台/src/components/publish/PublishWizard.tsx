@@ -610,7 +610,7 @@ export default function PublishWizard() {
                     applyFormTemplateName: '直播达人报名默认项',
                   }))
                 }
-                if (m.id === 'ice' || m.id === 'edit_ice') {
+                if (m.id === 'edit_ice') {
                   setForm((prev) => ({ ...prev, fulfillmentLoop: 'closed' }))
                 }
                 setStep('form')
