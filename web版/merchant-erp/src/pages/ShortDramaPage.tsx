@@ -2618,7 +2618,9 @@ export default function ShortDramaPage() {
       '你是竖屏商家短剧编剧。先读懂钩子、四拍、对白、冲突和商家字段，再按主次角色写一句话故事：画面主角是动作主语和镜头中心，客人/顾客只作配角。短时长更密、冲突更早；长时长可铺垫但前 2 秒仍要有钩子。禁止写成客人躺平加时的视角。不要写技术参数，不要出现字幕/Logo/演职员表。'
     try {
       let lastErr = '生成故事失败，请稍后重试'
-      for (const provider of ['doubao'] as const) {
+      const storyProviders = ['doubao', 'qwen', 'deepseek'] as const
+      for (let i = 0; i < storyProviders.length; i++) {
+        const provider = storyProviders[i]
         try {
           const res = await postAiChat({
             provider,
@@ -2648,7 +2650,16 @@ export default function ShortDramaPage() {
           lastErr = e instanceof Error ? e.message : String(e)
         }
       }
-      if (mountedRef.current) setErr(lastErr)
+      if (mountedRef.current) {
+        const raw = lastErr
+        const overdue = /overdue balance|account has an overdue|欠费|余额不足/i.test(raw)
+        setErr(
+          overdue
+            ? '豆包账户欠费，已自动换通义/DeepSeek 仍未写成功。请到火山方舟充值后再点「AI生成故事」。'
+            : formatVideoAiUserError(raw).replace(/^upstream_error\s*[—\-:]\s*/i, '') ||
+                '生成故事失败，请稍后重试',
+        )
+      }
     } finally {
       if (mountedRef.current) setStoryBusy(false)
     }
