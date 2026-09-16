@@ -25,10 +25,15 @@
     bindtap="onEnterIdentity"
   >{{pickedId ? '进入工作台' : '请先选择身份'}}</view>
 
-  <view class="welcome-plats">
-    <view wx:for="{{platformLogos}}" wx:key="id" class="welcome-plat">
-      <image class="welcome-plat__icon" src="{{item.icon}}" mode="aspectFit" />
-      <text class="welcome-plat__name">{{item.name}}</text>
+  <view class="welcome-cluster">
+    <view class="welcome-cluster__glow welcome-cluster__glow--a" />
+    <view class="welcome-cluster__glow welcome-cluster__glow--b" />
+    <view
+      wx:for="{{platformLogos}}"
+      wx:key="id"
+      class="welcome-glass welcome-glass--{{index}}"
+    >
+      <image class="welcome-glass__icon" src="{{item.icon}}" mode="aspectFit" />
     </view>
   </view>
 

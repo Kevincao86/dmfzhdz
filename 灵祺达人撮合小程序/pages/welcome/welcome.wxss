@@ -42,15 +42,15 @@
 
 .welcome-grid {
   width: 100%;
-  margin-top: 56rpx;
+  margin-top: 32rpx;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20rpx;
 }
 
 .welcome-tile {
-  min-height: 220rpx;
-  padding: 28rpx 22rpx 24rpx;
+  min-height: 188rpx;
+  padding: 22rpx 20rpx 18rpx;
   border-radius: 28rpx;
   background: rgba(255, 255, 255, 0.62);
   border: 2rpx solid rgba(255, 255, 255, 0.88);
@@ -97,7 +97,7 @@
 }
 
 .welcome-enter {
-  margin-top: 48rpx;
+  margin-top: 28rpx;
   width: 100%;
   height: 88rpx;
   line-height: 88rpx;
@@ -116,33 +116,100 @@
   border-color: #f5c84c;
 }
 
-.welcome-plats {
-  margin-top: auto;
-  padding-top: 36rpx;
-  width: 100%;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-}
-
-.welcome-plat {
+.welcome-cluster {
+  position: relative;
   flex: 1;
+  width: 100%;
+  min-height: 360rpx;
+  margin-top: 8rpx;
+}
+
+.welcome-cluster__glow {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.welcome-cluster__glow--a {
+  width: 280rpx;
+  height: 280rpx;
+  left: 8%;
+  top: 18%;
+  background: radial-gradient(circle, rgba(186, 230, 253, 0.55) 0%, transparent 70%);
+}
+
+.welcome-cluster__glow--b {
+  width: 320rpx;
+  height: 320rpx;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle, rgba(221, 214, 254, 0.5) 0%, transparent 70%);
+}
+
+.welcome-glass {
+  position: absolute;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 8rpx;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.42);
+  border: 2rpx solid rgba(255, 255, 255, 0.78);
+  box-shadow: 0 18rpx 40rpx rgba(90, 120, 160, 0.14);
+  backdrop-filter: blur(18px);
 }
 
-.welcome-plat__icon {
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 16rpx;
+.welcome-glass__icon {
+  width: 72%;
+  height: 72%;
 }
 
-.welcome-plat__name {
-  font-size: 18rpx;
-  color: #7b8a99;
-  line-height: 1.2;
+.welcome-glass--0 {
+  width: 148rpx;
+  height: 148rpx;
+  left: 18%;
+  top: 22%;
+  border-radius: 36rpx;
+  transform: rotate(-12deg);
+  z-index: 3;
+}
+
+.welcome-glass--1 {
+  width: 168rpx;
+  height: 168rpx;
+  left: 42%;
+  top: 8%;
+  border-radius: 40rpx;
+  transform: rotate(8deg);
+  z-index: 4;
+}
+
+.welcome-glass--2 {
+  width: 132rpx;
+  height: 132rpx;
+  left: 6%;
+  top: 52%;
+  border-radius: 32rpx;
+  transform: rotate(14deg);
+  z-index: 2;
+}
+
+.welcome-glass--3 {
+  width: 140rpx;
+  height: 140rpx;
+  right: 8%;
+  top: 42%;
+  border-radius: 34rpx;
+  transform: rotate(-7deg);
+  z-index: 5;
+}
+
+.welcome-glass--4 {
+  width: 124rpx;
+  height: 124rpx;
+  left: 38%;
+  top: 58%;
+  border-radius: 30rpx;
+  transform: rotate(18deg);
+  z-index: 1;
 }
 
 .welcome-vortex {
