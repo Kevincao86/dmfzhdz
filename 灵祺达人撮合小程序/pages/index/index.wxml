@@ -18,26 +18,7 @@
         </view>
       </view>
 
-      <view class="home-banner-v2" bindtap="goVerifyTalent" wx:if="{{!decorBanner}}">
-        <view class="home-banner-v2__copy">
-          <text class="home-banner-v2__title">{{bannerTitle}}</text>
-          <text class="home-banner-v2__sub">{{bannerSub}}</text>
-          <text class="home-banner-v2__hint">{{bannerHint}}</text>
-          <view class="home-banner-v2__cta">{{bannerCta}}</view>
-        </view>
-        <view class="home-banner-v2__aside" catchtap="noopSheetTap">
-          <view class="home-banner-v2__kpi">
-            <text class="home-banner-v2__kpi-num">{{tabCounts.normal || 0}}</text>
-            <text class="home-banner-v2__kpi-lbl">招募大厅</text>
-          </view>
-          <view class="home-banner-v2__rule" />
-          <view class="home-banner-v2__kpi">
-            <text class="home-banner-v2__kpi-num">{{todayCount || 0}}</text>
-            <text class="home-banner-v2__kpi-lbl">今日新增</text>
-          </view>
-        </view>
-      </view>
-      <view class="home-decor-banner" wx:elif="{{decorBanner}}" bindtap="onDecorBannerTap">
+      <view class="home-decor-banner" wx:if="{{decorBanner}}" bindtap="onDecorBannerTap">
         <video
           wx:if="{{decorBanner.isVideo}}"
           class="home-decor-banner__img"
@@ -56,6 +37,30 @@
     </view>
 
     <view class="home-toolbar">
+      <view class="home-desk" bindtap="goVerifyTalent" wx:if="{{!decorBanner}}">
+        <view class="home-desk__head">
+          <view class="home-desk__copy">
+            <text class="home-desk__title">{{bannerTitle}}</text>
+            <text class="home-desk__sub">{{bannerSub}}</text>
+          </view>
+          <view class="home-desk__cta">{{bannerCta}}</view>
+        </view>
+        <view class="home-desk__kpis" catchtap="noopSheetTap">
+          <view class="home-desk__kpi">
+            <text class="home-desk__kpi-num">{{tabCounts.normal || 0}}</text>
+            <text class="home-desk__kpi-lbl">招募大厅</text>
+          </view>
+          <view class="home-desk__kpi">
+            <text class="home-desk__kpi-num">{{tabCounts.urgent || 0}}</text>
+            <text class="home-desk__kpi-lbl">急单</text>
+          </view>
+          <view class="home-desk__kpi">
+            <text class="home-desk__kpi-num">{{todayCount || 0}}</text>
+            <text class="home-desk__kpi-lbl">今日新增</text>
+          </view>
+        </view>
+      </view>
+
       <view class="home-hall-mini">
         <view
           class="home-hall-mini__item {{hallTab === 'normal' ? 'home-hall-mini__item--on' : ''}}"
