@@ -62,19 +62,25 @@ Page({
     applyCapsulePadding(this, null, { band: 'navBandStyle' })
   },
 
-  onPickIdentity(e) {
+  onSelectIdentity(e) {
     const id = e.currentTarget.dataset.id
     if (!identityTypes.isWorkIdentity(id) || this._transitioning) return
+    this.setData({ pickedId: id })
+  },
+
+  onEnterIdentity() {
+    const id = this.data.pickedId
+    if (!identityTypes.isWorkIdentity(id) || this._transitioning) {
+      wx.showToast({ title: '请先选择身份', icon: 'none' })
+      return
+    }
 
     const pack = identityTheme.pack(id)
     this._transitioning = true
-
     this.setData({
-      pickedId: id,
       transitionColor: pack.navBar,
       transitionOn: true,
     })
-
     userProfile.writeIdentity(id)
 
     setTimeout(() => {

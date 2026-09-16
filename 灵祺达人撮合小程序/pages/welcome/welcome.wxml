@@ -11,7 +11,7 @@
       wx:key="id"
       class="welcome-tile welcome-tile--{{item.id}} {{pickedId === item.id ? 'welcome-tile--on' : ''}}"
       data-id="{{item.id}}"
-      bindtap="onPickIdentity"
+      bindtap="onSelectIdentity"
       hover-class="welcome-tile--hover"
     >
       <text class="welcome-tile__mark">{{item.mark}}</text>
@@ -20,7 +20,10 @@
     </view>
   </view>
 
-  <text class="welcome-cta">点选身份进入</text>
+  <view
+    class="welcome-enter {{pickedId ? 'welcome-enter--on' : ''}}"
+    bindtap="onEnterIdentity"
+  >{{pickedId ? '进入工作台' : '请先选择身份'}}</view>
 
   <view class="welcome-foot">
     <image class="welcome-foot__logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
