@@ -178,7 +178,7 @@ const FUNCTION_SECTIONS = [
         kind: 'link',
         url: '/pages/digital-human/digital-human',
         title: '数字人口播',
-        desc: '口播试听与成片指引',
+        desc: '口播成片（形象→文案→动作→预览→生成）',
         iconKey: 'mic',
       },
       {

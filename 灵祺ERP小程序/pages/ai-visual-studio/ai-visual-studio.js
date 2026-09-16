@@ -27,6 +27,11 @@ Page({
     headline: '',
     subheadline: '',
     offer: '',
+    timeRange: '',
+    note: '',
+    keywords: '',
+    keywordsBusy: false,
+    seriesOn: false,
     refPath: '',
     refDataUrl: '',
     aspect: '3:4',
@@ -35,6 +40,7 @@ Page({
     progress: '',
     err: '',
     resultUrl: '',
+    resultUrls: [],
     copyPoints: points.VISUAL_STUDIO_COPY_POINTS,
     imageStdPoints: points.VISUAL_STUDIO_IMAGE_POINTS,
     imageProPoints: points.VISUAL_STUDIO_IMAGE_PRO_POINTS,
@@ -58,6 +64,9 @@ Page({
       headline: this.data.headline,
       subheadline: this.data.subheadline,
       offer: this.data.offer,
+      timeRange: this.data.timeRange,
+      note: this.data.note,
+      keywords: this.data.keywords,
     }
   },
   onStep(e) {
@@ -103,6 +112,34 @@ Page({
   onOffer(e) {
     this.setData({ offer: e.detail.value })
   },
+  onTimeRange(e) {
+    this.setData({ timeRange: e.detail.value })
+  },
+  onNote(e) {
+    this.setData({ note: e.detail.value })
+  },
+  onKeywords(e) {
+    this.setData({ keywords: e.detail.value })
+  },
+  onToggleSeries() {
+    this.setData({ seriesOn: !this.data.seriesOn })
+  },
+  async onAiKeywords() {
+    if (this.data.keywordsBusy) return
+    this.setData({ keywordsBusy: true, err: '' })
+    try {
+      const r = await vs.fetchKeywords(this.formSnapshot(), {
+        headline: this.data.headline,
+        offer: this.data.offer,
+      })
+      if (!r.ok) throw new Error(r.message || '关键词生成失败')
+      this.setData({ keywords: r.keywords })
+    } catch (e) {
+      this.setData({ err: String((e && e.message) || e) })
+    } finally {
+      this.setData({ keywordsBusy: false })
+    }
+  },
   onAspect(e) {
     this.setData({ aspect: e.currentTarget.dataset.val })
   },
@@ -115,6 +152,8 @@ Page({
       headline: item.headline,
       subheadline: item.subheadline,
       offer: item.offer,
+      timeRange: item.timeRange || this.data.timeRange,
+      note: item.note || this.data.note,
     })
   },
   goRecharge() {
@@ -141,6 +180,8 @@ Page({
         headline: first.headline,
         subheadline: first.subheadline,
         offer: first.offer,
+        timeRange: first.timeRange || '',
+        note: first.note || '',
       })
       wx.showToast({ title: r.source === 'ai' ? '文案已生成' : '已用本地文案', icon: 'none' })
     } catch (e) {
@@ -187,7 +228,7 @@ Page({
       return
     }
     const tier = this.data.imageTier === 'pro' ? 'pro' : 'standard'
-    this.setData({ genBusy: true, err: '', progress: '校验积分…', resultUrl: '' })
+    this.setData({ genBusy: true, err: '', progress: '校验积分…', resultUrl: '', resultUrls: [] })
     try {
       await points.assertVisualStudioImageAffordable(1, tier)
       this.setData({ progress: '整理出图需求…' })
@@ -195,25 +236,39 @@ Page({
         headline,
         subheadline: this.data.subheadline,
         offer: this.data.offer,
+        timeRange: this.data.timeRange,
+        note: this.data.note,
       }
-      this.setData({
-        progress: tier === 'pro' ? '出图中…' : '出图中，约需数十秒…',
-      })
-      const r = await vs.generatePosterImage(this.formSnapshot(), copy, {
-        aspectRatio: this.data.aspect,
-        referenceImage: this.data.refDataUrl || '',
-        tier,
-      })
-      if (!r.ok) throw new Error(r.message || '出图失败')
-      // JWT 路径已由 /api/meoo-ai-agent-image 扣费；仅当接口未扣时再补扣
-      if (!(r.pointsCharged > 0)) {
-        await points.spendVisualStudioImagePoints({
-          idempotencyKey: `erp-vs-img-${Date.now()}`,
-          note: tier === 'pro' ? '视觉工坊高级生图' : '视觉工坊生图',
-          tier: r.usedPro ? 'pro' : 'standard',
+      const channels = this.data.seriesOn ? this.data.selectedChannels : [this.data.selectedChannels[0] || 'douyin']
+      const urls = []
+      for (let i = 0; i < channels.length; i++) {
+        this.setData({
+          progress:
+            channels.length > 1
+              ? `出图中 ${i + 1}/${channels.length}…`
+              : tier === 'pro'
+                ? '出图中…'
+                : '出图中，约需数十秒…',
         })
+        const snap = Object.assign({}, this.formSnapshot(), { channels: [channels[i]] })
+        // eslint-disable-next-line no-await-in-loop
+        const r = await vs.generatePosterImage(snap, copy, {
+          aspectRatio: this.data.aspect,
+          referenceImage: this.data.refDataUrl || '',
+          tier,
+        })
+        if (!r.ok) throw new Error(r.message || '出图失败')
+        urls.push(r.imageUrl)
+        if (!(r.pointsCharged > 0)) {
+          // eslint-disable-next-line no-await-in-loop
+          await points.spendVisualStudioImagePoints({
+            idempotencyKey: `erp-vs-img-${Date.now()}-${i}`,
+            note: tier === 'pro' ? '视觉工坊高级生图' : '视觉工坊生图',
+            tier: r.usedPro ? 'pro' : 'standard',
+          })
+        }
       }
-      this.setData({ resultUrl: r.imageUrl, progress: '生成完成' })
+      this.setData({ resultUrl: urls[0], resultUrls: urls, progress: '生成完成' })
     } catch (e) {
       const msg = String((e && e.message) || e)
       this.setData({ err: msg, progress: '' })

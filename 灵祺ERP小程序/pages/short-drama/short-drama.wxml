@@ -1,7 +1,7 @@
 <scroll-view scroll-y class="op-page" enhanced show-scrollbar="{{false}}">
   <view class="op-hero">
-    <text class="op-title">短剧制作</text>
-    <text class="op-sub">选场景与钩子，竖屏成片。长片与复杂分镜请到电脑端操作。</text>
+    <text class="op-title">AI 短剧</text>
+    <text class="op-sub">选世界观与场景，可 AI 写故事、上传角色参考图，竖屏出片。步骤与电脑端一致。</text>
     <text class="op-meta">{{rateLabel}}</text>
   </view>
 
@@ -45,7 +45,14 @@
       />
     </block>
     <text class="op-label">故事补充（选填）</text>
-    <textarea class="op-area" maxlength="400" placeholder="可改写故事走向" value="{{story}}" bindinput="onStory" />
+    <textarea class="op-area" maxlength="400" placeholder="可改写故事走向，或点 AI 生成故事" value="{{story}}" bindinput="onStory" />
+    <button class="op-btn-ghost" loading="{{storyBusy}}" bindtap="onAiStory">AI 生成故事</button>
+    <text class="op-label">角色参考图（选填，最多 3 张）</text>
+    <button class="op-btn-ghost" bindtap="onPickRefs">上传参考图</button>
+    <button wx:if="{{refPaths.length}}" class="op-btn-ghost" bindtap="clearRefs">去掉参考图</button>
+    <view wx:if="{{refPaths.length}}" class="op-chips">
+      <image wx:for="{{refPaths}}" wx:key="*this" src="{{item}}" mode="aspectFill" style="width:140rpx;height:140rpx;border-radius:12rpx" />
+    </view>
     <text class="op-label">对白钩子（选填）</text>
     <input class="op-input" placeholder="一句口语对白" value="{{dialogue}}" bindinput="onDialogue" />
     <text class="op-label">时长</text>

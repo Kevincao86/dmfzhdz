@@ -45,6 +45,7 @@ module.exports = {
   ICE_BATCH_GENERATE_COUNTS: [10, 20, 50, 100],
   MAIN_TABS: [
     { id: 'generate', label: '短视频出片', native: true },
+    { id: 'canvas', label: '无限画布', native: true },
     { id: 'cloud_batch', label: '一键混剪', native: true },
     { id: 'cases', label: '案例', native: true },
     { id: 'music', label: '配乐', native: true },
@@ -52,7 +53,7 @@ module.exports = {
   STUDIO_MODES: [
     {
       id: 'agent',
-      label: '创作舱模式',
+      label: 'Agent 模式',
       description: '自然语言 + Skill，自动规划分镜出片',
       pane: 'generate',
     },
@@ -77,8 +78,14 @@ module.exports = {
     {
       id: 'digital_human',
       label: '数字人口播',
-      description: '跳转数字人试听/电脑端成片',
+      description: '跳转数字人一体化出片',
       href: '/pages/digital-human/digital-human',
+    },
+    {
+      id: 'canvas',
+      label: '无限画布',
+      description: '分镜与参考素材同屏编排',
+      pane: 'canvas',
     },
   ],
   QUICK_CARDS: [

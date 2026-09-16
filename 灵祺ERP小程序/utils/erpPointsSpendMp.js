@@ -19,6 +19,8 @@ function checkAddonPointsAffordable(kind, durationSec, extra) {
     'visual_studio_image',
     'visual_studio_image_pro',
     'mix_material_analyze',
+    'brief',
+    'ops_plan',
   ])
   const sec = flatKinds.has(kind) ? undefined : Math.max(1, Math.ceil(Number(durationSec) || 1))
   const count = extra && extra.count != null ? Number(extra.count) : 1
@@ -54,6 +56,8 @@ function spendAddonPoints(opts) {
     'visual_studio_image',
     'visual_studio_image_pro',
     'mix_material_analyze',
+    'brief',
+    'ops_plan',
   ])
   const kind = opts.kind
   const sec = flatKinds.has(kind)

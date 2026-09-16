@@ -4,6 +4,7 @@ const videoAi = require('../../utils/videoAiMp.js')
 const erpPoints = require('../../utils/erpPointsSpendMp.js')
 const economics = require('../../utils/mpPointsEconomicsMp.js')
 const labels = require('../../utils/shortVideoLabelsMp.js')
+const vs = require('../../utils/visualStudioAiMp.js')
 
 const SEEDANCE_MODEL = labels.SEEDANCE_1_5_PRO_MODEL_ID
 
@@ -50,6 +51,9 @@ Page({
     shop: emptyShop(),
     story: '',
     dialogue: '',
+    storyBusy: false,
+    refPaths: [],
+    refDataUrls: [],
     durationOptions: catalog.DURATION_OPTIONS,
     durationIdx: 1,
     durationSec: 12,
@@ -120,6 +124,64 @@ Page({
     this.setData({ dialogue: e.detail.value })
   },
 
+  async onAiStory() {
+    if (this.data.storyBusy) return
+    const world = catalog.worldOf(this.data.worldId)
+    const scene = catalog.sceneOf(this.data.sceneId)
+    const shop = this.data.shop || emptyShop()
+    this.setData({ storyBusy: true, err: '' })
+    try {
+      const r = await vs.postAiChat(
+        [
+          {
+            role: 'system',
+            content: '你是短剧编剧。只输出故事补充正文（120～280字），不要标题。',
+          },
+          {
+            role: 'user',
+            content: [
+              `品类：${world.label}。场景：${scene.name}。钩子：${scene.hook}`,
+              `店名/主题：${shop.storeName}，卖点：${shop.offerName}，价格：${shop.price}，位置：${shop.area}`,
+              '写一段可拍的竖屏短剧故事：前三秒钩子、冲突、结尾转化。',
+            ].join('\n'),
+          },
+        ],
+        { provider: 'qwen', taskType: 'generate_copywriting', temperature: 0.55 },
+      )
+      if (!r.ok) throw new Error(r.message)
+      this.setData({ story: String(r.content || '').trim() })
+    } catch (e) {
+      this.setData({ err: (e && e.message) || '故事生成失败' })
+    } finally {
+      this.setData({ storyBusy: false })
+    }
+  },
+
+  onPickRefs() {
+    wx.chooseMedia({
+      count: 3,
+      mediaType: ['image'],
+      success: (res) => {
+        const files = (res.tempFiles || []).slice(0, 3)
+        const paths = []
+        const urls = []
+        files.forEach((f) => {
+          if (!f.tempFilePath) return
+          paths.push(f.tempFilePath)
+          try {
+            const b64 = wx.getFileSystemManager().readFileSync(f.tempFilePath, 'base64')
+            urls.push(`data:image/jpeg;base64,${b64}`)
+          } catch (_) {}
+        })
+        this.setData({ refPaths: paths, refDataUrls: urls })
+      },
+    })
+  },
+
+  clearRefs() {
+    this.setData({ refPaths: [], refDataUrls: [] })
+  },
+
   onDuration(e) {
     const idx = Number(e.detail.value) || 0
     const opt = catalog.DURATION_OPTIONS[idx] || catalog.DURATION_OPTIONS[1]
@@ -175,6 +237,9 @@ Page({
         flags: `--dur ${dur} --fps 24 --ratio 9:16 --wm false --rsn 720p`,
         generate_audio: true,
         durationSec: dur,
+      }
+      if (this.data.refDataUrls && this.data.refDataUrls.length) {
+        body.images_base64 = this.data.refDataUrls
       }
       const r = await videoAi.postSeedanceStart(body)
       if (!r.ok) {

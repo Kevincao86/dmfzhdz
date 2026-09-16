@@ -1,10 +1,48 @@
 <scroll-view scroll-y class="dh-page" enhanced show-scrollbar="{{false}}">
   <view class="dh-hero">
     <text class="dh-title">数字人口播</text>
-    <text class="dh-sub">{{tip}}</text>
+    <text class="dh-sub">选形象、写口播、配动作与背景，一键出竖屏口播。照片走口型驱动。成片 {{rateLabel}}。</text>
   </view>
 
-  <view class="dh-card">
+  <view class="dh-wizard">
+    <text
+      wx:for="{{wizardSteps}}"
+      wx:key="n"
+      class="dh-wiz {{step === item.n ? 'on' : ''}}"
+      data-step="{{item.n}}"
+      bindtap="onStep"
+    >{{item.n}}.{{item.label}}</text>
+  </view>
+
+  <view wx:if="{{step === 1}}" class="dh-card">
+    <text class="dh-label">数字人形象</text>
+    <view class="dh-chips">
+      <text
+        wx:for="{{presets}}"
+        wx:key="id"
+        class="dh-chip {{avatarMode === item.id ? 'on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onAvatarMode"
+      >{{item.label}}</text>
+    </view>
+    <view class="dh-ref" bindtap="onPickPhoto">
+      <image wx:if="{{photoPath}}" class="dh-ref-img" src="{{photoPath}}" mode="aspectFill" />
+      <text wx:else>上传正面竖照（照片驱动）</text>
+    </view>
+    <button class="dh-btn ghost" bindtap="onPickVideo">上传实拍视频（动作模仿）</button>
+    <text wx:if="{{videoPath}}" class="dh-hint">已选实拍视频</text>
+    <button class="dh-btn" bindtap="onNext">下一步：文案配音</button>
+  </view>
+
+  <view wx:elif="{{step === 2}}" class="dh-card">
+    <text class="dh-label">门店 / 卖点（给 AI 写稿）</text>
+    <input class="dh-input" placeholder="店名" value="{{shopName}}" bindinput="onShopName" />
+    <input class="dh-input" placeholder="卖点 / 套餐" value="{{shopOffer}}" bindinput="onShopOffer" />
+    <input class="dh-input" placeholder="主题，如周末双人餐" value="{{aiTopic}}" bindinput="onAiTopic" />
+    <button class="dh-btn ghost" loading="{{aiBusy}}" bindtap="onAiScript">AI 生成口播脚本</button>
+    <text class="dh-label">口播文案</text>
+    <textarea class="dh-area" maxlength="2000" placeholder="输入要合成的口播稿…" value="{{script}}" bindinput="onScript" />
+    <button class="dh-btn ghost" loading="{{aiBusy}}" bindtap="onAiRewrite">AI 改写口播</button>
     <text class="dh-label">音色</text>
     <view class="dh-chips">
       <text
@@ -15,21 +53,57 @@
         bindtap="onPickVoice"
       >{{item.label}}</text>
     </view>
-    <text class="dh-label">口播文案</text>
-    <textarea
-      class="dh-area"
-      maxlength="2000"
-      placeholder="输入要合成的口播稿…"
-      value="{{script}}"
-      bindinput="onScript"
-    />
     <view class="dh-btns">
-      <button class="dh-btn" loading="{{busy}}" disabled="{{busy}}" bindtap="onSynth">
-        {{busy ? '合成中…' : '合成并试听'}}
-      </button>
+      <button class="dh-btn" loading="{{ttsBusy}}" bindtap="onSynth">合成并试听</button>
       <button wx:if="{{playing}}" class="dh-btn ghost" bindtap="onStop">停止</button>
+    </view>
+    <text class="dh-label">抖音链接提取（可选）</text>
+    <input class="dh-input" placeholder="粘贴抖音分享链接" value="{{douyinUrl}}" bindinput="onDouyinUrl" />
+    <button class="dh-btn ghost" loading="{{linkBusy}}" bindtap="onParseLink">从链接提取口播</button>
+    <view class="dh-btns">
+      <button class="dh-btn ghost" bindtap="onPrev">上一步</button>
+      <button class="dh-btn" bindtap="onNext">下一步：动作背景</button>
     </view>
   </view>
 
+  <view wx:elif="{{step === 3}}" class="dh-card">
+    <text class="dh-label">动作指令</text>
+    <textarea class="dh-area" maxlength="800" placeholder="如：指向套餐海报；点头微笑；挥手告别" value="{{motion}}" bindinput="onMotion" />
+    <button class="dh-btn ghost" loading="{{aiBusy}}" bindtap="onAiMotion">AI 改写动作指令</button>
+    <text class="dh-label">背景描述</text>
+    <input class="dh-input" placeholder="如：暖色餐厅吧台" value="{{background}}" bindinput="onBackground" />
+    <view class="dh-btns">
+      <button class="dh-btn ghost" bindtap="onPrev">上一步</button>
+      <button class="dh-btn" bindtap="onNext">下一步：预览</button>
+    </view>
+  </view>
+
+  <view wx:elif="{{step === 4}}" class="dh-card">
+    <text class="dh-card-title">预览确认</text>
+    <image wx:if="{{photoPath}}" class="dh-ref-img wide" src="{{photoPath}}" mode="aspectFill" />
+    <text class="dh-out" user-select>{{script}}</text>
+    <text wx:if="{{motion}}" class="dh-hint">动作：{{motion}}</text>
+    <text wx:if="{{background}}" class="dh-hint">背景：{{background}}</text>
+    <view class="dh-btns">
+      <button class="dh-btn ghost" bindtap="onPrev">上一步</button>
+      <button class="dh-btn" bindtap="onNext">去生成</button>
+    </view>
+  </view>
+
+  <view wx:else class="dh-card">
+    <text class="dh-label">成片时长（秒）</text>
+    <slider min="4" max="15" step="1" value="{{durationSec}}" bindchange="onDuration" show-value activeColor="#ea580c" />
+    <button class="dh-btn" loading="{{busy}}" disabled="{{busy}}" bindtap="onGenerate">
+      {{busy ? (progress || '渲染中…') : '提交高清口播渲染'}}
+    </button>
+    <button class="dh-btn ghost" bindtap="onPrev">再编辑</button>
+    <text wx:if="{{progress}}" class="dh-hint">{{progress}}</text>
+  </view>
+
   <view wx:if="{{err}}" class="dh-err">{{err}}</view>
+  <view wx:if="{{resultUrl}}" class="dh-card">
+    <text class="dh-card-title">成片预览</text>
+    <video src="{{resultUrl}}" controls object-fit="contain" style="width:100%;height:520rpx;background:#0f172a" />
+    <button class="dh-btn" bindtap="saveAlbum">保存到相册</button>
+  </view>
 </scroll-view>

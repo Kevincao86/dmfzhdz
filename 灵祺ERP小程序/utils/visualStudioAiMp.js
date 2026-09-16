@@ -209,6 +209,9 @@ function buildLocalImagePrompt(form, copy) {
     `中国大陆本地生活营销海报，业态：${industry.label}，玩法：${pb.label}（${pb.desc}）。`,
     `投放渠道：${ch || '抖音'}。门店：${form.storeName || '本店'}。`,
     `画面主标题大字：「${c.headline || '限时优惠'}」，副标题「${c.subheadline || ''}」，优惠信息「${c.offer || ''}」。`,
+    c.timeRange ? `活动时段：${c.timeRange}。` : '',
+    c.note ? `补充说明：${c.note}。` : '',
+    form.keywords ? `关键词：${form.keywords}。` : '',
     `竖构图海报，专业排版，中文清晰可读，无水印乱码，真实质感，适合手机信息流。`,
   ]
     .filter(Boolean)
@@ -318,13 +321,34 @@ async function generatePosterImage(form, copy, opts) {
   }
 }
 
+async function fetchKeywords(form, copy) {
+  const industry = INDUSTRIES.find((i) => i.id === form.industry) || INDUSTRIES[0]
+  const pb = PLAYBOOKS.find((p) => p.id === form.playbook) || PLAYBOOKS[0]
+  const userPrompt = [
+    `为「${industry.label}」门店「${form.storeName || '本店'}」的「${pb.label}」海报生成 8～12 个中文关键词。`,
+    `主标题：${(copy && copy.headline) || ''}；优惠：${(copy && copy.offer) || ''}`,
+    '只输出用顿号分隔的关键词，不要解释。',
+  ].join('\n')
+  const res = await postAiChat(
+    [
+      { role: 'system', content: '你只输出中文关键词，用顿号分隔。' },
+      { role: 'user', content: userPrompt },
+    ],
+    { provider: 'qwen', taskType: 'generate_copywriting', temperature: 0.3 },
+  )
+  if (!res.ok) return { ok: false, message: res.message, keywords: '' }
+  return { ok: true, keywords: String(res.content || '').replace(/\s+/g, ' ').trim() }
+}
+
 module.exports = {
   CHANNELS,
   PLAYBOOKS,
   INDUSTRIES,
+  postAiChat,
   fetchCopySuggestions,
   fetchImagePrompt,
   generatePosterImage,
+  fetchKeywords,
   buildLocalImagePrompt,
   localCopyFallback,
 }

@@ -18,7 +18,7 @@
 
   <view class="vs-card" wx:if="{{step === 1}}">
     <text class="vs-card__title">投放渠道</text>
-    <text class="vs-card__sub">可多选，出图时按主渠道构图</text>
+    <text class="vs-card__sub">可多选；可开「一键多端套装」按所选渠道各出一张</text>
     <view class="vs-chips">
       <view
         wx:for="{{channels}}"
@@ -40,6 +40,7 @@
     </view>
     <text class="vs-label">门店 / 品牌名</text>
     <input class="vs-input" placeholder="如：灵祺小馆" value="{{storeName}}" bindinput="onStoreName" />
+    <view class="vs-chip {{seriesOn ? 'on' : ''}}" bindtap="onToggleSeries">一键多端套装{{seriesOn ? ' · 已开' : ''}}</view>
     <button class="vs-btn" bindtap="onNextStep">下一步：选玩法</button>
   </view>
 
@@ -86,6 +87,13 @@
     <input class="vs-input" value="{{subheadline}}" bindinput="onSubheadline" />
     <text class="vs-label">优惠信息</text>
     <input class="vs-input" value="{{offer}}" bindinput="onOffer" placeholder="如：¥99 双人餐" />
+    <text class="vs-label">活动时段</text>
+    <input class="vs-input" value="{{timeRange}}" bindinput="onTimeRange" placeholder="如：本周五至周日" />
+    <text class="vs-label">补充说明</text>
+    <input class="vs-input" value="{{note}}" bindinput="onNote" placeholder="如：仅堂食 / 需预约" />
+    <text class="vs-label">关键词</text>
+    <input class="vs-input" value="{{keywords}}" bindinput="onKeywords" placeholder="可手填或 AI 生成" />
+    <button class="vs-btn ghost" loading="{{keywordsBusy}}" bindtap="onAiKeywords">AI 生成关键词</button>
     <text class="vs-err" wx:if="{{err}}">{{err}}</text>
     <view class="vs-pair">
       <button class="vs-btn ghost" bindtap="onPrevStep">上一步</button>

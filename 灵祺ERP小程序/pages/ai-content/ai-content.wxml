@@ -1,87 +1,107 @@
-<view class="ai-page">
+<scroll-view scroll-y class="ai-page" enhanced show-scrollbar="{{false}}">
   <view class="ai-head-block">
-    <text class="ai-h1">文章与话题</text>
-    <text class="ai-intro">选择平台上下文与品牌或门店口径，对齐电脑端文案链路。</text>
-    <view class="ai-two-tabs">
-      <view class="ai-tab {{mainTab === 'article' ? 'on' : ''}}" data-t="article" bindtap="switchMain">写文章</view>
-      <view class="ai-tab {{mainTab === 'topic' ? 'on' : ''}}" data-t="topic" bindtap="switchMain">话题推荐</view>
+    <text class="ai-h1">爆款 Brief 生成</text>
+    <text class="ai-intro">与电脑端同源：选平台与风格，填写门店需求，一次生成达人可执行 Brief / 图文文稿（{{briefPoints}} 积分/篇）。</text>
+  </view>
+
+  <view class="ai-card">
+    <text class="ai-label">投放平台</text>
+    <view class="ai-chips">
+      <text
+        wx:for="{{platformOptions}}"
+        wx:key="id"
+        class="ai-chip {{platform === item.id ? 'on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onPlatform"
+      >{{item.label}}</text>
+    </view>
+    <text class="ai-label spaced">内容风格</text>
+    <view class="ai-chips">
+      <text
+        wx:for="{{styleOptions}}"
+        wx:key="id"
+        class="ai-chip {{style === item.id ? 'on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onStyle"
+      >{{item.label}}</text>
     </view>
   </view>
 
   <view class="ai-card">
-    <text class="ai-label">平台</text>
-    <picker mode="selector" range="{{platformOptions}}" range-key="label" value="{{platformIdx}}" bindchange="onPlatformChange">
-      <view class="ai-picker">{{platformOptions[platformIdx].label}}</view>
-    </picker>
-    <text wx:if="{{platformWarn}}" class="ai-warn">{{platformWarn}}</text>
-
-    <text class="ai-label spaced">品牌 / 门店</text>
-    <view class="ai-scope-row">
-      <view class="ai-pill {{scopeMode === 'brand' ? 'on' : ''}}" data-mode="brand" bindtap="toggleScope">品牌</view>
-      <view class="ai-pill {{scopeMode === 'store' ? 'on' : ''}}" data-mode="store" bindtap="toggleScope">门店</view>
-    </view>
-
-    <block wx:if="{{scopeMode === 'brand'}}">
-      <text class="ai-hint">品牌名称 · 可与来客「门店品牌」对齐</text>
-      <input
-        class="ai-input"
-        placeholder="例如：某某餐饮"
-        value="{{brandName}}"
-        bindinput="onBrand"
-      />
-    </block>
-    <block wx:else>
-      <button class="ai-chip-btn" bindtap="openStorePick">选择门店 · {{selSummary}}</button>
-      <text class="ai-hint">来客门店可多选（最多12家）</text>
-    </block>
+    <text class="ai-label">门店 / 标题 *</text>
+    <input class="ai-input" placeholder="如：老街铜锅 · 双人套餐探店" value="{{title}}" bindinput="onTitle" />
+    <text class="ai-label spaced">品类</text>
+    <input class="ai-input" placeholder="如：火锅 / 美业" value="{{category}}" bindinput="onCategory" />
+    <text class="ai-label spaced">区域</text>
+    <input class="ai-input" placeholder="如：上海静安" value="{{region}}" bindinput="onRegion" />
+    <text class="ai-label spaced">需求描述 *</text>
+    <textarea class="ai-area-article" maxlength="2000" placeholder="招牌、套餐、人群、必须出现的卖点与禁忌…" value="{{content}}" bindinput="onContent" />
+    <text class="ai-label spaced">补充要点（选填）</text>
+    <textarea class="ai-area-topic" maxlength="800" placeholder="节日节点、竞品对比、达人方向…" value="{{extraHint}}" bindinput="onExtra" />
+    <button class="ai-gen-main" loading="{{busy}}" disabled="{{busy}}" bindtap="onGenerate">
+      {{busy ? (progress || '生成中…') : (copyMode ? '生成图文文稿' : '生成 Brief')}}
+    </button>
+    <text wx:if="{{pointsTip}}" class="ai-hint">{{pointsTip}}</text>
+    <text wx:if="{{err}}" class="ai-err">{{err}}</text>
   </view>
 
-  <block wx:if="{{mainTab === 'article'}}">
-    <view class="ai-card flat">
-      <text class="ai-label">写作要点与活动信息 *</text>
-      <textarea class="ai-area-article" maxlength="2000" value="{{articleBrief}}" bindinput="onArticleBrief" placeholder="活动主题、卖点、套餐、适用人群…" />
-      <button class="ai-gen-main" loading="{{articleBusy}}" bindtap="submitArticle">开始写作</button>
-      <text wx:if="{{articleErr}}" class="ai-err">{{articleErr}}</text>
-      <view wx:if="{{articleOut}}" class="ai-out">{{articleOut}}</view>
-      <button wx:if="{{articleOut}}" class="ai-copy" bindtap="copyArticle">复制正文</button>
-    </view>
-  </block>
-
-  <block wx:if="{{mainTab === 'topic'}}">
-    <view class="ai-card flat">
-      <text class="ai-label">账号定位 · 选题背景 *</text>
-      <textarea class="ai-area-topic" maxlength="1500" value="{{topicFocus}}" bindinput="onTopicFocus" placeholder="人群画像、主推品类、竞品参考…" />
-      <button class="ai-gen-main ai-gen-muted" loading="{{topicBusy}}" bindtap="submitTopic">开始选题</button>
-      <text wx:if="{{topicErr}}" class="ai-err">{{topicErr}}</text>
-      <view wx:if="{{topicOut}}" class="ai-out">{{topicOut}}</view>
-      <button wx:if="{{topicOut}}" class="ai-copy" bindtap="copyTopic">复制结果</button>
-    </view>
-  </block>
-
-  <view class="ai-bottom-sp"></view>
-</view>
-
-<view wx:if="{{storeSheet}}" class="sheet-mask" catchtouchmove="noop" bindtap="closeStorePick">
-  <view class="sheet-panel" catchtap="noop">
-    <view class="sheet-head">
-      <text class="sheet-title">来客门店 · 点多选切换</text>
-      <text class="sheet-close" bindtap="closeStorePick">完成</text>
-    </view>
-    <scroll-view scroll-y class="sheet-scroll">
-      <view
-        wx:for="{{storeRows}}"
-        wx:key="id"
-        class="sheet-row"
-        bindtap="onToggleStore"
-        data-id="{{item.id}}"
-        data-name="{{item.name}}"
-      >
-        <view class="sheet-dot {{item._pick ? 'on' : ''}}"></view>
-        <view class="sheet-cell">
-          <text class="sheet-name">{{item.name}}</text>
-          <text wx:if="{{item.address}}" class="sheet-addr">{{item.address}}</text>
-        </view>
+  <block wx:if="{{result}}">
+    <view class="ai-card">
+      <view class="ai-row-between">
+        <text class="ai-label">结果</text>
+        <text class="ai-link" bindtap="copyMd">复制全文</text>
       </view>
-    </scroll-view>
-  </view>
-</view>
+      <text wx:if="{{result.requirementSummary}}" class="ai-block-title">一、需求汇总</text>
+      <text wx:if="{{result.requirementSummary}}" class="ai-out" user-select>{{result.requirementSummary}}</text>
+
+      <block wx:if="{{result.outputMode === 'copy_manuscript'}}">
+        <text wx:if="{{result.coverTitles.length}}" class="ai-block-title">封面 / 标题</text>
+        <view wx:for="{{result.coverTitles}}" wx:key="*this" class="ai-li">{{index + 1}}. {{item}}</view>
+        <text wx:if="{{result.openingParagraph}}" class="ai-block-title">开篇</text>
+        <text wx:if="{{result.openingParagraph}}" class="ai-out" user-select>{{result.openingParagraph}}</text>
+        <block wx:for="{{result.bodySections}}" wx:key="heading">
+          <text class="ai-block-title">{{item.heading}}</text>
+          <text class="ai-out" user-select>{{item.content}}</text>
+        </block>
+        <text wx:if="{{result.closingParagraph}}" class="ai-block-title">结尾</text>
+        <text wx:if="{{result.closingParagraph}}" class="ai-out" user-select>{{result.closingParagraph}}</text>
+        <text wx:if="{{result.fullCopy}}" class="ai-block-title">完整文稿</text>
+        <text wx:if="{{result.fullCopy}}" class="ai-out" user-select>{{result.fullCopy}}</text>
+      </block>
+
+      <block wx:else>
+        <text wx:if="{{result.unifiedSolutions.length}}" class="ai-block-title">二、解决方案</text>
+        <view wx:for="{{result.unifiedSolutions}}" wx:key="title" class="ai-li">
+          <text class="ai-strong">{{item.title}}</text>：{{item.desc}}
+        </view>
+        <text wx:if="{{result.hooks.length}}" class="ai-block-title">三、爆款钩子（前 3 秒）</text>
+        <view wx:for="{{result.hooks}}" wx:key="*this" class="ai-li">{{index + 1}}. {{item}}</view>
+        <text wx:if="{{result.titles.length}}" class="ai-block-title">四、标题 / 封面文案</text>
+        <view wx:for="{{result.titles}}" wx:key="*this" class="ai-li">{{index + 1}}. {{item}}</view>
+        <text wx:if="{{result.structure.length}}" class="ai-block-title">五、内容结构 / 分镜</text>
+        <view wx:for="{{result.structure}}" wx:key="scene" class="ai-shot">
+          <text class="ai-strong">镜头 {{index + 1}}：{{item.scene}}</text>
+          <text class="ai-out muted">画面：{{item.visual}}</text>
+          <text class="ai-out">口播：{{item.voice}}</text>
+          <text wx:if="{{item.subtitle}}" class="ai-out muted">字幕：{{item.subtitle}}</text>
+        </view>
+        <text wx:if="{{result.mustMention.length}}" class="ai-block-title">六、必提卖点</text>
+        <view wx:for="{{result.mustMention}}" wx:key="*this" class="ai-li">· {{item}}</view>
+        <text wx:if="{{result.forbidden.length}}" class="ai-block-title">七、禁忌事项</text>
+        <view wx:for="{{result.forbidden}}" wx:key="*this" class="ai-li">· {{item}}</view>
+        <text wx:if="{{result.topics.length}}" class="ai-block-title">八、话题 / 标签</text>
+        <view wx:for="{{result.topics}}" wx:key="*this" class="ai-li">{{item}}</view>
+        <view wx:if="{{result.roles.talent || result.roles.shoot || result.roles.edit}}" class="ai-shot">
+          <text class="ai-block-title">角色分工</text>
+          <text wx:if="{{result.roles.talent}}" class="ai-out">达人：{{result.roles.talent}}</text>
+          <text wx:if="{{result.roles.shoot}}" class="ai-out">拍摄：{{result.roles.shoot}}</text>
+          <text wx:if="{{result.roles.edit}}" class="ai-out">剪辑：{{result.roles.edit}}</text>
+        </view>
+      </block>
+
+      <text wx:if="{{result.checklist.length}}" class="ai-block-title">发布前自检</text>
+      <view wx:for="{{result.checklist}}" wx:key="*this" class="ai-li">· {{item}}</view>
+    </view>
+  </block>
+  <view class="ai-bottom-sp"></view>
+</scroll-view>

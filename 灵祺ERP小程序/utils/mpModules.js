@@ -33,8 +33,8 @@ module.exports.MODULE_COPY = {
     body: '小程序提供概览健康分、问法抽样与咨询测试；完整的门店信息、内容库、问法覆盖、平台同步与效果体检请在电脑端「运营 → GEO 运营优化」操作。',
   },
   ai_content: {
-    navTitle: '文章与话题',
-    body: '文章与话题需绑定抖音来客；支持品牌/多店上下文。高级编排请在电脑端完成。',
+    navTitle: '爆款 Brief 生成',
+    body: '与电脑端同源：选平台与风格，填写门店需求，生成达人 Brief / 图文文稿。请从「功能 → AI 创作 → 爆款 Brief 生成」进入。',
   },
   ai_visual_studio: {
     navTitle: '视觉工坊',
@@ -66,7 +66,7 @@ module.exports.MODULE_COPY = {
   },
   digital_human: {
     navTitle: '数字人口播',
-    body: '请从「功能 → AI 创作 → 数字人口播」进入试听；完整成片计费与电脑端一致。',
+    body: '请从「功能 → AI 创作 → 数字人口播」进入：形象、文案配音、动作背景、预览、生成，与电脑端步骤一致。',
   },
   ai_ops_plan: {
     navTitle: '运营方案',

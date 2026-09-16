@@ -18,6 +18,9 @@ const MP_POINTS_CLOUD_EDIT_SMART_MIN_CHARGE = 5
 
 const MP_POINTS_MIX_MATERIAL_ANALYZE_PER_USE = 15
 
+const MP_POINTS_BRIEF_PER_USE = 8
+const MP_POINTS_OPS_PLAN_PER_USE = 30
+
 const MP_POINTS_VISUAL_STUDIO_COPY_PER_USE = 3
 const MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE = 8
 /** 高级生图 GPT Image 2 high：150 积分/张（与 Web mpPointsEconomics 一致） */
@@ -39,6 +42,8 @@ const MP_POINTS_USAGE_KIND_LABELS = {
   visual_studio_copy: '视觉工坊文案',
   visual_studio_image: '视觉工坊常规生图',
   visual_studio_image_pro: '视觉工坊高级生图',
+  brief: '爆款 Brief',
+  ops_plan: 'AI 运营方案',
 }
 
 function mpPointsPerSecForKind(kind) {
@@ -83,6 +88,8 @@ function mpPointsCostForUsage(kind, opts) {
     const n = Math.max(1, Math.ceil(Number((opts && opts.count) || 1) || 1))
     return n * MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE
   }
+  if (kind === 'brief') return MP_POINTS_BRIEF_PER_USE
+  if (kind === 'ops_plan') return MP_POINTS_OPS_PLAN_PER_USE
   return 0
 }
 
@@ -102,6 +109,8 @@ function formatMpPointsRateLabel(kind) {
   if (kind === 'visual_studio_image_pro') {
     return `${MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE} 积分/张`
   }
+  if (kind === 'brief') return `${MP_POINTS_BRIEF_PER_USE} 积分/篇`
+  if (kind === 'ops_plan') return `${MP_POINTS_OPS_PLAN_PER_USE} 积分/次`
   const rate = mpPointsPerSecForKind(kind)
   if (rate != null) return `${rate} 积分/秒`
   return '按积分扣费'
@@ -131,6 +140,8 @@ module.exports = {
   MP_POINTS_VISUAL_STUDIO_COPY_PER_USE,
   MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE,
   MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE,
+  MP_POINTS_BRIEF_PER_USE,
+  MP_POINTS_OPS_PLAN_PER_USE,
   VISUAL_STUDIO_PRO_IMAGE_MODEL,
   mpPointsCostForUsage,
   formatMpPointsRateLabel,

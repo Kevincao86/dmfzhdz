@@ -8,7 +8,7 @@
         <text class="sv-header-sub">短视频出片 · 与电脑端同源</text>
       </view>
     </view>
-    <text class="sv-header-desc">创作舱与灵祺视频主路径；分镜请在短片生成区编排。</text>
+    <text class="sv-header-desc">Skill 技能 · 无限画布 · 短片生成 · 数字人 · 音乐配乐 · 案例做同款。</text>
     <text class="sv-persist-tip">生成后请及时保存到相册。刷新页面后，本页生成记录将消失。</text>
   </view>
 
@@ -196,6 +196,38 @@
       </button>
       <button wx:if="{{busy}}" class="sv-btn-outline" bindtap="cancelWait">停止等待</button>
       <text class="sv-cabin-tip">提交将按实际时长扣减短视频积分；成片可保存到相册。</text>
+    </view>
+  </view>
+
+  <!-- ========== 无限画布（分镜节点编排，应用后回写生成区） ========== -->
+  <view wx:if="{{mainPane === 'canvas'}}" class="sv-cabin-wrap">
+    <view class="sv-cabin-heading">
+      <text class="sv-cabin-h1">无限画布</text>
+      <text class="sv-cabin-h2">分镜节点可增删改排序，应用后进入短片生成区出片</text>
+    </view>
+    <view class="sv-cabin">
+      <view class="sv-script-panel">
+        <view class="sv-script-head">
+          <text class="sv-script-title">分镜节点</text>
+          <view class="sv-script-acts">
+            <text class="sv-link" bindtap="planScriptRows">自动规划</text>
+            <text class="sv-link" bindtap="addScriptRow">+ 镜头</text>
+          </view>
+        </view>
+        <view wx:for="{{scriptRows}}" wx:key="_id" class="sv-script-card">
+          <view class="sv-script-card-top">
+            <text class="sv-script-idx">镜头 {{index + 1}}</text>
+            <text class="sv-link" data-idx="{{index}}" data-dir="up" bindtap="moveScriptRow">上移</text>
+            <text class="sv-link" data-idx="{{index}}" data-dir="down" bindtap="moveScriptRow">下移</text>
+            <text class="sv-link danger" data-idx="{{index}}" bindtap="removeScriptRow">删</text>
+          </view>
+          <input class="sv-input" data-idx="{{index}}" data-field="timeRange" value="{{item.timeRange}}" placeholder="时段 如 0-5秒" bindinput="onScriptField" />
+          <textarea class="sv-area-sm" data-idx="{{index}}" data-field="visual" value="{{item.visual}}" placeholder="画面描述" bindinput="onScriptField" />
+          <textarea class="sv-area-sm" data-idx="{{index}}" data-field="dialogue" value="{{item.dialogue}}" placeholder="口播 / 字幕" bindinput="onScriptField" />
+        </view>
+      </view>
+      <button class="sv-btn-cyan" bindtap="applyFlowboard">应用流程后回写短片生成区</button>
+      <button class="sv-btn-outline" bindtap="runFlowboardGenerate">应用并开始创作</button>
     </view>
   </view>
 

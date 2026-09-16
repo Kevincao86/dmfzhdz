@@ -77,7 +77,7 @@ Page({
     mainPane: 'generate',
     studioModes: STUDIO_MODES,
     studioModeId: 'agent',
-    studioModeLabel: '创作舱模式',
+    studioModeLabel: 'Agent 模式',
     quickCards: QUICK_CARDS,
     desktopPaneTip: '',
 
@@ -249,7 +249,6 @@ Page({
   },
 
   async onShow() {
-    if (this.data.mainPane === 'canvas') this.setData({ mainPane: 'generate' })
     if (!api.getAccessToken()) {
       wx.redirectTo({ url: '/pages/login/login' })
       return
@@ -489,8 +488,7 @@ Page({
   },
 
   onMainTab(e) {
-    let id = e.currentTarget.dataset.id
-    if (id === 'canvas') id = 'generate'
+    const id = e.currentTarget.dataset.id
     if (!id || id === this.data.mainPane) return
     this.resetOutputs()
     this.setData({ mainPane: id, desktopPaneTip: '' })
@@ -498,8 +496,7 @@ Page({
   },
 
   onQuickCard(e) {
-    let pane = e.currentTarget.dataset.pane
-    if (pane === 'canvas') pane = 'generate'
+    const pane = e.currentTarget.dataset.pane
     if (!pane) return
     this.resetOutputs()
     this.setData({ mainPane: pane, desktopPaneTip: '' })

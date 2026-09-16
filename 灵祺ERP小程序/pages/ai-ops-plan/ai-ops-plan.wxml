@@ -1,10 +1,28 @@
 <scroll-view scroll-y class="op-page" enhanced show-scrollbar="{{false}}">
   <view class="op-hero">
-    <text class="op-title">运营方案</text>
-    <text class="op-sub">与电脑端同源生成；小程序展示方案摘要，完整图表可在电脑端查看。</text>
+    <text class="op-title">AI 运营方案</text>
+    <text class="op-sub">与电脑端同源：先选简易/标准版，点目标模板，再生成（{{opsPoints}} 积分/次）。</text>
   </view>
 
   <view class="op-card">
+    <text class="op-label">方案版本</text>
+    <view class="op-chips">
+      <text class="op-chip {{planEdition === 'simple' ? 'on' : ''}}" data-id="simple" bindtap="onEdition">简易版</text>
+      <text class="op-chip {{planEdition === 'standard' ? 'on' : ''}}" data-id="standard" bindtap="onEdition">标准版</text>
+    </view>
+    <text class="op-body muted">{{editionTip}}</text>
+
+    <text class="op-label">① 目标模板</text>
+    <view class="op-chips">
+      <text
+        wx:for="{{goalTemplates}}"
+        wx:key="id"
+        class="op-chip {{item.on ? 'on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onGoal"
+      >{{item.label}}</text>
+    </view>
+
     <text class="op-label">投放平台</text>
     <view class="op-chips">
       <text
@@ -28,16 +46,39 @@
     <text class="op-label">门店名称</text>
     <input class="op-input" value="{{storeName}}" placeholder="选填" bindinput="onStoreName" />
     <text class="op-label">目标备注</text>
-    <textarea class="op-area" maxlength="500" placeholder="选填，如拉新 / 核销 / 品牌" value="{{goalsNote}}" bindinput="onGoalsNote" />
+    <textarea class="op-area" maxlength="500" placeholder="点模板会自动填入，也可手改" value="{{goalsNote}}" bindinput="onGoalsNote" />
     <button class="op-btn" loading="{{busy}}" disabled="{{busy}}" bindtap="onGenerate">
-      {{busy ? '生成中…' : '生成方案'}}
+      {{busy ? (planEdition === 'simple' ? '正在生成简易方案…' : '正在生成标准方案…') : (planEdition === 'simple' ? '生成简易方案' : '生成标准方案')}}
     </button>
     <text wx:if="{{pointsHint}}" class="op-meta">{{pointsHint}}</text>
   </view>
 
   <view wx:if="{{err}}" class="op-err">{{err}}</view>
 
-  <block wx:if="{{plan}}">
+  <block wx:if="{{simple}}">
+    <view wx:if="{{simple.heroTitle}}" class="op-card">
+      <text class="op-card-title">{{simple.heroTitle}}</text>
+      <text wx:if="{{simple.heroSub}}" class="op-body" user-select>{{simple.heroSub}}</text>
+    </view>
+    <view wx:if="{{simple.steps.length}}" class="op-card">
+      <text class="op-card-title">本周步骤</text>
+      <view wx:for="{{simple.steps}}" wx:key="n" class="op-li">{{item.n}}. {{item.title}} {{item.desc}}</view>
+    </view>
+    <view wx:if="{{simple.platforms.length}}" class="op-card">
+      <text class="op-card-title">各平台怎么发</text>
+      <view wx:for="{{simple.platforms}}" wx:key="name" class="op-li">{{item.name}}：{{item.how}}</view>
+    </view>
+    <view wx:if="{{simple.combos.length}}" class="op-card">
+      <text class="op-card-title">推荐套餐</text>
+      <view wx:for="{{simple.combos}}" wx:key="name" class="op-li">{{item.name}} {{item.price}} {{item.selling}}</view>
+    </view>
+    <view wx:if="{{simple.checklist.length}}" class="op-card">
+      <text class="op-card-title">落地清单</text>
+      <view wx:for="{{simple.checklist}}" wx:key="*this" class="op-li">· {{item}}</view>
+    </view>
+  </block>
+
+  <block wx:elif="{{plan}}">
     <view wx:if="{{plan.background}}" class="op-card">
       <text class="op-card-title">背景</text>
       <text class="op-body" user-select>{{plan.background}}</text>

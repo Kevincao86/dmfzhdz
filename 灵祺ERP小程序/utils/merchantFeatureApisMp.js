@@ -138,6 +138,23 @@ async function runCompetitorAnalysis(body) {
   }
 }
 
+async function fetchDigitalHumanDouyinLink(url) {
+  try {
+    const r = await postJson('/api/meoo-digital-human-douyin-link', { url: String(url || '').trim() })
+    if (r.ok && (r.script || r.text || r.copy)) {
+      return {
+        ok: true,
+        script: String(r.script || r.text || r.copy || '').trim(),
+        motion: String(r.motion || r.action || '').trim(),
+        title: String(r.title || r.sourceTitle || '').trim(),
+      }
+    }
+    return { ok: false, message: String(r.message || r.error || r.detail || '链接解析失败') }
+  } catch (e) {
+    return { ok: false, message: (e && e.message) || '链接解析失败' }
+  }
+}
+
 async function synthesizeDigitalHumanTts(body) {
   try {
     const payload = Object.assign({ tenantId: tenantId() || undefined }, body || {})
@@ -161,6 +178,8 @@ function normalizeOpsPlan(plan) {
   const exec = plan.executionPlan || {}
   const budget = plan.marketingBudget || {}
   return {
+    planEdition: String(plan.planEdition || '').trim() || 'standard',
+    simplePlan: plan.simplePlan && typeof plan.simplePlan === 'object' ? plan.simplePlan : null,
     background: String(ops.background || '').trim(),
     backgroundDetail: String(ops.backgroundDetail || '').trim(),
     positioning: String(ops.positioning || '').trim(),
@@ -183,7 +202,12 @@ async function generateAiOpsPlan(body) {
     const r = await postJson('/api/meoo-ai-ops-plan', body)
     if (r.ok && r.plan) {
       const plan = normalizeOpsPlan(r.plan)
-      if (plan && (plan.background || plan.positioning || plan.goals.length)) {
+      const simpleOk =
+        plan &&
+        plan.simplePlan &&
+        ((Array.isArray(plan.simplePlan.steps) && plan.simplePlan.steps.length) ||
+          (plan.simplePlan.hero && (plan.simplePlan.hero.title || plan.simplePlan.hero.headline)))
+      if (plan && (simpleOk || plan.background || plan.positioning || plan.goals.length)) {
         return {
           ok: true,
           plan,
@@ -230,6 +254,7 @@ module.exports = {
   menuSummaryLines,
   runCompetitorAnalysis,
   synthesizeDigitalHumanTts,
+  fetchDigitalHumanDouyinLink,
   generateAiOpsPlan,
   runSiteSelection,
 }
