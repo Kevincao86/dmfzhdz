@@ -56,10 +56,10 @@ const QUICK: {
   color: string
   icon: typeof Users
 }[] = [
-  { title: '达人招募', path: '/recruitment', color: 'bg-purple-500', icon: Users },
-  { title: '投流管理', path: '/advertising', color: 'bg-orange-500', icon: UserPlus },
-  { title: '评论管理', path: '/operation', color: 'bg-green-500', icon: MessageSquare },
-  { title: '线索管理', path: '/leads', color: 'bg-blue-500', icon: UserPlus },
+  { title: '达人招募', path: '/recruitment', color: 'bg-[#1F6F78]', icon: Users },
+  { title: '投流管理', path: '/advertising', color: 'bg-[#3d4450]', icon: UserPlus },
+  { title: '评论管理', path: '/operation', color: 'bg-[#1F6F78]', icon: MessageSquare },
+  { title: '线索管理', path: '/leads', color: 'bg-[#3d4450]', icon: UserPlus },
 ]
 
 const SIMPLE_HOME_LINKS: { title: string; hint: string; path: string }[] = [
@@ -215,7 +215,7 @@ function MerchantHomeDashboard() {
     return (
       <div className="space-y-8">
         <div className="flex h-24 flex-col items-center justify-center gap-3 text-slate-500">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#1F6F78] border-t-transparent" />
           <span className="text-sm font-medium">加载经营数据…</span>
         </div>
         <div
@@ -245,7 +245,7 @@ function MerchantHomeDashboard() {
       <div className="space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="relative pl-4">
-            <span className="absolute left-0 top-1 h-[calc(100%-4px)] w-1 rounded-full bg-gradient-to-b from-cyan-500 to-orange-400" aria-hidden />
+            <span className="absolute left-0 top-1 h-[calc(100%-4px)] w-px bg-[#1F6F78]" aria-hidden />
             <h1 className="erp-page-title">今天</h1>
             <p className="mt-1 text-sm text-slate-600">先看这三件事，其它数据可随时切回详细版</p>
           </div>
@@ -288,7 +288,7 @@ function MerchantHomeDashboard() {
         <button
           type="button"
           onClick={() => setUiDensity('detailed')}
-          className="text-sm text-cyan-700 hover:underline"
+          className="text-sm text-[#1F6F78] hover:underline"
         >
           看完整数据
         </button>
@@ -300,7 +300,7 @@ function MerchantHomeDashboard() {
     <div className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="relative pl-4">
-          <span className="absolute left-0 top-1 h-[calc(100%-4px)] w-1 rounded-full bg-gradient-to-b from-cyan-500 to-orange-400" aria-hidden />
+          <span className="absolute left-0 top-1 h-[calc(100%-4px)] w-px bg-[#1F6F78]" aria-hidden />
           <h1 className="erp-page-title">数据看板</h1>
           <p className="mt-1 text-sm text-slate-600">本地生活全渠道经营概览</p>
         </div>
@@ -312,12 +312,12 @@ function MerchantHomeDashboard() {
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-6 lg:grid-cols-3">
         {(
           [
-            { label: '总营收', value: formatMoney(stats.totalRevenue), icon: Wallet, color: 'blue' },
-            { label: '订单数', value: formatNum(stats.totalOrders), icon: ShoppingCart, color: 'green' },
-            { label: '转化率', value: `${stats.conversionRate}%`, icon: Percent, color: 'purple' },
-            { label: '粉丝增长', value: `+${formatNum(stats.fansGrowth)}`, icon: Users, color: 'pink' },
-            { label: '今日新线索', value: stats.todayNewLeads, icon: UserPlus, color: 'orange' },
-            { label: '待处理评论', value: stats.pendingComments, icon: MessageSquare, color: 'red' },
+            { label: '总营收', value: formatMoney(stats.totalRevenue), icon: Wallet, color: 'ink' },
+            { label: '订单数', value: formatNum(stats.totalOrders), icon: ShoppingCart, color: 'teal' },
+            { label: '转化率', value: `${stats.conversionRate}%`, icon: Percent, color: 'ink' },
+            { label: '粉丝增长', value: `+${formatNum(stats.fansGrowth)}`, icon: Users, color: 'teal' },
+            { label: '今日新线索', value: stats.todayNewLeads, icon: UserPlus, color: 'ink' },
+            { label: '待处理评论', value: stats.pendingComments, icon: MessageSquare, color: 'teal' },
           ] as const
         ).map((card, idx) => (
           <motion.div
@@ -332,23 +332,15 @@ function MerchantHomeDashboard() {
               <div
                 className={cn(
                   'flex h-8 w-8 items-center justify-center rounded-lg',
-                  card.color === 'blue' && 'bg-blue-50',
-                  card.color === 'green' && 'bg-green-50',
-                  card.color === 'purple' && 'bg-purple-50',
-                  card.color === 'pink' && 'bg-pink-50',
-                  card.color === 'orange' && 'bg-orange-50',
-                  card.color === 'red' && 'bg-red-50',
+                  card.color === 'teal' && 'bg-[rgba(31,111,120,0.1)]',
+                  card.color === 'ink' && 'bg-[#F2F3F0]',
                 )}
               >
                 <card.icon
                   className={cn(
                     'h-4 w-4',
-                    card.color === 'blue' && 'text-blue-600',
-                    card.color === 'green' && 'text-green-600',
-                    card.color === 'purple' && 'text-purple-600',
-                    card.color === 'pink' && 'text-pink-600',
-                    card.color === 'orange' && 'text-orange-600',
-                    card.color === 'red' && 'text-red-600',
+                    card.color === 'teal' && 'text-[#1F6F78]',
+                    card.color === 'ink' && 'text-[#14181F]',
                   )}
                 />
               </div>

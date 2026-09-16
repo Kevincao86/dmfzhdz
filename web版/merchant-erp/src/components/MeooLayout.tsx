@@ -61,8 +61,9 @@ export default function MeooLayout() {
   const location = useLocation()
   const pathname = location.pathname
   const navigate = useNavigate()
-  const [collapsed, setCollapsed] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
   const [openGroups, setOpenGroups] = useState<string[]>([])
+  const [hoverGroup, setHoverGroup] = useState<string | null>(null)
   const [userOpen, setUserOpen] = useState(false)
   const [personalSettingsOpen, setPersonalSettingsOpen] = useState(false)
   const [personalSettingsFormKey, setPersonalSettingsFormKey] = useState(0)
@@ -200,82 +201,63 @@ export default function MeooLayout() {
     signOutAndGoLogin()
   }
 
-  const sidebarWidth = collapsed ? 'w-16' : 'w-64'
-  const mainMargin = collapsed ? 'ml-16' : 'ml-64'
+  const activeGroup = navItems.find(
+    (item) => item.children?.some((c) => childActive(pathname, c.path)),
+  )
+
+  const navLinkClass = (active: boolean) =>
+    cn(
+      'relative shrink-0 whitespace-nowrap px-2.5 py-2 text-[13px] font-medium transition-colors',
+      active ? 'text-[#1F6F78]' : 'text-[#3d4450] hover:text-[#14181F]',
+    )
 
   return (
     <TenantAnnouncementProvider>
-    <div className="flex min-h-screen bg-slate-100">
-      <aside
-        className={cn(
-          'fixed left-0 top-0 z-40 flex h-screen flex-shrink-0 flex-col border-r border-slate-800/80 bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 shadow-[8px_0_36px_-14px_rgba(15,23,42,0.7)] transition-all duration-300',
-          sidebarWidth,
-        )}
-      >
-        <div className="flex h-16 items-center border-b border-slate-800/80 bg-slate-950/80 px-4 backdrop-blur-sm">
-          {!collapsed && (
-            <>
-              <img
-                src={BRAND_LOGO_URL}
-                alt={BRAND_NAME}
-                className="mr-2 h-10 w-10 shrink-0 rounded-xl object-contain ring-1 ring-white/10"
-              />
-              <span className="text-lg font-semibold tracking-tight text-white">{BRAND_NAME}</span>
-            </>
-          )}
-          {collapsed && (
+    <div className="flex min-h-screen flex-col bg-[#F2F3F0] text-[#14181F]">
+      <header className="sticky top-0 z-40 border-b border-[#D5D9DE] bg-[#F2F3F0]/95 backdrop-blur-md">
+        <div className="flex h-14 items-center gap-3 px-3 lg:px-5">
+          <button
+            type="button"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-[#3d4450] hover:bg-white lg:hidden"
+            aria-label="打开菜单"
+            onClick={() => setMobileOpen(true)}
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <NavLink to="/home" className="flex shrink-0 items-center gap-2">
             <img
               src={BRAND_LOGO_URL}
               alt={BRAND_NAME}
-              className="mx-auto h-9 w-9 rounded-xl object-contain ring-1 ring-white/10"
+              className="h-8 w-8 rounded-lg object-contain ring-1 ring-[#D5D9DE]"
             />
-          )}
-        </div>
+            <span className="hidden text-[15px] font-semibold tracking-tight sm:inline">{BRAND_NAME}</span>
+          </NavLink>
 
-        <nav className="h-[calc(100vh-4rem)] space-y-1 overflow-y-auto p-3">
-          {navItems.map((item) => {
-            const Icon = item.icon
-            const active = item.children
-              ? item.children.some((c) => childActive(pathname, c.path))
-              : pathActive(pathname, item.path)
-
-            if (item.children) {
-              const open = openGroups.includes(item.path)
+          <nav className="hidden min-w-0 flex-1 items-center gap-0.5 overflow-x-auto lg:flex">
+            {navItems.map((item) => {
+              const active = item.children
+                ? item.children.some((c) => childActive(pathname, c.path))
+                : pathActive(pathname, item.path)
+              const href = item.children?.[0]?.path ?? item.path
               return (
-                <div key={item.path} className="relative">
-                  <button
-                    type="button"
-                    onClick={() => !collapsed && toggleGroup(item.path)}
-                    onMouseEnter={() => collapsed && setOpenGroups([item.path])}
-                    onMouseLeave={() => collapsed && setOpenGroups([])}
-                    className={cn(
-                      'flex w-full items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
-                      collapsed ? 'justify-center' : 'justify-between',
-                      active
-                        ? 'bg-cyan-500/15 text-cyan-100 ring-1 ring-cyan-500/25'
-                        : 'text-slate-300 hover:bg-slate-800/90 hover:text-white',
-                    )}
+                <div
+                  key={item.path}
+                  className="relative"
+                  onMouseEnter={() => item.children && setHoverGroup(item.path)}
+                  onMouseLeave={() => setHoverGroup(null)}
+                >
+                  <NavLink
+                    to={href}
+                    end={!item.children && item.path === '/home'}
+                    className={navLinkClass(active)}
                   >
-                    <div className="flex items-center">
-                      <Icon
-                        className={cn(
-                          'h-5 w-5',
-                          !collapsed && 'mr-3',
-                          active ? 'text-cyan-400' : 'text-slate-500',
-                        )}
-                      />
-                      {!collapsed && item.label}
-                    </div>
-                    {!collapsed &&
-                      (open ? (
-                        <ChevronDown className="h-4 w-4 text-slate-500" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 text-slate-500" />
-                      ))}
-                  </button>
-
-                  {open && !collapsed && (
-                    <div className="ml-4 mt-1 space-y-1">
+                    {item.label}
+                    {active ? (
+                      <span className="absolute inset-x-2 -bottom-px h-px bg-[#1F6F78]" />
+                    ) : null}
+                  </NavLink>
+                  {item.children && hoverGroup === item.path ? (
+                    <div className="absolute left-0 top-full z-50 min-w-[9.5rem] border border-[#D5D9DE] bg-white py-1 shadow-lg">
                       {item.children.map((c) => (
                         <NavLink
                           key={c.path}
@@ -283,10 +265,10 @@ export default function MeooLayout() {
                           end={c.path === '/finance'}
                           className={({ isActive }) =>
                             cn(
-                              'block rounded-lg px-3 py-2 text-sm transition-colors',
+                              'block px-3 py-1.5 text-[13px]',
                               isActive
-                                ? 'bg-cyan-500/15 font-medium text-cyan-100'
-                                : 'text-slate-400 hover:bg-slate-800/80 hover:text-white',
+                                ? 'bg-[rgba(31,111,120,0.1)] font-medium text-[#1F6F78]'
+                                : 'text-[#3d4450] hover:bg-[#F2F3F0]',
                             )
                           }
                         >
@@ -294,86 +276,15 @@ export default function MeooLayout() {
                         </NavLink>
                       ))}
                     </div>
-                  )}
-
-                  {collapsed && open && (
-                    <div className="absolute left-full top-0 z-50 ml-2 w-48 rounded-xl border border-slate-700 bg-slate-900 py-2 shadow-xl shadow-black/40">
-                      <div className="border-b border-slate-800 px-3 py-2 text-xs font-medium text-slate-400">
-                        {item.label}
-                      </div>
-                      {item.children.map((c) => (
-                        <NavLink
-                          key={c.path}
-                          to={c.path}
-                          end={c.path === '/finance'}
-                          className={({ isActive }) =>
-                            cn(
-                              'block px-3 py-2 text-sm transition-colors',
-                              isActive
-                                ? 'bg-cyan-500/15 font-medium text-cyan-100'
-                                : 'text-slate-400 hover:bg-slate-800 hover:text-white',
-                            )
-                          }
-                        >
-                          {c.label}
-                        </NavLink>
-                      ))}
-                    </div>
-                  )}
+                  ) : null}
                 </div>
               )
-            }
+            })}
+          </nav>
 
-            return (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                end={item.path === '/'}
-                className={({ isActive }) =>
-                  cn(
-                    'flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
-                    collapsed ? 'justify-center' : '',
-                    isActive
-                      ? 'bg-cyan-500/15 text-cyan-100 ring-1 ring-cyan-500/25'
-                      : 'text-slate-300 hover:bg-slate-800/90 hover:text-white',
-                  )
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    <Icon
-                      className={cn(
-                        'h-5 w-5',
-                        !collapsed && 'mr-3',
-                        isActive ? 'text-cyan-400' : 'text-slate-500',
-                      )}
-                    />
-                    {!collapsed && item.label}
-                  </>
-                )}
-              </NavLink>
-            )
-          })}
-        </nav>
-      </aside>
-
-      <div className={cn('flex min-w-0 flex-1 flex-col transition-all duration-300', mainMargin)}>
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200/80 bg-white/80 px-6 shadow-sm shadow-slate-900/[0.03] backdrop-blur-xl">
-          <div className="flex flex-1 items-center">
-            <button
-              type="button"
-              onClick={() => setCollapsed((v) => !v)}
-              className="mr-4 flex items-center justify-center rounded-xl p-2 text-slate-600 transition-colors hover:bg-cyan-50 hover:text-cyan-800"
-              aria-label="折叠侧栏"
-            >
-              {collapsed ? (
-                <Menu className="h-5 w-5" />
-              ) : (
-                <PanelLeft className="h-5 w-5" />
-              )}
-            </button>
-            <div className="relative w-96 max-w-full">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <div className="ml-auto flex items-center gap-2 sm:gap-3">
+            <div className="relative hidden w-52 xl:block">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#6b7280]" />
               <input
                 type="text"
                 value={headerSearchQuery}
@@ -385,17 +296,14 @@ export default function MeooLayout() {
                     setHeaderSearchQuery('')
                   }
                 }}
-                placeholder="搜索功能、数据，或输入 AI 指令..."
-                className="w-full rounded-xl border border-slate-200/90 bg-slate-50/90 py-2.5 pl-10 pr-4 text-sm text-slate-800 placeholder:text-slate-400 focus:border-cyan-400/60 focus:outline-none focus:ring-4 focus:ring-cyan-500/15"
+                placeholder="问灵祺…"
+                className="w-full rounded-lg border border-[#D5D9DE] bg-white py-1.5 pl-8 pr-3 text-sm text-[#14181F] placeholder:text-[#6b7280] focus:border-[#1F6F78] focus:outline-none focus:ring-2 focus:ring-[rgba(31,111,120,0.18)]"
               />
             </div>
-          </div>
-
-          <div className="flex items-center space-x-4">
             <PartnerClientScopeBar />
             {!isPartnerEdition() ? (
               <div
-                className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs font-medium text-slate-600"
+                className="hidden items-center rounded-lg border border-[#D5D9DE] bg-white p-0.5 text-xs font-medium text-[#3d4450] md:flex"
                 role="group"
                 aria-label="界面版本"
               >
@@ -405,9 +313,7 @@ export default function MeooLayout() {
                   onClick={() => setUiDensity('simple')}
                   className={cn(
                     'rounded-md px-2 py-1 transition-colors',
-                    uiDensity === 'simple'
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'hover:text-slate-800',
+                    uiDensity === 'simple' ? 'bg-[#F2F3F0] text-[#14181F]' : 'hover:text-[#14181F]',
                   )}
                 >
                   精简
@@ -418,9 +324,7 @@ export default function MeooLayout() {
                   onClick={() => setUiDensity('detailed')}
                   className={cn(
                     'rounded-md px-2 py-1 transition-colors',
-                    uiDensity === 'detailed'
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'hover:text-slate-800',
+                    uiDensity === 'detailed' ? 'bg-[#F2F3F0] text-[#14181F]' : 'hover:text-[#14181F]',
                   )}
                 >
                   详细
@@ -433,9 +337,9 @@ export default function MeooLayout() {
               <button
                 type="button"
                 onClick={() => setUserOpen((v) => !v)}
-                className="flex items-center space-x-3 rounded-xl border-l border-slate-200/90 py-2 pl-4 pr-2 transition-colors hover:bg-slate-50"
+                className="flex items-center space-x-3 rounded-lg py-1.5 pl-2 pr-1 transition-colors hover:bg-white"
               >
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-teal-600 shadow-md shadow-cyan-900/20">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1F6F78]">
                   <User className="h-4 w-4 text-white" />
                 </div>
                 <div className="flex flex-col items-start">
@@ -463,7 +367,7 @@ export default function MeooLayout() {
                   >
                     <div className="border-b border-slate-100 px-4 py-3">
                       <div className="flex items-center space-x-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-teal-600 shadow-md">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1F6F78]">
                           <User className="h-5 w-5 text-white" />
                         </div>
                         <div>
@@ -546,16 +450,113 @@ export default function MeooLayout() {
               </AnimatePresence>
             </div>
           </div>
-        </header>
+        </div>
 
-        <main className="erp-main erp-main-surface flex-1 overflow-auto p-5 lg:p-8">
+        {activeGroup?.children?.length ? (
+          <div className="hidden items-center gap-1 overflow-x-auto border-t border-[#D5D9DE] px-5 py-1.5 lg:flex">
+            {activeGroup.children.map((c) => (
+              <NavLink
+                key={c.path}
+                to={c.path}
+                end={c.path === '/finance'}
+                className={({ isActive }) =>
+                  cn(
+                    'shrink-0 rounded-md px-2.5 py-1 text-[13px]',
+                    isActive
+                      ? 'bg-white font-medium text-[#1F6F78] ring-1 ring-[#D5D9DE]'
+                      : 'text-[#6b7280] hover:text-[#14181F]',
+                  )
+                }
+              >
+                {c.label}
+              </NavLink>
+            ))}
+          </div>
+        ) : null}
+      </header>
+
+      {mobileOpen ? (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button
+            type="button"
+            className="absolute inset-0 bg-[#14181F]/40"
+            aria-label="关闭菜单"
+            onClick={() => setMobileOpen(false)}
+          />
+          <div className="absolute inset-y-0 left-0 flex w-[min(88vw,20rem)] flex-col bg-[#F2F3F0] shadow-xl">
+            <div className="flex h-14 items-center justify-between border-b border-[#D5D9DE] px-4">
+              <span className="text-sm font-semibold">{BRAND_NAME}</span>
+              <button
+                type="button"
+                className="rounded-lg p-2 text-[#3d4450]"
+                aria-label="关闭"
+                onClick={() => setMobileOpen(false)}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <nav className="flex-1 overflow-y-auto p-3">
+              {navItems.map((item) => {
+                const open = openGroups.includes(item.path)
+                if (item.children) {
+                  return (
+                    <div key={item.path} className="mb-1">
+                      <button
+                        type="button"
+                        onClick={() => toggleGroup(item.path)}
+                        className="flex w-full items-center justify-between px-2 py-2 text-sm font-medium text-[#14181F]"
+                      >
+                        {item.label}
+                        {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      </button>
+                      {open
+                        ? item.children.map((c) => (
+                            <NavLink
+                              key={c.path}
+                              to={c.path}
+                              end={c.path === '/finance'}
+                              onClick={() => setMobileOpen(false)}
+                              className={({ isActive }) =>
+                                cn(
+                                  'block px-4 py-1.5 text-sm',
+                                  isActive ? 'text-[#1F6F78]' : 'text-[#3d4450]',
+                                )
+                              }
+                            >
+                              {c.label}
+                            </NavLink>
+                          ))
+                        : null}
+                    </div>
+                  )
+                }
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    onClick={() => setMobileOpen(false)}
+                    className={({ isActive }) =>
+                      cn('block px-2 py-2 text-sm', isActive ? 'font-medium text-[#1F6F78]' : 'text-[#14181F]')
+                    }
+                  >
+                    {item.label}
+                  </NavLink>
+                )
+              })}
+            </nav>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <main className="erp-main erp-main-surface flex-1 overflow-auto p-5 lg:px-8 lg:py-6">
           <div className="mx-auto w-full max-w-[1400px]">
             <PlatformDecorHomeHost />
             <Outlet context={outletContext} />
           </div>
         </main>
 
-        <footer className="shrink-0 border-t border-slate-200/80 bg-white/70 px-6 py-3 backdrop-blur-md">
+        <footer className="shrink-0 border-t border-[#D5D9DE] bg-[#F2F3F0] px-6 py-3">
           <SiteIcpFooter />
         </footer>
       </div>

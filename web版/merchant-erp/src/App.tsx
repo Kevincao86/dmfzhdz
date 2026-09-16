@@ -73,7 +73,7 @@ function portalEdition() {
 
 function PageFallback() {
   return (
-    <div className="flex min-h-[50vh] items-center justify-center bg-[#f7f8fa] text-sm text-zinc-500">
+    <div className="flex min-h-[50vh] items-center justify-center bg-[#F2F3F0] text-sm text-[#6b7280]">
       页面加载中…
     </div>
   )
