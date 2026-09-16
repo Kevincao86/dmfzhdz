@@ -1013,10 +1013,20 @@ a.border:hover {
   }
 }
 
-.xx-header-nav {
+.xx-header-nav-cluster {
   display: flex;
   min-width: 0;
   flex: 1 1 0;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.1rem;
+  overflow: visible;
+}
+
+.xx-header-nav {
+  display: flex;
+  min-width: 0;
+  flex: 0 1 auto;
   flex-wrap: nowrap;
   align-items: center;
   gap: 0.1rem;
@@ -1053,8 +1063,8 @@ a.border:hover {
 .xx-header-more__menu {
   position: absolute;
   top: calc(100% + 0.45rem);
-  right: 0;
-  left: auto;
+  left: 0;
+  right: auto;
   z-index: 30;
   min-width: 8.75rem;
   padding: 0.3rem;
@@ -1102,7 +1112,7 @@ a.border:hover {
 }
 
 .xx-header-actions {
-  margin-left: 0;
+  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 0.5rem;

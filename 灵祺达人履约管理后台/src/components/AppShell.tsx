@@ -83,6 +83,7 @@ export default function AppShell() {
             </span>
           </NavLink>
 
+          <div className="xx-header-nav-cluster">
           <nav className="xx-header-nav" aria-label="主导航">
             {primaryNav.map((item) => (
               <NavLink key={item.to} to={item.to} className={navLinkClass(item.to)}>
@@ -127,6 +128,7 @@ export default function AppShell() {
               ) : null}
             </div>
           ) : null}
+          </div>
 
           <div className="xx-header-actions">
             <div className="xx-header-tools flex">
