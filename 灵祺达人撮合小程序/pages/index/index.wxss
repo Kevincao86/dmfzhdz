@@ -5,7 +5,7 @@
 
 /* —— 图1 首页版型（顶栏/Banner 随身份主题） —— */
 .home-page--v1 {
-  background: var(--lq-home-bg, #f0f9ff);
+  background: var(--lq-home-bg, #e8eef4);
 }
 
 .home-sticky-top {
@@ -14,7 +14,7 @@
 
 .home-hero-shell {
   padding-bottom: 0;
-  background: var(--lq-home-nav, #0284c7);
+  background: var(--lq-gradient, var(--lq-home-nav, #0284c7));
 }
 
 .home-scroll-full {
@@ -24,15 +24,20 @@
 }
 
 .home-toolbar {
+  margin: 0 24rpx;
   padding: 0 0 2rpx;
-  background: var(--lq-home-bg, #f0f9ff);
+  background: #fff;
   border-radius: 24rpx 24rpx 0 0;
+  box-shadow: var(--lq-shadow-card);
 }
 
 .home-list-scroll {
+  margin: 0 24rpx 16rpx;
   padding: 4rpx 0 16rpx;
-  background: var(--lq-home-bg, #f0f9ff);
+  background: #fff;
+  border-radius: 0 0 24rpx 24rpx;
   box-sizing: border-box;
+  box-shadow: var(--lq-shadow-card);
 }
 
 .share-cover-preload {
@@ -73,7 +78,7 @@
   box-sizing: border-box;
   background: #fff;
   border-radius: 999rpx;
-  box-shadow: 0 8rpx 24rpx rgba(55, 34, 120, 0.12);
+  box-shadow: 0 8rpx 24rpx rgba(20, 24, 31, 0.08);
 }
 
 .home-search-v2__icon {
@@ -286,7 +291,7 @@
   color: #fff;
   background: var(--lq-gradient);
   border-color: transparent;
-  box-shadow: var(--lq-shadow-tab);
+  box-shadow: none;
 }
 
 .home-hall-mini__count {

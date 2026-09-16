@@ -119,8 +119,8 @@
   text-align: center;
   font-size: 18rpx;
   font-weight: 700;
-  color: #7c3aed;
-  background: linear-gradient(135deg, #fde68a, #fbbf24);
+  color: var(--lq-gold-ink, #1e3a5f);
+  background: var(--lq-gold, #f5c84c);
   border-radius: 999rpx;
   line-height: 1.4;
 }
