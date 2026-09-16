@@ -116,30 +116,33 @@
   border-color: #f5c84c;
 }
 
-.welcome-foot {
+.welcome-plats {
   margin-top: auto;
-  padding-top: 40rpx;
+  padding-top: 36rpx;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.welcome-plat {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 8rpx;
 }
 
-.welcome-foot__logo {
-  width: 72rpx;
-  height: 72rpx;
+.welcome-plat__icon {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 16rpx;
 }
 
-.welcome-foot__name {
-  margin-top: 10rpx;
-  font-size: 28rpx;
-  font-weight: 700;
-  color: #1e3a5f;
-}
-
-.welcome-foot__tag {
-  margin-top: 4rpx;
-  font-size: 20rpx;
-  color: #94a3b8;
+.welcome-plat__name {
+  font-size: 18rpx;
+  color: #7b8a99;
+  line-height: 1.2;
 }
 
 .welcome-vortex {

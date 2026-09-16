@@ -25,10 +25,11 @@
     bindtap="onEnterIdentity"
   >{{pickedId ? '进入工作台' : '请先选择身份'}}</view>
 
-  <view class="welcome-foot">
-    <image class="welcome-foot__logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
-    <text class="welcome-foot__name">灵祺星选</text>
-    <text class="welcome-foot__tag">全网达人撮合平台</text>
+  <view class="welcome-plats">
+    <view wx:for="{{platformLogos}}" wx:key="id" class="welcome-plat">
+      <image class="welcome-plat__icon" src="{{item.icon}}" mode="aspectFit" />
+      <text class="welcome-plat__name">{{item.name}}</text>
+    </view>
   </view>
 
   <view

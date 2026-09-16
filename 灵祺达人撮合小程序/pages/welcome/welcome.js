@@ -18,6 +18,13 @@ Page({
   data: {
     navBandStyle: '',
     identityOptions: SPLASH_IDENTITY_META,
+    platformLogos: [
+      { id: 'douyin', name: '抖音', icon: '/images/platforms/douyin.png' },
+      { id: 'xiaohongshu', name: '小红书', icon: '/images/platforms/xiaohongshu.png' },
+      { id: 'dianping', name: '大众点评', icon: '/images/platforms/dianping.png' },
+      { id: 'weixin_video', name: '视频号', icon: '/images/platforms/wechat.png' },
+      { id: 'kuaishou', name: '快手', icon: '/images/platforms/kuaishou-local.png' },
+    ],
     transitionOn: false,
     transitionColor: '#1e3a5f',
     pickedId: '',
