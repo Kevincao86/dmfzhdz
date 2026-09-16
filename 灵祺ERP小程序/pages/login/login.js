@@ -71,6 +71,7 @@ Page({
     legalPromptAgreeLabel: LEGAL_PROMPT_COPY.pwd.agree,
     logoSrc: assetUrl('logo.png'),
     pickedId: '',
+    hasSession: false,
     navBandStyle: '',
     landingWays: LANDING_WAYS,
     platformLogos: [
@@ -92,6 +93,7 @@ Page({
     this.setData({
       devSkip: devAuth.isDevSkipLogin(),
       legalAgreed: loginLegalAgree.readAgreed(),
+      hasSession: Boolean(api.getBearerToken()),
     })
     this._applyNavPadding()
     this._syncModeHint()
@@ -104,17 +106,15 @@ Page({
 
   onShow() {
     this._applyNavPadding()
-    this.setData({ devSkip: devAuth.isDevSkipLogin() })
+    this.setData({
+      devSkip: devAuth.isDevSkipLogin(),
+      hasSession: Boolean(api.getBearerToken()),
+    })
     try {
       if (wx.getStorageSync('meoo_just_logged_out')) {
         wx.removeStorageSync('meoo_just_logged_out')
-        return
       }
     } catch (_) {}
-    const token = api.getBearerToken()
-    if (!token) return
-    if (devAuth.isDevSkipLogin() && token === devAuth.DEV_TOKEN) return
-    this._goHome()
   },
 
   onGuestBrowse() {
@@ -191,14 +191,7 @@ Page({
     if (this.data.refreshing) return
     this._clearCooldownTimers()
     this.setData({ busy: false, refreshing: true, err: '', infoHint: '' })
-    const token = api.getAccessToken()
-    const canEnter =
-      token && !(devAuth.isDevSkipLogin() && token === devAuth.DEV_TOKEN)
     try {
-      if (canEnter) {
-        await this._goHome()
-        return
-      }
       wx.reLaunch({ url: '/pages/login/login' })
     } catch (_) {
       wx.showToast({ title: '刷新失败，请稍后再试', icon: 'none' })
@@ -278,6 +271,14 @@ Page({
   onLandingEnter() {
     if (!this.data.pickedId) {
       wx.showToast({ title: '请先选择登录方式', icon: 'none' })
+      return
+    }
+    if (api.getBearerToken()) {
+      this._goHome()
+      return
+    }
+    if (devAuth.isDevSkipLogin()) {
+      this.onDevPreview()
       return
     }
     if (this.data.pickedId === 'wx') {
