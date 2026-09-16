@@ -268,26 +268,6 @@ Page({
     this._syncModeHint()
   },
 
-  onLandingEnter() {
-    if (!this.data.pickedId) {
-      wx.showToast({ title: '请先选择登录方式', icon: 'none' })
-      return
-    }
-    if (api.getBearerToken()) {
-      this._goHome()
-      return
-    }
-    if (devAuth.isDevSkipLogin()) {
-      this.onDevPreview()
-      return
-    }
-    if (this.data.pickedId === 'wx') {
-      this.onWxLogin()
-      return
-    }
-    this.onSubmit()
-  },
-
   onSwitchMode(e) {
     const mode = e.currentTarget.dataset.mode
     if (!mode || mode === this.data.mode) return

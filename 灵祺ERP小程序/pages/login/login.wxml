@@ -20,12 +20,7 @@
     </view>
   </view>
 
-  <view
-    class="welcome-enter {{pickedId ? 'welcome-enter--on' : ''}}"
-    bindtap="onLandingEnter"
-  >{{pickedId ? '进入工作台' : '请先选择登录方式'}}</view>
-
-  <view wx:if="{{pickedId && pickedId !== 'wx' && !hasSession}}" class="auth-card-v2 login-auth-card">
+  <view wx:if="{{pickedId && pickedId !== 'wx'}}" class="auth-card-v2 login-auth-card">
     <text class="mode-hint">{{modeHint}}</text>
     <block wx:if="{{mode === 'login'}}">
       <block wx:if="{{loginMethod === 'password'}}">
@@ -90,6 +85,16 @@
       </view>
     </block>
     <text wx:if="{{err}}" class="err-msg">{{err}}</text>
+    <button class="btn-v2 primary login-submit" loading="{{busy}}" disabled="{{busy}}" bindtap="onSubmit">{{submitLabel}}</button>
+  </view>
+
+  <view wx:if="{{pickedId === 'wx'}}" class="auth-card-v2 login-auth-card">
+    <text class="mode-hint">授权微信后绑定或登录商家账号。</text>
+    <text wx:if="{{err}}" class="err-msg">{{err}}</text>
+    <button class="btn-v2 wx-login" loading="{{wxBusy}}" disabled="{{busy || wxBusy}}" bindtap="onWxLogin">
+      <image class="wx-icon" src="{{wechatIconSrc}}" mode="aspectFit" />
+      <text>微信一键登录</text>
+    </button>
   </view>
 
   <view class="login-legal-row" bindtap="onToggleLegalAgree">
