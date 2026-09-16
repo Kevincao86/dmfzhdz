@@ -1016,11 +1016,13 @@ a.border:hover {
 .xx-header-nav {
   display: flex;
   min-width: 0;
-  flex: 1;
+  flex: 1 1 auto;
   flex-wrap: nowrap;
   align-items: center;
   gap: 0.15rem;
   overflow: visible;
+  padding-right: 0.85rem;
+  margin-right: 0.15rem;
 }
 
 .xx-header-more {
@@ -1044,9 +1046,10 @@ a.border:hover {
 
 .xx-header-more__menu {
   position: absolute;
-  top: calc(100% + 0.4rem);
-  left: 0;
-  z-index: 50;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  left: auto;
+  z-index: 30;
   min-width: 8.75rem;
   padding: 0.3rem;
   border-radius: 0.5rem;
@@ -1099,7 +1102,8 @@ a.border:hover {
   gap: 0.5rem;
   flex-shrink: 0;
   position: relative;
-  z-index: 2;
+  z-index: 40;
+  padding-left: 0.35rem;
 }
 
 .xx-header-tools {
