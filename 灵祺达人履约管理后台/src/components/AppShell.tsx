@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Menu, X } from 'lucide-react'
 import PlatformDecorDrHost from './PlatformDecorDrHost'
 import ThemeToggle from './ThemeToggle'
 import IdentitySwitchPanel from './IdentitySwitchPanel'
@@ -19,14 +18,10 @@ export default function AppShell() {
   const nav = useNavigate()
   const location = useLocation()
   const [shellRev, setShellRev] = useState(0)
-  const [mobileOpen, setMobileOpen] = useState(false)
   useEffect(() => onShellRefresh(() => setShellRev((n) => n + 1)), [])
   useEffect(() => {
     void syncAccountAccessOnBoot()
   }, [])
-  useEffect(() => {
-    setMobileOpen(false)
-  }, [location.pathname, location.search])
   void shellRev
 
   const account = getAccount()
@@ -60,14 +55,6 @@ export default function AppShell() {
     >
       <header className="xx-header-bar">
         <div className="xx-header-bar__row">
-          <button
-            type="button"
-            className="xx-header-icon-btn lg:hidden"
-            aria-label="打开菜单"
-            onClick={() => setMobileOpen(true)}
-          >
-            <Menu className="h-5 w-5" />
-          </button>
           <NavLink to="/hall?tab=home" className="xx-header-brand">
             <img src={BRAND_LOGO_URL} alt={BRAND_NAME_SHORT} className="xx-header-brand__logo" />
             <span className="xx-header-brand__name">
@@ -85,7 +72,7 @@ export default function AppShell() {
           </nav>
 
           <div className="xx-header-actions">
-            <div className="xx-header-tools hidden lg:flex">
+            <div className="xx-header-tools flex">
               <IdentitySwitchPanel />
               <ThemeToggle />
               <button type="button" className="xx-logout-btn xx-logout-btn--inline" onClick={logout}>
@@ -100,39 +87,6 @@ export default function AppShell() {
       <div className="xx-subbar">
         <AppTopBar variant="crumb" />
       </div>
-
-      {mobileOpen ? (
-        <div className="xx-mobile-mask" role="presentation">
-          <button
-            type="button"
-            className="xx-mobile-mask__backdrop"
-            aria-label="关闭菜单"
-            onClick={() => setMobileOpen(false)}
-          />
-          <div className="xx-mobile-drawer" role="dialog" aria-label="导航菜单">
-            <div className="xx-mobile-drawer__head">
-              <span>菜单</span>
-              <button type="button" className="xx-header-icon-btn" aria-label="关闭" onClick={() => setMobileOpen(false)}>
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <nav className="xx-mobile-drawer__nav">
-              {NAV.map((item) => (
-                <NavLink key={item.to} to={item.to} className={navLinkClass(item.to)} onClick={() => setMobileOpen(false)}>
-                  {item.label}
-                </NavLink>
-              ))}
-            </nav>
-            <div className="xx-mobile-drawer__foot">
-              <IdentitySwitchPanel />
-              <ThemeToggle />
-              <button type="button" className="xx-logout-btn" onClick={logout}>
-                退出登录
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       <div className="app-main-wrap">
         <main className="app-main">
