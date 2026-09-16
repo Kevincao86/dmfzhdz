@@ -210,11 +210,13 @@ export function AiAgentFloatingButton() {
     <button
       type="button"
       onClick={() => openDrawer()}
-      className={cn('erp-side-tab', drawerOpen && 'brightness-110')}
+      className={cn('erp-side-tab erp-side-tab-stack', drawerOpen && 'brightness-110')}
       aria-label="打开灵祺 AI 助手"
       title="AI 助手"
     >
-      AI助手
+      <span className="erp-side-tab-latin">AI</span>
+      <span>助</span>
+      <span>手</span>
     </button>
   )
 }

@@ -96,6 +96,20 @@ body {
   .erp-side-tab:hover {
     filter: brightness(1.08);
   }
+  /** AI 助手：拉丁词横排，中文竖排 */
+  .erp-side-tab-stack {
+    writing-mode: horizontal-tb;
+    text-orientation: mixed;
+    flex-direction: column;
+    letter-spacing: 0;
+    line-height: 1.2;
+    gap: 0.12rem;
+  }
+  .erp-side-tab-latin {
+    font-weight: 650;
+    letter-spacing: 0.02em;
+    line-height: 1;
+  }
 
   .erp-btn-primary {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:pointer-events-none disabled:opacity-50;
