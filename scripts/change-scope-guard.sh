@@ -740,6 +740,10 @@ PAT
 灵祺达人撮合小程序/custom-tab-bar/index.wxss
 灵祺达人撮合小程序/app.json
 灵祺达人撮合小程序/utils/identityTheme.js
+灵祺达人撮合小程序/pages/welcome/welcome.wxml
+灵祺达人撮合小程序/pages/welcome/welcome.wxss
+灵祺达人撮合小程序/pages/welcome/welcome.js
+灵祺达人撮合小程序/pages/welcome/welcome.json
 change-scope-guard
 PAT
       ;;
