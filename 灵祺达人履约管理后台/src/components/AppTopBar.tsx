@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Bell } from 'lucide-react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, NavLink, useLocation } from 'react-router-dom'
 import { getAccount, getActiveRole } from '../lib/mpSession'
 import { pageTitleForPath } from '../lib/shellNavConfig'
 import { unreadNotificationCount } from '../lib/mpSync/messagesStore'
@@ -70,9 +70,9 @@ export default function AppTopBar({ variant = 'full' }: AppTopBarProps) {
           <span className="app-topbar__badge">{unread > 99 ? '99+' : unread}</span>
         ) : null}
       </Link>
-      <Link to="/profile/membership" className="app-topbar__upgrade-btn">
+      <NavLink to="/profile/membership" className="app-topbar__upgrade-btn">
         升级会员
-      </Link>
+      </NavLink>
       <Link to="/profile" className="app-topbar__user">
         {avatarUrl ? (
           <img src={avatarUrl} alt="" className="app-topbar__avatar" />

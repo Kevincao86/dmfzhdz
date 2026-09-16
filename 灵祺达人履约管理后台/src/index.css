@@ -1140,10 +1140,24 @@ a.border:hover {
   border-color: transparent !important;
 }
 
-.xx-header-bar .app-topbar__upgrade-btn {
-  background: #fff;
-  color: #1e3a5f;
-  border-color: transparent;
+.xx-header-bar a.app-topbar__upgrade-btn,
+.xx-header-bar a.app-topbar__upgrade-btn:link,
+.xx-header-bar a.app-topbar__upgrade-btn:visited,
+.xx-header-bar a.app-topbar__upgrade-btn:hover,
+.xx-header-bar a.app-topbar__upgrade-btn:active,
+.xx-header-bar a.app-topbar__upgrade-btn[aria-current='page'] {
+  background: #f5c84c !important;
+  color: #1e3a5f !important;
+  border-color: transparent !important;
+}
+
+.xx-header-bar a.app-topbar__upgrade-btn:hover {
+  background: #ffd56a !important;
+}
+
+.xx-header-bar a.app-topbar__upgrade-btn[aria-current='page'] {
+  background: #ffe08a !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55);
 }
 
 .xx-content-plate {
