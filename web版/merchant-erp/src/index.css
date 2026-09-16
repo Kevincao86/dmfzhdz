@@ -72,8 +72,28 @@ body {
 
   /** 店小秘式：色底托出白底工作区 */
   .erp-content-plate {
-    @apply min-h-[calc(100vh-10.5rem)] rounded-xl bg-white p-5 lg:p-6;
+    @apply rounded-xl bg-white p-5 lg:p-6;
+    min-height: min(32rem, calc(100vh - 14rem));
     box-shadow: 0 1px 10px rgba(20, 24, 31, 0.06);
+  }
+
+  .erp-side-tab {
+    display: flex;
+    width: 2rem;
+    min-height: 6.75rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem 0 0 0.5rem;
+    background: var(--erp-header);
+    color: #fff;
+    font-size: 12px;
+    line-height: 1.2;
+    letter-spacing: 0.16em;
+    writing-mode: vertical-rl;
+    padding: 0.75rem 0;
+  }
+  .erp-side-tab:hover {
+    filter: brightness(1.08);
   }
 
   .erp-btn-primary {

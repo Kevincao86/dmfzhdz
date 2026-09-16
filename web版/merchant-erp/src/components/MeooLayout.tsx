@@ -529,8 +529,21 @@ export default function MeooLayout() {
           </div>
         </main>
 
-        <footer className="shrink-0 border-t border-[#c5d0dc] bg-[#E8EEF4] px-6 py-3">
-          <SiteIcpFooter />
+        <footer className="shrink-0 bg-[#E8EEF4] px-6 pb-6 pt-3">
+          <div className="mx-auto flex max-w-[1400px] flex-col items-center gap-1.5">
+            <p className="flex flex-wrap justify-center gap-x-4 text-xs text-slate-400">
+              <NavLink to="/help" className="transition-colors hover:text-slate-600">
+                帮助手册
+              </NavLink>
+              <NavLink to="/team" className="transition-colors hover:text-slate-600">
+                关于我们
+              </NavLink>
+              <NavLink to="/legal/privacy" className="transition-colors hover:text-slate-600">
+                隐私政策
+              </NavLink>
+            </p>
+            <SiteIcpFooter />
+          </div>
         </footer>
       </div>
 
@@ -585,10 +598,12 @@ export default function MeooLayout() {
       ) : null}
 
       <AiAgentDrawer />
-      <div className="pointer-events-none fixed bottom-0 right-0 z-[60] flex flex-col items-center gap-3 p-4 sm:bottom-2 sm:right-2 sm:p-5">
-        <div className="pointer-events-auto flex flex-col items-center gap-3">
-          <AiAgentFloatingButton />
+      <div className="pointer-events-none fixed right-0 top-[42%] z-[60] flex flex-col items-end gap-2">
+        <div className="pointer-events-auto mr-2">
           <AiGenerationJobsBanner />
+        </div>
+        <div className="pointer-events-auto flex flex-col items-end">
+          <AiAgentFloatingButton />
           <FloatingOnlineSupport customerId={adminName} enterpriseName={enterpriseName} />
         </div>
       </div>

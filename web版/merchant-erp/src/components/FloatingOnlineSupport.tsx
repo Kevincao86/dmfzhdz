@@ -676,7 +676,7 @@ export default function FloatingOnlineSupport({
 
   return (
     <>
-      <div className="flex flex-col items-center gap-3">
+      <div className="flex flex-row items-end gap-2">
         {open ? (
           <div
             className="pointer-events-auto flex max-h-[min(32rem,calc(100vh-8rem))] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
@@ -806,15 +806,12 @@ export default function FloatingOnlineSupport({
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className={cn(
-            'pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full shadow-lg transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
-            open ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-blue-600 text-white hover:bg-blue-700',
-          )}
+          className={cn('erp-side-tab', open && 'brightness-110')}
           aria-label={open ? `关闭${panelTitle}` : `打开${panelTitle}`}
           aria-expanded={open}
           aria-controls={open ? panelId : undefined}
         >
-          <Headphones className="h-6 w-6" />
+          在线客服
         </button>
       </div>
     </>
