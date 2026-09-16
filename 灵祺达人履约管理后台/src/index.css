@@ -1121,13 +1121,29 @@ a.border:hover {
   color: #fff;
 }
 
+.xx-header-bar .app-topbar__user {
+  background: rgba(255, 255, 255, 0.14) !important;
+  color: #fff !important;
+}
+
 .xx-header-bar .app-topbar__user:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.22) !important;
+}
+
+.xx-header-bar .app-topbar__role-badge,
+.xx-header-bar .app-topbar__role-badge--talent,
+.xx-header-bar .app-topbar__role-badge--shoot,
+.xx-header-bar .app-topbar__role-badge--edit,
+.xx-header-bar .app-topbar__role-badge--pr {
+  color: #1e3a5f !important;
+  background: #fff !important;
+  border-color: transparent !important;
 }
 
 .xx-header-bar .app-topbar__upgrade-btn {
   background: #fff;
   color: #1e3a5f;
+  border-color: transparent;
 }
 
 .xx-content-plate {
