@@ -961,7 +961,7 @@ a.border:hover {
   position: sticky;
   top: 0;
   z-index: 40;
-  background: #1e3a5f;
+  background: var(--identity-hero-gradient);
   color: #fff;
   box-shadow: 0 1px 0 rgba(15, 23, 42, 0.12);
 }
