@@ -1210,6 +1210,34 @@ a.border:hover {
   color: #475569;
 }
 
+html[data-theme='dark'] .app-frame.xx-erp-shell {
+  background: var(--app-bg);
+  color: var(--app-text);
+}
+
+html[data-theme='dark'] .xx-subbar {
+  background: #12121a;
+  border-bottom-color: var(--shell-border);
+}
+
+html[data-theme='dark'] .xx-content-plate {
+  background: var(--panel-card);
+  box-shadow: 0 1px 14px rgba(0, 0, 0, 0.35);
+}
+
+html[data-theme='dark'] .app-frame.xx-erp-shell .app-main-wrap,
+html[data-theme='dark'] .app-frame.xx-erp-shell .app-site-footer {
+  background-color: var(--app-bg);
+}
+
+html[data-theme='dark'] .xx-footer-links a:hover {
+  color: #e2e8f0;
+}
+
+html[data-theme='dark'] .xx-erp-shell .hall-tab-strip {
+  background: rgba(255, 255, 255, 0.06);
+}
+
 .xx-side-rail {
   position: fixed;
   right: 0;
