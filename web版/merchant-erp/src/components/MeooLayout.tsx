@@ -522,7 +522,7 @@ export default function MeooLayout() {
       ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <main className="erp-main erp-main-surface flex-1 overflow-auto p-4 lg:px-5 lg:py-4">
+        <main className="erp-main erp-main-surface flex-1 overflow-auto p-4 pr-12 lg:py-4 lg:pl-5 lg:pr-12">
           <div className="erp-content-plate mx-auto w-full max-w-[1400px]">
             <PlatformDecorHomeHost />
             <Outlet context={outletContext} />
