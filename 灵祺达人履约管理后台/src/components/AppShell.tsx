@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
 import PlatformDecorDrHost from './PlatformDecorDrHost'
 import ThemeToggle from './ThemeToggle'
@@ -162,17 +162,6 @@ export default function AppShell() {
           </p>
           <SiteIcpFooter className="text-[var(--shell-muted)]" />
         </footer>
-      </div>
-
-      <div className="xx-side-rail">
-        <Link to="/hall?tab=recommend" className="xx-side-tab xx-side-tab--stack">
-          <span className="xx-side-tab__latin">AI</span>
-          <span>匹</span>
-          <span>配</span>
-        </Link>
-        <Link to="/support" className="xx-side-tab">
-          在线客服
-        </Link>
       </div>
     </div>
   )
