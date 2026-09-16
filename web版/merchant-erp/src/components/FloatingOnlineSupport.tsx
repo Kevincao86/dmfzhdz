@@ -1,5 +1,6 @@
 import { Headphones, Minimize2, Send, User } from 'lucide-react'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { cn } from '../cn'
 import {
   formatSupportRelayTime,
@@ -676,22 +677,30 @@ export default function FloatingOnlineSupport({
 
   return (
     <>
-      <div className="relative">
-        {open ? (
-          <div
-            className="pointer-events-auto absolute right-full bottom-0 mr-2 flex max-h-[min(32rem,calc(100vh-8rem))] w-[min(22rem,calc(100vw-3rem))] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={panelId}
-          >
-            <div className="flex items-center justify-between border-b border-gray-100 bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-white">
+      {open
+        ? createPortal(
+            <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+              <button
+                type="button"
+                className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]"
+                aria-label={`收起${panelTitle}`}
+                onClick={() => setOpen(false)}
+              />
+              <div
+                className="relative z-10 flex h-[min(78vh,42rem)] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xl shadow-slate-900/20"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={panelId}
+                onClick={(e) => e.stopPropagation()}
+              >
+            <div className="flex items-center justify-between border-b border-white/10 bg-[#1E3A5F] px-4 py-3 text-white">
               <div className="flex min-w-0 items-center gap-2">
                 <Headphones className="h-5 w-5 shrink-0 opacity-95" aria-hidden />
                 <div className="min-w-0">
                   <h2 id={panelId} className="truncate text-sm font-semibold">
                     {panelTitle}
                   </h2>
-                  <p className="truncate text-[11px] text-blue-100/90">
+                  <p className="truncate text-[11px] text-white/80">
                     {humanMode ? '人工客服已接入' : connecting ? '接入中…' : '智能助手 · 可转人工'}
                     {statusExtra}
                   </p>
@@ -712,7 +721,7 @@ export default function FloatingOnlineSupport({
               </button>
             </div>
 
-            <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto bg-gray-50/80 p-3">
+            <div ref={listRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-gray-50/80 p-3">
               {messages.map((m) => (
                 <div key={m.id} className={cn('flex gap-2', m.role === 'user' ? 'flex-row-reverse' : 'flex-row')}>
                   <div
@@ -800,9 +809,13 @@ export default function FloatingOnlineSupport({
                 <Send className="h-4 w-4" />
               </button>
             </div>
-          </div>
-        ) : null}
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
+      <div className="relative">
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
