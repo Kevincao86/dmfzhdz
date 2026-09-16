@@ -1,17 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Menu, X } from 'lucide-react'
 import PlatformDecorDrHost from './PlatformDecorDrHost'
 import ThemeToggle from './ThemeToggle'
 import IdentitySwitchPanel from './IdentitySwitchPanel'
 import AppTopBar from './AppTopBar'
 import { clearSession, getAccount, getActiveRole } from '../lib/mpSession'
 import { clearMpRegistryCache } from '../lib/mpApi'
-import { readPrProfile } from '../lib/mpSync/userProfile'
-import { readMember } from '../lib/mpSync/talentMember'
 import { getWorkIdentity, WORK_EDITION_LABEL } from '../lib/mpWorkIdentity'
 import { isShellNavItemActive, navItemsForRole } from '../lib/shellNavConfig'
-import { identitySidebarMascotSrc } from '../lib/identityMascotAssets'
-import { identityShellClass, identityWorkAttr } from '../lib/identityTheme'
+import { identityWorkAttr } from '../lib/identityTheme'
 import SiteIcpFooter from '@merchant/components/SiteIcpFooter'
 import { BRAND_LOGO_URL, BRAND_NAME_SHORT } from '../lib/brand'
 import { onShellRefresh } from '../lib/shellRefresh'
@@ -21,10 +19,14 @@ export default function AppShell() {
   const nav = useNavigate()
   const location = useLocation()
   const [shellRev, setShellRev] = useState(0)
+  const [mobileOpen, setMobileOpen] = useState(false)
   useEffect(() => onShellRefresh(() => setShellRev((n) => n + 1)), [])
   useEffect(() => {
     void syncAccountAccessOnBoot()
   }, [])
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [location.pathname, location.search])
   void shellRev
 
   const account = getAccount()
@@ -45,85 +47,119 @@ export default function AppShell() {
     nav('/', { replace: true })
   }
 
-  const prProfile = role === 'pr' ? readPrProfile() : null
-  const member = role !== 'pr' ? readMember() : null
-  const idLabel =
-    role === 'pr'
-      ? account?.lingqiPrId || prProfile?.lingqiPrId || '未绑定 PRID'
-      : workId === 'shoot'
-        ? member?.lingqiShootTeamId || account?.lingqiShootTeamId || '未绑定拍摄团队ID'
-        : workId === 'edit'
-          ? member?.lingqiEditTeamId || account?.lingqiEditTeamId || '未绑定剪辑团队ID'
-          : account?.lingqiTalentId || member?.lingqiTalentId || '未绑定达人ID'
-
   const shellWorkId = role === 'pr' ? 'pr' : workId
   const editionLabel = role === 'pr' ? 'PR 版' : WORK_EDITION_LABEL[workId]
-  const sidebarTone = identityShellClass(shellWorkId)
+
+  const navLinkClass = (to: string) =>
+    `xx-header-link ${isShellNavItemActive(to, location.pathname, location.search) ? 'xx-header-link--active' : ''}`
 
   return (
-    <div className="app-frame min-h-screen text-[var(--app-text)]" data-work-identity={identityWorkAttr(shellWorkId)}>
-      <aside className={`app-sidebar ${sidebarTone}`}>
-        <div className="app-sidebar__brand">
-          <img src={BRAND_LOGO_URL} alt={BRAND_NAME_SHORT} className="app-sidebar__logo" />
-          <div className="min-w-0">
-            <div className="app-sidebar__title">灵祺星选平台</div>
-            <div className="app-sidebar__edition">{editionLabel}</div>
+    <div
+      className="app-frame xx-erp-shell min-h-screen"
+      data-work-identity={identityWorkAttr(shellWorkId)}
+    >
+      <header className="xx-header-bar">
+        <div className="xx-header-bar__row">
+          <button
+            type="button"
+            className="xx-header-icon-btn lg:hidden"
+            aria-label="打开菜单"
+            onClick={() => setMobileOpen(true)}
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <NavLink to="/hall?tab=home" className="xx-header-brand">
+            <img src={BRAND_LOGO_URL} alt={BRAND_NAME_SHORT} className="xx-header-brand__logo" />
+            <span className="xx-header-brand__name">
+              灵祺星选
+              <em>{editionLabel}</em>
+            </span>
+          </NavLink>
+
+          <nav className="xx-header-nav" aria-label="主导航">
+            {NAV.map((item) => (
+              <NavLink key={item.to} to={item.to} className={navLinkClass(item.to)}>
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
+
+          <div className="xx-header-actions">
+            <div className="xx-header-tools hidden lg:flex">
+              <IdentitySwitchPanel />
+              <ThemeToggle />
+              <button type="button" className="xx-logout-btn xx-logout-btn--inline" onClick={logout}>
+                退出
+              </button>
+            </div>
+            <AppTopBar variant="header" />
           </div>
         </div>
-        <p className="app-sidebar__slogan">让好内容，遇见好机会</p>
+      </header>
 
-        <nav className="app-sidebar__nav">
-          {NAV.map((item) => {
-            const Icon = item.icon
-            return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={() =>
-                  `shell-nav-link ${isShellNavItemActive(item.to, location.pathname, location.search) ? 'shell-nav-link--active' : ''}`
-                }
-              >
-                <Icon size={18} strokeWidth={2} className="shell-nav-link__icon" aria-hidden />
-                <span>{item.label}</span>
-              </NavLink>
-            )
-          })}
-        </nav>
+      <div className="xx-subbar">
+        <AppTopBar variant="crumb" />
+      </div>
 
-        <div className="app-sidebar__mascot" aria-hidden>
-          <div className="app-sidebar__mascot-glow" />
-          <img
-            src={identitySidebarMascotSrc(workId)}
-            alt=""
-            className="app-sidebar__mascot-img"
-            draggable={false}
+      {mobileOpen ? (
+        <div className="xx-mobile-mask" role="presentation">
+          <button
+            type="button"
+            className="xx-mobile-mask__backdrop"
+            aria-label="关闭菜单"
+            onClick={() => setMobileOpen(false)}
           />
+          <div className="xx-mobile-drawer" role="dialog" aria-label="导航菜单">
+            <div className="xx-mobile-drawer__head">
+              <span>菜单</span>
+              <button type="button" className="xx-header-icon-btn" aria-label="关闭" onClick={() => setMobileOpen(false)}>
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <nav className="xx-mobile-drawer__nav">
+              {NAV.map((item) => (
+                <NavLink key={item.to} to={item.to} className={navLinkClass(item.to)} onClick={() => setMobileOpen(false)}>
+                  {item.label}
+                </NavLink>
+              ))}
+            </nav>
+            <div className="xx-mobile-drawer__foot">
+              <IdentitySwitchPanel />
+              <ThemeToggle />
+              <button type="button" className="xx-logout-btn" onClick={logout}>
+                退出登录
+              </button>
+            </div>
+          </div>
         </div>
-
-        <Link to="/hall?tab=recommend" className="app-sidebar__promo no-underline">
-          <div className="app-sidebar__promo-title">AI 智能匹配</div>
-          <p className="app-sidebar__promo-text">完善资料后，系统将按标签与习惯为您推荐更契合的商单与达人。</p>
-        </Link>
-
-        <div className="app-sidebar__footer">
-          <div className="app-sidebar__id font-mono">{idLabel}</div>
-          <IdentitySwitchPanel />
-          <ThemeToggle />
-          <button type="button" className="shell-nav-link shell-nav-link--ghost" onClick={logout}>
-            退出登录
-          </button>
-        </div>
-      </aside>
+      ) : null}
 
       <div className="app-main-wrap">
-        <AppTopBar />
         <main className="app-main">
-          <Outlet key={`${shellWorkId}-${role}`} />
+          <div className="xx-content-plate">
+            <PlatformDecorDrHost />
+            <Outlet key={`${shellWorkId}-${role}`} />
+          </div>
         </main>
-        <PlatformDecorDrHost />
         <footer className="app-site-footer">
+          <p className="xx-footer-links">
+            <NavLink to="/help">帮助手册</NavLink>
+            <NavLink to="/team">关于我们</NavLink>
+            <NavLink to="/legal/privacy">隐私政策</NavLink>
+          </p>
           <SiteIcpFooter className="text-[var(--shell-muted)]" />
         </footer>
+      </div>
+
+      <div className="xx-side-rail">
+        <Link to="/hall?tab=recommend" className="xx-side-tab xx-side-tab--stack">
+          <span className="xx-side-tab__latin">AI</span>
+          <span>匹</span>
+          <span>配</span>
+        </Link>
+        <Link to="/support" className="xx-side-tab">
+          在线客服
+        </Link>
       </div>
     </div>
   )

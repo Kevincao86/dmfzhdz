@@ -56,6 +56,7 @@ list_scopes() {
   mp_hall_list_full    星选大厅招募单列表完整展示（瘦身 1MB 截断）
   merchant_landing_hero 商家落地页首屏图空白补全（平板工作台 / 全息文案）
   cs_web_beautify      商家 CS 全站视觉（落地+登录+工作台壳层/内页主题，不部署）
+  xingxuan_web_beautify 星选履约 Web 壳层对齐商家 CS（顶栏+内容板块，不部署）
   merchant_simple_ui   商家 CS 精简版：今天待办 + 侧栏收口（不改详细版 IA）
   git_code_only      远程只推代码：文档/素材 gitignore + 推送门禁（不改业务功能）
   knowledge_base       知识库（运营全局 + 商家/FWS 租户 + AI 投喂）
@@ -713,6 +714,16 @@ HomeDashboard
 AiAgentDrawer
 FloatingOnlineSupport
 App.tsx
+change-scope-guard
+PAT
+      ;;
+    xingxuan_web_beautify)
+      cat <<'PAT'
+AppShell
+AppTopBar
+灵祺达人履约管理后台/src/index.css
+SupportPage
+vite.config.ts
 change-scope-guard
 PAT
       ;;

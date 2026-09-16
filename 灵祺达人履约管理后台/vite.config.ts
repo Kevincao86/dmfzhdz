@@ -14,6 +14,7 @@ import { opsErpSyncGatewayPlugin } from '../web版/merchant-erp/vite-plugins/ops
 /** 嵌入 @merchant 页面时强制共用本项目的 React，避免 useState 读 null 导致整页黑屏 */
 function singleReactResolve(fulfillmentRoot: string) {
   const nm = (pkg: string) => path.resolve(fulfillmentRoot, 'node_modules', pkg)
+  const cryptoShim = path.resolve(fulfillmentRoot, 'src/shims/node-crypto-browser.ts')
   return {
     alias: {
       '@merchant': MERCHANT_ERP_SRC,
@@ -21,6 +22,8 @@ function singleReactResolve(fulfillmentRoot: string) {
       'react-dom': nm('react-dom'),
       'react/jsx-runtime': nm('react/jsx-runtime'),
       'react/jsx-dev-runtime': nm('react/jsx-dev-runtime'),
+      'node:crypto': cryptoShim,
+      crypto: cryptoShim,
     },
     dedupe: ['react', 'react-dom', 'react-router', 'react-router-dom'] as string[],
   }
