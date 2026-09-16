@@ -598,7 +598,7 @@ export default function MeooLayout() {
       ) : null}
 
       <AiAgentDrawer />
-      <div className="pointer-events-none fixed right-0 top-1/2 z-[60] -translate-y-1/2">
+      <div className="pointer-events-none fixed right-0 top-[68%] z-[60] -translate-y-1/2">
         <div className="pointer-events-auto mb-2 mr-2 flex justify-end">
           <AiGenerationJobsBanner />
         </div>
