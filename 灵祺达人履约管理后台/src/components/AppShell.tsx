@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { ChevronDown } from 'lucide-react'
 import PlatformDecorDrHost from './PlatformDecorDrHost'
 import ThemeToggle from './ThemeToggle'
 import IdentitySwitchPanel from './IdentitySwitchPanel'
@@ -28,6 +29,25 @@ export default function AppShell() {
   const role = getActiveRole()
   const workId = getWorkIdentity()
   const NAV = navItemsForRole(role, account)
+  const orderIdx = NAV.findIndex((item) => item.to === '/profile/my-orders')
+  const useMoreMenu = orderIdx >= 5 && orderIdx < NAV.length - 1
+  const primaryNav = useMoreMenu ? NAV.slice(0, orderIdx + 1) : NAV
+  const moreNav = useMoreMenu ? NAV.slice(orderIdx + 1) : []
+  const [moreOpen, setMoreOpen] = useState(false)
+  const moreRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    setMoreOpen(false)
+  }, [location.pathname, location.search])
+
+  useEffect(() => {
+    if (!moreOpen) return
+    function onDocClick(ev: MouseEvent) {
+      if (!moreRef.current?.contains(ev.target as Node)) setMoreOpen(false)
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [moreOpen])
 
   function logout() {
     if (
@@ -64,11 +84,48 @@ export default function AppShell() {
           </NavLink>
 
           <nav className="xx-header-nav" aria-label="主导航">
-            {NAV.map((item) => (
+            {primaryNav.map((item) => (
               <NavLink key={item.to} to={item.to} className={navLinkClass(item.to)}>
                 {item.label}
               </NavLink>
             ))}
+            {moreNav.length > 0 ? (
+              <div className="xx-header-more" ref={moreRef}>
+                <button
+                  type="button"
+                  className={`xx-header-link xx-header-more__btn${
+                    moreOpen || moreNav.some((item) => isShellNavItemActive(item.to, location.pathname, location.search))
+                      ? ' xx-header-link--active'
+                      : ''
+                  }`}
+                  aria-haspopup="menu"
+                  aria-expanded={moreOpen}
+                  onClick={() => setMoreOpen((v) => !v)}
+                >
+                  更多
+                  <ChevronDown className="xx-header-more__chevron" aria-hidden />
+                </button>
+                {moreOpen ? (
+                  <div className="xx-header-more__menu" role="menu">
+                    {moreNav.map((item) => (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        role="menuitem"
+                        className={`xx-header-more__item${
+                          isShellNavItemActive(item.to, location.pathname, location.search)
+                            ? ' xx-header-more__item--active'
+                            : ''
+                        }`}
+                        onClick={() => setMoreOpen(false)}
+                      >
+                        {item.label}
+                      </NavLink>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </nav>
 
           <div className="xx-header-actions">
