@@ -46,17 +46,20 @@
           <view class="home-desk__cta">{{bannerCta}}</view>
         </view>
         <view class="home-desk__kpis" catchtap="noopSheetTap">
-          <view class="home-desk__kpi">
+          <view class="home-desk__kpi home-desk__kpi--hall">
+            <text class="home-desk__kpi-tag">在招</text>
             <text class="home-desk__kpi-num">{{tabCounts.normal || 0}}</text>
             <text class="home-desk__kpi-lbl">招募大厅</text>
           </view>
-          <view class="home-desk__kpi">
+          <view class="home-desk__kpi home-desk__kpi--urgent">
+            <text class="home-desk__kpi-tag">加急</text>
             <text class="home-desk__kpi-num">{{tabCounts.urgent || 0}}</text>
-            <text class="home-desk__kpi-lbl">急单</text>
+            <text class="home-desk__kpi-lbl">急单大厅</text>
           </view>
-          <view class="home-desk__kpi">
+          <view class="home-desk__kpi home-desk__kpi--today">
+            <text class="home-desk__kpi-tag">今日</text>
             <text class="home-desk__kpi-num">{{todayCount || 0}}</text>
-            <text class="home-desk__kpi-lbl">今日新增</text>
+            <text class="home-desk__kpi-lbl">新增招募</text>
           </view>
         </view>
       </view>
