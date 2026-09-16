@@ -255,11 +255,16 @@ Page({
       api.requireRealAuth(url)
       return
     }
-    if (url.indexOf('/pages/ai-agent/') >= 0) {
-      wx.switchTab({ url })
+    if (url.indexOf('/pages/ai-agent/') >= 0 || url.indexOf('/pages/dashboard/') >= 0 || url.indexOf('/pages/functions/') >= 0) {
+      wx.switchTab({ url: url.split('?')[0] })
       return
     }
-    wx.navigateTo({ url })
+    wx.navigateTo({
+      url,
+      fail() {
+        wx.showToast({ title: '页面打开失败，请重新编译', icon: 'none' })
+      },
+    })
   },
 
   onLogout() {

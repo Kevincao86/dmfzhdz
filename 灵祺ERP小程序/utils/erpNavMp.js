@@ -23,23 +23,55 @@ const MODULE_PAGES = {
   settings: '/pages/mine/mine',
 }
 
+const TAB_PATHS = [
+  '/pages/functions/functions',
+  '/pages/dashboard/dashboard',
+  '/pages/ai-agent/ai-agent',
+  '/pages/mine/mine',
+]
+
+function isTabUrl(url) {
+  const p = String(url || '').split('?')[0]
+  return TAB_PATHS.includes(p)
+}
+
+function openUrl(url) {
+  const raw = String(url || '').trim()
+  if (!raw) {
+    wx.showToast({ title: '功能暂未开放', icon: 'none' })
+    return
+  }
+  if (isTabUrl(raw)) {
+    wx.switchTab({
+      url: raw.split('?')[0],
+      fail() {
+        wx.showToast({ title: '无法切换到该页', icon: 'none' })
+      },
+    })
+    return
+  }
+  wx.navigateTo({
+    url: raw,
+    fail() {
+      wx.showToast({ title: '页面打开失败，请重新编译', icon: 'none' })
+    },
+  })
+}
+
 function navForTaskType(taskType) {
   return TASK_NAV[taskType] || TASK_NAV.general
 }
 
 function openTaskPage(taskType) {
-  const url = navForTaskType(taskType)
-  if (!url) return
-  if (url.includes('/pages/functions/') || url.includes('/pages/dashboard/') || url.includes('/pages/ai-agent/') || url.includes('/pages/mine/')) {
-    wx.switchTab({ url })
-    return
-  }
-  wx.navigateTo({ url })
+  openUrl(navForTaskType(taskType))
 }
 
 module.exports = {
   TASK_NAV,
   MODULE_PAGES,
+  TAB_PATHS,
+  isTabUrl,
+  openUrl,
   navForTaskType,
   openTaskPage,
 }

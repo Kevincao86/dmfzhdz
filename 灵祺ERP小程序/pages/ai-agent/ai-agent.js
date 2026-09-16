@@ -1,11 +1,20 @@
 const api = require('../../utils/api.js')
-const agent = require('../../utils/aiAgentMp.js')
-const exec = require('../../utils/aiAgentExecutionMp.js')
-const confirmMp = require('../../utils/aiAgentConfirmMp.js')
 const erpNav = require('../../utils/erpNavMp.js')
-const membershipMp = require('../../utils/membershipMp.js')
 const { decodeJwtSub } = require('../../utils/jwtDecode.js')
 const { assetUrl } = require('../../utils/mpStaticAssets.js')
+
+let agent = null
+let exec = null
+let confirmMp = null
+let membershipMp = null
+try {
+  agent = require('../../utils/aiAgentMp.js')
+  exec = require('../../utils/aiAgentExecutionMp.js')
+  confirmMp = require('../../utils/aiAgentConfirmMp.js')
+  membershipMp = require('../../utils/membershipMp.js')
+} catch (e) {
+  console.error('ai-agent deps', e)
+}
 
 function lastScrollId(list, sending) {
   if (sending) return 'msg-thinking'
@@ -17,7 +26,7 @@ Page({
   data: {
     logoSrc: assetUrl('logo.png'),
     messages: [],
-    shortcuts: agent.AI_AGENT_SHORTCUTS,
+    shortcuts: [],
     input: '',
     sending: false,
     hasChat: false,
@@ -25,18 +34,28 @@ Page({
   },
 
   onLoad() {
+    if (!agent || !exec) {
+      wx.showToast({ title: '助手模块需重新编译', icon: 'none', duration: 2500 })
+      return
+    }
     this._execState = exec.createAgentExecutionState()
+    this.setData({ shortcuts: agent.AI_AGENT_SHORTCUTS || [] })
   },
 
   onShow() {
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 2 })
     }
+    if (!agent) return
     if (!api.isRealAuthed()) {
-      this.setData({ messages: [], hasChat: false, shortcuts: agent.shortcutsForPlan('free') })
+      this.setData({
+        messages: [],
+        hasChat: false,
+        shortcuts: agent.AI_AGENT_SHORTCUTS || [],
+      })
       return
     }
-    const sub = decodeJwtSub(api.getAccessToken())
+    const sub = decodeJwtSub(api.getBearerToken ? api.getBearerToken() : api.getAccessToken())
     if (sub) agent.setCurrentUserId(sub)
     const messages = agent.loadThread()
     this.setData({
@@ -48,8 +67,9 @@ Page({
   },
 
   async refreshShortcuts() {
+    if (!agent) return
     try {
-      const snap = await membershipMp.loadMembershipSnapshot()
+      const snap = membershipMp ? await membershipMp.loadMembershipSnapshot() : null
       const plan = (snap && snap.ent && snap.ent.plan) || 'free'
       this.setData({ shortcuts: agent.shortcutsForPlan(plan) })
     } catch (_) {
@@ -90,7 +110,7 @@ Page({
   },
 
   async sendLine(line) {
-    if (this.data.sending) return
+    if (!agent || this.data.sending) return
     if (!api.requireRealAuth('/pages/ai-agent/ai-agent')) return
     this.setData({ input: '', sending: true, hasChat: true, scrollTo: 'msg-thinking' })
     const history = this.data.messages.filter((m) => m.role === 'user' || m.role === 'assistant')
@@ -128,7 +148,7 @@ Page({
   async onConfirmPreview(e) {
     const id = e.currentTarget.dataset.id
     const msg = this.findPreview(id)
-    if (!msg || this.data.sending) return
+    if (!confirmMp || !msg || this.data.sending) return
     this.setData({ sending: true })
     try {
       const r = await confirmMp.confirmPreviewMessage(msg, { userBrief: msg._userBrief })

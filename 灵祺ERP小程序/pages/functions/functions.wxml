@@ -1,20 +1,60 @@
-<scroll-view scroll-y class="page-func-v2" enhanced show-scrollbar="{{false}}" style="padding-bottom:var(--tab-bar-pad)">
-  <view class="func-hero">
-    <view class="func-hero-main">
-      <image class="func-brand-logo" src="{{logoSrc}}" mode="aspectFit" />
-      <view class="func-hero-text">
-        <text class="func-h1">商家能力中心</text>
-        <text class="func-p">知识库 · 店铺 · 商品 · 运营 · AI 创作 · 投流 · 线索 · 财务</text>
+<scroll-view scroll-y class="home-page" enhanced show-scrollbar="{{false}}" style="padding-bottom:var(--tab-bar-pad)">
+  <view class="home-hero">
+    <view class="home-search">
+      <text class="home-search-icon">⌕</text>
+      <input
+        class="home-search-input"
+        placeholder="搜索店铺 / 商品 / 财务 / AI"
+        placeholder-class="home-search-ph"
+        value="{{keyword}}"
+        confirm-type="search"
+        bindinput="onSearchInput"
+        bindconfirm="onSearchConfirm"
+      />
+      <view class="home-search-btn" bindtap="onSearchConfirm">搜索</view>
+    </view>
+  </view>
+
+  <view class="home-desk">
+    <view class="home-desk-head">
+      <view class="home-desk-copy">
+        <text class="home-desk-title">{{deskTitle}}</text>
+        <text class="home-desk-sub">{{deskSub}}</text>
+      </view>
+      <view class="home-desk-cta" bindtap="onGoDashboard">经营概览</view>
+    </view>
+    <view class="home-kpis">
+      <view class="home-kpi home-kpi-pay" bindtap="onGoDashboard">
+        <text class="home-kpi-tag">成交</text>
+        <text class="home-kpi-num">{{kpiPay}}</text>
+        <text class="home-kpi-lbl">近7日金额</text>
+      </view>
+      <view class="home-kpi home-kpi-order" bindtap="onGoDashboard">
+        <text class="home-kpi-tag">核销</text>
+        <text class="home-kpi-num">{{kpiOrders}}</text>
+        <text class="home-kpi-lbl">近7日订单</text>
+      </view>
+      <view class="home-kpi home-kpi-agent" bindtap="onGoAgent">
+        <text class="home-kpi-tag">助手</text>
+        <text class="home-kpi-num">AI</text>
+        <text class="home-kpi-lbl">灵祺助手</text>
       </view>
     </view>
-    <view class="func-hero-glow" aria-hidden="true"></view>
+    <view class="home-hall">
+      <view class="home-hall-item {{hallTab === 'all' ? 'on' : ''}}" data-tab="all" bindtap="onHallTab">全部能力</view>
+      <view class="home-hall-item {{hallTab === 'ops' ? 'on' : ''}}" data-tab="ops" bindtap="onHallTab">运营</view>
+      <view class="home-hall-item {{hallTab === 'ai-create' ? 'on' : ''}}" data-tab="ai-create" bindtap="onHallTab">AI 创作</view>
+      <view class="home-hall-item {{hallTab === 'finance' ? 'on' : ''}}" data-tab="finance" bindtap="onHallTab">财务</view>
+    </view>
   </view>
+
   <view wx:if="{{guestMode}}" class="guest-banner" bindtap="onGoLogin">
     <text class="guest-banner-t">游客浏览中 · 可先查看功能模块</text>
-    <text class="guest-banner-a">登录后使用完整能力 ›</text>
+    <text class="guest-banner-a">登录后同步电脑端数据 ›</text>
   </view>
-  <block wx:for="{{sections}}" wx:key="id">
-    <navigator wx:if="{{item.layout === 'row'}}" url="{{item.items[0].url}}" class="sec-card-v2">
+
+  <block wx:for="{{visibleSections}}" wx:key="id">
+    <view wx:if="{{item.layout === 'row'}}" class="sec-card-v2" data-url="{{item.items[0].url}}" bindtap="onOpenCell">
       <view class="sec-row-v2">
         <view class="ibox ibox-{{item.tone}} ibox-sm">
           <image class="func-ic-img func-ic-sm" src="{{item.sectionIconSrc}}" mode="aspectFit" />
@@ -23,23 +63,23 @@
         <text class="sec-row-desc">{{item.rowDesc}}</text>
         <text class="chev">›</text>
       </view>
-    </navigator>
+    </view>
     <view wx:else class="sec-card-v2">
       <view class="sec-head-v2">
         <view class="ibox ibox-{{item.tone}} ibox-sm">
           <image class="func-ic-img func-ic-sm" src="{{item.sectionIconSrc}}" mode="aspectFit" />
         </view>
         <text>{{item.title}}</text>
-        <text class="chev">›</text>
       </view>
       <view class="grid-v2 grid-v2-{{item.cols}}">
-        <navigator
+        <view
           wx:for="{{item.items}}"
           wx:for-item="cell"
           wx:for-index="idx"
           wx:key="title"
-          url="{{cell.url}}"
           class="cell-v2 {{idx % item.cols !== item.cols - 1 ? 'cell-v2-divide' : ''}}"
+          data-url="{{cell.url}}"
+          bindtap="onOpenCell"
         >
           <view class="ibox ibox-{{item.tone}} ibox-sm">
             <image class="func-ic-img func-ic-sm" src="{{cell.iconSrc}}" mode="aspectFit" />
@@ -48,8 +88,9 @@
             <text class="cell-strong">{{cell.title}}</text>
             <text class="cell-span">{{cell.desc}}</text>
           </view>
-        </navigator>
+        </view>
       </view>
     </view>
   </block>
+  <view wx:if="{{!visibleSections.length}}" class="home-empty">没有匹配的功能，试试换个关键词</view>
 </scroll-view>
