@@ -327,7 +327,9 @@ async function postAiChatRequest(opts) {
     }
     throw new Error('未配置 MERCHANT_API_BASE_URL，请在 utils/config.local.js 设置商家后台地址')
   }
-  const parsed = registry.parseAiModelPickerKey(registry.effectiveChatPickerKey(opts.pickerKey))
+  const pickerKey = String(opts.pickerKey || registry.loadPickerKey() || '').trim()
+  const chatKey = registry.effectiveChatPickerKey(pickerKey)
+  const parsed = registry.parseAiModelPickerKey(chatKey)
   if (!parsed) throw new Error('模型配置无效')
   let chatModel = parsed.model
   if (parsed.provider === 'tokenmix' && !chatModel) {
@@ -343,7 +345,7 @@ async function postAiChatRequest(opts) {
       opts.imageDataUrls || [],
       getCurrentUserId(),
     ),
-    agentPickerKey: opts.pickerKey,
+    agentPickerKey: chatKey,
   }
   if (taskType) body.taskType = taskType
   if (parsed.provider === 'tokenmix') body.modelFamily = parsed.modelFamily
@@ -385,9 +387,10 @@ async function sendAgentTurn(opts) {
     userLine,
     history = [],
     attachments = [],
-    pickerKey,
+    pickerKey: pickerKeyRaw,
     modelOptions = [],
   } = opts
+  const pickerKey = String(pickerKeyRaw || registry.loadPickerKey() || '').trim()
   const imageDataUrls = []
   const bubbleImageUrls = []
   for (const a of attachments) {

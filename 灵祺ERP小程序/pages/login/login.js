@@ -5,6 +5,13 @@ const wxAccountMp = require('../../utils/wxAccountMp.js')
 const loginLegalAgree = require('../../utils/loginLegalAgree.js')
 const { assetUrl } = require('../../utils/mpStaticAssets.js')
 
+const LANDING_WAYS = [
+  { id: 'pwd', mark: '账号', label: '密码登录', sub: '登录名与密码进入工作台' },
+  { id: 'sms', mark: '快捷', label: '验证码', sub: '手机号短信验证码登录' },
+  { id: 'reg', mark: '入驻', label: '注册', sub: '新开商家账号，免费起步' },
+  { id: 'wx', mark: '微信', label: '一键登录', sub: '授权微信，绑定商家账号' },
+]
+
 const MODE_HINT = {
   login_password: '使用登录名与密码进入商家工作台。',
   login_sms: '使用注册手机号与短信验证码登录。',
@@ -62,6 +69,16 @@ Page({
     legalPromptAction: 'pwd',
     legalPromptText: LEGAL_PROMPT_COPY.pwd.text,
     legalPromptAgreeLabel: LEGAL_PROMPT_COPY.pwd.agree,
+    logoSrc: assetUrl('logo.png'),
+    pickedId: '',
+    landingWays: LANDING_WAYS,
+    platformLogos: [
+      { id: 'douyin', icon: assetUrl('platforms/douyin.png') },
+      { id: 'xiaohongshu', icon: assetUrl('platforms/xiaohongshu.png') },
+      { id: 'dianping', icon: assetUrl('platforms/dianping.png') },
+      { id: 'meituan', icon: assetUrl('platforms/meituan-waimai.png') },
+      { id: 'kuaishou', icon: assetUrl('platforms/kuaishou-local.png') },
+    ],
   },
 
   onLoad(options) {
@@ -225,11 +242,42 @@ Page({
     this.setData({ err: '', infoHint: '' })
   },
 
+  onPickLanding(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    this._clearErr()
+    if (id === 'pwd') {
+      this.setData({ pickedId: 'pwd', mode: 'login', loginMethod: 'password' })
+    } else if (id === 'sms') {
+      this.setData({ pickedId: 'sms', mode: 'login', loginMethod: 'sms' })
+    } else if (id === 'reg') {
+      this.setData({ pickedId: 'reg', mode: 'register' })
+    } else if (id === 'wx') {
+      this.setData({ pickedId: 'wx', mode: 'login', loginMethod: 'password' })
+    }
+    this._syncModeHint()
+  },
+
+  onLandingEnter() {
+    if (!this.data.pickedId) {
+      wx.showToast({ title: '请先选择登录方式', icon: 'none' })
+      return
+    }
+    if (this.data.pickedId === 'wx') {
+      this.onWxLogin()
+      return
+    }
+    this.onSubmit()
+  },
+
   onSwitchMode(e) {
     const mode = e.currentTarget.dataset.mode
     if (!mode || mode === this.data.mode) return
     this._clearErr()
-    this.setData({ mode })
+    this.setData({
+      mode,
+      pickedId: mode === 'register' ? 'reg' : this.data.loginMethod === 'sms' ? 'sms' : 'pwd',
+    })
     this._syncModeHint()
   },
 
@@ -237,7 +285,7 @@ Page({
     const loginMethod = e.currentTarget.dataset.method
     if (!loginMethod || loginMethod === this.data.loginMethod) return
     this._clearErr()
-    this.setData({ loginMethod })
+    this.setData({ loginMethod, pickedId: loginMethod === 'sms' ? 'sms' : 'pwd' })
     this._syncModeHint()
   },
 

@@ -71,7 +71,7 @@
     "list": [
       {
         "pagePath": "pages/functions/functions",
-        "text": "首页"
+        "text": "功能"
       },
       {
         "pagePath": "pages/dashboard/dashboard",

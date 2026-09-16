@@ -253,9 +253,14 @@ function isAgentImagePickerKey(key) {
 }
 
 function effectiveChatPickerKey(modelPickerKey) {
-  if (!isAgentImagePickerKey(modelPickerKey)) return modelPickerKey
-  const p = parseAgentImagePickerKey(modelPickerKey)
-  if (!p) return 'qwen::__default__'
+  let key = String(modelPickerKey || '').trim()
+  if (!key) key = loadPickerKey()
+  if (!isAgentImagePickerKey(key)) {
+    if (parseAiModelPickerKey(key)) return key
+    return defaultPickerKey()
+  }
+  const p = parseAgentImagePickerKey(key)
+  if (!p) return defaultPickerKey()
   if (p.kind === 'vendor') {
     if (p.vendor === 'qwen') return 'qwen::__default__'
     if (p.vendor === 'doubao') return 'doubao::__default__'
@@ -308,6 +313,7 @@ module.exports = {
   isAgentImagePickerKey,
   effectiveChatPickerKey,
   defaultModelIdForFamily,
+  defaultPickerKey,
   loadPickerKey,
   savePickerKey,
   filterOptions,
