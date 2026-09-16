@@ -63,7 +63,6 @@ export default function MeooLayout() {
   const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [openGroups, setOpenGroups] = useState<string[]>([])
-  const [hoverGroup, setHoverGroup] = useState<string | null>(null)
   const [userOpen, setUserOpen] = useState(false)
   const [personalSettingsOpen, setPersonalSettingsOpen] = useState(false)
   const [personalSettingsFormKey, setPersonalSettingsFormKey] = useState(0)
@@ -242,41 +241,14 @@ export default function MeooLayout() {
                 : pathActive(pathname, item.path)
               const href = item.children?.[0]?.path ?? item.path
               return (
-                <div
+                <NavLink
                   key={item.path}
-                  className="relative"
-                  onMouseEnter={() => item.children && setHoverGroup(item.path)}
-                  onMouseLeave={() => setHoverGroup(null)}
+                  to={href}
+                  end={!item.children && item.path === '/home'}
+                  className={navLinkClass(active)}
                 >
-                  <NavLink
-                    to={href}
-                    end={!item.children && item.path === '/home'}
-                    className={navLinkClass(active)}
-                  >
-                    {item.label}
-                  </NavLink>
-                  {item.children && hoverGroup === item.path ? (
-                    <div className="absolute left-0 top-full z-50 min-w-[9.5rem] border border-[#D5D9DE] bg-white py-1 shadow-lg">
-                      {item.children.map((c) => (
-                        <NavLink
-                          key={c.path}
-                          to={c.path}
-                          end={c.path === '/finance'}
-                          className={({ isActive }) =>
-                            cn(
-                              'block px-3 py-1.5 text-[13px]',
-                              isActive
-                                ? 'bg-[rgba(30,58,95,0.1)] font-medium text-[#1E3A5F]'
-                                : 'text-[#3d4450] hover:bg-[#F2F3F0]',
-                            )
-                          }
-                        >
-                          {c.label}
-                        </NavLink>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
+                  {item.label}
+                </NavLink>
               )
             })}
           </nav>
