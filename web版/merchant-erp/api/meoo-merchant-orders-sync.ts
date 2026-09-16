@@ -6,7 +6,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { verifyBearerJwt } from '../vite-plugins/aiGateway/authSupabase.js'
 import { loadTenantAiContextForUser } from '../vite-plugins/tenantMembershipCore.js'
-import { fetchDouyinTradeOrderDetails, eachShanghaiWeekChunks } from '../vite-plugins/douyinMerchantGateway.js'
+import { fetchDouyinTradeOrderDetails } from '../vite-plugins/douyinMerchantGateway.js'
 import {
   backfillOrderPoiFromRaw,
   upsertDouyinOrders,
@@ -113,14 +113,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const warnings: string[] = []
     let pulled = 0
     let upserted = 0
-    for (const chunk of eachShanghaiWeekChunks(startDate, endDate)) {
-      const r = await fetchDouyinTradeOrderDetails(douyinToken, chunk.start, chunk.end)
-      pulled += r.orders.length
-      const u = await upsertDouyinOrders(tenantId, r.orders)
-      upserted += u.upserted
-      for (const w of r.warnings) {
-        if (!warnings.includes(w)) warnings.push(w)
-      }
+    /** 内层已按周切片；外层再切会把同一区间重复打创单/更新窗 */
+    const r = await fetchDouyinTradeOrderDetails(douyinToken, startDate, endDate)
+    pulled = r.orders.length
+    const u = await upsertDouyinOrders(tenantId, r.orders)
+    upserted = u.upserted
+    for (const w of r.warnings) {
+      if (!warnings.includes(w)) warnings.push(w)
     }
     const poiBackfilled = await backfillOrderPoiFromRaw(tenantId).catch(() => 0)
     sendJson(res, 200, {

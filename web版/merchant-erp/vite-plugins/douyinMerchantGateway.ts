@@ -6270,6 +6270,7 @@ async function paginateDouyinTradeOrders(
 ): Promise<void> {
   const isHermes = apiPath.includes('hermes')
   let page = 1
+  let attempt = 0
   const pageSize = opts?.pageSize ?? 100
   const maxPages = opts?.maxPages ?? 100
   while (page <= maxPages) {
@@ -6297,6 +6298,11 @@ async function paginateDouyinTradeOrders(
     const raw = await dr.text()
     const j = parseDouyinJson(raw)
     if (!dr.ok) {
+      if (isDouyinOpenApiRateLimited(raw) && attempt < 3) {
+        attempt += 1
+        await sleep(500 * attempt * attempt)
+        continue
+      }
       warnings.push(
         `抖音${isHermes ? '即配' : '团购'}订单 HTTP ${dr.status}：${raw.slice(0, 200)}`,
       )
@@ -6304,9 +6310,15 @@ async function paginateDouyinTradeOrders(
     }
     const envErr = getDataError(j)
     if (!envErr.ok) {
+      if (isDouyinOpenApiRateLimited(envErr.msg ?? '') && attempt < 3) {
+        attempt += 1
+        await sleep(500 * attempt * attempt)
+        continue
+      }
       warnings.push(envErr.msg ?? `抖音${isHermes ? '即配' : '团购'}订单业务错误`)
       break
     }
+    attempt = 0
     const data = j.data as Record<string, unknown> | undefined
     const orders = (data?.orders as unknown[]) ?? []
     for (const rawOrder of orders) {
@@ -6560,6 +6572,23 @@ export async function fetchDouyinTradeOrderDetails(
   return { orders: Array.from(byId.values()), warnings }
 }
 
+export type DouyinFinanceReconcileOpts = {
+  /** 首页看板只要成交额：跳过 update 窗，少一半周切片 */
+  skipUpdateQuery?: boolean
+  /** 财务管理点「刷新」时绕过短缓存 */
+  bypassCache?: boolean
+}
+
+type DouyinFinanceReconcileResult = {
+  rows: FinanceReconcileRowPayload[]
+  warnings: string[]
+  hourlyTrend?: FinanceHourlyPayPoint[]
+}
+
+const DOUYIN_FINANCE_CACHE_TTL_MS = 20_000
+const douyinFinanceReconcileCache = new Map<string, { at: number; value: DouyinFinanceReconcileResult }>()
+const douyinFinanceReconcileInflight = new Map<string, Promise<DouyinFinanceReconcileResult>>()
+
 /**
  * 成交按支付时间 + 实收金额对齐来客后台；查询仍用创单时间窗（官方无 pay_time 筛），按周切片避免整月分页打满。
  */
@@ -6567,13 +6596,39 @@ export async function fetchDouyinFinanceReconcileRows(
   bearerToken: string,
   startYmd: string,
   endYmd: string,
-): Promise<{ rows: FinanceReconcileRowPayload[]; warnings: string[]; hourlyTrend?: FinanceHourlyPayPoint[] }> {
+  opts?: DouyinFinanceReconcileOpts,
+): Promise<DouyinFinanceReconcileResult> {
   const warnings: string[] = []
   const session = bearerToken ? resolveSession(bearerToken) : undefined
   if (!session) {
     warnings.push('当前 Bearer 非抖音来客绑定会话，无法拉取抖音订单；请使用「抖音绑定」返回的 accessToken。')
     return { rows: [], warnings }
   }
+  const cacheKey = `${session.merchantId}|${startYmd}|${endYmd}|${opts?.skipUpdateQuery ? 'sales' : 'full'}`
+  if (!opts?.bypassCache) {
+    const hit = douyinFinanceReconcileCache.get(cacheKey)
+    if (hit && Date.now() - hit.at < DOUYIN_FINANCE_CACHE_TTL_MS) return hit.value
+    const inflight = douyinFinanceReconcileInflight.get(cacheKey)
+    if (inflight) return inflight
+  }
+  const work = loadDouyinFinanceReconcileRows(session, startYmd, endYmd, warnings, opts)
+  douyinFinanceReconcileInflight.set(cacheKey, work)
+  try {
+    const value = await work
+    douyinFinanceReconcileCache.set(cacheKey, { at: Date.now(), value })
+    return value
+  } finally {
+    douyinFinanceReconcileInflight.delete(cacheKey)
+  }
+}
+
+async function loadDouyinFinanceReconcileRows(
+  session: NonNullable<ReturnType<typeof resolveSession>>,
+  startYmd: string,
+  endYmd: string,
+  warnings: string[],
+  opts?: DouyinFinanceReconcileOpts,
+): Promise<DouyinFinanceReconcileResult> {
   if (!unixRangeInclusiveShanghai(startYmd, endYmd)) {
     warnings.push('日期范围无效')
     return { rows: [], warnings }
@@ -6657,32 +6712,34 @@ export async function fetchDouyinFinanceReconcileRows(
       }
     }
 
-    for (const chunk of eachShanghaiWeekChunks(startYmd, endYmd)) {
-      const rng = unixRangeInclusiveShanghai(chunk.start, chunk.end)
-      if (!rng) continue
-      const chunkWarnings: string[] = []
-      await paginateDouyinTradeOrders(
-        token,
-        accountId,
-        '/goodlife/v1/trade/order/query/',
-        rng.startSec,
-        rng.endSec,
-        startYmd,
-        endYmd,
-        bucket,
-        seenSalesOrderIds,
-        seenVerifyCerts,
-        'update',
-        chunkWarnings,
-        { pageSize: DOUYIN_WEEK_PAGE_SIZE, maxPages: DOUYIN_WEEK_MAX_PAGES },
-        hourlyPay,
-      )
-      if (chunkWarnings.some((w) => w.includes('分页达到上限'))) {
-        hitPageCap = true
-        warnings.push(`核销更新区间 ${chunk.start}~${chunk.end} 订单较多，该周可能未拉全。`)
-      } else {
-        for (const w of chunkWarnings) {
-          if (!warnings.includes(w)) warnings.push(w)
+    if (!opts?.skipUpdateQuery) {
+      for (const chunk of eachShanghaiWeekChunks(startYmd, endYmd)) {
+        const rng = unixRangeInclusiveShanghai(chunk.start, chunk.end)
+        if (!rng) continue
+        const chunkWarnings: string[] = []
+        await paginateDouyinTradeOrders(
+          token,
+          accountId,
+          '/goodlife/v1/trade/order/query/',
+          rng.startSec,
+          rng.endSec,
+          startYmd,
+          endYmd,
+          bucket,
+          seenSalesOrderIds,
+          seenVerifyCerts,
+          'update',
+          chunkWarnings,
+          { pageSize: DOUYIN_WEEK_PAGE_SIZE, maxPages: DOUYIN_WEEK_MAX_PAGES },
+          hourlyPay,
+        )
+        if (chunkWarnings.some((w) => w.includes('分页达到上限'))) {
+          hitPageCap = true
+          warnings.push(`核销更新区间 ${chunk.start}~${chunk.end} 订单较多，该周可能未拉全。`)
+        } else {
+          for (const w of chunkWarnings) {
+            if (!warnings.includes(w)) warnings.push(w)
+          }
         }
       }
     }

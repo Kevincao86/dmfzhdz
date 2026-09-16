@@ -135,7 +135,9 @@ export async function handleFinanceReconcileGet(
   if (douyinToken) {
     jobs.push(
       (async () => {
-        const dy = await fetchDouyinFinanceReconcileRows(douyinToken, startYmd, endYmd)
+        const dy = await fetchDouyinFinanceReconcileRows(douyinToken, startYmd, endYmd, {
+          bypassCache: url.searchParams.get('refresh') === '1',
+        })
         return {
           warnings: dy.warnings,
           rows: dy.rows.map((r) => ({

@@ -111,7 +111,9 @@ async function loadReconcileRows(
   range: DashboardRange,
 ): Promise<{ rows: ReconcileRow[]; hourlyTrend?: FinanceHourlyPayPoint[] }> {
   if (platform === 'douyin') {
-    const r = await fetchDouyinFinanceReconcileRows(bearer, startYmd, endYmd)
+    const r = await fetchDouyinFinanceReconcileRows(bearer, startYmd, endYmd, {
+      skipUpdateQuery: true,
+    })
     return {
       rows: r.rows,
       hourlyTrend: range === 'realtime' ? (r.hourlyTrend ?? buildEmptyHourlyTrend()) : undefined,

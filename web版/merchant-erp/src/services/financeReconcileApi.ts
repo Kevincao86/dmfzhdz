@@ -46,6 +46,7 @@ export async function fetchFinanceReconcile(params?: {
   startDate?: string
   endDate?: string
   signal?: AbortSignal
+  refresh?: boolean
 }): Promise<FinanceReconcileResult> {
   const q = new URLSearchParams()
   const start = (params?.startDate ?? '').trim()
@@ -57,6 +58,7 @@ export async function fetchFinanceReconcile(params?: {
     const days = Math.min(90, Math.max(1, params?.days ?? 14))
     q.set('days', String(days))
   }
+  if (params?.refresh) q.set('refresh', '1')
   const douyinToken = readMerchantSession('meoo_douyin_merchant_token')
   const kuaishouToken = readMerchantSession('meoo_kuaishou_merchant_token')
   const meituanToken = readMerchantSession('meoo_meituan_merchant_token')

@@ -162,7 +162,7 @@ export function FinanceReconcilePage() {
     if (viewTab === 'orders') void loadOrders()
   }, [viewTab, loadOrders])
 
-  const load = useCallback(async (opts?: { mode: 'preset' | 'custom'; dayRange?: DayRangePreset; start?: string; end?: string }) => {
+  const load = useCallback(async (opts?: { mode: 'preset' | 'custom'; dayRange?: DayRangePreset; start?: string; end?: string; refresh?: boolean }) => {
     const mode = opts?.mode ?? rangeMode
     const days = opts?.dayRange ?? dayRange
     const start = opts?.start ?? (mode === 'custom' ? customStart : appliedRange.start)
@@ -198,8 +198,12 @@ export function FinanceReconcilePage() {
             })()
       const r =
         mode === 'custom'
-          ? await fetchFinanceReconcile({ startDate: nextRange.start, endDate: nextRange.end })
-          : await fetchFinanceReconcile({ days })
+          ? await fetchFinanceReconcile({
+              startDate: nextRange.start,
+              endDate: nextRange.end,
+              refresh: opts?.refresh,
+            })
+          : await fetchFinanceReconcile({ days, refresh: opts?.refresh })
       if (!r.ok) {
         setErr(r.message)
         setRows([])
@@ -363,8 +367,8 @@ export function FinanceReconcilePage() {
             onClick={() =>
               void load(
                 rangeMode === 'custom'
-                  ? { mode: 'custom', start: appliedRange.start, end: appliedRange.end }
-                  : { mode: 'preset', dayRange },
+                  ? { mode: 'custom', start: appliedRange.start, end: appliedRange.end, refresh: true }
+                  : { mode: 'preset', dayRange, refresh: true },
               )
             }
             disabled={loading}
