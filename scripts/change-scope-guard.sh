@@ -732,7 +732,10 @@ PAT
       cat <<'PAT'
 灵祺达人撮合小程序/styles/theme.wxss
 灵祺达人撮合小程序/styles/identity-themes.wxss
+灵祺达人撮合小程序/styles/hero-deco.wxss
 灵祺达人撮合小程序/pages/index/index.wxss
+灵祺达人撮合小程序/pages/index/index.wxml
+灵祺达人撮合小程序/pages/index/index.js
 灵祺达人撮合小程序/pages/mine/mine.wxss
 灵祺达人撮合小程序/custom-tab-bar/index.wxss
 灵祺达人撮合小程序/app.json

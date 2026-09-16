@@ -129,7 +129,7 @@
 
 /* Tab 首页顶栏：纯色跟随身份（避免 --lq-gradient-header 顶区色差） */
 .lq-hero-header--home {
-  background: var(--lq-home-nav, #0284c7);
+  background: var(--lq-gradient, var(--lq-home-nav, #1e3a5f));
 }
 
 .lq-hero-bg__pattern {

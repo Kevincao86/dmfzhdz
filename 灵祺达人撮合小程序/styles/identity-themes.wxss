@@ -8,15 +8,15 @@
   --lq-primary: #0284c7;
   --lq-primary-dark: #0369a1;
   --lq-primary-deep: #0369a1;
-  --lq-nav-bar: #0284c7;
+  --lq-nav-bar: #1e3a5f;
   --lq-primary-soft: #38bdf8;
   --lq-primary-50: #e0f2fe;
   --lq-primary-100: #bae6fd;
   --lq-violet: #38bdf8;
-  --lq-gradient: linear-gradient(135deg, #0369a1 0%, #0284c7 52%, #38bdf8 100%);
-  --lq-gradient-header: linear-gradient(145deg, #075985 0%, #0284c7 38%, #38bdf8 72%, #7dd3fc 100%);
-  --lq-gradient-deep: linear-gradient(165deg, #0369a1 0%, #0284c7 55%, #38bdf8 100%);
-  --lq-gradient-tab: linear-gradient(135deg, #0284c7 0%, #38bdf8 55%, #7dd3fc 100%);
+  --lq-gradient: linear-gradient(165deg, #1e3a5f 0%, #1e4d7b 48%, #0284c7 100%);
+  --lq-gradient-header: linear-gradient(165deg, #1e3a5f 0%, #1e4d7b 42%, #0284c7 100%);
+  --lq-gradient-deep: linear-gradient(165deg, #1e3a5f 0%, #0284c7 100%);
+  --lq-gradient-tab: linear-gradient(135deg, #1e3a5f 0%, #0284c7 100%);
   --lq-gradient-tab-track: linear-gradient(90deg, #e0f2fe 0%, #f0f9ff 50%, #fff7ed 100%);
   --lq-gradient-filter: linear-gradient(180deg, #ffffff 0%, #e8eef4 100%);
   --lq-bg: #e8eef4;
@@ -29,9 +29,9 @@
   --lq-chip-on-bg: #e0f2fe;
   --lq-chip-on-border: #7dd3fc;
   --lq-active-tint: rgba(2, 132, 199, 0.14);
-  --lq-home-nav: #0284c7;
+  --lq-home-nav: #1e3a5f;
   --lq-home-bg: #e8eef4;
-  --lq-home-banner: linear-gradient(135deg, #0369a1 0%, #0284c7 52%, #38bdf8 100%);
+  --lq-home-banner: linear-gradient(165deg, #1e3a5f 0%, #1e4d7b 48%, #0284c7 100%);
 }
 
 .lq-theme-shoot {
@@ -98,15 +98,15 @@
   --lq-primary: #7c3aed;
   --lq-primary-dark: #6d28d9;
   --lq-primary-deep: #6d28d9;
-  --lq-nav-bar: #7c3aed;
+  --lq-nav-bar: #4c1d95;
   --lq-primary-soft: #8b5cf6;
   --lq-primary-50: #f3e8ff;
   --lq-primary-100: #e9d5ff;
   --lq-violet: #8b5cf6;
-  --lq-gradient: linear-gradient(135deg, #6d28d9 0%, #7c3aed 52%, #8b5cf6 100%);
-  --lq-gradient-header: linear-gradient(145deg, #5b21b6 0%, #7c3aed 38%, #8b5cf6 72%, #a78bfa 100%);
-  --lq-gradient-deep: linear-gradient(165deg, #6d28d9 0%, #7c3aed 55%, #8b5cf6 100%);
-  --lq-gradient-tab: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 55%, #a78bfa 100%);
+  --lq-gradient: linear-gradient(165deg, #3b0764 0%, #5b21b6 52%, #6d28d9 100%);
+  --lq-gradient-header: linear-gradient(165deg, #3b0764 0%, #5b21b6 48%, #6d28d9 100%);
+  --lq-gradient-deep: linear-gradient(165deg, #3b0764 0%, #6d28d9 100%);
+  --lq-gradient-tab: linear-gradient(135deg, #4c1d95 0%, #6d28d9 100%);
   --lq-gradient-tab-track: linear-gradient(90deg, #f3e8ff 0%, #fdf4ff 50%, #fff7ed 100%);
   --lq-gradient-filter: linear-gradient(180deg, #ffffff 0%, #e8eef4 100%);
   --lq-bg: #e8eef4;
@@ -119,7 +119,7 @@
   --lq-chip-on-bg: #f3e8ff;
   --lq-chip-on-border: #ddd6fe;
   --lq-active-tint: rgba(124, 58, 237, 0.14);
-  --lq-home-nav: #7c3aed;
+  --lq-home-nav: #4c1d95;
   --lq-home-bg: #e8eef4;
-  --lq-home-banner: linear-gradient(135deg, #6d28d9 0%, #7c3aed 52%, #8b5cf6 100%);
+  --lq-home-banner: linear-gradient(165deg, #3b0764 0%, #5b21b6 52%, #6d28d9 100%);
 }

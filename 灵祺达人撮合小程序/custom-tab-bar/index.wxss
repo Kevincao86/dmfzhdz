@@ -117,16 +117,16 @@
 }
 
 .fab-btn {
-  width: 88rpx;
-  height: 88rpx;
-  margin-top: -28rpx;
-  border-radius: 50%;
-  background: var(--lq-gradient-tab);
-  box-shadow: var(--lq-shadow-soft);
+  width: 80rpx;
+  height: 80rpx;
+  margin-top: -20rpx;
+  border-radius: 12rpx;
+  background: var(--lq-primary);
+  box-shadow: 0 8rpx 20rpx rgba(20, 24, 31, 0.16);
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 5rpx solid #fff;
+  border: 4rpx solid #fff;
 }
 
 .fab-btn-inner {

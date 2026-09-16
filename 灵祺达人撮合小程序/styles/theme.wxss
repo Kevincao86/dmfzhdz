@@ -11,13 +11,12 @@ page {
   --lq-accent-deep: #ffb347;
   --lq-violet: #38bdf8;
   --lq-magenta: #7dd3fc;
-  --lq-gradient: linear-gradient(135deg, #0369a1 0%, #0284c7 52%, #38bdf8 100%);
+  --lq-gradient: linear-gradient(165deg, #1e3a5f 0%, #1e4d7b 48%, #0284c7 100%);
   --lq-gradient-header: linear-gradient(
-    145deg,
-    #075985 0%,
-    #0284c7 38%,
-    #38bdf8 72%,
-    #7dd3fc 100%
+    165deg,
+    #1e3a5f 0%,
+    #1e4d7b 42%,
+    #0284c7 100%
   );
   --lq-gradient-deep: linear-gradient(165deg, #0369a1 0%, #0284c7 55%, #38bdf8 100%);
   --lq-gradient-tab: linear-gradient(135deg, #0284c7 0%, #38bdf8 55%, #7dd3fc 100%);
@@ -44,9 +43,9 @@ page {
   --lq-radius-sm: 24rpx;
   --lq-header-pad-bottom: 32rpx;
   /* Tab 首页顶栏 / Banner：默认达人蓝（身份 class 可覆盖） */
-  --lq-home-nav: #0284c7;
+  --lq-home-nav: #1e3a5f;
   --lq-home-bg: #e8eef4;
-  --lq-home-banner: linear-gradient(135deg, #0369a1 0%, #0284c7 52%, #38bdf8 100%);
+  --lq-home-banner: linear-gradient(165deg, #1e3a5f 0%, #1e4d7b 48%, #0284c7 100%);
 }
 
 /** 品牌 Logo：仅圆形徽章，aspectFill 铺满 */

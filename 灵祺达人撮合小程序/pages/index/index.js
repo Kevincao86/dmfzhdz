@@ -32,43 +32,34 @@ const HOME_CATEGORY_CHIPS = [
   { id: 'more', label: '更多' },
 ]
 
-const homeBannerAssets = require('../../utils/homeBannerAssets.js')
 const mpCdnAssets = require('../../utils/mpCdnAssets.js')
 
 const HOME_BANNER_PR = {
-  bannerTitle: '成为灵祺星选 PR',
-  bannerSub: '发招募 · 智能荐达人',
-  bannerHint: '高效对接达人资源',
-  bannerCta: '去认证',
-  bannerGirl: homeBannerAssets.heroTalentSearch,
-  bannerClouds: homeBannerAssets.homeBannerClouds,
+  bannerTitle: '灵祺星选 PR 工作台',
+  bannerSub: '发布招募，对接认证达人',
+  bannerHint: '企业级撮合与履约协同',
+  bannerCta: '立即认证',
 }
 
 const HOME_BANNER_TALENT = {
-  bannerTitle: '成为灵祺星选达人',
-  bannerSub: '发现更多合作机会',
-  bannerHint: '让影响力创造价值',
-  bannerCta: '去认证',
-  bannerGirl: homeBannerAssets.heroTalent,
-  bannerClouds: homeBannerAssets.homeBannerClouds,
+  bannerTitle: '灵祺星选达人工作台',
+  bannerSub: '承接品牌商单与探店合作',
+  bannerHint: '认证后参与平台撮合',
+  bannerCta: '立即认证',
 }
 
 const HOME_BANNER_SHOOT = {
-  bannerTitle: '成为灵祺星选拍摄团队',
-  bannerSub: '接单大厅 · 现场跟拍',
-  bannerHint: '设备齐全 · 快速响应',
-  bannerCta: '去认证',
-  bannerGirl: homeBannerAssets.heroShoot,
-  bannerClouds: homeBannerAssets.homeBannerClouds,
+  bannerTitle: '灵祺星选拍摄工作台',
+  bannerSub: '现场跟拍与设备交付',
+  bannerHint: '认证团队优先派单',
+  bannerCta: '立即认证',
 }
 
 const HOME_BANNER_EDIT = {
-  bannerTitle: '成为灵祺星选剪辑团队',
-  bannerSub: '接单大厅 · 精剪交付',
-  bannerHint: '高效出片 · 品质保障',
-  bannerCta: '去认证',
-  bannerGirl: homeBannerAssets.heroEdit,
-  bannerClouds: homeBannerAssets.homeBannerClouds,
+  bannerTitle: '灵祺星选剪辑工作台',
+  bannerSub: '成片交付与档期管理',
+  bannerHint: '认证团队优先派单',
+  bannerCta: '立即认证',
 }
 
 function homeBannerForIdentity(identity) {

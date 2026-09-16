@@ -6,7 +6,7 @@ const identityTypes = require('./identityTypes.js')
 
 const PACKS = {
   talent: {
-    navBar: '#0284c7',
+    navBar: '#1e3a5f',
     bg: '#e8eef4',
     primary: '#0284c7',
     primaryDark: '#0369a1',
@@ -81,7 +81,7 @@ const PACKS = {
     activeTint: 'rgba(20, 184, 166, 0.14)',
   },
   pr: {
-    navBar: '#7c3aed',
+    navBar: '#4c1d95',
     bg: '#e8eef4',
     primary: '#7c3aed',
     primaryDark: '#6d28d9',

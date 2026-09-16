@@ -19,25 +19,11 @@
       </view>
 
       <view class="home-banner-v2" bindtap="goVerifyTalent" wx:if="{{!decorBanner}}">
-        <view class="home-banner-v2__deco home-banner-v2__deco--star" />
         <view class="home-banner-v2__copy">
           <text class="home-banner-v2__title">{{bannerTitle}}</text>
           <text class="home-banner-v2__sub">{{bannerSub}}</text>
           <text class="home-banner-v2__hint">{{bannerHint}}</text>
           <view class="home-banner-v2__cta">{{bannerCta}}</view>
-        </view>
-        <view class="home-banner-v2__scene">
-          <image
-            wx:if="{{workIdentity !== 'pr'}}"
-            class="home-banner-v2__clouds"
-            src="{{bannerClouds}}"
-            mode="aspectFit"
-          />
-          <image
-            class="home-banner-v2__girl {{workIdentity === 'pr' ? 'home-banner-v2__girl--search' : ''}} {{workIdentity === 'shoot' ? 'home-banner-v2__girl--shoot' : ''}} {{workIdentity === 'edit' ? 'home-banner-v2__girl--edit' : ''}}"
-            src="{{bannerGirl}}"
-            mode="aspectFit"
-          />
         </view>
         <view wx:if="{{todayCount > 0}}" class="home-banner-v2__notice" catchtap="noopSheetTap">
           <text class="home-banner-v2__notice-dot"></text>
