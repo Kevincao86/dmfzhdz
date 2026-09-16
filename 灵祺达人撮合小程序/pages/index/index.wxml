@@ -25,9 +25,16 @@
           <text class="home-banner-v2__hint">{{bannerHint}}</text>
           <view class="home-banner-v2__cta">{{bannerCta}}</view>
         </view>
-        <view wx:if="{{todayCount > 0}}" class="home-banner-v2__notice" catchtap="noopSheetTap">
-          <text class="home-banner-v2__notice-dot"></text>
-          <text>今日新增招募 {{todayCount}} 条</text>
+        <view class="home-banner-v2__aside" catchtap="noopSheetTap">
+          <view class="home-banner-v2__kpi">
+            <text class="home-banner-v2__kpi-num">{{tabCounts.normal || 0}}</text>
+            <text class="home-banner-v2__kpi-lbl">招募大厅</text>
+          </view>
+          <view class="home-banner-v2__rule" />
+          <view class="home-banner-v2__kpi">
+            <text class="home-banner-v2__kpi-num">{{todayCount || 0}}</text>
+            <text class="home-banner-v2__kpi-lbl">今日新增</text>
+          </view>
         </view>
       </view>
       <view class="home-decor-banner" wx:elif="{{decorBanner}}" bindtap="onDecorBannerTap">
