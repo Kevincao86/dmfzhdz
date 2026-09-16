@@ -57,6 +57,14 @@ const BASE_MENU = [
     url: '/pages/subscription/subscription',
   },
   {
+    id: 'agent',
+    title: '灵祺助手',
+    desc: '与电脑端 AI 智能体同源对话',
+    iconKey: 'ai',
+    tone: 'cyan',
+    url: '/pages/ai-agent/ai-agent',
+  },
+  {
     id: 'support',
     title: '在线客服',
     desc: '与商家管理后台坐席对话，消息互通',
@@ -128,7 +136,7 @@ Page({
       showPlanBadge: mpUi.SHOW_SUBSCRIPTION && real,
     })
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 2 })
+      this.getTabBar().setData({ selected: 3 })
     }
     if (!real) {
       this.setData({
@@ -245,6 +253,10 @@ Page({
     }
     if (!api.isRealAuthed()) {
       api.requireRealAuth(url)
+      return
+    }
+    if (url.indexOf('/pages/ai-agent/') >= 0) {
+      wx.switchTab({ url })
       return
     }
     wx.navigateTo({ url })

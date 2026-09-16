@@ -230,7 +230,6 @@ function requireRealAuth(redirectUrl) {
   return false
 }
 
-/** Tab 页（功能 / 经营概览 / 我的）是否可进入：已登录、开发预览或免登录游览 */
 function canAccessTabBar() {
   return canAccessPage()
 }

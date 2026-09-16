@@ -343,6 +343,7 @@ Page({
     const tabPaths = [
       '/pages/functions/functions',
       '/pages/dashboard/dashboard',
+      '/pages/ai-agent/ai-agent',
       '/pages/mine/mine',
     ]
     if (redirect) {

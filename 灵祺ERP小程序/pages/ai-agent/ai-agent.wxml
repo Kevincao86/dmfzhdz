@@ -1,0 +1,84 @@
+<view class="agent-page" style="padding-bottom:var(--tab-bar-pad)">
+  <view class="agent-hero">
+    <view class="agent-hero-main">
+      <image class="agent-logo" src="{{logoSrc}}" mode="aspectFit" />
+      <view class="agent-hero-text">
+        <text class="agent-h1">灵祺助手</text>
+        <text class="agent-p">与电脑端 AI 智能体同源 · 写操作需确认后再执行</text>
+      </view>
+    </view>
+    <view class="agent-hero-actions">
+      <view class="agent-chip" bindtap="onNewChat">新对话</view>
+      <navigator url="/pages/shortvideo-ai/shortvideo-ai" class="agent-chip ghost" hover-class="none">短视频出片</navigator>
+    </view>
+  </view>
+
+  <scroll-view
+    wx:if="{{!hasChat}}"
+    scroll-y
+    class="agent-empty"
+    enhanced
+    show-scrollbar="{{false}}"
+  >
+    <text class="empty-title">今天要处理哪件事？</text>
+    <text class="empty-sub">点快捷任务或直接输入，规则与商家后台助手一致</text>
+    <view class="shortcut-grid">
+      <view
+        wx:for="{{shortcuts}}"
+        wx:key="type"
+        class="shortcut"
+        data-prompt="{{item.prompt}}"
+        bindtap="onShortcut"
+      >
+        <text class="shortcut-t">{{item.label}}</text>
+      </view>
+    </view>
+  </scroll-view>
+
+  <scroll-view
+    wx:else
+    scroll-y
+    class="agent-chat"
+    scroll-into-view="{{scrollTo}}"
+    enhanced
+    show-scrollbar="{{false}}"
+  >
+    <view wx:for="{{messages}}" wx:key="id" id="msg-{{item.id}}" class="msg-row {{item.role === 'user' ? 'is-user' : ''}}">
+      <image wx:if="{{item.role !== 'user'}}" class="ava" src="{{logoSrc}}" mode="aspectFit" />
+      <view class="bubble {{item.role === 'user' ? 'bubble-user' : ''}} {{item.role === 'task_preview' ? 'bubble-preview' : ''}}">
+        <text user-select class="bubble-text">{{item.content}}</text>
+        <image
+          wx:if="{{item.imageUrls && item.imageUrls[0]}}"
+          class="bubble-img"
+          src="{{item.imageUrls[0]}}"
+          mode="widthFix"
+        />
+        <view wx:if="{{item.role === 'task_preview' && item.previewStatus === 'pending'}}" class="preview-actions">
+          <view class="btn-ghost" data-id="{{item.id}}" bindtap="onOpenModule">去对应模块</view>
+          <view class="btn-primary" data-id="{{item.id}}" bindtap="onConfirmPreview">确认执行</view>
+        </view>
+        <text wx:if="{{item.previewStatus === 'done'}}" class="preview-done">已确认</text>
+      </view>
+      <view wx:if="{{item.role === 'user'}}" class="ava ava-me">我</view>
+    </view>
+    <view wx:if="{{sending}}" id="msg-thinking" class="msg-row">
+      <image class="ava" src="{{logoSrc}}" mode="aspectFit" />
+      <view class="bubble"><text class="bubble-text muted">正在思考…</text></view>
+    </view>
+  </scroll-view>
+
+  <view class="composer-v2 agent-composer">
+    <input
+      class="composer-input"
+      placeholder="输入问题或经营任务…"
+      value="{{input}}"
+      disabled="{{sending}}"
+      bindinput="onInput"
+      confirm-type="send"
+      bindconfirm="onSend"
+    />
+    <view class="send-v2 {{sending || !input ? 'off' : ''}}" bindtap="onSend">
+      <text class="send-glyph">➤</text>
+    </view>
+  </view>
+</view>

@@ -38,11 +38,11 @@ module.exports.MODULE_COPY = {
   },
   ai_visual_studio: {
     navTitle: '视觉工坊',
-    body: '视觉工坊请在电脑端商家后台使用。',
+    body: '请从「功能 → AI 创作 → AI 视觉工坊」进入：选渠道、文案与出图，与电脑端视觉工坊同源接口。',
   },
   shortvideo_ai: {
     navTitle: '短视频出片',
-    body: '短视频出片请在电脑端商家后台使用。',
+    body: '请从「功能 → AI 创作 → 短视频AI处理」进入，与电脑端短视频创作台同源。',
   },
   shortvideo: {
     navTitle: '短视频优化',
@@ -66,11 +66,11 @@ module.exports.MODULE_COPY = {
   },
   digital_human: {
     navTitle: '数字人口播',
-    body: '数字人 TTS 试听与成片请在电脑端商家后台完成。',
+    body: '请从「功能 → AI 创作 → 数字人口播」进入试听；完整成片计费与电脑端一致。',
   },
   ai_ops_plan: {
     navTitle: '运营方案',
-    body: '多平台运营方案请在电脑端商家后台完成。',
+    body: '请从「功能 → AI 创作 → AI 运营方案」进入，与电脑端同源生成。',
   },
   platform_target: {
     navTitle: '平台签框',

@@ -2,6 +2,7 @@
   "pages": [
     "pages/functions/functions",
     "pages/dashboard/dashboard",
+    "pages/ai-agent/ai-agent",
     "pages/mine/mine",
     "pages/login/login",
     "pages/legal/legal",
@@ -39,6 +40,14 @@
     "pages/competitors/competitors",
     "pages/site-selection/site-selection",
     "pages/knowledge-base/knowledge-base",
+    "pages/ai-ops-plan/ai-ops-plan",
+    "pages/ai-visual-studio/ai-visual-studio",
+    "pages/ai-content/ai-content",
+    "pages/shortvideo-ai/shortvideo-ai",
+    "pages/digital-human/digital-human",
+    "pages/short-drama/short-drama",
+    "pages/recruit-brief-wizard/recruit-brief-wizard",
+    "pages/recruit-brief-records/recruit-brief-records",
     "pages/settings/settings",
     "pages/notifications/notifications",
     "pages/subscription/subscription",
@@ -67,6 +76,10 @@
       {
         "pagePath": "pages/dashboard/dashboard",
         "text": "经营概览"
+      },
+      {
+        "pagePath": "pages/ai-agent/ai-agent",
+        "text": "助手"
       },
       {
         "pagePath": "pages/mine/mine",

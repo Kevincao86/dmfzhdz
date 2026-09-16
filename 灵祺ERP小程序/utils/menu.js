@@ -55,7 +55,7 @@ const SECTIONS = [
         title: '达人招募',
         desc: '五步流程 · Brief · 订单（与 Web 同源）',
       },
-      { kind: 'mod', key: 'activity', title: '活动中心', desc: '活动创建、排期与效果（完整功能在电脑端）' },
+      { kind: 'link', url: '/pages/activity-center/activity-center', title: '活动中心', desc: '活动创建、排期与效果' },
       {
         kind: 'link',
         url: '/pages/reviews-list/reviews-list',
@@ -87,7 +87,12 @@ const SECTIONS = [
         featuredTheme: 'amber',
         featuredShortDesc: '口述脚本卖点 · 结构一键拆解',
       },
-      { kind: 'mod', key: 'shortvideo', title: '短视频优化 · 看板', desc: '脚本诊断与任务（完整看板在电脑端）' },
+      {
+        kind: 'link',
+        url: '/pages/shortvideo-ai/shortvideo-ai',
+        title: '短视频优化 · 看板',
+        desc: '脚本诊断与出片（与电脑端同源）',
+      },
       { kind: 'mod', key: 'live_check', title: '直播间分析', desc: '流量与转化（完整功能在电脑端）' },
       { kind: 'mod', key: 'platform_target', title: '平台签框', desc: '签约目标与进度（完整功能在电脑端）' },
     ],
@@ -95,20 +100,20 @@ const SECTIONS = [
   {
     title: '增长',
     items: [
-      { kind: 'mod', key: 'advertising', title: '投流', desc: '广告投放计划（请在电脑端操作）' },
-      { kind: 'mod', key: 'leads', title: '线索', desc: '线索分配与转化（请在电脑端操作）' },
+      { kind: 'link', url: '/pages/ads-manage/ads-manage', title: '投流', desc: '广告投放计划（与电脑端同源）' },
+      { kind: 'link', url: '/pages/leads-center/leads-center', title: '线索', desc: '线索分配与转化（与电脑端同源）' },
     ],
   },
   {
     title: '财务',
     items: [
-      { kind: 'mod', key: 'finance', title: '财务对账', desc: '账单核对（请在电脑端操作）' },
-      { kind: 'mod', key: 'finance_tax', title: '报税管理', desc: '税务辅助（请在电脑端操作）' },
+      { kind: 'link', url: '/pages/finance-reconcile/finance-reconcile', title: '财务对账', desc: '账单核对与核销（与电脑端同源）' },
+      { kind: 'link', url: '/pages/finance-tax/finance-tax', title: '报税管理', desc: '税务申报辅助（与电脑端同源）' },
     ],
   },
   {
     title: '系统',
-    items: [{ kind: 'mod', key: 'settings', title: '系统设置', desc: '店铺授权与密钥请在电脑端商家后台操作' }],
+    items: [{ kind: 'link', url: '/pages/settings/settings', title: '系统设置', desc: '平台授权、账号与订阅' }],
   },
 ]
 

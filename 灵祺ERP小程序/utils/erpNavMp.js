@@ -9,7 +9,7 @@ const TASK_NAV = {
   follow_local_lead: '/pages/leads-center/leads-center',
   sync_platform: '/pages/product-list/product-list',
   analyze_exception: '/pages/dashboard/dashboard',
-  generate_copywriting: '/pages/functions/functions',
+  generate_copywriting: '/pages/ai-content/ai-content',
   file_tax: '/pages/finance-tax/finance-tax',
   general: '/pages/functions/functions',
 }
@@ -30,7 +30,7 @@ function navForTaskType(taskType) {
 function openTaskPage(taskType) {
   const url = navForTaskType(taskType)
   if (!url) return
-  if (url.includes('/pages/functions/') || url.includes('/pages/dashboard/') || url.includes('/pages/mine/')) {
+  if (url.includes('/pages/functions/') || url.includes('/pages/dashboard/') || url.includes('/pages/ai-agent/') || url.includes('/pages/mine/')) {
     wx.switchTab({ url })
     return
   }

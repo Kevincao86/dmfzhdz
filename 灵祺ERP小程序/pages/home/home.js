@@ -69,7 +69,7 @@ Page({
         size: 'small',
         title: '短视频看板',
         sub: '脚本与任务',
-        url: '/pages/module-detail/module-detail?k=shortvideo',
+        url: '/pages/shortvideo-ai/shortvideo-ai',
         theme: 'mint',
       },
     ],
