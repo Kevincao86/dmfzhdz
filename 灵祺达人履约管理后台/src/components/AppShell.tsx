@@ -89,44 +89,44 @@ export default function AppShell() {
                 {item.label}
               </NavLink>
             ))}
-            {moreNav.length > 0 ? (
-              <div className="xx-header-more" ref={moreRef}>
-                <button
-                  type="button"
-                  className={`xx-header-link xx-header-more__btn${
-                    moreOpen || moreNav.some((item) => isShellNavItemActive(item.to, location.pathname, location.search))
-                      ? ' xx-header-link--active'
-                      : ''
-                  }`}
-                  aria-haspopup="menu"
-                  aria-expanded={moreOpen}
-                  onClick={() => setMoreOpen((v) => !v)}
-                >
-                  更多
-                  <ChevronDown className="xx-header-more__chevron" aria-hidden />
-                </button>
-                {moreOpen ? (
-                  <div className="xx-header-more__menu" role="menu">
-                    {moreNav.map((item) => (
-                      <NavLink
-                        key={item.to}
-                        to={item.to}
-                        role="menuitem"
-                        className={`xx-header-more__item${
-                          isShellNavItemActive(item.to, location.pathname, location.search)
-                            ? ' xx-header-more__item--active'
-                            : ''
-                        }`}
-                        onClick={() => setMoreOpen(false)}
-                      >
-                        {item.label}
-                      </NavLink>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
           </nav>
+          {moreNav.length > 0 ? (
+            <div className="xx-header-more" ref={moreRef}>
+              <button
+                type="button"
+                className={`xx-header-link xx-header-more__btn${
+                  moreOpen || moreNav.some((item) => isShellNavItemActive(item.to, location.pathname, location.search))
+                    ? ' xx-header-link--active'
+                    : ''
+                }`}
+                aria-haspopup="menu"
+                aria-expanded={moreOpen}
+                onClick={() => setMoreOpen((v) => !v)}
+              >
+                更多
+                <ChevronDown className="xx-header-more__chevron" aria-hidden />
+              </button>
+              {moreOpen ? (
+                <div className="xx-header-more__menu" role="menu">
+                  {moreNav.map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      role="menuitem"
+                      className={`xx-header-more__item${
+                        isShellNavItemActive(item.to, location.pathname, location.search)
+                          ? ' xx-header-more__item--active'
+                          : ''
+                      }`}
+                      onClick={() => setMoreOpen(false)}
+                    >
+                      {item.label}
+                    </NavLink>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="xx-header-actions">
             <div className="xx-header-tools flex">
