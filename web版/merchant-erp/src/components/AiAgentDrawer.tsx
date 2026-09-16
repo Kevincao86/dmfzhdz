@@ -204,7 +204,7 @@ export function AiAgentFloatingButton() {
     <button
       type="button"
       onClick={() => openDrawer()}
-      className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-[#14181F] shadow-lg shadow-[#14181F]/25 ring-2 ring-[#1F6F78]/50 transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#1F6F78] focus:ring-offset-2"
+      className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-[#14181F] shadow-lg shadow-[#14181F]/25 ring-2 ring-[#1E3A5F]/50 transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#1E3A5F] focus:ring-offset-2"
       aria-label="打开灵祺 AI 助手"
       title="AI 助手"
     >

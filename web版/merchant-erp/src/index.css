@@ -10,11 +10,12 @@ body,
   --embed-text-primary: #14181f;
   --embed-text-secondary: #3d4450;
   --embed-text-muted: #6b7280;
-  --erp-accent: #1f6f78;
-  --erp-accent-soft: rgba(31, 111, 120, 0.12);
-  --erp-canvas: #f2f3f0;
-  --erp-line: #d5d9de;
-  --erp-surface: rgba(255, 255, 255, 0.94);
+  --erp-accent: #1e3a5f;
+  --erp-header: #1e3a5f;
+  --erp-accent-soft: rgba(30, 58, 95, 0.12);
+  --erp-canvas: #e8eef4;
+  --erp-line: #c5d0dc;
+  --erp-surface: #ffffff;
   --erp-radius-lg: 0.75rem;
   --erp-radius-xl: 1rem;
   --erp-shadow-soft: 0 8px 28px -20px rgba(20, 24, 31, 0.35);
@@ -49,6 +50,30 @@ body {
 
   .erp-main-surface {
     background: var(--erp-canvas);
+  }
+
+  .erp-header-bar {
+    background: var(--erp-header);
+    color: #fff;
+  }
+
+  /** 顶栏菜单不出现系统滚动条/滚动按钮 */
+  .erp-header-bar nav,
+  .erp-header-subnav {
+    overflow: visible;
+    scrollbar-width: none;
+  }
+  .erp-header-bar nav::-webkit-scrollbar,
+  .erp-header-subnav::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  /** 店小秘式：色底托出白底工作区 */
+  .erp-content-plate {
+    @apply min-h-[calc(100vh-10.5rem)] rounded-xl bg-white p-5 lg:p-6;
+    box-shadow: 0 1px 10px rgba(20, 24, 31, 0.06);
   }
 
   .erp-btn-primary {
