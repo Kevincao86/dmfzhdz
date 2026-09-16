@@ -70,23 +70,29 @@ export default function AiAgentDrawer() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="fixed inset-0 z-[70] bg-slate-950/40 backdrop-blur-[2px]"
-            aria-label="关闭 AI 抽屉"
+            aria-label="关闭 AI 助手"
             onClick={closeDrawer}
           />
-          <motion.aside
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="meoo-ai-agent-title"
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-            className={cn(
-              'fixed right-0 top-0 z-[71] flex h-full w-full max-w-full flex-col border-l border-slate-200/90 bg-white shadow-2xl shadow-slate-900/15 sm:max-w-[520px]',
-              'sm:rounded-l-2xl',
-            )}
+          <motion.div
+            className="fixed inset-0 z-[71] flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            onClick={closeDrawer}
           >
-            <header className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-700 px-5 py-4 text-white">
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="meoo-ai-agent-title"
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              transition={{ duration: 0.18 }}
+              className="flex max-h-[min(40rem,calc(100vh-5rem))] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xl shadow-slate-900/20"
+              onClick={(e) => e.stopPropagation()}
+            >
+            <header className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 bg-[#1E3A5F] px-5 py-4 text-white">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/10 ring-1 ring-white/20">
@@ -96,11 +102,11 @@ export default function AiAgentDrawer() {
                     <h2 id="meoo-ai-agent-title" className="truncate text-base font-semibold tracking-tight">
                       灵祺 AI 助手
                     </h2>
-                    <p className="text-xs text-indigo-100/95">可咨询问题，也可生成任务方案</p>
+                    <p className="text-xs text-white/80">可咨询问题，也可生成任务方案</p>
                   </div>
                 </div>
                 {pageContext?.pageLabel ? (
-                  <p className="mt-2 truncate rounded-lg bg-black/15 px-2 py-1 text-[11px] text-indigo-50">
+                  <p className="mt-2 truncate rounded-lg bg-black/15 px-2 py-1 text-[11px] text-white/90">
                     上下文：{pageContext.pageLabel}
                     {pageContext.suggestedTasks?.length
                       ? ` · 可执行：${pageContext.suggestedTasks.join('、')}`
@@ -190,7 +196,8 @@ export default function AiAgentDrawer() {
                 涉及创建、修改、删除、发布等操作前将展示预览并由您确认
               </p>
             </footer>
-          </motion.aside>
+            </motion.div>
+          </motion.div>
         </>
       ) : null}
     </AnimatePresence>
@@ -199,12 +206,11 @@ export default function AiAgentDrawer() {
 
 export function AiAgentFloatingButton() {
   const { openDrawer, drawerOpen } = useAiAgent()
-  if (drawerOpen) return null
   return (
     <button
       type="button"
       onClick={() => openDrawer()}
-      className="erp-side-tab"
+      className={cn('erp-side-tab', drawerOpen && 'brightness-110')}
       aria-label="打开灵祺 AI 助手"
       title="AI 助手"
     >

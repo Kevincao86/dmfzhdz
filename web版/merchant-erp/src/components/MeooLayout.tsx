@@ -598,11 +598,11 @@ export default function MeooLayout() {
       ) : null}
 
       <AiAgentDrawer />
-      <div className="pointer-events-none fixed right-0 top-[42%] z-[60] flex flex-col items-end gap-2">
-        <div className="pointer-events-auto mr-2">
+      <div className="pointer-events-none fixed right-0 top-1/2 z-[60] -translate-y-1/2">
+        <div className="pointer-events-auto mb-2 mr-2 flex justify-end">
           <AiGenerationJobsBanner />
         </div>
-        <div className="pointer-events-auto flex flex-col items-end">
+        <div className="pointer-events-auto flex flex-col">
           <AiAgentFloatingButton />
           <FloatingOnlineSupport customerId={adminName} enterpriseName={enterpriseName} />
         </div>

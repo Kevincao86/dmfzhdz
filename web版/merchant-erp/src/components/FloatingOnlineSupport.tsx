@@ -676,10 +676,10 @@ export default function FloatingOnlineSupport({
 
   return (
     <>
-      <div className="flex flex-row items-end gap-2">
+      <div className="relative">
         {open ? (
           <div
-            className="pointer-events-auto flex max-h-[min(32rem,calc(100vh-8rem))] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
+            className="pointer-events-auto absolute right-full bottom-0 mr-2 flex max-h-[min(32rem,calc(100vh-8rem))] w-[min(22rem,calc(100vw-3rem))] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
             role="dialog"
             aria-modal="true"
             aria-labelledby={panelId}
