@@ -14,9 +14,28 @@ const MEMBERSHIP_MONTHLY_YUAN = {
 const FREE_DIRECT_AI_CALL_LIMIT = 50
 
 const PLAN_FEATURE_LINES = {
-  free: ['对话每月 50 次', '不含 GEO、竞对分析、报税管理'],
-  member: ['全功能开放', '标准对话额度'],
-  member_plus: ['全功能开放', '全部对话能力'],
+  free: [
+    '商品 / 店铺 / 招募基础',
+    '每平台绑定 1 个账号',
+    '直连 AI 对话 50 次/月（四厂商）',
+    '可预览生图 / 生视频，使用需升级',
+    '注册赠 100 积分',
+  ],
+  member: [
+    'GEO 优化 · 竞对分析 · 报税管理',
+    '每平台绑定 5 个账号',
+    '直连 AI 不限（四厂商）',
+    'AI 生图 · 短视频 · 数字人 · 混剪',
+    '本地推优化 + 线索跟进 AI',
+    '每月 6,720 积分（套餐桶）',
+  ],
+  member_plus: [
+    '全部 AI 模型（含 OpenAI / Claude）',
+    '每平台绑定 50 个账号',
+    '一键报税 AI · 代运营多店',
+    '每月 23,920 积分（套餐桶）',
+    '短视频 / 云剪 / 数字人可用',
+  ],
 }
 
 function normalizePlan(raw) {

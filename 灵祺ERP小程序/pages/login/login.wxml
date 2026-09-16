@@ -1,4 +1,4 @@
-<scroll-view scroll-y class="login-welcome" enhanced show-scrollbar="{{false}}">
+<scroll-view scroll-y class="login-welcome" enhanced show-scrollbar="{{false}}" style="{{navBandStyle}}">
   <view class="welcome-head">
     <image class="welcome-head__logo" src="{{logoSrc}}" mode="aspectFit" />
     <text class="welcome-head__title">灵祺商家</text>
@@ -23,7 +23,7 @@
   <view
     class="welcome-enter {{pickedId ? 'welcome-enter--on' : ''}}"
     bindtap="onLandingEnter"
-  >{{pickedId === 'wx' ? '微信一键登录' : (pickedId ? submitLabel : '请先选择登录方式')}}</view>
+  >{{pickedId ? '进入工作台' : '请先选择登录方式'}}</view>
 
   <view wx:if="{{pickedId && pickedId !== 'wx'}}" class="auth-card-v2 login-auth-card">
     <text class="mode-hint">{{modeHint}}</text>

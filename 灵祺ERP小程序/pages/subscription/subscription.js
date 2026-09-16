@@ -8,9 +8,9 @@ const payChannels = require('../../utils/tenantPayChannelsMp.js')
 const subUi = require('../../utils/subscriptionUiMp.js')
 
 function displayPlanFromTier(tierId) {
-  if (tierId === 'flagship') return '旗舰版'
-  if (tierId === 'pro') return '专业版'
-  return '基础版'
+  if (tierId === 'member_plus') return '会员 Plus'
+  if (tierId === 'member') return '会员版'
+  return '免费版'
 }
 
 Page({
@@ -43,9 +43,9 @@ Page({
     polling: false,
     channels: payChannels.TENANT_PAY_CHANNELS,
     tiers: subUi.TIERS,
-    activeTierId: 'pro',
-    currentTierId: 'pro',
-    featureTable: subUi.buildTable('pro'),
+    activeTierId: 'member',
+    currentTierId: 'free',
+    featureTable: subUi.buildTable('member'),
   },
 
   onUnload() {
@@ -88,15 +88,15 @@ Page({
     if (devAuth.isDevSkipLogin()) {
       this.setData({
         loading: false,
-        planLabel: '专业版',
-        displayPlanLabel: '专业版',
+        planLabel: '会员版',
+        displayPlanLabel: '会员版',
         isPaid: true,
         expireText: '2026-12-31',
         walletBalanceCents: 25160,
         walletBalanceYuan: '251.60',
-        currentTierId: 'pro',
-        activeTierId: 'pro',
-        featureTable: subUi.buildTable('pro'),
+        currentTierId: 'member',
+        activeTierId: 'member',
+        featureTable: subUi.buildTable('member'),
       })
       return
     }

@@ -14,7 +14,6 @@ Page({
   },
 
   onLoad() {
-    api.enterGuestBrowse()
     const sections = FUNCTION_SECTIONS.map((sec) => ({
       ...sec,
       cols: sec.layout === 'grid3' ? 3 : sec.layout === 'grid2' ? 2 : 1,
@@ -34,7 +33,6 @@ Page({
   },
 
   onShow() {
-    api.enterGuestBrowse()
     this.setData({ guestMode: !api.isRealAuthed() })
     if (api.isRealAuthed()) {
       try {

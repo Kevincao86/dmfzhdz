@@ -23,20 +23,22 @@
       data-id="{{item.id}}"
       bindtap="onPickDisplayTier"
     >
-      <text wx:if="{{item.id === 'pro'}}" class="sub-tier-crown">👑</text>
+      <text wx:if="{{item.id === 'member_plus'}}" class="sub-tier-crown">👑</text>
       <text>{{item.label}}</text>
     </view>
   </view>
 
   <view class="sub-table-card">
     <view class="sub-table-head">
-      <text class="sub-th feature">功能</text>
-      <text class="sub-th {{activeTierId === 'basic' ? 'highlight' : ''}}">基础版</text>
-      <text class="sub-th {{activeTierId === 'pro' ? 'highlight' : ''}}">
-        专业版
-        <text wx:if="{{currentTierId === 'pro'}}" class="sub-current-badge">当前套餐</text>
-      </text>
-      <text class="sub-th {{activeTierId === 'flagship' ? 'highlight' : ''}}">旗舰版</text>
+      <view class="sub-th feature">功能</view>
+      <view
+        wx:for="{{tiers}}"
+        wx:key="id"
+        class="sub-th {{activeTierId === item.id ? 'highlight' : ''}}"
+      >
+        <text>{{item.label}}</text>
+        <text wx:if="{{currentTierId === item.id}}" class="sub-current-badge">当前</text>
+      </view>
     </view>
     <view wx:for="{{featureTable}}" wx:key="key" class="sub-table-row">
       <view class="sub-td feature">
@@ -53,7 +55,7 @@
 
   <view class="sub-footer">
     <text class="sub-footer-ico">🛡</text>
-    <text>所有套餐均享受 7 天无理由退款保障</text>
+    <text>订阅含 ERP 全功能权益；付费档每月赠送 AI 积分（套餐桶，自然月刷新）。所有套餐均享受 7 天无理由退款保障。</text>
     <text class="sub-footer-info">ⓘ</text>
   </view>
 

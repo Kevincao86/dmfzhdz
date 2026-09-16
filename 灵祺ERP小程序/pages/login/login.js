@@ -71,6 +71,7 @@ Page({
     legalPromptAgreeLabel: LEGAL_PROMPT_COPY.pwd.agree,
     logoSrc: assetUrl('logo.png'),
     pickedId: '',
+    navBandStyle: '',
     landingWays: LANDING_WAYS,
     platformLogos: [
       { id: 'douyin', icon: assetUrl('platforms/douyin.png') },
@@ -92,6 +93,7 @@ Page({
       devSkip: devAuth.isDevSkipLogin(),
       legalAgreed: loginLegalAgree.readAgreed(),
     })
+    this._applyNavPadding()
     this._syncModeHint()
     void api.bootstrapSupabaseConfig()
   },
@@ -101,6 +103,7 @@ Page({
   },
 
   onShow() {
+    this._applyNavPadding()
     this.setData({ devSkip: devAuth.isDevSkipLogin() })
     try {
       if (wx.getStorageSync('meoo_just_logged_out')) {
@@ -225,6 +228,20 @@ Page({
       }
       this.setData({ [field]: v - 1 })
     }, 1000)
+  },
+
+  _applyNavPadding() {
+    try {
+      const win = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
+      const menu = wx.getMenuButtonBoundingClientRect()
+      const pxToRpx = 750 / win.windowWidth
+      const menuTopRpx = Math.round(menu.top * pxToRpx)
+      this.setData({ navBandStyle: `padding-top:${menuTopRpx}rpx;` })
+    } catch (_) {
+      this.setData({
+        navBandStyle: 'padding-top:calc(env(safe-area-inset-top) + 88rpx);',
+      })
+    }
   },
 
   _syncModeHint() {

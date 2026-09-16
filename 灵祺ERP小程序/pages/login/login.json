@@ -1,6 +1,5 @@
 {
-  "navigationBarTitleText": "灵祺商家",
-  "navigationBarBackgroundColor": "#d9f3fb",
+  "navigationStyle": "custom",
   "navigationBarTextStyle": "black",
   "backgroundColor": "#e9f6f8",
   "usingComponents": {}
