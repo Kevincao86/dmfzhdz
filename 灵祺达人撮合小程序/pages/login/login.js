@@ -72,7 +72,8 @@ function syncLoginIdentityFromProfile(page) {
 async function applyLoginIdentity(data, workId) {
   const role = identityTypes.accountRoleForWorkIdentity(workId)
   if (data && data.token && data.account) {
-    if (data.account.activeRole !== role) {
+    const already = data.account.activeRole === role
+    if (!already) {
       try {
         await auth.switchRole(role)
       } catch (_) {}
@@ -619,12 +620,21 @@ Page({
     }
     this.setData({ loading: true, err: '' })
     try {
-      avatar = await wxProfileDisplay.persistWxAvatarUrl(avatar)
+      const wxLoginCode = new Promise((resolve, reject) => {
+        wx.login({ success: (r) => resolve(r.code || ''), fail: reject })
+      })
+      const [persistedAvatar, code] = await Promise.all([
+        wxProfileDisplay.persistWxAvatarUrl(avatar),
+        wxLoginCode,
+      ])
+      avatar = persistedAvatar
+      this.setData({ wxAvatarUrl: avatar })
       const role = identityTypes.accountRoleForWorkIdentity(workId)
       const data = await auth.wxLogin({
         role,
         wxNickName: nick,
         wxAvatarUrl: avatar,
+        code,
       })
       if (data.isNew) {
         const acct = auth.readAccount()
@@ -643,7 +653,10 @@ Page({
         })
       }
       await applyLoginIdentity(data, workId)
-      await wxProfileDisplay.applyWxProfileAfterLogin(nick, avatar)
+      await wxProfileDisplay.applyWxProfileAfterLogin(nick, avatar, {
+        alreadyPersisted: true,
+        skipRemote: true,
+      })
       this.setData({ showWxAuthSheet: false, pendingWorkId: '', pendingWorkIdForBind: workId })
       resumeOrNavigateAfterLogin(this)
     } catch (e) {

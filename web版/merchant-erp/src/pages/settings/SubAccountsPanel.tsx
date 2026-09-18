@@ -2,6 +2,7 @@ import { KeyRound, Plus, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import SecretInput from '../../components/SecretInput'
 import { cn } from '../../cn'
+import { merchantApiFetchUrls } from '../../lib/merchantErpApiBase'
 import { supabase, supabaseConfigured } from '../../lib/supabaseClient'
 import {
   hashPassword,
@@ -15,6 +16,43 @@ import {
 
 function newId(): string {
   return `sub_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+}
+
+async function postSubaccountMutate(
+  token: string,
+  body: Record<string, unknown>,
+): Promise<{ ok?: boolean; message?: string; cloudUserId?: string }> {
+  const urls = merchantApiFetchUrls('/api/meoo-tenant-subaccount-mutate')
+  let lastMsg = '请求失败'
+  for (let i = 0; i < urls.length; i++) {
+    try {
+      const res = await fetch(urls[i]!, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      })
+      const text = await res.text()
+      let j: { ok?: boolean; message?: string; cloudUserId?: string } = {}
+      try {
+        j = text ? (JSON.parse(text) as typeof j) : {}
+      } catch {
+        lastMsg = `创建失败（HTTP ${res.status}）`
+        if ((res.status === 404 || res.status >= 502) && i < urls.length - 1) continue
+        return { ok: false, message: lastMsg }
+      }
+      if (res.ok && j.ok) return j
+      lastMsg = typeof j.message === 'string' && j.message.trim() ? j.message : `创建失败（HTTP ${res.status}）`
+      if ((res.status === 404 || res.status >= 502) && i < urls.length - 1) continue
+      return { ok: false, message: lastMsg, cloudUserId: j.cloudUserId }
+    } catch (e) {
+      lastMsg = e instanceof Error ? e.message : '网络异常'
+      if (i < urls.length - 1) continue
+    }
+  }
+  return { ok: false, message: lastMsg }
 }
 
 export default function SubAccountsPanel() {
@@ -105,17 +143,9 @@ export default function SubAccountsPanel() {
     }
     setSubmitting(true)
     try {
-      const res = await fetch('/api/meoo-tenant-subaccount-mutate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ action: 'create', loginName, password: form.password }),
-      })
-      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string; cloudUserId?: string }
-      if (!res.ok || !j.ok) {
-        setErr(typeof j.message === 'string' ? j.message : `创建失败（HTTP ${res.status}）`)
+      const j = await postSubaccountMutate(token, { action: 'create', loginName, password: form.password })
+      if (!j.ok) {
+        setErr(typeof j.message === 'string' ? j.message : '创建失败')
         return
       }
       const passwordHash = await hashPassword(form.password)
@@ -159,22 +189,14 @@ export default function SubAccountsPanel() {
     }
     setSubmitting(true)
     try {
-      const res = await fetch('/api/meoo-tenant-subaccount-mutate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          action: 'reset_password',
-          loginName: resetFor.loginName,
-          password: resetPwd.password,
-          cloudUserId: resetFor.cloudUserId,
-        }),
+      const j = await postSubaccountMutate(token, {
+        action: 'reset_password',
+        loginName: resetFor.loginName,
+        password: resetPwd.password,
+        cloudUserId: resetFor.cloudUserId,
       })
-      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string }
-      if (!res.ok || !j.ok) {
-        setErr(typeof j.message === 'string' ? j.message : `重置失败（HTTP ${res.status}）`)
+      if (!j.ok) {
+        setErr(typeof j.message === 'string' ? j.message : '重置失败')
         return
       }
       const passwordHash = await hashPassword(resetPwd.password)
@@ -209,21 +231,13 @@ export default function SubAccountsPanel() {
       }
       setSubmitting(true)
       try {
-        const res = await fetch('/api/meoo-tenant-subaccount-mutate', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json; charset=utf-8',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            action: 'delete',
-            loginName: row.loginName,
-            cloudUserId: row.cloudUserId,
-          }),
+        const j = await postSubaccountMutate(token, {
+          action: 'delete',
+          loginName: row.loginName,
+          cloudUserId: row.cloudUserId,
         })
-        const j = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string }
-        if (!res.ok || !j.ok) {
-          window.alert(typeof j.message === 'string' ? j.message : `删除失败（HTTP ${res.status}）`)
+        if (!j.ok) {
+          window.alert(typeof j.message === 'string' ? j.message : '删除失败')
           return
         }
       } finally {
@@ -368,7 +382,7 @@ export default function SubAccountsPanel() {
               </button>
             </div>
             <p className="mb-4 text-xs text-gray-500">
-              创建后会在 Supabase 注册同名租户邮箱账号，子账号使用<strong className="font-medium text-gray-700"> 登录账号 + 密码</strong>
+              创建后会注册同名租户登录账号，子账号使用<strong className="font-medium text-gray-700"> 登录账号 + 密码</strong>
               在登录页登录；岗位与权限仍保存在本机浏览器。
             </p>
             <div className="space-y-3">

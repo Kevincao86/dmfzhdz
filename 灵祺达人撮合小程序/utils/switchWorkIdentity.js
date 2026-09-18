@@ -189,6 +189,10 @@ async function applyWorkIdentityAfterLogin(token, account, workId) {
   const accountRole = identityTypes.accountRoleForWorkIdentity(workId)
   userProfile.writeIdentity(workId)
   auth.writeSession(token, account)
+  if (identitySatisfied(workId, account)) {
+    syncLocalProfilesFromAccount(account, workId)
+    return account
+  }
   try {
     await auth.ensureIdentity(accountRole, workIdentityForApi(workId))
   } catch (_) {}

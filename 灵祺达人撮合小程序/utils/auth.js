@@ -98,9 +98,11 @@ async function wxLogin(opts = {}) {
   const nick = String(opts.wxNickName || '').trim()
   const avatar = String(opts.wxAvatarUrl || '').trim()
   if (nick || avatar) wxProfileDisplay.writeWxProfileCache({ wxNickName: nick, wxAvatarUrl: avatar })
-  const code = await new Promise((resolve, reject) => {
-    wx.login({ success: (r) => resolve(r.code || ''), fail: reject })
-  })
+  const code = String(opts.code || '').trim()
+    ? String(opts.code || '').trim()
+    : await new Promise((resolve, reject) => {
+        wx.login({ success: (r) => resolve(r.code || ''), fail: reject })
+      })
   const data = await authPost('wx_login', {
     code,
     stableDevOpenId: accountMemberSync.ensureStableDevOpenId(),
@@ -110,11 +112,6 @@ async function wxLogin(opts = {}) {
     registerTalent: opts.registerTalent,
     registerPr: opts.registerPr,
   })
-  if (nick || avatar) {
-    try {
-      await updateWxProfile(nick, avatar)
-    } catch (_) {}
-  }
   return accountMemberSync.afterAuthSuccess(data)
 }
 

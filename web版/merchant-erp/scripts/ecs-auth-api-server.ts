@@ -41,6 +41,7 @@ import paymentOrdersListHandler from '../../../商家管理后台/api/_lib/handl
 import paymentOrdersVerifyHandler from '../../../商家管理后台/api/_lib/handlers/meoo-supabase-payment-orders-verify.ts'
 import paymentOrdersConfirmHandler from '../../../商家管理后台/api/_lib/handlers/meoo-supabase-payment-orders-confirm.ts'
 import tenantBillingHandler from '../api/meoo-tenant-billing.ts'
+import tenantSubaccountMutateHandler from '../api/meoo-tenant-subaccount-mutate.ts'
 import partnerXingxuanBootstrapHandler from '../api/meoo-partner-xingxuan-bootstrap.ts'
 import partnerAgentsHandler from '../api/meoo-partner-agents.ts'
 import partnerAgentEntitlementsHandler from '../api/meoo-partner-agent-entitlements.ts'
@@ -204,7 +205,7 @@ import apiPingHandler from '../api/ping.ts'
 import merchantSlugHandler from '../api/merchant/[...slug].ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260802-shop-analysis-ai-gross-pts'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260919-tenant-subaccount-mutate'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -255,6 +256,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-supabase-payment-orders-verify': paymentOrdersVerifyHandler as VercelLikeHandler,
   '/api/meoo-supabase-payment-orders-confirm': paymentOrdersConfirmHandler as VercelLikeHandler,
   '/api/meoo-tenant-billing': tenantBillingHandler as VercelLikeHandler,
+  '/api/meoo-tenant-subaccount-mutate': tenantSubaccountMutateHandler as VercelLikeHandler,
   '/api/meoo-partner-xingxuan-bootstrap': partnerXingxuanBootstrapHandler as VercelLikeHandler,
   '/api/meoo-partner-agents': partnerAgentsHandler as VercelLikeHandler,
   '/api/meoo-partner-agent-entitlements': partnerAgentEntitlementsHandler as VercelLikeHandler,

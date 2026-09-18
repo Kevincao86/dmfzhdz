@@ -109,18 +109,20 @@ function clearWxProfileCache() {
   } catch (_) {}
 }
 
-async function applyWxProfileAfterLogin(nick, avatar) {
+async function applyWxProfileAfterLogin(nick, avatar, opts) {
   const n = String(nick || '').trim()
   let av = String(avatar || '').trim()
-  if (av) av = await persistWxAvatarUrl(av)
+  if (av && !(opts && opts.alreadyPersisted)) av = await persistWxAvatarUrl(av)
   if (n || av) writeWxProfileCache({ wxNickName: n, wxAvatarUrl: av })
   const auth = require('./auth.js')
   const wxAccount = require('./wxAccount.js')
   const accountMemberSync = require('./accountMemberSync.js')
-  if ((n && !isPlaceholderWxNick(n)) || av) {
-    try {
-      await auth.updateWxProfile(n, av)
-    } catch (_) {}
+  if (!opts || !opts.skipRemote) {
+    if ((n && !isPlaceholderWxNick(n)) || av) {
+      try {
+        await auth.updateWxProfile(n, av)
+      } catch (_) {}
+    }
   }
   const acct = auth.readAccount()
   const finalNick = pickWxNick(n, acct && acct.wxNickName)
