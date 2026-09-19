@@ -1,14 +1,9 @@
 /**
  * POST /api/meoo-tenant-subaccount-mutate
- * 主账号（tenant_members.owner/admin）为同一租户创建 Supabase 登录子账号，子账号可用登录页 + 租户邮箱域登录 ERP。
+ * 主账号（tenant_members.owner/admin）为同一租户创建可登录子账号。
  *
- * Body JSON:
- * - { action: "create", loginName, password }
- * - { action: "reset_password", loginName?, password, cloudUserId? }
- * - { action: "delete", loginName?, cloudUserId? }
- *
- * 需在 Vercel 配置：SUPABASE_URL（或 VITE_SUPABASE_URL）、SUPABASE_SERVICE_ROLE_KEY、SUPABASE_ANON_KEY（或 VITE_SUPABASE_ANON_KEY），
- * 以及 TENANT_EMAIL_DOMAIN（或 VITE_SUPABASE_TENANT_EMAIL_DOMAIN，与登录页一致）。
+ * GoTrue 在轻量是 :9999，PostgREST 是 :8888。supabase-js Auth Admin 打到 8888/auth 常直接抛错，
+ * 外层变成 HTTP 500 且无 message。创建/改密/删用户与注册同一条：supabaseAdminFetch → /auth/v1/admin/users。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
@@ -16,6 +11,7 @@ import {
   readMerchantSupabaseAdminEnv,
   readMerchantSupabaseAnonKey,
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
+import { supabaseAdminFetch } from '../src/lib/supabaseAdminFetch.js'
 
 export const config = { maxDuration: 30 }
 
@@ -40,7 +36,6 @@ function loginNameToEmail(loginName: string, domain: string): string {
   return `${slug || 'user'}@${domain}`
 }
 
-/** GoTrue listUsers 在部分 TS/客户端版本下元素会被推成 never，显式收窄避免误报 */
 type ListedAuthUser = { id: string; email?: string | null }
 
 function tenantEmailDomain(): string {
@@ -65,6 +60,62 @@ function rawBody(req: VercelRequest): string {
   }
 }
 
+function serviceHeaders(serviceRole: string): Record<string, string> {
+  return {
+    apikey: serviceRole,
+    Authorization: `Bearer ${serviceRole}`,
+    'Content-Type': 'application/json',
+  }
+}
+
+/** 8888 上若未反代 GoTrue，回落到本机 :9999（路径无 /auth/v1 前缀） */
+function gotrueAdminCandidates(supabaseUrl: string, rel: string): string[] {
+  const base = supabaseUrl.replace(/\/$/, '')
+  const relAuth = rel.startsWith('/') ? rel : `/${rel}`
+  const out: string[] = []
+  const add = (u: string) => {
+    if (u && !out.includes(u)) out.push(u)
+  }
+  add(`${base}/auth/v1${relAuth}`)
+  add(`http://127.0.0.1:9999${relAuth}`)
+  const extra = (process.env.GOTRUE_URL ?? process.env.SUPABASE_GOTRUE_URL ?? '').trim().replace(/\/$/, '')
+  if (extra) {
+    if (/:(9999)\b/.test(extra) && !/\/auth\/v1$/i.test(extra)) add(`${extra}${relAuth}`)
+    else add(`${extra}/auth/v1${relAuth}`)
+  }
+  return out
+}
+
+async function gotrueAdminFetch(
+  supabaseUrl: string,
+  rel: string,
+  init: RequestInit,
+): Promise<Response> {
+  const urls = gotrueAdminCandidates(supabaseUrl, rel)
+  let last: Response | undefined
+  let lastErr = ''
+  for (const url of urls) {
+    try {
+      const res = await supabaseAdminFetch(url, init)
+      if (res.ok) return res
+      last = res
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+    }
+  }
+  if (last) return last
+  throw new Error(lastErr || `无法连接 GoTrue ${urls[0] ?? rel}`)
+}
+
+async function readJson(res: Response): Promise<Record<string, unknown>> {
+  const text = await res.text()
+  try {
+    return text ? (JSON.parse(text) as Record<string, unknown>) : {}
+  } catch {
+    return { raw: text.slice(0, 400) }
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   cors(res)
   if (req.method === 'OPTIONS') {
@@ -76,13 +127,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
+  try {
+    await handleMutate(req, res)
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e)
+    sendJson(res, 500, { ok: false, message: `创建子账号失败：${detail}`, detail })
+  }
+}
+
+async function handleMutate(req: VercelRequest, res: VercelResponse): Promise<void> {
   const { supabaseUrl, serviceRole, missingParts } = readMerchantSupabaseAdminEnv()
   const anonKey = readMerchantSupabaseAnonKey()
   if (missingParts.length > 0 || !anonKey) {
     sendJson(res, 503, {
       ok: false,
-      message:
-        '服务端未配置 Supabase：需 URL、SUPABASE_SERVICE_ROLE_KEY，以及 SUPABASE_ANON_KEY（用于校验当前登录）。',
+      message: '服务端未配置登录服务：需 URL、SUPABASE_SERVICE_ROLE_KEY，以及 SUPABASE_ANON_KEY。',
     })
     return
   }
@@ -91,24 +150,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const m = /^Bearer\s+(\S+)/i.exec(authHeader.trim())
   const jwt = m?.[1]?.trim()
   if (!jwt) {
-    sendJson(res, 401, { ok: false, message: '缺少 Authorization: Bearer <access_token>' })
+    sendJson(res, 401, { ok: false, message: '缺少登录凭证，请重新登录主账号' })
     return
   }
 
-  const userClient = createClient(supabaseUrl, anonKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-    global: { headers: { Authorization: `Bearer ${jwt}` } },
+  const userRes = await gotrueAdminFetch(supabaseUrl, '/user', {
+    headers: { apikey: anonKey, Authorization: `Bearer ${jwt}` },
   })
-  const { data: userData, error: userErr } = await userClient.auth.getUser()
-  if (userErr || !userData?.user?.id) {
+  const userJson = await readJson(userRes)
+  const managerId = typeof userJson.id === 'string' ? userJson.id : ''
+  if (!userRes.ok || !managerId) {
     sendJson(res, 401, { ok: false, message: '登录已失效，请重新登录主账号' })
     return
   }
-  const managerId = userData.user.id
 
   const admin = createClient(supabaseUrl, serviceRole, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
+  const headers = serviceHeaders(serviceRole)
 
   const { data: mems, error: memErr } = await admin.from('tenant_members').select('tenant_id, role').eq('user_id', managerId)
 
@@ -137,6 +196,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const domain = tenantEmailDomain()
   const email = loginName ? loginNameToEmail(loginName, domain) : ''
 
+  async function findUserIdByEmail(targetEmail: string): Promise<string> {
+    const listRes = await gotrueAdminFetch(supabaseUrl, '/admin/users?page=1&per_page=1000', { headers })
+    const listJson = await readJson(listRes)
+    const users = (Array.isArray(listJson.users) ? listJson.users : []) as ListedAuthUser[]
+    const hit = users.find((u) => (u.email ?? '').toLowerCase() === targetEmail.toLowerCase())
+    return hit?.id ?? ''
+  }
+
   if (action === 'create') {
     const password = String(body.password ?? '')
     if (loginName.length < 2 || loginName.length > 64) {
@@ -147,41 +214,55 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendJson(res, 400, { ok: false, message: '密码至少 6 位' })
       return
     }
-    const selfEmail = (userData.user.email ?? '').trim().toLowerCase()
+    const selfEmail = typeof userJson.email === 'string' ? userJson.email.trim().toLowerCase() : ''
     if (selfEmail && email.toLowerCase() === selfEmail) {
       sendJson(res, 400, { ok: false, message: '子账号不能与当前登录主账号相同' })
       return
     }
 
-    const { data: created, error: cuErr } = await admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { login_name: loginName, tenant_id: tenantId, is_subaccount: true },
+    const createRes = await gotrueAdminFetch(supabaseUrl, '/admin/users', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { login_name: loginName, tenant_id: tenantId, is_subaccount: true },
+      }),
     })
-    if (cuErr || !created.user) {
-      const msg = (cuErr?.message ?? '').toLowerCase()
+    const createJson = await readJson(createRes)
+    const createdId =
+      typeof createJson.id === 'string'
+        ? createJson.id
+        : typeof (createJson.user as { id?: string } | undefined)?.id === 'string'
+          ? (createJson.user as { id: string }).id
+          : ''
+    if (!createRes.ok || !createdId) {
+      const msg = String(createJson.msg ?? createJson.message ?? createJson.raw ?? '').toLowerCase()
       if (msg.includes('already') || msg.includes('registered')) {
         sendJson(res, 409, { ok: false, message: '该登录账号已在平台注册，请更换名称或联系管理员' })
         return
       }
-      sendJson(res, 400, { ok: false, message: cuErr?.message ?? '创建登录账号失败' })
+      sendJson(res, 400, {
+        ok: false,
+        message: String(createJson.msg ?? createJson.message ?? '创建登录账号失败'),
+      })
       return
     }
 
     const { error: insErr } = await admin.from('tenant_members').insert({
       tenant_id: tenantId,
-      user_id: created.user.id,
+      user_id: createdId,
       role: 'member',
     })
 
     if (insErr) {
-      await admin.auth.admin.deleteUser(created.user.id)
+      await gotrueAdminFetch(supabaseUrl, `/admin/users/${createdId}`, { method: 'DELETE', headers }).catch(() => undefined)
       sendJson(res, 500, { ok: false, message: `写入租户成员失败：${insErr.message}` })
       return
     }
 
-    sendJson(res, 200, { ok: true, cloudUserId: created.user.id, email })
+    sendJson(res, 200, { ok: true, cloudUserId: createdId, email })
     return
   }
 
@@ -198,9 +279,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         sendJson(res, 400, { ok: false, message: '缺少 loginName 或 cloudUserId' })
         return
       }
-      const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
-      const users = (list?.users ?? []) as ListedAuthUser[]
-      uid = users.find((u) => (u.email ?? '').toLowerCase() === email.toLowerCase())?.id ?? ''
+      uid = await findUserIdByEmail(email)
     }
     if (!uid) {
       sendJson(res, 404, { ok: false, message: '未找到该子账号的云端登录，请重新创建子账号后再试' })
@@ -217,9 +296,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    const { error: upErr } = await admin.auth.admin.updateUserById(uid, { password })
-    if (upErr) {
-      sendJson(res, 400, { ok: false, message: upErr.message })
+    const upRes = await gotrueAdminFetch(supabaseUrl, `/admin/users/${uid}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ password }),
+    })
+    if (!upRes.ok) {
+      const upJson = await readJson(upRes)
+      sendJson(res, 400, { ok: false, message: String(upJson.msg ?? upJson.message ?? '重置密码失败') })
       return
     }
     sendJson(res, 200, { ok: true })
@@ -229,11 +313,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   if (action === 'delete') {
     const cloudUserId = String(body.cloudUserId ?? '').trim()
     let uid = cloudUserId
-    if (!uid && email) {
-      const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
-      const users = (list?.users ?? []) as ListedAuthUser[]
-      uid = users.find((u) => (u.email ?? '').toLowerCase() === email.toLowerCase())?.id ?? ''
-    }
+    if (!uid && email) uid = await findUserIdByEmail(email)
     if (!uid) {
       sendJson(res, 200, { ok: true, skipped: true })
       return
@@ -254,7 +334,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
 
     await admin.from('tenant_members').delete().eq('user_id', uid).eq('tenant_id', tenantId)
-    await admin.auth.admin.deleteUser(uid)
+    await gotrueAdminFetch(supabaseUrl, `/admin/users/${uid}`, { method: 'DELETE', headers }).catch(() => undefined)
     sendJson(res, 200, { ok: true })
     return
   }

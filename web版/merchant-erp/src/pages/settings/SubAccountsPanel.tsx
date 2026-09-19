@@ -35,17 +35,21 @@ async function postSubaccountMutate(
         body: JSON.stringify(body),
       })
       const text = await res.text()
-      let j: { ok?: boolean; message?: string; cloudUserId?: string } = {}
+      let j: { ok?: boolean; message?: string; error?: string; detail?: string; cloudUserId?: string } = {}
       try {
         j = text ? (JSON.parse(text) as typeof j) : {}
       } catch {
         lastMsg = `创建失败（HTTP ${res.status}）`
-        if ((res.status === 404 || res.status >= 502) && i < urls.length - 1) continue
+        if ((res.status === 404 || res.status >= 500) && i < urls.length - 1) continue
         return { ok: false, message: lastMsg }
       }
       if (res.ok && j.ok) return j
-      lastMsg = typeof j.message === 'string' && j.message.trim() ? j.message : `创建失败（HTTP ${res.status}）`
-      if ((res.status === 404 || res.status >= 502) && i < urls.length - 1) continue
+      lastMsg =
+        (typeof j.message === 'string' && j.message.trim()) ||
+        (typeof j.detail === 'string' && j.detail.trim()) ||
+        (typeof j.error === 'string' && j.error.trim()) ||
+        `创建失败（HTTP ${res.status}）`
+      if ((res.status === 404 || res.status >= 500) && i < urls.length - 1) continue
       return { ok: false, message: lastMsg, cloudUserId: j.cloudUserId }
     } catch (e) {
       lastMsg = e instanceof Error ? e.message : '网络异常'
