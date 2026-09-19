@@ -2,8 +2,7 @@
  * POST /api/meoo-tenant-subaccount-mutate
  * 主账号（tenant_members.owner/admin）为同一租户创建可登录子账号。
  *
- * GoTrue 在轻量是 :9999，PostgREST 是 :8888。supabase-js Auth Admin 打到 8888/auth 常直接抛错，
- * 外层变成 HTTP 500 且无 message。创建/改密/删用户与注册同一条：supabaseAdminFetch → /auth/v1/admin/users。
+ * GoTrue 走 supabaseAdminFetch；租户表走 supabase-js + nodeSupabaseClientOptions（Node 20 须 ws transport）。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
@@ -11,6 +10,7 @@ import {
   readMerchantSupabaseAdminEnv,
   readMerchantSupabaseAnonKey,
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
+import { nodeSupabaseClientOptions } from '../src/lib/nodeSupabaseClientOptions.js'
 import { supabaseAdminFetch } from '../src/lib/supabaseAdminFetch.js'
 
 export const config = { maxDuration: 30 }
@@ -164,9 +164,7 @@ async function handleMutate(req: VercelRequest, res: VercelResponse): Promise<vo
     return
   }
 
-  const admin = createClient(supabaseUrl, serviceRole, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
+  const admin = createClient(supabaseUrl, serviceRole, nodeSupabaseClientOptions())
   const headers = serviceHeaders(serviceRole)
 
   const { data: mems, error: memErr } = await admin.from('tenant_members').select('tenant_id, role').eq('user_id', managerId)
