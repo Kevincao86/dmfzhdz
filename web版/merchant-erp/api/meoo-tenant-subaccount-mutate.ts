@@ -218,6 +218,26 @@ async function handleMutate(req: VercelRequest, res: VercelResponse): Promise<vo
       return
     }
 
+    async function ensureMember(userId: string): Promise<string | null> {
+      const { data: existing } = await admin
+        .from('tenant_members')
+        .select('tenant_id')
+        .eq('user_id', userId)
+        .maybeSingle()
+      if (existing?.tenant_id === tenantId) return null
+      if (existing?.tenant_id) return '该登录账号已在平台注册，请更换名称或联系管理员'
+      const { error: insErr } = await admin.from('tenant_members').insert({
+        tenant_id: tenantId,
+        user_id: userId,
+        role: 'member',
+      })
+      if (insErr) {
+        if (/duplicate|unique/i.test(insErr.message)) return null
+        return `写入租户成员失败：${insErr.message}`
+      }
+      return null
+    }
+
     const createRes = await gotrueAdminFetch(supabaseUrl, '/admin/users', {
       method: 'POST',
       headers,
@@ -229,34 +249,43 @@ async function handleMutate(req: VercelRequest, res: VercelResponse): Promise<vo
       }),
     })
     const createJson = await readJson(createRes)
-    const createdId =
+    let createdId =
       typeof createJson.id === 'string'
         ? createJson.id
         : typeof (createJson.user as { id?: string } | undefined)?.id === 'string'
           ? (createJson.user as { id: string }).id
           : ''
-    if (!createRes.ok || !createdId) {
-      const msg = String(createJson.msg ?? createJson.message ?? createJson.raw ?? '').toLowerCase()
-      if (msg.includes('already') || msg.includes('registered')) {
-        sendJson(res, 409, { ok: false, message: '该登录账号已在平台注册，请更换名称或联系管理员' })
-        return
+    const already =
+      !createRes.ok &&
+      /already|registered|exists/i.test(String(createJson.msg ?? createJson.message ?? createJson.raw ?? ''))
+    if (already && !createdId) {
+      createdId = await findUserIdByEmail(email)
+      if (createdId) {
+        await gotrueAdminFetch(supabaseUrl, `/admin/users/${createdId}`, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({ password }),
+        })
       }
-      sendJson(res, 400, {
+    }
+    if (!createdId) {
+      sendJson(res, already ? 409 : 400, {
         ok: false,
-        message: String(createJson.msg ?? createJson.message ?? '创建登录账号失败'),
+        message: already
+          ? '该登录账号已在平台注册，请更换名称或联系管理员'
+          : String(createJson.msg ?? createJson.message ?? '创建登录账号失败'),
       })
       return
     }
 
-    const { error: insErr } = await admin.from('tenant_members').insert({
-      tenant_id: tenantId,
-      user_id: createdId,
-      role: 'member',
-    })
-
-    if (insErr) {
-      await gotrueAdminFetch(supabaseUrl, `/admin/users/${createdId}`, { method: 'DELETE', headers }).catch(() => undefined)
-      sendJson(res, 500, { ok: false, message: `写入租户成员失败：${insErr.message}` })
+    const memFail = await ensureMember(createdId)
+    if (memFail) {
+      if (!already) {
+        await gotrueAdminFetch(supabaseUrl, `/admin/users/${createdId}`, { method: 'DELETE', headers }).catch(
+          () => undefined,
+        )
+      }
+      sendJson(res, 500, { ok: false, message: memFail })
       return
     }
 
