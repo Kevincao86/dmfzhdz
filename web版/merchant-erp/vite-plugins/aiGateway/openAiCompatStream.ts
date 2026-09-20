@@ -2,7 +2,9 @@
 
 import type { OpenAiCompatMessage } from './providers/openAiCompatibleFetch.js'
 
-const UPSTREAM_STREAM_TIMEOUT_MS = 45_000
+/** 智能体流式：思考链+长文需要超过 45s 才能出完正文 */
+export const AGENT_STREAM_TIMEOUT_MS = 180_000
+export const AGENT_STREAM_MAX_TOKENS = 8192
 
 function combineAbortSignals(a?: AbortSignal, b?: AbortSignal): AbortSignal | undefined {
   if (!a) return b
@@ -67,7 +69,7 @@ export async function* openAiCompatChatStream(opts: {
   signal?: AbortSignal
   timeoutMs?: number
 }): AsyncGenerator<OpenAiStreamDelta> {
-  const timeoutMs = opts.timeoutMs ?? UPSTREAM_STREAM_TIMEOUT_MS
+  const timeoutMs = opts.timeoutMs ?? AGENT_STREAM_TIMEOUT_MS
   const res = await fetch(opts.url, {
     method: 'POST',
     headers: {

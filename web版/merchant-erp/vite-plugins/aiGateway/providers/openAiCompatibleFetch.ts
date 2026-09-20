@@ -29,6 +29,7 @@ export async function openAiCompatChatFetch(opts: {
     model: opts.model,
     messages: opts.messages,
     temperature: opts.temperature ?? 0.6,
+    max_tokens: 8192,
     stream: false,
   }
   if (opts.tools?.length) {

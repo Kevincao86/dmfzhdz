@@ -36,6 +36,7 @@ import {
 import { parseArkVideoEndpointsRaw } from '../src/lib/arkVideoEndpointsConfig.js'
 import { isDouyinAssistAiVendorId, isValidAiVendorSlug } from '../src/lib/aiVendorCatalogShared.js'
 import { isTokenmixLinkedVendor } from '../src/lib/aiVendorKeysShared.js'
+import { AGENT_STREAM_MAX_TOKENS, AGENT_STREAM_TIMEOUT_MS } from './aiGateway/openAiCompatStream.js'
 import {
   buildProductImageUserLine,
   extractMainProductFromListingTitle,
@@ -1459,13 +1460,22 @@ function qwenChatBodyOverridesForModel(modelId: string): Record<string, unknown>
   return { enable_thinking: false }
 }
 
-const QWEN_AGENT_MAX_TOKENS = 8192
-const QWEN_AGENT_TIMEOUT_MS = 180_000
-
 function qwenAgentChatExtra(modelId: string, extra?: Record<string, unknown>): Record<string, unknown> {
   return {
-    max_tokens: QWEN_AGENT_MAX_TOKENS,
+    max_tokens: AGENT_STREAM_MAX_TOKENS,
     ...(qwenChatBodyOverridesForModel(modelId) ?? {}),
+    ...extra,
+  }
+}
+
+function doubaoModelSupportsThinkingToggle(modelId: string): boolean {
+  return /seed-1-6|seed-1-8|seed-2-0|seed1\.6|seed1\.8|doubao-seed/i.test(modelId)
+}
+
+function doubaoAgentChatExtra(modelId: string, extra?: Record<string, unknown>): Record<string, unknown> {
+  return {
+    max_tokens: AGENT_STREAM_MAX_TOKENS,
+    ...(doubaoModelSupportsThinkingToggle(modelId) ? { thinking: { type: 'disabled' } } : {}),
     ...extra,
   }
 }
@@ -1517,7 +1527,7 @@ async function callDoubaoChat(
   const candidates =
     modelCandidates?.length ? modelCandidates : await resolveDoubaoLiveChatCandidates(apiKey, env)
   const { result, modelUsed } = await invokeWithQuotaFailover(candidates, (mid) =>
-    openAiStyleChat(url, apiKey, mid, system, user, chatOverrides, fetchSignal),
+    openAiStyleChat(url, apiKey, mid, system, user, doubaoAgentChatExtra(mid, chatOverrides), fetchSignal),
   )
   return { text: result, modelUsed }
 }
@@ -3529,7 +3539,7 @@ export async function streamBuiltinAgentChatFromMessages(
             messages: oaiMessages,
             temperature: 0.65,
             extraBody: qwenAgentChatExtra(model),
-            timeoutMs: QWEN_AGENT_TIMEOUT_MS,
+            timeoutMs: AGENT_STREAM_TIMEOUT_MS,
             signal,
           })) {
             if (d.reasoning || d.content) onDelta(d)
@@ -3559,6 +3569,8 @@ export async function streamBuiltinAgentChatFromMessages(
         model: mid,
         messages: oaiMessages,
         temperature: 0.65,
+        extraBody: doubaoAgentChatExtra(mid),
+        timeoutMs: AGENT_STREAM_TIMEOUT_MS,
         signal,
       })) {
         if (d.reasoning || d.content) onDelta(d)
@@ -3597,10 +3609,12 @@ export async function merchantAgentChatFromMessages(
         : { ...envM, MERCHANT_AI_QWEN_CHAT_MODEL: mo }
   }
   if (vendor === 'doubao') {
-    const { text, modelUsed } = await callDoubaoChat(key, eff, system, user)
+    const { text, modelUsed } = await withUpstreamChatTimeoutMs(AGENT_STREAM_TIMEOUT_MS, () =>
+      callDoubaoChat(key, eff, system, user),
+    )
     return { text: polishVisibleAssistantText(text), modelUsed }
   }
-  const { text, modelUsed } = await withUpstreamChatTimeoutMs(QWEN_AGENT_TIMEOUT_MS, () =>
+  const { text, modelUsed } = await withUpstreamChatTimeoutMs(AGENT_STREAM_TIMEOUT_MS, () =>
     callQwenChat(key, eff, system, user),
   )
   return { text: polishVisibleAssistantText(text), modelUsed }

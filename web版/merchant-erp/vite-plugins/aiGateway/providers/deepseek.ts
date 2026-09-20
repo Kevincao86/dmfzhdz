@@ -23,9 +23,8 @@ export async function chatDeepseek(req: AIChatRequest, env: Record<string, strin
     model,
     messages: toMessages(req.messages),
     temperature: req.temperature ?? 0.6,
-    ...(req.taskType
-      ? { thinking: { type: 'enabled' }, reasoning_effort: 'medium' }
-      : { thinking: { type: 'disabled' } }),
+    max_tokens: 8192,
+    thinking: { type: 'disabled' },
   }
   if (req.tools?.length) {
     body.tools = req.tools

@@ -16,12 +16,16 @@ import {
   resolveAimodelserverBaseUrl,
 } from './providers/aimodelserver.js'
 import { type OpenAiCompatMessage } from './providers/openAiCompatibleFetch.js'
-import { openAiCompatChatStream, type OpenAiStreamDelta } from './openAiCompatStream.js'
+import { openAiCompatChatStream, type OpenAiStreamDelta, AGENT_STREAM_MAX_TOKENS, AGENT_STREAM_TIMEOUT_MS } from './openAiCompatStream.js'
 import { toOpenAiChatCompletionMessages } from './openAiChatMessages.js'
 import { streamBuiltinAgentChatFromMessages } from '../merchantAiUpstream.js'
 import { isQuotaHopableError } from '../../src/lib/vendorModelPool.js'
 
 export type AiStreamDeltaHandler = (delta: OpenAiStreamDelta) => void
+
+function agentStreamExtra(extra?: Record<string, unknown>): Record<string, unknown> {
+  return { max_tokens: AGENT_STREAM_MAX_TOKENS, ...extra }
+}
 
 function toOpenAiMessages(messages: AIChatRequest['messages']): OpenAiCompatMessage[] {
   return messages.map((m) => {
@@ -52,13 +56,14 @@ async function streamTokenMix(
   const baseRaw = resolveTokenmixBaseUrl(env)
   const model = resolveTokenMixModelId({ modelFamily: req.modelFamily, model: req.model }, env)
   const { default: OpenAI } = await import('openai')
-  const client = new OpenAI({ apiKey, baseURL: baseRaw })
+  const client = new OpenAI({ apiKey, baseURL: baseRaw, timeout: AGENT_STREAM_TIMEOUT_MS })
   const stream = await client.chat.completions.create({
     model,
     messages: toOpenAiChatCompletionMessages(req) as Parameters<
       typeof client.chat.completions.create
     >[0]['messages'],
     temperature: req.temperature ?? 0.7,
+    max_tokens: AGENT_STREAM_MAX_TOKENS,
     stream: true,
   }, { signal })
   for await (const chunk of stream) {
@@ -75,10 +80,8 @@ async function streamTokenMix(
   return { model: model }
 }
 
-function deepseekExtraBody(req: AIChatRequest): Record<string, unknown> {
-  // 闲聊禁用 thinking，避免长时间只有「思考中」；经营类任务再开中等推理
-  if (!req.taskType) return { thinking: { type: 'disabled' } }
-  return { thinking: { type: 'enabled' }, reasoning_effort: 'medium' }
+function deepseekExtraBody(_req: AIChatRequest): Record<string, unknown> {
+  return { max_tokens: AGENT_STREAM_MAX_TOKENS, thinking: { type: 'disabled' } }
 }
 
 async function streamDeepseek(
@@ -100,6 +103,7 @@ async function streamDeepseek(
       messages: toOpenAiMessages(req.messages),
       temperature: req.temperature ?? 0.6,
       extraBody: deepseekExtraBody(req),
+      timeoutMs: AGENT_STREAM_TIMEOUT_MS,
       signal,
     }),
     onDelta,
@@ -133,6 +137,8 @@ async function streamKimi(
         model,
         messages,
         temperature: req.temperature ?? 0.6,
+        extraBody: agentStreamExtra(),
+        timeoutMs: AGENT_STREAM_TIMEOUT_MS,
         signal,
       }),
       onDelta,
@@ -166,6 +172,8 @@ async function streamAimodelserver(
       model,
       messages: toOpenAiMessages(req.messages),
       temperature: req.temperature ?? 0.6,
+      extraBody: agentStreamExtra(),
+      timeoutMs: AGENT_STREAM_TIMEOUT_MS,
       signal,
     }),
     onDelta,
@@ -202,6 +210,8 @@ async function streamMinimax(
         model,
         messages,
         temperature: req.temperature ?? 1,
+        extraBody: agentStreamExtra(),
+        timeoutMs: AGENT_STREAM_TIMEOUT_MS,
         signal,
       }),
       onDelta,

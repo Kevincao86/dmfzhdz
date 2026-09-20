@@ -1,6 +1,7 @@
 import type { AIChatRequest, AIChatResponse } from '../../../src/services/ai/types.js'
 import { resolveTokenMixModelId, resolveTokenmixBaseUrl } from '../../../src/services/ai/tokenmixClient.js'
 import { toOpenAiChatCompletionMessages } from '../openAiChatMessages.js'
+import { AGENT_STREAM_MAX_TOKENS, AGENT_STREAM_TIMEOUT_MS } from '../openAiCompatStream.js'
 
 /**
  * 四大家族（OpenAI/Claude/Gemini/Grok）经 TokenMix OpenAI-compatible relay；多模态（附图）仅在此路径拼装。
@@ -18,6 +19,7 @@ export async function chatTokenMix(req: AIChatRequest, env: Record<string, strin
   const client = new OpenAI({
     apiKey,
     baseURL: baseRaw,
+    timeout: AGENT_STREAM_TIMEOUT_MS,
   })
 
   try {
@@ -25,6 +27,7 @@ export async function chatTokenMix(req: AIChatRequest, env: Record<string, strin
       model,
       messages: toOpenAiChatCompletionMessages(req),
       temperature: req.temperature ?? 0.7,
+      max_tokens: AGENT_STREAM_MAX_TOKENS,
       ...(req.tools?.length
         ? {
             tools: req.tools as Parameters<typeof client.chat.completions.create>[0]['tools'],
