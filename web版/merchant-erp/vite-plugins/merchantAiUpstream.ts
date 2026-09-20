@@ -1449,10 +1449,25 @@ function isQwen37FlashModelId(modelId: string): boolean {
   return /qwen3\.7-flash|qwen3-7-flash/i.test(modelId)
 }
 
-/** qwen3.7-flash 默认开思考链会多耗数秒；文案/对话关闭思考以秒级返回 */
+function qwenModelSupportsThinkingToggle(modelId: string): boolean {
+  return /qwen3|qwen-plus|qwen-turbo|qwen-flash|qwen-max|qwen-long/i.test(modelId)
+}
+
+/** 对话/智能体关掉思考链，避免占满超时还吐不出正文 */
 function qwenChatBodyOverridesForModel(modelId: string): Record<string, unknown> | undefined {
-  if (isQwen37FlashModelId(modelId)) return { enable_thinking: false }
-  return undefined
+  if (!qwenModelSupportsThinkingToggle(modelId)) return undefined
+  return { enable_thinking: false }
+}
+
+const QWEN_AGENT_MAX_TOKENS = 8192
+const QWEN_AGENT_TIMEOUT_MS = 180_000
+
+function qwenAgentChatExtra(modelId: string, extra?: Record<string, unknown>): Record<string, unknown> {
+  return {
+    max_tokens: QWEN_AGENT_MAX_TOKENS,
+    ...(qwenChatBodyOverridesForModel(modelId) ?? {}),
+    ...extra,
+  }
 }
 
 function prioritizeQwenChatModels(ids: readonly string[]): string[] {
@@ -1658,7 +1673,7 @@ async function callQwenChat(
           preferred,
           system,
           user,
-          { ...chatOverrides, ...qwenChatBodyOverridesForModel(preferred) },
+          qwenAgentChatExtra(preferred, chatOverrides),
           fetchSignal,
         )
         return { text, modelUsed: preferred }
@@ -1686,7 +1701,7 @@ async function callQwenChat(
           mid,
           system,
           user,
-          { ...chatOverrides, ...qwenChatBodyOverridesForModel(mid) },
+          qwenAgentChatExtra(mid, chatOverrides),
           fetchSignal,
         ),
       )
@@ -3513,6 +3528,8 @@ export async function streamBuiltinAgentChatFromMessages(
             model,
             messages: oaiMessages,
             temperature: 0.65,
+            extraBody: qwenAgentChatExtra(model),
+            timeoutMs: QWEN_AGENT_TIMEOUT_MS,
             signal,
           })) {
             if (d.reasoning || d.content) onDelta(d)
@@ -3583,6 +3600,8 @@ export async function merchantAgentChatFromMessages(
     const { text, modelUsed } = await callDoubaoChat(key, eff, system, user)
     return { text: polishVisibleAssistantText(text), modelUsed }
   }
-  const { text, modelUsed } = await callQwenChat(key, eff, system, user)
+  const { text, modelUsed } = await withUpstreamChatTimeoutMs(QWEN_AGENT_TIMEOUT_MS, () =>
+    callQwenChat(key, eff, system, user),
+  )
   return { text: polishVisibleAssistantText(text), modelUsed }
 }

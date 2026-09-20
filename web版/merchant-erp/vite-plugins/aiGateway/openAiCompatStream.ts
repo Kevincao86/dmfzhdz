@@ -16,11 +16,11 @@ function combineAbortSignals(a?: AbortSignal, b?: AbortSignal): AbortSignal | un
   return c.signal
 }
 
-function upstreamStreamTimeoutSignal(): AbortSignal {
+function upstreamStreamTimeoutSignal(ms: number): AbortSignal {
   const AS = AbortSignal as typeof AbortSignal & { timeout?: (n: number) => AbortSignal }
-  if (typeof AS.timeout === 'function') return AS.timeout(UPSTREAM_STREAM_TIMEOUT_MS)
+  if (typeof AS.timeout === 'function') return AS.timeout(ms)
   const c = new AbortController()
-  const t = setTimeout(() => c.abort(), UPSTREAM_STREAM_TIMEOUT_MS)
+  const t = setTimeout(() => c.abort(), ms)
   ;(t as { unref?: () => void }).unref?.()
   return c.signal
 }
@@ -65,7 +65,9 @@ export async function* openAiCompatChatStream(opts: {
   temperature?: number
   extraBody?: Record<string, unknown>
   signal?: AbortSignal
+  timeoutMs?: number
 }): AsyncGenerator<OpenAiStreamDelta> {
+  const timeoutMs = opts.timeoutMs ?? UPSTREAM_STREAM_TIMEOUT_MS
   const res = await fetch(opts.url, {
     method: 'POST',
     headers: {
@@ -80,7 +82,7 @@ export async function* openAiCompatChatStream(opts: {
       stream: true,
       ...opts.extraBody,
     }),
-    signal: combineAbortSignals(opts.signal, upstreamStreamTimeoutSignal()),
+    signal: combineAbortSignals(opts.signal, upstreamStreamTimeoutSignal(timeoutMs)),
   })
   if (!res.ok) {
     const text = await res.text()
