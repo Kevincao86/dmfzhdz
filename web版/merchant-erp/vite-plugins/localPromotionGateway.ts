@@ -7,7 +7,7 @@ import type { ServerResponse } from 'node:http'
 import type { MerchantAiEnv } from './merchantAiUpstream.js'
 import { generateAdvertisingAiTextBilled, type AdAiBillingOpts } from './merchantAdAiPoints.js'
 import {
-  buildAdInsightPrompt,
+  AD_INSIGHT_ACTIONS_MARKER,
   emptyAdvertisingClues,
   emptyAdvertisingList,
   emptyAdvertisingSummary,
@@ -44,13 +44,16 @@ function jsonBodyPreserveIntIds(body: unknown): string {
   return JSON.stringify(body).replace(/"(\d{16,})"/g, '$1')
 }
 
-const LOCAL_REPORT_METRICS = JSON.stringify([
+const LOCAL_REPORT_METRICS_LIST = [
   'stat_cost',
   'show_cnt',
   'click_cnt',
   'convert_cnt',
   'ctr',
-])
+  'conversion_cost',
+  'cpc_platform',
+  'form_cnt',
+]
 
 
 export type LocalPromotionCredentials = {
@@ -192,6 +195,194 @@ function dateRangeLast7(): { start: string; end: string } {
   return { start: fmt(start), end: fmt(end) }
 }
 
+function pickBudgetYuan(row: Record<string, unknown>): number | undefined {
+  const ds =
+    row.delivery_setting && typeof row.delivery_setting === 'object' && !Array.isArray(row.delivery_setting)
+      ? (row.delivery_setting as Record<string, unknown>)
+      : {}
+  const raw = Number(
+    row.project_budget ?? ds.project_budget ?? row.budget ?? ds.budget ?? row.project_bid ?? row.bid ?? 0,
+  )
+  if (!Number.isFinite(raw) || raw <= 0) return undefined
+  if (!Number.isInteger(raw) || raw < 1000) return Math.round(raw * 100) / 100
+  return Math.round(raw) / 100
+}
+
+type LocalReportMetrics = {
+  promotionId: string
+  projectId: string
+  statCost: number
+  showCnt: number
+  clickCnt: number
+  convertCnt: number
+  ctr: number
+}
+
+function parseLocalReportRow(row: Record<string, unknown>): LocalReportMetrics {
+  const dim =
+    row.dimensions && typeof row.dimensions === 'object' && !Array.isArray(row.dimensions)
+      ? (row.dimensions as Record<string, unknown>)
+      : {}
+  const nested = row.metrics
+  const src =
+    nested && typeof nested === 'object' && !Array.isArray(nested)
+      ? (nested as Record<string, unknown>)
+      : row
+  const num = (k: string) => {
+    const v = src[k] ?? row[k]
+    const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : 0
+    return Number.isFinite(n) ? n : 0
+  }
+  const showCnt = num('show_cnt')
+  const clickCnt = num('click_cnt')
+  const ctrRaw = num('ctr')
+  const ctr =
+    ctrRaw > 0
+      ? ctrRaw <= 1
+        ? Math.round(ctrRaw * 10000) / 100
+        : Math.round(ctrRaw * 100) / 100
+      : showCnt > 0
+        ? Math.round((clickCnt / showCnt) * 10000) / 100
+        : 0
+  return {
+    promotionId: String(
+      row.promotion_id ?? row.cdp_promotion_id ?? dim.promotion_id ?? dim.cdp_promotion_id ?? '',
+    ),
+    projectId: String(row.project_id ?? row.cdp_project_id ?? dim.project_id ?? dim.cdp_project_id ?? ''),
+    statCost: num('stat_cost'),
+    showCnt,
+    clickCnt,
+    convertCnt: num('convert_cnt') || num('form_cnt'),
+    ctr,
+  }
+}
+
+async function fetchOeReportRows(
+  creds: LocalPromotionCredentials,
+  path: string,
+  extraQuery: Record<string, string> = {},
+): Promise<Record<string, unknown>[]> {
+  const range = dateRangeLast7()
+  const startDate = range.start.slice(0, 10)
+  const endDate = range.end.slice(0, 10)
+  const extraBody: Record<string, unknown> = {}
+  if (extraQuery.filtering) {
+    try {
+      extraBody.filtering = JSON.parse(extraQuery.filtering) as unknown
+    } catch {
+      /* ignore */
+    }
+  }
+  const metricSets: string[][] = [
+    LOCAL_REPORT_METRICS_LIST,
+    ['stat_cost', 'show_cnt', 'click_cnt', 'convert_cnt', 'ctr'],
+    ['stat_cost', 'show_cnt', 'click_cnt', 'convert_cnt'],
+  ]
+  for (const metricsList of metricSets) {
+    const getQuery = {
+      local_account_id: creds.localAccountId,
+      start_date: startDate,
+      end_date: endDate,
+      time_granularity: 'TIME_GRANULARITY_TOTAL',
+      metrics: JSON.stringify(metricsList),
+      page: '1',
+      page_size: '100',
+      ...extraQuery,
+    }
+    const pr = await oceanGet<Record<string, unknown>>(creds, path, getQuery)
+    if (pr.ok) {
+      const rows = asRecordList(pr.data, 'project_list', 'promotion_list', 'list', 'data_list')
+      if (rows.length) return rows
+    }
+    const posted = await oceanPost<Record<string, unknown>>(creds, path, {
+      local_account_id: creds.localAccountId,
+      start_date: startDate,
+      end_date: endDate,
+      time_granularity: 'TIME_GRANULARITY_TOTAL',
+      metrics: metricsList,
+      page: 1,
+      page_size: 100,
+      ...extraBody,
+    })
+    if (posted.ok) {
+      const rows = asRecordList(posted.data, 'project_list', 'promotion_list', 'list', 'data_list')
+      if (rows.length) return rows
+    }
+  }
+  return []
+}
+
+async function loadLocalReportMaps(creds: LocalPromotionCredentials): Promise<{
+  byPromotion: Map<string, LocalReportMetrics>
+  byProject: Map<string, LocalReportMetrics>
+  totals: { statCost: number; showCnt: number; clickCnt: number; convertCnt: number; ctr: number }
+}> {
+  const byPromotion = new Map<string, LocalReportMetrics>()
+  const byProject = new Map<string, LocalReportMetrics>()
+  const ingest = (rows: Record<string, unknown>[], preferReplace = true) => {
+    for (const row of rows) {
+      const m = parseLocalReportRow(row)
+      if (m.promotionId) byPromotion.set(m.promotionId, m)
+      if (m.projectId) {
+        const prev = byProject.get(m.projectId)
+        if (!prev || preferReplace) byProject.set(m.projectId, m)
+      }
+    }
+  }
+
+  ingest(await fetchOeReportRows(creds, '/open_api/v3.0/local/report/promotion/get/'), false)
+  ingest(await fetchOeReportRows(creds, '/open_api/v3.0/local/report/project/get/'))
+  ingest(
+    await fetchOeReportRows(creds, '/open_api/v3.0/local/report/project/get/', {
+      filtering: JSON.stringify({ marketing_goal: 'VIDEO_IMAGE' }),
+    }),
+  )
+  ingest(
+    await fetchOeReportRows(creds, '/open_api/v3.0/local/report/project/get/', {
+      filtering: JSON.stringify({ marketing_goal: 'LIVE' }),
+    }),
+  )
+  const accountRows = await fetchOeReportRows(creds, '/open_api/v3.0/local/report/account/get/')
+  ingest(accountRows)
+
+  let statCost = 0
+  let showCnt = 0
+  let clickCnt = 0
+  let convertCnt = 0
+  for (const row of accountRows) {
+    const m = parseLocalReportRow(row)
+    if (m.statCost || m.showCnt) {
+      statCost += m.statCost
+      showCnt += m.showCnt
+      clickCnt += m.clickCnt
+      convertCnt += m.convertCnt
+    }
+  }
+  if (!statCost && !showCnt) {
+    const acc = byProject.size ? byProject : byPromotion
+    for (const m of acc.values()) {
+      statCost += m.statCost
+      showCnt += m.showCnt
+      clickCnt += m.clickCnt
+      convertCnt += m.convertCnt
+    }
+  }
+  const ctr = showCnt > 0 ? Math.round((clickCnt / showCnt) * 10000) / 100 : 0
+  return { byPromotion, byProject, totals: { statCost, showCnt, clickCnt, convertCnt, ctr } }
+}
+
+function metricsForRow(
+  maps: { byPromotion: Map<string, LocalReportMetrics>; byProject: Map<string, LocalReportMetrics> },
+  promotionId: string,
+  projectId: string,
+): LocalReportMetrics | undefined {
+  return (
+    maps.byPromotion.get(promotionId) ||
+    maps.byProject.get(promotionId) ||
+    (projectId ? maps.byProject.get(projectId) : undefined)
+  )
+}
+
 export async function handleLocalPromotionRoutes(
   method: string,
   pathname: string,
@@ -243,7 +434,7 @@ export async function handleLocalPromotionRoutes(
       projectName: String(p.project_name ?? p.name ?? '—'),
       status: String(p.project_status ?? p.status ?? ''),
       statusLabel: mapPromotionStatus(String(p.project_status_first ?? p.status ?? '')),
-      budgetYuan: Number(p.budget ?? 0) / 100 || undefined,
+      budgetYuan: pickBudgetYuan(p),
       marketingGoal: pickLocalMarketingGoal(p),
       createTime: String(p.create_time ?? ''),
     }))
@@ -266,46 +457,41 @@ export async function handleLocalPromotionRoutes(
       json(res, 200, { ...apiFailWithCreds(pr.message), message: pr.message })
       return true
     }
-    const reportMap = new Map<string, Record<string, unknown>>()
-    const range = dateRangeLast7()
-    const rep = await oceanGet<Record<string, unknown>>(creds, '/open_api/v3.0/local/report/promotion/get/', {
-      local_account_id: creds.localAccountId,
-      start_date: range.start.slice(0, 10),
-      end_date: range.end.slice(0, 10),
-      time_granularity: 'TIME_GRANULARITY_TOTAL',
-      metrics: LOCAL_REPORT_METRICS,
-      page: '1',
-      page_size: '100',
-    })
-    if (rep.ok) {
-      for (const row of asRecordList(rep.data, 'promotion_list', 'list')) {
-        const id = String(row.promotion_id ?? '')
-        if (id) reportMap.set(id, row)
+    const maps = await loadLocalReportMaps(creds)
+    const projectIds = [
+      ...new Set(pr.rows.map((p) => String(p.project_id ?? p.promotion_id ?? '')).filter(Boolean)),
+    ].slice(0, 20)
+    if (projectIds.length) {
+      const extra = await fetchOeReportRows(creds, '/open_api/v3.0/local/report/project/get/', {
+        filtering: jsonBodyPreserveIntIds({ cdp_project_ids: projectIds }),
+      })
+      for (const row of extra) {
+        const m = parseLocalReportRow(row)
+        if (m.projectId) maps.byProject.set(m.projectId, m)
+        if (m.promotionId) maps.byPromotion.set(m.promotionId, m)
       }
     }
     const list = pr.rows.map((p) => {
       const id = String(p.promotion_id ?? '')
-      const metrics = reportMap.get(id)
-      const statCost = metrics ? Number(metrics.stat_cost ?? 0) / 100 : undefined
-      const showCnt = metrics ? Number(metrics.show_cnt ?? 0) : undefined
-      const clickCnt = metrics ? Number(metrics.click_cnt ?? 0) : undefined
-      const convertCnt = metrics ? Number(metrics.convert_cnt ?? 0) : undefined
-      const ctr =
-        showCnt && showCnt > 0 && clickCnt != null
-          ? Math.round((clickCnt / showCnt) * 10000) / 100
-          : undefined
+      const projectId = String(p.project_id ?? '')
+      const metrics = metricsForRow(maps, id, projectId)
+      const statCost = metrics?.statCost
+      const showCnt = metrics?.showCnt
+      const clickCnt = metrics?.clickCnt
+      const convertCnt = metrics?.convertCnt
+      const ctr = metrics?.ctr
       return {
         promotionId: id,
         promotionName: String(p.promotion_name ?? p.project_name ?? '—'),
-        projectId: String(p.project_id ?? ''),
+        projectId,
         projectName: String(p.project_name ?? ''),
         statusFirst: String(p.promotion_status_first ?? ''),
         statusLabel: mapPromotionStatus(String(p.promotion_status_first ?? '')),
-        budgetYuan: Number(p.budget ?? 0) / 100 || undefined,
-        bidYuan: Number(p.bid ?? 0) / 100 || undefined,
+        budgetYuan: pickBudgetYuan(p),
+        bidYuan: pickBudgetYuan({ budget: p.bid, project_bid: p.project_bid }),
         marketingGoal: pickLocalMarketingGoal(p),
         learningPhase: String(p.learning_phase ?? ''),
-        createTime: String(p.promotion_create_time ?? ''),
+        createTime: String(p.promotion_create_time ?? p.create_time ?? ''),
         statCost,
         showCnt,
         clickCnt,
@@ -355,46 +541,17 @@ export async function handleLocalPromotionRoutes(
       return true
     }
     const creds = await resolveLocalPromotionCreds(rawCreds)
-    const pr = await oceanGet<Record<string, unknown>>(creds, '/open_api/v3.0/local/report/promotion/get/', {
-      local_account_id: creds.localAccountId,
-      start_date: range.start.slice(0, 10),
-      end_date: range.end.slice(0, 10),
-      time_granularity: 'TIME_GRANULARITY_TOTAL',
-      metrics: LOCAL_REPORT_METRICS,
-      page: '1',
-      page_size: '100',
-    })
-    if (!pr.ok) {
-      json(res, 200, {
-        ok: true,
-        summary: { statCost: 0, showCnt: 0, clickCnt: 0, convertCnt: 0, ctr: 0, dateRange: range },
-        message: pr.message,
-        demoMode: false,
-        apiError: pr.message,
-      })
-      return true
-    }
-    const rows = asRecordList(pr.data, 'promotion_list', 'list')
-    let statCost = 0
-    let showCnt = 0
-    let clickCnt = 0
-    let convertCnt = 0
-    for (const row of rows) {
-      statCost += Number(row.stat_cost ?? 0)
-      showCnt += Number(row.show_cnt ?? 0)
-      clickCnt += Number(row.click_cnt ?? 0)
-      convertCnt += Number(row.convert_cnt ?? 0)
-    }
-    const ctr = showCnt > 0 ? (clickCnt / showCnt) * 100 : 0
+    const maps = await loadLocalReportMaps(creds)
+    const t = maps.totals
     json(res, 200, {
       ok: true,
       summary: {
-        statCost: statCost / 100,
-        showCnt,
-        clickCnt,
-        convertCnt,
-        ctr: Math.round(ctr * 100) / 100,
-        cpl: convertCnt > 0 ? Math.round((statCost / 100 / convertCnt) * 100) / 100 : undefined,
+        statCost: t.statCost,
+        showCnt: t.showCnt,
+        clickCnt: t.clickCnt,
+        convertCnt: t.convertCnt,
+        ctr: t.ctr,
+        cpl: t.convertCnt > 0 ? Math.round((t.statCost / t.convertCnt) * 100) / 100 : undefined,
         dateRange: range,
       },
       demoMode: false,
@@ -531,8 +688,7 @@ export async function handleLocalPromotionRoutes(
     const summary = j.summary as Record<string, unknown> | undefined
     const pane = String(j.pane ?? 'ai')
     const mode = String(j.mode ?? 'assisted')
-    const { system, user } = buildAdInsightPrompt({
-      platformLabel: '巨量本地推',
+    const { system, user } = buildLocalPromotionInsightPrompt({
       pane,
       mode,
       summary,
@@ -841,11 +997,21 @@ async function listLocalPromotionsMerged(
         project_name: String(p.project_name ?? p.name ?? ''),
         promotion_status_first: projectStatusAsPromotion(status),
         marketing_goal: projectGoal.get(pid) ?? '',
-        budget: p.budget,
+        budget: p.budget ?? p.project_budget,
+        project_budget: p.project_budget ?? p.budget,
+        delivery_setting: p.delivery_setting,
         create_time: p.create_time,
       },
       projectGoal.get(pid) ?? '',
     )
+  }
+
+  for (const row of merged) {
+    const p = projectById.get(String(row.project_id ?? ''))
+    if (!p) continue
+    if (row.project_budget == null) row.project_budget = p.project_budget ?? p.budget
+    if (row.budget == null) row.budget = p.budget ?? p.project_budget
+    if (row.delivery_setting == null) row.delivery_setting = p.delivery_setting
   }
 
   if (merged.length) return { ok: true, rows: merged }
@@ -859,5 +1025,65 @@ function asRecordList(data: Record<string, unknown> | undefined, ...keys: string
     const v = data[k]
     if (Array.isArray(v)) return v.filter((x) => x && typeof x === 'object') as Record<string, unknown>[]
   }
+  const nested = data.data
+  if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+    const inner = asRecordList(nested as Record<string, unknown>, ...keys)
+    if (inner.length) return inner
+  }
+  if (data.metrics && typeof data.metrics === 'object') return [data]
   return []
+}
+
+function buildLocalPromotionInsightPrompt(input: {
+  pane: string
+  mode: string
+  summary?: Record<string, unknown>
+  promotions: unknown[]
+  clues: unknown[]
+  channelStats: unknown[]
+}): { system: string; user: string } {
+  const paneLabels: Record<string, string> = {
+    live: '直播间投流',
+    video: '短视频/图文投流',
+    leads: '线索分析',
+    ai: '整体投产',
+  }
+  const paneLabel = paneLabels[input.pane] ?? '投流'
+  const plans = (input.promotions ?? []) as Array<Record<string, unknown>>
+  const autoPlans = plans.filter(
+    (p) =>
+      String(p.promotionName ?? p.promotion_name ?? '').includes('自动投放') ||
+      String(p.promotionId ?? '') === String(p.projectId ?? ''),
+  )
+  const spend = Number(input.summary?.statCost ?? 0)
+  const show = Number(input.summary?.showCnt ?? 0)
+  const convert = Number(input.summary?.convertCnt ?? 0)
+  const clues = input.clues.length
+  const liveDelivering = plans.filter((p) => String(p.statusFirst ?? '').includes('ENABLE')).length
+
+  const system = `你是巨量本地推操盘手。必须基于给定数字说话，禁止编造消耗/展示/转化。
+当前板块：${paneLabel}。模式：${input.mode}。
+规则：
+1. 名称含「自动投放」或计划ID=项目ID：这是自动投放项目，不要建议「启用/暂停广告ID」，改建议预算、高峰日预算、素材、门店/商品、学习期观察。
+2. 消耗为0且状态投放中：优先排查审核、预算过低、学习期、定向过窄、短视频素材未过审，不要说「效果差」。
+3. 短视频看完播/点击/转化；直播看进入直播间与停留。给可执行动作，每条不超过2行。
+4. 不要输出 Markdown 标题堆砌。`
+
+  const actionHint =
+    input.mode === 'auto_adjust'
+      ? `\n文末单独一行 ${AD_INSIGHT_ACTIONS_MARKER} 后接 JSON 数组。仅对真实广告（计划ID≠项目ID）给 ENABLE/DISABLE，最多3条。自动投放项目不要进数组。`
+      : ''
+
+  const user = `近7日账户：消耗 ${spend} 元，展示 ${show}，转化 ${convert}，线索 ${clues} 条，在投 ${liveDelivering} 条。
+自动投放项目数：${autoPlans.length}。
+分渠道：${JSON.stringify(input.channelStats).slice(0, 1400)}
+计划明细（含预算/消耗/展示/转化/状态）：${JSON.stringify(plans).slice(0, 3500)}
+线索：${JSON.stringify(input.clues).slice(0, 600)}
+
+请输出：
+① 现状（是否在花钱、有无展示）
+② 本板块 3 条优先动作（预算/素材/定向/时段）
+③ 若数据为 0：给出 24 小时观察清单，不要空喊加大预算。${actionHint}`
+
+  return { system, user }
 }

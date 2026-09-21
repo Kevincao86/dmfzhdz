@@ -229,6 +229,7 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
       setAiRunning(false)
     }
     if (mode === 'full_ai' || mode === 'auto_adjust') {
+      setAiRunning(true)
       setPaneAi((prev) => ({
         ...prev,
         [pane]: { ...prev[pane], insight: null, actions: [] },
@@ -260,9 +261,14 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
           mode: effectiveMode,
         })
         if (r.ok) {
+          const rawActions = r.actions ?? []
+          const actions = rawActions.filter((a) => {
+            const row = classifiedPromotions.find((p) => p.promotionId === a.promotionId)
+            return !(row && row.projectId && row.promotionId === row.projectId)
+          })
           setPaneAi((prev) => ({
             ...prev,
-            [targetPane]: { insight: r.insight, actions: r.actions ?? [], busy: false },
+            [targetPane]: { insight: r.insight, actions, busy: false },
           }))
         } else {
           const aiMsg = /请先登录/.test(r.message)
@@ -296,12 +302,12 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
       return
     }
     if (aiMode !== 'full_ai' && aiMode !== 'auto_adjust') return
-    if (!aiRunning) return
     const cur = paneAi[pane]
     if (cur.busy || cur.insight) return
     if (loading) return
+    if (pane !== 'leads' && pane !== 'ai' && classifiedPromotions.length === 0) return
     void runPaneAi(pane)
-  }, [pane, aiMode, aiRunning, loading, paneAi, runPaneAi])
+  }, [pane, aiMode, loading, paneAi, runPaneAi, classifiedPromotions.length])
 
   const handlePaneChange = (next: LocalPane) => {
     setPane(next)
@@ -333,6 +339,13 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
 
   const applyAiAction = async (action: LocalPromotionAiAction) => {
     if (!action.promotionId || (action.actionType !== 'enable' && action.actionType !== 'disable')) {
+      return
+    }
+    const synthetic = classifiedPromotions.find(
+      (p) => p.promotionId === action.promotionId && p.projectId && p.promotionId === p.projectId,
+    )
+    if (synthetic) {
+      window.alert('该条来自自动投放项目，请在巨量本地推后台调整预算与素材，不要对项目 ID 做广告启停。')
       return
     }
     setAiApplyingId(action.actionId)
