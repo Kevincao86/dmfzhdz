@@ -1192,6 +1192,8 @@ localPromotionApi
 localPromotionOAuthCore
 localPromotionBindTestCore
 OceanEngineAdvertisingInner
+LocalPromotionSection
+localPromotionBindGuide
 change-scope-guard
 PAT
       ;;

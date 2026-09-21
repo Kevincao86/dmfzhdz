@@ -30,7 +30,7 @@ export const LOCAL_PROMOTION_BIND_GUIDE: BindGuideConfig = {
       title: '确认应用权限与回调',
       bullets: [
         '应用类型建议为「自研投放系统」或包含本地推能力的营销场景。',
-        '勾选投放、报表、线索等相关接口权限并确保应用已上线。',
+        '勾选本地推管理（投放/报表/线索），以及「工作台账户管理 / 巨量引擎工作台组织管理」。只勾本地推、不勾工作台管理时，授权页只能拿到工作台 ID，投流接口读不到数据。',
         '回调地址必须与 ERP 绑定页显示的地址完全一致（含 https、路径 /settings）。',
       ],
       note: 'App Secret 仅用于服务端换票，不能填入「Access Token」栏位；误填会导致 access_token 无效。',
@@ -51,7 +51,7 @@ export const LOCAL_PROMOTION_BIND_GUIDE: BindGuideConfig = {
       phase: 'oauth',
       title: '选择广告主编号',
       bullets: [
-        'OAuth 成功后 ERP 会列出已授权广告主 ID，选择对应账户即可。',
+        'OAuth 成功后会列出投放账户。若只看到「升级版工作台账户」，不要直接保存，应选其下的本地推投放账户。',
         '也可在本地推后台「账户信息」中查看数字广告主 ID 手动填写。',
         '广告主编号须与 OAuth 授权时勾选的账户一致。',
       ],
@@ -64,7 +64,7 @@ export const LOCAL_PROMOTION_BIND_GUIDE: BindGuideConfig = {
       '路径：系统设置 → 商业化后台 → 巨量本地推。',
       '填写：应用编号 App ID、应用密钥 App Secret（必填）。',
       '点击「前往巨量授权」完成 OAuth；返回后选择广告主编号，点击「保存并校验」。',
-      '校验通过即可在「投流」「线索」菜单查看真实数据；失败时暂为演示模式。',
+      '校验通过即可在「投流」「线索」菜单查看真实数据。若提示工作台账户，请改选其下的本地推投放账户后再保存。',
     ],
   },
 }

@@ -89,10 +89,13 @@ function pickIdList(obj: Record<string, unknown> | undefined, keys: string[]): s
 
 const OE_ACCOUNT_ROLE_LABELS: Record<string, string> = {
   ADVERTISER: '广告主',
-  CUSTOMER_ADMIN: '管家（管理员）',
-  CUSTOMER_OPERATOR: '管家（操作者）',
+  CUSTOMER_ADMIN: '工作台（管理员）',
+  CUSTOMER_OPERATOR: '工作台（操作者）',
   AGENT: '代理商',
   CHILD_AGENT: '二级代理商',
+  LOCAL: '本地推投放账户',
+  AD: '巨量广告账户',
+  QIANCHUAN: '千川账户',
 }
 
 function oeAccountRoleLabel(role: string): string {
@@ -109,7 +112,13 @@ export function parseAuthorizedAdvertisersFromOeData(
   const seen = new Set<string>()
 
   const push = (row: Record<string, unknown>) => {
-    const id = pickString(row, ['advertiser_id', 'advertiserId', 'id'])
+    const id = pickString(row, [
+      'advertiser_id',
+      'advertiserId',
+      'account_id',
+      'accountId',
+      'id',
+    ])
     if (!id || seen.has(id)) return
     seen.add(id)
     const name =
@@ -119,6 +128,8 @@ export function parseAuthorizedAdvertisersFromOeData(
         'name',
         'company_name',
         'companyName',
+        'account_name',
+        'accountName',
       ]) || id
     const accountType = pickString(row, [
       'account_role',
@@ -128,6 +139,8 @@ export function parseAuthorizedAdvertisersFromOeData(
       'role',
       'account_type',
       'accountType',
+      'account_source',
+      'accountSource',
     ])
     out.push({
       id,
@@ -158,6 +171,105 @@ export function advertiserIdsFromOptions(
   advertisers: LocalPromotionAdvertiserOption[] | undefined,
 ): string[] {
   return [...new Set((advertisers ?? []).map((a) => a.id).filter(Boolean))]
+}
+
+function labelLocalAdvertiser(row: LocalPromotionAdvertiserOption): LocalPromotionAdvertiserOption {
+  return {
+    ...row,
+    accountType: row.accountType || 'LOCAL',
+    accountTypeLabel: row.accountTypeLabel || '本地推投放账户',
+  }
+}
+
+function parseEbpAdvertiserRows(data: Record<string, unknown> | undefined): LocalPromotionAdvertiserOption[] {
+  if (!data) return []
+  const buckets = [data.account_list, data.list, data.advertiser_list, data.advertisers]
+  const rows: Record<string, unknown>[] = []
+  for (const b of buckets) {
+    if (Array.isArray(b)) {
+      for (const row of b) {
+        if (row && typeof row === 'object') rows.push(row as Record<string, unknown>)
+      }
+    }
+  }
+  if (!rows.length) return parseAuthorizedAdvertisersFromOeData(data).map(labelLocalAdvertiser)
+  const seen = new Set<string>()
+  const out: LocalPromotionAdvertiserOption[] = []
+  for (const row of rows) {
+    const source = pickString(row, ['account_source', 'accountSource', 'account_type', 'accountType']).toUpperCase()
+    if (source && /^(AD|AD_NORMAL|QIANCHUAN|STAR|DOU_PLUS|DOU\+)$/.test(source)) continue
+    const parsed = parseAuthorizedAdvertisersFromOeData({ list: [row] })
+    for (const item of parsed) {
+      if (seen.has(item.id)) continue
+      seen.add(item.id)
+      out.push(labelLocalAdvertiser(item))
+    }
+  }
+  return out
+}
+
+/** 升级版工作台 enterprise_organization_id / 旧版 cc_account_id → 其下本地推投放账户 */
+export async function listEbpLocalAdvertisers(
+  accessToken: string,
+  organizationId: string,
+): Promise<{ ok: true; advertisers: LocalPromotionAdvertiserOption[] } | { ok: false; message: string }> {
+  const id = organizationId.trim()
+  if (!id) return { ok: false, message: '缺少工作台账户 ID' }
+  const qs = (params: Record<string, string>) => new URLSearchParams(params).toString()
+  const attempts: string[] = [
+    `/open_api/2/ebp/advertiser/list/?${qs({
+      enterprise_organization_id: id,
+      account_source: 'LOCAL',
+      page: '1',
+      page_size: '100',
+    })}`,
+    `/open_api/2/ebp/advertiser/list/?${qs({
+      cc_account_id: id,
+      account_source: 'LOCAL',
+      page: '1',
+      page_size: '100',
+    })}`,
+    `/open_api/2/customer_center/advertiser/list/?${qs({
+      cc_account_id: id,
+      account_source: 'LOCAL',
+      page: '1',
+      page_size: '100',
+    })}`,
+    `/open_api/2/majordomo/advertiser/select/?${qs({ advertiser_id: id })}`,
+  ]
+  let last = '未返回本地推账户'
+  for (const path of attempts) {
+    const res = await getOeOAuth(path, accessToken)
+    if (res.code !== 0 && res.code !== undefined) {
+      last = res.message ?? last
+      continue
+    }
+    const advertisers = parseEbpAdvertiserRows(res.data)
+    if (advertisers.length) return { ok: true, advertisers }
+    last = res.message || '工作台下未找到本地推投放账户'
+  }
+  return { ok: false, message: last }
+}
+
+/** OAuth 列表里常是工作台账户；展开为真正可调 local/project 的投放账户 */
+export async function expandLocalPromotionAdvertisers(
+  accessToken: string,
+  oauthAdvertisers: LocalPromotionAdvertiserOption[],
+): Promise<LocalPromotionAdvertiserOption[]> {
+  const seen = new Set<string>()
+  const local: LocalPromotionAdvertiserOption[] = []
+  const pushAll = (items: LocalPromotionAdvertiserOption[]) => {
+    for (const item of items) {
+      if (!item.id || seen.has(item.id)) continue
+      seen.add(item.id)
+      local.push(labelLocalAdvertiser(item))
+    }
+  }
+  for (const acc of oauthAdvertisers) {
+    const ebp = await listEbpLocalAdvertisers(accessToken, acc.id)
+    if (ebp.ok) pushAll(ebp.advertisers)
+  }
+  return local.length ? local : oauthAdvertisers
 }
 
 /** 40 位 hex 多为 App Secret，勿误判为 access_token */
@@ -345,7 +457,8 @@ export async function fetchAuthorizedAdvertisers(
   if (!advertisers.length) {
     return { ok: false, message: '未获取到已授权广告主，请确认 OAuth 授权时勾选了投放账户' }
   }
-  return { ok: true, advertisers }
+  const expanded = await expandLocalPromotionAdvertisers(accessToken, advertisers)
+  return { ok: true, advertisers: expanded }
 }
 
 /** 获取 token 下已授权广告主 ID 列表 */

@@ -326,6 +326,15 @@ export default function LocalPromotionSection({ embedded = false }: { embedded?:
         setMsg({ tone: 'err', text: toUserFacingError(r.message, '授权校验') })
         return
       }
+      if (r.advertisers?.length) setAdvertiserOptions(r.advertisers)
+      if (r.needsLocalAccountPick) {
+        setFormOpen(true)
+        setMsg({ tone: 'err', text: r.message })
+        return
+      }
+
+      const accountId = (r.resolvedLocalAccountId || localAccountId).trim()
+      if (r.resolvedLocalAccountId) setLocalAccountId(r.resolvedLocalAccountId)
 
       const resolvedAccess = r.accessToken ?? accessToken.trim()
       const resolvedRefresh = r.refreshToken ?? (refreshToken.trim() || undefined)
@@ -338,19 +347,19 @@ export default function LocalPromotionSection({ embedded = false }: { embedded?:
             : advertiserOptions
       if (optionsFromResponse.length) setAdvertiserOptions(optionsFromResponse)
 
-      const pickedAdvertiser = optionsFromResponse.find((a) => a.id === localAccountId.trim())
+      const pickedAdvertiser = optionsFromResponse.find((a) => a.id === accountId)
       const label =
         accountName.trim() ||
         (pickedAdvertiser && pickedAdvertiser.name !== pickedAdvertiser.id
           ? pickedAdvertiser.name
           : '') ||
-        `本地推 ${localAccountId.trim()}`
+        `本地推 ${accountId}`
       let bindingId: string | undefined
 
       if (supabaseConfigured && supabase) {
         const ur = await upsertMerchantBinding(supabase, {
           provider: 'local_promotion',
-          merchantAccountId: localAccountId.trim(),
+          merchantAccountId: accountId,
           sealedCredentials: packLocalPromotionForCloud({
             accessToken: resolvedAccess,
             appId: appId.trim(),
@@ -378,7 +387,7 @@ export default function LocalPromotionSection({ embedded = false }: { embedded?:
         accessToken: resolvedAccess,
         refreshToken: resolvedRefresh,
         tokenExpiresAt: resolvedExpires,
-        localAccountId: localAccountId.trim(),
+        localAccountId: accountId,
         accountName: label,
         boundAt: new Date().toISOString(),
         demoMode: r.demoMode,
@@ -607,8 +616,8 @@ export default function LocalPromotionSection({ embedded = false }: { embedded?:
                       ))}
                     </select>
                     <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
-                      OAuth 会列出授权时勾选的全部可操作账户（含管家/代理商下属广告主，故可能多于 1 个）。
-                      请选实际投放本地推的账户；不确定时登录
+                      OAuth 若列出「工作台」账户，请改选带「本地推投放账户」的编号（不要选升级版/旧版工作台组织）。
+                      不确定时打开
                       {' '}
                       <a
                         href="https://localads.oceanengine.com"
@@ -619,7 +628,7 @@ export default function LocalPromotionSection({ embedded = false }: { embedded?:
                         巨量本地推后台
                       </a>
                       {' '}
-                      → 账户信息，核对广告主 ID 与名称。
+                      → 账户信息，核对投放账户 ID。
                     </p>
                   </>
                 ) : (

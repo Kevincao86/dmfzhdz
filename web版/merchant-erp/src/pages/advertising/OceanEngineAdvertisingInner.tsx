@@ -369,9 +369,23 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
         <div className="erp-panel mb-6 border-amber-200 bg-amber-50/90 p-4 text-sm text-amber-900">
           <p className="font-medium">已绑定但暂未拉到真实数据</p>
           <p className="mt-1 text-xs leading-relaxed">
-            {apiError}。请确认：① 广告主 ID{' '}
-            <code className="rounded bg-white/80 px-1">{bind?.localAccountId}</code>{' '}
-            与{platformLabel}后台一致；② 应用已开通投放/报表/线索权限；③ Token 未过期。
+            {apiError}
+            {platform === 'local_promotion' ? (
+              <>
+                。若当前 ID <code className="rounded bg-white/80 px-1">{bind?.localAccountId}</code>{' '}
+                是升级版/旧版工作台，请到
+                <Link to="/settings?tab=commercial" className="mx-1 font-medium text-cyan-700 underline">
+                  系统设置重新校验
+                </Link>
+                ，选其下的「本地推投放账户」；并确认开放平台已开通「工作台账户管理」。
+              </>
+            ) : (
+              <>
+                。请确认：① 广告主 ID{' '}
+                <code className="rounded bg-white/80 px-1">{bind?.localAccountId}</code>{' '}
+                与{platformLabel}后台一致；② 应用已开通投放/报表权限；③ Token 未过期。
+              </>
+            )}
           </p>
         </div>
       ) : null}

@@ -2,7 +2,9 @@
  * 巨量本地推绑定校验（轻量实现，供 Vercel 单文件 API 与 merchant 网关共用）
  */
 import {
+  expandLocalPromotionAdvertisers,
   fetchAuthorizedAdvertisers,
+  listEbpLocalAdvertisers,
   resolveLocalPromotionAccessToken,
   type LocalPromotionCredentialInput,
 } from '../vite-plugins/localPromotionOAuthCore.js'
@@ -26,6 +28,8 @@ export type LocalPromotionBindTestResult = {
       accountTypeLabel?: string
     }>
     tokenSource?: string
+    resolvedLocalAccountId?: string
+    needsLocalAccountPick?: boolean
   }
 }
 
@@ -147,17 +151,26 @@ export async function runLocalPromotionBindTest(bodyRaw: string): Promise<LocalP
       ? new Date(Date.now() + expiresIn * 1000).toISOString()
       : undefined
 
+  const oauthAdvertisers = advertisers?.length
+    ? advertisers
+    : (advertiserIds ?? []).map((id) => ({ id, name: id }))
+  const localAdvertisers = oauthAdvertisers.length
+    ? await expandLocalPromotionAdvertisers(accessToken, oauthAdvertisers)
+    : []
+  const localIds = localAdvertisers.map((a) => a.id)
+  const optionAdvertisers = localAdvertisers.length ? localAdvertisers : oauthAdvertisers
+  const optionIds = optionAdvertisers.map((a) => a.id)
+
   let localAccountId =
     input.localAccountId?.trim() ||
     process.env.OCEANENGINE_LOCAL_ACCOUNT_ID?.trim() ||
     ''
 
-  if (!localAccountId && advertiserIds?.length === 1) {
-    localAccountId = advertiserIds[0]
-  }
-
-  if (!localAccountId) {
-    if (advertiserIds && advertiserIds.length > 1) {
+  if (localAccountId && localIds.length && !localIds.includes(localAccountId)) {
+    const fromWorkbench = await listEbpLocalAdvertisers(accessToken, localAccountId)
+    if (fromWorkbench.ok && fromWorkbench.advertisers.length === 1) {
+      localAccountId = fromWorkbench.advertisers[0].id
+    } else if (fromWorkbench.ok && fromWorkbench.advertisers.length > 1) {
       return {
         statusCode: 200,
         body: {
@@ -165,10 +178,53 @@ export async function runLocalPromotionBindTest(bodyRaw: string): Promise<LocalP
           accessToken,
           refreshToken,
           tokenExpiresAt,
-          advertiserIds,
-          advertisers,
+          advertiserIds: fromWorkbench.advertisers.map((a) => a.id),
+          advertisers: fromWorkbench.advertisers,
           tokenSource,
-          message: 'OAuth 授权成功，请选择要绑定的广告主编号后再次保存',
+          needsLocalAccountPick: true,
+          message:
+            '当前绑定的是巨量工作台账户，不是本地推投放账户。请在下方选择「本地推投放账户」后再保存。',
+        },
+      }
+    } else if (localIds.length === 1) {
+      localAccountId = localIds[0]
+    } else if (localIds.length > 1) {
+      return {
+        statusCode: 200,
+        body: {
+          ok: true,
+          accessToken,
+          refreshToken,
+          tokenExpiresAt,
+          advertiserIds: localIds,
+          advertisers: localAdvertisers,
+          tokenSource,
+          needsLocalAccountPick: true,
+          message:
+            '请选择本地推投放账户（不要选工作台组织账户）。选好后再次点「保存并校验」。',
+        },
+      }
+    }
+  }
+
+  if (!localAccountId && optionIds.length === 1) {
+    localAccountId = optionIds[0]
+  }
+
+  if (!localAccountId) {
+    if (optionIds.length > 1) {
+      return {
+        statusCode: 200,
+        body: {
+          ok: true,
+          accessToken,
+          refreshToken,
+          tokenExpiresAt,
+          advertiserIds: optionIds,
+          advertisers: optionAdvertisers,
+          tokenSource,
+          needsLocalAccountPick: true,
+          message: 'OAuth 授权成功，请选择本地推投放账户后再次保存',
         },
       }
     }
@@ -180,8 +236,8 @@ export async function runLocalPromotionBindTest(bodyRaw: string): Promise<LocalP
         accessToken,
         refreshToken,
         tokenExpiresAt,
-        advertiserIds,
-        advertisers,
+        advertiserIds: optionIds,
+        advertisers: optionAdvertisers,
         tokenSource,
       },
     }
@@ -206,9 +262,10 @@ export async function runLocalPromotionBindTest(bodyRaw: string): Promise<LocalP
         accessToken,
         refreshToken,
         tokenExpiresAt,
-        advertiserIds,
-        advertisers,
+        advertiserIds: optionIds,
+        advertisers: optionAdvertisers,
         tokenSource,
+        resolvedLocalAccountId: localAccountId,
         message: '本地推授权校验通过',
       },
     }
@@ -233,17 +290,46 @@ export async function runLocalPromotionBindTest(bodyRaw: string): Promise<LocalP
         accessToken,
         refreshToken,
         tokenExpiresAt,
-        advertiserIds,
-        advertisers,
+        advertiserIds: optionIds,
+        advertisers: optionAdvertisers,
         tokenSource,
+        resolvedLocalAccountId: localAccountId,
         message: '本地推授权校验通过（推广计划接口）',
       },
     }
   }
 
-  let authorizedIds = advertiserIds
-  let authorizedAdvertisers = advertisers
-  if (!authorizedIds?.length) {
+  if (localIds.length) {
+    for (const id of localIds) {
+      if (id === localAccountId) continue
+      const retry = await oceanGet<{ project_list?: unknown[] }>(
+        { accessToken, localAccountId: id },
+        '/open_api/v3.0/local/project/list/',
+        { local_account_id: id, page: '1', page_size: '1' },
+      )
+      if (retry.ok) {
+        return {
+          statusCode: 200,
+          body: {
+            ok: true,
+            demoMode: false,
+            accessToken,
+            refreshToken,
+            tokenExpiresAt,
+            advertiserIds: localIds,
+            advertisers: localAdvertisers,
+            tokenSource,
+            resolvedLocalAccountId: id,
+            message: `已从工作台解析到本地推投放账户 ${id}，授权校验通过`,
+          },
+        }
+      }
+    }
+  }
+
+  let authorizedIds = optionIds
+  let authorizedAdvertisers = optionAdvertisers
+  if (!authorizedIds.length) {
     const adv = await fetchAuthorizedAdvertisers(accessToken)
     if (adv.ok) {
       authorizedAdvertisers = adv.advertisers
@@ -251,37 +337,32 @@ export async function runLocalPromotionBindTest(bodyRaw: string): Promise<LocalP
     }
   }
 
-  if (authorizedIds?.includes(localAccountId)) {
+  const failMsg = pr.message || promo.message || '连接失败'
+  if (authorizedIds.length) {
     return {
       statusCode: 200,
       body: {
         ok: true,
-        demoMode: false,
         accessToken,
         refreshToken,
         tokenExpiresAt,
         advertiserIds: authorizedIds,
         advertisers: authorizedAdvertisers,
         tokenSource,
-        message:
-          'OAuth 授权有效，广告主已在授权列表中。本地推项目接口暂不可用，请确认应用已开通本地推权限后重试。',
+        needsLocalAccountPick: true,
+        message: `无法用当前账户读取本地推项目（${failMsg}）。请改选下方「本地推投放账户」，不要选升级版/旧版工作台组织。`,
       },
     }
   }
-
-  const failMsg = pr.message || promo.message || '连接失败'
   return {
-    statusCode: 200,
+    statusCode: 400,
     body: {
-      ok: true,
-      demoMode: true,
+      ok: false,
       accessToken,
       refreshToken,
       tokenExpiresAt,
-      advertiserIds: authorizedIds ?? advertiserIds,
-      advertisers: authorizedAdvertisers ?? advertisers,
       tokenSource,
-      message: `无法连接巨量本地推（${failMsg}），当前为演示模式；请检查 Token 与广告主 ID 后重新绑定。`,
+      message: `无法读取本地推项目（${failMsg}）。授权时请勾选工作台组织，并在开放平台开通「工作台账户管理」，以便展开其下本地推投放账户。`,
     },
   }
 }

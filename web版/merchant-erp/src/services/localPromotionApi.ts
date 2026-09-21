@@ -430,6 +430,8 @@ export async function testLocalPromotionBind(input: {
         accountType?: string
         accountTypeLabel?: string
       }>
+      resolvedLocalAccountId?: string
+      needsLocalAccountPick?: boolean
     }
   | { ok: false; message: string }
 > {
@@ -482,6 +484,11 @@ export async function testLocalPromotionBind(input: {
           ? (r.data.advertiserIds as string[])
           : undefined,
         advertisers: Array.isArray(r.data.advertisers) ? r.data.advertisers : undefined,
+        resolvedLocalAccountId:
+          typeof (r.data as { resolvedLocalAccountId?: string }).resolvedLocalAccountId === 'string'
+            ? (r.data as { resolvedLocalAccountId: string }).resolvedLocalAccountId
+            : undefined,
+        needsLocalAccountPick: Boolean((r.data as { needsLocalAccountPick?: boolean }).needsLocalAccountPick),
       }
     }
     lastErr = r.message

@@ -13,6 +13,7 @@ import {
   emptyAdvertisingSummary,
   parseAdInsightResponse,
 } from './advertisingGatewayCommon.js'
+import { fetchAuthorizedAdvertisers, listEbpLocalAdvertisers } from './localPromotionOAuthCore.js'
 
 const OE_BASE = (process.env.OCEANENGINE_API_BASE ?? 'https://api.oceanengine.com').replace(/\/$/, '')
 
@@ -220,11 +221,12 @@ export async function handleLocalPromotionRoutes(
     (method === 'GET' || method === 'POST') &&
     pathname === '/api/merchant/local-promotion/projects'
   ) {
-    const creds = credsForList(method, url, bodyRaw)
-    if (!creds) {
+    const rawCreds = credsForList(method, url, bodyRaw)
+    if (!rawCreds) {
       json(res, 200, emptyAdvertisingList('请先绑定本地推账号'))
       return true
     }
+    const creds = await resolveLocalPromotionCreds(rawCreds)
     const pr = await oceanGet<{ project_list?: Record<string, unknown>[]; list?: Record<string, unknown>[] }>(
       creds,
       '/open_api/v3.0/local/project/list/',
@@ -255,11 +257,12 @@ export async function handleLocalPromotionRoutes(
     (method === 'GET' || method === 'POST') &&
     pathname === '/api/merchant/local-promotion/promotions'
   ) {
-    const creds = credsForList(method, url, bodyRaw)
-    if (!creds) {
+    const rawCreds = credsForList(method, url, bodyRaw)
+    if (!rawCreds) {
       json(res, 200, emptyAdvertisingList('请先绑定本地推账号'))
       return true
     }
+    const creds = await resolveLocalPromotionCreds(rawCreds)
     const pr = await oceanGet<{ promotion_list?: Record<string, unknown>[]; list?: Record<string, unknown>[] }>(
       creds,
       '/open_api/v3.0/local/promotion/list/',
@@ -325,11 +328,12 @@ export async function handleLocalPromotionRoutes(
 
   if (method === 'POST' && pathname === '/api/merchant/local-promotion/promotions/status') {
     const j = parseBody(bodyRaw)
-    const creds = credsFromBody(j)
-    if (!creds) {
+    const rawCreds = credsFromBody(j)
+    if (!rawCreds) {
       json(res, 400, { ok: false, message: '请先绑定本地推' })
       return true
     }
+    const creds = await resolveLocalPromotionCreds(rawCreds)
     const ids = Array.isArray(j.promotion_ids) ? j.promotion_ids.map(String) : []
     const optStatus = String(j.opt_status ?? 'ENABLE')
     if (ids.length === 0) {
@@ -353,12 +357,13 @@ export async function handleLocalPromotionRoutes(
     (method === 'GET' || method === 'POST') &&
     pathname === '/api/merchant/local-promotion/report/summary'
   ) {
-    const creds = credsForList(method, url, bodyRaw)
+    const rawCreds = credsForList(method, url, bodyRaw)
     const range = dateRangeLast7()
-    if (!creds) {
+    if (!rawCreds) {
       json(res, 200, emptyAdvertisingSummary(range, '请先绑定本地推账号'))
       return true
     }
+    const creds = await resolveLocalPromotionCreds(rawCreds)
     const pr = await oceanGet<Record<string, unknown>>(creds, '/open_api/v3.0/local/report/promotion/get/', {
       local_account_id: creds.localAccountId,
       start_date: range.start.slice(0, 10),
@@ -408,11 +413,12 @@ export async function handleLocalPromotionRoutes(
 
   if (method === 'POST' && pathname === '/api/merchant/local-promotion/clues/list') {
     const j = parseBody(bodyRaw)
-    const creds = credsFromBody(j)
-    if (!creds) {
+    const rawCreds = credsFromBody(j)
+    if (!rawCreds) {
       json(res, 200, emptyAdvertisingClues('请先绑定本地推账号'))
       return true
     }
+    const creds = await resolveLocalPromotionCreds(rawCreds)
     const range = dateRangeLast7()
     const pr = await oceanPost<{ list?: Record<string, unknown>[]; page_info?: Record<string, unknown> }>(
       creds,
@@ -462,11 +468,12 @@ export async function handleLocalPromotionRoutes(
 
   if (method === 'POST' && pathname === '/api/merchant/local-promotion/clues/callback') {
     const j = parseBody(bodyRaw)
-    const creds = credsFromBody(j)
-    if (!creds) {
+    const rawCreds = credsFromBody(j)
+    if (!rawCreds) {
       json(res, 400, { ok: false, message: '请先绑定本地推' })
       return true
     }
+    const creds = await resolveLocalPromotionCreds(rawCreds)
     const clueId = String(j.clue_id ?? j.clueId ?? '')
     const state = String(j.clue_convert_state ?? j.convertState ?? '')
     if (!clueId || !state) {
@@ -581,6 +588,49 @@ function credsFromQuery(url: URL): LocalPromotionCredentials | null {
 function credsForList(method: string, url: URL, bodyRaw: string): LocalPromotionCredentials | null {
   if (method === 'POST') return credsFromBody(parseBody(bodyRaw)) ?? credsFromQuery(url)
   return credsFromQuery(url) ?? credsFromBody({})
+}
+
+async function resolveLocalPromotionCreds(
+  creds: LocalPromotionCredentials,
+): Promise<LocalPromotionCredentials> {
+  const orig = await oceanGet(
+    creds,
+    '/open_api/v3.0/local/project/list/',
+    { local_account_id: creds.localAccountId, page: '1', page_size: '1' },
+  )
+  if (orig.ok) return creds
+
+  const seen = new Set<string>()
+  const candidates: string[] = []
+  const pushIds = (ids: string[]) => {
+    for (const id of ids) {
+      if (!id || seen.has(id) || id === creds.localAccountId) continue
+      seen.add(id)
+      candidates.push(id)
+    }
+  }
+
+  const ebp = await listEbpLocalAdvertisers(creds.accessToken, creds.localAccountId)
+  if (ebp.ok) pushIds(ebp.advertisers.map((a) => a.id))
+
+  if (!candidates.length) {
+    const auth = await fetchAuthorizedAdvertisers(creds.accessToken)
+    if (auth.ok) pushIds(auth.advertisers.map((a) => a.id))
+  }
+
+  if (candidates.length === 1) {
+    return { ...creds, localAccountId: candidates[0] }
+  }
+  for (const id of candidates) {
+    const probe = await oceanGet(
+      { ...creds, localAccountId: id },
+      '/open_api/v3.0/local/project/list/',
+      { local_account_id: id, page: '1', page_size: '1' },
+    )
+    if (probe.ok) return { ...creds, localAccountId: id }
+  }
+  if (candidates.length) return { ...creds, localAccountId: candidates[0] }
+  return creds
 }
 
 function asRecordList(data: Record<string, unknown> | undefined, ...keys: string[]): Record<string, unknown>[] {
