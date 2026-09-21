@@ -1,5 +1,5 @@
 import { Loader2, RefreshCw } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { cn } from '../../cn'
 import {
@@ -7,8 +7,8 @@ import {
   filterProjectsByChannel,
   filterPromotionsByChannel,
 } from '../../lib/localPromotionAnalytics'
-import { isLocalPromotionBound, readLocalPromotionBinding } from '../../lib/localPromotionBinding'
-import { isQianchuanBound, readQianchuanBinding } from '../../lib/qianchuanBinding'
+import { readLocalPromotionBinding } from '../../lib/localPromotionBinding'
+import { readQianchuanBinding } from '../../lib/qianchuanBinding'
 import { toUserFacingError } from '../../lib/userFacingError'
 import type {
   LocalClueRow,
@@ -106,15 +106,37 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
   const [aiApplyingId, setAiApplyingId] = useState<string | null>(null)
   const [aiRunning, setAiRunning] = useState(false)
   const [statusBusy, setStatusBusy] = useState<string | null>(null)
+  const reloadGen = useRef(0)
 
   const bind =
     platform === 'qianchuan' ? readQianchuanBinding() : readLocalPromotionBinding()
+  const bound = Boolean(bind?.accessToken && bind.localAccountId)
   const platformLabel = platform === 'qianchuan' ? '巨量千川' : '本地推'
 
+  const clearAdsState = useCallback(() => {
+    setPromotions([])
+    setProjects([])
+    setSummary(null)
+    setClues([])
+    setApiError(null)
+    setError(null)
+  }, [])
+
   const reload = useCallback(async () => {
+    const gen = ++reloadGen.current
     setLoading(true)
     setError(null)
     setApiError(null)
+    if (!bound) {
+      clearAdsState()
+      if (platform === 'qianchuan') {
+        setApiError(
+          '当前账号尚未绑定巨量千川。千川是电商/直播带货投放账户，与本地推（到店）相互独立，不能共用数据。',
+        )
+      }
+      setLoading(false)
+      return
+    }
     try {
       const fetchPromotions =
         platform === 'qianchuan' ? fetchQianchuanPromotions : fetchLocalPromotions
@@ -129,45 +151,54 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
         fetchSummary(),
         fetchClues(),
       ])
+      if (gen !== reloadGen.current) return
       const failures: string[] = []
       const apiErrors: string[] = []
 
       if (pr.ok) setPromotions(pr.list)
-      else failures.push(pr.message)
+      else {
+        setPromotions([])
+        failures.push(pr.message)
+      }
       if (pr.ok && pr.apiError) apiErrors.push(pr.apiError)
 
       if (pj.ok) setProjects(pj.list)
-      else failures.push(pj.message)
+      else {
+        setProjects([])
+        failures.push(pj.message)
+      }
       if (pj.ok && pj.apiError) apiErrors.push(pj.apiError)
 
       if (rep.ok) setSummary(rep.summary)
-      else failures.push(rep.message)
+      else {
+        setSummary(null)
+        failures.push(rep.message)
+      }
       if (rep.ok && 'apiError' in rep && rep.apiError) apiErrors.push(String(rep.apiError))
 
       if (cr.ok) setClues(cr.list)
-      else failures.push(cr.message)
-
-      const hasCreds = Boolean(bind?.accessToken && bind.localAccountId)
-      if (!hasCreds) {
-        setPromotions([])
-        setProjects([])
-        setSummary(null)
+      else {
         setClues([])
+        failures.push(cr.message)
       }
+
       setApiError(apiErrors[0] ?? null)
       setError(failures[0] ?? null)
     } catch (e) {
+      if (gen !== reloadGen.current) return
+      clearAdsState()
       setError(toUserFacingError(e, '同步投流数据'))
     } finally {
-      setLoading(false)
+      if (gen === reloadGen.current) setLoading(false)
     }
-  }, [bind?.accessToken, bind?.demoMode, bind?.localAccountId, platform])
+  }, [bound, clearAdsState, platform])
 
   useEffect(() => {
     void reload()
   }, [reload])
 
   useEffect(() => {
+    clearAdsState()
     setAiMode(readStoredAiMode(platform))
     setAiRunning(false)
     setPaneAi({
@@ -176,7 +207,7 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
       leads: emptyPaneAi(),
       ai: emptyPaneAi(),
     })
-  }, [platform])
+  }, [platform, clearAdsState])
 
   const classifiedPromotions = useMemo(
     () =>
@@ -240,7 +271,7 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
   const runPaneAi = useCallback(
     async (targetPane: LocalPane = pane, modeOverride?: LocalPromotionAiMode) => {
       const effectiveMode = modeOverride ?? (targetPane === 'ai' ? 'assisted' : aiMode)
-      if (effectiveMode === 'manual') return
+      if (!bound || effectiveMode === 'manual') return
       setPaneAi((prev) => ({
         ...prev,
         [targetPane]: { ...prev[targetPane], busy: true },
@@ -319,10 +350,11 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
         }))
       }
     },
-    [aiMode, pane, livePromotions, videoPromotions, classifiedPromotions, summary, clues, channelStats, platform],
+    [aiMode, bound, pane, livePromotions, videoPromotions, classifiedPromotions, summary, clues, channelStats, platform],
   )
 
   useEffect(() => {
+    if (!bound) return
     if (pane === 'ai') {
       const cur = paneAi.ai
       if (cur.busy || cur.insight || loading) return
@@ -433,7 +465,6 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
     }
   }
 
-  const bound = platform === 'qianchuan' ? isQianchuanBound() : isLocalPromotionBound()
   const currentAi = paneAi[pane]
 
   const aiPanelProps = {
@@ -466,7 +497,13 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
 
       {!bound ? (
         <div className="erp-panel mb-6 border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-900">
-          尚未绑定{platformLabel}，绑定后可同步真实投流数据。
+          {platform === 'qianchuan' ? (
+            <>
+              当前账号尚未绑定<strong>巨量千川</strong>（电商/直播带货）。它与「本地推」是两套广告主，不会显示本地推的计划和消耗。
+            </>
+          ) : (
+            <>尚未绑定本地推，绑定后可同步到店投流数据。</>
+          )}
           <Link to="/settings?tab=commercial" className="ml-1 font-medium text-cyan-700 underline">
             前往系统设置 · 商业化后台 · 巨量工作台
           </Link>
@@ -508,6 +545,8 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
 
       {error && !apiError ? <p className="mb-4 text-sm text-amber-700">{error}</p> : null}
 
+      {bound ? (
+        <>
       <div className="mb-6 flex flex-wrap gap-2 border-b border-slate-200 pb-1">
         {LOCAL_PANES.map((t) => (
           <button
@@ -582,6 +621,8 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
             void runPaneAi('ai')
           }}
         />
+      ) : null}
+        </>
       ) : null}
     </>
   )

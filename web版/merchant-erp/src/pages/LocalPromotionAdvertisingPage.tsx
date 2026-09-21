@@ -50,7 +50,7 @@ export default function LocalPromotionAdvertisingPage() {
       {channel === 'xhs_juguang' ? (
         <XhsAdvertisingFourPanePanel />
       ) : (
-        <OceanEngineAdvertisingInner platform={channel} />
+        <OceanEngineAdvertisingInner key={channel} platform={channel} />
       )}
     </ModulePage>
   )

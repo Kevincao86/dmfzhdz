@@ -477,13 +477,14 @@ export async function fetchLocalProjects(): Promise<
   | { ok: false; message: string }
 > {
   const creds = credsPayload()
-  const qs = creds
-    ? `?access_token=${encodeURIComponent(creds.access_token)}&advertiser_id=${encodeURIComponent(creds.local_account_id)}`
-    : ''
+  if (!creds) {
+    return { ok: true, list: [], apiError: '尚未绑定巨量千川（与本地推账号相互独立）' }
+  }
+  const qs = `?access_token=${encodeURIComponent(creds.access_token)}&advertiser_id=${encodeURIComponent(creds.local_account_id)}`
   const r = await requestJson<{ list?: LocalProjectRow[]; demoMode?: boolean; apiError?: string }>(
     `${apiBase()}/api/merchant/qianchuan/projects${qs}`,
     undefined,
-    '拉取项目',
+    '拉取千川项目',
   )
   if (!r.ok) return r
   return { ok: true, list: r.data.list ?? [], demoMode: r.data.demoMode, apiError: r.data.apiError }
@@ -494,13 +495,14 @@ export async function fetchQianchuanPromotions(): Promise<
   | { ok: false; message: string }
 > {
   const creds = credsPayload()
-  const qs = creds
-    ? `?access_token=${encodeURIComponent(creds.access_token)}&advertiser_id=${encodeURIComponent(creds.local_account_id)}`
-    : ''
+  if (!creds) {
+    return { ok: true, list: [], apiError: '尚未绑定巨量千川（与本地推账号相互独立）' }
+  }
+  const qs = `?access_token=${encodeURIComponent(creds.access_token)}&advertiser_id=${encodeURIComponent(creds.local_account_id)}`
   const r = await requestJson<{ list?: LocalPromotionRow[]; demoMode?: boolean; apiError?: string }>(
     `${apiBase()}/api/merchant/qianchuan/promotions${qs}`,
     undefined,
-    '拉取广告',
+    '拉取千川广告',
   )
   if (!r.ok) return r
   return { ok: true, list: r.data.list ?? [], demoMode: r.data.demoMode, apiError: r.data.apiError }
@@ -530,16 +532,27 @@ export async function fetchLocalReportSummary(): Promise<
   | { ok: false; message: string }
 > {
   const creds = credsPayload()
-  const qs = creds
-    ? `?access_token=${encodeURIComponent(creds.access_token)}&advertiser_id=${encodeURIComponent(creds.local_account_id)}`
-    : ''
+  if (!creds) {
+    return {
+      ok: true,
+      summary: {
+        statCost: 0,
+        showCnt: 0,
+        clickCnt: 0,
+        convertCnt: 0,
+        ctr: 0,
+        dateRange: { start: '', end: '' },
+      },
+    }
+  }
+  const qs = `?access_token=${encodeURIComponent(creds.access_token)}&advertiser_id=${encodeURIComponent(creds.local_account_id)}`
   const r = await requestJson<{ summary?: LocalReportSummary; demoMode?: boolean }>(
     `${apiBase()}/api/merchant/qianchuan/report/summary${qs}`,
     undefined,
-    '拉取报表',
+    '拉取千川报表',
   )
   if (!r.ok) return r
-  if (!r.data.summary) return { ok: false, message: '暂无报表数据，请确认账号下有投放记录。' }
+  if (!r.data.summary) return { ok: false, message: '暂无千川报表，请确认已开通千川投放。' }
   return { ok: true, summary: r.data.summary, demoMode: r.data.demoMode }
 }
 

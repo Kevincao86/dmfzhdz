@@ -65,18 +65,17 @@ function credsFromBody(j: Record<string, unknown>): QianchuanCredentials | null 
   const accessToken =
     (typeof j.access_token === 'string' ? j.access_token : '') ||
     (typeof j.accessToken === 'string' ? j.accessToken : '') ||
-    process.env.OCEANENGINE_ACCESS_TOKEN?.trim() ||
+    process.env.QIANCHUAN_ACCESS_TOKEN?.trim() ||
     ''
-  const localAccountId =
+  const advertiserId =
     (typeof j.advertiser_id === 'string' ? j.advertiser_id : '') ||
     (typeof j.advertiserId === 'string' ? j.advertiserId : '') ||
     (typeof j.local_account_id === 'string' ? j.local_account_id : '') ||
     (typeof j.localAccountId === 'string' ? j.localAccountId : '') ||
-    process.env.OCEANENGINE_ADVERTISER_ID?.trim() ||
-    process.env.OCEANENGINE_LOCAL_ACCOUNT_ID?.trim() ||
+    process.env.QIANCHUAN_ADVERTISER_ID?.trim() ||
     ''
-  if (!accessToken || !localAccountId) return null
-  return { accessToken, localAccountId }
+  if (!accessToken || !advertiserId) return null
+  return { accessToken, localAccountId: advertiserId }
 }
 
 async function oceanGet<T>(
