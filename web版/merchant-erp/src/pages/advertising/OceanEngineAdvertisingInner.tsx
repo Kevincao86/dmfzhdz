@@ -127,10 +127,10 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
 
       if (rep.ok) setSummary(rep.summary)
       else failures.push(rep.message)
+      if (rep.ok && 'apiError' in rep && rep.apiError) apiErrors.push(String(rep.apiError))
 
       if (cr.ok) setClues(cr.list)
       else failures.push(cr.message)
-      if (cr.ok && cr.apiError) apiErrors.push(cr.apiError)
 
       const hasCreds = Boolean(bind?.accessToken && bind.localAccountId)
       if (!hasCreds) {

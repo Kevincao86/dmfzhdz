@@ -16,18 +16,40 @@ import {
 
 const OE_BASE = (process.env.OCEANENGINE_API_BASE ?? 'https://api.oceanengine.com').replace(/\/$/, '')
 
-function mapOceanError(raw: string, status?: number): string {
+function mapOceanError(raw: string, status?: number, code?: number): string {
   const s = raw.trim()
   const lower = s.toLowerCase()
+  const codeHint = code != null ? `（巨量错误码 ${code}）` : ''
   if (status === 404 || /not_found|page could not be found/.test(lower)) {
-    return '巨量开放平台接口不可用，请检查授权或稍后重试。'
+    return `巨量开放平台接口不可用，请检查授权或稍后重试${codeHint}`
   }
-  if (status && status >= 500) return '巨量开放平台暂时繁忙，请稍后再试。'
+  if (status && status >= 500) return `巨量开放平台暂时繁忙，请稍后再试${codeHint}`
+  if (/access_token无效|access token invalid|invalid access_token/i.test(s)) {
+    return `access_token 无效或已过期，请到系统设置重新授权本地推${codeHint}`
+  }
   if (!/[\u4e00-\u9fff]/.test(s)) {
-    return '连接巨量本地推失败，请确认 Access Token 与广告主 ID 正确，并在开放平台开通线索/投放权限。'
+    return `连接巨量本地推失败，请确认 Access Token 与广告主 ID 正确，并在开放平台开通投放/报表权限${codeHint}`
   }
-  return s
+  return `${s}${codeHint}`
 }
+
+/** 广告主 ID 超过 15 位时 JSON.parse 会丢精度，先转成字符串 */
+function parseOceanJson<T>(text: string): T {
+  const quoted = text.replace(/([:\[,]\s*)(-?\d{16,})(?=\s*[,}\]])/g, '$1"$2"')
+  return JSON.parse(quoted) as T
+}
+
+function jsonBodyPreserveIntIds(body: unknown): string {
+  return JSON.stringify(body).replace(/"(\d{16,})"/g, '$1')
+}
+
+const LOCAL_REPORT_METRICS = JSON.stringify([
+  'stat_cost',
+  'show_cnt',
+  'click_cnt',
+  'convert_cnt',
+  'ctr',
+])
 
 
 export type LocalPromotionCredentials = {
@@ -63,9 +85,12 @@ function credsFromBody(j: Record<string, unknown>): LocalPromotionCredentials | 
     (typeof j.accessToken === 'string' ? j.accessToken : '') ||
     process.env.OCEANENGINE_ACCESS_TOKEN?.trim() ||
     ''
+  const localAccountIdRaw = j.local_account_id ?? j.localAccountId
   const localAccountId =
-    (typeof j.local_account_id === 'string' ? j.local_account_id : '') ||
-    (typeof j.localAccountId === 'string' ? j.localAccountId : '') ||
+    (typeof localAccountIdRaw === 'string' ? localAccountIdRaw.trim() : '') ||
+    (typeof localAccountIdRaw === 'number' && Number.isFinite(localAccountIdRaw)
+      ? String(localAccountIdRaw)
+      : '') ||
     process.env.OCEANENGINE_LOCAL_ACCOUNT_ID?.trim() ||
     ''
   if (!accessToken || !localAccountId) return null
@@ -85,15 +110,15 @@ async function oceanGet<T>(
   const text = await r.text()
   let parsed: OeEnvelope<T> = {}
   try {
-    parsed = JSON.parse(text) as OeEnvelope<T>
+    parsed = parseOceanJson<OeEnvelope<T>>(text)
   } catch {
     return { ok: false, message: mapOceanError(text, r.status) }
   }
   if (!r.ok) {
-    return { ok: false, message: mapOceanError(parsed.message ?? text, r.status) }
+    return { ok: false, message: mapOceanError(parsed.message ?? text, r.status, parsed.code) }
   }
   if (parsed.code !== 0 && parsed.code !== undefined) {
-    return { ok: false, message: mapOceanError(parsed.message ?? '请求被拒绝', r.status) }
+    return { ok: false, message: mapOceanError(parsed.message ?? '请求被拒绝', r.status, parsed.code) }
   }
   return { ok: true, data: (parsed.data ?? {}) as T }
 }
@@ -111,20 +136,20 @@ async function oceanPost<T>(
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
-    body: JSON.stringify(body),
+    body: jsonBodyPreserveIntIds(body),
   })
   const text = await r.text()
   let parsed: OeEnvelope<T> = {}
   try {
-    parsed = JSON.parse(text) as OeEnvelope<T>
+    parsed = parseOceanJson<OeEnvelope<T>>(text)
   } catch {
     return { ok: false, message: mapOceanError(text, r.status) }
   }
   if (!r.ok) {
-    return { ok: false, message: mapOceanError(parsed.message ?? text, r.status) }
+    return { ok: false, message: mapOceanError(parsed.message ?? text, r.status, parsed.code) }
   }
   if (parsed.code !== 0 && parsed.code !== undefined) {
-    return { ok: false, message: mapOceanError(parsed.message ?? '请求被拒绝', r.status) }
+    return { ok: false, message: mapOceanError(parsed.message ?? '请求被拒绝', r.status, parsed.code) }
   }
   return { ok: true, data: (parsed.data ?? {}) as T }
 }
@@ -191,26 +216,29 @@ export async function handleLocalPromotionRoutes(
     return true
   }
 
-  if (method === 'GET' && pathname === '/api/merchant/local-promotion/projects') {
-    const creds = credsFromQuery(url) ?? credsFromBody({})
+  if (
+    (method === 'GET' || method === 'POST') &&
+    pathname === '/api/merchant/local-promotion/projects'
+  ) {
+    const creds = credsForList(method, url, bodyRaw)
     if (!creds) {
       json(res, 200, emptyAdvertisingList('请先绑定本地推账号'))
       return true
     }
-    const pr = await oceanGet<{ project_list?: Record<string, unknown>[] }>(
+    const pr = await oceanGet<{ project_list?: Record<string, unknown>[]; list?: Record<string, unknown>[] }>(
       creds,
       '/open_api/v3.0/local/project/list/',
       {
         local_account_id: creds.localAccountId,
         page: url.searchParams.get('page') ?? '1',
-        page_size: url.searchParams.get('page_size') ?? '20',
+        page_size: url.searchParams.get('page_size') ?? '100',
       },
     )
     if (!pr.ok) {
       json(res, 200, { ...apiFailWithCreds(pr.message), message: pr.message })
       return true
     }
-    const list = (pr.data.project_list ?? []).map((p) => ({
+    const list = asRecordList(pr.data as Record<string, unknown>, 'project_list', 'list').map((p) => ({
       projectId: String(p.project_id ?? p.id ?? ''),
       projectName: String(p.project_name ?? p.name ?? '—'),
       status: String(p.project_status ?? p.status ?? ''),
@@ -223,19 +251,22 @@ export async function handleLocalPromotionRoutes(
     return true
   }
 
-  if (method === 'GET' && pathname === '/api/merchant/local-promotion/promotions') {
-    const creds = credsFromQuery(url) ?? credsFromBody({})
+  if (
+    (method === 'GET' || method === 'POST') &&
+    pathname === '/api/merchant/local-promotion/promotions'
+  ) {
+    const creds = credsForList(method, url, bodyRaw)
     if (!creds) {
       json(res, 200, emptyAdvertisingList('请先绑定本地推账号'))
       return true
     }
-    const pr = await oceanGet<{ promotion_list?: Record<string, unknown>[] }>(
+    const pr = await oceanGet<{ promotion_list?: Record<string, unknown>[]; list?: Record<string, unknown>[] }>(
       creds,
       '/open_api/v3.0/local/promotion/list/',
       {
         local_account_id: creds.localAccountId,
         page: url.searchParams.get('page') ?? '1',
-        page_size: url.searchParams.get('page_size') ?? '20',
+        page_size: url.searchParams.get('page_size') ?? '100',
       },
     )
     if (!pr.ok) {
@@ -244,22 +275,22 @@ export async function handleLocalPromotionRoutes(
     }
     const reportMap = new Map<string, Record<string, unknown>>()
     const range = dateRangeLast7()
-    const rep = await oceanGet<{ list?: Record<string, unknown>[] }>(
-      creds,
-      '/open_api/v3.0/local/report/promotion/get/',
-      {
-        local_account_id: creds.localAccountId,
-        start_date: range.start.slice(0, 10),
-        end_date: range.end.slice(0, 10),
-      },
-    )
+    const rep = await oceanGet<Record<string, unknown>>(creds, '/open_api/v3.0/local/report/promotion/get/', {
+      local_account_id: creds.localAccountId,
+      start_date: range.start.slice(0, 10),
+      end_date: range.end.slice(0, 10),
+      time_granularity: 'TIME_GRANULARITY_TOTAL',
+      metrics: LOCAL_REPORT_METRICS,
+      page: '1',
+      page_size: '100',
+    })
     if (rep.ok) {
-      for (const row of rep.data.list ?? []) {
+      for (const row of asRecordList(rep.data, 'promotion_list', 'list')) {
         const id = String(row.promotion_id ?? '')
         if (id) reportMap.set(id, row)
       }
     }
-    const list = (pr.data.promotion_list ?? []).map((p) => {
+    const list = asRecordList(pr.data as Record<string, unknown>, 'promotion_list', 'list').map((p) => {
       const id = String(p.promotion_id ?? '')
       const metrics = reportMap.get(id)
       const statCost = metrics ? Number(metrics.stat_cost ?? 0) / 100 : undefined
@@ -306,8 +337,8 @@ export async function handleLocalPromotionRoutes(
       return true
     }
     const pr = await oceanPost(creds, '/open_api/v3.0/local/promotion/status/update/', {
-      local_account_id: Number(creds.localAccountId),
-      promotion_ids: ids.map((id) => Number(id)),
+      local_account_id: creds.localAccountId,
+      promotion_ids: ids,
       opt_status: optStatus,
     })
     if (!pr.ok) {
@@ -318,32 +349,36 @@ export async function handleLocalPromotionRoutes(
     return true
   }
 
-  if (method === 'GET' && pathname === '/api/merchant/local-promotion/report/summary') {
-    const creds = credsFromQuery(url) ?? credsFromBody({})
+  if (
+    (method === 'GET' || method === 'POST') &&
+    pathname === '/api/merchant/local-promotion/report/summary'
+  ) {
+    const creds = credsForList(method, url, bodyRaw)
     const range = dateRangeLast7()
     if (!creds) {
       json(res, 200, emptyAdvertisingSummary(range, '请先绑定本地推账号'))
       return true
     }
-    const pr = await oceanGet<{ list?: Record<string, unknown>[] }>(
-      creds,
-      '/open_api/v3.0/local/report/promotion/get/',
-      {
-        local_account_id: creds.localAccountId,
-        start_date: range.start.slice(0, 10),
-        end_date: range.end.slice(0, 10),
-      },
-    )
+    const pr = await oceanGet<Record<string, unknown>>(creds, '/open_api/v3.0/local/report/promotion/get/', {
+      local_account_id: creds.localAccountId,
+      start_date: range.start.slice(0, 10),
+      end_date: range.end.slice(0, 10),
+      time_granularity: 'TIME_GRANULARITY_TOTAL',
+      metrics: LOCAL_REPORT_METRICS,
+      page: '1',
+      page_size: '100',
+    })
     if (!pr.ok) {
       json(res, 200, {
         ok: true,
         summary: { statCost: 0, showCnt: 0, clickCnt: 0, convertCnt: 0, ctr: 0, dateRange: range },
         message: pr.message,
         demoMode: false,
+        apiError: pr.message,
       })
       return true
     }
-    const rows = pr.data.list ?? []
+    const rows = asRecordList(pr.data, 'promotion_list', 'list')
     let statCost = 0
     let showCnt = 0
     let clickCnt = 0
@@ -379,12 +414,11 @@ export async function handleLocalPromotionRoutes(
       return true
     }
     const range = dateRangeLast7()
-    const accountId = Number(creds.localAccountId)
     const pr = await oceanPost<{ list?: Record<string, unknown>[]; page_info?: Record<string, unknown> }>(
       creds,
       '/open_api/2/tools/clue/life/get/',
       {
-        local_account_ids: [accountId],
+        local_account_ids: [creds.localAccountId],
         start_time: typeof j.start_time === 'string' ? j.start_time : range.start,
         end_time: typeof j.end_time === 'string' ? j.end_time : range.end,
         page: Number(j.page) || 1,
@@ -440,7 +474,7 @@ export async function handleLocalPromotionRoutes(
       return true
     }
     const pr = await oceanPost(creds, '/open_api/2/tools/clue/life/callback/', {
-      local_account_ids: [Number(creds.localAccountId)],
+      local_account_ids: [creds.localAccountId],
       clue_id: clueId,
       clue_convert_state: state,
       event_data:
@@ -542,4 +576,18 @@ function credsFromQuery(url: URL): LocalPromotionCredentials | null {
   const localAccountId = url.searchParams.get('local_account_id')?.trim() ?? ''
   if (!accessToken || !localAccountId) return null
   return { accessToken, localAccountId }
+}
+
+function credsForList(method: string, url: URL, bodyRaw: string): LocalPromotionCredentials | null {
+  if (method === 'POST') return credsFromBody(parseBody(bodyRaw)) ?? credsFromQuery(url)
+  return credsFromQuery(url) ?? credsFromBody({})
+}
+
+function asRecordList(data: Record<string, unknown> | undefined, ...keys: string[]): Record<string, unknown>[] {
+  if (!data) return []
+  for (const k of keys) {
+    const v = data[k]
+    if (Array.isArray(v)) return v.filter((x) => x && typeof x === 'object') as Record<string, unknown>[]
+  }
+  return []
 }

@@ -97,7 +97,8 @@ async function oceanGet<T>(
     const text = await r.text()
     let parsed: OeEnvelope<T> = {}
     try {
-      parsed = JSON.parse(text) as OeEnvelope<T>
+      const quoted = text.replace(/([:\[,]\s*)(-?\d{16,})(?=\s*[,}\]])/g, '$1"$2"')
+      parsed = JSON.parse(quoted) as OeEnvelope<T>
     } catch {
       return { ok: false, message: mapOceanError(text, r.status) }
     }

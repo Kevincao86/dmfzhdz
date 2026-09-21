@@ -23,6 +23,24 @@ function credsPayload() {
   }
 }
 
+async function postWithCreds<T extends Record<string, unknown>>(
+  path: string,
+  extra: Record<string, unknown> = {},
+  action = '请求',
+): Promise<{ ok: true; data: T } | { ok: false; message: string }> {
+  const creds = credsPayload()
+  if (!creds) return { ok: false, message: '请先在系统设置中绑定巨量本地推' }
+  return requestJson<T>(
+    `${apiBase()}${path}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...creds, ...extra }),
+    },
+    action,
+  )
+}
+
 async function requestJson<T extends Record<string, unknown>>(
   url: string,
   init?: RequestInit,
@@ -477,12 +495,10 @@ export async function fetchLocalProjects(): Promise<
   | { ok: false; message: string }
 > {
   const creds = credsPayload()
-  const qs = creds
-    ? `?access_token=${encodeURIComponent(creds.access_token)}&local_account_id=${encodeURIComponent(creds.local_account_id)}`
-    : ''
-  const r = await requestJson<{ list?: LocalProjectRow[]; demoMode?: boolean; apiError?: string }>(
-    `${apiBase()}/api/merchant/local-promotion/projects${qs}`,
-    undefined,
+  if (!creds) return { ok: false, message: '请先在系统设置中绑定巨量本地推' }
+  const r = await postWithCreds<{ list?: LocalProjectRow[]; demoMode?: boolean; apiError?: string }>(
+    '/api/merchant/local-promotion/projects',
+    {},
     '拉取项目',
   )
   if (!r.ok) return r
@@ -494,12 +510,10 @@ export async function fetchLocalPromotions(): Promise<
   | { ok: false; message: string }
 > {
   const creds = credsPayload()
-  const qs = creds
-    ? `?access_token=${encodeURIComponent(creds.access_token)}&local_account_id=${encodeURIComponent(creds.local_account_id)}`
-    : ''
-  const r = await requestJson<{ list?: LocalPromotionRow[]; demoMode?: boolean; apiError?: string }>(
-    `${apiBase()}/api/merchant/local-promotion/promotions${qs}`,
-    undefined,
+  if (!creds) return { ok: false, message: '请先在系统设置中绑定巨量本地推' }
+  const r = await postWithCreds<{ list?: LocalPromotionRow[]; demoMode?: boolean; apiError?: string }>(
+    '/api/merchant/local-promotion/promotions',
+    {},
     '拉取广告',
   )
   if (!r.ok) return r
@@ -526,21 +540,22 @@ export async function updatePromotionStatus(
 }
 
 export async function fetchLocalReportSummary(): Promise<
-  | { ok: true; summary: LocalReportSummary; demoMode?: boolean }
+  | { ok: true; summary: LocalReportSummary; demoMode?: boolean; apiError?: string }
   | { ok: false; message: string }
 > {
-  const creds = credsPayload()
-  const qs = creds
-    ? `?access_token=${encodeURIComponent(creds.access_token)}&local_account_id=${encodeURIComponent(creds.local_account_id)}`
-    : ''
-  const r = await requestJson<{ summary?: LocalReportSummary; demoMode?: boolean }>(
-    `${apiBase()}/api/merchant/local-promotion/report/summary${qs}`,
-    undefined,
-    '拉取报表',
-  )
+  const r = await postWithCreds<{
+    summary?: LocalReportSummary
+    demoMode?: boolean
+    apiError?: string
+  }>('/api/merchant/local-promotion/report/summary', {}, '拉取报表')
   if (!r.ok) return r
   if (!r.data.summary) return { ok: false, message: '暂无报表数据，请确认账号下有投放记录。' }
-  return { ok: true, summary: r.data.summary, demoMode: r.data.demoMode }
+  return {
+    ok: true,
+    summary: r.data.summary,
+    demoMode: r.data.demoMode,
+    apiError: r.data.apiError,
+  }
 }
 
 export async function fetchLocalClues(page = 1): Promise<

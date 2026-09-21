@@ -59,6 +59,11 @@ type OeTokenEnvelope = {
   data?: Record<string, unknown>
 }
 
+function parseOceanJson<T>(text: string): T {
+  const quoted = text.replace(/([:\[,]\s*)(-?\d{16,})(?=\s*[,}\]])/g, '$1"$2"')
+  return JSON.parse(quoted) as T
+}
+
 function pickString(obj: Record<string, unknown> | undefined, keys: string[]): string {
   if (!obj) return ''
   for (const k of keys) {
@@ -177,7 +182,7 @@ async function postOeOAuth(path: string, body: Record<string, unknown>): Promise
       })
       const text = await r.text()
       try {
-        const parsed = JSON.parse(text) as OeTokenEnvelope
+        const parsed = parseOceanJson<OeTokenEnvelope>(text)
         if (parsed.code === 0 || parsed.code === undefined) return parsed
         last = parsed
       } catch {
@@ -200,7 +205,7 @@ async function getOeOAuth(path: string, accessToken: string): Promise<OeTokenEnv
       })
       const text = await r.text()
       try {
-        const parsed = JSON.parse(text) as OeTokenEnvelope
+        const parsed = parseOceanJson<OeTokenEnvelope>(text)
         if (parsed.code === 0 || parsed.code === undefined) return parsed
         last = parsed
       } catch {

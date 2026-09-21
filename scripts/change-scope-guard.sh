@@ -86,6 +86,7 @@ list_scopes() {
   modian_official        墨典官网 m.mofangdianai.com（案例库入口）
   xingxuan_dy_oauth      星选履约 Web 抖音扫码登录（不含商家 cs / 小程序）
   xingxuan_open_loop     星选招募开环/闭环（小程序发单+达人报名群码 + 履约 Web 同步；闭环现网路径不改）
+  merchant_local_ads     商家 ERP：巨量本地推绑定/投流拉数（不含千川/聚光）
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -1181,6 +1182,16 @@ PAT
 TalentLoginAuthPanel
 灵祺达人履约管理后台/src/lib/mpApi.ts
 灵祺达人履约管理后台/src/lib/mpApiErrors.ts
+change-scope-guard
+PAT
+      ;;
+    merchant_local_ads)
+      cat <<'PAT'
+localPromotionGateway
+localPromotionApi
+localPromotionOAuthCore
+localPromotionBindTestCore
+OceanEngineAdvertisingInner
 change-scope-guard
 PAT
       ;;
