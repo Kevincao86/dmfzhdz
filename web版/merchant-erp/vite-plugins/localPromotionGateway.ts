@@ -246,7 +246,7 @@ export async function handleLocalPromotionRoutes(
       status: String(p.project_status ?? p.status ?? ''),
       statusLabel: mapPromotionStatus(String(p.project_status_first ?? p.status ?? '')),
       budgetYuan: Number(p.budget ?? 0) / 100 || undefined,
-      marketingGoal: String(p.marketing_goal ?? ''),
+      marketingGoal: pickLocalMarketingGoal(p),
       createTime: String(p.create_time ?? ''),
     }))
     json(res, 200, { ok: true, list, demoMode: false })
@@ -312,7 +312,7 @@ export async function handleLocalPromotionRoutes(
         statusLabel: mapPromotionStatus(String(p.promotion_status_first ?? '')),
         budgetYuan: Number(p.budget ?? 0) / 100 || undefined,
         bidYuan: Number(p.bid ?? 0) / 100 || undefined,
-        marketingGoal: String(p.marketing_goal ?? ''),
+        marketingGoal: pickLocalMarketingGoal(p),
         learningPhase: String(p.learning_phase ?? ''),
         createTime: String(p.promotion_create_time ?? ''),
         statCost,
@@ -631,6 +631,20 @@ async function resolveLocalPromotionCreds(
   }
   if (candidates.length) return { ...creds, localAccountId: candidates[0] }
   return creds
+}
+
+function pickLocalMarketingGoal(row: Record<string, unknown>): string {
+  const raw = String(
+    row.marketing_goal ?? row.marketingGoal ?? row.marketing_scene ?? '',
+  ).trim()
+  const upper = raw.toUpperCase()
+  if (upper === 'LIVE_PROM_GOODS' || upper === 'LIVE_PROMOTION' || upper === 'LIVE_ROOM') return 'LIVE'
+  if (upper === 'VIDEO_PROM_GOODS' || upper === 'SHORT_VIDEO') return 'VIDEO_IMAGE'
+  if (raw) return raw
+  const blob = `${row.promotion_name ?? ''} ${row.project_name ?? ''} ${row.name ?? ''}`
+  if (/直播/.test(blob)) return 'LIVE'
+  if (/短视频|图文/.test(blob)) return 'VIDEO_IMAGE'
+  return ''
 }
 
 function asRecordList(data: Record<string, unknown> | undefined, ...keys: string[]): Record<string, unknown>[] {

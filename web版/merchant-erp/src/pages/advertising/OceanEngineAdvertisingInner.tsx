@@ -72,6 +72,20 @@ type PaneAiState = {
 
 const emptyPaneAi = (): PaneAiState => ({ insight: null, actions: [], busy: false })
 
+function inferLocalMarketingGoal(
+  row: { marketingGoal?: string; promotionName?: string; projectName?: string; projectId?: string },
+  projects: LocalProjectRow[],
+): string {
+  const raw = String(row.marketingGoal ?? '').trim()
+  if (raw) return raw
+  const proj = row.projectId ? projects.find((p) => p.projectId === row.projectId) : undefined
+  if (proj?.marketingGoal?.trim()) return proj.marketingGoal.trim()
+  const blob = `${row.promotionName ?? ''} ${row.projectName ?? ''} ${proj?.projectName ?? ''}`
+  if (/直播/.test(blob)) return 'LIVE'
+  if (/短视频|图文/.test(blob)) return 'VIDEO_IMAGE'
+  return raw
+}
+
 export default function OceanEngineAdvertisingInner({ platform }: { platform: OceanPlatform }) {
   const [pane, setPane] = useState<LocalPane>('live')
   const [promotions, setPromotions] = useState<LocalPromotionRow[]>([])
@@ -163,19 +177,44 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
     })
   }, [platform])
 
+  const classifiedPromotions = useMemo(
+    () =>
+      promotions.map((p) => ({
+        ...p,
+        marketingGoal: inferLocalMarketingGoal(p, projects),
+      })),
+    [promotions, projects],
+  )
+  const classifiedProjects = useMemo(
+    () =>
+      projects.map((p) => ({
+        ...p,
+        marketingGoal: inferLocalMarketingGoal(
+          { marketingGoal: p.marketingGoal, projectName: p.projectName },
+          [],
+        ),
+      })),
+    [projects],
+  )
   const livePromotions = useMemo(
-    () => filterPromotionsByChannel(promotions, 'live'),
-    [promotions],
+    () => filterPromotionsByChannel(classifiedPromotions, 'live'),
+    [classifiedPromotions],
   )
   const videoPromotions = useMemo(
-    () => filterPromotionsByChannel(promotions, 'video'),
-    [promotions],
+    () => filterPromotionsByChannel(classifiedPromotions, 'video'),
+    [classifiedPromotions],
   )
-  const liveProjects = useMemo(() => filterProjectsByChannel(projects, 'live'), [projects])
-  const videoProjects = useMemo(() => filterProjectsByChannel(projects, 'video'), [projects])
+  const liveProjects = useMemo(
+    () => filterProjectsByChannel(classifiedProjects, 'live'),
+    [classifiedProjects],
+  )
+  const videoProjects = useMemo(
+    () => filterProjectsByChannel(classifiedProjects, 'video'),
+    [classifiedProjects],
+  )
   const channelStats = useMemo(
-    () => buildChannelStats({ promotions, clues }),
-    [promotions, clues],
+    () => buildChannelStats({ promotions: classifiedPromotions, clues }),
+    [classifiedPromotions, clues],
   )
 
   const setAiModePersist = (mode: LocalPromotionAiMode) => {
@@ -210,7 +249,7 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
             ? livePromotions
             : targetPane === 'video'
               ? videoPromotions
-              : promotions
+              : classifiedPromotions
         const r = await (platform === 'qianchuan' ? postQianchuanAdAiInsight : postAdAiInsight)({
           summary,
           promotions: promos,
@@ -225,21 +264,27 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
             [targetPane]: { insight: r.insight, actions: r.actions ?? [], busy: false },
           }))
         } else {
-          setError(r.message)
+          const aiMsg = /请先登录/.test(r.message)
+            ? 'AI 分析需要当前商家登录态，请刷新页面后重试。'
+            : r.message
           setPaneAi((prev) => ({
             ...prev,
-            [targetPane]: { ...prev[targetPane], busy: false },
+            [targetPane]: { insight: aiMsg, actions: [], busy: false },
           }))
         }
       } catch (e) {
-        setError(toUserFacingError(e, 'AI 投流分析'))
+        const msg = toUserFacingError(e, 'AI 投流分析')
         setPaneAi((prev) => ({
           ...prev,
-          [targetPane]: { ...prev[targetPane], busy: false },
+          [targetPane]: {
+            insight: /请先登录/.test(msg) ? 'AI 分析需要当前商家登录态，请刷新页面后重试。' : msg,
+            actions: [],
+            busy: false,
+          },
         }))
       }
     },
-    [aiMode, pane, livePromotions, videoPromotions, promotions, summary, clues, channelStats, platform],
+    [aiMode, pane, livePromotions, videoPromotions, classifiedPromotions, summary, clues, channelStats, platform],
   )
 
   useEffect(() => {
@@ -452,7 +497,7 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
           {pane === 'leads' ? (
             <LocalPromotionLeadsAnalysisPanel
               clues={clues}
-              promotions={promotions}
+              promotions={classifiedPromotions}
               summary={summary}
               loading={loading}
               onReload={reload}
@@ -463,7 +508,7 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
       {pane === 'ai' ? (
         <LocalPromotionAiOverviewPanel
           summary={summary}
-          promotions={promotions}
+          promotions={classifiedPromotions}
           clues={clues}
           loading={loading}
           aiInsight={paneAi.ai.insight}

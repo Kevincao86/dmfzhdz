@@ -1,3 +1,4 @@
+import { merchantApiAuthHeaders, resolveMerchantApiBearer } from '../lib/merchantApiAuth'
 import { readLocalPromotionBinding } from '../lib/localPromotionBinding'
 import type {
   LocalClueRow,
@@ -12,6 +13,14 @@ import { toUserFacingError } from '../lib/userFacingError'
 function apiBase(): string {
   const b = (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined)?.replace(/\/$/, '')
   return b ?? ''
+}
+
+async function merchantAuthJsonHeaders(): Promise<Record<string, string>> {
+  const auth = await resolveMerchantApiBearer()
+  return {
+    'Content-Type': 'application/json',
+    ...merchantApiAuthHeaders(auth.token, auth.source),
+  }
 }
 
 function credsPayload() {
@@ -630,7 +639,7 @@ export async function postClueAiSuggest(input: {
     `${apiBase()}/api/merchant/local-promotion/clues/ai-suggest`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await merchantAuthJsonHeaders(),
       body: JSON.stringify(input),
     },
     '生成跟进话术',
@@ -655,7 +664,7 @@ export async function postAdAiInsight(input: {
     `${apiBase()}/api/merchant/local-promotion/ai/ad-insight`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await merchantAuthJsonHeaders(),
       body: JSON.stringify(input),
     },
     '投流分析',
