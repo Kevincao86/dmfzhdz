@@ -4,7 +4,6 @@ import { Link } from 'react-router-dom'
 import { cn } from '../../cn'
 import {
   buildChannelStats,
-  classifyMarketingGoal,
   filterProjectsByChannel,
   filterPromotionsByChannel,
 } from '../../lib/localPromotionAnalytics'
