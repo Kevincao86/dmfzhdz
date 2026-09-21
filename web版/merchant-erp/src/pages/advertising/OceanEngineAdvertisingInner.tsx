@@ -305,7 +305,7 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
     const cur = paneAi[pane]
     if (cur.busy || cur.insight) return
     if (loading) return
-    if (pane !== 'leads' && pane !== 'ai' && classifiedPromotions.length === 0) return
+    if (pane !== 'leads' && classifiedPromotions.length === 0) return
     void runPaneAi(pane)
   }, [pane, aiMode, loading, paneAi, runPaneAi, classifiedPromotions.length])
 
