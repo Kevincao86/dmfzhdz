@@ -227,20 +227,18 @@ export async function handleLocalPromotionRoutes(
       return true
     }
     const creds = await resolveLocalPromotionCreds(rawCreds)
-    const pr = await oceanGet<{ project_list?: Record<string, unknown>[]; list?: Record<string, unknown>[] }>(
+    const pr = await listLocalByMarketingGoals(
       creds,
       '/open_api/v3.0/local/project/list/',
-      {
-        local_account_id: creds.localAccountId,
-        page: url.searchParams.get('page') ?? '1',
-        page_size: url.searchParams.get('page_size') ?? '100',
-      },
+      ['project_list', 'list'],
+      'project_status_first',
+      'PROJECT_STATUS_ALL',
     )
     if (!pr.ok) {
       json(res, 200, { ...apiFailWithCreds(pr.message), message: pr.message })
       return true
     }
-    const list = asRecordList(pr.data as Record<string, unknown>, 'project_list', 'list').map((p) => ({
+    const list = pr.rows.map((p) => ({
       projectId: String(p.project_id ?? p.id ?? ''),
       projectName: String(p.project_name ?? p.name ?? '—'),
       status: String(p.project_status ?? p.status ?? ''),
@@ -263,14 +261,12 @@ export async function handleLocalPromotionRoutes(
       return true
     }
     const creds = await resolveLocalPromotionCreds(rawCreds)
-    const pr = await oceanGet<{ promotion_list?: Record<string, unknown>[]; list?: Record<string, unknown>[] }>(
+    const pr = await listLocalByMarketingGoals(
       creds,
       '/open_api/v3.0/local/promotion/list/',
-      {
-        local_account_id: creds.localAccountId,
-        page: url.searchParams.get('page') ?? '1',
-        page_size: url.searchParams.get('page_size') ?? '100',
-      },
+      ['promotion_list', 'list'],
+      'promotion_status_first',
+      'PROMOTION_STATUS_ALL',
     )
     if (!pr.ok) {
       json(res, 200, { ...apiFailWithCreds(pr.message), message: pr.message })
@@ -293,7 +289,7 @@ export async function handleLocalPromotionRoutes(
         if (id) reportMap.set(id, row)
       }
     }
-    const list = asRecordList(pr.data as Record<string, unknown>, 'promotion_list', 'list').map((p) => {
+    const list = pr.rows.map((p) => {
       const id = String(p.promotion_id ?? '')
       const metrics = reportMap.get(id)
       const statCost = metrics ? Number(metrics.stat_cost ?? 0) / 100 : undefined
@@ -642,9 +638,86 @@ function pickLocalMarketingGoal(row: Record<string, unknown>): string {
   if (upper === 'VIDEO_PROM_GOODS' || upper === 'SHORT_VIDEO') return 'VIDEO_IMAGE'
   if (raw) return raw
   const blob = `${row.promotion_name ?? ''} ${row.project_name ?? ''} ${row.name ?? ''}`
-  if (/直播/.test(blob)) return 'LIVE'
   if (/短视频|图文/.test(blob)) return 'VIDEO_IMAGE'
+  if (/直播/.test(blob)) return 'LIVE'
   return ''
+}
+
+async function listAllLocalRows(
+  creds: LocalPromotionCredentials,
+  path: string,
+  listKeys: string[],
+  extraQuery: Record<string, string> = {},
+): Promise<{ ok: true; rows: Record<string, unknown>[] } | { ok: false; message: string }> {
+  const rows: Record<string, unknown>[] = []
+  const seen = new Set<string>()
+  for (let page = 1; page <= 10; page++) {
+    const pr = await oceanGet<Record<string, unknown>>(creds, path, {
+      local_account_id: creds.localAccountId,
+      page: String(page),
+      page_size: '100',
+      ...extraQuery,
+    })
+    if (!pr.ok) {
+      if (page === 1 && rows.length === 0) return { ok: false, message: pr.message }
+      break
+    }
+    const batch = asRecordList(pr.data, ...listKeys)
+    if (!batch.length) break
+    for (const row of batch) {
+      const id = String(row.promotion_id ?? row.project_id ?? row.id ?? '')
+      const key = id || JSON.stringify(row)
+      if (seen.has(key)) continue
+      seen.add(key)
+      rows.push(row)
+    }
+    if (batch.length < 100) break
+  }
+  return { ok: true, rows }
+}
+
+/** 无筛选时巨量偶发只返回直播；再按 VIDEO_IMAGE / LIVE 各拉一遍并分页合并 */
+async function listLocalByMarketingGoals(
+  creds: LocalPromotionCredentials,
+  path: string,
+  listKeys: string[],
+  statusKey: 'promotion_status_first' | 'project_status_first',
+  statusAll: string,
+): Promise<{ ok: true; rows: Record<string, unknown>[] } | { ok: false; message: string }> {
+  const variants: Array<{ goal: string; extra: Record<string, string> }> = [
+    { goal: '', extra: { filtering: JSON.stringify({ [statusKey]: statusAll }) } },
+    {
+      goal: 'VIDEO_IMAGE',
+      extra: {
+        filtering: JSON.stringify({ marketing_goal: 'VIDEO_IMAGE', [statusKey]: statusAll }),
+      },
+    },
+    {
+      goal: 'LIVE',
+      extra: { filtering: JSON.stringify({ marketing_goal: 'LIVE', [statusKey]: statusAll }) },
+    },
+  ]
+  const seen = new Set<string>()
+  const merged: Record<string, unknown>[] = []
+  let lastErr = ''
+  for (const v of variants) {
+    const got = await listAllLocalRows(creds, path, listKeys, v.extra)
+    if (!got.ok) {
+      lastErr = got.message
+      continue
+    }
+    for (const row of got.rows) {
+      const id = String(row.promotion_id ?? row.project_id ?? row.id ?? '')
+      const key = id || JSON.stringify(row)
+      if (seen.has(key)) continue
+      seen.add(key)
+      const hasGoal = String(row.marketing_goal ?? row.marketingGoal ?? '').trim()
+      merged.push(v.goal && !hasGoal ? { ...row, marketing_goal: v.goal } : row)
+    }
+  }
+  if (merged.length) return { ok: true, rows: merged }
+  if (lastErr) return { ok: false, message: lastErr }
+  return { ok: true, rows: [] }
 }
 
 function asRecordList(data: Record<string, unknown> | undefined, ...keys: string[]): Record<string, unknown>[] {

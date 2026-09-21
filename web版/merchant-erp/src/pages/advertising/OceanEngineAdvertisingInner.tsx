@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { cn } from '../../cn'
 import {
   buildChannelStats,
+  classifyMarketingGoal,
   filterProjectsByChannel,
   filterPromotionsByChannel,
 } from '../../lib/localPromotionAnalytics'
@@ -81,8 +82,8 @@ function inferLocalMarketingGoal(
   const proj = row.projectId ? projects.find((p) => p.projectId === row.projectId) : undefined
   if (proj?.marketingGoal?.trim()) return proj.marketingGoal.trim()
   const blob = `${row.promotionName ?? ''} ${row.projectName ?? ''} ${proj?.projectName ?? ''}`
-  if (/直播/.test(blob)) return 'LIVE'
   if (/短视频|图文/.test(blob)) return 'VIDEO_IMAGE'
+  if (/直播/.test(blob)) return 'LIVE'
   return raw
 }
 
@@ -201,7 +202,7 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
     [classifiedPromotions],
   )
   const videoPromotions = useMemo(
-    () => filterPromotionsByChannel(classifiedPromotions, 'video'),
+    () => classifiedPromotions.filter((p) => classifyMarketingGoal(p.marketingGoal) !== 'live'),
     [classifiedPromotions],
   )
   const liveProjects = useMemo(
@@ -209,7 +210,7 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
     [classifiedProjects],
   )
   const videoProjects = useMemo(
-    () => filterProjectsByChannel(classifiedProjects, 'video'),
+    () => classifiedProjects.filter((p) => classifyMarketingGoal(p.marketingGoal) !== 'live'),
     [classifiedProjects],
   )
   const channelStats = useMemo(
