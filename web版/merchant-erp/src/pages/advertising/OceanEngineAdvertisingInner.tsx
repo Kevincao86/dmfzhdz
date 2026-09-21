@@ -358,6 +358,10 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
   }
 
   const togglePromotion = async (row: LocalPromotionRow, enable: boolean) => {
+    if (row.promotionId && row.projectId && row.promotionId === row.projectId) {
+      window.alert('该条来自自动投放项目，请在巨量本地推后台管理广告计划。')
+      return
+    }
     setStatusBusy(row.promotionId)
     try {
       const r = await (platform === 'qianchuan'

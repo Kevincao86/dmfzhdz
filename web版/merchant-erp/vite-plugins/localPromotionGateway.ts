@@ -261,13 +261,7 @@ export async function handleLocalPromotionRoutes(
       return true
     }
     const creds = await resolveLocalPromotionCreds(rawCreds)
-    const pr = await listLocalByMarketingGoals(
-      creds,
-      '/open_api/v3.0/local/promotion/list/',
-      ['promotion_list', 'list'],
-      'promotion_status_first',
-      'PROMOTION_STATUS_ALL',
-    )
+    const pr = await listLocalPromotionsMerged(creds)
     if (!pr.ok) {
       json(res, 200, { ...apiFailWithCreds(pr.message), message: pr.message })
       return true
@@ -302,8 +296,9 @@ export async function handleLocalPromotionRoutes(
           : undefined
       return {
         promotionId: id,
-        promotionName: String(p.promotion_name ?? '—'),
+        promotionName: String(p.promotion_name ?? p.project_name ?? '—'),
         projectId: String(p.project_id ?? ''),
+        projectName: String(p.project_name ?? ''),
         statusFirst: String(p.promotion_status_first ?? ''),
         statusLabel: mapPromotionStatus(String(p.promotion_status_first ?? '')),
         budgetYuan: Number(p.budget ?? 0) / 100 || undefined,
@@ -717,6 +712,144 @@ async function listLocalByMarketingGoals(
   }
   if (merged.length) return { ok: true, rows: merged }
   if (lastErr) return { ok: false, message: lastErr }
+  return { ok: true, rows: [] }
+}
+
+async function listPromotionsByProjectId(
+  creds: LocalPromotionCredentials,
+  projectId: string,
+): Promise<Record<string, unknown>[]> {
+  const filters: Record<string, unknown>[] = [
+    { project_id: projectId, promotion_status_first: 'PROMOTION_STATUS_ALL' },
+    { project_id: projectId, marketing_goal: 'VIDEO_IMAGE', promotion_status_first: 'PROMOTION_STATUS_ALL' },
+    { project_id: projectId, marketing_goal: 'LIVE', promotion_status_first: 'PROMOTION_STATUS_ALL' },
+    { project_id: projectId },
+  ]
+  const seen = new Set<string>()
+  const rows: Record<string, unknown>[] = []
+  const take = (batch: Record<string, unknown>[]) => {
+    for (const row of batch) {
+      const rowPid = String(row.project_id ?? '')
+      if (rowPid && rowPid !== projectId) continue
+      const id = String(row.promotion_id ?? row.id ?? '')
+      if (!id || seen.has(id)) continue
+      seen.add(id)
+      rows.push({ ...row, project_id: row.project_id ?? projectId })
+    }
+  }
+  for (const filtering of filters) {
+    const got = await listAllLocalRows(
+      creds,
+      '/open_api/v3.0/local/promotion/list/',
+      ['promotion_list', 'list'],
+      { filtering: jsonBodyPreserveIntIds(filtering) },
+    )
+    if (got.ok && got.rows.length) take(got.rows)
+    if (rows.length) return rows
+    const posted = await oceanPost<Record<string, unknown>>(creds, '/open_api/v3.0/local/promotion/list/', {
+      local_account_id: creds.localAccountId,
+      filtering,
+      page: 1,
+      page_size: 100,
+    })
+    if (posted.ok) take(asRecordList(posted.data, 'promotion_list', 'list'))
+    if (rows.length) return rows
+  }
+  return rows
+}
+
+function projectStatusAsPromotion(status: string): string {
+  if (/ENABLE/.test(status)) return 'PROMOTION_STATUS_ENABLE'
+  if (/DISABLE/.test(status)) return 'PROMOTION_STATUS_DISABLE'
+  if (/DONE|COMPLETE/.test(status)) return 'PROMOTION_STATUS_DONE'
+  if (/DELETE/.test(status)) return 'PROMOTION_STATUS_DELETED'
+  return status || 'PROMOTION_STATUS_DISABLE'
+}
+
+async function listLocalPromotionsMerged(
+  creds: LocalPromotionCredentials,
+): Promise<{ ok: true; rows: Record<string, unknown>[] } | { ok: false; message: string }> {
+  const projects = await listLocalByMarketingGoals(
+    creds,
+    '/open_api/v3.0/local/project/list/',
+    ['project_list', 'list'],
+    'project_status_first',
+    'PROJECT_STATUS_ALL',
+  )
+  const projectRows = projects.ok ? projects.rows : []
+  const projectGoal = new Map<string, string>()
+  const projectById = new Map<string, Record<string, unknown>>()
+  for (const p of projectRows) {
+    const id = String(p.project_id ?? p.id ?? '')
+    if (!id) continue
+    projectGoal.set(id, pickLocalMarketingGoal(p))
+    projectById.set(id, p)
+  }
+
+  const fromGlobal = await listLocalByMarketingGoals(
+    creds,
+    '/open_api/v3.0/local/promotion/list/',
+    ['promotion_list', 'list'],
+    'promotion_status_first',
+    'PROMOTION_STATUS_ALL',
+  )
+  const seen = new Set<string>()
+  const merged: Record<string, unknown>[] = []
+  const pushPromo = (row: Record<string, unknown>, fallbackGoal = '') => {
+    const id = String(row.promotion_id ?? row.id ?? '')
+    if (!id || seen.has(id)) return
+    seen.add(id)
+    const pid = String(row.project_id ?? '')
+    const goal =
+      pickLocalMarketingGoal(row) ||
+      (pid ? projectGoal.get(pid) ?? '' : '') ||
+      fallbackGoal
+    merged.push({
+      ...row,
+      promotion_id: id,
+      project_id: pid,
+      marketing_goal: goal || row.marketing_goal,
+    })
+  }
+
+  if (fromGlobal.ok) {
+    for (const row of fromGlobal.rows) pushPromo(row)
+  }
+
+  const coveredProjects = new Set(
+    merged.map((r) => String(r.project_id ?? '')).filter(Boolean),
+  )
+  const projectIds = [...projectById.keys()].slice(0, 40)
+  for (const pid of projectIds) {
+    if (coveredProjects.has(pid)) continue
+    const child = await listPromotionsByProjectId(creds, pid)
+    const fallback = projectGoal.get(pid) ?? ''
+    for (const row of child) pushPromo(row, fallback)
+    if (child.length) coveredProjects.add(pid)
+  }
+
+  for (const pid of projectIds) {
+    if (merged.some((r) => String(r.project_id ?? '') === pid)) continue
+    const p = projectById.get(pid)
+    if (!p) continue
+    const status = String(p.project_status_first ?? p.project_status ?? p.status ?? '')
+    pushPromo(
+      {
+        promotion_id: pid,
+        promotion_name: String(p.project_name ?? p.name ?? '自动投放项目'),
+        project_id: pid,
+        project_name: String(p.project_name ?? p.name ?? ''),
+        promotion_status_first: projectStatusAsPromotion(status),
+        marketing_goal: projectGoal.get(pid) ?? '',
+        budget: p.budget,
+        create_time: p.create_time,
+      },
+      projectGoal.get(pid) ?? '',
+    )
+  }
+
+  if (merged.length) return { ok: true, rows: merged }
+  if (!fromGlobal.ok) return fromGlobal
   return { ok: true, rows: [] }
 }
 
