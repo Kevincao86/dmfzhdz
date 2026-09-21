@@ -555,6 +555,44 @@ export async function updatePromotionStatus(
   return { ok: true }
 }
 
+export async function updateProjectStatus(
+  projectIds: string[],
+  optStatus: 'ENABLE' | 'PAUSED',
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const creds = credsPayload()
+  if (!creds) return { ok: false, message: '请先在系统设置中绑定巨量本地推' }
+  const r = await requestJson<{ ok?: boolean }>(
+    `${apiBase()}/api/merchant/local-promotion/projects/status`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...creds, project_ids: projectIds, opt_status: optStatus }),
+    },
+    '更新项目状态',
+  )
+  if (!r.ok) return r
+  return { ok: true }
+}
+
+export async function updateProjectBudget(
+  projectId: string,
+  budgetYuan: number,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const creds = credsPayload()
+  if (!creds) return { ok: false, message: '请先在系统设置中绑定巨量本地推' }
+  const r = await requestJson<{ ok?: boolean }>(
+    `${apiBase()}/api/merchant/local-promotion/projects/budget`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...creds, project_id: projectId, budget_yuan: budgetYuan }),
+    },
+    '更新项目预算',
+  )
+  if (!r.ok) return r
+  return { ok: true }
+}
+
 export async function fetchLocalReportSummary(): Promise<
   | { ok: true; summary: LocalReportSummary; demoMode?: boolean; apiError?: string }
   | { ok: false; message: string }
@@ -665,7 +703,7 @@ export async function postAdAiInsight(input: {
     {
       method: 'POST',
       headers: await merchantAuthJsonHeaders(),
-      body: JSON.stringify(input),
+      body: JSON.stringify({ ...(credsPayload() ?? {}), ...input }),
     },
     '投流分析',
   )

@@ -536,6 +536,60 @@ export async function handleLocalPromotionRoutes(
     return true
   }
 
+  if (method === 'POST' && pathname === '/api/merchant/local-promotion/projects/status') {
+    const j = parseBody(bodyRaw)
+    const rawCreds = credsFromBody(j)
+    if (!rawCreds) {
+      json(res, 400, { ok: false, message: '请先绑定本地推' })
+      return true
+    }
+    const creds = await resolveLocalPromotionCreds(rawCreds)
+    const ids = Array.isArray(j.project_ids) ? j.project_ids.map(String) : []
+    const rawOpt = String(j.opt_status ?? 'ENABLE').toUpperCase()
+    const optStatus = rawOpt === 'DISABLE' || rawOpt === 'PAUSE' || rawOpt === 'PAUSED' ? 'PAUSED' : 'ENABLE'
+    if (ids.length === 0) {
+      json(res, 400, { ok: false, message: '缺少 project_ids' })
+      return true
+    }
+    const pr = await oceanPost(creds, '/open_api/v3.0/local/project/status/update/', {
+      local_account_id: creds.localAccountId,
+      data: ids.map((project_id) => ({ project_id, opt_status: optStatus })),
+    })
+    if (!pr.ok) {
+      json(res, 502, { ok: false, message: pr.message })
+      return true
+    }
+    json(res, 200, { ok: true })
+    return true
+  }
+
+  if (method === 'POST' && pathname === '/api/merchant/local-promotion/projects/budget') {
+    const j = parseBody(bodyRaw)
+    const rawCreds = credsFromBody(j)
+    if (!rawCreds) {
+      json(res, 400, { ok: false, message: '请先绑定本地推' })
+      return true
+    }
+    const creds = await resolveLocalPromotionCreds(rawCreds)
+    const projectId = String(j.project_id ?? '')
+    const budgetYuan = Number(j.budget_yuan ?? j.budgetYuan ?? 0)
+    if (!projectId || !Number.isFinite(budgetYuan) || budgetYuan <= 0) {
+      json(res, 400, { ok: false, message: '缺少 project_id 或日预算' })
+      return true
+    }
+    const pr = await oceanPost(creds, '/open_api/v3.0/local/project/update/', {
+      local_account_id: creds.localAccountId,
+      project_id: projectId,
+      budget: Math.round(budgetYuan * 100),
+    })
+    if (!pr.ok) {
+      json(res, 502, { ok: false, message: pr.message })
+      return true
+    }
+    json(res, 200, { ok: true, budgetYuan })
+    return true
+  }
+
   if (
     (method === 'GET' || method === 'POST') &&
     pathname === '/api/merchant/local-promotion/report/summary'
@@ -720,10 +774,22 @@ export async function handleLocalPromotionRoutes(
       return true
     }
     const { insight, actions } = parseAdInsightResponse(aiRes.text)
+    let finalInsight = insight
+    let finalActions = actions
+    if (mode === 'full_ai') {
+      const rawCreds = credsFromBody(j)
+      const applied = rawCreds
+        ? await applyFullAiLocalWrites(rawCreds, promotions, aiRes.text)
+        : { lines: ['未带本地推绑定，无法写入巨量。'] }
+      if (applied.lines.length) {
+        finalInsight = `${insight}\n\n④ 已对巨量执行\n${applied.lines.map((x) => `- ${x}`).join('\n')}`
+      }
+      finalActions = []
+    }
     json(res, 200, {
       ok: true,
-      insight,
-      actions,
+      insight: finalInsight,
+      actions: finalActions,
       pointsCharged: aiRes.pointsCharged,
       pointsBalance: aiRes.pointsBalance,
     })
@@ -1042,6 +1108,143 @@ function asRecordList(data: Record<string, unknown> | undefined, ...keys: string
   return []
 }
 
+function parseLocalActionRows(raw: string): Array<Record<string, unknown>> {
+  const markerIdx = raw.indexOf(AD_INSIGHT_ACTIONS_MARKER)
+  if (markerIdx < 0) return []
+  const tail = raw.slice(markerIdx + AD_INSIGHT_ACTIONS_MARKER.length).trim()
+  const jsonStart = tail.indexOf('[')
+  if (jsonStart < 0) return []
+  try {
+    const arr = JSON.parse(tail.slice(jsonStart)) as unknown
+    return Array.isArray(arr)
+      ? arr.filter((x) => x && typeof x === 'object') as Array<Record<string, unknown>>
+      : []
+  } catch {
+    return []
+  }
+}
+
+function isAutoDeliveryPlan(p: Record<string, unknown>): boolean {
+  const promoId = String(p.promotionId ?? p.promotion_id ?? '')
+  const projectId = String(p.projectId ?? p.project_id ?? '')
+  const name = String(p.promotionName ?? p.promotion_name ?? p.projectName ?? '')
+  return Boolean(projectId && promoId && promoId === projectId) || name.includes('自动投放')
+}
+
+function planMetrics(p: Record<string, unknown>) {
+  return {
+    statCost: Number(p.statCost ?? p.stat_cost ?? 0) || 0,
+    showCnt: Number(p.showCnt ?? p.show_cnt ?? 0) || 0,
+    clickCnt: Number(p.clickCnt ?? p.click_cnt ?? 0) || 0,
+    convertCnt: Number(p.convertCnt ?? p.convert_cnt ?? 0) || 0,
+    budgetYuan: Number(p.budgetYuan ?? p.budget_yuan ?? 0) || 0,
+  }
+}
+
+function inLearningHold(p: Record<string, unknown>): boolean {
+  const m = planMetrics(p)
+  if (m.statCost > 0 && m.statCost < 50 && m.convertCnt === 0) return true
+  if (m.showCnt > 0 && m.clickCnt === 0 && m.statCost < 30) return true
+  return false
+}
+
+function clampBudgetYuan(current: number, suggested: number): number {
+  const base = current > 0 ? current : 300
+  const lo = Math.max(100, Math.round(base * 0.8))
+  const hi = Math.min(5000, Math.round(base * 1.2))
+  const n = Math.round(suggested)
+  return Math.min(hi, Math.max(lo, n))
+}
+
+async function applyFullAiLocalWrites(
+  rawCreds: LocalPromotionCredentials,
+  promotions: unknown[],
+  insightRaw: string,
+): Promise<{ lines: string[] }> {
+  const creds = await resolveLocalPromotionCreds(rawCreds)
+  const plans = (promotions ?? []) as Array<Record<string, unknown>>
+  const byPromo = new Map(plans.map((p) => [String(p.promotionId ?? p.promotion_id ?? ''), p]))
+  const byProject = new Map(plans.map((p) => [String(p.projectId ?? p.project_id ?? ''), p]))
+  const rows = parseLocalActionRows(insightRaw)
+  const lines: string[] = []
+  const seen = new Set<string>()
+
+  const run = async (key: string, label: string, fn: () => Promise<{ ok: boolean; message?: string }>) => {
+    if (seen.has(key)) return
+    seen.add(key)
+    const r = await fn()
+    lines.push(r.ok ? label : `${label}失败：${r.message ?? '巨量拒绝'}`)
+  }
+
+  for (const row of rows) {
+    const promoId = String(row.promotionId ?? row.promotion_id ?? '').trim()
+    const projectId = String(row.projectId ?? row.project_id ?? promoId).trim()
+    const plan = byPromo.get(promoId) || byProject.get(projectId)
+    const opt = String(row.optStatus ?? row.actionType ?? '').toUpperCase()
+    const suggestedBudget = Number(row.budgetYuan ?? row.budget_yuan ?? 0)
+    const auto = plan ? isAutoDeliveryPlan(plan) : Boolean(projectId && promoId && projectId === promoId)
+
+    if ((opt === 'BUDGET' || suggestedBudget > 0) && projectId) {
+      if (plan && inLearningHold(plan)) {
+        lines.push(`学习期未改日预算（项目 ${projectId} 保持观察）`)
+        continue
+      }
+      const current = plan ? planMetrics(plan).budgetYuan : 0
+      const next = clampBudgetYuan(current, suggestedBudget || current)
+      if (current > 0 && next === current) {
+        lines.push(`日预算保持 ¥${current}（项目 ${projectId}）`)
+        continue
+      }
+      await run(`budget:${projectId}`, `日预算 ¥${current || '—'} → ¥${next}`, async () => {
+        const pr = await oceanPost(creds, '/open_api/v3.0/local/project/update/', {
+          local_account_id: creds.localAccountId,
+          project_id: projectId,
+          budget: Math.round(next * 100),
+        })
+        return pr.ok ? { ok: true } : { ok: false, message: pr.message }
+      })
+      continue
+    }
+
+    if (auto && (opt === 'ENABLE' || opt === 'PAUSED' || opt === 'DISABLE' || opt === 'PAUSE')) {
+      if (opt !== 'ENABLE' && plan && inLearningHold(plan)) {
+        lines.push(`学习期未暂停自动投放项目 ${projectId}`)
+        continue
+      }
+      const status = opt === 'ENABLE' ? 'ENABLE' : 'PAUSED'
+      await run(`pstatus:${projectId}:${status}`, `项目${status === 'ENABLE' ? '启用' : '暂停'} ${projectId}`, async () => {
+        const pr = await oceanPost(creds, '/open_api/v3.0/local/project/status/update/', {
+          local_account_id: creds.localAccountId,
+          data: [{ project_id: projectId, opt_status: status }],
+        })
+        return pr.ok ? { ok: true } : { ok: false, message: pr.message }
+      })
+      continue
+    }
+
+    if (!auto && promoId && (opt === 'ENABLE' || opt === 'DISABLE')) {
+      await run(`promo:${promoId}:${opt}`, `广告${opt === 'ENABLE' ? '启用' : '暂停'} ${promoId}`, async () => {
+        const pr = await oceanPost(creds, '/open_api/v3.0/local/promotion/status/update/', {
+          local_account_id: creds.localAccountId,
+          promotion_ids: [promoId],
+          opt_status: opt,
+        })
+        return pr.ok ? { ok: true } : { ok: false, message: pr.message }
+      })
+    }
+  }
+
+  if (!lines.length) {
+    const autoPlans = plans.filter(isAutoDeliveryPlan)
+    if (autoPlans.some(inLearningHold)) {
+      lines.push('学习期未改巨量参数：保持投放，继续观察点击与转化')
+    } else if (!rows.length) {
+      lines.push('本轮无写入：模型未给出可执行的预算/启停动作')
+    }
+  }
+  return { lines }
+}
+
 function buildLocalPromotionInsightPrompt(input: {
   pane: string
   mode: string
@@ -1058,40 +1261,47 @@ function buildLocalPromotionInsightPrompt(input: {
   }
   const paneLabel = paneLabels[input.pane] ?? '投流'
   const plans = (input.promotions ?? []) as Array<Record<string, unknown>>
-  const autoPlans = plans.filter(
-    (p) =>
-      String(p.promotionName ?? p.promotion_name ?? '').includes('自动投放') ||
-      String(p.promotionId ?? '') === String(p.projectId ?? ''),
-  )
-  const spend = Number(input.summary?.statCost ?? 0)
-  const show = Number(input.summary?.showCnt ?? 0)
-  const convert = Number(input.summary?.convertCnt ?? 0)
+  const autoPlans = plans.filter(isAutoDeliveryPlan)
+  const spend = plans.reduce((s, p) => s + (Number(p.statCost ?? 0) || 0), 0) || Number(input.summary?.statCost ?? 0)
+  const show = plans.reduce((s, p) => s + (Number(p.showCnt ?? 0) || 0), 0) || Number(input.summary?.showCnt ?? 0)
+  const convert = plans.reduce((s, p) => s + (Number(p.convertCnt ?? 0) || 0), 0) || Number(input.summary?.convertCnt ?? 0)
+  const click = plans.reduce((s, p) => s + (Number(p.clickCnt ?? 0) || 0), 0)
   const clues = input.clues.length
-  const liveDelivering = plans.filter((p) => String(p.statusFirst ?? '').includes('ENABLE')).length
+  const delivering = plans.filter((p) => String(p.statusFirst ?? '').includes('ENABLE')).length
+  const isolation =
+    input.pane === 'video'
+      ? '本板块只讨论短视频/图文。禁止出现直播、进直播间、直播消耗、直播计划。数字只来自下方短视频计划。'
+      : input.pane === 'live'
+        ? '本板块只讨论直播间投流。禁止出现短视频完播、图文、短视频计划。数字只来自下方直播计划。'
+        : '整体分析必须分「短视频」「直播」两段写，禁止把两类消耗、展示、转化加总后当成单一渠道。'
 
   const system = `你是巨量本地推操盘手。必须基于给定数字说话，禁止编造消耗/展示/转化。
 当前板块：${paneLabel}。模式：${input.mode}。
+硬性隔离：${isolation}
 规则：
-1. 名称含「自动投放」或计划ID=项目ID：这是自动投放项目，不要建议「启用/暂停广告ID」，改建议预算、高峰日预算、素材、门店/商品、学习期观察。
-2. 消耗为0且状态投放中：优先排查审核、预算过低、学习期、定向过窄、短视频素材未过审，不要说「效果差」。
-3. 短视频看完播/点击/转化；直播看进入直播间与停留。给可执行动作，每条不超过2行。
+1. 名称含「自动投放」或计划ID=项目ID：用项目预算/项目启停，不要对项目ID调用广告启停。
+2. 消耗低、有展示无点击：视为学习期或素材/定向问题，不要大额加预算，不要轻易暂停。
+3. 短视频看展示/点击/转化；直播看进入直播间与停留。动作每条不超过2行。
 4. 不要输出 Markdown 标题堆砌。`
 
-  const actionHint =
-    input.mode === 'auto_adjust'
-      ? `\n文末单独一行 ${AD_INSIGHT_ACTIONS_MARKER} 后接 JSON 数组。仅对真实广告（计划ID≠项目ID）给 ENABLE/DISABLE，最多3条。自动投放项目不要进数组。`
-      : ''
+  const needActions = input.mode === 'full_ai' || input.mode === 'auto_adjust'
+  const actionHint = needActions
+    ? `\n文末单独一行 ${AD_INSIGHT_ACTIONS_MARKER} 后接 JSON 数组，最多3条，且必须属于本板块计划。
+真实广告：{"promotionId":"...","optStatus":"ENABLE或DISABLE","reason":"..."}
+自动投放项目：{"projectId":"...","optStatus":"BUDGET或ENABLE或PAUSED","budgetYuan":数字,"reason":"..."}
+学习期不要给 PAUSED。预算调整幅度建议在现预算 ±20% 内。${input.mode === 'full_ai' ? '全面介入将把这些动作直接写入巨量。' : '自动调计划需商家确认后再写。'}`
+    : ''
 
-  const user = `近7日账户：消耗 ${spend} 元，展示 ${show}，转化 ${convert}，线索 ${clues} 条，在投 ${liveDelivering} 条。
+  const user = `本板块近7日：消耗 ${spend} 元，展示 ${show}，点击 ${click}，转化 ${convert}，线索 ${clues} 条，在投 ${delivering} 条。
 自动投放项目数：${autoPlans.length}。
-分渠道：${JSON.stringify(input.channelStats).slice(0, 1400)}
-计划明细（含预算/消耗/展示/转化/状态）：${JSON.stringify(plans).slice(0, 3500)}
-线索：${JSON.stringify(input.clues).slice(0, 600)}
+本板块统计：${JSON.stringify(input.channelStats).slice(0, 1200)}
+本板块计划明细：${JSON.stringify(plans).slice(0, 3500)}
+本板块线索：${JSON.stringify(input.clues).slice(0, 500)}
 
 请输出：
-① 现状（是否在花钱、有无展示）
-② 本板块 3 条优先动作（预算/素材/定向/时段）
-③ 若数据为 0：给出 24 小时观察清单，不要空喊加大预算。${actionHint}`
+① 现状（是否在花钱、有无展示；仅本板块）
+② 本板块 3 条优先动作
+③ 若学习期：写清观察项，不要空喊加大预算。${actionHint}`
 
   return { system, user }
 }

@@ -27,6 +27,7 @@ import {
   fetchLocalReportSummary,
   postAdAiInsight,
   updatePromotionStatus,
+  updateProjectStatus,
 } from '../../services/localPromotionApi'
 import {
   fetchLocalClues as fetchQianchuanClues,
@@ -202,7 +203,7 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
     [classifiedPromotions],
   )
   const videoPromotions = useMemo(
-    () => classifiedPromotions.filter((p) => classifyMarketingGoal(p.marketingGoal) !== 'live'),
+    () => filterPromotionsByChannel(classifiedPromotions, 'video'),
     [classifiedPromotions],
   )
   const liveProjects = useMemo(
@@ -210,7 +211,7 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
     [classifiedProjects],
   )
   const videoProjects = useMemo(
-    () => classifiedProjects.filter((p) => classifyMarketingGoal(p.marketingGoal) !== 'live'),
+    () => filterProjectsByChannel(classifiedProjects, 'video'),
     [classifiedProjects],
   )
   const channelStats = useMemo(
@@ -252,11 +253,39 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
             : targetPane === 'video'
               ? videoPromotions
               : classifiedPromotions
+        const paneChannelStats =
+          targetPane === 'live'
+            ? channelStats.filter((s) => s.channel === 'live')
+            : targetPane === 'video'
+              ? channelStats.filter((s) => s.channel === 'video')
+              : channelStats
+        const promoNames = new Set(promos.map((p) => p.promotionName).filter(Boolean))
+        const paneClues =
+          targetPane === 'live' || targetPane === 'video'
+            ? clues.filter((c) => !c.promotionName || promoNames.has(c.promotionName ?? ''))
+            : clues
+        const paneSummary = {
+          ...(summary ?? {
+            statCost: 0,
+            showCnt: 0,
+            clickCnt: 0,
+            convertCnt: 0,
+            ctr: 0,
+            dateRange: { start: '', end: '' },
+          }),
+          statCost: promos.reduce((s, p) => s + (p.statCost ?? 0), 0),
+          showCnt: promos.reduce((s, p) => s + (p.showCnt ?? 0), 0),
+          clickCnt: promos.reduce((s, p) => s + (p.clickCnt ?? 0), 0),
+          convertCnt: promos.reduce((s, p) => s + (p.convertCnt ?? 0), 0),
+          ctr: 0,
+        }
+        const showCnt = paneSummary.showCnt
+        paneSummary.ctr = showCnt > 0 ? Math.round((paneSummary.clickCnt / showCnt) * 10000) / 100 : 0
         const r = await (platform === 'qianchuan' ? postQianchuanAdAiInsight : postAdAiInsight)({
-          summary,
+          summary: paneSummary,
           promotions: promos,
-          clues,
-          channelStats,
+          clues: paneClues,
+          channelStats: paneChannelStats,
           pane: targetPane,
           mode: effectiveMode,
         })
@@ -305,9 +334,10 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
     const cur = paneAi[pane]
     if (cur.busy || cur.insight) return
     if (loading) return
-    if (pane !== 'leads' && classifiedPromotions.length === 0) return
+    const paneCount = pane === 'live' ? livePromotions.length : pane === 'video' ? videoPromotions.length : classifiedPromotions.length
+    if (pane !== 'leads' && paneCount === 0) return
     void runPaneAi(pane)
-  }, [pane, aiMode, loading, paneAi, runPaneAi, classifiedPromotions.length])
+  }, [pane, aiMode, loading, paneAi, runPaneAi, classifiedPromotions.length, livePromotions.length, videoPromotions.length])
 
   const handlePaneChange = (next: LocalPane) => {
     setPane(next)
@@ -372,7 +402,21 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
 
   const togglePromotion = async (row: LocalPromotionRow, enable: boolean) => {
     if (row.promotionId && row.projectId && row.promotionId === row.projectId) {
-      window.alert('该条来自自动投放项目，请在巨量本地推后台管理广告计划。')
+      if (platform !== 'local_promotion') {
+        window.alert('该条来自自动投放项目，请在巨量本地推后台管理广告计划。')
+        return
+      }
+      setStatusBusy(row.promotionId)
+      try {
+        const r = await updateProjectStatus([row.projectId], enable ? 'ENABLE' : 'PAUSED')
+        if (!r.ok) {
+          window.alert(r.message)
+          return
+        }
+        await reload()
+      } finally {
+        setStatusBusy(null)
+      }
       return
     }
     setStatusBusy(row.promotionId)
