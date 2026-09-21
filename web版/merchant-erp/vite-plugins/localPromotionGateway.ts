@@ -17,6 +17,12 @@ import { fetchAuthorizedAdvertisers, listEbpLocalAdvertisers } from './localProm
 
 const OE_BASE = (process.env.OCEANENGINE_API_BASE ?? 'https://api.oceanengine.com').replace(/\/$/, '')
 
+/** 投流 AI 与对话/智能体共用运营台 vendorKeys，不能只读轻量 process.env */
+async function resolveLocalAdAiEnv(aiEnv: MerchantAiEnv): Promise<MerchantAiEnv> {
+  const { mergeMerchantAiEnvWithRegistrySnapshot } = await import('./merchantRegistryVendorEnv.js')
+  return mergeMerchantAiEnvWithRegistrySnapshot(process.cwd(), aiEnv)
+}
+
 function mapOceanError(raw: string, status?: number, code?: number): string {
   const s = raw.trim()
   const lower = s.toLowerCase()
@@ -652,14 +658,15 @@ export async function handleLocalPromotionRoutes(
     const promotionName = String(j.promotionName ?? '本地推广告')
     const convertState = String(j.convertStateLabel ?? j.convertState ?? '新线索')
     const storeName = String(j.storeName ?? '本店')
+    const mergedEnv = await resolveLocalAdAiEnv(aiEnv)
     const adOut = await generateAdvertisingAiTextBilled(
-      aiEnv,
+      mergedEnv,
       {
         system:
           '你是本地生活商家线索跟进顾问。请用中文输出简短礼貌的跟进话术，80字以内，不要编造具体优惠金额。',
         user: `线索状态：${convertState}。来源广告：${promotionName}。联系电话：${phone}。门店：${storeName}。顾客：${name}。`,
       },
-      billing,
+      { ...billing, env: mergedEnv as Record<string, string> },
       '本地推线索话术 AI',
     )
     if (adOut.blocked) {
@@ -696,10 +703,11 @@ export async function handleLocalPromotionRoutes(
       clues,
       channelStats,
     })
+    const mergedEnv = await resolveLocalAdAiEnv(aiEnv)
     const adOut = await generateAdvertisingAiTextBilled(
-      aiEnv,
+      mergedEnv,
       { system, user },
-      billing,
+      { ...billing, env: mergedEnv as Record<string, string> },
       '本地推广告洞察 AI',
     )
     if (adOut.blocked) {
