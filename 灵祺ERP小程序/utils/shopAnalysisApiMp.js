@@ -83,6 +83,7 @@ function requestShop(method, path, data, timeoutMs) {
             Accept: 'application/json',
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
+            'X-Meoo-Access-Token': token,
           },
           authHeadersExtra(),
         ),
@@ -94,8 +95,11 @@ function requestShop(method, path, data, timeoutMs) {
             resolve(body)
             return
           }
+          const raw = body.message || body.detail || body.error || `请求失败 ${res.statusCode}`
           const msg =
-            body.message || body.detail || body.error || `请求失败 ${res.statusCode}`
+            raw === 'unauthorized' || raw === 'invalid_token' || raw === 'missing_token'
+              ? '登录凭证无效，请退出后重新登录'
+              : raw
           reject(new Error(typeof msg === 'string' ? msg : JSON.stringify(msg)))
         },
         fail(err) {

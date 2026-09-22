@@ -35,6 +35,17 @@
   box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.04);
 }
 
+.sm-name-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 16rpx;
+}
+
+.sm-name-field {
+  flex: 1;
+  min-width: 0;
+}
+
 .sm-label {
   display: block;
   font-size: 22rpx;
@@ -51,6 +62,32 @@
   border-radius: 16rpx;
   font-size: 28rpx;
   color: #0f172a;
+}
+
+.sm-btn.save-name {
+  margin-bottom: 12rpx !important;
+  flex-shrink: 0;
+  padding: 0 28rpx !important;
+}
+
+.sm-tools {
+  display: flex;
+  gap: 12rpx;
+  margin-bottom: 8rpx;
+}
+
+.sm-tool {
+  flex: 1;
+  text-align: center;
+  padding: 16rpx 8rpx;
+  border-radius: 16rpx;
+  background: #f1f5f9;
+  font-size: 22rpx;
+  color: #334155;
+}
+
+.sm-tool-t {
+  font-weight: 600;
 }
 
 .sm-row-btns {
@@ -77,7 +114,7 @@
 
 .sm-meta {
   display: block;
-  margin-top: 12rpx;
+  margin-top: 4rpx;
   font-size: 20rpx;
   color: #94a3b8;
 }
@@ -86,7 +123,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12rpx;
+  margin-bottom: 16rpx;
 }
 
 .sm-card-title {
@@ -105,6 +142,7 @@
 .sm-item {
   display: flex;
   align-items: center;
+  gap: 12rpx;
   padding: 18rpx 0;
   border-top: 1rpx solid #f1f5f9;
 }
@@ -114,23 +152,33 @@
   min-width: 0;
 }
 
+.sm-cat {
+  display: inline-block;
+  margin-right: 8rpx;
+  padding: 0 10rpx;
+  border-radius: 8rpx;
+  background: #ecfeff;
+  font-size: 20rpx;
+  color: #0e7490;
+}
+
 .sm-item-name {
-  display: block;
   font-size: 28rpx;
   color: #0f172a;
   font-weight: 600;
 }
 
 .sm-item-price {
-  display: block;
-  margin-top: 4rpx;
-  font-size: 24rpx;
+  flex-shrink: 0;
+  font-size: 28rpx;
+  font-weight: 700;
   color: #0891b2;
 }
 
 .sm-del {
-  padding: 8rpx 16rpx;
-  font-size: 24rpx;
+  flex-shrink: 0;
+  padding: 8rpx 8rpx;
+  font-size: 22rpx;
   color: #dc2626;
 }
 

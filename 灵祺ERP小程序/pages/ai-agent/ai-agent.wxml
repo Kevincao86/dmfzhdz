@@ -22,7 +22,11 @@
   >
     <text class="empty-title">今天要处理哪件事？</text>
     <text class="empty-sub">点快捷任务或直接输入，规则与商家后台助手一致</text>
-    <view class="shortcut-grid">
+    <view class="shortcut-fold" bindtap="onToggleShortcuts">
+      <text class="shortcut-fold-t">{{shortcutsCollapsed ? '快捷任务 · 展开' : '快捷任务 · 收起'}}</text>
+      <text class="shortcut-fold-n">{{shortcuts.length}}</text>
+    </view>
+    <view wx:if="{{!shortcutsCollapsed}}" class="shortcut-grid">
       <view
         wx:for="{{shortcuts}}"
         wx:key="type"

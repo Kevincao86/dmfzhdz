@@ -2,7 +2,7 @@
  * GET /api/meoo-shop-analysis-summary?startDate=&endDate=&platform=&marginPercent=
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { verifyBearerJwt } from '../vite-plugins/aiGateway/authSupabase.js'
+import { readRequestBearer, verifyAccessToken } from '../vite-plugins/aiGateway/authSupabase.js'
 import { loadTenantAiContextForUser } from '../vite-plugins/tenantMembershipCore.js'
 import {
   buildShopAdviceFacts,
@@ -15,12 +15,6 @@ function sendJson(res: VercelResponse, status: number, body: Record<string, unkn
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.status(status).send(JSON.stringify(body))
-}
-
-function bearer(authHeader: string | undefined): string | undefined {
-  return typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
-    ? authHeader.slice(7).trim()
-    : undefined
 }
 
 function shanghaiTodayYmd(): string {
@@ -37,7 +31,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     if (req.method === 'OPTIONS') {
       res.setHeader('Access-Control-Allow-Origin', '*')
       res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+      res.setHeader(
+        'Access-Control-Allow-Headers',
+        'Content-Type, Authorization, X-Meoo-Access-Token, X-Meoo-Douyin-Token',
+      )
       res.status(204).end()
       return
     }
@@ -45,21 +42,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendJson(res, 405, { ok: false, error: 'method_not_allowed' })
       return
     }
-    const token = bearer(req.headers.authorization)
+    const token = readRequestBearer(req.headers as Record<string, unknown>)
     if (!token) {
-      sendJson(res, 401, { ok: false, error: 'unauthorized' })
+      sendJson(res, 401, { ok: false, error: 'unauthorized', detail: 'missing_token' })
       return
     }
     const env = process.env as Record<string, string>
-    let user: Awaited<ReturnType<typeof verifyBearerJwt>>
+    let user: Awaited<ReturnType<typeof verifyAccessToken>>
     try {
-      user = await verifyBearerJwt(`Bearer ${token}`, env)
+      user = await verifyAccessToken(token, env)
     } catch {
-      sendJson(res, 401, { ok: false, error: 'unauthorized' })
+      sendJson(res, 401, { ok: false, error: 'unauthorized', detail: 'invalid_token' })
       return
     }
     if (!user?.id) {
-      sendJson(res, 401, { ok: false, error: 'unauthorized' })
+      sendJson(res, 401, { ok: false, error: 'unauthorized', detail: 'invalid_token' })
       return
     }
     const ctx = await loadTenantAiContextForUser(user.id, env)

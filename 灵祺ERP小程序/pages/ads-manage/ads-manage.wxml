@@ -24,6 +24,32 @@
   </view>
   <text wx:if="{{bindHint}}" class="ads-bind-hint">{{bindHint}}</text>
 
+  <view class="ads-ai-card">
+    <view class="ads-pane-row">
+      <view
+        wx:for="{{aiPanes}}"
+        wx:key="id"
+        class="ads-pane {{aiPane === item.id ? 'on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onAiPane"
+      >{{item.label}}</view>
+    </view>
+    <view class="ads-mode-row">
+      <view
+        wx:for="{{aiModes}}"
+        wx:key="id"
+        class="ads-mode {{aiMode === item.id ? 'on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onAiMode"
+      >{{item.label}}</view>
+    </view>
+    <view wx:if="{{aiMode !== 'manual'}}" class="ads-ai-actions">
+      <button class="ads-ai-run" size="mini" loading="{{aiBusy}}" bindtap="runAiInsight">生成分析</button>
+    </view>
+    <text wx:if="{{aiInsight}}" class="ads-ai-insight">{{aiInsight}}</text>
+    <text wx:elif="{{aiMode !== 'manual'}}" class="ads-ai-placeholder">与电脑端同源：选板块后生成投流建议，自动调计划需人工确认后再启停。</text>
+  </view>
+
   <view class="ads-today-card">
     <view class="ads-today-head">
       <text class="ads-today-title">今日数据</text>

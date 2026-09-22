@@ -68,6 +68,7 @@ function enrichAdRow(item) {
     duration: item.duration || '—',
     actionLabel: st.key === 'paused' ? '继续投放' : '暂停',
     thumb: item.thumb || '',
+    marketingGoal: item.marketingGoal || '',
   }
 }
 

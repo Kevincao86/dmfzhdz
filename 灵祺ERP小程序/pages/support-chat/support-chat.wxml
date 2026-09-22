@@ -11,7 +11,7 @@
   <scroll-view scroll-y class="chat-v2 tall" scroll-into-view="{{scrollTo}}" enhanced show-scrollbar="{{false}}">
     <view wx:for="{{messages}}" wx:key="id" id="msg-{{item.id}}" class="msg {{item.role === 'user' ? 'user' : 'bot'}}">
       <image wx:if="{{item.role !== 'user'}}" class="ava ava-ai-img" src="{{logoSrc}}" mode="aspectFit" />
-      <view class="bubble-v2 {{item.role === 'user' ? 'user' : ''}}"><text user-select>{{item.content}}</text></view>
+      <view class="bubble-v2 {{item.role === 'user' ? 'user' : ''}}"><text user-select>{{item.text || item.content}}</text></view>
       <text wx:if="{{item.role === 'user'}}" class="ava ava-me">我</text>
     </view>
   </scroll-view>

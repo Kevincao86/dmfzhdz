@@ -13,13 +13,51 @@ function looksLikeJwt(token: string): boolean {
   return token.split('.').length === 3
 }
 
+function readJwtSecrets(env: Record<string, string>): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of [env.SUPABASE_JWT_SECRET, env.GOTRUE_JWT_SECRET, env.JWT_SECRET]) {
+    const s = String(raw ?? '').trim()
+    if (!s || seen.has(s)) continue
+    seen.add(s)
+    out.push(s)
+  }
+  return out
+}
+
 function readJwtSecret(env: Record<string, string>): string {
-  return (
-    env.SUPABASE_JWT_SECRET ??
-    env.GOTRUE_JWT_SECRET ??
-    env.JWT_SECRET ??
-    ''
-  ).trim()
+  return readJwtSecrets(env)[0] ?? ''
+}
+
+function headerText(
+  headers: Record<string, unknown> | undefined,
+  key: string,
+): string {
+  if (!headers) return ''
+  const lower = key.toLowerCase()
+  for (const [k, v] of Object.entries(headers)) {
+    if (k.toLowerCase() !== lower) continue
+    if (typeof v === 'string') return v
+    if (Array.isArray(v) && typeof v[0] === 'string') return v[0]
+  }
+  return ''
+}
+
+/** 小程序偶发不带 Authorization，同时认自定义头与 body.access_token */
+export function readRequestBearer(
+  headers: Record<string, unknown> | undefined,
+  body?: Record<string, unknown> | null,
+): string {
+  const raw =
+    headerText(headers, 'authorization') ||
+    headerText(headers, 'x-meoo-access-token') ||
+    headerText(headers, 'x-access-token')
+  let token = raw.replace(/^Bearer\s+/i, '').trim()
+  if (!token && body && typeof body === 'object') {
+    const b = body
+    token = String(b.access_token ?? b.accessToken ?? '').trim()
+  }
+  return token
 }
 
 function base64UrlDecode(input: string): Buffer {
@@ -55,7 +93,7 @@ function verifyHs256JwtLocally(
   }
   if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) return null
 
-  let payload: { sub?: string; email?: string; role?: string; exp?: number }
+  let payload: { sub?: string; user_id?: string; email?: string; role?: string; exp?: number }
   try {
     payload = JSON.parse(base64UrlDecode(payloadB64).toString('utf8')) as typeof payload
   } catch {
@@ -63,10 +101,11 @@ function verifyHs256JwtLocally(
   }
 
   if (typeof payload.exp === 'number' && payload.exp * 1000 < Date.now() - 30_000) return null
-  const role = typeof payload.role === 'string' ? payload.role : ''
-  if (role && role !== 'authenticated') return null
+  const role = typeof payload.role === 'string' ? payload.role.trim() : ''
+  if (role === 'anon' || role === 'service_role') return null
 
-  const id = typeof payload.sub === 'string' && payload.sub.trim() ? payload.sub.trim() : ''
+  const idRaw = payload.sub ?? payload.user_id
+  const id = typeof idRaw === 'string' && idRaw.trim() ? idRaw.trim() : ''
   if (!id) return null
   return {
     id,
@@ -107,15 +146,25 @@ async function verifyBearerJwtViaAuthApi(
   return { id, email: typeof j.email === 'string' ? j.email : undefined }
 }
 
+export async function verifyAccessToken(
+  token: string | undefined,
+  env: Record<string, string>,
+): Promise<VerifiedUser | null> {
+  const t = String(token || '').trim()
+  if (!t) return verifyBearerJwt(undefined, env)
+  if (t.toLowerCase().startsWith('bearer ')) return verifyBearerJwt(t, env)
+  return verifyBearerJwt(`Bearer ${t}`, env)
+}
+
 export async function verifyBearerJwt(
   authHeader: string | undefined,
   env: Record<string, string>,
 ): Promise<VerifiedUser | null> {
   const allowUnauth = (env.MEOO_AI_CHAT_ALLOW_UNAUTHENTICATED ?? '').trim() === '1'
-  const jwt =
-    typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
-      ? authHeader.slice('Bearer '.length).trim()
-      : ''
+  const raw = typeof authHeader === 'string' ? authHeader.trim() : ''
+  const jwt = raw.toLowerCase().startsWith('bearer ')
+    ? raw.slice('Bearer '.length).trim()
+    : raw
   if (!jwt) {
     if (allowUnauth) return { id: 'dev-unauthenticated', email: 'dev' }
     return null
@@ -127,8 +176,7 @@ export async function verifyBearerJwt(
     return null
   }
 
-  const jwtSecret = readJwtSecret(env)
-  if (jwtSecret) {
+  for (const jwtSecret of readJwtSecrets(env)) {
     const local = verifyHs256JwtLocally(jwt, jwtSecret)
     if (local) return local
   }
@@ -139,7 +187,7 @@ export async function verifyBearerJwt(
     const mpUser = await verifyMpSessionToken(jwt, env)
     if (mpUser) return mpUser
     if (allowUnauth) return { id: 'dev-unauthenticated', email: 'dev' }
-    if (jwtSecret) {
+    if (readJwtSecrets(env).length) {
       throw new Error('invalid_jwt_or_expired')
     }
     throw new Error('supabase_anon_not_configured')
@@ -151,8 +199,8 @@ export async function verifyBearerJwt(
     return (await verifyMpSessionToken(jwt, env)) ?? null
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    if (jwtSecret) {
-      const local = verifyHs256JwtLocally(jwt, jwtSecret)
+    for (const secret of readJwtSecrets(env)) {
+      const local = verifyHs256JwtLocally(jwt, secret)
       if (local) return local
     }
     const mpUser = await verifyMpSessionToken(jwt, env)

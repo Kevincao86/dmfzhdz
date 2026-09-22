@@ -303,6 +303,7 @@ function adsChannelSpec(channel) {
       tag: '千川',
       projectsPath: '/api/merchant/qianchuan/projects',
       createPath: '/api/merchant/qianchuan/promotions/create',
+      insightPath: '/api/merchant/qianchuan/ai/ad-insight',
     }
   }
   if (channel === 'xhs_juguang') {
@@ -319,6 +320,7 @@ function adsChannelSpec(channel) {
       tag: '聚光',
       projectsPath: '/api/merchant/xhs-juguang/projects',
       createPath: '/api/merchant/xhs-juguang/promotions/create',
+      insightPath: '/api/merchant/xhs-juguang/ai/ad-insight',
     }
   }
   return {
@@ -334,6 +336,7 @@ function adsChannelSpec(channel) {
     tag: '本地推',
     projectsPath: '/api/merchant/local-promotion/projects',
     createPath: '/api/merchant/local-promotion/promotions/create',
+    insightPath: '/api/merchant/local-promotion/ai/ad-insight',
   }
 }
 
@@ -356,6 +359,7 @@ function mapPromotionRow(x, tag) {
     click,
     convert,
     projectId: String(x.projectId || x.project_id || ''),
+    marketingGoal: String(x.marketingGoal || x.marketing_goal || ''),
     tags: [tag],
   }
 }
@@ -440,7 +444,7 @@ async function createAdsPromotion(channel, input) {
   const budgetYuan = Number((input && input.budgetYuan) || 0)
   const goal = String((input && input.goal) || 'video')
   const marketingGoal =
-    goal === 'live' ? 'LIVE' : goal === 'clue' ? 'CLUE' : 'VIDEO_PROM_GOODS'
+    goal === 'live' ? 'LIVE' : goal === 'clue' ? 'CLUE' : 'VIDEO_IMAGE'
   if (!name) return { ok: false, message: '请填写计划名称' }
   if (!Number.isFinite(budgetYuan) || budgetYuan < 100) return { ok: false, message: '日预算至少 100 元' }
   try {
@@ -467,6 +471,36 @@ async function createAdsPromotion(channel, input) {
     }
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+async function postAdAiInsight(channel, input) {
+  const spec = adsChannelSpec(channel)
+  const creds = spec.creds()
+  if (!creds) return { ok: false, message: spec.unbound, insight: '' }
+  try {
+    const data = await merchantApi.merchantRequestAuth('POST', spec.insightPath, {
+      data: {
+        ...adsCredsPayload(creds),
+        summary: (input && input.summary) || null,
+        promotions: (input && input.promotions) || [],
+        clues: (input && input.clues) || [],
+        channelStats: (input && input.channelStats) || [],
+        pane: (input && input.pane) || 'ai',
+        mode: (input && input.mode) || 'assisted',
+      },
+      timeoutMs: 60000,
+    })
+    if (data && data.ok === false) {
+      return { ok: false, message: String(data.message || '分析失败'), insight: '' }
+    }
+    return {
+      ok: true,
+      insight: String((data && data.insight) || ''),
+      actions: Array.isArray(data && data.actions) ? data.actions : [],
+    }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e), insight: '' }
   }
 }
 
@@ -655,6 +689,7 @@ module.exports = {
   fetchAdsPromotions,
   fetchAdsProjects,
   createAdsPromotion,
+  postAdAiInsight,
   fetchAdsReport,
   updateAdsStatus,
   fetchLocalClues,

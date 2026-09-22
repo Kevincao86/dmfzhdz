@@ -48,6 +48,73 @@
   line-height: 1.5;
 }
 
+.ads-ai-card {
+  margin: 0 24rpx 16rpx;
+  padding: 20rpx;
+  background: #fff;
+  border-radius: 24rpx;
+  border: 1rpx solid rgba(124, 58, 237, 0.12);
+}
+
+.ads-pane-row,
+.ads-mode-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+}
+
+.ads-mode-row {
+  margin-top: 12rpx;
+}
+
+.ads-pane,
+.ads-mode {
+  padding: 10rpx 18rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  color: #64748b;
+  background: #f8fafc;
+  border: 1rpx solid #e2e8f0;
+}
+
+.ads-pane.on {
+  color: #fff;
+  background: #7c3aed;
+  border-color: #7c3aed;
+  font-weight: 700;
+}
+
+.ads-mode.on {
+  color: #5b21b6;
+  background: #ede9fe;
+  border-color: #c4b5fd;
+  font-weight: 650;
+}
+
+.ads-ai-actions {
+  margin-top: 16rpx;
+}
+
+.ads-ai-run {
+  background: #7c3aed !important;
+  color: #fff !important;
+  border-radius: 999rpx !important;
+}
+
+.ads-ai-insight,
+.ads-ai-placeholder {
+  display: block;
+  margin-top: 16rpx;
+  font-size: 24rpx;
+  line-height: 1.55;
+  color: #334155;
+  white-space: pre-wrap;
+}
+
+.ads-ai-placeholder {
+  color: #94a3b8;
+}
+
 .ads-expand {
   display: flex;
   flex-direction: column;

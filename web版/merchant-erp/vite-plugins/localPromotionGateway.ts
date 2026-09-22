@@ -34,6 +34,9 @@ function mapOceanError(raw: string, status?: number, code?: number): string {
   if (/access_token无效|access token invalid|invalid access_token/i.test(s)) {
     return `access_token 无效或已过期，请到系统设置重新授权本地推${codeHint}`
   }
+  if (code === 40000) {
+    return `巨量拒绝了创建参数。本地推营销目标须为 LIVE / VIDEO_IMAGE；请确认已授权门店/抖音号，或用已有计划作模板后重试${codeHint}`
+  }
   if (!/[\u4e00-\u9fff]/.test(s)) {
     return `连接巨量本地推失败，请确认 Access Token 与广告主 ID 正确，并在开放平台开通投放/报表权限${codeHint}`
   }
@@ -519,13 +522,11 @@ export async function handleLocalPromotionRoutes(
     const creds = await resolveLocalPromotionCreds(rawCreds)
     const name = String(j.name || j.project_name || j.promotion_name || '').trim()
     const budgetYuan = Number(j.budget_yuan ?? j.budgetYuan ?? 0)
-    const goalRaw = String(j.marketing_goal || j.goal || 'VIDEO_PROM_GOODS').toUpperCase()
+    const goalRaw = String(j.marketing_goal || j.goal || 'VIDEO_IMAGE').toUpperCase()
     const marketingGoal =
       goalRaw === 'LIVE' || goalRaw === 'LIVE_PROM_GOODS'
         ? 'LIVE'
-        : goalRaw === 'CLUE' || goalRaw === 'LEADS'
-          ? 'CLUE'
-          : 'VIDEO_PROM_GOODS'
+        : 'VIDEO_IMAGE'
     if (!name) {
       json(res, 400, { ok: false, message: '请填写计划名称' })
       return true
@@ -534,21 +535,88 @@ export async function handleLocalPromotionRoutes(
       json(res, 400, { ok: false, message: '日预算至少 100 元' })
       return true
     }
-    const pr = await oceanPost(creds, '/open_api/v3.0/local/project/create/', {
-      local_account_id: creds.localAccountId,
+    const budgetFen = Math.round(budgetYuan * 100)
+    const listed = await listLocalByMarketingGoals(
+      creds,
+      '/open_api/v3.0/local/project/list/',
+      ['project_list', 'list'],
+      'project_status_first',
+      'PROJECT_STATUS_ALL',
+    )
+    const templates = listed.ok ? listed.rows : []
+    const template =
+      templates.find((row) => pickLocalMarketingGoal(row) === (marketingGoal === 'LIVE' ? 'LIVE' : 'VIDEO_IMAGE')) ||
+      templates.find((row) => String(row.project_id ?? row.id ?? '').trim()) ||
+      null
+    const extra: Record<string, unknown> = {}
+    if (template) {
+      for (const k of [
+        'aweme_id',
+        'poi_id',
+        'poi_ids',
+        'delivery_goal',
+        'external_action',
+        'optimize_goal',
+        'audience',
+        'delivery_package',
+        'product_id',
+        'local_asset_id',
+      ]) {
+        if (template[k] != null && template[k] !== '') extra[k] = template[k]
+      }
+    }
+    const projectInner = {
       name,
-      project_name: name,
       marketing_goal: marketingGoal,
-      budget: Math.round(budgetYuan * 100),
-    })
-    if (!pr.ok) {
-      json(res, 502, { ok: false, message: pr.message })
+      budget_mode: 'BUDGET_MODE_DAY',
+      budget: budgetFen,
+      ...extra,
+    }
+    const attempts: Array<{ path: string; body: Record<string, unknown> }> = [
+      {
+        path: '/open_api/v3.0/local/project/create/',
+        body: { local_account_id: creds.localAccountId, ...projectInner, project_name: name },
+      },
+      {
+        path: '/open_api/v3.0/local/project/create/',
+        body: { local_account_id: creds.localAccountId, project: projectInner },
+      },
+    ]
+    const templateId = String(template?.project_id ?? template?.id ?? '').trim()
+    if (templateId) {
+      attempts.push({
+        path: '/open_api/v3.0/local/project/copy/',
+        body: {
+          local_account_id: creds.localAccountId,
+          project_id: templateId,
+          name,
+          project_name: name,
+          budget: budgetFen,
+        },
+      })
+    }
+    let lastMsg = ''
+    let created: Record<string, unknown> | null = null
+    for (const att of attempts) {
+      const pr = await oceanPost(creds, att.path, att.body)
+      if (pr.ok) {
+        created = (pr.data || {}) as Record<string, unknown>
+        break
+      }
+      lastMsg = pr.message
+    }
+    if (!created) {
+      json(res, 502, {
+        ok: false,
+        message:
+          lastMsg ||
+          '创建失败。请确认本地推营销目标为直播/短视频，并已在巨量后台开通门店与抖音号。',
+      })
       return true
     }
-    const data = (pr.data || {}) as Record<string, unknown>
     json(res, 200, {
       ok: true,
-      projectId: String(data.project_id ?? data.id ?? ''),
+      projectId: String(created.project_id ?? created.id ?? ''),
       message: '已在巨量本地推创建项目。广告单元素材可随后在巨量后台补齐。',
     })
     return true

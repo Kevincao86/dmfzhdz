@@ -15,9 +15,10 @@ function tenantId() {
 
 function postKb(body) {
   const token = api.getBearerToken()
-  return merchantRequestAuth('POST', '/api/meoo-kb', { data: body || {}, bearerToken: token }).then(
-    (r) => r || {},
-  )
+  return merchantRequestAuth('POST', '/api/meoo-kb', {
+    data: { ...(body || {}), access_token: token },
+    bearerToken: token,
+  }).then((r) => r || {})
 }
 
 async function listDocuments() {
@@ -26,7 +27,12 @@ async function listDocuments() {
   try {
     const r = await postKb({ action: 'list', scope: 'tenant', tenantId: tid })
     if (r.ok === false) {
-      return { ok: false, message: String(r.detail || r.error || '加载失败'), documents: [] }
+      const raw = String(r.detail || r.error || '加载失败')
+      const message =
+        raw === 'unauthorized' || raw === 'invalid_token' || raw === 'missing_token'
+          ? '登录凭证无效，请退出后重新登录'
+          : raw
+      return { ok: false, message, documents: [] }
     }
     const documents = Array.isArray(r.documents) ? r.documents : []
     return { ok: true, documents }

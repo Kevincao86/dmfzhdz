@@ -39,7 +39,10 @@ function merchantRequestAuth(method, path, opts) {
     Accept: 'application/json',
     'Content-Type': 'application/json',
   }
-  if (bearerToken) header.Authorization = `Bearer ${bearerToken}`
+  if (bearerToken) {
+    header.Authorization = `Bearer ${bearerToken}`
+    header['X-Meoo-Access-Token'] = bearerToken
+  }
   return new Promise((resolve, reject) => {
     const req = {
       url,

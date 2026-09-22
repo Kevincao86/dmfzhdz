@@ -7,6 +7,7 @@ const DEFAULT_BOT = {
   id: 'welcome-bot',
   role: 'bot',
   text: '您好，我是灵祺客服，可解答常见问题。如需人工协助，请点击「转人工服务」。',
+  content: '您好，我是灵祺客服，可解答常见问题。如需人工协助，请点击「转人工服务」。',
   at: '',
   ts: 0,
 }

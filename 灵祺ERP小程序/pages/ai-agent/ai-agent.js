@@ -27,6 +27,7 @@ Page({
     logoSrc: assetUrl('logo.png'),
     messages: [],
     shortcuts: [],
+    shortcutsCollapsed: true,
     input: '',
     sending: false,
     hasChat: false,
@@ -94,6 +95,10 @@ Page({
     agent.clearThread()
     this._execState = exec.createAgentExecutionState()
     this.setData({ messages: [], hasChat: false, input: '', sending: false, scrollTo: '' })
+  },
+
+  onToggleShortcuts() {
+    this.setData({ shortcutsCollapsed: !this.data.shortcutsCollapsed })
   },
 
   onShortcut(e) {

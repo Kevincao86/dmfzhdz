@@ -4,7 +4,7 @@
  * header: Authorization Bearer, X-Meoo-Douyin-Token
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { verifyBearerJwt } from '../vite-plugins/aiGateway/authSupabase.js'
+import { readRequestBearer, verifyAccessToken } from '../vite-plugins/aiGateway/authSupabase.js'
 import { loadTenantAiContextForUser } from '../vite-plugins/tenantMembershipCore.js'
 import {
   buildShopAdviceFacts,
@@ -33,20 +33,6 @@ function sendJson(res: VercelResponse, status: number, body: Record<string, unkn
   res.status(status).send(JSON.stringify(body))
 }
 
-function bearer(authHeader: string | undefined): string | undefined {
-  return typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
-    ? authHeader.slice(7).trim()
-    : undefined
-}
-
-function headerToken(req: VercelRequest, name: string): string | undefined {
-  const raw = req.headers[name]
-  const v = Array.isArray(raw) ? raw[0] : raw
-  if (!v || typeof v !== 'string') return undefined
-  const m = /^Bearer\s+(\S+)/i.exec(v.trim())
-  return (m?.[1] || v).trim() || undefined
-}
-
 function rawBody(req: VercelRequest): string {
   try {
     if (typeof req.body === 'string') return req.body
@@ -56,6 +42,14 @@ function rawBody(req: VercelRequest): string {
   } catch {
     return ''
   }
+}
+
+function headerToken(req: VercelRequest, name: string): string | undefined {
+  const raw = req.headers[name]
+  const v = Array.isArray(raw) ? raw[0] : raw
+  if (!v || typeof v !== 'string') return undefined
+  const m = /^Bearer\s+(\S+)/i.exec(v.trim())
+  return (m?.[1] || v).trim() || undefined
 }
 
 function isYmd(s: string): boolean {
@@ -69,7 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
       res.setHeader(
         'Access-Control-Allow-Headers',
-        'Content-Type, Authorization, X-Meoo-Douyin-Token',
+        'Content-Type, Authorization, X-Meoo-Access-Token, X-Meoo-Douyin-Token',
       )
       res.status(204).end()
       return
@@ -79,34 +73,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    const token = bearer(req.headers.authorization)
-    if (!token) {
-      sendJson(res, 401, { ok: false, error: 'unauthorized' })
-      return
-    }
-    const env = process.env as Record<string, string>
-    let user: Awaited<ReturnType<typeof verifyBearerJwt>>
-    try {
-      user = await verifyBearerJwt(`Bearer ${token}`, env)
-    } catch {
-      sendJson(res, 401, { ok: false, error: 'unauthorized' })
-      return
-    }
-    if (!user?.id) {
-      sendJson(res, 401, { ok: false, error: 'unauthorized' })
-      return
-    }
-    const ctx = await loadTenantAiContextForUser(user.id, env)
-    if (!ctx?.tenantId) {
-      sendJson(res, 400, { ok: false, error: 'tenant_required' })
-      return
-    }
-
     let body: Record<string, unknown>
     try {
       body = JSON.parse(rawBody(req) || '{}') as Record<string, unknown>
     } catch {
       sendJson(res, 400, { ok: false, error: 'invalid_json' })
+      return
+    }
+
+    const token = readRequestBearer(req.headers as Record<string, unknown>, body)
+    if (!token) {
+      sendJson(res, 401, { ok: false, error: 'unauthorized', detail: 'missing_token' })
+      return
+    }
+    const env = process.env as Record<string, string>
+    let user: Awaited<ReturnType<typeof verifyAccessToken>>
+    try {
+      user = await verifyAccessToken(token, env)
+    } catch {
+      sendJson(res, 401, { ok: false, error: 'unauthorized', detail: 'invalid_token' })
+      return
+    }
+    if (!user?.id) {
+      sendJson(res, 401, { ok: false, error: 'unauthorized', detail: 'invalid_token' })
+      return
+    }
+    const ctx = await loadTenantAiContextForUser(user.id, env)
+    if (!ctx?.tenantId) {
+      sendJson(res, 400, { ok: false, error: 'tenant_required' })
       return
     }
     const startDate = String(body.startDate || '').trim()

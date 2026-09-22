@@ -3,7 +3,7 @@
  * body.action 区分操作；scope=ops_global|tenant
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { verifyBearerJwt } from '../vite-plugins/aiGateway/authSupabase.js'
+import { readRequestBearer, verifyAccessToken } from '../vite-plugins/aiGateway/authSupabase.js'
 import { loadTenantAiContextForUser } from '../vite-plugins/tenantMembershipCore.js'
 import {
   deleteKbDocument,
@@ -37,12 +37,6 @@ function rawBody(req: VercelRequest): string {
   }
 }
 
-function bearer(authHeader: string | undefined): string | undefined {
-  return typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
-    ? authHeader.slice(7).trim()
-    : undefined
-}
-
 function asScope(raw: unknown): KbScope | null {
   const s = String(raw || '').trim()
   if (s === 'ops_global' || s === 'tenant') return s
@@ -54,7 +48,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     if (req.method === 'OPTIONS') {
       res.setHeader('Access-Control-Allow-Origin', '*')
       res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+      res.setHeader(
+        'Access-Control-Allow-Headers',
+        'Content-Type, Authorization, X-Meoo-Access-Token, X-Mp-Session',
+      )
       res.status(204).end()
       return
     }
@@ -87,14 +84,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     let uploadedBy = typeof body.uploadedBy === 'string' ? body.uploadedBy.trim() : ''
 
     if (scope === 'tenant') {
-      const token = bearer(req.headers.authorization)
+      const token = readRequestBearer(req.headers as Record<string, unknown>, body)
       if (!token) {
-        sendJson(res, 401, { ok: false, error: 'unauthorized' })
+        sendJson(res, 401, { ok: false, error: 'unauthorized', detail: 'missing_token' })
         return
       }
-      let user: Awaited<ReturnType<typeof verifyBearerJwt>>
+      let user: Awaited<ReturnType<typeof verifyAccessToken>>
       try {
-        user = await verifyBearerJwt(`Bearer ${token}`, env)
+        user = await verifyAccessToken(token, env)
       } catch (e) {
         sendJson(res, 401, {
           ok: false,
@@ -104,7 +101,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return
       }
       if (!user) {
-        sendJson(res, 401, { ok: false, error: 'unauthorized' })
+        sendJson(res, 401, { ok: false, error: 'unauthorized', detail: 'invalid_token' })
         return
       }
       const ctx = await loadTenantAiContextForUser(user.id, env, token, tenantId || undefined)

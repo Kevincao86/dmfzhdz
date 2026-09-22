@@ -17,6 +17,26 @@ const CHANNELS = [
   { id: 'xhs_juguang', label: '聚光' },
 ]
 
+const AI_PANES = [
+  { id: 'live', label: '直播' },
+  { id: 'video', label: '短视频' },
+  { id: 'leads', label: '线索' },
+  { id: 'ai', label: 'AI分析' },
+]
+
+const AI_MODES = [
+  { id: 'manual', label: '手动调整' },
+  { id: 'assisted', label: 'AI 辅助' },
+  { id: 'full_ai', label: '全面介入' },
+  { id: 'auto_adjust', label: '自动调计划' },
+]
+
+function paneOfRow(row) {
+  const g = String((row && (row.marketingGoal || row.goal || '')) || '').toUpperCase()
+  if (g === 'LIVE' || g === 'LIVE_PROM_GOODS' || /直播/.test(String((row && row.name) || ''))) return 'live'
+  return 'video'
+}
+
 Page({
   data: {
     loading: false,
@@ -42,6 +62,13 @@ Page({
       { id: 'clue', label: '线索' },
     ],
     createBusy: false,
+    aiPanes: AI_PANES,
+    aiPane: 'video',
+    aiModes: AI_MODES,
+    aiMode: 'assisted',
+    aiInsight: '',
+    aiBusy: false,
+    clues: [],
   },
 
   onShow() {
@@ -71,7 +98,7 @@ Page({
   onChannel(e) {
     const id = e.currentTarget.dataset.id
     if (!id || id === this.data.channel) return
-    this.setData({ channel: id, activeTab: 'all', expandedId: '' })
+    this.setData({ channel: id, activeTab: 'all', expandedId: '', aiInsight: '' })
     void this.load()
   },
 
@@ -121,18 +148,70 @@ Page({
         { key: 'deal', label: '转化', value: sum.convertCnt != null ? String(sum.convertCnt) : todayStats[3].value, trend: '' },
       ]
     }
+    let clues = this.data.clues
+    if (this.data.aiPane === 'leads' || this.data.aiPane === 'ai') {
+      const clueR = await feature.fetchAdsClues(this.data.channel)
+      clues = clueR.ok ? clueR.items || [] : []
+    }
     this.setData({
       loading: false,
       err: '',
       bindHint: listR.apiError || '',
       todayStats,
+      clues,
     })
+    if (this.data.aiMode === 'full_ai' || this.data.aiMode === 'auto_adjust') {
+      void this.runAiInsight()
+    }
   },
 
   applyTab(items) {
-    const statusTabs = tabCounts(items)
-    const displayItems = filterByTab(items, this.data.activeTab)
+    const pane = this.data.aiPane
+    let scoped = items
+    if (pane === 'live' || pane === 'video') {
+      scoped = items.filter((x) => paneOfRow(x) === pane)
+    }
+    const statusTabs = tabCounts(scoped)
+    const displayItems = filterByTab(scoped, this.data.activeTab)
     this.setData({ items, statusTabs, displayItems })
+  },
+
+  onAiPane(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id || id === this.data.aiPane) return
+    this.setData({ aiPane: id, aiInsight: '' })
+    this.applyTab(this.data.items)
+    if (this.data.aiMode === 'full_ai' || this.data.aiMode === 'auto_adjust') {
+      void this.runAiInsight()
+    }
+  },
+
+  onAiMode(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id || id === this.data.aiMode) return
+    this.setData({ aiMode: id })
+    if (id === 'full_ai' || id === 'auto_adjust') void this.runAiInsight()
+  },
+
+  async runAiInsight() {
+    if (this.data.aiBusy || this.data.aiMode === 'manual') return
+    this.setData({ aiBusy: true })
+    const pane = this.data.aiPane
+    const promotions = (this.data.items || []).filter((x) => {
+      if (pane === 'live' || pane === 'video') return paneOfRow(x) === pane
+      return true
+    })
+    const r = await feature.postAdAiInsight(this.data.channel, {
+      pane,
+      mode: this.data.aiMode,
+      promotions,
+      clues: this.data.clues || [],
+      summary: null,
+    })
+    this.setData({
+      aiBusy: false,
+      aiInsight: r.ok ? r.insight || '暂无分析' : r.message || '分析失败',
+    })
   },
 
   onTab(e) {
