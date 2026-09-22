@@ -171,6 +171,7 @@ import {
   detectPremiumImageRetryIntent,
   isAgentImagePlaceholderLine,
   modelPickerKeyForNativeImageVendor,
+  stripPremiumRetryPhrases,
 } from '../services/ai/aiImageIntentRouting'
 import { shouldRouteToAgentNativeImage } from '../services/ai/agentModelRoute'
 import {
@@ -217,7 +218,9 @@ function buildAgentImagePostOpts(
 
 function captionForAgentImageResult(img: AiAgentNativeImageOk, isI2i: boolean): string {
   if (img.channel === 'tokenmix') {
-    let s = `已使用 **${img.displayModel ?? '高级图像模型'}** 生成下方结果。`
+    let s = isI2i
+      ? `已使用 **${img.displayModel ?? '高级图像模型'}** 按原图重绘（保留主体与构图）。下方为生成结果。`
+      : `已使用 **${img.displayModel ?? '高级图像模型'}** 生成下方结果。`
     if (img.fallbackNote) s += `\n\n${img.fallbackNote}`
     return s
   }
@@ -326,14 +329,27 @@ function resolveNativeImagePrompt(line: string, msgs: AiAgentMessage[]): string 
   const stripped = line.replace(/\[引用[\s\S]*?\n\n/, '').trim()
   const placeholder = isAgentImagePlaceholderLine(stripped)
   const applyOnly = detectDirectImageApplyIntent(stripped)
-  if (stripped && !placeholder && !applyOnly) return line
+  const premiumOnly = detectPremiumImageRetryIntent(stripped) && !stripPremiumRetryPhrases(stripped)
+  if (stripped && !placeholder && !applyOnly && !premiumOnly && !detectPremiumImageRetryIntent(stripped)) {
+    return line
+  }
+  const ask = stripPremiumRetryPhrases(stripped)
+  if (ask && !placeholder && !applyOnly) {
+    return ask
+  }
   const prevUser = [...msgs].reverse().find((m) => {
     if (m.role !== 'user') return false
     const c = (m.content || '').replace(/\[引用[\s\S]*?\n\n/, '').trim()
-    return Boolean(c) && !isAgentImagePlaceholderLine(c) && !detectDirectImageApplyIntent(c)
+    return (
+      Boolean(c) &&
+      !isAgentImagePlaceholderLine(c) &&
+      !detectDirectImageApplyIntent(c) &&
+      !detectPremiumImageRetryIntent(c)
+    )
   })
   if (prevUser?.content?.trim()) {
-    return `${prevUser.content.trim()}\n\n请按上述要求直接生成处理后的图片，不要只给文字建议，也不要再让用户上传。`
+    const prevAsk = stripPremiumRetryPhrases(prevUser.content).trim() || prevUser.content.trim()
+    return prevAsk
   }
   const prevAsst = [...msgs].reverse().find(
     (m) => m.role === 'assistant' && /饱和|光影|质感|处理建议|调色|对比度/.test(m.content || ''),
@@ -342,6 +358,19 @@ function resolveNativeImagePrompt(line: string, msgs: AiAgentMessage[]): string 
     return `请按以下处理建议直接改图并返回结果图，不要再让我上传：\n${prevAsst.content.trim()}`
   }
   return `${line}\n请直接生成处理后的图片并返回图片文件，不要只给文字步骤。`
+}
+
+function buildPremiumRedrawPrompt(line: string, msgs: AiAgentMessage[]): string {
+  const ask = resolveNativeImagePrompt(line, msgs).replace(/\[引用[\s\S]*?\n\n/, '').trim()
+  const safeAsk =
+    ask && !detectPremiumImageRetryIntent(ask)
+      ? ask
+      : stripPremiumRetryPhrases(ask) || '把参考图做得更真实，降低饱和度，保留原有美食/主体与构图'
+  return [
+    '基于参考图做同场景重绘，必须保持原图的主体、构图、菜品/物品与空间关系。',
+    `用户美化要求：${safeAsk}`,
+    '只调整真实感、光影、色彩与质感。禁止换成其他主题、示意图、剖面图或无关场景。',
+  ].join('\n')
 }
 
 function injectGenerateImageReference(
@@ -2327,7 +2356,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
               return
             }
 
-            // 高级（国外）重绘：不传参考图，避免 TokenMix 硬拒
+            // 高级重绘：必须带上原图 + 原美化需求；禁止只用「用高级模型重绘」去文生图（会跑题）
             if (detectPremiumImageRetryIntent(strippedLine)) {
               if (denyFreeImageGen()) return
               if (!membershipAllowsTokenMix(plan)) {
@@ -2356,9 +2385,15 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
               }
               setModelPickerKeyState(proKey)
               savePickerKey(proKey)
+              const premiumRef =
+                visionUrls[0]?.trim() ||
+                collectAgentReferenceImages([], undefined, messagesRef.current)[0]
+              const premiumPrompt = buildPremiumRedrawPrompt(line, messagesRef.current)
               const imgPlaceholder = createAgentMessage(
                 'assistant',
-                '正在使用高级模型（国外 GPT Image）重绘，请稍候…（不附带原参考图）',
+                premiumRef
+                  ? '正在使用高级模型按原图重绘，请稍候…'
+                  : '正在使用高级模型按你的美化要求重绘，请稍候…',
               )
               imgPlaceholder.isStreaming = true
               setMessages((prev) => {
@@ -2366,15 +2401,27 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
                 messagesRef.current = next
                 return next
               })
-              const imgOpts = buildAgentImagePostOpts(proKey)
-              const imgRes = await postAiAgentNativeImage(line, {
+              const imgOpts = buildAgentImagePostOpts(proKey, premiumRef)
+              let imgRes = await postAiAgentNativeImage(premiumPrompt, {
                 ...imgOpts,
+                exactPrompt: true,
                 signal: ac.signal,
               })
+              if (
+                !imgRes.ok &&
+                premiumRef &&
+                /参考图|reference|不支持|硬拒|edit|image_url/i.test(imgRes.message)
+              ) {
+                imgRes = await postAiAgentNativeImage(premiumPrompt, {
+                  ...buildAgentImagePostOpts(proKey),
+                  exactPrompt: true,
+                  signal: ac.signal,
+                })
+              }
               if (imgRes.ok) {
                 const assistantMsg = createAgentMessage(
                   'assistant',
-                  captionForAgentImageResult(imgRes, false),
+                  captionForAgentImageResult(imgRes, Boolean(premiumRef)),
                   { imageUrls: [imgRes.imageUrl] },
                 )
                 setMessages((prev) => {
@@ -3064,12 +3111,18 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
               if (proKey) {
                 setModelPickerKeyState(proKey)
                 savePickerKey(proKey)
-                const imgOpts = buildAgentImagePostOpts(proKey)
-                const imgRes = await postAiAgentNativeImage(q, { ...imgOpts, signal: ac.signal })
+                const premiumRef = userReferenceImagesFromMessages(messagesRef.current)[0]
+                const premiumPrompt = buildPremiumRedrawPrompt(q, messagesRef.current)
+                const imgOpts = buildAgentImagePostOpts(proKey, premiumRef)
+                const imgRes = await postAiAgentNativeImage(premiumPrompt, {
+                  ...imgOpts,
+                  exactPrompt: true,
+                  signal: ac.signal,
+                })
                 if (imgRes.ok) {
                   const assistantMsg = createAgentMessage(
                     'assistant',
-                    captionForAgentImageResult(imgRes, false),
+                    captionForAgentImageResult(imgRes, Boolean(premiumRef)),
                     { imageUrls: [imgRes.imageUrl] },
                   )
                   setMessages((prev) => {

@@ -97,7 +97,7 @@ export function detectImageGenerationIntent(text: string, hasImages = false): bo
 
 /**
  * 用户对国内出图不满意，要求高级（国外）模型重绘。
- * 匹配后应走 TokenMix GPT Image，且不传参考图。
+ * 匹配后应走 TokenMix GPT Image；须带上原图与原需求，禁止只用「用高级模型重绘」六个字去文生图。
  */
 export function detectPremiumImageRetryIntent(text: string): boolean {
   const t = text.trim()
@@ -111,12 +111,25 @@ export function detectPremiumImageRetryIntent(text: string): boolean {
   )
 }
 
+/** 去掉「用高级模型重绘」等口令，露出用户真正的美化需求 */
+export function stripPremiumRetryPhrases(text: string): string {
+  return text
+    .replace(/\[引用[\s\S]*?\n\n/, '')
+    .replace(
+      /用高级(?:模型)?(?:重绘|再画|再生成|生成|出图)?|高级(?:生图|模型)(?:重绘|再画|再生成)?|国外(?:模型|生图)|GPT\s*Image|绘境\s*Max|换国外|换高级|重新用高级/gi,
+      ' ',
+    )
+    .replace(/(?:效果|图片|出图|生图).{0,10}不满意|不满意.{0,16}(?:重绘|再生成|换模型|用高级|高级模型)/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 /** 高级生图固定 picker（GPT Image 2） */
 export const AGENT_PREMIUM_IMAGE_PICKER_KEY = 'img::m::openai::gpt-image-2'
 
 /** 国内出图成功后的高级模型引导文案 */
 export function agentDomesticImageUpsellTip(): string {
-  return `若对效果不满意，可回复「用高级模型重绘」（国外 GPT Image，约 ${MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE} 积分/张；常规国内约 ${MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE} 积分/张）。带参考图的高级重绘将按文字描述重新生成，不再贴原图。`
+  return `若对效果不满意，可回复「用高级模型重绘」（国外 GPT Image，约 ${MP_POINTS_VISUAL_STUDIO_IMAGE_PRO_PER_USE} 积分/张；常规国内约 ${MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE} 积分/张）。高级重绘会保留原图主体并按你的美化要求再画一版。`
 }
 
 /** 发送前：对话模型 + 生图意图 → 自动切换为文生图 picker */
