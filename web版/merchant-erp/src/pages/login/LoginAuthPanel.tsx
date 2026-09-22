@@ -24,9 +24,10 @@ import {
 import { clearPendingDistributionRef, readPendingDistributionRef } from '../../lib/pendingDistributionRef'
 import { toUserFacingError } from '../../lib/userFacingError'
 import ErpScanLoginPanel from '../../components/login/ErpScanLoginPanel'
+import LoginAltMethods from '../../components/login/LoginAltMethods'
 
 type AuthMode = 'login' | 'register'
-type LoginMethod = 'password' | 'sms' | 'scan'
+type LoginMethod = 'password' | 'sms' | 'wechat' | 'douyin'
 
 const inputClass =
   'w-full rounded-xl border border-white/60 bg-white/55 px-4 py-3 text-base text-slate-900 outline-none backdrop-blur-sm placeholder:text-slate-400 focus:border-cyan-300/80 focus:bg-white/80 focus:ring-2 focus:ring-cyan-500/20 sm:text-sm'
@@ -386,7 +387,9 @@ export default function LoginAuthPanel({
               ? `使用登录名与密码进入${editionLabel()}工作台。`
               : loginMethod === 'sms'
                 ? '使用注册手机号与短信验证码登录。'
-                : '使用微信或抖音 App 扫码登录（需账号已绑定手机号）。'
+                : loginMethod === 'wechat'
+                  ? '使用微信扫码登录（需账号已绑定手机号）。'
+                  : '使用抖音 App 扫码登录（需账号已绑定手机号）。'
             : partnerMode
               ? '填写服务商信息并完成手机验证，注册后可绑定平台服务商身份与客户商家。'
               : '填写商家信息并完成手机验证，注册后为免费版，可订阅升级会员。'}
@@ -414,59 +417,18 @@ export default function LoginAuthPanel({
 
         {mode === 'login' ? (
           <>
-            <div className="mb-5 flex gap-6 border-b border-white/40 pb-1">
+            {loginMethod !== 'password' ? (
               <button
                 type="button"
+                className="mb-4 text-sm font-medium text-cyan-700 hover:underline"
                 onClick={() => {
                   setLoginMethod('password')
                   onErr(null)
                 }}
-                className={cn(
-                  'relative pb-2 text-sm font-semibold transition-colors',
-                  loginMethod === 'password'
-                    ? 'text-slate-900'
-                    : 'text-slate-400 hover:text-slate-600',
-                )}
               >
-                账号密码
-                {loginMethod === 'password' ? (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-cyan-500" />
-                ) : null}
+                ← 账号密码登录
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setLoginMethod('sms')
-                  onErr(null)
-                }}
-                className={cn(
-                  'relative pb-2 text-sm font-semibold transition-colors',
-                  loginMethod === 'sms'
-                    ? 'text-slate-900'
-                    : 'text-slate-400 hover:text-slate-600',
-                )}
-              >
-                手机验证码
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setLoginMethod('scan')
-                  onErr(null)
-                }}
-                className={cn(
-                  'relative pb-2 text-sm font-semibold transition-colors',
-                  loginMethod === 'scan'
-                    ? 'text-slate-900'
-                    : 'text-slate-400 hover:text-slate-600',
-                )}
-              >
-                扫码登录
-                {loginMethod === 'scan' ? (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-cyan-500" />
-                ) : null}
-              </button>
-            </div>
+            ) : null}
 
             {loginMethod === 'password' ? (
               <form className="space-y-5" onSubmit={(e) => void submitPasswordLogin(e)}>
@@ -577,8 +539,28 @@ export default function LoginAuthPanel({
                 portal={partnerMode ? 'partner' : 'merchant'}
                 err={err}
                 onErr={onErr}
+                channel={loginMethod === 'wechat' ? 'wechat' : 'douyin'}
               />
             )}
+
+            <LoginAltMethods
+              activeId={loginMethod === 'password' ? undefined : loginMethod}
+              onSelect={(id) => {
+                if (id === 'password') return
+                setLoginMethod(id)
+                onErr(null)
+                onInfoHint(null)
+              }}
+              methods={[
+                { id: 'sms', label: '短信验证码' },
+                {
+                  id: 'wechat',
+                  label: '微信登录',
+                  hint: '微信开放平台网站应用审核通过后启用',
+                },
+                { id: 'douyin', label: '抖音登录' },
+              ]}
+            />
           </>
         ) : (
           <form className="space-y-3.5" onSubmit={(e) => void submitRegister(e)}>

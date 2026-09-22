@@ -85,6 +85,7 @@ list_scopes() {
   douyin_spi_acceptance  抖音到综团购联调：SPI 过审桩 meoo-douyin-spi
   modian_official        墨典官网 m.mofangdianai.com（案例库入口）
   xingxuan_dy_oauth      星选履约 Web 抖音扫码登录（不含商家 cs / 小程序）
+  login_alt_methods      商家 ERP + 星选 Web 登录页：下方图标登录方式（不含小程序）
   xingxuan_open_loop     星选招募开环/闭环（小程序发单+达人报名群码 + 履约 Web 同步；闭环现网路径不改）
   merchant_local_ads     商家 ERP：巨量本地推绑定/投流；与千川账户/取数隔离（不含聚光）
 
@@ -1182,6 +1183,15 @@ PAT
 TalentLoginAuthPanel
 灵祺达人履约管理后台/src/lib/mpApi.ts
 灵祺达人履约管理后台/src/lib/mpApiErrors.ts
+change-scope-guard
+PAT
+      ;;
+    login_alt_methods)
+      cat <<'PAT'
+LoginAltMethods
+LoginAuthPanel
+ErpScanLoginPanel
+TalentLoginAuthPanel
 change-scope-guard
 PAT
       ;;

@@ -13,10 +13,16 @@ type Props = {
   portal: ErpOAuthPortal
   err: string | null
   onErr: (v: string | null) => void
+  /** 由登录页图标按钮指定渠道时，不再展示内部 Tab */
+  channel?: ScanChannel
 }
 
-export default function ErpScanLoginPanel({ portal, err, onErr }: Props) {
-  const [scanChannel, setScanChannel] = useState<ScanChannel>('douyin')
+export default function ErpScanLoginPanel({ portal, err, onErr, channel }: Props) {
+  const [scanChannel, setScanChannel] = useState<ScanChannel>(channel ?? 'douyin')
+
+  useEffect(() => {
+    if (channel) setScanChannel(channel)
+  }, [channel])
   const [dyAuthorizeUrl, setDyAuthorizeUrl] = useState('')
   const [dyScanHint, setDyScanHint] = useState('')
   const [dyLoading, setDyLoading] = useState(false)
@@ -54,6 +60,7 @@ export default function ErpScanLoginPanel({ portal, err, onErr }: Props) {
 
   return (
     <div className="space-y-4">
+      {channel ? null : (
       <div className="flex gap-4 border-b border-white/40 pb-1">
         {(
           [
@@ -80,6 +87,7 @@ export default function ErpScanLoginPanel({ portal, err, onErr }: Props) {
           </button>
         ))}
       </div>
+      )}
 
       {scanChannel === 'wechat' ? (
         <div className="rounded-2xl border border-white/50 bg-white/40 px-4 py-8 text-center backdrop-blur-sm">

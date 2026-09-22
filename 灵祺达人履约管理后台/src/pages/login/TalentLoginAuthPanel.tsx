@@ -1,10 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import RememberPasswordRow from '@merchant/components/login/RememberPasswordRow'
-import { cn } from '../../cn'
 import type { MpWorkIdentity } from '../../lib/mpWorkIdentity'
 import { ROLE_LABEL } from '../landing/landingCopy'
 import DyOAuthOfficialPanel from '@merchant/components/login/DyOAuthOfficialPanel'
+import LoginAltMethods from '@merchant/components/login/LoginAltMethods'
 import { formatMpApiErr } from '../../lib/mpApiErrors'
 import { dyOAuthBegin, scanCreate, scanPoll } from '../../lib/mpApi'
 import type { MpAccount } from '../../lib/mpSession'
@@ -151,29 +151,15 @@ export default function TalentLoginAuthPanel({
         </p>
       </div>
 
-      <div className="mb-5 flex gap-6 border-b border-slate-200/80">
-        {(
-          [
-            ['password', '账号密码'],
-            ['scan', '扫码登录'],
-          ] as const
-        ).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => onTabChange(id)}
-            className={cn(
-              'relative pb-3 text-sm font-semibold transition-colors',
-              tab === id ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600',
-            )}
-          >
-            {label}
-            {tab === id ? (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-gradient-to-r from-violet-500 to-cyan-500" />
-            ) : null}
-          </button>
-        ))}
-      </div>
+      {tab === 'scan' ? (
+        <button
+          type="button"
+          className="mb-4 text-sm font-medium text-violet-700 hover:underline"
+          onClick={() => onTabChange('password')}
+        >
+          ← 账号密码登录
+        </button>
+      ) : null}
 
       {tab === 'password' ? (
         <form className="space-y-4" onSubmit={onSubmit}>
@@ -221,29 +207,6 @@ export default function TalentLoginAuthPanel({
         </form>
       ) : (
         <>
-          <div className="mb-4 flex gap-2 rounded-xl bg-slate-100/80 p-1">
-            {(
-              [
-                ['wechat', '微信扫码'],
-                ['douyin', '抖音扫码'],
-              ] as const
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setScanChannel(id)}
-                className={cn(
-                  'flex-1 rounded-lg py-2 text-sm font-semibold transition',
-                  scanChannel === id
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700',
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
           {scanChannel === 'wechat' ? (
             SCAN_LOGIN_WECHAT_ENABLED ? (
               <div className="space-y-4 text-center">
@@ -288,6 +251,29 @@ export default function TalentLoginAuthPanel({
           )}
         </>
       )}
+
+      <LoginAltMethods
+        activeId={tab === 'scan' ? scanChannel : undefined}
+        onSelect={(id) => {
+          if (id === 'douyin') {
+            setScanChannel('douyin')
+            onTabChange('scan')
+            return
+          }
+          if (id === 'wechat') {
+            setScanChannel('wechat')
+            onTabChange('scan')
+          }
+        }}
+        methods={[
+          { id: 'douyin', label: '抖音登录' },
+          {
+            id: 'wechat',
+            label: '微信登录',
+            hint: '微信开放平台网站应用审核通过后启用',
+          },
+        ]}
+      />
 
       {showDevPreview && onDevPreview ? (
         <button
