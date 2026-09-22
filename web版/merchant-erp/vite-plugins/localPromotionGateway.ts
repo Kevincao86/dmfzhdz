@@ -328,49 +328,18 @@ function projectCreateBodyFromDetail(
   }
   const aud = src.audience
   if (aud && typeof aud === 'object' && !Array.isArray(aud)) {
-    /* 创建不带定向，避免 custom_area / action_days 校验把整次创建打回 */
+    out.audience = aud
   }
   return sanitizeLocalCreateBody(out)
 }
 
-const LOCAL_ACTION_DAYS = new Set([
-  'ACTIONDAYS_DAY7',
-  'ACTIONDAYS_DAY15',
-  'ACTIONDAYS_DAY30',
-  'ACTIONDAYS_DAY60',
-  'ACTIONDAYS_DAY90',
-  'ACTIONDAYS_DAY180',
-  'ACTIONDAYS_DAY365',
-])
-
-function normalizeActionDays(v: unknown): string {
-  const raw = String(v ?? '').trim().toUpperCase()
-  if (LOCAL_ACTION_DAYS.has(raw)) return raw
-  const n = Number(v)
-  const map: Record<number, string> = {
-    7: 'ACTIONDAYS_DAY7',
-    15: 'ACTIONDAYS_DAY15',
-    30: 'ACTIONDAYS_DAY30',
-    60: 'ACTIONDAYS_DAY60',
-    90: 'ACTIONDAYS_DAY90',
-    180: 'ACTIONDAYS_DAY180',
-    365: 'ACTIONDAYS_DAY365',
-  }
-  return map[n] || 'ACTIONDAYS_DAY7'
-}
-
 function withLocalAudienceDefaults(audience: Record<string, unknown>): Record<string, unknown> {
   const out = { ...audience }
-  const rawAc = out.action_config
-  const ac =
-    rawAc && typeof rawAc === 'object' && !Array.isArray(rawAc)
-      ? { ...(rawAc as Record<string, unknown>) }
-      : {}
-  ac.action_days = normalizeActionDays(ac.action_days)
-  out.action_config = ac
-  if (!out.custom_area || typeof out.custom_area !== 'object' || Array.isArray(out.custom_area)) {
-    out.custom_area = {}
-  }
+  const district = String(out.district ?? 'ALL').toUpperCase() || 'ALL'
+  out.district = district === 'LOCAL' || district === 'POI' || district === 'REGION' ? district : 'ALL'
+  if (out.district !== 'LOCAL') delete out.custom_area
+  if (out.district !== 'POI') delete out.poi_around
+  if (out.district !== 'REGION') delete out.region
   return out
 }
 
@@ -513,7 +482,12 @@ function sanitizeLocalCreateBody(body: Record<string, unknown>): Record<string, 
     if (next) out.external_action = next
     else delete out.external_action
   }
-  delete out.audience
+  const rawAud = out.audience
+  const aud =
+    rawAud && typeof rawAud === 'object' && !Array.isArray(rawAud)
+      ? withLocalAudienceDefaults(rawAud as Record<string, unknown>)
+      : { district: 'ALL' }
+  out.audience = aud
   return out
 }
 
