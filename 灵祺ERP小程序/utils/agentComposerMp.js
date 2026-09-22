@@ -9,7 +9,7 @@ const COMPOSER_TOOL_ACTIONS = [
 const PLUS_ACTIONS = [
   { id: 'image', label: '照片', iconClass: 'plus-icon--photo' },
   { id: 'camera', label: '拍摄', iconClass: 'plus-icon--camera' },
-  { id: 'location', label: '位置', iconClass: 'plus-icon--location' },
+  { id: 'video', label: '视频', iconClass: 'plus-icon--video' },
   { id: 'file', label: '文件', iconClass: 'plus-icon--file' },
 ]
 
@@ -64,8 +64,9 @@ function takePhoto() {
         resolve({
           kind: 'image',
           filePath: file.tempFilePath,
-          thumbPath: '',
+          thumbPath: file.tempFilePath,
           contentType: 'image/jpeg',
+          fileName: '拍摄',
         })
       },
       fail: (e) => reject(new Error((e && e.errMsg) || 'cancel')),

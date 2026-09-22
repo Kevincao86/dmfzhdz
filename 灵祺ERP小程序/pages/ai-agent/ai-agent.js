@@ -36,6 +36,9 @@ Page({
     attachments: [],
     recordingVoice: false,
     showSendBtn: false,
+    voiceMode: false,
+    showPlusPanel: false,
+    plusActions: composer.PLUS_ACTIONS,
   },
 
   onLoad() {
@@ -114,6 +117,8 @@ Page({
       attachments: [],
       recordingVoice: false,
       showSendBtn: false,
+      voiceMode: false,
+      showPlusPanel: false,
     })
   },
 
@@ -177,7 +182,7 @@ Page({
         contentType: row.contentType || '',
       })
     }
-    this.setData({ attachments: next }, () => composer.syncShowSendBtn(this))
+    this.setData({ attachments: next, showPlusPanel: false }, () => composer.syncShowSendBtn(this))
   },
 
   onRemoveAttach(e) {
@@ -238,16 +243,61 @@ Page({
     }
   },
 
-  async onToggleVoice() {
+  onTogglePlus() {
     if (this.data.sending) return
-    if (this.data.recordingVoice) {
-      composer.stopVoiceRecord(this, this._recorder, false)
+    this.setData({ showPlusPanel: !this.data.showPlusPanel, voiceMode: false })
+  },
+
+  onToggleVoiceMode() {
+    if (this.data.sending) return
+    if (this.data.recordingVoice) composer.stopVoiceRecord(this, this._recorder, true)
+    this.setData({
+      voiceMode: !this.data.voiceMode,
+      showPlusPanel: false,
+      recordingVoice: false,
+    })
+  },
+
+  async onPlusAction(e) {
+    const id = e.currentTarget.dataset.id
+    if (id === 'image') await this.onPickPhoto()
+    else if (id === 'camera') await this.onPickCamera()
+    else if (id === 'video') await this.onPickVideo()
+    else if (id === 'file') await this.onPickFile()
+  },
+
+  async onPickCamera() {
+    if (this.data.sending) return
+    if (!this.remainAttachSlots()) {
+      wx.showToast({ title: '附件已达上限', icon: 'none' })
       return
     }
+    try {
+      const row = await composer.takePhoto()
+      await this.appendPicked([row])
+    } catch (e) {
+      if (!/cancel/i.test((e && e.message) || '')) wx.showToast({ title: e.message || '拍摄失败', icon: 'none' })
+    }
+  },
+
+  async onVoiceTouchStart() {
+    if (this.data.sending || this.data.recordingVoice) return
     const ok = await composer.authorizeRecord()
     if (!ok) return
+    this._voiceStartedAt = Date.now()
     if (!this._recorder) this._recorder = composer.createRecorderManager(this)
     composer.startVoiceRecord(this, this._recorder)
+  },
+
+  onVoiceTouchEnd() {
+    if (!this.data.recordingVoice) return
+    const ms = Date.now() - (this._voiceStartedAt || 0)
+    composer.stopVoiceRecord(this, this._recorder, ms < 400)
+    if (ms < 400) wx.showToast({ title: '说话时间太短', icon: 'none' })
+  },
+
+  async onToggleVoice() {
+    this.onToggleVoiceMode()
   },
 
   async onVoiceRecorded(payload) {
@@ -263,7 +313,7 @@ Page({
       }
       const cur = String(this.data.input || '').trim()
       const next = cur ? `${cur} ${r.text}` : r.text
-      this.setData({ input: next }, () => composer.syncShowSendBtn(this))
+      this.setData({ input: next, voiceMode: false, showPlusPanel: false }, () => composer.syncShowSendBtn(this))
     } catch (e) {
       wx.hideLoading()
       wx.showToast({ title: (e && e.message) || '识别失败', icon: 'none' })
@@ -306,6 +356,8 @@ Page({
       hasChat: true,
       scrollTo: 'msg-thinking',
       showSendBtn: false,
+      showPlusPanel: false,
+      voiceMode: false,
     })
     const history = this.data.messages.filter((m) => m.role === 'user' || m.role === 'assistant')
     try {

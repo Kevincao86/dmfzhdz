@@ -73,7 +73,7 @@
     </view>
   </scroll-view>
 
-  <view class="composer-v2 agent-composer">
+  <view class="wx-composer">
     <scroll-view wx:if="{{attachments.length}}" class="attach-row" scroll-x enhanced show-scrollbar="{{false}}">
       <view class="attach-chip" wx:for="{{attachments}}" wx:key="id">
         <image wx:if="{{item.preview}}" class="attach-thumb" src="{{item.preview}}" mode="aspectFill" />
@@ -81,30 +81,46 @@
           <text class="attach-file-t">{{item.kind === 'video' ? '视频' : '文件'}}</text>
           <text class="attach-file-n">{{item.name}}</text>
         </view>
-        <view class="attach-x" data-id="{{item.id}}" bindtap="onRemoveAttach">×</view>
+        <view class="attach-x" data-id="{{item.id}}" catchtap="onRemoveAttach">×</view>
       </view>
     </scroll-view>
-    <view class="composer-tools">
+    <view class="wx-bar">
       <view
-        class="tool-btn {{recordingVoice ? 'on' : ''}}"
-        bindtap="onToggleVoice"
-      >{{recordingVoice ? '停止' : '语音'}}</view>
-      <view class="tool-btn" bindtap="onPickPhoto">照片</view>
-      <view class="tool-btn" bindtap="onPickVideo">视频</view>
-      <view class="tool-btn" bindtap="onPickFile">文件</view>
-    </view>
-    <view class="composer-row">
+        class="wx-icon {{voiceMode ? 'wx-icon--kb' : 'wx-icon--mic'}}"
+        bindtap="onToggleVoiceMode"
+      ></view>
       <input
-        class="composer-input"
-        placeholder="{{recordingVoice ? '正在录音，再点「停止」转文字…' : '输入问题或经营任务，可附照片/视频/文件…'}}"
+        wx:if="{{!voiceMode}}"
+        class="wx-input"
+        placeholder="{{sending ? '发送中…' : ''}}"
         value="{{input}}"
-        disabled="{{sending || recordingVoice}}"
+        disabled="{{sending}}"
         bindinput="onInput"
         confirm-type="send"
         bindconfirm="onSend"
+        adjust-position
+        hold-keyboard
       />
-      <view class="send-v2 {{sending || (!input && !attachments.length) ? 'off' : ''}}" bindtap="onSend">
-        <text class="send-glyph">➤</text>
+      <view
+        wx:else
+        class="wx-hold {{recordingVoice ? 'on' : ''}}"
+        bindtouchstart="onVoiceTouchStart"
+        bindtouchend="onVoiceTouchEnd"
+        bindtouchcancel="onVoiceTouchEnd"
+      >{{recordingVoice ? '松开 结束' : '按住 说话'}}</view>
+      <view
+        wx:if="{{!voiceMode && !showSendBtn}}"
+        class="wx-icon wx-icon--plus {{showPlusPanel ? 'on' : ''}}"
+        bindtap="onTogglePlus"
+      ></view>
+      <view wx:if="{{!voiceMode && showSendBtn}}" class="wx-send" bindtap="onSend">发送</view>
+    </view>
+    <view wx:if="{{showPlusPanel && !voiceMode}}" class="wx-plus">
+      <view class="plus-grid">
+        <view class="plus-item" wx:for="{{plusActions}}" wx:key="id" data-id="{{item.id}}" bindtap="onPlusAction">
+          <view class="plus-item-icon plus-icon {{item.iconClass}}"></view>
+          <text class="plus-item-label">{{item.label}}</text>
+        </view>
       </view>
     </view>
   </view>
