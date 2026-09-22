@@ -71,6 +71,8 @@ Page({
     replyingId: '',
     replyDraft: '',
     suggestBusyId: '',
+    autoReplyBusy: false,
+    processingAutoId: '',
     storePickerLabels: ['全部门店'],
     storePickerIndex: 0,
     storesInternal: [{ id: '', name: '全部门店' }],
@@ -153,6 +155,10 @@ Page({
 
   applySearch(items) {
     const kw = String(this.data.searchKw || '').trim().toLowerCase()
+    const drafts = {}
+    for (const x of this.data.items || []) {
+      if (x && x.id && x.replyDraft) drafts[x.id] = x.replyDraft
+    }
     let rows = items.slice()
     if (kw) {
       rows = rows.filter(
@@ -166,6 +172,7 @@ Page({
     else if (sort === 'stars_desc') rows.sort((a, b) => (b.ratingStars || 0) - (a.ratingStars || 0))
     else if (sort === 'stars_asc') rows.sort((a, b) => (a.ratingStars || 0) - (b.ratingStars || 0))
     else rows.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+    rows = rows.map((x) => ({ ...x, replyDraft: drafts[x.id] || x.replyDraft || '' }))
     this.setData({ items, displayItems: rows })
   },
 
@@ -243,6 +250,7 @@ Page({
       wx.setStorageSync(AI_KEY, next)
     } catch (_) {}
     this.setData({ aiAutoReply: next })
+    if (next) void this.runAutoReplies(this.data.items || [])
   },
 
   activeApiPlatform() {
@@ -257,7 +265,8 @@ Page({
     return row && row.id ? row.id : ''
   },
 
-  async load() {
+  async load(opts) {
+    const skipAuto = Boolean(opts && opts.skipAuto)
     if (!merchant.hasMerchantApi()) {
       this.setData({
         loading: false,
@@ -314,6 +323,7 @@ Page({
       this.applySearch(items)
       this.setData({ loading: false, syncedAtText })
       this.updatePlatTabCounts(items)
+      if (this.data.aiAutoReply && !skipAuto && !this.data.autoReplyBusy) void this.runAutoReplies(items)
     } catch (e) {
       this.setData({
         loading: false,
@@ -386,56 +396,96 @@ Page({
     wx.showToast({ title: '已标记稍后处理', icon: 'none' })
   },
 
-  startReply(e) {
-    const id = e.currentTarget.dataset.id
-    if (!id) return
-    const row = this.data.displayItems.find((x) => x.id === id)
-    this.setData({
-      replyingId: id,
-      replyDraft: row && row.replied ? row.replyText : '',
-    })
-  },
-
-  cancelReply() {
-    this.setData({ replyingId: '', replyDraft: '' })
+  patchDraft(id, text) {
+    const patch = {}
+    const items = (this.data.items || []).map((x) => (x.id === id ? { ...x, replyDraft: text } : x))
+    const displayItems = (this.data.displayItems || []).map((x) =>
+      x.id === id ? { ...x, replyDraft: text } : x,
+    )
+    this.setData({ items, displayItems, ...patch })
   },
 
   onReplyInput(e) {
-    this.setData({ replyDraft: e.detail.value || '' })
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    this.patchDraft(id, e.detail.value || '')
+  },
+
+  reviewSnapshot(row) {
+    if (!row) return undefined
+    return {
+      userName: row.userName,
+      content: row.content,
+      ratingStars: row.ratingStars,
+      sentiment: row.sentiment,
+      createdAt: row.createdAt,
+      poiName: row.poiName,
+      poiId: row.poiId,
+      productName: row.productName,
+      reviewKind: this.data.reviewKind,
+    }
+  },
+
+  async runAutoReplies(list) {
+    if (!this.data.aiAutoReply || this.data.autoReplyBusy) return
+    const pending = (list || []).filter((x) => x && !x.replied).slice(0, 15)
+    if (!pending.length) return
+    const plat = this.activeApiPlatform()
+    this.setData({ autoReplyBusy: true })
+    try {
+      for (const row of pending) {
+        if (!this.data.aiAutoReply) break
+        this.setData({ processingAutoId: row.id })
+        const sug = await reviews.postReviewAiSuggest(plat, row.id, this.reviewSnapshot(row))
+        if (!sug.ok) {
+          wx.showToast({ title: sug.message.slice(0, 18), icon: 'none' })
+          break
+        }
+        const rep = await reviews.postReviewReply(plat, row.id, sug.text, this.reviewSnapshot(row))
+        if (!rep.ok) {
+          wx.showToast({ title: rep.message.slice(0, 18), icon: 'none' })
+          break
+        }
+      }
+      await this.load({ skipAuto: true })
+    } finally {
+      this.setData({ autoReplyBusy: false, processingAutoId: '' })
+    }
   },
 
   async onAiSuggest(e) {
     const id = e.currentTarget.dataset.id
     if (!id) return
+    const row = (this.data.displayItems || []).find((x) => x.id === id)
     this.setData({ suggestBusyId: id })
-    const r = await reviews.postReviewAiSuggest(this.activeApiPlatform(), id)
+    const r = await reviews.postReviewAiSuggest(this.activeApiPlatform(), id, this.reviewSnapshot(row))
     this.setData({ suggestBusyId: '' })
     if (!r.ok) {
       wx.showToast({ title: r.message.slice(0, 18), icon: 'none' })
       return
     }
-    this.setData({
-      replyingId: id,
-      replyDraft: String(r.text || '').slice(0, 500),
-    })
+    this.patchDraft(id, String(r.text || '').slice(0, 500))
+    wx.showToast({ title: '话术已填入草稿', icon: 'none' })
   },
 
   async submitReply(e) {
     const id = e.currentTarget.dataset.id
-    const text = String(this.data.replyDraft || '').trim()
+    const row = (this.data.displayItems || []).find((x) => x.id === id)
+    const text = String((row && row.replyDraft) || '').trim()
     if (!id || !text) {
       wx.showToast({ title: '请输入回复内容', icon: 'none' })
       return
     }
+    this.setData({ replyingId: id })
     wx.showLoading({ title: '提交…', mask: true })
-    const r = await reviews.postReviewReply(this.activeApiPlatform(), id, text)
+    const r = await reviews.postReviewReply(this.activeApiPlatform(), id, text, this.reviewSnapshot(row))
     wx.hideLoading()
+    this.setData({ replyingId: '' })
     if (!r.ok) {
       wx.showModal({ title: '回复失败', content: r.message, showCancel: false })
       return
     }
-    this.setData({ replyingId: '', replyDraft: '' })
     wx.showToast({ title: '已回复', icon: 'success' })
-    void this.load()
+    void this.load({ skipAuto: true })
   },
 })

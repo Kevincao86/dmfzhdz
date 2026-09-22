@@ -1,5 +1,5 @@
 const merchantApi = require('./merchantApi.js')
-const { multiPlatformMerchantHeaders, tokenForReviewsApiPlatform } = require('./merchantHeadersMp.js')
+const { multiPlatformMerchantHeaders, aiReviewAuthHeaders, tokenForReviewsApiPlatform } = require('./merchantHeadersMp.js')
 
 function qs(params) {
   return Object.keys(params)
@@ -83,9 +83,32 @@ async function postReviewsSync(platform, opts = {}) {
  * @param {string} reviewId
  * @param {string} content
  */
-async function postReviewReply(apiPlatform, reviewId, content) {
+function reviewSnapshotBody(snapshot, mode) {
+  if (!snapshot || typeof snapshot !== 'object') return {}
+  const base = {
+    userName: snapshot.userName,
+    ratingStars: snapshot.ratingStars,
+    sentiment: snapshot.sentiment,
+    createdAt: snapshot.createdAt,
+    poiName: snapshot.poiName,
+    poiId: snapshot.poiId,
+    productName: snapshot.productName,
+    reviewKind: snapshot.reviewKind,
+  }
+  if (mode === 'reply') {
+    return { ...base, reviewContent: snapshot.content }
+  }
+  return { ...base, content: snapshot.content }
+}
+
+async function postReviewReply(apiPlatform, reviewId, content, snapshot) {
   const headers = multiPlatformMerchantHeaders()
-  const body = { platform: apiPlatform, reviewId, content: String(content || '').trim() }
+  const body = {
+    platform: apiPlatform,
+    reviewId,
+    content: String(content || '').trim(),
+    ...reviewSnapshotBody(snapshot, 'reply'),
+  }
   const tries = ['/api/meoo-merchant-reviews-reply', '/api/merchant/reviews/reply']
   let lastErr = '回复失败'
   for (const path of tries) {
@@ -114,14 +137,18 @@ async function postReviewReply(apiPlatform, reviewId, content) {
   }
 }
 
-async function postReviewAiSuggest(apiPlatform, reviewId) {
-  const headers = multiPlatformMerchantHeaders()
-  const body = { platform: apiPlatform, reviewId }
+async function postReviewAiSuggest(apiPlatform, reviewId, snapshot) {
+  const headers = aiReviewAuthHeaders()
+  const body = { platform: apiPlatform, reviewId, ...reviewSnapshotBody(snapshot, 'suggest') }
   const tries = ['/api/meoo-merchant-reviews-ai-suggest', '/api/merchant/reviews/ai-suggest']
   let lastErr = '话术生成失败'
   for (const path of tries) {
     try {
-      const data = await merchantApi.merchantRequestWithHeaders('POST', path, { headers, data: body })
+      const data = await merchantApi.merchantRequestWithHeaders('POST', path, {
+        headers,
+        data: body,
+        timeoutMs: 45000,
+      })
       const suggestion = String(data.suggestion || data.text || '').trim()
       if (suggestion) return { ok: true, text: suggestion }
       lastErr = data.message || '未返回话术'

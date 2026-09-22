@@ -104,9 +104,57 @@
   color: #0369a1 !important;
 }
 
-.rev-ai-lab {
-  font-size: 22rpx;
+.rev-ai-bar {
+  padding: 16rpx 24rpx 8rpx;
+  background: #fff;
+}
+
+.rev-ai-toggle {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 18rpx 20rpx;
+  border-radius: 20rpx;
+  border: 1rpx solid #e0e7ff;
+  background: linear-gradient(180deg, #f5f3ff 0%, #fff 100%);
+}
+
+.rev-ai-toggle-txt {
+  flex: 1;
+  min-width: 0;
+}
+
+.rev-ai-toggle-title {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #312e81;
+}
+
+.rev-ai-toggle-sub {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 20rpx;
   color: #64748b;
+  line-height: 1.4;
+}
+
+.rev-auto-banner {
+  margin: 0 24rpx 8rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 16rpx;
+  background: #f5f3ff;
+  border: 1rpx solid #ddd6fe;
+  font-size: 22rpx;
+  color: #5b21b6;
+}
+
+.rev-ai-btn {
+  margin: 0 !important;
+  border-radius: 999rpx !important;
+  background: #f5f3ff !important;
+  color: #5b21b6 !important;
+  border: 1rpx solid #ddd6fe !important;
 }
 
 .rev-tab-scroll {
@@ -331,13 +379,6 @@
   font-size: 22rpx;
   color: #475569;
   line-height: 1.45;
-}
-
-.rev-ai-btn {
-  margin: 12rpx 0 0 !important;
-  border-radius: 999rpx !important;
-  background: #fff !important;
-  color: #0284c7 !important;
 }
 
 .rev-reply-box {

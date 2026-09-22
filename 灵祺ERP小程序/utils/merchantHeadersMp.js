@@ -34,6 +34,17 @@ function multiPlatformMerchantHeaders() {
   return h
 }
 
+/** AI 话术：Authorization 必须是 ERP JWT（积分门禁），平台 token 只放 X-Meoo-* */
+function aiReviewAuthHeaders() {
+  const h = multiPlatformMerchantHeaders()
+  const jwt = api.getBearerToken ? String(api.getBearerToken() || '').trim() : ''
+  if (jwt) {
+    h.Authorization = `Bearer ${jwt}`
+    h['X-Meoo-Access-Token'] = jwt
+  }
+  return h
+}
+
 function tokenForReviewsApiPlatform(platform) {
   const map = {
     douyin: 'douyin',
@@ -50,5 +61,6 @@ function tokenForReviewsApiPlatform(platform) {
 
 module.exports = {
   multiPlatformMerchantHeaders,
+  aiReviewAuthHeaders,
   tokenForReviewsApiPlatform,
 }

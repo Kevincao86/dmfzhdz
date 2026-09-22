@@ -59,6 +59,7 @@ function enrichReviewRow(item, platId) {
     replyStatusLabel: st.label,
     replyStatusClass: st.cls,
     keywords,
+    replyDraft: String(item.replyDraft || ''),
     hasAiSuggest: !item.replied && Boolean(item.aiSuggest || item.content),
     aiSuggestPreview: String(item.aiSuggest || '').slice(0, 48) || '感谢光临，期待再次为您服务…',
   }
