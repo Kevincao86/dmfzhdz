@@ -5,6 +5,7 @@ const api = require('./api.js')
 const merchantApi = require('./merchantApi.js')
 const { readPlatformToken } = require('./platformTokensMp.js')
 const feat = require('./merchantFeatureApisMp.js')
+const sessionSync = require('./merchantSessionSyncMp.js')
 
 const MP_RECHARGE_POINTS_PER_YUAN = 40
 
@@ -37,6 +38,28 @@ function addDaysYmd(ymd, delta) {
 function defaultRange() {
   const end = shanghaiTodayYmd()
   return { startDate: addDaysYmd(end, -29), endDate: end }
+}
+
+function tenantIdHint() {
+  try {
+    return String(wx.getStorageSync(sessionSync.MEOO_ACTIVE_TENANT_ID) || '').trim()
+  } catch (_) {
+    return ''
+  }
+}
+
+function eachShopSyncChunks(startYmd, endYmd) {
+  const out = []
+  let cur = startYmd
+  let guard = 0
+  while (cur <= endYmd && guard++ < 80) {
+    const chunkEnd = addDaysYmd(cur, 2)
+    const end = chunkEnd > endYmd ? endYmd : chunkEnd
+    out.push({ start: cur, end })
+    if (end >= endYmd) break
+    cur = addDaysYmd(end, 1)
+  }
+  return out
 }
 
 function authHeadersExtra() {
@@ -87,7 +110,10 @@ function requestShop(method, path, data, timeoutMs) {
           },
           authHeadersExtra(),
         ),
-        data: method === 'GET' ? undefined : data,
+        data:
+          method === 'GET'
+            ? undefined
+            : Object.assign({ access_token: token, tenantId: tenantIdHint() }, data || {}),
         timeout,
         success(res) {
           const body = res.data || {}
@@ -139,7 +165,20 @@ async function fetchShopAnalysisSummary(opts) {
     `marginPercent=${encodeURIComponent(String(marginPercent || 0))}`,
   ]
   if (opts.poiId) q.push(`poiId=${encodeURIComponent(opts.poiId)}`)
-  const data = await requestShop('GET', `/api/meoo-shop-analysis-summary?${q.join('&')}`)
+  const tid = tenantIdHint()
+  if (tid) q.push(`tenantId=${encodeURIComponent(tid)}`)
+  let data = await requestShop('GET', `/api/meoo-shop-analysis-summary?${q.join('&')}`)
+  const empty =
+    !data.summary ||
+    (Number(data.summary.orderCount) || 0) === 0 &&
+      (Number(data.summary.salesAmountYuan) || 0) === 0
+  if (empty && platform !== 'all') {
+    const qAll = q.map((s) => (s.startsWith('platform=') ? 'platform=all' : s))
+    try {
+      const allData = await requestShop('GET', `/api/meoo-shop-analysis-summary?${qAll.join('&')}`)
+      if (allData.summary && (Number(allData.summary.orderCount) || 0) > 0) data = allData
+    } catch (_) {}
+  }
   return {
     ok: true,
     startDate,
@@ -163,6 +202,8 @@ async function fetchShopAnalysisAi(opts) {
     marginPercent: marginPercent || 0,
   }
   if (opts.poiId) body.poiId = opts.poiId
+  const tid = tenantIdHint()
+  if (tid) body.tenantId = tid
   const data = await requestShop('POST', '/api/meoo-shop-analysis-ai', body, 180000)
   return {
     ok: true,
@@ -178,9 +219,48 @@ async function fetchShopAnalysisAi(opts) {
   }
 }
 
+async function syncMerchantOrders(opts) {
+  const range = defaultRange()
+  const startDate = opts.startDate || range.startDate
+  const endDate = opts.endDate || range.endDate
+  const dy = readPlatformToken('douyin')
+  if (!dy) {
+    return { ok: false, message: '尚未同步到来客令牌，请下拉刷新后再试', pulled: 0, upserted: 0 }
+  }
+  const chunks = eachShopSyncChunks(startDate, endDate)
+  let pulled = 0
+  let upserted = 0
+  const warnings = []
+  for (const week of chunks) {
+    try {
+      const data = await requestShop(
+        'POST',
+        '/api/meoo-merchant-orders-sync',
+        {
+          startDate: week.start,
+          endDate: week.end,
+          douyinToken: dy,
+          tenantId: tenantIdHint(),
+        },
+        120000,
+      )
+      pulled += Number(data.pulled) || 0
+      upserted += Number(data.upserted) || 0
+      if (Array.isArray(data.warnings)) {
+        for (const w of data.warnings) if (w && !warnings.includes(w)) warnings.push(w)
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      if (!warnings.includes(msg)) warnings.push(msg)
+    }
+  }
+  return { ok: true, pulled, upserted, warnings }
+}
+
 module.exports = {
   defaultRange,
   shopAnalysisAiPointsFromGross,
   fetchShopAnalysisSummary,
   fetchShopAnalysisAi,
+  syncMerchantOrders,
 }

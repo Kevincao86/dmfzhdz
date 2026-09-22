@@ -59,16 +59,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendJson(res, 401, { ok: false, error: 'unauthorized', detail: 'invalid_token' })
       return
     }
-    const ctx = await loadTenantAiContextForUser(user.id, env)
-    if (!ctx?.tenantId) {
-      sendJson(res, 400, { ok: false, error: 'tenant_required' })
-      return
-    }
-
     const q = req.query || {}
     const get = (k: string) => {
       const v = q[k]
       return Array.isArray(v) ? String(v[0] || '') : String(v || '')
+    }
+    const ctx = await loadTenantAiContextForUser(user.id, env, token, get('tenantId') || undefined)
+    if (!ctx?.tenantId) {
+      sendJson(res, 400, { ok: false, error: 'tenant_required' })
+      return
     }
     let startDate = get('startDate')
     let endDate = get('endDate')

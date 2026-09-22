@@ -1,5 +1,6 @@
 const shop = require('../../utils/shopAnalysisApiMp.js')
 const api = require('../../utils/api.js')
+const sessionSync = require('../../utils/merchantSessionSyncMp.js')
 
 function yuan(n) {
   const v = Number(n) || 0
@@ -33,7 +34,11 @@ Page({
   onLoad() {
     const range = shop.defaultRange()
     this.setData({ startDate: range.startDate, endDate: range.endDate })
-    void this.loadCharts()
+    void this.loadCharts({ sync: true })
+  },
+
+  onShow() {
+    void sessionSync.syncFromCloud({ force: false }).catch(() => {})
   },
 
   onStorePick(e) {
@@ -56,7 +61,7 @@ Page({
   },
 
   onReload() {
-    void this.loadCharts()
+    void this.loadCharts({ sync: true })
   },
 
   applySummary(summary, adviceFacts) {
@@ -144,7 +149,7 @@ Page({
     })
   },
 
-  async loadCharts() {
+  async loadCharts(opts) {
     if (!api.isRealAuthed || !api.isRealAuthed()) {
       this.setData({ loading: false, err: '请先登录后再查看店铺分析' })
       return
@@ -154,6 +159,17 @@ Page({
     this._loadSeq = seq
     this.setData({ loading: true, err: '', showAdvice: false, aiSections: [], pointsCharged: 0 })
     try {
+      await sessionSync.syncFromCloud({ force: false })
+      if (opts && opts.sync) {
+        const syn = await shop.syncMerchantOrders({
+          startDate: this.data.startDate,
+          endDate: this.data.endDate,
+        })
+        if (seq !== this._loadSeq) return
+        if (!syn.ok && syn.message && syn.pulled === 0 && syn.upserted === 0) {
+          /* 无来客令牌时仍读已落库数据 */
+        }
+      }
       const r = await shop.fetchShopAnalysisSummary({
         startDate: this.data.startDate,
         endDate: this.data.endDate,

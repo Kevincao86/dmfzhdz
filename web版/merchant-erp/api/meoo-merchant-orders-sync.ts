@@ -4,7 +4,7 @@
  * 拉取抖音来客逐单并 UPSERT 到 merchant_platform_orders
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { verifyBearerJwt } from '../vite-plugins/aiGateway/authSupabase.js'
+import { readRequestBearer, verifyAccessToken } from '../vite-plugins/aiGateway/authSupabase.js'
 import { loadTenantAiContextForUser } from '../vite-plugins/tenantMembershipCore.js'
 import { fetchDouyinTradeOrderDetails } from '../vite-plugins/douyinMerchantGateway.js'
 import {
@@ -31,12 +31,6 @@ function rawBody(req: VercelRequest): string {
   }
 }
 
-function bearer(authHeader: string | undefined): string | undefined {
-  return typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
-    ? authHeader.slice(7).trim()
-    : undefined
-}
-
 function headerToken(req: VercelRequest, name: string): string | undefined {
   const raw = req.headers[name]
   const v = Array.isArray(raw) ? raw[0] : raw
@@ -54,7 +48,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     if (req.method === 'OPTIONS') {
       res.setHeader('Access-Control-Allow-Origin', '*')
       res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Meoo-Douyin-Token')
+      res.setHeader(
+        'Access-Control-Allow-Headers',
+        'Content-Type, Authorization, X-Meoo-Access-Token, X-Meoo-Douyin-Token',
+      )
       res.status(204).end()
       return
     }
@@ -63,35 +60,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    const token = bearer(req.headers.authorization)
-    if (!token) {
-      sendJson(res, 401, { ok: false, error: 'unauthorized' })
-      return
-    }
-    const env = process.env as Record<string, string>
-    let user: Awaited<ReturnType<typeof verifyBearerJwt>>
-    try {
-      user = await verifyBearerJwt(`Bearer ${token}`, env)
-    } catch {
-      sendJson(res, 401, { ok: false, error: 'unauthorized' })
-      return
-    }
-    if (!user?.id) {
-      sendJson(res, 401, { ok: false, error: 'unauthorized' })
-      return
-    }
-    const ctx = await loadTenantAiContextForUser(user.id, env)
-    const tenantId = ctx?.tenantId
-    if (!tenantId) {
-      sendJson(res, 400, { ok: false, error: 'tenant_required' })
-      return
-    }
-
     let body: Record<string, unknown>
     try {
       body = JSON.parse(rawBody(req) || '{}') as Record<string, unknown>
     } catch {
       sendJson(res, 400, { ok: false, error: 'invalid_json' })
+      return
+    }
+
+    const token = readRequestBearer(req.headers as Record<string, unknown>, body)
+    if (!token) {
+      sendJson(res, 401, { ok: false, error: 'unauthorized', detail: 'missing_token' })
+      return
+    }
+    const env = process.env as Record<string, string>
+    let user: Awaited<ReturnType<typeof verifyAccessToken>>
+    try {
+      user = await verifyAccessToken(token, env)
+    } catch {
+      sendJson(res, 401, { ok: false, error: 'unauthorized', detail: 'invalid_token' })
+      return
+    }
+    if (!user?.id) {
+      sendJson(res, 401, { ok: false, error: 'unauthorized', detail: 'invalid_token' })
+      return
+    }
+    const ctx = await loadTenantAiContextForUser(
+      user.id,
+      env,
+      token,
+      typeof body.tenantId === 'string' ? body.tenantId.trim() : undefined,
+    )
+    const tenantId = ctx?.tenantId
+    if (!tenantId) {
+      sendJson(res, 400, { ok: false, error: 'tenant_required' })
       return
     }
     const startDate = String(body.startDate || '').trim()

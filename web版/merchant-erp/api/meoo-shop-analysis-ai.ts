@@ -98,7 +98,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendJson(res, 401, { ok: false, error: 'unauthorized', detail: 'invalid_token' })
       return
     }
-    const ctx = await loadTenantAiContextForUser(user.id, env)
+    const ctx = await loadTenantAiContextForUser(
+      user.id,
+      env,
+      token,
+      typeof body.tenantId === 'string' ? body.tenantId.trim() : undefined,
+    )
     if (!ctx?.tenantId) {
       sendJson(res, 400, { ok: false, error: 'tenant_required' })
       return
