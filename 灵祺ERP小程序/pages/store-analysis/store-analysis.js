@@ -29,12 +29,13 @@ Page({
     estimatedPoints: 0,
     pointsCharged: 0,
     modelUsed: '',
+    syncHint: '',
   },
 
   onLoad() {
     const range = shop.defaultRange()
     this.setData({ startDate: range.startDate, endDate: range.endDate })
-    void this.loadCharts({ sync: true })
+    void this.loadCharts({ sync: true, startDate: range.startDate, endDate: range.endDate })
   },
 
   onShow() {
@@ -157,22 +158,13 @@ Page({
     if (this.data.analyzing) return
     const seq = (this._loadSeq || 0) + 1
     this._loadSeq = seq
-    this.setData({ loading: true, err: '', showAdvice: false, aiSections: [], pointsCharged: 0 })
+    this.setData({ loading: true, err: '', showAdvice: false, aiSections: [], pointsCharged: 0, syncHint: '' })
+    const startDate = (opts && opts.startDate) || this.data.startDate
+    const endDate = (opts && opts.endDate) || this.data.endDate
     try {
-      await sessionSync.syncFromCloud({ force: false })
-      if (opts && opts.sync) {
-        const syn = await shop.syncMerchantOrders({
-          startDate: this.data.startDate,
-          endDate: this.data.endDate,
-        })
-        if (seq !== this._loadSeq) return
-        if (!syn.ok && syn.message && syn.pulled === 0 && syn.upserted === 0) {
-          /* 无来客令牌时仍读已落库数据 */
-        }
-      }
       const r = await shop.fetchShopAnalysisSummary({
-        startDate: this.data.startDate,
-        endDate: this.data.endDate,
+        startDate,
+        endDate,
         platform: this.data.platform,
         poiId: this.data.poiId || undefined,
       })
@@ -185,6 +177,28 @@ Page({
         loading: false,
         err: e instanceof Error ? e.message : '加载失败',
       })
+    }
+    if (!(opts && opts.sync)) return
+    this.setData({ syncHint: '正在后台同步近 7 天来客订单…' })
+    try {
+      await sessionSync.syncFromCloud({ force: false })
+      await shop.syncMerchantOrders({
+        endDate,
+        maxDays: 7,
+      })
+      if (seq !== this._loadSeq) return
+      const r2 = await shop.fetchShopAnalysisSummary({
+        startDate,
+        endDate,
+        platform: this.data.platform,
+        poiId: this.data.poiId || undefined,
+      })
+      if (seq !== this._loadSeq) return
+      this.applySummary(r2.summary, r2.adviceFacts)
+      this.setData({ syncHint: '' })
+    } catch (_) {
+      if (seq !== this._loadSeq) return
+      this.setData({ syncHint: '' })
     }
   },
 

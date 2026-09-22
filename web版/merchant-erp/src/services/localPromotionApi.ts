@@ -536,6 +536,31 @@ export async function fetchLocalPromotions(): Promise<
   return { ok: true, list: r.data.list ?? [], demoMode: r.data.demoMode, apiError: r.data.apiError }
 }
 
+export async function createLocalPromotion(input: {
+  name: string
+  budgetYuan: number
+  marketingGoal?: 'LIVE' | 'VIDEO_IMAGE'
+}): Promise<{ ok: true; projectId?: string; message?: string } | { ok: false; message: string }> {
+  const creds = credsPayload()
+  if (!creds) return { ok: false, message: '请先在系统设置中绑定巨量本地推' }
+  const r = await requestJson<{ projectId?: string; message?: string }>(
+    `${apiBase()}/api/merchant/local-promotion/promotions/create`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...creds,
+        name: input.name,
+        budget_yuan: input.budgetYuan,
+        marketing_goal: input.marketingGoal ?? 'VIDEO_IMAGE',
+      }),
+    },
+    '创建本地推计划',
+  )
+  if (!r.ok) return r
+  return { ok: true, projectId: r.data.projectId, message: r.data.message }
+}
+
 export async function updatePromotionStatus(
   promotionIds: string[],
   optStatus: 'ENABLE' | 'DISABLE',

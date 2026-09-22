@@ -62,6 +62,16 @@ function eachShopSyncChunks(startYmd, endYmd) {
   return out
 }
 
+function clampSyncRange(opts) {
+  const range = defaultRange()
+  const endDate = opts.endDate || range.endDate
+  const maxDays = Math.max(1, Math.min(14, Number(opts.maxDays) || 7))
+  const startWanted = opts.startDate || addDaysYmd(endDate, -(maxDays - 1))
+  const minStart = addDaysYmd(endDate, -(maxDays - 1))
+  const startDate = startWanted < minStart ? minStart : startWanted
+  return { startDate, endDate }
+}
+
 function authHeadersExtra() {
   const h = {}
   const dy = readPlatformToken('douyin')
@@ -220,14 +230,18 @@ async function fetchShopAnalysisAi(opts) {
 }
 
 async function syncMerchantOrders(opts) {
-  const range = defaultRange()
-  const startDate = opts.startDate || range.startDate
-  const endDate = opts.endDate || range.endDate
+  const { startDate, endDate } = clampSyncRange(opts || {})
   const dy = readPlatformToken('douyin')
   if (!dy) {
-    return { ok: false, message: '尚未同步到来客令牌，请下拉刷新后再试', pulled: 0, upserted: 0 }
+    return { ok: false, message: '尚未同步到来客令牌', pulled: 0, upserted: 0 }
   }
-  const chunks = eachShopSyncChunks(startDate, endDate)
+  const spanDays =
+    Math.round(
+      (new Date(`${endDate}T12:00:00+08:00`).getTime() -
+        new Date(`${startDate}T12:00:00+08:00`).getTime()) /
+        86400000,
+    ) + 1
+  const chunks = spanDays <= 7 ? [{ start: startDate, end: endDate }] : eachShopSyncChunks(startDate, endDate)
   let pulled = 0
   let upserted = 0
   const warnings = []
@@ -242,7 +256,7 @@ async function syncMerchantOrders(opts) {
           douyinToken: dy,
           tenantId: tenantIdHint(),
         },
-        120000,
+        45000,
       )
       pulled += Number(data.pulled) || 0
       upserted += Number(data.upserted) || 0

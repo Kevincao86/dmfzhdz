@@ -508,6 +508,31 @@ export async function fetchQianchuanPromotions(): Promise<
   return { ok: true, list: r.data.list ?? [], demoMode: r.data.demoMode, apiError: r.data.apiError }
 }
 
+export async function createQianchuanPromotion(input: {
+  name: string
+  budgetYuan: number
+  marketingGoal?: 'LIVE' | 'VIDEO_IMAGE'
+}): Promise<{ ok: true; projectId?: string; message?: string } | { ok: false; message: string }> {
+  const creds = credsPayload()
+  if (!creds) return { ok: false, message: '请先在系统设置中绑定巨量千川' }
+  const r = await requestJson<{ projectId?: string; message?: string }>(
+    `${apiBase()}/api/merchant/qianchuan/promotions/create`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...creds,
+        name: input.name,
+        budget_yuan: input.budgetYuan,
+        marketing_goal: input.marketingGoal === 'LIVE' ? 'LIVE_PROM_GOODS' : 'VIDEO_PROM_GOODS',
+      }),
+    },
+    '创建千川计划',
+  )
+  if (!r.ok) return r
+  return { ok: true, projectId: r.data.projectId, message: r.data.message }
+}
+
 export async function updatePromotionStatus(
   promotionIds: string[],
   optStatus: 'ENABLE' | 'DISABLE',

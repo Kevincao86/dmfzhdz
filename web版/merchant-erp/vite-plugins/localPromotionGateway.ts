@@ -35,7 +35,8 @@ function mapOceanError(raw: string, status?: number, code?: number): string {
     return `access_token 无效或已过期，请到系统设置重新授权本地推${codeHint}`
   }
   if (code === 40000) {
-    return `巨量拒绝了创建参数。本地推营销目标须为 LIVE / VIDEO_IMAGE；请确认已授权门店/抖音号，或用已有计划作模板后重试${codeHint}`
+    if (/[\u4e00-\u9fff]/.test(s)) return `${s}${codeHint}`
+    return `巨量拒绝了创建参数，请确认本地推账号有创编权限、已选可投门店/抖音号${codeHint}`
   }
   if (!/[\u4e00-\u9fff]/.test(s)) {
     return `连接巨量本地推失败，请确认 Access Token 与广告主 ID 正确，并在开放平台开通投放/报表权限${codeHint}`
@@ -51,6 +52,40 @@ function parseOceanJson<T>(text: string): T {
 
 function jsonBodyPreserveIntIds(body: unknown): string {
   return JSON.stringify(body).replace(/"(\d{16,})"/g, '$1')
+}
+
+function oceanNumeric(v: unknown): number | string {
+  const s = String(v ?? '').trim()
+  if (!/^\d+$/.test(s)) return s
+  if (s.length >= 16) return s
+  const n = Number(s)
+  return Number.isFinite(n) ? n : s
+}
+
+function coerceOceanCreateBody(body: Record<string, unknown>): Record<string, unknown> {
+  const numKeys = new Set([
+    'local_account_id',
+    'product_id',
+    'aweme_id',
+    'budget',
+    'bid',
+    'schedule_fixed_seconds',
+    'high_budget_rate',
+  ])
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(body)) {
+    if (v == null || v === '') continue
+    if (k === 'promotion_poi_ids' && Array.isArray(v)) {
+      out[k] = v.map((x) => oceanNumeric(x))
+      continue
+    }
+    if (numKeys.has(k)) {
+      out[k] = oceanNumeric(v)
+      continue
+    }
+    out[k] = v
+  }
+  return out
 }
 
 const LOCAL_REPORT_METRICS_LIST = [
@@ -191,6 +226,69 @@ async function fetchLocalCreateAssets(
   return { awemeId, poiIds, productId }
 }
 
+async function fetchLocalProjectDetail(
+  creds: LocalPromotionCredentials,
+  projectId: string,
+): Promise<Record<string, unknown> | null> {
+  const q = { local_account_id: creds.localAccountId, project_id: projectId }
+  const got = await oceanGet<Record<string, unknown>>(creds, '/open_api/v3.0/local/project/detail/', q)
+  if (got.ok && got.data && typeof got.data === 'object') return got.data
+  const posted = await oceanPost<Record<string, unknown>>(creds, '/open_api/v3.0/local/project/detail/', q)
+  if (posted.ok && posted.data && typeof posted.data === 'object') return posted.data
+  return null
+}
+
+function projectCreateBodyFromDetail(
+  detail: Record<string, unknown>,
+  creds: LocalPromotionCredentials,
+  name: string,
+  budgetFen: number,
+): Record<string, unknown> {
+  const src = (
+    detail.project && typeof detail.project === 'object'
+      ? (detail.project as Record<string, unknown>)
+      : detail
+  )
+  const keep = [
+    'marketing_goal',
+    'local_delivery_scene',
+    'ad_type',
+    'delivery_goal',
+    'delivery_poi_mode',
+    'promotion_poi_ids',
+    'product_id',
+    'aweme_id',
+    'external_action',
+    'audience',
+    'schedule_type',
+    'schedule_time',
+    'bid_type',
+    'bid',
+    'budget_mode',
+    'is_set_peak_budget',
+    'peak_week_days',
+    'peak_holidays',
+    'high_budget_rate',
+  ]
+  const out: Record<string, unknown> = {
+    local_account_id: creds.localAccountId,
+    name,
+    budget: budgetFen,
+  }
+  for (const k of keep) {
+    const v = src[k]
+    if (v == null || v === '') continue
+    if (k === 'promotion_poi_ids') {
+      if (Array.isArray(v) && v.length) out[k] = v
+      continue
+    }
+    if (typeof v === 'object') continue
+    out[k] = v
+  }
+  if (!out.budget_mode) out.budget_mode = 'BUDGET_MODE_DAY'
+  return out
+}
+
 function isWeakOceanCreateError(msg: string): boolean {
   return /接口不可用|page could not be found|not_found|404/i.test(msg)
 }
@@ -208,7 +306,11 @@ async function oceanPost<T>(
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
-    body: jsonBodyPreserveIntIds(body),
+    body: jsonBodyPreserveIntIds(
+      body && typeof body === 'object' && !Array.isArray(body)
+        ? coerceOceanCreateBody(body as Record<string, unknown>)
+        : body,
+    ),
   })
   const text = await r.text()
   let parsed: OeEnvelope<T> = {}
@@ -595,44 +697,43 @@ export async function handleLocalPromotionRoutes(
       return true
     }
     const budgetFen = Math.round(budgetYuan * 100)
-    const assets = await fetchLocalCreateAssets(creds, marketingGoal)
     const attempts: Array<Record<string, unknown>> = []
-    if (marketingGoal === 'LIVE') {
-      if (!assets.awemeId) {
-        json(res, 400, {
-          ok: false,
-          message: '未获取到可投抖音号。请在巨量本地推开通直播投放抖音号后再创建。',
+    const listed = await listLocalByMarketingGoals(
+      creds,
+      '/open_api/v3.0/local/project/list/',
+      ['project_list', 'list'],
+      'project_status_first',
+      'PROJECT_STATUS_ALL',
+    )
+    const templateRow = listed.ok
+      ? listed.rows.find((row) => {
+          const g = pickLocalMarketingGoal(row)
+          return marketingGoal === 'LIVE' ? g === 'LIVE' : g === 'VIDEO_IMAGE' || !g
         })
-        return true
+      : undefined
+    const templateId = String(templateRow?.project_id ?? templateRow?.id ?? '').trim()
+    if (templateId) {
+      const detail = await fetchLocalProjectDetail(creds, templateId)
+      if (detail) attempts.push(projectCreateBodyFromDetail(detail, creds, name, budgetFen))
+    }
+    const assets = await fetchLocalCreateAssets(creds, marketingGoal)
+    if (marketingGoal === 'LIVE') {
+      if (assets.awemeId) {
+        attempts.push({
+          local_account_id: creds.localAccountId,
+          name,
+          marketing_goal: 'LIVE',
+          local_delivery_scene: 'CONTENT_HEAT',
+          ad_type: 'GENERAL',
+          aweme_id: assets.awemeId,
+          schedule_type: 'FROM_NOW_ON',
+          budget_mode: 'BUDGET_MODE_DAY',
+          budget: budgetFen,
+          bid_type: 'SMART',
+          external_action: 'LIVE_ENGAGE',
+        })
       }
-      attempts.push({
-        local_account_id: creds.localAccountId,
-        name,
-        marketing_goal: 'LIVE',
-        local_delivery_scene: 'CONTENT_HEAT',
-        ad_type: 'GENERAL',
-        aweme_id: assets.awemeId,
-        schedule_type: 'FROM_NOW_ON',
-        budget_mode: 'BUDGET_MODE_DAY',
-        budget: budgetFen,
-        bid_type: 'SMART',
-        external_action: 'LIVE_ENGAGE',
-      })
-      attempts.push({
-        local_account_id: creds.localAccountId,
-        name,
-        marketing_goal: 'LIVE',
-        local_delivery_scene: 'PRODUCT_PAY',
-        ad_type: 'GENERAL',
-        aweme_id: assets.awemeId,
-        schedule_type: 'FROM_NOW_ON',
-        budget_mode: 'BUDGET_MODE_DAY',
-        budget: budgetFen,
-        bid_type: 'SMART',
-        external_action: 'LIVE_OTO_GROUP_BUYING',
-      })
     } else {
-      const poiMode = assets.poiIds.length ? 'PART' : 'ALL'
       attempts.push({
         local_account_id: creds.localAccountId,
         name,
@@ -640,8 +741,7 @@ export async function handleLocalPromotionRoutes(
         local_delivery_scene: 'POI_RECOMMEND',
         ad_type: 'GENERAL',
         delivery_goal: 'POI',
-        delivery_poi_mode: poiMode,
-        ...(assets.poiIds.length ? { promotion_poi_ids: assets.poiIds.slice(0, 5) } : {}),
+        delivery_poi_mode: 'ALL',
         budget_mode: 'BUDGET_MODE_DAY',
         budget: budgetFen,
         bid_type: 'SMART',
@@ -673,6 +773,16 @@ export async function handleLocalPromotionRoutes(
         bid_type: 'SMART',
         external_action: 'NATIVE_ACTION',
       })
+    }
+    if (!attempts.length) {
+      json(res, 400, {
+        ok: false,
+        message:
+          marketingGoal === 'LIVE'
+            ? '未获取到可投抖音号，无法创建直播计划。请在巨量本地推开通直播投放抖音号。'
+            : '未能组装创建参数，请确认本地推已授权门店或商品。',
+      })
+      return true
     }
     let lastMsg = ''
     let created: Record<string, unknown> | null = null

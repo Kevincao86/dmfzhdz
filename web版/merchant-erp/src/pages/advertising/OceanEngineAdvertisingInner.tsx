@@ -1,4 +1,4 @@
-import { Loader2, RefreshCw } from 'lucide-react'
+import { Loader2, Plus, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { cn } from '../../cn'
@@ -20,6 +20,7 @@ import type {
   LocalReportSummary,
 } from '../../lib/localPromotionTypes'
 import {
+  createLocalPromotion,
   fetchLocalClues,
   fetchLocalProjects,
   fetchLocalPromotions,
@@ -29,6 +30,7 @@ import {
   updateProjectStatus,
 } from '../../services/localPromotionApi'
 import {
+  createQianchuanPromotion,
   fetchLocalClues as fetchQianchuanClues,
   fetchLocalProjects as fetchQianchuanProjects,
   fetchQianchuanPromotions,
@@ -106,6 +108,11 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
   const [aiApplyingId, setAiApplyingId] = useState<string | null>(null)
   const [aiRunning, setAiRunning] = useState(false)
   const [statusBusy, setStatusBusy] = useState<string | null>(null)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [createName, setCreateName] = useState('')
+  const [createBudget, setCreateBudget] = useState('300')
+  const [createBusy, setCreateBusy] = useState(false)
+  const [createMsg, setCreateMsg] = useState<string | null>(null)
   const reloadGen = useRef(0)
 
   const bind =
@@ -431,6 +438,38 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
     }
   }
 
+  const submitCreate = async () => {
+    const name = createName.trim()
+    const budgetYuan = Number(createBudget)
+    if (!name) {
+      setCreateMsg('请填写计划名称')
+      return
+    }
+    if (!Number.isFinite(budgetYuan) || budgetYuan < 100) {
+      setCreateMsg('日预算至少 100 元')
+      return
+    }
+    setCreateBusy(true)
+    setCreateMsg(null)
+    try {
+      const goal = pane === 'live' ? 'LIVE' : 'VIDEO_IMAGE'
+      const r = await (platform === 'qianchuan' ? createQianchuanPromotion : createLocalPromotion)({
+        name,
+        budgetYuan,
+        marketingGoal: goal,
+      })
+      if (!r.ok) {
+        setCreateMsg(r.message)
+        return
+      }
+      setCreateMsg(r.message || '已创建。创意素材可随后在广告后台补齐。')
+      setCreateName('')
+      await reload()
+    } finally {
+      setCreateBusy(false)
+    }
+  }
+
   const togglePromotion = async (row: LocalPromotionRow, enable: boolean) => {
     if (row.promotionId && row.projectId && row.promotionId === row.projectId) {
       if (platform !== 'local_promotion') {
@@ -483,7 +522,20 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
 
   return (
     <>
-      <div className="mb-4 flex justify-end">
+      <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
+        {bound ? (
+          <button
+            type="button"
+            onClick={() => {
+              setCreateOpen((v) => !v)
+              setCreateMsg(null)
+            }}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-3 py-1.5 text-sm text-white hover:bg-orange-700"
+          >
+            <Plus className="h-4 w-4" />
+            新建计划
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={() => void reload()}
@@ -494,6 +546,44 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
           同步
         </button>
       </div>
+
+      {bound && createOpen ? (
+        <div className="erp-panel mb-4 p-4">
+          <p className="text-sm font-medium text-slate-800">新建{platformLabel}计划</p>
+          <p className="mt-1 text-xs text-slate-500">
+            将按当前页签创建（{pane === 'live' ? '直播' : '短视频'}）。日预算至少 100 元；视频/创意素材仍需在广告后台补齐。
+          </p>
+          <div className="mt-3 flex flex-wrap items-end gap-3">
+            <label className="text-xs text-slate-600">
+              计划名称
+              <input
+                value={createName}
+                onChange={(e) => setCreateName(e.target.value)}
+                className="mt-1 block w-56 rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                placeholder="例如：周末到店短视频"
+              />
+            </label>
+            <label className="text-xs text-slate-600">
+              日预算（元）
+              <input
+                value={createBudget}
+                onChange={(e) => setCreateBudget(e.target.value)}
+                className="mt-1 block w-28 rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+                inputMode="numeric"
+              />
+            </label>
+            <button
+              type="button"
+              disabled={createBusy}
+              onClick={() => void submitCreate()}
+              className="rounded-lg bg-orange-600 px-4 py-1.5 text-sm text-white disabled:opacity-60"
+            >
+              {createBusy ? '创建中…' : '创建'}
+            </button>
+          </div>
+          {createMsg ? <p className="mt-2 text-xs text-amber-800">{createMsg}</p> : null}
+        </div>
+      ) : null}
 
       {!bound ? (
         <div className="erp-panel mb-6 border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-900">

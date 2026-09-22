@@ -126,6 +126,36 @@ export async function fetchXhsReportSummary(): Promise<
   return { ok: true, summary, demoMode: Boolean(data.demoMode) }
 }
 
+export async function createXhsPromotion(input: {
+  name: string
+  budgetYuan: number
+}): Promise<{ ok: true; projectId?: string; message?: string } | { ok: false; message: string }> {
+  const body = credsBody()
+  if (!body) return { ok: false, message: '请先在商业化后台绑定小红书聚光/种小草' }
+  const res = await fetch(`${apiBase()}/api/merchant/xhs-juguang/promotions/create`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ...body,
+      name: input.name,
+      campaign_name: input.name,
+      budget_yuan: input.budgetYuan,
+    }),
+  })
+  const data = await parseJson(res)
+  if (!res.ok || data.ok === false) {
+    return {
+      ok: false,
+      message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
+    }
+  }
+  return {
+    ok: true,
+    projectId: typeof data.projectId === 'string' ? data.projectId : undefined,
+    message: typeof data.message === 'string' ? data.message : undefined,
+  }
+}
+
 export async function updateXhsPromotionStatus(
   promotionIds: string[],
   optStatus: 'ENABLE' | 'DISABLE',
