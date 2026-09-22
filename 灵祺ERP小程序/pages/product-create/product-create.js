@@ -72,7 +72,51 @@ Page({
     actionOk: false,
   },
 
-  onLoad() {},
+  onLoad() {
+    try {
+      const pending = wx.getStorageSync('meoo_voice_product_pending')
+      if (pending && pending.platformId) {
+        wx.removeStorageSync('meoo_voice_product_pending')
+        this.applyVoicePending(pending)
+      }
+    } catch (_) {}
+  },
+
+  applyVoicePending(p) {
+    const id = String(p.platformId || '')
+    const title = String(p.title || '').trim()
+    const price = p.priceYuan != null ? String(p.priceYuan) : ''
+    const desc = String(p.description || '').trim()
+    const origin = String(p.originYuan || '').trim()
+    if (id === 'douyin') {
+      this.setData({
+        selectedPlatformId: id,
+        selectedPlatformIds: [id],
+        confirmLine: platformDisplayName(id),
+        productName: title,
+        priceYuan: price,
+        productDesc: desc,
+        originYuan: origin,
+        phase: 'douyin',
+        douyinStep: 1,
+        err: '',
+      })
+      void this.loadCategoryTree()
+      wx.showToast({ title: '语音稿已填入，请补齐类目与门店', icon: 'none' })
+      return
+    }
+    this.setData({
+      selectedPlatformId: id,
+      selectedPlatformIds: [id],
+      genericPlatform: id,
+      genericTitle: title,
+      genericPriceYuan: price,
+      genericDesc: desc,
+      confirmLine: platformDisplayName(id),
+      phase: 'generic',
+      err: '',
+    })
+  },
 
   onShow() {
     if (!api.canAccessPage()) {

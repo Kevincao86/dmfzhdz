@@ -45,6 +45,12 @@ const PREVIEW_BY_RANGE = {
   },
 }
 
+function chartTitleFor(rangeId) {
+  if (rangeId === 'day30') return '近30日成交趋势'
+  if (rangeId === 'day7') return '近7日成交趋势'
+  return '今日成交趋势'
+}
+
 function enrichKpis(kpis) {
   return kpis.map((k) => ({
     ...k,
@@ -61,6 +67,9 @@ Page({
     kpis: enrichKpis(EMPTY_KPIS),
     usePreview: false,
     chartEmpty: true,
+    chartBars: [],
+    chartHint: '',
+    chartTitle: '趋势分析',
   },
 
   onShow() {
@@ -86,11 +95,23 @@ Page({
     const previewPack = PREVIEW_BY_RANGE[tab.id] || PREVIEW_BY_RANGE.today
 
     if (devAuth.isDevSkipLogin()) {
+      const demo = [
+        { label: '09-16', value: 80, pct: 55, tip: '¥80' },
+        { label: '09-17', value: 120, pct: 80, tip: '¥120' },
+        { label: '09-18', value: 90, pct: 62, tip: '¥90' },
+        { label: '09-19', value: 150, pct: 100, tip: '¥150' },
+        { label: '09-20', value: 110, pct: 74, tip: '¥110' },
+        { label: '09-21', value: 130, pct: 87, tip: '¥130' },
+        { label: '09-22', value: 140, pct: 93, tip: '¥140' },
+      ]
       this.setData({
         loading: false,
         usePreview: true,
         kpis: enrichKpis(previewPack.kpis),
-        chartEmpty: true,
+        chartEmpty: false,
+        chartBars: demo,
+        chartHint: '预览数据',
+        chartTitle: chartTitleFor(tab.id),
       })
       return
     }
@@ -101,6 +122,9 @@ Page({
         usePreview: false,
         kpis: enrichKpis(EMPTY_KPIS),
         chartEmpty: true,
+        chartBars: [],
+        chartHint: '登录并绑定平台后可查看趋势',
+        chartTitle: chartTitleFor(tab.id),
       })
       return
     }
@@ -113,6 +137,9 @@ Page({
         usePreview: false,
         kpis: enrichKpis(EMPTY_KPIS),
         chartEmpty: true,
+        chartBars: [],
+        chartHint: '请先在系统设置绑定至少一个平台',
+        chartTitle: chartTitleFor(tab.id),
       })
       return
     }
@@ -148,11 +175,16 @@ Page({
       },
     ])
 
+    const bars = Array.isArray(d.chartBars) ? d.chartBars : []
+    const hasVal = bars.some((x) => Number(x.value) > 0)
     this.setData({
       loading: false,
       usePreview: false,
       kpis,
-      chartEmpty: true,
+      chartEmpty: bars.length === 0,
+      chartBars: bars,
+      chartHint: bars.length === 0 ? '暂无趋势点' : hasVal ? '' : '已接通平台，当前区间成交额为 0',
+      chartTitle: chartTitleFor(tab.id),
     })
   },
 })

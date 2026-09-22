@@ -34,12 +34,22 @@
 
   <view class="dash-chart-card">
     <view class="dash-chart-head">
-      <text class="dash-chart-title">趋势分析</text>
-      <text class="dash-chart-more">查看更多 ›</text>
+      <text class="dash-chart-title">{{chartTitle}}</text>
     </view>
-    <view class="dash-chart-ph">
-      <text wx:if="{{chartEmpty}}">暂无数据</text>
-      <text wx:else>趋势图</text>
+    <view wx:if="{{chartEmpty}}" class="dash-chart-ph">
+      <text>{{chartHint || '暂无数据'}}</text>
+    </view>
+    <view wx:else class="dash-chart-wrap">
+      <view class="dash-chart-bars">
+        <view wx:for="{{chartBars}}" wx:key="label" class="dash-bar-col">
+          <text class="dash-bar-tip">{{item.tip}}</text>
+          <view class="dash-bar-track">
+            <view class="dash-bar-fill" style="height: {{item.pct}}%;"></view>
+          </view>
+          <text class="dash-bar-lab">{{item.label}}</text>
+        </view>
+      </view>
+      <text wx:if="{{chartHint}}" class="dash-chart-hint">{{chartHint}}</text>
     </view>
   </view>
 

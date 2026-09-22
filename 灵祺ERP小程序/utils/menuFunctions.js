@@ -80,8 +80,8 @@ const FUNCTION_SECTIONS = [
       {
         kind: 'link',
         url: '/pages/product-voice/product-voice',
-        title: '语音建品',
-        desc: '语音描述快速建品',
+        title: '语音上品',
+        desc: '口述后 AI 优化，确认必填再上架',
         iconKey: 'mic',
       },
     ],
