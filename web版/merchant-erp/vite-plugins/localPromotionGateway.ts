@@ -201,8 +201,12 @@ function firstOceanListRow(data: unknown): Record<string, unknown> | null {
     'data_list',
   ]) {
     const arr = o[k]
-    if (Array.isArray(arr) && arr[0] && typeof arr[0] === 'object') {
-      return arr[0] as Record<string, unknown>
+    if (Array.isArray(arr) && arr.length) {
+      const first = arr[0]
+      if (first && typeof first === 'object') return first as Record<string, unknown>
+      if (typeof first === 'string' || typeof first === 'number') {
+        return { aweme_id: String(first), id: String(first) }
+      }
     }
   }
   return null
@@ -221,9 +225,21 @@ async function fetchLocalCreateAssets(
     page: '1',
     page_size: '20',
   })
-  if (aweme.ok) {
+    if (aweme.ok) {
     const row = firstOceanListRow(aweme.data)
-    awemeId = String(row?.aweme_id ?? row?.awemeId ?? row?.id ?? '').trim()
+    const nested = row
+      ? row.aweme_id_list ?? row.aweme_list
+      : null
+    const nestedFirst = Array.isArray(nested) ? nested[0] : null
+    awemeId = String(
+      row?.aweme_id ??
+        row?.awemeId ??
+        (nestedFirst && typeof nestedFirst === 'object'
+          ? (nestedFirst as Record<string, unknown>).aweme_id
+          : nestedFirst) ??
+        row?.id ??
+        '',
+    ).trim()
   }
   const poi = await oceanGetOrPost(creds, '/open_api/v3.0/local/poi/get/', {
     local_account_id: creds.localAccountId,
@@ -290,6 +306,10 @@ function projectCreateBodyFromDetail(
     'bid',
     'budget_mode',
     'is_set_peak_budget',
+    'schedule_type',
+    'schedule_fixed_seconds',
+    'start_time',
+    'end_time',
   ]
   const out: Record<string, unknown> = {
     local_account_id: creds.localAccountId,
@@ -354,17 +374,60 @@ function withLocalAudienceDefaults(audience: Record<string, unknown>): Record<st
   return out
 }
 
+/** 官方：LIVE 必填 FROM_NOW_ON | START_TO_END | FIXED_TIME；VIDEO_IMAGE 禁止传入 */
+const LIVE_SCHEDULE_TYPES = new Set(['FROM_NOW_ON', 'START_TO_END', 'FIXED_TIME'])
+
 function sanitizeLocalCreateBody(body: Record<string, unknown>): Record<string, unknown> {
   const out = { ...body }
   const goal = String(out.marketing_goal ?? '').toUpperCase()
-  const scene = String(out.local_delivery_scene ?? '').toUpperCase()
-  if (goal !== 'LIVE') {
+  let scene = String(out.local_delivery_scene ?? '').toUpperCase()
+  if (goal === 'LIVE') {
+    /* 直播不支持门店引流 */
+    if (scene === 'POI_RECOMMEND') {
+      scene = 'CONTENT_HEAT'
+      out.local_delivery_scene = scene
+    }
+    const st = String(out.schedule_type ?? '').toUpperCase()
+    if (!LIVE_SCHEDULE_TYPES.has(st)) out.schedule_type = 'FROM_NOW_ON'
+    if (out.schedule_type === 'START_TO_END' && (!out.start_time || !out.end_time)) {
+      out.schedule_type = 'FROM_NOW_ON'
+      delete out.start_time
+      delete out.end_time
+    }
+    if (out.schedule_type === 'FIXED_TIME') {
+      const sec = Number(out.schedule_fixed_seconds)
+      if (!Number.isFinite(sec) || sec < 1800) {
+        out.schedule_type = 'FROM_NOW_ON'
+        delete out.schedule_fixed_seconds
+      }
+    }
+    if (out.schedule_type !== 'FIXED_TIME') delete out.schedule_fixed_seconds
+    if (out.schedule_type !== 'START_TO_END') {
+      delete out.start_time
+      delete out.end_time
+    }
+    if (out.schedule_type === 'FIXED_TIME') {
+      out.budget_mode = 'BUDGET_MODE_TOTAL'
+      delete out.schedule_time
+    } else {
+      out.budget_mode = 'BUDGET_MODE_DAY'
+    }
+    delete out.delivery_goal
+    delete out.delivery_poi_mode
+    delete out.promotion_poi_ids
+    delete out.is_set_peak_budget
+    delete out.peak_week_days
+    delete out.peak_holidays
+    delete out.high_budget_rate
+    if (scene === 'CONTENT_HEAT') delete out.product_id
+  } else {
     delete out.schedule_type
     delete out.schedule_fixed_seconds
     delete out.start_time
     delete out.end_time
+    delete out.schedule_time
   }
-  if (scene !== 'CONTENT_HEAT') delete out.external_action
+  if (goal === 'VIDEO_IMAGE' && scene !== 'CONTENT_HEAT') delete out.external_action
   if (scene === 'CONTENT_HEAT') {
     delete out.delivery_goal
     delete out.delivery_poi_mode
@@ -809,6 +872,29 @@ export async function handleLocalPromotionRoutes(
     const budgetFen = Math.round(budgetYuan * 100)
     const attempts: Array<Record<string, unknown>> = []
     const assets = await fetchLocalCreateAssets(creds, marketingGoal)
+    const listed = await listLocalByMarketingGoals(
+      creds,
+      '/open_api/v3.0/local/project/list/',
+      ['project_list', 'list'],
+      'project_status_first',
+      'PROJECT_STATUS_ALL',
+    )
+    const templateRow = listed.ok
+      ? listed.rows.find((row) => {
+          const g = pickLocalMarketingGoal(row)
+          return marketingGoal === 'LIVE' ? g === 'LIVE' : g === 'VIDEO_IMAGE' || !g
+        })
+      : undefined
+    const templateId = String(templateRow?.project_id ?? templateRow?.id ?? '').trim()
+    const templateDetail = templateId ? await fetchLocalProjectDetail(creds, templateId) : null
+    if (!assets.awemeId && templateDetail) {
+      const src =
+        templateDetail.project && typeof templateDetail.project === 'object'
+          ? (templateDetail.project as Record<string, unknown>)
+          : templateDetail
+      const fromTpl = String(src.aweme_id ?? '').trim()
+      if (fromTpl) assets.awemeId = fromTpl
+    }
     if (marketingGoal === 'LIVE') {
       if (assets.awemeId) {
         attempts.push(
@@ -826,6 +912,24 @@ export async function handleLocalPromotionRoutes(
             external_action: 'LIVE_ENGAGE',
           }),
         )
+        if (assets.productId) {
+          attempts.push(
+            sanitizeLocalCreateBody({
+              local_account_id: creds.localAccountId,
+              name,
+              marketing_goal: 'LIVE',
+              local_delivery_scene: 'PRODUCT_PAY',
+              ad_type: 'GENERAL',
+              aweme_id: String(assets.awemeId),
+              product_id: assets.productId,
+              schedule_type: 'FROM_NOW_ON',
+              budget_mode: 'BUDGET_MODE_DAY',
+              budget: budgetFen,
+              bid_type: 'SMART',
+              external_action: 'LIVE_OTO_CLICK',
+            }),
+          )
+        }
       }
     } else {
       attempts.push(
@@ -892,24 +996,7 @@ export async function handleLocalPromotionRoutes(
         )
       }
     }
-    const listed = await listLocalByMarketingGoals(
-      creds,
-      '/open_api/v3.0/local/project/list/',
-      ['project_list', 'list'],
-      'project_status_first',
-      'PROJECT_STATUS_ALL',
-    )
-    const templateRow = listed.ok
-      ? listed.rows.find((row) => {
-          const g = pickLocalMarketingGoal(row)
-          return marketingGoal === 'LIVE' ? g === 'LIVE' : g === 'VIDEO_IMAGE' || !g
-        })
-      : undefined
-    const templateId = String(templateRow?.project_id ?? templateRow?.id ?? '').trim()
-    if (templateId) {
-      const detail = await fetchLocalProjectDetail(creds, templateId)
-      if (detail) attempts.push(projectCreateBodyFromDetail(detail, creds, name, budgetFen))
-    }
+    if (templateDetail) attempts.push(projectCreateBodyFromDetail(templateDetail, creds, name, budgetFen))
     if (!attempts.length) {
       json(res, 400, {
         ok: false,
