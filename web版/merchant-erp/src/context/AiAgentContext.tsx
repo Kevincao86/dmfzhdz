@@ -3114,11 +3114,22 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
                 const premiumRef = userReferenceImagesFromMessages(messagesRef.current)[0]
                 const premiumPrompt = buildPremiumRedrawPrompt(q, messagesRef.current)
                 const imgOpts = buildAgentImagePostOpts(proKey, premiumRef)
-                const imgRes = await postAiAgentNativeImage(premiumPrompt, {
+                let imgRes = await postAiAgentNativeImage(premiumPrompt, {
                   ...imgOpts,
                   exactPrompt: true,
                   signal: ac.signal,
                 })
+                if (
+                  !imgRes.ok &&
+                  premiumRef &&
+                  /参考图|reference|不支持|硬拒|edit|image_url/i.test(imgRes.message)
+                ) {
+                  imgRes = await postAiAgentNativeImage(premiumPrompt, {
+                    ...buildAgentImagePostOpts(proKey),
+                    exactPrompt: true,
+                    signal: ac.signal,
+                  })
+                }
                 if (imgRes.ok) {
                   const assistantMsg = createAgentMessage(
                     'assistant',
