@@ -106,8 +106,10 @@ function inferTaskTypeFromText(t) {
   return exec.inferTaskTypeFromText(t) || undefined
 }
 
-const COPYWRITING_HINT =
-  /话术|文案|脚本|口播|推广语|广告语|slogan|标题|描述|方案|计划|报告|清单|列表|邮件|短信|推文|种草文案|字幕|旁白|台词|宣传语/
+const COPYWRITING_ONLY_HINT =
+  /话术|文案|脚本|口播|推广语|广告语|slogan|种草文案|字幕|旁白|台词|宣传语|邮件正文|短信内容/
+const IMAGE_NOUN =
+  /图|图片|照片|照|海报|封面|logo|插画|门头|配图|画面|宣传图|店招|效果图|主图|商品图|详情图|美食图|菜品图|产品图|场景图|氛围图/i
 
 function detectImageEditIntent(text, hasImages) {
   const t = String(text || '').trim()
@@ -124,14 +126,23 @@ function detectImageEditIntent(text, hasImages) {
 function detectImageGenerationIntent(t, hasImages) {
   const text = String(t || '').trim()
   if (text.length < 2) return false
-  if (COPYWRITING_HINT.test(text) && !detectImageEditIntent(text, Boolean(hasImages))) return false
+  if (COPYWRITING_ONLY_HINT.test(text) && !IMAGE_NOUN.test(text) && !detectImageEditIntent(text, Boolean(hasImages))) {
+    return false
+  }
   if (detectImageEditIntent(text, Boolean(hasImages))) return true
-  if (/生图|文生图|图生图|作图|出图|画一张|画一幅|画个|P图|抠图|换背景|美化/i.test(text)) return true
-  if (/帮我生成|生成一张|生成一幅|生成个/i.test(text) && /图|照|海报|封面|logo|门头|配图|画面|宣传图|店招/i.test(text)) {
+  if (/生图|文生图|图生图|作图|出图|AI绘画|帮我画|画一张|画一幅|画个|P图|抠图|换背景|美化/i.test(text)) {
     return true
   }
-  if (/(?:设计|做|来).{0,10}(?:图|海报|门头|封面|店招|logo)/i.test(text)) return true
-  if (/门头照|店招|宣传海报|封面图|配图|效果图|海报设计|主图|商品图|详情图/i.test(text)) return true
+  if (/(?:帮我)?(?:生成|做|画|来|出|整)(?:一张|一幅|几张|个)?/.test(text) && IMAGE_NOUN.test(text)) {
+    return true
+  }
+  if (/生成.{0,24}(图|照片|图片|照|海报|门头|封面|插画|效果图|宣传图|店招|logo|美食)/i.test(text)) return true
+  if (/(?:设计|做|来|出).{0,12}(?:一张|几张|个)?(?:图|图片|照片|海报|门头|封面|店招|logo|美食图)/i.test(text)) {
+    return true
+  }
+  if (/美食图|菜品图|产品图|场景图|氛围图|人像图|门头照|店招|宣传海报|封面图|配图|效果图|海报设计|主图|商品图|详情图/i.test(text)) {
+    return true
+  }
   return false
 }
 
