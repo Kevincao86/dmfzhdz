@@ -25,6 +25,7 @@ import { clearPendingDistributionRef, readPendingDistributionRef } from '../../l
 import { toUserFacingError } from '../../lib/userFacingError'
 import ErpScanLoginPanel from '../../components/login/ErpScanLoginPanel'
 import LoginAltMethods from '../../components/login/LoginAltMethods'
+import LoginAltMethodsAgreeRow, { LOGIN_AGREE_REQUIRED } from '../../components/login/LoginAltMethodsAgreeRow'
 
 type AuthMode = 'login' | 'register'
 type LoginMethod = 'password' | 'sms' | 'wechat' | 'douyin'
@@ -67,6 +68,7 @@ export default function LoginAuthPanel({
   const [loginSmsSending, setLoginSmsSending] = useState(false)
   const rememberScope = partnerMode ? 'partner' : 'merchant'
   const [rememberPassword, setRememberPassword] = useState(() => isRememberLoginEnabled(rememberScope))
+  const [agreed, setAgreed] = useState(false)
 
   const [regLoginName, setRegLoginName] = useState('')
   const [merchantName, setMerchantName] = useState('')
@@ -126,6 +128,10 @@ export default function LoginAuthPanel({
     if (!supabase) return
     onErr(null)
     onInfoHint(null)
+    if (!agreed) {
+      onErr(LOGIN_AGREE_REQUIRED)
+      return
+    }
     const name = loginName.trim()
     if (name.length < 2) {
       onErr('账户名至少 2 个字符')
@@ -164,6 +170,10 @@ export default function LoginAuthPanel({
     if (!supabase) return
     onErr(null)
     onInfoHint(null)
+    if (!agreed) {
+      onErr(LOGIN_AGREE_REQUIRED)
+      return
+    }
     const mobile = loginPhone.replace(/\D/g, '')
     if (!isCnMobileValid(mobile)) {
       onErr('请输入有效的大陆手机号（11 位）')
@@ -256,6 +266,10 @@ export default function LoginAuthPanel({
     e.preventDefault()
     onErr(null)
     onInfoHint(null)
+    if (!agreed) {
+      onErr(LOGIN_AGREE_REQUIRED)
+      return
+    }
     const ln = regLoginName.trim()
     const mn = merchantName.trim()
     const mobile = phone.replace(/\D/g, '')
@@ -473,12 +487,13 @@ export default function LoginAuthPanel({
                   </p>
                 </div>
                 <RememberPasswordRow checked={rememberPassword} onChange={setRememberPassword} />
+                <LoginAltMethodsAgreeRow checked={agreed} onChange={setAgreed} />
                 {err ? (
                   <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">{err}</p>
                 ) : null}
                 <button
                   type="submit"
-                  disabled={busy}
+                  disabled={busy || !agreed}
                   className={primaryBtn}
                 >
                   {busy ? '登录中…' : '进入工作台'}
@@ -523,30 +538,44 @@ export default function LoginAuthPanel({
                     </button>
                   </div>
                 </div>
+                <LoginAltMethodsAgreeRow checked={agreed} onChange={setAgreed} />
                 {err ? (
                   <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">{err}</p>
                 ) : null}
                 <button
                   type="submit"
-                  disabled={busy}
+                  disabled={busy || !agreed}
                   className={primaryBtn}
                 >
                   {busy ? '登录中…' : '验证码登录'}
                 </button>
               </form>
             ) : (
-              <ErpScanLoginPanel
-                portal={partnerMode ? 'partner' : 'merchant'}
-                err={err}
-                onErr={onErr}
-                channel={loginMethod === 'wechat' ? 'wechat' : 'douyin'}
-              />
+              <>
+                <LoginAltMethodsAgreeRow checked={agreed} onChange={setAgreed} className="mb-4" />
+                {agreed ? (
+                  <ErpScanLoginPanel
+                    portal={partnerMode ? 'partner' : 'merchant'}
+                    err={err}
+                    onErr={onErr}
+                    channel={loginMethod === 'wechat' ? 'wechat' : 'douyin'}
+                  />
+                ) : (
+                  <p className="mb-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 ring-1 ring-amber-100">
+                    {LOGIN_AGREE_REQUIRED}
+                  </p>
+                )}
+              </>
             )}
 
             <LoginAltMethods
               activeId={loginMethod === 'password' ? undefined : loginMethod}
               onSelect={(id) => {
                 if (id === 'password') return
+                if (!agreed) {
+                  onErr(LOGIN_AGREE_REQUIRED)
+                  return
+                }
                 setLoginMethod(id)
                 onErr(null)
                 onInfoHint(null)
@@ -652,12 +681,13 @@ export default function LoginAuthPanel({
                 onChange={(e) => setConfirmPassword(e.target.value)}
               />
             </div>
+            <LoginAltMethodsAgreeRow checked={agreed} onChange={setAgreed} />
             {err ? (
               <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">{err}</p>
             ) : null}
             <button
               type="submit"
-              disabled={busy}
+              disabled={busy || !agreed}
               className={primaryBtn}
             >
               {busy ? '注册中…' : '确认注册'}

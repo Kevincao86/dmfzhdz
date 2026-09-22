@@ -5,6 +5,7 @@ import type { MpWorkIdentity } from '../../lib/mpWorkIdentity'
 import { ROLE_LABEL } from '../landing/landingCopy'
 import DyOAuthOfficialPanel from '@merchant/components/login/DyOAuthOfficialPanel'
 import LoginAltMethods from '@merchant/components/login/LoginAltMethods'
+import LoginAltMethodsAgreeRow, { LOGIN_AGREE_REQUIRED } from '@merchant/components/login/LoginAltMethodsAgreeRow'
 import { formatMpApiErr } from '../../lib/mpApiErrors'
 import { dyOAuthBegin, scanCreate, scanPoll } from '../../lib/mpApi'
 import type { MpAccount } from '../../lib/mpSession'
@@ -63,14 +64,17 @@ export default function TalentLoginAuthPanel({
   const [dyAuthorizeUrl, setDyAuthorizeUrl] = useState('')
   const [dyScanHint, setDyScanHint] = useState('')
   const [dyLoading, setDyLoading] = useState(false)
+  const [agreed, setAgreed] = useState(false)
+  const [agreeNeed, setAgreeNeed] = useState(false)
 
   function onSubmit(e: FormEvent) {
     e.preventDefault()
+    if (!agreed) return
     void onPasswordLogin()
   }
 
   useEffect(() => {
-    if (tab !== 'scan' || scanChannel !== 'wechat' || !SCAN_LOGIN_WECHAT_ENABLED) return
+    if (tab !== 'scan' || !agreed || scanChannel !== 'wechat' || !SCAN_LOGIN_WECHAT_ENABLED) return
     let cancelled = false
     ;(async () => {
       try {
@@ -86,10 +90,10 @@ export default function TalentLoginAuthPanel({
     return () => {
       cancelled = true
     }
-  }, [tab, scanChannel])
+  }, [tab, scanChannel, agreed])
 
   useEffect(() => {
-    if (tab !== 'scan' || scanChannel !== 'wechat' || !SCAN_LOGIN_WECHAT_ENABLED || !wxTicket) return
+    if (tab !== 'scan' || !agreed || scanChannel !== 'wechat' || !SCAN_LOGIN_WECHAT_ENABLED || !wxTicket) return
     const t = setInterval(async () => {
       try {
         const r = await scanPoll(wxTicket)
@@ -102,7 +106,7 @@ export default function TalentLoginAuthPanel({
   }, [wxTicket, tab, scanChannel, onScanLoginSuccess])
 
   useEffect(() => {
-    if (tab !== 'scan' || scanChannel !== 'douyin') return
+    if (tab !== 'scan' || !agreed || scanChannel !== 'douyin') return
     let cancelled = false
     setDyLoading(true)
     setDyScanHint('')
@@ -128,7 +132,7 @@ export default function TalentLoginAuthPanel({
     return () => {
       cancelled = true
     }
-  }, [tab, scanChannel, workIdentity])
+  }, [tab, scanChannel, workIdentity, agreed])
 
   return (
     <div className="relative w-full">
@@ -198,16 +202,28 @@ export default function TalentLoginAuthPanel({
               className="flex items-center gap-2 text-sm text-slate-600"
             />
           ) : null}
+          <LoginAltMethodsAgreeRow
+            checked={agreed}
+            onChange={(v) => {
+              setAgreed(v)
+              if (v) setAgreeNeed(false)
+            }}
+          />
           {err ? (
             <p className="rounded-xl bg-red-50 px-3 py-2.5 text-sm text-red-700 ring-1 ring-red-100">{err}</p>
           ) : null}
-          <button type="submit" disabled={loading} className={primaryBtn}>
+          <button type="submit" disabled={loading || !agreed} className={primaryBtn}>
             {loading ? '登录中…' : '进入星选平台'}
           </button>
         </form>
       ) : (
         <>
-          {scanChannel === 'wechat' ? (
+          <LoginAltMethodsAgreeRow checked={agreed} onChange={setAgreed} className="mb-4" />
+          {!agreed ? (
+            <p className="mb-4 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-800 ring-1 ring-amber-100">
+              {LOGIN_AGREE_REQUIRED}
+            </p>
+          ) : scanChannel === 'wechat' ? (
             SCAN_LOGIN_WECHAT_ENABLED ? (
               <div className="space-y-4 text-center">
                 <div className="mx-auto flex h-52 w-52 items-center justify-center rounded-2xl border border-slate-200 bg-white p-4 shadow-inner">
@@ -255,6 +271,11 @@ export default function TalentLoginAuthPanel({
       <LoginAltMethods
         activeId={tab === 'scan' ? scanChannel : undefined}
         onSelect={(id) => {
+          if (!agreed) {
+            setAgreeNeed(true)
+            return
+          }
+          setAgreeNeed(false)
           if (id === 'douyin') {
             setScanChannel('douyin')
             onTabChange('scan')
@@ -274,6 +295,9 @@ export default function TalentLoginAuthPanel({
           },
         ]}
       />
+      {agreeNeed && !agreed ? (
+        <p className="mt-2 text-center text-xs text-amber-700">{LOGIN_AGREE_REQUIRED}</p>
+      ) : null}
 
       {showDevPreview && onDevPreview ? (
         <button
