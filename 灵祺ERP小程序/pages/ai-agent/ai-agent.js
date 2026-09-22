@@ -164,17 +164,13 @@ Page({
       if (row.kind === 'image' && row.filePath) {
         try {
           dataUrl = await agent.readFileDataUrl(row.filePath, row.contentType || 'image/jpeg')
-          preview = dataUrl
-        } catch (_) {
-          preview = row.filePath
-        }
+        } catch (_) {}
+        preview = row.filePath
       } else if (row.kind === 'video' && row.thumbPath) {
         try {
           dataUrl = await agent.readFileDataUrl(row.thumbPath, 'image/jpeg')
-          preview = dataUrl
-        } catch (_) {
-          preview = row.thumbPath
-        }
+        } catch (_) {}
+        preview = row.thumbPath
       }
       next.push({
         id: `att-${Date.now()}-${next.length}`,

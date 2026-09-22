@@ -106,13 +106,59 @@ function inferTaskTypeFromText(t) {
   return exec.inferTaskTypeFromText(t) || undefined
 }
 
-function detectImageGenerationIntent(t) {
-  return /生图|画图|生成.*图|海报|封面|文生图|图生图/.test(String(t || ''))
+const COPYWRITING_HINT =
+  /话术|文案|脚本|口播|推广语|广告语|slogan|标题|描述|方案|计划|报告|清单|列表|邮件|短信|推文|种草文案|字幕|旁白|台词|宣传语/
+
+function detectImageEditIntent(text, hasImages) {
+  const t = String(text || '').trim()
+  if (/改图|修图|美化|图生图|换背景|抠图|P图|P一下|精修|修一下/i.test(t)) return true
+  if (/(?:让|把|将).{0,10}(?:这张|该|此|原)?(?:图片|照片|图).{0,24}(?:变|改|调|处理|优化|修|美化)/i.test(t)) {
+    return true
+  }
+  if (!hasImages) return false
+  if (/(?:处理|优化|调整|精修|修一下|美化).{0,12}(?:这张|该|此)?(?:图|图片|照片|门头|店招)/i.test(t)) return true
+  if (/(?:把|将).{1,40}(?:换成|改成|替换为|替换成)/i.test(t)) return true
+  return false
+}
+
+function detectImageGenerationIntent(t, hasImages) {
+  const text = String(t || '').trim()
+  if (text.length < 2) return false
+  if (COPYWRITING_HINT.test(text) && !detectImageEditIntent(text, Boolean(hasImages))) return false
+  if (detectImageEditIntent(text, Boolean(hasImages))) return true
+  if (/生图|文生图|图生图|作图|出图|画一张|画一幅|画个|P图|抠图|换背景|美化/i.test(text)) return true
+  if (/帮我生成|生成一张|生成一幅|生成个/i.test(text) && /图|照|海报|封面|logo|门头|配图|画面|宣传图|店招/i.test(text)) {
+    return true
+  }
+  if (/(?:设计|做|来).{0,10}(?:图|海报|门头|封面|店招|logo)/i.test(text)) return true
+  if (/门头照|店招|宣传海报|封面图|配图|效果图|海报设计|主图|商品图|详情图/i.test(text)) return true
+  return false
+}
+
+function shouldRouteToNativeImage(pickerKey, userLine, hasImages) {
+  if (registry.isAgentImagePickerKey(pickerKey) && detectImageGenerationIntent(userLine, hasImages)) return true
+  return detectImageGenerationIntent(userLine, hasImages)
+}
+
+function parseAgentImagePickerKeyLocal(key) {
+  const parts = String(key || '').split('::')
+  if (parts[0] !== 'img' || parts.length < 3) return null
+  if (parts[1] === 'v') {
+    const v = parts[2]
+    if (v === 'qwen' || v === 'doubao' || v === 'minimax' || v === 'auto') return { kind: 'vendor', vendor: v }
+    return null
+  }
+  if (parts[1] === 'm' && parts[2]) {
+    return { kind: 'style', family: parts[2], modelId: parts.slice(3).join('::') }
+  }
+  return null
 }
 
 function resolveImagePickerKey(chatPickerKey, options, userLine, hasImages) {
-  if (registry.isAgentImagePickerKey(chatPickerKey)) return chatPickerKey
-  if (!hasImages && !detectImageGenerationIntent(userLine)) return chatPickerKey
+  if (registry.isAgentImagePickerKey(chatPickerKey) && detectImageGenerationIntent(userLine, hasImages)) {
+    return chatPickerKey
+  }
+  if (!detectImageGenerationIntent(userLine, hasImages)) return chatPickerKey
   const parsed = registry.parseAiModelPickerKey(chatPickerKey)
   if (parsed && parsed.provider === 'doubao') return 'img::v::doubao'
   if (parsed && parsed.provider === 'qwen') return 'img::v::qwen'
@@ -121,13 +167,33 @@ function resolveImagePickerKey(chatPickerKey, options, userLine, hasImages) {
 }
 
 function agentNativeImageRouteFromPickerKey(key) {
-  const parse = registry.parseAgentImagePickerKey
-  const p = typeof parse === 'function' ? parse(key) : null
+  const parseFn =
+    typeof registry.parseAgentImagePickerKey === 'function'
+      ? registry.parseAgentImagePickerKey
+      : parseAgentImagePickerKeyLocal
+  const p = parseFn(key)
   if (p && p.kind === 'style') return { route: 'tokenmix', tokenmixImageModel: p.modelId }
   if (p && p.kind === 'vendor' && p.vendor !== 'auto') {
     return { route: 'builtin', preferredVendor: p.vendor }
   }
   return { route: 'builtin' }
+}
+
+function compactThreadForStorage(messages) {
+  return (messages || []).map((m) => {
+    const urls = Array.isArray(m.imageUrls) ? m.imageUrls : []
+    const kept = urls.filter((u) => {
+      const s = String(u || '')
+      if (/^https?:\/\//i.test(s)) return true
+      if (/^(wxfile|http):\/\//i.test(s) && s.length < 500) return true
+      if (s.startsWith('data:') && s.length < 60000) return true
+      return false
+    })
+    const next = Object.assign({}, m)
+    if (kept.length) next.imageUrls = kept
+    else delete next.imageUrls
+    return next
+  })
 }
 
 function loadThread() {
@@ -142,10 +208,22 @@ function loadThread() {
 }
 
 function saveThread(messages) {
-  const slice = messages.slice(-40)
+  const slice = compactThreadForStorage(messages).slice(-40)
   try {
     wx.setStorageSync(threadStorageKey(), JSON.stringify(slice))
-  } catch (_) {}
+  } catch (_) {
+    try {
+      const slim = slice.map((m) => {
+        const n = Object.assign({}, m)
+        if (n.imageUrls) {
+          n.imageUrls = n.imageUrls.filter((u) => /^https?:\/\//i.test(String(u || '')))
+          if (!n.imageUrls.length) delete n.imageUrls
+        }
+        return n
+      })
+      wx.setStorageSync(threadStorageKey(), JSON.stringify(slim))
+    } catch (__) {}
+  }
   const uid = getCurrentUserId()
   if (uid) {
     const habits = habitsMp.loadAgentUserHabits(uid)
@@ -414,8 +492,9 @@ async function sendAgentTurn(opts) {
     line,
     imageDataUrls.length > 0,
   )
+  const wantImage = shouldRouteToNativeImage(imagePickerKey, line, imageDataUrls.length > 0)
 
-  if (registry.isAgentImagePickerKey(imagePickerKey) || detectImageGenerationIntent(line)) {
+  if (wantImage) {
     try {
       const imgRes = await postAiAgentNativeImage(line, imagePickerKey, imageDataUrls[0])
       return {
@@ -433,11 +512,7 @@ async function sendAgentTurn(opts) {
         },
       }
     } catch (e) {
-      if (!registry.isAgentImagePickerKey(imagePickerKey)) {
-        /* 对话模型附图时生图失败则回退对话 */
-      } else {
-        throw e
-      }
+      throw e
     }
   }
 
@@ -445,7 +520,7 @@ async function sendAgentTurn(opts) {
     history,
     userLine: line,
     imageDataUrls,
-    pickerKey,
+    pickerKey: registry.effectiveChatPickerKey ? registry.effectiveChatPickerKey(pickerKey) : pickerKey,
     taskType: inferTaskTypeFromText(line),
   })
   return {
@@ -473,6 +548,15 @@ async function processAgentTurn(opts, executionState) {
     (opts.attachments && opts.attachments.length ? '请结合附图说明你的需求。' : '')
   const history = opts.history || []
   let state = executionState || exec.createAgentExecutionState()
+  const hasImgs = (opts.attachments || []).some((a) => a.dataUrl || a.kind === 'image')
+  if (shouldRouteToNativeImage(registry.loadPickerKey(), line, hasImgs)) {
+    const turn = await sendAgentTurn(opts)
+    return {
+      userMsg: turn.userMsg,
+      assistantMsgs: [turn.assistantMsg],
+      executionState: state,
+    }
+  }
 
   const flow = exec.resolveExecutionUserMessage(state, history, line)
   state = flow.state
