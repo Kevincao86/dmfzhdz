@@ -67,10 +67,11 @@
     </view>
     <text class="op-label">对白钩子（选填）</text>
     <input class="op-input" placeholder="一句口语对白" value="{{dialogue}}" bindinput="onDialogue" />
-    <text class="op-label">时长</text>
+    <text class="op-label">成片时长</text>
     <picker mode="selector" range="{{durationOptions}}" range-key="label" value="{{durationIdx}}" bindchange="onDuration">
       <view class="op-picker">{{durationOptions[durationIdx].label}}</view>
     </picker>
+    <text class="op-meta">{{durationHint}}</text>
     <button class="op-btn" loading="{{busy}}" disabled="{{busy}}" bindtap="onGenerate">
       {{busy ? (progress || '生成中…') : '开始出片'}}
     </button>

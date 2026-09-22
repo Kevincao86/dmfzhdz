@@ -60,9 +60,17 @@ Page({
     castConfirmed: false,
     refPaths: [],
     refDataUrls: [],
-    durationOptions: catalog.DURATION_OPTIONS,
-    durationIdx: 1,
-    durationSec: 12,
+    durationOptions: [
+      { sec: 0, label: '请选择成片时长', hint: '' },
+    ].concat(
+      catalog.DURATION_OPTIONS.map((o) => ({
+        ...o,
+        label: catalog.pickerLabel(o),
+      })),
+    ),
+    durationIdx: 0,
+    durationSec: 0,
+    durationHint: '单段（≤15 秒）直接出有声成片。超过 15 秒按 15 秒分段衔接（最长约 15 分钟）。',
     rateLabel: economics.formatMpPointsRateLabel('shortvideo'),
     busy: false,
     progress: '',
@@ -294,8 +302,8 @@ Page({
 
   onDuration(e) {
     const idx = Number(e.detail.value) || 0
-    const opt = catalog.DURATION_OPTIONS[idx] || catalog.DURATION_OPTIONS[1]
-    this.setData({ durationIdx: idx, durationSec: opt.sec })
+    const opt = this.data.durationOptions[idx] || { sec: 0 }
+    this.setData({ durationIdx: idx, durationSec: Number(opt.sec) || 0 })
   },
 
   cancelWait() {
@@ -326,49 +334,165 @@ Page({
     }
   },
 
+  async runDramaClip(prompt, durationSec, images) {
+    const clip = catalog.snapSeedanceClipSec(durationSec)
+    const body = {
+      model: SEEDANCE_MODEL,
+      prompt,
+      flags: `--dur ${clip} --fps 24 --ratio 9:16 --wm false --rsn 720p`,
+      generate_audio: true,
+      durationSec: clip,
+    }
+    if (images && images.length) body.images_base64 = images.slice(0, 3)
+    const r = await videoAi.postSeedanceStart(body)
+    if (!r.ok) return { ok: false, message: r.message || '发起失败' }
+    const done = await videoAi.pollSeedanceUntilDone(
+      r.taskId,
+      (t) => this.setData({ progress: t }),
+      () => this.shouldCancel(),
+    )
+    if (done.ok && done.videoUrl) return { ok: true, videoUrl: done.videoUrl, taskId: r.taskId }
+    return { ok: false, message: (done && done.message) || '生成未完成', taskId: r.taskId }
+  },
+
+  collectDramaImages() {
+    if (this.data.castConfirmed && this.data.castDataUrl) {
+      return [this.data.castDataUrl].concat(this.data.refDataUrls || []).slice(0, 3)
+    }
+    if (this.data.refDataUrls && this.data.refDataUrls.length) return this.data.refDataUrls.slice(0, 3)
+    return []
+  },
+
+  downloadImageAsDataUrl(url) {
+    return new Promise((resolve) => {
+      if (!url) {
+        resolve('')
+        return
+      }
+      if (/^data:image\//i.test(url)) {
+        resolve(url)
+        return
+      }
+      wx.downloadFile({
+        url,
+        success: (res) => {
+          if (res.statusCode !== 200 || !res.tempFilePath) {
+            resolve('')
+            return
+          }
+          try {
+            const b64 = wx.getFileSystemManager().readFileSync(res.tempFilePath, 'base64')
+            resolve(b64 ? `data:image/jpeg;base64,${b64}` : '')
+          } catch (_) {
+            resolve('')
+          }
+        },
+        fail: () => resolve(''),
+      })
+    })
+  },
+
   async onGenerate() {
     if (this.data.busy) return
     const world = catalog.worldOf(this.data.worldId)
     const scene = catalog.sceneOf(this.data.sceneId)
     const shop = this.data.shop || emptyShop()
+    const total = Math.min(catalog.MAX_DRAMA_TOTAL_SEC, Number(this.data.durationSec) || 0)
+    if (!total) {
+      this.setData({ err: '请先选择成片时长' })
+      return
+    }
     const prompt = catalog.buildPrompt(world, scene, shop, this.data.story, this.data.dialogue)
-    const dur = Math.max(5, Math.min(15, Number(this.data.durationSec) || 12))
-    const afford = await erpPoints.checkAddonPointsAffordable('shortvideo', dur)
+    const plan = catalog.planLongformSegmentDurations(total)
+    const afford = await erpPoints.checkAddonPointsAffordable('shortvideo', total)
     if (!afford.ok) {
       this.setData({ err: afford.message })
       return
     }
+    if (total > 60) {
+      const ok = await new Promise((resolve) => {
+        wx.showModal({
+          title: '长片将分段生成',
+          content: `将按 ${plan.join('+')} 秒共 ${plan.length} 段衔接，耗时和积分都更高，确认开始？`,
+          success: (r) => resolve(Boolean(r.confirm)),
+          fail: () => resolve(false),
+        })
+      })
+      if (!ok) return
+    }
     this._cancel = false
     this.setData({ busy: true, err: '', hint: '', resultUrl: '', progress: '排队中…' })
     try {
-      const body = {
-        model: SEEDANCE_MODEL,
-        prompt,
-        flags: `--dur ${dur} --fps 24 --ratio 9:16 --wm false --rsn 720p`,
-        generate_audio: true,
-        durationSec: dur,
-      }
-      if (this.data.castConfirmed && this.data.castDataUrl) {
-        body.images_base64 = [this.data.castDataUrl].concat(this.data.refDataUrls || []).slice(0, 3)
-      } else if (this.data.refDataUrls && this.data.refDataUrls.length) {
-        body.images_base64 = this.data.refDataUrls
-      }
-      const r = await videoAi.postSeedanceStart(body)
-      if (!r.ok) {
-        this.setData({ err: r.message || '发起失败' })
+      const images0 = this.collectDramaImages()
+      if (plan.length <= 1) {
+        const done = await this.runDramaClip(prompt, total, images0)
+        if (done.ok && done.videoUrl) {
+          this.setData({ resultUrl: done.videoUrl, hint: '成片已出，可保存到相册。', progress: '' })
+          await this.charge(done.taskId || `drama-${Date.now()}`, total)
+        } else if (!this.shouldCancel()) {
+          this.setData({ err: done.message || '生成未完成' })
+        }
         return
       }
-      const done = await videoAi.pollSeedanceUntilDone(
-        r.taskId,
-        (t) => this.setData({ progress: t }),
-        () => this.shouldCancel(),
-      )
-      if (done.ok && done.videoUrl) {
-        this.setData({ resultUrl: done.videoUrl, hint: '成片已出，可保存到相册。', progress: '' })
-        await this.charge(r.taskId, dur)
-      } else if (!this.shouldCancel()) {
-        this.setData({ err: done.message || '生成未完成' })
+
+      const segmentUrls = []
+      let lastFrameB64 = ''
+      for (let i = 0; i < plan.length; i++) {
+        if (this.shouldCancel()) {
+          this.setData({ hint: '已取消长片生成。' })
+          return
+        }
+        const segDur = plan[i]
+        this.setData({ progress: `全片 ${i + 1}/${plan.length} · ${segDur} 秒生成中` })
+        const images = []
+        if (i === 0) {
+          images.push(...images0)
+        } else if (lastFrameB64) {
+          images.push(lastFrameB64)
+          images.push(...images0.slice(0, 2))
+        } else {
+          images.push(...images0)
+        }
+        const segPrompt = `${prompt}\n本段是第 ${i + 1}/${plan.length} 段，时长约 ${segDur} 秒。衔接上一段动作，同角色同场景。`
+        // eslint-disable-next-line no-await-in-loop
+        const done = await this.runDramaClip(segPrompt, segDur, images)
+        if (!done.ok || !done.videoUrl) {
+          if (!this.shouldCancel()) this.setData({ err: done.message || '分段生成失败' })
+          return
+        }
+        segmentUrls.push(done.videoUrl)
+        this.setData({ progress: `全片 ${i + 1}/${plan.length} · 抽取尾帧…` })
+        // eslint-disable-next-line no-await-in-loop
+        const lf = await videoAi.postLastFrame({ videoUrl: done.videoUrl })
+        if (lf.ok && lf.imageUrl) {
+          // eslint-disable-next-line no-await-in-loop
+          lastFrameB64 = await this.downloadImageAsDataUrl(lf.imageUrl)
+        } else {
+          lastFrameB64 = ''
+        }
       }
+
+      let finalUrl = segmentUrls[segmentUrls.length - 1]
+      if (segmentUrls.length >= 2) {
+        this.setData({ progress: '拼接成片中…' })
+        const cat = await videoAi.postConcatUrls({ urls: segmentUrls, videoUrls: segmentUrls })
+        if (cat.ok && cat.videoUrl) finalUrl = cat.videoUrl
+        else {
+          this.setData({
+            resultUrl: finalUrl,
+            hint: `已生成 ${segmentUrls.length} 段，拼接失败：${cat.message || ''}。可逐段预览。`,
+            progress: '',
+          })
+          await this.charge(`drama-long-${Date.now()}`, total)
+          return
+        }
+      }
+      this.setData({
+        resultUrl: finalUrl,
+        hint: `长片已拼接完成（${segmentUrls.length} 段）。`,
+        progress: '',
+      })
+      await this.charge(`drama-long-${Date.now()}`, total)
     } catch (e) {
       this.setData({ err: e && e.message ? e.message : '生成失败' })
     } finally {

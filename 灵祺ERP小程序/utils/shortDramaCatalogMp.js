@@ -235,11 +235,45 @@ const SCENES = [
   { id: 'nature_comic', world: 'comic', name: '治愈自然', hook: '风一吹情绪就慢下来', mustSee: '树影、散步、静物', visual: '柔和色块，慢节奏分格' },
 ]
 
+const SEGMENT_UNIT_SEC = 15
+const MAX_DRAMA_TOTAL_SEC = 900
+
+/** 与网页 ShortDramaPage DURATION_OPTIONS 对齐 */
 const DURATION_OPTIONS = [
-  { sec: 8, label: '8 秒' },
-  { sec: 12, label: '12 秒' },
-  { sec: 15, label: '15 秒' },
+  { sec: 8, label: '8 秒', hint: '单段直出' },
+  { sec: 12, label: '12 秒', hint: '单段直出' },
+  { sec: 15, label: '15 秒', hint: '单段直出' },
+  { sec: 30, label: '30 秒', hint: '先试镜 · 智能全片' },
+  { sec: 60, label: '1 分钟', hint: '先试镜 · 智能全片' },
+  { sec: 180, label: '3 分钟', hint: '先试镜 · 智能全片' },
+  { sec: 300, label: '5 分钟', hint: '先试镜 · 智能全片' },
+  { sec: 600, label: '10 分钟', hint: '先试镜 · 智能全片' },
+  { sec: 900, label: '15 分钟', hint: '先试镜 · 智能全片' },
 ]
+
+function pickerLabel(opt) {
+  if (!opt) return '请选择成片时长'
+  return `${opt.label}（${opt.hint}）`
+}
+
+function planLongformSegmentDurations(targetTotalSec) {
+  const target = Math.max(5, Math.round(Number(targetTotalSec) || 5))
+  const unit = SEGMENT_UNIT_SEC
+  if (target <= unit) return [target]
+  const full = Math.floor(target / unit)
+  const rem = target % unit
+  const plan = Array.from({ length: full }, () => unit)
+  if (rem > 0) plan.push(rem)
+  return plan.length ? plan : [unit]
+}
+
+/** Seedance 单段官方稳妥 5/10/15 */
+function snapSeedanceClipSec(sec) {
+  const n = Math.max(5, Math.round(Number(sec) || 5))
+  if (n <= 5) return 5
+  if (n <= 10) return 10
+  return 15
+}
 
 function worldOf(id) {
   return WORLDS.find((w) => w.id === id) || WORLDS[0]
@@ -309,6 +343,11 @@ module.exports = {
   WORLDS,
   SCENES,
   DURATION_OPTIONS,
+  SEGMENT_UNIT_SEC,
+  MAX_DRAMA_TOTAL_SEC,
+  pickerLabel,
+  planLongformSegmentDurations,
+  snapSeedanceClipSec,
   worldOf,
   scenesOf,
   sceneOf,

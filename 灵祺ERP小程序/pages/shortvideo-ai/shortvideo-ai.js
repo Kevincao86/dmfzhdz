@@ -23,6 +23,7 @@ const {
   VIDEO_MODEL_DEFAULT_LABEL,
   SEEDANCE_QUALITY_OPTIONS,
   DURATION_OPTIONS,
+  LONGFORM_TARGET_TOTAL_OPTIONS,
   ASPECT_OPTIONS,
   SUBTITLE_STYLES,
   ICE_ASPECT_PRESETS,
@@ -95,6 +96,10 @@ Page({
 
     longformEnabled: false,
     plannerModel: 'doubao',
+    longformTargetOptions: LONGFORM_TARGET_TOTAL_OPTIONS.map((s) => `${s} 秒`),
+    longformTargetValues: LONGFORM_TARGET_TOTAL_OPTIONS.slice(),
+    longformTargetIdx: 3,
+    longformTargetTotalSec: 60,
     longformSegmentOptions: [2, 3, 4, 5, 6],
     longformSegmentLabels: ['2 段', '3 段', '4 段', '5 段', '6 段'],
     longformSegmentCount: 4,
@@ -110,7 +115,7 @@ Page({
     aspectIdx: 0,
     durationOptions: DURATION_OPTIONS.map((d) => d.label),
     durationValues: DURATION_OPTIONS.map((d) => String(d.sec)),
-    durationIdx: 0,
+    durationIdx: 2,
     kModeOptions: ['标准', '高品质'],
     kModeValues: ['std', 'pro'],
     kModeIdx: 0,
@@ -120,7 +125,7 @@ Page({
     sdModelIdx: 0,
     sdDurationOptions: DURATION_OPTIONS.map((d) => d.label),
     sdDurationValues: DURATION_OPTIONS.map((d) => String(d.sec)),
-    sdDurationIdx: 0,
+    sdDurationIdx: 2,
     sdQualityOptions: SEEDANCE_QUALITY_OPTIONS.map((q) => q.label),
     sdQualityValues: SEEDANCE_QUALITY_OPTIONS.map((q) => q.id),
     sdQualityIdx: 0,
@@ -272,16 +277,12 @@ Page({
 
   estimateShortvideoDurationSec() {
     if (this.data.longformEnabled) {
-      const rows = this.data.scriptRows || []
-      if (scriptTable.isScriptRowsUsable(rows)) {
-        return Math.max(10, rows.length * (Number(this.data.sdDurationValues[this.data.sdDurationIdx]) || 5))
-      }
-      return Number(this.data.longformSegmentCount) * (Number(this.data.sdDurationValues[this.data.sdDurationIdx]) || 10)
+      return Math.max(15, Number(this.data.longformTargetTotalSec) || 60)
     }
     if (this.data.engine === 'seedance') {
-      return Number(this.data.sdDurationValues[this.data.sdDurationIdx]) || 5
+      return Number(this.data.sdDurationValues[this.data.sdDurationIdx]) || 15
     }
-    return Number(this.data.durationValues[this.data.durationIdx]) || 5
+    return Number(this.data.durationValues[this.data.durationIdx]) || 15
   },
 
   async ensureShortvideoAffordable() {
@@ -587,17 +588,40 @@ Page({
     this.setData({ engine: eng })
   },
 
+  applyLongformTarget(totalSec) {
+    const opts = this.data.longformTargetValues || LONGFORM_TARGET_TOTAL_OPTIONS
+    const allowed = opts.includes(totalSec) ? totalSec : 60
+    const plan = scriptTable.planLongformSegmentDurations(allowed)
+    const n = Math.max(2, plan.length)
+    const segOpts = this.data.longformSegmentOptions || [2, 3, 4, 5, 6]
+    let six = segOpts.indexOf(n)
+    if (six < 0) six = Math.min(segOpts.length - 1, Math.max(0, n - 2))
+    const unit = plan[0] || 15
+    const dix = this.data.sdDurationValues.indexOf(String(unit))
+    return {
+      longformTargetTotalSec: allowed,
+      longformTargetIdx: Math.max(0, opts.indexOf(allowed)),
+      longformSegmentCount: n,
+      longformSegmentIdx: six >= 0 ? six : 2,
+      sdDurationIdx: dix >= 0 ? dix : 2,
+      scriptRows: scriptTable.resizeScriptRows(this.data.scriptRows, n, unit),
+    }
+  },
+
   onLongformChange(e) {
     const on = Boolean(e.detail.value)
     const patch = { longformEnabled: on }
     if (on) {
-      const dix = this.data.sdDurationValues.indexOf('10')
-      if (dix >= 0) patch.sdDurationIdx = dix
-      if (!scriptTable.isScriptRowsUsable(this.data.scriptRows)) {
-        patch.scriptRows = scriptTable.defaultScriptRows(this.data.longformSegmentCount, 5)
-      }
+      Object.assign(patch, this.applyLongformTarget(this.data.longformTargetTotalSec || 60))
     }
     this.setData(patch, () => this.refreshPointsHints())
+  },
+
+  onLongformTargetChange(e) {
+    const ix = Number(e.detail.value) || 0
+    const vals = this.data.longformTargetValues || LONGFORM_TARGET_TOTAL_OPTIONS
+    const sec = Number(vals[ix]) || 60
+    this.setData(this.applyLongformTarget(sec), () => this.refreshPointsHints())
   },
 
   onPlannerChange(e) {
@@ -660,8 +684,8 @@ Page({
       durOverride != null
         ? String(durOverride)
         : this.data.longformEnabled
-          ? this.data.sdDurationValues[this.data.sdDurationIdx] || '10'
-          : this.data.sdDurationValues[this.data.sdDurationIdx] || '5'
+          ? this.data.sdDurationValues[this.data.sdDurationIdx] || '15'
+          : this.data.sdDurationValues[this.data.sdDurationIdx] || '15'
     const fps = this.data.sdFpsValues[this.data.sdFpsIdx] || '24'
     const ratio = this.data.sdAspectValues[this.data.sdAspectIdx] || '9:16'
     const wm = this.data.sdWatermarkValues[this.data.sdWatermarkIdx] === 'on' ? 'true' : 'false'
@@ -1044,7 +1068,7 @@ Page({
 
     const segmentUrls = []
     let lastFrameB64 = ''
-    const durNum = Number(this.data.sdDurationValues[this.data.sdDurationIdx]) || 10
+    const durNum = Number(this.data.sdDurationValues[this.data.sdDurationIdx]) || 15
     const model = this.data.sdModelIds[this.data.sdModelIdx]
 
     const downloadImageAsDataUrl = (url) =>

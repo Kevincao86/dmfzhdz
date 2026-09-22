@@ -4,6 +4,18 @@ const SHORT_VIDEO_SEEDANCE_NATIVE_AV_SUFFIX =
 const SHORT_VIDEO_STRICT_VISUAL_SUFFIX =
   '【执行要求】严格按【画面】描述生成镜头与运镜，不得偏离场景/主体；同步生成中文口播语音；底部安全区中文字幕与口播一致，禁止乱码。'
 const SCRIPT_ROW_MAX_COUNT = 12
+const LONGFORM_SEGMENT_UNIT_SEC = 15
+
+function planLongformSegmentDurations(targetTotalSec) {
+  const target = Math.max(5, Math.round(Number(targetTotalSec) || 5))
+  const unit = LONGFORM_SEGMENT_UNIT_SEC
+  if (target <= unit) return [target]
+  const full = Math.floor(target / unit)
+  const rem = target % unit
+  const plan = Array.from({ length: full }, () => unit)
+  if (rem > 0) plan.push(rem)
+  return plan.length ? plan : [unit]
+}
 
 function sanitizePromptForSeedanceNativeAv(text) {
   let t = String(text || '').trim()
@@ -141,7 +153,9 @@ function promptsFromLongformPlan(prompts) {
 
 module.exports = {
   SCRIPT_ROW_MAX_COUNT,
+  LONGFORM_SEGMENT_UNIT_SEC,
   SHORT_VIDEO_SEEDANCE_NATIVE_AV_SUFFIX,
+  planLongformSegmentDurations,
   sanitizePromptForSeedanceNativeAv,
   buildVideoPromptFromScriptRow,
   buildPlanFromScriptRows,

@@ -107,7 +107,7 @@
 
       <view class="sv-params-grid four">
         <view class="sv-field">
-          <text class="sv-field-lab">时长</text>
+          <text class="sv-field-lab">单段时长</text>
           <picker mode="selector" range="{{sdDurationOptions}}" value="{{sdDurationIdx}}" disabled="{{busy}}" bindchange="sdDurChange">
             <view class="sv-pick">{{sdDurationOptions[sdDurationIdx]}}</view>
           </picker>
@@ -153,6 +153,12 @@
           </view>
         </label>
         <view wx:if="{{longformEnabled}}" class="sv-longform-extra">
+          <view class="sv-field">
+            <text class="sv-field-lab">目标总时长</text>
+            <picker mode="selector" range="{{longformTargetOptions}}" value="{{longformTargetIdx}}" disabled="{{busy}}" bindchange="onLongformTargetChange">
+              <view class="sv-pick">{{longformTargetOptions[longformTargetIdx]}}</view>
+            </picker>
+          </view>
           <view class="sv-field">
             <text class="sv-field-lab">片段数量</text>
             <picker mode="selector" range="{{longformSegmentLabels}}" value="{{longformSegmentIdx}}" disabled="{{busy}}" bindchange="onSegmentCountChange">

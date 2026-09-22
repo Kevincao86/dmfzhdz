@@ -11,10 +11,12 @@ module.exports = {
     { id: '1080p', label: '高清 1080p' },
   ],
   DURATION_OPTIONS: [
-    { sec: 5, label: '标准 5 秒' },
-    { sec: 10, label: '标准 10 秒' },
-    { sec: 15, label: '标准 15 秒' },
+    { sec: 5, label: '5 秒' },
+    { sec: 10, label: '10 秒' },
+    { sec: 15, label: '15 秒' },
   ],
+  /** 与网页 ShortVideoOptimizationPage LONGFORM_TARGET_TOTAL_OPTIONS 对齐 */
+  LONGFORM_TARGET_TOTAL_OPTIONS: [15, 30, 45, 60],
   ASPECT_OPTIONS: [
     { id: '9:16', label: '竖屏 9:16' },
     { id: '16:9', label: '横屏 16:9' },

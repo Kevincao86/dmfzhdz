@@ -14,6 +14,14 @@ function hasMerchantApi() {
   return Boolean(baseUrl())
 }
 
+function readStoredMerchantToken() {
+  try {
+    return String(wx.getStorageSync('meoo_access_token') || '').trim()
+  } catch (_) {
+    return ''
+  }
+}
+
 /**
  * @param {'GET'|'POST'} method
  * @param {string} path 以 / 开头，如 /api/ops-sync/registry
@@ -28,7 +36,8 @@ function merchantRequest(method, path, data) {
  */
 function merchantRequestAuth(method, path, opts) {
   const data = opts && opts.data
-  const bearerToken = opts && opts.bearerToken ? String(opts.bearerToken).trim() : ''
+  const bearerToken =
+    (opts && opts.bearerToken ? String(opts.bearerToken).trim() : '') || readStoredMerchantToken()
   const timeoutMs = Math.max(0, Number(opts && opts.timeoutMs) || 0)
   const b = baseUrl()
   if (!b) {
@@ -85,6 +94,11 @@ function merchantRequestWithHeaders(method, path, opts) {
     { Accept: 'application/json', 'Content-Type': 'application/json' },
     (opts && opts.headers) || {},
   )
+  const tok = readStoredMerchantToken()
+  if (tok && !header.Authorization) {
+    header.Authorization = `Bearer ${tok}`
+    header['X-Meoo-Access-Token'] = tok
+  }
   return new Promise((resolve, reject) => {
     const req = {
       url,
