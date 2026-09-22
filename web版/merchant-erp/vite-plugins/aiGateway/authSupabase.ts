@@ -25,10 +25,6 @@ function readJwtSecrets(env: Record<string, string>): string[] {
   return out
 }
 
-function readJwtSecret(env: Record<string, string>): string {
-  return readJwtSecrets(env)[0] ?? ''
-}
-
 function headerText(
   headers: Record<string, unknown> | undefined,
   key: string,
