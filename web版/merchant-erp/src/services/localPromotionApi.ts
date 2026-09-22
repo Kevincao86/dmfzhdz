@@ -618,6 +618,35 @@ export async function updateProjectBudget(
   return { ok: true }
 }
 
+export async function optimizeLocalProject(input: {
+  projectId: string
+  budgetYuan?: number
+  bidYuan?: number
+  district?: string
+  gender?: string
+}): Promise<{ ok: true } | { ok: false; message: string }> {
+  const creds = credsPayload()
+  if (!creds) return { ok: false, message: '请先在系统设置中绑定巨量本地推' }
+  const r = await requestJson<{ ok?: boolean }>(
+    `${apiBase()}/api/merchant/local-promotion/projects/optimize`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...creds,
+        project_id: input.projectId,
+        budget_yuan: input.budgetYuan,
+        bid_yuan: input.bidYuan,
+        district: input.district,
+        gender: input.gender,
+      }),
+    },
+    '写入巨量定向/出价',
+  )
+  if (!r.ok) return r
+  return { ok: true }
+}
+
 export async function fetchLocalReportSummary(): Promise<
   | { ok: true; summary: LocalReportSummary; demoMode?: boolean; apiError?: string }
   | { ok: false; message: string }

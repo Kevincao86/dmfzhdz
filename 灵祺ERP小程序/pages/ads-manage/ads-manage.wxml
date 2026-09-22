@@ -47,7 +47,8 @@
       <button class="ads-ai-run" size="mini" loading="{{aiBusy}}" bindtap="runAiInsight">生成分析</button>
     </view>
     <text wx:if="{{aiInsight}}" class="ads-ai-insight">{{aiInsight}}</text>
-    <text wx:elif="{{aiMode !== 'manual'}}" class="ads-ai-placeholder">与电脑端同源：选板块后生成投流建议，自动调计划需人工确认后再启停。</text>
+    <text wx:elif="{{aiMode === 'full_ai'}}" class="ads-ai-placeholder">全面介入：分析后会直接改巨量出价、人群、区域与日预算。</text>
+    <text wx:elif="{{aiMode !== 'manual'}}" class="ads-ai-placeholder">与电脑端同源：选板块后生成投流建议，自动调计划需人工确认后再写入巨量。</text>
   </view>
 
   <view class="ads-today-card">

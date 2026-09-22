@@ -51,7 +51,7 @@ export default function LocalPromotionAiModePanel({
         <div>
           <p className="text-sm font-semibold text-slate-900">AI 投流助手 · {paneLabel}</p>
           <p className="mt-0.5 text-xs text-slate-500">
-            支持手动调整、AI 辅助分析、全面介入与自动调计划（启停需确认后写入）
+            支持手动、AI 辅助、全面介入（直接改巨量出价/人群/区域）与自动调计划（确认后写入）
           </p>
         </div>
         {showRunButton ? (
@@ -155,16 +155,22 @@ export default function LocalPromotionAiModePanel({
                     <span className="ml-2 text-xs text-emerald-700">启用</span>
                   ) : a.actionType === 'disable' ? (
                     <span className="ml-2 text-xs text-amber-700">暂停</span>
+                  ) : a.actionType === 'optimize' ? (
+                    <span className="ml-2 text-xs text-violet-700">调出价/定向</span>
                   ) : (
                     <span className="ml-2 text-xs text-slate-500">备注</span>
                   )}
                 </p>
                 <p className="text-xs text-slate-500">{a.reason}</p>
               </div>
-              {a.actionType === 'enable' || a.actionType === 'disable' ? (
+              {a.actionType === 'enable' || a.actionType === 'disable' || a.actionType === 'optimize' ? (
                 <button
                   type="button"
-                  disabled={!a.promotionId || applyingId === a.actionId}
+                  disabled={
+                    applyingId === a.actionId ||
+                    (a.actionType !== 'optimize' && !a.promotionId) ||
+                    (a.actionType === 'optimize' && !a.projectId && !a.promotionId)
+                  }
                   onClick={() => onApplyAction(a)}
                   className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-cyan-500 disabled:opacity-50"
                 >

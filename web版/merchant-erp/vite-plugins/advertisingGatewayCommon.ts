@@ -7,9 +7,14 @@ export function parseAdInsightResponse(raw: string): {
   actions: Array<{
     actionId: string
     promotionId?: string
+    projectId?: string
     promotionName?: string
-    actionType: 'enable' | 'disable' | 'note'
+    actionType: 'enable' | 'disable' | 'note' | 'optimize'
     reason: string
+    budgetYuan?: number
+    bidYuan?: number
+    district?: string
+    gender?: string
   }>
 } {
   const markerIdx = raw.indexOf(AD_INSIGHT_ACTIONS_MARKER)
@@ -17,9 +22,14 @@ export function parseAdInsightResponse(raw: string): {
   const actions: Array<{
     actionId: string
     promotionId?: string
+    projectId?: string
     promotionName?: string
-    actionType: 'enable' | 'disable' | 'note'
+    actionType: 'enable' | 'disable' | 'note' | 'optimize'
     reason: string
+    budgetYuan?: number
+    bidYuan?: number
+    district?: string
+    gender?: string
   }> = []
   if (markerIdx < 0) return { insight, actions }
   const tail = raw.slice(markerIdx + AD_INSIGHT_ACTIONS_MARKER.length).trim()
@@ -33,21 +43,35 @@ export function parseAdInsightResponse(raw: string): {
       if (!row || typeof row !== 'object') continue
       const o = row as Record<string, unknown>
       const opt = String(o.optStatus ?? o.actionType ?? '').toUpperCase()
-      const actionType: 'enable' | 'disable' | 'note' =
+      const actionType: 'enable' | 'disable' | 'note' | 'optimize' =
         opt === 'ENABLE' || opt === 'enable'
           ? 'enable'
-          : opt === 'DISABLE' || opt === 'disable'
+          : opt === 'DISABLE' || opt === 'disable' || opt === 'PAUSED' || opt === 'PAUSE'
             ? 'disable'
-            : 'note'
+            : opt === 'BUDGET' ||
+                opt === 'BID' ||
+                opt === 'AUDIENCE' ||
+                opt === 'REGION' ||
+                opt === 'OPTIMIZE'
+              ? 'optimize'
+              : 'note'
       const promotionId = String(o.promotionId ?? o.promotion_id ?? '').trim() || undefined
+      const projectId = String(o.projectId ?? o.project_id ?? '').trim() || undefined
       const promotionName = String(o.promotionName ?? o.promotion_name ?? '').trim() || undefined
       const reason = String(o.reason ?? o.note ?? 'AI 建议调整').trim()
+      const budgetYuan = Number(o.budgetYuan ?? o.budget_yuan)
+      const bidYuan = Number(o.bidYuan ?? o.bid_yuan)
       actions.push({
-        actionId: `${promotionId ?? promotionName ?? 'act'}_${i}`,
+        actionId: `${promotionId ?? projectId ?? promotionName ?? 'act'}_${i}`,
         actionType,
         promotionId,
+        projectId,
         promotionName,
         reason,
+        budgetYuan: Number.isFinite(budgetYuan) && budgetYuan > 0 ? budgetYuan : undefined,
+        bidYuan: Number.isFinite(bidYuan) && bidYuan > 0 ? bidYuan : undefined,
+        district: String(o.district ?? '').trim() || undefined,
+        gender: String(o.gender ?? '').trim() || undefined,
       })
     }
   } catch {

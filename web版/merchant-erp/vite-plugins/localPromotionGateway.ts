@@ -35,8 +35,10 @@ function mapOceanError(raw: string, status?: number, code?: number): string {
     return `access_token 无效或已过期，请到系统设置重新授权本地推${codeHint}`
   }
   if (code === 40000) {
-    if (/[\u4e00-\u9fff]/.test(s)) return `${s}${codeHint}`
-    return `巨量拒绝了创建参数，请确认本地推账号有创编权限、已选可投门店/抖音号${codeHint}`
+    if (s && s !== 'parameter invalid' && s.toLowerCase() !== 'invalid param') {
+      return `${s}${codeHint}`
+    }
+    return `巨量拒绝了创建参数（缺少门店/商品/抖音号或字段不合规）。请确认本地推已授权可投门店或抖音号${codeHint}`
   }
   if (!/[\u4e00-\u9fff]/.test(s)) {
     return `连接巨量本地推失败，请确认 Access Token 与广告主 ID 正确，并在开放平台开通投放/报表权限${codeHint}`
@@ -65,8 +67,8 @@ function oceanNumeric(v: unknown): number | string {
 function coerceOceanCreateBody(body: Record<string, unknown>): Record<string, unknown> {
   const numKeys = new Set([
     'local_account_id',
+    'project_id',
     'product_id',
-    'aweme_id',
     'budget',
     'bid',
     'schedule_fixed_seconds',
@@ -174,7 +176,15 @@ async function oceanGet<T>(
 function firstOceanListRow(data: unknown): Record<string, unknown> | null {
   if (!data || typeof data !== 'object') return null
   const o = data as Record<string, unknown>
-  for (const k of ['list', 'aweme_list', 'poi_list', 'product_list', 'project_list', 'data_list']) {
+  for (const k of [
+    'list',
+    'aweme_id_list',
+    'aweme_list',
+    'poi_list',
+    'product_list',
+    'project_list',
+    'data_list',
+  ]) {
     const arr = o[k]
     if (Array.isArray(arr) && arr[0] && typeof arr[0] === 'object') {
       return arr[0] as Record<string, unknown>
@@ -190,15 +200,17 @@ async function fetchLocalCreateAssets(
   let awemeId = ''
   let productId = ''
   const poiIds: string[] = []
-  const aweme = await oceanGet(creds, '/open_api/v3.0/local/aweme/authorized/get/', {
+  const aweme = await oceanGetOrPost(creds, '/open_api/v3.0/local/aweme/authorized/get/', {
     local_account_id: creds.localAccountId,
     marketing_goal: marketingGoal,
+    page: '1',
+    page_size: '20',
   })
   if (aweme.ok) {
     const row = firstOceanListRow(aweme.data)
     awemeId = String(row?.aweme_id ?? row?.awemeId ?? row?.id ?? '').trim()
   }
-  const poi = await oceanGet(creds, '/open_api/v3.0/local/poi/get/', {
+  const poi = await oceanGetOrPost(creds, '/open_api/v3.0/local/poi/get/', {
     local_account_id: creds.localAccountId,
     page: '1',
     page_size: '20',
@@ -214,7 +226,7 @@ async function fetchLocalCreateAssets(
       }
     }
   }
-  const product = await oceanGet(creds, '/open_api/v3.0/local/product/get/', {
+  const product = await oceanGetOrPost(creds, '/open_api/v3.0/local/product/get/', {
     local_account_id: creds.localAccountId,
     page: '1',
     page_size: '10',
@@ -259,16 +271,10 @@ function projectCreateBodyFromDetail(
     'product_id',
     'aweme_id',
     'external_action',
-    'audience',
-    'schedule_type',
-    'schedule_time',
     'bid_type',
     'bid',
     'budget_mode',
     'is_set_peak_budget',
-    'peak_week_days',
-    'peak_holidays',
-    'high_budget_rate',
   ]
   const out: Record<string, unknown> = {
     local_account_id: creds.localAccountId,
@@ -285,8 +291,56 @@ function projectCreateBodyFromDetail(
     if (typeof v === 'object') continue
     out[k] = v
   }
+  const aud = src.audience
+  if (aud && typeof aud === 'object' && !Array.isArray(aud)) {
+    const district = String((aud as Record<string, unknown>).district ?? '').trim()
+    if (district) out.audience = aud
+  }
+  return sanitizeLocalCreateBody(out)
+}
+
+function sanitizeLocalCreateBody(body: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...body }
+  const goal = String(out.marketing_goal ?? '').toUpperCase()
+  const scene = String(out.local_delivery_scene ?? '').toUpperCase()
+  if (goal !== 'LIVE') {
+    delete out.schedule_type
+    delete out.schedule_fixed_seconds
+    delete out.start_time
+    delete out.end_time
+  }
+  if (scene !== 'CONTENT_HEAT') delete out.external_action
+  if (scene === 'CONTENT_HEAT') {
+    delete out.delivery_goal
+    delete out.delivery_poi_mode
+    delete out.promotion_poi_ids
+    delete out.product_id
+    delete out.is_set_peak_budget
+    delete out.peak_week_days
+    delete out.peak_holidays
+    delete out.high_budget_rate
+  }
+  if (String(out.is_set_peak_budget ?? '').toUpperCase() === 'FALSE') {
+    delete out.peak_week_days
+    delete out.peak_holidays
+    delete out.high_budget_rate
+  }
+  if (goal === 'LIVE') delete out.is_set_peak_budget
+  if (!out.ad_type) out.ad_type = 'GENERAL'
   if (!out.budget_mode) out.budget_mode = 'BUDGET_MODE_DAY'
+  if (!out.bid_type) out.bid_type = 'SMART'
+  if (!out.audience) out.audience = { district: 'ALL' }
   return out
+}
+
+async function oceanGetOrPost<T>(
+  creds: LocalPromotionCredentials,
+  path: string,
+  query: Record<string, string>,
+): Promise<{ ok: true; data: T } | { ok: false; message: string }> {
+  const got = await oceanGet<T>(creds, path, query)
+  if (got.ok) return got
+  return oceanPost<T>(creds, path, query)
 }
 
 function isWeakOceanCreateError(msg: string): boolean {
@@ -719,60 +773,91 @@ export async function handleLocalPromotionRoutes(
     const assets = await fetchLocalCreateAssets(creds, marketingGoal)
     if (marketingGoal === 'LIVE') {
       if (assets.awemeId) {
-        attempts.push({
-          local_account_id: creds.localAccountId,
-          name,
-          marketing_goal: 'LIVE',
-          local_delivery_scene: 'CONTENT_HEAT',
-          ad_type: 'GENERAL',
-          aweme_id: assets.awemeId,
-          schedule_type: 'FROM_NOW_ON',
-          budget_mode: 'BUDGET_MODE_DAY',
-          budget: budgetFen,
-          bid_type: 'SMART',
-          external_action: 'LIVE_ENGAGE',
-        })
+        attempts.push(
+          sanitizeLocalCreateBody({
+            local_account_id: creds.localAccountId,
+            name,
+            marketing_goal: 'LIVE',
+            local_delivery_scene: 'CONTENT_HEAT',
+            ad_type: 'GENERAL',
+            aweme_id: String(assets.awemeId),
+            schedule_type: 'FROM_NOW_ON',
+            budget_mode: 'BUDGET_MODE_DAY',
+            budget: budgetFen,
+            bid_type: 'SMART',
+            external_action: 'LIVE_ENGAGE',
+            audience: { district: 'ALL' },
+          }),
+        )
       }
     } else {
-      attempts.push({
-        local_account_id: creds.localAccountId,
-        name,
-        marketing_goal: 'VIDEO_IMAGE',
-        local_delivery_scene: 'POI_RECOMMEND',
-        ad_type: 'GENERAL',
-        delivery_goal: 'POI',
-        delivery_poi_mode: 'ALL',
-        budget_mode: 'BUDGET_MODE_DAY',
-        budget: budgetFen,
-        bid_type: 'SMART',
-        is_set_peak_budget: 'FALSE',
-      })
-      if (assets.productId) {
-        attempts.push({
+      attempts.push(
+        sanitizeLocalCreateBody({
           local_account_id: creds.localAccountId,
           name,
           marketing_goal: 'VIDEO_IMAGE',
-          local_delivery_scene: 'PRODUCT_PAY',
+          local_delivery_scene: 'CONTENT_HEAT',
           ad_type: 'GENERAL',
-          delivery_goal: 'PRODUCT',
-          product_id: assets.productId,
+          budget_mode: 'BUDGET_MODE_DAY',
+          budget: budgetFen,
+          bid_type: 'SMART',
+          external_action: 'NATIVE_ACTION',
+          audience: { district: 'ALL' },
+        }),
+      )
+      if (assets.poiIds.length) {
+        attempts.push(
+          sanitizeLocalCreateBody({
+            local_account_id: creds.localAccountId,
+            name,
+            marketing_goal: 'VIDEO_IMAGE',
+            local_delivery_scene: 'POI_RECOMMEND',
+            ad_type: 'GENERAL',
+            delivery_goal: 'POI',
+            delivery_poi_mode: 'PART',
+            promotion_poi_ids: assets.poiIds.slice(0, 5),
+            budget_mode: 'BUDGET_MODE_DAY',
+            budget: budgetFen,
+            bid_type: 'SMART',
+            is_set_peak_budget: 'FALSE',
+            audience: { district: 'POI', poi_around: { poi_around_radius: 'KM_10' } },
+          }),
+        )
+      }
+      attempts.push(
+        sanitizeLocalCreateBody({
+          local_account_id: creds.localAccountId,
+          name,
+          marketing_goal: 'VIDEO_IMAGE',
+          local_delivery_scene: 'POI_RECOMMEND',
+          ad_type: 'GENERAL',
+          delivery_goal: 'POI',
+          delivery_poi_mode: 'ALL',
           budget_mode: 'BUDGET_MODE_DAY',
           budget: budgetFen,
           bid_type: 'SMART',
           is_set_peak_budget: 'FALSE',
-        })
+          audience: { district: 'ALL' },
+        }),
+      )
+      if (assets.productId) {
+        attempts.push(
+          sanitizeLocalCreateBody({
+            local_account_id: creds.localAccountId,
+            name,
+            marketing_goal: 'VIDEO_IMAGE',
+            local_delivery_scene: 'PRODUCT_PAY',
+            ad_type: 'GENERAL',
+            delivery_goal: 'PRODUCT',
+            product_id: assets.productId,
+            budget_mode: 'BUDGET_MODE_DAY',
+            budget: budgetFen,
+            bid_type: 'SMART',
+            is_set_peak_budget: 'FALSE',
+            audience: { district: 'ALL' },
+          }),
+        )
       }
-      attempts.push({
-        local_account_id: creds.localAccountId,
-        name,
-        marketing_goal: 'VIDEO_IMAGE',
-        local_delivery_scene: 'CONTENT_HEAT',
-        ad_type: 'GENERAL',
-        budget_mode: 'BUDGET_MODE_DAY',
-        budget: budgetFen,
-        bid_type: 'SMART',
-        external_action: 'NATIVE_ACTION',
-      })
     }
     if (!attempts.length) {
       json(res, 400, {
@@ -784,30 +869,47 @@ export async function handleLocalPromotionRoutes(
       })
       return true
     }
-    let lastMsg = ''
+    const failMsgs: string[] = []
     let created: Record<string, unknown> | null = null
+    let usedScene = ''
     for (const body of attempts) {
       const pr = await oceanPost(creds, '/open_api/v3.0/local/project/create/', body)
       if (pr.ok) {
         created = (pr.data || {}) as Record<string, unknown>
+        usedScene = String(body.local_delivery_scene ?? '')
         break
       }
-      if (!lastMsg || isWeakOceanCreateError(lastMsg)) lastMsg = pr.message
-      else if (!isWeakOceanCreateError(pr.message)) lastMsg = pr.message
+      if (pr.message && !failMsgs.includes(pr.message)) failMsgs.push(pr.message)
     }
     if (!created) {
       json(res, 502, {
         ok: false,
         message:
-          lastMsg ||
-          '创建失败。请确认本地推已授权门店/抖音号，并在开放平台开通项目创建权限。',
+          failMsgs[0] ||
+          '创建失败。请确认本地推已授权门店/抖音号，并在开放平台开通「本地推投放」项目创建权限。',
+        attempts: failMsgs.slice(0, 4),
       })
       return true
     }
+    const projectId = String(created.project_id ?? created.id ?? '')
+    let promoNote = ''
+    if (projectId && usedScene !== 'CONTENT_HEAT') {
+      const promoBody: Record<string, unknown> = {
+        local_account_id: creds.localAccountId,
+        project_id: projectId,
+        name: `${name}-广告`,
+        enable_graphic_delivery: true,
+      }
+      if (assets.awemeId) promoBody.aweme_id = String(assets.awemeId)
+      const promo = await oceanPost(creds, '/open_api/v3.0/local/promotion/create/', promoBody)
+      promoNote = promo.ok ? '已同时创建团购卡广告。' : `项目已建好；广告单元需补素材（${promo.message}）。`
+    } else if (usedScene === 'CONTENT_HEAT') {
+      promoNote = '内容加热项目已创建；短视频素材可在巨量后台补齐后投放。'
+    }
     json(res, 200, {
       ok: true,
-      projectId: String(created.project_id ?? created.id ?? ''),
-      message: '已在巨量本地推创建项目。广告单元素材可随后在巨量后台补齐。',
+      projectId,
+      message: `已在巨量本地推创建项目。${promoNote}`.trim(),
     })
     return true
   }
@@ -890,6 +992,33 @@ export async function handleLocalPromotionRoutes(
       return true
     }
     json(res, 200, { ok: true, budgetYuan })
+    return true
+  }
+
+  if (method === 'POST' && pathname === '/api/merchant/local-promotion/projects/optimize') {
+    const j = parseBody(bodyRaw)
+    const rawCreds = credsFromBody(j)
+    if (!rawCreds) {
+      json(res, 400, { ok: false, message: '请先绑定本地推' })
+      return true
+    }
+    const creds = await resolveLocalPromotionCreds(rawCreds)
+    const projectId = String(j.project_id ?? j.projectId ?? '')
+    if (!projectId) {
+      json(res, 400, { ok: false, message: '缺少 project_id' })
+      return true
+    }
+    const body = buildLocalProjectOptimizeBody(creds, projectId, j)
+    if (Object.keys(body).length <= 2) {
+      json(res, 400, { ok: false, message: '缺少可写入巨量的出价/定向/预算字段' })
+      return true
+    }
+    const pr = await oceanPost(creds, '/open_api/v3.0/local/project/update/', body)
+    if (!pr.ok) {
+      json(res, 502, { ok: false, message: pr.message })
+      return true
+    }
+    json(res, 200, { ok: true, projectId })
     return true
   }
 
@@ -1459,6 +1588,51 @@ function clampBudgetYuan(current: number, suggested: number): number {
   return Math.min(hi, Math.max(lo, n))
 }
 
+function clampBidFen(suggestedFen: number): number {
+  const n = Math.round(suggestedFen)
+  return Math.min(1000000, Math.max(1, n))
+}
+
+function buildAudiencePatch(row: Record<string, unknown>): Record<string, unknown> | null {
+  const audienceIn = row.audience && typeof row.audience === 'object' ? (row.audience as Record<string, unknown>) : {}
+  const district = String(row.district ?? audienceIn.district ?? '').toUpperCase()
+  const gender = String(row.gender ?? audienceIn.gender ?? '').toUpperCase()
+  const ageRaw = row.age ?? audienceIn.age
+  const audience: Record<string, unknown> = {}
+  if (district === 'POI' || district === 'POI_AROUND') {
+    audience.district = 'POI'
+    audience.poi_around = { poi_around_radius: String(row.poiAroundRadius ?? 'KM_10') }
+  } else if (district === 'ALL' || district === 'REGION' || district === 'LOCAL') {
+    audience.district = district === 'POI_AROUND' ? 'POI' : district
+  }
+  if (gender === 'FEMALE' || gender === 'MALE' || gender === 'NONE') audience.gender = gender
+  if (Array.isArray(ageRaw) && ageRaw.length) audience.age = ageRaw.map(String)
+  else if (typeof ageRaw === 'string' && ageRaw.trim()) audience.age = [ageRaw.trim()]
+  return Object.keys(audience).length ? audience : null
+}
+
+function buildLocalProjectOptimizeBody(
+  creds: LocalPromotionCredentials,
+  projectId: string,
+  row: Record<string, unknown>,
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    local_account_id: creds.localAccountId,
+    project_id: projectId,
+  }
+  const budgetYuan = Number(row.budgetYuan ?? row.budget_yuan ?? 0)
+  if (Number.isFinite(budgetYuan) && budgetYuan >= 100) {
+    body.budget = Math.round(budgetYuan * 100)
+  }
+  const bidYuan = Number(row.bidYuan ?? row.bid_yuan ?? 0)
+  if (Number.isFinite(bidYuan) && bidYuan > 0) {
+    body.bid = clampBidFen(bidYuan * 100)
+  }
+  const aud = buildAudiencePatch(row)
+  if (aud) body.audience = aud
+  return body
+}
+
 async function applyFullAiLocalWrites(
   rawCreds: LocalPromotionCredentials,
   promotions: unknown[],
@@ -1479,13 +1653,56 @@ async function applyFullAiLocalWrites(
     lines.push(r.ok ? label : `${label}失败：${r.message ?? '巨量拒绝'}`)
   }
 
+  const writeOptimize = async (projectId: string, patch: Record<string, unknown>, label: string) => {
+    const body = buildLocalProjectOptimizeBody(creds, projectId, patch)
+    if (Object.keys(body).length <= 2) return
+    await run(`opt:${projectId}:${label}`, label, async () => {
+      const pr = await oceanPost(creds, '/open_api/v3.0/local/project/update/', body)
+      return pr.ok ? { ok: true } : { ok: false, message: pr.message }
+    })
+  }
+
   for (const row of rows) {
     const promoId = String(row.promotionId ?? row.promotion_id ?? '').trim()
     const projectId = String(row.projectId ?? row.project_id ?? promoId).trim()
     const plan = byPromo.get(promoId) || byProject.get(projectId)
     const opt = String(row.optStatus ?? row.actionType ?? '').toUpperCase()
     const suggestedBudget = Number(row.budgetYuan ?? row.budget_yuan ?? 0)
+    const suggestedBid = Number(row.bidYuan ?? row.bid_yuan ?? 0)
     const auto = plan ? isAutoDeliveryPlan(plan) : Boolean(projectId && promoId && projectId === promoId)
+
+    if (
+      projectId &&
+      (opt === 'BID' ||
+        opt === 'AUDIENCE' ||
+        opt === 'REGION' ||
+        opt === 'OPTIMIZE' ||
+        suggestedBid > 0 ||
+        row.district ||
+        row.audience ||
+        row.gender ||
+        row.age)
+    ) {
+      if (plan && inLearningHold(plan) && suggestedBid > 0) {
+        lines.push(`学习期未改出价（项目 ${projectId}）`)
+      } else {
+        const patch: Record<string, unknown> = { ...row }
+        if (suggestedBudget > 0 && plan) {
+          const current = planMetrics(plan).budgetYuan
+          patch.budgetYuan = clampBudgetYuan(current, suggestedBudget)
+        }
+        await writeOptimize(
+          projectId,
+          patch,
+          `写入巨量定向/出价（项目 ${projectId}）`,
+        )
+      }
+      if (opt === 'ENABLE' || opt === 'DISABLE' || opt === 'PAUSED') {
+        /* continue to status */
+      } else {
+        continue
+      }
+    }
 
     if ((opt === 'BUDGET' || suggestedBudget > 0) && projectId) {
       if (plan && inLearningHold(plan)) {
@@ -1498,14 +1715,7 @@ async function applyFullAiLocalWrites(
         lines.push(`日预算保持 ¥${current}（项目 ${projectId}）`)
         continue
       }
-      await run(`budget:${projectId}`, `日预算 ¥${current || '—'} → ¥${next}`, async () => {
-        const pr = await oceanPost(creds, '/open_api/v3.0/local/project/update/', {
-          local_account_id: creds.localAccountId,
-          project_id: projectId,
-          budget: Math.round(next * 100),
-        })
-        return pr.ok ? { ok: true } : { ok: false, message: pr.message }
-      })
+      await writeOptimize(projectId, { budgetYuan: next }, `日预算 ¥${current || '—'} → ¥${next}`)
       continue
     }
 
@@ -1537,15 +1747,58 @@ async function applyFullAiLocalWrites(
     }
   }
 
+  if (!rows.length) {
+    const heuristic = await heuristicLowRoiWrites(creds, plans, run)
+    lines.push(...heuristic)
+  }
+
   if (!lines.length) {
     const autoPlans = plans.filter(isAutoDeliveryPlan)
     if (autoPlans.some(inLearningHold)) {
       lines.push('学习期未改巨量参数：保持投放，继续观察点击与转化')
-    } else if (!rows.length) {
-      lines.push('本轮无写入：模型未给出可执行的预算/启停动作')
+    } else {
+      lines.push('本轮无写入：模型未给出可执行的预算/出价/定向动作')
     }
   }
   return { lines }
+}
+
+async function heuristicLowRoiWrites(
+  creds: LocalPromotionCredentials,
+  plans: Array<Record<string, unknown>>,
+  run: (key: string, label: string, fn: () => Promise<{ ok: boolean; message?: string }>) => Promise<void>,
+): Promise<string[]> {
+  const lines: string[] = []
+  const ranked = [...plans]
+    .map((p) => ({ p, m: planMetrics(p) }))
+    .filter((x) => x.m.statCost >= 40)
+    .sort((a, b) => {
+      const roiA = a.m.statCost > 0 ? a.m.convertCnt / a.m.statCost : 0
+      const roiB = b.m.statCost > 0 ? b.m.convertCnt / b.m.statCost : 0
+      return roiA - roiB
+    })
+    .slice(0, 3)
+  for (const { p, m } of ranked) {
+    const projectId = String(p.projectId ?? p.project_id ?? '')
+    if (!projectId) continue
+    if (inLearningHold(p)) {
+      lines.push(`学习期观察 ${projectId}，未改定向`)
+      continue
+    }
+    const roi = m.statCost > 0 ? m.convertCnt / m.statCost : 0
+    if (roi > 0.02 && m.convertCnt > 0) continue
+    const nextBudget = clampBudgetYuan(m.budgetYuan || 300, (m.budgetYuan || 300) * 0.85)
+    const body = buildLocalProjectOptimizeBody(creds, projectId, {
+      budgetYuan: nextBudget,
+      district: 'POI',
+      poiAroundRadius: 'KM_10',
+    })
+    await run(`heur:${projectId}`, `低投产收紧定向到门店附近10km并下调日预算至 ¥${nextBudget}`, async () => {
+      const pr = await oceanPost(creds, '/open_api/v3.0/local/project/update/', body)
+      return pr.ok ? { ok: true } : { ok: false, message: pr.message }
+    })
+  }
+  return lines
 }
 
 function buildLocalPromotionInsightPrompt(input: {
@@ -1591,8 +1844,9 @@ function buildLocalPromotionInsightPrompt(input: {
   const actionHint = needActions
     ? `\n文末单独一行 ${AD_INSIGHT_ACTIONS_MARKER} 后接 JSON 数组，最多3条，且必须属于本板块计划。
 真实广告：{"promotionId":"...","optStatus":"ENABLE或DISABLE","reason":"..."}
-自动投放项目：{"projectId":"...","optStatus":"BUDGET或ENABLE或PAUSED","budgetYuan":数字,"reason":"..."}
-学习期不要给 PAUSED。预算调整幅度建议在现预算 ±20% 内。${input.mode === 'full_ai' ? '全面介入将把这些动作直接写入巨量。' : '自动调计划需商家确认后再写。'}`
+自动投放/项目优化：{"projectId":"...","optStatus":"BUDGET或BID或AUDIENCE或PAUSED或ENABLE","budgetYuan":数字,"bidYuan":数字,"district":"POI或ALL","gender":"FEMALE或MALE或NONE","age":["AGE_BETWEEN_24_30"],"reason":"..."}
+投产低（消耗高、转化少）优先 AUDIENCE：district=POI（门店附近10km）或收紧性别年龄，其次小幅下调日预算；智能出价不要乱改 bidYuan。
+学习期不要给 PAUSED。预算调整幅度建议在现预算 ±20% 内。${input.mode === 'full_ai' ? '全面介入会立刻调用巨量 project/update 写入出价、人群、区域。' : '自动调计划需商家确认后再写。'}`
     : ''
 
   const user = `本板块近7日：消耗 ${spend} 元，展示 ${show}，点击 ${click}，转化 ${convert}，线索 ${clues} 条，在投 ${delivering} 条。

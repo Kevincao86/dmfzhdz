@@ -26,6 +26,7 @@ import {
   fetchLocalPromotions,
   fetchLocalReportSummary,
   postAdAiInsight,
+  optimizeLocalProject,
   updatePromotionStatus,
   updateProjectStatus,
 } from '../../services/localPromotionApi'
@@ -328,10 +329,7 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
         })
         if (r.ok) {
           const rawActions = r.actions ?? []
-          const actions = rawActions.filter((a) => {
-            const row = classifiedPromotions.find((p) => p.promotionId === a.promotionId)
-            return !(row && row.projectId && row.promotionId === row.projectId)
-          })
+          const actions = rawActions
           setPaneAi((prev) => ({
             ...prev,
             [targetPane]: { insight: r.insight, actions, busy: false },
@@ -406,6 +404,38 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
   }
 
   const applyAiAction = async (action: LocalPromotionAiAction) => {
+    if (action.actionType === 'optimize') {
+      const projectId =
+        action.projectId ||
+        classifiedPromotions.find((p) => p.promotionId === action.promotionId)?.projectId ||
+        action.promotionId
+      if (!projectId) return
+      setAiApplyingId(action.actionId)
+      try {
+        const r = await optimizeLocalProject({
+          projectId,
+          budgetYuan: action.budgetYuan,
+          bidYuan: action.bidYuan,
+          district: action.district,
+          gender: action.gender,
+        })
+        if (!r.ok) {
+          window.alert(r.message)
+          return
+        }
+        await reload()
+        setPaneAi((prev) => ({
+          ...prev,
+          [pane]: {
+            ...prev[pane],
+            actions: prev[pane].actions.filter((a) => a.actionId !== action.actionId),
+          },
+        }))
+      } finally {
+        setAiApplyingId(null)
+      }
+      return
+    }
     if (!action.promotionId || (action.actionType !== 'enable' && action.actionType !== 'disable')) {
       return
     }

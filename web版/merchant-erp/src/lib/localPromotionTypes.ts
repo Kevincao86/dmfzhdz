@@ -92,10 +92,15 @@ export type LocalPromotionAiPane = 'live' | 'video' | 'leads' | 'ai'
 
 export type LocalPromotionAiAction = {
   actionId: string
-  actionType: 'enable' | 'disable' | 'note'
+  actionType: 'enable' | 'disable' | 'note' | 'optimize'
   promotionId?: string
+  projectId?: string
   promotionName?: string
   reason: string
+  budgetYuan?: number
+  bidYuan?: number
+  district?: string
+  gender?: string
 }
 
 export const LOCAL_PROMOTION_AI_MODES: Array<{
@@ -105,8 +110,8 @@ export const LOCAL_PROMOTION_AI_MODES: Array<{
 }> = [
   { value: 'manual', label: '手动调整', hint: '仅查看数据，自行操作计划' },
   { value: 'assisted', label: 'AI 辅助', hint: '生成分析与优化建议，人工确认后执行' },
-  { value: 'full_ai', label: 'AI 全面介入', hint: '切换板块后自动分析并给出完整策略' },
-  { value: 'auto_adjust', label: 'AI 自动调计划', hint: '分析后生成启停动作，确认后写入巨量' },
+  { value: 'full_ai', label: 'AI 全面介入', hint: '分析后直接改巨量出价、人群、区域与预算' },
+  { value: 'auto_adjust', label: 'AI 自动调计划', hint: '给出调价/定向/启停，确认后写入巨量' },
 ]
 
 export const CLUE_CONVERT_STATES = [
