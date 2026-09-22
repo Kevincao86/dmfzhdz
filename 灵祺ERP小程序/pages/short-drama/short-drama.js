@@ -52,6 +52,12 @@ Page({
     story: '',
     dialogue: '',
     storyBusy: false,
+    castName: '',
+    castDesc: '',
+    castBusy: false,
+    castPreview: '',
+    castDataUrl: '',
+    castConfirmed: false,
     refPaths: [],
     refDataUrls: [],
     durationOptions: catalog.DURATION_OPTIONS,
@@ -122,6 +128,110 @@ Page({
 
   onDialogue(e) {
     this.setData({ dialogue: e.detail.value })
+  },
+
+  onCastName(e) {
+    this.setData({ castName: e.detail.value })
+  },
+  onCastDesc(e) {
+    this.setData({ castDesc: e.detail.value, castConfirmed: false })
+  },
+  _readImageDataUrl(path) {
+    try {
+      const b64 = wx.getFileSystemManager().readFileSync(path, 'base64')
+      return `data:image/jpeg;base64,${b64}`
+    } catch (_) {
+      return ''
+    }
+  },
+  onPickCastPhoto() {
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      success: (res) => {
+        const f = res.tempFiles && res.tempFiles[0]
+        if (!f || !f.tempFilePath) return
+        const dataUrl = this._readImageDataUrl(f.tempFilePath)
+        this.setData({
+          castPreview: f.tempFilePath,
+          castDataUrl: dataUrl,
+          castConfirmed: Boolean(dataUrl),
+        })
+      },
+    })
+  },
+  async onGenCast() {
+    if (this.data.castBusy) return
+    const desc = String(this.data.castDesc || '').trim()
+    const name = String(this.data.castName || '').trim() || '主角'
+    if (desc.length < 6) {
+      wx.showToast({ title: '请先写形象词（至少 6 字）', icon: 'none' })
+      return
+    }
+    this.setData({ castBusy: true, err: '' })
+    try {
+      const prompt = [
+        '竖屏半身短剧定妆，单人，正面或微侧，五官清晰，电影棚拍光，商业广告质感；不要证件照。',
+        `角色身份：${name}。`,
+        `外貌与穿搭：${desc}。`,
+        '禁止字幕、水印、Logo、多人、拼贴和海报排版。',
+      ].join('')
+      const r = await vs.postAiAgentImage(prompt, {
+        preferredVendor: 'qwen',
+        aspectRatio: '3:4',
+        exactPrompt: true,
+      })
+      if (!r.ok || !r.imageUrl) throw new Error(r.message || '角色生成失败')
+      this.setData({
+        castPreview: r.imageUrl,
+        castDataUrl: '',
+        castConfirmed: false,
+        hint: '已生成角色预览，请点「用此图确认角色」后再出片。',
+      })
+    } catch (e) {
+      this.setData({ err: (e && e.message) || '角色生成失败' })
+    } finally {
+      this.setData({ castBusy: false })
+    }
+  },
+  async onConfirmCast() {
+    const preview = String(this.data.castPreview || '').trim()
+    if (!preview) {
+      wx.showToast({ title: '请先生成或上传角色预览', icon: 'none' })
+      return
+    }
+    if (this.data.castDataUrl) {
+      this.setData({ castConfirmed: true, hint: '角色形象已确认，出片将锁这张脸。' })
+      return
+    }
+    wx.showLoading({ title: '确认角色…', mask: true })
+    try {
+      const local = await new Promise((resolve, reject) => {
+        wx.downloadFile({
+          url: preview,
+          success: (res) => {
+            if (res.statusCode === 200 && res.tempFilePath) resolve(res.tempFilePath)
+            else reject(new Error('角色图下载失败'))
+          },
+          fail: () => reject(new Error('角色图下载失败')),
+        })
+      })
+      const dataUrl = this._readImageDataUrl(local)
+      this.setData({
+        castPreview: local,
+        castDataUrl: dataUrl,
+        castConfirmed: Boolean(dataUrl),
+        hint: dataUrl ? '角色形象已确认，出片将锁这张脸。' : '角色图未能转成本地文件',
+      })
+    } catch (e) {
+      this.setData({ err: (e && e.message) || '确认角色失败' })
+    } finally {
+      wx.hideLoading()
+    }
+  },
+  onPreviewCast() {
+    if (!this.data.castPreview) return
+    wx.previewImage({ urls: [this.data.castPreview], current: this.data.castPreview })
   },
 
   async onAiStory() {
@@ -238,7 +348,9 @@ Page({
         generate_audio: true,
         durationSec: dur,
       }
-      if (this.data.refDataUrls && this.data.refDataUrls.length) {
+      if (this.data.castConfirmed && this.data.castDataUrl) {
+        body.images_base64 = [this.data.castDataUrl].concat(this.data.refDataUrls || []).slice(0, 3)
+      } else if (this.data.refDataUrls && this.data.refDataUrls.length) {
         body.images_base64 = this.data.refDataUrls
       }
       const r = await videoAi.postSeedanceStart(body)

@@ -47,7 +47,19 @@
     <text class="op-label">故事补充（选填）</text>
     <textarea class="op-area" maxlength="400" placeholder="可改写故事走向，或点 AI 生成故事" value="{{story}}" bindinput="onStory" />
     <button class="op-btn-ghost" loading="{{storyBusy}}" bindtap="onAiStory">AI 生成故事</button>
-    <text class="op-label">角色参考图（选填，最多 3 张）</text>
+
+    <text class="op-label">AI 生成角色（与网页端一致）</text>
+    <input class="op-input" placeholder="角色名，如店长小琪" value="{{castName}}" bindinput="onCastName" />
+    <textarea class="op-area" maxlength="300" placeholder="形象词：年龄、发型发色、衣着颜色款式。写完后点生成预览。" value="{{castDesc}}" bindinput="onCastDesc" />
+    <button class="op-btn-ghost" loading="{{castBusy}}" bindtap="onGenCast">生成角色预览</button>
+    <button class="op-btn-ghost" bindtap="onPickCastPhoto">上传角色参考图</button>
+    <view wx:if="{{castPreview}}" class="op-cast">
+      <image class="op-cast-img" src="{{castPreview}}" mode="aspectFill" bindtap="onPreviewCast" />
+      <text class="op-meta">{{castConfirmed ? '角色形象 · 已确认' : '角色形象 · 待确认'}}</text>
+      <button class="op-btn-ghost" bindtap="onConfirmCast">{{castConfirmed ? '已确认角色' : '用此图确认角色'}}</button>
+    </view>
+
+    <text class="op-label">场景参考图（选填，最多 3 张）</text>
     <button class="op-btn-ghost" bindtap="onPickRefs">上传参考图</button>
     <button wx:if="{{refPaths.length}}" class="op-btn-ghost" bindtap="clearRefs">去掉参考图</button>
     <view wx:if="{{refPaths.length}}" class="op-chips">

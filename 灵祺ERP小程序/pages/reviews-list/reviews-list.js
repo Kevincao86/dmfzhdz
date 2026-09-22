@@ -2,7 +2,8 @@ const api = require('../../utils/api.js')
 const merchant = require('../../utils/merchantApi.js')
 const reviews = require('../../utils/reviewsMp.js')
 const douyin = require('../../utils/douyinGoodsMp.js')
-const { PLATFORM_TABS } = require('../../utils/platformTokensMp.js')
+const { PLATFORM_TABS, hasAnyPlatformToken } = require('../../utils/platformTokensMp.js')
+const sessionSync = require('../../utils/merchantSessionSyncMp.js')
 const { enrichReviewRow, emptyPlatTabs } = require('../../utils/reviewsListUiMp.js')
 
 const AI_KEY = 'meoo_mp_reviews_ai_auto_v1'
@@ -106,8 +107,24 @@ Page({
       this.patchReplyTabCounts(0, 0, 0)
       return
     }
+    void this.bootLoad()
+  },
+
+  async bootLoad() {
+    try {
+      await sessionSync.syncFromCloud({ force: false })
+    } catch (_) {}
     void this.maybeLoadStores()
-    void this.load()
+    await this.load()
+    if (!this.data.items.length && hasAnyPlatformToken() && !this.data.errMsg) {
+      const plat = this.activeApiPlatform()
+      const r = await reviews.postReviewsSync(plat, {
+        kind: this.data.reviewKind,
+        poiId: this.currentPoiId(),
+      })
+      if (r.ok) await this.load()
+      else if (r.message) this.setData({ errMsg: r.message })
+    }
   },
 
   toggleFilter() {

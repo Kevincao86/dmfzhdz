@@ -4,6 +4,7 @@ const econ = require('../../utils/mpPointsEconomicsMp.js')
 const videoAi = require('../../utils/videoAiMp.js')
 const erpPoints = require('../../utils/erpPointsSpendMp.js')
 const labels = require('../../utils/shortVideoLabelsMp.js')
+const dhPresets = require('../../utils/digitalHumanPresetsMp.js')
 const fs = wx.getFileSystemManager()
 
 const VOICES = [
@@ -12,11 +13,12 @@ const VOICES = [
 ]
 
 const PRESETS = [
-  { id: 'photo', label: '照片驱动' },
-  { id: 'preset-f', label: '形象库·女' },
-  { id: 'preset-m', label: '形象库·男' },
+  { id: 'photo', label: '上传照片' },
+  { id: 'library', label: '预设形象' },
   { id: 'video', label: '实拍视频' },
 ]
+
+const LIBRARY = dhPresets.libraryAvatars()
 
 const SEEDANCE_MODEL = labels.SEEDANCE_1_5_PRO_MODEL_ID
 
@@ -30,8 +32,10 @@ Page({
       { n: 4, label: '预览' },
       { n: 5, label: '生成' },
     ],
-    avatarMode: 'photo',
+    avatarMode: 'library',
     presets: PRESETS,
+    libraryAvatars: LIBRARY,
+    selectedAvatarId: '',
     photoPath: '',
     photoDataUrl: '',
     videoPath: '',
@@ -65,9 +69,15 @@ Page({
     if (n >= 1 && n <= 5) this.setData({ step: n, err: '' })
   },
   onNext() {
-    if (this.data.step === 1 && this.data.avatarMode === 'photo' && !this.data.photoPath) {
-      wx.showToast({ title: '请先上传形象照片', icon: 'none' })
-      return
+    if (this.data.step === 1) {
+      if (this.data.avatarMode === 'photo' && !this.data.photoPath) {
+        wx.showToast({ title: '请先上传形象照片', icon: 'none' })
+        return
+      }
+      if (this.data.avatarMode === 'library' && !this.data.photoDataUrl) {
+        wx.showToast({ title: '请先点选一个预设形象', icon: 'none' })
+        return
+      }
     }
     if (this.data.step === 2 && String(this.data.script || '').trim().length < 8) {
       wx.showToast({ title: '请先填写口播文案（至少 8 字）', icon: 'none' })
@@ -80,7 +90,30 @@ Page({
   },
 
   onAvatarMode(e) {
-    this.setData({ avatarMode: e.currentTarget.dataset.id })
+    this.setData({ avatarMode: e.currentTarget.dataset.id, err: '' })
+  },
+  async onPickLibrary(e) {
+    const id = e.currentTarget.dataset.id
+    const row = LIBRARY.find((x) => x.id === id)
+    if (!row) return
+    this.setData({ selectedAvatarId: id, avatarMode: 'library', err: '' })
+    wx.showLoading({ title: '加载形象…', mask: true })
+    try {
+      const got = await dhPresets.downloadToDataUrl(row.url)
+      this.setData({
+        photoPath: got.path,
+        photoDataUrl: got.dataUrl,
+        avatarMode: 'library',
+      })
+    } catch (err) {
+      this.setData({
+        photoPath: row.url,
+        photoDataUrl: '',
+        err: (err && err.message) || '预设形象加载失败',
+      })
+    } finally {
+      wx.hideLoading()
+    }
   },
   onScript(e) {
     this.setData({ script: e.detail.value })
@@ -302,7 +335,7 @@ Page({
 
   async onGenerate() {
     const text = String(this.data.script || '').trim()
-    if (this.data.avatarMode === 'photo' && !this.data.photoPath) {
+    if ((this.data.avatarMode === 'photo' || this.data.avatarMode === 'library') && !this.data.photoDataUrl && !this.data.photoPath) {
       wx.showToast({ title: '请先选择数字人形象', icon: 'none' })
       return
     }

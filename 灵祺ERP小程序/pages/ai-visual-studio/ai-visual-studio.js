@@ -204,21 +204,50 @@ Page({
     }
   },
   onPickRef() {
-    wx.chooseMedia({
+    const apply = (path) => {
+      if (!path) return
+      try {
+        const b64 = wx.getFileSystemManager().readFileSync(path, 'base64')
+        this.setData({ refPath: path, refDataUrl: `data:image/jpeg;base64,${b64}` })
+      } catch (_) {
+        this.setData({ refPath: path, refDataUrl: '' })
+      }
+    }
+    const fail = (e) => {
+      wx.showToast({ title: (e && e.errMsg) || '无法打开相册', icon: 'none' })
+    }
+    if (wx.chooseMedia) {
+      wx.chooseMedia({
+        count: 1,
+        mediaType: ['image'],
+        sourceType: ['album', 'camera'],
+        success: (res) => {
+          const f = res.tempFiles && res.tempFiles[0]
+          apply(f && f.tempFilePath)
+        },
+        fail: (e) => {
+          if (/cancel/i.test(String((e && e.errMsg) || ''))) return
+          wx.chooseImage({
+            count: 1,
+            sizeType: ['compressed'],
+            sourceType: ['album', 'camera'],
+            success: (res) => apply(res.tempFilePaths && res.tempFilePaths[0]),
+            fail,
+          })
+        },
+      })
+      return
+    }
+    wx.chooseImage({
       count: 1,
-      mediaType: ['image'],
-      success: (res) => {
-        const f = res.tempFiles && res.tempFiles[0]
-        if (!f || !f.tempFilePath) return
-        const path = f.tempFilePath
-        try {
-          const b64 = wx.getFileSystemManager().readFileSync(path, 'base64')
-          this.setData({ refPath: path, refDataUrl: `data:image/jpeg;base64,${b64}` })
-        } catch (_) {
-          this.setData({ refPath: path, refDataUrl: '' })
-        }
-      },
+      sizeType: ['compressed'],
+      sourceType: ['album', 'camera'],
+      success: (res) => apply(res.tempFilePaths && res.tempFilePaths[0]),
+      fail,
     })
+  },
+  onClearRef() {
+    this.setData({ refPath: '', refDataUrl: '' })
   },
   async onGenerate() {
     if (this.data.genBusy) return

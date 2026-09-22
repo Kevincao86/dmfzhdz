@@ -143,6 +143,17 @@
   margin-bottom: 8rpx;
 }
 
+.op-cast {
+  margin-top: 12rpx;
+}
+
+.op-cast-img {
+  width: 240rpx;
+  height: 320rpx;
+  border-radius: 16rpx;
+  background: #0f172a;
+}
+
 .op-body.muted {
   color: #64748b;
   font-size: 24rpx;

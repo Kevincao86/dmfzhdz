@@ -345,6 +345,7 @@ module.exports = {
   PLAYBOOKS,
   INDUSTRIES,
   postAiChat,
+  postAiAgentImage,
   fetchCopySuggestions,
   fetchImagePrompt,
   generatePosterImage,

@@ -64,6 +64,16 @@ function oceanNumeric(v: unknown): number | string {
   return Number.isFinite(n) ? n : s
 }
 
+/** 巨量 marshmallow：is_set_peak_budget 必须是 JSON boolean，不能是 'FALSE' 字符串 */
+function coercePeakBudgetFlag(v: unknown): boolean | undefined {
+  if (typeof v === 'boolean') return v
+  if (v == null || v === '') return undefined
+  const u = String(v).trim().toUpperCase()
+  if (u === 'TRUE' || u === 'TURE' || u === '1') return true
+  if (u === 'FALSE' || u === '0') return false
+  return undefined
+}
+
 function coerceOceanCreateBody(body: Record<string, unknown>): Record<string, unknown> {
   const numKeys = new Set([
     'local_account_id',
@@ -79,6 +89,11 @@ function coerceOceanCreateBody(body: Record<string, unknown>): Record<string, un
     if (v == null || v === '') continue
     if (k === 'promotion_poi_ids' && Array.isArray(v)) {
       out[k] = v.map((x) => oceanNumeric(x))
+      continue
+    }
+    if (k === 'is_set_peak_budget') {
+      const flag = coercePeakBudgetFlag(v)
+      if (flag !== undefined) out[k] = flag
       continue
     }
     if (numKeys.has(k)) {
@@ -360,7 +375,12 @@ function sanitizeLocalCreateBody(body: Record<string, unknown>): Record<string, 
     delete out.peak_holidays
     delete out.high_budget_rate
   }
-  if (String(out.is_set_peak_budget ?? '').toUpperCase() === 'FALSE') {
+  if ('is_set_peak_budget' in out) {
+    const flag = coercePeakBudgetFlag(out.is_set_peak_budget)
+    if (flag === undefined) delete out.is_set_peak_budget
+    else out.is_set_peak_budget = flag
+  }
+  if (out.is_set_peak_budget === false) {
     delete out.peak_week_days
     delete out.peak_holidays
     delete out.high_budget_rate
@@ -835,7 +855,7 @@ export async function handleLocalPromotionRoutes(
             budget_mode: 'BUDGET_MODE_DAY',
             budget: budgetFen,
             bid_type: 'SMART',
-            is_set_peak_budget: 'FALSE',
+            is_set_peak_budget: false,
           }),
         )
       }
@@ -851,7 +871,7 @@ export async function handleLocalPromotionRoutes(
           budget_mode: 'BUDGET_MODE_DAY',
           budget: budgetFen,
           bid_type: 'SMART',
-          is_set_peak_budget: 'FALSE',
+          is_set_peak_budget: false,
         }),
       )
       if (assets.productId) {
@@ -867,7 +887,7 @@ export async function handleLocalPromotionRoutes(
             budget_mode: 'BUDGET_MODE_DAY',
             budget: budgetFen,
             bid_type: 'SMART',
-            is_set_peak_budget: 'FALSE',
+            is_set_peak_budget: false,
           }),
         )
       }

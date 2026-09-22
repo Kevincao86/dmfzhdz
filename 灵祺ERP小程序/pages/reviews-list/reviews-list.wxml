@@ -10,6 +10,9 @@
         confirm-type="search"
       />
     </view>
+    <view class="rev-filter-btn" bindtap="onSync">
+      <text>{{syncing ? '同步中' : '同步评价'}}</text>
+    </view>
     <view class="rev-filter-btn" bindtap="toggleFilter">
       <text class="rev-filter-ico">▾</text>
       <text>筛选</text>

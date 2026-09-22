@@ -3,6 +3,7 @@
  * 供评论、活动等需按平台路由的网关接口使用。
  */
 const { readPlatformToken } = require('./platformTokensMp.js')
+const api = require('./api.js')
 
 function multiPlatformMerchantHeaders() {
   const pairs = [
@@ -25,6 +26,11 @@ function multiPlatformMerchantHeaders() {
     }
   }
   if (primary) h.Authorization = `Bearer ${primary}`
+  const jwt = api.getBearerToken ? String(api.getBearerToken() || '').trim() : ''
+  if (jwt) {
+    h['X-Meoo-Access-Token'] = jwt
+    if (!h.Authorization) h.Authorization = `Bearer ${jwt}`
+  }
   return h
 }
 

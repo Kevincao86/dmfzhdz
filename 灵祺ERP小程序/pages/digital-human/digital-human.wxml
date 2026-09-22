@@ -25,9 +25,22 @@
         bindtap="onAvatarMode"
       >{{item.label}}</text>
     </view>
-    <view class="dh-ref" bindtap="onPickPhoto">
+    <view wx:if="{{avatarMode === 'library'}}" class="dh-grid">
+      <view
+        wx:for="{{libraryAvatars}}"
+        wx:key="id"
+        class="dh-av {{selectedAvatarId === item.id ? 'on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onPickLibrary"
+      >
+        <image class="dh-av-img" src="{{item.url}}" mode="aspectFill" />
+        <text class="dh-av-name">{{item.name}}</text>
+        <text class="dh-av-tag">{{item.tag}} · {{item.gender}}</text>
+      </view>
+    </view>
+    <view wx:if="{{avatarMode !== 'video'}}" class="dh-ref" bindtap="onPickPhoto">
       <image wx:if="{{photoPath}}" class="dh-ref-img" src="{{photoPath}}" mode="aspectFill" />
-      <text wx:else>上传正面竖照（照片驱动）</text>
+      <text wx:else>{{avatarMode === 'library' ? '点选上方预设，或点此改用自己的照片' : '上传正面竖照（照片驱动）'}}</text>
     </view>
     <button class="dh-btn ghost" bindtap="onPickVideo">上传实拍视频（动作模仿）</button>
     <text wx:if="{{videoPath}}" class="dh-hint">已选实拍视频</text>
