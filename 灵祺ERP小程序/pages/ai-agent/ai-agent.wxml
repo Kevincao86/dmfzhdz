@@ -71,9 +71,8 @@
     </view>
     <view wx:if="{{sending}}" id="msg-thinking" class="msg-row">
       <image class="ava" src="{{logoSrc}}" mode="aspectFit" />
-      <view class="bubble bubble-thinking">
+      <view class="bubble">
         <text class="bubble-text muted">{{thinkingText}}</text>
-        <view class="btn-stop-inline" bindtap="onStop">停止</view>
       </view>
     </view>
   </scroll-view>

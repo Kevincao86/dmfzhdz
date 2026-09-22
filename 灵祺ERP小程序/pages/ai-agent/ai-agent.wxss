@@ -206,26 +206,6 @@
   color: #64748b;
 }
 
-.bubble-thinking {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-}
-
-.btn-stop-inline {
-  flex-shrink: 0;
-  min-height: 52rpx;
-  padding: 0 20rpx;
-  border-radius: 8rpx;
-  background: #fa5151;
-  color: #fff;
-  font-size: 24rpx;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .bubble-img {
   width: 100%;
   margin-top: 12rpx;
