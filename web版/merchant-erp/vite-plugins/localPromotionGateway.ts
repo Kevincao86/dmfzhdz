@@ -374,6 +374,62 @@ function withLocalAudienceDefaults(audience: Record<string, unknown>): Record<st
   return out
 }
 
+/** 官方 marshmallow 实测允许值（LIVE_ENGAGE 会被拒绝，须用 LIVE_ENGAGEMENT） */
+const OE_EXTERNAL_ACTIONS = new Set([
+  'CLUE_ACQUISITION',
+  'CLUE_CONFIRM',
+  'CLUE_HIGH_INTENTION',
+  'FOLLOW_ACTION',
+  'LIVE_ENGAGEMENT',
+  'LIVE_ENTER_ACTION',
+  'LIVE_OTO_CLICK',
+  'LIVE_OTO_GROUP_BUYING',
+  'LIVE_STAY_TIME',
+  'NATIVE_ACTION',
+  'POI_RECOMMEND',
+  'PRIVATE_MESSAGE',
+  'SHOW',
+])
+
+const EXTERNAL_ACTION_ALIASES: Record<string, string> = {
+  LIVE_ENGAGE: 'LIVE_ENGAGEMENT',
+  LIVE_ENGAGEMENT: 'LIVE_ENGAGEMENT',
+  FOLLOWER_COUNT: 'FOLLOW_ACTION',
+  FOLLOW_ACTION: 'FOLLOW_ACTION',
+}
+
+function parseOceanAllowedList(message: string, field: string): string[] {
+  const m = String(message || '').match(new RegExp(`${field}[\\s\\S]*?correct is\\s+([^（(]+)`, 'i'))
+  if (!m) return []
+  return m[1]
+    .split(',')
+    .map((s) => s.trim().toUpperCase())
+    .filter((s) => /^[A-Z0-9_]+$/.test(s))
+}
+
+function normalizeExternalAction(v: unknown, goal: string, scene: string): string | undefined {
+  const raw = String(v ?? '').trim().toUpperCase()
+  const mapped = (EXTERNAL_ACTION_ALIASES[raw] || raw).replace(/[^A-Z0-9_]/g, '')
+  if (OE_EXTERNAL_ACTIONS.has(mapped)) return mapped
+  if (goal === 'LIVE' && scene === 'PRODUCT_PAY') return 'LIVE_OTO_CLICK'
+  if (goal === 'LIVE') return 'LIVE_ENGAGEMENT'
+  if (goal === 'VIDEO_IMAGE' && scene === 'CONTENT_HEAT') return 'NATIVE_ACTION'
+  return undefined
+}
+
+function nextExternalActionFromError(body: Record<string, unknown>, message: string): string | null {
+  const allowed = parseOceanAllowedList(message, 'external_action')
+  if (!allowed.length) return null
+  const current = String(body.external_action ?? '').toUpperCase()
+  const goal = String(body.marketing_goal ?? '').toUpperCase()
+  const preferred =
+    goal === 'LIVE'
+      ? ['LIVE_ENGAGEMENT', 'FOLLOW_ACTION', 'SHOW', 'NATIVE_ACTION', 'LIVE_ENTER_ACTION', 'LIVE_STAY_TIME']
+      : ['NATIVE_ACTION', 'FOLLOW_ACTION', 'SHOW']
+  const next = preferred.find((x) => allowed.includes(x) && x !== current) || allowed.find((x) => x !== current)
+  return next || null
+}
+
 /** 官方：LIVE 必填 FROM_NOW_ON | START_TO_END | FIXED_TIME；VIDEO_IMAGE 禁止传入 */
 const LIVE_SCHEDULE_TYPES = new Set(['FROM_NOW_ON', 'START_TO_END', 'FIXED_TIME'])
 
@@ -452,6 +508,11 @@ function sanitizeLocalCreateBody(body: Record<string, unknown>): Record<string, 
   if (!out.ad_type) out.ad_type = 'GENERAL'
   if (!out.budget_mode) out.budget_mode = 'BUDGET_MODE_DAY'
   if (!out.bid_type) out.bid_type = 'SMART'
+  if (out.external_action != null && out.external_action !== '') {
+    const next = normalizeExternalAction(out.external_action, goal, scene)
+    if (next) out.external_action = next
+    else delete out.external_action
+  }
   delete out.audience
   return out
 }
@@ -909,7 +970,22 @@ export async function handleLocalPromotionRoutes(
             budget_mode: 'BUDGET_MODE_DAY',
             budget: budgetFen,
             bid_type: 'SMART',
-            external_action: 'LIVE_ENGAGE',
+            external_action: 'LIVE_ENGAGEMENT',
+          }),
+        )
+        attempts.push(
+          sanitizeLocalCreateBody({
+            local_account_id: creds.localAccountId,
+            name,
+            marketing_goal: 'LIVE',
+            local_delivery_scene: 'CONTENT_HEAT',
+            ad_type: 'GENERAL',
+            aweme_id: String(assets.awemeId),
+            schedule_type: 'FROM_NOW_ON',
+            budget_mode: 'BUDGET_MODE_DAY',
+            budget: budgetFen,
+            bid_type: 'SMART',
+            external_action: 'FOLLOW_ACTION',
           }),
         )
         if (assets.productId) {
@@ -1010,7 +1086,14 @@ export async function handleLocalPromotionRoutes(
     const failMsgs: string[] = []
     let created: Record<string, unknown> | null = null
     let usedScene = ''
-    for (const body of attempts) {
+    const queue = [...attempts]
+    const seenBodies = new Set<string>()
+    while (queue.length) {
+      const body = queue.shift()!
+      const sig = JSON.stringify(body)
+      if (seenBodies.has(sig)) continue
+      seenBodies.add(sig)
+      if (seenBodies.size > 10) break
       const pr = await oceanPost(creds, '/open_api/v3.0/local/project/create/', body)
       if (pr.ok) {
         created = (pr.data || {}) as Record<string, unknown>
@@ -1018,6 +1101,10 @@ export async function handleLocalPromotionRoutes(
         break
       }
       if (pr.message && !failMsgs.includes(pr.message)) failMsgs.push(pr.message)
+      const nextAction = nextExternalActionFromError(body, pr.message || '')
+      if (nextAction) {
+        queue.unshift(sanitizeLocalCreateBody({ ...body, external_action: nextAction }))
+      }
     }
     if (!created) {
       json(res, 502, {
