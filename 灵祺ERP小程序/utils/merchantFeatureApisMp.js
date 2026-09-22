@@ -9,7 +9,11 @@ const supabaseRest = require('./supabaseRest.js')
 
 function postJson(path, body) {
   const token = api.getBearerToken()
-  return merchantRequestAuth('POST', path, { data: body || {}, bearerToken: token }).then((r) => r || {})
+  return merchantRequestAuth('POST', path, {
+    data: body || {},
+    bearerToken: token,
+    timeoutMs: 120000,
+  }).then((r) => r || {})
 }
 
 function tenantId() {
@@ -81,6 +85,84 @@ async function saveStoreMenu(rec) {
       payload,
       message: (e && e.message) || '云端保存失败（本地已更新）',
     }
+  }
+}
+
+function mergeMenuItems(existing, incoming) {
+  const key = (it) =>
+    `${String((it && it.category) || '').trim()}|${String((it && it.name) || '').trim()}|${it && it.productCode ? it.productCode : ''}|${it && it.priceYuan != null ? it.priceYuan : ''}`
+  const seen = new Set((existing || []).map(key))
+  const out = (existing || []).slice()
+  for (let i = 0; i < (incoming || []).length; i++) {
+    const it = incoming[i]
+    if (!it || !String(it.name || '').trim()) continue
+    const k = key(it)
+    if (seen.has(k)) continue
+    seen.add(k)
+    out.push(it)
+  }
+  return out
+}
+
+function parseCsvToRows(text) {
+  const lines = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/)
+  const rows = []
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (!String(line || '').trim()) continue
+    const cells = []
+    let cur = ''
+    let inQ = false
+    for (let j = 0; j < line.length; j++) {
+      const ch = line[j]
+      if (inQ) {
+        if (ch === '"' && line[j + 1] === '"') {
+          cur += '"'
+          j++
+        } else if (ch === '"') inQ = false
+        else cur += ch
+      } else if (ch === '"') inQ = true
+      else if (ch === ',' || ch === '\t' || ch === ';') {
+        cells.push(cur.trim())
+        cur = ''
+      } else cur += ch
+    }
+    cells.push(cur.trim())
+    if (cells.some((c) => c)) rows.push(cells)
+  }
+  return rows
+}
+
+async function recognizeStoreMenuImage(imageDataUrl, storeName) {
+  try {
+    const r = await postJson('/api/meoo-store-menu-recognize', {
+      imageDataUrl,
+      storeName: storeName || '',
+    })
+    if (r.ok && Array.isArray(r.items) && r.items.length) {
+      return { ok: true, items: r.items, notes: r.notes || '' }
+    }
+    return {
+      ok: false,
+      message: String(r.notes || r.detail || r.error || r.message || '未识别到价目条目'),
+    }
+  } catch (e) {
+    return { ok: false, message: (e && e.message) || '识别失败' }
+  }
+}
+
+async function recognizeStoreMenuExcel(body) {
+  try {
+    const r = await postJson('/api/meoo-store-menu-excel-recognize', body || {})
+    if (r.ok && Array.isArray(r.items) && r.items.length) {
+      return { ok: true, items: r.items, notes: r.notes || '' }
+    }
+    return {
+      ok: false,
+      message: String(r.notes || r.detail || r.error || r.message || '未识别到价目条目'),
+    }
+  } catch (e) {
+    return { ok: false, message: (e && e.message) || 'Excel 识别失败' }
   }
 }
 
@@ -249,6 +331,10 @@ module.exports = {
   readStoreMenu,
   writeStoreMenuLocal,
   saveStoreMenu,
+  mergeMenuItems,
+  parseCsvToRows,
+  recognizeStoreMenuImage,
+  recognizeStoreMenuExcel,
   readMargins,
   readIndustryPath,
   menuSummaryLines,

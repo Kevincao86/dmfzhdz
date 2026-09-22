@@ -509,6 +509,51 @@ export async function handleLocalPromotionRoutes(
     return true
   }
 
+  if (method === 'POST' && pathname === '/api/merchant/local-promotion/promotions/create') {
+    const j = parseBody(bodyRaw)
+    const rawCreds = credsFromBody(j)
+    if (!rawCreds) {
+      json(res, 400, { ok: false, message: '请先绑定本地推' })
+      return true
+    }
+    const creds = await resolveLocalPromotionCreds(rawCreds)
+    const name = String(j.name || j.project_name || j.promotion_name || '').trim()
+    const budgetYuan = Number(j.budget_yuan ?? j.budgetYuan ?? 0)
+    const goalRaw = String(j.marketing_goal || j.goal || 'VIDEO_PROM_GOODS').toUpperCase()
+    const marketingGoal =
+      goalRaw === 'LIVE' || goalRaw === 'LIVE_PROM_GOODS'
+        ? 'LIVE'
+        : goalRaw === 'CLUE' || goalRaw === 'LEADS'
+          ? 'CLUE'
+          : 'VIDEO_PROM_GOODS'
+    if (!name) {
+      json(res, 400, { ok: false, message: '请填写计划名称' })
+      return true
+    }
+    if (!Number.isFinite(budgetYuan) || budgetYuan < 100) {
+      json(res, 400, { ok: false, message: '日预算至少 100 元' })
+      return true
+    }
+    const pr = await oceanPost(creds, '/open_api/v3.0/local/project/create/', {
+      local_account_id: creds.localAccountId,
+      name,
+      project_name: name,
+      marketing_goal: marketingGoal,
+      budget: Math.round(budgetYuan * 100),
+    })
+    if (!pr.ok) {
+      json(res, 502, { ok: false, message: pr.message })
+      return true
+    }
+    const data = (pr.data || {}) as Record<string, unknown>
+    json(res, 200, {
+      ok: true,
+      projectId: String(data.project_id ?? data.id ?? ''),
+      message: '已在巨量本地推创建项目。广告单元素材可随后在巨量后台补齐。',
+    })
+    return true
+  }
+
   if (method === 'POST' && pathname === '/api/merchant/local-promotion/promotions/status') {
     const j = parseBody(bodyRaw)
     const rawCreds = credsFromBody(j)

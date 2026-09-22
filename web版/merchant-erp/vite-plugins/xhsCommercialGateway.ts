@@ -248,6 +248,52 @@ export async function handleXhsCommercialRoutes(
     return true
   }
 
+  if (method === 'POST' && pathname === '/api/merchant/xhs-juguang/promotions/create') {
+    const j = parseBody(bodyRaw)
+    if (noCreds || noApiBase) {
+      json(res, 400, { ok: false, message: '请先绑定小红书聚光账号' })
+      return true
+    }
+    const name = String(j.name || j.campaign_name || '').trim()
+    const budgetYuan = Number(j.budget_yuan ?? j.budgetYuan ?? 0)
+    if (!name) {
+      json(res, 400, { ok: false, message: '请填写计划名称' })
+      return true
+    }
+    if (!Number.isFinite(budgetYuan) || budgetYuan < 100) {
+      json(res, 400, { ok: false, message: '日预算至少 100 元' })
+      return true
+    }
+    const path = process.env.XHS_JUGUANG_CREATE_PATH?.trim() || '/api/open/jg/campaign/create'
+    const r = await xhsCommercialFetch(path, creds!, {
+      method: 'POST',
+      body: {
+        ...j,
+        advertiser_id: creds!.advertiserId,
+        advertiserId: creds!.advertiserId,
+        access_token: creds!.accessToken,
+        name,
+        campaign_name: name,
+        budget: budgetYuan,
+        budget_yuan: budgetYuan,
+      },
+    })
+    if (!r.ok) {
+      json(res, 502, { ok: false, message: r.message })
+      return true
+    }
+    const data = (r.json.data && typeof r.json.data === 'object' ? r.json.data : r.json) as Record<
+      string,
+      unknown
+    >
+    json(res, 200, {
+      ok: true,
+      projectId: String(data.campaign_id ?? data.id ?? data.unit_id ?? ''),
+      message: '已向小红书聚光提交新建计划。创意素材可随后在聚光后台补齐。',
+    })
+    return true
+  }
+
   if (method === 'POST' && pathname === '/api/merchant/xhs-juguang/promotions/status') {
     const j = parseBody(bodyRaw)
     if (noCreds || noApiBase) {

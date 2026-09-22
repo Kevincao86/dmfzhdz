@@ -314,6 +314,46 @@ export async function handleQianchuanRoutes(
     return true
   }
 
+  if (method === 'POST' && pathname === '/api/merchant/qianchuan/promotions/create') {
+    const j = parseBody(bodyRaw)
+    const creds = credsFromBody(j)
+    if (!creds) {
+      json(res, 400, { ok: false, message: '请先绑定千川' })
+      return true
+    }
+    const name = String(j.name || j.campaign_name || '').trim()
+    const budgetYuan = Number(j.budget_yuan ?? j.budgetYuan ?? 0)
+    const goalRaw = String(j.marketing_goal || j.goal || 'VIDEO_PROM_GOODS').toUpperCase()
+    const marketingGoal =
+      goalRaw === 'LIVE' || goalRaw === 'LIVE_PROM_GOODS' ? 'LIVE_PROM_GOODS' : 'VIDEO_PROM_GOODS'
+    if (!name) {
+      json(res, 400, { ok: false, message: '请填写计划名称' })
+      return true
+    }
+    if (!Number.isFinite(budgetYuan) || budgetYuan < 100) {
+      json(res, 400, { ok: false, message: '日预算至少 100 元' })
+      return true
+    }
+    const pr = await oceanPost(creds, '/open_api/v1.0/qianchuan/campaign/create/', {
+      advertiser_id: Number(creds.localAccountId),
+      campaign_name: name,
+      marketing_goal: marketingGoal,
+      budget_mode: 'BUDGET_MODE_DAY',
+      budget: Math.round(budgetYuan * 100),
+    })
+    if (!pr.ok) {
+      json(res, 502, { ok: false, message: pr.message })
+      return true
+    }
+    const data = (pr.data || {}) as Record<string, unknown>
+    json(res, 200, {
+      ok: true,
+      projectId: String(data.campaign_id ?? data.id ?? ''),
+      message: '已在巨量千川创建广告组。创意素材可随后在千川后台补齐。',
+    })
+    return true
+  }
+
   if (method === 'POST' && pathname === '/api/merchant/qianchuan/promotions/status') {
     const j = parseBody(bodyRaw)
     const creds = credsFromBody(j)

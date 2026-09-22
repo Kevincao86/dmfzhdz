@@ -385,3 +385,64 @@
 .ads-bottom-space {
   height: 32rpx;
 }
+
+.ads-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 80;
+  display: flex;
+  align-items: flex-end;
+}
+
+.ads-sheet {
+  width: 100%;
+  background: #fff;
+  border-radius: 28rpx 28rpx 0 0;
+  padding: 32rpx 28rpx calc(28rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
+.ads-sheet-title {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 700;
+  margin-bottom: 16rpx;
+}
+
+.ads-sheet-lab {
+  display: block;
+  font-size: 22rpx;
+  color: #64748b;
+  margin-top: 8rpx;
+}
+
+.ads-sheet-input {
+  margin-top: 8rpx;
+  height: 72rpx;
+  padding: 0 20rpx;
+  border-radius: 12rpx;
+  background: #f8fafc;
+  font-size: 26rpx;
+}
+
+.ads-sheet-row {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 24rpx;
+}
+
+.ads-sheet-btn {
+  flex: 1;
+  background: #ea580c !important;
+  color: #fff !important;
+  font-size: 28rpx !important;
+}
+
+.ads-sheet-btn.ghost {
+  background: #f1f5f9 !important;
+  color: #334155 !important;
+}

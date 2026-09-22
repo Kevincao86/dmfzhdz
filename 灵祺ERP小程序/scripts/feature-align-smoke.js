@@ -86,4 +86,9 @@ contact.saveOverride('douyin', 'poi-1', { phone: '13800000000', businessHours: '
 const ov = contact.getOverride('douyin', 'poi-1')
 assert(ov && ov.phone === '13800000000', 'store contact override')
 
+const featApis = require(path.join(mpRoot, 'utils/merchantFeatureApisMp.js'))
+const csvRows = featApis.parseCsvToRows('名称,价格\n招牌套餐,88\n')
+assert(csvRows.length >= 2 && csvRows[1][1] === '88', 'csv parse')
+assert(typeof featApis.mergeMenuItems === 'function', 'merge menu')
+
 console.log('OK: erp-mp feature-align smoke')

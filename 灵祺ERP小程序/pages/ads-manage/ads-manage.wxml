@@ -104,3 +104,28 @@
   </block>
   <view class="ads-bottom-space"></view>
 </scroll-view>
+
+<view wx:if="{{createOpen}}" class="ads-mask" catchtouchmove="noop">
+  <view class="ads-sheet">
+    <text class="ads-sheet-title">新建{{channel === 'xhs_juguang' ? '聚光' : channel === 'qianchuan' ? '千川' : '本地推'}}计划</text>
+    <text class="ads-sheet-lab">计划名称</text>
+    <input class="ads-sheet-input" value="{{createName}}" bindinput="onCreateName" placeholder="如：周末到店引流" />
+    <text class="ads-sheet-lab">日预算（元，至少 100）</text>
+    <input class="ads-sheet-input" type="digit" value="{{createBudget}}" bindinput="onCreateBudget" />
+    <text class="ads-sheet-lab">投放目标</text>
+    <view class="ads-channel-row" style="margin: 8rpx 0 16rpx;">
+      <view
+        wx:for="{{createGoals}}"
+        wx:key="id"
+        class="ads-channel {{createGoal === item.id ? 'on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onCreateGoal"
+      >{{item.label}}</view>
+    </view>
+    <text class="ads-bind-hint">将调用巨量/聚光开放接口创建项目或广告组。视频/创意素材仍可能需在广告后台补齐。</text>
+    <view class="ads-sheet-row">
+      <button class="ads-sheet-btn ghost" bindtap="onCreateClose">取消</button>
+      <button class="ads-sheet-btn" loading="{{createBusy}}" bindtap="onCreateSubmit">创建</button>
+    </view>
+  </view>
+</view>

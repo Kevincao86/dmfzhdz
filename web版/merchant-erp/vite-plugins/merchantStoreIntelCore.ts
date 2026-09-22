@@ -460,6 +460,38 @@ function refineExcelProductRows(rows: string[][]): string[][] {
   return rows
 }
 
+async function rowsFromExcelBase64(
+  rawB64: string,
+  fileNameHint: string,
+): Promise<{ rows: string[][]; sheetName: string; fileName: string }> {
+  const b64 = rawB64.replace(/^data:[^;]+;base64,/, '')
+  const buf = Buffer.from(b64, 'base64')
+  if (!buf.length) throw new Error('空文件')
+  const XLSX = await import('xlsx')
+  const wb = XLSX.read(buf, { type: 'buffer', raw: false, cellDates: true })
+  const names = wb.SheetNames || []
+  if (!names.length) throw new Error('Excel 无工作表')
+  let bestName = names[0] || 'Sheet1'
+  let bestRows: string[][] = []
+  for (const name of names) {
+    const sheet = wb.Sheets[name]
+    if (!sheet) continue
+    const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false }) as unknown[][]
+    const rows = aoa
+      .map((r) => (Array.isArray(r) ? r.map((c) => String(c ?? '').trim()) : []))
+      .filter((r) => r.some((c) => c.length > 0))
+    if (rows.length > bestRows.length) {
+      bestName = name
+      bestRows = rows
+    }
+  }
+  return {
+    rows: bestRows,
+    sheetName: bestName,
+    fileName: fileNameHint || 'menu.xlsx',
+  }
+}
+
 export async function runStoreMenuExcelRecognizeCore(
   bodyRaw: string,
   authHeader: string | undefined,
@@ -469,22 +501,50 @@ export async function runStoreMenuExcelRecognizeCore(
   if (!session) return { status: 401, body: { ok: false, error: 'unauthorized' } }
   const aiEnv = await mergeStoreIntelAiEnv(env)
 
-  let body: { rows?: unknown; fileName?: string; sheetName?: string; storeName?: string }
+  let body: {
+    rows?: unknown
+    fileName?: string
+    sheetName?: string
+    storeName?: string
+    fileBase64?: string
+    contentBase64?: string
+  }
   try {
     body = JSON.parse(bodyRaw || '{}') as typeof body
   } catch {
     return { status: 400, body: { ok: false, error: 'invalid_json' } }
   }
 
-  if (!Array.isArray(body.rows) || body.rows.length === 0) {
-    return { status: 400, body: { ok: false, error: 'rows_required' } }
-  }
-
   const rows: string[][] = []
-  for (const row of body.rows) {
-    if (!Array.isArray(row)) continue
-    const cells = row.map((c) => String(c ?? '').trim())
-    if (cells.some((c) => c.length > 0)) rows.push(cells)
+  if (Array.isArray(body.rows)) {
+    for (const row of body.rows) {
+      if (!Array.isArray(row)) continue
+      const cells = row.map((c) => String(c ?? '').trim())
+      if (cells.some((c) => c.length > 0)) rows.push(cells)
+    }
+  }
+  const fileB64 = String(body.fileBase64 || body.contentBase64 || '').trim()
+  if (rows.length === 0 && fileB64) {
+    try {
+      const parsed = await rowsFromExcelBase64(fileB64, String(body.fileName || ''))
+      for (const row of parsed.rows) {
+        if (row.some((c) => c.length > 0)) rows.push(row)
+      }
+      if (!body.fileName) body.fileName = parsed.fileName
+      if (!body.sheetName) body.sheetName = parsed.sheetName
+    } catch (e) {
+      return {
+        status: 400,
+        body: {
+          ok: false,
+          error: 'excel_parse_failed',
+          detail: e instanceof Error ? e.message : String(e),
+        },
+      }
+    }
+  }
+  if (rows.length === 0) {
+    return { status: 400, body: { ok: false, error: 'rows_required' } }
   }
   const refined = refineExcelProductRows(rows)
   if (refined.length === 0) {

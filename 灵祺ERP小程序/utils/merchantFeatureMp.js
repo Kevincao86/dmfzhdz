@@ -301,6 +301,8 @@ function adsChannelSpec(channel) {
       accountQuery: 'advertiser_id',
       unbound: '尚未绑定巨量千川。请在电脑端「系统 → 投流」绑定千川账号后下拉刷新。',
       tag: '千川',
+      projectsPath: '/api/merchant/qianchuan/projects',
+      createPath: '/api/merchant/qianchuan/promotions/create',
     }
   }
   if (channel === 'xhs_juguang') {
@@ -315,6 +317,8 @@ function adsChannelSpec(channel) {
       accountQuery: 'advertiser_id',
       unbound: '尚未绑定小红书聚光 / 种小草。请在电脑端「系统设置」完成绑定后下拉刷新。',
       tag: '聚光',
+      projectsPath: '/api/merchant/xhs-juguang/projects',
+      createPath: '/api/merchant/xhs-juguang/promotions/create',
     }
   }
   return {
@@ -328,6 +332,8 @@ function adsChannelSpec(channel) {
     accountQuery: 'local_account_id',
     unbound: '尚未绑定巨量本地推。请在电脑端「系统设置」完成绑定后下拉刷新。',
     tag: '本地推',
+    projectsPath: '/api/merchant/local-promotion/projects',
+    createPath: '/api/merchant/local-promotion/promotions/create',
   }
 }
 
@@ -400,6 +406,65 @@ async function updateAdsStatus(channel, promotionIds, optStatus) {
       opt_status: optStatus,
     })
     return { ok: true }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+async function fetchAdsProjects(channel) {
+  if (!merchantApi.hasMerchantApi()) {
+    return { ok: false, message: '请配置商家后台 API 地址', items: [] }
+  }
+  const spec = adsChannelSpec(channel)
+  const creds = spec.creds()
+  if (!creds) return { ok: false, message: spec.unbound, items: [] }
+  const qs = `?access_token=${encodeURIComponent(creds.access_token)}&${spec.accountQuery}=${encodeURIComponent(creds.local_account_id)}`
+  try {
+    const data = await merchantApi.merchantRequest('GET', `${spec.projectsPath}${qs}`)
+    const list = Array.isArray(data.list) ? data.list : []
+    const items = list.map((x) => ({
+      id: String(x.projectId || x.campaign_id || x.id || ''),
+      name: String(x.projectName || x.campaign_name || x.name || '计划'),
+    })).filter((x) => x.id)
+    return { ok: true, items }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e), items: [] }
+  }
+}
+
+async function createAdsPromotion(channel, input) {
+  const spec = adsChannelSpec(channel)
+  const creds = spec.creds()
+  if (!creds) return { ok: false, message: spec.unbound }
+  const name = String((input && input.name) || '').trim()
+  const budgetYuan = Number((input && input.budgetYuan) || 0)
+  const goal = String((input && input.goal) || 'video')
+  const marketingGoal =
+    goal === 'live' ? 'LIVE' : goal === 'clue' ? 'CLUE' : 'VIDEO_PROM_GOODS'
+  if (!name) return { ok: false, message: '请填写计划名称' }
+  if (!Number.isFinite(budgetYuan) || budgetYuan < 100) return { ok: false, message: '日预算至少 100 元' }
+  try {
+    const data = await merchantApi.merchantRequestAuth('POST', spec.createPath, {
+      data: {
+        ...adsCredsPayload(creds),
+        name,
+        campaign_name: name,
+        project_name: name,
+        budget_yuan: budgetYuan,
+        budgetYuan,
+        marketing_goal: marketingGoal,
+        goal,
+      },
+      timeoutMs: 60000,
+    })
+    if (data && data.ok === false) {
+      return { ok: false, message: String(data.message || '创建失败') }
+    }
+    return {
+      ok: true,
+      projectId: String((data && (data.projectId || data.campaign_id)) || ''),
+      message: String((data && data.message) || '已创建'),
+    }
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : String(e) }
   }
@@ -588,6 +653,8 @@ module.exports = {
   fetchMarketingActivities,
   fetchLocalPromotions,
   fetchAdsPromotions,
+  fetchAdsProjects,
+  createAdsPromotion,
   fetchAdsReport,
   updateAdsStatus,
   fetchLocalClues,

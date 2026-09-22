@@ -32,6 +32,16 @@ Page({
     channels: CHANNELS,
     expandedId: '',
     bindHint: '',
+    createOpen: false,
+    createName: '',
+    createBudget: '300',
+    createGoal: 'video',
+    createGoals: [
+      { id: 'video', label: '短视频' },
+      { id: 'live', label: '直播' },
+      { id: 'clue', label: '线索' },
+    ],
+    createBusy: false,
   },
 
   onShow() {
@@ -143,14 +153,49 @@ Page({
   },
 
   onCreateAd() {
+    this.setData({
+      createOpen: true,
+      createName: '',
+      createBudget: '300',
+      createGoal: 'video',
+    })
+  },
+
+  onCreateClose() {
+    this.setData({ createOpen: false })
+  },
+  onCreateName(e) {
+    this.setData({ createName: e.detail.value })
+  },
+  onCreateBudget(e) {
+    this.setData({ createBudget: e.detail.value })
+  },
+  onCreateGoal(e) {
+    const id = e.currentTarget.dataset.id
+    if (id) this.setData({ createGoal: id })
+  },
+  async onCreateSubmit() {
+    if (this.data.createBusy) return
+    this.setData({ createBusy: true })
+    wx.showLoading({ title: '创建中…', mask: true })
+    const r = await feature.createAdsPromotion(this.data.channel, {
+      name: this.data.createName,
+      budgetYuan: Number(this.data.createBudget),
+      goal: this.data.createGoal,
+    })
+    wx.hideLoading()
+    this.setData({ createBusy: false })
+    if (!r.ok) {
+      wx.showModal({ title: '创建失败', content: r.message || '巨量/聚光拒绝了该请求', showCancel: false })
+      return
+    }
+    this.setData({ createOpen: false })
     wx.showModal({
-      title: '新建投放',
-      content:
-        this.data.channel === 'xhs_juguang'
-          ? '新建计划需在小红书聚光后台完成素材与定向。小程序可启停已有计划。'
-          : '新建计划需在巨量后台完成素材与定向。小程序可启停已有计划。',
+      title: '已提交新建',
+      content: r.message || '计划已创建。创意素材可随后在广告平台补齐。',
       showCancel: false,
     })
+    await this.load()
   },
 
   onViewAllData() {
@@ -189,4 +234,6 @@ Page({
     const id = e.currentTarget.dataset.id
     this.setData({ expandedId: this.data.expandedId === id ? '' : id })
   },
+
+  noop() {},
 })

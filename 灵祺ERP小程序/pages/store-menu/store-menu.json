@@ -1,1 +1,1 @@
-{ "navigationBarTitleText": "菜单价目表", "navigationBarBackgroundColor": "#ecfeff", "navigationBarTextStyle": "black" }
+{ "navigationBarTitleText": "菜单价目表", "navigationBarBackgroundColor": "#ecfeff", "navigationBarTextStyle": "black", "enablePullDownRefresh": true }
