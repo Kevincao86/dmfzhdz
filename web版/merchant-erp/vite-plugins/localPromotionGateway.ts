@@ -294,9 +294,23 @@ function projectCreateBodyFromDetail(
   const aud = src.audience
   if (aud && typeof aud === 'object' && !Array.isArray(aud)) {
     const district = String((aud as Record<string, unknown>).district ?? '').trim()
-    if (district) out.audience = aud
+    if (district && district.toUpperCase() !== 'ALL') {
+      out.audience = withLocalAudienceDefaults(aud as Record<string, unknown>)
+    }
   }
   return sanitizeLocalCreateBody(out)
+}
+
+function withLocalAudienceDefaults(audience: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...audience }
+  const rawAc = out.action_config
+  const ac =
+    rawAc && typeof rawAc === 'object' && !Array.isArray(rawAc)
+      ? { ...(rawAc as Record<string, unknown>) }
+      : {}
+  if (ac.action_days == null || ac.action_days === '') ac.action_days = 7
+  out.action_config = ac
+  return out
 }
 
 function sanitizeLocalCreateBody(body: Record<string, unknown>): Record<string, unknown> {
@@ -329,7 +343,14 @@ function sanitizeLocalCreateBody(body: Record<string, unknown>): Record<string, 
   if (!out.ad_type) out.ad_type = 'GENERAL'
   if (!out.budget_mode) out.budget_mode = 'BUDGET_MODE_DAY'
   if (!out.bid_type) out.bid_type = 'SMART'
-  if (!out.audience) out.audience = { district: 'ALL' }
+  if (out.audience && typeof out.audience === 'object' && !Array.isArray(out.audience)) {
+    const aud = out.audience as Record<string, unknown>
+    const district = String(aud.district ?? '').toUpperCase()
+    if (!district || district === 'ALL') delete out.audience
+    else out.audience = withLocalAudienceDefaults(aud)
+  } else {
+    delete out.audience
+  }
   return out
 }
 
@@ -782,7 +803,6 @@ export async function handleLocalPromotionRoutes(
             budget: budgetFen,
             bid_type: 'SMART',
             external_action: 'LIVE_ENGAGE',
-            audience: { district: 'ALL' },
           }),
         )
       }
@@ -798,7 +818,6 @@ export async function handleLocalPromotionRoutes(
           budget: budgetFen,
           bid_type: 'SMART',
           external_action: 'NATIVE_ACTION',
-          audience: { district: 'ALL' },
         }),
       )
       if (assets.poiIds.length) {
@@ -816,7 +835,10 @@ export async function handleLocalPromotionRoutes(
             budget: budgetFen,
             bid_type: 'SMART',
             is_set_peak_budget: 'FALSE',
-            audience: { district: 'POI', poi_around: { poi_around_radius: 'KM_10' } },
+            audience: withLocalAudienceDefaults({
+              district: 'POI',
+              poi_around: { poi_around_radius: 'KM_10' },
+            }),
           }),
         )
       }
@@ -833,7 +855,6 @@ export async function handleLocalPromotionRoutes(
           budget: budgetFen,
           bid_type: 'SMART',
           is_set_peak_budget: 'FALSE',
-          audience: { district: 'ALL' },
         }),
       )
       if (assets.productId) {
@@ -850,7 +871,6 @@ export async function handleLocalPromotionRoutes(
             budget: budgetFen,
             bid_type: 'SMART',
             is_set_peak_budget: 'FALSE',
-            audience: { district: 'ALL' },
           }),
         )
       }
@@ -1604,7 +1624,7 @@ function buildAudiencePatch(row: Record<string, unknown>): Record<string, unknow
   if (gender === 'FEMALE' || gender === 'MALE' || gender === 'NONE') audience.gender = gender
   if (Array.isArray(ageRaw) && ageRaw.length) audience.age = ageRaw.map(String)
   else if (typeof ageRaw === 'string' && ageRaw.trim()) audience.age = [ageRaw.trim()]
-  return Object.keys(audience).length ? audience : null
+  return Object.keys(audience).length ? withLocalAudienceDefaults(audience) : null
 }
 
 function buildLocalProjectOptimizeBody(
