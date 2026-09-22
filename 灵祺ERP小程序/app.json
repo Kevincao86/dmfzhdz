@@ -98,6 +98,6 @@
       "desc": "用于选择门店位置"
     }
   },
-  "requiredPrivateInfos": ["chooseLocation", "getRecorderManager"],
+  "requiredPrivateInfos": ["chooseLocation"],
   "lazyCodeLoading": "requiredComponents"
 }
