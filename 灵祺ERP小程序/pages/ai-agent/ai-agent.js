@@ -31,6 +31,7 @@ Page({
     shortcutsCollapsed: true,
     input: '',
     sending: false,
+    thinkingText: '正在生成…',
     hasChat: false,
     scrollTo: '',
     attachments: [],
@@ -47,11 +48,15 @@ Page({
       return
     }
     this._execState = exec.createAgentExecutionState()
+    this._runId = 0
+    this._requestTask = null
+    this._stopped = false
     this.setData({ shortcuts: agent.AI_AGENT_SHORTCUTS || [] })
     this._recorder = composer.createRecorderManager(this)
   },
 
   onUnload() {
+    this.abortPendingRequest()
     if (this.data.recordingVoice && this._recorder) {
       composer.stopVoiceRecord(this, this._recorder, true)
     }
@@ -92,13 +97,43 @@ Page({
     }
   },
 
-  persist(messages) {
+  abortPendingRequest() {
+    this._stopped = true
+    this._runId = (this._runId || 0) + 1
+    const task = this._requestTask
+    this._requestTask = null
+    if (task && typeof task.abort === 'function') {
+      try {
+        task.abort()
+      } catch (_) {}
+    }
+  },
+
+  onStop() {
+    if (!this.data.sending) return
+    this.abortPendingRequest()
+    const list = this.data.messages || []
+    const last = list[list.length - 1]
+    const next =
+      last && last.role === 'assistant' && last.content === '已停止生成。'
+        ? list
+        : [...list, { id: `a-stop-${Date.now()}`, role: 'assistant', content: '已停止生成。' }]
+    this.persist(next, { sending: false, thinkingText: '正在生成…' })
+  },
+
+  persist(messages, extra) {
     agent.saveThread(messages)
-    this.setData({
-      messages,
-      hasChat: messages.some((m) => m.role === 'user'),
-      scrollTo: lastScrollId(messages, this.data.sending),
-    })
+    const sending = extra && extra.sending != null ? extra.sending : this.data.sending
+    this.setData(
+      Object.assign(
+        {
+          messages,
+          hasChat: messages.some((m) => m.role === 'user'),
+          scrollTo: lastScrollId(messages, sending),
+        },
+        extra || {},
+      ),
+    )
   },
 
   onInput(e) {
@@ -110,6 +145,7 @@ Page({
   },
 
   onNewChat() {
+    this.abortPendingRequest()
     agent.clearThread()
     this._execState = exec.createAgentExecutionState()
     this.setData({
@@ -117,6 +153,7 @@ Page({
       hasChat: false,
       input: '',
       sending: false,
+      thinkingText: '正在生成…',
       scrollTo: '',
       attachments: [],
       recordingVoice: false,
@@ -355,43 +392,58 @@ Page({
         : atts.length
           ? '请结合附图说明你的需求。'
           : '')
-    this.setData({
+    const history = this.data.messages.filter((m) => m.role === 'user' || m.role === 'assistant')
+    const userMsg = {
+      id: `u-${Date.now()}`,
+      role: 'user',
+      content: text,
+      imageUrls: packed.map((a) => a.preview).filter(Boolean),
+    }
+    const wantImage = agent.shouldRouteToNativeImage
+      ? agent.shouldRouteToNativeImage('', text, packed.some((a) => a.kind === 'image'))
+      : /美化|修图|生成|生图|海报|图片|照片|门头|菜品|美食/.test(text)
+    this._stopped = false
+    const runId = (this._runId || 0) + 1
+    this._runId = runId
+    this.persist([...this.data.messages, userMsg], {
       input: '',
       attachments: [],
       sending: true,
-      hasChat: true,
-      scrollTo: 'msg-thinking',
+      thinkingText:
+        wantImage || packed.some((a) => a.kind === 'image') ? '正在用 AI 模型出图…' : '正在生成…',
       showSendBtn: false,
       showPlusPanel: false,
       voiceMode: false,
     })
-    const history = this.data.messages.filter((m) => m.role === 'user' || m.role === 'assistant')
     try {
       const r = await agent.processAgentTurn(
-        { userLine: text, history, attachments: packed },
+        {
+          userLine: text,
+          history,
+          attachments: packed,
+          requestOpts: {
+            onRequestTask: (task) => {
+              this._requestTask = task
+            },
+          },
+        },
         this._execState,
       )
+      if (this._runId !== runId || this._stopped) return
       this._execState = r.executionState || this._execState
-      const next = [...this.data.messages, r.userMsg, ...(r.assistantMsgs || [])]
-      this.setData({ sending: false })
-      this.persist(next)
+      this._requestTask = null
+      this.persist([...(this.data.messages || []), ...(r.assistantMsgs || [])], { sending: false })
     } catch (e) {
+      if (this._runId !== runId || this._stopped || (agent.isAbortError && agent.isAbortError(e))) {
+        this.setData({ sending: false })
+        return
+      }
       const err = {
         id: `err-${Date.now()}`,
         role: 'assistant',
         content: (e && e.message) || '发送失败，请稍后重试',
       }
-      this.setData({ sending: false })
-      this.persist([
-        ...this.data.messages,
-        {
-          id: `u-${Date.now()}`,
-          role: 'user',
-          content: text,
-          imageUrls: packed.map((a) => a.preview).filter(Boolean),
-        },
-        err,
-      ])
+      this.persist([...(this.data.messages || []), err], { sending: false })
     }
   },
 

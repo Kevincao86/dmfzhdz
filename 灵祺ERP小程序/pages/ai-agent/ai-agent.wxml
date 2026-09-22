@@ -52,12 +52,14 @@
       <view class="bubble {{item.role === 'user' ? 'bubble-user' : ''}} {{item.role === 'task_preview' ? 'bubble-preview' : ''}}">
         <text user-select class="bubble-text">{{item.content}}</text>
         <image
-          wx:if="{{item.imageUrls && item.imageUrls[0]}}"
+          wx:for="{{item.imageUrls || []}}"
+          wx:for-item="img"
+          wx:key="*this"
           class="bubble-img"
-          src="{{item.imageUrls[0]}}"
+          src="{{img}}"
           mode="widthFix"
           bindtap="onPreviewBubbleImage"
-          data-url="{{item.imageUrls[0]}}"
+          data-url="{{img}}"
         />
         <view wx:if="{{item.role === 'task_preview' && item.previewStatus === 'pending'}}" class="preview-actions">
           <view class="btn-ghost" data-id="{{item.id}}" bindtap="onOpenModule">去对应模块</view>
@@ -69,7 +71,10 @@
     </view>
     <view wx:if="{{sending}}" id="msg-thinking" class="msg-row">
       <image class="ava" src="{{logoSrc}}" mode="aspectFit" />
-      <view class="bubble"><text class="bubble-text muted">正在思考…</text></view>
+      <view class="bubble bubble-thinking">
+        <text class="bubble-text muted">{{thinkingText}}</text>
+        <view class="btn-stop-inline" bindtap="onStop">停止</view>
+      </view>
     </view>
   </scroll-view>
 
@@ -92,9 +97,9 @@
       <input
         wx:if="{{!voiceMode}}"
         class="wx-input"
-        placeholder="{{sending ? '发送中…' : ''}}"
+        placeholder=""
         value="{{input}}"
-        disabled="{{sending}}"
+        disabled="{{false}}"
         bindinput="onInput"
         bindfocus="onInputFocus"
         confirm-type="send"
@@ -110,11 +115,16 @@
         bindtouchcancel="onVoiceTouchEnd"
       >{{recordingVoice ? '松开 结束' : '按住 说话'}}</view>
       <view
-        wx:if="{{!voiceMode && !showSendBtn}}"
+        wx:if="{{sending}}"
+        class="wx-send wx-stop"
+        bindtap="onStop"
+      >停止</view>
+      <view
+        wx:elif="{{!voiceMode && !showSendBtn}}"
         class="wx-icon wx-icon--plus {{showPlusPanel ? 'on' : ''}}"
         bindtap="onTogglePlus"
       ></view>
-      <view wx:if="{{!voiceMode && showSendBtn}}" class="wx-send" bindtap="onSend">发送</view>
+      <view wx:elif="{{!voiceMode && showSendBtn}}" class="wx-send" bindtap="onSend">发送</view>
     </view>
     <view wx:if="{{showPlusPanel && !voiceMode}}" class="wx-plus">
       <view class="plus-grid">

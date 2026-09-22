@@ -196,7 +196,8 @@ function compactThreadForStorage(messages) {
     const kept = urls.filter((u) => {
       const s = String(u || '')
       if (/^https?:\/\//i.test(s)) return true
-      if (/^(wxfile|http):\/\//i.test(s) && s.length < 500) return true
+      if (/^(wxfile|http):\/\//i.test(s) && s.length < 800) return true
+      if (/agent-gen-\d+\.(jpg|jpeg|png|webp)$/i.test(s)) return true
       if (s.startsWith('data:') && s.length < 60000) return true
       return false
     })
@@ -357,12 +358,18 @@ function friendlyNetworkError(errMsg) {
   return em + hint
 }
 
+function isAbortError(err) {
+  if (!err) return false
+  if (err.aborted) return true
+  return /abort|已停止/i.test(String(err.message || err.errMsg || ''))
+}
+
 function requestJson(path, data, opts) {
   const base = apiBase()
   if (!base) return Promise.reject(new Error('未配置商家后台 API'))
   const timeout = Math.max(10000, Number(opts && opts.timeoutMs) || AI_REQUEST_TIMEOUT_MS)
   return new Promise((resolve, reject) => {
-    wx.request({
+    const task = wx.request({
       url: `${base}${path}`,
       method: 'POST',
       header: authHeaders(),
@@ -377,10 +384,89 @@ function requestJson(path, data, opts) {
         reject(new Error(merchantApiFriendlyError(res.statusCode, body || {})))
       },
       fail(err) {
-        reject(new Error(friendlyNetworkError(err && err.errMsg)))
+        const em = String((err && err.errMsg) || '')
+        if (/abort/i.test(em)) {
+          const e = new Error('已停止生成')
+          e.aborted = true
+          reject(e)
+          return
+        }
+        reject(new Error(friendlyNetworkError(em)))
+      },
+    })
+    if (opts && typeof opts.onRequestTask === 'function') {
+      try {
+        opts.onRequestTask(task)
+      } catch (_) {}
+    }
+  })
+}
+
+function persistGeneratedImageUrl(imageUrl) {
+  return new Promise((resolve) => {
+    const src = String(imageUrl || '').trim()
+    if (!src) {
+      resolve('')
+      return
+    }
+    if (/^https?:\/\//i.test(src) && src.length < 4000) {
+      resolve(src)
+      return
+    }
+    const m = /^data:image\/([\w+.-]+);base64,(.+)$/i.exec(src)
+    if (!m) {
+      resolve(src.length < 60000 ? src : '')
+      return
+    }
+    const ext = /png/i.test(m[1]) ? 'png' : /webp/i.test(m[1]) ? 'webp' : 'jpg'
+    const filePath = `${wx.env.USER_DATA_PATH}/agent-gen-${Date.now()}.${ext}`
+    wx.getFileSystemManager().writeFile({
+      filePath,
+      data: m[2],
+      encoding: 'base64',
+      success() {
+        resolve(filePath)
+      },
+      fail() {
+        resolve(src.length < 60000 ? src : '')
       },
     })
   })
+}
+
+function sameImagePayload(a, b) {
+  const x = String(a || '')
+  const y = String(b || '')
+  if (!x || !y) return false
+  if (x === y) return true
+  const ix = x.indexOf('base64,')
+  const iy = y.indexOf('base64,')
+  if (ix < 0 || iy < 0) return false
+  if (x.length !== y.length) return false
+  return x.slice(ix, ix + 96) === y.slice(iy, iy + 96)
+}
+
+function vendorCaption(data) {
+  if (data && data.channel === 'tokenmix' && data.displayModel) {
+    return `已用 AI 模型（${data.displayModel}）生成，见下图。`
+  }
+  const v = String((data && data.vendorUsed) || '')
+  const name = v === 'qwen' ? '通义万相' : v === 'doubao' ? '豆包' : v === 'minimax' ? 'MiniMax' : ''
+  if (name) return `已用 AI 模型（${name}）生成，见下图。`
+  return '已用 AI 模型生成，见下图。'
+}
+
+function buildAgentImagePrompt(userLine, hasRef) {
+  const t = String(userLine || '').trim() || (hasRef ? '请美化这张参考图' : '高质量商业摄影图片')
+  if (!hasRef) return t
+  if (detectImageEditIntent(t, true)) {
+    return [
+      t,
+      '请基于参考图做专业精修，不要原样复制：提升曝光与白平衡、锐化主体、清理杂乱背景、增强色彩与质感。',
+      '食物要更有食欲，门头/店招要更干净端正。成图必须与原图有明显可见差异。',
+    ].join('\n')
+  }
+  return `${t}\n请以参考图为内容依据重新绘制一张更高品质的成图，禁止原样输出参考图。`
 }
 
 function buildChatMessages(history, userLine, imageDataUrls, userId) {
@@ -440,7 +526,7 @@ async function postAiChatRequest(opts) {
   if (taskType) body.taskType = taskType
   if (parsed.provider === 'tokenmix') body.modelFamily = parsed.modelFamily
   if (opts.imageDataUrls && opts.imageDataUrls.length) body.imageDataUrls = opts.imageDataUrls
-  const data = await requestJson('/api/meoo-ai-chat', body)
+  const data = await requestJson('/api/meoo-ai-chat', body, opts.requestOpts)
   return {
     ok: true,
     content: String(data.content || ''),
@@ -449,22 +535,30 @@ async function postAiChatRequest(opts) {
   }
 }
 
-async function postAiAgentNativeImage(prompt, pickerKey, referenceImageDataUrl) {
+async function postAiAgentNativeImage(prompt, pickerKey, referenceImageDataUrl, requestOpts) {
   ensureRealAuthForAi()
   const route = agentNativeImageRouteFromPickerKey(pickerKey)
-  const body = { prompt }
-  const ref = referenceImageDataUrl && referenceImageDataUrl.trim()
-  if (ref) body.reference_image = ref
+  const ref = referenceImageDataUrl && String(referenceImageDataUrl).trim()
+  const body = { prompt: buildAgentImagePrompt(prompt, Boolean(ref)) }
+  if (ref) {
+    body.reference_image = ref
+    body.exact_prompt = true
+  }
   if (route.route === 'tokenmix' && route.tokenmixImageModel) {
     body.image_route = 'tokenmix'
     body.tokenmix_image_model = route.tokenmixImageModel
   } else if (route.preferredVendor) {
     body.preferred_vendor = route.preferredVendor
   }
-  const data = await requestJson('/api/meoo-ai-agent-image', body)
-  const imageUrl = String(data.imageUrl || '').trim()
-  if (!imageUrl) throw new Error('生图未返回图片地址')
-  let caption = '已生成图片，见下图。'
+  const data = await requestJson('/api/meoo-ai-agent-image', body, requestOpts)
+  const rawUrl = String(data.imageUrl || '').trim()
+  if (!rawUrl) throw new Error('生图未返回图片地址')
+  if (ref && sameImagePayload(rawUrl, ref)) {
+    throw new Error('模型未改图（返回了原图），请换一句描述后重试')
+  }
+  const imageUrl = await persistGeneratedImageUrl(rawUrl)
+  if (!imageUrl) throw new Error('成图已生成但无法在小程序中预览，请重试')
+  let caption = vendorCaption(data)
   if (data.fallbackNote) caption += `\n\n${data.fallbackNote}`
   return { ok: true, content: caption, imageUrl }
 }
@@ -479,6 +573,7 @@ async function sendAgentTurn(opts) {
     attachments = [],
     pickerKey: pickerKeyRaw,
     modelOptions = [],
+    requestOpts,
   } = opts
   const pickerKey = String(pickerKeyRaw || registry.loadPickerKey() || '').trim()
   const imageDataUrls = []
@@ -507,7 +602,12 @@ async function sendAgentTurn(opts) {
 
   if (wantImage) {
     try {
-      const imgRes = await postAiAgentNativeImage(line, imagePickerKey, imageDataUrls[0])
+      const imgRes = await postAiAgentNativeImage(
+        line,
+        imagePickerKey,
+        imageDataUrls[0],
+        requestOpts,
+      )
       return {
         userMsg: {
           id: `u-${Date.now()}`,
@@ -533,6 +633,7 @@ async function sendAgentTurn(opts) {
     imageDataUrls,
     pickerKey: registry.effectiveChatPickerKey ? registry.effectiveChatPickerKey(pickerKey) : pickerKey,
     taskType: inferTaskTypeFromText(line),
+    requestOpts,
   })
   return {
     userMsg: {
@@ -700,9 +801,11 @@ module.exports = {
   clearThread,
   sendAgentTurn,
   processAgentTurn,
+  shouldRouteToNativeImage,
   readFileDataUrl,
   transcribeVoiceTempPath,
   inferTaskTypeFromText,
   apiBase,
   devMockReply,
+  isAbortError,
 }
