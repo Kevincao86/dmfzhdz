@@ -76,6 +76,7 @@ function enrichLeadRow(item) {
     id: String(item.id || ''),
     name,
     phoneMasked: maskPhone(item.phone),
+    phone: String(item.phone || ''),
     stateKey: st.key,
     stateLabel: st.label,
     tagLabel: st.tag,

@@ -1,4 +1,13 @@
 <view class="leads-page">
+  <view class="ads-channel-row leads-channel-row">
+    <view
+      wx:for="{{channels}}"
+      wx:key="id"
+      class="ads-channel {{channel === item.id ? 'on' : ''}}"
+      data-id="{{item.id}}"
+      bindtap="onChannel"
+    >{{item.label}}</view>
+  </view>
   <view class="leads-toolbar">
     <view class="leads-search">
       <text class="leads-search-ico">⌕</text>
@@ -17,7 +26,7 @@
   </view>
 
   <view wx:if="{{showFilter}}" class="leads-filter-panel">
-    <text class="leads-filter-tip">可按来源渠道、创建时间筛选（与 Web 线索中心一致）</text>
+    <text class="leads-filter-tip">按状态筛选；本地推与千川线索互相隔离，回传状态与电脑端同源。</text>
   </view>
 
   <view class="leads-stat-card">

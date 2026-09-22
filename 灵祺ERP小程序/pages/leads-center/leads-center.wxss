@@ -5,6 +5,31 @@
   flex-direction: column;
 }
 
+.leads-channel-row {
+  display: flex;
+  gap: 12rpx;
+  padding: 16rpx 24rpx 0;
+  background: #fff;
+}
+
+.ads-channel {
+  flex: 1;
+  text-align: center;
+  padding: 16rpx 0;
+  border-radius: 16rpx;
+  font-size: 24rpx;
+  color: #64748b;
+  background: #f8fafc;
+  border: 1rpx solid #e2e8f0;
+}
+
+.ads-channel.on {
+  color: #fff;
+  background: #0d9488;
+  border-color: #0d9488;
+  font-weight: 700;
+}
+
 .leads-toolbar {
   display: flex;
   gap: 12rpx;

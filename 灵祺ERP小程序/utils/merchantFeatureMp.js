@@ -242,8 +242,16 @@ async function fetchMarketingActivities(platformId, status) {
 }
 
 function readLocalPromotionCreds() {
+  return readBindCreds('meoo_local_promotion_bind')
+}
+
+function readQianchuanCreds() {
+  return readBindCreds('meoo_qianchuan_bind')
+}
+
+function readBindCreds(storageKey) {
   try {
-    let raw = wx.getStorageSync('meoo_local_promotion_bind')
+    let raw = wx.getStorageSync(storageKey)
     if (typeof raw === 'string' && raw.trim()) {
       try {
         raw = JSON.parse(raw)
@@ -253,7 +261,7 @@ function readLocalPromotionCreds() {
     }
     if (!raw || typeof raw !== 'object') return null
     const access_token = String(raw.accessToken || raw.access_token || '').trim()
-    const local_account_id = String(raw.localAccountId || raw.local_account_id || '').trim()
+    const local_account_id = String(raw.localAccountId || raw.local_account_id || raw.advertiserId || '').trim()
     if (!access_token || !local_account_id) return null
     return { access_token, local_account_id }
   } catch (_) {
@@ -261,52 +269,126 @@ function readLocalPromotionCreds() {
   }
 }
 
-async function fetchLocalPromotions() {
-  if (!merchantApi.hasMerchantApi()) {
-    return { ok: false, message: '请配置商家后台 API 地址' }
-  }
-  const creds = readLocalPromotionCreds()
-  const qs = creds
-    ? `?access_token=${encodeURIComponent(creds.access_token)}&local_account_id=${encodeURIComponent(creds.local_account_id)}`
-    : ''
-  try {
-    const data = await merchantApi.merchantRequest('GET', `/api/merchant/local-promotion/promotions${qs}`)
-    const list = Array.isArray(data.list) ? data.list : []
-    const items = list.map((x) => ({
-      id: String(x.id || x.promotion_id || ''),
-      name: String(x.name || x.promotion_name || '计划'),
-      status: String(x.status || x.opt_status || '—'),
-      budget: x.budget != null ? String(x.budget) : '',
-    }))
-    return { ok: true, items, demoMode: Boolean(data.demoMode) }
-  } catch (e) {
+function adsChannelSpec(channel) {
+  if (channel === 'qianchuan') {
     return {
-      ok: false,
-      message:
-        (e instanceof Error ? e.message : String(e)) ||
-        '尚未绑定巨量本地推，请在商家后台「设置 → 商业化后台」完成绑定后重新打开小程序',
+      label: '巨量千川',
+      creds: readQianchuanCreds,
+      promotionsPath: '/api/merchant/qianchuan/promotions',
+      statusPath: '/api/merchant/qianchuan/promotions/status',
+      reportPath: '/api/merchant/qianchuan/report/summary',
+      cluesPath: '/api/merchant/qianchuan/clues/list',
+      callbackPath: '/api/merchant/qianchuan/clues/callback',
+      accountQuery: 'advertiser_id',
+      unbound: '尚未绑定巨量千川。请在电脑端「系统 → 投流」绑定千川账号后下拉刷新。',
+      tag: '千川',
     }
+  }
+  return {
+    label: '本地推',
+    creds: readLocalPromotionCreds,
+    promotionsPath: '/api/merchant/local-promotion/promotions',
+    statusPath: '/api/merchant/local-promotion/promotions/status',
+    reportPath: '/api/merchant/local-promotion/report/summary',
+    cluesPath: '/api/merchant/local-promotion/clues/list',
+    callbackPath: '/api/merchant/local-promotion/clues/callback',
+    accountQuery: 'local_account_id',
+    unbound: '尚未绑定巨量本地推。请在电脑端「系统设置」完成绑定后下拉刷新。',
+    tag: '本地推',
   }
 }
 
-async function fetchLocalClues(page) {
+function mapPromotionRow(x, tag) {
+  const id = String(x.promotionId || x.promotion_id || x.id || '')
+  const name = String(x.promotionName || x.promotion_name || x.name || '计划')
+  const status = String(x.statusLabel || x.status || x.opt_status || x.statusFirst || '—')
+  const budget = x.budgetYuan != null ? String(x.budgetYuan) : x.budget != null ? String(x.budget) : ''
+  const spend = x.statCost != null ? String(x.statCost) : x.spend != null ? String(x.spend) : ''
+  const exposure = x.showCnt != null ? String(x.showCnt) : x.exposure != null ? String(x.exposure) : ''
+  const click = x.clickCnt != null ? String(x.clickCnt) : ''
+  const convert = x.convertCnt != null ? String(x.convertCnt) : ''
+  return {
+    id,
+    name,
+    status,
+    budget,
+    spend,
+    exposure,
+    click,
+    convert,
+    projectId: String(x.projectId || x.project_id || ''),
+    tags: [tag],
+  }
+}
+
+async function fetchAdsPromotions(channel) {
   if (!merchantApi.hasMerchantApi()) {
     return { ok: false, message: '请配置商家后台 API 地址' }
   }
-  const creds = readLocalPromotionCreds()
-  if (!creds) {
-    return { ok: false, message: '尚未绑定巨量本地推，线索需在设置页完成绑定后同步' }
-  }
+  const spec = adsChannelSpec(channel)
+  const creds = spec.creds()
+  if (!creds) return { ok: false, message: spec.unbound }
+  const qs = `?access_token=${encodeURIComponent(creds.access_token)}&${spec.accountQuery}=${encodeURIComponent(creds.local_account_id)}`
   try {
-    const data = await merchantApi.merchantRequest(
-      'POST',
-      '/api/merchant/local-promotion/clues/list',
-      {
-        ...creds,
-        page: page || 1,
-        page_size: 50,
-      },
-    )
+    const data = await merchantApi.merchantRequest('GET', `${spec.promotionsPath}${qs}`)
+    const list = Array.isArray(data.list) ? data.list : []
+    return {
+      ok: true,
+      items: list.map((x) => mapPromotionRow(x, spec.tag)),
+      demoMode: Boolean(data.demoMode),
+      apiError: data.apiError || data.message || '',
+    }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+async function fetchAdsReport(channel) {
+  const spec = adsChannelSpec(channel)
+  const creds = spec.creds()
+  if (!creds) return { ok: false, message: spec.unbound }
+  const qs = `?access_token=${encodeURIComponent(creds.access_token)}&${spec.accountQuery}=${encodeURIComponent(creds.local_account_id)}`
+  try {
+    const data = await merchantApi.merchantRequest('GET', `${spec.reportPath}${qs}`)
+    return { ok: true, summary: data.summary || null, demoMode: Boolean(data.demoMode) }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+async function updateAdsStatus(channel, promotionIds, optStatus) {
+  const spec = adsChannelSpec(channel)
+  const creds = spec.creds()
+  if (!creds) return { ok: false, message: spec.unbound }
+  try {
+    await merchantApi.merchantRequest('POST', spec.statusPath, {
+      ...creds,
+      promotion_ids: promotionIds,
+      opt_status: optStatus,
+    })
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+async function fetchLocalPromotions() {
+  return fetchAdsPromotions('local_promotion')
+}
+
+async function fetchAdsClues(channel, page) {
+  if (!merchantApi.hasMerchantApi()) {
+    return { ok: false, message: '请配置商家后台 API 地址' }
+  }
+  const spec = adsChannelSpec(channel)
+  const creds = spec.creds()
+  if (!creds) return { ok: false, message: spec.unbound }
+  try {
+    const data = await merchantApi.merchantRequest('POST', spec.cluesPath, {
+      ...creds,
+      page: page || 1,
+      page_size: 50,
+    })
     const list = Array.isArray(data.list) ? data.list : []
     const items = list.map((x) => ({
       id: String(x.clue_id || x.id || ''),
@@ -314,8 +396,29 @@ async function fetchLocalClues(page) {
       phone: String(x.telephone || x.phone || ''),
       state: String(x.convert_state || x.state || '—'),
       createdAt: String(x.create_time || x.created_at || ''),
+      source: spec.label,
     }))
     return { ok: true, items, demoMode: Boolean(data.demoMode) }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+async function fetchLocalClues(page) {
+  return fetchAdsClues('local_promotion', page)
+}
+
+async function postClueCallback(channel, clueId, convertState) {
+  const spec = adsChannelSpec(channel)
+  const creds = spec.creds()
+  if (!creds) return { ok: false, message: spec.unbound }
+  try {
+    await merchantApi.merchantRequest('POST', spec.callbackPath, {
+      ...creds,
+      clue_id: clueId,
+      clue_convert_state: convertState,
+    })
+    return { ok: true }
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : String(e) }
   }
@@ -373,7 +476,12 @@ module.exports = {
   fetchStoresForPlatform,
   fetchMarketingActivities,
   fetchLocalPromotions,
+  fetchAdsPromotions,
+  fetchAdsReport,
+  updateAdsStatus,
   fetchLocalClues,
+  fetchAdsClues,
+  postClueCallback,
   postAiAssist,
   loadNotifications,
   pushNotification,

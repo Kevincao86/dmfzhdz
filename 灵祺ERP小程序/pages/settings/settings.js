@@ -66,6 +66,22 @@ Page({
       })
       return
     }
+    void this.boot()
+  },
+
+  async onPullDownRefresh() {
+    try {
+      await this.boot(true)
+    } finally {
+      wx.stopPullDownRefresh()
+    }
+  },
+
+  async boot(force) {
+    const sessionSync = require('../../utils/merchantSessionSyncMp.js')
+    try {
+      await sessionSync.syncFromCloud({ force: Boolean(force) })
+    } catch (_) {}
     this.refreshBindings()
   },
 

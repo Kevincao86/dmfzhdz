@@ -9,12 +9,13 @@ const { writePlatformToken } = require('./platformTokensMp.js')
 const MEOO_ACTIVE_TENANT_ID = 'meoo_active_tenant_id'
 const MEOO_MERCHANT_DISPLAY_NAME = 'meoo_erp_merchant_display_name'
 
-const PROVIDERS = ['douyin', 'kuaishou', 'local_promotion', 'xhs_commercial']
+const PROVIDERS = ['douyin', 'kuaishou', 'local_promotion', 'qianchuan', 'xhs_commercial']
 
 const ACTIVE_ID_KEY = {
   douyin: 'meoo_active_douyin_binding_id',
   kuaishou: 'meoo_active_kuaishou_binding_id',
   local_promotion: 'meoo_active_local_promotion_binding_id',
+  qianchuan: 'meoo_active_qianchuan_binding_id',
   xhs_commercial: 'meoo_active_xhs_commercial_binding_id',
 }
 
@@ -35,6 +36,7 @@ const KUAISHOU_KEYS = [
 
 const LEGACY_BIND_KEY = {
   local_promotion: 'meoo_local_promotion_bind',
+  qianchuan: 'meoo_qianchuan_bind',
   xhs_commercial: 'meoo_xhs_commercial_bind',
 }
 
@@ -92,7 +94,9 @@ function parseBindingRow(raw) {
   const provider =
     raw.provider === 'local_promotion'
       ? 'local_promotion'
-      : raw.provider === 'xhs_commercial'
+      : raw.provider === 'qianchuan'
+        ? 'qianchuan'
+        : raw.provider === 'xhs_commercial'
         ? 'xhs_commercial'
         : raw.provider === 'kuaishou'
           ? 'kuaishou'
@@ -229,6 +233,36 @@ function applyLocalPromotion(row, tenantId) {
   writeActiveBindingId('local_promotion', tenantId, row.id)
 }
 
+function applyQianchuan(row, tenantId) {
+  const legacyKey = LEGACY_BIND_KEY.qianchuan
+  if (!row) {
+    writeActiveBindingId('qianchuan', tenantId, null)
+    try {
+      wx.removeStorageSync(legacyKey)
+    } catch (_) {}
+    return
+  }
+  const creds = unpackLocalPromotion(row.sealedCredentials)
+  if (!creds) {
+    writeActiveBindingId('qianchuan', tenantId, null)
+    try {
+      wx.removeStorageSync(legacyKey)
+    } catch (_) {}
+    return
+  }
+  const state = {
+    bindingId: row.id,
+    appId: creds.appId,
+    accessToken: creds.accessToken,
+    localAccountId: row.merchantAccountId,
+    accountName: row.bindingLabel || row.accountDisplayName || row.merchantAccountId,
+    boundAt: row.updatedAt,
+    demoMode: row.demoMode,
+  }
+  storageSet(legacyKey, JSON.stringify(state))
+  writeActiveBindingId('qianchuan', tenantId, row.id)
+}
+
 function applyXhsCommercial(row, tenantId) {
   const legacyKey = LEGACY_BIND_KEY.xhs_commercial
   if (!row) {
@@ -262,7 +296,7 @@ function applyXhsCommercial(row, tenantId) {
 function clearPlatformSessionForAccountSwitch() {
   clearDouyinLocal()
   clearKuaishouLocal()
-  for (const p of ['local_promotion', 'xhs_commercial']) {
+  for (const p of ['local_promotion', 'qianchuan', 'xhs_commercial']) {
     const k = LEGACY_BIND_KEY[p]
     try {
       wx.removeStorageSync(k)
@@ -310,6 +344,17 @@ function readBindingSnapshotFromStorage() {
       }
     } catch (_) {}
   }
+  const qcRaw = storageGet(LEGACY_BIND_KEY.qianchuan)
+  let qc = { bound: false, accountName: '' }
+  if (qcRaw) {
+    try {
+      const o = JSON.parse(qcRaw)
+      qc = {
+        bound: Boolean(o && o.accessToken),
+        accountName: (o && (o.accountName || o.localAccountId)) || '已绑定',
+      }
+    } catch (_) {}
+  }
   return {
     douyin: readName(
       'meoo_douyin_merchant_token',
@@ -322,6 +367,7 @@ function readBindingSnapshotFromStorage() {
       'meoo_kuaishou_merchant_id',
     ),
     localPromotion: lp,
+    qianchuan: qc,
     xhsCommercial: xhs,
     meituan: readName('meoo_meituan_merchant_token', '', ''),
     xiaohongshu: readName('meoo_xhs_merchant_token', '', ''),
@@ -419,6 +465,7 @@ async function syncFromCloud(opts) {
         if (provider === 'douyin') applyDouyin(active, tenantId)
         else if (provider === 'kuaishou') applyKuaishou(active, tenantId)
         else if (provider === 'local_promotion') applyLocalPromotion(active, tenantId)
+        else if (provider === 'qianchuan') applyQianchuan(active, tenantId)
         else if (provider === 'xhs_commercial') applyXhsCommercial(active, tenantId)
       }
       lastSyncAt = Date.now()

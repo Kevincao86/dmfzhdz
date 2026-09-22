@@ -11,6 +11,7 @@ const CLOUD_PLATFORMS = [
   { id: 'douyin', label: '抖音来客', key: 'douyin' },
   { id: 'kuaishou', label: '快手团购', key: 'kuaishou' },
   { id: 'local_promotion', label: '巨量本地推', key: 'localPromotion' },
+  { id: 'qianchuan', label: '巨量千川', key: 'qianchuan' },
   { id: 'xhs_commercial', label: '小红书聚光', key: 'xhsCommercial' },
 ]
 
@@ -67,6 +68,7 @@ function formatAgentBindingContext() {
     { key: 'douyin', label: '抖音来客' },
     { key: 'kuaishou', label: '快手团购' },
     { key: 'localPromotion', label: '巨量本地推' },
+    { key: 'qianchuan', label: '巨量千川' },
     { key: 'xhsCommercial', label: '小红书聚光' },
   ]
   const bound = []

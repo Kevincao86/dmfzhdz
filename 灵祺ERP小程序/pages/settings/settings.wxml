@@ -1,7 +1,7 @@
 <scroll-view scroll-y class="erp-page" enhanced show-scrollbar="{{false}}">
   <view class="erp-hero">
     <text class="erp-hero-title">系统设置</text>
-    <text class="erp-hero-sub">平台连接、账号与订阅。深度绑定请在电脑端商家后台完成。</text>
+    <text class="erp-hero-sub">平台连接与电脑端同账号云端同步。OAuth 深度绑定仍在电脑端完成，完成后下拉本页即可拉取。</text>
   </view>
 
   <view wx:if="{{guestMode}}" class="erp-card" bindtap="onGoLogin">

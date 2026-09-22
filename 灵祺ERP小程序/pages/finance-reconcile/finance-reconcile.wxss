@@ -68,6 +68,15 @@
   color: #dc2626;
 }
 
+.fin-records-banner {
+  margin: 0 24rpx 16rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 16rpx;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 22rpx;
+}
+
 .fin-card {
   margin: 0 24rpx 16rpx;
   padding: 22rpx;

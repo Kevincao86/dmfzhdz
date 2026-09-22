@@ -1,1 +1,1 @@
-{ "navigationBarTitleText": "线索中心" }
+{ "navigationBarTitleText": "线索中心", "enablePullDownRefresh": true }

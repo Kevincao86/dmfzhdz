@@ -9,9 +9,20 @@
         <text>🔔</text>
         <view wx:if="{{hasUnread}}" class="ads-bell-dot"></view>
       </view>
-      <button class="ads-new-btn" bindtap="onCreateAd">+ 新建广告</button>
+      <button class="ads-new-btn" bindtap="onCreateAd">+ 新建</button>
     </view>
   </view>
+
+  <view class="ads-channel-row">
+    <view
+      wx:for="{{channels}}"
+      wx:key="id"
+      class="ads-channel {{channel === item.id ? 'on' : ''}}"
+      data-id="{{item.id}}"
+      bindtap="onChannel"
+    >{{item.label}}</view>
+  </view>
+  <text wx:if="{{bindHint}}" class="ads-bind-hint">{{bindHint}}</text>
 
   <view class="ads-today-card">
     <view class="ads-today-head">
@@ -46,7 +57,7 @@
   </view>
 
   <view wx:if="{{showFilter}}" class="ads-filter-panel">
-    <text class="ads-filter-tip">可按平台、预算范围筛选（与电脑端投流一致）</text>
+    <text class="ads-filter-tip">筛选当前渠道计划状态；本地推与千川账号互相隔离，与电脑端一致。</text>
   </view>
 
   <view wx:if="{{loading}}" class="ads-state">加载中…</view>
@@ -83,7 +94,11 @@
           <text class="ads-duration">投放时长 {{item.duration}}</text>
           <button class="ads-action-btn" size="mini" data-id="{{item.id}}" bindtap="onManage">{{item.actionLabel}}</button>
         </view>
-        <text class="ads-data-link" data-id="{{item.id}}" bindtap="onViewData">查看数据 ›</text>
+        <text class="ads-data-link" data-id="{{item.id}}" bindtap="onViewData">{{expandedId === item.id ? '收起数据' : '查看数据'}} ›</text>
+        <view wx:if="{{expandedId === item.id}}" class="ads-expand">
+          <text>消耗 {{item.spend}} · 曝光 {{item.exposure}}</text>
+          <text wx:if="{{item.click}}">点击 {{item.click}}</text>
+        </view>
       </view>
     </view>
   </block>

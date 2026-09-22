@@ -11,6 +11,10 @@
     <text class="fin-hero-deco">✓</text>
   </view>
 
+  <view wx:if="{{showRecords && cards.length}}" class="fin-records-banner">
+    <text>同源对账单 {{cards.length}} 条 · 与电脑端财务对账同一接口</text>
+  </view>
+
   <view wx:if="{{loading}}" class="fin-state">加载中…</view>
   <view wx:elif="{{err}}" class="fin-state fin-err">{{err}}</view>
   <block wx:else>

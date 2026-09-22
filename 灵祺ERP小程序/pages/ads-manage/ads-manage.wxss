@@ -16,6 +16,47 @@
   box-shadow: 0 12rpx 36rpx rgba(14, 165, 233, 0.08);
 }
 
+.ads-channel-row {
+  display: flex;
+  gap: 12rpx;
+  margin: 0 24rpx 12rpx;
+}
+
+.ads-channel {
+  flex: 1;
+  text-align: center;
+  padding: 16rpx 0;
+  border-radius: 16rpx;
+  font-size: 24rpx;
+  color: #64748b;
+  background: #fff;
+  border: 1rpx solid #e2e8f0;
+}
+
+.ads-channel.on {
+  color: #fff;
+  background: #ea580c;
+  border-color: #ea580c;
+  font-weight: 700;
+}
+
+.ads-bind-hint {
+  display: block;
+  margin: 0 24rpx 12rpx;
+  font-size: 22rpx;
+  color: #b45309;
+  line-height: 1.5;
+}
+
+.ads-expand {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: #64748b;
+}
+
 .ads-title {
   display: block;
   font-size: 36rpx;

@@ -14,6 +14,7 @@ Page({
     err: '',
     cards: [],
     quickEntries: QUICK_ENTRIES,
+    showRecords: false,
   },
 
   onShow() {
@@ -22,6 +23,14 @@ Page({
       return
     }
     void this.load()
+  },
+
+  async onPullDownRefresh() {
+    try {
+      await this.load()
+    } finally {
+      wx.stopPullDownRefresh()
+    }
   },
 
   async load() {
@@ -40,19 +49,35 @@ Page({
   },
 
   onRecords() {
-    wx.showToast({ title: '完整记录请在电脑端查看', icon: 'none' })
+    this.setData({ showRecords: !this.data.showRecords })
   },
 
-  onCardAction() {
-    wx.showToast({ title: '请在电脑端完成对账', icon: 'none' })
+  onCardAction(e) {
+    const id = e.currentTarget.dataset.id
+    const row = (this.data.cards || []).find((x) => String(x.id) === String(id))
+    if (!row) return
+    const lines = [
+      row.title,
+      row.period || row.settleTime || '',
+      `应结：${row.payable}`,
+      `实结：${row.actual}`,
+      `差异：${row.diff}`,
+      row.statusText || row.tag || '',
+    ]
+      .filter(Boolean)
+      .join('\n')
+    wx.showModal({ title: '对账明细', content: lines, showCancel: false })
   },
 
   onQuick(e) {
     const id = e.currentTarget.dataset.id
     if (id === 'help') {
-      wx.showToast({ title: '请联系在线客服', icon: 'none' })
+      wx.navigateTo({ url: '/pages/support-chat/support-chat' })
       return
     }
-    wx.showToast({ title: '请在电脑端财务模块操作', icon: 'none' })
+    if (id === 'statement' || id === 'settlement' || id === 'talent') {
+      this.setData({ showRecords: true })
+      wx.showToast({ title: '已展开下方对账记录', icon: 'none' })
+    }
   },
 })

@@ -1,1 +1,1 @@
-{ "navigationBarTitleText": "财务对账" }
+{ "navigationBarTitleText": "财务对账", "enablePullDownRefresh": true }

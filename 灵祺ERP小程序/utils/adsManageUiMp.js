@@ -63,8 +63,10 @@ function enrichAdRow(item) {
     dailyBudget: item.dailyBudget || item.budget || '—',
     spend: item.spend != null && item.spend !== '' ? item.spend : '—',
     exposure: item.exposure != null && item.exposure !== '' ? item.exposure : '—',
+    click: item.click != null && item.click !== '' ? item.click : '',
+    convert: item.convert != null && item.convert !== '' ? item.convert : '',
     duration: item.duration || '—',
-    actionLabel: st.key === 'paused' ? '继续投放' : '管理',
+    actionLabel: st.key === 'paused' ? '继续投放' : '暂停',
     thumb: item.thumb || '',
   }
 }
