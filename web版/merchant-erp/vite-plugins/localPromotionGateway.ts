@@ -293,12 +293,35 @@ function projectCreateBodyFromDetail(
   }
   const aud = src.audience
   if (aud && typeof aud === 'object' && !Array.isArray(aud)) {
-    const district = String((aud as Record<string, unknown>).district ?? '').trim()
-    if (district && district.toUpperCase() !== 'ALL') {
-      out.audience = withLocalAudienceDefaults(aud as Record<string, unknown>)
-    }
+    /* 创建不带定向，避免 custom_area / action_days 校验把整次创建打回 */
   }
   return sanitizeLocalCreateBody(out)
+}
+
+const LOCAL_ACTION_DAYS = new Set([
+  'ACTIONDAYS_DAY7',
+  'ACTIONDAYS_DAY15',
+  'ACTIONDAYS_DAY30',
+  'ACTIONDAYS_DAY60',
+  'ACTIONDAYS_DAY90',
+  'ACTIONDAYS_DAY180',
+  'ACTIONDAYS_DAY365',
+])
+
+function normalizeActionDays(v: unknown): string {
+  const raw = String(v ?? '').trim().toUpperCase()
+  if (LOCAL_ACTION_DAYS.has(raw)) return raw
+  const n = Number(v)
+  const map: Record<number, string> = {
+    7: 'ACTIONDAYS_DAY7',
+    15: 'ACTIONDAYS_DAY15',
+    30: 'ACTIONDAYS_DAY30',
+    60: 'ACTIONDAYS_DAY60',
+    90: 'ACTIONDAYS_DAY90',
+    180: 'ACTIONDAYS_DAY180',
+    365: 'ACTIONDAYS_DAY365',
+  }
+  return map[n] || 'ACTIONDAYS_DAY7'
 }
 
 function withLocalAudienceDefaults(audience: Record<string, unknown>): Record<string, unknown> {
@@ -308,8 +331,11 @@ function withLocalAudienceDefaults(audience: Record<string, unknown>): Record<st
     rawAc && typeof rawAc === 'object' && !Array.isArray(rawAc)
       ? { ...(rawAc as Record<string, unknown>) }
       : {}
-  if (ac.action_days == null || ac.action_days === '') ac.action_days = 7
+  ac.action_days = normalizeActionDays(ac.action_days)
   out.action_config = ac
+  if (!out.custom_area || typeof out.custom_area !== 'object' || Array.isArray(out.custom_area)) {
+    out.custom_area = {}
+  }
   return out
 }
 
@@ -343,14 +369,7 @@ function sanitizeLocalCreateBody(body: Record<string, unknown>): Record<string, 
   if (!out.ad_type) out.ad_type = 'GENERAL'
   if (!out.budget_mode) out.budget_mode = 'BUDGET_MODE_DAY'
   if (!out.bid_type) out.bid_type = 'SMART'
-  if (out.audience && typeof out.audience === 'object' && !Array.isArray(out.audience)) {
-    const aud = out.audience as Record<string, unknown>
-    const district = String(aud.district ?? '').toUpperCase()
-    if (!district || district === 'ALL') delete out.audience
-    else out.audience = withLocalAudienceDefaults(aud)
-  } else {
-    delete out.audience
-  }
+  delete out.audience
   return out
 }
 
@@ -769,24 +788,6 @@ export async function handleLocalPromotionRoutes(
     }
     const budgetFen = Math.round(budgetYuan * 100)
     const attempts: Array<Record<string, unknown>> = []
-    const listed = await listLocalByMarketingGoals(
-      creds,
-      '/open_api/v3.0/local/project/list/',
-      ['project_list', 'list'],
-      'project_status_first',
-      'PROJECT_STATUS_ALL',
-    )
-    const templateRow = listed.ok
-      ? listed.rows.find((row) => {
-          const g = pickLocalMarketingGoal(row)
-          return marketingGoal === 'LIVE' ? g === 'LIVE' : g === 'VIDEO_IMAGE' || !g
-        })
-      : undefined
-    const templateId = String(templateRow?.project_id ?? templateRow?.id ?? '').trim()
-    if (templateId) {
-      const detail = await fetchLocalProjectDetail(creds, templateId)
-      if (detail) attempts.push(projectCreateBodyFromDetail(detail, creds, name, budgetFen))
-    }
     const assets = await fetchLocalCreateAssets(creds, marketingGoal)
     if (marketingGoal === 'LIVE') {
       if (assets.awemeId) {
@@ -835,10 +836,6 @@ export async function handleLocalPromotionRoutes(
             budget: budgetFen,
             bid_type: 'SMART',
             is_set_peak_budget: 'FALSE',
-            audience: withLocalAudienceDefaults({
-              district: 'POI',
-              poi_around: { poi_around_radius: 'KM_10' },
-            }),
           }),
         )
       }
@@ -875,6 +872,24 @@ export async function handleLocalPromotionRoutes(
         )
       }
     }
+    const listed = await listLocalByMarketingGoals(
+      creds,
+      '/open_api/v3.0/local/project/list/',
+      ['project_list', 'list'],
+      'project_status_first',
+      'PROJECT_STATUS_ALL',
+    )
+    const templateRow = listed.ok
+      ? listed.rows.find((row) => {
+          const g = pickLocalMarketingGoal(row)
+          return marketingGoal === 'LIVE' ? g === 'LIVE' : g === 'VIDEO_IMAGE' || !g
+        })
+      : undefined
+    const templateId = String(templateRow?.project_id ?? templateRow?.id ?? '').trim()
+    if (templateId) {
+      const detail = await fetchLocalProjectDetail(creds, templateId)
+      if (detail) attempts.push(projectCreateBodyFromDetail(detail, creds, name, budgetFen))
+    }
     if (!attempts.length) {
       json(res, 400, {
         ok: false,
@@ -901,6 +916,7 @@ export async function handleLocalPromotionRoutes(
       json(res, 502, {
         ok: false,
         message:
+          failMsgs.filter((m) => !/audience\./i.test(m)).slice(-1)[0] ||
           failMsgs[0] ||
           '创建失败。请确认本地推已授权门店/抖音号，并在开放平台开通「本地推投放」项目创建权限。',
         attempts: failMsgs.slice(0, 4),
