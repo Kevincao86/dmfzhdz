@@ -343,10 +343,6 @@ async function oceanGetOrPost<T>(
   return oceanPost<T>(creds, path, query)
 }
 
-function isWeakOceanCreateError(msg: string): boolean {
-  return /接口不可用|page could not be found|not_found|404/i.test(msg)
-}
-
 async function oceanPost<T>(
   creds: LocalPromotionCredentials,
   path: string,
@@ -1603,7 +1599,7 @@ function buildAudiencePatch(row: Record<string, unknown>): Record<string, unknow
     audience.district = 'POI'
     audience.poi_around = { poi_around_radius: String(row.poiAroundRadius ?? 'KM_10') }
   } else if (district === 'ALL' || district === 'REGION' || district === 'LOCAL') {
-    audience.district = district === 'POI_AROUND' ? 'POI' : district
+    audience.district = district
   }
   if (gender === 'FEMALE' || gender === 'MALE' || gender === 'NONE') audience.gender = gender
   if (Array.isArray(ageRaw) && ageRaw.length) audience.age = ageRaw.map(String)
