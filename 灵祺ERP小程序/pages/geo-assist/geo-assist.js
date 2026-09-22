@@ -89,6 +89,8 @@ Page({
     consultReply: '',
     geoPack: '',
     paneNote: '',
+    showReport: false,
+    reportText: '',
   },
 
   onShow() {
@@ -104,11 +106,16 @@ Page({
       query: '与电脑端「问法覆盖」一致：查漏补缺高频提问，低于 60% 会触发待办。',
       reputation: '与电脑端「口碑证据」一致：沉淀可作引用的到店与评价证据。',
       sync: '与电脑端「平台同步」一致：把事实库对齐到来客与其他渠道。',
-      health: '与电脑端「效果体检」一致：查看拆解指标与行动计划。',
+      health: '效果体检：查看拆解指标与行动计划。点下方「优化报告」看完整待办与问法抽样。',
       consult: '',
       overview: '',
     }
     this.setData({ paneNote: map[this.data.tab] || '' })
+  },
+
+  onGeoJump(e) {
+    const url = e.currentTarget.dataset.url
+    if (url) wx.navigateTo({ url })
   },
 
   onTab(e) {
@@ -234,7 +241,27 @@ Page({
   },
 
   onOpenReport() {
-    wx.showToast({ title: '完整报告请在电脑端查看', icon: 'none' })
+    const lines = []
+    if (this.data.rationale) lines.push(String(this.data.rationale))
+    lines.push(`信息完整度 ${this.data.kpiInfo || '—'} · 问法覆盖 ${this.data.kpiQuery || '—'} · 新鲜度 ${this.data.kpiFresh || '—'}`)
+    const todos = this.data.todos || []
+    for (let i = 0; i < todos.length; i++) lines.push(`${i + 1}. ${todos[i]}`)
+    const samples = this.data.querySamples || []
+    if (samples.length) {
+      lines.push('问法抽样：')
+      for (let i = 0; i < Math.min(8, samples.length); i++) {
+        const s = samples[i]
+        lines.push(`${s.covered ? '✓' : '○'} ${s.q}`)
+      }
+    }
+    this.setData({
+      showReport: true,
+      reportText: lines.filter(Boolean).join('\n') || '暂无报告，请先同步评分。',
+    })
+  },
+
+  onCloseReport() {
+    this.setData({ showReport: false })
   },
 
   onOpenConsult() {

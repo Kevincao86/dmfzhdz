@@ -14,6 +14,7 @@ const {
 const CHANNELS = [
   { id: 'local_promotion', label: '本地推' },
   { id: 'qianchuan', label: '千川' },
+  { id: 'xhs_juguang', label: '聚光' },
 ]
 
 Page({
@@ -144,7 +145,10 @@ Page({
   onCreateAd() {
     wx.showModal({
       title: '新建投放',
-      content: '新建计划需在巨量后台完成素材与定向。小程序可启停已有计划。电脑端：cs.mofangdianai.com → 投流。',
+      content:
+        this.data.channel === 'xhs_juguang'
+          ? '新建计划需在小红书聚光后台完成素材与定向。小程序可启停已有计划。'
+          : '新建计划需在巨量后台完成素材与定向。小程序可启停已有计划。',
       showCancel: false,
     })
   },
@@ -153,7 +157,12 @@ Page({
     const s = this.data.todayStats || []
     const lines = s.map((x) => `${x.label}：${x.value}`).join('\n')
     wx.showModal({
-      title: this.data.channel === 'qianchuan' ? '千川今日数据' : '本地推今日数据',
+      title:
+        this.data.channel === 'qianchuan'
+          ? '千川今日数据'
+          : this.data.channel === 'xhs_juguang'
+            ? '聚光今日数据'
+            : '本地推今日数据',
       content: lines || '暂无报表',
       showCancel: false,
     })

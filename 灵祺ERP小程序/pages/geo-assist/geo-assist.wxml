@@ -87,9 +87,12 @@
 
   <block wx:if="{{tab !== 'overview' && tab !== 'consult'}}">
     <view class="geo-card">
-      <text class="geo-card-title">与电脑端一致</text>
+      <text class="geo-card-title">可在小程序完成</text>
       <text class="geo-card-body">{{paneNote}}</text>
-      <text class="geo-muted geo-muted-block">批量编排、结构化字段与流水线任务请在浏览器打开商家后台「运营 → GEO 运营优化」完成。</text>
+      <button wx:if="{{tab === 'store'}}" class="geo-primary" data-url="/pages/store-list/store-list?mode=info" bindtap="onGeoJump">去店铺信息</button>
+      <button wx:if="{{tab === 'content'}}" class="geo-primary" data-url="/pages/knowledge-base/knowledge-base" bindtap="onGeoJump">去知识库投喂</button>
+      <button wx:if="{{tab === 'reputation'}}" class="geo-primary" data-url="/pages/reviews-list/reviews-list" bindtap="onGeoJump">去评价管理</button>
+      <button wx:if="{{tab === 'health' || tab === 'query'}}" class="geo-primary" bindtap="onOpenReport">查看优化报告</button>
     </view>
   </block>
 
@@ -100,5 +103,15 @@
       <text class="geo-fab-ico">🤖</text>
       <text>咨询优化方案</text>
     </button>
+  </view>
+</view>
+
+<view wx:if="{{showReport}}" class="geo-mask" catchtouchmove="noop">
+  <view class="geo-report-sheet">
+    <text class="geo-card-title">GEO 优化报告</text>
+    <scroll-view scroll-y class="geo-report-body" style="max-height: 60vh;">
+      <text class="geo-card-body">{{reportText}}</text>
+    </scroll-view>
+    <button class="geo-primary" bindtap="onCloseReport">关闭</button>
   </view>
 </view>

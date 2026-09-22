@@ -4,7 +4,19 @@
     <text class="store-notice-close" bindtap="onCloseNotice">×</text>
   </view>
   <view wx:if="{{mode === 'decoration'}}" class="store-notice store-notice-soft">
-    <text class="store-notice-text">展示各平台门店名称与地址，装修素材请在对应平台商家中心维护。</text>
+    <text class="store-notice-text">查看各平台装修状态。抖音来客可在本页选图提交五连图头图；复杂编排仍在平台商家中心。</text>
+  </view>
+
+  <view class="store-search">
+    <input
+      class="store-search-input"
+      placeholder="搜索门店名称"
+      value="{{keyword}}"
+      bindinput="onSearch"
+      bindconfirm="onSearchConfirm"
+      confirm-type="search"
+    />
+    <text class="store-search-go" bindtap="onSearchConfirm">搜索</text>
   </view>
 
   <scroll-view scroll-x class="store-tab-scroll" enhanced show-scrollbar="{{false}}">
@@ -51,11 +63,19 @@
       <view wx:elif="{{!platCard.connected}}" class="store-state store-err-soft">尚未绑定{{platCard.name}}</view>
 
       <view wx:if="{{items.length}}" class="store-list-block">
-        <text class="store-list-title">门店列表</text>
+        <text class="store-list-title">{{mode === 'decoration' ? '装修列表' : '门店列表'}}</text>
         <view wx:for="{{items}}" wx:key="id" class="store-list-card">
           <text class="store-list-name">{{item.name}}</text>
           <text wx:if="{{item.address}}" class="store-list-addr">{{item.address}}</text>
+          <text wx:if="{{item.phone}}" class="store-list-addr">电话 {{item.phone}}</text>
+          <text wx:if="{{item.businessHours}}" class="store-list-addr">营业 {{item.businessHours}}</text>
+          <text wx:if="{{item.auditStatus}}" class="store-list-id">审核 {{item.auditStatus}}</text>
+          <text wx:if="{{item.announcement}}" class="store-list-addr">公告 {{item.announcement}}</text>
           <text class="store-list-id">ID {{item.id}}</text>
+          <view class="store-list-actions">
+            <text class="store-mini-btn" data-id="{{item.id}}" bindtap="onEditContact">补充电话/营业时间</text>
+            <text wx:if="{{mode === 'decoration'}}" class="store-mini-btn" data-id="{{item.id}}" bindtap="onDecorate">五连图头图</text>
+          </view>
         </view>
       </view>
     </block>
@@ -65,3 +85,17 @@
     <text>所有平台信息均通过官方授权，安全可靠</text>
   </view>
 </scroll-view>
+
+<view wx:if="{{editOpen}}" class="store-mask" catchtouchmove="noop">
+  <view class="store-sheet">
+    <text class="store-sheet-title">补充 {{editName}}</text>
+    <text class="store-sheet-lab">营业电话</text>
+    <input class="store-sheet-input" value="{{editPhone}}" bindinput="onEditPhone" placeholder="平台未返回时可手填" />
+    <text class="store-sheet-lab">营业时间</text>
+    <input class="store-sheet-input" value="{{editHours}}" bindinput="onEditHours" placeholder="如 10:00-22:00" />
+    <view class="store-sheet-row">
+      <button class="store-sheet-btn ghost" bindtap="onEditCancel">取消</button>
+      <button class="store-sheet-btn" bindtap="onEditSave">保存</button>
+    </view>
+  </view>
+</view>

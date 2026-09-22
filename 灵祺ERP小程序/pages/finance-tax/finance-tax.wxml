@@ -1,18 +1,40 @@
 <scroll-view scroll-y class="page-pad-v2" enhanced show-scrollbar="{{false}}">
   <view class="lq-hero">
     <text class="lq-hero-title">报税管理</text>
-    <text class="lq-hero-sub">税务申报辅助 · 账单核对入口</text>
+    <text class="lq-hero-sub">按月汇总已绑定平台对账核销，可复制申报包（与网页同源对账接口）</text>
   </view>
-  <view wx:if="{{!rows.length}}" class="lq-empty">
+  <view class="chip-row">
+    <text class="chip" bindtap="onPrevMonth">‹ 上月</text>
+    <text class="chip on">{{periodLabel}}</text>
+    <text class="chip" bindtap="onNextMonth">下月 ›</text>
+  </view>
+  <text class="lq-hero-sub" style="margin:0 32rpx 16rpx">{{periodRange}} · 销售额 {{totalSales}} · 核销 {{totalVerify}}</text>
+  <view class="chip-row">
+    <text class="chip on" bindtap="onCopyPack">复制申报包</text>
+    <text class="chip" bindtap="onFileOnce">一键报税</text>
+    <text class="chip" bindtap="onOpenReconcile">打开对账</text>
+  </view>
+  <view wx:if="{{loading}}" class="lq-empty">
+    <text class="lq-empty-title">加载中…</text>
+  </view>
+  <view wx:elif="{{err}}" class="lq-empty">
+    <text class="lq-empty-title">加载失败</text>
+    <text class="lq-empty-desc">{{err}}</text>
+  </view>
+  <view wx:elif="{{!rows.length}}" class="lq-empty">
     <text class="lq-empty-title">暂无报税条目</text>
-    <text class="lq-empty-desc">登录并同步财务数据后显示</text>
+    <text class="lq-empty-desc">登录并同步财务对账后显示</text>
   </view>
   <view wx:for="{{rows}}" wx:key="id" class="lq-nav-card">
     <view class="lq-nav-ico amber">税</view>
     <view class="lq-nav-main">
       <text class="lq-nav-title">{{item.title}}</text>
-      <text class="lq-nav-desc">{{item.sub}}</text>
+      <text class="lq-nav-desc">{{item.sub}} · 销售 {{item.sales}} · 核销 {{item.verify}}</text>
     </view>
     <text class="tag">{{item.tag}}</text>
+  </view>
+  <view wx:if="{{history.length}}" class="lq-hero">
+    <text class="lq-hero-title">申报记录</text>
+    <text wx:for="{{history}}" wx:key="id" class="lq-hero-sub">{{item.periodLabel}} · {{item.status}} · 核销 {{item.totalVerifyYuan}}</text>
   </view>
 </scroll-view>

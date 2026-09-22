@@ -63,6 +63,58 @@ async function uploadPlainText(params) {
   }
 }
 
+async function uploadFileBase64(params) {
+  const tid = tenantId()
+  if (!tid) return { ok: false, message: '未找到租户，请先登录' }
+  const fileName = String((params && params.fileName) || '资料.bin').trim()
+  const contentType = String((params && params.contentType) || 'application/octet-stream')
+  const contentBase64 = String((params && params.contentBase64) || '').trim()
+  if (!contentBase64) return { ok: false, message: '文件内容为空' }
+  const title = String((params && params.title) || '').trim() || fileName.replace(/\.[^.]+$/, '')
+  try {
+    const r = await postKb({
+      action: 'upload',
+      scope: 'tenant',
+      tenantId: tid,
+      title,
+      fileName,
+      contentType,
+      contentBase64,
+      summary: String((params && params.summary) || '').trim(),
+      visibility: 'tenant_agents',
+      feedEnabled: true,
+    })
+    if (r.ok === false || !r.document) {
+      return { ok: false, message: String(r.detail || r.error || '上传失败') }
+    }
+    return { ok: true, document: r.document }
+  } catch (e) {
+    return { ok: false, message: (e && e.message) || '上传失败' }
+  }
+}
+
+async function updateDocument(params) {
+  const tid = tenantId()
+  if (!tid) return { ok: false, message: '未找到租户' }
+  const documentId = String((params && params.documentId) || '').trim()
+  if (!documentId) return { ok: false, message: '缺少文档 ID' }
+  try {
+    const r = await postKb({
+      action: 'update',
+      scope: 'tenant',
+      tenantId: tid,
+      documentId,
+      title: params.title,
+      summary: params.summary,
+      feedEnabled: params.feedEnabled,
+    })
+    if (r.ok === false) return { ok: false, message: String(r.detail || r.error || '更新失败') }
+    return { ok: true, document: r.document }
+  } catch (e) {
+    return { ok: false, message: (e && e.message) || '更新失败' }
+  }
+}
+
 async function deleteDocument(documentId) {
   const tid = tenantId()
   if (!tid) return { ok: false, message: '未找到租户' }
@@ -77,4 +129,11 @@ async function deleteDocument(documentId) {
   }
 }
 
-module.exports = { tenantId, listDocuments, uploadPlainText, deleteDocument }
+module.exports = {
+  tenantId,
+  listDocuments,
+  uploadPlainText,
+  uploadFileBase64,
+  updateDocument,
+  deleteDocument,
+}

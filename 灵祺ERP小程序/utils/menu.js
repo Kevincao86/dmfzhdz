@@ -93,8 +93,8 @@ const SECTIONS = [
         title: '短视频优化 · 看板',
         desc: '脚本诊断与出片（与电脑端同源）',
       },
-      { kind: 'mod', key: 'live_check', title: '直播间分析', desc: '流量与转化（完整功能在电脑端）' },
-      { kind: 'mod', key: 'platform_target', title: '平台签框', desc: '签约目标与进度（完整功能在电脑端）' },
+      { kind: 'link', url: '/pages/competitors/competitors', title: '竞争对手分析', desc: '竞品情报与对比' },
+      { kind: 'link', url: '/pages/site-selection/site-selection', title: '选址参考', desc: '人流热度与选址打分' },
     ],
   },
   {

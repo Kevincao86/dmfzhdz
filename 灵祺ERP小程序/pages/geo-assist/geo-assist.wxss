@@ -403,3 +403,28 @@
 .geo-fab-ico {
   font-size: 32rpx;
 }
+
+.geo-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 80;
+  display: flex;
+  align-items: flex-end;
+}
+
+.geo-report-sheet {
+  width: 100%;
+  background: #fff;
+  border-radius: 28rpx 28rpx 0 0;
+  padding: 32rpx 28rpx calc(28rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
+.geo-report-body {
+  margin: 16rpx 0 24rpx;
+  white-space: pre-wrap;
+}

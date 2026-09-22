@@ -57,7 +57,7 @@
   </view>
 
   <view wx:if="{{showFilter}}" class="ads-filter-panel">
-    <text class="ads-filter-tip">筛选当前渠道计划状态；本地推与千川账号互相隔离，与电脑端一致。</text>
+    <text class="ads-filter-tip">筛选当前渠道计划状态；本地推、千川、聚光账号互相隔离，与网页同源接口。</text>
   </view>
 
   <view wx:if="{{loading}}" class="ads-state">加载中…</view>

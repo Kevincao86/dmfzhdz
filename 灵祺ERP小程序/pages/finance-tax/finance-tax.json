@@ -1,1 +1,1 @@
-{ "navigationBarTitleText": "报税管理" }
+{ "navigationBarTitleText": "报税管理", "enablePullDownRefresh": true }

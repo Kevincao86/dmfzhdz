@@ -14,6 +14,7 @@ const {
 const CHANNELS = [
   { id: 'local_promotion', label: '本地推' },
   { id: 'qianchuan', label: '千川' },
+  { id: 'xhs_juguang', label: '聚光' },
 ]
 
 Page({

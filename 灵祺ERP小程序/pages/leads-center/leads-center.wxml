@@ -26,7 +26,7 @@
   </view>
 
   <view wx:if="{{showFilter}}" class="leads-filter-panel">
-    <text class="leads-filter-tip">按状态筛选；本地推与千川线索互相隔离，回传状态与电脑端同源。</text>
+    <text class="leads-filter-tip">按状态筛选；本地推、千川、种小草线索互相隔离，回传与网页同源。</text>
   </view>
 
   <view class="leads-stat-card">

@@ -14,7 +14,9 @@
       <button class="erp-btn-primary" loading="{{busy}}" disabled="{{busy}}" bindtap="onSubmit">
         {{busy ? '提交中…' : '保存并投喂知识库'}}
       </button>
-      <text class="erp-hint" style="margin-top:12rpx">复杂文件上传请到电脑端 cs.mofangdianai.com → 我的知识库</text>
+      <button class="erp-btn-ghost" style="margin-top:12rpx" loading="{{busy}}" disabled="{{busy}}" bindtap="onPickFile">
+        从聊天/文件投喂（txt / pdf / 图）
+      </button>
     </block>
   </view>
 
@@ -33,7 +35,7 @@
         <text class="kb-title">{{item.title}}</text>
         <text wx:if="{{item.summary}}" class="kb-sum">{{item.summary}}</text>
         <view class="kb-meta">
-          <text class="erp-chip">{{item.feedLabel}}</text>
+          <text class="erp-chip" data-id="{{item.id}}" data-on="{{item.feedOn ? '1' : '0'}}" bindtap="onToggleFeed">{{item.feedLabel}}</text>
           <text class="kb-time">{{item.updatedAt}}</text>
         </view>
       </view>

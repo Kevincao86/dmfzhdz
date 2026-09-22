@@ -1,31 +1,98 @@
 const api = require('../../utils/api.js')
 const feature = require('../../utils/merchantFeatureMp.js')
+const tax = require('../../utils/taxFilingMp.js')
 
 Page({
-  data: { days: 30, loading: false, err: '', rows: [] },
-  onShow() {
-    if (!api.getAccessToken()) wx.redirectTo({ url: '/pages/login/login' })
+  data: {
+    periodOffset: -1,
+    periodLabel: '',
+    periodRange: '',
+    loading: false,
+    err: '',
+    rows: [],
+    totalSales: 0,
+    totalVerify: 0,
+    history: [],
   },
-  async onLoad() {
-    this.setData({ loading: true, err: '', rows: [] })
-    const r = await feature.fetchFinanceReconcile(this.data.days)
-    if (!r.ok) {
-      this.setData({ loading: false, err: r.message })
+  onShow() {
+    if (!api.getAccessToken()) {
+      wx.redirectTo({ url: '/pages/login/login' })
       return
     }
-    const map = {}
-    for (const row of r.rows) {
-      const k = row.platformLabel || row.platform
-      if (!map[k]) map[k] = { platformLabel: k, sales: 0, verify: 0 }
-      map[k].sales += Number(row.salesAmountYuan) || 0
-      map[k].verify += Number(row.verifyAmountYuan) || 0
+    void this.load()
+  },
+  async onPullDownRefresh() {
+    try {
+      await this.load()
+    } finally {
+      wx.stopPullDownRefresh()
     }
-    const rows = Object.keys(map).map((key) => ({
-      key,
-      platformLabel: map[key].platformLabel,
-      sales: Math.round(map[key].sales * 100) / 100,
-      verify: Math.round(map[key].verify * 100) / 100,
-    }))
-    this.setData({ loading: false, rows })
+  },
+  onPrevMonth() {
+    this.setData({ periodOffset: this.data.periodOffset - 1 })
+    void this.load()
+  },
+  onNextMonth() {
+    if (this.data.periodOffset >= 0) return
+    this.setData({ periodOffset: this.data.periodOffset + 1 })
+    void this.load()
+  },
+  async load() {
+    const period = tax.shanghaiMonthRangeYmd(this.data.periodOffset)
+    this.setData({
+      loading: true,
+      err: '',
+      periodLabel: period.label,
+      periodRange: `${period.start} ~ ${period.end}`,
+    })
+    const r = await feature.fetchFinanceReconcile(tax.daysCovering(period.start))
+    if (!r.ok) {
+      this.setData({ loading: false, err: r.message, rows: [], history: tax.readHistory() })
+      return
+    }
+    const rows = tax.aggregateRows(r.rows, period.start, period.end)
+    const totalSales = rows.reduce((s, x) => s + (Number(x.sales) || 0), 0)
+    const totalVerify = rows.reduce((s, x) => s + (Number(x.verify) || 0), 0)
+    this.setData({
+      loading: false,
+      rows,
+      totalSales: Math.round(totalSales * 100) / 100,
+      totalVerify: Math.round(totalVerify * 100) / 100,
+      history: tax.readHistory(),
+    })
+  },
+  onCopyPack() {
+    const payload = {
+      period: this.data.periodLabel,
+      range: this.data.periodRange,
+      totalSales: this.data.totalSales,
+      totalVerify: this.data.totalVerify,
+      platforms: this.data.rows,
+    }
+    wx.setClipboardData({
+      data: JSON.stringify(payload, null, 2),
+      success: () => wx.showToast({ title: '已复制申报包 JSON', icon: 'none' }),
+    })
+  },
+  onFileOnce() {
+    if (!this.data.rows.length) {
+      wx.showToast({ title: '暂无对账数据', icon: 'none' })
+      return
+    }
+    this.onCopyPack()
+    const period = tax.shanghaiMonthRangeYmd(this.data.periodOffset)
+    const history = tax.appendHistory({
+      id: `TAX-${Date.now()}`,
+      periodLabel: period.label,
+      startDate: period.start,
+      endDate: period.end,
+      submittedAt: new Date().toISOString(),
+      totalVerifyYuan: this.data.totalVerify,
+      status: 'submitted_mock',
+    })
+    this.setData({ history })
+  },
+  onOpenReconcile() {
+    wx.navigateTo({ url: '/pages/finance-reconcile/finance-reconcile' })
   },
 })

@@ -1,7 +1,7 @@
 <scroll-view scroll-y class="page-pad-v2" enhanced show-scrollbar="{{false}}">
   <view class="lq-hero">
     <text class="lq-hero-title">活动中心</text>
-    <text class="lq-hero-sub">多平台活动同步 · 状态一目了然</text>
+    <text class="lq-hero-sub">多平台活动同步 · 状态筛选与网页同源</text>
   </view>
   <view class="chip-row">
     <text
@@ -10,6 +10,15 @@
       class="chip {{platform === item.id ? 'on' : ''}}"
       data-id="{{item.id}}"
       bindtap="onTab"
+    >{{item.label}}</text>
+  </view>
+  <view class="chip-row">
+    <text
+      wx:for="{{statusTabs}}"
+      wx:key="id"
+      class="chip {{status === item.id ? 'on' : ''}}"
+      data-id="{{item.id}}"
+      bindtap="onStatus"
     >{{item.label}}</text>
   </view>
   <view wx:if="{{loading}}" class="lq-empty">
@@ -22,16 +31,20 @@
   </view>
   <view wx:elif="{{!items.length}}" class="lq-empty">
     <text class="lq-empty-title">暂无活动</text>
-    <text class="lq-empty-desc">切换平台或稍后再试</text>
+    <text class="lq-empty-desc">切换平台或状态后再试</text>
   </view>
   <block wx:else>
-    <view wx:for="{{items}}" wx:key="id" class="lq-nav-card">
+    <view wx:for="{{items}}" wx:key="id" class="lq-nav-card" data-id="{{item.id}}" bindtap="onExpand">
       <view class="lq-nav-ico orange">营</view>
       <view class="lq-nav-main">
         <text class="lq-nav-title">{{item.title}}</text>
         <text class="lq-nav-desc">{{item.summary}}</text>
+        <text wx:if="{{expandedId === item.id}}" class="lq-nav-desc">开始 {{item.startAt || '—'}} · 结束 {{item.endAt || '—'}}</text>
       </view>
-      <text class="tag">{{item.uiStatusLabel}}</text>
+      <view>
+        <text class="tag">{{item.uiStatusLabel}}</text>
+        <text class="chip" data-title="{{item.title}}" catchtap="onCopy">复制</text>
+      </view>
     </view>
   </block>
 </scroll-view>
