@@ -7,10 +7,11 @@ const {
   findPlatformOption,
 } = require('../../utils/productCreatePlatformsMp.js')
 
-function allPlatformRows() {
-  const a = selectablePlatformRows('groupbuy')
-  const b = selectablePlatformRows('waimai')
-  return a.concat(b)
+function withShortHint(rows) {
+  return rows.map((p) => ({
+    ...p,
+    status: p.comingSoon ? '暂未开放' : p.selectable ? '已接通' : '未绑定',
+  }))
 }
 
 function platformName(id) {
@@ -21,7 +22,8 @@ function platformName(id) {
 Page({
   data: {
     phase: 'platform',
-    platformRows: [],
+    groupbuyRows: [],
+    waimaiRows: [],
     platformId: '',
     platformLabel: '',
     recording: false,
@@ -43,7 +45,10 @@ Page({
       wx.redirectTo({ url: '/pages/login/login' })
       return
     }
-    this.setData({ platformRows: allPlatformRows() })
+    this.setData({
+      groupbuyRows: withShortHint(selectablePlatformRows('groupbuy')),
+      waimaiRows: withShortHint(selectablePlatformRows('waimai')),
+    })
   },
 
   onLoad() {
@@ -60,7 +65,7 @@ Page({
 
   onPickPlatform(e) {
     const id = e.currentTarget.dataset.id
-    const hit = (this.data.platformRows || []).find((x) => x.id === id)
+    const hit = [...(this.data.groupbuyRows || []), ...(this.data.waimaiRows || [])].find((x) => x.id === id)
     if (!hit || !hit.selectable) {
       wx.showToast({ title: hit && hit.comingSoon ? '即将支持' : '请先绑定该平台', icon: 'none' })
       return

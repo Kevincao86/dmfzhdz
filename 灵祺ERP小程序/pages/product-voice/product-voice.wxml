@@ -1,68 +1,97 @@
-<scroll-view scroll-y class="voice-page" enhanced show-scrollbar="{{false}}">
-  <view class="voice-hero meoo-card">
-    <text class="voice-hero-title">语音上品</text>
-    <text class="voice-hero-desc">先选平台 → 口述商品 → AI 优化选填 → 你确认必填后提交到该平台。</text>
-  </view>
-
-  <view wx:if="{{phase === 'platform'}}" class="voice-card">
-    <text class="voice-h">1. 选择上架平台（必选）</text>
-    <view
-      wx:for="{{platformRows}}"
-      wx:key="id"
-      class="plat {{platformId === item.id ? 'on' : ''}} {{item.selectable ? '' : 'off'}}"
-      data-id="{{item.id}}"
-      bindtap="onPickPlatform"
-    >
-      <image wx:if="{{item.logo}}" class="plat-logo" src="{{item.logo}}" mode="aspectFit" />
-      <view class="plat-body">
-        <text class="plat-name">{{item.name}}</text>
-        <text class="plat-desc">{{item.desc}}</text>
+<view class="voice-root">
+  <scroll-view scroll-y class="voice-scroll" enhanced show-scrollbar="{{false}}">
+    <view class="voice-inner">
+      <view class="voice-hero">
+        <text class="voice-hero-title">语音上品</text>
+        <text class="voice-hero-desc">先选平台，口述商品，确认名称和售价后再提交。</text>
       </view>
-      <text wx:if="{{platformId === item.id}}" class="plat-tick">✓</text>
+
+      <view wx:if="{{phase === 'platform'}}" class="voice-card">
+        <text class="voice-h">选择上架平台</text>
+
+        <text class="sec-lab">团购 · 到店</text>
+        <view
+          wx:for="{{groupbuyRows}}"
+          wx:key="id"
+          class="plat {{platformId === item.id ? 'on' : ''}} {{item.selectable ? '' : 'off'}}"
+          data-id="{{item.id}}"
+          bindtap="onPickPlatform"
+        >
+          <image wx:if="{{item.logo}}" class="plat-logo" src="{{item.logo}}" mode="aspectFit" />
+          <view wx:else class="plat-logo ph">{{item.letter}}</view>
+          <view class="plat-body">
+            <text class="plat-name">{{item.name}}</text>
+            <text class="plat-status {{item.selectable ? 'ok' : ''}}">{{item.status}}</text>
+          </view>
+          <view class="plat-radio {{platformId === item.id ? 'on' : ''}}">
+            <text wx:if="{{platformId === item.id}}">✓</text>
+          </view>
+        </view>
+
+        <text class="sec-lab">外卖 · 到家</text>
+        <view
+          wx:for="{{waimaiRows}}"
+          wx:key="id"
+          class="plat {{platformId === item.id ? 'on' : ''}} {{item.selectable ? '' : 'off'}}"
+          data-id="{{item.id}}"
+          bindtap="onPickPlatform"
+        >
+          <image wx:if="{{item.logo}}" class="plat-logo" src="{{item.logo}}" mode="aspectFit" />
+          <view wx:else class="plat-logo ph">{{item.letter}}</view>
+          <view class="plat-body">
+            <text class="plat-name">{{item.name}}</text>
+            <text class="plat-status {{item.selectable ? 'ok' : ''}}">{{item.status}}</text>
+          </view>
+          <view class="plat-radio {{platformId === item.id ? 'on' : ''}}">
+            <text wx:if="{{platformId === item.id}}">✓</text>
+          </view>
+        </view>
+
+        <button class="meoo-btn-primary voice-next" bindtap="onConfirmPlatform">下一步 · 口述商品</button>
+      </view>
+
+      <view wx:if="{{phase === 'record'}}" class="voice-card">
+        <text class="voice-h">口述商品信息</text>
+        <text class="voice-p">当前平台：{{platformLabel}}。请说清名称、价格；卖点由 AI 补全。</text>
+        <button class="meoo-btn-primary voice-record-btn" disabled="{{busy}}" bindtap="toggleRecord">
+          {{recording ? '停止并交给 AI 优化' : '开始录音'}}
+        </button>
+        <button class="meoo-btn-ghost skip" disabled="{{busy || recording}}" bindtap="useMock">跳过录音（演示）</button>
+        <button class="meoo-btn-ghost skip" disabled="{{busy || recording}}" bindtap="onBackPlatform">重选平台</button>
+        <text wx:if="{{recording}}" class="voice-pulse">录音中… 再点一次结束</text>
+      </view>
+
+      <view wx:if="{{phase === 'confirm'}}" class="voice-card">
+        <text class="voice-h">确认必填 · AI 已填选填</text>
+        <text wx:if="{{aiNote}}" class="voice-note">{{aiNote}}</text>
+        <text class="voice-plat">将提交至 {{platformLabel}}</text>
+
+        <text class="req-lab">必填 · 须你确认</text>
+        <text class="meoo-label">商品名称</text>
+        <input class="meoo-input" value="{{title}}" data-k="title" bindinput="onField" placeholder="上架展示名称" />
+        <text class="meoo-label">售价（元）</text>
+        <input class="meoo-input" type="digit" value="{{priceYuan}}" data-k="priceYuan" bindinput="onField" placeholder="请核对价格" />
+        <view class="req-check {{requiredOk ? 'on' : ''}}" bindtap="onToggleRequiredOk">
+          <text class="req-box">{{requiredOk ? '✓' : ''}}</text>
+          <text>我已核对名称与售价，确认无误</text>
+        </view>
+
+        <text class="opt-lab">选填 · AI 已优化，可改</text>
+        <text class="meoo-label">商品说明</text>
+        <textarea class="meoo-input area" value="{{description}}" data-k="description" bindinput="onField" maxlength="2000" />
+        <text class="meoo-label">卖点摘要</text>
+        <input class="meoo-input" value="{{subtitle}}" data-k="subtitle" bindinput="onField" />
+        <text class="meoo-label">标签</text>
+        <input class="meoo-input" value="{{tags}}" data-k="tags" bindinput="onField" />
+        <text class="meoo-label">划线价（元，选填）</text>
+        <input class="meoo-input" type="digit" value="{{originYuan}}" data-k="originYuan" bindinput="onField" />
+
+        <text wx:if="{{rawText}}" class="voice-raw">识别原文：{{rawText}}</text>
+        <text wx:if="{{platformId === 'douyin'}}" class="voice-p">抖音来客还需类目/门店/头图，确认后进入向导补齐再提交。</text>
+
+        <button class="meoo-btn-primary" loading="{{busy}}" bindtap="onPublish">确认并提交到{{platformLabel}}</button>
+        <button class="meoo-btn-ghost skip" disabled="{{busy}}" bindtap="onBackRecord">重新录音</button>
+      </view>
     </view>
-    <button class="meoo-btn-primary" bindtap="onConfirmPlatform">下一步 · 口述商品</button>
-  </view>
-
-  <view wx:if="{{phase === 'record'}}" class="voice-card">
-    <text class="voice-h">2. 口述商品信息</text>
-    <text class="voice-p">目标平台：{{platformLabel}}。请说清名称、价格；卖点/标签可略说，由 AI 补全。</text>
-    <button class="meoo-btn-primary voice-record-btn" disabled="{{busy}}" bindtap="toggleRecord">
-      {{recording ? '停止并交给 AI 优化' : '开始录音'}}
-    </button>
-    <button class="meoo-btn-ghost skip" disabled="{{busy || recording}}" bindtap="useMock">跳过录音（演示）</button>
-    <button class="meoo-btn-ghost skip" disabled="{{busy || recording}}" bindtap="onBackPlatform">重选平台</button>
-    <text wx:if="{{recording}}" class="voice-pulse">录音中… 再点一次结束</text>
-  </view>
-
-  <view wx:if="{{phase === 'confirm'}}" class="voice-card">
-    <text class="voice-h">3. 确认必填 · AI 已填选填</text>
-    <text wx:if="{{aiNote}}" class="voice-note">{{aiNote}}</text>
-    <text class="voice-plat">将提交至 {{platformLabel}}</text>
-
-    <text class="req-lab">必填 · 须你确认</text>
-    <text class="meoo-label">商品名称</text>
-    <input class="meoo-input" value="{{title}}" data-k="title" bindinput="onField" placeholder="上架展示名称" />
-    <text class="meoo-label">售价（元）</text>
-    <input class="meoo-input" type="digit" value="{{priceYuan}}" data-k="priceYuan" bindinput="onField" placeholder="请核对价格" />
-    <view class="req-check {{requiredOk ? 'on' : ''}}" bindtap="onToggleRequiredOk">
-      <text class="req-box">{{requiredOk ? '✓' : ''}}</text>
-      <text>我已核对名称与售价，确认无误</text>
-    </view>
-
-    <text class="opt-lab">选填 · AI 已优化，可改</text>
-    <text class="meoo-label">商品说明</text>
-    <textarea class="meoo-input area" value="{{description}}" data-k="description" bindinput="onField" maxlength="2000" />
-    <text class="meoo-label">卖点摘要</text>
-    <input class="meoo-input" value="{{subtitle}}" data-k="subtitle" bindinput="onField" />
-    <text class="meoo-label">标签</text>
-    <input class="meoo-input" value="{{tags}}" data-k="tags" bindinput="onField" />
-    <text class="meoo-label">划线价（元，选填）</text>
-    <input class="meoo-input" type="digit" value="{{originYuan}}" data-k="originYuan" bindinput="onField" />
-
-    <text wx:if="{{rawText}}" class="voice-raw">识别原文：{{rawText}}</text>
-    <text wx:if="{{platformId === 'douyin'}}" class="voice-p">抖音来客还需类目/门店/头图，确认后进入向导补齐再提交。</text>
-
-    <button class="meoo-btn-primary" loading="{{busy}}" bindtap="onPublish">确认并提交到{{platformLabel}}</button>
-    <button class="meoo-btn-ghost skip" disabled="{{busy}}" bindtap="onBackRecord">重新录音</button>
-  </view>
-</scroll-view>
+  </scroll-view>
+</view>
