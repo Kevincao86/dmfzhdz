@@ -105,6 +105,10 @@ Page({
     this.setData({ input: e.detail.value }, () => composer.syncShowSendBtn(this))
   },
 
+  onInputFocus() {
+    if (this.data.showPlusPanel) this.setData({ showPlusPanel: false })
+  },
+
   onNewChat() {
     agent.clearThread()
     this._execState = exec.createAgentExecutionState()
@@ -245,7 +249,13 @@ Page({
 
   onTogglePlus() {
     if (this.data.sending) return
-    this.setData({ showPlusPanel: !this.data.showPlusPanel, voiceMode: false })
+    const next = !this.data.showPlusPanel
+    if (next) {
+      try {
+        wx.hideKeyboard({ complete: () => {} })
+      } catch (_) {}
+    }
+    this.setData({ showPlusPanel: next, voiceMode: false })
   },
 
   onToggleVoiceMode() {

@@ -96,10 +96,11 @@
         value="{{input}}"
         disabled="{{sending}}"
         bindinput="onInput"
+        bindfocus="onInputFocus"
         confirm-type="send"
         bindconfirm="onSend"
-        adjust-position
-        hold-keyboard
+        adjust-position="{{!showPlusPanel}}"
+        cursor-spacing="24"
       />
       <view
         wx:else

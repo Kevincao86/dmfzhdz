@@ -310,6 +310,7 @@ function shortLabel(label) {
 module.exports = {
   listAiModelPickerOptions,
   parseAiModelPickerKey,
+  parseAgentImagePickerKey,
   isAgentImagePickerKey,
   effectiveChatPickerKey,
   defaultModelIdForFamily,

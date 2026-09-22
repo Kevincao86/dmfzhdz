@@ -121,7 +121,8 @@ function resolveImagePickerKey(chatPickerKey, options, userLine, hasImages) {
 }
 
 function agentNativeImageRouteFromPickerKey(key) {
-  const p = registry.parseAgentImagePickerKey(key)
+  const parse = registry.parseAgentImagePickerKey
+  const p = typeof parse === 'function' ? parse(key) : null
   if (p && p.kind === 'style') return { route: 'tokenmix', tokenmixImageModel: p.modelId }
   if (p && p.kind === 'vendor' && p.vendor !== 'auto') {
     return { route: 'builtin', preferredVendor: p.vendor }
