@@ -480,6 +480,10 @@ async function processAgentTurn(opts, executionState) {
       id: `u-${Date.now()}`,
       role: 'user',
       content: line,
+      imageUrls: (opts.attachments || [])
+        .map((a) => a.preview || a.dataUrl)
+        .filter(Boolean)
+        .slice(0, MAX_ATTACH),
     }
     const assistantMsgs = []
     if (flow.assistantLine) {
@@ -502,6 +506,10 @@ async function processAgentTurn(opts, executionState) {
       id: `u-${Date.now()}`,
       role: 'user',
       content: line,
+      imageUrls: (opts.attachments || [])
+        .map((a) => a.preview || a.dataUrl)
+        .filter(Boolean)
+        .slice(0, MAX_ATTACH),
     }
     return {
       userMsg,

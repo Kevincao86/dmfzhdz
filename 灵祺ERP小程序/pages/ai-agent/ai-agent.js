@@ -2,6 +2,7 @@ const api = require('../../utils/api.js')
 const erpNav = require('../../utils/erpNavMp.js')
 const { decodeJwtSub } = require('../../utils/jwtDecode.js')
 const { assetUrl } = require('../../utils/mpStaticAssets.js')
+const composer = require('../../utils/agentComposerMp.js')
 
 let agent = null
 let exec = null
@@ -32,6 +33,9 @@ Page({
     sending: false,
     hasChat: false,
     scrollTo: '',
+    attachments: [],
+    recordingVoice: false,
+    showSendBtn: false,
   },
 
   onLoad() {
@@ -41,6 +45,13 @@ Page({
     }
     this._execState = exec.createAgentExecutionState()
     this.setData({ shortcuts: agent.AI_AGENT_SHORTCUTS || [] })
+    this._recorder = composer.createRecorderManager(this)
+  },
+
+  onUnload() {
+    if (this.data.recordingVoice && this._recorder) {
+      composer.stopVoiceRecord(this, this._recorder, true)
+    }
   },
 
   onShow() {
@@ -88,13 +99,22 @@ Page({
   },
 
   onInput(e) {
-    this.setData({ input: e.detail.value })
+    this.setData({ input: e.detail.value }, () => composer.syncShowSendBtn(this))
   },
 
   onNewChat() {
     agent.clearThread()
     this._execState = exec.createAgentExecutionState()
-    this.setData({ messages: [], hasChat: false, input: '', sending: false, scrollTo: '' })
+    this.setData({
+      messages: [],
+      hasChat: false,
+      input: '',
+      sending: false,
+      scrollTo: '',
+      attachments: [],
+      recordingVoice: false,
+      showSendBtn: false,
+    })
   },
 
   onToggleShortcuts() {
@@ -105,22 +125,194 @@ Page({
     const prompt = String(e.currentTarget.dataset.prompt || '').trim()
     if (!prompt || this.data.sending) return
     this.setData({ input: prompt })
-    void this.sendLine(prompt)
+    void this.sendLine(prompt, [])
   },
 
   onSend() {
+    if (this.data.sending || this.data.recordingVoice) return
     const line = String(this.data.input || '').trim()
-    if (!line || this.data.sending) return
-    void this.sendLine(line)
+    const attachments = this.data.attachments || []
+    if (!line && !attachments.length) return
+    void this.sendLine(line, attachments)
   },
 
-  async sendLine(line) {
+  remainAttachSlots() {
+    const max = (agent && agent.MAX_ATTACH) || 8
+    return Math.max(0, max - (this.data.attachments || []).length)
+  },
+
+  async appendPicked(rows) {
+    const remain = this.remainAttachSlots()
+    if (!remain) {
+      wx.showToast({ title: '附件已达上限', icon: 'none' })
+      return
+    }
+    const sliced = (rows || []).slice(0, remain)
+    const next = (this.data.attachments || []).slice()
+    for (const row of sliced) {
+      let preview = row.thumbPath || ''
+      let dataUrl = ''
+      if (row.kind === 'image' && row.filePath) {
+        try {
+          dataUrl = await agent.readFileDataUrl(row.filePath, row.contentType || 'image/jpeg')
+          preview = dataUrl
+        } catch (_) {
+          preview = row.filePath
+        }
+      } else if (row.kind === 'video' && row.thumbPath) {
+        try {
+          dataUrl = await agent.readFileDataUrl(row.thumbPath, 'image/jpeg')
+          preview = dataUrl
+        } catch (_) {
+          preview = row.thumbPath
+        }
+      }
+      next.push({
+        id: `att-${Date.now()}-${next.length}`,
+        kind: row.kind,
+        name: row.fileName || (row.kind === 'image' ? '照片' : row.kind === 'video' ? '视频' : '文件'),
+        filePath: row.filePath,
+        preview,
+        dataUrl,
+        contentType: row.contentType || '',
+      })
+    }
+    this.setData({ attachments: next }, () => composer.syncShowSendBtn(this))
+  },
+
+  onRemoveAttach(e) {
+    const id = e.currentTarget.dataset.id
+    const next = (this.data.attachments || []).filter((a) => a.id !== id)
+    this.setData({ attachments: next }, () => composer.syncShowSendBtn(this))
+  },
+
+  async onPickPhoto() {
+    if (this.data.sending) return
+    const remain = this.remainAttachSlots()
+    if (!remain) {
+      wx.showToast({ title: '附件已达上限', icon: 'none' })
+      return
+    }
+    try {
+      const rows = await composer.chooseAlbumImages(remain)
+      await this.appendPicked(rows)
+    } catch (e) {
+      if (!/cancel/i.test((e && e.message) || '')) wx.showToast({ title: e.message || '选择失败', icon: 'none' })
+    }
+  },
+
+  async onPickVideo() {
+    if (this.data.sending) return
+    const remain = this.remainAttachSlots()
+    if (!remain) {
+      wx.showToast({ title: '附件已达上限', icon: 'none' })
+      return
+    }
+    try {
+      const rows = await composer.chooseAlbumVideos(remain)
+      await this.appendPicked(rows)
+    } catch (e) {
+      if (!/cancel/i.test((e && e.message) || '')) wx.showToast({ title: e.message || '选择失败', icon: 'none' })
+    }
+  },
+
+  async onPickFile() {
+    if (this.data.sending) return
+    if (!this.remainAttachSlots()) {
+      wx.showToast({ title: '附件已达上限', icon: 'none' })
+      return
+    }
+    try {
+      const row = await composer.chooseFile()
+      const isImg = /^image\//i.test(row.contentType || '') || /\.(png|jpe?g|webp|gif)$/i.test(row.filePath || '')
+      const isVid = /^video\//i.test(row.contentType || '') || /\.(mp4|mov|m4v)$/i.test(row.filePath || '')
+      await this.appendPicked([
+        {
+          ...row,
+          kind: isImg ? 'image' : isVid ? 'video' : 'file',
+          thumbPath: isImg ? row.filePath : '',
+        },
+      ])
+    } catch (e) {
+      if (!/cancel/i.test((e && e.message) || '')) wx.showToast({ title: e.message || '选择失败', icon: 'none' })
+    }
+  },
+
+  async onToggleVoice() {
+    if (this.data.sending) return
+    if (this.data.recordingVoice) {
+      composer.stopVoiceRecord(this, this._recorder, false)
+      return
+    }
+    const ok = await composer.authorizeRecord()
+    if (!ok) return
+    if (!this._recorder) this._recorder = composer.createRecorderManager(this)
+    composer.startVoiceRecord(this, this._recorder)
+  },
+
+  async onVoiceRecorded(payload) {
+    const path = payload && payload.filePath
+    if (!path || !agent) return
+    wx.showLoading({ title: '识别中…', mask: true })
+    try {
+      const r = await agent.transcribeVoiceTempPath(path)
+      wx.hideLoading()
+      if (!r.ok || !r.text) {
+        wx.showToast({ title: (r && r.message) || '语音识别失败', icon: 'none' })
+        return
+      }
+      const cur = String(this.data.input || '').trim()
+      const next = cur ? `${cur} ${r.text}` : r.text
+      this.setData({ input: next }, () => composer.syncShowSendBtn(this))
+    } catch (e) {
+      wx.hideLoading()
+      wx.showToast({ title: (e && e.message) || '识别失败', icon: 'none' })
+    }
+  },
+
+  onPreviewBubbleImage(e) {
+    const url = e.currentTarget.dataset.url
+    if (!url) return
+    wx.previewImage({ urls: [url], current: url })
+  },
+
+  async sendLine(line, attachments) {
     if (!agent || this.data.sending) return
     if (!api.requireRealAuth('/pages/ai-agent/ai-agent')) return
-    this.setData({ input: '', sending: true, hasChat: true, scrollTo: 'msg-thinking' })
+    const atts = Array.isArray(attachments) ? attachments : []
+    const fileNote = atts
+      .filter((a) => a.kind === 'file')
+      .map((a) => `【附件：${a.name || '文件'}】`)
+      .join(' ')
+    const packed = atts
+      .filter((a) => a.kind === 'image' || a.kind === 'video')
+      .map((a) => ({
+        kind: a.kind,
+        dataUrl: a.dataUrl,
+        preview: a.preview || a.dataUrl,
+        name: a.name,
+      }))
+    const text =
+      [String(line || '').trim(), fileNote].filter(Boolean).join('\n') ||
+      (atts.some((a) => a.kind === 'video')
+        ? '请结合附带的视频说明你的需求。'
+        : atts.length
+          ? '请结合附图说明你的需求。'
+          : '')
+    this.setData({
+      input: '',
+      attachments: [],
+      sending: true,
+      hasChat: true,
+      scrollTo: 'msg-thinking',
+      showSendBtn: false,
+    })
     const history = this.data.messages.filter((m) => m.role === 'user' || m.role === 'assistant')
     try {
-      const r = await agent.processAgentTurn({ userLine: line, history }, this._execState)
+      const r = await agent.processAgentTurn(
+        { userLine: text, history, attachments: packed },
+        this._execState,
+      )
       this._execState = r.executionState || this._execState
       const next = [...this.data.messages, r.userMsg, ...(r.assistantMsgs || [])]
       this.setData({ sending: false })
@@ -134,7 +326,12 @@ Page({
       this.setData({ sending: false })
       this.persist([
         ...this.data.messages,
-        { id: `u-${Date.now()}`, role: 'user', content: line },
+        {
+          id: `u-${Date.now()}`,
+          role: 'user',
+          content: text,
+          imageUrls: packed.map((a) => a.preview).filter(Boolean),
+        },
         err,
       ])
     }
