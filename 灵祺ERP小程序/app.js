@@ -12,6 +12,14 @@ App({
     if (token) {
       this.globalData.accessToken = token
       if (!devAuth.isDevSession()) void sessionSync.syncFromCloud({ force: true })
+      try {
+        if (wx.getStorageSync('meoo_just_logged_out') !== '1') {
+          wx.switchTab({
+            url: '/pages/functions/functions',
+            fail: () => {},
+          })
+        }
+      } catch (_) {}
     } else {
       this.globalData.accessToken = null
     }

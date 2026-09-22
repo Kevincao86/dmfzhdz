@@ -2,7 +2,7 @@ const api = require('../../utils/api.js')
 const merchant = require('../../utils/merchantApi.js')
 const reviews = require('../../utils/reviewsMp.js')
 const douyin = require('../../utils/douyinGoodsMp.js')
-const { PLATFORM_TABS, hasAnyPlatformToken } = require('../../utils/platformTokensMp.js')
+const { PLATFORM_TABS } = require('../../utils/platformTokensMp.js')
 const sessionSync = require('../../utils/merchantSessionSyncMp.js')
 const { enrichReviewRow, emptyPlatTabs } = require('../../utils/reviewsListUiMp.js')
 
@@ -95,7 +95,7 @@ Page({
       return
     }
     const erpOk = merchant.hasMerchantApi()
-    this.setData({ erpOk, aiAutoReply: this.readAiToggle(), platTabs: emptyPlatTabs() })
+    this.setData({ erpOk, aiAutoReply: this.readAiToggle(), platTabs: emptyPlatTabs(), loading: true, errMsg: '' })
     if (!erpOk) {
       this.setData({
         loading: false,
@@ -111,19 +111,25 @@ Page({
   },
 
   async bootLoad() {
+    const gen = (this._bootGen = (this._bootGen || 0) + 1)
+    this.setData({ loading: true, errMsg: '' })
     try {
-      await sessionSync.syncFromCloud({ force: false })
-    } catch (_) {}
-    void this.maybeLoadStores()
-    await this.load()
-    if (!this.data.items.length && hasAnyPlatformToken() && !this.data.errMsg) {
-      const plat = this.activeApiPlatform()
-      const r = await reviews.postReviewsSync(plat, {
-        kind: this.data.reviewKind,
-        poiId: this.currentPoiId(),
+      const syncP = sessionSync.syncFromCloud({ force: false }).catch(() => {})
+      await Promise.race([
+        syncP,
+        new Promise((resolve) => setTimeout(resolve, 6000)),
+      ])
+      if (gen !== this._bootGen) return
+      void this.maybeLoadStores()
+      await this.load()
+    } catch (e) {
+      if (gen !== this._bootGen) return
+      this.setData({
+        loading: false,
+        errMsg: (e && e.message) || '评价加载失败',
+        items: [],
+        displayItems: [],
       })
-      if (r.ok) await this.load()
-      else if (r.message) this.setData({ errMsg: r.message })
     }
   },
 
@@ -266,47 +272,56 @@ Page({
     }
     const plat = this.activeApiPlatform()
     this.setData({ loading: true, errMsg: '' })
-    const r = await reviews.fetchReviewsList(plat, this.data.sentiment, this.data.replyStatus, {
-      kind: this.data.reviewKind,
-      poiId: this.currentPoiId(),
-    })
-    if (!r.ok) {
+    try {
+      const r = await reviews.fetchReviewsList(plat, this.data.sentiment, this.data.replyStatus, {
+        kind: this.data.reviewKind,
+        poiId: this.currentPoiId(),
+      })
+      if (!r.ok) {
+        this.setData({
+          loading: false,
+          errMsg: r.message,
+          items: [],
+          displayItems: [],
+          syncedAtText: '',
+          platTabs: emptyPlatTabs(),
+        })
+        this.patchReplyTabCounts(0, 0, 0)
+        return
+      }
+      const stats = r.stats
+      if (stats && typeof stats.total === 'number')
+        this.patchReplyTabCounts(stats.total, stats.unreplied || 0, stats.replied || 0)
+      else this.patchReplyTabCounts(0, 0, 0)
+
+      const platId = this.data.activePlatTab === 'all' ? plat : this.data.activePlatTab
+      const items = (r.items || []).map((x) =>
+        enrichReviewRow(
+          {
+            id: String(x.id || ''),
+            userName: String(x.userName || x.user_name || '匿名'),
+            ratingStars: Number(x.ratingStars || x.rating_stars || 0) || 0,
+            content: String(x.content || ''),
+            createdAt: String(x.createdAt || x.created_at || ''),
+            replied: Boolean(x.replied),
+            replyText: String(x.replyText || x.reply_text || ''),
+            sentiment: String(x.sentiment || ''),
+          },
+          platId === 'all' ? plat : platId,
+        ),
+      )
+      const syncedAtText = r.syncedAt ? `上次同步：${r.syncedAt}` : '可先点右上角「同步评价」拉取开放平台数据'
+      this.applySearch(items)
+      this.setData({ loading: false, syncedAtText })
+      this.updatePlatTabCounts(items)
+    } catch (e) {
       this.setData({
         loading: false,
-        errMsg: r.message,
+        errMsg: (e && e.message) || '评价加载失败',
         items: [],
         displayItems: [],
-        syncedAtText: '',
-        platTabs: emptyPlatTabs(),
       })
-      this.patchReplyTabCounts(0, 0, 0)
-      return
     }
-    const stats = r.stats
-    if (stats && typeof stats.total === 'number')
-      this.patchReplyTabCounts(stats.total, stats.unreplied || 0, stats.replied || 0)
-    else this.patchReplyTabCounts(0, 0, 0)
-
-    const platId = this.data.activePlatTab === 'all' ? plat : this.data.activePlatTab
-    const items = (r.items || []).map((x) =>
-      enrichReviewRow(
-        {
-          id: String(x.id || ''),
-          userName: String(x.userName || x.user_name || '匿名'),
-          ratingStars: Number(x.ratingStars || x.rating_stars || 0) || 0,
-          content: String(x.content || ''),
-          createdAt: String(x.createdAt || x.created_at || ''),
-          replied: Boolean(x.replied),
-          replyText: String(x.replyText || x.reply_text || ''),
-          sentiment: String(x.sentiment || ''),
-        },
-        platId === 'all' ? plat : platId,
-      ),
-    )
-    const syncedAtText = r.syncedAt ? `上次同步：${r.syncedAt}` : '可先「同步评价」拉取开放平台数据'
-    this.applySearch(items)
-    this.setData({ loading: false, syncedAtText })
-    this.updatePlatTabCounts(items)
   },
 
   updatePlatTabCounts(items) {
@@ -340,18 +355,27 @@ Page({
     const plat = this.activeApiPlatform()
     this.setData({ syncing: true })
     wx.showLoading({ title: '同步中…', mask: true })
-    const r = await reviews.postReviewsSync(plat, {
-      kind: this.data.reviewKind,
-      poiId: this.currentPoiId(),
-    })
-    wx.hideLoading()
-    this.setData({ syncing: false })
-    if (!r.ok) {
-      wx.showModal({ title: '同步失败', content: r.message, showCancel: false })
-      return
+    try {
+      const r = await reviews.postReviewsSync(plat, {
+        kind: this.data.reviewKind,
+        poiId: this.currentPoiId(),
+      })
+      if (!r.ok) {
+        wx.showModal({ title: '同步失败', content: r.message, showCancel: false })
+        return
+      }
+      wx.showToast({ title: r.message || '已同步', icon: 'success' })
+      await this.load()
+    } catch (e) {
+      wx.showModal({
+        title: '同步失败',
+        content: (e && e.message) || '同步超时，请稍后重试',
+        showCancel: false,
+      })
+    } finally {
+      wx.hideLoading()
+      this.setData({ syncing: false })
     }
-    wx.showToast({ title: r.message || '已同步', icon: 'success' })
-    void this.load()
   },
 
   onPullDownRefresh() {

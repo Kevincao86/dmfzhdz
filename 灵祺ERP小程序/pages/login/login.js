@@ -98,6 +98,7 @@ Page({
     this._applyNavPadding()
     this._syncModeHint()
     void api.bootstrapSupabaseConfig()
+    this._enterWorkspaceIfLoggedIn()
   },
 
   onUnload() {
@@ -113,8 +114,27 @@ Page({
     try {
       if (wx.getStorageSync('meoo_just_logged_out')) {
         wx.removeStorageSync('meoo_just_logged_out')
+        return
       }
     } catch (_) {}
+    this._enterWorkspaceIfLoggedIn()
+  },
+
+  _enterWorkspaceIfLoggedIn() {
+    try {
+      if (wx.getStorageSync('meoo_just_logged_out')) return false
+    } catch (_) {}
+    if (!api.getBearerToken()) return false
+    const dest = this._redirect && this._redirect.startsWith('/') ? this._redirect : '/pages/functions/functions'
+    if (dest === '/pages/functions/functions' || dest === '/pages/dashboard/dashboard' || dest === '/pages/ai-agent/ai-agent' || dest === '/pages/mine/mine') {
+      wx.switchTab({
+        url: dest,
+        fail: () => wx.reLaunch({ url: dest }),
+      })
+    } else {
+      wx.reLaunch({ url: dest })
+    }
+    return true
   },
 
   onGuestBrowse() {

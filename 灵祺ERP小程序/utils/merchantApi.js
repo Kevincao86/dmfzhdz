@@ -86,11 +86,12 @@ function merchantRequestWithHeaders(method, path, opts) {
     (opts && opts.headers) || {},
   )
   return new Promise((resolve, reject) => {
-    wx.request({
+    const req = {
       url,
       method,
       header,
-      data: method === 'GET' ? undefined : opts?.data,
+      data: method === 'GET' ? undefined : opts && opts.data,
+      timeout: Math.max(8000, Number((opts && opts.timeoutMs) || 20000)),
       success(res) {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(res.data)
@@ -105,7 +106,8 @@ function merchantRequestWithHeaders(method, path, opts) {
         const em = err && typeof err.errMsg === 'string' ? err.errMsg : '网络异常'
         reject(new Error(em))
       },
-    })
+    }
+    wx.request(req)
   })
 }
 

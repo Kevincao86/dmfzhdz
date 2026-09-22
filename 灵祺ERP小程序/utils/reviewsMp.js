@@ -1,6 +1,13 @@
 const merchantApi = require('./merchantApi.js')
 const { multiPlatformMerchantHeaders, tokenForReviewsApiPlatform } = require('./merchantHeadersMp.js')
 
+function qs(params) {
+  return Object.keys(params)
+    .filter((k) => params[k] != null && String(params[k]).trim() !== '')
+    .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(String(params[k]).trim())}`)
+    .join('&')
+}
+
 /**
  * @param {string} platform douyin | kuaishou | meituan | xhs | eleme | meituan_waimai | jd_waimai
  * @param {'all'|'good'|'neutral'|'bad'} sentiment
@@ -9,17 +16,21 @@ const { multiPlatformMerchantHeaders, tokenForReviewsApiPlatform } = require('./
  * @returns {Promise<{ok:true,items:any[],stats?:object,syncedAt?:string}|{ok:false,message:string}>}
  */
 async function fetchReviewsList(platform, sentiment, replyStatus, opts = {}) {
-  const q = new URLSearchParams({ platform, sentiment, replyStatus })
-  if (opts.kind === 'product' || opts.kind === 'store') q.set('kind', opts.kind)
-  if (opts.poiId && String(opts.poiId).trim()) q.set('poiId', String(opts.poiId).trim())
-  if (opts.productId && String(opts.productId).trim()) q.set('productId', String(opts.productId).trim())
+  const q = qs({
+    platform,
+    sentiment,
+    replyStatus,
+    kind: opts.kind === 'product' || opts.kind === 'store' ? opts.kind : '',
+    poiId: opts.poiId,
+    productId: opts.productId,
+  })
 
   const tries = [`/api/meoo-merchant-reviews?${q}`, `/api/merchant/reviews?${q}`]
   const headers = multiPlatformMerchantHeaders()
   let lastErr = '评论列表拉取失败'
   for (const path of tries) {
     try {
-      const data = await merchantApi.merchantRequestWithHeaders('GET', path, { headers })
+      const data = await merchantApi.merchantRequestWithHeaders('GET', path, { headers, timeoutMs: 15000 })
       const items = Array.isArray(data.items) ? data.items : []
       const stats = data.stats && typeof data.stats === 'object' ? data.stats : undefined
       const syncedAt = typeof data.syncedAt === 'string' ? data.syncedAt : undefined
@@ -50,7 +61,11 @@ async function postReviewsSync(platform, opts = {}) {
   let lastErr = '同步失败'
   for (const path of tries) {
     try {
-      const data = await merchantApi.merchantRequestWithHeaders('POST', path, { headers, data: body })
+      const data = await merchantApi.merchantRequestWithHeaders('POST', path, {
+        headers,
+        data: body,
+        timeoutMs: 25000,
+      })
       const items = Array.isArray(data.items) ? data.items : undefined
       const syncedAt = typeof data.syncedAt === 'string' ? data.syncedAt : undefined
       const message = typeof data.message === 'string' ? data.message : ''
