@@ -1,18 +1,12 @@
-import { Link } from 'react-router-dom'
 import SiteIcpFooter from '../SiteIcpFooter'
+import { LEGAL_COMPANY_NAME } from '../../lib/legalProductMeta'
 
 export default function LoginLegalFooter() {
+  const year = new Date().getFullYear()
   return (
-    <div className="mt-4 space-y-2">
-      <p className="text-center text-xs leading-relaxed text-slate-500">
-        查看{' '}
-        <Link to="/legal/aup" className="text-cyan-700 hover:underline">
-          软件服务及许可协议
-        </Link>{' '}
-        和{' '}
-        <Link to="/legal/privacy" className="text-cyan-700 hover:underline">
-          隐私政策
-        </Link>
+    <div className="mt-4 space-y-1.5">
+      <p className="text-center text-xs leading-relaxed text-slate-400">
+        © {year} {LEGAL_COMPANY_NAME} Copyright. All Rights Reserved.
       </p>
       <SiteIcpFooter />
     </div>

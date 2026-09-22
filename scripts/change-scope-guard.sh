@@ -1192,6 +1192,7 @@ LoginAltMethods
 LoginAuthPanel
 ErpScanLoginPanel
 TalentLoginAuthPanel
+LoginLegalFooter
 change-scope-guard
 PAT
       ;;
