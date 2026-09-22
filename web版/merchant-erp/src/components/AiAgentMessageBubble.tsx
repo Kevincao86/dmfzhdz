@@ -132,6 +132,19 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
               ))}
             </div>
           ) : null}
+          {(m.videoUrls?.filter(Boolean) ?? []).length > 0 ? (
+            <div className="mb-2 flex flex-wrap gap-2">
+              {(m.videoUrls ?? []).filter(Boolean).map((src, i) => (
+                <video
+                  key={`tv-${i}`}
+                  src={src}
+                  controls
+                  playsInline
+                  className="max-h-[min(70vh,28rem)] w-full max-w-full rounded-lg border border-indigo-100 bg-black object-contain"
+                />
+              ))}
+            </div>
+          ) : null}
           <p className="whitespace-pre-wrap leading-relaxed">{formatAssistantDisplayText(m.content)}</p>
         </div>
       </div>
@@ -148,7 +161,7 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
     !isUser && !isSystem && rawContent ? formatAssistantDisplayText(rawContent) || rawContent : rawContent
   const thinkingText = m.thinkingText?.trim() ?? ''
   const showThinking = !isUser && !isSystem && !displayText && Boolean(thinkingText)
-  const showBody = Boolean(displayText) || showThinking || imgs.length > 0
+  const showBody = Boolean(displayText) || showThinking || imgs.length > 0 || videos.length > 0
 
   if (isUser) {
     return (
@@ -223,6 +236,19 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
                       ? 'max-h-[min(70vh,28rem)] w-full max-w-full rounded-lg border border-slate-200/80 object-contain shadow-sm'
                       : 'max-h-40 max-w-[min(100%,14rem)] rounded-lg border border-slate-200/80 object-contain'
                   }
+                />
+              ))}
+            </div>
+          ) : null}
+          {videos.length > 0 ? (
+            <div className="mb-2 flex flex-wrap gap-2">
+              {videos.map((src, i) => (
+                <video
+                  key={`av-${i}`}
+                  src={src}
+                  controls
+                  playsInline
+                  className="max-h-[min(70vh,28rem)] w-full max-w-full rounded-lg border border-slate-200/80 bg-black object-contain"
                 />
               ))}
             </div>

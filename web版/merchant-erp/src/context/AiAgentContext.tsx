@@ -166,8 +166,10 @@ import {
 import {
   AGENT_PREMIUM_IMAGE_PICKER_KEY,
   agentDomesticImageUpsellTip,
+  detectDirectImageApplyIntent,
   detectIceMixVideoIntent,
   detectPremiumImageRetryIntent,
+  isAgentImagePlaceholderLine,
   modelPickerKeyForNativeImageVendor,
 } from '../services/ai/aiImageIntentRouting'
 import { shouldRouteToAgentNativeImage } from '../services/ai/agentModelRoute'
@@ -297,8 +299,75 @@ function isComposerBlockedFile(file: File): boolean {
 }
 
 function userReferenceImagesFromMessages(msgs: AiAgentMessage[]): string[] {
-  const lastUser = [...msgs].reverse().find((m) => m.role === 'user')
-  return lastUser?.imageUrls?.map((u) => u.trim()).filter(Boolean) ?? []
+  for (const m of [...msgs].reverse()) {
+    if (m.role !== 'user' && m.role !== 'assistant' && m.role !== 'tool_result') continue
+    const urls = m.imageUrls?.map((u) => u.trim()).filter(Boolean) ?? []
+    if (urls.length) return urls
+  }
+  return []
+}
+
+function collectAgentReferenceImages(
+  attachments: AiComposerAttachment[],
+  quotedMessageId: string | undefined,
+  msgs: AiAgentMessage[],
+): string[] {
+  const fromAtt = attachmentVisionUrls(attachments)
+  if (fromAtt.length) return fromAtt
+  if (quotedMessageId) {
+    const quoted = msgs.find((m) => m.id === quotedMessageId)
+    const fromQuote = quoted?.imageUrls?.map((u) => u.trim()).filter(Boolean) ?? []
+    if (fromQuote.length) return fromQuote
+  }
+  return userReferenceImagesFromMessages(msgs)
+}
+
+function resolveNativeImagePrompt(line: string, msgs: AiAgentMessage[]): string {
+  const stripped = line.replace(/\[引用[\s\S]*?\n\n/, '').trim()
+  const placeholder = isAgentImagePlaceholderLine(stripped)
+  const applyOnly = detectDirectImageApplyIntent(stripped)
+  if (stripped && !placeholder && !applyOnly) return line
+  const prevUser = [...msgs].reverse().find((m) => {
+    if (m.role !== 'user') return false
+    const c = (m.content || '').replace(/\[引用[\s\S]*?\n\n/, '').trim()
+    return Boolean(c) && !isAgentImagePlaceholderLine(c) && !detectDirectImageApplyIntent(c)
+  })
+  if (prevUser?.content?.trim()) {
+    return `${prevUser.content.trim()}\n\n请按上述要求直接生成处理后的图片，不要只给文字建议，也不要再让用户上传。`
+  }
+  const prevAsst = [...msgs].reverse().find(
+    (m) => m.role === 'assistant' && /饱和|光影|质感|处理建议|调色|对比度/.test(m.content || ''),
+  )
+  if (prevAsst?.content?.trim()) {
+    return `请按以下处理建议直接改图并返回结果图，不要再让我上传：\n${prevAsst.content.trim()}`
+  }
+  return `${line}\n请直接生成处理后的图片并返回图片文件，不要只给文字步骤。`
+}
+
+function injectGenerateImageReference(
+  calls: AiAgentToolCall[],
+  referenceImageDataUrl: string | undefined,
+): AiAgentToolCall[] {
+  const ref = referenceImageDataUrl?.trim()
+  if (!ref) return calls
+  return calls.map((c) => {
+    if (c.function?.name !== 'generate_image') return c
+    let args: Record<string, unknown> = {}
+    try {
+      const raw = c.function.arguments?.trim()
+      if (raw) args = JSON.parse(raw) as Record<string, unknown>
+    } catch {
+      args = {}
+    }
+    if (String(args.reference_image || '').trim()) return c
+    return {
+      ...c,
+      function: {
+        ...c.function,
+        arguments: JSON.stringify({ ...args, reference_image: ref }),
+      },
+    }
+  })
 }
 
 function cloneAgentMessages(msgs: AiAgentMessage[]): AiAgentMessage[] {
@@ -1944,10 +2013,13 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
             return next
           })
 
-          const results = await executeAiAgentToolCalls(toolCalls, {
-            signal,
-            userText: trimmed,
-          })
+          const results = await executeAiAgentToolCalls(
+            injectGenerateImageReference(toolCalls, imageDataUrls[0]),
+            {
+              signal,
+              userText: trimmed,
+            },
+          )
           applyClientToolResults(results, {
             pageLabel: previewPage ?? pageContext?.pageLabel,
             userBrief: trimmed,
@@ -2134,8 +2206,12 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     (text: string) => {
       const trimmed = text.trim()
       const attachments = [...pendingComposerAttachments]
-      const visionUrls = attachmentVisionUrls(attachments)
       const pq = pendingQuoteRef.current
+      const visionUrls = collectAgentReferenceImages(
+        attachments,
+        pq?.quotedMessageId,
+        messagesRef.current,
+      )
       if ((!trimmed && attachments.length === 0 && !pq) || aiSending) return
       const videoCount = attachments.filter((a) => a.kind === 'video').length
       const imageCount = attachments.filter((a) => a.kind === 'image').length
@@ -2179,7 +2255,9 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         else if (a.kind === 'video') bubbleImageUrls.push(a.posterUrl)
       }
       const userMsg = createAgentMessage('user', line, {
-        imageUrls: bubbleImageUrls.length ? bubbleImageUrls : undefined,
+        imageUrls: (bubbleImageUrls.length ? bubbleImageUrls : visionUrls).filter(Boolean).length
+          ? (bubbleImageUrls.length ? bubbleImageUrls : visionUrls)
+          : undefined,
         videoUrls: attachments
           .filter((a): a is Extract<AiComposerAttachment, { kind: 'video' }> => a.kind === 'video')
           .map((a) => a.previewUrl),
@@ -2318,13 +2396,14 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
             }
 
             const refImg = visionUrls[0]?.trim()
+            const imagePrompt = resolveNativeImagePrompt(line, messagesRef.current)
             const imagePickerKey = resolveImagePickerKeyForUserLine(
               activePickerKey,
               modelPickerOptions,
-              strippedLine,
+              imagePrompt,
               visionUrls.length > 0,
             )
-            if (shouldRouteToAgentNativeImage(imagePickerKey, strippedLine, visionUrls)) {
+            if (shouldRouteToAgentNativeImage(imagePickerKey, imagePrompt, visionUrls)) {
               if (denyFreeImageGen()) return
               if (imagePickerKey !== activePickerKey) {
                 setModelPickerKeyState(imagePickerKey)
@@ -2339,7 +2418,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
               })
               // 国内优先：自动路由到 builtin；若用户手动选了国外且带参考图，仍按所选（可能被服务端拒）
               const imgOpts = buildAgentImagePostOpts(imagePickerKey, refImg)
-              const imgRes = await postAiAgentNativeImage(line, {
+              const imgRes = await postAiAgentNativeImage(imagePrompt, {
                 ...imgOpts,
                 signal: ac.signal,
               })

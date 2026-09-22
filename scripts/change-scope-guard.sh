@@ -1108,6 +1108,7 @@ PAT
 AiAgentPage
 AiAgentDrawer
 AiAgentComposerBar
+AiAgentMessageBubble
 aiImageIntentRouting
 agentImageModelKeys
 agentModelRoute

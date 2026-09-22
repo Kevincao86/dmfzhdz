@@ -19,13 +19,45 @@ export function detectIceMixVideoIntent(text: string): boolean {
   )
 }
 
-/** 明确改图 / 图上改字（含附图场景） */
+/** 去掉引用前缀后再判意图 */
+function stripQuotePrefix(text: string): string {
+  return text.replace(/\[引用[\s\S]*?\n\n/, '').trim()
+}
+
+/** 附图后未打字时的占位句，不能当「只要识图」——前面若在改图应直接出图 */
+export function isAgentImagePlaceholderLine(text: string): boolean {
+  const t = stripQuotePrefix(text)
+  return /请结合附图说明你的需求/.test(t) && t.length < 40
+}
+
+/** 「直接处理 / 按建议出图」——须走像素出图而不是再给文字步骤 */
+export function detectDirectImageApplyIntent(text: string): boolean {
+  const t = stripQuotePrefix(text)
+  if (!t) return false
+  return (
+    /^(?:直接处理|马上处理|立刻处理|现在处理|按建议处理|按你的建议(?:处理|改|出图)|开始处理)(?:吧|啊|！|!)?$/i.test(
+      t,
+    ) || /直接(?:帮我)?(?:处理|改图|修图|出图|生成)/i.test(t)
+  )
+}
+
+/** 明确改图 / 图上改字 / 调色调光（含附图场景） */
 function detectImageEditIntent(text: string, hasImages: boolean): boolean {
-  const t = text.trim()
+  const t = stripQuotePrefix(text)
+  if (detectDirectImageApplyIntent(t)) return true
   if (/改图|修图|图生图|换背景|抠图|P图|P一下|把文字换|改文字|替换文字|图上的字|图片文字|图里的字|海报文字/i.test(t)) {
     return true
   }
+  if (/(?:让|把|将).{0,10}(?:这张|该|此|原)?(?:图片|照片|图).{0,24}(?:变|改|调|处理|优化|修)/i.test(t)) {
+    return true
+  }
   if (!hasImages) return false
+  if (/饱和度|光影|质感|调色|色调|对比度|锐化|氛围感|真实感|低饱和|降饱和|加光影|补光/i.test(t)) {
+    return true
+  }
+  if (/(?:处理|优化|调整|精修|修一下).{0,8}(?:这张|该|此)?(?:图|图片|照片)/i.test(t)) {
+    return true
+  }
   // 附图 +「把文字换成… / 改成…」等
   if (/(?:换|改|替换).{0,16}(?:字|文字|文案|标题|logo|Logo|内容)|(?:字|文字|文案|标题).{0,10}(?:换|改)成/i.test(t)) {
     return true
@@ -48,8 +80,10 @@ export function detectImageGenerationIntent(text: string, hasImages = false): bo
   const t = text.trim()
   if (t.length < 2) return false
   if (detectIceMixVideoIntent(t)) return false
-  if (COPYWRITING_HINT.test(t) && !detectImageEditIntent(t, hasImages)) return false
-  if (detectImageEditIntent(t, hasImages)) return true
+  const images = hasImages || /［附图］/.test(t)
+  if (COPYWRITING_HINT.test(t) && !detectImageEditIntent(t, images)) return false
+  if (detectImageEditIntent(t, images)) return true
+  if (hasImages && isAgentImagePlaceholderLine(t)) return true
   if (/生图|文生图|图生图|作图|出图|AI绘画|帮我画|画一张|画一幅|画个|P图|抠图|换背景/i.test(t)) return true
   if (/帮我生成|生成一张|生成一幅|生成个/i.test(t)) {
     return /图|照|海报|封面|logo|插画|门头|配图|画面|像素|宣传图|店招/i.test(t)
