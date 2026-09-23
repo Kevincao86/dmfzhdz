@@ -126,8 +126,8 @@ function storePathCandidates(platformId, qs) {
   return out
 }
 
-function storeQueryString(keyword) {
-  const parts = ['page=1', 'pageSize=50', 'relationType=all']
+function storeQueryString(keyword, page, pageSize) {
+  const parts = [`page=${page || 1}`, `pageSize=${pageSize || 50}`, 'relationType=all']
   const kw = keyword && String(keyword).trim()
   if (kw) parts.push(`keyword=${encodeURIComponent(kw)}`)
   return `?${parts.join('&')}`
@@ -170,13 +170,15 @@ async function tryOneStorePath(path, token) {
   }
 }
 
-async function fetchStoresForPlatform(platformId, keyword) {
+async function fetchStoresForPlatform(platformId, keyword, opts) {
   const token = readPlatformToken(platformId)
   if (!token) {
     const label = PLATFORM_TABS.find((p) => p.id === platformId)
     return { ok: false, message: `尚未绑定${label ? label.label : platformId}` }
   }
-  const paths = storePathCandidates(platformId, storeQueryString(keyword))
+  const page = opts && opts.page ? opts.page : 1
+  const pageSize = opts && opts.pageSize ? opts.pageSize : 50
+  const paths = storePathCandidates(platformId, storeQueryString(keyword, page, pageSize))
   if (!paths.length) {
     return { ok: false, message: '该平台门店接口尚未接入' }
   }

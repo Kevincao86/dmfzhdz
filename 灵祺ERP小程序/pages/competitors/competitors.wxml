@@ -1,14 +1,24 @@
 <scroll-view scroll-y class="erp-page" enhanced show-scrollbar="{{false}}">
   <view class="erp-hero">
     <text class="erp-hero-title">竞争对手分析</text>
-    <text class="erp-hero-sub">与电脑端同源 API。填写门店名称与地址后生成竞品报告。</text>
+    <text class="erp-hero-sub">与电脑端同源。选择已认领门店后生成竞品报告。</text>
   </view>
 
   <view class="erp-card">
-    <text class="erp-label">门店名称</text>
-    <input class="erp-input" value="{{storeName}}" placeholder="必填" bindinput="onStoreName" />
-    <text class="erp-label">门店地址</text>
-    <input class="erp-input" value="{{address}}" placeholder="含城市的详细地址" bindinput="onAddress" />
+    <text class="erp-label">选择门店</text>
+    <picker
+      mode="selector"
+      range="{{storeLabels}}"
+      value="{{storeIndex}}"
+      disabled="{{storeLoading || !storeLabels.length || busy}}"
+      bindchange="onPickStore"
+    >
+      <view class="erp-input store-pick {{storePicked ? '' : 'is-placeholder'}}">
+        {{storeLoading ? '加载门店…' : (storePicked ? storeName : (storeLabels.length ? '请选择已认领门店' : '暂无可选门店'))}}
+      </view>
+    </picker>
+    <text wx:if="{{address}}" class="store-addr">{{address}}</text>
+    <text wx:if="{{storeErr}}" class="erp-err">{{storeErr}}</text>
     <button class="erp-btn-primary" loading="{{busy}}" disabled="{{busy}}" bindtap="onAnalyze">
       {{busy ? '分析中…' : '开始分析'}}
     </button>
