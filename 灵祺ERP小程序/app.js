@@ -1,9 +1,13 @@
 const devAuth = require('./utils/devAuth.js')
 const sessionSync = require('./utils/merchantSessionSyncMp.js')
 const supabaseCfg = require('./utils/supabaseClientConfigMp.js')
+const mpDefaultShare = require('./utils/mpDefaultShare.js')
+
+mpDefaultShare.installDefaultShare()
 
 App({
   onLaunch() {
+    mpDefaultShare.enableShareMenu()
     void supabaseCfg.bootstrap()
     if (devAuth.isDevSkipLogin()) {
       devAuth.applyDevSession()

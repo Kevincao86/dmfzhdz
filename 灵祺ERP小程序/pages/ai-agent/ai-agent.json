@@ -3,5 +3,7 @@
   "navigationBarBackgroundColor": "#eef2ff",
   "navigationBarTextStyle": "black",
   "backgroundColor": "#f8fafc",
-  "disableScroll": true
+  "disableScroll": true,
+  "enableShareAppMessage": true,
+  "enableShareTimeline": true
 }
