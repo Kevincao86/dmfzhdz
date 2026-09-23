@@ -742,15 +742,39 @@ async function processAgentTurn(opts, executionState) {
   }
 }
 
-/** 语音转文字：优先 VOICE_DRAFT_URL，module=agent */
+function voiceMimeFromPath(filePath) {
+  const lower = String(filePath || '').toLowerCase()
+  if (lower.endsWith('.wav')) return 'audio/wav'
+  if (lower.endsWith('.mp3')) return 'audio/mpeg'
+  if (lower.endsWith('.m4a')) return 'audio/mp4'
+  return 'audio/aac'
+}
+
+/** 语音转文字：有 VOICE_DRAFT_URL 走旧上传；否则 POST /api/meoo-ai-asr */
 async function transcribeVoiceTempPath(tempFilePath) {
   const url = (config.VOICE_DRAFT_URL || '').trim()
   const token = api.getBearerToken()
   if (devAuth.isDevSkipLogin() && (!url || !tempFilePath)) {
     return { ok: true, text: '（演示）帮我看一下今天最该优先处理的三件事' }
   }
-  if (!url || !tempFilePath) {
-    return { ok: false, message: '请配置 VOICE_DRAFT_URL 以使用语音输入' }
+  if (!tempFilePath) {
+    return { ok: false, message: '没有录到声音，请按住再说一次' }
+  }
+  if (!url) {
+    try {
+      ensureRealAuthForAi()
+      const mime = voiceMimeFromPath(tempFilePath)
+      const dataUrl = await readFileDataUrl(tempFilePath, mime)
+      const mark = String(dataUrl).indexOf('base64,')
+      const audioBase64 = mark >= 0 ? String(dataUrl).slice(mark + 7) : ''
+      if (!audioBase64) return { ok: false, message: '录音文件为空' }
+      const body = await requestJson('/api/meoo-ai-asr', { audioBase64, mime }, { timeoutMs: 45000 })
+      const text = String((body && body.text) || '').trim()
+      if (!text) return { ok: false, message: '没有识别到内容，请再说一次' }
+      return { ok: true, text }
+    } catch (e) {
+      return { ok: false, message: (e && e.message) || '语音识别失败' }
+    }
   }
   return new Promise((resolve) => {
     wx.uploadFile({
