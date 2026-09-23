@@ -167,6 +167,9 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp', embedded = fa
   const [httpPollReady, setHttpPollReady] = useState(false)
   const [httpPollError, setHttpPollError] = useState<string | null>(null)
   const [sendError, setSendError] = useState<string | null>(null)
+  const [aiEnabled, setAiEnabled] = useState(true)
+  const [aiKnowledge, setAiKnowledge] = useState('')
+  const [aiSaveHint, setAiSaveHint] = useState('')
   const [sendBusy, setSendBusy] = useState(false)
   const channelReady =
     (useHttpPoll && httpPollReady) || (Boolean(relayUrl) && relayReady)
@@ -1043,6 +1046,60 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp', embedded = fa
               </div>
 
               <div className="border-t border-slate-800 p-3">
+                <div className="mb-3 rounded-lg border border-slate-700 bg-slate-950/80 p-3">
+                  <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                    AI 智能回复
+                  </div>
+                  <label className="mb-2 flex items-center gap-2 text-xs text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={aiEnabled}
+                      onChange={(e) => setAiEnabled(e.target.checked)}
+                    />
+                    用户咨询时先由 AI 根据项目说明回复
+                  </label>
+                  <p className="mb-2 text-[11px] leading-relaxed text-slate-500">
+                    人工入口固定为每天 9:00–22:00。时段内用户可进入人工客服；咨询较多时按会话排队。保存后网页与商家小程序同步读取。
+                  </p>
+                  <textarea
+                    value={aiKnowledge}
+                    onChange={(e) => setAiKnowledge(e.target.value)}
+                    rows={4}
+                    placeholder="补充项目说明，例如套餐规则、不能承诺退款、引导到哪个菜单…"
+                    className="mb-2 w-full rounded border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-100"
+                  />
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={!canEdit || !httpPollToken}
+                      onClick={() => {
+                        if (!httpPollToken) {
+                          setAiSaveHint('未配置客服写入令牌，无法同步到网页和小程序')
+                          return
+                        }
+                        const text =
+                          'LQCFG:' +
+                          JSON.stringify({
+                            aiEnabled,
+                            humanStartHour: 9,
+                            humanEndHour: 22,
+                            knowledge: aiKnowledge.slice(0, 4000),
+                          })
+                        void postSupportOpsSend(httpPollToken, {
+                          sessionId: '__lq_support_ai_cfg__',
+                          text,
+                          id: `cfg-${Date.now()}`,
+                        }).then((out) => {
+                          setAiSaveHint(out.ok ? '已同步到网页与小程序' : out.error || '保存失败')
+                        })
+                      }}
+                      className="rounded bg-indigo-600 px-3 py-1 text-[11px] text-white disabled:opacity-40"
+                    >
+                      保存 AI 回复设置
+                    </button>
+                    {aiSaveHint ? <span className="text-[11px] text-slate-400">{aiSaveHint}</span> : null}
+                  </div>
+                </div>
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                   <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">自动回复模版</span>
                   <button
