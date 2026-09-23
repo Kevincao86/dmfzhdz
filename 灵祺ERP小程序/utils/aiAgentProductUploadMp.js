@@ -140,6 +140,8 @@ function sheetFromPlan(plan) {
       saleEnd: ymd(addDays(today, 365)),
       useDays: '360',
       useAllDay: true,
+      useTimeStart: '10:00',
+      useTimeEnd: '22:00',
       headUrl: '',
       headLocal: '',
     },
@@ -158,12 +160,14 @@ async function attachSheets(msg) {
     uploadContext = { ok: false, message: e instanceof Error ? e.message : '读取平台资料失败' }
   }
   const aiLine = uploadContext.ok
-    ? `类目 ${uploadContext.categoryName} · ${uploadContext.typeLabel} · 门店 ${uploadContext.storeNames} · 说明与退款规则已按方案补齐`
+    ? `类目 ${uploadContext.categoryName} · ${uploadContext.typeLabel} · 门店 ${uploadContext.storeNames}`
     : uploadContext.message
+  const aiRest =
+    '使用规则、退款政策、不可用日期、预约、投放渠道、券码、收款方式、到店核销、限购、商品名'
   return Object.assign({}, msg, {
     uploadSheets,
     uploadContext,
-    content: `${msg.content}\n\n请确认标价/售价、库存、组合内容、售卖时间、可使用时间。主图可上传，也可留空由 AI 生成。\nAI 已补充：${aiLine}`,
+    content: `${msg.content}\n\n请确认抖音团购必填：标价、售价、库存、菜品搭配、售卖起止、可使用日期与每日时段、封面图（可留空由 AI 生成）。\nAI 已补充：${aiLine}。其余必填：${aiRest}。`,
   })
 }
 
@@ -236,7 +240,6 @@ async function uploadConfirmed(plan, sheet, platform, uploadContext) {
   if (!Number.isFinite(origin) || origin <= 0) return { ok: false, message: '请填写大于 0 的标价' }
   if (!Number.isFinite(stock) || stock <= 0) return { ok: false, message: '请填写库存' }
   if (!Number.isFinite(useDays) || useDays <= 0) return { ok: false, message: '请填写可使用天数' }
-  if (!String(form.comboText || '').trim()) return { ok: false, message: '请填写组合商品内容' }
 
   if (platform !== 'douyin') {
     const head = await ensureHeadUrl(form, name).catch((e) => ({
@@ -292,6 +295,12 @@ async function uploadConfirmed(plan, sheet, platform, uploadContext) {
   if (form.useAllDay) {
     detail.trade_rules.daily_consume_mode = 'all_day'
     detail.trade_rules.daily_all_day = true
+  } else {
+    const start = String(form.useTimeStart || '10:00').trim()
+    const end = String(form.useTimeEnd || '22:00').trim()
+    detail.trade_rules.daily_consume_mode = 'time_slots'
+    detail.trade_rules.daily_all_day = false
+    detail.trade_rules.daily_time_periods = [{ start, end }]
   }
   const saved = await douyin.saveProduct('submit', detail)
   if (!saved.ok) return saved

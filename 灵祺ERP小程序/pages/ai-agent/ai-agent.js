@@ -526,6 +526,16 @@ Page({
     }
   },
 
+  onToggleUseAllDay(e) {
+    const id = e.currentTarget.dataset.id
+    const slot = e.currentTarget.dataset.slot
+    if (!id || !slot) return
+    const msg = (this.data.messages || []).find((m) => m.id === id)
+    const sheet = msg && (msg.uploadSheets || []).find((s) => s.slotKey === slot)
+    const on = !(sheet && sheet.form && sheet.form.useAllDay)
+    this.patchUploadSheet(id, slot, { useAllDay: on })
+  },
+
   onToggleProductPlatform(e) {
     const id = e.currentTarget.dataset.id
     const plat = e.currentTarget.dataset.plat
