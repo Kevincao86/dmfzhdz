@@ -230,7 +230,7 @@ function buildDefaultPayload(form) {
     origin_price_yuan: origin,
     head_image_urls: [head],
     aux_image_urls: (form.auxUrls || []).filter((u) => /^https?:\/\//i.test(String(u || '').trim())),
-    env_image_urls: [],
+    env_image_urls: (form.envUrls || []).filter((u) => /^https?:\/\//i.test(String(u || '').trim())),
     poi_ids: poiIds,
     sales_info: {
       channel: 'unlimited',

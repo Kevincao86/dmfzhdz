@@ -98,7 +98,10 @@ module.exports.includes = includes
   <view wx:if="{{phase === 'generic'}}" class="wizard-card">
     <text class="wizard-title">填写商品资料</text>
     <text class="wizard-desc">与 Web「上品页面设置」同源，由网关提交至{{confirmLine}}。</text>
-    <text class="meoo-label">商品名称</text>
+    <view class="ai-row">
+      <text class="meoo-label">商品名称</text>
+      <button class="ai-btn" size="mini" loading="{{aiBusy === 'copy'}}" bindtap="onAiCopy">AI 优化标题与说明</button>
+    </view>
     <input class="meoo-input" value="{{genericTitle}}" data-k="genericTitle" bindinput="onField" placeholder="与平台上架展示名称一致" />
     <text class="meoo-label">售价（元）</text>
     <input class="meoo-input" type="digit" value="{{genericPriceYuan}}" data-k="genericPriceYuan" bindinput="onField" />
@@ -156,27 +159,45 @@ module.exports.includes = includes
   <!-- Douyin: detail（字段对齐 Web buildPayload 默认项，UI 适配小程序）-->
   <view wx:if="{{phase === 'douyin' && douyinStep === 3}}" class="wizard-card">
     <text class="wizard-title">商品信息</text>
-    <text class="meoo-label">商品名称</text>
+    <view class="ai-row">
+      <text class="meoo-label">商品名称</text>
+      <button class="ai-btn" size="mini" loading="{{aiBusy === 'copy'}}" bindtap="onAiCopy">AI 优化标题与说明</button>
+    </view>
     <input class="meoo-input" value="{{productName}}" data-k="productName" bindinput="onField" placeholder="如：双人火锅套餐" />
     <text class="meoo-label">售价（元）</text>
     <input class="meoo-input" type="digit" value="{{priceYuan}}" data-k="priceYuan" bindinput="onField" />
-    <text class="meoo-label">原价（元，可选）</text>
+    <text class="meoo-label">划线价（元，可选）</text>
     <input class="meoo-input" type="digit" value="{{originYuan}}" data-k="originYuan" bindinput="onField" />
     <text class="meoo-label">商品说明</text>
     <textarea class="meoo-input area" value="{{productDesc}}" data-k="productDesc" bindinput="onField" maxlength="2000" placeholder="卖点、使用规则等（与 Web 富文本说明同源字段）" />
-    <text class="meoo-label">头图（必传）</text>
+    <view class="ai-row">
+      <text class="meoo-label">头图（必传）</text>
+      <button class="ai-btn" size="mini" data-mode="generate" loading="{{aiBusy === 'head'}}" bindtap="onAiHead">AI 生成</button>
+      <button class="ai-btn" size="mini" data-mode="enhance" loading="{{aiBusy === 'head'}}" bindtap="onAiHead">AI 优化</button>
+    </view>
     <view class="img-row">
       <image wx:if="{{headUrl}}" class="thumb" src="{{headUrl}}" mode="aspectFill" />
       <button class="meoo-btn-ghost mini" bindtap="onPickHead" loading="{{headUploading}}">
         {{headUrl ? '更换头图' : '上传头图'}}
       </button>
     </view>
-    <text class="meoo-label">附加图（选填，最多 3 张）</text>
+    <view class="ai-row">
+      <text class="meoo-label">附加图（选填，最多 3 张）</text>
+      <button class="ai-btn" size="mini" loading="{{aiBusy === 'aux'}}" bindtap="onAiAux">AI 生成</button>
+    </view>
     <view class="aux-row">
       <view wx:for="{{auxThumbSlots}}" wx:key="index" class="aux-cell">
         <image wx:if="{{item.url}}" class="aux-thumb" src="{{item.url}}" mode="aspectFill" />
         <button wx:else class="aux-add" size="mini" data-slot="{{index}}" bindtap="onPickAux" disabled="{{uploading}}">+</button>
         <text wx:if="{{item.url}}" class="aux-clear" data-slot="{{index}}" bindtap="onClearAux">清除</text>
+      </view>
+    </view>
+    <text class="meoo-label">环境图（选填，最多 3 张）</text>
+    <view class="aux-row">
+      <view wx:for="{{envThumbSlots}}" wx:key="index" class="aux-cell">
+        <image wx:if="{{item.url}}" class="aux-thumb" src="{{item.url}}" mode="aspectFill" />
+        <button wx:else class="aux-add" size="mini" data-slot="{{index}}" bindtap="onPickEnv" disabled="{{uploading}}">+</button>
+        <text wx:if="{{item.url}}" class="aux-clear" data-slot="{{index}}" bindtap="onClearEnv">清除</text>
       </view>
     </view>
     <text class="meoo-label">核销有效天数</text>

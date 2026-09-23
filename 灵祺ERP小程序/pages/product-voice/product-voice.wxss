@@ -80,6 +80,7 @@ page {
   border: 2rpx solid #e2e8f0;
   border-radius: 20rpx;
   background: #fff;
+  overflow: hidden;
 }
 
 .plat.on {
@@ -105,8 +106,10 @@ page {
 .plat-logo {
   width: 72rpx;
   height: 72rpx;
-  display: block;
   border-radius: 16rpx;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
 }
 
 .plat-logo.ph {

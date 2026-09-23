@@ -18,7 +18,7 @@
           bindtap="onPickPlatform"
         >
           <view class="plat-logo-wrap">
-            <image wx:if="{{item.logo}}" class="plat-logo" src="{{item.logo}}" mode="aspectFill" style="width:72rpx;height:72rpx;display:block;" />
+            <view wx:if="{{item.logo}}" class="plat-logo" style="background-image:url({{item.logo}});"></view>
             <view wx:else class="plat-logo ph">{{item.letter}}</view>
           </view>
           <view class="plat-body">
@@ -39,7 +39,7 @@
           bindtap="onPickPlatform"
         >
           <view class="plat-logo-wrap">
-            <image wx:if="{{item.logo}}" class="plat-logo" src="{{item.logo}}" mode="aspectFill" style="width:72rpx;height:72rpx;display:block;" />
+            <view wx:if="{{item.logo}}" class="plat-logo" style="background-image:url({{item.logo}});"></view>
             <view wx:else class="plat-logo ph">{{item.letter}}</view>
           </view>
           <view class="plat-body">

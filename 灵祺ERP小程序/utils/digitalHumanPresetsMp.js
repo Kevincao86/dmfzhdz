@@ -34,6 +34,26 @@ function libraryAvatars() {
   }))
 }
 
+/** 与网页数字人预设音色对应：每个形象一套，另加通用女声/男声。 */
+function voicePresets() {
+  const bound = libraryAvatars().map((a) => ({
+    id: `v-${a.id}`,
+    label: `${a.name} · ${a.tag}`,
+    avatarId: a.id,
+    gender: a.gender,
+  }))
+  return bound.concat([
+    { id: 'v-custom-female', label: '亲和女声', avatarId: '', gender: '女' },
+    { id: 'v-custom-male', label: '稳重男声', avatarId: '', gender: '男' },
+  ])
+}
+
+function voiceIdForAvatar(avatarId) {
+  const id = String(avatarId || '').trim()
+  if (!id) return 'v-custom-female'
+  return `v-${id}`
+}
+
 function downloadToDataUrl(url) {
   return new Promise((resolve, reject) => {
     wx.downloadFile({
@@ -59,5 +79,7 @@ function downloadToDataUrl(url) {
 
 module.exports = {
   libraryAvatars,
+  voicePresets,
+  voiceIdForAvatar,
   downloadToDataUrl,
 }

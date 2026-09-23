@@ -13,7 +13,7 @@ const RANGE_TABS = [
 const EMPTY_KPIS = [
   { label: '成交额', value: '—', delta: '', deltaUp: true, iconKey: 'shop' },
   { label: '核销单', value: '—', delta: '', deltaUp: true, iconKey: 'list' },
-  { label: '好评率', value: '—', delta: '', deltaUp: true, iconKey: 'star' },
+  { label: '转化率', value: '—', delta: '', deltaUp: true, iconKey: 'star' },
   { label: '在途招募', value: '—', delta: '', deltaUp: true, iconKey: 'user' },
 ]
 
@@ -23,7 +23,7 @@ const PREVIEW_BY_RANGE = {
     kpis: [
       { label: '成交额', value: '¥12,480', delta: '较昨日 +12.5%', deltaUp: true, iconKey: 'shop' },
       { label: '核销单', value: '326', delta: '较昨日 +8.3%', deltaUp: true, iconKey: 'list' },
-      { label: '好评率', value: '4.8', delta: '较昨日 +0.2', deltaUp: true, iconKey: 'star' },
+      { label: '转化率', value: '12.6%', delta: '较昨日 +0.8%', deltaUp: true, iconKey: 'star' },
       { label: '在途招募', value: '18', delta: '较昨日 +2', deltaUp: true, iconKey: 'user' },
     ],
   },
@@ -31,7 +31,7 @@ const PREVIEW_BY_RANGE = {
     kpis: [
       { label: '成交额', value: '¥86,320', delta: '较上周期 +9.1%', deltaUp: true, iconKey: 'shop' },
       { label: '核销单', value: '2,148', delta: '较上周期 +6.4%', deltaUp: true, iconKey: 'list' },
-      { label: '好评率', value: '4.7', delta: '较上周期 +0.1', deltaUp: true, iconKey: 'star' },
+      { label: '转化率', value: '11.4%', delta: '较上周期 +0.6%', deltaUp: true, iconKey: 'star' },
       { label: '在途招募', value: '24', delta: '较上周期 +5', deltaUp: true, iconKey: 'user' },
     ],
   },
@@ -39,7 +39,7 @@ const PREVIEW_BY_RANGE = {
     kpis: [
       { label: '成交额', value: '¥328,600', delta: '较上周期 +15.2%', deltaUp: true, iconKey: 'shop' },
       { label: '核销单', value: '8,926', delta: '较上周期 +11.8%', deltaUp: true, iconKey: 'list' },
-      { label: '好评率', value: '4.8', delta: '较上周期 +0.3', deltaUp: true, iconKey: 'star' },
+      { label: '转化率', value: '13.1%', delta: '较上周期 +1.2%', deltaUp: true, iconKey: 'star' },
       { label: '在途招募', value: '31', delta: '较上周期 +7', deltaUp: true, iconKey: 'user' },
     ],
   },
@@ -49,6 +49,13 @@ function chartTitleFor(rangeId) {
   if (rangeId === 'day30') return '近30日成交趋势'
   if (rangeId === 'day7') return '近7日成交趋势'
   return '今日成交趋势'
+}
+
+function formatConversion(raw) {
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n <= 0) return '—'
+  const text = String(Math.round(n * 10) / 10)
+  return text.endsWith('%') ? text : `${text}%`
 }
 
 function enrichKpis(kpis) {
@@ -160,8 +167,8 @@ Page({
         iconKey: 'list',
       },
       {
-        label: '好评率',
-        value: d.conversionRate ? String(d.conversionRate) : '—',
+        label: '转化率',
+        value: formatConversion(d.conversionRate),
         delta: '',
         deltaUp: true,
         iconKey: 'star',

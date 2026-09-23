@@ -1,4 +1,5 @@
 const api = require('../../utils/api.js')
+const merchantApi = require('../../utils/merchantApi.js')
 const douyin = require('../../utils/douyinGoodsMp.js')
 const listing = require('../../utils/productListingMp.js')
 const {
@@ -57,6 +58,8 @@ Page({
     productDesc: '',
     headUrl: '',
     auxThumbSlots: [{ url: '' }, { url: '' }, { url: '' }],
+    envThumbSlots: [{ url: '' }, { url: '' }, { url: '' }],
+    aiBusy: '',
     consumeValidDaysIndex: 3,
     consumeValidDaysOptions: ['30', '90', '180', '360', '730'],
     afterSaleLabels: ['随时退', '过期退', '不可退'],
@@ -428,6 +431,111 @@ Page({
     this.setData({ poiIds: ids, stores })
   },
 
+  async postGoodsAi(action, extra) {
+    const headers = {}
+    const token = douyin.douyinToken()
+    if (token) headers['X-Meoo-Douyin-Token'] = token
+    const payload = Object.assign({ action, model: 'qwen', product_name: this.data.productName }, extra || {})
+    const paths = ['/api/meoo-douyin-goods-ai-assist', '/api/merchant/douyin/goods/ai/assist']
+    let last = 'AI 请求失败'
+    for (let i = 0; i < paths.length; i += 1) {
+      try {
+        const data = await merchantApi.merchantRequestWithHeaders('POST', paths[i], {
+          data: payload,
+          headers,
+          timeoutMs: 90000,
+        })
+        if (data && data.ok === false) {
+          last = String(data.message || last)
+          continue
+        }
+        return { ok: true, data: data || {} }
+      } catch (e) {
+        last = (e && e.message) || last
+      }
+    }
+    return { ok: false, message: last }
+  },
+
+  async onAiCopy() {
+    const name = String(this.data.productName || this.data.genericTitle || '').trim()
+    if (!name) {
+      wx.showToast({ title: '请先填写商品名称', icon: 'none' })
+      return
+    }
+    this.setData({ aiBusy: 'copy' })
+    const [titleR, descR] = await Promise.all([
+      this.postGoodsAi('optimize_title', { product_name: name, title_draft: name }),
+      this.postGoodsAi('generate_desc', { product_name: name, title_draft: name }),
+    ])
+    const patch = { aiBusy: '' }
+    if (titleR.ok && titleR.data && titleR.data.title) {
+      const title = String(titleR.data.title).slice(0, 40)
+      if (this.data.phase === 'generic') patch.genericTitle = title
+      else patch.productName = title
+    }
+    if (descR.ok && descR.data && descR.data.description) {
+      const desc = String(descR.data.description)
+      if (this.data.phase === 'generic') patch.genericDesc = desc
+      else patch.productDesc = desc
+    }
+    this.setData(patch)
+    if (!titleR.ok && !descR.ok) {
+      wx.showToast({ title: titleR.message || descR.message || 'AI 生成失败', icon: 'none' })
+    }
+  },
+
+  async onAiHead(e) {
+    const enhance = e.currentTarget.dataset.mode === 'enhance'
+    const name = String(this.data.productName || '').trim()
+    if (!name) {
+      wx.showToast({ title: '请先填写商品名称', icon: 'none' })
+      return
+    }
+    if (enhance && !/^https?:\/\//i.test(this.data.headUrl || '')) {
+      wx.showToast({ title: '请先上传头图再优化', icon: 'none' })
+      return
+    }
+    this.setData({ aiBusy: 'head' })
+    const r = await this.postGoodsAi(enhance ? 'image_enhance' : 'image_generate', {
+      product_name: name,
+      listing_title: name,
+      image_role: 'head',
+      image_urls: enhance ? [this.data.headUrl] : undefined,
+    })
+    const url = r.ok && r.data && Array.isArray(r.data.image_urls) ? r.data.image_urls[0] : ''
+    this.setData({ aiBusy: '', headUrl: url || this.data.headUrl })
+    if (!r.ok || !url) wx.showToast({ title: (r && r.message) || '头图生成失败', icon: 'none' })
+  },
+
+  async onAiAux() {
+    const name = String(this.data.productName || '').trim()
+    if (!name) {
+      wx.showToast({ title: '请先填写商品名称', icon: 'none' })
+      return
+    }
+    const slots = this.data.auxThumbSlots || []
+    const empty = slots.findIndex((s) => !s.url)
+    if (empty < 0) {
+      wx.showToast({ title: '附加图已满', icon: 'none' })
+      return
+    }
+    this.setData({ aiBusy: 'aux' })
+    const r = await this.postGoodsAi('image_generate', {
+      product_name: name,
+      listing_title: name,
+      image_role: 'aux',
+    })
+    const url = r.ok && r.data && Array.isArray(r.data.image_urls) ? r.data.image_urls[0] : ''
+    if (!url) {
+      this.setData({ aiBusy: '' })
+      wx.showToast({ title: (r && r.message) || '附加图生成失败', icon: 'none' })
+      return
+    }
+    const next = slots.map((s, i) => (i === empty ? { url } : s))
+    this.setData({ aiBusy: '', auxThumbSlots: next })
+  },
+
   onPickHead() {
     wx.chooseMedia({
       count: 1,
@@ -482,6 +590,41 @@ Page({
       .filter((u) => /^https?:\/\//i.test(u))
   },
 
+  envUrlsFromSlots() {
+    return (this.data.envThumbSlots || [])
+      .map((s) => String(s.url || '').trim())
+      .filter((u) => /^https?:\/\//i.test(u))
+  },
+
+  onPickEnv(e) {
+    const slot = Number(e.currentTarget.dataset.slot) || 0
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      success: async (res) => {
+        const path = res.tempFiles && res.tempFiles[0] && res.tempFiles[0].tempFilePath
+        if (!path) return
+        this.setData({ uploading: true })
+        const up = await douyin.uploadProductImage(path)
+        this.setData({ uploading: false })
+        if (!up.ok) {
+          wx.showToast({ title: up.message, icon: 'none' })
+          return
+        }
+        const slots = [...this.data.envThumbSlots]
+        while (slots.length <= slot) slots.push({ url: '' })
+        slots[slot] = { url: up.url }
+        this.setData({ envThumbSlots: slots })
+      },
+    })
+  },
+
+  onClearEnv(e) {
+    const slot = Number(e.currentTarget.dataset.slot) || 0
+    const slots = this.data.envThumbSlots.map((s, i) => (i === slot ? { url: '' } : s))
+    this.setData({ envThumbSlots: slots })
+  },
+
   async doSave(mode) {
     const optDays = this.data.consumeValidDaysOptions
     const idx = Math.min(optDays.length - 1, Math.max(0, this.data.consumeValidDaysIndex))
@@ -500,6 +643,7 @@ Page({
       headUrl: this.data.headUrl,
       poiIds: this.data.poiIds,
       auxUrls: this.auxUrlsFromSlots(),
+      envUrls: this.envUrlsFromSlots(),
       consumeValidDays,
       afterSalePolicy,
     })

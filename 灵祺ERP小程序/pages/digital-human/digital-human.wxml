@@ -56,7 +56,7 @@
     <text class="dh-label">口播文案</text>
     <textarea class="dh-area" maxlength="2000" placeholder="输入要合成的口播稿…" value="{{script}}" bindinput="onScript" />
     <button class="dh-btn ghost" loading="{{aiBusy}}" bindtap="onAiRewrite">AI 改写口播</button>
-    <text class="dh-label">音色</text>
+    <text class="dh-label">音色（与网页预设一致，点选形象会自动对上专属音色）</text>
     <view class="dh-chips">
       <text
         wx:for="{{voices}}"

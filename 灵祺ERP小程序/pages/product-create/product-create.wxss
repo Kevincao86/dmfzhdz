@@ -32,6 +32,30 @@
   background: #e2e8f0;
 }
 
+.ai-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 8rpx;
+}
+
+.ai-row .meoo-label {
+  margin: 0;
+  flex: 1;
+}
+
+.ai-btn {
+  margin: 0;
+  padding: 0 16rpx;
+  font-size: 22rpx;
+  line-height: 1.8;
+  color: #4338ca;
+  background: #eef2ff;
+  border-radius: 999rpx;
+}
+
 .wizard-card {
   margin: 16rpx 24rpx 32rpx;
   padding: 28rpx;

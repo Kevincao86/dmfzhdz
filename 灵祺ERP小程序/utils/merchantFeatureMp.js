@@ -366,39 +366,52 @@ function mapPromotionRow(x, tag) {
   }
 }
 
-async function fetchAdsPromotions(channel) {
-  if (!merchantApi.hasMerchantApi()) {
-    return { ok: false, message: '请配置商家后台 API 地址' }
-  }
-  const spec = adsChannelSpec(channel)
+async function requestAdsList(spec, path) {
   const creds = spec.creds()
   if (!creds) return { ok: false, message: spec.unbound }
-  const qs = `?access_token=${encodeURIComponent(creds.access_token)}&${spec.accountQuery}=${encodeURIComponent(creds.local_account_id)}`
+  const postBody = spec.accountQuery === 'local_account_id'
   try {
-    const data = await merchantApi.merchantRequest('GET', `${spec.promotionsPath}${qs}`)
-    const list = Array.isArray(data.list) ? data.list : []
-    return {
-      ok: true,
-      items: list.map((x) => mapPromotionRow(x, spec.tag)),
-      demoMode: Boolean(data.demoMode),
-      apiError: data.apiError || data.message || '',
+    const data = postBody
+      ? await merchantApi.merchantRequestAuth('POST', path, {
+          data: adsCredsPayload(creds),
+          timeoutMs: 60000,
+        })
+      : await merchantApi.merchantRequest(
+          'GET',
+          `${path}?access_token=${encodeURIComponent(creds.access_token)}&${spec.accountQuery}=${encodeURIComponent(creds.local_account_id)}`,
+        )
+    if (data && data.ok === false) {
+      return { ok: false, message: String(data.message || '拉取失败') }
     }
+    return { ok: true, data }
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : String(e) }
   }
 }
 
+async function fetchAdsPromotions(channel) {
+  if (!merchantApi.hasMerchantApi()) {
+    return { ok: false, message: '请配置商家后台 API 地址' }
+  }
+  const spec = adsChannelSpec(channel)
+  const got = await requestAdsList(spec, spec.promotionsPath)
+  if (!got.ok) return got
+  const data = got.data || {}
+  const list = Array.isArray(data.list) ? data.list : []
+  return {
+    ok: true,
+    items: list.map((x) => mapPromotionRow(x, spec.tag)),
+    demoMode: Boolean(data.demoMode),
+    apiError: data.apiError || '',
+  }
+}
+
 async function fetchAdsReport(channel) {
   const spec = adsChannelSpec(channel)
-  const creds = spec.creds()
-  if (!creds) return { ok: false, message: spec.unbound }
-  const qs = `?access_token=${encodeURIComponent(creds.access_token)}&${spec.accountQuery}=${encodeURIComponent(creds.local_account_id)}`
-  try {
-    const data = await merchantApi.merchantRequest('GET', `${spec.reportPath}${qs}`)
-    return { ok: true, summary: data.summary || null, demoMode: Boolean(data.demoMode) }
-  } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : String(e) }
-  }
+  const got = await requestAdsList(spec, spec.reportPath)
+  if (!got.ok) return got
+  const data = got.data || {}
+  return { ok: true, summary: data.summary || null, demoMode: Boolean(data.demoMode) }
 }
 
 async function updateAdsStatus(channel, promotionIds, optStatus) {
@@ -422,11 +435,10 @@ async function fetchAdsProjects(channel) {
     return { ok: false, message: '请配置商家后台 API 地址', items: [] }
   }
   const spec = adsChannelSpec(channel)
-  const creds = spec.creds()
-  if (!creds) return { ok: false, message: spec.unbound, items: [] }
-  const qs = `?access_token=${encodeURIComponent(creds.access_token)}&${spec.accountQuery}=${encodeURIComponent(creds.local_account_id)}`
+  const got = await requestAdsList(spec, spec.projectsPath)
+  if (!got.ok) return { ok: false, message: got.message, items: [] }
   try {
-    const data = await merchantApi.merchantRequest('GET', `${spec.projectsPath}${qs}`)
+    const data = got.data || {}
     const list = Array.isArray(data.list) ? data.list : []
     const items = list.map((x) => ({
       id: String(x.projectId || x.campaign_id || x.id || ''),

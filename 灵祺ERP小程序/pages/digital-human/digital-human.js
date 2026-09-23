@@ -7,10 +7,7 @@ const labels = require('../../utils/shortVideoLabelsMp.js')
 const dhPresets = require('../../utils/digitalHumanPresetsMp.js')
 const fs = wx.getFileSystemManager()
 
-const VOICES = [
-  { id: 'v-custom-female', label: '亲和女声' },
-  { id: 'v-custom-male', label: '稳重男声' },
-]
+const VOICES = dhPresets.voicePresets()
 
 const PRESETS = [
   { id: 'photo', label: '上传照片' },
@@ -104,6 +101,7 @@ Page({
         photoPath: got.path,
         photoDataUrl: got.dataUrl,
         avatarMode: 'library',
+        voiceId: dhPresets.voiceIdForAvatar(row.id),
       })
     } catch (err) {
       this.setData({

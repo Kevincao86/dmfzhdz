@@ -111,9 +111,76 @@ const COPYWRITING_ONLY_HINT =
 const IMAGE_NOUN =
   /图|图片|照片|照|海报|封面|logo|插画|门头|配图|画面|宣传图|店招|效果图|主图|商品图|详情图|美食图|菜品图|产品图|场景图|氛围图/i
 
+function refersToPriorImage(text) {
+  const t = String(text || '').trim()
+  if (!t) return false
+  const mentionsPrior = /上述|上文|刚才|上一张|上张|这张图|原图|生成的图|前面的图|结合上文|基于上文|图里|图中/.test(t)
+  const asksChange = /改|换|调整|修|变|替换|P一下|美化/.test(t)
+  if (mentionsPrior && asksChange) return true
+  if (/(?:把|将).{1,48}(?:改成|换成|替换成|调整成)/.test(t) && /图|照片|画面|上述|上文/.test(t)) return true
+  return false
+}
+
+function lastHistoryImageUrl(history) {
+  const list = Array.isArray(history) ? history : []
+  for (let i = list.length - 1; i >= 0; i -= 1) {
+    const urls = list[i] && list[i].imageUrls
+    if (!Array.isArray(urls) || !urls.length) continue
+    const hit = String(urls[urls.length - 1] || '').trim()
+    if (hit) return hit
+  }
+  return ''
+}
+
+function readLocalImageDataUrl(filePath) {
+  return new Promise((resolve) => {
+    wx.getFileSystemManager().readFile({
+      filePath,
+      encoding: 'base64',
+      success(res) {
+        const b64 = res && res.data ? String(res.data) : ''
+        resolve(b64 ? `data:image/jpeg;base64,${b64}` : '')
+      },
+      fail() {
+        resolve('')
+      },
+    })
+  })
+}
+
+function downloadImageDataUrl(url) {
+  return new Promise((resolve) => {
+    wx.downloadFile({
+      url,
+      success(res) {
+        if (res.statusCode !== 200 || !res.tempFilePath) {
+          resolve('')
+          return
+        }
+        readLocalImageDataUrl(res.tempFilePath).then(resolve)
+      },
+      fail() {
+        resolve('')
+      },
+    })
+  })
+}
+
+async function materializeReferenceImage(raw) {
+  const src = String(raw || '').trim()
+  if (!src) return ''
+  if (/^data:image\//i.test(src)) return src
+  if (/^https?:\/\//i.test(src)) {
+    const dataUrl = await downloadImageDataUrl(src)
+    return dataUrl || src
+  }
+  return readLocalImageDataUrl(src)
+}
+
 function detectImageEditIntent(text, hasImages) {
   const t = String(text || '').trim()
   if (/改图|修图|美化|图生图|换背景|抠图|P图|P一下|精修|修一下/i.test(t)) return true
+  if (refersToPriorImage(t)) return true
   if (/(?:让|把|将).{0,10}(?:这张|该|此|原)?(?:图片|照片|图).{0,24}(?:变|改|调|处理|优化|修|美化)/i.test(t)) {
     return true
   }
@@ -446,27 +513,25 @@ function sameImagePayload(a, b) {
   return x.slice(ix, ix + 96) === y.slice(iy, iy + 96)
 }
 
-function vendorCaption(data) {
+function vendorCaption(data, edited) {
+  const action = edited ? '按上文图片调整' : '生成'
   if (data && data.channel === 'tokenmix' && data.displayModel) {
-    return `已用 AI 模型（${data.displayModel}）生成，见下图。`
+    return `已用 AI 模型（${data.displayModel}）${action}，见下图。`
   }
   const v = String((data && data.vendorUsed) || '')
   const name = v === 'qwen' ? '通义万相' : v === 'doubao' ? '豆包' : v === 'minimax' ? 'MiniMax' : ''
-  if (name) return `已用 AI 模型（${name}）生成，见下图。`
-  return '已用 AI 模型生成，见下图。'
+  if (name) return `已用 AI 模型（${name}）${action}，见下图。`
+  return edited ? '已按上文图片调整，见下图。' : '已用 AI 模型生成，见下图。'
 }
 
 function buildAgentImagePrompt(userLine, hasRef) {
-  const t = String(userLine || '').trim() || (hasRef ? '请美化这张参考图' : '高质量商业摄影图片')
+  const t = String(userLine || '').trim() || (hasRef ? '请在参考图上按要求修改' : '高质量商业摄影图片')
   if (!hasRef) return t
-  if (detectImageEditIntent(t, true)) {
-    return [
-      t,
-      '请基于参考图做专业精修，不要原样复制：提升曝光与白平衡、锐化主体、清理杂乱背景、增强色彩与质感。',
-      '食物要更有食欲，门头/店招要更干净端正。成图必须与原图有明显可见差异。',
-    ].join('\n')
-  }
-  return `${t}\n请以参考图为内容依据重新绘制一张更高品质的成图，禁止原样输出参考图。`
+  return [
+    '必须基于参考图修改，禁止忽略参考图重新生成一张无关的新图。',
+    '用户没有点名要改的场景、构图、食物、桌面和其他人物都保持不变。',
+    `修改要求：${t}`,
+  ].join('\n')
 }
 
 function buildChatMessages(history, userLine, imageDataUrls, userId) {
@@ -558,7 +623,7 @@ async function postAiAgentNativeImage(prompt, pickerKey, referenceImageDataUrl, 
   }
   const imageUrl = await persistGeneratedImageUrl(rawUrl)
   if (!imageUrl) throw new Error('成图已生成但无法在小程序中预览，请重试')
-  let caption = vendorCaption(data)
+  let caption = vendorCaption(data, Boolean(ref))
   if (data.fallbackNote) caption += `\n\n${data.fallbackNote}`
   return { ok: true, content: caption, imageUrl }
 }
@@ -592,22 +657,21 @@ async function sendAgentTurn(opts) {
         ? '请结合附图说明你的需求。'
         : '')
 
-  const imagePickerKey = resolveImagePickerKey(
-    pickerKey,
-    modelOptions,
-    line,
-    imageDataUrls.length > 0,
-  )
-  const wantImage = shouldRouteToNativeImage(imagePickerKey, line, imageDataUrls.length > 0)
+  const priorImage = lastHistoryImageUrl(history)
+  const editPrior = refersToPriorImage(line) || detectImageEditIntent(line, imageDataUrls.length > 0)
+  const hasImageContext = imageDataUrls.length > 0 || (editPrior && Boolean(priorImage))
+  const imagePickerKey = resolveImagePickerKey(pickerKey, modelOptions, line, hasImageContext)
+  const wantImage = shouldRouteToNativeImage(imagePickerKey, line, hasImageContext)
 
   if (wantImage) {
     try {
-      const imgRes = await postAiAgentNativeImage(
-        line,
-        imagePickerKey,
-        imageDataUrls[0],
-        requestOpts,
-      )
+      let reference = imageDataUrls[0] || ''
+      if (!reference && editPrior) {
+        if (!priorImage) throw new Error('对话里还没有可修改的图片，请先生成或上传一张图')
+        reference = await materializeReferenceImage(priorImage)
+        if (!reference) throw new Error('上一张图读取失败，无法按上文修改')
+      }
+      const imgRes = await postAiAgentNativeImage(line, imagePickerKey, reference, requestOpts)
       return {
         userMsg: {
           id: `u-${Date.now()}`,
