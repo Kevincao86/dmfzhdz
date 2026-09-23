@@ -15,8 +15,11 @@ import {
   type ErpAgentUsageKind,
 } from './erpPointsEconomics.js'
 import {
+  MP_POINTS_REVIEW_AI_REPLIES_PER_CHARGE,
   MP_POINTS_USAGE_KIND_LABELS,
   mpPointsCostForUsage,
+  mpPointsReviewAiBatchSlot,
+  mpPointsReviewAiChargeForNext,
   parseMpPointsUsageKind,
   type MpPointsUsageKind,
 } from './mpPointsEconomics.js'
@@ -249,4 +252,97 @@ export function parseErpAiPointsUsageKind(raw: unknown): ErpAiUsageKind | null {
   const k = String(raw || '').trim()
   if (k === ERP_AGENT_USAGE_KIND) return ERP_AGENT_USAGE_KIND
   return parseMpPointsUsageKind(raw)
+}
+
+/** 生成前：本组第 1 条需要余额 ≥ 1；组内其余条已含在本批积分内。 */
+export async function assertReviewAiBatchAffordable(
+  admin: SupabaseClient,
+  tenantId: string,
+): Promise<ErpAiPointsSpendResult> {
+  const prior = await countReviewAiLedgerSuccesses(admin, tenantId)
+  const charge = mpPointsReviewAiChargeForNext(prior)
+  const balances = await readErpTenantPointsBalances(admin, tenantId)
+  if (charge > 0 && balances.totalPoints < charge) {
+    return {
+      ok: false,
+      error: 'insufficient_points',
+      message: formatErpAiPointsInsufficient(balances.totalPoints, charge),
+      required: charge,
+      balance: balances.totalPoints,
+    }
+  }
+  return {
+    ok: true,
+    pointsCharged: 0,
+    fromPackage: 0,
+    fromRecharge: 0,
+    packageBalance: balances.packagePoints,
+    rechargeBalance: balances.rechargePoints,
+    balance: balances.totalPoints,
+  }
+}
+
+/** 已入账的评价回复 AI 条数（含扣分与组内 0 积分流水）。 */
+export async function countReviewAiLedgerSuccesses(
+  admin: SupabaseClient,
+  tenantId: string,
+): Promise<number> {
+  const { count, error } = await admin
+    .from('tenant_points_ledger')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', tenantId)
+    .eq('usage_kind', 'review_ai')
+  if (error) {
+    if (/does not exist|Could not find/i.test(error.message)) return 0
+    throw error
+  }
+  return Math.max(0, Math.floor(Number(count) || 0))
+}
+
+/**
+ * 评价回复成功后入账：每 25 条的第 1 条扣 1 积分，其余写 0 积分流水，usage_kind 均为 review_ai。
+ */
+export async function recordReviewAiSuccess(
+  admin: SupabaseClient,
+  tenantId: string,
+  opts?: { idempotencyKey?: string },
+): Promise<ErpAiPointsSpendResult> {
+  const prior = await countReviewAiLedgerSuccesses(admin, tenantId)
+  const charge = mpPointsReviewAiChargeForNext(prior)
+  const slot = mpPointsReviewAiBatchSlot(prior)
+  const idempotencyKey = String(opts?.idempotencyKey || '').trim()
+  if (charge > 0) {
+    return spendErpAiPoints(admin, tenantId, {
+      kind: 'review_ai',
+      pointsOverride: charge,
+      idempotencyKey,
+      note: `每 ${MP_POINTS_REVIEW_AI_REPLIES_PER_CHARGE} 条扣 1 积分`,
+    })
+  }
+
+  const balances = await readErpTenantPointsBalances(admin, tenantId)
+  const reason = buildSpendReason(
+    'review_ai',
+    `本批 ${slot}/${MP_POINTS_REVIEW_AI_REPLIES_PER_CHARGE}，已含在本批 1 积分内`,
+    idempotencyKey,
+  )
+  const { error } = await admin.from('tenant_points_ledger').insert({
+    tenant_id: tenantId,
+    delta_package_points: 0,
+    delta_recharge_points: 0,
+    balance_package_after: balances.packagePoints,
+    balance_recharge_after: balances.rechargePoints,
+    reason,
+    usage_kind: 'review_ai',
+  })
+  if (error && !/does not exist|Could not find/i.test(error.message)) throw error
+  return {
+    ok: true,
+    pointsCharged: 0,
+    fromPackage: 0,
+    fromRecharge: 0,
+    packageBalance: balances.packagePoints,
+    rechargeBalance: balances.rechargePoints,
+    balance: balances.totalPoints,
+  }
 }

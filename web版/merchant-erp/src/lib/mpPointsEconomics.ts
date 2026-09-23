@@ -95,8 +95,25 @@ export const MP_POINTS_GOODS_AI_PER_USE = 5
 /** 投流/线索 AI（广告洞察、跟进话术）：5 积分/次；≈¥0.05 */
 export const MP_POINTS_AD_AI_PER_USE = 5
 
-/** 评价回复 AI：1 积分/次。只走千问 / DeepSeek / 豆包，单条约 ¥0.001–0.003；1 积分预算 ¥0.01。 */
+/**
+ * 评价回复 AI：每成功 25 条扣 1 积分，记入 usage_kind=review_ai。
+ * 千问 flash 一条约 ¥0.0002–0.0004；25 条成本约 ¥0.005–0.01，对上 1 积分预算与 60% 毛利。
+ * 扣在每组第 1 条成功时，覆盖随后 24 条。
+ */
+export const MP_POINTS_REVIEW_AI_REPLIES_PER_CHARGE = 25
 export const MP_POINTS_REVIEW_AI_PER_USE = 1
+
+/** 下一条成功回复应扣积分：每组开头扣 1，组内其余为 0。priorSuccessCount 为已入账条数。 */
+export function mpPointsReviewAiChargeForNext(priorSuccessCount: number): number {
+  const prior = Math.max(0, Math.floor(Number(priorSuccessCount) || 0))
+  return prior % MP_POINTS_REVIEW_AI_REPLIES_PER_CHARGE === 0 ? MP_POINTS_REVIEW_AI_PER_USE : 0
+}
+
+/** 下一条在当前 25 条批次中的序号（1–25）。 */
+export function mpPointsReviewAiBatchSlot(priorSuccessCount: number): number {
+  const prior = Math.max(0, Math.floor(Number(priorSuccessCount) || 0))
+  return (prior % MP_POINTS_REVIEW_AI_REPLIES_PER_CHARGE) + 1
+}
 
 /** 单积分内部 API 成本（元） */
 export const MP_POINT_INTERNAL_COST_YUAN = 0.01
@@ -249,7 +266,9 @@ export function formatMpPointsRateLabel(kind: MpPointsUsageKind, opts?: { motion
   if (kind === 'recruitment_ai') return `${MP_POINTS_RECRUITMENT_AI_PER_USE} 积分/次`
   if (kind === 'goods_ai') return `${MP_POINTS_GOODS_AI_PER_USE} 积分/次`
   if (kind === 'ad_ai') return `${MP_POINTS_AD_AI_PER_USE} 积分/次`
-  if (kind === 'review_ai') return `${MP_POINTS_REVIEW_AI_PER_USE} 积分/次`
+  if (kind === 'review_ai') {
+    return `${MP_POINTS_REVIEW_AI_PER_USE} 积分/${MP_POINTS_REVIEW_AI_REPLIES_PER_CHARGE} 条`
+  }
   if (kind === 'cloud_edit') {
     return `${MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP} 积分/条（≤${MP_POINTS_CLOUD_EDIT_MAX_SEC} 秒）`
   }
