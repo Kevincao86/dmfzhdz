@@ -13,6 +13,10 @@ import {
   emptyAdvertisingSummary,
   parseAdInsightResponse,
 } from './advertisingGatewayCommon.js'
+import {
+  ensureOceanUserAccessToken,
+  oceanAccessTokenInvalidMessage,
+} from './localPromotionOAuthCore.js'
 
 const OE_BASE = (
   process.env.QIANCHUAN_API_BASE ??
@@ -38,6 +42,11 @@ export type QianchuanCredentials = {
   accessToken: string
   localAccountId: string
   demoMode?: boolean
+  appId?: string
+  appSecret?: string
+  refreshToken?: string
+  tokenExpiresAt?: string
+  rotated?: boolean
 }
 
 type OeEnvelope<T> = {
@@ -47,10 +56,28 @@ type OeEnvelope<T> = {
   request_id?: string
 }
 
+type ResWithQcCreds = ServerResponse & { __qcCreds?: QianchuanCredentials }
+
+function stampQcCreds(res: ServerResponse, creds: QianchuanCredentials) {
+  ;(res as ResWithQcCreds).__qcCreds = creds
+}
+
 function json(res: ServerResponse, status: number, body: unknown) {
+  const creds = (res as ResWithQcCreds).__qcCreds
+  let out = body
+  if (creds?.rotated && out && typeof out === 'object' && !Array.isArray(out)) {
+    out = {
+      ...(out as Record<string, unknown>),
+      oceanToken: {
+        accessToken: creds.accessToken,
+        refreshToken: creds.refreshToken,
+        tokenExpiresAt: creds.tokenExpiresAt,
+      },
+    }
+  }
   res.statusCode = status
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
-  res.end(JSON.stringify(body))
+  res.end(JSON.stringify(out))
 }
 
 function parseBody(raw: string): Record<string, unknown> {
@@ -75,10 +102,50 @@ function credsFromBody(j: Record<string, unknown>): QianchuanCredentials | null 
     process.env.QIANCHUAN_ADVERTISER_ID?.trim() ||
     ''
   if (!accessToken || !advertiserId) return null
-  return { accessToken, localAccountId: advertiserId }
+  const appId =
+    (typeof j.app_id === 'string' ? j.app_id.trim() : '') ||
+    (typeof j.appId === 'string' ? j.appId.trim() : '') ||
+    undefined
+  const appSecret =
+    (typeof j.app_secret === 'string' ? j.app_secret.trim() : '') ||
+    (typeof j.appSecret === 'string' ? j.appSecret.trim() : '') ||
+    undefined
+  const refreshToken =
+    (typeof j.refresh_token === 'string' ? j.refresh_token.trim() : '') ||
+    (typeof j.refreshToken === 'string' ? j.refreshToken.trim() : '') ||
+    undefined
+  const tokenExpiresAt =
+    (typeof j.token_expires_at === 'string' ? j.token_expires_at.trim() : '') ||
+    (typeof j.tokenExpiresAt === 'string' ? j.tokenExpiresAt.trim() : '') ||
+    undefined
+  return {
+    accessToken,
+    localAccountId: advertiserId,
+    appId: appId || undefined,
+    appSecret: appSecret || undefined,
+    refreshToken: refreshToken || undefined,
+    tokenExpiresAt: tokenExpiresAt || undefined,
+  }
 }
 
-async function oceanGet<T>(
+async function refreshQianchuanCreds(creds: QianchuanCredentials, force = false): Promise<boolean> {
+  const out = await ensureOceanUserAccessToken({
+    accessToken: creds.accessToken,
+    appId: creds.appId,
+    appSecret: creds.appSecret,
+    refreshToken: creds.refreshToken,
+    tokenExpiresAt: creds.tokenExpiresAt,
+    force,
+  })
+  if (!out.refreshed) return false
+  creds.accessToken = out.accessToken
+  if (out.refreshToken) creds.refreshToken = out.refreshToken
+  if (out.tokenExpiresAt) creds.tokenExpiresAt = out.tokenExpiresAt
+  creds.rotated = true
+  return true
+}
+
+async function oceanGetRaw<T>(
   creds: QianchuanCredentials,
   path: string,
   query: Record<string, string>,
@@ -104,7 +171,20 @@ async function oceanGet<T>(
   return { ok: true, data: (parsed.data ?? {}) as T }
 }
 
-async function oceanPost<T>(
+async function oceanGet<T>(
+  creds: QianchuanCredentials,
+  path: string,
+  query: Record<string, string>,
+): Promise<{ ok: true; data: T } | { ok: false; message: string }> {
+  await refreshQianchuanCreds(creds, false)
+  const first = await oceanGetRaw<T>(creds, path, query)
+  if (first.ok || !oceanAccessTokenInvalidMessage(first.message)) return first
+  const did = await refreshQianchuanCreds(creds, true)
+  if (!did) return first
+  return oceanGetRaw<T>(creds, path, query)
+}
+
+async function oceanPostRaw<T>(
   creds: QianchuanCredentials,
   path: string,
   body: unknown,
@@ -133,6 +213,19 @@ async function oceanPost<T>(
     return { ok: false, message: mapOceanError(parsed.message ?? '请求被拒绝', r.status) }
   }
   return { ok: true, data: (parsed.data ?? {}) as T }
+}
+
+async function oceanPost<T>(
+  creds: QianchuanCredentials,
+  path: string,
+  body: unknown,
+): Promise<{ ok: true; data: T } | { ok: false; message: string }> {
+  await refreshQianchuanCreds(creds, false)
+  const first = await oceanPostRaw<T>(creds, path, body)
+  if (first.ok || !oceanAccessTokenInvalidMessage(first.message)) return first
+  const did = await refreshQianchuanCreds(creds, true)
+  if (!did) return first
+  return oceanPostRaw<T>(creds, path, body)
 }
 
 const PROMO_STATUS_ZH: Record<string, string> = {
@@ -172,6 +265,11 @@ function dateRangeLast7(): { start: string; end: string } {
   return { start: fmt(start), end: fmt(end) }
 }
 
+function takeQcCreds(res: ServerResponse, creds: QianchuanCredentials | null): QianchuanCredentials | null {
+  if (creds) stampQcCreds(res, creds)
+  return creds
+}
+
 export async function handleQianchuanRoutes(
   method: string,
   pathname: string,
@@ -182,6 +280,23 @@ export async function handleQianchuanRoutes(
   billing?: AdAiBillingOpts,
 ): Promise<boolean> {
   if (!pathname.startsWith('/api/merchant/qianchuan/')) return false
+
+  if (method === 'POST' && pathname === '/api/merchant/qianchuan/oauth/refresh') {
+    const creds = takeQcCreds(res, credsFromBody(parseBody(bodyRaw)))
+    if (!creds) {
+      json(res, 400, { ok: false, message: '请先绑定巨量千川' })
+      return true
+    }
+    const did = await refreshQianchuanCreds(creds, true)
+    json(res, 200, {
+      ok: true,
+      refreshed: did,
+      accessToken: creds.accessToken,
+      refreshToken: creds.refreshToken,
+      tokenExpiresAt: creds.tokenExpiresAt,
+    })
+    return true
+  }
 
   if (method === 'POST' && pathname === '/api/merchant/qianchuan/bind/test') {
     const { runQianchuanBindTest } = await import('../api/qianchuanBindTestCore.js')
@@ -198,7 +313,7 @@ export async function handleQianchuanRoutes(
   }
 
   if (method === 'GET' && pathname === '/api/merchant/qianchuan/projects') {
-    const creds = credsFromQuery(url) ?? credsFromBody({})
+    const creds = takeQcCreds(res, credsFromQuery(url) ?? credsFromBody({}))
     if (!creds) {
       json(res, 200, emptyAdvertisingList('请先绑定千川账号'))
       return true
@@ -230,7 +345,7 @@ export async function handleQianchuanRoutes(
   }
 
   if (method === 'GET' && pathname === '/api/merchant/qianchuan/promotions') {
-    const creds = credsFromQuery(url) ?? credsFromBody({})
+    const creds = takeQcCreds(res, credsFromQuery(url) ?? credsFromBody({}))
     if (!creds) {
       json(res, 200, emptyAdvertisingList('请先绑定千川账号'))
       return true
@@ -316,7 +431,7 @@ export async function handleQianchuanRoutes(
 
   if (method === 'POST' && pathname === '/api/merchant/qianchuan/promotions/create') {
     const j = parseBody(bodyRaw)
-    const creds = credsFromBody(j)
+    const creds = takeQcCreds(res, credsFromBody(j))
     if (!creds) {
       json(res, 400, { ok: false, message: '请先绑定千川' })
       return true
@@ -356,7 +471,7 @@ export async function handleQianchuanRoutes(
 
   if (method === 'POST' && pathname === '/api/merchant/qianchuan/promotions/status') {
     const j = parseBody(bodyRaw)
-    const creds = credsFromBody(j)
+    const creds = takeQcCreds(res, credsFromBody(j))
     if (!creds) {
       json(res, 400, { ok: false, message: '请先绑定千川' })
       return true
@@ -381,7 +496,7 @@ export async function handleQianchuanRoutes(
   }
 
   if (method === 'GET' && pathname === '/api/merchant/qianchuan/report/summary') {
-    const creds = credsFromQuery(url) ?? credsFromBody({})
+    const creds = takeQcCreds(res, credsFromQuery(url) ?? credsFromBody({}))
     const range = dateRangeLast7()
     if (!creds) {
       json(res, 200, emptyAdvertisingSummary(range, '请先绑定千川账号'))
@@ -435,7 +550,7 @@ export async function handleQianchuanRoutes(
 
   if (method === 'POST' && pathname === '/api/merchant/qianchuan/clues/list') {
     const j = parseBody(bodyRaw)
-    const creds = credsFromBody(j)
+    const creds = takeQcCreds(res, credsFromBody(j))
     if (!creds) {
       json(res, 200, emptyAdvertisingClues('请先绑定千川账号'))
       return true
@@ -490,7 +605,7 @@ export async function handleQianchuanRoutes(
 
   if (method === 'POST' && pathname === '/api/merchant/qianchuan/clues/callback') {
     const j = parseBody(bodyRaw)
-    const creds = credsFromBody(j)
+    const creds = takeQcCreds(res, credsFromBody(j))
     if (!creds) {
       json(res, 400, { ok: false, message: '请先绑定千川' })
       return true

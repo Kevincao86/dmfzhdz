@@ -1,4 +1,6 @@
-import { readQianchuanBinding } from '../lib/qianchuanBinding'
+import { packQianchuanForCloud, readQianchuanBinding, writeQianchuanBinding } from '../lib/qianchuanBinding'
+import { upsertMerchantBinding } from '../lib/merchantPlatformBindings'
+import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import type {
   LocalClueRow,
   LocalProjectRow,
@@ -20,7 +22,100 @@ function credsPayload() {
   return {
     access_token: bind.accessToken,
     local_account_id: bind.localAccountId,
+    advertiser_id: bind.localAccountId,
+    app_id: bind.appId,
+    app_secret: bind.appSecret,
+    refresh_token: bind.refreshToken,
+    token_expires_at: bind.tokenExpiresAt,
   }
+}
+
+function oceanTokenStale(expiresAt?: string): boolean {
+  const raw = String(expiresAt || '').trim()
+  if (!raw) return true
+  const t = Date.parse(raw)
+  if (!Number.isFinite(t)) return true
+  return t <= Date.now() + 2 * 60 * 60 * 1000
+}
+
+type OceanTokenPatch = {
+  accessToken?: string
+  refreshToken?: string
+  tokenExpiresAt?: string
+}
+
+async function persistOceanTokenPatch(token: OceanTokenPatch | undefined) {
+  const access = token?.accessToken?.trim()
+  if (!access) return
+  const bind = readQianchuanBinding()
+  if (!bind) return
+  const next = {
+    ...bind,
+    accessToken: access,
+    refreshToken: token.refreshToken?.trim() || bind.refreshToken,
+    tokenExpiresAt: token.tokenExpiresAt?.trim() || bind.tokenExpiresAt,
+  }
+  writeQianchuanBinding(next)
+  if (!supabaseConfigured || !supabase) return
+  await upsertMerchantBinding(supabase, {
+    provider: 'qianchuan',
+    merchantAccountId: next.localAccountId,
+    sealedCredentials: packQianchuanForCloud({
+      accessToken: next.accessToken,
+      appId: next.appId,
+      appSecret: next.appSecret,
+      refreshToken: next.refreshToken,
+      tokenExpiresAt: next.tokenExpiresAt,
+    }),
+    clientKey: next.appId || null,
+    accountDisplayName: next.accountName || null,
+    bindingLabel: next.accountName || null,
+    demoMode: next.demoMode,
+  })
+}
+
+let oceanRefreshInflight: Promise<void> | null = null
+
+async function persistOceanTokenFromData(data: unknown) {
+  if (!data || typeof data !== 'object') return
+  const o = data as { oceanToken?: OceanTokenPatch }
+  if (o.oceanToken) await persistOceanTokenPatch(o.oceanToken)
+}
+
+async function ensureQianchuanTokenFresh(): Promise<void> {
+  const bind = readQianchuanBinding()
+  if (!bind?.refreshToken?.trim() || !bind.appId?.trim() || !bind.appSecret?.trim()) return
+  if (!oceanTokenStale(bind.tokenExpiresAt)) return
+  if (oceanRefreshInflight) {
+    await oceanRefreshInflight
+    return
+  }
+  oceanRefreshInflight = (async () => {
+    const r = await requestJson<{
+      accessToken?: string
+      refreshToken?: string
+      tokenExpiresAt?: string
+      oceanToken?: OceanTokenPatch
+    }>(
+      `${apiBase()}/api/merchant/qianchuan/oauth/refresh`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credsPayload() ?? {}),
+      },
+      '刷新巨量授权',
+    )
+    if (!r.ok) return
+    await persistOceanTokenPatch(r.data.oceanToken ?? r.data)
+  })().finally(() => {
+    oceanRefreshInflight = null
+  })
+  await oceanRefreshInflight
+}
+
+async function qcCreds() {
+  await ensureQianchuanTokenFresh()
+  return credsPayload()
 }
 
 async function requestJson<T extends Record<string, unknown>>(
@@ -45,6 +140,7 @@ async function requestJson<T extends Record<string, unknown>>(
       const msg = typeof data.message === 'string' ? data.message : text
       return { ok: false, message: toUserFacingError(msg, action) }
     }
+    await persistOceanTokenFromData(data)
     return { ok: true, data }
   } catch (e) {
     return { ok: false, message: toUserFacingError(e, action) }
@@ -476,7 +572,7 @@ export async function fetchLocalProjects(): Promise<
   | { ok: true; list: LocalProjectRow[]; demoMode?: boolean; apiError?: string }
   | { ok: false; message: string }
 > {
-  const creds = credsPayload()
+  const creds = await qcCreds()
   if (!creds) {
     return { ok: true, list: [], apiError: '尚未绑定巨量千川（与本地推账号相互独立）' }
   }
@@ -494,7 +590,7 @@ export async function fetchQianchuanPromotions(): Promise<
   | { ok: true; list: LocalPromotionRow[]; demoMode?: boolean; apiError?: string }
   | { ok: false; message: string }
 > {
-  const creds = credsPayload()
+  const creds = await qcCreds()
   if (!creds) {
     return { ok: true, list: [], apiError: '尚未绑定巨量千川（与本地推账号相互独立）' }
   }
@@ -513,7 +609,7 @@ export async function createQianchuanPromotion(input: {
   budgetYuan: number
   marketingGoal?: 'LIVE' | 'VIDEO_IMAGE'
 }): Promise<{ ok: true; projectId?: string; message?: string } | { ok: false; message: string }> {
-  const creds = credsPayload()
+  const creds = await qcCreds()
   if (!creds) return { ok: false, message: '请先在系统设置中绑定巨量千川' }
   const r = await requestJson<{ projectId?: string; message?: string }>(
     `${apiBase()}/api/merchant/qianchuan/promotions/create`,
@@ -537,7 +633,7 @@ export async function updatePromotionStatus(
   promotionIds: string[],
   optStatus: 'ENABLE' | 'DISABLE',
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const creds = credsPayload()
+  const creds = await qcCreds()
   if (!creds) return { ok: false, message: '请先在系统设置中绑定巨量千川' }
   const r = await requestJson<{ ok?: boolean }>(
     `${apiBase()}/api/merchant/qianchuan/promotions/status`,
@@ -556,7 +652,7 @@ export async function fetchLocalReportSummary(): Promise<
   | { ok: true; summary: LocalReportSummary; demoMode?: boolean }
   | { ok: false; message: string }
 > {
-  const creds = credsPayload()
+  const creds = await qcCreds()
   if (!creds) {
     return {
       ok: true,
@@ -585,7 +681,7 @@ export async function fetchLocalClues(page = 1): Promise<
   | { ok: true; list: LocalClueRow[]; demoMode?: boolean; apiError?: string }
   | { ok: false; message: string }
 > {
-  const creds = credsPayload()
+  const creds = await qcCreds()
   if (!creds) {
     return { ok: false, message: '请先在系统设置中绑定巨量千川' }
   }
@@ -613,7 +709,7 @@ export async function postClueCallback(input: {
   reasonCode?: string
   reasonMessage?: string
 }): Promise<{ ok: true } | { ok: false; message: string }> {
-  const creds = credsPayload()
+  const creds = await qcCreds()
   if (!creds) return { ok: false, message: '请先在系统设置中绑定巨量千川' }
   const r = await requestJson<{ ok?: boolean }>(
     `${apiBase()}/api/merchant/qianchuan/clues/callback`,
@@ -667,12 +763,13 @@ export async function postAdAiInsight(input: {
   | { ok: true; insight: string; actions?: LocalPromotionAiAction[] }
   | { ok: false; message: string }
 > {
+  await ensureQianchuanTokenFresh()
   const r = await requestJson<{ insight?: string; actions?: LocalPromotionAiAction[] }>(
     `${apiBase()}/api/merchant/qianchuan/ai/ad-insight`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
+      body: JSON.stringify({ ...(credsPayload() ?? {}), ...input }),
     },
     '投流分析',
   )

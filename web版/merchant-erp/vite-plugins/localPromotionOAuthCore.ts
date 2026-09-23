@@ -421,6 +421,67 @@ export async function refreshAccessToken(
   return { ok: true, accessToken, refreshToken: nextRefresh, expiresIn }
 }
 
+/** 巨量 access_token 官方约 24h，到期前 skew 内视为应刷新 */
+export function oceanAccessTokenStale(expiresAt?: string, skewMs = 2 * 60 * 60 * 1000): boolean {
+  const raw = String(expiresAt || '').trim()
+  if (!raw) return false
+  const t = Date.parse(raw)
+  if (!Number.isFinite(t)) return false
+  return t <= Date.now() + skewMs
+}
+
+export function oceanAccessTokenInvalidMessage(message: string): boolean {
+  return /access_token无效|access token invalid|invalid access_token|token过期|请刷新或重新授权|40100|40101|access-token/i.test(
+    String(message || ''),
+  )
+}
+
+export async function ensureOceanUserAccessToken(input: {
+  accessToken: string
+  appId?: string
+  appSecret?: string
+  refreshToken?: string
+  tokenExpiresAt?: string
+  force?: boolean
+}): Promise<{
+  accessToken: string
+  refreshToken?: string
+  tokenExpiresAt?: string
+  refreshed: boolean
+  message?: string
+}> {
+  const accessToken = String(input.accessToken || '').trim()
+  const appId = String(input.appId || '').trim()
+  const appSecret = String(input.appSecret || '').trim()
+  const refreshToken = String(input.refreshToken || '').trim()
+  const tokenExpiresAt = String(input.tokenExpiresAt || '').trim() || undefined
+  const canRefresh = Boolean(appId && appSecret && refreshToken)
+  const stale = Boolean(input.force) || oceanAccessTokenStale(tokenExpiresAt)
+  if (!canRefresh || !stale) {
+    return { accessToken, refreshToken: refreshToken || undefined, tokenExpiresAt, refreshed: false }
+  }
+  const rf = await refreshAccessToken(appId, appSecret, refreshToken)
+  if (!rf.ok) {
+    return {
+      accessToken,
+      refreshToken: refreshToken || undefined,
+      tokenExpiresAt,
+      refreshed: false,
+      message: rf.message,
+    }
+  }
+  const nextExp =
+    typeof rf.expiresIn === 'number' && rf.expiresIn > 0
+      ? new Date(Date.now() + rf.expiresIn * 1000).toISOString()
+      : undefined
+  return {
+    accessToken: rf.accessToken,
+    refreshToken: rf.refreshToken || refreshToken,
+    tokenExpiresAt: nextExp,
+    refreshed: true,
+  }
+}
+
 async function fetchAppAccessToken(
   appId: string,
   appSecret: string,

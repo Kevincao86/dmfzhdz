@@ -1,5 +1,11 @@
 import { merchantApiAuthHeaders, resolveMerchantApiBearer } from '../lib/merchantApiAuth'
-import { readLocalPromotionBinding } from '../lib/localPromotionBinding'
+import {
+  packLocalPromotionForCloud,
+  readLocalPromotionBinding,
+  writeLocalPromotionBinding,
+} from '../lib/localPromotionBinding'
+import { upsertMerchantBinding } from '../lib/merchantPlatformBindings'
+import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import type {
   LocalClueRow,
   LocalProjectRow,
@@ -29,7 +35,94 @@ function credsPayload() {
   return {
     access_token: bind.accessToken,
     local_account_id: bind.localAccountId,
+    app_id: bind.appId,
+    app_secret: bind.appSecret,
+    refresh_token: bind.refreshToken,
+    token_expires_at: bind.tokenExpiresAt,
   }
+}
+
+function oceanTokenStale(expiresAt?: string): boolean {
+  const raw = String(expiresAt || '').trim()
+  if (!raw) return true
+  const t = Date.parse(raw)
+  if (!Number.isFinite(t)) return true
+  return t <= Date.now() + 2 * 60 * 60 * 1000
+}
+
+type OceanTokenPatch = {
+  accessToken?: string
+  refreshToken?: string
+  tokenExpiresAt?: string
+}
+
+async function persistOceanTokenPatch(token: OceanTokenPatch | undefined) {
+  const access = token?.accessToken?.trim()
+  if (!access) return
+  const bind = readLocalPromotionBinding()
+  if (!bind) return
+  const next = {
+    ...bind,
+    accessToken: access,
+    refreshToken: token.refreshToken?.trim() || bind.refreshToken,
+    tokenExpiresAt: token.tokenExpiresAt?.trim() || bind.tokenExpiresAt,
+  }
+  writeLocalPromotionBinding(next)
+  if (!supabaseConfigured || !supabase) return
+  await upsertMerchantBinding(supabase, {
+    provider: 'local_promotion',
+    merchantAccountId: next.localAccountId,
+    sealedCredentials: packLocalPromotionForCloud({
+      accessToken: next.accessToken,
+      appId: next.appId,
+      appSecret: next.appSecret,
+      refreshToken: next.refreshToken,
+      tokenExpiresAt: next.tokenExpiresAt,
+    }),
+    clientKey: next.appId || null,
+    accountDisplayName: next.accountName || null,
+    bindingLabel: next.accountName || null,
+    demoMode: next.demoMode,
+  })
+}
+
+let oceanRefreshInflight: Promise<void> | null = null
+
+async function ensureLocalPromotionTokenFresh(): Promise<void> {
+  const bind = readLocalPromotionBinding()
+  if (!bind?.refreshToken?.trim() || !bind.appId?.trim() || !bind.appSecret?.trim()) return
+  if (!oceanTokenStale(bind.tokenExpiresAt)) return
+  if (oceanRefreshInflight) {
+    await oceanRefreshInflight
+    return
+  }
+  oceanRefreshInflight = (async () => {
+    const r = await requestJson<{
+      accessToken?: string
+      refreshToken?: string
+      tokenExpiresAt?: string
+      oceanToken?: OceanTokenPatch
+    }>(
+      `${apiBase()}/api/merchant/local-promotion/oauth/refresh`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credsPayload() ?? {}),
+      },
+      '刷新巨量授权',
+    )
+    if (!r.ok) return
+    await persistOceanTokenPatch(r.data.oceanToken ?? r.data)
+  })().finally(() => {
+    oceanRefreshInflight = null
+  })
+  await oceanRefreshInflight
+}
+
+async function persistOceanTokenFromData(data: unknown) {
+  if (!data || typeof data !== 'object') return
+  const o = data as { oceanToken?: OceanTokenPatch }
+  if (o.oceanToken) await persistOceanTokenPatch(o.oceanToken)
 }
 
 async function postWithCreds<T extends Record<string, unknown>>(
@@ -37,9 +130,10 @@ async function postWithCreds<T extends Record<string, unknown>>(
   extra: Record<string, unknown> = {},
   action = '请求',
 ): Promise<{ ok: true; data: T } | { ok: false; message: string }> {
+  await ensureLocalPromotionTokenFresh()
   const creds = credsPayload()
   if (!creds) return { ok: false, message: '请先在系统设置中绑定巨量本地推' }
-  return requestJson<T>(
+  const r = await requestJson<T>(
     `${apiBase()}${path}`,
     {
       method: 'POST',
@@ -48,6 +142,8 @@ async function postWithCreds<T extends Record<string, unknown>>(
     },
     action,
   )
+  if (r.ok) await persistOceanTokenFromData(r.data)
+  return r
 }
 
 async function requestJson<T extends Record<string, unknown>>(
@@ -72,6 +168,7 @@ async function requestJson<T extends Record<string, unknown>>(
       const msg = typeof data.message === 'string' ? data.message : text
       return { ok: false, message: toUserFacingError(msg, action) }
     }
+    await persistOceanTokenFromData(data)
     return { ok: true, data }
   } catch (e) {
     return { ok: false, message: toUserFacingError(e, action) }
@@ -752,6 +849,7 @@ export async function postAdAiInsight(input: {
   | { ok: true; insight: string; actions?: LocalPromotionAiAction[] }
   | { ok: false; message: string }
 > {
+  await ensureLocalPromotionTokenFresh()
   const r = await requestJson<{ insight?: string; actions?: LocalPromotionAiAction[] }>(
     `${apiBase()}/api/merchant/local-promotion/ai/ad-insight`,
     {
@@ -762,6 +860,7 @@ export async function postAdAiInsight(input: {
     '投流分析',
   )
   if (!r.ok) return r
+  await persistOceanTokenFromData(r.data)
   if (!r.data.insight) return { ok: false, message: '未能生成分析，请稍后重试。' }
   return { ok: true, insight: r.data.insight, actions: r.data.actions }
 }

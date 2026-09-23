@@ -42,8 +42,9 @@ export const LOCAL_PROMOTION_BIND_GUIDE: BindGuideConfig = {
       bullets: [
         '在 ERP 填写 App ID 与 App Secret，点击「前往巨量授权」。',
         '使用有投放权限的账号登录，勾选要接入的广告主账户并确认授权。',
-        '授权成功后浏览器跳回系统设置页，系统自动用 auth_code 换取 access_token（约 24 小时有效）。',
-        'refresh_token 约 30 天有效，ERP 会一并保存以便后续刷新。',
+        '授权成功后浏览器跳回系统设置页，系统自动用 auth_code 换取 access_token。官方规定该票约 24 小时过期，这是巨量规则，无法改成永久。',
+        '同时会保存 refresh_token（约 30 天）。打开投流/线索时 ERP 会在到期前自动换新票并写回；只要大约 30 天内有使用，授权会持续续期。',
+        '仅粘贴 Access Token、没有 refresh_token 的绑定无法自动续期，到期须重新点「前往巨量授权」。超过约 30 天完全未使用也需重新授权。',
       ],
     },
     {
@@ -64,6 +65,7 @@ export const LOCAL_PROMOTION_BIND_GUIDE: BindGuideConfig = {
       '路径：系统设置 → 商业化后台 → 巨量本地推。',
       '填写：应用编号 App ID、应用密钥 App Secret（必填）。',
       '点击「前往巨量授权」完成 OAuth；返回后选择广告主编号，点击「保存并校验」。',
+      '之后打开投流页会自动刷新 token，不必每天重新授权（须走 OAuth，不能只贴 Access Token）。',
       '校验通过即可在「投流」「线索」菜单查看真实数据。若提示工作台账户，请改选其下的本地推投放账户后再保存。',
     ],
   },
