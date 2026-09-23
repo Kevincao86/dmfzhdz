@@ -9,11 +9,13 @@ let agent = null
 let exec = null
 let confirmMp = null
 let membershipMp = null
+let previewMp = null
 try {
   agent = require('../../utils/aiAgentMp.js')
   exec = require('../../utils/aiAgentExecutionMp.js')
   confirmMp = require('../../utils/aiAgentConfirmMp.js')
   membershipMp = require('../../utils/membershipMp.js')
+  previewMp = require('../../utils/aiAgentPreviewMp.js')
 } catch (e) {
   console.error('ai-agent deps', e)
 }
@@ -78,7 +80,9 @@ Page({
     }
     const sub = decodeJwtSub(api.getBearerToken ? api.getBearerToken() : api.getAccessToken())
     if (sub) agent.setCurrentUserId(sub)
-    const messages = agent.loadThread()
+    const messages = (agent.loadThread() || []).map((m) =>
+      previewMp && previewMp.ensureRecruitWizard ? previewMp.ensureRecruitWizard(m) : m,
+    )
     this.setData({
       messages,
       hasChat: messages.some((m) => m.role === 'user'),
@@ -296,10 +300,17 @@ Page({
   onToggleVoiceMode() {
     if (this.data.sending) return
     if (this.data.recordingVoice) composer.stopVoiceRecord(this, this._recorder, true)
+    const next = !this.data.voiceMode
     this.setData({
-      voiceMode: !this.data.voiceMode,
+      voiceMode: next,
       showPlusPanel: false,
       recordingVoice: false,
+    })
+    if (!next) return
+    this._recordReady = false
+    void composer.authorizeRecord().then((ok) => {
+      this._recordReady = !!ok
+      if (!ok && this.data.voiceMode) this.setData({ voiceMode: false })
     })
   },
 
@@ -325,17 +336,25 @@ Page({
     }
   },
 
-  async onVoiceTouchStart() {
+  onVoiceTouchStart() {
     if (this.data.sending || this.data.recordingVoice) return
-    const ok = await composer.authorizeRecord()
-    if (!ok) return
+    if (!this._recordReady) {
+      wx.showToast({ title: '请先允许麦克风，再按住说话', icon: 'none' })
+      void composer.authorizeRecord().then((ok) => {
+        this._recordReady = !!ok
+      })
+      return
+    }
+    this._voiceHolding = true
     this._voiceStartedAt = Date.now()
     if (!this._recorder) this._recorder = composer.createRecorderManager(this)
     composer.startVoiceRecord(this, this._recorder)
   },
 
   onVoiceTouchEnd() {
-    if (!this.data.recordingVoice) return
+    const holding = this._voiceHolding
+    this._voiceHolding = false
+    if (!holding && !this.data.recordingVoice) return
     const ms = Date.now() - (this._voiceStartedAt || 0)
     composer.stopVoiceRecord(this, this._recorder, ms < 400)
     if (ms < 400) wx.showToast({ title: '说话时间太短', icon: 'none' })
@@ -551,11 +570,115 @@ Page({
     this.persist(messages)
   },
 
+  replacePreview(id, nextMsg) {
+    const messages = (this.data.messages || []).map((m) => (m.id === id ? nextMsg : m))
+    this.setData({ messages })
+  },
+
+  onRecruitField(e) {
+    const id = e.currentTarget.dataset.id
+    const field = e.currentTarget.dataset.field
+    const bucket = e.currentTarget.dataset.bucket || 'scope'
+    const msg = this.findPreview(id)
+    const brief = msg && msg.preview && msg.preview.recruitmentBrief
+    if (!brief || !field) return
+    const value = e.detail.value
+    let nextBrief
+    if (bucket === 'budget') {
+      nextBrief = Object.assign({}, brief, {
+        wizardBudget: Object.assign({}, brief.wizardBudget, { [field]: value }),
+      })
+    } else {
+      const scope = Object.assign({}, brief.wizardScope, { [field]: value })
+      nextBrief = Object.assign({}, brief, {
+        wizardScope: scope,
+        mainProductName: field === 'mainProductName' ? value : brief.mainProductName,
+      })
+    }
+    this.replacePreview(
+      id,
+      Object.assign({}, msg, { preview: Object.assign({}, msg.preview, { recruitmentBrief: nextBrief }) }),
+    )
+  },
+
+  onRecruitPlatform(e) {
+    const id = e.currentTarget.dataset.id
+    const plat = e.currentTarget.dataset.plat
+    const msg = this.findPreview(id)
+    const brief = msg && msg.preview && msg.preview.recruitmentBrief
+    if (!brief || !plat) return
+    const scope = Object.assign({}, brief.wizardScope)
+    if (plat === 'douyin') scope.platformDouyin = !scope.platformDouyin
+    if (plat === 'xhs') scope.platformXhs = !scope.platformXhs
+    if (!scope.platformDouyin && !scope.platformXhs) {
+      wx.showToast({ title: '至少选一个平台', icon: 'none' })
+      return
+    }
+    const platforms = []
+    if (scope.platformDouyin) platforms.push('抖音')
+    if (scope.platformXhs) platforms.push('小红书')
+    scope.platforms = platforms
+    scope.platform = platforms[0] || '抖音'
+    const nextBrief = Object.assign({}, brief, { wizardScope: scope })
+    this.replacePreview(
+      id,
+      Object.assign({}, msg, { preview: Object.assign({}, msg.preview, { recruitmentBrief: nextBrief }) }),
+    )
+  },
+
+  onRecruitForm(e) {
+    const id = e.currentTarget.dataset.id
+    const form = e.currentTarget.dataset.form
+    const msg = this.findPreview(id)
+    const brief = msg && msg.preview && msg.preview.recruitmentBrief
+    if (!brief || !form) return
+    const nextBrief = Object.assign({}, brief, {
+      wizardScope: Object.assign({}, brief.wizardScope, { contentForm: form }),
+    })
+    this.replacePreview(
+      id,
+      Object.assign({}, msg, { preview: Object.assign({}, msg.preview, { recruitmentBrief: nextBrief }) }),
+    )
+  },
+
+  async onRecruitNext(e) {
+    const id = e.currentTarget.dataset.id
+    const msg = this.findPreview(id)
+    if (!previewMp || !msg || this.data.sending) return
+    const step = (msg.preview.recruitmentBrief && msg.preview.recruitmentBrief.wizardStep) || 1
+    if (step === 2) wx.showLoading({ title: '整理拍摄要点…', mask: true })
+    try {
+      const r = await previewMp.advanceRecruitWizard(msg)
+      if (!r || !r.ok) {
+        wx.showToast({ title: (r && r.message) || '请先补全', icon: 'none' })
+        return
+      }
+      this.persist((this.data.messages || []).map((m) => (m.id === id ? r.msg : m)))
+    } finally {
+      try {
+        wx.hideLoading()
+      } catch (_) {}
+    }
+  },
+
+  onRecruitBack(e) {
+    const id = e.currentTarget.dataset.id
+    const msg = this.findPreview(id)
+    if (!previewMp || !msg) return
+    const next = previewMp.backRecruitWizard(msg)
+    this.persist((this.data.messages || []).map((m) => (m.id === id ? next : m)))
+  },
+
   async onConfirmPreview(e) {
     const id = e.currentTarget.dataset.id
     const mode = e.currentTarget.dataset.mode || ''
     const msg = this.findPreview(id)
     if (!confirmMp || !msg || this.data.sending) return
+    const recruitStep = msg.preview && msg.preview.recruitmentBrief && msg.preview.recruitmentBrief.wizardStep
+    if (msg.preview && msg.preview.taskType === 'recruit_influencer' && recruitStep && recruitStep < 4) {
+      wx.showToast({ title: '请先完成四步确认', icon: 'none' })
+      return
+    }
     const hasChips = Array.isArray(msg.previewPlatforms)
     const platforms = hasChips ? msg.previewPlatforms.filter((p) => p.checked).map((p) => p.id) : undefined
     this.setData({ sending: true })

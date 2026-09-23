@@ -385,6 +385,34 @@
   font-size: 22rpx;
 }
 
+.recruit-card {
+  margin-top: 12rpx;
+}
+
+.step-bar {
+  display: flex;
+  gap: 8rpx;
+  margin-bottom: 12rpx;
+}
+
+.step-seg {
+  flex: 1;
+  height: 8rpx;
+  border-radius: 999rpx;
+  background: #e2e8f0;
+}
+
+.step-seg.on {
+  background: #6366f1;
+}
+
+.shoot-box {
+  margin-top: 8rpx;
+  padding: 16rpx;
+  border-radius: 12rpx;
+  background: #f8fafc;
+}
+
 .preview-actions {
   display: flex;
   gap: 12rpx;

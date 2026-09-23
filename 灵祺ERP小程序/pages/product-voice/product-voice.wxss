@@ -91,12 +91,22 @@ page {
   opacity: 0.55;
 }
 
+.plat-logo-wrap {
+  width: 72rpx;
+  height: 72rpx;
+  min-width: 72rpx;
+  max-width: 72rpx;
+  flex: 0 0 72rpx;
+  overflow: hidden;
+  border-radius: 16rpx;
+  background: #f8fafc;
+}
+
 .plat-logo {
   width: 72rpx;
   height: 72rpx;
+  display: block;
   border-radius: 16rpx;
-  flex-shrink: 0;
-  background: #f8fafc;
 }
 
 .plat-logo.ph {

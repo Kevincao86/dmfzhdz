@@ -218,9 +218,29 @@ function createRecorderManager(page) {
       page.onVoiceRecorded({ filePath: path, durationSec: Math.max(1, Math.round((res.duration || 0) / 1000)) })
     }
   })
-  recorder.onError(() => {
-    wx.showToast({ title: '录音失败', icon: 'none' })
+  recorder.onStart(() => {
+    page._voiceRetried = false
+  })
+  recorder.onError((err) => {
+    if (page._voiceReject) return
+    const em = String((err && err.errMsg) || '')
+    if (/auth|deny|permission|authorize/i.test(em)) {
+      if (page.setData) page.setData({ recordingVoice: false })
+      wx.showToast({ title: '请开启麦克风权限', icon: 'none' })
+      return
+    }
+    if (page._voiceHolding && !page._voiceRetried) {
+      page._voiceRetried = true
+      recorder.start({
+        duration: 60000,
+        sampleRate: 16000,
+        numberOfChannels: 1,
+        format: 'wav',
+      })
+      return
+    }
     if (page.setData) page.setData({ recordingVoice: false })
+    wx.showToast({ title: '录音失败', icon: 'none' })
   })
   return recorder
 }
@@ -231,9 +251,10 @@ function startVoiceRecord(page, recorder) {
   page.setData({ recordingVoice: true })
   recorder.start({
     duration: 60000,
-    format: 'mp3',
     sampleRate: 16000,
     numberOfChannels: 1,
+    encodeBitRate: 48000,
+    format: 'aac',
   })
 }
 

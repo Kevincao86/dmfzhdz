@@ -144,7 +144,62 @@
           data-id="{{item.id}}"
           bindtap="onOpenModule"
         >去商品列表</view>
-        <view wx:if="{{item.role === 'task_preview' && item.previewStatus === 'pending' && item.preview.taskType !== 'create_product'}}" class="preview-actions">
+        <view wx:if="{{item.role === 'task_preview' && item.previewStatus === 'pending' && item.preview.taskType === 'recruit_influencer' && item.preview.recruitmentBrief}}" class="recruit-card">
+          <view class="step-bar">
+            <view class="step-seg {{item.preview.recruitmentBrief.wizardStep >= 1 ? 'on' : ''}}"></view>
+            <view class="step-seg {{item.preview.recruitmentBrief.wizardStep >= 2 ? 'on' : ''}}"></view>
+            <view class="step-seg {{item.preview.recruitmentBrief.wizardStep >= 3 ? 'on' : ''}}"></view>
+            <view class="step-seg {{item.preview.recruitmentBrief.wizardStep >= 4 ? 'on' : ''}}"></view>
+          </view>
+          <view wx:if="{{item.preview.recruitmentBrief.wizardStep === 1}}">
+            <view class="field-row">
+              <text class="field-lab">主推套餐</text>
+              <input class="field-inp" value="{{item.preview.recruitmentBrief.wizardScope.mainProductName}}" data-id="{{item.id}}" data-field="mainProductName" bindinput="onRecruitField" />
+            </view>
+            <text class="field-lab block">目标平台</text>
+            <view class="plat-row">
+              <view class="plat-chip {{item.preview.recruitmentBrief.wizardScope.platformDouyin ? 'on' : ''}}" data-id="{{item.id}}" data-plat="douyin" catchtap="onRecruitPlatform">抖音</view>
+              <view class="plat-chip {{item.preview.recruitmentBrief.wizardScope.platformXhs ? 'on' : ''}}" data-id="{{item.id}}" data-plat="xhs" catchtap="onRecruitPlatform">小红书</view>
+            </view>
+            <view class="field-row">
+              <text class="field-lab">招募城市</text>
+              <input class="field-inp" placeholder="如 宁波，或全国" value="{{item.preview.recruitmentBrief.wizardScope.city}}" data-id="{{item.id}}" data-field="city" bindinput="onRecruitField" />
+            </view>
+            <view class="field-row">
+              <text class="field-lab">门店</text>
+              <input class="field-inp" placeholder="可留空" value="{{item.preview.recruitmentBrief.wizardScope.storeName}}" data-id="{{item.id}}" data-field="storeName" bindinput="onRecruitField" />
+            </view>
+            <text class="field-lab block">内容形式</text>
+            <view class="plat-row">
+              <view class="plat-chip {{item.preview.recruitmentBrief.wizardScope.contentForm === 'instore' ? 'on' : ''}}" data-id="{{item.id}}" data-form="instore" catchtap="onRecruitForm">到店探店</view>
+              <view class="plat-chip {{item.preview.recruitmentBrief.wizardScope.contentForm === 'talk' ? 'on' : ''}}" data-id="{{item.id}}" data-form="talk" catchtap="onRecruitForm">不到店口播</view>
+              <view class="plat-chip {{item.preview.recruitmentBrief.wizardScope.contentForm === 'note' ? 'on' : ''}}" data-id="{{item.id}}" data-form="note" catchtap="onRecruitForm">图文笔记</view>
+            </view>
+          </view>
+          <view wx:if="{{item.preview.recruitmentBrief.wizardStep === 2}}">
+            <view class="field-row">
+              <text class="field-lab">总预算</text>
+              <input class="field-inp" type="number" value="{{item.preview.recruitmentBrief.wizardBudget.budgetYuan}}" data-id="{{item.id}}" data-bucket="budget" data-field="budgetYuan" bindinput="onRecruitField" />
+            </view>
+            <view class="field-row">
+              <text class="field-lab">计划人数</text>
+              <input class="field-inp" type="number" value="{{item.preview.recruitmentBrief.wizardBudget.headcount}}" data-id="{{item.id}}" data-bucket="budget" data-field="headcount" bindinput="onRecruitField" />
+            </view>
+            <view class="field-row">
+              <text class="field-lab">佣金 %</text>
+              <input class="field-inp" type="number" value="{{item.preview.recruitmentBrief.wizardBudget.commissionPct}}" data-id="{{item.id}}" data-bucket="budget" data-field="commissionPct" bindinput="onRecruitField" />
+            </view>
+          </view>
+          <view wx:if="{{item.preview.recruitmentBrief.wizardStep === 3 || item.preview.recruitmentBrief.wizardStep === 4}}" class="shoot-box">
+            <text class="plan-desc">{{item.preview.recruitmentBrief.briefText}}</text>
+          </view>
+          <view class="preview-actions">
+            <view wx:if="{{item.preview.recruitmentBrief.wizardStep > 1}}" class="btn-ghost" data-id="{{item.id}}" bindtap="onRecruitBack">上一步</view>
+            <view wx:if="{{item.preview.recruitmentBrief.wizardStep < 4}}" class="btn-primary" data-id="{{item.id}}" bindtap="onRecruitNext">下一步</view>
+            <view wx:if="{{item.preview.recruitmentBrief.wizardStep === 4}}" class="btn-primary" data-id="{{item.id}}" bindtap="onConfirmPreview">确认发布</view>
+          </view>
+        </view>
+        <view wx:if="{{item.role === 'task_preview' && item.previewStatus === 'pending' && item.preview.taskType !== 'create_product' && item.preview.taskType !== 'recruit_influencer'}}" class="preview-actions">
           <view class="btn-ghost" data-id="{{item.id}}" bindtap="onOpenModule">去对应模块</view>
           <view class="btn-primary" data-id="{{item.id}}" bindtap="onConfirmPreview">确认执行</view>
         </view>

@@ -17,8 +17,10 @@
           data-id="{{item.id}}"
           bindtap="onPickPlatform"
         >
-          <image wx:if="{{item.logo}}" class="plat-logo" src="{{item.logo}}" mode="aspectFit" />
-          <view wx:else class="plat-logo ph">{{item.letter}}</view>
+          <view class="plat-logo-wrap">
+            <image wx:if="{{item.logo}}" class="plat-logo" src="{{item.logo}}" mode="aspectFill" style="width:72rpx;height:72rpx;display:block;" />
+            <view wx:else class="plat-logo ph">{{item.letter}}</view>
+          </view>
           <view class="plat-body">
             <text class="plat-name">{{item.name}}</text>
             <text class="plat-status {{item.selectable ? 'ok' : ''}}">{{item.status}}</text>
@@ -36,8 +38,10 @@
           data-id="{{item.id}}"
           bindtap="onPickPlatform"
         >
-          <image wx:if="{{item.logo}}" class="plat-logo" src="{{item.logo}}" mode="aspectFit" />
-          <view wx:else class="plat-logo ph">{{item.letter}}</view>
+          <view class="plat-logo-wrap">
+            <image wx:if="{{item.logo}}" class="plat-logo" src="{{item.logo}}" mode="aspectFill" style="width:72rpx;height:72rpx;display:block;" />
+            <view wx:else class="plat-logo ph">{{item.letter}}</view>
+          </view>
           <view class="plat-body">
             <text class="plat-name">{{item.name}}</text>
             <text class="plat-status {{item.selectable ? 'ok' : ''}}">{{item.status}}</text>
