@@ -2,6 +2,7 @@ const api = require('../../utils/api.js')
 const merchant = require('../../utils/merchantApi.js')
 const listing = require('../../utils/productListingMp.js')
 const douyin = require('../../utils/douyinGoodsMp.js')
+const library = require('../../utils/productEditLibraryMp.js')
 const {
   LIST_TABS,
   STATUS_FILTERS,
@@ -54,11 +55,12 @@ Page({
       void this.maybeLoadStores()
       void this.loadList()
     } else {
+      const local = this.localDraftRows(this.data.activePlat)
+      this.applyAllFilters(local)
       this.setData({
         loading: false,
-        errMsg: '尚未连接商家后台',
-        items: [],
-        displayItems: [],
+        errMsg: local.length ? '' : '尚未连接商家后台',
+        note: local.length ? '已展示本机草稿箱' : '',
       })
     }
   },
@@ -155,6 +157,31 @@ Page({
     this.applyAllFilters(this.data.items)
   },
 
+  localDraftRows(platformId) {
+    return library
+      .loadProductEditLibrary()
+      .filter((r) => !r.platformApi || r.platformApi === platformId)
+      .map((r) =>
+        enrichProductRow(
+          {
+            id: r.id,
+            name: r.name,
+            priceYuan: r.price,
+            status: r.status,
+            store: r.store,
+          },
+          platformId,
+        ),
+      )
+  },
+
+  mergeLocalDrafts(apiItems, platformId) {
+    const local = this.localDraftRows(platformId)
+    const ids = new Set((apiItems || []).map((x) => x.id))
+    const extra = local.filter((x) => x.id && !ids.has(x.id))
+    return extra.concat(apiItems || [])
+  },
+
   applyAllFilters(items) {
     const displayItems = applyFilters(items, {
       keyword: this.data.keyword,
@@ -167,18 +194,28 @@ Page({
 
   async loadList() {
     if (!merchant.hasMerchantApi()) {
+      const local = this.localDraftRows(this.data.activePlat)
+      this.applyAllFilters(local)
       this.setData({
         loading: false,
-        errMsg: '尚未连接商家后台',
-        note: '',
-        items: [],
-        displayItems: [],
+        errMsg: local.length ? '' : '尚未连接商家后台',
+        note: local.length ? '已展示本机草稿箱' : '',
       })
       return
     }
     this.setData({ loading: true, errMsg: '', note: '' })
     const r = await listing.fetchMerchantProductList(this.data.activePlat, { page: 1, pageSize: 50 })
     if (!r.ok) {
+      const local = this.localDraftRows(this.data.activePlat)
+      if (local.length) {
+        this.applyAllFilters(local)
+        this.setData({
+          loading: false,
+          errMsg: '',
+          note: `平台列表暂不可用，已展示本机草稿`,
+        })
+        return
+      }
       this.setData({
         loading: false,
         errMsg: r.message,
@@ -188,7 +225,10 @@ Page({
       })
       return
     }
-    const items = (r.items || []).map((x) => enrichProductRow(x, this.data.activePlat))
+    const items = this.mergeLocalDrafts(
+      (r.items || []).map((x) => enrichProductRow(x, this.data.activePlat)),
+      this.data.activePlat,
+    )
     this.applyAllFilters(items)
     this.setData({
       loading: false,

@@ -374,9 +374,6 @@ Page({
   async sendLine(line, attachments) {
     if (!agent || this.data.sending) return
     if (!api.requireRealAuth('/pages/ai-agent/ai-agent')) return
-    try {
-      await sessionSync.syncFromCloud({ force: true })
-    } catch (_) {}
     const atts = Array.isArray(attachments) ? attachments : []
     const fileNote = atts
       .filter((a) => a.kind === 'file')
@@ -421,6 +418,9 @@ Page({
       voiceMode: false,
     })
     try {
+      await sessionSync.syncFromCloud({ force: true })
+    } catch (_) {}
+    try {
       const r = await agent.processAgentTurn(
         {
           userLine: text,
@@ -462,15 +462,38 @@ Page({
     erpNav.openTaskPage(type || 'general')
   },
 
+  onToggleProductPlatform(e) {
+    const id = e.currentTarget.dataset.id
+    const plat = e.currentTarget.dataset.plat
+    if (!id || !plat) return
+    const messages = (this.data.messages || []).map((m) => {
+      if (m.id !== id || !Array.isArray(m.previewPlatforms)) return m
+      return Object.assign({}, m, {
+        previewPlatforms: m.previewPlatforms.map((p) =>
+          p.id === plat ? Object.assign({}, p, { checked: !p.checked }) : p,
+        ),
+      })
+    })
+    this.persist(messages)
+  },
+
   async onConfirmPreview(e) {
     const id = e.currentTarget.dataset.id
+    const mode = e.currentTarget.dataset.mode || ''
     const msg = this.findPreview(id)
     if (!confirmMp || !msg || this.data.sending) return
+    const hasChips = Array.isArray(msg.previewPlatforms)
+    const platforms = hasChips ? msg.previewPlatforms.filter((p) => p.checked).map((p) => p.id) : undefined
     this.setData({ sending: true })
     try {
-      const r = await confirmMp.confirmPreviewMessage(msg, { userBrief: msg._userBrief })
+      const r = await confirmMp.confirmPreviewMessage(msg, {
+        userBrief: msg._userBrief,
+        mode: mode === 'submit' ? 'submit' : mode === 'draft' ? 'draft' : undefined,
+        platforms,
+      })
+      const isProduct = msg.preview && msg.preview.taskType === 'create_product'
       const marked = this.data.messages.map((m) =>
-        m.id === id ? Object.assign({}, m, { previewStatus: 'done' }) : m,
+        m.id === id && r && r.ok ? Object.assign({}, m, { previewStatus: 'done' }) : m,
       )
       const note = {
         id: `a-ok-${Date.now()}`,
@@ -479,6 +502,7 @@ Page({
       }
       this.setData({ sending: false })
       this.persist([...marked, note])
+      if (isProduct) return
       if (r && r.navUrl) {
         const url = r.navUrl
         if (url.includes('/pages/ai-agent/') || url.includes('/pages/functions/') || url.includes('/pages/dashboard/') || url.includes('/pages/mine/')) {

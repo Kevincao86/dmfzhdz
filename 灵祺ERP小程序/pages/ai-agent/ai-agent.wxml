@@ -61,7 +61,36 @@
           bindtap="onPreviewBubbleImage"
           data-url="{{img}}"
         />
-        <view wx:if="{{item.role === 'task_preview' && item.previewStatus === 'pending'}}" class="preview-actions">
+        <view wx:if="{{item.preview && item.preview.taskType === 'create_product' && item.preview.productPlans.length}}" class="plan-list">
+          <view wx:for="{{item.preview.productPlans}}" wx:for-item="plan" wx:key="slotKey" class="plan-card">
+            <text class="plan-name">{{plan.productName || plan.slotLabel}}</text>
+            <text class="plan-price">{{plan.suggestedPriceYuan > 0 ? '建议 ¥' + plan.suggestedPriceYuan : '建议售价生成中'}}</text>
+            <text wx:if="{{plan.description}}" class="plan-desc">{{plan.description}}</text>
+            <text wx:if="{{plan.comboText}}" class="plan-desc">{{plan.comboText}}</text>
+          </view>
+        </view>
+        <view wx:if="{{item.role === 'task_preview' && item.previewStatus === 'pending' && item.preview.taskType === 'create_product'}}" class="plat-row">
+          <view
+            wx:for="{{item.previewPlatforms}}"
+            wx:for-item="plat"
+            wx:key="id"
+            class="plat-chip {{plat.checked ? 'on' : ''}}"
+            data-id="{{item.id}}"
+            data-plat="{{plat.id}}"
+            catchtap="onToggleProductPlatform"
+          >{{plat.label}}</view>
+        </view>
+        <view wx:if="{{item.role === 'task_preview' && item.previewStatus === 'pending' && item.preview.taskType === 'create_product'}}" class="preview-actions">
+          <view class="btn-ghost" data-id="{{item.id}}" data-mode="draft" bindtap="onConfirmPreview">保存至草稿</view>
+          <view class="btn-primary" data-id="{{item.id}}" data-mode="submit" bindtap="onConfirmPreview">提交至平台</view>
+        </view>
+        <view
+          wx:if="{{item.role === 'task_preview' && item.preview && item.preview.taskType === 'create_product'}}"
+          class="preview-link"
+          data-id="{{item.id}}"
+          bindtap="onOpenModule"
+        >去商品列表</view>
+        <view wx:if="{{item.role === 'task_preview' && item.previewStatus === 'pending' && item.preview.taskType !== 'create_product'}}" class="preview-actions">
           <view class="btn-ghost" data-id="{{item.id}}" bindtap="onOpenModule">去对应模块</view>
           <view class="btn-primary" data-id="{{item.id}}" bindtap="onConfirmPreview">确认执行</view>
         </view>

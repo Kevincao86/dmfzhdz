@@ -5,70 +5,121 @@ const listing = require('./productListingMp.js')
 const ops = require('./opsRegistryMp.js')
 const rest = require('./supabaseRest.js')
 const briefStore = require('./kolBriefStorageMp.js')
-const { readPlatformToken } = require('./platformTokensMp.js')
 const erpNav = require('./erpNavMp.js')
+const library = require('./productEditLibraryMp.js')
+const intelSnap = require('./merchantIntelSnapshotMp.js')
 
 const DEFAULT_PRODUCT_PLATFORMS = ['douyin', 'meituan', 'xiaohongshu']
 
-function boundPlatforms(platforms) {
-  return (platforms || DEFAULT_PRODUCT_PLATFORMS).filter((p) => {
-    if (p === 'jd') return false
-    return Boolean(readPlatformToken(p))
-  })
-}
-
-function formatSubmitSummary(results) {
-  if (!results.length) return '未提交任何平台（请先完成平台绑定）'
-  return results
-    .map((r) => {
-      const plat = listing.createPlatformLabel(r.platform)
-      return `${r.planLabel} @ ${plat}：${r.ok ? '已保存草稿' : r.message || '失败'}`
-    })
-    .join('\n')
-}
-
-async function submitProductPlansFromPreview(previewMsg) {
-  const plans = (previewMsg.preview.productPlans || []).filter(
-    (p) => p.enrichStatus !== 'error' && String(p.productName || '').trim(),
-  )
-  if (!plans.length) {
-    return { ok: false, message: '预览尚未就绪或方案为空，请等待生成完成后再确认。' }
+function selectedPlatforms(previewMsg, override) {
+  if (Array.isArray(override)) {
+    return override.filter((p) => p && p !== 'jd')
   }
-  const platforms = boundPlatforms(DEFAULT_PRODUCT_PLATFORMS)
-  if (!platforms.length) {
+  const chips = previewMsg && previewMsg.previewPlatforms
+  if (Array.isArray(chips) && chips.length) {
+    const on = chips.filter((p) => p && p.checked !== false).map((p) => p.id)
+    if (on.length) return on.filter((p) => p !== 'jd')
+  }
+  return DEFAULT_PRODUCT_PLATFORMS.slice()
+}
+
+function planPriceYuan(plan) {
+  const n = Number(plan && plan.suggestedPriceYuan)
+  return Number.isFinite(n) && n > 0 ? n : 99
+}
+
+function saveLocalDraft(plan, platform, status) {
+  const title = String((plan && (plan.productName || plan.slotLabel)) || '').trim()
+  if (!title) return { ok: false, message: '方案名称为空' }
+  const price = planPriceYuan(plan)
+  let store = '—'
+  try {
+    const snap = intelSnap.loadSnapshot()
+    store = (snap && snap.storeName) || '—'
+  } catch (_) {}
+  const id = `agent-${platform}-${title.slice(0, 40)}`
+  const saved = library.upsertProductEditLibraryDraft({
+    id,
+    name: title,
+    platform: listing.createPlatformLabel(platform),
+    store,
+    status,
+    price,
+    platformApi: platform,
+  })
+  return saved
+    ? { ok: true, draftId: id, price, message: '已写入商品列表草稿箱' }
+    : { ok: false, message: '写入草稿箱失败' }
+}
+
+async function submitProductPlansFromPreview(previewMsg, options) {
+  const mode = options && options.mode === 'submit' ? 'submit' : 'draft'
+  const plans = ((previewMsg.preview && previewMsg.preview.productPlans) || []).filter((p) => {
+    if (!p || p.enrichStatus === 'loading') return false
+    if (p.enrichStatus === 'error') return false
+    return Boolean(String(p.productName || p.slotLabel || '').trim())
+  })
+  if (!plans.length) {
+    const loading = ((previewMsg.preview && previewMsg.preview.productPlans) || []).some(
+      (p) => p && p.enrichStatus === 'loading',
+    )
     return {
       ok: false,
-      message: '尚未绑定任何商品平台。请在电脑端「系统设置」完成抖音/美团/小红书授权后，下拉刷新「我的」页同步。',
+      message: loading ? '方案还在生成，请等预览出现后再操作。' : '预览尚未就绪或方案为空，请核对后再试。',
     }
   }
-  const results = []
+  const platforms = selectedPlatforms(previewMsg, options && options.platforms)
+  if (!platforms.length) return { ok: false, message: '请至少勾选一个目标平台。' }
+
+  const lines = []
+  let localOk = 0
+  let platformOk = 0
   for (const plan of plans) {
     const title = String(plan.productName || plan.slotLabel || '').trim()
-    const priceYuan = Number(plan.suggestedPriceYuan) > 0 ? Number(plan.suggestedPriceYuan) : 99
+    const priceYuan = planPriceYuan(plan)
+    const priceNote = Number(plan.suggestedPriceYuan) > 0 ? '' : '（方案未给售价，已按 ¥99 写入）'
     const desc = [plan.description, ...(plan.comboLines || [])].filter(Boolean).join('\n')
     for (const plat of platforms) {
+      const label = listing.createPlatformLabel(plat)
+      const local = saveLocalDraft(plan, plat, '草稿')
+      if (!local.ok) {
+        lines.push(`${title} @ ${label}：${local.message}`)
+        continue
+      }
+      localOk += 1
+      if (mode === 'draft') {
+        lines.push(`${title} @ ${label}：已保存至商品列表草稿箱${priceNote}`)
+        continue
+      }
       const r = await listing.postPlatformProductDraft(plat, {
         title,
         priceYuan,
         description: desc || undefined,
       })
-      results.push({
-        planLabel: plan.slotLabel || title,
-        platform: plat,
-        ok: r.ok,
-        message: r.message || (r.ok ? '已保存' : '失败'),
-        draftId: r.draftId,
-      })
+      const placeholder = /占位/.test(String((r && r.message) || ''))
+      if (r.ok && !placeholder) {
+        platformOk += 1
+        saveLocalDraft(plan, plat, '审核中')
+        lines.push(`${title} @ ${label}：平台已接收${r.draftId ? `（${r.draftId}）` : ''}，列表中为审核中`)
+      } else if (r.ok && placeholder) {
+        lines.push(
+          `${title} @ ${label}：已写入草稿箱${priceNote}。线上「提交至平台」目前是占位接口，不会进入抖音/美团/小红书商家后台。真上品要在「创建商品」补类目、主图和门店后再保存。`,
+        )
+      } else {
+        lines.push(
+          `${title} @ ${label}：已写入草稿箱${priceNote}。提交平台未成功：${r.message || '失败'}。草稿可在商品列表「草稿」中继续编辑。`,
+        )
+      }
     }
   }
-  const okCount = results.filter((x) => x.ok).length
+  const ok = localOk > 0
   return {
-    ok: okCount > 0,
-    okCount,
-    failCount: results.length - okCount,
-    summary: formatSubmitSummary(results),
-    results,
-    navUrl: erpNav.navForTaskType('create_product'),
+    ok,
+    localOk,
+    platformOk,
+    summary: lines.join('\n'),
+    message: lines.join('\n'),
+    navUrl: mode === 'draft' || platformOk === 0 ? '' : erpNav.navForTaskType('create_product'),
   }
 }
 
@@ -152,7 +203,7 @@ async function submitRecruitmentFromPreview(previewMsg, userBrief) {
 async function confirmPreviewMessage(previewMsg, context) {
   const taskType = previewMsg.preview && previewMsg.preview.taskType
   if (taskType === 'create_product') {
-    return submitProductPlansFromPreview(previewMsg)
+    return submitProductPlansFromPreview(previewMsg, context)
   }
   if (taskType === 'recruit_influencer') {
     return submitRecruitmentFromPreview(previewMsg, context && context.userBrief)

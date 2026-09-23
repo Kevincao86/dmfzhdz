@@ -42,6 +42,11 @@ function createProductPreviewMessage(userBrief, assistantContent) {
     role: 'task_preview',
     content: intro,
     previewStatus: 'pending',
+    previewPlatforms: [
+      { id: 'douyin', label: '抖音来客', checked: true },
+      { id: 'meituan', label: '美团团购', checked: true },
+      { id: 'xiaohongshu', label: '小红书', checked: true },
+    ],
     preview: Object.assign(buildPreviewShell('create_product', '创建商品'), {
       productPlans,
       productPlan: productPlans[0],
@@ -133,9 +138,14 @@ async function enrichProductPreviewMessage(msg) {
     ]
   }
 
+  const readyPlans = plans.map((p) =>
+    Object.assign({}, p, {
+      comboText: (p.comboLines || []).filter(Boolean).join(' · '),
+    }),
+  )
   return Object.assign({}, msg, {
-    content: `${msg.content}\n\n已生成 ${plans.length} 项团购方案，请核对后点击「确认执行」。`,
-    preview: Object.assign({}, msg.preview, { productPlans: plans, productPlan: plans[0] }),
+    content: `${msg.content}\n\n已生成 ${readyPlans.length} 项团购方案，请核对后选择「保存至草稿」或「提交至平台」。`,
+    preview: Object.assign({}, msg.preview, { productPlans: readyPlans, productPlan: readyPlans[0] }),
   })
 }
 
