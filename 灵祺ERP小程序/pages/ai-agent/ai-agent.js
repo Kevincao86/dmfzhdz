@@ -377,7 +377,12 @@ Page({
       }
       const cur = String(this.data.input || '').trim()
       const next = cur ? `${cur} ${r.text}` : r.text
-      this.setData({ input: next, voiceMode: false, showPlusPanel: false }, () => composer.syncShowSendBtn(this))
+      if (this.data.sending) {
+        this.setData({ input: next, showPlusPanel: false }, () => composer.syncShowSendBtn(this))
+        wx.showToast({ title: '上一条还在生成，已写入输入框', icon: 'none' })
+        return
+      }
+      await this.sendLine(next, this.data.attachments || [])
     } catch (e) {
       wx.hideLoading()
       wx.showToast({ title: (e && e.message) || '识别失败', icon: 'none' })
