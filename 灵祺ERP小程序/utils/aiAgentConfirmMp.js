@@ -8,6 +8,7 @@ const briefStore = require('./kolBriefStorageMp.js')
 const erpNav = require('./erpNavMp.js')
 const library = require('./productEditLibraryMp.js')
 const intelSnap = require('./merchantIntelSnapshotMp.js')
+const uploadMp = require('./aiAgentProductUploadMp.js')
 
 const DEFAULT_PRODUCT_PLATFORMS = ['douyin', 'meituan', 'xiaohongshu']
 
@@ -75,13 +76,20 @@ async function submitProductPlansFromPreview(previewMsg, options) {
   let localOk = 0
   let platformOk = 0
   for (const plan of plans) {
-    const title = String(plan.productName || plan.slotLabel || '').trim()
-    const priceYuan = planPriceYuan(plan)
-    const priceNote = Number(plan.suggestedPriceYuan) > 0 ? '' : '（方案未给售价，已按 ¥99 写入）'
-    const desc = [plan.description, ...(plan.comboLines || [])].filter(Boolean).join('\n')
+    const sheet = ((previewMsg && previewMsg.uploadSheets) || []).find((s) => s.slotKey === plan.slotKey)
+    const formPrice = sheet && sheet.form ? Number(sheet.form.priceYuan) : 0
+    const priced =
+      Number.isFinite(formPrice) && formPrice > 0
+        ? Object.assign({}, plan, {
+            suggestedPriceYuan: formPrice,
+            productName: (sheet && sheet.productName) || plan.productName,
+          })
+        : plan
+    const title = String(priced.productName || priced.slotLabel || '').trim()
+    const priceNote = Number(priced.suggestedPriceYuan) > 0 ? '' : '（方案未给售价，已按 ¥99 写入）'
     for (const plat of platforms) {
       const label = listing.createPlatformLabel(plat)
-      const local = saveLocalDraft(plan, plat, '草稿')
+      const local = saveLocalDraft(priced, plat, '草稿')
       if (!local.ok) {
         lines.push(`${title} @ ${label}：${local.message}`)
         continue
@@ -91,28 +99,17 @@ async function submitProductPlansFromPreview(previewMsg, options) {
         lines.push(`${title} @ ${label}：已保存至商品列表草稿箱${priceNote}`)
         continue
       }
-      const r = await listing.postPlatformProductDraft(plat, {
-        title,
-        priceYuan,
-        description: desc || undefined,
-      })
-      const placeholder = /占位/.test(String((r && r.message) || ''))
-      if (r.ok && !placeholder) {
+      const r = await uploadMp.uploadConfirmed(priced, sheet, plat, previewMsg && previewMsg.uploadContext)
+      if (r.ok) {
         platformOk += 1
-        saveLocalDraft(plan, plat, '审核中')
-        lines.push(`${title} @ ${label}：平台已接收${r.draftId ? `（${r.draftId}）` : ''}，列表中为审核中`)
-      } else if (r.ok && placeholder) {
-        lines.push(
-          `${title} @ ${label}：已写入草稿箱${priceNote}。线上「提交至平台」目前是占位接口，不会进入抖音/美团/小红书商家后台。真上品要在「创建商品」补类目、主图和门店后再保存。`,
-        )
+        saveLocalDraft(priced, plat, '审核中')
+        lines.push(`${title} @ ${label}：${r.message || '已提交平台'}${r.headGenerated ? '（主图由 AI 生成）' : ''}`)
       } else {
-        lines.push(
-          `${title} @ ${label}：已写入草稿箱${priceNote}。提交平台未成功：${r.message || '失败'}。草稿可在商品列表「草稿」中继续编辑。`,
-        )
+        lines.push(`${title} @ ${label}：已写入草稿箱${priceNote}。提交平台未成功：${r.message || '失败'}`)
       }
     }
   }
-  const ok = localOk > 0
+  const ok = mode === 'submit' ? platformOk > 0 : localOk > 0
   return {
     ok,
     localOk,

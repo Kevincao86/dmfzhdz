@@ -69,6 +69,52 @@
             <text wx:if="{{plan.comboText}}" class="plan-desc">{{plan.comboText}}</text>
           </view>
         </view>
+        <view wx:if="{{item.uploadSheets && item.uploadSheets.length && item.previewStatus === 'pending'}}" class="upload-sheets">
+          <text class="upload-h">请确认后上传</text>
+          <text wx:if="{{item.uploadContext.categoryName}}" class="upload-ai">AI 已补充：{{item.uploadContext.categoryName}} · {{item.uploadContext.typeLabel}} · {{item.uploadContext.storeNames}}</text>
+          <text wx:elif="{{item.uploadContext.message}}" class="upload-ai">{{item.uploadContext.message}}</text>
+          <view wx:for="{{item.uploadSheets}}" wx:for-item="sheet" wx:key="slotKey" class="sheet">
+            <text class="plan-name">{{sheet.productName}}</text>
+            <view class="field-row">
+              <text class="field-lab">标价</text>
+              <input class="field-inp" type="digit" value="{{sheet.form.originYuan}}" data-id="{{item.id}}" data-slot="{{sheet.slotKey}}" data-field="originYuan" bindinput="onUploadField" />
+            </view>
+            <view class="field-row">
+              <text class="field-lab">售价</text>
+              <input class="field-inp" type="digit" value="{{sheet.form.priceYuan}}" data-id="{{item.id}}" data-slot="{{sheet.slotKey}}" data-field="priceYuan" bindinput="onUploadField" />
+            </view>
+            <view class="field-row">
+              <text class="field-lab">库存</text>
+              <input class="field-inp" type="number" value="{{sheet.form.stockQty}}" data-id="{{item.id}}" data-slot="{{sheet.slotKey}}" data-field="stockQty" bindinput="onUploadField" />
+            </view>
+            <text class="field-lab block">组合内容（一行一项）</text>
+            <textarea class="field-area" value="{{sheet.form.comboText}}" data-id="{{item.id}}" data-slot="{{sheet.slotKey}}" data-field="comboText" bindinput="onUploadField" auto-height />
+            <view class="field-row">
+              <text class="field-lab">售卖开始</text>
+              <picker mode="date" value="{{sheet.form.saleStart}}" data-id="{{item.id}}" data-slot="{{sheet.slotKey}}" data-field="saleStart" bindchange="onUploadDate">
+                <text class="field-inp picker">{{sheet.form.saleStart}}</text>
+              </picker>
+            </view>
+            <view class="field-row">
+              <text class="field-lab">售卖结束</text>
+              <picker mode="date" value="{{sheet.form.saleEnd}}" data-id="{{item.id}}" data-slot="{{sheet.slotKey}}" data-field="saleEnd" bindchange="onUploadDate">
+                <text class="field-inp picker">{{sheet.form.saleEnd}}</text>
+              </picker>
+            </view>
+            <view class="field-row">
+              <text class="field-lab">可用天数</text>
+              <input class="field-inp" type="number" value="{{sheet.form.useDays}}" data-id="{{item.id}}" data-slot="{{sheet.slotKey}}" data-field="useDays" bindinput="onUploadField" />
+            </view>
+            <view class="head-row">
+              <image wx:if="{{sheet.form.headLocal || sheet.form.headUrl}}" class="head-img" src="{{sheet.form.headLocal || sheet.form.headUrl}}" mode="aspectFill" />
+              <view wx:else class="head-empty">主图可选</view>
+              <view class="head-actions">
+                <view class="mini-btn" data-id="{{item.id}}" data-slot="{{sheet.slotKey}}" bindtap="onPickProductHead">相册</view>
+                <view class="mini-btn" data-id="{{item.id}}" data-slot="{{sheet.slotKey}}" data-name="{{sheet.productName}}" bindtap="onGenProductHead">AI 生成</view>
+              </view>
+            </view>
+          </view>
+        </view>
         <view wx:if="{{item.role === 'task_preview' && item.previewStatus === 'pending' && item.preview.taskType === 'create_product'}}" class="plat-row">
           <view
             wx:for="{{item.previewPlatforms}}"

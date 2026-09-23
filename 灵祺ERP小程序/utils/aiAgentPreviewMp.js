@@ -143,10 +143,12 @@ async function enrichProductPreviewMessage(msg) {
       comboText: (p.comboLines || []).filter(Boolean).join(' · '),
     }),
   )
-  return Object.assign({}, msg, {
-    content: `${msg.content}\n\n已生成 ${readyPlans.length} 项团购方案，请核对后选择「保存至草稿」或「提交至平台」。`,
+  const next = Object.assign({}, msg, {
+    content: `${msg.content}\n\n已生成 ${readyPlans.length} 项团购方案。请核对下方必填项后提交至平台。`,
     preview: Object.assign({}, msg.preview, { productPlans: readyPlans, productPlan: readyPlans[0] }),
   })
+  const upload = require('./aiAgentProductUploadMp.js')
+  return upload.attachSheets(next)
 }
 
 function localRecruitBriefFallback(msg) {

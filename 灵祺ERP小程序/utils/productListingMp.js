@@ -177,4 +177,48 @@ async function postPlatformProductDraft(
   }
 }
 
-module.exports = { fetchMerchantProductList, postMerchantProductSyncDouyin, postPlatformProductDraft, createPlatformLabel }
+const SAVE_PATHS = {
+  douyin: ['/api/meoo-douyin-goods-product-save', '/api/merchant/douyin/goods/product/save'],
+  meituan: ['/api/merchant/meituan/goods/product/save'],
+  xiaohongshu: ['/api/merchant/xhs/goods/product/save'],
+  kuaishou: ['/api/meoo-kuaishou-goods-product-save', '/api/merchant/kuaishou/goods/product/save'],
+}
+
+/** 真实上品：抖音/美团/小红书 goods/product/save，不用占位的 /product/draft */
+async function postGoodsProductSave(platform, body) {
+  const token = readPlatformToken(platform)
+  if (!token) {
+    return { ok: false, message: `未找到${createPlatformLabel(platform)}授权，请先在电脑端系统设置绑定` }
+  }
+  const paths = SAVE_PATHS[platform]
+  if (!paths) return { ok: false, message: '该平台暂不能从助手直接提交' }
+  let last = '提交失败'
+  for (const p of paths) {
+    try {
+      const data = await merchantApi.merchantRequestAuth('POST', p, { bearerToken: token, data: body })
+      const productId = String(
+        (data && (data.product_id || data.productId || data.draftId)) ||
+          (data && data.data && (data.data.product_id || data.data.productId)) ||
+          '',
+      ).trim()
+      const message = data && typeof data.message === 'string' ? data.message : ''
+      if (/占位|演示模式/.test(message)) {
+        return { ok: false, message }
+      }
+      return { ok: true, productId, message }
+    } catch (e) {
+      last = e instanceof Error ? e.message : String(e)
+      if (/404|not found/i.test(last)) continue
+      return { ok: false, message: last }
+    }
+  }
+  return { ok: false, message: last }
+}
+
+module.exports = {
+  fetchMerchantProductList,
+  postMerchantProductSyncDouyin,
+  postPlatformProductDraft,
+  postGoodsProductSave,
+  createPlatformLabel,
+}

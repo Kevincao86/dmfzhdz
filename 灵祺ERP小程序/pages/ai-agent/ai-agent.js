@@ -462,6 +462,70 @@ Page({
     erpNav.openTaskPage(type || 'general')
   },
 
+  patchUploadSheet(id, slot, patch) {
+    const messages = (this.data.messages || []).map((m) => {
+      if (m.id !== id || !Array.isArray(m.uploadSheets)) return m
+      return Object.assign({}, m, {
+        uploadSheets: m.uploadSheets.map((s) =>
+          s.slotKey === slot ? Object.assign({}, s, { form: Object.assign({}, s.form, patch) }) : s,
+        ),
+      })
+    })
+    this.setData({ messages })
+  },
+
+  onUploadField(e) {
+    const id = e.currentTarget.dataset.id
+    const slot = e.currentTarget.dataset.slot
+    const field = e.currentTarget.dataset.field
+    if (!id || !slot || !field) return
+    this.patchUploadSheet(id, slot, { [field]: e.detail.value })
+  },
+
+  onUploadDate(e) {
+    const id = e.currentTarget.dataset.id
+    const slot = e.currentTarget.dataset.slot
+    const field = e.currentTarget.dataset.field
+    if (!id || !slot || !field) return
+    this.patchUploadSheet(id, slot, { [field]: e.detail.value, saleUnlimited: false })
+  },
+
+  onPickProductHead(e) {
+    const id = e.currentTarget.dataset.id
+    const slot = e.currentTarget.dataset.slot
+    if (!id || !slot) return
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      sourceType: ['album', 'camera'],
+      success: (res) => {
+        const path = res.tempFiles && res.tempFiles[0] && res.tempFiles[0].tempFilePath
+        if (path) this.patchUploadSheet(id, slot, { headLocal: path, headUrl: '' })
+      },
+    })
+  },
+
+  async onGenProductHead(e) {
+    const id = e.currentTarget.dataset.id
+    const slot = e.currentTarget.dataset.slot
+    const name = e.currentTarget.dataset.name || '团购商品'
+    if (!id || !slot || !agent || !agent.postAiAgentNativeImage) return
+    wx.showLoading({ title: '生成主图…', mask: true })
+    try {
+      const r = await agent.postAiAgentNativeImage(
+        `${name} 商品主图，真实摄影，干净背景，不要文字和水印`,
+        '',
+      )
+      this.patchUploadSheet(id, slot, { headLocal: (r && r.imageUrl) || '', headUrl: '' })
+    } catch (err) {
+      wx.showToast({ title: (err && err.message) || '生图失败', icon: 'none' })
+    } finally {
+      try {
+        wx.hideLoading()
+      } catch (_) {}
+    }
+  },
+
   onToggleProductPlatform(e) {
     const id = e.currentTarget.dataset.id
     const plat = e.currentTarget.dataset.plat

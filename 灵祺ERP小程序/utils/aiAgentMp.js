@@ -808,4 +808,5 @@ module.exports = {
   apiBase,
   devMockReply,
   isAbortError,
+  postAiAgentNativeImage,
 }
