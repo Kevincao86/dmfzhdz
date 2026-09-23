@@ -4810,6 +4810,12 @@ async function buildGoodlifeProductSaveBody(
 
   const nowSec = toDouyinUnixSeconds(Date.now())
   const oneYearSec = nowSec + 366 * 86400
+  const startRaw = sales.sold_start_time ?? erp.sold_start_time
+  const endRaw = sales.sold_end_time ?? erp.sold_end_time
+  const startSec = startRaw != null && Number(startRaw) > 0 ? toDouyinUnixSeconds(startRaw) : nowSec
+  const endSec = endRaw != null && Number(endRaw) > 0 ? toDouyinUnixSeconds(endRaw) : oneYearSec
+  const soldStart = startSec
+  const soldEnd = endSec > soldStart ? endSec : soldStart + 366 * 86400
 
   const product: Record<string, unknown> = {
     product_name,
@@ -4820,8 +4826,8 @@ async function buildGoodlifeProductSaveBody(
     open_biz_type: resolveOpenBizTypeForGoodlifeSave(erp, goodlifeApiProductType, category_id),
     out_id,
     account_name,
-    sold_start_time: nowSec,
-    sold_end_time: oneYearSec,
+    sold_start_time: soldStart,
+    sold_end_time: soldEnd,
     pois: poi_ids.map((poi_id) => ({ poi_id })),
   }
   normalizeGoodlifeProductTopLevelTimes(product)
