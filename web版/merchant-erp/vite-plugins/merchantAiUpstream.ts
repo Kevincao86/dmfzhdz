@@ -2802,18 +2802,8 @@ export async function generateAdvertisingAiText(
   }
 }
 
-/** 评价回复 AI：TokenMix → DeepSeek → MiniMax → Kimi → 千问 → 豆包，额度/鉴权失败自动切换 */
-const REVIEW_REPLY_AI_VENDOR_ORDER = [
-  'openai',
-  'claude',
-  'gemini',
-  'grok',
-  'deepseek',
-  'minimax',
-  'kimi',
-  'qwen',
-  'doubao',
-] as const
+/** 评价回复 AI：只走千问 → DeepSeek → 豆包，额度/鉴权失败再换下一家 */
+const REVIEW_REPLY_AI_VENDOR_ORDER = ['qwen', 'deepseek', 'doubao'] as const
 
 export type MerchantReviewReplyContext = {
   platformLabel: string
@@ -2888,8 +2878,8 @@ export async function generateReviewReplyByAi(
     ok: false,
     message:
       errors.length > 0
-        ? `评价智能回复失败（已轮询全部已配置模型）：${errors.join('；')}`
-        : '未配置任一 AI Key（TokenMix / DeepSeek / MiniMax / Kimi / 千问 / 豆包）。请在运营台 AI 厂商配置或轻量环境变量中至少配置一家。',
+        ? `评价智能回复失败（已轮询千问、DeepSeek、豆包）：${errors.join('；')}`
+        : '未配置千问、DeepSeek 或豆包 Key。请在运营台 AI 厂商配置或轻量环境变量中至少配置一家。',
   }
 }
 

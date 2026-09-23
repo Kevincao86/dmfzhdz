@@ -95,8 +95,8 @@ export const MP_POINTS_GOODS_AI_PER_USE = 5
 /** 投流/线索 AI（广告洞察、跟进话术）：5 积分/次；≈¥0.05 */
 export const MP_POINTS_AD_AI_PER_USE = 5
 
-/** 评价回复 AI：3 积分/次；≈¥0.03 */
-export const MP_POINTS_REVIEW_AI_PER_USE = 3
+/** 评价回复 AI：1 积分/次。只走千问 / DeepSeek / 豆包，单条约 ¥0.001–0.003；1 积分预算 ¥0.01。 */
+export const MP_POINTS_REVIEW_AI_PER_USE = 1
 
 /** 单积分内部 API 成本（元） */
 export const MP_POINT_INTERNAL_COST_YUAN = 0.01
