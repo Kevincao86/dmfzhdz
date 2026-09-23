@@ -28,7 +28,7 @@ import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 const DEFAULT_BOT: ChatMessage = {
   id: 'm0',
   role: 'bot',
-  text: '您好，我是灵祺智能助手，可解答常见问题。如需人工协助，请点击下方「转人工服务」。',
+  text: '您好，我是灵祺智能助手。我会先回答您的问题；如需人工，请在 9:00–22:00 点击「进入人工客服」。',
   at: '',
   ts: 0,
 }
@@ -36,6 +36,49 @@ const DEFAULT_BOT: ChatMessage = {
 function nowTime(): string {
   return new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
 }
+
+const SUPPORT_CFG_SESSION = '__lq_support_ai_cfg__'
+const SUPPORT_QUEUE_SESSION = '__lq_support_queue__'
+const SUPPORT_CFG_PREFIX = 'LQCFG:'
+
+type SupportAiCfg = {
+  aiEnabled: boolean
+  humanStartHour: number
+  humanEndHour: number
+  knowledge: string
+}
+
+const DEFAULT_SUPPORT_CFG: SupportAiCfg = {
+  aiEnabled: true,
+  humanStartHour: 9,
+  humanEndHour: 22,
+  knowledge: '',
+}
+
+function supportHumanOpen(cfg: SupportAiCfg): boolean {
+  const h = new Date().getHours()
+  return h >= cfg.humanStartHour && h < cfg.humanEndHour
+}
+
+function parseSupportCfg(text: string): SupportAiCfg | null {
+  const body = text.startsWith(SUPPORT_CFG_PREFIX) ? text.slice(SUPPORT_CFG_PREFIX.length) : text
+  try {
+    const o = JSON.parse(body) as Partial<SupportAiCfg>
+    if (!o || typeof o !== 'object') return null
+    return {
+      aiEnabled: o.aiEnabled !== false,
+      humanStartHour: Number(o.humanStartHour) || 9,
+      humanEndHour: Number(o.humanEndHour) || 22,
+      knowledge: String(o.knowledge || '').slice(0, 4000),
+    }
+  } catch {
+    return null
+  }
+}
+
+const SUPPORT_PROJECT_BRIEF = `你是灵祺在线客服。灵祺是本地生活商家 ERP，网页与商家小程序互通，主要能力包括：商品与团购、门店菜单与经营类目、达人招募、评价处理、本地推/投流、短视频与视觉工坊、会员与在线客服。
+用简体中文直接回答，先给结论。不知道的功能说明去商家后台或小程序哪个菜单查看，不要编造订单、退款或已处理结果。
+人工客服时段为 9:00–22:00，时段内可点「进入人工客服」；人多时会排队。`
 
 const SUPPORT_RELAY_POLL_MS = 4000
 const MP_SUPPORT_RELAY_POLL_MS = 2000
@@ -79,6 +122,8 @@ export default function FloatingOnlineSupport({
   const [open, setOpen] = useState(false)
   const [humanMode, setHumanMode] = useState(false)
   const [connecting, setConnecting] = useState(false)
+  const [humanOpen, setHumanOpen] = useState(() => supportHumanOpen(DEFAULT_SUPPORT_CFG))
+  const supportCfgRef = useRef<SupportAiCfg>(DEFAULT_SUPPORT_CFG)
   const [relayReady, setRelayReady] = useState(isMpChannel)
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
@@ -92,6 +137,41 @@ export default function FloatingOnlineSupport({
   useEffect(() => {
     enterpriseNameRef.current = enterpriseName
   }, [enterpriseName])
+
+  useEffect(() => {
+    if (!open || !supabaseConfigured || !supabase) return
+    let cancelled = false
+    void (async () => {
+      const { data: auth } = await supabase.auth.getUser()
+      const uid = auth.user?.id
+      if (uid) {
+        await supabase.from('support_relay_messages').insert({
+          session_id: SUPPORT_CFG_SESSION,
+          from_role: 'system',
+          text: 'join',
+          ts: Date.now(),
+          client_msg_id: `cfg-join-${uid}`,
+          author_user_id: uid,
+        } as never)
+      }
+      const { data } = await supabase
+        .from('support_relay_messages')
+        .select('text,ts')
+        .eq('session_id', SUPPORT_CFG_SESSION)
+        .order('ts', { ascending: true })
+      if (cancelled) return
+      let cfg = DEFAULT_SUPPORT_CFG
+      for (const row of data || []) {
+        const parsed = parseSupportCfg(String((row as { text?: string }).text || ''))
+        if (parsed) cfg = parsed
+      }
+      supportCfgRef.current = cfg
+      setHumanOpen(supportHumanOpen(cfg))
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open])
 
   const customSupportWsUrl =
     typeof import.meta.env.VITE_SUPPORT_RELAY_WS === 'string' && import.meta.env.VITE_SUPPORT_RELAY_WS.trim().length > 0
@@ -573,35 +653,48 @@ export default function FloatingOnlineSupport({
 
   const requestHuman = () => {
     if (humanMode || connecting) return
+    if (!supportHumanOpen(supportCfgRef.current)) return
     setConnecting(true)
-    const sysText = isMpChannel
-      ? '已为您接入灵祺人工客服（星选）。请直接描述问题，运营同事将在商家管理后台「小程序在线客服」中回复。'
-      : '已为您接入灵祺人工客服，请在下方直接描述问题，客服同事将在此会话中回复'
-    const bid = pushMessage('system', sysText)
-    void emitRelayLine('system', sysText, bid).then((r) => {
+    void (async () => {
+      let ahead = 0
+      if (supabaseConfigured && supabase) {
+        const sid = sessionIdRef.current
+        const { data: auth } = await supabase.auth.getUser()
+        const uid = auth.user?.id ?? null
+        await supabase.from('support_relay_messages').insert({
+          session_id: SUPPORT_QUEUE_SESSION,
+          from_role: 'system',
+          text: `LQQUEUE OPEN ${sid}`,
+          ts: Date.now(),
+          client_msg_id: `q-open-${sid}`,
+          ...(uid ? { author_user_id: uid } : {}),
+        } as never)
+        const { data } = await supabase
+          .from('support_relay_messages')
+          .select('text,ts')
+          .eq('session_id', SUPPORT_QUEUE_SESSION)
+        const done = new Set<string>()
+        const opens: { sid: string; ts: number }[] = []
+        for (const row of data || []) {
+          const text = String((row as { text?: string }).text || '')
+          const ts = Number((row as { ts?: number }).ts) || 0
+          if (text.startsWith('LQQUEUE DONE ')) done.add(text.slice('LQQUEUE DONE '.length).trim())
+          if (text.startsWith('LQQUEUE OPEN ')) {
+            opens.push({ sid: text.slice('LQQUEUE OPEN '.length).trim(), ts })
+          }
+        }
+        const waiting = opens.filter((o) => o.sid && !done.has(o.sid)).sort((a, b) => a.ts - b.ts)
+        const idx = waiting.findIndex((o) => o.sid === sid)
+        ahead = idx <= 0 ? 0 : idx
+      }
+      const aheadText = ahead > 0 ? `当前前方 ${ahead} 人，` : ''
+      const sysText = `已进入人工客服排队。${aheadText}客服将按顺序在本会话回复。`
+      const bid = pushMessage('system', sysText)
+      const r = await emitRelayLine('system', sysText, bid)
       setConnecting(false)
-      if (isMpChannel) {
-        if (r.ok) setHumanMode(true)
-        else pushMessage('system', `消息未能写入客服通道。${r.detail ?? ''}`.trim())
-        return
-      }
-      const wsUrl = getSupportRelayWsUrl()
-      const cloud = !wsUrl && supabaseConfigured && supabase
-      if (!wsUrl && !cloud) {
-        setHumanMode(true)
-        return
-      }
-      if (r.ok) {
-        setHumanMode(true)
-      } else {
-        pushMessage(
-          'system',
-          wsUrl
-            ? `暂无法连接到人工客服会话：${r.detail ?? 'WebSocket 不可用'}。请稍后重试或通过其他渠道联系客户经理。`
-            : `消息未能写入云端会话表。${r.detail ?? ''} 详见控制台 [support_relay_messages]。`,
-        )
-      }
-    })
+      if (r.ok || (!getSupportRelayWsUrl() && !(supabaseConfigured && supabase))) setHumanMode(true)
+      else if (!r.ok) pushMessage('system', `未能进入人工排队。${r.detail ?? ''}`.trim())
+    })()
   }
 
   const send = () => {
@@ -615,13 +708,39 @@ export default function FloatingOnlineSupport({
         if (!r.ok) {
           pushMessage('system', `消息尚未送达客服通道。${r.detail ?? ''}`.trim())
         }
-        if (!humanMode) {
-          window.setTimeout(() => {
-            const botText =
-              '已收到您的问题。若需运营人工处理，请点击「转人工服务」。'
-            const bid = pushMessage('bot', botText)
-            void emitRelayLine('bot', botText, bid)
-          }, 500)
+        if (!humanMode && supportCfgRef.current.aiEnabled) {
+          void import('../services/ai/aiClient')
+            .then(({ postAiChat }) =>
+              postAiChat({
+                provider: 'qwen',
+                stream: false,
+                messages: [
+                  {
+                    role: 'system',
+                    content:
+                      SUPPORT_PROJECT_BRIEF +
+                      (supportCfgRef.current.knowledge
+                        ? `\n\n【运营补充说明】\n${supportCfgRef.current.knowledge}`
+                        : ''),
+                  },
+                  { role: 'user', content: t },
+                ],
+              }),
+            )
+            .then((res) => {
+              const botText = (res.content || '').trim() || '已收到，请再补充具体问题。'
+              const bid = pushMessage('bot', botText)
+              void emitRelayLine('bot', botText, bid)
+            })
+            .catch(() => {
+              const botText = '已收到您的问题。人工客服时段为 9:00–22:00，可点击「进入人工客服」。'
+              const bid = pushMessage('bot', botText)
+              void emitRelayLine('bot', botText, bid)
+            })
+        } else if (!humanMode) {
+          const botText = '已收到您的问题。如需人工，请在 9:00–22:00 点击「进入人工客服」。'
+          const bid = pushMessage('bot', botText)
+          void emitRelayLine('bot', botText, bid)
         } else {
           queueMicrotask(() => relaySyncRef.current?.())
         }
@@ -642,13 +761,39 @@ export default function FloatingOnlineSupport({
           `消息尚未送达客服通道。${r.detail ?? ''}`.trim(),
         )
       }
-      if (!humanMode) {
-        window.setTimeout(() => {
-          const botText =
-            '已收到您的问题。若需人工深度处理（如账号异常、合同与开票），请点击「转人工服务」。'
-          const bid = pushMessage('bot', botText)
-          void emitRelayLine('bot', botText, bid)
-        }, 500)
+      if (!humanMode && supportCfgRef.current.aiEnabled) {
+        void import('../services/ai/aiClient')
+          .then(({ postAiChat }) =>
+            postAiChat({
+              provider: 'qwen',
+              stream: false,
+              messages: [
+                {
+                  role: 'system',
+                  content:
+                    SUPPORT_PROJECT_BRIEF +
+                    (supportCfgRef.current.knowledge
+                      ? `\n\n【运营补充说明】\n${supportCfgRef.current.knowledge}`
+                      : ''),
+                },
+                { role: 'user', content: t },
+              ],
+            }),
+          )
+          .then((res) => {
+            const botText = (res.content || '').trim() || '已收到，请再补充具体问题。'
+            const bid = pushMessage('bot', botText)
+            void emitRelayLine('bot', botText, bid)
+          })
+          .catch(() => {
+            const botText = '已收到您的问题。人工客服时段为 9:00–22:00，可点击「进入人工客服」。'
+            const bid = pushMessage('bot', botText)
+            void emitRelayLine('bot', botText, bid)
+          })
+      } else if (!humanMode) {
+        const botText = '已收到您的问题。如需人工，请在 9:00–22:00 点击「进入人工客服」。'
+        const bid = pushMessage('bot', botText)
+        void emitRelayLine('bot', botText, bid)
       }
     })
   }
@@ -773,7 +918,7 @@ export default function FloatingOnlineSupport({
               ))}
             </div>
 
-            {!humanMode && !connecting ? (
+            {!humanMode && !connecting && humanOpen ? (
               <div className="border-t border-gray-100 bg-white px-3 py-2">
                 <button
                   type="button"
@@ -781,8 +926,13 @@ export default function FloatingOnlineSupport({
                   disabled={relayBlocked}
                   className="w-full rounded-lg border border-amber-200 bg-amber-50 py-2 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  转人工服务
+                  进入人工客服
                 </button>
+              </div>
+            ) : null}
+            {!humanMode && !humanOpen ? (
+              <div className="border-t border-gray-100 bg-white px-3 py-2 text-center text-[11px] text-gray-400">
+                人工客服服务时间为 9:00–22:00
               </div>
             ) : null}
 
