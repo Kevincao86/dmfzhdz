@@ -3,6 +3,7 @@ const erpNav = require('../../utils/erpNavMp.js')
 const { decodeJwtSub } = require('../../utils/jwtDecode.js')
 const { assetUrl } = require('../../utils/mpStaticAssets.js')
 const composer = require('../../utils/agentComposerMp.js')
+const sessionSync = require('../../utils/merchantSessionSyncMp.js')
 
 let agent = null
 let exec = null
@@ -84,6 +85,7 @@ Page({
       scrollTo: lastScrollId(messages, false),
     })
     void this.refreshShortcuts()
+    void sessionSync.syncFromCloud({ force: true }).catch(() => {})
   },
 
   async refreshShortcuts() {
@@ -372,6 +374,9 @@ Page({
   async sendLine(line, attachments) {
     if (!agent || this.data.sending) return
     if (!api.requireRealAuth('/pages/ai-agent/ai-agent')) return
+    try {
+      await sessionSync.syncFromCloud({ force: true })
+    } catch (_) {}
     const atts = Array.isArray(attachments) ? attachments : []
     const fileNote = atts
       .filter((a) => a.kind === 'file')

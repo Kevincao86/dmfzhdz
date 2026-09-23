@@ -15,6 +15,11 @@
       <text wx:if="{{item.role === 'user'}}" class="ava ava-me">我</text>
     </view>
   </scroll-view>
+  <view wx:if="{{!humanMode}}" class="support-human">
+    <view wx:if="{{humanOpen}}" class="support-human-btn" bindtap="onRequestHuman">{{connecting ? '排队接入中…' : '进入人工客服'}}</view>
+    <text wx:else class="support-human-off">人工客服服务时间为 9:00–22:00</text>
+    <text wx:if="{{queueHint}}" class="support-human-off">{{queueHint}}</text>
+  </view>
   <view class="composer-v2 support-composer">
     <input class="composer-input" placeholder="输入消息…" value="{{input}}" bindinput="onInput" confirm-type="send" bindconfirm="onSend" />
     <view class="send-v2" bindtap="onSend"><text class="send-glyph">➤</text></view>

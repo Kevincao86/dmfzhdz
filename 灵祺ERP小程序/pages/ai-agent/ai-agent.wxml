@@ -1,4 +1,4 @@
-<view class="agent-page" style="padding-bottom:var(--tab-bar-pad)">
+<view class="agent-page">
   <view class="agent-hero">
     <view class="agent-hero-main">
       <image class="agent-logo" src="{{logoSrc}}" mode="aspectFit" />

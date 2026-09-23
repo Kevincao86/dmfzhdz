@@ -376,7 +376,14 @@ function readBindingSnapshotFromStorage() {
 
 function applyStoreIntel(row, tenantId) {
   if (!row || typeof row !== 'object') return
-  const margin = row.margin_config
+  let margin = row.margin_config
+  if (typeof margin === 'string') {
+    try {
+      margin = JSON.parse(margin)
+    } catch (_) {
+      margin = null
+    }
+  }
   if (margin && typeof margin === 'object') {
     storageSet(tenantScopedKey('meoo_store_margin_config_v1', tenantId), JSON.stringify(margin))
     if (margin.margins && typeof margin.margins === 'object') {
