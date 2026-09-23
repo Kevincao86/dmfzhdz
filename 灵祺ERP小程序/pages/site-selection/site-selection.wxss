@@ -57,3 +57,68 @@
   font-weight: 700;
   color: var(--erp-text);
 }
+
+.intel-map {
+  width: 100%;
+  height: 420rpx;
+  margin-top: 12rpx;
+  border-radius: 16rpx;
+  overflow: hidden;
+}
+
+.heat-drivers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+  margin-top: 12rpx;
+}
+
+.heat-chip {
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 22rpx;
+}
+
+.heat-days {
+  margin-top: 12rpx;
+}
+
+.heat-day {
+  display: flex;
+  justify-content: space-between;
+  padding: 8rpx 0;
+  font-size: 24rpx;
+  color: #475569;
+}
+
+.heat-day-v {
+  font-weight: 600;
+  color: var(--erp-text);
+}
+
+.ss-rec {
+  padding: 16rpx 0;
+  border-top: 1rpx solid #d1fae5;
+}
+
+.ss-rec:first-of-type {
+  border-top: none;
+}
+
+.ss-near {
+  padding: 12rpx 0;
+  border-top: 1rpx solid #f1f5f9;
+}
+
+.ss-near:first-of-type {
+  border-top: none;
+}
+
+.ss-near-name {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--erp-text);
+}

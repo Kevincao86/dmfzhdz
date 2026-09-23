@@ -212,6 +212,14 @@ async function runCompetitorAnalysis(body) {
         industryHint: r.industryHint,
         competitors: Array.isArray(r.competitors) ? r.competitors : [],
         suggestions: Array.isArray(r.suggestions) ? r.suggestions : [],
+        bundleSuggestions: Array.isArray(r.bundleSuggestions) ? r.bundleSuggestions : [],
+        mapSource: r.mapSource || '',
+        mapProvider: r.mapProvider || r.mapSource || '',
+        mapMeta: r.mapMeta && typeof r.mapMeta === 'object' ? r.mapMeta : null,
+        peerPois: Array.isArray(r.peerPois) ? r.peerPois : [],
+        heatMapGrid: Array.isArray(r.heatMapGrid) ? r.heatMapGrid : [],
+        footTrafficHeat: r.footTrafficHeat || null,
+        location: (r.mapMeta && r.mapMeta.location) || (r.footTrafficHeat && r.footTrafficHeat.location) || null,
       }
     }
     return { ok: false, message: String(r.error || r.message || r.detail || '分析失败') }
@@ -314,10 +322,18 @@ async function runSiteSelection(body) {
         ok: true,
         summary: String(r.summary || ''),
         score: r.score,
+        scoreStory: r.scoreStory || '',
+        brandUnderstanding: r.brandUnderstanding || '',
         footTrafficHeat: r.footTrafficHeat || null,
         recommendations: Array.isArray(r.recommendations) ? r.recommendations : [],
         checklist: Array.isArray(r.checklist) ? r.checklist : [],
         nearby: r.nearby || null,
+        location: r.location || null,
+        heatMapGrid: Array.isArray(r.heatMapGrid) ? r.heatMapGrid : [],
+        mapProvider: r.mapProvider || r.mapSource || '',
+        mapSource: r.mapSource || r.mapProvider || '',
+        competitors: Array.isArray(r.competitors) ? r.competitors : [],
+        mapMeta: r.mapMeta && typeof r.mapMeta === 'object' ? r.mapMeta : null,
       }
     }
     return { ok: false, message: String(r.error || r.message || r.detail || '选址评估失败') }

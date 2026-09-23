@@ -1,5 +1,6 @@
 const feat = require('../../utils/merchantFeatureApisMp.js')
 const feature = require('../../utils/merchantFeatureMp.js')
+const intelMap = require('../../utils/storeIntelMapMp.js')
 
 async function loadDouyinStores() {
   const all = []
@@ -36,6 +37,14 @@ Page({
     summary: '',
     competitors: [],
     suggestions: [],
+    bundles: [],
+    heat: null,
+    mapSourceLabel: '',
+    showMap: false,
+    mapLat: 30,
+    mapLng: 120,
+    markers: [],
+    includePoints: [],
   },
 
   onShow() {
@@ -113,7 +122,19 @@ Page({
       wx.showToast({ title: '请先选择门店', icon: 'none' })
       return
     }
-    this.setData({ busy: true, err: '', summary: '', competitors: [], suggestions: [] })
+    this.setData({
+      busy: true,
+      err: '',
+      summary: '',
+      competitors: [],
+      suggestions: [],
+      bundles: [],
+      heat: null,
+      mapSourceLabel: '',
+      showMap: false,
+      markers: [],
+      includePoints: [],
+    })
     void (async () => {
       const menu = feat.readStoreMenu()
       const r = await feat.runCompetitorAnalysis({
@@ -128,17 +149,23 @@ Page({
         this.setData({ busy: false, err: r.message || '分析失败' })
         return
       }
+      const mapView = intelMap.buildMapView(r, storeName)
       this.setData({
         busy: false,
         summary: r.summary,
         competitors: (r.competitors || []).map((c, i) => ({
           id: `c-${i}`,
           name: String(c.name || c.storeName || '竞品').trim(),
-          distance: c.distance || c.distanceText || '',
-          priceBand: c.priceBand || c.priceRange || '',
-          note: c.note || c.highlight || c.summary || '',
+          distance: c.distanceHint || c.distance || c.distanceText || '',
+          priceBand: c.priceRange || c.priceBand || '',
+          note: c.highlights || c.note || c.highlight || c.summary || '',
+          hots: intelMap.mapHotProducts(c.hotProducts),
         })),
         suggestions: r.suggestions || [],
+        bundles: intelMap.mapBundles(r.bundleSuggestions),
+        heat: intelMap.mapHeat(r.footTrafficHeat),
+        mapSourceLabel: intelMap.mapSourceLabel(r),
+        ...mapView,
       })
     })()
   },

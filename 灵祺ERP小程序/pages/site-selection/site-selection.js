@@ -1,5 +1,33 @@
 const api = require('../../utils/api.js')
 const feat = require('../../utils/merchantFeatureApisMp.js')
+const intelMap = require('../../utils/storeIntelMapMp.js')
+
+function formatRec(x, i) {
+  const dist =
+    x && x.distanceM != null && Number.isFinite(Number(x.distanceM))
+      ? Number(x.distanceM) >= 1000
+        ? `约 ${(Number(x.distanceM) / 1000).toFixed(1)} km`
+        : `约 ${Math.round(Number(x.distanceM))} m`
+      : ''
+  const counts = x && x.counts && typeof x.counts === 'object' ? x.counts : {}
+  const countLine = [
+    counts.competitor != null ? `同业 ${counts.competitor}` : '',
+    counts.transit != null ? `交通 ${counts.transit}` : '',
+    counts.mall != null ? `商场 ${counts.mall}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
+  return {
+    id: `r-${i}`,
+    title: String(x.title || x.label || x.name || `荐${x.rank || i + 1}`).trim(),
+    score: x.score != null ? `${x.score} 分` : '',
+    verdict: String(x.verdict || '').trim(),
+    distDir: [dist, x.direction].filter(Boolean).join(' · '),
+    address: String(x.address || '').trim(),
+    note: String(x.reason || x.note || x.summary || '').trim(),
+    countLine,
+  }
+}
 
 Page({
   data: {
@@ -15,7 +43,15 @@ Page({
     dimensions: [],
     checklist: [],
     recommendations: [],
+    nearbyCompetitors: [],
+    heat: null,
     heatNote: '',
+    mapSourceLabel: '',
+    showMap: false,
+    mapLat: 30,
+    mapLng: 120,
+    markers: [],
+    includePoints: [],
   },
 
   onLoad() {
@@ -77,7 +113,13 @@ Page({
       dimensions: [],
       checklist: [],
       recommendations: [],
+      nearbyCompetitors: [],
+      heat: null,
       heatNote: '',
+      mapSourceLabel: '',
+      showMap: false,
+      markers: [],
+      includePoints: [],
     })
     void (async () => {
       const r = await feat.runSiteSelection({
@@ -87,6 +129,7 @@ Page({
         brandName: String(this.data.brandName || '').trim() || undefined,
         industryPath: feat.readIndustryPath() || undefined,
         margins: feat.readMargins(),
+        radiusM: 1500,
       })
       if (!r.ok) {
         this.setData({ busy: false, err: r.message || '评估失败' })
@@ -101,13 +144,25 @@ Page({
             note: String(d.note || ''),
           }))
         : []
-      const heat = r.footTrafficHeat || {}
-      const heatNote = heat.summary || heat.level || heat.note || ''
-      const recommendations = (r.recommendations || []).map((x, i) => ({
-        id: `r-${i}`,
-        title: String(x.title || x.name || x.label || '推荐点位').trim(),
-        note: String(x.note || x.reason || x.summary || '').trim(),
-      }))
+      const heat = intelMap.mapHeat(r.footTrafficHeat)
+      const recs = (r.recommendations || []).map(formatRec)
+      const nearbyCompetitors = (r.competitors || []).slice(0, 8).map((c, i) => {
+        const m = c && c.distanceM
+        let dist = ''
+        if (m != null && Number.isFinite(Number(m))) {
+          dist = Number(m) >= 1000 ? `${(Number(m) / 1000).toFixed(1)} km` : `${Math.round(Number(m))} m`
+        }
+        return {
+          id: `n-${i}`,
+          name: String(c.name || '同业').trim(),
+          dist,
+        }
+      })
+      const mapPayload = Object.assign({}, r, {
+        mapMeta: r.mapMeta || { location: r.location, pois: r.competitors },
+        competitors: r.competitors,
+      })
+      const mapView = intelMap.buildMapView(mapPayload, String(this.data.spotLabel || '预想点位').trim() || '预想点位')
       this.setData({
         busy: false,
         summary: r.summary || '',
@@ -115,8 +170,12 @@ Page({
         verdict: String(score.verdict || ''),
         dimensions: dims,
         checklist: r.checklist || [],
-        recommendations,
-        heatNote: String(heatNote || ''),
+        recommendations: recs,
+        nearbyCompetitors,
+        heat,
+        heatNote: heat && heat.insight ? '' : String((r.footTrafficHeat && (r.footTrafficHeat.summary || r.footTrafficHeat.level)) || ''),
+        mapSourceLabel: intelMap.mapSourceLabel(r) || (mapView.showMap ? '选址地图' : ''),
+        ...mapView,
       })
     })()
   },

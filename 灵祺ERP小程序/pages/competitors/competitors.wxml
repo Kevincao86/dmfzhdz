@@ -1,7 +1,7 @@
 <scroll-view scroll-y class="erp-page" enhanced show-scrollbar="{{false}}">
   <view class="erp-hero">
     <text class="erp-hero-title">竞争对手分析</text>
-    <text class="erp-hero-sub">与电脑端同源。选择已认领门店后生成竞品报告。</text>
+    <text class="erp-hero-sub">与电脑端同源。地图实查周边同业，并给出热销推断与组品建议。</text>
   </view>
 
   <view class="erp-card">
@@ -31,20 +31,66 @@
     <text class="erp-body" user-select>{{summary}}</text>
   </view>
 
+  <view wx:if="{{showMap}}" class="erp-card">
+    <text class="erp-card-title">{{mapSourceLabel || '周边地图'}}</text>
+    <map
+      class="intel-map"
+      latitude="{{mapLat}}"
+      longitude="{{mapLng}}"
+      scale="14"
+      markers="{{markers}}"
+      include-points="{{includePoints}}"
+      enable-zoom
+      enable-scroll
+      show-location="{{false}}"
+    />
+    <text class="erp-hint">蓝标为本店，点竞品针可看店名。</text>
+  </view>
+
+  <view wx:if="{{heat}}" class="erp-card">
+    <text class="erp-card-title">近 7 日人流热度</text>
+    <text wx:if="{{heat.insight}}" class="erp-body">{{heat.insight}}</text>
+    <text wx:if="{{heat.disclaimer}}" class="erp-hint">{{heat.disclaimer}}</text>
+    <view wx:if="{{heat.drivers.length}}" class="heat-drivers">
+      <text wx:for="{{heat.drivers}}" wx:key="*this" class="heat-chip">{{item}}</text>
+    </view>
+    <view wx:if="{{heat.days.length}}" class="heat-days">
+      <view wx:for="{{heat.days}}" wx:key="id" class="heat-day">
+        <text class="heat-day-l">{{item.label}}</text>
+        <text class="heat-day-v">日均 {{item.avg}}</text>
+      </view>
+    </view>
+  </view>
+
   <view wx:if="{{competitors.length}}" class="erp-card">
-    <text class="erp-card-title">周边竞品</text>
+    <text class="erp-card-title">{{mapSourceLabel || '周边竞品'}}</text>
     <view wx:for="{{competitors}}" wx:key="id" class="cp-row">
       <text class="cp-row-name">{{item.name}}</text>
       <text wx:if="{{item.distance}}" class="cp-row-meta">{{item.distance}}</text>
       <text wx:if="{{item.priceBand}}" class="cp-row-meta">价格带：{{item.priceBand}}</text>
       <text wx:if="{{item.note}}" class="cp-row-note">{{item.note}}</text>
+      <view wx:if="{{item.hots.length}}" class="cp-hot">
+        <text class="cp-hot-title">热销团购/外卖（推断，供组品参考）</text>
+        <text wx:for="{{item.hots}}" wx:for-item="hp" wx:key="id" class="cp-hot-line">{{hp.line}}</text>
+      </view>
     </view>
   </view>
 
   <view wx:if="{{suggestions.length}}" class="erp-card">
-    <text class="erp-card-title">差异化建议</text>
+    <text class="erp-card-title">经营建议</text>
     <view wx:for="{{suggestions}}" wx:key="*this" class="cp-sug">
       <text>· {{item}}</text>
+    </view>
+  </view>
+
+  <view wx:if="{{bundles.length}}" class="erp-card">
+    <text class="erp-card-title">组品建议（AI · 毛利 + 菜单 + 竞品）</text>
+    <view wx:for="{{bundles}}" wx:key="id" class="cp-bundle">
+      <text class="cp-bundle-title">{{item.title}}</text>
+      <text wx:if="{{item.combo}}" class="cp-row-note">组合：{{item.combo}}</text>
+      <text wx:if="{{item.price}}" class="cp-bundle-price">{{item.price}}{{item.origin ? ' · ' + item.origin : ''}}{{item.margin ? ' · ' + item.margin : ''}}</text>
+      <text wx:if="{{item.competitorRef}}" class="cp-row-meta">竞品对标：{{item.competitorRef}}</text>
+      <text wx:if="{{item.rationale}}" class="cp-row-note">{{item.rationale}}</text>
     </view>
   </view>
 </scroll-view>

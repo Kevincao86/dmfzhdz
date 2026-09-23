@@ -1,7 +1,7 @@
 <scroll-view scroll-y class="erp-page" enhanced show-scrollbar="{{false}}">
   <view class="erp-hero">
     <text class="erp-hero-title">选址参考</text>
-    <text class="erp-hero-sub">人流热度、周边配套与综合打分。与电脑端「选址参考」同源 API。</text>
+    <text class="erp-hero-sub">人流热度、周边地图与综合打分。与电脑端「选址参考」同源 API。</text>
   </view>
 
   <view class="erp-card">
@@ -34,6 +34,37 @@
     <text wx:if="{{heatNote}}" class="erp-hint" style="margin-top:12rpx">人流：{{heatNote}}</text>
   </view>
 
+  <view wx:if="{{showMap}}" class="erp-card">
+    <text class="erp-card-title">{{mapSourceLabel || '选址地图'}}</text>
+    <map
+      class="intel-map"
+      latitude="{{mapLat}}"
+      longitude="{{mapLng}}"
+      scale="14"
+      markers="{{markers}}"
+      include-points="{{includePoints}}"
+      enable-zoom
+      enable-scroll
+      show-location="{{false}}"
+    />
+    <text class="erp-hint">蓝标为预想点位，周边针为同业门店。</text>
+  </view>
+
+  <view wx:if="{{heat}}" class="erp-card">
+    <text class="erp-card-title">近 7 日人流热度</text>
+    <text wx:if="{{heat.insight}}" class="erp-body">{{heat.insight}}</text>
+    <text wx:if="{{heat.disclaimer}}" class="erp-hint">{{heat.disclaimer}}</text>
+    <view wx:if="{{heat.drivers.length}}" class="heat-drivers">
+      <text wx:for="{{heat.drivers}}" wx:key="*this" class="heat-chip">{{item}}</text>
+    </view>
+    <view wx:if="{{heat.days.length}}" class="heat-days">
+      <view wx:for="{{heat.days}}" wx:key="id" class="heat-day">
+        <text>{{item.label}}</text>
+        <text class="heat-day-v">日均 {{item.avg}}</text>
+      </view>
+    </view>
+  </view>
+
   <view wx:if="{{dimensions.length}}" class="erp-card">
     <text class="erp-card-title">维度得分</text>
     <view wx:for="{{dimensions}}" wx:key="id" class="ss-dim">
@@ -46,12 +77,21 @@
   </view>
 
   <view wx:if="{{recommendations.length}}" class="erp-card">
-    <text class="erp-card-title">推荐点位</text>
-    <view wx:for="{{recommendations}}" wx:key="id" class="erp-row">
-      <view>
-        <text class="kb-title">{{item.title}}</text>
-        <text wx:if="{{item.note}}" class="erp-hint">{{item.note}}</text>
-      </view>
+    <text class="erp-card-title">附近合适点位推荐</text>
+    <view wx:for="{{recommendations}}" wx:key="id" class="ss-rec">
+      <text class="kb-title">{{item.title}}{{item.score ? ' · ' + item.score : ''}}{{item.verdict ? ' · ' + item.verdict : ''}}</text>
+      <text wx:if="{{item.distDir}}" class="erp-hint">{{item.distDir}}</text>
+      <text wx:if="{{item.address}}" class="erp-hint">{{item.address}}</text>
+      <text wx:if="{{item.note}}" class="erp-body">{{item.note}}</text>
+      <text wx:if="{{item.countLine}}" class="erp-hint">{{item.countLine}}</text>
+    </view>
+  </view>
+
+  <view wx:if="{{nearbyCompetitors.length}}" class="erp-card">
+    <text class="erp-card-title">同业密度</text>
+    <view wx:for="{{nearbyCompetitors}}" wx:key="id" class="ss-near">
+      <text class="ss-near-name">{{item.name}}</text>
+      <text wx:if="{{item.dist}}" class="erp-hint">{{item.dist}}</text>
     </view>
   </view>
 
