@@ -235,16 +235,106 @@ function smtpFromAddress(): string {
   return (
     process.env.MEOO_SMTP_FROM ||
     process.env.MEOO_MAIL_FROM ||
+    process.env.MEOO_FEISHU_MAIL_FROM ||
     'lingqi@mofangdianai.com'
   ).trim()
 }
 
+function feishuAppCreds(): { appId: string; appSecret: string } {
+  return {
+    appId: (process.env.FEISHU_APP_ID || process.env.FEISHU_OFFICIAL_APP_ID || '').trim(),
+    appSecret: (process.env.FEISHU_APP_SECRET || process.env.FEISHU_OFFICIAL_APP_SECRET || '').trim(),
+  }
+}
+
+function allowDevEmailCode(): boolean {
+  if (process.env.MEOO_SMS_DEV_EXPOSE === '1') return true
+  if (process.env.MEOO_AUTH_API_SERVER === '1') return false
+  return process.env.NODE_ENV !== 'production' && process.env.VERCEL_ENV !== 'production'
+}
+
 function smtpConfigured(): boolean {
   return Boolean(
-    (process.env.MEOO_SMTP_HOST || '').trim() &&
-      (process.env.MEOO_SMTP_USER || process.env.MEOO_SMTP_FROM || 'lingqi@mofangdianai.com') &&
+    (process.env.MEOO_SMTP_HOST || process.env.MEOO_SMTP_PASS || '').trim() &&
       (process.env.MEOO_SMTP_PASS || '').trim(),
   )
+}
+
+async function feishuTenantAccessToken(): Promise<string | null> {
+  const { appId, appSecret } = feishuAppCreds()
+  if (!appId || !appSecret) return null
+  const res = await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    body: JSON.stringify({ app_id: appId, app_secret: appSecret }),
+  })
+  const data = (await res.json().catch(() => ({}))) as { code?: number; tenant_access_token?: string }
+  if (!res.ok || data.code !== 0 || !data.tenant_access_token) return null
+  return data.tenant_access_token
+}
+
+async function feishuMailUserAccessToken(): Promise<string | null> {
+  const direct = (process.env.FEISHU_MAIL_USER_ACCESS_TOKEN || '').trim()
+  if (direct) return direct
+  const refresh = (process.env.FEISHU_MAIL_REFRESH_TOKEN || '').trim()
+  const { appId, appSecret } = feishuAppCreds()
+  if (!refresh || !appId || !appSecret) return null
+  const res = await fetch('https://open.feishu.cn/open-apis/authen/v2/oauth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    body: JSON.stringify({
+      grant_type: 'refresh_token',
+      client_id: appId,
+      client_secret: appSecret,
+      refresh_token: refresh,
+    }),
+  })
+  const data = (await res.json().catch(() => ({}))) as { code?: number; access_token?: string }
+  if (!res.ok || (data.code != null && data.code !== 0) || !data.access_token) return null
+  return data.access_token
+}
+
+async function sendViaFeishuMail(
+  to: string,
+  subject: string,
+  text: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const from = smtpFromAddress()
+  const token = (await feishuMailUserAccessToken()) || (await feishuTenantAccessToken())
+  if (!token) return { ok: false, message: '飞书发信未配置（缺少 FEISHU_APP_ID / FEISHU_APP_SECRET）' }
+  const mailboxId = encodeURIComponent(from)
+  const url = `https://open.feishu.cn/open-apis/mail/v1/user_mailboxes/${mailboxId}/messages/send`
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({
+        subject,
+        to: [{ mail_address: to }],
+        head_from: { name: '灵祺' },
+        body_plain_text: text,
+      }),
+    })
+    const raw = await res.text()
+    let parsed: { code?: number; msg?: string } = {}
+    try {
+      parsed = JSON.parse(raw) as typeof parsed
+    } catch {
+      /* ignore */
+    }
+    if (!res.ok || (parsed.code != null && parsed.code !== 0)) {
+      return {
+        ok: false,
+        message: parsed.msg || raw.slice(0, 180) || `飞书发信失败 HTTP ${res.status}`,
+      }
+    }
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) }
+  }
 }
 
 async function smtpCommand(socket: net.Socket, cmd?: string): Promise<string> {
@@ -264,12 +354,12 @@ async function smtpCommand(socket: net.Socket, cmd?: string): Promise<string> {
 }
 
 async function sendSmtpMail(to: string, subject: string, text: string): Promise<{ ok: true } | { ok: false; message: string }> {
-  const host = (process.env.MEOO_SMTP_HOST || '').trim()
+  const host = (process.env.MEOO_SMTP_HOST || 'smtp.feishu.cn').trim()
   const port = Number(process.env.MEOO_SMTP_PORT || 465)
   const user = (process.env.MEOO_SMTP_USER || smtpFromAddress()).trim()
   const pass = (process.env.MEOO_SMTP_PASS || '').trim()
   const from = smtpFromAddress()
-  if (!host || !pass) return { ok: false, message: '邮箱发信未配置（MEOO_SMTP_HOST / MEOO_SMTP_PASS）' }
+  if (!pass) return { ok: false, message: '邮箱发信未配置（MEOO_SMTP_PASS 或飞书发信）' }
 
   return await new Promise((resolve) => {
     const socket = tls.connect({ host, port, servername: host }, async () => {
@@ -314,17 +404,61 @@ export async function sendAuthEmailCode(emailRaw: string): Promise<
   const code = String(randomInt(100000, 999999))
   emailOtpStore.set(email, { code, exp: Date.now() + EMAIL_OTP_TTL_MS })
   const text = `您的灵祺ERP验证码是 ${code}，5 分钟内有效。如非本人操作请忽略。`
+  const subject = '灵祺ERP邮箱验证码'
+  const viaFeishu = await sendViaFeishuMail(email, subject, text)
+  if (viaFeishu.ok) {
+    return {
+      ok: true,
+      message: `验证码已发送至 ${maskEmail(email)}`,
+      ...(allowDevEmailCode() ? { devCode: code } : {}),
+    }
+  }
   if (smtpConfigured()) {
-    const sent = await sendSmtpMail(email, '灵祺ERP邮箱验证码', text)
+    const sent = await sendSmtpMail(email, subject, text)
     if (!sent.ok) return { ok: false, error: 'email_send_failed', message: sent.message }
-    const expose = process.env.MEOO_SMS_DEV_EXPOSE === '1' || process.env.VERCEL_ENV !== 'production'
-    return { ok: true, message: `验证码已发送至 ${maskEmail(email)}`, ...(expose ? { devCode: code } : {}) }
+    return {
+      ok: true,
+      message: `验证码已发送至 ${maskEmail(email)}`,
+      ...(allowDevEmailCode() ? { devCode: code } : {}),
+    }
   }
-  const expose = process.env.MEOO_SMS_DEV_EXPOSE === '1' || process.env.NODE_ENV !== 'production'
-  if (!expose) {
-    return { ok: false, error: 'email_not_configured', message: '邮箱发信未配置，请联系管理员设置 MEOO_SMTP_*' }
+  if (allowDevEmailCode()) {
+    return { ok: true, message: '开发环境验证码已生成（发件箱 灵祺）', devCode: code }
   }
-  return { ok: true, message: `开发环境验证码已生成（发件箱 ${smtpFromAddress()}）`, devCode: code }
+  return {
+    ok: false,
+    error: 'email_not_configured',
+    message: viaFeishu.message || '邮箱发信未配置',
+  }
+}
+
+export async function loginWithEmailCode(input: {
+  email: string
+  emailCode: string
+}): Promise<
+  | { ok: true; access_token: string; refresh_token: string; expires_in?: number; loginName: string }
+  | { ok: false; error: string; message: string }
+> {
+  const email = normalizeBindEmail(input.email)
+  const emailCode = String(input.emailCode || '').trim()
+  if (!email) return { ok: false, error: 'invalid_email', message: '请输入有效邮箱' }
+  if (!/^\d{6}$/.test(emailCode)) return { ok: false, error: 'invalid_email_code', message: '请输入 6 位验证码' }
+  if (!verifyAuthEmailCode(email, emailCode)) {
+    return { ok: false, error: 'email_code_invalid', message: '邮箱验证码错误或已过期' }
+  }
+  const user = await findAuthUserByBindEmail(email)
+  if (!user) return { ok: false, error: 'email_not_registered', message: '该邮箱尚未注册，请先注册' }
+  const session = await createAdminSessionForUserId(user.userId, user.email)
+  if (!session.ok) {
+    return { ok: false, error: session.error, message: session.detail || '登录失败' }
+  }
+  return {
+    ok: true,
+    access_token: session.access_token,
+    refresh_token: session.refresh_token,
+    expires_in: session.expires_in,
+    loginName: user.loginName,
+  }
 }
 
 export function verifyAuthEmailCode(emailRaw: string, code: string): boolean {

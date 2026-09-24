@@ -17,6 +17,7 @@ import {
   isCnMobileValid,
   isLoginNameValid,
   isMerchantShortNameValid,
+  loginWithEmailCode,
   loginWithSmsCode,
   registerMerchantAccount,
   registerPartnerAccount,
@@ -30,7 +31,7 @@ import LoginAltMethods from '../../components/login/LoginAltMethods'
 import LoginAltMethodsAgreeRow, { LOGIN_AGREE_REQUIRED } from '../../components/login/LoginAltMethodsAgreeRow'
 
 type AuthMode = 'login' | 'register'
-type LoginMethod = 'password' | 'sms' | 'wechat' | 'douyin'
+type LoginMethod = 'password' | 'sms' | 'email' | 'wechat' | 'douyin'
 
 const inputClass =
   'w-full rounded-xl border border-white/60 bg-white/55 px-4 py-3 text-base text-slate-900 outline-none backdrop-blur-sm placeholder:text-slate-400 focus:border-cyan-300/80 focus:bg-white/80 focus:ring-2 focus:ring-cyan-500/20 sm:text-sm'
@@ -68,6 +69,10 @@ export default function LoginAuthPanel({
   const [loginSmsCode, setLoginSmsCode] = useState('')
   const [loginSmsCooldown, setLoginSmsCooldown] = useState(0)
   const [loginSmsSending, setLoginSmsSending] = useState(false)
+  const [loginEmail, setLoginEmail] = useState('')
+  const [loginEmailCode, setLoginEmailCode] = useState('')
+  const [loginEmailCooldown, setLoginEmailCooldown] = useState(0)
+  const [loginEmailSending, setLoginEmailSending] = useState(false)
   const rememberScope = partnerMode ? 'partner' : 'merchant'
   const [rememberPassword, setRememberPassword] = useState(() => isRememberLoginEnabled(rememberScope))
   const [agreed, setAgreed] = useState(false)
@@ -99,6 +104,12 @@ export default function LoginAuthPanel({
     const t = window.setTimeout(() => setEmailCooldown((s) => s - 1), 1000)
     return () => window.clearTimeout(t)
   }, [emailCooldown])
+
+  useEffect(() => {
+    if (loginEmailCooldown <= 0) return
+    const t = window.setTimeout(() => setLoginEmailCooldown((s) => s - 1), 1000)
+    return () => window.clearTimeout(t)
+  }, [loginEmailCooldown])
 
   useEffect(() => {
     const saved = readRememberedLogin(rememberScope)
@@ -211,6 +222,38 @@ export default function LoginAuthPanel({
     }
   }
 
+  const submitEmailLogin = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!supabase) return
+    onErr(null)
+    onInfoHint(null)
+    if (!agreed) {
+      onErr(LOGIN_AGREE_REQUIRED)
+      return
+    }
+    const mail = loginEmail.trim()
+    if (!isBindEmailValid(mail)) {
+      onErr('请输入有效邮箱')
+      return
+    }
+    if (!/^\d{6}$/.test(loginEmailCode.trim())) {
+      onErr('请输入 6 位邮箱验证码')
+      return
+    }
+    setBusy(true)
+    try {
+      const r = await loginWithEmailCode({ email: mail, emailCode: loginEmailCode.trim() })
+      if (!r.ok || !r.access_token || !r.refresh_token) {
+        onErr(r.message ?? (r.error === 'email_not_registered' ? '该邮箱尚未注册，请先注册' : '验证码登录失败'))
+        return
+      }
+      const ok = await applySessionTokens(r.access_token, r.refresh_token)
+      if (ok) onLoginSuccess()
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const sendSmsForRegister = useCallback(async () => {
     if (smsInflightRef.current || smsSending || smsCooldown > 0) return
     onErr(null)
@@ -295,6 +338,33 @@ export default function LoginAuthPanel({
       setLoginSmsSending(false)
     }
   }, [loginPhone, onErr, onInfoHint, loginSmsSending, loginSmsCooldown])
+
+  const sendEmailForLogin = useCallback(async () => {
+    if (loginEmailSending || loginEmailCooldown > 0) return
+    onErr(null)
+    const mail = loginEmail.trim()
+    if (!isBindEmailValid(mail)) {
+      onErr('请输入有效邮箱')
+      return
+    }
+    setLoginEmailSending(true)
+    try {
+      const r = await sendAuthEmailCode(mail)
+      if (!r.ok) {
+        onErr(toUserFacingError(r.message ?? r.error, '邮箱验证码发送'))
+        return
+      }
+      setLoginEmailCooldown(60)
+      if (r.devCode && import.meta.env.DEV) {
+        setLoginEmailCode(r.devCode)
+        onInfoHint(`开发环境验证码：${r.devCode}（已自动填入）`)
+      } else {
+        onInfoHint(r.message ?? '验证码已发送至邮箱')
+      }
+    } finally {
+      setLoginEmailSending(false)
+    }
+  }, [loginEmail, onErr, onInfoHint, loginEmailSending, loginEmailCooldown])
 
   const submitRegister = async (e: FormEvent) => {
     e.preventDefault()
@@ -449,9 +519,11 @@ export default function LoginAuthPanel({
               ? `使用登录名与密码进入${editionLabel()}工作台。`
               : loginMethod === 'sms'
                 ? '使用注册手机号与短信验证码登录。'
-                : loginMethod === 'wechat'
-                  ? '使用微信扫码登录（需账号已绑定手机号）。'
-                  : '使用抖音 App 扫码登录（需账号已绑定手机号）。'
+                : loginMethod === 'email'
+                  ? '使用注册邮箱与邮箱验证码登录。'
+                  : loginMethod === 'wechat'
+                    ? '使用微信扫码登录（需账号已绑定手机号）。'
+                    : '使用抖音 App 扫码登录（需账号已绑定手机号）。'
             : partnerMode
               ? '填写服务商信息并完成手机验证，注册后可绑定平台服务商身份与客户商家。'
               : '填写商家信息并用手机或邮箱验证，注册后为免费版，可订阅升级会员。'}
@@ -459,15 +531,16 @@ export default function LoginAuthPanel({
       </div>
 
       <div>
-        <div className="mb-5 flex items-center gap-3 rounded-2xl border border-white/50 bg-white/40 px-4 py-3 backdrop-blur-sm">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/60 bg-white/70 shadow-sm">
+        <div className="mb-5 flex items-start gap-3 rounded-2xl border border-white/50 bg-white/40 px-4 py-3 backdrop-blur-sm">
+          <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/60 bg-white/70 shadow-sm">
             <ShieldCheck className="h-5 w-5 text-cyan-600" />
           </div>
-          <div className="min-w-0 text-left">
-            <p className="text-sm font-semibold text-slate-800">安全可信</p>
-            <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
-              短信由阿里云发送，邮箱验证码由 lingqi@mofangdianai.com 发出，登录会话经加密存储。
+          <div className="min-w-0 flex-1 text-left">
+            <p className="text-sm font-semibold leading-none text-slate-800">安全可信</p>
+            <p className="mt-2 text-[13px] leading-5 text-slate-500">
+              短信由阿里云发送，邮箱验证码由灵祺发出。
             </p>
+            <p className="mt-0.5 text-[13px] leading-5 text-slate-500">登录会话经加密存储。</p>
           </div>
         </div>
 
@@ -530,7 +603,7 @@ export default function LoginAuthPanel({
                         onInfoHint('已切换到手机验证码登录，验证通过即可进入工作台')
                       }}
                     >
-                      切换手机验证码登录
+                      切换手机或邮箱验证码登录
                     </button>
                   </p>
                 </div>
@@ -598,6 +671,56 @@ export default function LoginAuthPanel({
                   {busy ? '登录中…' : '验证码登录'}
                 </button>
               </form>
+            ) : loginMethod === 'email' ? (
+              <form className="space-y-5" onSubmit={(e) => void submitEmailLogin(e)}>
+                <div>
+                  <label className={labelClass} htmlFor="meoo-login-email">
+                    邮箱
+                  </label>
+                  <input
+                    id="meoo-login-email"
+                    className={inputClass}
+                    autoComplete="email"
+                    placeholder="注册时绑定的邮箱"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value.trim())}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass} htmlFor="meoo-login-email-code">
+                    邮箱验证码
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      id="meoo-login-email-code"
+                      className={cn(inputClass, 'min-w-0 flex-1')}
+                      inputMode="numeric"
+                      placeholder="6 位验证码"
+                      value={loginEmailCode}
+                      onChange={(e) => setLoginEmailCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    />
+                    <button
+                      type="button"
+                      disabled={loginEmailSending || loginEmailCooldown > 0 || busy}
+                      onClick={() => void sendEmailForLogin()}
+                      className={smsBtn}
+                    >
+                      {loginEmailSending
+                        ? '发送中…'
+                        : loginEmailCooldown > 0
+                          ? `${loginEmailCooldown}s`
+                          : '获取验证码'}
+                    </button>
+                  </div>
+                </div>
+                <LoginAltMethodsAgreeRow checked={agreed} onChange={setAgreed} />
+                {err ? (
+                  <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">{err}</p>
+                ) : null}
+                <button type="submit" disabled={busy || !agreed} className={primaryBtn}>
+                  {busy ? '登录中…' : '验证码登录'}
+                </button>
+              </form>
             ) : (
               <>
                 <LoginAltMethodsAgreeRow checked={agreed} onChange={setAgreed} className="mb-4" />
@@ -630,6 +753,7 @@ export default function LoginAuthPanel({
               }}
               methods={[
                 { id: 'sms', label: '短信验证码' },
+                { id: 'email', label: '邮箱登录' },
                 {
                   id: 'wechat',
                   label: '微信登录',

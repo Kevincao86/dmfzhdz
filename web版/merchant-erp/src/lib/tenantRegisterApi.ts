@@ -217,6 +217,37 @@ export async function registerPartnerAccount(body: {
   return { ok: j.ok !== false, message: j.message }
 }
 
+export async function loginWithEmailCode(body: {
+  email: string
+  emailCode: string
+}): Promise<SmsLoginResult> {
+  const posted = await postAuthJson<SmsLoginResult & { message?: string; detail?: string }>(
+    '/api/meoo-auth-identity',
+    { action: 'email_login', email: body.email, emailCode: body.emailCode },
+    '登录',
+  )
+  if (!('res' in posted)) {
+    return posted
+  }
+  const { res, json: j } = posted
+  if (!res.ok) {
+    return {
+      ok: false,
+      error: j.error ?? `http_${res.status}`,
+      message: j.message,
+      detail: j.detail,
+    }
+  }
+  return {
+    ok: j.ok !== false,
+    access_token: j.access_token,
+    refresh_token: j.refresh_token,
+    expires_in: j.expires_in,
+    loginName: j.loginName,
+    message: j.message,
+  }
+}
+
 export async function loginWithSmsCode(body: {
   phone: string
   smsCode: string

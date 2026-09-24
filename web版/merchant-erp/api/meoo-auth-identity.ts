@@ -1,12 +1,13 @@
 /**
  * POST /api/meoo-auth-identity
- * action: email_send | identities | bind_contact | merge_confirm
+ * action: email_send | email_login | identities | bind_contact | merge_confirm
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
   bindContactToCurrentUser,
   confirmAccountMerge,
   identitiesFromUser,
+  loginWithEmailCode,
   needsPhoneBindFromUser,
   readAuthUserFromAccessToken,
   sendAuthEmailCode,
@@ -74,6 +75,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return
       }
       sendJson(res, 200, { ok: true, message: out.message, ...(out.devCode ? { devCode: out.devCode } : {}) })
+      return
+    }
+
+    if (action === 'email_login') {
+      const out = await loginWithEmailCode({ email: body.email || '', emailCode: body.emailCode || '' })
+      if (!out.ok) {
+        const status = out.error === 'email_not_registered' ? 404 : 400
+        sendJson(res, status, { ok: false, error: out.error, message: out.message })
+        return
+      }
+      sendJson(res, 200, out)
       return
     }
 

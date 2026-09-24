@@ -1,7 +1,7 @@
 import { cn } from '../../cn'
 import wechatLogo from './LoginAltMethods.wechat.png'
 
-export type LoginAltMethodId = 'password' | 'sms' | 'wechat' | 'douyin'
+export type LoginAltMethodId = 'password' | 'sms' | 'email' | 'wechat' | 'douyin'
 
 export type LoginAltMethod = {
   id: LoginAltMethodId
@@ -70,8 +70,21 @@ function BrandLogo({ src }: { src: string }) {
   return <img src={src} alt="" draggable={false} className="h-8 w-8 shrink-0 rounded-lg object-contain" />
 }
 
+function EmailIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-8 w-8 shrink-0" aria-hidden>
+      <rect width="24" height="24" rx="6" fill="#0d9488" />
+      <path
+        fill="#fff"
+        d="M6.4 7.2h11.2c.7 0 1.2.5 1.2 1.2v7.2c0 .7-.5 1.2-1.2 1.2H6.4c-.7 0-1.2-.5-1.2-1.2V8.4c0-.7.5-1.2 1.2-1.2zm5.6 5.1 5.4-3.3H6.6L12 12.3zm0 1.3-5.6-3.4v6.2h11.2V10.2L12 13.6z"
+      />
+    </svg>
+  )
+}
+
 function MethodIcon({ id }: { id: LoginAltMethodId }) {
   if (id === 'sms') return <SmsIcon />
+  if (id === 'email') return <EmailIcon />
   if (id === 'wechat') return <BrandLogo src={wechatLogo} />
   if (id === 'douyin') return <DouyinIcon />
   return (
@@ -92,7 +105,18 @@ export default function LoginAltMethods({ methods, activeId, onSelect }: Props) 
           <span className="bg-white/80 px-3 text-xs text-slate-400">或使用</span>
         </div>
       </div>
-      <div className={cn('grid gap-2', methods.length === 3 ? 'grid-cols-1 sm:grid-cols-3' : methods.length === 1 ? 'grid-cols-1' : 'grid-cols-2')}>
+      <div
+        className={cn(
+          'grid gap-2',
+          methods.length >= 4
+            ? 'grid-cols-2'
+            : methods.length === 3
+              ? 'grid-cols-1 sm:grid-cols-3'
+              : methods.length === 1
+                ? 'grid-cols-1'
+                : 'grid-cols-2',
+        )}
+      >
         {methods.map((m) => (
           <button
             key={m.id}

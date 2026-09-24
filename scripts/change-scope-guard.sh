@@ -1204,6 +1204,7 @@ authIdentityBindCore
 meoo-auth-identity
 authEmailOtp
 LoginAuthPanel
+LoginAltMethods
 tenantRegisterApi
 tenantAuthApiMp
 authWxLoginShared
