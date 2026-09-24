@@ -281,8 +281,12 @@ Page({
     }
     const listed = await tenantAuthApi.postAuthIdentity({ action: 'linked_accounts', access_token: access })
     const others = (listed.accounts || []).filter((a) => !a.current)
-    if (!listed.ok || !others.length) {
-      api.logoutAndGoLogin()
+    if (!listed.ok) {
+      wx.showToast({ title: listed.message || '同号账号读取失败', icon: 'none' })
+      return
+    }
+    if (!others.length) {
+      wx.showToast({ title: '该手机号或邮箱下还没有其它账号', icon: 'none' })
       return
     }
     wx.showActionSheet({
@@ -309,6 +313,10 @@ Page({
         wx.reLaunch({ url: '/pages/mine/mine' })
       },
     })
+  },
+
+  onSameAccountSwitch() {
+    this.switchAccount()
   },
 
   onMenuTap(e) {

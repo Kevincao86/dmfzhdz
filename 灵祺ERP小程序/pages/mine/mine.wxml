@@ -49,6 +49,7 @@
       <text class="chev">›</text>
     </view>
   </view>
+  <button wx:if="{{!guestMode}}" class="same-switch-btn" bindtap="onSameAccountSwitch">切换同号账号</button>
   <button wx:if="{{!guestMode}}" class="logout-v2 danger" bindtap="onLogout">退出登录</button>
 </scroll-view>
 <view wx:if="{{showLogoutConfirm}}" class="logout-mask" catchtouchmove="true">
