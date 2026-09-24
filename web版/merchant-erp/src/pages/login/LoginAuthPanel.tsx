@@ -4,7 +4,6 @@ import EditionSwitchLink from '../../components/EditionSwitchLink'
 import SecretInput from '../../components/SecretInput'
 import { cn } from '../../cn'
 import { supabase } from '../../lib/supabaseClient'
-import { loginNameToTenantEmail } from '../../lib/tenantAuthEmail'
 import { editionLabel, isPartnerEdition } from '../../lib/appEdition'
 import {
   isRememberLoginEnabled,
@@ -18,6 +17,7 @@ import {
   isLoginNameValid,
   isMerchantShortNameValid,
   loginWithEmailCode,
+  loginWithPasswordIdentifier,
   loginWithSmsCode,
   registerMerchantAccount,
   registerPartnerAccount,
@@ -92,6 +92,8 @@ export default function LoginAuthPanel({
   const [smsSending, setSmsSending] = useState(false)
   const smsInflightRef = useRef(false)
   const loginSmsInflightRef = useRef(false)
+  const emailInflightRef = useRef(false)
+  const loginEmailInflightRef = useRef(false)
 
   useEffect(() => {
     if (smsCooldown <= 0) return
@@ -152,7 +154,7 @@ export default function LoginAuthPanel({
     }
     const name = loginName.trim()
     if (name.length < 2) {
-      onErr('账户名至少 2 个字符')
+      onErr('请输入登录名、手机号或邮箱')
       return
     }
     if (password.length < 6) {
@@ -161,19 +163,15 @@ export default function LoginAuthPanel({
     }
     setBusy(true)
     try {
-      const email = loginNameToTenantEmail(name)
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) {
-        onErr(error.message.includes('Invalid login') ? '账号或密码错误' : error.message)
+      const r = await loginWithPasswordIdentifier({ identifier: name, password })
+      if (!r.ok || !r.access_token || !r.refresh_token) {
+        onErr(r.message ?? '账号或密码错误')
         return
       }
-      const { data: after } = await supabase.auth.getSession()
-      if (!after.session) {
-        onErr('登录已成功，但未读到会话。请刷新本页或稍后再试。')
-        return
-      }
+      const ok = await applySessionTokens(r.access_token, r.refresh_token)
+      if (!ok) return
       if (rememberPassword) {
-        writeRememberedLogin(rememberScope, { loginName: name, password })
+        writeRememberedLogin(rememberScope, { loginName: r.loginName || name, password })
       } else {
         writeRememberedLogin(rememberScope, null)
       }
@@ -284,13 +282,15 @@ export default function LoginAuthPanel({
   }, [phone, onErr, onInfoHint, smsSending, smsCooldown])
 
   const sendEmailForRegister = useCallback(async () => {
-    if (emailSending || emailCooldown > 0) return
+    if (emailInflightRef.current || emailSending || emailCooldown > 0) return
     onErr(null)
+    onInfoHint(null)
     const mail = regEmail.trim()
     if (!isBindEmailValid(mail)) {
       onErr('请输入有效邮箱')
       return
     }
+    emailInflightRef.current = true
     setEmailSending(true)
     try {
       const r = await sendAuthEmailCode(mail)
@@ -306,6 +306,7 @@ export default function LoginAuthPanel({
         onInfoHint(r.message ?? '验证码已发送至邮箱')
       }
     } finally {
+      emailInflightRef.current = false
       setEmailSending(false)
     }
   }, [regEmail, onErr, onInfoHint, emailSending, emailCooldown])
@@ -340,13 +341,15 @@ export default function LoginAuthPanel({
   }, [loginPhone, onErr, onInfoHint, loginSmsSending, loginSmsCooldown])
 
   const sendEmailForLogin = useCallback(async () => {
-    if (loginEmailSending || loginEmailCooldown > 0) return
+    if (loginEmailInflightRef.current || loginEmailSending || loginEmailCooldown > 0) return
     onErr(null)
+    onInfoHint(null)
     const mail = loginEmail.trim()
     if (!isBindEmailValid(mail)) {
       onErr('请输入有效邮箱')
       return
     }
+    loginEmailInflightRef.current = true
     setLoginEmailSending(true)
     try {
       const r = await sendAuthEmailCode(mail)
@@ -362,6 +365,7 @@ export default function LoginAuthPanel({
         onInfoHint(r.message ?? '验证码已发送至邮箱')
       }
     } finally {
+      loginEmailInflightRef.current = false
       setLoginEmailSending(false)
     }
   }, [loginEmail, onErr, onInfoHint, loginEmailSending, loginEmailCooldown])
@@ -569,15 +573,15 @@ export default function LoginAuthPanel({
               <form className="space-y-5" onSubmit={(e) => void submitPasswordLogin(e)}>
                 <div>
                   <label className={labelClass} htmlFor="meoo-login-name">
-                    登录名
+                    登录名 / 手机号 / 邮箱
                   </label>
                   <input
                     id="meoo-login-name"
                     className={inputClass}
                     autoComplete="username"
-                    placeholder="字母与数字，4–32 位"
+                    placeholder="登录名、绑定手机号或绑定邮箱"
                     value={loginName}
-                    onChange={(e) => setLoginName(e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 32))}
+                    onChange={(e) => setLoginName(e.target.value.slice(0, 64))}
                   />
                 </div>
                 <div>
@@ -701,7 +705,7 @@ export default function LoginAuthPanel({
                     />
                     <button
                       type="button"
-                      disabled={loginEmailSending || loginEmailCooldown > 0 || busy}
+                      disabled={loginEmailSending || loginEmailCooldown > 0}
                       onClick={() => void sendEmailForLogin()}
                       className={smsBtn}
                     >
@@ -712,6 +716,10 @@ export default function LoginAuthPanel({
                           : '获取验证码'}
                     </button>
                   </div>
+                  {err ? (
+                    <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">{err}</p>
+                  ) : null}
+                  {infoHint ? <p className="mt-2 text-sm text-cyan-800">{infoHint}</p> : null}
                 </div>
                 <LoginAltMethodsAgreeRow checked={agreed} onChange={setAgreed} />
                 {err ? (
@@ -882,13 +890,19 @@ export default function LoginAuthPanel({
                 />
                 <button
                   type="button"
-                  disabled={emailSending || emailCooldown > 0 || busy}
+                  disabled={emailSending || emailCooldown > 0}
                   onClick={() => void sendEmailForRegister()}
                   className={smsBtn}
                 >
                   {emailSending ? '发送中…' : emailCooldown > 0 ? `${emailCooldown}s` : '获取验证码'}
                 </button>
               </div>
+              {err ? (
+                <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">{err}</p>
+              ) : null}
+              {infoHint ? (
+                <p className="mt-2 text-sm text-cyan-800">{infoHint}</p>
+              ) : null}
             </div>
               </>
             )}

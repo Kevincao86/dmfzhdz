@@ -9,7 +9,7 @@ import {
   phoneFromUserRecord,
   verifyAuthSmsCode,
 } from './authSmsAuthShared.js'
-import { readMerchantSupabaseAdminEnv } from './merchantSupabaseAdminEnv.js'
+import { readMerchantSupabaseAdminEnv, readMerchantSupabaseAnonKey } from './merchantSupabaseAdminEnv.js'
 import { supabaseAdminFetch } from '../src/lib/supabaseAdminFetch.js'
 
 export const ERP_WX_OPENID_META_KEY = 'erp_wx_openid'
@@ -180,6 +180,96 @@ export async function findAuthUserByBindEmail(
     page += 1
   }
   return null
+}
+
+export async function findAuthUserByLoginName(
+  loginName: string,
+): Promise<{ userId: string; email: string; loginName: string } | null> {
+  const needle = String(loginName || '').trim().toLowerCase()
+  if (!needle || needle.length < 2) return null
+  const { supabaseUrl, serviceRole, missingParts } = adminEnv()
+  if (missingParts.length) return null
+  const base = supabaseUrl.replace(/\/$/, '')
+  let page = 1
+  const perPage = 200
+  while (page <= 20) {
+    const res = await supabaseAdminFetch(`${base}/auth/v1/admin/users?page=${page}&per_page=${perPage}`, {
+      headers: adminHeaders(serviceRole),
+    })
+    if (!res.ok) return null
+    const parsed = (await res.json()) as { users?: Record<string, unknown>[] }
+    const users = Array.isArray(parsed.users) ? parsed.users : []
+    for (const u of users) {
+      const userId = typeof u.id === 'string' ? u.id : ''
+      const authEmail = typeof u.email === 'string' ? u.email : ''
+      const meta = u.user_metadata as { login_name?: string } | undefined
+      const name =
+        (typeof meta?.login_name === 'string' && meta.login_name.trim()) ||
+        (authEmail ? authEmail.split('@')[0] ?? '' : '')
+      if (userId && authEmail && name.toLowerCase() === needle) {
+        return { userId, email: authEmail, loginName: name }
+      }
+    }
+    if (users.length < perPage) break
+    page += 1
+  }
+  return null
+}
+
+export async function resolveAuthUserForLogin(
+  identifier: string,
+): Promise<{ userId: string; email: string; loginName: string } | null> {
+  const email = normalizeBindEmail(identifier)
+  if (email) return findAuthUserByBindEmail(email)
+  const phone = normalizeCnMobile(identifier)
+  if (phone) return findAuthUserByPhone(phone)
+  return findAuthUserByLoginName(identifier)
+}
+
+export async function loginWithPasswordIdentifier(input: {
+  identifier: string
+  password: string
+}): Promise<
+  | { ok: true; access_token: string; refresh_token: string; expires_in?: number; loginName: string }
+  | { ok: false; error: string; message: string }
+> {
+  const identifier = String(input.identifier || '').trim()
+  const password = String(input.password || '')
+  if (identifier.length < 2) return { ok: false, error: 'invalid_login', message: '请输入登录名、手机号或邮箱' }
+  if (password.length < 6) return { ok: false, error: 'invalid_password', message: '密码至少 6 位' }
+  const user = await resolveAuthUserForLogin(identifier)
+  if (!user) return { ok: false, error: 'invalid_login', message: '账号或密码错误' }
+  const { supabaseUrl, missingParts } = adminEnv()
+  const anonKey = readMerchantSupabaseAnonKey()
+  if (missingParts.length || !anonKey) {
+    return { ok: false, error: 'supabase_not_configured', message: '登录服务未配置' }
+  }
+  const res = await supabaseAdminFetch(`${supabaseUrl.replace(/\/$/, '')}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: anonKey,
+      Authorization: `Bearer ${anonKey}`,
+    },
+    body: JSON.stringify({ email: user.email, password }),
+  })
+  const data = (await res.json().catch(() => ({}))) as {
+    access_token?: string
+    refresh_token?: string
+    expires_in?: number
+    error_description?: string
+    msg?: string
+  }
+  if (!res.ok || !data.access_token || !data.refresh_token) {
+    return { ok: false, error: 'invalid_login', message: '账号或密码错误' }
+  }
+  return {
+    ok: true,
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    expires_in: data.expires_in,
+    loginName: user.loginName,
+  }
 }
 
 export async function findAuthUserByErpDyOpenId(

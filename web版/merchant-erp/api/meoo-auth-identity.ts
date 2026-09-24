@@ -1,6 +1,6 @@
 /**
  * POST /api/meoo-auth-identity
- * action: email_send | email_login | identities | bind_contact | merge_confirm
+ * action: email_send | email_login | password_login | identities | bind_contact | merge_confirm
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
@@ -8,6 +8,7 @@ import {
   confirmAccountMerge,
   identitiesFromUser,
   loginWithEmailCode,
+  loginWithPasswordIdentifier,
   needsPhoneBindFromUser,
   readAuthUserFromAccessToken,
   sendAuthEmailCode,
@@ -64,6 +65,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       emailCode?: string
       mergeToken?: string
       access_token?: string
+      identifier?: string
+      password?: string
+      loginName?: string
     }
     const action = String(body.action || '').trim()
     const token = bearer(req) || String(body.access_token || '').trim()
@@ -83,6 +87,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       if (!out.ok) {
         const status = out.error === 'email_not_registered' ? 404 : 400
         sendJson(res, status, { ok: false, error: out.error, message: out.message })
+        return
+      }
+      sendJson(res, 200, out)
+      return
+    }
+
+    if (action === 'password_login') {
+      const out = await loginWithPasswordIdentifier({
+        identifier: body.identifier || body.loginName || body.email || body.phone || '',
+        password: body.password || '',
+      })
+      if (!out.ok) {
+        sendJson(res, 400, { ok: false, error: out.error, message: out.message })
         return
       }
       sendJson(res, 200, out)
