@@ -337,20 +337,38 @@ async function sendViaFeishuMail(
   }
 }
 
-async function smtpCommand(socket: net.Socket, cmd?: string): Promise<string> {
-  if (cmd) socket.write(cmd.endsWith('\r\n') ? cmd : `${cmd}\r\n`)
+function smtpLastCode(reply: string): string {
+  const lines = reply.replace(/\r/g, '').split('\n').map((l) => l.trim()).filter(Boolean)
+  return lines[lines.length - 1] || reply.trim()
+}
+
+async function smtpReadReply(socket: net.Socket): Promise<string> {
   return await new Promise((resolve, reject) => {
-    const onData = (buf: Buffer) => {
-      socket.off('error', onErr)
-      resolve(buf.toString('utf8'))
+    let buf = ''
+    const onData = (chunk: Buffer) => {
+      buf += chunk.toString('utf8')
+      const lines = buf.replace(/\r/g, '').split('\n').filter((l) => l.length > 0)
+      if (lines.some((l) => /^\d{3} /.test(l))) {
+        cleanup()
+        resolve(buf)
+      }
     }
     const onErr = (e: Error) => {
-      socket.off('data', onData)
+      cleanup()
       reject(e)
     }
-    socket.once('data', onData)
+    const cleanup = () => {
+      socket.off('data', onData)
+      socket.off('error', onErr)
+    }
+    socket.on('data', onData)
     socket.once('error', onErr)
   })
+}
+
+async function smtpCommand(socket: net.Socket, cmd?: string): Promise<string> {
+  if (cmd) socket.write(cmd.endsWith('\r\n') ? cmd : `${cmd}\r\n`)
+  return await smtpReadReply(socket)
 }
 
 async function sendSmtpMail(to: string, subject: string, text: string): Promise<{ ok: true } | { ok: false; message: string }> {
@@ -360,25 +378,31 @@ async function sendSmtpMail(to: string, subject: string, text: string): Promise<
   const pass = (process.env.MEOO_SMTP_PASS || '').trim()
   const from = smtpFromAddress()
   if (!pass) return { ok: false, message: '邮箱发信未配置（MEOO_SMTP_PASS 或飞书发信）' }
+  const encodedSubject = `=?UTF-8?B?${Buffer.from(subject, 'utf8').toString('base64')}?=`
 
   return await new Promise((resolve) => {
     const socket = tls.connect({ host, port, servername: host }, async () => {
       try {
         await smtpCommand(socket)
-        await smtpCommand(socket, `EHLO mofangdianai.com`)
-        await smtpCommand(socket, 'AUTH LOGIN')
-        await smtpCommand(socket, Buffer.from(user).toString('base64'))
-        const auth = await smtpCommand(socket, Buffer.from(pass).toString('base64'))
-        if (!/^2/.test(auth.trim().split('\n').pop() || auth)) {
+        await smtpCommand(socket, 'EHLO mofangdianai.com')
+        const plain = Buffer.from(`\u0000${user}\u0000${pass}`, 'utf8').toString('base64')
+        const auth = await smtpCommand(socket, `AUTH PLAIN ${plain}`)
+        if (!/^2/.test(smtpLastCode(auth))) {
           socket.end()
-          resolve({ ok: false, message: '邮箱发信认证失败' })
+          const hint = smtpLastCode(auth)
+          resolve({
+            ok: false,
+            message: hint.includes('frequency')
+              ? '飞书 SMTP 认证次数过多，请稍后再试'
+              : '飞书 SMTP 认证失败，请稍后重试或在飞书重置 IMAP/SMTP 密码',
+          })
           return
         }
         await smtpCommand(socket, `MAIL FROM:<${from}>`)
         await smtpCommand(socket, `RCPT TO:<${to}>`)
         await smtpCommand(socket, 'DATA')
         const payload =
-          `From: 灵祺ERP <${from}>\r\nTo: ${to}\r\nSubject: ${subject}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${text}\r\n.\r\n`
+          `From: 灵祺 <${from}>\r\nTo: ${to}\r\nSubject: ${encodedSubject}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n${text}\r\n.\r\n`
         await smtpCommand(socket, payload)
         await smtpCommand(socket, 'QUIT')
         socket.end()
@@ -405,17 +429,17 @@ export async function sendAuthEmailCode(emailRaw: string): Promise<
   emailOtpStore.set(email, { code, exp: Date.now() + EMAIL_OTP_TTL_MS })
   const text = `您的灵祺ERP验证码是 ${code}，5 分钟内有效。如非本人操作请忽略。`
   const subject = '灵祺ERP邮箱验证码'
-  const viaFeishu = await sendViaFeishuMail(email, subject, text)
-  if (viaFeishu.ok) {
+  if (smtpConfigured()) {
+    const sent = await sendSmtpMail(email, subject, text)
+    if (!sent.ok) return { ok: false, error: 'email_send_failed', message: sent.message }
     return {
       ok: true,
       message: `验证码已发送至 ${maskEmail(email)}`,
       ...(allowDevEmailCode() ? { devCode: code } : {}),
     }
   }
-  if (smtpConfigured()) {
-    const sent = await sendSmtpMail(email, subject, text)
-    if (!sent.ok) return { ok: false, error: 'email_send_failed', message: sent.message }
+  const viaFeishu = await sendViaFeishuMail(email, subject, text)
+  if (viaFeishu.ok) {
     return {
       ok: true,
       message: `验证码已发送至 ${maskEmail(email)}`,
