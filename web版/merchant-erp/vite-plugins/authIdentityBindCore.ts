@@ -620,13 +620,7 @@ export type ProbeContactResult =
 
 type ListedAuthUser = { userId: string; email: string; loginName: string; displayName: string; raw: Record<string, unknown> }
 
-function userMergedAway(u: Record<string, unknown>): boolean {
-  const meta = (u.user_metadata as Record<string, unknown> | undefined) ?? {}
-  return Boolean(String(meta.merged_into || '').trim())
-}
-
 function summarizeAuthUser(u: Record<string, unknown>): ListedAuthUser | null {
-  if (userMergedAway(u)) return null
   const userId = typeof u.id === 'string' ? u.id : ''
   const authEmail = typeof u.email === 'string' ? u.email : ''
   if (!userId || !authEmail) return null
