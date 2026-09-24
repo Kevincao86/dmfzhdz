@@ -1,6 +1,6 @@
 /**
  * POST /api/meoo-auth-identity
- * action: email_send | email_login | password_login | identities | bind_contact | merge_confirm | update_profile | change_password
+ * action: email_send | email_login | password_login | identities | bind_contact | probe_contact | merge_confirm | update_profile | change_password
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
@@ -14,6 +14,7 @@ import {
   loginWithEmailCode,
   loginWithPasswordIdentifier,
   needsPhoneBindFromUser,
+  probeContactForBind,
   readAuthUserFromAccessToken,
   sendAuthEmailCode,
   updateAuthProfile,
@@ -175,6 +176,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return
       }
       sendJson(res, 200, { ok: true, message: out.message })
+      return
+    }
+
+    if (action === 'probe_contact') {
+      if (!userId) {
+        sendJson(res, 401, { ok: false, error: 'unauthorized', message: '请先登录' })
+        return
+      }
+      const out = await probeContactForBind({
+        userId,
+        phone: body.phone,
+        email: body.email,
+      })
+      if (!out.ok) {
+        const status = out.error === 'account_exists_merge' ? 409 : 400
+        sendJson(res, status, out as unknown as Record<string, unknown>)
+        return
+      }
+      sendJson(res, 200, out as unknown as Record<string, unknown>)
       return
     }
 

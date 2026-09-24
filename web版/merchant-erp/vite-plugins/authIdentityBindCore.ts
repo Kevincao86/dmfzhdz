@@ -610,6 +610,76 @@ export type BindContactResult =
     }
   | { ok: false; error: string; message: string }
 
+export type ProbeContactResult =
+  | { ok: true; available: true }
+  | Extract<BindContactResult, { error: 'account_exists_merge' }>
+  | { ok: false; error: string; message: string }
+
+async function mergeConflictIfHeld(
+  userId: string,
+  phone: string,
+  email: string,
+): Promise<Extract<BindContactResult, { error: 'account_exists_merge' }> | null> {
+  if (phone) {
+    const holder = await findAuthUserByPhone(phone)
+    if (holder && holder.userId !== userId) {
+      const token = issueMergeToken({
+        fromUserId: userId,
+        targetUserId: holder.userId,
+        channel: 'phone',
+        value: phone,
+      })
+      return {
+        ok: false,
+        error: 'account_exists_merge',
+        message: `已有该账号（${holder.loginName} / ${maskPhone(phone)}），是否确定合并？`,
+        mergeToken: token,
+        channel: 'phone',
+        masked: maskPhone(phone),
+        loginName: holder.loginName,
+      }
+    }
+    return null
+  }
+  if (email) {
+    const holder = await findAuthUserByBindEmail(email)
+    if (holder && holder.userId !== userId) {
+      const token = issueMergeToken({
+        fromUserId: userId,
+        targetUserId: holder.userId,
+        channel: 'email',
+        value: email,
+      })
+      return {
+        ok: false,
+        error: 'account_exists_merge',
+        message: `已有该账号（${holder.loginName} / ${maskEmail(email)}），是否确定合并？`,
+        mergeToken: token,
+        channel: 'email',
+        masked: maskEmail(email),
+        loginName: holder.loginName,
+      }
+    }
+  }
+  return null
+}
+
+/** 点绑定先查号：有账号则发 mergeToken，无则 available，均不消耗验证码 */
+export async function probeContactForBind(input: {
+  userId: string
+  phone?: string
+  email?: string
+}): Promise<ProbeContactResult> {
+  const user = await fetchAuthUserById(input.userId)
+  if (!user) return { ok: false, error: 'account_not_found', message: '账号不存在' }
+  const phone = normalizeCnMobile(input.phone ?? '')
+  const email = normalizeBindEmail(input.email ?? '')
+  if (!phone && !email) return { ok: false, error: 'invalid_contact', message: '请填写手机号或邮箱' }
+  const conflict = await mergeConflictIfHeld(input.userId, phone || '', email || '')
+  if (conflict) return conflict
+  return { ok: true, available: true }
+}
+
 export async function bindContactToCurrentUser(input: {
   userId: string
   phone?: string
@@ -626,48 +696,16 @@ export async function bindContactToCurrentUser(input: {
     if (!(await verifyAuthSmsCode(phone, String(input.smsCode || '').trim()))) {
       return { ok: false, error: 'sms_code_invalid', message: '手机验证码错误或已过期' }
     }
-    const holder = await findAuthUserByPhone(phone)
-    if (holder && holder.userId !== input.userId) {
-      const token = issueMergeToken({
-        fromUserId: input.userId,
-        targetUserId: holder.userId,
-        channel: 'phone',
-        value: phone,
-      })
-      return {
-        ok: false,
-        error: 'account_exists_merge',
-        message: `已有该账号（${holder.loginName} / ${maskPhone(phone)}），是否确定合并？需再次验证手机号。`,
-        mergeToken: token,
-        channel: 'phone',
-        masked: maskPhone(phone),
-        loginName: holder.loginName,
-      }
-    }
+    const conflict = await mergeConflictIfHeld(input.userId, phone, '')
+    if (conflict) return conflict
     const patched = await patchUserMetadata(input.userId, { phone }, { phone })
     if (!patched.ok) return { ok: false, error: 'bind_failed', message: patched.message }
   } else if (email) {
     if (!verifyAuthEmailCode(email, String(input.emailCode || ''))) {
       return { ok: false, error: 'email_code_invalid', message: '邮箱验证码错误或已过期' }
     }
-    const holder = await findAuthUserByBindEmail(email)
-    if (holder && holder.userId !== input.userId) {
-      const token = issueMergeToken({
-        fromUserId: input.userId,
-        targetUserId: holder.userId,
-        channel: 'email',
-        value: email,
-      })
-      return {
-        ok: false,
-        error: 'account_exists_merge',
-        message: `已有该账号（${holder.loginName} / ${maskEmail(email)}），是否确定合并？需再次验证邮箱。`,
-        mergeToken: token,
-        channel: 'email',
-        masked: maskEmail(email),
-        loginName: holder.loginName,
-      }
-    }
+    const conflict = await mergeConflictIfHeld(input.userId, '', email)
+    if (conflict) return conflict
     const patched = await patchUserMetadata(input.userId, { [ERP_BIND_EMAIL_META_KEY]: email })
     if (!patched.ok) return { ok: false, error: 'bind_failed', message: patched.message }
   } else {

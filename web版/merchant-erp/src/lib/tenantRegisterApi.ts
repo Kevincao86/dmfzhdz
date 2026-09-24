@@ -106,6 +106,7 @@ export type IdentityActionResult = {
   needsPhoneBind?: boolean
   displayName?: string
   avatarUrl?: string
+  available?: boolean
 }
 
 export async function postAuthIdentity(body: Record<string, unknown>): Promise<IdentityActionResult> {

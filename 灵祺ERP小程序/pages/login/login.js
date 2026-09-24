@@ -73,6 +73,7 @@ Page({
     bindSmsCooldown: 0,
     bindMergeToken: '',
     bindMergeMsg: '',
+    bindNeedCode: false,
     bindAccessToken: '',
     legalPromptAction: 'pwd',
     legalPromptText: LEGAL_PROMPT_COPY.pwd.text,
@@ -484,6 +485,7 @@ Page({
           bindSmsCode: '',
           bindMergeToken: '',
           bindMergeMsg: '',
+          bindNeedCode: false,
         })
         return
       }
@@ -657,6 +659,9 @@ Page({
       this.setData({ bindSmsSending: false })
     }
   },
+  onBindBack() {
+    this.setData({ bindMergeToken: '', bindMergeMsg: '', bindNeedCode: false, bindSmsCode: '', err: '' })
+  },
   async onConfirmBindPhone() {
     const mobile = String(this.data.bindPhone || '').replace(/\D/g, '')
     const smsCode = String(this.data.bindSmsCode || '').trim()
@@ -664,13 +669,13 @@ Page({
       this.setData({ err: '请输入正确的 11 位手机号' })
       return
     }
-    if (!/^\d{6}$/.test(smsCode)) {
-      this.setData({ err: '请输入 6 位验证码' })
-      return
-    }
     this.setData({ busy: true, err: '' })
     try {
       if (this.data.bindMergeToken) {
+        if (!/^\d{6}$/.test(smsCode)) {
+          this.setData({ err: '请输入 6 位验证码' })
+          return
+        }
         const r = await tenantAuthApi.postAuthIdentity({
           action: 'merge_confirm',
           mergeToken: this.data.bindMergeToken,
@@ -684,8 +689,34 @@ Page({
           { access_token: r.access_token, refresh_token: r.refresh_token || '' },
           r.loginName || '',
         )
-        this.setData({ showBindPhone: false, bindMergeToken: '' })
+        this.setData({ showBindPhone: false, bindMergeToken: '', bindNeedCode: false })
         this._goHome()
+        return
+      }
+      if (!this.data.bindNeedCode) {
+        const r = await tenantAuthApi.postAuthIdentity({
+          action: 'probe_contact',
+          phone: mobile,
+          access_token: this.data.bindAccessToken,
+        })
+        if (r.error === 'account_exists_merge' && r.mergeToken) {
+          this.setData({
+            bindMergeToken: r.mergeToken,
+            bindMergeMsg: r.message || '已有该账号，是否确定合并？',
+            bindSmsCode: '',
+            bindNeedCode: true,
+          })
+          return
+        }
+        if (!r.ok) {
+          this.setData({ err: r.message || '检测失败' })
+          return
+        }
+        this.setData({ bindNeedCode: true, bindSmsCode: '' })
+        return
+      }
+      if (!/^\d{6}$/.test(smsCode)) {
+        this.setData({ err: '请输入 6 位验证码' })
         return
       }
       const r = await tenantAuthApi.postAuthIdentity({
@@ -699,11 +730,7 @@ Page({
           bindMergeToken: r.mergeToken,
           bindMergeMsg: r.message || '已有该账号，是否确定合并？',
           bindSmsCode: '',
-        })
-        wx.showModal({
-          title: '已有该账号',
-          content: r.message || '是否确定合并？需再次短信验证。',
-          showCancel: true,
+          bindNeedCode: true,
         })
         return
       }
@@ -711,7 +738,7 @@ Page({
         this.setData({ err: r.message || '绑定失败' })
         return
       }
-      this.setData({ showBindPhone: false })
+      this.setData({ showBindPhone: false, bindNeedCode: false })
       this._goHome()
     } finally {
       this.setData({ busy: false })

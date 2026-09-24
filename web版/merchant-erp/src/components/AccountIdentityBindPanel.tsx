@@ -37,6 +37,7 @@ export default function AccountIdentityBindPanel() {
   const [hint, setHint] = useState('')
   const [mergeToken, setMergeToken] = useState('')
   const [mergeMsg, setMergeMsg] = useState('')
+  const [awaitingCode, setAwaitingCode] = useState(false)
 
   const load = useCallback(async () => {
     const token = (await supabase?.auth.getSession())?.data.session?.access_token || ''
@@ -104,8 +105,39 @@ export default function AccountIdentityBindPanel() {
           await supabase.auth.setSession({ access_token: r.access_token, refresh_token: r.refresh_token })
         }
         setMergeToken('')
+        setAwaitingCode(false)
         setBindKind(null)
         await load()
+        return
+      }
+      if (!awaitingCode) {
+        if (bindKind === 'phone' && !isCnMobileValid(value)) {
+          setErr('请输入有效手机号')
+          return
+        }
+        if (bindKind === 'email' && !isBindEmailValid(value)) {
+          setErr('请输入有效邮箱')
+          return
+        }
+        const r = await postAuthIdentity({
+          action: 'probe_contact',
+          access_token: token,
+          phone: bindKind === 'phone' ? value.replace(/\D/g, '') : undefined,
+          email: bindKind === 'email' ? value.trim() : undefined,
+        })
+        if (r.error === 'account_exists_merge' && r.mergeToken) {
+          setMergeToken(r.mergeToken)
+          setMergeMsg(r.message || '已有该账号，是否确定合并？')
+          setCode('')
+          setAwaitingCode(true)
+          return
+        }
+        if (!r.ok) {
+          setErr(r.message || '检测失败')
+          return
+        }
+        setAwaitingCode(true)
+        setCode('')
         return
       }
       const r = await postAuthIdentity({
@@ -127,6 +159,7 @@ export default function AccountIdentityBindPanel() {
         return
       }
       setBindKind(null)
+      setAwaitingCode(false)
       await load()
     } finally {
       setBusy(false)
@@ -148,6 +181,7 @@ export default function AccountIdentityBindPanel() {
                 setErr('')
                 setHint('')
                 setMergeToken('')
+                setAwaitingCode(false)
                 if (it.id === 'wechat') {
                   setHint('请在商家小程序内使用微信一键登录完成绑定')
                   return
@@ -198,7 +232,10 @@ export default function AccountIdentityBindPanel() {
             {mergeToken ? '确认合并账号' : bindKind === 'phone' ? (ids?.phone ? '换绑手机号' : '绑定手机号') : ids?.email ? '换绑邮箱' : '绑定邮箱'}
           </p>
           {mergeToken ? <p className="text-xs text-slate-600">{mergeMsg}</p> : null}
-          {!mergeToken ? (
+          {awaitingCode && !mergeToken ? (
+            <p className="text-xs text-slate-500">该{bindKind === 'phone' ? '手机号' : '邮箱'}尚未占用，请获取验证码后绑定。</p>
+          ) : null}
+          {!awaitingCode && !mergeToken ? (
             <input
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
               placeholder={bindKind === 'phone' ? '11 位手机号' : '邮箱'}
@@ -207,27 +244,41 @@ export default function AccountIdentityBindPanel() {
                 setValue(bindKind === 'phone' ? e.target.value.replace(/\D/g, '').slice(0, 11) : e.target.value)
               }
             />
-          ) : null}
-          <div className="flex gap-2">
-            <input
-              className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              placeholder="6 位验证码"
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            />
-            <button
-              type="button"
-              className="shrink-0 rounded-lg border px-3 text-xs text-cyan-700"
-              disabled={cooldown > 0}
-              onClick={() => void send()}
-            >
-              {cooldown > 0 ? `${cooldown}s` : '获取验证码'}
-            </button>
-          </div>
+          ) : (
+            <div className="flex gap-2">
+              <input
+                className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                placeholder="6 位验证码"
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              />
+              <button
+                type="button"
+                className="shrink-0 rounded-lg border px-3 text-xs text-cyan-700"
+                disabled={cooldown > 0}
+                onClick={() => void send()}
+              >
+                {cooldown > 0 ? `${cooldown}s` : '获取验证码'}
+              </button>
+            </div>
+          )}
           {err ? <p className="text-xs text-red-600">{err}</p> : null}
           <div className="flex gap-2">
-            <button type="button" className="flex-1 rounded-lg border py-2 text-sm" onClick={() => setBindKind(null)}>
-              取消
+            <button
+              type="button"
+              className="flex-1 rounded-lg border py-2 text-sm"
+              onClick={() => {
+                if (awaitingCode || mergeToken) {
+                  setMergeToken('')
+                  setAwaitingCode(false)
+                  setCode('')
+                  setErr('')
+                  return
+                }
+                setBindKind(null)
+              }}
+            >
+              {awaitingCode || mergeToken ? '返回' : '取消'}
             </button>
             <button
               type="button"
@@ -235,7 +286,13 @@ export default function AccountIdentityBindPanel() {
               className="flex-1 rounded-lg bg-slate-900 py-2 text-sm text-white"
               onClick={() => void submit()}
             >
-              {mergeToken ? '确定合并' : ids && ((bindKind === 'phone' && ids.phone) || (bindKind === 'email' && ids.email)) ? '确认换绑' : '确认绑定'}
+              {mergeToken
+                ? '确定合并'
+                : awaitingCode
+                  ? ids && ((bindKind === 'phone' && ids.phone) || (bindKind === 'email' && ids.email))
+                    ? '确认换绑'
+                    : '确认绑定'
+                  : '绑定'}
             </button>
           </div>
         </div>

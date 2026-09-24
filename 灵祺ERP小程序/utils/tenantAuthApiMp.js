@@ -31,6 +31,7 @@ function postJson(path, body, timeoutMs) {
           return
         }
         resolve({
+          ...j,
           ...base,
           ok: false,
           error: j.error || `http_${res.statusCode}`,
