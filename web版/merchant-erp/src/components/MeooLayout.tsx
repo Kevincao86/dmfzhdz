@@ -42,8 +42,6 @@ import PlatformDecorHomeHost from './PlatformDecorHomeHost'
 import { TenantAnnouncementProvider } from '../context/TenantAnnouncementContext'
 import PartnerClientScopeBar from './PartnerClientScopeBar'
 import OpsRegistryBridge from './OpsRegistryBridge'
-import SupabaseChangePasswordForm from './SupabaseChangePasswordForm'
-import AccountIdentityBindPanel from './AccountIdentityBindPanel'
 import AuthBindContactModal from './login/AuthBindContactModal'
 import { postAuthIdentity } from '../lib/tenantRegisterApi'
 import { useAiAgent } from '../context/AiAgentContext'
@@ -67,8 +65,6 @@ export default function MeooLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [openGroups, setOpenGroups] = useState<string[]>([])
   const [userOpen, setUserOpen] = useState(false)
-  const [personalSettingsOpen, setPersonalSettingsOpen] = useState(false)
-  const [personalSettingsFormKey, setPersonalSettingsFormKey] = useState(0)
   const [headerSearchQuery, setHeaderSearchQuery] = useState('')
   const { submitTopSearchQuery } = useAiAgent()
   const { plan } = useMembership()
@@ -105,6 +101,7 @@ export default function MeooLayout() {
   const [phone, setPhone] = useState('—')
   const [needPhoneBind, setNeedPhoneBind] = useState(false)
   const [bindAccessToken, setBindAccessToken] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState('')
 
   useEffect(() => {
     const client = supabase
@@ -128,6 +125,7 @@ export default function MeooLayout() {
             setPhone('—')
             setNeedPhoneBind(false)
             setBindAccessToken('')
+            setAvatarUrl('')
           }
           return
         }
@@ -135,8 +133,18 @@ export default function MeooLayout() {
           clearTenantScopedBrowserState()
         }
         lastUserId = u.id
-        const meta = u.user_metadata as { login_name?: string; phone?: string; bind_email?: string } | undefined
-        setAdminName(meta?.login_name ?? u.email?.split('@')[0] ?? '用户')
+        const meta = u.user_metadata as {
+          login_name?: string
+          phone?: string
+          bind_email?: string
+          display_name?: string
+          nickname?: string
+          avatar_url?: string
+        } | undefined
+        setAdminName(
+          (meta?.display_name || meta?.nickname || meta?.login_name || u.email?.split('@')[0] || '用户').trim(),
+        )
+        setAvatarUrl(String(meta?.avatar_url || '').trim())
         const mobile = phoneFromAuthUser({ phone: u.phone, user_metadata: meta })
         setPhone(mobile ? maskCnPhone(mobile) : '—')
         const tok = session?.access_token || ''
@@ -328,8 +336,12 @@ export default function MeooLayout() {
                 onClick={() => setUserOpen((v) => !v)}
                 className="flex items-center space-x-3 rounded-lg py-1 pl-2 pr-1 transition-colors hover:bg-white/10"
               >
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20">
-                  <User className="h-4 w-4 text-white" />
+                <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-white/20">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <User className="h-4 w-4 text-white" />
+                  )}
                 </div>
                 <div className="flex flex-col items-start">
                   <span className="text-sm font-medium text-white">{adminName}</span>
@@ -403,8 +415,7 @@ export default function MeooLayout() {
                         className="flex w-full items-center px-4 py-2.5 text-sm text-slate-700 transition-colors hover:bg-slate-50"
                         onClick={() => {
                           setUserOpen(false)
-                          setPersonalSettingsFormKey((k) => k + 1)
-                          setPersonalSettingsOpen(true)
+                          navigate('/account')
                         }}
                       >
                         <Settings className="mr-3 h-4 w-4 text-slate-400" />
@@ -562,62 +573,6 @@ export default function MeooLayout() {
           </div>
         </footer>
       </div>
-
-      {personalSettingsOpen ? (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="meoo-personal-settings-title"
-          onClick={() => setPersonalSettingsOpen(false)}
-        >
-          <div
-            className="max-h-[min(90vh,720px)] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200/90 bg-white p-6 shadow-2xl shadow-slate-900/15"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 id="meoo-personal-settings-title" className="text-lg font-semibold text-slate-900">
-                个人中心
-              </h2>
-              <button
-                type="button"
-                onClick={() => setPersonalSettingsOpen(false)}
-                className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
-                aria-label="关闭"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            {supabaseConfigured ? (
-              <>
-                <AccountIdentityBindPanel />
-                <div className="mt-6 border-t border-slate-100 pt-5">
-                  <p className="mb-3 text-sm font-semibold text-slate-800">修改密码</p>
-                  <SupabaseChangePasswordForm key={personalSettingsFormKey} />
-                </div>
-              </>
-            ) : (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-                <p className="font-medium">当前未启用云端登录</p>
-                <p className="mt-1 text-amber-900/95">
-                  请先由管理员在完成云端登录相关配置（服务地址与安全密钥），并重启 ERP
-                  后，即可在此修改主账号登录密码。
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPersonalSettingsOpen(false)
-                    navigate({ pathname: '/settings', search: 'tab=accounts' })
-                  }}
-                  className="mt-4 w-full rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 py-2.5 text-sm font-medium text-white transition hover:brightness-110"
-                >
-                  前往系统设置
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      ) : null}
 
       <AuthBindContactModal
         open={needPhoneBind}

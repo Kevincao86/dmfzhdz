@@ -104,11 +104,13 @@ export type IdentityActionResult = {
     emailMasked?: string
   }
   needsPhoneBind?: boolean
+  displayName?: string
+  avatarUrl?: string
 }
 
 export async function postAuthIdentity(body: Record<string, unknown>): Promise<IdentityActionResult> {
   const token = typeof body.access_token === 'string' ? body.access_token : ''
-  const candidates = merchantErpApiCandidates('/api/meoo-auth-identity')
+  const candidates = erpAuthApiCandidates('/api/meoo-auth-identity')
   let lastMessage = '请求失败，请稍后重试。'
   for (let i = 0; i < candidates.length; i += 1) {
     try {

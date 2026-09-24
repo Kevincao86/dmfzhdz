@@ -754,6 +754,82 @@ export function needsPhoneBindFromUser(u: Record<string, unknown> | null): boole
   return true
 }
 
+export function displayNameFromUser(u: Record<string, unknown>): string {
+  const meta = (u.user_metadata as Record<string, unknown> | undefined) ?? {}
+  const display = String(meta.display_name || meta.nickname || '').trim()
+  if (display) return display
+  return loginNameFromUser(u)
+}
+
+export function avatarUrlFromUser(u: Record<string, unknown>): string {
+  const meta = (u.user_metadata as Record<string, unknown> | undefined) ?? {}
+  return String(meta.avatar_url || '').trim()
+}
+
+export async function updateAuthProfile(input: {
+  userId: string
+  displayName?: string
+  avatarUrl?: string
+}): Promise<{ ok: true } | { ok: false; error: string; message: string }> {
+  const patch: Record<string, unknown> = {}
+  if (input.displayName != null) {
+    const name = String(input.displayName).trim().slice(0, 30)
+    if (name.length < 1) return { ok: false, error: 'invalid_name', message: '昵称至少 1 个字' }
+    patch.display_name = name
+    patch.nickname = name
+  }
+  if (input.avatarUrl != null) {
+    const url = String(input.avatarUrl).trim()
+    if (url && !url.startsWith('data:image/') && !/^https?:\/\//i.test(url)) {
+      return { ok: false, error: 'invalid_avatar', message: '头像格式无效' }
+    }
+    if (url.length > 180000) return { ok: false, error: 'avatar_too_large', message: '头像过大，请换一张更小的图' }
+    patch.avatar_url = url
+  }
+  if (!Object.keys(patch).length) return { ok: false, error: 'empty', message: '没有需要保存的资料' }
+  const patched = await patchUserMetadata(input.userId, patch)
+  if (!patched.ok) return { ok: false, error: 'update_failed', message: patched.message }
+  return { ok: true }
+}
+
+export async function changePasswordWithBoundContact(input: {
+  userId: string
+  channel: 'phone' | 'email'
+  smsCode?: string
+  emailCode?: string
+  newPassword: string
+}): Promise<{ ok: true; message: string } | { ok: false; error: string; message: string }> {
+  const password = String(input.newPassword || '')
+  if (password.length < 6) return { ok: false, error: 'invalid_password', message: '新密码至少 6 位' }
+  const user = await fetchAuthUserById(input.userId)
+  if (!user) return { ok: false, error: 'account_not_found', message: '账号不存在' }
+  const phone = phoneFromUserRecord(user) || ''
+  const email = bindEmailFromUser(user)
+  if (input.channel === 'phone') {
+    if (!phone) return { ok: false, error: 'phone_missing', message: '当前账号未绑定手机号' }
+    if (!(await verifyAuthSmsCode(phone, String(input.smsCode || '').trim()))) {
+      return { ok: false, error: 'sms_code_invalid', message: '手机验证码错误或已过期' }
+    }
+  } else {
+    if (!email) return { ok: false, error: 'email_missing', message: '当前账号未绑定邮箱' }
+    if (!verifyAuthEmailCode(email, String(input.emailCode || '').trim())) {
+      return { ok: false, error: 'email_code_invalid', message: '邮箱验证码错误或已过期' }
+    }
+  }
+  const { supabaseUrl, serviceRole, missingParts } = adminEnv()
+  if (missingParts.length) return { ok: false, error: 'not_configured', message: '登录服务未配置' }
+  const res = await supabaseAdminFetch(
+    `${supabaseUrl.replace(/\/$/, '')}/auth/v1/admin/users/${encodeURIComponent(input.userId)}`,
+    {
+      method: 'PUT',
+      headers: adminHeaders(serviceRole),
+      body: JSON.stringify({ password }),
+    },
+  )
+  if (!res.ok) return { ok: false, error: 'password_update_failed', message: (await res.text()).slice(0, 200) || '密码更新失败' }
+  return { ok: true, message: '密码已更新，下次登录请使用新密码' }
+}
+
 export function loginNameFromUser(u: Record<string, unknown>): string {
   const meta = u.user_metadata as { login_name?: string } | undefined
   const fromMeta = typeof meta?.login_name === 'string' ? meta.login_name.trim() : ''

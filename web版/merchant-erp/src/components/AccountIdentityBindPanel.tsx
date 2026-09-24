@@ -134,8 +134,8 @@ export default function AccountIdentityBindPanel() {
   }
 
   return (
-    <div className="mt-6 border-t border-slate-100 pt-5">
-      <p className="mb-3 text-sm font-semibold text-slate-800">已绑定社交账号</p>
+    <div>
+      <p className="mb-3 text-sm font-semibold text-slate-800">账号绑定</p>
       <div className="grid grid-cols-4 gap-2">
         {ITEMS.map((it) => {
           const on = Boolean(ids?.[it.id])
@@ -177,7 +177,9 @@ export default function AccountIdentityBindPanel() {
                 )}
               </span>
               {it.label}
-              <span className="text-[10px]">{on ? '已绑定' : '未绑定'}</span>
+              <span className="text-[10px]">
+                {it.id === 'wechat' || it.id === 'douyin' ? (on ? '已绑定' : '未绑定') : on ? '点击换绑' : '未绑定'}
+              </span>
             </button>
           )
         })}
@@ -193,7 +195,7 @@ export default function AccountIdentityBindPanel() {
       {bindKind ? (
         <div className="mt-4 space-y-2 rounded-xl border border-slate-200 p-3">
           <p className="text-sm font-medium text-slate-800">
-            {mergeToken ? '确认合并账号' : bindKind === 'phone' ? '绑定手机号' : '绑定邮箱'}
+            {mergeToken ? '确认合并账号' : bindKind === 'phone' ? (ids?.phone ? '换绑手机号' : '绑定手机号') : ids?.email ? '换绑邮箱' : '绑定邮箱'}
           </p>
           {mergeToken ? <p className="text-xs text-slate-600">{mergeMsg}</p> : null}
           {!mergeToken ? (
@@ -233,7 +235,7 @@ export default function AccountIdentityBindPanel() {
               className="flex-1 rounded-lg bg-slate-900 py-2 text-sm text-white"
               onClick={() => void submit()}
             >
-              {mergeToken ? '确定合并' : '确认绑定'}
+              {mergeToken ? '确定合并' : ids && ((bindKind === 'phone' && ids.phone) || (bindKind === 'email' && ids.email)) ? '确认换绑' : '确认绑定'}
             </button>
           </div>
         </div>

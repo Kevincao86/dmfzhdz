@@ -1,17 +1,22 @@
 /**
  * POST /api/meoo-auth-identity
- * action: email_send | email_login | password_login | identities | bind_contact | merge_confirm
+ * action: email_send | email_login | password_login | identities | bind_contact | merge_confirm | update_profile | change_password
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
+  avatarUrlFromUser,
   bindContactToCurrentUser,
+  changePasswordWithBoundContact,
   confirmAccountMerge,
+  displayNameFromUser,
   identitiesFromUser,
+  loginNameFromUser,
   loginWithEmailCode,
   loginWithPasswordIdentifier,
   needsPhoneBindFromUser,
   readAuthUserFromAccessToken,
   sendAuthEmailCode,
+  updateAuthProfile,
 } from '../vite-plugins/authIdentityBindCore.js'
 
 export const config = { maxDuration: 60 }
@@ -68,6 +73,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       identifier?: string
       password?: string
       loginName?: string
+      displayName?: string
+      avatarUrl?: string
+      channel?: 'phone' | 'email'
+      newPassword?: string
     }
     const action = String(body.action || '').trim()
     const token = bearer(req) || String(body.access_token || '').trim()
@@ -118,7 +127,54 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         ok: true,
         identities: identitiesFromUser(user),
         needsPhoneBind: needsPhoneBindFromUser(user),
+        loginName: loginNameFromUser(user),
+        displayName: displayNameFromUser(user),
+        avatarUrl: avatarUrlFromUser(user),
       })
+      return
+    }
+
+    if (action === 'update_profile') {
+      if (!userId) {
+        sendJson(res, 401, { ok: false, error: 'unauthorized', message: '请先登录' })
+        return
+      }
+      const out = await updateAuthProfile({
+        userId,
+        displayName: body.displayName,
+        avatarUrl: body.avatarUrl,
+      })
+      if (!out.ok) {
+        sendJson(res, 400, { ok: false, error: out.error, message: out.message })
+        return
+      }
+      const next = await readAuthUserFromAccessToken(token)
+      sendJson(res, 200, {
+        ok: true,
+        identities: next ? identitiesFromUser(next) : undefined,
+        displayName: next ? displayNameFromUser(next) : body.displayName,
+        avatarUrl: next ? avatarUrlFromUser(next) : body.avatarUrl,
+      })
+      return
+    }
+
+    if (action === 'change_password') {
+      if (!userId) {
+        sendJson(res, 401, { ok: false, error: 'unauthorized', message: '请先登录' })
+        return
+      }
+      const out = await changePasswordWithBoundContact({
+        userId,
+        channel: body.channel === 'email' ? 'email' : 'phone',
+        smsCode: body.smsCode,
+        emailCode: body.emailCode,
+        newPassword: body.newPassword || '',
+      })
+      if (!out.ok) {
+        sendJson(res, 400, { ok: false, error: out.error, message: out.message })
+        return
+      }
+      sendJson(res, 200, { ok: true, message: out.message })
       return
     }
 

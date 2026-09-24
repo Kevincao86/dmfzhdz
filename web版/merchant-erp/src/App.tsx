@@ -57,6 +57,7 @@ const XingxuanPartnerRoutePage = lazy(() =>
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 const LocalPromotionAdvertisingPage = lazy(() => import('./pages/LocalPromotionAdvertisingPage'))
 const LocalPromotionLeadsPage = lazy(() => import('./pages/LocalPromotionLeadsPage'))
+const AccountProfilePage = lazy(() => import('./pages/AccountProfilePage'))
 const WalletPage = lazy(() => import('./pages/WalletPage'))
 const AffiliateApplyPage = lazy(() => import('./pages/AffiliateApplyPage'))
 const AffiliatePortalPage = lazy(() => import('./pages/AffiliatePortalPage'))
@@ -202,6 +203,7 @@ export default function App() {
                     <Route path="finance/tax" element={<FinanceTaxPage />} />
                     <Route path="finance/agent-settlement" element={<PartnerAgentSettlementRoute />} />
                     <Route path="settings" element={<SettingsPage />} />
+                    <Route path="account" element={<AccountProfilePage />} />
                     <Route path="wallet" element={<WalletPage />} />
                   </Route>
 
