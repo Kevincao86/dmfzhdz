@@ -43,23 +43,33 @@
   color: #475569;
   font-weight: 600;
 }
-.pe-avatar-btn {
+.pe-avatar-row {
   display: flex;
   align-items: center;
-  gap: 20rpx;
+  gap: 24rpx;
+  min-height: 128rpx;
+}
+.pe-avatar-hit {
+  width: 128rpx;
+  height: 128rpx;
+  min-width: 128rpx;
   padding: 0;
   margin: 0;
+  line-height: 128rpx;
   background: transparent;
-  text-align: left;
+  border-radius: 28rpx;
+  overflow: hidden;
 }
-.pe-avatar-btn::after {
+.pe-avatar-hit::after {
   border: none;
 }
 .pe-avatar {
-  width: 112rpx;
-  height: 112rpx;
+  width: 128rpx;
+  height: 128rpx;
   border-radius: 28rpx;
   background: #e2e8f0;
+  display: block;
+  pointer-events: none;
 }
 .pe-avatar-ph {
   display: flex;
@@ -68,9 +78,23 @@
   font-size: 24rpx;
   color: #64748b;
 }
+.pe-avatar-actions {
+  flex: 1;
+  min-width: 0;
+}
 .pe-avatar-tip {
-  font-size: 24rpx;
+  display: block;
+  font-size: 28rpx;
   color: #0284c7;
+  font-weight: 600;
+  padding: 8rpx 0;
+}
+.pe-avatar-sub {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: #64748b;
+  line-height: 1.4;
 }
 .pe-input {
   height: 80rpx;
@@ -89,9 +113,17 @@
 .btn-v2 {
   height: 88rpx;
   line-height: 88rpx;
+  padding: 0 32rpx;
   border-radius: 16rpx;
   font-size: 28rpx;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+.btn-v2::after {
+  border: none;
 }
 .btn-v2.primary {
   background: #0284c7;
@@ -195,6 +227,10 @@
   background: #fff;
   border: 1rpx solid #bae6fd;
   border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
 }
 .sms-btn::after {
   border: none;

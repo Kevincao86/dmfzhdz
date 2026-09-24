@@ -14,11 +14,21 @@
     <view class="pe-card">
       <text class="pe-sec">基本资料</text>
       <text class="field-label">头像</text>
-      <button class="pe-avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
-        <image wx:if="{{avatarUrl}}" class="pe-avatar" src="{{avatarUrl}}" mode="aspectFill" />
-        <view wx:else class="pe-avatar pe-avatar-ph">点选</view>
-        <text class="pe-avatar-tip">点击更换头像</text>
-      </button>
+      <view class="pe-avatar-row">
+        <button
+          class="pe-avatar-hit"
+          hover-class="none"
+          open-type="chooseAvatar"
+          bindchooseavatar="onChooseAvatar"
+        >
+          <image wx:if="{{avatarUrl}}" class="pe-avatar" src="{{avatarUrl}}" mode="aspectFill" />
+          <view wx:else class="pe-avatar pe-avatar-ph">点选</view>
+        </button>
+        <view class="pe-avatar-actions">
+          <text class="pe-avatar-tip" bindtap="onPickFromAlbum">点击更换头像</text>
+          <text class="pe-avatar-sub" bindtap="onPickFromAlbum">可用微信头像，或从相册 / 拍照上传</text>
+        </view>
+      </view>
 
       <text class="field-label">登录名</text>
       <input class="pe-input pe-disabled" disabled value="{{loginName || '—'}}" />

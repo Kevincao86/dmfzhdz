@@ -38,9 +38,22 @@
 .input-wrap { display: flex; align-items: center; gap: 16rpx; border: 2rpx solid #e2e8f0; border-radius: 24rpx; padding: 0 20rpx; background: #f8fafc; }
 .input-wrap input { flex: 1; border: none; background: transparent; padding: 22rpx 0; font-size: 26rpx; outline: none; }
 .eye { font-size: 28rpx; opacity: .5; }
-.btn-v2 { border: none; border-radius: 28rpx; padding: 24rpx 32rpx; font-size: 28rpx; font-weight: 700; cursor: default; }
+.btn-v2 {
+  border: none;
+  border-radius: 28rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  padding: 0 32rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+.btn-v2::after { border: none; }
 .btn-v2.primary { background: linear-gradient(95deg,#0ea5e9,#06b6d4); color: #fff; width: 100%; margin-top: 16rpx; box-shadow: 0 12rpx 40rpx rgba(14,165,233,.3); }
-.btn-v2.sm { width: auto; padding: 16rpx 28rpx; font-size: 24rpx; }
+.btn-v2.sm { width: auto; height: 64rpx; line-height: 64rpx; padding: 0 28rpx; font-size: 24rpx; }
 .auth-foot { display: flex; justify-content: space-between; margin-top: 24rpx; font-size: 22rpx; }
 .auth-foot a { color: #64748b; }
 .page-agent-v2 { display: flex; flex-direction: column; min-height: 100%; margin: -24rpx -28rpx 0; }

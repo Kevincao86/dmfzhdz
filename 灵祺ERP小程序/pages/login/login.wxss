@@ -293,7 +293,9 @@
   font-size: 28rpx;
   font-weight: 700;
   border-radius: 28rpx;
-  padding: 24rpx 32rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  padding: 0 32rpx;
 }
 
 .btn-v2.wx-login::after {

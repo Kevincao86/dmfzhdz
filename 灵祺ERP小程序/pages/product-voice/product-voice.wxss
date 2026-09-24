@@ -19,7 +19,7 @@ page {
 
 .voice-inner {
   width: 100%;
-  padding: 20rpx 28rpx calc(48rpx + env(safe-area-inset-bottom));
+  padding: 16rpx 16rpx calc(48rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
 }
 
@@ -47,7 +47,7 @@ page {
 .voice-card {
   width: 100%;
   margin-top: 8rpx;
-  padding: 24rpx;
+  padding: 28rpx 20rpx;
   background: #fff;
   border-radius: 24rpx;
   box-sizing: border-box;
@@ -74,13 +74,13 @@ page {
   flex-direction: row;
   align-items: center;
   width: 100%;
+  min-height: 148rpx;
   box-sizing: border-box;
-  padding: 20rpx 16rpx;
-  margin-bottom: 12rpx;
+  padding: 28rpx 24rpx;
+  margin-bottom: 16rpx;
   border: 2rpx solid #e2e8f0;
-  border-radius: 20rpx;
+  border-radius: 24rpx;
   background: #fff;
-  overflow: hidden;
 }
 
 .plat.on {
@@ -93,23 +93,23 @@ page {
 }
 
 .plat-logo-wrap {
-  width: 72rpx;
-  height: 72rpx;
-  min-width: 72rpx;
-  max-width: 72rpx;
-  flex: 0 0 72rpx;
+  width: 96rpx;
+  height: 96rpx;
+  min-width: 96rpx;
+  max-width: 96rpx;
+  flex: 0 0 96rpx;
   overflow: hidden;
-  border-radius: 16rpx;
+  border-radius: 20rpx;
   background: #f8fafc;
 }
 
 .plat-logo {
-  width: 72rpx;
-  height: 72rpx;
-  border-radius: 16rpx;
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 20rpx;
   background-repeat: no-repeat;
   background-position: center;
-  background-size: cover;
+  background-size: contain;
 }
 
 .plat-logo.ph {
@@ -124,31 +124,25 @@ page {
 
 .plat-body {
   flex: 1;
-  width: 0;
   min-width: 0;
-  margin: 0 16rpx;
-  overflow: hidden;
+  margin: 0 20rpx;
 }
 
 .plat-name {
   display: block;
-  font-size: 28rpx;
+  font-size: 30rpx;
   font-weight: 700;
   color: #0f172a;
-  line-height: 1.35;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.4;
+  word-break: break-all;
 }
 
 .plat-status {
   display: block;
-  margin-top: 6rpx;
-  font-size: 22rpx;
+  margin-top: 8rpx;
+  font-size: 24rpx;
   color: #94a3b8;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.4;
 }
 
 .plat-status.ok {
@@ -156,15 +150,15 @@ page {
 }
 
 .plat-radio {
-  width: 40rpx;
-  height: 40rpx;
+  width: 48rpx;
+  height: 48rpx;
   border-radius: 50%;
   border: 2rpx solid #cbd5e1;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22rpx;
+  font-size: 24rpx;
   color: #fff;
   font-weight: 800;
 }

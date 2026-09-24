@@ -145,13 +145,38 @@ Page({
     persistLocal({ avatarUrl, displayName, loginName, updatedAt: Date.now() })
   },
 
-  onChooseAvatar(e) {
-    const url = e.detail && e.detail.avatarUrl
+  applyAvatar(url) {
     if (!url) return
     this.setData({ profileErr: '', profileHint: '' })
     compressAvatar(url)
       .then((data) => this.setData({ avatarUrl: data }))
       .catch((err) => this.setData({ profileErr: err.message || '头像处理失败' }))
+  },
+
+  onChooseAvatar(e) {
+    this.applyAvatar(e.detail && e.detail.avatarUrl)
+  },
+
+  onPickFromAlbum() {
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      sourceType: ['album', 'camera'],
+      success: (res) => {
+        const file = res.tempFiles && res.tempFiles[0]
+        this.applyAvatar(file && file.tempFilePath)
+      },
+      fail: (err) => {
+        const msg = String((err && err.errMsg) || '')
+        if (msg.indexOf('cancel') >= 0) return
+        wx.chooseImage({
+          count: 1,
+          sizeType: ['compressed'],
+          sourceType: ['album', 'camera'],
+          success: (r) => this.applyAvatar(r.tempFilePaths && r.tempFilePaths[0]),
+        })
+      },
+    })
   },
 
   onDisplayName(e) {
