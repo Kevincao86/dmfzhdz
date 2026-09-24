@@ -7,6 +7,36 @@ function yuan(n) {
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+const ANALYSIS_CACHE_KEY = 'meoo_shop_analysis_ai_v1'
+
+function analysisCacheKey(page) {
+  let tenant = ''
+  try {
+    tenant = String(wx.getStorageSync('meoo_active_tenant_id') || wx.getStorageSync('meoo_login_name') || '')
+  } catch (_) {}
+  return [tenant, page.data.startDate, page.data.endDate, page.data.platform, page.data.poiId || ''].join('|')
+}
+
+function readAnalysisCache(key) {
+  try {
+    const raw = wx.getStorageSync(ANALYSIS_CACHE_KEY)
+    const row = typeof raw === 'string' ? JSON.parse(raw || '{}') : raw || {}
+    if (!row || row.key !== key || !Array.isArray(row.aiSections) || !row.aiSections.length) return null
+    return row
+  } catch (_) {
+    return null
+  }
+}
+
+function writeAnalysisCache(key, payload) {
+  try {
+    wx.setStorageSync(
+      ANALYSIS_CACHE_KEY,
+      Object.assign({ key, savedAt: Date.now() }, payload),
+    )
+  } catch (_) {}
+}
+
 Page({
   data: {
     startDate: '',
@@ -170,7 +200,18 @@ Page({
       })
       if (seq !== this._loadSeq) return
       this.applySummary(r.summary, r.adviceFacts)
-      this.setData({ loading: false })
+      const cached = readAnalysisCache(analysisCacheKey(this))
+      this.setData(
+        cached
+          ? {
+              loading: false,
+              showAdvice: true,
+              aiSections: cached.aiSections,
+              pointsCharged: cached.pointsCharged || 0,
+              modelUsed: cached.modelUsed || '',
+            }
+          : { loading: false },
+      )
     } catch (e) {
       if (seq !== this._loadSeq) return
       this.setData({
@@ -204,6 +245,17 @@ Page({
 
   onAnalyze() {
     if (!this.data.summary || this.data.analyzing) return
+    const cached = readAnalysisCache(analysisCacheKey(this))
+    if (cached) {
+      this.setData({
+        showAdvice: true,
+        aiSections: cached.aiSections,
+        pointsCharged: cached.pointsCharged || 0,
+        modelUsed: cached.modelUsed || '',
+        err: '',
+      })
+      return
+    }
     this.setData({ analyzing: true, err: '' })
     void (async () => {
       try {
@@ -226,6 +278,13 @@ Page({
               : []
         if (!sections.length && r.adviceFacts) {
           sections.push({ id: 'a-f', title: '规则建议', body: r.adviceFacts })
+        }
+        if (sections.length && !r.aiFailed) {
+          writeAnalysisCache(analysisCacheKey(this), {
+            aiSections: sections,
+            pointsCharged: r.pointsCharged || 0,
+            modelUsed: r.modelUsed || '',
+          })
         }
         this.setData({
           analyzing: false,

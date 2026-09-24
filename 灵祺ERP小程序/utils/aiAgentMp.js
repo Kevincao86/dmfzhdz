@@ -431,6 +431,11 @@ function isAbortError(err) {
   return /abort|已停止/i.test(String(err.message || err.errMsg || ''))
 }
 
+function isInterruptedError(err) {
+  if (!err || err.aborted) return false
+  return /interrupted/i.test(String(err.message || err.errMsg || ''))
+}
+
 function requestJson(path, data, opts) {
   const base = apiBase()
   if (!base) return Promise.reject(new Error('未配置商家后台 API'))
@@ -455,6 +460,12 @@ function requestJson(path, data, opts) {
         if (/abort/i.test(em)) {
           const e = new Error('已停止生成')
           e.aborted = true
+          reject(e)
+          return
+        }
+        if (/interrupted/i.test(em)) {
+          const e = new Error('已切到后台，回到前台后继续生成')
+          e.interrupted = true
           reject(e)
           return
         }
@@ -896,5 +907,6 @@ module.exports = {
   apiBase,
   devMockReply,
   isAbortError,
+  isInterruptedError,
   postAiAgentNativeImage,
 }

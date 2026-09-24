@@ -295,6 +295,9 @@ Page({
       this.setData({ pickedId: 'reg', mode: 'register' })
     } else if (id === 'wx') {
       this.setData({ pickedId: 'wx', mode: 'login', loginMethod: 'password' })
+      this._syncModeHint()
+      void this.onWxLogin()
+      return
     }
     this._syncModeHint()
   },

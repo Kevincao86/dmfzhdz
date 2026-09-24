@@ -59,6 +59,8 @@ Page({
   },
 
   onUnload() {
+    this._pendingTurn = null
+    this._resumeOnShow = false
     this.abortPendingRequest()
     if (this.data.recordingVoice && this._recorder) {
       composer.stopVoiceRecord(this, this._recorder, true)
@@ -90,6 +92,10 @@ Page({
     })
     void this.refreshShortcuts()
     void sessionSync.syncFromCloud({ force: true }).catch(() => {})
+    if (this._resumeOnShow && this.data.sending && !this._stopped) {
+      this._resumeOnShow = false
+      void this.resumeInterruptedTurn()
+    }
   },
 
   async refreshShortcuts() {
@@ -117,6 +123,8 @@ Page({
 
   onStop() {
     if (!this.data.sending) return
+    this._pendingTurn = null
+    this._resumeOnShow = false
     this.abortPendingRequest()
     const list = this.data.messages || []
     const last = list[list.length - 1]
@@ -429,6 +437,9 @@ Page({
       ? agent.shouldRouteToNativeImage('', text, packed.some((a) => a.kind === 'image'))
       : /美化|修图|生成|生图|海报|图片|照片|门头|菜品|美食/.test(text)
     this._stopped = false
+    this._pendingTurn = null
+    this._resumeOnShow = false
+    this._resumeTries = 0
     const runId = (this._runId || 0) + 1
     this._runId = runId
     this.persist([...this.data.messages, userMsg], {
@@ -467,12 +478,79 @@ Page({
         this.setData({ sending: false })
         return
       }
+      if (agent.isInterruptedError && agent.isInterruptedError(e)) {
+        this._pendingTurn = { text, history, packed, runId }
+        this._resumeOnShow = true
+        this.setData({ sending: true, thinkingText: '切到后台了，回到前台后继续生成' })
+        return
+      }
       const err = {
         id: `err-${Date.now()}`,
         role: 'assistant',
         content: (e && e.message) || '发送失败，请稍后重试',
       }
       this.persist([...(this.data.messages || []), err], { sending: false })
+    }
+  },
+
+  async resumeInterruptedTurn() {
+    const pending = this._pendingTurn
+    if (!pending || this._stopped || !agent) return
+    const runId = pending.runId
+    if (this._runId !== runId) return
+    this._resumeTries = (this._resumeTries || 0) + 1
+    if (this._resumeTries > 3) {
+      this._pendingTurn = null
+      this._resumeOnShow = false
+      this.persist(
+        [
+          ...(this.data.messages || []),
+          { id: `err-${Date.now()}`, role: 'assistant', content: '切到后台后生成中断，请再发一次。' },
+        ],
+        { sending: false },
+      )
+      return
+    }
+    this.setData({ sending: true, thinkingText: '正在继续生成…' })
+    try {
+      const r = await agent.processAgentTurn(
+        {
+          userLine: pending.text,
+          history: pending.history,
+          attachments: pending.packed,
+          requestOpts: {
+            onRequestTask: (task) => {
+              this._requestTask = task
+            },
+          },
+        },
+        this._execState,
+      )
+      if (this._runId !== runId || this._stopped) return
+      this._pendingTurn = null
+      this._resumeOnShow = false
+      this._resumeTries = 0
+      this._execState = r.executionState || this._execState
+      this._requestTask = null
+      this.persist([...(this.data.messages || []), ...(r.assistantMsgs || [])], { sending: false })
+    } catch (e) {
+      if (this._runId !== runId || this._stopped || (agent.isAbortError && agent.isAbortError(e))) {
+        this.setData({ sending: false })
+        return
+      }
+      if (agent.isInterruptedError && agent.isInterruptedError(e)) {
+        this._resumeOnShow = true
+        this.setData({ sending: true, thinkingText: '切到后台了，回到前台后继续生成' })
+        return
+      }
+      this._pendingTurn = null
+      this.persist(
+        [
+          ...(this.data.messages || []),
+          { id: `err-${Date.now()}`, role: 'assistant', content: (e && e.message) || '发送失败，请稍后重试' },
+        ],
+        { sending: false },
+      )
     }
   },
 
