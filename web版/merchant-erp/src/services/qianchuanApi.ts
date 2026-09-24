@@ -46,7 +46,7 @@ type OceanTokenPatch = {
 
 async function persistOceanTokenPatch(token: OceanTokenPatch | undefined) {
   const access = token?.accessToken?.trim()
-  if (!access) return
+  if (!token || !access) return
   const bind = readQianchuanBinding()
   if (!bind) return
   const next = {

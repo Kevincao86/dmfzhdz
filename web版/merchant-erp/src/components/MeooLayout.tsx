@@ -139,7 +139,7 @@ export default function MeooLayout() {
         setAdminName(meta?.login_name ?? u.email?.split('@')[0] ?? '用户')
         const mobile = phoneFromAuthUser({ phone: u.phone, user_metadata: meta })
         setPhone(mobile ? maskCnPhone(mobile) : '—')
-        const tok = session.access_token
+        const tok = session?.access_token || ''
         setBindAccessToken(tok || '')
         if (tok) {
           const idn = await postAuthIdentity({ action: 'identities', access_token: tok })
