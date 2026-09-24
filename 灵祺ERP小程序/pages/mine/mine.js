@@ -44,7 +44,7 @@ const BASE_MENU = [
   {
     id: 'switch',
     title: '切换账号',
-    desc: '使用其他门店账户登录',
+    desc: '同一手机号或邮箱下最多 3 个账号',
     iconKey: 'switchUser',
     tone: 'cyan',
     action: 'switch',
@@ -273,11 +273,49 @@ Page({
     }
   },
 
+  async switchAccount() {
+    const access = api.getAccessToken()
+    if (!access) {
+      api.logoutAndGoLogin()
+      return
+    }
+    const listed = await tenantAuthApi.postAuthIdentity({ action: 'linked_accounts', access_token: access })
+    const others = (listed.accounts || []).filter((a) => !a.current)
+    if (!listed.ok || !others.length) {
+      api.logoutAndGoLogin()
+      return
+    }
+    wx.showActionSheet({
+      itemList: others.map((a) => a.displayName || a.loginName).concat('登录其它账号'),
+      success: async (res) => {
+        if (res.tapIndex >= others.length) {
+          api.logoutAndGoLogin()
+          return
+        }
+        const target = others[res.tapIndex]
+        const r = await tenantAuthApi.postAuthIdentity({
+          action: 'switch_account',
+          access_token: access,
+          targetUserId: target.userId,
+        })
+        if (!r.ok || !r.access_token) {
+          wx.showToast({ title: r.message || '切换失败', icon: 'none' })
+          return
+        }
+        api.persistSession(
+          { access_token: r.access_token, refresh_token: r.refresh_token || '' },
+          r.loginName || target.loginName,
+        )
+        wx.reLaunch({ url: '/pages/mine/mine' })
+      },
+    })
+  },
+
   onMenuTap(e) {
     const action = e.currentTarget.dataset.action
     const url = e.currentTarget.dataset.url
     if (action === 'switch') {
-      api.logoutAndGoLogin()
+      this.switchAccount()
       return
     }
     if (!url) return

@@ -14,8 +14,10 @@ import {
   loginWithEmailCode,
   loginWithPasswordIdentifier,
   needsPhoneBindFromUser,
+  listLinkedAccounts,
   probeContactForBind,
   readAuthUserFromAccessToken,
+  switchToLinkedAccount,
   sendBoundContactOtp,
   sendAuthEmailCode,
   updateAuthProfile,
@@ -78,6 +80,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       displayName?: string
       avatarUrl?: string
       channel?: 'phone' | 'email'
+      targetUserId?: string
       newPassword?: string
     }
     const action = String(body.action || '').trim()
@@ -231,6 +234,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       if (!out.ok) {
         const status = out.error === 'account_exists_merge' ? 409 : 400
         sendJson(res, status, out as unknown as Record<string, unknown>)
+        return
+      }
+      sendJson(res, 200, out as unknown as Record<string, unknown>)
+      return
+    }
+
+    if (action === 'linked_accounts') {
+      if (!userId) {
+        sendJson(res, 401, { ok: false, error: 'unauthorized', message: '请先登录' })
+        return
+      }
+      const out = await listLinkedAccounts(userId)
+      if (!out.ok) {
+        sendJson(res, 400, { ok: false, error: out.error, message: out.message })
+        return
+      }
+      sendJson(res, 200, { ok: true, accounts: out.accounts })
+      return
+    }
+
+    if (action === 'switch_account') {
+      if (!userId) {
+        sendJson(res, 401, { ok: false, error: 'unauthorized', message: '请先登录' })
+        return
+      }
+      const out = await switchToLinkedAccount({ userId, targetUserId: body.targetUserId || '' })
+      if (!out.ok) {
+        sendJson(res, 400, { ok: false, error: out.error, message: out.message })
         return
       }
       sendJson(res, 200, out as unknown as Record<string, unknown>)

@@ -136,7 +136,7 @@
 
 <view wx:if="{{showBindPhone}}" class="login-legal-mask" catchtouchmove="true">
   <view class="login-legal-modal" catchtap="true">
-    <text class="login-legal-modal-title">{{bindMergeToken ? '确认合并账号' : '绑定手机号'}}</text>
+    <text class="login-legal-modal-title">{{bindMergeToken ? '加入已有手机号' : '绑定手机号'}}</text>
     <text class="login-legal-modal-content">{{bindMergeToken ? bindMergeMsg : (bindNeedCode ? '该手机号尚未注册，请获取验证码后完成绑定。' : '输入手机号后点绑定。若该号已注册，将提示是否合并。')}}</text>
     <view wx:if="{{!bindNeedCode && !bindMergeToken}}" class="field-v2">
       <view class="input-wrap">
@@ -152,7 +152,7 @@
     <text wx:if="{{err}}" class="err-msg">{{err}}</text>
     <view class="login-legal-modal-actions">
       <button wx:if="{{bindNeedCode || bindMergeToken}}" class="login-legal-modal-btn login-legal-modal-btn--decline" bindtap="onBindBack">返回</button>
-      <button class="login-legal-modal-btn login-legal-modal-btn--agree" bindtap="onConfirmBindPhone">{{bindMergeToken ? '确定合并' : (bindNeedCode ? '确认绑定' : '绑定并进入')}}</button>
+      <button class="login-legal-modal-btn login-legal-modal-btn--agree" bindtap="onConfirmBindPhone">{{bindMergeToken ? '确定加入' : (bindNeedCode ? '确认绑定' : '绑定并进入')}}</button>
     </view>
   </view>
 </view>

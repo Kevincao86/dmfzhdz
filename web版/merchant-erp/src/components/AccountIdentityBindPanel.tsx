@@ -98,11 +98,13 @@ export default function AccountIdentityBindPanel() {
           emailCode: bindKind === 'email' ? code : undefined,
         })
         if (!r.ok) {
-          setErr(r.message || '合并失败')
+          setErr(r.message || '加入失败')
           return
         }
         if (r.access_token && r.refresh_token && supabase) {
           await supabase.auth.setSession({ access_token: r.access_token, refresh_token: r.refresh_token })
+          window.location.assign('/')
+          return
         }
         setMergeToken('')
         setAwaitingCode(false)
@@ -229,7 +231,7 @@ export default function AccountIdentityBindPanel() {
       {bindKind ? (
         <div className="mt-4 space-y-2 rounded-xl border border-slate-200 p-3">
           <p className="text-sm font-medium text-slate-800">
-            {mergeToken ? '确认合并账号' : bindKind === 'phone' ? (ids?.phone ? '换绑手机号' : '绑定手机号') : ids?.email ? '换绑邮箱' : '绑定邮箱'}
+            {mergeToken ? '加入已有账号' : bindKind === 'phone' ? (ids?.phone ? '换绑手机号' : '绑定手机号') : ids?.email ? '换绑邮箱' : '绑定邮箱'}
           </p>
           {mergeToken ? <p className="text-xs text-slate-600">{mergeMsg}</p> : null}
           {awaitingCode && !mergeToken ? (
@@ -287,7 +289,7 @@ export default function AccountIdentityBindPanel() {
               onClick={() => void submit()}
             >
               {mergeToken
-                ? '确定合并'
+                ? '确定加入'
                 : awaitingCode
                   ? ids && ((bindKind === 'phone' && ids.phone) || (bindKind === 'email' && ids.email))
                     ? '确认换绑'

@@ -681,14 +681,16 @@ Page({
           mergeToken: this.data.bindMergeToken,
           smsCode,
         })
-        if (!r.ok || !r.access_token) {
-          this.setData({ err: r.message || '合并失败' })
+        if (!r.ok) {
+          this.setData({ err: r.message || '加入失败' })
           return
         }
-        api.persistSession(
-          { access_token: r.access_token, refresh_token: r.refresh_token || '' },
-          r.loginName || '',
-        )
+        if (r.access_token) {
+          api.persistSession(
+            { access_token: r.access_token, refresh_token: r.refresh_token || '' },
+            r.loginName || '',
+          )
+        }
         this.setData({ showBindPhone: false, bindMergeToken: '', bindNeedCode: false })
         this._goHome()
         return

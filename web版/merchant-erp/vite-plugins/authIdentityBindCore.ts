@@ -19,6 +19,8 @@ export const ERP_BIND_EMAIL_META_KEY = 'bind_email'
 
 const EMAIL_OTP_TTL_MS = 5 * 60 * 1000
 const MERGE_TTL_MS = 15 * 60 * 1000
+/** 同一手机号或邮箱最多挂载的商家账号数 */
+export const MAX_ACCOUNTS_PER_CONTACT = 3
 const emailOtpStore = new Map<string, { code: string; exp: number }>()
 const mergeStore = new Map<
   string,
@@ -616,50 +618,132 @@ export type ProbeContactResult =
   | Extract<BindContactResult, { error: 'account_exists_merge' }>
   | { ok: false; error: string; message: string }
 
+type ListedAuthUser = { userId: string; email: string; loginName: string; displayName: string; raw: Record<string, unknown> }
+
+function userMergedAway(u: Record<string, unknown>): boolean {
+  const meta = (u.user_metadata as Record<string, unknown> | undefined) ?? {}
+  return Boolean(String(meta.merged_into || '').trim())
+}
+
+function summarizeAuthUser(u: Record<string, unknown>): ListedAuthUser | null {
+  if (userMergedAway(u)) return null
+  const userId = typeof u.id === 'string' ? u.id : ''
+  const authEmail = typeof u.email === 'string' ? u.email : ''
+  if (!userId || !authEmail) return null
+  const loginName = loginNameFromUser(u)
+  return { userId, email: authEmail, loginName, displayName: displayNameFromUser(u), raw: u }
+}
+
+async function eachAuthUser(visit: (u: Record<string, unknown>) => void): Promise<boolean> {
+  const { supabaseUrl, serviceRole, missingParts } = adminEnv()
+  if (missingParts.length) return false
+  const base = supabaseUrl.replace(/\/$/, '')
+  let page = 1
+  const perPage = 200
+  while (page <= 20) {
+    const res = await supabaseAdminFetch(`${base}/auth/v1/admin/users?page=${page}&per_page=${perPage}`, {
+      headers: adminHeaders(serviceRole),
+    })
+    if (!res.ok) return false
+    const parsed = (await res.json()) as { users?: Record<string, unknown>[] }
+    const users = Array.isArray(parsed.users) ? parsed.users : []
+    for (const u of users) visit(u)
+    if (users.length < perPage) break
+    page += 1
+  }
+  return true
+}
+
+async function listAuthUsersByPhone(phone: string): Promise<ListedAuthUser[]> {
+  const needle = normalizeCnMobile(phone)
+  if (!needle) return []
+  const out: ListedAuthUser[] = []
+  await eachAuthUser((u) => {
+    if (phoneFromUserRecord(u) !== needle) return
+    const row = summarizeAuthUser(u)
+    if (row) out.push(row)
+  })
+  return out
+}
+
+async function listAuthUsersByBindEmail(email: string): Promise<ListedAuthUser[]> {
+  const needle = normalizeBindEmail(email)
+  if (!needle) return []
+  const out: ListedAuthUser[] = []
+  await eachAuthUser((u) => {
+    if (bindEmailFromUser(u) !== needle) return
+    const row = summarizeAuthUser(u)
+    if (row) out.push(row)
+  })
+  return out
+}
+
+function authPhoneColumn(u: Record<string, unknown>): string {
+  const rawPhone = typeof u.phone === 'string' ? u.phone : ''
+  const digits = rawPhone.replace(/\D/g, '')
+  if (digits.startsWith('86') && digits.length === 13) return normalizeCnMobile(digits.slice(2)) || ''
+  return normalizeCnMobile(digits) || ''
+}
+
 async function mergeConflictIfHeld(
   userId: string,
   phone: string,
   email: string,
-): Promise<Extract<BindContactResult, { error: 'account_exists_merge' }> | null> {
+): Promise<Extract<BindContactResult, { error: 'account_exists_merge' }> | { ok: false; error: string; message: string } | null> {
   if (phone) {
-    const holder = await findAuthUserByPhone(phone)
-    if (holder && holder.userId !== userId) {
-      const token = issueMergeToken({
-        fromUserId: userId,
-        targetUserId: holder.userId,
-        channel: 'phone',
-        value: phone,
-      })
+    const holders = await listAuthUsersByPhone(phone)
+    const others = holders.filter((h) => h.userId !== userId)
+    if (!others.length) return null
+    if (holders.length >= MAX_ACCOUNTS_PER_CONTACT) {
       return {
         ok: false,
-        error: 'account_exists_merge',
-        message: `已有该账号（${holder.loginName} / ${maskPhone(phone)}），是否确定合并？`,
-        mergeToken: token,
-        channel: 'phone',
-        masked: maskPhone(phone),
-        loginName: holder.loginName,
+        error: 'contact_account_full',
+        message: `该手机号已绑定 ${MAX_ACCOUNTS_PER_CONTACT} 个账号，无法再加入`,
       }
     }
-    return null
+    const holder = others[0]!
+    const token = issueMergeToken({
+      fromUserId: userId,
+      targetUserId: holder.userId,
+      channel: 'phone',
+      value: phone,
+    })
+    return {
+      ok: false,
+      error: 'account_exists_merge',
+      message: `该手机号下已有账号（${holder.loginName} / ${maskPhone(phone)}）。验证后将当前账号加入该号，最多 ${MAX_ACCOUNTS_PER_CONTACT} 个，可在「切换账号」中切换。`,
+      mergeToken: token,
+      channel: 'phone',
+      masked: maskPhone(phone),
+      loginName: holder.loginName,
+    }
   }
   if (email) {
-    const holder = await findAuthUserByBindEmail(email)
-    if (holder && holder.userId !== userId) {
-      const token = issueMergeToken({
-        fromUserId: userId,
-        targetUserId: holder.userId,
-        channel: 'email',
-        value: email,
-      })
+    const holders = await listAuthUsersByBindEmail(email)
+    const others = holders.filter((h) => h.userId !== userId)
+    if (!others.length) return null
+    if (holders.length >= MAX_ACCOUNTS_PER_CONTACT) {
       return {
         ok: false,
-        error: 'account_exists_merge',
-        message: `已有该账号（${holder.loginName} / ${maskEmail(email)}），是否确定合并？`,
-        mergeToken: token,
-        channel: 'email',
-        masked: maskEmail(email),
-        loginName: holder.loginName,
+        error: 'contact_account_full',
+        message: `该邮箱已绑定 ${MAX_ACCOUNTS_PER_CONTACT} 个账号，无法再加入`,
       }
+    }
+    const holder = others[0]!
+    const token = issueMergeToken({
+      fromUserId: userId,
+      targetUserId: holder.userId,
+      channel: 'email',
+      value: email,
+    })
+    return {
+      ok: false,
+      error: 'account_exists_merge',
+      message: `该邮箱下已有账号（${holder.loginName} / ${maskEmail(email)}）。验证后将当前账号加入该邮箱，最多 ${MAX_ACCOUNTS_PER_CONTACT} 个，可在「切换账号」中切换。`,
+      mergeToken: token,
+      channel: 'email',
+      masked: maskEmail(email),
+      loginName: holder.loginName,
     }
   }
   return null
@@ -724,9 +808,10 @@ export async function confirmAccountMerge(input: {
 }): Promise<
   | {
       ok: true
-      merged: true
-      access_token: string
-      refresh_token: string
+      merged: boolean
+      joined?: boolean
+      access_token?: string
+      refresh_token?: string
       expires_in?: number
       loginName: string
       identities: IdentitySnapshot
@@ -746,43 +831,95 @@ export async function confirmAccountMerge(input: {
   }
 
   const from = await fetchAuthUserById(row.fromUserId)
-  const target = await fetchAuthUserById(row.targetUserId)
-  if (!from || !target) return { ok: false, error: 'account_not_found', message: '待合并账号不存在' }
+  if (!from) return { ok: false, error: 'account_not_found', message: '待加入账号不存在' }
 
-  const wx = wxOpenIdFromUser(from)
-  const dy = dyOpenIdFromUser(from)
-  const fromEmail = bindEmailFromUser(from)
-  const fromPhone = phoneFromUserRecord(from) || ''
-  const patch: Record<string, unknown> = { merged_from: row.fromUserId }
-  if (wx && !wxOpenIdFromUser(target)) patch[ERP_WX_OPENID_META_KEY] = wx
-  if (dy && !dyOpenIdFromUser(target)) patch[ERP_DY_OPENID_META_KEY] = dy
-  if (fromEmail && !bindEmailFromUser(target)) patch[ERP_BIND_EMAIL_META_KEY] = fromEmail
-  if (row.channel === 'phone') patch.phone = row.value
-  else if (fromPhone && !phoneFromUserRecord(target)) patch.phone = fromPhone
+  const holders =
+    row.channel === 'phone' ? await listAuthUsersByPhone(row.value) : await listAuthUsersByBindEmail(row.value)
+  const already = holders.some((h) => h.userId === row.fromUserId)
+  if (!already && holders.length >= MAX_ACCOUNTS_PER_CONTACT) {
+    return {
+      ok: false,
+      error: 'contact_account_full',
+      message: `该${row.channel === 'phone' ? '手机号' : '邮箱'}已绑定 ${MAX_ACCOUNTS_PER_CONTACT} 个账号，无法再加入`,
+    }
+  }
 
-  const extraPhone = phoneFromUserRecord(target) || (row.channel === 'phone' ? row.value : fromPhone) || undefined
-  const patched = await patchUserMetadata(row.targetUserId, patch, extraPhone ? { phone: extraPhone } : undefined)
+  const patch: Record<string, unknown> =
+    row.channel === 'phone' ? { phone: row.value } : { [ERP_BIND_EMAIL_META_KEY]: row.value }
+  const columnTaken =
+    row.channel === 'phone' && holders.some((h) => h.userId !== row.fromUserId && authPhoneColumn(h.raw) === row.value)
+  const patched = await patchUserMetadata(
+    row.fromUserId,
+    patch,
+    !columnTaken && row.channel === 'phone' ? { phone: row.value } : undefined,
+  )
   if (!patched.ok) return { ok: false, error: 'merge_failed', message: patched.message }
 
-  await patchUserMetadata(row.fromUserId, { merged_into: row.targetUserId, merged_at: new Date().toISOString() })
-
   mergeStore.delete(String(input.mergeToken || '').trim())
-  const targetEmail = typeof target.email === 'string' ? target.email : ''
-  const meta = target.user_metadata as { login_name?: string } | undefined
-  const loginName = (typeof meta?.login_name === 'string' && meta.login_name.trim()) || targetEmail.split('@')[0] || ''
-  const session = await createAdminSessionForUserId(row.targetUserId, targetEmail)
-  if (!session.ok) {
-    return { ok: false, error: session.error, message: '合并成功但登录失败，请用原账号登录' }
-  }
-  const next = (await fetchAuthUserById(row.targetUserId)) || target
+  const next = (await fetchAuthUserById(row.fromUserId)) || from
+  const loginName = loginNameFromUser(next)
   return {
     ok: true,
-    merged: true,
+    merged: false,
+    joined: true,
+    loginName,
+    identities: identitiesFromUser(next),
+  }
+}
+
+export type LinkedAccount = { userId: string; loginName: string; displayName: string; current: boolean }
+
+export async function listLinkedAccounts(userId: string): Promise<
+  { ok: true; accounts: LinkedAccount[] } | { ok: false; error: string; message: string }
+> {
+  const user = await fetchAuthUserById(userId)
+  if (!user) return { ok: false, error: 'account_not_found', message: '账号不存在' }
+  const phone = phoneFromUserRecord(user) || ''
+  const email = bindEmailFromUser(user)
+  const byId = new Map<string, ListedAuthUser>()
+  if (phone) {
+    for (const row of await listAuthUsersByPhone(phone)) byId.set(row.userId, row)
+  }
+  if (email) {
+    for (const row of await listAuthUsersByBindEmail(email)) byId.set(row.userId, row)
+  }
+  const self = summarizeAuthUser(user)
+  if (self) byId.set(self.userId, self)
+  const accounts = [...byId.values()].map((row) => ({
+    userId: row.userId,
+    loginName: row.loginName,
+    displayName: row.displayName,
+    current: row.userId === userId,
+  }))
+  return { ok: true, accounts }
+}
+
+export async function switchToLinkedAccount(input: {
+  userId: string
+  targetUserId: string
+}): Promise<
+  | { ok: true; access_token: string; refresh_token: string; expires_in?: number; loginName: string }
+  | { ok: false; error: string; message: string }
+> {
+  const targetUserId = String(input.targetUserId || '').trim()
+  if (!targetUserId || targetUserId === input.userId) {
+    return { ok: false, error: 'invalid_target', message: '请选择要切换的账号' }
+  }
+  const listed = await listLinkedAccounts(input.userId)
+  if (!listed.ok) return listed
+  const hit = listed.accounts.find((a) => a.userId === targetUserId)
+  if (!hit) return { ok: false, error: 'not_linked', message: '该账号不在当前手机号或邮箱下' }
+  const target = await fetchAuthUserById(targetUserId)
+  if (!target) return { ok: false, error: 'account_not_found', message: '账号不存在' }
+  const targetEmail = typeof target.email === 'string' ? target.email : ''
+  const session = await createAdminSessionForUserId(targetUserId, targetEmail)
+  if (!session.ok) return { ok: false, error: session.error, message: session.detail || '切换失败' }
+  return {
+    ok: true,
     access_token: session.access_token,
     refresh_token: session.refresh_token,
     expires_in: session.expires_in,
-    loginName,
-    identities: identitiesFromUser(next),
+    loginName: hit.loginName,
   }
 }
 

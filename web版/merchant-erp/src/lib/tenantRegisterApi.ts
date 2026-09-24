@@ -104,6 +104,8 @@ export type IdentityActionResult = {
     emailMasked?: string
   }
   needsPhoneBind?: boolean
+  joined?: boolean
+  accounts?: { userId: string; loginName: string; displayName: string; current: boolean }[]
   displayName?: string
   avatarUrl?: string
   available?: boolean

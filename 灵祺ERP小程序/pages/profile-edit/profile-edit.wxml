@@ -80,7 +80,7 @@
       <text wx:if="{{bindHint}}" class="pe-hint">{{bindHint}}</text>
 
       <view wx:if="{{bindKind}}" class="bind-box">
-        <text class="pe-sec">{{mergeToken ? '确认合并账号' : (bindKind === 'phone' ? (ids.phone ? '换绑手机号' : '绑定手机号') : (ids.email ? '换绑邮箱' : '绑定邮箱'))}}</text>
+        <text class="pe-sec">{{mergeToken ? '加入已有账号' : (bindKind === 'phone' ? (ids.phone ? '换绑手机号' : '绑定手机号') : (ids.email ? '换绑邮箱' : '绑定邮箱'))}}</text>
         <text wx:if="{{mergeToken}}" class="pe-desc">{{mergeMsg}}</text>
         <text wx:if="{{awaitingCode && !mergeToken}}" class="pe-hint">该{{bindKind === 'phone' ? '手机号' : '邮箱'}}尚未占用，请获取验证码后绑定。</text>
         <input
@@ -98,7 +98,7 @@
         <view class="row-btns">
           <button class="btn-v2 ghost flex1" bindtap="onBindBack">{{awaitingCode || mergeToken ? '返回' : '取消'}}</button>
           <button class="btn-v2 primary flex1" disabled="{{bindBusy}}" bindtap="onBindSubmit">
-            {{bindBusy ? '处理中…' : (mergeToken ? '确定合并' : (awaitingCode ? '确认绑定' : '绑定'))}}
+            {{bindBusy ? '处理中…' : (mergeToken ? '确定加入' : (awaitingCode ? '确认绑定' : '绑定'))}}
           </button>
         </view>
       </view>

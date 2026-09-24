@@ -102,6 +102,9 @@ export default function MeooLayout() {
   const [needPhoneBind, setNeedPhoneBind] = useState(false)
   const [bindAccessToken, setBindAccessToken] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
+  const [linkedAccounts, setLinkedAccounts] = useState<
+    { userId: string; loginName: string; displayName: string; current: boolean }[]
+  >([])
 
   useEffect(() => {
     const client = supabase
@@ -214,6 +217,27 @@ export default function MeooLayout() {
         state: { fromLogout: true, infoHint },
       })
     })()
+  }
+
+  const loadLinkedAccounts = useCallback(async () => {
+    const token = (await supabase?.auth.getSession())?.data.session?.access_token || ''
+    if (!token) {
+      setLinkedAccounts([])
+      return
+    }
+    const r = await postAuthIdentity({ action: 'linked_accounts', access_token: token })
+    setLinkedAccounts(r.ok && r.accounts ? r.accounts : [])
+  }, [])
+
+  const switchLinkedAccount = async (targetUserId: string) => {
+    const token = (await supabase?.auth.getSession())?.data.session?.access_token || ''
+    if (!token || !supabase) return
+    const r = await postAuthIdentity({ action: 'switch_account', access_token: token, targetUserId })
+    if (!r.ok || !r.access_token || !r.refresh_token) return
+    clearTenantScopedBrowserState()
+    await supabase.auth.setSession({ access_token: r.access_token, refresh_token: r.refresh_token })
+    setUserOpen(false)
+    window.location.assign('/')
   }
 
   const handleSwitchAccount = () => {
@@ -333,7 +357,12 @@ export default function MeooLayout() {
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setUserOpen((v) => !v)}
+                onClick={() => {
+                  setUserOpen((v) => {
+                    if (!v) void loadLinkedAccounts()
+                    return !v
+                  })
+                }}
                 className="flex items-center space-x-3 rounded-lg py-1 pl-2 pr-1 transition-colors hover:bg-white/10"
               >
                 <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-white/20">
@@ -378,13 +407,24 @@ export default function MeooLayout() {
                       </div>
                     </div>
                     <div className="py-1">
+                      {linkedAccounts.filter((a) => !a.current).map((a) => (
+                        <button
+                          key={a.userId}
+                          type="button"
+                          onClick={() => void switchLinkedAccount(a.userId)}
+                          className="flex w-full items-center px-4 py-2.5 text-sm text-slate-700 transition-colors hover:bg-slate-50"
+                        >
+                          <Users className="mr-3 h-4 w-4 text-slate-400" />
+                          <span className="min-w-0 truncate">切换到 {a.displayName || a.loginName}</span>
+                        </button>
+                      ))}
                       <button
                         type="button"
                         onClick={() => void handleSwitchAccount()}
                         className="flex w-full items-center px-4 py-2.5 text-sm text-slate-700 transition-colors hover:bg-slate-50"
                       >
                         <Users className="mr-3 h-4 w-4 text-slate-400" />
-                        切换账号
+                        {linkedAccounts.some((a) => !a.current) ? '登录其它账号' : '切换账号'}
                       </button>
                       <button
                         type="button"

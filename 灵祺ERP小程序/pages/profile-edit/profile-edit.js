@@ -306,7 +306,7 @@ Page({
           emailCode: kind === 'email' ? this.data.bindCode : undefined,
         })
         if (!r.ok) {
-          this.setData({ bindErr: r.message || '合并失败' })
+          this.setData({ bindErr: r.message || '加入失败' })
           return
         }
         if (r.access_token) {

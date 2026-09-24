@@ -162,7 +162,7 @@ export default function AuthBindContactModal({
   const submitMerge = async () => {
     if (!merge) return
     if (!/^\d{6}$/.test(smsCode.trim())) {
-      setErr('请输入验证码确认合并')
+      setErr('请输入验证码确认加入')
       return
     }
     setBusy(true)
@@ -173,11 +173,11 @@ export default function AuthBindContactModal({
         mergeToken: merge.mergeToken,
         smsCode: smsCode.trim(),
       })
-      if (!r.ok || !r.access_token || !r.refresh_token) {
-        setErr(r.message || '合并失败')
+      if (!r.ok) {
+        setErr(r.message || '加入失败')
         return
       }
-      if (supabase) {
+      if (r.access_token && r.refresh_token && supabase) {
         await supabase.auth.setSession({
           access_token: r.access_token,
           refresh_token: r.refresh_token,
@@ -191,11 +191,11 @@ export default function AuthBindContactModal({
 
   if (!open) return null
 
-  const heading = step === 'merge' ? '确认合并账号' : title
+  const heading = step === 'merge' ? '加入已有手机号' : title
   const primaryLabel = busy
     ? '处理中…'
     : step === 'merge'
-      ? '确定合并'
+      ? '确定加入'
       : step === 'code'
         ? '确认绑定'
         : '绑定并继续'
@@ -212,7 +212,7 @@ export default function AuthBindContactModal({
           </p>
         ) : (
           <p className="mt-2 text-sm leading-relaxed text-slate-600">
-            微信 / 抖音登录后需绑定手机号。输入号码后点绑定，若已有账号将提示是否合并。
+            微信 / 抖音登录后需绑定手机号。若该号已有账号，验证后把当前账号加入该号（最多 3 个）。
           </p>
         )}
 
@@ -229,7 +229,7 @@ export default function AuthBindContactModal({
         ) : (
           <div className="mt-4">
             {step === 'merge' && merge ? (
-              <p className="mb-2 text-xs text-slate-500">向 {merge.masked} 发送验证码并填写，以确认合并。</p>
+              <p className="mb-2 text-xs text-slate-500">向 {merge.masked} 发送验证码并填写，以确认加入该号。</p>
             ) : (
               <p className="mb-2 text-xs text-slate-500">将发送至 {phone}</p>
             )}
