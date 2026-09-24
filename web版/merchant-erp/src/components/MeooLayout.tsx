@@ -135,7 +135,7 @@ export default function MeooLayout() {
           clearTenantScopedBrowserState()
         }
         lastUserId = u.id
-        const meta = u.user_metadata as { login_name?: string; phone?: string } | undefined
+        const meta = u.user_metadata as { login_name?: string; phone?: string; bind_email?: string } | undefined
         setAdminName(meta?.login_name ?? u.email?.split('@')[0] ?? '用户')
         const mobile = phoneFromAuthUser({ phone: u.phone, user_metadata: meta })
         setPhone(mobile ? maskCnPhone(mobile) : '—')
@@ -145,7 +145,8 @@ export default function MeooLayout() {
           const idn = await postAuthIdentity({ action: 'identities', access_token: tok })
           setNeedPhoneBind(Boolean(idn.needsPhoneBind))
         } else {
-          setNeedPhoneBind(!mobile)
+          const hasEmail = Boolean(String(meta?.bind_email || '').trim())
+          setNeedPhoneBind(!mobile && !hasEmail)
         }
         const tid = await fetchPrimaryTenantId(client)
         setActiveTenantStorageId(tid)

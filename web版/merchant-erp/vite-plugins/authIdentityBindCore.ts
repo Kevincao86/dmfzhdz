@@ -749,7 +749,9 @@ export async function confirmAccountMerge(input: {
 
 export function needsPhoneBindFromUser(u: Record<string, unknown> | null): boolean {
   if (!u) return true
-  return !userHasPhone(u)
+  if (userHasPhone(u)) return false
+  if (bindEmailFromUser(u)) return false
+  return true
 }
 
 export function loginNameFromUser(u: Record<string, unknown>): string {
