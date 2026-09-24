@@ -201,7 +201,20 @@ export default function AuthBindContactModal({
         {err ? <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</p> : null}
 
         <div className="mt-5 flex gap-2">
-          {onClose ? (
+          {merge ? (
+            <button
+              type="button"
+              disabled={busy}
+              className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+              onClick={() => {
+                setMerge(null)
+                setMergeCode('')
+                setErr('')
+              }}
+            >
+              返回
+            </button>
+          ) : onClose ? (
             <button
               type="button"
               className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm text-slate-600"
