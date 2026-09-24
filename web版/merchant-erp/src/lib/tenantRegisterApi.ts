@@ -70,6 +70,64 @@ async function postAuthJson<T extends Record<string, unknown>>(
   return { ok: false, error: 'network_error', message: lastMessage }
 }
 
+export async function sendAuthEmailCode(email: string): Promise<SmsSendResult> {
+  const posted = await postAuthJson<SmsSendResult & { message?: string; detail?: string; devCode?: string }>(
+    '/api/meoo-auth-identity',
+    { action: 'email_send', email },
+    '发送邮箱验证码',
+  )
+  if (!('res' in posted)) return posted
+  const { res, json: j } = posted
+  if (!res.ok) {
+    return { ok: false, error: j.error ?? `http_${res.status}`, message: j.message ?? j.detail }
+  }
+  return { ok: j.ok !== false, message: j.message, devCode: j.devCode }
+}
+
+export type IdentityActionResult = {
+  ok: boolean
+  error?: string
+  message?: string
+  mergeToken?: string
+  channel?: 'phone' | 'email'
+  masked?: string
+  loginName?: string
+  access_token?: string
+  refresh_token?: string
+  identities?: {
+    wechat: boolean
+    douyin: boolean
+    phone: boolean
+    email: boolean
+    phoneMasked?: string
+    emailMasked?: string
+  }
+  needsPhoneBind?: boolean
+}
+
+export async function postAuthIdentity(body: Record<string, unknown>): Promise<IdentityActionResult> {
+  const token = typeof body.access_token === 'string' ? body.access_token : ''
+  const candidates = merchantErpApiCandidates('/api/meoo-auth-identity')
+  let lastMessage = '请求失败，请稍后重试。'
+  for (let i = 0; i < candidates.length; i += 1) {
+    try {
+      const res = await fetch(candidates[i]!, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(body),
+      })
+      const j = (await res.json().catch(() => ({}))) as IdentityActionResult
+      return { ...j, ok: j.ok !== false && res.status < 500 }
+    } catch (e) {
+      lastMessage = toUserFacingError(e, '账号绑定')
+    }
+  }
+  return { ok: false, error: 'network_error', message: lastMessage }
+}
+
 export async function sendAuthSms(phone: string): Promise<SmsSendResult> {
   const posted = await postAuthJson<SmsSendResult & { message?: string; detail?: string; devCode?: string }>(
     '/api/meoo-auth-sms-send',
@@ -96,8 +154,10 @@ export const sendRegistrationSms = sendAuthSms
 export async function registerMerchantAccount(body: {
   loginName: string
   merchantName: string
-  phone: string
-  smsCode: string
+  phone?: string
+  smsCode?: string
+  email?: string
+  emailCode?: string
   password: string
   confirmPassword: string
   refCode?: string
@@ -200,6 +260,10 @@ export function isMerchantShortNameValid(name: string): boolean {
 
 export function isCnMobileValid(phone: string): boolean {
   return /^1\d{10}$/.test(String(phone || '').replace(/\D/g, ''))
+}
+
+export function isBindEmailValid(email: string): boolean {
+  return /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(String(email || '').trim())
 }
 
 /** @internal 供单测或排障 */

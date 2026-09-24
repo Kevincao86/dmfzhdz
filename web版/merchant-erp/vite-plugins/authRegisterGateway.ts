@@ -16,6 +16,11 @@ import {
   verifyAuthSmsCode,
 } from './authSmsAuthShared.js'
 import { signInWithWxLoginCode, wxLoginErrorMessage } from './authWxLoginShared.js'
+import {
+  findAuthUserByBindEmail,
+  normalizeBindEmail,
+  verifyAuthEmailCode,
+} from './authIdentityBindCore.js'
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -161,6 +166,7 @@ export function authRegisterGatewayPlugin(): Plugin {
               expires_in: out.expires_in,
               loginName: out.loginName,
               isNew: out.isNew,
+              needsPhoneBind: out.needsPhoneBind,
             })
           } catch (e) {
             json(res, 500, { ok: false, error: 'wx_login_failed', detail: String(e) })
@@ -226,6 +232,8 @@ export function authRegisterGatewayPlugin(): Plugin {
               merchantName?: string
               phone?: string
               smsCode?: string
+              email?: string
+              emailCode?: string
               password?: string
               confirmPassword?: string
             }
@@ -233,6 +241,8 @@ export function authRegisterGatewayPlugin(): Plugin {
             const merchantName = (body.merchantName ?? '').trim()
             const phone = normalizeCnMobile(body.phone ?? '')
             const smsCode = String(body.smsCode ?? '').trim()
+            const email = normalizeBindEmail(body.email ?? '')
+            const emailCode = String(body.emailCode ?? '').trim()
             const password = body.password ?? ''
             const confirmPassword = body.confirmPassword ?? password
 
@@ -244,12 +254,34 @@ export function authRegisterGatewayPlugin(): Plugin {
               json(res, 400, { ok: false, error: 'invalid_merchant_name', message: '商家简称 2–30 字，可含汉字' })
               return
             }
-            if (!phone) {
-              json(res, 400, { ok: false, error: 'invalid_phone' })
-              return
-            }
-            if (!/^\d{6}$/.test(smsCode)) {
-              json(res, 400, { ok: false, error: 'invalid_sms_code' })
+            if (phone) {
+              if (!/^\d{6}$/.test(smsCode)) {
+                json(res, 400, { ok: false, error: 'invalid_sms_code' })
+                return
+              }
+              if (!(await verifyAuthSmsCode(phone, smsCode, viteRoot))) {
+                json(res, 400, { ok: false, error: 'sms_code_invalid', message: '验证码错误或已过期' })
+                return
+              }
+              if (await phoneAlreadyRegistered(phone)) {
+                json(res, 409, { ok: false, error: 'phone_exists', message: '该手机号已注册，请直接登录' })
+                return
+              }
+            } else if (email) {
+              if (!/^\d{6}$/.test(emailCode)) {
+                json(res, 400, { ok: false, error: 'invalid_email_code', message: '请输入 6 位邮箱验证码' })
+                return
+              }
+              if (!verifyAuthEmailCode(email, emailCode)) {
+                json(res, 400, { ok: false, error: 'email_code_invalid', message: '邮箱验证码错误或已过期' })
+                return
+              }
+              if (await findAuthUserByBindEmail(email)) {
+                json(res, 409, { ok: false, error: 'email_exists', message: '该邮箱已注册，请直接登录' })
+                return
+              }
+            } else {
+              json(res, 400, { ok: false, error: 'invalid_contact', message: '请使用手机号或邮箱完成验证' })
               return
             }
             if (password.length < 6) {
@@ -260,20 +292,13 @@ export function authRegisterGatewayPlugin(): Plugin {
               json(res, 400, { ok: false, error: 'password_mismatch', message: '两次输入的密码不一致' })
               return
             }
-            if (!(await verifyAuthSmsCode(phone, smsCode, viteRoot))) {
-              json(res, 400, { ok: false, error: 'sms_code_invalid', message: '验证码错误或已过期' })
-              return
-            }
-            if (await phoneAlreadyRegistered(phone)) {
-              json(res, 409, { ok: false, error: 'phone_exists', message: '该手机号已注册，请直接登录' })
-              return
-            }
 
             const result = await provisionMerchantTenant({
               loginName,
               password,
               merchantName,
-              phone,
+              phone: phone || undefined,
+              bindEmail: email || undefined,
               trialDays: 0,
             })
             if (!result.ok) {
@@ -364,6 +389,47 @@ export function authRegisterGatewayPlugin(): Plugin {
             json(res, 200, { ok: true, message: '服务商注册成功，请登录', tenantId: result.tenantId })
           } catch (e) {
             json(res, 500, { ok: false, error: 'register_failed', detail: String(e) })
+          }
+          return
+        }
+
+        if (url === '/api/meoo-auth-identity') {
+          try {
+            const ident = (await import('../api/meoo-auth-identity.js')).default
+            const raw = await readBody(req)
+            let parsed: unknown = {}
+            try {
+              parsed = JSON.parse(raw || '{}')
+            } catch {
+              parsed = {}
+            }
+            const mockReq = {
+              method: 'POST',
+              headers: req.headers,
+              body: parsed,
+            }
+            const mockRes = {
+              statusCode: 200,
+              setHeader: (k: string, v: string) => res.setHeader(k, v),
+              status(code: number) {
+                res.statusCode = code
+                this.statusCode = code
+                return this
+              },
+              send(body: string) {
+                if (!res.headersSent) {
+                  res.setHeader('Content-Type', 'application/json; charset=utf-8')
+                }
+                res.end(body)
+                return this
+              },
+              end(body?: string) {
+                res.end(body)
+              },
+            }
+            await ident(mockReq as never, mockRes as never)
+          } catch (e) {
+            json(res, 500, { ok: false, error: 'identity_failed', detail: String(e) })
           }
           return
         }

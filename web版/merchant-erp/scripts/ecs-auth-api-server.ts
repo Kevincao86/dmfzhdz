@@ -13,6 +13,7 @@ import smsVerifyHandler from '../api/meoo-auth-sms-verify.ts'
 import smsLoginHandler from '../api/meoo-auth-sms-login.ts'
 import smsChangePasswordHandler from '../api/meoo-auth-sms-change-password.ts'
 import wxLoginHandler from '../api/meoo-auth-wx-login.ts'
+import identityHandler from '../api/meoo-auth-identity.ts'
 import clientConfigHandler from '../api/meoo-erp-client-config.ts'
 import pingHandler from '../api/meoo-auth-ping.ts'
 import supportPollHandler from '../../../商家管理后台/api/_lib/handlers/support-poll.ts'
@@ -205,7 +206,7 @@ import apiPingHandler from '../api/ping.ts'
 import merchantSlugHandler from '../api/merchant/[...slug].ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260919-tenant-subaccount-mutate'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260924-auth-identity-bind'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -227,6 +228,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-auth-sms-login': smsLoginHandler as VercelLikeHandler,
   '/api/meoo-auth-sms-change-password': smsChangePasswordHandler as VercelLikeHandler,
   '/api/meoo-auth-wx-login': wxLoginHandler as VercelLikeHandler,
+  '/api/meoo-auth-identity': identityHandler as VercelLikeHandler,
   '/api/meoo-auth-ping': pingHandler as VercelLikeHandler,
   '/api/meoo-erp-client-config': clientConfigHandler as VercelLikeHandler,
   '/api/support-poll': supportPollHandler as VercelLikeHandler,

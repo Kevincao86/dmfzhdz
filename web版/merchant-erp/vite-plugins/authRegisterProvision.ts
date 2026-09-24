@@ -26,6 +26,7 @@ export async function provisionMerchantTenant(body: {
   password: string
   merchantName: string
   phone?: string
+  bindEmail?: string
   trialDays?: number
   edition?: 'merchant' | 'partner'
 }): Promise<{ ok: true; tenantId: string; userId: string; email: string } | { ok: false; error: string; detail?: string }> {
@@ -66,6 +67,7 @@ export async function provisionMerchantTenant(body: {
           login_name: loginName,
           merchant_name: merchantName,
           phone: body.phone ?? '',
+          bind_email: body.bindEmail ?? '',
         },
       }),
     })

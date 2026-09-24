@@ -78,6 +78,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       expires_in: out.expires_in,
       loginName: out.loginName,
       isNew: out.isNew,
+      needsPhoneBind: out.needsPhoneBind,
     })
   } catch (e) {
     sendJson(res, 500, {

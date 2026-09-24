@@ -133,3 +133,25 @@
     </view>
   </view>
 </view>
+
+<view wx:if="{{showBindPhone}}" class="login-legal-mask" catchtouchmove="true">
+  <view class="login-legal-modal" catchtap="true">
+    <text class="login-legal-modal-title">{{bindMergeToken ? '确认合并账号' : '绑定手机号'}}</text>
+    <text class="login-legal-modal-content">{{bindMergeToken ? bindMergeMsg : '微信一键登录后需绑定手机号。若该手机已注册，将提示合并为同一账号。'}}</text>
+    <view class="field-v2">
+      <view class="input-wrap">
+        <input class="input-field" type="number" maxlength="11" placeholder="11 位手机号" value="{{bindPhone}}" bindinput="onBindPhoneInput" />
+      </view>
+    </view>
+    <view class="sms-row" style="margin-top: 16rpx;">
+      <view class="input-wrap flex1">
+        <input class="input-field" type="number" maxlength="6" placeholder="6 位验证码" value="{{bindSmsCode}}" bindinput="onBindSmsCode" />
+      </view>
+      <button class="sms-btn" size="mini" disabled="{{busy || bindSmsSending || bindSmsCooldown > 0}}" bindtap="onSendBindSms">{{bindSmsSending ? '发送中…' : (bindSmsCooldown > 0 ? bindSmsCooldown + 's' : '获取验证码')}}</button>
+    </view>
+    <text wx:if="{{err}}" class="err-msg">{{err}}</text>
+    <view class="login-legal-modal-actions">
+      <button class="login-legal-modal-btn login-legal-modal-btn--agree" bindtap="onConfirmBindPhone">{{bindMergeToken ? '确定合并' : '绑定并进入'}}</button>
+    </view>
+  </view>
+</view>

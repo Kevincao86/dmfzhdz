@@ -502,6 +502,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         access_token: erpSession?.access_token,
         refresh_token: erpSession?.refresh_token,
         loginName: erpSession?.loginName,
+        needsPhoneBind: erpSession?.needsPhoneBind,
       })
       return
     }

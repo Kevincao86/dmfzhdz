@@ -34,6 +34,7 @@ import {
   createAdminSessionForUserId,
   findAuthUserByPhone,
 } from '../../vite-plugins/authSmsAuthShared.js'
+import { signInOrProvisionByDyOpenId } from '../../vite-plugins/authIdentityBindCore.js'
 
 export type MpAccountRole = 'talent' | 'pr'
 
@@ -1468,12 +1469,40 @@ export type MpAuthDyOAuthCompleteResult = {
   workIdentity: string
   isNew: boolean
   portal: DyOAuthPortal
-  erpSession?: { access_token: string; refresh_token: string; loginName: string }
+  erpSession?: {
+    access_token: string
+    refresh_token: string
+    loginName: string
+    needsPhoneBind?: boolean
+    isNew?: boolean
+  }
 }
 
 async function tryErpSessionFromMpAccount(
   account: MpAccountRow,
-): Promise<{ access_token: string; refresh_token: string; loginName: string }> {
+): Promise<{
+  access_token: string
+  refresh_token: string
+  loginName: string
+  needsPhoneBind?: boolean
+  isNew?: boolean
+}> {
+  const dyOpenId = String(account.dy_openid || account.openid || '').trim()
+  if (dyOpenId) {
+    const dy = await signInOrProvisionByDyOpenId({
+      openid: dyOpenId,
+      nickName: account.wx_nick_name || '',
+    })
+    if (dy.ok) {
+      return {
+        access_token: dy.access_token,
+        refresh_token: dy.refresh_token,
+        loginName: dy.loginName,
+        needsPhoneBind: dy.needsPhoneBind,
+        isNew: dy.isNew,
+      }
+    }
+  }
   const phone = normalizeMpLoginPhone(String(account.login_name || ''))
   if (!phone || !isValidMpLoginPhone(phone)) throw new Error('erp_dy_phone_not_bound')
   const user = await findAuthUserByPhone(phone)
@@ -1484,6 +1513,7 @@ async function tryErpSessionFromMpAccount(
     access_token: sess.access_token,
     refresh_token: sess.refresh_token,
     loginName: user.loginName,
+    needsPhoneBind: false,
   }
 }
 

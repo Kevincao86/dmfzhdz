@@ -66,6 +66,14 @@ Page({
     devSkip: false,
     legalAgreed: false,
     showLegalPrompt: false,
+    showBindPhone: false,
+    bindPhone: '',
+    bindSmsCode: '',
+    bindSmsSending: false,
+    bindSmsCooldown: 0,
+    bindMergeToken: '',
+    bindMergeMsg: '',
+    bindAccessToken: '',
     legalPromptAction: 'pwd',
     legalPromptText: LEGAL_PROMPT_COPY.pwd.text,
     legalPromptAgreeLabel: LEGAL_PROMPT_COPY.pwd.agree,
@@ -223,13 +231,15 @@ Page({
   _clearCooldownTimers() {
     if (this._loginCdTimer) clearInterval(this._loginCdTimer)
     if (this._regCdTimer) clearInterval(this._regCdTimer)
+    if (this._bindCdTimer) clearInterval(this._bindCdTimer)
     this._loginCdTimer = null
     this._regCdTimer = null
+    this._bindCdTimer = null
   },
 
   _startCooldown(field, timerKey) {
     this.setData({ [field]: 60 })
-    const key = timerKey === 'login' ? '_loginCdTimer' : '_regCdTimer'
+    const key = timerKey === 'login' ? '_loginCdTimer' : timerKey === 'bind' ? '_bindCdTimer' : '_regCdTimer'
     if (this[key]) clearInterval(this[key])
     this[key] = setInterval(() => {
       const v = this.data[field]
@@ -466,8 +476,16 @@ Page({
         { access_token: r.access_token, refresh_token: r.refresh_token || '' },
         r.loginName || '',
       )
-      if (r.isNew) {
-        wx.showToast({ title: '已自动注册并登录', icon: 'success', duration: 2000 })
+      if (r.needsPhoneBind || r.isNew) {
+        this.setData({
+          showBindPhone: true,
+          bindAccessToken: r.access_token,
+          bindPhone: '',
+          bindSmsCode: '',
+          bindMergeToken: '',
+          bindMergeMsg: '',
+        })
+        return
       }
       this._goHome()
     } catch (e) {
@@ -609,6 +627,92 @@ Page({
         err: '',
       })
       this._syncModeHint()
+    } finally {
+      this.setData({ busy: false })
+    }
+  },
+
+  onBindPhoneInput(e) {
+    this.setData({ bindPhone: String(e.detail.value || '').replace(/\D/g, '').slice(0, 11) })
+  },
+  onBindSmsCode(e) {
+    this.setData({ bindSmsCode: String(e.detail.value || '').replace(/\D/g, '').slice(0, 6) })
+  },
+  async onSendBindSms() {
+    const mobile = String(this.data.bindPhone || '').replace(/\D/g, '')
+    if (!tenantAuthApi.isCnMobileValid(mobile)) {
+      this.setData({ err: '请输入正确的 11 位手机号' })
+      return
+    }
+    this.setData({ bindSmsSending: true, err: '' })
+    try {
+      const r = await tenantAuthApi.sendAuthSms(mobile)
+      if (!r.ok) {
+        this.setData({ err: r.message || '验证码发送失败' })
+        return
+      }
+      this._startCooldown('bindSmsCooldown', 'bind')
+      if (r.devCode) this.setData({ bindSmsCode: r.devCode })
+    } finally {
+      this.setData({ bindSmsSending: false })
+    }
+  },
+  async onConfirmBindPhone() {
+    const mobile = String(this.data.bindPhone || '').replace(/\D/g, '')
+    const smsCode = String(this.data.bindSmsCode || '').trim()
+    if (!tenantAuthApi.isCnMobileValid(mobile)) {
+      this.setData({ err: '请输入正确的 11 位手机号' })
+      return
+    }
+    if (!/^\d{6}$/.test(smsCode)) {
+      this.setData({ err: '请输入 6 位验证码' })
+      return
+    }
+    this.setData({ busy: true, err: '' })
+    try {
+      if (this.data.bindMergeToken) {
+        const r = await tenantAuthApi.postAuthIdentity({
+          action: 'merge_confirm',
+          mergeToken: this.data.bindMergeToken,
+          smsCode,
+        })
+        if (!r.ok || !r.access_token) {
+          this.setData({ err: r.message || '合并失败' })
+          return
+        }
+        api.persistSession(
+          { access_token: r.access_token, refresh_token: r.refresh_token || '' },
+          r.loginName || '',
+        )
+        this.setData({ showBindPhone: false, bindMergeToken: '' })
+        this._goHome()
+        return
+      }
+      const r = await tenantAuthApi.postAuthIdentity({
+        action: 'bind_contact',
+        phone: mobile,
+        smsCode,
+        access_token: this.data.bindAccessToken,
+      })
+      if (r.error === 'account_exists_merge' && r.mergeToken) {
+        this.setData({
+          bindMergeToken: r.mergeToken,
+          bindMergeMsg: r.message || '已有该账号，是否确定合并？',
+          bindSmsCode: '',
+        })
+        wx.showModal({
+          title: '已有该账号',
+          content: r.message || '是否确定合并？需再次短信验证。',
+          showCancel: true,
+        })
+        return
+      }
+      if (!r.ok) {
+        this.setData({ err: r.message || '绑定失败' })
+        return
+      }
+      this.setData({ showBindPhone: false })
+      this._goHome()
     } finally {
       this.setData({ busy: false })
     }

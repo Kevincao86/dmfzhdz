@@ -10,6 +10,11 @@ import {
 } from '../vite-plugins/authRegistrationOtp.js'
 import { provisionMerchantTenant } from '../vite-plugins/authRegisterProvision.js'
 import { phoneAlreadyRegistered, verifyRegisterSmsCode } from '../vite-plugins/authSmsAuthShared.js'
+import {
+  findAuthUserByBindEmail,
+  normalizeBindEmail,
+  verifyAuthEmailCode,
+} from '../vite-plugins/authIdentityBindCore.js'
 import { persistBindDistributionAttribution } from '../src/lib/distributionAttributionPersist.js'
 
 export const config = { maxDuration: 60 }
@@ -54,6 +59,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       merchantName?: string
       phone?: string
       smsCode?: string
+      email?: string
+      emailCode?: string
       password?: string
       confirmPassword?: string
       refCode?: string
@@ -62,6 +69,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const merchantName = (body.merchantName ?? '').trim()
     const phone = normalizeCnMobile(body.phone ?? '')
     const smsCode = String(body.smsCode ?? '').trim()
+    const email = normalizeBindEmail(body.email ?? '')
+    const emailCode = String(body.emailCode ?? '').trim()
     const password = body.password ?? ''
     const confirmPassword = body.confirmPassword ?? password
 
@@ -81,12 +90,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       })
       return
     }
-    if (!phone) {
-      sendJson(res, 400, { ok: false, error: 'invalid_phone', message: '请输入有效大陆手机号' })
-      return
-    }
-    if (!/^\d{6}$/.test(smsCode)) {
-      sendJson(res, 400, { ok: false, error: 'invalid_sms_code', message: '请输入 6 位验证码' })
+    if (phone) {
+      if (!/^\d{6}$/.test(smsCode)) {
+        sendJson(res, 400, { ok: false, error: 'invalid_sms_code', message: '请输入 6 位验证码' })
+        return
+      }
+      if (!(await verifyRegisterSmsCode(phone, smsCode))) {
+        sendJson(res, 400, { ok: false, error: 'sms_code_invalid', message: '验证码错误或已过期' })
+        return
+      }
+    } else if (email) {
+      if (!/^\d{6}$/.test(emailCode)) {
+        sendJson(res, 400, { ok: false, error: 'invalid_email_code', message: '请输入 6 位邮箱验证码' })
+        return
+      }
+      if (!verifyAuthEmailCode(email, emailCode)) {
+        sendJson(res, 400, { ok: false, error: 'email_code_invalid', message: '邮箱验证码错误或已过期' })
+        return
+      }
+    } else {
+      sendJson(res, 400, { ok: false, error: 'invalid_contact', message: '请使用手机号或邮箱完成验证' })
       return
     }
     if (password.length < 6) {
@@ -97,16 +120,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendJson(res, 400, { ok: false, error: 'password_mismatch', message: '两次输入的密码不一致' })
       return
     }
-    if (!(await verifyRegisterSmsCode(phone, smsCode))) {
-      sendJson(res, 400, { ok: false, error: 'sms_code_invalid', message: '验证码错误或已过期' })
-      return
-    }
     try {
-      if (await phoneAlreadyRegistered(phone)) {
+      if (phone && (await phoneAlreadyRegistered(phone))) {
         sendJson(res, 409, {
           ok: false,
           error: 'phone_exists',
           message: '该手机号已注册，请直接登录',
+        })
+        return
+      }
+      if (email && (await findAuthUserByBindEmail(email))) {
+        sendJson(res, 409, {
+          ok: false,
+          error: 'email_exists',
+          message: '该邮箱已注册，请直接登录',
         })
         return
       }
@@ -126,7 +153,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       loginName,
       password,
       merchantName,
-      phone,
+      phone: phone || undefined,
+      bindEmail: email || undefined,
       trialDays: 0,
     })
     if (!result.ok) {

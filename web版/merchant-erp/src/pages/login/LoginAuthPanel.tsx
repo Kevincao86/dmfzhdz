@@ -13,12 +13,14 @@ import {
 } from '../../lib/rememberLogin'
 import RememberPasswordRow from '../../components/login/RememberPasswordRow'
 import {
+  isBindEmailValid,
   isCnMobileValid,
   isLoginNameValid,
   isMerchantShortNameValid,
   loginWithSmsCode,
   registerMerchantAccount,
   registerPartnerAccount,
+  sendAuthEmailCode,
   sendAuthSms,
 } from '../../lib/tenantRegisterApi'
 import { clearPendingDistributionRef, readPendingDistributionRef } from '../../lib/pendingDistributionRef'
@@ -76,6 +78,11 @@ export default function LoginAuthPanel({
   const [smsCode, setSmsCode] = useState('')
   const [regPassword, setRegPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [regChannel, setRegChannel] = useState<'phone' | 'email'>('phone')
+  const [regEmail, setRegEmail] = useState('')
+  const [emailCode, setEmailCode] = useState('')
+  const [emailCooldown, setEmailCooldown] = useState(0)
+  const [emailSending, setEmailSending] = useState(false)
   const [smsCooldown, setSmsCooldown] = useState(0)
   const [smsSending, setSmsSending] = useState(false)
   const smsInflightRef = useRef(false)
@@ -88,10 +95,10 @@ export default function LoginAuthPanel({
   }, [smsCooldown])
 
   useEffect(() => {
-    if (loginSmsCooldown <= 0) return
-    const t = window.setTimeout(() => setLoginSmsCooldown((s) => s - 1), 1000)
+    if (emailCooldown <= 0) return
+    const t = window.setTimeout(() => setEmailCooldown((s) => s - 1), 1000)
     return () => window.clearTimeout(t)
-  }, [loginSmsCooldown])
+  }, [emailCooldown])
 
   useEffect(() => {
     const saved = readRememberedLogin(rememberScope)
@@ -233,6 +240,33 @@ export default function LoginAuthPanel({
     }
   }, [phone, onErr, onInfoHint, smsSending, smsCooldown])
 
+  const sendEmailForRegister = useCallback(async () => {
+    if (emailSending || emailCooldown > 0) return
+    onErr(null)
+    const mail = regEmail.trim()
+    if (!isBindEmailValid(mail)) {
+      onErr('请输入有效邮箱')
+      return
+    }
+    setEmailSending(true)
+    try {
+      const r = await sendAuthEmailCode(mail)
+      if (!r.ok) {
+        onErr(toUserFacingError(r.message ?? r.error, '邮箱验证码发送'))
+        return
+      }
+      setEmailCooldown(60)
+      if (r.devCode && import.meta.env.DEV) {
+        setEmailCode(r.devCode)
+        onInfoHint(`开发环境验证码：${r.devCode}（已自动填入）`)
+      } else {
+        onInfoHint(r.message ?? '验证码已发送至邮箱')
+      }
+    } finally {
+      setEmailSending(false)
+    }
+  }, [regEmail, onErr, onInfoHint, emailSending, emailCooldown])
+
   const sendSmsForLogin = useCallback(async () => {
     if (loginSmsInflightRef.current || loginSmsSending || loginSmsCooldown > 0) return
     onErr(null)
@@ -273,6 +307,7 @@ export default function LoginAuthPanel({
     const ln = regLoginName.trim()
     const mn = merchantName.trim()
     const mobile = phone.replace(/\D/g, '')
+    const mail = regEmail.trim()
 
     if (!isLoginNameValid(ln)) {
       onErr('登录名须为 4–32 位字母或数字组合')
@@ -282,13 +317,24 @@ export default function LoginAuthPanel({
       onErr(partnerMode ? '服务商简称 2–30 字' : '商家简称 2–30 字，可输入汉字、字母或数字')
       return
     }
-    if (!isCnMobileValid(mobile)) {
-      onErr('请输入有效的大陆手机号')
-      return
-    }
-    if (!/^\d{6}$/.test(smsCode.trim())) {
-      onErr('请输入 6 位短信验证码')
-      return
+    if (regChannel === 'phone') {
+      if (!isCnMobileValid(mobile)) {
+        onErr('请输入有效的大陆手机号')
+        return
+      }
+      if (!/^\d{6}$/.test(smsCode.trim())) {
+        onErr('请输入 6 位短信验证码')
+        return
+      }
+    } else {
+      if (!isBindEmailValid(mail)) {
+        onErr('请输入有效邮箱')
+        return
+      }
+      if (!/^\d{6}$/.test(emailCode.trim())) {
+        onErr('请输入 6 位邮箱验证码')
+        return
+      }
     }
     if (regPassword.length < 6) {
       onErr('密码至少 6 位')
@@ -313,8 +359,10 @@ export default function LoginAuthPanel({
         : await registerMerchantAccount({
             loginName: ln,
             merchantName: mn,
-            phone: mobile,
-            smsCode: smsCode.trim(),
+            phone: regChannel === 'phone' ? mobile : undefined,
+            smsCode: regChannel === 'phone' ? smsCode.trim() : undefined,
+            email: regChannel === 'email' ? mail : undefined,
+            emailCode: regChannel === 'email' ? emailCode.trim() : undefined,
             password: regPassword,
             confirmPassword,
             refCode: pendingRefCode || readPendingDistributionRef() || undefined,
@@ -406,7 +454,7 @@ export default function LoginAuthPanel({
                   : '使用抖音 App 扫码登录（需账号已绑定手机号）。'
             : partnerMode
               ? '填写服务商信息并完成手机验证，注册后可绑定平台服务商身份与客户商家。'
-              : '填写商家信息并完成手机验证，注册后为免费版，可订阅升级会员。'}
+              : '填写商家信息并用手机或邮箱验证，注册后为免费版，可订阅升级会员。'}
         </p>
       </div>
 
@@ -418,7 +466,7 @@ export default function LoginAuthPanel({
           <div className="min-w-0 text-left">
             <p className="text-sm font-semibold text-slate-800">安全可信</p>
             <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
-              短信由阿里云发送，登录会话经加密存储，保障账号安全。
+              短信由阿里云发送，邮箱验证码由 lingqi@mofangdianai.com 发出，登录会话经加密存储。
             </p>
           </div>
         </div>
@@ -618,6 +666,30 @@ export default function LoginAuthPanel({
                 onChange={(e) => setMerchantName(e.target.value.slice(0, 30))}
               />
             </div>
+            <div className="flex gap-2 rounded-xl bg-slate-100/80 p-1">
+              <button
+                type="button"
+                className={cn(
+                  'flex-1 rounded-lg py-2 text-sm font-medium',
+                  regChannel === 'phone' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500',
+                )}
+                onClick={() => setRegChannel('phone')}
+              >
+                手机号注册
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  'flex-1 rounded-lg py-2 text-sm font-medium',
+                  regChannel === 'email' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500',
+                )}
+                onClick={() => setRegChannel('email')}
+              >
+                邮箱注册
+              </button>
+            </div>
+            {regChannel === 'phone' ? (
+              <>
             <div>
               <label className={labelClass} htmlFor="meoo-reg-phone">
                 手机号
@@ -655,6 +727,47 @@ export default function LoginAuthPanel({
                 </button>
               </div>
             </div>
+              </>
+            ) : (
+              <>
+            <div>
+              <label className={labelClass} htmlFor="meoo-reg-email">
+                邮箱
+              </label>
+              <input
+                id="meoo-reg-email"
+                className={inputClass}
+                autoComplete="email"
+                placeholder="用于接收验证码"
+                value={regEmail}
+                onChange={(e) => setRegEmail(e.target.value.trim())}
+              />
+            </div>
+            <div>
+              <label className={labelClass} htmlFor="meoo-reg-email-code">
+                邮箱验证码
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="meoo-reg-email-code"
+                  className={cn(inputClass, 'min-w-0 flex-1')}
+                  inputMode="numeric"
+                  placeholder="6 位验证码"
+                  value={emailCode}
+                  onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                />
+                <button
+                  type="button"
+                  disabled={emailSending || emailCooldown > 0 || busy}
+                  onClick={() => void sendEmailForRegister()}
+                  className={smsBtn}
+                >
+                  {emailSending ? '发送中…' : emailCooldown > 0 ? `${emailCooldown}s` : '获取验证码'}
+                </button>
+              </div>
+            </div>
+              </>
+            )}
             <div>
               <label className={labelClass} htmlFor="meoo-reg-pw">
                 密码

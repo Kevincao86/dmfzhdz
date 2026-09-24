@@ -1,5 +1,9 @@
 import { randomBytes } from 'node:crypto'
 
+import {
+  fetchAuthUserById,
+  needsPhoneBindFromUser,
+} from './authIdentityBindCore.js'
 import { provisionMerchantTenant } from './authRegisterProvision.js'
 import {
   createAdminSessionForUserId,
@@ -20,6 +24,7 @@ export type WxLoginResult =
       expires_in?: number
       loginName: string
       isNew: boolean
+      needsPhoneBind: boolean
     }
   | { ok: false; error: string; message: string; detail?: string }
 
@@ -354,6 +359,7 @@ export async function signInWithWxLoginCode(input: {
     }
   }
 
+  const full = await fetchAuthUserById(user.userId)
   return {
     ok: true,
     access_token: session.access_token,
@@ -361,6 +367,7 @@ export async function signInWithWxLoginCode(input: {
     expires_in: session.expires_in,
     loginName: user.loginName,
     isNew,
+    needsPhoneBind: needsPhoneBindFromUser(full),
   }
 }
 

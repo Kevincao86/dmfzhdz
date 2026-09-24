@@ -43,6 +43,9 @@ import { TenantAnnouncementProvider } from '../context/TenantAnnouncementContext
 import PartnerClientScopeBar from './PartnerClientScopeBar'
 import OpsRegistryBridge from './OpsRegistryBridge'
 import SupabaseChangePasswordForm from './SupabaseChangePasswordForm'
+import AccountIdentityBindPanel from './AccountIdentityBindPanel'
+import AuthBindContactModal from './login/AuthBindContactModal'
+import { postAuthIdentity } from '../lib/tenantRegisterApi'
 import { useAiAgent } from '../context/AiAgentContext'
 import { fetchPrimaryTenantId, fetchTenantEnterpriseName } from '../lib/tenantBilling'
 import { hydratePlatformBindingsFromCloud } from '../lib/merchantPlatformBindingHydrate'
@@ -100,6 +103,8 @@ export default function MeooLayout() {
   const [enterpriseName, setEnterpriseName] = useState('')
   const [accountType] = useState('主账号')
   const [phone, setPhone] = useState('—')
+  const [needPhoneBind, setNeedPhoneBind] = useState(false)
+  const [bindAccessToken, setBindAccessToken] = useState('')
 
   useEffect(() => {
     const client = supabase
@@ -121,6 +126,8 @@ export default function MeooLayout() {
             setAdminName('管理员')
             setEnterpriseName('')
             setPhone('—')
+            setNeedPhoneBind(false)
+            setBindAccessToken('')
           }
           return
         }
@@ -132,6 +139,14 @@ export default function MeooLayout() {
         setAdminName(meta?.login_name ?? u.email?.split('@')[0] ?? '用户')
         const mobile = phoneFromAuthUser({ phone: u.phone, user_metadata: meta })
         setPhone(mobile ? maskCnPhone(mobile) : '—')
+        const tok = session.access_token
+        setBindAccessToken(tok || '')
+        if (tok) {
+          const idn = await postAuthIdentity({ action: 'identities', access_token: tok })
+          setNeedPhoneBind(Boolean(idn.needsPhoneBind))
+        } else {
+          setNeedPhoneBind(!mobile)
+        }
         const tid = await fetchPrimaryTenantId(client)
         setActiveTenantStorageId(tid)
         if (tid) {
@@ -392,7 +407,7 @@ export default function MeooLayout() {
                         }}
                       >
                         <Settings className="mr-3 h-4 w-4 text-slate-400" />
-                        修改密码
+                        个人中心
                       </button>
                       {!isPartnerEdition() ? (
                         <button
@@ -561,7 +576,7 @@ export default function MeooLayout() {
           >
             <div className="mb-4 flex items-center justify-between gap-3">
               <h2 id="meoo-personal-settings-title" className="text-lg font-semibold text-slate-900">
-                修改密码
+                个人中心
               </h2>
               <button
                 type="button"
@@ -573,7 +588,13 @@ export default function MeooLayout() {
               </button>
             </div>
             {supabaseConfigured ? (
-              <SupabaseChangePasswordForm key={personalSettingsFormKey} />
+              <>
+                <AccountIdentityBindPanel />
+                <div className="mt-6 border-t border-slate-100 pt-5">
+                  <p className="mb-3 text-sm font-semibold text-slate-800">修改密码</p>
+                  <SupabaseChangePasswordForm key={personalSettingsFormKey} />
+                </div>
+              </>
             ) : (
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
                 <p className="font-medium">当前未启用云端登录</p>
@@ -596,6 +617,12 @@ export default function MeooLayout() {
           </div>
         </div>
       ) : null}
+
+      <AuthBindContactModal
+        open={needPhoneBind}
+        accessToken={bindAccessToken}
+        onBound={() => setNeedPhoneBind(false)}
+      />
 
       <AiAgentDrawer />
       <div className="pointer-events-none fixed right-0 top-[68%] z-[60] -translate-y-1/2">

@@ -54,6 +54,14 @@ function sendAuthSms(phone) {
   return postJson('/api/meoo-auth-sms-send', { phone })
 }
 
+function sendAuthEmailCode(email) {
+  return postJson('/api/meoo-auth-identity', { action: 'email_send', email })
+}
+
+function postAuthIdentity(body) {
+  return postJson('/api/meoo-auth-identity', body)
+}
+
 function registerMerchantAccount(body) {
   return postJson('/api/meoo-auth-register', body)
 }
@@ -84,8 +92,14 @@ function isCnMobileValid(phone) {
   return /^1\d{10}$/.test(String(phone || '').replace(/\D/g, ''))
 }
 
+function isBindEmailValid(email) {
+  return /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(String(email || '').trim())
+}
+
 module.exports = {
   sendAuthSms,
+  sendAuthEmailCode,
+  postAuthIdentity,
   registerMerchantAccount,
   loginWithSmsCode,
   loginWithPassword,
@@ -93,5 +107,6 @@ module.exports = {
   isLoginNameValid,
   isMerchantShortNameValid,
   isCnMobileValid,
+  isBindEmailValid,
   apiRoot,
 }

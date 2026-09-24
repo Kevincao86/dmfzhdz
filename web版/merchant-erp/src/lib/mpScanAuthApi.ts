@@ -58,6 +58,7 @@ export async function erpDyOAuthComplete(
   refresh_token: string
   loginName?: string
   portal?: string
+  needsPhoneBind?: boolean
 }> {
   const data = await postMpAuth({
     action: 'dy_oauth_complete',
@@ -74,5 +75,6 @@ export async function erpDyOAuthComplete(
     refresh_token,
     loginName: typeof data.loginName === 'string' ? data.loginName : undefined,
     portal: typeof data.portal === 'string' ? data.portal : undefined,
+    needsPhoneBind: data.needsPhoneBind === true,
   }
 }
