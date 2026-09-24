@@ -1,4 +1,5 @@
 const api = require('../../utils/api.js')
+const tenantAuthApi = require('../../utils/tenantAuthApiMp.js')
 const devAuth = require('../../utils/devAuth.js')
 const membershipMp = require('../../utils/membershipMp.js')
 const platformBindingsMp = require('../../utils/platformBindingsMp.js')
@@ -19,7 +20,7 @@ const BASE_MENU = [
   {
     id: 'profile',
     title: '修改个人资料',
-    desc: '头像、昵称与联系方式',
+    desc: '头像、昵称、换绑与登录密码',
     iconKey: 'user',
     tone: 'cyan',
     url: '/pages/profile-edit/profile-edit',
@@ -160,6 +161,39 @@ Page({
     } catch (_) {}
     this.setData({ devMode: devAuth.isDevSkipLogin() })
     void this.refreshAccountData()
+    void this.hydrateCloudProfile()
+  },
+
+  async hydrateCloudProfile() {
+    if (!api.isRealAuthed() || devAuth.isDevSkipLogin()) return
+    const r = await tenantAuthApi.postAuthIdentity({
+      action: 'identities',
+      access_token: api.getAccessToken(),
+    })
+    if (!r.ok) return
+    const displayName = String(r.displayName || r.loginName || '').trim()
+    const avatarUrl = String(r.avatarUrl || '').trim()
+    const loginName = String(r.loginName || '').trim()
+    const patch = {}
+    if (displayName) {
+      patch.storeName = displayName
+      patch.storeShort = displayName.slice(0, 2)
+      patch.loginName = loginName || displayName
+    }
+    if (avatarUrl) {
+      patch.avatarUrl = avatarUrl
+      patch.storeLogoSrc = avatarUrl
+    }
+    if (Object.keys(patch).length) this.setData(patch)
+    try {
+      wx.setStorageSync(PROFILE_KEY, {
+        avatarUrl,
+        displayName,
+        loginName,
+        updatedAt: Date.now(),
+      })
+      if (displayName) wx.setStorageSync('meoo_erp_merchant_display_name', displayName)
+    } catch (_) {}
   },
 
   onEditProfile() {

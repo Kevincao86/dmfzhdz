@@ -7,6 +7,7 @@ import {
   createAdminSessionForUserId,
   findAuthUserByPhone,
   phoneFromUserRecord,
+  sendAuthSmsCode,
   verifyAuthSmsCode,
 } from './authSmsAuthShared.js'
 import { readMerchantSupabaseAdminEnv, readMerchantSupabaseAnonKey } from './merchantSupabaseAdminEnv.js'
@@ -866,6 +867,26 @@ export async function changePasswordWithBoundContact(input: {
   )
   if (!res.ok) return { ok: false, error: 'password_update_failed', message: (await res.text()).slice(0, 200) || '密码更新失败' }
   return { ok: true, message: '密码已更新，下次登录请使用新密码' }
+}
+
+export async function sendBoundContactOtp(input: {
+  userId: string
+  channel: 'phone' | 'email'
+}): Promise<{ ok: true; message: string; devCode?: string } | { ok: false; error: string; message: string }> {
+  const user = await fetchAuthUserById(input.userId)
+  if (!user) return { ok: false, error: 'account_not_found', message: '账号不存在' }
+  if (input.channel === 'phone') {
+    const phone = phoneFromUserRecord(user) || ''
+    if (!phone) return { ok: false, error: 'phone_missing', message: '当前账号未绑定手机号' }
+    const sent = await sendAuthSmsCode(phone)
+    if (!sent.ok) return { ok: false, error: sent.error, message: sent.message || '验证码发送失败' }
+    return { ok: true, message: sent.message, ...(sent.devCode ? { devCode: sent.devCode } : {}) }
+  }
+  const email = bindEmailFromUser(user)
+  if (!email) return { ok: false, error: 'email_missing', message: '当前账号未绑定邮箱' }
+  const sent = await sendAuthEmailCode(email)
+  if (!sent.ok) return { ok: false, error: sent.error, message: sent.message || '验证码发送失败' }
+  return { ok: true, message: sent.message, ...(sent.devCode ? { devCode: sent.devCode } : {}) }
 }
 
 export function loginNameFromUser(u: Record<string, unknown>): string {

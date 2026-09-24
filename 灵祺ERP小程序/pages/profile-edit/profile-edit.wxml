@@ -1,7 +1,7 @@
 <view class="pe-page">
   <view class="pe-card">
-    <text class="pe-title">修改个人资料</text>
-    <text class="pe-desc">可更新头像、昵称与联系手机。浏览功能无需授权；保存资料需登录商家账号。</text>
+    <text class="pe-title">个人中心</text>
+    <text class="pe-desc">与电脑端同步：可改头像、昵称，换绑手机/邮箱，并用验证码修改登录密码。</text>
   </view>
 
   <view wx:if="{{guestMode}}" class="pe-card pe-guest">
@@ -10,38 +10,121 @@
     <button class="btn-v2 primary" bindtap="onGoLogin">去登录</button>
   </view>
 
-  <view class="pe-card">
-    <text class="field-label">头像</text>
-    <button class="pe-avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
-      <image wx:if="{{avatarUrl}}" class="pe-avatar" src="{{avatarUrl}}" mode="aspectFill" />
-      <view wx:else class="pe-avatar pe-avatar-ph">点选</view>
-      <text class="pe-avatar-tip">点击更换头像</text>
-    </button>
+  <block wx:if="{{!guestMode}}">
+    <view class="pe-card">
+      <text class="pe-sec">基本资料</text>
+      <text class="field-label">头像</text>
+      <button class="pe-avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+        <image wx:if="{{avatarUrl}}" class="pe-avatar" src="{{avatarUrl}}" mode="aspectFill" />
+        <view wx:else class="pe-avatar pe-avatar-ph">点选</view>
+        <text class="pe-avatar-tip">点击更换头像</text>
+      </button>
 
-    <text class="field-label">昵称 / 商家简称</text>
-    <input
-      class="pe-input"
-      type="nickname"
-      placeholder="点击选用微信昵称或手动输入"
-      value="{{displayName}}"
-      bindinput="onDisplayName"
-      bindblur="onNickBlur"
-      bindnicknamereview="onNickBlur"
-    />
+      <text class="field-label">登录名</text>
+      <input class="pe-input pe-disabled" disabled value="{{loginName || '—'}}" />
 
-    <text class="field-label">登录账户</text>
-    <input class="pe-input pe-disabled" disabled value="{{loginName || '登录后显示'}}" />
+      <text class="field-label">昵称</text>
+      <input
+        class="pe-input"
+        type="nickname"
+        maxlength="30"
+        placeholder="点击选用微信昵称或手动输入"
+        value="{{displayName}}"
+        bindinput="onDisplayName"
+        bindblur="onNickBlur"
+        bindnicknamereview="onNickBlur"
+      />
 
-    <text class="field-label">联系手机（选填）</text>
-    <input
-      class="pe-input"
-      type="number"
-      maxlength="11"
-      placeholder="11 位手机号"
-      value="{{phone}}"
-      bindinput="onPhone"
-    />
+      <text wx:if="{{profileErr}}" class="pe-err">{{profileErr}}</text>
+      <text wx:if="{{profileHint}}" class="pe-ok">{{profileHint}}</text>
+      <button class="btn-v2 primary pe-save" bindtap="onSave">{{saving ? '保存中…' : '保存资料'}}</button>
+    </view>
 
-    <button class="btn-v2 primary pe-save" bindtap="onSave">{{saving ? '保存中…' : '保存资料'}}</button>
-  </view>
+    <view class="pe-card">
+      <text class="pe-sec">账号绑定</text>
+      <view class="bind-grid">
+        <view class="bind-tile {{ids.wechat ? 'on' : ''}}" data-kind="wechat" bindtap="onTapBind">
+          <text class="bind-ico">微</text>
+          <text>微信</text>
+          <text class="bind-st">{{ids.wechat ? '已绑定' : '未绑定'}}</text>
+        </view>
+        <view class="bind-tile {{ids.douyin ? 'on' : ''}}" data-kind="douyin" bindtap="onTapBind">
+          <text class="bind-ico dark">抖</text>
+          <text>抖音</text>
+          <text class="bind-st">{{ids.douyin ? '已绑定' : '未绑定'}}</text>
+        </view>
+        <view class="bind-tile {{ids.phone ? 'on' : ''}}" data-kind="phone" bindtap="onTapBind">
+          <text class="bind-ico">📱</text>
+          <text>手机</text>
+          <text class="bind-st">{{ids.phone ? '点击换绑' : '未绑定'}}</text>
+        </view>
+        <view class="bind-tile {{ids.email ? 'on' : ''}}" data-kind="email" bindtap="onTapBind">
+          <text class="bind-ico">✉️</text>
+          <text>邮箱</text>
+          <text class="bind-st">{{ids.email ? '点击换绑' : '未绑定'}}</text>
+        </view>
+      </view>
+      <text wx:if="{{ids.phoneMasked || ids.emailMasked}}" class="pe-masked">
+        {{ids.phoneMasked ? '手机 ' + ids.phoneMasked : ''}}{{ids.phoneMasked && ids.emailMasked ? ' · ' : ''}}{{ids.emailMasked ? '邮箱 ' + ids.emailMasked : ''}}
+      </text>
+      <text wx:if="{{bindHint}}" class="pe-hint">{{bindHint}}</text>
+
+      <view wx:if="{{bindKind}}" class="bind-box">
+        <text class="pe-sec">{{mergeToken ? '确认合并账号' : (bindKind === 'phone' ? (ids.phone ? '换绑手机号' : '绑定手机号') : (ids.email ? '换绑邮箱' : '绑定邮箱'))}}</text>
+        <text wx:if="{{mergeToken}}" class="pe-desc">{{mergeMsg}}</text>
+        <text wx:if="{{awaitingCode && !mergeToken}}" class="pe-hint">该{{bindKind === 'phone' ? '手机号' : '邮箱'}}尚未占用，请获取验证码后绑定。</text>
+        <input
+          wx:if="{{!awaitingCode && !mergeToken}}"
+          class="pe-input"
+          placeholder="{{bindKind === 'phone' ? '11 位手机号' : '邮箱'}}"
+          value="{{bindValue}}"
+          bindinput="onBindValue"
+        />
+        <view wx:else class="sms-row">
+          <input class="pe-input flex1" type="number" maxlength="6" placeholder="6 位验证码" value="{{bindCode}}" bindinput="onBindCode" />
+          <button class="sms-btn" size="mini" disabled="{{bindCooldown > 0}}" bindtap="onSendBindCode">{{bindCooldown > 0 ? bindCooldown + 's' : '获取验证码'}}</button>
+        </view>
+        <text wx:if="{{bindErr}}" class="pe-err">{{bindErr}}</text>
+        <view class="row-btns">
+          <button class="btn-v2 ghost flex1" bindtap="onBindBack">{{awaitingCode || mergeToken ? '返回' : '取消'}}</button>
+          <button class="btn-v2 primary flex1" disabled="{{bindBusy}}" bindtap="onBindSubmit">
+            {{bindBusy ? '处理中…' : (mergeToken ? '确定合并' : (awaitingCode ? '确认绑定' : '绑定'))}}
+          </button>
+        </view>
+      </view>
+    </view>
+
+    <view class="pe-card pe-card-last">
+      <text class="pe-sec">修改登录密码</text>
+      <text class="pe-desc" wx:if="{{ids.email && !ids.phone}}">使用绑定邮箱收取验证码后设置新密码。</text>
+      <text class="pe-desc" wx:elif="{{ids.phone && !ids.email}}">使用绑定手机号收取验证码后设置新密码。</text>
+      <text class="pe-desc" wx:elif="{{ids.phone && ids.email}}">手机号与邮箱均已绑定，任选一种验证即可。</text>
+      <text class="pe-desc" wx:else>请先绑定手机号或邮箱后再修改密码。</text>
+
+      <view wx:if="{{ids.phone && ids.email}}" class="pw-tabs">
+        <view class="pw-tab {{pwChannel === 'phone' ? 'on' : ''}}" data-channel="phone" bindtap="onPwChannel">手机验证码</view>
+        <view class="pw-tab {{pwChannel === 'email' ? 'on' : ''}}" data-channel="email" bindtap="onPwChannel">邮箱验证码</view>
+      </view>
+
+      <block wx:if="{{ids.phone || ids.email}}">
+        <text class="field-label">{{ids.phone && ids.email ? (pwChannel === 'email' ? '邮箱验证码' : '短信验证码') : (ids.email && !ids.phone ? '邮箱验证码' : '短信验证码')}}</text>
+        <view class="sms-row">
+          <input class="pe-input flex1" type="number" maxlength="6" placeholder="6 位验证码" value="{{pwCode}}" bindinput="onPwCode" />
+          <button class="sms-btn" size="mini" disabled="{{pwSending || pwCooldown > 0 || pwBusy}}" bindtap="onSendPwCode">
+            {{pwSending ? '发送中…' : (pwCooldown > 0 ? pwCooldown + 's' : '获取验证码')}}
+          </button>
+        </view>
+        <text class="pe-hint">
+          {{ids.phone && ids.email ? (pwChannel === 'email' ? (ids.emailMasked ? '将发至 ' + ids.emailMasked : '将发至绑定邮箱') : (ids.phoneMasked ? '将发至 ' + ids.phoneMasked : '将发至绑定手机')) : (ids.email && !ids.phone ? (ids.emailMasked ? '将发至 ' + ids.emailMasked : '将发至绑定邮箱') : (ids.phoneMasked ? '将发至 ' + ids.phoneMasked : '将发至绑定手机'))}}
+        </text>
+        <text class="field-label">新密码</text>
+        <input class="pe-input" password placeholder="至少 6 位" value="{{newPassword}}" bindinput="onNewPassword" />
+        <text class="field-label">确认新密码</text>
+        <input class="pe-input" password placeholder="再次输入" value="{{confirmPassword}}" bindinput="onConfirmPassword" />
+        <text wx:if="{{pwErr}}" class="pe-err">{{pwErr}}</text>
+        <text wx:if="{{pwOk}}" class="pe-ok">{{pwOk}}</text>
+        <button class="btn-v2 primary pe-save" disabled="{{pwBusy}}" bindtap="onSavePassword">{{pwBusy ? '保存中…' : '保存新密码'}}</button>
+      </block>
+    </view>
+  </block>
 </view>

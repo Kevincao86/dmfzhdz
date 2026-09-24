@@ -1,6 +1,6 @@
 /**
  * POST /api/meoo-auth-identity
- * action: email_send | email_login | password_login | identities | bind_contact | probe_contact | merge_confirm | update_profile | change_password
+ * action: email_send | email_login | password_login | identities | bind_contact | probe_contact | merge_confirm | update_profile | change_password | send_bound_otp
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
@@ -16,6 +16,7 @@ import {
   needsPhoneBindFromUser,
   probeContactForBind,
   readAuthUserFromAccessToken,
+  sendBoundContactOtp,
   sendAuthEmailCode,
   updateAuthProfile,
 } from '../vite-plugins/authIdentityBindCore.js'
@@ -156,6 +157,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         displayName: next ? displayNameFromUser(next) : body.displayName,
         avatarUrl: next ? avatarUrlFromUser(next) : body.avatarUrl,
       })
+      return
+    }
+
+    if (action === 'send_bound_otp') {
+      if (!userId) {
+        sendJson(res, 401, { ok: false, error: 'unauthorized', message: '请先登录' })
+        return
+      }
+      const out = await sendBoundContactOtp({
+        userId,
+        channel: body.channel === 'email' ? 'email' : 'phone',
+      })
+      if (!out.ok) {
+        sendJson(res, 400, { ok: false, error: out.error, message: out.message })
+        return
+      }
+      sendJson(res, 200, { ok: true, message: out.message, ...(out.devCode ? { devCode: out.devCode } : {}) })
       return
     }
 
