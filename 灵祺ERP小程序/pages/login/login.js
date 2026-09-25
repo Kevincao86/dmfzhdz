@@ -18,25 +18,6 @@ const MODE_HINT = {
   register: '填写商家信息并完成手机验证，注册后为免费版，可订阅升级会员。',
 }
 
-const LEGAL_PROMPT_COPY = {
-  wx: {
-    text: '使用微信一键登录前，请勾选并同意《用户协议》和《隐私政策》。',
-    agree: '同意并登录',
-  },
-  pwd: {
-    text: '使用账号登录前，请勾选并同意《用户协议》和《隐私政策》。',
-    agree: '同意并登录',
-  },
-  sms: {
-    text: '使用验证码登录前，请勾选并同意《用户协议》和《隐私政策》。',
-    agree: '同意并登录',
-  },
-  reg: {
-    text: '注册前，请勾选并同意《用户协议》和《隐私政策》。',
-    agree: '同意并注册',
-  },
-}
-
 Page({
   data: {
     mode: 'login',
@@ -65,7 +46,6 @@ Page({
     submitLabel: '登录并进入工作台',
     devSkip: false,
     legalAgreed: false,
-    showLegalPrompt: false,
     showBindPhone: false,
     bindPhone: '',
     bindSmsCode: '',
@@ -75,9 +55,6 @@ Page({
     bindMergeMsg: '',
     bindNeedCode: false,
     bindAccessToken: '',
-    legalPromptAction: 'pwd',
-    legalPromptText: LEGAL_PROMPT_COPY.pwd.text,
-    legalPromptAgreeLabel: LEGAL_PROMPT_COPY.pwd.agree,
     logoSrc: assetUrl('logo.png'),
     pickedId: '',
     hasSession: false,
@@ -99,9 +76,10 @@ Page({
     } catch (_) {
       this._redirect = raw
     }
+    loginLegalAgree.writeAgreed(false)
     this.setData({
       devSkip: devAuth.isDevSkipLogin(),
-      legalAgreed: loginLegalAgree.readAgreed(),
+      legalAgreed: false,
       hasSession: Boolean(api.getBearerToken()),
     })
     this._applyNavPadding()
@@ -155,9 +133,7 @@ Page({
   },
 
   onToggleLegalAgree() {
-    const next = !this.data.legalAgreed
-    loginLegalAgree.writeAgreed(next)
-    this.setData({ legalAgreed: next, err: '' })
+    this.setData({ legalAgreed: !this.data.legalAgreed, err: '' })
   },
 
   onOpenLegal(e) {
@@ -165,48 +141,9 @@ Page({
     wx.navigateTo({ url: `/pages/legal/legal?doc=${doc}` })
   },
 
-  _openLegalPrompt(action) {
-    const copy = LEGAL_PROMPT_COPY[action] || LEGAL_PROMPT_COPY.pwd
-    this.setData({
-      showLegalPrompt: true,
-      legalPromptAction: action,
-      legalPromptText: copy.text,
-      legalPromptAgreeLabel: copy.agree,
-    })
-  },
-
-  onLegalDecline() {
-    this.setData({ showLegalPrompt: false, legalPromptAction: 'pwd' })
-  },
-
-  onLegalAgreeContinue() {
-    const action = this.data.legalPromptAction || 'pwd'
-    loginLegalAgree.writeAgreed(true)
-    this.setData({
-      legalAgreed: true,
-      showLegalPrompt: false,
-      err: '',
-    })
-    if (action === 'wx') {
-      void this._doWxLogin()
-      return
-    }
-    if (action === 'pwd') {
-      void this._submitPassword()
-      return
-    }
-    if (action === 'sms') {
-      void this._submitSmsLogin()
-      return
-    }
-    if (action === 'reg') {
-      void this._submitRegister()
-    }
-  },
-
-  _ensureLegalAgreed(action) {
+  _ensureLegalAgreed() {
     if (this.data.legalAgreed) return true
-    this._openLegalPrompt(action)
+    wx.showToast({ title: '请先阅读并勾选协议', icon: 'none' })
     return false
   },
 
