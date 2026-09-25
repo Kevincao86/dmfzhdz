@@ -7,7 +7,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: linear-gradient(180deg, #d9f3fb 0%, #e9f8f4 38%, #f4eefc 72%, #fbf7ff 100%);
+  background: #f7f6fb;
 }
 
 .welcome-head {
@@ -29,7 +29,7 @@
   margin-top: 20rpx;
   font-size: 48rpx;
   font-weight: 750;
-  color: #1e3a5f;
+  color: #2a2140;
   letter-spacing: 2rpx;
 }
 
@@ -67,7 +67,7 @@
 .welcome-tile--on {
   transform: none;
   background: rgba(255, 255, 255, 0.92);
-  border-color: #1e3a5f;
+  border-color: #2a2140;
   box-shadow: 0 12rpx 36rpx rgba(30, 58, 95, 0.14);
 }
 
@@ -78,7 +78,7 @@
   color: #7c3aed;
 }
 
-.welcome-tile--talent .welcome-tile__mark { color: #1e3a5f; }
+.welcome-tile--talent .welcome-tile__mark { color: #2a2140; }
 .welcome-tile--shoot .welcome-tile__mark { color: #0f4c5c; }
 .welcome-tile--edit .welcome-tile__mark { color: #0f5c54; }
 
@@ -86,7 +86,7 @@
   margin-top: 10rpx;
   font-size: 36rpx;
   font-weight: 750;
-  color: #1e3a5f;
+  color: #2a2140;
 }
 
 .welcome-tile__sub {
@@ -111,7 +111,7 @@
 }
 
 .welcome-enter--on {
-  color: #1e3a5f;
+  color: #2a2140;
   background: #f5c84c;
   border-color: #f5c84c;
 }

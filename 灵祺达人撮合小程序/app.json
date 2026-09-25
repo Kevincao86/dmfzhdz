@@ -83,15 +83,15 @@
   ],
   "window": {
     "navigationBarTitleText": "灵祺星选平台",
-    "navigationBarBackgroundColor": "#1e3a5f",
+    "navigationBarBackgroundColor": "#7c4dff",
     "navigationBarTextStyle": "white",
-    "backgroundColor": "#e8eef4",
+    "backgroundColor": "#f7f6fb",
     "backgroundTextStyle": "dark"
   },
   "tabBar": {
     "custom": true,
     "color": "#94a3b8",
-    "selectedColor": "#0284c7",
+    "selectedColor": "#7c4dff",
     "backgroundColor": "#ffffff",
     "list": [
       { "pagePath": "pages/index/index", "text": "首页" },
