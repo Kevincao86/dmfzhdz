@@ -2,11 +2,13 @@
 
 const SHARE_TITLE = '灵祺经营管理助手'
 const SHARE_PATH = '/pages/functions/functions'
+const SHARE_IMAGE = '/images/share-cover.png'
 
 function sharePayload() {
   return {
     title: SHARE_TITLE,
     path: SHARE_PATH,
+    imageUrl: SHARE_IMAGE,
   }
 }
 
@@ -15,7 +17,7 @@ function defaultOnShareAppMessage() {
 }
 
 function defaultOnShareTimeline() {
-  return { title: SHARE_TITLE, query: '' }
+  return { title: SHARE_TITLE, query: '', imageUrl: SHARE_IMAGE }
 }
 
 function enableShareMenu() {
@@ -51,6 +53,7 @@ function installDefaultShare() {
 module.exports = {
   SHARE_TITLE,
   SHARE_PATH,
+  SHARE_IMAGE,
   sharePayload,
   installDefaultShare,
   enableShareMenu,
