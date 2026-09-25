@@ -238,10 +238,8 @@ function resolveImagePickerKey(chatPickerKey, options, userLine, hasImages) {
   }
   if (!detectImageGenerationIntent(userLine, hasImages)) return chatPickerKey
   const parsed = registry.parseAiModelPickerKey(chatPickerKey)
-  if (parsed && parsed.provider === 'doubao') return 'img::v::doubao'
-  if (parsed && parsed.provider === 'qwen') return 'img::v::qwen'
   if (parsed && parsed.provider === 'minimax') return 'img::v::minimax'
-  return 'img::v::auto'
+  return 'img::v::doubao'
 }
 
 function agentNativeImageRouteFromPickerKey(key) {
@@ -627,21 +625,25 @@ async function postAiAgentNativeImage(prompt, pickerKey, referenceImageDataUrl, 
       const expanded = await requestJson(
         '/api/meoo-ai-chat',
         {
-          provider: 'qwen',
+          provider: 'doubao',
           temperature: 0.2,
-          taskType: 'generate_copywriting',
           messages: [
-            { role: 'system', content: '你只输出一段中文画面描述，不要解释。' },
+            {
+              role: 'system',
+              content: '你只输出一段中文画面描述，不要解释。句子里的人物、动作、食物、物品、地点必须全部写进同一画面，禁止漏掉人物或只写食物。',
+            },
             {
               role: 'user',
-              content: `完整解读这句话里的每一个人物、动作、食物、物品和地点，写成一段生图描述，全部必须入画，禁止只画其中一部分：${prompt}`,
+              content: `完整解读这句话，写成一段生图描述：${prompt}`,
             },
           ],
         },
         { timeoutMs: 25000 },
       )
       const text = String((expanded && expanded.content) || '').trim()
-      if (text.length >= 12) scenePrompt = text
+      if (text.length >= 12) {
+        scenePrompt = `${text}\n用户原话必须全部入画，禁止只画食物或背景：${prompt}`
+      }
     } catch (_) {
       /* 解读失败时仍用原句约束出图 */
     }
