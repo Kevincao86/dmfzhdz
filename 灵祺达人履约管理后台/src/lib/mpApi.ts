@@ -309,8 +309,9 @@ export async function bindPhoneSms(phone: string, smsCode: string, platform: 'wx
   return { token: String(data.token), account: data.account as MpAccount }
 }
 
-export async function fetchTraining() {
-  const path = '/api/meoo-mp-training'
+export async function fetchTraining(hostId?: string) {
+  const q = hostId ? `?hostId=${encodeURIComponent(hostId)}` : ''
+  const path = `/api/meoo-mp-training${q}`
   const base = mpErpApiBase()
   const url = base ? buildMpErpApiUrl(base, path) : path
   const res = await fetch(url)
