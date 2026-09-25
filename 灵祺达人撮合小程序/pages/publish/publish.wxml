@@ -185,7 +185,7 @@
           <text class="pub-target-brand">灵祺星选</text>
         </view>
       </view>
-      <view class="pub-target-main">
+      <scroll-view scroll-y class="tpl-scroll" enhanced show-scrollbar="{{false}}">
         <text class="tpl-title">选择招募模版</text>
         <text class="tpl-sub">系统模版沿用现有表单，自定义可勾选字段并新增</text>
         <view class="pub-mode-list pub-mode-list--target" wx:if="{{step === 'tpl'}}">
@@ -214,13 +214,12 @@
               <text class="tpl-row__name">{{item.label}}</text>
               <text class="tpl-row__del" data-id="{{item.id}}" bindtap="onRemoveCustomPublishField">删除</text>
             </view>
-            <view class="tpl-add">
-              <input class="tpl-add__input" placeholder="新增字段，如到店时间" value="{{customFieldDraft}}" bindinput="onCustomFieldDraft" />
-              <text class="tpl-add__btn" bindtap="onAddCustomPublishField">添加</text>
-            </view>
           </view>
-          <view class="tpl-go" bindtap="onCustomTemplateDone">开始填写</view>
         </block>
+      </scroll-view>
+      <view class="tpl-dock" wx:if="{{step === 'tplCustom'}}">
+        <view class="tpl-dock__add" bindtap="onPromptCustomField">新增自定义字段</view>
+        <view class="tpl-dock__go" bindtap="onCustomTemplateDone">开始填写</view>
       </view>
     </view>
   </block>

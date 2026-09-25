@@ -134,7 +134,25 @@ export default function PublishWizard() {
   const [search] = useSearchParams()
   const pr = readPrProfile()
 
-  const [step, setStep] = useState<'channel' | 'target' | 'mode' | 'placeholder' | 'form' | 'done'>('channel')
+  const [step, setStep] = useState<'channel' | 'target' | 'mode' | 'tpl' | 'tplCustom' | 'placeholder' | 'form' | 'done'>('channel')
+  const [publishTemplateMode, setPublishTemplateMode] = useState<'system' | 'custom'>('system')
+  const [fieldOn, setFieldOn] = useState<Record<string, boolean>>({
+    delivery: true,
+    deadline: true,
+    platform: true,
+    city: true,
+    location: true,
+    tags: true,
+    fans: true,
+    level: true,
+    fee: true,
+    count: true,
+    detail: true,
+    apply: true,
+    cover: true,
+  })
+  const [customPublishFields, setCustomPublishFields] = useState<{ id: string; label: string; value: string }[]>([])
+  const [customFieldDraft, setCustomFieldDraft] = useState('')
   const [recruitChannel, setRecruitChannel] = useState('')
   const [isTargetedRecruit, setIsTargetedRecruit] = useState(false)
   const [recruitTarget, setRecruitTarget] = useState('')
@@ -264,6 +282,21 @@ export default function PublishWizard() {
     const isTargeted = String(meta.recruitScope || '') === 'targeted'
     let recruitTargetId = String(meta.recruitTarget || '').trim() || 'talent'
     setStep('form')
+    setPublishTemplateMode(meta.publishTemplateMode === 'custom' ? 'custom' : 'system')
+    if (meta.publishFieldOn && typeof meta.publishFieldOn === 'object') {
+      setFieldOn((prev) => ({ ...prev, ...(meta.publishFieldOn as Record<string, boolean>) }))
+    }
+    if (Array.isArray(meta.customPublishFields)) {
+      setCustomPublishFields(
+        (meta.customPublishFields as { id?: string; label?: string; value?: string }[])
+          .filter((row) => String(row?.label || '').trim())
+          .map((row, i) => ({
+            id: String(row.id || `c-${i}`),
+            label: String(row.label || '').trim(),
+            value: String(row.value || ''),
+          })),
+      )
+    }
     setRecruitChannel(isTargeted ? 'targeted' : 'open')
     setIsTargetedRecruit(isTargeted)
     setRecruitTarget(recruitTargetId)
@@ -368,7 +401,10 @@ export default function PublishWizard() {
       : ''
 
   async function onSubmit() {
-    const vErr = validatePublishForm(form, recruitMode, recruitTarget || 'talent', isTargetedRecruit)
+    const vErr = validatePublishForm(form, recruitMode, recruitTarget || 'talent', isTargetedRecruit, {
+      mode: publishTemplateMode,
+      fieldOn,
+    })
     if (vErr) {
       setErr(vErr)
       return
@@ -382,6 +418,9 @@ export default function PublishWizard() {
         existing: editingOrder || undefined,
         recruitTarget: recruitTarget || 'talent',
         isTargetedRecruit,
+        publishTemplateMode,
+        publishFieldOn: fieldOn,
+        customPublishFields,
       })
       if (isEditMode && editMpId) {
         await updateMpRecruitmentOrder(order)
@@ -613,7 +652,8 @@ export default function PublishWizard() {
                 if (m.id === 'edit_ice') {
                   setForm((prev) => ({ ...prev, fulfillmentLoop: 'closed' }))
                 }
-                setStep('form')
+                setPublishTemplateMode('system')
+                setStep('tpl')
               }}
             >
               <div className="font-semibold">{m.label}</div>
@@ -626,6 +666,112 @@ export default function PublishWizard() {
   }
 
 
+  const publishFieldCatalog = [
+    { key: 'delivery', label: '投放窗口' },
+    { key: 'deadline', label: '报名截止时间' },
+    { key: 'platform', label: '招募平台' },
+    { key: 'city', label: '招募城市' },
+    { key: 'location', label: '商家位置' },
+    { key: 'tags', label: '需求标签' },
+    { key: 'fans', label: '粉丝要求' },
+    { key: 'level', label: '带货等级' },
+    { key: 'fee', label: '费用模式' },
+    { key: 'count', label: '招募人数' },
+    { key: 'detail', label: '招募详情' },
+    { key: 'apply', label: '报名必填信息' },
+    { key: 'cover', label: '封面' },
+  ]
+  const showField = (key: string) => publishTemplateMode !== 'custom' || fieldOn[key] !== false
+
+  if (step === 'tpl' || step === 'tplCustom') {
+    return (
+      <div className="page-content-shell page-content-shell--narrow space-y-4">
+        <button
+          type="button"
+          className="text-slate-400 text-sm"
+          onClick={() => setStep(step === 'tplCustom' ? 'tpl' : 'mode')}
+        >
+          ‹ 返回
+        </button>
+        <h2 className="text-xl font-bold">选择招募模版</h2>
+        <p className="text-sm text-slate-400">系统模版沿用现有表单，自定义可勾选字段并新增</p>
+        {step === 'tpl' ? (
+          <div className="space-y-3">
+            <button type="button" className="choice-card w-full text-left surface-card rounded-xl border p-4" onClick={() => { setPublishTemplateMode('system'); setStep('form') }}>
+              <div className="font-semibold">系统模版</div>
+              <div className="text-sm text-slate-400 mt-1">使用现在的完整招募表单</div>
+            </button>
+            <button type="button" className="choice-card w-full text-left surface-card rounded-xl border p-4" onClick={() => { setPublishTemplateMode('custom'); setStep('tplCustom') }}>
+              <div className="font-semibold">自定义模版</div>
+              <div className="text-sm text-slate-400 mt-1">勾选系统字段，或自己新增字段</div>
+            </button>
+          </div>
+        ) : (
+          <div className="surface-card rounded-xl border divide-y">
+            {publishFieldCatalog.map((item) => (
+              <label key={item.key} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                <span>{item.label}</span>
+                <input
+                  type="checkbox"
+                  checked={fieldOn[item.key] !== false}
+                  onChange={(e) => setFieldOn((prev) => ({ ...prev, [item.key]: e.target.checked }))}
+                />
+              </label>
+            ))}
+            {customPublishFields.map((row) => (
+              <div key={row.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                <span>{row.label}</span>
+                <button type="button" className="text-xs text-slate-400" onClick={() => setCustomPublishFields((list) => list.filter((x) => x.id !== row.id))}>删除</button>
+              </div>
+            ))}
+            <div className="flex items-center gap-2 px-4 py-2.5">
+              <input
+                className="flex-1 rounded-lg panel-input border px-3 py-1.5 text-sm"
+                placeholder="新增字段，如到店时间"
+                value={customFieldDraft}
+                onChange={(e) => setCustomFieldDraft(e.target.value)}
+              />
+              <button
+                type="button"
+                className="shrink-0 text-sm font-medium text-violet-600"
+                onClick={() => {
+                  const label = customFieldDraft.trim()
+                  if (!label) {
+                    setErr('请填写字段名称')
+                    return
+                  }
+                  setErr('')
+                  setCustomPublishFields((list) => list.concat([{ id: `c-${Date.now()}`, label, value: '' }]))
+                  setCustomFieldDraft('')
+                }}
+              >
+                新增自定义字段
+              </button>
+            </div>
+            <div className="px-4 py-3">
+              <button
+                type="button"
+                className="w-full rounded-lg bg-violet-700 text-white text-sm py-2"
+                onClick={() => {
+                  const picked = Object.keys(fieldOn).filter((k) => fieldOn[k] !== false)
+                  if (!picked.length && !customPublishFields.length) {
+                    setErr('请至少保留一个字段')
+                    return
+                  }
+                  setErr('')
+                  setStep('form')
+                }}
+              >
+                开始填写
+              </button>
+            </div>
+          </div>
+        )}
+        {err ? <p className="text-red-500 text-sm">{err}</p> : null}
+      </div>
+    )
+  }
+
   return (
     <>
     <div className="page-content-shell page-content-shell--wide space-y-4">
@@ -633,7 +779,7 @@ export default function PublishWizard() {
         <button
           type="button"
           className="text-[var(--shell-muted)] text-sm hover:text-[var(--shell-text)]"
-          onClick={() => (isEditMode ? nav('/orders') : setStep('mode'))}
+          onClick={() => (isEditMode ? nav('/orders') : setStep(publishTemplateMode === 'custom' ? 'tplCustom' : 'tpl'))}
         >
           ‹ 返回
         </button>
@@ -651,7 +797,7 @@ export default function PublishWizard() {
         aside={<TipsCard title="填写小贴士" items={PUBLISH_TIPS} />}
         main={
       <section className="pub-form-card space-y-4 text-sm">
-        {!isTargetedRecruit ? (
+        {!isTargetedRecruit && showField('delivery') ? (
         <div>
           <PubLabel>投放窗口 *</PubLabel>
           <div className="grid grid-cols-2 gap-2 mt-1">
@@ -678,7 +824,7 @@ export default function PublishWizard() {
         </div>
         ) : null}
 
-        {!isTargetedRecruit && display.showSignupDeadline ? (
+        {!isTargetedRecruit && display.showSignupDeadline && showField('deadline') ? (
           <PubSelectRow
             label="招募报名截止时间 *"
             value={deadlineDisplayText}
@@ -812,7 +958,7 @@ export default function PublishWizard() {
           </div>
         ) : null}
 
-        {!isSupplierPublish && recruitMode !== 'live' ? (
+        {!isSupplierPublish && recruitMode !== 'live' && showField('platform') ? (
           <PubSelectRow
             label="招募平台 *"
             value={display.platformDisplayText}
@@ -821,12 +967,15 @@ export default function PublishWizard() {
             onClick={() => openPicker('platform')}
           />
         ) : null}
+        {showField('city') ? (
         <PubSelectRow
           label="招募城市 *"
           value={display.cityDisplayText}
           placeholder={display.cityDisplayText === '请选择招募城市'}
           onClick={() => openPicker('city')}
         />
+        ) : null}
+        {showField('location') ? (
         <div>
           <PubLabel>商家位置</PubLabel>
           <p className="text-xs text-[var(--shell-muted)] mb-2">选填；Web 端暂仅文字，小程序端可地图选点导航</p>
@@ -844,6 +993,8 @@ export default function PublishWizard() {
             }
           />
         </div>
+        ) : null}
+        {showField('tags') ? (
         <PubSelectRow
           label={isSupplierPublish ? '需求品类标签 *' : '需求达人标签 *'}
           hint="最多 2 个，不可重复"
@@ -851,6 +1002,7 @@ export default function PublishWizard() {
           placeholder={!form.talentTags.length}
           onClick={() => openPicker('tag')}
         />
+        ) : null}
 
         {isSupplierPublish && recruitTarget === 'shoot' ? (
           <div className="space-y-3 rounded-lg border border-[var(--shell-border)] p-3">
@@ -928,7 +1080,7 @@ export default function PublishWizard() {
           </div>
         ) : null}
 
-        {!isSupplierPublish ? (
+        {!isSupplierPublish && showField('fans') ? (
         <div>
           <PubLabel>达人粉丝要求 *</PubLabel>
           <div className="flex gap-2 mt-1">
@@ -968,10 +1120,12 @@ export default function PublishWizard() {
         </div>
         ) : null}
 
-        {display.showDouyinLevel && !isSupplierPublish ? (
+        {display.showDouyinLevel && !isSupplierPublish && showField('level') ? (
           <PubSelectRow label="达人带货等级 *" value={display.levelDisplayText} onClick={() => openPicker('reqLevel')} />
         ) : null}
 
+        {showField('fee') ? (
+        <>
         <PubSelectRow
           label="费用模式 *"
           value={display.feeTypeLabel}
@@ -1202,8 +1356,10 @@ export default function PublishWizard() {
             onChange={(e) => patchNumericField('cpsPercent', e.target.value)}
           />
         </div>
+        </>
+        ) : null}
 
-        {!isTargetedRecruit ? (
+        {!isTargetedRecruit && showField('count') ? (
         <div>
           <PubLabel>{recruitMode === 'edit_ice' ? '成片位总数 *' : '招募人数 *'}</PubLabel>
           <input
@@ -1216,6 +1372,7 @@ export default function PublishWizard() {
         </div>
         ) : null}
 
+        {showField('detail') ? (
         <div>
           <PubLabel>招募详情 *</PubLabel>
           <textarea
@@ -1226,6 +1383,7 @@ export default function PublishWizard() {
             onChange={(e) => patchForm({ recruitDetail: e.target.value })}
           />
         </div>
+        ) : null}
 
         {recruitMode !== 'ice' && recruitMode !== 'edit_ice' ? (
           <div>
@@ -1423,13 +1581,36 @@ export default function PublishWizard() {
           </div>
         ) : null}
 
+        {showField('apply') ? (
         <PubSelectRow
           label={isSupplierPublish ? '团队报名必填信息 *' : '达人报名必填信息 *'}
           value={display.applyFormDisplayText}
           placeholder={display.applyFormPlaceholder}
           onClick={() => openPicker('applyMenu')}
         />
+        ) : null}
 
+        {publishTemplateMode === 'custom' && customPublishFields.length ? (
+          <div className="space-y-2">
+            {customPublishFields.map((row) => (
+              <div key={row.id}>
+                <PubLabel>{row.label}</PubLabel>
+                <input
+                  className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
+                  placeholder="请填写"
+                  value={row.value}
+                  onChange={(e) =>
+                    setCustomPublishFields((list) =>
+                      list.map((x) => (x.id === row.id ? { ...x, value: e.target.value } : x)),
+                    )
+                  }
+                />
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {showField('cover') ? (
         <RecruitCoverField
           platform={form.platform}
           talentTags={form.talentTags}
@@ -1439,6 +1620,7 @@ export default function PublishWizard() {
           region={buildRegionText(form)}
           onChange={(patch) => patchForm(patch)}
         />
+        ) : null}
 
         <PublishLinkeAttachSection
           platform={form.platform}

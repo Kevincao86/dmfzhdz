@@ -1207,6 +1207,25 @@ Page({
   onCustomFieldDraft(e) {
     this.setData({ customFieldDraft: e.detail.value })
   },
+  onPromptCustomField() {
+    wx.showModal({
+      title: '新增自定义字段',
+      editable: true,
+      placeholderText: '如：到店时间',
+      success: (res) => {
+        if (!res.confirm) return
+        const label = String(res.content || '').trim()
+        if (!label) {
+          wx.showToast({ title: '请填写字段名称', icon: 'none' })
+          return
+        }
+        const list = (this.data.customPublishFields || []).concat([
+          { id: `c-${Date.now()}`, label, value: '' },
+        ])
+        this.setData({ customPublishFields: list })
+      },
+    })
+  },
   onAddCustomPublishField() {
     const label = String(this.data.customFieldDraft || '').trim()
     if (!label) {

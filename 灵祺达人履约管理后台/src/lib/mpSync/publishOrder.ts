@@ -295,28 +295,41 @@ export function validatePublishFee(f: PublishForm): string | null {
   return null
 }
 
+export type PublishTemplateGate = {
+  mode?: 'system' | 'custom'
+  fieldOn?: Record<string, boolean>
+}
+
+function fieldNeeded(gate: PublishTemplateGate | undefined, key: string) {
+  if (!gate || gate.mode !== 'custom') return true
+  return gate.fieldOn?.[key] !== false
+}
+
 export function validatePublishForm(
   f: PublishForm,
   recruitMode: string,
   recruitTarget = 'talent',
   isTargetedRecruit = false,
+  gate?: PublishTemplateGate,
 ): string | null {
+  const need = (key: string) => fieldNeeded(gate, key)
   const isSupplier = recruitTarget === 'shoot' || recruitTarget === 'edit'
   if (!String(f.title || '').trim()) return '请填写招募标题'
   if (recruitMode === 'live') {
     const liveErr = validateLivePublish(f)
     if (liveErr) return liveErr
-    if (isDouyinLivePlatform(f.livePlatform) && !(f.douyinSalesLevels || []).length) {
+    if (need('level') && isDouyinLivePlatform(f.livePlatform) && !(f.douyinSalesLevels || []).length) {
       return '请选择达人带货等级'
     }
-  } else if (!isSupplier && !f.platform) return '请选择招募平台'
-  if (!f.cityNational && !(f.selectedCities || []).length) return '请选择招募城市'
-  if (!(f.talentTags || []).length) return isSupplier ? '请选择需求品类标签' : '请选择需求达人标签'
-  if (!isSupplier && f.fansLimitMode === 'limit' && !String(f.fansMin ?? '').trim()) return '请填写粉丝下限'
-  if (!isTargetedRecruit && f.deliveryWindow !== 'urgent' && !String(f.signupDeadline || '').trim()) {
+  } else if (need('platform') && !isSupplier && !f.platform) return '请选择招募平台'
+  if (need('city') && !f.cityNational && !(f.selectedCities || []).length) return '请选择招募城市'
+  if (need('tags') && !(f.talentTags || []).length) return isSupplier ? '请选择需求品类标签' : '请选择需求达人标签'
+  if (need('fans') && !isSupplier && f.fansLimitMode === 'limit' && !String(f.fansMin ?? '').trim()) return '请填写粉丝下限'
+  if (need('deadline') && !isTargetedRecruit && f.deliveryWindow !== 'urgent' && !String(f.signupDeadline || '').trim()) {
     return '请选择招募报名截止时间'
   }
   if (
+    need('level') &&
     !isSupplier &&
     recruitMode !== 'live' &&
     f.platform === '抖音' &&
@@ -324,16 +337,18 @@ export function validatePublishForm(
   ) {
     return '请选择达人带货等级'
   }
-  if (!f.feeTypeId) return '请选择费用模式'
-  const feeErr = validatePublishFee(f)
-  if (feeErr) return feeErr
-  if (!isTargetedRecruit) {
+  if (need('fee') && !f.feeTypeId) return '请选择费用模式'
+  if (need('fee')) {
+    const feeErr = validatePublishFee(f)
+    if (feeErr) return feeErr
+  }
+  if (need('count') && !isTargetedRecruit) {
     const n = Math.max(1, parseNonNegativeInt(String(f.recruitCount || '1'), 1))
     if (n < 1) return '招募人数至少为 1'
-  } else if (!f.inviteResponseHours) {
+  } else if (!f.inviteResponseHours && isTargetedRecruit) {
     return '请设置邀约响应时间'
   }
-  if (!String(f.recruitDetail || '').trim() && recruitMode !== 'live') return '请填写招募详情'
+  if (need('detail') && !String(f.recruitDetail || '').trim() && recruitMode !== 'live') return '请填写招募详情'
   if (isSupplier) {
     const sErr = validateSupplierPublish(recruitTarget, f, recruitMode)
     if (sErr) return sErr
@@ -363,11 +378,13 @@ export function validatePublishForm(
   ) {
     return '剪辑云剪请上传剪辑师群二维码'
   }
-  if (!(f.applyFormFields || []).length) {
-    return isSupplier ? '请配置团队报名必填信息' : '请配置达人报名必填信息'
+  if (need('apply')) {
+    if (!(f.applyFormFields || []).length) {
+      return isSupplier ? '请配置团队报名必填信息' : '请配置达人报名必填信息'
+    }
+    const tplErr = validateTemplateFields(f.applyFormFields)
+    if (tplErr) return tplErr
   }
-  const tplErr = validateTemplateFields(f.applyFormFields)
-  if (tplErr) return tplErr
   const lk = f.linkeAttach
   if (lk?.enabled) {
     if (!lk.clientId) return '挂接林客时请选择客户商家'
@@ -452,6 +469,9 @@ export function buildPublishOrder(
     existing?: Record<string, unknown>
     recruitTarget?: string
     isTargetedRecruit?: boolean
+    publishTemplateMode?: 'system' | 'custom'
+    publishFieldOn?: Record<string, boolean>
+    customPublishFields?: { id: string; label: string; value: string }[]
   },
 ) {
   const mode = modeById(recruitModeId)
@@ -474,7 +494,14 @@ export function buildPublishOrder(
     : Math.max(1, parseNonNegativeInt(String(form.recruitCount || '1'), 1))
   const isUrgent = !isTargetedRecruit && form.deliveryWindow === 'urgent'
   const deadline = isTargetedRecruit ? '' : resolveSignupDeadline(form)
-  const recruitmentInfo = buildRecruitmentInfo(form, recruitModeId, recruitTarget)
+  let recruitmentInfo = buildRecruitmentInfo(form, recruitModeId, recruitTarget)
+  if (options?.publishTemplateMode === 'custom') {
+    for (const row of options.customPublishFields || []) {
+      const label = String(row?.label || '').trim()
+      const value = String(row?.value || '').trim()
+      if (label && value) recruitmentInfo += `\n${label}：${value}`
+    }
+  }
   const pr = readPrProfile()
   const account = getAccount()
   const coverFields = buildCoverFieldsForOrder(form)
@@ -571,6 +598,9 @@ export function buildPublishOrder(
       applyFormTemplateId: form.applyFormTemplateId,
       applyFormTemplateName: form.applyFormTemplateName || '',
       applyFormFields: form.applyFormFields || [],
+      publishTemplateMode: options?.publishTemplateMode === 'custom' ? 'custom' : 'system',
+      publishFieldOn: options?.publishFieldOn || {},
+      customPublishFields: options?.customPublishFields || [],
       coverLibraryId: coverFields.coverLibraryId,
       coverImageSource: coverFields.coverImageSource,
       ...(coverFields.coverImageSource === 'library' && coverFields.coverImage
