@@ -1,6 +1,6 @@
 .dash-page-v2 {
   min-height: 100vh;
-  padding: 0 28rpx 32rpx;
+  padding: 0 28rpx 160rpx;
   box-sizing: border-box;
   background: linear-gradient(180deg, #e8f4fc 0%, #f8fafc 240rpx, #f8fafc 100%);
 }
@@ -152,6 +152,51 @@
   font-size: 28rpx;
   font-weight: 700;
   color: #0f172a;
+}
+
+.dash-yday {
+  margin-top: 20rpx;
+}
+
+.dash-yday-date {
+  font-size: 22rpx;
+  color: #64748b;
+}
+
+.dash-yday-hint {
+  display: block;
+  margin: -8rpx 0 16rpx;
+  font-size: 22rpx;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+
+.dash-yday-empty {
+  font-size: 24rpx;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.dash-yday-sec + .dash-yday-sec {
+  margin-top: 20rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx solid #f1f5f9;
+}
+
+.dash-yday-sec-title {
+  display: block;
+  margin-bottom: 8rpx;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.dash-yday-sec-body {
+  display: block;
+  font-size: 26rpx;
+  line-height: 1.6;
+  color: #334155;
+  white-space: pre-wrap;
 }
 
 .dash-chart-more {

@@ -53,5 +53,21 @@
     </view>
   </view>
 
+  <view class="dash-chart-card dash-yday">
+    <view class="dash-chart-head">
+      <text class="dash-chart-title">{{ydayTitle}}</text>
+      <text wx:if="{{ydayDate}}" class="dash-yday-date">{{ydayDate}}</text>
+    </view>
+    <text class="dash-yday-hint">{{ydayHint}}</text>
+    <view wx:if="{{ydayLoading}}" class="dash-yday-empty">正在生成昨日分析…</view>
+    <view wx:elif="{{ydayEmpty}}" class="dash-yday-empty">{{ydayEmpty}}</view>
+    <view wx:else>
+      <view wx:for="{{ydaySections}}" wx:key="id" class="dash-yday-sec">
+        <text wx:if="{{item.title}}" class="dash-yday-sec-title">{{item.title}}</text>
+        <text class="dash-yday-sec-body" user-select>{{item.body}}</text>
+      </view>
+    </view>
+  </view>
+
   <view wx:if="{{loading}}" class="dash-loading">加载中…</view>
 </scroll-view>

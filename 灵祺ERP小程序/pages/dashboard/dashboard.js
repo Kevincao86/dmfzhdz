@@ -2,7 +2,10 @@ const api = require('../../utils/api.js')
 const devAuth = require('../../utils/devAuth.js')
 const merchant = require('../../utils/merchantApi.js')
 const dashboardMp = require('../../utils/dashboardMp.js')
+const shop = require('../../utils/shopAnalysisApiMp.js')
 const { iconDataUri } = require('../../utils/funcIconAssetsMp.js')
+
+const YDAY_CACHE_KEY = 'meoo_dash_yesterday_analysis_v1'
 
 const RANGE_TABS = [
   { id: 'today', label: '今日', apiRange: 'realtime' },
@@ -65,6 +68,71 @@ function enrichKpis(kpis) {
   }))
 }
 
+function shanghaiNowParts(date) {
+  const d = date || new Date()
+  const ymd = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
+  const hour = Number(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Shanghai',
+      hour: '2-digit',
+      hourCycle: 'h23',
+    }).format(d),
+  )
+  return { ymd, hour: Number.isFinite(hour) ? hour : 0 }
+}
+
+function addDaysYmd(ymd, delta) {
+  const ms = new Date(`${ymd}T12:00:00+08:00`).getTime() + delta * 86400000
+  return new Date(ms).toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
+}
+
+/** 10:00 前沿用上一档；10:00 起分析昨天，缓存到次日 10:00 */
+function yesterdayRefreshSlot(now) {
+  const { ymd, hour } = shanghaiNowParts(now)
+  if (hour >= 10) return { slot: ymd, targetDate: addDaysYmd(ymd, -1) }
+  return { slot: addDaysYmd(ymd, -1), targetDate: addDaysYmd(ymd, -2) }
+}
+
+function dashTenantKey() {
+  try {
+    return String(wx.getStorageSync('meoo_active_tenant_id') || wx.getStorageSync('meoo_login_name') || '').trim()
+  } catch (_) {
+    return ''
+  }
+}
+
+function readYesterdayCache(slot, tenant) {
+  try {
+    const raw = wx.getStorageSync(YDAY_CACHE_KEY)
+    const row = typeof raw === 'string' ? JSON.parse(raw || '{}') : raw || {}
+    if (!row || row.slot !== slot || row.tenant !== tenant) return null
+    if (!Array.isArray(row.sections) || !row.sections.length) return null
+    return row
+  } catch (_) {
+    return null
+  }
+}
+
+function writeYesterdayCache(row) {
+  try {
+    wx.setStorageSync(YDAY_CACHE_KEY, row)
+  } catch (_) {}
+}
+
+function sectionsFromAi(r) {
+  const list = Array.isArray(r && r.aiSections) ? r.aiSections : []
+  const out = list
+    .map((s, i) => ({
+      id: String((s && s.id) || i),
+      title: String((s && (s.title || s.heading)) || '').trim(),
+      body: String((s && (s.body || s.content || s.text)) || '').trim(),
+    }))
+    .filter((s) => s.body)
+  const report = String((r && r.aiReport) || '').trim()
+  if (!out.length && report) out.push({ id: 'report', title: '', body: report })
+  return out
+}
+
 Page({
   data: {
     loading: false,
@@ -77,6 +145,12 @@ Page({
     chartBars: [],
     chartHint: '',
     chartTitle: '趋势分析',
+    ydayTitle: '昨日数据分析',
+    ydayDate: '',
+    ydayHint: '每天 10:00 更新，结果缓存 1 天',
+    ydayLoading: false,
+    ydaySections: [],
+    ydayEmpty: '',
   },
 
   onShow() {
@@ -88,6 +162,7 @@ Page({
       return
     }
     void this.loadDash()
+    void this.loadYesterdayAnalysis()
   },
 
   onRangeTap(e) {
@@ -193,5 +268,101 @@ Page({
       chartHint: bars.length === 0 ? '暂无趋势点' : hasVal ? '' : '已接通平台，当前区间成交额为 0',
       chartTitle: chartTitleFor(tab.id),
     })
+  },
+
+  async loadYesterdayAnalysis() {
+    const { slot, targetDate } = yesterdayRefreshSlot()
+    const tenant = dashTenantKey()
+    const base = {
+      ydayDate: targetDate,
+      ydayHint: '每天 10:00 更新，结果缓存 1 天',
+    }
+    if (devAuth.isDevSkipLogin()) {
+      this.setData({
+        ...base,
+        ydayLoading: false,
+        ydayEmpty: '',
+        ydaySections: [
+          {
+            id: 'preview',
+            title: '经营小结',
+            body: '预览：昨日成交集中在午后，核销与转化保持稳定。正式环境会按昨天的订单生成，并缓存到次日 10:00。',
+          },
+        ],
+      })
+      return
+    }
+    if (!api.isRealAuthed || !api.isRealAuthed() || !merchant.hasMerchantApi()) {
+      this.setData({
+        ...base,
+        ydayLoading: false,
+        ydaySections: [],
+        ydayEmpty: '登录后查看昨日数据分析',
+      })
+      return
+    }
+    const cached = readYesterdayCache(slot, tenant)
+    if (cached) {
+      this.setData({
+        ...base,
+        ydayLoading: false,
+        ydayEmpty: '',
+        ydayDate: cached.targetDate || targetDate,
+        ydaySections: cached.sections,
+        ydayHint:
+          cached.pointsCharged > 0
+            ? `每天 10:00 更新，结果缓存 1 天 · 已消耗 ${cached.pointsCharged} 积分`
+            : base.ydayHint,
+      })
+      return
+    }
+    if (this._ydayLoading) return
+    this._ydayLoading = true
+    const seq = (this._ydaySeq || 0) + 1
+    this._ydaySeq = seq
+    this.setData({ ...base, ydayLoading: true, ydayEmpty: '', ydaySections: [] })
+    try {
+      const r = await shop.fetchShopAnalysisAi({
+        startDate: targetDate,
+        endDate: targetDate,
+        platform: 'all',
+      })
+      if (seq !== this._ydaySeq) return
+      const sections = sectionsFromAi(r)
+      if (!sections.length) {
+        this.setData({
+          ydayLoading: false,
+          ydaySections: [],
+          ydayEmpty: r.message || '昨日暂无可分析的经营数据',
+        })
+        return
+      }
+      writeYesterdayCache({
+        slot,
+        tenant,
+        targetDate,
+        sections,
+        pointsCharged: Number(r.pointsCharged) || 0,
+        savedAt: Date.now(),
+      })
+      this.setData({
+        ydayLoading: false,
+        ydayEmpty: '',
+        ydaySections: sections,
+        ydayHint:
+          Number(r.pointsCharged) > 0
+            ? `每天 10:00 更新，结果缓存 1 天 · 本次消耗 ${r.pointsCharged} 积分`
+            : base.ydayHint,
+      })
+    } catch (e) {
+      if (seq !== this._ydaySeq) return
+      this.setData({
+        ydayLoading: false,
+        ydaySections: [],
+        ydayEmpty: e instanceof Error ? e.message : '昨日分析暂时无法生成',
+      })
+    } finally {
+      if (seq === this._ydaySeq) this._ydayLoading = false
+    }
   },
 })
