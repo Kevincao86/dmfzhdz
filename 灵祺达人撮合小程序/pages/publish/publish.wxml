@@ -76,8 +76,8 @@
             data-id="{{item.id}}"
             bindtap="onSelectChannel"
           >
-            <view class="pub-mode-icon pub-mode-icon--{{item.id === 'targeted' ? 'brand' : 'visit'}}">
-              <text class="pub-mode-icon-glyph">{{item.iconGlyph}}</text>
+            <view class="pub-mode-icon">
+              <view class="pub-line pub-line--{{item.id}}"></view>
             </view>
             <view class="pub-mode-copy">
               <text class="pub-mode-name">{{item.label}}</text>
@@ -112,8 +112,8 @@
             data-id="{{item.id}}"
             bindtap="onSelectTarget"
           >
-            <view class="pub-mode-icon pub-mode-icon--{{item.iconKey}}">
-              <text class="pub-mode-icon-glyph">{{item.iconGlyph}}</text>
+            <view class="pub-mode-icon">
+              <view class="pub-line pub-line--{{item.iconKey || item.id}}"></view>
             </view>
             <view class="pub-mode-copy">
               <text class="pub-mode-name">{{item.label}}</text>
@@ -163,8 +163,8 @@
             data-id="{{item.id}}"
             bindtap="onSelectMode"
           >
-            <view class="pub-mode-icon pub-mode-icon--{{item.iconKey}}">
-              <text class="pub-mode-icon-glyph">{{item.iconGlyph}}</text>
+            <view class="pub-mode-icon">
+              <view class="pub-line pub-line--{{item.iconKey || item.id}}"></view>
             </view>
             <view class="pub-mode-copy">
               <text class="pub-mode-name">{{item.label}}</text>
