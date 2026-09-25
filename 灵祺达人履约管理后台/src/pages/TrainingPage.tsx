@@ -14,6 +14,9 @@ type Lecturer = {
   bank: string
   bankNo: string
   licenseNo: string
+  idFront?: string
+  idBack?: string
+  licenseImage?: string
 }
 
 type Course = {
@@ -43,6 +46,10 @@ export default function TrainingPage() {
   const [licenseNo, setLicenseNo] = useState('')
   const [bank, setBank] = useState('')
   const [bankNo, setBankNo] = useState('')
+  const [idFront, setIdFront] = useState('')
+  const [idBack, setIdBack] = useState('')
+  const [licenseImage, setLicenseImage] = useState('')
+  const [ocrHint, setOcrHint] = useState('')
   const [depositOk, setDepositOk] = useState(false)
   const [lecturer, setLecturer] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -60,6 +67,9 @@ export default function TrainingPage() {
       setLicenseNo(profile.licenseNo || '')
       setBank(profile.bank || '')
       setBankNo(profile.bankNo || '')
+      setIdFront(profile.idFront || '')
+      setIdBack(profile.idBack || '')
+      setLicenseImage(profile.licenseImage || '')
       setDepositOk(true)
     }
   }
@@ -209,6 +219,9 @@ export default function TrainingPage() {
                 bank: bank.trim(),
                 bankNo: bankNo.trim(),
                 licenseNo: kind === 'entity' ? licenseNo.trim() : '',
+                idFront,
+                idBack,
+                licenseImage,
               })
                 .then(() => {
                   setLecturer(true)
@@ -232,6 +245,86 @@ export default function TrainingPage() {
               <input type="checkbox" checked={depositOk} onChange={(e) => setDepositOk(e.target.checked)} />
               确认缴纳保证金 ¥{DEPOSIT}
             </label>
+            <p className="text-sm font-medium text-slate-800">上传原件并识别</p>
+            <label className="block text-sm text-slate-600">
+              身份证人像面
+              <input
+                className="mt-1 block w-full text-sm"
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  const reader = new FileReader()
+                  reader.onload = () => {
+                    const imageDataUrl = String(reader.result || '')
+                    setIdFront(imageDataUrl)
+                    setOcrHint('正在识别人像面…')
+                    postTraining({ action: 'ocrDoc', kind: 'id_front', imageDataUrl })
+                      .then((r) => {
+                        const f = (r.fields || {}) as Record<string, string>
+                        if (f.name) setName(f.name)
+                        if (f.idNo) setIdNo(f.idNo)
+                        setOcrHint('已填入人像面文字，请核对')
+                      })
+                      .catch(() => setOcrHint('人像面识别失败，请手工填写'))
+                  }
+                  reader.readAsDataURL(file)
+                }}
+              />
+            </label>
+            <label className="block text-sm text-slate-600">
+              身份证国徽面
+              <input
+                className="mt-1 block w-full text-sm"
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  const reader = new FileReader()
+                  reader.onload = () => {
+                    const imageDataUrl = String(reader.result || '')
+                    setIdBack(imageDataUrl)
+                    setOcrHint('正在识别国徽面…')
+                    postTraining({ action: 'ocrDoc', kind: 'id_back', imageDataUrl })
+                      .then(() => setOcrHint('国徽面已上传'))
+                      .catch(() => setOcrHint('国徽面识别失败'))
+                  }
+                  reader.readAsDataURL(file)
+                }}
+              />
+            </label>
+            {kind === 'entity' ? (
+              <label className="block text-sm text-slate-600">
+                营业执照
+                <input
+                  className="mt-1 block w-full text-sm"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    const reader = new FileReader()
+                    reader.onload = () => {
+                      const imageDataUrl = String(reader.result || '')
+                      setLicenseImage(imageDataUrl)
+                      setOcrHint('正在识别营业执照…')
+                      postTraining({ action: 'ocrDoc', kind: 'license', imageDataUrl })
+                        .then((r) => {
+                          const f = (r.fields || {}) as Record<string, string>
+                          if (f.name) setName(f.name)
+                          if (f.licenseNo) setLicenseNo(f.licenseNo)
+                          setOcrHint('已填入执照文字，请核对')
+                        })
+                        .catch(() => setOcrHint('执照识别失败，请手工填写'))
+                    }
+                    reader.readAsDataURL(file)
+                  }}
+                />
+              </label>
+            ) : null}
+            {ocrHint ? <p className="text-xs text-violet-700">{ocrHint}</p> : null}
             <div className="flex gap-3 text-sm">
               <button type="button" className={kind === 'person' ? 'font-semibold text-violet-700' : 'text-slate-500'} onClick={() => setKind('person')}>
                 个人

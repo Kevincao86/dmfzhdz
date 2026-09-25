@@ -163,6 +163,17 @@ function laborTax(monthPayable) {
   return Math.max(0, Math.round(tax * 100) / 100)
 }
 
+async function recognizeDoc(kind, imageDataUrl) {
+  if (!ecs.hasBase || !ecs.hasBase()) throw new Error('识别服务未连接')
+  const res = await ecs.post('/api/meoo-mp-training', {
+    action: 'ocrDoc',
+    kind,
+    imageDataUrl,
+  })
+  if (!res || res.ok === false) throw new Error((res && res.error) || '识别失败')
+  return res.fields || {}
+}
+
 async function saveProfile(input) {
   const profile = {
     hostId: accountId(),
@@ -172,6 +183,9 @@ async function saveProfile(input) {
     bank: String(input.bank || '').trim(),
     bankNo: String(input.bankNo || '').trim(),
     licenseNo: String(input.licenseNo || '').trim(),
+    idFront: String(input.idFront || ''),
+    idBack: String(input.idBack || ''),
+    licenseImage: String(input.licenseImage || ''),
     updatedAt: new Date().toISOString(),
   }
   if (!profile.name || !profile.bankNo) throw new Error('请填写户名和账号')
@@ -275,6 +289,7 @@ module.exports = {
   createCourse,
   signup,
   readProfile,
+  recognizeDoc,
   saveProfile,
   myOrders,
   splitFee,

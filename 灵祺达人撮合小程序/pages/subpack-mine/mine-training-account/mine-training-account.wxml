@@ -6,6 +6,16 @@
   </view>
   <text class="tp-hint" wx:if="{{kind === 'person'}}">平台按月累计预扣个人所得税。当月应付款不超过 800 元不预扣。个人不能开增值税发票，学员要票请改个体户或企业。</text>
   <text class="tp-hint" wx:else>平台不扣个税，凭你开给平台的 99% 发票打满应付款。学员要票由你的主体直接开，平台只就 1% 佣金开票。</text>
+  <text class="tp-label">身份证原件</text>
+  <view class="tp-picks">
+    <view class="tp-pick" data-kind="id_front" bindtap="onPickDoc">人像面</view>
+    <view class="tp-pick" data-kind="id_back" bindtap="onPickDoc">国徽面</view>
+  </view>
+  <block wx:if="{{kind === 'entity'}}">
+    <text class="tp-label">营业执照原件</text>
+    <view class="tp-pick" data-kind="license" bindtap="onPickDoc">上传并识别</view>
+  </block>
+  <text class="tp-hint">上传后自动填入证件上的文字，请核对后再保存。</text>
   <text class="tp-label">{{kind === 'person' ? '姓名' : '主体名称'}}</text>
   <input class="tp-input" value="{{name}}" bindinput="onName" />
   <text class="tp-label">{{kind === 'person' ? '身份证号' : '联系人身份证'}}</text>

@@ -8,6 +8,9 @@ Page({
     bank: '',
     bankNo: '',
     licenseNo: '',
+    idFront: '',
+    idBack: '',
+    licenseImage: '',
   },
   onShow() {
     const p = training.readProfile()
@@ -19,6 +22,47 @@ Page({
       bank: p.bank || '',
       bankNo: p.bankNo || '',
       licenseNo: p.licenseNo || '',
+      idFront: p.idFront || '',
+      idBack: p.idBack || '',
+      licenseImage: p.licenseImage || '',
+    })
+  },
+  onPickDoc(e) {
+    const kind = e.currentTarget.dataset.kind
+    wx.chooseImage({
+      count: 1,
+      sizeType: ['compressed'],
+      success: (res) => {
+        const path = res.tempFilePaths && res.tempFilePaths[0]
+        if (!path) return
+        wx.showLoading({ title: '识别中' })
+        wx.getFileSystemManager().readFile({
+          filePath: path,
+          encoding: 'base64',
+          success: async (file) => {
+            const imageDataUrl = `data:image/jpeg;base64,${file.data}`
+            const patch = kind === 'id_front' ? { idFront: imageDataUrl } : kind === 'id_back' ? { idBack: imageDataUrl } : { licenseImage: imageDataUrl }
+            try {
+              const fields = await training.recognizeDoc(kind, imageDataUrl)
+              if (fields.name) patch.name = fields.name
+              if (fields.idNo) patch.idNo = fields.idNo
+              if (fields.licenseNo) patch.licenseNo = fields.licenseNo
+              if (fields.legalPerson && this.data.kind === 'entity' && !fields.name) patch.name = fields.legalPerson
+              this.setData(patch)
+              wx.showToast({ title: '已填入识别结果', icon: 'none' })
+            } catch (err) {
+              this.setData(patch)
+              wx.showToast({ title: String(err.message || '识别失败').slice(0, 18), icon: 'none' })
+            } finally {
+              wx.hideLoading()
+            }
+          },
+          fail: () => {
+            wx.hideLoading()
+            wx.showToast({ title: '读取照片失败', icon: 'none' })
+          },
+        })
+      },
     })
   },
   onKind(e) { this.setData({ kind: e.currentTarget.dataset.id }) },

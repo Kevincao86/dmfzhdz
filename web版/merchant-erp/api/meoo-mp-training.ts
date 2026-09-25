@@ -34,6 +34,9 @@ type Profile = {
   bank: string
   bankNo: string
   licenseNo: string
+  idFront: string
+  idBack: string
+  licenseImage: string
   updatedAt: string
 }
 type Order = {
@@ -80,6 +83,48 @@ function writeStore(store: Store) {
   fs.writeFileSync(FILE, JSON.stringify(store), 'utf8')
 }
 
+function clipImage(raw: unknown) {
+  const s = String(raw || '')
+  if (!s.startsWith('data:image/')) return ''
+  return s.slice(0, 280000)
+}
+
+async function ocrDoc(kind: string, imageDataUrl: string) {
+  const image = clipImage(imageDataUrl)
+  if (!image) throw new Error('请上传图片')
+  const { routeAiChat } = await import('../vite-plugins/aiGateway/chatRouter.js')
+  const env = process.env as Record<string, string>
+  const provider = (env.MERCHANT_MP_AI_PROVIDER || 'doubao').trim()
+  const ask =
+    kind === 'license'
+      ? '这是营业执照。只输出 JSON：{"name":"企业名称","licenseNo":"统一社会信用代码","legalPerson":"法定代表人"}。看不清的字段留空字符串。'
+      : kind === 'id_back'
+        ? '这是身份证国徽面。只输出 JSON：{"authority":"签发机关","validFrom":"","validTo":""}。看不清的字段留空字符串。'
+        : '这是身份证人像面。只输出 JSON：{"name":"姓名","idNo":"公民身份号码","address":""}。看不清的字段留空字符串。'
+  const res = await routeAiChat(
+    {
+      provider: provider as 'doubao',
+      temperature: 0,
+      imageDataUrls: [image],
+      messages: [
+        { role: 'system', content: '你只做证件文字识别，不判断真伪。只输出 JSON，不要其它文字。' },
+        { role: 'user', content: ask },
+      ],
+    },
+    env,
+  )
+  const text = String(res.content || '')
+  const m = text.match(/\{[\s\S]*\}/)
+  let fields: Record<string, string> = {}
+  try {
+    const parsed = JSON.parse(m ? m[0] : '{}') as Record<string, unknown>
+    for (const [k, v] of Object.entries(parsed)) fields[k] = String(v || '').trim()
+  } catch {
+    fields = {}
+  }
+  return fields
+}
+
 function splitFee(fee: number) {
   const pay = Math.round(fee * 100) / 100
   const commission = Math.round(pay * 0.01 * 100) / 100
@@ -87,7 +132,7 @@ function splitFee(fee: number) {
   return { pay, commission, payable }
 }
 
-export default function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   const store = readStore()
   if (req.method === 'GET') {
     const hostId = String(req.query.hostId || '')
@@ -109,6 +154,16 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   const body = (req.body && typeof req.body === 'object' ? req.body : {}) as Record<string, unknown>
   const action = String(body.action || 'create')
 
+  if (action === 'ocrDoc') {
+    try {
+      const fields = await ocrDoc(String(body.kind || 'id_front'), String(body.imageDataUrl || ''))
+      res.status(200).json({ ok: true, fields })
+    } catch (e) {
+      res.status(400).json({ ok: false, error: e instanceof Error ? e.message : '识别失败' })
+    }
+    return
+  }
+
   if (action === 'saveProfile') {
     const hostId = String(body.hostId || '')
     if (!hostId) {
@@ -123,6 +178,9 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       bank: String(body.bank || '').trim(),
       bankNo: String(body.bankNo || '').trim(),
       licenseNo: String(body.licenseNo || '').trim(),
+      idFront: clipImage(body.idFront),
+      idBack: clipImage(body.idBack),
+      licenseImage: clipImage(body.licenseImage),
       updatedAt: new Date().toISOString(),
     }
     store.profiles = store.profiles.filter((p) => p.hostId !== hostId).concat(profile)
