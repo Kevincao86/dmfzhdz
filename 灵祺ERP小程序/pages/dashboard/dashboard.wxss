@@ -159,8 +159,24 @@
 }
 
 .dash-yday-date {
+  display: block;
+  margin: -8rpx 0 8rpx;
   font-size: 22rpx;
   color: #64748b;
+}
+
+.dash-yday-btn {
+  font-size: 22rpx;
+  color: #0891b2;
+  font-weight: 700;
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
+  background: #ecfeff;
+}
+
+.dash-yday-btn.is-off {
+  color: #94a3b8;
+  background: #f1f5f9;
 }
 
 .dash-yday-hint {

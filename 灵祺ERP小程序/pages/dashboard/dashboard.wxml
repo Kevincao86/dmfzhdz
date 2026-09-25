@@ -56,8 +56,9 @@
   <view class="dash-chart-card dash-yday">
     <view class="dash-chart-head">
       <text class="dash-chart-title">{{ydayTitle}}</text>
-      <text wx:if="{{ydayDate}}" class="dash-yday-date">{{ydayDate}}</text>
+      <text class="dash-yday-btn {{ydayLoading ? 'is-off' : ''}}" bindtap="onManualYesterdayAnalysis">{{ydayLoading ? '分析中' : '手动分析'}}</text>
     </view>
+    <text wx:if="{{ydayDate}}" class="dash-yday-date">{{ydayDate}} · 每天 10:00 自动分析</text>
     <text class="dash-yday-hint">{{ydayHint}}</text>
     <view wx:if="{{ydayLoading}}" class="dash-yday-empty">正在生成昨日分析…</view>
     <view wx:elif="{{ydayEmpty}}" class="dash-yday-empty">{{ydayEmpty}}</view>

@@ -3,6 +3,7 @@ const devAuth = require('../../utils/devAuth.js')
 const merchant = require('../../utils/merchantApi.js')
 const dashboardMp = require('../../utils/dashboardMp.js')
 const shop = require('../../utils/shopAnalysisApiMp.js')
+const sessionSync = require('../../utils/merchantSessionSyncMp.js')
 const { iconDataUri } = require('../../utils/funcIconAssetsMp.js')
 
 const YDAY_CACHE_KEY = 'meoo_dash_yesterday_analysis_v1'
@@ -119,18 +120,69 @@ function writeYesterdayCache(row) {
   } catch (_) {}
 }
 
-function sectionsFromAi(r) {
-  const list = Array.isArray(r && r.aiSections) ? r.aiSections : []
-  const out = list
-    .map((s, i) => ({
-      id: String((s && s.id) || i),
-      title: String((s && (s.title || s.heading)) || '').trim(),
-      body: String((s && (s.body || s.content || s.text)) || '').trim(),
-    }))
-    .filter((s) => s.body)
-  const report = String((r && r.aiReport) || '').trim()
-  if (!out.length && report) out.push({ id: 'report', title: '', body: report })
-  return out
+const YDAY_AI_SYSTEM = [
+  '你是资深本地生活店铺经营顾问。请只根据给出的昨日数据写中文分析，禁止编造未提供的数字。',
+  '输出只能使用这五个标题，格式为「一、标题」：',
+  '一、经营总览',
+  '二、客群洞察',
+  '三、商品与退款',
+  '四、评价口碑',
+  '五、行动建议',
+  '每节 3～5 条，用「· 」开头。数据不足的节写明「昨日数据不足」，不要猜测。',
+].join('\n')
+
+function pointsFromTokenUsage(usage, model) {
+  const prompt = Math.max(0, Math.floor(Number(usage && usage.prompt_tokens) || 0))
+  const completion = Math.max(0, Math.floor(Number(usage && usage.completion_tokens) || 0))
+  if (prompt + completion <= 0) return 1
+  const m = String(model || '').toLowerCase()
+  let inPerK = 0.0008
+  let outPerK = 0.002
+  if (/flash|turbo/.test(m)) {
+    inPerK = 0.0003
+    outPerK = 0.0006
+  } else if (/max/.test(m)) {
+    inPerK = 0.0024
+    outPerK = 0.0096
+  } else if (/mini|haiku/.test(m)) {
+    inPerK = 0.001
+    outPerK = 0.004
+  } else if (/gpt-4o|claude|gemini|grok/.test(m)) {
+    inPerK = 0.02
+    outPerK = 0.06
+  }
+  const costYuan = (prompt / 1000) * inPerK + (completion / 1000) * outPerK
+  return Math.max(1, Math.ceil(costYuan / 0.01))
+}
+
+function sectionsFromReport(text) {
+  const raw = String(text || '').trim()
+  if (!raw) return []
+  const parts = raw.split(/\n(?=[一二三四五六七八九十]、)/).map((s) => s.trim()).filter(Boolean)
+  const sections = parts.map((block, i) => {
+    const lines = block.split('\n')
+    const title = lines[0].replace(/^[一二三四五六七八九十]、/, '').trim()
+    const body = lines.slice(1).join('\n').trim() || lines[0]
+    return { id: String(i), title: body === lines[0] ? '' : title, body }
+  })
+  return sections.filter((s) => s.body)
+}
+
+function factsForYesterday(targetDate, summary, adviceFacts) {
+  const s = summary || {}
+  return [
+    `统计日期：${targetDate}（昨日）`,
+    '平台：全部已绑定平台',
+    '门店范围：全部门店',
+    `成交额：${s.salesAmountYuan == null ? '未知' : s.salesAmountYuan} 元`,
+    `订单数：${s.orderCount == null ? '未知' : s.orderCount}`,
+    `核销额：${s.verifyAmountYuan == null ? '未知' : s.verifyAmountYuan} 元`,
+    `退款额：${s.refundAmountYuan == null ? '未知' : s.refundAmountYuan} 元`,
+    adviceFacts ? String(adviceFacts) : '',
+    '请输出完整五节分析。',
+  ]
+    .filter(Boolean)
+    .join('\n')
 }
 
 Page({
@@ -147,7 +199,7 @@ Page({
     chartTitle: '趋势分析',
     ydayTitle: '昨日数据分析',
     ydayDate: '',
-    ydayHint: '每天 10:00 更新，结果缓存 1 天',
+    ydayHint: '每天 10:00 自动分析，按实际 token 扣积分',
     ydayLoading: false,
     ydaySections: [],
     ydayEmpty: '',
@@ -270,12 +322,17 @@ Page({
     })
   },
 
-  async loadYesterdayAnalysis() {
+  onManualYesterdayAnalysis() {
+    void this.loadYesterdayAnalysis({ manual: true })
+  },
+
+  async loadYesterdayAnalysis(opts) {
+    const manual = Boolean(opts && opts.manual)
     const { slot, targetDate } = yesterdayRefreshSlot()
     const tenant = dashTenantKey()
     const base = {
       ydayDate: targetDate,
-      ydayHint: '每天 10:00 更新，结果缓存 1 天',
+      ydayHint: '每天 10:00 自动分析，按实际 token 扣积分',
     }
     if (devAuth.isDevSkipLogin()) {
       this.setData({
@@ -285,8 +342,8 @@ Page({
         ydaySections: [
           {
             id: 'preview',
-            title: '经营小结',
-            body: '预览：昨日成交集中在午后，核销与转化保持稳定。正式环境会按昨天的订单生成，并缓存到次日 10:00。',
+            title: '经营总览',
+            body: '预览：昨日成交集中在午后。正式环境由 AI 根据昨日订单分析，按 token 扣积分。',
           },
         ],
       })
@@ -301,64 +358,90 @@ Page({
       })
       return
     }
-    const cached = readYesterdayCache(slot, tenant)
-    if (cached) {
-      this.setData({
-        ...base,
-        ydayLoading: false,
-        ydayEmpty: '',
-        ydayDate: cached.targetDate || targetDate,
-        ydaySections: cached.sections,
-        ydayHint:
-          cached.pointsCharged > 0
-            ? `每天 10:00 更新，结果缓存 1 天 · 已消耗 ${cached.pointsCharged} 积分`
-            : base.ydayHint,
-      })
-      return
+    if (!manual) {
+      const cached = readYesterdayCache(slot, tenant)
+      if (cached) {
+        this.setData({
+          ...base,
+          ydayLoading: false,
+          ydayEmpty: '',
+          ydayDate: cached.targetDate || targetDate,
+          ydaySections: cached.sections,
+          ydayHint:
+            cached.pointsCharged > 0
+              ? `每天 10:00 自动更新 · 本次已扣 ${cached.pointsCharged} 积分`
+              : base.ydayHint,
+        })
+        return
+      }
     }
     if (this._ydayLoading) return
     this._ydayLoading = true
     const seq = (this._ydaySeq || 0) + 1
     this._ydaySeq = seq
-    this.setData({ ...base, ydayLoading: true, ydayEmpty: '', ydaySections: [] })
+    this.setData({ ...base, ydayLoading: true, ydayEmpty: '', ydaySections: manual ? this.data.ydaySections : [] })
     try {
-      const r = await shop.fetchShopAnalysisAi({
+      const summaryRes = await shop.fetchShopAnalysisSummary({
         startDate: targetDate,
         endDate: targetDate,
         platform: 'all',
       })
       if (seq !== this._ydaySeq) return
-      const sections = sectionsFromAi(r)
-      if (!sections.length) {
+      const summary = summaryRes.summary || {}
+      const orders = Number(summary.orderCount) || 0
+      const sales = Number(summary.salesAmountYuan) || 0
+      const facts = String(summaryRes.adviceFacts || '').trim()
+      if (orders <= 0 && sales <= 0 && !facts) {
         this.setData({
           ydayLoading: false,
           ydaySections: [],
-          ydayEmpty: r.message || '昨日暂无可分析的经营数据',
+          ydayEmpty: '昨日暂无经营数据，未调用 AI',
         })
         return
       }
+      const token = api.getBearerToken ? api.getBearerToken() : ''
+      let tenantId = tenant
+      try {
+        tenantId = String(wx.getStorageSync(sessionSync.MEOO_ACTIVE_TENANT_ID) || tenant).trim()
+      } catch (_) {}
+      const chat = await merchant.merchantRequestAuth('POST', '/api/meoo-ai-chat', {
+        bearerToken: token,
+        timeoutMs: 90000,
+        data: {
+          provider: 'qwen',
+          stream: false,
+          ...(tenantId ? { tenantId } : {}),
+          ...(token ? { access_token: token } : {}),
+          messages: [
+            { role: 'system', content: YDAY_AI_SYSTEM },
+            { role: 'user', content: factsForYesterday(targetDate, summary, facts) },
+          ],
+        },
+      })
+      if (seq !== this._ydaySeq) return
+      const data = chat && typeof chat === 'object' ? chat : {}
+      if (data.ok === false) throw new Error(String(data.detail || data.message || data.error || 'AI 分析失败'))
+      const sections = sectionsFromReport(data.content)
+      if (!sections.length) throw new Error('AI 未返回分析内容')
+      const pointsCharged = pointsFromTokenUsage(data.usage, data.model)
       writeYesterdayCache({
         slot,
         tenant,
         targetDate,
         sections,
-        pointsCharged: Number(r.pointsCharged) || 0,
+        pointsCharged,
         savedAt: Date.now(),
       })
       this.setData({
         ydayLoading: false,
         ydayEmpty: '',
         ydaySections: sections,
-        ydayHint:
-          Number(r.pointsCharged) > 0
-            ? `每天 10:00 更新，结果缓存 1 天 · 本次消耗 ${r.pointsCharged} 积分`
-            : base.ydayHint,
+        ydayHint: `按 token 扣减 · 本次 ${pointsCharged} 积分`,
       })
     } catch (e) {
       if (seq !== this._ydaySeq) return
       this.setData({
         ydayLoading: false,
-        ydaySections: [],
         ydayEmpty: e instanceof Error ? e.message : '昨日分析暂时无法生成',
       })
     } finally {
