@@ -80,13 +80,11 @@ async function askAi(userText, history, cfg) {
   if (!base) throw new Error('未配置客服 AI 接口')
   const token = api.getBearerToken ? api.getBearerToken() : api.getAccessToken()
   const knowledge = cfg && cfg.knowledge ? `\n\n【运营补充说明】\n${cfg.knowledge}` : ''
-  const messages = [{ role: 'system', content: PROJECT_BRIEF + knowledge }]
-  for (const m of (history || []).slice(-8)) {
-    if (!m || !m.text) continue
-    if (m.role === 'user') messages.push({ role: 'user', content: m.text })
-    else if (m.role === 'bot' || m.role === 'assistant') messages.push({ role: 'assistant', content: m.text })
-  }
-  messages.push({ role: 'user', content: String(userText || '').trim() })
+  const messages = [
+    { role: 'system', content: PROJECT_BRIEF + knowledge },
+    { role: 'user', content: String(userText || '').trim() },
+  ]
+  void history
   const data = await new Promise((resolve, reject) => {
     wx.request({
       url: `${base}/api/meoo-ai-chat`,
@@ -100,7 +98,6 @@ async function askAi(userText, history, cfg) {
       data: {
         provider: 'qwen',
         stream: false,
-        taskType: 'generate_copywriting',
         messages,
       },
       success(res) {
