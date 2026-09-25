@@ -1,0 +1,22 @@
+<view class="tp">
+  <text class="tp-label">收款主体</text>
+  <view class="tp-picks">
+    <view class="tp-pick {{kind === 'person' ? 'tp-pick--on' : ''}}" data-id="person" bindtap="onKind">个人</view>
+    <view class="tp-pick {{kind === 'entity' ? 'tp-pick--on' : ''}}" data-id="entity" bindtap="onKind">个体户 / 企业</view>
+  </view>
+  <text class="tp-hint" wx:if="{{kind === 'person'}}">平台按月累计预扣个人所得税。当月应付款不超过 800 元不预扣。个人不能开增值税发票，学员要票请改个体户或企业。</text>
+  <text class="tp-hint" wx:else>平台不扣个税，凭你开给平台的 99% 发票打满应付款。学员要票由你的主体直接开，平台只就 1% 佣金开票。</text>
+  <text class="tp-label">{{kind === 'person' ? '姓名' : '主体名称'}}</text>
+  <input class="tp-input" value="{{name}}" bindinput="onName" />
+  <text class="tp-label">{{kind === 'person' ? '身份证号' : '联系人身份证'}}</text>
+  <input class="tp-input" value="{{idNo}}" bindinput="onId" />
+  <block wx:if="{{kind === 'entity'}}">
+    <text class="tp-label">统一社会信用代码</text>
+    <input class="tp-input" value="{{licenseNo}}" bindinput="onLicense" />
+  </block>
+  <text class="tp-label">开户行</text>
+  <input class="tp-input" value="{{bank}}" bindinput="onBank" placeholder="{{kind === 'person' ? '个人银行卡开户行' : '对公或经营者账户开户行'}}" />
+  <text class="tp-label">账号</text>
+  <input class="tp-input" value="{{bankNo}}" bindinput="onBankNo" />
+  <view class="tp-btn" bindtap="onSave">保存认证</view>
+</view>

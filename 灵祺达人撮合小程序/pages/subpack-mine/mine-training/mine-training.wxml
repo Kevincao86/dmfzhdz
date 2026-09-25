@@ -1,0 +1,34 @@
+<view class="tr-page">
+  <text class="tr-note">课时费由平台代收。平台留 1% 佣金，99% 核实通过后 T+1 结算。</text>
+  <view class="tr-links">
+    <text bindtap="onAccount">收款认证</text>
+    <text bindtap="onSettle">我的结算</text>
+  </view>
+  <view class="tr-seg">
+    <view class="tr-seg__item {{filter === 'all' ? 'tr-seg__item--on' : ''}}" data-id="all" bindtap="onFilter">全部</view>
+    <view class="tr-seg__item {{filter === 'online' ? 'tr-seg__item--on' : ''}}" data-id="online" bindtap="onFilter">线上</view>
+    <view class="tr-seg__item {{filter === 'offline' ? 'tr-seg__item--on' : ''}}" data-id="offline" bindtap="onFilter">线下</view>
+  </view>
+  <view wx:if="{{loading}}" class="tr-empty">加载中</view>
+  <view wx:elif="{{!shown.length}}" class="tr-empty">还没有培训课程</view>
+  <view wx:for="{{shown}}" wx:key="id" class="tr-card" data-id="{{item.id}}" bindtap="onOpen">
+    <image wx:if="{{item.poster}}" class="tr-card__cover" src="{{item.poster}}" mode="aspectFill" />
+    <view wx:else class="tr-card__cover tr-card__cover--ph">培训</view>
+    <view class="tr-card__body">
+      <text class="tr-card__title">{{item.title}}</text>
+      <text class="tr-card__host">{{item.hostRole === 'pr' ? 'PR' : '达人'}} · {{item.hostName}}</text>
+      <view class="tr-card__meta">
+        <text class="tr-chip">{{item.mode === 'offline' ? '线下' : '线上'}}</text>
+        <text class="tr-when">{{item.whenText || '时间由讲师安排'}}</text>
+      </view>
+      <view class="tr-card__foot">
+        <text class="tr-fee">{{item.fee ? '¥' + item.fee : '费用面议'}}</text>
+        <text class="tr-go">报名</text>
+      </view>
+    </view>
+  </view>
+  <view class="tr-post" bindtap="onPost">
+    <text class="tr-post__main">发布培训</text>
+    <text class="tr-post__sub">高级会员并缴纳保证金后可发布</text>
+  </view>
+</view>

@@ -1,0 +1,28 @@
+<view class="tp">
+  <view class="tp-gate" wx:if="{{!advanced || !paid}}">
+    <text class="tp-gate__t">发布条件</text>
+    <text class="tp-line">高级会员：{{advanced ? '已开通' : '未开通'}}</text>
+    <text class="tp-line">保证金 ¥{{yuan}}：{{paid ? '已缴纳' : '未缴纳'}}</text>
+    <view class="tp-btn" wx:if="{{!paid}}" bindtap="onPayDeposit">缴纳保证金</view>
+  </view>
+  <block wx:if="{{advanced && paid && !depositOnly}}">
+    <text class="tp-label">课程名称</text>
+    <input class="tp-input" placeholder="如：探店口播训练营" value="{{title}}" bindinput="onTitle" />
+    <text class="tp-label">形式</text>
+    <view class="tp-picks">
+      <view class="tp-pick {{mode === 'online' ? 'tp-pick--on' : ''}}" data-id="online" bindtap="onMode">线上</view>
+      <view class="tp-pick {{mode === 'offline' ? 'tp-pick--on' : ''}}" data-id="offline" bindtap="onMode">线下</view>
+    </view>
+    <text class="tp-label">城市</text>
+    <input class="tp-input" placeholder="线下填写城市" value="{{city}}" bindinput="onCity" />
+    <text class="tp-label">时间</text>
+    <input class="tp-input" placeholder="如：周六 14:00" value="{{whenText}}" bindinput="onWhen" />
+    <text class="tp-label">名额</text>
+    <input class="tp-input" type="number" value="{{seats}}" bindinput="onSeats" />
+    <text class="tp-label">费用</text>
+    <input class="tp-input" type="digit" placeholder="课时费，平台不代收" value="{{fee}}" bindinput="onFee" />
+    <view class="tp-poster" bindtap="onPoster">{{poster ? '已选择海报' : '上传海报'}}</view>
+    <text class="tp-hint">课时费进平台托管。你只安排课程。个人结算预扣个税，个体户或企业须先开票再打款。</text>
+    <view class="tp-btn" bindtap="onSubmit">发布</view>
+  </block>
+</view>

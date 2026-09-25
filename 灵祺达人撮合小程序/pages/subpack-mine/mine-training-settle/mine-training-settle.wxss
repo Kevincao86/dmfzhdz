@@ -1,0 +1,6 @@
+@import '../mine-training-post/mine-training-post.wxss';
+.st-line { display: block; margin-top: 10rpx; font-size: 26rpx; color: #3d3650; line-height: 1.5; }
+.st-empty { margin-top: 40rpx; text-align: center; color: #9a94a8; font-size: 26rpx; }
+.st-card { margin-top: 20rpx; padding: 20rpx; border: 1rpx solid #f0eef5; border-radius: 16rpx; }
+.st-title { display: block; font-size: 30rpx; font-weight: 700; color: #1f1a2e; }
+.st-actions { margin-top: 12rpx; color: #5b2dcc; font-size: 26rpx; }

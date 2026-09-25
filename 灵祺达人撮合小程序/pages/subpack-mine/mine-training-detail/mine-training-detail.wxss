@@ -1,0 +1,12 @@
+.td { min-height: 100vh; background: #fff; padding-bottom: 160rpx; }
+.td-cover { width: 100%; height: 420rpx; }
+.td-body { padding: 28rpx; }
+.td-title { display: block; font-size: 40rpx; font-weight: 700; color: #1f1a2e; }
+.td-host { display: block; margin-top: 8rpx; font-size: 26rpx; color: #8b8798; }
+.td-picks { display: flex; gap: 16rpx; margin-top: 24rpx; }
+.td-pick { flex: 1; text-align: center; line-height: 72rpx; border-radius: 16rpx; border: 1rpx solid #eceaf2; font-size: 26rpx; color: #6b6578; }
+.td-pick--on { border-color: #5b2dcc; color: #5b2dcc; background: #f7f4ff; }
+.td-line { display: block; margin-top: 16rpx; font-size: 26rpx; color: #3d3650; }
+.td-hint { display: block; margin-top: 16rpx; font-size: 22rpx; color: #9a94a8; line-height: 1.5; }
+.td-input { margin-top: 16rpx; height: 80rpx; border: 1rpx solid #eceaf2; border-radius: 14rpx; padding: 0 20rpx; font-size: 28rpx; }
+.td-bar { position: fixed; left: 28rpx; right: 28rpx; bottom: calc(24rpx + env(safe-area-inset-bottom)); height: 88rpx; line-height: 88rpx; text-align: center; background: #5b2dcc; color: #fff; border-radius: 16rpx; font-size: 30rpx; font-weight: 600; }

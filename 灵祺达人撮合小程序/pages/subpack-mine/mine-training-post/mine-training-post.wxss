@@ -1,0 +1,12 @@
+.tp { min-height: 100vh; background: #fff; padding: 28rpx; box-sizing: border-box; }
+.tp-label { display: block; margin-top: 22rpx; font-size: 24rpx; color: #8b8798; }
+.tp-input { margin-top: 8rpx; height: 80rpx; border: 1rpx solid #eceaf2; border-radius: 14rpx; padding: 0 20rpx; font-size: 28rpx; }
+.tp-picks { display: flex; gap: 16rpx; margin-top: 10rpx; }
+.tp-pick { flex: 1; text-align: center; line-height: 72rpx; border-radius: 14rpx; border: 1rpx solid #eceaf2; font-size: 26rpx; }
+.tp-pick--on { border-color: #5b2dcc; color: #5b2dcc; background: #f7f4ff; }
+.tp-poster { margin-top: 24rpx; height: 160rpx; border: 1rpx dashed #d9d3ea; border-radius: 16rpx; text-align: center; line-height: 160rpx; color: #5b2dcc; font-size: 26rpx; }
+.tp-hint { display: block; margin-top: 16rpx; font-size: 22rpx; color: #9a94a8; }
+.tp-btn { margin-top: 28rpx; height: 88rpx; line-height: 88rpx; text-align: center; background: #5b2dcc; color: #fff; border-radius: 16rpx; font-size: 30rpx; font-weight: 600; }
+.tp-gate { padding: 12rpx 0 8rpx; }
+.tp-gate__t { display: block; font-size: 32rpx; font-weight: 700; color: #1f1a2e; }
+.tp-line { display: block; margin-top: 12rpx; font-size: 26rpx; color: #3d3650; }

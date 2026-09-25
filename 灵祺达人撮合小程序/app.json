@@ -77,6 +77,11 @@
         "mine-targeted-invites/mine-targeted-invites",
         "mine-wechat-oa-bind/mine-wechat-oa-bind",
         "mine-affiliate-apply/mine-affiliate-apply",
+        "mine-training/mine-training",
+        "mine-training-detail/mine-training-detail",
+        "mine-training-post/mine-training-post",
+        "mine-training-account/mine-training-account",
+        "mine-training-settle/mine-training-settle",
         "mine-affiliate-portal/mine-affiliate-portal"
       ]
     }

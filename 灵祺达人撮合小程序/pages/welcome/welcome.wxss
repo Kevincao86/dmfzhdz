@@ -66,9 +66,9 @@
 
 .welcome-tile--on {
   transform: none;
-  background: rgba(255, 255, 255, 0.92);
-  border-color: #2a2140;
-  box-shadow: 0 12rpx 36rpx rgba(30, 58, 95, 0.14);
+  background: #fff;
+  border-color: #7c4dff;
+  box-shadow: 0 8rpx 24rpx rgba(124, 77, 255, 0.12);
 }
 
 .welcome-tile__mark {
@@ -111,17 +111,13 @@
 }
 
 .welcome-enter--on {
-  color: #2a2140;
-  background: #f5c84c;
-  border-color: #f5c84c;
+  color: #fff;
+  background: #7c4dff;
+  border-color: #7c4dff;
 }
 
 .welcome-cluster {
-  position: relative;
-  flex: 1;
-  width: 100%;
-  min-height: 360rpx;
-  margin-top: 8rpx;
+  display: none;
 }
 
 .welcome-cluster__glow {

@@ -33,6 +33,7 @@ import regionalPartnerChangePasswordHandler from '../../../商家管理后台/ap
 import regionalPartnerPricingHandler from '../../../商家管理后台/api/_lib/handlers/meoo-regional-partner-pricing.ts'
 import tenantSubscriptionTiersHandler from '../../../商家管理后台/api/_lib/handlers/meoo-tenant-subscription-tiers.ts'
 import plannerRoomSyncHandler from '../api/meoo-planner-room-sync.ts'
+import mpTrainingHandler from '../api/meoo-mp-training.ts'
 import plannerGptConfigHandler from '../api/meoo-planner-gpt-config.ts'
 import tenantsListHandler from '../../../商家管理后台/api/_lib/handlers/meoo-supabase-tenants-list.ts'
 import tenantsPatchHandler from '../../../商家管理后台/api/_lib/handlers/meoo-supabase-tenants-patch.ts'
@@ -249,6 +250,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-regional-partner-pricing': regionalPartnerPricingHandler as VercelLikeHandler,
   '/api/meoo-tenant-subscription-tiers': tenantSubscriptionTiersHandler as VercelLikeHandler,
   '/api/meoo-planner-room-sync': plannerRoomSyncHandler as VercelLikeHandler,
+  '/api/meoo-mp-training': mpTrainingHandler as VercelLikeHandler,
   '/api/meoo-planner-gpt-config': plannerGptConfigHandler as VercelLikeHandler,
   '/api/meoo-supabase-tenants-list': tenantsListHandler as VercelLikeHandler,
   '/api/meoo-supabase-tenants-patch': tenantsPatchHandler as VercelLikeHandler,

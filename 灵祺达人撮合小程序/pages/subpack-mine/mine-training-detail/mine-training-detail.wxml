@@ -1,0 +1,18 @@
+<view class="td" wx:if="{{course}}">
+  <image wx:if="{{course.poster}}" class="td-cover" src="{{course.poster}}" mode="aspectFill" />
+  <view class="td-body">
+    <text class="td-title">{{course.title}}</text>
+    <text class="td-host">{{course.hostRole === 'pr' ? 'PR' : '达人'}} · {{course.hostName}}</text>
+    <view class="td-picks">
+      <view class="td-pick {{modePick === 'online' ? 'td-pick--on' : ''}}" data-id="online" bindtap="onMode">线上</view>
+      <view class="td-pick {{modePick === 'offline' ? 'td-pick--on' : ''}}" data-id="offline" bindtap="onMode">线下{{course.city ? ' · ' + course.city : ''}}</view>
+    </view>
+    <text class="td-line">时间 {{course.whenText || '由讲师安排'}}</text>
+    <text class="td-line">名额 {{course.enrolled || course.signupCount || 0}} / {{course.seats}}</text>
+    <text class="td-line">费用 {{course.fee ? '¥' + course.fee : '面议'}}</text>
+    <text class="td-hint" wx:if="{{parts}}">学员支付 ¥{{parts.pay}} 到平台。平台佣金 ¥{{parts.commission}}，讲师应付款 ¥{{parts.payable}}。核实通过后 T+1 结算。个人预扣个税，个体户或企业凭发票打满应付款。</text>
+    <input class="td-input" placeholder="你的姓名" value="{{name}}" bindinput="onName" />
+    <input class="td-input" placeholder="联系方式" value="{{contact}}" bindinput="onContact" />
+  </view>
+  <view class="td-bar" bindtap="onSignup">支付到平台并报名</view>
+</view>
