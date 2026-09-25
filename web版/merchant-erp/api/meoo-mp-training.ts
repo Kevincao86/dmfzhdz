@@ -23,6 +23,8 @@ type Course = {
   fee: string
   poster: string
   note: string
+  reviewStatus: 'pending' | 'approved' | 'rejected'
+  reviewNote: string
   createdAt: string
   signups: Signup[]
 }
@@ -34,6 +36,11 @@ type Profile = {
   bank: string
   bankNo: string
   licenseNo: string
+  city: string
+  platforms: string
+  skills: string
+  years: string
+  intro: string
   idFront: string
   idBack: string
   licenseImage: string
@@ -159,6 +166,14 @@ async function ocrDoc(kind: string, imageDataUrl: string) {
   return fields
 }
 
+function clipText(value: unknown, max: number) {
+  return String(value || '').trim().slice(0, max)
+}
+
+function publicCourse(course: Course) {
+  return !course.reviewStatus || course.reviewStatus === 'approved'
+}
+
 function splitFee(fee: number) {
   const pay = Math.round(fee * 100) / 100
   const commission = Math.round(pay * 0.01 * 100) / 100
@@ -170,12 +185,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const store = readStore()
   if (req.method === 'GET') {
     const hostId = String(req.query.hostId || '')
+    const review = String(req.query.review || '') === '1'
+    const courses = (review ? store.courses : store.courses.filter(publicCourse)).map(({ signups, ...rest }) => ({
+      ...rest,
+      signupCount: (signups || []).length,
+    }))
     res.status(200).json({
       ok: true,
-      courses: store.courses.map(({ signups, ...rest }) => ({
-        ...rest,
-        signupCount: (signups || []).length,
-      })),
+      courses,
       profile: hostId ? store.profiles.find((p) => p.hostId === hostId) || null : null,
       orders: hostId ? store.orders.filter((o) => o.hostId === hostId) : [],
     })
@@ -212,6 +229,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       bank: String(body.bank || '').trim(),
       bankNo: String(body.bankNo || '').trim(),
       licenseNo: String(body.licenseNo || '').trim(),
+      city: clipText(body.city, 40),
+      platforms: clipText(body.platforms, 80),
+      skills: clipText(body.skills, 120),
+      years: clipText(body.years, 8),
+      intro: clipText(body.intro, 400),
       idFront: clipImage(body.idFront),
       idBack: clipImage(body.idBack),
       licenseImage: clipImage(body.licenseImage),
@@ -225,6 +247,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (action === 'create') {
     const title = String(body.title || '').trim()
+    const poster = String(body.poster || '')
     if (!title) {
       res.status(400).json({ ok: false, error: '请填写课程名称' })
       return
@@ -241,8 +264,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       seats: Math.max(1, Number(body.seats) || 1),
       enrolled: 0,
       fee: String(body.fee || '').trim(),
-      poster: String(body.poster || '').slice(0, 400000),
+      poster: poster.startsWith('data:image/') ? poster.slice(0, 400000) : '',
       note: String(body.note || '').trim(),
+      reviewStatus: 'pending',
+      reviewNote: '',
       createdAt: new Date().toISOString(),
       signups: [],
     }
@@ -261,6 +286,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const name = String(body.name || '').trim()
     if (!name) {
       res.status(400).json({ ok: false, error: '请填写姓名' })
+      return
+    }
+    if (!publicCourse(course)) {
+      res.status(400).json({ ok: false, error: '课程还在审核中' })
       return
     }
     if ((course.signups || []).length >= course.seats) {
@@ -288,6 +317,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     store.orders.unshift(order)
     writeStore(store)
     res.status(200).json({ ok: true, order })
+    return
+  }
+
+  if (action === 'review') {
+    const course = store.courses.find((c) => c.id === String(body.id || ''))
+    if (!course) {
+      res.status(404).json({ ok: false, error: '课程不存在' })
+      return
+    }
+    const status = body.status === 'rejected' ? 'rejected' : 'approved'
+    course.reviewStatus = status
+    course.reviewNote = clipText(body.note, 200)
+    writeStore(store)
+    res.status(200).json({ ok: true, course: { id: course.id, reviewStatus: course.reviewStatus } })
     return
   }
 

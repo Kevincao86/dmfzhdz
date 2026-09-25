@@ -9,6 +9,7 @@ import {
   Headphones,
   LayoutDashboard,
   Library,
+  GraduationCap,
   Megaphone,
   BookOpen,
   MapPinned,
@@ -99,6 +100,13 @@ export const OPS_NAV_GROUPS: OpsNavGroup[] = [
         to: '/platform-decor?kind=banner',
         label: '页面广告位',
         icon: PanelTop,
+        permission: 'platform_decor',
+      },
+      {
+        kind: 'leaf',
+        to: '/training-review',
+        label: '培训审核',
+        icon: GraduationCap,
         permission: 'platform_decor',
       },
       {
