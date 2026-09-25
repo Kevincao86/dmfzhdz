@@ -82,6 +82,7 @@ async function spendAgentPointsAfterSuccess(
   ctx: TenantAiContext,
   env: Record<string, string>,
   idempotencyKey?: string,
+  pointsOverride?: number,
 ): Promise<void> {
   const admin = createTenantAdminClient(env)
   if (!admin) return
@@ -89,10 +90,12 @@ async function spendAgentPointsAfterSuccess(
   const key =
     String(idempotencyKey || '').trim() ||
     `agent_${ctx.tenantId}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+  const points = Math.floor(Number(pointsOverride) || 0)
   void spendErpAiPoints(admin, ctx.tenantId, {
     kind: ERP_AGENT_USAGE_KIND,
     idempotencyKey: key,
     note: 'AI 智能体对话',
+    ...(points > 0 ? { pointsOverride: points } : {}),
   })
 }
 
@@ -309,7 +312,7 @@ export async function loadTenantAiContextForUser(
 export function recordDirectAiUsageAfterSuccess(
   ctx: TenantAiContext | undefined,
   env: Record<string, string>,
-  opts?: { idempotencyKey?: string },
+  opts?: { idempotencyKey?: string; pointsOverride?: number },
 ): void {
   if (!ctx) return
   if (ctx.plan === 'free') {
@@ -319,7 +322,7 @@ export function recordDirectAiUsageAfterSuccess(
     void incrementDirectAiUsage(ctx.tenantId, month, used, env)
   }
   /** 免费版也扣积分（注册赠送/月赠），凡 AI token 对话一律计费 */
-  void spendAgentPointsAfterSuccess(ctx, env, opts?.idempotencyKey)
+  void spendAgentPointsAfterSuccess(ctx, env, opts?.idempotencyKey, opts?.pointsOverride)
 }
 
 export type AiAccessCheck =

@@ -12,8 +12,38 @@ import {
   MP_POINTS_BRIEF_PER_USE,
 } from './mpPointsEconomics.js'
 
-/** ERP 智能体对话：每轮成功回复扣费（与文稿检核同档，计入套餐桶优先、充值桶补足） */
-export const ERP_AGENT_POINTS_PER_TURN = MP_POINTS_ARTICLE_PER_USE
+/**
+ * 智能体对话预检下限。实际扣费按 token 成本、毛利 60%（1 积分覆盖 ¥0.01 AI 成本）。
+ */
+export const ERP_AGENT_POINTS_PER_TURN = 1
+
+/** 按模型公开价（元 / 千 token）估算对话成本，再按 60% 毛利换成积分 */
+export function erpAgentPointsFromTokenUsage(
+  usage: { prompt_tokens?: number; completion_tokens?: number } | null | undefined,
+  model?: string | null,
+): number {
+  const prompt = Math.max(0, Math.floor(Number(usage?.prompt_tokens) || 0))
+  const completion = Math.max(0, Math.floor(Number(usage?.completion_tokens) || 0))
+  if (prompt + completion <= 0) return ERP_AGENT_POINTS_PER_TURN
+  const m = String(model || '').toLowerCase()
+  let inPerK = 0.0008
+  let outPerK = 0.002
+  if (/flash|turbo/.test(m)) {
+    inPerK = 0.0003
+    outPerK = 0.0006
+  } else if (/max/.test(m)) {
+    inPerK = 0.0024
+    outPerK = 0.0096
+  } else if (/mini|haiku/.test(m)) {
+    inPerK = 0.001
+    outPerK = 0.004
+  } else if (/gpt-4o|claude|gemini|grok/.test(m)) {
+    inPerK = 0.02
+    outPerK = 0.06
+  }
+  const costYuan = (prompt / 1000) * inPerK + (completion / 1000) * outPerK
+  return Math.max(1, Math.ceil(costYuan / MP_POINT_INTERNAL_COST_YUAN))
+}
 
 export const ERP_AGENT_USAGE_KIND = 'agent' as const
 export type ErpAgentUsageKind = typeof ERP_AGENT_USAGE_KIND

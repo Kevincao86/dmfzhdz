@@ -471,7 +471,7 @@ async function runImageGenerateWithBuiltinFailover(
 function buildAgentFreeformImagePrompt(userRequest: string): string {
   const core = userRequest.trim().replace(/\s+/g, ' ').slice(0, 900)
   if (!core) return '生成一张简洁明快、构图均衡的本地生活场景示意图，光线自然、画质清晰。'
-  return `根据下列中文描述生成一张高质量图片：画面清晰、光线自然、构图均衡，适合用作宣传配图或示意图。须紧扣描述主体；避免违规内容、乱码水印、明显畸形肢体与低分辨率。用户描述：「${core}」。`
+  return `先完整解读下面这句话：列出其中每一个人物、动作、食物、物品和地点，并全部画进同一张图。禁止只画其中一部分（例如句子里有人和食物时，不能只画食物）。画面清晰、光线自然。用户原话：「${core}」。`
 }
 
 function buildAgentFreeformImageI2iPrompt(userRequest: string): string {
@@ -585,7 +585,7 @@ export async function runAgentFreeformTextToImage(
   | { ok: false; message: string }
 > {
   const ref = opts?.referenceImage?.trim()
-  const exact = opts?.exactPrompt === true || userLine.trim().startsWith('帮我生成一张')
+  const exact = opts?.exactPrompt === true
   const prompt = exact
     ? userLine.trim()
     : ref

@@ -51,7 +51,7 @@ function ensureAuth() {
   throw new Error('请先登录后再使用视觉工坊（「我的」页完成登录）')
 }
 
-function requestJson(path, data) {
+function requestJson(path, data, timeoutMs) {
   const base = apiBase()
   if (!base) return Promise.reject(new Error('未配置商家后台 API'))
   return new Promise((resolve, reject) => {
@@ -60,7 +60,7 @@ function requestJson(path, data) {
       method: 'POST',
       header: authHeaders(),
       data,
-      timeout: 120000,
+      timeout: Math.max(8000, Number(timeoutMs) || 25000),
       success(res) {
         const body = res.data
         if (res.statusCode >= 200 && res.statusCode < 300 && body && body.ok !== false) {
@@ -95,6 +95,54 @@ async function postAiChat(messages, opts) {
   }
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/** 高级生图走 start/poll，单次请求控制在微信超时以内 */
+async function pollTokenmixImage(body) {
+  const started = await requestJson(
+    '/api/meoo-ai-agent-image',
+    Object.assign({}, body, { phase: 'start' }),
+    50000,
+  )
+  if (started.imageUrl) return started
+  const taskId = String(started.taskId || '').trim()
+  if (!taskId) throw new Error('高级生图未返回任务号')
+  const deadline = Date.now() + 240000
+  let retryAfterSec = Number(started.retryAfterSec) || 4
+  while (Date.now() < deadline) {
+    const waitSec = Math.max(2, Math.min(8, retryAfterSec))
+    await sleep(waitSec * 1000)
+    const polled = await requestJson(
+      '/api/meoo-ai-agent-image',
+      {
+        phase: 'poll',
+        task_id: taskId,
+        image_route: 'tokenmix',
+        tokenmix_image_model: body.tokenmix_image_model,
+        prompt: body.prompt,
+      },
+      25000,
+    )
+    if (polled.retryAfterSec) retryAfterSec = Number(polled.retryAfterSec) || retryAfterSec
+    if (polled.imageUrl) return polled
+    if (polled.pending === false && !polled.imageUrl) {
+      throw new Error('高级生图未返回图片')
+    }
+  }
+  throw new Error('高级生图仍在生成，请稍后重试')
+}
+
+const ASPECT_WANX = {
+  '3:4': '832*1184',
+  '1:1': '1024*1024',
+  '9:16': '720*1280',
+  '4:3': '1184*832',
+  '16:9': '1280*720',
+  carousel: '1440*768',
+}
+
 async function postAiAgentImage(prompt, opts) {
   ensureAuth()
   const o = opts || {}
@@ -102,7 +150,8 @@ async function postAiAgentImage(prompt, opts) {
     prompt: String(prompt || '').trim(),
     preferred_vendor: o.preferredVendor || 'qwen',
   }
-  if (o.aspectRatio) body.aspect_ratio = o.aspectRatio
+  if (o.aspectRatio && o.aspectRatio !== 'carousel') body.aspect_ratio = o.aspectRatio
+  if (o.wanxSize) body.wanx_size = o.wanxSize
   if (o.exactPrompt) body.exact_prompt = true
   if (o.preferWanxPoster) body.prefer_wanx_poster = true
   if (o.referenceImage) body.reference_image = o.referenceImage
@@ -111,7 +160,10 @@ async function postAiAgentImage(prompt, opts) {
     if (o.tokenmixImageModel) body.tokenmix_image_model = o.tokenmixImageModel
   }
   try {
-    const data = await requestJson('/api/meoo-ai-agent-image', body)
+    const useAsyncPro = body.image_route === 'tokenmix'
+    const data = useAsyncPro
+      ? await pollTokenmixImage(body)
+      : await requestJson('/api/meoo-ai-agent-image', body, 55000)
     const imageUrl = String(data.imageUrl || '').trim()
     if (!imageUrl) return { ok: false, message: '生图未返回图片地址' }
     return {
@@ -296,9 +348,11 @@ async function generatePosterImage(form, copy, opts) {
   const packed = await fetchImagePrompt(form, copy)
   const usePro = o.tier === 'pro'
   const economics = require('./mpPointsEconomicsMp.js')
+  const aspect = o.aspectRatio || '3:4'
   const gen = await postAiAgentImage(packed.prompt, {
     preferredVendor: 'qwen',
-    aspectRatio: o.aspectRatio || '3:4',
+    aspectRatio: aspect,
+    wanxSize: ASPECT_WANX[aspect] || ASPECT_WANX['3:4'],
     exactPrompt: true,
     preferWanxPoster: true,
     // 高级 GPT Image 2 暂不支持参考图

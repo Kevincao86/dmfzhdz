@@ -1,7 +1,7 @@
 import type { AiPermissionId, AiTaskType } from './aiAgentTypes'
 import { AI_AGENT_SHORTCUTS } from './aiAgentTypes'
 import type { MembershipPlan } from './membershipPlan'
-import { MEMBERSHIP_PLAN_LABELS, ERP_AGENT_POINTS_PER_TURN } from './membershipPlan'
+import { MEMBERSHIP_PLAN_LABELS } from './membershipPlan'
 
 export type AiAgentPlanProfile = {
   plan: MembershipPlan
@@ -16,7 +16,7 @@ export type AiAgentPlanProfile = {
 const BASE_WELCOME =
   '你好，我是灵祺 AI 助手。你可以像普通 AI 一样问我任何问题；若在 ERP 里涉及改商品、发招募单、报税、发布等操作，会先展示预览，**需您确认后**才会调用业务接口。'
 
-const PAID_AGENT_POINTS_HINT = `每轮对话消耗 ${ERP_AGENT_POINTS_PER_TURN} 积分（优先扣套餐月赠积分，不足再扣充值积分）`
+const PAID_AGENT_POINTS_HINT = `对话按实际 token 扣积分（毛利 60%，短对话通常 1 积分；优先扣套餐月赠，不足再扣充值）`
 
 const WELCOME_BY_PLAN: Record<MembershipPlan, string> = {
   free: `${BASE_WELCOME}\n\n当前为 **免费版**：可使用豆包/千问/MiniMax/DeepSeek 对话（每月直连调用 ${50} 次上限）。生图、生视频可浏览对应板块，点击使用需升级会员；报税管理、GEO、竞对分析亦需升级会员。`,
@@ -57,7 +57,7 @@ export function buildAiAgentPlanProfile(plan: MembershipPlan): AiAgentPlanProfil
     composerHint:
       plan === 'free'
         ? '可闲聊或问经营问题；生图/生视频、报税/GEO 等需升级会员'
-        : `开放对话；每轮消耗 ${ERP_AGENT_POINTS_PER_TURN} 积分（套餐桶优先）`,
+        : '开放对话；按实际 token 扣积分（毛利 60%，短对话通常 1 积分）',
     shortcuts: shortcutsForPlan(plan),
     permissions: permissionsForPlan(plan),
   }

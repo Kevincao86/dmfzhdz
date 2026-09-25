@@ -537,7 +537,13 @@ function vendorCaption(data, edited) {
 
 function buildAgentImagePrompt(userLine, hasRef) {
   const t = String(userLine || '').trim() || (hasRef ? '请在参考图上按要求修改' : '高质量商业摄影图片')
-  if (!hasRef) return t
+  if (!hasRef) {
+    return [
+      '先完整解读用户这句话里的每一个主体、动作和场景，全部画进同一张图，禁止只画其中一部分。',
+      '人物、食物、物品、地点只要被提到，都必须同时出现，并让人物做出句子里的动作。',
+      `用户原话：${t}`,
+    ].join('\n')
+  }
   return [
     '必须基于参考图修改，禁止忽略参考图重新生成一张无关的新图。',
     '用户没有点名要改的场景、构图、食物、桌面和其他人物都保持不变。',
@@ -615,7 +621,32 @@ async function postAiAgentNativeImage(prompt, pickerKey, referenceImageDataUrl, 
   ensureRealAuthForAi()
   const route = agentNativeImageRouteFromPickerKey(pickerKey)
   const ref = referenceImageDataUrl && String(referenceImageDataUrl).trim()
-  const body = { prompt: buildAgentImagePrompt(prompt, Boolean(ref)) }
+  let scenePrompt = buildAgentImagePrompt(prompt, Boolean(ref))
+  if (!ref) {
+    try {
+      const expanded = await requestJson(
+        '/api/meoo-ai-chat',
+        {
+          provider: 'qwen',
+          temperature: 0.2,
+          taskType: 'generate_copywriting',
+          messages: [
+            { role: 'system', content: '你只输出一段中文画面描述，不要解释。' },
+            {
+              role: 'user',
+              content: `完整解读这句话里的每一个人物、动作、食物、物品和地点，写成一段生图描述，全部必须入画，禁止只画其中一部分：${prompt}`,
+            },
+          ],
+        },
+        { timeoutMs: 25000 },
+      )
+      const text = String((expanded && expanded.content) || '').trim()
+      if (text.length >= 12) scenePrompt = text
+    } catch (_) {
+      /* 解读失败时仍用原句约束出图 */
+    }
+  }
+  const body = { prompt: scenePrompt }
   if (ref) {
     body.reference_image = ref
     body.exact_prompt = true

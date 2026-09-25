@@ -127,6 +127,9 @@
       <view class="vs-chip {{aspect === '3:4' ? 'on' : ''}}" data-val="3:4" bindtap="onAspect">竖版 3:4</view>
       <view class="vs-chip {{aspect === '1:1' ? 'on' : ''}}" data-val="1:1" bindtap="onAspect">方形 1:1</view>
       <view class="vs-chip {{aspect === '9:16' ? 'on' : ''}}" data-val="9:16" bindtap="onAspect">竖屏 9:16</view>
+      <view class="vs-chip {{aspect === '4:3' ? 'on' : ''}}" data-val="4:3" bindtap="onAspect">横版 4:3</view>
+      <view class="vs-chip {{aspect === '16:9' ? 'on' : ''}}" data-val="16:9" bindtap="onAspect">横屏 16:9</view>
+      <view class="vs-chip {{aspect === 'carousel' ? 'on' : ''}}" data-val="carousel" bindtap="onAspect">三连图</view>
     </view>
     <button class="vs-btn" loading="{{genBusy}}" bindtap="onGenerate">一键出图（{{imagePoints}} 积分）</button>
     <text class="vs-progress" wx:if="{{progress}}">{{progress}}</text>

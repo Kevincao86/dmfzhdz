@@ -92,8 +92,14 @@ export async function runMeooAiChatStream(
       tokenUsage: usageSafe ?? null,
       status: 'ok',
     })
-    recordDirectAiUsageAfterSuccess(usageCtx, fullEnv)
     const inputText = lastUser?.content ?? ''
+    const { erpAgentPointsFromTokenUsage } = await import('../../src/lib/erpPointsEconomics.js')
+    recordDirectAiUsageAfterSuccess(usageCtx, fullEnv, {
+      pointsOverride: erpAgentPointsFromTokenUsage(
+        usageSafe ?? estimateLlmTokensFromText(inputText, res.content),
+        res.model,
+      ),
+    })
     void recordAiTokenUsageAfterSuccess({
       userId: user.id,
       usageCtx,
