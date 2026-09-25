@@ -1,5 +1,21 @@
 import { useCallback, useEffect, useState } from 'react'
-import { fetchOpsErpApi } from '../../lib/opsErpApiBase'
+
+const TRAINING_API = [
+  'https://mofangdianai.com/erp-api/meoo-mp-training',
+  'https://dr.mofangdianai.com/erp-api/meoo-mp-training',
+]
+
+async function trainingFetch(query: string, init?: RequestInit) {
+  let last = '培训接口没有连上'
+  for (const base of TRAINING_API) {
+    try {
+      return await fetch(`${base}${query}`, { ...init, cache: 'no-store' })
+    } catch (e) {
+      last = e instanceof Error && e.message !== 'Failed to fetch' ? e.message : '培训接口没有连上'
+    }
+  }
+  throw new Error(last)
+}
 
 type Row = {
   id: string
@@ -20,7 +36,7 @@ export default function OpsTrainingReviewPage() {
   const [busyId, setBusyId] = useState('')
 
   const load = useCallback(async () => {
-    const res = await fetchOpsErpApi('/api/meoo-mp-training?review=1', undefined, { ecsOnly: true })
+    const res = await trainingFetch('?review=1')
     const data = (await res.json()) as { ok?: boolean; error?: string; courses?: Row[] }
     if (!res.ok || data.ok === false) throw new Error(data.error || '加载失败')
     setRows(Array.isArray(data.courses) ? data.courses : [])
@@ -34,15 +50,11 @@ export default function OpsTrainingReviewPage() {
     setBusyId(id)
     setErr('')
     try {
-      const res = await fetchOpsErpApi(
-        '/api/meoo-mp-training',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'review', id, status }),
-        },
-        { ecsOnly: true },
-      )
+      const res = await trainingFetch('', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'review', id, status }),
+      })
       const data = (await res.json()) as { ok?: boolean; error?: string }
       if (!res.ok || data.ok === false) throw new Error(data.error || '审核失败')
       await load()
