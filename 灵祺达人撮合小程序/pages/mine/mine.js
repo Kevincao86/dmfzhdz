@@ -31,6 +31,13 @@ const MY_ORDERS_MENU = {
   icon: 'list',
 }
 
+const TRAINING_MENU = {
+  key: 'training',
+  label: '培训课程',
+  sub: '线上或线下课程报名与发布',
+  icon: 'list',
+}
+
 const POINTS_RECHARGE_MENU = {
   key: 'pointsRecharge',
   label: '积分充值',
@@ -203,10 +210,10 @@ function talentMenusForIdentity(identity) {
     return withManualMenu([
       { key: 'profile', label: '拍摄团队信息', sub: '团队资料 · 设备 · 作品集', icon: 'info' },
       { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
-      { key: 'training', label: '培训课程', sub: '报名或发布，平台只做中间人', icon: 'list' },
       { key: 'orderCalendar', label: '商单日历', sub: calSub, icon: 'chart' },
       { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
       { key: 'prQuotes', label: '我的报价', sub: '为合作 PR 设置专属报价', icon: 'quote' },
+      TRAINING_MENU,
       POINTS_RECHARGE_MENU,
       MY_ORDERS_MENU,
       { key: 'subscriptions', label: '商单订阅', sub: '匹配城市/平台/品类的新招募提醒', icon: 'star' },
@@ -219,10 +226,10 @@ function talentMenusForIdentity(identity) {
     return withManualMenu([
       { key: 'profile', label: '剪辑团队信息', sub: '团队资料 · 风格 · 作品集', icon: 'info' },
       { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
-      { key: 'training', label: '培训课程', sub: '报名或发布，平台只做中间人', icon: 'list' },
       { key: 'orderCalendar', label: '商单日历', sub: calSub, icon: 'chart' },
       { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
       { key: 'prQuotes', label: '我的报价', sub: '为合作 PR 设置专属报价', icon: 'quote' },
+      TRAINING_MENU,
       POINTS_RECHARGE_MENU,
       MY_ORDERS_MENU,
       { key: 'subscriptions', label: '商单订阅', sub: '匹配城市/平台/品类的新招募提醒', icon: 'star' },
@@ -234,12 +241,12 @@ function talentMenusForIdentity(identity) {
   return withManualMenu([
     { key: 'profile', label: '我的信息', sub: '多平台达人资料（抖音/小红书等）', icon: 'info' },
     { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
-    { key: 'training', label: '培训课程', sub: '报名或发布，平台只做中间人', icon: 'list' },
     { key: 'targetedInvites', label: '我的邀约', sub: 'PR 定向合作邀约，接受或拒绝', icon: 'list' },
     { key: 'wechatOaBind', label: '服务号邀约通知', sub: '关注服务号，定向邀约推送到微信', icon: 'star' },
     { key: 'orderCalendar', label: '商单日历', sub: calSub, icon: 'chart' },
     { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
     { key: 'prQuotes', label: '我的报价', sub: '为合作 PR 设置专属报价', icon: 'quote' },
+    TRAINING_MENU,
     POINTS_RECHARGE_MENU,
     MY_ORDERS_MENU,
     { key: 'subscriptions', label: '商单订阅', sub: '匹配城市/平台/品类的新招募提醒', icon: 'star' },
@@ -254,8 +261,8 @@ function buildPrMenus() {
   return withManualMenu([
     { key: 'prProfile', label: '我的 PR 信息', sub: '机构/个人资料与所在城市', icon: 'info' },
     { key: 'prOrders', label: '我的发单', sub: '已发布的招募订单', icon: 'list' },
-    { key: 'training', label: '培训课程', sub: '报名或发布，需高级会员和保证金', icon: 'list' },
     { key: 'orderCalendar', label: '商单日历', sub: calSub, icon: 'chart' },
+    TRAINING_MENU,
     POINTS_RECHARGE_MENU,
     MY_ORDERS_MENU,
     { key: 'templates', label: '我的模版', sub: '达人 / 拍摄 / 剪辑报名表单', icon: 'tpl' },
