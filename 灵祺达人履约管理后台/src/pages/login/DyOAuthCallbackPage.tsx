@@ -48,6 +48,10 @@ export default function DyOAuthCallbackPage() {
         if (cancelled) return
         const workIdentity = parseWorkIdentity(r.workIdentity)
         await applyWorkIdentityAfterLogin(r.token, r.account, workIdentity)
+        if (r.account.needsPhoneBind) {
+          nav(`/login?role=${workIdentity}&bind=1`, { replace: true })
+          return
+        }
         nav('/hall', { replace: true })
       } catch (e) {
         if (!cancelled) {

@@ -84,6 +84,7 @@ export default function LoginPage() {
 
   async function onScanLoginSuccess(token: string, account: MpAccount) {
     await applyWorkIdentityAfterLogin(token, account, workIdentity)
+    if (account.needsPhoneBind) return
     nav('/hall', { replace: true })
   }
 
@@ -147,6 +148,7 @@ export default function LoginPage() {
           onDevPreview={onDevPreview}
           rememberPassword={rememberPassword}
           onRememberPasswordChange={setRememberPassword}
+          bindPending={params.get('bind') === '1'}
         />
         <p className="mt-4 text-center text-sm text-slate-600">
           还没有账号？{' '}

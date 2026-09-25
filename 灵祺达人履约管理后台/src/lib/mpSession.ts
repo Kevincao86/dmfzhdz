@@ -22,6 +22,7 @@ export type MpAccount = {
   wxNickName: string | null
   wxAvatarUrl: string | null
   hasPassword: boolean
+  needsPhoneBind?: boolean
   prFeatureAccess?: {
     addons: boolean
     recommendHall: boolean

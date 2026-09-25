@@ -11,6 +11,7 @@ import {
   ClipboardList,
   Receipt,
   CalendarDays,
+  GraduationCap,
 } from 'lucide-react'
 import type { MpAccount, MpAccountRole } from './mpSession'
 import { shouldShowAddonsNav } from './addonAccess'
@@ -44,6 +45,7 @@ export function navItemsForRole(role: MpAccountRole, account?: MpAccount | null)
       { to: '/orders/calendar', label: '商单日历', icon: CalendarDays },
       { to: '/form-relay', label: '转发工具', icon: Share2 },
       { to: '/templates', label: '我的模版', icon: Layers },
+      { to: '/training', label: '培训课程', icon: GraduationCap },
       ...common,
     ]
   }
@@ -51,6 +53,7 @@ export function navItemsForRole(role: MpAccountRole, account?: MpAccount | null)
     { to: '/hall?tab=home', label: '招募大厅', icon: LayoutGrid },
     { to: '/orders', label: '我的报名', icon: ClipboardList },
     { to: '/orders/calendar', label: '商单日历', icon: CalendarDays },
+    { to: '/training', label: '培训课程', icon: GraduationCap },
     ...commonWithAddons('talent', account),
   ]
 }
@@ -101,6 +104,7 @@ export function pageTitleForPath(pathname: string, search: string): { section: s
     '/profile/pr': 'PR 资料',
     '/profile/supplier': '团队资料',
     '/addons': '增值服务',
+    '/training': '培训课程',
   }
   const prefixes = Object.entries(map).sort((a, b) => b[0].length - a[0].length)
   for (const [prefix, title] of prefixes) {

@@ -26,6 +26,11 @@ import {
   mpAuthScanPoll,
   mpAuthSetLoginCredentials,
   mpAuthSmsLogin,
+  mpAuthSendEmailCode,
+  mpAuthEmailLogin,
+  mpAuthEmailRegister,
+  mpAuthBindEmailLogin,
+  mpAuthBindPhoneSms,
   mpAuthChangePasswordBySms,
   mpAuthEnsureIdentity,
   mpAuthSwitchRole,
@@ -258,6 +263,73 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       )
       const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, account)
       sendJson(res, 200, { ok: true, token, account: payload })
+      return
+    }
+
+    if (action === 'email_send') {
+      const sent = await mpAuthSendEmailCode(String(body.email || ''))
+      if (!sent.ok) {
+        sendJson(res, 400, { ok: false, error: sent.error, message: sent.message })
+        return
+      }
+      sendJson(res, 200, { ok: true, message: sent.message, devCode: sent.devCode })
+      return
+    }
+
+    if (action === 'email_login') {
+      const { token, account } = await mpAuthEmailLogin(
+        supabaseUrl,
+        serviceRole,
+        String(body.email || ''),
+        String(body.emailCode || ''),
+      )
+      const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, account)
+      sendJson(res, 200, { ok: true, token, account: payload })
+      return
+    }
+
+    if (action === 'email_register') {
+      const roleRaw = pickAuthField(req, body, 'role')
+      const { token, account, isNew } = await mpAuthEmailRegister(supabaseUrl, serviceRole, {
+        email: String(body.email || ''),
+        emailCode: String(body.emailCode || ''),
+        password: String(body.password || ''),
+        role: roleRaw === 'pr' ? 'pr' : 'talent',
+      })
+      const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, account)
+      sendJson(res, 200, { ok: true, token, isNew, account: payload })
+      return
+    }
+
+    if (action === 'bind_email_login' || action === 'bind_phone_sms') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      const platformRaw = pickAuthField(req, body, 'platform')
+      const platform = platformRaw === 'dy' ? 'dy' : 'wx'
+      const bound =
+        action === 'bind_email_login'
+          ? await mpAuthBindEmailLogin(
+              supabaseUrl,
+              serviceRole,
+              sess.account.id,
+              String(body.email || ''),
+              String(body.emailCode || ''),
+              platform,
+            )
+          : await mpAuthBindPhoneSms(
+              supabaseUrl,
+              serviceRole,
+              sess.account.id,
+              String(body.phone || ''),
+              String(body.smsCode || ''),
+              platform,
+            )
+      const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, bound.account)
+      sendJson(res, 200, { ok: true, token: bound.token, account: payload })
       return
     }
 
@@ -1529,6 +1601,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         'bind_phone_login',
         'password_login',
         'sms_login',
+        'email_send',
+        'email_login',
+        'email_register',
+        'bind_email_login',
+        'bind_phone_sms',
         'change_password_sms',
         'register',
         'set_password',
@@ -1588,6 +1665,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       msg === 'invalid_phone' ||
       msg === 'invalid_sms_code' ||
       msg === 'phone_not_registered' ||
+      msg === 'email_not_registered' ||
+      msg === 'email_taken' ||
+      msg === 'invalid_email' ||
+      msg === 'invalid_email_code' ||
+      msg === 'email_code_invalid' ||
+      msg === 'email_bind_failed' ||
       msg === 'phone_mismatch' ||
       msg === 'account_phone_missing' ||
       msg === 'phone_bind_failed' ||
@@ -1614,6 +1697,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       invalid_password: '密码至少 6 位',
       login_name_taken: '该手机号已被注册',
       phone_not_registered: '该手机号尚未注册，请先注册',
+      email_not_registered: '该邮箱尚未注册，请先注册',
+      email_taken: '该邮箱已被注册',
+      invalid_email: '请输入有效邮箱',
+      invalid_email_code: '请输入 6 位邮箱验证码',
+      email_code_invalid: '邮箱验证码错误或已过期',
+      email_bind_failed: '邮箱绑定失败，请重试',
       phone_mismatch: '手机号须与当前登录账号一致',
       account_phone_missing: '当前账号未绑定手机号',
       invalid_credentials: '账号或密码错误',

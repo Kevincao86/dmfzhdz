@@ -275,6 +275,59 @@ export async function sendRegisterSms(phone: string) {
   return postJsonCandidates('/api/meoo-auth-sms-send', { phone: phone.trim() })
 }
 
+export async function smsLogin(phone: string, smsCode: string) {
+  const data = await mpAuthRequest('sms_login', { phone: phone.trim(), smsCode: smsCode.trim() })
+  return { token: String(data.token), account: data.account as MpAccount }
+}
+
+export async function sendEmailCode(email: string) {
+  return mpAuthRequest('email_send', { email: email.trim() })
+}
+
+export async function emailLogin(email: string, emailCode: string) {
+  const data = await mpAuthRequest('email_login', { email: email.trim(), emailCode: emailCode.trim() })
+  return { token: String(data.token), account: data.account as MpAccount }
+}
+
+export async function emailRegister(input: {
+  email: string
+  emailCode: string
+  password: string
+  role: 'talent' | 'pr'
+}) {
+  const data = await mpAuthRequest('email_register', {
+    email: input.email.trim(),
+    emailCode: input.emailCode.trim(),
+    password: input.password,
+    role: input.role,
+  })
+  return { token: String(data.token), account: data.account as MpAccount }
+}
+
+export async function bindPhoneSms(phone: string, smsCode: string, platform: 'wx' | 'dy') {
+  const data = await mpAuthRequest('bind_phone_sms', { phone, smsCode, platform })
+  return { token: String(data.token), account: data.account as MpAccount }
+}
+
+export async function fetchTraining() {
+  const path = '/api/meoo-mp-training'
+  const base = mpErpApiBase()
+  const url = base ? buildMpErpApiUrl(base, path) : path
+  const res = await fetch(url)
+  const data = await parseJsonRes(res)
+  if (!res.ok || data.ok === false) throw new Error(String(data.error || data.message || 'training_failed'))
+  return data
+}
+
+export async function postTraining(body: Record<string, unknown>) {
+  return postJsonCandidates('/api/meoo-mp-training', body)
+}
+
+export async function bindEmailLogin(email: string, emailCode: string, platform: 'wx' | 'dy') {
+  const data = await mpAuthRequest('bind_email_login', { email, emailCode, platform })
+  return { token: String(data.token), account: data.account as MpAccount }
+}
+
 export async function phoneRegister(input: {
   phone: string
   smsCode: string

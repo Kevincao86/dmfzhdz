@@ -17,8 +17,15 @@ import { upsertSupplierTeamLibraryFromMember } from './supplierTeamLibrarySync.j
 import { upsertMpPrUser, dedupeMpPrUsersByOpenId } from './mpPrUserUpsert.js'
 import { createRegistrySnapshotIoFetch } from './registrySnapshotIoFetch.js'
 import { ensureDouyinSalesLevelMonthlyReset } from './mpDouyinSalesLevelMonthlyReset.js'
-import { normalizeMpLoginName, normalizeMpLoginPhone, isValidMpLoginPhone } from './mpPhoneAuth.js'
+import {
+  normalizeMpLoginName,
+  normalizeMpLoginPhone,
+  normalizeMpLoginEmail,
+  isValidMpLoginPhone,
+  isMpContactBound,
+} from './mpPhoneAuth.js'
 import { verifyAuthSmsCode } from '../../vite-plugins/authSmsAuthShared.js'
+import { sendAuthEmailCode, verifyAuthEmailCode } from '../../vite-plugins/authIdentityBindCore.js'
 import {
   buildDouyinWebAuthorizeUrl,
   decodeDyOAuthState,
@@ -110,8 +117,9 @@ export function mpAccountOAuthOpenId(account: MpAccountRow): string {
   return String(account.openid || account.dy_openid || '').trim()
 }
 
+/** 微信/抖音须绑定手机号或邮箱后才算同一账号 */
 export function mpAccountNeedsPhoneBind(account: MpAccountRow): boolean {
-  return !isValidMpLoginPhone(String(account.login_name || ''))
+  return !isMpContactBound(String(account.login_name || ''))
 }
 
 function pepper(): string {
@@ -1050,6 +1058,107 @@ export async function mpAuthSmsLogin(
   return { token, account }
 }
 
+export async function mpAuthSendEmailCode(email: string) {
+  return sendAuthEmailCode(email)
+}
+
+/** 邮箱 + 验证码登录（登录名即绑定邮箱） */
+export async function mpAuthEmailLogin(
+  supabaseUrl: string,
+  serviceRole: string,
+  email: string,
+  emailCode: string,
+): Promise<{ token: string; account: MpAccountRow }> {
+  const rest = restClient(supabaseUrl, serviceRole)
+  const mail = normalizeMpLoginEmail(email)
+  if (!mail) throw new Error('invalid_email')
+  const code = String(emailCode || '').trim()
+  if (!/^\d{6}$/.test(code)) throw new Error('invalid_email_code')
+  if (!verifyAuthEmailCode(mail, code)) throw new Error('email_code_invalid')
+  let account = await findAccountByLoginName(rest, mail)
+  if (!account) throw new Error('email_not_registered')
+  account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, account)
+  const token = await createSession(rest, account.id)
+  return { token, account }
+}
+
+export async function mpAuthEmailRegister(
+  supabaseUrl: string,
+  serviceRole: string,
+  input: { email: string; emailCode: string; password: string; role?: MpAccountRole },
+): Promise<{ token: string; account: MpAccountRow; isNew: true }> {
+  const rest = restClient(supabaseUrl, serviceRole)
+  const mail = normalizeMpLoginEmail(input.email)
+  if (!mail) throw new Error('invalid_email')
+  const emailCode = String(input.emailCode || '').trim()
+  if (!/^\d{6}$/.test(emailCode)) throw new Error('invalid_email_code')
+  const password = String(input.password || '')
+  if (password.length < 6) throw new Error('invalid_password')
+  if (!verifyAuthEmailCode(mail, emailCode)) throw new Error('email_code_invalid')
+  const existing = await findAccountByLoginName(rest, mail)
+  if (existing) throw new Error('email_taken')
+  const role: MpAccountRole = input.role === 'pr' ? 'pr' : 'talent'
+  const { hash, salt } = hashPassword(password)
+  let account = await insertAccount(rest, {
+    openid: null,
+    login_name: mail,
+    password_hash: hash,
+    password_salt: salt,
+    active_role: role,
+    wx_nick_name: '',
+    wx_avatar_url: '',
+  })
+  account = await provisionRegistryForAccount(supabaseUrl, serviceRole, account, role, '', '')
+  const token = await createSession(rest, account.id)
+  return { token, account, isNew: true }
+}
+
+/** 微信/抖音登录后绑定邮箱；同邮箱合并为同一账号 */
+export async function mpAuthBindEmailLogin(
+  supabaseUrl: string,
+  serviceRole: string,
+  accountId: string,
+  email: string,
+  emailCode: string,
+  platform: 'wx' | 'dy',
+): Promise<{ token: string; account: MpAccountRow }> {
+  const rest = restClient(supabaseUrl, serviceRole)
+  const mail = normalizeMpLoginEmail(email)
+  if (!mail) throw new Error('invalid_email')
+  const code = String(emailCode || '').trim()
+  if (!/^\d{6}$/.test(code)) throw new Error('invalid_email_code')
+  if (!verifyAuthEmailCode(mail, code)) throw new Error('email_code_invalid')
+  let current = await findAccountById(rest, accountId)
+  if (!current) throw new Error('account_not_found')
+  const holder = await findAccountByLoginName(rest, mail)
+  if (holder && holder.id !== accountId) {
+    current = await mergeMpAccountIntoPhoneHolder(rest, supabaseUrl, serviceRole, current, holder, platform)
+  } else if (!isMpContactBound(String(current.login_name || ''))) {
+    await updateAccount(rest, accountId, { login_name: mail })
+    current = (await findAccountById(rest, accountId))!
+  }
+  if (mpAccountNeedsPhoneBind(current)) throw new Error('email_bind_failed')
+  const token = await createSession(rest, current.id)
+  return { token, account: current }
+}
+
+/** 微信/抖音登录后用短信绑定手机号（校验验证码后再合并） */
+export async function mpAuthBindPhoneSms(
+  supabaseUrl: string,
+  serviceRole: string,
+  accountId: string,
+  phone: string,
+  smsCode: string,
+  platform: 'wx' | 'dy',
+): Promise<{ token: string; account: MpAccountRow }> {
+  const phoneNorm = normalizeMpLoginPhone(phone)
+  if (!phoneNorm) throw new Error('invalid_phone')
+  const code = String(smsCode || '').trim()
+  if (!/^\d{6}$/.test(code)) throw new Error('invalid_sms_code')
+  if (!(await verifyAuthSmsCode(phoneNorm, code))) throw new Error('sms_code_invalid')
+  return mpAuthBindPhoneLogin(supabaseUrl, serviceRole, accountId, phoneNorm, platform)
+}
+
 /** 已登录：手机号须与账号一致 + 验证码 → 更新密码 */
 export async function mpAuthChangePasswordBySms(
   supabaseUrl: string,
@@ -1151,7 +1260,7 @@ export async function mpAuthSetLoginCredentials(
   if (!name) throw new Error('invalid_login_name')
   const cur = await findAccountById(rest, accountId)
   const curName = String(cur?.login_name || '').trim()
-  if (name !== curName && !isValidMpLoginPhone(name)) throw new Error('invalid_login_name')
+  if (name !== curName && !isMpContactBound(name)) throw new Error('invalid_login_name')
   let existing = await findAccountByLoginName(rest, name)
   if (existing && existing.id !== accountId) {
     const reclaimed = await reclaimStaleLoginNameHolder(
