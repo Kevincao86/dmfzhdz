@@ -7,6 +7,7 @@ const sessionSync = require('../../utils/merchantSessionSyncMp.js')
 const { iconDataUri } = require('../../utils/funcIconAssetsMp.js')
 
 const YDAY_CACHE_KEY = 'meoo_dash_yesterday_analysis_v1'
+const YDAY_AUTO_KEY = 'meoo_dash_yday_auto_v1'
 
 const RANGE_TABS = [
   { id: 'today', label: '今日', apiRange: 'realtime' },
@@ -120,6 +121,21 @@ function writeYesterdayCache(row) {
   } catch (_) {}
 }
 
+function readYdayAuto() {
+  try {
+    return wx.getStorageSync(YDAY_AUTO_KEY) === '1'
+  } catch (_) {
+    return false
+  }
+}
+
+function writeYdayAuto(on) {
+  try {
+    if (on) wx.setStorageSync(YDAY_AUTO_KEY, '1')
+    else wx.removeStorageSync(YDAY_AUTO_KEY)
+  } catch (_) {}
+}
+
 const YDAY_AI_SYSTEM = [
   '你是资深本地生活店铺经营顾问。请只根据给出的昨日数据写中文分析，禁止编造未提供的数字。',
   '输出只能使用这五个标题，格式为「一、标题」：',
@@ -199,7 +215,8 @@ Page({
     chartTitle: '趋势分析',
     ydayTitle: '昨日数据分析',
     ydayDate: '',
-    ydayHint: '每天 10:00 自动分析，按实际 token 扣积分',
+    ydayHint: '自动分析默认关闭，打开后每天 10:00 分析一次',
+    ydayAuto: false,
     ydayLoading: false,
     ydaySections: [],
     ydayEmpty: '',
@@ -213,8 +230,21 @@ Page({
       api.goLogin()
       return
     }
+    this.setData({ ydayAuto: readYdayAuto() })
     void this.loadDash()
     void this.loadYesterdayAnalysis()
+  },
+
+  onToggleYdayAuto(e) {
+    const on = !!(e.detail && e.detail.value)
+    writeYdayAuto(on)
+    this.setData({
+      ydayAuto: on,
+      ydayHint: on
+        ? '已开启，每天 10:00 自动分析，按实际 token 扣积分'
+        : '已关闭。打开后每天 10:00 才会自动分析',
+    })
+    if (on) void this.loadYesterdayAnalysis()
   },
 
   onRangeTap(e) {
@@ -330,9 +360,12 @@ Page({
     const manual = Boolean(opts && opts.manual)
     const { slot, targetDate } = yesterdayRefreshSlot()
     const tenant = dashTenantKey()
+    const autoOn = readYdayAuto()
     const base = {
       ydayDate: targetDate,
-      ydayHint: '每天 10:00 自动分析，按实际 token 扣积分',
+      ydayHint: autoOn
+        ? '已开启，每天 10:00 自动分析，按实际 token 扣积分'
+        : '已关闭。打开后每天 10:00 才会自动分析',
     }
     if (devAuth.isDevSkipLogin()) {
       this.setData({
@@ -369,8 +402,17 @@ Page({
           ydaySections: cached.sections,
           ydayHint:
             cached.pointsCharged > 0
-              ? `每天 10:00 自动更新 · 本次已扣 ${cached.pointsCharged} 积分`
+              ? `${autoOn ? '已开启，每天 10:00 自动更新' : '自动分析已关闭'} · 本次已扣 ${cached.pointsCharged} 积分`
               : base.ydayHint,
+        })
+        return
+      }
+      if (!autoOn) {
+        this.setData({
+          ...base,
+          ydayLoading: false,
+          ydaySections: [],
+          ydayEmpty: '自动分析未开启。打开开关后每天 10:00 分析一次，也可点手动分析',
         })
         return
       }

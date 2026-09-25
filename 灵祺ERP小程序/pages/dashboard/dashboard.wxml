@@ -56,9 +56,15 @@
   <view class="dash-chart-card dash-yday">
     <view class="dash-chart-head">
       <text class="dash-chart-title">{{ydayTitle}}</text>
-      <text class="dash-yday-btn {{ydayLoading ? 'is-off' : ''}}" bindtap="onManualYesterdayAnalysis">{{ydayLoading ? '分析中' : '手动分析'}}</text>
+      <view class="dash-yday-actions">
+        <view class="dash-yday-auto">
+          <text>自动</text>
+          <switch class="dash-yday-switch" checked="{{ydayAuto}}" color="#0891b2" disabled="{{ydayLoading}}" bindchange="onToggleYdayAuto" />
+        </view>
+        <text class="dash-yday-btn {{ydayLoading ? 'is-off' : ''}}" bindtap="onManualYesterdayAnalysis">{{ydayLoading ? '分析中' : '手动分析'}}</text>
+      </view>
     </view>
-    <text wx:if="{{ydayDate}}" class="dash-yday-date">{{ydayDate}} · 每天 10:00 自动分析</text>
+    <text wx:if="{{ydayDate}}" class="dash-yday-date">{{ydayDate}}</text>
     <text class="dash-yday-hint">{{ydayHint}}</text>
     <view wx:if="{{ydayLoading}}" class="dash-yday-empty">正在生成昨日分析…</view>
     <view wx:elif="{{ydayEmpty}}" class="dash-yday-empty">{{ydayEmpty}}</view>
