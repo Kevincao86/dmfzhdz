@@ -177,6 +177,56 @@
     </view>
   </block>
 
+  <block wx:elif="{{step === 'tpl' || step === 'tplCustom'}}">
+    <view class="pub-screen pub-screen--mode">
+      <view class="pub-target-top" style="{{heroHeadStyle}}">
+        <view class="pub-target-nav">
+          <text class="pub-target-back" bindtap="onBackFromTemplate">‹</text>
+          <text class="pub-target-brand">灵祺星选</text>
+        </view>
+      </view>
+      <view class="pub-target-main">
+        <text class="pub-target-title">选择招募模版</text>
+        <text class="pub-target-sub">系统模版沿用现有表单 · 自定义可勾选字段并新增</text>
+        <view class="pub-mode-list pub-mode-list--target" wx:if="{{step === 'tpl'}}">
+          <view class="pub-mode-card pub-mode-card--icon" bindtap="onPickSystemTemplate">
+            <view class="pub-mode-copy">
+              <text class="pub-mode-name">系统模版</text>
+              <text class="pub-mode-sub">使用现在的完整招募表单</text>
+            </view>
+            <text class="pub-mode-arrow">›</text>
+          </view>
+          <view class="pub-mode-card pub-mode-card--icon" bindtap="onPickCustomTemplate">
+            <view class="pub-mode-copy">
+              <text class="pub-mode-name">自定义模版</text>
+              <text class="pub-mode-sub">勾选系统字段，或自己新增字段</text>
+            </view>
+            <text class="pub-mode-arrow">›</text>
+          </view>
+        </view>
+        <block wx:else>
+          <view class="pub-mode-list">
+            <view class="pub-mode-card" wx:for="{{publishFieldCatalog}}" wx:key="key">
+              <text class="pub-mode-name">{{item.label}}</text>
+              <switch checked="{{fieldOn[item.key]}}" color="#5b2dcc" data-key="{{item.key}}" bindchange="onTogglePublishField" />
+            </view>
+          </view>
+          <view class="pub-mode-card" style="margin-top: 24rpx;">
+            <input placeholder="新增字段名称" value="{{customFieldDraft}}" bindinput="onCustomFieldDraft" />
+            <text bindtap="onAddCustomPublishField">添加</text>
+          </view>
+          <view wx:for="{{customPublishFields}}" wx:key="id" class="pub-mode-card">
+            <text class="pub-mode-name">{{item.label}}</text>
+            <text data-id="{{item.id}}" bindtap="onRemoveCustomPublishField">删除</text>
+          </view>
+          <view class="pub-mode-card pub-mode-card--icon" bindtap="onCustomTemplateDone" style="margin-top: 24rpx;">
+            <text class="pub-mode-name">用这个模版填写</text>
+          </view>
+        </block>
+      </view>
+    </view>
+  </block>
+
   <!-- 填写表单（主界面 + 全屏选择叠层，保留滚动位置） -->
   <block wx:elif="{{step === 'form'}}">
     <view class="pub-form-host">
@@ -204,7 +254,7 @@
       >
         <view class="pub-form-body">
           <view class="pub-form-card">
-          <view class="pub-field" id="field-delivery-window" wx:if="{{!isTargetedRecruit}}">
+          <view class="pub-field" id="field-delivery-window" wx:if="{{!isTargetedRecruit && (publishTemplateMode !== 'custom' || fieldOn.delivery)}}">
             <text class="pub-label">投放窗口 *</text>
             <view class="pub-window-row">
               <view
@@ -219,7 +269,7 @@
               </view>
             </view>
           </view>
-          <view class="pub-field" id="field-signup-deadline" wx:if="{{showSignupDeadline && !isTargetedRecruit}}">
+          <view class="pub-field" id="field-signup-deadline" wx:if="{{showSignupDeadline && !isTargetedRecruit && (publishTemplateMode !== 'custom' || fieldOn.deadline)}}">
             <text class="pub-label">招募报名截止时间 *</text>
             <view class="pub-deadline-row">
               <picker class="pub-deadline-pick" mode="date" value="{{signupDeadlineDate}}" start="{{todayDate}}" bindchange="onSignupDeadlineDate">
@@ -353,7 +403,7 @@
               />
             </view>
           </block>
-          <view class="pub-field" id="field-platform" wx:if="{{!isSupplierPublish && recruitMode !== 'live'}}">
+          <view class="pub-field" id="field-platform" wx:if="{{!isSupplierPublish && recruitMode !== 'live' && (publishTemplateMode !== 'custom' || fieldOn.platform)}}">
             <text class="pub-label">招募平台 *</text>
             <view class="pub-select" data-view="platform" bindtap="openPicker">
               <image wx:if="{{platformSelectIcon}}" class="pub-select__icon" src="{{platformSelectIcon}}" mode="aspectFit" />
@@ -361,14 +411,14 @@
               <text class="pub-select-arrow">›</text>
             </view>
           </view>
-          <view class="pub-field" id="field-city">
+          <view class="pub-field" id="field-city" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.city}}">
             <text class="pub-label">招募城市 *</text>
             <view class="pub-select" data-view="city" bindtap="openPicker">
               <text class="pub-select-text {{cityPlaceholder ? 'pub-select-text--ph' : ''}}">{{cityDisplayText}}</text>
               <text class="pub-select-arrow">›</text>
             </view>
           </view>
-          <view class="pub-field" id="field-merchant-location">
+          <view class="pub-field" id="field-merchant-location" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.location}}">
             <text class="pub-label">商家位置</text>
             <text class="pub-label-hint">选填；地图选点后可导航</text>
             <view class="pub-location-row">
@@ -382,7 +432,7 @@
             </view>
             <text wx:if="{{merchantLocationMapReady}}" class="pub-location-map-tag">已地图定位 · 达人端可一键导航</text>
           </view>
-          <view class="pub-field" id="field-tag">
+          <view class="pub-field" id="field-tag" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.tags}}">
             <text class="pub-label">{{isSupplierPublish ? '需求品类标签 *' : '需求达人标签 *'}}</text>
             <text class="pub-label-hint">最多 2 个，不可重复</text>
             <view class="pub-select" data-view="tag" bindtap="openPicker">
@@ -390,7 +440,7 @@
               <text class="pub-select-arrow">›</text>
             </view>
           </view>
-          <view class="pub-field" id="field-fans" wx:if="{{!isSupplierPublish}}">
+          <view class="pub-field" id="field-fans" wx:if="{{!isSupplierPublish && (publishTemplateMode !== 'custom' || fieldOn.fans)}}">
             <text class="pub-label">达人粉丝要求 *</text>
             <view class="pub-radio-pair pub-radio-pair--fans">
               <view
@@ -505,14 +555,14 @@
               <input class="pub-input" placeholder="选填" value="{{form.referenceUrl}}" data-key="referenceUrl" bindinput="onFieldInput" />
             </view>
           </block>
-          <view class="pub-field" id="field-req-level" wx:if="{{showDouyinLevel && !isSupplierPublish}}">
+          <view class="pub-field" id="field-req-level" wx:if="{{showDouyinLevel && !isSupplierPublish && (publishTemplateMode !== 'custom' || fieldOn.level)}}">
             <text class="pub-label">达人带货等级 *</text>
             <view class="pub-select" data-view="reqLevel" bindtap="openPicker">
               <text class="pub-select-text">{{levelDisplayText}}</text>
               <text class="pub-select-arrow">›</text>
             </view>
           </view>
-          <view class="pub-field" id="field-fee">
+          <view class="pub-field" id="field-fee" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.fee}}">
             <text class="pub-label">费用模式 *</text>
             <view class="pub-select" data-view="fee" bindtap="openPicker">
               <text class="pub-select-text {{feePlaceholder ? 'pub-select-text--ph' : ''}}">{{feeTypeLabel}}</text>
@@ -655,11 +705,11 @@
               </block>
             </block>
           </view>
-          <view class="pub-field" id="field-recruit-count" wx:if="{{!isTargetedRecruit}}">
+          <view class="pub-field" id="field-recruit-count" wx:if="{{!isTargetedRecruit && (publishTemplateMode !== 'custom' || fieldOn.count)}}">
             <text class="pub-label">{{recruitMode === 'edit_ice' ? '成片位总数 *' : '招募人数 *'}}</text>
             <input class="pub-input" type="number" placeholder="1" value="{{form.recruitCount}}" data-key="recruitCount" bindinput="onFieldInput" />
           </view>
-          <view class="pub-field" id="field-recruit-detail">
+          <view class="pub-field" id="field-recruit-detail" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.detail}}">
             <text class="pub-label">招募详情 *</text>
             <textarea
               class="pub-textarea"
@@ -719,14 +769,21 @@
               <image wx:if="{{form.editGroupQrImage}}" class="pub-cover-preview" src="{{form.editGroupQrImage}}" mode="aspectFit" bindtap="onPreviewEditGroupQr" />
             </view>
           </view>
-          <view class="pub-field" id="field-apply-form">
+          <view class="pub-field" wx:if="{{publishTemplateMode === 'custom' && customPublishFields.length}}">
+            <text class="pub-label">自定义字段</text>
+            <view wx:for="{{customPublishFields}}" wx:key="id" class="pub-field">
+              <text class="pub-label">{{item.label}}</text>
+              <input class="pub-input" placeholder="请填写" value="{{item.value}}" data-id="{{item.id}}" bindinput="onCustomPublishValue" />
+            </view>
+          </view>
+          <view class="pub-field" id="field-apply-form" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.apply}}">
             <text class="pub-label">{{isSupplierPublish ? '团队报名必填信息 *' : '达人报名必填信息 *'}}</text>
             <view class="pub-select" data-view="applyForm" bindtap="openPicker">
               <text class="pub-select-text {{applyFormPlaceholder ? 'pub-select-text--ph' : ''}}">{{applyFormDisplayText}}</text>
               <text class="pub-select-arrow">›</text>
             </view>
           </view>
-          <view class="pub-field" id="field-cover">
+          <view class="pub-field" id="field-cover" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.cover}}">
             <text class="pub-label">招募单封面图（选填）</text>
             <text class="pub-cover-hint">{{coverSourceHint}}</text>
             <view wx:if="{{coverPreviewUrl}}" class="pub-cover-preview-wrap" bindtap="onPreviewCoverImage">

@@ -220,6 +220,39 @@ Page({
     signupDeadlinePlaceholder: true,
     recruitMode: '',
     recruitModeLabel: '',
+    publishTemplateMode: 'system',
+    fieldOn: {
+      delivery: true,
+      deadline: true,
+      platform: true,
+      city: true,
+      location: true,
+      tags: true,
+      fans: true,
+      level: true,
+      fee: true,
+      count: true,
+      detail: true,
+      apply: true,
+      cover: true,
+    },
+    publishFieldCatalog: [
+      { key: 'delivery', label: '投放窗口' },
+      { key: 'deadline', label: '报名截止时间' },
+      { key: 'platform', label: '招募平台' },
+      { key: 'city', label: '招募城市' },
+      { key: 'location', label: '商家位置' },
+      { key: 'tags', label: '需求标签' },
+      { key: 'fans', label: '粉丝要求' },
+      { key: 'level', label: '带货等级' },
+      { key: 'fee', label: '费用模式' },
+      { key: 'count', label: '招募人数' },
+      { key: 'detail', label: '招募详情' },
+      { key: 'apply', label: '报名必填信息' },
+      { key: 'cover', label: '封面' },
+    ],
+    customPublishFields: [],
+    customFieldDraft: '',
     iceVerifyModes: publishOpts.ICE_VERIFY_MODES,
     form: emptyForm('talent'),
     isSupplierPublish: false,
@@ -959,6 +992,12 @@ Page({
         signupDeadlineTime: restored.signupDeadlineTime || '23:59',
         deliveryDeadlineDate: restored.deliveryDeadlineDate || '',
         deliveryDeadlineTime: restored.deliveryDeadlineTime || '18:00',
+        publishTemplateMode: meta.publishTemplateMode === 'custom' ? 'custom' : 'system',
+        fieldOn:
+          meta.publishFieldOn && typeof meta.publishFieldOn === 'object'
+            ? { ...this.data.fieldOn, ...meta.publishFieldOn }
+            : this.data.fieldOn,
+        customPublishFields: Array.isArray(meta.customPublishFields) ? meta.customPublishFields : [],
       }, () => this.syncDeliveryDeadlineFromParts())
       if (isSupplier) this.syncSupplierPublishGrids(restored.patch)
       this.syncDisplayFields()
@@ -1113,7 +1152,8 @@ Page({
     if (!mode) return
     const today = defaultSignupDate()
     const patch = {
-      step: 'form',
+      step: 'tpl',
+      publishTemplateMode: 'system',
       pickerView: '',
       recruitMode: mode.id,
       recruitModeLabel: mode.label,
@@ -1139,6 +1179,68 @@ Page({
       this.resetFormScrollToTop()
     })
   },
+  sysFieldOn(key) {
+    if (this.data.publishTemplateMode !== 'custom') return true
+    const on = this.data.fieldOn || {}
+    return on[key] !== false
+  },
+  onPickSystemTemplate() {
+    this.setData({ publishTemplateMode: 'system', step: 'form' }, () => {
+      this.syncTabBarOverlay()
+      this.resetFormScrollToTop()
+    })
+  },
+  onPickCustomTemplate() {
+    this.setData({ publishTemplateMode: 'custom', step: 'tplCustom' })
+    this.syncTabBarOverlay()
+  },
+  onBackFromTemplate() {
+    this.setData({ step: this.data.step === 'tplCustom' ? 'tpl' : 'mode' })
+    this.syncTabBarOverlay()
+  },
+  onTogglePublishField(e) {
+    const key = e.currentTarget.dataset.key
+    if (!key) return
+    const on = !!(e.detail && e.detail.value)
+    this.setData({ [`fieldOn.${key}`]: on })
+  },
+  onCustomFieldDraft(e) {
+    this.setData({ customFieldDraft: e.detail.value })
+  },
+  onAddCustomPublishField() {
+    const label = String(this.data.customFieldDraft || '').trim()
+    if (!label) {
+      wx.showToast({ title: '请填写字段名称', icon: 'none' })
+      return
+    }
+    const list = (this.data.customPublishFields || []).concat([
+      { id: `c-${Date.now()}`, label, value: '' },
+    ])
+    this.setData({ customPublishFields: list, customFieldDraft: '' })
+  },
+  onRemoveCustomPublishField(e) {
+    const id = e.currentTarget.dataset.id
+    this.setData({
+      customPublishFields: (this.data.customPublishFields || []).filter((x) => x.id !== id),
+    })
+  },
+  onCustomPublishValue(e) {
+    const id = e.currentTarget.dataset.id
+    const value = e.detail.value
+    const list = (this.data.customPublishFields || []).map((x) => (x.id === id ? { ...x, value } : x))
+    this.setData({ customPublishFields: list })
+  },
+  onCustomTemplateDone() {
+    const picked = Object.keys(this.data.fieldOn || {}).filter((k) => this.data.fieldOn[k] !== false)
+    if (!picked.length && !(this.data.customPublishFields || []).length) {
+      wx.showToast({ title: '请至少保留一个字段', icon: 'none' })
+      return
+    }
+    this.setData({ step: 'form' }, () => {
+      this.syncTabBarOverlay()
+      this.resetFormScrollToTop()
+    })
+  },
   onBackToMode() {
     if (this.data.isEditMode) {
       this.setData({
@@ -1151,7 +1253,12 @@ Page({
       wx.switchTab({ url: '/pages/mine/mine' })
       return
     }
-    this.setData({ step: 'mode', scrollIntoView: '', lastScrollAnchor: '', formScrollTop: 0 })
+    this.setData({
+      step: this.data.publishTemplateMode === 'custom' ? 'tplCustom' : 'tpl',
+      scrollIntoView: '',
+      lastScrollAnchor: '',
+      formScrollTop: 0,
+    })
   },
   onFieldInput(e) {
     const key = e.currentTarget.dataset.key
@@ -1501,20 +1608,22 @@ Page({
     const target = this.data.recruitTarget || 'talent'
     const isSupplier = target === 'shoot' || target === 'edit'
     if (!String(f.title || '').trim()) return '请填写招募标题'
+    const need = (key) => this.sysFieldOn(key)
     if (this.data.recruitMode === 'live') {
       const liveErr = livePublishForm.validateLivePublish(f)
       if (liveErr) return liveErr
       if (livePublishForm.isDouyinLivePlatform(f.livePlatform) && !(f.douyinSalesLevels || []).length) {
         return '请选择达人带货等级'
       }
-    } else if (!isSupplier && !f.platform) return '请选择招募平台'
-    if (!f.cityNational && !(f.selectedCities || []).length) return '请选择招募城市'
-    if (!isSupplier && !(f.talentTags || []).length) return '请选择需求达人标签'
-    if (!isSupplier && f.fansLimitMode === 'limit' && !String(f.fansMin ?? '').trim()) return '请填写粉丝下限'
-    if (f.deliveryWindow !== 'urgent' && !this.data.isTargetedRecruit && !String(f.signupDeadline || '').trim()) {
+    } else if (need('platform') && !isSupplier && !f.platform) return '请选择招募平台'
+    if (need('city') && !f.cityNational && !(f.selectedCities || []).length) return '请选择招募城市'
+    if (need('tags') && !isSupplier && !(f.talentTags || []).length) return '请选择需求达人标签'
+    if (need('fans') && !isSupplier && f.fansLimitMode === 'limit' && !String(f.fansMin ?? '').trim()) return '请填写粉丝下限'
+    if (need('deadline') && f.deliveryWindow !== 'urgent' && !this.data.isTargetedRecruit && !String(f.signupDeadline || '').trim()) {
       return '请选择招募报名截止时间'
     }
     if (
+      need('level') &&
       !isSupplier &&
       this.data.recruitMode !== 'live' &&
       f.platform === '抖音' &&
@@ -1522,16 +1631,18 @@ Page({
     ) {
       return '请选择达人带货等级'
     }
-    if (!f.feeTypeId) return '请选择费用模式'
-    const feeErr = this.validateFee(f)
-    if (feeErr) return feeErr
+    if (need('fee') && !f.feeTypeId) return '请选择费用模式'
+    if (need('fee')) {
+      const feeErr = this.validateFee(f)
+      if (feeErr) return feeErr
+    }
     if (!this.data.isTargetedRecruit) {
       const n = Math.max(1, publishNumeric.parseNonNegativeInt(String(f.recruitCount || '1'), 1))
       if (n < 1) return '招募人数至少为 1'
     } else if (!f.inviteResponseHours) {
       return '请设置邀约响应时间'
     }
-    if (!String(f.recruitDetail || '').trim() && this.data.recruitMode !== 'live') return '请填写招募详情'
+    if (need('detail') && !String(f.recruitDetail || '').trim() && this.data.recruitMode !== 'live') return '请填写招募详情'
     if (isSupplier) {
       const sErr = supplierPublishForm.validateSupplierPublish(target, f, this.data.recruitMode)
       if (sErr) return sErr
@@ -1554,11 +1665,13 @@ Page({
     ) {
       return '剪辑云剪请上传剪辑师群二维码'
     }
-    if (!(f.applyFormFields || []).length) {
+    if (need('apply') && !(f.applyFormFields || []).length) {
       return isSupplier ? '请配置团队报名必填信息' : '请配置达人报名必填信息'
     }
-    const afErr = applyTemplates.validateTemplateFields(f.applyFormFields)
-    if (afErr) return afErr
+    if (need('apply')) {
+      const afErr = applyTemplates.validateTemplateFields(f.applyFormFields)
+      if (afErr) return afErr
+    }
     const lk = f.linkeAttach
     if (lk && lk.enabled) {
       if (!lk.clientId) return '挂接林客时请选择客户商家'
@@ -1676,6 +1789,13 @@ Page({
     }
     if (mode.id === 'edit_ice') {
       lines.push(`云剪审核方式：${f.iceVerifyMode === 'pr' ? 'PR 审核' : 'AI 核查'}`)
+    }
+    if (this.data.publishTemplateMode === 'custom') {
+      ;(this.data.customPublishFields || []).forEach((row) => {
+        const label = String((row && row.label) || '').trim()
+        const value = String((row && row.value) || '').trim()
+        if (label && value) lines.push(`${label}：${value}`)
+      })
     }
     return lines.join('\n')
   },
@@ -1859,6 +1979,9 @@ Page({
           applyFormTemplateId: f.applyFormTemplateId,
           applyFormTemplateName: f.applyFormTemplateName || '',
           applyFormFields: f.applyFormFields || [],
+          publishTemplateMode: this.data.publishTemplateMode || 'system',
+          publishFieldOn: this.data.fieldOn || {},
+          customPublishFields: this.data.customPublishFields || [],
           coverImage: coverFields.coverImage,
           coverLibraryId: coverFields.coverLibraryId,
           coverImageSource: coverFields.coverImageSource,
