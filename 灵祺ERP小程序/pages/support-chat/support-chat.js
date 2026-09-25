@@ -175,8 +175,11 @@ Page({
               const bid = this.pushLocal('bot', botText || '已收到，请补充更具体的问题。')
               void relay.sendChatLine('bot', botText, bid, this._sessionId)
             })
-            .catch(() => {
-              const botText = '已收到您的问题。人工客服时段为 9:00–22:00，可点击「进入人工客服」。'
+            .catch((e) => {
+              const detail = String((e && e.message) || '').slice(0, 80)
+              const botText = detail
+                ? `暂时没能回答（${detail}）。可在 9:00–22:00 点击「进入人工客服」。`
+                : '已收到您的问题。人工客服时段为 9:00–22:00，可点击「进入人工客服」。'
               const bid = this.pushLocal('bot', botText)
               void relay.sendChatLine('bot', botText, bid, this._sessionId)
             })

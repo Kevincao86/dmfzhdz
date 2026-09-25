@@ -2,10 +2,11 @@
  * 在线客服：AI 先答，9:00–22:00 可转人工并排队。
  * 运营台把配置写进会话 __lq_support_ai_cfg__，商家加入该会话后可读。
  */
-const config = require('./config.js')
 const api = require('./api.js')
 const devAuth = require('./devAuth.js')
 const relay = require('./supportRelayMp.js')
+const { merchantRequestAuth } = require('./merchantApi.js')
+const sessionSync = require('./merchantSessionSyncMp.js')
 
 const CFG_SESSION = '__lq_support_ai_cfg__'
 const QUEUE_SESSION = '__lq_support_queue__'
@@ -73,47 +74,65 @@ async function loadConfig() {
   }
 }
 
-async function askAi(userText, history, cfg) {
-  const base = String(config.MERCHANT_API_BASE_URL || '')
-    .trim()
-    .replace(/\/$/, '')
-  if (!base) throw new Error('未配置客服 AI 接口')
+function activeTenantId() {
+  try {
+    return String(wx.getStorageSync(sessionSync.MEOO_ACTIVE_TENANT_ID) || '').trim()
+  } catch (_) {
+    return ''
+  }
+}
+
+function bearerToken() {
   const token = api.getBearerToken ? api.getBearerToken() : api.getAccessToken()
-  const knowledge = cfg && cfg.knowledge ? `\n\n【运营补充说明】\n${cfg.knowledge}` : ''
-  const messages = [
-    { role: 'system', content: PROJECT_BRIEF + knowledge },
-    { role: 'user', content: String(userText || '').trim() },
-  ]
-  void history
-  const data = await new Promise((resolve, reject) => {
-    wx.request({
-      url: `${base}/api/meoo-ai-chat`,
-      method: 'POST',
-      timeout: 60000,
-      header: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        ...(token && token !== devAuth.DEV_TOKEN ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      data: {
-        provider: 'qwen',
-        stream: false,
-        messages,
-      },
-      success(res) {
-        const body = res.data || {}
-        if (res.statusCode >= 200 && res.statusCode < 300 && body.ok !== false && body.content) {
-          resolve(body)
-          return
-        }
-        reject(new Error((body.detail || body.message || body.error || 'AI 暂不可用').toString()))
-      },
-      fail(err) {
-        reject(new Error((err && err.errMsg) || '网络异常'))
-      },
-    })
+  const t = String(token || '').trim()
+  if (!t || t === devAuth.DEV_TOKEN) return ''
+  return t
+}
+
+/** 与网页 FloatingOnlineSupport → postAiChat 相同：千问、非流式、产品说明 + 当前问题 */
+async function postSupportChat(messages) {
+  const token = bearerToken()
+  const tenantId = activeTenantId()
+  const body = await merchantRequestAuth('POST', '/erp-api/meoo-ai-chat', {
+    bearerToken: token,
+    timeoutMs: 90000,
+    data: {
+      provider: 'qwen',
+      stream: false,
+      messages,
+      ...(tenantId ? { tenantId } : {}),
+      ...(token ? { access_token: token } : {}),
+    },
   })
-  return String(data.content || '').trim()
+  const data = body && typeof body === 'object' ? body : {}
+  const content = String(data.content || '').trim()
+  if (data.ok === false || !content) {
+    const err = new Error(String(data.detail || data.message || data.error || 'AI 暂不可用'))
+    err.statusCode = data.ok === false ? 400 : 0
+    throw err
+  }
+  return content
+}
+
+async function askAi(userText, history, cfg) {
+  const knowledge = cfg && cfg.knowledge ? `\n\n【运营补充说明】\n${cfg.knowledge}` : ''
+  const messages = [{ role: 'system', content: PROJECT_BRIEF + knowledge }]
+  for (const m of (history || []).slice(-6)) {
+    const text = String((m && (m.text || m.content)) || '').trim()
+    if (!text || text === String(userText || '').trim()) continue
+    if (/进入人工客服/.test(text)) continue
+    if (m.role === 'user') messages.push({ role: 'user', content: text })
+    else if (m.role === 'bot' || m.role === 'assistant') messages.push({ role: 'assistant', content: text })
+  }
+  messages.push({ role: 'user', content: String(userText || '').trim() })
+  try {
+    return await postSupportChat(messages)
+  } catch (e) {
+    const msg = String((e && e.message) || '')
+    if (!/401|unauthorized|未授权/.test(msg) || typeof api.refreshAccessToken !== 'function') throw e
+    await api.refreshAccessToken().catch(() => {})
+    return postSupportChat(messages)
+  }
 }
 
 async function enqueue(userSessionId) {
