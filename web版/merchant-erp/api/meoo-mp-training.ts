@@ -89,39 +89,69 @@ function clipImage(raw: unknown) {
   return s.slice(0, 280000)
 }
 
-async function ocrDoc(kind: string, imageDataUrl: string) {
-  const image = clipImage(imageDataUrl)
-  if (!image) throw new Error('请上传图片')
-  const { routeAiChat } = await import('../vite-plugins/aiGateway/chatRouter.js')
-  const env = process.env as Record<string, string>
-  const provider = (env.MERCHANT_MP_AI_PROVIDER || 'doubao').trim()
-  const ask =
-    kind === 'license'
-      ? '这是营业执照。只输出 JSON：{"name":"企业名称","licenseNo":"统一社会信用代码","legalPerson":"法定代表人"}。看不清的字段留空字符串。'
-      : kind === 'id_back'
-        ? '这是身份证国徽面。只输出 JSON：{"authority":"签发机关","validFrom":"","validTo":""}。看不清的字段留空字符串。'
-        : '这是身份证人像面。只输出 JSON：{"name":"姓名","idNo":"公民身份号码","address":""}。看不清的字段留空字符串。'
-  const res = await routeAiChat(
-    {
-      provider: provider as 'doubao',
-      temperature: 0,
-      imageDataUrls: [image],
-      messages: [
-        { role: 'system', content: '你只做证件文字识别，不判断真伪。只输出 JSON，不要其它文字。' },
-        { role: 'user', content: ask },
-      ],
-    },
-    env,
-  )
-  const text = String(res.content || '')
-  const m = text.match(/\{[\s\S]*\}/)
-  let fields: Record<string, string> = {}
-  try {
-    const parsed = JSON.parse(m ? m[0] : '{}') as Record<string, unknown>
-    for (const [k, v] of Object.entries(parsed)) fields[k] = String(v || '').trim()
-  } catch {
-    fields = {}
+function rawImageBase64(dataUrl: string) {
+  const s = String(dataUrl || '')
+  const i = s.indexOf(',')
+  const b64 = (i >= 0 ? s.slice(i + 1) : s).replace(/\s/g, '')
+  if (b64.length < 80) throw new Error('请上传图片')
+  if (b64.length > 5_500_000) throw new Error('图片过大，请换一张较小的照片')
+  return b64
+}
+
+function pickText(node: unknown, keys: string[]): string {
+  if (!node || typeof node !== 'object') return ''
+  const bag = node as Record<string, unknown>
+  for (const key of keys) {
+    const v = bag[key]
+    if (typeof v === 'string' && v.trim()) return v.trim()
   }
+  for (const v of Object.values(bag)) {
+    const hit = pickText(v, keys)
+    if (hit) return hit
+  }
+  return ''
+}
+
+async function volcOcr(action: string, b64: string) {
+  const ak = String(process.env.MERCHANT_AI_VOLC_ACCESS_KEY || '').trim()
+  const sk = String(process.env.MERCHANT_AI_VOLC_SECRET_KEY || '').trim()
+  if (!ak || !sk) throw new Error('证件识别服务未配置')
+  const { signVolcVisualFormPost } = await import('../vite-plugins/volcVisualSign.js')
+  const body = `image_base64=${encodeURIComponent(b64)}&version=v3`
+  const signed = signVolcVisualFormPost({
+    accessKeyId: ak,
+    secretAccessKey: sk,
+    action,
+    version: '2020-08-26',
+    region: String(process.env.MERCHANT_AI_VOLC_REGION || 'cn-north-1'),
+    body,
+  })
+  const res = await fetch(signed.url, { method: 'POST', headers: signed.headers, body: signed.body })
+  const data = (await res.json()) as Record<string, unknown>
+  const meta = data.ResponseMetadata as { Error?: { Message?: string } } | undefined
+  const code = Number(data.code)
+  if (!res.ok || (Number.isFinite(code) && code !== 10000)) {
+    throw new Error(String(data.message || meta?.Error?.Message || `识别失败(${res.status})`))
+  }
+  return data
+}
+
+async function ocrDoc(kind: string, imageDataUrl: string) {
+  const b64 = rawImageBase64(imageDataUrl)
+  const action = kind === 'license' ? 'BusinessLicense' : 'IDCard'
+  const data = await volcOcr(action, b64)
+  const name = pickText(data, ['name', 'company_name', 'enterprise_name', 'legal_person'])
+  const idNo = pickText(data, ['id_number', 'id_card_number', 'id_num', 'num'])
+  const licenseNo = pickText(data, ['credit_code', 'reg_num', 'social_credit_code', 'license_no'])
+  const address = pickText(data, ['address', 'domicile'])
+  const authority = pickText(data, ['issue_authority', 'authority'])
+  const fields: Record<string, string> = {}
+  if (name) fields.name = name
+  if (idNo) fields.idNo = idNo
+  if (licenseNo) fields.licenseNo = licenseNo
+  if (address) fields.address = address
+  if (authority) fields.authority = authority
+  if (!Object.keys(fields).length) throw new Error('未识别到证件文字，请换一张更清晰的照片')
   return fields
 }
 

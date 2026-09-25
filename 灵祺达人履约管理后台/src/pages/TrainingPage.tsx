@@ -6,6 +6,34 @@ import { getAccount } from '../lib/mpSession'
 const ADVANCED = new Set(['pro', 'flagship', 'enterprise'])
 const DEPOSIT = 500
 
+function compressImageFile(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      const max = 1600
+      const scale = Math.min(1, max / Math.max(img.width, img.height))
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.max(1, Math.round(img.width * scale))
+      canvas.height = Math.max(1, Math.round(img.height * scale))
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        URL.revokeObjectURL(url)
+        reject(new Error('无法处理图片'))
+        return
+      }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      URL.revokeObjectURL(url)
+      resolve(canvas.toDataURL('image/jpeg', 0.82))
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('无法读取图片'))
+    }
+    img.src = url
+  })
+}
+
 type Lecturer = {
   hostId: string
   kind: 'person' | 'entity'
@@ -246,58 +274,15 @@ export default function TrainingPage() {
               确认缴纳保证金 ¥{DEPOSIT}
             </label>
             <p className="text-sm font-medium text-slate-800">上传原件并识别</p>
-            <label className="block text-sm text-slate-600">
-              身份证人像面
-              <input
-                className="mt-1 block w-full text-sm"
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (!file) return
-                  const reader = new FileReader()
-                  reader.onload = () => {
-                    const imageDataUrl = String(reader.result || '')
-                    setIdFront(imageDataUrl)
-                    setOcrHint('正在识别人像面…')
-                    postTraining({ action: 'ocrDoc', kind: 'id_front', imageDataUrl })
-                      .then((r) => {
-                        const f = (r.fields || {}) as Record<string, string>
-                        if (f.name) setName(f.name)
-                        if (f.idNo) setIdNo(f.idNo)
-                        setOcrHint('已填入人像面文字，请核对')
-                      })
-                      .catch(() => setOcrHint('人像面识别失败，请手工填写'))
-                  }
-                  reader.readAsDataURL(file)
-                }}
-              />
-            </label>
-            <label className="block text-sm text-slate-600">
-              身份证国徽面
-              <input
-                className="mt-1 block w-full text-sm"
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (!file) return
-                  const reader = new FileReader()
-                  reader.onload = () => {
-                    const imageDataUrl = String(reader.result || '')
-                    setIdBack(imageDataUrl)
-                    setOcrHint('正在识别国徽面…')
-                    postTraining({ action: 'ocrDoc', kind: 'id_back', imageDataUrl })
-                      .then(() => setOcrHint('国徽面已上传'))
-                      .catch(() => setOcrHint('国徽面识别失败'))
-                  }
-                  reader.readAsDataURL(file)
-                }}
-              />
-            </label>
-            {kind === 'entity' ? (
-              <label className="block text-sm text-slate-600">
-                营业执照
+            {(
+              [
+                ['id_front', '身份证人像面'],
+                ['id_back', '身份证国徽面'],
+                ...(kind === 'entity' ? [['license', '营业执照'] as const] : []),
+              ] as const
+            ).map(([docKind, label]) => (
+              <label key={docKind} className="block text-sm text-slate-600">
+                {label}
                 <input
                   className="mt-1 block w-full text-sm"
                   type="file"
@@ -305,25 +290,26 @@ export default function TrainingPage() {
                   onChange={(e) => {
                     const file = e.target.files?.[0]
                     if (!file) return
-                    const reader = new FileReader()
-                    reader.onload = () => {
-                      const imageDataUrl = String(reader.result || '')
-                      setLicenseImage(imageDataUrl)
-                      setOcrHint('正在识别营业执照…')
-                      postTraining({ action: 'ocrDoc', kind: 'license', imageDataUrl })
-                        .then((r) => {
-                          const f = (r.fields || {}) as Record<string, string>
-                          if (f.name) setName(f.name)
-                          if (f.licenseNo) setLicenseNo(f.licenseNo)
-                          setOcrHint('已填入执照文字，请核对')
-                        })
-                        .catch(() => setOcrHint('执照识别失败，请手工填写'))
-                    }
-                    reader.readAsDataURL(file)
+                    setOcrHint(`正在识别${label}…`)
+                    compressImageFile(file)
+                      .then((imageDataUrl) => {
+                        if (docKind === 'id_front') setIdFront(imageDataUrl)
+                        else if (docKind === 'id_back') setIdBack(imageDataUrl)
+                        else setLicenseImage(imageDataUrl)
+                        return postTraining({ action: 'ocrDoc', kind: docKind, imageDataUrl })
+                      })
+                      .then((r) => {
+                        const f = (r.fields || {}) as Record<string, string>
+                        if (f.name) setName(f.name)
+                        if (f.idNo) setIdNo(f.idNo)
+                        if (f.licenseNo) setLicenseNo(f.licenseNo)
+                        setOcrHint(`已填入${label}文字，请核对`)
+                      })
+                      .catch((ex) => setOcrHint(ex instanceof Error ? ex.message : `${label}识别失败`))
                   }}
                 />
               </label>
-            ) : null}
+            ))}
             {ocrHint ? <p className="text-xs text-violet-700">{ocrHint}</p> : null}
             <div className="flex gap-3 text-sm">
               <button type="button" className={kind === 'person' ? 'font-semibold text-violet-700' : 'text-slate-500'} onClick={() => setKind('person')}>

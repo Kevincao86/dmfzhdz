@@ -90,3 +90,50 @@ export function signVolcVisualJsonPost(opts: {
     body: bodyStr,
   }
 }
+
+/** 证件 OCR：application/x-www-form-urlencoded */
+export function signVolcVisualFormPost(opts: {
+  accessKeyId: string
+  secretAccessKey: string
+  action: string
+  version?: string
+  region?: string
+  body: string
+}): VolcSignedRequest {
+  const host = 'visual.volcengineapi.com'
+  const region = (opts.region || 'cn-north-1').trim() || 'cn-north-1'
+  const version = opts.version || '2020-08-26'
+  const bodyStr = opts.body
+  const xDate = volcDateTimeNow()
+  const shortDate = xDate.slice(0, 8)
+  const payloadHash = hashHex(bodyStr)
+  const query: Record<string, string> = { Action: opts.action, Version: version }
+  const canonicalQuery = queryParamsToString(query)
+  const signedHeaders = 'content-type;host;x-content-sha256;x-date'
+  const canonicalHeaders =
+    `content-type:application/x-www-form-urlencoded\n` +
+    `host:${host}\n` +
+    `x-content-sha256:${payloadHash}\n` +
+    `x-date:${xDate}\n`
+  const canonicalRequest = ['POST', '/', canonicalQuery, canonicalHeaders, signedHeaders, payloadHash].join('\n')
+  const credentialScope = `${shortDate}/${region}/cv/request`
+  const stringToSign = ['HMAC-SHA256', xDate, credentialScope, hashHex(canonicalRequest)].join('\n')
+  const kDate = hmac(opts.secretAccessKey, shortDate)
+  const kRegion = hmac(kDate, region)
+  const kService = hmac(kRegion, 'cv')
+  const kSigning = hmac(kService, 'request')
+  const signature = hmac(kSigning, stringToSign).toString('hex')
+  const authorization =
+    `HMAC-SHA256 Credential=${opts.accessKeyId}/${credentialScope}, ` +
+    `SignedHeaders=${signedHeaders}, Signature=${signature}`
+  return {
+    url: `https://${host}/?${canonicalQuery}`,
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'X-Date': xDate,
+      'X-Content-Sha256': payloadHash,
+      Authorization: authorization,
+    },
+    body: bodyStr,
+  }
+}

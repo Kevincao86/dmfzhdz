@@ -36,8 +36,8 @@ Page({
         const path = res.tempFilePaths && res.tempFilePaths[0]
         if (!path) return
         wx.showLoading({ title: '识别中' })
-        wx.getFileSystemManager().readFile({
-          filePath: path,
+        const read = (filePath) => wx.getFileSystemManager().readFile({
+          filePath,
           encoding: 'base64',
           success: async (file) => {
             const imageDataUrl = `data:image/jpeg;base64,${file.data}`
@@ -62,6 +62,16 @@ Page({
             wx.showToast({ title: '读取照片失败', icon: 'none' })
           },
         })
+        if (wx.compressImage) {
+          wx.compressImage({
+            src: path,
+            quality: 60,
+            success: (c) => read(c.tempFilePath || path),
+            fail: () => read(path),
+          })
+        } else {
+          read(path)
+        }
       },
     })
   },
