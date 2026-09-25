@@ -7,10 +7,57 @@
 .support-hero {
   margin: 16rpx 24rpx 8rpx;
 }
-.support-chat-page .chat-v2.tall {
+.support-chat {
   flex: 1;
   min-height: 0;
-  padding-bottom: 16rpx;
+  height: 0;
+  padding: 8rpx 24rpx 16rpx;
+  box-sizing: border-box;
+}
+.msg-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+  margin-bottom: 20rpx;
+}
+.msg-row.is-user {
+  justify-content: flex-end;
+}
+.ava {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #fff;
+}
+.ava-me {
+  background: #0891b2;
+  color: #fff;
+  font-size: 22rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bubble {
+  max-width: 520rpx;
+  padding: 20rpx 24rpx;
+  border-radius: 16rpx;
+  background: #fff;
+  border: 1rpx solid rgba(15, 23, 42, 0.06);
+  box-sizing: border-box;
+}
+.bubble-user {
+  background: #0891b2;
+  border-color: transparent;
+}
+.bubble-text {
+  font-size: 28rpx;
+  line-height: 40rpx;
+  color: rgba(0, 0, 0, 0.9);
+  white-space: pre-wrap;
+}
+.bubble-user .bubble-text {
+  color: #fff;
 }
 .support-composer {
   margin: 0;
