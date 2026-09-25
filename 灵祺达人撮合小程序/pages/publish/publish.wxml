@@ -186,8 +186,8 @@
         </view>
       </view>
       <view class="pub-target-main">
-        <text class="pub-target-title">选择招募模版</text>
-        <text class="pub-target-sub">系统模版沿用现有表单 · 自定义可勾选字段并新增</text>
+        <text class="tpl-title">选择招募模版</text>
+        <text class="tpl-sub">系统模版沿用现有表单，自定义可勾选字段并新增</text>
         <view class="pub-mode-list pub-mode-list--target" wx:if="{{step === 'tpl'}}">
           <view class="pub-mode-card pub-mode-card--icon" bindtap="onPickSystemTemplate">
             <view class="pub-mode-copy">
@@ -205,23 +205,21 @@
           </view>
         </view>
         <block wx:else>
-          <view class="pub-mode-list">
-            <view class="pub-mode-card" wx:for="{{publishFieldCatalog}}" wx:key="key">
-              <text class="pub-mode-name">{{item.label}}</text>
-              <switch checked="{{fieldOn[item.key]}}" color="#5b2dcc" data-key="{{item.key}}" bindchange="onTogglePublishField" />
+          <view class="tpl-sheet">
+            <view class="tpl-row" wx:for="{{publishFieldCatalog}}" wx:key="key">
+              <text class="tpl-row__name">{{item.label}}</text>
+              <switch class="tpl-switch" checked="{{fieldOn[item.key]}}" color="#5b2dcc" data-key="{{item.key}}" bindchange="onTogglePublishField" />
+            </view>
+            <view class="tpl-row" wx:for="{{customPublishFields}}" wx:key="id">
+              <text class="tpl-row__name">{{item.label}}</text>
+              <text class="tpl-row__del" data-id="{{item.id}}" bindtap="onRemoveCustomPublishField">删除</text>
+            </view>
+            <view class="tpl-add">
+              <input class="tpl-add__input" placeholder="新增字段，如到店时间" value="{{customFieldDraft}}" bindinput="onCustomFieldDraft" />
+              <text class="tpl-add__btn" bindtap="onAddCustomPublishField">添加</text>
             </view>
           </view>
-          <view class="pub-mode-card" style="margin-top: 24rpx;">
-            <input placeholder="新增字段名称" value="{{customFieldDraft}}" bindinput="onCustomFieldDraft" />
-            <text bindtap="onAddCustomPublishField">添加</text>
-          </view>
-          <view wx:for="{{customPublishFields}}" wx:key="id" class="pub-mode-card">
-            <text class="pub-mode-name">{{item.label}}</text>
-            <text data-id="{{item.id}}" bindtap="onRemoveCustomPublishField">删除</text>
-          </view>
-          <view class="pub-mode-card pub-mode-card--icon" bindtap="onCustomTemplateDone" style="margin-top: 24rpx;">
-            <text class="pub-mode-name">用这个模版填写</text>
-          </view>
+          <view class="tpl-go" bindtap="onCustomTemplateDone">开始填写</view>
         </block>
       </view>
     </view>
