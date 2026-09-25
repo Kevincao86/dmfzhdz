@@ -131,7 +131,11 @@ async function volcOcr(action: string, b64: string) {
   const meta = data.ResponseMetadata as { Error?: { Message?: string } } | undefined
   const code = Number(data.code)
   if (!res.ok || (Number.isFinite(code) && code !== 10000)) {
-    throw new Error(String(data.message || meta?.Error?.Message || `识别失败(${res.status})`))
+    const raw = String(data.message || meta?.Error?.Message || `识别失败(${res.status})`)
+    if (/access denied/i.test(raw)) {
+      throw new Error('火山引擎账号未开通身份证识别和营业执照识别，当前密钥没有这项权限')
+    }
+    throw new Error(raw)
   }
   return data
 }
