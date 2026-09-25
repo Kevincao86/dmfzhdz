@@ -42,6 +42,11 @@ type Lecturer = {
   bank: string
   bankNo: string
   licenseNo: string
+  city?: string
+  platforms?: string
+  skills?: string
+  years?: string
+  intro?: string
   idFront?: string
   idBack?: string
   licenseImage?: string
@@ -74,6 +79,12 @@ export default function TrainingPage() {
   const [licenseNo, setLicenseNo] = useState('')
   const [bank, setBank] = useState('')
   const [bankNo, setBankNo] = useState('')
+  const [city, setCity] = useState('')
+  const [platforms, setPlatforms] = useState('')
+  const [skills, setSkills] = useState('')
+  const [years, setYears] = useState('')
+  const [intro, setIntro] = useState('')
+  const [poster, setPoster] = useState('')
   const [idFront, setIdFront] = useState('')
   const [idBack, setIdBack] = useState('')
   const [licenseImage, setLicenseImage] = useState('')
@@ -95,6 +106,11 @@ export default function TrainingPage() {
       setLicenseNo(profile.licenseNo || '')
       setBank(profile.bank || '')
       setBankNo(profile.bankNo || '')
+      setCity(profile.city || '')
+      setPlatforms(profile.platforms || '')
+      setSkills(profile.skills || '')
+      setYears(profile.years || '')
+      setIntro(profile.intro || '')
       setIdFront(profile.idFront || '')
       setIdBack(profile.idBack || '')
       setLicenseImage(profile.licenseImage || '')
@@ -176,11 +192,16 @@ export default function TrainingPage() {
         onSubmit={(e) => {
           e.preventDefault()
           if (!lecturer || !title.trim()) return
+          if (!poster.startsWith('data:image/')) {
+            setErr('请上传宣传海报')
+            return
+          }
           postTraining({
             action: 'create',
             title: title.trim(),
             fee,
             mode: postMode,
+            poster,
             hostId: me?.accountId || '',
             hostName: me?.wxNickName || me?.loginName || '达人',
             hostRole: me?.activeRole || 'talent',
@@ -188,6 +209,8 @@ export default function TrainingPage() {
             .then(() => {
               setTitle('')
               setFee('')
+              setPoster('')
+              setErr('已提交审核，通过后会出现在首页广告栏')
               return load()
             })
             .catch((ex) => setErr(ex instanceof Error ? ex.message : '发布失败'))
@@ -205,8 +228,24 @@ export default function TrainingPage() {
           <button type="button" className={postMode === 'online' ? 'font-semibold text-violet-700' : ''} onClick={() => setPostMode('online')}>线上</button>
           <button type="button" className={postMode === 'offline' ? 'font-semibold text-violet-700' : ''} onClick={() => setPostMode('offline')}>线下</button>
         </div>
+        <label className="block text-sm text-slate-600">
+          宣传海报
+          <input
+            className="mt-1 block w-full text-sm"
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (!file) return
+              compressImageFile(file)
+                .then((url) => setPoster(url))
+                .catch((ex) => setErr(ex instanceof Error ? ex.message : '海报处理失败'))
+            }}
+          />
+        </label>
+        {poster ? <img src={poster} alt="宣传海报" className="h-36 w-full rounded-xl object-cover" /> : null}
         <button type="submit" disabled={!lecturer} className="rounded-xl bg-slate-900 px-3 py-2 text-sm text-white disabled:opacity-40">
-          发布
+          提交审核
         </button>
       </form>
       {applyOpen ? (
@@ -236,6 +275,10 @@ export default function TrainingPage() {
                 setErr('请填写统一社会信用代码')
                 return
               }
+              if (!city.trim() || !intro.trim()) {
+                setErr('请填写常驻城市和讲师介绍')
+                return
+              }
               setSaving(true)
               setErr('')
               postTraining({
@@ -247,6 +290,11 @@ export default function TrainingPage() {
                 bank: bank.trim(),
                 bankNo: bankNo.trim(),
                 licenseNo: kind === 'entity' ? licenseNo.trim() : '',
+                city: city.trim(),
+                platforms: platforms.trim(),
+                skills: skills.trim(),
+                years: years.trim(),
+                intro: intro.trim(),
                 idFront,
                 idBack,
                 licenseImage,
@@ -324,6 +372,12 @@ export default function TrainingPage() {
             {kind === 'entity' ? (
               <input className="w-full rounded-xl border px-3 py-2 text-sm" placeholder="统一社会信用代码" value={licenseNo} onChange={(e) => setLicenseNo(e.target.value)} />
             ) : null}
+            <p className="text-sm font-medium text-slate-800">本地生活讲师介绍</p>
+            <input className="w-full rounded-xl border px-3 py-2 text-sm" placeholder="常驻城市，如宁波" value={city} onChange={(e) => setCity(e.target.value)} />
+            <input className="w-full rounded-xl border px-3 py-2 text-sm" placeholder="出镜平台：抖音 / 小红书 / 视频号" value={platforms} onChange={(e) => setPlatforms(e.target.value)} />
+            <input className="w-full rounded-xl border px-3 py-2 text-sm" placeholder="擅长：探店、团购带货、到店直播、门店短视频" value={skills} onChange={(e) => setSkills(e.target.value)} />
+            <input className="w-full rounded-xl border px-3 py-2 text-sm" placeholder="本地生活经验，如 3 年" value={years} onChange={(e) => setYears(e.target.value)} />
+            <textarea className="w-full rounded-xl border px-3 py-2 text-sm" rows={3} placeholder="讲给本地生活达人：带过哪些品类、商圈或门店，这门课解决什么接单问题" value={intro} onChange={(e) => setIntro(e.target.value)} />
             <input className="w-full rounded-xl border px-3 py-2 text-sm" placeholder="开户行" value={bank} onChange={(e) => setBank(e.target.value)} />
             <input className="w-full rounded-xl border px-3 py-2 text-sm" placeholder="账号" value={bankNo} onChange={(e) => setBankNo(e.target.value)} />
             {err ? <p className="text-sm text-red-600">{err}</p> : null}

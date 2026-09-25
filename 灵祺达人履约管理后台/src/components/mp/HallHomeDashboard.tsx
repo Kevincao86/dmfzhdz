@@ -16,7 +16,7 @@ import {
   UserRound,
 } from 'lucide-react'
 import AiTokenUsagePanel from '../../components/AiTokenUsagePanel'
-import { fetchMpRegistry, clearMpRegistryCache } from '../../lib/mpApi'
+import { fetchMpRegistry, clearMpRegistryCache, fetchTraining } from '../../lib/mpApi'
 import { buildHallDashboardStats, emptyHallDashboardStats, type HallDashboardStats } from '../../lib/mpRecruitment/hallDashboard'
 import { Link } from 'react-router-dom'
 import { getWorkIdentity, type MpWorkIdentity } from '../../lib/mpWorkIdentity'
@@ -243,6 +243,44 @@ function orderTagChips(row: RecruitmentOrderRow): string[] {
   return tags.filter(Boolean).slice(0, 3)
 }
 
+function TrainingAdBar() {
+  const [ads, setAds] = useState<{ id: string; title: string; poster: string }[]>([])
+  const [index, setIndex] = useState(0)
+  useEffect(() => {
+    let alive = true
+    fetchTraining()
+      .then((data) => {
+        if (!alive) return
+        const list = (Array.isArray(data.courses) ? data.courses : [])
+          .filter((c) => c && String((c as { poster?: string }).poster || '').startsWith('data:image/'))
+          .slice(0, 6)
+          .map((c) => {
+            const row = c as { id?: string; title?: string; poster?: string }
+            return { id: String(row.id || ''), title: String(row.title || '培训课程'), poster: String(row.poster || '') }
+          })
+        setAds(list)
+      })
+      .catch(() => {
+        if (alive) setAds([])
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+  useEffect(() => {
+    if (ads.length < 2) return
+    const timer = window.setInterval(() => setIndex((n) => (n + 1) % ads.length), 4000)
+    return () => window.clearInterval(timer)
+  }, [ads.length])
+  if (!ads.length) return null
+  const ad = ads[index] || ads[0]
+  return (
+    <Link to="/training" className="mb-4 block overflow-hidden rounded-2xl border border-slate-200" style={{ height: 148 }}>
+      <img src={ad.poster} alt={ad.title} className="h-full w-full object-cover" />
+    </Link>
+  )
+}
+
 function TalentHomeDashboard({
   stats,
   loading,
@@ -336,6 +374,8 @@ function TalentHomeDashboard({
           </Link>
         </div>
       </section>
+
+      <TrainingAdBar />
 
       <div className="talent-home__stat-row">
         <Link to="/hall?tab=hall" className="talent-home__stat-card talent-home__stat-card--purple no-underline">
@@ -485,6 +525,8 @@ function PrHomeDashboard({ stats, loading, err, onRetry }: {
           <button type="button" className="dash-home__retry" onClick={onRetry}>刷新重试</button>
         </p>
       ) : null}
+
+      <TrainingAdBar />
 
       <div className="dash-stat-grid">
             {PR_STAT_CARDS.map((c) => {
