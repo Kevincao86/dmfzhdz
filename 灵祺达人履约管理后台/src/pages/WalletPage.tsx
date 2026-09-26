@@ -31,11 +31,29 @@ type Quote = {
   hasAccount: boolean
 }
 
+type BoundAccount = {
+  kind?: string
+  name?: string
+  bank?: string
+  bankNo?: string
+  licenseNo?: string
+  lecturerStatus?: string
+  city?: string
+  intro?: string
+}
+
 export default function WalletPage() {
   const me = getAccount()
   const [balance, setBalance] = useState(0)
   const [depositPaid, setDepositPaid] = useState(false)
   const [quote, setQuote] = useState<Quote | null>(null)
+  const [account, setAccount] = useState<BoundAccount | null>(null)
+  const [bindOpen, setBindOpen] = useState(false)
+  const [kind, setKind] = useState<'person' | 'entity'>('person')
+  const [holder, setHolder] = useState('')
+  const [bankName, setBankName] = useState('')
+  const [bankNo, setBankNo] = useState('')
+  const [licenseNo, setLicenseNo] = useState('')
   const [orders, setOrders] = useState<SettleOrder[]>([])
   const [busy, setBusy] = useState('')
   const [err, setErr] = useState('')
@@ -63,6 +81,7 @@ export default function WalletPage() {
       setBalance(points)
       setDepositPaid(!!deposit?.paid)
       setQuote((training.settlement as Quote) || null)
+      setAccount((training.profile as BoundAccount) || null)
       setOrders(rows)
     } catch (e) {
       setErr(e instanceof Error ? e.message : '加载失败')
@@ -120,6 +139,58 @@ export default function WalletPage() {
       await load()
     } catch (e) {
       setErr(e instanceof Error ? e.message : '提现失败')
+    } finally {
+      setBusy('')
+    }
+  }
+
+  function lecturerApproved(profile: BoundAccount | null) {
+    if (!profile) return false
+    if (profile.lecturerStatus === 'none' || profile.lecturerStatus === 'pending' || profile.lecturerStatus === 'rejected') return false
+    if (profile.lecturerStatus === 'approved') return true
+    return !!(profile.intro && profile.city)
+  }
+
+  function openBind() {
+    setKind(account?.kind === 'entity' ? 'entity' : 'person')
+    setHolder(account?.name || '')
+    setBankName(account?.bank || '')
+    setBankNo(account?.bankNo || '')
+    setLicenseNo(account?.licenseNo || '')
+    setErr('')
+    setBindOpen(true)
+  }
+
+  async function saveAccount() {
+    if (!me?.accountId) return
+    if (!lecturerApproved(account)) {
+      setErr('讲师通过后才能绑定收款账户')
+      return
+    }
+    if (!holder.trim() || !bankNo.trim()) {
+      setErr('请填写户名和账号')
+      return
+    }
+    if (kind === 'entity' && !licenseNo.trim()) {
+      setErr('请填写统一社会信用代码')
+      return
+    }
+    setBusy('bind')
+    setErr('')
+    try {
+      await postTraining({
+        action: 'saveProfile',
+        hostId: me.accountId,
+        kind,
+        name: holder.trim(),
+        bank: bankName.trim(),
+        bankNo: bankNo.trim(),
+        licenseNo: kind === 'entity' ? licenseNo.trim() : '',
+      })
+      setBindOpen(false)
+      await load()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '保存失败')
     } finally {
       setBusy('')
     }
@@ -206,6 +277,21 @@ export default function WalletPage() {
       <section className="rounded-2xl border border-[var(--shell-border)] bg-[var(--panel-card)] p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
+            <h2 className="text-sm font-semibold text-[var(--shell-text)]">收款账户绑定</h2>
+            <p className="mt-1 text-sm text-[var(--shell-text)]">
+              {account?.name && account?.bankNo ? `已绑定 ${account.bank || '收款账户'} 尾号 ${String(account.bankNo).slice(-4)}` : '未绑定'}
+            </p>
+            <p className="mt-1 text-xs text-[var(--shell-muted)]">未绑定也可以发布培训。提现课时费前，把款项打到这个账户。</p>
+          </div>
+          <button type="button" className="rounded-xl border border-violet-200 px-3 py-2 text-sm font-semibold text-violet-700" onClick={openBind}>
+            {account?.name && account?.bankNo ? '修改' : '去绑定'}
+          </button>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-[var(--shell-border)] bg-[var(--panel-card)] p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
             <h2 className="text-sm font-semibold text-[var(--shell-text)]">培训结算</h2>
             <p className="mt-1 text-sm text-[var(--shell-text)]">可提现 ¥{Number(quote?.net || 0).toFixed(2)}</p>
             <p className="mt-1 text-xs text-[var(--shell-muted)]">
@@ -234,6 +320,45 @@ export default function WalletPage() {
         <h2 className="text-sm font-semibold text-[var(--shell-text)]">支付记录</h2>
         <p className="mt-1 text-xs text-[var(--shell-muted)]">会员开通与积分充值</p>
       </Link>
+
+      {bindOpen ? (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-6" onClick={() => setBindOpen(false)}>
+          <form
+            className="w-full max-w-md rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-3xl"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={(e) => { e.preventDefault(); void saveAccount() }}
+          >
+            <h2 className="text-lg font-bold text-slate-900">收款账户绑定</h2>
+            <p className="mt-1 text-sm text-slate-500">课时费提现打到这个账户。未绑定也可以发布培训。</p>
+            <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
+              <button type="button" className={kind === 'person' ? 'rounded-xl bg-white py-2 text-sm font-semibold text-violet-700' : 'rounded-xl py-2 text-sm text-slate-500'} onClick={() => setKind('person')}>个人</button>
+              <button type="button" className={kind === 'entity' ? 'rounded-xl bg-white py-2 text-sm font-semibold text-violet-700' : 'rounded-xl py-2 text-sm text-slate-500'} onClick={() => setKind('entity')}>个体户 / 企业</button>
+            </div>
+            <label className="mt-4 block text-xs font-medium text-slate-500">
+              户名
+              <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400" value={holder} onChange={(e) => setHolder(e.target.value)} placeholder={kind === 'person' ? '收款人姓名' : '账户名称'} />
+            </label>
+            <label className="mt-3 block text-xs font-medium text-slate-500">
+              开户行
+              <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400" value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="开户行" />
+            </label>
+            <label className="mt-3 block text-xs font-medium text-slate-500">
+              账号
+              <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400" value={bankNo} onChange={(e) => setBankNo(e.target.value)} placeholder="收款账号" />
+            </label>
+            {kind === 'entity' ? (
+              <label className="mt-3 block text-xs font-medium text-slate-500">
+                统一社会信用代码
+                <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400" value={licenseNo} onChange={(e) => setLicenseNo(e.target.value)} placeholder="18 位信用代码" />
+              </label>
+            ) : null}
+            <div className="mt-5 flex gap-2">
+              <button type="button" className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-600" onClick={() => setBindOpen(false)}>取消</button>
+              <button type="submit" disabled={busy === 'bind'} className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{busy === 'bind' ? '保存中' : '保存账户'}</button>
+            </div>
+          </form>
+        </div>
+      ) : null}
 
       {payOpen ? (
         <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-6" onClick={() => { setPayOpen(false); setPayTrade(''); setPayQr('') }}>

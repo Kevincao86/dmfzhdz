@@ -1,9 +1,9 @@
 <view class="la">
   <view class="la-hero">
-    <text class="la-hero__kicker">本地生活讲师</text>
-    <text class="la-hero__title">{{mode === 'apply' ? '申请讲师' : '收款认证'}}</text>
-    <text class="la-hero__sub" wx:if="{{mode === 'apply'}}">写你在哪座城市、出镜什么平台、带过哪些到店内容。审核通过后才能填写收款认证。</text>
-    <text class="la-hero__sub" wx:else>讲师已通过。填写证件和收款账户，课时费结算到这个账户。</text>
+    <text class="la-hero__kicker">{{mode === 'apply' ? '本地生活讲师' : '我的钱包'}}</text>
+    <text class="la-hero__title">{{mode === 'apply' ? '申请讲师' : '收款账户绑定'}}</text>
+    <text class="la-hero__sub" wx:if="{{mode === 'apply'}}">写你在哪座城市、出镜什么平台、带过哪些到店内容。审核通过后即可发布培训。</text>
+    <text class="la-hero__sub" wx:else>课时费提现打到这个账户。未绑定也可以发布培训。</text>
   </view>
 
   <block wx:if="{{mode === 'apply'}}">
@@ -23,8 +23,8 @@
     </view>
     <view class="la-card" wx:if="{{lecturerStatus !== 'none'}}">
       <text class="la-sec">{{lecturerStatus === 'approved' ? '已通过' : lecturerStatus === 'pending' ? '审核中' : '未通过'}}</text>
-      <text class="la-note" wx:if="{{lecturerStatus === 'approved'}}">讲师申请已通过，可以去填写收款认证。</text>
-      <text class="la-note" wx:elif="{{lecturerStatus === 'pending'}}">平台正在审核。通过前不能填写收款认证。</text>
+      <text class="la-note" wx:if="{{lecturerStatus === 'approved'}}">讲师申请已通过，可以发布培训。收款账户在我的钱包绑定。</text>
+      <text class="la-note" wx:elif="{{lecturerStatus === 'pending'}}">平台正在审核。通过后即可发布培训。</text>
       <text class="la-note" wx:else>可以修改介绍后重新提交。</text>
     </view>
     <view class="la-card">
@@ -92,8 +92,8 @@
 
   <block wx:elif="{{lecturerStatus !== 'approved'}}">
     <view class="la-card">
-      <text class="la-sec">还不能收款认证</text>
-      <text class="la-note">请先提交讲师申请。审核通过后，再填写证件和收款账户。</text>
+      <text class="la-sec">还不能绑定</text>
+      <text class="la-note">讲师通过后才能绑定收款账户。未绑定也可以发布培训。</text>
     </view>
     <view class="la-bar">
       <view class="la-btn" bindtap="goApply">去申请讲师</view>
@@ -112,42 +112,9 @@
     </view>
 
     <view class="la-card">
-      <text class="la-sec">证件原件</text>
-      <text class="la-sec__hint">上传后自动填入证件文字，请核对后再提交。</text>
-      <view class="la-docs">
-        <view class="la-doc" data-kind="id_front" bindtap="onPickDoc">
-          <image wx:if="{{idFront}}" class="la-doc__img" src="{{idFront}}" mode="aspectFill" />
-          <block wx:else>
-            <text class="la-doc__name">人像面</text>
-            <text class="la-doc__tip">点击上传</text>
-          </block>
-          <text wx:if="{{idFront}}" class="la-doc__badge">已上传</text>
-        </view>
-        <view class="la-doc" data-kind="id_back" bindtap="onPickDoc">
-          <image wx:if="{{idBack}}" class="la-doc__img" src="{{idBack}}" mode="aspectFill" />
-          <block wx:else>
-            <text class="la-doc__name">国徽面</text>
-            <text class="la-doc__tip">点击上传</text>
-          </block>
-          <text wx:if="{{idBack}}" class="la-doc__badge">已上传</text>
-        </view>
-      </view>
-      <view wx:if="{{kind === 'entity'}}" class="la-doc la-doc--wide" data-kind="license" bindtap="onPickDoc">
-        <image wx:if="{{licenseImage}}" class="la-doc__img" src="{{licenseImage}}" mode="aspectFill" />
-        <block wx:else>
-          <text class="la-doc__name">营业执照</text>
-          <text class="la-doc__tip">点击上传并识别</text>
-        </block>
-        <text wx:if="{{licenseImage}}" class="la-doc__badge">已上传</text>
-      </view>
-    </view>
-
-    <view class="la-card">
-      <text class="la-sec">身份信息</text>
-      <text class="la-label">{{kind === 'person' ? '姓名' : '主体名称'}}</text>
-      <input class="la-input" value="{{name}}" bindinput="onName" placeholder="{{kind === 'person' ? '与身份证一致' : '与营业执照一致'}}" />
-      <text class="la-label">{{kind === 'person' ? '身份证号' : '联系人身份证'}}</text>
-      <input class="la-input" value="{{idNo}}" bindinput="onId" placeholder="请核对识别结果" />
+      <text class="la-sec">账户信息</text>
+      <text class="la-label">户名</text>
+      <input class="la-input" value="{{name}}" bindinput="onName" placeholder="{{kind === 'person' ? '收款人姓名' : '账户名称'}}" />
       <block wx:if="{{kind === 'entity'}}">
         <text class="la-label">统一社会信用代码</text>
         <input class="la-input" value="{{licenseNo}}" bindinput="onLicense" placeholder="18 位信用代码" />
@@ -163,7 +130,7 @@
     </view>
 
     <view class="la-bar">
-      <view class="la-btn" bindtap="onSave">保存收款认证</view>
+      <view class="la-btn" bindtap="onSave">保存账户</view>
     </view>
   </block>
 </view>

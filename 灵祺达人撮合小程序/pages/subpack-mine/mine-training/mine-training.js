@@ -8,7 +8,6 @@ Page({
     loading: true,
     lecturerStatus: 'none',
     lecturerLabel: '未申请',
-    payoutLabel: '待开通',
   },
   onShow() {
     this.load()
@@ -18,8 +17,7 @@ Page({
     const profile = await training.syncProfile()
     const lecturerStatus = training.lecturerState(profile)
     const lecturerLabel = lecturerStatus === 'approved' ? '已通过' : lecturerStatus === 'pending' ? '审核中' : lecturerStatus === 'rejected' ? '未通过' : profile && profile.lecturerStatus === 'none' ? '未认证' : '未申请'
-    const payoutLabel = lecturerStatus !== 'approved' ? '待开通' : profile && profile.bankNo ? '已认证' : '未填写'
-    this.setData({ lecturerStatus, lecturerLabel, payoutLabel })
+    this.setData({ lecturerStatus, lecturerLabel })
   },
   async load() {
     this.setData({ loading: true })
@@ -47,22 +45,6 @@ Page({
   onApply() {
     wx.navigateTo({ url: '/pages/subpack-mine/mine-training-account/mine-training-account?mode=apply' })
   },
-  onAccount() {
-    if (this.data.lecturerStatus !== 'approved') {
-      wx.showModal({
-        title: '请先申请讲师',
-        content: '讲师申请审核通过后，才能填写收款认证。',
-        confirmText: '去申请',
-        success: (res) => {
-          if (res.confirm) {
-            wx.navigateTo({ url: '/pages/subpack-mine/mine-training-account/mine-training-account?mode=apply' })
-          }
-        },
-      })
-      return
-    }
-    wx.navigateTo({ url: '/pages/subpack-mine/mine-training-account/mine-training-account?mode=payout' })
-  },
   onSettle() {
     wx.navigateTo({ url: '/pages/subpack-mine/mine-training-settle/mine-training-settle' })
   },
@@ -83,8 +65,6 @@ Page({
             return
           } else if (reason.indexOf('讲师') >= 0) {
             wx.navigateTo({ url: '/pages/subpack-mine/mine-training-account/mine-training-account?mode=apply' })
-          } else if (reason.indexOf('认证') >= 0) {
-            wx.navigateTo({ url: '/pages/subpack-mine/mine-training-account/mine-training-account?mode=payout' })
           }
         },
       })

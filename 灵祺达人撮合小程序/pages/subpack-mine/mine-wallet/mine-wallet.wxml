@@ -28,6 +28,17 @@
   <view class="wl-card">
     <view class="wl-row">
       <view>
+        <text class="wl-name">收款账户绑定</text>
+        <text class="wl-line">{{accountBound ? '已绑定' : '未绑定'}}</text>
+        <text class="wl-hint">未绑定也可以发布培训。提现课时费前，把款项打到这个账户。</text>
+      </view>
+      <view class="wl-btn wl-btn--ghost" bindtap="onBindAccount">{{accountBound ? '修改' : '去绑定'}}</view>
+    </view>
+  </view>
+
+  <view class="wl-card">
+    <view class="wl-row">
+      <view>
         <text class="wl-name">培训结算</text>
         <text class="wl-line">可提现 ¥{{netLabel}}</text>
         <text class="wl-hint">已扣佣金 ¥{{commissionLabel}}，个税 ¥{{taxLabel}}。提现到绑定的收款账户。</text>

@@ -55,7 +55,7 @@ Page({
   onLoad(query) {
     const mode = query && query.mode === 'apply' ? 'apply' : 'payout'
     this.setData({ mode })
-    wx.setNavigationBarTitle({ title: mode === 'apply' ? '申请讲师' : '收款认证' })
+    wx.setNavigationBarTitle({ title: mode === 'apply' ? '申请讲师' : '收款账户绑定' })
   },
   async onShow() {
     let depositPaid = training.depositPaid()

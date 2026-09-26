@@ -1,5 +1,5 @@
 <view class="tp">
-  <text class="tp-hint" wx:if="{{!profile}}">还没有收款认证。请先到收款认证选择个人或个体户/企业。</text>
+  <text class="tp-hint" wx:if="{{!profile || !profile.bankNo}}">还没有绑定收款账户。到我的钱包绑定后才能提现，不影响发布培训。</text>
   <block wx:else>
     <text class="tp-label">当前主体</text>
     <text class="st-line">{{profile.kind === 'entity' ? '个体户 / 企业' : '个人'}} · {{profile.name}}</text>

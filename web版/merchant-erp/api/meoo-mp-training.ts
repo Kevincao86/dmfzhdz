@@ -325,7 +325,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     const prev = store.profiles.find((p) => p.hostId === hostId)
     if (!prev || lecturerState(prev) !== 'approved') {
-      res.status(400).json({ ok: false, error: '讲师申请通过后才能收款认证' })
+      res.status(400).json({ ok: false, error: '讲师申请通过后才能绑定收款账户' })
       return
     }
     const name = String(body.name || '').trim()
@@ -375,10 +375,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(400).json({ ok: false, error: '请先申请讲师并通过审核' })
         return
       }
-      if (!profile.name || !profile.bankNo) {
-        res.status(400).json({ ok: false, error: '请先完成收款认证' })
-        return
-      }
       if (!trainingDepositView(hostId).paid) {
         res.status(400).json({ ok: false, error: '请先缴纳保证金' })
         return
@@ -417,8 +413,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return
     }
     const profile = store.profiles.find((p) => p.hostId === hostId)
-    if (!profile || lecturerState(profile) !== 'approved' || !profile.name || !profile.bankNo) {
-      res.status(400).json({ ok: false, error: '请先完成讲师审核和收款认证' })
+    if (!profile || lecturerState(profile) !== 'approved') {
+      res.status(400).json({ ok: false, error: '请先申请讲师并通过审核' })
       return
     }
     const title = String(body.title || '').trim()

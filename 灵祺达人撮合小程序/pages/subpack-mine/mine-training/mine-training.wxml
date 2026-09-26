@@ -5,10 +5,6 @@
       <text class="tr-action__name">申请讲师</text>
       <text class="tr-action__state">{{lecturerLabel}}</text>
     </view>
-    <view class="tr-action {{lecturerStatus === 'approved' ? '' : 'tr-action--wait'}}" bindtap="onAccount">
-      <text class="tr-action__name">收款认证</text>
-      <text class="tr-action__state">{{payoutLabel}}</text>
-    </view>
     <view class="tr-action" bindtap="onSettle">
       <text class="tr-action__name">我的结算</text>
       <text class="tr-action__state">课时费</text>
@@ -39,6 +35,6 @@
   </view>
   <view class="tr-post" bindtap="onPost">
     <text class="tr-post__main">发布培训</text>
-    <text class="tr-post__sub">先开通会员并缴纳保证金，再申请讲师</text>
+    <text class="tr-post__sub">讲师通过后即可发布，收款账户在我的钱包绑定</text>
   </view>
 </view>

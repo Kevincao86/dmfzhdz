@@ -16,7 +16,7 @@
       <text>保证金 ¥{{yuan}}</text>
       <text class="{{paid ? 'tp-ok' : 'tp-wait'}}">{{paid ? '已缴纳' : '未缴纳'}}</text>
     </view>
-    <text class="tp-hint">保证金到我的钱包缴纳。讲师审核通过并完成收款认证后才能发布。</text>
+    <text class="tp-hint">保证金到我的钱包缴纳。讲师审核通过后即可发布。收款账户在我的钱包绑定。</text>
   </view>
 
   <block wx:if="{{view === 'list' && !depositOnly}}">

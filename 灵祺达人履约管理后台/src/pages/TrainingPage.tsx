@@ -211,10 +211,8 @@ export default function TrainingPage() {
   }, [payTrade])
 
   const shown = courses.filter((c) => mode === 'all' || c.mode === mode)
-  const payoutReady = lecturerStatus === 'approved' && !!name.trim() && !!bankNo.trim()
   function publishGate() {
     if (lecturerStatus !== 'approved') return '请先申请讲师并通过审核'
-    if (!name.trim() || !bankNo.trim()) return '讲师已通过。请先完成收款认证，再发布培训'
     if (!depositPaid) return '请先到我的钱包缴纳保证金'
     return ''
   }
@@ -257,7 +255,6 @@ export default function TrainingPage() {
     if (reason) {
       setErr(reason)
       if (lecturerStatus !== 'approved') setPanel('apply')
-      else if (!name.trim() || !bankNo.trim()) setPanel('payout')
       else navigate('/profile/wallet')
       return
     }
@@ -305,24 +302,6 @@ export default function TrainingPage() {
               }}
             >
               {applyLabel}
-            </button>
-            <button
-              type="button"
-              className={
-                lecturerStatus === 'approved'
-                  ? 'rounded-xl border border-violet-200 bg-white px-4 py-2 text-sm font-semibold text-violet-700'
-                  : 'rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-400'
-              }
-              onClick={() => {
-                if (lecturerStatus !== 'approved') {
-                  setErr('讲师申请通过后才能收款认证')
-                  return
-                }
-                setErr('')
-                setPanel('payout')
-              }}
-            >
-              {payoutReady ? '收款资料' : '收款认证'}
             </button>
           </div>
         </div>
@@ -573,43 +552,13 @@ export default function TrainingPage() {
                   .finally(() => setSaving(false))
                 return
               }
-              if (!name.trim() || !idNo.trim() || !bank.trim() || !bankNo.trim()) {
-                setErr('请填写收款资料')
-                return
-              }
-              if (kind === 'entity' && !licenseNo.trim()) {
-                setErr('请填写统一社会信用代码')
-                return
-              }
-              setSaving(true)
-              setErr('')
-              postTraining({
-                action: 'saveProfile',
-                hostId: me.accountId,
-                kind,
-                name: name.trim(),
-                idNo: idNo.trim(),
-                bank: bank.trim(),
-                bankNo: bankNo.trim(),
-                licenseNo: kind === 'entity' ? licenseNo.trim() : '',
-                idFront,
-                idBack,
-                licenseImage,
-              })
-                .then(() => setPanel(''))
-                .catch((ex) => setErr(ex instanceof Error ? ex.message : '保存失败'))
-                .finally(() => setSaving(false))
             }}
           >
             <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
               <div>
                 <p className="text-xs font-semibold tracking-wide text-violet-600">本地生活讲师</p>
-                <h2 className="mt-1 text-xl font-bold text-slate-900">{panel === 'apply' ? '申请讲师' : '收款认证'}</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  {panel === 'apply'
-                    ? '先写你在哪座城市、出镜什么平台、带过哪些到店内容。审核通过后才能填写收款认证。'
-                    : '讲师已通过。填写证件和收款账户，课时费才会结算到这个账户。'}
-                </p>
+                <h2 className="mt-1 text-xl font-bold text-slate-900">申请讲师</h2>
+                <p className="mt-1 text-sm text-slate-500">先写你在哪座城市、出镜什么平台、带过哪些到店内容。审核通过后即可发布培训。收款账户在我的钱包绑定。</p>
               </div>
               <button type="button" className="rounded-full px-2 text-xl leading-none text-slate-400 hover:text-slate-700" onClick={() => setPanel('')} aria-label="关闭">
                 ×
@@ -641,98 +590,6 @@ export default function TrainingPage() {
                   )}
                 </div>
               </section>
-              ) : null}
-
-              {panel === 'payout' ? (
-              <>
-              <section>
-                <h3 className="text-sm font-semibold text-slate-900">收款主体</h3>
-                <div className="mt-3 grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
-                  <button type="button" className={`rounded-xl py-2 text-sm ${kind === 'person' ? 'bg-white font-semibold text-violet-700 shadow-sm' : 'text-slate-500'}`} onClick={() => setKind('person')}>
-                    个人
-                  </button>
-                  <button type="button" className={`rounded-xl py-2 text-sm ${kind === 'entity' ? 'bg-white font-semibold text-violet-700 shadow-sm' : 'text-slate-500'}`} onClick={() => setKind('entity')}>
-                    个体户 / 企业
-                  </button>
-                </div>
-                <p className="mt-2 text-xs leading-relaxed text-slate-500">
-                  {kind === 'person'
-                    ? '个人不能开增值税发票。学员要票请改个体户或企业。'
-                    : '凭你开出的 99% 发票结算，学员发票由你的主体开具。'}
-                </p>
-              </section>
-
-              <section>
-                <h3 className="text-sm font-semibold text-slate-900">证件原件</h3>
-                <p className="mt-1 text-xs text-slate-500">上传后自动填入证件文字，请核对。</p>
-                <div className={`mt-3 grid gap-3 ${kind === 'entity' ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
-                  {(
-                    [
-                      ['id_front', '身份证人像面'],
-                      ['id_back', '身份证国徽面'],
-                      ...(kind === 'entity' ? [['license', '营业执照'] as const] : []),
-                    ] as const
-                  ).map(([docKind, label]) => {
-                    const preview = docKind === 'id_front' ? idFront : docKind === 'id_back' ? idBack : licenseImage
-                    return (
-                      <label key={docKind} className="relative flex h-32 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border border-dashed border-violet-200 bg-violet-50/40 text-center">
-                        {preview ? <img src={preview} alt="" className="absolute inset-0 h-full w-full object-cover" /> : null}
-                        <span className={`relative px-2 text-sm font-medium ${preview ? 'rounded-full bg-slate-900/70 py-1 text-white' : 'text-slate-700'}`}>
-                          {preview ? '已上传 · 更换' : label}
-                        </span>
-                        {!preview ? <span className="relative mt-1 text-xs text-slate-400">点击上传</span> : null}
-                        <input
-                          className="sr-only"
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            if (!file) return
-                            setOcrHint(`正在识别${label}…`)
-                            compressImageFile(file)
-                              .then((imageDataUrl) => {
-                                if (docKind === 'id_front') setIdFront(imageDataUrl)
-                                else if (docKind === 'id_back') setIdBack(imageDataUrl)
-                                else setLicenseImage(imageDataUrl)
-                                return postTraining({ action: 'ocrDoc', kind: docKind, imageDataUrl })
-                              })
-                              .then((r) => {
-                                const f = (r.fields || {}) as Record<string, string>
-                                if (f.name) setName(f.name)
-                                if (f.idNo) setIdNo(f.idNo)
-                                if (f.licenseNo) setLicenseNo(f.licenseNo)
-                                setOcrHint(`已填入${label}文字，请核对`)
-                              })
-                              .catch((ex) => setOcrHint(ex instanceof Error ? ex.message : `${label}识别失败`))
-                          }}
-                        />
-                      </label>
-                    )
-                  })}
-                </div>
-                {ocrHint ? <p className="mt-2 text-xs text-violet-700">{ocrHint}</p> : null}
-              </section>
-
-              <section>
-                <h3 className="text-sm font-semibold text-slate-900">身份信息</h3>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <label className="block text-xs font-medium text-slate-500">
-                    {kind === 'person' ? '姓名' : '主体名称'}
-                    <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" placeholder={kind === 'person' ? '与身份证一致' : '与营业执照一致'} value={name} onChange={(e) => setName(e.target.value)} />
-                  </label>
-                  <label className="block text-xs font-medium text-slate-500">
-                    {kind === 'person' ? '身份证号' : '联系人身份证'}
-                    <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" placeholder="请核对识别结果" value={idNo} onChange={(e) => setIdNo(e.target.value)} />
-                  </label>
-                  {kind === 'entity' ? (
-                    <label className="block text-xs font-medium text-slate-500 sm:col-span-2">
-                      统一社会信用代码
-                      <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" placeholder="18 位信用代码" value={licenseNo} onChange={(e) => setLicenseNo(e.target.value)} />
-                    </label>
-                  ) : null}
-                </div>
-              </section>
-              </>
               ) : null}
 
               {panel === 'apply' ? (
@@ -804,21 +661,6 @@ export default function TrainingPage() {
               </section>
               ) : null}
 
-              {panel === 'payout' ? (
-              <section>
-                <h3 className="text-sm font-semibold text-slate-900">收款账户</h3>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <label className="block text-xs font-medium text-slate-500">
-                    开户行
-                    <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" placeholder={kind === 'person' ? '个人银行卡开户行' : '对公或经营者账户开户行'} value={bank} onChange={(e) => setBank(e.target.value)} />
-                  </label>
-                  <label className="block text-xs font-medium text-slate-500">
-                    账号
-                    <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" placeholder="收款账号" value={bankNo} onChange={(e) => setBankNo(e.target.value)} />
-                  </label>
-                </div>
-              </section>
-              ) : null}
               {err ? <p className="text-sm text-red-600">{err}</p> : null}
             </div>
             <div className="flex gap-2 border-t border-slate-100 bg-white px-6 py-4">
@@ -826,7 +668,7 @@ export default function TrainingPage() {
                 取消
               </button>
               <button type="submit" disabled={saving || (panel === 'apply' && lecturerStatus === 'approved')} className="flex-1 rounded-xl bg-violet-600 px-3 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
-                {saving ? '提交中…' : panel === 'apply' ? (lecturerStatus === 'approved' ? '已通过' : lecturerStatus === 'pending' ? '更新申请' : '提交申请') : '保存收款认证'}
+                {saving ? '提交中…' : lecturerStatus === 'approved' ? '已通过' : lecturerStatus === 'pending' ? '更新申请' : '提交申请'}
               </button>
             </div>
           </form>

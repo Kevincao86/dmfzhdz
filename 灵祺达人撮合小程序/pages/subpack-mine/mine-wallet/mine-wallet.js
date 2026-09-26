@@ -17,6 +17,7 @@ Page({
     netLabel: '0',
     commissionLabel: '0',
     taxLabel: '0',
+    accountBound: false,
   },
   onLoad() {
     prepareMineSubPage(this)
@@ -45,11 +46,13 @@ Page({
         ? Math.max(0, Math.floor(Number(s.balance) || packageRemaining + rechargeBalance))
         : Math.max(0, Math.floor(Number(data && data.mpAiPointsBalance) || 0))
       const summary = await training.walletSummary()
+      const profile = await training.syncProfile()
       const quote = summary.settlement || {}
       this.setData({
         loading: false,
         balanceLabel: balance.toLocaleString('zh-CN'),
         depositPaid: summary.depositPaid,
+        accountBound: !!(profile && profile.name && profile.bankNo),
         netLabel: Number(quote.net || 0).toFixed(2),
         commissionLabel: Number(quote.commission || 0).toFixed(2),
         taxLabel: Number(quote.tax || 0).toFixed(2),
@@ -60,6 +63,9 @@ Page({
   },
   onPoints() {
     wx.navigateTo({ url: '/pages/subpack-mine/mine-xingxuan-points-recharge/mine-xingxuan-points-recharge' })
+  },
+  onBindAccount() {
+    wx.navigateTo({ url: '/pages/subpack-mine/mine-training-account/mine-training-account?mode=payout' })
   },
   onSettle() {
     wx.navigateTo({ url: '/pages/subpack-mine/mine-training-settle/mine-training-settle' })

@@ -118,7 +118,6 @@ function publishBlockReason() {
   if (state === 'none') return profile && profile.lecturerStatus === 'none' ? '讲师未认证，不能发布课程' : '请先申请讲师'
   if (state === 'pending') return '讲师申请审核中，通过后才能发布'
   if (state === 'rejected') return '讲师申请未通过，请修改后重新提交'
-  if (!profile.bankNo || !profile.name) return '请先完成收款认证'
   if (!depositPaid()) return '发布培训需缴纳保证金'
   return ''
 }
@@ -345,7 +344,7 @@ async function recognizeDoc(kind, imageDataUrl) {
 
 async function saveProfile(input) {
   const prev = readProfile() || {}
-  if (lecturerState(prev) !== 'approved') throw new Error('讲师申请通过后才能收款认证')
+  if (lecturerState(prev) !== 'approved') throw new Error('讲师申请通过后才能绑定收款账户')
   const profile = {
     ...prev,
     hostId: accountId(),
