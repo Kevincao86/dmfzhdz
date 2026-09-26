@@ -51,7 +51,12 @@ function publishBlockReason() {
   }
   if (!isAdvancedMember()) return '发布培训需开通高级会员（专业版及以上）'
   if (!depositPaid()) return '发布培训需缴纳保证金'
-  if (!readProfile()) return '请先完成收款认证'
+  const profile = readProfile()
+  const state = lecturerState(profile)
+  if (state === 'none') return '请先申请讲师'
+  if (state === 'pending') return '讲师申请审核中，通过后才能发布'
+  if (state === 'rejected') return '讲师申请未通过，请修改后重新提交'
+  if (!profile.bankNo || !profile.name) return '请先完成收款认证'
   return ''
 }
 
@@ -133,6 +138,59 @@ function writeProfile(profile) {
   wx.setStorageSync(PROFILE_KEY, map)
 }
 
+function lecturerState(profile) {
+  if (!profile) return 'none'
+  if (profile.lecturerStatus === 'pending' || profile.lecturerStatus === 'approved' || profile.lecturerStatus === 'rejected') {
+    return profile.lecturerStatus
+  }
+  if (profile.intro && profile.city) return 'approved'
+  return 'none'
+}
+
+async function syncProfile() {
+  if (!(ecs.hasBase && ecs.hasBase())) return readProfile()
+  try {
+    const res = await ecs.get(`/api/meoo-mp-training?hostId=${encodeURIComponent(accountId())}`)
+    if (res && res.profile) {
+      writeProfile(res.profile)
+      return res.profile
+    }
+  } catch (_) {}
+  return readProfile()
+}
+
+async function applyLecturer(input) {
+  const prev = readProfile() || {}
+  const profile = {
+    ...prev,
+    hostId: accountId(),
+    city: String(input.city || '').trim(),
+    platforms: String(input.platforms || '').trim(),
+    skills: String(input.skills || '').trim(),
+    years: String(input.years || '').trim(),
+    intro: String(input.intro || '').trim(),
+    lecturerStatus: 'pending',
+    updatedAt: new Date().toISOString(),
+  }
+  if (!profile.city || !profile.intro) throw new Error('请填写常驻城市和讲师介绍')
+  if (ecs.hasBase && ecs.hasBase()) {
+    const res = await ecs.post('/api/meoo-mp-training', {
+      action: 'applyLecturer',
+      hostId: profile.hostId,
+      city: profile.city,
+      platforms: profile.platforms,
+      skills: profile.skills,
+      years: profile.years,
+      intro: profile.intro,
+    })
+    const saved = (res && res.profile) || profile
+    writeProfile(saved)
+    return saved
+  }
+  writeProfile(profile)
+  return profile
+}
+
 function readOrders() {
   try {
     const list = wx.getStorageSync(ORDER_KEY)
@@ -175,7 +233,10 @@ async function recognizeDoc(kind, imageDataUrl) {
 }
 
 async function saveProfile(input) {
+  const prev = readProfile() || {}
+  if (lecturerState(prev) !== 'approved') throw new Error('讲师申请通过后才能收款认证')
   const profile = {
+    ...prev,
     hostId: accountId(),
     kind: input.kind === 'entity' ? 'entity' : 'person',
     name: String(input.name || '').trim(),
@@ -183,25 +244,21 @@ async function saveProfile(input) {
     bank: String(input.bank || '').trim(),
     bankNo: String(input.bankNo || '').trim(),
     licenseNo: String(input.licenseNo || '').trim(),
-    city: String(input.city || '').trim(),
-    platforms: String(input.platforms || '').trim(),
-    skills: String(input.skills || '').trim(),
-    years: String(input.years || '').trim(),
-    intro: String(input.intro || '').trim(),
-    idFront: String(input.idFront || ''),
-    idBack: String(input.idBack || ''),
-    licenseImage: String(input.licenseImage || ''),
+    idFront: String(input.idFront || prev.idFront || ''),
+    idBack: String(input.idBack || prev.idBack || ''),
+    licenseImage: String(input.licenseImage || prev.licenseImage || ''),
+    lecturerStatus: 'approved',
     updatedAt: new Date().toISOString(),
   }
   if (!profile.name || !profile.bankNo) throw new Error('请填写户名和账号')
-  if (!profile.city || !profile.intro) throw new Error('请填写常驻城市和讲师介绍')
   if (profile.kind === 'entity' && !profile.licenseNo) throw new Error('请填写统一社会信用代码')
-  writeProfile(profile)
   if (ecs.hasBase && ecs.hasBase()) {
-    try {
-      await ecs.post('/api/meoo-mp-training', { action: 'saveProfile', ...profile })
-    } catch (_) {}
+    const res = await ecs.post('/api/meoo-mp-training', { action: 'saveProfile', ...profile })
+    const saved = (res && res.profile) || profile
+    writeProfile(saved)
+    return saved
   }
+  writeProfile(profile)
   return profile
 }
 
@@ -295,6 +352,9 @@ module.exports = {
   createCourse,
   signup,
   readProfile,
+  lecturerState,
+  syncProfile,
+  applyLecturer,
   recognizeDoc,
   saveProfile,
   myOrders,

@@ -1,8 +1,18 @@
 <view class="tr-page">
-  <text class="tr-note">课时费由平台代收。平台留 1% 佣金，99% 核实通过后 T+1 结算。</text>
-  <view class="tr-links">
-    <text bindtap="onAccount">收款认证</text>
-    <text bindtap="onSettle">我的结算</text>
+  <text class="tr-note">课时费代收代付。佣金 1%，其余核实通过后 T+1 结算。</text>
+  <view class="tr-actions">
+    <view class="tr-action" bindtap="onApply">
+      <text class="tr-action__name">申请讲师</text>
+      <text class="tr-action__state">{{lecturerLabel}}</text>
+    </view>
+    <view class="tr-action {{lecturerStatus === 'approved' ? '' : 'tr-action--wait'}}" bindtap="onAccount">
+      <text class="tr-action__name">收款认证</text>
+      <text class="tr-action__state">{{payoutLabel}}</text>
+    </view>
+    <view class="tr-action" bindtap="onSettle">
+      <text class="tr-action__name">我的结算</text>
+      <text class="tr-action__state">课时费</text>
+    </view>
   </view>
   <view class="tr-seg">
     <view class="tr-seg__item {{filter === 'all' ? 'tr-seg__item--on' : ''}}" data-id="all" bindtap="onFilter">全部</view>

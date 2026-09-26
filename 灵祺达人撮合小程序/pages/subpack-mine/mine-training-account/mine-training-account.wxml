@@ -1,87 +1,111 @@
 <view class="la">
   <view class="la-hero">
     <text class="la-hero__kicker">本地生活讲师</text>
-    <text class="la-hero__title">申请讲师</text>
-    <text class="la-hero__sub">讲给探店、团购和到店直播的达人。先确认你是谁、常在哪座城市讲课。</text>
+    <text class="la-hero__title">{{mode === 'apply' ? '申请讲师' : '收款认证'}}</text>
+    <text class="la-hero__sub" wx:if="{{mode === 'apply'}}">写你在哪座城市、出镜什么平台、带过哪些到店内容。审核通过后才能填写收款认证。</text>
+    <text class="la-hero__sub" wx:else>讲师已通过。填写证件和收款账户，课时费结算到这个账户。</text>
   </view>
 
-  <view class="la-card">
-    <text class="la-sec">收款主体</text>
-    <view class="la-seg">
-      <view class="la-seg__item {{kind === 'person' ? 'la-seg__item--on' : ''}}" data-id="person" bindtap="onKind">个人</view>
-      <view class="la-seg__item {{kind === 'entity' ? 'la-seg__item--on' : ''}}" data-id="entity" bindtap="onKind">个体户 / 企业</view>
+  <block wx:if="{{mode === 'apply'}}">
+    <view class="la-card" wx:if="{{lecturerStatus !== 'none'}}">
+      <text class="la-sec">{{lecturerStatus === 'approved' ? '已通过' : lecturerStatus === 'pending' ? '审核中' : '未通过'}}</text>
+      <text class="la-note" wx:if="{{lecturerStatus === 'approved'}}">讲师申请已通过，可以去填写收款认证。</text>
+      <text class="la-note" wx:elif="{{lecturerStatus === 'pending'}}">平台正在审核。通过前不能填写收款认证。</text>
+      <text class="la-note" wx:else>可以修改介绍后重新提交。</text>
     </view>
-    <text class="la-note" wx:if="{{kind === 'person'}}">按月累计预扣个人所得税。当月应付款不超过 800 元不预扣。个人不能开增值税发票。</text>
-    <text class="la-note" wx:else>不扣个税。凭你开出的 99% 发票结算，学员发票由你的主体开具。</text>
-  </view>
+    <view class="la-card">
+      <text class="la-sec">讲师介绍</text>
+      <text class="la-sec__hint">写给本地生活达人：你在哪座城市、出镜什么平台、带过哪些到店内容。</text>
+      <text class="la-label">常驻城市</text>
+      <input class="la-input" value="{{city}}" bindinput="onCity" disabled="{{lecturerStatus === 'approved'}}" placeholder="如：宁波" />
+      <text class="la-label">出镜平台</text>
+      <input class="la-input" value="{{platforms}}" bindinput="onPlatforms" disabled="{{lecturerStatus === 'approved'}}" placeholder="抖音 / 小红书 / 视频号" />
+      <text class="la-label">擅长内容</text>
+      <input class="la-input" value="{{skills}}" bindinput="onSkills" disabled="{{lecturerStatus === 'approved'}}" placeholder="探店、团购带货、到店直播、门店短视频" />
+      <text class="la-label">本地生活经验</text>
+      <input class="la-input" value="{{years}}" bindinput="onYears" disabled="{{lecturerStatus === 'approved'}}" placeholder="如：3 年" />
+      <text class="la-label">介绍</text>
+      <textarea class="la-area" value="{{intro}}" bindinput="onIntro" disabled="{{lecturerStatus === 'approved'}}" placeholder="带过哪些品类、商圈或门店，这门课解决什么接单问题" />
+    </view>
+    <view class="la-bar" wx:if="{{lecturerStatus !== 'approved'}}">
+      <view class="la-btn" bindtap="onApply">{{lecturerStatus === 'rejected' ? '重新提交' : lecturerStatus === 'pending' ? '更新申请' : '提交申请'}}</view>
+    </view>
+  </block>
 
-  <view class="la-card">
-    <text class="la-sec">证件原件</text>
-    <text class="la-sec__hint">上传后自动填入证件文字，请核对后再提交。</text>
-    <view class="la-docs">
-      <view class="la-doc" data-kind="id_front" bindtap="onPickDoc">
-        <image wx:if="{{idFront}}" class="la-doc__img" src="{{idFront}}" mode="aspectFill" />
-        <block wx:else>
-          <text class="la-doc__name">人像面</text>
-          <text class="la-doc__tip">点击上传</text>
-        </block>
-        <text wx:if="{{idFront}}" class="la-doc__badge">已上传</text>
+  <block wx:elif="{{lecturerStatus !== 'approved'}}">
+    <view class="la-card">
+      <text class="la-sec">还不能收款认证</text>
+      <text class="la-note">请先提交讲师申请。审核通过后，再填写证件和收款账户。</text>
+    </view>
+    <view class="la-bar">
+      <view class="la-btn" bindtap="goApply">去申请讲师</view>
+    </view>
+  </block>
+
+  <block wx:else>
+    <view class="la-card">
+      <text class="la-sec">收款主体</text>
+      <view class="la-seg">
+        <view class="la-seg__item {{kind === 'person' ? 'la-seg__item--on' : ''}}" data-id="person" bindtap="onKind">个人</view>
+        <view class="la-seg__item {{kind === 'entity' ? 'la-seg__item--on' : ''}}" data-id="entity" bindtap="onKind">个体户 / 企业</view>
       </view>
-      <view class="la-doc" data-kind="id_back" bindtap="onPickDoc">
-        <image wx:if="{{idBack}}" class="la-doc__img" src="{{idBack}}" mode="aspectFill" />
+      <text class="la-note" wx:if="{{kind === 'person'}}">按月累计预扣个人所得税。当月应付款不超过 800 元不预扣。个人不能开增值税发票。</text>
+      <text class="la-note" wx:else>不扣个税。凭你开出的 99% 发票结算，学员发票由你的主体开具。</text>
+    </view>
+
+    <view class="la-card">
+      <text class="la-sec">证件原件</text>
+      <text class="la-sec__hint">上传后自动填入证件文字，请核对后再提交。</text>
+      <view class="la-docs">
+        <view class="la-doc" data-kind="id_front" bindtap="onPickDoc">
+          <image wx:if="{{idFront}}" class="la-doc__img" src="{{idFront}}" mode="aspectFill" />
+          <block wx:else>
+            <text class="la-doc__name">人像面</text>
+            <text class="la-doc__tip">点击上传</text>
+          </block>
+          <text wx:if="{{idFront}}" class="la-doc__badge">已上传</text>
+        </view>
+        <view class="la-doc" data-kind="id_back" bindtap="onPickDoc">
+          <image wx:if="{{idBack}}" class="la-doc__img" src="{{idBack}}" mode="aspectFill" />
+          <block wx:else>
+            <text class="la-doc__name">国徽面</text>
+            <text class="la-doc__tip">点击上传</text>
+          </block>
+          <text wx:if="{{idBack}}" class="la-doc__badge">已上传</text>
+        </view>
+      </view>
+      <view wx:if="{{kind === 'entity'}}" class="la-doc la-doc--wide" data-kind="license" bindtap="onPickDoc">
+        <image wx:if="{{licenseImage}}" class="la-doc__img" src="{{licenseImage}}" mode="aspectFill" />
         <block wx:else>
-          <text class="la-doc__name">国徽面</text>
-          <text class="la-doc__tip">点击上传</text>
+          <text class="la-doc__name">营业执照</text>
+          <text class="la-doc__tip">点击上传并识别</text>
         </block>
-        <text wx:if="{{idBack}}" class="la-doc__badge">已上传</text>
+        <text wx:if="{{licenseImage}}" class="la-doc__badge">已上传</text>
       </view>
     </view>
-    <view wx:if="{{kind === 'entity'}}" class="la-doc la-doc--wide" data-kind="license" bindtap="onPickDoc">
-      <image wx:if="{{licenseImage}}" class="la-doc__img" src="{{licenseImage}}" mode="aspectFill" />
-      <block wx:else>
-        <text class="la-doc__name">营业执照</text>
-        <text class="la-doc__tip">点击上传并识别</text>
+
+    <view class="la-card">
+      <text class="la-sec">身份信息</text>
+      <text class="la-label">{{kind === 'person' ? '姓名' : '主体名称'}}</text>
+      <input class="la-input" value="{{name}}" bindinput="onName" placeholder="{{kind === 'person' ? '与身份证一致' : '与营业执照一致'}}" />
+      <text class="la-label">{{kind === 'person' ? '身份证号' : '联系人身份证'}}</text>
+      <input class="la-input" value="{{idNo}}" bindinput="onId" placeholder="请核对识别结果" />
+      <block wx:if="{{kind === 'entity'}}">
+        <text class="la-label">统一社会信用代码</text>
+        <input class="la-input" value="{{licenseNo}}" bindinput="onLicense" placeholder="18 位信用代码" />
       </block>
-      <text wx:if="{{licenseImage}}" class="la-doc__badge">已上传</text>
     </view>
-  </view>
 
-  <view class="la-card">
-    <text class="la-sec">身份信息</text>
-    <text class="la-label">{{kind === 'person' ? '姓名' : '主体名称'}}</text>
-    <input class="la-input" value="{{name}}" bindinput="onName" placeholder="{{kind === 'person' ? '与身份证一致' : '与营业执照一致'}}" />
-    <text class="la-label">{{kind === 'person' ? '身份证号' : '联系人身份证'}}</text>
-    <input class="la-input" value="{{idNo}}" bindinput="onId" placeholder="请核对识别结果" />
-    <block wx:if="{{kind === 'entity'}}">
-      <text class="la-label">统一社会信用代码</text>
-      <input class="la-input" value="{{licenseNo}}" bindinput="onLicense" placeholder="18 位信用代码" />
-    </block>
-  </view>
+    <view class="la-card">
+      <text class="la-sec">收款账户</text>
+      <text class="la-label">开户行</text>
+      <input class="la-input" value="{{bank}}" bindinput="onBank" placeholder="{{kind === 'person' ? '个人银行卡开户行' : '对公或经营者账户开户行'}}" />
+      <text class="la-label">账号</text>
+      <input class="la-input" value="{{bankNo}}" bindinput="onBankNo" placeholder="收款账号" />
+    </view>
 
-  <view class="la-card">
-    <text class="la-sec">讲师介绍</text>
-    <text class="la-sec__hint">写给本地生活达人：你在哪座城市、出镜什么平台、带过哪些到店内容。</text>
-    <text class="la-label">常驻城市</text>
-    <input class="la-input" value="{{city}}" bindinput="onCity" placeholder="如：宁波" />
-    <text class="la-label">出镜平台</text>
-    <input class="la-input" value="{{platforms}}" bindinput="onPlatforms" placeholder="抖音 / 小红书 / 视频号" />
-    <text class="la-label">擅长内容</text>
-    <input class="la-input" value="{{skills}}" bindinput="onSkills" placeholder="探店、团购带货、到店直播、门店短视频" />
-    <text class="la-label">本地生活经验</text>
-    <input class="la-input" value="{{years}}" bindinput="onYears" placeholder="如：3 年" />
-    <text class="la-label">介绍</text>
-    <textarea class="la-area" value="{{intro}}" bindinput="onIntro" placeholder="带过哪些品类、商圈或门店，这门课解决什么接单问题" />
-  </view>
-
-  <view class="la-card">
-    <text class="la-sec">收款账户</text>
-    <text class="la-label">开户行</text>
-    <input class="la-input" value="{{bank}}" bindinput="onBank" placeholder="{{kind === 'person' ? '个人银行卡开户行' : '对公或经营者账户开户行'}}" />
-    <text class="la-label">账号</text>
-    <input class="la-input" value="{{bankNo}}" bindinput="onBankNo" placeholder="收款账号" />
-  </view>
-
-  <view class="la-bar">
-    <view class="la-btn" bindtap="onSave">提交申请</view>
-  </view>
+    <view class="la-bar">
+      <view class="la-btn" bindtap="onSave">保存收款认证</view>
+    </view>
+  </block>
 </view>

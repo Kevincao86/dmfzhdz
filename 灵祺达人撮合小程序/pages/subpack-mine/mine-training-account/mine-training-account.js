@@ -2,6 +2,8 @@ const training = require('../../../utils/mpTraining.js')
 
 Page({
   data: {
+    mode: 'payout',
+    lecturerStatus: 'none',
     kind: 'person',
     name: '',
     idNo: '',
@@ -17,10 +19,16 @@ Page({
     idBack: '',
     licenseImage: '',
   },
-  onShow() {
-    const p = training.readProfile()
+  onLoad(query) {
+    const mode = query && query.mode === 'apply' ? 'apply' : 'payout'
+    this.setData({ mode })
+    wx.setNavigationBarTitle({ title: mode === 'apply' ? '申请讲师' : '收款认证' })
+  },
+  async onShow() {
+    const p = await training.syncProfile()
     if (!p) return
     this.setData({
+      lecturerStatus: training.lecturerState(p),
       kind: p.kind || 'person',
       name: p.name || '',
       idNo: p.idNo || '',
@@ -96,6 +104,18 @@ Page({
   onSkills(e) { this.setData({ skills: e.detail.value }) },
   onYears(e) { this.setData({ years: e.detail.value }) },
   onIntro(e) { this.setData({ intro: e.detail.value }) },
+  goApply() {
+    wx.redirectTo({ url: '/pages/subpack-mine/mine-training-account/mine-training-account?mode=apply' })
+  },
+  async onApply() {
+    try {
+      await training.applyLecturer(this.data)
+      wx.showToast({ title: '已提交审核', icon: 'success' })
+      setTimeout(() => wx.navigateBack(), 500)
+    } catch (e) {
+      wx.showToast({ title: String(e.message || '提交失败').slice(0, 18), icon: 'none' })
+    }
+  },
   async onSave() {
     try {
       await training.saveProfile(this.data)

@@ -44,6 +44,8 @@ type Profile = {
   idFront: string
   idBack: string
   licenseImage: string
+  lecturerStatus: 'pending' | 'approved' | 'rejected' | ''
+  lecturerNote: string
   updatedAt: string
 }
 type Order = {
@@ -174,6 +176,28 @@ function publicCourse(course: Course) {
   return !course.reviewStatus || course.reviewStatus === 'approved'
 }
 
+function lecturerState(profile: Profile): 'none' | 'pending' | 'approved' | 'rejected' {
+  if (profile.lecturerStatus === 'pending' || profile.lecturerStatus === 'approved' || profile.lecturerStatus === 'rejected') {
+    return profile.lecturerStatus
+  }
+  if (profile.intro && profile.city) return 'approved'
+  return 'none'
+}
+
+function lecturerCard(profile: Profile) {
+  return {
+    hostId: profile.hostId,
+    city: profile.city,
+    platforms: profile.platforms,
+    skills: profile.skills,
+    years: profile.years,
+    intro: profile.intro,
+    lecturerStatus: lecturerState(profile),
+    lecturerNote: profile.lecturerNote || '',
+    updatedAt: profile.updatedAt,
+  }
+}
+
 function splitFee(fee: number) {
   const pay = Math.round(fee * 100) / 100
   const commission = Math.round(pay * 0.01 * 100) / 100
@@ -194,6 +218,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ok: true,
       courses,
       profile: hostId ? store.profiles.find((p) => p.hostId === hostId) || null : null,
+      profiles: review ? store.profiles.filter((p) => lecturerState(p) !== 'none').map(lecturerCard) : [],
       orders: hostId ? store.orders.filter((o) => o.hostId === hostId) : [],
     })
     return
@@ -215,28 +240,95 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return
   }
 
+  if (action === 'applyLecturer') {
+    const hostId = String(body.hostId || '')
+    const city = clipText(body.city, 40)
+    const intro = clipText(body.intro, 400)
+    if (!hostId) {
+      res.status(400).json({ ok: false, error: '缺少身份' })
+      return
+    }
+    if (!city || !intro) {
+      res.status(400).json({ ok: false, error: '请填写常驻城市和讲师介绍' })
+      return
+    }
+    const prev = store.profiles.find((p) => p.hostId === hostId)
+    const profile: Profile = {
+      hostId,
+      kind: prev?.kind === 'entity' ? 'entity' : 'person',
+      name: prev?.name || '',
+      idNo: prev?.idNo || '',
+      bank: prev?.bank || '',
+      bankNo: prev?.bankNo || '',
+      licenseNo: prev?.licenseNo || '',
+      city,
+      platforms: clipText(body.platforms, 80),
+      skills: clipText(body.skills, 120),
+      years: clipText(body.years, 8),
+      intro,
+      idFront: prev?.idFront || '',
+      idBack: prev?.idBack || '',
+      licenseImage: prev?.licenseImage || '',
+      lecturerStatus: 'pending',
+      lecturerNote: '',
+      updatedAt: new Date().toISOString(),
+    }
+    store.profiles = store.profiles.filter((p) => p.hostId !== hostId).concat(profile)
+    writeStore(store)
+    res.status(200).json({ ok: true, profile })
+    return
+  }
+
+  if (action === 'reviewLecturer') {
+    const hostId = String(body.hostId || '')
+    const profile = store.profiles.find((p) => p.hostId === hostId)
+    if (!profile || lecturerState(profile) === 'none') {
+      res.status(404).json({ ok: false, error: '讲师申请不存在' })
+      return
+    }
+    profile.lecturerStatus = body.status === 'rejected' ? 'rejected' : 'approved'
+    profile.lecturerNote = clipText(body.note, 200)
+    writeStore(store)
+    res.status(200).json({ ok: true, profile: lecturerCard(profile) })
+    return
+  }
+
   if (action === 'saveProfile') {
     const hostId = String(body.hostId || '')
     if (!hostId) {
       res.status(400).json({ ok: false, error: '缺少身份' })
       return
     }
+    const prev = store.profiles.find((p) => p.hostId === hostId)
+    if (!prev || lecturerState(prev) !== 'approved') {
+      res.status(400).json({ ok: false, error: '讲师申请通过后才能收款认证' })
+      return
+    }
+    const name = String(body.name || '').trim()
+    const bankNo = String(body.bankNo || '').trim()
+    const kind = body.kind === 'entity' ? 'entity' : 'person'
+    const licenseNo = String(body.licenseNo || '').trim()
+    if (!name || !bankNo) {
+      res.status(400).json({ ok: false, error: '请填写户名和账号' })
+      return
+    }
+    if (kind === 'entity' && !licenseNo) {
+      res.status(400).json({ ok: false, error: '请填写统一社会信用代码' })
+      return
+    }
     const profile: Profile = {
-      hostId,
-      kind: body.kind === 'entity' ? 'entity' : 'person',
-      name: String(body.name || '').trim(),
+      ...prev,
+      kind,
+      name,
       idNo: String(body.idNo || '').trim(),
       bank: String(body.bank || '').trim(),
-      bankNo: String(body.bankNo || '').trim(),
-      licenseNo: String(body.licenseNo || '').trim(),
-      city: clipText(body.city, 40),
-      platforms: clipText(body.platforms, 80),
-      skills: clipText(body.skills, 120),
-      years: clipText(body.years, 8),
-      intro: clipText(body.intro, 400),
-      idFront: clipImage(body.idFront),
-      idBack: clipImage(body.idBack),
-      licenseImage: clipImage(body.licenseImage),
+      bankNo,
+      licenseNo: kind === 'entity' ? licenseNo : '',
+      idFront: clipImage(body.idFront) || prev.idFront || '',
+      idBack: clipImage(body.idBack) || prev.idBack || '',
+      licenseImage: clipImage(body.licenseImage) || prev.licenseImage || '',
+      lecturerStatus: 'approved',
+      lecturerNote: prev.lecturerNote || '',
       updatedAt: new Date().toISOString(),
     }
     store.profiles = store.profiles.filter((p) => p.hostId !== hostId).concat(profile)
@@ -251,6 +343,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!title) {
       res.status(400).json({ ok: false, error: '请填写课程名称' })
       return
+    }
+    const hostId = String(body.hostId || '')
+    if (hostId) {
+      const profile = store.profiles.find((p) => p.hostId === hostId)
+      if (!profile || lecturerState(profile) !== 'approved') {
+        res.status(400).json({ ok: false, error: '请先申请讲师并通过审核' })
+        return
+      }
+      if (!profile.name || !profile.bankNo) {
+        res.status(400).json({ ok: false, error: '请先完成收款认证' })
+        return
+      }
     }
     const course: Course = {
       id: `tr-${Date.now()}`,
