@@ -49,6 +49,7 @@ import XingxuanFunnelPage from './pages/XingxuanFunnelPage'
 import XingxuanSubscriptionsPage from './pages/XingxuanSubscriptionsPage'
 import XingxuanMembershipPage from './pages/XingxuanMembershipPage'
 import XingxuanPointsRechargePage from './pages/XingxuanPointsRechargePage'
+import WalletPage from './pages/WalletPage'
 import OrderCalendarPage from './pages/OrderCalendarPage'
 import TrainingPage from './pages/TrainingPage'
 import MyPaymentOrdersPage from './pages/MyPaymentOrdersPage'
@@ -145,6 +146,7 @@ export default function App() {
         <Route path="/chat" element={<ChatPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/profile/membership" element={<XingxuanMembershipPage />} />
+        <Route path="/profile/wallet" element={<WalletPage />} />
         <Route path="/profile/points-recharge" element={<XingxuanPointsRechargePage />} />
         <Route path="/profile/my-orders" element={<MyPaymentOrdersPage />} />
         <Route path="/profile/favorites" element={<FavoritesPage />} />

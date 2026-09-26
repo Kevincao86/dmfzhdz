@@ -38,10 +38,10 @@ const TRAINING_MENU = {
   icon: 'list',
 }
 
-const POINTS_RECHARGE_MENU = {
-  key: 'pointsRecharge',
-  label: '积分充值',
-  sub: '视频/文稿检核与 Brief 生成',
+const WALLET_MENU = {
+  key: 'wallet',
+  label: '我的钱包',
+  sub: '积分、保证金与培训结算',
   icon: 'wallet',
 }
 
@@ -214,7 +214,7 @@ function talentMenusForIdentity(identity) {
       { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
       { key: 'prQuotes', label: '我的报价', sub: '为合作 PR 设置专属报价', icon: 'quote' },
       TRAINING_MENU,
-      POINTS_RECHARGE_MENU,
+      WALLET_MENU,
       MY_ORDERS_MENU,
       { key: 'subscriptions', label: '商单订阅', sub: '匹配城市/平台/品类的新招募提醒', icon: 'star' },
       { key: 'talentCredit', label: '达人信用', sub: '履约评分与提升建议', icon: 'chart' },
@@ -230,7 +230,7 @@ function talentMenusForIdentity(identity) {
       { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
       { key: 'prQuotes', label: '我的报价', sub: '为合作 PR 设置专属报价', icon: 'quote' },
       TRAINING_MENU,
-      POINTS_RECHARGE_MENU,
+      WALLET_MENU,
       MY_ORDERS_MENU,
       { key: 'subscriptions', label: '商单订阅', sub: '匹配城市/平台/品类的新招募提醒', icon: 'star' },
       { key: 'talentCredit', label: '达人信用', sub: '履约评分与提升建议', icon: 'chart' },
@@ -247,7 +247,7 @@ function talentMenusForIdentity(identity) {
     { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
     { key: 'prQuotes', label: '我的报价', sub: '为合作 PR 设置专属报价', icon: 'quote' },
     TRAINING_MENU,
-    POINTS_RECHARGE_MENU,
+    WALLET_MENU,
     MY_ORDERS_MENU,
     { key: 'subscriptions', label: '商单订阅', sub: '匹配城市/平台/品类的新招募提醒', icon: 'star' },
     { key: 'talentCredit', label: '达人信用', sub: '履约评分与提升建议', icon: 'chart' },
@@ -263,7 +263,7 @@ function buildPrMenus() {
     { key: 'prOrders', label: '我的发单', sub: '已发布的招募订单', icon: 'list' },
     { key: 'orderCalendar', label: '商单日历', sub: calSub, icon: 'chart' },
     TRAINING_MENU,
-    POINTS_RECHARGE_MENU,
+    WALLET_MENU,
     MY_ORDERS_MENU,
     { key: 'templates', label: '我的模版', sub: '达人 / 拍摄 / 剪辑报名表单', icon: 'tpl' },
     { key: 'briefTemplates', label: 'Brief 模版', sub: '结构化发单模版 · 一键套用', icon: 'tpl' },
@@ -300,6 +300,7 @@ const MENU_URLS = {
   formRelay: '/pages/subpack-pr/mine-form-relay/mine-form-relay',
   myOrders: '/pages/subpack-mine/mine-my-orders/mine-my-orders',
   pointsRecharge: '/pages/subpack-mine/mine-xingxuan-points-recharge/mine-xingxuan-points-recharge',
+  wallet: '/pages/subpack-mine/mine-wallet/mine-wallet',
   briefGen: '/pages/subpack-pr/mine-pr-addon-ai-content/mine-pr-addon-ai-content',
   aiReview: '/pages/subpack-pr/mine-pr-addon-ai-review/mine-pr-addon-ai-review',
   addonsHub: '/pages/subpack-pr/mine-pr-addons/mine-pr-addons',

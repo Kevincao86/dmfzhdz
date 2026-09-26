@@ -1,0 +1,11 @@
+.wl { min-height: 100vh; background: #f7f6fb; padding: 24rpx 28rpx 48rpx; box-sizing: border-box; }
+.wl-sub { display: block; font-size: 24rpx; line-height: 1.5; color: #8b8499; }
+.wl-err { display: block; margin-top: 16rpx; font-size: 24rpx; color: #b42318; }
+.wl-card { margin-top: 20rpx; padding: 28rpx; border-radius: 28rpx; background: #fff; }
+.wl-row { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; }
+.wl-name { display: block; font-size: 28rpx; font-weight: 700; color: #1f1a2e; }
+.wl-value { display: block; margin-top: 8rpx; font-size: 44rpx; font-weight: 700; color: #5b2dcc; }
+.wl-line { display: block; margin-top: 8rpx; font-size: 30rpx; color: #1f1a2e; }
+.wl-hint { display: block; margin-top: 8rpx; font-size: 22rpx; line-height: 1.5; color: #8b8499; }
+.wl-btn { flex-shrink: 0; padding: 0 24rpx; height: 64rpx; line-height: 64rpx; border-radius: 16rpx; background: #5b2dcc; color: #fff; font-size: 26rpx; font-weight: 600; }
+.wl-go { display: block; margin-top: 16rpx; font-size: 26rpx; font-weight: 600; color: #5b2dcc; }

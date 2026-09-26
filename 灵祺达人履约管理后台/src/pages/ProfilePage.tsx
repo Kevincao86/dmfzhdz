@@ -84,9 +84,9 @@ export default function ProfilePage() {
    */
   const menuItems = [
     {
-      to: '/profile/points-recharge',
-      label: '积分充值',
-      desc: 'AI 视频/文稿检核与 Brief 消耗',
+      to: '/profile/wallet',
+      label: '我的钱包',
+      desc: '积分、培训保证金与课时费应付款',
     },
     {
       to: '/profile/my-orders',

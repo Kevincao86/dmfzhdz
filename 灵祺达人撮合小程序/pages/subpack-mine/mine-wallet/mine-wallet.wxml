@@ -1,0 +1,38 @@
+<view class="wl">
+  <text class="wl-sub">积分、培训保证金和课时费应付款。课时费不是提现。</text>
+  <text wx:if="{{err}}" class="wl-err">{{err}}</text>
+
+  <view class="wl-card">
+    <view class="wl-row">
+      <view>
+        <text class="wl-name">积分</text>
+        <text class="wl-value">{{loading ? '…' : balanceLabel}}</text>
+        <text class="wl-hint">用于视频、文稿检核和 Brief 生成</text>
+      </view>
+      <view class="wl-btn" bindtap="onPoints">去充值</view>
+    </view>
+  </view>
+
+  <view class="wl-card">
+    <view class="wl-row">
+      <view>
+        <text class="wl-name">培训保证金</text>
+        <text class="wl-line">{{depositPaid ? '¥' + yuan + ' 已缴纳' : '¥' + yuan + ' 未缴纳'}}</text>
+        <text class="wl-hint">讲师履约保证金，和星选同一份记录</text>
+      </view>
+      <view wx:if="{{!depositPaid}}" class="wl-btn" bindtap="onPayDeposit">微信支付</view>
+    </view>
+  </view>
+
+  <view class="wl-card" bindtap="onSettle">
+    <text class="wl-name">培训结算</text>
+    <text class="wl-hint">学员付款后由平台代收，提交完成证明后进入 T+1 应付款</text>
+    <text class="wl-go">查看应付款</text>
+  </view>
+
+  <view class="wl-card" bindtap="onOrders">
+    <text class="wl-name">支付记录</text>
+    <text class="wl-hint">会员开通与积分充值</text>
+    <text class="wl-go">查看记录</text>
+  </view>
+</view>

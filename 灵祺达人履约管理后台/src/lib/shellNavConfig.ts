@@ -98,6 +98,8 @@ export function pageTitleForPath(pathname: string, search: string): { section: s
     '/messages': '消息',
     '/chat': '私信',
     '/profile': '我的',
+    '/profile/wallet': '我的钱包',
+    '/profile/points-recharge': '积分充值',
     '/profile/my-orders': '我的订单',
     '/profile/membership': '会员中心',
     '/profile/talent': '达人资料',
