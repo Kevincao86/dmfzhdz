@@ -96,6 +96,18 @@
       <input class="tp-input" type="number" value="{{seats}}" bindinput="onSeats" />
       <text class="tp-label">课程说明</text>
       <textarea class="tp-area" placeholder="这门课解决什么接单问题，适合谁来听" value="{{note}}" bindinput="onNote" />
+      <text class="tp-label">报名字段</text>
+      <text class="tp-hint">学员填完才能支付。姓名必留，身份证和手机号可以关掉。</text>
+      <view class="tp-chips">
+        <view class="tp-chip tp-chip--on" data-key="name" bindtap="onToggleField">姓名 · 必填</view>
+        <view class="tp-chip {{signupOn.idNo ? 'tp-chip--on' : 'tp-chip--off'}}" data-key="idNo" bindtap="onToggleField">身份证号</view>
+        <view class="tp-chip {{signupOn.phone ? 'tp-chip--on' : 'tp-chip--off'}}" data-key="phone" bindtap="onToggleField">手机号</view>
+        <view wx:for="{{customFields}}" wx:key="key" class="tp-chip tp-chip--on" data-key="{{item.key}}" bindtap="onRemoveField">{{item.label}} ×</view>
+      </view>
+      <view class="tp-add-row">
+        <input class="tp-input" placeholder="自定义字段，如微信号" value="{{fieldDraft}}" bindinput="onFieldDraft" />
+        <view class="tp-add" bindtap="onAddField">添加</view>
+      </view>
     </view>
   </block>
 

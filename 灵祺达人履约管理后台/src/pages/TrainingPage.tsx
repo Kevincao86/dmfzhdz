@@ -97,6 +97,41 @@ type Lecturer = {
   lecturerStatus?: 'none' | 'pending' | 'approved' | 'rejected' | ''
 }
 
+type SignupField = { key: string; label: string; kind: 'name' | 'idNo' | 'phone' | 'text' }
+
+const DEFAULT_FIELDS: SignupField[] = [
+  { key: 'name', label: '姓名', kind: 'name' },
+  { key: 'idNo', label: '身份证号', kind: 'idNo' },
+  { key: 'phone', label: '手机号', kind: 'phone' },
+]
+
+function fieldsOf(raw: unknown): SignupField[] {
+  const list = Array.isArray(raw) ? raw : []
+  const out: SignupField[] = []
+  for (const item of list) {
+    if (!item || typeof item !== 'object') continue
+    const row = item as SignupField
+    const label = String(row.label || '').trim()
+    if (!label) continue
+    const kind = row.kind === 'name' || row.kind === 'idNo' || row.kind === 'phone' || row.kind === 'text' ? row.kind : 'text'
+    const key = String(row.key || `${kind}-${out.length}`)
+    if (out.some((field) => field.key === key)) continue
+    out.push({ key, label, kind })
+  }
+  if (!out.some((field) => field.kind === 'name')) out.unshift(DEFAULT_FIELDS[0])
+  return out.length ? out : DEFAULT_FIELDS.map((field) => ({ ...field }))
+}
+
+function answersError(fields: SignupField[], answers: Record<string, string>) {
+  for (const field of fields) {
+    const value = String(answers[field.key] || '').trim()
+    if (!value) return `请填写${field.label}`
+    if (field.kind === 'idNo' && !/^(\d{15}|\d{17}[\dXx])$/.test(value)) return '请填写正确的身份证号'
+    if (field.kind === 'phone' && !/^1\d{10}$/.test(value)) return '请填写正确的手机号'
+  }
+  return ''
+}
+
 type Course = {
   id: string
   title: string
@@ -109,6 +144,7 @@ type Course = {
   signupCount?: number
   poster?: string
   note?: string
+  signupFields?: SignupField[]
   reviewStatus?: 'pending' | 'approved' | 'rejected' | ''
   reviewNote?: string
 }
@@ -158,12 +194,16 @@ export default function TrainingPage() {
   const [platformMode, setPlatformMode] = useState<'single' | 'multi'>('multi')
   const [platformPicks, setPlatformPicks] = useState<string[]>([])
   const [poster, setPoster] = useState('')
+  const [signupFields, setSignupFields] = useState<SignupField[]>(DEFAULT_FIELDS)
+  const [fieldDraft, setFieldDraft] = useState('')
+  const [sheetErr, setSheetErr] = useState('')
+  const [answers, setAnswers] = useState<Record<string, string>>({})
   const [idFront, setIdFront] = useState('')
   const [idBack, setIdBack] = useState('')
   const [licenseImage, setLicenseImage] = useState('')
   const [ocrHint, setOcrHint] = useState('')
   const [depositPaid, setDepositPaid] = useState(false)
-  const [payOpen, setPayOpen] = useState<null | { purpose: 'deposit' | 'course'; courseId: string; name: string; title: string }>(null)
+  const [payOpen, setPayOpen] = useState<null | { purpose: 'deposit' | 'course'; courseId: string; name: string; title: string; fields: SignupField[] }>(null)
   const [payChannel, setPayChannel] = useState<'wechat' | 'alipay' | 'douyin'>('wechat')
   const [payQr, setPayQr] = useState('')
   const [payTrade, setPayTrade] = useState('')
@@ -267,11 +307,11 @@ export default function TrainingPage() {
 
   async function startScanPay() {
     if (!payOpen || !me?.accountId) {
-      setErr('请先登录')
+      setSheetErr('请先登录')
       return
     }
     setPayBusy(true)
-    setErr('')
+    setSheetErr('')
     try {
       const res = await postTraining({
         action: 'prepay',
@@ -280,14 +320,15 @@ export default function TrainingPage() {
         scene: 'native',
         hostId: me.accountId,
         courseId: payOpen.courseId,
-        name: payOpen.name,
-        contact: me.loginName || '',
+        name: answers.name || payOpen.name,
+        contact: answers.phone || '',
+        answers,
       })
       setPayQr(String(res.qrDataUrl || ''))
       setPayTrade(String(res.outTradeNo || ''))
-      if (!res.qrDataUrl) setErr('没有拿到付款码')
+      if (!res.qrDataUrl) setSheetErr('没有拿到付款码')
     } catch (ex) {
-      setErr(ex instanceof Error ? ex.message : '支付下单失败')
+      setSheetErr(ex instanceof Error ? ex.message : '支付下单失败')
     } finally {
       setPayBusy(false)
     }
@@ -316,7 +357,10 @@ export default function TrainingPage() {
     setSeats('20')
     setNote('')
     setPoster('')
+    setSignupFields(DEFAULT_FIELDS.map((field) => ({ ...field })))
+    setFieldDraft('')
     setErr('')
+    setSheetErr('')
     setEditorOpen(true)
   }
 
@@ -338,7 +382,10 @@ export default function TrainingPage() {
     setSeats(String(course.seats || 20))
     setNote(course.note || '')
     setPoster(course.poster || '')
+    setSignupFields(fieldsOf(course.signupFields))
+    setFieldDraft('')
     setErr('')
+    setSheetErr('')
     setEditorOpen(true)
   }
   const applyLabel =
@@ -378,7 +425,7 @@ export default function TrainingPage() {
           </button>
         ))}
       </div>
-      {err ? <p className="text-sm text-red-600">{err}</p> : null}
+      {err && !editorOpen && !panel && !payOpen ? <p className="text-sm text-red-600">{err}</p> : null}
       <div className="space-y-3">
         {shown.map((c) => (
           <article id={`train-${c.id}`} key={c.id} className={`rounded-2xl border bg-white p-4 ${focusCourseId === c.id ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-200'}`}>
@@ -399,12 +446,11 @@ export default function TrainingPage() {
               type="button"
               className="mt-3 rounded-xl bg-violet-600 px-3 py-2 text-sm text-white"
               onClick={() => {
-                const name = window.prompt('报名姓名')
-                if (!name) return
-                setErr('')
+                setAnswers({})
+                setSheetErr('')
                 setPayQr('')
                 setPayTrade('')
-                setPayOpen({ purpose: 'course', courseId: c.id, name, title: c.title })
+                setPayOpen({ purpose: 'course', courseId: c.id, name: '', title: c.title, fields: fieldsOf(c.signupFields) })
               }}
             >
               扫码支付报名
@@ -467,30 +513,31 @@ export default function TrainingPage() {
                 return
               }
               if (!title.trim()) {
-                setErr('请填写课程名称')
+                setSheetErr('请填写课程名称')
                 return
               }
               if (!poster.startsWith('data:image/')) {
-                setErr('请上传宣传海报')
+                setSheetErr('请上传宣传海报')
                 return
               }
               if (!postCity.trim()) {
-                setErr('请选择城市')
+                setSheetErr('请选择城市')
                 return
               }
               if (!whenStartDate || !whenEndDate) {
-                setErr('请选择上课日期')
+                setSheetErr('请选择上课日期')
                 return
               }
               if (whenEndDate < whenStartDate) {
-                setErr('结束日期不能早于开始日期')
+                setSheetErr('结束日期不能早于开始日期')
                 return
               }
               if (!whenStartTime || !whenEndTime || whenEndTime <= whenStartTime) {
-                setErr('请设置每天的起止时间')
+                setSheetErr('请设置每天的起止时间')
                 return
               }
               setErr('')
+              setSheetErr('')
               postTraining({
                 action: editingId ? 'update' : 'create',
                 id: editingId,
@@ -502,6 +549,7 @@ export default function TrainingPage() {
                 seats: Number(seats) || 1,
                 note: note.trim(),
                 poster,
+                signupFields,
                 hostId: me?.accountId || '',
                 hostName: me?.wxNickName || me?.loginName || '达人',
                 hostRole: me?.activeRole || 'talent',
@@ -511,7 +559,7 @@ export default function TrainingPage() {
                   setErr(editingId ? '已保存，重新进入审核' : '已提交审核，通过后会出现在首页广告栏')
                   return load()
                 })
-                .catch((ex) => setErr(ex instanceof Error ? ex.message : '提交失败'))
+                .catch((ex) => setSheetErr(ex instanceof Error ? ex.message : '提交失败'))
             }}
           >
             <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
@@ -566,7 +614,7 @@ export default function TrainingPage() {
                   <input className="sr-only" type="file" accept="image/*" onChange={(e) => {
                     const file = e.target.files?.[0]
                     if (!file) return
-                    compressImageFile(file).then((url) => setPoster(url)).catch((ex) => setErr(ex instanceof Error ? ex.message : '海报处理失败'))
+                    compressImageFile(file).then((url) => setPoster(url)).catch((ex) => setSheetErr(ex instanceof Error ? ex.message : '海报处理失败'))
                   }} />
                 </label>
               </section>
@@ -622,11 +670,49 @@ export default function TrainingPage() {
                   </label>
                 </div>
               </section>
-              {err ? <p className="text-sm text-red-600">{err}</p> : null}
+              <section>
+                <h3 className="text-sm font-semibold text-slate-900">报名字段</h3>
+                <p className="mt-1 text-xs text-slate-500">学员填完这些资料后才能支付。姓名必填，身份证和手机号可以关掉，也可以再加自定义项。</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {DEFAULT_FIELDS.map((preset) => {
+                    const on = signupFields.some((field) => field.key === preset.key)
+                    return (
+                      <button
+                        key={preset.key}
+                        type="button"
+                        className={`rounded-full px-3 py-1.5 text-sm ${on ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-500'} ${preset.kind === 'name' ? 'cursor-default' : ''}`}
+                        onClick={() => {
+                          if (preset.kind === 'name') return
+                          setSignupFields((prev) => (prev.some((field) => field.key === preset.key) ? prev.filter((field) => field.key !== preset.key) : prev.concat(preset)))
+                        }}
+                      >
+                        {preset.label}{preset.kind === 'name' ? ' · 必填' : on ? ' · 已选' : ''}
+                      </button>
+                    )
+                  })}
+                  {signupFields.filter((field) => field.kind === 'text').map((field) => (
+                    <button key={field.key} type="button" className="rounded-full bg-violet-50 px-3 py-1.5 text-sm text-violet-700" onClick={() => setSignupFields((prev) => prev.filter((item) => item.key !== field.key))}>
+                      {field.label} ×
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <input className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400" placeholder="自定义字段，如微信号" value={fieldDraft} onChange={(e) => setFieldDraft(e.target.value)} />
+                  <button type="button" className="rounded-xl bg-slate-900 px-3 py-2 text-sm text-white" onClick={() => {
+                    const label = fieldDraft.trim()
+                    if (!label || signupFields.length >= 8 || signupFields.some((field) => field.label === label)) return
+                    setSignupFields((prev) => prev.concat({ key: `c${Date.now()}`, label, kind: 'text' }))
+                    setFieldDraft('')
+                  }}>添加</button>
+                </div>
+              </section>
             </div>
-            <div className="flex gap-2 border-t border-slate-100 px-6 py-4">
+            <div className="border-t border-slate-100 px-6 py-4">
+              {sheetErr ? <p className="mb-3 text-sm text-red-600">{sheetErr}</p> : null}
+              <div className="flex gap-2">
               <button type="button" className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-600" onClick={() => setEditorOpen(false)}>取消</button>
               <button type="submit" className="flex-1 rounded-xl bg-violet-600 px-3 py-2.5 text-sm font-semibold text-white">{editingId ? '保存并重新审核' : '提交审核'}</button>
+              </div>
             </div>
           </form>
         </div>
@@ -849,8 +935,23 @@ export default function TrainingPage() {
       {payOpen ? (
         <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-6" onClick={() => { setPayOpen(null); setPayTrade(''); setPayQr('') }}>
           <div className="w-full max-w-md rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-slate-900">{payOpen.title}</h2>
-            <p className="mt-1 text-sm text-slate-500">用微信、支付宝或抖音扫码支付。支付成功后自动入账，和小程序共用同一份记录。</p>
+            <h2 className="text-lg font-bold text-slate-900">{payOpen.purpose === 'course' ? '填写报名信息' : payOpen.title}</h2>
+            <p className="mt-1 text-sm text-slate-500">{payOpen.purpose === 'course' ? '资料填完后才能支付报名费。支付成功后自动入账。' : '用微信、支付宝或抖音扫码支付。'}</p>
+            {payOpen.purpose === 'course' ? (
+              <div className="mt-4 space-y-3">
+                {payOpen.fields.map((field) => (
+                  <label key={field.key} className="block text-xs font-medium text-slate-500">
+                    {field.label}
+                    <input
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400"
+                      value={answers[field.key] || ''}
+                      placeholder={field.kind === 'idNo' ? '18 位身份证号' : field.kind === 'phone' ? '11 位手机号' : ''}
+                      onChange={(e) => setAnswers((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                    />
+                  </label>
+                ))}
+              </div>
+            ) : null}
             <div className="mt-4 grid grid-cols-3 gap-2">
               {([
                 ['wechat', '微信'],
@@ -868,7 +969,18 @@ export default function TrainingPage() {
               ))}
             </div>
             {payQr ? <img src={payQr} alt="付款码" className="mx-auto mt-4 h-56 w-56" /> : null}
-            <button type="button" disabled={payBusy} className="mt-4 w-full rounded-xl bg-violet-600 py-2.5 text-sm font-semibold text-white disabled:opacity-60" onClick={() => { void startScanPay() }}>
+            {sheetErr ? <p className="mt-3 text-sm text-red-600">{sheetErr}</p> : null}
+            <button type="button" disabled={payBusy} className="mt-4 w-full rounded-xl bg-violet-600 py-2.5 text-sm font-semibold text-white disabled:opacity-60" onClick={() => {
+              if (payOpen.purpose === 'course') {
+                const reason = answersError(payOpen.fields, answers)
+                if (reason) {
+                  setSheetErr(reason)
+                  return
+                }
+              }
+              setSheetErr('')
+              void startScanPay()
+            }}>
               {payBusy ? '正在生成付款码' : payQr ? '重新生成付款码' : '生成付款码'}
             </button>
             {payTrade ? <p className="mt-2 text-center text-xs text-slate-400">等待支付结果</p> : null}

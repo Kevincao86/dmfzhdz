@@ -32,6 +32,7 @@ type Pay = {
   courseId: string
   payerName: string
   contact: string
+  answers?: Record<string, string>
   amountCents: number
   channel: 'wechat' | 'alipay' | 'douyin'
   status: 'pending' | 'paid' | 'refunded'
@@ -87,6 +88,56 @@ function tradeNo() {
   return `TRN${Date.now()}${Math.floor(Math.random() * 9000 + 1000)}`
 }
 
+type SignupField = { key: string; label: string; kind: 'name' | 'idNo' | 'phone' | 'text' }
+
+const DEFAULT_SIGNUP_FIELDS: SignupField[] = [
+  { key: 'name', label: '姓名', kind: 'name' },
+  { key: 'idNo', label: '身份证号', kind: 'idNo' },
+  { key: 'phone', label: '手机号', kind: 'phone' },
+]
+
+export function normalizeSignupFields(raw: unknown): SignupField[] {
+  const list = Array.isArray(raw) ? raw : []
+  const out: SignupField[] = []
+  for (const item of list) {
+    if (!item || typeof item !== 'object') continue
+    const row = item as Record<string, unknown>
+    const label = String(row.label || '').trim().slice(0, 20)
+    if (!label) continue
+    const kind = row.kind === 'name' || row.kind === 'idNo' || row.kind === 'phone' || row.kind === 'text' ? row.kind : 'text'
+    const key = String(row.key || `${kind}-${out.length}`).trim().slice(0, 24)
+    if (!key || out.some((field) => field.key === key)) continue
+    out.push({ key, label, kind })
+    if (out.length >= 8) break
+  }
+  if (!out.some((field) => field.kind === 'name')) out.unshift(DEFAULT_SIGNUP_FIELDS[0])
+  return out.length ? out : DEFAULT_SIGNUP_FIELDS.map((field) => ({ ...field }))
+}
+
+export function validateSignupAnswers(fields: SignupField[], raw: unknown) {
+  const source = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
+  const answers: Record<string, string> = {}
+  for (const field of fields) {
+    const value = String(source[field.key] || '').trim()
+    if (!value) return { ok: false as const, error: `请填写${field.label}` }
+    if (field.kind === 'idNo' && !/^(\d{15}|\d{17}[\dXx])$/.test(value)) {
+      return { ok: false as const, error: '请填写正确的身份证号' }
+    }
+    if (field.kind === 'phone' && !/^1\d{10}$/.test(value)) {
+      return { ok: false as const, error: '请填写正确的手机号' }
+    }
+    answers[field.key] = value
+  }
+  const name = fields.find((field) => field.kind === 'name')
+  const phone = fields.find((field) => field.kind === 'phone')
+  return {
+    ok: true as const,
+    answers,
+    name: name ? answers[name.key] : '',
+    phone: phone ? answers[phone.key] : '',
+  }
+}
+
 function splitFee(fee: number) {
   const pay = Math.round(fee * 100) / 100
   const commission = Math.round(pay * 0.01 * 100) / 100
@@ -127,6 +178,7 @@ function enrollCourse(bag: Bag, pay: Pay) {
     id: `su-${Date.now()}`,
     name: pay.payerName,
     contact: pay.contact,
+    answers: pay.answers || {},
     at: order.createdAt,
     orderId: order.id,
   })
@@ -228,8 +280,12 @@ export async function createTrainingPrepay(body: Record<string, unknown>) {
     if (review && review !== 'approved') return { ok: false as const, error: '课程还在审核中' }
     const signups = Array.isArray(course.signups) ? course.signups : []
     if (signups.length >= Math.max(1, Number(course.seats) || 1)) return { ok: false as const, error: '名额已满' }
-    const name = String(body.name || '').trim()
-    if (!name) return { ok: false as const, error: '请填写姓名' }
+    const fields = normalizeSignupFields(course.signupFields)
+    const filled = validateSignupAnswers(fields, body.answers || { name: body.name, phone: body.contact, idNo: body.idNo })
+    if (!filled.ok) return { ok: false as const, error: filled.error }
+    body.name = filled.name
+    body.contact = filled.phone
+    body.answers = filled.answers
     amountCents = Math.round((Number(course.fee) || 0) * 100)
     if (amountCents < 1) return { ok: false as const, error: '课程费用无效，无法发起支付' }
     description = `培训课时费 ${String(course.title || '')}`.slice(0, 40)
@@ -242,6 +298,7 @@ export async function createTrainingPrepay(body: Record<string, unknown>) {
     courseId,
     payerName: String(body.name || '').trim(),
     contact: String(body.contact || '').trim(),
+    answers: body.answers && typeof body.answers === 'object' ? (body.answers as Record<string, string>) : {},
     amountCents,
     channel,
     status: 'pending',

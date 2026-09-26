@@ -9,4 +9,5 @@
 .td-line { display: block; margin-top: 16rpx; font-size: 26rpx; color: #3d3650; }
 .td-hint { display: block; margin-top: 16rpx; font-size: 22rpx; color: #9a94a8; line-height: 1.5; }
 .td-input { margin-top: 16rpx; height: 80rpx; border: 1rpx solid #eceaf2; border-radius: 14rpx; padding: 0 20rpx; font-size: 28rpx; }
+.td-err { display: block; margin-top: 16rpx; font-size: 26rpx; color: #b42318; }
 .td-bar { position: fixed; left: 28rpx; right: 28rpx; bottom: calc(24rpx + env(safe-area-inset-bottom)); height: 88rpx; line-height: 88rpx; text-align: center; background: #5b2dcc; color: #fff; border-radius: 16rpx; font-size: 30rpx; font-weight: 600; }

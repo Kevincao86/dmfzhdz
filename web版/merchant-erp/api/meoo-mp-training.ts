@@ -5,11 +5,12 @@
 import fs from 'fs'
 import path from 'path'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createTrainingPrepay, queryTrainingPay, refundTrainingDeposit, trainingDepositView, trainingWithdrawQuote, withdrawTraining } from '../src/lib/mpTrainingPay.js'
+import { createTrainingPrepay, normalizeSignupFields, queryTrainingPay, refundTrainingDeposit, trainingDepositView, trainingWithdrawQuote, withdrawTraining } from '../src/lib/mpTrainingPay.js'
 
 export const config = { maxDuration: 20 }
 
-type Signup = { id: string; name: string; contact: string; at: string; orderId: string }
+type SignupField = { key: string; label: string; kind: 'name' | 'idNo' | 'phone' | 'text' }
+type Signup = { id: string; name: string; contact: string; at: string; orderId: string; answers?: Record<string, string> }
 type Course = {
   id: string
   title: string
@@ -24,6 +25,7 @@ type Course = {
   fee: string
   poster: string
   note: string
+  signupFields: SignupField[]
   reviewStatus: 'pending' | 'approved' | 'rejected'
   reviewNote: string
   createdAt: string
@@ -394,6 +396,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       fee: String(body.fee || '').trim(),
       poster: poster.startsWith('data:image/') ? poster.slice(0, 400000) : '',
       note: String(body.note || '').trim(),
+      signupFields: normalizeSignupFields(body.signupFields),
       reviewStatus: 'pending',
       reviewNote: '',
       createdAt: new Date().toISOString(),
@@ -431,6 +434,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     course.seats = Math.max(taken, Math.max(1, Number(body.seats) || 1))
     course.fee = String(body.fee || '').trim()
     course.note = String(body.note || '').trim()
+    course.signupFields = normalizeSignupFields(body.signupFields)
     if (poster.startsWith('data:image/')) course.poster = poster.slice(0, 400000)
     course.reviewStatus = 'pending'
     course.reviewNote = ''

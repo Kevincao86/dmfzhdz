@@ -114,6 +114,11 @@
 .tp-box--on { border-color: #5b2dcc; background: #5b2dcc; }
 .tp-chips { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 16rpx; }
 .tp-chip { padding: 8rpx 16rpx; border-radius: 999rpx; background: #f4f0ff; color: #5b2dcc; font-size: 22rpx; }
+.tp-chip--off { background: #f4f2fa; color: #6e687c; }
+.tp-chip--on { background: #5b2dcc; color: #fff; }
+.tp-add-row { display: flex; align-items: center; gap: 12rpx; }
+.tp-add-row .tp-input { flex: 1; }
+.tp-add { margin-top: 10rpx; height: 88rpx; line-height: 88rpx; padding: 0 28rpx; border-radius: 18rpx; background: #1f1a2e; color: #fff; font-size: 26rpx; }
 .tp-sheet .tp-btn { position: static; width: 100%; margin-top: 20rpx; }
 
 .tp-poster {

@@ -58,6 +58,7 @@ async function prepay(input) {
     courseId: input && input.courseId ? input.courseId : '',
     name: input && input.name ? input.name : '',
     contact: input && input.contact ? input.contact : '',
+    answers: input && input.answers ? input.answers : {},
     openid,
   })
   if (!res || res.ok === false) throw new Error((res && res.error) || '支付下单失败')
@@ -167,6 +168,7 @@ async function createCourse(input) {
     fee: input.fee || '',
     poster: input.poster || '',
     note: input.note || '',
+    signupFields: input.signupFields || [],
   }
   if (ecs.hasBase && ecs.hasBase()) {
     const res = await ecs.post('/api/meoo-mp-training', payload)
@@ -215,6 +217,7 @@ async function updateCourse(input) {
     fee: input.fee || '',
     poster: input.poster || '',
     note: input.note || '',
+    signupFields: input.signupFields || [],
   }
   if (ecs.hasBase && ecs.hasBase()) {
     const res = await ecs.post('/api/meoo-mp-training', payload)

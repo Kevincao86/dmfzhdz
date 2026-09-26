@@ -43,6 +43,19 @@ function formatWhen(startDate, endDate, startTime, endTime) {
   return `${startDate} 至 ${endDate}，每天 ${startTime}-${endTime}`
 }
 
+function fieldView(fields) {
+  const list = Array.isArray(fields) ? fields : []
+  return {
+    signupFields: list,
+    signupOn: {
+      name: list.some((field) => field.key === 'name'),
+      idNo: list.some((field) => field.key === 'idNo'),
+      phone: list.some((field) => field.key === 'phone'),
+    },
+    customFields: list.filter((field) => field.kind === 'text'),
+  }
+}
+
 function blankForm() {
   return {
     editingId: '',
@@ -61,6 +74,12 @@ function blankForm() {
     fee: '',
     poster: '',
     note: '',
+    ...fieldView([
+      { key: 'name', label: '姓名', kind: 'name' },
+      { key: 'idNo', label: '身份证号', kind: 'idNo' },
+      { key: 'phone', label: '手机号', kind: 'phone' },
+    ]),
+    fieldDraft: '',
     cityOpen: false,
     cityKeyword: '',
     cityActiveProvince: '',
@@ -157,6 +176,7 @@ Page({
       fee: course.fee || '',
       poster: course.poster || '',
       note: course.note || '',
+      ...fieldView(Array.isArray(course.signupFields) && course.signupFields.length ? course.signupFields : blankForm().signupFields),
     })
     wx.setNavigationBarTitle({ title: '编辑培训' })
   },
@@ -257,6 +277,30 @@ Page({
   onSeats(e) { this.setData({ seats: e.detail.value }) },
   onFee(e) { this.setData({ fee: e.detail.value }) },
   onNote(e) { this.setData({ note: e.detail.value }) },
+  onToggleField(e) {
+    const key = e.currentTarget.dataset.key
+    if (key === 'name') return
+    const presets = {
+      idNo: { key: 'idNo', label: '身份证号', kind: 'idNo' },
+      phone: { key: 'phone', label: '手机号', kind: 'phone' },
+    }
+    const fields = [...(this.data.signupFields || [])]
+    const idx = fields.findIndex((field) => field.key === key)
+    if (idx >= 0) fields.splice(idx, 1)
+    else if (presets[key]) fields.push(presets[key])
+    this.setData(fieldView(fields))
+  },
+  onRemoveField(e) {
+    const key = e.currentTarget.dataset.key
+    this.setData(fieldView((this.data.signupFields || []).filter((field) => field.key !== key)))
+  },
+  onFieldDraft(e) { this.setData({ fieldDraft: e.detail.value }) },
+  onAddField() {
+    const label = String(this.data.fieldDraft || '').trim()
+    const fields = this.data.signupFields || []
+    if (!label || fields.length >= 8 || fields.some((field) => field.label === label)) return
+    this.setData({ ...fieldView(fields.concat({ key: `c${Date.now()}`, label, kind: 'text' })), fieldDraft: '' })
+  },
   onMode(e) { this.setData({ mode: e.currentTarget.dataset.id }) },
   noop() {},
   onPoster() {
