@@ -18,6 +18,20 @@
         </view>
       </view>
 
+      <swiper
+        wx:if="{{trainAds.length}}"
+        class="home-decor-banner"
+        indicator-dots
+        circular
+        autoplay
+        interval="4000"
+        duration="400"
+      >
+        <swiper-item wx:for="{{trainAds}}" wx:key="id">
+          <image class="home-decor-banner__img" src="{{item.poster}}" mode="aspectFill" data-id="{{item.id}}" bindtap="onTrainAdTap" />
+          <text class="home-decor-banner__title">{{item.title}}</text>
+        </swiper-item>
+      </swiper>
       <view class="home-decor-banner" wx:if="{{decorBanner}}" bindtap="onDecorBannerTap">
         <video
           wx:if="{{decorBanner.isVideo}}"

@@ -275,7 +275,7 @@ function TrainingAdBar() {
   if (!ads.length) return null
   const ad = ads[index] || ads[0]
   return (
-    <Link to="/training" className="mb-4 block overflow-hidden rounded-2xl border border-slate-200" style={{ height: 148 }}>
+    <Link to={ad.id ? `/training?course=${encodeURIComponent(ad.id)}` : '/training'} className="mb-4 block overflow-hidden rounded-2xl border border-slate-200" style={{ height: 148 }}>
       <img src={ad.poster} alt={ad.title} className="h-full w-full object-cover" />
     </Link>
   )

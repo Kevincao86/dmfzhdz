@@ -1,7 +1,57 @@
 const training = require('../../../utils/mpTraining.js')
+const cityPicker = require('../../../utils/publishCityPicker.js')
+
+function todayDate() {
+  const d = new Date()
+  const m = `${d.getMonth() + 1}`.padStart(2, '0')
+  const day = `${d.getDate()}`.padStart(2, '0')
+  return `${d.getFullYear()}-${m}-${day}`
+}
+
+function cityLabel(national, cities) {
+  if (national) return '全国'
+  const list = cities || []
+  if (!list.length) return ''
+  return list.length <= 2 ? list.join('、') : `${list.slice(0, 2).join('、')} 等${list.length}城`
+}
+
+function parseCity(raw) {
+  const text = String(raw || '').trim()
+  if (!text) return { cityNational: false, selectedCities: [] }
+  if (text === '全国' || text === '不限') return { cityNational: true, selectedCities: [] }
+  return {
+    cityNational: false,
+    selectedCities: text.split(/[、,，/]/).map((s) => s.trim()).filter(Boolean),
+  }
+}
+
+function parseWhen(raw) {
+  const m = String(raw || '').trim().match(/^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}))?/)
+  return { whenDate: m ? m[1] : '', whenTime: m && m[2] ? m[2] : '14:00' }
+}
 
 function blankForm() {
-  return { editingId: '', title: '', mode: 'offline', city: '', whenText: '', seats: '20', fee: '', poster: '', note: '' }
+  return {
+    editingId: '',
+    title: '',
+    mode: 'offline',
+    city: '',
+    cityNational: false,
+    selectedCities: [],
+    cityDisplay: '',
+    whenText: '',
+    whenDate: '',
+    whenTime: '14:00',
+    seats: '20',
+    fee: '',
+    poster: '',
+    note: '',
+    cityOpen: false,
+    cityKeyword: '',
+    cityActiveProvince: '',
+    cityProvinceRows: [],
+    cityCheckGrid: [],
+  }
 }
 
 function statusText(course) {
@@ -16,6 +66,7 @@ Page({
     depositOnly: false,
     paid: false,
     yuan: training.DEPOSIT_YUAN,
+    todayDate: todayDate(),
     advanced: false,
     loading: true,
     mine: [],
@@ -81,7 +132,10 @@ Page({
       editingId: course.id,
       title: course.title || '',
       mode: course.mode === 'online' ? 'online' : 'offline',
+      ...parseCity(course.city),
       city: course.city || '',
+      cityDisplay: cityLabel(parseCity(course.city).cityNational, parseCity(course.city).selectedCities),
+      ...parseWhen(course.whenText),
       whenText: course.whenText || '',
       seats: String(course.seats || 20),
       fee: course.fee || '',
@@ -96,12 +150,84 @@ Page({
     this.loadMine()
   },
   onTitle(e) { this.setData({ title: e.detail.value }) },
-  onCity(e) { this.setData({ city: e.detail.value }) },
-  onWhen(e) { this.setData({ whenText: e.detail.value }) },
+  refreshCityUi(activeProvinceHint) {
+    const hint = activeProvinceHint != null ? activeProvinceHint : this.data.cityActiveProvince
+    const st = cityPicker.initModalState(this.data.cityKeyword, hint, this.data.selectedCities || [])
+    this.setData({
+      cityActiveProvince: st.activeProvince,
+      cityProvinceRows: st.provinceRows,
+      cityCheckGrid: st.cityCheckGrid,
+    })
+  },
+  syncCity() {
+    const national = !!this.data.cityNational
+    const cities = this.data.selectedCities || []
+    const city = national ? '全国' : cities.join('、')
+    this.setData({ city, cityDisplay: cityLabel(national, cities) })
+  },
+  onOpenCity() {
+    this.setData({ cityOpen: true, cityKeyword: '' }, () => this.refreshCityUi(''))
+  },
+  onCloseCity() {
+    this.setData({ cityOpen: false })
+  },
+  onCityNational() {
+    this.setData({ cityNational: true, selectedCities: [] }, () => {
+      this.syncCity()
+      this.refreshCityUi()
+    })
+  },
+  onCityKeyword(e) {
+    this.setData({ cityKeyword: e.detail.value }, () => this.refreshCityUi())
+  },
+  onCityProvinceTap(e) {
+    const province = e.currentTarget.dataset.name
+    if (!province || province === this.data.cityActiveProvince) return
+    this.refreshCityUi(province)
+  },
+  onCityCheckTap(e) {
+    const name = e.currentTarget.dataset.name
+    if (!name) return
+    const cities = [...(this.data.selectedCities || [])]
+    const idx = cities.indexOf(name)
+    if (idx >= 0) cities.splice(idx, 1)
+    else cities.push(name)
+    this.setData({ selectedCities: cities, cityNational: false }, () => {
+      this.syncCity()
+      this.refreshCityUi()
+    })
+  },
+  onRemoveCity(e) {
+    const name = e.currentTarget.dataset.name
+    const cities = (this.data.selectedCities || []).filter((c) => c !== name)
+    this.setData({ selectedCities: cities, cityNational: false }, () => {
+      this.syncCity()
+      this.refreshCityUi()
+    })
+  },
+  onConfirmCity() {
+    if (!this.data.cityNational && !(this.data.selectedCities || []).length) {
+      wx.showToast({ title: '请选择全国或添加城市', icon: 'none' })
+      return
+    }
+    this.syncCity()
+    this.setData({ cityOpen: false })
+  },
+  onWhenDate(e) {
+    const whenDate = e.detail.value
+    const whenTime = this.data.whenTime || '14:00'
+    this.setData({ whenDate, whenText: `${whenDate} ${whenTime}` })
+  },
+  onWhenTime(e) {
+    const whenTime = e.detail.value
+    const whenDate = this.data.whenDate
+    this.setData({ whenTime, whenText: whenDate ? `${whenDate} ${whenTime}` : '' })
+  },
   onSeats(e) { this.setData({ seats: e.detail.value }) },
   onFee(e) { this.setData({ fee: e.detail.value }) },
   onNote(e) { this.setData({ note: e.detail.value }) },
   onMode(e) { this.setData({ mode: e.currentTarget.dataset.id }) },
+  noop() {},
   onPoster() {
     wx.chooseImage({
       count: 1,
@@ -137,6 +263,14 @@ Page({
     }
     if (!String(this.data.poster || '').startsWith('data:image/')) {
       wx.showToast({ title: '请上传宣传海报', icon: 'none' })
+      return
+    }
+    if (!this.data.cityNational && !(this.data.selectedCities || []).length) {
+      wx.showToast({ title: '请选择城市', icon: 'none' })
+      return
+    }
+    if (!this.data.whenDate) {
+      wx.showToast({ title: '请选择上课日期', icon: 'none' })
       return
     }
     wx.showLoading({ title: '提交中', mask: true })

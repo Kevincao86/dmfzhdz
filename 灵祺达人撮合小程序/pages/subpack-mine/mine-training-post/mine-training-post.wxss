@@ -43,6 +43,76 @@
 .tp-seg { display: flex; margin-top: 12rpx; padding: 6rpx; border-radius: 18rpx; background: #f4f2fa; }
 .tp-seg__item { flex: 1; height: 72rpx; line-height: 72rpx; text-align: center; border-radius: 14rpx; font-size: 26rpx; color: #6e687c; }
 .tp-seg__item--on { background: #fff; color: #5b2dcc; font-weight: 700; }
+.tp-select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 88rpx;
+  margin-top: 10rpx;
+  padding: 0 24rpx;
+  border-radius: 18rpx;
+  background: #f7f6fb;
+  font-size: 28rpx;
+  color: #1f1a2e;
+}
+.tp-ph { color: #a39cb0; }
+.tp-arrow { color: #a39cb0; font-size: 32rpx; }
+.tp-when { display: flex; gap: 16rpx; }
+.tp-when picker { flex: 1; }
+.tp-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 40;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(15, 12, 28, 0.45);
+}
+.tp-sheet {
+  width: 100%;
+  max-height: 86vh;
+  padding: 28rpx 28rpx calc(28rpx + env(safe-area-inset-bottom));
+  border-radius: 28rpx 28rpx 0 0;
+  background: #fff;
+  box-sizing: border-box;
+}
+.tp-sheet__head { display: flex; align-items: center; justify-content: space-between; }
+.tp-sheet__title { font-size: 34rpx; font-weight: 700; color: #1f1a2e; }
+.tp-sheet__x { font-size: 40rpx; color: #8b8499; padding: 0 8rpx; }
+.tp-national {
+  margin-top: 16rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  text-align: center;
+  border-radius: 16rpx;
+  background: #f4f0ff;
+  color: #5b2dcc;
+  font-size: 28rpx;
+  font-weight: 600;
+}
+.tp-national--on { background: #5b2dcc; color: #fff; }
+.tp-dual { display: flex; height: 420rpx; margin-top: 16rpx; overflow: hidden; border-radius: 18rpx; background: #f7f6fb; }
+.tp-dual__col { width: 42%; height: 420rpx; }
+.tp-dual__col--cities { width: 58%; background: #fff; }
+.tp-prov, .tp-city { padding: 22rpx 20rpx; font-size: 26rpx; color: #3d3650; }
+.tp-prov--on { background: #fff; color: #5b2dcc; font-weight: 700; }
+.tp-city { display: flex; align-items: center; gap: 12rpx; }
+.tp-box {
+  width: 32rpx;
+  height: 32rpx;
+  line-height: 32rpx;
+  text-align: center;
+  border-radius: 8rpx;
+  border: 2rpx solid #d5d0e0;
+  font-size: 20rpx;
+  color: #fff;
+}
+.tp-box--on { border-color: #5b2dcc; background: #5b2dcc; }
+.tp-chips { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 16rpx; }
+.tp-chip { padding: 8rpx 16rpx; border-radius: 999rpx; background: #f4f0ff; color: #5b2dcc; font-size: 22rpx; }
+.tp-sheet .tp-btn { position: static; width: 100%; margin-top: 20rpx; }
 
 .tp-poster {
   position: relative;

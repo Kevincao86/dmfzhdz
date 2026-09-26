@@ -62,9 +62,19 @@
         <view class="tp-seg__item {{mode === 'offline' ? 'tp-seg__item--on' : ''}}" data-id="offline" bindtap="onMode">线下</view>
       </view>
       <text class="tp-label">城市</text>
-      <input class="tp-input" placeholder="{{mode === 'offline' ? '线下上课城市' : '可留空'}}" value="{{city}}" bindinput="onCity" />
-      <text class="tp-label">时间</text>
-      <input class="tp-input" placeholder="如：周六 14:00" value="{{whenText}}" bindinput="onWhen" />
+      <view class="tp-select" bindtap="onOpenCity">
+        <text class="{{cityDisplay ? '' : 'tp-ph'}}">{{cityDisplay || '请选择城市'}}</text>
+        <text class="tp-arrow">›</text>
+      </view>
+      <text class="tp-label">上课时间</text>
+      <view class="tp-when">
+        <picker mode="date" value="{{whenDate}}" start="{{todayDate}}" bindchange="onWhenDate">
+          <view class="tp-select"><text class="{{whenDate ? '' : 'tp-ph'}}">{{whenDate || '选择日期'}}</text><text class="tp-arrow">›</text></view>
+        </picker>
+        <picker mode="time" value="{{whenTime}}" bindchange="onWhenTime">
+          <view class="tp-select"><text>{{whenTime || '14:00'}}</text><text class="tp-arrow">›</text></view>
+        </picker>
+      </view>
     </view>
 
     <view class="tp-card">
@@ -88,5 +98,33 @@
   <view class="tp-bar tp-bar--split" wx:else>
     <view class="tp-btn tp-btn--ghost" bindtap="onBack">返回</view>
     <view class="tp-btn" bindtap="onSubmit">{{editingId ? '保存并重新审核' : '提交审核'}}</view>
+  </view>
+
+  <view class="tp-mask" wx:if="{{cityOpen}}" catchtouchmove="noop">
+    <view class="tp-sheet" catchtap="noop">
+      <view class="tp-sheet__head">
+        <text class="tp-sheet__title">选择城市</text>
+        <text class="tp-sheet__x" bindtap="onCloseCity">×</text>
+      </view>
+      <text class="tp-hint">可多选城市；选「全国」则不限地域</text>
+      <view class="tp-national {{cityNational ? 'tp-national--on' : ''}}" bindtap="onCityNational">全国</view>
+      <input class="tp-input" placeholder="搜索省、市" value="{{cityKeyword}}" bindinput="onCityKeyword" />
+      <view class="tp-dual">
+        <scroll-view class="tp-dual__col" scroll-y>
+          <view wx:for="{{cityProvinceRows}}" wx:key="name" class="tp-prov {{item.active ? 'tp-prov--on' : ''}}" data-name="{{item.name}}" bindtap="onCityProvinceTap">{{item.name}}</view>
+        </scroll-view>
+        <scroll-view class="tp-dual__col tp-dual__col--cities" scroll-y>
+          <view wx:for="{{cityCheckGrid}}" wx:key="name" class="tp-city" data-name="{{item.name}}" bindtap="onCityCheckTap">
+            <text class="tp-box {{item.on ? 'tp-box--on' : ''}}">{{item.on ? '✓' : ''}}</text>
+            <text>{{item.name}}</text>
+          </view>
+          <view wx:if="{{!cityCheckGrid.length}}" class="tp-hint">暂无匹配城市</view>
+        </scroll-view>
+      </view>
+      <view class="tp-chips" wx:if="{{selectedCities.length}}">
+        <view wx:for="{{selectedCities}}" wx:key="*this" class="tp-chip" data-name="{{item}}" bindtap="onRemoveCity">{{item}} ×</view>
+      </view>
+      <view class="tp-btn" bindtap="onConfirmCity">确认</view>
+    </view>
   </view>
 </view>

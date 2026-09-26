@@ -16,6 +16,7 @@ const selectionHomePopup = require('../../utils/selectionHomePopup.js')
 const scheduleHomePopup = require('../../utils/scheduleHomePopup.js')
 const opsBroadcastHomePopup = require('../../utils/opsBroadcastHomePopup.js')
 const mpPlatformDecor = require('../../utils/mpPlatformDecor.js')
+const mpTraining = require('../../utils/mpTraining.js')
 const memberStore = require('../../utils/talentMember.js')
 const regionFilterPicker = require('../../utils/regionFilterPicker.js')
 const hallRegionLocate = require('../../utils/hallRegionLocate.js')
@@ -161,6 +162,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     showDecorPopup: false,
     decorPopup: null,
     decorBanner: null,
+    trainAds: [],
     ...HOME_BANNER_TALENT,
   },
   onLoad() {
@@ -273,6 +275,23 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     } catch (_) {
       this.setData({ decorBanner: null })
     }
+    try {
+      const courses = await mpTraining.listCourses()
+      const trainAds = (Array.isArray(courses) ? courses : [])
+        .filter((c) => c && String(c.poster || '').indexOf('data:image/') === 0)
+        .slice(0, 6)
+        .map((c) => ({ id: c.id, title: c.title || '培训课程', poster: c.poster }))
+      this.setData({ trainAds })
+    } catch (_) {
+      this.setData({ trainAds: [] })
+    }
+  },
+  onTrainAdTap(e) {
+    const id = e.currentTarget.dataset.id
+    const url = id
+      ? `/pages/subpack-mine/mine-training-detail/mine-training-detail?id=${id}`
+      : '/pages/subpack-mine/mine-training/mine-training'
+    wx.navigateTo({ url })
   },
   onDecorBannerTap() {
     const item = this.data.decorBanner

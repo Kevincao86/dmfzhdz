@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchTraining, postTraining } from '../lib/mpApi'
 import { getAccount } from '../lib/mpSession'
 import { initModalState } from '../lib/mpSync/publishCityPicker'
@@ -30,6 +30,11 @@ function parseLecturerCities(raw: string) {
 function lecturerCityText(national: boolean, cities: string[]) {
   if (national) return '全国'
   return cities.length ? cities.join('、') : ''
+}
+
+function parseWhen(raw: string) {
+  const matched = String(raw || '').trim().match(/^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}))?/)
+  return { date: matched ? matched[1] : '', time: matched && matched[2] ? matched[2] : '14:00' }
 }
 
 const ADVANCED = new Set(['pro', 'flagship', 'enterprise'])
@@ -102,6 +107,8 @@ type Course = {
 export default function TrainingPage() {
   const me = getAccount()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const focusCourseId = searchParams.get('course') || ''
   const [courses, setCourses] = useState<Course[]>([])
   const [mine, setMine] = useState<Course[]>([])
   const [mode, setMode] = useState<'all' | 'online' | 'offline'>('all')
@@ -132,6 +139,11 @@ export default function TrainingPage() {
   const [cityKeyword, setCityKeyword] = useState('')
   const [cityProvince, setCityProvince] = useState('')
   const [cityOpen, setCityOpen] = useState(false)
+  const [cityTarget, setCityTarget] = useState<'lecturer' | 'course'>('lecturer')
+  const [courseNational, setCourseNational] = useState(false)
+  const [courseCities, setCourseCities] = useState<string[]>([])
+  const [whenDate, setWhenDate] = useState('')
+  const [whenTime, setWhenTime] = useState('14:00')
   const [platformMode, setPlatformMode] = useState<'single' | 'multi'>('multi')
   const [platformPicks, setPlatformPicks] = useState<string[]>([])
   const [poster, setPoster] = useState('')
@@ -194,6 +206,11 @@ export default function TrainingPage() {
   }, [])
 
   useEffect(() => {
+    if (!focusCourseId) return
+    document.getElementById(`train-${focusCourseId}`)?.scrollIntoView({ block: 'center' })
+  }, [focusCourseId, courses])
+
+  useEffect(() => {
     if (!payTrade) return
     const timer = window.setInterval(() => {
       postTraining({ action: 'payQuery', outTradeNo: payTrade })
@@ -216,11 +233,26 @@ export default function TrainingPage() {
     if (!depositPaid) return '请先到我的钱包缴纳保证金'
     return ''
   }
+  const pickerCities = cityTarget === 'course' ? courseCities : selectedCities
+  const pickerNational = cityTarget === 'course' ? courseNational : cityNational
   const cityUi = useMemo(
-    () => initModalState(cityKeyword, cityProvince, selectedCities),
-    [cityKeyword, cityProvince, selectedCities],
+    () => initModalState(cityKeyword, cityProvince, pickerCities),
+    [cityKeyword, cityProvince, pickerCities],
   )
   const cityLabel = lecturerCityText(cityNational, selectedCities) || '请选择城市'
+  const courseCityLabel = lecturerCityText(courseNational, courseCities) || '请选择城市'
+
+  function applyCourseCity(national: boolean, cities: string[]) {
+    setCourseNational(national)
+    setCourseCities(cities)
+    setPostCity(lecturerCityText(national, cities))
+  }
+
+  function openCourseCity() {
+    setCityTarget('course')
+    setCityKeyword('')
+    setCityOpen(true)
+  }
 
   async function startScanPay() {
     if (!payOpen || !me?.accountId) {
@@ -263,7 +295,11 @@ export default function TrainingPage() {
     setFee('')
     setPostMode('online')
     setPostCity('')
+    setCourseNational(false)
+    setCourseCities([])
     setWhenText('')
+    setWhenDate('')
+    setWhenTime('14:00')
     setSeats('20')
     setNote('')
     setPoster('')
@@ -276,8 +312,14 @@ export default function TrainingPage() {
     setTitle(course.title || '')
     setFee(course.fee || '')
     setPostMode(course.mode === 'offline' ? 'offline' : 'online')
-    setPostCity(course.city || '')
-    setWhenText(course.whenText || '')
+    const parsedCity = parseLecturerCities(course.city || '')
+    setPostCity(lecturerCityText(parsedCity.national, parsedCity.cities))
+    setCourseNational(parsedCity.national)
+    setCourseCities(parsedCity.cities)
+    const parsedWhen = parseWhen(course.whenText || '')
+    setWhenText(parsedWhen.date ? `${parsedWhen.date} ${parsedWhen.time}` : '')
+    setWhenDate(parsedWhen.date)
+    setWhenTime(parsedWhen.time)
     setSeats(String(course.seats || 20))
     setNote(course.note || '')
     setPoster(course.poster || '')
@@ -324,7 +366,7 @@ export default function TrainingPage() {
       {err ? <p className="text-sm text-red-600">{err}</p> : null}
       <div className="space-y-3">
         {shown.map((c) => (
-          <article key={c.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+          <article id={`train-${c.id}`} key={c.id} className={`rounded-2xl border bg-white p-4 ${focusCourseId === c.id ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-200'}`}>
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="font-semibold text-slate-900">{c.title}</h2>
@@ -417,6 +459,14 @@ export default function TrainingPage() {
                 setErr('请上传宣传海报')
                 return
               }
+              if (!postCity.trim()) {
+                setErr('请选择城市')
+                return
+              }
+              if (!whenDate) {
+                setErr('请选择上课日期')
+                return
+              }
               setErr('')
               postTraining({
                 action: editingId ? 'update' : 'create',
@@ -425,7 +475,7 @@ export default function TrainingPage() {
                 fee,
                 mode: postMode,
                 city: postCity.trim(),
-                whenText: whenText.trim(),
+                whenText: `${whenDate} ${whenTime || '14:00'}`,
                 seats: Number(seats) || 1,
                 note: note.trim(),
                 poster,
@@ -510,12 +560,17 @@ export default function TrainingPage() {
                       <button type="button" className={`rounded-xl py-2 text-sm ${postMode === 'offline' ? 'bg-white font-semibold text-violet-700 shadow-sm' : 'text-slate-500'}`} onClick={() => setPostMode('offline')}>线下</button>
                     </div>
                   </div>
-                  <label className="block text-xs font-medium text-slate-500">城市
-                    <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" placeholder={postMode === 'offline' ? '线下上课城市' : '可留空'} value={postCity} onChange={(e) => setPostCity(e.target.value)} />
-                  </label>
-                  <label className="block text-xs font-medium text-slate-500">时间
-                    <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" placeholder="如：周六 14:00" value={whenText} onChange={(e) => setWhenText(e.target.value)} />
-                  </label>
+                  <div className="block text-xs font-medium text-slate-500">城市
+                    <button type="button" className={`mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-left text-sm ${courseCityLabel === '请选择城市' ? 'text-slate-400' : 'text-slate-900'}`} onClick={openCourseCity}>
+                      {courseCityLabel}
+                    </button>
+                  </div>
+                  <div className="block text-xs font-medium text-slate-500">上课时间
+                    <div className="mt-1 grid grid-cols-2 gap-2">
+                      <input className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" type="date" value={whenDate} onChange={(e) => setWhenDate(e.target.value)} />
+                      <input className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" type="time" value={whenTime} onChange={(e) => setWhenTime(e.target.value)} />
+                    </div>
+                  </div>
                 </div>
               </section>
               <section>
@@ -649,7 +704,7 @@ export default function TrainingPage() {
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <div className="block text-xs font-medium text-slate-500">
                     常驻城市
-                    <button type="button" className={`mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-left text-sm ${cityLabel === '请选择城市' ? 'text-slate-400' : 'text-slate-900'}`} onClick={() => setCityOpen(true)}>
+                    <button type="button" className={`mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-left text-sm ${cityLabel === '请选择城市' ? 'text-slate-400' : 'text-slate-900'}`} onClick={() => { setCityTarget('lecturer'); setCityOpen(true) }}>
                       {cityLabel}
                     </button>
                   </div>
@@ -717,7 +772,10 @@ export default function TrainingPage() {
               <button type="button" className="text-xl text-slate-400" onClick={() => setCityOpen(false)} aria-label="关闭">×</button>
             </div>
             <p className="mt-1 text-xs text-slate-500">可多选城市；选「全国」则不限地域</p>
-            <button type="button" className={`mt-3 w-full rounded-xl py-2 text-sm font-semibold ${cityNational ? 'bg-violet-600 text-white' : 'bg-violet-50 text-violet-700'}`} onClick={() => { setCityNational(true); setSelectedCities([]); setCity('全国') }}>全国</button>
+            <button type="button" className={`mt-3 w-full rounded-xl py-2 text-sm font-semibold ${pickerNational ? 'bg-violet-600 text-white' : 'bg-violet-50 text-violet-700'}`} onClick={() => {
+              if (cityTarget === 'course') applyCourseCity(true, [])
+              else { setCityNational(true); setSelectedCities([]); setCity('全国') }
+            }}>全国</button>
             <input className="mt-3 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400" placeholder="搜索省、市" value={cityKeyword} onChange={(e) => setCityKeyword(e.target.value)} />
             <div className="mt-3 grid h-64 grid-cols-2 overflow-hidden rounded-2xl bg-slate-50">
               <div className="overflow-auto">
@@ -728,10 +786,9 @@ export default function TrainingPage() {
               <div className="overflow-auto bg-white">
                 {cityUi.cityCheckGrid.map((c) => (
                   <button key={c.name} type="button" className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm" onClick={() => {
-                    const next = selectedCities.includes(c.name) ? selectedCities.filter((x) => x !== c.name) : selectedCities.concat(c.name)
-                    setCityNational(false)
-                    setSelectedCities(next)
-                    setCity(next.join('、'))
+                    const next = pickerCities.includes(c.name) ? pickerCities.filter((x) => x !== c.name) : pickerCities.concat(c.name)
+                    if (cityTarget === 'course') applyCourseCity(false, next)
+                    else { setCityNational(false); setSelectedCities(next); setCity(next.join('、')) }
                   }}>
                     <span className={`flex h-4 w-4 items-center justify-center rounded border text-[10px] text-white ${c.on ? 'border-violet-600 bg-violet-600' : 'border-slate-300'}`}>{c.on ? '✓' : ''}</span>
                     {c.name}
@@ -739,14 +796,13 @@ export default function TrainingPage() {
                 ))}
               </div>
             </div>
-            {selectedCities.length ? (
+            {pickerCities.length ? (
               <div className="mt-3 flex flex-wrap gap-2">
-                {selectedCities.map((name) => (
+                {pickerCities.map((name) => (
                   <button key={name} type="button" className="rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700" onClick={() => {
-                    const next = selectedCities.filter((x) => x !== name)
-                    setSelectedCities(next)
-                    setCity(next.join('、'))
-                    setCityNational(false)
+                    const next = pickerCities.filter((x) => x !== name)
+                    if (cityTarget === 'course') applyCourseCity(false, next)
+                    else { setSelectedCities(next); setCity(next.join('、')); setCityNational(false) }
                   }}>{name} ×</button>
                 ))}
               </div>
