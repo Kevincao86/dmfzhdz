@@ -183,12 +183,18 @@ async function saveProfile(input) {
     bank: String(input.bank || '').trim(),
     bankNo: String(input.bankNo || '').trim(),
     licenseNo: String(input.licenseNo || '').trim(),
+    city: String(input.city || '').trim(),
+    platforms: String(input.platforms || '').trim(),
+    skills: String(input.skills || '').trim(),
+    years: String(input.years || '').trim(),
+    intro: String(input.intro || '').trim(),
     idFront: String(input.idFront || ''),
     idBack: String(input.idBack || ''),
     licenseImage: String(input.licenseImage || ''),
     updatedAt: new Date().toISOString(),
   }
   if (!profile.name || !profile.bankNo) throw new Error('请填写户名和账号')
+  if (!profile.city || !profile.intro) throw new Error('请填写常驻城市和讲师介绍')
   if (profile.kind === 'entity' && !profile.licenseNo) throw new Error('请填写统一社会信用代码')
   writeProfile(profile)
   if (ecs.hasBase && ecs.hasBase()) {
