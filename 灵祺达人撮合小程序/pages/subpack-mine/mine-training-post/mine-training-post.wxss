@@ -1,12 +1,90 @@
-.tp { min-height: 100vh; background: #fff; padding: 28rpx; box-sizing: border-box; }
-.tp-label { display: block; margin-top: 22rpx; font-size: 24rpx; color: #8b8798; }
-.tp-input { margin-top: 8rpx; height: 80rpx; border: 1rpx solid #eceaf2; border-radius: 14rpx; padding: 0 20rpx; font-size: 28rpx; }
-.tp-picks { display: flex; gap: 16rpx; margin-top: 10rpx; }
-.tp-pick { flex: 1; text-align: center; line-height: 72rpx; border-radius: 14rpx; border: 1rpx solid #eceaf2; font-size: 26rpx; }
-.tp-pick--on { border-color: #5b2dcc; color: #5b2dcc; background: #f7f4ff; }
-.tp-poster { margin-top: 24rpx; height: 160rpx; border: 1rpx dashed #d9d3ea; border-radius: 16rpx; text-align: center; line-height: 160rpx; color: #5b2dcc; font-size: 26rpx; }
-.tp-hint { display: block; margin-top: 16rpx; font-size: 22rpx; color: #9a94a8; }
-.tp-btn { margin-top: 28rpx; height: 88rpx; line-height: 88rpx; text-align: center; background: #5b2dcc; color: #fff; border-radius: 16rpx; font-size: 30rpx; font-weight: 600; }
-.tp-gate { padding: 12rpx 0 8rpx; }
-.tp-gate__t { display: block; font-size: 32rpx; font-weight: 700; color: #1f1a2e; }
-.tp-line { display: block; margin-top: 12rpx; font-size: 26rpx; color: #3d3650; }
+.tp {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 24rpx 24rpx 200rpx;
+  background: #f4f2fa;
+}
+
+.tp-hero { padding: 8rpx 8rpx 8rpx; }
+.tp-hero__kicker { display: block; font-size: 22rpx; font-weight: 600; letter-spacing: 2rpx; color: #7c4dff; }
+.tp-hero__title { display: block; margin-top: 8rpx; font-size: 44rpx; font-weight: 700; color: #1f1a2e; }
+.tp-hero__sub { display: block; margin-top: 12rpx; font-size: 26rpx; line-height: 1.55; color: #6e687c; }
+
+.tp-card, .tp-course {
+  margin-top: 20rpx;
+  padding: 28rpx;
+  border-radius: 28rpx;
+  background: #fff;
+}
+.tp-sec { display: block; font-size: 30rpx; font-weight: 700; color: #1f1a2e; }
+.tp-hint, .tp-course__meta, .tp-course__note {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  line-height: 1.55;
+  color: #8b8499;
+}
+.tp-course__note { color: #b42318; }
+.tp-cond { display: flex; justify-content: space-between; margin-top: 18rpx; font-size: 28rpx; color: #1f1a2e; }
+.tp-ok { color: #067647; font-weight: 600; }
+.tp-wait { color: #b54708; font-weight: 600; }
+.tp-label { display: block; margin-top: 22rpx; font-size: 24rpx; color: #6e687c; }
+.tp-input, .tp-area {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 10rpx;
+  border-radius: 18rpx;
+  background: #f7f6fb;
+  font-size: 28rpx;
+  color: #1f1a2e;
+}
+.tp-input { height: 88rpx; padding: 0 24rpx; }
+.tp-area { height: 180rpx; padding: 20rpx 24rpx; line-height: 1.5; }
+.tp-seg { display: flex; margin-top: 12rpx; padding: 6rpx; border-radius: 18rpx; background: #f4f2fa; }
+.tp-seg__item { flex: 1; height: 72rpx; line-height: 72rpx; text-align: center; border-radius: 14rpx; font-size: 26rpx; color: #6e687c; }
+.tp-seg__item--on { background: #fff; color: #5b2dcc; font-weight: 700; }
+
+.tp-poster {
+  position: relative;
+  height: 320rpx;
+  margin-top: 16rpx;
+  border-radius: 24rpx;
+  border: 2rpx dashed #d9d0ee;
+  background: #f7f4ff;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.tp-poster__img { position: absolute; left: 0; top: 0; width: 100%; height: 320rpx; }
+.tp-poster__name { font-size: 28rpx; font-weight: 600; color: #1f1a2e; }
+.tp-poster__tip { margin-top: 8rpx; font-size: 22rpx; color: #8b8499; }
+.tp-poster__badge { position: absolute; right: 16rpx; bottom: 16rpx; padding: 6rpx 16rpx; border-radius: 999rpx; background: rgba(31, 26, 46, 0.72); color: #fff; font-size: 22rpx; }
+
+.tp-course { display: flex; gap: 20rpx; padding: 20rpx; }
+.tp-course__cover { width: 168rpx; height: 210rpx; border-radius: 18rpx; background: #f4f0ff; flex-shrink: 0; }
+.tp-course__cover--ph { display: flex; align-items: center; justify-content: center; color: #7c4dff; font-size: 24rpx; }
+.tp-course__body { flex: 1; min-width: 0; }
+.tp-course__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12rpx; }
+.tp-course__title { flex: 1; font-size: 30rpx; font-weight: 700; color: #1f1a2e; line-height: 1.35; }
+.tp-status { flex-shrink: 0; padding: 4rpx 12rpx; border-radius: 999rpx; font-size: 20rpx; font-weight: 600; }
+.tp-status--pending { color: #b54708; background: #fff4e5; }
+.tp-status--rejected { color: #b42318; background: #fdecea; }
+.tp-status--approved { color: #067647; background: #e8f7ef; }
+.tp-edit { display: inline-block; margin-top: 16rpx; padding: 0 24rpx; height: 56rpx; line-height: 56rpx; border-radius: 999rpx; background: #f4f0ff; color: #5b2dcc; font-size: 24rpx; font-weight: 600; }
+
+.tp-empty { margin-top: 48rpx; text-align: center; color: #9a94a8; font-size: 26rpx; }
+
+.tp-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  gap: 16rpx;
+  padding: 16rpx 24rpx calc(16rpx + env(safe-area-inset-bottom));
+  background: rgba(244, 242, 250, 0.96);
+}
+.tp-btn { flex: 1; height: 92rpx; line-height: 92rpx; text-align: center; border-radius: 20rpx; background: #5b2dcc; color: #fff; font-size: 30rpx; font-weight: 600; }
+.tp-btn--ghost { flex: 0 0 180rpx; background: #fff; color: #3d3650; border: 1rpx solid #e4dff0; }

@@ -214,9 +214,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ...rest,
       signupCount: (signups || []).length,
     }))
+    const mine = hostId
+      ? store.courses
+          .filter((c) => c.hostId === hostId)
+          .map(({ signups, ...rest }) => ({
+            ...rest,
+            signupCount: (signups || []).length,
+          }))
+      : []
     res.status(200).json({
       ok: true,
       courses,
+      mine,
       profile: hostId ? store.profiles.find((p) => p.hostId === hostId) || null : null,
       profiles: review ? store.profiles.filter((p) => lecturerState(p) !== 'none').map(lecturerCard) : [],
       orders: hostId ? store.orders.filter((o) => o.hostId === hostId) : [],
@@ -378,6 +387,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     store.courses.unshift(course)
     writeStore(store)
     res.status(200).json({ ok: true, course })
+    return
+  }
+
+  if (action === 'update') {
+    const hostId = String(body.hostId || '')
+    const course = store.courses.find((c) => c.id === String(body.id || '') && c.hostId === hostId)
+    if (!course) {
+      res.status(404).json({ ok: false, error: '课程不存在' })
+      return
+    }
+    const profile = store.profiles.find((p) => p.hostId === hostId)
+    if (!profile || lecturerState(profile) !== 'approved' || !profile.name || !profile.bankNo) {
+      res.status(400).json({ ok: false, error: '请先完成讲师审核和收款认证' })
+      return
+    }
+    const title = String(body.title || '').trim()
+    if (!title) {
+      res.status(400).json({ ok: false, error: '请填写课程名称' })
+      return
+    }
+    const poster = String(body.poster || '')
+    const taken = (course.signups || []).length
+    course.title = title
+    course.mode = body.mode === 'offline' ? 'offline' : 'online'
+    course.city = String(body.city || '').trim()
+    course.whenText = String(body.whenText || '').trim()
+    course.seats = Math.max(taken, Math.max(1, Number(body.seats) || 1))
+    course.fee = String(body.fee || '').trim()
+    course.note = String(body.note || '').trim()
+    if (poster.startsWith('data:image/')) course.poster = poster.slice(0, 400000)
+    course.reviewStatus = 'pending'
+    course.reviewNote = ''
+    writeStore(store)
+    const { signups, ...rest } = course
+    res.status(200).json({ ok: true, course: { ...rest, signupCount: (signups || []).length } })
     return
   }
 

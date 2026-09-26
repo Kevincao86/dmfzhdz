@@ -1,28 +1,92 @@
 <view class="tp">
-  <view class="tp-gate" wx:if="{{!advanced || !paid}}">
-    <text class="tp-gate__t">发布条件</text>
-    <text class="tp-line">高级会员：{{advanced ? '已开通' : '未开通'}}</text>
-    <text class="tp-line">保证金 ¥{{yuan}}：{{paid ? '已缴纳' : '未缴纳'}}</text>
-    <view class="tp-btn" wx:if="{{!paid}}" bindtap="onPayDeposit">缴纳保证金</view>
+  <view class="tp-hero">
+    <text class="tp-hero__kicker">本地生活培训</text>
+    <text class="tp-hero__title">{{view === 'form' ? (editingId ? '编辑培训' : '新增培训') : '我发布的'}}</text>
+    <text class="tp-hero__sub" wx:if="{{view === 'form'}}">改完会重新提交审核。通过前不会出现在首页广告栏。</text>
+    <text class="tp-hero__sub" wx:else>查看已提交的课程，可以新增，也可以改已发布的内容。</text>
   </view>
-  <block wx:if="{{advanced && paid && !depositOnly}}">
-    <text class="tp-label">课程名称</text>
-    <input class="tp-input" placeholder="如：探店口播训练营" value="{{title}}" bindinput="onTitle" />
-    <text class="tp-label">形式</text>
-    <view class="tp-picks">
-      <view class="tp-pick {{mode === 'online' ? 'tp-pick--on' : ''}}" data-id="online" bindtap="onMode">线上</view>
-      <view class="tp-pick {{mode === 'offline' ? 'tp-pick--on' : ''}}" data-id="offline" bindtap="onMode">线下</view>
+
+  <view class="tp-card" wx:if="{{!advanced || !paid}}">
+    <text class="tp-sec">发布条件</text>
+    <view class="tp-cond">
+      <text>高级会员</text>
+      <text class="{{advanced ? 'tp-ok' : 'tp-wait'}}">{{advanced ? '已开通' : '未开通'}}</text>
     </view>
-    <text class="tp-label">城市</text>
-    <input class="tp-input" placeholder="线下填写城市" value="{{city}}" bindinput="onCity" />
-    <text class="tp-label">时间</text>
-    <input class="tp-input" placeholder="如：周六 14:00" value="{{whenText}}" bindinput="onWhen" />
-    <text class="tp-label">名额</text>
-    <input class="tp-input" type="number" value="{{seats}}" bindinput="onSeats" />
-    <text class="tp-label">费用</text>
-    <input class="tp-input" type="digit" placeholder="课时费，平台不代收" value="{{fee}}" bindinput="onFee" />
-    <view class="tp-poster" bindtap="onPoster">{{poster ? '已选择海报' : '上传海报'}}</view>
-    <text class="tp-hint">课时费进平台托管。你只安排课程。个人结算预扣个税，个体户或企业须先开票再打款。</text>
-    <view class="tp-btn" bindtap="onSubmit">发布</view>
+    <view class="tp-cond">
+      <text>保证金 ¥{{yuan}}</text>
+      <text class="{{paid ? 'tp-ok' : 'tp-wait'}}">{{paid ? '已确认' : '未确认'}}</text>
+    </view>
+    <text class="tp-hint">需高级会员，并确认保证金。课时费由平台代收，核实通过后 T+1 结算。</text>
+  </view>
+
+  <block wx:if="{{view === 'list' && !depositOnly}}">
+    <view wx:if="{{loading}}" class="tp-empty">加载中</view>
+    <view wx:elif="{{!mine.length}}" class="tp-empty">还没有发布培训</view>
+    <view wx:for="{{mine}}" wx:key="id" class="tp-course">
+      <image wx:if="{{item.poster}}" class="tp-course__cover" src="{{item.poster}}" mode="aspectFill" />
+      <view wx:else class="tp-course__cover tp-course__cover--ph">海报</view>
+      <view class="tp-course__body">
+        <view class="tp-course__top">
+          <text class="tp-course__title">{{item.title}}</text>
+          <text class="tp-status tp-status--{{item.statusKey}}">{{item.statusText}}</text>
+        </view>
+        <text class="tp-course__meta">{{item.modeText}}{{item.city ? ' · ' + item.city : ''}}{{item.whenText ? ' · ' + item.whenText : ''}}</text>
+        <text class="tp-course__meta">¥{{item.fee || '0'}} · {{item.signupCount || 0}}/{{item.seats}} 人</text>
+        <text wx:if="{{item.reviewStatus === 'rejected' && item.reviewNote}}" class="tp-course__note">{{item.reviewNote}}</text>
+        <view class="tp-edit" data-id="{{item.id}}" bindtap="onEdit">编辑</view>
+      </view>
+    </view>
   </block>
+
+  <block wx:if="{{view === 'form' && advanced && paid}}">
+    <view class="tp-card">
+      <text class="tp-sec">宣传海报</text>
+      <text class="tp-hint">竖图更适合首页广告栏。上传后请看清画面。</text>
+      <view class="tp-poster" bindtap="onPoster">
+        <image wx:if="{{poster}}" class="tp-poster__img" src="{{poster}}" mode="aspectFill" />
+        <block wx:else>
+          <text class="tp-poster__name">上传海报</text>
+          <text class="tp-poster__tip">点击选择图片</text>
+        </block>
+        <text wx:if="{{poster}}" class="tp-poster__badge">更换</text>
+      </view>
+    </view>
+
+    <view class="tp-card">
+      <text class="tp-sec">课程信息</text>
+      <text class="tp-label">课程名称</text>
+      <input class="tp-input" placeholder="如：宁波探店口播训练营" value="{{title}}" bindinput="onTitle" />
+      <text class="tp-label">形式</text>
+      <view class="tp-seg">
+        <view class="tp-seg__item {{mode === 'online' ? 'tp-seg__item--on' : ''}}" data-id="online" bindtap="onMode">线上</view>
+        <view class="tp-seg__item {{mode === 'offline' ? 'tp-seg__item--on' : ''}}" data-id="offline" bindtap="onMode">线下</view>
+      </view>
+      <text class="tp-label">城市</text>
+      <input class="tp-input" placeholder="{{mode === 'offline' ? '线下上课城市' : '可留空'}}" value="{{city}}" bindinput="onCity" />
+      <text class="tp-label">时间</text>
+      <input class="tp-input" placeholder="如：周六 14:00" value="{{whenText}}" bindinput="onWhen" />
+    </view>
+
+    <view class="tp-card">
+      <text class="tp-sec">费用与名额</text>
+      <text class="tp-label">课时费（元）</text>
+      <input class="tp-input" type="digit" placeholder="平台代收，学员支付这个金额" value="{{fee}}" bindinput="onFee" />
+      <text class="tp-label">名额</text>
+      <input class="tp-input" type="number" value="{{seats}}" bindinput="onSeats" />
+      <text class="tp-label">课程说明</text>
+      <textarea class="tp-area" placeholder="这门课解决什么接单问题，适合谁来听" value="{{note}}" bindinput="onNote" />
+    </view>
+  </block>
+
+  <view class="tp-bar" wx:if="{{depositOnly || !advanced || !paid}}">
+    <view class="tp-btn" wx:if="{{!advanced}}" bindtap="onOpenMember">去开通会员</view>
+    <view class="tp-btn" wx:elif="{{!paid}}" bindtap="onPayDeposit">确认保证金 ¥{{yuan}}</view>
+  </view>
+  <view class="tp-bar" wx:elif="{{view === 'list'}}">
+    <view class="tp-btn" bindtap="onCreate">新增培训</view>
+  </view>
+  <view class="tp-bar tp-bar--split" wx:else>
+    <view class="tp-btn tp-btn--ghost" bindtap="onBack">返回</view>
+    <view class="tp-btn" bindtap="onSubmit">{{editingId ? '保存并重新审核' : '提交审核'}}</view>
+  </view>
 </view>

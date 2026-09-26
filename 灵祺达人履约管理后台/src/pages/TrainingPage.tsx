@@ -63,16 +63,27 @@ type Course = {
   seats: number
   fee: string
   signupCount?: number
+  poster?: string
+  note?: string
+  reviewStatus?: 'pending' | 'approved' | 'rejected' | ''
+  reviewNote?: string
 }
 
 export default function TrainingPage() {
   const me = getAccount()
   const [courses, setCourses] = useState<Course[]>([])
+  const [mine, setMine] = useState<Course[]>([])
   const [mode, setMode] = useState<'all' | 'online' | 'offline'>('all')
   const [err, setErr] = useState('')
   const [title, setTitle] = useState('')
   const [fee, setFee] = useState('')
   const [postMode, setPostMode] = useState<'online' | 'offline'>('online')
+  const [postCity, setPostCity] = useState('')
+  const [whenText, setWhenText] = useState('')
+  const [seats, setSeats] = useState('20')
+  const [note, setNote] = useState('')
+  const [editingId, setEditingId] = useState('')
+  const [editorOpen, setEditorOpen] = useState(false)
   const [kind, setKind] = useState<'person' | 'entity'>('person')
   const [name, setName] = useState('')
   const [idNo, setIdNo] = useState('')
@@ -98,6 +109,7 @@ export default function TrainingPage() {
   async function load() {
     const data = await fetchTraining(me?.accountId)
     setCourses((data.courses as Course[]) || [])
+    setMine((data.mine as Course[]) || [])
     const profile = data.profile as Lecturer | null
     const status = profile?.lecturerStatus
     const nextStatus =
@@ -131,6 +143,38 @@ export default function TrainingPage() {
 
   const shown = courses.filter((c) => mode === 'all' || c.mode === mode)
   const payoutReady = lecturerStatus === 'approved' && !!bankNo.trim()
+
+  function openCreate() {
+    if (!payoutReady) {
+      setErr('先申请讲师，审核通过并完成收款认证后才能发布')
+      return
+    }
+    setEditingId('')
+    setTitle('')
+    setFee('')
+    setPostMode('online')
+    setPostCity('')
+    setWhenText('')
+    setSeats('20')
+    setNote('')
+    setPoster('')
+    setErr('')
+    setEditorOpen(true)
+  }
+
+  function openEdit(course: Course) {
+    setEditingId(course.id)
+    setTitle(course.title || '')
+    setFee(course.fee || '')
+    setPostMode(course.mode === 'offline' ? 'offline' : 'online')
+    setPostCity(course.city || '')
+    setWhenText(course.whenText || '')
+    setSeats(String(course.seats || 20))
+    setNote(course.note || '')
+    setPoster(course.poster || '')
+    setErr('')
+    setEditorOpen(true)
+  }
   const applyLabel =
     lecturerStatus === 'approved' ? '讲师已通过' : lecturerStatus === 'pending' ? '讲师审核中' : lecturerStatus === 'rejected' ? '重新申请讲师' : '申请讲师'
 
@@ -220,75 +264,155 @@ export default function TrainingPage() {
         ))}
         {!shown.length ? <p className="text-sm text-slate-400">还没有课程</p> : null}
       </div>
-      <form
-        className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4"
-        onSubmit={(e) => {
-          e.preventDefault()
-          if (!title.trim()) return
-          if (lecturerStatus !== 'approved') {
-            setErr('请先申请讲师并通过审核')
-            return
-          }
-          if (!bankNo.trim()) {
-            setErr('请先完成收款认证')
-            return
-          }
-          if (!poster.startsWith('data:image/')) {
-            setErr('请上传宣传海报')
-            return
-          }
-          postTraining({
-            action: 'create',
-            title: title.trim(),
-            fee,
-            mode: postMode,
-            poster,
-            hostId: me?.accountId || '',
-            hostName: me?.wxNickName || me?.loginName || '达人',
-            hostRole: me?.activeRole || 'talent',
-          })
-            .then(() => {
-              setTitle('')
-              setFee('')
-              setPoster('')
-              setErr('已提交审核，通过后会出现在首页广告栏')
-              return load()
-            })
-            .catch((ex) => setErr(ex instanceof Error ? ex.message : '发布失败'))
-        }}
-      >
-        <h2 className="font-semibold text-slate-900">发布培训</h2>
-        {!payoutReady ? (
-          <p className="text-xs text-slate-500">
-            先申请讲师，审核通过后再做收款认证，然后才能发布。
-          </p>
-        ) : null}
-        <input className="w-full rounded-xl border px-3 py-2 text-sm" placeholder="课程名称" value={title} onChange={(e) => setTitle(e.target.value)} />
-        <input className="w-full rounded-xl border px-3 py-2 text-sm" placeholder="费用（元）" value={fee} onChange={(e) => setFee(e.target.value)} />
-        <div className="flex gap-3 text-sm">
-          <button type="button" className={postMode === 'online' ? 'font-semibold text-violet-700' : ''} onClick={() => setPostMode('online')}>线上</button>
-          <button type="button" className={postMode === 'offline' ? 'font-semibold text-violet-700' : ''} onClick={() => setPostMode('offline')}>线下</button>
+      <section className="rounded-3xl border border-slate-200 bg-white p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">我发布的</h2>
+            <p className="mt-1 text-sm text-slate-500">查看已提交的课程。新增或修改后都会重新进入审核。</p>
+          </div>
+          <button type="button" className="shrink-0 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white" onClick={openCreate}>
+            新增培训
+          </button>
         </div>
-        <label className="block text-sm text-slate-600">
-          宣传海报
-          <input
-            className="mt-1 block w-full text-sm"
-            type="file"
-            accept="image/*"
-            onChange={(e) => {
-              const file = e.target.files?.[0]
-              if (!file) return
-              compressImageFile(file)
-                .then((url) => setPoster(url))
-                .catch((ex) => setErr(ex instanceof Error ? ex.message : '海报处理失败'))
+        {!payoutReady ? <p className="mt-3 text-xs text-slate-500">先申请讲师，审核通过并完成收款认证后才能发布。</p> : null}
+        <div className="mt-4 space-y-3">
+          {mine.map((c) => (
+            <article key={c.id} className="flex gap-3 rounded-2xl bg-slate-50 p-3">
+              {c.poster ? (
+                <img src={c.poster} alt="" className="h-24 w-16 shrink-0 rounded-xl object-cover" />
+              ) : (
+                <div className="flex h-24 w-16 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-xs text-violet-700">海报</div>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-semibold text-slate-900">{c.title}</h3>
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${c.reviewStatus === 'rejected' ? 'bg-red-50 text-red-700' : c.reviewStatus === 'pending' ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-700'}`}>
+                    {c.reviewStatus === 'rejected' ? '未通过' : c.reviewStatus === 'pending' ? '审核中' : '已通过'}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  {c.mode === 'offline' ? '线下' : '线上'}
+                  {c.city ? ` · ${c.city}` : ''}
+                  {c.whenText ? ` · ${c.whenText}` : ''} · ¥{c.fee || '0'} · {c.signupCount || 0}/{c.seats} 人
+                </p>
+                {c.reviewStatus === 'rejected' && c.reviewNote ? <p className="mt-1 text-xs text-red-600">{c.reviewNote}</p> : null}
+                <button type="button" className="mt-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-violet-700" onClick={() => openEdit(c)}>
+                  编辑
+                </button>
+              </div>
+            </article>
+          ))}
+          {!mine.length ? <p className="py-6 text-center text-sm text-slate-400">还没有发布培训</p> : null}
+        </div>
+      </section>
+      {editorOpen ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-6" onClick={() => setEditorOpen(false)}>
+          <form
+            className="flex max-h-[min(94vh,880px)] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (!payoutReady) {
+                setErr('先申请讲师，审核通过并完成收款认证后才能发布')
+                return
+              }
+              if (!title.trim()) {
+                setErr('请填写课程名称')
+                return
+              }
+              if (!poster.startsWith('data:image/')) {
+                setErr('请上传宣传海报')
+                return
+              }
+              setErr('')
+              postTraining({
+                action: editingId ? 'update' : 'create',
+                id: editingId,
+                title: title.trim(),
+                fee,
+                mode: postMode,
+                city: postCity.trim(),
+                whenText: whenText.trim(),
+                seats: Number(seats) || 1,
+                note: note.trim(),
+                poster,
+                hostId: me?.accountId || '',
+                hostName: me?.wxNickName || me?.loginName || '达人',
+                hostRole: me?.activeRole || 'talent',
+              })
+                .then(() => {
+                  setEditorOpen(false)
+                  setErr(editingId ? '已保存，重新进入审核' : '已提交审核，通过后会出现在首页广告栏')
+                  return load()
+                })
+                .catch((ex) => setErr(ex instanceof Error ? ex.message : '提交失败'))
             }}
-          />
-        </label>
-        {poster ? <img src={poster} alt="宣传海报" className="h-36 w-full rounded-xl object-cover" /> : null}
-        <button type="submit" disabled={!payoutReady} className="rounded-xl bg-slate-900 px-3 py-2 text-sm text-white disabled:opacity-40">
-          提交审核
-        </button>
-      </form>
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
+              <div>
+                <p className="text-xs font-semibold tracking-wide text-violet-600">本地生活培训</p>
+                <h2 className="mt-1 text-xl font-bold text-slate-900">{editingId ? '编辑培训' : '新增培训'}</h2>
+                <p className="mt-1 text-sm text-slate-500">保存后重新审核。通过前不会出现在首页广告栏。</p>
+              </div>
+              <button type="button" className="rounded-full px-2 text-xl leading-none text-slate-400" onClick={() => setEditorOpen(false)} aria-label="关闭">×</button>
+            </div>
+            <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
+              <section>
+                <h3 className="text-sm font-semibold text-slate-900">宣传海报</h3>
+                <label className="relative mt-3 flex h-40 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border border-dashed border-violet-200 bg-violet-50/50">
+                  {poster ? <img src={poster} alt="" className="absolute inset-0 h-full w-full object-cover" /> : null}
+                  <span className={`relative text-sm font-medium ${poster ? 'rounded-full bg-slate-900/70 px-3 py-1 text-white' : 'text-slate-700'}`}>{poster ? '更换海报' : '上传海报'}</span>
+                  <input className="sr-only" type="file" accept="image/*" onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    compressImageFile(file).then((url) => setPoster(url)).catch((ex) => setErr(ex instanceof Error ? ex.message : '海报处理失败'))
+                  }} />
+                </label>
+              </section>
+              <section>
+                <h3 className="text-sm font-semibold text-slate-900">课程信息</h3>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <label className="block text-xs font-medium text-slate-500 sm:col-span-2">课程名称
+                    <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" placeholder="如：宁波探店口播训练营" value={title} onChange={(e) => setTitle(e.target.value)} />
+                  </label>
+                  <div className="sm:col-span-2">
+                    <p className="text-xs font-medium text-slate-500">形式</p>
+                    <div className="mt-1 grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
+                      <button type="button" className={`rounded-xl py-2 text-sm ${postMode === 'online' ? 'bg-white font-semibold text-violet-700 shadow-sm' : 'text-slate-500'}`} onClick={() => setPostMode('online')}>线上</button>
+                      <button type="button" className={`rounded-xl py-2 text-sm ${postMode === 'offline' ? 'bg-white font-semibold text-violet-700 shadow-sm' : 'text-slate-500'}`} onClick={() => setPostMode('offline')}>线下</button>
+                    </div>
+                  </div>
+                  <label className="block text-xs font-medium text-slate-500">城市
+                    <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" placeholder={postMode === 'offline' ? '线下上课城市' : '可留空'} value={postCity} onChange={(e) => setPostCity(e.target.value)} />
+                  </label>
+                  <label className="block text-xs font-medium text-slate-500">时间
+                    <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" placeholder="如：周六 14:00" value={whenText} onChange={(e) => setWhenText(e.target.value)} />
+                  </label>
+                </div>
+              </section>
+              <section>
+                <h3 className="text-sm font-semibold text-slate-900">费用与名额</h3>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <label className="block text-xs font-medium text-slate-500">课时费（元）
+                    <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" placeholder="平台代收" value={fee} onChange={(e) => setFee(e.target.value)} />
+                  </label>
+                  <label className="block text-xs font-medium text-slate-500">名额
+                    <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" value={seats} onChange={(e) => setSeats(e.target.value)} />
+                  </label>
+                  <label className="block text-xs font-medium text-slate-500 sm:col-span-2">课程说明
+                    <textarea className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" rows={3} placeholder="这门课解决什么接单问题" value={note} onChange={(e) => setNote(e.target.value)} />
+                  </label>
+                </div>
+              </section>
+              {err ? <p className="text-sm text-red-600">{err}</p> : null}
+            </div>
+            <div className="flex gap-2 border-t border-slate-100 px-6 py-4">
+              <button type="button" className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-600" onClick={() => setEditorOpen(false)}>取消</button>
+              <button type="submit" className="flex-1 rounded-xl bg-violet-600 px-3 py-2.5 text-sm font-semibold text-white">{editingId ? '保存并重新审核' : '提交审核'}</button>
+            </div>
+          </form>
+        </div>
+      ) : null}
       {panel ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-6" onClick={() => setPanel('')}>
           <form

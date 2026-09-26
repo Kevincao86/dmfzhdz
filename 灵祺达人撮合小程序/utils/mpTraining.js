@@ -123,6 +123,51 @@ async function createCourse(input) {
   return course
 }
 
+async function listMine() {
+  const hostId = accountId()
+  if (ecs.hasBase && ecs.hasBase()) {
+    try {
+      const res = await ecs.get(`/api/meoo-mp-training?hostId=${encodeURIComponent(hostId)}`)
+      if (res && Array.isArray(res.mine)) return res.mine
+    } catch (_) {}
+  }
+  return readLocal().filter((c) => !c.hostId || c.hostId === hostId)
+}
+
+async function updateCourse(input) {
+  const reason = publishBlockReason()
+  if (reason) throw new Error(reason)
+  const id = String(input.id || '')
+  if (!id) throw new Error('课程不存在')
+  const identity = userProfile.readIdentity()
+  const payload = {
+    action: 'update',
+    id,
+    title: input.title,
+    hostId: accountId(),
+    hostRole: identity,
+    mode: input.mode === 'offline' ? 'offline' : 'online',
+    city: input.city || '',
+    whenText: input.whenText || '',
+    seats: Number(input.seats) || 1,
+    fee: input.fee || '',
+    poster: input.poster || '',
+    note: input.note || '',
+  }
+  if (ecs.hasBase && ecs.hasBase()) {
+    const res = await ecs.post('/api/meoo-mp-training', payload)
+    const course = (res && res.course) || (res && res.data && res.data.course)
+    if (course) return course
+    if (res && res.error) throw new Error(String(res.error))
+  }
+  const list = readLocal()
+  const course = list.find((c) => c.id === id)
+  if (!course) throw new Error('课程不存在')
+  Object.assign(course, payload, { reviewStatus: 'pending', reviewNote: '' })
+  writeLocal(list)
+  return course
+}
+
 function readProfile() {
   try {
     const map = wx.getStorageSync(PROFILE_KEY) || {}
@@ -349,7 +394,9 @@ module.exports = {
   publishBlockReason,
   planId,
   listCourses,
+  listMine,
   createCourse,
+  updateCourse,
   signup,
   readProfile,
   lecturerState,
