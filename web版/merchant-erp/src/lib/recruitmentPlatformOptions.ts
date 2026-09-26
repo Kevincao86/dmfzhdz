@@ -1,5 +1,3 @@
-import { PLATFORM_LOGO_SRC } from './platformBranding'
-
 /** 与星选 publishFormOptions.PLATFORMS 一致 */
 export type RecruitmentPlatform = '抖音' | '小红书' | '大众点评' | '快手' | '微信视频号'
 
@@ -12,11 +10,11 @@ export const XINGXUAN_RECRUITMENT_PLATFORMS: RecruitmentPlatform[] = [
 ]
 
 export const RECRUITMENT_PLATFORM_ICON_SRC: Record<RecruitmentPlatform, string> = {
-  抖音: PLATFORM_LOGO_SRC.douyin,
-  小红书: PLATFORM_LOGO_SRC.xiaohongshu,
-  大众点评: PLATFORM_LOGO_SRC.dianping,
-  快手: PLATFORM_LOGO_SRC.kuaishou_local,
-  微信视频号: PLATFORM_LOGO_SRC.wechat,
+  抖音: '/platforms/douyin.png',
+  小红书: '/platforms/xiaohongshu.png',
+  大众点评: '/platforms/dianping.png',
+  快手: '/platforms/kuaishou-local.png',
+  微信视频号: '/platforms/wechat.png',
 }
 
 export function normalizeRecruitmentPlatform(raw: string | undefined): RecruitmentPlatform {
