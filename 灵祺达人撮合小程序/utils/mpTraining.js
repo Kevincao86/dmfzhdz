@@ -23,14 +23,53 @@ function readDepositMap() {
   }
 }
 
-function depositPaid() {
-  return !!readDepositMap()[accountId()]
+function applyDeposit(deposit) {
+  const map = readDepositMap()
+  const id = accountId()
+  if (deposit && deposit.paid) {
+    map[id] = { yuan: DEPOSIT_YUAN, at: deposit.paidAt || Date.now(), server: true, channel: deposit.channel || 'wechat' }
+  } else {
+    delete map[id]
+  }
+  wx.setStorageSync(DEPOSIT_KEY, map)
 }
 
-function markDepositPaid() {
-  const map = readDepositMap()
-  map[accountId()] = { yuan: DEPOSIT_YUAN, at: Date.now() }
-  wx.setStorageSync(DEPOSIT_KEY, map)
+function depositPaid() {
+  const row = readDepositMap()[accountId()]
+  return !!(row && row.server)
+}
+
+async function syncDeposit() {
+  if (!(ecs.hasBase && ecs.hasBase())) return depositPaid()
+  const res = await ecs.get(`/api/meoo-mp-training?hostId=${encodeURIComponent(accountId())}`)
+  if (res && res.deposit) applyDeposit(res.deposit)
+  return depositPaid()
+}
+
+async function prepay(input) {
+  if (!(ecs.hasBase && ecs.hasBase())) throw new Error('请先登录后再支付')
+  const openid = require('./mpWechatOpenId.js').resolveOpenIdFromLocal()
+  const res = await ecs.post('/api/meoo-mp-training', {
+    action: 'prepay',
+    purpose: input && input.purpose === 'course' ? 'course' : 'deposit',
+    channel: 'wechat',
+    scene: 'jsapi',
+    hostId: accountId(),
+    courseId: input && input.courseId ? input.courseId : '',
+    name: input && input.name ? input.name : '',
+    contact: input && input.contact ? input.contact : '',
+    openid,
+  })
+  if (!res || res.ok === false) throw new Error((res && res.error) || '支付下单失败')
+  return res
+}
+
+async function payQuery(outTradeNo) {
+  if (!(ecs.hasBase && ecs.hasBase())) throw new Error('请先登录后再查询支付')
+  const res = await ecs.post('/api/meoo-mp-training', { action: 'payQuery', outTradeNo })
+  if (res && res.deposit) applyDeposit(res.deposit)
+  if (!res || res.ok === false) throw new Error((res && res.error) || '支付查询失败')
+  return res
 }
 
 function planId() {
@@ -324,33 +363,8 @@ async function myOrders() {
   return readOrders().filter((o) => o.hostId === hostId)
 }
 
-async function signup(id, name, contact) {
-  if (ecs.hasBase && ecs.hasBase()) {
-    const res = await ecs.post('/api/meoo-mp-training', { action: 'signup', id, name, contact })
-    if (res && res.ok === false) throw new Error(String(res.error || '报名失败'))
-    if (res && (res.ok || res.enrolled != null)) return res
-  }
-  const list = readLocal()
-  const course = list.find((c) => c.id === id)
-  if (!course) throw new Error('课程不存在')
-  course.enrolled = Number(course.enrolled || 0) + 1
-  writeLocal(list)
-  const order = {
-    id: `od-${Date.now()}`,
-    courseId: course.id,
-    title: course.title,
-    hostId: course.hostId,
-    name,
-    contact,
-    ...splitFee(course.fee),
-    status: 'escrow',
-    evidence: '',
-    createdAt: new Date().toISOString(),
-    verifiedAt: '',
-    settleAt: '',
-  }
-  writeOrders([order].concat(readOrders()))
-  return { ok: true, order }
+async function signup() {
+  throw new Error('请先完成微信支付后再报名')
 }
 
 async function markReview(orderId, evidence) {
@@ -363,9 +377,12 @@ async function markReview(orderId, evidence) {
   const list = readOrders()
   const order = list.find((o) => o.id === orderId)
   if (!order) throw new Error('订单不存在')
-  order.status = 'review'
+  order.status = 'ready'
   order.evidence = evidence || ''
   order.verifiedAt = new Date().toISOString()
+  const due = new Date()
+  due.setDate(due.getDate() + 1)
+  order.settleAt = due.toISOString()
   writeOrders(list)
   return order
 }
@@ -391,7 +408,9 @@ async function markReady(orderId) {
 module.exports = {
   DEPOSIT_YUAN,
   depositPaid,
-  markDepositPaid,
+  syncDeposit,
+  prepay,
+  payQuery,
   isAdvancedMember,
   publishBlockReason,
   planId,

@@ -80,7 +80,7 @@
 
   <view class="tp-bar" wx:if="{{depositOnly || !advanced || !paid}}">
     <view class="tp-btn" wx:if="{{!advanced}}" bindtap="onOpenMember">去开通会员</view>
-    <view class="tp-btn" wx:elif="{{!paid}}" bindtap="onPayDeposit">确认保证金 ¥{{yuan}}</view>
+    <view class="tp-btn" wx:elif="{{!paid}}" bindtap="onPayDeposit">微信支付保证金 ¥{{yuan}}</view>
   </view>
   <view class="tp-bar" wx:elif="{{view === 'list'}}">
     <view class="tp-btn" bindtap="onCreate">新增培训</view>

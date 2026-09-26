@@ -12,6 +12,7 @@ import {
   testDouyinPayPrivateKeySign,
   verifyDouyinPayNotifySignature,
 } from '../src/lib/douyinPayV1.js'
+import { confirmTrainingPay } from '../src/lib/mpTrainingPay.js'
 import { confirmMembershipPayFromSnapshot } from '../src/lib/mpMembershipPayShared.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 import { readMerchantSupabaseAdminEnv } from '../vite-plugins/merchantSupabaseAdminEnv.js'
@@ -158,6 +159,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   if (!isDouyinPayOrderSuccess(tradeState) || !outTradeNo) {
     res.status(200).json({ code: 'SUCCESS', message: '成功' })
+    return
+  }
+
+  if (outTradeNo.startsWith('TRN')) {
+    const ok = confirmTrainingPay(outTradeNo, transactionId)
+    res.status(ok ? 200 : 500).json({ code: ok ? 'SUCCESS' : 'FAIL', message: ok ? '成功' : 'training_confirm_failed' })
     return
   }
 

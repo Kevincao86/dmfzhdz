@@ -5,6 +5,7 @@
     <text class="st-line">{{profile.kind === 'entity' ? '个体户 / 企业' : '个人'}} · {{profile.name}}</text>
     <text class="st-line" wx:if="{{profile.kind === 'person'}}">本月应付款 ¥{{monthPayable}}，预扣个税 ¥{{monthTax}}。到账约为应付款减去预扣。</text>
     <text class="st-line" wx:else>企业或个体户不预扣个税。收到你开给平台的发票后，按应付款全额打出。平台只就 1% 佣金入收入。</text>
+    <text class="st-line">课时费不是提现。学员付款后由平台代收，提交完成证明即进入 T+1 应付款。个人预扣个税，企业凭发票打款。</text>
   </block>
   <view wx:if="{{!orders.length}}" class="st-empty">还没有报名订单</view>
   <view wx:for="{{orders}}" wx:key="id" class="st-card">
@@ -14,9 +15,6 @@
     <text class="st-line" wx:if="{{item.settleAt}}">预计打款 {{item.settleAt}}</text>
     <view class="st-actions" wx:if="{{item.status === 'escrow'}}">
       <text data-id="{{item.id}}" bindtap="onEvidence">提交完成证明</text>
-    </view>
-    <view class="st-actions" wx:if="{{item.status === 'review'}}">
-      <text data-id="{{item.id}}" bindtap="onPass">核实通过，进入 T+1</text>
     </view>
   </view>
 </view>

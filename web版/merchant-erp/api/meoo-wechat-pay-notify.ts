@@ -14,6 +14,7 @@ import {
   verifyWechatPayNotifySignature,
 } from '../src/lib/wechatPayV3.js'
 import { readMerchantSupabaseAdminEnv } from '../vite-plugins/merchantSupabaseAdminEnv.js'
+import { confirmTrainingPay } from '../src/lib/mpTrainingPay.js'
 
 export const config = { maxDuration: 30 }
 
@@ -109,6 +110,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   if (tradeState !== 'SUCCESS' || !outTradeNo) {
     res.status(200).json({ code: 'SUCCESS', message: '成功' })
+    return
+  }
+
+  if (outTradeNo.startsWith('TRN')) {
+    const ok = confirmTrainingPay(outTradeNo, transactionId)
+    res.status(ok ? 200 : 500).json({ code: ok ? 'SUCCESS' : 'FAIL', message: ok ? '成功' : 'training_confirm_failed' })
     return
   }
 

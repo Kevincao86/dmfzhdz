@@ -13,6 +13,7 @@ import {
   testAlipayPrivateKeySign,
   verifyAlipayNotifySignature,
 } from '../src/lib/alipayPay.js'
+import { confirmTrainingPay } from '../src/lib/mpTrainingPay.js'
 import { confirmMembershipPayFromSnapshot } from '../src/lib/mpMembershipPayShared.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 import { readMerchantSupabaseAdminEnv } from '../vite-plugins/merchantSupabaseAdminEnv.js'
@@ -167,6 +168,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     !outTradeNo
   ) {
     res.status(200).send('success')
+    return
+  }
+
+  if (outTradeNo.startsWith('TRN')) {
+    const ok = confirmTrainingPay(outTradeNo, tradeNo)
+    res.status(ok ? 200 : 500).send(ok ? 'success' : 'failure')
     return
   }
 

@@ -138,7 +138,12 @@ export default function TrainingPage() {
   const [idBack, setIdBack] = useState('')
   const [licenseImage, setLicenseImage] = useState('')
   const [ocrHint, setOcrHint] = useState('')
-  const [depositOk, setDepositOk] = useState(false)
+  const [depositPaid, setDepositPaid] = useState(false)
+  const [payOpen, setPayOpen] = useState<null | { purpose: 'deposit' | 'course'; courseId: string; name: string; title: string }>(null)
+  const [payChannel, setPayChannel] = useState<'wechat' | 'alipay' | 'douyin'>('wechat')
+  const [payQr, setPayQr] = useState('')
+  const [payTrade, setPayTrade] = useState('')
+  const [payBusy, setPayBusy] = useState(false)
   const [panel, setPanel] = useState<'' | 'apply' | 'payout'>('')
   const [lecturerStatus, setLecturerStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none')
   const [saving, setSaving] = useState(false)
@@ -148,6 +153,8 @@ export default function TrainingPage() {
     const data = await fetchTraining(me?.accountId)
     setCourses((data.courses as Course[]) || [])
     setMine((data.mine as Course[]) || [])
+    const deposit = data.deposit as { paid?: boolean } | undefined
+    setDepositPaid(!!deposit?.paid)
     const profile = data.profile as Lecturer | null
     const status = profile?.lecturerStatus
     const nextStatus =
@@ -179,12 +186,28 @@ export default function TrainingPage() {
     setIdFront(profile.idFront || '')
     setIdBack(profile.idBack || '')
     setLicenseImage(profile.licenseImage || '')
-    if (nextStatus !== 'none') setDepositOk(true)
   }
 
   useEffect(() => {
     load().catch((e) => setErr(e instanceof Error ? e.message : '加载失败'))
   }, [])
+
+  useEffect(() => {
+    if (!payTrade) return
+    const timer = window.setInterval(() => {
+      postTraining({ action: 'payQuery', outTradeNo: payTrade })
+        .then((res) => {
+          if (!res.paid) return
+          window.clearInterval(timer)
+          setPayTrade('')
+          setPayQr('')
+          setPayOpen(null)
+          return load()
+        })
+        .catch(() => {})
+    }, 2500)
+    return () => window.clearInterval(timer)
+  }, [payTrade])
 
   const shown = courses.filter((c) => mode === 'all' || c.mode === mode)
   const payoutReady = lecturerStatus === 'approved' && !!bankNo.trim()
@@ -194,9 +217,44 @@ export default function TrainingPage() {
   )
   const cityLabel = lecturerCityText(cityNational, selectedCities) || '请选择城市'
 
+  async function startScanPay() {
+    if (!payOpen || !me?.accountId) {
+      setErr('请先登录')
+      return
+    }
+    setPayBusy(true)
+    setErr('')
+    try {
+      const res = await postTraining({
+        action: 'prepay',
+        purpose: payOpen.purpose,
+        channel: payChannel,
+        scene: 'native',
+        hostId: me.accountId,
+        courseId: payOpen.courseId,
+        name: payOpen.name,
+        contact: me.loginName || '',
+      })
+      setPayQr(String(res.qrDataUrl || ''))
+      setPayTrade(String(res.outTradeNo || ''))
+      if (!res.qrDataUrl) setErr('没有拿到付款码')
+    } catch (ex) {
+      setErr(ex instanceof Error ? ex.message : '支付下单失败')
+    } finally {
+      setPayBusy(false)
+    }
+  }
+
   function openCreate() {
     if (!payoutReady) {
       setErr('先申请讲师，审核通过并完成收款认证后才能发布')
+      return
+    }
+    if (!depositPaid) {
+      setErr('请先扫码缴纳保证金')
+      setPayQr('')
+      setPayTrade('')
+      setPayOpen({ purpose: 'deposit', courseId: '', name: '', title: '培训保证金' })
       return
     }
     setEditingId('')
@@ -265,7 +323,7 @@ export default function TrainingPage() {
           </div>
         </div>
         <p className="mt-1 text-sm text-slate-500">
-          课时费由平台代收。平台确认 1% 佣金，其余记应付款，核实通过后 T+1 结算。
+          课时费由平台代收，不提供提现。提交完成证明后进入 T+1 应付款。个人预扣个税，企业凭发票打款。
         </p>
       </div>
       <div className="flex gap-2 text-sm">
@@ -303,12 +361,13 @@ export default function TrainingPage() {
               onClick={() => {
                 const name = window.prompt('报名姓名')
                 if (!name) return
-                postTraining({ action: 'signup', id: c.id, name, contact: me?.loginName || '' })
-                  .then(() => load())
-                  .catch((e) => setErr(e instanceof Error ? e.message : '报名失败'))
+                setErr('')
+                setPayQr('')
+                setPayTrade('')
+                setPayOpen({ purpose: 'course', courseId: c.id, name, title: c.title })
               }}
             >
-              报名
+              扫码支付报名
             </button>
           </article>
         ))}
@@ -479,8 +538,11 @@ export default function TrainingPage() {
                   setErr('请先开通专业版、旗舰版或企业版')
                   return
                 }
-                if (!depositOk) {
-                  setErr(`请确认缴纳保证金 ¥${DEPOSIT}`)
+                if (!depositPaid) {
+                  setErr(`请先扫码缴纳保证金 ¥${DEPOSIT}`)
+                  setPayQr('')
+                  setPayTrade('')
+                  setPayOpen({ purpose: 'deposit', courseId: '', name: '', title: '培训保证金' })
                   return
                 }
                 const cityValue = lecturerCityText(cityNational, selectedCities)
@@ -556,7 +618,7 @@ export default function TrainingPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h3 className="text-sm font-semibold text-slate-900">申请条件</h3>
-                    <p className="mt-1 text-xs leading-relaxed text-slate-500">需高级会员，并确认保证金 ¥{DEPOSIT}。个人按月预扣个税，当月不超过 800 元不预扣。</p>
+                    <p className="mt-1 text-xs leading-relaxed text-slate-500">需高级会员，并用微信、支付宝或抖音扫码缴纳保证金 ¥{DEPOSIT}。个人按月预扣个税，当月不超过 800 元不预扣。</p>
                   </div>
                   <span className={`rounded-full px-3 py-1 text-xs font-semibold ${advanced ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>
                     高级会员{advanced ? '已开通' : '未开通'}
@@ -567,10 +629,22 @@ export default function TrainingPage() {
                     去开通会员
                   </Link>
                 ) : null}
-                <label className="mt-3 flex items-center gap-2 text-sm text-slate-700">
-                  <input type="checkbox" checked={depositOk} onChange={(e) => setDepositOk(e.target.checked)} />
-                  确认缴纳保证金 ¥{DEPOSIT}
-                </label>
+                <div className="mt-3 flex items-center justify-between gap-3 text-sm text-slate-700">
+                  <span>{depositPaid ? `保证金 ¥${DEPOSIT} 已缴纳` : `保证金 ¥${DEPOSIT} 未缴纳`}</span>
+                  {depositPaid ? null : (
+                    <button
+                      type="button"
+                      className="rounded-xl bg-violet-600 px-3 py-2 text-sm font-semibold text-white"
+                      onClick={() => {
+                        setPayQr('')
+                        setPayTrade('')
+                        setPayOpen({ purpose: 'deposit', courseId: '', name: '', title: '培训保证金' })
+                      }}
+                    >
+                      扫码缴纳
+                    </button>
+                  )}
+                </div>
               </section>
               ) : null}
 
@@ -806,6 +880,35 @@ export default function TrainingPage() {
               </div>
             ) : null}
             <button type="button" className="mt-4 rounded-xl bg-violet-600 py-2.5 text-sm font-semibold text-white" onClick={() => setCityOpen(false)}>确认</button>
+          </div>
+        </div>
+      ) : null}
+      {payOpen ? (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-6" onClick={() => { setPayOpen(null); setPayTrade(''); setPayQr('') }}>
+          <div className="w-full max-w-md rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-slate-900">{payOpen.title}</h2>
+            <p className="mt-1 text-sm text-slate-500">用微信、支付宝或抖音扫码支付。支付成功后自动入账，和小程序共用同一份记录。</p>
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              {([
+                ['wechat', '微信'],
+                ['alipay', '支付宝'],
+                ['douyin', '抖音'],
+              ] as const).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={payChannel === id ? 'rounded-xl bg-violet-600 py-2 text-sm font-semibold text-white' : 'rounded-xl bg-slate-100 py-2 text-sm text-slate-600'}
+                  onClick={() => { setPayChannel(id); setPayQr(''); setPayTrade('') }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {payQr ? <img src={payQr} alt="付款码" className="mx-auto mt-4 h-56 w-56" /> : null}
+            <button type="button" disabled={payBusy} className="mt-4 w-full rounded-xl bg-violet-600 py-2.5 text-sm font-semibold text-white disabled:opacity-60" onClick={() => { void startScanPay() }}>
+              {payBusy ? '正在生成付款码' : payQr ? '重新生成付款码' : '生成付款码'}
+            </button>
+            {payTrade ? <p className="mt-2 text-center text-xs text-slate-400">等待支付结果</p> : null}
           </div>
         </div>
       ) : null}

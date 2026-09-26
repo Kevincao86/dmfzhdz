@@ -5,6 +5,7 @@
 import fs from 'fs'
 import path from 'path'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { createTrainingPrepay, queryTrainingPay, trainingDepositView } from '../src/lib/mpTrainingPay.js'
 
 export const config = { maxDuration: 20 }
 
@@ -66,22 +67,30 @@ type Order = {
   settleAt: string
 }
 
-type Store = { courses: Course[]; profiles: Profile[]; orders: Order[] }
+type Store = {
+  courses: Course[]
+  profiles: Profile[]
+  orders: Order[]
+  payments: unknown[]
+  deposits: unknown[]
+}
 
 const FILE = path.join(process.cwd(), 'data', 'mp-training.json')
 
 function emptyStore(): Store {
-  return { courses: [], profiles: [], orders: [] }
+  return { courses: [], profiles: [], orders: [], payments: [], deposits: [] }
 }
 
 function readStore(): Store {
   try {
     const data = JSON.parse(fs.readFileSync(FILE, 'utf8'))
-    if (Array.isArray(data)) return { courses: data, profiles: [], orders: [] }
+    if (Array.isArray(data)) return { courses: data, profiles: [], orders: [], payments: [], deposits: [] }
     return {
       courses: Array.isArray(data.courses) ? data.courses : [],
       profiles: Array.isArray(data.profiles) ? data.profiles : [],
       orders: Array.isArray(data.orders) ? data.orders : [],
+      payments: Array.isArray(data.payments) ? data.payments : [],
+      deposits: Array.isArray(data.deposits) ? data.deposits : [],
     }
   } catch {
     return emptyStore()
@@ -89,8 +98,10 @@ function readStore(): Store {
 }
 
 function writeStore(store: Store) {
+  const latest = readStore()
+  const next = { ...store, payments: latest.payments, deposits: latest.deposits }
   fs.mkdirSync(path.dirname(FILE), { recursive: true })
-  fs.writeFileSync(FILE, JSON.stringify(store), 'utf8')
+  fs.writeFileSync(FILE, JSON.stringify(next), 'utf8')
 }
 
 function clipImage(raw: unknown) {
@@ -199,13 +210,6 @@ function lecturerCard(profile: Profile) {
   }
 }
 
-function splitFee(fee: number) {
-  const pay = Math.round(fee * 100) / 100
-  const commission = Math.round(pay * 0.01 * 100) / 100
-  const payable = Math.round((pay - commission) * 100) / 100
-  return { pay, commission, payable }
-}
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const store = readStore()
   if (req.method === 'GET') {
@@ -230,6 +234,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       profile: hostId ? store.profiles.find((p) => p.hostId === hostId) || null : null,
       profiles: review ? store.profiles.filter((p) => lecturerState(p) !== 'none').map(lecturerCard) : [],
       orders: hostId ? store.orders.filter((o) => o.hostId === hostId) : [],
+      deposit: trainingDepositView(hostId),
     })
     return
   }
@@ -260,6 +265,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     if (!city || !intro) {
       res.status(400).json({ ok: false, error: '请填写常驻城市和讲师介绍' })
+      return
+    }
+    if (!trainingDepositView(hostId).paid) {
+      res.status(400).json({ ok: false, error: '请先缴纳保证金' })
       return
     }
     const prev = store.profiles.find((p) => p.hostId === hostId)
@@ -366,6 +375,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(400).json({ ok: false, error: '请先完成收款认证' })
         return
       }
+      if (!trainingDepositView(hostId).paid) {
+        res.status(400).json({ ok: false, error: '请先缴纳保证金' })
+        return
+      }
     }
     const course: Course = {
       id: `tr-${Date.now()}`,
@@ -427,46 +440,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return
   }
 
+  if (action === 'prepay') {
+    try {
+      const result = await createTrainingPrepay(body)
+      res.status(result.ok ? 200 : 400).json(result)
+    } catch (e) {
+      res.status(400).json({ ok: false, error: e instanceof Error ? e.message : '支付下单失败' })
+    }
+    return
+  }
+
+  if (action === 'payQuery') {
+    try {
+      const result = await queryTrainingPay(String(body.outTradeNo || ''))
+      res.status(result.ok ? 200 : 404).json(result)
+    } catch (e) {
+      res.status(400).json({ ok: false, error: e instanceof Error ? e.message : '支付查询失败' })
+    }
+    return
+  }
+
   if (action === 'signup') {
-    const course = store.courses.find((c) => c.id === String(body.id || ''))
-    if (!course) {
-      res.status(404).json({ ok: false, error: '课程不存在' })
-      return
-    }
-    const name = String(body.name || '').trim()
-    if (!name) {
-      res.status(400).json({ ok: false, error: '请填写姓名' })
-      return
-    }
-    if (!publicCourse(course)) {
-      res.status(400).json({ ok: false, error: '课程还在审核中' })
-      return
-    }
-    if ((course.signups || []).length >= course.seats) {
-      res.status(400).json({ ok: false, error: '名额已满' })
-      return
-    }
-    const parts = splitFee(Number(course.fee) || 0)
-    const order: Order = {
-      id: `od-${Date.now()}`,
-      courseId: course.id,
-      title: course.title,
-      hostId: course.hostId,
-      name,
-      contact: String(body.contact || '').trim(),
-      ...parts,
-      status: 'escrow',
-      evidence: '',
-      createdAt: new Date().toISOString(),
-      verifiedAt: '',
-      settleAt: '',
-    }
-    course.signups = course.signups || []
-    course.signups.push({ id: `su-${Date.now()}`, name, contact: order.contact, at: order.createdAt, orderId: order.id })
-    course.enrolled = course.signups.length
-    store.orders.unshift(order)
-    writeStore(store)
-    res.status(200).json({ ok: true, order })
+    res.status(400).json({ ok: false, error: '请先完成支付后再报名' })
     return
   }
 
@@ -486,13 +481,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (action === 'verify') {
     const order = store.orders.find((o) => o.id === String(body.orderId || ''))
-    if (!order || order.status !== 'escrow') {
+    if (!order || (order.status !== 'escrow' && order.status !== 'review')) {
       res.status(400).json({ ok: false, error: '订单不在托管中' })
       return
     }
     order.evidence = String(body.evidence || '').trim()
-    order.status = 'review'
+    order.status = 'ready'
     order.verifiedAt = new Date().toISOString()
+    const due = new Date()
+    due.setDate(due.getDate() + 1)
+    order.settleAt = due.toISOString()
     writeStore(store)
     res.status(200).json({ ok: true, order })
     return

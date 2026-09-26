@@ -23,12 +23,24 @@ Page({
       wx.showToast({ title: '请填写姓名', icon: 'none' })
       return
     }
+    if (this._paying) return
+    this._paying = true
+    wx.showLoading({ title: '拉起微信支付', mask: true })
     try {
-      await training.signup(this._id, name, this.data.contact)
-      wx.showToast({ title: '已报名', icon: 'success' })
+      const pre = await training.prepay({ purpose: 'course', courseId: this._id, name, contact: this.data.contact })
+      const payApi = require('../../../utils/mpMembershipApi.js')
+      await payApi.requestWxPayment(pre.jsapiParams)
+      const q = await training.payQuery(pre.outTradeNo)
+      wx.hideLoading()
+      if (!q.paid) throw new Error('支付结果确认中，请稍后刷新')
+      wx.showToast({ title: '已支付并报名', icon: 'success' })
       setTimeout(() => wx.navigateBack(), 600)
     } catch (e) {
-      wx.showToast({ title: String(e.message || '报名失败').slice(0, 18), icon: 'none' })
+      wx.hideLoading()
+      const msg = String(e && e.message || '支付未完成')
+      if (!/cancel|取消/i.test(msg)) wx.showToast({ title: msg.slice(0, 18), icon: 'none' })
+    } finally {
+      this._paying = false
     }
   },
 })

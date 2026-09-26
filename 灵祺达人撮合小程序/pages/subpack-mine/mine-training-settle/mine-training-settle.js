@@ -44,13 +44,4 @@ Page({
       },
     })
   },
-  async onPass(e) {
-    try {
-      await training.markReady(e.currentTarget.dataset.id)
-      wx.showToast({ title: '已进入 T+1', icon: 'success' })
-      this.load()
-    } catch (err) {
-      wx.showToast({ title: String(err.message || '失败').slice(0, 18), icon: 'none' })
-    }
-  },
 })

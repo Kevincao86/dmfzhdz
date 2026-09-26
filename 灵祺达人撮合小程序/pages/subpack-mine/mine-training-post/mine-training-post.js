@@ -28,9 +28,11 @@ Page({
       advanced: training.isAdvancedMember(),
     })
   },
-  onShow() {
+  async onShow() {
+    let paid = training.depositPaid()
+    try { paid = await training.syncDeposit() } catch (_) {}
     this.setData({
-      paid: training.depositPaid(),
+      paid,
       advanced: training.isAdvancedMember(),
     })
     if (this.data.view !== 'form') this.loadMine()
@@ -55,22 +57,30 @@ Page({
   onOpenMember() {
     wx.navigateTo({ url: '/pages/subpack-mine/mine-xingxuan-membership/mine-xingxuan-membership' })
   },
-  onPayDeposit() {
+  async onPayDeposit() {
     if (!training.isAdvancedMember()) {
       this.onOpenMember()
       return
     }
-    wx.showModal({
-      title: `确认保证金 ¥${training.DEPOSIT_YUAN}`,
-      content: '保证金用于培训履约。课时费由平台代收，核实通过后 T+1 结算。',
-      confirmText: '确认',
-      success: (res) => {
-        if (!res.confirm) return
-        training.markDepositPaid()
-        this.setData({ paid: true, depositOnly: false })
-        wx.showToast({ title: '已记录', icon: 'success' })
-      },
-    })
+    if (this._paying) return
+    this._paying = true
+    wx.showLoading({ title: '拉起微信支付', mask: true })
+    try {
+      const pre = await training.prepay({ purpose: 'deposit' })
+      const payApi = require('../../../utils/mpMembershipApi.js')
+      await payApi.requestWxPayment(pre.jsapiParams)
+      const q = await training.payQuery(pre.outTradeNo)
+      wx.hideLoading()
+      if (!q.paid) throw new Error('支付结果确认中，请稍后下拉刷新')
+      this.setData({ paid: true, depositOnly: false })
+      wx.showToast({ title: '保证金已支付', icon: 'success' })
+    } catch (e) {
+      wx.hideLoading()
+      const msg = String(e && e.message || '支付未完成')
+      if (!/cancel|取消/i.test(msg)) wx.showToast({ title: msg.slice(0, 18), icon: 'none' })
+    } finally {
+      this._paying = false
+    }
   },
   onCreate() {
     const reason = training.publishBlockReason()
