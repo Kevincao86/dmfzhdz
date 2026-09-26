@@ -1,8 +1,7 @@
 import { cn } from '../cn'
 import type { MerchantPlatformId } from '../constants/merchantPlatforms'
-import { merchantStaticUrl } from './webStaticOssAssets'
 
-/** 静态 Logo 资源（public/platforms） */
+/** 静态 Logo 资源（public/platforms）。同源文件优先：OSS 账号停用后远程地址会 403，图标会空白。 */
 export type PlatformLogoKey =
   | 'douyin'
   | 'dianping'
@@ -18,18 +17,17 @@ export type PlatformLogoKey =
   | 'wechat_moments'
 
 export const PLATFORM_LOGO_SRC: Record<PlatformLogoKey, string> = {
-  douyin: merchantStaticUrl('/platforms/douyin.png'),
-  dianping: merchantStaticUrl('/platforms/dianping.png'),
-  xiaohongshu: merchantStaticUrl('/platforms/xiaohongshu.png'),
-  douyin_laike: merchantStaticUrl('/platforms/douyin-laike.png'),
-  kuaishou_local: merchantStaticUrl('/platforms/kuaishou-local.png'),
-  ocean_engine_local: merchantStaticUrl('/platforms/ocean-engine-local.png'),
-  xhs_juguang: merchantStaticUrl('/platforms/xhs-juguang.png'),
-  eleme_shangou: merchantStaticUrl('/platforms/eleme-shangou.png'),
-  meituan_waimai: merchantStaticUrl('/platforms/meituan-waimai.png'),
-  jd_waimai: merchantStaticUrl('/platforms/jd-waimai.png'),
-  wechat: merchantStaticUrl('/platforms/wechat.png'),
-  /** 朋友圈彩色快门标：OSS 未同步前走同源静态，避免空白 */
+  douyin: '/platforms/douyin.png',
+  dianping: '/platforms/dianping.png',
+  xiaohongshu: '/platforms/xiaohongshu.png',
+  douyin_laike: '/platforms/douyin-laike.png',
+  kuaishou_local: '/platforms/kuaishou-local.png',
+  ocean_engine_local: '/platforms/ocean-engine-local.png',
+  xhs_juguang: '/platforms/xhs-juguang.png',
+  eleme_shangou: '/platforms/eleme-shangou.png',
+  meituan_waimai: '/platforms/meituan-waimai.png',
+  jd_waimai: '/platforms/jd-waimai.png',
+  wechat: '/platforms/wechat.png',
   wechat_moments: '/platforms/wechat-moments.png',
 }
 

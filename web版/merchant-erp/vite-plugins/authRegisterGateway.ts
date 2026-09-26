@@ -329,6 +329,8 @@ export function authRegisterGatewayPlugin(): Plugin {
               merchantName?: string
               phone?: string
               smsCode?: string
+              email?: string
+              emailCode?: string
               password?: string
               confirmPassword?: string
             }
@@ -336,6 +338,8 @@ export function authRegisterGatewayPlugin(): Plugin {
             const partnerName = (body.partnerName ?? body.merchantName ?? '').trim()
             const phone = normalizeCnMobile(body.phone ?? '')
             const smsCode = String(body.smsCode ?? '').trim()
+            const email = normalizeBindEmail(body.email ?? '')
+            const emailCode = String(body.emailCode ?? '').trim()
             const password = body.password ?? ''
             const confirmPassword = body.confirmPassword ?? password
 
@@ -347,12 +351,34 @@ export function authRegisterGatewayPlugin(): Plugin {
               json(res, 400, { ok: false, error: 'invalid_partner_name', message: '服务商简称 2–30 字' })
               return
             }
-            if (!phone) {
-              json(res, 400, { ok: false, error: 'invalid_phone' })
-              return
-            }
-            if (!/^\d{6}$/.test(smsCode)) {
-              json(res, 400, { ok: false, error: 'invalid_sms_code' })
+            if (phone) {
+              if (!/^\d{6}$/.test(smsCode)) {
+                json(res, 400, { ok: false, error: 'invalid_sms_code' })
+                return
+              }
+              if (!(await verifyAuthSmsCode(phone, smsCode, viteRoot))) {
+                json(res, 400, { ok: false, error: 'sms_code_invalid', message: '验证码错误或已过期' })
+                return
+              }
+              if (await phoneAlreadyRegistered(phone)) {
+                json(res, 409, { ok: false, error: 'phone_exists', message: '该手机号已注册，请直接登录' })
+                return
+              }
+            } else if (email) {
+              if (!/^\d{6}$/.test(emailCode)) {
+                json(res, 400, { ok: false, error: 'invalid_email_code', message: '请输入 6 位邮箱验证码' })
+                return
+              }
+              if (!verifyAuthEmailCode(email, emailCode)) {
+                json(res, 400, { ok: false, error: 'email_code_invalid', message: '邮箱验证码错误或已过期' })
+                return
+              }
+              if (await findAuthUserByBindEmail(email)) {
+                json(res, 409, { ok: false, error: 'email_exists', message: '该邮箱已注册，请直接登录' })
+                return
+              }
+            } else {
+              json(res, 400, { ok: false, error: 'invalid_contact', message: '请使用手机号或邮箱完成验证' })
               return
             }
             if (password.length < 6) {
@@ -363,20 +389,13 @@ export function authRegisterGatewayPlugin(): Plugin {
               json(res, 400, { ok: false, error: 'password_mismatch' })
               return
             }
-            if (!(await verifyAuthSmsCode(phone, smsCode, viteRoot))) {
-              json(res, 400, { ok: false, error: 'sms_code_invalid', message: '验证码错误或已过期' })
-              return
-            }
-            if (await phoneAlreadyRegistered(phone)) {
-              json(res, 409, { ok: false, error: 'phone_exists', message: '该手机号已注册，请直接登录' })
-              return
-            }
 
             const result = await provisionMerchantTenant({
               loginName,
               password,
               merchantName: partnerName,
-              phone,
+              phone: phone || undefined,
+              bindEmail: email || undefined,
               trialDays: 0,
               edition: 'partner',
             })

@@ -425,8 +425,10 @@ export default function LoginAuthPanel({
         ? await registerPartnerAccount({
             loginName: ln,
             partnerName: mn,
-            phone: mobile,
-            smsCode: smsCode.trim(),
+            phone: regChannel === 'phone' ? mobile : undefined,
+            smsCode: regChannel === 'phone' ? smsCode.trim() : undefined,
+            email: regChannel === 'email' ? mail : undefined,
+            emailCode: regChannel === 'email' ? emailCode.trim() : undefined,
             password: regPassword,
             confirmPassword,
           })
@@ -529,7 +531,7 @@ export default function LoginAuthPanel({
                     ? '使用微信扫码登录（需账号已绑定手机号）。'
                     : '使用抖音 App 扫码登录（需账号已绑定手机号）。'
             : partnerMode
-              ? '填写服务商信息并完成手机验证，注册后可绑定平台服务商身份与客户商家。'
+              ? '填写服务商信息并用手机或邮箱验证，注册后可绑定平台服务商身份与客户商家。'
               : '填写商家信息并用手机或邮箱验证，注册后为免费版，可订阅升级会员。'}
         </p>
       </div>

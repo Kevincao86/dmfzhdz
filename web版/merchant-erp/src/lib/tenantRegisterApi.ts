@@ -191,8 +191,10 @@ export async function registerMerchantAccount(body: {
 export async function registerPartnerAccount(body: {
   loginName: string
   partnerName: string
-  phone: string
-  smsCode: string
+  phone?: string
+  smsCode?: string
+  email?: string
+  emailCode?: string
   password: string
   confirmPassword: string
 }): Promise<RegisterResult> {
@@ -203,6 +205,8 @@ export async function registerPartnerAccount(body: {
       partnerName: body.partnerName,
       phone: body.phone,
       smsCode: body.smsCode,
+      email: body.email,
+      emailCode: body.emailCode,
       password: body.password,
       confirmPassword: body.confirmPassword,
     },
