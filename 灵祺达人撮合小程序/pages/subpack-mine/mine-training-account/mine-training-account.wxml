@@ -3,7 +3,6 @@
     <text class="la-hero__kicker">{{mode === 'apply' ? '本地生活讲师' : '我的钱包'}}</text>
     <text class="la-hero__title">{{mode === 'apply' ? '申请讲师' : '收款账户绑定'}}</text>
     <text class="la-hero__sub" wx:if="{{mode === 'apply'}}">写你在哪座城市、出镜什么平台、带过哪些到店内容。审核通过后即可发布培训。</text>
-    <text class="la-hero__sub" wx:else>课时费提现打到这个账户。未绑定也可以发布培训。</text>
   </view>
 
   <block wx:if="{{mode === 'apply'}}">
@@ -107,8 +106,36 @@
         <view class="la-seg__item {{kind === 'person' ? 'la-seg__item--on' : ''}}" data-id="person" bindtap="onKind">个人</view>
         <view class="la-seg__item {{kind === 'entity' ? 'la-seg__item--on' : ''}}" data-id="entity" bindtap="onKind">个体户 / 企业</view>
       </view>
-      <text class="la-note" wx:if="{{kind === 'person'}}">按月累计预扣个人所得税。当月应付款不超过 800 元不预扣。个人不能开增值税发票。</text>
-      <text class="la-note" wx:else>不扣个税。凭你开出的 99% 发票结算，学员发票由你的主体开具。</text>
+    </view>
+
+    <view class="la-card">
+      <text class="la-sec">证件照</text>
+      <view class="la-docs">
+        <view class="la-doc" data-kind="id_front" bindtap="onPickDoc">
+          <image wx:if="{{idFront}}" class="la-doc__img" src="{{idFront}}" mode="aspectFill" />
+          <block wx:else>
+            <text class="la-doc__name">人像面</text>
+            <text class="la-doc__tip">点击上传</text>
+          </block>
+          <text wx:if="{{idFront}}" class="la-doc__badge">已上传</text>
+        </view>
+        <view class="la-doc" data-kind="id_back" bindtap="onPickDoc">
+          <image wx:if="{{idBack}}" class="la-doc__img" src="{{idBack}}" mode="aspectFill" />
+          <block wx:else>
+            <text class="la-doc__name">国徽面</text>
+            <text class="la-doc__tip">点击上传</text>
+          </block>
+          <text wx:if="{{idBack}}" class="la-doc__badge">已上传</text>
+        </view>
+      </view>
+      <view wx:if="{{kind === 'entity'}}" class="la-doc la-doc--wide" data-kind="license" bindtap="onPickDoc">
+        <image wx:if="{{licenseImage}}" class="la-doc__img" src="{{licenseImage}}" mode="aspectFill" />
+        <block wx:else>
+          <text class="la-doc__name">营业执照</text>
+          <text class="la-doc__tip">点击上传</text>
+        </block>
+        <text wx:if="{{licenseImage}}" class="la-doc__badge">已上传</text>
+      </view>
     </view>
 
     <view class="la-card">

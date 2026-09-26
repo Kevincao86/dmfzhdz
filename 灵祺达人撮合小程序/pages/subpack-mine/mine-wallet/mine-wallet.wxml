@@ -30,7 +30,6 @@
       <view>
         <text class="wl-name">收款账户绑定</text>
         <text class="wl-line">{{accountBound ? '已绑定' : '未绑定'}}</text>
-        <text class="wl-hint">未绑定也可以发布培训。提现课时费前，把款项打到这个账户。</text>
       </view>
       <view class="wl-btn wl-btn--ghost" bindtap="onBindAccount">{{accountBound ? '修改' : '去绑定'}}</view>
     </view>

@@ -5,6 +5,34 @@ import { getAccount } from '../lib/mpSession'
 
 const DEPOSIT = 500
 
+function compressImageFile(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      const max = 1600
+      const scale = Math.min(1, max / Math.max(img.width, img.height))
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.max(1, Math.round(img.width * scale))
+      canvas.height = Math.max(1, Math.round(img.height * scale))
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        URL.revokeObjectURL(url)
+        reject(new Error('无法处理图片'))
+        return
+      }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      URL.revokeObjectURL(url)
+      resolve(canvas.toDataURL('image/jpeg', 0.82))
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('无法读取图片'))
+    }
+    img.src = url
+  })
+}
+
 const ORDER_STATUS: Record<string, string> = {
   escrow: '托管中',
   review: '待核实',
@@ -37,6 +65,10 @@ type BoundAccount = {
   bank?: string
   bankNo?: string
   licenseNo?: string
+  idNo?: string
+  idFront?: string
+  idBack?: string
+  licenseImage?: string
   lecturerStatus?: string
   city?: string
   intro?: string
@@ -54,6 +86,10 @@ export default function WalletPage() {
   const [bankName, setBankName] = useState('')
   const [bankNo, setBankNo] = useState('')
   const [licenseNo, setLicenseNo] = useState('')
+  const [idNo, setIdNo] = useState('')
+  const [idFront, setIdFront] = useState('')
+  const [idBack, setIdBack] = useState('')
+  const [licenseImage, setLicenseImage] = useState('')
   const [orders, setOrders] = useState<SettleOrder[]>([])
   const [busy, setBusy] = useState('')
   const [err, setErr] = useState('')
@@ -157,14 +193,44 @@ export default function WalletPage() {
     setBankName(account?.bank || '')
     setBankNo(account?.bankNo || '')
     setLicenseNo(account?.licenseNo || '')
+    setIdNo(account?.idNo || '')
+    setIdFront(account?.idFront || '')
+    setIdBack(account?.idBack || '')
+    setLicenseImage(account?.licenseImage || '')
     setErr('')
     setBindOpen(true)
+  }
+
+  async function onDoc(docKind: 'id_front' | 'id_back' | 'license', file: File) {
+    const label = docKind === 'id_front' ? '身份证人像面' : docKind === 'id_back' ? '身份证国徽面' : '营业执照'
+    setErr('')
+    try {
+      const imageDataUrl = await compressImageFile(file)
+      if (docKind === 'id_front') setIdFront(imageDataUrl)
+      else if (docKind === 'id_back') setIdBack(imageDataUrl)
+      else setLicenseImage(imageDataUrl)
+      const result = await postTraining({ action: 'ocrDoc', kind: docKind, imageDataUrl })
+      const fields = (result.fields || {}) as Record<string, string>
+      if (fields.name) setHolder(fields.name)
+      if (fields.idNo) setIdNo(fields.idNo)
+      if (fields.licenseNo) setLicenseNo(fields.licenseNo)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : `${label}识别失败`)
+    }
   }
 
   async function saveAccount() {
     if (!me?.accountId) return
     if (!lecturerApproved(account)) {
       setErr('讲师通过后才能绑定收款账户')
+      return
+    }
+    if (!idFront || !idBack) {
+      setErr('请上传身份证人像面和国徽面')
+      return
+    }
+    if (kind === 'entity' && !licenseImage) {
+      setErr('请上传营业执照')
       return
     }
     if (!holder.trim() || !bankNo.trim()) {
@@ -183,9 +249,13 @@ export default function WalletPage() {
         hostId: me.accountId,
         kind,
         name: holder.trim(),
+        idNo: idNo.trim(),
         bank: bankName.trim(),
         bankNo: bankNo.trim(),
         licenseNo: kind === 'entity' ? licenseNo.trim() : '',
+        idFront,
+        idBack,
+        licenseImage: kind === 'entity' ? licenseImage : '',
       })
       setBindOpen(false)
       await load()
@@ -281,7 +351,6 @@ export default function WalletPage() {
             <p className="mt-1 text-sm text-[var(--shell-text)]">
               {account?.name && account?.bankNo ? `已绑定 ${account.bank || '收款账户'} 尾号 ${String(account.bankNo).slice(-4)}` : '未绑定'}
             </p>
-            <p className="mt-1 text-xs text-[var(--shell-muted)]">未绑定也可以发布培训。提现课时费前，把款项打到这个账户。</p>
           </div>
           <button type="button" className="rounded-xl border border-violet-200 px-3 py-2 text-sm font-semibold text-violet-700" onClick={openBind}>
             {account?.name && account?.bankNo ? '修改' : '去绑定'}
@@ -324,15 +393,38 @@ export default function WalletPage() {
       {bindOpen ? (
         <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-6" onClick={() => setBindOpen(false)}>
           <form
-            className="w-full max-w-md rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-3xl"
+            className="max-h-[min(92vh,760px)] w-full max-w-md overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-3xl"
             onClick={(e) => e.stopPropagation()}
             onSubmit={(e) => { e.preventDefault(); void saveAccount() }}
           >
             <h2 className="text-lg font-bold text-slate-900">收款账户绑定</h2>
-            <p className="mt-1 text-sm text-slate-500">课时费提现打到这个账户。未绑定也可以发布培训。</p>
             <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
               <button type="button" className={kind === 'person' ? 'rounded-xl bg-white py-2 text-sm font-semibold text-violet-700' : 'rounded-xl py-2 text-sm text-slate-500'} onClick={() => setKind('person')}>个人</button>
               <button type="button" className={kind === 'entity' ? 'rounded-xl bg-white py-2 text-sm font-semibold text-violet-700' : 'rounded-xl py-2 text-sm text-slate-500'} onClick={() => setKind('entity')}>个体户 / 企业</button>
+            </div>
+            <div className={`mt-4 grid gap-3 ${kind === 'entity' ? 'grid-cols-3' : 'grid-cols-2'}`}>
+              {(
+                [
+                  ['id_front', '身份证人像面', idFront],
+                  ['id_back', '身份证国徽面', idBack],
+                  ...(kind === 'entity' ? [['license', '营业执照', licenseImage] as const] : []),
+                ] as const
+              ).map(([docKind, label, preview]) => (
+                <label key={docKind} className="relative flex h-28 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border border-dashed border-violet-200 bg-violet-50/40 text-center">
+                  {preview ? <img src={preview} alt="" className="absolute inset-0 h-full w-full object-cover" /> : null}
+                  <span className={`relative px-2 text-xs font-medium ${preview ? 'rounded-full bg-slate-900/70 py-1 text-white' : 'text-slate-700'}`}>{preview ? '更换' : label}</span>
+                  <input
+                    className="sr-only"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      e.target.value = ''
+                      if (file) void onDoc(docKind, file)
+                    }}
+                  />
+                </label>
+              ))}
             </div>
             <label className="mt-4 block text-xs font-medium text-slate-500">
               户名
@@ -352,6 +444,7 @@ export default function WalletPage() {
                 <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400" value={licenseNo} onChange={(e) => setLicenseNo(e.target.value)} placeholder="18 位信用代码" />
               </label>
             ) : null}
+            {err && bindOpen ? <p className="mt-3 text-sm text-red-600">{err}</p> : null}
             <div className="mt-5 flex gap-2">
               <button type="button" className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-600" onClick={() => setBindOpen(false)}>取消</button>
               <button type="submit" disabled={busy === 'bind'} className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{busy === 'bind' ? '保存中' : '保存账户'}</button>

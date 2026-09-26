@@ -275,6 +275,14 @@ Page({
     }
   },
   async onSave() {
+    if (!this.data.idFront || !this.data.idBack) {
+      wx.showToast({ title: '请上传身份证正反面', icon: 'none' })
+      return
+    }
+    if (this.data.kind === 'entity' && !this.data.licenseImage) {
+      wx.showToast({ title: '请上传营业执照', icon: 'none' })
+      return
+    }
     try {
       await training.saveProfile(this.data)
       wx.showToast({ title: '已保存', icon: 'success' })
