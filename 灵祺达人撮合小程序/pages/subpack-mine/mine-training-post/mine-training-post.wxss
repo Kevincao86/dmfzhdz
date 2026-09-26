@@ -151,7 +151,9 @@
 .tp-status--pending { color: #b54708; background: #fff4e5; }
 .tp-status--rejected { color: #b42318; background: #fdecea; }
 .tp-status--approved { color: #067647; background: #e8f7ef; }
-.tp-edit { display: inline-block; margin-top: 16rpx; padding: 0 24rpx; height: 56rpx; line-height: 56rpx; border-radius: 999rpx; background: #f4f0ff; color: #5b2dcc; font-size: 24rpx; font-weight: 600; }
+.tp-actions { display: flex; align-items: center; justify-content: space-between; margin-top: 16rpx; }
+.tp-edit { display: inline-block; padding: 0 24rpx; height: 56rpx; line-height: 56rpx; border-radius: 999rpx; background: #f4f0ff; color: #5b2dcc; font-size: 24rpx; font-weight: 600; }
+.tp-del { display: inline-block; padding: 0 24rpx; height: 56rpx; line-height: 56rpx; border-radius: 999rpx; background: #fff; color: #b42318; font-size: 24rpx; font-weight: 600; }
 
 .tp-empty { margin-top: 48rpx; text-align: center; color: #9a94a8; font-size: 26rpx; }
 

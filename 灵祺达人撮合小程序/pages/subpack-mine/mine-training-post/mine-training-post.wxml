@@ -33,7 +33,10 @@
         <text class="tp-course__meta">{{item.modeText}}{{item.city ? ' · ' + item.city : ''}}{{item.whenText ? ' · ' + item.whenText : ''}}</text>
         <text class="tp-course__meta">¥{{item.fee || '0'}} · {{item.signupCount || 0}}/{{item.seats}} 人</text>
         <text wx:if="{{item.reviewStatus === 'rejected' && item.reviewNote}}" class="tp-course__note">{{item.reviewNote}}</text>
-        <view class="tp-edit" data-id="{{item.id}}" bindtap="onEdit">编辑</view>
+        <view class="tp-actions">
+          <view class="tp-edit" data-id="{{item.id}}" bindtap="onEdit">编辑</view>
+          <view class="tp-del" data-id="{{item.id}}" data-title="{{item.title}}" catchtap="onDelete">删除</view>
+        </view>
       </view>
     </view>
   </block>

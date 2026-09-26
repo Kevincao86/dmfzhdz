@@ -235,6 +235,18 @@ async function updateCourse(input) {
   return course
 }
 
+async function deleteCourse(id) {
+  const courseId = String(id || '')
+  if (!courseId) throw new Error('课程不存在')
+  const payload = { action: 'delete', id: courseId, hostId: accountId() }
+  if (ecs.hasBase && ecs.hasBase()) {
+    const res = await ecs.post('/api/meoo-mp-training', payload)
+    if (res && res.error) throw new Error(String(res.error))
+    if (res && res.ok === false) throw new Error('删除失败')
+  }
+  writeLocal(readLocal().filter((c) => c.id !== courseId))
+}
+
 function readProfile() {
   try {
     const map = wx.getStorageSync(PROFILE_KEY) || {}
@@ -450,6 +462,7 @@ module.exports = {
   listMine,
   createCourse,
   updateCourse,
+  deleteCourse,
   signup,
   readProfile,
   lecturerState,

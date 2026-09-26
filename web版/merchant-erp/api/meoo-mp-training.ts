@@ -463,6 +463,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return
   }
 
+  if (action === 'delete') {
+    const hostId = String(body.hostId || '')
+    const id = String(body.id || '')
+    const course = store.courses.find((c) => c.id === id && c.hostId === hostId)
+    if (!course) {
+      res.status(404).json({ ok: false, error: '课程不存在' })
+      return
+    }
+    if ((course.signups || []).length) {
+      res.status(400).json({ ok: false, error: '已有学员报名，不能删除' })
+      return
+    }
+    store.courses = store.courses.filter((c) => c.id !== id)
+    writeStore(store)
+    res.status(200).json({ ok: true })
+    return
+  }
+
   if (action === 'prepay') {
     try {
       const result = await createTrainingPrepay(body)

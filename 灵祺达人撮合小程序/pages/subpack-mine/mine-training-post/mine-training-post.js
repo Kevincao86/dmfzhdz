@@ -159,6 +159,29 @@ Page({
     this.setData({ view: 'form', ...blankForm() })
     wx.setNavigationBarTitle({ title: '新增培训' })
   },
+  onDelete(e) {
+    const id = e.currentTarget.dataset.id
+    const title = e.currentTarget.dataset.title || '这门课程'
+    wx.showModal({
+      title: '删除课程',
+      content: `删除「${title}」？删除后首页不再展示。已有学员报名的不能删除。`,
+      confirmText: '删除',
+      confirmColor: '#b42318',
+      success: async (res) => {
+        if (!res.confirm) return
+        wx.showLoading({ title: '删除中', mask: true })
+        try {
+          await training.deleteCourse(id)
+          wx.hideLoading()
+          wx.showToast({ title: '已删除', icon: 'success' })
+          this.loadMine()
+        } catch (err) {
+          wx.hideLoading()
+          wx.showToast({ title: String((err && err.message) || '删除失败').slice(0, 18), icon: 'none' })
+        }
+      },
+    })
+  },
   onEdit(e) {
     const course = (this.data.mine || []).find((c) => c.id === e.currentTarget.dataset.id)
     if (!course) return

@@ -495,9 +495,24 @@ export default function TrainingPage() {
                   {c.whenText ? ` · ${c.whenText}` : ''} · ¥{c.fee || '0'} · {c.signupCount || 0}/{c.seats} 人
                 </p>
                 {c.reviewStatus === 'rejected' && c.reviewNote ? <p className="mt-1 text-xs text-red-600">{c.reviewNote}</p> : null}
-                <button type="button" className="mt-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-violet-700" onClick={() => openEdit(c)}>
-                  编辑
-                </button>
+                <div className="mt-2 flex items-center justify-between">
+                  <button type="button" className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-violet-700" onClick={() => openEdit(c)}>
+                    编辑
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-red-600"
+                    onClick={() => {
+                      if (!window.confirm(`删除「${c.title}」？删除后首页不再展示。`)) return
+                      setErr('')
+                      postTraining({ action: 'delete', id: c.id, hostId: me?.accountId || '' })
+                        .then(() => load())
+                        .catch((ex) => setErr(ex instanceof Error ? ex.message : '删除失败'))
+                    }}
+                  >
+                    删除
+                  </button>
+                </div>
               </div>
             </article>
           ))}
