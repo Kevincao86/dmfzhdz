@@ -24,6 +24,7 @@ type Course = {
   enrolled: number
   fee: string
   poster: string
+  posterMp: string
   note: string
   signupFields: SignupField[]
   reviewStatus: 'pending' | 'approved' | 'rejected'
@@ -112,6 +113,12 @@ function clipImage(raw: unknown) {
   const s = String(raw || '')
   if (!s.startsWith('data:image/')) return ''
   return s.slice(0, 280000)
+}
+
+function clipPoster(raw: unknown) {
+  const s = String(raw || '')
+  if (!s.startsWith('data:image/')) return ''
+  return s.slice(0, 400000)
 }
 
 function rawImageBase64(dataUrl: string) {
@@ -365,9 +372,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (action === 'create') {
     const title = String(body.title || '').trim()
-    const poster = String(body.poster || '')
+    const poster = clipPoster(body.poster)
+    const posterMp = clipPoster(body.posterMp)
     if (!title) {
       res.status(400).json({ ok: false, error: '请填写课程名称' })
+      return
+    }
+    if (!poster) {
+      res.status(400).json({ ok: false, error: '请上传星选平台宣传图' })
+      return
+    }
+    if (!posterMp) {
+      res.status(400).json({ ok: false, error: '请上传小程序宣传图' })
       return
     }
     const hostId = String(body.hostId || '')
@@ -394,7 +410,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       seats: Math.max(1, Number(body.seats) || 1),
       enrolled: 0,
       fee: String(body.fee || '').trim(),
-      poster: poster.startsWith('data:image/') ? poster.slice(0, 400000) : '',
+      poster,
+      posterMp,
       note: String(body.note || '').trim(),
       signupFields: normalizeSignupFields(body.signupFields),
       reviewStatus: 'pending',
@@ -425,7 +442,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.status(400).json({ ok: false, error: '请填写课程名称' })
       return
     }
-    const poster = String(body.poster || '')
+    const poster = clipPoster(body.poster)
+    const posterMp = clipPoster(body.posterMp)
     const taken = (course.signups || []).length
     course.title = title
     course.mode = body.mode === 'offline' ? 'offline' : 'online'
@@ -435,7 +453,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     course.fee = String(body.fee || '').trim()
     course.note = String(body.note || '').trim()
     course.signupFields = normalizeSignupFields(body.signupFields)
-    if (poster.startsWith('data:image/')) course.poster = poster.slice(0, 400000)
+    if (poster) course.poster = poster
+    if (posterMp) course.posterMp = posterMp
     course.reviewStatus = 'pending'
     course.reviewNote = ''
     writeStore(store)

@@ -275,8 +275,8 @@ function TrainingAdBar() {
   if (!ads.length) return null
   const ad = ads[index] || ads[0]
   return (
-    <Link to={ad.id ? `/training?course=${encodeURIComponent(ad.id)}` : '/training'} className="mb-4 block aspect-video overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
-      <img src={ad.poster} alt={ad.title} className="h-full w-full object-contain" />
+    <Link to={ad.id ? `/training?course=${encodeURIComponent(ad.id)}` : '/training'} className="talent-home__ad">
+      <img src={ad.poster} alt={ad.title} />
     </Link>
   )
 }

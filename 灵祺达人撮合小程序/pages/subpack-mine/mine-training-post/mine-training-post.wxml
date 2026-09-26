@@ -23,7 +23,7 @@
     <view wx:if="{{loading}}" class="tp-empty">加载中</view>
     <view wx:elif="{{!mine.length}}" class="tp-empty">还没有发布培训</view>
     <view wx:for="{{mine}}" wx:key="id" class="tp-course">
-      <image wx:if="{{item.poster}}" class="tp-course__cover" src="{{item.poster}}" mode="aspectFill" />
+      <image wx:if="{{item.posterMp || item.poster}}" class="tp-course__cover" src="{{item.posterMp || item.poster}}" mode="aspectFill" />
       <view wx:else class="tp-course__cover tp-course__cover--ph">海报</view>
       <view class="tp-course__body">
         <view class="tp-course__top">
@@ -40,15 +40,25 @@
 
   <block wx:if="{{view === 'form' && advanced && paid}}">
     <view class="tp-card">
-      <text class="tp-sec">宣传海报</text>
-      <text class="tp-hint">和星选同一张图，裁切框不一样。建议 1500×840（16:9），课程名放中间。首页广告栏更扁，详情接近 16:9，我发布的是竖图。</text>
-      <view class="tp-poster" bindtap="onPoster">
+      <text class="tp-sec">宣传图</text>
+      <text class="tp-hint">星选和小程序各传一张。星选首页贴齐左右，16:9，建议 1500×844。小程序首页广告栏约 3:1，建议 1500×470。</text>
+      <text class="tp-label">星选平台 · 16:9</text>
+      <view class="tp-poster tp-poster--web" data-key="poster" bindtap="onPoster">
         <image wx:if="{{poster}}" class="tp-poster__img" src="{{poster}}" mode="aspectFill" />
         <block wx:else>
-          <text class="tp-poster__name">上传海报</text>
-          <text class="tp-poster__tip">点击选择图片</text>
+          <text class="tp-poster__name">上传星选宣传图</text>
+          <text class="tp-poster__tip">1500×844，课程名放中间</text>
         </block>
         <text wx:if="{{poster}}" class="tp-poster__badge">更换</text>
+      </view>
+      <text class="tp-label">小程序 · 约 3:1</text>
+      <view class="tp-poster tp-poster--mp" data-key="posterMp" bindtap="onPoster">
+        <image wx:if="{{posterMp}}" class="tp-poster__img" src="{{posterMp}}" mode="aspectFill" />
+        <block wx:else>
+          <text class="tp-poster__name">上传小程序宣传图</text>
+          <text class="tp-poster__tip">1500×470，重要内容放中间</text>
+        </block>
+        <text wx:if="{{posterMp}}" class="tp-poster__badge">更换</text>
       </view>
     </view>
 

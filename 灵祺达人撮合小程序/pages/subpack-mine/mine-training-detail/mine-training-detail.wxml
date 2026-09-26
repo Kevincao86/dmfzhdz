@@ -1,5 +1,5 @@
 <view class="td" wx:if="{{course}}">
-  <image wx:if="{{course.poster}}" class="td-cover" src="{{course.poster}}" mode="aspectFill" />
+  <image wx:if="{{course.posterMp || course.poster}}" class="td-cover" src="{{course.posterMp || course.poster}}" mode="aspectFill" />
   <view class="td-body">
     <text class="td-title">{{course.title}}</text>
     <text class="td-host">{{course.hostRole === 'pr' ? 'PR' : '达人'}} · {{course.hostName}}</text>

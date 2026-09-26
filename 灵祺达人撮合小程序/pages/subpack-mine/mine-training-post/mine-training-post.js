@@ -73,6 +73,7 @@ function blankForm() {
     seats: '20',
     fee: '',
     poster: '',
+    posterMp: '',
     note: '',
     ...fieldView([
       { key: 'name', label: '姓名', kind: 'name' },
@@ -175,6 +176,7 @@ Page({
       seats: String(course.seats || 20),
       fee: course.fee || '',
       poster: course.poster || '',
+      posterMp: course.posterMp || '',
       note: course.note || '',
       ...fieldView(Array.isArray(course.signupFields) && course.signupFields.length ? course.signupFields : blankForm().signupFields),
     })
@@ -303,7 +305,8 @@ Page({
   },
   onMode(e) { this.setData({ mode: e.currentTarget.dataset.id }) },
   noop() {},
-  onPoster() {
+  onPoster(e) {
+    const key = e.currentTarget.dataset.key === 'posterMp' ? 'posterMp' : 'poster'
     wx.chooseImage({
       count: 1,
       sizeType: ['compressed'],
@@ -314,7 +317,7 @@ Page({
           wx.getFileSystemManager().readFile({
             filePath,
             encoding: 'base64',
-            success: (file) => this.setData({ poster: `data:image/jpeg;base64,${file.data}` }),
+            success: (file) => this.setData({ [key]: `data:image/jpeg;base64,${file.data}` }),
             fail: () => wx.showToast({ title: '海报读取失败', icon: 'none' }),
           })
         }
@@ -337,7 +340,11 @@ Page({
       return
     }
     if (!String(this.data.poster || '').startsWith('data:image/')) {
-      wx.showToast({ title: '请上传宣传海报', icon: 'none' })
+      wx.showToast({ title: '请上传星选宣传图', icon: 'none' })
+      return
+    }
+    if (!String(this.data.posterMp || '').startsWith('data:image/')) {
+      wx.showToast({ title: '请上传小程序宣传图', icon: 'none' })
       return
     }
     if (!this.data.cityNational && !(this.data.selectedCities || []).length) {

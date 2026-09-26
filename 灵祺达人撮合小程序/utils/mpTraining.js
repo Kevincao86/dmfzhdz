@@ -167,6 +167,7 @@ async function createCourse(input) {
     seats: Number(input.seats) || 1,
     fee: input.fee || '',
     poster: input.poster || '',
+    posterMp: input.posterMp || '',
     note: input.note || '',
     signupFields: input.signupFields || [],
   }
@@ -216,6 +217,7 @@ async function updateCourse(input) {
     seats: Number(input.seats) || 1,
     fee: input.fee || '',
     poster: input.poster || '',
+    posterMp: input.posterMp || '',
     note: input.note || '',
     signupFields: input.signupFields || [],
   }

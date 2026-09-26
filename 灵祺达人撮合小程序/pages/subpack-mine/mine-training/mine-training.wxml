@@ -18,7 +18,7 @@
   <view wx:if="{{loading}}" class="tr-empty">加载中</view>
   <view wx:elif="{{!shown.length}}" class="tr-empty">还没有培训课程</view>
   <view wx:for="{{shown}}" wx:key="id" class="tr-card" data-id="{{item.id}}" bindtap="onOpen">
-    <image wx:if="{{item.poster}}" class="tr-card__cover" src="{{item.poster}}" mode="aspectFill" />
+    <image wx:if="{{item.posterMp || item.poster}}" class="tr-card__cover" src="{{item.posterMp || item.poster}}" mode="aspectFill" />
     <view wx:else class="tr-card__cover tr-card__cover--ph">培训</view>
     <view class="tr-card__body">
       <text class="tr-card__title">{{item.title}}</text>

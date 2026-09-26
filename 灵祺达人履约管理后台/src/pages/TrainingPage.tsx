@@ -143,6 +143,7 @@ type Course = {
   fee: string
   signupCount?: number
   poster?: string
+  posterMp?: string
   note?: string
   signupFields?: SignupField[]
   reviewStatus?: 'pending' | 'approved' | 'rejected' | ''
@@ -194,6 +195,7 @@ export default function TrainingPage() {
   const [platformMode, setPlatformMode] = useState<'single' | 'multi'>('multi')
   const [platformPicks, setPlatformPicks] = useState<string[]>([])
   const [poster, setPoster] = useState('')
+  const [posterMp, setPosterMp] = useState('')
   const [signupFields, setSignupFields] = useState<SignupField[]>(DEFAULT_FIELDS)
   const [fieldDraft, setFieldDraft] = useState('')
   const [sheetErr, setSheetErr] = useState('')
@@ -357,6 +359,7 @@ export default function TrainingPage() {
     setSeats('20')
     setNote('')
     setPoster('')
+    setPosterMp('')
     setSignupFields(DEFAULT_FIELDS.map((field) => ({ ...field })))
     setFieldDraft('')
     setErr('')
@@ -382,6 +385,7 @@ export default function TrainingPage() {
     setSeats(String(course.seats || 20))
     setNote(course.note || '')
     setPoster(course.poster || '')
+    setPosterMp(course.posterMp || '')
     setSignupFields(fieldsOf(course.signupFields))
     setFieldDraft('')
     setErr('')
@@ -517,7 +521,11 @@ export default function TrainingPage() {
                 return
               }
               if (!poster.startsWith('data:image/')) {
-                setSheetErr('请上传宣传海报')
+                setSheetErr('请上传星选平台宣传图')
+                return
+              }
+              if (!posterMp.startsWith('data:image/')) {
+                setSheetErr('请上传小程序宣传图')
                 return
               }
               if (!postCity.trim()) {
@@ -549,6 +557,7 @@ export default function TrainingPage() {
                 seats: Number(seats) || 1,
                 note: note.trim(),
                 poster,
+                posterMp,
                 signupFields,
                 hostId: me?.accountId || '',
                 hostName: me?.wxNickName || me?.loginName || '达人',
@@ -572,49 +581,30 @@ export default function TrainingPage() {
             </div>
             <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
               <section>
-                <h3 className="text-sm font-semibold text-slate-900">宣传海报</h3>
-                <p className="mt-1 text-xs leading-relaxed text-slate-500">小程序和星选用同一张海报。建议按 16:9 出图（1500×840），课程名放正中。星选首页按 16:9 完整显示；小程序首页广告栏更扁，大约 3:1；详情头图接近 16:9；两边「我发布的」是竖图，会裁掉左右。</p>
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                  <figure className="rounded-xl border border-slate-200 bg-slate-50 p-2">
-                    <div className="rounded-lg bg-white p-1.5 shadow-sm">
-                      <div className="h-1.5 w-8 rounded bg-slate-200" />
-                      <div className="mt-1 h-2 rounded bg-slate-100" />
-                      <div className="relative mt-1 h-7 overflow-hidden rounded bg-violet-200">
-                        <span className="absolute inset-x-1 bottom-0.5 text-[8px] font-semibold text-violet-900">课程名</span>
-                      </div>
-                      <div className="mt-1 h-6 rounded bg-slate-100" />
-                    </div>
-                    <figcaption className="mt-1.5 text-[11px] leading-snug text-slate-600">小程序首页，搜索框下的广告栏。扁横幅，底部压课程名。</figcaption>
-                  </figure>
-                  <figure className="rounded-xl border border-slate-200 bg-slate-50 p-2">
-                    <div className="rounded-lg bg-white p-1.5 shadow-sm">
-                      <div className="h-10 rounded bg-violet-200" />
-                      <div className="mt-1 h-1.5 w-12 rounded bg-slate-200" />
-                      <div className="mt-1 h-1.5 w-8 rounded bg-slate-100" />
-                    </div>
-                    <figcaption className="mt-1.5 text-[11px] leading-snug text-slate-600">小程序培训列表封面，点进详情后是更高的头图。</figcaption>
-                  </figure>
-                  <figure className="rounded-xl border border-slate-200 bg-slate-50 p-2">
-                    <div className="rounded-lg bg-white p-1.5 shadow-sm">
-                      <div className="h-6 rounded bg-violet-200" />
-                      <div className="mt-1.5 flex gap-1">
-                        <div className="h-8 w-5 shrink-0 rounded bg-violet-300" />
-                        <div className="min-w-0 flex-1">
-                          <div className="h-1.5 w-full rounded bg-slate-200" />
-                          <div className="mt-1 h-1.5 w-8 rounded bg-slate-100" />
-                        </div>
-                      </div>
-                    </div>
-                    <figcaption className="mt-1.5 text-[11px] leading-snug text-slate-600">星选首页按 16:9 完整显示这张海报。我发布的列表是左侧竖向小图。</figcaption>
-                  </figure>
-                </div>
-                <label className="relative mt-3 flex h-40 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border border-dashed border-violet-200 bg-violet-50/50">
+                <h3 className="text-sm font-semibold text-slate-900">宣传图</h3>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">星选和小程序各传一张，尺寸分开。两张都要传。</p>
+                <p className="mt-3 text-xs font-medium text-slate-700">星选平台 · 16:9</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">首页左右贴齐内容区。建议 1500×844，课程名放正中。</p>
+                <label className="relative mt-2 flex aspect-video cursor-pointer items-center justify-center overflow-hidden rounded-2xl border border-dashed border-violet-200 bg-violet-50/50">
                   {poster ? <img src={poster} alt="" className="absolute inset-0 h-full w-full object-cover" /> : null}
-                  <span className={`relative text-sm font-medium ${poster ? 'rounded-full bg-slate-900/70 px-3 py-1 text-white' : 'text-slate-700'}`}>{poster ? '更换海报' : '上传海报'}</span>
+                  <span className={`relative text-sm font-medium ${poster ? 'rounded-full bg-slate-900/70 px-3 py-1 text-white' : 'text-slate-700'}`}>{poster ? '更换星选宣传图' : '上传星选宣传图'}</span>
                   <input className="sr-only" type="file" accept="image/*" onChange={(e) => {
                     const file = e.target.files?.[0]
+                    e.target.value = ''
                     if (!file) return
                     compressImageFile(file).then((url) => setPoster(url)).catch((ex) => setSheetErr(ex instanceof Error ? ex.message : '海报处理失败'))
+                  }} />
+                </label>
+                <p className="mt-4 text-xs font-medium text-slate-700">小程序 · 约 3:1</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">小程序首页广告栏。建议 1500×470，重要内容放正中。</p>
+                <label className="relative mt-2 flex aspect-[32/10] cursor-pointer items-center justify-center overflow-hidden rounded-2xl border border-dashed border-violet-200 bg-violet-50/50">
+                  {posterMp ? <img src={posterMp} alt="" className="absolute inset-0 h-full w-full object-cover" /> : null}
+                  <span className={`relative text-sm font-medium ${posterMp ? 'rounded-full bg-slate-900/70 px-3 py-1 text-white' : 'text-slate-700'}`}>{posterMp ? '更换小程序宣传图' : '上传小程序宣传图'}</span>
+                  <input className="sr-only" type="file" accept="image/*" onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    e.target.value = ''
+                    if (!file) return
+                    compressImageFile(file).then((url) => setPosterMp(url)).catch((ex) => setSheetErr(ex instanceof Error ? ex.message : '海报处理失败'))
                   }} />
                 </label>
               </section>

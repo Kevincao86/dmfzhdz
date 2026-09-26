@@ -278,9 +278,9 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     try {
       const courses = await mpTraining.listCourses()
       const trainAds = (Array.isArray(courses) ? courses : [])
-        .filter((c) => c && String(c.poster || '').indexOf('data:image/') === 0)
+        .filter((c) => c && String(c.posterMp || '').indexOf('data:image/') === 0)
         .slice(0, 6)
-        .map((c) => ({ id: c.id, title: c.title || '培训课程', poster: c.poster }))
+        .map((c) => ({ id: c.id, title: c.title || '培训课程', poster: c.posterMp }))
       this.setData({ trainAds })
     } catch (_) {
       this.setData({ trainAds: [] })

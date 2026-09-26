@@ -134,7 +134,9 @@
   align-items: center;
   justify-content: center;
 }
-.tp-poster__img { position: absolute; left: 0; top: 0; width: 100%; height: 320rpx; }
+.tp-poster--web { height: 360rpx; }
+.tp-poster--mp { height: 200rpx; }
+.tp-poster__img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
 .tp-poster__name { font-size: 28rpx; font-weight: 600; color: #1f1a2e; }
 .tp-poster__tip { margin-top: 8rpx; font-size: 22rpx; color: #8b8499; }
 .tp-poster__badge { position: absolute; right: 16rpx; bottom: 16rpx; padding: 6rpx 16rpx; border-radius: 999rpx; background: rgba(31, 26, 46, 0.72); color: #fff; font-size: 22rpx; }
