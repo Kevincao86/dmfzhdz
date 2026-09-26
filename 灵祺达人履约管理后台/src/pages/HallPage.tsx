@@ -18,7 +18,7 @@ const ALL_TABS: { id: HallMainTab; label: string }[] = [
 export default function HallPage() {
   const role = getActiveRole()
   const prRecommendEnabled = role !== 'pr' || canUsePrRecommendHall()
-  const TABS = ALL_TABS.filter((t) => t.id !== 'recommend' || prRecommendEnabled)
+  const TABS = ALL_TABS
   const [params, setParams] = useSearchParams()
   const tabParam = params.get('tab') as HallMainTab | null
   const tab: HallMainTab =
@@ -29,12 +29,6 @@ export default function HallPage() {
       setParams({ tab: 'hall' }, { replace: true })
     }
   }, [tabParam, setParams, TABS])
-
-  useEffect(() => {
-    if (tab === 'recommend' && role === 'pr' && !prRecommendEnabled) {
-      setParams({ tab: 'hall' }, { replace: true })
-    }
-  }, [tab, role, prRecommendEnabled, setParams])
 
   function selectTab(next: HallMainTab) {
     setParams({ tab: next }, { replace: true })
@@ -66,7 +60,7 @@ export default function HallPage() {
           <RecommendHallPanel />
         ) : (
           <PrFeatureLocked
-            title="推荐大厅即将开放使用"
+            title="推荐大厅需开通后使用"
             desc="智能荐达人、匹配招募单与达人库检索为增值能力，需由灵祺运营在后台为您开通后方可使用。"
             bullets={['AI 智能推荐达人', '全部达人库检索', '按招募单智能匹配']}
           />

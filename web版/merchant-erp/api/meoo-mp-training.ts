@@ -63,6 +63,7 @@ type Order = {
   pay: number
   commission: number
   payable: number
+  payerHostId?: string
   status: 'escrow' | 'review' | 'ready' | 'settled'
   evidence: string
   createdAt: string
@@ -246,6 +247,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       profile: hostId ? store.profiles.find((p) => p.hostId === hostId) || null : null,
       profiles: review ? store.profiles.filter((p) => lecturerState(p) !== 'none').map(lecturerCard) : [],
       orders: hostId ? store.orders.filter((o) => o.hostId === hostId) : [],
+      enrolled: hostId
+        ? store.orders
+            .filter((o) => String(o.payerHostId || '') === hostId)
+            .map((o) => ({
+              id: o.id,
+              courseId: o.courseId,
+              title: o.title,
+              status: o.status,
+              pay: o.pay,
+              createdAt: o.createdAt,
+            }))
+        : [],
       deposit: trainingDepositView(hostId),
       settlement: trainingWithdrawQuote(hostId),
     })
@@ -386,6 +399,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.status(400).json({ ok: false, error: '请上传小程序宣传图' })
       return
     }
+    const feeNum = Number(body.fee)
+    if (!Number.isFinite(feeNum) || feeNum <= 0) {
+      res.status(400).json({ ok: false, error: '请填写大于 0 的课时费' })
+      return
+    }
     const hostId = String(body.hostId || '')
     if (hostId) {
       const profile = store.profiles.find((p) => p.hostId === hostId)
@@ -440,6 +458,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const title = String(body.title || '').trim()
     if (!title) {
       res.status(400).json({ ok: false, error: '请填写课程名称' })
+      return
+    }
+    const feeNum = Number(body.fee)
+    if (!Number.isFinite(feeNum) || feeNum <= 0) {
+      res.status(400).json({ ok: false, error: '请填写大于 0 的课时费' })
       return
     }
     const poster = clipPoster(body.poster)

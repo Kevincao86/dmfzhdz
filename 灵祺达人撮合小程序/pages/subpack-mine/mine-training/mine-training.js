@@ -5,6 +5,7 @@ Page({
     filter: 'all',
     courses: [],
     shown: [],
+    enrolled: [],
     loading: true,
     lecturerStatus: 'none',
     lecturerLabel: '未申请',
@@ -23,7 +24,8 @@ Page({
     this.setData({ loading: true })
     try {
       const courses = await training.listCourses()
-      this.setData({ courses, loading: false }, () => this.applyFilter())
+      const enrolled = await training.myEnrollments()
+      this.setData({ courses, enrolled, loading: false }, () => this.applyFilter())
     } catch (e) {
       this.setData({ loading: false })
       wx.showToast({ title: '加载失败', icon: 'none' })

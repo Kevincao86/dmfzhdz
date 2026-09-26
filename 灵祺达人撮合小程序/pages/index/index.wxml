@@ -94,6 +94,7 @@
           急单大厅<text wx:if="{{tabCounts.urgent}}" class="home-hall-mini__count">{{tabCounts.urgent}}</text>
         </view>
         <view
+          wx:if="{{showPaichianTab}}"
           class="home-hall-mini__item {{hallTab === 'paichian' ? 'home-hall-mini__item--on' : ''}}"
           data-tab="paichian"
           bindtap="onHallTab"
@@ -102,18 +103,21 @@
         </view>
       </view>
 
-      <view class="paichian-sub-tabs paichian-sub-tabs--v1" wx:if="{{hallTab === 'paichian'}}">
+      <view class="paichian-sub-tabs paichian-sub-tabs--v1" wx:if="{{hallTab === 'paichian' && showPaichianTab}}">
         <view
+          wx:if="{{showShootSub}}"
           class="paichian-sub-tab {{paichianSubTab === 'shoot' ? 'paichian-sub-tab--on' : ''}}"
           data-sub="shoot"
           bindtap="onPaichianSubTab"
         >拍摄任务</view>
         <view
+          wx:if="{{showEditSub}}"
           class="paichian-sub-tab {{paichianSubTab === 'edit' ? 'paichian-sub-tab--on' : ''}}"
           data-sub="edit"
           bindtap="onPaichianSubTab"
         >剪辑任务</view>
         <view
+          wx:if="{{showIceSub}}"
           class="paichian-sub-tab {{paichianSubTab === 'ice' ? 'paichian-sub-tab--on' : ''}}"
           data-sub="ice"
           bindtap="onPaichianSubTab"

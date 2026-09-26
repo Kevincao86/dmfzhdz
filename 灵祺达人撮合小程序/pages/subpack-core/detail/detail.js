@@ -32,6 +32,8 @@ const subpageNav = require('../../../utils/subpageNav.js')
 const mpTargetedRecruit = require('../../../utils/mpTargetedRecruit.js')
 const mpTargetedRecruitApi = require('../../../utils/mpTargetedRecruitApi.js')
 const participant = require('../../../utils/participant.js')
+const switchWorkIdentity = require('../../../utils/switchWorkIdentity.js')
+const identityTypes = require('../../../utils/identityTypes.js')
 
 function padTimeHm(raw) {
   const s = String(raw || '').trim()
@@ -1678,16 +1680,61 @@ Page({
       this.setData({ contacting: false })
     }
   },
+  offerClaimIdentitySwitch(verdict) {
+    if (!verdict) return
+    if (verdict.code === 'targeted_invite_only') {
+      wx.showModal({
+        title: '定向邀约',
+        content: verdict.message,
+        confirmText: '去邀约',
+        success(res) {
+          if (res.confirm) {
+            wx.navigateTo({ url: '/pages/subpack-mine/mine-targeted-invites/mine-targeted-invites' })
+          }
+        },
+      })
+      return
+    }
+    const target = switchWorkIdentity.claimSwitchTarget(verdict.code)
+    if (!target) {
+      wx.showToast({ title: verdict.message || '当前不能报名', icon: 'none' })
+      return
+    }
+    const label = identityTypes.workIdentityLabel(target)
+    wx.showModal({
+      title: '当前身份不能报名',
+      content: `${verdict.message}。切换为「${label}」后可以继续，不用重新登录。`,
+      confirmText: '切换',
+      success: async (res) => {
+        if (!res.confirm) return
+        wx.showLoading({ title: '切换中', mask: true })
+        try {
+          const result = await switchWorkIdentity.applyWorkIdentitySwitch(target)
+          wx.hideLoading()
+          if (!result || result.needsReLogin) {
+            wx.showToast({ title: (result && result.cloudWarning) || '请重新登录', icon: 'none' })
+            return
+          }
+          const member = memberStore.readMember()
+          if (!memberProfileApplyGate.ensureMemberProfileForApplyOrRedirect(member, target)) return
+          this.goApply()
+        } catch (e) {
+          wx.hideLoading()
+          wx.showToast({ title: '切换失败', icon: 'none' })
+        }
+      },
+    })
+  },
   goApply() {
     if (this.data.showTargetedInviteActions) return
     const v = this.data.view
     if (v && v.isFormRelay) {
-      if (this.data.isPr) {
-        wx.showToast({ title: '请切换达人身份再报名', icon: 'none' })
-        return
-      }
-      if (!auth.isLoggedIn()) {
-        const back = `/pages/subpack-core/detail/detail?id=${encodeURIComponent(this.data.id)}&openFormRelay=1`
+    if (userProfile.readIdentity() === 'pr') {
+      this.offerClaimIdentitySwitch({ code: 'wrong_identity', message: '请切换为达人身份后再报名' })
+      return
+    }
+    if (!auth.isLoggedIn()) {
+      const back = `/pages/subpack-core/detail/detail?id=${encodeURIComponent(this.data.id)}&openFormRelay=1`
         guestRoutes.redirectToLogin(back)
         return
       }
@@ -1701,8 +1748,11 @@ Page({
       wx.showToast({ title: '报名已截止', icon: 'none' })
       return
     }
-    if (this.data.isPr) {
-      wx.showToast({ title: '请切换达人身份再报名', icon: 'none' })
+    if (userProfile.readIdentity() === 'pr') {
+      const target = recruitApplyGate.recruitTargetFromMpOrder(this.data.mpOrder)
+      const code = this.data.isIce || target === 'edit' ? 'edit_only' : target === 'shoot' ? 'shoot_only' : 'talent_only'
+      const label = code === 'edit_only' ? '剪辑' : code === 'shoot_only' ? '拍摄' : '达人'
+      this.offerClaimIdentitySwitch({ code, message: `请切换为${label}身份后再报名` })
       return
     }
     if (!auth.isLoggedIn()) {
@@ -1723,9 +1773,13 @@ Page({
     const workId = userProfile.readIdentity()
     const member = memberStore.readMember()
     if (!memberProfileApplyGate.ensureMemberProfileForApplyOrRedirect(member, workId)) return
-    const recruitHint = recruitApplyGate.claimBlockHint(this.data.mpOrder, workId)
-    if (recruitHint) {
-      wx.showToast({ title: recruitHint, icon: 'none' })
+    const verdict = recruitApplyGate.validateRecruitmentClaim(this.data.mpOrder, workId)
+    if (!verdict.ok) {
+      if (verdict.code === 'slots_full') {
+        wx.showToast({ title: verdict.message, icon: 'none' })
+        return
+      }
+      this.offerClaimIdentitySwitch(verdict)
       return
     }
     if (!v || !this.data.id) return

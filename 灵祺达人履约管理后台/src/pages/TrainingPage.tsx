@@ -157,6 +157,7 @@ export default function TrainingPage() {
   const focusCourseId = searchParams.get('course') || ''
   const [courses, setCourses] = useState<Course[]>([])
   const [mine, setMine] = useState<Course[]>([])
+  const [enrolled, setEnrolled] = useState<{ id: string; title: string; pay?: number; status?: string }[]>([])
   const [mode, setMode] = useState<'all' | 'online' | 'offline'>('all')
   const [err, setErr] = useState('')
   const [title, setTitle] = useState('')
@@ -219,6 +220,7 @@ export default function TrainingPage() {
     const data = await fetchTraining(me?.accountId)
     setCourses((data.courses as Course[]) || [])
     setMine((data.mine as Course[]) || [])
+    setEnrolled((data.enrolled as { id: string; title: string; pay?: number; status?: string }[]) || [])
     const deposit = data.deposit as { paid?: boolean } | undefined
     setDepositPaid(!!deposit?.paid)
     const profile = data.profile as Lecturer | null
@@ -414,7 +416,7 @@ export default function TrainingPage() {
           </div>
         </div>
         <p className="mt-1 text-sm text-slate-500">
-          课时费由平台代收，不提供提现。提交完成证明后进入 T+1 应付款。个人预扣个税，企业凭发票打款。
+          课时费由平台代收。核实通过后进入 T+1 应付款，到我的钱包提现。个人预扣个税，企业凭发票打款。
         </p>
       </div>
       <div className="flex gap-2 text-sm">
@@ -463,6 +465,19 @@ export default function TrainingPage() {
         ))}
         {!shown.length ? <p className="text-sm text-slate-400">还没有课程</p> : null}
       </div>
+      {enrolled.length ? (
+        <section className="rounded-3xl border border-slate-200 bg-white p-5">
+          <h2 className="text-lg font-bold text-slate-900">我报名的</h2>
+          <div className="mt-3 space-y-2">
+            {enrolled.map((row) => (
+              <p key={row.id} className="text-sm text-slate-600">
+                {row.title} · 已支付 ¥{row.pay || 0}
+                {row.status === 'escrow' ? ' · 待核实' : row.status === 'ready' ? ' · 待结算' : row.status === 'settled' ? ' · 已结算' : ''}
+              </p>
+            ))}
+          </div>
+        </section>
+      ) : null}
       <section className="rounded-3xl border border-slate-200 bg-white p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -533,6 +548,11 @@ export default function TrainingPage() {
               }
               if (!title.trim()) {
                 setSheetErr('请填写课程名称')
+                return
+              }
+              const feeNum = Number(fee)
+              if (!Number.isFinite(feeNum) || feeNum <= 0) {
+                setSheetErr('请填写大于 0 的课时费')
                 return
               }
               if (!poster.startsWith('data:image/')) {

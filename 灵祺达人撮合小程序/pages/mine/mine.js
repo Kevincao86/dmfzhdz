@@ -634,20 +634,20 @@ Page({
   onGoLoginPage() {
     guestRoutes.redirectToLogin('/pages/mine/mine')
   },
-  onSwitchIdentity() {
+  async onSwitchIdentity() {
     if (!auth.isLoggedIn()) {
       wx.reLaunch({ url: '/pages/welcome/welcome' })
       return
     }
-    wx.showModal({
-      title: '切换身份',
-      content: '是否退出当前账号？退出后将返回身份选择页。',
-      confirmText: '退出',
-      confirmColor: '#0284c7',
-      success(res) {
-        if (res.confirm) accountSessionActions.logout()
-      },
-    })
+    const prev = userProfile.readIdentity()
+    const result = await switchWorkIdentity.promptPickIdentity()
+    if (!result || result.workId === prev) return
+    if (result.needsReLogin) {
+      wx.showToast({ title: result.cloudWarning || '请重新登录', icon: 'none' })
+      return
+    }
+    if (result.cloudWarning) wx.showToast({ title: result.cloudWarning, icon: 'none' })
+    wx.reLaunch({ url: '/pages/index/index' })
   },
   onCloseWxLoginSheet() {
     this.setData({ showWxLoginSheet: false })

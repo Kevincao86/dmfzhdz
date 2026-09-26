@@ -9,6 +9,7 @@ function orderMatchesRecommendHallIdentity(row, identity) {
   if (!row) return false
   if (identity === 'pr') return false
   const target = row.recruitTarget || 'talent'
+  if (row.isIce || target === 'edit') return identity === 'edit'
   return target === primaryRecruitTargetForIdentity(identity)
 }
 

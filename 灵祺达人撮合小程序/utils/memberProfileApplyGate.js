@@ -57,13 +57,31 @@ function isMemberProfileComplete(member, workIdentity) {
   return !validateMemberProfileForApply(member, workIdentity)
 }
 
-/** 资料未完整时 Toast 并跳转「我的信息」，返回 false */
+/** 资料未完整时说明缺什么，确认后再去完善。身份不对时去切换，不退出登录。 */
 function ensureMemberProfileForApplyOrRedirect(member, workIdentity) {
   const err = validateMemberProfileForApply(member, workIdentity)
   if (!err) return true
+  if (String(workIdentity || '').trim() === 'pr') {
+    const switchWorkIdentity = require('./switchWorkIdentity.js')
+    wx.showModal({
+      title: '切换身份',
+      content: '报名需要达人、拍摄或剪辑身份，切换后不用重新登录。',
+      confirmText: '去切换',
+      success(res) {
+        if (res.confirm) void switchWorkIdentity.promptPickIdentity()
+      },
+    })
+    return false
+  }
   const mpProfileNav = require('./mpProfileNav.js')
-  wx.showToast({ title: err, icon: 'none', duration: 2200 })
-  mpProfileNav.goMyProfile()
+  wx.showModal({
+    title: '请先完善资料',
+    content: err,
+    confirmText: '去完善',
+    success(res) {
+      if (res.confirm) mpProfileNav.goMyProfile()
+    },
+  })
   return false
 }
 

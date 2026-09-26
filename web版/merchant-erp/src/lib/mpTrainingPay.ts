@@ -35,6 +35,7 @@ type Pay = {
   answers?: Record<string, string>
   amountCents: number
   channel: 'wechat' | 'alipay' | 'douyin'
+  payerHostId: string
   status: 'pending' | 'paid' | 'refunded'
   createdAt: string
   paidAt: string
@@ -170,6 +171,7 @@ function enrollCourse(bag: Bag, pay: Pay) {
     evidence: '',
     outTradeNo: pay.outTradeNo,
     channel: pay.channel,
+    payerHostId: pay.payerHostId || '',
     createdAt: new Date().toISOString(),
     verifiedAt: '',
     settleAt: '',
@@ -280,6 +282,15 @@ export async function createTrainingPrepay(body: Record<string, unknown>) {
     if (review && review !== 'approved') return { ok: false as const, error: '课程还在审核中' }
     const signups = Array.isArray(course.signups) ? course.signups : []
     if (signups.length >= Math.max(1, Number(course.seats) || 1)) return { ok: false as const, error: '名额已满' }
+    const payerHostId = hostId
+    if (
+      payerHostId &&
+      bag.orders.some(
+        (o) => String(o.courseId || '') === courseId && String(o.payerHostId || '') === payerHostId,
+      )
+    ) {
+      return { ok: false as const, error: '你已报名该课程' }
+    }
     const fields = normalizeSignupFields(course.signupFields)
     const filled = validateSignupAnswers(fields, body.answers || { name: body.name, phone: body.contact, idNo: body.idNo })
     if (!filled.ok) return { ok: false as const, error: filled.error }
@@ -301,6 +312,7 @@ export async function createTrainingPrepay(body: Record<string, unknown>) {
     answers: body.answers && typeof body.answers === 'object' ? (body.answers as Record<string, string>) : {},
     amountCents,
     channel,
+    payerHostId: hostId,
     status: 'pending',
     createdAt: new Date().toISOString(),
     paidAt: '',

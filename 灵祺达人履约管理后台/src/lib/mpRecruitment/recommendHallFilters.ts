@@ -38,6 +38,7 @@ export function orderMatchesRecommendHallIdentity(
 ): boolean {
   if (identity === 'pr') return false
   const target = row.recruitTarget || 'talent'
+  if (row.isIce || target === 'edit') return identity === 'edit'
   return target === primaryRecruitTargetForIdentity(identity)
 }
 

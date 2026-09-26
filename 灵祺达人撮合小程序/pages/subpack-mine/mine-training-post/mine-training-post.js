@@ -362,6 +362,11 @@ Page({
       wx.showToast({ title: '请填写课程名称', icon: 'none' })
       return
     }
+    const feeNum = Number(this.data.fee)
+    if (!Number.isFinite(feeNum) || feeNum <= 0) {
+      wx.showToast({ title: '请填写大于 0 的课时费', icon: 'none' })
+      return
+    }
     if (!String(this.data.poster || '').startsWith('data:image/')) {
       wx.showToast({ title: '请上传星选宣传图', icon: 'none' })
       return

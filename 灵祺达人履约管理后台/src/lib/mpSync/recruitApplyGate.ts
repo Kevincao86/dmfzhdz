@@ -23,18 +23,24 @@ export function isEditTeamRecruitment(mp: Record<string, unknown> | null | undef
   return recruitTargetFromMpOrder(mp) === 'edit'
 }
 
-/** 大厅：剪辑类招募全身份可见（含剪辑云剪任务包） */
+/** 大厅：当前身份能报名的单；PR 可见全部开放商单 */
 export function hallOrderVisibleToIdentity(
   row: { recruitTarget?: string; isIce?: boolean },
-  _identity: MpWorkIdentity,
+  identity: MpWorkIdentity,
 ): boolean {
   if (!row) return false
-  if (row.recruitTarget === 'edit') return true
-  if (row.isIce) return true
-  if (_identity === 'pr' || _identity === 'talent') return true
-  if (_identity === 'shoot') return row.recruitTarget === 'shoot'
-  if (_identity === 'edit') return row.recruitTarget === 'edit'
-  return true
+  if (identity === 'pr') return true
+  const target = row.recruitTarget || 'talent'
+  if (row.isIce || target === 'edit') return identity === 'edit'
+  if (identity === 'shoot') return target === 'shoot'
+  return identity === 'talent' && target === 'talent'
+}
+
+export function claimIdentityForOrder(mp: Record<string, unknown> | null | undefined): MpWorkIdentity {
+  if (!mp) return 'talent'
+  if (isEditTeamRecruitment(mp) || isIceMpOrder(mp) || recruitTargetFromMpOrder(mp) === 'edit') return 'edit'
+  if (recruitTargetFromMpOrder(mp) === 'shoot') return 'shoot'
+  return 'talent'
 }
 
 export function hallOrderMatchesIdentityPool(
@@ -54,6 +60,18 @@ export function validateRecruitmentClaim(
       ok: false,
       message: '请切换为达人 / 拍摄 / 剪辑身份后再报名',
       code: 'wrong_identity',
+    }
+  }
+
+  const meta =
+    mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+      ? (mp.mpPublishMeta as Record<string, unknown>)
+      : {}
+  if (meta.recruitScope === 'targeted') {
+    return {
+      ok: false,
+      message: '该招募为定向邀约，请在我的邀约中接受邀请',
+      code: 'targeted_invite_only',
     }
   }
 

@@ -10,14 +10,22 @@ function primaryRecruitTargetForIdentity(identity) {
   return 'talent'
 }
 
+/** 只列出当前身份能报名的单。PR 浏览全部开放商单。 */
 function orderMatchesIdentity(row, identity) {
   if (!row) return false
-  /** 剪辑类招募全身份可见（含剪辑云剪任务包） */
-  if (row.recruitTarget === 'edit') return true
-  if (row.isIce) return true
-  /** 招募大厅公开展示：达人/PR 可见全部对象（含剪辑/拍摄单） */
-  if (identity === 'pr' || identity === 'talent') return true
-  return row.recruitTarget === primaryRecruitTargetForIdentity(identity)
+  if (identity === 'pr') return true
+  const target = row.recruitTarget || 'talent'
+  if (row.isIce || target === 'edit') return identity === 'edit'
+  if (identity === 'shoot') return target === 'shoot'
+  return identity === 'talent' && target === 'talent'
+}
+
+/** 拍剪分栏只给 PR 浏览用；达人/拍摄/剪辑的可报名单已在招募大厅。 */
+function hallTabVisibility(identity) {
+  if (identity === 'pr') {
+    return { showPaichianTab: true, showShootSub: true, showEditSub: true, showIceSub: true }
+  }
+  return { showPaichianTab: false, showShootSub: false, showEditSub: false, showIceSub: false }
 }
 
 function defaultPaichianSubTab(identity) {
@@ -61,6 +69,7 @@ function bucketOrdersForIdentity(mapped, identity, opts) {
 module.exports = {
   primaryRecruitTargetForIdentity,
   orderMatchesIdentity,
+  hallTabVisibility,
   defaultPaichianSubTab,
   bucketOrdersForIdentity,
 }

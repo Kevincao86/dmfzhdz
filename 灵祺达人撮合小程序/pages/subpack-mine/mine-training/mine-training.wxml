@@ -15,6 +15,18 @@
     <view class="tr-seg__item {{filter === 'online' ? 'tr-seg__item--on' : ''}}" data-id="online" bindtap="onFilter">线上</view>
     <view class="tr-seg__item {{filter === 'offline' ? 'tr-seg__item--on' : ''}}" data-id="offline" bindtap="onFilter">线下</view>
   </view>
+  <view wx:if="{{enrolled.length}}" class="tr-actions">
+    <view class="tr-action">
+      <text class="tr-action__name">我报名的</text>
+      <text class="tr-action__state">{{enrolled.length}} 门</text>
+    </view>
+  </view>
+  <view wx:for="{{enrolled}}" wx:key="id" class="tr-card">
+    <view class="tr-card__body">
+      <text class="tr-card__title">{{item.title}}</text>
+      <text class="tr-card__host">已支付 ¥{{item.pay}} · {{item.status === 'escrow' ? '待核实' : item.status === 'ready' ? '待结算' : item.status === 'settled' ? '已结算' : '处理中'}}</text>
+    </view>
+  </view>
   <view wx:if="{{loading}}" class="tr-empty">加载中</view>
   <view wx:elif="{{!shown.length}}" class="tr-empty">还没有培训课程</view>
   <view wx:for="{{shown}}" wx:key="id" class="tr-card" data-id="{{item.id}}" bindtap="onOpen">
@@ -22,7 +34,7 @@
     <view wx:else class="tr-card__cover tr-card__cover--ph">培训</view>
     <view class="tr-card__body">
       <text class="tr-card__title">{{item.title}}</text>
-      <text class="tr-card__host">{{item.hostRole === 'pr' ? 'PR' : '达人'}} · {{item.hostName}}</text>
+      <text class="tr-card__host">{{item.hostRole === 'pr' ? 'PR' : item.hostRole === 'shoot' ? '拍摄' : item.hostRole === 'edit' ? '剪辑' : '达人'}} · {{item.hostName}}</text>
       <view class="tr-card__meta">
         <text class="tr-chip">{{item.mode === 'offline' ? '线下' : '线上'}}</text>
         <text class="tr-when">{{item.whenText || '时间由讲师安排'}}</text>

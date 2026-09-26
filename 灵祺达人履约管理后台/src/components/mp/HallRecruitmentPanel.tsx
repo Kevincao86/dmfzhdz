@@ -233,16 +233,18 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
   const roleHint =
     hallIdentity === 'pr'
       ? 'PR 视角 · 全部开放商单'
-      : `${WORK_EDITION_LABEL[hallIdentity]} · ${workIdentityLabel(hallIdentity)}招募 + 云剪任务`
+      : `${WORK_EDITION_LABEL[hallIdentity]} · 只显示你可以报名的招募`
+
+  useEffect(() => {
+    if (hallIdentity !== 'pr' && hallTab === 'paichian') setHallTab('normal')
+  }, [hallIdentity, hallTab])
 
   const tabs: { id: HallTab; label: string; count: number }[] = [
     { id: 'normal', label: '招募大厅', count: tabCounts.normal },
     { id: 'urgent', label: '急单大厅', count: tabCounts.urgent },
-    {
-      id: 'paichian',
-      label: '拍剪任务',
-      count: tabCounts.paichian,
-    },
+    ...(hallIdentity === 'pr'
+      ? [{ id: 'paichian' as const, label: '拍剪任务', count: tabCounts.paichian }]
+      : []),
   ]
   const paichianSubs: { id: PaichianSubTab; label: string; count: number }[] = [
     { id: 'shoot', label: '拍摄任务', count: tabCounts.shoot },

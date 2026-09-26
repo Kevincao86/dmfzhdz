@@ -16,15 +16,14 @@ function isEditTeamRecruitment(mp) {
   return recruitTargetFromMpOrder(mp) === 'edit'
 }
 
-/** 大厅：剪辑类招募全身份可见（含剪辑云剪任务包） */
-function hallOrderVisibleToIdentity(row, _identity) {
+/** 大厅：当前身份能报名的单；PR 可见全部开放商单 */
+function hallOrderVisibleToIdentity(row, identity) {
   if (!row) return false
-  if (row.recruitTarget === 'edit') return true
-  if (row.isIce) return true
-  if (_identity === 'pr' || _identity === 'talent') return true
-  if (_identity === 'shoot') return row.recruitTarget === 'shoot'
-  if (_identity === 'edit') return row.recruitTarget === 'edit'
-  return true
+  if (identity === 'pr') return true
+  const target = row.recruitTarget || 'talent'
+  if (row.isIce || target === 'edit') return identity === 'edit'
+  if (identity === 'shoot') return target === 'shoot'
+  return identity === 'talent' && target === 'talent'
 }
 
 function hallOrderMatchesIdentityPool(row, identity) {

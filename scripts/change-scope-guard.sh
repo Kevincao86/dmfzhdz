@@ -86,6 +86,7 @@ list_scopes() {
   modian_official        墨典官网 m.mofangdianai.com（案例库入口）
   xingxuan_dy_oauth      星选履约 Web 抖音扫码登录（不含商家 cs / 小程序）
   login_alt_methods      商家 ERP + 星选 Web 登录页：下方图标登录方式（不含小程序）
+  xingxuan_hall_ux       星选网页+微信小程序：大厅按身份、身份切换、推荐大厅说明、培训报名
   xingxuan_open_loop     星选招募开环/闭环（小程序发单+达人报名群码 + 履约 Web 同步；闭环现网路径不改）
   merchant_local_ads     商家 ERP：巨量本地推绑定/投流；与千川账户/取数隔离（不含聚光）
   account_identity_bind  商家账号：邮箱注册、社交登录绑手机、同号合并、个人中心绑定态
@@ -1241,6 +1242,33 @@ LocalPromotionSection
 localPromotionBindGuide
 qianchuanGateway
 qianchuanApi
+change-scope-guard
+PAT
+      ;;
+    xingxuan_hall_ux)
+      cat <<'PAT'
+hallIdentityBuckets
+recruitApplyGate
+recommendHallFilters
+roleHallFilters
+HallPage
+HallRecruitmentPanel
+RecommendHallPanel
+RecruitmentDetailPage
+switchWorkIdentity
+memberProfileApplyGate
+formRelayGroupQrFeature
+AddonComingSoon
+mine-training
+mpTraining
+meoo-mp-training
+mpTrainingPay
+TrainingPage
+lingqi-xingxuan-app/src/api/hall.ts
+灵祺达人撮合小程序/pages/index/index
+灵祺达人撮合小程序/pages/mine/mine
+灵祺达人撮合小程序/pages/recommend/recommend
+灵祺达人撮合小程序/pages/subpack-core/detail/detail
 change-scope-guard
 PAT
       ;;

@@ -175,7 +175,7 @@ async function createCourse(input) {
     const res = await ecs.post('/api/meoo-mp-training', payload)
     const course = (res && res.course) || (res && res.data && res.data.course)
     if (course) return course
-    if (res && res.error) throw new Error(String(res.error))
+    throw new Error((res && res.error) || '发布失败')
   }
   const course = {
     id: `tr-${Date.now()}`,
@@ -186,6 +186,16 @@ async function createCourse(input) {
   }
   writeLocal([course].concat(readLocal()))
   return course
+}
+
+async function myEnrollments() {
+  if (!(ecs.hasBase && ecs.hasBase())) return []
+  try {
+    const res = await ecs.get(`/api/meoo-mp-training?hostId=${encodeURIComponent(accountId())}`)
+    return res && Array.isArray(res.enrolled) ? res.enrolled : []
+  } catch (_) {
+    return []
+  }
 }
 
 async function listMine() {
@@ -460,6 +470,7 @@ module.exports = {
   planId,
   listCourses,
   listMine,
+  myEnrollments,
   createCourse,
   updateCourse,
   deleteCourse,

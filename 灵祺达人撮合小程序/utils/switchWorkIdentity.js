@@ -199,6 +199,43 @@ async function applyWorkIdentityAfterLogin(token, account, workId) {
   return finalizeAccountForWorkId(workId, auth.readAccount()) || account
 }
 
+function claimSwitchTarget(code) {
+  if (code === 'edit_only') return 'edit'
+  if (code === 'shoot_only') return 'shoot'
+  if (code === 'talent_only' || code === 'wrong_identity') return 'talent'
+  return ''
+}
+
+/** 不退出登录，直接换工作台身份 */
+function promptPickIdentity() {
+  const list = identityTypes.WORK_ID_LIST.slice()
+  const current = userProfile.readIdentity()
+  const labels = list.map((id) => identityTypes.workIdentityLabel(id) + (id === current ? '（当前）' : ''))
+  return new Promise((resolve) => {
+    wx.showActionSheet({
+      itemList: labels,
+      success: async (res) => {
+        const next = list[res.tapIndex]
+        if (!next || next === current) {
+          resolve({ workId: current })
+          return
+        }
+        wx.showLoading({ title: '切换中', mask: true })
+        try {
+          const result = await applyWorkIdentitySwitch(next)
+          wx.hideLoading()
+          resolve(result)
+        } catch (e) {
+          wx.hideLoading()
+          wx.showToast({ title: '切换失败', icon: 'none' })
+          resolve(null)
+        }
+      },
+      fail: () => resolve(null),
+    })
+  })
+}
+
 module.exports = {
   workIdentityForApi,
   syncLocalProfilesFromAccount,
@@ -206,4 +243,6 @@ module.exports = {
   ensureWorkIdentityIfNeeded,
   applyWorkIdentitySwitch,
   applyWorkIdentityAfterLogin,
+  claimSwitchTarget,
+  promptPickIdentity,
 }

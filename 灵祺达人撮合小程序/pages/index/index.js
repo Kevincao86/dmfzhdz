@@ -137,6 +137,10 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     filterStatus: listFilters.HALL_DEFAULT_STATUS_FILTER || '招募中/收集中',
     statusFilters: listFilters.HALL_STATUS_FILTERS,
     workIdentity: 'talent',
+    showPaichianTab: false,
+    showShootSub: false,
+    showEditSub: false,
+    showIceSub: false,
     platformFilters: hallFilters.PLATFORM_FILTERS,
     cityFilters: ['全部'],
     priceBuckets: hallFilters.priceBucketsForView([]),
@@ -218,7 +222,9 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     identityTheme.applyTabHomeChrome()
     const identity = userProfile.readIdentity()
     const identityChanged = this._lastHallIdentity !== identity
-    const patch = { workIdentity: identity, ...homeBannerForIdentity(identity) }
+    const tabVis = hallIdentity.hallTabVisibility(identity)
+    const patch = { workIdentity: identity, ...tabVis, ...homeBannerForIdentity(identity) }
+    if (!tabVis.showPaichianTab && this.data.hallTab === 'paichian') patch.hallTab = 'normal'
     if (identityChanged) {
       patch.paichianSubTab = hallIdentity.defaultPaichianSubTab(identity)
       this._lastHallIdentity = identity
