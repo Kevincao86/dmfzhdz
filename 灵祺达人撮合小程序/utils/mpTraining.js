@@ -214,6 +214,7 @@ async function applyLecturer(input) {
     skills: String(input.skills || '').trim(),
     years: String(input.years || '').trim(),
     intro: String(input.intro || '').trim(),
+    avatar: String(input.avatar || prev.avatar || ''),
     lecturerStatus: 'pending',
     updatedAt: new Date().toISOString(),
   }
@@ -227,6 +228,7 @@ async function applyLecturer(input) {
       skills: profile.skills,
       years: profile.years,
       intro: profile.intro,
+      avatar: profile.avatar || '',
     })
     const saved = (res && res.profile) || profile
     writeProfile(saved)

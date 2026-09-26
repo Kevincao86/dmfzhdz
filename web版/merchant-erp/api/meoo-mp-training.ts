@@ -41,6 +41,7 @@ type Profile = {
   skills: string
   years: string
   intro: string
+  avatar: string
   idFront: string
   idBack: string
   licenseImage: string
@@ -251,7 +252,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (action === 'applyLecturer') {
     const hostId = String(body.hostId || '')
-    const city = clipText(body.city, 40)
+    const city = clipText(body.city, 240)
     const intro = clipText(body.intro, 400)
     if (!hostId) {
       res.status(400).json({ ok: false, error: '缺少身份' })
@@ -271,10 +272,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       bankNo: prev?.bankNo || '',
       licenseNo: prev?.licenseNo || '',
       city,
-      platforms: clipText(body.platforms, 80),
+      platforms: clipText(body.platforms, 120),
       skills: clipText(body.skills, 120),
       years: clipText(body.years, 8),
       intro,
+      avatar: clipImage(body.avatar) || prev?.avatar || '',
       idFront: prev?.idFront || '',
       idBack: prev?.idBack || '',
       licenseImage: prev?.licenseImage || '',

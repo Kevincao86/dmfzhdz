@@ -1,7 +1,36 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchTraining, postTraining } from '../lib/mpApi'
 import { getAccount } from '../lib/mpSession'
+import { initModalState } from '../lib/mpSync/publishCityPicker'
+import { allCitiesFlat } from '../lib/mpSync/chinaRegion'
+
+const LECTURER_PLATFORMS = ['抖音', '小红书', '大众点评', '快手', '微信视频号']
+
+function splitPlatforms(raw: string) {
+  return String(raw || '')
+    .split(/[、,，/]/)
+    .map((s) => s.trim())
+    .filter((s) => LECTURER_PLATFORMS.includes(s))
+}
+
+function parseLecturerCities(raw: string) {
+  const text = String(raw || '').trim()
+  if (!text) return { national: false, cities: [] as string[] }
+  if (text === '全国' || text === '不限') return { national: true, cities: [] as string[] }
+  const all = allCitiesFlat()
+  const matched: string[] = []
+  for (const part of text.split(/[、,，/\s]+/).map((s) => s.trim()).filter(Boolean)) {
+    const hit = all.find((c) => c === part || c.replace(/市$/, '') === part.replace(/市$/, '') || c.includes(part))
+    if (hit && !matched.includes(hit)) matched.push(hit)
+  }
+  return { national: false, cities: matched }
+}
+
+function lecturerCityText(national: boolean, cities: string[]) {
+  if (national) return '全国'
+  return cities.length ? cities.join('、') : ''
+}
 
 const ADVANCED = new Set(['pro', 'flagship', 'enterprise'])
 const DEPOSIT = 500
@@ -47,6 +76,7 @@ type Lecturer = {
   skills?: string
   years?: string
   intro?: string
+  avatar?: string
   idFront?: string
   idBack?: string
   licenseImage?: string
@@ -95,6 +125,14 @@ export default function TrainingPage() {
   const [skills, setSkills] = useState('')
   const [years, setYears] = useState('')
   const [intro, setIntro] = useState('')
+  const [avatar, setAvatar] = useState('')
+  const [cityNational, setCityNational] = useState(false)
+  const [selectedCities, setSelectedCities] = useState<string[]>([])
+  const [cityKeyword, setCityKeyword] = useState('')
+  const [cityProvince, setCityProvince] = useState('')
+  const [cityOpen, setCityOpen] = useState(false)
+  const [platformMode, setPlatformMode] = useState<'single' | 'multi'>('multi')
+  const [platformPicks, setPlatformPicks] = useState<string[]>([])
   const [poster, setPoster] = useState('')
   const [idFront, setIdFront] = useState('')
   const [idBack, setIdBack] = useState('')
@@ -127,7 +165,14 @@ export default function TrainingPage() {
     setBank(profile.bank || '')
     setBankNo(profile.bankNo || '')
     setCity(profile.city || '')
+    const parsedCities = parseLecturerCities(profile.city || '')
+    setCityNational(parsedCities.national)
+    setSelectedCities(parsedCities.cities)
     setPlatforms(profile.platforms || '')
+    const picked = splitPlatforms(profile.platforms || '')
+    setPlatformPicks(picked)
+    setPlatformMode(picked.length > 1 ? 'multi' : 'single')
+    setAvatar(profile.avatar || '')
     setSkills(profile.skills || '')
     setYears(profile.years || '')
     setIntro(profile.intro || '')
@@ -143,6 +188,11 @@ export default function TrainingPage() {
 
   const shown = courses.filter((c) => mode === 'all' || c.mode === mode)
   const payoutReady = lecturerStatus === 'approved' && !!bankNo.trim()
+  const cityUi = useMemo(
+    () => initModalState(cityKeyword, cityProvince, selectedCities),
+    [cityKeyword, cityProvince, selectedCities],
+  )
+  const cityLabel = lecturerCityText(cityNational, selectedCities) || '请选择城市'
 
   function openCreate() {
     if (!payoutReady) {
@@ -433,8 +483,9 @@ export default function TrainingPage() {
                   setErr(`请确认缴纳保证金 ¥${DEPOSIT}`)
                   return
                 }
-                if (!city.trim() || !intro.trim()) {
-                  setErr('请填写常驻城市和讲师介绍')
+                const cityValue = lecturerCityText(cityNational, selectedCities)
+                if (!cityValue || !intro.trim()) {
+                  setErr('请选择常驻城市并填写讲师介绍')
                   return
                 }
                 setSaving(true)
@@ -442,8 +493,9 @@ export default function TrainingPage() {
                 postTraining({
                   action: 'applyLecturer',
                   hostId: me.accountId,
-                  city: city.trim(),
-                  platforms: platforms.trim(),
+                  city: cityValue,
+                  platforms: platformPicks.join('、'),
+                  avatar,
                   skills: skills.trim(),
                   years: years.trim(),
                   intro: intro.trim(),
@@ -616,21 +668,61 @@ export default function TrainingPage() {
 
               {panel === 'apply' ? (
               <section>
+                <h3 className="text-sm font-semibold text-slate-900">头像或照片</h3>
+                <p className="mt-1 text-xs text-slate-500">用一张能看出是你的近照。</p>
+                <label className="relative mt-3 flex h-28 w-28 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-dashed border-violet-200 bg-violet-50/50">
+                  {avatar ? <img src={avatar} alt="" className="absolute inset-0 h-full w-full object-cover" /> : <span className="text-sm text-violet-700">上传</span>}
+                  <input className="sr-only" type="file" accept="image/*" onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    compressImageFile(file).then(setAvatar).catch((ex) => setErr(ex instanceof Error ? ex.message : '照片处理失败'))
+                  }} />
+                </label>
+              </section>
+              ) : null}
+
+              {panel === 'apply' ? (
+              <section>
                 <h3 className="text-sm font-semibold text-slate-900">讲师介绍</h3>
                 <p className="mt-1 text-xs text-slate-500">写给本地生活达人：常驻城市、出镜平台、带过的到店内容。</p>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <label className="block text-xs font-medium text-slate-500">
+                  <div className="block text-xs font-medium text-slate-500">
                     常驻城市
-                    <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" placeholder="如：宁波" value={city} onChange={(e) => setCity(e.target.value)} />
-                  </label>
+                    <button type="button" className={`mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-left text-sm ${cityLabel === '请选择城市' ? 'text-slate-400' : 'text-slate-900'}`} onClick={() => setCityOpen(true)}>
+                      {cityLabel}
+                    </button>
+                  </div>
                   <label className="block text-xs font-medium text-slate-500">
                     本地生活经验
                     <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" placeholder="如：3 年" value={years} onChange={(e) => setYears(e.target.value)} />
                   </label>
-                  <label className="block text-xs font-medium text-slate-500">
+                  <div className="text-xs font-medium text-slate-500 sm:col-span-2">
                     出镜平台
-                    <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" placeholder="抖音 / 小红书 / 视频号" value={platforms} onChange={(e) => setPlatforms(e.target.value)} />
-                  </label>
+                    <div className="mt-1 grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
+                      <button type="button" className={`rounded-xl py-2 text-sm ${platformMode === 'single' ? 'bg-white font-semibold text-violet-700 shadow-sm' : 'text-slate-500'}`} onClick={() => { setPlatformMode('single'); setPlatformPicks((prev) => prev.slice(0, 1)) }}>单选</button>
+                      <button type="button" className={`rounded-xl py-2 text-sm ${platformMode === 'multi' ? 'bg-white font-semibold text-violet-700 shadow-sm' : 'text-slate-500'}`} onClick={() => setPlatformMode('multi')}>多选</button>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {LECTURER_PLATFORMS.map((name) => {
+                        const on = platformPicks.includes(name)
+                        return (
+                          <button
+                            key={name}
+                            type="button"
+                            className={`rounded-full px-3 py-1.5 text-sm ${on ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-600'}`}
+                            onClick={() => {
+                              setPlatformPicks((prev) => {
+                                if (platformMode === 'single') return prev.length === 1 && prev[0] === name ? [] : [name]
+                                return prev.includes(name) ? prev.filter((x) => x !== name) : prev.concat(name)
+                              })
+                            }}
+                          >
+                            {name}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
                   <label className="block text-xs font-medium text-slate-500">
                     擅长内容
                     <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" placeholder="探店、团购带货、到店直播" value={skills} onChange={(e) => setSkills(e.target.value)} />
@@ -669,6 +761,52 @@ export default function TrainingPage() {
               </button>
             </div>
           </form>
+        </div>
+      ) : null}
+      {cityOpen ? (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-950/50 sm:items-center sm:p-6" onClick={() => setCityOpen(false)}>
+          <div className="flex max-h-[86vh] w-full max-w-lg flex-col rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-900">选择城市</h3>
+              <button type="button" className="text-xl text-slate-400" onClick={() => setCityOpen(false)} aria-label="关闭">×</button>
+            </div>
+            <p className="mt-1 text-xs text-slate-500">可多选城市；选「全国」则不限地域</p>
+            <button type="button" className={`mt-3 w-full rounded-xl py-2 text-sm font-semibold ${cityNational ? 'bg-violet-600 text-white' : 'bg-violet-50 text-violet-700'}`} onClick={() => { setCityNational(true); setSelectedCities([]); setCity('全国') }}>全国</button>
+            <input className="mt-3 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-violet-400" placeholder="搜索省、市" value={cityKeyword} onChange={(e) => setCityKeyword(e.target.value)} />
+            <div className="mt-3 grid h-64 grid-cols-2 overflow-hidden rounded-2xl bg-slate-50">
+              <div className="overflow-auto">
+                {cityUi.provinceRows.map((p) => (
+                  <button key={p.name} type="button" className={`block w-full px-3 py-2.5 text-left text-sm ${p.active ? 'bg-white font-semibold text-violet-700' : 'text-slate-600'}`} onClick={() => setCityProvince(p.name)}>{p.name}</button>
+                ))}
+              </div>
+              <div className="overflow-auto bg-white">
+                {cityUi.cityCheckGrid.map((c) => (
+                  <button key={c.name} type="button" className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm" onClick={() => {
+                    const next = selectedCities.includes(c.name) ? selectedCities.filter((x) => x !== c.name) : selectedCities.concat(c.name)
+                    setCityNational(false)
+                    setSelectedCities(next)
+                    setCity(next.join('、'))
+                  }}>
+                    <span className={`flex h-4 w-4 items-center justify-center rounded border text-[10px] text-white ${c.on ? 'border-violet-600 bg-violet-600' : 'border-slate-300'}`}>{c.on ? '✓' : ''}</span>
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {selectedCities.length ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {selectedCities.map((name) => (
+                  <button key={name} type="button" className="rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700" onClick={() => {
+                    const next = selectedCities.filter((x) => x !== name)
+                    setSelectedCities(next)
+                    setCity(next.join('、'))
+                    setCityNational(false)
+                  }}>{name} ×</button>
+                ))}
+              </div>
+            ) : null}
+            <button type="button" className="mt-4 rounded-xl bg-violet-600 py-2.5 text-sm font-semibold text-white" onClick={() => setCityOpen(false)}>确认</button>
+          </div>
         </div>
       ) : null}
     </div>

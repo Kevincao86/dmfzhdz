@@ -14,12 +14,26 @@
       <text class="la-note" wx:else>可以修改介绍后重新提交。</text>
     </view>
     <view class="la-card">
+      <text class="la-sec">头像或照片</text>
+      <text class="la-sec__hint">用一张能看出是你的近照，审核时会一起看。</text>
+      <view class="la-avatar" bindtap="onPickAvatar">
+        <image wx:if="{{avatar}}" class="la-avatar__img" src="{{avatar}}" mode="aspectFill" />
+        <text wx:else class="la-avatar__tip">上传</text>
+      </view>
+    </view>
+    <view class="la-card">
       <text class="la-sec">讲师介绍</text>
       <text class="la-sec__hint">写给本地生活达人：你在哪座城市、出镜什么平台、带过哪些到店内容。</text>
       <text class="la-label">常驻城市</text>
-      <input class="la-input" value="{{city}}" bindinput="onCity" disabled="{{lecturerStatus === 'approved'}}" placeholder="如：宁波" />
+      <view class="la-pick {{city ? '' : 'la-pick--ph'}}" bindtap="openCity">{{cityDisplay}}</view>
       <text class="la-label">出镜平台</text>
-      <input class="la-input" value="{{platforms}}" bindinput="onPlatforms" disabled="{{lecturerStatus === 'approved'}}" placeholder="抖音 / 小红书 / 视频号" />
+      <view class="la-seg">
+        <view class="la-seg__item {{platformMode === 'single' ? 'la-seg__item--on' : ''}}" data-id="single" bindtap="onPlatformMode">单选</view>
+        <view class="la-seg__item {{platformMode === 'multi' ? 'la-seg__item--on' : ''}}" data-id="multi" bindtap="onPlatformMode">多选</view>
+      </view>
+      <view class="la-plats">
+        <view wx:for="{{platformRows}}" wx:key="name" class="la-plat {{item.on ? 'la-plat--on' : ''}}" data-name="{{item.name}}" bindtap="onPlatformTap">{{item.name}}</view>
+      </view>
       <text class="la-label">擅长内容</text>
       <input class="la-input" value="{{skills}}" bindinput="onSkills" disabled="{{lecturerStatus === 'approved'}}" placeholder="探店、团购带货、到店直播、门店短视频" />
       <text class="la-label">本地生活经验</text>
@@ -29,6 +43,36 @@
     </view>
     <view class="la-bar" wx:if="{{lecturerStatus !== 'approved'}}">
       <view class="la-btn" bindtap="onApply">{{lecturerStatus === 'rejected' ? '重新提交' : lecturerStatus === 'pending' ? '更新申请' : '提交申请'}}</view>
+    </view>
+    <view wx:if="{{cityModalOpen}}" class="la-city">
+      <view class="la-city__mask" bindtap="closeCity"></view>
+      <view class="la-city__panel">
+        <view class="la-city__head">
+          <text class="la-sec">选择城市</text>
+          <text class="la-city__x" bindtap="closeCity">×</text>
+        </view>
+        <text class="la-note">可多选城市；选「全国」则不限地域</text>
+        <view class="la-city__national {{cityNational ? 'la-city__national--on' : ''}}" bindtap="onCityNational">全国</view>
+        <input class="la-input" placeholder="搜索省、市" value="{{cityKeyword}}" bindinput="onCityKeyword" />
+        <view class="la-city__dual">
+          <scroll-view class="la-city__prov" scroll-y>
+            <view wx:for="{{cityProvinceRows}}" wx:key="name" class="la-city__prov-item {{item.active ? 'la-city__prov-item--on' : ''}}" data-name="{{item.name}}" bindtap="onCityProvinceTap">{{item.name}}</view>
+          </scroll-view>
+          <scroll-view class="la-city__list" scroll-y>
+            <view wx:for="{{cityCheckGrid}}" wx:key="name" class="la-city__row" data-name="{{item.name}}" bindtap="onCityCheckTap">
+              <text class="la-city__box {{item.on ? 'la-city__box--on' : ''}}">{{item.on ? '✓' : ''}}</text>
+              <text>{{item.name}}</text>
+            </view>
+          </scroll-view>
+        </view>
+        <view class="la-plats" wx:if="{{citySelectedChips.length}}">
+          <view wx:for="{{citySelectedChips}}" wx:key="name" class="la-plat la-plat--on">
+            {{item.name}}
+            <text data-name="{{item.name}}" catchtap="onRemoveCityChip"> ×</text>
+          </view>
+        </view>
+        <view class="la-btn" bindtap="closeCity">确认</view>
+      </view>
     </view>
   </block>
 

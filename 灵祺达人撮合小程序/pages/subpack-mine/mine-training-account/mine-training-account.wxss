@@ -187,3 +187,57 @@
   font-size: 30rpx;
   font-weight: 700;
 }
+
+.la-avatar {
+  width: 160rpx;
+  height: 160rpx;
+  margin-top: 20rpx;
+  border-radius: 80rpx;
+  overflow: hidden;
+  background: #f4f0ff;
+  border: 2rpx dashed #d9d0ee;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.la-avatar__img { width: 160rpx; height: 160rpx; }
+.la-avatar__tip { font-size: 26rpx; color: #5b2dcc; font-weight: 600; }
+.la-pick {
+  height: 88rpx;
+  margin-top: 10rpx;
+  padding: 0 24rpx;
+  border-radius: 16rpx;
+  background: #f7f6fb;
+  line-height: 88rpx;
+  font-size: 28rpx;
+  color: #1f1a2e;
+}
+.la-pick--ph { color: #9a94a8; }
+.la-plats { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 16rpx; }
+.la-plat { padding: 0 22rpx; height: 64rpx; line-height: 64rpx; border-radius: 999rpx; background: #f4f2fa; color: #3d3650; font-size: 24rpx; }
+.la-plat--on { background: #efe9ff; color: #5b2dcc; font-weight: 600; }
+.la-city { position: fixed; left: 0; right: 0; top: 0; bottom: 0; z-index: 30; }
+.la-city__mask { position: absolute; left: 0; right: 0; top: 0; bottom: 0; background: rgba(15, 12, 28, 0.45); }
+.la-city__panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 82vh;
+  padding: 28rpx 24rpx calc(24rpx + env(safe-area-inset-bottom));
+  border-radius: 28rpx 28rpx 0 0;
+  background: #fff;
+  box-sizing: border-box;
+}
+.la-city__head { display: flex; align-items: center; justify-content: space-between; }
+.la-city__x { font-size: 40rpx; color: #8b8499; padding: 0 8rpx; }
+.la-city__national { margin-top: 16rpx; height: 72rpx; line-height: 72rpx; text-align: center; border-radius: 16rpx; background: #f4f0ff; color: #5b2dcc; font-weight: 600; }
+.la-city__national--on { background: #5b2dcc; color: #fff; }
+.la-city__dual { display: flex; height: 420rpx; margin-top: 16rpx; border-radius: 16rpx; overflow: hidden; background: #f7f6fb; }
+.la-city__prov { width: 240rpx; height: 420rpx; }
+.la-city__list { flex: 1; height: 420rpx; background: #fff; }
+.la-city__prov-item { padding: 22rpx 20rpx; font-size: 26rpx; color: #3d3650; }
+.la-city__prov-item--on { background: #fff; color: #5b2dcc; font-weight: 700; }
+.la-city__row { display: flex; align-items: center; gap: 12rpx; padding: 22rpx 20rpx; font-size: 26rpx; color: #1f1a2e; }
+.la-city__box { width: 32rpx; height: 32rpx; line-height: 32rpx; text-align: center; border-radius: 8rpx; border: 1rpx solid #d9d0ee; font-size: 20rpx; color: #fff; }
+.la-city__box--on { background: #5b2dcc; border-color: #5b2dcc; }
