@@ -16,7 +16,7 @@
       <text>保证金 ¥{{yuan}}</text>
       <text class="{{paid ? 'tp-ok' : 'tp-wait'}}">{{paid ? '已缴纳' : '未缴纳'}}</text>
     </view>
-    <text class="tp-hint">先开通高级会员，再微信支付保证金。讲师审核通过并完成收款认证后才能发布。</text>
+    <text class="tp-hint">保证金到我的钱包缴纳。讲师审核通过并完成收款认证后才能发布。</text>
   </view>
 
   <block wx:if="{{view === 'list' && !depositOnly}}">
@@ -80,7 +80,7 @@
 
   <view class="tp-bar {{!advanced && !paid ? 'tp-bar--stack' : ''}}" wx:if="{{depositOnly || !advanced || !paid}}">
     <view class="tp-btn tp-btn--line" wx:if="{{!advanced}}" bindtap="onOpenMember">去开通会员</view>
-    <view class="tp-btn" wx:if="{{!paid}}" bindtap="onPayDeposit">微信支付保证金 ¥{{yuan}}</view>
+    <view class="tp-btn" wx:if="{{!paid}}" bindtap="onOpenWallet">去钱包缴纳保证金</view>
   </view>
   <view class="tp-bar" wx:elif="{{view === 'list'}}">
     <view class="tp-btn" bindtap="onCreate">新增培训</view>

@@ -246,26 +246,8 @@ Page({
   onOpenMember() {
     wx.navigateTo({ url: '/pages/subpack-mine/mine-xingxuan-membership/mine-xingxuan-membership' })
   },
-  async onPayDeposit() {
-    if (this._paying) return
-    this._paying = true
-    wx.showLoading({ title: '拉起微信支付', mask: true })
-    try {
-      const pre = await training.prepay({ purpose: 'deposit' })
-      const payApi = require('../../../utils/mpMembershipApi.js')
-      await payApi.requestWxPayment(pre.jsapiParams)
-      const q = await training.payQuery(pre.outTradeNo)
-      wx.hideLoading()
-      if (!q.paid) throw new Error('支付结果确认中，请稍后下拉刷新')
-      this.setData({ depositPaid: true })
-      wx.showToast({ title: '保证金已支付', icon: 'success' })
-    } catch (e) {
-      wx.hideLoading()
-      const msg = String((e && e.message) || '支付未完成')
-      if (!/cancel|取消/i.test(msg)) wx.showToast({ title: msg.slice(0, 18), icon: 'none' })
-    } finally {
-      this._paying = false
-    }
+  onOpenWallet() {
+    wx.navigateTo({ url: '/pages/subpack-mine/mine-wallet/mine-wallet' })
   },
   async onApply() {
     if (!training.isAdvancedMember()) {
@@ -280,8 +262,8 @@ Page({
       return
     }
     if (!this.data.depositPaid) {
-      wx.showToast({ title: '请先缴纳保证金', icon: 'none' })
-      await this.onPayDeposit()
+      wx.showToast({ title: '请到钱包缴纳保证金', icon: 'none' })
+      this.onOpenWallet()
       return
     }
     try {

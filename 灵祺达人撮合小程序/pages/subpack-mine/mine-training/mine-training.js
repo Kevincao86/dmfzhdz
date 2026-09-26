@@ -78,7 +78,7 @@ Page({
           if (reason.indexOf('会员') >= 0) {
             wx.navigateTo({ url: '/pages/subpack-mine/mine-xingxuan-membership/mine-xingxuan-membership' })
           } else if (reason.indexOf('保证金') >= 0) {
-            wx.navigateTo({ url: '/pages/subpack-mine/mine-training-post/mine-training-post?deposit=1' })
+            wx.navigateTo({ url: '/pages/subpack-mine/mine-wallet/mine-wallet' })
           } else if (reason.indexOf('审核中') >= 0) {
             return
           } else if (reason.indexOf('讲师') >= 0) {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { fetchTraining, postTraining } from '../lib/mpApi'
 import { getAccount } from '../lib/mpSession'
 import { initModalState } from '../lib/mpSync/publishCityPicker'
@@ -101,6 +101,7 @@ type Course = {
 
 export default function TrainingPage() {
   const me = getAccount()
+  const navigate = useNavigate()
   const [courses, setCourses] = useState<Course[]>([])
   const [mine, setMine] = useState<Course[]>([])
   const [mode, setMode] = useState<'all' | 'online' | 'offline'>('all')
@@ -251,10 +252,8 @@ export default function TrainingPage() {
       return
     }
     if (!depositPaid) {
-      setErr('请先扫码缴纳保证金')
-      setPayQr('')
-      setPayTrade('')
-      setPayOpen({ purpose: 'deposit', courseId: '', name: '', title: '培训保证金' })
+      setErr('请先到我的钱包缴纳保证金')
+      navigate('/profile/wallet')
       return
     }
     setEditingId('')
@@ -539,10 +538,8 @@ export default function TrainingPage() {
                   return
                 }
                 if (!depositPaid) {
-                  setErr(`请先扫码缴纳保证金 ¥${DEPOSIT}`)
-                  setPayQr('')
-                  setPayTrade('')
-                  setPayOpen({ purpose: 'deposit', courseId: '', name: '', title: '培训保证金' })
+                  setPanel('')
+                  navigate('/profile/wallet')
                   return
                 }
                 const cityValue = lecturerCityText(cityNational, selectedCities)
@@ -618,7 +615,7 @@ export default function TrainingPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h3 className="text-sm font-semibold text-slate-900">申请条件</h3>
-                    <p className="mt-1 text-xs leading-relaxed text-slate-500">需高级会员，并用微信、支付宝或抖音扫码缴纳保证金 ¥{DEPOSIT}。个人按月预扣个税，当月不超过 800 元不预扣。</p>
+                    <p className="mt-1 text-xs leading-relaxed text-slate-500">这里只填写讲师资料。保证金 ¥{DEPOSIT} 到我的钱包缴纳。个人按月预扣个税，当月不超过 800 元不预扣。</p>
                   </div>
                   <span className={`rounded-full px-3 py-1 text-xs font-semibold ${advanced ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>
                     高级会员{advanced ? '已开通' : '未开通'}
@@ -632,17 +629,9 @@ export default function TrainingPage() {
                 <div className="mt-3 flex items-center justify-between gap-3 text-sm text-slate-700">
                   <span>{depositPaid ? `保证金 ¥${DEPOSIT} 已缴纳` : `保证金 ¥${DEPOSIT} 未缴纳`}</span>
                   {depositPaid ? null : (
-                    <button
-                      type="button"
-                      className="rounded-xl bg-violet-600 px-3 py-2 text-sm font-semibold text-white"
-                      onClick={() => {
-                        setPayQr('')
-                        setPayTrade('')
-                        setPayOpen({ purpose: 'deposit', courseId: '', name: '', title: '培训保证金' })
-                      }}
-                    >
-                      扫码缴纳
-                    </button>
+                    <Link to="/profile/wallet" className="rounded-xl bg-violet-600 px-3 py-2 text-sm font-semibold text-white" onClick={() => setPanel('')}>
+                      去钱包缴纳
+                    </Link>
                   )}
                 </div>
               </section>

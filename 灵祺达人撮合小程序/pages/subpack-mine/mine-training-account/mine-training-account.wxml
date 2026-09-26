@@ -11,14 +11,14 @@
       <view class="la-cond__head">
         <view>
           <text class="la-sec">申请条件</text>
-          <text class="la-note">需高级会员，并缴纳保证金 ¥{{yuan}}。个人按月预扣个税，当月不超过 800 元不预扣。</text>
+          <text class="la-note">这里只填写讲师资料。保证金 ¥{{yuan}} 到我的钱包缴纳。</text>
         </view>
         <text class="la-badge {{advanced ? 'la-badge--ok' : 'la-badge--wait'}}">高级会员{{advanced ? '已开通' : '未开通'}}</text>
       </view>
       <text wx:if="{{!advanced}}" class="la-link" bindtap="onOpenMember">去开通会员</text>
       <view class="la-cond__row">
         <text>{{depositPaid ? '保证金 ¥' + yuan + ' 已缴纳' : '保证金 ¥' + yuan + ' 未缴纳'}}</text>
-        <text wx:if="{{!depositPaid}}" class="la-pay" bindtap="onPayDeposit">微信支付</text>
+        <text wx:if="{{!depositPaid}}" class="la-pay" bindtap="onOpenWallet">去钱包缴纳</text>
       </view>
     </view>
     <view class="la-card" wx:if="{{lecturerStatus !== 'none'}}">
