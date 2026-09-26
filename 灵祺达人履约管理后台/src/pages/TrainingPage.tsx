@@ -211,7 +211,13 @@ export default function TrainingPage() {
   }, [payTrade])
 
   const shown = courses.filter((c) => mode === 'all' || c.mode === mode)
-  const payoutReady = lecturerStatus === 'approved' && !!bankNo.trim()
+  const payoutReady = lecturerStatus === 'approved' && !!name.trim() && !!bankNo.trim()
+  function publishGate() {
+    if (lecturerStatus !== 'approved') return '请先申请讲师并通过审核'
+    if (!name.trim() || !bankNo.trim()) return '讲师已通过。请先完成收款认证，再发布培训'
+    if (!depositPaid) return '请先到我的钱包缴纳保证金'
+    return ''
+  }
   const cityUi = useMemo(
     () => initModalState(cityKeyword, cityProvince, selectedCities),
     [cityKeyword, cityProvince, selectedCities],
@@ -247,13 +253,12 @@ export default function TrainingPage() {
   }
 
   function openCreate() {
-    if (!payoutReady) {
-      setErr('先申请讲师，审核通过并完成收款认证后才能发布')
-      return
-    }
-    if (!depositPaid) {
-      setErr('请先到我的钱包缴纳保证金')
-      navigate('/profile/wallet')
+    const reason = publishGate()
+    if (reason) {
+      setErr(reason)
+      if (lecturerStatus !== 'approved') setPanel('apply')
+      else if (!name.trim() || !bankNo.trim()) setPanel('payout')
+      else navigate('/profile/wallet')
       return
     }
     setEditingId('')
@@ -382,7 +387,7 @@ export default function TrainingPage() {
             新增培训
           </button>
         </div>
-        {!payoutReady ? <p className="mt-3 text-xs text-slate-500">先申请讲师，审核通过并完成收款认证后才能发布。</p> : null}
+        {publishGate() ? <p className="mt-3 text-xs text-slate-500">{publishGate()}</p> : null}
         <div className="mt-4 space-y-3">
           {mine.map((c) => (
             <article key={c.id} className="flex gap-3 rounded-2xl bg-slate-50 p-3">
@@ -420,8 +425,9 @@ export default function TrainingPage() {
             onClick={(e) => e.stopPropagation()}
             onSubmit={(e) => {
               e.preventDefault()
-              if (!payoutReady) {
-                setErr('先申请讲师，审核通过并完成收款认证后才能发布')
+              const reason = publishGate()
+              if (reason) {
+                setErr(reason)
                 return
               }
               if (!title.trim()) {
