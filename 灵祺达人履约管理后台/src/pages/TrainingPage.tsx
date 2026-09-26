@@ -573,7 +573,7 @@ export default function TrainingPage() {
             <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
               <section>
                 <h3 className="text-sm font-semibold text-slate-900">宣传海报</h3>
-                <p className="mt-1 text-xs leading-relaxed text-slate-500">小程序和星选用同一张海报，裁切框不一样。建议按 16:9 出图（1500×840），课程名放正中。小程序首页广告栏更扁，大约 3:1；详情头图接近 16:9；两边「我发布的」是竖图，会裁掉左右。</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">小程序和星选用同一张海报。建议按 16:9 出图（1500×840），课程名放正中。星选首页按 16:9 完整显示；小程序首页广告栏更扁，大约 3:1；详情头图接近 16:9；两边「我发布的」是竖图，会裁掉左右。</p>
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   <figure className="rounded-xl border border-slate-200 bg-slate-50 p-2">
                     <div className="rounded-lg bg-white p-1.5 shadow-sm">
@@ -605,7 +605,7 @@ export default function TrainingPage() {
                         </div>
                       </div>
                     </div>
-                    <figcaption className="mt-1.5 text-[11px] leading-snug text-slate-600">星选首页同样是横幅。我发布的列表是左侧竖向小图。</figcaption>
+                    <figcaption className="mt-1.5 text-[11px] leading-snug text-slate-600">星选首页按 16:9 完整显示这张海报。我发布的列表是左侧竖向小图。</figcaption>
                   </figure>
                 </div>
                 <label className="relative mt-3 flex h-40 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border border-dashed border-violet-200 bg-violet-50/50">
