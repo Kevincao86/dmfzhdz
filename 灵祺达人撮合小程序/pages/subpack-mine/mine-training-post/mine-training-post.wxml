@@ -41,7 +41,7 @@
   <block wx:if="{{view === 'form' && advanced && paid}}">
     <view class="tp-card">
       <text class="tp-sec">宣传海报</text>
-      <text class="tp-hint">建议横图 1500×840（16:9），课程名放中间。审核通过后出现在首页广告栏、培训列表和详情头图。</text>
+      <text class="tp-hint">和星选同一张图，裁切框不一样。建议 1500×840（16:9），课程名放中间。首页广告栏更扁，详情接近 16:9，我发布的是竖图。</text>
       <view class="tp-poster" bindtap="onPoster">
         <image wx:if="{{poster}}" class="tp-poster__img" src="{{poster}}" mode="aspectFill" />
         <block wx:else>

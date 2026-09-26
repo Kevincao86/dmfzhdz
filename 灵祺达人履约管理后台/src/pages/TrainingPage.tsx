@@ -452,7 +452,7 @@ export default function TrainingPage() {
             <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
               <section>
                 <h3 className="text-sm font-semibold text-slate-900">宣传海报</h3>
-                <p className="mt-1 text-xs leading-relaxed text-slate-500">建议横图 1500×840 像素（16:9）。课程名放在画面正中。审核通过后才会出现在下面这些位置，都会从中间裁切。</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">小程序和星选用同一张海报，裁切框不一样。建议按 16:9 出图（1500×840），课程名放正中。小程序首页广告栏更扁，大约 3:1；详情头图接近 16:9；两边「我发布的」是竖图，会裁掉左右。</p>
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   <figure className="rounded-xl border border-slate-200 bg-slate-50 p-2">
                     <div className="rounded-lg bg-white p-1.5 shadow-sm">

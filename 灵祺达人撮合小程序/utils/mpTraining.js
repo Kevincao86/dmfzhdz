@@ -12,7 +12,7 @@ const DEPOSIT_YUAN = 500
 
 function accountId() {
   const acct = auth.readAccount() || {}
-  return String(acct.id || acct.userId || acct.lingqiPrId || acct.phone || 'local')
+  return String(acct.accountId || acct.id || acct.userId || acct.phone || acct.loginName || 'local')
 }
 
 function readDepositMap() {
