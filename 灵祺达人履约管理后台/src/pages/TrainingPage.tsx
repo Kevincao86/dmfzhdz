@@ -452,6 +452,41 @@ export default function TrainingPage() {
             <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
               <section>
                 <h3 className="text-sm font-semibold text-slate-900">宣传海报</h3>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">建议横图 1500×840 像素（16:9）。课程名放在画面正中。审核通过后才会出现在下面这些位置，都会从中间裁切。</p>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  <figure className="rounded-xl border border-slate-200 bg-slate-50 p-2">
+                    <div className="rounded-lg bg-white p-1.5 shadow-sm">
+                      <div className="h-1.5 w-8 rounded bg-slate-200" />
+                      <div className="mt-1 h-2 rounded bg-slate-100" />
+                      <div className="relative mt-1 h-7 overflow-hidden rounded bg-violet-200">
+                        <span className="absolute inset-x-1 bottom-0.5 text-[8px] font-semibold text-violet-900">课程名</span>
+                      </div>
+                      <div className="mt-1 h-6 rounded bg-slate-100" />
+                    </div>
+                    <figcaption className="mt-1.5 text-[11px] leading-snug text-slate-600">小程序首页，搜索框下的广告栏。扁横幅，底部压课程名。</figcaption>
+                  </figure>
+                  <figure className="rounded-xl border border-slate-200 bg-slate-50 p-2">
+                    <div className="rounded-lg bg-white p-1.5 shadow-sm">
+                      <div className="h-10 rounded bg-violet-200" />
+                      <div className="mt-1 h-1.5 w-12 rounded bg-slate-200" />
+                      <div className="mt-1 h-1.5 w-8 rounded bg-slate-100" />
+                    </div>
+                    <figcaption className="mt-1.5 text-[11px] leading-snug text-slate-600">小程序培训列表封面，点进详情后是更高的头图。</figcaption>
+                  </figure>
+                  <figure className="rounded-xl border border-slate-200 bg-slate-50 p-2">
+                    <div className="rounded-lg bg-white p-1.5 shadow-sm">
+                      <div className="h-6 rounded bg-violet-200" />
+                      <div className="mt-1.5 flex gap-1">
+                        <div className="h-8 w-5 shrink-0 rounded bg-violet-300" />
+                        <div className="min-w-0 flex-1">
+                          <div className="h-1.5 w-full rounded bg-slate-200" />
+                          <div className="mt-1 h-1.5 w-8 rounded bg-slate-100" />
+                        </div>
+                      </div>
+                    </div>
+                    <figcaption className="mt-1.5 text-[11px] leading-snug text-slate-600">星选首页同样是横幅。我发布的列表是左侧竖向小图。</figcaption>
+                  </figure>
+                </div>
                 <label className="relative mt-3 flex h-40 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border border-dashed border-violet-200 bg-violet-50/50">
                   {poster ? <img src={poster} alt="" className="absolute inset-0 h-full w-full object-cover" /> : null}
                   <span className={`relative text-sm font-medium ${poster ? 'rounded-full bg-slate-900/70 px-3 py-1 text-white' : 'text-slate-700'}`}>{poster ? '更换海报' : '上传海报'}</span>

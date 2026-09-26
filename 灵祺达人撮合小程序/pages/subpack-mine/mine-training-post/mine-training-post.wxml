@@ -41,7 +41,7 @@
   <block wx:if="{{view === 'form' && advanced && paid}}">
     <view class="tp-card">
       <text class="tp-sec">宣传海报</text>
-      <text class="tp-hint">竖图更适合首页广告栏。上传后请看清画面。</text>
+      <text class="tp-hint">建议横图 1500×840（16:9），课程名放中间。审核通过后出现在首页广告栏、培训列表和详情头图。</text>
       <view class="tp-poster" bindtap="onPoster">
         <image wx:if="{{poster}}" class="tp-poster__img" src="{{poster}}" mode="aspectFill" />
         <block wx:else>
