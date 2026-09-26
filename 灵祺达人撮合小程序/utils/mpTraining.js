@@ -89,13 +89,13 @@ function publishBlockReason() {
     return '请先选择达人或 PR 身份'
   }
   if (!isAdvancedMember()) return '发布培训需开通高级会员（专业版及以上）'
-  if (!depositPaid()) return '发布培训需缴纳保证金'
   const profile = readProfile()
   const state = lecturerState(profile)
   if (state === 'none') return '请先申请讲师'
   if (state === 'pending') return '讲师申请审核中，通过后才能发布'
   if (state === 'rejected') return '讲师申请未通过，请修改后重新提交'
   if (!profile.bankNo || !profile.name) return '请先完成收款认证'
+  if (!depositPaid()) return '发布培训需缴纳保证金'
   return ''
 }
 

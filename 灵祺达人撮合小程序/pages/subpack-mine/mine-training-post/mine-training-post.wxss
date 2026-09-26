@@ -88,3 +88,6 @@
 }
 .tp-btn { flex: 1; height: 92rpx; line-height: 92rpx; text-align: center; border-radius: 20rpx; background: #5b2dcc; color: #fff; font-size: 30rpx; font-weight: 600; }
 .tp-btn--ghost { flex: 0 0 180rpx; background: #fff; color: #3d3650; border: 1rpx solid #e4dff0; }
+.tp-btn--line { background: #fff; color: #5b2dcc; border: 1rpx solid #d9d0ee; }
+.tp-bar--stack { flex-direction: column; }
+.tp-bar--stack .tp-btn { flex: none; width: 100%; }

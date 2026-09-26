@@ -40,6 +40,15 @@
   background: #fff;
 }
 
+.la-cond { background: #f7f6fb; }
+.la-cond__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16rpx; }
+.la-badge { flex-shrink: 0; padding: 8rpx 16rpx; border-radius: 999rpx; font-size: 22rpx; font-weight: 600; }
+.la-badge--ok { background: #e8f7ef; color: #067647; }
+.la-badge--wait { background: #fff4e5; color: #b54708; }
+.la-link { display: block; margin-top: 16rpx; font-size: 28rpx; font-weight: 600; color: #5b2dcc; }
+.la-cond__row { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; margin-top: 20rpx; font-size: 28rpx; color: #1f1a2e; }
+.la-pay { flex-shrink: 0; padding: 0 24rpx; height: 64rpx; line-height: 64rpx; border-radius: 16rpx; background: #5b2dcc; color: #fff; font-size: 26rpx; font-weight: 600; }
+
 .la-sec {
   display: block;
   font-size: 30rpx;

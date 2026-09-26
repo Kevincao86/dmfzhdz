@@ -39,6 +39,6 @@
   </view>
   <view class="tr-post" bindtap="onPost">
     <text class="tr-post__main">发布培训</text>
-    <text class="tr-post__sub">高级会员并缴纳保证金后可发布</text>
+    <text class="tr-post__sub">先开通会员并缴纳保证金，再申请讲师</text>
   </view>
 </view>

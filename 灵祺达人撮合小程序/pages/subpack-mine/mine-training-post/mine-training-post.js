@@ -58,10 +58,6 @@ Page({
     wx.navigateTo({ url: '/pages/subpack-mine/mine-xingxuan-membership/mine-xingxuan-membership' })
   },
   async onPayDeposit() {
-    if (!training.isAdvancedMember()) {
-      this.onOpenMember()
-      return
-    }
     if (this._paying) return
     this._paying = true
     wx.showLoading({ title: '拉起微信支付', mask: true })
