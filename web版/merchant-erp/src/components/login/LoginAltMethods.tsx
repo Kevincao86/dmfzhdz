@@ -125,15 +125,17 @@ export default function LoginAltMethods({ methods, activeId, onSelect }: Props) 
             disabled={m.disabled}
             onClick={() => onSelect(m.id)}
             className={cn(
-              'inline-flex items-center justify-center gap-2 rounded-xl border bg-white px-3 py-2.5 text-sm font-medium text-slate-800 shadow-sm transition',
+              'grid w-full grid-cols-[2rem_minmax(0,1fr)] items-center gap-2 rounded-xl border bg-white px-3 py-2.5 text-sm font-medium text-slate-800 shadow-sm transition',
               activeId === m.id
                 ? 'border-cyan-400 ring-2 ring-cyan-500/20'
                 : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50',
               m.disabled && 'cursor-not-allowed opacity-55 hover:bg-white',
             )}
           >
-            <MethodIcon id={m.id} />
-            {m.label}
+            <span className="flex h-8 w-8 items-center justify-center">
+              <MethodIcon id={m.id} />
+            </span>
+            <span className="truncate text-center">{m.label}</span>
           </button>
         ))}
       </div>
