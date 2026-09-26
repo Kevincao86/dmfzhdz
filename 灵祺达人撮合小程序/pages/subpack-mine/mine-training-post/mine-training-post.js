@@ -26,8 +26,21 @@ function parseCity(raw) {
 }
 
 function parseWhen(raw) {
-  const m = String(raw || '').trim().match(/^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}))?/)
-  return { whenDate: m ? m[1] : '', whenTime: m && m[2] ? m[2] : '14:00' }
+  const text = String(raw || '').trim()
+  const range = text.match(/^(\d{4}-\d{2}-\d{2})\s*至\s*(\d{4}-\d{2}-\d{2})[，,\s]*每天\s*(\d{2}:\d{2})\s*[-–—至到]\s*(\d{2}:\d{2})/)
+  if (range) {
+    return { whenStartDate: range[1], whenEndDate: range[2], whenStartTime: range[3], whenEndTime: range[4] }
+  }
+  const one = text.match(/^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}))?/)
+  if (one) {
+    return { whenStartDate: one[1], whenEndDate: one[1], whenStartTime: one[2] || '14:00', whenEndTime: '16:00' }
+  }
+  return { whenStartDate: '', whenEndDate: '', whenStartTime: '14:00', whenEndTime: '16:00' }
+}
+
+function formatWhen(startDate, endDate, startTime, endTime) {
+  if (!startDate || !endDate || !startTime || !endTime) return ''
+  return `${startDate} 至 ${endDate}，每天 ${startTime}-${endTime}`
 }
 
 function blankForm() {
@@ -40,8 +53,10 @@ function blankForm() {
     selectedCities: [],
     cityDisplay: '',
     whenText: '',
-    whenDate: '',
-    whenTime: '14:00',
+    whenStartDate: '',
+    whenEndDate: '',
+    whenStartTime: '14:00',
+    whenEndTime: '16:00',
     seats: '20',
     fee: '',
     poster: '',
@@ -127,6 +142,7 @@ Page({
   onEdit(e) {
     const course = (this.data.mine || []).find((c) => c.id === e.currentTarget.dataset.id)
     if (!course) return
+    const when = parseWhen(course.whenText)
     this.setData({
       view: 'form',
       editingId: course.id,
@@ -135,8 +151,8 @@ Page({
       ...parseCity(course.city),
       city: course.city || '',
       cityDisplay: cityLabel(parseCity(course.city).cityNational, parseCity(course.city).selectedCities),
-      ...parseWhen(course.whenText),
-      whenText: course.whenText || '',
+      ...when,
+      whenText: formatWhen(when.whenStartDate, when.whenEndDate, when.whenStartTime, when.whenEndTime) || course.whenText || '',
       seats: String(course.seats || 20),
       fee: course.fee || '',
       poster: course.poster || '',
@@ -213,15 +229,30 @@ Page({
     this.syncCity()
     this.setData({ cityOpen: false })
   },
-  onWhenDate(e) {
-    const whenDate = e.detail.value
-    const whenTime = this.data.whenTime || '14:00'
-    this.setData({ whenDate, whenText: `${whenDate} ${whenTime}` })
+  syncWhen(patch) {
+    const next = Object.assign({}, this.data, patch)
+    next.whenText = formatWhen(next.whenStartDate, next.whenEndDate, next.whenStartTime, next.whenEndTime)
+    this.setData({
+      whenStartDate: next.whenStartDate,
+      whenEndDate: next.whenEndDate,
+      whenStartTime: next.whenStartTime,
+      whenEndTime: next.whenEndTime,
+      whenText: next.whenText,
+    })
   },
-  onWhenTime(e) {
-    const whenTime = e.detail.value
-    const whenDate = this.data.whenDate
-    this.setData({ whenTime, whenText: whenDate ? `${whenDate} ${whenTime}` : '' })
+  onWhenStartDate(e) {
+    const whenStartDate = e.detail.value
+    const whenEndDate = this.data.whenEndDate && this.data.whenEndDate < whenStartDate ? whenStartDate : this.data.whenEndDate
+    this.syncWhen({ whenStartDate, whenEndDate })
+  },
+  onWhenEndDate(e) {
+    this.syncWhen({ whenEndDate: e.detail.value })
+  },
+  onWhenStartTime(e) {
+    this.syncWhen({ whenStartTime: e.detail.value })
+  },
+  onWhenEndTime(e) {
+    this.syncWhen({ whenEndTime: e.detail.value })
   },
   onSeats(e) { this.setData({ seats: e.detail.value }) },
   onFee(e) { this.setData({ fee: e.detail.value }) },
@@ -269,8 +300,16 @@ Page({
       wx.showToast({ title: '请选择城市', icon: 'none' })
       return
     }
-    if (!this.data.whenDate) {
+    if (!this.data.whenStartDate || !this.data.whenEndDate) {
       wx.showToast({ title: '请选择上课日期', icon: 'none' })
+      return
+    }
+    if (this.data.whenEndDate < this.data.whenStartDate) {
+      wx.showToast({ title: '结束日期不能早于开始', icon: 'none' })
+      return
+    }
+    if (!this.data.whenStartTime || !this.data.whenEndTime || this.data.whenEndTime <= this.data.whenStartTime) {
+      wx.showToast({ title: '请设置每天的起止时间', icon: 'none' })
       return
     }
     wx.showLoading({ title: '提交中', mask: true })

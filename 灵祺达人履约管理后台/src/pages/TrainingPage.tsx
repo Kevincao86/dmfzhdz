@@ -33,8 +33,17 @@ function lecturerCityText(national: boolean, cities: string[]) {
 }
 
 function parseWhen(raw: string) {
-  const matched = String(raw || '').trim().match(/^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}))?/)
-  return { date: matched ? matched[1] : '', time: matched && matched[2] ? matched[2] : '14:00' }
+  const text = String(raw || '').trim()
+  const range = text.match(/^(\d{4}-\d{2}-\d{2})\s*至\s*(\d{4}-\d{2}-\d{2})[，,\s]*每天\s*(\d{2}:\d{2})\s*[-–—至到]\s*(\d{2}:\d{2})/)
+  if (range) return { startDate: range[1], endDate: range[2], startTime: range[3], endTime: range[4] }
+  const one = text.match(/^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}))?/)
+  if (one) return { startDate: one[1], endDate: one[1], startTime: one[2] || '14:00', endTime: '16:00' }
+  return { startDate: '', endDate: '', startTime: '14:00', endTime: '16:00' }
+}
+
+function formatWhen(startDate: string, endDate: string, startTime: string, endTime: string) {
+  if (!startDate || !endDate || !startTime || !endTime) return ''
+  return `${startDate} 至 ${endDate}，每天 ${startTime}-${endTime}`
 }
 
 const ADVANCED = new Set(['pro', 'flagship', 'enterprise'])
@@ -142,8 +151,10 @@ export default function TrainingPage() {
   const [cityTarget, setCityTarget] = useState<'lecturer' | 'course'>('lecturer')
   const [courseNational, setCourseNational] = useState(false)
   const [courseCities, setCourseCities] = useState<string[]>([])
-  const [whenDate, setWhenDate] = useState('')
-  const [whenTime, setWhenTime] = useState('14:00')
+  const [whenStartDate, setWhenStartDate] = useState('')
+  const [whenEndDate, setWhenEndDate] = useState('')
+  const [whenStartTime, setWhenStartTime] = useState('14:00')
+  const [whenEndTime, setWhenEndTime] = useState('16:00')
   const [platformMode, setPlatformMode] = useState<'single' | 'multi'>('multi')
   const [platformPicks, setPlatformPicks] = useState<string[]>([])
   const [poster, setPoster] = useState('')
@@ -298,8 +309,10 @@ export default function TrainingPage() {
     setCourseNational(false)
     setCourseCities([])
     setWhenText('')
-    setWhenDate('')
-    setWhenTime('14:00')
+    setWhenStartDate('')
+    setWhenEndDate('')
+    setWhenStartTime('14:00')
+    setWhenEndTime('16:00')
     setSeats('20')
     setNote('')
     setPoster('')
@@ -317,9 +330,11 @@ export default function TrainingPage() {
     setCourseNational(parsedCity.national)
     setCourseCities(parsedCity.cities)
     const parsedWhen = parseWhen(course.whenText || '')
-    setWhenText(parsedWhen.date ? `${parsedWhen.date} ${parsedWhen.time}` : '')
-    setWhenDate(parsedWhen.date)
-    setWhenTime(parsedWhen.time)
+    setWhenStartDate(parsedWhen.startDate)
+    setWhenEndDate(parsedWhen.endDate)
+    setWhenStartTime(parsedWhen.startTime)
+    setWhenEndTime(parsedWhen.endTime)
+    setWhenText(formatWhen(parsedWhen.startDate, parsedWhen.endDate, parsedWhen.startTime, parsedWhen.endTime))
     setSeats(String(course.seats || 20))
     setNote(course.note || '')
     setPoster(course.poster || '')
@@ -463,8 +478,16 @@ export default function TrainingPage() {
                 setErr('请选择城市')
                 return
               }
-              if (!whenDate) {
+              if (!whenStartDate || !whenEndDate) {
                 setErr('请选择上课日期')
+                return
+              }
+              if (whenEndDate < whenStartDate) {
+                setErr('结束日期不能早于开始日期')
+                return
+              }
+              if (!whenStartTime || !whenEndTime || whenEndTime <= whenStartTime) {
+                setErr('请设置每天的起止时间')
                 return
               }
               setErr('')
@@ -475,7 +498,7 @@ export default function TrainingPage() {
                 fee,
                 mode: postMode,
                 city: postCity.trim(),
-                whenText: `${whenDate} ${whenTime || '14:00'}`,
+                whenText: formatWhen(whenStartDate, whenEndDate, whenStartTime, whenEndTime),
                 seats: Number(seats) || 1,
                 note: note.trim(),
                 poster,
@@ -565,10 +588,22 @@ export default function TrainingPage() {
                       {courseCityLabel}
                     </button>
                   </div>
-                  <div className="block text-xs font-medium text-slate-500">上课时间
-                    <div className="mt-1 grid grid-cols-2 gap-2">
-                      <input className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" type="date" value={whenDate} onChange={(e) => setWhenDate(e.target.value)} />
-                      <input className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" type="time" value={whenTime} onChange={(e) => setWhenTime(e.target.value)} />
+                  <div className="block text-xs font-medium text-slate-500 sm:col-span-2">上课日期
+                    <div className="mt-1 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                      <input className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" type="date" value={whenStartDate} onChange={(e) => {
+                        const next = e.target.value
+                        setWhenStartDate(next)
+                        if (whenEndDate && whenEndDate < next) setWhenEndDate(next)
+                      }} />
+                      <span className="text-sm text-slate-400">至</span>
+                      <input className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" type="date" min={whenStartDate || undefined} value={whenEndDate} onChange={(e) => setWhenEndDate(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="block text-xs font-medium text-slate-500 sm:col-span-2">每天时段
+                    <div className="mt-1 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                      <input className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" type="time" value={whenStartTime} onChange={(e) => setWhenStartTime(e.target.value)} />
+                      <span className="text-sm text-slate-400">至</span>
+                      <input className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" type="time" value={whenEndTime} onChange={(e) => setWhenEndTime(e.target.value)} />
                     </div>
                   </div>
                 </div>

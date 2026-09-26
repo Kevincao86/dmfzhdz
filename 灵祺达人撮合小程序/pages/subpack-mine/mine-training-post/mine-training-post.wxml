@@ -66,13 +66,24 @@
         <text class="{{cityDisplay ? '' : 'tp-ph'}}">{{cityDisplay || '请选择城市'}}</text>
         <text class="tp-arrow">›</text>
       </view>
-      <text class="tp-label">上课时间</text>
+      <text class="tp-label">上课日期</text>
       <view class="tp-when">
-        <picker mode="date" value="{{whenDate}}" start="{{todayDate}}" bindchange="onWhenDate">
-          <view class="tp-select"><text class="{{whenDate ? '' : 'tp-ph'}}">{{whenDate || '选择日期'}}</text><text class="tp-arrow">›</text></view>
+        <picker mode="date" value="{{whenStartDate}}" start="{{todayDate}}" bindchange="onWhenStartDate">
+          <view class="tp-select"><text class="{{whenStartDate ? '' : 'tp-ph'}}">{{whenStartDate || '开始日期'}}</text><text class="tp-arrow">›</text></view>
         </picker>
-        <picker mode="time" value="{{whenTime}}" bindchange="onWhenTime">
-          <view class="tp-select"><text>{{whenTime || '14:00'}}</text><text class="tp-arrow">›</text></view>
+        <text class="tp-when__to">至</text>
+        <picker mode="date" value="{{whenEndDate}}" start="{{whenStartDate || todayDate}}" bindchange="onWhenEndDate">
+          <view class="tp-select"><text class="{{whenEndDate ? '' : 'tp-ph'}}">{{whenEndDate || '结束日期'}}</text><text class="tp-arrow">›</text></view>
+        </picker>
+      </view>
+      <text class="tp-label">每天时段</text>
+      <view class="tp-when">
+        <picker mode="time" value="{{whenStartTime}}" bindchange="onWhenStartTime">
+          <view class="tp-select"><text>{{whenStartTime || '14:00'}}</text><text class="tp-arrow">›</text></view>
+        </picker>
+        <text class="tp-when__to">至</text>
+        <picker mode="time" value="{{whenEndTime}}" bindchange="onWhenEndTime">
+          <view class="tp-select"><text>{{whenEndTime || '16:00'}}</text><text class="tp-arrow">›</text></view>
         </picker>
       </view>
     </view>

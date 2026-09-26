@@ -57,8 +57,10 @@
 }
 .tp-ph { color: #a39cb0; }
 .tp-arrow { color: #a39cb0; font-size: 32rpx; }
-.tp-when { display: flex; gap: 16rpx; }
-.tp-when picker { flex: 1; }
+.tp-when { display: flex; align-items: center; gap: 12rpx; }
+.tp-when picker { flex: 1; min-width: 0; }
+.tp-when__to { margin-top: 10rpx; flex-shrink: 0; font-size: 24rpx; color: #6e687c; }
+.tp-when .tp-select { padding: 0 16rpx; font-size: 26rpx; }
 .tp-mask {
   position: fixed;
   left: 0;
