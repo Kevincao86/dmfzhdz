@@ -217,6 +217,28 @@ async function wechatPayFetch<T>(
   return data as T
 }
 
+export async function createWechatDomesticRefund(opts: {
+  cfg: WechatPayConfig
+  outTradeNo: string
+  outRefundNo: string
+  refundCents: number
+  totalCents: number
+  reason?: string
+}): Promise<{ refundId?: string; status?: string }> {
+  const data = await wechatPayFetch<{ refund_id?: string; status?: string }>(
+    opts.cfg,
+    'POST',
+    '/v3/refund/domestic/refunds',
+    {
+      out_trade_no: opts.outTradeNo,
+      out_refund_no: opts.outRefundNo,
+      reason: String(opts.reason || '培训保证金退款').slice(0, 80),
+      amount: { refund: opts.refundCents, total: opts.totalCents, currency: 'CNY' },
+    },
+  )
+  return { refundId: data.refund_id, status: data.status }
+}
+
 export async function createWechatNativeOrder(opts: {
   cfg: WechatPayConfig
   outTradeNo: string

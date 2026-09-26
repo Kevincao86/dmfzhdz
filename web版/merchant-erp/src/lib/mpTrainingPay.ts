@@ -4,15 +4,17 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
-import { createAlipayPrecreateOrder, loadAlipayPayConfig, queryAlipayOrderByOutTradeNo } from './alipayPay.js'
+import { createAlipayPrecreateOrder, createAlipayRefund, loadAlipayPayConfig, queryAlipayOrderByOutTradeNo } from './alipayPay.js'
 import {
   createDouyinPayNativeOrder,
+  createDouyinPayRefund,
   isDouyinPayOrderSuccess,
   loadDouyinPayMerchantConfig,
   queryDouyinPayOrderByOutTradeNo,
 } from './douyinPayV1.js'
 import {
   buildJsapiPayParams,
+  createWechatDomesticRefund,
   createWechatJsapiOrder,
   createWechatNativeOrder,
   loadWechatPayConfig,
@@ -32,7 +34,7 @@ type Pay = {
   contact: string
   amountCents: number
   channel: 'wechat' | 'alipay' | 'douyin'
-  status: 'pending' | 'paid'
+  status: 'pending' | 'paid' | 'refunded'
   createdAt: string
   paidAt: string
   transactionId: string
@@ -48,14 +50,15 @@ type Deposit = {
 
 type Bag = {
   courses: Array<Record<string, unknown>>
-  profiles: unknown[]
+  profiles: Array<Record<string, unknown>>
   orders: Array<Record<string, unknown>>
   payments: Pay[]
   deposits: Deposit[]
+  payouts: Array<Record<string, unknown>>
 }
 
 function emptyBag(): Bag {
-  return { courses: [], profiles: [], orders: [], payments: [], deposits: [] }
+  return { courses: [], profiles: [], orders: [], payments: [], deposits: [], payouts: [] }
 }
 
 function readBag(): Bag {
@@ -68,6 +71,7 @@ function readBag(): Bag {
       orders: Array.isArray(data.orders) ? data.orders : [],
       payments: Array.isArray(data.payments) ? data.payments : [],
       deposits: Array.isArray(data.deposits) ? data.deposits : [],
+      payouts: Array.isArray(data.payouts) ? data.payouts : [],
     }
   } catch {
     return emptyBag()
@@ -306,4 +310,144 @@ export async function createTrainingPrepay(body: Record<string, unknown>) {
     qrDataUrl,
     jsapiParams,
   }
+}
+
+function laborTax(monthPayable: number) {
+  const income = Number(monthPayable) || 0
+  if (income <= 800) return 0
+  const taxable = income <= 4000 ? income - 800 : income * 0.8
+  let tax = taxable * 0.2
+  if (taxable > 50000) tax = taxable * 0.4 - 7000
+  else if (taxable > 20000) tax = taxable * 0.3 - 2000
+  return Math.max(0, Math.round(tax * 100) / 100)
+}
+
+function money(n: number) {
+  return Math.round(n * 100) / 100
+}
+
+function dueOrders(bag: Bag, hostId: string) {
+  const now = Date.now()
+  return bag.orders.filter((order) => {
+    if (String(order.hostId || '') !== hostId || order.status !== 'ready') return false
+    const at = String(order.settleAt || '')
+    return !at || new Date(at).getTime() <= now
+  })
+}
+
+export function trainingWithdrawQuote(hostId: string) {
+  const bag = readBag()
+  const profile = bag.profiles.find((p) => String(p.hostId || '') === hostId) || null
+  const due = dueOrders(bag, hostId)
+  const payable = money(due.reduce((sum, order) => sum + Number(order.payable || 0), 0))
+  const commission = money(due.reduce((sum, order) => sum + Number(order.commission || 0), 0))
+  const kind = profile && profile.kind === 'entity' ? 'entity' : 'person'
+  const tax = kind === 'entity' ? 0 : laborTax(payable)
+  const net = money(payable - tax)
+  const bankNo = String(profile?.bankNo || '')
+  return {
+    count: due.length,
+    payable,
+    commission,
+    tax,
+    net,
+    kind,
+    bank: String(profile?.bank || ''),
+    bankTail: bankNo.slice(-4),
+    hasAccount: !!(profile && profile.name && bankNo),
+  }
+}
+
+async function refundCaptured(pay: Pay) {
+  const outRefundNo = `TRR${Date.now()}${Math.floor(Math.random() * 9000 + 1000)}`
+  if (pay.channel === 'wechat') {
+    const cfg = loadWechatPayConfig()
+    if (!cfg.ok) throw new Error('微信支付未配置，无法原路退款')
+    await createWechatDomesticRefund({
+      cfg: cfg.config,
+      outTradeNo: pay.outTradeNo,
+      outRefundNo,
+      refundCents: pay.amountCents,
+      totalCents: pay.amountCents,
+      reason: '培训保证金退款',
+    })
+  } else if (pay.channel === 'alipay') {
+    const cfg = loadAlipayPayConfig()
+    if (!cfg.ok) throw new Error('支付宝未配置，无法原路退款')
+    await createAlipayRefund({
+      cfg: cfg.config,
+      outTradeNo: pay.outTradeNo,
+      outRefundNo,
+      refundCents: pay.amountCents,
+      reason: '培训保证金退款',
+    })
+  } else {
+    const cfg = loadDouyinPayMerchantConfig()
+    if (!cfg.ok) throw new Error('抖音支付未配置，无法原路退款')
+    await createDouyinPayRefund({
+      cfg: cfg.config,
+      outTradeNo: pay.outTradeNo,
+      outRefundNo,
+      refundCents: pay.amountCents,
+      totalCents: pay.amountCents,
+      reason: '培训保证金退款',
+    })
+  }
+  return outRefundNo
+}
+
+export async function refundTrainingDeposit(hostId: string) {
+  const id = String(hostId || '').trim()
+  const first = readBag()
+  const deposit = first.deposits.find((d) => d.hostId === id)
+  if (!deposit) return { ok: false as const, error: '没有可退的保证金' }
+  const pay = first.payments.find((p) => p.outTradeNo === deposit.outTradeNo && p.purpose === 'deposit')
+  const captured = !!(pay && pay.status === 'paid' && pay.transactionId && !deposit.outTradeNo.startsWith('TRN-manual'))
+  let outRefundNo = ''
+  if (captured && pay) outRefundNo = await refundCaptured(pay)
+  const bag = readBag()
+  const freshPay = bag.payments.find((p) => p.outTradeNo === deposit.outTradeNo && p.purpose === 'deposit')
+  if (freshPay && captured) freshPay.status = 'refunded'
+  bag.deposits = bag.deposits.filter((d) => d.hostId !== id)
+  const profile = bag.profiles.find((p) => String(p.hostId || '') === id)
+  if (profile) {
+    profile.lecturerStatus = 'none'
+    profile.updatedAt = new Date().toISOString()
+  }
+  writeBag(bag)
+  return { ok: true as const, lecturerStatus: 'none' as const, outRefundNo }
+}
+
+export function withdrawTraining(hostId: string) {
+  const id = String(hostId || '').trim()
+  const bag = readBag()
+  const profile = bag.profiles.find((p) => String(p.hostId || '') === id)
+  if (!profile || !profile.name || !profile.bankNo) {
+    return { ok: false as const, error: '请先完成收款认证，绑定收款账户' }
+  }
+  const due = dueOrders(bag, id)
+  if (!due.length) return { ok: false as const, error: '暂无可提现的结算单' }
+  const quote = trainingWithdrawQuote(id)
+  if (quote.net <= 0) return { ok: false as const, error: '扣税后没有可提现金额' }
+  const now = new Date().toISOString()
+  for (const order of due) {
+    order.status = 'settled'
+    order.withdrawnAt = now
+  }
+  bag.payouts.unshift({
+    id: `po-${Date.now()}`,
+    hostId: id,
+    name: String(profile.name),
+    bank: String(profile.bank || ''),
+    bankNo: String(profile.bankNo),
+    payable: quote.payable,
+    commission: quote.commission,
+    tax: quote.tax,
+    net: quote.net,
+    kind: quote.kind,
+    orderIds: due.map((order) => String(order.id || '')),
+    createdAt: now,
+  })
+  writeBag(bag)
+  return { ok: true as const, ...quote }
 }

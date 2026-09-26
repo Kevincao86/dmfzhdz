@@ -8,12 +8,13 @@ const STATUS = {
 }
 
 Page({
-  data: { orders: [], profile: null, monthTax: 0, monthPayable: 0 },
+  data: { orders: [], profile: null, monthTax: 0, monthPayable: 0, netLabel: '0' },
   onShow() {
     this.load()
   },
   async load() {
-    const profile = training.readProfile()
+    const profile = await training.syncProfile()
+    const summary = await training.walletSummary().catch(() => null)
     const orders = await training.myOrders()
     const month = new Date().toISOString().slice(0, 7)
     const monthPayable = (orders || [])
@@ -25,7 +26,25 @@ Page({
       statusText: STATUS[o.status] || o.status,
       net: profile && profile.kind === 'person' ? '' : o.payable,
     }))
-    this.setData({ orders: view, profile, monthTax, monthPayable: Math.round(monthPayable * 100) / 100 })
+    const net = summary && summary.settlement ? Number(summary.settlement.net || 0) : 0
+    this.setData({ orders: view, profile, monthTax, monthPayable: Math.round(monthPayable * 100) / 100, netLabel: net.toFixed(2) })
+  },
+  onWithdraw() {
+    wx.showModal({
+      title: '提现到绑定账户',
+      content: `可提现 ¥${this.data.netLabel}。个人按劳务报酬扣个税，企业不预扣。`,
+      confirmText: '确认提现',
+      success: async (res) => {
+        if (!res.confirm) return
+        try {
+          await training.withdrawSettlement()
+          wx.showToast({ title: '已提现', icon: 'success' })
+          this.load()
+        } catch (e) {
+          wx.showToast({ title: String((e && e.message) || '提现失败').slice(0, 18), icon: 'none' })
+        }
+      },
+    })
   },
   async onEvidence(e) {
     const orderId = e.currentTarget.dataset.id

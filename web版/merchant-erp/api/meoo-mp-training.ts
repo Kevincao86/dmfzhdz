@@ -5,7 +5,7 @@
 import fs from 'fs'
 import path from 'path'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createTrainingPrepay, queryTrainingPay, trainingDepositView } from '../src/lib/mpTrainingPay.js'
+import { createTrainingPrepay, queryTrainingPay, refundTrainingDeposit, trainingDepositView, trainingWithdrawQuote, withdrawTraining } from '../src/lib/mpTrainingPay.js'
 
 export const config = { maxDuration: 20 }
 
@@ -46,7 +46,7 @@ type Profile = {
   idFront: string
   idBack: string
   licenseImage: string
-  lecturerStatus: 'pending' | 'approved' | 'rejected' | ''
+  lecturerStatus: 'pending' | 'approved' | 'rejected' | 'none' | ''
   lecturerNote: string
   updatedAt: string
 }
@@ -73,24 +73,26 @@ type Store = {
   orders: Order[]
   payments: unknown[]
   deposits: unknown[]
+  payouts: unknown[]
 }
 
 const FILE = path.join(process.cwd(), 'data', 'mp-training.json')
 
 function emptyStore(): Store {
-  return { courses: [], profiles: [], orders: [], payments: [], deposits: [] }
+  return { courses: [], profiles: [], orders: [], payments: [], deposits: [], payouts: [] }
 }
 
 function readStore(): Store {
   try {
     const data = JSON.parse(fs.readFileSync(FILE, 'utf8'))
-    if (Array.isArray(data)) return { courses: data, profiles: [], orders: [], payments: [], deposits: [] }
+    if (Array.isArray(data)) return { courses: data, profiles: [], orders: [], payments: [], deposits: [], payouts: [] }
     return {
       courses: Array.isArray(data.courses) ? data.courses : [],
       profiles: Array.isArray(data.profiles) ? data.profiles : [],
       orders: Array.isArray(data.orders) ? data.orders : [],
       payments: Array.isArray(data.payments) ? data.payments : [],
       deposits: Array.isArray(data.deposits) ? data.deposits : [],
+      payouts: Array.isArray(data.payouts) ? data.payouts : [],
     }
   } catch {
     return emptyStore()
@@ -99,7 +101,7 @@ function readStore(): Store {
 
 function writeStore(store: Store) {
   const latest = readStore()
-  const next = { ...store, payments: latest.payments, deposits: latest.deposits }
+  const next = { ...store, payments: latest.payments, deposits: latest.deposits, payouts: latest.payouts }
   fs.mkdirSync(path.dirname(FILE), { recursive: true })
   fs.writeFileSync(FILE, JSON.stringify(next), 'utf8')
 }
@@ -189,6 +191,7 @@ function publicCourse(course: Course) {
 }
 
 function lecturerState(profile: Profile): 'none' | 'pending' | 'approved' | 'rejected' {
+  if (profile.lecturerStatus === 'none') return 'none'
   if (profile.lecturerStatus === 'pending' || profile.lecturerStatus === 'approved' || profile.lecturerStatus === 'rejected') {
     return profile.lecturerStatus
   }
@@ -235,6 +238,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       profiles: review ? store.profiles.filter((p) => lecturerState(p) !== 'none').map(lecturerCard) : [],
       orders: hostId ? store.orders.filter((o) => o.hostId === hostId) : [],
       deposit: trainingDepositView(hostId),
+      settlement: trainingWithdrawQuote(hostId),
     })
     return
   }
@@ -456,6 +460,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.status(result.ok ? 200 : 404).json(result)
     } catch (e) {
       res.status(400).json({ ok: false, error: e instanceof Error ? e.message : '支付查询失败' })
+    }
+    return
+  }
+
+  if (action === 'refundDeposit') {
+    try {
+      const result = await refundTrainingDeposit(String(body.hostId || ''))
+      res.status(result.ok ? 200 : 400).json(result)
+    } catch (e) {
+      res.status(400).json({ ok: false, error: e instanceof Error ? e.message : '退款失败' })
+    }
+    return
+  }
+
+  if (action === 'withdraw') {
+    try {
+      const result = withdrawTraining(String(body.hostId || ''))
+      res.status(result.ok ? 200 : 400).json(result)
+    } catch (e) {
+      res.status(400).json({ ok: false, error: e instanceof Error ? e.message : '提现失败' })
     }
     return
   }

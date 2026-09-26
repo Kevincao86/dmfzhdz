@@ -64,6 +64,30 @@ async function prepay(input) {
   return res
 }
 
+async function walletSummary() {
+  if (!(ecs.hasBase && ecs.hasBase())) return { depositPaid: depositPaid(), settlement: null }
+  const res = await ecs.get(`/api/meoo-mp-training?hostId=${encodeURIComponent(accountId())}`)
+  if (res && res.deposit) applyDeposit(res.deposit)
+  return { depositPaid: depositPaid(), settlement: (res && res.settlement) || null }
+}
+
+async function refundDeposit() {
+  if (!(ecs.hasBase && ecs.hasBase())) throw new Error('请先登录后再退款')
+  const res = await ecs.post('/api/meoo-mp-training', { action: 'refundDeposit', hostId: accountId() })
+  if (!res || res.ok === false) throw new Error((res && res.error) || '退款失败')
+  applyDeposit({ paid: false })
+  const profile = readProfile()
+  if (profile) writeProfile({ ...profile, lecturerStatus: 'none' })
+  return res
+}
+
+async function withdrawSettlement() {
+  if (!(ecs.hasBase && ecs.hasBase())) throw new Error('请先登录后再提现')
+  const res = await ecs.post('/api/meoo-mp-training', { action: 'withdraw', hostId: accountId() })
+  if (!res || res.ok === false) throw new Error((res && res.error) || '提现失败')
+  return res
+}
+
 async function payQuery(outTradeNo) {
   if (!(ecs.hasBase && ecs.hasBase())) throw new Error('请先登录后再查询支付')
   const res = await ecs.post('/api/meoo-mp-training', { action: 'payQuery', outTradeNo })
@@ -91,7 +115,7 @@ function publishBlockReason() {
   if (!isAdvancedMember()) return '发布培训需开通高级会员（专业版及以上）'
   const profile = readProfile()
   const state = lecturerState(profile)
-  if (state === 'none') return '请先申请讲师'
+  if (state === 'none') return profile && profile.lecturerStatus === 'none' ? '讲师未认证，不能发布课程' : '请先申请讲师'
   if (state === 'pending') return '讲师申请审核中，通过后才能发布'
   if (state === 'rejected') return '讲师申请未通过，请修改后重新提交'
   if (!profile.bankNo || !profile.name) return '请先完成收款认证'
@@ -224,6 +248,7 @@ function writeProfile(profile) {
 
 function lecturerState(profile) {
   if (!profile) return 'none'
+  if (profile.lecturerStatus === 'none') return 'none'
   if (profile.lecturerStatus === 'pending' || profile.lecturerStatus === 'approved' || profile.lecturerStatus === 'rejected') {
     return profile.lecturerStatus
   }
@@ -409,6 +434,9 @@ module.exports = {
   DEPOSIT_YUAN,
   depositPaid,
   syncDeposit,
+  walletSummary,
+  refundDeposit,
+  withdrawSettlement,
   prepay,
   payQuery,
   isAdvancedMember,

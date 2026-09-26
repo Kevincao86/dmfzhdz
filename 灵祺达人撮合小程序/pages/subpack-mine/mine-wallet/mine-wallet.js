@@ -14,6 +14,9 @@ Page({
     balanceLabel: '0',
     depositPaid: false,
     yuan: training.DEPOSIT_YUAN,
+    netLabel: '0',
+    commissionLabel: '0',
+    taxLabel: '0',
   },
   onLoad() {
     prepareMineSubPage(this)
@@ -41,11 +44,15 @@ Page({
       const balance = s
         ? Math.max(0, Math.floor(Number(s.balance) || packageRemaining + rechargeBalance))
         : Math.max(0, Math.floor(Number(data && data.mpAiPointsBalance) || 0))
-      const depositPaid = await training.syncDeposit()
+      const summary = await training.walletSummary()
+      const quote = summary.settlement || {}
       this.setData({
         loading: false,
         balanceLabel: balance.toLocaleString('zh-CN'),
-        depositPaid,
+        depositPaid: summary.depositPaid,
+        netLabel: Number(quote.net || 0).toFixed(2),
+        commissionLabel: Number(quote.commission || 0).toFixed(2),
+        taxLabel: Number(quote.tax || 0).toFixed(2),
       })
     } catch (e) {
       this.setData({ loading: false, err: String((e && e.message) || '加载失败').slice(0, 24) })
@@ -56,6 +63,41 @@ Page({
   },
   onSettle() {
     wx.navigateTo({ url: '/pages/subpack-mine/mine-training-settle/mine-training-settle' })
+  },
+  onRefund() {
+    wx.showModal({
+      title: '退回保证金',
+      content: '退款后讲师变为未认证，不能发布课程。保证金按原支付方式退回。',
+      confirmText: '确认退款',
+      success: async (res) => {
+        if (!res.confirm) return
+        try {
+          await training.refundDeposit()
+          wx.showToast({ title: '已退款', icon: 'success' })
+          this.load()
+        } catch (e) {
+          wx.showToast({ title: String((e && e.message) || '退款失败').slice(0, 18), icon: 'none' })
+        }
+      },
+    })
+  },
+  onWithdraw() {
+    wx.showModal({
+      title: '提现到绑定账户',
+      content: `可提现 ¥${this.data.netLabel}，已扣佣金 ¥${this.data.commissionLabel}、个税 ¥${this.data.taxLabel}。`,
+      confirmText: '确认提现',
+      success: async (res) => {
+        if (!res.confirm) return
+        try {
+          const result = await training.withdrawSettlement()
+          const tail = result.bankTail ? `尾号${result.bankTail}` : '绑定账户'
+          wx.showToast({ title: `已提现至${tail}`, icon: 'none' })
+          this.load()
+        } catch (e) {
+          wx.showToast({ title: String((e && e.message) || '提现失败').slice(0, 18), icon: 'none' })
+        }
+      },
+    })
   },
   onOrders() {
     wx.navigateTo({ url: '/pages/subpack-mine/mine-my-orders/mine-my-orders' })

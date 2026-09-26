@@ -20,11 +20,24 @@ type SettleOrder = {
   settleAt?: string
 }
 
+type Quote = {
+  count: number
+  payable: number
+  commission: number
+  tax: number
+  net: number
+  bank: string
+  bankTail: string
+  hasAccount: boolean
+}
+
 export default function WalletPage() {
   const me = getAccount()
   const [balance, setBalance] = useState(0)
   const [depositPaid, setDepositPaid] = useState(false)
+  const [quote, setQuote] = useState<Quote | null>(null)
   const [orders, setOrders] = useState<SettleOrder[]>([])
+  const [busy, setBusy] = useState('')
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(true)
   const [payOpen, setPayOpen] = useState(false)
@@ -49,6 +62,7 @@ export default function WalletPage() {
       const rows = Array.isArray(training.orders) ? (training.orders as SettleOrder[]) : []
       setBalance(points)
       setDepositPaid(!!deposit?.paid)
+      setQuote((training.settlement as Quote) || null)
       setOrders(rows)
     } catch (e) {
       setErr(e instanceof Error ? e.message : '加载失败')
@@ -77,6 +91,39 @@ export default function WalletPage() {
     }, 2500)
     return () => window.clearInterval(timer)
   }, [payTrade])
+
+  async function refundDeposit() {
+    if (!me?.accountId) return
+    if (!window.confirm('退回保证金后，讲师变为未认证，不能发布课程。确认退款？')) return
+    setBusy('refund')
+    setErr('')
+    try {
+      await postTraining({ action: 'refundDeposit', hostId: me.accountId })
+      await load()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '退款失败')
+    } finally {
+      setBusy('')
+    }
+  }
+
+  async function withdraw() {
+    if (!me?.accountId) return
+    const net = Number(quote?.net || 0).toFixed(2)
+    const tax = Number(quote?.tax || 0).toFixed(2)
+    const commission = Number(quote?.commission || 0).toFixed(2)
+    if (!window.confirm(`提现 ¥${net} 到绑定账户。已扣佣金 ¥${commission}、个税 ¥${tax}。`)) return
+    setBusy('withdraw')
+    setErr('')
+    try {
+      await postTraining({ action: 'withdraw', hostId: me.accountId })
+      await load()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '提现失败')
+    } finally {
+      setBusy('')
+    }
+  }
 
   async function startScanPay() {
     if (!me?.accountId) {
@@ -110,7 +157,7 @@ export default function WalletPage() {
           ← 返回我的
         </Link>
         <h1 className="mt-2 text-xl font-bold text-[var(--shell-text)]">我的钱包</h1>
-        <p className="mt-1 text-sm text-[var(--shell-muted)]">积分、培训保证金和课时费应付款。课时费不是提现。</p>
+        <p className="mt-1 text-sm text-[var(--shell-muted)]">积分、培训保证金和课时费。退保证金后讲师变为未认证，不能发布课程。</p>
       </div>
       {err ? <p className="text-sm text-red-600">{err}</p> : null}
 
@@ -136,7 +183,11 @@ export default function WalletPage() {
             </p>
             <p className="mt-1 text-xs text-[var(--shell-muted)]">讲师履约保证金，和小程序同一份记录</p>
           </div>
-          {depositPaid ? null : (
+          {depositPaid ? (
+            <button type="button" className="rounded-xl border border-violet-200 px-3 py-2 text-sm font-semibold text-violet-700" disabled={busy === 'refund'} onClick={() => { void refundDeposit() }}>
+              {busy === 'refund' ? '退款中' : '退款'}
+            </button>
+          ) : (
             <button
               type="button"
               className="rounded-xl bg-violet-600 px-3 py-2 text-sm font-semibold text-white"
@@ -153,8 +204,18 @@ export default function WalletPage() {
       </section>
 
       <section className="rounded-2xl border border-[var(--shell-border)] bg-[var(--panel-card)] p-4">
-        <h2 className="text-sm font-semibold text-[var(--shell-text)]">培训结算</h2>
-        <p className="mt-1 text-xs text-[var(--shell-muted)]">学员付款后由平台代收。提交完成证明后进入 T+1 应付款，不提供提现。</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-[var(--shell-text)]">培训结算</h2>
+            <p className="mt-1 text-sm text-[var(--shell-text)]">可提现 ¥{Number(quote?.net || 0).toFixed(2)}</p>
+            <p className="mt-1 text-xs text-[var(--shell-muted)]">
+              已扣佣金 ¥{Number(quote?.commission || 0).toFixed(2)}，个税 ¥{Number(quote?.tax || 0).toFixed(2)}。提现到绑定的收款账户{quote?.bankTail ? `（尾号 ${quote.bankTail}）` : ''}。
+            </p>
+          </div>
+          <button type="button" className="rounded-xl bg-violet-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60" disabled={busy === 'withdraw'} onClick={() => { void withdraw() }}>
+            {busy === 'withdraw' ? '提现中' : '提现'}
+          </button>
+        </div>
         {!orders.length ? <p className="mt-3 text-sm text-[var(--shell-muted)]">还没有报名订单</p> : null}
         <div className="mt-3 space-y-2">
           {orders.map((order) => (

@@ -17,7 +17,7 @@ Page({
   async loadProfile() {
     const profile = await training.syncProfile()
     const lecturerStatus = training.lecturerState(profile)
-    const lecturerLabel = lecturerStatus === 'approved' ? '已通过' : lecturerStatus === 'pending' ? '审核中' : lecturerStatus === 'rejected' ? '未通过' : '未申请'
+    const lecturerLabel = lecturerStatus === 'approved' ? '已通过' : lecturerStatus === 'pending' ? '审核中' : lecturerStatus === 'rejected' ? '未通过' : profile && profile.lecturerStatus === 'none' ? '未认证' : '未申请'
     const payoutLabel = lecturerStatus !== 'approved' ? '待开通' : profile && profile.bankNo ? '已认证' : '未填写'
     this.setData({ lecturerStatus, lecturerLabel, payoutLabel })
   },

@@ -80,7 +80,7 @@ type Lecturer = {
   idFront?: string
   idBack?: string
   licenseImage?: string
-  lecturerStatus?: 'pending' | 'approved' | 'rejected' | ''
+  lecturerStatus?: 'none' | 'pending' | 'approved' | 'rejected' | ''
 }
 
 type Course = {
@@ -159,7 +159,7 @@ export default function TrainingPage() {
     const profile = data.profile as Lecturer | null
     const status = profile?.lecturerStatus
     const nextStatus =
-      status === 'pending' || status === 'approved' || status === 'rejected'
+      status === 'none' || status === 'pending' || status === 'approved' || status === 'rejected'
         ? status
         : profile?.intro && profile?.city
           ? 'approved'

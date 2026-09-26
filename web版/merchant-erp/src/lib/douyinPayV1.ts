@@ -301,6 +301,22 @@ async function douyinPayFetch<T>(
   return data as T
 }
 
+export async function createDouyinPayRefund(opts: {
+  cfg: DouyinPayMerchantConfig
+  outTradeNo: string
+  outRefundNo: string
+  refundCents: number
+  totalCents: number
+  reason?: string
+}): Promise<void> {
+  await douyinPayFetch(opts.cfg, 'POST', '/v1/refund/domestic/refunds', {
+    out_trade_no: opts.outTradeNo,
+    out_refund_no: opts.outRefundNo,
+    reason: String(opts.reason || '培训保证金退款').slice(0, 80),
+    amount: { refund: opts.refundCents, total: opts.totalCents, currency: 'CNY' },
+  })
+}
+
 export async function createDouyinPayNativeOrder(opts: {
   cfg: DouyinPayMerchantConfig
   outTradeNo: string

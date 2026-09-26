@@ -1,5 +1,5 @@
 <view class="wl">
-  <text class="wl-sub">积分、培训保证金和课时费应付款。课时费不是提现。</text>
+  <text class="wl-sub">积分、培训保证金和课时费。退保证金后讲师变为未认证，不能发布课程。</text>
   <text wx:if="{{err}}" class="wl-err">{{err}}</text>
 
   <view class="wl-card">
@@ -20,14 +20,21 @@
         <text class="wl-line">{{depositPaid ? '¥' + yuan + ' 已缴纳' : '¥' + yuan + ' 未缴纳'}}</text>
         <text class="wl-hint">讲师履约保证金，和星选同一份记录</text>
       </view>
-      <view wx:if="{{!depositPaid}}" class="wl-btn" bindtap="onPayDeposit">微信支付</view>
+      <view wx:if="{{depositPaid}}" class="wl-btn wl-btn--ghost" bindtap="onRefund">退款</view>
+      <view wx:else class="wl-btn" bindtap="onPayDeposit">微信支付</view>
     </view>
   </view>
 
-  <view class="wl-card" bindtap="onSettle">
-    <text class="wl-name">培训结算</text>
-    <text class="wl-hint">学员付款后由平台代收，提交完成证明后进入 T+1 应付款</text>
-    <text class="wl-go">查看应付款</text>
+  <view class="wl-card">
+    <view class="wl-row">
+      <view>
+        <text class="wl-name">培训结算</text>
+        <text class="wl-line">可提现 ¥{{netLabel}}</text>
+        <text class="wl-hint">已扣佣金 ¥{{commissionLabel}}，个税 ¥{{taxLabel}}。提现到绑定的收款账户。</text>
+      </view>
+      <view class="wl-btn" bindtap="onWithdraw">提现</view>
+    </view>
+    <text class="wl-go" bindtap="onSettle">查看应付款</text>
   </view>
 
   <view class="wl-card" bindtap="onOrders">

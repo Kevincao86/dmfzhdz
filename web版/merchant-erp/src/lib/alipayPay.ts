@@ -336,6 +336,26 @@ export async function fetchAlipayPagePayQrCode(payPageUrl: string): Promise<stri
   throw new Error('alipay_page_qr_not_found')
 }
 
+export async function createAlipayRefund(opts: {
+  cfg: AlipayPayConfig
+  outTradeNo: string
+  outRefundNo: string
+  refundCents: number
+  reason?: string
+}): Promise<void> {
+  await alipayGatewayCall(
+    opts.cfg,
+    'alipay.trade.refund',
+    {
+      out_trade_no: opts.outTradeNo,
+      refund_amount: (opts.refundCents / 100).toFixed(2),
+      out_request_no: opts.outRefundNo,
+      refund_reason: String(opts.reason || '培训保证金退款').slice(0, 80),
+    },
+    { notifyUrl: false },
+  )
+}
+
 export async function createAlipayPrecreateOrder(opts: {
   cfg: AlipayPayConfig
   outTradeNo: string
