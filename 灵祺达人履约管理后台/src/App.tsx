@@ -67,6 +67,7 @@ const BriefGenRecordsPage = lazy(() => import('@merchant/pages/BriefGenRecordsPa
 const DigitalHumanAddonPage = lazy(() => import('@merchant/pages/DigitalHumanBroadcastPage'))
 const AiScriptReviewAddonPage = lazy(() => import('@merchant/pages/AiScriptReviewAddonPage'))
 const PlatformVideoReviewRulesPage = lazy(() => import('@merchant/pages/PlatformVideoReviewRulesPage'))
+const PlatformScriptReviewRulesPage = lazy(() => import('@merchant/pages/PlatformScriptReviewRulesPage'))
 const ShortDramaAddonPage = lazy(() => import('@merchant/pages/ShortDramaPage'))
 const AiImageAddonPage = lazy(() => import('@merchant/pages/AiImageStudioPage'))
 
@@ -150,6 +151,18 @@ export default function App() {
         <Route path="/chat" element={<ChatPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route
+          path="/profile/ai-review/script-rules"
+          element={
+            <LazyAddonPage>
+              <MerchantEmbedProviders>
+                <MerchantEmbedErrorBoundary>
+                  <PlatformScriptReviewRulesPage />
+                </MerchantEmbedErrorBoundary>
+              </MerchantEmbedProviders>
+            </LazyAddonPage>
+          }
+        />
+        <Route
           path="/profile/ai-review/platform-rules"
           element={
             <LazyAddonPage>
@@ -199,6 +212,7 @@ export default function App() {
           </Route>
           <Route path="ai-video-review" element={<Navigate to="/profile/ai-review?mode=video" replace />} />
           <Route path="ai-review/platform-rules" element={<Navigate to="/profile/ai-review/platform-rules" replace />} />
+          <Route path="ai-review/script-rules" element={<Navigate to="/profile/ai-review/script-rules" replace />} />
           <Route path="ai-review" element={<Navigate to="/profile/ai-review" replace />} />
           <Route path="ai-drama" element={<LazyAddonPage><ShortDramaAddonPage /></LazyAddonPage>} />
           <Route path="digital-human" element={<LazyAddonPage><DigitalHumanAddonPage /></LazyAddonPage>} />

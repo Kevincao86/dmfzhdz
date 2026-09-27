@@ -406,9 +406,9 @@ export default function AiComplianceReviewAddonPage({ mode: legacyMode }: Props)
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-colors ${
               mode === 'script'
-                ? 'bg-violet-600 text-white shadow-sm'
+                ? 'bg-[#12161a] text-[#f6f3ec]'
                 : 'border border-[var(--shell-border)] text-[var(--shell-muted)] hover:bg-[var(--shell-hover)]'
             }`}
             onClick={() => setActiveMode('script')}
@@ -417,9 +417,9 @@ export default function AiComplianceReviewAddonPage({ mode: legacyMode }: Props)
           </button>
           <button
             type="button"
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-colors ${
               mode === 'video'
-                ? 'bg-violet-600 text-white shadow-sm'
+                ? 'bg-[#12161a] text-[#f6f3ec]'
                 : 'border border-[var(--shell-border)] text-[var(--shell-muted)] hover:bg-[var(--shell-hover)]'
             }`}
             onClick={() => setActiveMode('video')}
@@ -475,10 +475,18 @@ export default function AiComplianceReviewAddonPage({ mode: legacyMode }: Props)
             >
               查看平台视频审核规则
             </button>
-          ) : null}
+          ) : (
+            <button
+              type="button"
+              className="rounded-lg border border-[var(--shell-border)] px-3 py-2 text-sm text-[var(--shell-fg)] hover:bg-[var(--shell-hover)]"
+              onClick={() => navigate('/profile/ai-review/script-rules')}
+            >
+              查看平台文稿审核规则
+            </button>
+          )}
           <button
             type="button"
-            className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500"
+            className="inline-flex items-center gap-2 rounded-sm bg-[#12161a] px-4 py-2 text-sm font-medium text-[#f6f3ec] hover:bg-[#1c2329]"
             onClick={() => fileRef.current?.click()}
           >
             <Upload className="h-4 w-4" />

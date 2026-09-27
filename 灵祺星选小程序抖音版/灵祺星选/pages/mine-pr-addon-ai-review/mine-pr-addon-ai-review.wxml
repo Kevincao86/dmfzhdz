@@ -65,6 +65,7 @@
           <text class="addon-order-pick__arrow">▼</text>
         </view>
       </picker>
+      <button wx:if="{{reviewMode === 'script'}}" class="addon-btn" bindtap="onOpenScriptRules">查看平台文稿审核规则</button>
 
       <button class="addon-btn addon-btn--accent" bindtap="onImportTap">{{importBtnLabel}}</button>
       <button wx:if="{{batchCount > 0}}" class="addon-btn" loading="{{batchBusy}}" disabled="{{batchBusy || !!busyId}}" bindtap="onBatchCheck">

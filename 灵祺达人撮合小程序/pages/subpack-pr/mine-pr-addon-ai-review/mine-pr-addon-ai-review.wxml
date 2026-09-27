@@ -90,6 +90,9 @@
         </picker>
         <button class="addon-btn" bindtap="onOpenPlatformRules">查看平台视频审核规则</button>
       </block>
+      <block wx:if="{{reviewMode === 'script'}}">
+        <button class="addon-btn" bindtap="onOpenScriptRules">查看平台文稿审核规则</button>
+      </block>
 
       <button
         class="addon-btn addon-btn--accent"

@@ -94,6 +94,7 @@ list_scopes() {
   studio_scene_review   商家小程序视觉工坊玩法二级选项；达人/星选视频审核按团购带货与品宣打卡等场景分规则
   video_rule_links      达人小程序与星选短视频审核增加平台官方规则链接页
   xingxuan_mine_ui      星选：AI审核进我的、增值服务加AI短剧；网页壳层与我的页本地重排
+  xingxuan_ui_script_rules  星选网页按钮/布局重排；文稿审核（小红书/大众点评）规则页：星选Web+达人/星选小程序
   ads_studio_review      本地推投流免进设置页、商家小程序 AI 标签对齐星选、审核规则半月刷新
   account_identity_bind  商家账号：邮箱注册、社交登录绑手机、同号合并、个人中心绑定态
   login_session_refresh  商家 Web/小程序：登录仍在但 access token 过期时先刷新再请求
@@ -1276,6 +1277,21 @@ App.tsx
 shellNavConfig
 AiComplianceReviewAddonPage
 index.css
+change-scope-guard
+PAT
+      ;;
+    xingxuan_ui_script_rules)
+      cat <<'PAT'
+platformScriptReviewRuleLinks
+PlatformScriptReviewRulesPage
+AiComplianceReviewAddonPage
+App.tsx
+shellNavConfig
+index.css
+MerchantEmbedShell
+mine-pr-addon-ai-review
+mine-pr-addon-script-rule-links
+app.json
 change-scope-guard
 PAT
       ;;

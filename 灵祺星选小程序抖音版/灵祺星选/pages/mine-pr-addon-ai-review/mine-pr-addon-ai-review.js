@@ -173,6 +173,11 @@ Page({
       platform: opts[idx] || opts[0] || '',
     })
   },
+  onOpenScriptRules() {
+    wx.navigateTo({
+      url: '/pages/mine-pr-addon-script-rule-links/mine-pr-addon-script-rule-links',
+    })
+  },
   onLinkInput(e) {
     this.setData({ linkInput: String((e.detail && e.detail.value) || '') })
   },

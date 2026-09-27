@@ -189,6 +189,11 @@ Page({
       url: '/pages/subpack-pr/mine-pr-addon-video-rule-links/mine-pr-addon-video-rule-links',
     })
   },
+  onOpenScriptRules() {
+    wx.navigateTo({
+      url: '/pages/subpack-pr/mine-pr-addon-script-rule-links/mine-pr-addon-script-rule-links',
+    })
+  },
   onLinkInput(e) {
     this.setData({ linkInput: String((e.detail && e.detail.value) || '') })
   },
