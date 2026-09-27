@@ -1,5 +1,6 @@
 import { Loader2, Plus, ShieldCheck, Trash2, Upload } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   type AddonComplianceItem,
   type AddonComplianceMode,
@@ -77,6 +78,7 @@ function modePanelMeta(mode: AddonComplianceMode) {
 }
 
 export default function AiComplianceReviewAddonPage({ mode: legacyMode }: Props) {
+  const navigate = useNavigate()
   const access = readMpEmbedAddonAccess()
   const canScript = access.aiReview
   const canVideo = access.aiVideoReview
@@ -464,6 +466,15 @@ export default function AiComplianceReviewAddonPage({ mode: legacyMode }: Props)
                 ))}
               </select>
             </label>
+          ) : null}
+          {mode === 'video' ? (
+            <button
+              type="button"
+              className="rounded-lg border border-[var(--shell-border)] px-3 py-2 text-sm text-[var(--shell-fg)] hover:bg-[var(--shell-hover)]"
+              onClick={() => navigate('/addons/ai-review/platform-rules')}
+            >
+              查看平台视频审核规则
+            </button>
           ) : null}
           <button
             type="button"

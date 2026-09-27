@@ -20,7 +20,7 @@ function resolveAddonNavTarget(pathname: string): string | null {
   if (pathname === '/addons/ai-content' || pathname.startsWith('/addons/ai-content/')) {
     return '/addons/ai-content'
   }
-  if (pathname === '/addons/ai-review' || pathname === '/addons/ai-video-review') {
+  if (pathname === '/addons/ai-review' || pathname.startsWith('/addons/ai-review/') || pathname === '/addons/ai-video-review') {
     return '/addons/ai-review'
   }
   if (pathname === '/addons/shortvideo') return '/addons/shortvideo'

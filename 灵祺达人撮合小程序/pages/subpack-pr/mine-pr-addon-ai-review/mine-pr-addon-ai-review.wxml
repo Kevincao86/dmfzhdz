@@ -88,6 +88,7 @@
             <text class="addon-order-pick__arrow">▼</text>
           </view>
         </picker>
+        <button class="addon-btn" bindtap="onOpenPlatformRules">查看平台视频审核规则</button>
       </block>
 
       <button

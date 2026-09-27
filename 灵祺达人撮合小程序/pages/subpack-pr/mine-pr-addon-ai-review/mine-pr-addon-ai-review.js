@@ -184,6 +184,11 @@ Page({
       scene: opts[idx] || opts[0] || '探店种草',
     })
   },
+  onOpenPlatformRules() {
+    wx.navigateTo({
+      url: '/pages/subpack-pr/mine-pr-addon-video-rule-links/mine-pr-addon-video-rule-links',
+    })
+  },
   onLinkInput(e) {
     this.setData({ linkInput: String((e.detail && e.detail.value) || '') })
   },

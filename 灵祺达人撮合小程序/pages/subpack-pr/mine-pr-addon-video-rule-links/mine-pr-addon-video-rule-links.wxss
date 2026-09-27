@@ -1,0 +1,5 @@
+@import '../../../styles/mp-addon-page.wxss';
+
+.rule-link {
+  margin-top: 16rpx;
+}

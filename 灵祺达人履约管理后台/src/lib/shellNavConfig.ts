@@ -105,6 +105,7 @@ export function pageTitleForPath(pathname: string, search: string): { section: s
     '/profile/talent': '达人资料',
     '/profile/pr': 'PR 资料',
     '/profile/supplier': '团队资料',
+    '/addons/ai-review/platform-rules': '平台视频审核规则',
     '/addons': '增值服务',
     '/training': '培训课程',
   }
