@@ -1,7 +1,7 @@
 <view class="tp">
   <view class="tp-hero">
     <text class="tp-hero__kicker">本地生活培训</text>
-    <text class="tp-hero__title">{{view === 'form' ? (editingId ? '编辑培训' : '新增培训') : '我发布的'}}</text>
+    <text class="tp-hero__title">{{view === 'form' ? (editingId ? '编辑培训' : '新增培训') : '我的课程'}}</text>
     <text class="tp-hero__sub" wx:if="{{view === 'form'}}">改完会重新提交审核。通过前不会出现在首页广告栏。</text>
     <text class="tp-hero__sub" wx:else>查看已提交的课程，可以新增，也可以改已发布的内容。</text>
   </view>
@@ -129,6 +129,7 @@
     <view class="tp-btn" wx:if="{{!paid}}" bindtap="onOpenWallet">去钱包缴纳保证金</view>
   </view>
   <view class="tp-bar" wx:elif="{{view === 'list'}}">
+    <view class="tp-btn tp-btn--ghost" bindtap="onSettle">课时结算</view>
     <view class="tp-btn" bindtap="onCreate">新增培训</view>
   </view>
   <view class="tp-bar tp-bar--split" wx:else>

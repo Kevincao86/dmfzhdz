@@ -168,6 +168,72 @@ const PLATFORM_ANNOUNCEMENTS = [
   { title: '平台服务协议更新通知', date: '05-20' },
 ]
 
+type HomeCourse = {
+  id: string
+  title: string
+  poster: string
+  mode: string
+  city: string
+  whenText: string
+  fee: string
+  hostName: string
+}
+
+function todayText() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
+function isUpcomingCourse(whenText: string) {
+  const dates = String(whenText || '').match(/\d{4}-\d{2}-\d{2}/g) || []
+  const start = dates[0] || ''
+  if (!start) return true
+  return start >= todayText()
+}
+
+function cityKey(raw: string) {
+  return String(raw || '').replace(/市$/, '').trim()
+}
+
+function courseMatchesCity(city: string, userCity: string) {
+  const key = cityKey(userCity)
+  if (!key) return true
+  const raw = String(city || '')
+  if (!raw) return false
+  if (raw.includes('全国')) return true
+  return raw.split(/[、,，/\s]+/).some((part) => {
+    const p = cityKey(part)
+    return p && (p === key || p.includes(key) || key.includes(p))
+  })
+}
+
+function pickHomeCourses(raw: unknown, userCity: string): HomeCourse[] {
+  const list = Array.isArray(raw) ? raw : []
+  const key = cityKey(userCity)
+  const rows = list
+    .map((item) => {
+      const row = item as Record<string, unknown>
+      return {
+        id: String(row.id || ''),
+        title: String(row.title || '培训课程'),
+        poster: String(row.poster || ''),
+        mode: row.mode === 'offline' ? 'offline' : 'online',
+        city: String(row.city || ''),
+        whenText: String(row.whenText || ''),
+        fee: String(row.fee || ''),
+        hostName: String(row.hostName || ''),
+      }
+    })
+    .filter((row) => row.id && isUpcomingCourse(row.whenText))
+    .filter((row) => (row.mode === 'online' ? true : !key ? row.city.includes('全国') || !row.city : courseMatchesCity(row.city, key)))
+  rows.sort((a, b) => {
+    const aLocal = a.mode === 'offline' && key && courseMatchesCity(a.city, key) && !a.city.includes('全国') ? 0 : 1
+    const bLocal = b.mode === 'offline' && key && courseMatchesCity(b.city, key) && !b.city.includes('全国') ? 0 : 1
+    return aLocal - bLocal
+  })
+  return rows.slice(0, 4)
+}
+
 function countPendingApplications(reg: MpRegistry): number {
   const apps = readApplications()
   if (!apps.length) return 0
@@ -298,7 +364,7 @@ function TalentHomeDashboard({
 }) {
   const displayName = resolveShellDisplayName()
   const profileLink = workId === 'shoot' || workId === 'edit' ? '/profile/supplier' : '/profile/talent'
-  const [recentApps, setRecentApps] = useState<RecentApplicationItem[]>([])
+  const [homeCourses, setHomeCourses] = useState<HomeCourse[]>([])
   const [matchCount, setMatchCount] = useState(0)
   const [pendingCount, setPendingCount] = useState(0)
   const [appsLoading, setAppsLoading] = useState(true)
@@ -314,8 +380,6 @@ function TalentHomeDashboard({
         const reg = await fetchMpRegistry()
         if (!alive) return
         setPendingCount(countPendingApplications(reg))
-        const mpOrders = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
-        const mpById = new Map(mpOrders.map((o) => [String((o as { id?: string })?.id || ''), o as Record<string, unknown>]))
         const all = loadAllOrderRows(reg)
         const rows = all.filter((r) => orderVisibleToWorkIdentity(r, workId) && r.statusLabel === '招募中')
         let enriched = rows
@@ -329,16 +393,13 @@ function TalentHomeDashboard({
         const matched = enriched.filter((r) => (r.matchScore || 0) >= 55 || r.aiMatch)
         setMatchCount(matched.length)
 
-        const localApps = readApplications()
-        const recent = [...localApps]
-          .sort((a, b) => applicationSortMs(b.appliedAt) - applicationSortMs(a.appliedAt))
-          .slice(0, 4)
-          .map((app) => enrichRecentApplication(app, mpById.get(app.mpOrderId), reg))
-        setRecentApps(recent)
+        const training = await fetchTraining().catch(() => null)
+        if (!alive) return
+        setHomeCourses(pickHomeCourses(training && training.courses, String(member?.city || '')))
       } catch {
         if (!alive) return
         setMatchCount(0)
-        setRecentApps([])
+        setHomeCourses([])
       } finally {
         if (alive) setAppsLoading(false)
       }
@@ -460,48 +521,41 @@ function TalentHomeDashboard({
         </div>
 
         <section className="talent-home__panel talent-home__right">
-          <h3 className="talent-home__panel-title">最近报名单</h3>
+          <h3 className="talent-home__panel-title">课程培训推荐</h3>
           {appsLoading ? (
-            <p className="talent-home__hint">报名单加载中…</p>
-          ) : recentApps.length ? (
+            <p className="talent-home__hint">课程加载中…</p>
+          ) : homeCourses.length ? (
             <ul className="talent-home__order-list">
-              {recentApps.map((item) => {
-                const cover = item.coverUrl || ''
-                const tags = item.tags
-                const appliedLabel = formatAppliedAtShort(item.appliedAt)
-                return (
-                  <li key={item.mpOrderId}>
-                    <div className="talent-home__order-row">
-                      <div className="talent-home__order-cover">
-                        {cover ? <img src={cover} alt="" /> : <span>📋</span>}
-                      </div>
-                      <div className="talent-home__order-body">
-                        <h4 className="talent-home__order-title">{item.title}</h4>
-                        <div className="talent-home__order-tags">
-                          {tags.map((tag) => (
-                            <span key={tag} className="talent-home__order-tag">{tag}</span>
-                          ))}
-                        </div>
-                        {appliedLabel ? (
-                          <p className="talent-home__order-applied">报名时间 {appliedLabel}</p>
-                        ) : null}
-                      </div>
-                      <span className="talent-home__order-status">{item.progressLabel}</span>
-                      <Link
-                        to={`/recruitment/${encodeURIComponent(item.mpOrderId)}?applied=1`}
-                        className="talent-home__order-apply talent-home__order-apply--outline"
-                      >
-                        查看详情
-                      </Link>
+              {homeCourses.map((item) => (
+                <li key={item.id}>
+                  <div className="talent-home__order-row">
+                    <div className="talent-home__order-cover">
+                      {item.poster ? <img src={item.poster} alt="" /> : <span>课</span>}
                     </div>
-                  </li>
-                )
-              })}
+                    <div className="talent-home__order-body">
+                      <h4 className="talent-home__order-title">{item.title}</h4>
+                      <div className="talent-home__order-tags">
+                        <span className="talent-home__order-tag">{item.mode === 'offline' ? '线下' : '线上'}</span>
+                        {item.city ? <span className="talent-home__order-tag">{item.city}</span> : null}
+                        {item.hostName ? <span className="talent-home__order-tag">{item.hostName}</span> : null}
+                      </div>
+                      {item.whenText ? <p className="talent-home__order-applied">{item.whenText}</p> : null}
+                    </div>
+                    <span className="talent-home__order-status">{item.fee ? `¥${item.fee}` : '待定'}</span>
+                    <Link
+                      to={`/training?course=${encodeURIComponent(item.id)}`}
+                      className="talent-home__order-apply talent-home__order-apply--outline"
+                    >
+                      查看详情
+                    </Link>
+                  </div>
+                </li>
+              ))}
             </ul>
           ) : (
             <div className="talent-home__order-empty">
-              <p>暂无报名记录</p>
-              <Link to="/hall?tab=hall" className="talent-home__order-empty-link">去招募大厅报名</Link>
+              <p>暂无同城或线上的即将开课</p>
+              <Link to="/training" className="talent-home__order-empty-link">查看全部培训</Link>
             </div>
           )}
         </section>

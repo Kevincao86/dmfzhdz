@@ -23,6 +23,7 @@ const orderCalendar = require('../../utils/orderCalendarEvents.js')
 const appRegistrySync = require('../../utils/applicationsRegistrySync.js')
 const applicationsStore = require('../../utils/applicationsStore.js')
 const prPublishedOrders = require('../../utils/prPublishedOrders.js')
+const training = require('../../utils/mpTraining.js')
 
 const MY_ORDERS_MENU = {
   key: 'myOrders',
@@ -34,7 +35,7 @@ const MY_ORDERS_MENU = {
 const TRAINING_MENU = {
   key: 'training',
   label: '培训课程',
-  sub: '线上或线下课程报名与发布',
+  sub: '即将开始的线上和线下课程',
   icon: 'list',
 }
 
@@ -177,6 +178,23 @@ function workbenchGreeting(displayName) {
   return name && name !== '灵祺用户' ? `${name}，${tail}` : tail
 }
 
+function injectMyCoursesMenu(menus) {
+  const list = (menus || []).slice()
+  if (list.some((item) => item.key === 'myCourses')) return list
+  const item = attachMenuGlyphs([
+    {
+      key: 'myCourses',
+      label: '我的课程',
+      sub: '发布、编辑和结算自己的培训',
+      icon: 'list',
+    },
+  ])[0]
+  const idx = list.findIndex((row) => row.key === 'training')
+  if (idx >= 0) list.splice(idx + 1, 0, item)
+  else list.push(item)
+  return list
+}
+
 function splitWorkbenchMenus(menus, identity) {
   const keys = QUICK_MENU_KEYS[identity] || QUICK_MENU_KEYS.talent
   const keySet = new Set(keys)
@@ -306,6 +324,7 @@ const MENU_URLS = {
   addonsHub: '/pages/subpack-pr/mine-pr-addons/mine-pr-addons',
   xingxuanMembership: '/pages/subpack-mine/mine-xingxuan-membership/mine-xingxuan-membership',
   training: '/pages/subpack-mine/mine-training/mine-training',
+  myCourses: '/pages/subpack-mine/mine-training-post/mine-training-post',
   affiliatePortal: '/pages/subpack-mine/mine-affiliate-portal/mine-affiliate-portal',
   affiliateApply: '/pages/subpack-mine/mine-affiliate-apply/mine-affiliate-apply',
 }
@@ -507,11 +526,12 @@ Page({
       (((identity === 'talent' || identity === 'shoot' || identity === 'edit') &&
         memberProfileApplyGate.isMemberProfileComplete(member, identity)) ||
         (identity === 'pr' && prProfile && String(prProfile.contactPhone || '').trim()))
-    const menus = filterMenusForAccount(
+    let menus = filterMenusForAccount(
       identity === 'pr' ? buildPrMenus() : talentMenusForIdentity(identity),
       acct,
       identity,
     )
+    if (this._lecturerApproved) menus = injectMyCoursesMenu(menus)
     const { quickMenus, bizMenus } = splitWorkbenchMenus(menus, identity)
     const planId = mpMembershipUi.readMembershipPlanId(acct, identity, member, prProfile)
     const membershipPlanLabel = mpMembershipUi.planLabel(planId)
@@ -548,6 +568,21 @@ Page({
       ...stats,
     })
     if (identity === 'pr' && wxLoggedIn) void this.refreshPrStatsIfNeeded()
+    if (wxLoggedIn) void this.attachLecturerCourses(identity)
+  },
+  async attachLecturerCourses(identity) {
+    if (!auth.isLoggedIn()) return
+    try {
+      const profile = await training.syncProfile()
+      const approved = training.lecturerState(profile) === 'approved'
+      this._lecturerApproved = approved
+      if (!approved || userProfile.readIdentity() !== identity) return
+      const current = this.data.menus || []
+      if (current.some((item) => item.key === 'myCourses')) return
+      const next = injectMyCoursesMenu(current)
+      const split = splitWorkbenchMenus(next, identity)
+      this.setData({ menus: next, quickMenus: split.quickMenus, bizMenus: split.bizMenus })
+    } catch (_) {}
   },
   async refreshPrStatsIfNeeded() {
     if (userProfile.readIdentity() !== 'pr' || !auth.isLoggedIn()) return

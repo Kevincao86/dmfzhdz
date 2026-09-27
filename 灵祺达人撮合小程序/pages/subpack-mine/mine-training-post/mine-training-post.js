@@ -146,6 +146,9 @@ Page({
   onOpenWallet() {
     wx.navigateTo({ url: '/pages/subpack-mine/mine-wallet/mine-wallet' })
   },
+  onSettle() {
+    wx.navigateTo({ url: '/pages/subpack-mine/mine-training-settle/mine-training-settle' })
+  },
   onCreate() {
     const reason = training.publishBlockReason()
     if (reason) {

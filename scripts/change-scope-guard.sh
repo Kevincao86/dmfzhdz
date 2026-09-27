@@ -1264,6 +1264,9 @@ mpTraining
 meoo-mp-training
 mpTrainingPay
 TrainingPage
+HallHomeDashboard
+ProfilePage
+mine-training-detail
 lingqi-xingxuan-app/src/api/hall.ts
 灵祺达人撮合小程序/pages/index/index
 灵祺达人撮合小程序/pages/mine/mine

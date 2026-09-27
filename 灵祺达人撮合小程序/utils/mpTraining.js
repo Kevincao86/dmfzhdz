@@ -108,6 +108,56 @@ function isAdvancedMember() {
   return ADVANCED.has(String(planId() || 'basic'))
 }
 
+function todayText() {
+  const now = new Date()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  return `${now.getFullYear()}-${m}-${d}`
+}
+
+function courseDates(whenText) {
+  return String(whenText || '').match(/\d{4}-\d{2}-\d{2}/g) || []
+}
+
+function isUpcomingCourse(course) {
+  const dates = courseDates(course && course.whenText)
+  const start = dates[0] || ''
+  if (!start) return true
+  return start >= todayText()
+}
+
+function cityKey(raw) {
+  return String(raw || '').replace(/市$/, '').trim()
+}
+
+function courseMatchesCity(course, city) {
+  const key = cityKey(city)
+  if (!key || key === '全部') return true
+  const raw = String((course && course.city) || '')
+  if (!raw) return false
+  if (raw.includes('全国')) return true
+  return raw.split(/[、,，/\s]+/).some((part) => {
+    const p = cityKey(part)
+    return p && (p === key || p.includes(key) || key.includes(p))
+  })
+}
+
+function recommendCourses(courses, userCity) {
+  const key = cityKey(userCity)
+  const list = (Array.isArray(courses) ? courses : []).filter((course) => {
+    if (!course || !isUpcomingCourse(course)) return false
+    if (course.mode !== 'offline') return true
+    if (!key) return String(course.city || '').includes('全国') || !course.city
+    return courseMatchesCity(course, key)
+  })
+  list.sort((a, b) => {
+    const aLocal = a.mode === 'offline' && key && courseMatchesCity(a, key) && !String(a.city || '').includes('全国') ? 0 : 1
+    const bLocal = b.mode === 'offline' && key && courseMatchesCity(b, key) && !String(b.city || '').includes('全国') ? 0 : 1
+    return aLocal - bLocal
+  })
+  return list.slice(0, 4)
+}
+
 function publishBlockReason() {
   const identity = userProfile.readIdentity()
   if (identity !== 'pr' && identity !== 'talent' && identity !== 'shoot' && identity !== 'edit') {
@@ -466,6 +516,9 @@ module.exports = {
   prepay,
   payQuery,
   isAdvancedMember,
+  isUpcomingCourse,
+  courseMatchesCity,
+  recommendCourses,
   publishBlockReason,
   planId,
   listCourses,

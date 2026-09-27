@@ -283,6 +283,9 @@ export async function createTrainingPrepay(body: Record<string, unknown>) {
     const signups = Array.isArray(course.signups) ? course.signups : []
     if (signups.length >= Math.max(1, Number(course.seats) || 1)) return { ok: false as const, error: '名额已满' }
     const payerHostId = hostId
+    if (payerHostId && payerHostId === String(course.hostId || '')) {
+      return { ok: false as const, error: '不能报名自己发布的课程' }
+    }
     if (
       payerHostId &&
       bag.orders.some(

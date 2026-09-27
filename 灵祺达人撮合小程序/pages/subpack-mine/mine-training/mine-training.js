@@ -3,6 +3,8 @@ const training = require('../../../utils/mpTraining.js')
 Page({
   data: {
     filter: 'all',
+    cityFilter: '全部',
+    cities: [],
     courses: [],
     shown: [],
     enrolled: [],
@@ -33,11 +35,31 @@ Page({
   },
   applyFilter() {
     const f = this.data.filter
-    const shown = (this.data.courses || []).filter((c) => f === 'all' || c.mode === f)
-    this.setData({ shown })
+    const city = this.data.cityFilter || '全部'
+    const upcoming = (this.data.courses || []).filter((c) => training.isUpcomingCourse(c))
+    const cities = []
+    upcoming.forEach((c) => {
+      if (c.mode !== 'offline') return
+      String(c.city || '')
+        .split(/[、,，/\s]+/)
+        .forEach((part) => {
+          const key = String(part || '').replace(/市$/, '').trim()
+          if (key && key !== '全国' && cities.indexOf(key) < 0) cities.push(key)
+        })
+    })
+    const shown = upcoming.filter((c) => {
+      if (f !== 'all' && c.mode !== f) return false
+      if (f === 'offline' && !training.courseMatchesCity(c, city)) return false
+      return true
+    })
+    this.setData({ shown, cities })
   },
   onFilter(e) {
-    this.setData({ filter: e.currentTarget.dataset.id }, () => this.applyFilter())
+    const filter = e.currentTarget.dataset.id
+    this.setData({ filter, cityFilter: filter === 'offline' ? this.data.cityFilter : '全部' }, () => this.applyFilter())
+  },
+  onCity(e) {
+    this.setData({ cityFilter: e.currentTarget.dataset.city || '全部', filter: 'offline' }, () => this.applyFilter())
   },
   onOpen(e) {
     wx.navigateTo({
@@ -46,32 +68,5 @@ Page({
   },
   onApply() {
     wx.navigateTo({ url: '/pages/subpack-mine/mine-training-account/mine-training-account?mode=apply' })
-  },
-  onSettle() {
-    wx.navigateTo({ url: '/pages/subpack-mine/mine-training-settle/mine-training-settle' })
-  },
-  onPost() {
-    const reason = training.publishBlockReason()
-    if (reason) {
-      wx.showModal({
-        title: '还不能发布',
-        content: reason + (reason.indexOf('保证金') >= 0 ? `（¥${training.DEPOSIT_YUAN}）` : ''),
-        confirmText: reason.indexOf('会员') >= 0 ? '去开通' : reason.indexOf('保证金') >= 0 ? '去缴纳' : reason.indexOf('审核中') >= 0 ? '知道了' : '去填写',
-        success: (res) => {
-          if (!res.confirm) return
-          if (reason.indexOf('会员') >= 0) {
-            wx.navigateTo({ url: '/pages/subpack-mine/mine-xingxuan-membership/mine-xingxuan-membership' })
-          } else if (reason.indexOf('保证金') >= 0) {
-            wx.navigateTo({ url: '/pages/subpack-mine/mine-wallet/mine-wallet' })
-          } else if (reason.indexOf('审核中') >= 0) {
-            return
-          } else if (reason.indexOf('讲师') >= 0) {
-            wx.navigateTo({ url: '/pages/subpack-mine/mine-training-account/mine-training-account?mode=apply' })
-          }
-        },
-      })
-      return
-    }
-    wx.navigateTo({ url: '/pages/subpack-mine/mine-training-post/mine-training-post' })
   },
 })

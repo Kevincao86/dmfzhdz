@@ -1,4 +1,17 @@
 const training = require('../../../utils/mpTraining.js')
+const auth = require('../../../utils/auth.js')
+
+function myAccountId() {
+  const acct = auth.readAccount() || {}
+  return String(acct.accountId || acct.id || acct.userId || acct.phone || acct.loginName || '')
+}
+
+function hostLabel(role) {
+  if (role === 'pr') return 'PR'
+  if (role === 'shoot') return '拍摄'
+  if (role === 'edit') return '剪辑'
+  return '达人'
+}
 
 const DEFAULT_FIELDS = [
   { key: 'name', label: '姓名', kind: 'name' },
@@ -27,17 +40,21 @@ function fieldError(fields) {
 }
 
 Page({
-  data: { course: null, fields: DEFAULT_FIELDS.map((field) => ({ ...field, value: '' })), modePick: 'online', parts: null, formErr: '' },
+  data: { course: null, fields: DEFAULT_FIELDS.map((field) => ({ ...field, value: '' })), modePick: 'online', parts: null, formErr: '', ownCourse: false, hostLabel: '达人' },
   onLoad(q) {
     this._id = q.id || ''
   },
   async onShow() {
     const list = await training.listCourses()
     const course = (list || []).find((c) => c.id === this._id) || null
+    const mineId = myAccountId()
+    const ownCourse = !!(course && mineId && String(course.hostId || '') === mineId)
     this.setData({
       course,
+      ownCourse,
+      hostLabel: hostLabel(course && course.hostRole),
       fields: fieldsFrom(course),
-      formErr: '',
+      formErr: ownCourse ? '这是你发布的课程，不能报名自己的课。' : '',
       parts: course ? training.splitFee(course.fee) : null,
       modePick: course && course.mode === 'offline' ? 'offline' : 'online',
     })
@@ -49,6 +66,10 @@ Page({
   },
   onMode(e) { this.setData({ modePick: e.currentTarget.dataset.id }) },
   async onSignup() {
+    if (this.data.ownCourse) {
+      this.setData({ formErr: '不能报名自己发布的课程' })
+      return
+    }
     const reason = fieldError(this.data.fields)
     if (reason) {
       this.setData({ formErr: reason })

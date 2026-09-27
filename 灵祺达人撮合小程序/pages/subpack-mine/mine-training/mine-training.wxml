@@ -1,19 +1,19 @@
 <view class="tr-page">
-  <text class="tr-note">课时费代收代付。佣金 1%，其余核实通过后 T+1 结算。</text>
+  <text class="tr-note">这里是即将开始的课程。线上课直接报名，线下课可以按城市查看。</text>
   <view class="tr-actions">
     <view class="tr-action" bindtap="onApply">
       <text class="tr-action__name">申请讲师</text>
       <text class="tr-action__state">{{lecturerLabel}}</text>
-    </view>
-    <view class="tr-action" bindtap="onSettle">
-      <text class="tr-action__name">我的结算</text>
-      <text class="tr-action__state">课时费</text>
     </view>
   </view>
   <view class="tr-seg">
     <view class="tr-seg__item {{filter === 'all' ? 'tr-seg__item--on' : ''}}" data-id="all" bindtap="onFilter">全部</view>
     <view class="tr-seg__item {{filter === 'online' ? 'tr-seg__item--on' : ''}}" data-id="online" bindtap="onFilter">线上</view>
     <view class="tr-seg__item {{filter === 'offline' ? 'tr-seg__item--on' : ''}}" data-id="offline" bindtap="onFilter">线下</view>
+  </view>
+  <view wx:if="{{filter === 'offline'}}" class="tr-cities">
+    <text class="tr-city {{cityFilter === '全部' ? 'tr-city--on' : ''}}" data-city="全部" bindtap="onCity">全部</text>
+    <text wx:for="{{cities}}" wx:key="*this" class="tr-city {{cityFilter === item ? 'tr-city--on' : ''}}" data-city="{{item}}" bindtap="onCity">{{item}}</text>
   </view>
   <view wx:if="{{enrolled.length}}" class="tr-actions">
     <view class="tr-action">
@@ -28,7 +28,7 @@
     </view>
   </view>
   <view wx:if="{{loading}}" class="tr-empty">加载中</view>
-  <view wx:elif="{{!shown.length}}" class="tr-empty">还没有培训课程</view>
+  <view wx:elif="{{!shown.length}}" class="tr-empty">还没有即将开始的课程</view>
   <view wx:for="{{shown}}" wx:key="id" class="tr-card" data-id="{{item.id}}" bindtap="onOpen">
     <image wx:if="{{item.posterMp || item.poster}}" class="tr-card__cover" src="{{item.posterMp || item.poster}}" mode="aspectFill" />
     <view wx:else class="tr-card__cover tr-card__cover--ph">培训</view>
@@ -44,9 +44,5 @@
         <text class="tr-go">报名</text>
       </view>
     </view>
-  </view>
-  <view class="tr-post" bindtap="onPost">
-    <text class="tr-post__main">发布培训</text>
-    <text class="tr-post__sub">讲师通过后即可发布，收款账户在我的钱包绑定</text>
   </view>
 </view>

@@ -41,6 +41,33 @@ function parseWhen(raw: string) {
   return { startDate: '', endDate: '', startTime: '14:00', endTime: '16:00' }
 }
 
+function todayText() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
+function isUpcomingCourse(whenText: string) {
+  const dates = String(whenText || '').match(/\d{4}-\d{2}-\d{2}/g) || []
+  const start = dates[0] || ''
+  if (!start) return true
+  return start >= todayText()
+}
+
+function cityKey(raw: string) {
+  return String(raw || '').replace(/市$/, '').trim()
+}
+
+function courseMatchesCity(city: string, selected: string) {
+  const key = cityKey(selected)
+  if (!key || key === '全部') return true
+  const raw = String(city || '')
+  if (raw.includes('全国')) return true
+  return raw.split(/[、,，/\s]+/).some((part) => {
+    const p = cityKey(part)
+    return p && (p === key || p.includes(key) || key.includes(p))
+  })
+}
+
 function formatWhen(startDate: string, endDate: string, startTime: string, endTime: string) {
   if (!startDate || !endDate || !startTime || !endTime) return ''
   return `${startDate} 至 ${endDate}，每天 ${startTime}-${endTime}`
@@ -135,6 +162,7 @@ function answersError(fields: SignupField[], answers: Record<string, string>) {
 type Course = {
   id: string
   title: string
+  hostId?: string
   hostName: string
   mode: 'online' | 'offline'
   city: string
@@ -155,6 +183,8 @@ export default function TrainingPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const focusCourseId = searchParams.get('course') || ''
+  const mineMode = searchParams.get('mine') === '1'
+  const [offlineCity, setOfflineCity] = useState('全部')
   const [courses, setCourses] = useState<Course[]>([])
   const [mine, setMine] = useState<Course[]>([])
   const [enrolled, setEnrolled] = useState<{ id: string; title: string; pay?: number; status?: string }[]>([])
@@ -282,7 +312,31 @@ export default function TrainingPage() {
     return () => window.clearInterval(timer)
   }, [payTrade])
 
-  const shown = courses.filter((c) => mode === 'all' || c.mode === mode)
+  const upcoming = courses.filter((c) => isUpcomingCourse(c.whenText))
+  const offlineCities = Array.from(
+    new Set(
+      upcoming
+        .filter((c) => c.mode === 'offline')
+        .flatMap((c) => String(c.city || '').split(/[、,，/\s]+/).map((part) => cityKey(part)).filter((part) => part && part !== '全国')),
+    ),
+  )
+  const shown = upcoming.filter((c) => {
+    if (mode !== 'all' && c.mode !== mode) return false
+    if (mode === 'offline' && !courseMatchesCity(c.city, offlineCity)) return false
+    return true
+  })
+  const focusCourse = shown.find((c) => c.id === focusCourseId) || upcoming.find((c) => c.id === focusCourseId) || null
+  function openCoursePay(course: Course) {
+    if (me?.accountId && course.hostId && course.hostId === me.accountId) {
+      setErr('不能报名自己发布的课程')
+      return
+    }
+    setAnswers({})
+    setSheetErr('')
+    setPayQr('')
+    setPayTrade('')
+    setPayOpen({ purpose: 'course', courseId: course.id, name: '', title: course.title, fields: fieldsOf(course.signupFields) })
+  }
   function publishGate() {
     if (lecturerStatus !== 'approved') return '请先申请讲师并通过审核'
     if (!depositPaid) return '请先到我的钱包缴纳保证金'
@@ -401,25 +455,38 @@ export default function TrainingPage() {
     <div className="mx-auto max-w-3xl space-y-4 p-4">
       <div>
         <div className="flex items-center justify-between gap-3">
-          <h1 className="text-xl font-bold text-slate-900">培训课程</h1>
+          <h1 className="text-xl font-bold text-slate-900">{mineMode ? '我的课程' : '培训课程'}</h1>
           <div className="flex gap-2">
-            <button
-              type="button"
-              className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white"
-              onClick={() => {
-                setErr('')
-                setPanel('apply')
-              }}
-            >
-              {applyLabel}
-            </button>
+            {mineMode ? (
+              <>
+                <button type="button" className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700" onClick={() => navigate('/training')}>
+                  返回课程
+                </button>
+                <Link to="/profile/wallet" className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 no-underline">
+                  课时结算
+                </Link>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white"
+                onClick={() => {
+                  setErr('')
+                  setPanel('apply')
+                }}
+              >
+                {applyLabel}
+              </button>
+            )}
           </div>
         </div>
         <p className="mt-1 text-sm text-slate-500">
-          课时费由平台代收。核实通过后进入 T+1 应付款，到我的钱包提现。个人预扣个税，企业凭发票打款。
+          {mineMode
+            ? '讲师审核通过后在这里发布和修改课程。课时费核实通过后到我的钱包提现。'
+            : '这里是即将开始的课程。线上课直接报名，线下课可以按城市查看。'}
         </p>
       </div>
-      <div className="flex gap-2 text-sm">
+      {!mineMode ? <div className="flex gap-2 text-sm">
         {(['all', 'online', 'offline'] as const).map((id) => (
           <button
             key={id}
@@ -430,12 +497,59 @@ export default function TrainingPage() {
             {id === 'all' ? '全部' : id === 'online' ? '线上' : '线下'}
           </button>
         ))}
-      </div>
+      </div> : null}
+      {!mineMode && mode === 'offline' ? (
+        <div className="flex flex-wrap gap-2 text-sm">
+          {['全部', ...offlineCities].map((city) => (
+            <button
+              key={city}
+              type="button"
+              className={offlineCity === city ? 'rounded-full bg-slate-900 px-3 py-1 text-white' : 'rounded-full bg-slate-100 px-3 py-1'}
+              onClick={() => setOfflineCity(city)}
+            >
+              {city}
+            </button>
+          ))}
+        </div>
+      ) : null}
       {err && !editorOpen && !panel && !payOpen ? <p className="text-sm text-red-600">{err}</p> : null}
-      <div className="space-y-3">
+      {!mineMode && focusCourse ? (
+        <article className="rounded-2xl border border-violet-300 bg-white p-4">
+          <div className="flex gap-3">
+            {focusCourse.poster ? (
+              <img src={focusCourse.poster} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
+            ) : (
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-xs text-violet-700">课</div>
+            )}
+            <div>
+              <h2 className="font-semibold text-slate-900">{focusCourse.title}</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                {focusCourse.hostName} · {focusCourse.mode === 'offline' ? '线下' : '线上'}
+                {focusCourse.city ? ` · ${focusCourse.city}` : ''} {focusCourse.whenText ? ` · ${focusCourse.whenText}` : ''}
+              </p>
+            </div>
+          </div>
+          {focusCourse.note ? <p className="mt-3 text-sm text-slate-600">{focusCourse.note}</p> : null}
+          {me?.accountId && focusCourse.hostId === me.accountId ? (
+            <p className="mt-3 text-sm text-amber-700">这是你发布的课程，不能报名自己的课。</p>
+          ) : (
+            <button type="button" className="mt-3 rounded-xl bg-violet-600 px-3 py-2 text-sm text-white" onClick={() => openCoursePay(focusCourse)}>
+              查看并报名
+            </button>
+          )}
+        </article>
+      ) : null}
+      {!mineMode ? <div className="space-y-3">
         {shown.map((c) => (
           <article id={`train-${c.id}`} key={c.id} className={`rounded-2xl border bg-white p-4 ${focusCourseId === c.id ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-200'}`}>
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              {c.poster ? (
+                <img src={c.poster} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
+              ) : (
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-xs text-violet-700">课</div>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="font-semibold text-slate-900">{c.title}</h2>
                 <p className="mt-1 text-sm text-slate-500">
@@ -444,28 +558,24 @@ export default function TrainingPage() {
                 </p>
               </div>
               <p className="text-sm font-semibold text-violet-700">¥{c.fee || '0'}</p>
+                </div>
+              </div>
             </div>
             <p className="mt-2 text-xs text-slate-400">
               已报 {c.signupCount || 0}/{c.seats}
             </p>
-            <button
-              type="button"
-              className="mt-3 rounded-xl bg-violet-600 px-3 py-2 text-sm text-white"
-              onClick={() => {
-                setAnswers({})
-                setSheetErr('')
-                setPayQr('')
-                setPayTrade('')
-                setPayOpen({ purpose: 'course', courseId: c.id, name: '', title: c.title, fields: fieldsOf(c.signupFields) })
-              }}
-            >
-              扫码支付报名
-            </button>
+            {me?.accountId && c.hostId === me.accountId ? (
+              <p className="mt-3 text-sm text-amber-700">这是你发布的课程，不能报名自己的课。</p>
+            ) : (
+              <button type="button" className="mt-3 rounded-xl bg-violet-600 px-3 py-2 text-sm text-white" onClick={() => openCoursePay(c)}>
+                查看并报名
+              </button>
+            )}
           </article>
         ))}
-        {!shown.length ? <p className="text-sm text-slate-400">还没有课程</p> : null}
-      </div>
-      {enrolled.length ? (
+        {!shown.length ? <p className="text-sm text-slate-400">还没有即将开始的课程</p> : null}
+      </div> : null}
+      {!mineMode && enrolled.length ? (
         <section className="rounded-3xl border border-slate-200 bg-white p-5">
           <h2 className="text-lg font-bold text-slate-900">我报名的</h2>
           <div className="mt-3 space-y-2">
@@ -478,7 +588,7 @@ export default function TrainingPage() {
           </div>
         </section>
       ) : null}
-      <section className="rounded-3xl border border-slate-200 bg-white p-5">
+      {mineMode ? <section className="rounded-3xl border border-slate-200 bg-white p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold text-slate-900">我发布的</h2>
@@ -533,7 +643,7 @@ export default function TrainingPage() {
           ))}
           {!mine.length ? <p className="py-6 text-center text-sm text-slate-400">还没有发布培训</p> : null}
         </div>
-      </section>
+      </section> : null}
       {editorOpen ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-6" onClick={() => setEditorOpen(false)}>
           <form
