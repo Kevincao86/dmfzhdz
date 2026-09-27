@@ -28,6 +28,7 @@ import { capabilityMetaForMode } from '../lib/addonAiComplianceCapabilities'
 
 const SCRIPT_PLATFORM_OPTS = ['小红书', '大众点评'] as const
 const VIDEO_PLATFORM_OPTS = ['抖音', '快手', '视频号'] as const
+const VIDEO_SCENE_OPTS = ['团购带货', '品宣打卡', '探店种草', '直播带货'] as const
 
 function platformOptionsForMode(mode: AddonComplianceMode): readonly string[] {
   return mode === 'video' ? VIDEO_PLATFORM_OPTS : SCRIPT_PLATFORM_OPTS
@@ -99,6 +100,7 @@ export default function AiComplianceReviewAddonPage({ mode: legacyMode }: Props)
 
   const fileRef = useRef<HTMLInputElement>(null)
   const [platform, setPlatform] = useState(() => defaultPlatformForMode(mode))
+  const [scene, setScene] = useState<(typeof VIDEO_SCENE_OPTS)[number]>('探店种草')
 
   useEffect(() => {
     const opts = platformOptionsForMode(mode)
@@ -243,6 +245,7 @@ export default function AiComplianceReviewAddonPage({ mode: legacyMode }: Props)
         mpOrderId: 'addon',
         applicantId: prepared.id,
         platform,
+        scene,
         applicantName: prepared.label,
         videoUrl: prepared.videoUrl,
       })
@@ -446,6 +449,22 @@ export default function AiComplianceReviewAddonPage({ mode: legacyMode }: Props)
               ))}
             </select>
           </label>
+          {mode === 'video' ? (
+            <label className="block text-xs text-[var(--shell-muted)]">
+              场景
+              <select
+                value={scene}
+                onChange={(e) => setScene(e.target.value as (typeof VIDEO_SCENE_OPTS)[number])}
+                className="mt-1 block rounded-lg border border-[var(--shell-border)] bg-transparent px-3 py-2 text-sm"
+              >
+                {VIDEO_SCENE_OPTS.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <button
             type="button"
             className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500"

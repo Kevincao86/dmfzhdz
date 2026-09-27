@@ -9,6 +9,7 @@ const addonAiComplianceCapabilities = require('../../../utils/addonAiComplianceC
 
 const SCRIPT_PLATFORM_OPTIONS = ['小红书', '大众点评']
 const VIDEO_PLATFORM_OPTIONS = ['抖音', '快手', '视频号']
+const VIDEO_SCENE_OPTIONS = ['团购带货', '品宣打卡', '探店种草', '直播带货']
 
 function platformOptionsForMode(reviewMode) {
   return reviewMode === 'video' ? VIDEO_PLATFORM_OPTIONS : SCRIPT_PLATFORM_OPTIONS
@@ -61,6 +62,9 @@ Page({
     platformOptions: SCRIPT_PLATFORM_OPTIONS,
     platformIndex: 0,
     platform: SCRIPT_PLATFORM_OPTIONS[0],
+    sceneOptions: VIDEO_SCENE_OPTIONS,
+    sceneIndex: 2,
+    scene: '探店种草',
     linkInput: '',
     items: [],
     busyId: '',
@@ -170,6 +174,14 @@ Page({
     this.setData({
       platformIndex: idx,
       platform: opts[idx] || opts[0] || '',
+    })
+  },
+  onSceneChange(e) {
+    const idx = Number(e.detail.value) || 0
+    const opts = this.data.sceneOptions || VIDEO_SCENE_OPTIONS
+    this.setData({
+      sceneIndex: idx,
+      scene: opts[idx] || opts[0] || '探店种草',
     })
   },
   onLinkInput(e) {
@@ -373,6 +385,7 @@ Page({
         mpOrderId: 'addon',
         applicantId: prepared.id,
         platform,
+        scene: this.data.scene,
         applicantName: prepared.label,
         videoUrl: prepared.videoUrl,
         filePath: prepared.filePath,

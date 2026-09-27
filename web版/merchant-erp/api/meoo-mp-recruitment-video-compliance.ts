@@ -122,6 +122,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           typeof body.merchantRequirements === 'string' ? body.merchantRequirements : undefined,
         taskDetail: typeof body.taskDetail === 'string' ? body.taskDetail : undefined,
         category: typeof body.category === 'string' ? body.category : undefined,
+        scene: typeof body.scene === 'string' ? body.scene : undefined,
         region: typeof body.region === 'string' ? body.region : undefined,
         applicantName: typeof body.applicantName === 'string' ? body.applicantName : undefined,
         videoUrl,

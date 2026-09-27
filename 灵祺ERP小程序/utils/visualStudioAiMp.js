@@ -265,6 +265,9 @@ function buildLocalImagePrompt(form, copy) {
   const c = copy || {}
   return [
     `中国大陆本地生活营销海报，业态：${industry.label}，玩法：${pb.label}（${pb.desc}）。`,
+    form.variantLabel && form.variantName
+      ? `${form.variantLabel}：${form.variantName}${form.variantPeriod ? `（${form.variantPeriod}）` : ''}。`
+      : '',
     `投放渠道：${ch || '抖音'}。门店：${form.storeName || '本店'}。`,
     `画面主标题大字：「${c.headline || '限时优惠'}」，副标题「${c.subheadline || ''}」，优惠信息「${c.offer || ''}」。`,
     c.timeRange ? `活动时段：${c.timeRange}。` : '',
@@ -288,6 +291,9 @@ async function fetchCopySuggestions(form) {
     `你是中国大陆本地生活商家营销文案专家。请为「${industry.label}」门店生成 3 套海报文案。`,
     `门店名：${form.storeName || '（未填，可用「本店」）'}`,
     `营销玩法：${pb.label}（${pb.desc}）`,
+    form.variantLabel && form.variantName
+      ? `${form.variantLabel}：${form.variantName}${form.variantPeriod ? `，${form.variantPeriod}` : ''}`
+      : '',
     `投放平台：${channels || '抖音'}`,
     '要求：每套含 headline（主标题≤12字）、subheadline、offer、timeRange、note；只输出 JSON 数组。',
     `格式：${jsonExample}`,

@@ -79,6 +79,17 @@
         </view>
       </picker>
 
+      <block wx:if="{{reviewMode === 'video'}}">
+        <text class="addon-label">场景</text>
+        <picker mode="selector" range="{{sceneOptions}}" value="{{sceneIndex}}" bindchange="onSceneChange">
+          <view class="addon-order-pick">
+            <text class="addon-order-pick__label">场景</text>
+            <text class="addon-order-pick__val">{{scene}}</text>
+            <text class="addon-order-pick__arrow">▼</text>
+          </view>
+        </picker>
+      </block>
+
       <button
         class="addon-btn addon-btn--accent"
         open-type="agreePrivacyAuthorization"

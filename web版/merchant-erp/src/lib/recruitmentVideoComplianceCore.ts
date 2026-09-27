@@ -47,6 +47,8 @@ export type VideoComplianceInput = {
   merchantRequirements?: string
   taskDetail?: string
   category?: string
+  /** 团购带货 / 品宣打卡 / 探店种草 / 直播带货；空则按商单类目推断 */
+  scene?: string
   region?: string
   applicantName?: string
   videoUrl?: string
@@ -149,6 +151,91 @@ async function callLlmWithFallback(
     }
   }
   throw new Error(lastErr || 'all_providers_failed')
+}
+
+type VideoReviewScene = {
+  id: 'group_buy' | 'brand_checkin' | 'store_visit' | 'live_sell'
+  label: string
+  rules: string
+  phrases: string[]
+}
+
+const VIDEO_REVIEW_SCENES: Record<VideoReviewScene['id'], VideoReviewScene> = {
+  group_buy: {
+    id: 'group_buy',
+    label: '团购带货',
+    rules: `
+【场景·团购带货】本条按带货转化审核，不按纯氛围片放行：
+- 口播/字幕中的价格、套餐内容、使用限制、预约条件必须与商单 Brief 一致；大字低价、小字或片尾才说「需补差/部分日期不可用」→ suspect。
+- 必须能回到平台团购/到店核销。引导加微信、站外下单、私下转账 → suspect。
+- 须有合作或广告标识（口播或字幕）。未标识探店/带货合作 → suspect。
+- 「全网最低」「内部价」「不限量」「官方唯一」且无法从商单证实 → suspect。
+- 只拍氛围、完全不提套餐或价格，而商单是团购带货 → suspect（货不对板）。
+`.trim(),
+    phrases: ['内部价', '不走团购', '加微信下单', '站外下单', '补差价', '不限量'],
+  },
+  brand_checkin: {
+    id: 'brand_checkin',
+    label: '品宣打卡',
+    rules: `
+【场景·品宣打卡】本条按品牌曝光与真实到店审核，不按团购转化卡价格：
+- 须是真实门店、产品或空间，不得用无关网图、他人店面冒充到店打卡。
+- 不得编造销量榜、全网第一、官方唯一、必火。品牌排名无依据 → suspect。
+- 品宣片可以不报团购价。若主动报价格或赠品，限制条件须同屏说清，否则按虚假宣传 suspect。
+- 不得把品宣拍成医疗功效、竞品贬低或站外导流。
+- 有真实到店画面、合作标识，且没有极限承诺 → 不要仅因「没有团购价」判 suspect。
+`.trim(),
+    phrases: ['全网第一', '官方唯一', '必火', '销量第一'],
+  },
+  store_visit: {
+    id: 'store_visit',
+    label: '探店种草',
+    rules: `
+【场景·探店种草】本条按到店体验审核：
+- 体验、人均、必点若说出口，须与商单一致；编造隐藏菜单或虚假排队 → suspect。
+- 须标识探店合作。未标识 → suspect。
+- 不强制出现团购价。一旦出现价格或套餐，改用团购带货的价格与核销规则。
+- 美食客观描述、无擦边出镜，不要上升为色情导流。
+`.trim(),
+    phrases: ['全网最火', '隐藏菜单必点', '不用预约随便来'],
+  },
+  live_sell: {
+    id: 'live_sell',
+    label: '直播带货',
+    rules: `
+【场景·直播带货】本条按直播间成交审核：
+- 直播间价格、赠品、福袋条件须与口播一致，承诺无法兑现 → suspect。
+- 不得诱导离开直播间私下交易或加微信成交。
+- 须标识商业推广。限时库存、全网最低无依据 → suspect。
+`.trim(),
+    phrases: ['加微信拍', '直播间专属最低', '福袋必中', '私下转账'],
+  },
+}
+
+function videoReviewSceneFor(input: VideoComplianceInput): VideoReviewScene {
+  const picked = String(input.scene || '').trim()
+  const named = Object.values(VIDEO_REVIEW_SCENES).find((s) => s.label === picked || s.id === picked)
+  if (named) return named
+  const blob = [
+    input.category,
+    input.orderTitle,
+    input.recruitmentInfo,
+    input.merchantRequirements,
+    input.taskDetail,
+    input.extraText,
+  ]
+    .map((s) => String(s || ''))
+    .join('\n')
+  if (/招募模式[:：]\s*品宣|品宣打卡|品牌曝光/.test(blob)) return VIDEO_REVIEW_SCENES.brand_checkin
+  if (/招募模式[:：]\s*直播|直播带货|直播达人/.test(blob)) return VIDEO_REVIEW_SCENES.live_sell
+  if (/团购带货|带货转化|套餐核销/.test(blob)) return VIDEO_REVIEW_SCENES.group_buy
+  if (/品宣/.test(String(input.category || '')) || /招募模式[:：]\s*品宣/.test(blob)) {
+    return VIDEO_REVIEW_SCENES.brand_checkin
+  }
+  if (/直播/.test(String(input.category || ''))) return VIDEO_REVIEW_SCENES.live_sell
+  if (/团购|带货|套餐|核销/.test(blob)) return VIDEO_REVIEW_SCENES.group_buy
+  if (/打卡|氛围/.test(blob) && !/团购|套餐/.test(blob)) return VIDEO_REVIEW_SCENES.brand_checkin
+  return VIDEO_REVIEW_SCENES.store_visit
 }
 
 function videoComplianceRulesForPlatform(platform: string): { system: string; phrases: string[] } {
@@ -444,9 +531,14 @@ export async function runRecruitmentVideoComplianceCheck(
   }
 
   const platformNorm = normalizeRecruitmentPlatform(String(input.platform || '抖音').trim() || '抖音')
+  const scene = videoReviewSceneFor(input)
   const builtIn = videoComplianceRulesForPlatform(platformNorm)
-  const phrases = builtIn.phrases
-  const system = await appendOfficialComplianceRules(builtIn.system, 'video', platformNorm)
+  const phrases = [...builtIn.phrases, ...scene.phrases]
+  const system = await appendOfficialComplianceRules(
+    `${builtIn.system}\n\n${scene.rules}`,
+    'video',
+    platformNorm,
+  )
   const localHits = localRiskScan(scannedText, phrases)
   const visualHits = mediaExtract?.visualHits ?? []
   const mergedLocalHits = [...new Set([...localHits, ...visualHits])].slice(0, 16)
@@ -471,6 +563,8 @@ export async function runRecruitmentVideoComplianceCheck(
       : ''
   const user = [
     `【平台】${platformNorm}`,
+    `【场景】${scene.label}`,
+    '请按该场景的审核重点判断，不要把品宣打卡按团购带货卡价格，也不要把团购带货按纯氛围片放行。',
     `【商单】${String(input.orderTitle || input.mpOrderId || '').trim()}`,
     `【类目/地区】${String(input.category || '').trim()} ${String(input.region || '').trim()}`.trim(),
     `【达人】${String(input.applicantName || input.applicantId || '').trim()}`,

@@ -91,6 +91,7 @@ list_scopes() {
   merchant_local_ads     商家 ERP：巨量本地推绑定/投流；与千川账户/取数隔离（不含聚光）
   ads_studio_review      本地推投流读云端绑定；商家小程序 AI 短片/工坊/短剧对齐星选；视频与文稿审核半月拉规则
   mp_ads_today           商家小程序投流「今日数据」按上海时区当天账户报表，不再用近7日汇总
+  studio_scene_review   商家小程序视觉工坊玩法二级选项；达人/星选视频审核按团购带货与品宣打卡等场景分规则
   ads_studio_review      本地推投流免进设置页、商家小程序 AI 标签对齐星选、审核规则半月刷新
   account_identity_bind  商家账号：邮箱注册、社交登录绑手机、同号合并、个人中心绑定态
   login_session_refresh  商家 Web/小程序：登录仍在但 access token 过期时先刷新再请求
@@ -1261,6 +1262,20 @@ LocalPromotionSection
 localPromotionBindGuide
 qianchuanGateway
 qianchuanApi
+change-scope-guard
+PAT
+      ;;
+    studio_scene_review)
+      cat <<'PAT'
+visualStudioVariantsMp
+visualStudioAiMp
+ai-visual-studio.js
+ai-visual-studio.wxml
+recruitmentVideoComplianceCore
+meoo-mp-recruitment-video-compliance
+AiComplianceReviewAddonPage
+mine-pr-addon-ai-review.js
+mine-pr-addon-ai-review.wxml
 change-scope-guard
 PAT
       ;;

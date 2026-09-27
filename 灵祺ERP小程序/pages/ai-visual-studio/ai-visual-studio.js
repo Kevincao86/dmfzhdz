@@ -1,5 +1,25 @@
 const vs = require('../../utils/visualStudioAiMp.js')
+const variants = require('../../utils/visualStudioVariantsMp.js')
 const points = require('../../utils/erpPointsSpendMp.js')
+
+function fillStore(text, storeName) {
+  const store = String(storeName || '').trim() || '本店'
+  return String(text || '').replace(/\{store\}/g, store)
+}
+
+function variantView(playbook, industry, variantId) {
+  const cfg = variants.getPlaybookVariantConfig(playbook, industry)
+  const options = cfg
+    ? cfg.options.map((o) => ({ id: o.id, label: o.label, periodLabel: o.periodLabel || '' }))
+    : []
+  const picked = options.find((o) => o.id === variantId) || null
+  return {
+    variantLabel: cfg ? cfg.pickerLabel : '',
+    variantOptions: options,
+    playbookVariantId: picked ? picked.id : '',
+    variantPeriod: picked ? picked.periodLabel : '',
+  }
+}
 
 function mapChannels(selected) {
   const set = new Set(selected || [])
@@ -22,6 +42,7 @@ Page({
     storeName: '',
     playbooks: vs.PLAYBOOKS,
     playbook: 'grand_opening',
+    ...variantView('grand_opening', 'catering', ''),
     copyItems: [],
     copyIndex: 0,
     headline: '',
@@ -61,6 +82,9 @@ Page({
       industry: this.data.industry,
       storeName: this.data.storeName,
       playbook: this.data.playbook,
+      variantLabel: this.data.variantLabel,
+      variantName: (this.data.variantOptions.find((o) => o.id === this.data.playbookVariantId) || {}).label || '',
+      variantPeriod: this.data.variantPeriod,
       headline: this.data.headline,
       subheadline: this.data.subheadline,
       offer: this.data.offer,
@@ -95,13 +119,34 @@ Page({
     this.setData({ selectedChannels: selected, channels: mapChannels(selected) })
   },
   onIndustry(e) {
-    this.setData({ industry: e.currentTarget.dataset.id })
+    const industry = e.currentTarget.dataset.id
+    const view = variantView(this.data.playbook, industry, this.data.playbookVariantId)
+    this.setData(Object.assign({ industry }, view))
   },
   onStoreName(e) {
     this.setData({ storeName: e.detail.value })
   },
   onPlaybook(e) {
-    this.setData({ playbook: e.currentTarget.dataset.id })
+    const playbook = e.currentTarget.dataset.id
+    this.setData(Object.assign({ playbook }, variantView(playbook, this.data.industry, '')))
+  },
+  onVariant(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    const opt = variants.resolvePlaybookVariant(this.data.playbook, id, this.data.industry)
+    const view = variantView(this.data.playbook, this.data.industry, id)
+    if (!opt) {
+      this.setData(view)
+      return
+    }
+    const fill = (text) => fillStore(text, this.data.storeName)
+    const patch = Object.assign({}, view)
+    if (opt.headline !== undefined) patch.headline = fill(opt.headline)
+    if (opt.subheadline !== undefined) patch.subheadline = fill(opt.subheadline)
+    if (opt.offer !== undefined) patch.offer = fill(opt.offer)
+    if (opt.timeRange !== undefined) patch.timeRange = opt.timeRange
+    if (opt.note !== undefined) patch.note = opt.note
+    this.setData(patch)
   },
   onHeadline(e) {
     this.setData({ headline: e.detail.value })
