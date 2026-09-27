@@ -22,15 +22,21 @@ const PLAYBOOKS = [
   { id: 'festival_promo', label: '节日大促', desc: '节日限定福利' },
   { id: 'store_visit', label: '探店种草', desc: '打卡、UGC、氛围感' },
   { id: 'member_recharge', label: '会员储值', desc: '储值送礼、复购锁客' },
+  { id: 'daily_sign', label: '日签海报', desc: '每日营业、天气联动、社群触达' },
+  { id: 'product_hero', label: '招牌单品', desc: '爆款菜、引流品、主图' },
+  { id: 'logo_brand', label: '品牌标识', desc: 'Logo、头像、门头字' },
+  { id: 'menu_board', label: '菜单价目', desc: '电子菜单、价目视觉' },
+  { id: 'platform_carousel_five', label: '三连图', desc: '一张连续海报裁成 3 张，从左到右横滑' },
+  { id: 'platform_detail_page', label: '详情图', desc: '团购详情页竖向长图，5 段拼接' },
 ]
 
 const INDUSTRIES = [
-  { id: 'dining', label: '餐饮' },
+  { id: 'catering', label: '餐饮' },
   { id: 'beauty', label: '美业' },
   { id: 'leisure', label: '休娱' },
-  { id: 'hotel', label: '酒店' },
+  { id: 'hotel', label: '酒旅' },
   { id: 'pet', label: '宠物' },
-  { id: 'edu', label: '教育' },
+  { id: 'education', label: '教育' },
 ]
 
 function apiBase() {

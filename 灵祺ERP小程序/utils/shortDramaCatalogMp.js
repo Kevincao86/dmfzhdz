@@ -279,8 +279,53 @@ function worldOf(id) {
   return WORLDS.find((w) => w.id === id) || WORLDS[0]
 }
 
+const STYLES = [
+  { id: 'smoke', worlds: ['catering'], name: '烟火气', visual: '暖黄实用光，蒸汽油光，真实市井，禁止精修广告片感' },
+  { id: 'neon', worlds: ['catering', 'leisure', 'vlog'], name: '夜色街灯', visual: '夜晚路灯与室内暖光，潮湿地面反光，克制不霓虹爆炸' },
+  { id: 'fresh', worlds: ['catering', 'leisure', 'edu', 'retail'], name: '清新打卡', visual: '自然光，浅景深，干净桌面或镜面' },
+  { id: 'quiet', worlds: ['leisure', 'home', 'retail'], name: '高级克制', visual: '低饱和，留白，材质特写，慢推' },
+  { id: 'cinema', worlds: ['catering', 'leisure', 'travel', 'vlog', 'tech', 'drama', 'auto', 'home'], name: '电影感', visual: '跟拍推轨，轻微运动模糊，情绪特写，连续运镜' },
+  { id: 'outdoor', worlds: ['travel', 'vlog'], name: '户外旅行', visual: '户外自然光，地标清晰，跟拍行走，禁止滤镜过重' },
+  { id: 'handheld', worlds: ['vlog', 'travel'], name: '手持生活', visual: '手持轻微晃动，生活纪实，对白口语，禁止精修广告片' },
+  { id: 'showroom', worlds: ['retail', 'auto', 'home'], name: '展陈质感', visual: '展厅或样板间干净光，材质与空间可读，慢推' },
+  { id: 'product', worlds: ['tech', 'auto'], name: '产品冷调', visual: '干净桌面，材质微距，手部操作，屏幕内容可读' },
+  { id: 'live', worlds: ['drama'], name: '真人写实', visual: '当代都市真人写实，人物表情清晰，禁止二维漫画，禁止探店空镜堆砌' },
+  { id: 'cel', worlds: ['comic'], name: '赛璐珞', visual: '日漫赛璐珞上色，清晰线稿，眼睛高光，二维动画，禁止真人实拍质感' },
+  { id: 'ink', worlds: ['comic'], name: '国漫厚涂', visual: '国漫厚涂，服饰纹样清楚，气势与飘带，二维，禁止真人古装剧' },
+  { id: 'webtoon', worlds: ['comic'], name: '条漫清透', visual: '韩漫清透上色，竖屏分格阅读，大特写与留白，二维' },
+]
+
+const DEFAULT_STYLE = {
+  catering: 'smoke',
+  leisure: 'fresh',
+  travel: 'outdoor',
+  vlog: 'handheld',
+  retail: 'showroom',
+  auto: 'showroom',
+  home: 'quiet',
+  edu: 'fresh',
+  tech: 'product',
+  drama: 'live',
+  comic: 'cel',
+}
+
 function scenesOf(worldId) {
   return SCENES.filter((s) => s.world === worldId)
+}
+
+function stylesOf(worldId) {
+  const list = STYLES.filter((s) => s.worlds.indexOf(worldId) >= 0)
+  return list.length ? list : STYLES.slice(0, 1)
+}
+
+function defaultStyleId(worldId) {
+  const id = DEFAULT_STYLE[worldId] || 'cinema'
+  const list = stylesOf(worldId)
+  return list.some((s) => s.id === id) ? id : list[0].id
+}
+
+function styleOf(id) {
+  return STYLES.find((s) => s.id === id) || STYLES[0]
 }
 
 function sceneOf(id) {
@@ -316,7 +361,7 @@ function kindLine(promptKind) {
   return '本地生活真人写实竖屏短剧，前 3 秒必须冲突或反转。禁止办公室网文，禁止仙侠古装。'
 }
 
-function buildPrompt(world, scene, shop, story, dialogue) {
+function buildPrompt(world, scene, shop, story, dialogue, style) {
   const infoBits = (world.fields || [])
     .map((f) => {
       const v = String((shop && shop[f.key]) || '').trim()
@@ -329,6 +374,7 @@ function buildPrompt(world, scene, shop, story, dialogue) {
     `【竖屏短剧·${world.label}·${scene.name}】`,
     kindLine(world.promptKind),
     `画面必须出现：${scene.mustSee}。${scene.visual}。`,
+    style && style.name ? `画风：${style.name}${style.visual ? `（${style.visual}）` : ''}。` : '',
     infoBits ? `创作信息：${infoBits}。` : '',
     `主题：${fillTokens(story || scene.hook, scene, shop)}`,
     `钩子：${scene.hook}。`,
@@ -351,6 +397,9 @@ module.exports = {
   worldOf,
   scenesOf,
   sceneOf,
+  stylesOf,
+  defaultStyleId,
+  styleOf,
   fillTokens,
   buildPrompt,
 }

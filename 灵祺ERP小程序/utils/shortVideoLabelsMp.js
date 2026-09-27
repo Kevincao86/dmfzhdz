@@ -46,35 +46,34 @@ module.exports = {
   ],
   ICE_BATCH_GENERATE_COUNTS: [10, 20, 50, 100],
   MAIN_TABS: [
-    { id: 'generate', label: '短视频出片', native: true },
+    { id: 'generate', label: '短片生成', native: true },
     { id: 'canvas', label: '无限画布', native: true },
-    { id: 'cloud_batch', label: '一键混剪', native: true },
     { id: 'cases', label: '案例', native: true },
-    { id: 'music', label: '配乐', native: true },
+    { id: 'cloud_batch', label: 'AI混剪', native: true },
   ],
   STUDIO_MODES: [
     {
       id: 'agent',
       label: 'Agent 模式',
-      description: '自然语言 + Skill，自动规划分镜出片',
+      description: '自然语言 + 探店/活动技能，自动规划分镜出片',
       pane: 'generate',
     },
     {
       id: 'video',
-      label: '视频出片',
+      label: '视频生成',
       description: '文生/图生短片',
       pane: 'generate',
     },
     {
       id: 'image',
-      label: '图片出图',
-      description: '跳转视觉工坊',
+      label: '图片生成',
+      description: '跳转 AI 视觉工坊',
       href: '/pages/ai-visual-studio/ai-visual-studio',
     },
     {
       id: 'music',
       label: '音乐 / 配乐',
-      description: '内容匹配曲库试听选用',
+      description: '内容匹配曲库试听选用（独立工作区）',
       pane: 'music',
     },
     {
@@ -91,8 +90,9 @@ module.exports = {
     },
   ],
   QUICK_CARDS: [
-    { id: 'generate', label: '视频出片', desc: '文生/图生短片', pane: 'generate' },
-    { id: 'cases', label: '案例灵感', desc: '做同款', pane: 'cases' },
-    { id: 'cloud_batch', label: '一键混剪', desc: '素材一键成片', pane: 'cloud_batch' },
+    { id: 'canvas', label: '无限画布', desc: '自由创作', pane: 'canvas' },
+    { id: 'generate', label: '短片生成', desc: '一键出片', pane: 'generate' },
+    { id: 'cases', label: '技能案例', desc: '做同款灵感', pane: 'cases' },
+    { id: 'cloud_batch', label: 'AI混剪', desc: '包装精修', pane: 'cloud_batch' },
   ],
 }

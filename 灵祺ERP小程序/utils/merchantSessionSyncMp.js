@@ -122,12 +122,24 @@ function parseBindingRow(raw) {
   }
 }
 
+function pickSealed(o, a, b) {
+  const left = typeof o[a] === 'string' ? o[a].trim() : ''
+  if (left) return left
+  return typeof o[b] === 'string' ? o[b].trim() : ''
+}
+
 function unpackLocalPromotion(sealed) {
   try {
     const o = JSON.parse(sealed)
-    const accessToken = typeof o.accessToken === 'string' ? o.accessToken.trim() : ''
+    const accessToken = pickSealed(o, 'accessToken', 'access_token') || pickSealed(o, 'token', 'token')
     if (!accessToken) return null
-    return { accessToken, appId: typeof o.appId === 'string' ? o.appId : '' }
+    return {
+      accessToken,
+      appId: pickSealed(o, 'appId', 'app_id'),
+      appSecret: pickSealed(o, 'appSecret', 'app_secret'),
+      refreshToken: pickSealed(o, 'refreshToken', 'refresh_token'),
+      tokenExpiresAt: pickSealed(o, 'tokenExpiresAt', 'token_expires_at'),
+    }
   } catch (_) {
     return null
   }
@@ -223,7 +235,10 @@ function applyLocalPromotion(row, tenantId) {
   const state = {
     bindingId: row.id,
     appId: creds.appId,
+    appSecret: creds.appSecret || '',
     accessToken: creds.accessToken,
+    refreshToken: creds.refreshToken || '',
+    tokenExpiresAt: creds.tokenExpiresAt || '',
     localAccountId: row.merchantAccountId,
     accountName: row.bindingLabel || row.accountDisplayName || row.merchantAccountId,
     boundAt: row.updatedAt,

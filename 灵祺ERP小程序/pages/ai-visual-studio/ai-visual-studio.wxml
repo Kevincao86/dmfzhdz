@@ -17,7 +17,7 @@
   </view>
 
   <view class="vs-card" wx:if="{{step === 1}}">
-    <text class="vs-card__title">投放渠道</text>
+    <text class="vs-card__title">发到哪个平台</text>
     <text class="vs-card__sub">可多选；可开「一键多端套装」按所选渠道各出一张</text>
     <view class="vs-chips">
       <view
@@ -65,9 +65,9 @@
   </view>
 
   <view class="vs-card" wx:elif="{{step === 3}}">
-    <text class="vs-card__title">海报文案</text>
-    <text class="vs-card__sub">可手填，或一键生成 3 套方案（{{copyPoints}} 积分/次）</text>
-    <button class="vs-btn ghost" loading="{{copyBusy}}" bindtap="onAiCopy">生成文案包</button>
+    <text class="vs-card__title">文案与风格</text>
+    <text class="vs-card__sub">不自动生成 · 手动「AI 生成」{{copyPoints}} 积分/次</text>
+    <button class="vs-btn ghost" loading="{{copyBusy}}" bindtap="onAiCopy">{{copyItems.length ? 'AI 换一版' : 'AI 生成'}}</button>
     <view class="vs-copy-list" wx:if="{{copyItems.length}}">
       <view
         wx:for="{{copyItems}}"
@@ -109,13 +109,13 @@
   </view>
 
   <view class="vs-card" wx:elif="{{step === 4}}">
-    <text class="vs-card__title">制作海报</text>
-    <text class="vs-card__sub">常规 {{imageStdPoints}} 积分/张 · 高清出图 {{imageProPoints}} 积分/张</text>
+    <text class="vs-card__title">生成与方案</text>
+    <text class="vs-card__sub">常规生图 {{imageStdPoints}} 积分/张 · 高级生图 · GPT Image 2 {{imageProPoints}} 积分/张</text>
     <view class="vs-chips">
-      <view class="vs-chip {{imageTier === 'standard' ? 'on' : ''}}" data-tier="standard" bindtap="onImageTier">常规出图</view>
-      <view class="vs-chip {{imageTier === 'pro' ? 'on' : ''}}" data-tier="pro" bindtap="onImageTier">高清出图</view>
+      <view class="vs-chip {{imageTier === 'standard' ? 'on' : ''}}" data-tier="standard" bindtap="onImageTier">常规生图</view>
+      <view class="vs-chip {{imageTier === 'pro' ? 'on' : ''}}" data-tier="pro" bindtap="onImageTier">高级生图 · GPT Image 2</view>
     </view>
-    <text class="vs-card__sub" wx:if="{{imageTier === 'pro' && refPath}}">高清出图暂不使用参考图，将按文案出图。</text>
+    <text class="vs-card__sub" wx:if="{{imageTier === 'pro' && refPath}}">高级生图走 GPT Image 2 纯文生图，本次将不使用已上传的参考图。</text>
     <text class="vs-label">参考图（常规档图生图）</text>
     <button class="vs-btn ghost" bindtap="onPickRef">{{refPath ? '更换参考图' : '上传参考图'}}</button>
     <view class="vs-ref" bindtap="onPickRef">

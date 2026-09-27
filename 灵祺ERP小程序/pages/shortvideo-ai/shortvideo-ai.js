@@ -377,7 +377,7 @@ Page({
       arkKeyConfigured: Boolean(conf.arkKeyConfigured),
       arkVideoModels: models,
       arkVideoSetupIssue: String(conf.arkVideoSetupIssue || '')
-        .replace(/Seedance[^，。]*/gi, '视频出片')
+        .replace(/Seedance[^，。]*/gi, '视频生成')
         .replace(/Kling[^，。]*/gi, '兼容引擎')
         .replace(/火山方舟|通义千问|豆包|万相|qwen|gpt-?[^\s，。]*/gi, '出片服务'),
       longformPlanner: { doubao: Boolean(lp.doubao), qwen: Boolean(lp.qwen) },
@@ -443,10 +443,10 @@ Page({
     const genCost = economics.mpPointsCostForUsage('shortvideo', { durationSec: genSec })
     const mixCost = economics.mpPointsCostForUsage(mixKind, { durationSec: mixSec })
     this.setData({
-      pointsHintGenerate: `消耗提醒：短视频生成 ${economics.formatMpPointsRateLabel('shortvideo')}；当前约 ${genSec} 秒预计 ${genCost} 积分。`,
+      pointsHintGenerate: `消耗提醒：短片生成 ${economics.formatMpPointsRateLabel('shortvideo')}；当前约 ${genSec} 秒预计 ${genCost} 积分。`,
       pointsHintMix: this.isSmartPreset()
-        ? `消耗提醒：一键混剪 ${economics.formatMpPointsRateLabel('cloud_edit_smart')}；当前约 ${mixSec} 秒预计 ${mixCost} 积分。`
-        : `消耗提醒：一键混剪 ${economics.formatMpPointsRateLabel('cloud_edit')}；预计 ${mixCost} 积分/条。`,
+        ? `消耗提醒：智能一键成片 ${economics.formatMpPointsRateLabel('cloud_edit_smart')}；当前约 ${mixSec} 秒预计 ${mixCost} 积分。`
+        : `消耗提醒：普通混剪 ${economics.formatMpPointsRateLabel('cloud_edit')}；预计 ${mixCost} 积分/条。`,
     })
   },
 
@@ -703,7 +703,7 @@ Page({
     } else if (!this.data.arkKeyConfigured) {
       return `当前环境未开通${VIDEO_ENGINE_LABEL_SEEDANCE}，请联系管理员。`
     } else if (!this.data.sdModelIds.length) {
-      return this.data.arkVideoSetupIssue || '请先完成视频出片配置。'
+      return this.data.arkVideoSetupIssue || '请先完成视频生成配置。'
     }
     return ''
   },
@@ -1209,7 +1209,7 @@ Page({
     try {
       if (this.data.longformEnabled || scriptTable.isScriptRowsUsable(this.data.scriptRows)) {
         if (this.data.engine === 'kling') {
-          this.setData({ err: '长片请使用默认视频出片；可关闭长片后重试。' })
+          this.setData({ err: '长片请使用默认视频生成；可关闭长片后重试。' })
           return
         }
         await this.runLongformFromScriptOrPlan()
@@ -1273,7 +1273,7 @@ Page({
 
   async runSmartBatch() {
     if (!this.data.smartBatchEnabled) {
-      this.setData({ iceErr: '运营台未开启一键混剪' })
+      this.setData({ iceErr: '运营台未开启智能一键成片' })
       return
     }
     if (!this.data.briefOk) {
@@ -1285,12 +1285,12 @@ Page({
       .map((j) => j.mediaUrl)
     const imageUrls = (this.data.imageItems || []).map((x) => x.mediaUrl)
     if (mediaUrls.length + imageUrls.length < 2) {
-      this.setData({ iceErr: '一键混剪至少需要 2 个素材（视频或图片）' })
+      this.setData({ iceErr: '智能一键成片至少需要 2 个素材（视频或图片）' })
       return
     }
     if (!(await this.ensureCloudEditAffordable())) return
     const aspect = this.getIceAspect()
-    this.setData({ smartBatchBusy: true, iceBusy: true, iceErr: '', iceHint: '一键混剪提交中…' })
+    this.setData({ smartBatchBusy: true, iceBusy: true, iceErr: '', iceHint: '智能一键成片提交中…' })
     try {
       const body = {
         mediaUrls,
@@ -1320,15 +1320,15 @@ Page({
         jobs: prev.concat([
           {
             id: localId,
-            label: '一键混剪成片',
+            label: '智能一键成片',
             mediaUrl: done.downloadUrl,
             previewUrl: done.downloadUrl || done.previewUrl,
             phase: 'done',
             exportId: r.batchJobId,
-            message: '一键混剪完成',
+            message: '智能一键成片完成',
           },
         ]),
-        iceHint: '一键混剪完成',
+        iceHint: '智能一键成片完成',
         latestDonePreview: done.downloadUrl || done.previewUrl,
       })
       await this.chargeCloudEdit(r.batchJobId)

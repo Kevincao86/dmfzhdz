@@ -271,8 +271,11 @@ function readBindCreds(storageKey) {
       raw.localAccountId || raw.local_account_id || raw.advertiserId || raw.advertiser_id || '',
     ).trim()
     const app_id = String(raw.appId || raw.app_id || '').trim()
+    const app_secret = String(raw.appSecret || raw.app_secret || '').trim()
+    const refresh_token = String(raw.refreshToken || raw.refresh_token || '').trim()
+    const token_expires_at = String(raw.tokenExpiresAt || raw.token_expires_at || '').trim()
     if (!access_token || !local_account_id) return null
-    return { access_token, local_account_id, app_id }
+    return { access_token, local_account_id, app_id, app_secret, refresh_token, token_expires_at }
   } catch (_) {
     return null
   }
@@ -287,6 +290,12 @@ function adsCredsPayload(creds) {
     advertiserId: creds.local_account_id,
     app_id: creds.app_id || '',
     appId: creds.app_id || '',
+    app_secret: creds.app_secret || '',
+    appSecret: creds.app_secret || '',
+    refresh_token: creds.refresh_token || '',
+    refreshToken: creds.refresh_token || '',
+    token_expires_at: creds.token_expires_at || '',
+    tokenExpiresAt: creds.token_expires_at || '',
   }
 }
 

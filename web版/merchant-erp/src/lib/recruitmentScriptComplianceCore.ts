@@ -17,6 +17,7 @@ import {
   DIANPING_NOTE_RISK_PHRASES,
 } from './dianpingNoteComplianceRules.js'
 import { normalizeRecruitmentPlatform } from './deliveryReviewPlatform.js'
+import { appendOfficialComplianceRules } from './complianceRulesRefresh.js'
 import {
   buildNumberedScriptBody,
   buildScriptComplianceLocationMessage,
@@ -234,7 +235,9 @@ export async function runRecruitmentScriptComplianceCheck(
   }
 
   const platform = normalizeRecruitmentPlatform(String(input.platform || '小红书').trim() || '小红书')
-  const { system, phrases } = complianceRulesForPlatform(platform)
+  const builtIn = complianceRulesForPlatform(platform)
+  const phrases = builtIn.phrases
+  const system = await appendOfficialComplianceRules(builtIn.system, 'script', platform)
   const localHits = localRiskScan(scannedText, phrases)
 
   const user = [

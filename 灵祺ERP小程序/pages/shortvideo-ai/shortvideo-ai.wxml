@@ -5,7 +5,7 @@
       <text class="sv-header-icon">映</text>
       <view class="sv-header-titles">
         <text class="sv-header-title">短视频创作台</text>
-        <text class="sv-header-sub">短视频出片 · 与电脑端同源</text>
+        <text class="sv-header-sub">短片生成 · 与电脑端同源</text>
       </view>
     </view>
     <text class="sv-header-desc">Skill 技能 · 无限画布 · 短片生成 · 数字人 · 音乐配乐 · 案例做同款。</text>
@@ -14,7 +14,7 @@
 
   <view wx:if="{{pointsBalance != null}}" class="sv-points-bar">
     <text class="sv-points-bal">积分余额 {{pointsBalance}}</text>
-    <text wx:if="{{mainPane === 'generate'}}" class="sv-points-rate">短视频出片 · {{rateShortvideo}}</text>
+    <text wx:if="{{mainPane === 'generate'}}" class="sv-points-rate">短片生成 · {{rateShortvideo}}</text>
     <text wx:elif="{{mainPane === 'cloud_batch'}}" class="sv-points-rate">云剪 {{rateCloudEdit}} · 一键成片 {{rateCloudEditSmart}}</text>
   </view>
   <view wx:if="{{mainPane === 'generate' && pointsHintGenerate}}" class="sv-points-tip">{{pointsHintGenerate}}</view>
@@ -46,7 +46,7 @@
   <!-- ========== 短视频生成 / 创作舱 ========== -->
   <view wx:if="{{mainPane === 'generate'}}" class="sv-cabin-wrap">
     <view class="sv-cabin-heading">
-      <text class="sv-cabin-h1">{{studioModeId === 'agent' ? '创作舱一站出片 · 文案到分镜' : '视频出片'}}</text>
+      <text class="sv-cabin-h1">{{studioModeId === 'agent' ? '创作舱一站出片 · 文案到分镜' : '视频生成'}}</text>
       <text class="sv-cabin-h2">主路径：{{engineLabelSeedance}}</text>
     </view>
 
@@ -372,11 +372,11 @@
         <view>
           <view class="sv-ice-sec-head">
             <text class="sv-step-n sm">2</text>
-            <text class="sv-ice-sec-title">剪辑文案指令 *</text>
+            <text class="sv-ice-sec-title">AI 混剪生成</text>
           </view>
         </view>
         <button class="sv-btn-ai" disabled="{{!canAiBrief || briefAiLoading}}" bindtap="runAiEditBrief">
-          {{briefAiLoading ? '生成中…' : '生成文案'}}
+          {{briefAiLoading ? '生成中…' : 'AI 规划分镜'}}
         </button>
       </view>
       <textarea class="sv-area" value="{{editBrief}}" disabled="{{iceBusy || briefAiLoading}}" bindinput="onEditBrief" placeholder="示例：竖屏探店，前 3 秒抓眼球；突出招牌；适合抖音。" />
@@ -408,7 +408,7 @@
         </view>
       </view>
       <block wx:if="{{imageItems.length}}">
-        <button class="sv-btn-violet" disabled="{{!canOneClickImages}}" bindtap="runOneClickImages">一键成片（{{imageItems.length}} 张图）</button>
+        <button class="sv-btn-violet" disabled="{{!canOneClickImages}}" bindtap="runOneClickImages">智能一键成片（{{imageItems.length}} 张图）</button>
       </block>
     </view>
 
@@ -434,7 +434,7 @@
     <view class="sv-submit-sticky">
       <view wx:if="{{iceErr || iceHint}}" class="sv-alert {{iceErr ? 'err' : 'hint'}}">{{iceErr || iceHint}}</view>
       <button class="sv-btn-cyan full" disabled="{{!canSubmitIce || downloadBusy}}" loading="{{iceBusy && !smartBatchBusy}}" bindtap="runIceBatch">
-        {{iceBusy && !smartBatchBusy ? '灵祺云剪进行中…' : '提交灵祺云剪'}}
+        {{iceBusy && !smartBatchBusy ? '普通混剪生成中…' : '普通混剪'}}
       </button>
       <button
         wx:if="{{smartBatchEnabled}}"
@@ -442,7 +442,7 @@
         disabled="{{iceBusy}}"
         loading="{{smartBatchBusy}}"
         bindtap="runSmartBatch"
-      >一键混剪</button>
+      >{{smartBatchBusy ? '智能成片批量生成中…' : '智能一键成片'}}</button>
     </view>
 
     <view class="sv-output">

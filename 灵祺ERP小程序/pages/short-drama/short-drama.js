@@ -29,6 +29,14 @@ function packScenes(worldId, sceneId) {
   }))
 }
 
+function packStyles(worldId, styleId) {
+  return catalog.stylesOf(worldId).map((s) => ({
+    id: s.id,
+    name: s.name,
+    on: s.id === styleId,
+  }))
+}
+
 function packFields(world, shop) {
   const s = shop || emptyShop()
   return (world.fields || []).map((f) => ({
@@ -47,6 +55,8 @@ Page({
     fields: packFields(catalog.worldOf('catering'), emptyShop()),
     scenes: packScenes('catering', 'hotpot'),
     sceneId: 'hotpot',
+    styles: packStyles('catering', catalog.defaultStyleId('catering')),
+    styleId: catalog.defaultStyleId('catering'),
     sceneHook: catalog.sceneOf('hotpot').hook,
     shop: emptyShop(),
     story: '',
@@ -91,6 +101,7 @@ Page({
     const scenes = catalog.scenesOf(world.id)
     const sceneId = scenes[0] ? scenes[0].id : 'hotpot'
     const scene = catalog.sceneOf(sceneId)
+    const styleId = catalog.defaultStyleId(world.id)
     this.setData({
       worlds: packWorlds(world.id),
       worldId: world.id,
@@ -98,6 +109,8 @@ Page({
       fields: packFields(world, emptyShop()),
       scenes: packScenes(world.id, sceneId),
       sceneId,
+      styles: packStyles(world.id, styleId),
+      styleId,
       sceneHook: scene.hook,
       shop: emptyShop(),
     })
@@ -107,6 +120,15 @@ Page({
     const id = e.currentTarget.dataset.id
     if (!id || id === this.data.worldId) return
     this.applyWorld(id)
+  },
+
+  onStyle(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id || id === this.data.styleId) return
+    this.setData({
+      styleId: id,
+      styles: packStyles(this.data.worldId, id),
+    })
   },
 
   onScene(e) {
@@ -402,7 +424,14 @@ Page({
       this.setData({ err: '请先选择成片时长' })
       return
     }
-    const prompt = catalog.buildPrompt(world, scene, shop, this.data.story, this.data.dialogue)
+    const prompt = catalog.buildPrompt(
+      world,
+      scene,
+      shop,
+      this.data.story,
+      this.data.dialogue,
+      catalog.styleOf(this.data.styleId),
+    )
     const plan = catalog.planLongformSegmentDurations(total)
     const afford = await erpPoints.checkAddonPointsAffordable('shortvideo', total)
     if (!afford.ok) {

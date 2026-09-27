@@ -1,10 +1,12 @@
 import { merchantApiAuthHeaders, resolveMerchantApiBearer } from '../lib/merchantApiAuth'
 import {
+  applyActiveLocalPromotionBinding,
   packLocalPromotionForCloud,
+  pickActiveLocalPromotionBinding,
   readLocalPromotionBinding,
   writeLocalPromotionBinding,
 } from '../lib/localPromotionBinding'
-import { upsertMerchantBinding } from '../lib/merchantPlatformBindings'
+import { listMerchantBindings, upsertMerchantBinding } from '../lib/merchantPlatformBindings'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import type {
   LocalClueRow,
@@ -87,6 +89,22 @@ async function persistOceanTokenPatch(token: OceanTokenPatch | undefined) {
 }
 
 let oceanRefreshInflight: Promise<void> | null = null
+
+/** 投流页进入时从云端绑定写入本地，不必先打开系统设置。云端为空时保留已有本地凭证。 */
+export async function hydrateLocalPromotionBindingFromCloud(): Promise<boolean> {
+  const existing = readLocalPromotionBinding()
+  if (!supabaseConfigured || !supabase) return Boolean(existing?.accessToken)
+  let rows: Awaited<ReturnType<typeof listMerchantBindings>> = []
+  try {
+    rows = await listMerchantBindings(supabase, 'local_promotion')
+  } catch {
+    return Boolean(existing?.accessToken)
+  }
+  const picked = pickActiveLocalPromotionBinding(rows)
+  if (!picked) return Boolean(existing?.accessToken)
+  applyActiveLocalPromotionBinding(picked)
+  return Boolean(readLocalPromotionBinding()?.accessToken)
+}
 
 async function ensureLocalPromotionTokenFresh(): Promise<void> {
   const bind = readLocalPromotionBinding()

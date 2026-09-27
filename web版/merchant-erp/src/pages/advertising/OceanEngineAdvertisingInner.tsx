@@ -25,6 +25,7 @@ import {
   fetchLocalProjects,
   fetchLocalPromotions,
   fetchLocalReportSummary,
+  hydrateLocalPromotionBindingFromCloud,
   postAdAiInsight,
   optimizeLocalProject,
   updatePromotionStatus,
@@ -114,10 +115,16 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
   const [createBudget, setCreateBudget] = useState('300')
   const [createBusy, setCreateBusy] = useState(false)
   const [createMsg, setCreateMsg] = useState<string | null>(null)
+  const [bindTick, setBindTick] = useState(0)
+  const [checkingCloud, setCheckingCloud] = useState(
+    () => platform === 'local_promotion' && !readLocalPromotionBinding(),
+  )
   const reloadGen = useRef(0)
 
-  const bind =
-    platform === 'qianchuan' ? readQianchuanBinding() : readLocalPromotionBinding()
+  const bind = useMemo(() => {
+    void bindTick
+    return platform === 'qianchuan' ? readQianchuanBinding() : readLocalPromotionBinding()
+  }, [platform, bindTick])
   const bound = Boolean(bind?.accessToken && bind.localAccountId)
   const platformLabel = platform === 'qianchuan' ? '巨量千川' : '本地推'
 
@@ -135,7 +142,20 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
     setLoading(true)
     setError(null)
     setApiError(null)
-    if (!bound) {
+    if (platform === 'local_promotion') {
+      try {
+        await hydrateLocalPromotionBindingFromCloud()
+      } catch {
+        /* 云端暂时读不到时继续用本地已有绑定 */
+      }
+      if (gen !== reloadGen.current) return
+      setBindTick((n) => n + 1)
+      setCheckingCloud(false)
+    }
+    const live =
+      platform === 'qianchuan' ? readQianchuanBinding() : readLocalPromotionBinding()
+    const liveBound = Boolean(live?.accessToken && live.localAccountId)
+    if (!liveBound) {
       clearAdsState()
       if (platform === 'qianchuan') {
         setApiError(
@@ -199,7 +219,7 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
     } finally {
       if (gen === reloadGen.current) setLoading(false)
     }
-  }, [bound, clearAdsState, platform])
+  }, [clearAdsState, platform])
 
   useEffect(() => {
     void reload()
@@ -615,7 +635,9 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
         </div>
       ) : null}
 
-      {!bound ? (
+      {checkingCloud && !bound ? (
+        <div className="erp-panel mb-6 p-4 text-sm text-slate-600">正在读取已绑定的本地推账号…</div>
+      ) : !bound ? (
         <div className="erp-panel mb-6 border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-900">
           {platform === 'qianchuan' ? (
             <>

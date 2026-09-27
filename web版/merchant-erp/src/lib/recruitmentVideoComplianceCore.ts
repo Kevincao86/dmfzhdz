@@ -36,6 +36,7 @@ import {
 } from './complianceHitLocations.js'
 import { isRetryableAiProviderError } from './aiProviderRetryableError.js'
 import { isVisualForceHitPhrase } from './videoVisualRiskTaxonomy.js'
+import { appendOfficialComplianceRules } from './complianceRulesRefresh.js'
 
 export type VideoComplianceInput = {
   mpOrderId?: string
@@ -443,7 +444,9 @@ export async function runRecruitmentVideoComplianceCheck(
   }
 
   const platformNorm = normalizeRecruitmentPlatform(String(input.platform || '抖音').trim() || '抖音')
-  const { system, phrases } = videoComplianceRulesForPlatform(platformNorm)
+  const builtIn = videoComplianceRulesForPlatform(platformNorm)
+  const phrases = builtIn.phrases
+  const system = await appendOfficialComplianceRules(builtIn.system, 'video', platformNorm)
   const localHits = localRiskScan(scannedText, phrases)
   const visualHits = mediaExtract?.visualHits ?? []
   const mergedLocalHits = [...new Set([...localHits, ...visualHits])].slice(0, 16)

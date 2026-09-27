@@ -89,6 +89,8 @@ list_scopes() {
   xingxuan_hall_ux       星选网页+微信小程序：大厅按身份、身份切换、推荐大厅说明、培训报名
   xingxuan_open_loop     星选招募开环/闭环（小程序发单+达人报名群码 + 履约 Web 同步；闭环现网路径不改）
   merchant_local_ads     商家 ERP：巨量本地推绑定/投流；与千川账户/取数隔离（不含聚光）
+  ads_studio_review      本地推投流读云端绑定；商家小程序 AI 短片/工坊/短剧对齐星选；视频与文稿审核半月拉规则
+  ads_studio_review      本地推投流免进设置页、商家小程序 AI 标签对齐星选、审核规则半月刷新
   account_identity_bind  商家账号：邮箱注册、社交登录绑手机、同号合并、个人中心绑定态
   login_session_refresh  商家 Web/小程序：登录仍在但 access token 过期时先刷新再请求
 
@@ -1258,6 +1260,48 @@ LocalPromotionSection
 localPromotionBindGuide
 qianchuanGateway
 qianchuanApi
+change-scope-guard
+PAT
+      ;;
+    ads_studio_review)
+      cat <<'PAT'
+localPromotionApi
+OceanEngineAdvertisingInner
+merchantSessionSyncMp
+merchantFeatureMp
+shortVideoLabelsMp
+shortvideo-ai.wxml
+shortvideo-ai.js
+visualStudioAiMp
+ai-visual-studio.wxml
+ai-visual-studio.js
+shortDramaCatalogMp
+short-drama.js
+short-drama.wxml
+complianceRulesRefresh
+recruitmentVideoComplianceCore
+recruitmentScriptComplianceCore
+change-scope-guard
+PAT
+      ;;
+    ads_studio_review)
+      cat <<'PAT'
+localPromotionApi
+OceanEngineAdvertisingInner
+merchantSessionSyncMp
+merchantFeatureMp
+shortVideoLabelsMp
+shortvideo-ai.wxml
+shortvideo-ai.js
+visualStudioAiMp
+ai-visual-studio.wxml
+ai-visual-studio.js
+shortDramaCatalogMp
+short-drama.js
+short-drama.wxml
+complianceRulesRefresh
+recruitmentVideoComplianceCore
+recruitmentScriptComplianceCore
 change-scope-guard
 PAT
       ;;
