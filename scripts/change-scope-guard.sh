@@ -95,6 +95,7 @@ list_scopes() {
   video_rule_links      达人小程序与星选短视频审核增加平台官方规则链接页
   xingxuan_mine_ui      星选：AI审核进我的、增值服务加AI短剧；网页壳层与我的页本地重排
   xingxuan_ui_script_rules  星选网页按钮/布局重排；文稿审核（小红书/大众点评）规则页：星选Web+达人/星选小程序
+  xingxuan_ui_desk          星选网页按确认的台账样式稿改 UI（仅 CSS/壳层，不改功能）
   ads_studio_review      本地推投流免进设置页、商家小程序 AI 标签对齐星选、审核规则半月刷新
   account_identity_bind  商家账号：邮箱注册、社交登录绑手机、同号合并、个人中心绑定态
   login_session_refresh  商家 Web/小程序：登录仍在但 access token 过期时先刷新再请求
@@ -1277,6 +1278,14 @@ App.tsx
 shellNavConfig
 AiComplianceReviewAddonPage
 index.css
+change-scope-guard
+PAT
+      ;;
+    xingxuan_ui_desk)
+      cat <<'PAT'
+xingxuan-desk.css
+index.css
+main.tsx
 change-scope-guard
 PAT
       ;;

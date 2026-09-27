@@ -1,0 +1,338 @@
+/* 星选工作台「履约台账」视觉 — 仅样式，不改功能。对齐 tmp/xingxuan-ui-mockups */
+
+.app-frame.xx-erp-shell {
+  --xx-ink: #12161a;
+  --xx-paper: #f6f3ec;
+  --xx-panel: #fffcf7;
+  --xx-rule: #d9d2c6;
+  --xx-brass: #b8923a;
+  --xx-muted: #6b6458;
+}
+
+.app-frame.xx-erp-shell .app-main-wrap {
+  background-color: var(--xx-paper) !important;
+}
+
+.app-frame.xx-erp-shell .xx-content-plate {
+  border-radius: 2px;
+  background: #fffdf8;
+  border-color: var(--xx-rule);
+  box-shadow: none;
+}
+
+.app-frame.xx-erp-shell .xx-subbar {
+  background: #efebe3;
+  border-bottom-color: var(--xx-rule);
+}
+
+/* —— 大厅顶 Tab：下划线，不要胶囊条 —— */
+.app-frame.xx-erp-shell .hall-tab-strip {
+  display: flex;
+  width: 100%;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0 0 0.15rem !important;
+  gap: 0 !important;
+  border-bottom: 1px solid var(--xx-rule) !important;
+}
+
+.app-frame.xx-erp-shell .hall-tab-btn,
+.app-frame.xx-erp-shell .hall-tab-btn:hover,
+.app-frame.xx-erp-shell .hall-tab-btn.hall-tab-btn--active {
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--xx-muted) !important;
+  font-weight: 560;
+  padding: 0.7rem 1.2rem 0.65rem !important;
+}
+
+.app-frame.xx-erp-shell .hall-tab-btn.hall-tab-btn--active {
+  color: var(--xx-ink) !important;
+  box-shadow: inset 0 -2px 0 var(--xx-brass) !important;
+}
+
+/* —— 招募工具条 / 页头 —— */
+.app-frame.xx-erp-shell .hall-toolbar-stack,
+.app-frame.xx-erp-shell .hall-toolbar-card {
+  border-radius: 2px !important;
+  box-shadow: none !important;
+  border-color: var(--xx-rule) !important;
+  background: var(--xx-panel) !important;
+  overflow: hidden;
+}
+
+.app-frame.xx-erp-shell .page-hero:not(.page-hero--inset),
+.app-frame.xx-erp-shell .page-hero--stacked {
+  background: var(--xx-ink) !important;
+  color: #f4f2ec !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.app-frame.xx-erp-shell .hall-toolbar-stack .status-tab-bar {
+  border-top: 1px solid var(--xx-rule) !important;
+  background: var(--xx-panel) !important;
+}
+
+.app-frame.xx-erp-shell .hall-toolbar-stack .status-tab-bar .status-tab {
+  color: var(--xx-muted) !important;
+}
+
+.app-frame.xx-erp-shell .status-tab--active {
+  color: var(--xx-ink) !important;
+}
+
+.app-frame.xx-erp-shell .status-tab--active::after {
+  background: var(--xx-brass) !important;
+}
+
+.app-frame.xx-erp-shell .filter-toolbar {
+  background: var(--xx-panel) !important;
+  box-shadow: none !important;
+}
+
+.app-frame.xx-erp-shell .filter-toolbar__search,
+.app-frame.xx-erp-shell .filter-toolbar__chip,
+.app-frame.xx-erp-shell .panel-select,
+.app-frame.xx-erp-shell select {
+  border-radius: 2px !important;
+}
+
+.app-frame.xx-erp-shell .panel-tab,
+.app-frame.xx-erp-shell .panel-tab-active {
+  border-radius: 2px !important;
+  box-shadow: none !important;
+}
+
+.app-frame.xx-erp-shell .panel-tab-active {
+  background: var(--xx-ink) !important;
+  color: #f4f2ec !important;
+}
+
+/* —— 首页欢迎 / 指标 / 快捷入口 —— */
+.app-frame.xx-erp-shell .talent-home__welcome,
+.app-frame.xx-erp-shell .talent-home__panel {
+  border-radius: 2px !important;
+  box-shadow: none !important;
+  background: var(--xx-panel) !important;
+  border-color: var(--xx-rule) !important;
+}
+
+.app-frame.xx-erp-shell .talent-home__welcome-title {
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.app-frame.xx-erp-shell .talent-home__btn,
+.app-frame.xx-erp-shell .talent-home__btn--primary,
+.app-frame.xx-erp-shell .talent-home__btn--outline {
+  border-radius: 2px !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.app-frame.xx-erp-shell .talent-home__btn--primary,
+.app-frame.xx-erp-shell a.talent-home__btn--primary {
+  background: var(--xx-ink) !important;
+  color: #f4f2ec !important;
+}
+
+.app-frame.xx-erp-shell .talent-home__btn--outline,
+.app-frame.xx-erp-shell a.talent-home__btn--outline {
+  background: transparent !important;
+  border: 1px solid var(--xx-rule) !important;
+  color: var(--xx-ink) !important;
+}
+
+.app-frame.xx-erp-shell .talent-home__btn--outline:hover {
+  border-color: var(--xx-ink) !important;
+  color: var(--xx-ink) !important;
+}
+
+.app-frame.xx-erp-shell .talent-home__stat-card,
+.app-frame.xx-erp-shell .talent-home__stat-card--purple,
+.app-frame.xx-erp-shell .talent-home__stat-card--blue,
+.app-frame.xx-erp-shell .talent-home__stat-card--orange,
+.app-frame.xx-erp-shell a.talent-home__stat-card {
+  color: var(--xx-ink) !important;
+  background: var(--xx-panel) !important;
+  border: 1px solid var(--xx-rule) !important;
+  border-radius: 2px !important;
+  box-shadow: none !important;
+  min-height: 6rem;
+  transform: none !important;
+}
+
+.app-frame.xx-erp-shell .talent-home__stat-card--purple .talent-home__stat-trend.up,
+.app-frame.xx-erp-shell .talent-home__stat-card--purple .talent-home__stat-trend.down {
+  color: var(--xx-muted) !important;
+}
+
+.app-frame.xx-erp-shell .talent-home__stat-label,
+.app-frame.xx-erp-shell .talent-home__stat-sub {
+  color: var(--xx-muted) !important;
+  opacity: 1 !important;
+}
+
+.app-frame.xx-erp-shell .talent-home__quick-card,
+.app-frame.xx-erp-shell .talent-home__quick-card--purple,
+.app-frame.xx-erp-shell .talent-home__quick-card--blue {
+  color: var(--xx-ink) !important;
+  background: var(--xx-panel) !important;
+  border: 1px solid var(--xx-rule) !important;
+  border-radius: 2px !important;
+  box-shadow: none !important;
+  min-height: 7.5rem;
+}
+
+.app-frame.xx-erp-shell .talent-home__quick-icon,
+.app-frame.xx-erp-shell .talent-home__quick-card--blue .talent-home__quick-icon {
+  background: #efebe3 !important;
+  color: var(--xx-ink) !important;
+  border-radius: 2px !important;
+}
+
+.app-frame.xx-erp-shell .talent-home__quick-btn,
+.app-frame.xx-erp-shell .talent-home__quick-btn--blue {
+  background: var(--xx-ink) !important;
+  color: #f4f2ec !important;
+  border-radius: 2px !important;
+}
+
+.app-frame.xx-erp-shell .talent-home__retry {
+  color: var(--xx-ink) !important;
+}
+
+/* —— Token 账本 —— */
+.app-frame.xx-erp-shell .ai-token-panel {
+  border-radius: 2px !important;
+  border-color: var(--xx-rule) !important;
+  background: var(--xx-panel) !important;
+  box-shadow: none !important;
+}
+
+.app-frame.xx-erp-shell .ai-token-panel__glow {
+  display: none !important;
+}
+
+.app-frame.xx-erp-shell .ai-token-panel__stat,
+.app-frame.xx-erp-shell .ai-token-panel__stat--violet,
+.app-frame.xx-erp-shell .ai-token-panel__stat--blue,
+.app-frame.xx-erp-shell .ai-token-panel__stat--green,
+.app-frame.xx-erp-shell .ai-token-panel__stat--amber {
+  background: #f3eee4 !important;
+  border: 1px solid var(--xx-rule) !important;
+  border-radius: 2px !important;
+  color: var(--xx-ink) !important;
+}
+
+.app-frame.xx-erp-shell .ai-token-panel__tabs button {
+  border-radius: 2px !important;
+  box-shadow: none !important;
+}
+
+.app-frame.xx-erp-shell .ai-token-panel__tabs button.is-active {
+  background: var(--xx-ink) !important;
+  color: #f4f2ec !important;
+}
+
+.app-frame.xx-erp-shell .ai-token-panel__icon {
+  background: var(--xx-ink) !important;
+  color: var(--xx-brass) !important;
+  border-radius: 2px !important;
+}
+
+.app-frame.xx-erp-shell .ai-token-panel__bar {
+  background: var(--xx-ink) !important;
+}
+
+/* —— 卡片 / 按钮通用 —— */
+.app-frame.xx-erp-shell .surface-card {
+  border-radius: 2px;
+  box-shadow: none;
+  border-color: var(--xx-rule);
+  background: var(--xx-panel);
+}
+
+.app-frame.xx-erp-shell :is(
+  button.btn-mockup--primary,
+  a.btn-mockup--primary,
+  .btn-mockup--primary,
+  .talent-home__btn--primary,
+  .app-order-card__btn--primary,
+  .recommend-order-card__apply,
+  .form-relay-preview-btn,
+  .form-relay-publish-card__cta,
+  .recommend-hall-sheet__ok,
+  .chat-panel-v2__send,
+  .pr-orders-toolbar__publish,
+  .pr-talent-card__chat
+) {
+  background: var(--xx-ink) !important;
+  box-shadow: none !important;
+  border-radius: 2px !important;
+  color: #f4f2ec !important;
+}
+
+.app-frame.xx-erp-shell :is(button, a, [type='button']).rounded-full,
+.app-frame.xx-erp-shell :is(button, a, [type='button']).rounded-xl,
+.app-frame.xx-erp-shell :is(button, a, [type='button']).rounded-lg {
+  border-radius: 2px !important;
+}
+
+.app-frame.xx-erp-shell button.bg-violet-600,
+.app-frame.xx-erp-shell a.bg-violet-600,
+.app-frame.xx-erp-shell button.bg-sky-600,
+.app-frame.xx-erp-shell a.bg-sky-600,
+.app-frame.xx-erp-shell button.bg-blue-600,
+.app-frame.xx-erp-shell a.bg-blue-600,
+.app-frame.xx-erp-shell button.bg-violet-700 {
+  background: var(--xx-ink) !important;
+  color: #f4f2ec !important;
+  box-shadow: none !important;
+}
+
+.app-frame.xx-erp-shell .bg-violet-50,
+.app-frame.xx-erp-shell .bg-sky-50 {
+  background: #f1ebe0 !important;
+}
+
+.app-frame.xx-erp-shell .text-violet-700,
+.app-frame.xx-erp-shell .text-violet-800,
+.app-frame.xx-erp-shell .text-violet-900,
+.app-frame.xx-erp-shell .text-sky-700 {
+  color: #3f382c !important;
+}
+
+.app-frame.xx-erp-shell .chat-panel-v2__bubble--mine {
+  background: var(--xx-ink) !important;
+  color: #f4f2ec !important;
+}
+
+.app-frame.xx-erp-shell .list-card-horizontal__stats {
+  color: var(--xx-ink);
+}
+
+.app-frame.xx-erp-shell .choice-card:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.app-frame.xx-erp-shell .pr-recommend-view-mode--active {
+  background: var(--xx-ink) !important;
+  color: #f4f2ec !important;
+  box-shadow: none !important;
+  border-radius: 2px !important;
+}
+
+.app-frame.xx-erp-shell .merchant-embed-root nav button {
+  border-radius: 2px !important;
+}
+
+html[data-theme='dark'] .app-frame.xx-erp-shell .hall-tab-strip {
+  background: transparent !important;
+  border-bottom-color: rgba(255, 255, 255, 0.12) !important;
+}
