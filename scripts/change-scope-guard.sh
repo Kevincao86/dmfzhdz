@@ -90,6 +90,7 @@ list_scopes() {
   xingxuan_open_loop     星选招募开环/闭环（小程序发单+达人报名群码 + 履约 Web 同步；闭环现网路径不改）
   merchant_local_ads     商家 ERP：巨量本地推绑定/投流；与千川账户/取数隔离（不含聚光）
   account_identity_bind  商家账号：邮箱注册、社交登录绑手机、同号合并、个人中心绑定态
+  login_session_refresh  商家 Web/小程序：登录仍在但 access token 过期时先刷新再请求
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -1196,6 +1197,21 @@ LoginAuthPanel
 ErpScanLoginPanel
 TalentLoginAuthPanel
 LoginLegalFooter
+change-scope-guard
+PAT
+      ;;
+    login_session_refresh)
+      cat <<'PAT'
+灵祺ERP小程序/utils/api.js
+灵祺ERP小程序/utils/merchantApi.js
+灵祺ERP小程序/utils/shopAnalysisApiMp.js
+灵祺ERP小程序/utils/aiAgentMp.js
+灵祺ERP小程序/utils/tenantBillingApiMp.js
+灵祺ERP小程序/app.js
+灵祺小程序/utils/api.js
+灵祺小程序/utils/merchantApi.js
+灵祺小程序/app.js
+supabaseClient.ts
 change-scope-guard
 PAT
       ;;

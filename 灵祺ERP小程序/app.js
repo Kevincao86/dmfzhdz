@@ -15,7 +15,15 @@ App({
     const token = String(wx.getStorageSync('meoo_access_token') || '').trim()
     if (token) {
       this.globalData.accessToken = token
-      if (!devAuth.isDevSession()) void sessionSync.syncFromCloud({ force: true })
+      void supabaseCfg.bootstrap().then(() => {
+        const api = require('./utils/api.js')
+        return api.ensureFreshAccessToken()
+      }).then((fresh) => {
+        if (fresh) this.globalData.accessToken = fresh
+        if (!devAuth.isDevSession()) void sessionSync.syncFromCloud({ force: true })
+      }).catch(() => {
+        if (!devAuth.isDevSession()) void sessionSync.syncFromCloud({ force: true })
+      })
       try {
         if (wx.getStorageSync('meoo_just_logged_out') !== '1') {
           wx.switchTab({

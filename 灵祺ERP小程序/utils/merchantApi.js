@@ -3,6 +3,7 @@
  * 需在 utils/config.js 或 config.local.js 配置 MERCHANT_API_BASE_URL，小程序写入的招募单才会进入与 Web 相同的 `.meoo-dev-sync` 注册表。
  */
 const config = require('./config.js')
+const api = require('./api.js')
 
 function baseUrl() {
   return String(config.MERCHANT_API_BASE_URL || '')
@@ -36,45 +37,62 @@ function merchantRequest(method, path, data) {
  */
 function merchantRequestAuth(method, path, opts) {
   const data = opts && opts.data
-  const bearerToken =
-    (opts && opts.bearerToken ? String(opts.bearerToken).trim() : '') || readStoredMerchantToken()
+  const explicit = opts && opts.bearerToken ? String(opts.bearerToken).trim() : ''
+  const stored = readStoredMerchantToken()
+  const usesUserJwt = !explicit || explicit === stored
   const timeoutMs = Math.max(0, Number(opts && opts.timeoutMs) || 0)
   const b = baseUrl()
   if (!b) {
     return Promise.reject(new Error('尚未配置商家后台 API 地址，请在 config.local.js 设置 MERCHANT_API_BASE_URL。'))
   }
   const url = `${b}${path.startsWith('/') ? path : `/${path}`}`
-  const header = {
-    Accept: 'application/json',
-    'Content-Type': 'application/json',
-  }
-  if (bearerToken) {
-    header.Authorization = `Bearer ${bearerToken}`
-    header['X-Meoo-Access-Token'] = bearerToken
-  }
-  return new Promise((resolve, reject) => {
-    const req = {
-      url,
-      method,
-      header,
-      data: method === 'GET' ? undefined : data,
-      success(res) {
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve(res.data)
-          return
-        }
-        const msg =
-          (res.data && (res.data.error || res.data.message || res.data.detail)) ||
-          `请求失败 ${res.statusCode}`
-        reject(new Error(typeof msg === 'string' ? msg : JSON.stringify(msg)))
-      },
-      fail(err) {
-        const em = err && typeof err.errMsg === 'string' ? err.errMsg : '网络异常'
-        reject(new Error(em))
-      },
-    }
-    if (timeoutMs > 0) req.timeout = timeoutMs
-    wx.request(req)
+
+  const send = (bearerToken) =>
+    new Promise((resolve, reject) => {
+      const header = {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      }
+      if (bearerToken) {
+        header.Authorization = `Bearer ${bearerToken}`
+        header['X-Meoo-Access-Token'] = bearerToken
+      }
+      const req = {
+        url,
+        method,
+        header,
+        data: method === 'GET' ? undefined : data,
+        success(res) {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve(res.data)
+            return
+          }
+          const msg =
+            (res.data && (res.data.error || res.data.message || res.data.detail)) ||
+            `请求失败 ${res.statusCode}`
+          const err = new Error(typeof msg === 'string' ? msg : JSON.stringify(msg))
+          err.statusCode = res.statusCode
+          err.payload = res.data
+          reject(err)
+        },
+        fail(err) {
+          const em = err && typeof err.errMsg === 'string' ? err.errMsg : '网络异常'
+          reject(new Error(em))
+        },
+      }
+      if (timeoutMs > 0) req.timeout = timeoutMs
+      wx.request(req)
+    })
+
+  const prepare = usesUserJwt ? api.ensureFreshAccessToken().catch(() => stored) : Promise.resolve(explicit)
+  return prepare.then((fresh) => {
+    const bearer = usesUserJwt ? readStoredMerchantToken() || fresh || explicit : explicit
+    return send(bearer).catch((err) => {
+      if (!usesUserJwt || !api.isStaleAccessError(err && err.statusCode, (err && err.payload) || err)) {
+        throw err
+      }
+      return api.refreshAccessToken().then((next) => send(next))
+    })
   })
 }
 
@@ -94,34 +112,56 @@ function merchantRequestWithHeaders(method, path, opts) {
     { Accept: 'application/json', 'Content-Type': 'application/json' },
     (opts && opts.headers) || {},
   )
-  const tok = readStoredMerchantToken()
-  if (tok && !header.Authorization) {
-    header.Authorization = `Bearer ${tok}`
-    header['X-Meoo-Access-Token'] = tok
-  }
-  return new Promise((resolve, reject) => {
-    const req = {
-      url,
-      method,
-      header,
-      data: method === 'GET' ? undefined : opts && opts.data,
-      timeout: Math.max(8000, Number((opts && opts.timeoutMs) || 20000)),
-      success(res) {
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve(res.data)
-          return
-        }
-        const msg =
-          (res.data && (res.data.error || res.data.message || res.data.detail)) ||
-          `请求失败 ${res.statusCode}`
-        reject(new Error(typeof msg === 'string' ? msg : JSON.stringify(msg)))
-      },
-      fail(err) {
-        const em = err && typeof err.errMsg === 'string' ? err.errMsg : '网络异常'
-        reject(new Error(em))
-      },
+  const stored = readStoredMerchantToken()
+  const headerBearer = String(header.Authorization || '')
+    .replace(/^Bearer\s+/i, '')
+    .trim()
+  const usesUserJwt = !headerBearer || headerBearer === stored
+  const send = (bearerToken, asUser) => {
+    if (asUser && bearerToken) {
+      header.Authorization = `Bearer ${bearerToken}`
+      header['X-Meoo-Access-Token'] = bearerToken
+    } else if (!header.Authorization && bearerToken) {
+      header.Authorization = `Bearer ${bearerToken}`
+      header['X-Meoo-Access-Token'] = bearerToken
     }
-    wx.request(req)
+    return new Promise((resolve, reject) => {
+      const req = {
+        url,
+        method,
+        header,
+        data: method === 'GET' ? undefined : opts && opts.data,
+        timeout: Math.max(8000, Number((opts && opts.timeoutMs) || 20000)),
+        success(res) {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve(res.data)
+            return
+          }
+          const msg =
+            (res.data && (res.data.error || res.data.message || res.data.detail)) ||
+            `请求失败 ${res.statusCode}`
+          const err = new Error(typeof msg === 'string' ? msg : JSON.stringify(msg))
+          err.statusCode = res.statusCode
+          err.payload = res.data
+          reject(err)
+        },
+        fail(err) {
+          const em = err && typeof err.errMsg === 'string' ? err.errMsg : '网络异常'
+          reject(new Error(em))
+        },
+      }
+      wx.request(req)
+    })
+  }
+  const prepare = usesUserJwt ? api.ensureFreshAccessToken().catch(() => stored) : Promise.resolve(headerBearer)
+  return prepare.then(() => {
+    const bearer = usesUserJwt ? readStoredMerchantToken() || headerBearer : headerBearer
+    return send(bearer, usesUserJwt).catch((err) => {
+      if (!usesUserJwt || !api.isStaleAccessError(err && err.statusCode, (err && err.payload) || err)) {
+        throw err
+      }
+      return api.refreshAccessToken().then((next) => send(next, true))
+    })
   })
 }
 

@@ -3,6 +3,7 @@ const { loginNameToTenantEmail } = require('./tenantAuth.js')
 const devAuth = require('./devAuth.js')
 const tenantAuthApi = require('./tenantAuthApiMp.js')
 const supabaseCfg = require('./supabaseClientConfigMp.js')
+const { decodeJwtPayload } = require('./jwtDecode.js')
 
 const REQUEST_TIMEOUT_MS = 20000
 
@@ -238,6 +239,52 @@ function getRefreshToken() {
   return wx.getStorageSync('meoo_refresh_token') || ''
 }
 
+/** GoTrue access_token 默认约 1 小时过期；本地仍有 token 时界面仍显示已登录。 */
+function accessTokenExpiring(token, skewMs) {
+  const raw = String(token || '').trim()
+  if (!raw || raw === devAuth.DEV_TOKEN) return false
+  const payload = decodeJwtPayload(raw)
+  const exp = payload && typeof payload.exp === 'number' ? payload.exp : 0
+  if (!exp) return false
+  return exp * 1000 < Date.now() + (skewMs || 120000)
+}
+
+function isStaleAccessError(statusCode, payload) {
+  const code = Number(statusCode) || 0
+  const text =
+    typeof payload === 'string'
+      ? payload
+      : payload && typeof payload === 'object'
+        ? [payload.detail, payload.error, payload.message].filter(Boolean).join(' ')
+        : ''
+  if (code === 401) return true
+  return /invalid_token|missing_token|unauthorized|invalid_jwt|jwt expired|登录凭证无效|未检测到有效登录/.test(
+    String(text),
+  )
+}
+
+let refreshInflight = null
+
+/**
+ * 临近过期或已过期时用 refresh_token 换新 access_token。
+ * 刷新失败时保留原 token，由调用方决定是否提示重新登录。
+ */
+function ensureFreshAccessToken() {
+  const token = getStoredAccessToken()
+  if (!token || token === devAuth.DEV_TOKEN) return Promise.resolve(token)
+  if (!accessTokenExpiring(token)) return Promise.resolve(token)
+  if (!getRefreshToken()) return Promise.resolve(token)
+  if (refreshInflight) return refreshInflight
+  refreshInflight = supabaseCfg
+    .bootstrap()
+    .then(() => refreshAccessToken())
+    .catch(() => getStoredAccessToken())
+    .finally(() => {
+      refreshInflight = null
+    })
+  return refreshInflight
+}
+
 /** access_token 过期时用 refresh_token 换发；失败需重新登录 */
 function refreshAccessToken() {
   const rt = getRefreshToken()
@@ -310,6 +357,9 @@ module.exports = {
   getAccessToken,
   getBearerToken,
   refreshAccessToken,
+  ensureFreshAccessToken,
+  accessTokenExpiring,
+  isStaleAccessError,
   isAuthed,
   isRealAuthed,
   isGuestBrowsing,

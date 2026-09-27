@@ -438,7 +438,8 @@ function requestJson(path, data, opts) {
   const base = apiBase()
   if (!base) return Promise.reject(new Error('未配置商家后台 API'))
   const timeout = Math.max(10000, Number(opts && opts.timeoutMs) || AI_REQUEST_TIMEOUT_MS)
-  return new Promise((resolve, reject) => {
+  const send = () =>
+    new Promise((resolve, reject) => {
     const task = wx.request({
       url: `${base}${path}`,
       method: 'POST',
@@ -451,7 +452,10 @@ function requestJson(path, data, opts) {
           resolve(body)
           return
         }
-        reject(new Error(merchantApiFriendlyError(res.statusCode, body || {})))
+        const err = new Error(merchantApiFriendlyError(res.statusCode, body || {}))
+        err.statusCode = res.statusCode
+        err.staleAuth = api.isStaleAccessError(res.statusCode, body || {})
+        reject(err)
       },
       fail(err) {
         const em = String((err && err.errMsg) || '')
@@ -475,6 +479,13 @@ function requestJson(path, data, opts) {
         opts.onRequestTask(task)
       } catch (_) {}
     }
+  })
+  const prepare = api.ensureFreshAccessToken
+    ? api.ensureFreshAccessToken().catch(() => '')
+    : Promise.resolve('')
+  return prepare.then(() => send()).catch((e) => {
+    if (!e || !e.staleAuth || !api.refreshAccessToken) throw e
+    return api.refreshAccessToken().then(() => send())
   })
 }
 

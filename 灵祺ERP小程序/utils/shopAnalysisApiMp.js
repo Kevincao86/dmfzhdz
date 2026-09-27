@@ -95,15 +95,13 @@ function friendlyShopNetError(errMsg) {
 }
 
 function requestShop(method, path, data, timeoutMs) {
-  const token = api.getBearerToken && api.getBearerToken()
-  if (!token) return Promise.reject(new Error('请先登录后再使用店铺分析'))
   const b = merchantApi.baseUrl()
   if (!b) return Promise.reject(new Error('请配置商家后台 API 地址'))
   const url = `${b}${path.startsWith('/') ? path : `/${path}`}`
   const timeout = Math.max(10000, Number(timeoutMs) || 60000)
   const maxTry = method === 'GET' ? 2 : 1
 
-  const once = () =>
+  const once = (token) =>
     new Promise((resolve, reject) => {
       wx.request({
         url,
@@ -132,11 +130,12 @@ function requestShop(method, path, data, timeoutMs) {
             return
           }
           const raw = body.message || body.detail || body.error || `请求失败 ${res.statusCode}`
-          const msg =
-            raw === 'unauthorized' || raw === 'invalid_token' || raw === 'missing_token'
-              ? '登录凭证无效，请退出后重新登录'
-              : raw
-          reject(new Error(typeof msg === 'string' ? msg : JSON.stringify(msg)))
+          const stale = api.isStaleAccessError ? api.isStaleAccessError(res.statusCode, body) : false
+          const msg = stale ? '登录凭证无效，请退出后重新登录' : raw
+          const err = new Error(typeof msg === 'string' ? msg : JSON.stringify(msg))
+          err.statusCode = res.statusCode
+          err.staleAuth = stale
+          reject(err)
         },
         fail(err) {
           reject(new Error((err && err.errMsg) || '网络异常'))
@@ -144,19 +143,30 @@ function requestShop(method, path, data, timeoutMs) {
       })
     })
 
-  const run = (attempt) =>
-    once().catch((e) => {
+  const prepare = api.ensureFreshAccessToken
+    ? api.ensureFreshAccessToken().catch(() => '')
+    : Promise.resolve('')
+
+  const run = (attempt, token) =>
+    once(token).catch((e) => {
       const msg = e instanceof Error ? e.message : String(e)
       if (attempt < maxTry && isTransientWxFail(msg)) {
         return new Promise((r) => {
-          setTimeout(() => r(run(attempt + 1)), 600 * attempt)
+          setTimeout(() => r(run(attempt + 1, token)), 600 * attempt)
         })
       }
       if (isTransientWxFail(msg)) return Promise.reject(new Error(friendlyShopNetError(msg)))
       return Promise.reject(e instanceof Error ? e : new Error(msg))
     })
 
-  return run(1)
+  return prepare.then(() => {
+    const token = api.getBearerToken && api.getBearerToken()
+    if (!token) return Promise.reject(new Error('请先登录后再使用店铺分析'))
+    return run(1, token).catch((e) => {
+      if (!e || !e.staleAuth || !api.refreshAccessToken) throw e
+      return api.refreshAccessToken().then((next) => run(1, next))
+    })
+  })
 }
 
 async function fetchShopAnalysisSummary(opts) {

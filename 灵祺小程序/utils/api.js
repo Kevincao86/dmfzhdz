@@ -3,6 +3,7 @@ const { loginNameToTenantEmail } = require('./tenantAuth.js')
 const devAuth = require('./devAuth.js')
 const sessionSync = require('./merchantSessionSyncMp.js')
 const tenantAuthApi = require('./tenantAuthApiMp.js')
+const { decodeJwtPayload } = require('./jwtDecode.js')
 
 const REQUEST_TIMEOUT_MS = 20000
 
@@ -138,6 +139,45 @@ function getRefreshToken() {
   return wx.getStorageSync('meoo_refresh_token') || ''
 }
 
+function accessTokenExpiring(token, skewMs) {
+  const raw = String(token || '').trim()
+  if (!raw || raw === devAuth.DEV_TOKEN) return false
+  const payload = decodeJwtPayload(raw)
+  const exp = payload && typeof payload.exp === 'number' ? payload.exp : 0
+  if (!exp) return false
+  return exp * 1000 < Date.now() + (skewMs || 120000)
+}
+
+function isStaleAccessError(statusCode, payload) {
+  const code = Number(statusCode) || 0
+  const text =
+    typeof payload === 'string'
+      ? payload
+      : payload && typeof payload === 'object'
+        ? [payload.detail, payload.error, payload.message].filter(Boolean).join(' ')
+        : ''
+  if (code === 401) return true
+  return /invalid_token|missing_token|unauthorized|invalid_jwt|jwt expired|登录凭证无效|未检测到有效登录/.test(
+    String(text),
+  )
+}
+
+let refreshInflight = null
+
+function ensureFreshAccessToken() {
+  const token = String(getAccessToken() || '').trim()
+  if (!token || token === devAuth.DEV_TOKEN) return Promise.resolve(token)
+  if (!accessTokenExpiring(token)) return Promise.resolve(token)
+  if (!getRefreshToken()) return Promise.resolve(token)
+  if (refreshInflight) return refreshInflight
+  refreshInflight = refreshAccessToken()
+    .catch(() => String(getAccessToken() || '').trim())
+    .finally(() => {
+      refreshInflight = null
+    })
+  return refreshInflight
+}
+
 /** access_token 过期时用 refresh_token 换发；失败需重新登录 */
 function refreshAccessToken() {
   const rt = getRefreshToken()
@@ -200,6 +240,8 @@ module.exports = {
   logoutAndGoLogin,
   getAccessToken,
   refreshAccessToken,
+  ensureFreshAccessToken,
+  isStaleAccessError,
   isAuthed,
   goLogin,
 }

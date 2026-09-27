@@ -16,9 +16,8 @@ function billingUrl() {
 }
 
 function billingFetchOnce(body) {
-  const token = api.getBearerToken()
-  if (!token) return Promise.reject(new Error('请先登录'))
-  return new Promise((resolve, reject) => {
+  const send = (token) =>
+    new Promise((resolve, reject) => {
     wx.request({
       url: billingUrl(),
       method: 'POST',
@@ -39,6 +38,7 @@ function billingFetchOnce(body) {
           fmt.billingApiErrorMessage(json, res.statusText || '', res.statusCode || 0),
         )
         err.status = res.statusCode
+        err.staleAuth = api.isStaleAccessError(res.statusCode, json)
         reject(err)
       },
       fail(err) {
@@ -50,6 +50,17 @@ function billingFetchOnce(body) {
               : '网络异常'
         reject(new Error(em))
       },
+    })
+  })
+  const prepare = api.ensureFreshAccessToken
+    ? api.ensureFreshAccessToken().catch(() => '')
+    : Promise.resolve('')
+  return prepare.then(() => {
+    const token = api.getBearerToken()
+    if (!token) return Promise.reject(new Error('请先登录'))
+    return send(token).catch((e) => {
+      if (!e || !e.staleAuth) throw e
+      return api.refreshAccessToken().then((next) => send(next))
     })
   })
 }
