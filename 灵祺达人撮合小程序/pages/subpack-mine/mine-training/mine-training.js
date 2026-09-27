@@ -51,7 +51,7 @@ Page({
       if (f !== 'all' && c.mode !== f) return false
       if (f === 'offline' && !training.courseMatchesCity(c, city)) return false
       return true
-    })
+    }).map((c) => ({ ...c, own: training.isOwnCourse(c) }))
     this.setData({ shown, cities })
   },
   onFilter(e) {

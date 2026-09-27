@@ -1,10 +1,4 @@
 const training = require('../../../utils/mpTraining.js')
-const auth = require('../../../utils/auth.js')
-
-function myAccountId() {
-  const acct = auth.readAccount() || {}
-  return String(acct.accountId || acct.id || acct.userId || acct.phone || acct.loginName || '')
-}
 
 function hostLabel(role) {
   if (role === 'pr') return 'PR'
@@ -47,14 +41,13 @@ Page({
   async onShow() {
     const list = await training.listCourses()
     const course = (list || []).find((c) => c.id === this._id) || null
-    const mineId = myAccountId()
-    const ownCourse = !!(course && mineId && String(course.hostId || '') === mineId)
+    const ownCourse = training.isOwnCourse(course)
     this.setData({
       course,
       ownCourse,
       hostLabel: hostLabel(course && course.hostRole),
       fields: fieldsFrom(course),
-      formErr: ownCourse ? '这是你发布的课程，不能报名自己的课。' : '',
+      formErr: ownCourse ? '这是你发布的课程，不能报名自己的课。其他人发布的课程可以报名。' : '',
       parts: course ? training.splitFee(course.fee) : null,
       modePick: course && course.mode === 'offline' ? 'offline' : 'online',
     })
@@ -67,7 +60,7 @@ Page({
   onMode(e) { this.setData({ modePick: e.currentTarget.dataset.id }) },
   async onSignup() {
     if (this.data.ownCourse) {
-      this.setData({ formErr: '不能报名自己发布的课程' })
+      this.setData({ formErr: '不能报名自己发布的课程。其他人发布的课程可以报名。' })
       return
     }
     const reason = fieldError(this.data.fields)

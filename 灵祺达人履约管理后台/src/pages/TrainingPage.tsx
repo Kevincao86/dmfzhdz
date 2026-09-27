@@ -483,7 +483,7 @@ export default function TrainingPage() {
         <p className="mt-1 text-sm text-slate-500">
           {mineMode
             ? '讲师审核通过后在这里发布和修改课程。课时费核实通过后到我的钱包提现。'
-            : '这里是即将开始的课程。线上课直接报名，线下课可以按城市查看。'}
+            : '这里是即将开始的课程。讲师也可以报名别人发布的课，不能报名自己发布的课。线下课可以按城市查看。'}
         </p>
       </div>
       {!mineMode ? <div className="flex gap-2 text-sm">
@@ -531,7 +531,7 @@ export default function TrainingPage() {
           </div>
           {focusCourse.note ? <p className="mt-3 text-sm text-slate-600">{focusCourse.note}</p> : null}
           {me?.accountId && focusCourse.hostId === me.accountId ? (
-            <p className="mt-3 text-sm text-amber-700">这是你发布的课程，不能报名自己的课。</p>
+            <p className="mt-3 text-sm text-amber-700">这是你发布的课程，不能报名自己的课。其他人发布的课程可以报名。</p>
           ) : (
             <button type="button" className="mt-3 rounded-xl bg-violet-600 px-3 py-2 text-sm text-white" onClick={() => openCoursePay(focusCourse)}>
               查看并报名
@@ -565,7 +565,7 @@ export default function TrainingPage() {
               已报 {c.signupCount || 0}/{c.seats}
             </p>
             {me?.accountId && c.hostId === me.accountId ? (
-              <p className="mt-3 text-sm text-amber-700">这是你发布的课程，不能报名自己的课。</p>
+              <p className="mt-3 text-sm text-amber-700">这是你发布的课程，不能报名自己的课。其他人发布的课程可以报名。</p>
             ) : (
               <button type="button" className="mt-3 rounded-xl bg-violet-600 px-3 py-2 text-sm text-white" onClick={() => openCoursePay(c)}>
                 查看并报名

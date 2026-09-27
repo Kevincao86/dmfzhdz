@@ -1,5 +1,5 @@
 <view class="tr-page">
-  <text class="tr-note">这里是即将开始的课程。线上课直接报名，线下课可以按城市查看。</text>
+  <text class="tr-note">这里是即将开始的课程。讲师也可以报名别人发布的课，不能报名自己发布的课。线下课可以按城市查看。</text>
   <view class="tr-seg">
     <view class="tr-seg__item {{filter === 'all' ? 'tr-seg__item--on' : ''}}" data-id="all" bindtap="onFilter">全部</view>
     <view class="tr-seg__item {{filter === 'online' ? 'tr-seg__item--on' : ''}}" data-id="online" bindtap="onFilter">线上</view>
@@ -35,7 +35,7 @@
       </view>
       <view class="tr-card__foot">
         <text class="tr-fee">{{item.fee ? '¥' + item.fee : '费用面议'}}</text>
-        <text class="tr-go">报名</text>
+        <text class="tr-go {{item.own ? 'tr-go--mine' : ''}}">{{item.own ? '我发布的' : '报名'}}</text>
       </view>
     </view>
   </view>

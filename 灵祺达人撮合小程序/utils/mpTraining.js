@@ -130,6 +130,19 @@ function cityKey(raw) {
   return String(raw || '').replace(/市$/, '').trim()
 }
 
+function viewerIds() {
+  const acct = auth.readAccount() || {}
+  return [acct.accountId, acct.id, acct.userId, acct.phone, acct.loginName, acct.lingqiTalentId, acct.lingqiPrId]
+    .map((id) => String(id || '').trim())
+    .filter((id) => id && id !== 'local')
+}
+
+function isOwnCourse(course) {
+  const hostId = String((course && course.hostId) || '').trim()
+  if (!hostId || hostId === 'local') return false
+  return viewerIds().indexOf(hostId) >= 0
+}
+
 function courseMatchesCity(course, city) {
   const key = cityKey(city)
   if (!key || key === '全部') return true
@@ -517,6 +530,7 @@ module.exports = {
   payQuery,
   isAdvancedMember,
   isUpcomingCourse,
+  isOwnCourse,
   courseMatchesCity,
   recommendCourses,
   publishBlockReason,
