@@ -138,16 +138,23 @@ Page({
       }),
     )
     this.applyTab(items)
-    let todayStats = statsFromAds(items)
-    const sum = reportR.ok && reportR.summary ? reportR.summary : null
-    if (sum) {
-      todayStats = [
-        { key: 'spend', label: '消耗(元)', value: sum.statCost != null ? String(sum.statCost) : todayStats[0].value, trend: '' },
-        { key: 'expose', label: '曝光', value: sum.showCnt != null ? String(sum.showCnt) : todayStats[1].value, trend: '' },
-        { key: 'click', label: '点击', value: sum.clickCnt != null ? String(sum.clickCnt) : todayStats[2].value, trend: '' },
-        { key: 'deal', label: '转化', value: sum.convertCnt != null ? String(sum.convertCnt) : todayStats[3].value, trend: '' },
-      ]
+    const money = (n) => {
+      const v = Number(n)
+      return Number.isFinite(v) ? v.toFixed(2) : '0.00'
     }
+    const count = (n) => {
+      const v = Number(n)
+      return Number.isFinite(v) ? String(Math.round(v)) : '0'
+    }
+    const sum = reportR.ok && reportR.summary ? reportR.summary : null
+    const todayStats = sum
+      ? [
+          { key: 'spend', label: '消耗(元)', value: money(sum.statCost), trend: '' },
+          { key: 'expose', label: '曝光', value: count(sum.showCnt), trend: '' },
+          { key: 'click', label: '点击', value: count(sum.clickCnt), trend: '' },
+          { key: 'deal', label: '转化', value: count(sum.convertCnt), trend: '' },
+        ]
+      : emptyTodayStats()
     let clues = this.data.clues
     if (this.data.aiPane === 'leads' || this.data.aiPane === 'ai') {
       const clueR = await feature.fetchAdsClues(this.data.channel)

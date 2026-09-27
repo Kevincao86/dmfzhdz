@@ -265,6 +265,20 @@ function dateRangeLast7(): { start: string; end: string } {
   return { start: fmt(start), end: fmt(end) }
 }
 
+function dateRangeTodayShanghai(): { start: string; end: string } {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date())
+  const year = parts.find((p) => p.type === 'year')?.value || '0000'
+  const month = parts.find((p) => p.type === 'month')?.value || '01'
+  const day = parts.find((p) => p.type === 'day')?.value || '01'
+  const ymd = `${year}-${month}-${day}`
+  return { start: `${ymd} 00:00:00`, end: `${ymd} 23:59:59` }
+}
+
 function takeQcCreds(res: ServerResponse, creds: QianchuanCredentials | null): QianchuanCredentials | null {
   if (creds) stampQcCreds(res, creds)
   return creds
@@ -497,7 +511,8 @@ export async function handleQianchuanRoutes(
 
   if (method === 'GET' && pathname === '/api/merchant/qianchuan/report/summary') {
     const creds = takeQcCreds(res, credsFromQuery(url) ?? credsFromBody({}))
-    const range = dateRangeLast7()
+    const wantToday = url.searchParams.get('range') === 'today'
+    const range = wantToday ? dateRangeTodayShanghai() : dateRangeLast7()
     if (!creds) {
       json(res, 200, emptyAdvertisingSummary(range, '请先绑定千川账号'))
       return true

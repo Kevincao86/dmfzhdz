@@ -60,7 +60,7 @@
       <view wx:for="{{todayStats}}" wx:key="key" class="ads-kpi">
         <text class="ads-kpi-val">{{item.value}}</text>
         <text class="ads-kpi-lab">{{item.label}}</text>
-        <text class="ads-kpi-trend">较昨日 ↑ {{item.trend}}%</text>
+        <text wx:if="{{item.trend !== ''}}" class="ads-kpi-trend">较昨日 ↑ {{item.trend}}%</text>
       </view>
     </view>
   </view>

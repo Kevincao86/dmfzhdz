@@ -417,10 +417,24 @@ async function fetchAdsPromotions(channel) {
 
 async function fetchAdsReport(channel) {
   const spec = adsChannelSpec(channel)
-  const got = await requestAdsList(spec, spec.reportPath)
-  if (!got.ok) return got
-  const data = got.data || {}
-  return { ok: true, summary: data.summary || null, demoMode: Boolean(data.demoMode) }
+  const creds = spec.creds()
+  if (!creds) return { ok: false, message: spec.unbound, summary: null }
+  const todayQuery = `range=today&access_token=${encodeURIComponent(creds.access_token)}&${spec.accountQuery}=${encodeURIComponent(creds.local_account_id)}`
+  try {
+    const data =
+      spec.accountQuery === 'local_account_id'
+        ? await merchantApi.merchantRequestAuth('POST', spec.reportPath, {
+            data: Object.assign({}, adsCredsPayload(creds), { range: 'today' }),
+            timeoutMs: 60000,
+          })
+        : await merchantApi.merchantRequest('GET', `${spec.reportPath}?${todayQuery}`)
+    if (data && data.ok === false) {
+      return { ok: false, message: String(data.message || '拉取今日报表失败'), summary: null }
+    }
+    return { ok: true, summary: (data && data.summary) || null, demoMode: Boolean(data && data.demoMode) }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e), summary: null }
+  }
 }
 
 async function updateAdsStatus(channel, promotionIds, optStatus) {

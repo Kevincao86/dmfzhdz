@@ -670,6 +670,25 @@ function dateRangeLast7(): { start: string; end: string } {
   return { start: fmt(start), end: fmt(end) }
 }
 
+function shanghaiYmd(d = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(d)
+  const year = parts.find((p) => p.type === 'year')?.value || '0000'
+  const month = parts.find((p) => p.type === 'month')?.value || '01'
+  const day = parts.find((p) => p.type === 'day')?.value || '01'
+  return `${year}-${month}-${day}`
+}
+
+/** 上海自然日当天，供小程序「今日数据」。网页近7日仍走 dateRangeLast7。 */
+function dateRangeTodayShanghai(): { start: string; end: string } {
+  const ymd = shanghaiYmd()
+  return { start: `${ymd} 00:00:00`, end: `${ymd} 23:59:59` }
+}
+
 function pickBudgetYuan(row: Record<string, unknown>): number | undefined {
   const ds =
     row.delivery_setting && typeof row.delivery_setting === 'object' && !Array.isArray(row.delivery_setting)
@@ -736,8 +755,8 @@ async function fetchOeReportRows(
   creds: LocalPromotionCredentials,
   path: string,
   extraQuery: Record<string, string> = {},
+  range: { start: string; end: string } = dateRangeLast7(),
 ): Promise<Record<string, unknown>[]> {
-  const range = dateRangeLast7()
   const startDate = range.start.slice(0, 10)
   const endDate = range.end.slice(0, 10)
   const extraBody: Record<string, unknown> = {}
@@ -844,6 +863,50 @@ async function loadLocalReportMaps(creds: LocalPromotionCredentials): Promise<{
   }
   const ctr = showCnt > 0 ? Math.round((clickCnt / showCnt) * 10000) / 100 : 0
   return { byPromotion, byProject, totals: { statCost, showCnt, clickCnt, convertCnt, ctr } }
+}
+
+/** 只汇总账户报表。项目报表仅在账户报表为空时兜底，且每个项目只计一次，避免近7日或分目标重复相加。 */
+async function loadLocalAccountTotals(
+  creds: LocalPromotionCredentials,
+  range: { start: string; end: string },
+): Promise<{ statCost: number; showCnt: number; clickCnt: number; convertCnt: number; ctr: number }> {
+  const add = (rows: Record<string, unknown>[], dedupeProject: boolean) => {
+    let statCost = 0
+    let showCnt = 0
+    let clickCnt = 0
+    let convertCnt = 0
+    const seen = new Set<string>()
+    for (const row of rows) {
+      const m = parseLocalReportRow(row)
+      if (dedupeProject && m.projectId) {
+        if (seen.has(m.projectId)) continue
+        seen.add(m.projectId)
+      }
+      statCost += m.statCost
+      showCnt += m.showCnt
+      clickCnt += m.clickCnt
+      convertCnt += m.convertCnt
+    }
+    return { statCost, showCnt, clickCnt, convertCnt }
+  }
+  let totals = add(
+    await fetchOeReportRows(creds, '/open_api/v3.0/local/report/account/get/', {}, range),
+    false,
+  )
+  if (!totals.statCost && !totals.showCnt) {
+    totals = add(
+      await fetchOeReportRows(creds, '/open_api/v3.0/local/report/project/get/', {}, range),
+      true,
+    )
+  }
+  const ctr = totals.showCnt > 0 ? Math.round((totals.clickCnt / totals.showCnt) * 10000) / 100 : 0
+  return {
+    statCost: Math.round(totals.statCost * 100) / 100,
+    showCnt: totals.showCnt,
+    clickCnt: totals.clickCnt,
+    convertCnt: totals.convertCnt,
+    ctr,
+  }
 }
 
 function metricsForRow(
@@ -1342,14 +1405,17 @@ export async function handleLocalPromotionRoutes(
     pathname === '/api/merchant/local-promotion/report/summary'
   ) {
     const rawCreds = credsForList(method, url, bodyRaw)
-    const range = dateRangeLast7()
+    const body = method === 'POST' ? parseBody(bodyRaw) : {}
+    const wantToday = String(body.range ?? url.searchParams.get('range') ?? '') === 'today'
+    const range = wantToday ? dateRangeTodayShanghai() : dateRangeLast7()
     if (!rawCreds) {
       json(res, 200, emptyAdvertisingSummary(range, '请先绑定本地推账号'))
       return true
     }
     const creds = await resolveLocalPromotionCreds(rawCreds, res)
-    const maps = await loadLocalReportMaps(creds)
-    const t = maps.totals
+    const t = wantToday
+      ? await loadLocalAccountTotals(creds, range)
+      : (await loadLocalReportMaps(creds)).totals
     json(res, 200, {
       ok: true,
       summary: {
