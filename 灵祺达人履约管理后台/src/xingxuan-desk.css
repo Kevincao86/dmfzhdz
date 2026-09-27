@@ -7,6 +7,26 @@
   --xx-rule: #d9d2c6;
   --xx-brass: #b8923a;
   --xx-muted: #6b6458;
+  --xx-solid: #12161a;
+  --xx-on-solid: #f4f2ec;
+  --xx-wash: var(--xx-wash);
+  --xx-th: var(--xx-th);
+  --xx-soft: var(--xx-soft);
+}
+
+html[data-theme='dark'] .app-frame.xx-erp-shell {
+  --xx-ink: #f3efe6;
+  --xx-paper: #101216;
+  --xx-panel: #1b1e24;
+  --xx-rule: #3d3830;
+  --xx-brass: #d4b36a;
+  --xx-muted: #b7ae9f;
+  --xx-solid: #efeae0;
+  --xx-on-solid: #161410;
+  --xx-wash: #2a261f;
+  --xx-th: #26231c;
+  --xx-soft: #2a261f;
+  --shell-bg: #1b1e24;
 }
 
 .app-frame.xx-erp-shell .app-main-wrap {
@@ -15,13 +35,13 @@
 
 .app-frame.xx-erp-shell .xx-content-plate {
   border-radius: 2px;
-  background: #fffdf8;
+  background: var(--xx-panel);
   border-color: var(--xx-rule);
   box-shadow: none;
 }
 
 .app-frame.xx-erp-shell .xx-subbar {
-  background: #efebe3;
+  background: var(--xx-soft);
   border-bottom-color: var(--xx-rule);
 }
 
@@ -67,7 +87,7 @@
 .app-frame.xx-erp-shell .page-hero:not(.page-hero--inset),
 .app-frame.xx-erp-shell .page-hero--stacked {
   background: var(--xx-ink) !important;
-  color: #f4f2ec !important;
+  color: var(--xx-on-solid) !important;
   border-radius: 0 !important;
   box-shadow: none !important;
 }
@@ -109,7 +129,7 @@
 
 .app-frame.xx-erp-shell .panel-tab-active {
   background: var(--xx-ink) !important;
-  color: #f4f2ec !important;
+  color: var(--xx-on-solid) !important;
 }
 
 /* —— 首页欢迎 / 指标 / 快捷入口 —— */
@@ -137,7 +157,7 @@
 .app-frame.xx-erp-shell .talent-home__btn--primary,
 .app-frame.xx-erp-shell a.talent-home__btn--primary {
   background: var(--xx-ink) !important;
-  color: #f4f2ec !important;
+  color: var(--xx-on-solid) !important;
 }
 
 .app-frame.xx-erp-shell .talent-home__btn--outline,
@@ -190,7 +210,7 @@
 
 .app-frame.xx-erp-shell .talent-home__quick-icon,
 .app-frame.xx-erp-shell .talent-home__quick-card--blue .talent-home__quick-icon {
-  background: #efebe3 !important;
+  background: var(--xx-soft) !important;
   color: var(--xx-ink) !important;
   border-radius: 2px !important;
 }
@@ -198,7 +218,7 @@
 .app-frame.xx-erp-shell .talent-home__quick-btn,
 .app-frame.xx-erp-shell .talent-home__quick-btn--blue {
   background: var(--xx-ink) !important;
-  color: #f4f2ec !important;
+  color: var(--xx-on-solid) !important;
   border-radius: 2px !important;
 }
 
@@ -223,7 +243,7 @@
 .app-frame.xx-erp-shell .ai-token-panel__stat--blue,
 .app-frame.xx-erp-shell .ai-token-panel__stat--green,
 .app-frame.xx-erp-shell .ai-token-panel__stat--amber {
-  background: #f3eee4 !important;
+  background: var(--xx-th) !important;
   border: 1px solid var(--xx-rule) !important;
   border-radius: 2px !important;
   color: var(--xx-ink) !important;
@@ -236,7 +256,7 @@
 
 .app-frame.xx-erp-shell .ai-token-panel__tabs button.is-active {
   background: var(--xx-ink) !important;
-  color: #f4f2ec !important;
+  color: var(--xx-on-solid) !important;
 }
 
 .app-frame.xx-erp-shell .ai-token-panel__icon {
@@ -274,7 +294,7 @@
   background: var(--xx-ink) !important;
   box-shadow: none !important;
   border-radius: 2px !important;
-  color: #f4f2ec !important;
+  color: var(--xx-on-solid) !important;
 }
 
 .app-frame.xx-erp-shell :is(button, a, [type='button']).rounded-full,
@@ -291,25 +311,25 @@
 .app-frame.xx-erp-shell a.bg-blue-600,
 .app-frame.xx-erp-shell button.bg-violet-700 {
   background: var(--xx-ink) !important;
-  color: #f4f2ec !important;
+  color: var(--xx-on-solid) !important;
   box-shadow: none !important;
 }
 
 .app-frame.xx-erp-shell .bg-violet-50,
 .app-frame.xx-erp-shell .bg-sky-50 {
-  background: #f1ebe0 !important;
+  background: var(--xx-wash) !important;
 }
 
 .app-frame.xx-erp-shell .text-violet-700,
 .app-frame.xx-erp-shell .text-violet-800,
 .app-frame.xx-erp-shell .text-violet-900,
 .app-frame.xx-erp-shell .text-sky-700 {
-  color: #3f382c !important;
+  color: var(--xx-ink) !important;
 }
 
 .app-frame.xx-erp-shell .chat-panel-v2__bubble--mine {
   background: var(--xx-ink) !important;
-  color: #f4f2ec !important;
+  color: var(--xx-on-solid) !important;
 }
 
 .app-frame.xx-erp-shell .list-card-horizontal__stats {
@@ -323,7 +343,7 @@
 
 .app-frame.xx-erp-shell .pr-recommend-view-mode--active {
   background: var(--xx-ink) !important;
-  color: #f4f2ec !important;
+  color: var(--xx-on-solid) !important;
   box-shadow: none !important;
   border-radius: 2px !important;
 }
@@ -372,7 +392,7 @@ html[data-theme='dark'] .app-frame.xx-erp-shell .hall-tab-strip {
   gap: 0.45rem;
   min-height: 5.2rem;
   border: 1px solid var(--xx-rule, #d9d2c6);
-  background: #fffdf8;
+  background: var(--xx-panel);
   color: var(--xx-ink, #12161a);
   font-size: 0.8125rem;
 }
@@ -400,7 +420,7 @@ html[data-theme='dark'] .app-frame.xx-erp-shell .hall-tab-strip {
   display: inline-block;
   height: 4px;
   margin-right: 0.4rem;
-  background: #12161a;
+  background: var(--xx-ink);
   vertical-align: middle;
 }
 
@@ -485,7 +505,7 @@ html[data-theme='dark'] .app-frame.xx-erp-shell .hall-tab-strip {
 .app-frame.xx-erp-shell .talent-home--desk .talent-home__stat-card--blue,
 .app-frame.xx-erp-shell .talent-home--desk .talent-home__stat-card--orange {
   display: block;
-  background: #fffdf8 !important;
+  background: var(--xx-panel) !important;
   color: var(--xx-ink) !important;
   border: 1px solid var(--xx-rule) !important;
   border-radius: 2px !important;
@@ -500,13 +520,13 @@ html[data-theme='dark'] .app-frame.xx-erp-shell .hall-tab-strip {
 .xx-app-table {
   width: 100%;
   border-collapse: collapse;
-  background: #fffdf8;
+  background: var(--xx-panel);
   font-size: 0.875rem;
 }
 .xx-app-table th {
   text-align: left;
   font-weight: 560;
-  background: #f3eee4;
+  background: var(--xx-th);
   padding: 0.7rem 0.75rem;
   border-bottom: 1px solid var(--xx-rule, #d9d2c6);
 }
@@ -581,7 +601,7 @@ html[data-theme='dark'] .app-frame.xx-erp-shell .hall-tab-strip {
   flex-direction: column;
   gap: 0.45rem;
   border: 1px solid var(--xx-rule, #d9d2c6);
-  background: #fffdf8;
+  background: var(--xx-panel);
   padding: 0.65rem;
 }
 .xx-train-card--on {
@@ -589,7 +609,7 @@ html[data-theme='dark'] .app-frame.xx-erp-shell .hall-tab-strip {
 }
 .xx-train-card__poster {
   aspect-ratio: 16 / 10;
-  background: #efe8dc;
+  background: var(--xx-soft);
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -628,7 +648,7 @@ html[data-theme='dark'] .app-frame.xx-erp-shell .hall-tab-strip {
 .xx-pay-table {
   width: 100%;
   border-collapse: collapse;
-  background: #fffdf8;
+  background: var(--xx-panel);
   font-size: 0.875rem;
 }
 .xx-pay-table th,
@@ -639,7 +659,7 @@ html[data-theme='dark'] .app-frame.xx-erp-shell .hall-tab-strip {
   vertical-align: top;
 }
 .xx-pay-table th {
-  background: #f3eee4;
+  background: var(--xx-th);
   font-weight: 560;
 }
 .xx-pay-table__sub {
@@ -648,7 +668,7 @@ html[data-theme='dark'] .app-frame.xx-erp-shell .hall-tab-strip {
   color: var(--xx-muted, #6b6458);
 }
 .xx-pay-table__hit {
-  background: #f7f1e4;
+  background: var(--xx-wash);
 }
 .xx-pay-table__pay {
   display: block;
@@ -683,7 +703,7 @@ html[data-theme='dark'] .app-frame.xx-erp-shell .hall-tab-strip {
   grid-area: day;
   align-self: stretch;
   border: 1px solid var(--xx-rule, #d9d2c6);
-  background: #fffdf8;
+  background: var(--xx-panel);
   padding: 1rem;
 }
 .xx-cal-desk__day-date {
@@ -695,7 +715,7 @@ html[data-theme='dark'] .app-frame.xx-erp-shell .hall-tab-strip {
 .xx-cal-desk__notes {
   order: 2;
   border: 1px solid var(--xx-rule, #d9d2c6);
-  background: #fffdf8;
+  background: var(--xx-panel);
   padding: 1rem 1.1rem;
 }
 @media (max-width: 960px) {
@@ -779,4 +799,80 @@ html[data-theme='dark'] .app-frame.xx-erp-shell .hall-tab-strip {
 }
 .recommend-hall-page--rail .recommend-hall-sheet-backdrop {
   grid-column: 1 / -1;
+}
+
+/* 黑暗模式：内容区跟着主题变，不再锁在浅色纸面上 */
+html[data-theme='dark'] .app-frame.xx-erp-shell .xx-content-plate,
+html[data-theme='dark'] .app-frame.xx-erp-shell .app-main,
+html[data-theme='dark'] .app-frame.xx-erp-shell .page-content-shell {
+  color: var(--xx-ink);
+}
+html[data-theme='dark'] .app-frame.xx-erp-shell .xx-subbar {
+  background: var(--xx-panel) !important;
+  color: var(--xx-ink);
+  border-bottom-color: var(--xx-rule) !important;
+}
+html[data-theme='dark'] .app-frame.xx-erp-shell :is(
+  .bg-white,
+  .bg-white\/90,
+  .bg-white\/80,
+  .bg-slate-50,
+  .bg-slate-100,
+  .bg-violet-50,
+  .bg-violet-100,
+  .bg-fuchsia-50
+) {
+  background-color: var(--xx-panel) !important;
+  color: var(--xx-ink);
+}
+html[data-theme='dark'] .app-frame.xx-erp-shell .bg-slate-900 {
+  background-color: var(--xx-solid) !important;
+  color: var(--xx-on-solid) !important;
+}
+html[data-theme='dark'] .app-frame.xx-erp-shell :is(
+  .text-slate-900,
+  .text-slate-800,
+  .text-slate-700,
+  .text-slate-600,
+  .text-\[var\(--shell-text\)\]
+) {
+  color: var(--xx-ink) !important;
+}
+html[data-theme='dark'] .app-frame.xx-erp-shell :is(
+  .text-slate-500,
+  .text-slate-400,
+  .text-slate-300,
+  .text-\[var\(--shell-muted\)\]
+) {
+  color: var(--xx-muted) !important;
+}
+html[data-theme='dark'] .app-frame.xx-erp-shell :is(
+  .border-slate-200,
+  .border-slate-100,
+  .border-violet-100,
+  .border-violet-200,
+  .border-\[var\(--shell-border\)\]
+) {
+  border-color: var(--xx-rule) !important;
+}
+html[data-theme='dark'] .app-frame.xx-erp-shell :is(input, select, textarea) {
+  background-color: var(--xx-paper);
+  color: var(--xx-ink);
+  border-color: var(--xx-rule);
+}
+html[data-theme='dark'] .app-frame.xx-erp-shell .messages-hub,
+html[data-theme='dark'] .app-frame.xx-erp-shell .messages-hub__sidebar {
+  background: var(--xx-panel);
+  color: var(--xx-ink);
+  border-color: var(--xx-rule);
+}
+html[data-theme='dark'] .app-frame.xx-erp-shell .talent-home__announce-more {
+  color: var(--xx-brass) !important;
+}
+html[data-theme='dark'] .app-frame.xx-erp-shell [class*='from-violet'],
+html[data-theme='dark'] .app-frame.xx-erp-shell [class*='to-fuchsia'],
+html[data-theme='dark'] .app-frame.xx-erp-shell [class*='from-fuchsia'] {
+  background-image: none !important;
+  background-color: var(--xx-wash) !important;
+  color: var(--xx-ink) !important;
 }
