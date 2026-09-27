@@ -1,11 +1,5 @@
 <view class="tr-page">
   <text class="tr-note">这里是即将开始的课程。线上课直接报名，线下课可以按城市查看。</text>
-  <view class="tr-actions">
-    <view class="tr-action" bindtap="onApply">
-      <text class="tr-action__name">申请讲师</text>
-      <text class="tr-action__state">{{lecturerLabel}}</text>
-    </view>
-  </view>
   <view class="tr-seg">
     <view class="tr-seg__item {{filter === 'all' ? 'tr-seg__item--on' : ''}}" data-id="all" bindtap="onFilter">全部</view>
     <view class="tr-seg__item {{filter === 'online' ? 'tr-seg__item--on' : ''}}" data-id="online" bindtap="onFilter">线上</view>
@@ -44,5 +38,8 @@
         <text class="tr-go">报名</text>
       </view>
     </view>
+  </view>
+  <view class="tr-fab {{lecturerStatus === 'approved' ? 'tr-fab--done' : ''}} {{lecturerStatus === 'pending' ? 'tr-fab--wait' : ''}}" bindtap="onApply">
+    <text class="tr-fab__main">{{lecturerStatus === 'approved' ? '讲师已通过' : lecturerStatus === 'pending' ? '讲师审核中' : lecturerStatus === 'rejected' ? '重新申请' : '申请讲师'}}</text>
   </view>
 </view>
