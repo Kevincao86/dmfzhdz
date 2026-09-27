@@ -55,6 +55,8 @@ import TrainingPage from './pages/TrainingPage'
 import MyPaymentOrdersPage from './pages/MyPaymentOrdersPage'
 import XingxuanTalentCreditPage from './pages/XingxuanTalentCreditPage'
 import MerchantEmbedShell from './merchant/MerchantEmbedShell'
+import MerchantEmbedProviders from './merchant/MerchantEmbedProviders'
+import MerchantEmbedErrorBoundary from './merchant/MerchantEmbedErrorBoundary'
 import { getToken } from './lib/mpSession'
 import { isPublicSharePath, isPublicVideoReviewSharePath } from './lib/publicShareRoutes'
 
@@ -65,6 +67,7 @@ const BriefGenRecordsPage = lazy(() => import('@merchant/pages/BriefGenRecordsPa
 const DigitalHumanAddonPage = lazy(() => import('@merchant/pages/DigitalHumanBroadcastPage'))
 const AiScriptReviewAddonPage = lazy(() => import('@merchant/pages/AiScriptReviewAddonPage'))
 const PlatformVideoReviewRulesPage = lazy(() => import('@merchant/pages/PlatformVideoReviewRulesPage'))
+const ShortDramaAddonPage = lazy(() => import('@merchant/pages/ShortDramaPage'))
 const AiImageAddonPage = lazy(() => import('@merchant/pages/AiImageStudioPage'))
 
 function AddonPageFallback() {
@@ -146,6 +149,30 @@ export default function App() {
         <Route path="/messages" element={<MessagesPage />} />
         <Route path="/chat" element={<ChatPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route
+          path="/profile/ai-review/platform-rules"
+          element={
+            <LazyAddonPage>
+              <MerchantEmbedProviders>
+                <MerchantEmbedErrorBoundary>
+                  <PlatformVideoReviewRulesPage />
+                </MerchantEmbedErrorBoundary>
+              </MerchantEmbedProviders>
+            </LazyAddonPage>
+          }
+        />
+        <Route
+          path="/profile/ai-review"
+          element={
+            <LazyAddonPage>
+              <MerchantEmbedProviders>
+                <MerchantEmbedErrorBoundary>
+                  <AiScriptReviewAddonPage />
+                </MerchantEmbedErrorBoundary>
+              </MerchantEmbedProviders>
+            </LazyAddonPage>
+          }
+        />
         <Route path="/profile/membership" element={<XingxuanMembershipPage />} />
         <Route path="/profile/wallet" element={<WalletPage />} />
         <Route path="/profile/points-recharge" element={<XingxuanPointsRechargePage />} />
@@ -170,9 +197,10 @@ export default function App() {
             <Route index element={<LazyAddonPage><AiContentAddonPage /></LazyAddonPage>} />
             <Route path="records" element={<LazyAddonPage><BriefGenRecordsPage /></LazyAddonPage>} />
           </Route>
-          <Route path="ai-video-review" element={<Navigate to="/addons/ai-review?mode=video" replace />} />
-          <Route path="ai-review/platform-rules" element={<LazyAddonPage><PlatformVideoReviewRulesPage /></LazyAddonPage>} />
-          <Route path="ai-review" element={<LazyAddonPage><AiScriptReviewAddonPage /></LazyAddonPage>} />
+          <Route path="ai-video-review" element={<Navigate to="/profile/ai-review?mode=video" replace />} />
+          <Route path="ai-review/platform-rules" element={<Navigate to="/profile/ai-review/platform-rules" replace />} />
+          <Route path="ai-review" element={<Navigate to="/profile/ai-review" replace />} />
+          <Route path="ai-drama" element={<LazyAddonPage><ShortDramaAddonPage /></LazyAddonPage>} />
           <Route path="digital-human" element={<LazyAddonPage><DigitalHumanAddonPage /></LazyAddonPage>} />
           <Route path="ai-image" element={<LazyAddonPage><AiImageAddonPage /></LazyAddonPage>} />
         </Route>

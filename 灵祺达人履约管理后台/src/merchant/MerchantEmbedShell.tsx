@@ -20,8 +20,8 @@ function resolveAddonNavTarget(pathname: string): string | null {
   if (pathname === '/addons/ai-content' || pathname.startsWith('/addons/ai-content/')) {
     return '/addons/ai-content'
   }
-  if (pathname === '/addons/ai-review' || pathname.startsWith('/addons/ai-review/') || pathname === '/addons/ai-video-review') {
-    return '/addons/ai-review'
+  if (pathname === '/addons/ai-drama' || pathname.startsWith('/addons/ai-drama/')) {
+    return '/addons/ai-drama'
   }
   if (pathname === '/addons/shortvideo') return '/addons/shortvideo'
   if (pathname === '/addons/digital-human') return '/addons/digital-human'
@@ -79,6 +79,12 @@ export default function MerchantEmbedShell() {
   useEffect(() => {
     if (syncing || !addonEnabled || !unlockedNav.length) return
     const target = resolveAddonNavTarget(location.pathname)
+    if (
+      location.pathname.startsWith('/addons/ai-review') ||
+      location.pathname === '/addons/ai-video-review'
+    ) {
+      return
+    }
     if (!target) {
       if (location.pathname === '/addons' || location.pathname.startsWith('/addons/')) {
         navigate(unlockedNav[0]!.to, { replace: true })
@@ -120,9 +126,9 @@ export default function MerchantEmbedShell() {
                         key={t.to}
                         type="button"
                         onClick={() => onNavClick(t)}
-                        className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                        className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-colors ${
                           active
-                            ? 'bg-violet-600 text-white shadow-sm'
+                            ? 'bg-[#161d24] text-[#f4f2ec] shadow-none'
                             : t.unlocked
                               ? 'text-[var(--shell-muted)] hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]'
                               : 'text-[var(--shell-muted)] opacity-60 hover:bg-[var(--shell-hover)]'
@@ -151,7 +157,7 @@ export default function MerchantEmbedShell() {
                   key={t.to}
                   type="button"
                   onClick={() => onNavClick(t)}
-                  className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-sm text-violet-800"
+                  className="rounded-sm border border-[#e6e0d4] bg-[#fffdf8] px-3 py-1.5 text-sm text-[#161d24]"
                 >
                   {t.label} · 升级解锁
                 </button>

@@ -471,7 +471,7 @@ export default function AiComplianceReviewAddonPage({ mode: legacyMode }: Props)
             <button
               type="button"
               className="rounded-lg border border-[var(--shell-border)] px-3 py-2 text-sm text-[var(--shell-fg)] hover:bg-[var(--shell-hover)]"
-              onClick={() => navigate('/addons/ai-review/platform-rules')}
+              onClick={() => navigate('/profile/ai-review/platform-rules')}
             >
               查看平台视频审核规则
             </button>

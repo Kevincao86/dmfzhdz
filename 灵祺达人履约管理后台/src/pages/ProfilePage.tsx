@@ -173,6 +173,11 @@ export default function ProfilePage() {
       label: '我的推广',
       desc: '推广码 · 太阳码 · 佣金与商户明细',
     },
+    {
+      to: '/profile/ai-review',
+      label: 'AI审核',
+      desc: '文稿与短视频合规检核',
+    },
     ...(lecturerApproved
       ? [
           {
