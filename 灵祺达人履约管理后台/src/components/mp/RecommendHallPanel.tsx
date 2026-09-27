@@ -237,8 +237,8 @@ function SupplierRecommendOrders() {
   }
 
   return (
-    <div className="recommend-hall-page">
-      <div className="recommend-hall-stack">
+    <div className="recommend-hall-page recommend-hall-page--rail">
+      <div className="recommend-hall-stack recommend-hall-rail">
         <header className="recommend-hall-head">
           <h1 className="recommend-hall-head__title">
             达人推荐大厅

@@ -336,3 +336,447 @@ html[data-theme='dark'] .app-frame.xx-erp-shell .hall-tab-strip {
   background: transparent !important;
   border-bottom-color: rgba(255, 255, 255, 0.12) !important;
 }
+
+/* 首页：公告在左、六宫格在右、用量表在下、按钮在底 */
+.talent-home--desk {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.talent-home__greet {
+  padding: 0.2rem 0 0.4rem;
+}
+.app-frame.xx-erp-shell .talent-home--desk .talent-home__announce-item {
+  justify-content: flex-start;
+  gap: 1.4rem;
+}
+.talent-home__desk {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(16rem, 0.9fr);
+  gap: 1rem;
+  align-items: stretch;
+}
+@media (max-width: 900px) {
+  .talent-home__desk { grid-template-columns: 1fr; }
+}
+.talent-home__icon-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+.talent-home__icon-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 5.2rem;
+  border: 1px solid var(--xx-rule, #d9d2c6);
+  background: #fffdf8;
+  color: var(--xx-ink, #12161a);
+  font-size: 0.8125rem;
+}
+.talent-home__foot-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+.talent-home__courses .talent-home__order-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.ai-token-ledger {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+.ai-token-ledger th,
+.ai-token-ledger td {
+  text-align: left;
+  padding: 0.55rem 0.4rem;
+  border-bottom: 1px solid var(--xx-rule, #d9d2c6);
+}
+.ai-token-ledger__bar {
+  display: inline-block;
+  height: 4px;
+  margin-right: 0.4rem;
+  background: #12161a;
+  vertical-align: middle;
+}
+
+/* 招募大厅：标题、筛选、双列列表拆开，不再叠成一张蓝卡 */
+.app-frame.xx-erp-shell .hall-page--ledger .hall-ledger-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+  overflow: visible;
+}
+.app-frame.xx-erp-shell .hall-page--ledger .page-hero,
+.app-frame.xx-erp-shell .hall-page--ledger .page-hero--stacked {
+  background: transparent !important;
+  color: var(--xx-ink, #12161a) !important;
+  box-shadow: none !important;
+  padding: 0.2rem 0 0.4rem !important;
+}
+.app-frame.xx-erp-shell .hall-page--ledger .page-hero h2,
+.app-frame.xx-erp-shell .hall-page--ledger .page-hero p,
+.app-frame.xx-erp-shell .hall-page--ledger .page-hero .text-\[var\(--shell-muted\)\] {
+  color: var(--xx-ink, #12161a) !important;
+}
+.hall-page--ledger .hall-list,
+.hall-page--ledger .hall-list--two-col {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 800px) {
+  .hall-page--ledger .hall-list { grid-template-columns: 1fr; }
+}
+
+/* 推荐：筛选改为左栏 */
+.recommend-hall-page--rail {
+  display: grid;
+  grid-template-columns: 16rem minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+.recommend-hall-page--rail .recommend-hall-rail {
+  grid-column: 1;
+  grid-row: 1 / span 6;
+}
+.recommend-hall-page--rail .recommend-hall-list,
+.recommend-hall-page--rail .recommend-hall-hint,
+.recommend-hall-page--rail .recommend-hall-err {
+  grid-column: 2;
+}
+@media (max-width: 900px) {
+  .recommend-hall-page--rail { grid-template-columns: 1fr; }
+  .recommend-hall-page--rail .recommend-hall-rail,
+  .recommend-hall-page--rail .recommend-hall-list { grid-column: auto; grid-row: auto; }
+}
+
+/* 我的：左档案、右菜单 */
+.xx-profile-desk {
+  display: grid;
+  grid-template-columns: 18rem minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+.xx-profile-desk__side,
+.xx-profile-desk__main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+@media (max-width: 900px) {
+  .xx-profile-desk { grid-template-columns: 1fr; }
+}
+
+/* 首页三块指标改成描边方块，快捷入口不再和课程并排 */
+.app-frame.xx-erp-shell .talent-home--desk .talent-home__stat-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.app-frame.xx-erp-shell .talent-home--desk .talent-home__stat-card,
+.app-frame.xx-erp-shell .talent-home--desk .talent-home__stat-card--purple,
+.app-frame.xx-erp-shell .talent-home--desk .talent-home__stat-card--blue,
+.app-frame.xx-erp-shell .talent-home--desk .talent-home__stat-card--orange {
+  display: block;
+  background: #fffdf8 !important;
+  color: var(--xx-ink) !important;
+  border: 1px solid var(--xx-rule) !important;
+  border-radius: 2px !important;
+  box-shadow: none !important;
+  padding: 0.9rem 1rem !important;
+}
+.app-frame.xx-erp-shell .talent-home--desk .talent-home__stat-card svg {
+  display: none !important;
+}
+
+/* 我的报名：表格，不再是卡片流 */
+.xx-app-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fffdf8;
+  font-size: 0.875rem;
+}
+.xx-app-table th {
+  text-align: left;
+  font-weight: 560;
+  background: #f3eee4;
+  padding: 0.7rem 0.75rem;
+  border-bottom: 1px solid var(--xx-rule, #d9d2c6);
+}
+.xx-app-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--xx-rule, #d9d2c6);
+  vertical-align: top;
+}
+.xx-app-table__title,
+.xx-app-table__open {
+  color: var(--xx-ink, #12161a);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.xx-app-table__sub {
+  margin: 0.2rem 0 0;
+  color: var(--xx-muted, #6b6458);
+  font-size: 0.75rem;
+}
+.xx-app-table__ops {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+/* 培训：标题在左，三列海报在下 */
+.xx-train-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 0.5rem 0 2rem;
+}
+.xx-train-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.xx-train-head h1 {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+.xx-train-kicker {
+  margin: 0.15rem 0 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  color: var(--xx-muted, #6b6458);
+}
+.xx-train-lead {
+  margin: 0;
+  max-width: 40rem;
+  color: var(--xx-muted, #6b6458);
+  font-size: 0.875rem;
+}
+.xx-train-modes {
+  display: flex;
+  gap: 0.4rem;
+}
+.xx-train-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+@media (max-width: 900px) {
+  .xx-train-grid { grid-template-columns: 1fr; }
+}
+.xx-train-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  border: 1px solid var(--xx-rule, #d9d2c6);
+  background: #fffdf8;
+  padding: 0.65rem;
+}
+.xx-train-card--on {
+  outline: 2px solid #b8923a;
+}
+.xx-train-card__poster {
+  aspect-ratio: 16 / 10;
+  background: #efe8dc;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.xx-train-card__poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.xx-train-card h2 {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+}
+.xx-train-card__host,
+.xx-train-card__meta {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--xx-muted, #6b6458);
+}
+.xx-train-card__foot {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.xx-train-card__foot button {
+  border: 1px solid var(--xx-ink, #12161a);
+  background: transparent;
+  padding: 0.35rem 0.8rem;
+  border-radius: 2px;
+}
+
+/* 我的订单：账本表 */
+.xx-pay-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fffdf8;
+  font-size: 0.875rem;
+}
+.xx-pay-table th,
+.xx-pay-table td {
+  text-align: left;
+  padding: 0.7rem 0.65rem;
+  border-bottom: 1px solid var(--xx-rule, #d9d2c6);
+  vertical-align: top;
+}
+.xx-pay-table th {
+  background: #f3eee4;
+  font-weight: 560;
+}
+.xx-pay-table__sub {
+  margin: 0.15rem 0 0;
+  font-size: 0.75rem;
+  color: var(--xx-muted, #6b6458);
+}
+.xx-pay-table__hit {
+  background: #f7f1e4;
+}
+.xx-pay-table__pay {
+  display: block;
+  margin-top: 0.35rem;
+  border: 1px solid var(--xx-ink, #12161a);
+  background: transparent;
+  padding: 0.2rem 0.45rem;
+  font-size: 0.75rem;
+}
+
+/* 商单日历：月历在左，当日事项在右，说明沉到下面 */
+.xx-cal-page {
+  background: transparent;
+}
+.xx-cal-desk {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+}
+.xx-cal-desk__board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18rem;
+  grid-template-areas:
+    "soon day"
+    "month day";
+  gap: 1rem;
+  align-items: start;
+}
+.xx-cal-desk__soon { grid-area: soon; }
+.xx-cal-desk__month { grid-area: month; }
+.xx-cal-desk__day {
+  grid-area: day;
+  align-self: stretch;
+  border: 1px solid var(--xx-rule, #d9d2c6);
+  background: #fffdf8;
+  padding: 1rem;
+}
+.xx-cal-desk__day-date {
+  margin: 0 0 0.75rem;
+  font-size: 0.75rem;
+  color: var(--xx-muted, #6b6458);
+}
+.xx-cal-desk__board { order: 1; }
+.xx-cal-desk__notes {
+  order: 2;
+  border: 1px solid var(--xx-rule, #d9d2c6);
+  background: #fffdf8;
+  padding: 1rem 1.1rem;
+}
+@media (max-width: 960px) {
+  .xx-cal-desk__board {
+    grid-template-columns: 1fr;
+    grid-template-areas: "soon" "month" "day";
+  }
+}
+
+/* 消息：整页左右分栏，不再是顶栏下面再套一张圆角卡 */
+.app-frame.xx-erp-shell .messages-page {
+  display: grid;
+  grid-template-columns: 22rem minmax(0, 1fr);
+  gap: 0 1rem;
+  align-items: start;
+}
+.app-frame.xx-erp-shell .messages-page__head {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 22rem minmax(0, 1fr);
+  align-items: end;
+}
+.app-frame.xx-erp-shell .messages-page__tools {
+  justify-self: end;
+}
+.app-frame.xx-erp-shell .messages-hub {
+  grid-column: 1 / -1;
+  border-radius: 0;
+  box-shadow: none;
+  min-height: calc(100vh - 12rem);
+}
+@media (max-width: 900px) {
+  .app-frame.xx-erp-shell .messages-page,
+  .app-frame.xx-erp-shell .messages-page__head {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 增值服务：文字导航，短剧场景在左、表单在右 */
+.xx-addon-nav {
+  border-bottom: 1px solid var(--xx-rule, #d9d2c6);
+  background: transparent;
+  padding: 0 1.25rem;
+}
+.xx-addon-nav__row {
+  display: flex;
+  gap: 1.25rem;
+  overflow-x: auto;
+}
+.xx-addon-nav__link {
+  border: 0;
+  background: transparent;
+  padding: 0.75rem 0 0.65rem;
+  color: var(--xx-muted, #6b6458);
+  border-radius: 0;
+}
+.xx-addon-nav__link--on {
+  color: var(--xx-ink, #12161a);
+  box-shadow: inset 0 -2px 0 #b8923a;
+}
+.app-frame.xx-erp-shell .short-drama-create {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(18rem, 0.85fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+.app-frame.xx-erp-shell .short-drama-create__scenes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.app-frame.xx-erp-shell .short-drama-create__scenes .grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+@media (max-width: 960px) {
+  .app-frame.xx-erp-shell .short-drama-create { grid-template-columns: 1fr; }
+}
+
+.recommend-hall-page--rail > :not(.recommend-hall-rail) {
+  grid-column: 2;
+}
+.recommend-hall-page--rail .recommend-hall-sheet-backdrop {
+  grid-column: 1 / -1;
+}

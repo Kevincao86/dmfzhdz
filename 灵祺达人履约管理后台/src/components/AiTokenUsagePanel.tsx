@@ -24,7 +24,7 @@ function emptyData(): AiTokenUsageResponse {
   }
 }
 
-export default function AiTokenUsagePanel() {
+export default function AiTokenUsagePanel({ layout = 'cards' }: { layout?: 'cards' | 'ledger' }) {
   const [range, setRange] = useState<AiTokenUsageRange>('week')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
@@ -113,6 +113,39 @@ export default function AiTokenUsagePanel() {
             <Loader2 className="ai-token-panel__spin" size={16} />
             加载用量…
           </p>
+        ) : layout === 'ledger' ? (
+          <table className="ai-token-ledger">
+            <thead>
+              <tr>
+                <th>时间</th>
+                <th>输入</th>
+                <th>输出</th>
+                <th>总数</th>
+                <th>占比</th>
+              </tr>
+            </thead>
+            <tbody>
+              {chartData.length ? chartData.map((d) => {
+                const share = summary.totalTokens > 0 ? Math.round((d.totalTokens / summary.totalTokens) * 100) : 0
+                return (
+                  <tr key={d.date}>
+                    <td>{d.date}</td>
+                    <td>{formatTokenCount(d.promptTokens)}</td>
+                    <td>{formatTokenCount(d.completionTokens)}</td>
+                    <td>{formatTokenCount(d.totalTokens)}</td>
+                    <td>
+                      <span className="ai-token-ledger__bar" style={{ width: `${share}%` }} />
+                      {share}%
+                    </td>
+                  </tr>
+                )
+              }) : (
+                <tr>
+                  <td colSpan={5}>该时段暂无 AI 调用</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         ) : (
           <>
             <div className="ai-token-panel__stats">

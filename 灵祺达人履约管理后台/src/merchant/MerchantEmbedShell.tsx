@@ -115,10 +115,10 @@ export default function MerchantEmbedShell() {
           <>
             {allNav.length > 0 ? (
               <nav
-                className="shrink-0 border-b border-[var(--shell-border)] bg-[var(--panel-card)] px-4 py-2.5 md:px-6"
+                className="xx-addon-nav shrink-0"
                 aria-label="增值服务"
               >
-                <div className="flex flex-wrap gap-2">
+                <div className="xx-addon-nav__row">
                   {allNav.map((t) => {
                     const active = isAddonNavTargetActive(t.to, location.pathname)
                     return (
@@ -126,12 +126,8 @@ export default function MerchantEmbedShell() {
                         key={t.to}
                         type="button"
                         onClick={() => onNavClick(t)}
-                        className={`rounded-sm px-3 py-1.5 text-sm font-medium transition-colors ${
-                          active
-                            ? 'bg-[#161d24] text-[#f4f2ec] shadow-none'
-                            : t.unlocked
-                              ? 'text-[var(--shell-muted)] hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]'
-                              : 'text-[var(--shell-muted)] opacity-60 hover:bg-[var(--shell-hover)]'
+                        className={`xx-addon-nav__link ${
+                          active ? 'xx-addon-nav__link--on' : ''
                         }`}
                         title={t.unlocked ? t.label : upgradePromptMessage(t.label, t.perm)}
                       >

@@ -60,7 +60,6 @@ import { buildNotifiedApplicantIdSet } from '../lib/mpSync/applicantListExtras'
 import { mapMpOrderRow } from '../lib/mpRecruitment/orderCard'
 import type { MpRegistry } from '../lib/mpRecruitment/types'
 import PrOrdersPage from './PrOrdersPage'
-import ApplicationOrderCard from '../components/mp/ApplicationOrderCard'
 import TalentApplicationDeliveryActions from '../components/mp/TalentApplicationDeliveryActions'
 import TalentUploadedVideoPreviewModal from '../components/mp/TalentUploadedVideoPreviewModal'
 import HallCityFilter from '../components/mp/HallCityFilter'
@@ -68,6 +67,8 @@ import { EmptyState } from '../components/ui/MockupLayouts'
 import { getActiveRole } from '../lib/mpSession'
 
 type EnrichedApplication = ApplicationLocal & {
+  platform?: string
+  storeName?: string
   region?: string
   category?: string
   statusLabel?: string
@@ -938,6 +939,18 @@ function TalentApplicationsPage() {
       ) : null}
 
       <div className="orders-page__list">
+        <table className="xx-app-table">
+          <thead>
+            <tr>
+              <th>商单</th>
+              <th>门店</th>
+              <th>平台</th>
+              <th>报名时间</th>
+              <th>状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
         {filtered.map((a) => {
           const ds = a.displayStatus || resolveApplicationDisplayStatus(a._progressMp || null, a._progressMe || null, a.mpOrderId)
           const href = detailHref(a.mpOrderId)
@@ -982,27 +995,38 @@ function TalentApplicationsPage() {
               {renderDeliveryActions(a)}
             </>
           )
+          const applied = String(a.appliedAt || '').replace('T', ' ').slice(0, 16) || '—'
           return (
-            <ApplicationOrderCard
-              key={`${a.mpOrderId}-${a.applicantId}`}
-              title={a.title || a.mpOrderId}
-              coverUrl={a.coverUrl}
-              region={a.region}
-              scheduleText={a.scheduleText}
-              statusLabel={ds.label}
-              statusTone={ds.tone}
-              appliedAt={a.appliedAt}
-              detailHref={href}
-              detailState={detailReturnState}
-              confirmLabel={confirmLabel}
-              confirmHref={confirmLabel ? href : undefined}
-              confirmState={confirmLabel ? detailReturnState : undefined}
-              extraAction={extraAction}
-              aiStatusText={a.aiCheckStatusText}
-              aiStatusTone={a.aiCheckStatusTone}
-            />
+            <tr key={`${a.mpOrderId}-${a.applicantId}`}>
+              <td>
+                <Link to={href} state={detailReturnState} className="xx-app-table__title">
+                  {a.title || a.mpOrderId}
+                </Link>
+                {a.scheduleText ? <p className="xx-app-table__sub">{a.scheduleText}</p> : null}
+              </td>
+              <td>{a.storeName || a.region || '—'}</td>
+              <td>{a.platform || '—'}</td>
+              <td>{applied}</td>
+              <td>
+                <span className={`app-order-card__status app-order-card__status--${ds.tone}`}>{ds.label}</span>
+                {a.aiCheckStatusText ? <p className="xx-app-table__sub">{a.aiCheckStatusText}</p> : null}
+              </td>
+              <td className="xx-app-table__ops">
+                <Link to={href} state={detailReturnState} className="xx-app-table__open">
+                  打开详情
+                </Link>
+                {confirmLabel ? (
+                  <Link to={href} state={detailReturnState} className="xx-app-table__open">
+                    {confirmLabel}
+                  </Link>
+                ) : null}
+                {extraAction}
+              </td>
+            </tr>
           )
         })}
+          </tbody>
+        </table>
       </div>
       <TalentUploadedVideoPreviewModal
         url={previewVideoUrl}

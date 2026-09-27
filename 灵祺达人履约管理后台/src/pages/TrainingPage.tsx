@@ -452,10 +452,13 @@ export default function TrainingPage() {
     lecturerStatus === 'approved' ? '讲师已通过' : lecturerStatus === 'pending' ? '讲师审核中' : lecturerStatus === 'rejected' ? '重新申请讲师' : '申请讲师'
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4 p-4">
-      <div>
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="text-xl font-bold text-slate-900">{mineMode ? '我的课程' : '培训课程'}</h1>
+    <div className="xx-train-page">
+      <header className="xx-train-head">
+        <div>
+          <h1>{mineMode ? '我的课程' : '培训课程'}</h1>
+          <p className="xx-train-kicker">TRAINING</p>
+        </div>
+        <div className="xx-train-head__tools">
           <div className="flex gap-2">
             {mineMode ? (
               <>
@@ -480,13 +483,13 @@ export default function TrainingPage() {
             )}
           </div>
         </div>
-        <p className="mt-1 text-sm text-slate-500">
-          {mineMode
-            ? '讲师审核通过后在这里发布和修改课程。课时费核实通过后到我的钱包提现。'
-            : '这里是即将开始的课程。讲师也可以报名别人发布的课，不能报名自己发布的课。线下课可以按城市查看。'}
-        </p>
-      </div>
-      {!mineMode ? <div className="flex gap-2 text-sm">
+      </header>
+      <p className="xx-train-lead">
+        {mineMode
+          ? '讲师审核通过后在这里发布和修改课程。课时费核实通过后到我的钱包提现。'
+          : '这里是即将开始的课程。讲师也可以报名别人发布的课，不能报名自己发布的课。线下课可以按城市查看。'}
+      </p>
+      {!mineMode ? <div className="xx-train-modes">
         {(['all', 'online', 'offline'] as const).map((id) => (
           <button
             key={id}
@@ -539,38 +542,27 @@ export default function TrainingPage() {
           )}
         </article>
       ) : null}
-      {!mineMode ? <div className="space-y-3">
+      {!mineMode ? <div className="xx-train-grid">
         {shown.map((c) => (
-          <article id={`train-${c.id}`} key={c.id} className={`rounded-2xl border bg-white p-4 ${focusCourseId === c.id ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-200'}`}>
-            <div className="flex items-start gap-3">
-              {c.poster ? (
-                <img src={c.poster} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
-              ) : (
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-xs text-violet-700">课</div>
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="font-semibold text-slate-900">{c.title}</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  {c.hostName} · {c.mode === 'online' ? '线上' : '线下'}
-                  {c.city ? ` · ${c.city}` : ''} {c.whenText ? ` · ${c.whenText}` : ''}
-                </p>
-              </div>
-              <p className="text-sm font-semibold text-violet-700">¥{c.fee || '0'}</p>
-                </div>
-              </div>
+          <article id={`train-${c.id}`} key={c.id} className={`xx-train-card ${focusCourseId === c.id ? 'xx-train-card--on' : ''}`}>
+            <div className="xx-train-card__poster">
+              {c.poster ? <img src={c.poster} alt="" /> : <span>课</span>}
             </div>
-            <p className="mt-2 text-xs text-slate-400">
-              已报 {c.signupCount || 0}/{c.seats}
+            <h2>{c.title}</h2>
+            <p className="xx-train-card__host">
+              主讲：{c.hostName || '待定'} · {c.mode === 'online' ? '线上' : '线下'}
+              {c.city ? ` · ${c.city}` : ''}
+              {c.whenText ? ` · ${c.whenText}` : ''}
             </p>
-            {me?.accountId && c.hostId === me.accountId ? (
-              <p className="mt-3 text-sm text-amber-700">这是你发布的课程，不能报名自己的课。其他人发布的课程可以报名。</p>
-            ) : (
-              <button type="button" className="mt-3 rounded-xl bg-violet-600 px-3 py-2 text-sm text-white" onClick={() => openCoursePay(c)}>
-                查看并报名
-              </button>
-            )}
+            <p className="xx-train-card__meta">已报 {c.signupCount || 0}/{c.seats}</p>
+            <div className="xx-train-card__foot">
+              <strong>¥ {c.fee || '0'}</strong>
+              {me?.accountId && c.hostId === me.accountId ? (
+                <span>本人课程</span>
+              ) : (
+                <button type="button" onClick={() => openCoursePay(c)}>报名</button>
+              )}
+            </div>
           </article>
         ))}
         {!shown.length ? <p className="text-sm text-slate-400">还没有即将开始的课程</p> : null}

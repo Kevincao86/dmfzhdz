@@ -10,10 +10,12 @@ import {
   Handshake,
   AlertTriangle,
   UserCheck,
-  Play,
-  ArrowRight,
+  CalendarDays,
+  GraduationCap,
+  ShieldCheck,
+  Wallet,
+  CircleHelp,
   Send,
-  UserRound,
 } from 'lucide-react'
 import AiTokenUsagePanel from '../../components/AiTokenUsagePanel'
 import { fetchMpRegistry, clearMpRegistryCache, fetchTraining } from '../../lib/mpApi'
@@ -409,8 +411,17 @@ function TalentHomeDashboard({
     }
   }, [workId, refreshKey])
 
+  const shortcuts = [
+    { to: '/hall?tab=hall', label: '报名', icon: Send },
+    { to: '/orders/calendar', label: '日历', icon: CalendarDays },
+    { to: '/training', label: '课程', icon: GraduationCap },
+    { to: '/profile/ai-review', label: '审核', icon: ShieldCheck },
+    { to: '/profile/wallet', label: '钱包', icon: Wallet },
+    { to: '/help', label: '帮助', icon: CircleHelp },
+  ]
+
   return (
-    <div className="talent-home">
+    <div className="talent-home talent-home--desk">
       {loading ? <p className="talent-home__hint">加载数据中…</p> : null}
       {err ? (
         <p className="talent-home__err">
@@ -419,24 +430,10 @@ function TalentHomeDashboard({
         </p>
       ) : null}
 
-      <section className="talent-home__welcome">
-        <div className="talent-home__welcome-main">
-          <h2 className="talent-home__welcome-title">Hi，{displayName} 👋</h2>
-          <p className="talent-home__welcome-sub">今天是充满机会的一天，加油哦！</p>
-        </div>
-        <div className="talent-home__welcome-actions">
-          <Link to="/help" className="talent-home__btn talent-home__btn--primary">
-            <Play size={15} strokeWidth={2.5} aria-hidden />
-            新手引导
-          </Link>
-          <Link to={profileLink} className="talent-home__btn talent-home__btn--outline">
-            完善资料，提升接单效率
-            <ArrowRight size={15} strokeWidth={2.5} aria-hidden />
-          </Link>
-        </div>
-      </section>
-
-      <TrainingAdBar />
+      <header className="talent-home__greet">
+        <h2 className="talent-home__welcome-title">你好，{displayName}</h2>
+        <p className="talent-home__welcome-sub">欢迎回到灵祺星选</p>
+      </header>
 
       <div className="talent-home__stat-row">
         <Link to="/hall?tab=hall" className="talent-home__stat-card talent-home__stat-card--purple no-underline">
@@ -475,52 +472,41 @@ function TalentHomeDashboard({
         </Link>
       </div>
 
-      <AiTokenUsagePanel />
+      <div className="talent-home__desk">
+        <section className="talent-home__panel talent-home__announce">
+          <h3 className="talent-home__panel-title">平台公告</h3>
+          <ul className="talent-home__announce-list">
+            {PLATFORM_ANNOUNCEMENTS.map((item) => (
+              <li key={item.title}>
+                <Link to="/help" className="talent-home__announce-item no-underline">
+                  <span className="talent-home__announce-date">{item.date}</span>
+                  <span className="talent-home__announce-text">{item.title}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <Link to="/help" className="talent-home__announce-more">查看全部公告</Link>
+        </section>
 
-      <div className="talent-home__body">
-        <div className="talent-home__left">
-          <section className="talent-home__panel">
-            <h3 className="talent-home__panel-title">快捷入口</h3>
-            <div className="talent-home__quick-grid">
-              <div className="talent-home__quick-card talent-home__quick-card--purple">
-                <div className="talent-home__quick-icon">
-                  <Send size={22} strokeWidth={2} aria-hidden />
-                </div>
-                <div className="talent-home__quick-label">去报名</div>
-                <div className="talent-home__quick-sub">发现更多订单机会</div>
-                <Link to="/hall?tab=hall" className="talent-home__quick-btn">去报名</Link>
-              </div>
-              <div className="talent-home__quick-card talent-home__quick-card--blue">
-                <div className="talent-home__quick-icon">
-                  <UserRound size={22} strokeWidth={2} aria-hidden />
-                </div>
-                <div className="talent-home__quick-label">完善资料</div>
-                <div className="talent-home__quick-sub">完善资料提升匹配率</div>
-                <Link to={profileLink} className="talent-home__quick-btn talent-home__quick-btn--blue">去完善</Link>
-              </div>
-            </div>
-          </section>
+        <section className="talent-home__panel">
+          <h3 className="talent-home__panel-title">快捷入口</h3>
+          <div className="talent-home__icon-grid">
+            {shortcuts.map((item) => {
+              const Icon = item.icon
+              return (
+                <Link key={item.label} to={item.to} className="talent-home__icon-tile no-underline">
+                  <Icon size={22} strokeWidth={1.6} aria-hidden />
+                  <span>{item.label}</span>
+                </Link>
+              )
+            })}
+          </div>
+        </section>
+      </div>
 
-          <section className="talent-home__panel">
-            <h3 className="talent-home__panel-title">平台公告</h3>
-            <ul className="talent-home__announce-list">
-              {PLATFORM_ANNOUNCEMENTS.map((item) => (
-                <li key={item.title}>
-                  <Link to="/help" className="talent-home__announce-item no-underline">
-                    <div className="talent-home__announce-main">
-                      {item.latest ? <span className="talent-home__announce-badge">最新</span> : null}
-                      <span className="talent-home__announce-text">{item.title}</span>
-                    </div>
-                    <span className="talent-home__announce-date">{item.date}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-            <Link to="/help" className="talent-home__announce-more">查看更多</Link>
-          </section>
-        </div>
+      <AiTokenUsagePanel layout="ledger" />
 
-        <section className="talent-home__panel talent-home__right">
+      <section className="talent-home__panel talent-home__courses">
           <h3 className="talent-home__panel-title">课程培训推荐</h3>
           {appsLoading ? (
             <p className="talent-home__hint">课程加载中…</p>
@@ -559,7 +545,12 @@ function TalentHomeDashboard({
             </div>
           )}
         </section>
+
+      <div className="talent-home__foot-actions">
+        <Link to="/help" className="talent-home__btn talent-home__btn--outline">新手引导</Link>
+        <Link to={profileLink} className="talent-home__btn talent-home__btn--outline">完善资料</Link>
       </div>
+      <TrainingAdBar />
     </div>
   )
 }

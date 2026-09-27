@@ -262,11 +262,11 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
     return tabCounts.normal
   }, [hallTab, paichianSubTab, tabCounts])
 
-  const listTwoCol = false
+  const listTwoCol = true
 
   return (
-    <div className="hall-page">
-      <div className="hall-toolbar-stack">
+    <div className="hall-page hall-page--ledger">
+      <div className="hall-ledger-head">
         <PageHero
           stacked
           title="招募大厅"

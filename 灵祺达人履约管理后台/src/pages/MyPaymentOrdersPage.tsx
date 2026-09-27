@@ -43,54 +43,6 @@ function OrderStatusBadge({ status }: { status: 'pending' | 'confirmed' | 'rejec
   )
 }
 
-function MembershipOrderCard({
-  row,
-  highlighted,
-}: {
-  row: MpMembershipOrderRow
-  highlighted?: boolean
-}) {
-  return (
-    <article
-      className={cn(
-        'surface-card rounded-xl border p-4',
-        highlighted ? 'border-violet-400 ring-2 ring-violet-200' : 'border-[var(--shell-border)]',
-      )}
-    >
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <p className="text-xs text-[var(--shell-muted)]">会员开通</p>
-          <p className="mt-1 font-semibold text-[var(--shell-text)]">
-            {membershipPlanLabel(row.planId)} · {membershipBillingLabel(row.billing)}
-          </p>
-        </div>
-        <OrderStatusBadge status={row.status} />
-      </div>
-      <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-        <div>
-          <dt className="text-[var(--shell-muted)]">金额</dt>
-          <dd className="font-semibold text-[var(--shell-text)]">¥{yuanFromCents(row.amountCents)}</dd>
-        </div>
-        <div>
-          <dt className="text-[var(--shell-muted)]">支付方式</dt>
-          <dd>{payModeLabel(row.payMode)}</dd>
-        </div>
-        <div>
-          <dt className="text-[var(--shell-muted)]">创建时间</dt>
-          <dd>{fmtTime(row.createdAt)}</dd>
-        </div>
-        <div>
-          <dt className="text-[var(--shell-muted)]">支付时间</dt>
-          <dd>{row.paidAt ? fmtTime(row.paidAt) : '—'}</dd>
-        </div>
-      </dl>
-      {row.outTradeNo ? (
-        <p className="mt-2 font-mono text-xs text-[var(--shell-muted)]">商户单号 {row.outTradeNo}</p>
-      ) : null}
-    </article>
-  )
-}
-
 function usePayCountdownTick(active: boolean) {
   const [nowMs, setNowMs] = useState(() => Date.now())
   useEffect(() => {
@@ -99,76 +51,6 @@ function usePayCountdownTick(active: boolean) {
     return () => window.clearInterval(id)
   }, [active])
   return nowMs
-}
-
-function PointsOrderCard({
-  row,
-  highlighted,
-  nowMs,
-  onPay,
-}: {
-  row: MpPointsOrderRow
-  highlighted?: boolean
-  nowMs: number
-  onPay?: (row: MpPointsOrderRow) => void
-}) {
-  const isPending = row.status === 'pending'
-  const remainingMs = isPending ? pointsPayRemainingMs(row.createdAt, nowMs) : 0
-  const showPay = isPending && remainingMs > 0
-
-  return (
-    <article
-      className={cn(
-        'surface-card rounded-xl border p-4',
-        highlighted ? 'border-violet-400 ring-2 ring-violet-200' : 'border-[var(--shell-border)]',
-      )}
-    >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-xs text-[var(--shell-muted)]">积分充值</p>
-          <p className="mt-1 font-semibold text-[var(--shell-text)]">{row.points.toLocaleString('zh-CN')} 积分</p>
-        </div>
-        <div className="flex flex-col items-end gap-2 shrink-0">
-          <OrderStatusBadge status={row.status} />
-          {showPay ? (
-            <>
-              <p className="text-xs text-amber-700">
-                剩余支付时间 <strong>{formatPayCountdown(remainingMs)}</strong>
-              </p>
-              <button
-                type="button"
-                className="xx-membership-cta xx-membership-cta--primary px-4 py-1.5 text-sm"
-                onClick={() => onPay?.(row)}
-              >
-                去支付
-              </button>
-            </>
-          ) : null}
-        </div>
-      </div>
-      <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-        <div>
-          <dt className="text-[var(--shell-muted)]">金额</dt>
-          <dd className="font-semibold text-[var(--shell-text)]">¥{yuanFromCents(row.amountCents)}</dd>
-        </div>
-        <div>
-          <dt className="text-[var(--shell-muted)]">支付方式</dt>
-          <dd>{payModeLabel(row.payMode)}</dd>
-        </div>
-        <div>
-          <dt className="text-[var(--shell-muted)]">创建时间</dt>
-          <dd>{fmtTime(row.createdAt)}</dd>
-        </div>
-        <div>
-          <dt className="text-[var(--shell-muted)]">到账时间</dt>
-          <dd>{row.paidAt ? fmtTime(row.paidAt) : '—'}</dd>
-        </div>
-      </dl>
-      {row.outTradeNo ? (
-        <p className="mt-2 font-mono text-xs text-[var(--shell-muted)]">商户单号 {row.outTradeNo}</p>
-      ) : null}
-    </article>
-  )
 }
 
 function DeductOrderNote({ note }: { note: string }) {
@@ -214,23 +96,31 @@ function PointsSpendPanel({ usage }: { usage: MpMyUsageDetails }) {
         {ledger.length === 0 ? (
           <p className="mt-3 text-sm text-[var(--shell-muted)]">暂无积分消耗记录</p>
         ) : (
-          <ul className="mt-3 divide-y divide-[var(--shell-border)]">
-            {ledger.map((row) => (
-              <li key={row.id} className="flex flex-wrap items-start justify-between gap-2 py-3 text-sm">
-                <div>
-                  <p className="font-medium text-[var(--shell-text)]">{row.kindLabel}</p>
-                  {row.note ? <p className="mt-0.5 text-xs text-[var(--shell-muted)]">{row.note}</p> : null}
-                  <p className="mt-1 text-xs text-[var(--shell-muted)]">{fmtTime(row.createdAt)}</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold text-amber-700">-{row.points.toLocaleString('zh-CN')} 积分</p>
-                  <p className="text-xs text-[var(--shell-muted)]">
-                    剩余 {row.balanceAfter.toLocaleString('zh-CN')}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <table className="xx-pay-table">
+            <thead>
+              <tr>
+                <th>单号</th>
+                <th>类型</th>
+                <th>金额</th>
+                <th>时间</th>
+                <th>余额</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ledger.map((row) => (
+                <tr key={row.id}>
+                  <td>{row.id}</td>
+                  <td>
+                    {row.kindLabel}
+                    {row.note ? <p className="xx-pay-table__sub">{row.note}</p> : null}
+                  </td>
+                  <td>-{row.points.toLocaleString('zh-CN')} 积分</td>
+                  <td>{fmtTime(row.createdAt)}</td>
+                  <td>{row.balanceAfter.toLocaleString('zh-CN')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </section>
     </div>
@@ -282,25 +172,31 @@ function QuotaSpendPanel({ usage }: { usage: MpMyUsageDetails }) {
         {usageLedger.length === 0 ? (
           <p className="mt-3 text-sm text-[var(--shell-muted)]">暂无套餐消耗记录</p>
         ) : (
-          <ul className="mt-3 divide-y divide-[var(--shell-border)]">
-            {usageLedger.map((row) => (
-              <li key={row.id} className="flex flex-wrap items-start justify-between gap-2 py-3 text-sm">
-                <div>
-                  <p className="font-medium text-[var(--shell-text)]">{row.kindLabel}</p>
-                  {row.note ? <p className="mt-0.5 text-xs text-[var(--shell-muted)]">{row.note}</p> : null}
-                  <p className="mt-1 text-xs text-[var(--shell-muted)]">{fmtTime(row.createdAt)}</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold text-amber-700">{row.chargeSummary}</p>
-                  {row.points > 0 ? (
-                    <p className="text-xs text-[var(--shell-muted)]">
-                      积分余额 {row.balanceAfter.toLocaleString('zh-CN')}
-                    </p>
-                  ) : null}
-                </div>
-              </li>
-            ))}
-          </ul>
+          <table className="xx-pay-table">
+            <thead>
+              <tr>
+                <th>单号</th>
+                <th>类型</th>
+                <th>金额</th>
+                <th>时间</th>
+                <th>余额</th>
+              </tr>
+            </thead>
+            <tbody>
+              {usageLedger.map((row) => (
+                <tr key={row.id}>
+                  <td>{row.id}</td>
+                  <td>
+                    {row.kindLabel}
+                    {row.note ? <p className="xx-pay-table__sub">{row.note}</p> : null}
+                  </td>
+                  <td>{row.chargeSummary}</td>
+                  <td>{fmtTime(row.createdAt)}</td>
+                  <td>{row.points > 0 ? row.balanceAfter.toLocaleString('zh-CN') : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </section>
     </div>
@@ -416,7 +312,7 @@ export default function MyPaymentOrdersPage() {
     tab === 'recharge' ? '暂无积分充值订单' : tab === 'membership' ? '暂无会员开通订单' : ''
 
   return (
-    <div className="page-content-shell page-content-shell--narrow space-y-4">
+    <div className="page-content-shell page-content-shell--wide xx-pay-desk space-y-4">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <Link to="/profile" className="text-sm text-[var(--shell-muted)] hover:text-[var(--shell-text)]">
@@ -472,15 +368,30 @@ export default function MyPaymentOrdersPage() {
             </div>
           </div>
         ) : (
-          <div className="space-y-3">
-            {membershipOrders.map((row) => (
-              <MembershipOrderCard
-                key={`m-${row.id}`}
-                row={row}
-                highlighted={Boolean(highlightOutTradeNo && row.outTradeNo === highlightOutTradeNo)}
-              />
-            ))}
-          </div>
+          <table className="xx-pay-table">
+            <thead>
+              <tr>
+                <th>单号</th>
+                <th>类型</th>
+                <th>金额</th>
+                <th>支付方式</th>
+                <th>时间</th>
+                <th>状态</th>
+              </tr>
+            </thead>
+            <tbody>
+              {membershipOrders.map((row) => (
+                <tr key={`m-${row.id}`} className={highlightOutTradeNo && row.outTradeNo === highlightOutTradeNo ? 'xx-pay-table__hit' : undefined}>
+                  <td>{row.outTradeNo || row.id}</td>
+                  <td>会员 · {membershipPlanLabel(row.planId)} · {membershipBillingLabel(row.billing)}</td>
+                  <td>¥{yuanFromCents(row.amountCents)}</td>
+                  <td>{payModeLabel(row.payMode)}</td>
+                  <td>{row.paidAt ? fmtTime(row.paidAt) : fmtTime(row.createdAt)}</td>
+                  <td><OrderStatusBadge status={row.status} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )
       ) : null}
 
@@ -495,17 +406,41 @@ export default function MyPaymentOrdersPage() {
             </div>
           </div>
         ) : (
-          <div className="space-y-3">
-            {pointsOrders.map((row) => (
-              <PointsOrderCard
-                key={`p-${row.id}`}
-                row={row}
-                highlighted={Boolean(highlightOutTradeNo && row.outTradeNo === highlightOutTradeNo)}
-                nowMs={countdownNowMs}
-                onPay={setResumePayOrder}
-              />
-            ))}
-          </div>
+          <table className="xx-pay-table">
+            <thead>
+              <tr>
+                <th>单号</th>
+                <th>类型</th>
+                <th>金额</th>
+                <th>支付方式</th>
+                <th>时间</th>
+                <th>状态</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pointsOrders.map((row) => {
+                const remainingMs = row.status === 'pending' ? pointsPayRemainingMs(row.createdAt, countdownNowMs) : 0
+                const showPay = row.status === 'pending' && remainingMs > 0
+                return (
+                  <tr key={`p-${row.id}`} className={highlightOutTradeNo && row.outTradeNo === highlightOutTradeNo ? 'xx-pay-table__hit' : undefined}>
+                    <td>{row.outTradeNo || row.id}</td>
+                    <td>积分 · {row.points.toLocaleString('zh-CN')}</td>
+                    <td>¥{yuanFromCents(row.amountCents)}</td>
+                    <td>{payModeLabel(row.payMode)}</td>
+                    <td>{row.paidAt ? fmtTime(row.paidAt) : fmtTime(row.createdAt)}</td>
+                    <td>
+                      <OrderStatusBadge status={row.status} />
+                      {showPay ? (
+                        <button type="button" className="xx-pay-table__pay" onClick={() => setResumePayOrder(row)}>
+                          去支付 {formatPayCountdown(remainingMs)}
+                        </button>
+                      ) : null}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         )
       ) : null}
 

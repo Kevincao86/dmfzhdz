@@ -4179,7 +4179,8 @@ export default function ShortDramaPage() {
       </div>
 
       {mainTab === 'create' ? (
-        <div className="space-y-5">
+        <div className="short-drama-create space-y-5">
+          <div className="short-drama-create__scenes">
           <div className="flex gap-2 overflow-x-auto pb-1">
             {WORLDS.map((w) => (
               <button
@@ -4230,8 +4231,9 @@ export default function ShortDramaPage() {
               )
             })}
           </div>
+          </div>
 
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
+          <div className="short-drama-create__work grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
             <section className="erp-panel space-y-5 p-5">
               <div>
                 <p className="mb-2 text-sm font-medium text-slate-800">{hookLabel}</p>

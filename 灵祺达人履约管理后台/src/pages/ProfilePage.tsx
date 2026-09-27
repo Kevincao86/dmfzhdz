@@ -197,7 +197,8 @@ export default function ProfilePage() {
   ]
 
   return (
-    <div className="page-content-shell page-content-shell--narrow space-y-4">
+    <div className="page-content-shell page-content-shell--wide xx-profile-desk">
+      <aside className="xx-profile-desk__side">
       <ProfileMineHeader
         avatar={avatar}
         name={displayName}
@@ -247,12 +248,15 @@ export default function ProfilePage() {
           <dd className="text-amber-600 font-mono text-xs">{systemId}</dd>
         </div>
       </dl>
+      </aside>
 
+      <div className="xx-profile-desk__main">
       <ProfileMenuList items={menuItems} />
 
-      <p className="text-center text-xs text-[var(--shell-muted)]">
+      <p className="text-xs text-[var(--shell-muted)]">
         完善资料后，推荐大厅将按标签与习惯智能匹配
       </p>
+      </div>
     </div>
   )
 }

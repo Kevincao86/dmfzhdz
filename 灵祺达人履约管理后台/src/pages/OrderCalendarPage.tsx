@@ -387,15 +387,15 @@ export default function OrderCalendarPage() {
   const navLabel = viewMode === 'week' ? '本周' : monthTitle(year, month)
 
   return (
-    <div className="min-h-full bg-gradient-to-br from-violet-50/80 via-white to-fuchsia-50/40 px-4 py-5 pb-10 lg:px-6 lg:py-6">
+    <div className="xx-cal-page min-h-full px-4 py-5 pb-10 lg:px-6 lg:py-6">
       {toast ? (
         <div className="fixed bottom-6 left-1/2 z-50 max-w-md -translate-x-1/2 rounded-xl border border-violet-200 bg-white px-4 py-2.5 text-sm text-slate-700 shadow-lg">
           {toast}
         </div>
       ) : null}
-      <div className="mx-auto flex max-w-7xl flex-col gap-5 lg:flex-row lg:items-stretch lg:gap-6">
+      <div className="xx-cal-desk mx-auto max-w-7xl">
         {/* 左侧功能说明 */}
-        <aside className="flex shrink-0 flex-col rounded-[20px] border border-violet-100/80 bg-white/90 p-5 shadow-[0_4px_24px_rgba(124,77,255,0.08)] lg:w-[30%] lg:max-w-sm lg:p-6">
+        <aside className="xx-cal-desk__notes">
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">近7天待办</h1>
           <p className="mt-2 text-sm leading-relaxed text-slate-500">
             {calendarPageSubtitleForWork(workId)}。横向滑动查看近期事项，在日历中掌握整体进度。
@@ -452,7 +452,7 @@ export default function OrderCalendarPage() {
         </aside>
 
         {/* 右侧主内容 */}
-        <main className="flex min-w-0 flex-1 flex-col gap-4">
+        <main className="xx-cal-desk__board">
           {loading ? (
             <div className="flex flex-1 items-center justify-center gap-2 rounded-[20px] border border-violet-100 bg-white py-20 text-sm text-slate-500 shadow-sm">
               <Loader2 className="h-4 w-4 animate-spin text-violet-500" />
@@ -465,7 +465,7 @@ export default function OrderCalendarPage() {
           ) : (
             <>
               {/* 近7天待办横滑 */}
-              <section className="rounded-[20px] border border-violet-100/80 bg-white p-4 shadow-[0_4px_20px_rgba(15,23,42,0.05)] sm:p-5">
+              <section className="xx-cal-desk__soon rounded-[20px] border border-violet-100/80 bg-white p-4 shadow-[0_4px_20px_rgba(15,23,42,0.05)] sm:p-5">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <h2 className="text-base font-semibold text-slate-900">近7天待办</h2>
                   <button
@@ -561,7 +561,7 @@ export default function OrderCalendarPage() {
               </section>
 
               {/* 日历区 */}
-              <section className="rounded-[20px] border border-violet-100/80 bg-white p-4 shadow-[0_4px_20px_rgba(15,23,42,0.05)] sm:p-5">
+              <section className="xx-cal-desk__month rounded-[20px] border border-violet-100/80 bg-white p-4 shadow-[0_4px_20px_rgba(15,23,42,0.05)] sm:p-5">
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <div className="inline-flex rounded-xl bg-slate-100 p-1 text-xs font-medium">
@@ -710,11 +710,12 @@ export default function OrderCalendarPage() {
               {/* 选中日事件列表 */}
               <section
                 ref={eventListRef}
-                className="rounded-[20px] border border-violet-100/80 bg-white p-4 shadow-[0_4px_20px_rgba(15,23,42,0.05)] sm:p-5"
+                className="xx-cal-desk__day"
               >
-                <h2 className="mb-3 text-sm font-semibold text-slate-900">
+                <h2 className="mb-1 text-sm font-semibold text-slate-900">当日事项</h2>
+                <p className="xx-cal-desk__day-date">
                   {selectedDateKey ? `${selectedDateKey.replace(/-/g, '/')} 的商单` : '选择日期'}
-                </h2>
+                </p>
                 {selectedEvents.length === 0 ? (
                   <p className="py-8 text-center text-sm text-slate-400">该日暂无商单安排</p>
                 ) : (
