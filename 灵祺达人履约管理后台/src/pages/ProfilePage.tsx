@@ -95,32 +95,9 @@ export default function ProfilePage() {
   /**
    * 个人推广入口：必须以内联字面量写进 menuItems（勿抽成变量后再展开，
    * 避免错误构建/旧 dist 漏打包导致线上「我的推广」消失）。
+   * 顺序：资料和接单 → 钱和订单 → 讲师课程 → 数据 → 帮助。
    */
   const menuItems = [
-    ...(lecturerApproved
-      ? [
-          {
-            to: '/training?mine=1',
-            label: '我的课程',
-            desc: '发布、编辑和结算自己的培训',
-          },
-        ]
-      : []),
-    {
-      to: '/profile/wallet',
-      label: '我的钱包',
-      desc: '积分、培训保证金与课时费应付款',
-    },
-    {
-      to: '/profile/my-orders',
-      label: '我的订单',
-      desc: '会员开通与积分充值支付记录',
-    },
-    {
-      to: '/affiliate/portal',
-      label: '我的推广',
-      desc: '推广码 · 太阳码 · 佣金与商户明细',
-    },
     {
       to: profileLink,
       label: profileMenuLabel,
@@ -144,14 +121,14 @@ export default function ProfilePage() {
             desc: '曝光→报名→入选→发布转化',
           },
           {
-            to: '/profile/linke',
-            label: '抖音林客授权',
-            desc: '非必填 · 发单可挂接林客商家',
-          },
-          {
             to: '/profile/favorites',
             label: '我的收藏',
             desc: '收藏的达人 / 拍摄 / 剪辑团队',
+          },
+          {
+            to: '/profile/linke',
+            label: '抖音林客授权',
+            desc: '非必填 · 发单可挂接林客商家',
           },
         ]
       : [
@@ -159,11 +136,6 @@ export default function ProfilePage() {
             to: '/profile/subscriptions',
             label: '商单订阅',
             desc: '匹配城市/平台/品类的新招募提醒',
-          },
-          {
-            to: '/profile/talent-credit',
-            label: '达人信用',
-            desc: '履约评分与提升建议',
           },
           {
             to: '/profile/favorites',
@@ -180,7 +152,36 @@ export default function ProfilePage() {
                   ? '为合作 PR 设置剪辑专属报价（单条/半天/全天）'
                   : '为合作 PR 设置专属报价',
           },
+          {
+            to: '/profile/talent-credit',
+            label: '达人信用',
+            desc: '履约评分与提升建议',
+          },
         ]),
+    {
+      to: '/profile/wallet',
+      label: '我的钱包',
+      desc: '积分、培训保证金与课时费应付款',
+    },
+    {
+      to: '/profile/my-orders',
+      label: '我的订单',
+      desc: '会员开通与积分充值支付记录',
+    },
+    {
+      to: '/affiliate/portal',
+      label: '我的推广',
+      desc: '推广码 · 太阳码 · 佣金与商户明细',
+    },
+    ...(lecturerApproved
+      ? [
+          {
+            to: '/training?mine=1',
+            label: '我的课程',
+            desc: '发布、编辑和结算自己的培训',
+          },
+        ]
+      : []),
     {
       to: '/profile/analytics',
       label: '数据分析',
