@@ -48,7 +48,7 @@ Page({
       hostLabel: hostLabel(course && course.hostRole),
       fields: fieldsFrom(course),
       formErr: ownCourse ? '这是你发布的课程，不能报名自己的课。其他人发布的课程可以报名。' : '',
-      parts: course ? training.splitFee(course.fee) : null,
+      parts: null,
       modePick: course && course.mode === 'offline' ? 'offline' : 'online',
     })
   },
@@ -57,7 +57,6 @@ Page({
     const fields = (this.data.fields || []).map((field) => (field.key === key ? { ...field, value: e.detail.value } : field))
     this.setData({ fields, formErr: '' })
   },
-  onMode(e) { this.setData({ modePick: e.currentTarget.dataset.id }) },
   async onSignup() {
     if (this.data.ownCourse) {
       this.setData({ formErr: '不能报名自己发布的课程。其他人发布的课程可以报名。' })

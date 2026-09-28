@@ -48,7 +48,16 @@ async function syncDeposit() {
 
 async function prepay(input) {
   if (!(ecs.hasBase && ecs.hasBase())) throw new Error('请先登录后再支付')
-  const openid = require('./mpWechatOpenId.js').resolveOpenIdFromLocal()
+  let openid = require('./mpWechatOpenId.js').resolveOpenIdFromLocal()
+  let code = ''
+  if (!openid) {
+    code = await new Promise((resolve) => {
+      wx.login({
+        success: (r) => resolve(String((r && r.code) || '')),
+        fail: () => resolve(''),
+      })
+    })
+  }
   const res = await ecs.post('/api/meoo-mp-training', {
     action: 'prepay',
     purpose: input && input.purpose === 'course' ? 'course' : 'deposit',
@@ -60,6 +69,7 @@ async function prepay(input) {
     contact: input && input.contact ? input.contact : '',
     answers: input && input.answers ? input.answers : {},
     openid,
+    code,
   })
   if (!res || res.ok === false) throw new Error((res && res.error) || '支付下单失败')
   return res

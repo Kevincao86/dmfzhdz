@@ -12,6 +12,7 @@ import {
   loadDouyinPayMerchantConfig,
   queryDouyinPayOrderByOutTradeNo,
 } from './douyinPayV1.js'
+import { wxCodeToOpenId } from './mpAccountAuth.js'
 import {
   buildJsapiPayParams,
   createWechatDomesticRefund,
@@ -322,13 +323,20 @@ export async function createTrainingPrepay(body: Record<string, unknown>) {
     paidAt: '',
     transactionId: '',
   }
-  bag.payments.unshift(pay)
-  writeBag(bag)
   let qrDataUrl = ''
   let jsapiParams: ReturnType<typeof buildJsapiPayParams> | undefined
   if (channel === 'wechat' && scene === 'jsapi') {
-    const openid = String(body.openid || '').trim()
-    if (!openid) return { ok: false as const, error: '请使用微信登录后再支付' }
+    let openid = String(body.openid || '').trim()
+    if (!openid) {
+      const code = String(body.code || '').trim()
+      if (!code) return { ok: false as const, error: '请使用微信登录后再支付' }
+      try {
+        const session = await wxCodeToOpenId(code)
+        openid = session.openid
+      } catch {
+        return { ok: false as const, error: '请使用微信登录后再支付' }
+      }
+    }
     const cfg = loadWechatPayConfig()
     if (!cfg.ok) return { ok: false as const, error: '微信支付未配置' }
     const { prepayId } = await createWechatJsapiOrder({
@@ -374,6 +382,8 @@ export async function createTrainingPrepay(body: Record<string, unknown>) {
     })
     qrDataUrl = await wechatNativeCodeUrlToDataUrl(codeUrl)
   }
+  bag.payments.unshift(pay)
+  writeBag(bag)
   return {
     ok: true as const,
     outTradeNo,

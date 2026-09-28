@@ -4,15 +4,13 @@
     <text class="td-title">{{course.title}}</text>
     <text class="td-host">{{hostLabel}} · {{course.hostName}}</text>
     <view class="td-picks">
-      <view class="td-pick {{modePick === 'online' ? 'td-pick--on' : ''}}" data-id="online" bindtap="onMode">线上</view>
-      <view class="td-pick {{modePick === 'offline' ? 'td-pick--on' : ''}}" data-id="offline" bindtap="onMode">线下{{course.city ? ' · ' + course.city : ''}}</view>
+      <view class="td-pick td-pick--on">{{course.mode === 'offline' ? '线下' : '线上'}}{{course.mode === 'offline' && course.city ? ' · ' + course.city : ''}}</view>
     </view>
     <text class="td-line">时间 {{course.whenText || '由讲师安排'}}</text>
     <text class="td-line" wx:if="{{course.mode === 'offline' && course.address}}">地址 {{course.address}}</text>
     <text class="td-line" wx:if="{{course.mode === 'offline' && (course.contactName || course.contactWay)}}">联系 {{course.contactName}} {{course.contactWay}}</text>
     <text class="td-line">名额 {{course.enrolled || course.signupCount || 0}} / {{course.seats}}</text>
     <text class="td-line">费用 {{course.fee ? '¥' + course.fee : '面议'}}</text>
-    <text class="td-hint" wx:if="{{parts}}">学员支付 ¥{{parts.pay}} 到平台。平台佣金 ¥{{parts.commission}}，讲师应付款 ¥{{parts.payable}}。核实通过后 T+1 结算。个人预扣个税，个体户或企业凭发票打满应付款。</text>
     <block wx:if="{{ownCourse}}">
       <text class="td-err">这是你发布的课程，不能报名自己的课。其他人发布的课程可以报名。</text>
     </block>
