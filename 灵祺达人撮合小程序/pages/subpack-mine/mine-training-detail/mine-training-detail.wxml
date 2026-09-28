@@ -9,7 +9,7 @@
     <text class="td-line">时间 {{course.whenText || '由讲师安排'}}</text>
     <text class="td-line" wx:if="{{course.mode === 'offline' && course.address}}">地址 {{course.address}}</text>
     <text class="td-line" wx:if="{{course.mode === 'offline' && (course.contactName || course.contactWay)}}">联系 {{course.contactName}} {{course.contactWay}}</text>
-    <view wx:if="{{liveUrl}}" class="td-live" bindtap="onLive">进入直播间</view>
+    <view wx:if="{{liveUrl}}" class="td-live" bindtap="onLive">{{liveButton}}</view>
     <text class="td-line">名额 {{course.enrolled || course.signupCount || 0}} / {{course.seats}}</text>
     <text class="td-line">费用 {{course.fee ? '¥' + course.fee : '面议'}}</text>
     <view wx:if="{{articleBlocks.length}}" class="td-article">

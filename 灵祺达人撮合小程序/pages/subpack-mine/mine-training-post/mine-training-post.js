@@ -114,6 +114,35 @@ function resolveImageSrc(src, map) {
   }
 }
 
+function meetingCodeOf(text) {
+  const raw = String(text || '')
+  const compact = raw.replace(/[\s-]/g, '')
+  if (/^\d{9,12}$/.test(compact)) return compact
+  const labeled = raw.match(/会议号[:：\s]*([\d\s-]{9,24})/)
+  if (!labeled) return ''
+  const digits = labeled[1].replace(/\D/g, '')
+  return digits.length >= 9 && digits.length <= 12 ? digits : ''
+}
+
+function guessLivePlatform(saved, value) {
+  if (saved === 'meeting' || saved === 'channels' || saved === 'douyin') return saved
+  const text = String(value || '')
+  if (/meeting\.tencent\.com/i.test(text) || meetingCodeOf(text)) return 'meeting'
+  if (/sph[a-zA-Z0-9_-]{3,}/.test(text)) return 'channels'
+  if (/douyin\.com|iesdouyin\.com/i.test(text)) return 'douyin'
+  return ''
+}
+
+function liveInputError(platform, value) {
+  const text = String(value || '').trim()
+  if (!platform) return '请选择直播平台'
+  if (!text) return platform === 'channels' ? '请填写视频号 ID' : '请填写直播间链接'
+  if (platform === 'meeting' && !/meeting\.tencent\.com/i.test(text) && !meetingCodeOf(text)) return '请填写会议链接或会议号'
+  if (platform === 'channels' && !/sph[a-zA-Z0-9_-]{3,}/.test(text)) return '请填写视频号 ID'
+  if (platform === 'douyin' && !/^https?:\/\/(?:[a-z0-9-]+\.)?(?:douyin\.com|iesdouyin\.com)\/\S+$/i.test(text)) return '请填写抖音直播链接'
+  return ''
+}
+
 function restoreArticleImages(html, map) {
   let error = ''
   const next = String(html || '').replace(/<img\b[^>]*src=["']([^"']+)["'][^>]*>/gi, (full, src) => {
@@ -168,6 +197,7 @@ function blankForm() {
     detailCover: '',
     detailBody: '',
     liveUrl: '',
+    livePlatform: 'meeting',
     note: '',
     ...fieldView([
       { key: 'name', label: '姓名', kind: 'name' },
@@ -302,6 +332,7 @@ Page({
       contactName: course.contactName || '',
       contactWay: course.contactWay || '',
       liveUrl: course.liveUrl || '',
+      livePlatform: guessLivePlatform(course.livePlatform, course.liveUrl || ''),
       ...when,
       whenText: formatWhen(when.whenStartDate, when.whenEndDate, when.whenStartTime, when.whenEndTime) || course.whenText || '',
       seats: String(course.seats || 20),
@@ -417,6 +448,7 @@ Page({
   onSeats(e) { this.setData({ seats: e.detail.value }) },
   onFee(e) { this.setData({ fee: e.detail.value }) },
   onLiveUrl(e) { this.setData({ liveUrl: e.detail.value }) },
+  onLivePlatform(e) { this.setData({ livePlatform: e.currentTarget.dataset.id || 'meeting' }) },
   onEditorReady() {
     wx.createSelectorQuery().in(this).select('#articleEditor').context((res) => {
       this.editorCtx = res && res.context
@@ -604,9 +636,9 @@ Page({
       return
     }
     if (this.data.mode === 'online') {
-      const live = String(this.data.liveUrl || '').trim()
-      if (!/^https?:\/\/\S+$/i.test(live)) {
-        wx.showToast({ title: '请填写直播间链接', icon: 'none' })
+      const liveErr = liveInputError(this.data.livePlatform, this.data.liveUrl)
+      if (liveErr) {
+        wx.showToast({ title: liveErr.slice(0, 18), icon: 'none' })
         return
       }
     } else if (this.data.cityNational || this.data.city === '全国' || !(this.data.selectedCities || []).length) {
@@ -650,6 +682,7 @@ Page({
         note: articlePlain(restored.html),
         city: this.data.mode === 'online' ? '全国' : this.data.city,
         liveUrl: this.data.mode === 'online' ? String(this.data.liveUrl || '').trim() : '',
+        livePlatform: this.data.mode === 'online' ? this.data.livePlatform || '' : '',
       })
       if (this.data.editingId) await training.updateCourse(input)
       else await training.createCourse(input)

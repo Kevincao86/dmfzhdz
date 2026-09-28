@@ -167,6 +167,61 @@ function answersError(fields: SignupField[], answers: Record<string, string>) {
   return ''
 }
 
+type LivePlatform = '' | 'meeting' | 'channels' | 'douyin'
+
+function meetingCodeOf(text: string) {
+  const raw = String(text || '')
+  const compact = raw.replace(/[\s-]/g, '')
+  if (/^\d{9,12}$/.test(compact)) return compact
+  const labeled = raw.match(/会议号[:：\s]*([\d\s-]{9,24})/)
+  if (labeled) {
+    const digits = labeled[1].replace(/\D/g, '')
+    if (digits.length >= 9 && digits.length <= 12) return digits
+  }
+  return ''
+}
+
+function meetingUrlOf(text: string) {
+  const found = String(text || '').match(/https?:\/\/(?:[a-z0-9-]+\.)?meeting\.tencent\.com\/\S+/i)
+  return found ? found[0].replace(/[，。）)]+$/, '') : ''
+}
+
+function liveInputError(platform: LivePlatform, value: string) {
+  const text = value.trim()
+  if (!platform) return '请选择直播平台'
+  if (!text) return platform === 'channels' ? '请填写视频号 ID' : '请填写直播间链接'
+  if (platform === 'meeting' && !meetingUrlOf(text) && !meetingCodeOf(text)) return '请填写腾讯会议链接或 9 到 12 位会议号'
+  if (platform === 'channels' && !/sph[a-zA-Z0-9_-]{3,}/.test(text)) return '请填写 sph 开头的视频号 ID'
+  if (platform === 'douyin' && !/^https?:\/\/(?:[a-z0-9-]+\.)?(?:douyin\.com|iesdouyin\.com)\/\S+$/i.test(text)) return '请填写抖音直播链接'
+  return ''
+}
+
+function guessLivePlatform(saved: string | undefined, value: string): LivePlatform {
+  if (saved === 'meeting' || saved === 'channels' || saved === 'douyin') return saved
+  const text = String(value || '')
+  if (/meeting\.tencent\.com/i.test(text) || meetingCodeOf(text)) return 'meeting'
+  if (/sph[a-zA-Z0-9_-]{3,}/.test(text)) return 'channels'
+  if (/douyin\.com|iesdouyin\.com/i.test(text)) return 'douyin'
+  return ''
+}
+
+function liveEntry(course: Course) {
+  if (course.mode === 'offline') return null
+  const raw = String(course.liveUrl || '').trim()
+  if (!raw) return null
+  const platform = guessLivePlatform(course.livePlatform, raw)
+  if (platform === 'channels') {
+    const id = raw.match(/sph[a-zA-Z0-9_-]{3,}/)?.[0] || raw
+    return { href: '', label: '复制视频号 ID', copy: id }
+  }
+  if (platform === 'meeting') {
+    const href = meetingUrlOf(raw) || (meetingCodeOf(raw) ? `wemeet://page/inmeeting?meeting_code=${meetingCodeOf(raw)}` : '')
+    return href ? { href, label: '进入腾讯会议', copy: '' } : null
+  }
+  if (/^https?:\/\/\S+$/i.test(raw)) return { href: raw, label: platform === 'douyin' ? '进入抖音直播' : '进入直播间', copy: '' }
+  return null
+}
+
 type Course = {
   id: string
   title: string
@@ -178,6 +233,7 @@ type Course = {
   contactName?: string
   contactWay?: string
   liveUrl?: string
+  livePlatform?: LivePlatform
   whenText: string
   seats: number
   fee: string
@@ -212,6 +268,8 @@ export default function TrainingPage() {
   const [projectContact, setProjectContact] = useState('')
   const [projectContactWay, setProjectContactWay] = useState('')
   const [liveUrl, setLiveUrl] = useState('')
+  const [livePlatform, setLivePlatform] = useState<LivePlatform>('meeting')
+  const [liveCopied, setLiveCopied] = useState('')
   const [whenText, setWhenText] = useState('')
   const [seats, setSeats] = useState('20')
   const [note, setNote] = useState('')
@@ -421,6 +479,7 @@ export default function TrainingPage() {
     setPostMode('online')
     setPostCity('全国')
     setLiveUrl('')
+    setLivePlatform('meeting')
     setVenueAddress('')
     setProjectContact('')
     setProjectContactWay('')
@@ -455,6 +514,7 @@ export default function TrainingPage() {
     setProjectContact(course.contactName || '')
     setProjectContactWay(course.contactWay || '')
     setLiveUrl(course.liveUrl || '')
+    setLivePlatform(guessLivePlatform(course.livePlatform, course.liveUrl || ''))
     setCourseNational(parsedCity.national)
     setCourseCities(parsedCity.cities)
     const parsedWhen = parseWhen(course.whenText || '')
@@ -668,9 +728,18 @@ export default function TrainingPage() {
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{detailCourse.mode === 'offline' ? `线下${detailCourse.city ? ` · ${detailCourse.city}` : ''}` : '线上 · 全国'}</span>
                 {detailCourse.whenText ? <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{detailCourse.whenText}</span> : null}
               </div>
-              {detailCourse.mode !== 'offline' && /^https?:\/\/\S+$/i.test(detailCourse.liveUrl || '') ? (
-                <a className="inline-flex rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white" href={detailCourse.liveUrl} target="_blank" rel="noreferrer">进入直播间</a>
-              ) : null}
+              {(() => {
+                const entry = liveEntry(detailCourse)
+                if (!entry) return null
+                if (entry.copy) {
+                  return (
+                    <button type="button" className="inline-flex rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white" onClick={() => { void navigator.clipboard.writeText(entry.copy); setLiveCopied(detailCourse.id) }}>
+                      {liveCopied === detailCourse.id ? '视频号 ID 已复制，请到微信打开' : entry.label}
+                    </button>
+                  )
+                }
+                return <a className="inline-flex rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white" href={entry.href} target="_blank" rel="noreferrer">{entry.label}</a>
+              })()}
               {detailCourse.mode === 'offline' && (detailCourse.address || detailCourse.contactName || detailCourse.contactWay) ? (
                 <p className="text-sm leading-relaxed text-slate-600">{[detailCourse.address, detailCourse.contactName, detailCourse.contactWay].filter(Boolean).join(' · ')}</p>
               ) : null}
@@ -739,8 +808,9 @@ export default function TrainingPage() {
                 return
               }
               if (postMode === 'online') {
-                if (!/^https?:\/\/\S+$/i.test(liveUrl.trim())) {
-                  setSheetErr('请填写可打开的直播间链接')
+                const liveErr = liveInputError(livePlatform, liveUrl)
+                if (liveErr) {
+                  setSheetErr(liveErr)
                   return
                 }
               } else if (!postCity.trim() || postCity === '全国') {
@@ -784,6 +854,7 @@ export default function TrainingPage() {
                 contactName: postMode === 'offline' ? projectContact.trim() : '',
                 contactWay: postMode === 'offline' ? projectContactWay.trim() : '',
                 liveUrl: postMode === 'online' ? liveUrl.trim() : '',
+                livePlatform: postMode === 'online' ? livePlatform : '',
                 whenText: formatWhen(whenStartDate, whenEndDate, whenStartTime, whenEndTime),
                 seats: Number(seats) || 1,
                 note: plainTextFromArticle(detailBody) || note.trim(),
@@ -874,9 +945,18 @@ export default function TrainingPage() {
                     )}
                   </div>
                   {postMode === 'online' ? (
-                    <label className="block text-xs font-medium text-slate-500 sm:col-span-2">直播间链接
-                      <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" placeholder="https:// 开头，打开课程详情可跳转进入" value={liveUrl} onChange={(e) => setLiveUrl(e.target.value)} />
-                    </label>
+                    <div className="sm:col-span-2">
+                      <p className="text-xs font-medium text-slate-500">直播平台</p>
+                      <div className="mt-1 grid grid-cols-3 gap-2 rounded-2xl bg-slate-100 p-1">
+                        {([['meeting', '腾讯会议'], ['channels', '视频号'], ['douyin', '抖音']] as const).map(([id, label]) => (
+                          <button key={id} type="button" className={`rounded-xl py-2 text-sm ${livePlatform === id ? 'bg-white font-semibold text-violet-700 shadow-sm' : 'text-slate-500'}`} onClick={() => setLivePlatform(id)}>{label}</button>
+                        ))}
+                      </div>
+                      <label className="mt-3 block text-xs font-medium text-slate-500">{livePlatform === 'channels' ? '视频号 ID' : livePlatform === 'douyin' ? '抖音直播链接' : '会议链接或会议号'}
+                        <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" placeholder={livePlatform === 'channels' ? 'sph 开头，在视频号助手复制' : livePlatform === 'douyin' ? 'https://live.douyin.com/ 或 v.douyin.com' : 'meeting.tencent.com 链接，或 9–12 位会议号'} value={liveUrl} onChange={(e) => setLiveUrl(e.target.value)} />
+                      </label>
+                      <p className="mt-1 text-xs leading-relaxed text-slate-500">{livePlatform === 'channels' ? '小程序会打开这个视频号的直播。微信要求该视频号已和撮合小程序关联主体。' : livePlatform === 'douyin' ? '网页直接打开直播间。微信不能拉起抖音，小程序会把链接复制出来。' : '小程序会直接打开腾讯会议。填写会议号才能自动入会。'}</p>
+                    </div>
                   ) : null}
                   {postMode === 'offline' ? (
                     <label className="block text-xs font-medium text-slate-500">具体地址

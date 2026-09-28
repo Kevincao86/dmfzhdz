@@ -23,6 +23,7 @@ type Course = {
   contactName: string
   contactWay: string
   liveUrl: string
+  livePlatform: string
   whenText: string
   seats: number
   enrolled: number
@@ -293,13 +294,39 @@ function offlinePlace(mode: 'online' | 'offline', body: Record<string, unknown>)
   return { address, contactName, contactWay }
 }
 
-function readLiveUrl(mode: 'online' | 'offline', body: Record<string, unknown>) {
-  if (mode !== 'online') return { liveUrl: '' }
-  if (!('liveUrl' in body)) return { liveUrl: '' }
+function meetingOk(text: string) {
+  if (/https?:\/\/(?:[a-z0-9-]+\.)?meeting\.tencent\.com\/\S+/i.test(text)) return true
+  if (/^\d{9,12}$/.test(text.replace(/[\s-]/g, ''))) return true
+  const labeled = text.match(/会议号[:：\s]*([\d\s-]{9,24})/)
+  if (!labeled) return false
+  const digits = labeled[1].replace(/\D/g, '')
+  return digits.length >= 9 && digits.length <= 12
+}
+
+function readLiveUrl(mode: 'online' | 'offline', body: Record<string, unknown>): { liveUrl: string; livePlatform: string; error?: string; absent?: boolean } {
+  if (mode !== 'online') return { liveUrl: '', livePlatform: '' }
+  if (!('liveUrl' in body)) return { liveUrl: '', livePlatform: '', absent: true }
   const liveUrl = clipText(body.liveUrl, 500)
-  if (!liveUrl) return { error: '请填写直播间链接' }
-  if (!/^https?:\/\/\S+$/i.test(liveUrl)) return { error: '直播间链接需要以 http:// 或 https:// 开头' }
-  return { liveUrl }
+  const platform = 'livePlatform' in body ? clipText(body.livePlatform, 20) : ''
+  if (!liveUrl) return { liveUrl: '', livePlatform: '', error: '请填写直播间链接' }
+  if (!platform) {
+    if (!/^https?:\/\/\S+$/i.test(liveUrl)) return { liveUrl: '', livePlatform: '', error: '直播间链接需要以 http:// 或 https:// 开头' }
+    return { liveUrl, livePlatform: '' }
+  }
+  if (platform === 'meeting') {
+    if (!meetingOk(liveUrl)) return { liveUrl: '', livePlatform: '', error: '请填写腾讯会议链接或 9 到 12 位会议号' }
+    return { liveUrl, livePlatform: 'meeting' }
+  }
+  if (platform === 'channels') {
+    const id = liveUrl.match(/sph[a-zA-Z0-9_-]{3,}/)?.[0] || ''
+    if (!id) return { liveUrl: '', livePlatform: '', error: '请填写 sph 开头的视频号 ID' }
+    return { liveUrl: id, livePlatform: 'channels' }
+  }
+  if (platform === 'douyin') {
+    if (!/^https?:\/\/(?:[a-z0-9-]+\.)?(?:douyin\.com|iesdouyin\.com)\/\S+$/i.test(liveUrl)) return { liveUrl: '', livePlatform: '', error: '请填写抖音直播链接' }
+    return { liveUrl, livePlatform: 'douyin' }
+  }
+  return { liveUrl: '', livePlatform: '', error: '请选择直播平台' }
 }
 
 function publicCourse(course: Course) {
@@ -564,6 +591,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       contactName: place.contactName,
       contactWay: place.contactWay,
       liveUrl: live.liveUrl,
+      livePlatform: live.livePlatform || '',
       whenText: String(body.whenText || '').trim(),
       seats: Math.max(1, Number(body.seats) || 1),
       enrolled: 0,
@@ -633,8 +661,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     course.address = place.address
     course.contactName = place.contactName
     course.contactWay = place.contactWay
-    if (mode !== 'online') course.liveUrl = ''
-    else if ('liveUrl' in body) course.liveUrl = live.liveUrl
+    if (mode !== 'online') {
+      course.liveUrl = ''
+      course.livePlatform = ''
+    } else if (!live.absent && 'liveUrl' in body) {
+      course.liveUrl = live.liveUrl
+      if ('livePlatform' in body) course.livePlatform = live.livePlatform || ''
+    }
     course.whenText = String(body.whenText || '').trim()
     course.seats = Math.max(taken, Math.max(1, Number(body.seats) || 1))
     course.fee = String(body.fee || '').trim()

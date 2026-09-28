@@ -28,10 +28,33 @@ function coverOf(course) {
   return list.find((src) => /^data:image\/|^https?:\/\//i.test(String(src || ''))) || ''
 }
 
+function meetingCodeOf(text) {
+  const raw = String(text || '')
+  const compact = raw.replace(/[\s-]/g, '')
+  if (/^\d{9,12}$/.test(compact)) return compact
+  const labeled = raw.match(/会议号[:：\s]*([\d\s-]{9,24})/)
+  if (!labeled) return ''
+  const digits = labeled[1].replace(/\D/g, '')
+  return digits.length >= 9 && digits.length <= 12 ? digits : ''
+}
+
+function meetingPwdOf(text) {
+  const found = String(text || '').match(/密码[:：\s]*([A-Za-z0-9]{4,6})/)
+  return found ? found[1] : ''
+}
+
 function liveOf(course) {
   const url = String((course && course.liveUrl) || '').trim()
   if (!course || course.mode === 'offline') return ''
-  return /^https?:\/\/\S+$/i.test(url) ? url : ''
+  return url
+}
+
+function liveButtonOf(course) {
+  const platform = course && course.livePlatform
+  if (platform === 'channels') return '进入视频号直播'
+  if (platform === 'douyin') return '进入抖音直播'
+  if (platform === 'meeting') return '进入腾讯会议'
+  return '进入直播间'
 }
 
 function safeHtml(html) {
@@ -74,7 +97,7 @@ function fieldError(fields) {
 }
 
 Page({
-  data: { course: null, cover: '', liveUrl: '', modeLabel: '', articleBlocks: [], fields: DEFAULT_FIELDS.map((field) => ({ ...field, value: '' })), modePick: 'online', parts: null, formErr: '', ownCourse: false, hostLabel: '达人' },
+  data: { course: null, cover: '', liveUrl: '', livePlatform: '', liveButton: '进入直播间', modeLabel: '', articleBlocks: [], fields: DEFAULT_FIELDS.map((field) => ({ ...field, value: '' })), modePick: 'online', parts: null, formErr: '', ownCourse: false, hostLabel: '达人' },
   onLoad(q) {
     this._id = q.id || ''
   },
@@ -87,6 +110,8 @@ Page({
       course,
       cover: coverOf(course),
       liveUrl: liveOf(course),
+      livePlatform: (course && course.livePlatform) || '',
+      liveButton: liveButtonOf(course),
       modeLabel: offline ? `线下${course && course.city ? ' · ' + course.city : ''}` : '线上 · 全国',
       articleBlocks: articleBlocks(course && course.detailBody),
       ownCourse,
@@ -98,17 +123,44 @@ Page({
     })
   },
   onLive() {
-    const url = String(this.data.liveUrl || '')
-    if (!/^https?:\/\/\S+$/i.test(url)) return
+    const raw = String(this.data.liveUrl || '').trim()
+    const platform = this.data.livePlatform || ''
+    if (!raw) return
+    if (platform === 'meeting' || (!platform && /meeting\.tencent\.com/i.test(raw))) {
+      const code = meetingCodeOf(raw)
+      const pwd = meetingPwdOf(raw)
+      const path = `pages/index/index?chn=Lingqi${code ? `&code=${code}` : ''}${pwd ? `&pwd=${encodeURIComponent(pwd)}` : ''}`
+      wx.navigateToMiniProgram({
+        appId: 'wx33fd6cdc62520063',
+        path,
+        fail: (err) => {
+          if (/cancel|取消/i.test(String(err && err.errMsg || ''))) return
+          this.copyLive(raw, '进入腾讯会议', '没有打开腾讯会议，内容已复制。')
+        },
+      })
+      return
+    }
+    if (platform === 'channels') {
+      const id = (raw.match(/sph[a-zA-Z0-9_-]{3,}/) || [])[0]
+      if (!id || !wx.openChannelsLive) {
+        this.copyLive(raw, '视频号直播', '当前微信不能打开视频号，ID 已复制。')
+        return
+      }
+      wx.openChannelsLive({
+        finderUserName: id,
+        fail: (err) => {
+          if (/cancel|取消/i.test(String(err && err.errMsg || ''))) return
+          this.copyLive(id, '视频号直播', '微信没有打开这个视频号。需要和本小程序关联主体后才能跳转，ID 已复制。')
+        },
+      })
+      return
+    }
+    this.copyLive(raw, platform === 'douyin' ? '抖音直播' : '进入直播间', platform === 'douyin' ? '链接已复制。微信里不能直接打开抖音，请到抖音粘贴进入。' : '链接已复制。请到对应 App 或浏览器打开。')
+  },
+  copyLive(data, title, content) {
     wx.setClipboardData({
-      data: url,
-      success: () => {
-        wx.showModal({
-          title: '进入直播间',
-          content: '直播间链接已复制。小程序不能直接打开外部直播间，请到浏览器粘贴打开。',
-          showCancel: false,
-        })
-      },
+      data: String(data || ''),
+      success: () => wx.showModal({ title, content, showCancel: false }),
     })
   },
   onField(e) {
