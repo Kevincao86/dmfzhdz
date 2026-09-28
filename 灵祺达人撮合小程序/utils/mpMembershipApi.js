@@ -57,10 +57,24 @@ function isWechatPayDevtoolsQrMode() {
   return mpRuntime.isDevtoolsEnv()
 }
 
+function payableWechatOpenId(raw) {
+  const id = String(raw || '').trim()
+  return /^o[A-Za-z0-9_-]{15,}$/.test(id) ? id : ''
+}
+
+function wechatLoginCode() {
+  return new Promise((resolve) => {
+    wx.login({
+      success: (r) => resolve(String((r && r.code) || '')),
+      fail: () => resolve(''),
+    })
+  })
+}
+
 async function createWechatJsapiPrepay(body) {
-  const accountMemberSync = require('./accountMemberSync.js')
-  let openid = String((body && body.openid) || '').trim()
-  if (!openid) openid = mpWechatOpenId.resolveOpenIdFromLocal()
+  const code = await wechatLoginCode()
+  const openid = payableWechatOpenId((body && body.openid) || mpWechatOpenId.resolveOpenIdFromLocal())
+  if (!code && !openid) throw new Error('请使用微信登录后再支付')
 
   const prepayPayload = {
     action: 'membership_wechat_prepay',
@@ -68,17 +82,9 @@ async function createWechatJsapiPrepay(body) {
     workRole: body.workRole,
     planId: body.planId,
     billing: body.billing,
+    code,
   }
-  if (openid) {
-    prepayPayload.openid = openid
-  } else {
-    const code = await new Promise((resolve, reject) => {
-      wx.login({ success: (r) => resolve(r.code || ''), fail: reject })
-    })
-    if (!code) throw new Error('wx_login_failed')
-    prepayPayload.code = code
-    prepayPayload.stableDevOpenId = accountMemberSync.ensureStableDevOpenId()
-  }
+  if (openid) prepayPayload.openid = openid
   try {
     const data = await postAuthAction(prepayPayload)
     const payMode = String(data.payMode || '').trim()
@@ -175,27 +181,19 @@ async function pollPointsWechatPay(outTradeNo) {
 }
 
 async function createPointsWechatJsapiPrepay(body) {
-  const accountMemberSync = require('./accountMemberSync.js')
-  let openid = String((body && body.openid) || '').trim()
-  if (!openid) openid = mpWechatOpenId.resolveOpenIdFromLocal()
+  const code = await wechatLoginCode()
+  const openid = payableWechatOpenId((body && body.openid) || mpWechatOpenId.resolveOpenIdFromLocal())
+  if (!code && !openid) throw new Error('请使用微信登录后再支付')
 
   const prepayPayload = {
     action: 'points_wechat_prepay',
     payMode: 'jsapi',
     workRole: body.workRole,
+    code,
   }
   if (body.points != null) prepayPayload.points = body.points
   if (body.yuan != null) prepayPayload.yuan = body.yuan
-  if (openid) {
-    prepayPayload.openid = openid
-  } else {
-    const code = await new Promise((resolve, reject) => {
-      wx.login({ success: (r) => resolve(r.code || ''), fail: reject })
-    })
-    if (!code) throw new Error('wx_login_failed')
-    prepayPayload.code = code
-    prepayPayload.stableDevOpenId = accountMemberSync.ensureStableDevOpenId()
-  }
+  if (openid) prepayPayload.openid = openid
   try {
     const data = await postAuthAction(prepayPayload)
     const payMode = String(data.payMode || '').trim()

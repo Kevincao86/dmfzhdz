@@ -36,6 +36,8 @@ import {
   mpAuthSwitchRole,
   mpAuthUpdateWxProfile,
   mpAuthBindWxOpenId,
+  wxCodeToOpenId,
+  type MpAccountRow,
   mpAuthWxLogin,
   mpAuthDyLogin,
   mpAuthBindPhoneLogin,
@@ -110,6 +112,71 @@ function sendJson(res: VercelResponse, status: number, body: Record<string, unkn
   sendCors(res)
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
   res.status(status).send(JSON.stringify(body))
+}
+
+const WECHAT_PAYER_OPENID_RE = /^o[A-Za-z0-9_-]{15,}$/
+
+function payableWechatOpenId(raw: unknown): string {
+  const id = String(raw || '').trim()
+  return WECHAT_PAYER_OPENID_RE.test(id) ? id : ''
+}
+
+/** 本地缓存的 local_/dev_ 或空 openid 不能下单；有登录码时以当次 code 换到的为准。 */
+async function attachJsapiPayerOpenId(
+  supabaseUrl: string,
+  serviceRole: string,
+  account: MpAccountRow,
+  prepayBody: Record<string, unknown>,
+): Promise<MpAccountRow> {
+  const code = String(prepayBody.code || '').trim()
+  let openid = ''
+  if (code) {
+    try {
+      const exchanged = await wxCodeToOpenId(code)
+      openid = payableWechatOpenId(exchanged.openid)
+    } catch {
+      openid = ''
+    }
+  }
+  if (!openid) {
+    openid = payableWechatOpenId(prepayBody.openid) || payableWechatOpenId(account.openid)
+  }
+  if (openid) prepayBody.openid = openid
+  else delete prepayBody.openid
+  if (code && openid && !payableWechatOpenId(account.openid)) {
+    try {
+      return await mpAuthBindWxOpenId(supabaseUrl, serviceRole, account.id, code)
+    } catch {
+      return account
+    }
+  }
+  return account
+}
+
+function sendWechatPayFail(
+  res: VercelResponse,
+  result: { error?: string; status?: number },
+): void {
+  const raw = String(result.error || '')
+  const payer = /openid/i.test(raw) || raw === 'missing_openid'
+  const message = payer
+    ? '请退出后重新微信登录，再发起支付'
+    : /[\u4e00-\u9fa5]/.test(raw)
+      ? raw
+      : '支付下单失败，请稍后重试'
+  const status = result.status === 502 ? 400 : result.status || 400
+  sendJson(res, status, { ok: false, error: raw || 'pay_failed', message })
+}
+
+function sendWechatPollFail(res: VercelResponse, error: string): void {
+  const raw = String(error || '')
+  const message =
+    raw === 'order_not_found'
+      ? '订单未找到，请重新发起支付'
+      : /[\u4e00-\u9fa5]/.test(raw)
+        ? raw
+        : '查询支付状态失败，请稍后重试'
+  sendJson(res, 400, { ok: false, error: raw || 'pay_query_failed', message })
 }
 
 function rawBody(req: VercelRequest): string {
@@ -778,22 +845,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       }
       let account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
       const prepayBody = { ...(body as Record<string, unknown>) }
-      const openidHint = String(prepayBody.openid || account.openid || '').trim()
-      if (!openidHint && String(prepayBody.code || '').trim()) {
-        account = await mpAuthBindWxOpenId(
-          supabaseUrl,
-          serviceRole,
-          account.id,
-          String(prepayBody.code).trim(),
-          String(prepayBody.stableDevOpenId || '').trim() || undefined,
-        )
-        if (account.openid) prepayBody.openid = account.openid
+      account = await attachJsapiPayerOpenId(supabaseUrl, serviceRole, account, prepayBody)
+      if (String(prepayBody.payMode || '').trim() === 'jsapi' && !payableWechatOpenId(prepayBody.openid)) {
+        sendJson(res, 400, {
+          ok: false,
+          error: 'missing_openid',
+          message: '请使用微信登录后再支付',
+        })
+        return
       }
       const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
       const data = await io.load()
       const result = await createMembershipWechatPrepayFromSnapshot(data, account, prepayBody)
       if (!result.ok) {
-        sendJson(res, result.status, { ok: false, error: result.error })
+        sendWechatPayFail(res, result)
         return
       }
       await io.save(data)
@@ -829,7 +894,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const data = await io.load()
       const result = await pollMembershipWechatPayFromSnapshot(data, outTradeNo, cfgResult.config)
       if (!result.ok) {
-        sendJson(res, 502, { ok: false, error: result.error })
+        sendWechatPollFail(res, result.error)
         return
       }
       if (result.status === 'paid') {
@@ -1024,22 +1089,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       }
       let account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
       const prepayBody = { ...(body as Record<string, unknown>) }
-      const openidHint = String(prepayBody.openid || account.openid || '').trim()
-      if (!openidHint && String(prepayBody.code || '').trim()) {
-        account = await mpAuthBindWxOpenId(
-          supabaseUrl,
-          serviceRole,
-          account.id,
-          String(prepayBody.code).trim(),
-          String(prepayBody.stableDevOpenId || '').trim() || undefined,
-        )
-        if (account.openid) prepayBody.openid = account.openid
+      account = await attachJsapiPayerOpenId(supabaseUrl, serviceRole, account, prepayBody)
+      if (String(prepayBody.payMode || '').trim() === 'jsapi' && !payableWechatOpenId(prepayBody.openid)) {
+        sendJson(res, 400, {
+          ok: false,
+          error: 'missing_openid',
+          message: '请使用微信登录后再支付',
+        })
+        return
       }
       const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
       const data = await io.load()
       const result = await createPointsWechatPrepayFromSnapshot(data, account, prepayBody)
       if (!result.ok) {
-        sendJson(res, result.status, { ok: false, error: result.error })
+        sendWechatPayFail(res, result)
         return
       }
       await io.save(data)
@@ -1077,7 +1140,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const data = await io.load()
       const result = await pollPointsWechatPayFromSnapshot(data, outTradeNo, cfgResult.config)
       if (!result.ok) {
-        sendJson(res, 502, { ok: false, error: result.error })
+        sendWechatPollFail(res, result.error)
         return
       }
       if (result.status === 'paid' || result.status === 'expired') {
@@ -1112,17 +1175,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       }
       let account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
       const prepayBody = { ...(body as Record<string, unknown>) }
-      const openidHint = String(prepayBody.openid || account.openid || '').trim()
-      if (!openidHint && String(prepayBody.code || '').trim()) {
-        account = await mpAuthBindWxOpenId(
-          supabaseUrl,
-          serviceRole,
-          account.id,
-          String(prepayBody.code).trim(),
-          String(prepayBody.stableDevOpenId || '').trim() || undefined,
-        )
-        if (account.openid) prepayBody.openid = account.openid
-      }
+      account = await attachJsapiPayerOpenId(supabaseUrl, serviceRole, account, prepayBody)
       const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
       const data = await io.load()
       const result = await resumePointsPayFromSnapshot(data, account, outTradeNo, prepayBody)
@@ -1131,7 +1184,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           expireStalePointsCheckoutsInSnapshot(data)
           await io.save(data)
         }
-        sendJson(res, result.status, { ok: false, error: result.error })
+        if (result.status === 502) sendWechatPayFail(res, result)
+        else sendJson(res, result.status, { ok: false, error: result.error })
         return
       }
       await io.save(data)
