@@ -226,6 +226,7 @@ function lecturerState(profile: Profile): 'none' | 'pending' | 'approved' | 'rej
 function lecturerCard(profile: Profile) {
   return {
     hostId: profile.hostId,
+    name: profile.name || '',
     city: profile.city,
     platforms: profile.platforms,
     skills: profile.skills,
@@ -341,14 +342,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (action === 'reviewLecturer') {
-    const hostId = String(body.hostId || '')
-    const profile = store.profiles.find((p) => p.hostId === hostId)
+    const hostId = String(body.hostId || '').trim()
+    const profile = store.profiles.find((p) => String(p.hostId || '').trim() === hostId)
     if (!profile || lecturerState(profile) === 'none') {
       res.status(404).json({ ok: false, error: '讲师申请不存在' })
       return
     }
-    profile.lecturerStatus = body.status === 'rejected' ? 'rejected' : 'approved'
-    profile.lecturerNote = clipText(body.note, 200)
+    const status = body.status === 'rejected' ? 'rejected' : 'approved'
+    const note = clipText(body.note, 200)
+    if (status === 'rejected' && !note) {
+      res.status(400).json({ ok: false, error: '驳回需要填写原因' })
+      return
+    }
+    if (status === 'approved' && (!String(profile.city || '').trim() || !String(profile.intro || '').trim())) {
+      res.status(400).json({ ok: false, error: '城市或介绍为空，不能通过' })
+      return
+    }
+    profile.lecturerStatus = status
+    profile.lecturerNote = status === 'rejected' ? note : ''
     writeStore(store)
     res.status(200).json({ ok: true, profile: lecturerCard(profile) })
     return
@@ -589,10 +600,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return
     }
     const status = body.status === 'rejected' ? 'rejected' : 'approved'
+    const note = clipText(body.note, 200)
+    if (status === 'rejected' && !note) {
+      res.status(400).json({ ok: false, error: '驳回需要填写原因' })
+      return
+    }
+    if (status === 'approved') {
+      const lecturer = store.profiles.find((p) => String(p.hostId || '').trim() === String(course.hostId || '').trim())
+      if (!lecturer || lecturerState(lecturer) !== 'approved') {
+        res.status(400).json({ ok: false, error: '讲师尚未通过，不能审核通过课程' })
+        return
+      }
+    }
     course.reviewStatus = status
-    course.reviewNote = clipText(body.note, 200)
+    course.reviewNote = status === 'rejected' ? note : ''
     writeStore(store)
-    res.status(200).json({ ok: true, course: { id: course.id, reviewStatus: course.reviewStatus } })
+    res.status(200).json({ ok: true, course: { id: course.id, reviewStatus: course.reviewStatus, reviewNote: course.reviewNote } })
     return
   }
 

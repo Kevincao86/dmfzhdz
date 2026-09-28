@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   Library,
   GraduationCap,
+  UserRound,
   Megaphone,
   BookOpen,
   MapPinned,
@@ -100,6 +101,13 @@ export const OPS_NAV_GROUPS: OpsNavGroup[] = [
         to: '/platform-decor?kind=banner',
         label: '页面广告位',
         icon: PanelTop,
+        permission: 'platform_decor',
+      },
+      {
+        kind: 'leaf',
+        to: '/lecturer-review',
+        label: '讲师审核',
+        icon: UserRound,
         permission: 'platform_decor',
       },
       {

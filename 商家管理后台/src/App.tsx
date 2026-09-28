@@ -24,6 +24,7 @@ import OpsHelpManualPage from './ops/pages/OpsHelpManualPage'
 import OpsKnowledgeBasePage from './ops/pages/OpsKnowledgeBasePage'
 import OpsTeamIntroPage from './ops/pages/OpsTeamIntroPage'
 import OpsPlatformDecorPage from './ops/pages/OpsPlatformDecorPage'
+import OpsLecturerReviewPage from './ops/pages/OpsLecturerReviewPage'
 import OpsTrainingReviewPage from './ops/pages/OpsTrainingReviewPage'
 import OpsDistributionPage from './ops/pages/OpsDistributionPage'
 import OpsRegionalPartnersPage from './ops/pages/OpsRegionalPartnersPage'
@@ -75,6 +76,7 @@ export default function App() {
           <Route path="help-manual/fulfillment" element={<Navigate to="/help-manual?edition=fulfillment" replace />} />
           <Route path="help-manual/mp" element={<Navigate to="/help-manual?edition=mp" replace />} />
           <Route path="platform-decor" element={<OpsPlatformDecorPage />} />
+          <Route path="lecturer-review" element={<OpsLecturerReviewPage />} />
           <Route path="training-review" element={<OpsTrainingReviewPage />} />
           <Route path="team-intro" element={<OpsTeamIntroPage />} />
         </Route>

@@ -32,6 +32,7 @@ list_scopes() {
   ops_pr_library    运营台 PR 用户库
   ops_talent_library 运营台达人库
   ops_home          运营台首页看板
+  ops_training_review  运营台：讲师审核与培训审核分开，驳回须填原因
   ops_ark_models    运营台火山方舟模型拉取 + Seedance 目录（不含短剧菜单）
   ops_short_drama   运营台「短剧AI制作」子菜单 + 即梦/Vidu/MiniMax 凭据（不含成片工坊）
   recommend_hall    推荐大厅全部达人池（慎用，见 recommend-all-talents-lock）
@@ -270,6 +271,17 @@ videoModelDuration
 merchantVideoAiGateway
 merchantApiGatewayCore
 meoo-merchant-ai-ark-discover-models
+change-scope-guard
+PAT
+      ;;
+    ops_training_review)
+      cat <<'PAT'
+OpsTrainingReviewPage
+OpsLecturerReviewPage
+opsTrainingReviewApi
+opsNavConfig
+商家管理后台/src/App.tsx
+meoo-mp-training
 change-scope-guard
 PAT
       ;;
