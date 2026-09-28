@@ -101,10 +101,15 @@ Page({
     }
     if (!this._messagesBootstrapped) {
       void this.bootstrap()
-    } else if (chat.canChat()) {
+      return
+    }
+    const now = Date.now()
+    if (this._lastMsgReloadAt && now - this._lastMsgReloadAt < 20000) return
+    this._lastMsgReloadAt = now
+    if (chat.canChat()) {
       void this.reloadChatSessionsQuiet()
     }
-    if (this._messagesBootstrapped && api.hasApi()) {
+    if (api.hasApi()) {
       void this.loadGroupSessions().then(() => {
         if (this.data.msgTab === 'group') this.applySearch()
       })
@@ -121,6 +126,8 @@ Page({
   },
   applyIdentityCopy() {
     const id = userProfile.readIdentity()
+    if (this._identityCopy === id) return
+    this._identityCopy = id
     if (id === 'pr') {
       this.setData({
         identityHint: 'PR · 与达人私信',

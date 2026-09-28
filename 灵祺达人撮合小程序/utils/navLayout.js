@@ -8,13 +8,18 @@ function applyCapsulePadding(page, styleKey = 'capsuleStyle', splitKeys = null) 
     const capsuleRightRpx = Math.round((win.windowWidth - menu.left + 12) * pxToRpx)
     if (splitKeys) {
       const bandKey = splitKeys.band || splitKeys.top
+      const bandVal = `padding-top:${menuTopRpx}rpx;`
+      const rightVal = `padding-right:${capsuleRightRpx}rpx;`
+      if (page.data[bandKey] === bandVal && page.data[splitKeys.right] === rightVal) return
       page.setData({
-        [bandKey]: `padding-top:${menuTopRpx}rpx;`,
-        [splitKeys.right]: `padding-right:${capsuleRightRpx}rpx;`,
+        [bandKey]: bandVal,
+        [splitKeys.right]: rightVal,
       })
     } else {
+      const combined = `padding-top:${menuTopRpx}rpx;padding-right:${capsuleRightRpx}rpx;`
+      if (page.data[styleKey] === combined) return
       page.setData({
-        [styleKey]: `padding-top:${menuTopRpx}rpx;padding-right:${capsuleRightRpx}rpx;`,
+        [styleKey]: combined,
       })
     }
   } catch (_) {

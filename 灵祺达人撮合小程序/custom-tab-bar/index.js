@@ -15,16 +15,13 @@ Component({
   lifetimes: {
     attached() {
       this.applyIdentityLayout()
-      identityTheme.syncTabBar()
       chatBadgeWatcher.syncBarFromGlobal()
-      // 冷启动拉一次角标即可；勿在每次 Tab show 全量请求（会导致底栏切换卡顿）
-      void chatBadgeWatcher.refreshNow({ minIntervalMs: 0 })
+      void chatBadgeWatcher.refreshNow({ minIntervalMs: 12000 })
     },
   },
   pageLifetimes: {
     show() {
       this.applyIdentityLayout()
-      identityTheme.syncTabBar()
       chatBadgeWatcher.syncBarFromGlobal()
       void chatBadgeWatcher.refreshNow({ minIntervalMs: 20000 })
     },
@@ -38,12 +35,13 @@ Component({
       const cur = this.data.list || []
       const same =
         cur.length === list.length && cur.every((item, i) => item.pagePath === list[i].pagePath)
-      const patch = { lqThemeClass }
+      const patch = {}
+      if (this.data.lqThemeClass !== lqThemeClass) patch.lqThemeClass = lqThemeClass
       if (!same || this.data.hasCenterFab !== hasCenterFab) {
         patch.list = list
         patch.hasCenterFab = hasCenterFab
       }
-      this.setData(patch)
+      if (Object.keys(patch).length) this.setData(patch)
     },
     switchTab(e) {
       const idx = Number(e.currentTarget.dataset.index)

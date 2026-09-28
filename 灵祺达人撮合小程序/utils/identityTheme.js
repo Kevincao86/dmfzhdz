@@ -51,9 +51,14 @@ function themeClass(id) {
   return `lq-theme-${normalize(id)}`
 }
 
+let lastChromeId = ''
+
 function applyChrome(id, opts) {
-  const t = pack(id)
-  const animate = opts && opts.animate === false ? false : true
+  const nid = normalize(id)
+  if (lastChromeId === nid && !(opts && opts.force)) return
+  lastChromeId = nid
+  const t = pack(nid)
+  const animate = opts && opts.animate === true
   try {
     wx.setNavigationBarColor({
       frontColor: '#ffffff',
@@ -75,7 +80,7 @@ function applyChrome(id, opts) {
   try {
     const app = getApp()
     if (app && app.globalData) {
-      app.globalData.workIdentityTheme = normalize(id)
+      app.globalData.workIdentityTheme = nid
     }
   } catch (_) {}
 }
@@ -89,11 +94,22 @@ function applyToPage(page) {
   if (!page || typeof page.setData !== 'function') return
   const id = userProfile.readIdentity()
   const t = pack(id)
-  page.setData({
-    lqThemeClass: themeClass(id),
-    credCheckboxColor: t.primary,
-  })
-  applyChrome(id)
+  const cls = themeClass(id)
+  const patch = {}
+  if (page.data.lqThemeClass !== cls) patch.lqThemeClass = cls
+  if (page.data.credCheckboxColor && page.data.credCheckboxColor !== t.primary) {
+    patch.credCheckboxColor = t.primary
+  }
+  if (Object.keys(patch).length) page.setData(patch)
+  applyChrome(id, { animate: false })
+}
+
+function tabListSame(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (!a[i] || !b[i] || a[i].pagePath !== b[i].pagePath || a[i].text !== b[i].text) return false
+  }
+  return true
 }
 
 function syncTabBar() {
@@ -108,17 +124,21 @@ function syncTabBar() {
       const page = pages[i]
       if (!page || typeof page.getTabBar !== 'function') continue
       const bar = page.getTabBar()
-      if (bar && typeof bar.setData === 'function') {
-        bar.setData({ lqThemeClass: cls, list, hasCenterFab })
-        break
-      }
+      if (!bar || typeof bar.setData !== 'function') continue
+      const patch = {}
+      if (bar.data.lqThemeClass !== cls) patch.lqThemeClass = cls
+      if (bar.data.hasCenterFab !== hasCenterFab) patch.hasCenterFab = hasCenterFab
+      if (!tabListSame(bar.data.list, list)) patch.list = list
+      if (Object.keys(patch).length) bar.setData(patch)
+      break
     }
   } catch (_) {}
 }
 
 function broadcast() {
+  lastChromeId = ''
   const id = userProfile.readIdentity()
-  applyChrome(id)
+  applyChrome(id, { animate: false, force: true })
   const cls = themeClass(id)
   try {
     const pages = getCurrentPages()

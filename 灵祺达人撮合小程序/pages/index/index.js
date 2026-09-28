@@ -101,10 +101,10 @@ function applyNavLayout(page) {
     const pxToRpx = 750 / win.windowWidth
     const menuTopRpx = Math.round(menu.top * pxToRpx)
     const capsuleRightRpx = Math.round((win.windowWidth - menu.left + 12) * pxToRpx)
-    page.setData({
-      navTopStyle: `padding-top:${menuTopRpx}rpx;`,
-      brandPadStyle: `padding-right:${capsuleRightRpx}rpx;`,
-    })
+    const navTopStyle = `padding-top:${menuTopRpx}rpx;`
+    const brandPadStyle = `padding-right:${capsuleRightRpx}rpx;`
+    if (page.data.navTopStyle === navTopStyle && page.data.brandPadStyle === brandPadStyle) return
+    page.setData({ navTopStyle, brandPadStyle })
   } catch (_) {
     page.setData({
       navTopStyle: 'padding-top:calc(env(safe-area-inset-top) + 12rpx);',

@@ -2,13 +2,32 @@ const userProfile = require('./userProfile.js')
 const chatBadgeWatcher = require('./chatBadgeWatcher.js')
 const { getTabList, routeToPagePath } = require('./tabBarConfig.js')
 
+function tabListSame(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (!a[i] || !b[i] || a[i].pagePath !== b[i].pagePath || a[i].text !== b[i].text) return false
+  }
+  return true
+}
+
+function patchTabBar(bar, patch) {
+  if (!bar || typeof bar.setData !== 'function' || !patch) return
+  const keys = Object.keys(patch)
+  if (!keys.length) return
+  const changed = keys.some((k) => {
+    if (k === 'list') return !tabListSame(bar.data.list, patch.list)
+    return bar.data[k] !== patch[k]
+  })
+  if (changed) bar.setData(patch)
+}
+
 function syncTabBarList(page) {
   if (!page || typeof page.getTabBar !== 'function') return null
   const bar = page.getTabBar()
   if (!bar) return null
   const list = getTabList(userProfile.readIdentity())
   const hasCenterFab = list.some((item) => item && item.center)
-  bar.setData({ list, hasCenterFab })
+  patchTabBar(bar, { list, hasCenterFab })
   return bar
 }
 
@@ -17,8 +36,7 @@ function setTabBarForPage(page, pagePath) {
   const bar = syncTabBarList(page)
   if (!bar) return
   const idx = (bar.data.list || []).findIndex((i) => i.pagePath === pagePath)
-  if (idx >= 0) bar.setData({ selected: idx })
-  // 仅同步本地角标，避免每次切 Tab 都 syncProfile + listSessions
+  if (idx >= 0) patchTabBar(bar, { selected: idx })
   chatBadgeWatcher.syncBarFromGlobal()
 }
 
@@ -41,7 +59,7 @@ function refreshTabBar() {
   if (!bar) return
   const path = routeToPagePath(page.route)
   const idx = (bar.data.list || []).findIndex((i) => i.pagePath === path)
-  if (idx >= 0) bar.setData({ selected: idx })
+  if (idx >= 0) patchTabBar(bar, { selected: idx })
   void chatBadgeWatcher.refreshNow({ clearOverride: true })
   try {
     require('./identityTheme.js').syncTabBar()
@@ -52,7 +70,7 @@ function refreshTabBar() {
 function setTabBarHidden(page, hidden) {
   if (!page || typeof page.getTabBar !== 'function') return
   const bar = page.getTabBar()
-  if (bar) bar.setData({ hidden: !!hidden })
+  if (bar && bar.data.hidden !== !!hidden) bar.setData({ hidden: !!hidden })
 }
 
 module.exports = {
