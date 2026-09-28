@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { TrainingPageArticleEditor, articleBodyClass, noteToArticleHtml, plainTextFromArticle, sanitizeArticleHtml } from './TrainingPageArticleEditor'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchTraining, postTraining } from '../lib/mpApi'
 import { getAccount } from '../lib/mpSession'
@@ -183,6 +184,7 @@ type Course = {
   poster?: string
   posterMp?: string
   detailCover?: string
+  detailBody?: string
   note?: string
   signupFields?: SignupField[]
   reviewStatus?: 'pending' | 'approved' | 'rejected' | ''
@@ -242,6 +244,7 @@ export default function TrainingPage() {
   const [poster, setPoster] = useState('')
   const [posterMp, setPosterMp] = useState('')
   const [detailCover, setDetailCover] = useState('')
+  const [detailBody, setDetailBody] = useState('')
   const [detailCourse, setDetailCourse] = useState<Course | null>(null)
   const [signupFields, setSignupFields] = useState<SignupField[]>(DEFAULT_FIELDS)
   const [fieldDraft, setFieldDraft] = useState('')
@@ -430,6 +433,7 @@ export default function TrainingPage() {
     setPoster('')
     setPosterMp('')
     setDetailCover('')
+    setDetailBody('')
     setSignupFields(DEFAULT_FIELDS.map((field) => ({ ...field })))
     setFieldDraft('')
     setErr('')
@@ -460,6 +464,7 @@ export default function TrainingPage() {
     setPoster(course.poster || '')
     setPosterMp(course.posterMp || '')
     setDetailCover(course.detailCover || '')
+    setDetailBody(course.detailBody || noteToArticleHtml(course.note || ''))
     setSignupFields(fieldsOf(course.signupFields))
     setFieldDraft('')
     setErr('')
@@ -663,10 +668,11 @@ export default function TrainingPage() {
               {detailCourse.mode === 'offline' && (detailCourse.address || detailCourse.contactName || detailCourse.contactWay) ? (
                 <p className="text-sm leading-relaxed text-slate-600">{[detailCourse.address, detailCourse.contactName, detailCourse.contactWay].filter(Boolean).join(' · ')}</p>
               ) : null}
-              <section>
-                <h3 className="text-sm font-semibold text-slate-900">课程介绍</h3>
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-600">{detailCourse.note || '讲师还没有写课程介绍。'}</p>
-              </section>
+              {detailCourse.detailBody ? (
+                <article className={articleBodyClass} dangerouslySetInnerHTML={{ __html: sanitizeArticleHtml(detailCourse.detailBody) }} />
+              ) : (
+                <p className="whitespace-pre-wrap text-[17px] leading-[1.75] text-[#353535]">{detailCourse.note || '讲师还没有写课程介绍。'}</p>
+              )}
             </div>
             <div className="flex gap-2 border-t border-slate-100 px-6 py-4">
               {me?.accountId && detailCourse.hostId === me.accountId ? (
@@ -768,7 +774,8 @@ export default function TrainingPage() {
                 contactWay: postMode === 'offline' ? projectContactWay.trim() : '',
                 whenText: formatWhen(whenStartDate, whenEndDate, whenStartTime, whenEndTime),
                 seats: Number(seats) || 1,
-                note: note.trim(),
+                note: plainTextFromArticle(detailBody) || note.trim(),
+                detailBody,
                 poster,
                 posterMp,
                 detailCover,
@@ -790,32 +797,23 @@ export default function TrainingPage() {
               <div>
                 <p className="text-xs font-semibold tracking-wide text-violet-600">课程编辑</p>
                 <h2 className="mt-1 text-xl font-bold text-slate-900">{editingId ? '编辑课程' : '新建课程'}</h2>
-                <p className="mt-1 text-sm text-slate-500">封面显示在课程详情页顶部。保存后重新审核。</p>
+                <p className="mt-1 text-sm text-slate-500">详情按公众号图文来排，可以插图，文字样式自己调。保存后重新审核。</p>
               </div>
               <button type="button" className="rounded-full px-2 text-xl leading-none text-slate-400" onClick={() => setEditorOpen(false)} aria-label="关闭">×</button>
             </div>
             <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
-              <section className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-                <label className="relative flex aspect-video cursor-pointer items-center justify-center overflow-hidden rounded-2xl border border-dashed border-slate-300 bg-slate-50">
-                  {detailCover || poster ? <img src={detailCover || poster} alt="" className="absolute inset-0 h-full w-full object-cover" /> : null}
-                  <span className={`relative text-sm font-medium ${detailCover || poster ? 'rounded-full bg-slate-900/70 px-3 py-1 text-white' : 'text-slate-600'}`}>{detailCover ? '更换详情封面' : '上传详情封面'}</span>
-                  <input className="sr-only" type="file" accept="image/*" onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    e.target.value = ''
-                    if (!file) return
-                    compressImageFile(file).then((url) => setDetailCover(url)).catch((ex) => setSheetErr(ex instanceof Error ? ex.message : '封面处理失败'))
-                  }} />
-                </label>
-                <div className="flex flex-col justify-center gap-3">
-                  <label className="block text-xs font-medium text-slate-500">课程名称
-                    <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" placeholder="如：宁波探店口播训练营" value={title} onChange={(e) => setTitle(e.target.value)} />
-                  </label>
-                  <label className="block text-xs font-medium text-slate-500">课程介绍
-                    <textarea className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" rows={5} placeholder="这门课解决什么问题，适合谁来学" value={note} onChange={(e) => setNote(e.target.value)} />
-                  </label>
-                  <p className="text-xs leading-relaxed text-slate-400">封面建议 16:9，例如 1500×844。不传则用星选宣传图。</p>
-                </div>
-              </section>
+              <TrainingPageArticleEditor
+                openKey={editorOpen ? (editingId || 'new') : ''}
+                title={title}
+                onTitle={setTitle}
+                cover={detailCover}
+                onCoverFile={(file) => {
+                  compressImageFile(file).then((url) => setDetailCover(url)).catch((ex) => setSheetErr(ex instanceof Error ? ex.message : '封面处理失败'))
+                }}
+                initialHtml={detailBody}
+                onHtml={setDetailBody}
+                onError={setSheetErr}
+              />
               <section>
                 <h3 className="text-sm font-semibold text-slate-900">宣传图</h3>
                 <p className="mt-1 text-xs leading-relaxed text-slate-500">星选和小程序各传一张，尺寸分开。两张都要传。</p>

@@ -29,6 +29,7 @@ type Course = {
   poster: string
   posterMp: string
   detailCover: string
+  detailBody: string
   note: string
   signupFields: SignupField[]
   reviewStatus: 'pending' | 'approved' | 'rejected'
@@ -124,6 +125,86 @@ function clipPoster(raw: unknown) {
   const s = String(raw || '')
   if (!s.startsWith('data:image/')) return ''
   return s.slice(0, 400000)
+}
+
+const ARTICLE_TAGS = new Set(['p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'strike', 'h2', 'h3', 'ul', 'ol', 'li', 'blockquote', 'img', 'span', 'div', 'font', 'hr'])
+const FONT_PX: Record<string, string> = { '1': '12px', '2': '14px', '3': '16px', '4': '18px', '5': '24px', '6': '32px', '7': '40px' }
+
+function articleStyle(style: string) {
+  const parts: string[] = []
+  for (const chunk of String(style || '').split(';')) {
+    const idx = chunk.indexOf(':')
+    if (idx < 0) continue
+    const key = chunk.slice(0, idx).trim().toLowerCase()
+    const val = chunk.slice(idx + 1).trim()
+    if (!key || !val || /url\(|expression|javascript/i.test(val)) continue
+    if ((key === 'color' || key === 'background-color') && (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(val) || /^rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)$/i.test(val))) {
+      parts.push(`${key}:${val}`)
+    } else if (key === 'font-size') {
+      const n = Number(/^(\d{1,2})px$/.exec(val)?.[1])
+      if (n >= 12 && n <= 48) parts.push(`font-size:${n}px`)
+    } else if (key === 'text-align' && /^(left|center|right|justify)$/i.test(val)) {
+      parts.push(`text-align:${val.toLowerCase()}`)
+    } else if (key === 'font-weight' && /^(normal|bold|[1-9]00)$/i.test(val)) {
+      parts.push(`font-weight:${val.toLowerCase()}`)
+    }
+  }
+  return parts.join(';')
+}
+
+function articleImageSrc(src: string) {
+  const s = String(src || '').trim()
+  if (/^https:\/\/[^\s"'<>]+$/i.test(s) && s.length < 500) return s
+  if (/^data:image\/(jpeg|jpg|png|webp);base64,[a-z0-9+/=]+$/i.test(s) && s.length <= 280000) return s
+  return ''
+}
+
+function articlePlain(html: string) {
+  return String(html || '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .slice(0, 800)
+}
+
+function sanitizeArticle(raw: unknown): { html: string; error?: string } {
+  let html = String(raw || '')
+  if (html.length > 2_000_000) return { html: '', error: '详情图文过大，请少放几张图' }
+  html = html.replace(/<!--[\s\S]*?-->/g, '')
+  html = html.replace(/<(script|style|iframe|object|embed|svg|math)[\s\S]*?<\/\1>/gi, '')
+  let images = 0
+  html = html.replace(/<\/?([a-z0-9]+)([^>]*)>/gi, (full, tag: string, attrs: string) => {
+    const name = tag.toLowerCase()
+    if (!ARTICLE_TAGS.has(name)) return ''
+    if (full.startsWith('</')) return name === 'br' || name === 'img' || name === 'hr' ? '' : `</${name}>`
+    if (name === 'br') return '<br>'
+    if (name === 'hr') return '<hr>'
+    if (name === 'img') {
+      images += 1
+      if (images > 8) return ''
+      const src = articleImageSrc(/src\s*=\s*["']([^"']+)["']/i.exec(attrs)?.[1] || '')
+      return src ? `<img src="${src}" alt="">` : ''
+    }
+    let style = articleStyle(/style\s*=\s*["']([^"']*)["']/i.exec(attrs)?.[1] || '')
+    const align = /align\s*=\s*["']?(left|center|right|justify)["']?/i.exec(attrs)?.[1]
+    if (align) style = [style, `text-align:${align.toLowerCase()}`].filter(Boolean).join(';')
+    if (name === 'font') {
+      const size = FONT_PX[/size\s*=\s*["']?([1-7])["']?/i.exec(attrs)?.[1] || '']
+      const color = /color\s*=\s*["']([^"']+)["']/i.exec(attrs)?.[1] || ''
+      const extra = [size ? `font-size:${size}` : '', articleStyle(`color:${color}`)].filter(Boolean)
+      style = [style, ...extra].filter(Boolean).join(';')
+    }
+    return style ? `<${name} style="${style}">` : `<${name}>`
+  })
+  if (html.length > 1_400_000) return { html: '', error: '详情图文过大，请少放几张图' }
+  return { html }
 }
 
 function rawImageBase64(dataUrl: string) {
@@ -416,6 +497,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const poster = clipPoster(body.poster)
     const posterMp = clipPoster(body.posterMp)
     const detailCover = clipPoster(body.detailCover)
+    const article = sanitizeArticle(body.detailBody)
+    if (article.error) {
+      res.status(400).json({ ok: false, error: article.error })
+      return
+    }
     if (!title) {
       res.status(400).json({ ok: false, error: '请填写课程名称' })
       return
@@ -469,7 +555,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       poster,
       posterMp,
       detailCover,
-      note: String(body.note || '').trim(),
+      detailBody: article.html,
+      note: articlePlain(article.html) || String(body.note || '').trim(),
       signupFields: normalizeSignupFields(body.signupFields),
       reviewStatus: 'pending',
       reviewNote: '',
@@ -507,6 +594,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const poster = clipPoster(body.poster)
     const posterMp = clipPoster(body.posterMp)
     const detailCover = clipPoster(body.detailCover)
+    const article = 'detailBody' in body ? sanitizeArticle(body.detailBody) : null
+    if (article?.error) {
+      res.status(400).json({ ok: false, error: article.error })
+      return
+    }
     const taken = (course.signups || []).length
     const mode = body.mode === 'offline' ? 'offline' : 'online'
     const place = offlinePlace(mode, body)
@@ -523,7 +615,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     course.whenText = String(body.whenText || '').trim()
     course.seats = Math.max(taken, Math.max(1, Number(body.seats) || 1))
     course.fee = String(body.fee || '').trim()
-    course.note = String(body.note || '').trim()
+    if (article) {
+      course.detailBody = article.html
+      course.note = articlePlain(article.html)
+    } else {
+      course.note = String(body.note || '').trim()
+    }
     course.signupFields = normalizeSignupFields(body.signupFields)
     if (poster) course.poster = poster
     if (posterMp) course.posterMp = posterMp
