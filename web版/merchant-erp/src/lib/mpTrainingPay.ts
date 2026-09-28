@@ -258,6 +258,26 @@ export async function queryTrainingPay(outTradeNo: string) {
   }
 }
 
+function payableWechatOpenId(raw: unknown) {
+  const id = String(raw || '').trim()
+  if (!/^o[A-Za-z0-9_-]{15,}$/.test(id)) return ''
+  return id
+}
+
+async function trainingPayerOpenId(body: Record<string, unknown>) {
+  const code = String(body.code || '').trim()
+  if (code) {
+    try {
+      const session = await wxCodeToOpenId(code)
+      const fresh = payableWechatOpenId(session.openid)
+      if (fresh) return fresh
+    } catch {
+      /* 登录码失败时再看本地是否已有可用 openid */
+    }
+  }
+  return payableWechatOpenId(body.openid)
+}
+
 export async function createTrainingPrepay(body: Record<string, unknown>) {
   const purpose = body.purpose === 'course' ? 'course' : 'deposit'
   const channel = body.channel === 'alipay' || body.channel === 'douyin' ? body.channel : 'wechat'
@@ -326,17 +346,8 @@ export async function createTrainingPrepay(body: Record<string, unknown>) {
   let qrDataUrl = ''
   let jsapiParams: ReturnType<typeof buildJsapiPayParams> | undefined
   if (channel === 'wechat' && scene === 'jsapi') {
-    let openid = String(body.openid || '').trim()
-    if (!openid) {
-      const code = String(body.code || '').trim()
-      if (!code) return { ok: false as const, error: '请使用微信登录后再支付' }
-      try {
-        const session = await wxCodeToOpenId(code)
-        openid = session.openid
-      } catch {
-        return { ok: false as const, error: '请使用微信登录后再支付' }
-      }
-    }
+    const openid = await trainingPayerOpenId(body)
+    if (!openid) return { ok: false as const, error: '请使用微信登录后再支付' }
     const cfg = loadWechatPayConfig()
     if (!cfg.ok) return { ok: false as const, error: '微信支付未配置' }
     const { prepayId } = await createWechatJsapiOrder({

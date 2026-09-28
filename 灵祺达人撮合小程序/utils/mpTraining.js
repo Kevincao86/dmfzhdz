@@ -46,18 +46,21 @@ async function syncDeposit() {
   return depositPaid()
 }
 
+function payableWechatOpenId(raw) {
+  const id = String(raw || '').trim()
+  return /^o[A-Za-z0-9_-]{15,}$/.test(id) ? id : ''
+}
+
 async function prepay(input) {
   if (!(ecs.hasBase && ecs.hasBase())) throw new Error('请先登录后再支付')
-  let openid = require('./mpWechatOpenId.js').resolveOpenIdFromLocal()
-  let code = ''
-  if (!openid) {
-    code = await new Promise((resolve) => {
-      wx.login({
-        success: (r) => resolve(String((r && r.code) || '')),
-        fail: () => resolve(''),
-      })
+  const code = await new Promise((resolve) => {
+    wx.login({
+      success: (r) => resolve(String((r && r.code) || '')),
+      fail: () => resolve(''),
     })
-  }
+  })
+  const openid = payableWechatOpenId(require('./mpWechatOpenId.js').resolveOpenIdFromLocal())
+  if (!code && !openid) throw new Error('请使用微信登录后再支付')
   const res = await ecs.post('/api/meoo-mp-training', {
     action: 'prepay',
     purpose: input && input.purpose === 'course' ? 'course' : 'deposit',
