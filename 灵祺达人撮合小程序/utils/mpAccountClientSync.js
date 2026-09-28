@@ -23,6 +23,8 @@ const PUBLISH_DRAFTS_KEY = 'meoo_publish_wizard_drafts_v1'
 let pushTimer = null
 let syncing = false
 let sessionPulled = false
+let localEpoch = 0
+let needResync = false
 
 function readJson(key, fallback) {
   try {
@@ -186,7 +188,28 @@ function mergeApplicationsRemote(local, remote) {
     .slice(0, 80)
 }
 
-function applyRemoteState(state) {
+function rowsKeepingLocalRead(localRows, remoteRows) {
+  const local = Array.isArray(localRows) ? localRows : []
+  const remote = Array.isArray(remoteRows) ? remoteRows : []
+  const readIds = new Set(local.filter((row) => row && row.read && row.id).map((row) => String(row.id)))
+  const seen = new Set()
+  const next = []
+  for (const row of remote) {
+    if (!row || typeof row !== 'object') continue
+    const id = String(row.id || '')
+    if (id) seen.add(id)
+    next.push(id && readIds.has(id) ? { ...row, read: true } : row)
+  }
+  for (const row of local) {
+    if (!row || !row.read || !row.id) continue
+    const id = String(row.id)
+    if (seen.has(id)) continue
+    next.push(row)
+  }
+  return next.slice(0, 100)
+}
+
+function applyRemoteState(state, epochAtStart) {
   if (!state || typeof state !== 'object') return
   const account = sessionStore.readAccount()
   const appKey = scope.scopedStorageKey(APPLICATIONS_BASE, account)
@@ -210,19 +233,20 @@ function applyRemoteState(state) {
   const msgKey = scope.scopedStorageKey(MSG_KEY, account)
   const inboxKey = scope.scopedStorageKey(INBOX_SEEN_KEY, account)
   const draftsKey = scope.scopedStorageKey(PUBLISH_DRAFTS_KEY, account)
-  if (Array.isArray(state.notifications)) {
-    writeJson(notifyKey, state.notifications.slice(0, 100))
+  const readFieldsStale = epochAtStart != null && epochAtStart !== localEpoch
+  if (!readFieldsStale && Array.isArray(state.notifications)) {
+    writeJson(notifyKey, rowsKeepingLocalRead(readList(notifyKey), state.notifications))
   }
-  if (Array.isArray(state.messages)) {
-    writeJson(msgKey, state.messages.slice(0, 100))
+  if (!readFieldsStale && Array.isArray(state.messages)) {
+    writeJson(msgKey, rowsKeepingLocalRead(readList(msgKey), state.messages))
   }
-  if (Array.isArray(state.inboxSeen)) {
+  if (!readFieldsStale && Array.isArray(state.inboxSeen)) {
     const local = readJson(inboxKey, [])
-    const merged = new Set(
-      [...(Array.isArray(local) ? local : []), ...state.inboxSeen]
-        .map((id) => String(id || '').trim())
-        .filter(Boolean),
-    )
+    const merged = new Set()
+    for (const id of [...state.inboxSeen, ...(Array.isArray(local) ? local : [])]) {
+      const key = String(id || '').trim()
+      if (key) merged.add(key)
+    }
     writeJson(inboxKey, [...merged].slice(-500))
   }
   if (state.selectionHandled && typeof state.selectionHandled === 'object') {
@@ -249,26 +273,37 @@ function applyRemoteState(state) {
 }
 
 async function syncWithServer() {
-  if (!isLoggedIn() || syncing) return null
+  if (!isLoggedIn()) return null
+  if (syncing) {
+    needResync = true
+    return null
+  }
   syncing = true
+  const epochAtStart = localEpoch
   try {
     const data = await ecs.post(
       '/api/meoo-ops-mp-auth',
       { action: 'client_state_sync', state: collectLocalState() },
       authHeaders(),
     )
-    if (data && data.state) applyRemoteState(data.state)
+    if (data && data.state) applyRemoteState(data.state, epochAtStart)
     return data
   } catch (e) {
     console.warn('[mp] client_state_sync', String(e && e.message ? e.message : e).slice(0, 120))
     return null
   } finally {
     syncing = false
+    if (needResync) {
+      needResync = false
+      return syncWithServer()
+    }
   }
 }
 
 function schedulePush(delayMs) {
+  localEpoch += 1
   if (!isLoggedIn()) return
+  if (syncing) needResync = true
   if (pushTimer) clearTimeout(pushTimer)
   pushTimer = setTimeout(() => {
     pushTimer = null

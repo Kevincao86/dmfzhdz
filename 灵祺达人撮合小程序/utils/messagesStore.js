@@ -199,26 +199,63 @@ function markNotificationsRead(ids) {
   if (idSet) markInboxSeen([...idSet])
 }
 
+/** 本次打开小程序里标过的已读。下拉刷新不会清掉，避免同步回包把存储盖掉。 */
+const memorySeen = new Set()
+
 function readInboxSeenSet() {
+  const set = new Set()
   try {
     const raw = wx.getStorageSync(storageKey(INBOX_SEEN_KEY))
     const list = typeof raw === 'string' ? JSON.parse(raw) : raw
-    return new Set(Array.isArray(list) ? list.map(String) : [])
-  } catch {
-    return new Set()
-  }
+    if (Array.isArray(list)) {
+      for (const id of list) {
+        const key = String(id || '').trim()
+        if (key) set.add(key)
+      }
+    }
+  } catch (_) {}
+  for (const key of memorySeen) set.add(key)
+  return set
 }
 
 function markInboxSeen(ids) {
   const set = readInboxSeenSet()
   for (const id of ids || []) {
     const key = String(id || '').trim()
-    if (key) set.add(key)
+    if (!key) continue
+    set.add(key)
+    memorySeen.add(key)
   }
   try {
     wx.setStorageSync(storageKey(INBOX_SEEN_KEY), JSON.stringify([...set].slice(-500)))
     scheduleClientSync()
   } catch (_) {}
+}
+
+function rememberReadNotifications(rows) {
+  const byId = new Map()
+  for (const row of readList(NOTIFY_KEY)) {
+    if (row && row.id) byId.set(String(row.id), row)
+  }
+  for (const row of rows || []) {
+    if (!row || typeof row !== 'object' || !row.id) continue
+    const id = String(row.id)
+    const prev = byId.get(id) || {}
+    byId.set(id, {
+      ...prev,
+      id: row.id,
+      title: row.title || prev.title || '',
+      body: row.body || prev.body || '',
+      category: row.category || prev.category,
+      createdAt: row.createdAt || prev.createdAt || '',
+      mpOrderId: row.mpOrderId || prev.mpOrderId,
+      applicantId: row.applicantId || prev.applicantId,
+      noticeType: row.noticeType || prev.noticeType,
+      dedupeKey: row.dedupeKey || prev.dedupeKey,
+      read: true,
+    })
+  }
+  writeList(NOTIFY_KEY, [...byId.values()].slice(-100))
 }
 
 /** 站内信 id 在注册表里稳定；再记一条标题+商单+时间，避免只靠内存态。 */
@@ -338,20 +375,26 @@ function dedupeSelectionInboxRows(rows) {
 
 function mergeRegistryInboxForTalent(reg, member) {
   const seen = readInboxSeenSet()
+  const local = readAllNotificationRows()
+  const localReadIds = new Set(
+    local.filter((r) => r && r.read && r.id).map((r) => String(r.id)),
+  )
   const selectionRows = talentInboxMatch.buildSelectionNoticeRows(reg, member).map((r) => ({
     ...r,
-    read: isInboxRowSeen(r, seen),
+    read: isInboxRowSeen(r, seen) || localReadIds.has(String(r.id || '')),
   }))
-  const remote = inboxRowsForTalent(reg, member)
+  const remote = inboxRowsForTalent(reg, member).map((row) =>
+    localReadIds.has(String(row.id || '')) ? { ...row, read: true } : row,
+  )
   const merged = dedupeSelectionInboxRows([...selectionRows, ...remote])
-  const local = readAllNotificationRows()
   const remoteIds = new Set(merged.map((r) => r.id))
-  const rest = local.filter((r) => !remoteIds.has(r.id))
+  const rest = local.filter((r) => r && !remoteIds.has(r.id))
   return inboxRowEnrich.enrichAndSort(reg, dedupeSelectionInboxRows([...merged, ...rest]))
 }
 
 function markAllNotificationsRead(extraRows) {
   markNotificationsRead()
+  rememberReadNotifications(extraRows)
   rememberInboxRows([...(readAllNotificationRows() || []), ...(extraRows || [])])
 }
 
