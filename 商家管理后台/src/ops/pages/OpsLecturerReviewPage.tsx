@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { loadTrainingReview, postTrainingReview, reviewBucket, type LecturerRow } from '../opsTrainingReviewApi'
+import { CourseDetailDialog, LecturerDetailDialog } from '../opsTrainingReviewDetail'
+import { loadTrainingReview, postTrainingReview, reviewBucket, type LecturerRow, type TrainingCourseRow } from '../opsTrainingReviewApi'
 
 const TABS = [
   { id: 'pending', label: '待审核' },
@@ -9,6 +10,9 @@ const TABS = [
 
 export default function OpsLecturerReviewPage() {
   const [rows, setRows] = useState<LecturerRow[]>([])
+  const [courses, setCourses] = useState<TrainingCourseRow[]>([])
+  const [openLecturer, setOpenLecturer] = useState<LecturerRow | null>(null)
+  const [openCourse, setOpenCourse] = useState<TrainingCourseRow | null>(null)
   const [tab, setTab] = useState<(typeof TABS)[number]['id']>('pending')
   const [err, setErr] = useState('')
   const [busyId, setBusyId] = useState('')
@@ -18,6 +22,7 @@ export default function OpsLecturerReviewPage() {
   const load = useCallback(async () => {
     const data = await loadTrainingReview()
     setRows(data.lecturers.filter((row) => row.lecturerStatus && row.lecturerStatus !== 'none'))
+    setCourses(data.courses)
   }, [])
 
   useEffect(() => {
@@ -69,11 +74,14 @@ export default function OpsLecturerReviewPage() {
           const incomplete = !row.city?.trim() || !row.intro?.trim()
           return (
             <article key={row.hostId} className="rounded-xl border border-[var(--ops-border)] bg-[var(--ops-panel)] p-4 shadow-[var(--ops-card-shadow)]">
+              <button type="button" className="w-full text-left" onClick={() => { setOpenLecturer(row); setOpenCourse(null) }}>
               <h2 className="font-semibold">{row.name || '未填姓名'} · {row.city || '未填城市'}</h2>
               <p className="ops-muted mt-1 text-sm">{row.platforms || '未填平台'}{row.years ? ` · ${row.years}` : ''}</p>
               <p className="mt-2 text-sm leading-relaxed">{row.skills || '未填擅长'}</p>
               <p className="mt-2 text-sm leading-relaxed">{row.intro || '未填写介绍'}</p>
               {row.lecturerNote ? <p className="ops-hint-warn mt-2 text-sm">驳回原因：{row.lecturerNote}</p> : null}
+              <p className="ops-muted mt-2 text-xs">查看详情</p>
+              </button>
               {bucket === 'pending' && incomplete ? <p className="ops-hint-warn mt-2 text-sm">城市或介绍为空，不能通过。</p> : null}
               {rejectId === row.hostId ? (
                 <div className="mt-3 space-y-2">
@@ -115,6 +123,21 @@ export default function OpsLecturerReviewPage() {
         })}
         {!shown.length ? <p className="ops-muted py-8 text-center text-sm">{tab === 'pending' ? '没有待审核的讲师申请。' : '这一栏是空的。'}</p> : null}
       </div>
+      {openCourse ? (
+        <CourseDetailDialog
+          row={openCourse}
+          lecturer={openLecturer || undefined}
+          onBack={openLecturer ? () => setOpenCourse(null) : undefined}
+          onClose={() => { setOpenCourse(null); setOpenLecturer(null) }}
+        />
+      ) : openLecturer ? (
+        <LecturerDetailDialog
+          row={openLecturer}
+          courses={courses}
+          onOpenCourse={setOpenCourse}
+          onClose={() => setOpenLecturer(null)}
+        />
+      ) : null}
     </div>
   )
 }

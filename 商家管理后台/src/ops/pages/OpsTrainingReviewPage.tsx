@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { CourseDetailDialog } from '../opsTrainingReviewDetail'
 import { loadTrainingReview, postTrainingReview, reviewBucket, type LecturerRow, type TrainingCourseRow } from '../opsTrainingReviewApi'
 
 const TABS = [
@@ -10,6 +11,7 @@ const TABS = [
 export default function OpsTrainingReviewPage() {
   const [rows, setRows] = useState<TrainingCourseRow[]>([])
   const [lecturers, setLecturers] = useState<LecturerRow[]>([])
+  const [openCourse, setOpenCourse] = useState<TrainingCourseRow | null>(null)
   const [tab, setTab] = useState<(typeof TABS)[number]['id']>('pending')
   const [err, setErr] = useState('')
   const [busyId, setBusyId] = useState('')
@@ -82,6 +84,7 @@ export default function OpsTrainingReviewPage() {
                 <div className="ops-muted flex h-24 w-40 shrink-0 items-center justify-center rounded-xl bg-[var(--ops-bg)] text-xs">无海报</div>
               )}
               <div className="min-w-0 flex-1">
+                <button type="button" className="w-full text-left" onClick={() => setOpenCourse(row)}>
                 <h2 className="font-semibold">{row.title}</h2>
                 <p className="ops-muted mt-1 text-sm">
                   {row.hostName} · {row.mode === 'offline' ? '线下' : '线上'}
@@ -93,6 +96,8 @@ export default function OpsTrainingReviewPage() {
                 {row.note ? <p className="mt-2 text-sm leading-relaxed">{row.note}</p> : null}
                 {row.reviewNote ? <p className="ops-hint-warn mt-2 text-sm">驳回原因：{row.reviewNote}</p> : null}
                 {!ready ? <p className="ops-hint-warn mt-2 text-sm">这位讲师还没通过，课程不能上架。</p> : null}
+                <p className="ops-muted mt-2 text-xs">查看详情</p>
+                </button>
                 {rejectId === row.id ? (
                   <div className="mt-3 space-y-2">
                     <textarea
@@ -134,6 +139,13 @@ export default function OpsTrainingReviewPage() {
         })}
         {!shown.length ? <p className="ops-muted py-8 text-center text-sm">{tab === 'pending' ? '没有待审核的课程。' : '这一栏是空的。'}</p> : null}
       </div>
+      {openCourse ? (
+        <CourseDetailDialog
+          row={openCourse}
+          lecturer={lecturers.find((row) => String(row.hostId || '').trim() === String(openCourse.hostId || '').trim())}
+          onClose={() => setOpenCourse(null)}
+        />
+      ) : null}
     </div>
   )
 }

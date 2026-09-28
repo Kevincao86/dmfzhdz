@@ -8,14 +8,20 @@ export type TrainingCourseRow = {
   title: string
   hostId?: string
   hostName: string
+  hostRole?: string
   mode: 'online' | 'offline'
   city?: string
   address?: string
   contactName?: string
   contactWay?: string
+  whenText?: string
+  seats?: number
+  signupCount?: number
   fee?: string
   note?: string
   poster?: string
+  posterMp?: string
+  signupFields?: { key: string; label: string }[]
   reviewStatus?: 'pending' | 'approved' | 'rejected'
   reviewNote?: string
   createdAt?: string
@@ -24,6 +30,7 @@ export type TrainingCourseRow = {
 export type LecturerRow = {
   hostId: string
   name?: string
+  avatar?: string
   city?: string
   platforms?: string
   skills?: string

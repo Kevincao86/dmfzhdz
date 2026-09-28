@@ -279,6 +279,7 @@ PAT
 OpsTrainingReviewPage
 OpsLecturerReviewPage
 opsTrainingReviewApi
+opsTrainingReviewDetail
 opsNavConfig
 商家管理后台/src/App.tsx
 meoo-mp-training

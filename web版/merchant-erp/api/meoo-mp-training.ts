@@ -227,6 +227,7 @@ function lecturerCard(profile: Profile) {
   return {
     hostId: profile.hostId,
     name: profile.name || '',
+    avatar: profile.avatar || '',
     city: profile.city,
     platforms: profile.platforms,
     skills: profile.skills,
