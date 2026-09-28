@@ -23,6 +23,46 @@ function fieldsFrom(course) {
   }))
 }
 
+function coverOf(course) {
+  const list = [course && course.detailCover, course && course.poster, course && course.posterMp]
+  return list.find((src) => /^data:image\/|^https?:\/\//i.test(String(src || ''))) || ''
+}
+
+function liveOf(course) {
+  const url = String((course && course.liveUrl) || '').trim()
+  if (!course || course.mode === 'offline') return ''
+  return /^https?:\/\/\S+$/i.test(url) ? url : ''
+}
+
+function safeHtml(html) {
+  return String(html || '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/\son\w+\s*=\s*(['"]).*?\1/gi, '')
+    .replace(/javascript:/gi, '')
+}
+
+function articleBlocks(html) {
+  const src = safeHtml(html)
+  if (!src.trim()) return []
+  const blocks = []
+  const re = /<img\b[^>]*src=["']([^"']+)["'][^>]*>/gi
+  let last = 0
+  let match = re.exec(src)
+  while (match) {
+    const before = src.slice(last, match.index).trim()
+    if (before) blocks.push({ id: `h${blocks.length}`, type: 'html', html: before })
+    const img = String(match[1] || '')
+    if (/^https:\/\/[^\s"'<>]+$/i.test(img) || /^data:image\/(jpeg|jpg|png|webp);base64,/i.test(img)) {
+      blocks.push({ id: `i${blocks.length}`, type: 'img', src: img })
+    }
+    last = match.index + match[0].length
+    match = re.exec(src)
+  }
+  const tail = src.slice(last).trim()
+  if (tail) blocks.push({ id: `h${blocks.length}`, type: 'html', html: tail })
+  return blocks
+}
+
 function fieldError(fields) {
   for (const field of fields || []) {
     const value = String(field.value || '').trim()
@@ -34,7 +74,7 @@ function fieldError(fields) {
 }
 
 Page({
-  data: { course: null, fields: DEFAULT_FIELDS.map((field) => ({ ...field, value: '' })), modePick: 'online', parts: null, formErr: '', ownCourse: false, hostLabel: '达人' },
+  data: { course: null, cover: '', liveUrl: '', modeLabel: '', articleBlocks: [], fields: DEFAULT_FIELDS.map((field) => ({ ...field, value: '' })), modePick: 'online', parts: null, formErr: '', ownCourse: false, hostLabel: '达人' },
   onLoad(q) {
     this._id = q.id || ''
   },
@@ -42,14 +82,33 @@ Page({
     const list = await training.listCourses()
     const course = (list || []).find((c) => c.id === this._id) || null
     const ownCourse = training.isOwnCourse(course)
+    const offline = course && course.mode === 'offline'
     this.setData({
       course,
+      cover: coverOf(course),
+      liveUrl: liveOf(course),
+      modeLabel: offline ? `线下${course && course.city ? ' · ' + course.city : ''}` : '线上 · 全国',
+      articleBlocks: articleBlocks(course && course.detailBody),
       ownCourse,
       hostLabel: hostLabel(course && course.hostRole),
       fields: fieldsFrom(course),
       formErr: ownCourse ? '这是你发布的课程，不能报名自己的课。其他人发布的课程可以报名。' : '',
       parts: null,
-      modePick: course && course.mode === 'offline' ? 'offline' : 'online',
+      modePick: offline ? 'offline' : 'online',
+    })
+  },
+  onLive() {
+    const url = String(this.data.liveUrl || '')
+    if (!/^https?:\/\/\S+$/i.test(url)) return
+    wx.setClipboardData({
+      data: url,
+      success: () => {
+        wx.showModal({
+          title: '进入直播间',
+          content: '直播间链接已复制。小程序不能直接打开外部直播间，请到浏览器粘贴打开。',
+          showCancel: false,
+        })
+      },
     })
   },
   onField(e) {

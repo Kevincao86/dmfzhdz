@@ -140,6 +140,9 @@
 .tp-poster__name { font-size: 28rpx; font-weight: 600; color: #1f1a2e; }
 .tp-poster__tip { margin-top: 8rpx; font-size: 22rpx; color: #8b8499; }
 .tp-poster__badge { position: absolute; right: 16rpx; bottom: 16rpx; padding: 6rpx 16rpx; border-radius: 999rpx; background: rgba(31, 26, 46, 0.72); color: #fff; font-size: 22rpx; }
+.tp-tools { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 20rpx; }
+.tp-tool { padding: 0 18rpx; height: 56rpx; line-height: 56rpx; border-radius: 12rpx; background: #f4f2fa; color: #3d3650; font-size: 22rpx; }
+.tp-editor { box-sizing: border-box; width: 100%; height: 640rpx; margin-top: 16rpx; padding: 12rpx 16rpx; border: 1rpx solid #eceaf2; border-radius: 16rpx; background: #fff; font-size: 30rpx; line-height: 1.7; color: #353535; }
 
 .tp-course { display: flex; gap: 20rpx; padding: 20rpx; }
 .tp-course__cover { width: 168rpx; height: 210rpx; border-radius: 18rpx; background: #f4f0ff; flex-shrink: 0; }

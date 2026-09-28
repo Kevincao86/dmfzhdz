@@ -1,16 +1,24 @@
 <view class="td" wx:if="{{course}}">
-  <image wx:if="{{course.posterMp || course.poster}}" class="td-cover" src="{{course.posterMp || course.poster}}" mode="aspectFill" />
+  <image wx:if="{{cover}}" class="td-cover" src="{{cover}}" mode="aspectFill" />
   <view class="td-body">
     <text class="td-title">{{course.title}}</text>
     <text class="td-host">{{hostLabel}} · {{course.hostName}}</text>
     <view class="td-picks">
-      <view class="td-pick td-pick--on">{{course.mode === 'offline' ? '线下' : '线上'}}{{course.mode === 'offline' && course.city ? ' · ' + course.city : ''}}</view>
+      <view class="td-pick td-pick--on">{{modeLabel}}</view>
     </view>
     <text class="td-line">时间 {{course.whenText || '由讲师安排'}}</text>
     <text class="td-line" wx:if="{{course.mode === 'offline' && course.address}}">地址 {{course.address}}</text>
     <text class="td-line" wx:if="{{course.mode === 'offline' && (course.contactName || course.contactWay)}}">联系 {{course.contactName}} {{course.contactWay}}</text>
+    <view wx:if="{{liveUrl}}" class="td-live" bindtap="onLive">进入直播间</view>
     <text class="td-line">名额 {{course.enrolled || course.signupCount || 0}} / {{course.seats}}</text>
     <text class="td-line">费用 {{course.fee ? '¥' + course.fee : '面议'}}</text>
+    <view wx:if="{{articleBlocks.length}}" class="td-article">
+      <block wx:for="{{articleBlocks}}" wx:key="id">
+        <image wx:if="{{item.type === 'img'}}" class="td-article__img" src="{{item.src}}" mode="widthFix" />
+        <rich-text wx:else nodes="{{item.html}}" />
+      </block>
+    </view>
+    <text wx:elif="{{course.note}}" class="td-note">{{course.note}}</text>
     <block wx:if="{{ownCourse}}">
       <text class="td-err">这是你发布的课程，不能报名自己的课。其他人发布的课程可以报名。</text>
     </block>

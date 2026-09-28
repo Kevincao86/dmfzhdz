@@ -2,7 +2,7 @@
   <view class="tp-hero">
     <text class="tp-hero__kicker">本地生活培训</text>
     <text class="tp-hero__title">{{view === 'form' ? (editingId ? '编辑培训' : '新增培训') : '我的课程'}}</text>
-    <text class="tp-hero__sub" wx:if="{{view === 'form'}}">改完会重新提交审核。通过前不会出现在首页广告栏。</text>
+    <text class="tp-hero__sub" wx:if="{{view === 'form'}}">详情按图文填写，和网页是同一份内容。改完会重新提交审核。</text>
     <text class="tp-hero__sub" wx:else>查看已提交的课程，可以新增，也可以改已发布的内容。</text>
   </view>
 
@@ -30,7 +30,7 @@
           <text class="tp-course__title">{{item.title}}</text>
           <text class="tp-status tp-status--{{item.statusKey}}">{{item.statusText}}</text>
         </view>
-        <text class="tp-course__meta">{{item.modeText}}{{item.city ? ' · ' + item.city : ''}}{{item.address ? ' · ' + item.address : ''}}{{item.whenText ? ' · ' + item.whenText : ''}}</text>
+        <text class="tp-course__meta">{{item.mode === 'offline' ? '线下' : '线上 · 全国'}}{{item.mode === 'offline' && item.city ? ' · ' + item.city : ''}}{{item.mode === 'offline' && item.address ? ' · ' + item.address : ''}}{{item.whenText ? ' · ' + item.whenText : ''}}</text>
         <text class="tp-course__meta">¥{{item.fee || '0'}} · {{item.signupCount || 0}}/{{item.seats}} 人</text>
         <text wx:if="{{item.reviewStatus === 'rejected' && item.reviewNote}}" class="tp-course__note">{{item.reviewNote}}</text>
         <view class="tp-actions">
@@ -42,6 +42,41 @@
   </block>
 
   <block wx:if="{{view === 'form' && advanced && paid}}">
+    <view class="tp-card">
+      <text class="tp-sec">课程详情</text>
+      <text class="tp-hint">封面和正文显示在课程详情页。文字可以加粗、调大小和颜色，最多插入 8 张图。</text>
+      <text class="tp-label">详情封面 · 16:9</text>
+      <view class="tp-poster tp-poster--web" data-key="detailCover" bindtap="onPoster">
+        <image wx:if="{{detailCover}}" class="tp-poster__img" src="{{detailCover}}" mode="aspectFill" />
+        <block wx:else>
+          <text class="tp-poster__name">上传详情封面</text>
+          <text class="tp-poster__tip">不上传时，详情页用星选宣传图</text>
+        </block>
+        <text wx:if="{{detailCover}}" class="tp-poster__badge">更换</text>
+      </view>
+      <view class="tp-tools">
+        <view class="tp-tool" data-name="bold" catchtap="onFormat">加粗</view>
+        <view class="tp-tool" data-name="italic" catchtap="onFormat">斜体</view>
+        <view class="tp-tool" data-name="underline" catchtap="onFormat">下划线</view>
+        <view class="tp-tool" data-name="strike" catchtap="onFormat">删除线</view>
+        <view class="tp-tool" data-name="header" data-value="H2" catchtap="onFormat">标题</view>
+        <view class="tp-tool" data-name="align" data-value="left" catchtap="onFormat">居左</view>
+        <view class="tp-tool" data-name="align" data-value="center" catchtap="onFormat">居中</view>
+        <view class="tp-tool" data-name="align" data-value="right" catchtap="onFormat">居右</view>
+        <view class="tp-tool" data-name="fontSize" data-value="16px" catchtap="onFormat">小</view>
+        <view class="tp-tool" data-name="fontSize" data-value="20px" catchtap="onFormat">中</view>
+        <view class="tp-tool" data-name="fontSize" data-value="24px" catchtap="onFormat">大</view>
+        <view class="tp-tool" data-name="color" data-value="#353535" catchtap="onFormat">黑</view>
+        <view class="tp-tool" data-name="color" data-value="#c45c26" catchtap="onFormat">橙</view>
+        <view class="tp-tool" data-name="color" data-value="#5b2dcc" catchtap="onFormat">紫</view>
+        <view class="tp-tool" data-name="list" data-value="bullet" catchtap="onFormat">列表</view>
+        <view class="tp-tool" data-name="list" data-value="ordered" catchtap="onFormat">序号</view>
+        <view class="tp-tool" data-name="image" catchtap="onFormat">图片</view>
+        <view class="tp-tool" data-name="divider" catchtap="onFormat">分割线</view>
+      </view>
+      <editor id="articleEditor" class="tp-editor" placeholder="从这里开始写正文" bindready="onEditorReady" show-img-size show-img-toolbar show-img-resize></editor>
+    </view>
+
     <view class="tp-card">
       <text class="tp-sec">宣传图</text>
       <text class="tp-hint">星选和小程序各传一张。星选首页贴齐左右，16:9，建议 1500×844。小程序首页广告栏约 3:1，建议 1500×470。</text>
@@ -75,10 +110,17 @@
         <view class="tp-seg__item {{mode === 'offline' ? 'tp-seg__item--on' : ''}}" data-id="offline" bindtap="onMode">线下</view>
       </view>
       <text class="tp-label">城市</text>
-      <view class="tp-select" bindtap="onOpenCity">
+      <view wx:if="{{mode === 'online'}}" class="tp-select">
+        <text>全国</text>
+      </view>
+      <view wx:else class="tp-select" bindtap="onOpenCity">
         <text class="{{cityDisplay ? '' : 'tp-ph'}}">{{cityDisplay || '请选择城市'}}</text>
         <text class="tp-arrow">›</text>
       </view>
+      <block wx:if="{{mode === 'online'}}">
+        <text class="tp-label">直播间链接</text>
+        <input class="tp-input" placeholder="https:// 开头，学员用来进入直播间" value="{{liveUrl}}" bindinput="onLiveUrl" />
+      </block>
       <block wx:if="{{mode === 'offline'}}">
         <text class="tp-label">具体地址</text>
         <input class="tp-input" placeholder="门牌、楼层或教室" value="{{address}}" bindinput="onAddress" />
@@ -115,8 +157,6 @@
       <input class="tp-input" type="digit" placeholder="平台代收，学员支付这个金额" value="{{fee}}" bindinput="onFee" />
       <text class="tp-label">名额</text>
       <input class="tp-input" type="number" value="{{seats}}" bindinput="onSeats" />
-      <text class="tp-label">课程说明</text>
-      <textarea class="tp-area" placeholder="这门课解决什么接单问题，适合谁来听" value="{{note}}" bindinput="onNote" />
       <text class="tp-label">报名字段</text>
       <text class="tp-hint">学员填完才能支付。姓名必留，身份证和手机号可以关掉。</text>
       <view class="tp-chips">

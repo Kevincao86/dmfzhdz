@@ -43,6 +43,94 @@ function formatWhen(startDate, endDate, startTime, endTime) {
   return `${startDate} 至 ${endDate}，每天 ${startTime}-${endTime}`
 }
 
+function escapeHtml(text) {
+  return String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+function noteToHtml(note) {
+  const text = String(note || '').trim()
+  if (!text) return ''
+  return text.split(/\n+/).map((line) => `<p>${escapeHtml(line)}</p>`).join('')
+}
+
+function articlePlain(html) {
+  return String(html || '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .slice(0, 800)
+}
+
+function normalizeEditorHtml(html) {
+  let src = String(html || '')
+    .replace(/<h1\b([^>]*)>/gi, '<h2$1>')
+    .replace(/<\/h1>/gi, '</h2>')
+  src = src.replace(/<([a-z0-9]+)([^>]*)>/gi, (full, tag, attrs) => {
+    const cls = /class\s*=\s*["']([^"']*)["']/i.exec(attrs)
+    if (!cls) return full
+    const align = /ql-align-(left|center|right|justify)/.exec(cls[1])
+    const size = /ql-size-(small|large|huge)/.exec(cls[1])
+    const sizePx = size ? { small: '14px', large: '20px', huge: '24px' }[size[1]] : ''
+    const extra = []
+    if (align) extra.push(`text-align:${align[1]}`)
+    if (sizePx) extra.push(`font-size:${sizePx}`)
+    let next = attrs.replace(/\sclass\s*=\s*["'][^"']*["']/i, '')
+    if (extra.length) {
+      const style = /style\s*=\s*["']([^"']*)["']/i.exec(next)
+      if (style) next = next.replace(style[0], `style="${style[1]};${extra.join(';')}"`)
+      else next += ` style="${extra.join(';')}"`
+    }
+    return `<${tag}${next}>`
+  })
+  return src
+}
+
+function resolveImageSrc(src, map) {
+  const raw = String(src || '').trim().replace(/&amp;/g, '&')
+  if (/^https:\/\/[^\s"'<>]+$/i.test(raw) && raw.length < 500) return raw
+  if (/^data:image\/(jpeg|jpg|png|webp);base64,[a-z0-9+/=]+$/i.test(raw)) return raw.length <= 280000 ? raw : ''
+  const bag = map || {}
+  if (bag[raw]) return bag[raw]
+  const name = raw.split('/').pop()
+  const key = Object.keys(bag).find((item) => item === raw || (name && item.endsWith(name)))
+  if (key) return bag[key]
+  if (!/^wxfile:|^https?:\/\/tmp|USER_DATA|train-img-/i.test(raw) && raw.indexOf('tmp') < 0) return ''
+  try {
+    const b64 = wx.getFileSystemManager().readFileSync(raw, 'base64')
+    const url = `data:image/jpeg;base64,${b64}`
+    return url.length <= 280000 ? url : ''
+  } catch (_) {
+    return ''
+  }
+}
+
+function restoreArticleImages(html, map) {
+  let error = ''
+  const next = String(html || '').replace(/<img\b[^>]*src=["']([^"']+)["'][^>]*>/gi, (full, src) => {
+    const data = resolveImageSrc(src, map)
+    if (!data) {
+      error = '有图片未能保存，请重新插入'
+      return ''
+    }
+    if (data.length > 280000) {
+      error = '有图片过大，请换一张较小的图'
+      return ''
+    }
+    return `<img src="${data}" alt="">`
+  })
+  return { html: next, error }
+}
+
 function fieldView(fields) {
   const list = Array.isArray(fields) ? fields : []
   return {
@@ -77,6 +165,9 @@ function blankForm() {
     fee: '',
     poster: '',
     posterMp: '',
+    detailCover: '',
+    detailBody: '',
+    liveUrl: '',
     note: '',
     ...fieldView([
       { key: 'name', label: '姓名', kind: 'name' },
@@ -162,6 +253,8 @@ Page({
       wx.showToast({ title: reason.slice(0, 18), icon: 'none' })
       return
     }
+    this.editorCtx = null
+    this._imgMap = {}
     this.setData({ view: 'form', ...blankForm() })
     wx.setNavigationBarTitle({ title: '新增培训' })
   },
@@ -192,29 +285,39 @@ Page({
     const course = (this.data.mine || []).find((c) => c.id === e.currentTarget.dataset.id)
     if (!course) return
     const when = parseWhen(course.whenText)
+    const online = course.mode === 'online'
+    const city = online ? { cityNational: true, selectedCities: [], city: '全国', cityDisplay: '全国' } : (() => {
+      const parsed = parseCity(course.city)
+      return { ...parsed, city: course.city || '', cityDisplay: cityLabel(parsed.cityNational, parsed.selectedCities) }
+    })()
+    this.editorCtx = null
+    this._imgMap = {}
     this.setData({
       view: 'form',
       editingId: course.id,
       title: course.title || '',
-      mode: course.mode === 'online' ? 'online' : 'offline',
-      ...parseCity(course.city),
-      city: course.city || '',
+      mode: online ? 'online' : 'offline',
+      ...city,
       address: course.address || '',
       contactName: course.contactName || '',
       contactWay: course.contactWay || '',
-      cityDisplay: cityLabel(parseCity(course.city).cityNational, parseCity(course.city).selectedCities),
+      liveUrl: course.liveUrl || '',
       ...when,
       whenText: formatWhen(when.whenStartDate, when.whenEndDate, when.whenStartTime, when.whenEndTime) || course.whenText || '',
       seats: String(course.seats || 20),
       fee: course.fee || '',
       poster: course.poster || '',
       posterMp: course.posterMp || '',
+      detailCover: course.detailCover || '',
+      detailBody: course.detailBody || '',
       note: course.note || '',
       ...fieldView(Array.isArray(course.signupFields) && course.signupFields.length ? course.signupFields : blankForm().signupFields),
     })
     wx.setNavigationBarTitle({ title: '编辑培训' })
   },
   onBack() {
+    this.editorCtx = null
+    this._imgMap = {}
     this.setData({ view: 'list', ...blankForm() })
     wx.setNavigationBarTitle({ title: '发布培训' })
     this.loadMine()
@@ -313,7 +416,105 @@ Page({
   },
   onSeats(e) { this.setData({ seats: e.detail.value }) },
   onFee(e) { this.setData({ fee: e.detail.value }) },
-  onNote(e) { this.setData({ note: e.detail.value }) },
+  onLiveUrl(e) { this.setData({ liveUrl: e.detail.value }) },
+  onEditorReady() {
+    wx.createSelectorQuery().in(this).select('#articleEditor').context((res) => {
+      this.editorCtx = res && res.context
+      const html = this.editorHtmlForShow(this.data.detailBody || noteToHtml(this.data.note))
+      if (this.editorCtx && html) this.editorCtx.setContents({ html })
+    }).exec()
+  },
+  editorHtmlForShow(html) {
+    const fs = wx.getFileSystemManager()
+    const dir = wx.env && wx.env.USER_DATA_PATH
+    if (!dir) return html
+    let i = 0
+    return String(html || '').replace(/src="(data:image\/(?:jpeg|jpg|png|webp);base64,[^"]+)"/gi, (full, src) => {
+      if (src.length > 280000) return full
+      const ext = /png/i.test(src.slice(0, 30)) ? 'png' : 'jpg'
+      const filePath = `${dir}/train-img-${Date.now()}-${i}.${ext}`
+      i += 1
+      try {
+        fs.writeFileSync(filePath, src.slice(src.indexOf(',') + 1), 'base64')
+        if (!this._imgMap) this._imgMap = {}
+        this._imgMap[filePath] = src
+        return `src="${filePath}"`
+      } catch (_) {
+        return full
+      }
+    })
+  },
+  onFormat(e) {
+    const name = e.currentTarget.dataset.name
+    const value = e.currentTarget.dataset.value
+    if (!this.editorCtx || !name) return
+    if (name === 'image') {
+      this.onInsertImage()
+      return
+    }
+    if (name === 'divider') {
+      this.editorCtx.insertDivider()
+      return
+    }
+    if (value) this.editorCtx.format(name, value)
+    else this.editorCtx.format(name)
+  },
+  onInsertImage() {
+    if (!this.editorCtx) return
+    this.editorCtx.getContents({
+      success: (res) => {
+        const count = ((res && res.html) || '').match(/<img\b/gi)
+        if (count && count.length >= 8) {
+          wx.showToast({ title: '最多 8 张图片', icon: 'none' })
+          return
+        }
+        this.pickArticleImage()
+      },
+      fail: () => this.pickArticleImage(),
+    })
+  },
+  pickArticleImage() {
+    wx.chooseImage({
+      count: 1,
+      sizeType: ['compressed'],
+      success: (res) => {
+        const path = (res.tempFilePaths || [])[0]
+        if (!path || !this.editorCtx) return
+        const finish = (filePath) => {
+          wx.getFileSystemManager().readFile({
+            filePath,
+            encoding: 'base64',
+            success: (file) => {
+              const dataUrl = `data:image/jpeg;base64,${file.data}`
+              if (dataUrl.length > 280000) {
+                wx.showToast({ title: '图片过大，请换一张', icon: 'none' })
+                return
+              }
+              if (!this._imgMap) this._imgMap = {}
+              this._imgMap[filePath] = dataUrl
+              this._imgMap[path] = dataUrl
+              this.editorCtx.insertImage({ src: filePath, width: '100%' })
+            },
+            fail: () => wx.showToast({ title: '图片读取失败', icon: 'none' }),
+          })
+        }
+        if (wx.compressImage) {
+          wx.compressImage({ src: path, quality: 40, success: (c) => finish(c.tempFilePath || path), fail: () => finish(path) })
+        } else {
+          finish(path)
+        }
+      },
+    })
+  },
+  readArticleHtml() {
+    if (!this.editorCtx) return Promise.resolve(String(this.data.detailBody || ''))
+    return new Promise((resolve) => {
+      this.editorCtx.getContents({
+        success: (res) => resolve((res && res.html) || ''),
+        fail: () => resolve(String(this.data.detailBody || '')),
+      })
+    })
+  },
   onToggleField(e) {
     const key = e.currentTarget.dataset.key
     if (key === 'name') return
@@ -338,10 +539,25 @@ Page({
     if (!label || fields.length >= 8 || fields.some((field) => field.label === label)) return
     this.setData({ ...fieldView(fields.concat({ key: `c${Date.now()}`, label, kind: 'text' })), fieldDraft: '' })
   },
-  onMode(e) { this.setData({ mode: e.currentTarget.dataset.id }) },
+  onMode(e) {
+    const mode = e.currentTarget.dataset.id
+    if (mode === 'online') {
+      this.setData({ mode: 'online', city: '全国', cityNational: true, selectedCities: [], cityDisplay: '全国' })
+      return
+    }
+    const wasNational = this.data.cityNational || this.data.city === '全国'
+    this.setData({
+      mode: 'offline',
+      cityNational: wasNational ? false : this.data.cityNational,
+      selectedCities: wasNational ? [] : this.data.selectedCities,
+      city: wasNational ? '' : this.data.city,
+      cityDisplay: wasNational ? '' : this.data.cityDisplay,
+    })
+  },
   noop() {},
   onPoster(e) {
-    const key = e.currentTarget.dataset.key === 'posterMp' ? 'posterMp' : 'poster'
+    const asked = e.currentTarget.dataset.key
+    const key = asked === 'posterMp' ? 'posterMp' : asked === 'detailCover' ? 'detailCover' : 'poster'
     wx.chooseImage({
       count: 1,
       sizeType: ['compressed'],
@@ -387,7 +603,13 @@ Page({
       wx.showToast({ title: '请上传小程序宣传图', icon: 'none' })
       return
     }
-    if (!this.data.cityNational && !(this.data.selectedCities || []).length) {
+    if (this.data.mode === 'online') {
+      const live = String(this.data.liveUrl || '').trim()
+      if (!/^https?:\/\/\S+$/i.test(live)) {
+        wx.showToast({ title: '请填写直播间链接', icon: 'none' })
+        return
+      }
+    } else if (this.data.cityNational || this.data.city === '全国' || !(this.data.selectedCities || []).length) {
       wx.showToast({ title: '请选择城市', icon: 'none' })
       return
     }
@@ -417,8 +639,20 @@ Page({
     }
     wx.showLoading({ title: '提交中', mask: true })
     try {
-      if (this.data.editingId) await training.updateCourse(this.data)
-      else await training.createCourse(this.data)
+      const restored = restoreArticleImages(normalizeEditorHtml(await this.readArticleHtml()), this._imgMap)
+      if (restored.error) {
+        wx.hideLoading()
+        wx.showToast({ title: restored.error.slice(0, 18), icon: 'none' })
+        return
+      }
+      const input = Object.assign({}, this.data, {
+        detailBody: restored.html,
+        note: articlePlain(restored.html),
+        city: this.data.mode === 'online' ? '全国' : this.data.city,
+        liveUrl: this.data.mode === 'online' ? String(this.data.liveUrl || '').trim() : '',
+      })
+      if (this.data.editingId) await training.updateCourse(input)
+      else await training.createCourse(input)
       wx.hideLoading()
       wx.showToast({ title: '已提交审核', icon: 'success' })
       this.setData({ view: 'list', ...blankForm() })
