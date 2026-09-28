@@ -1,13 +1,9 @@
 const messagesStore = require('../../../utils/messagesStore.js')
 const { prepareMineSubPage } = require('../../../utils/pageIdentityChrome.js')
-const ops = require('../../../utils/opsRegistryTalentMp.js')
-const api = require('../../../utils/api.js')
-const talentMember = require('../../../utils/talentMember.js')
-const userProfile = require('../../../utils/userProfile.js')
 const inboxNoticeState = require('../../../utils/inboxNoticeState.js')
 const inboxCatalog = require('../../../utils/inboxNoticeCatalog.js')
 const talentInboxMatch = require('../../../utils/talentInboxMatch.js')
-const appRegistrySync = require('../../../utils/applicationsRegistrySync.js')
+const ntfPage = require('../../../utils/notificationInboxPage.js')
 
 const TABS = [
   { id: 'all', label: '全部' },
@@ -23,10 +19,6 @@ const SECTION_META = {
   order: { title: '订单通知' },
   business: { title: '业务通知' },
   system: { title: '系统通知' },
-}
-
-function enrichAll(rows) {
-  return (rows || []).map((r) => inboxCatalog.enrichNoticeRow(inboxNoticeState.enrichRow(r)))
 }
 
 function buildSections(rows, activeTab) {
@@ -76,20 +68,7 @@ Page({
     wx.stopPullDownRefresh()
   },
   async loadRows() {
-    let rows = enrichAll(messagesStore.readNotifications())
-    if (userProfile.readIdentity() === 'talent' && api.hasApi()) {
-      try {
-        const member = talentMember.readMember()
-        if (member && (member.id || member.contact)) {
-          const reg = await appRegistrySync.fetchRegistryAndReconcileApplications({ includeLocalContext: true })
-          rows = enrichAll(messagesStore.mergeRegistryInboxForTalent(reg, member))
-        }
-      } catch (_) {
-        /* 使用本地通知 */
-      }
-    } else {
-      rows = enrichAll(inboxNoticeState.sortRows(rows))
-    }
+    const rows = await ntfPage.fetchNotificationRows()
     const pages = getCurrentPages()
     const mine = pages.length >= 2 ? pages[pages.length - 2] : null
     if (mine && typeof mine.refresh === 'function') mine.refresh()

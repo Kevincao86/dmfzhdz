@@ -5,8 +5,6 @@ const talentMember = require('./talentMember.js')
 const userProfile = require('./userProfile.js')
 const inboxNoticeState = require('./inboxNoticeState.js')
 const inboxCatalog = require('./inboxNoticeCatalog.js')
-const appRegistrySync = require('./applicationsRegistrySync.js')
-const registryProfileSync = require('./registryProfileSync.js')
 
 const TABS = [
   { id: 'all', label: '全部' },
@@ -59,17 +57,26 @@ function buildTabs(counts) {
   }))
 }
 
+function localNotificationRows() {
+  return enrichAll(inboxNoticeState.sortRows(messagesStore.readNotifications()))
+}
+
+/** 只拉本人站内信切片。大厅整包注册表留给报名回填，不挡消息列表。 */
 async function fetchNotificationRows() {
-  let rows = enrichAll(messagesStore.readNotifications())
+  let rows = localNotificationRows()
   if (userProfile.readIdentity() === 'talent' && api.hasApi()) {
     try {
-      await registryProfileSync.pullRegistryProfileAfterLogin()
       const member = talentMember.readMember()
       if (member && (member.id || member.contact)) {
-        const reg = await appRegistrySync.fetchRegistryAndReconcileApplications({
-          includeLocalContext: true,
-          skipCache: true,
-        })
+        const slice = await ops.fetchTalentInboxSlice()
+        const cached = ops.readRegistryCache() || {}
+        const reg = ops.mergeRegistryInboxSlice(
+          {
+            mpRecruitmentOrders: Array.isArray(cached.mpRecruitmentOrders) ? cached.mpRecruitmentOrders : [],
+            mpTalentInbox: Array.isArray(cached.mpTalentInbox) ? cached.mpTalentInbox : [],
+          },
+          slice,
+        )
         rows = enrichAll(messagesStore.mergeRegistryInboxForTalent(reg, member))
       }
     } catch (_) {
@@ -95,6 +102,7 @@ function patchFromRows(rows, activeTab) {
 module.exports = {
   TABS,
   buildSections,
+  localNotificationRows,
   fetchNotificationRows,
   patchFromRows,
 }

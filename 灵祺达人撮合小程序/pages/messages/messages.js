@@ -51,7 +51,9 @@ Page({
     recHeadBandStyle: '',
     recHeadInnerStyle: '',
     chatConfigured: api.hasApi(),
-    loading: true,
+    ntfLoading: true,
+    chatLoading: true,
+    groupLoading: true,
     refreshing: false,
     err: '',
     searchKeyword: '',
@@ -136,33 +138,64 @@ Page({
     }
   },
   async bootstrap() {
-    this.setData({ loading: !this.data.refreshing, err: '' })
-    try {
-      await this.loadNotifications()
-      if (chat.canChat()) {
-        await this.loadChatSessions()
-      } else {
-        this.setData({ chatConfigured: false, allSessions: [], sessions: [] })
-      }
-      if (api.hasApi()) {
-        await this.loadGroupSessions()
-      } else {
-        this.setData({ allGroupSessions: [], groupSessions: [] })
-      }
-      this.applySearch()
-      this.setData({ loading: false, refreshing: false }, () => {
-        void refreshMessagesTabBadge(this)
-      })
-      this._messagesBootstrapped = true
-    } catch (e) {
-      this.setData({
-        loading: false,
-        refreshing: false,
-        err: String(e && e.message ? e.message : e).slice(0, 120) || '加载失败',
-      })
+    const refreshing = !!this.data.refreshing
+    this.setData({
+      ntfLoading: !refreshing,
+      chatLoading: !refreshing,
+      groupLoading: !refreshing,
+      err: '',
+    })
+    const tasks = [
+      this.loadNotifications()
+        .catch((e) => {
+          this.setData({
+            err: String(e && e.message ? e.message : e).slice(0, 120) || '加载失败',
+          })
+        })
+        .finally(() => {
+          this.setData({ ntfLoading: false, refreshing: false })
+        }),
+    ]
+    if (chat.canChat()) {
+      tasks.push(
+        this.loadChatSessions()
+          .then(() => {
+            if (this.data.msgTab === 'chat') this.applySearch()
+          })
+          .catch((e) => {
+            console.warn('[messages] loadChatSessions', e)
+          })
+          .finally(() => {
+            this.setData({ chatLoading: false })
+          }),
+      )
+    } else {
+      this.setData({ chatConfigured: false, allSessions: [], sessions: [], chatLoading: false })
     }
+    if (api.hasApi()) {
+      tasks.push(
+        this.loadGroupSessions()
+          .then(() => {
+            if (this.data.msgTab === 'group') this.applySearch()
+          })
+          .finally(() => {
+            this.setData({ groupLoading: false })
+          }),
+      )
+    } else {
+      this.setData({ allGroupSessions: [], groupSessions: [], groupLoading: false })
+    }
+    await Promise.all(tasks)
+    this.applySearch()
+    this._messagesBootstrapped = true
+    void refreshMessagesTabBadge(this)
   },
   async loadNotifications() {
+    const local = ntfPage.localNotificationRows()
+    if (local.length) {
+      this.reapplyNtfView(local)
+      this.setData({ ntfLoading: false })
+    }
     const rows = await ntfPage.fetchNotificationRows()
     this.reapplyNtfView(rows)
   },
