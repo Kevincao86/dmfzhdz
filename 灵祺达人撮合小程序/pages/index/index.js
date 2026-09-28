@@ -216,7 +216,6 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
   },
   onShow() {
     mpShare.enableShareMenu()
-    mpShare.preloadShareCover()
     setTabBarForPage(this, '/pages/index/index')
     applyNavLayout(this)
     identityTheme.applyTabHomeChrome()
@@ -230,9 +229,9 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
       this._lastHallIdentity = identity
     }
     const hasRows = Array.isArray(this.data.displayRows) && this.data.displayRows.length > 0
-    const fresh = this._lastHallLoadedAt && Date.now() - this._lastHallLoadedAt < 45000
-    if (hasRows && fresh && !identityChanged) {
+    if (hasRows && !identityChanged) {
       this.setData(patch)
+      void loadHallList(this)
       return
     }
     this.setData({ ...patch, loading: !hasRows, err: '' })
@@ -248,13 +247,14 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
         this.setData({
           loading: false,
           err: '加载异常，请下拉刷新',
-          displayRows: [],
+          displayRows: hasRows ? this.data.displayRows : [],
         })
         this.applyFilters()
       })
-      .finally(() => {
-        void this.tryShowInboxPopup()
-      })
+    if (!this._inboxPopupShown) {
+      this._inboxPopupShown = true
+      void this.tryShowInboxPopup()
+    }
   },
   async tryShowInboxPopup() {
     void this.loadDecorBanner()
@@ -453,7 +453,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     wx.previewImage({ urls: [url], current: url })
   },
   onPullDownRefresh() {
-    loadHallList(this)
+    loadHallList(this, { force: true })
       .catch(() => {})
       .finally(() => {
         wx.stopPullDownRefresh()

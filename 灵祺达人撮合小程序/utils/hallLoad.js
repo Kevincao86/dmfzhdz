@@ -1,6 +1,3 @@
-/**
- * 首页招募大厅加载：优先轻量 ECS，失败才用本地缓存
- */
 const api = require('./api.js')
 const { showDemoOrders } = require('./mpDemoMode.js')
 const ops = require('./opsRegistryTalentMp.js')
@@ -10,6 +7,18 @@ const hallFilters = require('./recruitmentHallFilters.js')
 const orderCard = require('./recruitmentOrderCard.js')
 const hallIdentity = require('./hallIdentityBuckets.js')
 const userProfile = require('./userProfile.js')
+
+/** 切 Tab 直接用这份内存，不挡渲染 */
+const TAB_FRESH_MS = 5 * 60 * 1000
+
+const mem = {
+  hall: null,
+  hallAt: 0,
+  rec: null,
+  recAt: 0,
+  hallInflight: null,
+  recInflight: null,
+}
 
 function errHint(msg) {
   const m = String(msg || '')
@@ -44,11 +53,74 @@ function mapRegistryToRows(reg, identity) {
   }
 }
 
+function remember(reg, recommendPool) {
+  if (!reg) return
+  const now = Date.now()
+  if (recommendPool) {
+    mem.rec = reg
+    mem.recAt = now
+  } else {
+    mem.hall = reg
+    mem.hallAt = now
+  }
+}
+
+function peekRegistry(recommendPool) {
+  const data = recommendPool ? mem.rec : mem.hall
+  const at = recommendPool ? mem.recAt : mem.hallAt
+  if (data && Date.now() - at < TAB_FRESH_MS) {
+    return { data, fresh: true }
+  }
+  const disk = registryCache.load({ allowStale: true, recommendPool: !!recommendPool })
+  if (disk && disk.data) {
+    remember(disk.data, recommendPool)
+    return { data: disk.data, fresh: disk.stale !== true }
+  }
+  return null
+}
+
+function warmupHallRegistry(opts) {
+  const recommendPool = !!(opts && opts.includeRecommendPool)
+  const existing = recommendPool ? mem.recInflight : mem.hallInflight
+  if (existing) return existing
+  const task = ops
+    .fetchRegistry(opts || {})
+    .then((reg) => {
+      remember(reg, recommendPool)
+      return reg
+    })
+    .finally(() => {
+      if (recommendPool) mem.recInflight = null
+      else mem.hallInflight = null
+    })
+  if (recommendPool) mem.recInflight = task
+  else mem.hallInflight = task
+  return task
+}
+
+async function resolveHallRegistry(opts) {
+  const force = !!(opts && opts.force)
+  const recommendPool = !!(opts && opts.includeRecommendPool)
+  if (!force) {
+    const hit = peekRegistry(recommendPool)
+    if (hit && hit.fresh) return hit.data
+    if (hit) {
+      void warmupHallRegistry(opts)
+      return hit.data
+    }
+  }
+  return warmupHallRegistry(opts)
+}
+
 /**
  * @param {WechatMiniprogram.Page.Instance} page
+ * @param {{ force?: boolean }} [opts]
  */
-async function loadHallList(page) {
+async function loadHallList(page, opts) {
+  const force = !!(opts && opts.force)
   const seq = (page._hallLoadSeq = (page._hallLoadSeq || 0) + 1)
+  const identity = userProfile.readIdentity()
+  const hasRows = Array.isArray(page.data.displayRows) && page.data.displayRows.length > 0
 
   const finish = (patch) => {
     if (page._hallLoadSeq !== seq) return
@@ -67,9 +139,14 @@ async function loadHallList(page) {
     if (typeof page.applyFilters === 'function') page.applyFilters()
   }
 
-  const applyRows = (patch) => {
-    if (page._hallLoadSeq !== seq) return
-    page.setData({ loading: false, err: '', ...patch })
+  const applyRows = (reg) => {
+    if (page._hallLoadSeq !== seq || !reg) return
+    if (!force && page._lastHallRegistry === reg && hasRows && page._lastHallMappedIdentity === identity) {
+      return
+    }
+    page._lastHallRegistry = reg
+    page._lastHallMappedIdentity = identity
+    page.setData({ loading: false, err: '', ...mapRegistryToRows(reg, identity) })
     if (typeof page.applyFilters === 'function') page.applyFilters()
   }
 
@@ -84,34 +161,38 @@ async function loadHallList(page) {
     return
   }
 
-  page.setData({ loading: true, err: '' })
-
-  const cached = registryCache.load({ allowStale: true })
-  if (cached && cached.data && (cached.data.mpRecruitmentOrders || []).length) {
-    try {
-      page._lastHallRegistry = cached.data
-      applyRows(mapRegistryToRows(cached.data))
-    } catch (e) {
-      console.warn('[hallLoad] stale cache render failed', e)
+  const cached = peekRegistry(false)
+  if (cached && cached.data) {
+    applyRows(cached.data)
+    if (!force && cached.fresh) return
+    if (!force) {
+      void warmupHallRegistry()
+        .then((reg) => applyRows(reg))
+        .catch(() => {})
+      return
     }
+  } else if (!hasRows) {
+    page.setData({ loading: true, err: '' })
   }
 
   try {
-    const reg = await ops.fetchRegistry()
-    if (page._hallLoadSeq !== seq) return
-    page._lastHallRegistry = reg
-    applyRows(mapRegistryToRows(reg))
+    const reg = await resolveHallRegistry({ force })
+    applyRows(reg)
   } catch (e) {
     if (page._hallLoadSeq !== seq) return
-    const stale = registryCache.load({ allowStale: true })
-    if (stale && stale.data && (stale.data.mpRecruitmentOrders || []).length) {
-      try {
-        applyRows(mapRegistryToRows(stale.data))
-        return
-      } catch (_) {}
+    const stale = peekRegistry(false)
+    if (stale && stale.data) {
+      applyRows(stale.data)
+      return
     }
     finish({ err: errHint(e && e.message ? e.message : e) })
   }
 }
 
-module.exports = { loadHallList, mapRegistryToRows }
+module.exports = {
+  loadHallList,
+  mapRegistryToRows,
+  warmupHallRegistry,
+  resolveHallRegistry,
+  peekRegistry,
+}

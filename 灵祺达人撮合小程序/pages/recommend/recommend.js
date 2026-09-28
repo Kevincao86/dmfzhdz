@@ -2,7 +2,7 @@ const auth = require('../../utils/auth.js')
 const config = require('../../utils/config.js')
 const { showDemoOrders } = require('../../utils/mpDemoMode.js')
 const api = require('../../utils/api.js')
-const ops = require('../../utils/opsRegistryTalentMp.js')
+const hallLoad = require('../../utils/hallLoad.js')
 const userProfile = require('../../utils/userProfile.js')
 const memberStore = require('../../utils/talentMember.js')
 const listFilters = require('../../utils/recruitmentListFilters.js')
@@ -722,16 +722,13 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     const mode = recommendPageMode.resolveRecommendPageMode()
     const hasRows = Array.isArray(this.data.displayRows) && this.data.displayRows.length > 0
     const modeKey = `${mode.identity}|${mode.isPrMode}|${mode.talentTestMode}`
-    const fresh =
-      this._lastRecommendLoadedAt &&
-      this._lastRecommendModeKey === modeKey &&
-      Date.now() - this._lastRecommendLoadedAt < 45000
-    if (hasRows && fresh) {
+    if (hasRows && this._lastRecommendModeKey === modeKey) {
       this.setData({
         identity: mode.identity,
         isPrMode: mode.isPrMode,
         talentTestMode: mode.talentTestMode,
       })
+      void this.loadOrderList({ silent: true })
       return
     }
     this.setData({
@@ -820,6 +817,60 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
   onUnload() {
     hallCountdownTick.stopHallCountdownTick(this)
   },
+  applyTalentRegistry(reg) {
+    if (!reg) return
+    const board = this.data.prBoard || 'talent'
+    this._boardPools = {
+      talent: prBoard.buildBoardPool(reg, 'talent'),
+      shoot: prBoard.buildBoardPool(reg, 'shoot'),
+      edit: prBoard.buildBoardPool(reg, 'edit'),
+    }
+    const pool = this._boardPools[board] || []
+    require('../../utils/recommendPoolVerify.js').logRecommendPoolParity(reg, board)
+    const prBoardOrderCount = prBoard.countPrOrdersForBoard(reg, board)
+    const eligible = recruitmentAi.listPrEligibleOrders(reg, { board })
+    const matchOptions = prMatchOrderSelect.buildPrMatchOrderOptions(eligible)
+    let matchOrderId = prMatchOrderSelect.readPrMatchOrderId(board)
+    if (
+      matchOrderId !== prMatchOrderSelect.PR_MATCH_RECENT &&
+      !matchOptions.some((o) => o.id === matchOrderId)
+    ) {
+      matchOrderId = prMatchOrderSelect.PR_MATCH_RECENT
+      prMatchOrderSelect.writePrMatchOrderId(board, matchOrderId)
+    }
+    const matchOrderIndex = Math.max(
+      0,
+      matchOptions.findIndex((o) => o.id === matchOrderId),
+    )
+    const prOrderCount = recruitmentAi.resolvePrRecentOrders(reg).length
+    const rowsForCity = [
+      ...this._boardPools.talent,
+      ...this._boardPools.shoot,
+      ...this._boardPools.edit,
+    ]
+    this.setData({
+      allRows: pool,
+      cityFilters: hallFilters.buildCityFilterOptions(rowsForCity),
+      prOrderCount,
+      prBoardOrderCount,
+      prMatchOrderId: matchOrderId,
+      prMatchOrderOptions: matchOptions,
+      prMatchOrderLabels: matchOptions.map((o) => o.label),
+      prMatchOrderIndex: matchOrderIndex,
+      prMatchOrderLabel: (matchOptions[matchOrderIndex] || matchOptions[0] || {}).label || '',
+      prMatchHint: prMatchOrderSelect.matchHintForSelection(
+        board,
+        matchOrderId,
+        matchOptions,
+        prBoardOrderCount,
+      ),
+      prSearchPlaceholder: prBoard.boardSearchPlaceholder(board),
+      registryCache: reg,
+      loading: false,
+      err: '',
+    })
+    this.applyTalentFilters()
+  },
   async loadTalentList() {
     if (this.data.prRecommendLocked) {
       this.setData({ loading: false, err: '', allRows: [], displayRows: [] })
@@ -836,70 +887,32 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
       })
       return
     }
-    this.setData({ loading: true, err: '' })
+    const hasRows = Array.isArray(this.data.displayRows) && this.data.displayRows.length > 0
+    if (!hasRows) this.setData({ loading: true, err: '' })
     try {
-      const reg = await ops.fetchRegistry({ includeRecommendPool: true })
-      const board = this.data.prBoard || 'talent'
-      this._boardPools = {
-        talent: prBoard.buildBoardPool(reg, 'talent'),
-        shoot: prBoard.buildBoardPool(reg, 'shoot'),
-        edit: prBoard.buildBoardPool(reg, 'edit'),
+      const cached = hallLoad.peekRegistry(true)
+      if (cached && cached.data) {
+        this.applyTalentRegistry(cached.data)
+        if (cached.fresh) {
+          if (userProfile.readIdentity() === 'pr') void this.refreshMutualChatKeys()
+          return
+        }
       }
-      const pool = this._boardPools[board] || []
-      require('../../utils/recommendPoolVerify.js').logRecommendPoolParity(reg, board)
-      const prBoardOrderCount = prBoard.countPrOrdersForBoard(reg, board)
-      const eligible = recruitmentAi.listPrEligibleOrders(reg, { board })
-      const matchOptions = prMatchOrderSelect.buildPrMatchOrderOptions(eligible)
-      let matchOrderId = prMatchOrderSelect.readPrMatchOrderId(board)
-      if (
-        matchOrderId !== prMatchOrderSelect.PR_MATCH_RECENT &&
-        !matchOptions.some((o) => o.id === matchOrderId)
-      ) {
-        matchOrderId = prMatchOrderSelect.PR_MATCH_RECENT
-        prMatchOrderSelect.writePrMatchOrderId(board, matchOrderId)
-      }
-      const matchOrderIndex = Math.max(
-        0,
-        matchOptions.findIndex((o) => o.id === matchOrderId),
-      )
-      const prOrderCount = recruitmentAi.resolvePrRecentOrders(reg).length
-      const rowsForCity = [
-        ...this._boardPools.talent,
-        ...this._boardPools.shoot,
-        ...this._boardPools.edit,
-      ]
-      this.setData({
-        allRows: pool,
-        cityFilters: hallFilters.buildCityFilterOptions(rowsForCity),
-        prOrderCount,
-        prBoardOrderCount,
-        prMatchOrderId: matchOrderId,
-        prMatchOrderOptions: matchOptions,
-        prMatchOrderLabels: matchOptions.map((o) => o.label),
-        prMatchOrderIndex: matchOrderIndex,
-        prMatchOrderLabel: (matchOptions[matchOrderIndex] || matchOptions[0] || {}).label || '',
-        prMatchHint: prMatchOrderSelect.matchHintForSelection(
-          board,
-          matchOrderId,
-          matchOptions,
-          prBoardOrderCount,
-        ),
-        prSearchPlaceholder: prBoard.boardSearchPlaceholder(board),
-        registryCache: reg,
-        loading: false,
-      })
+      const reg = await hallLoad.resolveHallRegistry({ includeRecommendPool: true })
+      this.applyTalentRegistry(reg)
       if (userProfile.readIdentity() === 'pr') await this.refreshMutualChatKeys()
-      this.applyTalentFilters()
     } catch (e) {
       this.setData({
         loading: false,
         err: String(e.message || e),
-        allRows: [],
-        displayRows: [MOCK_PREVIEW],
+        allRows: hasRows ? this.data.allRows : [],
+        displayRows: hasRows ? this.data.displayRows : [MOCK_PREVIEW],
       })
     }
   },
-  async loadOrderList() {
+  async loadOrderList(opts) {
+    const silent = !!(opts && opts.silent)
+    const force = !!(opts && opts.force)
     const mode = recommendPageMode.resolveRecommendPageMode()
     if (mode.isPrMode) {
       if (!this.data.isPrMode) {
@@ -920,9 +933,8 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
       this.safeApplyOrderFilters()
       return
     }
-    this.setData({ loading: true, err: '' })
-    try {
-      const reg = await ops.fetchRegistry()
+    const hasRows = Array.isArray(this.data.displayRows) && this.data.displayRows.length > 0
+    const applyOrderReg = (reg) => {
       const identity = userProfile.readIdentity()
       let rows = recommendHall.filterRecommendHallOrders(orderCard.loadAllOrderRows(reg), identity)
       if (allowDemo) {
@@ -934,15 +946,28 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
         allOrderRows: rows,
         cityFilters: hallFilters.buildCityFilterOptions(rows),
         loading: false,
+        err: '',
       })
       this._stripCacheKey = ''
       this._stripEnriched = null
       this.safeApplyOrderFilters()
+    }
+    if (!silent && !hasRows) this.setData({ loading: true, err: '' })
+    try {
+      const cached = hallLoad.peekRegistry(false)
+      if (cached && cached.data && !force) {
+        applyOrderReg(cached.data)
+        if (cached.fresh) return
+        void hallLoad.warmupHallRegistry().then((reg) => applyOrderReg(reg)).catch(() => {})
+        return
+      }
+      const reg = await hallLoad.resolveHallRegistry({ force })
+      applyOrderReg(reg)
     } catch (e) {
       this.setData({
         loading: false,
         err: String(e.message || e),
-        allOrderRows: allowDemo ? mocks : [],
+        allOrderRows: hasRows ? this.data.allOrderRows : allowDemo ? mocks : [],
       })
       this.safeApplyOrderFilters()
     }

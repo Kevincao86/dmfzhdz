@@ -22,12 +22,17 @@ function redirectIfPhoneBindRequired() {
 function runDeferredStartup() {
   if (isWelcomeRoute()) return
 
-  try {
-    const chatBadgeWatcher = require('./utils/chatBadgeWatcher.js')
-    chatBadgeWatcher.start()
-  } catch (e) {
-    console.warn('[mp] chatBadgeWatcher', e)
-  }
+    try {
+      const chatBadgeWatcher = require('./utils/chatBadgeWatcher.js')
+      chatBadgeWatcher.start()
+    } catch (e) {
+      console.warn('[mp] chatBadgeWatcher', e)
+    }
+    try {
+      require('./utils/hallLoad.js').warmupHallRegistry()
+    } catch (e) {
+      console.warn('[mp] warmupHallRegistry', e)
+    }
   try {
     const auth = require('./utils/auth.js')
     if (auth.isLoggedIn()) {
