@@ -166,6 +166,9 @@ type Course = {
   hostName: string
   mode: 'online' | 'offline'
   city: string
+  address?: string
+  contactName?: string
+  contactWay?: string
   whenText: string
   seats: number
   fee: string
@@ -194,6 +197,9 @@ export default function TrainingPage() {
   const [fee, setFee] = useState('')
   const [postMode, setPostMode] = useState<'online' | 'offline'>('online')
   const [postCity, setPostCity] = useState('')
+  const [venueAddress, setVenueAddress] = useState('')
+  const [projectContact, setProjectContact] = useState('')
+  const [projectContactWay, setProjectContactWay] = useState('')
   const [whenText, setWhenText] = useState('')
   const [seats, setSeats] = useState('20')
   const [note, setNote] = useState('')
@@ -405,6 +411,9 @@ export default function TrainingPage() {
     setFee('')
     setPostMode('online')
     setPostCity('')
+    setVenueAddress('')
+    setProjectContact('')
+    setProjectContactWay('')
     setCourseNational(false)
     setCourseCities([])
     setWhenText('')
@@ -430,6 +439,9 @@ export default function TrainingPage() {
     setPostMode(course.mode === 'offline' ? 'offline' : 'online')
     const parsedCity = parseLecturerCities(course.city || '')
     setPostCity(lecturerCityText(parsedCity.national, parsedCity.cities))
+    setVenueAddress(course.address || '')
+    setProjectContact(course.contactName || '')
+    setProjectContactWay(course.contactWay || '')
     setCourseNational(parsedCity.national)
     setCourseCities(parsedCity.cities)
     const parsedWhen = parseWhen(course.whenText || '')
@@ -530,6 +542,13 @@ export default function TrainingPage() {
                 {focusCourse.hostName} · {focusCourse.mode === 'offline' ? '线下' : '线上'}
                 {focusCourse.city ? ` · ${focusCourse.city}` : ''} {focusCourse.whenText ? ` · ${focusCourse.whenText}` : ''}
               </p>
+              {focusCourse.mode === 'offline' && (focusCourse.address || focusCourse.contactName || focusCourse.contactWay) ? (
+                <p className="mt-1 text-sm text-slate-600">
+                  {focusCourse.address || ''}
+                  {focusCourse.contactName ? `${focusCourse.address ? ' · ' : ''}${focusCourse.contactName}` : ''}
+                  {focusCourse.contactWay ? ` ${focusCourse.contactWay}` : ''}
+                </p>
+              ) : null}
             </div>
           </div>
           {focusCourse.note ? <p className="mt-3 text-sm text-slate-600">{focusCourse.note}</p> : null}
@@ -552,6 +571,7 @@ export default function TrainingPage() {
             <p className="xx-train-card__host">
               主讲：{c.hostName || '待定'} · {c.mode === 'online' ? '线上' : '线下'}
               {c.city ? ` · ${c.city}` : ''}
+              {c.mode === 'offline' && c.address ? ` · ${c.address}` : ''}
               {c.whenText ? ` · ${c.whenText}` : ''}
             </p>
             <p className="xx-train-card__meta">已报 {c.signupCount || 0}/{c.seats}</p>
@@ -609,6 +629,7 @@ export default function TrainingPage() {
                 <p className="mt-1 text-xs text-slate-500">
                   {c.mode === 'offline' ? '线下' : '线上'}
                   {c.city ? ` · ${c.city}` : ''}
+                  {c.mode === 'offline' && c.address ? ` · ${c.address}` : ''}
                   {c.whenText ? ` · ${c.whenText}` : ''} · ¥{c.fee || '0'} · {c.signupCount || 0}/{c.seats} 人
                 </p>
                 {c.reviewStatus === 'rejected' && c.reviewNote ? <p className="mt-1 text-xs text-red-600">{c.reviewNote}</p> : null}
@@ -669,6 +690,18 @@ export default function TrainingPage() {
                 setSheetErr('请选择城市')
                 return
               }
+              if (postMode === 'offline' && !venueAddress.trim()) {
+                setSheetErr('请填写具体地址')
+                return
+              }
+              if (postMode === 'offline' && !projectContact.trim()) {
+                setSheetErr('请填写项目联系人')
+                return
+              }
+              if (postMode === 'offline' && !projectContactWay.trim()) {
+                setSheetErr('请填写联系方式')
+                return
+              }
               if (!whenStartDate || !whenEndDate) {
                 setSheetErr('请选择上课日期')
                 return
@@ -690,6 +723,9 @@ export default function TrainingPage() {
                 fee,
                 mode: postMode,
                 city: postCity.trim(),
+                address: postMode === 'offline' ? venueAddress.trim() : '',
+                contactName: postMode === 'offline' ? projectContact.trim() : '',
+                contactWay: postMode === 'offline' ? projectContactWay.trim() : '',
                 whenText: formatWhen(whenStartDate, whenEndDate, whenStartTime, whenEndTime),
                 seats: Number(seats) || 1,
                 note: note.trim(),
@@ -763,6 +799,21 @@ export default function TrainingPage() {
                       {courseCityLabel}
                     </button>
                   </div>
+                  {postMode === 'offline' ? (
+                    <label className="block text-xs font-medium text-slate-500">具体地址
+                      <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" placeholder="门牌、楼层或教室" value={venueAddress} onChange={(e) => setVenueAddress(e.target.value)} />
+                    </label>
+                  ) : null}
+                  {postMode === 'offline' ? (
+                    <label className="block text-xs font-medium text-slate-500">项目联系人
+                      <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" placeholder="到场对接人" value={projectContact} onChange={(e) => setProjectContact(e.target.value)} />
+                    </label>
+                  ) : null}
+                  {postMode === 'offline' ? (
+                    <label className="block text-xs font-medium text-slate-500">联系方式
+                      <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" placeholder="手机号或微信" value={projectContactWay} onChange={(e) => setProjectContactWay(e.target.value)} />
+                    </label>
+                  ) : null}
                   <div className="block text-xs font-medium text-slate-500 sm:col-span-2">上课日期
                     <div className="mt-1 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
                       <input className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" type="date" value={whenStartDate} onChange={(e) => {

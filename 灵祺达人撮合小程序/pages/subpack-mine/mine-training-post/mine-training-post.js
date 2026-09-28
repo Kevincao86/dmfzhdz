@@ -62,6 +62,9 @@ function blankForm() {
     title: '',
     mode: 'offline',
     city: '',
+    address: '',
+    contactName: '',
+    contactWay: '',
     cityNational: false,
     selectedCities: [],
     cityDisplay: '',
@@ -196,6 +199,9 @@ Page({
       mode: course.mode === 'online' ? 'online' : 'offline',
       ...parseCity(course.city),
       city: course.city || '',
+      address: course.address || '',
+      contactName: course.contactName || '',
+      contactWay: course.contactWay || '',
       cityDisplay: cityLabel(parseCity(course.city).cityNational, parseCity(course.city).selectedCities),
       ...when,
       whenText: formatWhen(when.whenStartDate, when.whenEndDate, when.whenStartTime, when.whenEndTime) || course.whenText || '',
@@ -214,6 +220,9 @@ Page({
     this.loadMine()
   },
   onTitle(e) { this.setData({ title: e.detail.value }) },
+  onAddress(e) { this.setData({ address: e.detail.value }) },
+  onContactName(e) { this.setData({ contactName: e.detail.value }) },
+  onContactWay(e) { this.setData({ contactWay: e.detail.value }) },
   refreshCityUi(activeProvinceHint) {
     const hint = activeProvinceHint != null ? activeProvinceHint : this.data.cityActiveProvince
     const st = cityPicker.initModalState(this.data.cityKeyword, hint, this.data.selectedCities || [])
@@ -380,6 +389,18 @@ Page({
     }
     if (!this.data.cityNational && !(this.data.selectedCities || []).length) {
       wx.showToast({ title: '请选择城市', icon: 'none' })
+      return
+    }
+    if (this.data.mode === 'offline' && !String(this.data.address || '').trim()) {
+      wx.showToast({ title: '请填写具体地址', icon: 'none' })
+      return
+    }
+    if (this.data.mode === 'offline' && !String(this.data.contactName || '').trim()) {
+      wx.showToast({ title: '请填写项目联系人', icon: 'none' })
+      return
+    }
+    if (this.data.mode === 'offline' && !String(this.data.contactWay || '').trim()) {
+      wx.showToast({ title: '请填写联系方式', icon: 'none' })
       return
     }
     if (!this.data.whenStartDate || !this.data.whenEndDate) {

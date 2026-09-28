@@ -19,6 +19,9 @@ type Course = {
   hostId: string
   mode: 'online' | 'offline'
   city: string
+  address: string
+  contactName: string
+  contactWay: string
   whenText: string
   seats: number
   enrolled: number
@@ -194,6 +197,17 @@ async function ocrDoc(kind: string, imageDataUrl: string) {
 
 function clipText(value: unknown, max: number) {
   return String(value || '').trim().slice(0, max)
+}
+
+function offlinePlace(mode: 'online' | 'offline', body: Record<string, unknown>) {
+  const address = clipText(body.address, 120)
+  const contactName = clipText(body.contactName, 40)
+  const contactWay = clipText(body.contactWay, 40)
+  if (mode !== 'offline') return { address: '', contactName: '', contactWay: '' }
+  if (!address) return { error: '请填写具体地址' }
+  if (!contactName) return { error: '请填写项目联系人' }
+  if (!contactWay) return { error: '请填写联系方式' }
+  return { address, contactName, contactWay }
 }
 
 function publicCourse(course: Course) {
@@ -416,14 +430,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return
       }
     }
+    const mode = body.mode === 'offline' ? 'offline' : 'online'
+    const place = offlinePlace(mode, body)
+    if ('error' in place) {
+      res.status(400).json({ ok: false, error: place.error })
+      return
+    }
     const course: Course = {
       id: `tr-${Date.now()}`,
       title,
       hostName: String(body.hostName || '达人').trim() || '达人',
       hostRole: String(body.hostRole || 'talent'),
       hostId: String(body.hostId || ''),
-      mode: body.mode === 'offline' ? 'offline' : 'online',
+      mode,
       city: String(body.city || '').trim(),
+      address: place.address,
+      contactName: place.contactName,
+      contactWay: place.contactWay,
       whenText: String(body.whenText || '').trim(),
       seats: Math.max(1, Number(body.seats) || 1),
       enrolled: 0,
@@ -468,9 +491,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const poster = clipPoster(body.poster)
     const posterMp = clipPoster(body.posterMp)
     const taken = (course.signups || []).length
+    const mode = body.mode === 'offline' ? 'offline' : 'online'
+    const place = offlinePlace(mode, body)
+    if ('error' in place) {
+      res.status(400).json({ ok: false, error: place.error })
+      return
+    }
     course.title = title
-    course.mode = body.mode === 'offline' ? 'offline' : 'online'
+    course.mode = mode
     course.city = String(body.city || '').trim()
+    course.address = place.address
+    course.contactName = place.contactName
+    course.contactWay = place.contactWay
     course.whenText = String(body.whenText || '').trim()
     course.seats = Math.max(taken, Math.max(1, Number(body.seats) || 1))
     course.fee = String(body.fee || '').trim()

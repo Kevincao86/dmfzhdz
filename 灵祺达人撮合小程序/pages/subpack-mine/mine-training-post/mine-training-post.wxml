@@ -30,7 +30,7 @@
           <text class="tp-course__title">{{item.title}}</text>
           <text class="tp-status tp-status--{{item.statusKey}}">{{item.statusText}}</text>
         </view>
-        <text class="tp-course__meta">{{item.modeText}}{{item.city ? ' · ' + item.city : ''}}{{item.whenText ? ' · ' + item.whenText : ''}}</text>
+        <text class="tp-course__meta">{{item.modeText}}{{item.city ? ' · ' + item.city : ''}}{{item.address ? ' · ' + item.address : ''}}{{item.whenText ? ' · ' + item.whenText : ''}}</text>
         <text class="tp-course__meta">¥{{item.fee || '0'}} · {{item.signupCount || 0}}/{{item.seats}} 人</text>
         <text wx:if="{{item.reviewStatus === 'rejected' && item.reviewNote}}" class="tp-course__note">{{item.reviewNote}}</text>
         <view class="tp-actions">
@@ -79,6 +79,14 @@
         <text class="{{cityDisplay ? '' : 'tp-ph'}}">{{cityDisplay || '请选择城市'}}</text>
         <text class="tp-arrow">›</text>
       </view>
+      <block wx:if="{{mode === 'offline'}}">
+        <text class="tp-label">具体地址</text>
+        <input class="tp-input" placeholder="门牌、楼层或教室" value="{{address}}" bindinput="onAddress" />
+        <text class="tp-label">项目联系人</text>
+        <input class="tp-input" placeholder="到场对接人" value="{{contactName}}" bindinput="onContactName" />
+        <text class="tp-label">联系方式</text>
+        <input class="tp-input" placeholder="手机号或微信" value="{{contactWay}}" bindinput="onContactWay" />
+      </block>
       <text class="tp-label">上课日期</text>
       <view class="tp-when">
         <picker mode="date" value="{{whenStartDate}}" start="{{todayDate}}" bindchange="onWhenStartDate">
