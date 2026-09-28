@@ -177,6 +177,7 @@ type Course = {
   address?: string
   contactName?: string
   contactWay?: string
+  liveUrl?: string
   whenText: string
   seats: number
   fee: string
@@ -210,6 +211,7 @@ export default function TrainingPage() {
   const [venueAddress, setVenueAddress] = useState('')
   const [projectContact, setProjectContact] = useState('')
   const [projectContactWay, setProjectContactWay] = useState('')
+  const [liveUrl, setLiveUrl] = useState('')
   const [whenText, setWhenText] = useState('')
   const [seats, setSeats] = useState('20')
   const [note, setNote] = useState('')
@@ -417,11 +419,12 @@ export default function TrainingPage() {
     setTitle('')
     setFee('')
     setPostMode('online')
-    setPostCity('')
+    setPostCity('全国')
+    setLiveUrl('')
     setVenueAddress('')
     setProjectContact('')
     setProjectContactWay('')
-    setCourseNational(false)
+    setCourseNational(true)
     setCourseCities([])
     setWhenText('')
     setWhenStartDate('')
@@ -451,6 +454,7 @@ export default function TrainingPage() {
     setVenueAddress(course.address || '')
     setProjectContact(course.contactName || '')
     setProjectContactWay(course.contactWay || '')
+    setLiveUrl(course.liveUrl || '')
     setCourseNational(parsedCity.national)
     setCourseCities(parsedCity.cities)
     const parsedWhen = parseWhen(course.whenText || '')
@@ -555,8 +559,8 @@ export default function TrainingPage() {
             </div>
             <h2>{c.title}</h2>
             <p className="xx-train-card__host">
-              主讲：{c.hostName || '待定'} · {c.mode === 'online' ? '线上' : '线下'}
-              {c.city ? ` · ${c.city}` : ''}
+              主讲：{c.hostName || '待定'} · {c.mode === 'online' ? '线上 · 全国' : '线下'}
+              {c.mode === 'offline' && c.city ? ` · ${c.city}` : ''}
               {c.mode === 'offline' && c.address ? ` · ${c.address}` : ''}
               {c.whenText ? ` · ${c.whenText}` : ''}
             </p>
@@ -613,8 +617,7 @@ export default function TrainingPage() {
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-slate-500">
-                  {c.mode === 'offline' ? '线下' : '线上'}
-                  {c.city ? ` · ${c.city}` : ''}
+                  {c.mode === 'offline' ? `线下${c.city ? ` · ${c.city}` : ''}` : '线上 · 全国'}
                   {c.mode === 'offline' && c.address ? ` · ${c.address}` : ''}
                   {c.whenText ? ` · ${c.whenText}` : ''} · ¥{c.fee || '0'} · {c.signupCount || 0}/{c.seats} 人
                 </p>
@@ -662,9 +665,12 @@ export default function TrainingPage() {
               </div>
               <p className="text-sm text-slate-500">主讲 {detailCourse.hostName || '待定'} · 已报 {detailCourse.signupCount || 0}/{detailCourse.seats}</p>
               <div className="flex flex-wrap gap-2 text-xs">
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{detailCourse.mode === 'offline' ? '线下' : '线上'}{detailCourse.city ? ` · ${detailCourse.city}` : ''}</span>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{detailCourse.mode === 'offline' ? `线下${detailCourse.city ? ` · ${detailCourse.city}` : ''}` : '线上 · 全国'}</span>
                 {detailCourse.whenText ? <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{detailCourse.whenText}</span> : null}
               </div>
+              {detailCourse.mode !== 'offline' && /^https?:\/\/\S+$/i.test(detailCourse.liveUrl || '') ? (
+                <a className="inline-flex rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white" href={detailCourse.liveUrl} target="_blank" rel="noreferrer">进入直播间</a>
+              ) : null}
               {detailCourse.mode === 'offline' && (detailCourse.address || detailCourse.contactName || detailCourse.contactWay) ? (
                 <p className="text-sm leading-relaxed text-slate-600">{[detailCourse.address, detailCourse.contactName, detailCourse.contactWay].filter(Boolean).join(' · ')}</p>
               ) : null}
@@ -732,7 +738,12 @@ export default function TrainingPage() {
                 setSheetErr('请上传小程序宣传图')
                 return
               }
-              if (!postCity.trim()) {
+              if (postMode === 'online') {
+                if (!/^https?:\/\/\S+$/i.test(liveUrl.trim())) {
+                  setSheetErr('请填写可打开的直播间链接')
+                  return
+                }
+              } else if (!postCity.trim() || postCity === '全国') {
                 setSheetErr('请选择城市')
                 return
               }
@@ -768,10 +779,11 @@ export default function TrainingPage() {
                 title: title.trim(),
                 fee,
                 mode: postMode,
-                city: postCity.trim(),
+                city: postMode === 'online' ? '全国' : postCity.trim(),
                 address: postMode === 'offline' ? venueAddress.trim() : '',
                 contactName: postMode === 'offline' ? projectContact.trim() : '',
                 contactWay: postMode === 'offline' ? projectContactWay.trim() : '',
+                liveUrl: postMode === 'online' ? liveUrl.trim() : '',
                 whenText: formatWhen(whenStartDate, whenEndDate, whenStartTime, whenEndTime),
                 seats: Number(seats) || 1,
                 note: plainTextFromArticle(detailBody) || note.trim(),
@@ -848,15 +860,24 @@ export default function TrainingPage() {
                   <div className="sm:col-span-2">
                     <p className="text-xs font-medium text-slate-500">形式</p>
                     <div className="mt-1 grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
-                      <button type="button" className={`rounded-xl py-2 text-sm ${postMode === 'online' ? 'bg-white font-semibold text-violet-700 shadow-sm' : 'text-slate-500'}`} onClick={() => setPostMode('online')}>线上</button>
-                      <button type="button" className={`rounded-xl py-2 text-sm ${postMode === 'offline' ? 'bg-white font-semibold text-violet-700 shadow-sm' : 'text-slate-500'}`} onClick={() => setPostMode('offline')}>线下</button>
+                      <button type="button" className={`rounded-xl py-2 text-sm ${postMode === 'online' ? 'bg-white font-semibold text-violet-700 shadow-sm' : 'text-slate-500'}`} onClick={() => { setPostMode('online'); setPostCity('全国'); setCourseNational(true); setCourseCities([]) }}>线上</button>
+                      <button type="button" className={`rounded-xl py-2 text-sm ${postMode === 'offline' ? 'bg-white font-semibold text-violet-700 shadow-sm' : 'text-slate-500'}`} onClick={() => { setPostMode('offline'); if (!postCity.trim() || postCity === '全国') { setPostCity(''); setCourseNational(false); setCourseCities([]) } }}>线下</button>
                     </div>
                   </div>
                   <div className="block text-xs font-medium text-slate-500">城市
-                    <button type="button" className={`mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-left text-sm ${courseCityLabel === '请选择城市' ? 'text-slate-400' : 'text-slate-900'}`} onClick={openCourseCity}>
-                      {courseCityLabel}
-                    </button>
+                    {postMode === 'online' ? (
+                      <div className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900">全国</div>
+                    ) : (
+                      <button type="button" className={`mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-left text-sm ${courseCityLabel === '请选择城市' ? 'text-slate-400' : 'text-slate-900'}`} onClick={openCourseCity}>
+                        {courseCityLabel}
+                      </button>
+                    )}
                   </div>
+                  {postMode === 'online' ? (
+                    <label className="block text-xs font-medium text-slate-500 sm:col-span-2">直播间链接
+                      <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" placeholder="https:// 开头，打开课程详情可跳转进入" value={liveUrl} onChange={(e) => setLiveUrl(e.target.value)} />
+                    </label>
+                  ) : null}
                   {postMode === 'offline' ? (
                     <label className="block text-xs font-medium text-slate-500">具体地址
                       <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" placeholder="门牌、楼层或教室" value={venueAddress} onChange={(e) => setVenueAddress(e.target.value)} />

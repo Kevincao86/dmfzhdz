@@ -22,6 +22,7 @@ type Course = {
   address: string
   contactName: string
   contactWay: string
+  liveUrl: string
   whenText: string
   seats: number
   enrolled: number
@@ -292,6 +293,15 @@ function offlinePlace(mode: 'online' | 'offline', body: Record<string, unknown>)
   return { address, contactName, contactWay }
 }
 
+function readLiveUrl(mode: 'online' | 'offline', body: Record<string, unknown>) {
+  if (mode !== 'online') return { liveUrl: '' }
+  if (!('liveUrl' in body)) return { liveUrl: '' }
+  const liveUrl = clipText(body.liveUrl, 500)
+  if (!liveUrl) return { error: '请填写直播间链接' }
+  if (!/^https?:\/\/\S+$/i.test(liveUrl)) return { error: '直播间链接需要以 http:// 或 https:// 开头' }
+  return { liveUrl }
+}
+
 function publicCourse(course: Course) {
   return !course.reviewStatus || course.reviewStatus === 'approved'
 }
@@ -537,6 +547,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.status(400).json({ ok: false, error: place.error })
       return
     }
+    const live = readLiveUrl(mode, body)
+    if ('error' in live) {
+      res.status(400).json({ ok: false, error: live.error })
+      return
+    }
     const course: Course = {
       id: `tr-${Date.now()}`,
       title,
@@ -544,10 +559,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       hostRole: String(body.hostRole || 'talent'),
       hostId: String(body.hostId || ''),
       mode,
-      city: String(body.city || '').trim(),
+      city: mode === 'online' ? '全国' : String(body.city || '').trim(),
       address: place.address,
       contactName: place.contactName,
       contactWay: place.contactWay,
+      liveUrl: live.liveUrl,
       whenText: String(body.whenText || '').trim(),
       seats: Math.max(1, Number(body.seats) || 1),
       enrolled: 0,
@@ -606,12 +622,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.status(400).json({ ok: false, error: place.error })
       return
     }
+    const live = readLiveUrl(mode, body)
+    if ('error' in live) {
+      res.status(400).json({ ok: false, error: live.error })
+      return
+    }
     course.title = title
     course.mode = mode
-    course.city = String(body.city || '').trim()
+    course.city = mode === 'online' ? '全国' : String(body.city || '').trim()
     course.address = place.address
     course.contactName = place.contactName
     course.contactWay = place.contactWay
+    if (mode !== 'online') course.liveUrl = ''
+    else if ('liveUrl' in body) course.liveUrl = live.liveUrl
     course.whenText = String(body.whenText || '').trim()
     course.seats = Math.max(taken, Math.max(1, Number(body.seats) || 1))
     course.fee = String(body.fee || '').trim()
