@@ -182,6 +182,7 @@ type Course = {
   signupCount?: number
   poster?: string
   posterMp?: string
+  detailCover?: string
   note?: string
   signupFields?: SignupField[]
   reviewStatus?: 'pending' | 'approved' | 'rejected' | ''
@@ -240,6 +241,8 @@ export default function TrainingPage() {
   const [platformPicks, setPlatformPicks] = useState<string[]>([])
   const [poster, setPoster] = useState('')
   const [posterMp, setPosterMp] = useState('')
+  const [detailCover, setDetailCover] = useState('')
+  const [detailCourse, setDetailCourse] = useState<Course | null>(null)
   const [signupFields, setSignupFields] = useState<SignupField[]>(DEFAULT_FIELDS)
   const [fieldDraft, setFieldDraft] = useState('')
   const [sheetErr, setSheetErr] = useState('')
@@ -299,7 +302,9 @@ export default function TrainingPage() {
   useEffect(() => {
     if (!focusCourseId) return
     document.getElementById(`train-${focusCourseId}`)?.scrollIntoView({ block: 'center' })
-  }, [focusCourseId, courses])
+    const found = courses.find((c) => c.id === focusCourseId) || mine.find((c) => c.id === focusCourseId)
+    if (found) setDetailCourse(found)
+  }, [focusCourseId, courses, mine])
 
   useEffect(() => {
     if (!payTrade) return
@@ -331,7 +336,6 @@ export default function TrainingPage() {
     if (mode === 'offline' && !courseMatchesCity(c.city, offlineCity)) return false
     return true
   })
-  const focusCourse = shown.find((c) => c.id === focusCourseId) || upcoming.find((c) => c.id === focusCourseId) || null
   function openCoursePay(course: Course) {
     if (me?.accountId && course.hostId && course.hostId === me.accountId) {
       setErr('不能报名自己发布的课程')
@@ -425,6 +429,7 @@ export default function TrainingPage() {
     setNote('')
     setPoster('')
     setPosterMp('')
+    setDetailCover('')
     setSignupFields(DEFAULT_FIELDS.map((field) => ({ ...field })))
     setFieldDraft('')
     setErr('')
@@ -454,6 +459,7 @@ export default function TrainingPage() {
     setNote(course.note || '')
     setPoster(course.poster || '')
     setPosterMp(course.posterMp || '')
+    setDetailCover(course.detailCover || '')
     setSignupFields(fieldsOf(course.signupFields))
     setFieldDraft('')
     setErr('')
@@ -528,42 +534,17 @@ export default function TrainingPage() {
         </div>
       ) : null}
       {err && !editorOpen && !panel && !payOpen ? <p className="text-sm text-red-600">{err}</p> : null}
-      {!mineMode && focusCourse ? (
-        <article className="rounded-2xl border border-violet-300 bg-white p-4">
-          <div className="flex gap-3">
-            {focusCourse.poster ? (
-              <img src={focusCourse.poster} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
-            ) : (
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-xs text-violet-700">课</div>
-            )}
-            <div>
-              <h2 className="font-semibold text-slate-900">{focusCourse.title}</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                {focusCourse.hostName} · {focusCourse.mode === 'offline' ? '线下' : '线上'}
-                {focusCourse.city ? ` · ${focusCourse.city}` : ''} {focusCourse.whenText ? ` · ${focusCourse.whenText}` : ''}
-              </p>
-              {focusCourse.mode === 'offline' && (focusCourse.address || focusCourse.contactName || focusCourse.contactWay) ? (
-                <p className="mt-1 text-sm text-slate-600">
-                  {focusCourse.address || ''}
-                  {focusCourse.contactName ? `${focusCourse.address ? ' · ' : ''}${focusCourse.contactName}` : ''}
-                  {focusCourse.contactWay ? ` ${focusCourse.contactWay}` : ''}
-                </p>
-              ) : null}
-            </div>
-          </div>
-          {focusCourse.note ? <p className="mt-3 text-sm text-slate-600">{focusCourse.note}</p> : null}
-          {me?.accountId && focusCourse.hostId === me.accountId ? (
-            <p className="mt-3 text-sm text-amber-700">这是你发布的课程，不能报名自己的课。其他人发布的课程可以报名。</p>
-          ) : (
-            <button type="button" className="mt-3 rounded-xl bg-violet-600 px-3 py-2 text-sm text-white" onClick={() => openCoursePay(focusCourse)}>
-              查看并报名
-            </button>
-          )}
-        </article>
-      ) : null}
       {!mineMode ? <div className="xx-train-grid">
         {shown.map((c) => (
-          <article id={`train-${c.id}`} key={c.id} className={`xx-train-card ${focusCourseId === c.id ? 'xx-train-card--on' : ''}`}>
+          <article
+            id={`train-${c.id}`}
+            key={c.id}
+            role="button"
+            tabIndex={0}
+            className={`xx-train-card cursor-pointer ${focusCourseId === c.id ? 'xx-train-card--on' : ''}`}
+            onClick={() => setDetailCourse(c)}
+            onKeyDown={(e) => { if (e.key === 'Enter') setDetailCourse(c) }}
+          >
             <div className="xx-train-card__poster">
               {c.poster ? <img src={c.poster} alt="" /> : <span>课</span>}
             </div>
@@ -580,7 +561,7 @@ export default function TrainingPage() {
               {me?.accountId && c.hostId === me.accountId ? (
                 <span>本人课程</span>
               ) : (
-                <button type="button" onClick={() => openCoursePay(c)}>报名</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); openCoursePay(c) }}>报名</button>
               )}
             </div>
           </article>
@@ -613,7 +594,7 @@ export default function TrainingPage() {
         {publishGate() ? <p className="mt-3 text-xs text-slate-500">{publishGate()}</p> : null}
         <div className="mt-4 space-y-3">
           {mine.map((c) => (
-            <article key={c.id} className="flex gap-3 rounded-2xl bg-slate-50 p-3">
+            <article key={c.id} role="button" tabIndex={0} className="flex cursor-pointer gap-3 rounded-2xl bg-slate-50 p-3" onClick={() => setDetailCourse(c)} onKeyDown={(e) => { if (e.key === 'Enter') setDetailCourse(c) }}>
               {c.poster ? (
                 <img src={c.poster} alt="" className="h-24 w-16 shrink-0 rounded-xl object-cover" />
               ) : (
@@ -634,13 +615,14 @@ export default function TrainingPage() {
                 </p>
                 {c.reviewStatus === 'rejected' && c.reviewNote ? <p className="mt-1 text-xs text-red-600">{c.reviewNote}</p> : null}
                 <div className="mt-2 flex items-center justify-between">
-                  <button type="button" className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-violet-700" onClick={() => openEdit(c)}>
+                  <button type="button" className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-violet-700" onClick={(e) => { e.stopPropagation(); setDetailCourse(null); openEdit(c) }}>
                     编辑
                   </button>
                   <button
                     type="button"
                     className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-red-600"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation()
                       if (!window.confirm(`删除「${c.title}」？删除后首页不再展示。`)) return
                       setErr('')
                       postTraining({ action: 'delete', id: c.id, hostId: me?.accountId || '' })
@@ -657,10 +639,49 @@ export default function TrainingPage() {
           {!mine.length ? <p className="py-6 text-center text-sm text-slate-400">还没有发布培训</p> : null}
         </div>
       </section> : null}
+      {detailCourse ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-6" onClick={() => setDetailCourse(null)}>
+          <div className="flex max-h-[min(94vh,860px)] w-full max-w-3xl flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
+            <div className="relative aspect-video bg-slate-100">
+              {(detailCourse.detailCover || detailCourse.poster) ? (
+                <img src={detailCourse.detailCover || detailCourse.poster} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full items-center justify-center text-sm text-slate-400">还没有详情封面</div>
+              )}
+              <button type="button" className="absolute right-3 top-3 rounded-full bg-white/90 px-3 py-1 text-sm text-slate-700" onClick={() => setDetailCourse(null)}>关闭</button>
+            </div>
+            <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
+              <div className="flex items-start justify-between gap-4">
+                <h2 className="text-2xl font-bold text-slate-900">{detailCourse.title}</h2>
+                <p className="shrink-0 text-xl font-semibold text-slate-900">¥{detailCourse.fee || '0'}</p>
+              </div>
+              <p className="text-sm text-slate-500">主讲 {detailCourse.hostName || '待定'} · 已报 {detailCourse.signupCount || 0}/{detailCourse.seats}</p>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{detailCourse.mode === 'offline' ? '线下' : '线上'}{detailCourse.city ? ` · ${detailCourse.city}` : ''}</span>
+                {detailCourse.whenText ? <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{detailCourse.whenText}</span> : null}
+              </div>
+              {detailCourse.mode === 'offline' && (detailCourse.address || detailCourse.contactName || detailCourse.contactWay) ? (
+                <p className="text-sm leading-relaxed text-slate-600">{[detailCourse.address, detailCourse.contactName, detailCourse.contactWay].filter(Boolean).join(' · ')}</p>
+              ) : null}
+              <section>
+                <h3 className="text-sm font-semibold text-slate-900">课程介绍</h3>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-600">{detailCourse.note || '讲师还没有写课程介绍。'}</p>
+              </section>
+            </div>
+            <div className="flex gap-2 border-t border-slate-100 px-6 py-4">
+              {me?.accountId && detailCourse.hostId === me.accountId ? (
+                <button type="button" className="flex-1 rounded-xl bg-slate-900 py-2.5 text-sm font-semibold text-white" onClick={() => { const course = detailCourse; setDetailCourse(null); openEdit(course) }}>编辑课程</button>
+              ) : (
+                <button type="button" className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-semibold text-white" onClick={() => { const course = detailCourse; setDetailCourse(null); openCoursePay(course) }}>报名</button>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
       {editorOpen ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-6" onClick={() => setEditorOpen(false)}>
           <form
-            className="flex max-h-[min(94vh,880px)] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl"
+            className="flex max-h-[min(94vh,880px)] w-full max-w-5xl flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl"
             onClick={(e) => e.stopPropagation()}
             onSubmit={(e) => {
               e.preventDefault()
@@ -750,6 +771,7 @@ export default function TrainingPage() {
                 note: note.trim(),
                 poster,
                 posterMp,
+                detailCover,
                 signupFields,
                 hostId: submitHostId,
                 hostName: me?.wxNickName || me?.loginName || '达人',
@@ -766,13 +788,34 @@ export default function TrainingPage() {
           >
             <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
               <div>
-                <p className="text-xs font-semibold tracking-wide text-violet-600">本地生活培训</p>
-                <h2 className="mt-1 text-xl font-bold text-slate-900">{editingId ? '编辑培训' : '新增培训'}</h2>
-                <p className="mt-1 text-sm text-slate-500">保存后重新审核。通过前不会出现在首页广告栏。</p>
+                <p className="text-xs font-semibold tracking-wide text-violet-600">课程编辑</p>
+                <h2 className="mt-1 text-xl font-bold text-slate-900">{editingId ? '编辑课程' : '新建课程'}</h2>
+                <p className="mt-1 text-sm text-slate-500">封面显示在课程详情页顶部。保存后重新审核。</p>
               </div>
               <button type="button" className="rounded-full px-2 text-xl leading-none text-slate-400" onClick={() => setEditorOpen(false)} aria-label="关闭">×</button>
             </div>
             <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
+              <section className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+                <label className="relative flex aspect-video cursor-pointer items-center justify-center overflow-hidden rounded-2xl border border-dashed border-slate-300 bg-slate-50">
+                  {detailCover || poster ? <img src={detailCover || poster} alt="" className="absolute inset-0 h-full w-full object-cover" /> : null}
+                  <span className={`relative text-sm font-medium ${detailCover || poster ? 'rounded-full bg-slate-900/70 px-3 py-1 text-white' : 'text-slate-600'}`}>{detailCover ? '更换详情封面' : '上传详情封面'}</span>
+                  <input className="sr-only" type="file" accept="image/*" onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    e.target.value = ''
+                    if (!file) return
+                    compressImageFile(file).then((url) => setDetailCover(url)).catch((ex) => setSheetErr(ex instanceof Error ? ex.message : '封面处理失败'))
+                  }} />
+                </label>
+                <div className="flex flex-col justify-center gap-3">
+                  <label className="block text-xs font-medium text-slate-500">课程名称
+                    <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" placeholder="如：宁波探店口播训练营" value={title} onChange={(e) => setTitle(e.target.value)} />
+                  </label>
+                  <label className="block text-xs font-medium text-slate-500">课程介绍
+                    <textarea className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" rows={5} placeholder="这门课解决什么问题，适合谁来学" value={note} onChange={(e) => setNote(e.target.value)} />
+                  </label>
+                  <p className="text-xs leading-relaxed text-slate-400">封面建议 16:9，例如 1500×844。不传则用星选宣传图。</p>
+                </div>
+              </section>
               <section>
                 <h3 className="text-sm font-semibold text-slate-900">宣传图</h3>
                 <p className="mt-1 text-xs leading-relaxed text-slate-500">星选和小程序各传一张，尺寸分开。两张都要传。</p>
@@ -804,9 +847,6 @@ export default function TrainingPage() {
               <section>
                 <h3 className="text-sm font-semibold text-slate-900">课程信息</h3>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <label className="block text-xs font-medium text-slate-500 sm:col-span-2">课程名称
-                    <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" placeholder="如：宁波探店口播训练营" value={title} onChange={(e) => setTitle(e.target.value)} />
-                  </label>
                   <div className="sm:col-span-2">
                     <p className="text-xs font-medium text-slate-500">形式</p>
                     <div className="mt-1 grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
@@ -862,9 +902,6 @@ export default function TrainingPage() {
                   </label>
                   <label className="block text-xs font-medium text-slate-500">名额
                     <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" value={seats} onChange={(e) => setSeats(e.target.value)} />
-                  </label>
-                  <label className="block text-xs font-medium text-slate-500 sm:col-span-2">课程说明
-                    <textarea className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:bg-white" rows={3} placeholder="这门课解决什么接单问题" value={note} onChange={(e) => setNote(e.target.value)} />
                   </label>
                 </div>
               </section>

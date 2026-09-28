@@ -28,6 +28,7 @@ type Course = {
   fee: string
   poster: string
   posterMp: string
+  detailCover: string
   note: string
   signupFields: SignupField[]
   reviewStatus: 'pending' | 'approved' | 'rejected'
@@ -414,6 +415,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const title = String(body.title || '').trim()
     const poster = clipPoster(body.poster)
     const posterMp = clipPoster(body.posterMp)
+    const detailCover = clipPoster(body.detailCover)
     if (!title) {
       res.status(400).json({ ok: false, error: '请填写课程名称' })
       return
@@ -466,6 +468,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       fee: String(body.fee || '').trim(),
       poster,
       posterMp,
+      detailCover,
       note: String(body.note || '').trim(),
       signupFields: normalizeSignupFields(body.signupFields),
       reviewStatus: 'pending',
@@ -503,6 +506,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     const poster = clipPoster(body.poster)
     const posterMp = clipPoster(body.posterMp)
+    const detailCover = clipPoster(body.detailCover)
     const taken = (course.signups || []).length
     const mode = body.mode === 'offline' ? 'offline' : 'online'
     const place = offlinePlace(mode, body)
@@ -523,6 +527,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     course.signupFields = normalizeSignupFields(body.signupFields)
     if (poster) course.poster = poster
     if (posterMp) course.posterMp = posterMp
+    if ('detailCover' in body) course.detailCover = detailCover
     course.reviewStatus = 'pending'
     course.reviewNote = ''
     writeStore(store)
