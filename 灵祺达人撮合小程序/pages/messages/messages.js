@@ -294,7 +294,7 @@ Page({
     if (!row) return
     if (!row.read) {
       messagesStore.markNotificationsRead([row.id])
-      messagesStore.markInboxSeen([row.id])
+      messagesStore.rememberInboxRows([row])
       const rows = (this._ntfRows || []).map((r) =>
         r.id === id ? this.enrichNtfRow({ ...r, read: true }) : r
       )
@@ -343,7 +343,7 @@ Page({
       wx.showToast({ title: '暂无未读消息', icon: 'none' })
       return
     }
-    messagesStore.markAllNotificationsRead()
+    messagesStore.markAllNotificationsRead(rows)
     wx.showToast({ title: '已全部标为已读', icon: 'success' })
     const next = rows.map((r) => this.enrichNtfRow({ ...r, read: true }))
     this.reapplyNtfView(next)

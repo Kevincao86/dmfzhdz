@@ -217,7 +217,13 @@ function applyRemoteState(state) {
     writeJson(msgKey, state.messages.slice(0, 100))
   }
   if (Array.isArray(state.inboxSeen)) {
-    writeJson(inboxKey, state.inboxSeen.slice(-500))
+    const local = readJson(inboxKey, [])
+    const merged = new Set(
+      [...(Array.isArray(local) ? local : []), ...state.inboxSeen]
+        .map((id) => String(id || '').trim())
+        .filter(Boolean),
+    )
+    writeJson(inboxKey, [...merged].slice(-500))
   }
   if (state.selectionHandled && typeof state.selectionHandled === 'object') {
     inboxNoticeState.applyHandledMapFromSync(state.selectionHandled)

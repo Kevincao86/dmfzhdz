@@ -19,7 +19,7 @@ Page({
     this.setData({ row })
     if (!row.read) {
       messagesStore.markNotificationsRead([row.id])
-      messagesStore.markInboxSeen([row.id])
+      messagesStore.rememberInboxRows([row])
     }
   },
   onUnload() {
@@ -40,7 +40,7 @@ Page({
     const row = this.data.row
     if (!row || !action) return
     inboxNoticeState.markHandled(row, action)
-    messagesStore.markInboxSeen([row.id])
+    messagesStore.rememberInboxRows([row])
     wx.showToast({
       title: action === 'joined' ? '已标记入群' : '已确认',
       icon: 'success',

@@ -211,11 +211,49 @@ function readInboxSeenSet() {
 
 function markInboxSeen(ids) {
   const set = readInboxSeenSet()
-  for (const id of ids || []) set.add(String(id))
+  for (const id of ids || []) {
+    const key = String(id || '').trim()
+    if (key) set.add(key)
+  }
   try {
     wx.setStorageSync(storageKey(INBOX_SEEN_KEY), JSON.stringify([...set].slice(-500)))
     scheduleClientSync()
   } catch (_) {}
+}
+
+/** 站内信 id 在注册表里稳定；再记一条标题+商单+时间，避免只靠内存态。 */
+function rowSeenKeys(row) {
+  if (!row || typeof row !== 'object') return []
+  const keys = []
+  const id = String(row.id || '').trim()
+  if (id) keys.push(id)
+  const dedupe = String(row.dedupeKey || '').trim()
+  if (dedupe) keys.push(dedupe)
+  const title = String(row.title || '').trim()
+  const mp = String(row.mpOrderId || '').trim()
+  const created = String(row.createdAt || '').trim()
+  if (title && (mp || created)) keys.push(`${title}|${mp}|${created}`)
+  return keys
+}
+
+function isInboxRowSeen(row, seen) {
+  if (row && row.read) return true
+  const set = seen || readInboxSeenSet()
+  return rowSeenKeys(row).some((key) => set.has(key))
+}
+
+function rememberInboxRows(rows) {
+  const keys = []
+  for (const row of rows || []) {
+    if (!row) continue
+    if (typeof row === 'string') {
+      const key = row.trim()
+      if (key) keys.push(key)
+      continue
+    }
+    keys.push(...rowSeenKeys(row))
+  }
+  if (keys.length) markInboxSeen(keys)
 }
 
 /** 合并 registry 站内信（达人：会员 id / 报名 id 严格匹配） */
@@ -256,7 +294,7 @@ function inboxRowsForTalent(reg, member) {
         category: cat,
         categoryLabel: CATEGORY_LABELS[cat],
         createdAt: row.createdAt || '',
-        read: !!row.read || seen.has(String(row.id)),
+        read: isInboxRowSeen(row, seen),
         fromRegistry: true,
         noticeType:
           row.noticeType || (isSel ? 'selection' : isSched ? 'schedule' : isOps ? 'ops_broadcast' : ''),
@@ -302,7 +340,7 @@ function mergeRegistryInboxForTalent(reg, member) {
   const seen = readInboxSeenSet()
   const selectionRows = talentInboxMatch.buildSelectionNoticeRows(reg, member).map((r) => ({
     ...r,
-    read: !!r.read || seen.has(String(r.id)),
+    read: isInboxRowSeen(r, seen),
   }))
   const remote = inboxRowsForTalent(reg, member)
   const merged = dedupeSelectionInboxRows([...selectionRows, ...remote])
@@ -312,10 +350,9 @@ function mergeRegistryInboxForTalent(reg, member) {
   return inboxRowEnrich.enrichAndSort(reg, dedupeSelectionInboxRows([...merged, ...rest]))
 }
 
-function markAllNotificationsRead() {
+function markAllNotificationsRead(extraRows) {
   markNotificationsRead()
-  const rows = readAllNotificationRows()
-  markInboxSeen(rows.map((r) => r.id))
+  rememberInboxRows([...(readAllNotificationRows() || []), ...(extraRows || [])])
 }
 
 module.exports = {
@@ -333,4 +370,6 @@ module.exports = {
   inboxRowsForTalentMember: inboxRowsForTalent,
   mergeRegistryInboxForTalent,
   markInboxSeen,
+  rememberInboxRows,
+  isInboxRowSeen,
 }
