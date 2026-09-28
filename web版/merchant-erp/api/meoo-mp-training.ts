@@ -258,7 +258,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ok: true,
       courses,
       mine,
-      profile: hostId ? store.profiles.find((p) => p.hostId === hostId) || null : null,
+      profile: hostId ? store.profiles.find((p) => String(p.hostId || '').trim() === hostId.trim()) || null : null,
       profiles: review ? store.profiles.filter((p) => lecturerState(p) !== 'none').map(lecturerCard) : [],
       orders: hostId ? store.orders.filter((o) => o.hostId === hostId) : [],
       enrolled: hostId
@@ -311,7 +311,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.status(400).json({ ok: false, error: '请先缴纳保证金' })
       return
     }
-    const prev = store.profiles.find((p) => p.hostId === hostId)
+    const prev = store.profiles.find((p) => String(p.hostId || '').trim() === hostId)
+    const keepApproved = prev ? lecturerState(prev) === 'approved' : false
     const profile: Profile = {
       hostId,
       kind: prev?.kind === 'entity' ? 'entity' : 'person',
@@ -329,8 +330,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       idFront: prev?.idFront || '',
       idBack: prev?.idBack || '',
       licenseImage: prev?.licenseImage || '',
-      lecturerStatus: 'pending',
-      lecturerNote: '',
+      lecturerStatus: keepApproved ? 'approved' : 'pending',
+      lecturerNote: keepApproved ? prev?.lecturerNote || '' : '',
       updatedAt: new Date().toISOString(),
     }
     store.profiles = store.profiles.filter((p) => p.hostId !== hostId).concat(profile)
@@ -418,9 +419,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.status(400).json({ ok: false, error: '请填写大于 0 的课时费' })
       return
     }
-    const hostId = String(body.hostId || '')
+    const hostId = String(body.hostId || '').trim()
     if (hostId) {
-      const profile = store.profiles.find((p) => p.hostId === hostId)
+      const profile = store.profiles.find((p) => String(p.hostId || '').trim() === hostId)
       if (!profile || lecturerState(profile) !== 'approved') {
         res.status(400).json({ ok: false, error: '请先申请讲师并通过审核' })
         return

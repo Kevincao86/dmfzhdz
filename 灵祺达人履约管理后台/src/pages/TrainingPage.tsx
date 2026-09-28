@@ -104,6 +104,13 @@ function compressImageFile(file: File): Promise<string> {
   })
 }
 
+function lecturerStatusOf(profile: Lecturer | null | undefined): 'none' | 'pending' | 'approved' | 'rejected' {
+  const status = profile?.lecturerStatus
+  if (status === 'none' || status === 'pending' || status === 'approved' || status === 'rejected') return status
+  if (profile?.intro && profile?.city) return 'approved'
+  return 'none'
+}
+
 type Lecturer = {
   hostId: string
   kind: 'person' | 'entity'
@@ -260,14 +267,7 @@ export default function TrainingPage() {
     const deposit = data.deposit as { paid?: boolean } | undefined
     setDepositPaid(!!deposit?.paid)
     const profile = data.profile as Lecturer | null
-    const status = profile?.lecturerStatus
-    const nextStatus =
-      status === 'none' || status === 'pending' || status === 'approved' || status === 'rejected'
-        ? status
-        : profile?.intro && profile?.city
-          ? 'approved'
-          : 'none'
-    setLecturerStatus(nextStatus)
+    setLecturerStatus(lecturerStatusOf(profile))
     if (!profile) return
     setKind(profile.kind === 'entity' ? 'entity' : 'person')
     setName(profile.name || '')
@@ -664,10 +664,29 @@ export default function TrainingPage() {
             onClick={(e) => e.stopPropagation()}
             onSubmit={(e) => {
               e.preventDefault()
-              const reason = publishGate()
-              if (reason) {
-                setErr(reason)
-                return
+              void (async () => {
+              let submitHostId = me?.accountId || ''
+              try {
+                const data = await fetchTraining(submitHostId)
+                const profile = data.profile as Lecturer | null
+                const status = lecturerStatusOf(profile)
+                setLecturerStatus(status)
+                if (profile?.hostId) submitHostId = profile.hostId
+                const deposit = data.deposit as { paid?: boolean } | undefined
+                if (deposit) setDepositPaid(!!deposit.paid)
+                if (status !== 'approved') {
+                  setSheetErr('请先申请讲师并通过审核')
+                  return
+                }
+                if (deposit && deposit.paid === false) {
+                  setSheetErr('请先到我的钱包缴纳保证金')
+                  return
+                }
+              } catch {
+                if (lecturerStatus !== 'approved') {
+                  setSheetErr('请先申请讲师并通过审核')
+                  return
+                }
               }
               if (!title.trim()) {
                 setSheetErr('请填写课程名称')
@@ -732,7 +751,7 @@ export default function TrainingPage() {
                 poster,
                 posterMp,
                 signupFields,
-                hostId: me?.accountId || '',
+                hostId: submitHostId,
                 hostName: me?.wxNickName || me?.loginName || '达人',
                 hostRole: me?.activeRole || 'talent',
               })
@@ -742,6 +761,7 @@ export default function TrainingPage() {
                   return load()
                 })
                 .catch((ex) => setSheetErr(ex instanceof Error ? ex.message : '提交失败'))
+              })()
             }}
           >
             <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
@@ -907,11 +927,12 @@ export default function TrainingPage() {
                 return
               }
               if (panel === 'apply') {
-                if (!advanced) {
+                const editingLecturer = lecturerStatus === 'approved'
+                if (!editingLecturer && !advanced) {
                   setErr('请先开通专业版、旗舰版或企业版')
                   return
                 }
-                if (!depositPaid) {
+                if (!editingLecturer && !depositPaid) {
                   setPanel('')
                   navigate('/profile/wallet')
                   return
@@ -934,7 +955,7 @@ export default function TrainingPage() {
                   intro: intro.trim(),
                 })
                   .then(() => {
-                    setLecturerStatus('pending')
+                    setLecturerStatus(editingLecturer ? 'approved' : 'pending')
                     setPanel('')
                   })
                   .catch((ex) => setErr(ex instanceof Error ? ex.message : '申请失败'))
@@ -946,8 +967,8 @@ export default function TrainingPage() {
             <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
               <div>
                 <p className="text-xs font-semibold tracking-wide text-violet-600">本地生活讲师</p>
-                <h2 className="mt-1 text-xl font-bold text-slate-900">申请讲师</h2>
-                <p className="mt-1 text-sm text-slate-500">先写你在哪座城市、出镜什么平台、带过哪些到店内容。审核通过后即可发布培训。收款账户在我的钱包绑定。</p>
+                <h2 className="mt-1 text-xl font-bold text-slate-900">{lecturerStatus === 'approved' ? '编辑讲师资料' : '申请讲师'}</h2>
+                <p className="mt-1 text-sm text-slate-500">{lecturerStatus === 'approved' ? '可以修改常驻城市、出镜平台和介绍。保存后仍然是已通过的讲师。' : '先写你在哪座城市、出镜什么平台、带过哪些到店内容。审核通过后即可发布培训。收款账户在我的钱包绑定。'}</p>
               </div>
               <button type="button" className="rounded-full px-2 text-xl leading-none text-slate-400 hover:text-slate-700" onClick={() => setPanel('')} aria-label="关闭">
                 ×
@@ -1056,8 +1077,8 @@ export default function TrainingPage() {
               <button type="button" className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-600" onClick={() => setPanel('')}>
                 取消
               </button>
-              <button type="submit" disabled={saving || (panel === 'apply' && lecturerStatus === 'approved')} className="flex-1 rounded-xl bg-violet-600 px-3 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
-                {saving ? '提交中…' : lecturerStatus === 'approved' ? '已通过' : lecturerStatus === 'pending' ? '更新申请' : '提交申请'}
+              <button type="submit" disabled={saving} className="flex-1 rounded-xl bg-violet-600 px-3 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+                {saving ? '提交中…' : lecturerStatus === 'approved' ? '保存资料' : lecturerStatus === 'pending' ? '更新申请' : '提交申请'}
               </button>
             </div>
           </form>
