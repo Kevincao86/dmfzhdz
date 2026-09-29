@@ -117,31 +117,26 @@
       </view>
     </view>
 
-    <view class="wb-section" wx:if="{{bizMenus.length}}">
+    <view class="wb-section" wx:for="{{bizGroups}}" wx:key="id">
       <view class="wb-section-head">
-        <text class="wb-section-title">业务管理</text>
+        <text class="wb-section-title">{{item.title}}</text>
       </view>
-      <view class="wb-biz-card">
+      <view class="wb-biz-grid">
         <view
-          wx:for="{{bizMenus}}"
+          wx:for="{{item.items}}"
+          wx:for-item="menu"
           wx:key="key"
-          class="wb-biz-row {{item.comingSoon ? 'wb-biz-row--soon' : ''}}"
-          hover-class="wb-biz-row--hover"
-          data-key="{{item.key}}"
+          class="wb-biz-tile {{menu.comingSoon ? 'wb-biz-tile--soon' : ''}}"
+          hover-class="wb-biz-tile--hover"
+          data-key="{{menu.key}}"
           bindtap="onMenuTap"
         >
-          <view class="wb-biz-icon">
-            <image class="wb-biz-img" src="{{item.iconSrc}}" mode="aspectFill" />
+          <view class="wb-biz-tile-icon">
+            <image class="wb-biz-tile-img" src="{{menu.iconSrc}}" mode="aspectFill" />
+            <text class="wb-menu-badge" wx:if="{{menu.badge}}">{{menu.badge}}</text>
           </view>
-          <view class="wb-biz-body">
-            <text class="wb-biz-label">{{item.label}}</text>
-            <text class="wb-biz-sub">{{item.sub}}</text>
-          </view>
-          <view class="wb-biz-right">
-            <text class="wb-menu-badge wb-menu-badge--row" wx:if="{{item.badge}}">{{item.badge}}</text>
-            <text class="menu-soon" wx:if="{{item.comingSoon}}">即将开放</text>
-            <text class="wb-biz-arrow" wx:else>›</text>
-          </view>
+          <text class="wb-biz-tile-label">{{menu.label}}</text>
+          <text class="wb-biz-tile-sub">{{menu.comingSoon ? '即将开放' : menu.sub}}</text>
         </view>
       </view>
     </view>

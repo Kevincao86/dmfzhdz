@@ -195,6 +195,58 @@ function injectMyCoursesMenu(menus) {
   return list
 }
 
+const BIZ_GROUP_DEFS = [
+  { id: 'account', title: '账号与通知', keys: ['accountBind', 'wechatOaBind'] },
+  {
+    id: 'deal',
+    title: '接单合作',
+    keys: [
+      'targetedInvites',
+      'prQuotes',
+      'subscriptions',
+      'templates',
+      'briefTemplates',
+      'cooperation',
+      'talentWatchlist',
+      'formRelay',
+      'funnel',
+    ],
+  },
+  {
+    id: 'money',
+    title: '资金推广',
+    keys: ['wallet', 'myOrders', 'affiliatePortal', 'affiliateApply', 'pointsRecharge'],
+  },
+  {
+    id: 'tools',
+    title: '内容与数据',
+    keys: ['briefGen', 'aiReview', 'addonsHub', 'training', 'myCourses', 'analytics'],
+  },
+  { id: 'help', title: '帮助服务', keys: ['manual', 'support'] },
+]
+
+function groupBizMenus(biz) {
+  const used = new Set()
+  const groups = []
+  for (const def of BIZ_GROUP_DEFS) {
+    const items = []
+    for (const key of def.keys) {
+      const found = (biz || []).find((row) => row.key === key)
+      if (!found) continue
+      items.push(found)
+      used.add(key)
+    }
+    if (items.length) groups.push({ id: def.id, title: def.title, items })
+  }
+  const rest = (biz || []).filter((row) => row && !used.has(row.key))
+  if (rest.length) {
+    const tools = groups.find((group) => group.id === 'tools')
+    if (tools) tools.items.push(...rest)
+    else groups.push({ id: 'tools', title: '内容与数据', items: rest })
+  }
+  return groups
+}
+
 function splitWorkbenchMenus(menus, identity) {
   const keys = QUICK_MENU_KEYS[identity] || QUICK_MENU_KEYS.talent
   const keySet = new Set(keys)
@@ -205,7 +257,7 @@ function splitWorkbenchMenus(menus, identity) {
     else biz.push({ ...item })
   }
   const orderedQuick = keys.map((k) => quick.find((i) => i.key === k)).filter(Boolean)
-  return { quickMenus: orderedQuick, bizMenus: biz }
+  return { quickMenus: orderedQuick, bizMenus: biz, bizGroups: groupBizMenus(biz) }
 }
 const mpShare = require('../../utils/mpShare.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
@@ -362,6 +414,7 @@ Page({
     menus: talentMenusForIdentity('talent'),
     quickMenus: [],
     bizMenus: [],
+    bizGroups: [],
     greeting: '',
     notifyBadge: 0,
     calendarTodoCount: 0,
@@ -537,7 +590,7 @@ Page({
       identity,
     )
     if (this._lecturerApproved) menus = injectMyCoursesMenu(menus)
-    const { quickMenus, bizMenus } = splitWorkbenchMenus(menus, identity)
+    const { quickMenus, bizMenus, bizGroups } = splitWorkbenchMenus(menus, identity)
     const planId = mpMembershipUi.readMembershipPlanId(acct, identity, member, prProfile)
     const membershipPlanLabel = mpMembershipUi.planLabel(planId)
     const membershipExpiryLabel = mpMembershipUi.formatExpiryLabel(
@@ -561,6 +614,7 @@ Page({
       menus,
       quickMenus,
       bizMenus,
+      bizGroups,
       greeting: workbenchGreeting(displayName),
       statAppliedKey: identity === 'pr' ? 'prOrders' : 'applications',
       notifyBadge: 0,
@@ -586,7 +640,12 @@ Page({
       if (current.some((item) => item.key === 'myCourses')) return
       const next = injectMyCoursesMenu(current)
       const split = splitWorkbenchMenus(next, identity)
-      this.setData({ menus: next, quickMenus: split.quickMenus, bizMenus: split.bizMenus })
+      this.setData({
+        menus: next,
+        quickMenus: split.quickMenus,
+        bizMenus: split.bizMenus,
+        bizGroups: split.bizGroups,
+      })
     } catch (_) {}
   },
   async refreshPrStatsIfNeeded() {
@@ -635,7 +694,13 @@ Page({
       const bizMenus = patchMenusCalendarMeta(this.data.bizMenus, identity, count)
       const app = getApp()
       if (app && app.globalData) app.globalData.calendarTodoCount = count
-      this.setData({ calendarTodoCount: count, menus, quickMenus, bizMenus })
+      this.setData({
+        calendarTodoCount: count,
+        menus,
+        quickMenus,
+        bizMenus,
+        bizGroups: groupBizMenus(bizMenus),
+      })
     } catch (_) {}
   },
   async refreshNotifyBadge() {

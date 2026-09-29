@@ -4,7 +4,6 @@ import {
   BadgeCheck,
   Bell,
   BookOpen,
-  ChevronRight,
   CircleHelp,
   CreditCard,
   FileText,
@@ -36,8 +35,15 @@ type MenuEntry = {
   to: string
   label: string
   desc?: string
-  group: 'quick' | 'biz'
+  group: 'quick' | 'deal' | 'money' | 'tools' | 'help'
 }
+
+const BIZ_SECTIONS = [
+  { id: 'deal', title: '接单合作' },
+  { id: 'money', title: '资金推广' },
+  { id: 'tools', title: '内容与数据' },
+  { id: 'help', title: '帮助服务' },
+] as const
 
 const TILE_TONES = [
   'bg-violet-50 text-violet-700',
@@ -208,7 +214,7 @@ export default function ProfilePage() {
             to: '/profile/linke',
             label: '抖音林客授权',
             desc: '非必填 · 发单可挂接林客商家',
-            group: 'biz' as const,
+            group: 'deal' as const,
           },
         ]
       : [
@@ -245,7 +251,7 @@ export default function ProfilePage() {
                 : workId === 'edit'
                   ? '为合作 PR 设置剪辑专属报价（单条/半天/全天）'
                   : '为合作 PR 设置专属报价',
-            group: 'biz' as const,
+            group: 'deal' as const,
           },
         ]),
     ...(isPr
@@ -254,7 +260,7 @@ export default function ProfilePage() {
             to: '/profile/wallet',
             label: '我的钱包',
             desc: '积分、培训保证金与课时费应付款',
-            group: 'biz' as const,
+            group: 'money' as const,
           },
         ]
       : []),
@@ -262,19 +268,19 @@ export default function ProfilePage() {
       to: '/profile/my-orders',
       label: '我的订单',
       desc: '会员开通与积分充值支付记录',
-      group: 'biz',
+      group: 'money',
     },
     {
       to: '/affiliate/portal',
       label: '我的推广',
       desc: '推广码 · 太阳码 · 佣金与商户明细',
-      group: 'biz',
+      group: 'money',
     },
     {
       to: '/profile/ai-review',
       label: 'AI审核',
       desc: '文稿与短视频合规检核',
-      group: 'biz',
+      group: 'tools',
     },
     ...(lecturerApproved
       ? [
@@ -282,7 +288,7 @@ export default function ProfilePage() {
             to: '/training?mine=1',
             label: '我的课程',
             desc: '发布、编辑和结算自己的培训',
-            group: 'biz' as const,
+            group: 'tools' as const,
           },
         ]
       : []),
@@ -290,13 +296,16 @@ export default function ProfilePage() {
       to: '/profile/analytics',
       label: '数据分析',
       desc: isPr ? '发单与转化概况' : '报名与发单概况',
-      group: 'biz',
+      group: 'tools',
     },
-    { to: '/help', label: '使用说明', desc: '功能与操作方式', group: 'biz' },
-    { to: '/profile/support', label: '小灵同学', desc: '我的客服与常见问题', group: 'biz' },
+    { to: '/help', label: '使用说明', desc: '功能与操作方式', group: 'help' },
+    { to: '/profile/support', label: '小灵同学', desc: '我的客服与常见问题', group: 'help' },
   ]
   const quickItems = menuItems.filter((item) => item.group === 'quick')
-  const bizItems = menuItems.filter((item) => item.group === 'biz')
+  const bizSections = BIZ_SECTIONS.map((section) => ({
+    ...section,
+    items: menuItems.filter((item) => item.group === section.id),
+  })).filter((section) => section.items.length)
 
   return (
     <div className="page-content-shell page-content-shell--wide xx-profile-desk">
@@ -379,32 +388,35 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        <section>
-          <h2 className="px-1 text-xs font-semibold tracking-[0.22em] text-[var(--shell-muted)]">业务管理</h2>
-          <nav className="surface-card mt-3 overflow-hidden rounded-2xl border">
-            {bizItems.map((item) => {
-              const Icon = menuGlyph(item.to)
-              return (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  className="flex items-center gap-3 border-b border-[var(--shell-border)] px-4 py-3.5 last:border-b-0 hover:bg-violet-50/70"
-                >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-700">
-                    <Icon className="h-5 w-5" strokeWidth={1.75} />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold text-[var(--shell-text)]">{item.label}</span>
-                    {item.desc ? (
-                      <span className="mt-0.5 block truncate text-xs text-[var(--shell-muted)]">{item.desc}</span>
-                    ) : null}
-                  </span>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-[var(--shell-muted)]" />
-                </Link>
-              )
-            })}
-          </nav>
-        </section>
+        {bizSections.map((section) => (
+          <section key={section.id}>
+            <h2 className="px-1 text-xs font-semibold tracking-[0.22em] text-[var(--shell-muted)]">{section.title}</h2>
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {section.items.map((item, index) => {
+                const Icon = menuGlyph(item.to)
+                return (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    className="surface-card flex flex-col items-start gap-3 rounded-2xl border px-4 py-4 transition hover:-translate-y-0.5 hover:shadow-md"
+                  >
+                    <span
+                      className={`flex h-11 w-11 items-center justify-center rounded-2xl ${TILE_TONES[index % TILE_TONES.length]}`}
+                    >
+                      <Icon className="h-5 w-5" strokeWidth={1.75} />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold text-[var(--shell-text)]">{item.label}</span>
+                      {item.desc ? (
+                        <span className="mt-1 block line-clamp-2 text-xs leading-5 text-[var(--shell-muted)]">{item.desc}</span>
+                      ) : null}
+                    </span>
+                  </Link>
+                )
+              })}
+            </div>
+          </section>
+        ))}
 
         <p className="text-xs text-[var(--shell-muted)]">完善资料后，推荐大厅将按标签与习惯智能匹配</p>
       </div>
