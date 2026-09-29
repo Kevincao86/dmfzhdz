@@ -52,6 +52,9 @@ Page({
     err: '',
     evalPoints: evalApi.TALENT_EVAL_POINTS,
     advicePoints: evalApi.TALENT_ADVICE_POINTS,
+    evalCostText: '达人信息评估 · ' + evalApi.TALENT_EVAL_POINTS + '积分',
+    reevalCostText: '重新评估 · ' + evalApi.TALENT_EVAL_POINTS + '积分',
+    adviceCostText: '分析整改 · ' + evalApi.TALENT_ADVICE_POINTS + '积分',
   },
 
   onLoad() {
@@ -188,10 +191,20 @@ Page({
     }, 32)
   },
 
+  failEval(e, evaluatingKey) {
+    const msg = String(e && e.message ? e.message : e || '评估失败').slice(0, 120)
+    const patch = { err: msg }
+    patch[evaluatingKey] = false
+    this.setData(patch)
+    wx.showToast({ title: msg, icon: 'none', duration: 2800 })
+  },
+
   async onEvaluate() {
     if (!this.data.canEval || this.data.evaluating || this.data.advising) return
     this.stopTick()
     this.setData({ evaluating: true, err: '' })
+    wx.showLoading({ title: '评估中', mask: true })
+    let failed = null
     try {
       const input = this._input || this.accountInput()
       const score = await evalApi.evaluateTalent(input, { force: true })
@@ -209,16 +222,17 @@ Page({
       })
       this.playScore(score.score)
     } catch (e) {
-      this.setData({
-        evaluating: false,
-        err: String(e && e.message ? e.message : e).slice(0, 120),
-      })
+      failed = e
     }
+    wx.hideLoading()
+    if (failed) this.failEval(failed, 'evaluating')
   },
 
   async onAdvise() {
     if (!this.data.scoreReady || this.data.evaluating || this.data.advising) return
     this.setData({ advising: true, err: '' })
+    wx.showLoading({ title: '分析中', mask: true })
+    let failed = null
     try {
       const advice = await evalApi.adviseTalent(this._input || this.accountInput(), this._score, { force: true })
       this.setData({
@@ -227,10 +241,9 @@ Page({
         sections: advice.sections,
       })
     } catch (e) {
-      this.setData({
-        advising: false,
-        err: String(e && e.message ? e.message : e).slice(0, 120),
-      })
+      failed = e
     }
+    wx.hideLoading()
+    if (failed) this.failEval(failed, 'advising')
   },
 })

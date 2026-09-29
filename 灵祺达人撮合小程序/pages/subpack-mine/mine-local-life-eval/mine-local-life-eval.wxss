@@ -224,12 +224,21 @@
   margin: 12rpx 0 0;
   border-radius: 16rpx;
   font-size: 30rpx;
-  line-height: 2.4;
+  line-height: 88rpx;
+  text-align: center;
+  font-weight: 700;
 }
 
-.btn-main::after,
-.btn-sub::after {
-  border: none;
+.btn-main--hover {
+  opacity: 0.88;
+}
+
+.btn-sub--hover {
+  background: #f5f0ff;
+}
+
+.btn--off {
+  opacity: 0.45;
 }
 
 .btn-main {
