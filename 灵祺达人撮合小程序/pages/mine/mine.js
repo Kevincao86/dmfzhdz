@@ -196,31 +196,25 @@ function injectMyCoursesMenu(menus) {
 }
 
 const BIZ_GROUP_DEFS = [
-  { id: 'account', title: '账号与通知', keys: ['accountBind', 'wechatOaBind'] },
+  {
+    id: 'account',
+    title: '账号与通知',
+    keys: ['accountBind', 'subscriptions', 'targetedInvites', 'prQuotes'],
+  },
   {
     id: 'deal',
     title: '接单合作',
-    keys: [
-      'targetedInvites',
-      'prQuotes',
-      'subscriptions',
-      'templates',
-      'briefTemplates',
-      'cooperation',
-      'talentWatchlist',
-      'formRelay',
-      'funnel',
-    ],
+    keys: ['templates', 'briefTemplates', 'cooperation', 'talentWatchlist', 'formRelay', 'funnel'],
   },
   {
     id: 'money',
     title: '资金推广',
-    keys: ['wallet', 'myOrders', 'affiliatePortal', 'affiliateApply', 'pointsRecharge'],
+    keys: ['wallet', 'myOrders', 'affiliatePortal', 'affiliateApply', 'pointsRecharge', 'training'],
   },
   {
     id: 'tools',
     title: '内容与数据',
-    keys: ['briefGen', 'aiReview', 'addonsHub', 'training', 'myCourses', 'analytics'],
+    keys: ['briefGen', 'aiReview', 'addonsHub', 'myCourses', 'analytics'],
   },
   { id: 'help', title: '帮助服务', keys: ['manual', 'support'] },
 ]
@@ -315,14 +309,13 @@ function talentMenusForIdentity(identity) {
     { key: 'accountBind', label: '账号绑定', sub: '微信 · 抖音 · 手机号 · 邮箱', icon: 'info' },
     { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
     { key: 'targetedInvites', label: '我的邀约', sub: 'PR 定向合作邀约，接受或拒绝', icon: 'list' },
-    { key: 'wechatOaBind', label: '服务号订阅通知', sub: '关注服务号，邀约和日程提醒推到微信', icon: 'star' },
     { key: 'orderCalendar', label: '商单日历', sub: calSub, icon: 'chart' },
     { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
     { key: 'prQuotes', label: '我的报价', sub: '为合作 PR 设置专属报价', icon: 'quote' },
     TRAINING_MENU,
     WALLET_MENU,
     MY_ORDERS_MENU,
-    { key: 'subscriptions', label: '商单订阅', sub: '匹配城市/平台/品类的新招募提醒', icon: 'star' },
+    { key: 'subscriptions', label: '订阅通知', sub: '商单匹配提醒 · 服务号邀约通知', icon: 'star' },
     { key: 'talentCredit', label: '达人信用', sub: '履约评分与提升建议', icon: 'chart' },
     { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
     { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },

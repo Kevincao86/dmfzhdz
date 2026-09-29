@@ -2,6 +2,10 @@ const { prepareXingxuanSubPage } = require('../../../utils/pageIdentityChrome.js
 const xingxuan = require('../../../utils/xingxuanEnhanceApi.js')
 const pickers = require('../../../utils/subscriptionPickerHelpers.js')
 const mpSubscribe = require('../../../utils/mpSubscribeMessages.js')
+const oaBind = require('../../../utils/mpWechatOaBindApi.js')
+const participant = require('../../../utils/participant.js')
+const auth = require('../../../utils/auth.js')
+const userProfile = require('../../../utils/userProfile.js')
 
 Page({
   data: {
@@ -25,12 +29,38 @@ Page({
     urgentOnly: false,
     matched: [],
     saving: false,
+    showOa: false,
+    oaLoading: false,
+    oaBound: false,
+    oaNeedLogin: false,
+    oaNeedProfile: false,
+    oaDisplayName: '灵祺星选',
+    oaQrUrl: '',
+    oaExpiresAt: '',
+    oaPolling: false,
+    oaCreating: false,
+    oaBoundAt: '',
+    oaTalentMemberId: '',
   },
+
+  _oaPollTimer: null,
 
   async onShow() {
     const ready = await prepareXingxuanSubPage(this)
     if (!ready) return
+    const showOa = userProfile.readIdentity() === 'talent'
+    this.setData({ showOa })
+    wx.setNavigationBarTitle({ title: showOa ? '订阅通知' : '商单订阅' })
     await this.load()
+    if (showOa) await this.refreshOaStatus({ silent: !!this.data.oaTalentMemberId })
+  },
+
+  onHide() {
+    this.stopOaPoll()
+  },
+
+  onUnload() {
+    this.stopOaPoll()
   },
 
   async load() {
@@ -216,5 +246,90 @@ Page({
     const id = e.currentTarget.dataset.id
     if (!id) return
     wx.navigateTo({ url: `/pages/subpack-core/detail/detail?id=${encodeURIComponent(id)}` })
+  },
+
+  oaTalentId() {
+    const acct = auth.readAccount()
+    return String((acct && acct.registryMemberId) || participant.resolveTalentMemberId() || '').trim()
+  },
+
+  stopOaPoll() {
+    if (this._oaPollTimer) {
+      clearInterval(this._oaPollTimer)
+      this._oaPollTimer = null
+    }
+    if (this.data.oaPolling) this.setData({ oaPolling: false })
+  },
+
+  async refreshOaStatus({ silent = false } = {}) {
+    if (!auth.isLoggedIn()) {
+      this.setData({ oaLoading: false, oaBound: false, oaNeedLogin: true, oaNeedProfile: false })
+      return false
+    }
+    const oaTalentMemberId = this.oaTalentId()
+    if (!oaTalentMemberId) {
+      this.setData({ oaLoading: false, oaBound: false, oaNeedLogin: false, oaNeedProfile: true })
+      return false
+    }
+    if (!silent) {
+      this.setData({ oaLoading: true, oaTalentMemberId, oaNeedLogin: false, oaNeedProfile: false })
+    }
+    try {
+      const res = await oaBind.getStatus(oaTalentMemberId)
+      const oaBound = !!res.bound
+      this.setData({
+        oaLoading: false,
+        oaBound,
+        oaDisplayName: res.oaDisplayName || '灵祺星选',
+        oaBoundAt: res.boundAt || '',
+        oaTalentMemberId,
+      })
+      if (oaBound) this.stopOaPoll()
+      return oaBound
+    } catch (e) {
+      this.setData({ oaLoading: false })
+      if (!silent) wx.showToast({ title: e.message || '服务号状态加载失败', icon: 'none' })
+      return false
+    }
+  },
+
+  startOaPoll() {
+    this.stopOaPoll()
+    this.setData({ oaPolling: true })
+    this._oaPollTimer = setInterval(() => {
+      this.refreshOaStatus({ silent: true })
+    }, 3000)
+  },
+
+  async onCreateOaQr() {
+    if (!auth.isLoggedIn()) {
+      wx.showToast({ title: '请先登录', icon: 'none' })
+      return
+    }
+    const oaTalentMemberId = this.oaTalentId()
+    if (!oaTalentMemberId) {
+      wx.showToast({ title: '请先完善达人资料', icon: 'none' })
+      return
+    }
+    this.setData({ oaCreating: true })
+    try {
+      const res = await oaBind.createTicket(oaTalentMemberId)
+      this.setData({
+        oaCreating: false,
+        oaQrUrl: res.qrUrl || '',
+        oaExpiresAt: res.expiresAt || '',
+        oaDisplayName: res.oaDisplayName || this.data.oaDisplayName,
+      })
+      this.startOaPoll()
+    } catch (e) {
+      this.setData({ oaCreating: false })
+      wx.showToast({ title: e.message || '获取二维码失败', icon: 'none' })
+    }
+  },
+
+  onPreviewOaQr() {
+    const url = String(this.data.oaQrUrl || '').trim()
+    if (!url) return
+    wx.previewImage({ urls: [url], current: url })
   },
 })

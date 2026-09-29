@@ -1,4 +1,37 @@
 <view class="xingxuan-page {{lqThemeClass}}">
+  <view class="xingxuan-card" wx:if="{{showOa}}">
+    <view class="row between">
+      <text class="xingxuan-title">服务号通知</text>
+      <text class="oa-status {{oaBound ? 'oa-status--on' : ''}}">{{oaBound ? '已绑定' : (oaLoading ? '加载中' : '未绑定')}}</text>
+    </view>
+    <text class="xingxuan-hint">关注「{{oaDisplayName}}」后，定向邀约和商单日历提醒会推到微信，不用每次点授权。</text>
+    <text class="xingxuan-hint" wx:if="{{oaNeedLogin}}">请先登录后再绑定服务号。</text>
+    <text class="xingxuan-hint" wx:elif="{{oaNeedProfile}}">请先在「我的信息」保存达人资料，再绑定服务号。</text>
+    <block wx:elif="{{oaBound}}">
+      <text class="xingxuan-hint" wx:if="{{oaBoundAt}}">绑定时间：{{oaBoundAt}}</text>
+    </block>
+    <block wx:else>
+      <button
+        class="xingxuan-btn xingxuan-btn--primary save-btn"
+        loading="{{oaCreating}}"
+        disabled="{{oaCreating || oaNeedLogin || oaNeedProfile}}"
+        bindtap="onCreateOaQr"
+      >{{oaQrUrl ? '重新获取二维码' : '获取关注二维码'}}</button>
+      <view wx:if="{{oaQrUrl}}" class="oa-qr">
+        <image
+          class="oa-qr-img"
+          src="{{oaQrUrl}}"
+          mode="aspectFit"
+          show-menu-by-longpress="{{true}}"
+          bindtap="onPreviewOaQr"
+        />
+        <text class="xingxuan-hint">长按识别二维码，关注「{{oaDisplayName}}」</text>
+        <text class="xingxuan-hint" wx:if="{{oaExpiresAt}}">有效期至 {{oaExpiresAt}}</text>
+        <text class="xingxuan-hint" wx:if="{{oaPolling}}">等待关注确认中…</text>
+      </view>
+    </block>
+  </view>
+
   <view class="xingxuan-card">
     <view class="row between">
       <text class="xingxuan-title">开启商单订阅</text>

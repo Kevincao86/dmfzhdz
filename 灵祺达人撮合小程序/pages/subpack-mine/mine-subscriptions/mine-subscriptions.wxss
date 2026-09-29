@@ -7,6 +7,30 @@
   align-items: center;
 }
 
+.oa-status {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.oa-status--on {
+  color: #059669;
+}
+
+.oa-qr {
+  margin-top: 20rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.oa-qr-img {
+  width: 360rpx;
+  height: 360rpx;
+  background: #fff;
+  border-radius: 16rpx;
+}
+
 .field-label {
   display: block;
   margin-top: 24rpx;
