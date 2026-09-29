@@ -1,0 +1,15 @@
+.page { padding: 32rpx; }
+.lead, .hint, .masked { display: block; font-size: 24rpx; color: #64748b; line-height: 1.6; }
+.grid { display: flex; gap: 16rpx; margin-top: 24rpx; }
+.cell { flex: 1; border: 1px solid #e2e8f0; border-radius: 16rpx; padding: 20rpx 8rpx; text-align: center; }
+.cell.on { border-color: #f5d08a; background: #fff8eb; }
+.cell-name { display: block; font-size: 26rpx; color: #1e293b; }
+.cell-sub { display: block; margin-top: 8rpx; font-size: 20rpx; color: #94a3b8; }
+.masked, .hint { margin-top: 16rpx; }
+.form { margin-top: 24rpx; }
+.input { background: #fff; border: 1px solid #e2e8f0; border-radius: 12rpx; padding: 16rpx 20rpx; font-size: 28rpx; }
+.code-row { display: flex; gap: 12rpx; align-items: center; margin-top: 16rpx; }
+.code { flex: 1; }
+.ghost { margin: 0; }
+.submit { margin-top: 20rpx; background: #f59e0b; color: #fff; }
+.err { display: block; margin-top: 16rpx; color: #dc2626; font-size: 24rpx; }

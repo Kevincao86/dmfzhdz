@@ -142,6 +142,28 @@ async function sendRegisterSms(phone) {
   return ecs.post('/api/meoo-auth-sms-send', { phone: String(phone || '').trim() })
 }
 
+async function sendEmailCode(email) {
+  return authPost('email_send', { email: String(email || '').trim() })
+}
+
+async function bindPhoneSms({ phone, smsCode, platform }) {
+  const data = await authPost('bind_phone_sms', {
+    phone: String(phone || '').trim(),
+    smsCode: String(smsCode || '').trim(),
+    platform: platform === 'dy' ? 'dy' : 'wx',
+  })
+  return accountMemberSync.afterAuthSuccess(data)
+}
+
+async function bindEmailLogin({ email, emailCode, platform }) {
+  const data = await authPost('bind_email_login', {
+    email: String(email || '').trim(),
+    emailCode: String(emailCode || '').trim(),
+    platform: platform === 'dy' ? 'dy' : 'wx',
+  })
+  return accountMemberSync.afterAuthSuccess(data)
+}
+
 async function setLoginCredentials(loginName, password) {
   return authPost('set_login_credentials', {
     loginName: String(loginName || '').trim(),
@@ -219,6 +241,9 @@ module.exports = {
   SESSION_KEY,
   ACCOUNT_KEY,
   sendRegisterSms,
+  sendEmailCode,
+  bindPhoneSms,
+  bindEmailLogin,
   phoneRegister,
   readSessionToken,
   readAccount,

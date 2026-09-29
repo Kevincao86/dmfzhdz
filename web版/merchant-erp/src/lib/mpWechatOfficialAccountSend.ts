@@ -125,7 +125,7 @@ export async function sendWechatOaCalendarReminderTemplate(opts: {
   if (!cfgResult.ok) throw new Error('wx_oa_not_configured')
 
   const templateId = String(cfgResult.config.calendarReminderTemplateId || '').trim()
-  if (!templateId) return
+  if (!templateId) throw new Error('wx_oa_calendar_template_missing')
 
   const mpOrderId = String(opts.mpOrderId || '').trim()
   const pagePath = 'pages/subpack-mine/mine-order-calendar/mine-order-calendar'

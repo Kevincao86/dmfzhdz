@@ -6,6 +6,7 @@ import { readMember, memberTypeLabel } from '../lib/mpSync/talentMember'
 import { supplierSummaryLabel } from '../lib/mpSync/supplierTeamProfile'
 import { prDisplayName, readPrProfile } from '../lib/mpSync/userProfile'
 import { resolveShellDisplayName } from '../lib/shellDisplayName'
+import TalentAccountBindPanel from '../components/TalentAccountBindPanel'
 import { ProfileMenuList, ProfileMineHeader } from '../components/ui/MockupLayouts'
 import { readApplications, readPublishedOrders } from '../lib/mpSync/applicationsStore'
 import {
@@ -236,11 +237,9 @@ export default function ProfilePage() {
         </button>
       ) : null}
 
+      <TalentAccountBindPanel />
+
       <dl className="surface-card rounded-xl border p-4 space-y-3 text-sm">
-        <div className="flex justify-between gap-4">
-          <dt className="text-[var(--shell-muted)]">手机号</dt>
-          <dd className="text-[var(--shell-text)]">{acc?.loginName || acc?.wxNickName || '—'}</dd>
-        </div>
         <div className="flex justify-between gap-4">
           <dt className="text-[var(--shell-muted)]">
             {isPr ? 'PR ID' : workId === 'shoot' ? '拍摄团队 ID' : workId === 'edit' ? '剪辑团队 ID' : '灵祺达人 ID'}

@@ -23,6 +23,14 @@ export type MpAccount = {
   wxAvatarUrl: string | null
   hasPassword: boolean
   needsPhoneBind?: boolean
+  identities?: {
+    wechat: boolean
+    douyin: boolean
+    phone: boolean
+    email: boolean
+    phoneMasked: string
+    emailMasked: string
+  }
   prFeatureAccess?: {
     addons: boolean
     recommendHall: boolean

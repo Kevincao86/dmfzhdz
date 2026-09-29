@@ -37,6 +37,7 @@ list_scopes() {
   ops_short_drama   运营台「短剧AI制作」子菜单 + 即梦/Vidu/MiniMax 凭据（不含成片工坊）
   recommend_hall    推荐大厅全部达人池（慎用，见 recommend-all-talents-lock）
   mp_auth           小程序登录/会话
+  talent_account_bind  达人/星选账号绑定（微信抖音手机邮箱）与商单日历服务号提醒发送
   ai_vision_workshop AI视觉工坊（DR增值嵌入 + 撮合小程序原生页 + 会员权限位）
   form_relay_share   转发代收「复制分享」短链（微信 genwxashortlink + 详情页路径）
   merchant_ai_ops_mix 商家 ERP：AI运营方案 + AI混剪去重
@@ -313,6 +314,21 @@ meoo-ops-mp-auth
 mpSession
 auth.js
 pages/login/
+PAT
+      ;;
+    talent_account_bind)
+      cat <<'PAT'
+mpAccountAuth.ts
+mpWechatOfficialAccountSend.ts
+mpCalendarReminderCore.ts
+TalentAccountBindPanel
+ProfilePage.tsx
+mpSession.ts
+灵祺达人撮合小程序/utils/auth.js
+灵祺达人撮合小程序/app.json
+mine-account-bind
+灵祺达人撮合小程序/pages/mine/mine.js
+change-scope-guard
 PAT
       ;;
     ai_vision_workshop)

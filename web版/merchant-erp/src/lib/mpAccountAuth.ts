@@ -326,6 +326,33 @@ export async function resolveSession(
   return { account, token: t }
 }
 
+function maskMpPhone(phone: string): string {
+  const d = phone.replace(/\D/g, '')
+  if (d.length < 7) return d
+  return `${d.slice(0, 3)}****${d.slice(-4)}`
+}
+
+function maskMpEmail(email: string): string {
+  const at = email.indexOf('@')
+  if (at <= 0) return email
+  return `${email.slice(0, 1)}***${email.slice(at)}`
+}
+
+/** 达人/PR 账号已绑定的登录方式。手机号与邮箱共用 login_name，同一时刻只显示其中一项。 */
+export function mpAccountIdentities(account: MpAccountRow) {
+  const login = String(account.login_name || '').trim()
+  const phone = isValidMpLoginPhone(login) ? normalizeMpLoginPhone(login) || '' : ''
+  const email = phone ? '' : normalizeMpLoginEmail(login) || ''
+  return {
+    wechat: Boolean(String(account.openid || '').trim()),
+    douyin: Boolean(String(account.dy_openid || '').trim()),
+    phone: Boolean(phone),
+    email: Boolean(email),
+    phoneMasked: phone ? maskMpPhone(phone) : '',
+    emailMasked: email ? maskMpEmail(email) : '',
+  }
+}
+
 export function accountToClientPayload(
   account: MpAccountRow,
   extras?: {
@@ -338,7 +365,9 @@ export function accountToClientPayload(
   return {
     accountId: account.id,
     openid: account.openid,
+    dyOpenid: account.dy_openid || null,
     loginName: account.login_name,
+    identities: mpAccountIdentities(account),
     activeRole: account.active_role,
     lingqiTalentId: account.lingqi_talent_id,
     lingqiPrId: account.lingqi_pr_id,

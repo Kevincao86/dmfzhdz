@@ -227,6 +227,7 @@ function talentMenusForIdentity(identity) {
   if (identity === 'shoot') {
     return withManualMenu([
       { key: 'profile', label: '拍摄团队信息', sub: '团队资料 · 设备 · 作品集', icon: 'info' },
+      { key: 'accountBind', label: '账号绑定', sub: '微信 · 抖音 · 手机号 · 邮箱', icon: 'info' },
       { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
       { key: 'orderCalendar', label: '商单日历', sub: calSub, icon: 'chart' },
       { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
@@ -243,6 +244,7 @@ function talentMenusForIdentity(identity) {
   if (identity === 'edit') {
     return withManualMenu([
       { key: 'profile', label: '剪辑团队信息', sub: '团队资料 · 风格 · 作品集', icon: 'info' },
+      { key: 'accountBind', label: '账号绑定', sub: '微信 · 抖音 · 手机号 · 邮箱', icon: 'info' },
       { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
       { key: 'orderCalendar', label: '商单日历', sub: calSub, icon: 'chart' },
       { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
@@ -258,6 +260,7 @@ function talentMenusForIdentity(identity) {
   }
   return withManualMenu([
     { key: 'profile', label: '我的信息', sub: '多平台达人资料（抖音/小红书等）', icon: 'info' },
+    { key: 'accountBind', label: '账号绑定', sub: '微信 · 抖音 · 手机号 · 邮箱', icon: 'info' },
     { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
     { key: 'targetedInvites', label: '我的邀约', sub: 'PR 定向合作邀约，接受或拒绝', icon: 'list' },
     { key: 'wechatOaBind', label: '服务号邀约通知', sub: '关注服务号，定向邀约推送到微信', icon: 'star' },
@@ -278,6 +281,7 @@ function buildPrMenus() {
   const calSub = orderCalendar.calendarSubtitle('pr')
   return withManualMenu([
     { key: 'prProfile', label: '我的 PR 信息', sub: '机构/个人资料与所在城市', icon: 'info' },
+    { key: 'accountBind', label: '账号绑定', sub: '微信 · 抖音 · 手机号 · 邮箱', icon: 'info' },
     { key: 'prOrders', label: '我的发单', sub: '已发布的招募订单', icon: 'list' },
     { key: 'orderCalendar', label: '商单日历', sub: calSub, icon: 'chart' },
     TRAINING_MENU,
@@ -299,6 +303,7 @@ const MENU_URLS = {
   applications: '/pages/subpack-mine/mine-applications/mine-applications',
   targetedInvites: '/pages/subpack-mine/mine-targeted-invites/mine-targeted-invites',
   wechatOaBind: '/pages/subpack-mine/mine-wechat-oa-bind/mine-wechat-oa-bind',
+  accountBind: '/pages/subpack-mine/mine-account-bind/mine-account-bind',
   orderCalendar: '/pages/subpack-mine/mine-order-calendar/mine-order-calendar',
   favorites: '/pages/subpack-mine/mine-favorites/mine-favorites',
   templates: '/pages/subpack-mine/mine-templates/mine-templates',

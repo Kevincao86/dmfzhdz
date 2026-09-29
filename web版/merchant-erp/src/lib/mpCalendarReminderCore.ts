@@ -18,7 +18,7 @@ import {
   readMerchantSupabaseAdminEnv,
 } from '../../vite-plugins/merchantSupabaseAdminEnv.js'
 
-export type MpCalendarReminderLeadPreset = 'day8' | 'day_before_20' | 'days2_before'
+export type MpCalendarReminderLeadPreset = 'day8' | 'day_before_20' | 'days2_before' | 'at'
 
 export type MpCalendarReminderBody = {
   action?: string
@@ -29,6 +29,7 @@ export type MpCalendarReminderBody = {
   storeName?: string
   mpOrderId?: string
   leadPreset?: string
+  remindAt?: string
   channels?: string[]
   reminderId?: string
 }
@@ -39,7 +40,7 @@ export type MpCalendarReminderAuth = {
   wxOpenId: string
 }
 
-const LEAD_PRESETS = new Set<MpCalendarReminderLeadPreset>(['day8', 'day_before_20', 'days2_before'])
+const LEAD_PRESETS = new Set<MpCalendarReminderLeadPreset>(['day8', 'day_before_20', 'days2_before', 'at'])
 
 function reminderErrorResponse(e: unknown): { status: number; data: Record<string, unknown> } {
   const msg = e instanceof Error ? e.message : String(e)
@@ -153,14 +154,17 @@ async function sendOneDueReminder(
     mpOrderId: row.mp_order_id,
   }
   const errors: string[] = []
-  let sent = false
+  let oaSent = !wantOa
+  let subscribeSent = !wantSubscribe
 
   if (wantOa) {
     const oaOpenId = resolveOaOpenId(row.owner_key, row.owner_role)
-    if (oaOpenId) {
+    if (!oaOpenId) {
+      errors.push(row.owner_role === 'talent' ? 'no_oa_openid' : 'oa_role_not_talent')
+    } else {
       try {
         await sendWechatOaCalendarReminderTemplate({ oaOpenId, ...payload })
-        sent = true
+        oaSent = true
       } catch (e) {
         errors.push(e instanceof Error ? e.message : String(e))
       }
@@ -172,16 +176,16 @@ async function sendOneDueReminder(
     if (wxOpenId) {
       try {
         await notifyCalendarReminderSubscribe({ openId: wxOpenId, ...payload })
-        sent = true
+        subscribeSent = true
       } catch (e) {
         errors.push(e instanceof Error ? e.message : String(e))
       }
-    } else if (!sent) {
+    } else {
       errors.push('no_wx_open_id')
     }
   }
 
-  if (sent) return { sent: true }
+  if (oaSent && subscribeSent) return { sent: true }
   return { sent: false, error: errors.join('; ') || 'no_channel' }
 }
 
@@ -238,7 +242,16 @@ export async function handleMpCalendarReminderBody(
       if (!LEAD_PRESETS.has(leadPresetRaw)) {
         return { status: 400, data: { ok: false, error: 'invalid_lead_preset' } }
       }
-      const remindAt = computeRemindAtIso(eventDateKey, leadPresetRaw)
+      let remindAt = ''
+      if (leadPresetRaw === 'at') {
+        const ms = Date.parse(String(body.remindAt || '').trim())
+        if (!Number.isFinite(ms)) {
+          return { status: 400, data: { ok: false, error: 'invalid_remind_at' } }
+        }
+        remindAt = new Date(ms).toISOString()
+      } else {
+        remindAt = computeRemindAtIso(eventDateKey, leadPresetRaw)
+      }
       if (new Date(remindAt).getTime() <= Date.now()) {
         return { status: 400, data: { ok: false, error: 'remind_at_in_past' } }
       }
