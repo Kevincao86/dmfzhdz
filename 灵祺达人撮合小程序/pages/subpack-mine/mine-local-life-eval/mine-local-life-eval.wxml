@@ -1,4 +1,4 @@
-<view class="xingxuan-page page-shell {{lqThemeClass}} {{platformId === 'douyin' ? 'xingxuan-page--dock' : ''}}">
+<view class="xingxuan-page page-shell {{lqThemeClass}} xingxuan-page--dock">
   <view class="plats">
     <view
       wx:for="{{platforms}}"
@@ -12,12 +12,13 @@
     </view>
   </view>
 
-  <block wx:if="{{platformId === 'douyin'}}">
   <view class="xingxuan-card ident">
     <image class="avatar" src="{{avatarUrl}}" mode="aspectFill" wx:if="{{avatarUrl}}" />
     <view class="avatar avatar--ph" wx:else>{{avatarLetter}}</view>
     <text class="nick">{{nickname || '未填写昵称'}}</text>
-    <text class="did">抖音号 {{douyinId || '未填写'}}</text>
+    <text class="did">{{accountLabel}} {{accountId || '未填写'}}</text>
+    <text class="did" wx:if="{{basis}}">{{basis}}</text>
+    <text class="did" wx:else>按已填写的昵称和账号分析</text>
   </view>
 
   <view class="xingxuan-card hero">
@@ -31,9 +32,9 @@
     </view>
     <text class="label">数据智能分析</text>
     <view class="levels" wx:if="{{scoreReady}}">
-      <text class="level-title">预估下月带货等级</text>
-      <text class="level">视频带货力 {{videoLevel}}</text>
-      <text class="level">直播带货力 {{liveLevel}}</text>
+      <text class="level-title">{{levelTitle}}</text>
+      <text class="level">{{levelALabel}} {{videoLevel}}</text>
+      <text class="level">{{levelBLabel}} {{liveLevel}}</text>
     </view>
   </view>
 
@@ -52,19 +53,15 @@
       <text class="sec-line">{{item.next}}</text>
     </view>
   </view>
-  </block>
-  <view class="xingxuan-card soon" wx:else>
-    <text class="soon-title">功能开放中</text>
-  </view>
 
-  <view class="eval-dock" wx:if="{{platformId === 'douyin'}}">
+  <view class="eval-dock">
     <button class="btn-main" loading="{{evaluating}}" disabled="{{!canEval || evaluating || advising}}" bindtap="onEvaluate">
       达人信息评估
     </button>
     <button class="btn-sub" loading="{{advising}}" disabled="{{!scoreReady || evaluating || advising}}" bindtap="onAdvise">
       分析整改
     </button>
-    <text class="need" wx:if="{{!canEval}}">请先到「我的信息」填写抖音昵称或抖音号</text>
+    <text class="need" wx:if="{{!canEval}}">请先到「我的信息」填写{{nickLabel}}或{{accountLabel}}</text>
     <text class="need" wx:elif="{{!scoreReady}}">请先完成达人信息评估</text>
     <text class="err" wx:if="{{err}}">{{err}}</text>
   </view>

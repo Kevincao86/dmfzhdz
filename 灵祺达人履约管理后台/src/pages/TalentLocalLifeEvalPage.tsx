@@ -3,7 +3,10 @@ import { getAccount } from '../lib/mpSession'
 import { readMember } from '../lib/mpSync/talentMember'
 import {
   adviseTalent,
+  describeEvalBasis,
   evaluateTalent,
+  platformEvalMeta,
+  type EvalAccountInput,
   type LocalLifeAdvice,
   type LocalLifeScore,
 } from '../lib/talentLocalLifeEval'
@@ -23,13 +26,25 @@ function letterOf(name: string) {
 
 export default function TalentLocalLifeEvalPage() {
   const member = readMember()
-  const douyin = member?.platformProfiles?.douyin
-  const nickname = String(douyin?.platformNickname || '').trim()
-  const douyinId = String(douyin?.platformAccount || '').trim()
-  const avatarUrl = String(getAccount()?.wxAvatarUrl || '').trim()
-  const canEval = !!(nickname || douyinId)
-
   const [platformId, setPlatformId] = useState<(typeof PLATFORMS)[number]['id']>('douyin')
+  const prof = member?.platformProfiles?.[platformId]
+  const meta = platformEvalMeta(platformId)
+  const input: EvalAccountInput = {
+    platformId,
+    nickname: String(prof?.platformNickname || '').trim(),
+    accountId: String(prof?.platformAccount || '').trim(),
+    followers: String(prof?.followers || '').trim(),
+    profileLink: String(prof?.profileLink || '').trim(),
+    tags: Array.isArray(prof?.accountTags) ? prof.accountTags : [],
+    salesLevel: String(prof?.douyinSalesLevel || '').trim(),
+    talentGrade: String(prof?.talentGrade || '').trim(),
+    quotePrice: String(prof?.quotePrice || '').trim(),
+  }
+  const nickname = input.nickname || ''
+  const accountId = input.accountId || ''
+  const basis = describeEvalBasis(input)
+  const avatarUrl = String(getAccount()?.wxAvatarUrl || '').trim()
+  const canEval = !!(nickname || accountId)
   const [evaluating, setEvaluating] = useState(false)
   const [advising, setAdvising] = useState(false)
   const [displayScore, setDisplayScore] = useState(0)
@@ -61,10 +76,11 @@ export default function TalentLocalLifeEvalPage() {
     setEvaluating(true)
     setErr('')
     setScore(null)
+    setAdvice(null)
     setScorePop(false)
     setDisplayScore(0)
     try {
-      const next = await evaluateTalent(nickname, douyinId)
+      const next = await evaluateTalent(input)
       setScore(next)
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
@@ -78,7 +94,7 @@ export default function TalentLocalLifeEvalPage() {
     setAdvising(true)
     setErr('')
     try {
-      setAdvice(await adviseTalent(nickname, douyinId, score))
+      setAdvice(await adviseTalent(input, score))
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
@@ -105,6 +121,10 @@ export default function TalentLocalLifeEvalPage() {
             onClick={() => {
               setPlatformId(item.id)
               setErr('')
+              setScore(null)
+              setAdvice(null)
+              setDisplayScore(0)
+              setScorePop(false)
             }}
           >
             <img src={item.icon} alt="" className="h-5 w-5 rounded bg-white object-contain" />
@@ -113,22 +133,19 @@ export default function TalentLocalLifeEvalPage() {
         ))}
       </div>
 
-      {platformId !== 'douyin' ? (
-        <div className="surface-card flex min-h-64 items-center justify-center rounded-xl border p-8">
-          <p className="text-base font-medium text-[var(--shell-muted)]">功能开放中</p>
-        </div>
-      ) : (
-      <>
       <div className="surface-card rounded-xl border p-8 text-center">
         {avatarUrl ? (
           <img src={avatarUrl} alt="" className="mx-auto h-20 w-20 rounded-full object-cover" />
         ) : (
           <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-violet-100 text-2xl font-bold text-violet-700">
-            {letterOf(nickname || douyinId)}
+            {letterOf(nickname || accountId)}
           </div>
         )}
         <p className="mt-3 text-lg font-bold">{nickname || '未填写昵称'}</p>
-        <p className="mt-1 text-sm text-[var(--shell-muted)]">抖音号 {douyinId || '未填写'}</p>
+        <p className="mt-1 text-sm text-[var(--shell-muted)]">
+          {meta.accountLabel} {accountId || '未填写'}
+        </p>
+        <p className="mt-1 text-sm text-[var(--shell-muted)]">{basis || '按已填写的昵称和账号分析'}</p>
       </div>
 
       <div className="surface-card rounded-xl border p-8 text-center">
@@ -176,9 +193,13 @@ export default function TalentLocalLifeEvalPage() {
         <p className="mt-3 font-medium">数据智能分析</p>
         {score ? (
           <div className="mt-4 space-y-1 text-sm">
-            <p className="font-medium">预估下月带货等级</p>
-            <p>视频带货力 {score.videoLevel}</p>
-            <p>直播带货力 {score.liveLevel}</p>
+            <p className="font-medium">{meta.levelTitle}</p>
+            <p>
+              {meta.levelA} {score.videoLevel}
+            </p>
+            <p>
+              {meta.levelB} {score.liveLevel}
+            </p>
           </div>
         ) : null}
       </div>
@@ -214,7 +235,9 @@ export default function TalentLocalLifeEvalPage() {
         </button>
       </div>
       {!canEval ? (
-        <p className="text-center text-sm text-[var(--shell-muted)]">请先到「我的信息」填写抖音昵称或抖音号</p>
+        <p className="text-center text-sm text-[var(--shell-muted)]">
+          请先到「我的信息」填写{meta.nickLabel}或{meta.accountLabel}
+        </p>
       ) : !score ? (
         <p className="text-center text-sm text-[var(--shell-muted)]">请先完成达人信息评估</p>
       ) : null}
@@ -231,8 +254,6 @@ export default function TalentLocalLifeEvalPage() {
           ))}
         </div>
       ) : null}
-      </>
-      )}
 
       <style>{`@keyframes talent-eval-spin { to { transform: rotate(360deg); } } @keyframes talent-eval-pop { 0% { transform: scale(0.72); opacity: 0.4; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }`}</style>
     </div>

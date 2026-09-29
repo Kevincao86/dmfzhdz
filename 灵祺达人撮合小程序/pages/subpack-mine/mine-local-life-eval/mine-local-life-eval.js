@@ -16,7 +16,13 @@ Page({
     avatarUrl: '',
     avatarLetter: '达',
     nickname: '',
-    douyinId: '',
+    accountId: '',
+    accountLabel: '抖音号',
+    nickLabel: '抖音昵称',
+    levelTitle: '预估下月带货等级',
+    levelALabel: '视频带货力',
+    levelBLabel: '直播带货力',
+    basis: '',
     platforms: [
       { id: 'douyin', name: '抖音平台', icon: '/images/platforms/douyin.png' },
       { id: 'xiaohongshu', name: '小红书', icon: '/images/platforms/xiaohongshu.png' },
@@ -57,7 +63,21 @@ Page({
   onPlatform(e) {
     const id = e.currentTarget.dataset.id
     if (!id || id === this.data.platformId) return
-    this.setData({ platformId: id, err: '' })
+    this.stopTick()
+    this._score = null
+    this.setData({
+      platformId: id,
+      err: '',
+      scoreReady: false,
+      adviceReady: false,
+      situations: [],
+      sections: [],
+      displayScore: 0,
+      scorePop: false,
+      videoLevel: '',
+      liveLevel: '',
+    })
+    this.loadIdentity(id)
   },
 
   onTab(e) {
@@ -70,18 +90,41 @@ Page({
     this.stopTick()
   },
 
-  loadIdentity() {
+  accountInput(platformId) {
+    const id = platformId || this.data.platformId || 'douyin'
     const member = talentMember.readMember()
-    const prof = (member && member.platformProfiles && member.platformProfiles.douyin) || {}
+    const prof = (member && member.platformProfiles && member.platformProfiles[id]) || {}
+    const tags = Array.isArray(prof.accountTags) ? prof.accountTags : []
+    return {
+      platformId: id,
+      nickname: String(prof.platformNickname || '').trim(),
+      accountId: String(prof.platformAccount || '').trim(),
+      followers: String(prof.followers || '').trim(),
+      profileLink: String(prof.profileLink || '').trim(),
+      tags,
+      salesLevel: String(prof.douyinSalesLevel || '').trim(),
+      talentGrade: String(prof.talentGrade || '').trim(),
+      quotePrice: String(prof.quotePrice || '').trim(),
+    }
+  },
+
+  loadIdentity(platformId) {
+    const input = this.accountInput(platformId)
+    const meta = evalApi.platformEvalMeta(input.platformId)
     const wx = wxAccount.readWxAccount() || {}
-    const nickname = String(prof.platformNickname || '').trim()
-    const douyinId = String(prof.platformAccount || '').trim()
+    this._input = input
     this.setData({
       avatarUrl: String(wx.wxAvatarUrl || '').trim(),
-      avatarLetter: letterOf(nickname || douyinId),
-      nickname,
-      douyinId,
-      canEval: !!(nickname || douyinId),
+      avatarLetter: letterOf(input.nickname || input.accountId),
+      nickname: input.nickname,
+      accountId: input.accountId,
+      accountLabel: meta.accountLabel,
+      nickLabel: meta.nickLabel,
+      levelTitle: meta.levelTitle,
+      levelALabel: meta.levelA,
+      levelBLabel: meta.levelB,
+      basis: evalApi.describeEvalBasis(input),
+      canEval: !!(input.nickname || input.accountId),
     })
   },
 
@@ -118,12 +161,14 @@ Page({
       evaluating: true,
       err: '',
       scoreReady: false,
+      adviceReady: false,
       scorePop: false,
       displayScore: 0,
       situations: [],
+      sections: [],
     })
     try {
-      const score = await evalApi.evaluateTalent(this.data.nickname, this.data.douyinId)
+      const score = await evalApi.evaluateTalent(this._input || this.accountInput())
       this._score = score
       this.setData({
         scoreReady: true,
@@ -144,7 +189,7 @@ Page({
     if (!this.data.scoreReady || this.data.evaluating || this.data.advising) return
     this.setData({ advising: true, err: '' })
     try {
-      const advice = await evalApi.adviseTalent(this.data.nickname, this.data.douyinId, this._score)
+      const advice = await evalApi.adviseTalent(this._input || this.accountInput(), this._score)
       this.setData({
         advising: false,
         adviceReady: true,
