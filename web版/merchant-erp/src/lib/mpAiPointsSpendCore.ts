@@ -273,6 +273,14 @@ export function spendMpAiPointsWithSnapshot(
     ensureMonthlyGiftPointsGranted(data, account, roleOpts)
   }
 
+  if (opts.kind === 'talent_eval' || opts.kind === 'talent_advice') {
+    const role = resolvePointsLibraryRole(data, account, roleOpts)
+    const plan = resolveMembershipPlanForAccount(data, account, role)
+    if (String(plan.id || 'basic') === 'basic') {
+      return { ok: false, error: 'not_found', message: '请先开通会员后再使用达人账号分析' }
+    }
+  }
+
   const role = resolvePointsLibraryRole(data, account, roleOpts)
   const target = resolveRegistryTargetIdForAccount(data, account, role)
   const split = computeAccountQuotaSpendSplit(data, account, opts.kind, {
@@ -349,6 +357,13 @@ export function assertMpAiPointsAffordable(
 ): MpAiPointsSpendResult {
   const roleOpts = { roleHint: opts?.roleHint }
   ensureMonthlyGiftPointsGranted(data, account, roleOpts)
+  if (kind === 'talent_eval' || kind === 'talent_advice') {
+    const role = resolvePointsLibraryRole(data, account, roleOpts)
+    const plan = resolveMembershipPlanForAccount(data, account, role)
+    if (String(plan.id || 'basic') === 'basic') {
+      return { ok: false, error: 'not_found', message: '请先开通会员后再使用达人账号分析' }
+    }
+  }
   if (kind === 'brief' && resolveEffectiveQuotaCell(account, data, 'ai_brief_gen', roleOpts) !== true) {
     return { ok: false, error: 'not_found', message: '当前档位未开通 AI Brief 生成，请升级会员后使用' }
   }

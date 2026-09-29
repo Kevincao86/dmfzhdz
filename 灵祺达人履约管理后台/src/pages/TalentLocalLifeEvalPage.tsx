@@ -8,6 +8,8 @@ import {
   douyinScoreGrade,
   evaluateTalent,
   platformEvalMeta,
+  TALENT_ADVICE_POINTS,
+  TALENT_EVAL_POINTS,
   readSavedTalentEval,
   type EvalAccountInput,
   type LocalLifeAdvice,
@@ -281,7 +283,11 @@ export default function TalentLocalLifeEvalPage() {
           disabled={!canEval || evaluating || advising}
           onClick={() => void onEvaluate()}
         >
-          {evaluating ? '评估中…' : score ? '重新评估' : '达人信息评估'}
+          {evaluating
+            ? '评估中…'
+            : score
+              ? `重新评估 · ${TALENT_EVAL_POINTS}积分`
+              : `达人信息评估 · ${TALENT_EVAL_POINTS}积分`}
         </button>
         <button
           type="button"
@@ -289,7 +295,7 @@ export default function TalentLocalLifeEvalPage() {
           disabled={!score || evaluating || advising}
           onClick={() => void onAdvise()}
         >
-          {advising ? '分析中…' : '分析整改'}
+          {advising ? '分析中…' : `分析整改 · ${TALENT_ADVICE_POINTS}积分`}
         </button>
       </div>
       {!canEval ? (

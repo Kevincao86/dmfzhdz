@@ -469,6 +469,57 @@ async function askDoubao(system: string, user: string): Promise<string> {
   throw new Error(lastErr)
 }
 
+export const TALENT_EVAL_POINTS = 5
+export const TALENT_ADVICE_POINTS = 3
+
+async function postAuth(body: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const candidates = mpApiFetchCandidates('/api/meoo-ops-mp-auth')
+  if (!candidates.length) throw new Error('未配置评估接口')
+  const token = getToken()
+  let lastErr = '积分校验失败'
+  for (let i = 0; i < candidates.length; i += 1) {
+    const url = candidates[i]!
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'X-Mp-Session': token, Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ ...body, sessionToken: token, token }),
+      })
+      const data = (await res.json()) as Record<string, unknown>
+      if (!res.ok || data.ok === false) {
+        const msg = String(data.message || data.detail || data.error || `http_${res.status}`)
+        if ((res.status === 404 || msg === 'not_found') && i < candidates.length - 1) {
+          lastErr = msg
+          continue
+        }
+        throw new Error(msg === 'not_found' ? '请先开通会员后再使用达人账号分析' : msg)
+      }
+      return data
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+      if (i < candidates.length - 1 && /not_found|404/i.test(lastErr)) continue
+      throw e instanceof Error ? e : new Error(lastErr)
+    }
+  }
+  throw new Error(lastErr)
+}
+
+async function assertTalentPoints(kind: 'talent_eval' | 'talent_advice') {
+  await postAuth({ action: 'mp_ai_points_afford', kind })
+}
+
+async function spendTalentPoints(kind: 'talent_eval' | 'talent_advice', note: string) {
+  await postAuth({
+    action: 'mp_ai_points_spend',
+    kind,
+    idempotencyKey: `${kind}-${Date.now()}`,
+    note,
+  })
+}
+
 async function askDoubaoJson(system: string, user: string): Promise<Record<string, unknown>> {
   const first = await askDoubao(system, user)
   try {
@@ -597,11 +648,13 @@ export async function evaluateTalent(raw: EvalAccountInput, opts?: { force?: boo
     const saved = savedFromCache(readCache(key))
     if (saved) return saved.score
   }
+  await assertTalentPoints('talent_eval')
   const j = await askDoubaoJson(
     scoreSystem(spec),
     `${accountFacts(spec, row)}\n请按权重给各板块 points，并给出 risk 和各板块现状。现状用达人自己能看懂的话来写，不要写给商家的合作判断。`,
   )
   const score = buildScore(spec, j)
+  await spendTalentPoints('talent_eval', '达人账号评估')
   writeCache(key, score, true)
   return score
 }
@@ -623,12 +676,14 @@ export async function adviseTalent(
       }
     }
   }
+  await assertTalentPoints('talent_advice')
   const lines = score.situations.map((item) => `${item.name}：${item.now}`).join('\n')
   const j = await askDoubaoJson(
     ADVICE_SYSTEM,
     `${accountFacts(spec, row)}\n评分：${score.score}/100，${spec.levelA} ${score.videoLevel}，${spec.levelB} ${score.liveLevel}。\n现状：\n${lines}\n请只写给达人本人的改法。`,
   )
   const advice: LocalLifeAdvice = { sections: mapSuggestions(j.sections) }
+  await spendTalentPoints('talent_advice', '达人账号分析整改')
   writeCache(key, { advice })
   return advice
 }

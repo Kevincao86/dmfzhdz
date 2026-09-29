@@ -95,6 +95,12 @@ export const MP_POINTS_GOODS_AI_PER_USE = 5
 /** 投流/线索 AI（广告洞察、跟进话术）：5 积分/次；≈¥0.05 */
 export const MP_POINTS_AD_AI_PER_USE = 5
 
+/** 达人账号评估：5 积分/次；一次豆包结构化打分≈¥0.05 */
+export const MP_POINTS_TALENT_EVAL_PER_USE = 5
+
+/** 达人账号分析整改：3 积分/次；短建议≈¥0.03 */
+export const MP_POINTS_TALENT_ADVICE_PER_USE = 3
+
 /**
  * 评价回复 AI：每成功 25 条扣 1 积分，记入 usage_kind=review_ai。
  * 千问 flash 一条约 ¥0.0002–0.0004；25 条成本约 ¥0.005–0.01，对上 1 积分预算与 60% 毛利。
@@ -166,6 +172,8 @@ export type MpPointsUsageKind =
   | 'goods_ai'
   | 'ad_ai'
   | 'review_ai'
+  | 'talent_eval'
+  | 'talent_advice'
 
 export const MP_POINTS_USAGE_KIND_LABELS: Record<MpPointsUsageKind, string> = {
   video: '短视频 AI 检核',
@@ -186,6 +194,8 @@ export const MP_POINTS_USAGE_KIND_LABELS: Record<MpPointsUsageKind, string> = {
   goods_ai: '商品向导 AI',
   ad_ai: '投流/线索 AI',
   review_ai: '评价回复 AI',
+  talent_eval: '达人账号评估',
+  talent_advice: '达人账号分析整改',
 }
 
 const MP_POINTS_PER_SEC_BY_KIND: Partial<Record<MpPointsUsageKind, number>> = {
@@ -241,7 +251,9 @@ export function parseMpPointsUsageKind(raw: unknown): MpPointsUsageKind | null {
     k === 'recruitment_ai' ||
     k === 'goods_ai' ||
     k === 'ad_ai' ||
-    k === 'review_ai'
+    k === 'review_ai' ||
+    k === 'talent_eval' ||
+    k === 'talent_advice'
   ) {
     return k
   }
@@ -266,6 +278,8 @@ export function formatMpPointsRateLabel(kind: MpPointsUsageKind, opts?: { motion
   if (kind === 'recruitment_ai') return `${MP_POINTS_RECRUITMENT_AI_PER_USE} 积分/次`
   if (kind === 'goods_ai') return `${MP_POINTS_GOODS_AI_PER_USE} 积分/次`
   if (kind === 'ad_ai') return `${MP_POINTS_AD_AI_PER_USE} 积分/次`
+  if (kind === 'talent_eval') return `${MP_POINTS_TALENT_EVAL_PER_USE} 积分/次`
+  if (kind === 'talent_advice') return `${MP_POINTS_TALENT_ADVICE_PER_USE} 积分/次`
   if (kind === 'review_ai') {
     return `${MP_POINTS_REVIEW_AI_PER_USE} 积分/${MP_POINTS_REVIEW_AI_REPLIES_PER_CHARGE} 条`
   }
@@ -328,6 +342,8 @@ export function mpPointsCostForUsage(kind: MpPointsUsageKind, opts?: MpPointsCos
   if (kind === 'recruitment_ai') return MP_POINTS_RECRUITMENT_AI_PER_USE
   if (kind === 'goods_ai') return MP_POINTS_GOODS_AI_PER_USE
   if (kind === 'ad_ai') return MP_POINTS_AD_AI_PER_USE
+  if (kind === 'talent_eval') return MP_POINTS_TALENT_EVAL_PER_USE
+  if (kind === 'talent_advice') return MP_POINTS_TALENT_ADVICE_PER_USE
   if (kind === 'review_ai') return MP_POINTS_REVIEW_AI_PER_USE
   return MP_POINTS_ARTICLE_PER_USE
 }

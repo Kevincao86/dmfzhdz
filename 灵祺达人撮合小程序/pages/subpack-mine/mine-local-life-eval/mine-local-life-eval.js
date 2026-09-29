@@ -50,6 +50,8 @@ Page({
     adviceStatus: '',
     sections: [],
     err: '',
+    evalPoints: evalApi.TALENT_EVAL_POINTS,
+    advicePoints: evalApi.TALENT_ADVICE_POINTS,
   },
 
   onLoad() {

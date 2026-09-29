@@ -68,10 +68,13 @@
 
   <view class="eval-dock">
     <button class="btn-main" loading="{{evaluating}}" disabled="{{!canEval || evaluating || advising}}" bindtap="onEvaluate">
-      {{evaluating ? '评估中…' : (scoreReady ? '重新评估' : '达人信息评估')}}
+      <text wx:if="{{evaluating}}">评估中…</text>
+      <text wx:elif="{{scoreReady}}">重新评估 · {{evalPoints}}积分</text>
+      <text wx:else>达人信息评估 · {{evalPoints}}积分</text>
     </button>
     <button class="btn-sub" loading="{{advising}}" disabled="{{!scoreReady || evaluating || advising}}" bindtap="onAdvise">
-      分析整改
+      <text wx:if="{{advising}}">分析中…</text>
+      <text wx:else>分析整改 · {{advicePoints}}积分</text>
     </button>
     <text class="need" wx:if="{{!canEval}}">请先到「我的信息」填写{{nickLabel}}或{{accountLabel}}</text>
     <text class="need" wx:elif="{{!scoreReady}}">请先完成达人信息评估</text>

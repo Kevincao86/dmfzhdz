@@ -10,6 +10,8 @@ const VISUAL_STUDIO_COPY_POINTS = 3
 const VISUAL_STUDIO_IMAGE_POINTS = 8
 /** 高级生图 GPT Image 2：与 Web mpPointsEconomics 对齐 */
 const VISUAL_STUDIO_IMAGE_PRO_POINTS = 150
+const TALENT_EVAL_POINTS = 5
+const TALENT_ADVICE_POINTS = 3
 const VISUAL_STUDIO_PRO_IMAGE_MODEL = 'gpt-image-2'
 
 function authHeaders() {
@@ -63,6 +65,8 @@ function estimatePointsForKind(kind, durationSec) {
   if (kind === 'visual_studio_copy') return VISUAL_STUDIO_COPY_POINTS
   if (kind === 'visual_studio_image') return VISUAL_STUDIO_IMAGE_POINTS
   if (kind === 'visual_studio_image_pro') return VISUAL_STUDIO_IMAGE_PRO_POINTS
+  if (kind === 'talent_eval') return TALENT_EVAL_POINTS
+  if (kind === 'talent_advice') return TALENT_ADVICE_POINTS
   return 0
 }
 
@@ -297,6 +301,27 @@ async function assertAddonAffordable(kind, durationSec) {
   return result
 }
 
+async function assertTalentEvalAffordable(kind) {
+  try {
+    await postAuthAction({
+      action: 'mp_ai_points_afford',
+      kind,
+      ...mpBillingRoleHint.billingRolePayload(),
+    })
+  } catch (e) {
+    const err = new Error(mpApiErrors.formatMpApiErr(e, '请先开通会员后再使用达人账号分析'))
+    err.code = e && e.code ? e.code : ''
+    throw err
+  }
+}
+
+async function spendTalentEvalPoints(kind, note) {
+  return spendPointsKind(kind, {
+    idempotencyKey: `${kind}-${Date.now()}`,
+    note: note || (kind === 'talent_advice' ? '达人账号分析整改' : '达人账号评估'),
+  })
+}
+
 async function spendAddonPoints(kind, opts) {
   try {
     const data = await postAuthAction({
@@ -324,6 +349,8 @@ module.exports = {
   VISUAL_STUDIO_IMAGE_POINTS,
   VISUAL_STUDIO_IMAGE_PRO_POINTS,
   VISUAL_STUDIO_PRO_IMAGE_MODEL,
+  TALENT_EVAL_POINTS,
+  TALENT_ADVICE_POINTS,
   estimateVideoPoints,
   assertLocalPointsEnough,
   checkPointsAffordable,
@@ -335,6 +362,8 @@ module.exports = {
   spendVisualStudioCopyPoints,
   spendVisualStudioImagePoints,
   assertAddonAffordable,
+  assertTalentEvalAffordable,
+  spendTalentEvalPoints,
   spendAddonPoints,
   affordActionFromError,
 }

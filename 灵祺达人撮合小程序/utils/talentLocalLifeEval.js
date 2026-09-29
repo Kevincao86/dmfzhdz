@@ -1,5 +1,6 @@
 const ecs = require('./ecs.js')
 const sessionStore = require('./mpSessionStore.js')
+const pointsSpend = require('./mpPointsSpendApi.js')
 
 const PLATFORM_SPECS = {
   douyin: {
@@ -524,11 +525,13 @@ async function evaluateTalent(raw, opts) {
     const saved = savedFromCache(readCache(key))
     if (saved) return saved.score
   }
+  await pointsSpend.assertTalentEvalAffordable('talent_eval')
   const j = await askDoubaoJson(
     scoreSystem(spec),
     `${accountFacts(spec, row)}\n请按权重给各板块 points，并给出 risk 和各板块现状。现状用达人自己能看懂的话来写，不要写给商家的合作判断。`,
   )
   const score = buildScore(spec, j)
+  await pointsSpend.spendTalentEvalPoints('talent_eval', '达人账号评估')
   writeCache(key, score, true)
   return score
 }
@@ -547,12 +550,14 @@ async function adviseTalent(raw, score, opts) {
       return { sections: mapSuggestions(cached.advice.sections) }
     }
   }
+  await pointsSpend.assertTalentEvalAffordable('talent_advice')
   const lines = score.situations.map((item) => `${item.name}：${item.now}`).join('\n')
   const j = await askDoubaoJson(
     ADVICE_SYSTEM,
     `${accountFacts(spec, row)}\n评分：${score.score}/100，${spec.levelA} ${score.videoLevel}，${spec.levelB} ${score.liveLevel}。\n现状：\n${lines}\n请只写给达人本人的改法。`,
   )
   const advice = { sections: mapSuggestions(j.sections) }
+  await pointsSpend.spendTalentEvalPoints('talent_advice', '达人账号分析整改')
   writeCache(key, { advice })
   return advice
 }
@@ -565,4 +570,6 @@ module.exports = {
   DOUYIN_SCORE_GRADES,
   douyinScoreGrade,
   readSavedTalentEval,
+  TALENT_EVAL_POINTS: pointsSpend.TALENT_EVAL_POINTS,
+  TALENT_ADVICE_POINTS: pointsSpend.TALENT_ADVICE_POINTS,
 }
