@@ -4,7 +4,7 @@ import { isPartnerEdition } from '../../lib/appEdition'
 
 const BASE_NAV = [
   { to: '/', label: '首页' },
-  { to: '/help', label: '帮助手册' },
+  { to: '/help', label: '使用说明' },
   { to: '/team', label: '团队介绍' },
 ] as const
 
