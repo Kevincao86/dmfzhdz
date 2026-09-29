@@ -268,13 +268,13 @@ export default function ProfilePage() {
       to: '/profile/my-orders',
       label: '我的订单',
       desc: '会员开通与积分充值支付记录',
-      group: 'money',
+      group: 'deal',
     },
     {
       to: '/affiliate/portal',
       label: '我的推广',
       desc: '推广码 · 太阳码 · 佣金与商户明细',
-      group: 'money',
+      group: 'deal',
     },
     {
       to: '/profile/ai-review',
