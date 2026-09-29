@@ -26,7 +26,6 @@ import {
   saveDistributionPolicy,
   settlementBatchAction,
   withdrawAction,
-  callbackWithdrawPaid,
   yuanFromCents,
   type RegistryDistributionAffiliate,
   type RegistryDistributionPartnerChannel,
