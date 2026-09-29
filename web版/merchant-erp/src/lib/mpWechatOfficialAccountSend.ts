@@ -134,11 +134,14 @@ export async function sendWechatOaCalendarReminderTemplate(opts: {
   const token = await getWechatOfficialAccountAccessToken()
   const mpAppId = mpWechatAppId()
 
+  const timeValue = formatOaCalendarTime15(opts.eventDateKey)
+  if (timeValue === '—') throw new Error('wx_oa_calendar_time_invalid')
+
   const payload: Record<string, unknown> = {
     touser: oid,
     template_id: templateId,
     data: {
-      time15: { value: formatOaCalendarTime15(opts.eventDateKey) },
+      time15: { value: timeValue },
       thing3: { value: clipThing(oaCalendarProjectLabel(opts.eventTitle, opts.eventKind)) },
       thing14: { value: clipThing(opts.storeName || '商单日程') },
     },
