@@ -244,37 +244,27 @@
 }
 
 .ico-insight {
-  left: 8rpx;
-  bottom: 8rpx;
-  width: 28rpx;
-  height: 28rpx;
+  left: 2rpx;
+  top: 2rpx;
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  background: var(--lq-gradient-tab, linear-gradient(135deg, #7c4dff 0%, #c084fc 100%));
+  box-shadow: 0 4rpx 12rpx rgba(124, 77, 255, 0.45);
 }
 
-.ico-insight-bar {
+.ico-insight-spark {
   position: absolute;
-  bottom: 0;
-  width: 6rpx;
-  border-radius: 3rpx;
-  background: #94a3b8;
+  left: 9rpx;
+  top: 9rpx;
+  width: 22rpx;
+  height: 22rpx;
+  background: #fff;
+  clip-path: polygon(50% 0%, 62% 34%, 100% 50%, 62% 66%, 50% 100%, 38% 66%, 0% 50%, 38% 34%);
 }
 
-.ico-insight-bar--1 {
-  left: 0;
-  height: 12rpx;
-}
-
-.ico-insight-bar--2 {
-  left: 11rpx;
-  height: 20rpx;
-}
-
-.ico-insight-bar--3 {
-  left: 22rpx;
-  height: 28rpx;
-}
-
-.tab-icon.is-active .ico-insight-bar {
-  background: var(--lq-primary);
+.tab-icon.is-active .ico-insight {
+  box-shadow: 0 0 0 4rpx rgba(124, 77, 255, 0.22), 0 6rpx 16rpx rgba(124, 77, 255, 0.5);
 }
 
 /* 消息 */

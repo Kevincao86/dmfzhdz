@@ -32,9 +32,7 @@
           </block>
           <block wx:elif="{{item.icon === 'insight'}}">
             <view class="ico ico-insight">
-              <view class="ico-insight-bar ico-insight-bar--1"></view>
-              <view class="ico-insight-bar ico-insight-bar--2"></view>
-              <view class="ico-insight-bar ico-insight-bar--3"></view>
+              <view class="ico-insight-spark"></view>
             </view>
           </block>
           <block wx:elif="{{item.icon === 'chat'}}">
