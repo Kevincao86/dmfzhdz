@@ -39,6 +39,11 @@ Page({
     scorePop: false,
     videoLevel: '',
     liveLevel: '',
+    showGrade: false,
+    gradeKey: '',
+    gradeLabel: '',
+    gradeNote: '',
+    grades: evalApi.DOUYIN_SCORE_GRADES,
     situations: [],
     tabs: [],
     adviceReady: false,
@@ -76,6 +81,10 @@ Page({
       scorePop: false,
       videoLevel: '',
       liveLevel: '',
+      showGrade: false,
+      gradeKey: '',
+      gradeLabel: '',
+      gradeNote: '',
     })
     this.loadIdentity(id)
   },
@@ -166,15 +175,25 @@ Page({
       displayScore: 0,
       situations: [],
       sections: [],
+      showGrade: false,
+      gradeKey: '',
+      gradeLabel: '',
+      gradeNote: '',
     })
     try {
-      const score = await evalApi.evaluateTalent(this._input || this.accountInput())
+      const input = this._input || this.accountInput()
+      const score = await evalApi.evaluateTalent(input)
       this._score = score
+      const grade = input.platformId === 'douyin' ? evalApi.douyinScoreGrade(score.score) : null
       this.setData({
         scoreReady: true,
         videoLevel: score.videoLevel,
         liveLevel: score.liveLevel,
         situations: score.situations || [],
+        showGrade: !!grade,
+        gradeKey: grade ? grade.key : '',
+        gradeLabel: grade ? grade.label : '',
+        gradeNote: grade ? grade.note : '',
       })
       this.playScore(score.score)
     } catch (e) {

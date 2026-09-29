@@ -31,10 +31,22 @@
       </view>
     </view>
     <text class="label">数据智能分析</text>
+    <view class="grade" wx:if="{{showGrade}}">
+      <text class="grade-label grade-label--{{gradeKey}}">{{gradeLabel}}</text>
+      <text class="grade-note">{{gradeNote}}</text>
+    </view>
     <view class="levels" wx:if="{{scoreReady}}">
       <text class="level-title">{{levelTitle}}</text>
       <text class="level">{{levelALabel}} {{videoLevel}}</text>
       <text class="level">{{levelBLabel}} {{liveLevel}}</text>
+    </view>
+  </view>
+
+  <view class="xingxuan-card advice" wx:if="{{showGrade}}">
+    <text class="advice-title">评级释义</text>
+    <view class="sec {{gradeKey === item.key ? 'sec--on' : ''}}" wx:for="{{grades}}" wx:key="key">
+      <text class="sec-name">{{item.range}}：{{item.label}}</text>
+      <text class="sec-line">{{item.note}}</text>
     </view>
   </view>
 

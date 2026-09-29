@@ -258,6 +258,22 @@ function scoreFromBlocks(spec: PlatformSpec, blocks: { name: string; points: num
   }
 }
 
+export const DOUYIN_SCORE_GRADES = [
+  { key: 'excellent', range: '85~100', label: '优秀', note: '头部达人，稳定高核销' },
+  { key: 'good', range: '70~84', label: '良好', note: '可合作，有明确短板，需要约定履约标准' },
+  { key: 'fix', range: '60~69', label: '待整改', note: '谨慎合作，必须强约束' },
+  { key: 'risk', range: '＜60', label: '高危', note: '不建议合作' },
+] as const
+
+export function douyinScoreGrade(score: number) {
+  const n = Math.round(Number(score))
+  if (!Number.isFinite(n)) return null
+  if (n >= 85) return DOUYIN_SCORE_GRADES[0]
+  if (n >= 70) return DOUYIN_SCORE_GRADES[1]
+  if (n >= 60) return DOUYIN_SCORE_GRADES[2]
+  return DOUYIN_SCORE_GRADES[3]
+}
+
 export function platformEvalMeta(platformId: string) {
   const spec = specOf(platformId)
   return {

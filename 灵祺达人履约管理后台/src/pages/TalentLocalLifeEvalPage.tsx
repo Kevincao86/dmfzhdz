@@ -4,6 +4,8 @@ import { readMember } from '../lib/mpSync/talentMember'
 import {
   adviseTalent,
   describeEvalBasis,
+  DOUYIN_SCORE_GRADES,
+  douyinScoreGrade,
   evaluateTalent,
   platformEvalMeta,
   type EvalAccountInput,
@@ -52,6 +54,7 @@ export default function TalentLocalLifeEvalPage() {
   const [score, setScore] = useState<LocalLifeScore | null>(null)
   const [advice, setAdvice] = useState<LocalLifeAdvice | null>(null)
   const [err, setErr] = useState('')
+  const grade = platformId === 'douyin' && score ? douyinScoreGrade(score.score) : null
 
   useEffect(() => {
     if (!score) return
@@ -191,6 +194,24 @@ export default function TalentLocalLifeEvalPage() {
           </div>
         </div>
         <p className="mt-3 font-medium">数据智能分析</p>
+        {grade ? (
+          <div className="mt-3">
+            <p
+              className={`text-lg font-extrabold ${
+                grade.key === 'excellent'
+                  ? 'text-green-700'
+                  : grade.key === 'good'
+                    ? 'text-violet-700'
+                    : grade.key === 'fix'
+                      ? 'text-amber-700'
+                      : 'text-red-700'
+              }`}
+            >
+              {grade.label}
+            </p>
+            <p className="mt-1 text-sm text-[var(--shell-muted)]">{grade.note}</p>
+          </div>
+        ) : null}
         {score ? (
           <div className="mt-4 space-y-1 text-sm">
             <p className="font-medium">{meta.levelTitle}</p>
@@ -203,6 +224,20 @@ export default function TalentLocalLifeEvalPage() {
           </div>
         ) : null}
       </div>
+
+      {grade ? (
+        <div className="surface-card space-y-3 rounded-xl border p-4 text-left">
+          <p className="font-medium">评级释义</p>
+          {DOUYIN_SCORE_GRADES.map((row) => (
+            <div key={row.key} className="border-t border-violet-100 pt-3">
+              <p className={`text-sm font-semibold ${row.key === grade.key ? 'text-slate-900' : 'text-violet-700'}`}>
+                {row.range}：{row.label}
+              </p>
+              <p className="mt-1 text-sm">{row.note}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {score?.situations?.length ? (
         <div className="surface-card space-y-3 rounded-xl border p-4 text-left">
