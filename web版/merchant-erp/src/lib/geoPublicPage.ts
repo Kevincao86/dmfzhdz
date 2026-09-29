@@ -225,6 +225,115 @@ export function renderGeoPublicLlms(
   return lines.join('\n')
 }
 
+export type GeoPrecisionStore = {
+  name: string
+  poiId: string
+  gaps: string[]
+}
+
+export type GeoPrecisionReport = {
+  /** 精确地址、营业时间、电话三项的齐备比例 */
+  percent: number
+  readyCount: number
+  storeCount: number
+  stores: GeoPrecisionStore[]
+  factPack: string
+}
+
+type PrecisionInput = {
+  name?: string
+  address?: string
+  city?: string
+  phone?: string
+  businessHours?: string
+  announcement?: string
+  addressHierarchy?: string
+  poiId?: string
+  id?: string
+}
+
+export function composeStoreAddress(address?: string, addressHierarchy?: string): string {
+  const a = clip(address, 180)
+  const h = clip(addressHierarchy, 80)
+  if (!h || a.includes(h)) return a
+  return clip(`${h}${a}`, 180)
+}
+
+function addressIsPrecise(address: string): boolean {
+  if (address.length < 8) return false
+  return /区|县|镇|街道/.test(address) || /路|街|巷|号|栋|层|商场|广场/.test(address)
+}
+
+/** 口径卡：只保留能和来客、抖音对上的事实，不含健康分。 */
+export function assessGeoPrecision(raw: PrecisionInput[]): GeoPrecisionReport {
+  const rows = raw
+    .map((s) => ({
+      name: clip(s.name, 80),
+      address: composeStoreAddress(s.address, s.addressHierarchy),
+      city: clip(s.city, 40),
+      phone: clip(s.phone, 40),
+      businessHours: clip(s.businessHours, 80),
+      announcement: clip(s.announcement, 300),
+      poiId: clip(s.poiId ?? s.id, 64),
+    }))
+    .filter((s) => s.name)
+    .slice(0, 20)
+
+  let passed = 0
+  const stores: GeoPrecisionStore[] = rows.map((s) => {
+    const gaps: string[] = []
+    if (!addressIsPrecise(s.address)) gaps.push('地址未到区、路或门牌')
+    else passed += 1
+    if (!s.businessHours) gaps.push('缺营业时间')
+    else passed += 1
+    if (!s.phone) gaps.push('缺电话')
+    else passed += 1
+    return { name: s.name, poiId: s.poiId, gaps }
+  })
+  const checks = rows.length * 3
+  const blocks = rows.map((s) =>
+    [
+      `【${s.name}】`,
+      `地址：${s.address || '资料未提供'}`,
+      s.city ? `城市：${s.city}` : '',
+      `营业时间：${s.businessHours || '资料未提供'}`,
+      `电话：${s.phone || '资料未提供'}`,
+      s.announcement ? `公告：${s.announcement}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n'),
+  )
+  const factPack = [
+    '只使用下面写出的事实回答。没有写出的价格、停车、团购、人均，一律回答「资料未提供」。',
+    ...blocks,
+  ].join('\n\n')
+  return {
+    percent: checks === 0 ? 0 : Math.round((passed / checks) * 100),
+    readyCount: stores.filter((s) => s.gaps.length === 0).length,
+    storeCount: stores.length,
+    stores,
+    factPack: rows.length ? factPack : '',
+  }
+}
+
+/** 咨询回复里若出现口径卡没有的电话、价格或停车，标出来。 */
+export function factReplyDrift(reply: string, factPack: string): string[] {
+  const factsOnly = factPack.includes('\n\n') ? factPack.slice(factPack.indexOf('\n\n') + 2) : factPack
+  const issues: string[] = []
+  const packDigits = factsOnly.replace(/\D/g, '')
+  const phones = reply.match(/1[3-9]\d{9}|0\d{2,3}-?\d{7,8}/g) ?? []
+  for (const phone of phones) {
+    const digits = phone.replace(/\D/g, '')
+    if (digits.length >= 7 && !packDigits.includes(digits)) {
+      issues.push(`回答里的电话 ${phone} 不在口径卡中`)
+    }
+  }
+  if (/人均|元\/人|停车/.test(reply) && !/人均|停车/.test(factsOnly)) {
+    issues.push('回答提到了口径卡里没有的价格或停车')
+  }
+  return issues.slice(0, 5)
+}
+
 export function renderGeoPublicSitemap(
   pages: Array<{ doc: GeoPublicDoc }>,
   origin = GEO_PUBLIC_ORIGIN,

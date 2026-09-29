@@ -33,7 +33,6 @@ import {
   GEO_HEALTH_SCORE,
   INFO_COMPLETENESS,
   OPTIMIZE_TODO,
-  PLATFORM_SYNC_FEATURE,
   QUESTION_COVERAGE,
   QUESTION_COVERAGE_FEATURE,
   STORE_INFO_FEATURE,
@@ -50,6 +49,7 @@ import {
   GeoStoreBreakdownTable,
 } from '../components/geo/GeoOverviewEnhancements'
 import { loadGeoScoreSnapshot, saveGeoScoreSnapshot } from '../lib/geoPersist'
+import { assessGeoPrecision, composeStoreAddress, factReplyDrift } from '../lib/geoPublicPage'
 import { loadSavedGeoPublicLink, publishGeoPublicPage, type GeoPublicLink } from '../services/geoPublicApi'
 import {
   buildGeoScoreContextPayload,
@@ -118,47 +118,9 @@ function mapAiTodoToAction(t: { title: string; type: string; priority: string },
   }
 }
 
-/** 基于抖音来客门店行 + 当前评分结果生成咨询测试用的知识包 */
-function buildGeoAiKnowledgePack(args: {
-  scopeLabel: string
-  accountName?: string
-  stores: DouyinStoreRow[]
-  infoCompletenessPercent: number
-  questionCoveragePercent: number
-  contentFreshnessPercent: number
-  healthScore: number
-  lastStructuredContentUpdateMs: number
-  querySamples: readonly { q: string; covered: boolean }[]
-}): string {
-  const lastAt = new Date(args.lastStructuredContentUpdateMs).toLocaleString('zh-CN', { hour12: false })
-  const blocks = args.stores.slice(0, 12).map((s, i) => {
-    const lines = [
-      `【门店${i + 1}】${s.name}（poi_id: ${s.id}）`,
-      s.brandName ? `- 品牌：${s.brandName}` : null,
-      s.address ? `- 地址：${s.address}` : `- 地址：（来客未返回或待补充）`,
-      s.businessHours ? `- 营业：${s.businessHours}` : `- 营业：（待补充）`,
-      s.phone ? `- 电话：${s.phone}` : `- 电话：（待补充）`,
-      s.avatarUrl ? `- 门头/外显图：已维护` : `- 门头图：缺失或不可解析`,
-      s.announcement ? `- 公告摘要：${s.announcement.slice(0, 200)}` : null,
-      s.updatedAt ? `- 同步/更新时间：${s.updatedAt}` : null,
-    ].filter(Boolean)
-    return lines.join('\n')
-  })
-  return [
-    `【评分范围】${args.scopeLabel}`,
-    args.accountName ? `【来客账户】${args.accountName}` : null,
-    `【GEO 指标】健康分 ${args.healthScore}/100；信息完整度 ${args.infoCompletenessPercent}%；问法覆盖率 ${args.questionCoveragePercent}%；内容新鲜度 ${args.contentFreshnessPercent}%`,
-    `【内容时效参考】最近门店数据时间：${lastAt}`,
-    `【门店事实（抖音来客）】`,
-    ...blocks,
-    `【问法覆盖样例】`,
-    ...args.querySamples.map(
-      (r) => `- 「${r.q}」：${r.covered ? '事实侧可支撑回答' : '事实侧待补齐'}`,
-    ),
-    `【说明】数据来自已绑定抖音来客门店接口，用于 GEO 咨询测试。`,
-  ]
-    .filter(Boolean)
-    .join('\n')
+/** 咨询测试只投喂可核对事实，不带健康分。 */
+function buildGeoAiKnowledgePack(stores: DouyinStoreRow[]): string {
+  return assessGeoPrecision(stores).factPack
 }
 
 function readDouyinToken(): string | null {
@@ -389,6 +351,11 @@ export default function GeoPage() {
     [activeStores],
   )
 
+  const precision = useMemo(() => {
+    const source = activeStores.length ? activeStores : pickerRows
+    return assessGeoPrecision(source)
+  }, [activeStores, pickerRows])
+
   const hasScore = Boolean(liveMetrics)
   const viewInputs = liveMetrics?.inputs ?? {
     infoCompletenessPercent: 0,
@@ -403,7 +370,7 @@ export default function GeoPage() {
     const stores = source
       .map((s) => ({
         name: s.name,
-        address: s.address || '',
+        address: composeStoreAddress(s.address, s.addressHierarchy),
         city: s.city || '',
         phone: s.phone || '',
         businessHours: s.businessHours || '',
@@ -660,18 +627,8 @@ export default function GeoPage() {
     if (!liveMetrics || activeStores.length === 0) {
       return '（请先完成「同步来客并 AI 综合评分」，以生成可投喂模型的知识包）'
     }
-    return buildGeoAiKnowledgePack({
-      scopeLabel: scopeDisplayName,
-      accountName: accountNameFromApi,
-      stores: activeStores,
-      infoCompletenessPercent: liveMetrics.inputs.infoCompletenessPercent,
-      questionCoveragePercent: liveMetrics.inputs.questionCoveragePercent,
-      contentFreshnessPercent: liveMetrics.inputs.contentFreshnessPercent,
-      healthScore: liveMetrics.healthScore,
-      lastStructuredContentUpdateMs: liveMetrics.lastStructuredContentUpdateMs,
-      querySamples,
-    })
-  }, [liveMetrics, activeStores, scopeDisplayName, accountNameFromApi, querySamples])
+    return buildGeoAiKnowledgePack(activeStores)
+  }, [liveMetrics, activeStores])
 
   const runGeoGenerateConsultQuestion = useCallback(async () => {
     setConsultErr(null)
@@ -1059,7 +1016,7 @@ export default function GeoPage() {
               <strong className="font-medium text-gray-700">「AI 生成咨询文案」</strong>
               生成贴近真实场景的模拟问法（优先覆盖待补齐字段），再
               <strong className="font-medium text-gray-700">「发送至 AI 模型」</strong>
-              查看回答是否准确、是否瞎编。这次请求会把知识包直接交给你绑定的模型，公开的豆包、千问不会因此提到本店。
+              查看回答是否准确、是否瞎编。这次只把口径卡交给你绑定的模型，健康分不会送进去。公开的豆包、千问仍看不到这次请求。
             </p>
           </div>
 
@@ -1147,6 +1104,15 @@ export default function GeoPage() {
                 <pre className="ui-hint-block mt-2 whitespace-pre-wrap font-sans text-sm text-gray-800">
                   {consultReply}
                 </pre>
+                {factReplyDrift(consultReply, geoKnowledgePack).length > 0 ? (
+                  <ul className="mt-3 list-inside list-disc text-sm text-amber-800">
+                    {factReplyDrift(consultReply, geoKnowledgePack).map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-3 text-xs text-emerald-800">回复未发现口径卡以外的电话、价格或停车。</p>
+                )}
               </div>
             ) : null}
           </div>
@@ -1506,9 +1472,44 @@ export default function GeoPage() {
           <div>
             <h2 className="text-xl font-bold text-gray-900">AI 引用发布</h2>
             <p className="mt-1 text-sm text-gray-500">
-              {PLATFORM_SYNC_FEATURE.oneClickSync}。页面是公开 HTML，带店名、地址、营业时间、电话和常见问答，检索式模型可以抓取。
-              {PLATFORM_SYNC_FEATURE.syncStatus}。
+              精准度只看三件事能不能和来客对上：精确到区、路或门牌的地址，营业时间，电话。咨询测试和公开页都只用这张口径卡。
             </p>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h3 className="font-semibold text-gray-900">口径精准度 {precision.percent}%</h3>
+                <p className="mt-1 text-sm text-gray-600">
+                  {precision.storeCount
+                    ? `${precision.readyCount}/${precision.storeCount} 家店三项都齐。缺的项先在来客补上，再同步。公开模型要对上，把下面这张卡写进来客和抖音简介。`
+                    : '还没有门店。请先绑定抖音来客，并在页顶同步门店。'}
+                </p>
+              </div>
+              {precision.factPack ? (
+                <button
+                  type="button"
+                  className="text-sm font-medium text-blue-600 hover:underline"
+                  onClick={() => void navigator.clipboard.writeText(precision.factPack)}
+                >
+                  复制口径卡
+                </button>
+              ) : null}
+            </div>
+            {precision.stores.length > 0 ? (
+              <ul className="mt-4 space-y-2 text-sm text-gray-800">
+                {precision.stores.map((s) => (
+                  <li key={s.poiId || s.name} className="flex gap-2">
+                    <span className={s.gaps.length ? 'text-amber-700' : 'text-emerald-700'}>
+                      {s.gaps.length ? '待补' : '已齐'}
+                    </span>
+                    <span>
+                      {s.name}
+                      {s.gaps.length ? `：${s.gaps.join('、')}` : ''}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </div>
           <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             <p className="text-sm text-gray-700">
