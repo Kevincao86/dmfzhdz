@@ -260,6 +260,7 @@ function talentMenusForIdentity(identity) {
   }
   return withManualMenu([
     { key: 'profile', label: '我的信息', sub: '多平台达人资料（抖音/小红书等）', icon: 'info' },
+    { key: 'localLifeEval', label: '抖音本地生活评估', sub: '豆包预估评分、下月带货等级与整改', icon: 'chart' },
     { key: 'accountBind', label: '账号绑定', sub: '微信 · 抖音 · 手机号 · 邮箱', icon: 'info' },
     { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
     { key: 'targetedInvites', label: '我的邀约', sub: 'PR 定向合作邀约，接受或拒绝', icon: 'list' },
@@ -300,6 +301,7 @@ function buildPrMenus() {
 
 const MENU_URLS = {
   profile: '/pages/register/register?edit=1',
+  localLifeEval: '/pages/subpack-mine/mine-local-life-eval/mine-local-life-eval',
   applications: '/pages/subpack-mine/mine-applications/mine-applications',
   targetedInvites: '/pages/subpack-mine/mine-targeted-invites/mine-targeted-invites',
   wechatOaBind: '/pages/subpack-mine/mine-wechat-oa-bind/mine-wechat-oa-bind',

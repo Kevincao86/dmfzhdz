@@ -104,6 +104,15 @@ export default function ProfilePage() {
       label: profileMenuLabel,
       desc: profileDesc,
     },
+    ...(!isPr && workId !== 'shoot' && workId !== 'edit'
+      ? [
+          {
+            to: '/profile/local-life-eval',
+            label: '抖音本地生活评估',
+            desc: '豆包预估评分、下月带货等级与整改',
+          },
+        ]
+      : []),
     ...(isPr
       ? [
           {

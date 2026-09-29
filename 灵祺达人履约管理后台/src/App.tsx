@@ -19,6 +19,7 @@ import FavoritesPage from './pages/FavoritesPage'
 import AnalyticsPage from './pages/AnalyticsPage'
 import SupportPage from './pages/SupportPage'
 import TalentProfilePage from './pages/TalentProfilePage'
+import TalentLocalLifeEvalPage from './pages/TalentLocalLifeEvalPage'
 import TalentPrQuotesPage from './pages/TalentPrQuotesPage'
 import SupplierProfilePage from './pages/SupplierProfilePage'
 import PrDouyinLinkePage from './pages/PrDouyinLinkePage'
@@ -199,6 +200,7 @@ export default function App() {
         <Route path="/profile/funnel" element={<XingxuanFunnelPage />} />
         <Route path="/profile/support" element={<SupportPage />} />
         <Route path="/profile/talent" element={<TalentProfilePage />} />
+        <Route path="/profile/local-life-eval" element={<TalentLocalLifeEvalPage />} />
         <Route path="/profile/pr-quotes" element={<TalentPrQuotesPage />} />
         <Route path="/profile/supplier" element={<SupplierProfilePage />} />
         <Route path="/profile/pr" element={<PrProfilePage />} />

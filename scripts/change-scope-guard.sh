@@ -97,6 +97,7 @@ list_scopes() {
   mp_ads_today           商家小程序投流「今日数据」按上海时区当天账户报表，不再用近7日汇总
   studio_scene_review   商家小程序视觉工坊玩法二级选项；达人/星选视频审核按团购带货与品宣打卡等场景分规则
   video_rule_links      达人小程序与星选短视频审核增加平台官方规则链接页
+  talent_local_life_eval 达人小程序与星选：抖音本地生活信息评估（豆包预估分、下月带货等级、整改）
   xingxuan_mine_ui      星选：AI审核进我的、增值服务加AI短剧；网页壳层与我的页本地重排
   xingxuan_ui_script_rules  星选网页按钮/布局重排；文稿审核（小红书/大众点评）规则页：星选Web+达人/星选小程序
   xingxuan_ui_desk          星选网页按确认的台账样式稿改 UI（仅 CSS/壳层，不改功能）
@@ -1512,6 +1513,19 @@ AffiliatePortalSection
 WalletPage.tsx
 mine-wallet
 mpDistributionAffiliatePortal
+change-scope-guard
+PAT
+      ;;
+    talent_local_life_eval)
+      cat <<'PAT'
+talentLocalLifeEval
+mine-local-life-eval
+TalentLocalLifeEvalPage
+ProfilePage.tsx
+App.tsx
+shellNavConfig
+灵祺达人撮合小程序/pages/mine/mine.js
+灵祺达人撮合小程序/app.json
 change-scope-guard
 PAT
       ;;

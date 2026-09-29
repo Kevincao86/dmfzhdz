@@ -103,6 +103,7 @@ export function pageTitleForPath(pathname: string, search: string): { section: s
     '/profile/my-orders': '我的订单',
     '/profile/membership': '会员中心',
     '/profile/talent': '达人资料',
+    '/profile/local-life-eval': '抖音本地生活评估',
     '/profile/pr': 'PR 资料',
     '/profile/supplier': '团队资料',
     '/profile/ai-review/script-rules': '平台文稿审核规则',

@@ -1,0 +1,43 @@
+<view class="xingxuan-page page-shell {{lqThemeClass}}">
+  <view class="xingxuan-card ident">
+    <image class="avatar" src="{{avatarUrl}}" mode="aspectFill" wx:if="{{avatarUrl}}" />
+    <view class="avatar avatar--ph" wx:else>{{avatarLetter}}</view>
+    <text class="nick">{{nickname || '未填写昵称'}}</text>
+    <text class="did">抖音号 {{douyinId || '未填写'}}</text>
+  </view>
+
+  <view class="xingxuan-card hero">
+    <view class="ring {{evaluating ? 'ring--spin' : ''}}" style="background: conic-gradient(#7c4dff {{displayScore}}%, #efeaf8 0);">
+      <view class="ring-hole">
+        <text class="score">{{displayScore}}</text>
+      </view>
+    </view>
+    <text class="label">豆包预估分</text>
+    <text class="hint">豆包预估，不是来客官方等级</text>
+    <view class="levels" wx:if="{{scoreReady}}">
+      <text class="level-title">预估下月带货等级</text>
+      <text class="level">视频带货力 {{videoLevel}}</text>
+      <text class="level">直播带货力 {{liveLevel}}</text>
+      <text class="basis" wx:if="{{basis}}">{{basis}}</text>
+    </view>
+  </view>
+
+  <button class="btn-main" loading="{{evaluating}}" disabled="{{!canEval || evaluating || advising}}" bindtap="onEvaluate">
+    达人信息评估
+  </button>
+  <button class="btn-sub" loading="{{advising}}" disabled="{{!canEval || evaluating || advising}}" bindtap="onAdvise">
+    分析整改
+  </button>
+  <text class="need" wx:if="{{!canEval}}">请先到「我的信息」填写抖音昵称或抖音号</text>
+  <text class="err" wx:if="{{err}}">{{err}}</text>
+
+  <view class="xingxuan-card advice" wx:if="{{adviceReady}}">
+    <text class="advice-title">现状</text>
+    <text class="advice-status">{{adviceStatus}}</text>
+    <view class="sec" wx:for="{{sections}}" wx:key="name">
+      <text class="sec-name">{{item.name}}</text>
+      <text class="sec-line" wx:if="{{item.now}}">现状：{{item.now}}</text>
+      <text class="sec-line">接下来：{{item.next}}</text>
+    </view>
+  </view>
+</view>
