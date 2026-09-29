@@ -7,15 +7,16 @@ const SCORE_SYSTEM = [
   '不要编造粉丝数、核销额、GMV 或具体成交数字。',
   '只输出一个 JSON 对象，不要 Markdown，不要额外说明。',
   '不要写「公开资料不足」「仅供参考」「不是官方」「弱预估」这类提示句。',
-  '字段：score 为 0 到 100 的整数；videoLevel 为 Lv0 到 Lv8，表示预估下月视频带货力；liveLevel 为 Lv0 到 Lv8，表示预估下月直播带货力。',
+  '字段：score 为 0 到 100 的整数；videoLevel 为 Lv0 到 Lv8，表示预估下月视频带货力；liveLevel 为 Lv0 到 Lv8，表示预估下月直播带货力；situations 为 3 到 5 项，每项含 name、now。',
+  'now 不超过 40 字，只写该板块现状，不要写建议。name 从这些板块里选：内容种草、探店转化、粉丝匹配、直播带货、账号风险。',
 ].join('')
 
 const ADVICE_SYSTEM = [
-  '你是豆包。按抖音本地生活达人场景写现状和整改，不是来客官方诊断。',
-  '不要编造粉丝数、核销额、GMV。不要写「公开资料不足」「仅供参考」「无法判断」这类提示句，直接写现状和可执行动作。',
+  '你是豆包。按已给出的达人现状写整改建议，不要再复述现状。',
+  '不要编造粉丝数、核销额、GMV。不要写「公开资料不足」「仅供参考」「无法判断」这类提示句。',
   '只输出一个 JSON 对象，不要 Markdown。',
-  '字段：status 为不超过 80 字的现状；sections 为 3 到 5 项，每项含 name、now、next。',
-  'name 从这些板块里选：内容种草、探店转化、粉丝匹配、直播带货、账号风险。',
+  '字段：sections 为 3 到 5 项，每项只含 name、next。next 不超过 40 字，只写接下来怎么改。',
+  'name 与现状里的板块一致。',
 ].join('')
 
 function authHeaders() {
@@ -76,7 +77,27 @@ function identityLine(nickname, douyinId) {
 }
 
 function cacheKey(nickname, douyinId) {
-  return `lq_local_life_eval_v1:${String(nickname || '').trim()}|${String(douyinId || '').trim()}`
+  return `lq_local_life_eval_v2:${String(nickname || '').trim()}|${String(douyinId || '').trim()}`
+}
+
+function mapSituations(rows) {
+  return (Array.isArray(rows) ? rows : [])
+    .map((row) => ({
+      name: String(row && row.name ? row.name : '').trim().slice(0, 12),
+      now: String(row && row.now ? row.now : '').trim().slice(0, 40),
+    }))
+    .filter((row) => row.name && row.now)
+    .slice(0, 5)
+}
+
+function mapSuggestions(rows) {
+  return (Array.isArray(rows) ? rows : [])
+    .map((row) => ({
+      name: String(row && row.name ? row.name : '').trim().slice(0, 12),
+      next: String(row && row.next ? row.next : '').trim().slice(0, 40),
+    }))
+    .filter((row) => row.name && row.next)
+    .slice(0, 5)
 }
 
 function readCache(nickname, douyinId) {
@@ -98,48 +119,42 @@ function writeCache(nickname, douyinId, patch) {
 
 async function evaluateTalent(nickname, douyinId) {
   const cached = readCache(nickname, douyinId)
-  if (cached && cached.videoLevel && cached.liveLevel) {
+  if (cached && cached.videoLevel && cached.liveLevel && Array.isArray(cached.situations) && cached.situations.length) {
     return {
       score: clampScore(cached.score),
       videoLevel: levelText(cached.videoLevel),
       liveLevel: levelText(cached.liveLevel),
+      situations: mapSituations(cached.situations),
     }
   }
   const j = await askDoubao(
     SCORE_SYSTEM,
-    `${identityLine(nickname, douyinId)}\n请给出本地生活达人 0-100 预估分，以及预估下月视频带货力和直播带货力。同一昵称和抖音号每次必须给出相同分数和相同等级。`,
+    `${identityLine(nickname, douyinId)}\n请给出本地生活达人 0-100 预估分、预估下月视频带货力和直播带货力，并列出各板块现状。同一昵称和抖音号每次必须给出相同分数、等级和现状。`,
   )
   const score = {
     score: clampScore(j.score),
     videoLevel: levelText(j.videoLevel),
     liveLevel: levelText(j.liveLevel),
+    situations: mapSituations(j.situations),
   }
   writeCache(nickname, douyinId, score)
   return score
 }
 
 async function adviseTalent(nickname, douyinId, score) {
+  if (!score || !Array.isArray(score.situations) || !score.situations.length) {
+    throw new Error('请先完成达人信息评估')
+  }
   const cached = readCache(nickname, douyinId)
-  if (cached && cached.advice && cached.advice.status) return cached.advice
-  const extra = score
-    ? `\n已有评分：${score.score}/100，预估下月视频带货力 ${score.videoLevel}，直播带货力 ${score.liveLevel}。`
-    : ''
+  if (cached && cached.advice && Array.isArray(cached.advice.sections) && cached.advice.sections.length) {
+    return { sections: mapSuggestions(cached.advice.sections) }
+  }
+  const lines = score.situations.map((row) => `${row.name}：${row.now}`).join('\n')
   const j = await askDoubao(
     ADVICE_SYSTEM,
-    `${identityLine(nickname, douyinId)}${extra}\n请分析现状，并列出接下来要优化的板块。`,
+    `${identityLine(nickname, douyinId)}\n评分：${score.score}/100，视频带货力 ${score.videoLevel}，直播带货力 ${score.liveLevel}。\n现状：\n${lines}\n请只给出整改建议。`,
   )
-  const sections = Array.isArray(j.sections) ? j.sections : []
-  const advice = {
-    status: String(j.status || '').trim().slice(0, 80),
-    sections: sections
-      .map((row) => ({
-        name: String(row && row.name ? row.name : '').trim().slice(0, 12),
-        now: String(row && row.now ? row.now : '').trim().slice(0, 80),
-        next: String(row && row.next ? row.next : '').trim().slice(0, 80),
-      }))
-      .filter((row) => row.name && (row.now || row.next))
-      .slice(0, 5),
-  }
+  const advice = { sections: mapSuggestions(j.sections) }
   writeCache(nickname, douyinId, { advice })
   return advice
 }

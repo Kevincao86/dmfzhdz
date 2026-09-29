@@ -25,6 +25,7 @@ Page({
     scorePop: false,
     videoLevel: '',
     liveLevel: '',
+    situations: [],
     tabs: [],
     adviceReady: false,
     adviceStatus: '',
@@ -105,8 +106,7 @@ Page({
       scoreReady: false,
       scorePop: false,
       displayScore: 0,
-      adviceReady: false,
-      sections: [],
+      situations: [],
     })
     try {
       const score = await evalApi.evaluateTalent(this.data.nickname, this.data.douyinId)
@@ -115,6 +115,7 @@ Page({
         scoreReady: true,
         videoLevel: score.videoLevel,
         liveLevel: score.liveLevel,
+        situations: score.situations || [],
       })
       this.playScore(score.score)
     } catch (e) {
@@ -126,14 +127,13 @@ Page({
   },
 
   async onAdvise() {
-    if (!this.data.canEval || this.data.evaluating || this.data.advising) return
+    if (!this.data.scoreReady || this.data.evaluating || this.data.advising) return
     this.setData({ advising: true, err: '' })
     try {
       const advice = await evalApi.adviseTalent(this.data.nickname, this.data.douyinId, this._score)
       this.setData({
         advising: false,
         adviceReady: true,
-        adviceStatus: advice.status,
         sections: advice.sections,
       })
     } catch (e) {

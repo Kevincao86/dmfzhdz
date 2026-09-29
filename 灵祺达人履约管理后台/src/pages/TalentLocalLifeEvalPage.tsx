@@ -52,7 +52,6 @@ export default function TalentLocalLifeEvalPage() {
     setEvaluating(true)
     setErr('')
     setScore(null)
-    setAdvice(null)
     setScorePop(false)
     setDisplayScore(0)
     try {
@@ -66,7 +65,7 @@ export default function TalentLocalLifeEvalPage() {
   }
 
   async function onAdvise() {
-    if (!canEval || evaluating || advising) return
+    if (!score || evaluating || advising) return
     setAdvising(true)
     setErr('')
     try {
@@ -148,6 +147,18 @@ export default function TalentLocalLifeEvalPage() {
         ) : null}
       </div>
 
+      {score?.situations?.length ? (
+        <div className="surface-card space-y-3 rounded-xl border p-4 text-left">
+          <p className="font-medium">达人现状</p>
+          {score.situations.map((row) => (
+            <div key={row.name} className="border-t border-violet-100 pt-3">
+              <p className="text-sm font-semibold text-violet-700">{row.name}</p>
+              <p className="mt-1 text-sm">{row.now}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
       <div className="flex flex-col gap-3">
         <button
           type="button"
@@ -160,7 +171,7 @@ export default function TalentLocalLifeEvalPage() {
         <button
           type="button"
           className="rounded-xl border border-violet-300 bg-white px-4 py-3 text-sm font-medium text-violet-700 disabled:opacity-50"
-          disabled={!canEval || evaluating || advising}
+          disabled={!score || evaluating || advising}
           onClick={() => void onAdvise()}
         >
           {advising ? '分析中…' : '分析整改'}
@@ -168,18 +179,18 @@ export default function TalentLocalLifeEvalPage() {
       </div>
       {!canEval ? (
         <p className="text-center text-sm text-[var(--shell-muted)]">请先到「我的信息」填写抖音昵称或抖音号</p>
+      ) : !score ? (
+        <p className="text-center text-sm text-[var(--shell-muted)]">请先完成达人信息评估</p>
       ) : null}
       {err ? <p className="text-center text-sm text-red-600">{err}</p> : null}
 
-      {advice ? (
+      {advice?.sections?.length ? (
         <div className="surface-card space-y-3 rounded-xl border p-4">
-          <p className="font-medium">现状</p>
-          <p className="text-sm text-[var(--shell-muted)]">{advice.status}</p>
+          <p className="font-medium">整改建议</p>
           {advice.sections.map((row) => (
             <div key={row.name} className="border-t border-violet-100 pt-3">
               <p className="text-sm font-semibold text-violet-700">{row.name}</p>
-              {row.now ? <p className="mt-1 text-sm">现状：{row.now}</p> : null}
-              <p className="mt-1 text-sm">接下来：{row.next}</p>
+              <p className="mt-1 text-sm">{row.next}</p>
             </div>
           ))}
         </div>

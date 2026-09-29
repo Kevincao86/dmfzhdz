@@ -23,22 +23,29 @@
     </view>
   </view>
 
+  <view class="xingxuan-card advice" wx:if="{{scoreReady && situations.length}}">
+    <text class="advice-title">达人现状</text>
+    <view class="sec" wx:for="{{situations}}" wx:key="name">
+      <text class="sec-name">{{item.name}}</text>
+      <text class="sec-line">{{item.now}}</text>
+    </view>
+  </view>
+
   <button class="btn-main" loading="{{evaluating}}" disabled="{{!canEval || evaluating || advising}}" bindtap="onEvaluate">
     达人信息评估
   </button>
-  <button class="btn-sub" loading="{{advising}}" disabled="{{!canEval || evaluating || advising}}" bindtap="onAdvise">
+  <button class="btn-sub" loading="{{advising}}" disabled="{{!scoreReady || evaluating || advising}}" bindtap="onAdvise">
     分析整改
   </button>
   <text class="need" wx:if="{{!canEval}}">请先到「我的信息」填写抖音昵称或抖音号</text>
+  <text class="need" wx:elif="{{!scoreReady}}">请先完成达人信息评估</text>
   <text class="err" wx:if="{{err}}">{{err}}</text>
 
   <view class="xingxuan-card advice" wx:if="{{adviceReady}}">
-    <text class="advice-title">现状</text>
-    <text class="advice-status">{{adviceStatus}}</text>
+    <text class="advice-title">整改建议</text>
     <view class="sec" wx:for="{{sections}}" wx:key="name">
       <text class="sec-name">{{item.name}}</text>
-      <text class="sec-line" wx:if="{{item.now}}">现状：{{item.now}}</text>
-      <text class="sec-line">接下来：{{item.next}}</text>
+      <text class="sec-line">{{item.next}}</text>
     </view>
   </view>
 
