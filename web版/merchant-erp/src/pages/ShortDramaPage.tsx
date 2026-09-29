@@ -1659,13 +1659,15 @@ function buildDramaXiaoyunquePrompt(opts: {
   return [
     opts.identity,
     multi
-      ? `【形象锁定】第1张是角色对照条，从左到右：${names.map((n, i) => `${i + 1}.${n}`).join('、')}。成片必须让这些人都入画、有对手戏，禁止只出现其中一人。每人必须是对照条里对应那张脸和衣服。对照条不是成片构图，禁止把它原样当镜头。禁止抠图贴图、禁止白边贴纸、禁止左右分屏、禁止另起文案空间。`
-      : `【形象锁定】第1张只提供${lead}的脸、衣服和店内空间（同一张脸、同一套衣服、同一家店）。成片必须按【分镜必演】演戏，禁止整段维持首帧站姿。禁止抠图贴图、禁止白边贴纸、禁止左右分屏、禁止另起文案空间。`,
+      ? opts.hasSceneRefs
+        ? `【形象锁定】第1张是角色对照条，从左到右：${names.map((n, i) => `${i + 1}.${n}`).join('、')}。成片必须让这些人都入画、有对手戏，禁止只出现其中一人。每人必须是对照条里对应那张脸和衣服。对照条不是成片构图，禁止把它原样当镜头。禁止抠图贴图、禁止白边贴纸、禁止左右分屏。`
+        : `【形象锁定】第1张只锁定这些人的脸和衣服：${names.map((n, i) => `${i + 1}.${n}`).join('、')}。成片必须让这些人都入画、有对手戏。禁止沿用照片里的棚拍或纯色底当背景。`
+      : opts.hasSceneRefs
+        ? `【形象锁定】第1张只提供${lead}的脸和衣服（同一张脸、同一套衣服）。成片必须按【分镜必演】演戏，禁止整段维持首帧站姿。背景以参考画面为准。禁止抠图贴图、禁止白边贴纸、禁止左右分屏。`
+        : `【形象锁定】第1张只锁定${lead}的脸和衣服。成片必须按【分镜必演】演戏，禁止整段维持首帧站姿。禁止沿用照片里的棚拍、纯色底或无关房间当背景。`,
     opts.hasSceneRefs
-      ? multi
-        ? '【场景锁定】第2张是店内实拍，灯光、家具、走廊必须与实拍一致；所有角色要走进这些空间里对手戏，不要只站在对照条里。'
-        : '【场景锁定】第2张是店内实拍，灯光、家具、走廊必须与实拍一致；人物要走进这些空间里做事，不要只站在一张定妆里。'
-      : '',
+      ? '【背景锁定】已上传参考画面。成片的空间、灯光、家具和陈设必须按参考画面出片，人物走进这个背景里演戏。禁止换成故事文字里的另一间房、另一条街或棚拍。'
+      : '【故事配景】没有上传参考画面。若第1张是角色定妆或对照条，只取脸和衣服，场景、道具和灯光按一句话故事重搭。若第1张已是上一段成片尾帧，就沿用该画面里的场景继续演，保持同一空间。',
     opts.actionPlaybook?.trim() || '',
     opts.story.trim(),
     '请按一句话故事多镜编排成片。必须有中文对白人声和环境声，禁止无声片、禁止只配字幕不发声。竖屏 9:16。前 3 秒必须冲突或反转。必须按对白钩子演戏，禁止改成一个人在走廊走路。不要字幕水印 Logo。',
@@ -2120,13 +2122,13 @@ function dramaJimengPhotoReady(cfg: VideoAiBackendConfig | null): boolean {
 function dramaXiaoyunqueHint(cfg: VideoAiBackendConfig | null, cfgLoaded: boolean): string {
   if (!cfgLoaded) return ''
   if (dramaXiaoyunqueReady(cfg)) {
-    return ' 当前：必须同时确认角色形象并上传参考画面，才会生成有声短剧。不能只凭文案出片，失败会直接报原因。'
+    return ' 当前：参考画面可以不传。传了就按参考背景出片；不传就按已确认的故事匹配场景。角色形象仍须确认，不能只凭文案出片。'
   }
   if (dramaJimengPhotoReady(cfg)) {
     const detail = stripVideoVendorNamesFromUserText(String(cfg?.xiaoyunqueProbeDetail || '').trim())
     return (
       ` 当前：视觉云已绑定，但有声短剧探测未通过${detail ? `（${detail}）` : ''}。` +
-      '仍须提交角色图+参考画面；未开通或欠费会明确报错，不会改成纯文案成片。'
+      '参考画面可以不传；未开通或欠费会明确报错，不会改成纯文案成片。'
     )
   }
   return ' 当前：短剧视频未配置。未配置时不能生成，以免走纯文案片。'
@@ -2996,9 +2998,6 @@ export default function ShortDramaPage() {
         if (!raw.startsWith('data:image/')) continue
         scenes.push(await compressPortraitDataUrlForLibrary(raw))
       }
-      if (scenes.length === 0) {
-        throw new Error('请先上传至少一张参考画面。角色图和店内参考必须同时提交，不能只凭文案出片。')
-      }
       let cont = ''
       const contRaw = String(continueFrame ?? '').trim()
       if (contRaw) {
@@ -3007,13 +3006,30 @@ export default function ShortDramaPage() {
           : toDramaImageDataUrl(contRaw)
         if (asData?.startsWith('data:image/')) cont = await compressPortraitDataUrlForLibrary(asData)
       }
+      if (scenes.length === 0) {
+        let storyFrame = cont
+        if (!storyFrame && namedPortraits.length >= 2) {
+          const strip = await composeDramaCastStrip(namedPortraits)
+          if (!strip?.startsWith('data:image/')) {
+            throw new Error('多角色形象未能拼成对照图。请重新确认每位角色后再生成。')
+          }
+          storyFrame = strip
+        } else if (!storyFrame) {
+          storyFrame = portraits[0]!
+        }
+        const storySlot = storyFrame.startsWith('data:image/')
+          ? await compressPortraitDataUrlForLibrary(storyFrame)
+          : ''
+        if (!storySlot) throw new Error('角色形象未能编码。请重新确认后再生成。')
+        return [storySlot]
+      }
       const scenePacked =
         scenes.length > 1 ? (await composeDramaSceneCollage(scenes)) || scenes[0]! : scenes[0] || ''
       const sceneSlot = scenePacked.startsWith('data:image/')
         ? await compressPortraitDataUrlForLibrary(scenePacked)
         : ''
       if (!sceneSlot) {
-        throw new Error('参考画面未能编码成图片。请重新上传店内实拍后再生成。')
+        throw new Error('参考画面未能编码成图片。请重新上传后再生成。')
       }
       const openingAction = String(formula.beats[0] || story || '').trim()
       let firstRaw = cont
@@ -3052,7 +3068,7 @@ export default function ShortDramaPage() {
       }
       const packed = [...new Set([firstSlot, sceneSlot])].slice(0, 2)
       if (packed.length < 2) {
-        throw new Error('角色图和参考画面必须同时提交。请重新上传后再生成。')
+        throw new Error('参考画面已上传，但没能和角色图一起提交。请重新上传后再生成。')
       }
       return packed
     },
@@ -3075,8 +3091,10 @@ export default function ShortDramaPage() {
     }
     if (refItems.length > 0) {
       bits.push(
-        `已上传 ${refItems.length} 份参考画面（含图/视频抽帧），人物必须站进该店内空间并吃到现场灯光（霓虹反射到皮肤与衣服），禁止抠图贴图、白边、图层叠加、悬浮，禁止另起无关空间。必须按戏剧四拍演戏，禁止整段站桩。`,
+        `已上传 ${refItems.length} 份参考画面。成片背景必须按这些画面的空间、灯光和陈设出片，人物站进该背景，禁止抠图贴图、白边、图层叠加，禁止换成别的房间。`,
       )
+    } else {
+      bits.push('未上传参考画面。场景、道具和灯光按一句话故事匹配，禁止套用无关实拍背景。')
     }
     return bits.join('')
   }, [cast, refItems.length, roles])
@@ -3491,21 +3509,18 @@ export default function ShortDramaPage() {
     if (!cfgLoaded) return '正在加载视频引擎配置'
     if (cfg?.configLoadError) return `视频配置加载失败：${cfg.configLoadError.slice(0, 120)}`
     if (!cfg?.xiaoyunqueConfigured) {
-      return '请在运营台完成短剧视频配置后再生成。短剧必须带角色图和参考画面，不再走纯文案模型。'
+      return '请在运营台完成短剧视频配置后再生成。角色形象仍须确认，参考画面可以不传。'
     }
     if (!durationSelected) return '请先选择成片时长'
     if (!story.trim()) return '请先确认一句话故事，或点「AI生成故事」。'
     if (!cast.some((m) => String(m.preview || '').trim())) {
       return '请先确认角色形象（上传照片或生成并确认预览），不能只凭文案生成。'
     }
-    if (refItems.length === 0) {
-      return '请先上传至少一张参考画面，角色和店内场景必须一起用。'
-    }
     if (mediaBusy) return '正在处理参考画面，请稍候'
     if (portraitBusy) return '正在补充角色画像，请稍候'
     if (characterBusy) return '正在生成角色形象，请稍候'
     return null
-  }, [busy, storyBusy, cfgLoaded, cfg, durationSelected, story, cast, refItems.length, mediaBusy, portraitBusy, characterBusy])
+  }, [busy, storyBusy, cfgLoaded, cfg, durationSelected, story, cast, mediaBusy, portraitBusy, characterBusy])
 
   useEffect(() => {
     mountedRef.current = true
@@ -3563,25 +3578,30 @@ export default function ShortDramaPage() {
     onProgress?: (t: string) => void
   }) => {
     const imgs = (opts.images_base64 ?? []).map((s) => String(s).trim()).filter(Boolean)
-    if (imgs.length < 2) {
+    if (imgs.length < 1) {
       return {
         ok: false as const,
-        message: '必须同时提交角色图和参考画面，已拒绝纯文案生成。请确认角色形象并上传店内参考后再试。',
+        message: '请先确认角色形象后再生成。参考画面可以不传，不传时按故事匹配场景。',
       }
     }
+    const sceneLocked = refItems.length > 0
     const identity = buildDramaIdentityLock(cast, roles)
     const leadName = buildDramaStoryCastBrief(cast, roles).leadName
     const castNames = cast
       .filter((m) => m.preview || m.name.trim())
       .map((m, i) => m.name.trim() || `角色${i + 1}`)
     const kb = Math.max(1, Math.round(imgs.reduce((n, s) => n + s.length, 0) / 1370))
-    opts.onProgress?.(`已提交角色+店内参考（${imgs.length} 张，约 ${kb}KB），云端生成有声短剧…`)
+    opts.onProgress?.(
+      sceneLocked
+        ? `已提交角色和参考背景（${imgs.length} 张，约 ${kb}KB），按参考画面背景出片…`
+        : `未上传参考画面（角色 ${imgs.length} 张，约 ${kb}KB），按故事匹配场景…`,
+    )
     const xyqPrompt = buildDramaXiaoyunquePrompt({
       leadName,
       castNames,
       identity,
       story: [opts.prompt, fusionPromptNote].filter(Boolean).join('\n'),
-      hasSceneRefs: true,
+      hasSceneRefs: sceneLocked,
       actionPlaybook,
     })
     const xyq = await runXiaoyunqueVideoJob({
@@ -3601,7 +3621,7 @@ export default function ShortDramaPage() {
       cloudPending: !xyq.ok && xyq.cloudPending === true,
       message:
         formatVideoAiUserError(xyq.ok ? '成片未带上角色/参考图，已丢弃以免变成文案片' : xyq.message) ||
-        '有声短剧未成功。未改走纯文案成片，以免丢掉角色和店内场景。',
+        '有声短剧未成功。未改走纯文案成片，以免丢掉角色。',
     }
   }
 
@@ -3753,9 +3773,10 @@ export default function ShortDramaPage() {
     const castNames = cast
       .filter((m) => m.preview || m.name.trim())
       .map((m, i) => m.name.trim() || `角色${i + 1}`)
-    if (fusionImgs.length < 2) {
-      throw new Error('必须同时提交角色图和参考画面，已拒绝纯文案生成。')
+    if (fusionImgs.length < 1) {
+      throw new Error('请先确认角色形象后再生成。参考画面可以不传。')
     }
+    const sceneLocked = refItems.length > 0
     const xyqPrompt = buildDramaXiaoyunquePrompt({
       leadName,
       castNames,
@@ -3765,10 +3786,14 @@ export default function ShortDramaPage() {
         `目标总时长约 ${total} 秒，竖屏 9:16。`,
         `戏剧四拍：${formula.beats.join(' → ')}。`,
       ].join('\n'),
-      hasSceneRefs: true,
+      hasSceneRefs: sceneLocked,
       actionPlaybook,
     })
-    setProgress(`有声短剧全片（角色+店内参考，约 ${total} 秒，提交后在云端生成）…`)
+    setProgress(
+      sceneLocked
+        ? `有声短剧全片（按参考背景出片，约 ${total} 秒，提交后在云端生成）…`
+        : `有声短剧全片（按故事匹配场景，约 ${total} 秒，提交后在云端生成）…`,
+    )
     const xyq = await runXiaoyunqueVideoJob({
       prompt: xyqPrompt,
       durationSec: total,
@@ -3800,7 +3825,7 @@ export default function ShortDramaPage() {
       return
     }
     setProgress(
-      `全片未出，改分段图生（仍带角色+参考）…（${formatVideoAiUserError(xyq.ok ? '成片未带上参考图' : xyq.message).slice(0, 80)}）`,
+      `全片未出，改分段图生（仍锁定角色${refItems.length > 0 ? '和参考背景' : '，按故事配景'}）…（${formatVideoAiUserError(xyq.ok ? '成片未带上参考图' : xyq.message).slice(0, 80)}）`,
     )
 
     const plan = planLongformSegmentDurations(total)
@@ -3821,8 +3846,8 @@ export default function ShortDramaPage() {
       } else {
         images = await prepareDramaModelImages()
       }
-      if (!images || images.length < 2) {
-        throw new Error('分段生成缺少角色图或参考画面，已停止以免变成文案片。')
+      if (!images || images.length < 1) {
+        throw new Error('分段生成缺少角色图，已停止。')
       }
       const prompt = buildSegmentPrompt({
         meta: metaPrompt,
@@ -3901,9 +3926,11 @@ export default function ShortDramaPage() {
       if (!showPreviewGate) {
         const fusionImgs = await prepareDramaModelImages()
         setProgress(
-          cast.filter((m) => m.preview).length >= 2
-            ? '已提交多角色对照+店内参考，正在生成有声短剧…'
-            : '角色已融入店内实拍，正在生成有声短剧…',
+          refItems.length > 0
+            ? cast.filter((m) => m.preview).length >= 2
+              ? '已提交多角色对照和参考背景，按参考画面出片…'
+              : '角色将进入参考画面背景，正在生成有声短剧…'
+            : '未传参考画面，按一句话故事匹配场景…',
         )
         const prompt = `${metaPrompt}\n${actionPlaybook}\n时长约 ${durationSec} 秒，竖屏 9:16 单段直出。结构：${formula.beats.join(' → ')}。`
         const r = await runOneClip({
@@ -4470,7 +4497,7 @@ export default function ShortDramaPage() {
                     </span>
                   </div>
                   <p className="text-[11px] leading-relaxed text-slate-500">
-                    上传店内实拍、成片参考或短视频。有角色图时，角色和这些画面会一起交给模型，必须按店内场景拍，不会只出角色。
+                    可以不传。传了则成片背景必须按这些画面出；不传则按已确认的一句话故事匹配场景。
                   </p>
                   <input
                     ref={refInputRef}
@@ -5148,9 +5175,9 @@ export default function ShortDramaPage() {
                                 : segmentPlanLabel(durationSec)
                           }。先出前 ${PREVIEW_SEC} 秒试镜，满意再生成全片。`
                         : collectFusionImages().length
-                          ? dramaJimengPhotoReady(cfg)
-                            ? '当前为单段直出，角色照片走有声短剧；提交后在云端生成，断网也会继续。'
-                            : '当前为单段直出，将融合参考画面与角色形象。'
+                          ? refItems.length > 0
+                            ? '当前为单段直出，将按参考画面的背景出片，并锁定角色形象。'
+                            : '当前为单段直出，未传参考画面，将按一句话故事匹配场景。'
                           : '当前为单段直出，无需试镜确认。'
                       : '请先选择成片时长，再生成故事或短剧。'}
               </p>

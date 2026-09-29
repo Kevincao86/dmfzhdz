@@ -361,7 +361,7 @@ function kindLine(promptKind) {
   return '本地生活真人写实竖屏短剧，前 3 秒必须冲突或反转。禁止办公室网文，禁止仙侠古装。'
 }
 
-function buildPrompt(world, scene, shop, story, dialogue, style) {
+function buildPrompt(world, scene, shop, story, dialogue, style, hasSceneRefs) {
   const infoBits = (world.fields || [])
     .map((f) => {
       const v = String((shop && shop[f.key]) || '').trim()
@@ -370,10 +370,13 @@ function buildPrompt(world, scene, shop, story, dialogue, style) {
     .filter(Boolean)
     .join('，')
   const quoted = String(dialogue || '').trim()
+  const sceneLine = hasSceneRefs
+    ? '【背景锁定】已上传参考画面。成片的空间、灯光和陈设必须按参考画面出片。故事只决定动作和对白，禁止改到另一间房或另一条街。'
+    : `【故事配景】未上传参考画面。场景按故事匹配：${scene.mustSee}。${scene.visual}。`
   return [
     `【竖屏短剧·${world.label}·${scene.name}】`,
     kindLine(world.promptKind),
-    `画面必须出现：${scene.mustSee}。${scene.visual}。`,
+    sceneLine,
     style && style.name ? `画风：${style.name}${style.visual ? `（${style.visual}）` : ''}。` : '',
     infoBits ? `创作信息：${infoBits}。` : '',
     `主题：${fillTokens(story || scene.hook, scene, shop)}`,

@@ -3209,10 +3209,10 @@ export async function handleMerchantAiVideoRoutes(input: {
       const xyqImages = Array.isArray(parsed.images_base64)
         ? parsed.images_base64.filter((x) => typeof x === 'string' && String(x).trim()).length
         : 0
-      if (xyqImages < 2) {
+      if (xyqImages < 1) {
         json(res, 400, {
           ok: false,
-          message: '必须同时提交角色图和参考画面，已拒绝纯文案生成。',
+          message: '短剧需要角色形象图，已拒绝纯文案生成。参考画面可以不传。',
         })
         return true
       }

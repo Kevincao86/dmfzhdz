@@ -529,6 +529,9 @@ merchantVideoAiGateway
 videoAiApi
 aiImageDelivery
 meoo-ai-agent-image
+shortDramaCatalogMp
+short-drama.js
+short-drama.wxml
 change-scope-guard
 PAT
       ;;

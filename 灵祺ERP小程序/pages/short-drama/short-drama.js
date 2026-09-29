@@ -424,6 +424,7 @@ Page({
       this.setData({ err: '请先选择成片时长' })
       return
     }
+    const hasRefs = (this.data.refDataUrls || []).length > 0
     const prompt = catalog.buildPrompt(
       world,
       scene,
@@ -431,6 +432,7 @@ Page({
       this.data.story,
       this.data.dialogue,
       catalog.styleOf(this.data.styleId),
+      hasRefs,
     )
     const plan = catalog.planLongformSegmentDurations(total)
     const afford = await erpPoints.checkAddonPointsAffordable('shortvideo', total)
@@ -482,7 +484,9 @@ Page({
         } else {
           images.push(...images0)
         }
-        const segPrompt = `${prompt}\n本段是第 ${i + 1}/${plan.length} 段，时长约 ${segDur} 秒。衔接上一段动作，同角色同场景。`
+        const segPrompt = hasRefs
+          ? `${prompt}\n本段是第 ${i + 1}/${plan.length} 段，时长约 ${segDur} 秒。衔接上一段动作，背景必须继续按参考画面，不要换场景。`
+          : `${prompt}\n本段是第 ${i + 1}/${plan.length} 段，时长约 ${segDur} 秒。衔接上一段动作，场景继续按故事匹配，不要换到无关空间。`
         // eslint-disable-next-line no-await-in-loop
         const done = await this.runDramaClip(segPrompt, segDur, images)
         if (!done.ok || !done.videoUrl) {

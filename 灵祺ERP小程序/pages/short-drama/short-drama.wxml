@@ -59,7 +59,8 @@
       <button class="op-btn-ghost" bindtap="onConfirmCast">{{castConfirmed ? '已确认角色' : '用此图确认角色'}}</button>
     </view>
 
-    <text class="op-label">参考画面（选填，最多 3 张）</text>
+    <text class="op-label">参考画面（可不传，最多 3 张）</text>
+    <text class="op-body muted">传了则按这些画面的背景出片；不传则按 AI 故事匹配场景。</text>
     <button class="op-btn-ghost" bindtap="onPickRefs">上传参考图</button>
     <button wx:if="{{refPaths.length}}" class="op-btn-ghost" bindtap="clearRefs">去掉参考图</button>
     <view wx:if="{{refPaths.length}}" class="op-chips">

@@ -493,7 +493,7 @@ function buildXiaoyunqueSubmitBody(opts: {
     language: 'Chinese',
     enable_watermark: false,
   }
-  /** 槽位 1=角色（或尾帧），槽位 2=店内参考/拼贴。多图原图会撑爆请求，由短剧页先压成 2 张再提交 */
+  /** 槽位 1=角色（或尾帧）。有第 2 张时才是参考背景，成片必须按该背景出。无第 2 张则按故事配景。 */
   if (opts.imageUrls.length) body.img_url_list = opts.imageUrls.slice(0, 2)
   if (opts.binaries.length) body.binary_data_base64 = opts.binaries.slice(0, 2)
   if (opts.videoUrls.length) body.video_url_list = opts.videoUrls.slice(0, 50)
@@ -530,10 +530,10 @@ export async function volcSubmitXiaoyunqueTask(
   const hasVideoRef = videoUrls.length > 0
   const imageCount = imageUrls.length + binaries.length
   const hasImageRef = imageCount > 0
-  if (imageCount < 2) {
+  if (imageCount < 1) {
     return {
       ok: false,
-      message: '必须同时提交角色图和参考画面，已拒绝纯文案生成。',
+      message: '短剧需要角色形象图，已拒绝纯文案生成。参考画面可以不传。',
     }
   }
 

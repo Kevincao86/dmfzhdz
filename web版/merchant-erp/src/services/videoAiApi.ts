@@ -1817,13 +1817,18 @@ export async function runXiaoyunqueVideoJob(opts: {
     opts.flags?.trim() ||
     `--dur ${durationSec} --fps 24 --ratio ${aspect} --wm false`
   const imgs = (opts.images_base64 ?? []).map((s) => String(s).trim()).filter(Boolean)
-  if (imgs.length < 2) {
+  if (imgs.length < 1) {
     return {
       ok: false,
-      message: '短剧必须同时提交角色图和参考画面，已拒绝纯文案生成。',
+      message: '短剧需要先确认角色形象，已拒绝纯文案生成。参考画面可以不传。',
     }
   }
-  opts.onProgress?.(`有声短剧提交中（角色+参考 ${imgs.length} 张，目标 ${durationSec} 秒）…`)
+  const sceneLocked = imgs.length >= 2
+  opts.onProgress?.(
+    sceneLocked
+      ? `有声短剧提交中（角色+参考背景 ${imgs.length} 张，按参考背景出片，目标 ${durationSec} 秒）…`
+      : `有声短剧提交中（仅角色 ${imgs.length} 张，按故事匹配场景，目标 ${durationSec} 秒）…`,
+  )
   const start = await postSeedanceVideoStart({
     prompt: opts.prompt,
     flags,
@@ -1838,7 +1843,7 @@ export async function runXiaoyunqueVideoJob(opts: {
   if (usedNorefText) {
     return {
       ok: false,
-      message: '成片走了无参考文生，已丢弃。角色和店内参考必须进片，请再试。',
+      message: '成片走了无参考文生，已丢弃。角色图必须进片，请再试。',
     }
   }
   if (/jimeng_ti2v|jimeng_i2v|jimeng_vgfm_i2v/i.test(usedModel)) {
