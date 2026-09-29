@@ -1,4 +1,4 @@
-<view class="xingxuan-page page-shell {{lqThemeClass}}">
+<view class="xingxuan-page page-shell {{lqThemeClass}} {{platformId === 'douyin' ? 'xingxuan-page--dock' : ''}}">
   <view class="plats">
     <view
       wx:for="{{platforms}}"
@@ -45,16 +45,6 @@
     </view>
   </view>
 
-  <button class="btn-main" loading="{{evaluating}}" disabled="{{!canEval || evaluating || advising}}" bindtap="onEvaluate">
-    达人信息评估
-  </button>
-  <button class="btn-sub" loading="{{advising}}" disabled="{{!scoreReady || evaluating || advising}}" bindtap="onAdvise">
-    分析整改
-  </button>
-  <text class="need" wx:if="{{!canEval}}">请先到「我的信息」填写抖音昵称或抖音号</text>
-  <text class="need" wx:elif="{{!scoreReady}}">请先完成达人信息评估</text>
-  <text class="err" wx:if="{{err}}">{{err}}</text>
-
   <view class="xingxuan-card advice" wx:if="{{adviceReady}}">
     <text class="advice-title">整改建议</text>
     <view class="sec" wx:for="{{sections}}" wx:key="name">
@@ -65,6 +55,18 @@
   </block>
   <view class="xingxuan-card soon" wx:else>
     <text class="soon-title">功能开放中</text>
+  </view>
+
+  <view class="eval-dock" wx:if="{{platformId === 'douyin'}}">
+    <button class="btn-main" loading="{{evaluating}}" disabled="{{!canEval || evaluating || advising}}" bindtap="onEvaluate">
+      达人信息评估
+    </button>
+    <button class="btn-sub" loading="{{advising}}" disabled="{{!scoreReady || evaluating || advising}}" bindtap="onAdvise">
+      分析整改
+    </button>
+    <text class="need" wx:if="{{!canEval}}">请先到「我的信息」填写抖音昵称或抖音号</text>
+    <text class="need" wx:elif="{{!scoreReady}}">请先完成达人信息评估</text>
+    <text class="err" wx:if="{{err}}">{{err}}</text>
   </view>
 
   <view class="eval-tab-bar">

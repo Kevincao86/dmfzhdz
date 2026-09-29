@@ -170,11 +170,27 @@
   line-height: 1.5;
 }
 
+.eval-dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 18;
+  bottom: calc(96rpx + env(safe-area-inset-bottom));
+  padding: 16rpx 24rpx 12rpx;
+  background: linear-gradient(180deg, rgba(250, 247, 255, 0) 0%, #faf7ff 36%);
+}
+
 .btn-main,
 .btn-sub {
-  margin: 20rpx 24rpx 0;
+  margin: 12rpx 0 0;
   border-radius: 16rpx;
   font-size: 30rpx;
+  line-height: 2.4;
+}
+
+.btn-main::after,
+.btn-sub::after {
+  border: none;
 }
 
 .btn-main {
@@ -190,7 +206,7 @@
 
 .err {
   display: block;
-  margin: 16rpx 24rpx 0;
+  margin: 12rpx 0 0;
   color: #b91c1c;
   font-size: 24rpx;
   text-align: center;
@@ -217,6 +233,10 @@
 .xingxuan-page {
   padding-bottom: calc(128rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
+}
+
+.xingxuan-page--dock {
+  padding-bottom: calc(420rpx + env(safe-area-inset-bottom));
 }
 
 .eval-tab-bar {
