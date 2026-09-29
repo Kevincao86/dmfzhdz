@@ -263,7 +263,7 @@ function talentMenusForIdentity(identity) {
     { key: 'accountBind', label: '账号绑定', sub: '微信 · 抖音 · 手机号 · 邮箱', icon: 'info' },
     { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
     { key: 'targetedInvites', label: '我的邀约', sub: 'PR 定向合作邀约，接受或拒绝', icon: 'list' },
-    { key: 'wechatOaBind', label: '服务号邀约通知', sub: '关注服务号，定向邀约推送到微信', icon: 'star' },
+    { key: 'wechatOaBind', label: '服务号订阅通知', sub: '关注服务号，邀约和日程提醒推到微信', icon: 'star' },
     { key: 'orderCalendar', label: '商单日历', sub: calSub, icon: 'chart' },
     { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
     { key: 'prQuotes', label: '我的报价', sub: '为合作 PR 设置专属报价', icon: 'quote' },

@@ -1,8 +1,8 @@
 <view class="oa-bind-page {{lqThemeClass}}">
   <view class="oa-bind-hero">
     <view class="oa-bind-hero__badge">微信服务号</view>
-    <text class="oa-bind-hero__title">定向邀约通知</text>
-    <text class="oa-bind-hero__sub">绑定「{{oaDisplayName}}」后，PR 定向合作邀约将推送到服务号消息，无需每次授权订阅消息。</text>
+    <text class="oa-bind-hero__title">服务号订阅通知</text>
+    <text class="oa-bind-hero__sub">绑定「{{oaDisplayName}}」后，定向邀约和商单日历提醒会推到服务号，无需每次点授权。</text>
   </view>
 
   <view wx:if="{{loading}}" class="oa-bind-card oa-bind-card--center">
