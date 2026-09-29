@@ -4,10 +4,11 @@ import {
   markTrainingPayoutsPaid,
   type TrainingPayoutRow,
 } from '../opsTrainingReviewApi'
+import { parsePayoutCallbackIds, payoutCallbackSummary } from '../payoutCallbackCsv'
 
 const TABS = [
   { id: 'pending', label: '待打款' },
-  { id: 'paid', label: '已打款' },
+  { id: 'paid', label: '打款成功' },
 ] as const
 
 function money(n: number) {
@@ -29,7 +30,7 @@ function csvCell(value: string) {
 }
 
 function exportPayouts(rows: TrainingPayoutRow[]) {
-  const header = ['收款户名', '收款账号', '开户行', '实发金额', '主体', '申请时间', '提现单号', '备注']
+  const header = ['收款户名', '收款账号', '开户行', '实发金额', '主体', '申请时间', '提现编号', '备注']
   const lines = [header.join(',')]
   rows.forEach((row) => {
     const account = row.bankNo ? `="${row.bankNo}"` : ''
@@ -64,6 +65,7 @@ export default function OpsTrainingPayoutsPage() {
   const [tab, setTab] = useState<(typeof TABS)[number]['id']>('pending')
   const [picked, setPicked] = useState<string[]>([])
   const [err, setErr] = useState('')
+  const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
 
   const load = useCallback(async () => {
@@ -91,7 +93,7 @@ export default function OpsTrainingPayoutsPage() {
   async function markPaid() {
     const ids = pickedRows.filter((row) => row.status === 'pending').map((row) => row.id)
     if (!ids.length) return
-    if (!window.confirm(`确认把 ${ids.length} 笔标为已打款？请先完成银行转账。`)) return
+    if (!window.confirm(`确认把 ${ids.length} 笔标为打款成功？请先完成银行转账。`)) return
     setBusy(true)
     setErr('')
     try {
@@ -104,15 +106,36 @@ export default function OpsTrainingPayoutsPage() {
     }
   }
 
+  async function onCallbackFile(file: File) {
+    const ids = parsePayoutCallbackIds(await file.text())
+    if (!ids.length) {
+      setErr('回传文件里没有提现编号')
+      return
+    }
+    setBusy(true)
+    setErr('')
+    setNotice('')
+    try {
+      const result = await markTrainingPayoutsPaid(ids)
+      setNotice(payoutCallbackSummary(result))
+      await load()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '回传失败')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div>
         <h1 className="ops-page-title text-xl font-semibold">课时费提现</h1>
         <p className="ops-muted mt-1 text-sm">
-          达人在小程序发起提现后出现在这里。勾选后导出 CSV，用网银或支付宝批量打到收款账户，打完再标记已打款。
+          达人在小程序发起提现后出现在这里。导出名单打款后，按提现编号回传打款记录。回传成功后，这里显示打款成功，达人端显示提现成功。
         </p>
       </div>
       {err ? <p className="ops-hint-warn text-sm">{err}</p> : null}
+      {notice ? <p className="text-sm text-emerald-700">{notice}</p> : null}
       <div className="flex flex-wrap items-center gap-2">
         {TABS.map((item) => {
           const count = rows.filter((row) => row.status === item.id).length
@@ -143,9 +166,23 @@ export default function OpsTrainingPayoutsPage() {
         </button>
         {tab === 'pending' ? (
           <button type="button" className="ops-btn-soft" disabled={busy || !pickedRows.length} onClick={() => void markPaid()}>
-            标记已打款
+            标记打款成功
           </button>
         ) : null}
+        <label className={`ops-btn-soft ${busy ? 'pointer-events-none opacity-60' : ''}`}>
+          回传打款记录
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            disabled={busy}
+            onChange={(event) => {
+              const file = event.target.files?.[0]
+              event.target.value = ''
+              if (file) void onCallbackFile(file)
+            }}
+          />
+        </label>
       </div>
       <div className="overflow-x-auto rounded-xl border border-[var(--ops-border)] bg-[var(--ops-panel)]">
         <table className="min-w-full text-left text-sm">
@@ -160,6 +197,7 @@ export default function OpsTrainingPayoutsPage() {
               <th className="p-3">实发</th>
               <th className="p-3">佣金 / 个税</th>
               <th className="p-3">申请时间</th>
+              <th className="p-3">提现编号</th>
               <th className="p-3">状态</th>
             </tr>
           </thead>
@@ -181,7 +219,8 @@ export default function OpsTrainingPayoutsPage() {
                   <div>{whenText(row.createdAt)}</div>
                   {row.paidAt ? <div className="ops-muted text-xs">打款 {whenText(row.paidAt)}</div> : null}
                 </td>
-                <td className="p-3">{row.status === 'paid' ? '已打款' : '待打款'}</td>
+                <td className="p-3 font-mono text-xs">{row.id}</td>
+                <td className="p-3">{row.status === 'paid' ? '打款成功' : '待打款'}</td>
               </tr>
             ))}
           </tbody>

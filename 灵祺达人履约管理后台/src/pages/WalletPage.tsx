@@ -386,7 +386,7 @@ export default function WalletPage() {
                   </p>
                 </div>
                 <span className={row.status === 'paid' ? 'text-emerald-700' : 'text-amber-700'}>
-                  {row.status === 'paid' ? '已打款' : '待打款'}
+                  {row.status === 'paid' ? '提现成功' : '待打款'}
                 </span>
               </div>
             ))}

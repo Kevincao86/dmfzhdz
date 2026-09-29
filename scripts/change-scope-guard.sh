@@ -1444,6 +1444,23 @@ web版/merchant-erp/.gitignore
 change-scope-guard
 PAT
       ;;
+    payout_callback)
+      cat <<'PAT'
+OpsTrainingPayoutsPage
+OpsDistributionPage
+opsTrainingReviewApi
+opsDistributionApi
+payoutCallbackCsv
+mpTrainingPay
+distributionRegistryCore
+distributionAffiliatePortalClient
+AffiliatePortalSection
+WalletPage.tsx
+mine-wallet
+mpDistributionAffiliatePortal
+change-scope-guard
+PAT
+      ;;
     *)
       echo ""
       ;;

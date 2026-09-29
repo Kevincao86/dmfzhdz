@@ -15,6 +15,7 @@ import {
   batchPatchAffiliateCommission,
   batchPatchPartnerCommission,
   batchPatchSalespersonCommission,
+  callbackWithdrawPaid,
   createSettlementBatch,
   loadDistributionSnapshot,
   patchAffiliateCommission,
@@ -25,11 +26,13 @@ import {
   saveDistributionPolicy,
   settlementBatchAction,
   withdrawAction,
+  callbackWithdrawPaid,
   yuanFromCents,
   type RegistryDistributionAffiliate,
   type RegistryDistributionPartnerChannel,
   type RegistryDistributionPolicy,
 } from '../opsDistributionApi'
+import { parsePayoutCallbackIds, payoutCallbackSummary } from '../payoutCallbackCsv'
 
 const AFFILIATE_STATUS_LABEL: Record<string, string> = {
   pending: '待审核',
@@ -46,7 +49,7 @@ const WITHDRAW_STATUS_LABEL: Record<string, string> = {
   pending_review: '待审核',
   approved: '已通过',
   rejected: '已拒绝',
-  paid: '已打款',
+  paid: '打款成功',
   failed: '打款失败',
 }
 
@@ -309,7 +312,7 @@ function exportWithdrawCsv(
     paidAt?: string
   }>,
 ) {
-  const header = ['申请人', '类型', '金额', '渠道', '状态', '申请时间', '打款时间', '单号']
+  const header = ['申请人', '类型', '金额', '渠道', '状态', '申请时间', '打款时间', '提现编号']
   const lines = [header.join(',')]
   rows.forEach((row) => {
     const cells = [
@@ -341,6 +344,7 @@ export default function OpsDistributionPage() {
   const [tab, setTab] = useState<TabId>(searchParams.get('tab') === 'withdraw' ? 'withdraw' : 'policy')
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
+  const [callbackNote, setCallbackNote] = useState('')
   const [policy, setPolicy] = useState<RegistryDistributionPolicy>(mergeDistributionPolicy(null))
   const [affiliates, setAffiliates] = useState<RegistryDistributionAffiliate[]>([])
   const [partners, setPartners] = useState<RegistryDistributionPartnerChannel[]>([])
@@ -450,19 +454,52 @@ export default function OpsDistributionPage() {
           </h1>
           <p className="mt-1 max-w-3xl text-sm text-slate-400">
             {withdrawOnly
-              ? '审核通过后导出名单打款，再标记已付。网页端和小程序读同一份申请状态。'
+              ? '导出名单打款后，按提现编号回传打款记录。回传后这里显示打款成功，申请人端显示提现成功。'
               : 'P1 提现审核 · P2 结算批次 · 单个/批量调整个人分销员与服务商（代理商）佣金比例。数据写入注册表扩展字段。'}
           </p>
         </div>
         {tab === 'withdraw' ? (
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-lg border border-[var(--ops-border)] px-3 py-2 text-sm text-slate-300 disabled:opacity-50"
-            disabled={!shownWithdraws.length}
-            onClick={() => exportWithdrawCsv(shownWithdraws)}
-          >
-            导出当前列表
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-lg border border-[var(--ops-border)] px-3 py-2 text-sm text-slate-300 disabled:opacity-50"
+              disabled={!shownWithdraws.length}
+              onClick={() => exportWithdrawCsv(shownWithdraws)}
+            >
+              导出当前列表
+            </button>
+            {canEdit ? (
+              <label className="inline-flex cursor-pointer items-center rounded-lg border border-[var(--ops-border)] px-3 py-2 text-sm text-slate-300">
+                回传打款记录
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0]
+                    event.target.value = ''
+                    if (!file) return
+                    void file.text().then(async (text) => {
+                      const ids = parsePayoutCallbackIds(text)
+                      if (!ids.length) {
+                        setErr('回传文件里没有提现编号')
+                        setCallbackNote('')
+                        return
+                      }
+                      setErr(null)
+                      const result = await callbackWithdrawPaid(ids)
+                      if (!result.ok) {
+                        setErr(result.error || '回传失败')
+                        return
+                      }
+                      setCallbackNote(payoutCallbackSummary(result))
+                      await reload()
+                    })
+                  }}
+                />
+              </label>
+            ) : null}
+          </div>
         ) : null}
         <button
           type="button"
@@ -477,6 +514,7 @@ export default function OpsDistributionPage() {
       {err ? (
         <p className="rounded-lg border border-red-900/50 bg-red-950/40 px-3 py-2 text-sm text-red-300">{err}</p>
       ) : null}
+      {callbackNote ? <p className="text-sm text-emerald-300">{callbackNote}</p> : null}
 
       {withdrawOnly ? null : <div className="flex flex-wrap gap-2 border-b border-[var(--ops-border)] pb-2">
         {TABS.map((t) => (
@@ -829,6 +867,7 @@ export default function OpsDistributionPage() {
             <thead className="bg-slate-900/80 text-xs text-slate-400">
               <tr>
                 <th className="p-2">申请人</th>
+                <th className="p-2">提现编号</th>
                 <th className="p-2">金额</th>
                 <th className="p-2">渠道</th>
                 <th className="p-2">状态</th>
@@ -841,6 +880,7 @@ export default function OpsDistributionPage() {
               {shownWithdraws.map((w) => (
                 <tr key={w.id} className="border-t border-slate-800">
                   <td className="p-2 text-white">{w.ownerLabel}</td>
+                  <td className="p-2 font-mono text-xs text-slate-300">{w.id}</td>
                   <td className="p-2">¥{yuanFromCents(w.amountCents)}</td>
                   <td className="p-2 text-slate-400">{w.channel === 'manual_bank' ? '银行转账' : w.channel === 'manual_alipay' ? '支付宝' : w.channel}</td>
                   <td className="p-2">{withdrawStatusLabel(w.status)}</td>
@@ -863,7 +903,7 @@ export default function OpsDistributionPage() {
                             if (ref) void withdrawAction(w.id, 'mark_paid', { externalBillNo: ref }).then(reload)
                           }}
                         >
-                          标记已付
+                          标记打款成功
                         </button>
                       ) : null}
                     </td>

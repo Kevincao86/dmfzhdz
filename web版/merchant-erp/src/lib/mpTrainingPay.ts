@@ -592,18 +592,27 @@ export function listTrainingPayouts(): TrainingPayoutRow[] {
 
 export function markTrainingPayoutsPaid(ids: string[]) {
   const set = new Set(ids.map((id) => String(id || '').trim()).filter(Boolean))
-  if (!set.size) return { ok: false as const, error: '请选择要标记的提现' }
+  if (!set.size) return { ok: false as const, error: '回传文件里没有提现编号' }
   const bag = readBag()
+  const known = new Set(bag.payouts.map((row) => String(row.id || '')))
   const now = new Date().toISOString()
+  const alreadyPaid: string[] = []
+  const missing: string[] = []
   let updated = 0
+  for (const id of set) {
+    if (!known.has(id)) missing.push(id)
+  }
   for (const row of bag.payouts) {
     const id = String(row.id || '')
-    if (!set.has(id) || row.status === 'paid') continue
+    if (!set.has(id)) continue
+    if (row.status === 'paid') {
+      alreadyPaid.push(id)
+      continue
+    }
     row.status = 'paid'
     row.paidAt = now
     updated += 1
   }
-  if (!updated) return { ok: false as const, error: '没有可标记的待打款记录' }
-  writeBag(bag)
-  return { ok: true as const, updated }
+  if (updated) writeBag(bag)
+  return { ok: true as const, updated, alreadyPaid, missing }
 }

@@ -109,7 +109,7 @@ export function withdrawRequestStatusLabel(status: string): string {
     case 'rejected':
       return '已拒绝'
     case 'paid':
-      return '已打款'
+      return '提现成功'
     case 'failed':
       return '打款失败'
     default:

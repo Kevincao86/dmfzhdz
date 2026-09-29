@@ -775,7 +775,7 @@ export function withdrawRequestStatusLabel(status: RegistryDistributionWithdrawR
     case 'rejected':
       return '已拒绝'
     case 'paid':
-      return '已打款'
+      return '提现成功'
     case 'failed':
       return '打款失败'
     default:
@@ -817,7 +817,9 @@ export function patchWithdrawRequestFromSnapshot(
     row.failReason = String(body.failReason || body.opsNote || '已拒绝').trim()
     adjustWallet(data, row.ownerType, row.ownerId, row.amountCents, -row.amountCents, 0)
   } else if (action === 'mark_paid') {
-    if (row.status !== 'approved') return { ok: false, error: 'invalid_status', status: 400 }
+    if (row.status !== 'approved' && row.status !== 'pending_review') {
+      return { ok: false, error: 'invalid_status', status: 400 }
+    }
     row.status = 'paid'
     row.paidAt = ts
     row.externalBillNo = String(body.externalBillNo || body.bankReference || '').trim() || undefined
@@ -971,6 +973,32 @@ export function applyDistributionRegistryAction(
       const r = patchWithdrawRequestFromSnapshot(data, String(body.requestId || ''), sub, body)
       if (!r.ok) return r
       return { ok: true, result: { request: r.request } }
+    }
+    case 'withdraw_callback_paid': {
+      const ids = normalizeIds(body.ids)
+      const updated: string[] = []
+      const alreadyPaid: string[] = []
+      const missing: string[] = []
+      const skipped: string[] = []
+      for (const id of ids) {
+        const row = data.distributionWithdrawRequests?.find((item) => item.id === id)
+        if (!row) {
+          missing.push(id)
+          continue
+        }
+        if (row.status === 'paid') {
+          alreadyPaid.push(id)
+          continue
+        }
+        if (row.status !== 'approved' && row.status !== 'pending_review') {
+          skipped.push(id)
+          continue
+        }
+        const r = patchWithdrawRequestFromSnapshot(data, id, 'mark_paid', body)
+        if (!r.ok) skipped.push(id)
+        else updated.push(id)
+      }
+      return { ok: true, result: { updated, alreadyPaid, missing, skipped } }
     }
     case 'settlement_batch_create': {
       const r = createSettlementBatchFromSnapshot(data, body)

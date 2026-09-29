@@ -25,7 +25,7 @@ function withdrawStatusLabel(status) {
     pending_review: '待审核',
     approved: '已通过',
     rejected: '已拒绝',
-    paid: '已打款',
+    paid: '提现成功',
     failed: '打款失败',
   }
   return map[status] || status

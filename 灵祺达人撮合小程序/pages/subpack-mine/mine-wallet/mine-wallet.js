@@ -61,7 +61,7 @@ Page({
           id: row.id,
           net: Number(row.net || 0).toFixed(2),
           status: row.status === 'paid' ? 'paid' : 'pending',
-          statusText: row.status === 'paid' ? '已打款' : '待打款',
+          statusText: row.status === 'paid' ? '提现成功' : '待打款',
           createdAt: String(row.createdAt || '').slice(0, 16).replace('T', ' '),
           paidAt: row.paidAt ? String(row.paidAt).slice(0, 16).replace('T', ' ') : '',
         })),

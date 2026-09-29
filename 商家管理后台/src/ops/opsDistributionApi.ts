@@ -181,6 +181,25 @@ export async function withdrawAction(
   return { ok: j.ok !== false, error: j.error as string | undefined }
 }
 
+export async function callbackWithdrawPaid(ids: string[]): Promise<{
+  ok: boolean
+  error?: string
+  updated: string[]
+  alreadyPaid: string[]
+  missing: string[]
+  skipped: string[]
+}> {
+  const j = await postDistribution({ action: 'withdraw_callback_paid', ids })
+  return {
+    ok: j.ok !== false,
+    error: j.error as string | undefined,
+    updated: Array.isArray(j.updated) ? (j.updated as string[]) : [],
+    alreadyPaid: Array.isArray(j.alreadyPaid) ? (j.alreadyPaid as string[]) : [],
+    missing: Array.isArray(j.missing) ? (j.missing as string[]) : [],
+    skipped: Array.isArray(j.skipped) ? (j.skipped as string[]) : [],
+  }
+}
+
 export async function createSettlementBatch(body: {
   payeeType: 'partner_tenant' | 'individual_affiliate'
   payeeId: string

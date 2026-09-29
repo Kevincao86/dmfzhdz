@@ -93,9 +93,19 @@ export async function markTrainingPayoutsPaid(ids: string[]) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'markPayoutsPaid', ids }),
   })
-  const data = (await res.json()) as { ok?: boolean; error?: string; updated?: number }
-  if (!res.ok || data.ok === false) throw new Error(data.error || '标记失败')
-  return data.updated || 0
+  const data = (await res.json()) as {
+    ok?: boolean
+    error?: string
+    updated?: number
+    alreadyPaid?: string[]
+    missing?: string[]
+  }
+  if (!res.ok || data.ok === false) throw new Error(data.error || '回传失败')
+  return {
+    updated: data.updated || 0,
+    alreadyPaid: Array.isArray(data.alreadyPaid) ? data.alreadyPaid : [],
+    missing: Array.isArray(data.missing) ? data.missing : [],
+  }
 }
 
 export async function postTrainingReview(body: Record<string, unknown>) {

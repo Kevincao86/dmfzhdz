@@ -383,7 +383,7 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
           {affiliate.status === 'active' && withdrawGate ? (
             <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
               <h4 className="text-sm font-medium text-gray-900">提现申请明细</h4>
-              <p className="text-xs text-slate-500">运营审核并标记打款后，状态将同步更新为「已打款」。</p>
+              <p className="text-xs text-slate-500">运营回传打款记录后，状态会更新为「提现成功」。</p>
               {!data?.withdrawRequests?.length ? (
                 <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
                   暂无提现记录，提交申请后将在此显示进度。
