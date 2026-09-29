@@ -74,7 +74,7 @@ async function askDoubao(system: string, user: string): Promise<Record<string, u
         body: JSON.stringify({
           provider: 'doubao',
           stream: false,
-          temperature: 0.3,
+          temperature: 0,
           messages: [
             { role: 'system', content: system },
             { role: 'user', content: user },
@@ -109,16 +109,47 @@ function identityLine(nickname: string, douyinId: string) {
   return `昵称：${nickname || '未填写'}\n抖音号：${douyinId || '未填写'}`
 }
 
+function cacheKey(nickname: string, douyinId: string) {
+  return `lq_local_life_eval_v1:${nickname.trim()}|${douyinId.trim()}`
+}
+
+function readCache(nickname: string, douyinId: string): Record<string, unknown> | null {
+  try {
+    const raw = localStorage.getItem(cacheKey(nickname, douyinId))
+    if (!raw) return null
+    const j = JSON.parse(raw) as Record<string, unknown>
+    if (typeof j.score !== 'number') return null
+    return j
+  } catch {
+    return null
+  }
+}
+
+function writeCache(nickname: string, douyinId: string, patch: Record<string, unknown>) {
+  const prev = readCache(nickname, douyinId) || {}
+  localStorage.setItem(cacheKey(nickname, douyinId), JSON.stringify({ ...prev, ...patch }))
+}
+
 export async function evaluateTalent(nickname: string, douyinId: string): Promise<LocalLifeScore> {
+  const cached = readCache(nickname, douyinId)
+  if (cached && cached.videoLevel && cached.liveLevel) {
+    return {
+      score: clampScore(cached.score),
+      videoLevel: levelText(cached.videoLevel),
+      liveLevel: levelText(cached.liveLevel),
+    }
+  }
   const j = await askDoubao(
     SCORE_SYSTEM,
-    `${identityLine(nickname, douyinId)}\n请给出本地生活达人 0-100 预估分，以及预估下月视频带货力和直播带货力。`,
+    `${identityLine(nickname, douyinId)}\n请给出本地生活达人 0-100 预估分，以及预估下月视频带货力和直播带货力。同一昵称和抖音号每次必须给出相同分数和相同等级。`,
   )
-  return {
+  const score = {
     score: clampScore(j.score),
     videoLevel: levelText(j.videoLevel),
     liveLevel: levelText(j.liveLevel),
   }
+  writeCache(nickname, douyinId, score)
+  return score
 }
 
 export async function adviseTalent(
@@ -126,15 +157,21 @@ export async function adviseTalent(
   douyinId: string,
   score: LocalLifeScore | null,
 ): Promise<LocalLifeAdvice> {
+  const cached = readCache(nickname, douyinId)
+  const cachedAdvice = cached?.advice
+  if (cachedAdvice && typeof cachedAdvice === 'object') {
+    const advice = cachedAdvice as LocalLifeAdvice
+    if (advice.status) return advice
+  }
   const extra = score
-    ? `\n已有豆包预估分：${score.score}/100，预估下月视频带货力 ${score.videoLevel}，直播带货力 ${score.liveLevel}。`
+    ? `\n已有评分：${score.score}/100，预估下月视频带货力 ${score.videoLevel}，直播带货力 ${score.liveLevel}。`
     : ''
   const j = await askDoubao(
     ADVICE_SYSTEM,
     `${identityLine(nickname, douyinId)}${extra}\n请分析现状，并列出接下来要优化的板块。`,
   )
   const sections = Array.isArray(j.sections) ? j.sections : []
-  return {
+  const advice: LocalLifeAdvice = {
     status: String(j.status || '').trim().slice(0, 80),
     sections: sections
       .map((row) => {
@@ -148,4 +185,6 @@ export async function adviseTalent(
       .filter((row) => row.name && (row.now || row.next))
       .slice(0, 5),
   }
+  writeCache(nickname, douyinId, { advice })
+  return advice
 }
