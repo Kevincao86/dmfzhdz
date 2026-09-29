@@ -93,6 +93,8 @@ type ReconcileRow = {
   verifyOrderCount: number
   salesAmountYuan: number
   verifyAmountYuan: number
+  refundAmountYuan?: number
+  refundCouponCount?: number
 }
 
 function buildEmptyHourlyTrend(): FinanceHourlyPayPoint[] {
@@ -111,9 +113,7 @@ async function loadReconcileRows(
   range: DashboardRange,
 ): Promise<{ rows: ReconcileRow[]; hourlyTrend?: FinanceHourlyPayPoint[] }> {
   if (platform === 'douyin') {
-    const r = await fetchDouyinFinanceReconcileRows(bearer, startYmd, endYmd, {
-      skipUpdateQuery: true,
-    })
+    const r = await fetchDouyinFinanceReconcileRows(bearer, startYmd, endYmd)
     return {
       rows: r.rows,
       hourlyTrend: range === 'realtime' ? (r.hourlyTrend ?? buildEmptyHourlyTrend()) : undefined,
@@ -152,12 +152,16 @@ function aggregateDashboard(rows: ReconcileRow[]) {
   let verifyAmount = 0
   let orderCount = 0
   let verifyOrderCount = 0
+  let refundAmount = 0
+  let refundCouponCount = 0
   const trendMap = new Map<string, number>()
   for (const row of rows) {
     payAmount += row.salesAmountYuan
     verifyAmount += row.verifyAmountYuan
     orderCount += row.orderCount
     verifyOrderCount += row.verifyOrderCount
+    refundAmount += row.refundAmountYuan ?? 0
+    refundCouponCount += row.refundCouponCount ?? 0
     const label = ymdToTrendLabel(row.date)
     trendMap.set(label, (trendMap.get(label) ?? 0) + row.salesAmountYuan)
   }
@@ -170,6 +174,8 @@ function aggregateDashboard(rows: ReconcileRow[]) {
   return {
     payAmount: Math.round(payAmount * 100) / 100,
     verifyAmount: Math.round(verifyAmount * 100) / 100,
+    refundAmount: Math.round(refundAmount * 100) / 100,
+    refundCouponCount,
     conversionRate,
     orderCount,
     trend,

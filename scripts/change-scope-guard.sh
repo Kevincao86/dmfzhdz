@@ -104,6 +104,7 @@ list_scopes() {
   ads_studio_review      本地推投流免进设置页、商家小程序 AI 标签对齐星选、审核规则半月刷新
   account_identity_bind  商家账号：邮箱注册、社交登录绑手机、同号合并、个人中心绑定态
   login_session_refresh  商家 Web/小程序：登录仍在但 access token 过期时先刷新再请求
+  merchant_shop_metrics  商家小程序经营分析与商家 ERP 看板：营收/核销/退款金额与成交券、退款券
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -1536,6 +1537,21 @@ web版/merchant-erp/src/lib/mpCalendarReminderCore.ts
 灵祺达人撮合小程序/app.json
 tabBarConfig
 custom-tab-bar
+change-scope-guard
+PAT
+      ;;
+    merchant_shop_metrics)
+      cat <<'PAT'
+douyinMerchantGateway.ts
+merchantDashboardGateway.ts
+merchantPlatformOrdersCore.ts
+meoo-shop-analysis-summary.ts
+merchantDashboardApi.ts
+HomeDashboard.tsx
+灵祺ERP小程序/utils/dashboardMp.js
+灵祺ERP小程序/pages/dashboard/dashboard.js
+灵祺ERP小程序/pages/dashboard/dashboard.wxml
+灵祺ERP小程序/pages/dashboard/dashboard.wxss
 change-scope-guard
 PAT
       ;;

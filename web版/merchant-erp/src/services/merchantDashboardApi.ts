@@ -25,6 +25,8 @@ export type DashboardRange = 'realtime' | 'day7' | 'day30'
 export type PlatformDashboardMetrics = {
   payAmount: number
   verifyAmount: number
+  refundAmount: number
+  refundCouponCount: number
   conversionRate: number
   orderCount: number
   trend: { date: string; payAmount: number }[]
@@ -39,7 +41,10 @@ export type HomeDashboardPlatformState = {
 
 export type HomeAggregateStats = {
   totalRevenue: number
+  totalVerify: number
+  totalRefund: number
   totalOrders: number
+  totalRefundCoupons: number
   conversionRate: number
   fansGrowth: number
   todayNewLeads: number
@@ -50,6 +55,8 @@ function emptyMetrics(): PlatformDashboardMetrics {
   return {
     payAmount: 0,
     verifyAmount: 0,
+    refundAmount: 0,
+    refundCouponCount: 0,
     conversionRate: 0,
     orderCount: 0,
     trend: [],
@@ -147,6 +154,8 @@ async function fetchPlatformDashboard(
 
     const payAmount = num(inner.payAmount ?? inner.pay_amount ?? inner.totalPay)
     const verifyAmount = num(inner.verifyAmount ?? inner.verify_amount ?? inner.verifyTotal)
+    const refundAmount = num(inner.refundAmount ?? inner.refund_amount)
+    const refundCouponCount = num(inner.refundCouponCount ?? inner.refund_coupon_count)
     const conversionRate = num(inner.conversionRate ?? inner.conversion_rate)
     const orderCount = num(inner.orderCount ?? inner.order_count ?? inner.orders)
 
@@ -183,6 +192,8 @@ async function fetchPlatformDashboard(
     return {
       payAmount,
       verifyAmount,
+      refundAmount,
+      refundCouponCount,
       conversionRate,
       orderCount,
       trend,
@@ -273,7 +284,10 @@ export async function fetchHomeDashboardByPlatforms(
 
   const connectedPlats = platforms.filter((p) => p.connected)
   const totalRevenue = connectedPlats.reduce((s, p) => s + p.metrics.payAmount, 0)
+  const totalVerify = connectedPlats.reduce((s, p) => s + p.metrics.verifyAmount, 0)
+  const totalRefund = connectedPlats.reduce((s, p) => s + p.metrics.refundAmount, 0)
   const totalOrders = connectedPlats.reduce((s, p) => s + p.metrics.orderCount, 0)
+  const totalRefundCoupons = connectedPlats.reduce((s, p) => s + p.metrics.refundCouponCount, 0)
   const avgConv =
     connectedPlats.length > 0
       ? connectedPlats.reduce((s, p) => s + p.metrics.conversionRate, 0) / connectedPlats.length
@@ -283,7 +297,10 @@ export async function fetchHomeDashboardByPlatforms(
 
   const aggregate: HomeAggregateStats = {
     totalRevenue,
+    totalVerify,
+    totalRefund,
     totalOrders,
+    totalRefundCoupons,
     conversionRate: Math.round(avgConv * 10) / 10,
     fansGrowth: extra.fansGrowth,
     todayNewLeads: extra.todayNewLeads,

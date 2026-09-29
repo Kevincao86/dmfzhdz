@@ -6000,6 +6000,8 @@ export type FinanceReconcileRowPayload = {
   verifyOrderCount: number
   salesAmountYuan: number
   verifyAmountYuan: number
+  refundAmountYuan?: number
+  refundCouponCount?: number
 }
 
 function shanghaiDateStringFromUnixSec(sec: number): string {
@@ -6153,10 +6155,19 @@ type DouyinFinanceDayBucket = {
   verifyOrderCount: number
   salesAmountYuan: number
   verifyAmountYuan: number
+  refundAmountYuan: number
+  refundCouponCount: number
 }
 
 function emptyDouyinFinanceDayBucket(): DouyinFinanceDayBucket {
-  return { orderCount: 0, verifyOrderCount: 0, salesAmountYuan: 0, verifyAmountYuan: 0 }
+  return {
+    orderCount: 0,
+    verifyOrderCount: 0,
+    salesAmountYuan: 0,
+    verifyAmountYuan: 0,
+    refundAmountYuan: 0,
+    refundCouponCount: 0,
+  }
 }
 
 function certVerifyDedupeKey(order: Record<string, unknown>, cert: Record<string, unknown>): string {
@@ -6196,6 +6207,61 @@ function mergeDouyinOrderSales(
     const hour = shanghaiHourFromUnixSec(paySec)
     hourlyPay.set(hour, (hourlyPay.get(hour) ?? 0) + amount)
   }
+}
+
+function certIsRefunded(itemStatus: number, refundFen: number): boolean {
+  if (refundFen > 0) return true
+  return itemStatus === 300 || itemStatus === 301
+}
+
+function mergeDouyinOrderRefund(
+  bucket: Map<string, DouyinFinanceDayBucket>,
+  order: Record<string, unknown>,
+  startYmd: string,
+  endYmd: string,
+  seenRefundCerts: Set<string>,
+): void {
+  const certs = order.certificate
+  if (Array.isArray(certs) && certs.length > 0) {
+    const perCertYuan = perCertificatePayYuan(order, certs.length)
+    for (const c of certs) {
+      if (!c || typeof c !== 'object') continue
+      const cert = c as Record<string, unknown>
+      const st = Number(cert.item_status ?? cert.status)
+      const refundFen = Number(cert.refund_amount ?? cert.refund_fee)
+      const refundFenSafe = Number.isFinite(refundFen) && refundFen > 0 ? refundFen : 0
+      if (!certIsRefunded(st, refundFenSafe)) continue
+      const dedupeKey = `refund:${certVerifyDedupeKey(order, cert)}`
+      if (seenRefundCerts.has(dedupeKey)) continue
+      seenRefundCerts.add(dedupeKey)
+      const refundSec =
+        unixSecFromApiTime(cert.item_update_time) ||
+        unixSecFromApiTime(order.update_order_time) ||
+        orderPayUnixSec(order)
+      if (refundSec <= 0) continue
+      const day = shanghaiDateStringFromUnixSec(refundSec)
+      if (day < startYmd || day > endYmd) continue
+      const cur = bucket.get(day) ?? emptyDouyinFinanceDayBucket()
+      cur.refundCouponCount += 1
+      cur.refundAmountYuan += refundFenSafe > 0 ? refundFenSafe / 100 : perCertYuan
+      bucket.set(day, cur)
+    }
+    return
+  }
+  const st = Number(order.order_status)
+  if (st !== 300 && st !== 301) return
+  const oid = orderUniqueId(order)
+  const dedupeKey = `refund:order:${oid}`
+  if (seenRefundCerts.has(dedupeKey)) return
+  seenRefundCerts.add(dedupeKey)
+  const refundSec = unixSecFromApiTime(order.update_order_time) || orderPayUnixSec(order)
+  if (refundSec <= 0) return
+  const day = shanghaiDateStringFromUnixSec(refundSec)
+  if (day < startYmd || day > endYmd) return
+  const cur = bucket.get(day) ?? emptyDouyinFinanceDayBucket()
+  cur.refundCouponCount += orderSalesCouponCount(order)
+  cur.refundAmountYuan += orderPayAmountYuan(order)
+  bucket.set(day, cur)
 }
 
 function mergeDouyinOrderVerify(
@@ -6256,6 +6322,7 @@ type PaginateDouyinOrdersOpts = {
   pageSize?: number
   /** 创单拉取时回调原始订单（用于逐单落库） */
   onOrder?: (order: Record<string, unknown>) => void
+  seenRefundCerts?: Set<string>
 }
 
 async function paginateDouyinTradeOrders(
@@ -6333,6 +6400,9 @@ async function paginateDouyinTradeOrders(
       opts?.onOrder?.(order)
       mergeDouyinOrderSales(bucket, order, startYmd, endYmd, seenSalesOrderIds, hourlyPay)
       mergeDouyinOrderVerify(bucket, order, startYmd, endYmd, seenVerifyCerts, isHermes)
+      if (opts?.seenRefundCerts) {
+        mergeDouyinOrderRefund(bucket, order, startYmd, endYmd, opts.seenRefundCerts)
+      }
     }
     if (orders.length < pageSize) break
     page += 1
@@ -6643,6 +6713,7 @@ async function loadDouyinFinanceReconcileRows(
   const bucket = new Map<string, DouyinFinanceDayBucket>()
   const seenSalesOrderIds = new Set<string>()
   const seenVerifyCerts = new Set<string>()
+  const seenRefundCerts = new Set<string>()
   const trackHourly = startYmd === endYmd
   const hourlyPay = trackHourly ? new Map<number, number>() : undefined
   const queryStart = addCalendarDaysShanghai(startYmd, -DOUYIN_SALES_CREATE_LOOKBACK_DAYS)
@@ -6672,7 +6743,7 @@ async function loadDouyinFinanceReconcileRows(
           seenVerifyCerts,
           'create',
           tradeWarnings,
-          { pageSize: DOUYIN_WEEK_PAGE_SIZE, maxPages: DOUYIN_WEEK_MAX_PAGES },
+          { pageSize: DOUYIN_WEEK_PAGE_SIZE, maxPages: DOUYIN_WEEK_MAX_PAGES, seenRefundCerts },
           hourlyPay,
         ),
       ]
@@ -6691,7 +6762,7 @@ async function loadDouyinFinanceReconcileRows(
             seenVerifyCerts,
             'create',
             hermesWarnings,
-            { pageSize: DOUYIN_WEEK_PAGE_SIZE, maxPages: DOUYIN_HERMES_WEEK_MAX_PAGES },
+            { pageSize: DOUYIN_WEEK_PAGE_SIZE, maxPages: DOUYIN_HERMES_WEEK_MAX_PAGES, seenRefundCerts },
             hourlyPay,
           ),
         )
@@ -6736,7 +6807,7 @@ async function loadDouyinFinanceReconcileRows(
           seenVerifyCerts,
           'update',
           chunkWarnings,
-          { pageSize: DOUYIN_WEEK_PAGE_SIZE, maxPages: DOUYIN_WEEK_MAX_PAGES },
+          { pageSize: DOUYIN_WEEK_PAGE_SIZE, maxPages: DOUYIN_WEEK_MAX_PAGES, seenRefundCerts },
           hourlyPay,
         )
         if (chunkWarnings.some((w) => w.includes('分页达到上限'))) {
@@ -6769,6 +6840,8 @@ async function loadDouyinFinanceReconcileRows(
       verifyOrderCount: v?.verifyOrderCount ?? 0,
       salesAmountYuan: Math.round((v?.salesAmountYuan ?? 0) * 100) / 100,
       verifyAmountYuan: Math.round((v?.verifyAmountYuan ?? 0) * 100) / 100,
+      refundAmountYuan: Math.round((v?.refundAmountYuan ?? 0) * 100) / 100,
+      refundCouponCount: v?.refundCouponCount ?? 0,
     }
   })
 

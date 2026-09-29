@@ -77,7 +77,10 @@ const TIME_FILTERS = [
 
 const EMPTY_AGG: HomeAggregateStats = {
   totalRevenue: 0,
+  totalVerify: 0,
+  totalRefund: 0,
   totalOrders: 0,
+  totalRefundCoupons: 0,
   conversionRate: 0,
   fansGrowth: 0,
   todayNewLeads: 0,
@@ -87,6 +90,11 @@ const EMPTY_AGG: HomeAggregateStats = {
 function formatMoney(n: number) {
   if (!Number.isFinite(n)) return '¥0.00'
   return `¥${n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
+function formatCount(n: number) {
+  if (!Number.isFinite(n)) return '0'
+  return Math.round(n).toLocaleString('zh-CN')
 }
 
 function formatNum(n: number) {
@@ -169,6 +177,8 @@ function MerchantHomeDashboard() {
         ...p,
         payAmount: homeEmpty && !isConnected ? 0 : (st?.metrics.payAmount ?? 0),
         verifyAmount: homeEmpty && !isConnected ? 0 : (st?.metrics.verifyAmount ?? 0),
+        refundAmount: homeEmpty && !isConnected ? 0 : (st?.metrics.refundAmount ?? 0),
+        refundCouponCount: homeEmpty && !isConnected ? 0 : (st?.metrics.refundCouponCount ?? 0),
         conversionRate: homeEmpty && !isConnected ? 0 : (st?.metrics.conversionRate ?? 0),
         orderCount: homeEmpty && !isConnected ? 0 : (st?.metrics.orderCount ?? 0),
         isConnected,
@@ -312,9 +322,11 @@ function MerchantHomeDashboard() {
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-6 lg:grid-cols-3">
         {(
           [
-            { label: '总营收', value: formatMoney(stats.totalRevenue), icon: Wallet, color: 'ink' },
-            { label: '订单数', value: formatNum(stats.totalOrders), icon: ShoppingCart, color: 'teal' },
-            { label: '转化率', value: `${stats.conversionRate}%`, icon: Percent, color: 'ink' },
+            { label: '营收金额', value: formatMoney(stats.totalRevenue), icon: Wallet, color: 'ink' },
+            { label: '核销总金额', value: formatMoney(stats.totalVerify), icon: Wallet, color: 'teal' },
+            { label: '退款金额', value: formatMoney(stats.totalRefund), icon: Percent, color: 'ink' },
+            { label: '成交券数', value: formatCount(stats.totalOrders), icon: ShoppingCart, color: 'teal' },
+            { label: '退款券数', value: formatCount(stats.totalRefundCoupons), icon: ShoppingCart, color: 'ink' },
             { label: '粉丝增长', value: `+${formatNum(stats.fansGrowth)}`, icon: Users, color: 'teal' },
             { label: '今日新线索', value: stats.todayNewLeads, icon: UserPlus, color: 'ink' },
             { label: '待处理评论', value: stats.pendingComments, icon: MessageSquare, color: 'teal' },
@@ -419,22 +431,26 @@ function MerchantHomeDashboard() {
                 </div>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">成交金额</span>
+                    <span className="text-sm text-gray-500">营收金额</span>
                     <span className="text-lg font-bold text-gray-900">{formatMoney(p.payAmount)}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">核销金额</span>
+                    <span className="text-sm text-gray-500">核销总金额</span>
                     <span className="text-base font-medium text-green-600">
                       {formatMoney(p.verifyAmount)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">转化率</span>
-                    <span className="text-base font-medium text-blue-600">{p.conversionRate}%</span>
+                    <span className="text-sm text-gray-500">退款金额</span>
+                    <span className="text-base font-medium text-rose-600">{formatMoney(p.refundAmount)}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-500">成交券数</span>
                     <span className="text-base font-medium text-gray-700">{p.orderCount}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-500">退款券数</span>
+                    <span className="text-base font-medium text-gray-700">{p.refundCouponCount}</span>
                   </div>
                 </div>
                 <div className="mt-4 border-t border-gray-100 pt-4">
@@ -563,11 +579,13 @@ function MerchantHomeDashboard() {
                 </button>
               </div>
 
-              <div className="mb-6 grid grid-cols-3 gap-4">
+              <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
                 {[
-                  { label: '成交金额', value: formatMoney(modalPlatform.payAmount), sub: timeLabel },
-                  { label: '核销金额', value: formatMoney(modalPlatform.verifyAmount), sub: timeLabel },
+                  { label: '营收金额', value: formatMoney(modalPlatform.payAmount), sub: timeLabel },
+                  { label: '核销总金额', value: formatMoney(modalPlatform.verifyAmount), sub: timeLabel },
+                  { label: '退款金额', value: formatMoney(modalPlatform.refundAmount), sub: timeLabel },
                   { label: '成交券数', value: modalPlatform.orderCount, sub: timeLabel },
+                  { label: '退款券数', value: modalPlatform.refundCouponCount, sub: timeLabel },
                 ].map((cell) => (
                   <div key={cell.label} className="rounded-lg bg-gray-50 p-4">
                     <p className="mb-1 text-sm text-gray-500">{cell.label}</p>

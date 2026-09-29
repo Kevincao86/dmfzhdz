@@ -90,6 +90,8 @@ async function fetchPlatformSummary(platformId, range) {
       return {
         payAmount,
         verifyAmount: num(inner.verifyAmount ?? inner.verify_amount),
+        refundAmount: num(inner.refundAmount ?? inner.refund_amount),
+        refundCouponCount: num(inner.refundCouponCount ?? inner.refund_coupon_count),
         conversionRate: num(inner.conversionRate ?? inner.conversion_rate),
         orderCount: num(inner.orderCount ?? inner.order_count ?? inner.orders),
         trend: fillTrend(inner, range, payAmount),
@@ -152,7 +154,10 @@ async function fetchAggregateDashboard(range) {
   const ids = PLATFORM_TABS.map((p) => p.id).filter((id) => id !== 'jd')
   const rows = await Promise.all(ids.map((id) => fetchPlatformSummary(id, range)))
   let revenue = 0
+  let verify = 0
+  let refund = 0
   let orders = 0
+  let refundCoupons = 0
   let convSum = 0
   let convN = 0
   const hit = []
@@ -160,7 +165,10 @@ async function fetchAggregateDashboard(range) {
     if (!r) continue
     hit.push(r)
     revenue += r.payAmount
+    verify += r.verifyAmount
+    refund += r.refundAmount
     orders += r.orderCount
+    refundCoupons += r.refundCouponCount
     if (r.conversionRate > 0) {
       convSum += r.conversionRate
       convN += 1
@@ -172,7 +180,10 @@ async function fetchAggregateDashboard(range) {
   return {
     connected,
     totalRevenue: revenue,
+    totalVerify: verify,
+    totalRefund: refund,
     totalOrders: orders,
+    totalRefundCoupons: refundCoupons,
     conversionRate,
     fansGrowth: 0,
     trend,

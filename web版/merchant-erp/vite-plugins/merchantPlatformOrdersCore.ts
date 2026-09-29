@@ -262,9 +262,13 @@ export type ShopAnalysisSummary = {
   orderCount: number
   couponCount: number
   salesAmountYuan: number
+  /** 核销总金额（来客实时回填；本地订单表没有逐券核销额时为 0） */
+  verifyAmountYuan: number
   refundAmountYuan: number
   /** 区间内 refund_amount_fen > 0 的订单笔数（含部分退） */
   refundCount: number
+  /** 退款券数 */
+  refundCouponCount: number
   refundRate: number
   buyerCount: number
   openIdCoverage: number
@@ -558,8 +562,10 @@ export async function computeShopAnalysisSummary(params: {
       orderCount,
       couponCount,
       salesAmountYuan: salesYuan,
+      verifyAmountYuan: 0,
       refundAmountYuan: refundYuan,
       refundCount,
+      refundCouponCount: refundCount,
       refundRate,
       buyerCount,
       openIdCoverage,
@@ -677,8 +683,9 @@ export function buildShopAdviceFacts(summary: ShopAnalysisSummary, rangeLabel: s
     `统计区间：${rangeLabel}`,
     ``,
     `一、整体运营概况`,
-    `· 共 ${summary.orderCount} 笔订单、成交券 ${summary.couponCount} 张，成交额 ¥${summary.salesAmountYuan.toLocaleString('zh-CN')}。`,
-    `· 退款 ${summary.refundCount} 笔、退款额 ¥${summary.refundAmountYuan.toLocaleString('zh-CN')}，退款率 ${summary.refundRate}%${summary.refundRate >= 20 ? '（偏高，核心风险）' : ''}。`,
+    `· 成交券 ${summary.couponCount} 张，营收 ¥${summary.salesAmountYuan.toLocaleString('zh-CN')}。`,
+    `· 核销总金额 ¥${(summary.verifyAmountYuan || 0).toLocaleString('zh-CN')}。`,
+    `· 退款 ${summary.refundCouponCount || summary.refundCount} 张券、退款额 ¥${summary.refundAmountYuan.toLocaleString('zh-CN')}，退款率 ${summary.refundRate}%${summary.refundRate >= 20 ? '（偏高，核心风险）' : ''}。`,
     `· 可识别买家 ${summary.buyerCount} 人（覆盖率 ${summary.openIdCoverage}%）；新客 ${summary.newBuyerCount} / 老客 ${summary.oldBuyerCount}；新客成交占比 ${summary.newBuyerShare}%（人数占比 ${summary.newBuyerPeopleShare}%）；区间复购率 ${summary.repurchaseRate}%。`,
     summary.guestBasis === 'history'
       ? `· 新老客按「区间开始前是否有成交」判定。`

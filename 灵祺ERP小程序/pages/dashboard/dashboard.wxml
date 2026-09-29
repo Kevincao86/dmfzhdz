@@ -66,6 +66,12 @@
     </view>
     <text wx:if="{{ydayDate}}" class="dash-yday-date">{{ydayDate}}</text>
     <text class="dash-yday-hint">{{ydayHint}}</text>
+    <view wx:if="{{ydayMetrics.length}}" class="dash-yday-metrics">
+      <view wx:for="{{ydayMetrics}}" wx:key="label" class="dash-yday-metric">
+        <text class="dash-yday-metric-label">{{item.label}}</text>
+        <text class="dash-yday-metric-value">{{item.value}}</text>
+      </view>
+    </view>
     <view wx:if="{{ydayLoading}}" class="dash-yday-empty">正在生成昨日分析…</view>
     <view wx:elif="{{ydayEmpty}}" class="dash-yday-empty">{{ydayEmpty}}</view>
     <view wx:else>

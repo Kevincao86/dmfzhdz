@@ -6,7 +6,7 @@ const shop = require('../../utils/shopAnalysisApiMp.js')
 const sessionSync = require('../../utils/merchantSessionSyncMp.js')
 const { iconDataUri } = require('../../utils/funcIconAssetsMp.js')
 
-const YDAY_CACHE_KEY = 'meoo_dash_yesterday_analysis_v1'
+const YDAY_CACHE_KEY = 'meoo_dash_yesterday_analysis_v2'
 const YDAY_AUTO_KEY = 'meoo_dash_yday_auto_v1'
 
 const RANGE_TABS = [
@@ -16,10 +16,11 @@ const RANGE_TABS = [
 ]
 
 const EMPTY_KPIS = [
-  { label: '成交额', value: '—', delta: '', deltaUp: true, iconKey: 'shop' },
-  { label: '核销单', value: '—', delta: '', deltaUp: true, iconKey: 'list' },
-  { label: '转化率', value: '—', delta: '', deltaUp: true, iconKey: 'star' },
-  { label: '在途招募', value: '—', delta: '', deltaUp: true, iconKey: 'user' },
+  { label: '营收金额', value: '—', delta: '', deltaUp: true, iconKey: 'shop' },
+  { label: '核销总金额', value: '—', delta: '', deltaUp: true, iconKey: 'list' },
+  { label: '退款金额', value: '—', delta: '', deltaUp: true, iconKey: 'star' },
+  { label: '成交券数', value: '—', delta: '', deltaUp: true, iconKey: 'user' },
+  { label: '退款券数', value: '—', delta: '', deltaUp: true, iconKey: 'list' },
 ]
 
 /** 仅 DEV_SKIP 预览模式使用 */
@@ -184,21 +185,55 @@ function sectionsFromReport(text) {
   return sections.filter((s) => s.body)
 }
 
+function formatYuanExact(n) {
+  const x = Number(n)
+  if (!Number.isFinite(x)) return '—'
+  const fixed = x.toFixed(2)
+  const parts = fixed.split('.')
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  return `¥${parts.join('.')}`
+}
+
 function factsForYesterday(targetDate, summary, adviceFacts) {
   const s = summary || {}
+  const yuan = (n) => (n == null || n === '' ? '未知' : n)
   return [
     `统计日期：${targetDate}（昨日）`,
     '平台：全部已绑定平台',
     '门店范围：全部门店',
-    `成交额：${s.salesAmountYuan == null ? '未知' : s.salesAmountYuan} 元`,
-    `订单数：${s.orderCount == null ? '未知' : s.orderCount}`,
-    `核销额：${s.verifyAmountYuan == null ? '未知' : s.verifyAmountYuan} 元`,
-    `退款额：${s.refundAmountYuan == null ? '未知' : s.refundAmountYuan} 元`,
+    `营收金额：${yuan(s.salesAmountYuan)} 元`,
+    `核销总金额：${yuan(s.verifyAmountYuan)} 元`,
+    `退款金额：${yuan(s.refundAmountYuan)} 元`,
+    `成交券数：${s.couponCount == null ? '未知' : s.couponCount}`,
+    `退款券数：${s.refundCouponCount == null ? '未知' : s.refundCouponCount}`,
     adviceFacts ? String(adviceFacts) : '',
-    '请输出完整五节分析。',
+    '请输出完整五节分析。数字必须与上面给出的金额和券数一致，禁止把有数写成 0。',
   ]
     .filter(Boolean)
     .join('\n')
+}
+
+function summaryHasBiz(summary) {
+  const s = summary || {}
+  return (
+    (Number(s.orderCount) || 0) > 0 ||
+    (Number(s.salesAmountYuan) || 0) > 0 ||
+    (Number(s.verifyAmountYuan) || 0) > 0 ||
+    (Number(s.refundAmountYuan) || 0) > 0 ||
+    (Number(s.couponCount) || 0) > 0 ||
+    (Number(s.refundCouponCount) || 0) > 0
+  )
+}
+
+function ydayMetricsFromSummary(summary) {
+  const s = summary || {}
+  return [
+    { label: '营收金额', value: formatYuanExact(s.salesAmountYuan) },
+    { label: '核销总金额', value: formatYuanExact(s.verifyAmountYuan) },
+    { label: '退款金额', value: formatYuanExact(s.refundAmountYuan) },
+    { label: '成交券数', value: String(Number(s.couponCount) || 0) },
+    { label: '退款券数', value: String(Number(s.refundCouponCount) || 0) },
+  ]
 }
 
 Page({
@@ -220,6 +255,7 @@ Page({
     ydayLoading: false,
     ydaySections: [],
     ydayEmpty: '',
+    ydayMetrics: [],
   },
 
   onShow() {
@@ -310,32 +346,39 @@ Page({
 
     const kpis = enrichKpis([
       {
-        label: '成交额',
-        value: dashboardMp.formatCurrencyYuan(d.totalRevenue),
+        label: '营收金额',
+        value: formatYuanExact(d.totalRevenue),
         delta: '',
         deltaUp: true,
         iconKey: 'shop',
       },
       {
-        label: '核销单',
-        value: d.totalOrders ? String(d.totalOrders) : '0',
+        label: '核销总金额',
+        value: formatYuanExact(d.totalVerify),
         delta: '',
         deltaUp: true,
         iconKey: 'list',
       },
       {
-        label: '转化率',
-        value: formatConversion(d.conversionRate),
+        label: '退款金额',
+        value: formatYuanExact(d.totalRefund),
         delta: '',
         deltaUp: true,
         iconKey: 'star',
       },
       {
-        label: '在途招募',
-        value: d.fansGrowth ? String(d.fansGrowth) : '—',
+        label: '成交券数',
+        value: String(d.totalOrders || 0),
         delta: '',
         deltaUp: true,
         iconKey: 'user',
+      },
+      {
+        label: '退款券数',
+        value: String(d.totalRefundCoupons || 0),
+        delta: '',
+        deltaUp: true,
+        iconKey: 'list',
       },
     ])
 
@@ -350,6 +393,21 @@ Page({
       chartHint: bars.length === 0 ? '暂无趋势点' : hasVal ? '' : '已接通平台，当前区间成交额为 0',
       chartTitle: chartTitleFor(tab.id),
     })
+  },
+
+  async fillYesterdayMetrics(targetDate) {
+    try {
+      const summaryRes = await shop.fetchShopAnalysisSummary({
+        startDate: targetDate,
+        endDate: targetDate,
+        platform: 'all',
+      })
+      const summary = (summaryRes && summaryRes.summary) || {}
+      this.setData({
+        ydayDate: targetDate,
+        ydayMetrics: ydayMetricsFromSummary(summary),
+      })
+    } catch (_) {}
   },
 
   onManualYesterdayAnalysis() {
@@ -405,6 +463,7 @@ Page({
               ? `${autoOn ? '已开启，每天 10:00 自动更新' : '自动分析已关闭'} · 本次已扣 ${cached.pointsCharged} 积分`
               : base.ydayHint,
         })
+        void this.fillYesterdayMetrics(targetDate)
         return
       }
       if (!autoOn) {
@@ -414,6 +473,7 @@ Page({
           ydaySections: [],
           ydayEmpty: '自动分析未开启。打开开关后每天 10:00 分析一次，也可点手动分析',
         })
+        void this.fillYesterdayMetrics(targetDate)
         return
       }
     }
@@ -430,13 +490,13 @@ Page({
       })
       if (seq !== this._ydaySeq) return
       const summary = summaryRes.summary || {}
-      const orders = Number(summary.orderCount) || 0
-      const sales = Number(summary.salesAmountYuan) || 0
-      const facts = String(summaryRes.adviceFacts || '').trim()
-      if (orders <= 0 && sales <= 0 && !facts) {
+      const metrics = ydayMetricsFromSummary(summary)
+      this.setData({ ydayMetrics: metrics, ydayDate: targetDate })
+      if (!summaryHasBiz(summary)) {
         this.setData({
           ydayLoading: false,
           ydaySections: [],
+          ydayMetrics: metrics,
           ydayEmpty: '昨日暂无经营数据，未调用 AI',
         })
         return
@@ -456,7 +516,7 @@ Page({
           ...(token ? { access_token: token } : {}),
           messages: [
             { role: 'system', content: YDAY_AI_SYSTEM },
-            { role: 'user', content: factsForYesterday(targetDate, summary, facts) },
+            { role: 'user', content: factsForYesterday(targetDate, summary, summaryRes.adviceFacts) },
           ],
         },
       })
@@ -477,6 +537,7 @@ Page({
       this.setData({
         ydayLoading: false,
         ydayEmpty: '',
+        ydayMetrics: metrics,
         ydaySections: sections,
         ydayHint: `按 token 扣减 · 本次 ${pointsCharged} 积分`,
       })
