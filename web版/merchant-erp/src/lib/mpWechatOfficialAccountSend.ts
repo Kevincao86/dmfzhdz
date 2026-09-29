@@ -93,12 +93,14 @@ export async function sendWechatOaTargetedInviteTemplate(
   }
 }
 
-function formatOaCalendarTime10(eventDateKey: string, eventKind?: string): string {
+/** 服务号类目模板 time 字段：2019年10月1日 或 2019年10月1日 15:01 */
+function formatOaCalendarTime15(eventDateKey: string): string {
   const dk = String(eventDateKey || '').trim()
-  if (!dk) return '—'
-  const suffix = eventKind === 'deadline' ? ' 截止' : ''
-  const s = `${dk}${suffix}`
-  return s.length <= 20 ? s : `${s.slice(0, 19)}…`
+  const m = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/.exec(dk)
+  if (!m) return '—'
+  const date = `${Number(m[1])}年${Number(m[2])}月${Number(m[3])}日`
+  if (!m[4]) return date
+  return `${date} ${String(m[4]).padStart(2, '0')}:${m[5]}`
 }
 
 function oaCalendarProjectLabel(eventTitle: string, eventKind?: string): string {
@@ -110,7 +112,7 @@ function oaCalendarProjectLabel(eventTitle: string, eventKind?: string): string 
   return '日程提醒'
 }
 
-/** 商单日历到点提醒 — 服务号模板（time10/thing13/thing18） */
+/** 商单日历到点提醒 — 服务号模板 45122（time15 报名时间 / thing3 名称 / thing14 项目） */
 export async function sendWechatOaCalendarReminderTemplate(opts: {
   oaOpenId: string
   eventTitle: string
@@ -136,9 +138,9 @@ export async function sendWechatOaCalendarReminderTemplate(opts: {
     touser: oid,
     template_id: templateId,
     data: {
-      time10: { value: formatOaCalendarTime10(opts.eventDateKey, opts.eventKind) },
-      thing13: { value: clipThing(opts.storeName || '—') },
-      thing18: { value: clipThing(oaCalendarProjectLabel(opts.eventTitle, opts.eventKind)) },
+      time15: { value: formatOaCalendarTime15(opts.eventDateKey) },
+      thing3: { value: clipThing(oaCalendarProjectLabel(opts.eventTitle, opts.eventKind)) },
+      thing14: { value: clipThing(opts.storeName || '商单日程') },
     },
   }
 
