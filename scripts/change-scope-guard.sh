@@ -1577,6 +1577,7 @@ opsDashboardCompute.ts
 灵祺ERP小程序/pages/subscription/subscription.wxml
 灵祺ERP小程序/pages/mine/mine.js
 20260929230000_tenant_membership_member_store.sql
+XingxuanMembershipPage.tsx
 change-scope-guard
 PAT
       ;;

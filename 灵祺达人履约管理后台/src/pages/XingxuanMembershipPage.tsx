@@ -14,6 +14,7 @@ import {
   computeMembershipDiscountPct,
   formatMembershipPromoCountdown,
   isMembershipPromoActive,
+  resolveEffectiveMembershipTier,
   resolveEffectivePlanPriceYuan,
   type MpLibraryRole,
   type MpMembershipPlanVersion,
@@ -413,23 +414,28 @@ export default function XingxuanMembershipPage() {
 
   function applyProfilePlan(profile: Awaited<ReturnType<typeof fetchRegistryProfile>>) {
     const activeRole = getActiveRole()
-    const plan =
+    const storedPlan =
       activeRole === 'pr'
-        ? String(profile.prProfile?.mpMembershipPlan || profile.mpMembershipPlan || 'basic')
-        : String(profile.talentMember?.mpMembershipPlan || profile.mpMembershipPlan || 'basic')
-    const effectivePlan = String(profile.mpMembershipPlanEffective || plan).trim() || 'basic'
+        ? String(profile.prProfile?.mpMembershipPlan || 'basic')
+        : String(profile.talentMember?.mpMembershipPlan || 'basic')
     const expires =
       activeRole === 'pr'
-        ? String(profile.prProfile?.mpMembershipExpiresAt || profile.mpMembershipExpiresAt || '').trim() ||
-          undefined
-        : String(profile.talentMember?.mpMembershipExpiresAt || profile.mpMembershipExpiresAt || '').trim() ||
-          undefined
-    setCurrentPlan(profile.mpMembershipExpired ? effectivePlan : plan.trim() || 'basic')
+        ? String(profile.prProfile?.mpMembershipExpiresAt || '').trim() || undefined
+        : String(profile.talentMember?.mpMembershipExpiresAt || '').trim() || undefined
+    const effectivePlan = resolveEffectiveMembershipTier(storedPlan, expires)
+    const talentAccess = profile.talentMember?.mpFeatureAccess
+    setCurrentPlan(effectivePlan)
     setCurrentExpiresAt(expires)
     setProfileAccess(
       activeRole === 'pr'
         ? { mpMembershipPlan: effectivePlan, prFeatureAccess: profile.prFeatureAccess }
-        : { mpMembershipPlan: effectivePlan, mpFeatureAccess: profile.prFeatureAccess },
+        : {
+            mpMembershipPlan: effectivePlan,
+            mpFeatureAccess:
+              talentAccess && typeof talentAccess === 'object'
+                ? (talentAccess as { addons?: boolean; recommendHall?: boolean })
+                : undefined,
+          },
     )
   }
 

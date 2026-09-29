@@ -998,7 +998,7 @@ export function mergeMembershipPlanVersions(
     byId.set(s.id, {
       ...(prev ?? { id: normalized.id, name: normalized.name, permissions: {}, sortOrder: normalized.sortOrder }),
       ...normalized,
-      permissions: { ...(normalized.permissions ?? {}), ...(prev?.permissions ?? {}) },
+      permissions: { ...(prev?.permissions ?? {}), ...(normalized.permissions ?? {}) },
     })
   }
   return [...byId.values()].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
