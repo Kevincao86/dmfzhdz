@@ -891,6 +891,8 @@ export type RegistryMpAiPointsSpendEntry = {
     | 'goods_ai'
     | 'ad_ai'
     | 'review_ai'
+    | 'talent_eval'
+    | 'talent_advice'
   points: number
   balanceAfter: number
   createdAt: string
