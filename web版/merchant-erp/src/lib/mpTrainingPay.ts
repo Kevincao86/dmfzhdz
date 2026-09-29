@@ -541,7 +541,69 @@ export function withdrawTraining(hostId: string) {
     kind: quote.kind,
     orderIds: due.map((order) => String(order.id || '')),
     createdAt: now,
+    status: 'pending',
+    paidAt: '',
   })
   writeBag(bag)
   return { ok: true as const, ...quote }
+}
+
+export type TrainingPayoutRow = {
+  id: string
+  hostId: string
+  name: string
+  bank: string
+  bankNo: string
+  payable: number
+  commission: number
+  tax: number
+  net: number
+  kind: 'person' | 'entity'
+  orderCount: number
+  createdAt: string
+  status: 'pending' | 'paid'
+  paidAt: string
+}
+
+export function listTrainingPayouts(): TrainingPayoutRow[] {
+  const bag = readBag()
+  return bag.payouts.map((row) => {
+    const kind = row.kind === 'entity' ? 'entity' : 'person'
+    const status = row.status === 'paid' ? 'paid' : 'pending'
+    const orderIds = Array.isArray(row.orderIds) ? row.orderIds : []
+    return {
+      id: String(row.id || ''),
+      hostId: String(row.hostId || ''),
+      name: String(row.name || ''),
+      bank: String(row.bank || ''),
+      bankNo: String(row.bankNo || ''),
+      payable: Number(row.payable) || 0,
+      commission: Number(row.commission) || 0,
+      tax: Number(row.tax) || 0,
+      net: Number(row.net) || 0,
+      kind,
+      orderCount: orderIds.length,
+      createdAt: String(row.createdAt || ''),
+      status,
+      paidAt: String(row.paidAt || ''),
+    }
+  })
+}
+
+export function markTrainingPayoutsPaid(ids: string[]) {
+  const set = new Set(ids.map((id) => String(id || '').trim()).filter(Boolean))
+  if (!set.size) return { ok: false as const, error: '请选择要标记的提现' }
+  const bag = readBag()
+  const now = new Date().toISOString()
+  let updated = 0
+  for (const row of bag.payouts) {
+    const id = String(row.id || '')
+    if (!set.has(id) || row.status === 'paid') continue
+    row.status = 'paid'
+    row.paidAt = now
+    updated += 1
+  }
+  if (!updated) return { ok: false as const, error: '没有可标记的待打款记录' }
+  writeBag(bag)
+  return { ok: true as const, updated }
 }

@@ -26,6 +26,7 @@ import OpsTeamIntroPage from './ops/pages/OpsTeamIntroPage'
 import OpsPlatformDecorPage from './ops/pages/OpsPlatformDecorPage'
 import OpsLecturerReviewPage from './ops/pages/OpsLecturerReviewPage'
 import OpsTrainingReviewPage from './ops/pages/OpsTrainingReviewPage'
+import OpsTrainingPayoutsPage from './ops/pages/OpsTrainingPayoutsPage'
 import OpsDistributionPage from './ops/pages/OpsDistributionPage'
 import OpsRegionalPartnersPage from './ops/pages/OpsRegionalPartnersPage'
 import OpsLegalDocPage from './pages/OpsLegalDocPage'
@@ -78,6 +79,7 @@ export default function App() {
           <Route path="platform-decor" element={<OpsPlatformDecorPage />} />
           <Route path="lecturer-review" element={<OpsLecturerReviewPage />} />
           <Route path="training-review" element={<OpsTrainingReviewPage />} />
+          <Route path="training-payouts" element={<OpsTrainingPayoutsPage />} />
           <Route path="team-intro" element={<OpsTeamIntroPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

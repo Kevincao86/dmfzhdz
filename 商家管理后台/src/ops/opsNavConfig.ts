@@ -118,6 +118,13 @@ export const OPS_NAV_GROUPS: OpsNavGroup[] = [
         permission: 'platform_decor',
       },
       {
+        kind: 'leaf',
+        to: '/training-payouts',
+        label: '课时费提现',
+        icon: CreditCard,
+        permission: 'platform_decor',
+      },
+      {
         kind: 'parent',
         id: 'help-manual-hub',
         label: '帮助手册',

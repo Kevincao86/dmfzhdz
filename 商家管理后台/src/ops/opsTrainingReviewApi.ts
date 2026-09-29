@@ -63,6 +63,41 @@ export async function loadTrainingReview() {
   }
 }
 
+export type TrainingPayoutRow = {
+  id: string
+  hostId: string
+  name: string
+  bank: string
+  bankNo: string
+  payable: number
+  commission: number
+  tax: number
+  net: number
+  kind: 'person' | 'entity'
+  orderCount: number
+  createdAt: string
+  status: 'pending' | 'paid'
+  paidAt: string
+}
+
+export async function loadTrainingPayouts() {
+  const res = await trainingFetch('?payouts=1')
+  const data = (await res.json()) as { ok?: boolean; error?: string; payouts?: TrainingPayoutRow[] }
+  if (!res.ok || data.ok === false) throw new Error(data.error || '加载失败')
+  return Array.isArray(data.payouts) ? data.payouts : []
+}
+
+export async function markTrainingPayoutsPaid(ids: string[]) {
+  const res = await trainingFetch('', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'markPayoutsPaid', ids }),
+  })
+  const data = (await res.json()) as { ok?: boolean; error?: string; updated?: number }
+  if (!res.ok || data.ok === false) throw new Error(data.error || '标记失败')
+  return data.updated || 0
+}
+
 export async function postTrainingReview(body: Record<string, unknown>) {
   const res = await trainingFetch('', {
     method: 'POST',

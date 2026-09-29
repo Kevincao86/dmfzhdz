@@ -5,7 +5,7 @@
 import fs from 'fs'
 import path from 'path'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createTrainingPrepay, normalizeSignupFields, queryTrainingPay, refundTrainingDeposit, trainingDepositView, trainingWithdrawQuote, withdrawTraining } from '../src/lib/mpTrainingPay.js'
+import { createTrainingPrepay, listTrainingPayouts, markTrainingPayoutsPaid, normalizeSignupFields, queryTrainingPay, refundTrainingDeposit, trainingDepositView, trainingWithdrawQuote, withdrawTraining } from '../src/lib/mpTrainingPay.js'
 
 export const config = { maxDuration: 20 }
 
@@ -361,6 +361,10 @@ function lecturerCard(profile: Profile) {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const store = readStore()
   if (req.method === 'GET') {
+    if (String(req.query.payouts || '') === '1') {
+      res.status(200).json({ ok: true, payouts: listTrainingPayouts() })
+      return
+    }
     const hostId = String(req.query.hostId || '')
     const review = String(req.query.review || '') === '1'
     const courses = (review ? store.courses : store.courses.filter(publicCourse)).map(({ signups, ...rest }) => ({
@@ -734,6 +738,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } catch (e) {
       res.status(400).json({ ok: false, error: e instanceof Error ? e.message : '退款失败' })
     }
+    return
+  }
+
+  if (action === 'markPayoutsPaid') {
+    const ids = Array.isArray(body.ids) ? body.ids.map((id) => String(id || '')) : []
+    const result = markTrainingPayoutsPaid(ids)
+    res.status(result.ok ? 200 : 400).json(result)
     return
   }
 
