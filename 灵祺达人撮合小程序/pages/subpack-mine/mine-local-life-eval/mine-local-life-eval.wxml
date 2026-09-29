@@ -6,7 +6,10 @@
       class="plat {{platformId === item.id ? 'plat--on' : ''}}"
       data-id="{{item.id}}"
       bindtap="onPlatform"
-    >{{item.name}}</view>
+    >
+      <image class="plat-logo" src="{{item.icon}}" mode="aspectFit" />
+      <text>{{item.name}}</text>
+    </view>
   </view>
 
   <block wx:if="{{platformId === 'douyin'}}">

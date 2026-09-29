@@ -9,11 +9,11 @@ import {
 } from '../lib/talentLocalLifeEval'
 
 const PLATFORMS = [
-  { id: 'douyin', name: '抖音平台' },
-  { id: 'xiaohongshu', name: '小红书' },
-  { id: 'kuaishou', name: '快手' },
-  { id: 'dianping', name: '大众点评' },
-  { id: 'weixin_video', name: '微信视频号' },
+  { id: 'douyin', name: '抖音平台', icon: '/platforms/douyin.png' },
+  { id: 'xiaohongshu', name: '小红书', icon: '/platforms/xiaohongshu.png' },
+  { id: 'kuaishou', name: '快手', icon: '/platforms/kuaishou-local.png' },
+  { id: 'dianping', name: '大众点评', icon: '/platforms/dianping.png' },
+  { id: 'weixin_video', name: '微信视频号', icon: '/platforms/wechat.png' },
 ] as const
 
 function letterOf(name: string) {
@@ -99,14 +99,15 @@ export default function TalentLocalLifeEvalPage() {
             type="button"
             className={
               platformId === item.id
-                ? 'rounded-full bg-violet-600 px-3 py-1.5 text-sm font-medium text-white'
-                : 'rounded-full border border-violet-200 bg-white px-3 py-1.5 text-sm text-[var(--shell-muted)]'
+                ? 'inline-flex items-center gap-1.5 rounded-full bg-violet-600 py-1 pl-1 pr-3 text-sm font-medium text-white'
+                : 'inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-white py-1 pl-1 pr-3 text-sm text-[var(--shell-muted)]'
             }
             onClick={() => {
               setPlatformId(item.id)
               setErr('')
             }}
           >
+            <img src={item.icon} alt="" className="h-5 w-5 rounded bg-white object-contain" />
             {item.name}
           </button>
         ))}

@@ -8,13 +8,24 @@
 }
 
 .plat {
-  padding: 10rpx 22rpx;
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 8rpx 18rpx 8rpx 8rpx;
   border-radius: 999rpx;
   background: #fff;
   color: #64748b;
   font-size: 24rpx;
   border: 2rpx solid #e8e4f4;
   line-height: 1.4;
+}
+
+.plat-logo {
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 8rpx;
+  background: #fff;
+  flex-shrink: 0;
 }
 
 .plat--on {
