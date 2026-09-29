@@ -911,6 +911,10 @@ export async function fetchRegistryProfile(): Promise<{
     shortvideo: boolean
     cloudEdit: boolean
     digitalHuman: boolean
+    visualStudio: boolean
+    aiDrama: boolean
+    talentEval: boolean
+    talentAdvice: boolean
     brief: boolean
   }
   mpMembershipPlan: string
@@ -930,6 +934,10 @@ export async function fetchRegistryProfile(): Promise<{
         shortvideo?: boolean
         cloudEdit?: boolean
         digitalHuman?: boolean
+        visualStudio?: boolean
+        aiDrama?: boolean
+        talentEval?: boolean
+        talentAdvice?: boolean
         brief?: boolean
       }
     | undefined
@@ -950,6 +958,10 @@ export async function fetchRegistryProfile(): Promise<{
       shortvideo: raw?.shortvideo === true,
       cloudEdit: raw?.cloudEdit === true,
       digitalHuman: raw?.digitalHuman === true,
+      visualStudio: raw?.visualStudio === true,
+      aiDrama: raw?.aiDrama === true,
+      talentEval: raw?.talentEval === true,
+      talentAdvice: raw?.talentAdvice === true,
       brief: raw?.brief === true,
     },
     mpMembershipPlan: String(data.mpMembershipPlan || 'basic').trim() || 'basic',

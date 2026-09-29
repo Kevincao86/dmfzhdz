@@ -30,6 +30,9 @@ function allAddonOn(): MpAddonAccess {
     cloudEdit: true,
     digitalHuman: true,
     visualStudio: true,
+    aiDrama: true,
+    talentEval: true,
+    talentAdvice: true,
     brief: true,
     aiVideoReview: true,
     aiReview: true,
@@ -55,6 +58,9 @@ export function readAccountAddonAccess(account?: MpAccount | null): MpAddonAcces
     cloudEdit: raw.cloudEdit === true,
     digitalHuman: raw.digitalHuman === true,
     visualStudio: raw.visualStudio === true,
+    aiDrama: raw.aiDrama === true,
+    talentEval: raw.talentEval === true,
+    talentAdvice: raw.talentAdvice === true,
     brief: raw.brief === true,
     aiVideoReview: raw.aiVideoReview === true,
     aiReview: raw.aiReview === true,
@@ -95,6 +101,7 @@ export type AddonNavPerm =
   | 'brief'
   | 'digitalHuman'
   | 'visualStudio'
+  | 'aiDrama'
   | 'aiVideoReview'
   | 'aiReview'
 
@@ -104,5 +111,6 @@ export function isAddonNavPermEnabled(access: MpAddonAccess, perm: AddonNavPerm)
   if (perm === 'aiVideoReview') return access.aiVideoReview
   if (perm === 'aiReview') return access.aiReview || access.aiVideoReview
   if (perm === 'visualStudio') return access.visualStudio
+  if (perm === 'aiDrama') return access.aiDrama === true
   return access.digitalHuman
 }

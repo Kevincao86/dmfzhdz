@@ -11,11 +11,14 @@ function expandLegacy(raw) {
   const cloudEdit = raw.cloudEdit === true || (legacy && raw.cloudEdit !== false)
   const digitalHuman = raw.digitalHuman === true || (legacy && raw.digitalHuman !== false)
   const visualStudio = raw.visualStudio === true || (legacy && raw.visualStudio !== false)
+  const aiDrama = raw.aiDrama === true
+  const talentEval = raw.talentEval === true
+  const talentAdvice = raw.talentAdvice === true
   const brief = raw.brief === true
   const aiVideoReview = raw.aiVideoReview === true
   const aiReview = raw.aiReview === true
   const any =
-    legacy || shortvideo || cloudEdit || digitalHuman || visualStudio || brief || aiVideoReview || aiReview
+    legacy || shortvideo || cloudEdit || digitalHuman || visualStudio || aiDrama || brief || aiVideoReview || aiReview
   return {
     addons: any,
     recommendHall: raw.recommendHall === true,
@@ -23,6 +26,9 @@ function expandLegacy(raw) {
     cloudEdit,
     digitalHuman,
     visualStudio,
+    aiDrama,
+    talentEval,
+    talentAdvice,
     brief,
     aiVideoReview,
     aiReview,
@@ -50,6 +56,9 @@ function canUseAddonPerm(account, perm) {
   if (perm === 'brief') return access.brief
   if (perm === 'digitalHuman') return access.digitalHuman
   if (perm === 'visualStudio') return access.visualStudio
+  if (perm === 'aiDrama') return access.aiDrama === true
+  if (perm === 'talentEval') return access.talentEval === true
+  if (perm === 'talentAdvice') return access.talentAdvice === true
   if (perm === 'aiVideoReview') return access.aiVideoReview
   if (perm === 'aiReview') return access.aiReview
   return false
@@ -67,6 +76,9 @@ function patchAccountPrFeatureAccess(account, access) {
       cloudEdit: typeof access.cloudEdit === 'boolean' ? access.cloudEdit : prev.cloudEdit,
       digitalHuman: typeof access.digitalHuman === 'boolean' ? access.digitalHuman : prev.digitalHuman,
       visualStudio: typeof access.visualStudio === 'boolean' ? access.visualStudio : prev.visualStudio,
+      aiDrama: typeof access.aiDrama === 'boolean' ? access.aiDrama : prev.aiDrama,
+      talentEval: typeof access.talentEval === 'boolean' ? access.talentEval : prev.talentEval,
+      talentAdvice: typeof access.talentAdvice === 'boolean' ? access.talentAdvice : prev.talentAdvice,
       brief: typeof access.brief === 'boolean' ? access.brief : prev.brief,
       aiVideoReview: typeof access.aiVideoReview === 'boolean' ? access.aiVideoReview : prev.aiVideoReview,
       aiReview: typeof access.aiReview === 'boolean' ? access.aiReview : prev.aiReview,

@@ -697,6 +697,9 @@ export type MpAddonSubmoduleAccess = {
   shortvideo: boolean
   cloudEdit: boolean
   digitalHuman: boolean
+  aiDrama: boolean
+  talentEval: boolean
+  talentAdvice: boolean
   brief: boolean
   aiVideoReview: boolean
   aiReview: boolean
@@ -721,6 +724,9 @@ export function resolveAddonSubmoduleAccess(cells: Record<string, TierCell>): Mp
     submoduleEnabled(cells, 'addon_cloud_edit', legacy ? ['addons'] : []) ||
     submoduleEnabled(cells, 'cloud_edit', legacy ? ['addons'] : [])
   const digitalHuman = submoduleEnabled(cells, 'addon_digital_human', legacy ? ['addons'] : [])
+  const aiDrama = submoduleEnabled(cells, 'addon_ai_drama', [])
+  const talentEval = submoduleEnabled(cells, 'addon_talent_eval', [])
+  const talentAdvice = submoduleEnabled(cells, 'addon_talent_advice', [])
   const brief = cells.ai_brief_gen === true
   const aiVideoReview = submoduleEnabled(cells, 'addon_ai_video_review', [])
   const aiReview = submoduleEnabled(cells, 'addon_ai_script_review', [])
@@ -728,10 +734,13 @@ export function resolveAddonSubmoduleAccess(cells: Record<string, TierCell>): Mp
     shortvideo,
     cloudEdit,
     digitalHuman,
+    aiDrama,
+    talentEval,
+    talentAdvice,
     brief,
     aiVideoReview,
     aiReview,
-    any: shortvideo || cloudEdit || digitalHuman || brief || aiVideoReview || aiReview,
+    any: shortvideo || cloudEdit || digitalHuman || aiDrama || brief || aiVideoReview || aiReview,
   }
 }
 

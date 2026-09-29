@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { fetchTraining } from '../lib/mpApi'
 import { getAccount } from '../lib/mpSession'
+import { readAccountPrFeatureAccess } from '../lib/prFeatureAccess'
 import { getWorkIdentity, WORK_EDITION_LABEL } from '../lib/mpWorkIdentity'
 import { readMember, memberTypeLabel } from '../lib/mpSync/talentMember'
 import { supplierSummaryLabel } from '../lib/mpSync/supplierTeamProfile'
@@ -167,6 +168,12 @@ export default function ProfilePage() {
    * 避免错误构建/旧 dist 漏打包导致线上「我的推广」消失）。
    * 顺序：资料和接单 → 钱和订单 → 讲师课程 → 数据 → 帮助。
    */
+  const talentAccess = readAccountPrFeatureAccess(getAccount())
+  const showTalentAnalysis =
+    !isPr &&
+    workId !== 'shoot' &&
+    workId !== 'edit' &&
+    (talentAccess.talentEval || talentAccess.talentAdvice)
   const menuItems: MenuEntry[] = [
     {
       to: profileLink,
@@ -174,7 +181,7 @@ export default function ProfilePage() {
       desc: profileDesc,
       group: 'quick',
     },
-    ...(!isPr && workId !== 'shoot' && workId !== 'edit'
+    ...(showTalentAnalysis
       ? [
           {
             to: '/profile/local-life-eval',

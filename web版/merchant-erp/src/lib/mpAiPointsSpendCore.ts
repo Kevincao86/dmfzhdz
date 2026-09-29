@@ -237,6 +237,19 @@ export function formatMpAiPointsInsufficient(balance: number, required: number):
   return `积分不足（当前 ${balance.toLocaleString('zh-CN')}，需要 ${required.toLocaleString('zh-CN')}），请充值积分或升级套餐后再试`
 }
 
+function talentContentPermissionError(
+  data: RegistrySnapshot,
+  account: MpAccountRow,
+  kind: MpPointsUsageKind,
+  roleOpts: { roleHint?: MpLibraryRole | null },
+): MpAiPointsSpendResult | null {
+  if (kind !== 'talent_eval' && kind !== 'talent_advice') return null
+  const key = kind === 'talent_eval' ? 'addon_talent_eval' : 'addon_talent_advice'
+  if (resolveEffectiveQuotaCell(account, data, key, roleOpts) === true) return null
+  const label = kind === 'talent_eval' ? '达人账号评估' : '达人账号分析'
+  return { ok: false, error: 'not_found', message: `当前档位未开通${label}，请升级会员后使用` }
+}
+
 export function spendMpAiPointsWithSnapshot(
   data: RegistrySnapshot,
   account: MpAccountRow,
@@ -273,13 +286,8 @@ export function spendMpAiPointsWithSnapshot(
     ensureMonthlyGiftPointsGranted(data, account, roleOpts)
   }
 
-  if (opts.kind === 'talent_eval' || opts.kind === 'talent_advice') {
-    const role = resolvePointsLibraryRole(data, account, roleOpts)
-    const plan = resolveMembershipPlanForAccount(data, account, role)
-    if (String(plan.id || 'basic') === 'basic') {
-      return { ok: false, error: 'not_found', message: '请先开通会员后再使用达人账号分析' }
-    }
-  }
+  const talentGate = talentContentPermissionError(data, account, opts.kind, roleOpts)
+  if (talentGate) return talentGate
 
   const role = resolvePointsLibraryRole(data, account, roleOpts)
   const target = resolveRegistryTargetIdForAccount(data, account, role)
@@ -357,13 +365,8 @@ export function assertMpAiPointsAffordable(
 ): MpAiPointsSpendResult {
   const roleOpts = { roleHint: opts?.roleHint }
   ensureMonthlyGiftPointsGranted(data, account, roleOpts)
-  if (kind === 'talent_eval' || kind === 'talent_advice') {
-    const role = resolvePointsLibraryRole(data, account, roleOpts)
-    const plan = resolveMembershipPlanForAccount(data, account, role)
-    if (String(plan.id || 'basic') === 'basic') {
-      return { ok: false, error: 'not_found', message: '请先开通会员后再使用达人账号分析' }
-    }
-  }
+  const talentGate = talentContentPermissionError(data, account, kind, roleOpts)
+  if (talentGate) return talentGate
   if (kind === 'brief' && resolveEffectiveQuotaCell(account, data, 'ai_brief_gen', roleOpts) !== true) {
     return { ok: false, error: 'not_found', message: '当前档位未开通 AI Brief 生成，请升级会员后使用' }
   }

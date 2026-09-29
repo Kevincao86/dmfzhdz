@@ -5,6 +5,9 @@ export type MpAddonAccess = {
   cloudEdit: boolean
   digitalHuman: boolean
   visualStudio: boolean
+  aiDrama: boolean
+  talentEval: boolean
+  talentAdvice: boolean
   brief: boolean
   aiVideoReview: boolean
   aiReview: boolean
@@ -23,6 +26,9 @@ export function readAccountPrFeatureAccess(account?: MpAccount | null): PrFeatur
   const cloudEdit = raw?.cloudEdit === true
   const digitalHuman = raw?.digitalHuman === true
   const visualStudio = raw?.visualStudio === true
+  const aiDrama = raw?.aiDrama === true
+  const talentEval = raw?.talentEval === true
+  const talentAdvice = raw?.talentAdvice === true
   const brief = raw?.brief === true
   const aiVideoReview = raw?.aiVideoReview === true
   const aiReview = raw?.aiReview === true
@@ -33,6 +39,7 @@ export function readAccountPrFeatureAccess(account?: MpAccount | null): PrFeatur
     cloudEdit ||
     digitalHuman ||
     visualStudio ||
+    aiDrama ||
     brief ||
     aiVideoReview ||
     aiReview
@@ -43,6 +50,9 @@ export function readAccountPrFeatureAccess(account?: MpAccount | null): PrFeatur
     cloudEdit: cloudEdit || (legacyAddons && raw?.cloudEdit !== false),
     digitalHuman: digitalHuman || (legacyAddons && raw?.digitalHuman !== false),
     visualStudio: visualStudio || (legacyAddons && raw?.visualStudio !== false),
+    aiDrama,
+    talentEval,
+    talentAdvice,
     brief,
     aiVideoReview,
     aiReview,
@@ -69,6 +79,9 @@ export function patchAccountPrFeatureAccess(
       cloudEdit: typeof access.cloudEdit === 'boolean' ? access.cloudEdit : prev.cloudEdit,
       digitalHuman: typeof access.digitalHuman === 'boolean' ? access.digitalHuman : prev.digitalHuman,
       visualStudio: typeof access.visualStudio === 'boolean' ? access.visualStudio : prev.visualStudio,
+      aiDrama: typeof access.aiDrama === 'boolean' ? access.aiDrama : prev.aiDrama,
+      talentEval: typeof access.talentEval === 'boolean' ? access.talentEval : prev.talentEval,
+      talentAdvice: typeof access.talentAdvice === 'boolean' ? access.talentAdvice : prev.talentAdvice,
       brief: typeof access.brief === 'boolean' ? access.brief : prev.brief,
       aiVideoReview: typeof access.aiVideoReview === 'boolean' ? access.aiVideoReview : prev.aiVideoReview,
       aiReview: typeof access.aiReview === 'boolean' ? access.aiReview : prev.aiReview,

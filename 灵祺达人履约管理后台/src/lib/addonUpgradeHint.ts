@@ -13,6 +13,7 @@ const DEFAULT_PAID_UNLOCK: Record<AddonNavPerm, boolean> = {
   brief: true,
   digitalHuman: true,
   visualStudio: true,
+  aiDrama: true,
   aiVideoReview: true,
   aiReview: true,
 }

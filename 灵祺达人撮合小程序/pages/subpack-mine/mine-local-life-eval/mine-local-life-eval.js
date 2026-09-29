@@ -1,3 +1,4 @@
+const prFeatureAccess = require('../../../utils/prFeatureAccess.js')
 const talentMember = require('../../../utils/talentMember.js')
 const wxAccount = require('../../../utils/wxAccount.js')
 const evalApi = require('../../../utils/talentLocalLifeEval.js')
@@ -200,6 +201,10 @@ Page({
   },
 
   async onEvaluate() {
+    if (!prFeatureAccess.canUseAddonPerm(null, 'talentEval')) {
+      wx.showToast({ title: '当前档位未开通达人账号评估', icon: 'none' })
+      return
+    }
     if (!this.data.canEval || this.data.evaluating || this.data.advising) return
     this.stopTick()
     this.setData({ evaluating: true, err: '' })
@@ -229,6 +234,10 @@ Page({
   },
 
   async onAdvise() {
+    if (!prFeatureAccess.canUseAddonPerm(null, 'talentAdvice')) {
+      wx.showToast({ title: '当前档位未开通达人账号分析', icon: 'none' })
+      return
+    }
     if (!this.data.scoreReady || this.data.evaluating || this.data.advising) return
     this.setData({ advising: true, err: '' })
     wx.showLoading({ title: '分析中', mask: true })

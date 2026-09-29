@@ -30,6 +30,10 @@ function applyPrFeatureAccessToSession(access: {
   shortvideo?: boolean
   cloudEdit?: boolean
   digitalHuman?: boolean
+  visualStudio?: boolean
+  aiDrama?: boolean
+  talentEval?: boolean
+  talentAdvice?: boolean
   brief?: boolean
 }) {
   const account = getAccount()
@@ -41,6 +45,10 @@ function applyPrFeatureAccessToSession(access: {
     prev.shortvideo === (access.shortvideo === true) &&
     prev.cloudEdit === (access.cloudEdit === true) &&
     prev.digitalHuman === (access.digitalHuman === true) &&
+    prev.visualStudio === (access.visualStudio === true) &&
+    prev.aiDrama === (access.aiDrama === true) &&
+    prev.talentEval === (access.talentEval === true) &&
+    prev.talentAdvice === (access.talentAdvice === true) &&
     prev.brief === (access.brief === true)
   ) {
     return

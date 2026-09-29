@@ -1,6 +1,11 @@
+const prFeatureAccess = require('./prFeatureAccess.js')
+const sessionStore = require('./mpSessionStore.js')
+
 /** 底部 Tab：随 PR / 达人身份切换（达人隐藏「发招募」） */
 function getTabList(identity) {
   const isPr = identity === 'pr'
+  const talentAccess = prFeatureAccess.readAccountPrFeatureAccess(sessionStore.readAccount())
+  const showTalentAnalysis = talentAccess.talentEval === true || talentAccess.talentAdvice === true
   const list = [
     { pagePath: '/pages/index/index', text: '首页', icon: 'home' },
     {
@@ -17,7 +22,7 @@ function getTabList(identity) {
       icon: 'plus',
       center: true,
     })
-  } else {
+  } else if (showTalentAnalysis) {
     list.push({
       pagePath: '/pages/subpack-mine/mine-local-life-eval/mine-local-life-eval',
       text: '达人账号分析',

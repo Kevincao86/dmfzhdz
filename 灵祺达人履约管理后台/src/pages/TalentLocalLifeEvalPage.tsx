@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getAccount } from '../lib/mpSession'
+import { readAccountPrFeatureAccess } from '../lib/prFeatureAccess'
 import { readMember } from '../lib/mpSync/talentMember'
 import {
   adviseTalent,
@@ -49,6 +50,9 @@ export default function TalentLocalLifeEvalPage() {
   const accountId = input.accountId || ''
   const basis = describeEvalBasis(input)
   const avatarUrl = String(getAccount()?.wxAvatarUrl || '').trim()
+  const talentAccess = readAccountPrFeatureAccess(getAccount())
+  const canRunEval = talentAccess.talentEval
+  const canRunAdvice = talentAccess.talentAdvice
   const canEval = !!(nickname || accountId)
   const [evaluating, setEvaluating] = useState(false)
   const [advising, setAdvising] = useState(false)
@@ -107,7 +111,7 @@ export default function TalentLocalLifeEvalPage() {
   }, [score, animateScore])
 
   async function onEvaluate() {
-    if (!canEval || evaluating || advising) return
+    if (!canRunEval || !canEval || evaluating || advising) return
     setEvaluating(true)
     setErr('')
     try {
@@ -125,7 +129,7 @@ export default function TalentLocalLifeEvalPage() {
   }
 
   async function onAdvise() {
-    if (!score || evaluating || advising) return
+    if (!canRunAdvice || !score || evaluating || advising) return
     setAdvising(true)
     setErr('')
     try {
@@ -276,11 +280,17 @@ export default function TalentLocalLifeEvalPage() {
         </div>
       ) : null}
 
+      {!canRunEval ? (
+        <p className="text-center text-sm text-[var(--shell-muted)]">当前档位未开通达人账号评估</p>
+      ) : null}
+      {!canRunAdvice ? (
+        <p className="text-center text-sm text-[var(--shell-muted)]">当前档位未开通达人账号分析</p>
+      ) : null}
       <div className="flex flex-col gap-3">
         <button
           type="button"
           className="rounded-xl bg-violet-600 px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
-          disabled={!canEval || evaluating || advising}
+          disabled={!canRunEval || !canEval || evaluating || advising}
           onClick={() => void onEvaluate()}
         >
           {evaluating
@@ -292,7 +302,7 @@ export default function TalentLocalLifeEvalPage() {
         <button
           type="button"
           className="rounded-xl border border-violet-300 bg-white px-4 py-3 text-sm font-medium text-violet-700 disabled:opacity-50"
-          disabled={!score || evaluating || advising}
+          disabled={!canRunAdvice || !score || evaluating || advising}
           onClick={() => void onAdvise()}
         >
           {advising ? '分析中…' : `分析整改 · ${TALENT_ADVICE_POINTS}积分`}
