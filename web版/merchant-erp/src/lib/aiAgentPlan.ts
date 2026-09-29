@@ -20,7 +20,8 @@ const PAID_AGENT_POINTS_HINT = `对话按实际 token 扣积分（毛利 60%，�
 
 const WELCOME_BY_PLAN: Record<MembershipPlan, string> = {
   free: `${BASE_WELCOME}\n\n当前为 **免费版**：可使用豆包/千问/MiniMax/DeepSeek 对话（每月直连调用 ${50} 次上限）。生图、生视频可浏览对应板块，点击使用需升级会员；报税管理、GEO、竞对分析亦需升级会员。`,
-  member: `${BASE_WELCOME}\n\n当前为 **会员版**：可使用四厂商对话模型；${PAID_AGENT_POINTS_HINT}。生图时若您选的是豆包等对话模型，系统会自动切换为对应文生图引擎优化出图。`,
+  member: `${BASE_WELCOME}\n\n当前为 **会员版**：可使用四厂商对话模型；${PAID_AGENT_POINTS_HINT}。每个平台可绑定 1 个账号。生图时若您选的是豆包等对话模型，系统会自动切换为对应文生图引擎优化出图。`,
+  member_store: `${BASE_WELCOME}\n\n当前为 **进阶版**：可使用四厂商对话模型；${PAID_AGENT_POINTS_HINT}。每个平台可绑定 5 个账号。`,
   member_plus: `${BASE_WELCOME}\n\n当前为 **会员 Plus**：可使用全部对话与文生图模型（灵祺高阶版智能AI模型）；${PAID_AGENT_POINTS_HINT}。复杂任务与一键报税均已开放。`,
 }
 
@@ -52,7 +53,7 @@ export function buildAiAgentPlanProfile(plan: MembershipPlan): AiAgentPlanProfil
   return {
     plan,
     planLabel: MEMBERSHIP_PLAN_LABELS[plan],
-    tierTag: plan === 'member_plus' ? 'Plus' : plan === 'member' ? '会员' : '免费',
+    tierTag: plan === 'member_plus' ? 'Plus' : plan === 'member_store' ? '进阶' : plan === 'member' ? '会员' : '免费',
     welcome: WELCOME_BY_PLAN[plan],
     composerHint:
       plan === 'free'

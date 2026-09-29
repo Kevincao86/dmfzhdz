@@ -105,6 +105,7 @@ list_scopes() {
   account_identity_bind  商家账号：邮箱注册、社交登录绑手机、同号合并、个人中心绑定态
   login_session_refresh  商家 Web/小程序：登录仍在但 access token 过期时先刷新再请求
   merchant_shop_metrics  商家小程序经营分析与商家 ERP 看板：营收/核销/退款金额与成交券、退款券
+  merchant_membership_plans  星选会员权益与商家订阅档位：168 一账号、368 五账号、计量文案
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -1552,6 +1553,30 @@ HomeDashboard.tsx
 灵祺ERP小程序/pages/dashboard/dashboard.js
 灵祺ERP小程序/pages/dashboard/dashboard.wxml
 灵祺ERP小程序/pages/dashboard/dashboard.wxss
+change-scope-guard
+PAT
+      ;;
+    merchant_membership_plans)
+      cat <<'PAT'
+membershipPlan.ts
+meooPaymentTiers.ts
+erpPointsEconomics.ts
+SubscriptionPlansPanel.tsx
+tenantBillingClient.ts
+aiAgentPlan.ts
+SettingsPage.tsx
+mpPointsEconomics.ts
+mpMembershipCatalog.ts
+paymentTierLogic.ts
+meoo-supabase-payment-orders-confirm.ts
+opsDashboardCompute.ts
+灵祺ERP小程序/utils/membershipPlanMp.js
+灵祺ERP小程序/utils/subscriptionUiMp.js
+灵祺ERP小程序/utils/meooPaymentTiers.js
+灵祺ERP小程序/pages/subscription/subscription.js
+灵祺ERP小程序/pages/subscription/subscription.wxml
+灵祺ERP小程序/pages/mine/mine.js
+20260929230000_tenant_membership_member_store.sql
 change-scope-guard
 PAT
       ;;

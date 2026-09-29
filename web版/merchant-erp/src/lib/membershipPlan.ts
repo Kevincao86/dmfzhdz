@@ -1,14 +1,16 @@
 /** 租户会员档位（与 public.tenants.membership_plan 一致） */
-export type MembershipPlan = 'free' | 'member' | 'member_plus'
+export type MembershipPlan = 'free' | 'member' | 'member_store' | 'member_plus'
 
 export const MEMBERSHIP_PLAN_LABELS: Record<MembershipPlan, string> = {
   free: '免费版',
   member: '会员版',
+  member_store: '进阶版',
   member_plus: '会员 Plus',
 }
 
 export const MEMBERSHIP_MONTHLY_YUAN: Partial<Record<MembershipPlan, number>> = {
   member: 168,
+  member_store: 368,
   member_plus: 598,
 }
 
@@ -23,7 +25,7 @@ export const ERP_AGENT_POINTS_PER_TURN = MP_POINTS_ARTICLE_PER_USE
 /** 各会员档位：抖音来客 / 巨量本地推 每平台可绑定账号数 */
 export function platformBindingLimit(plan: MembershipPlan): number {
   if (plan === 'member_plus') return 50
-  if (plan === 'member') return 5
+  if (plan === 'member_store') return 5
   return 1
 }
 
@@ -39,10 +41,10 @@ export function canAddPlatformBinding(plan: MembershipPlan, currentCount: number
 export function platformBindingLimitExceededMessage(plan: MembershipPlan): string {
   const n = platformBindingLimit(plan)
   const label = MEMBERSHIP_PLAN_LABELS[plan]
-  if (plan === 'free') {
-    return `${label}每个平台仅可绑定 1 个账号。如需绑定更多，请升级会员版（5 个）或会员 Plus（50 个）。`
+  if (plan === 'free' || plan === 'member') {
+    return `${label}每个平台仅可绑定 1 个账号。如需绑定更多，请升级进阶版（5 个）或会员 Plus（50 个）。`
   }
-  if (plan === 'member') {
+  if (plan === 'member_store') {
     return `${label}每个平台最多绑定 ${n} 个账号。如需更多，请升级会员 Plus（50 个）。`
   }
   return `${label}每个平台最多绑定 ${n} 个账号。`
@@ -53,7 +55,7 @@ export const BASIC_AI_PROVIDERS = ['qwen', 'doubao', 'minimax', 'deepseek'] as c
 export type BasicAiProvider = (typeof BASIC_AI_PROVIDERS)[number]
 
 export function normalizeMembershipPlan(raw: unknown): MembershipPlan {
-  if (raw === 'free' || raw === 'member' || raw === 'member_plus') return raw
+  if (raw === 'free' || raw === 'member' || raw === 'member_store' || raw === 'member_plus') return raw
   return 'member'
 }
 

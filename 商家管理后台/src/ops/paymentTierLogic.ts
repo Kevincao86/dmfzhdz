@@ -1,9 +1,10 @@
 /** 与 web版/merchant-erp/src/lib/meooPaymentTiers.ts 公式保持一致 */
 
-export type OpsMembershipPlan = 'free' | 'member' | 'member_plus'
+export type OpsMembershipPlan = 'free' | 'member' | 'member_store' | 'member_plus'
 
 const SUBSCRIPTION_TIER_CENTS = new Map<number, number>([
   [16800, 30],
+  [36800, 30],
   [59800, 30],
   [46800, 90],
   [168800, 90],
@@ -11,6 +12,7 @@ const SUBSCRIPTION_TIER_CENTS = new Map<number, number>([
 
 const SUBSCRIPTION_TIER_PLAN = new Map<number, OpsMembershipPlan>([
   [16800, 'member'],
+  [36800, 'member_store'],
   [59800, 'member_plus'],
   [46800, 'member'],
   [168800, 'member_plus'],
@@ -29,6 +31,7 @@ export function membershipPlanFromVerifiedCents(verifiedCents: number): OpsMembe
   const hit = SUBSCRIPTION_TIER_PLAN.get(verifiedCents)
   if (hit) return hit
   if (verifiedCents >= 59800) return 'member_plus'
+  if (verifiedCents >= 36800) return 'member_store'
   if (verifiedCents >= 16800) return 'member'
   return null
 }

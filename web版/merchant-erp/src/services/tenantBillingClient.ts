@@ -175,7 +175,7 @@ export type EffectiveSubscriptionTier = {
   label: string
   yuan: number
   cents: number
-  plan?: 'member' | 'member_plus'
+  plan?: 'member' | 'member_store' | 'member_plus'
   key?: string
   periodDays?: number
   regionalMarkup?: boolean

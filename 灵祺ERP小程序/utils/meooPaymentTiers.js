@@ -11,6 +11,7 @@ function computeErpRechargePoints(yuan) {
 module.exports = {
   SUBSCRIPTION_TIERS: [
     { label: '会员版 · 月度', yuan: 168, cents: 16800, plan: 'member' },
+    { label: '进阶版 · 月度', yuan: 368, cents: 36800, plan: 'member_store' },
     { label: '会员 Plus · 月度', yuan: 598, cents: 59800, plan: 'member_plus' },
     { label: '会员版 · 季度', yuan: 468, cents: 46800, plan: 'member' },
     { label: '会员 Plus · 季度', yuan: 1688, cents: 168800, plan: 'member_plus' },

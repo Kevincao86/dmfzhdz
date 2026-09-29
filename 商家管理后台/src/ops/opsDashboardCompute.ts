@@ -33,7 +33,9 @@ function recruitmentMerchantKey(o: {
 }
 
 function normalizeTenantPlan(raw?: string): 'free' | 'member' | 'member_plus' {
-  if (raw === 'member' || raw === 'member_plus') return raw
+  if (raw === 'member' || raw === 'member_store' || raw === 'member_plus') {
+    return raw === 'member_store' ? 'member' : raw
+  }
   return 'free'
 }
 
@@ -65,7 +67,8 @@ function subscriptionPlanFromOrder(o: OpsPaymentOrderRow): 'member' | 'member_pl
   if (o.status !== 'confirmed') return null
   const cents = o.verified_amount_cents ?? o.amount_cents
   const plan = membershipPlanFromVerifiedCents(cents)
-  if (plan === 'member' || plan === 'member_plus') return plan
+  if (plan === 'member' || plan === 'member_store') return 'member'
+  if (plan === 'member_plus') return plan
   return null
 }
 

@@ -9,6 +9,7 @@ const subUi = require('../../utils/subscriptionUiMp.js')
 
 function displayPlanFromTier(tierId) {
   if (tierId === 'member_plus') return '会员 Plus'
+  if (tierId === 'member_store') return '进阶版'
   if (tierId === 'member') return '会员版'
   return '免费版'
 }

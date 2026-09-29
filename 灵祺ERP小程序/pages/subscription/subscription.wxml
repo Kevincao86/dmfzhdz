@@ -45,9 +45,9 @@
         <text class="sub-row-ico">{{item.icon}}</text>
         <text>{{item.label}}</text>
       </view>
-      <text class="sub-td {{item.cells[0].highlight ? 'highlight' : ''}} {{item.cells[0].check ? 'check' : ''}}">{{item.cells[0].text}}</text>
-      <text class="sub-td {{item.cells[1].highlight ? 'highlight' : ''}} {{item.cells[1].check ? 'check' : ''}}">{{item.cells[1].text}}</text>
-      <text class="sub-td {{item.cells[2].highlight ? 'highlight' : ''}} {{item.cells[2].check ? 'check' : ''}}">{{item.cells[2].text}}</text>
+      <block wx:for="{{item.cells}}" wx:for-item="cell" wx:key="tierId">
+        <text class="sub-td {{cell.highlight ? 'highlight' : ''}} {{cell.check ? 'check' : ''}}">{{cell.text}}</text>
+      </block>
     </view>
   </view>
 

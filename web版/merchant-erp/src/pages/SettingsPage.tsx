@@ -206,7 +206,7 @@ export default function SettingsPage() {
     void reloadMembership({ silent: true })
   }
 
-  const isPaidMember = plan === 'member' || plan === 'member_plus'
+  const isPaidMember = plan === 'member' || plan === 'member_store' || plan === 'member_plus'
   const memberUsage = useMemo(
     () => computeMemberUsageRemaining(subSnap?.serviceExpireAt ?? null),
     [subSnap?.serviceExpireAt],

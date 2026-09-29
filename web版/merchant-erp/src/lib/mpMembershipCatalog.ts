@@ -95,9 +95,11 @@ const DEFAULT_PLAN_PRICING: Record<
 
 function matrixAiQuotas(role: MpLibraryRole, tier: MpMembershipTier): { video: number; copy: number } {
   const pts = MP_DEFAULT_GIFT_POINTS[role][tier]
-  if (tier === 'basic') return { video: 1, copy: 1 }
+  const wholeMinutes = videoMinutesFromGiftPoints(pts)
+  const video =
+    wholeMinutes > 0 ? wholeMinutes : pts >= 2 ? Math.round((pts / 120) * 100) / 100 : 0
   return {
-    video: videoMinutesFromGiftPoints(pts),
+    video,
     copy: articleUsesFromGiftPoints(pts),
   }
 }
@@ -551,14 +553,21 @@ function quotaUnitSuffix(def: MpPermissionDef): string {
   return ' 次/月'
 }
 
+function quotaAmountLabel(def: MpPermissionDef, n: number): string {
+  if (n >= 9999) return '不限'
+  if (def.quotaUnit === 'minutes' && n > 0 && n < 1) {
+    return `${Math.max(1, Math.round(n * 60))} 秒/月`
+  }
+  return `${Math.floor(n)}${quotaUnitSuffix(def)}`
+}
+
 function formatCellValue(def: MpPermissionDef, cell: TierCell): string {
   if (cell === '—' || cell === dash()) return '未开通'
   if (def.kind === 'boolean') return cell === true ? '已开通' : '未开通'
   if (def.kind === 'quota') {
     const n = Number(cell)
-    if (!Number.isFinite(n)) return String(cell)
-    if (n >= 9999) return '不限'
-    return `${n}${quotaUnitSuffix(def)}`
+    if (!Number.isFinite(n) || n <= 0) return '未开通'
+    return quotaAmountLabel(def, n)
   }
   return String(cell)
 }
@@ -879,8 +888,7 @@ export function planFeatureDetail(def: MpPermissionDef, cell: TierCell): string 
   if (def.kind === 'quota') {
     const n = Number(cell)
     if (!Number.isFinite(n) || n <= 0) return undefined
-    if (n >= 9999) return '不限'
-    return `${n}${quotaUnitSuffix(def)}`
+    return quotaAmountLabel(def, n)
   }
   const s = String(cell).trim()
   return s || undefined
@@ -990,7 +998,7 @@ export function mergeMembershipPlanVersions(
     byId.set(s.id, {
       ...(prev ?? { id: normalized.id, name: normalized.name, permissions: {}, sortOrder: normalized.sortOrder }),
       ...normalized,
-      permissions: { ...(prev?.permissions ?? {}), ...(normalized.permissions ?? {}) },
+      permissions: { ...(normalized.permissions ?? {}), ...(prev?.permissions ?? {}) },
     })
   }
   return [...byId.values()].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))

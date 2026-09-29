@@ -2,11 +2,12 @@
 
 const TIERS = [
   { id: 'free', label: '免费版', plan: 'free', price: '永久' },
-  { id: 'member', label: '会员版', plan: 'member', price: '¥168/月起' },
+  { id: 'member', label: '会员版', plan: 'member', price: '¥168/月' },
+  { id: 'member_store', label: '进阶版', plan: 'member_store', price: '¥368/月' },
   { id: 'member_plus', label: '会员 Plus', plan: 'member_plus', price: '¥598/月起' },
 ]
 
-/** 月赠积分：168×40、598×40，与 erpPointsEconomics.ERP_MONTHLY_GIFT_POINTS 一致 */
+/** 月赠积分：168×40、368×40、598×40，与 erpPointsEconomics.ERP_MONTHLY_GIFT_POINTS 一致 */
 const FEATURE_ROWS = [
   {
     key: 'core',
@@ -14,6 +15,7 @@ const FEATURE_ROWS = [
     icon: '⚡',
     free: '商品 / 店铺 / 招募基础',
     member: 'GEO · 竞对分析 · 报税管理',
+    member_store: 'GEO · 竞对分析 · 报税管理',
     member_plus: '代运营多店 + 全功能',
   },
   {
@@ -21,7 +23,8 @@ const FEATURE_ROWS = [
     label: '平台账号绑定',
     icon: '🔗',
     free: '每平台 1 个',
-    member: '每平台 5 个',
+    member: '每平台 1 个',
+    member_store: '每平台 5 个',
     member_plus: '每平台 50 个',
   },
   {
@@ -30,6 +33,7 @@ const FEATURE_ROWS = [
     icon: '💬',
     free: '50 次/月（四厂商）',
     member: '不限（四厂商）',
+    member_store: '不限（四厂商）',
     member_plus: '不限（含 OpenAI / Claude）',
   },
   {
@@ -38,6 +42,7 @@ const FEATURE_ROWS = [
     icon: '🎬',
     free: '可预览，使用需升级',
     member: '生图 · 短视频 · 数字人 · 混剪',
+    member_store: '生图 · 短视频 · 数字人 · 混剪',
     member_plus: '短视频 / 云剪 / 数字人',
   },
   {
@@ -46,6 +51,7 @@ const FEATURE_ROWS = [
     icon: '📈',
     free: '—',
     member: '本地推优化 + 线索跟进 AI',
+    member_store: '本地推优化 + 线索跟进 AI',
     member_plus: '一键报税 AI',
   },
   {
@@ -53,13 +59,15 @@ const FEATURE_ROWS = [
     label: 'AI 积分',
     icon: '✦',
     free: '注册赠 100 积分',
-    member: '每月 6,720 积分（套餐桶）',
-    member_plus: '每月 23,920 积分（套餐桶）',
+    member: '每月 6,720 积分',
+    member_store: '每月 14,720 积分',
+    member_plus: '每月 23,920 积分',
   },
 ]
 
 function planToTierId(plan) {
   if (plan === 'member_plus') return 'member_plus'
+  if (plan === 'member_store') return 'member_store'
   if (plan === 'member') return 'member'
   return 'free'
 }
@@ -81,6 +89,12 @@ function buildTable(activeTierId) {
     cells: [
       { tierId: 'free', text: row.free, highlight: activeTierId === 'free', check: false },
       { tierId: 'member', text: row.member, highlight: activeTierId === 'member', check: cellCheck(row.member) },
+      {
+        tierId: 'member_store',
+        text: row.member_store,
+        highlight: activeTierId === 'member_store',
+        check: cellCheck(row.member_store),
+      },
       {
         tierId: 'member_plus',
         text: row.member_plus,

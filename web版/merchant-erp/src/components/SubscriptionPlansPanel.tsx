@@ -45,11 +45,19 @@ const PLAN_FEATURES: Record<MembershipPlan, string[]> = {
   ],
   member: [
     'GEO 优化 · 竞对分析 · 报税管理',
-    '每平台绑定 5 个账号',
+    '每平台绑定 1 个账号',
     '直连 AI 不限（四厂商）',
     'AI 生图 · 短视频 · 数字人 · 混剪',
     '本地推优化 + 线索跟进 AI',
     monthlyGiftFeature('member'),
+  ],
+  member_store: [
+    'GEO 优化 · 竞对分析 · 报税管理',
+    '每平台绑定 5 个账号',
+    '直连 AI 不限（四厂商）',
+    'AI 生图 · 短视频 · 数字人 · 混剪',
+    '本地推优化 + 线索跟进 AI',
+    monthlyGiftFeature('member_store'),
   ],
   member_plus: [
     '全部 AI 模型（含 OpenAI / Claude）',
@@ -66,6 +74,7 @@ function buildCardsFromTiers(tiers: EffectiveSubscriptionTier[]): SubscriptionPl
     tiers.find((t) => t.plan === plan && (periodDays === 30 ? t.cents < 40000 : t.cents >= 40000))
 
   const memberMonthly = find('member', 30)
+  const memberStore = find('member_store', 30)
   const memberQuarter = find('member', 90)
   const plusMonthly = find('member_plus', 30)
   const plusQuarter = find('member_plus', 90)
@@ -93,6 +102,16 @@ function buildCardsFromTiers(tiers: EffectiveSubscriptionTier[]): SubscriptionPl
       features: PLAN_FEATURES.member,
       giftPoints: ERP_MONTHLY_GIFT_POINTS.member,
       regionalMarkup: memberMonthly?.regionalMarkup,
+    },
+    {
+      plan: 'member_store',
+      tierIndex: idx(memberStore),
+      label: '进阶版',
+      priceYuan: memberStore?.yuan ?? 368,
+      period: '月付',
+      features: PLAN_FEATURES.member_store,
+      giftPoints: ERP_MONTHLY_GIFT_POINTS.member_store,
+      regionalMarkup: memberStore?.regionalMarkup,
     },
     {
       plan: 'member',
@@ -131,8 +150,8 @@ function buildCardsFromTiers(tiers: EffectiveSubscriptionTier[]): SubscriptionPl
 
 function platformTiersAsEffective(): EffectiveSubscriptionTier[] {
   return SUBSCRIPTION_TIERS.filter(
-    (t): t is (typeof SUBSCRIPTION_TIERS)[number] & { plan: 'member' | 'member_plus' } =>
-      t.plan === 'member' || t.plan === 'member_plus',
+    (t): t is (typeof SUBSCRIPTION_TIERS)[number] & { plan: 'member' | 'member_store' | 'member_plus' } =>
+      t.plan === 'member' || t.plan === 'member_store' || t.plan === 'member_plus',
   ).map((t) => ({
     label: t.label,
     yuan: t.yuan,
@@ -172,7 +191,22 @@ export default function SubscriptionPlansPanel({
       })
   }, [])
 
-  const cards = useMemo(() => buildCardsFromTiers(tiers ?? platformTiersAsEffective()), [tiers])
+  const cards = useMemo(() => {
+    const base = tiers ?? platformTiersAsEffective()
+    const withStore = base.some((t) => t.plan === 'member_store' || t.cents === 36800)
+      ? base
+      : [
+          ...base,
+          {
+            label: '进阶版 · 月度',
+            yuan: 368,
+            cents: 36800,
+            plan: 'member_store' as const,
+            periodDays: 30,
+          },
+        ]
+    return buildCardsFromTiers(withStore)
+  }, [tiers])
 
   const paidCards = useMemo(() => cards.filter((c) => c.plan !== 'free'), [cards])
 
@@ -197,7 +231,7 @@ export default function SubscriptionPlansPanel({
             </h2>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-300">
               订阅含 ERP 全功能权益；付费档位每月赠送 AI 积分（套餐桶，自然月刷新）。
-              积分可用于视频检核、Brief、云剪等 AI 能力。
+              积分可用于文稿、Brief、生图等 AI 能力。
               {source === 'regional' && pricingCity ? (
                 <span className="mt-1 block text-amber-200/90">
                   当前按区域价展示（{pricingCity}）

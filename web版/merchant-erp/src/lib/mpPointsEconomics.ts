@@ -472,7 +472,11 @@ export function resolveRechargePointsAndCents(body: {
 
 export function formatPointsEquivalentsLine(points: number): string {
   const eq = mpPointsEquivalents(points)
-  return `约 ${eq.videoMinutes} 分钟视频检核 · ${eq.articleUses} 次文稿检核 · ${eq.briefUses} 篇 Brief`
+  const video =
+    eq.videoMinutes >= 1
+      ? `约 ${eq.videoMinutes} 分钟视频检核`
+      : `约 ${Math.floor(Math.max(0, points) / MP_POINTS_VIDEO_PER_SEC)} 秒视频检核`
+  return `${video} · ${eq.articleUses} 次文稿检核 · ${eq.briefUses} 篇 Brief`
 }
 
 export function formatComplianceBillingSuffix(res: {

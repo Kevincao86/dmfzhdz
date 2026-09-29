@@ -7,6 +7,7 @@ export type PaymentTier = { label: string; yuan: number; cents: number; plan?: M
 
 export const SUBSCRIPTION_TIERS: PaymentTier[] = [
   { label: '会员版 · 月度', yuan: 168, cents: 16800, plan: 'member' },
+  { label: '进阶版 · 月度', yuan: 368, cents: 36800, plan: 'member_store' },
   { label: '会员 Plus · 月度', yuan: 598, cents: 59800, plan: 'member_plus' },
   { label: '会员版 · 季度', yuan: 468, cents: 46800, plan: 'member' },
   { label: '会员 Plus · 季度', yuan: 1688, cents: 168800, plan: 'member_plus' },
@@ -48,7 +49,7 @@ export function subscriptionDaysFromVerifiedCents(verifiedCents: number): number
   if (!Number.isFinite(verifiedCents) || verifiedCents <= 0) return 0
   for (const t of SUBSCRIPTION_TIERS) {
     if (t.cents === verifiedCents) {
-      if (t.cents === 16800 || t.cents === 59800) return 30
+      if (t.cents === 16800 || t.cents === 36800 || t.cents === 59800) return 30
       if (t.cents === 46800 || t.cents === 168800) return 90
     }
   }
@@ -63,6 +64,7 @@ export function membershipPlanFromVerifiedCents(verifiedCents: number): Membersh
     if (t.cents === verifiedCents && t.plan) return t.plan
   }
   if (verifiedCents >= 59800) return 'member_plus'
+  if (verifiedCents >= 36800) return 'member_store'
   if (verifiedCents >= 16800) return 'member'
   return null
 }

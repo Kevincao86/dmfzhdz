@@ -272,7 +272,7 @@ Page({
       }
       this.setData({
         planLabel: label,
-        planPillClass: plan === 'member_plus' ? 'plus' : plan === 'member' ? 'member' : 'free',
+        planPillClass: plan === 'member_plus' ? 'plus' : plan === 'member' || plan === 'member_store' ? 'member' : 'free',
       })
       this.patchSubscribeMenuDesc(subDesc)
     } catch (_) {

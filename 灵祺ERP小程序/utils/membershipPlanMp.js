@@ -3,11 +3,13 @@
 const MEMBERSHIP_PLAN_LABELS = {
   free: '免费版',
   member: '会员版',
+  member_store: '进阶版',
   member_plus: '会员 Plus',
 }
 
 const MEMBERSHIP_MONTHLY_YUAN = {
   member: 168,
+  member_store: 368,
   member_plus: 598,
 }
 
@@ -23,11 +25,19 @@ const PLAN_FEATURE_LINES = {
   ],
   member: [
     'GEO 优化 · 竞对分析 · 报税管理',
-    '每平台绑定 5 个账号',
+    '每平台绑定 1 个账号',
     '直连 AI 不限（四厂商）',
     'AI 生图 · 短视频 · 数字人 · 混剪',
     '本地推优化 + 线索跟进 AI',
     '每月 6,720 积分（套餐桶）',
+  ],
+  member_store: [
+    'GEO 优化 · 竞对分析 · 报税管理',
+    '每平台绑定 5 个账号',
+    '直连 AI 不限（四厂商）',
+    'AI 生图 · 短视频 · 数字人 · 混剪',
+    '本地推优化 + 线索跟进 AI',
+    '每月 14,720 积分（套餐桶）',
   ],
   member_plus: [
     '全部 AI 模型（含 OpenAI / Claude）',
@@ -39,7 +49,7 @@ const PLAN_FEATURE_LINES = {
 }
 
 function normalizePlan(raw) {
-  if (raw === 'free' || raw === 'member' || raw === 'member_plus') return raw
+  if (raw === 'free' || raw === 'member' || raw === 'member_store' || raw === 'member_plus') return raw
   return 'free'
 }
 
@@ -56,7 +66,7 @@ function buildEntitlements(plan, directAiCallsUsed) {
     directAiRemaining: remaining,
     monthlyYuan: MEMBERSHIP_MONTHLY_YUAN[plan] != null ? MEMBERSHIP_MONTHLY_YUAN[plan] : null,
     featureLines: PLAN_FEATURE_LINES[plan] || PLAN_FEATURE_LINES.free,
-    isPaid: plan === 'member' || plan === 'member_plus',
+    isPaid: plan === 'member' || plan === 'member_store' || plan === 'member_plus',
   }
 }
 

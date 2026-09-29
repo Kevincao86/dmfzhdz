@@ -7,9 +7,9 @@ import { MEMBERSHIP_MONTHLY_YUAN } from './membershipPlan.js'
 import {
   MP_POINT_AI_COST_SHARE,
   MP_POINT_INTERNAL_COST_YUAN,
-  MP_POINTS_VIDEO_PER_MIN,
   MP_POINTS_ARTICLE_PER_USE,
   MP_POINTS_BRIEF_PER_USE,
+  MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE,
 } from './mpPointsEconomics.js'
 
 /**
@@ -77,6 +77,7 @@ export function computeErpMonthlyGiftFromYuan(monthlyYuan: number): number {
 export const ERP_MONTHLY_GIFT_POINTS: Record<MembershipPlan, number> = {
   free: ERP_BASIC_GIFT_POINTS,
   member: computeErpMonthlyGiftFromYuan(MEMBERSHIP_MONTHLY_YUAN.member ?? 168),
+  member_store: computeErpMonthlyGiftFromYuan(MEMBERSHIP_MONTHLY_YUAN.member_store ?? 368),
   member_plus: computeErpMonthlyGiftFromYuan(MEMBERSHIP_MONTHLY_YUAN.member_plus ?? 598),
 }
 
@@ -105,21 +106,21 @@ export function computeErpRechargePointsFromCents(cents: number): number {
 }
 
 export function erpPointsEquivalents(points: number): {
-  videoMinutes: number
   articleUses: number
   briefUses: number
+  imageUses: number
 } {
   const p = Math.max(0, Math.floor(Number(points) || 0))
   return {
-    videoMinutes: Math.floor(p / MP_POINTS_VIDEO_PER_MIN),
     articleUses: Math.floor(p / MP_POINTS_ARTICLE_PER_USE),
     briefUses: Math.floor(p / MP_POINTS_BRIEF_PER_USE),
+    imageUses: Math.floor(p / MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE),
   }
 }
 
 export function formatErpPointsEquivalentsLine(points: number): string {
   const eq = erpPointsEquivalents(points)
-  return `约 ${eq.videoMinutes} 分钟视频检核 · ${eq.articleUses} 次文稿 · ${eq.briefUses} 篇 Brief`
+  return `约 ${eq.articleUses.toLocaleString('zh-CN')} 次文稿 · ${eq.briefUses.toLocaleString('zh-CN')} 篇 Brief · ${eq.imageUses.toLocaleString('zh-CN')} 张生图`
 }
 
 export function erpMonthlyGiftPointsForPlan(plan: MembershipPlan): number {
