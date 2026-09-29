@@ -1433,6 +1433,17 @@ mpGroupQrHallSlice
 change-scope-guard
 PAT
       ;;
+    geo_public)
+      cat <<'PAT'
+geoPublicPage
+geoPublicApi
+meoo-geo-public
+GeoPage.tsx
+geoModuleSpec.ts
+web版/merchant-erp/.gitignore
+change-scope-guard
+PAT
+      ;;
     *)
       echo ""
       ;;

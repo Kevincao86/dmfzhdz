@@ -112,7 +112,7 @@ export const STORE_INFO_FIELDS = {
 export const STORE_INFO_FEATURE = {
   fieldCheck: '必填项+格式校验',
   statusMonitor: '自动识别缺失项，触发待办',
-  multiPlatformSync: '支持抖音/美团/大众点评同步',
+  multiPlatformSync: '发布公开引用页后，把同一套店名、地址、营业时间、电话写回来客/美团/点评',
 } as const
 
 /** 内容库类型 */
@@ -142,11 +142,11 @@ export const WORD_OF_MOUTH_FEATURE = {
   negativeMonitor: '负面反馈监测，指导运营优化',
 } as const
 
-/** 平台同步 */
+/** 对外发布：公开 HTML 供检索，不是写入抖音/美团/点评的接口 */
 export const PLATFORM_SYNC_FEATURE = {
-  boundPlatform: ['抖音', '美团', '大众点评'] as const,
-  oneClickSync: '优化后信息一键同步',
-  syncStatus: '同步进度监测，处理失败项',
+  boundPlatform: ['公开引用页', 'llms.txt', 'sitemap'] as const,
+  oneClickSync: '用当前门店事实发布可被抓取的引用页',
+  syncStatus: '发布后给出固定网址；来客、美团、点评需商家自行贴上同一套事实',
 } as const
 
 /** 效果体检 */
@@ -165,4 +165,4 @@ export const TODO_TRIGGER_RULE = [
 
 /** AI 引用适配核心规则 */
 export const AI_ADAPTATION_RULE =
-  '结构化内容优先读取，规范度/更新频率越高，引用优先级越高'
+  '公开模型只读得到已发布的引用页和来客/点评等外部页面；后台健康分和咨询测试不会进入它们的回答'

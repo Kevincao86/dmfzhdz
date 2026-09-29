@@ -50,6 +50,7 @@ import {
   GeoStoreBreakdownTable,
 } from '../components/geo/GeoOverviewEnhancements'
 import { loadGeoScoreSnapshot, saveGeoScoreSnapshot } from '../lib/geoPersist'
+import { loadSavedGeoPublicLink, publishGeoPublicPage, type GeoPublicLink } from '../services/geoPublicApi'
 import {
   buildGeoScoreContextPayload,
   computeDeterministicGeoFromStores,
@@ -81,7 +82,7 @@ const TABS = [
   { id: 'content' as const, label: '内容库' },
   { id: 'query' as const, label: '问法覆盖' },
   { id: 'reputation' as const, label: '口碑证据' },
-  { id: 'sync' as const, label: '平台同步' },
+  { id: 'sync' as const, label: 'AI引用发布' },
   { id: 'health' as const, label: '效果体检' },
 ]
 
@@ -214,6 +215,9 @@ export default function GeoPage() {
   const [scoreBusy, setScoreBusy] = useState(false)
   const [storesSyncErr, setStoresSyncErr] = useState<string | null>(null)
   const [accountNameFromApi, setAccountNameFromApi] = useState<string | undefined>(undefined)
+  const [publishBusy, setPublishBusy] = useState(false)
+  const [publishErr, setPublishErr] = useState<string | null>(null)
+  const [publicLink, setPublicLink] = useState<GeoPublicLink | null>(() => loadSavedGeoPublicLink())
 
   useEffect(() => {
     const tok = readDouyinToken()
@@ -393,6 +397,40 @@ export default function GeoPage() {
   }
   const viewHealth = liveMetrics?.healthScore ?? 0
   const viewLastMs = liveMetrics?.lastStructuredContentUpdateMs ?? Date.now()
+
+  const publishPublicPage = useCallback(async () => {
+    const source = activeStores.length ? activeStores : pickerRows
+    const stores = source
+      .map((s) => ({
+        name: s.name,
+        address: s.address || '',
+        city: s.city || '',
+        phone: s.phone || '',
+        businessHours: s.businessHours || '',
+        announcement: s.announcement || '',
+        poiId: s.id,
+      }))
+      .filter((s) => s.name.trim())
+      .slice(0, 20)
+    if (!stores.length) {
+      setPublishErr('还没有门店。请先绑定抖音来客，并在页顶同步门店。')
+      return
+    }
+    setPublishBusy(true)
+    setPublishErr(null)
+    const brandName =
+      (geoScope === 'brand' ? brandKeyword.trim() : '') ||
+      accountNameFromApi ||
+      source.find((s) => s.brandName?.trim())?.brandName ||
+      ''
+    const r = await publishGeoPublicPage({ brandName, stores })
+    setPublishBusy(false)
+    if (!r.ok) {
+      setPublishErr(r.message)
+      return
+    }
+    setPublicLink(r.link)
+  }, [accountNameFromApi, activeStores, brandKeyword, geoScope, pickerRows])
 
   const runHealthCheck = useCallback(() => {
     setHealthBusy(true)
@@ -1021,7 +1059,7 @@ export default function GeoPage() {
               <strong className="font-medium text-gray-700">「AI 生成咨询文案」</strong>
               生成贴近真实场景的模拟问法（优先覆盖待补齐字段），再
               <strong className="font-medium text-gray-700">「发送至 AI 模型」</strong>
-              查看回答是否准确、是否瞎编。
+              查看回答是否准确、是否瞎编。这次请求会把知识包直接交给你绑定的模型，公开的豆包、千问不会因此提到本店。
             </p>
           </div>
 
@@ -1466,21 +1504,76 @@ export default function GeoPage() {
       {tab === 'sync' && (
         <div className="space-y-6">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">平台同步</h2>
+            <h2 className="text-xl font-bold text-gray-900">AI 引用发布</h2>
             <p className="mt-1 text-sm text-gray-500">
-              将门店知识、商品与活动在对应平台侧保持更新，用户在 App 或小程序中看到的信息与 ERP 一致（按各平台上架规则执行）。
+              {PLATFORM_SYNC_FEATURE.oneClickSync}。页面是公开 HTML，带店名、地址、营业时间、电话和常见问答，检索式模型可以抓取。
+              {PLATFORM_SYNC_FEATURE.syncStatus}。
             </p>
-            <p className="mt-2 text-xs text-gray-500">
-              支持平台：{PLATFORM_SYNC_FEATURE.boundPlatform.join('、')}。{PLATFORM_SYNC_FEATURE.oneClickSync}；{PLATFORM_SYNC_FEATURE.syncStatus}
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+            <p className="text-sm text-gray-700">
+              将发布当前范围内已加载的门店，最多 20 家。发布前请先在概览同步来客门店，并补齐地址、营业时间和电话。
             </p>
+            <button
+              type="button"
+              disabled={publishBusy}
+              onClick={() => void publishPublicPage()}
+              className="mt-4 inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+            >
+              {publishBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Globe2 className="mr-2 h-4 w-4" />}
+              发布公开引用页
+            </button>
+            {publishErr ? <p className="mt-3 text-sm text-red-600">{publishErr}</p> : null}
+            {publicLink ? (
+              <div className="mt-5 space-y-3 text-sm text-gray-800">
+                <p>
+                  公开地址：
+                  <a className="ml-1 break-all font-medium text-blue-700 hover:underline" href={publicLink.url} target="_blank" rel="noreferrer">
+                    {publicLink.url}
+                  </a>
+                </p>
+                {publicLink.updatedAt ? (
+                  <p className="text-xs text-gray-500">最近发布：{publicLink.updatedAt}</p>
+                ) : null}
+                {publicLink.citation ? (
+                  <p className="rounded-lg bg-gray-50 p-3 leading-6">{publicLink.citation}</p>
+                ) : null}
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    className="text-sm font-medium text-blue-600 hover:underline"
+                    onClick={() => void navigator.clipboard.writeText(publicLink.url)}
+                  >
+                    复制网址
+                  </button>
+                  {publicLink.citation ? (
+                    <button
+                      type="button"
+                      className="text-sm font-medium text-blue-600 hover:underline"
+                      onClick={() => void navigator.clipboard.writeText(publicLink.citation)}
+                    >
+                      复制引用句
+                    </button>
+                  ) : null}
+                </div>
+                {publicLink.llms ? (
+                  <p className="text-xs text-gray-500 break-all">模型目录：{publicLink.llms}</p>
+                ) : null}
+                {publicLink.sitemap ? (
+                  <p className="text-xs text-gray-500 break-all">站点地图：{publicLink.sitemap}</p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2 font-semibold text-gray-900">
                 <Store className="h-5 w-5 text-blue-600" />
-                门店侧
+                来客 / 点评 / 美团
               </div>
-              <p className="mt-2 text-sm text-gray-600">核对抖音来客等平台的门店资料是否与事实库一致。</p>
+              <p className="mt-2 text-sm text-gray-600">
+                这些平台没有从 ERP 写入的接口。把上面同一段店名、地址、营业时间和电话贴进各平台，模型才更容易从它们的页面引用。
+              </p>
               <button
                 type="button"
                 onClick={() => navigate('/store/info')}
@@ -1494,7 +1587,7 @@ export default function GeoPage() {
                 <Link2 className="h-5 w-5 text-violet-600" />
                 商品与活动
               </div>
-              <p className="mt-2 text-sm text-gray-600">套餐、卖点与活动页需与内容库口径一致。</p>
+              <p className="mt-2 text-sm text-gray-600">套餐和活动如果要被引用，文案需与公开页口径一致。</p>
               <button
                 type="button"
                 onClick={() => navigate('/products/list')}

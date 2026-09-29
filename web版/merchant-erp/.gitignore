@@ -25,3 +25,6 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
+
+# 商家发布的 GEO 公开事实页（运行时写入，勿入库）
+data/geo-public/
