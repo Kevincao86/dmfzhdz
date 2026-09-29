@@ -126,17 +126,16 @@
           wx:for="{{item.items}}"
           wx:for-item="menu"
           wx:key="key"
-          class="wb-biz-tile {{menu.comingSoon ? 'wb-biz-tile--soon' : ''}}"
-          hover-class="wb-biz-tile--hover"
+          class="wb-quick-tile {{menu.comingSoon ? 'wb-quick-tile--soon' : ''}}"
+          hover-class="wb-quick-tile--hover"
           data-key="{{menu.key}}"
           bindtap="onMenuTap"
         >
-          <view class="wb-biz-tile-icon">
-            <image class="wb-biz-tile-img" src="{{menu.iconSrc}}" mode="aspectFill" />
+          <view class="wb-tile-icon">
+            <image class="wb-tile-img" src="{{menu.iconSrc}}" mode="aspectFill" />
             <text class="wb-menu-badge" wx:if="{{menu.badge}}">{{menu.badge}}</text>
           </view>
-          <text class="wb-biz-tile-label">{{menu.label}}</text>
-          <text class="wb-biz-tile-sub">{{menu.comingSoon ? '即将开放' : menu.sub}}</text>
+          <text class="wb-tile-label">{{menu.label}}</text>
         </view>
       </view>
     </view>
