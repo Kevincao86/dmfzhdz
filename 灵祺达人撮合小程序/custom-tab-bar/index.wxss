@@ -112,6 +112,12 @@
   font-weight: 700;
 }
 
+.tab-text--compact {
+  font-size: 18rpx;
+  letter-spacing: -0.04em;
+  white-space: nowrap;
+}
+
 .tab-text--fab {
   margin-top: 4rpx;
 }
@@ -235,6 +241,40 @@
 
 .tab-icon.is-active .ico-star {
   background: var(--lq-gradient-tab);
+}
+
+.ico-insight {
+  left: 8rpx;
+  bottom: 8rpx;
+  width: 28rpx;
+  height: 28rpx;
+}
+
+.ico-insight-bar {
+  position: absolute;
+  bottom: 0;
+  width: 6rpx;
+  border-radius: 3rpx;
+  background: #94a3b8;
+}
+
+.ico-insight-bar--1 {
+  left: 0;
+  height: 12rpx;
+}
+
+.ico-insight-bar--2 {
+  left: 11rpx;
+  height: 20rpx;
+}
+
+.ico-insight-bar--3 {
+  left: 22rpx;
+  height: 28rpx;
+}
+
+.tab-icon.is-active .ico-insight-bar {
+  background: var(--lq-primary);
 }
 
 /* 消息 */

@@ -1,6 +1,8 @@
 const talentMember = require('../../../utils/talentMember.js')
 const wxAccount = require('../../../utils/wxAccount.js')
 const evalApi = require('../../../utils/talentLocalLifeEval.js')
+const userProfile = require('../../../utils/userProfile.js')
+const { getTabList } = require('../../../utils/tabBarConfig.js')
 const { syncPageIdentity } = require('../../../utils/pageIdentityChrome.js')
 
 function letterOf(name) {
@@ -20,9 +22,10 @@ Page({
     advising: false,
     displayScore: 0,
     scoreReady: false,
+    scorePop: false,
     videoLevel: '',
     liveLevel: '',
-    basis: '',
+    tabs: [],
     adviceReady: false,
     adviceStatus: '',
     sections: [],
@@ -39,6 +42,13 @@ Page({
   onShow() {
     syncPageIdentity(this)
     this.loadIdentity()
+    this.setData({ tabs: getTabList(userProfile.readIdentity()) })
+  },
+
+  onTab(e) {
+    const path = e.currentTarget.dataset.path
+    if (!path || String(e.currentTarget.dataset.navigate) === 'true') return
+    wx.switchTab({ url: path })
   },
 
   onUnload() {
@@ -70,16 +80,20 @@ Page({
   playScore(target) {
     this.stopTick()
     const goal = Math.max(0, Math.min(100, Number(target) || 0))
-    this.setData({ displayScore: 0, evaluating: false })
-    let cur = 0
+    const start = Date.now()
+    const dur = 1400
+    this.setData({ displayScore: 0, evaluating: false, scorePop: false })
     this._timer = setInterval(() => {
-      cur += Math.max(1, Math.round((goal - cur) / 8))
-      if (cur >= goal) {
-        cur = goal
+      const t = Math.min(1, (Date.now() - start) / dur)
+      const eased = 1 - Math.pow(1 - t, 3)
+      const cur = Math.round(goal * eased)
+      if (t >= 1) {
         this.stopTick()
+        this.setData({ displayScore: goal, scorePop: true })
+        return
       }
       this.setData({ displayScore: cur })
-    }, 40)
+    }, 32)
   },
 
   async onEvaluate() {
@@ -89,6 +103,7 @@ Page({
       evaluating: true,
       err: '',
       scoreReady: false,
+      scorePop: false,
       displayScore: 0,
       adviceReady: false,
       sections: [],
@@ -100,7 +115,6 @@ Page({
         scoreReady: true,
         videoLevel: score.videoLevel,
         liveLevel: score.liveLevel,
-        basis: score.basis,
       })
       this.playScore(score.score)
     } catch (e) {

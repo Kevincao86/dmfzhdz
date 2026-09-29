@@ -7,18 +7,19 @@
   </view>
 
   <view class="xingxuan-card hero">
-    <view class="ring {{evaluating ? 'ring--spin' : ''}}" style="background: conic-gradient(#7c4dff {{displayScore}}%, #efeaf8 0);">
-      <view class="ring-hole">
-        <text class="score">{{displayScore}}</text>
+    <view class="ring-stage">
+      <view class="ring-halo {{evaluating ? 'ring-halo--on' : ''}}"></view>
+      <view class="ring {{scorePop ? 'ring--pop' : ''}}" style="background: conic-gradient(from -90deg, #7c4dff 0%, #c084fc {{displayScore}}%, #efeaf8 {{displayScore}}%);">
+        <view class="ring-hole">
+          <text class="score {{scorePop ? 'score--pop' : ''}}">{{displayScore}}</text>
+        </view>
       </view>
     </view>
-    <text class="label">豆包预估分</text>
-    <text class="hint">豆包预估，不是来客官方等级</text>
+    <text class="label">数据智能分析</text>
     <view class="levels" wx:if="{{scoreReady}}">
       <text class="level-title">预估下月带货等级</text>
       <text class="level">视频带货力 {{videoLevel}}</text>
       <text class="level">直播带货力 {{liveLevel}}</text>
-      <text class="basis" wx:if="{{basis}}">{{basis}}</text>
     </view>
   </view>
 
@@ -38,6 +39,19 @@
       <text class="sec-name">{{item.name}}</text>
       <text class="sec-line" wx:if="{{item.now}}">现状：{{item.now}}</text>
       <text class="sec-line">接下来：{{item.next}}</text>
+    </view>
+  </view>
+
+  <view class="eval-tab-bar">
+    <view
+      wx:for="{{tabs}}"
+      wx:key="pagePath"
+      class="eval-tab {{item.navigate ? 'eval-tab--on' : ''}}"
+      data-path="{{item.pagePath}}"
+      data-navigate="{{item.navigate}}"
+      bindtap="onTab"
+    >
+      <text class="eval-tab-text">{{item.text}}</text>
     </view>
   </view>
 </view>

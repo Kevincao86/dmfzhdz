@@ -1526,6 +1526,8 @@ App.tsx
 shellNavConfig
 灵祺达人撮合小程序/pages/mine/mine.js
 灵祺达人撮合小程序/app.json
+tabBarConfig
+custom-tab-bar
 change-scope-guard
 PAT
       ;;

@@ -108,8 +108,8 @@ export default function ProfilePage() {
       ? [
           {
             to: '/profile/local-life-eval',
-            label: '抖音本地生活评估',
-            desc: '豆包预估评分、下月带货等级与整改',
+            label: '数据智能分析',
+            desc: '本地生活达人评分、下月带货等级与整改',
           },
         ]
       : []),

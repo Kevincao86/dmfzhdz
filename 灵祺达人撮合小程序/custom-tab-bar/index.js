@@ -47,6 +47,10 @@ Component({
       const idx = Number(e.currentTarget.dataset.index)
       const item = this.data.list[idx]
       if (!item) return
+      if (item.navigate) {
+        wx.navigateTo({ url: item.pagePath })
+        return
+      }
       wx.switchTab({ url: item.pagePath })
     },
   },

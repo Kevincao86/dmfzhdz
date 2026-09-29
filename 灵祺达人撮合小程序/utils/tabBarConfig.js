@@ -17,6 +17,14 @@ function getTabList(identity) {
       icon: 'plus',
       center: true,
     })
+  } else {
+    list.push({
+      pagePath: '/pages/subpack-mine/mine-local-life-eval/mine-local-life-eval',
+      text: '数据智能分析',
+      icon: 'insight',
+      navigate: true,
+      compact: true,
+    })
   }
   list.push(
     { pagePath: '/pages/messages/messages', text: '消息', icon: 'chat' },

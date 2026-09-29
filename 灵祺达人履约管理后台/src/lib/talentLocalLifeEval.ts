@@ -6,13 +6,13 @@ const SCORE_SYSTEM = [
   '这不是抖音来客官方接口，不要声称读到了来客后台、团购分或当月官方带货力等级。',
   '不要编造粉丝数、核销额、GMV 或具体成交数字。',
   '只输出一个 JSON 对象，不要 Markdown，不要额外说明。',
-  '字段：score 为 0 到 100 的整数；videoLevel 为 Lv0 到 Lv8，表示预估下月视频带货力；liveLevel 为 Lv0 到 Lv8，表示预估下月直播带货力；basis 不超过 40 字。',
-  '若公开印象里没有这个达人，score 不要高于 55，basis 写「公开资料不足，仅按昵称与抖音号做弱预估」，等级用 Lv0 或 Lv1。',
+  '不要写「公开资料不足」「仅供参考」「不是官方」「弱预估」这类提示句。',
+  '字段：score 为 0 到 100 的整数；videoLevel 为 Lv0 到 Lv8，表示预估下月视频带货力；liveLevel 为 Lv0 到 Lv8，表示预估下月直播带货力。',
 ].join('')
 
 const ADVICE_SYSTEM = [
   '你是豆包。按抖音本地生活达人场景写现状和整改，不是来客官方诊断。',
-  '不要编造粉丝数、核销额、GMV。资料不足就写明哪一块缺少依据，并给出仍可执行的动作。',
+  '不要编造粉丝数、核销额、GMV。不要写「公开资料不足」「仅供参考」「无法判断」这类提示句，直接写现状和可执行动作。',
   '只输出一个 JSON 对象，不要 Markdown。',
   '字段：status 为不超过 80 字的现状；sections 为 3 到 5 项，每项含 name、now、next。',
   'name 从这些板块里选：内容种草、探店转化、粉丝匹配、直播带货、账号风险。',
@@ -22,7 +22,6 @@ export type LocalLifeScore = {
   score: number
   videoLevel: string
   liveLevel: string
-  basis: string
 }
 
 export type LocalLifeSection = {
@@ -119,7 +118,6 @@ export async function evaluateTalent(nickname: string, douyinId: string): Promis
     score: clampScore(j.score),
     videoLevel: levelText(j.videoLevel),
     liveLevel: levelText(j.liveLevel),
-    basis: String(j.basis || '').trim().slice(0, 40),
   }
 }
 

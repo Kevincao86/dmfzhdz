@@ -24,23 +24,27 @@ export default function TalentLocalLifeEvalPage() {
   const [evaluating, setEvaluating] = useState(false)
   const [advising, setAdvising] = useState(false)
   const [displayScore, setDisplayScore] = useState(0)
+  const [scorePop, setScorePop] = useState(false)
   const [score, setScore] = useState<LocalLifeScore | null>(null)
   const [advice, setAdvice] = useState<LocalLifeAdvice | null>(null)
   const [err, setErr] = useState('')
 
   useEffect(() => {
     if (!score) return
-    let cur = 0
     const goal = score.score
-    const timer = window.setInterval(() => {
-      cur += Math.max(1, Math.round((goal - cur) / 8))
-      if (cur >= goal) {
-        cur = goal
-        window.clearInterval(timer)
-      }
-      setDisplayScore(cur)
-    }, 40)
-    return () => window.clearInterval(timer)
+    const start = performance.now()
+    const dur = 1400
+    let frame = 0
+    setScorePop(false)
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / dur)
+      const eased = 1 - (1 - t) ** 3
+      setDisplayScore(Math.round(goal * eased))
+      if (t < 1) frame = requestAnimationFrame(tick)
+      else setScorePop(true)
+    }
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
   }, [score])
 
   async function onEvaluate() {
@@ -49,6 +53,7 @@ export default function TalentLocalLifeEvalPage() {
     setErr('')
     setScore(null)
     setAdvice(null)
+    setScorePop(false)
     setDisplayScore(0)
     try {
       const next = await evaluateTalent(nickname, douyinId)
@@ -92,25 +97,53 @@ export default function TalentLocalLifeEvalPage() {
       </div>
 
       <div className="surface-card rounded-xl border p-8 text-center">
-        <div
-          className="mx-auto flex h-44 w-44 items-center justify-center rounded-full"
-          style={{
-            background: `conic-gradient(#7c4dff ${displayScore}%, #efeaf8 0)`,
-            animation: evaluating ? 'talent-eval-spin 0.9s linear infinite' : undefined,
-          }}
-        >
-          <div className="flex h-36 w-36 items-center justify-center rounded-full bg-white">
-            <span className="text-5xl font-extrabold text-violet-700">{displayScore}</span>
+        <div className="relative mx-auto h-52 w-52">
+          <div
+            className="absolute inset-2 rounded-full blur-md"
+            style={{
+              background:
+                'conic-gradient(from 0deg, transparent 0 62%, rgba(124,77,255,0.55) 78%, transparent 92%)',
+              animation: evaluating ? 'talent-eval-spin 1.15s linear infinite' : undefined,
+              opacity: evaluating ? 1 : 0,
+            }}
+          />
+          <svg viewBox="0 0 200 200" className="relative h-full w-full -rotate-90">
+            <circle cx="100" cy="100" r="86" fill="none" stroke="#efeaf8" strokeWidth="14" />
+            <circle
+              cx="100"
+              cy="100"
+              r="86"
+              fill="none"
+              stroke="url(#talentEvalArc)"
+              strokeWidth="14"
+              strokeLinecap="round"
+              strokeDasharray={`${2 * Math.PI * 86}`}
+              strokeDashoffset={`${2 * Math.PI * 86 * (1 - displayScore / 100)}`}
+            />
+            <defs>
+              <linearGradient id="talentEvalArc" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#7c4dff" />
+                <stop offset="100%" stopColor="#c084fc" />
+              </linearGradient>
+            </defs>
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span
+              className="text-6xl font-extrabold tabular-nums text-violet-700"
+              style={{
+                animation: scorePop ? 'talent-eval-pop 0.55s cubic-bezier(0.2, 1.35, 0.36, 1)' : undefined,
+              }}
+            >
+              {displayScore}
+            </span>
           </div>
         </div>
-        <p className="mt-3 font-medium">豆包预估分</p>
-        <p className="mt-1 text-xs text-[var(--shell-muted)]">豆包预估，不是来客官方等级</p>
+        <p className="mt-3 font-medium">数据智能分析</p>
         {score ? (
           <div className="mt-4 space-y-1 text-sm">
             <p className="font-medium">预估下月带货等级</p>
             <p>视频带货力 {score.videoLevel}</p>
             <p>直播带货力 {score.liveLevel}</p>
-            {score.basis ? <p className="text-[var(--shell-muted)]">{score.basis}</p> : null}
           </div>
         ) : null}
       </div>
@@ -152,7 +185,7 @@ export default function TalentLocalLifeEvalPage() {
         </div>
       ) : null}
 
-      <style>{`@keyframes talent-eval-spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`@keyframes talent-eval-spin { to { transform: rotate(360deg); } } @keyframes talent-eval-pop { 0% { transform: scale(0.72); opacity: 0.4; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }`}</style>
     </div>
   )
 }
