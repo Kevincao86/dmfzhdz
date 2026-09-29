@@ -31,6 +31,8 @@ import {
   mpAuthEmailRegister,
   mpAuthBindEmailLogin,
   mpAuthBindPhoneSms,
+  mpAuthRebindEmailLogin,
+  mpAuthRebindPhoneSms,
   mpAuthChangePasswordBySms,
   mpAuthEnsureIdentity,
   mpAuthSwitchRole,
@@ -397,6 +399,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
             )
       const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, bound.account)
       sendJson(res, 200, { ok: true, token: bound.token, account: payload })
+      return
+    }
+
+    if (action === 'rebind_phone_sms' || action === 'rebind_email_login') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      const rebound =
+        action === 'rebind_phone_sms'
+          ? await mpAuthRebindPhoneSms(
+              supabaseUrl,
+              serviceRole,
+              sess.account.id,
+              String(body.phone || ''),
+              String(body.smsCode || ''),
+            )
+          : await mpAuthRebindEmailLogin(
+              supabaseUrl,
+              serviceRole,
+              sess.account.id,
+              String(body.email || ''),
+              String(body.emailCode || ''),
+            )
+      const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, rebound.account)
+      sendJson(res, 200, { ok: true, token: rebound.token, account: payload })
       return
     }
 
@@ -1660,6 +1690,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         'email_register',
         'bind_email_login',
         'bind_phone_sms',
+        'rebind_email_login',
+        'rebind_phone_sms',
         'change_password_sms',
         'register',
         'set_password',
@@ -1728,6 +1760,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       msg === 'phone_mismatch' ||
       msg === 'account_phone_missing' ||
       msg === 'phone_bind_failed' ||
+      msg === 'phone_taken' ||
+      msg === 'phone_unchanged' ||
+      msg === 'email_unchanged' ||
+      msg === 'account_email_missing' ||
       msg === 'wx_openid_conflict' ||
       msg === 'dy_openid_conflict' ||
       msg === 'invalid_password' ||
@@ -1774,6 +1810,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       wx_already_registered: '该微信已注册',
       wx_openid_already_bound: '该微信已绑定其他账号，请用原账号登录',
       phone_bind_failed: '手机号绑定失败，请重试',
+      phone_taken: '该手机号已被其他账号使用',
+      phone_unchanged: '新手机号与当前绑定相同',
+      email_unchanged: '新邮箱与当前绑定相同',
+      account_email_missing: '当前账号未绑定邮箱',
       wx_openid_conflict: '该微信已绑定其他手机号账号',
       dy_openid_conflict: '该抖音已绑定其他手机号账号',
       missing_openid: '缺少微信 openid，请重新登录后再试',

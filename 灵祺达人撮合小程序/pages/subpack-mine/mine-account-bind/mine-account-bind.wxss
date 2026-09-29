@@ -12,4 +12,5 @@
 .code { flex: 1; }
 .ghost { margin: 0; }
 .submit { margin-top: 20rpx; background: #f59e0b; color: #fff; }
+.submit--ghost { background: #fff; color: #b45309; border: 1px solid #f59e0b; }
 .err { display: block; margin-top: 16rpx; color: #dc2626; font-size: 24rpx; }

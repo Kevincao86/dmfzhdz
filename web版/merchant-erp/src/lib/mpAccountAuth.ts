@@ -1188,6 +1188,60 @@ export async function mpAuthBindPhoneSms(
   return mpAuthBindPhoneLogin(supabaseUrl, serviceRole, accountId, phoneNorm, platform)
 }
 
+/** 已绑定手机号后换成新号码。新号已被其他账号占用时不合并。 */
+export async function mpAuthRebindPhoneSms(
+  supabaseUrl: string,
+  serviceRole: string,
+  accountId: string,
+  phone: string,
+  smsCode: string,
+): Promise<{ token: string; account: MpAccountRow }> {
+  const rest = restClient(supabaseUrl, serviceRole)
+  const phoneNorm = normalizeMpLoginPhone(phone)
+  if (!phoneNorm) throw new Error('invalid_phone')
+  const code = String(smsCode || '').trim()
+  if (!/^\d{6}$/.test(code)) throw new Error('invalid_sms_code')
+  if (!(await verifyAuthSmsCode(phoneNorm, code))) throw new Error('sms_code_invalid')
+  const current = await findAccountById(rest, accountId)
+  if (!current) throw new Error('account_not_found')
+  const currentPhone = normalizeMpLoginPhone(String(current.login_name || ''))
+  if (!currentPhone) throw new Error('account_phone_missing')
+  if (currentPhone === phoneNorm) throw new Error('phone_unchanged')
+  const holder = await findAccountByLoginName(rest, phoneNorm)
+  if (holder && holder.id !== accountId) throw new Error('phone_taken')
+  await updateAccount(rest, accountId, { login_name: phoneNorm })
+  const next = (await findAccountById(rest, accountId))!
+  const token = await createSession(rest, next.id)
+  return { token, account: next }
+}
+
+/** 已绑定邮箱后换成新邮箱。新邮箱已被其他账号占用时不合并。 */
+export async function mpAuthRebindEmailLogin(
+  supabaseUrl: string,
+  serviceRole: string,
+  accountId: string,
+  email: string,
+  emailCode: string,
+): Promise<{ token: string; account: MpAccountRow }> {
+  const rest = restClient(supabaseUrl, serviceRole)
+  const mail = normalizeMpLoginEmail(email)
+  if (!mail) throw new Error('invalid_email')
+  const code = String(emailCode || '').trim()
+  if (!/^\d{6}$/.test(code)) throw new Error('invalid_email_code')
+  if (!verifyAuthEmailCode(mail, code)) throw new Error('email_code_invalid')
+  const current = await findAccountById(rest, accountId)
+  if (!current) throw new Error('account_not_found')
+  const currentMail = normalizeMpLoginEmail(String(current.login_name || ''))
+  if (!currentMail) throw new Error('account_email_missing')
+  if (currentMail === mail) throw new Error('email_unchanged')
+  const holder = await findAccountByLoginName(rest, mail)
+  if (holder && holder.id !== accountId) throw new Error('email_taken')
+  await updateAccount(rest, accountId, { login_name: mail })
+  const next = (await findAccountById(rest, accountId))!
+  const token = await createSession(rest, next.id)
+  return { token, account: next }
+}
+
 /** 已登录：手机号须与账号一致 + 验证码 → 更新密码 */
 export async function mpAuthChangePasswordBySms(
   supabaseUrl: string,

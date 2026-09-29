@@ -164,6 +164,22 @@ async function bindEmailLogin({ email, emailCode, platform }) {
   return accountMemberSync.afterAuthSuccess(data)
 }
 
+async function rebindPhoneSms({ phone, smsCode }) {
+  const data = await authPost('rebind_phone_sms', {
+    phone: String(phone || '').trim(),
+    smsCode: String(smsCode || '').trim(),
+  })
+  return accountMemberSync.afterAuthSuccess(data)
+}
+
+async function rebindEmailLogin({ email, emailCode }) {
+  const data = await authPost('rebind_email_login', {
+    email: String(email || '').trim(),
+    emailCode: String(emailCode || '').trim(),
+  })
+  return accountMemberSync.afterAuthSuccess(data)
+}
+
 async function setLoginCredentials(loginName, password) {
   return authPost('set_login_credentials', {
     loginName: String(loginName || '').trim(),
@@ -244,6 +260,8 @@ module.exports = {
   sendEmailCode,
   bindPhoneSms,
   bindEmailLogin,
+  rebindPhoneSms,
+  rebindEmailLogin,
   phoneRegister,
   readSessionToken,
   readAccount,

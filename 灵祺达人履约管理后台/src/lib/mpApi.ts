@@ -329,6 +329,16 @@ export async function bindEmailLogin(email: string, emailCode: string, platform:
   return { token: String(data.token), account: data.account as MpAccount }
 }
 
+export async function rebindPhoneSms(phone: string, smsCode: string) {
+  const data = await mpAuthRequest('rebind_phone_sms', { phone, smsCode })
+  return { token: String(data.token), account: data.account as MpAccount }
+}
+
+export async function rebindEmailLogin(email: string, emailCode: string) {
+  const data = await mpAuthRequest('rebind_email_login', { email, emailCode })
+  return { token: String(data.token), account: data.account as MpAccount }
+}
+
 export async function phoneRegister(input: {
   phone: string
   smsCode: string

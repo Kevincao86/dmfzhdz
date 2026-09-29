@@ -20,6 +20,7 @@ Page({
   data: {
     ids: readIds(null),
     kind: '',
+    editing: false,
     value: '',
     code: '',
     cooldown: 0,
@@ -70,7 +71,11 @@ Page({
       })
       return
     }
-    this.setData({ kind: id, value: '', code: '' })
+    this.setData({ kind: id, editing: false, value: '', code: '' })
+  },
+
+  onStartRebind() {
+    this.setData({ editing: true, value: '', code: '', err: '', hint: '' })
   },
 
   async bindWechat() {
@@ -139,10 +144,14 @@ Page({
     }
     const ids = this.data.ids || {}
     const platform = ids.douyin && !ids.wechat ? 'dy' : 'wx'
+    const replacing = !!this.data.editing
     this.setData({ busy: true, err: '' })
     try {
-      const data =
-        this.data.kind === 'phone'
+      const data = replacing
+        ? this.data.kind === 'phone'
+          ? await auth.rebindPhoneSms({ phone: this.data.value, smsCode: this.data.code })
+          : await auth.rebindEmailLogin({ email: this.data.value.trim(), emailCode: this.data.code })
+        : this.data.kind === 'phone'
           ? await auth.bindPhoneSms({ phone: this.data.value, smsCode: this.data.code, platform })
           : await auth.bindEmailLogin({
               email: this.data.value.trim(),
@@ -163,9 +172,10 @@ Page({
         busy: false,
         ids: next,
         kind: '',
+        editing: false,
         value: '',
         code: '',
-        hint: '已绑定。同一手机号或邮箱下的微信、抖音会并成一个账号。',
+        hint: replacing ? '已换绑' : '已绑定。同一手机号或邮箱下的微信、抖音会并成一个账号。',
       })
     } catch (e) {
       this.setData({ busy: false, err: String((e && e.message) || '绑定失败').slice(0, 40) })

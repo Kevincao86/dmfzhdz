@@ -3,6 +3,8 @@ import {
   bindEmailLogin,
   bindPhoneSms,
   fetchSession,
+  rebindEmailLogin,
+  rebindPhoneSms,
   sendEmailCode,
   sendRegisterSms,
 } from '../lib/mpApi'
@@ -22,6 +24,7 @@ function emailOk(raw: string) {
 export default function TalentAccountBindPanel() {
   const [acc, setAcc] = useState<MpAccount | null>(getAccount())
   const [kind, setKind] = useState<Kind | null>(null)
+  const [editing, setEditing] = useState(false)
   const [value, setValue] = useState('')
   const [code, setCode] = useState('')
   const [cooldown, setCooldown] = useState(0)
@@ -68,30 +71,36 @@ export default function TalentAccountBindPanel() {
     setCooldown(60)
   }
 
+  const boundNow = kind === 'phone' ? Boolean(ids?.phone) : kind === 'email' ? Boolean(ids?.email) : false
+
   const submit = async () => {
     if (!kind) return
     setBusy(true)
     setErr('')
     try {
-      const before = kind === 'phone' ? Boolean(ids?.phone) : Boolean(ids?.email)
-      const r =
-        kind === 'phone'
+      const replacing = boundNow && editing
+      const r = replacing
+        ? kind === 'phone'
+          ? await rebindPhoneSms(value.replace(/\D/g, ''), code.trim())
+          : await rebindEmailLogin(value.trim(), code.trim())
+        : kind === 'phone'
           ? await bindPhoneSms(value.replace(/\D/g, ''), code.trim(), platform)
           : await bindEmailLogin(value.trim(), code.trim(), platform)
       const token = r.token || getToken()
       if (token) setSession(token, r.account)
       setAcc(r.account)
       const after = kind === 'phone' ? Boolean(r.account.identities?.phone) : Boolean(r.account.identities?.email)
-      if (!after && !before) {
+      if (!replacing && !after && !boundNow) {
         setErr('该账号已有另一个登录名。同一手机号或邮箱会把微信、抖音并到已有账号，新的联系方式不能再单独挂上。')
         return
       }
       setKind(null)
+      setEditing(false)
       setValue('')
       setCode('')
-      setHint('已绑定。同一手机号或邮箱下的微信、抖音会并成一个账号。')
+      setHint(replacing ? '已换绑' : '已绑定。同一手机号或邮箱下的微信、抖音会并成一个账号。')
     } catch (e) {
-      setErr(formatMpApiErr(e, '绑定失败'))
+      setErr(formatMpApiErr(e, boundNow && editing ? '换绑失败' : '绑定失败'))
     } finally {
       setBusy(false)
     }
@@ -131,6 +140,7 @@ export default function TalentAccountBindPanel() {
                   return
                 }
                 setKind(it.id)
+                setEditing(false)
                 setValue('')
                 setCode('')
               }}
@@ -154,7 +164,22 @@ export default function TalentAccountBindPanel() {
         </p>
       ) : null}
       {hint ? <p className="mt-2 text-xs text-[var(--shell-muted)]">{hint}</p> : null}
-      {kind ? (
+      {kind && boundNow && !editing ? (
+        <button
+          type="button"
+          className="mt-3 w-full rounded-lg border border-amber-400 py-2 text-sm text-amber-700"
+          onClick={() => {
+            setEditing(true)
+            setValue('')
+            setCode('')
+            setErr('')
+            setHint('')
+          }}
+        >
+          换绑
+        </button>
+      ) : null}
+      {kind && (!boundNow || editing) ? (
         <form
           className="mt-3 space-y-2"
           onSubmit={(e) => {
@@ -164,7 +189,7 @@ export default function TalentAccountBindPanel() {
         >
           <input
             className="w-full rounded-lg border border-[var(--shell-border)] bg-transparent px-3 py-2 text-sm"
-            placeholder={kind === 'phone' ? '11 位手机号' : '邮箱'}
+            placeholder={kind === 'phone' ? (editing ? '新手机号' : '11 位手机号') : editing ? '新邮箱' : '邮箱'}
             value={value}
             onChange={(e) =>
               setValue(kind === 'phone' ? e.target.value.replace(/\D/g, '').slice(0, 11) : e.target.value)
@@ -192,7 +217,7 @@ export default function TalentAccountBindPanel() {
             disabled={busy}
             className="w-full rounded-lg bg-amber-500 py-2 text-sm text-white disabled:opacity-60"
           >
-            {busy ? '绑定中…' : '绑定'}
+            {busy ? '提交中…' : editing ? '确定' : '绑定'}
           </button>
         </form>
       ) : err ? (
