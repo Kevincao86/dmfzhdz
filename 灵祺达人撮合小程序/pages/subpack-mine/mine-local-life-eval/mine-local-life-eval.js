@@ -17,6 +17,14 @@ Page({
     avatarLetter: '达',
     nickname: '',
     douyinId: '',
+    platforms: [
+      { id: 'douyin', name: '抖音平台' },
+      { id: 'xiaohongshu', name: '小红书' },
+      { id: 'kuaishou', name: '快手' },
+      { id: 'dianping', name: '大众点评' },
+      { id: 'weixin_video', name: '微信视频号' },
+    ],
+    platformId: 'douyin',
     canEval: false,
     evaluating: false,
     advising: false,
@@ -44,6 +52,12 @@ Page({
     syncPageIdentity(this)
     this.loadIdentity()
     this.setData({ tabs: getTabList(userProfile.readIdentity()) })
+  },
+
+  onPlatform(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id || id === this.data.platformId) return
+    this.setData({ platformId: id, err: '' })
   },
 
   onTab(e) {

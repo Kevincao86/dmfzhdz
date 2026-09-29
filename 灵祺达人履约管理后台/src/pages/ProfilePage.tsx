@@ -108,8 +108,8 @@ export default function ProfilePage() {
       ? [
           {
             to: '/profile/local-life-eval',
-            label: '数据智能分析',
-            desc: '本地生活达人评分、下月带货等级与整改',
+            label: '达人账号分析',
+            desc: '抖音平台评分与整改，其他平台开放中',
           },
         ]
       : []),

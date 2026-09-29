@@ -8,6 +8,14 @@ import {
   type LocalLifeScore,
 } from '../lib/talentLocalLifeEval'
 
+const PLATFORMS = [
+  { id: 'douyin', name: '抖音平台' },
+  { id: 'xiaohongshu', name: '小红书' },
+  { id: 'kuaishou', name: '快手' },
+  { id: 'dianping', name: '大众点评' },
+  { id: 'weixin_video', name: '微信视频号' },
+] as const
+
 function letterOf(name: string) {
   const s = name.trim()
   return s ? s.slice(0, 1) : '达'
@@ -21,6 +29,7 @@ export default function TalentLocalLifeEvalPage() {
   const avatarUrl = String(getAccount()?.wxAvatarUrl || '').trim()
   const canEval = !!(nickname || douyinId)
 
+  const [platformId, setPlatformId] = useState<(typeof PLATFORMS)[number]['id']>('douyin')
   const [evaluating, setEvaluating] = useState(false)
   const [advising, setAdvising] = useState(false)
   const [displayScore, setDisplayScore] = useState(0)
@@ -80,9 +89,35 @@ export default function TalentLocalLifeEvalPage() {
   return (
     <div className="page-content-shell page-content-shell--narrow space-y-4">
       <header>
-        <h1 className="text-xl font-bold">达人抖音本地生活信息评估</h1>
+        <h1 className="text-xl font-bold">达人账号分析</h1>
       </header>
 
+      <div className="flex flex-wrap gap-2">
+        {PLATFORMS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className={
+              platformId === item.id
+                ? 'rounded-full bg-violet-600 px-3 py-1.5 text-sm font-medium text-white'
+                : 'rounded-full border border-violet-200 bg-white px-3 py-1.5 text-sm text-[var(--shell-muted)]'
+            }
+            onClick={() => {
+              setPlatformId(item.id)
+              setErr('')
+            }}
+          >
+            {item.name}
+          </button>
+        ))}
+      </div>
+
+      {platformId !== 'douyin' ? (
+        <div className="surface-card flex min-h-64 items-center justify-center rounded-xl border p-8">
+          <p className="text-base font-medium text-[var(--shell-muted)]">功能开放中</p>
+        </div>
+      ) : (
+      <>
       <div className="surface-card rounded-xl border p-8 text-center">
         {avatarUrl ? (
           <img src={avatarUrl} alt="" className="mx-auto h-20 w-20 rounded-full object-cover" />
@@ -195,6 +230,8 @@ export default function TalentLocalLifeEvalPage() {
           ))}
         </div>
       ) : null}
+      </>
+      )}
 
       <style>{`@keyframes talent-eval-spin { to { transform: rotate(360deg); } } @keyframes talent-eval-pop { 0% { transform: scale(0.72); opacity: 0.4; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }`}</style>
     </div>

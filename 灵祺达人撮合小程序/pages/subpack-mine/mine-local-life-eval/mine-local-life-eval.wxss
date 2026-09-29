@@ -1,5 +1,43 @@
 @import '../../../styles/xingxuan-subpage.wxss';
 
+.plats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  padding: 8rpx 24rpx 4rpx;
+}
+
+.plat {
+  padding: 10rpx 22rpx;
+  border-radius: 999rpx;
+  background: #fff;
+  color: #64748b;
+  font-size: 24rpx;
+  border: 2rpx solid #e8e4f4;
+  line-height: 1.4;
+}
+
+.plat--on {
+  background: #7c4dff;
+  color: #fff;
+  border-color: #7c4dff;
+  font-weight: 700;
+}
+
+.soon {
+  margin-top: 24rpx;
+  min-height: 420rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.soon-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
 .ident,
 .hero,
 .advice {
