@@ -28,6 +28,7 @@ import {
   Monitor,
   Mountain,
   PawPrint,
+  PenLine,
   Plane,
   Plus,
   Radio,
@@ -1311,8 +1312,46 @@ const STYLES: { id: StyleId; worlds: WorldId[]; name: string; visual: string }[]
 function worldOf(id: WorldId) {
   return WORLDS.find((w) => w.id === id) ?? WORLDS[0]!
 }
+/** 每个大类场景列表末尾都有这一张，不进预设表 */
+const CUSTOM_SCENE_ID = 'custom_scene'
+
+type CustomSceneDraft = {
+  name: string
+  hook: string
+  mustSee: string
+}
+
+const DEFAULT_CUSTOM_SCENE: CustomSceneDraft = {
+  name: '',
+  hook: '',
+  mustSee: '',
+}
+
+function customSceneFor(worldId: WorldId, draft: CustomSceneDraft): DramaScene {
+  return {
+    id: CUSTOM_SCENE_ID,
+    world: worldId,
+    name: draft.name.trim() || '自定义场景',
+    hook: draft.hook.trim() || '自己写这一场怎么开场',
+    mustSee: draft.mustSee.trim() || '按自定义场景和一句话故事出画面',
+    visual: '用户自定义场景。画面只按用户写的名称、钩子和必须出现的元素出，禁止套用其它预设场景。',
+    icon: PenLine,
+  }
+}
+
 function scenesOf(id: WorldId) {
-  return SCENES.filter((s) => s.world === id)
+  return [
+    ...SCENES.filter((s) => s.world === id),
+    {
+      id: CUSTOM_SCENE_ID,
+      world: id,
+      name: '自定义',
+      hook: '自己写场景名、钩子和画面',
+      mustSee: '',
+      visual: '',
+      icon: PenLine,
+    },
+  ]
 }
 function formulasOf(sceneId: string) {
   return FORMULAS.filter((f) => f.scene === sceneId)
@@ -2461,6 +2500,7 @@ export default function ShortDramaPage() {
   const [sceneId, setSceneId] = useState(SCENES[0]!.id)
   const [formulaId, setFormulaId] = useState(FORMULAS[0]!.id)
   const [customHook, setCustomHook] = useState<CustomHookDraft>(DEFAULT_CUSTOM_HOOK)
+  const [customScene, setCustomScene] = useState<CustomSceneDraft>(DEFAULT_CUSTOM_SCENE)
   const [styleId, setStyleId] = useState<StyleId>('smoke')
   const [shop, setShop] = useState<ShopFill>({ storeName: '', offerName: '', price: '', area: '' })
   const [story, setStory] = useState('')
@@ -2512,10 +2552,19 @@ export default function ShortDramaPage() {
   const visibleScenes = scenesOf(worldId)
   const visibleFormulas = formulasOf(sceneId)
   const visibleStyles = stylesOf(worldId)
-  const scene = SCENES.find((s) => s.id === sceneId) ?? visibleScenes[0] ?? SCENES[0]!
+  const scene =
+    sceneId === CUSTOM_SCENE_ID
+      ? customSceneFor(worldId, customScene)
+      : (SCENES.find((s) => s.id === sceneId) ?? visibleScenes.find((s) => s.id !== CUSTOM_SCENE_ID) ?? SCENES[0]!)
   const formula =
-    formulaId === CUSTOM_FORMULA_ID
-      ? resolveCustomFormula(sceneId, customHook, { story, roles, conflict, dialogue })
+    sceneId === CUSTOM_SCENE_ID || formulaId === CUSTOM_FORMULA_ID
+      ? resolveCustomFormula(
+          scene.id,
+          sceneId === CUSTOM_SCENE_ID && !customHook.name.trim()
+            ? { ...customHook, name: customScene.name.trim() || '自定义钩子' }
+            : customHook,
+          { story, roles, conflict, dialogue },
+        )
       : FORMULAS.find((f) => f.id === formulaId) ?? visibleFormulas[0] ?? FORMULAS[0]!
   const style = STYLES.find((s) => s.id === styleId) ?? visibleStyles[0] ?? STYLES[0]!
   const hookLabel =
@@ -2530,21 +2579,29 @@ export default function ShortDramaPage() {
             : '戏剧钩子'
   const durationSelected = isDramaDurationSelected(durationSec)
   const hookSelected =
-    formulaId === CUSTOM_FORMULA_ID
-      ? Boolean(customHook.name.trim())
-      : Boolean(formulaId && FORMULAS.some((f) => f.id === formulaId))
+    sceneId === CUSTOM_SCENE_ID
+      ? Boolean(customScene.name.trim() || customHook.name.trim())
+      : formulaId === CUSTOM_FORMULA_ID
+        ? Boolean(customHook.name.trim())
+        : Boolean(formulaId && FORMULAS.some((f) => f.id === formulaId))
   const storyWriteGate = useMemo(() => {
     if (!hookSelected && !durationSelected) {
-      return formulaId === CUSTOM_FORMULA_ID
-        ? `请先填写${hookLabel}名称，并选择成片时长`
-        : `请先选择${hookLabel}，并选择成片时长`
+      return sceneId === CUSTOM_SCENE_ID
+        ? '请先填写自定义场景名称，并选择成片时长'
+        : formulaId === CUSTOM_FORMULA_ID
+          ? `请先填写${hookLabel}名称，并选择成片时长`
+          : `请先选择${hookLabel}，并选择成片时长`
     }
     if (!hookSelected) {
-      return formulaId === CUSTOM_FORMULA_ID ? `请先填写${hookLabel}名称` : `请先选择${hookLabel}`
+      return sceneId === CUSTOM_SCENE_ID
+        ? '请先填写自定义场景名称'
+        : formulaId === CUSTOM_FORMULA_ID
+          ? `请先填写${hookLabel}名称`
+          : `请先选择${hookLabel}`
     }
     if (!durationSelected) return '请先选择成片时长'
     return null
-  }, [hookSelected, durationSelected, hookLabel, formulaId])
+  }, [hookSelected, durationSelected, hookLabel, formulaId, sceneId])
   const longPlan = useMemo(
     () => planLongformSegmentDurations(Math.min(MAX_DRAMA_TOTAL_SEC, Math.max(5, durationSec))),
     [durationSec],
@@ -3401,6 +3458,7 @@ export default function ShortDramaPage() {
     setWorldId(nextWorldId)
     setSceneId(nextScene.id)
     setFormulaId(nextFormula.id)
+    setCustomScene(DEFAULT_CUSTOM_SCENE)
     setStyleId(nextWorld.defaultStyle)
     clearTrial()
     setResultPreviewUrl(null)
@@ -4231,12 +4289,22 @@ export default function ShortDramaPage() {
             {visibleScenes.map((s) => {
               const Icon = s.icon
               const on = s.id === sceneId
+              const customCard = s.id === CUSTOM_SCENE_ID
+              const cardName = customCard ? customScene.name.trim() || '自定义' : s.name
+              const cardHook = customCard ? customScene.hook.trim() || s.hook : s.hook
               return (
                 <button
                   key={s.id}
                   type="button"
                   disabled={busy}
                   onClick={() => {
+                    if (customCard) {
+                      setSceneId(CUSTOM_SCENE_ID)
+                      setFormulaId(CUSTOM_FORMULA_ID)
+                      clearTrial()
+                      setResultPreviewUrl(null)
+                      return
+                    }
                     const nextFormula = formulasOf(s.id)[0] ?? formula
                     setSceneId(s.id)
                     setFormulaId(nextFormula.id)
@@ -4245,19 +4313,70 @@ export default function ShortDramaPage() {
                     applyTemplate(s, nextFormula, shop)
                   }}
                   className={cn(
-                    'rounded-2xl border bg-white p-3 text-left transition active:scale-[0.99]',
+                    'rounded-2xl border p-3 text-left transition active:scale-[0.99]',
+                    customCard ? 'border-dashed' : 'bg-white',
                     on
                       ? 'border-cyan-600 bg-cyan-50'
-                      : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50',
+                      : customCard
+                        ? 'border-slate-300 bg-slate-50 hover:border-cyan-300 hover:bg-white'
+                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50',
                   )}
                 >
                   <Icon className="h-4 w-4 text-slate-500" />
-                  <p className="mt-2 text-sm font-medium text-slate-900">{s.name}</p>
-                  <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-slate-500">{s.hook}</p>
+                  <p className="mt-2 text-sm font-medium text-slate-900">{cardName}</p>
+                  <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-slate-500">{cardHook}</p>
                 </button>
               )
             })}
           </div>
+          {sceneId === CUSTOM_SCENE_ID ? (
+            <div className="mt-3 space-y-3 rounded-xl border border-dashed border-cyan-200 bg-cyan-50/40 p-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-slate-700">场景名称</span>
+                  <input
+                    className={fieldCls}
+                    disabled={busy}
+                    value={customScene.name}
+                    onChange={(e) => {
+                      clearTrial()
+                      setCustomScene((p) => ({ ...p, name: e.target.value }))
+                    }}
+                    placeholder="例如：深夜档口收摊"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-slate-700">开场钩子</span>
+                  <input
+                    className={fieldCls}
+                    disabled={busy}
+                    value={customScene.hook}
+                    onChange={(e) => {
+                      clearTrial()
+                      setCustomScene((p) => ({ ...p, hook: e.target.value }))
+                    }}
+                    placeholder="这一场前三秒怎么抓住人"
+                  />
+                </label>
+              </div>
+              <label className="block space-y-1.5">
+                <span className="text-xs font-medium text-slate-700">画面里必须出现</span>
+                <input
+                  className={fieldCls}
+                  disabled={busy}
+                  value={customScene.mustSee}
+                  onChange={(e) => {
+                    clearTrial()
+                    setCustomScene((p) => ({ ...p, mustSee: e.target.value }))
+                  }}
+                  placeholder="例如：卷帘门、剩汤、路灯"
+                />
+              </label>
+              <p className="text-[11px] leading-snug text-slate-500">
+                只用于当前这个大类。成片按这里写的场景出，不再套用上面的预设场景。
+              </p>
+            </div>
+          ) : null}
           </div>
 
           <div className="short-drama-create__work grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">

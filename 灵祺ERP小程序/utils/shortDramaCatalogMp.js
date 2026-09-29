@@ -310,7 +310,16 @@ const DEFAULT_STYLE = {
 }
 
 function scenesOf(worldId) {
-  return SCENES.filter((s) => s.world === worldId)
+  return SCENES.filter((s) => s.world === worldId).concat([
+    {
+      id: 'custom_scene',
+      world: worldId,
+      name: '自定义',
+      hook: '自己写场景名、钩子和画面',
+      mustSee: '',
+      visual: '',
+    },
+  ])
 }
 
 function stylesOf(worldId) {
@@ -328,7 +337,20 @@ function styleOf(id) {
   return STYLES.find((s) => s.id === id) || STYLES[0]
 }
 
-function sceneOf(id) {
+function sceneOf(id, draft) {
+  if (id === 'custom_scene') {
+    const name = String((draft && draft.name) || '').trim() || '自定义场景'
+    const hook = String((draft && draft.hook) || '').trim() || '自己写这一场怎么开场'
+    const mustSee = String((draft && draft.mustSee) || '').trim() || '按自定义场景和一句话故事出画面'
+    return {
+      id: 'custom_scene',
+      world: '',
+      name,
+      hook,
+      mustSee,
+      visual: '用户自定义场景。画面只按用户写的名称、钩子和必须出现的元素出，禁止套用其它预设场景。',
+    }
+  }
   return SCENES.find((s) => s.id === id) || SCENES[0]
 }
 

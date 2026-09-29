@@ -31,6 +31,15 @@
       >{{item.name}}</text>
     </view>
     <text class="op-body muted">钩子：{{sceneHook}}</text>
+    <block wx:if="{{sceneId === 'custom_scene'}}">
+      <text class="op-label">场景名称</text>
+      <input class="op-input" placeholder="例如：深夜档口收摊" value="{{customSceneName}}" bindinput="onCustomSceneName" />
+      <text class="op-label">开场钩子</text>
+      <input class="op-input" placeholder="这一场前三秒怎么抓住人" value="{{customSceneHook}}" bindinput="onCustomSceneHook" />
+      <text class="op-label">画面里必须出现</text>
+      <input class="op-input" placeholder="例如：卷帘门、剩汤、路灯" value="{{customSceneMustSee}}" bindinput="onCustomSceneMust" />
+      <text class="op-body muted">只用于当前这个大类。成片按这里写的场景出，不再套用预设场景。</text>
+    </block>
   </view>
 
   <view class="op-card">

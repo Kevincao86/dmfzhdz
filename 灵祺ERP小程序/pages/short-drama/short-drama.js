@@ -58,6 +58,9 @@ Page({
     styles: packStyles('catering', catalog.defaultStyleId('catering')),
     styleId: catalog.defaultStyleId('catering'),
     sceneHook: catalog.sceneOf('hotpot').hook,
+    customSceneName: '',
+    customSceneHook: '',
+    customSceneMustSee: '',
     shop: emptyShop(),
     story: '',
     dialogue: '',
@@ -112,6 +115,9 @@ Page({
       styles: packStyles(world.id, styleId),
       styleId,
       sceneHook: scene.hook,
+      customSceneName: '',
+      customSceneHook: '',
+      customSceneMustSee: '',
       shop: emptyShop(),
     })
   },
@@ -134,12 +140,35 @@ Page({
   onScene(e) {
     const id = e.currentTarget.dataset.id
     if (!id || id === this.data.sceneId) return
-    const scene = catalog.sceneOf(id)
+    const scene = catalog.sceneOf(id, {
+      name: this.data.customSceneName,
+      hook: this.data.customSceneHook,
+      mustSee: this.data.customSceneMustSee,
+    })
     this.setData({
       scenes: packScenes(this.data.worldId, id),
       sceneId: id,
       sceneHook: scene.hook,
     })
+  },
+
+  onCustomSceneName(e) {
+    const name = e.detail.value
+    const scene = catalog.sceneOf('custom_scene', {
+      name,
+      hook: this.data.customSceneHook,
+      mustSee: this.data.customSceneMustSee,
+    })
+    this.setData({ customSceneName: name, sceneHook: scene.hook })
+  },
+
+  onCustomSceneHook(e) {
+    const hook = e.detail.value
+    this.setData({ customSceneHook: hook, sceneHook: hook || '自己写这一场怎么开场' })
+  },
+
+  onCustomSceneMust(e) {
+    this.setData({ customSceneMustSee: e.detail.value })
   },
 
   onField(e) {
@@ -267,7 +296,11 @@ Page({
   async onAiStory() {
     if (this.data.storyBusy) return
     const world = catalog.worldOf(this.data.worldId)
-    const scene = catalog.sceneOf(this.data.sceneId)
+    const scene = catalog.sceneOf(this.data.sceneId, {
+      name: this.data.customSceneName,
+      hook: this.data.customSceneHook,
+      mustSee: this.data.customSceneMustSee,
+    })
     const shop = this.data.shop || emptyShop()
     this.setData({ storyBusy: true, err: '' })
     try {
@@ -417,7 +450,11 @@ Page({
   async onGenerate() {
     if (this.data.busy) return
     const world = catalog.worldOf(this.data.worldId)
-    const scene = catalog.sceneOf(this.data.sceneId)
+    const scene = catalog.sceneOf(this.data.sceneId, {
+      name: this.data.customSceneName,
+      hook: this.data.customSceneHook,
+      mustSee: this.data.customSceneMustSee,
+    })
     const shop = this.data.shop || emptyShop()
     const total = Math.min(catalog.MAX_DRAMA_TOTAL_SEC, Number(this.data.durationSec) || 0)
     if (!total) {
