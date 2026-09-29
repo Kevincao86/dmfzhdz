@@ -1528,6 +1528,11 @@ shellNavConfig
 灵祺达人撮合小程序/pages/mine/mine.wxml
 灵祺达人撮合小程序/pages/mine/mine.wxss
 灵祺达人撮合小程序/pages/subpack-mine/mine-subscriptions/
+灵祺达人撮合小程序/pages/subpack-mine/mine-wechat-oa-bind/
+web版/merchant-erp/api/meoo-ops-mp-wechat-oa-bind.ts
+web版/merchant-erp/src/lib/mpWechatOaBindingCore.ts
+web版/merchant-erp/src/lib/mpCalendarReminderCore.ts
+灵祺达人撮合小程序/utils/mpWechatOaBindApi.js
 灵祺达人撮合小程序/app.json
 tabBarConfig
 custom-tab-bar

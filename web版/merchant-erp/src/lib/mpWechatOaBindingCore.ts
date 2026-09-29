@@ -35,15 +35,35 @@ function pruneTickets(data: RegistrySnapshot): RegistryMpWechatOaBindTicket[] {
   })
 }
 
-function findMember(data: RegistrySnapshot, talentMemberId: string): RegistryMpTalentMember | null {
-  const id = String(talentMemberId || '').trim()
+function findListedMember(data: RegistrySnapshot, memberId: string): RegistryMpTalentMember | null {
+  const id = String(memberId || '').trim()
   if (!id) return null
   for (const m of data.mpTalentMembers ?? []) {
     if (!m) continue
     if (String(m.id) === id) return m
     if (m.lingqiTalentId && String(m.lingqiTalentId) === id) return m
   }
+  for (const u of data.mpPrUsers ?? []) {
+    if (!u) continue
+    if (String(u.id) === id || (u.lingqiPrId && String(u.lingqiPrId) === id)) {
+      return { id: String(u.id), wxOpenId: u.wxOpenId, lingqiTalentId: u.lingqiPrId } as RegistryMpTalentMember
+    }
+  }
+  const teams = [...(data.shootTeamLibraryEntries ?? []), ...(data.editTeamLibraryEntries ?? [])]
+  for (const e of teams) {
+    if (!e) continue
+    const keys = [e.id, e.memberId, e.lingqiTeamId, e.lingqiTalentId].map((x) => String(x || '').trim())
+    if (!keys.includes(id)) continue
+    return {
+      id: String(e.memberId || e.id),
+      lingqiTalentId: String(e.lingqiTalentId || e.lingqiTeamId || ''),
+    } as RegistryMpTalentMember
+  }
   return null
+}
+
+function findMember(data: RegistrySnapshot, talentMemberId: string): RegistryMpTalentMember | null {
+  return findListedMember(data, talentMemberId)
 }
 
 export function oaOpenIdForTalentMember(data: RegistrySnapshot, talentMemberId: string): string {
@@ -73,6 +93,7 @@ export function wechatOaBindStatusInSnapshot(
 export async function createWechatOaBindTicketInSnapshot(
   data: RegistrySnapshot,
   talentMemberId: string,
+  opts?: { allowUnlisted?: boolean },
 ): Promise<
   | { ok: true; ticket: string; sceneStr: string; qrUrl: string; expiresAt: string }
   | { ok: false; error: string; status: number; message?: string }
@@ -82,7 +103,9 @@ export async function createWechatOaBindTicketInSnapshot(
 
   const memberId = String(talentMemberId || '').trim()
   if (!memberId) return { ok: false, error: 'invalid_talent_member_id', status: 400 }
-  if (!findMember(data, memberId)) return { ok: false, error: 'member_not_found', status: 404 }
+  if (!findMember(data, memberId) && !opts?.allowUnlisted) {
+    return { ok: false, error: 'member_not_found', status: 404 }
+  }
 
   const ticket = newTicketId()
   const sceneStr = ticket.length <= SCENE_MAX ? ticket : ticket.slice(0, SCENE_MAX)

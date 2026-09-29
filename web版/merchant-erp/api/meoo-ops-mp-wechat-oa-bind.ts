@@ -97,13 +97,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    const talentMemberId = String(
-      body.talentMemberId || session.account.registry_member_id || '',
-    ).trim()
+    const sessionMemberId = String(session.account.registry_member_id || '').trim()
+    const talentMemberId = String(body.talentMemberId || sessionMemberId).trim()
     if (!talentMemberId) {
       sendOpsJson(res, 400, { ok: false, error: 'missing_talent_member_id' })
       return
     }
+    const ownIds = new Set(
+      [
+        session.account.registry_member_id,
+        session.account.registry_pr_id,
+        session.account.lingqi_talent_id,
+        session.account.lingqi_pr_id,
+      ]
+        .map((id) => String(id || '').trim())
+        .filter(Boolean),
+    )
+    const allowUnlisted = ownIds.has(talentMemberId)
 
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
@@ -119,7 +129,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
 
     if (action === 'create_ticket') {
-      const created = await createWechatOaBindTicketInSnapshot(data, talentMemberId)
+      const created = await createWechatOaBindTicketInSnapshot(data, talentMemberId, { allowUnlisted })
       if (!created.ok) {
         sendOpsJson(res, created.status, {
           ok: false,

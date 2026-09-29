@@ -199,7 +199,7 @@ const BIZ_GROUP_DEFS = [
   {
     id: 'account',
     title: '账号与通知',
-    keys: ['accountBind', 'subscriptions', 'targetedInvites', 'prQuotes'],
+    keys: ['accountBind', 'wechatOaBind', 'subscriptions', 'targetedInvites', 'prQuotes'],
   },
   {
     id: 'deal',
@@ -274,6 +274,7 @@ function talentMenusForIdentity(identity) {
     return withManualMenu([
       { key: 'profile', label: '拍摄团队信息', sub: '团队资料 · 设备 · 作品集', icon: 'info' },
       { key: 'accountBind', label: '账号绑定', sub: '微信 · 抖音 · 手机号 · 邮箱', icon: 'info' },
+      { key: 'wechatOaBind', label: '服务号通知', sub: '关注服务号，邀约和日程提醒推到微信', icon: 'star' },
       { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
       { key: 'orderCalendar', label: '商单日历', sub: calSub, icon: 'chart' },
       { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
@@ -291,6 +292,7 @@ function talentMenusForIdentity(identity) {
     return withManualMenu([
       { key: 'profile', label: '剪辑团队信息', sub: '团队资料 · 风格 · 作品集', icon: 'info' },
       { key: 'accountBind', label: '账号绑定', sub: '微信 · 抖音 · 手机号 · 邮箱', icon: 'info' },
+      { key: 'wechatOaBind', label: '服务号通知', sub: '关注服务号，邀约和日程提醒推到微信', icon: 'star' },
       { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
       { key: 'orderCalendar', label: '商单日历', sub: calSub, icon: 'chart' },
       { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
@@ -327,6 +329,7 @@ function buildPrMenus() {
   return withManualMenu([
     { key: 'prProfile', label: '我的 PR 信息', sub: '机构/个人资料与所在城市', icon: 'info' },
     { key: 'accountBind', label: '账号绑定', sub: '微信 · 抖音 · 手机号 · 邮箱', icon: 'info' },
+    { key: 'wechatOaBind', label: '服务号通知', sub: '关注服务号，邀约和日程提醒推到微信', icon: 'star' },
     { key: 'prOrders', label: '我的发单', sub: '已发布的招募订单', icon: 'list' },
     { key: 'orderCalendar', label: '商单日历', sub: calSub, icon: 'chart' },
     TRAINING_MENU,

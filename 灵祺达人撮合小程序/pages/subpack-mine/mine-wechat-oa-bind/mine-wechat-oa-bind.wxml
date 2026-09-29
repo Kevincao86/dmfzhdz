@@ -11,13 +11,13 @@
 
   <view wx:elif="{{needLogin}}" class="oa-bind-card">
     <text class="oa-bind-card__title">请先登录</text>
-    <text class="oa-bind-card__desc">登录并完成达人资料后，即可绑定服务号接收邀约通知。</text>
+    <text class="oa-bind-card__desc">登录并完成资料后，即可绑定服务号接收通知。</text>
     <button class="oa-bind-btn oa-bind-btn--primary" bindtap="onGoLogin">去登录</button>
   </view>
 
   <view wx:elif="{{needProfile}}" class="oa-bind-card">
-    <text class="oa-bind-card__title">请先完善达人资料</text>
-    <text class="oa-bind-card__desc">绑定服务号需要关联您的达人账号，请先在「我的信息」保存资料。</text>
+    <text class="oa-bind-card__title">请先完善资料</text>
+    <text class="oa-bind-card__desc">绑定服务号需要关联当前身份账号，请先在「我的信息」保存资料。</text>
     <button class="oa-bind-btn oa-bind-btn--primary" bindtap="onGoProfile">去完善资料</button>
   </view>
 

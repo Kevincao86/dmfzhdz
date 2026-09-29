@@ -298,8 +298,8 @@ export async function processDueCalendarReminders(): Promise<{
   if (!due.length) return { processed: 0, sent: 0, failed: 0 }
 
   let registry: Awaited<ReturnType<ReturnType<typeof createRegistrySnapshotIoFetch>['load']>> | null = null
-  const resolveOaOpenId = (ownerKey: string, ownerRole: string): string => {
-    if (ownerRole !== 'talent' || !registry) return ''
+  const resolveOaOpenId = (ownerKey: string, _ownerRole: string): string => {
+    if (!registry || !ownerKey) return ''
     return oaOpenIdForTalentMember(registry, ownerKey)
   }
 

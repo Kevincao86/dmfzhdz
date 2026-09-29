@@ -14,7 +14,7 @@ async function call(body) {
       throw new Error('登录已过期，请重新登录')
     }
     if (code === 'member_not_found') {
-      throw new Error('未找到达人资料，请先在「我的信息」完善并保存')
+      throw new Error('未找到当前身份资料，请先在「我的信息」完善并保存')
     }
     if (code === 'wx_oa_not_configured') {
       throw new Error('服务号通知暂未开通，请联系管理员')

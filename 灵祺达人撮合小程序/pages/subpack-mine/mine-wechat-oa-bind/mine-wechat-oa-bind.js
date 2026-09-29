@@ -112,7 +112,7 @@ Page({
     }
     const talentMemberId = this.talentId()
     if (!talentMemberId) {
-      wx.showToast({ title: '请先完善达人资料', icon: 'none' })
+      wx.showToast({ title: '请先完善资料', icon: 'none' })
       return
     }
     this.setData({ creating: true })
