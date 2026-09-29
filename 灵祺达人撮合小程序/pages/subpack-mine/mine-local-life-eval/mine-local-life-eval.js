@@ -69,23 +69,7 @@ Page({
     const id = e.currentTarget.dataset.id
     if (!id || id === this.data.platformId) return
     this.stopTick()
-    this._score = null
-    this.setData({
-      platformId: id,
-      err: '',
-      scoreReady: false,
-      adviceReady: false,
-      situations: [],
-      sections: [],
-      displayScore: 0,
-      scorePop: false,
-      videoLevel: '',
-      liveLevel: '',
-      showGrade: false,
-      gradeKey: '',
-      gradeLabel: '',
-      gradeNote: '',
-    })
+    this.setData({ platformId: id, err: '' })
     this.loadIdentity(id)
   },
 
@@ -135,6 +119,45 @@ Page({
       basis: evalApi.describeEvalBasis(input),
       canEval: !!(input.nickname || input.accountId),
     })
+    if (!this.data.evaluating) this.restoreSaved(input)
+  },
+
+  restoreSaved(input) {
+    const saved = evalApi.readSavedTalentEval(input)
+    if (!saved) {
+      this._score = null
+      this.setData({
+        scoreReady: false,
+        adviceReady: false,
+        situations: [],
+        sections: [],
+        displayScore: 0,
+        scorePop: false,
+        videoLevel: '',
+        liveLevel: '',
+        showGrade: false,
+        gradeKey: '',
+        gradeLabel: '',
+        gradeNote: '',
+      })
+      return
+    }
+    const grade = input.platformId === 'douyin' ? evalApi.douyinScoreGrade(saved.score.score) : null
+    this._score = saved.score
+    this.setData({
+      scoreReady: true,
+      displayScore: saved.score.score,
+      scorePop: false,
+      videoLevel: saved.score.videoLevel,
+      liveLevel: saved.score.liveLevel,
+      situations: saved.score.situations || [],
+      adviceReady: !!(saved.advice && saved.advice.sections && saved.advice.sections.length),
+      sections: saved.advice ? saved.advice.sections : [],
+      showGrade: !!grade,
+      gradeKey: grade ? grade.key : '',
+      gradeLabel: grade ? grade.label : '',
+      gradeNote: grade ? grade.note : '',
+    })
   },
 
   stopTick() {
@@ -166,23 +189,10 @@ Page({
   async onEvaluate() {
     if (!this.data.canEval || this.data.evaluating || this.data.advising) return
     this.stopTick()
-    this.setData({
-      evaluating: true,
-      err: '',
-      scoreReady: false,
-      adviceReady: false,
-      scorePop: false,
-      displayScore: 0,
-      situations: [],
-      sections: [],
-      showGrade: false,
-      gradeKey: '',
-      gradeLabel: '',
-      gradeNote: '',
-    })
+    this.setData({ evaluating: true, err: '' })
     try {
       const input = this._input || this.accountInput()
-      const score = await evalApi.evaluateTalent(input)
+      const score = await evalApi.evaluateTalent(input, { force: true })
       this._score = score
       const grade = input.platformId === 'douyin' ? evalApi.douyinScoreGrade(score.score) : null
       this.setData({
@@ -208,7 +218,7 @@ Page({
     if (!this.data.scoreReady || this.data.evaluating || this.data.advising) return
     this.setData({ advising: true, err: '' })
     try {
-      const advice = await evalApi.adviseTalent(this._input || this.accountInput(), this._score)
+      const advice = await evalApi.adviseTalent(this._input || this.accountInput(), this._score, { force: true })
       this.setData({
         advising: false,
         adviceReady: true,

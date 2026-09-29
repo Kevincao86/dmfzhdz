@@ -68,7 +68,7 @@
 
   <view class="eval-dock">
     <button class="btn-main" loading="{{evaluating}}" disabled="{{!canEval || evaluating || advising}}" bindtap="onEvaluate">
-      达人信息评估
+      {{evaluating ? '评估中…' : (scoreReady ? '重新评估' : '达人信息评估')}}
     </button>
     <button class="btn-sub" loading="{{advising}}" disabled="{{!scoreReady || evaluating || advising}}" bindtap="onAdvise">
       分析整改

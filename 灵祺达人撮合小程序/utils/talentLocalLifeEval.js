@@ -111,11 +111,12 @@ const PLATFORM_SPECS = {
 }
 
 const ADVICE_SYSTEM = [
-  '你是豆包。按已给出的达人现状写整改建议，不要再复述现状。',
-  '不要编造粉丝数、核销额、GMV。未在资料里出现的数字不要写进来。',
+  '你是豆包。这是达人自己看的体检，按现状写给达人本人的改法，用「你」来写。',
+  '不要用商家口吻，不要写合作、履约、核销、不建议合作。',
+  '不要编造粉丝数、GMV。未在资料里出现的数字不要写进来。',
   '不要写「公开资料不足」「仅供参考」「无法判断」这类提示句。',
   '只输出一个 JSON 对象，不要 Markdown。',
-  '字段：sections 为 3 到 5 项，每项只含 name、next。next 不超过 40 字，只写接下来怎么改。',
+  '字段：sections 为 3 到 5 项，每项只含 name、next。next 不超过 40 字，只写你接下来怎么改。',
   'name 与现状里的板块一致。',
 ].join('')
 
@@ -229,10 +230,10 @@ function scoreFromBlocks(spec, blocks, risk) {
 }
 
 const DOUYIN_SCORE_GRADES = [
-  { key: 'excellent', range: '85~100', label: '优秀', note: '头部达人，稳定高核销' },
-  { key: 'good', range: '70~84', label: '良好', note: '可合作，有明确短板，需要约定履约标准' },
-  { key: 'fix', range: '60~69', label: '待整改', note: '谨慎合作，必须强约束' },
-  { key: 'risk', range: '＜60', label: '高危', note: '不建议合作' },
+  { key: 'excellent', range: '85~100', label: '优秀', note: '内容和带货都比较稳，按现在的节奏继续发' },
+  { key: 'good', range: '70~84', label: '良好', note: '整体能看，把报告里标出的短板补一补会更稳' },
+  { key: 'fix', range: '60~69', label: '待整改', note: '短板比较明显，先按报告把内容改到位' },
+  { key: 'risk', range: '＜60', label: '高危', note: '现在接单容易吃力，先把内容和账号基础补上' },
 ]
 
 function douyinScoreGrade(score) {
@@ -471,9 +472,36 @@ function readCache(key) {
   }
 }
 
-function writeCache(key, patch) {
-  const prev = readCache(key) || {}
+function writeCache(key, patch, replace) {
+  const prev = replace ? {} : readCache(key) || {}
   wx.setStorageSync(key, JSON.stringify({ ...prev, ...patch }))
+}
+
+function savedFromCache(cached) {
+  if (!cached || !cached.videoLevel || !cached.liveLevel || !Array.isArray(cached.situations) || !cached.situations.length) {
+    return null
+  }
+  const adviceRaw = cached.advice
+  let advice = null
+  if (adviceRaw && Array.isArray(adviceRaw.sections)) {
+    const sections = mapSuggestions(adviceRaw.sections)
+    if (sections.length) advice = { sections }
+  }
+  return {
+    score: {
+      score: clampScore(cached.score),
+      videoLevel: levelText(cached.videoLevel),
+      liveLevel: levelText(cached.liveLevel),
+      situations: mapSituations(cached.situations),
+    },
+    advice,
+  }
+}
+
+function readSavedTalentEval(raw) {
+  const row = normalizeInput(raw).row
+  if (!row.nickname && !row.accountId) return null
+  return savedFromCache(readCache(cacheKey(row)))
 }
 
 function buildScore(spec, j) {
@@ -486,31 +514,26 @@ function buildScore(spec, j) {
   }
 }
 
-async function evaluateTalent(raw) {
+async function evaluateTalent(raw, opts) {
   const packed = normalizeInput(raw)
   const spec = packed.spec
   const row = packed.row
   if (!row.nickname && !row.accountId) throw new Error(`请先填写${spec.nickLabel}或${spec.accountLabel}`)
   const key = cacheKey(row)
-  const cached = readCache(key)
-  if (cached && cached.videoLevel && cached.liveLevel && Array.isArray(cached.situations) && cached.situations.length) {
-    return {
-      score: clampScore(cached.score),
-      videoLevel: levelText(cached.videoLevel),
-      liveLevel: levelText(cached.liveLevel),
-      situations: mapSituations(cached.situations),
-    }
+  if (!(opts && opts.force)) {
+    const saved = savedFromCache(readCache(key))
+    if (saved) return saved.score
   }
   const j = await askDoubaoJson(
     scoreSystem(spec),
-    `${accountFacts(spec, row)}\n请按权重给各板块 points，并给出 risk 和各板块现状。现状只根据上面已填写的资料来写。`,
+    `${accountFacts(spec, row)}\n请按权重给各板块 points，并给出 risk 和各板块现状。现状用达人自己能看懂的话来写，不要写给商家的合作判断。`,
   )
   const score = buildScore(spec, j)
-  writeCache(key, score)
+  writeCache(key, score, true)
   return score
 }
 
-async function adviseTalent(raw, score) {
+async function adviseTalent(raw, score, opts) {
   if (!score || !Array.isArray(score.situations) || !score.situations.length) {
     throw new Error('请先完成达人信息评估')
   }
@@ -518,14 +541,16 @@ async function adviseTalent(raw, score) {
   const spec = packed.spec
   const row = packed.row
   const key = cacheKey(row)
-  const cached = readCache(key)
-  if (cached && cached.advice && Array.isArray(cached.advice.sections) && cached.advice.sections.length) {
-    return { sections: mapSuggestions(cached.advice.sections) }
+  if (!(opts && opts.force)) {
+    const cached = readCache(key)
+    if (cached && cached.advice && Array.isArray(cached.advice.sections) && cached.advice.sections.length) {
+      return { sections: mapSuggestions(cached.advice.sections) }
+    }
   }
   const lines = score.situations.map((item) => `${item.name}：${item.now}`).join('\n')
   const j = await askDoubaoJson(
     ADVICE_SYSTEM,
-    `${accountFacts(spec, row)}\n评分：${score.score}/100，${spec.levelA} ${score.videoLevel}，${spec.levelB} ${score.liveLevel}。\n现状：\n${lines}\n请只给出整改建议。建议只针对已填写的资料，不要编造粉丝或成交数字。`,
+    `${accountFacts(spec, row)}\n评分：${score.score}/100，${spec.levelA} ${score.videoLevel}，${spec.levelB} ${score.liveLevel}。\n现状：\n${lines}\n请只写给达人本人的改法。`,
   )
   const advice = { sections: mapSuggestions(j.sections) }
   writeCache(key, { advice })
@@ -539,4 +564,5 @@ module.exports = {
   describeEvalBasis,
   DOUYIN_SCORE_GRADES,
   douyinScoreGrade,
+  readSavedTalentEval,
 }

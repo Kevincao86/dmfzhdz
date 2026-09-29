@@ -8,6 +8,7 @@ import {
   douyinScoreGrade,
   evaluateTalent,
   platformEvalMeta,
+  readSavedTalentEval,
   type EvalAccountInput,
   type LocalLifeAdvice,
   type LocalLifeScore,
@@ -51,13 +52,42 @@ export default function TalentLocalLifeEvalPage() {
   const [advising, setAdvising] = useState(false)
   const [displayScore, setDisplayScore] = useState(0)
   const [scorePop, setScorePop] = useState(false)
+  const [animateScore, setAnimateScore] = useState(false)
   const [score, setScore] = useState<LocalLifeScore | null>(null)
   const [advice, setAdvice] = useState<LocalLifeAdvice | null>(null)
   const [err, setErr] = useState('')
   const grade = platformId === 'douyin' && score ? douyinScoreGrade(score.score) : null
+  const savedKey = [
+    platformId,
+    nickname,
+    accountId,
+    input.followers,
+    input.profileLink,
+    (input.tags || []).join(','),
+    input.salesLevel,
+    input.talentGrade,
+    input.quotePrice,
+  ].join('|')
 
   useEffect(() => {
-    if (!score) return
+    const saved = readSavedTalentEval(input)
+    setErr('')
+    if (!saved) {
+      setScore(null)
+      setAdvice(null)
+      setDisplayScore(0)
+      setScorePop(false)
+      setAnimateScore(false)
+      return
+    }
+    setAnimateScore(false)
+    setScore(saved.score)
+    setAdvice(saved.advice)
+    setDisplayScore(saved.score.score)
+  }, [savedKey])
+
+  useEffect(() => {
+    if (!score || !animateScore) return
     const goal = score.score
     const start = performance.now()
     const dur = 1400
@@ -72,18 +102,18 @@ export default function TalentLocalLifeEvalPage() {
     }
     frame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frame)
-  }, [score])
+  }, [score, animateScore])
 
   async function onEvaluate() {
     if (!canEval || evaluating || advising) return
     setEvaluating(true)
     setErr('')
-    setScore(null)
-    setAdvice(null)
-    setScorePop(false)
-    setDisplayScore(0)
     try {
-      const next = await evaluateTalent(input)
+      const next = await evaluateTalent(input, { force: true })
+      setAdvice(null)
+      setAnimateScore(true)
+      setDisplayScore(0)
+      setScorePop(false)
       setScore(next)
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
@@ -97,7 +127,7 @@ export default function TalentLocalLifeEvalPage() {
     setAdvising(true)
     setErr('')
     try {
-      setAdvice(await adviseTalent(input, score))
+      setAdvice(await adviseTalent(input, score, { force: true }))
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
@@ -121,14 +151,7 @@ export default function TalentLocalLifeEvalPage() {
                 ? 'inline-flex items-center gap-1.5 rounded-full bg-violet-600 py-1 pl-1 pr-3 text-sm font-medium text-white'
                 : 'inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-white py-1 pl-1 pr-3 text-sm text-[var(--shell-muted)]'
             }
-            onClick={() => {
-              setPlatformId(item.id)
-              setErr('')
-              setScore(null)
-              setAdvice(null)
-              setDisplayScore(0)
-              setScorePop(false)
-            }}
+            onClick={() => setPlatformId(item.id)}
           >
             <img src={item.icon} alt="" className="h-5 w-5 rounded bg-white object-contain" />
             {item.name}
@@ -258,7 +281,7 @@ export default function TalentLocalLifeEvalPage() {
           disabled={!canEval || evaluating || advising}
           onClick={() => void onEvaluate()}
         >
-          {evaluating ? '评估中…' : '达人信息评估'}
+          {evaluating ? '评估中…' : score ? '重新评估' : '达人信息评估'}
         </button>
         <button
           type="button"
