@@ -600,7 +600,7 @@ export default function MeooLayout() {
           <div className="mx-auto flex max-w-[1400px] flex-col items-center gap-1.5">
             <p className="flex flex-wrap justify-center gap-x-4 text-xs text-slate-400">
               <NavLink to="/help" className="transition-colors hover:text-slate-600">
-                帮助手册
+                使用说明
               </NavLink>
               <NavLink to="/team" className="transition-colors hover:text-slate-600">
                 关于我们

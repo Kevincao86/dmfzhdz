@@ -5,6 +5,7 @@
     "pages/dashboard/dashboard",
     "pages/ai-agent/ai-agent",
     "pages/mine/mine",
+    "pages/usage-guide/usage-guide",
     "pages/legal/legal",
     "pages/home/home",
     "pages/module-detail/module-detail",

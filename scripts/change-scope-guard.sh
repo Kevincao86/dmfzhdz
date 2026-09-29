@@ -38,6 +38,8 @@ list_scopes() {
   recommend_hall    推荐大厅全部达人池（慎用，见 recommend-all-talents-lock）
   mp_auth           小程序登录/会话
   talent_account_bind  达人/星选账号绑定（微信抖音手机邮箱）与商单日历服务号提醒发送
+  product_usage_guide  商家 ERP、商家小程序、星选、达人小程序的使用说明
+  usage_guide       商家ERP、商家小程序、星选、达人小程序的使用说明
   ai_vision_workshop AI视觉工坊（DR增值嵌入 + 撮合小程序原生页 + 会员权限位）
   form_relay_share   转发代收「复制分享」短链（微信 genwxashortlink + 详情页路径）
   merchant_ai_ops_mix 商家 ERP：AI运营方案 + AI混剪去重
@@ -314,6 +316,39 @@ meoo-ops-mp-auth
 mpSession
 auth.js
 pages/login/
+PAT
+      ;;
+    usage_guide)
+      cat <<'PAT'
+productUsageGuide
+ProductUsageGuide
+HelpManualPage
+LoginPortalNav
+MeooLayout
+AppShell.tsx
+ProfilePage.tsx
+usage-guide
+灵祺ERP小程序/pages/mine/mine.js
+灵祺ERP小程序/app.json
+mine-manual
+灵祺达人撮合小程序/pages/mine/mine.js
+change-scope-guard
+PAT
+      ;;
+    product_usage_guide)
+      cat <<'PAT'
+productUsageGuide
+ProductUsageGuide
+HelpManualPage
+MeooLayout
+AppShell.tsx
+ProfilePage.tsx
+usage-guide
+灵祺ERP小程序/app.json
+灵祺ERP小程序/pages/mine/mine.js
+mine-manual
+灵祺达人撮合小程序/pages/mine/mine.js
+change-scope-guard
 PAT
       ;;
     talent_account_bind)

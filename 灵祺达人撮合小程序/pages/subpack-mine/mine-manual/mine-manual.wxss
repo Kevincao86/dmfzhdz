@@ -4,6 +4,12 @@
   padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
 }
 
+.manual-step {
+  display: block;
+  margin-top: 8rpx;
+  line-height: 1.6;
+}
+
 .manual-hero .title-lg {
   display: block;
   margin-bottom: 8rpx;

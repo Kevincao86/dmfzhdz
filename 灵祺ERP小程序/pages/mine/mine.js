@@ -10,6 +10,14 @@ const PROFILE_KEY = 'meoo_merchant_profile_v1'
 
 const BASE_MENU = [
   {
+    id: 'usage',
+    title: '使用说明',
+    desc: '功能与操作方式',
+    iconKey: 'book',
+    tone: 'cyan',
+    url: '/pages/usage-guide/usage-guide',
+  },
+  {
     id: 'settings',
     title: '系统设置',
     desc: '平台连接、账号与订阅',
@@ -327,7 +335,7 @@ Page({
       return
     }
     if (!url) return
-    if (url.indexOf('profile-edit') >= 0) {
+    if (url.indexOf('profile-edit') >= 0 || url.indexOf('usage-guide') >= 0) {
       wx.navigateTo({ url })
       return
     }

@@ -1,7 +1,12 @@
 <scroll-view class="manual-page" scroll-y enhanced show-scrollbar="{{false}}">
   <view class="card manual-hero">
     <text class="title-lg">{{productName}}</text>
-    <text class="hint">运营台维护的图文使用手册 · 微信 / 抖音小程序同步展示</text>
+    <text class="hint">当前功能与操作方式</text>
+  </view>
+
+  <view class="card manual-article" wx:for="{{guides}}" wx:key="title">
+    <text class="section-title section-title--plain">{{item.title}}</text>
+    <text class="hint manual-step" wx:for="{{item.steps}}" wx:for-item="step" wx:key="*this">{{index + 1}}. {{step}}</text>
   </view>
 
   <view wx:if="{{loading}}" class="card manual-state">

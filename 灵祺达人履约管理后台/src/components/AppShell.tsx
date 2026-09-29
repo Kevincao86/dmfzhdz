@@ -156,7 +156,7 @@ export default function AppShell() {
         </main>
         <footer className="app-site-footer">
           <p className="xx-footer-links">
-            <NavLink to="/help">帮助手册</NavLink>
+            <NavLink to="/help">使用说明</NavLink>
             <NavLink to="/team">关于我们</NavLink>
             <NavLink to="/legal/privacy">隐私政策</NavLink>
           </p>

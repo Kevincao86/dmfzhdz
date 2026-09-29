@@ -87,8 +87,8 @@ const PR_MENU_KEYS = new Set(['prOrders', 'prProfile', 'formRelay', 'cooperation
 
 const MANUAL_MENU = {
   key: 'manual',
-  label: '使用手册',
-  sub: '运营台图文手册 · 与帮助手册同步',
+  label: '使用说明',
+  sub: '功能与操作方式',
   icon: 'manual',
 }
 

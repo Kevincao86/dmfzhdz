@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import LoginPortalNav from '../components/login/LoginPortalNav'
+import ProductUsageGuide from '../components/ProductUsageGuide'
 import RichContentView from '../components/RichContentView'
 import { fetchHelpManualPublic } from '../lib/helpManualApi'
 import {
@@ -91,12 +92,15 @@ export default function HelpManualPage({ edition }: Props) {
           </Link>
         </div>
         <div className="mx-auto max-w-6xl px-4 pb-8 pt-2 sm:px-6">
-          <h1 className="text-2xl font-bold sm:text-3xl">帮助手册</h1>
-          <p className="mt-2 text-sm text-white/70">{product} 使用指南与常见问题</p>
+          <h1 className="text-2xl font-bold sm:text-3xl">使用说明</h1>
+          <p className="mt-2 text-sm text-white/70">{product} 的功能与操作方式</p>
         </div>
       </header>
 
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 lg:flex-row">
+      <div className="mx-auto max-w-6xl px-4 pt-8 sm:px-6">
+        <ProductUsageGuide edition={edition} />
+      </div>
+      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 pb-8 sm:px-6 lg:flex-row">
         <aside className="w-full shrink-0 rounded-xl border border-slate-200 bg-white p-3 lg:w-56">
           <p className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-slate-400">分类</p>
           {loading ? <p className="px-2 py-4 text-sm text-slate-500">加载中…</p> : null}

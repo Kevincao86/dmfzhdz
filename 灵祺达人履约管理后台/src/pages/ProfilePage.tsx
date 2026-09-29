@@ -193,7 +193,7 @@ export default function ProfilePage() {
       label: '数据分析',
       desc: isPr ? '发单与转化概况' : '报名与发单概况',
     },
-    { to: '/help', label: '帮助中心', desc: '使用说明与常见问题' },
+    { to: '/help', label: '使用说明', desc: '功能与操作方式' },
     { to: '/profile/support', label: '小灵同学', desc: '我的客服与常见问题' },
   ]
 

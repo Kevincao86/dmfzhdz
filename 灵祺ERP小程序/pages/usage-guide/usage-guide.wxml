@@ -1,0 +1,7 @@
+<scroll-view class="page" scroll-y>
+  <text class="lead">商家小程序：下面是当前功能，以及对应的操作方式。</text>
+  <view class="card" wx:for="{{sections}}" wx:key="title">
+    <text class="card-title">{{item.title}}</text>
+    <text class="step" wx:for="{{item.steps}}" wx:for-item="step" wx:key="*this">{{index + 1}}. {{step}}</text>
+  </view>
+</scroll-view>
